@@ -1,95 +1,60 @@
-From: greycat@whiteboxes.ch (Mikhail Yakshin)
-Date: Thu, 30 Jul 2015 12:45:41 +0300
-Subject: ARM: dts: sunxi: Regulators at common board layouts
-Message-ID: <55B9F245.2000300@whiteboxes.ch>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Thu, 30 Jul 2015 10:46:11 +0100
+Subject: [PATCH 02/12] [media] dvb-pll: Add support for THOMSON DTT7546X
+ tuner.
+In-Reply-To: <20150722141040.2be3ca98@recife.lan>
+References: <1435158670-7195-1-git-send-email-peter.griffin@linaro.org>
+ <1435158670-7195-3-git-send-email-peter.griffin@linaro.org>
+ <20150722141040.2be3ca98@recife.lan>
+Message-ID: <20150730094611.GC488@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Mauro,
 
-I've been analyzing various boards based on Allwinner A20 CPU and
-X-Powers AXP209 PMU (to make a proper configuration for our board,
-Whitebox Labs Watermelon).
+On Wed, 22 Jul 2015, Mauro Carvalho Chehab wrote:
 
-There are some things very common and some things pretty different on
-various boards.
+> Em Wed, 24 Jun 2015 16:11:00 +0100
+> Peter Griffin <peter.griffin@linaro.org> escreveu:
+> 
+> > This is used in conjunction with the STV0367 demodulator on
+> > the STV0367-NIM-V1.0 NIM card which can be used with the STi
+> > STB SoC's.
+> > 
+> > This tuner has a fifth register, so some changes have been made
+> > to accommodate this.
+> > 
+> > Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> > ---
+> >  drivers/media/dvb-frontends/dvb-pll.c | 74 +++++++++++++++++++++++++++++------
+> >  drivers/media/dvb-frontends/dvb-pll.h |  1 +
+> >  2 files changed, 64 insertions(+), 11 deletions(-)
+> > 
+> > diff --git a/drivers/media/dvb-frontends/dvb-pll.c b/drivers/media/dvb-frontends/dvb-pll.c
+> > index 6d8fe88..f7381c7 100644
+> > --- a/drivers/media/dvb-frontends/dvb-pll.c
+> > +++ b/drivers/media/dvb-frontends/dvb-pll.c
+> > @@ -141,6 +141,35 @@ static struct dvb_pll_desc dvb_pll_thomson_dtt7520x = {
+> >  	},
+> >  };
+> >  
+> > +static void thomson_dtt7546x_bw(struct dvb_frontend *fe, u8 *buf)
+> > +{
+> > +	/* set CB2 reg - set ATC, XTO */
+> > +	buf[4] = 0xc3;
+> > +}
+> > +
+> > +static struct dvb_pll_desc dvb_pll_thomson_dtt7546x = {
+> > +	.name  = "Thomson dtt7546x",
+> > +	.min   = 44250000,
+> > +	.max   = 863250000,
+> > +	.set   = thomson_dtt7546x_bw,
+> > +	.iffreq= 36166667,
+> 
+> Whitespace is missing. Please check the patchs with scripts/checkpatch.pl.
 
-Namely, there's agreement on that DCDC2 and DCDC3 and used for CPU
-voltages (VDD-CPU and (VDD-SYS=VDD-INT)+VDD-DLL respectively) on all
-boards I've analyzed (Olimex boards, Cubieboard / Cubietruck, BananaPi,
-PCDuino, Watermelon, etc) and probably it should be kept this way.
+Will fix in V2.
 
-However, what puzzles me the most so far is LDO1 regulator. According to
-[AXP209 datasheet, p. 13, p. 23][1] and all the boards I've
-investigated, it's used exclusively for powering VDD-RTC input of A20
-CPU that supports internal CPU's RTC. LDO1 gets very special status in
-AXP209 - basically, it's as close to "always on" (even on backup
-battery) as possible the purpose of timekeeping.
+regards,
 
-According to the same spec, LDO1 allows 2 distinct voltage choices: 1.3V
-and 3.3V. However, according to the [A20 datasheet][2], VDD-RTC (pin K8)
-has absolute minimum and maximum voltage ratings of 3.0V. I'm not sure
-how is it supposed to work together, given that X-Powers AXP209 and
-Allwinner A20 is basically produced by different branches the same
-company and are meant to be totally compatible.
-
-What's even more weird, is that all configurations I've encountered so
-far (i.e. FEX configurations for 3.4 sunxi kernel and DTS for modern
-mainline kernels) use hard locked 1.3V setting for LDO1. For example,
-kernel 3.4:
-
-/sys/devices/platform/sunxi-i2c.0/i2c-0/0-0034/axp20-regulator.21/regulator/regulator.1/
-name    axp20_ldo1
-microvolts      1300000
-min_microvolts  1300000
-max_microvolts  1300000
-
-and similar construction in mainline DTSes:
-
-    vdd_rtc: ldo1 {
-            regulator-min-microvolt = <1300000>;
-            regulator-max-microvolt = <1300000>;
-            regulator-always-on;
-    };
-
-or in axp209.dtsi:
-
-    reg_ldo1: ldo1 {
-            /* LDO1 is a fixed output regulator */
-            regulator-always-on;
-            regulator-min-microvolt = <1300000>;
-            regulator-max-microvolt = <1300000>;
-            regulator-name = "ldo1";
-    };
-
-If we'll take a look at default power-on setup for AXP209 in the
-datasheet (page 24), we'll see that it's determined by LDO1SET pin. If
-it's connected to GND, then LDO1 will start with 1.3V, if it's connected
-to VINT, then it would be 3.3V.
-
-I've analyzed all the schematics I found in public:
-
-* Older Olimex schematics (Lime rev C, Lime rev D, Lime2 rev B) state
-that LDO1 line is "3V3/30mA". LDO1SET is grounded.
-* Newer Olimex schematics (Lime2 rev C) call that "1V3/30mA". LDO1SET is
-grounded.
-* All Bananapi and Cubieboard schematics look very similar and seem to
-be originating from the same source (reference Allwinner design?) and do
-not hint any voltages. LDO1SET is grounded.
-
-Can someone explain to me how does it work / supposed to work?
-
-[1]: http://linux-sunxi.org/images/8/89/AXP209_Datasheet_v1.0en.pdf
-[2]:
-https://github.com/OLIMEX/OLINUXINO/raw/master/HARDWARE/A20-PDFs/A20%20Datasheet%20v1.0%2020130227.pdf
-
--- 
-WBR, Mikhail Yakshin
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150730/ee55ae82/attachment.sig>
+Peter.
