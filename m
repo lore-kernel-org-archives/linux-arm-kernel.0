@@ -1,39 +1,75 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 30 Jul 2015 02:21:50 +0200
-Subject: [PATCH 04/20] ARM: at91/dt: at91rm9200: use slow clock where necessary
+Date: Thu, 30 Jul 2015 02:21:47 +0200
+Subject: [PATCH 01/20] Documentation: dt: atmel-at91: add clocks to system
+ timer, rstc and shdwc
 In-Reply-To: <1438215726-27452-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1438215726-27452-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1438215726-27452-5-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1438215726-27452-2-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The system timer and the RTC need the slow clock, add it.
+The system timer (at91rm9200), the reset controller and the shutdown
+controller need an input clock. This is the slow clock and they will not
+function without it.
+
+Also fix the shutdown controller example.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
-Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
- arch/arm/boot/dts/at91rm9200.dtsi | 2 ++
- 1 file changed, 2 insertions(+)
+Cc: Sebastian Reichel <sre@kernel.org>
+Cc: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+Cc: linux-pm at vger.kernel.org
+ Documentation/devicetree/bindings/arm/atmel-at91.txt | 11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/at91rm9200.dtsi b/arch/arm/boot/dts/at91rm9200.dtsi
-index e3cfb9972f54..385e0c36dece 100644
---- a/arch/arm/boot/dts/at91rm9200.dtsi
-+++ b/arch/arm/boot/dts/at91rm9200.dtsi
-@@ -359,6 +359,7 @@
- 				compatible = "atmel,at91rm9200-st", "syscon", "simple-mfd";
- 				reg = <0xfffffd00 0x100>;
- 				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
-+				clocks = <&slow_xtal>;
+diff --git a/Documentation/devicetree/bindings/arm/atmel-at91.txt b/Documentation/devicetree/bindings/arm/atmel-at91.txt
+index 424ac8cbfa08..209710cdf3aa 100644
+--- a/Documentation/devicetree/bindings/arm/atmel-at91.txt
++++ b/Documentation/devicetree/bindings/arm/atmel-at91.txt
+@@ -50,6 +50,7 @@ System Timer (ST) required properties:
+ - reg: Should contain registers location and length
+ - interrupts: Should contain interrupt for the ST which is the IRQ line
+   shared across all System Controller members.
++- clocks: phandle to input clock.
+ Its subnodes can be:
+ - watchdog: compatible should be "atmel,at91rm9200-wdt"
  
- 				watchdog {
- 					compatible = "atmel,at91rm9200-wdt";
-@@ -369,6 +370,7 @@
- 				compatible = "atmel,at91rm9200-rtc";
- 				reg = <0xfffffe00 0x40>;
- 				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
-+				clocks = <&slow_xtal>;
- 				status = "disabled";
- 			};
+@@ -89,12 +90,14 @@ RSTC Reset Controller required properties:
+ - compatible: Should be "atmel,<chip>-rstc".
+   <chip> can be "at91sam9260" or "at91sam9g45"
+ - reg: Should contain registers location and length
++- clocks: phandle to input clock.
  
+ Example:
+ 
+ 	rstc at fffffd00 {
+ 		compatible = "atmel,at91sam9260-rstc";
+ 		reg = <0xfffffd00 0x10>;
++		clocks = <&clk32k>;
+ 	};
+ 
+ RAMC SDRAM/DDR Controller required properties:
+@@ -117,6 +120,7 @@ required properties:
+ - compatible: Should be "atmel,<chip>-shdwc".
+   <chip> can be "at91sam9260", "at91sam9rl" or "at91sam9x5".
+ - reg: Should contain registers location and length
++- clocks: phandle to input clock.
+ 
+ optional properties:
+ - atmel,wakeup-mode: String, operation mode of the wakeup mode.
+@@ -135,9 +139,10 @@ optional at91sam9x5 properties:
+ 
+ Example:
+ 
+-	rstc at fffffd00 {
+-		compatible = "atmel,at91sam9260-rstc";
+-		reg = <0xfffffd00 0x10>;
++	shdwc at fffffd10 {
++		compatible = "atmel,at91sam9260-shdwc";
++		reg = <0xfffffd10 0x10>;
++		clocks = <&clk32k>;
+ 	};
+ 
+ Special Function Registers (SFR)
 -- 
 2.1.4
