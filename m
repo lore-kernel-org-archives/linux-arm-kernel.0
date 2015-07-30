@@ -1,58 +1,82 @@
-From: slash.tmp@free.fr (Mason)
-Date: Thu, 30 Jul 2015 14:53:54 +0200
-Subject: arch/arm/kernel/setup.c does not compile at -O0
-Message-ID: <55BA1E62.9080103@free.fr>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 30 Jul 2015 14:13:59 +0100
+Subject: [PATCH] ARM64: PCI: do not enable resources on PROBE_ONLY systems
+Message-ID: <1438262039-32085-1-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello everyone,
+On ARM64 PROBE_ONLY PCI systems resources are not currently claimed,
+therefore they can't be enabled since they do not have a valid
+parent pointer; this in turn prevents enabling PCI devices on
+ARM64 PROBE_ONLY systems, causing PCI devices initialization to
+fail.
 
-I'm trying to debug a live kernel (v3.14) using a DS-5 JTAG probe.
+To solve this issue, resources must be claimed when devices are
+added on PROBE_ONLY systems, which ensures that the resource hierarchy
+is validated and the resource tree is sane, but this requires changes
+in the ARM64 resource management that can affect adversely existing
+PCI set-ups (claiming resources on !PROBE_ONLY systems might break
+existing ARM64 PCI platform implementations).
 
-In order to make the control flow easier to follow, I disabled
-optimizations by adding
+As a temporary solution in preparation for a proper resources claiming
+implementation in ARM64 core, to enable PCI PROBE_ONLY systems on ARM64,
+this patch adds a pcibios_enable_device() arch implementation that
+simply prevents enabling resources on PROBE_ONLY systems (mirroring ARM
+behaviour).
 
-  subdir-ccflags-y := -O0
+This is always a safe thing to do because on PROBE_ONLY systems the
+configuration space set-up can be considered immutable, and it is in
+preparation of proper resource claiming that would finally validate
+the PCI resources tree in the ARM64 arch implementation on PROBE_ONLY
+systems.
 
-to arch/arm/kernel/Makefile
+For !PROBE_ONLY systems resources enablement in pcibios_enable_device()
+on ARM64 is implemented as in current PCI core, leaving the behaviour
+unchanged.
 
-With that change, linking fails:
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+---
+Bjorn, all,
 
-arch/arm/kernel/setup.c:924: undefined reference to `psci_smp_ops'
+as I mention in the commit log, this patch is a temporary solution
+in preparation for proper resources claiming in ARM64, so that
+we can safely enable the PCI generic host controller on ARM64 systems.
 
-      if (psci_smp_available())
-        smp_set_ops(&psci_smp_ops);
+It mirrors ARM implementation and I will work on changing both
+ARM and ARM64 to convert them to proper resources claiming in
+the respective implementations.
 
-#ifdef CONFIG_ARM_PSCI
-void psci_init(void);
-bool psci_smp_available(void);
-#else
-static inline void psci_init(void) { }
-static inline bool psci_smp_available(void) { return false; }
-#endif
+Lorenzo
 
-The optimizer is able to remove the entire block, but this
-does not happen when optimizations are disabled.
+ arch/arm64/kernel/pci.c | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-Is compiling at -O0 not supported?
-
-
-My larger problem: the DS-5 debugger refuses to show the value
-of local variables. As a work-around, I can make some variables
-global, but it's really inconvenient.
-
-I checked that CONFIG_FRAME_POINTER=y
-and source files are compiled with -g
-
-arm-linux-gnueabihf-gcc -Wp,-MD,init/.main.o.d  -nostdinc -isystem /opt/gcc-linaro-2014.11/bin/../lib/gcc/arm-linux-gnueabihf/4.9.3/include -I/opt/linux/arch/arm/include -Iarch/arm/include/generated  -Iinclude -I/opt/linux/arch/arm/include/uapi -Iarch/arm/include/generated/uapi -I/opt/linux/include/uapi -Iinclude/generated/uapi -include /opt/linux/include/linux/kconfig.h -D__KERNEL__ -mlittle-endian -Iarch/arm/mach-tangox/include -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs -fno-strict-aliasing -fno-common -Werror-implicit-function-declaration -Wno-format-security -fno-delete-null-pointer-checks -std=gnu89 -O2 -fno-dwarf2-cfi-asm -fno-omit-frame-pointer -mapcs -mno-sched-prolog -mabi=aapcs-linux -mno-thumb-interwork -mfpu=vfp -marm -D__LINUX_ARM_ARCH__=7 -march=armv7-a -msoft-float -Uarm -Wframe-larger-than=1024 -fno-stack-protector -Wno-unused-but-set-variable -fno-omit-frame-pointer -fno-optimize-sibling-calls -fno-var-tracking-assignments -g -Wdeclaration-after-statement -Wno-
- p
-ointer-sign -fno-strict-overflow -fconserve-stack -Werror=implicit-int -Werror=strict-prototypes -Werror=date-time -DCC_HAVE_ASM_GOTO -O0    -D"KBUILD_STR(s)=#s" -D"KBUILD_BASENAME=KBUILD_STR(main)"  -D"KBUILD_MODNAME=KBUILD_STR(main)" -c -o init/main.o init/main.c
-
-
-Any idea how I can get DS-5 to properly handle local variables?
-
-
-I'm trying to convert an old-style board config to a device tree,
-and I can't even get serial to work... :-(
-
-Regards.
+diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+index 4095379..b3d098b 100644
+--- a/arch/arm64/kernel/pci.c
++++ b/arch/arm64/kernel/pci.c
+@@ -38,6 +38,19 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
+ 	return res->start;
+ }
+ 
++/**
++ * pcibios_enable_device - Enable I/O and memory.
++ * @dev: PCI device to be enabled
++ * @mask: bitmask of BARs to enable
++ */
++int pcibios_enable_device(struct pci_dev *dev, int mask)
++{
++	if (pci_has_flag(PCI_PROBE_ONLY))
++		return 0;
++
++	return pci_enable_resources(dev, mask);
++}
++
+ /*
+  * Try to assign the IRQ number from DT when adding a new device
+  */
+-- 
+2.2.1
