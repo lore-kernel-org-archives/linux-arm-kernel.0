@@ -1,10 +1,10 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 30 Jul 2015 13:43:39 +0530
-Subject: [PATCH 6/7] ARM: dts: dra7-evm: Fix spurious card insert/removal
+Date: Thu, 30 Jul 2015 13:43:40 +0530
+Subject: [PATCH 7/7] ARM: dts: dra72-evm: Fix spurious card insert/removal
  interrupt
 In-Reply-To: <1438244020-4244-1-git-send-email-kishon@ti.com>
 References: <1438244020-4244-1-git-send-email-kishon@ti.com>
-Message-ID: <1438244020-4244-7-git-send-email-kishon@ti.com>
+Message-ID: <1438244020-4244-8-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -20,14 +20,14 @@ Fix it by making ldo1_reg as always_on.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- arch/arm/boot/dts/dra7-evm.dts |    1 +
+ arch/arm/boot/dts/dra72-evm.dts |    1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/dra7-evm.dts b/arch/arm/boot/dts/dra7-evm.dts
-index 25f0a00..a6c82e5 100644
---- a/arch/arm/boot/dts/dra7-evm.dts
-+++ b/arch/arm/boot/dts/dra7-evm.dts
-@@ -358,6 +358,7 @@
+diff --git a/arch/arm/boot/dts/dra72-evm.dts b/arch/arm/boot/dts/dra72-evm.dts
+index c5d8e7d..45f11a0 100644
+--- a/arch/arm/boot/dts/dra72-evm.dts
++++ b/arch/arm/boot/dts/dra72-evm.dts
+@@ -295,6 +295,7 @@
  					regulator-name = "ldo1";
  					regulator-min-microvolt = <1800000>;
  					regulator-max-microvolt = <3300000>;
