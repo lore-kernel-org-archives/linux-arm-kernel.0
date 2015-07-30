@@ -1,35 +1,48 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 30 Jul 2015 15:35:56 +0200
-Subject: [PATCH 1/2] ARM: ux500: move ASIC ID remap to ITCM area
-Message-ID: <1438263356-29705-1-git-send-email-linus.walleij@linaro.org>
+Date: Thu, 30 Jul 2015 15:36:06 +0200
+Subject: [PATCH 2/2] ARM: ux500: simplify and move debug UART
+Message-ID: <1438263366-29756-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Ux500 does not have ITCM memory so we can remap the ASIC ID
-at 0xfffe0000 to get that remap out of the vmalloc area.
+The debug UART code defined three different virtual addresses
+while only one is ever used. Get rid of this, and move the
+UART remapping to 0xfffe8000 where DTCM reside on some platforms
+but not on Ux500, so it can be reused moving the UART out of the
+vmalloc area.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/mach-ux500/db8500-regs.h | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
+ arch/arm/include/debug/ux500.S | 9 ++-------
+ 1 file changed, 2 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/mach-ux500/db8500-regs.h b/arch/arm/mach-ux500/db8500-regs.h
-index 27399553c841..65b7a689374c 100644
---- a/arch/arm/mach-ux500/db8500-regs.h
-+++ b/arch/arm/mach-ux500/db8500-regs.h
-@@ -182,8 +182,11 @@
-  */
- #define U8500_IO_VIRTUAL	0xf0000000
- #define U8500_IO_PHYSICAL	0xa0000000
--/* This is where we map in the ROM to check ASIC IDs */
--#define UX500_VIRT_ROM		IOMEM(0xf0000000)
-+/*
-+ * This is where we map in the ROM to check ASIC IDs, as the Ux500s
-+ * do not have TCM memory, we can reuse the ITCM reserved area.
-+ */
-+#define UX500_VIRT_ROM		IOMEM(0xfffe0000)
+diff --git a/arch/arm/include/debug/ux500.S b/arch/arm/include/debug/ux500.S
+index aa7f63a8b5e0..aa3af7cb45e0 100644
+--- a/arch/arm/include/debug/ux500.S
++++ b/arch/arm/include/debug/ux500.S
+@@ -24,21 +24,16 @@
+ #define U8500_UART0_PHYS_BASE	(0x80120000)
+ #define U8500_UART1_PHYS_BASE	(0x80121000)
+ #define U8500_UART2_PHYS_BASE	(0x80007000)
+-#define U8500_UART0_VIRT_BASE	(0xf8120000)
+-#define U8500_UART1_VIRT_BASE	(0xf8121000)
+-#define U8500_UART2_VIRT_BASE	(0xf8007000)
+ #define __UX500_PHYS_UART(n)	U8500_UART##n##_PHYS_BASE
+-#define __UX500_VIRT_UART(n)	U8500_UART##n##_VIRT_BASE
+ #endif
  
- /* This macro is used in assembly, so no cast */
- #define IO_ADDRESS(x)           \
+-#if !defined(__UX500_PHYS_UART) || !defined(__UX500_VIRT_UART)
++#if !defined(__UX500_PHYS_UART)
+ #error Unknown SOC
+ #endif
+ 
+ #define UX500_PHYS_UART(n)	__UX500_PHYS_UART(n)
+-#define UX500_VIRT_UART(n)	__UX500_VIRT_UART(n)
+ #define UART_PHYS_BASE	UX500_PHYS_UART(CONFIG_UX500_DEBUG_UART)
+-#define UART_VIRT_BASE	UX500_VIRT_UART(CONFIG_UX500_DEBUG_UART)
++#define UART_VIRT_BASE	(0xfff07000)
+ 
+ 	.macro	addruart, rp, rv, tmp
+ 	ldr	\rp, =UART_PHYS_BASE		@ no, physical address
 -- 
 2.4.3
