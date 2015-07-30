@@ -1,147 +1,122 @@
-From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
-Date: Thu, 30 Jul 2015 16:33:38 +0200
-Subject: [PATCH linux-next 1/1] tty/serial: at91: fix I/O accesses on RHR and
- THR for AVR32
-Message-ID: <b950edd352e715d7f1f0d5ca4856ae4fec56890f.1438260564.git.cyrille.pitchen@atmel.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 30 Jul 2015 15:33:54 +0100
+Subject: [PATCH] irqchip/gic: Only allow the primary GIC to set the CPU map
+In-Reply-To: <1438265479-15427-1-git-send-email-jonathanh@nvidia.com>
+References: <1438265479-15427-1-git-send-email-jonathanh@nvidia.com>
+Message-ID: <55BA35D2.5040307@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes I/O accesses on the Receiver Holding Register and on the
-Transmitter Holding Register. Indeed AVR32 can only perform 32bit I/O
-accesses on registers: using 8bit I/O accesses would read or write garbage
-data.
+On 30/07/15 15:11, Jon Hunter wrote:
+> The gic_init_bases() function initialises an array that stores the mapping
+> between the GIC and CPUs. This array is a global array that is
+> unconditionally initialised on every call to gic_init_bases(). Although,
+> it is not common for there to be more than one GIC instance, there are
+> some devices that do support nested GIC controllers and gic_init_bases()
+> can be called more than once.
+> 
+> A 2nd call to gic_init_bases() will clear the previous CPU mapping and
+> will only setup the mapping again for the CPU calling gic_init_bases().
+> Fix this by only allowing the CPU map to be configured for the primary GIC.
+> 
+> For secondary GICs the CPU map is not relevant because these GICs do not
+> directly route the interrupts to the main CPU(s) but to other GICs or
+> devices.
+> 
+> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
+> ---
+> This is a follow-up to the patch titled "irqchip: gic: Add a cpu map for
+> each GIC instance" and discussed here [1]. Based upon the discussion I have
+> re-worked and re-titled it approriately.
+> 
+> [1] http://www.spinics.net/lists/kernel/msg2044421.html
+> 
+>  drivers/irqchip/irq-gic.c | 43 +++++++++++++++++++++++++------------------
+>  1 file changed, 25 insertions(+), 18 deletions(-)
+> 
+> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+> index a530d9a9b810..7566fe259d27 100644
+> --- a/drivers/irqchip/irq-gic.c
+> +++ b/drivers/irqchip/irq-gic.c
+> @@ -416,19 +416,26 @@ static void gic_cpu_init(struct gic_chip_data *gic)
+>  	int i;
+>  
+>  	/*
+> -	 * Get what the GIC says our CPU mask is.
+> +	 * Setting up the CPU map is only relevant for the primary GIC
+> +	 * because any nested/secondary GICs do not directly interface
+> +	 * with the CPU(s).
+>  	 */
+> -	BUG_ON(cpu >= NR_GIC_CPU_IF);
+> -	cpu_mask = gic_get_cpumask(gic);
+> -	gic_cpu_map[cpu] = cpu_mask;
+> +	if (gic == &gic_data[0]) {
+> +		/*
+> +		 * Get what the GIC says our CPU mask is.
+> +		 */
+> +		BUG_ON(cpu >= NR_GIC_CPU_IF);
+> +		cpu_mask = gic_get_cpumask(gic);
+> +		gic_cpu_map[cpu] = cpu_mask;
+>  
+> -	/*
+> -	 * Clear our mask from the other map entries in case they're
+> -	 * still undefined.
+> -	 */
+> -	for (i = 0; i < NR_GIC_CPU_IF; i++)
+> -		if (i != cpu)
+> -			gic_cpu_map[i] &= ~cpu_mask;
+> +		/*
+> +		 * Clear our mask from the other map entries in case they're
+> +		 * still undefined.
+> +		 */
+> +		for (i = 0; i < NR_GIC_CPU_IF; i++)
+> +			if (i != cpu)
+> +				gic_cpu_map[i] &= ~cpu_mask;
+> +	}
+>  
+>  	gic_cpu_config(dist_base, NULL);
+>  
+> @@ -977,13 +984,6 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+>  	}
+>  
+>  	/*
+> -	 * Initialize the CPU interface map to all CPUs.
+> -	 * It will be refined as each CPU probes its ID.
+> -	 */
+> -	for (i = 0; i < NR_GIC_CPU_IF; i++)
+> -		gic_cpu_map[i] = 0xff;
+> -
+> -	/*
+>  	 * Find out how many interrupts are supported.
+>  	 * The GIC only supports up to 1020 interrupt sources.
+>  	 */
+> @@ -1028,6 +1028,13 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+>  		return;
+>  
+>  	if (gic_nr == 0) {
+> +		/*
+> +		 * Initialize the CPU interface map to all CPUs.
+> +		 * It will be refined as each CPU probes its ID.
+> +		 * This is only necessary for the primary GIC.
+> +		 */
+> +		for (i = 0; i < NR_GIC_CPU_IF; i++)
+> +			gic_cpu_map[i] = 0xff;
+>  #ifdef CONFIG_SMP
+>  		set_smp_cross_call(gic_raise_softirq);
+>  		register_cpu_notifier(&gic_cpu_notifier);
+> 
 
-Fixes: commit b5199d468177 ("tty/serial: at91: add support to FIFOs")
-Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
----
-Hi all,
+Looks good.
 
-this patch fixes a bug on AVR32 introduced by the support of FIFOs for
-AT91. Indeed when FIFOs are enabled they work in Multiple Data mode.
-The Multiple Data mode allows to read up to 4 data from the Receiver
-Holding Register (RHR) or write up to 4 data into the Transmitter Holding
-Register (THR) in a single I/O access. Hence when only one data is to be
-read from the RHR or written into the THR, the driver cannot use 32bit I/O
-access anymore but must use 8bit I/O access instead.
+I think there is a another bug caused by 322895062 ("irqchip: gic:
+Preserve gic V2 bypass bits in cpu ctrl register"), where
+gic_cpu_if_up() only acts on the primary GIC. In the secondary GIC case,
+it will stay disabled.
 
-For ARM-base AT91 SoCs, 8bit I/O accesses can always be used even when
-FIFOs are not available. However AV32 can only use 32bit I/O accesses.
+Mind fixing this while you're at it?
 
-Since atmel_uart_readb(), resp. atmel_uart_writeb(), was created by the
-FIFO support patch to access the RHR, resp. the THR, this patch replaces
-it by atmel_uart_read_char(), resp. atmel_uart_write_char(). Hence the
-actual width of the I/O access now depends only on the architecture.
+Thanks,
 
-All registers but RHR and THR use 32bit I/O accesses.
-
-This patch was tested on a at91sam9260ek board.
-
-Best Regards,
-
-Cyrille
-
-ChangeLog:
-
-v1: initial version
-
- drivers/tty/serial/atmel_serial.c | 37 +++++++++++++++++++++++++++----------
- 1 file changed, 27 insertions(+), 10 deletions(-)
-
-diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-index e91b3b2f0590..5ca5cf3e9359 100644
---- a/drivers/tty/serial/atmel_serial.c
-+++ b/drivers/tty/serial/atmel_serial.c
-@@ -204,16 +204,33 @@ static inline void atmel_uart_writel(struct uart_port *port, u32 reg, u32 value)
- 	__raw_writel(value, port->membase + reg);
- }
- 
--static inline u8 atmel_uart_readb(struct uart_port *port, u32 reg)
-+#ifdef CONFIG_AVR32
-+
-+/* AVR32 cannot handle 8 or 16bit I/O accesses but only 32bit I/O accesses */
-+static inline u8 atmel_uart_read_char(struct uart_port *port)
-+{
-+	return __raw_readl(port->membase + ATMEL_US_RHR);
-+}
-+
-+static inline void atmel_uart_write_char(struct uart_port *port, u8 value)
- {
--	return __raw_readb(port->membase + reg);
-+	__raw_writel(value, port->membase + ATMEL_US_THR);
- }
- 
--static inline void atmel_uart_writeb(struct uart_port *port, u32 reg, u8 value)
-+#else
-+
-+static inline u8 atmel_uart_read_char(struct uart_port *port)
- {
--	__raw_writeb(value, port->membase + reg);
-+	return __raw_readb(port->membase + ATMEL_US_RHR);
- }
- 
-+static inline void atmel_uart_write_char(struct uart_port *port, u8 value)
-+{
-+	__raw_writeb(value, port->membase + ATMEL_US_THR);
-+}
-+
-+#endif
-+
- #ifdef CONFIG_SERIAL_ATMEL_PDC
- static bool atmel_use_pdc_rx(struct uart_port *port)
- {
-@@ -658,7 +675,7 @@ static void atmel_rx_chars(struct uart_port *port)
- 
- 	status = atmel_uart_readl(port, ATMEL_US_CSR);
- 	while (status & ATMEL_US_RXRDY) {
--		ch = atmel_uart_readb(port, ATMEL_US_RHR);
-+		ch = atmel_uart_read_char(port);
- 
- 		/*
- 		 * note that the error handling code is
-@@ -709,7 +726,7 @@ static void atmel_tx_chars(struct uart_port *port)
- 
- 	if (port->x_char &&
- 	    (atmel_uart_readl(port, ATMEL_US_CSR) & atmel_port->tx_done_mask)) {
--		atmel_uart_writeb(port, ATMEL_US_THR, port->x_char);
-+		atmel_uart_write_char(port, port->x_char);
- 		port->icount.tx++;
- 		port->x_char = 0;
- 	}
-@@ -718,7 +735,7 @@ static void atmel_tx_chars(struct uart_port *port)
- 
- 	while (atmel_uart_readl(port, ATMEL_US_CSR) &
- 	       atmel_port->tx_done_mask) {
--		atmel_uart_writeb(port, ATMEL_US_THR, xmit->buf[xmit->tail]);
-+		atmel_uart_write_char(port, xmit->buf[xmit->tail]);
- 		xmit->tail = (xmit->tail + 1) & (UART_XMIT_SIZE - 1);
- 		port->icount.tx++;
- 		if (uart_circ_empty(xmit))
-@@ -2294,7 +2311,7 @@ static int atmel_poll_get_char(struct uart_port *port)
- 	while (!(atmel_uart_readl(port, ATMEL_US_CSR) & ATMEL_US_RXRDY))
- 		cpu_relax();
- 
--	return atmel_uart_readb(port, ATMEL_US_RHR);
-+	return atmel_uart_read_char(port);
- }
- 
- static void atmel_poll_put_char(struct uart_port *port, unsigned char ch)
-@@ -2302,7 +2319,7 @@ static void atmel_poll_put_char(struct uart_port *port, unsigned char ch)
- 	while (!(atmel_uart_readl(port, ATMEL_US_CSR) & ATMEL_US_TXRDY))
- 		cpu_relax();
- 
--	atmel_uart_writeb(port, ATMEL_US_THR, ch);
-+	atmel_uart_write_char(port, ch);
- }
- #endif
- 
-@@ -2409,7 +2426,7 @@ static void atmel_console_putchar(struct uart_port *port, int ch)
- {
- 	while (!(atmel_uart_readl(port, ATMEL_US_CSR) & ATMEL_US_TXRDY))
- 		cpu_relax();
--	atmel_uart_writeb(port, ATMEL_US_THR, ch);
-+	atmel_uart_write_char(port, ch);
- }
- 
- /*
+	M.
 -- 
-1.8.2.2
+Jazz is not dead. It just smells funny...
