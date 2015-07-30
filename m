@@ -1,113 +1,206 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 30 Jul 2015 09:55:13 +0900
-Subject: [PATCH] ARM: EXYNOS: pd: fix resource deallocation on error path
-In-Reply-To: <55B97147.7000202@mleia.com>
-References: <1438200913-10532-1-git-send-email-vz@mleia.com>
- <CAJKOXPeWgXR0SuRzZyXHSiewZDuuJXXFmjyWasXDFxDAQUzyqA@mail.gmail.com>
- <55B96A86.8000502@mleia.com> <55B96C9C.8010908@samsung.com>
- <55B97147.7000202@mleia.com>
-Message-ID: <55B975F1.5080408@samsung.com>
+From: mturquette@linaro.org (Michael Turquette)
+Date: Wed, 29 Jul 2015 18:02:13 -0700
+Subject: [PATCH v7 3/5] clk: Supply the critical clock {init, enable,
+ disable} framework
+In-Reply-To: <1437570255-21049-4-git-send-email-lee.jones@linaro.org>
+References: <1437570255-21049-1-git-send-email-lee.jones@linaro.org>
+ <1437570255-21049-4-git-send-email-lee.jones@linaro.org>
+Message-ID: <20150730010213.642.10831@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30.07.2015 09:35, Vladimir Zapolskiy wrote:
-> On 30.07.2015 03:15, Krzysztof Kozlowski wrote:
->> On 30.07.2015 09:06, Vladimir Zapolskiy wrote:
->>> On 30.07.2015 02:37, Krzysztof Kozlowski wrote:
->>>> 2015-07-30 5:15 GMT+09:00 Vladimir Zapolskiy <vz@mleia.com>:
->>>>> The change fixes a bug introduced by 2be2a3ff42a5, memory allocated
->>>>> by kstrdup_const() must be always deallocated with kfree_const(),
->>>>> otherwise there is a risk of kfree'ing ro memory.
->>>>
->>>> This looks good. Can you provide also Cc-stable and fixes tags?
->>>
->>> Since the change fixes two independent issues I decided not to add a
->>> particular commit to Fixes tag. I can split the commit of course, but I
->>> feel reluctant to send a series in this particular case.
->>>
->>> Let me know your decision with respect to my comments.
->>
->> Although this is only error-path but still this applies for backporting
->> to stable. Please split it up and add respective fixes tags. This helps
->> companies/people using stable trees, including LTS.
-> 
-> Okay, I'll resend the split changes tomorrow.
-> 
->>>
->>>>>
->>>>> Also remove unneeded of_node_put(), if for_each_compatible_node() body
->>>>> execution is not terminated, this prevents from double kfree() in
->>>>> OF_DYNAMIC build.
->>>>
->>>> Each iteration of for_each_compatible_node() has a check:
->>>> (dn = of_find_compatible_node(dn, type, compatible))
->>>> this increases the references to 'np'. 
->>>
->>> Correct.
->>>
->>>> If loop continues then previous 'np' is not of_node_put().
->>>
->>> This I don't understand. The previous 'np' is of_node_put() on next
->>> iteration of the loop, i.e. if and only if loop continues. Please elaborate.
->>
->> Step by step, if I get it right:
->> 1. initialization: dn = of_find_compatible_node(NULL, type, compatible);
->> 1a. if (!pd->base) then we want to drop that reference.
->> 1b. if not, then loop itself
->> 3. increase value: dn = of_find_compatible_node(dn, type, compatible)
->> 4. next iteration of loop, now we have 'dn' from last 'increase value'
->> 5. if (!pd->base) then we want to drop that reference.
-> 
-> It is quite basic but it might be more visual, if the questionable
-> expression is preprocessed and some C99 magic is applied on top:
-> 
-> 
-> for_each_compatible_node(np, NULL, "samsung,exynos4210-pd") {
-> ...	
-> 	continue;
-> ...
-> }
-> 
-> stands for
-> 
-> for (dn = of_find_compatible_node(NULL, NULL, "samsung,exynos4210-pd");
-> dn; \
->      dn = of_find_compatible_node(np, NULL, "samsung,exynos4210-pd")) {
-> ...
-> 	continue;
-> ...
-> }
-> 
-> stands for
-> 
-> for (dn = of_find_compatible_node(NULL, NULL, "samsung,exynos4210-pd");
-> dn; \
->      dn = of_find_compatible_node(np, NULL, "samsung,exynos4210-pd")) {
-> ...
-> 	goto contin;
-> ...
-> contin:
-> }
-> 
-> stands for
-> 
-> dn = of_find_compatible_node(NULL, NULL, "samsung,exynos4210-pd");
-> while (dn) {
-> 	...
-> 	goto contin;
-> 	...
-> contin:
-> 	dn = of_find_compatible_node(np, NULL, "samsung,exynos4210-pd")
-> };
-> 
-> 
-> then np reference counter is decremented inside closing
-> of_find_compatible_node() as usual, there is no need to decrement it two
-> times.
-> 
-> Do I miss something?
+Hi Lee,
 
-Yes, you are right. Thanks for patience!
++ linux-clk ml
 
-Best regards,
-Krzysztof
+Quoting Lee Jones (2015-07-22 06:04:13)
+> These new API calls will firstly provide a mechanisms to tag a clock as
+> critical and secondly allow any knowledgeable driver to (un)gate clocks,
+> even if they are marked as critical.
+> 
+> Suggested-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  drivers/clk/clk.c            | 45 ++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/clk-provider.h |  2 ++
+>  include/linux/clk.h          | 30 +++++++++++++++++++++++++++++
+>  3 files changed, 77 insertions(+)
+> 
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index 61c3fc5..486b1da 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -46,6 +46,21 @@ static struct clk_core *clk_core_lookup(const char *name);
+>  
+>  /***    private data structures    ***/
+>  
+> +/**
+> + * struct critical -   Provides 'play' over critical clocks.  A clock can be
+> + *                     marked as critical, meaning that it should not be
+> + *                     disabled.  However, if a driver which is aware of the
+> + *                     critical behaviour wants to control it, it can do so
+> + *                     using clk_enable_critical() and clk_disable_critical().
+> + *
+> + * @enabled    Is clock critical?  Once set, doesn't change
+> + * @leave_on   Self explanatory.  Can be disabled by knowledgeable drivers
+
+Not self explanatory. I need this explained to me. What does leave_on
+do? Better yet, what would happen if leave_on did not exist?
+
+> + */
+> +struct critical {
+> +       bool enabled;
+> +       bool leave_on;
+> +};
+> +
+>  struct clk_core {
+>         const char              *name;
+>         const struct clk_ops    *ops;
+> @@ -75,6 +90,7 @@ struct clk_core {
+>         struct dentry           *dentry;
+>  #endif
+>         struct kref             ref;
+> +       struct critical         critical;
+>  };
+>  
+>  struct clk {
+> @@ -995,6 +1011,10 @@ static void clk_core_disable(struct clk_core *clk)
+>         if (WARN_ON(clk->enable_count == 0))
+>                 return;
+>  
+> +       /* Refuse to turn off a critical clock */
+> +       if (clk->enable_count == 1 && clk->critical.leave_on)
+> +               return;
+
+How do we get to this point? clk_enable_critical actually calls
+clk_enable, thus incrementing the enable_count. The only time that we
+could hit the above case is if,
+
+a) there is an imbalance in clk_enable and clk_disable calls. If this is
+the case then the drivers need to be fixed. Or better yet some
+infrastructure to catch that, now that we have per-user struct clk
+cookies.
+
+b) a driver knowingly calls clk_enable_critical(foo) and then regular,
+old clk_disable(foo). But why would a driver do that?
+
+It might be that I am missing the point here, so please feel free to
+clue me in.
+
+Regards,
+Mike
+
+> +
+>         if (--clk->enable_count > 0)
+>                 return;
+>  
+> @@ -1037,6 +1057,13 @@ void clk_disable(struct clk *clk)
+>  }
+>  EXPORT_SYMBOL_GPL(clk_disable);
+>  
+> +void clk_disable_critical(struct clk *clk)
+> +{
+> +       clk->core->critical.leave_on = false;
+> +       clk_disable(clk);
+> +}
+> +EXPORT_SYMBOL_GPL(clk_disable_critical);
+> +
+>  static int clk_core_enable(struct clk_core *clk)
+>  {
+>         int ret = 0;
+> @@ -1100,6 +1127,15 @@ int clk_enable(struct clk *clk)
+>  }
+>  EXPORT_SYMBOL_GPL(clk_enable);
+>  
+> +int clk_enable_critical(struct clk *clk)
+> +{
+> +       if (clk->core->critical.enabled)
+> +               clk->core->critical.leave_on = true;
+> +
+> +       return clk_enable(clk);
+> +}
+> +EXPORT_SYMBOL_GPL(clk_enable_critical);
+> +
+>  static unsigned long clk_core_round_rate_nolock(struct clk_core *clk,
+>                                                 unsigned long rate,
+>                                                 unsigned long min_rate,
+> @@ -2482,6 +2518,15 @@ fail_out:
+>  }
+>  EXPORT_SYMBOL_GPL(clk_register);
+>  
+> +void clk_init_critical(struct clk *clk)
+> +{
+> +       struct critical *critical = &clk->core->critical;
+> +
+> +       critical->enabled = true;
+> +       critical->leave_on = true;
+> +}
+> +EXPORT_SYMBOL_GPL(clk_init_critical);
+> +
+>  /*
+>   * Free memory allocated for a clock.
+>   * Caller must hold prepare_lock.
+> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+> index 5591ea7..15ef8c9 100644
+> --- a/include/linux/clk-provider.h
+> +++ b/include/linux/clk-provider.h
+> @@ -563,6 +563,8 @@ struct clk *devm_clk_register(struct device *dev, struct clk_hw *hw);
+>  void clk_unregister(struct clk *clk);
+>  void devm_clk_unregister(struct device *dev, struct clk *clk);
+>  
+> +void clk_init_critical(struct clk *clk);
+> +
+>  /* helper functions */
+>  const char *__clk_get_name(struct clk *clk);
+>  struct clk_hw *__clk_get_hw(struct clk *clk);
+> diff --git a/include/linux/clk.h b/include/linux/clk.h
+> index 8381bbf..9807f3b 100644
+> --- a/include/linux/clk.h
+> +++ b/include/linux/clk.h
+> @@ -231,6 +231,19 @@ struct clk *devm_clk_get(struct device *dev, const char *id);
+>  int clk_enable(struct clk *clk);
+>  
+>  /**
+> + * clk_enable_critical - inform the system when the clock source should be
+> + *                      running, even if clock is critical.
+> + * @clk: clock source
+> + *
+> + * If the clock can not be enabled/disabled, this should return success.
+> + *
+> + * May be called from atomic contexts.
+> + *
+> + * Returns success (0) or negative errno.
+> + */
+> +int clk_enable_critical(struct clk *clk);
+> +
+> +/**
+>   * clk_disable - inform the system when the clock source is no longer required.
+>   * @clk: clock source
+>   *
+> @@ -247,6 +260,23 @@ int clk_enable(struct clk *clk);
+>  void clk_disable(struct clk *clk);
+>  
+>  /**
+> + * clk_disable_critical - inform the system when the clock source is no
+> + *                       longer required, even if clock is critical.
+> + * @clk: clock source
+> + *
+> + * Inform the system that a clock source is no longer required by
+> + * a driver and may be shut down.
+> + *
+> + * May be called from atomic contexts.
+> + *
+> + * Implementation detail: if the clock source is shared between
+> + * multiple drivers, clk_enable_critical() calls must be balanced
+> + * by the same number of clk_disable_critical() calls for the clock
+> + * source to be disabled.
+> + */
+> +void clk_disable_critical(struct clk *clk);
+> +
+> +/**
+>   * clk_get_rate - obtain the current clock rate (in Hz) for a clock source.
+>   *               This is only valid once the clock source has been enabled.
+>   * @clk: clock source
+> -- 
+> 1.9.1
+> 
