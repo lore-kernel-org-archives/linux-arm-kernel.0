@@ -1,116 +1,56 @@
-From: tchalamarla@caviumnetworks.com (tchalamarla at caviumnetworks.com)
-Date: Thu, 30 Jul 2015 10:55:06 -0700
-Subject: [PATCH] iommu/arm-smmu-v2: ThunderX(errata-23399) mis-extends 64bit
- registers
-Message-ID: <1438278906-29627-1-git-send-email-tchalamarla@caviumnetworks.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Thu, 30 Jul 2015 20:04:57 +0200
+Subject: [PATCH v5 01/10] clk: mediatek: Removed unused dpi_ck clock from
+ MT8173
+In-Reply-To: <20150730173643.GH3159@codeaurora.org>
+References: <1438152754-11970-1-git-send-email-jamesjj.liao@mediatek.com>
+ <1438154233.17770.39.camel@mtksdaap41> <20150730173643.GH3159@codeaurora.org>
+Message-ID: <1450634.BBmUdb8ZLk@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
+Am Donnerstag, 30. Juli 2015, 10:36:43 schrieb Stephen Boyd:
+> On 07/29, James Liao wrote:
+> > Hi Stephen,
+> > 
+> > Could you help to apply this patch into 4.2?
+> > 
+> > 
+> > Best regards,
+> > 
+> > James
+> > 
+> > On Wed, 2015-07-29 at 09:05 +0200, Heiko St?bner wrote:
+> > > Am Mittwoch, 29. Juli 2015, 14:52:25 schrieb James Liao:
+> > > > The dpi_ck clock can be removed because it not actually used
+> > > > in topckgen and subsystems.
+> > > > 
+> > > > Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
+> > > 
+> > > From our past discussions this change looks about right, and should
+> > > still
+> > > become _part of 4.2_, to not have the CLK_TOP_DPI become part of the
+> > > devicetree CLK_TOP_DPI.
+> 
+> Did you mean ABI?
 
-The SMMU architecture defines two different behaviors when 64-bit
-registers are written with 32-bit writes.  The first behavior causes
-zero extension into the upper 32-bits.  The second behavior splits a
-64-bit register into "normal" 32-bit register pairs.
+yep, sorry
 
-On some passes of ThunderX,
-the following registers incorrectly zero extended when they should
-instead behave as normal 32-bit register pairs:
+> 
+> > > Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+> 
+> Is it being used in DT right now and causing regressions on
+> v4.2-rcX? Sorry, I'm trying to understand why this patch matters
+> for the 4.2 release.
 
-  SMMU()_(S)GFAR
-  SMMU()_NSGFAR
-  SMMU()_CB()_TTBR0
-  SMMU()_CB()_TTBR1
-  SMMU()_CB()_FAR
+it's not been used in an actual devicetree file, but as far as I understand it, 
+the dt-binding headers themself are also part of the ABI.
 
-Signed-off-by: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
----
- drivers/iommu/arm-smmu.c | 51 ++++++++++++++++++++++++++++++++++--------------
- 1 file changed, 36 insertions(+), 15 deletions(-)
+And it is new in 4.2, so has not been part of an official release yet.
 
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 66a803b..7a3cf7f 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -290,6 +290,7 @@ struct arm_smmu_device {
- 	u32				features;
- 
- #define ARM_SMMU_OPT_SECURE_CFG_ACCESS (1 << 0)
-+#define ARM_SMMU_OPT_64BIT_WRITES_ONLY (1 << 1)
- 	u32				options;
- 	enum arm_smmu_arch_version	version;
- 
-@@ -351,6 +352,8 @@ struct arm_smmu_option_prop {
- 
- static struct arm_smmu_option_prop arm_smmu_options[] = {
- 	{ ARM_SMMU_OPT_SECURE_CFG_ACCESS, "calxeda,smmu-secure-config-access" },
-+	/* ThunderX errata 23399 */
-+	{ ARM_SMMU_OPT_64BIT_WRITES_ONLY, "thunderx,smmu-64-bit-writes-only" },
- 	{ 0, NULL},
- };
- 
-@@ -719,6 +722,7 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
- 				       struct io_pgtable_cfg *pgtbl_cfg)
- {
- 	u32 reg;
-+	u64 reg64;
- 	bool stage1;
- 	struct arm_smmu_cfg *cfg = &smmu_domain->cfg;
- 	struct arm_smmu_device *smmu = smmu_domain->smmu;
-@@ -762,22 +766,39 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
- 
- 	/* TTBRs */
- 	if (stage1) {
--		reg = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[0];
--		writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR0_LO);
--		reg = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[0] >> 32;
--		reg |= ARM_SMMU_CB_ASID(cfg) << TTBRn_HI_ASID_SHIFT;
--		writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR0_HI);
--
--		reg = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[1];
--		writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR1_LO);
--		reg = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[1] >> 32;
--		reg |= ARM_SMMU_CB_ASID(cfg) << TTBRn_HI_ASID_SHIFT;
--		writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR1_HI);
-+		if (smmu->options & ARM_SMMU_OPT_64BIT_WRITES_ONLY) {
-+			reg64 = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[0];
-+			reg64 |= ((u64) ARM_SMMU_CB_ASID(cfg)) <<
-+						(TTBRn_HI_ASID_SHIFT + 32);
-+			writeq_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR0_LO);
-+
-+			reg64 = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[1];
-+			reg64 |= ((u64)ARM_SMMU_CB_ASID(cfg)) <<
-+						(TTBRn_HI_ASID_SHIFT + 32);
-+			writeq_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR1_LO);
-+		} else {
-+			reg = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[0];
-+			writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR0_LO);
-+			reg = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[0] >> 32;
-+			reg |= ARM_SMMU_CB_ASID(cfg) << TTBRn_HI_ASID_SHIFT;
-+			writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR0_HI);
-+
-+			reg = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[1];
-+			writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR1_LO);
-+			reg = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[1] >> 32;
-+			reg |= ARM_SMMU_CB_ASID(cfg) << TTBRn_HI_ASID_SHIFT;
-+			writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR1_HI);
-+		}
- 	} else {
--		reg = pgtbl_cfg->arm_lpae_s2_cfg.vttbr;
--		writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR0_LO);
--		reg = pgtbl_cfg->arm_lpae_s2_cfg.vttbr >> 32;
--		writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR0_HI);
-+		if (smmu->options & ARM_SMMU_OPT_64BIT_WRITES_ONLY) {
-+			reg64 = pgtbl_cfg->arm_lpae_s2_cfg.vttbr;
-+			writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR0_LO);
-+		} else {
-+			reg = pgtbl_cfg->arm_lpae_s2_cfg.vttbr;
-+			writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR0_LO);
-+			reg = pgtbl_cfg->arm_lpae_s2_cfg.vttbr >> 32;
-+			writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR0_HI);
-+		}
- 	}
- 
- 	/* TTBCR */
--- 
-2.1.0
+The reason for the removal from what I understand is that the removed clock is 
+not documented at all (it's source, what it does), which got it the "clk_null" 
+parent in the first place.
+
+
+Heiko
