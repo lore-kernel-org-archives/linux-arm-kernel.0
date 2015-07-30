@@ -1,62 +1,121 @@
-From: albert.aribaud@3adev.fr (Albert ARIBAUD)
-Date: Thu, 30 Jul 2015 18:13:21 +0200
-Subject: [PATCH v8 1/5] mtd: nand: vf610_nfc: Freescale NFC for VF610,
- MPC5125 and others
-In-Reply-To: <1438015365-15685-2-git-send-email-stefan@agner.ch>
-References: <1438015365-15685-1-git-send-email-stefan@agner.ch>
- <1438015365-15685-2-git-send-email-stefan@agner.ch>
-Message-ID: <20150730181321.3bd38db7.albert.aribaud@3adev.fr>
+From: stripathi@apm.com (Suman Tripathi)
+Date: Thu, 30 Jul 2015 21:43:57 +0530
+Subject: arch/arm/kernel/setup.c does not compile at -O0
+In-Reply-To: <20150730155048.GS7557@n2100.arm.linux.org.uk>
+References: <55BA1E62.9080103@free.fr>
+ <CAOHikRBW+OnYvduFMVnssYAxDP4u+E+Q9NJ+5iDhnc21OvFRpg@mail.gmail.com>
+ <20150730155048.GS7557@n2100.arm.linux.org.uk>
+Message-ID: <CAOHikRBe=e7UMuEdbs8KhCc59MxhOP2DGwQVMOhtC6VmJW2JBg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
+On Thu, Jul 30, 2015 at 9:20 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Thu, Jul 30, 2015 at 08:53:45PM +0530, Suman Tripathi wrote:
+>> Hi,
+>>
+>> On Thu, Jul 30, 2015 at 6:23 PM, Mason <slash.tmp@free.fr> wrote:
+>> >
+>> > Hello everyone,
+>> >
+>> > I'm trying to debug a live kernel (v3.14) using a DS-5 JTAG probe.
+>> >
+>> > In order to make the control flow easier to follow, I disabled
+>> > optimizations by adding
+>> >
+>> >   subdir-ccflags-y := -O0
+>> >
+>> > to arch/arm/kernel/Makefile
+>> >
+>> > With that change, linking fails:
+>> >
+>> > arch/arm/kernel/setup.c:924: undefined reference to `psci_smp_ops'
+>> >
+>> >       if (psci_smp_available())
+>> >         smp_set_ops(&psci_smp_ops);
+>> >
+>> > #ifdef CONFIG_ARM_PSCI
+>> > void psci_init(void);
+>> > bool psci_smp_available(void);
+>> > #else
+>> > static inline void psci_init(void) { }
+>> > static inline bool psci_smp_available(void) { return false; }
+>> > #endif
+>> >
+>> > The optimizer is able to remove the entire block, but this
+>> > does not happen when optimizations are disabled.
+>> >
+>> > Is compiling at -O0 not supported?
+>>
+>> If you have inline functions, it won't compile at -O0
+>
+> That's incorrect.
+>
+> If you have static inline functions, there isn't a problem irrespective
+> of optimisation level - they'll become merely static functions which
+> won't be inlined, and you'll end up with a copy of the function per
+> compilation unit.
+>
+> If you have extern inline functions, they also won't be inlined, but
+> unlike static inline, the compiler won't emit a static function.
+> Instead, the compiler expects the function to be provided via another
+> compilation unit or library (which won't happen in the Linux kernel.)
+> However, Linux kernel coding style does not allow the use of extern
+> inline functions.
+>
+> The problem which the Linux kernel has is that we rely on the compiler
+> performing optimisations in multiple places - such as eliminating code
+> which can't be reached.  Disabling the optimiser prevents such
+> eliminations from happening, and ends up leaving symbols behind which
+> are purposely not-defined (which are so in order to detect errors for
+> accessors like get_user(), etc. which are only defined to operate on
+> 1, 2, 4 and maybe 8 byte values.)
+>
+> For example:
+>
+> #define __put_user_check(x, p)                                          \
+>         ({                                                              \
+>                 unsigned long __limit = current_thread_info()->addr_limit - 1; \                const typeof(*(p)) __user *__tmp_p = (p);               \
+>                 register const typeof(*(p)) __r2 asm("r2") = (x);       \
+>                 register const typeof(*(p)) __user *__p asm("r0") = __tmp_p; \
+>                 register unsigned long __l asm("r1") = __limit;         \
+>                 register int __e asm("r0");                             \
+>                 switch (sizeof(*(__p))) {                               \
+>                 case 1:                                                 \
+>                         __put_user_x(__r2, __p, __e, __l, 1);           \
+>                         break;                                          \
+>                 case 2:                                                 \
+>                         __put_user_x(__r2, __p, __e, __l, 2);           \
+>                         break;                                          \
+>                 case 4:                                                 \
+>                         __put_user_x(__r2, __p, __e, __l, 4);           \
+>                         break;                                          \
+>                 case 8:                                                 \
+>                         __put_user_x(__r2, __p, __e, __l, 8);           \
+>                         break;                                          \
+>                 default: __e = __put_user_bad(); break;                 \
+>                 }                                                       \
+>                 __e;                                                    \
+>         })
+>
+> which relies on the optimiser removing all the cases which don't apply to
+> the access size.  Disabling optimisation prevents that happening, so you
+> end up with the entire switch() statement coded in the output assembly
+> for every invocation of this macro - which includes a call to
+> __put_user_bad() just in case sizeof(*__p) changes unexpectedly.
+>
+> Building the kernel with optimisation disabled is not supported.
 
-Le Mon, 27 Jul 2015 18:42:41 +0200, Stefan Agner <stefan@agner.ch> a
-?crit :
+Thanks for the info Russell !!
 
-> This driver supports Freescale NFC (NAND flash controller) found on
-> Vybrid (VF610), MPC5125, MCF54418 and Kinetis K70. The driver has
-> been tested on 8-bit and 16-bit NAND interface and supports ONFI
-> parameter page reading.
-> 
-> [...]
-> 
-> diff --git a/drivers/mtd/nand/vf610_nfc.c b/drivers/mtd/nand/vf610_nfc.c
-> new file mode 100644
-> index 0000000..0da500e
-> --- /dev/null
-> +++ b/drivers/mtd/nand/vf610_nfc.c
-> @@ -0,0 +1,640 @@
-> [...]
+>
+> --
+> FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+> according to speedtest.net.
 
-... about line 708:
 
-> +	err = devm_request_irq(nfc->dev, irq, vf610_nfc_irq, 0, DRV_NAME, mtd);
-> +	if (err) {
-> +		dev_err(nfc->dev, "Error requesting IRQ!\n");
-> +		goto error;
-> +	}
-> +
-> +	vf610_nfc_init_controller(nfc);
 
-The call above is too early: vf610_nfc_init_controller() will test
-for (nfc->chip.options & NAND_BUSWIDTH_16) but this option bit is only
-set once nand_scan_ident() below has been run.
-
-This has the effect that even when the DT node specifies a 16-bit wide
-bus, the controller is configured for 8-bit mode at this point, which of
-course causes read failures. I've experienced this with a Vybrid SoC
-and a Micron MT29F4G16ABADAH4 16-bit NAND.
-
-> +	/* first scan to find the device and get the page size */
-> +	if (nand_scan_ident(mtd, 1, NULL)) {
-> +		err = -ENXIO;
-> +		goto error;
-> +	}
-
-Placing the call to vf610_nfc_init_controller() here, after the call
-to nand_scan_ident() rather than before it, fixed the issue for me.
-
-Cordialement,
-Albert ARIBAUD
-3ADEV
+-- 
+Thanks,
+with regards,
+Suman Tripathi
