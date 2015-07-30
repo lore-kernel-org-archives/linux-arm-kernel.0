@@ -1,105 +1,74 @@
-From: toshi.kani@hp.com (Toshi Kani)
-Date: Wed, 29 Jul 2015 18:00:04 -0600
-Subject: [PATCH v2 08/25] arch: introduce memremap()
-In-Reply-To: <20150729214358.GK30479@wotan.suse.de>
-References: <20150725023649.8664.59145.stgit@dwillia2-desk3.amr.corp.intel.com>
- <20150725023842.8664.97620.stgit@dwillia2-desk3.amr.corp.intel.com>
- <20150726172527.GA29513@lst.de>
- <CAPcyv4igoopDPpcCRU1TNYdwPhiYdcDiRA7L9Jdian=0rtexRg@mail.gmail.com>
- <20150727051258.GB15836@lst.de>
- <CAPcyv4jN6jYzw11qOOR-xd_w6s5dguQSoHyvmPFSWtL9S+tz3w@mail.gmail.com>
- <20150729065004.GA17162@lst.de> <20150729182712.GI30479@wotan.suse.de>
- <CAPcyv4iAeMAmU1QRZ1=WTav0cg2=-gqzzrt3nMC1QoD1+hOeBg@mail.gmail.com>
- <1438203638.3214.418.camel@hp.com> <20150729214358.GK30479@wotan.suse.de>
-Message-ID: <1438214404.3214.438.camel@hp.com>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Thu, 30 Jul 2015 03:06:30 +0300
+Subject: [PATCH] ARM: EXYNOS: pd: fix resource deallocation on error path
+In-Reply-To: <CAJKOXPeWgXR0SuRzZyXHSiewZDuuJXXFmjyWasXDFxDAQUzyqA@mail.gmail.com>
+References: <1438200913-10532-1-git-send-email-vz@mleia.com>
+ <CAJKOXPeWgXR0SuRzZyXHSiewZDuuJXXFmjyWasXDFxDAQUzyqA@mail.gmail.com>
+Message-ID: <55B96A86.8000502@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-07-29 at 23:43 +0200, Luis R. Rodriguez wrote:
-> On Wed, Jul 29, 2015 at 03:00:38PM -0600, Toshi Kani wrote:
-> > On Wed, 2015-07-29 at 11:33 -0700, Dan Williams wrote:
-> > > On Wed, Jul 29, 2015 at 11:27 AM, Luis R. Rodriguez <mcgrof@suse.com> 
-> > > wrote:
-> > > > On Wed, Jul 29, 2015 at 08:50:04AM +0200, Christoph Hellwig wrote:
-> > > > > On Mon, Jul 27, 2015 at 04:26:03PM -0700, Dan Williams wrote:
-> > > > > > Oh, because all we have at this point is ioremap_cache() which
-> > > > > > silently falls back.  It's not until the introduction of
-> > > > > > arch_memremp() where we update the arch code to break that 
-> > > > > > behavior.
-> > > > > 
-> > > > > Ok, makes sense.  Might be worth to document in the changelog.
-> > > > > 
-> > > > > > That said, I think it may be beneficial to allow a fallback if 
-> > > > > > the user cares.  So maybe memremap() can call plain ioremap() if
-> > > > > > MEMREMAP_STRICT is not set and none of the other mapping types 
-> > > > > > are satisfied.
-> > > > > 
-> > > > > Is there a real use case for it?  Fallback APIs always seem 
-> > > > > confusing and it might make more sense to do this in the caller(s) 
-> > > > > that actually need it.
-> > > > 
-> > > > It seems semantics-wise we are trying to separate these two really, 
-> > > > so I agree with this. Having a fallback would onloy make things more
-> > > > complicated for any sanitizer / checker / etc, and I don't think the 
-> > > > practical gains of having a fallback outweight the gains of having a 
-> > > > clear semantic separation on intended memory type and interactions 
-> > > > with it.
-> > > > 
-> > > 
-> > > Yup, consider it dropped.  Drivers that want fallback behavior can do
-> > > it explicitly.
-> > 
-> > I agree in general.  However, for the drivers to be able to fall back
-> > properly, they will need to know the cache type they can fall back with. 
-> > 
+On 30.07.2015 02:37, Krzysztof Kozlowski wrote:
+> 2015-07-30 5:15 GMT+09:00 Vladimir Zapolskiy <vz@mleia.com>:
+>> The change fixes a bug introduced by 2be2a3ff42a5, memory allocated
+>> by kstrdup_const() must be always deallocated with kfree_const(),
+>> otherwise there is a risk of kfree'ing ro memory.
 > 
-> That would depend on the purpose of the region and the driver developer 
-> should in theory know best. One issue with this of course is that, as 
-> we've discovered, the semantics of on the ioremap*() variant front 
-> regarding cache types is not clearly well defined, or at least it may be 
-> only well defined implicitly on x86 only, so the driver developer can only 
-> *hope* for the best across architectures. Our ambiguity on our semantics 
-> on ioremap*() variants therefore means driver developers can resonably be 
-> puzzled by what fallbacks to use. That also means architectures 
-> maintainers should not whip driver developers for any misuse. Such 
-> considerations are why although we're now revisiting semantics for 
-> ioremap*() variants I was in hopes we could be at least somewhat
-> pedantic about memremap() semantics.
+> This looks good. Can you provide also Cc-stable and fixes tags?
 
-I agree.  However, there are a few exceptions like /dev/mem, which can map a
-target range without knowledge.
+Since the change fixes two independent issues I decided not to add a
+particular commit to Fixes tag. I can split the commit of course, but I
+feel reluctant to send a series in this particular case.
 
-> For instance since memremap() only has 2 types right now can a respective
-> fallback be documented as an alternative to help with this ? Or can we not
-> generalize this ?  One for MEMREMAP_WB and one for MEMREMAP_WT ?
+Let me know your decision with respect to my comments.
 
-Yes, if a target range can be only mapped by memremap().  However, there is
-no restriction that a range can be mapped with a single interface alone. 
- For example, a range can be mapped with remap_pfn_range() to user space
-with any cache type.  So, in theory, memremap() can overlap with any other
-types.
-
-> > ioremap() falls back to the cache type of an existing mapping to avoid
-> > aliasing.
+>>
+>> Also remove unneeded of_node_put(), if for_each_compatible_node() body
+>> execution is not terminated, this prevents from double kfree() in
+>> OF_DYNAMIC build.
 > 
-> Does that assume an existing ioremap*() call was used on a bigger range?
-> Do you know if that happens to only be the case for x86 (I'd think so)
-> or if its the same for other architectures ?
+> Each iteration of for_each_compatible_node() has a check:
+> (dn = of_find_compatible_node(dn, type, compatible))
+> this increases the references to 'np'. 
 
-In the /dev/mem example, it is remap_pfn_range().  I think other archs have
-the same issue, but I do not know if they fall back in case of overlapping
-call. 
+Correct.
 
-> While at it, Dan, will / should memremap() support overlapping calls ?
-> What is the expectation on behaviour ?
+> If loop continues then previous 'np' is not of_node_put().
+
+This I don't understand. The previous 'np' is of_node_put() on next
+iteration of the loop, i.e. if and only if loop continues. Please elaborate.
+
+--
+With best wishes,
+Vladimir
+
 > 
-> PS: I did see you reply about this being about lacking an arch 
-> implementation for a memremap() type, not a cache type, but as the driver 
-> uses one memremap() type the goal for a region is just as important as the 
-> resulting type.
-
-Agreed.  Drivers cannot tell if a fallback is due to lacking implementation
-of overlapping, unless they check with #ifdef ioremap_xxx.
-
-Thanks,
--Toshi
+>>
+>> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
+>> ---
+>>  arch/arm/mach-exynos/pm_domains.c | 3 +--
+>>  1 file changed, 1 insertion(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
+>> index 6001f1c..4a87e86 100644
+>> --- a/arch/arm/mach-exynos/pm_domains.c
+>> +++ b/arch/arm/mach-exynos/pm_domains.c
+>> @@ -146,9 +146,8 @@ static __init int exynos4_pm_init_power_domain(void)
+>>                 pd->base = of_iomap(np, 0);
+>>                 if (!pd->base) {
+>>                         pr_warn("%s: failed to map memory\n", __func__);
+>> -                       kfree(pd->pd.name);
+>> +                       kfree_const(pd->pd.name);
+>>                         kfree(pd);
+>> -                       of_node_put(np);
+>>                         continue;
+>>                 }
+>>
+>> --
+>> 2.1.4
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
