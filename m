@@ -1,111 +1,91 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 30 Jul 2015 13:24:05 +0200
-Subject: [PATCH 08/11] MTD: m25p80: Add option to limit SPI transfer size.
-In-Reply-To: <CAOMqctRPOv3_YZqS-g+SuuMT5UpOJMFs1OtBuZAhLR_SZnfTyw@mail.gmail.com>
-References: <cover.1433364398.git.hramrach@gmail.com>
- <201507271943.32453.marex@denx.de>
- <CAOMqctRPOv3_YZqS-g+SuuMT5UpOJMFs1OtBuZAhLR_SZnfTyw@mail.gmail.com>
-Message-ID: <201507301324.05721.marex@denx.de>
+From: mkrufky@linuxtv.org (Michael Ira Krufky)
+Date: Thu, 30 Jul 2015 07:37:41 -0400
+Subject: [PATCH 02/12] [media] dvb-pll: Add support for THOMSON DTT7546X
+ tuner.
+In-Reply-To: <CAOcJUbw5hSmPdrz6rPPYU6iMBHnvOZc1p3f+4WhEYq2-XmAPVw@mail.gmail.com>
+References: <1435158670-7195-1-git-send-email-peter.griffin@linaro.org>
+ <1435158670-7195-3-git-send-email-peter.griffin@linaro.org>
+ <1435195057.9377.18.camel@perches.com>
+ <20150722185811.2d718baa@recife.lan>
+ <20150730094738.GD488@griffinp-ThinkPad-X1-Carbon-2nd>
+ <1438250928.2677.10.camel@perches.com>
+ <CAOcJUbw5hSmPdrz6rPPYU6iMBHnvOZc1p3f+4WhEYq2-XmAPVw@mail.gmail.com>
+Message-ID: <CAOcJUbwVBVxmaP-vNkw0n8Cf3-=Fn8Aou8FG81Ajab1B2h4Z4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, July 27, 2015 at 10:43:05 PM, Michal Suchanek wrote:
-> On 27 July 2015 at 19:43, Marek Vasut <marex@denx.de> wrote:
-> > On Monday, July 27, 2015 at 11:46:25 AM, Michal Suchanek wrote:
-> >> On 24 July 2015 at 10:34, Marek Vasut <marex@denx.de> wrote:
-> >> > On Thursday, July 23, 2015 at 07:03:47 PM, Michal Suchanek wrote:
-> >> Ok, so here is some summary.
-> >> 
-> >> I have a NOR flash attached to a s3c64xx SPI controller with 64byte
-> >> fifo and a pl330 dma controller.
-> >> 
-> >> Normally DMA controller is used for transfers that do not fit into the
-> >> FIFO.
-> >> 
-> >> I tried adding the flash memory ID to the spi-nor driver table and
-> >> adding a DT node for it.
-> >> 
-> >> The flash is rated at 120MHz so I used that speed but the ID was
-> >> bit-shifted and identification failed. There is DT property
-> >> samsung,spi-feedback-delay for addressing this and at 120MHz it must
-> >> be 2 or 3 on this board. 40MHz works with default value 0.
-> >> 
-> >> The next step after identification worked was to try reading the flash
-> >> content. For this the DMA controller is used because data is
-> >> transferred in blocks larger than 64 bytes. When reading the whole 4MB
-> >> flash the transfer failed silently. I got a 4MB file of all ones or
-> >> all zeroes.
-> >> 
-> >> It turns out that
-> >> 
-> >>  - the pl330 locks up when transfering large amount of data.
-> >> 
-> >> Specifically, the maximum power of 2 sized transfer at 120MHz is 128
-> >> bytes and 64k at 40MHz. Transferring more than this results in the
-> >> pl330 locking up and never signalling completion of the transfer.
-> > 
-> > Hypothesis:
-> > I think this might just be that the controller didn't catch all the
-> > inbound clock ticks and thus counted less inbound data than it was
-> > set up to receive. The controller thus waits for more data.
-> 
-> The flash chip can transfer data as long as you keep the clock going,
-> especially when you transfer 64k off a 4M flash.
-> 
-> The read command is bound just by stopping the clock. There is always
-> more data to be had.
+On Thu, Jul 30, 2015 at 7:14 AM, Michael Ira Krufky <mkrufky@linuxtv.org> wrote:
+> On Thu, Jul 30, 2015 at 6:08 AM, Joe Perches <joe@perches.com> wrote:
+>> On Thu, 2015-07-30 at 10:47 +0100, Peter Griffin wrote:
+>>> Hi Mauro / Joe,
+>>>
+>>> On Wed, 22 Jul 2015, Mauro Carvalho Chehab wrote:
+>>>
+>>> > Em Wed, 24 Jun 2015 18:17:37 -0700
+>>> > Joe Perches <joe@perches.com> escreveu:
+>>> >
+>>> > > On Wed, 2015-06-24 at 16:11 +0100, Peter Griffin wrote:
+>>> > > > This is used in conjunction with the STV0367 demodulator on
+>>> > > > the STV0367-NIM-V1.0 NIM card which can be used with the STi
+>>> > > > STB SoC's.
+>>> > >
+>>> > > Barely associated to this specific patch, but for
+>>> > > dvb-pll.c, another thing that seems possible is to
+>>> > > convert the struct dvb_pll_desc uses to const and
+>>> > > change the "entries" fixed array size from 12 to []
+>>> > >
+>>> > > It'd save a couple KB overall and remove ~5KB of data.
+>>> > >
+>>> > > $ size drivers/media/dvb-frontends/dvb-pll.o*
+>>> > >    text      data     bss     dec     hex filename
+>>> > >    8520      1552    2120   12192    2fa0 drivers/media/dvb-frontends/dvb-pll.o.new
+>>> > >    5624      6363    2120   14107    371b drivers/media/dvb-frontends/dvb-pll.o.old
+>>> >
+>>> > Peter,
+>>> >
+>>> > Please add this patch on the next patch series you submit.
+>>>
+>>> Ok will do, I've added this patch with a slightly updated commit message
+>>> to my series.
+>>>
+>>> Joe - Can I add your signed-off-by?
+>>
+>> Signed-off-by: Joe Perches <joe@perches.com>
+>
+> Reviewed-by: Michael Ira Krufky <m.krufky@samsung.com>
+>
+> Joe, nice optimization - thanks for that.
+>
+> With regards to Peter's patch, is this a digital-only tuner, or is it
+> a hybrid tuner?
+>
+> The 5th byte that you send to the THOMSON DTT7546X seems to resemble
+> the 'auxiliary byte' that gets set in tuner-simple.c
+>
+> I'm not sure that dvb-pll is the right place for this tuner
+> definition, if this is the case.  Maybe this definition belongs in
+> tuner-simple instead, if the pattern matches better there.
+>
+> Mauro, can we hold off on merging Peter's patch until we resolve this?
 
-Sure, if you keep clocking the chip, the data will keep going. Is the
-chip being clocked ?
+This code block, specifically, I would rather not see added into dvb-pll:
 
-Doesn't the PL330 have some kind of a counter register where you can check
-how much data were received so far ? That should be sufficient to verify
-this hypothesis of mine.
++static int dvb_pll_get_num_regs(struct dvb_pll_priv *priv)
++{
++       int num_regs = 4;
++
++       if (strncmp(priv->pll_desc->name, "Thomson dtt7546x", 16) == 0)
++               num_regs = 5;
++
++       return num_regs;
++}
++
 
-> >> Data
-> >> is left in FIFO which causes subsequent commands to fail since garbage
-> >> is returned instead of command reply. Also subsequent read may cause
-> >> I/O error or or return an empty page depending on the garbage around.
-> > 
-> > So the driver for the DMA controller might need to be augmented to handle
-> > this case -- add a timeout and in case DMA times out, drain the FIFO to
-> > make sure subsequent transfers do not fail.
-> 
-> There is no way to add timeout in the DMA driver since it does not
-> know the SPI clock.
-> 
-> The timeout is handled by the SPI driver and it should be possible to
-> augment it to drain the FIFO when DMA fails so long as FIFO level is
-> readable somewhere.
+tuner-simple provides an infrastructure that allows this tuner to be
+added in a more elegant way without the need to add special cases to
+otherwise generic code, as done in the above.
 
-If the DMA doesn't complete in certain amount of time, it should time out
-I'd say. Don't you think ?
+I'm sorry, Peter.  Can you take a look at tuner-simple and consider
+sending a new patch?
 
-> >> - the I/O errors are not checked in spi-nor at all which leads to
-> >> silent data corruption.
-> >> 
-> >> On a suggestion that this may improve reliability I changed the
-> >> s3c64xx driver to use DMA for all transfers. This caused
-> >> identification to fail in spin-nor because the ID was prefixed with
-> >> extra 00  byte. Testing with spidev confirmed that everything is
-> >> prefixed with extra 00.
-> > 
-> > The determinism of this is in fact excellent news.
-> > 
-> >> Also when the DMA controller locked up no
-> >> transfers were possible anymore. When DMA was not used for sending
-> >> commands the controller would recover on next command. I made the
-> >> option to always use DMA configurable and it turns out that the
-> >> returned data is prefixed with 00 only when no transfer without DMA
-> >> was ever made. Loading the spi-nor driver with the dma-only option off
-> >> and then with dma-only option on results in correct operation. Only
-> >> loading the dma-only driver first causes the 00 prefix.
-> > 
-> > Can we conclude that the PIO codepath somehow programs a register
-> > somewhere which gets rid of this 0x00 prefix ? If so, this should then
-> > also be part of the DMA codepath, or even better, this should be set in
-> > probe() somewhere.
-> 
-> Yes, it looks like it.
-
-Did you find what this could be please ?
+-Michael Ira Krufky
