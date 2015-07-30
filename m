@@ -1,60 +1,71 @@
 From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Thu, 30 Jul 2015 12:32:03 +0200
-Subject: [PATCH v3 0/4] mfd: Improve DT binding docs for max77686 and max77802
-Message-ID: <1438252327-28427-1-git-send-email-javier@osg.samsung.com>
+Date: Thu, 30 Jul 2015 12:32:06 +0200
+Subject: [PATCH v3 3/4] mfd: Add DT binding for Maxim MAX77802 IC
+In-Reply-To: <1438252327-28427-1-git-send-email-javier@osg.samsung.com>
+References: <1438252327-28427-1-git-send-email-javier@osg.samsung.com>
+Message-ID: <1438252327-28427-4-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Lee,
+The MAX77802 is a chip that contains regulators, 2 32kHz clocks,
+a RTC and an I2C interface to program the individual components.
 
-This series contains some improvements for the Device Tree bindings of
-the Maxim MAX77686 and MAX77802 multi-function devices.
+The are already DT bindings for the regulators and clocks and
+these reference to a bindings/mfd/max77802.txt file, that didn't
+exist, for the details about the PMIC.
 
-This is the third version of the series that addresses issues pointed
-out by Sergei Shtylyov and you.
+Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-Patch #1 changes the max77686 binding to not suggest using a deprecated
-property of the regulator DT binding.
-
-Patch #2 changes the max77686 example to use a generic node name instead
-of the chip's name.
-
-Patch #3 adds a DT binding for the mfd portion of the max77802 that was
-missing.
-
-Patch #4 moves the regulator portion of the max77686 to the regulator's
-DT binding sub-directory since it is a better fit for this information.
-This fourth patch needs an ack from the regulator sub-system maintainer.
+---
 
 Changes in v3:
- - Fix typo in ePAPR document name. Suggested by Sergei Shtylyov
 - Add Krzysztof Kozlowski Reviewed-by tag to patch #3.
 - Capitalise all acronyms. Suggested by Lee Jones.
 - Use relative path to refer other bindings. Suggested by Lee Jones.
 - Use IRQ_TYPE_NONE instead of 0 in example. Suggested by Lee Jones.
-- Add Krzysztof Kozlowski Reviewed-by tag to patch #4.
-- Add Lee Jones Acked-by tag to patch #4.
 
 Changes in v2:
-- Add Krzysztof Kozlowski Reviewed-by tag in patch #1.
 - Use the correct "maxim,max77802" compatible string.
   Suggested by Krzysztof Kozlowski
 - Use a pmic generic node name for the max77802 node example.
   Suggested by Sergei Shtylyov.
-- Use a generic name for the max77686 node in the regulator example.
 
-Javier Martinez Canillas (4):
-  mfd: max77686: Don't suggest in binding to use a deprecated property
-  mfd: max77686: Use a generic name for the PMIC node in the example
-  mfd: Add DT binding for Maxim MAX77802 IC
-  mfd: max77686: Split out regulator part from the DT binding
-
- Documentation/devicetree/bindings/mfd/max77686.txt | 63 ++-----------------
- Documentation/devicetree/bindings/mfd/max77802.txt | 26 ++++++++
- .../devicetree/bindings/regulator/max77686.txt     | 71 ++++++++++++++++++++++
- 3 files changed, 101 insertions(+), 59 deletions(-)
+ Documentation/devicetree/bindings/mfd/max77802.txt | 26 ++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/mfd/max77802.txt
- create mode 100644 Documentation/devicetree/bindings/regulator/max77686.txt
 
+diff --git a/Documentation/devicetree/bindings/mfd/max77802.txt b/Documentation/devicetree/bindings/mfd/max77802.txt
+new file mode 100644
+index 000000000000..911ec5fcaefd
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mfd/max77802.txt
+@@ -0,0 +1,26 @@
++Maxim MAX77802 multi-function device
++
++The Maxim MAX77802 is a Power Management IC (PMIC) that contains 10 high
++efficiency Buck regulators, 32 Low-DropOut (LDO) regulators used to power
++up application processors and peripherals, a 2-channel 32kHz clock outputs,
++a Real-Time-Clock (RTC) and a I2C interface to program the individual
++regulators, clocks outputs and the RTC.
++
++Binding for the built-in 32k clock generator block is defined separately
++in the ../clk/maxim,max77802.txt file and binding for the regulators
++is defined in the ../regulator/max77802.txt file.
++
++Required properties:
++- compatible : Must be "maxim,max77802";
++- reg : Specifies the I2C slave address of PMIC block.
++- interrupts : This I2C device has an IRQ line connected to the main SoC.
++- interrupt-parent : The parent interrupt controller.
++
++Example:
++
++	max77802: pmic at 09 {
++		compatible = "maxim,max77802";
++		interrupt-parent = <&intc>;
++		interrupts = <26 IRQ_TYPE_NONE>;
++		reg = <0x09>;
++	};
 -- 
 2.4.3
