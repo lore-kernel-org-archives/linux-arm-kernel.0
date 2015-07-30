@@ -1,73 +1,30 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 30 Jul 2015 11:24:03 -0500
-Subject: [PATCH V3 02/16] PM / OPP: Create a directory for opp bindings
-In-Reply-To: <20150730134959.GB17794@linux>
-References: <cover.1438166099.git.viresh.kumar@linaro.org>
- <4dfe565ff17766b7df127d475d84958e96fdab1b.1438166099.git.viresh.kumar@linaro.org>
- <CAL_Jsq+J41c7qx11L13-g0UyD+hY9W36Wu9P+6O3cnDv7ysY6Q@mail.gmail.com>
- <20150730134959.GB17794@linux>
-Message-ID: <CAL_JsqLeBcaaJ05AtW+tyD5Uxuo5uVYLrq3_oKzrv94xhNpZGg@mail.gmail.com>
+From: jlu@pengutronix.de (Jan =?ISO-8859-1?Q?L=FCbbe?=)
+Date: Thu, 30 Jul 2015 18:25:06 +0200
+Subject: [PATCH v3 2/6] mmc: sdhci-esdhc-imx: add tuning-step seting
+ support
+In-Reply-To: <1438160637-28061-3-git-send-email-haibo.chen@freescale.com>
+References: <1438160637-28061-1-git-send-email-haibo.chen@freescale.com>
+ <1438160637-28061-3-git-send-email-haibo.chen@freescale.com>
+Message-ID: <1438273506.26075.2.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 30, 2015 at 8:49 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> On 30-07-15, 08:18, Rob Herring wrote:
->> On Wed, Jul 29, 2015 at 5:52 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
->> > More platform specific extended opp bindings will follow and it would be
->> > easy to manage them with a directory for opp. Lets create that and move
->> > the existing opp bindings into it.
->> >
->> > Cc: Rob Herring <rob.herring@linaro.org>
->>
->> Use get_maintainers.pl please so you send to right people and right email.
->
-> Already done, you were just cc'd as an extra guy :)
+On Mi, 2015-07-29 at 17:03 +0800, Haibo Chen wrote:
+> tuning-step is the delay cell steps in tuning procedure. The default
+> value of tuning-step is 1. For imx6 series usdhc, tuning procedure can
+> be passed when the tuning-step value is 1. But imx7d usdhc need the
+> tuning-step value as 2, otherwise it can't pass the tuning procedure.
+> 
+> So this patch add the tuning-step setting in driver, so that user can
+> set the tuning-step value in dts.
 
-No, because no one that is a maintainer of
-Documentation/devicetree/bindings is cc'ed here. You did on the other
-patch, but not here as neither Ian, Mark, Kumar nor Pawel are cc'ed.
+>From your description, the correct tuning-step value only depends on the
+SoC. Why not derive it from the compatible string?
 
->> > Cc: devicetree at vger.kernel.org
->> > Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
->> > ---
->> >  Documentation/devicetree/bindings/power/{ => opp}/opp.txt | 0
->> >  1 file changed, 0 insertions(+), 0 deletions(-)
->> >  rename Documentation/devicetree/bindings/power/{ => opp}/opp.txt (100%)
->> >
->> > diff --git a/Documentation/devicetree/bindings/power/opp.txt b/Documentation/devicetree/bindings/power/opp/opp.txt
->> > similarity index 100%
->> > rename from Documentation/devicetree/bindings/power/opp.txt
->> > rename to Documentation/devicetree/bindings/power/opp/opp.txt
->>
->> "power" seems to be a random collection of things. I'd prefer you move
->> this to .../bindings/opp/opp.txt.
->
-> Hmm, sure. That would be better I think.
->
-> --------------8<-------------------
->
-> Message-Id: <29597667e2c8afdbf396c5fcc9269fb27794131c.1438264123.git.viresh.kumar@linaro.org>
-> From: Viresh Kumar <viresh.kumar@linaro.org>
-> Date: Mon, 27 Jul 2015 10:04:21 +0530
-> Subject: [PATCH] PM / OPP: Create a directory for opp bindings
->
-> More platform specific extended opp bindings will follow and it would be
-> easy to manage them with a directory for opp. Lets create that and move
-> the existing opp bindings into it.
->
-> Cc: Rob Herring <rob.herring@linaro.org>
-
-Still wrong...
-
-
-> Cc: devicetree at vger.kernel.org
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-> ---
->  Documentation/devicetree/bindings/{power => opp}/opp.txt | 0
->  1 file changed, 0 insertions(+), 0 deletions(-)
->  rename Documentation/devicetree/bindings/{power => opp}/opp.txt (100%)
->
-> diff --git a/Documentation/devicetree/bindings/power/opp.txt b/Documentation/devicetree/bindings/opp/opp.txt
-> similarity index 100%
-> rename from Documentation/devicetree/bindings/power/opp.txt
-> rename to Documentation/devicetree/bindings/opp/opp.txt
+Regards,
+Jan L?bbe
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
