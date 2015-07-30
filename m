@@ -1,30 +1,37 @@
-From: jlu@pengutronix.de (Jan =?ISO-8859-1?Q?L=FCbbe?=)
-Date: Thu, 30 Jul 2015 18:25:06 +0200
-Subject: [PATCH v3 2/6] mmc: sdhci-esdhc-imx: add tuning-step seting
- support
-In-Reply-To: <1438160637-28061-3-git-send-email-haibo.chen@freescale.com>
-References: <1438160637-28061-1-git-send-email-haibo.chen@freescale.com>
- <1438160637-28061-3-git-send-email-haibo.chen@freescale.com>
-Message-ID: <1438273506.26075.2.camel@pengutronix.de>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 30 Jul 2015 11:25:27 -0500
+Subject: [PATCH] drivers/usb/: Simplify return statements
+In-Reply-To: <20150730131337.GA2715@alcatraz>
+References: <20150730131337.GA2715@alcatraz>
+Message-ID: <20150730162527.GL18246@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mi, 2015-07-29 at 17:03 +0800, Haibo Chen wrote:
-> tuning-step is the delay cell steps in tuning procedure. The default
-> value of tuning-step is 1. For imx6 series usdhc, tuning procedure can
-> be passed when the tuning-step value is 1. But imx7d usdhc need the
-> tuning-step value as 2, otherwise it can't pass the tuning procedure.
+On Thu, Jul 30, 2015 at 01:13:42PM +0000, Karajgaonkar, Saurabh (S.) wrote:
+> From: Saurabh Karajgaonkar <skarajga@visteon.com>
 > 
-> So this patch add the tuning-step setting in driver, so that user can
-> set the tuning-step value in dts.
+> This patch is created using simple_return.cocci coccinelle script.
+> It replaces the redundant instances where variables are assigned
+> return value from functions and then used in return statements.
+> 
+> Signed-off-by: Saurabh Karajgaonkar <skarajga@visteon.com>
 
->From your description, the correct tuning-step value only depends on the
-SoC. Why not derive it from the compatible string?
+do you mind splitting this per-driver ? That makes it a lot easier for
+different maintainers to take their part. For example, I would take
+drivers/usb/phy/* and drivers/usb/musb/*
 
-Regards,
-Jan L?bbe
+Alan Stern would handle drivers/usb/host/[uoe]hci*.[ch]
+
+Mathias Nyman, driver/usb/host/xhci*.[ch]
+
+and so on. Thanks
+
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150730/7a4ff866/attachment.sig>
