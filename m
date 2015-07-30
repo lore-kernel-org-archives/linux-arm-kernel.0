@@ -1,93 +1,84 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 30 Jul 2015 09:50:51 +0200
-Subject: [RFC PATCH 2/2] dt: spi: s3c64xx: add compatible to
- controller-data
-In-Reply-To: <557c1962448393b2a8736f26bfa2a3a5ba4aeb7a.1438170519.git.hramrach@gmail.com>
-References: <cover.1438170519.git.hramrach@gmail.com>
- <557c1962448393b2a8736f26bfa2a3a5ba4aeb7a.1438170519.git.hramrach@gmail.com>
-Message-ID: <20150730095051.06eff8b1@bbrezillon>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 30 Jul 2015 15:55:17 +0800
+Subject: [PATCH 7/7] clk: sunxi: Add a simple gates driver
+In-Reply-To: <20150727202648.GB14521@codeaurora.org>
+References: <1437945270-32014-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1437945270-32014-8-git-send-email-maxime.ripard@free-electrons.com>
+ <20150727202648.GB14521@codeaurora.org>
+Message-ID: <CAGb2v6517qCXmNkYihnfBmc5fL7bqTDOQwedNYjq+p2Mg45+gQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Michal,
+On Tue, Jul 28, 2015 at 4:26 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> On 07/26, Maxime Ripard wrote:
+>> diff --git a/drivers/clk/sunxi/clk-simple-gates.c b/drivers/clk/sunxi/clk-simple-gates.c
+>> new file mode 100644
+>> index 000000000000..1a3963a8a686
+>> --- /dev/null
+>> +++ b/drivers/clk/sunxi/clk-simple-gates.c
+>> @@ -0,0 +1,159 @@
+>> +/*
+>> + * Copyright 2015 Maxime Ripard
+>> + *
+>> + * Maxime Ripard <maxime.ripard@free-electrons.com>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License as published by
+>> + * the Free Software Foundation; either version 2 of the License, or
+>> + * (at your option) any later version.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + */
+>> +
 
-On Wed, 29 Jul 2015 12:19:57 +0200
-Michal Suchanek <hramrach@gmail.com> wrote:
+I'm guessing the following were copied from clk-sunxi.c.
 
-> The controller-data subnode has no compatible. This can lead to other
-> drivers getting confused by it. Add a compatible to make devicetreee
-> unambiguous.
-> 
-> Signed-off-by: Michal Suchanek <hramrach@gmail.com>
-> ---
->  Documentation/devicetree/bindings/spi/spi-samsung.txt | 3 +++
->  drivers/spi/spi-s3c64xx.c                             | 4 ++++
->  2 files changed, 7 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/spi/spi-samsung.txt b/Documentation/devicetree/bindings/spi/spi-samsung.txt
-> index 6dbdeb3..b1e98d1 100644
-> --- a/Documentation/devicetree/bindings/spi/spi-samsung.txt
-> +++ b/Documentation/devicetree/bindings/spi/spi-samsung.txt
-> @@ -92,16 +92,19 @@ Example:
->  			spi-max-frequency = <10000>;
->  
->  			controller-data {
-> +				compatible = "samsung,s3c-controller-data";
+>> +#include <linux/clk-provider.h>
+>> +#include <linux/clkdev.h>
+>
+> Is this used?
 
-AFAIK compatible should (as much as possible :-)) only be used to encode
-HW type, and here you're using it to expose what you want to do with
-your data in Linux.
+clk_register_clkdev() is not used in this file, so not needed.
 
->  				samsung,spi-feedback-delay = <0>;
->  			};
->  
->  			partition at 0 {
-> +				compatible = "linux,ofpart-partition";
+>> +#include <linux/of.h>
+>> +#include <linux/of_address.h>
+>> +#include <linux/reset-controller.h>
+>
+> Is this used?
 
-Ditto.
+A remnant of the USB clocks, which has been moved to clk-usb.c.
 
-Since you have to patch your DTs anyway, how about putting your
-partitions in a subnode and patch the ofpart code to parse this subnode
-if it is present (see the following patch).
+Not needed here nor in clk-sunxi.c.
 
-Best Regards,
+>> +#include <linux/spinlock.h>
+>> +#include <linux/log2.h>
+>
+> Is this used?
 
-Boris
+This is only used for clock factor calculation. Not applicable in
+clk-simple-gates.c, so no.
 
---- >8 ---
+>> +
+>> +static DEFINE_SPINLOCK(gates_lock);
+>> +
+> [...]
+>> +
+>> +static const int sun4i_a10_ahb_critical_clocks[] __initdata = {
+>
+> Shouldn't it be __initconst ?
 
->From e342860932bda3a6354a0a6e17540db5c85a14e0 Mon Sep 17 00:00:00 2001
-From: Boris Brezillon <boris.brezillon@free-electrons.com>
-Date: Thu, 30 Jul 2015 09:44:07 +0200
-Subject: [PATCH] mtd: ofpart: search for a partitions node
+Not sure why our critical clocks lists are __initdata...
 
-The DT partition parser currently assumes the parition definitions are
-directly stored in the MTD device node, but sometime this device node
-contains other child nodes used to store device specific information.
-
-Search for a partitions subnode containing the partition definitions,
-if it is not there, parse the definitions in the device node.
-
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
----
- drivers/mtd/ofpart.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/mtd/ofpart.c b/drivers/mtd/ofpart.c
-index 8a06cfb..ba52b88 100644
---- a/drivers/mtd/ofpart.c
-+++ b/drivers/mtd/ofpart.c
-@@ -38,7 +38,10 @@ static int parse_ofpart_partitions(struct mtd_info *master,
- 	if (!data)
- 		return 0;
- 
--	node = data->of_node;
-+	node = of_get_child_by_name(data->of_node, "partitions");
-+	if (!node)
-+		node = data->of_node;
-+
- 	if (!node)
- 		return 0;
- 
--- 
-1.9.1
+>> +     14,     /* ahb_sdram */
+>> +};
+>> +
+> --
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+> a Linux Foundation Collaborative Project
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-clk" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
