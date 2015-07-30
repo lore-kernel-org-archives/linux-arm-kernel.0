@@ -1,51 +1,45 @@
 From: manabian@gmail.com (Joachim Eastwood)
-Date: Fri, 31 Jul 2015 00:24:18 +0200
-Subject: [PATCH 0/9] LPC18xx DTS changes for 4.3 part2
-Message-ID: <1438295067-24407-1-git-send-email-manabian@gmail.com>
+Date: Fri, 31 Jul 2015 00:24:19 +0200
+Subject: [PATCH 1/9] ARM: dts: lpc18xx: add usb otg phy node
+In-Reply-To: <1438295067-24407-1-git-send-email-manabian@gmail.com>
+References: <1438295067-24407-1-git-send-email-manabian@gmail.com>
+Message-ID: <1438295067-24407-2-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here is some more LPC18xx dts changes for v4.3. This is the dts
-changes for the drivers that will go in for v4.3. Note that the
-USB phy driver is not in next yet, but is queued on Kishon's phy
-next repo.
+Add the USB OTG phy under the CREG syscon node and attach it to
+the USB0 EHCI controller.
 
-Changes include:
+Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+---
+ arch/arm/boot/dts/lpc18xx.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
- - Add USB OTG phy, PL111 LCD controller and PL172 memory
-   controller nodes to lpc18xx.dtsi
-
- - Enable USB0 on EA4357 Dev Kit
-
- - Add static memory devices on EA4357 Dev Kit
-
- - Enable UART0 pinmux and Ethernet on Hitex Eval Board
-   from Ariel D'Alessandro
-
- - Add static memory devices on Hitex Eval Board
-
-Changes are also available in the git repository at:
-
-  https://github.com/manabian/linux-lpc.git tags/lpc18xx_dts_for_4.3-part2
-
-
-Ariel D'Alessandro (2):
-  ARM: dts: lpc4350-hitex-eval: add pinctrl and uart0 muxing
-  ARM: dts: lpc4350-hitex-eval: add ethernet
-
-Joachim Eastwood (7):
-  ARM: dts: lpc18xx: add usb otg phy node
-  ARM: dts: lpc18xx: add pl111 lcd controller node
-  ARM: dts: lpc18xx: add pl172 memory-controller node
-  ARM: dts: lpc4357-ea4357: add usb0
-  ARM: dts: lpc4357-ea4357: add emc pins and static memory devices
-  ARM: dts: lpc4357-ea4357: add mmio-gpio leds
-  ARM: dts: lpc4350-hitex-eval: add emc pins and static memory devices
-
- arch/arm/boot/dts/lpc18xx.dtsi              |  32 ++++
- arch/arm/boot/dts/lpc4350-hitex-eval.dts    | 244 +++++++++++++++++++++++++++
- arch/arm/boot/dts/lpc4357-ea4357-devkit.dts | 253 ++++++++++++++++++++++++++++
- 3 files changed, 529 insertions(+)
-
+diff --git a/arch/arm/boot/dts/lpc18xx.dtsi b/arch/arm/boot/dts/lpc18xx.dtsi
+index c17b82cc2d4c..afd9d3b40eb1 100644
+--- a/arch/arm/boot/dts/lpc18xx.dtsi
++++ b/arch/arm/boot/dts/lpc18xx.dtsi
+@@ -83,6 +83,8 @@
+ 			reg = <0x40006100 0x100>;
+ 			interrupts = <8>;
+ 			clocks = <&ccu1 CLK_CPU_USB0>;
++			phys = <&usb0_otg_phy>;
++			phy-names = "usb";
+ 			has-transaction-translator;
+ 			status = "disabled";
+ 		};
+@@ -109,6 +111,12 @@
+ 			compatible = "nxp,lpc1850-creg", "syscon", "simple-mfd";
+ 			reg = <0x40043000 0x1000>;
+ 			clocks = <&ccu1 CLK_CPU_CREG>;
++
++			usb0_otg_phy: phy at 004 {
++				compatible = "nxp,lpc1850-usb-otg-phy";
++				clocks = <&ccu1 CLK_USB0>;
++				#phy-cells = <0>;
++			};
+ 		};
+ 
+ 		cgu: clock-controller at 40050000 {
 -- 
 1.8.0
