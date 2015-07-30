@@ -1,53 +1,39 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Thu, 30 Jul 2015 14:35:51 +0200
-Subject: [PATCH 2/3] ARM: berlin: register cpufreq-dt for the BG2Q
-In-Reply-To: <1438259752-16320-1-git-send-email-antoine.tenart@free-electrons.com>
-References: <1438259752-16320-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1438259752-16320-3-git-send-email-antoine.tenart@free-electrons.com>
+Date: Thu, 30 Jul 2015 14:35:49 +0200
+Subject: [PATCH 0/3] ARM: berlin: add cpufreq support for the BG2Q
+Message-ID: <1438259752-16320-1-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The BG2Q SoC uses cpufreq-dt for cpufreq. Register a platform device for
-this.
+Hi,
 
-Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
----
- arch/arm/mach-berlin/berlin.c | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+This series adds the cpufreq support to the Berlin BG2Q SoC only, as I
+told this couldn't be done for BG2 and BG2CD.
 
-diff --git a/arch/arm/mach-berlin/berlin.c b/arch/arm/mach-berlin/berlin.c
-index ac181c6797ee..0de906374994 100644
---- a/arch/arm/mach-berlin/berlin.c
-+++ b/arch/arm/mach-berlin/berlin.c
-@@ -15,9 +15,21 @@
- #include <linux/io.h>
- #include <linux/kernel.h>
- #include <linux/of_platform.h>
-+#include <linux/platform_device.h>
- #include <asm/hardware/cache-l2x0.h>
- #include <asm/mach/arch.h>
- 
-+static const struct of_device_id berlin2q_match[] = {
-+	{ .compatible = "marvell,berlin2q" },
-+	{ },
-+};
-+
-+static void __init berlin_init_late(void)
-+{
-+	if (of_find_matching_node(NULL, berlin2q_match))
-+		platform_device_register_simple("cpufreq-dt", -1, NULL, 0);
-+}
-+
- static const char * const berlin_dt_compat[] = {
- 	"marvell,berlin",
- 	NULL,
-@@ -25,6 +37,7 @@ static const char * const berlin_dt_compat[] = {
- 
- DT_MACHINE_START(BERLIN_DT, "Marvell Berlin")
- 	.dt_compat	= berlin_dt_compat,
-+	.init_late	= berlin_init_late,
- 	/*
- 	 * with DT probing for L2CCs, berlin_init_machine can be removed.
- 	 * Note: 88DE3005 (Armada 1500-mini) uses pl310 l2cc
+First, the cpuclk clock is added to the Berlin clock driver. This clock
+has a divider fixed to 1, so we use a fixed factor clock here.
+
+Then register a platform device for cpufreq-dt, when using a BG2Q.
+
+I also added the OPP table definition in the BG2Q device tree. Some
+bootloaders may update this table when booting. Mine doesn't.
+
+Tested on a BG2Q DMP.
+
+Thanks,
+
+Antoine
+
+Antoine Tenart (3):
+  clk: berlin: add cpuclk
+  ARM: berlin: register cpufreq-dt for the BG2Q
+  ARM: berlin: dts: add the cpufreq-dt bindings on the BG2Q
+
+ arch/arm/boot/dts/berlin2q.dtsi      | 11 +++++++++++
+ arch/arm/mach-berlin/berlin.c        | 13 +++++++++++++
+ drivers/clk/berlin/bg2q.c            | 14 +++++++-------
+ include/dt-bindings/clock/berlin2q.h |  3 ++-
+ 4 files changed, 33 insertions(+), 8 deletions(-)
+
 -- 
 2.5.0
