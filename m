@@ -1,145 +1,94 @@
 From: dan.j.williams@intel.com (Dan Williams)
-Date: Thu, 30 Jul 2015 12:55:53 -0400
-Subject: [PATCH v3 24/24] pmem: convert to generic memremap
+Date: Thu, 30 Jul 2015 12:55:36 -0400
+Subject: [PATCH v3 21/24] arch: kill ioremap_fullcache()
 In-Reply-To: <20150730165155.33962.64121.stgit@dwillia2-desk3.amr.corp.intel.com>
 References: <20150730165155.33962.64121.stgit@dwillia2-desk3.amr.corp.intel.com>
-Message-ID: <20150730165553.33962.20257.stgit@dwillia2-desk3.amr.corp.intel.com>
+Message-ID: <20150730165536.33962.67351.stgit@dwillia2-desk3.amr.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update memremap_pmem() to query the architecture for the mapping type of
-the given persistent memory range  and then pass those flags to generic
-memremap().  arch_memremap_pmem_flags() is provided an address range to
-evaluate in the event an arch has a need for different mapping types by
-address range.  For example the ACPI NFIT carries EFI mapping types in
-its memory range description table.
+Nothing calls this helper, and now that ioremap_cache() is being
+deprecated these can also be removed.
 
-Cc: Ross Zwisler <ross.zwisler@linux.intel.com>
 Signed-off-by: Dan Williams <dan.j.williams@intel.com>
 ---
- arch/x86/include/asm/io.h |    2 +-
- arch/x86/mm/ioremap.c     |   16 ++++++++++------
- include/linux/pmem.h      |   26 +++++++++++++++-----------
- 3 files changed, 26 insertions(+), 18 deletions(-)
+ arch/frv/include/asm/io.h        |    5 -----
+ arch/m68k/include/asm/io_mm.h    |    6 ------
+ arch/m68k/include/asm/io_no.h    |    5 -----
+ arch/microblaze/include/asm/io.h |    1 -
+ arch/tile/include/asm/io.h       |    1 -
+ 5 files changed, 18 deletions(-)
 
-diff --git a/arch/x86/include/asm/io.h b/arch/x86/include/asm/io.h
-index 1a9d44ee9ed0..26c81b01419c 100644
---- a/arch/x86/include/asm/io.h
-+++ b/arch/x86/include/asm/io.h
-@@ -245,7 +245,7 @@ static inline void flush_write_buffers(void)
- #endif
+diff --git a/arch/frv/include/asm/io.h b/arch/frv/include/asm/io.h
+index a31b63ec4930..15a49a268754 100644
+--- a/arch/frv/include/asm/io.h
++++ b/arch/frv/include/asm/io.h
+@@ -272,11 +272,6 @@ static inline void __iomem *ioremap_wt(unsigned long physaddr, unsigned long siz
+ 	return __ioremap(physaddr, size, IOMAP_WRITETHROUGH);
  }
  
--void __pmem *arch_memremap_pmem(resource_size_t offset, size_t size);
-+unsigned long arch_memremap_pmem_flags(resource_size_t offset, size_t size);
- #endif /* __KERNEL__ */
- 
- extern void native_io_delay(void);
-diff --git a/arch/x86/mm/ioremap.c b/arch/x86/mm/ioremap.c
-index ffbfcf2e701b..5a41e3e4ea1e 100644
---- a/arch/x86/mm/ioremap.c
-+++ b/arch/x86/mm/ioremap.c
-@@ -205,6 +205,16 @@ err_free_memtype:
- 	return NULL;
- }
- 
-+unsigned long arch_memremap_pmem_flags(resource_size_t offset, size_t size)
-+{
-+	/*
-+	 * TODO: check the mapping type provided by platform firmware,
-+	 * per range.
-+	 */
-+	return MEMREMAP_WB;
-+}
-+EXPORT_SYMBOL(arch_memremap_pmem_flags);
-+
- /**
-  * ioremap_nocache     -   map bus memory into CPU space
-  * @phys_addr:    bus address of the memory
-@@ -310,12 +320,6 @@ void *arch_memremap(resource_size_t phys_addr, size_t size,
- }
- EXPORT_SYMBOL(arch_memremap);
- 
--void __pmem *arch_memremap_pmem(resource_size_t offset, size_t size)
+-static inline void __iomem *ioremap_fullcache(unsigned long physaddr, unsigned long size)
 -{
--	return (void __pmem *) arch_memremap(offset, size, MEMREMAP_WB);
+-	return __ioremap(physaddr, size, IOMAP_FULL_CACHING);
 -}
--EXPORT_SYMBOL(arch_memremap_pmem);
 -
- void __iomem *ioremap_prot(resource_size_t phys_addr, unsigned long size,
- 				unsigned long prot_val)
- {
-diff --git a/include/linux/pmem.h b/include/linux/pmem.h
-index 1bf74c735fa0..03f9d73f3e13 100644
---- a/include/linux/pmem.h
-+++ b/include/linux/pmem.h
-@@ -28,10 +28,10 @@ static inline bool __arch_has_wmb_pmem(void)
- 	return false;
- }
+ #define ioremap_wc ioremap_nocache
  
--static inline void __pmem *arch_memremap_pmem(resource_size_t offset,
-+static inline unsigned long arch_memremap_pmem_flags(resource_size_t offset,
- 		unsigned long size)
+ extern void iounmap(void volatile __iomem *addr);
+diff --git a/arch/m68k/include/asm/io_mm.h b/arch/m68k/include/asm/io_mm.h
+index f55cad529400..910e90770eb2 100644
+--- a/arch/m68k/include/asm/io_mm.h
++++ b/arch/m68k/include/asm/io_mm.h
+@@ -473,12 +473,6 @@ static inline void __iomem *ioremap_wt(unsigned long physaddr,
  {
--	return NULL;
-+	return 0;
+ 	return __ioremap(physaddr, size, IOMAP_WRITETHROUGH);
  }
- 
- static inline void arch_memcpy_to_pmem(void __pmem *dst, const void *src,
-@@ -43,8 +43,8 @@ static inline void arch_memcpy_to_pmem(void __pmem *dst, const void *src,
+-static inline void __iomem *ioremap_fullcache(unsigned long physaddr,
+-				      unsigned long size)
+-{
+-	return __ioremap(physaddr, size, IOMAP_FULL_CACHING);
+-}
+-
+ static inline void memset_io(volatile void __iomem *addr, unsigned char val, int count)
+ {
+ 	__builtin_memset((void __force *) addr, val, count);
+diff --git a/arch/m68k/include/asm/io_no.h b/arch/m68k/include/asm/io_no.h
+index ad7bd40e6742..2690fa99dc56 100644
+--- a/arch/m68k/include/asm/io_no.h
++++ b/arch/m68k/include/asm/io_no.h
+@@ -159,11 +159,6 @@ static inline void *ioremap_wt(unsigned long physaddr, unsigned long size)
+ {
+ 	return __ioremap(physaddr, size, IOMAP_WRITETHROUGH);
+ }
+-static inline void *ioremap_fullcache(unsigned long physaddr, unsigned long size)
+-{
+-	return __ioremap(physaddr, size, IOMAP_FULL_CACHING);
+-}
+-
+ #define	iounmap(addr)	do { } while(0)
  
  /*
-  * Architectures that define ARCH_HAS_PMEM_API must provide
-- * implementations for arch_memremap_pmem(), arch_memcpy_to_pmem(),
-- * arch_wmb_pmem(), and __arch_has_wmb_pmem().
-+ * implementations for arch_memremap_pmem_flags(),
-+ * arch_memcpy_to_pmem(), arch_wmb_pmem(), and __arch_has_wmb_pmem().
-  */
+diff --git a/arch/microblaze/include/asm/io.h b/arch/microblaze/include/asm/io.h
+index 39b6315db82e..5e0cbf4e4204 100644
+--- a/arch/microblaze/include/asm/io.h
++++ b/arch/microblaze/include/asm/io.h
+@@ -40,7 +40,6 @@ extern void iounmap(void __iomem *addr);
  
- static inline void memcpy_from_pmem(void *dst, void __pmem const *src, size_t size)
-@@ -54,7 +54,7 @@ static inline void memcpy_from_pmem(void *dst, void __pmem const *src, size_t si
+ extern void __iomem *ioremap(phys_addr_t address, unsigned long size);
+ #define ioremap_nocache(addr, size)		ioremap((addr), (size))
+-#define ioremap_fullcache(addr, size)		ioremap((addr), (size))
+ #define ioremap_wc(addr, size)			ioremap((addr), (size))
+ #define ioremap_wt(addr, size)			ioremap((addr), (size))
  
- static inline void memunmap_pmem(void __pmem *addr)
- {
--	iounmap((void __force __iomem *) addr);
-+	memunmap((void __force *) addr);
- }
+diff --git a/arch/tile/include/asm/io.h b/arch/tile/include/asm/io.h
+index dc61de15c1f9..e2867d235170 100644
+--- a/arch/tile/include/asm/io.h
++++ b/arch/tile/include/asm/io.h
+@@ -55,7 +55,6 @@ extern void iounmap(volatile void __iomem *addr);
+ #define ioremap_nocache(physaddr, size)		ioremap(physaddr, size)
+ #define ioremap_wc(physaddr, size)		ioremap(physaddr, size)
+ #define ioremap_wt(physaddr, size)		ioremap(physaddr, size)
+-#define ioremap_fullcache(physaddr, size)	ioremap(physaddr, size)
  
- /**
-@@ -85,16 +85,15 @@ static inline bool arch_has_pmem_api(void)
-  * default_memremap_pmem + default_memcpy_to_pmem is sufficient for
-  * making data durable relative to i/o completion.
-  */
--static void default_memcpy_to_pmem(void __pmem *dst, const void *src,
-+static inline void default_memcpy_to_pmem(void __pmem *dst, const void *src,
- 		size_t size)
- {
- 	memcpy((void __force *) dst, src, size);
- }
+ #define mmiowb()
  
--static void __pmem *default_memremap_pmem(resource_size_t offset,
--		unsigned long size)
-+static inline unsigned long default_memremap_pmem_flags(void)
- {
--	return (void __pmem *) memremap(offset, size, MEMREMAP_WT);
-+	return MEMREMAP_WT;
- }
- 
- /**
-@@ -112,9 +111,14 @@ static void __pmem *default_memremap_pmem(resource_size_t offset,
- static inline void __pmem *memremap_pmem(resource_size_t offset,
- 		unsigned long size)
- {
-+	unsigned long flags;
-+
- 	if (arch_has_pmem_api())
--		return arch_memremap_pmem(offset, size);
--	return default_memremap_pmem(offset, size);
-+		flags = arch_memremap_pmem_flags(offset, size);
-+	else
-+		flags = default_memremap_pmem_flags();
-+
-+	return (void __pmem *) memremap(offset, size, flags);
- }
- 
- /**
