@@ -1,105 +1,266 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Thu, 30 Jul 2015 15:11:19 +0100
-Subject: [PATCH] irqchip/gic: Only allow the primary GIC to set the CPU map
-Message-ID: <1438265479-15427-1-git-send-email-jonathanh@nvidia.com>
+From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
+Date: Thu, 30 Jul 2015 14:15:42 +0000
+Subject: [PATCH v6] PCI: Store PCIe bus address in struct of_pci_range
+In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E01D6F94A@lhreml503-mbs>
+References: <1438010223-124422-1-git-send-email-gabriele.paoloni@huawei.com>
+ <20150729172053.GE31170@google.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E01D6F350@lhreml503-mbs>
+ <CAL_JsqKs11-sXQTdBD+ZjbVYFWUHBARTW9q5MF1hCXUhZ+nWLQ@mail.gmail.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E01D6F94A@lhreml503-mbs>
+Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E01D6F98F@lhreml503-mbs>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The gic_init_bases() function initialises an array that stores the mapping
-between the GIC and CPUs. This array is a global array that is
-unconditionally initialised on every call to gic_init_bases(). Although,
-it is not common for there to be more than one GIC instance, there are
-some devices that do support nested GIC controllers and gic_init_bases()
-can be called more than once.
 
-A 2nd call to gic_init_bases() will clear the previous CPU mapping and
-will only setup the mapping again for the CPU calling gic_init_bases().
-Fix this by only allowing the CPU map to be configured for the primary GIC.
 
-For secondary GICs the CPU map is not relevant because these GICs do not
-directly route the interrupts to the main CPU(s) but to other GICs or
-devices.
+> -----Original Message-----
+> From: linux-pci-owner at vger.kernel.org [mailto:linux-pci-
+> owner at vger.kernel.org] On Behalf Of Gabriele Paoloni
+> Sent: Thursday, July 30, 2015 2:52 PM
+> To: Rob Herring
+> Cc: Bjorn Helgaas; arnd at arndb.de; lorenzo.pieralisi at arm.com; Wangzhou
+> (B); robh+dt at kernel.org; james.morse at arm.com; Liviu.Dudau at arm.com;
+> linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> devicetree at vger.kernel.org; Yuanzhichang; Zhudacai; zhangjukuo;
+> qiuzhenfa; Liguozhu (Kenneth)
+> Subject: RE: [PATCH v6] PCI: Store PCIe bus address in struct
+> of_pci_range
+> 
+> 
+> 
+> > -----Original Message-----
+> > From: linux-pci-owner at vger.kernel.org [mailto:linux-pci-
+> > owner at vger.kernel.org] On Behalf Of Rob Herring
+> > Sent: Thursday, July 30, 2015 2:43 PM
+> > To: Gabriele Paoloni
+> > Cc: Bjorn Helgaas; arnd at arndb.de; lorenzo.pieralisi at arm.com; Wangzhou
+> > (B); robh+dt at kernel.org; james.morse at arm.com; Liviu.Dudau at arm.com;
+> > linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> > devicetree at vger.kernel.org; Yuanzhichang; Zhudacai; zhangjukuo;
+> > qiuzhenfa; Liguozhu (Kenneth)
+> > Subject: Re: [PATCH v6] PCI: Store PCIe bus address in struct
+> > of_pci_range
+> >
+> > On Wed, Jul 29, 2015 at 2:44 PM, Gabriele Paoloni
+> > <gabriele.paoloni@huawei.com> wrote:
+> > > Hi Bjorn
+> > >
+> > > Many Thanks for your reply
+> > >
+> > > I have commented back inline with resolutions from my side.
+> > >
+> > > If you're ok with them I'll send it out a new version in the
+> > appropriate patchset
+> > >
+> > > Cheers
+> > >
+> > > Gab
+> > >
+> > >> -----Original Message-----
+> > >> From: Bjorn Helgaas [mailto:bhelgaas at google.com]
+> > >> Sent: Wednesday, July 29, 2015 6:21 PM
+> > >> To: Gabriele Paoloni
+> > >> Cc: arnd at arndb.de; lorenzo.pieralisi at arm.com; Wangzhou (B);
+> > >> robh+dt at kernel.org; james.morse at arm.com; Liviu.Dudau at arm.com;
+> linux-
+> > >> pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> > >> devicetree at vger.kernel.org; Yuanzhichang; Zhudacai; zhangjukuo;
+> > >> qiuzhenfa; Liguozhu (Kenneth)
+> > >> Subject: Re: [PATCH v6] PCI: Store PCIe bus address in struct
+> > >> of_pci_range
+> > >>
+> > >> Hi Gabriele,
+> > >>
+> > >> As far as I can tell, this is not specific to PCIe, so please use
+> > "PCI"
+> > >> in
+> > >> the subject as a generic term that includes both PCI and PCIe.
+> > >
+> > > sure agreed
+> > >
+> > >>
+> > >> On Mon, Jul 27, 2015 at 11:17:03PM +0800, Gabriele Paoloni wrote:
+> > >> > From: gabriele paoloni <gabriele.paoloni@huawei.com>
+> > >> >
+> > >> >     This patch is needed port PCIe designware to new DT parsing
+> > API
+> > >> >     As discussed in
+> > >> >     http://lists.infradead.org/pipermail/linux-arm-kernel/2015-
+> > >> January/317743.html
+> > >> >     in designware we have a problem as the PCI addresses in the
+> > PCIe
+> > >> controller
+> > >> >     address space are required in order to perform correct HW
+> > >> operation.
+> > >> >
+> > >> >     In order to solve this problem commit f4c55c5a3 "PCI:
+> > designware:
+> > >> >     Program ATU with untranslated address" added code to read
+> the
+> > >> PCIe
+> > >>
+> > >> Conventional reference is 12-char SHA1, like this:
+> > >>
+> > >>   f4c55c5a3f7f ("PCI: designware: Program ATU with untranslated
+> > >> address")
+> > >
+> > > Agreed, will change this
+> > >
+> > >>
+> > >> >     controller start address directly from the DT ranges.
+> > >> >
+> > >> >     In the new DT parsing API of_pci_get_host_bridge_resources()
+> > >> hides the
+> > >> >     DT parser from the host controller drivers, so it is not
+> > possible
+> > >> >     for drivers to parse values directly from the DT.
+> > >> >
+> > >> >     In http://www.spinics.net/lists/linux-pci/msg42540.html we
+> > >> already tried
+> > >> >     to use the new DT parsing API but there is a bug (obviously)
+> > in
+> > >> setting
+> > >> >     the <*>_mod_base addresses
+> > >> >     Applying this patch we can easily set "<*>_mod_base = win-
+> > >> >__res.start"
+> > >>
+> > >> By itself, this patch adds something.  It would help me understand
+> > it
+> > >> if
+> > >> the *user* of this new something were in the same patch series.
+> > >
+> > > the user is: "[PATCH v5 2/5] PCI: designware: Add ARM64 support"
+> > > I will ask Zhou Wang to include this patch in his patchset
+> > >
+> > >
+> > >>
+> > >> >     This patch adds a new field in "struct of_pci_range" to
+> store
+> > the
+> > >> >     pci bus start address; it fills the field in
+> > >> of_pci_range_parser_one();
+> > >> >     in of_pci_get_host_bridge_resources() it retrieves the
+> > resource
+> > >> entry
+> > >> >     after it is created and added to the resource list and uses
+> > >> >     entry->__res.start to store the pci controller address
+> > >>
+> > >> struct of_pci_range is starting to get confusing to non-OF folks
+> > like
+> > >> me.
+> > >> It now contains:
+> > >>
+> > >>   u32 pci_space;
+> > >>   u64 pci_addr;
+> > >>   u64 cpu_addr;
+> > >>   u64 bus_addr;
+> > >>
+> > >> Can you explain what all these things mean, and maybe even add
+> one-
+> > line
+> > >> comments to the structure?
+> > >
+> > > sure I can add comments inline in the code
+> > >
+> > >>
+> > >> pci_space: The only uses I see are to determine whether to print
+> > >> "Prefetch".  I don't see any real functionality that uses this.
+> > >
+> > > Looking at the code I agree. it's seems to be used only in powerpc
+> > > and microblaze to print out.
+> > > However from my understanding pci_space is the phys.hi field of the
+> > > ranges property: it defines the properties of the address space
+> > associated
+> > > to the PCI address. if you're curious you can find a nice and quick
+> > to read
+> > > "guide" in http://devicetree.org/MPC5200:PCI
+> > >
+> > >>
+> > >> pci_addr: I assume this is a PCI bus address, like what you would
+> > see
+> > >> if
+> > >> you put an analyzer on the bus/link.  This address could go in a
+> BAR.
+> > >
+> > > Yes, this is the PCI start address of the range: phys.mid +
+> phys.low
+> > in the
+> > > guide mentioned above
+> > >
+> > >>
+> > >> cpu_addr: I assume this is a CPU physical address, like what you
+> > would
+> > >> see
+> > >> in /proc/iomem and what you would pass to ioremap().
+> > >
+> > > Yes correct
+> > >
+> > >>
+> > >> bus_addr: ?
+> > >>
+> > >
+> > > According to the guide above, this is the address into which the
+> > pci_address
+> > > get translated to and that is passed to the root complex. Between
+> the
+> > root
+> > > complex and the CPU there can be intermediate translation layers:
+> see
+> > that to
+> > > get pci_address we call "of_translate_address"; this will apply all
+> > the
+> > > translation layers (ranges in the DT) that it finds till it comes
+> to
+> > the root
+> > > node of the DT (thus retrieving the CPU address).
+> > > Now said that, for designware we need the first translated PCI
+> > address, that we call
+> >
+> > I think you mean "translated CPU address." The flow of addresses
+> looks
+> > like this:
+> >
+> > CPU -> CPU bus address -> bus fabric address decoding -> bus address
+> > -> DW PCI -> PCI address
+> >
+> > This is quite common that an IP block does not see the full address.
+> > It is unusual that the IP block needs to know its full address on the
+> > slave side. It is quite common for the master side and the kernel
+> > deals with that all the time with DMA mapping
+> >
+> > > here bus_addr after Rob Herring suggested the name...honestly I
+> > cannot think of a
+> > > different name
+> >
+> > Thinking about this some more, is this really a translation versus
+> > just a stripping of high bits? Does the DW IP have less than 32-bits
+> > address? If so, we could express differently and just mask the CPU
+> > address within the driver instead.
+> 
+> I don?t think we should rely on PCI addresses...what if the
+> intermediate
+> translation layer changes the lower significant bits of the "bus
+> address"
+> to translate into a cpu address?
 
-Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
----
-This is a follow-up to the patch titled "irqchip: gic: Add a cpu map for
-each GIC instance" and discussed here [1]. Based upon the discussion I have
-re-worked and re-titled it approriately.
+Sorry above I meant "I don?t think we should rely on CPU addresses"
 
-[1] http://www.spinics.net/lists/kernel/msg2044421.html
-
- drivers/irqchip/irq-gic.c | 43 +++++++++++++++++++++++++------------------
- 1 file changed, 25 insertions(+), 18 deletions(-)
-
-diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index a530d9a9b810..7566fe259d27 100644
---- a/drivers/irqchip/irq-gic.c
-+++ b/drivers/irqchip/irq-gic.c
-@@ -416,19 +416,26 @@ static void gic_cpu_init(struct gic_chip_data *gic)
- 	int i;
- 
- 	/*
--	 * Get what the GIC says our CPU mask is.
-+	 * Setting up the CPU map is only relevant for the primary GIC
-+	 * because any nested/secondary GICs do not directly interface
-+	 * with the CPU(s).
- 	 */
--	BUG_ON(cpu >= NR_GIC_CPU_IF);
--	cpu_mask = gic_get_cpumask(gic);
--	gic_cpu_map[cpu] = cpu_mask;
-+	if (gic == &gic_data[0]) {
-+		/*
-+		 * Get what the GIC says our CPU mask is.
-+		 */
-+		BUG_ON(cpu >= NR_GIC_CPU_IF);
-+		cpu_mask = gic_get_cpumask(gic);
-+		gic_cpu_map[cpu] = cpu_mask;
- 
--	/*
--	 * Clear our mask from the other map entries in case they're
--	 * still undefined.
--	 */
--	for (i = 0; i < NR_GIC_CPU_IF; i++)
--		if (i != cpu)
--			gic_cpu_map[i] &= ~cpu_mask;
-+		/*
-+		 * Clear our mask from the other map entries in case they're
-+		 * still undefined.
-+		 */
-+		for (i = 0; i < NR_GIC_CPU_IF; i++)
-+			if (i != cpu)
-+				gic_cpu_map[i] &= ~cpu_mask;
-+	}
- 
- 	gic_cpu_config(dist_base, NULL);
- 
-@@ -977,13 +984,6 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
- 	}
- 
- 	/*
--	 * Initialize the CPU interface map to all CPUs.
--	 * It will be refined as each CPU probes its ID.
--	 */
--	for (i = 0; i < NR_GIC_CPU_IF; i++)
--		gic_cpu_map[i] = 0xff;
--
--	/*
- 	 * Find out how many interrupts are supported.
- 	 * The GIC only supports up to 1020 interrupt sources.
- 	 */
-@@ -1028,6 +1028,13 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
- 		return;
- 
- 	if (gic_nr == 0) {
-+		/*
-+		 * Initialize the CPU interface map to all CPUs.
-+		 * It will be refined as each CPU probes its ID.
-+		 * This is only necessary for the primary GIC.
-+		 */
-+		for (i = 0; i < NR_GIC_CPU_IF; i++)
-+			gic_cpu_map[i] = 0xff;
- #ifdef CONFIG_SMP
- 		set_smp_cross_call(gic_raise_softirq);
- 		register_cpu_notifier(&gic_cpu_notifier);
--- 
-2.1.4
+> 
+> In that case we're going to program the DW with a wrong address
+> 
+> What I am saying is that the DW driver should not rely on the
+> behavior of external HW....what do you think?
+> 
+> >
+> > Rob
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-pci"
+> in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> ???
+?&?~?&???+-
+> ?????w??????m?b??ir(?????}????z?&j:+v???
+????zZ+??+zf???h???~????i???
+> z?
+?w????????&?)?f
