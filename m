@@ -1,114 +1,63 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Thu, 30 Jul 2015 18:08:50 +0100
-Subject: [PATCH v2 00/11]  Add c8sectpfe LinuxDVB demux driver
-Message-ID: <1438276141-16902-1-git-send-email-peter.griffin@linaro.org>
+Date: Thu, 30 Jul 2015 18:08:51 +0100
+Subject: [PATCH v2 01/11] [media] stv0367: Refine i2c error trace to include
+ i2c address
+In-Reply-To: <1438276141-16902-1-git-send-email-peter.griffin@linaro.org>
+References: <1438276141-16902-1-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1438276141-16902-2-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maruro and linux-media folks,
+When using stv0367 demodulator with STi STB platforms,
+we can have easily have four or more stv0367 demods running
+in the system at one time.
 
-This patchset adds support for a LinuxDVB demux driver for the
-ST STB stih407 family SoC's. Mauro - it is what I spoke to you about
-when we met at ELC-E in Dusseldorf last year.
+As typically the b2120 reference design ships with a b2004a daughter
+board, which can accept two dvb NIM cards, and each b2100A NIM
+has 2x stv0367 demods and 2x NXPs tuner on it.
 
-One big advantage of having a upstream demux driver for ST
-SoC's is that it will be easier to maintain support for the ST demodulators
-and tuners which are already upstream (and also add support for newer demods
-such as the stv6120 and stv910). As this driver allows ST NIM reference boards
-(which typically have a tuner/demod combination on)
-to be used easily with a upstream kernel on ST STB reference designs.
+In such circumstances it is useful to print the i2c address
+on error messages to know which one is failing due to I2C issues.
 
-Up until now it is not easy to test stv0367, stv6110 stv90x.c demod and tuner
-drivers which are supported upstream with ST STB reference hardware,
-and as such makes helping support these devices difficult.
+Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+---
+ drivers/media/dvb-frontends/stv0367.c | 12 ++++++++----
+ 1 file changed, 8 insertions(+), 4 deletions(-)
 
-It also furthers the aim of having a completely open source A/V pipeline for STi
-chipsets. A upstream DRM driver is already merged for STi SoC's. ALSA SoC is
-current under review, and when this driver is accepted we would have a totaly
-open source frontend support (tuner->demod->demux) :-)
-
-This initial patchset adds support for the following demux HW called c8sectpfe: -
-* Input Block HW
-* HW PID filtering
-* memdma engine (moves TS from input block sram to RAM)
-
-The driver creates one Linux DVB adapter, and each tsin channel which is
-described in DT has a set of LDVB device nodes.
-
-Currently the driver supports 7 tsin channels. This driver has been tested with
-the stih407-b2120 board and stih410-b2120 reference design boards, and currently
-we support the following DVB fronend cards:
- - STMicroelectronics DVB-T B2100A (STV0367 + TDA18212)
- - STMicroelectronics DVB-S/S2 STV0903 + STV6110 + LNBP24 board
-
-This patchset also includes some small changes to stv0367.c to get
-the upstream driver working correctly with the ST NIM reference board. Also Joe
-Perches dvb-pll patch is included with this series.
-
-regards,
-
-Peter.
-
-Changes since v1:
-- Rebase patches on v4.2-rc3 (Peter)
-- Rework firmware loading mechanism to be async (Peter)
-- Rework ELF firmware loading code (Peter)
-- Add support for 8192 special PID (Peter)
-- Fixup Kconfig depedencies for c8sectpfe (Peter)
-- Fix typo in Makefile rule for c8sectpfe-debugfs (Paul)
-
-- Include Joe Perches dvb-pll patch as requested by (Mauro)
-- Remove BUG_ON from various places (Mauro)
-- Drop THOMSON DTT7546X tuner support (rework based on tuner-simple later) (Mike)
-- Move driver to drivers/media/platform/sti/c8sectpfe/
-- usleep_range instead of msleep (Mauro)
-
-Joe Perches (1):
-  dvb-pll: Convert struct dvb_pll_desc uses to const.
-
-Peter Griffin (10):
-  [media] stv0367: Refine i2c error trace to include i2c address
-  [media] stv0367: Add support for 16Mhz reference clock
-  [media] c8sectpfe: Add DT bindings documentation for c8sectpfe driver.
-  ARM: DT: STi: STiH407: Add c8sectpfe LinuxDVB DT node.
-  [media] c8sectpfe: STiH407/10 Linux DVB demux support
-  [media] c8sectpfe: Add LDVB helper functions.
-  [media] c8sectpfe: Add support for various ST NIM cards.
-  [media] c8sectpfe: Add c8sectpfe debugfs support.
-  [media] c8sectpfe: Add Kconfig and Makefile for the driver.
-  MAINTAINERS: Add c8sectpfe driver directory to STi section
-
- .../bindings/media/stih407-c8sectpfe.txt           |   89 ++
- MAINTAINERS                                        |    1 +
- arch/arm/boot/dts/stihxxx-b2120.dtsi               |   38 +
- drivers/media/dvb-frontends/dvb-pll.c              |   50 +-
- drivers/media/dvb-frontends/stv0367.c              |   17 +-
- drivers/media/platform/Kconfig                     |    4 +-
- drivers/media/platform/Makefile                    |    1 +
- drivers/media/platform/sti/c8sectpfe/Kconfig       |   28 +
- drivers/media/platform/sti/c8sectpfe/Makefile      |    9 +
- .../platform/sti/c8sectpfe/c8sectpfe-common.c      |  265 +++++
- .../platform/sti/c8sectpfe/c8sectpfe-common.h      |   64 +
- .../media/platform/sti/c8sectpfe/c8sectpfe-core.c  | 1235 ++++++++++++++++++++
- .../media/platform/sti/c8sectpfe/c8sectpfe-core.h  |  288 +++++
- .../platform/sti/c8sectpfe/c8sectpfe-debugfs.c     |  271 +++++
- .../platform/sti/c8sectpfe/c8sectpfe-debugfs.h     |   26 +
- .../media/platform/sti/c8sectpfe/c8sectpfe-dvb.c   |  244 ++++
- .../media/platform/sti/c8sectpfe/c8sectpfe-dvb.h   |   20 +
- include/dt-bindings/media/c8sectpfe.h              |   12 +
- 18 files changed, 2632 insertions(+), 30 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/media/stih407-c8sectpfe.txt
- create mode 100644 drivers/media/platform/sti/c8sectpfe/Kconfig
- create mode 100644 drivers/media/platform/sti/c8sectpfe/Makefile
- create mode 100644 drivers/media/platform/sti/c8sectpfe/c8sectpfe-common.c
- create mode 100644 drivers/media/platform/sti/c8sectpfe/c8sectpfe-common.h
- create mode 100644 drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c
- create mode 100644 drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.h
- create mode 100644 drivers/media/platform/sti/c8sectpfe/c8sectpfe-debugfs.c
- create mode 100644 drivers/media/platform/sti/c8sectpfe/c8sectpfe-debugfs.h
- create mode 100644 drivers/media/platform/sti/c8sectpfe/c8sectpfe-dvb.c
- create mode 100644 drivers/media/platform/sti/c8sectpfe/c8sectpfe-dvb.h
- create mode 100644 include/dt-bindings/media/c8sectpfe.h
-
+diff --git a/drivers/media/dvb-frontends/stv0367.c b/drivers/media/dvb-frontends/stv0367.c
+index ec3e18e..9a49db1 100644
+--- a/drivers/media/dvb-frontends/stv0367.c
++++ b/drivers/media/dvb-frontends/stv0367.c
+@@ -791,11 +791,13 @@ int stv0367_writeregs(struct stv0367_state *state, u16 reg, u8 *data, int len)
+ 	memcpy(buf + 2, data, len);
+ 
+ 	if (i2cdebug)
+-		printk(KERN_DEBUG "%s: %02x: %02x\n", __func__, reg, buf[2]);
++		printk(KERN_DEBUG "%s: [%02x] %02x: %02x\n", __func__,
++			state->config->demod_address, reg, buf[2]);
+ 
+ 	ret = i2c_transfer(state->i2c, &msg, 1);
+ 	if (ret != 1)
+-		printk(KERN_ERR "%s: i2c write error!\n", __func__);
++		printk(KERN_ERR "%s: i2c write error! ([%02x] %02x: %02x)\n",
++			__func__, state->config->demod_address, reg, buf[2]);
+ 
+ 	return (ret != 1) ? -EREMOTEIO : 0;
+ }
+@@ -829,10 +831,12 @@ static u8 stv0367_readreg(struct stv0367_state *state, u16 reg)
+ 
+ 	ret = i2c_transfer(state->i2c, msg, 2);
+ 	if (ret != 2)
+-		printk(KERN_ERR "%s: i2c read error\n", __func__);
++		printk(KERN_ERR "%s: i2c read error ([%02x] %02x: %02x)\n",
++			__func__, state->config->demod_address, reg, b1[0]);
+ 
+ 	if (i2cdebug)
+-		printk(KERN_DEBUG "%s: %02x: %02x\n", __func__, reg, b1[0]);
++		printk(KERN_DEBUG "%s: [%02x] %02x: %02x\n", __func__,
++			state->config->demod_address, reg, b1[0]);
+ 
+ 	return b1[0];
+ }
 -- 
 1.9.1
