@@ -1,51 +1,52 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 30 Jul 2015 02:24:31 +0200
-Subject: [PATCH 4/5] rtc: at91sam9: get sclk rate after enabling it
+Date: Thu, 30 Jul 2015 02:24:32 +0200
+Subject: [PATCH 5/5] rtc: at91rm9200: sort headers alphabetically
 In-Reply-To: <1438215872-27794-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1438215872-27794-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1438215872-27794-4-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1438215872-27794-5-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-See help for clk_get_rate(): "obtain the current clock rate (in Hz) for a
-clock source. This is only valid once the clock source has been enabled."
-
-It currently returns the correct value but that may not stay that way.
+Sort included headers alphabetically.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- drivers/rtc/rtc-at91sam9.c | 13 +++++++------
- 1 file changed, 7 insertions(+), 6 deletions(-)
+ drivers/rtc/rtc-at91rm9200.c | 16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/rtc/rtc-at91sam9.c b/drivers/rtc/rtc-at91sam9.c
-index 23f721d049b2..f9e85ace5e71 100644
---- a/drivers/rtc/rtc-at91sam9.c
-+++ b/drivers/rtc/rtc-at91sam9.c
-@@ -425,18 +425,19 @@ static int at91_rtc_probe(struct platform_device *pdev)
- 	if (IS_ERR(rtc->sclk))
- 		return PTR_ERR(rtc->sclk);
+diff --git a/drivers/rtc/rtc-at91rm9200.c b/drivers/rtc/rtc-at91rm9200.c
+index 8093d9e50619..cb62e214b52a 100644
+--- a/drivers/rtc/rtc-at91rm9200.c
++++ b/drivers/rtc/rtc-at91rm9200.c
+@@ -18,21 +18,21 @@
+  *
+  */
  
--	sclk_rate = clk_get_rate(rtc->sclk);
--	if (!sclk_rate || sclk_rate > AT91_RTT_RTPRES) {
--		dev_err(&pdev->dev, "Invalid slow clock rate\n");
--		return -EINVAL;
--	}
--
- 	ret = clk_prepare_enable(rtc->sclk);
- 	if (ret) {
- 		dev_err(&pdev->dev, "Could not enable slow clock\n");
- 		return ret;
- 	}
+-#include <linux/module.h>
+-#include <linux/kernel.h>
+-#include <linux/platform_device.h>
+-#include <linux/time.h>
+-#include <linux/rtc.h>
+ #include <linux/bcd.h>
+ #include <linux/clk.h>
++#include <linux/completion.h>
+ #include <linux/interrupt.h>
+-#include <linux/spinlock.h>
+ #include <linux/ioctl.h>
+-#include <linux/completion.h>
+ #include <linux/io.h>
+-#include <linux/of.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
+ #include <linux/of_device.h>
++#include <linux/of.h>
++#include <linux/platform_device.h>
++#include <linux/rtc.h>
++#include <linux/spinlock.h>
+ #include <linux/suspend.h>
++#include <linux/time.h>
+ #include <linux/uaccess.h>
  
-+	sclk_rate = clk_get_rate(rtc->sclk);
-+	if (!sclk_rate || sclk_rate > AT91_RTT_RTPRES) {
-+		dev_err(&pdev->dev, "Invalid slow clock rate\n");
-+		ret = -EINVAL;
-+		goto err_clk;
-+	}
-+
- 	mr = rtt_readl(rtc, MR);
- 
- 	/* unless RTT is counting at 1 Hz, re-initialize it */
+ #include "rtc-at91rm9200.h"
 -- 
 2.1.4
