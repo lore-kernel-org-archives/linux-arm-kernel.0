@@ -1,71 +1,38 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 29 Jul 2015 22:06:02 -0500
-Subject: [PATCH v2 0/22] On-demand device probing
-In-Reply-To: <1438089593-7696-1-git-send-email-tomeu.vizoso@collabora.com>
+Date: Wed, 29 Jul 2015 22:08:10 -0500
+Subject: [PATCH v2 05/22] ACPI: add acpi_dev_get_device()
+In-Reply-To: <1438089593-7696-6-git-send-email-tomeu.vizoso@collabora.com>
 References: <1438089593-7696-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <CAL_Jsq+2q=c6JbER8EMOGFtR=a6gvHermb8DRo9dKyj6fvdnXg@mail.gmail.com>
+ <1438089593-7696-6-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <CAL_JsqKn82RqVhRRX0YPwZcfX66==1i3D43y8XLP07QARSGGrw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, Jul 28, 2015 at 8:19 AM, Tomeu Vizoso
 <tomeu.vizoso@collabora.com> wrote:
-> Hello,
+> This function is just a getter for struct acpi_device.dev and is needed
+> in the implementation of the fwnode API when building with !CONFIG_ACPI.
 >
-> I have a problem with the panel on my Tegra Chromebook taking longer
-> than expected to be ready during boot (St?phane Marchesin reported what
-> is basically the same issue in [0]), and have looked into ordered
-> probing as a better way of solving this than moving nodes around in the
-> DT or playing with initcall levels and linking order.
+> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+> ---
 >
-> While reading the thread [1] that Alexander Holler started with his
-> series to make probing order deterministic, it occurred to me that it
-> should be possible to achieve the same by probing devices as they are
-> referenced by other devices.
+> Changes in v2:
+> - Add acpi_dev_get_device()
 >
-> This basically reuses the information that is already implicit in the
-> probe() implementations, saving us from refactoring existing drivers or
-> adding information to DTBs.
+>  include/linux/acpi.h | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
 >
-> During review of v1 of this series Linus Walleij suggested that it
-> should be the device driver core to make sure that dependencies are
-> ready before probing a device. I gave this idea a try [2] but Mark Brown
-> pointed out to the logic duplication between the resource acquisition
-> and dependency discovery code paths (though I think it's fairly minor).
+> diff --git a/include/linux/acpi.h b/include/linux/acpi.h
+> index 01e6770d8e27..d1ad6c20c7e4 100644
+> --- a/include/linux/acpi.h
+> +++ b/include/linux/acpi.h
+> @@ -78,6 +78,11 @@ static inline void acpi_preset_companion(struct device *dev,
+>         ACPI_COMPANION_SET(dev, acpi_find_child_device(parent, addr, NULL));
+>  }
 >
-> To address that code duplication I experimented with Arnd's devm_probe
-> [3] concept of having drivers declare their dependencies instead of
-> acquiring them during probe, and while it worked [4], I don't think we
-> end up winning anything when compared to just probing devices on-demand
-> from resource getters.
->
-> One remaining objection is to the "sprinkling" of calls to
-> fwnode_ensure_device() in the resource getters of each subsystem, but I
-> think it's the right thing to do given that the storage of resources is
-> currently subsystem-specific.
+> +static inline struct device *acpi_dev_get_device(struct acpi_device *adev)
 
-Seems like a minor change to me.
-
-> We could avoid the above by moving resource storage into the core, but I
-> don't think there's a compelling case for that.
->
-> I have tested this on boards with Tegra, iMX.6, Exynos and OMAP SoCs,
-> and these patches were enough to eliminate all the deferred probes
-> (except one in PandaBoard because omap_dma_system doesn't have a
-> firmware node as of yet).
->
-> With this series I get the kernel to output to the panel in 0.5s,
-> instead of 2.8s.
-
-Generally, I think this looks pretty good. It is simple and the error
-path is simply falling back to deferred probe.
-
-One overall comment is I'm not so sure if fwnode_ensure_device
-shouldn't just be of_ensure_device. At least currently, it looks like
-all the calling locations are DT specific functions anyway. There's
-very little logic within the function to really benefit sharing with
-ACPI. It is basically just a call to of_platform_device_find and then
-bus_probe_device. I expect the get functions will always call into
-DT/ACPI specific functions which can then call the firmware specific
-device find function.
+get usually implies reference counting. Perhaps acpi_dev_to_device or
+acpi_dev_find_device.
 
 Rob
