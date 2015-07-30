@@ -1,61 +1,61 @@
-From: slash.tmp@free.fr (Mason)
-Date: Thu, 30 Jul 2015 15:58:53 +0200
-Subject: arch/arm/kernel/setup.c does not compile at -O0
-In-Reply-To: <55BA2335.706@arm.com>
-References: <55BA1E62.9080103@free.fr> <55BA2335.706@arm.com>
-Message-ID: <55BA2D9D.1070402@free.fr>
+From: matt@codeblueprint.co.uk (Matt Fleming)
+Date: Thu, 30 Jul 2015 15:01:44 +0100
+Subject: [PATCH 1/2] efi: add 'offset' param to efi_low_alloc()
+In-Reply-To: <1438164259-14470-2-git-send-email-ard.biesheuvel@linaro.org>
+References: <1438164259-14470-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1438164259-14470-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20150730140144.GH2725@codeblueprint.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/07/2015 15:14, Robin Murphy wrote:
-
-> On 30/07/15 13:53, Mason wrote:
+On Wed, 29 Jul, at 12:04:18PM, Ard Biesheuvel wrote:
+> In some cases, e.g., when allocating memory for the arm64 kernel,
+> we need memory at a certain offset from an aligned boundary. So add
+> an offset parameter to efi_low_alloc(), and update the existing
+> callers to pass zero by default.
 > 
->> Any idea how I can get DS-5 to properly handle local variables?
-> 
-> I carry a patch locally reverting 2062afb4f804 - at least on arm64, the 
-> debugger manages to resolve optimised locals considerably better without 
-> the -fno-var-tracking-assignments option. The Kconfig "Generate dwarf4 
-> debug info" option is a good idea, and "Generate readable assembly code" 
-> sometimes helps a bit too.
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/kernel/efi-stub.c                   |  2 +-
+>  arch/x86/boot/compressed/eboot.c               |  4 ++--
+>  drivers/firmware/efi/libstub/efi-stub-helper.c | 20 +++++++++++++++-----
+>  include/linux/efi.h                            |  2 +-
+>  4 files changed, 19 insertions(+), 9 deletions(-)
+ 
+[...]
 
-I reverted 2062afb4f804 (I'm using 4.9.3 so I think it's safe)
+> @@ -269,10 +269,19 @@ efi_status_t efi_low_alloc(efi_system_table_t *sys_table_arg,
+>  		 * checks pointers against NULL. Skip the first 8
+>  		 * bytes so we start at a nice even number.
+>  		 */
+> -		if (start == 0x0)
+> +		if (start + offset == 0x0)
+>  			start += 8;
+>  
+> -		start = round_up(start, align);
+> +		/*
+> +		 * Check if the offset exceeds the misalignment of this region.
+> +		 * In that case, we can round down instead of up, and the
+> +		 * resulting start value will be correctly aligned and still
+> +		 * point past the start of the region.
+> +		 */
+> +		if (offset >= (start & (align - 1)))
+> +			start = round_down(start, align) + offset;
+> +		else
+> +			start = round_up(start, align) + offset;
+>  		if ((start + size) > end)
+>  			continue;
 
-AFAICT, config DEBUG_INFO_DWARF4 isn't available in 3.14
-(I think bfaf2dd3509b was included in 3.16)
+Aha, now I see what you mean. Thanks for doing this Ard, these are much
+more polished than what I was expecting.
 
-But the problem seems to be on a higher level. My debugger
-just doesn't see ANY local variable whatsoever.
+I'm gonna have to NAK this because it's just too much of a special case
+to support directly in efi_low_alloc(), which I think was the exact
+point that you made originally, and which I was too tired/dumb to
+understand. Sorry.
 
-For example, if I break in serial8250_probe, step past the
-initializations, then the Eclipse "Variables" tab states
-Locals: 0 variables (as it does everywhere, mind you).
+In particular, the fact that you can use the offset argument to violate
+the requested alignment seems like it would trip up most users. 
 
-If I try to print from the "Commands" tab:
-
-print p
-ERROR(EXP8): Could not find the symbol "p"
-print irqflag
-ERROR(EXP8): Could not find the symbol "irqflag"
-
-I'm doing wrong something fundamental.
-
-This is my work flow:
-
-Start the system, interrupt it in Uboot
-Connect the DS-5 probe
-Set a HW breakpoint at the address of start_kernel
-Let Uboot load the kernel
-When the breakpoint is hit, load the symbols with:
-  add-symbol-file /opt/linux-3.14/vmlinux
-
-=> Is vmlinux supposed to contain the debug info for the
-local variables? (I mean 'automatic' variables, in the
-C sense.)
-
-> Whilst in general -O0 isn't going to work, I've had some success using 
-> "__attribute__ ((optimize(0)))" on individual functions of interest.
-
-This will work at the function granularity?
-
-Regards.
+-- 
+Matt Fleming, Intel Open Source Technology Center
