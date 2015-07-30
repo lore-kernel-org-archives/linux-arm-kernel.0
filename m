@@ -1,204 +1,87 @@
-From: shenwei.wang@freescale.com (Shenwei Wang)
-Date: Thu, 30 Jul 2015 09:32:42 -0500
-Subject: [PATCH v4 1/1] Serial: imx: add dev_pm_ops to support suspend to
- ram/disk
-Message-ID: <1438266762-4397-1-git-send-email-shenwei.wang@freescale.com>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Thu, 30 Jul 2015 15:33:04 +0100
+Subject: [PATCH 02/12] [media] dvb-pll: Add support for THOMSON DTT7546X
+ tuner.
+In-Reply-To: <CAOcJUbzhL2LXro9cwazZxtH=-=FndNARi7TSsFi+DGCPP3uEdA@mail.gmail.com>
+References: <1435158670-7195-1-git-send-email-peter.griffin@linaro.org>
+ <1435158670-7195-3-git-send-email-peter.griffin@linaro.org>
+ <1435195057.9377.18.camel@perches.com>
+ <20150722185811.2d718baa@recife.lan>
+ <20150730094738.GD488@griffinp-ThinkPad-X1-Carbon-2nd>
+ <1438250928.2677.10.camel@perches.com>
+ <CAOcJUbw5hSmPdrz6rPPYU6iMBHnvOZc1p3f+4WhEYq2-XmAPVw@mail.gmail.com>
+ <CAOcJUbzhL2LXro9cwazZxtH=-=FndNARi7TSsFi+DGCPP3uEdA@mail.gmail.com>
+Message-ID: <20150730143304.GA22196@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When system goes into low power states like SUSPEND_MEM and
-HIBERNATION, the hardware IP block may be powered off to reduce
-the power consumption. This power down may cause problems on
-some imx platforms, because the hardware settings are reset to
-its power on default values which may differ from the ones when
-it power off. This patch added the dev_pm_ops and implemented
-two callbacks: suspend_noirq and resume_noirq, which will save
-the necessory hardware parameters right before power down and
-recover them before system uses the hardware.
+Hi Michael,
 
-Because added the dev_pm_ops, the old suspend/resume callbacks
-under platform_driver will not be called any more. Changed their
-prototypes and moved those two callbacks into dev_pm_ops too.
+On Thu, 30 Jul 2015, Michael Ira Krufky wrote:
 
-Signed-off-by: Shenwei Wang <shenwei.wang@freescale.com>
----
-Change log:
+> On Thu, Jul 30, 2015 at 7:14 AM, Michael Ira Krufky <mkrufky@linuxtv.org> wrote:
+> > On Thu, Jul 30, 2015 at 6:08 AM, Joe Perches <joe@perches.com> wrote:
+> >> On Thu, 2015-07-30 at 10:47 +0100, Peter Griffin wrote:
+> >>> Hi Mauro / Joe,
+> >>>
+> >>> On Wed, 22 Jul 2015, Mauro Carvalho Chehab wrote:
+> >>>
+> >>> > Em Wed, 24 Jun 2015 18:17:37 -0700
+> >>> > Joe Perches <joe@perches.com> escreveu:
+> >>> >
+> >>> > > On Wed, 2015-06-24 at 16:11 +0100, Peter Griffin wrote:
+> >>> > > > This is used in conjunction with the STV0367 demodulator on
+> >>> > > > the STV0367-NIM-V1.0 NIM card which can be used with the STi
+> >>> > > > STB SoC's.
+> >>> > >
+> >>> > > Barely associated to this specific patch, but for
+> >>> > > dvb-pll.c, another thing that seems possible is to
+> >>> > > convert the struct dvb_pll_desc uses to const and
+> >>> > > change the "entries" fixed array size from 12 to []
+> >>> > >
+> >>> > > It'd save a couple KB overall and remove ~5KB of data.
+> >>> > >
+> >>> > > $ size drivers/media/dvb-frontends/dvb-pll.o*
+> >>> > >    text      data     bss     dec     hex filename
+> >>> > >    8520      1552    2120   12192    2fa0 drivers/media/dvb-frontends/dvb-pll.o.new
+> >>> > >    5624      6363    2120   14107    371b drivers/media/dvb-frontends/dvb-pll.o.old
+> >>> >
+> >>> > Peter,
+> >>> >
+> >>> > Please add this patch on the next patch series you submit.
+> >>>
+> >>> Ok will do, I've added this patch with a slightly updated commit message
+> >>> to my series.
+> >>>
+> >>> Joe - Can I add your signed-off-by?
+> >>
+> >> Signed-off-by: Joe Perches <joe@perches.com>
+> >
+> > Reviewed-by: Michael Ira Krufky <m.krufky@samsung.com>
+> >
+> > Joe, nice optimization - thanks for that.
+> >
+> > With regards to Peter's patch, is this a digital-only tuner, or is it
+> > a hybrid tuner?
+> >
+> > The 5th byte that you send to the THOMSON DTT7546X seems to resemble
+> > the 'auxiliary byte' that gets set in tuner-simple.c
+> >
+> > I'm not sure that dvb-pll is the right place for this tuner
+> > definition, if this is the case.  Maybe this definition belongs in
+> > tuner-simple instead, if the pattern matches better there.
+> >
+> > Mauro, can we hold off on merging Peter's patch until we resolve this?
+> >
+> > -Michael Ira Krufky
+> 
+> eek!  I mispelled my own email address.
+> 
+> 
+> With regards to Joe's patch - I'd like to see that merged.  ...and
+> here is my correctly spelled email address:
+> 
+> 
+> Reviewed-by: Michael Ira Krufky <m.krufky@samsung.com>
 
-PATCH v4
-	Added the return value check for clk_enable.
-	Replace the number 0x1 with UCR2_SRST.
-
-PATCH v3
-	After added the dev_pm_ops, the old suspend/resume callbacks
-	under platform_driver will not be called. Changed their
-	prototypes and moved them into dev_pm_ops too.
-
-PATCH v2
-	Change pr_debug to dev_dbg per GregK's review feedback.
-
- drivers/tty/serial/imx.c | 128 +++++++++++++++++++++++++++++++++++------------
- 1 file changed, 96 insertions(+), 32 deletions(-)
-
-diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-index 2c90dc3..a935c8e 100644
---- a/drivers/tty/serial/imx.c
-+++ b/drivers/tty/serial/imx.c
-@@ -216,6 +216,7 @@ struct imx_port {
- 	unsigned int		tx_bytes;
- 	unsigned int		dma_tx_nents;
- 	wait_queue_head_t	dma_wait;
-+	unsigned int            saved_reg[10];
- };
-
- struct imx_port_ucrs {
-@@ -1811,36 +1812,6 @@ static struct uart_driver imx_reg = {
- 	.cons           = IMX_CONSOLE,
- };
-
--static int serial_imx_suspend(struct platform_device *dev, pm_message_t state)
--{
--	struct imx_port *sport = platform_get_drvdata(dev);
--	unsigned int val;
--
--	/* enable wakeup from i.MX UART */
--	val = readl(sport->port.membase + UCR3);
--	val |= UCR3_AWAKEN;
--	writel(val, sport->port.membase + UCR3);
--
--	uart_suspend_port(&imx_reg, &sport->port);
--
--	return 0;
--}
--
--static int serial_imx_resume(struct platform_device *dev)
--{
--	struct imx_port *sport = platform_get_drvdata(dev);
--	unsigned int val;
--
--	/* disable wakeup from i.MX UART */
--	val = readl(sport->port.membase + UCR3);
--	val &= ~UCR3_AWAKEN;
--	writel(val, sport->port.membase + UCR3);
--
--	uart_resume_port(&imx_reg, &sport->port);
--
--	return 0;
--}
--
- #ifdef CONFIG_OF
- /*
-  * This function returns 1 iff pdev isn't a device instatiated by dt, 0 iff it
-@@ -1992,16 +1963,109 @@ static int serial_imx_remove(struct platform_device *pdev)
- 	return uart_remove_one_port(&imx_reg, &sport->port);
- }
-
-+static int imx_serial_port_suspend_noirq(struct device *dev)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct imx_port *sport = platform_get_drvdata(pdev);
-+	int ret;
-+
-+	ret = clk_enable(sport->clk_ipg);
-+	if (ret)
-+		dev_err(dev, "UART%d suspend error!\r\n", sport->port.line);
-+
-+	/* Save necessary regs */
-+	sport->saved_reg[0] = readl(sport->port.membase + UCR1);
-+	sport->saved_reg[1] = readl(sport->port.membase + UCR2);
-+	sport->saved_reg[2] = readl(sport->port.membase + UCR3);
-+	sport->saved_reg[3] = readl(sport->port.membase + UCR4);
-+	sport->saved_reg[4] = readl(sport->port.membase + UFCR);
-+	sport->saved_reg[5] = readl(sport->port.membase + UESC);
-+	sport->saved_reg[6] = readl(sport->port.membase + UTIM);
-+	sport->saved_reg[7] = readl(sport->port.membase + UBIR);
-+	sport->saved_reg[8] = readl(sport->port.membase + UBMR);
-+	sport->saved_reg[9] = readl(sport->port.membase + IMX21_UTS);
-+
-+	if (ret == 0)
-+		clk_disable(sport->clk_ipg);
-+
-+	return 0;
-+}
-+
-+static int imx_serial_port_resume_noirq(struct device *dev)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct imx_port *sport = platform_get_drvdata(pdev);
-+	int ret;
-+
-+	ret = clk_enable(sport->clk_ipg);
-+	if (ret)
-+		dev_err(dev, "UART%d resume error!\r\n", sport->port.line);
-+
-+	writel(sport->saved_reg[4], sport->port.membase + UFCR);
-+	writel(sport->saved_reg[5], sport->port.membase + UESC);
-+	writel(sport->saved_reg[6], sport->port.membase + UTIM);
-+	writel(sport->saved_reg[7], sport->port.membase + UBIR);
-+	writel(sport->saved_reg[8], sport->port.membase + UBMR);
-+	writel(sport->saved_reg[9], sport->port.membase + IMX21_UTS);
-+	writel(sport->saved_reg[0], sport->port.membase + UCR1);
-+	writel(sport->saved_reg[1] | UCR2_SRST, sport->port.membase + UCR2);
-+	writel(sport->saved_reg[2], sport->port.membase + UCR3);
-+	writel(sport->saved_reg[3], sport->port.membase + UCR4);
-+
-+	if (ret == 0)
-+		clk_disable(sport->clk_ipg);
-+
-+	return 0;
-+}
-+
-+static int imx_serial_port_suspend(struct device *dev)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct imx_port *sport = platform_get_drvdata(pdev);
-+	unsigned int val;
-+
-+	/* enable wakeup from i.MX UART */
-+	val = readl(sport->port.membase + UCR3);
-+	val |= UCR3_AWAKEN;
-+	writel(val, sport->port.membase + UCR3);
-+
-+	uart_suspend_port(&imx_reg, &sport->port);
-+
-+	return 0;
-+}
-+
-+static int imx_serial_port_resume(struct device *dev)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct imx_port *sport = platform_get_drvdata(pdev);
-+	unsigned int val;
-+
-+	/* disable wakeup from i.MX UART */
-+	val = readl(sport->port.membase + UCR3);
-+	val &= ~UCR3_AWAKEN;
-+	writel(val, sport->port.membase + UCR3);
-+
-+	uart_resume_port(&imx_reg, &sport->port);
-+
-+	return 0;
-+}
-+
-+static const struct dev_pm_ops imx_serial_port_pm_ops = {
-+	.suspend_noirq = imx_serial_port_suspend_noirq,
-+	.resume_noirq = imx_serial_port_resume_noirq,
-+	.suspend = imx_serial_port_suspend,
-+	.resume = imx_serial_port_resume,
-+};
-+
- static struct platform_driver serial_imx_driver = {
- 	.probe		= serial_imx_probe,
- 	.remove		= serial_imx_remove,
-
--	.suspend	= serial_imx_suspend,
--	.resume		= serial_imx_resume,
- 	.id_table	= imx_uart_devtype,
- 	.driver		= {
- 		.name	= "imx-uart",
- 		.of_match_table = imx_uart_dt_ids,
-+		.pm	= &imx_serial_port_pm_ops,
- 	},
- };
-
---
-2.5.0.rc2
+Ok I will add your reviewed-by and include it in my v2.
