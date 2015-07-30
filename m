@@ -1,35 +1,95 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 29 Jul 2015 17:13:57 -0700
-Subject: [PATCH v6 04/13] clk: qcom: gdsc: Manage clocks with !CONFIG_PM
-In-Reply-To: <55B85870.7060900@codeaurora.org>
-References: <1437549069-29655-1-git-send-email-rnayak@codeaurora.org>
- <1437549069-29655-5-git-send-email-rnayak@codeaurora.org>
- <55B03D65.8040207@codeaurora.org> <55B0A764.6010708@codeaurora.org>
- <55B826B0.2090705@codeaurora.org> <55B85870.7060900@codeaurora.org>
-Message-ID: <20150730001357.GF3159@codeaurora.org>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 30 Jul 2015 09:15:24 +0900
+Subject: [PATCH] ARM: EXYNOS: pd: fix resource deallocation on error path
+In-Reply-To: <55B96A86.8000502@mleia.com>
+References: <1438200913-10532-1-git-send-email-vz@mleia.com>
+ <CAJKOXPeWgXR0SuRzZyXHSiewZDuuJXXFmjyWasXDFxDAQUzyqA@mail.gmail.com>
+ <55B96A86.8000502@mleia.com>
+Message-ID: <55B96C9C.8010908@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/29, Rajendra Nayak wrote:
+On 30.07.2015 09:06, Vladimir Zapolskiy wrote:
+> On 30.07.2015 02:37, Krzysztof Kozlowski wrote:
+>> 2015-07-30 5:15 GMT+09:00 Vladimir Zapolskiy <vz@mleia.com>:
+>>> The change fixes a bug introduced by 2be2a3ff42a5, memory allocated
+>>> by kstrdup_const() must be always deallocated with kfree_const(),
+>>> otherwise there is a risk of kfree'ing ro memory.
+>>
+>> This looks good. Can you provide also Cc-stable and fixes tags?
 > 
-> On 07/29/2015 06:34 AM, Stephen Boyd wrote:
-> >
-> >Sorry, I read the thread and I tried to understand what was going on but
-> >I'm still lost. Can you clarify further in the commit text somehow?
+> Since the change fixes two independent issues I decided not to add a
+> particular commit to Fixes tag. I can split the commit of course, but I
+> feel reluctant to send a series in this particular case.
 > 
-> So I can add this in the commit text, if it seems fine
-> 
-> "The use of pm_clk_add_notifier() isn't appropriate here since we need
-> to only manage clocks with valid power domain associations done via
-> DT, instead of what pm_clk_add_notifier() does, which is manage clocks
-> for all on SoC/off SoC devices associating all of them to a dummy
-> power domain instead"
-> 
+> Let me know your decision with respect to my comments.
 
-Yes that's good, thanks. But I still wonder why the code isn't
-generic so that we don't have lots of drivers duplicating the
-same logic. I guess we can consolidate another day.
+Although this is only error-path but still this applies for backporting
+to stable. Please split it up and add respective fixes tags. This helps
+companies/people using stable trees, including LTS.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+> 
+>>>
+>>> Also remove unneeded of_node_put(), if for_each_compatible_node() body
+>>> execution is not terminated, this prevents from double kfree() in
+>>> OF_DYNAMIC build.
+>>
+>> Each iteration of for_each_compatible_node() has a check:
+>> (dn = of_find_compatible_node(dn, type, compatible))
+>> this increases the references to 'np'. 
+> 
+> Correct.
+> 
+>> If loop continues then previous 'np' is not of_node_put().
+> 
+> This I don't understand. The previous 'np' is of_node_put() on next
+> iteration of the loop, i.e. if and only if loop continues. Please elaborate.
+
+Step by step, if I get it right:
+1. initialization: dn = of_find_compatible_node(NULL, type, compatible);
+1a. if (!pd->base) then we want to drop that reference.
+1b. if not, then loop itself
+3. increase value: dn = of_find_compatible_node(dn, type, compatible)
+4. next iteration of loop, now we have 'dn' from last 'increase value'
+5. if (!pd->base) then we want to drop that reference.
+
+Best regards,
+Krzysztof
+
+
+> 
+> --
+> With best wishes,
+> Vladimir
+> 
+>>
+>>>
+>>> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
+>>> ---
+>>>  arch/arm/mach-exynos/pm_domains.c | 3 +--
+>>>  1 file changed, 1 insertion(+), 2 deletions(-)
+>>>
+>>> diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
+>>> index 6001f1c..4a87e86 100644
+>>> --- a/arch/arm/mach-exynos/pm_domains.c
+>>> +++ b/arch/arm/mach-exynos/pm_domains.c
+>>> @@ -146,9 +146,8 @@ static __init int exynos4_pm_init_power_domain(void)
+>>>                 pd->base = of_iomap(np, 0);
+>>>                 if (!pd->base) {
+>>>                         pr_warn("%s: failed to map memory\n", __func__);
+>>> -                       kfree(pd->pd.name);
+>>> +                       kfree_const(pd->pd.name);
+>>>                         kfree(pd);
+>>> -                       of_node_put(np);
+>>>                         continue;
+>>>                 }
+>>>
+>>> --
+>>> 2.1.4
+>>>
+>>>
+>>> _______________________________________________
+>>> linux-arm-kernel mailing list
+>>> linux-arm-kernel at lists.infradead.org
+>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
