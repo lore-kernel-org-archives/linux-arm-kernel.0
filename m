@@ -1,73 +1,114 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 30 Jul 2015 16:06:51 +0200
-Subject: [PATCH 1/2] efi: add 'offset' param to efi_low_alloc()
-In-Reply-To: <20150730140144.GH2725@codeblueprint.co.uk>
-References: <1438164259-14470-1-git-send-email-ard.biesheuvel@linaro.org>
- <1438164259-14470-2-git-send-email-ard.biesheuvel@linaro.org>
- <20150730140144.GH2725@codeblueprint.co.uk>
-Message-ID: <CAKv+Gu9Lrfr594rUYdv-5QngiBf3FcNJ447U7Nnb07aW5kTgwg@mail.gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 30 Jul 2015 09:08:29 -0500
+Subject: [PATCH v4 04/46] staging: emxx_udc: add ep capabilities support
+In-Reply-To: <55B9CF1A.1070107@samsung.com>
+References: <1437988616-6962-1-git-send-email-r.baldyga@samsung.com>
+ <1437988616-6962-5-git-send-email-r.baldyga@samsung.com>
+ <20150729152029.GB32418@saruman.tx.rr.com>
+ <55B9CF1A.1070107@samsung.com>
+Message-ID: <20150730140829.GA18246@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 July 2015 at 16:01, Matt Fleming <matt@codeblueprint.co.uk> wrote:
-> On Wed, 29 Jul, at 12:04:18PM, Ard Biesheuvel wrote:
->> In some cases, e.g., when allocating memory for the arm64 kernel,
->> we need memory at a certain offset from an aligned boundary. So add
->> an offset parameter to efi_low_alloc(), and update the existing
->> callers to pass zero by default.
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>  arch/arm64/kernel/efi-stub.c                   |  2 +-
->>  arch/x86/boot/compressed/eboot.c               |  4 ++--
->>  drivers/firmware/efi/libstub/efi-stub-helper.c | 20 +++++++++++++++-----
->>  include/linux/efi.h                            |  2 +-
->>  4 files changed, 19 insertions(+), 9 deletions(-)
->
-> [...]
->
->> @@ -269,10 +269,19 @@ efi_status_t efi_low_alloc(efi_system_table_t *sys_table_arg,
->>                * checks pointers against NULL. Skip the first 8
->>                * bytes so we start at a nice even number.
->>                */
->> -             if (start == 0x0)
->> +             if (start + offset == 0x0)
->>                       start += 8;
->>
->> -             start = round_up(start, align);
->> +             /*
->> +              * Check if the offset exceeds the misalignment of this region.
->> +              * In that case, we can round down instead of up, and the
->> +              * resulting start value will be correctly aligned and still
->> +              * point past the start of the region.
->> +              */
->> +             if (offset >= (start & (align - 1)))
->> +                     start = round_down(start, align) + offset;
->> +             else
->> +                     start = round_up(start, align) + offset;
->>               if ((start + size) > end)
->>                       continue;
->
-> Aha, now I see what you mean. Thanks for doing this Ard, these are much
-> more polished than what I was expecting.
->
-> I'm gonna have to NAK this because it's just too much of a special case
-> to support directly in efi_low_alloc(), which I think was the exact
-> point that you made originally, and which I was too tired/dumb to
-> understand. Sorry.
->
+Hi,
 
-No worries. Will has already queued the original patch, which solves
-all know issues regarding the placement of the kernel image by the EFI
-stub.
+On Thu, Jul 30, 2015 at 09:15:38AM +0200, Robert Baldyga wrote:
+> On 07/29/2015 05:20 PM, Felipe Balbi wrote:
+> > On Mon, Jul 27, 2015 at 11:16:14AM +0200, Robert Baldyga wrote:
+> >> Convert endpoint configuration to new capabilities model.
+> >>
+> >> Fixed typo in "epc-nulk" to "epc-bulk".
+> >>
+> >> Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
+> >> ---
+> >>  drivers/staging/emxx_udc/emxx_udc.c | 60 ++++++++++++++++++-------------------
+> >>  1 file changed, 29 insertions(+), 31 deletions(-)
+> >>
+> >> diff --git a/drivers/staging/emxx_udc/emxx_udc.c b/drivers/staging/emxx_udc/emxx_udc.c
+> >> index 3b7aa36..0d64bee 100644
+> >> --- a/drivers/staging/emxx_udc/emxx_udc.c
+> >> +++ b/drivers/staging/emxx_udc/emxx_udc.c
+> >> @@ -3153,36 +3153,33 @@ static const struct usb_gadget_ops nbu2ss_gadget_ops = {
+> >>  	.ioctl			= nbu2ss_gad_ioctl,
+> >>  };
+> >>  
+> >> -static const char g_ep0_name[] = "ep0";
+> >> -static const char g_ep1_name[] = "ep1-bulk";
+> >> -static const char g_ep2_name[] = "ep2-bulk";
+> >> -static const char g_ep3_name[] = "ep3in-int";
+> >> -static const char g_ep4_name[] = "ep4-iso";
+> >> -static const char g_ep5_name[] = "ep5-iso";
+> >> -static const char g_ep6_name[] = "ep6-bulk";
+> >> -static const char g_ep7_name[] = "ep7-bulk";
+> >> -static const char g_ep8_name[] = "ep8in-int";
+> >> -static const char g_ep9_name[] = "ep9-iso";
+> >> -static const char g_epa_name[] = "epa-iso";
+> >> -static const char g_epb_name[] = "epb-bulk";
+> >> -static const char g_epc_name[] = "epc-nulk";
+> >> -static const char g_epd_name[] = "epdin-int";
+> >> -
+> >> -static const char *gp_ep_name[NUM_ENDPOINTS] = {
+> >> -	g_ep0_name,
+> >> -	g_ep1_name,
+> >> -	g_ep2_name,
+> >> -	g_ep3_name,
+> >> -	g_ep4_name,
+> >> -	g_ep5_name,
+> >> -	g_ep6_name,
+> >> -	g_ep7_name,
+> >> -	g_ep8_name,
+> >> -	g_ep9_name,
+> >> -	g_epa_name,
+> >> -	g_epb_name,
+> >> -	g_epc_name,
+> >> -	g_epd_name,
+> >> +static const struct {
+> >> +	const char *name;
+> >> +	const struct usb_ep_caps caps;
+> >> +} ep_info[NUM_ENDPOINTS] = {
+> >> +#define EP_INFO(_name, _type, _dir) \
+> >> +	{ \
+> >> +		.name = _name, \
+> >> +		.caps = USB_EP_CAPS(USB_EP_CAPS_TYPE_ ## _type, \
+> >> +				USB_EP_CAPS_DIR_ ## _dir), \
+> >> +	}
+> >> +
+> >> +	EP_INFO("ep0",		CONTROL, ALL),
+> >> +	EP_INFO("ep1-bulk",	BULK,	ALL),
+> >> +	EP_INFO("ep2-bulk",	BULK,	ALL),
+> >> +	EP_INFO("ep3in-int",	INT,	IN),
+> >> +	EP_INFO("ep4-iso",	INT,	ALL),
+> >> +	EP_INFO("ep5-iso",	ISO,	ALL),
+> >> +	EP_INFO("ep6-bulk",	ISO,	ALL),
+> >> +	EP_INFO("ep7-bulk",	BULK,	ALL),
+> >> +	EP_INFO("ep8in-int",	INT,	IN),
+> >> +	EP_INFO("ep9-iso",	ISO,	ALL),
+> >> +	EP_INFO("epa-iso",	ISO,	ALL),
+> >> +	EP_INFO("epb-bulk",	BULK,	ALL),
+> >> +	EP_INFO("epc-bulk",	BULK,	ALL),
+> >> +	EP_INFO("epdin-int",	INT,	IN),
+> > 
+> > IMO, this is pointless obfuscation. It just makes it a pain to grep
+> > source around. Why don't you have UDC drivers initialize the 1-bit flags
+> > directly ?
+> > 
+> 
+> Do you mean something like this? It just makes it a pain to scroll this
+> source ;)
 
-> In particular, the fact that you can use the offset argument to violate
-> the requested alignment seems like it would trip up most users.
->
+but it's at least easy to grep. Another option would be the following:
 
-Yes. We could always rename this enhanced efi_low_alloc() to
-efi_low_alloc_with_offset() and introduce a new efi_low_alloc() which
-calls it using an offset of zero. But only if you insist.
+EP_INFO("ep0", USB_EP_CAPS(USB_EP_CAPS_TYPE_CONTROL,
+			USB_EP_CAPS_DIR_ALL)),
+
+that also helps grepping.
 
 -- 
-Ard.
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150730/6b98a016/attachment-0001.sig>
