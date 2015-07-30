@@ -1,78 +1,85 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 30 Jul 2015 10:02:46 +0100
+Date: Thu, 30 Jul 2015 10:04:30 +0100
 Subject: [PATCH] irqchip: gic: Add a cpu map for each GIC instance
-In-Reply-To: <55B9DB74.8030100@nvidia.com>
-References: <1438180984-18219-1-git-send-email-jonathanh@nvidia.com>	<alpine.DEB.2.11.1507291810040.3825@nanos>
- <20150730081934.02a6aa99@why.wild-wind.fr.eu.org>
- <55B9DB74.8030100@nvidia.com>
-Message-ID: <55B9E836.6090004@arm.com>
+In-Reply-To: <55B9E145.9050202@nvidia.com>
+References: <1438180984-18219-1-git-send-email-jonathanh@nvidia.com>
+ <20150729183321.GP7557@n2100.arm.linux.org.uk> <55B92939.5040101@nvidia.com>
+ <55B9DE44.1010102@arm.com> <55B9E145.9050202@nvidia.com>
+Message-ID: <55B9E89E.5050905@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/07/15 09:08, Jon Hunter wrote:
+On 30/07/15 09:33, Jon Hunter wrote:
 > 
-> On 30/07/15 08:19, Marc Zyngier wrote:
->> On Wed, 29 Jul 2015 17:10:45 +0100
->> Thomas Gleixner <tglx@linutronix.de> wrote:
->>
->>> On Wed, 29 Jul 2015, Jon Hunter wrote:
+> On 30/07/15 09:20, Marc Zyngier wrote:
+>> On 29/07/15 20:27, Jon Hunter wrote:
 >>>
->>> Cc'ing Marc ...
->>
->> Thanks for looping me in.
->>
+>>> On 29/07/15 19:33, Russell King - ARM Linux wrote:
+>>>> On Wed, Jul 29, 2015 at 03:43:04PM +0100, Jon Hunter wrote:
+>>>>> The gic_init_bases() function initialises an array that stores the mapping
+>>>>> between the GIC and CPUs. This array is a global array that is
+>>>>> unconditionally initialised on every call to gic_init_bases(). Although,
+>>>>> it is not common for there to be more than one GIC instance, there are
+>>>>> some devices that do support nested GIC controllers and gic_init_bases()
+>>>>> can be called more than once.
+>>>>>
+>>>>> A 2nd call to gic_init_bases() will clear the previous CPU mapping and
+>>>>> will only setup the mapping again for CPU0. This is because for child GIC
+>>>>> controllers there is most likely only one recipient of the interrupt.
+>>>>>
+>>>>> Fix this by moving the CPU mapping array to the GIC chip data structure
+>>>>> so that it is initialised for each GIC instance separately. It is assumed
+>>>>> that the bL switcher code is only interested in the root or primary GIC
+>>>>> instance.
+>>>>
+>>>> Does it make sense to expose the per-CPU-ness of the non-primary GIC?
+>>>> If they are chained off a primary GIC SPI interrupt, then all IRQs on
+>>>> the secondary GIC are routed to the same CPU that the SPI on the primary
+>>>> GIC is routed to.
 >>>
->>>> The gic_init_bases() function initialises an array that stores the mapping
->>>> between the GIC and CPUs. This array is a global array that is
->>>> unconditionally initialised on every call to gic_init_bases(). Although,
->>>> it is not common for there to be more than one GIC instance, there are
->>>> some devices that do support nested GIC controllers and gic_init_bases()
->>>> can be called more than once.
->>>>
->>>> A 2nd call to gic_init_bases() will clear the previous CPU mapping and
->>>> will only setup the mapping again for CPU0. This is because for child GIC
->>>> controllers there is most likely only one recipient of the interrupt.
->>>>
->>>> Fix this by moving the CPU mapping array to the GIC chip data structure
->>>> so that it is initialised for each GIC instance separately. It is assumed
->>>> that the bL switcher code is only interested in the root or primary GIC
->>>> instance.
+>>> I am looking at a use-case where there is a secondary GIC and the secondary
+>>> GIC is used as a interrupt router between the main CPU cluster and another
+>>> CPU. So in this case the mapping of a secondary is still of interest. This
+>>> patch does not address setting up the secondary mapping, but avoids a
+>>> secondary GIC overwriting the primary map (which we don't want).
+>>>  
+>>>> Other features like the PPIs and SGIs in the secondary CPU should also
+>>>> be ignored - they probably aren't used anyway.
+>>>
+>>> Yes, agree.
+>>>  
+>>>> I have to say though... are the 1020 IRQs that the primary GIC provides
+>>>> really not enough?  What insane hardware needs more than 1020 IRQs?
+>>>
+>>> Ha. I guess some realview boards for a start ...
+>>>
+>>> # grep -r "gic_init(1" arch/arm/
+>>> arch/arm/mach-realview/realview_pb1176.c:	gic_init(1, IRQ_PB1176_GIC_START,
+>>> arch/arm/mach-realview/realview_eb.c:		gic_init(1, 96, __io_address(REALVIEW_EB_GIC_DIST_BASE),
+>>> arch/arm/mach-realview/realview_pb11mp.c:	gic_init(1, IRQ_PB11MP_GIC_START,
 >>
->> This feels very odd. If you have a secondary GIC, it is cascaded into
->> the primary one, and I don't see why you would need to manage the
->> affinity of the interrupt for the secondary GIC. The only thing that
->> matters is the affinity of interrupts in the primary one, and this is
->> what the bl switcher is dealing with.
->>
->> To me, it looks like the bug is to even try to compute an affinity for
->> a GIC that is not the primary one, and keeping it around doesn't
->> seem to make much sense. 
->>
->> Or am I overlooking something?
+>> Different use case. These are development boards with a relatively
+>> modular design, where the SoC may or may not have a GIC by itself. When
+>> it has one, you end up with the on-board GIC being a secondary one.
 > 
-> I mentioned to Russell (sorry you were not copied), that I am looking at
-> a use-case where the secondary GIC is actually a router that can route
-> interrupts to the main CPU cluster (via the primary GIC) or to another
-> CPU. So it turns out that I do see a use for being able to configure the
-> cpu map for the secondary as well. In this case the set_affinity would
-> be use to direct the interrupt to either the main cluster or the other CPU.
+> Yes, I understand that the use-case may be different, but I highlighted
+> this as a use where the primary map would be overwritten as the driver
+> is today.
+> 
+>> I never thought someone would quote these designs as an example to
+>> follow... ;-)
+> 
+> I can't say if this example was followed, but nevertheless hardware
+> designers certainly do get creative ;-)
+> 
+> So we need to ensure the primary cpu map does not get overwritten by a
+> secondary and I have a case where the secondary map is of interest. So
+> are ok with this?
 
-I'm afraid that's not exactly the same thing. This data structure maps
-Linux view of the CPU number to the number of the CPU interface. What
-you're describing is being able to route the interrupts to an entity
-that is not under the kernel's control. I don't think you should
-shoehorn the two concept together.
-
-> Please note that this patch does not address configuring the map for the
-> secondary GIC. I am trying to think about the best way to handle this. I
-> guess it could done via device-tree or we could have a API,
-> gic_set_cpu_map(), that would allow you to set it.
-
-This is starting to look a lot like the Freescale Vybrid stuff, where
-they share devices between two unrelated ARM CPUs, each running their
-own OS.
-
-You should sync up with these guys.
+My point is that there is no secondary map. That map should only be
+written for the primary GIC, because that's the only place it makes
+sense. Your "other CPU" is not under the control of Linux (at least, not
+as a CPU), so this map is not the right data structure.
 
 Thanks,
 
