@@ -1,126 +1,188 @@
-From: henryc.chen@mediatek.com (Henry Chen)
-Date: Thu, 30 Jul 2015 23:07:26 +0800
-Subject: [PATCH] mfd: mt6397: Implement wake handler and suspend/resume for
- mt6397-core.c
-Message-ID: <1438268846-22451-1-git-send-email-henryc.chen@mediatek.com>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Thu, 30 Jul 2015 18:07:53 +0300
+Subject: [PATCH linux-next 1/1] tty/serial: at91: fix I/O accesses on
+ RHR and THR for AVR32
+In-Reply-To: <b950edd352e715d7f1f0d5ca4856ae4fec56890f.1438260564.git.cyrille.pitchen@atmel.com>
+References: <b950edd352e715d7f1f0d5ca4856ae4fec56890f.1438260564.git.cyrille.pitchen@atmel.com>
+Message-ID: <1438268873.29746.126.camel@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Register mt6393_irq as wake up source to pinctrl by flag "IRQF_NO_SUSPEND".
-Implement .irq_set_wake() function of pmic to keep who is wakeup source,
-and enable irq on .suspend()and restore irq on .resume().
+On Thu, 2015-07-30 at 16:33 +0200, Cyrille Pitchen wrote:
+> This patch fixes I/O accesses on the Receiver Holding Register and on 
+> the
+> Transmitter Holding Register. Indeed AVR32 can only perform 32bit I/O
+> accesses on registers: using 8bit I/O accesses would read or write 
+> garbage
+> data.
+> 
 
-Signed-off-by: Henry Chen <henryc.chen@mediatek.com>
----
- drivers/mfd/mt6397-core.c       | 49 ++++++++++++++++++++++++++++++++++++++++-
- include/linux/mfd/mt6397/core.h |  1 +
- 2 files changed, 49 insertions(+), 1 deletion(-)
+Thanks!
 
-diff --git a/drivers/mfd/mt6397-core.c b/drivers/mfd/mt6397-core.c
-index 03929a6..aebdee5 100644
---- a/drivers/mfd/mt6397-core.c
-+++ b/drivers/mfd/mt6397-core.c
-@@ -93,12 +93,31 @@ static void mt6397_irq_enable(struct irq_data *data)
- 	mt6397->irq_masks_cur[reg] |= BIT(shift);
- }
- 
-+#ifdef CONFIG_PM_SLEEP
-+static int mt6397_irq_set_wake(struct irq_data *irq_data, unsigned int on)
-+{
-+	struct mt6397_chip *mt6397 = irq_data_get_irq_chip_data(irq_data);
-+	int shift = irq_data->hwirq & 0xf;
-+	int reg = irq_data->hwirq >> 4;
-+
-+	if (on)
-+		mt6397->wake_mask[reg] |= BIT(shift);
-+	else
-+		mt6397->wake_mask[reg] &= ~BIT(shift);
-+
-+	return 0;
-+}
-+#else
-+#define mt6397_irq_set_wake NULL
-+#endif
-+
- static struct irq_chip mt6397_irq_chip = {
- 	.name = "mt6397-irq",
- 	.irq_bus_lock = mt6397_irq_lock,
- 	.irq_bus_sync_unlock = mt6397_irq_sync_unlock,
- 	.irq_enable = mt6397_irq_enable,
- 	.irq_disable = mt6397_irq_disable,
-+	.irq_set_wake = mt6397_irq_set_wake,
- };
- 
- static void mt6397_irq_handle_reg(struct mt6397_chip *mt6397, int reg,
-@@ -142,6 +161,7 @@ static int mt6397_irq_domain_map(struct irq_domain *d, unsigned int irq,
- 	irq_set_chip_data(irq, mt6397);
- 	irq_set_chip_and_handler(irq, &mt6397_irq_chip, handle_level_irq);
- 	irq_set_nested_thread(irq, 1);
-+
- #ifdef CONFIG_ARM
- 	set_irq_flags(irq, IRQF_VALID);
- #else
-@@ -173,7 +193,8 @@ static int mt6397_irq_init(struct mt6397_chip *mt6397)
- 	}
- 
- 	ret = devm_request_threaded_irq(mt6397->dev, mt6397->irq, NULL,
--		mt6397_irq_thread, IRQF_ONESHOT, "mt6397-pmic", mt6397);
-+		mt6397_irq_thread, IRQF_ONESHOT | IRQF_NO_SUSPEND,
-+		"mt6397-pmic", mt6397);
- 	if (ret) {
- 		dev_err(mt6397->dev, "failed to register irq=%d; err: %d\n",
- 			mt6397->irq, ret);
-@@ -183,6 +204,31 @@ static int mt6397_irq_init(struct mt6397_chip *mt6397)
- 	return 0;
- }
- 
-+#ifdef CONFIG_PM_SLEEP
-+static int mt6397_irq_suspend(struct device *dev)
-+{
-+	struct mt6397_chip *chip = dev_get_drvdata(dev);
-+
-+	regmap_write(chip->regmap, MT6397_INT_CON0, chip->wake_mask[0]);
-+	regmap_write(chip->regmap, MT6397_INT_CON1, chip->wake_mask[1]);
-+
-+	return 0;
-+}
-+
-+static int mt6397_irq_resume(struct device *dev)
-+{
-+	struct mt6397_chip *chip = dev_get_drvdata(dev);
-+
-+	regmap_write(chip->regmap, MT6397_INT_CON0, chip->irq_masks_cur[0]);
-+	regmap_write(chip->regmap, MT6397_INT_CON1, chip->irq_masks_cur[1]);
-+
-+	return 0;
-+}
-+#endif
-+
-+static SIMPLE_DEV_PM_OPS(mt6397_pm_ops, mt6397_irq_suspend,
-+			mt6397_irq_resume);
-+
- static int mt6397_probe(struct platform_device *pdev)
- {
- 	int ret;
-@@ -237,6 +283,7 @@ static struct platform_driver mt6397_driver = {
- 	.driver = {
- 		.name = "mt6397",
- 		.of_match_table = of_match_ptr(mt6397_of_match),
-+		.pm = &mt6397_pm_ops,
- 	},
- };
- 
-diff --git a/include/linux/mfd/mt6397/core.h b/include/linux/mfd/mt6397/core.h
-index cf5265b..45b8e8a 100644
---- a/include/linux/mfd/mt6397/core.h
-+++ b/include/linux/mfd/mt6397/core.h
-@@ -57,6 +57,7 @@ struct mt6397_chip {
- 	int irq;
- 	struct irq_domain *irq_domain;
- 	struct mutex irqlock;
-+	u16 wake_mask[2];
- 	u16 irq_masks_cur[2];
- 	u16 irq_masks_cache[2];
- };
+Tested-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+
+> Fixes: commit b5199d468177 ("tty/serial: at91: add support to FIFOs")
+> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+> ---
+> Hi all,
+> 
+> this patch fixes a bug on AVR32 introduced by the support of FIFOs 
+> for
+> AT91. Indeed when FIFOs are enabled they work in Multiple Data mode.
+> The Multiple Data mode allows to read up to 4 data from the Receiver
+> Holding Register (RHR) or write up to 4 data into the Transmitter 
+> Holding
+> Register (THR) in a single I/O access. Hence when only one data is to 
+> be
+> read from the RHR or written into the THR, the driver cannot use 
+> 32bit I/O
+> access anymore but must use 8bit I/O access instead.
+> 
+> For ARM-base AT91 SoCs, 8bit I/O accesses can always be used even 
+> when
+> FIFOs are not available. However AV32 can only use 32bit I/O 
+> accesses.
+> 
+> Since atmel_uart_readb(), resp. atmel_uart_writeb(), was created by 
+> the
+> FIFO support patch to access the RHR, resp. the THR, this patch 
+> replaces
+> it by atmel_uart_read_char(), resp. atmel_uart_write_char(). Hence 
+> the
+> actual width of the I/O access now depends only on the architecture.
+> 
+> All registers but RHR and THR use 32bit I/O accesses.
+> 
+> This patch was tested on a at91sam9260ek board.
+> 
+> Best Regards,
+> 
+> Cyrille
+> 
+> ChangeLog:
+> 
+> v1: initial version
+> 
+>  drivers/tty/serial/atmel_serial.c | 37 +++++++++++++++++++++++++++--
+> --------
+>  1 file changed, 27 insertions(+), 10 deletions(-)
+> 
+> diff --git a/drivers/tty/serial/atmel_serial.c 
+> b/drivers/tty/serial/atmel_serial.c
+> index e91b3b2f0590..5ca5cf3e9359 100644
+> --- a/drivers/tty/serial/atmel_serial.c
+> +++ b/drivers/tty/serial/atmel_serial.c
+> @@ -204,16 +204,33 @@ static inline void atmel_uart_writel(struct 
+> uart_port *port, u32 reg, u32 value)
+>  	__raw_writel(value, port->membase + reg);
+>  }
+>  
+> -static inline u8 atmel_uart_readb(struct uart_port *port, u32 reg)
+> +#ifdef CONFIG_AVR32
+> +
+> +/* AVR32 cannot handle 8 or 16bit I/O accesses but only 32bit I/O 
+> accesses */
+> +static inline u8 atmel_uart_read_char(struct uart_port *port)
+> +{
+> +	return __raw_readl(port->membase + ATMEL_US_RHR);
+> +}
+> +
+> +static inline void atmel_uart_write_char(struct uart_port *port, u8 
+> value)
+>  {
+> -	return __raw_readb(port->membase + reg);
+> +	__raw_writel(value, port->membase + ATMEL_US_THR);
+>  }
+>  
+> -static inline void atmel_uart_writeb(struct uart_port *port, u32 
+> reg, u8 value)
+> +#else
+> +
+> +static inline u8 atmel_uart_read_char(struct uart_port *port)
+>  {
+> -	__raw_writeb(value, port->membase + reg);
+> +	return __raw_readb(port->membase + ATMEL_US_RHR);
+>  }
+>  
+> +static inline void atmel_uart_write_char(struct uart_port *port, u8 
+> value)
+> +{
+> +	__raw_writeb(value, port->membase + ATMEL_US_THR);
+> +}
+> +
+> +#endif
+> +
+>  #ifdef CONFIG_SERIAL_ATMEL_PDC
+>  static bool atmel_use_pdc_rx(struct uart_port *port)
+>  {
+> @@ -658,7 +675,7 @@ static void atmel_rx_chars(struct uart_port 
+> *port)
+>  
+>  	status = atmel_uart_readl(port, ATMEL_US_CSR);
+>  	while (status & ATMEL_US_RXRDY) {
+> -		ch = atmel_uart_readb(port, ATMEL_US_RHR);
+> +		ch = atmel_uart_read_char(port);
+>  
+>  		/*
+>  		 * note that the error handling code is
+> @@ -709,7 +726,7 @@ static void atmel_tx_chars(struct uart_port 
+> *port)
+>  
+>  	if (port->x_char &&
+>  	    (atmel_uart_readl(port, ATMEL_US_CSR) & atmel_port
+> ->tx_done_mask)) {
+> -		atmel_uart_writeb(port, ATMEL_US_THR, port->x_char);
+> +		atmel_uart_write_char(port, port->x_char);
+>  		port->icount.tx++;
+>  		port->x_char = 0;
+>  	}
+> @@ -718,7 +735,7 @@ static void atmel_tx_chars(struct uart_port 
+> *port)
+>  
+>  	while (atmel_uart_readl(port, ATMEL_US_CSR) &
+>  	       atmel_port->tx_done_mask) {
+> -		atmel_uart_writeb(port, ATMEL_US_THR, xmit->buf[xmit
+> ->tail]);
+> +		atmel_uart_write_char(port, xmit->buf[xmit->tail]);
+>  		xmit->tail = (xmit->tail + 1) & (UART_XMIT_SIZE - 
+> 1);
+>  		port->icount.tx++;
+>  		if (uart_circ_empty(xmit))
+> @@ -2294,7 +2311,7 @@ static int atmel_poll_get_char(struct uart_port 
+> *port)
+>  	while (!(atmel_uart_readl(port, ATMEL_US_CSR) & 
+> ATMEL_US_RXRDY))
+>  		cpu_relax();
+>  
+> -	return atmel_uart_readb(port, ATMEL_US_RHR);
+> +	return atmel_uart_read_char(port);
+>  }
+>  
+>  static void atmel_poll_put_char(struct uart_port *port, unsigned 
+> char ch)
+> @@ -2302,7 +2319,7 @@ static void atmel_poll_put_char(struct 
+> uart_port *port, unsigned char ch)
+>  	while (!(atmel_uart_readl(port, ATMEL_US_CSR) & 
+> ATMEL_US_TXRDY))
+>  		cpu_relax();
+>  
+> -	atmel_uart_writeb(port, ATMEL_US_THR, ch);
+> +	atmel_uart_write_char(port, ch);
+>  }
+>  #endif
+>  
+> @@ -2409,7 +2426,7 @@ static void atmel_console_putchar(struct 
+> uart_port *port, int ch)
+>  {
+>  	while (!(atmel_uart_readl(port, ATMEL_US_CSR) & 
+> ATMEL_US_TXRDY))
+>  		cpu_relax();
+> -	atmel_uart_writeb(port, ATMEL_US_THR, ch);
+> +	atmel_uart_write_char(port, ch);
+>  }
+>  
+>  /*
+
 -- 
-1.8.1.1.dirty
+Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Intel Finland Oy
