@@ -1,61 +1,95 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 30 Jul 2015 15:47:37 +0530
-Subject: [PATCH 05/10] opp: Add support to parse "operating-points-v2"
- bindings
-In-Reply-To: <55B80A34.1010805@codeaurora.org>
-References: <cover.1434369079.git.viresh.kumar@linaro.org>
- <1b5a393f2162752cbb773956dff15739e7525a1d.1434369079.git.viresh.kumar@linaro.org>
- <2910042.ys2zsBBKt2@amdc1976> <20150727030239.GG19944@linux>
- <55B80A34.1010805@codeaurora.org>
-Message-ID: <20150730101737.GB9121@linux>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 30 Jul 2015 12:17:23 +0200
+Subject: [PATCH 7/7] clk: sunxi: Add a simple gates driver
+In-Reply-To: <CAGb2v6517qCXmNkYihnfBmc5fL7bqTDOQwedNYjq+p2Mg45+gQ@mail.gmail.com>
+References: <1437945270-32014-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1437945270-32014-8-git-send-email-maxime.ripard@free-electrons.com>
+ <20150727202648.GB14521@codeaurora.org>
+ <CAGb2v6517qCXmNkYihnfBmc5fL7bqTDOQwedNYjq+p2Mg45+gQ@mail.gmail.com>
+Message-ID: <20150730101723.GL2564@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28-07-15, 16:03, Stephen Boyd wrote:
-> There is talk about moving to 64 bits for the frequency in the clk API.
-> It's not actively being developed though and I'm not sure when we'll get
-> there. From a DT perspective though, I don't see why it would be bad to
-> have two cells instead of one cell for the frequency here. It would
-> allow up to 64 bits of frequency so that when we change the clk API we
-> won't need to do anything in the OPP bindings to handle it. Just because
-> we have problems in the kernel doesn't mean we should put the same
-> problems into DT.
+On Thu, Jul 30, 2015 at 03:55:17PM +0800, Chen-Yu Tsai wrote:
+> On Tue, Jul 28, 2015 at 4:26 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> > On 07/26, Maxime Ripard wrote:
+> >> diff --git a/drivers/clk/sunxi/clk-simple-gates.c b/drivers/clk/sunxi/clk-simple-gates.c
+> >> new file mode 100644
+> >> index 000000000000..1a3963a8a686
+> >> --- /dev/null
+> >> +++ b/drivers/clk/sunxi/clk-simple-gates.c
+> >> @@ -0,0 +1,159 @@
+> >> +/*
+> >> + * Copyright 2015 Maxime Ripard
+> >> + *
+> >> + * Maxime Ripard <maxime.ripard@free-electrons.com>
+> >> + *
+> >> + * This program is free software; you can redistribute it and/or modify
+> >> + * it under the terms of the GNU General Public License as published by
+> >> + * the Free Software Foundation; either version 2 of the License, or
+> >> + * (at your option) any later version.
+> >> + *
+> >> + * This program is distributed in the hope that it will be useful,
+> >> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> >> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> >> + * GNU General Public License for more details.
+> >> + */
+> >> +
+> 
+> I'm guessing the following were copied from clk-sunxi.c.
+> 
+> >> +#include <linux/clk-provider.h>
+> >> +#include <linux/clkdev.h>
+> >
+> > Is this used?
+> 
+> clk_register_clkdev() is not used in this file, so not needed.
+> 
+> >> +#include <linux/of.h>
+> >> +#include <linux/of_address.h>
+> >> +#include <linux/reset-controller.h>
+> >
+> > Is this used?
+> 
+> A remnant of the USB clocks, which has been moved to clk-usb.c.
+> 
+> Not needed here nor in clk-sunxi.c.
+> 
+> >> +#include <linux/spinlock.h>
+> >> +#include <linux/log2.h>
+> >
+> > Is this used?
+> 
+> This is only used for clock factor calculation. Not applicable in
+> clk-simple-gates.c, so no.
 
-Updated the code as:
+You're right, we don't need any of these...
 
-diff --git a/drivers/base/power/opp.c b/drivers/base/power/opp.c
-index d9ebbd739b23..73e4e1ce60a1 100644
---- a/drivers/base/power/opp.c
-+++ b/drivers/base/power/opp.c
-@@ -743,6 +743,7 @@ static int _opp_add_static_v2(struct device *dev, struct device_node *np)
- {
-        struct device_opp *dev_opp;
-        struct dev_pm_opp *new_opp;
-+       u64 rate;
-        int ret;
- 
-        /* Hold our list modification lock here */
-@@ -754,12 +755,18 @@ static int _opp_add_static_v2(struct device *dev, struct device_node *np)
-                goto unlock;
-        }
- 
--       ret = of_property_read_u32(np, "opp-hz", (u32 *)&new_opp->rate);
-+       ret = of_property_read_u64(np, "opp-hz", &rate);
-        if (ret < 0) {
-                dev_err(dev, "%s: opp-hz not found\n", __func__);
-                goto free_opp;
-        }
- 
-+       /*
-+        * Rate is defined as an unsigned long in clk API, and so casting
-+        * explicitly to its type. Must be fixed once rate is 64 bit
-+        * guaranteed in clk API.
-+        */
-+       new_opp->rate = (unsigned long)rate;
-        new_opp->turbo = of_property_read_bool(np, "turbo-mode");
- 
-        new_opp->np = np;
+> >> +static DEFINE_SPINLOCK(gates_lock);
+> >> +
+> > [...]
+> >> +
+> >> +static const int sun4i_a10_ahb_critical_clocks[] __initdata = {
+> >
+> > Shouldn't it be __initconst ?
+> 
+> Not sure why our critical clocks lists are __initdata...
 
+Why shouldn't it be?
+
+CLK_OF_DECLARE callbacks only run at of_clk_init time, which is way
+before the init memory is discarded.
+
+Maxime
 
 -- 
-viresh
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150730/f0ffccd0/attachment-0001.sig>
