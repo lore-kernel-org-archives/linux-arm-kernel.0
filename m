@@ -1,93 +1,73 @@
-From: sophian.yoma@gmail.com (yoma sophian)
-Date: Fri, 31 Jul 2015 00:20:54 +0800
-Subject: question about detect hard lockups without NMIs using secondary
- cpus
-In-Reply-To: <20150729182905.GO7557@n2100.arm.linux.org.uk>
-References: <CADUS3onib4DYYtPo7RfLAYiN4fpspzcFCx86-pJwuLc37hz3dQ@mail.gmail.com>
- <20150729182905.GO7557@n2100.arm.linux.org.uk>
-Message-ID: <CADUS3o=AQ2ic7K2RboDzEyBuJSzkACpbDXB=hcpsnedbi1dKcg@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 30 Jul 2015 11:24:03 -0500
+Subject: [PATCH V3 02/16] PM / OPP: Create a directory for opp bindings
+In-Reply-To: <20150730134959.GB17794@linux>
+References: <cover.1438166099.git.viresh.kumar@linaro.org>
+ <4dfe565ff17766b7df127d475d84958e96fdab1b.1438166099.git.viresh.kumar@linaro.org>
+ <CAL_Jsq+J41c7qx11L13-g0UyD+hY9W36Wu9P+6O3cnDv7ysY6Q@mail.gmail.com>
+ <20150730134959.GB17794@linux>
+Message-ID: <CAL_JsqLeBcaaJ05AtW+tyD5Uxuo5uVYLrq3_oKzrv94xhNpZGg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi Russel
-
-2015-07-30 2:29 GMT+08:00 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Thu, Jul 30, 2015 at 12:03:46AM +0800, yoma sophian wrote:
->> hi all:
->> below link introduced how to emulate NMIs on systems where they are
->> not available by using timer interrupts on other cpus.
+On Thu, Jul 30, 2015 at 8:49 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> On 30-07-15, 08:18, Rob Herring wrote:
+>> On Wed, Jul 29, 2015 at 5:52 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+>> > More platform specific extended opp bindings will follow and it would be
+>> > easy to manage them with a directory for opp. Lets create that and move
+>> > the existing opp bindings into it.
+>> >
+>> > Cc: Rob Herring <rob.herring@linaro.org>
 >>
->> http://article.gmane.org/gmane.linux.kernel/1419661
+>> Use get_maintainers.pl please so you send to right people and right email.
+>
+> Already done, you were just cc'd as an extra guy :)
+
+No, because no one that is a maintainer of
+Documentation/devicetree/bindings is cc'ed here. You did on the other
+patch, but not here as neither Ian, Mark, Kumar nor Pawel are cc'ed.
+
+>> > Cc: devicetree at vger.kernel.org
+>> > Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+>> > ---
+>> >  Documentation/devicetree/bindings/power/{ => opp}/opp.txt | 0
+>> >  1 file changed, 0 insertions(+), 0 deletions(-)
+>> >  rename Documentation/devicetree/bindings/power/{ => opp}/opp.txt (100%)
+>> >
+>> > diff --git a/Documentation/devicetree/bindings/power/opp.txt b/Documentation/devicetree/bindings/power/opp/opp.txt
+>> > similarity index 100%
+>> > rename from Documentation/devicetree/bindings/power/opp.txt
+>> > rename to Documentation/devicetree/bindings/power/opp/opp.txt
 >>
->> in kernel/watchdog.c
->>     --> watchdog_overflow_callback
->>           if (is_hardlockup()) {
->>            ...........................
->>                 if (hardlockup_panic)
->>                         panic("Watchdog detected hard LOCKUP on cpu %d",
->>                               this_cpu); /*************/
->>                 else
->>                         WARN(1, "Watchdog detected hard LOCKUP on cpu %d",
->>                              this_cpu);
->>              .......................
->>         }
->>
->> I have some questions:
->> a.
->> in SMP system, suppose 4 cores, and hardlockup_panic is 1.
->> Core0 find Core1 hard lcokup in hardIRQ context
->> the panic function, above with '*' marked, will fail on
->> smp_send_stop(), and we will have no idea where core1 is trapped in,
->> right?
+>> "power" seems to be a random collection of things. I'd prefer you move
+>> this to .../bindings/opp/opp.txt.
 >
-> watchdog_overflow_callback() is only ever entered for the failed core.
-> What you missed out on is:
+> Hmm, sure. That would be better I think.
 >
->         int this_cpu = smp_processor_id();
+> --------------8<-------------------
 >
-> which gets the CPU number of the CPU executing this code.  So, Core 0
-> will never find Core 1 having locked up via this code path.
-if core0 found it is locked in lockdep, that mean the situation is no so worse,
-core0 has the chance to go back, right.
+> Message-Id: <29597667e2c8afdbf396c5fcc9269fb27794131c.1438264123.git.viresh.kumar@linaro.org>
+> From: Viresh Kumar <viresh.kumar@linaro.org>
+> Date: Mon, 27 Jul 2015 10:04:21 +0530
+> Subject: [PATCH] PM / OPP: Create a directory for opp bindings
+>
+> More platform specific extended opp bindings will follow and it would be
+> easy to manage them with a directory for opp. Lets create that and move
+> the existing opp bindings into it.
+>
+> Cc: Rob Herring <rob.herring@linaro.org>
+
+Still wrong...
 
 
-
->> b.
->> things will get worse if we are running single core system if hard
->> lockup happen.
->> We even have no idea what happen.
+> Cc: devicetree at vger.kernel.org
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> ---
+>  Documentation/devicetree/bindings/{power => opp}/opp.txt | 0
+>  1 file changed, 0 insertions(+), 0 deletions(-)
+>  rename Documentation/devicetree/bindings/{power => opp}/opp.txt (100%)
 >
-> Basically, without NMIs (or FIQs in ARM speak) lockups with IRQs off are
-> undetectable by the kernel other than "the system stopped responding".
->
-> In a SMP system, there are mechanisms by which other CPUs can detect a
-> locked-up CPU, and they can call trigger_all_cpu_backtrace() - and that
-> can only get a trace out of the locked up CPU if it uses FIQs.  A CPU
-> which has locked up in an IRQs-off region won't be able to receive an
-> IRQ or IPI by definition.
-
-so in ur case "A CPU  which has locked up in an IRQs-off region won't
-be able to receive an
-IRQ or IPI by definition.' the only wake to trigger_them is by FIQ, right?
-
-
-> Work has been going on for the last 9 months to try and bring a working
-> trigger_all_cpu_backtrace() implementation, initially with IRQs and
-> later with FIQs.
->
-> In previous merge windows, we have moved forward with getting some FIQ
-> changes merged, and in the next merge window, I have patches queued up
-> (available in linux-next) which add IRQ-based trigger_all_cpu_backtrace()
-> support.
->
-> The next piece of the puzzle is sorting out the patches which bring FIQ
-> based trigger_all_cpu_backtrace() support - but even if we do, that won't
-> be available everywhere - for example, it won't be available if your kernel
-> runs in the non-secure world with a secure monitor, because FIQs generally
-> aren't usable in that world.
-Is there patch that we can reference what you describe above?
-if we stay in secure world, and take some ppi as fiq and others ppi/spi are IRQ.
-isn't that enough to cover above idea?
-( GIC has the cability to let NS irq to be handed by secure Cpu)
-
-appreciate ur kine help
+> diff --git a/Documentation/devicetree/bindings/power/opp.txt b/Documentation/devicetree/bindings/opp/opp.txt
+> similarity index 100%
+> rename from Documentation/devicetree/bindings/power/opp.txt
+> rename to Documentation/devicetree/bindings/opp/opp.txt
