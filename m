@@ -1,51 +1,174 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 30 Jul 2015 15:36:09 +0200
-Subject: [PATCH v1 1/2] dt: atmel-usart: document new I/O data register
- width property
-In-Reply-To: <1438261591-13130-1-git-send-email-andriy.shevchenko@linux.intel.com>
-References: <1438261591-13130-1-git-send-email-andriy.shevchenko@linux.intel.com>
-Message-ID: <55BA2849.2050803@atmel.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 30 Jul 2015 08:42:53 -0500
+Subject: [PATCH v6] PCI: Store PCIe bus address in struct of_pci_range
+In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E01D6F350@lhreml503-mbs>
+References: <1438010223-124422-1-git-send-email-gabriele.paoloni@huawei.com>
+ <20150729172053.GE31170@google.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E01D6F350@lhreml503-mbs>
+Message-ID: <CAL_JsqKs11-sXQTdBD+ZjbVYFWUHBARTW9q5MF1hCXUhZ+nWLQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 30/07/2015 15:06, Andy Shevchenko a ?crit :
-> This change documents a new property for the Atmel serial device, allowing an
-> implementer to specify either four bytes or one byte access to the controller
-> data register.
-> 
-> This supports a change that unbreaks this driver on ATNGW100 board.
-> 
-> Signed-off-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-> ---
->  Documentation/devicetree/bindings/serial/atmel-usart.txt | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/serial/atmel-usart.txt b/Documentation/devicetree/bindings/serial/atmel-usart.txt
-> index e6e6142..a8c290a7 100644
-> --- a/Documentation/devicetree/bindings/serial/atmel-usart.txt
-> +++ b/Documentation/devicetree/bindings/serial/atmel-usart.txt
-> @@ -6,6 +6,8 @@ Required properties:
->    additional mode or an USART new feature.
->    For the dbgu UART, use "atmel,<chip>-dbgu", "atmel,<chip>-usart"
->  - reg: Should contain registers location and length
-> +- reg-io-width: The I/O register width (in bytes) implemented by
-> +  this device. Supported values are 1 or 4 (the default).
+On Wed, Jul 29, 2015 at 2:44 PM, Gabriele Paoloni
+<gabriele.paoloni@huawei.com> wrote:
+> Hi Bjorn
+>
+> Many Thanks for your reply
+>
+> I have commented back inline with resolutions from my side.
+>
+> If you're ok with them I'll send it out a new version in the appropriate patchset
+>
+> Cheers
+>
+> Gab
+>
+>> -----Original Message-----
+>> From: Bjorn Helgaas [mailto:bhelgaas at google.com]
+>> Sent: Wednesday, July 29, 2015 6:21 PM
+>> To: Gabriele Paoloni
+>> Cc: arnd at arndb.de; lorenzo.pieralisi at arm.com; Wangzhou (B);
+>> robh+dt at kernel.org; james.morse at arm.com; Liviu.Dudau at arm.com; linux-
+>> pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+>> devicetree at vger.kernel.org; Yuanzhichang; Zhudacai; zhangjukuo;
+>> qiuzhenfa; Liguozhu (Kenneth)
+>> Subject: Re: [PATCH v6] PCI: Store PCIe bus address in struct
+>> of_pci_range
+>>
+>> Hi Gabriele,
+>>
+>> As far as I can tell, this is not specific to PCIe, so please use "PCI"
+>> in
+>> the subject as a generic term that includes both PCI and PCIe.
+>
+> sure agreed
+>
+>>
+>> On Mon, Jul 27, 2015 at 11:17:03PM +0800, Gabriele Paoloni wrote:
+>> > From: gabriele paoloni <gabriele.paoloni@huawei.com>
+>> >
+>> >     This patch is needed port PCIe designware to new DT parsing API
+>> >     As discussed in
+>> >     http://lists.infradead.org/pipermail/linux-arm-kernel/2015-
+>> January/317743.html
+>> >     in designware we have a problem as the PCI addresses in the PCIe
+>> controller
+>> >     address space are required in order to perform correct HW
+>> operation.
+>> >
+>> >     In order to solve this problem commit f4c55c5a3 "PCI: designware:
+>> >     Program ATU with untranslated address" added code to read the
+>> PCIe
+>>
+>> Conventional reference is 12-char SHA1, like this:
+>>
+>>   f4c55c5a3f7f ("PCI: designware: Program ATU with untranslated
+>> address")
+>
+> Agreed, will change this
+>
+>>
+>> >     controller start address directly from the DT ranges.
+>> >
+>> >     In the new DT parsing API of_pci_get_host_bridge_resources()
+>> hides the
+>> >     DT parser from the host controller drivers, so it is not possible
+>> >     for drivers to parse values directly from the DT.
+>> >
+>> >     In http://www.spinics.net/lists/linux-pci/msg42540.html we
+>> already tried
+>> >     to use the new DT parsing API but there is a bug (obviously) in
+>> setting
+>> >     the <*>_mod_base addresses
+>> >     Applying this patch we can easily set "<*>_mod_base = win-
+>> >__res.start"
+>>
+>> By itself, this patch adds something.  It would help me understand it
+>> if
+>> the *user* of this new something were in the same patch series.
+>
+> the user is: "[PATCH v5 2/5] PCI: designware: Add ARM64 support"
+> I will ask Zhou Wang to include this patch in his patchset
+>
+>
+>>
+>> >     This patch adds a new field in "struct of_pci_range" to store the
+>> >     pci bus start address; it fills the field in
+>> of_pci_range_parser_one();
+>> >     in of_pci_get_host_bridge_resources() it retrieves the resource
+>> entry
+>> >     after it is created and added to the resource list and uses
+>> >     entry->__res.start to store the pci controller address
+>>
+>> struct of_pci_range is starting to get confusing to non-OF folks like
+>> me.
+>> It now contains:
+>>
+>>   u32 pci_space;
+>>   u64 pci_addr;
+>>   u64 cpu_addr;
+>>   u64 bus_addr;
+>>
+>> Can you explain what all these things mean, and maybe even add one-line
+>> comments to the structure?
+>
+> sure I can add comments inline in the code
+>
+>>
+>> pci_space: The only uses I see are to determine whether to print
+>> "Prefetch".  I don't see any real functionality that uses this.
+>
+> Looking at the code I agree. it's seems to be used only in powerpc
+> and microblaze to print out.
+> However from my understanding pci_space is the phys.hi field of the
+> ranges property: it defines the properties of the address space associated
+> to the PCI address. if you're curious you can find a nice and quick to read
+> "guide" in http://devicetree.org/MPC5200:PCI
+>
+>>
+>> pci_addr: I assume this is a PCI bus address, like what you would see
+>> if
+>> you put an analyzer on the bus/link.  This address could go in a BAR.
+>
+> Yes, this is the PCI start address of the range: phys.mid + phys.low in the
+> guide mentioned above
+>
+>>
+>> cpu_addr: I assume this is a CPU physical address, like what you would
+>> see
+>> in /proc/iomem and what you would pass to ioremap().
+>
+> Yes correct
+>
+>>
+>> bus_addr: ?
+>>
+>
+> According to the guide above, this is the address into which the pci_address
+> get translated to and that is passed to the root complex. Between the root
+> complex and the CPU there can be intermediate translation layers: see that to
+> get pci_address we call "of_translate_address"; this will apply all the
+> translation layers (ranges in the DT) that it finds till it comes to the root
+> node of the DT (thus retrieving the CPU address).
+> Now said that, for designware we need the first translated PCI address, that we call
 
-Well, sorry but no.
-The proper way to implement this is to cling to certain compatible
-strings. But I'm pretty sure that this issue shall not be fixed like this.
+I think you mean "translated CPU address." The flow of addresses looks
+like this:
 
-But I think that Cyrille is about to propose another version. Let's wait
-for his code...
+CPU -> CPU bus address -> bus fabric address decoding -> bus address
+-> DW PCI -> PCI address
 
-Bye,
+This is quite common that an IP block does not see the full address.
+It is unusual that the IP block needs to know its full address on the
+slave side. It is quite common for the master side and the kernel
+deals with that all the time with DMA mapping
 
+> here bus_addr after Rob Herring suggested the name...honestly I cannot think of a
+> different name
 
->  - interrupts: Should contain interrupt
->  - clock-names: tuple listing input clock names.
->  	Required elements: "usart"
-> 
+Thinking about this some more, is this really a translation versus
+just a stripping of high bits? Does the DW IP have less than 32-bits
+address? If so, we could express differently and just mask the CPU
+address within the driver instead.
 
-
--- 
-Nicolas Ferre
+Rob
