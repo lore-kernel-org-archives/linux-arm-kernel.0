@@ -1,129 +1,64 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Thu, 30 Jul 2015 16:13:47 +0100
-Subject: [PATCH] irqchip/gic: Only allow the primary GIC to set the CPU map
-In-Reply-To: <55BA3D29.1000204@nvidia.com>
-References: <1438265479-15427-1-git-send-email-jonathanh@nvidia.com>
- <55BA35D2.5040307@arm.com> <55BA3D29.1000204@nvidia.com>
-Message-ID: <55BA3F2B.40500@nvidia.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 30 Jul 2015 12:15:50 -0300
+Subject: [PATCH v4 1/1] Serial: imx: add dev_pm_ops to support suspend to
+ ram/disk
+In-Reply-To: <1438266762-4397-1-git-send-email-shenwei.wang@freescale.com>
+References: <1438266762-4397-1-git-send-email-shenwei.wang@freescale.com>
+Message-ID: <CAOMZO5DN3vARpY0ZQ7nEv+jbf-kcQQF4jrXqddGi81wvaxLPMg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Shenwei,
 
-On 30/07/15 16:05, Jon Hunter wrote:
-> 
-> On 30/07/15 15:33, Marc Zyngier wrote:
->> On 30/07/15 15:11, Jon Hunter wrote:
->>> The gic_init_bases() function initialises an array that stores the mapping
->>> between the GIC and CPUs. This array is a global array that is
->>> unconditionally initialised on every call to gic_init_bases(). Although,
->>> it is not common for there to be more than one GIC instance, there are
->>> some devices that do support nested GIC controllers and gic_init_bases()
->>> can be called more than once.
->>>
->>> A 2nd call to gic_init_bases() will clear the previous CPU mapping and
->>> will only setup the mapping again for the CPU calling gic_init_bases().
->>> Fix this by only allowing the CPU map to be configured for the primary GIC.
->>>
->>> For secondary GICs the CPU map is not relevant because these GICs do not
->>> directly route the interrupts to the main CPU(s) but to other GICs or
->>> devices.
->>>
->>> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
->>> ---
->>> This is a follow-up to the patch titled "irqchip: gic: Add a cpu map for
->>> each GIC instance" and discussed here [1]. Based upon the discussion I have
->>> re-worked and re-titled it approriately.
->>>
->>> [1] http://www.spinics.net/lists/kernel/msg2044421.html
->>>
->>>  drivers/irqchip/irq-gic.c | 43 +++++++++++++++++++++++++------------------
->>>  1 file changed, 25 insertions(+), 18 deletions(-)
->>>
->>> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
->>> index a530d9a9b810..7566fe259d27 100644
->>> --- a/drivers/irqchip/irq-gic.c
->>> +++ b/drivers/irqchip/irq-gic.c
->>> @@ -416,19 +416,26 @@ static void gic_cpu_init(struct gic_chip_data *gic)
->>>  	int i;
->>>  
->>>  	/*
->>> -	 * Get what the GIC says our CPU mask is.
->>> +	 * Setting up the CPU map is only relevant for the primary GIC
->>> +	 * because any nested/secondary GICs do not directly interface
->>> +	 * with the CPU(s).
->>>  	 */
->>> -	BUG_ON(cpu >= NR_GIC_CPU_IF);
->>> -	cpu_mask = gic_get_cpumask(gic);
->>> -	gic_cpu_map[cpu] = cpu_mask;
->>> +	if (gic == &gic_data[0]) {
->>> +		/*
->>> +		 * Get what the GIC says our CPU mask is.
->>> +		 */
->>> +		BUG_ON(cpu >= NR_GIC_CPU_IF);
->>> +		cpu_mask = gic_get_cpumask(gic);
->>> +		gic_cpu_map[cpu] = cpu_mask;
->>>  
->>> -	/*
->>> -	 * Clear our mask from the other map entries in case they're
->>> -	 * still undefined.
->>> -	 */
->>> -	for (i = 0; i < NR_GIC_CPU_IF; i++)
->>> -		if (i != cpu)
->>> -			gic_cpu_map[i] &= ~cpu_mask;
->>> +		/*
->>> +		 * Clear our mask from the other map entries in case they're
->>> +		 * still undefined.
->>> +		 */
->>> +		for (i = 0; i < NR_GIC_CPU_IF; i++)
->>> +			if (i != cpu)
->>> +				gic_cpu_map[i] &= ~cpu_mask;
->>> +	}
->>>  
->>>  	gic_cpu_config(dist_base, NULL);
->>>  
->>> @@ -977,13 +984,6 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
->>>  	}
->>>  
->>>  	/*
->>> -	 * Initialize the CPU interface map to all CPUs.
->>> -	 * It will be refined as each CPU probes its ID.
->>> -	 */
->>> -	for (i = 0; i < NR_GIC_CPU_IF; i++)
->>> -		gic_cpu_map[i] = 0xff;
->>> -
->>> -	/*
->>>  	 * Find out how many interrupts are supported.
->>>  	 * The GIC only supports up to 1020 interrupt sources.
->>>  	 */
->>> @@ -1028,6 +1028,13 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
->>>  		return;
->>>  
->>>  	if (gic_nr == 0) {
->>> +		/*
->>> +		 * Initialize the CPU interface map to all CPUs.
->>> +		 * It will be refined as each CPU probes its ID.
->>> +		 * This is only necessary for the primary GIC.
->>> +		 */
->>> +		for (i = 0; i < NR_GIC_CPU_IF; i++)
->>> +			gic_cpu_map[i] = 0xff;
->>>  #ifdef CONFIG_SMP
->>>  		set_smp_cross_call(gic_raise_softirq);
->>>  		register_cpu_notifier(&gic_cpu_notifier);
->>>
->>
->> Looks good.
->>
->> I think there is a another bug caused by 322895062 ("irqchip: gic:
->> Preserve gic V2 bypass bits in cpu ctrl register"), where
->> gic_cpu_if_up() only acts on the primary GIC. In the secondary GIC case,
->> it will stay disabled.
->>
->> Mind fixing this while you're at it?
-> 
-> Ah yes, I see. Ok, I will resend this with the other fix as a series.
+On Thu, Jul 30, 2015 at 11:32 AM, Shenwei Wang
+<shenwei.wang@freescale.com> wrote:
 
-Hmmm, what about gic_cpu_if_down()? Looks like the only user is
-vexpress-tc2. Ideally it should pass the gic_nr. I could make it pass 0
-by default.
+> +static int imx_serial_port_suspend_noirq(struct device *dev)
+> +{
+> +       struct platform_device *pdev = to_platform_device(dev);
+> +       struct imx_port *sport = platform_get_drvdata(pdev);
+> +       int ret;
+> +
+> +       ret = clk_enable(sport->clk_ipg);
+> +       if (ret)
+> +               dev_err(dev, "UART%d suspend error!\r\n", sport->port.line);
 
-Jon
+In case of error you should propagate it:
+
+ret = clk_enable(sport->clk_ipg);
+if (ret)
+    return ret;
+
+> +
+> +       /* Save necessary regs */
+> +       sport->saved_reg[0] = readl(sport->port.membase + UCR1);
+> +       sport->saved_reg[1] = readl(sport->port.membase + UCR2);
+> +       sport->saved_reg[2] = readl(sport->port.membase + UCR3);
+> +       sport->saved_reg[3] = readl(sport->port.membase + UCR4);
+> +       sport->saved_reg[4] = readl(sport->port.membase + UFCR);
+> +       sport->saved_reg[5] = readl(sport->port.membase + UESC);
+> +       sport->saved_reg[6] = readl(sport->port.membase + UTIM);
+> +       sport->saved_reg[7] = readl(sport->port.membase + UBIR);
+> +       sport->saved_reg[8] = readl(sport->port.membase + UBMR);
+> +       sport->saved_reg[9] = readl(sport->port.membase + IMX21_UTS);
+> +
+> +       if (ret == 0)
+> +               clk_disable(sport->clk_ipg);
+
+then you don't need to check ret here. Just call clk_disable unconditionally.
+
+> +
+> +       return 0;
+> +}
+> +
+> +static int imx_serial_port_resume_noirq(struct device *dev)
+> +{
+> +       struct platform_device *pdev = to_platform_device(dev);
+> +       struct imx_port *sport = platform_get_drvdata(pdev);
+> +       int ret;
+> +
+> +       ret = clk_enable(sport->clk_ipg);
+> +       if (ret)
+> +               dev_err(dev, "UART%d resume error!\r\n", sport->port.line);
+
+Same here.
