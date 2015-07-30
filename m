@@ -1,134 +1,262 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 30 Jul 2015 15:50:25 +0200
-Subject: [RFC PATCH 6/6] mtd: nand: sunxi: support per-partition ECC config
+Date: Thu, 30 Jul 2015 15:50:24 +0200
+Subject: [RFC PATCH 5/6] mtd: nand: add infrastructure for per-partition ECC
+ config
 In-Reply-To: <1438264225-23796-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1438264225-23796-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1438264225-23796-7-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1438264225-23796-6-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner SoCs have to support per-partition ECC in order to properly
-expose the first stage bootloader partition which requires specific ECC
-config that might not match the NAND chip requirements.
+Some SoCs require a different ECC config for their first stage bootloader,
+but we cannot apply the same config on the whole flash, or we might have
+to live an unsuitable ECC config (often weaker than what is required by
+the NAND chip).
+
+This patch makes use of the mtd_part_ops infrastructure to let the NAND
+controller adjust the ECC config for each partition.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/mtd/nand/sunxi_nand.c | 61 ++++++++++++++++++++++++++++++++++++++++---
- 1 file changed, 57 insertions(+), 4 deletions(-)
+ drivers/mtd/nand/nand_base.c | 152 +++++++++++++++++++++++++++++++++++++++++++
+ include/linux/mtd/nand.h     |  35 +++++++++-
+ 2 files changed, 186 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
-index 96dda70..6ced4c9 100644
---- a/drivers/mtd/nand/sunxi_nand.c
-+++ b/drivers/mtd/nand/sunxi_nand.c
-@@ -210,6 +210,10 @@ struct sunxi_nand_hw_ecc {
- 	struct nand_ecclayout layout;
- };
- 
-+struct sunxi_nand_part {
-+	struct nand_ecc_ctrl ecc;
-+};
-+
- /*
-  * NAND chip structure: stores NAND chip device related information
-  *
-@@ -535,7 +539,7 @@ static int sunxi_nfc_hw_ecc_read_page(struct mtd_info *mtd,
- 				      int oob_required, int page)
- {
- 	struct sunxi_nfc *nfc = to_sunxi_nfc(chip->controller);
--	struct nand_ecc_ctrl *ecc = &chip->ecc;
-+	struct nand_ecc_ctrl *ecc = nand_ecc(chip);
- 	struct nand_ecclayout *layout = ecc->layout;
- 	struct sunxi_nand_hw_ecc *data = ecc->priv;
- 	unsigned int max_bitflips = 0;
-@@ -621,7 +625,7 @@ static int sunxi_nfc_hw_ecc_write_page(struct mtd_info *mtd,
- 				       const uint8_t *buf, int oob_required)
- {
- 	struct sunxi_nfc *nfc = to_sunxi_nfc(chip->controller);
--	struct nand_ecc_ctrl *ecc = &chip->ecc;
-+	struct nand_ecc_ctrl *ecc = nand_ecc(chip);
- 	struct nand_ecclayout *layout = ecc->layout;
- 	struct sunxi_nand_hw_ecc *data = ecc->priv;
- 	int offset;
-@@ -697,7 +701,7 @@ static int sunxi_nfc_hw_syndrome_ecc_read_page(struct mtd_info *mtd,
- 					       int page)
- {
- 	struct sunxi_nfc *nfc = to_sunxi_nfc(chip->controller);
--	struct nand_ecc_ctrl *ecc = &chip->ecc;
-+	struct nand_ecc_ctrl *ecc = nand_ecc(chip);
- 	struct sunxi_nand_hw_ecc *data = ecc->priv;
- 	unsigned int max_bitflips = 0;
- 	uint8_t *oob = chip->oob_poi;
-@@ -765,7 +769,7 @@ static int sunxi_nfc_hw_syndrome_ecc_write_page(struct mtd_info *mtd,
- 						int oob_required)
- {
- 	struct sunxi_nfc *nfc = to_sunxi_nfc(chip->controller);
--	struct nand_ecc_ctrl *ecc = &chip->ecc;
-+	struct nand_ecc_ctrl *ecc = nand_ecc(chip);
- 	struct sunxi_nand_hw_ecc *data = ecc->priv;
- 	uint8_t *oob = chip->oob_poi;
- 	int offset = 0;
-@@ -1214,6 +1218,54 @@ static int sunxi_nand_ecc_init(struct mtd_info *mtd, struct nand_ecc_ctrl *ecc,
- 	return 0;
+diff --git a/drivers/mtd/nand/nand_base.c b/drivers/mtd/nand/nand_base.c
+index 67a29f5..9b027c6 100644
+--- a/drivers/mtd/nand/nand_base.c
++++ b/drivers/mtd/nand/nand_base.c
+@@ -4152,6 +4152,155 @@ static void nand_ecc_cleanup(struct mtd_info *mtd, struct nand_ecc_ctrl *ecc)
+ 		nand_bch_free((struct nand_bch_control *)ecc->priv);
  }
  
-+static int sunxi_nand_part_add(struct mtd_part *part)
++static void nand_part_select(struct mtd_part *part)
 +{
-+	struct nand_part *npart = mtd_part_get_priv(part);
-+	struct device_node *np = part->mtd.dev.of_node;
-+	struct sunxi_nand_part *spart;
++	struct nand_chip *chip = part->master->priv;
++
++	if (chip->part_ops->select)
++		chip->part_ops->select(part);
++
++	chip->cur_part = part;
++}
++
++static void nand_part_deselect(struct mtd_info *mtd)
++{
++	struct nand_chip *chip = mtd->priv;
++
++	if (chip->part_ops->deselect)
++		chip->part_ops->deselect(chip->cur_part);
++
++	chip->cur_part = NULL;
++}
++
++static int nand_part_read(struct mtd_info *mtd, loff_t from, size_t len,
++			  size_t *retlen, u_char *buf)
++{
++	struct mtd_part *part = mtd_to_part(mtd);
++	struct mtd_ecc_stats stats;
++	struct mtd_oob_ops ops;
 +	int ret;
 +
-+	if (!np)
-+		return 0;
++	nand_get_device(part->master, FL_READING);
++	stats = part->master->ecc_stats;
 +
-+	spart = kzalloc(sizeof(*spart), GFP_KERNEL);
-+	if (!spart)
++	nand_part_select(part);
++	memset(&ops, 0, sizeof(ops));
++	ops.len = len;
++	ops.datbuf = buf;
++	ops.mode = MTD_OPS_PLACE_OOB;
++	ret = nand_do_read_ops(part->master, from + part->offset, &ops);
++	*retlen = ops.retlen;
++	nand_part_deselect(part->master);
++
++	if (unlikely(mtd_is_eccerr(ret)))
++		part->mtd.ecc_stats.failed +=
++			part->master->ecc_stats.failed - stats.failed;
++	else
++		part->mtd.ecc_stats.corrected +=
++			part->master->ecc_stats.corrected - stats.corrected;
++	nand_release_device(part->master);
++
++	return ret;
++}
++
++static int nand_part_write(struct mtd_info *mtd, loff_t to, size_t len,
++			   size_t *retlen, const u_char *buf)
++{
++	struct mtd_part *part = mtd_to_part(mtd);
++	struct mtd_oob_ops ops;
++	int ret;
++
++	nand_get_device(part->master, FL_WRITING);
++	nand_part_select(part);
++	memset(&ops, 0, sizeof(ops));
++	ops.len = len;
++	ops.datbuf = (uint8_t *)buf;
++	ops.mode = MTD_OPS_PLACE_OOB;
++	ret = nand_do_write_ops(part->master, to + part->offset, &ops);
++	*retlen = ops.retlen;
++	nand_part_deselect(part->master);
++	nand_release_device(part->master);
++	return ret;
++}
++
++static int panic_nand_part_write(struct mtd_info *mtd, loff_t to, size_t len,
++				 size_t *retlen, const uint8_t *buf)
++{
++	struct mtd_part *part = mtd_to_part(mtd);
++	struct nand_chip *chip = part->master->priv;
++	struct mtd_oob_ops ops;
++	int ret;
++
++	/* Wait for the device to get ready */
++	panic_nand_wait(part->master, chip, 400);
++
++	/* Grab the device */
++	panic_nand_get_device(chip, part->master, FL_WRITING);
++
++	memset(&ops, 0, sizeof(ops));
++	ops.len = len;
++	ops.datbuf = (uint8_t *)buf;
++	ops.mode = MTD_OPS_PLACE_OOB;
++
++	ret = nand_do_write_ops(part->master, to + part->offset, &ops);
++
++	*retlen = ops.retlen;
++	return ret;
++}
++
++static int nand_part_add(struct mtd_part *part)
++{
++	struct mtd_info *mtd = &part->mtd;
++	struct nand_chip *chip = part->master->priv;
++	struct nand_part *npart;
++	int ret;
++
++	npart = kzalloc(sizeof(*npart), GFP_KERNEL);
++	if (!npart)
 +		return -ENOMEM;
 +
-+	/*
-+	 * Only initialize partition specific ECC config if the nand-ecc-mode
-+	 * property is provided.
-+	 */
-+	if (of_get_nand_ecc_mode(np) >= 0) {
-+		ret = sunxi_nand_ecc_init(&part->mtd, &spart->ecc, np);
++	mtd_part_set_priv(part, npart);
++	mtd->_read = nand_part_read;
++	mtd->_write = nand_part_write;
++	mtd->_panic_write = panic_nand_part_write;
++
++	if (chip->part_ops->add) {
++		ret = chip->part_ops->add(part);
 +		if (ret) {
-+			kfree(spart);
++			kfree(npart);
 +			return ret;
 +		}
-+
-+		npart->ecc = &spart->ecc;
 +	}
 +
-+	nand_part_set_priv(npart, spart);
++	if (npart->ecc)
++		nand_ecc_ctrl_init(&part->mtd, npart->ecc);
++	else
++		npart->ecc = &chip->ecc;
 +
 +	return 0;
 +}
 +
-+static void sunxi_nand_part_remove(struct mtd_part *part)
++static void nand_part_remove(struct mtd_part *part)
 +{
++	struct nand_chip *chip = part->master->priv;
 +	struct nand_part *npart = mtd_part_get_priv(part);
-+	struct sunxi_nand_part *spart = nand_part_get_priv(npart);
 +
-+	npart->ecc = NULL;
-+	sunxi_nand_ecc_cleanup(&spart->ecc);
-+	kfree(spart);
++	if (npart->ecc == &chip->ecc)
++		npart->ecc = NULL;
++	else
++		nand_ecc_cleanup(&part->mtd, npart->ecc);
++
++	if (chip->part_ops->remove)
++		chip->part_ops->remove(part);
++
++	kfree(part->mtd.priv);
 +}
 +
-+static const struct nand_part_ops sunxi_nand_part_ops = {
-+	.add = sunxi_nand_part_add,
-+	.remove = sunxi_nand_part_remove,
++static const struct mtd_part_ops nand_mtd_part_ops = {
++	.add = nand_part_add,
++	.remove = nand_part_remove,
 +};
 +
- static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
- 				struct device_node *np)
- {
-@@ -1317,6 +1369,7 @@ static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
- 	nand->read_buf = sunxi_nfc_read_buf;
- 	nand->write_buf = sunxi_nfc_write_buf;
- 	nand->read_byte = sunxi_nfc_read_byte;
-+	nand->part_ops = &sunxi_nand_part_ops;
+ /**
+  * nand_scan_tail - [NAND Interface] Scan for the NAND device
+  * @mtd: MTD device structure
+@@ -4189,6 +4338,9 @@ int nand_scan_tail(struct mtd_info *mtd)
+ 	/* Set the internal oob buffer location, just after the page data */
+ 	chip->oob_poi = chip->buffers->databuf + mtd->writesize;
  
- 	if (of_get_nand_on_flash_bbt(np))
- 		nand->bbt_options |= NAND_BBT_USE_FLASH | NAND_BBT_NO_OOB;
++	if (chip->part_ops)
++		mtd->part_ops = &nand_mtd_part_ops;
++
+ 	if (!chip->write_page)
+ 		chip->write_page = nand_write_page;
+ 
+diff --git a/include/linux/mtd/nand.h b/include/linux/mtd/nand.h
+index 2a9b557..71b491d 100644
+--- a/include/linux/mtd/nand.h
++++ b/include/linux/mtd/nand.h
+@@ -538,6 +538,28 @@ struct nand_buffers {
+ 	uint8_t *databuf;
+ };
+ 
++struct nand_part {
++	struct nand_ecc_ctrl *ecc;
++	void *priv;
++};
++
++static inline void *nand_part_get_priv(struct nand_part *part)
++{
++	return part->priv;
++}
++
++static inline void nand_part_set_priv(struct nand_part *part, void *priv)
++{
++	part->priv = priv;
++}
++
++struct nand_part_ops {
++	int (*add)(struct mtd_part *part);
++	void (*remove)(struct mtd_part *part);
++	void (*select)(struct mtd_part *part);
++	void (*deselect)(struct mtd_part *part);
++};
++
+ /**
+  * struct nand_chip - NAND Private Flash Chip Data
+  * @IO_ADDR_R:		[BOARDSPECIFIC] address to read the 8 I/O lines of the
+@@ -676,6 +698,7 @@ struct nand_chip {
+ 	int (*onfi_get_features)(struct mtd_info *mtd, struct nand_chip *chip,
+ 			int feature_addr, uint8_t *subfeature_para);
+ 	int (*setup_read_retry)(struct mtd_info *mtd, int retry_mode);
++	int (*select_part)(struct mtd_info *master, struct mtd_info *slave);
+ 
+ 	int chip_delay;
+ 	unsigned int options;
+@@ -723,6 +746,9 @@ struct nand_chip {
+ 	struct nand_bbt_descr *badblock_pattern;
+ 
+ 	void *priv;
++
++	const struct nand_part_ops *part_ops;
++	struct mtd_part *cur_part;
+ };
+ 
+ /*
+@@ -1033,6 +1059,13 @@ const struct nand_sdr_timings *onfi_async_timing_mode_to_sdr_timings(int mode);
+ 
+ static inline struct nand_ecc_ctrl *nand_ecc(struct nand_chip *chip)
+ {
+-	return &chip->ecc;
++	struct nand_part *npart;
++
++	if (!chip->cur_part)
++		return &chip->ecc;
++
++	npart = chip->cur_part->mtd.priv;
++
++	return npart->ecc;
+ }
+ #endif /* __LINUX_MTD_NAND_H */
 -- 
 1.9.1
