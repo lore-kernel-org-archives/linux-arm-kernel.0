@@ -1,41 +1,41 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Thu, 30 Jul 2015 11:23:18 +0200
-Subject: [PATCH v2 2/5] Documentation: bindings: document the Berlin PWM driver
-In-Reply-To: <1438248201-29222-1-git-send-email-antoine.tenart@free-electrons.com>
-References: <1438248201-29222-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1438248201-29222-3-git-send-email-antoine.tenart@free-electrons.com>
+Date: Thu, 30 Jul 2015 11:23:16 +0200
+Subject: [PATCH v2 0/5] ARM: berlin: PWM support
+Message-ID: <1438248201-29222-1-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Following the addition of a Berlin PWM driver, this patch adds the
-corresponding documentation.
+Hi all,
 
-Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
----
- Documentation/devicetree/bindings/pwm/pwm-berlin.txt | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+This series adds a driver for the Marvell Berlin PWM controller, which
+has 4 channels.
+
+This has been tested on a BG2Q DMP.
+
+Thanks,
+
+Antoine
+
+Changes since v1:
+	- Added a sentinel in berlin_pwm_match[]
+
+Antoine Tenart (5):
+  pwm: add the Berlin pwm controller driver
+  Documentation: bindings: document the Berlin PWM driver
+  ARM: berlin: add a PWM node on the BG2Q
+  ARM: berlin: add a PWM node on the BG2
+  ARM: berlin: add a PWM node on the BG2CD
+
+ .../devicetree/bindings/pwm/pwm-berlin.txt         |  15 ++
+ arch/arm/boot/dts/berlin2.dtsi                     |   6 +
+ arch/arm/boot/dts/berlin2cd.dtsi                   |   6 +
+ arch/arm/boot/dts/berlin2q.dtsi                    |   6 +
+ drivers/pwm/Kconfig                                |   9 +
+ drivers/pwm/Makefile                               |   1 +
+ drivers/pwm/pwm-berlin.c                           | 207 +++++++++++++++++++++
+ 7 files changed, 250 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-berlin.txt
+ create mode 100644 drivers/pwm/pwm-berlin.c
 
-diff --git a/Documentation/devicetree/bindings/pwm/pwm-berlin.txt b/Documentation/devicetree/bindings/pwm/pwm-berlin.txt
-new file mode 100644
-index 000000000000..3d7ab7bfbf54
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pwm/pwm-berlin.txt
-@@ -0,0 +1,15 @@
-+Berlin PWM controller
-+
-+Required properties:
-+- compatible: should be "marvell,berlin-pwm"
-+- reg: physical base address and length of the controller's registers
-+- #pwm-cells: should be 3. See pwm.txt in this directory for a description of
-+  the cells format.
-+
-+Example:
-+
-+pwm: pwm at f7f20000 {
-+	compatible = "marvell,berlin-pwm";
-+	reg = <0xf7f20000 0x40>;
-+	#pwm-cells = <3>;
-+}
 -- 
 2.5.0
