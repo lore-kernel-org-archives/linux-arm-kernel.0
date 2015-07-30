@@ -1,91 +1,58 @@
-From: mkrufky@linuxtv.org (Michael Ira Krufky)
-Date: Thu, 30 Jul 2015 07:37:41 -0400
-Subject: [PATCH 02/12] [media] dvb-pll: Add support for THOMSON DTT7546X
- tuner.
-In-Reply-To: <CAOcJUbw5hSmPdrz6rPPYU6iMBHnvOZc1p3f+4WhEYq2-XmAPVw@mail.gmail.com>
-References: <1435158670-7195-1-git-send-email-peter.griffin@linaro.org>
- <1435158670-7195-3-git-send-email-peter.griffin@linaro.org>
- <1435195057.9377.18.camel@perches.com>
- <20150722185811.2d718baa@recife.lan>
- <20150730094738.GD488@griffinp-ThinkPad-X1-Carbon-2nd>
- <1438250928.2677.10.camel@perches.com>
- <CAOcJUbw5hSmPdrz6rPPYU6iMBHnvOZc1p3f+4WhEYq2-XmAPVw@mail.gmail.com>
-Message-ID: <CAOcJUbwVBVxmaP-vNkw0n8Cf3-=Fn8Aou8FG81Ajab1B2h4Z4A@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 30 Jul 2015 12:45:45 +0100
+Subject: [PATCH v2 3/6] mailbox: Add support for ST's Mailbox IP
+In-Reply-To: <1438121215.30903.27.camel@tiscali.nl>
+References: <1437990272-23111-1-git-send-email-lee.jones@linaro.org>
+ <1437990272-23111-4-git-send-email-lee.jones@linaro.org>
+ <1438121215.30903.27.camel@tiscali.nl>
+Message-ID: <20150730114545.GG14642@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 30, 2015 at 7:14 AM, Michael Ira Krufky <mkrufky@linuxtv.org> wrote:
-> On Thu, Jul 30, 2015 at 6:08 AM, Joe Perches <joe@perches.com> wrote:
->> On Thu, 2015-07-30 at 10:47 +0100, Peter Griffin wrote:
->>> Hi Mauro / Joe,
->>>
->>> On Wed, 22 Jul 2015, Mauro Carvalho Chehab wrote:
->>>
->>> > Em Wed, 24 Jun 2015 18:17:37 -0700
->>> > Joe Perches <joe@perches.com> escreveu:
->>> >
->>> > > On Wed, 2015-06-24 at 16:11 +0100, Peter Griffin wrote:
->>> > > > This is used in conjunction with the STV0367 demodulator on
->>> > > > the STV0367-NIM-V1.0 NIM card which can be used with the STi
->>> > > > STB SoC's.
->>> > >
->>> > > Barely associated to this specific patch, but for
->>> > > dvb-pll.c, another thing that seems possible is to
->>> > > convert the struct dvb_pll_desc uses to const and
->>> > > change the "entries" fixed array size from 12 to []
->>> > >
->>> > > It'd save a couple KB overall and remove ~5KB of data.
->>> > >
->>> > > $ size drivers/media/dvb-frontends/dvb-pll.o*
->>> > >    text      data     bss     dec     hex filename
->>> > >    8520      1552    2120   12192    2fa0 drivers/media/dvb-frontends/dvb-pll.o.new
->>> > >    5624      6363    2120   14107    371b drivers/media/dvb-frontends/dvb-pll.o.old
->>> >
->>> > Peter,
->>> >
->>> > Please add this patch on the next patch series you submit.
->>>
->>> Ok will do, I've added this patch with a slightly updated commit message
->>> to my series.
->>>
->>> Joe - Can I add your signed-off-by?
->>
->> Signed-off-by: Joe Perches <joe@perches.com>
->
-> Reviewed-by: Michael Ira Krufky <m.krufky@samsung.com>
->
-> Joe, nice optimization - thanks for that.
->
-> With regards to Peter's patch, is this a digital-only tuner, or is it
-> a hybrid tuner?
->
-> The 5th byte that you send to the THOMSON DTT7546X seems to resemble
-> the 'auxiliary byte' that gets set in tuner-simple.c
->
-> I'm not sure that dvb-pll is the right place for this tuner
-> definition, if this is the case.  Maybe this definition belongs in
-> tuner-simple instead, if the pattern matches better there.
->
-> Mauro, can we hold off on merging Peter's patch until we resolve this?
+On Wed, 29 Jul 2015, Paul Bolle wrote:
 
-This code block, specifically, I would rather not see added into dvb-pll:
+> On ma, 2015-07-27 at 10:44 +0100, Lee Jones wrote:
+> > --- /dev/null
+> > +++ b/drivers/mailbox/mailbox-sti.c
+> 
+> > +static int sti_mbox_probe(struct platform_device *pdev)
+> > +{
+> > +	[...]
+> > +
+> > +	match = of_match_device(sti_mailbox_match, &pdev->dev);
+> > +	if (!match) {
+> > +		dev_err(&pdev->dev, "No configuration found\n");
+> > +		return -ENODEV;
+> > +	}
+> > +	pdev->dev.platform_data = (struct sti_mbox_pdata *) match->data;
+> > +
+> > +	[...]
+> > +}
+> 
+> > +static struct platform_driver sti_mbox_driver = {
+> > +	.probe = sti_mbox_probe,
+> > +	.remove = sti_mbox_remove,
+> > +	.driver = {
+> > +		.name = "sti-mailbox",
+> > +		.of_match_table = sti_mailbox_match,
+> > +	},
+> > +};
+> > +module_platform_driver(sti_mbox_driver);
+> 
+> > +MODULE_ALIAS("platform:mailbox-sti");
+> 
+> It seems this alias is only useful if there's a corresponding struct
+> platform_device with a "mailbox-sti" .name. I couldn't spot that
+> platform_device.
+> 
+> Besides, if I read sti_max_probe() correctly, without OF support loading
+> this module won't accomplish much. So what would another way of
+> autoloading this module buy you?
 
-+static int dvb_pll_get_num_regs(struct dvb_pll_priv *priv)
-+{
-+       int num_regs = 4;
-+
-+       if (strncmp(priv->pll_desc->name, "Thomson dtt7546x", 16) == 0)
-+               num_regs = 5;
-+
-+       return num_regs;
-+}
-+
+I think this line can be safely removed.
 
-tuner-simple provides an infrastructure that allows this tuner to be
-added in a more elegant way without the need to add special cases to
-otherwise generic code, as done in the above.
-
-I'm sorry, Peter.  Can you take a look at tuner-simple and consider
-sending a new patch?
-
--Michael Ira Krufky
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
