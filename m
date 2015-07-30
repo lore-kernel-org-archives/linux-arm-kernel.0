@@ -1,39 +1,68 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 30 Jul 2015 13:43:40 +0530
-Subject: [PATCH 7/7] ARM: dts: dra72-evm: Fix spurious card insert/removal
- interrupt
-In-Reply-To: <1438244020-4244-1-git-send-email-kishon@ti.com>
-References: <1438244020-4244-1-git-send-email-kishon@ti.com>
-Message-ID: <1438244020-4244-8-git-send-email-kishon@ti.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Thu, 30 Jul 2015 16:15:08 +0800
+Subject: [PATCH v4 2/2] arm64: Enable Marvell Berlin SoC family in
+ Kconfig and defconfig
+In-Reply-To: <55B9DB50.3070907@gmail.com>
+References: <1437557992-7111-1-git-send-email-jszhang@marvell.com>
+ <1437557992-7111-3-git-send-email-jszhang@marvell.com>
+ <55B9DB50.3070907@gmail.com>
+Message-ID: <20150730161508.7efb0174@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ldo1_reg in addition to being connected to the io lines is also
-connected to the card detect line. On card removal, omap_hsmmc
-driver does a regulator_disable causing card detect line to be
-pulled down. This raises a card insertion interrupt and once the
-MMC core detects there is no card inserted, it does a
-regulator disable which again raises a card insertion interrupt.
-This happens in a loop causing infinite MMC interrupts.
+Dear Sebastian,
 
-Fix it by making ldo1_reg as always_on.
+On Thu, 30 Jul 2015 10:07:44 +0200
+Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
 
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
----
- arch/arm/boot/dts/dra72-evm.dts |    1 +
- 1 file changed, 1 insertion(+)
+> On 07/22/2015 11:39 AM, Jisheng Zhang wrote:
+> > This patch introduces ARCH_BERLIN to enable Marvell Berlin SoC family in
+> > Kconfig and defconfig.
+> >
+> > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> 
+> I guess this will go through arm64 directly? If so,
 
-diff --git a/arch/arm/boot/dts/dra72-evm.dts b/arch/arm/boot/dts/dra72-evm.dts
-index c5d8e7d..45f11a0 100644
---- a/arch/arm/boot/dts/dra72-evm.dts
-+++ b/arch/arm/boot/dts/dra72-evm.dts
-@@ -295,6 +295,7 @@
- 					regulator-name = "ldo1";
- 					regulator-min-microvolt = <1800000>;
- 					regulator-max-microvolt = <3300000>;
-+					regulator-always-on;
- 					regulator-boot-on;
- 				};
- 
--- 
-1.7.9.5
+I dunno. But from previous pull request for mt8173, rk3368, their according
+change goes through arm-soc tree.
+
+Thanks,
+Jisheng
+
+> 
+> Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> 
+> > ---
+> >   arch/arm64/Kconfig.platforms | 6 ++++++
+> >   arch/arm64/configs/defconfig | 1 +
+> >   2 files changed, 7 insertions(+)
+> >
+> > diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+> > index f7e4327..37b8fc5 100644
+> > --- a/arch/arm64/Kconfig.platforms
+> > +++ b/arch/arm64/Kconfig.platforms
+> > @@ -1,5 +1,11 @@
+> >   menu "Platform selection"
+> >
+> > +config ARCH_BERLIN
+> > +	bool "Marvell Berlin SoC Family"
+> > +	select DW_APB_ICTL
+> > +	help
+> > +	  This enables support for Marvell Berlin SoC Family
+> > +
+> >   config ARCH_EXYNOS
+> >   	bool
+> >   	help
+> > diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+> > index 506b466..83843f9 100644
+> > --- a/arch/arm64/configs/defconfig
+> > +++ b/arch/arm64/configs/defconfig
+> > @@ -31,6 +31,7 @@ CONFIG_MODULES=y
+> >   CONFIG_MODULE_UNLOAD=y
+> >   # CONFIG_BLK_DEV_BSG is not set
+> >   # CONFIG_IOSCHED_DEADLINE is not set
+> > +CONFIG_ARCH_BERLIN=y
+> >   CONFIG_ARCH_EXYNOS7=y
+> >   CONFIG_ARCH_FSL_LS2085A=y
+> >   CONFIG_ARCH_HISI=y
+> >
