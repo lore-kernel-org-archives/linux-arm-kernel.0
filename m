@@ -1,60 +1,52 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Thu, 30 Jul 2015 10:46:11 +0100
-Subject: [PATCH 02/12] [media] dvb-pll: Add support for THOMSON DTT7546X
- tuner.
-In-Reply-To: <20150722141040.2be3ca98@recife.lan>
-References: <1435158670-7195-1-git-send-email-peter.griffin@linaro.org>
- <1435158670-7195-3-git-send-email-peter.griffin@linaro.org>
- <20150722141040.2be3ca98@recife.lan>
-Message-ID: <20150730094611.GC488@griffinp-ThinkPad-X1-Carbon-2nd>
+From: jchandra@broadcom.com (Jayachandran C.)
+Date: Thu, 30 Jul 2015 15:43:52 +0530
+Subject: [PATCH v3 1/2] PCI: generic: remove dependency on hw_pci
+In-Reply-To: <20150730092808.GA4685@red-moon>
+References: <1438183681-30519-1-git-send-email-jchandra@broadcom.com>
+ <20150730092808.GA4685@red-moon>
+Message-ID: <20150730101351.GA31408@jayachandranc.netlogicmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mauro,
-
-On Wed, 22 Jul 2015, Mauro Carvalho Chehab wrote:
-
-> Em Wed, 24 Jun 2015 16:11:00 +0100
-> Peter Griffin <peter.griffin@linaro.org> escreveu:
+On Thu, Jul 30, 2015 at 10:28:08AM +0100, Lorenzo Pieralisi wrote:
+> On Wed, Jul 29, 2015 at 04:28:00PM +0100, Jayachandran C wrote:
+> > The current code in pci-host-generic.c uses pci_common_init_dev()
+> > from ARM platform to do some of the PCI initializations, and this
+> > prevents it from being used in ARM64.
+> > 
+> > The initialization done by pci_common_init_dev() that is needed
+> > by pci-host-generic.c is really limited, and can be done easily
+> > in the same file without using hw_pci API. The ARM platform
+> > requires a pci_sys_data as sysdata for the PCI bus, this can be
+> > handled by setting up gen_pci to have a pci_sys_data variable as
+> > the first element.
 > 
-> > This is used in conjunction with the STV0367 demodulator on
-> > the STV0367-NIM-V1.0 NIM card which can be used with the STi
-> > STB SoC's.
-> > 
-> > This tuner has a fifth register, so some changes have been made
-> > to accommodate this.
-> > 
-> > Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> > ---
-> >  drivers/media/dvb-frontends/dvb-pll.c | 74 +++++++++++++++++++++++++++++------
-> >  drivers/media/dvb-frontends/dvb-pll.h |  1 +
-> >  2 files changed, 64 insertions(+), 11 deletions(-)
-> > 
-> > diff --git a/drivers/media/dvb-frontends/dvb-pll.c b/drivers/media/dvb-frontends/dvb-pll.c
-> > index 6d8fe88..f7381c7 100644
-> > --- a/drivers/media/dvb-frontends/dvb-pll.c
-> > +++ b/drivers/media/dvb-frontends/dvb-pll.c
-> > @@ -141,6 +141,35 @@ static struct dvb_pll_desc dvb_pll_thomson_dtt7520x = {
-> >  	},
-> >  };
-> >  
-> > +static void thomson_dtt7546x_bw(struct dvb_frontend *fe, u8 *buf)
-> > +{
-> > +	/* set CB2 reg - set ATC, XTO */
-> > +	buf[4] = 0xc3;
-> > +}
-> > +
-> > +static struct dvb_pll_desc dvb_pll_thomson_dtt7546x = {
-> > +	.name  = "Thomson dtt7546x",
-> > +	.min   = 44250000,
-> > +	.max   = 863250000,
-> > +	.set   = thomson_dtt7546x_bw,
-> > +	.iffreq= 36166667,
+> Ok, I still do not like leaving pci_sys_data there, and to remove
+> it there is only one snag (+ one patch to prevent
+> resources enablement on ARM64 PROBE_ONLY systems to have a
+> consolidated ARM/ARM64 host generic), which consists in removing the
+> align_resource pointer from pci_sys_data. A proposed solution (maybe
+> not ideal, we can consider it a temporary step to make progress)
+> here:
 > 
-> Whitespace is missing. Please check the patchs with scripts/checkpatch.pl.
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/359273.html
+> 
+> Comments very appreciated on the patch above, I do not have major
+> concerns with this patch other than the pci_sys_data hack, because
+> that's what it is.
 
-Will fix in V2.
+In may opinion, we have to leave ->sysdata on ARM pointing to a valid
+pci_sys_data. Leaving it pointing to random stuff and hoping that it
+will not be used is pretty bad - so I don't see why such a patch would
+make it upstream.
 
-regards,
+The second issue I have is adding dependencies between patches that
+enable basic functionality on arm64 with arm infrastructure cleanup
+patches. Given the number of kernel releases the cleanups take [and
+factoring in the amount of mess arm has :)], we will end up waiting
+a long time for arm64.
 
-Peter.
+BTW, I am not sure why there is a pushback on wrapping a structure in
+another, container_of() is the linux way of doing things :)
+
+JC.
