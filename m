@@ -1,71 +1,75 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 30 Jul 2015 21:27:03 +0200
-Subject: [RFC] arm64: defconfig: enable 48-bit VA by default
-In-Reply-To: <20150730101358.GA30796@e104818-lin.cambridge.arm.com>
-References: <CY1PR0301MB07488D6DC5F0B171D6B290E187830@CY1PR0301MB0748.namprd03.prod.outlook.com>
- <55B0E1AD.60409@arm.com>
- <BY2PR0301MB0743CBCFC5476E39A5D1EC0B878C0@BY2PR0301MB0743.namprd03.prod.outlook.com>
- <CAKv+Gu9LHBd7wM6P4H0X5WigzDETtpr2++_Ebo=adg5QtTOW2w@mail.gmail.com>
- <BY2PR0301MB074300C5F31701D9211827F0878C0@BY2PR0301MB0743.namprd03.prod.outlook.com>
- <20150730101358.GA30796@e104818-lin.cambridge.arm.com>
-Message-ID: <CAKv+Gu-G9Vpmt_c84OsG0JNRKopJ44uneJaAEpY3AMq6oS-Qdg@mail.gmail.com>
+From: jogo@openwrt.org (Jonas Gorski)
+Date: Thu, 30 Jul 2015 21:27:33 +0200
+Subject: [PATCH v4 1/3] dt-binding: spi: Mediatek: Document devicetree
+ bindings for spi bus
+In-Reply-To: <1438167874-1305-2-git-send-email-leilk.liu@mediatek.com>
+References: <1438167874-1305-1-git-send-email-leilk.liu@mediatek.com>
+ <1438167874-1305-2-git-send-email-leilk.liu@mediatek.com>
+Message-ID: <CAOiHx=k_0vdE=_gYO7v+-dSNJ+OsxHAjoPNs0esRuOYo6gUcmA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 July 2015 at 12:13, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Wed, Jul 29, 2015 at 08:49:57PM +0000, Stuart Yoder wrote:
->> > From: Ard Biesheuvel [mailto:ard.biesheuvel at linaro.org]
-[...]
->> > To be honest, I think this is poorly designed, and I am not sure we
->> > should cater for such configurations in the defconfig.
->>
->> Agree, if this is a one-off weird platform then we shouldn't.
->>
->> But, the 'Principles of ARM Memory Maps' doc proposes this:
->> 2 GB at 0x8000_0000
->> 30 GB at 0x8_8000_0000
->> 480 GB at 0x88_0000_0000
->
-> I'm not particularly recommending this layout, at least not without some
-> clarifications on DRAM aliases (I'll ping people internally about it
-> again). The original layout pre-dates ARMv8, it was meant for ARMv7/LPAE
-> and all the memory beyond 32-bit was highmem anyway. It was later
-> updated for AArch64 but only to allow 44/48-bit PA (a few sections
-> added).
->
+Hi,
 
-As an aside, is there any reason why the direct mapping *must* be a
-linear mapping?
-Other than the performance concerns regarding phys_to_virt/virt_to_phys, I mean?
+On Wed, Jul 29, 2015 at 1:04 PM, Leilk Liu <leilk.liu@mediatek.com> wrote:
+> Signed-off-by: Leilk Liu <leilk.liu@mediatek.com>
+> ---
+>  .../devicetree/bindings/spi/spi-mt65xx.txt         | 38 ++++++++++++++++++++++
+>  1 file changed, 38 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/spi/spi-mt65xx.txt
+>
+> diff --git a/Documentation/devicetree/bindings/spi/spi-mt65xx.txt b/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
+> new file mode 100644
+> index 0000000..f8005d6
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
+> @@ -0,0 +1,38 @@
+> +MTK SPI device
 
-> How I understood it at the time is that in hardware you place the large
-> DRAM (chip select) at high addresses, e.g. 64GB would be at a 512GB
-> offset, but lower 2GB+30GB aliased in the lower space with the
-> corresponding high address remaining a hole (that produces external
-> aborts if accessed). The first alias at 2GB was meant for 32-bit
-> initialisation code before the MMU is enabled. With AArch64, you don't
-> really need this low alias (assuming your EL3/EL2/secure-EL1 code is
-> 64-bit) since PC can use >32-bit addresses.
->
->> ...i.e. if you have > 32 GB then your RAM regions are split into 3
->> chunks.  The aarch64 kernel will support > than 32GB right?  A
->> basic server will have that much or more.
->>
->> How will we deal with systems with > 32GB of memory that follow that
->> map?
->
-> My recommendation would be to avoid the lower alias (in hardware or some
-> EL3 configuration change) and keep all the RAM at 0x80_0000_0000, just
-> boot the system in AArch64 mode.
->
->> When do we expect the default page size for the aarch64 kernel to be
->> changed to 64KB?  Any workload that puts pressure on the TLBs will benefit
->> from this.
->
-> This comes with its own set problems. 64KB is useful for specific
-> use-cases (e.g. large databases) but not general purpose where you waste
-> a large amount of RAM. So there are no plans to change the default page
-> size to 64KB.
->
-> --
-> Catalin
+You are calling it "MediaTek SPI controller" in the Kconfig entry, so
+you should call it that here as well.
+
+> +
+> +Required properties:
+> +- compatible: should be one of the following.
+> +    - mediatek,mt8173-spi: for mt8173 platforms
+> +    - mediatek,mt8135-spi: for mt8135 platforms
+> +    - mediatek,mt6589-spi: for mt6589 platforms
+> +
+> +- #address-cells: should be 1.
+> +
+> +- #size-cells: should be 0.
+> +
+> +- reg: Address and length of the register set for the device
+> +
+> +- interrupts: Should contain spi interrupt
+> +
+> +- clocks: phandles to input clocks.
+> +
+> +- clock-names: tuple listing input clock names.
+> +       Required elements: "main"
+> +
+> +- pad-select: should specify spi pad used, only required for MT8173.
+> +        This value should be 0~3.
+
+As already commented on the v3, this is a vendor property, and must
+have a vendor prefix, so it must be called "mediatek,pad-select".
+
+> +
+> +Example:
+> +
+> +- SoC Specific Portion:
+> +spi: spi at 1100a000 {
+> +       compatible = "mediatek,mt8173-spi";
+> +       #address-cells = <1>;
+> +       #size-cells = <0>;
+> +       reg = <0 0x1100a000 0 0x1000>;
+> +       interrupts = <GIC_SPI 110 IRQ_TYPE_LEVEL_LOW>;
+> +       clocks = <&pericfg CLK_PERI_SPI0>;
+> +       clock-names = "main";
+> +       pad-select = <0>;
+> +       status = "disabled";
+> +};
+
+
+Jonas
