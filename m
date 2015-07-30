@@ -1,38 +1,45 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 29 Jul 2015 22:08:10 -0500
-Subject: [PATCH v2 05/22] ACPI: add acpi_dev_get_device()
-In-Reply-To: <1438089593-7696-6-git-send-email-tomeu.vizoso@collabora.com>
-References: <1438089593-7696-1-git-send-email-tomeu.vizoso@collabora.com>
- <1438089593-7696-6-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <CAL_JsqKn82RqVhRRX0YPwZcfX66==1i3D43y8XLP07QARSGGrw@mail.gmail.com>
+From: vthakkar1994@gmail.com (Vaishali Thakkar)
+Date: Thu, 30 Jul 2015 08:42:58 +0530
+Subject: [PATCH] soc: versatile: Use devm_kzalloc
+Message-ID: <20150730031257.GA3133@vaishali-Ideapad-Z570>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 28, 2015 at 8:19 AM, Tomeu Vizoso
-<tomeu.vizoso@collabora.com> wrote:
-> This function is just a getter for struct acpi_device.dev and is needed
-> in the implementation of the fwnode API when building with !CONFIG_ACPI.
->
-> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-> ---
->
-> Changes in v2:
-> - Add acpi_dev_get_device()
->
->  include/linux/acpi.h | 10 ++++++++++
->  1 file changed, 10 insertions(+)
->
-> diff --git a/include/linux/acpi.h b/include/linux/acpi.h
-> index 01e6770d8e27..d1ad6c20c7e4 100644
-> --- a/include/linux/acpi.h
-> +++ b/include/linux/acpi.h
-> @@ -78,6 +78,11 @@ static inline void acpi_preset_companion(struct device *dev,
->         ACPI_COMPANION_SET(dev, acpi_find_child_device(parent, addr, NULL));
->  }
->
-> +static inline struct device *acpi_dev_get_device(struct acpi_device *adev)
+This patch introduces the use of devm_kzalloc and does away
+with kfree in the probe function.
 
-get usually implies reference counting. Perhaps acpi_dev_to_device or
-acpi_dev_find_device.
+Signed-off-by: Vaishali Thakkar <vthakkar1994@gmail.com>
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/soc/versatile/soc-realview.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-Rob
+diff --git a/drivers/soc/versatile/soc-realview.c b/drivers/soc/versatile/soc-realview.c
+index e642c45..0889710 100644
+--- a/drivers/soc/versatile/soc-realview.c
++++ b/drivers/soc/versatile/soc-realview.c
+@@ -103,7 +103,8 @@ static int realview_soc_probe(struct platform_device *pdev)
+ 	if (IS_ERR(syscon_regmap))
+ 		return PTR_ERR(syscon_regmap);
+ 
+-	soc_dev_attr = kzalloc(sizeof(*soc_dev_attr), GFP_KERNEL);
++	soc_dev_attr = devm_kzalloc(&pdev->dev, sizeof(*soc_dev_attr),
++				    GFP_KERNEL);
+ 	if (!soc_dev_attr)
+ 		return -ENOMEM;
+ 
+@@ -115,10 +116,9 @@ static int realview_soc_probe(struct platform_device *pdev)
+ 	soc_dev_attr->machine = "RealView";
+ 	soc_dev_attr->family = "Versatile";
+ 	soc_dev = soc_device_register(soc_dev_attr);
+-	if (IS_ERR(soc_dev)) {
+-		kfree(soc_dev_attr);
++	if (IS_ERR(soc_dev))
+ 		return -ENODEV;
+-	}
++
+ 	ret = regmap_read(syscon_regmap, REALVIEW_SYS_ID_OFFSET,
+ 			  &realview_coreid);
+ 	if (ret)
+-- 
+1.9.1
