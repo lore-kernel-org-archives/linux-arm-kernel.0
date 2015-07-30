@@ -1,82 +1,35 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 30 Jul 2015 14:14:29 +0100
-Subject: arch/arm/kernel/setup.c does not compile at -O0
-In-Reply-To: <55BA1E62.9080103@free.fr>
-References: <55BA1E62.9080103@free.fr>
-Message-ID: <55BA2335.706@arm.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 30 Jul 2015 08:18:50 -0500
+Subject: [PATCH V3 02/16] PM / OPP: Create a directory for opp bindings
+In-Reply-To: <4dfe565ff17766b7df127d475d84958e96fdab1b.1438166099.git.viresh.kumar@linaro.org>
+References: <cover.1438166099.git.viresh.kumar@linaro.org>
+ <4dfe565ff17766b7df127d475d84958e96fdab1b.1438166099.git.viresh.kumar@linaro.org>
+Message-ID: <CAL_Jsq+J41c7qx11L13-g0UyD+hY9W36Wu9P+6O3cnDv7ysY6Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/07/15 13:53, Mason wrote:
-> Hello everyone,
+On Wed, Jul 29, 2015 at 5:52 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> More platform specific extended opp bindings will follow and it would be
+> easy to manage them with a directory for opp. Lets create that and move
+> the existing opp bindings into it.
 >
-> I'm trying to debug a live kernel (v3.14) using a DS-5 JTAG probe.
->
-> In order to make the control flow easier to follow, I disabled
-> optimizations by adding
->
->    subdir-ccflags-y := -O0
->
-> to arch/arm/kernel/Makefile
->
-> With that change, linking fails:
->
-> arch/arm/kernel/setup.c:924: undefined reference to `psci_smp_ops'
->
->        if (psci_smp_available())
->          smp_set_ops(&psci_smp_ops);
->
-> #ifdef CONFIG_ARM_PSCI
-> void psci_init(void);
-> bool psci_smp_available(void);
-> #else
-> static inline void psci_init(void) { }
-> static inline bool psci_smp_available(void) { return false; }
-> #endif
->
-> The optimizer is able to remove the entire block, but this
-> does not happen when optimizations are disabled.
->
-> Is compiling at -O0 not supported?
->
->
-> My larger problem: the DS-5 debugger refuses to show the value
-> of local variables. As a work-around, I can make some variables
-> global, but it's really inconvenient.
->
-> I checked that CONFIG_FRAME_POINTER=y
-> and source files are compiled with -g
->
-> arm-linux-gnueabihf-gcc -Wp,-MD,init/.main.o.d  -nostdinc -isystem /opt/gcc-linaro-2014.11/bin/../lib/gcc/arm-linux-gnueabihf/4.9.3/include -I/opt/linux/arch/arm/include -Iarch/arm/include/generated  -Iinclude -I/opt/linux/arch/arm/include/uapi -Iarch/arm/include/generated/uapi -I/opt/linux/include/uapi -Iinclude/generated/uapi -include /opt/linux/include/linux/kconfig.h -D__KERNEL__ -mlittle-endian -Iarch/arm/mach-tangox/include -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs -fno-strict-aliasing -fno-common -Werror-implicit-function-declaration -Wno-format-security -fno-delete-null-pointer-checks -std=gnu89 -O2 -fno-dwarf2-cfi-asm -fno-omit-frame-pointer -mapcs -mno-sched-prolog -mabi=aapcs-linux -mno-thumb-interwork -mfpu=vfp -marm -D__LINUX_ARM_ARCH__=7 -march=armv7-a -msoft-float -Uarm -Wframe-larger-than=1024 -fno-stack-protector -Wno-unused-but-set-variable -fno-omit-frame-pointer -fno-optimize-sibling-calls -fno-var-tracking-assignments -g -Wdeclaration-after-statement -Wno
--
->   p
-> ointer-sign -fno-strict-overflow -fconserve-stack -Werror=implicit-int -Werror=strict-prototypes -Werror=date-time -DCC_HAVE_ASM_GOTO -O0    -D"KBUILD_STR(s)=#s" -D"KBUILD_BASENAME=KBUILD_STR(main)"  -D"KBUILD_MODNAME=KBUILD_STR(main)" -c -o init/main.o init/main.c
->
->
-> Any idea how I can get DS-5 to properly handle local variables?
+> Cc: Rob Herring <rob.herring@linaro.org>
 
-I carry a patch locally reverting 2062afb4f804 - at least on arm64, the 
-debugger manages to resolve optimised locals considerably better without 
-the -fno-var-tracking-assignments option. The Kconfig "Generate dwarf4 
-debug info" option is a good idea, and "Generate readable assembly code" 
-sometimes helps a bit too.
+Use get_maintainers.pl please so you send to right people and right email.
 
-Whilst in general -O0 isn't going to work, I've had some success using 
-"__attribute__ ((optimize(0)))" on individual functions of interest.
+> Cc: devicetree at vger.kernel.org
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> ---
+>  Documentation/devicetree/bindings/power/{ => opp}/opp.txt | 0
+>  1 file changed, 0 insertions(+), 0 deletions(-)
+>  rename Documentation/devicetree/bindings/power/{ => opp}/opp.txt (100%)
+>
+> diff --git a/Documentation/devicetree/bindings/power/opp.txt b/Documentation/devicetree/bindings/power/opp/opp.txt
+> similarity index 100%
+> rename from Documentation/devicetree/bindings/power/opp.txt
+> rename to Documentation/devicetree/bindings/power/opp/opp.txt
 
-Hope that's of some help.
+"power" seems to be a random collection of things. I'd prefer you move
+this to .../bindings/opp/opp.txt.
 
-Robin.
-
->
->
-> I'm trying to convert an old-style board config to a device tree,
-> and I can't even get serial to work... :-(
->
-> Regards.
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+Rob
