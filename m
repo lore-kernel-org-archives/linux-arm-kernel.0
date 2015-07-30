@@ -1,42 +1,39 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 30 Jul 2015 02:21:48 +0200
-Subject: [PATCH 02/20] Documentation: watchdog: at91sam9_wdt: add clocks
- property
+Date: Thu, 30 Jul 2015 02:21:49 +0200
+Subject: [PATCH 03/20] Documentation: dt: rtc: at91rm9200: add clocks property
 In-Reply-To: <1438215726-27452-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1438215726-27452-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1438215726-27452-3-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1438215726-27452-4-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The watchdog has an input clock, the slow clock. It is required as it will
-not function without it.
+The RTC needs an input clock, it is the slow clock. It is required as it
+will not function without it.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
-Cc: Wim Van Sebroeck <wim@iguana.be>
-Cc: linux-watchdog at vger.kernel.org
- Documentation/devicetree/bindings/watchdog/atmel-wdt.txt | 2 ++
+Cc: Alessandro Zummo <a.zummo@towertech.it>
+Cc: rtc-linux at googlegroups.com
+ Documentation/devicetree/bindings/rtc/atmel,at91rm9200-rtc.txt | 2 ++
  1 file changed, 2 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
-index a4d869744f59..86fa6de1019b 100644
---- a/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
-+++ b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
-@@ -6,6 +6,7 @@ Required properties:
- - compatible: must be "atmel,at91sam9260-wdt".
+diff --git a/Documentation/devicetree/bindings/rtc/atmel,at91rm9200-rtc.txt b/Documentation/devicetree/bindings/rtc/atmel,at91rm9200-rtc.txt
+index 34c1505774bf..5d3791e789c6 100644
+--- a/Documentation/devicetree/bindings/rtc/atmel,at91rm9200-rtc.txt
++++ b/Documentation/devicetree/bindings/rtc/atmel,at91rm9200-rtc.txt
+@@ -5,6 +5,7 @@ Required properties:
  - reg: physical base address of the controller and length of memory mapped
    region.
+ - interrupts: rtc alarm/event interrupt
 +- clocks: phandle to input clock.
  
- Optional properties:
- - timeout-sec: contains the watchdog timeout in seconds.
-@@ -39,6 +40,7 @@ Example:
- 		compatible = "atmel,at91sam9260-wdt";
- 		reg = <0xfffffd40 0x10>;
- 		interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
-+		clocks = <&clk32k>;
- 		timeout-sec = <15>;
- 		atmel,watchdog-type = "hardware";
- 		atmel,reset-type = "all";
+ Example:
+ 
+@@ -12,4 +13,5 @@ rtc at fffffe00 {
+ 	compatible = "atmel,at91rm9200-rtc";
+ 	reg = <0xfffffe00 0x100>;
+ 	interrupts = <1 4 7>;
++	clocks = <&clk32k>;
+ };
 -- 
 2.1.4
