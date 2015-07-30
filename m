@@ -1,82 +1,75 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 30 Jul 2015 18:45:42 +0200
-Subject: [PATCH v2 2/2] ARM: at91: sama5/dt: update rstc to correct
- compatible string
-In-Reply-To: <55ACEB9B.70901@atmel.com>
-References: <1437384726-24927-1-git-send-email-josh.wu@atmel.com>
- <1437384726-24927-2-git-send-email-josh.wu@atmel.com>
- <55ACEB9B.70901@atmel.com>
-Message-ID: <55BA54B6.2080802@atmel.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 30 Jul 2015 17:51:00 +0100
+Subject: [PATCH 2/2] irqchip/gic: Ensure gic_cpu_if_up/down() programs
+ correct GIC instance
+In-Reply-To: <1438273573-27958-2-git-send-email-jonathanh@nvidia.com>
+References: <1438273573-27958-1-git-send-email-jonathanh@nvidia.com>
+ <1438273573-27958-2-git-send-email-jonathanh@nvidia.com>
+Message-ID: <55BA55F4.2060001@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 20/07/2015 14:37, Nicolas Ferre a ?crit :
-> Le 20/07/2015 11:32, Josh Wu a ?crit :
->> They'll use "atmel,sama5d3-rstc" for reset function.
->>
->> Cc: devicetree at vger.kernel.org
->> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+On 30/07/15 17:26, Jon Hunter wrote:
+> Commit 3228950621d9 ("irqchip: gic: Preserve gic V2 bypass bits in cpu
+> ctrl register") added a new function, gic_cpu_if_up(), to program the
+> GIC CPU_CTRL register. This function assumes that there is only one GIC
+> instance present and hence always uses the chip data for the primary GIC
+> controller. Although it is not common for there to be a secondary, some
+> devices do support a secondary. Therefore, fix this by passing
+> gic_cpu_if_up() a pointer to the appropriate chip data structure.
 > 
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Similarly, the function gic_cpu_if_down() only assumes that there is a
+> single GIC instance present. Update this function so that an instance
+> number is passed for the appropriate GIC. The vexpress TC2 (which has
+> a single GIC) is currently the only user of this function and so update
+> it accordingly.
 > 
-> And we'll have to synchronize with the other patches. The best way to
-> deal with that can be to take both of them with us through arm-soc.
+> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
+> ---
+> I was hoping to make the gic_cpu_if_up/down function more symmetric as we
+> discussed but it is not possible to pass the gic_nr to gic_cpu_if_up()
+> from all the places called without making more changes. However, given
+> that gic_cpu_if_up() is a local function and gic_cpu_if_down() is public,
+> may be it does not matter too much.
 > 
-> Sebastian,
+>  arch/arm/mach-vexpress/tc2_pm.c |  2 +-
+>  drivers/irqchip/irq-gic.c       | 14 +++++++-------
+>  include/linux/irqchip/arm-gic.h |  2 +-
+>  3 files changed, 9 insertions(+), 9 deletions(-)
 > 
-> 1/ as you weren't in the CC list of the original patch, do you want me
-> to re-send the whole series?
-> 
-> 2/ can we take these driver's changes with use through the arm-soc git
-> tree so that we can manage the synchronization better?
+> diff --git a/arch/arm/mach-vexpress/tc2_pm.c b/arch/arm/mach-vexpress/tc2_pm.c
+> index b3328cd46c33..1aa4ccece69f 100644
+> --- a/arch/arm/mach-vexpress/tc2_pm.c
+> +++ b/arch/arm/mach-vexpress/tc2_pm.c
+> @@ -80,7 +80,7 @@ static void tc2_pm_cpu_powerdown_prepare(unsigned int cpu, unsigned int cluster)
+>  	 * to the CPU by disabling the GIC CPU IF to prevent wfi
+>  	 * from completing execution behind power controller back
+>  	 */
+> -	gic_cpu_if_down();
+> +	gic_cpu_if_down(0);
+>  }
+>  
+>  static void tc2_pm_cluster_powerdown_prepare(unsigned int cluster)
+> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+> index 7566fe259d27..cf9aca22120f 100644
+> --- a/drivers/irqchip/irq-gic.c
+> +++ b/drivers/irqchip/irq-gic.c
+> @@ -356,10 +356,10 @@ static u8 gic_get_cpumask(struct gic_chip_data *gic)
+>  	return mask;
+>  }
+>  
+> -static void gic_cpu_if_up(void)
+> +static void gic_cpu_if_up(struct gic_chip_data *gic)
+>  {
+> -	void __iomem *cpu_base = gic_data_cpu_base(&gic_data[0]);
+> -	void __iomem *dist_base = gic_data_dist_base(&gic_data[0]);
+> +	void __iomem *cpu_base = gic_data_cpu_base(gic);
+> +	void __iomem *dist_base = gic_data_dist_base(gic);
 
-Okay, so to ease synchronization, I take this one with me through
-arm-soc and add the old compatibility string as a fallback => the newer
-will be used when merged...
+Which tree is that against? I don't have a dist_base in mainline...
 
-Thanks, bye.
+Thanks,
 
-
-> Thanks, bye,
-> 
->> ---
->>
->> Changes in v2: None
->>
->>  arch/arm/boot/dts/sama5d3.dtsi | 2 +-
->>  arch/arm/boot/dts/sama5d4.dtsi | 2 +-
->>  2 files changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
->> index 9e2444b..280255b 100644
->> --- a/arch/arm/boot/dts/sama5d3.dtsi
->> +++ b/arch/arm/boot/dts/sama5d3.dtsi
->> @@ -1259,7 +1259,7 @@
->>  			};
->>  
->>  			rstc at fffffe00 {
->> -				compatible = "atmel,at91sam9g45-rstc";
->> +				compatible = "atmel,sama5d3-rstc";
->>  				reg = <0xfffffe00 0x10>;
->>  			};
->>  
->> diff --git a/arch/arm/boot/dts/sama5d4.dtsi b/arch/arm/boot/dts/sama5d4.dtsi
->> index 3ee22ee..481196c 100644
->> --- a/arch/arm/boot/dts/sama5d4.dtsi
->> +++ b/arch/arm/boot/dts/sama5d4.dtsi
->> @@ -1277,7 +1277,7 @@
->>  			};
->>  
->>  			rstc at fc068600 {
->> -				compatible = "atmel,at91sam9g45-rstc";
->> +				compatible = "atmel,sama5d3-rstc";
->>  				reg = <0xfc068600 0x10>;
->>  			};
->>  
->>
-> 
-> 
-
-
+	M.
 -- 
-Nicolas Ferre
+Jazz is not dead. It just smells funny...
