@@ -1,39 +1,34 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Thu, 30 Jul 2015 10:49:27 +0200
-Subject: [RESEND PATCH] pinctrl: at91: fix null pointer dereference
-In-Reply-To: <20150730083343.GA23018@gradator.net>
-References: <20150715133048.GD14886@odux.rfo.atmel.com>
- <1438069696-25303-1-git-send-email-ludovic.desroches@atmel.com>
- <CACRpkdaiwcTzxG=KqPZxk6ijLOE0PAh9ybkNqUYhkmAcQV40eg@mail.gmail.com>
- <20150728131253.GA4055@odux.rfo.atmel.com>
- <20150730083343.GA23018@gradator.net>
-Message-ID: <20150730084927.GC4055@odux.rfo.atmel.com>
+From: rsahu@apm.com (Rameshwar Sahu)
+Date: Thu, 30 Jul 2015 14:21:07 +0530
+Subject: [PATCH] dmaengine: xgene-dma: Add ACPI support for X-Gene DMA
+ engine driver
+In-Reply-To: <2384915.JHlOHWBXHy@wuerfel>
+References: <1437484479-2822-1-git-send-email-rsahu@apm.com>
+ <2384915.JHlOHWBXHy@wuerfel>
+Message-ID: <CAFd313xntHx7JhfTWSsJo+bTm-DuEcbAzqXt9in1s0irL3g7sw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 30, 2015 at 10:33:43AM +0200, Sylvain Rochet wrote:
-> Hello Ludovic,
-> 
-> On Tue, Jul 28, 2015 at 03:12:53PM +0200, Ludovic Desroches wrote:
-> > On Tue, Jul 28, 2015 at 02:48:09PM +0200, Linus Walleij wrote:
-> > > On Tue, Jul 28, 2015 at 9:48 AM, Ludovic Desroches
+Hi Arnd,
 
-[...]
+On Wed, Jul 29, 2015 at 8:04 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 21 July 2015 18:44:39 Rameshwar Prasad Sahu wrote:
+>> This patch adds ACPI support for the APM X-Gene DMA engine driver.
+>>
+>> Signed-off-by: Rameshwar Prasad Sahu <rsahu@apm.com>
+>>
+>
+> How does a slave driver refer to a channel in case of ACPI?
 
-> > > Is this a regression to v4.2 that should go to stable or v4.3 material?
-> > 
-> > Yes it is a regression from v4.0, it applies well on v4.0.9
-> > 
-> > Fixes: a0b957f306fa ("pinctrl: at91: allow to have disabled gpio bank")
-> > Cc: stable at vger.kernel.org # 4.0
-> 
-> a0b957f306fa have a stable tag up to 3.18, should this patch inherit a 
-> stable tag up to 3.18 instead of only up to 4.0 ?
-> 
+We don't support slave dma here. This driver supports only memcp, xor,
+pq, scatter-gather offloading, so,
+client driver can use linux dmaengine APIs like dma_request_channel()
+etc to request channel.
 
-Well spotted, I didn't notice it has hit 3.18 through stable, so yes
-stable tag should be 3.18 and later.
 
-Thanks
-
-Ludovic
+>
+>         Arnd
+> --
+> To unsubscribe from this list: send the line "unsubscribe dmaengine" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
