@@ -1,92 +1,75 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 30 Jul 2015 02:22:01 +0200
-Subject: [PATCH 15/20] watchdog: at91sam9: get and use slow clock
+Date: Thu, 30 Jul 2015 02:22:02 +0200
+Subject: [PATCH 16/20] power/reset: at91-reset: remove useless
+ at91_reset_platform_probe()
 In-Reply-To: <1438215726-27452-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1438215726-27452-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1438215726-27452-16-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1438215726-27452-17-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit dca1a4b5ff6e ("clk: at91: keep slow clk enabled to prevent system
-hang") added a workaround for the slow clock as it is not properly handled
-by its users.
-
-Get and use the slow clock as it is necessary for the at91sam9 watchdog.
+Since all the at91 platforms are now DT only, at91_reset_platform_probe()
+is now useless, remove it.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
-Cc: Wim Van Sebroeck <wim@iguana.be>
-Cc: linux-watchdog at vger.kernel.org
- drivers/watchdog/at91sam9_wdt.c | 22 ++++++++++++++++++++--
- 1 file changed, 20 insertions(+), 2 deletions(-)
+Cc: Sebastian Reichel <sre@kernel.org>
+Cc: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+Cc: linux-pm at vger.kernel.org
+ drivers/power/reset/at91-reset.c | 36 +-----------------------------------
+ 1 file changed, 1 insertion(+), 35 deletions(-)
 
-diff --git a/drivers/watchdog/at91sam9_wdt.c b/drivers/watchdog/at91sam9_wdt.c
-index e4698f7c5f93..7e6acaf3ece4 100644
---- a/drivers/watchdog/at91sam9_wdt.c
-+++ b/drivers/watchdog/at91sam9_wdt.c
-@@ -17,6 +17,7 @@
- 
- #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
- 
-+#include <linux/clk.h>
- #include <linux/errno.h>
- #include <linux/init.h>
- #include <linux/interrupt.h>
-@@ -90,6 +91,7 @@ struct at91wdt {
- 	unsigned long heartbeat;	/* WDT heartbeat in jiffies */
- 	bool nowayout;
- 	unsigned int irq;
-+	struct clk *sclk;
- };
- 
- /* ......................................................................... */
-@@ -352,15 +354,25 @@ static int __init at91wdt_probe(struct platform_device *pdev)
- 	if (IS_ERR(wdt->base))
- 		return PTR_ERR(wdt->base);
- 
-+	wdt->sclk = devm_clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(wdt->sclk))
-+		return PTR_ERR(wdt->sclk);
-+
-+	err = clk_prepare_enable(wdt->sclk);
-+	if (err) {
-+		dev_err(&pdev->dev, "Could not enable slow clock\n");
-+		return err;
-+	}
-+
- 	if (pdev->dev.of_node) {
- 		err = of_at91wdt_init(pdev->dev.of_node, wdt);
- 		if (err)
--			return err;
-+			goto err_clk;
- 	}
- 
- 	err = at91_wdt_init(pdev, wdt);
- 	if (err)
--		return err;
-+		goto err_clk;
- 
- 	platform_set_drvdata(pdev, wdt);
- 
-@@ -368,6 +380,11 @@ static int __init at91wdt_probe(struct platform_device *pdev)
- 		wdt->wdd.timeout, wdt->nowayout);
- 
- 	return 0;
-+
-+err_clk:
-+	clk_disable_unprepare(wdt->sclk);
-+
-+	return err;
+diff --git a/drivers/power/reset/at91-reset.c b/drivers/power/reset/at91-reset.c
+index 36dc52fb2ec8..3e8f478385c1 100644
+--- a/drivers/power/reset/at91-reset.c
++++ b/drivers/power/reset/at91-reset.c
+@@ -195,46 +195,12 @@ static int at91_reset_of_probe(struct platform_device *pdev)
+ 	return register_restart_handler(&at91_restart_nb);
  }
  
- static int __exit at91wdt_remove(struct platform_device *pdev)
-@@ -377,6 +394,7 @@ static int __exit at91wdt_remove(struct platform_device *pdev)
+-static int at91_reset_platform_probe(struct platform_device *pdev)
+-{
+-	const struct platform_device_id *match;
+-	struct resource *res;
+-	int idx = 0;
+-
+-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	at91_rstc_base = devm_ioremap_resource(&pdev->dev, res);
+-	if (IS_ERR(at91_rstc_base)) {
+-		dev_err(&pdev->dev, "Could not map reset controller address\n");
+-		return PTR_ERR(at91_rstc_base);
+-	}
+-
+-	for (idx = 0; idx < 2; idx++) {
+-		res = platform_get_resource(pdev, IORESOURCE_MEM, idx + 1 );
+-		at91_ramc_base[idx] = devm_ioremap(&pdev->dev, res->start,
+-						   resource_size(res));
+-		if (!at91_ramc_base[idx]) {
+-			dev_err(&pdev->dev, "Could not map ram controller address\n");
+-			return -ENOMEM;
+-		}
+-	}
+-
+-	match = platform_get_device_id(pdev);
+-	at91_restart_nb.notifier_call =
+-		(int (*)(struct notifier_block *,
+-			 unsigned long, void *)) match->driver_data;
+-
+-	return register_restart_handler(&at91_restart_nb);
+-}
+-
+ static int at91_reset_probe(struct platform_device *pdev)
+ {
+ 	int ret;
  
- 	pr_warn("I quit now, hardware will probably reboot!\n");
- 	del_timer(&wdt->timer);
-+	clk_disable_unprepare(wdt->sclk);
+-	if (pdev->dev.of_node)
+-		ret = at91_reset_of_probe(pdev);
+-	else
+-		ret = at91_reset_platform_probe(pdev);
  
- 	return 0;
- }
++	ret = at91_reset_of_probe(pdev);
+ 	if (ret)
+ 		return ret;
+ 
 -- 
 2.1.4
