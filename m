@@ -1,80 +1,37 @@
-From: stripathi@apm.com (Suman Tripathi)
-Date: Thu, 30 Jul 2015 20:53:45 +0530
-Subject: arch/arm/kernel/setup.c does not compile at -O0
-In-Reply-To: <55BA1E62.9080103@free.fr>
-References: <55BA1E62.9080103@free.fr>
-Message-ID: <CAOHikRBW+OnYvduFMVnssYAxDP4u+E+Q9NJ+5iDhnc21OvFRpg@mail.gmail.com>
+From: Igal.Liberman@freescale.com (Liberman Igal)
+Date: Thu, 30 Jul 2015 15:32:32 +0000
+Subject: [RFC PATCH 8/8] powerpc/fsl: Use new clockgen binding
+In-Reply-To: <1434682158-7243-9-git-send-email-scottwood@freescale.com>
+References: <1434682158-7243-1-git-send-email-scottwood@freescale.com>
+ <1434682158-7243-9-git-send-email-scottwood@freescale.com>
+Message-ID: <DM2PR03MB50986F3471DF3DD74494002E68B0@DM2PR03MB509.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On Thu, Jul 30, 2015 at 6:23 PM, Mason <slash.tmp@free.fr> wrote:
->
-> Hello everyone,
->
-> I'm trying to debug a live kernel (v3.14) using a DS-5 JTAG probe.
->
-> In order to make the control flow easier to follow, I disabled
-> optimizations by adding
->
->   subdir-ccflags-y := -O0
->
-> to arch/arm/kernel/Makefile
->
-> With that change, linking fails:
->
-> arch/arm/kernel/setup.c:924: undefined reference to `psci_smp_ops'
->
->       if (psci_smp_available())
->         smp_set_ops(&psci_smp_ops);
->
-> #ifdef CONFIG_ARM_PSCI
-> void psci_init(void);
-> bool psci_smp_available(void);
-> #else
-> static inline void psci_init(void) { }
-> static inline bool psci_smp_available(void) { return false; }
-> #endif
->
-> The optimizer is able to remove the entire block, but this
-> does not happen when optimizations are disabled.
->
-> Is compiling at -O0 not supported?
+Regards,
+Igal Liberman.
 
-If you have inline functions, it won't compile at -O0
+> -----Original Message-----
+> From: Wood Scott-B07421
+> Sent: Friday, June 19, 2015 5:49 AM
+> To: Mike Turquette; Tang Yuantian-B29983
+> Cc: Rafael J. Wysocki; Liberman Igal-B31950; Bucur Madalin-Cristian-B32716;
+> linux-clk at vger.kernel.org; linux-pm at vger.kernel.org; linuxppc-
+> dev at lists.ozlabs.org; linux-arm-kernel at lists.infradead.org;
+> devicetree at vger.kernel.org; Wood Scott-B07421
+> Subject: [RFC PATCH 8/8] powerpc/fsl: Use new clockgen binding
+> 
+> The driver retains compatibility with old device trees, but we don't want the
+> old nodes lying around to be copied, or used as a reference (some of the
+> mux options are incorrect), or even just being clutter.
+> 
+> We will also need the #clock-cells in the clockgen node in order to add fman
+> nodes.
+> 
+> Signed-off-by: Scott Wood <scottwood@freescale.com>
+> ---
 
->
->
-> My larger problem: the DS-5 debugger refuses to show the value
-> of local variables. As a work-around, I can make some variables
-> global, but it's really inconvenient.
->
-> I checked that CONFIG_FRAME_POINTER=y
-> and source files are compiled with -g
->
-> arm-linux-gnueabihf-gcc -Wp,-MD,init/.main.o.d  -nostdinc -isystem /opt/gcc-linaro-2014.11/bin/../lib/gcc/arm-linux-gnueabihf/4.9.3/include -I/opt/linux/arch/arm/include -Iarch/arm/include/generated  -Iinclude -I/opt/linux/arch/arm/include/uapi -Iarch/arm/include/generated/uapi -I/opt/linux/include/uapi -Iinclude/generated/uapi -include /opt/linux/include/linux/kconfig.h -D__KERNEL__ -mlittle-endian -Iarch/arm/mach-tangox/include -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs -fno-strict-aliasing -fno-common -Werror-implicit-function-declaration -Wno-format-security -fno-delete-null-pointer-checks -std=gnu89 -O2 -fno-dwarf2-cfi-asm -fno-omit-frame-pointer -mapcs -mno-sched-prolog -mabi=aapcs-linux -mno-thumb-interwork -mfpu=vfp -marm -D__LINUX_ARM_ARCH__=7 -march=armv7-a -msoft-float -Uarm -Wframe-larger-than=1024 -fno-stack-protector -Wno-unused-but-set-variable -fno-omit-frame-pointer -fno-optimize-sibling-calls -fno-var-tracking-assignments -g -Wdeclaration-after-statement -Wno-
->  p
-> ointer-sign -fno-strict-overflow -fconserve-stack -Werror=implicit-int -Werror=strict-prototypes -Werror=date-time -DCC_HAVE_ASM_GOTO -O0    -D"KBUILD_STR(s)=#s" -D"KBUILD_BASENAME=KBUILD_STR(main)"  -D"KBUILD_MODNAME=KBUILD_STR(main)" -c -o init/main.o init/main.c
->
->
-> Any idea how I can get DS-5 to properly handle local variables?
->
->
-> I'm trying to convert an old-style board config to a device tree,
-> and I can't even get serial to work... :-(
->
-> Regards.
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Tested on: several e500mc, e5500 and e6500 platforms.
 
-
-
-
--- 
-Thanks,
-with regards,
-Suman Tripathi
+Tested-by: Igal Liberman <Igal.Liberman@freescale.com>
