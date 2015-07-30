@@ -1,68 +1,95 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 30 Jul 2015 11:57:05 +0200
-Subject: [PATCH 1/5] rtc: at91sam9: properly handle error case
-In-Reply-To: <1438215872-27794-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1438215872-27794-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <55B9F4F1.2060901@atmel.com>
+From: greycat@whiteboxes.ch (Mikhail Yakshin)
+Date: Thu, 30 Jul 2015 12:45:41 +0300
+Subject: ARM: dts: sunxi: Regulators at common board layouts
+Message-ID: <55B9F245.2000300@whiteboxes.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 30/07/2015 02:24, Alexandre Belloni a ?crit :
-> In case of a probe error, it is possible to abort after issuing
-> clk_prepare_enable(). Ensure the clock is disabled and unprepared in that
-> case.
-> 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Hi,
 
-To the whole series:
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+I've been analyzing various boards based on Allwinner A20 CPU and
+X-Powers AXP209 PMU (to make a proper configuration for our board,
+Whitebox Labs Watermelon).
 
-Thanks.
+There are some things very common and some things pretty different on
+various boards.
 
-> ---
->  drivers/rtc/rtc-at91sam9.c | 13 ++++++++++---
->  1 file changed, 10 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/rtc/rtc-at91sam9.c b/drivers/rtc/rtc-at91sam9.c
-> index 5ccaee32df72..152cd816cc43 100644
-> --- a/drivers/rtc/rtc-at91sam9.c
-> +++ b/drivers/rtc/rtc-at91sam9.c
-> @@ -451,8 +451,10 @@ static int at91_rtc_probe(struct platform_device *pdev)
->  
->  	rtc->rtcdev = devm_rtc_device_register(&pdev->dev, pdev->name,
->  					&at91_rtc_ops, THIS_MODULE);
-> -	if (IS_ERR(rtc->rtcdev))
-> -		return PTR_ERR(rtc->rtcdev);
-> +	if (IS_ERR(rtc->rtcdev)) {
-> +		ret = PTR_ERR(rtc->rtcdev);
-> +		goto err_clk;
-> +	}
->  
->  	/* register irq handler after we know what name we'll use */
->  	ret = devm_request_irq(&pdev->dev, rtc->irq, at91_rtc_interrupt,
-> @@ -460,7 +462,7 @@ static int at91_rtc_probe(struct platform_device *pdev)
->  			       dev_name(&rtc->rtcdev->dev), rtc);
->  	if (ret) {
->  		dev_dbg(&pdev->dev, "can't share IRQ %d?\n", rtc->irq);
-> -		return ret;
-> +		goto err_clk;
->  	}
->  
->  	/* NOTE:  sam9260 rev A silicon has a ROM bug which resets the
-> @@ -474,6 +476,11 @@ static int at91_rtc_probe(struct platform_device *pdev)
->  				dev_name(&rtc->rtcdev->dev));
->  
->  	return 0;
-> +
-> +err_clk:
-> +	clk_disable_unprepare(rtc->sclk);
-> +
-> +	return ret;
->  }
->  
->  /*
-> 
+Namely, there's agreement on that DCDC2 and DCDC3 and used for CPU
+voltages (VDD-CPU and (VDD-SYS=VDD-INT)+VDD-DLL respectively) on all
+boards I've analyzed (Olimex boards, Cubieboard / Cubietruck, BananaPi,
+PCDuino, Watermelon, etc) and probably it should be kept this way.
 
+However, what puzzles me the most so far is LDO1 regulator. According to
+[AXP209 datasheet, p. 13, p. 23][1] and all the boards I've
+investigated, it's used exclusively for powering VDD-RTC input of A20
+CPU that supports internal CPU's RTC. LDO1 gets very special status in
+AXP209 - basically, it's as close to "always on" (even on backup
+battery) as possible the purpose of timekeeping.
+
+According to the same spec, LDO1 allows 2 distinct voltage choices: 1.3V
+and 3.3V. However, according to the [A20 datasheet][2], VDD-RTC (pin K8)
+has absolute minimum and maximum voltage ratings of 3.0V. I'm not sure
+how is it supposed to work together, given that X-Powers AXP209 and
+Allwinner A20 is basically produced by different branches the same
+company and are meant to be totally compatible.
+
+What's even more weird, is that all configurations I've encountered so
+far (i.e. FEX configurations for 3.4 sunxi kernel and DTS for modern
+mainline kernels) use hard locked 1.3V setting for LDO1. For example,
+kernel 3.4:
+
+/sys/devices/platform/sunxi-i2c.0/i2c-0/0-0034/axp20-regulator.21/regulator/regulator.1/
+name    axp20_ldo1
+microvolts      1300000
+min_microvolts  1300000
+max_microvolts  1300000
+
+and similar construction in mainline DTSes:
+
+    vdd_rtc: ldo1 {
+            regulator-min-microvolt = <1300000>;
+            regulator-max-microvolt = <1300000>;
+            regulator-always-on;
+    };
+
+or in axp209.dtsi:
+
+    reg_ldo1: ldo1 {
+            /* LDO1 is a fixed output regulator */
+            regulator-always-on;
+            regulator-min-microvolt = <1300000>;
+            regulator-max-microvolt = <1300000>;
+            regulator-name = "ldo1";
+    };
+
+If we'll take a look at default power-on setup for AXP209 in the
+datasheet (page 24), we'll see that it's determined by LDO1SET pin. If
+it's connected to GND, then LDO1 will start with 1.3V, if it's connected
+to VINT, then it would be 3.3V.
+
+I've analyzed all the schematics I found in public:
+
+* Older Olimex schematics (Lime rev C, Lime rev D, Lime2 rev B) state
+that LDO1 line is "3V3/30mA". LDO1SET is grounded.
+* Newer Olimex schematics (Lime2 rev C) call that "1V3/30mA". LDO1SET is
+grounded.
+* All Bananapi and Cubieboard schematics look very similar and seem to
+be originating from the same source (reference Allwinner design?) and do
+not hint any voltages. LDO1SET is grounded.
+
+Can someone explain to me how does it work / supposed to work?
+
+[1]: http://linux-sunxi.org/images/8/89/AXP209_Datasheet_v1.0en.pdf
+[2]:
+https://github.com/OLIMEX/OLINUXINO/raw/master/HARDWARE/A20-PDFs/A20%20Datasheet%20v1.0%2020130227.pdf
 
 -- 
-Nicolas Ferre
+WBR, Mikhail Yakshin
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150730/ee55ae82/attachment.sig>
