@@ -1,102 +1,52 @@
 From: manabian@gmail.com (Joachim Eastwood)
-Date: Fri, 31 Jul 2015 00:24:24 +0200
-Subject: [PATCH 6/9] ARM: dts: lpc4357-ea4357: add mmio-gpio leds
+Date: Fri, 31 Jul 2015 00:24:25 +0200
+Subject: [PATCH 7/9] ARM: dts: lpc4350-hitex-eval: add pinctrl and uart0 muxing
 In-Reply-To: <1438295067-24407-1-git-send-email-manabian@gmail.com>
 References: <1438295067-24407-1-git-send-email-manabian@gmail.com>
-Message-ID: <1438295067-24407-7-git-send-email-manabian@gmail.com>
+Message-ID: <1438295067-24407-8-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hook up LEDs on the outputs from the D-type flip-flop found on
-the address/data bus.
+From: Ariel D'Alessandro <ariel@vanguardiasur.com.ar>
 
-Note that the LEDx label in the schematics is reversed in regard
-to the bits on the data bus. Hence the reverse ordering used here.
+Setup pin muxing and properties for the debug console on uart0.
 
+Signed-off-by: Ariel D'Alessandro <ariel@vanguardiasur.com.ar>
 Signed-off-by: Joachim Eastwood <manabian@gmail.com>
 ---
- arch/arm/boot/dts/lpc4357-ea4357-devkit.dts | 69 +++++++++++++++++++++++++++++
- 1 file changed, 69 insertions(+)
+ arch/arm/boot/dts/lpc4350-hitex-eval.dts | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-diff --git a/arch/arm/boot/dts/lpc4357-ea4357-devkit.dts b/arch/arm/boot/dts/lpc4357-ea4357-devkit.dts
-index 7768d724c379..5f7bdad80963 100644
---- a/arch/arm/boot/dts/lpc4357-ea4357-devkit.dts
-+++ b/arch/arm/boot/dts/lpc4357-ea4357-devkit.dts
-@@ -85,6 +85,75 @@
- 			gpios = <&gpio LPC_GPIO(4,13) GPIO_ACTIVE_LOW>;
- 		};
+diff --git a/arch/arm/boot/dts/lpc4350-hitex-eval.dts b/arch/arm/boot/dts/lpc4350-hitex-eval.dts
+index 4ebdb54cc9ce..1dab22150510 100644
+--- a/arch/arm/boot/dts/lpc4350-hitex-eval.dts
++++ b/arch/arm/boot/dts/lpc4350-hitex-eval.dts
+@@ -36,6 +36,26 @@
  	};
-+
-+	leds_mmio {
-+		compatible = "gpio-leds";
-+
-+		led1 {
-+			gpios = <&mmio_leds 15 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "heartbeat";
-+		};
-+
-+		led2 {
-+			gpios = <&mmio_leds 14 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		led3 {
-+			gpios = <&mmio_leds 13 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		led4 {
-+			gpios = <&mmio_leds 12 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		led5 {
-+			gpios = <&mmio_leds 11 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		led6 {
-+			gpios = <&mmio_leds 10 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		led7 {
-+			gpios = <&mmio_leds 9 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		led8 {
-+			gpios = <&mmio_leds 8 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		led9 {
-+			gpios = <&mmio_leds 7 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		led10 {
-+			gpios = <&mmio_leds 6 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		led11 {
-+			gpios = <&mmio_leds 5 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		led12 {
-+			gpios = <&mmio_leds 4 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		led13 {
-+			gpios = <&mmio_leds 3 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		led14 {
-+			gpios = <&mmio_leds 2 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		led15 {
-+			gpios = <&mmio_leds 1 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		led16 {
-+			gpios = <&mmio_leds 0 GPIO_ACTIVE_HIGH>;
-+		};
-+	};
  };
  
- &pinctrl {
++&pinctrl {
++	uart0_pins: uart0-pins {
++		uart0_rx_cfg {
++			pins = "pf_11";
++			function = "uart0";
++			input-schmitt-disable;
++			bias-disable;
++			input-enable;
++		};
++
++		uart0_tx_cfg {
++			pins = "pf_10";
++			function = "uart0";
++			bias-pull-down;
++		};
++	};
++};
++
+ &uart0 {
+ 	status = "okay";
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_pins>;
+ };
 -- 
 1.8.0
