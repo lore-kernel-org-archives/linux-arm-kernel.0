@@ -1,51 +1,39 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 30 Jul 2015 13:43:34 +0530
-Subject: [PATCH 1/7] ARM: dts: dra72-evm: add evm_3v3_sd regulator
+Date: Thu, 30 Jul 2015 13:43:37 +0530
+Subject: [PATCH 4/7] ARM: dts: dra7-evm: Add MMCSD card removal GPIO
 In-Reply-To: <1438244020-4244-1-git-send-email-kishon@ti.com>
 References: <1438244020-4244-1-git-send-email-kishon@ti.com>
-Message-ID: <1438244020-4244-2-git-send-email-kishon@ti.com>
+Message-ID: <1438244020-4244-5-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a node for evm_3v3_sd using pcf which feeds on to mmc vdd.
-Update mapping for vmmc-supply and vmmc_aux-supply.
-evm_3v3_sd supplies to SD card vdd, and ldo1 to sdcard i/o lines.
+From: Nishanth Menon <nm@ti.com>
 
+SDMMC Card Detect can be used over default GPIO map.
+
+Reported-by: Yan Liu <yan-liu@ti.com>
+Signed-off-by: Nishanth Menon <nm@ti.com>
+Signed-off-by: Sekhar Nori <nsekhar@ti.com>
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- arch/arm/boot/dts/dra72-evm.dts |   13 +++++++++++--
- 1 file changed, 11 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/dra7-evm.dts |    5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/boot/dts/dra72-evm.dts b/arch/arm/boot/dts/dra72-evm.dts
-index 8037384..3998d37 100644
---- a/arch/arm/boot/dts/dra72-evm.dts
-+++ b/arch/arm/boot/dts/dra72-evm.dts
-@@ -30,6 +30,15 @@
- 		regulator-max-microvolt = <3300000>;
- 	};
- 
-+	evm_3v3_sd: fixedregulator-sd {
-+		compatible = "regulator-fixed";
-+		regulator-name = "evm_3v3_sd";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		enable-active-high;
-+		gpio = <&pcf_gpio_21 5 GPIO_ACTIVE_HIGH>;
-+	};
-+
- 	extcon_usb1: extcon_usb1 {
- 		compatible = "linux,extcon-usb-gpio";
- 		id-gpio = <&pcf_gpio_21 1 GPIO_ACTIVE_HIGH>;
-@@ -491,8 +500,8 @@
- 	status = "okay";
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc1_pins_default>;
--
--	vmmc-supply = <&ldo1_reg>;
-+	vmmc-supply = <&evm_3v3_sd>;
-+	vmmc_aux-supply = <&ldo1_reg>;
+diff --git a/arch/arm/boot/dts/dra7-evm.dts b/arch/arm/boot/dts/dra7-evm.dts
+index 1e0c88e..25f0a00 100644
+--- a/arch/arm/boot/dts/dra7-evm.dts
++++ b/arch/arm/boot/dts/dra7-evm.dts
+@@ -474,6 +474,11 @@
+ 	vmmc-supply = <&evm_3v3_sd>;
+ 	vmmc_aux-supply = <&ldo1_reg>;
  	bus-width = <4>;
- 	/*
- 	 * SDCD signal is not being used here - using the fact that GPIO mode
++	/*
++	 * SDCD signal is not being used here - using the fact that GPIO mode
++	 * is always hardwired.
++	 */
++	cd-gpios = <&gpio6 27 0>;
+ };
+ 
+ &mmc2 {
 -- 
 1.7.9.5
