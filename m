@@ -1,7 +1,7 @@
 From: agross@codeaurora.org (Andy Gross)
-Date: Thu, 30 Jul 2015 16:16:37 -0500
-Subject: [GIT PULL] qcom dt changes for 4.3
-Message-ID: <1438290997-17503-1-git-send-email-agross@codeaurora.org>
+Date: Thu, 30 Jul 2015 16:16:47 -0500
+Subject: [GIT PULL] qcom defconfig changes for 4.3
+Message-ID: <1438291007-17536-1-git-send-email-agross@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,49 +11,18 @@ The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
 
 are available in the git repository at:
 
-  git://codeaurora.org/quic/kernel/agross-msm.git tags/qcom-dt-for-4.3
+  git://codeaurora.org/quic/kernel/agross-msm.git tags/qcom-defconfig-for-4.3
 
-for you to fetch changes up to baff39e6708e099261bac73a46377cffc9257388:
+for you to fetch changes up to 142f2610d525c23afa5ba5e4e535504bea8b04b9:
 
-  ARM: dts: qs600: Add real regulators to sdcc (2015-07-28 14:57:47 -0500)
-
-----------------------------------------------------------------
-* Switch to use pinctrl compatible for GPIOs
-* Add RPM regulators for MSM8960
-* Add SPI Ethernet support on MSM8960 CDP
-* Add SMEM support along with dependencies
-* Add PM8921 support for GPIO and MPP
-* Fix GSBI cell index
-* Switch to use real regulators on APQ8064 w/ SDCC
+  ARM: qcom_defconfig: Enable options for KS8851 ethernet (2015-07-24 14:51:32 -0500)
 
 ----------------------------------------------------------------
-Bjorn Andersson (3):
-      ARM: dts: qcom: Replace gpio node with pinctrl node
-      ARM: dts: msm8974: Add tcsr mutex node
-      ARM: dts: msm8974: Add smem reservation and node
+* Enable KS8851 for QCOM SoCs in qcom defconfig
 
-Pramod Gurav (1):
-      ARM: dts: apq8064: Add DT support for GSBI6 and for UART pin mux
+----------------------------------------------------------------
+Stephen Boyd (1):
+      ARM: qcom_defconfig: Enable options for KS8851 ethernet
 
-Srinivas Kandagatla (6):
-      ARM: dts: apq8064: Add pm8921 mfd and its gpio node
-      ARM: dts: apq8064: add pm8921 mpp support
-      ARM: dts: apq8064: fix missing gsbi cell-index
-      ARM: dts: apq8064: remove temporary fixed regulator for mmc
-      ARM: dts: ifc6410: add real regulators for sdcc nodes.
-      ARM: dts: qs600: Add real regulators to sdcc
-
-Stephen Boyd (4):
-      ARM: dts: qcom: Replace gpio node with pinctrl node
-      ARM: dts: qcom: Add MSM8960 RPM and RPM regulator nodes
-      ARM: dts: qcom: Add MSM8960 CDP RPM regulators
-      ARM: dts: qcom: Add ks8851 node for wired ethernet
-
- arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts |   20 ++
- arch/arm/boot/dts/qcom-apq8064-ifc6410.dts  |   40 ++++
- arch/arm/boot/dts/qcom-apq8064.dtsi         |   91 ++++++--
- arch/arm/boot/dts/qcom-msm8660.dtsi         |   11 +-
- arch/arm/boot/dts/qcom-msm8960-cdp.dts      |  302 +++++++++++++++++++++++++++
- arch/arm/boot/dts/qcom-msm8960.dtsi         |   49 ++++-
- arch/arm/boot/dts/qcom-msm8974.dtsi         |   32 +++
- 7 files changed, 523 insertions(+), 22 deletions(-)
+ arch/arm/configs/qcom_defconfig |    3 +++
+ 1 file changed, 3 insertions(+)
