@@ -1,92 +1,34 @@
 From: dan.j.williams@intel.com (Dan Williams)
-Date: Thu, 30 Jul 2015 12:54:57 -0400
-Subject: [PATCH v3 14/24] intel-iommu: switch from ioremap_cache to memremap
+Date: Thu, 30 Jul 2015 12:55:08 -0400
+Subject: [PATCH v3 16/24] pxa2xx-flash: switch from ioremap_cache to memremap
 In-Reply-To: <20150730165155.33962.64121.stgit@dwillia2-desk3.amr.corp.intel.com>
 References: <20150730165155.33962.64121.stgit@dwillia2-desk3.amr.corp.intel.com>
-Message-ID: <20150730165456.33962.30608.stgit@dwillia2-desk3.amr.corp.intel.com>
+Message-ID: <20150730165508.33962.94985.stgit@dwillia2-desk3.amr.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 In preparation for deprecating ioremap_cache() convert its usage in
-intel-iommu to memremap.  This also eliminates the mishandling of the
-__iomem annotation in the implementation.
+pxa2xx-flash to memremap.
 
 Cc: David Woodhouse <dwmw2@infradead.org>
-Cc: Joerg Roedel <joro@8bytes.org>
+Cc: Brian Norris <computersforpeace@gmail.com>
 Signed-off-by: Dan Williams <dan.j.williams@intel.com>
 ---
- drivers/iommu/intel-iommu.c         |   10 ++++++----
- drivers/iommu/intel_irq_remapping.c |    4 ++--
- 2 files changed, 8 insertions(+), 6 deletions(-)
+ drivers/mtd/maps/pxa2xx-flash.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/iommu/intel-iommu.c b/drivers/iommu/intel-iommu.c
-index 0649b94f5958..5852df8cc50f 100644
---- a/drivers/iommu/intel-iommu.c
-+++ b/drivers/iommu/intel-iommu.c
-@@ -34,6 +34,7 @@
- #include <linux/mempool.h>
- #include <linux/memory.h>
- #include <linux/timer.h>
-+#include <linux/io.h>
- #include <linux/iova.h>
- #include <linux/iommu.h>
- #include <linux/intel-iommu.h>
-@@ -2874,7 +2875,8 @@ static int copy_context_table(struct intel_iommu *iommu,
- 			}
- 
- 			ret = -ENOMEM;
--			old_ce = ioremap_cache(old_ce_phys, PAGE_SIZE);
-+			old_ce = memremap(old_ce_phys, PAGE_SIZE,
-+					MEMREMAP_WB);
- 			if (!old_ce)
- 				goto out;
- 
-@@ -2922,7 +2924,7 @@ static int copy_context_table(struct intel_iommu *iommu,
- 	__iommu_flush_cache(iommu, new_ce, VTD_PAGE_SIZE);
- 
- out_unmap:
--	iounmap(old_ce);
-+	memunmap(old_ce);
- 
- out:
- 	return ret;
-@@ -2956,7 +2958,7 @@ static int copy_translation_tables(struct intel_iommu *iommu)
- 	if (!old_rt_phys)
- 		return -EINVAL;
- 
--	old_rt = ioremap_cache(old_rt_phys, PAGE_SIZE);
-+	old_rt = memremap(old_rt_phys, PAGE_SIZE, MEMREMAP_WB);
- 	if (!old_rt)
+diff --git a/drivers/mtd/maps/pxa2xx-flash.c b/drivers/mtd/maps/pxa2xx-flash.c
+index 12fa75df5008..19a3074c58a6 100644
+--- a/drivers/mtd/maps/pxa2xx-flash.c
++++ b/drivers/mtd/maps/pxa2xx-flash.c
+@@ -71,8 +71,8 @@ static int pxa2xx_flash_probe(struct platform_device *pdev)
+ 		       info->map.name);
  		return -ENOMEM;
- 
-@@ -3005,7 +3007,7 @@ static int copy_translation_tables(struct intel_iommu *iommu)
- 	ret = 0;
- 
- out_unmap:
--	iounmap(old_rt);
-+	memunmap(old_rt);
- 
- 	return ret;
- }
-diff --git a/drivers/iommu/intel_irq_remapping.c b/drivers/iommu/intel_irq_remapping.c
-index 27cdfa84ec5b..bdc52cc6ed23 100644
---- a/drivers/iommu/intel_irq_remapping.c
-+++ b/drivers/iommu/intel_irq_remapping.c
-@@ -408,7 +408,7 @@ static int iommu_load_old_irte(struct intel_iommu *iommu)
- 	size     = INTR_REMAP_TABLE_ENTRIES*sizeof(struct irte);
- 
- 	/* Map the old IR table */
--	old_ir_table = ioremap_cache(irt_phys, size);
-+	old_ir_table = memremap(irt_phys, size, MEMREMAP_WB);
- 	if (!old_ir_table)
- 		return -ENOMEM;
- 
-@@ -426,7 +426,7 @@ static int iommu_load_old_irte(struct intel_iommu *iommu)
- 			bitmap_set(iommu->ir_table->bitmap, i, 1);
  	}
- 
--	iounmap(old_ir_table);
-+	memunmap(old_ir_table);
- 
- 	return 0;
- }
+-	info->map.cached =
+-		ioremap_cache(info->map.phys, info->map.size);
++	info->map.cached = memremap(info->map.phys, info->map.size,
++			MEMREMAP_WB);
+ 	if (!info->map.cached)
+ 		printk(KERN_WARNING "Failed to ioremap cached %s\n",
+ 		       info->map.name);
