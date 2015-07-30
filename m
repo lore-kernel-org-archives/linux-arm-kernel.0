@@ -1,41 +1,45 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 30 Jul 2015 12:22:33 +0200
-Subject: [PATCH v2 2/3] ARM: at91/dt: add basic dtsi for sama5d2 SoC
-In-Reply-To: <20150729150218.GA6073@piout.net>
-References: <1438079151-29653-1-git-send-email-nicolas.ferre@atmel.com>
- <1438079151-29653-3-git-send-email-nicolas.ferre@atmel.com>
- <20150729150218.GA6073@piout.net>
-Message-ID: <55B9FAE9.3030906@atmel.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Thu, 30 Jul 2015 12:32:05 +0200
+Subject: [PATCH v3 2/4] mfd: max77686: Use a generic name for the PMIC node in
+ the example
+In-Reply-To: <1438252327-28427-1-git-send-email-javier@osg.samsung.com>
+References: <1438252327-28427-1-git-send-email-javier@osg.samsung.com>
+Message-ID: <1438252327-28427-3-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 29/07/2015 17:02, Alexandre Belloni a ?crit :
-> Hi,
-> 
-> On 28/07/2015 at 12:25:50 +0200, Nicolas Ferre wrote :
->> +
->> +		sdmmc0: sdio-host at a0000000 {
->> +			compatible = "atmel,sama5d2-sdhci";
->> +			reg = <0xa0000000 0x300>;
->> +			interrupts = <31 IRQ_TYPE_LEVEL_HIGH 0>;
->> +			clocks = <&sdmmc0_hclk>, <&sdmmc0_gclk>, <&main>;
->> +			clock-names = "hclock", "multclk", "baseclk";
-> 
-> Those bindings have not been taken yet. Are you confident enough this
-> will go in as-is?
+The ePAPR standard says that: "the name of a node should be somewhat
+generic, reflecting the function of the device and not its precise
+programming model."
 
-You're right: I'll remove these nodes as well as the ones about the
-classD and generated clocks. That way we avoid anticipating on drivers
-that are not-so-quite-merged-yet-but-probably-will ;-)
+So, change the max77686 binding document example to use a generic
+node name instead of using the chip's name.
 
-Bye,
+Suggested-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
+---
 
->> +			status = "disabled";
->> +		};
->> +
-> 
+Changes in v3:
+ - Fix typo in ePAPR document name. Suggested by Sergei Shtylyov
 
+Changes in v2: None
 
+ Documentation/devicetree/bindings/mfd/max77686.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/Documentation/devicetree/bindings/mfd/max77686.txt b/Documentation/devicetree/bindings/mfd/max77686.txt
+index 8221102d3fc2..d2ed3c20a5c3 100644
+--- a/Documentation/devicetree/bindings/mfd/max77686.txt
++++ b/Documentation/devicetree/bindings/mfd/max77686.txt
+@@ -48,7 +48,7 @@ to get matched with their hardware counterparts as follow:
+ 
+ Example:
+ 
+-	max77686 at 09 {
++	max77686: pmic at 09 {
+ 		compatible = "maxim,max77686";
+ 		interrupt-parent = <&wakeup_eint>;
+ 		interrupts = <26 0>;
 -- 
-Nicolas Ferre
+2.4.3
