@@ -1,34 +1,56 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 30 Jul 2015 09:23:57 +0900
-Subject: [PATCH] ARM: shmobile: Enable fixed voltage regulator in
- shmobile_defconfig
-In-Reply-To: <cover.1438215768.git.horms+renesas@verge.net.au>
-References: <cover.1438215768.git.horms+renesas@verge.net.au>
-Message-ID: <4055a722d260ca30610fc52238d0aa49ff5bffa9.1438215768.git.horms+renesas@verge.net.au>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 30 Jul 2015 02:24:28 +0200
+Subject: [PATCH 1/5] rtc: at91sam9: properly handle error case
+Message-ID: <1438215872-27794-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is selected by MACH_MARZEN which is enabled in shmobile_defconfig,
-however, MACH_MARZEN is going away along with the board code it enables.
+In case of a probe error, it is possible to abort after issuing
+clk_prepare_enable(). Ensure the clock is disabled and unprepared in that
+case.
 
-Acked-by: Magnus Damm <damm@opensource.se>
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/configs/shmobile_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/rtc/rtc-at91sam9.c | 13 ++++++++++---
+ 1 file changed, 10 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
-index 8da509327265..89bf31ccfbfa 100644
---- a/arch/arm/configs/shmobile_defconfig
-+++ b/arch/arm/configs/shmobile_defconfig
-@@ -122,6 +122,7 @@ CONFIG_WATCHDOG=y
- CONFIG_DA9063_WATCHDOG=y
- CONFIG_MFD_AS3711=y
- CONFIG_MFD_DA9063=y
-+CONFIG_REGULATOR_FIXED_VOLTAGE=y
- CONFIG_REGULATOR_AS3711=y
- CONFIG_REGULATOR_DA9210=y
- CONFIG_REGULATOR_GPIO=y
+diff --git a/drivers/rtc/rtc-at91sam9.c b/drivers/rtc/rtc-at91sam9.c
+index 5ccaee32df72..152cd816cc43 100644
+--- a/drivers/rtc/rtc-at91sam9.c
++++ b/drivers/rtc/rtc-at91sam9.c
+@@ -451,8 +451,10 @@ static int at91_rtc_probe(struct platform_device *pdev)
+ 
+ 	rtc->rtcdev = devm_rtc_device_register(&pdev->dev, pdev->name,
+ 					&at91_rtc_ops, THIS_MODULE);
+-	if (IS_ERR(rtc->rtcdev))
+-		return PTR_ERR(rtc->rtcdev);
++	if (IS_ERR(rtc->rtcdev)) {
++		ret = PTR_ERR(rtc->rtcdev);
++		goto err_clk;
++	}
+ 
+ 	/* register irq handler after we know what name we'll use */
+ 	ret = devm_request_irq(&pdev->dev, rtc->irq, at91_rtc_interrupt,
+@@ -460,7 +462,7 @@ static int at91_rtc_probe(struct platform_device *pdev)
+ 			       dev_name(&rtc->rtcdev->dev), rtc);
+ 	if (ret) {
+ 		dev_dbg(&pdev->dev, "can't share IRQ %d?\n", rtc->irq);
+-		return ret;
++		goto err_clk;
+ 	}
+ 
+ 	/* NOTE:  sam9260 rev A silicon has a ROM bug which resets the
+@@ -474,6 +476,11 @@ static int at91_rtc_probe(struct platform_device *pdev)
+ 				dev_name(&rtc->rtcdev->dev));
+ 
+ 	return 0;
++
++err_clk:
++	clk_disable_unprepare(rtc->sclk);
++
++	return ret;
+ }
+ 
+ /*
 -- 
 2.1.4
