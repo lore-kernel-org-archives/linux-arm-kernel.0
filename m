@@ -1,37 +1,51 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 29 Jul 2015 17:27:54 -0700
-Subject: [PATCH v5 06/10] clk: mediatek: mt8173: Fix enabling of critical
- clocks
-In-Reply-To: <1438152754-11970-7-git-send-email-jamesjj.liao@mediatek.com>
-References: <1438152754-11970-1-git-send-email-jamesjj.liao@mediatek.com>
- <1438152754-11970-7-git-send-email-jamesjj.liao@mediatek.com>
-Message-ID: <20150730002754.GG3159@codeaurora.org>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 30 Jul 2015 02:24:30 +0200
+Subject: [PATCH 3/5] rtc: at91sam9: sort headers alphabetically
+In-Reply-To: <1438215872-27794-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1438215872-27794-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1438215872-27794-3-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/29, James Liao wrote:
-> From: Sascha Hauer <s.hauer@pengutronix.de>
-> 
-> On the MT8173 the clocks are provided by different units. To enable
-> the critical clocks we must be sure that all parent clocks are already
-> registered, otherwise the parents of the critical clocks end up being
-> unused and get disabled later.
-> 
-> On MT8173, for example, it is the CLK_TOP clocks that have CLK_APMIXED
-> PLLs as their parents, so we cannot enable the CLK_TOP critical clocks
-> until the CLK_APMIXED clocks have all been registered.
-> 
-> To find a place where all parents are registered we try each time
-> after we've registered some clocks if all known providers are present
-> now and only then we enable the critical clocks.
-> 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
-> ---
+Sort included headers alphabetically.
 
-Please move up to v4.2-rc2 so that this patch can be dropped. I
-already applied this and sent it off to Linus so it's in -rc2.
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ drivers/rtc/rtc-at91sam9.c | 16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
 
+diff --git a/drivers/rtc/rtc-at91sam9.c b/drivers/rtc/rtc-at91sam9.c
+index 0a8485ac3864..23f721d049b2 100644
+--- a/drivers/rtc/rtc-at91sam9.c
++++ b/drivers/rtc/rtc-at91sam9.c
+@@ -11,20 +11,20 @@
+  * 2 of the License, or (at your option) any later version.
+  */
+ 
+-#include <linux/module.h>
+-#include <linux/kernel.h>
+-#include <linux/platform_device.h>
+-#include <linux/time.h>
+-#include <linux/rtc.h>
++#include <linux/clk.h>
+ #include <linux/interrupt.h>
+ #include <linux/ioctl.h>
+-#include <linux/slab.h>
+-#include <linux/platform_data/atmel.h>
+ #include <linux/io.h>
++#include <linux/kernel.h>
+ #include <linux/mfd/syscon.h>
++#include <linux/module.h>
++#include <linux/platform_data/atmel.h>
++#include <linux/platform_device.h>
+ #include <linux/regmap.h>
++#include <linux/rtc.h>
++#include <linux/slab.h>
+ #include <linux/suspend.h>
+-#include <linux/clk.h>
++#include <linux/time.h>
+ 
+ /*
+  * This driver uses two configurable hardware resources that live in the
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+2.1.4
