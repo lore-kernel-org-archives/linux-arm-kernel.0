@@ -1,100 +1,121 @@
-From: albert.aribaud@3adev.fr (Albert ARIBAUD)
-Date: Thu, 30 Jul 2015 22:11:25 +0200
-Subject: [PATCH v8 1/5] mtd: nand: vf610_nfc: Freescale NFC for VF610,
- MPC5125 and others
-In-Reply-To: <36ffdc45494ab888ba375ff8478864ad@agner.ch>
-References: <1438015365-15685-1-git-send-email-stefan@agner.ch>
- <1438015365-15685-2-git-send-email-stefan@agner.ch>
- <20150730181321.3bd38db7.albert.aribaud@3adev.fr>
- <36ffdc45494ab888ba375ff8478864ad@agner.ch>
-Message-ID: <20150730221125.08b5b2cf.albert.aribaud@3adev.fr>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 30 Jul 2015 15:41:50 -0500
+Subject: [PATCH v6] PCI: Store PCIe bus address in struct of_pci_range
+In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E01D6FC15@lhreml503-mbs>
+References: <1438010223-124422-1-git-send-email-gabriele.paoloni@huawei.com>
+ <20150729172053.GE31170@google.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E01D6F350@lhreml503-mbs>
+ <CAL_JsqKs11-sXQTdBD+ZjbVYFWUHBARTW9q5MF1hCXUhZ+nWLQ@mail.gmail.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E01D6F94A@lhreml503-mbs>
+ <20150730161447.GG9640@google.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E01D6FB3B@lhreml503-mbs>
+ <20150730171445.GI9640@google.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E01D6FC15@lhreml503-mbs>
+Message-ID: <CAL_Jsq+aQVakaZf4xo7sxnVyTmPR+HJ-9ByyS6OYJ0PHDYOwmg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
+On Thu, Jul 30, 2015 at 12:34 PM, Gabriele Paoloni
+<gabriele.paoloni@huawei.com> wrote:
+>> -----Original Message-----
+>> From: Bjorn Helgaas [mailto:bhelgaas at google.com]
+>> Sent: 30 July 2015 18:15
+>> On Thu, Jul 30, 2015 at 04:50:55PM +0000, Gabriele Paoloni wrote:
+>> > > -----Original Message-----
+>> > > From: linux-pci-owner at vger.kernel.org [mailto:linux-pci-
+>> > > owner at vger.kernel.org] On Behalf Of Bjorn Helgaas
+>> > > Sent: Thursday, July 30, 2015 5:15 PM
+>> > > On Thu, Jul 30, 2015 at 01:52:13PM +0000, Gabriele Paoloni wrote:
 
-Le Thu, 30 Jul 2015 19:00:38 +0200, Stefan Agner <stefan@agner.ch> a
-?crit :
+[...]
 
-> Hi Albert,
-> 
-> On 2015-07-30 18:13, Albert ARIBAUD wrote:
-> > Hi Stefan,
-> > 
-> > Le Mon, 27 Jul 2015 18:42:41 +0200, Stefan Agner <stefan@agner.ch> a
-> > ?crit :
-> > 
-> >> This driver supports Freescale NFC (NAND flash controller) found on
-> >> Vybrid (VF610), MPC5125, MCF54418 and Kinetis K70. The driver has
-> >> been tested on 8-bit and 16-bit NAND interface and supports ONFI
-> >> parameter page reading.
-> >>
-> >> [...]
-> >>
-> >> diff --git a/drivers/mtd/nand/vf610_nfc.c b/drivers/mtd/nand/vf610_nfc.c
-> >> new file mode 100644
-> >> index 0000000..0da500e
-> >> --- /dev/null
-> >> +++ b/drivers/mtd/nand/vf610_nfc.c
-> >> @@ -0,0 +1,640 @@
-> >> [...]
-> > 
-> > ... about line 708:
-> > 
-> >> +	err = devm_request_irq(nfc->dev, irq, vf610_nfc_irq, 0, DRV_NAME, mtd);
-> >> +	if (err) {
-> >> +		dev_err(nfc->dev, "Error requesting IRQ!\n");
-> >> +		goto error;
-> >> +	}
-> >> +
-> >> +	vf610_nfc_init_controller(nfc);
-> > 
-> > The call above is too early: vf610_nfc_init_controller() will test
-> > for (nfc->chip.options & NAND_BUSWIDTH_16) but this option bit is only
-> > set once nand_scan_ident() below has been run.
-> > 
-> > This has the effect that even when the DT node specifies a 16-bit wide
-> > bus, the controller is configured for 8-bit mode at this point, which of
-> > course causes read failures. I've experienced this with a Vybrid SoC
-> > and a Micron MT29F4G16ABADAH4 16-bit NAND.
-> > 
-> >> +	/* first scan to find the device and get the page size */
-> >> +	if (nand_scan_ident(mtd, 1, NULL)) {
-> >> +		err = -ENXIO;
-> >> +		goto error;
-> >> +	}
-> > 
-> > Placing the call to vf610_nfc_init_controller() here, after the call
-> > to nand_scan_ident() rather than before it, fixed the issue for me.
-> 
-> Hm, since nand_scan_ident access the devices we actually want the
-> controller initialized before we access it the first time. In most
-> cases, the boot loader/boot ROM probably initialized the controller in a
-> way that identifying the chip should work non the less. However, the
-> safe way would be to initialize it before calling nand_scan_ident.
+>> > > > I don?t think we should rely on [CPU] addresses...what if the
+>> > > intermediate
+>> > > > translation layer changes the lower significant bits of the "bus
+>> > > address"
+>> > > > to translate into a cpu address?
+>> > >
+>> > > Is it really a possiblity that the lower bits could be changed?
+>> >
+>> > I've checked all the current deignware users DTs except "pci-
+>> layerscape"
+>> > that I could not find:
+>> > spear1310.dtsi
+>> > spear1340.dtsi
+>> > dra7.dtsi
+>> > imx6qdl.dtsi
+>> > imx6sx.dtsi
+>> > keystone.dtsi
+>> > exynos5440.dtsi
+>> >
+>> > None of them modifies the lower bits. To be more precise the only guy
+>> > that provides another translation layer is "dra7.dtsi":
+>> > axi0
+>> > http://lxr.free-electrons.com/source/arch/arm/boot/dts/dra7.dtsi#L207
+>> >
+>> > axi1
+>> > http://lxr.free-electrons.com/source/arch/arm/boot/dts/dra7.dtsi#L241
+>> >
+>> > For this case masking the top 4bits (bits28 to 31) should make the job.
 
-Correct -- there is a mutual dependency here between nand_scan_ident()
-and vf610_nfc_init_controller(). Anyway, my call order switch was only
-a hack to get things working.
+IMO, we should just fix this case. After further study, I don't think
+this is a DW issue, but rather an SOC integration issue.
 
-> However, I see your point regarding bus width: With the change to
-> nand_dt_init, we have that information after nand_scan_ident. There is
-> actually more: Also the HW ECC settings are not yet parsed at that
-> point, hence the ECC status and offset will not be initialized right. 
-> 
-> We could call the whole initialization twice. This would configure 8-Bit
-> mode for the 16-Bit devices, but during initialization this is anyway
-> the required default (ONFI). Or we split it up and call it something
-> like vf610_nfc_preinit_controller and vf610_nfc_init_controller.
-> 
-> What do you think?
+I believe you can just fixup the address in the pp->ops->host_init hook.
 
-I think creating a vf610_nfc_preinit_controller() function with no
-dependency on the DT is the cleaner option.
+In looking at this, I'm curious why only 2 ATU viewports are used by
+default as this causes switching on config accesses. Probably some
+configuration only has 2 viewports. This would not even work on SMP
+systems! Memory and i/o accesses do not have any lock. A config access
+on one core will temporarily disable the i/o or memory viewport which
+will cause an abort, dropped, or garbage data on an i/o or memory
+access from another core. You would have to be accessing cfg space on
+a bus other than the root bus, so maybe no one is doing that.
 
-> --
-> Stefan
+>> >
+>> > Speaking in general terms so far I've always seen linear mappings
+>> > that differ by bitmask offset, however linear does not mean that you
+>> > cannot affect the lower bits: e.g. <0x0> to <0x0 + size> can map to
+>> > <0x0000cafe to 0x0000cafe + size>, but I guess that for HW design
+>> reasons
+>> > it is much easier to remap directly using a bitmask...but I was not
+>> sure
+>> > and I didn't think about the problems that can arise with ACPI.
 
-Cordialement,
-Albert ARIBAUD
-3ADEV
+For higher speed buses, the h/w designs are not going to be doing
+complicated translations in order to meet timing requirements. At the
+top level only the highest order bits are going to be looked at. For
+downstream segments, the high order bits may get dropped to simplify
+routing. If an IP block has full address bits in this case, they could
+either be tied to 0 or tied off to the correct address. Either is
+reasonable, so I'm sure there is h/w doing both. That doesn't mean h/w
+designers haven't done something crazy, too.
+
+>> As I said, it wouldn't make sense for the bits that comprise the
+>> offset into the window to change, so the mapping only has to be linear
+>> inside the window.
+>>
+>> For the bits outside the window offset, I don't know enough to say
+>> whether masking is sufficient or safe.
+>>
+>> > If you think the bitmask is Ok then I can directly define it in
+>> > designware and we can drop this patch.
+>>
+>> It's OK by me, but I know nothing about the actual hardware involved.
+>> For the DesignWare question, I think you would just have to convince
+>> Jingoo and Pratyush (cc'd).
+>
+> Yes actually looking at
+> http://lxr.free-electrons.com/source/arch/arm/boot/dts/spear1310.dtsi#L99
+> I can see that pci_addr=0 is mapped to bus_addr 0x80020000, so clearing
+> the top 4 bits would alter the behaviour of the current designware
+> SW framework...now I don't know if DW needs only the low 28b of that
+> value or not....
+
+Given that most cases have same cpu and bus address, masking is not
+the right solution in general.
+
+There is also a bug here BTW. pcie0 and pcie2 have the same CPU
+address for the memory range.
+
+Rob
