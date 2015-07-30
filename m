@@ -1,161 +1,93 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 30 Jul 2015 11:16:41 -0500
-Subject: [PATCH v4 2/2] dt: power: st: Provide bindings for ST's OPPs
-In-Reply-To: <20150730084634.GD9319@x1>
-References: <1438010430-5802-1-git-send-email-lee.jones@linaro.org>
- <1438010430-5802-2-git-send-email-lee.jones@linaro.org>
- <20150728022936.GB1229@linux>
- <20150728225510.GB3159@codeaurora.org> <20150729081403.GH2284@x1>
- <20150729221526.GE3159@codeaurora.org> <20150730084634.GD9319@x1>
-Message-ID: <CAL_JsqKQLQ15qSt95zBZykzzPhcUrtZzhk29a76n+r_3719AiA@mail.gmail.com>
+From: sophian.yoma@gmail.com (yoma sophian)
+Date: Fri, 31 Jul 2015 00:20:54 +0800
+Subject: question about detect hard lockups without NMIs using secondary
+ cpus
+In-Reply-To: <20150729182905.GO7557@n2100.arm.linux.org.uk>
+References: <CADUS3onib4DYYtPo7RfLAYiN4fpspzcFCx86-pJwuLc37hz3dQ@mail.gmail.com>
+ <20150729182905.GO7557@n2100.arm.linux.org.uk>
+Message-ID: <CADUS3o=AQ2ic7K2RboDzEyBuJSzkACpbDXB=hcpsnedbi1dKcg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 30, 2015 at 3:46 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> On Wed, 29 Jul 2015, Stephen Boyd wrote:
->
->> On 07/29, Lee Jones wrote:
->> > On Tue, 28 Jul 2015, Stephen Boyd wrote:
->> >
->> > > On 07/28, Viresh Kumar wrote:
->> > > > Cc'ing few people (whom I cc'd last time as well :)).
->> > > >
->> > > > On 27-07-15, 16:20, Lee Jones wrote:
->> > > > > + - opp-hz            : CPU frequency [Hz] for this OPP [See: ./opp.txt]
->> > > > > + - st,avs            : List of available voltages [uV] indexed by process code
->> > > > > + - st,cuts           : Cut version this OPP is suitable for [0xFF means ALL]
->> > > > > + - st,substrate              : Substrate version this OPP is suitable for [0xFF means ALL]
->> [...]
->> > > > > +cpu0-opp-list {
->> > > > > +     compatible      = "operating-points-v2-sti";
->> > > > > +     st,syscfg       = <&syscfg [major_offset]>;
->> > > > > +     st,syscfg-eng   = <&syscfg_eng [pcode_offset] [minor_offset]>;
->> > > > > +
->> > > > > +     opp0 {
->> > > > > +             opp-hz          = <1200000000>;
->> > > > > +             st,avs          = <1110 1150 1100 1080 1040 1020 980 930>;
->> > > > > +             st,substrate    = <0xff>;
->> > > > > +             st,cuts         = <0xff>;
->> > > > > +     };
->> > > > > +     opp1 {
->> > > > > +             opp-hz          = <1500000000>;
->> > > > > +             st,avs          = <1200 1200 1200 1200 1170 1140 1100 1070>;
->> > > > > +             st,substrate    = <0xff>;
->> > > > > +             st,cuts         = <0x2>;
->> > > > > +     };
->> > > > > +};
->> > > >
->> > > > I don't see more problems here, unless we can move some of this to the
->> > > > generic bindings.
->> > > >
->> > > > @Rob/Stephen: Please respond before it is late :)
->> > >
->> > > It's interesting to have vendor specific properties like avs,
->> > > cuts, and substrate. That could replace our planned usage of the
->> > > opp-names property where we encode similar information (speed
->> > > bin, revision, etc.) into a string that we look for.
->> > >
->> > > So I wonder why the avs/cut/substrate information can't be
->> > > encoded into the opp name? That would make these properties
->> > > obsolete, given that all they're used for is to pick out the
->> > > correct OPP?
->> >
->> > You could hack the substrate and cut version into a string, but that's
->> > exactly what it would be, a hack.  I'm struggling how you would do the
->> > same for 'st,avs', which is an array of u32s.
->> >
->>
->>
->> (I don't understand the st,avs property to begin with, so feel
->> free to ignore the rest of this mail.)
->>
->> For qcom platforms we have the pvs bin and speed bin, and
->> sometimes a revision number. Each one of these properties
->> corresponds to a different set of OPPs (opp table). So we might
->> have speed1-pvs2-v0 for speed bin 1, pvs bin 2 and version 0. We
->> fill out an opp table for this and then point the opps property
->> at the table and have a corresponding opp-name "speed1-pvs2-v0"
->> in the "consumer" node.
->>
->>       operating-points-v2 = <&speed1_pvs2_v0>;
->>       operating-points-names = "speed1-pvs2-v0";
->>
->> We have quite a few of these tables because the values are
->> always different. If the values were the same then we could use
->> the same table with different names I suppose, but we're not
->> doing that.
->>
->> From a quick read of the st properties (that I admit I don't
->> understand), it looks like we're trying to compress the OPP
->> tables by listing all the voltages that could be used for a
->> particular frequency depending on which avs is present on the
->> device? And then limiting the frequency voltage pairs depending
->> on which cut and substrate is present?
->>
->> So we'd probably have to expand out the tables to be unique per
->> avs/cut/substrate parameter. Something like:
->>
->> avs0-cut2 {
->>       compatible = "operating-points-v2";
->>
->>       opp0 {
->>               opp-hz = <1200000000>;
->>               opp-microvolt = <1100>;
->>       };
->>
->>       opp1 {
->>               opp-hz = <1500000000>;
->>               opp-microvolt = <1200>;
->>       };
->> };
->>
->> avs1-cut2 {
->>       compatible = "operating-points-v2";
->>
->>       opp0 {
->>               opp-hz = <1200000000>;
->>               opp-microvolt = <1150>;
->>       };
->>
->>       opp1 {
->>               opp-hz = <1500000000>;
->>               opp-microvolt = <1200>;
->>       };
->> };
->>
->> And then another copy of these for the devices without cuts != 2
->> where the top frequency is gone?
->
-> There is nothing stopping us from representing the data in this way.
-> On the plus side, it would mean that we wouldn't need any vendor
-> specific properties.  However, far outweighing the positives are the
-> fact that, even in our very simple example provided, where we only
-> have 2 frequencies, differ between only 1 cut and support all
-> substrates, we would still need 16 OPP tables.  When any one of those
-> variables increase (and they will), we would then have a large number
-> of permutations and subsequently and unruly amount of OPP tables.
->
-> (... and we haven't even provided the body-biasing information yet.)
->
-> The way we've chosen to represent our circumstance is the least
-> intrusive and the most succinct way we can think of.  Which IMHO
-> outweighs the fact that we have to introduce a couple of vendor
-> properties by a country mile.
+hi Russel
 
-Regardless of which is better or worse, you are both doing essentially
-the same thing. You are selecting OPPs based on some Si parameters. We
-should not really be doing this 2 different ways. I'd be fine with 2
-ways if it was 2 for all SOCs, but right now it is 2 for 2 SOCs.
-Really, I'd like to see most if not all the selection or fixup of OPPs
-be done in the bootloader and the kernel just deals with the correct
-OPP table.
+2015-07-30 2:29 GMT+08:00 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> On Thu, Jul 30, 2015 at 12:03:46AM +0800, yoma sophian wrote:
+>> hi all:
+>> below link introduced how to emulate NMIs on systems where they are
+>> not available by using timer interrupts on other cpus.
+>>
+>> http://article.gmane.org/gmane.linux.kernel/1419661
+>>
+>> in kernel/watchdog.c
+>>     --> watchdog_overflow_callback
+>>           if (is_hardlockup()) {
+>>            ...........................
+>>                 if (hardlockup_panic)
+>>                         panic("Watchdog detected hard LOCKUP on cpu %d",
+>>                               this_cpu); /*************/
+>>                 else
+>>                         WARN(1, "Watchdog detected hard LOCKUP on cpu %d",
+>>                              this_cpu);
+>>              .......................
+>>         }
+>>
+>> I have some questions:
+>> a.
+>> in SMP system, suppose 4 cores, and hardlockup_panic is 1.
+>> Core0 find Core1 hard lcokup in hardIRQ context
+>> the panic function, above with '*' marked, will fail on
+>> smp_send_stop(), and we will have no idea where core1 is trapped in,
+>> right?
+>
+> watchdog_overflow_callback() is only ever entered for the failed core.
+> What you missed out on is:
+>
+>         int this_cpu = smp_processor_id();
+>
+> which gets the CPU number of the CPU executing this code.  So, Core 0
+> will never find Core 1 having locked up via this code path.
+if core0 found it is locked in lockdep, that mean the situation is no so worse,
+core0 has the chance to go back, right.
 
-Where are you storing the data that gets selected to fill into these
-properties? Is it just look-up tables or is there some kind of
-algorithm to generate the values? If the former, then DT is as good a
-data struct as any to store the tables. There is a lot of duplication
-though with only a single property varying in each set. If you both
-have that problem, then perhaps we can come up with a generic way to
-list all possible values more concisely.
 
-Rob
+
+>> b.
+>> things will get worse if we are running single core system if hard
+>> lockup happen.
+>> We even have no idea what happen.
+>
+> Basically, without NMIs (or FIQs in ARM speak) lockups with IRQs off are
+> undetectable by the kernel other than "the system stopped responding".
+>
+> In a SMP system, there are mechanisms by which other CPUs can detect a
+> locked-up CPU, and they can call trigger_all_cpu_backtrace() - and that
+> can only get a trace out of the locked up CPU if it uses FIQs.  A CPU
+> which has locked up in an IRQs-off region won't be able to receive an
+> IRQ or IPI by definition.
+
+so in ur case "A CPU  which has locked up in an IRQs-off region won't
+be able to receive an
+IRQ or IPI by definition.' the only wake to trigger_them is by FIQ, right?
+
+
+> Work has been going on for the last 9 months to try and bring a working
+> trigger_all_cpu_backtrace() implementation, initially with IRQs and
+> later with FIQs.
+>
+> In previous merge windows, we have moved forward with getting some FIQ
+> changes merged, and in the next merge window, I have patches queued up
+> (available in linux-next) which add IRQ-based trigger_all_cpu_backtrace()
+> support.
+>
+> The next piece of the puzzle is sorting out the patches which bring FIQ
+> based trigger_all_cpu_backtrace() support - but even if we do, that won't
+> be available everywhere - for example, it won't be available if your kernel
+> runs in the non-secure world with a secure monitor, because FIQs generally
+> aren't usable in that world.
+Is there patch that we can reference what you describe above?
+if we stay in secure world, and take some ppi as fiq and others ppi/spi are IRQ.
+isn't that enough to cover above idea?
+( GIC has the cability to let NS irq to be handed by secure Cpu)
+
+appreciate ur kine help
