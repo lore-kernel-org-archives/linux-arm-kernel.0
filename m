@@ -1,202 +1,33 @@
-From: lho@apm.com (Loc Ho)
-Date: Wed, 29 Jul 2015 16:39:10 -0700
-Subject: [PATCH v2 2/3] edac: Add L3/SoC support to the APM X-Gene SoC
- EDAC driver
-In-Reply-To: <20150729142941.GC17367@nazgul.tnic>
-References: <1437808063-17592-1-git-send-email-lho@apm.com>
- <1437808063-17592-2-git-send-email-lho@apm.com>
- <1437808063-17592-3-git-send-email-lho@apm.com>
- <20150729142941.GC17367@nazgul.tnic>
-Message-ID: <CAPw-ZTkZ7q8PUWydFad5TXrhcY6YBRjdVvz+SR+LV4sOLDKkEg@mail.gmail.com>
+From: mohun106@gmail.com (Radha Mohan)
+Date: Wed, 29 Jul 2015 17:01:06 -0700
+Subject: [PATCH v2 0/3] Add MDIO support to ThunderX NIC driver
+In-Reply-To: <1438121533-21528-1-git-send-email-mohun106@gmail.com>
+References: <1438121533-21528-1-git-send-email-mohun106@gmail.com>
+Message-ID: <CAC8NTUXy0Man6QvxgRJW-B4KPxrrzK5ngDAAZX8PB5nPwBKYVQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Borislav,
-
->> +
->> +static void xgene_edac_l3_hw_init(struct edac_device_ctl_info *edac_dev,
->> +                               bool enable)
+On Tue, Jul 28, 2015 at 3:12 PM,  <mohun106@gmail.com> wrote:
+> From: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
 >
-> arg alignment. It should be
+> This patch series adds MDIO support to ThunderX NIC driver by making use
+> of existing mdio-octeon driver. In the process modified the mdio-octeon
+> driver to work on both Octeon and ThunderX platforms.
 >
-> function name(arg1, arg2,
->               arg3, arg4,
->               arg5...
+> * From v1:
+>   - Removed default selection in Kconfig for MDIO_OCTEON
+>   - Replace uint64 with u64 as suggested by David Daney
 >
-> Check your other functions too.
-
-I will check and fix other functions if any. But this function is just
-fine. It may be off just by the + extra character with patch
-generation only.
-
->> +{
->> +     struct xgene_edac_dev_ctx *ctx = edac_dev->pvt_info;
->> +     struct dentry *edac_debugfs;
->> +     char name[30];
->> +
->> +     if (!IS_ENABLED(CONFIG_EDAC_DEBUG))
->> +             return;
->> +
->> +     /*
->> +      * Todo: Switch to common EDAC debug file system for edac device
->> +      *       when available.
->> +      */
+> Radha Mohan Chintakuntla (3):
+>   net: mdio-octeon: Modify driver to work on both ThunderX and Octeon
+>   net: mdio-octeon: Fix octeon_mdiobus_probe function for return values
+>   net: thunderx: Select CONFIG_MDIO_OCTEON for ThunderX NIC
 >
-> What is that?
-
-Debug folder node shows up at /sys/kernel/debug/<file here> while the
-MC debug node shows up at /sys/kernel/debug/edac where <file here> is
-the driver node name. It would be better if everything shows up at
-/sys/kernel/debug/edac. For this to happen, I need EDAC core change to
-provide an parent node.
-
+>  drivers/net/ethernet/cavium/Kconfig |    2 +
+>  drivers/net/phy/Kconfig             |   10 ++--
+>  drivers/net/phy/mdio-octeon.c       |  136 +++++++++++++++++++++++++++++------
+>  3 files changed, 122 insertions(+), 26 deletions(-)
 >
->> +     if (!ctx->edac->dfs) {
->> +             ctx->edac->dfs = debugfs_create_dir(edac_dev->dev->kobj.name,
->> +                                                 NULL);
->> +             if (!ctx->edac->dfs)
->> +                     return;
->> +     }
->> +     sprintf(name, "l3c%d", ctx->edac_idx);
->> +     edac_debugfs = debugfs_create_dir(name, ctx->edac->dfs);
->> +     if (!edac_debugfs)
->> +             return;
->> +
->> +     debugfs_create_file("l3_inject_ctrl", S_IWUSR, edac_debugfs, edac_dev,
->> +                         &xgene_edac_l3_debug_inject_fops);
->> +}
->> +
->> +static int xgene_edac_l3_add(struct xgene_edac *edac, struct device_node *np,
->> +                          int version)
->> +{
->> +     struct edac_device_ctl_info *edac_dev;
->> +     struct xgene_edac_dev_ctx *ctx;
->> +     struct resource res;
->> +     void __iomem *dev_csr;
->> +     int edac_idx;
->> +     int rc = 0;
->> +
->> +     if (!devres_open_group(edac->dev, xgene_edac_l3_add, GFP_KERNEL))
->> +             return -ENOMEM;
->> +
->> +     rc = of_address_to_resource(np, 0, &res);
->> +     if (rc < 0) {
->> +             dev_err(edac->dev, "no L3 resource address\n");
->> +             goto err;
->> +     }
->> +     dev_csr = devm_ioremap_resource(edac->dev, &res);
->> +     if (IS_ERR(dev_csr)) {
->> +             dev_err(edac->dev,
->> +                     "devm_ioremap_resource failed for L3 resource address\n");
->> +             rc = PTR_ERR(dev_csr);
->> +             goto err;
->> +     }
->>
->> +     edac_idx = edac_device_alloc_index();
->> +     edac_dev = edac_device_alloc_ctl_info(sizeof(*ctx),
->> +                                           "l3c", 1, "l3c", 1, 0, NULL, 0,
->> +                                           edac_idx);
->> +     if (!edac_dev) {
->> +             rc = -ENOMEM;
->> +             goto err;
->> +     }
->> +
->> +     ctx = edac_dev->pvt_info;
->> +     ctx->dev_csr = dev_csr;
->> +     ctx->name = "xgene_l3_err";
->> +     ctx->edac_idx = edac_idx;
->> +     ctx->edac = edac;
->> +     ctx->edac_dev = edac_dev;
->> +     ctx->ddev = *edac->dev;
->> +     ctx->version = version;
->> +     edac_dev->dev = &ctx->ddev;
->> +     edac_dev->ctl_name = ctx->name;
->> +     edac_dev->dev_name = ctx->name;
->> +     edac_dev->mod_name = EDAC_MOD_STR;
->> +
->> +     if (edac_op_state == EDAC_OPSTATE_POLL)
->> +             edac_dev->edac_check = xgene_edac_l3_check;
->
-> So depending on what SoC elements you detect, the last one's check
-> function will win?
->
-> If xgene_edac loads on multiple SoC elements, you need a global xgene
-> check function for which l3, soc, mc, etc register...
 
-No... each EDAC instance has its own context as we allocated via
-function edac_device_alloc_ctl_info. Per type of instance will use the
-same type function.
-
->> +
->> +static const char * const *xgene_edac_soc_mem_data(
->> +     struct xgene_edac_dev_ctx *ctx)
->> +{
->> +     switch (ctx->version) {
->> +     case 1:
->> +             return soc_mem_err_v1;
->> +     default:
->> +             return NULL;
->> +     }
->> +}
->
-> That's one badly formatted function used only once. Just move the logic
-> there and kill it.
-
-For format, code looks fine. In any case, I will roll this into the code.
-
->> +static int xgene_edac_soc_add(struct xgene_edac *edac, struct device_node *np,
->> +                           int version)
->> +{
->> +     struct edac_device_ctl_info *edac_dev;
->> +     struct xgene_edac_dev_ctx *ctx;
->> +     void __iomem *dev_csr;
->> +     struct resource res;
->> +     int edac_idx;
->> +     int rc = 0;
->> +
->> +     if (!devres_open_group(edac->dev, xgene_edac_soc_add, GFP_KERNEL))
->> +             return -ENOMEM;
->> +
->> +     rc = of_address_to_resource(np, 0, &res);
->> +     if (rc < 0) {
->> +             dev_err(edac->dev, "no SoC resource address\n");
->> +             goto err;
->> +     }
->> +     dev_csr = devm_ioremap_resource(edac->dev, &res);
->> +     if (IS_ERR(dev_csr)) {
->> +             dev_err(edac->dev,
->> +                     "devm_ioremap_resource failed for soc resource address\n");
->> +             rc = PTR_ERR(dev_csr);
->> +             goto err;
->> +     }
->> +
->> +     edac_idx = edac_device_alloc_index();
->> +     edac_dev = edac_device_alloc_ctl_info(sizeof(*ctx),
->> +                                           "SOC", 1, "SOC", 1, 2, NULL, 0,
->> +                                           edac_idx);
->> +     if (!edac_dev) {
->> +             rc = -ENOMEM;
->> +             goto err;
->> +     }
->> +
->> +     ctx = edac_dev->pvt_info;
->> +     ctx->dev_csr = dev_csr;
->> +     ctx->name = "xgene_soc_err";
->> +     ctx->edac_idx = edac_idx;
->> +     ctx->edac = edac;
->> +     ctx->edac_dev = edac_dev;
->> +     ctx->ddev = *edac->dev;
->> +     ctx->version = version;
->> +     edac_dev->dev = &ctx->ddev;
->> +     edac_dev->ctl_name = ctx->name;
->> +     edac_dev->dev_name = ctx->name;
->> +     edac_dev->mod_name = EDAC_MOD_STR;
->> +
->> +     if (edac_op_state == EDAC_OPSTATE_POLL)
->> +             edac_dev->edac_check = xgene_edac_soc_check;
->
-> Same here about the ->edac_check function.
-
-Same comment as above.
-
--Loc
+Cc'ing David Miller.
+Can you pick this patch series please ?
