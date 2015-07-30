@@ -1,47 +1,62 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 30 Jul 2015 02:21:53 +0200
-Subject: [PATCH 07/20] ARM: at91/dt: at91sam9263: use slow clock where
- necessary
+Date: Thu, 30 Jul 2015 02:22:03 +0200
+Subject: [PATCH 17/20] power/reset: at91-reset: get and use slow clock
 In-Reply-To: <1438215726-27452-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1438215726-27452-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1438215726-27452-8-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1438215726-27452-18-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The watchdog, the reset controller, the two real-time timers and the
-shutdown controller need the slow clock, add it where necessary.
+Commit dca1a4b5ff6e ("clk: at91: keep slow clk enabled to prevent system
+hang") added a workaround for the slow clock as it is not properly handled
+by its users.
+
+Get and use the slow clock as it is necessary for the at91 reset
+controller.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
-Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
- arch/arm/boot/dts/at91sam9263.dtsi | 3 +++
- 1 file changed, 3 insertions(+)
+Cc: Sebastian Reichel <sre@kernel.org>
+Cc: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+Cc: linux-pm at vger.kernel.org
+ drivers/power/reset/at91-reset.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
-index e36d966ef5e8..dc168acfebdd 100644
---- a/arch/arm/boot/dts/at91sam9263.dtsi
-+++ b/arch/arm/boot/dts/at91sam9263.dtsi
-@@ -384,11 +384,13 @@
- 			rstc at fffffd00 {
- 				compatible = "atmel,at91sam9260-rstc";
- 				reg = <0xfffffd00 0x10>;
-+				clocks = <&slow_xtal>;
- 			};
+diff --git a/drivers/power/reset/at91-reset.c b/drivers/power/reset/at91-reset.c
+index 3e8f478385c1..cd277570af6e 100644
+--- a/drivers/power/reset/at91-reset.c
++++ b/drivers/power/reset/at91-reset.c
+@@ -11,6 +11,7 @@
+  * warranty of any kind, whether express or implied.
+  */
  
- 			shdwc at fffffd10 {
- 				compatible = "atmel,at91sam9260-shdwc";
- 				reg = <0xfffffd10 0x10>;
-+				clocks = <&slow_xtal>;
- 			};
++#include <linux/clk.h>
+ #include <linux/io.h>
+ #include <linux/module.h>
+ #include <linux/of_address.h>
+@@ -46,6 +47,7 @@ enum reset_type {
+ };
  
- 			pinctrl at fffff200 {
-@@ -902,6 +904,7 @@
- 				compatible = "atmel,at91sam9260-wdt";
- 				reg = <0xfffffd40 0x10>;
- 				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
-+				clocks = <&slow_xtal>;
- 				atmel,watchdog-type = "hardware";
- 				atmel,reset-type = "all";
- 				atmel,dbg-halt;
+ static void __iomem *at91_ramc_base[2], *at91_rstc_base;
++static struct clk *sclk;
+ 
+ /*
+ * unless the SDRAM is cleanly shutdown before we hit the
+@@ -199,6 +201,15 @@ static int at91_reset_probe(struct platform_device *pdev)
+ {
+ 	int ret;
+ 
++	sclk = devm_clk_get(&pdev->dev, NULL);
++	if (IS_ERR(sclk))
++		return PTR_ERR(sclk);
++
++	ret = clk_prepare_enable(sclk);
++	if (ret) {
++		dev_err(&pdev->dev, "Could not enable slow clock\n");
++		return ret;
++	}
+ 
+ 	ret = at91_reset_of_probe(pdev);
+ 	if (ret)
 -- 
 2.1.4
