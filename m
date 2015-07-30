@@ -1,39 +1,39 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 30 Jul 2015 02:21:49 +0200
-Subject: [PATCH 03/20] Documentation: dt: rtc: at91rm9200: add clocks property
+Date: Thu, 30 Jul 2015 02:21:50 +0200
+Subject: [PATCH 04/20] ARM: at91/dt: at91rm9200: use slow clock where necessary
 In-Reply-To: <1438215726-27452-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1438215726-27452-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1438215726-27452-4-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1438215726-27452-5-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The RTC needs an input clock, it is the slow clock. It is required as it
-will not function without it.
+The system timer and the RTC need the slow clock, add it.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
-Cc: Alessandro Zummo <a.zummo@towertech.it>
-Cc: rtc-linux at googlegroups.com
- Documentation/devicetree/bindings/rtc/atmel,at91rm9200-rtc.txt | 2 ++
+Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+ arch/arm/boot/dts/at91rm9200.dtsi | 2 ++
  1 file changed, 2 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/rtc/atmel,at91rm9200-rtc.txt b/Documentation/devicetree/bindings/rtc/atmel,at91rm9200-rtc.txt
-index 34c1505774bf..5d3791e789c6 100644
---- a/Documentation/devicetree/bindings/rtc/atmel,at91rm9200-rtc.txt
-+++ b/Documentation/devicetree/bindings/rtc/atmel,at91rm9200-rtc.txt
-@@ -5,6 +5,7 @@ Required properties:
- - reg: physical base address of the controller and length of memory mapped
-   region.
- - interrupts: rtc alarm/event interrupt
-+- clocks: phandle to input clock.
+diff --git a/arch/arm/boot/dts/at91rm9200.dtsi b/arch/arm/boot/dts/at91rm9200.dtsi
+index e3cfb9972f54..385e0c36dece 100644
+--- a/arch/arm/boot/dts/at91rm9200.dtsi
++++ b/arch/arm/boot/dts/at91rm9200.dtsi
+@@ -359,6 +359,7 @@
+ 				compatible = "atmel,at91rm9200-st", "syscon", "simple-mfd";
+ 				reg = <0xfffffd00 0x100>;
+ 				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
++				clocks = <&slow_xtal>;
  
- Example:
+ 				watchdog {
+ 					compatible = "atmel,at91rm9200-wdt";
+@@ -369,6 +370,7 @@
+ 				compatible = "atmel,at91rm9200-rtc";
+ 				reg = <0xfffffe00 0x40>;
+ 				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
++				clocks = <&slow_xtal>;
+ 				status = "disabled";
+ 			};
  
-@@ -12,4 +13,5 @@ rtc at fffffe00 {
- 	compatible = "atmel,at91rm9200-rtc";
- 	reg = <0xfffffe00 0x100>;
- 	interrupts = <1 4 7>;
-+	clocks = <&clk32k>;
- };
 -- 
 2.1.4
