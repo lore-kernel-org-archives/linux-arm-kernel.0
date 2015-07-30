@@ -1,174 +1,67 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 30 Jul 2015 08:42:53 -0500
-Subject: [PATCH v6] PCI: Store PCIe bus address in struct of_pci_range
-In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E01D6F350@lhreml503-mbs>
-References: <1438010223-124422-1-git-send-email-gabriele.paoloni@huawei.com>
- <20150729172053.GE31170@google.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E01D6F350@lhreml503-mbs>
-Message-ID: <CAL_JsqKs11-sXQTdBD+ZjbVYFWUHBARTW9q5MF1hCXUhZ+nWLQ@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 30 Jul 2015 14:49:46 +0100
+Subject: [PATCH v3 1/2] PCI: generic: remove dependency on hw_pci
+In-Reply-To: <20150730101351.GA31408@jayachandranc.netlogicmicro.com>
+References: <1438183681-30519-1-git-send-email-jchandra@broadcom.com>
+ <20150730092808.GA4685@red-moon>
+ <20150730101351.GA31408@jayachandranc.netlogicmicro.com>
+Message-ID: <20150730134946.GB12999@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 29, 2015 at 2:44 PM, Gabriele Paoloni
-<gabriele.paoloni@huawei.com> wrote:
-> Hi Bjorn
->
-> Many Thanks for your reply
->
-> I have commented back inline with resolutions from my side.
->
-> If you're ok with them I'll send it out a new version in the appropriate patchset
->
-> Cheers
->
-> Gab
->
->> -----Original Message-----
->> From: Bjorn Helgaas [mailto:bhelgaas at google.com]
->> Sent: Wednesday, July 29, 2015 6:21 PM
->> To: Gabriele Paoloni
->> Cc: arnd at arndb.de; lorenzo.pieralisi at arm.com; Wangzhou (B);
->> robh+dt at kernel.org; james.morse at arm.com; Liviu.Dudau at arm.com; linux-
->> pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
->> devicetree at vger.kernel.org; Yuanzhichang; Zhudacai; zhangjukuo;
->> qiuzhenfa; Liguozhu (Kenneth)
->> Subject: Re: [PATCH v6] PCI: Store PCIe bus address in struct
->> of_pci_range
->>
->> Hi Gabriele,
->>
->> As far as I can tell, this is not specific to PCIe, so please use "PCI"
->> in
->> the subject as a generic term that includes both PCI and PCIe.
->
-> sure agreed
->
->>
->> On Mon, Jul 27, 2015 at 11:17:03PM +0800, Gabriele Paoloni wrote:
->> > From: gabriele paoloni <gabriele.paoloni@huawei.com>
->> >
->> >     This patch is needed port PCIe designware to new DT parsing API
->> >     As discussed in
->> >     http://lists.infradead.org/pipermail/linux-arm-kernel/2015-
->> January/317743.html
->> >     in designware we have a problem as the PCI addresses in the PCIe
->> controller
->> >     address space are required in order to perform correct HW
->> operation.
->> >
->> >     In order to solve this problem commit f4c55c5a3 "PCI: designware:
->> >     Program ATU with untranslated address" added code to read the
->> PCIe
->>
->> Conventional reference is 12-char SHA1, like this:
->>
->>   f4c55c5a3f7f ("PCI: designware: Program ATU with untranslated
->> address")
->
-> Agreed, will change this
->
->>
->> >     controller start address directly from the DT ranges.
->> >
->> >     In the new DT parsing API of_pci_get_host_bridge_resources()
->> hides the
->> >     DT parser from the host controller drivers, so it is not possible
->> >     for drivers to parse values directly from the DT.
->> >
->> >     In http://www.spinics.net/lists/linux-pci/msg42540.html we
->> already tried
->> >     to use the new DT parsing API but there is a bug (obviously) in
->> setting
->> >     the <*>_mod_base addresses
->> >     Applying this patch we can easily set "<*>_mod_base = win-
->> >__res.start"
->>
->> By itself, this patch adds something.  It would help me understand it
->> if
->> the *user* of this new something were in the same patch series.
->
-> the user is: "[PATCH v5 2/5] PCI: designware: Add ARM64 support"
-> I will ask Zhou Wang to include this patch in his patchset
->
->
->>
->> >     This patch adds a new field in "struct of_pci_range" to store the
->> >     pci bus start address; it fills the field in
->> of_pci_range_parser_one();
->> >     in of_pci_get_host_bridge_resources() it retrieves the resource
->> entry
->> >     after it is created and added to the resource list and uses
->> >     entry->__res.start to store the pci controller address
->>
->> struct of_pci_range is starting to get confusing to non-OF folks like
->> me.
->> It now contains:
->>
->>   u32 pci_space;
->>   u64 pci_addr;
->>   u64 cpu_addr;
->>   u64 bus_addr;
->>
->> Can you explain what all these things mean, and maybe even add one-line
->> comments to the structure?
->
-> sure I can add comments inline in the code
->
->>
->> pci_space: The only uses I see are to determine whether to print
->> "Prefetch".  I don't see any real functionality that uses this.
->
-> Looking at the code I agree. it's seems to be used only in powerpc
-> and microblaze to print out.
-> However from my understanding pci_space is the phys.hi field of the
-> ranges property: it defines the properties of the address space associated
-> to the PCI address. if you're curious you can find a nice and quick to read
-> "guide" in http://devicetree.org/MPC5200:PCI
->
->>
->> pci_addr: I assume this is a PCI bus address, like what you would see
->> if
->> you put an analyzer on the bus/link.  This address could go in a BAR.
->
-> Yes, this is the PCI start address of the range: phys.mid + phys.low in the
-> guide mentioned above
->
->>
->> cpu_addr: I assume this is a CPU physical address, like what you would
->> see
->> in /proc/iomem and what you would pass to ioremap().
->
-> Yes correct
->
->>
->> bus_addr: ?
->>
->
-> According to the guide above, this is the address into which the pci_address
-> get translated to and that is passed to the root complex. Between the root
-> complex and the CPU there can be intermediate translation layers: see that to
-> get pci_address we call "of_translate_address"; this will apply all the
-> translation layers (ranges in the DT) that it finds till it comes to the root
-> node of the DT (thus retrieving the CPU address).
-> Now said that, for designware we need the first translated PCI address, that we call
+On Thu, Jul 30, 2015 at 11:13:52AM +0100, Jayachandran C. wrote:
+> On Thu, Jul 30, 2015 at 10:28:08AM +0100, Lorenzo Pieralisi wrote:
+> > On Wed, Jul 29, 2015 at 04:28:00PM +0100, Jayachandran C wrote:
+> > > The current code in pci-host-generic.c uses pci_common_init_dev()
+> > > from ARM platform to do some of the PCI initializations, and this
+> > > prevents it from being used in ARM64.
+> > > 
+> > > The initialization done by pci_common_init_dev() that is needed
+> > > by pci-host-generic.c is really limited, and can be done easily
+> > > in the same file without using hw_pci API. The ARM platform
+> > > requires a pci_sys_data as sysdata for the PCI bus, this can be
+> > > handled by setting up gen_pci to have a pci_sys_data variable as
+> > > the first element.
+> > 
+> > Ok, I still do not like leaving pci_sys_data there, and to remove
+> > it there is only one snag (+ one patch to prevent
+> > resources enablement on ARM64 PROBE_ONLY systems to have a
+> > consolidated ARM/ARM64 host generic), which consists in removing the
+> > align_resource pointer from pci_sys_data. A proposed solution (maybe
+> > not ideal, we can consider it a temporary step to make progress)
+> > here:
+> > 
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/359273.html
+> > 
+> > Comments very appreciated on the patch above, I do not have major
+> > concerns with this patch other than the pci_sys_data hack, because
+> > that's what it is.
+> 
+> In may opinion, we have to leave ->sysdata on ARM pointing to a valid
+> pci_sys_data. Leaving it pointing to random stuff and hoping that it
+> will not be used is pretty bad - so I don't see why such a patch would
+> make it upstream.
 
-I think you mean "translated CPU address." The flow of addresses looks
-like this:
+I really can't follow what you mean here, if we remove pci_sys_data
+dependency pci_sys_data will be an internal data structure for
+drivers still depending on bios32 to initialize hosts, it won't extend
+to all ARM PCI host controllers, so I struggle to see your point.
 
-CPU -> CPU bus address -> bus fabric address decoding -> bus address
--> DW PCI -> PCI address
+> The second issue I have is adding dependencies between patches that
+> enable basic functionality on arm64 with arm infrastructure cleanup
+> patches. Given the number of kernel releases the cleanups take [and
+> factoring in the amount of mess arm has :)], we will end up waiting
+> a long time for arm64.
 
-This is quite common that an IP block does not see the full address.
-It is unusual that the IP block needs to know its full address on the
-slave side. It is quite common for the master side and the kernel
-deals with that all the time with DMA mapping
+I agree, that's the reason why I think it is time to merge your changes,
+but this does not mean that the consolidation stops here, I made
+an exception since this patch has been hanging in the balance for
+a while, but the clean-up has to be completed anyway and I will take
+care of that.
 
-> here bus_addr after Rob Herring suggested the name...honestly I cannot think of a
-> different name
+> BTW, I am not sure why there is a pushback on wrapping a structure in
+> another, container_of() is the linux way of doing things :)
 
-Thinking about this some more, is this really a translation versus
-just a stripping of high bits? Does the DW IP have less than 32-bits
-address? If so, we could express differently and just mask the CPU
-address within the driver instead.
+I think you are aware of my opinion by now, no point stating it again.
 
-Rob
+Lorenzo
