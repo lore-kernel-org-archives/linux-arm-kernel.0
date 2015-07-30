@@ -1,45 +1,68 @@
-From: vthakkar1994@gmail.com (Vaishali Thakkar)
-Date: Thu, 30 Jul 2015 08:42:58 +0530
-Subject: [PATCH] soc: versatile: Use devm_kzalloc
-Message-ID: <20150730031257.GA3133@vaishali-Ideapad-Z570>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 29 Jul 2015 22:20:05 -0500
+Subject: [PATCH v2 01/22] platform: delay device-driver matches until
+ late_initcall
+In-Reply-To: <1438089593-7696-2-git-send-email-tomeu.vizoso@collabora.com>
+References: <1438089593-7696-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1438089593-7696-2-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <CAL_Jsq+SBGFNHR+T15FSMsqh-TWaNBMqesxZfXKiH8g9mqXYuQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch introduces the use of devm_kzalloc and does away
-with kfree in the probe function.
+On Tue, Jul 28, 2015 at 8:19 AM, Tomeu Vizoso
+<tomeu.vizoso@collabora.com> wrote:
+> Delay matches of platform devices until late_initcall, when we are sure
+> that all built-in drivers have been registered already.  This is needed
+> to prevent deferred probes because of some drivers not having registered
+> yet.
+>
+> The reason why only platform devices are delayed is that some other
+> devices are expected to be probed earlier than late_initcall, for
+> example, the system PNP driver needs to probe its devices in
+> fs_initcall.
+>
+> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+> ---
+>
+> Changes in v2:
+> - Move delay to platform.c
+>
+>  drivers/base/platform.c | 28 ++++++++++++++++++++++++++++
+>  1 file changed, 28 insertions(+)
+>
+> diff --git a/drivers/base/platform.c b/drivers/base/platform.c
+> index 063f0ab15259..fcf654678e27 100644
+> --- a/drivers/base/platform.c
+> +++ b/drivers/base/platform.c
+> @@ -33,6 +33,8 @@
+>  /* For automatically allocated device IDs */
+>  static DEFINE_IDA(platform_devid_ida);
+>
+> +static bool enable_matches;
+> +
+>  struct device platform_bus = {
+>         .init_name      = "platform",
+>  };
+> @@ -839,6 +841,15 @@ static int platform_match(struct device *dev, struct device_driver *drv)
+>         struct platform_device *pdev = to_platform_device(dev);
+>         struct platform_driver *pdrv = to_platform_driver(drv);
+>
+> +       /*
+> +        * Delay matches of platform devices until late_initcall, when we are
+> +        * sure that all built-in drivers have been registered already. This
+> +        * is needed to prevent deferred probes because of some drivers
+> +        * not having registered yet.
+> +        */
+> +       if (!enable_matches)
+> +               return false;
+> +
 
-Signed-off-by: Vaishali Thakkar <vthakkar1994@gmail.com>
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/soc/versatile/soc-realview.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+Having this as a global makes me nervous. I think it would be better
+to be DT specific or per device some how. Perhaps use OF_POPULATED_BUS
+flag as an additional test.
 
-diff --git a/drivers/soc/versatile/soc-realview.c b/drivers/soc/versatile/soc-realview.c
-index e642c45..0889710 100644
---- a/drivers/soc/versatile/soc-realview.c
-+++ b/drivers/soc/versatile/soc-realview.c
-@@ -103,7 +103,8 @@ static int realview_soc_probe(struct platform_device *pdev)
- 	if (IS_ERR(syscon_regmap))
- 		return PTR_ERR(syscon_regmap);
- 
--	soc_dev_attr = kzalloc(sizeof(*soc_dev_attr), GFP_KERNEL);
-+	soc_dev_attr = devm_kzalloc(&pdev->dev, sizeof(*soc_dev_attr),
-+				    GFP_KERNEL);
- 	if (!soc_dev_attr)
- 		return -ENOMEM;
- 
-@@ -115,10 +116,9 @@ static int realview_soc_probe(struct platform_device *pdev)
- 	soc_dev_attr->machine = "RealView";
- 	soc_dev_attr->family = "Versatile";
- 	soc_dev = soc_device_register(soc_dev_attr);
--	if (IS_ERR(soc_dev)) {
--		kfree(soc_dev_attr);
-+	if (IS_ERR(soc_dev))
- 		return -ENODEV;
--	}
-+
- 	ret = regmap_read(syscon_regmap, REALVIEW_SYS_ID_OFFSET,
- 			  &realview_coreid);
- 	if (ret)
--- 
-1.9.1
+There could be non-DT platforms that rely on the initcall ordering and
+moving all probes to late_initcall could change the ordering. I'm not
+sure though.
+
+Rob
