@@ -1,222 +1,218 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 30 Jul 2015 12:17:47 +0100
-Subject: [PATCH v7 3/5] clk: Supply the critical clock {init, enable,
- disable} framework
-In-Reply-To: <20150730010213.642.10831@quantum>
-References: <1437570255-21049-1-git-send-email-lee.jones@linaro.org>
- <1437570255-21049-4-git-send-email-lee.jones@linaro.org>
- <20150730010213.642.10831@quantum>
-Message-ID: <20150730111747.GF14642@x1>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Thu, 30 Jul 2015 12:20:38 +0100
+Subject: [PATCH v6] PCI: Store PCIe bus address in struct of_pci_range
+In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E01D6F6F8@lhreml503-mbs>
+References: <1438010223-124422-1-git-send-email-gabriele.paoloni@huawei.com>
+ <20150729172053.GE31170@google.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E01D6F350@lhreml503-mbs>
+ <20150729214710.GE9640@google.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E01D6F6F8@lhreml503-mbs>
+Message-ID: <20150730112038.GE20890@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 29 Jul 2015, Michael Turquette wrote:
+Hello,
 
-> Hi Lee,
-> 
-> + linux-clk ml
-> 
-> Quoting Lee Jones (2015-07-22 06:04:13)
-> > These new API calls will firstly provide a mechanisms to tag a clock as
-> > critical and secondly allow any knowledgeable driver to (un)gate clocks,
-> > even if they are marked as critical.
+On Thu, Jul 30, 2015 at 09:30:41AM +0100, Gabriele Paoloni wrote:
+> > -----Original Message-----
+> > From: Bjorn Helgaas [mailto:bhelgaas at google.com]
+> > Sent: Wednesday, July 29, 2015 10:47 PM
+> > To: Gabriele Paoloni
+> > Cc: arnd at arndb.de; lorenzo.pieralisi at arm.com; Wangzhou (B);
+> > robh+dt at kernel.org; james.morse at arm.com; Liviu.Dudau at arm.com; linux-
+> > pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> > devicetree at vger.kernel.org; Yuanzhichang; Zhudacai; zhangjukuo;
+> > qiuzhenfa; Liguozhu (Kenneth); Andrew Murray
+> > Subject: Re: [PATCH v6] PCI: Store PCIe bus address in struct
+> > of_pci_range
 > > 
-> > Suggested-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > ---
-> >  drivers/clk/clk.c            | 45 ++++++++++++++++++++++++++++++++++++++++++++
-> >  include/linux/clk-provider.h |  2 ++
-> >  include/linux/clk.h          | 30 +++++++++++++++++++++++++++++
-> >  3 files changed, 77 insertions(+)
+> > [+cc Andrew]
 > > 
-> > diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> > index 61c3fc5..486b1da 100644
-> > --- a/drivers/clk/clk.c
-> > +++ b/drivers/clk/clk.c
-> > @@ -46,6 +46,21 @@ static struct clk_core *clk_core_lookup(const char *name);
-> >  
-> >  /***    private data structures    ***/
-> >  
-> > +/**
-> > + * struct critical -   Provides 'play' over critical clocks.  A clock can be
-> > + *                     marked as critical, meaning that it should not be
-> > + *                     disabled.  However, if a driver which is aware of the
-> > + *                     critical behaviour wants to control it, it can do so
-> > + *                     using clk_enable_critical() and clk_disable_critical().
-> > + *
-> > + * @enabled    Is clock critical?  Once set, doesn't change
-> > + * @leave_on   Self explanatory.  Can be disabled by knowledgeable drivers
-> 
-> Not self explanatory. I need this explained to me. What does leave_on
-> do? Better yet, what would happen if leave_on did not exist?
-> 
-> > + */
-> > +struct critical {
-> > +       bool enabled;
-> > +       bool leave_on;
-> > +};
-> > +
-> >  struct clk_core {
-> >         const char              *name;
-> >         const struct clk_ops    *ops;
-> > @@ -75,6 +90,7 @@ struct clk_core {
-> >         struct dentry           *dentry;
-> >  #endif
-> >         struct kref             ref;
-> > +       struct critical         critical;
-> >  };
-> >  
-> >  struct clk {
-> > @@ -995,6 +1011,10 @@ static void clk_core_disable(struct clk_core *clk)
-> >         if (WARN_ON(clk->enable_count == 0))
-> >                 return;
-> >  
-> > +       /* Refuse to turn off a critical clock */
-> > +       if (clk->enable_count == 1 && clk->critical.leave_on)
-> > +               return;
-> 
-> How do we get to this point? clk_enable_critical actually calls
-> clk_enable, thus incrementing the enable_count. The only time that we
-> could hit the above case is if,
-> 
-> a) there is an imbalance in clk_enable and clk_disable calls. If this is
-> the case then the drivers need to be fixed. Or better yet some
-> infrastructure to catch that, now that we have per-user struct clk
-> cookies.
-> 
-> b) a driver knowingly calls clk_enable_critical(foo) and then regular,
-> old clk_disable(foo). But why would a driver do that?
-> 
-> It might be that I am missing the point here, so please feel free to
-> clue me in.
+> > On Wed, Jul 29, 2015 at 07:44:18PM +0000, Gabriele Paoloni wrote:
+> > > > -----Original Message-----
+> > > > From: Bjorn Helgaas [mailto:bhelgaas at google.com]
+> > > > Sent: Wednesday, July 29, 2015 6:21 PM
+> > > > To: Gabriele Paoloni
+> > 
+> > > > On Mon, Jul 27, 2015 at 11:17:03PM +0800, Gabriele Paoloni wrote:
+> > > > > From: gabriele paoloni <gabriele.paoloni@huawei.com>
+> > 
+> > > > >     This patch adds a new field in "struct of_pci_range" to store
+> > the
+> > > > >     pci bus start address; it fills the field in
+> > > > of_pci_range_parser_one();
+> > > > >     in of_pci_get_host_bridge_resources() it retrieves the
+> > resource
+> > > > entry
+> > > > >     after it is created and added to the resource list and uses
+> > > > >     entry->__res.start to store the pci controller address
+> > > >
+> > > > struct of_pci_range is starting to get confusing to non-OF folks
+> > like
+> > > > me.
+> > > > It now contains:
+> > > >
+> > > >   u32 pci_space;
+> > > >   u64 pci_addr;
+> > > >   u64 cpu_addr;
+> > > >   u64 bus_addr;
+> > > >
+> > > > Can you explain what all these things mean, and maybe even add one-
+> > > > line comments to the structure?
 
-This check behaves in a very similar to the WARN() above.  It's more
-of a fail-safe.  If all drivers are behaving properly, then it
-shouldn't ever be true.  If they're not, it prevents an incorrectly
-written driver from irrecoverably crippling the system.
+I can try to do that, as I worked with Andrew Murray when he did the patch.
 
-As I said in the other mail.  We can do without these 3 new wrappers.
-We _could_ just write a driver which only calls clk_enable() _after_
-it calls clk_disable(), a kind of intentional unbalance and it would
-do that same thing.  However, what we're trying to do here is provide
-a proper API, so we can see at first glance what the 'knowledgeable'
-driver is trying to do and not have someone attempt to submit a 'fix'
-which calls clk_enable() or something.
+- pci_space is indeed the range.flags variable and it was trying to keep
+  the original value from the DT mainly to try to identify the config space
+  in the ranges described. It has now become clear that declaring config
+  space in the ranges area is wrong even if one supports ECAM so pci_space
+  could be removed as suggested by Bjorn.
+- pci_addr is the address that goes on the PCI(e) bus.
+- cpu_addr is the translated address that the CPU uses. It does not necessarily
+  means it is the same address that the Root Complex sees when requested to
+  do Address Translation between host side and bus side. Also, what gets stored
+  in the cpu_addr is not equal to what gets declared in the ranges property if
+  there are other address translation parents between the Root Complex and the
+  CPU.
+- bus_addr is meant to be the un-translated cpu_addr that DesignWare needs
+  in order to setup its ATS service. The reason for putting it in the of_pci_range
+  is because the struct resource does not have the concept of an untranslated
+  address.
 
-> > +
-> >         if (--clk->enable_count > 0)
-> >                 return;
-> >  
-> > @@ -1037,6 +1057,13 @@ void clk_disable(struct clk *clk)
-> >  }
-> >  EXPORT_SYMBOL_GPL(clk_disable);
-> >  
-> > +void clk_disable_critical(struct clk *clk)
-> > +{
-> > +       clk->core->critical.leave_on = false;
-> > +       clk_disable(clk);
-> > +}
-> > +EXPORT_SYMBOL_GPL(clk_disable_critical);
-> > +
-> >  static int clk_core_enable(struct clk_core *clk)
-> >  {
-> >         int ret = 0;
-> > @@ -1100,6 +1127,15 @@ int clk_enable(struct clk *clk)
-> >  }
-> >  EXPORT_SYMBOL_GPL(clk_enable);
-> >  
-> > +int clk_enable_critical(struct clk *clk)
-> > +{
-> > +       if (clk->core->critical.enabled)
-> > +               clk->core->critical.leave_on = true;
-> > +
-> > +       return clk_enable(clk);
-> > +}
-> > +EXPORT_SYMBOL_GPL(clk_enable_critical);
-> > +
-> >  static unsigned long clk_core_round_rate_nolock(struct clk_core *clk,
-> >                                                 unsigned long rate,
-> >                                                 unsigned long min_rate,
-> > @@ -2482,6 +2518,15 @@ fail_out:
-> >  }
-> >  EXPORT_SYMBOL_GPL(clk_register);
-> >  
-> > +void clk_init_critical(struct clk *clk)
-> > +{
-> > +       struct critical *critical = &clk->core->critical;
-> > +
-> > +       critical->enabled = true;
-> > +       critical->leave_on = true;
-> > +}
-> > +EXPORT_SYMBOL_GPL(clk_init_critical);
-> > +
-> >  /*
-> >   * Free memory allocated for a clock.
-> >   * Caller must hold prepare_lock.
-> > diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-> > index 5591ea7..15ef8c9 100644
-> > --- a/include/linux/clk-provider.h
-> > +++ b/include/linux/clk-provider.h
-> > @@ -563,6 +563,8 @@ struct clk *devm_clk_register(struct device *dev, struct clk_hw *hw);
-> >  void clk_unregister(struct clk *clk);
-> >  void devm_clk_unregister(struct device *dev, struct clk *clk);
-> >  
-> > +void clk_init_critical(struct clk *clk);
-> > +
-> >  /* helper functions */
-> >  const char *__clk_get_name(struct clk *clk);
-> >  struct clk_hw *__clk_get_hw(struct clk *clk);
-> > diff --git a/include/linux/clk.h b/include/linux/clk.h
-> > index 8381bbf..9807f3b 100644
-> > --- a/include/linux/clk.h
-> > +++ b/include/linux/clk.h
-> > @@ -231,6 +231,19 @@ struct clk *devm_clk_get(struct device *dev, const char *id);
-> >  int clk_enable(struct clk *clk);
-> >  
-> >  /**
-> > + * clk_enable_critical - inform the system when the clock source should be
-> > + *                      running, even if clock is critical.
-> > + * @clk: clock source
-> > + *
-> > + * If the clock can not be enabled/disabled, this should return success.
-> > + *
-> > + * May be called from atomic contexts.
-> > + *
-> > + * Returns success (0) or negative errno.
-> > + */
-> > +int clk_enable_critical(struct clk *clk);
-> > +
-> > +/**
-> >   * clk_disable - inform the system when the clock source is no longer required.
-> >   * @clk: clock source
-> >   *
-> > @@ -247,6 +260,23 @@ int clk_enable(struct clk *clk);
-> >  void clk_disable(struct clk *clk);
-> >  
-> >  /**
-> > + * clk_disable_critical - inform the system when the clock source is no
-> > + *                       longer required, even if clock is critical.
-> > + * @clk: clock source
-> > + *
-> > + * Inform the system that a clock source is no longer required by
-> > + * a driver and may be shut down.
-> > + *
-> > + * May be called from atomic contexts.
-> > + *
-> > + * Implementation detail: if the clock source is shared between
-> > + * multiple drivers, clk_enable_critical() calls must be balanced
-> > + * by the same number of clk_disable_critical() calls for the clock
-> > + * source to be disabled.
-> > + */
-> > +void clk_disable_critical(struct clk *clk);
-> > +
-> > +/**
-> >   * clk_get_rate - obtain the current clock rate (in Hz) for a clock source.
-> >   *               This is only valid once the clock source has been enabled.
-> >   * @clk: clock source
+Best regards,
+Liviu
+
+
+> > 
+> > > > pci_space: The only uses I see are to determine whether to print
+> > > > "Prefetch".  I don't see any real functionality that uses this.
+> > >
+> > > Looking at the code I agree. it's seems to be used only in powerpc
+> > > and microblaze to print out.
+> > > However from my understanding pci_space is the phys.hi field of the
+> > > ranges property: it defines the properties of the address space
+> > associated
+> > > to the PCI address. if you're curious you can find a nice and quick
+> > to read
+> > > "guide" in http://devicetree.org/MPC5200:PCI
+> > 
+> > I think pci_space should be removed and the users should test
+> > "range.flags & IORESOURCE_PREFETCH" instead.  That's already set by
+> > of_bus_pci_get_flags().  This is separate from your current patch, of
+> > course.
+> 
+> Ok so I'll do nothing in my patch about this; maybe I can propose a separate
+> patch for this, but I cannot test it (I've got no microblaze and powerpc 
+> neither....)
+> 
+> > 
+> > 29b635c00f3e ("of/pci: Provide support for parsing PCI DT ranges
+> > property") added struct of_pci_range, and even at the time,
+> > of_bus_pci_get_flags() set IORESOURCE_PREFETCH in of_pci_range.flags.
+> > 
+> > 654837e8fe8d ("powerpc/pci: Use of_pci_range_parser helper in
+> > pci_process_bridge_OF_ranges") converted powerpc to use
+> > of_pci_range_parser() instead of parsing manually.  It converted other
+> > references to look at struct of_pci_range.flags; I'm not sure why it
+> > didn't do that for the prefetch bit.
+> > 
+> > I copied Andrew in case there's some subtlety here.
+> > 
+> > > > pci_addr: I assume this is a PCI bus address, like what you would
+> > see
+> > > > if
+> > > > you put an analyzer on the bus/link.  This address could go in a
+> > BAR.
+> > >
+> > > Yes, this is the PCI start address of the range: phys.mid + phys.low
+> > in the
+> > > guide mentioned above
+> > >
+> > > > cpu_addr: I assume this is a CPU physical address, like what you
+> > would
+> > > > see
+> > > > in /proc/iomem and what you would pass to ioremap().
+> > >
+> > > Yes correct
+> > >
+> > > > bus_addr: ?
+> > >
+> > > According to the guide above, this is the address into which the
+> > pci_address
+> > > get translated to and that is passed to the root complex. Between the
+> > root
+> > > complex and the CPU there can be intermediate translation layers:
+> > 
+> > I can't quite parse this, but I do understand how a host bridge can
+> > translate CPU physical addresses to a different range of PCI bus
+> > addresses.  What I don't understand is the difference between
+> > "pci_addr"
+> > and the "bus_addr" you're adding.
+> 
+> For example see:
+> http://lxr.free-electrons.com/source/arch/arm/boot/dts/imx6qdl.dtsi#L148
+> 
+> ranges = <0x00000800 0 0x01f00000 0x01f00000 0 0x00080000   /* configuration space */
+>           0x81000000 0 0          0x01f80000 0 0x00010000   /* downstream I/O */
+>           0x82000000 0 0x01000000 0x01000000 0 0x00f00000>; /* non-prefetchable memory *
+>                /\          /\          /\
+>            pci_space    pci_addr     bus_addr            
+> 
+> 
+> The host bridge performs the first translation from pci_addr to bus_addr.
+> If there are other ranges in the parents nodes in the DT bus_addr gets 
+> translated further till you get the cpu_addr.
+> 
+> Hope it is a bit clearer now....
+> 
+> > 
+> > > see that to
+> > > get pci_address we call "of_translate_address"; this will apply all
+> > the
+> > > translation layers (ranges in the DT) that it finds till it comes to
+> > the root
+> > > node of the DT (thus retrieving the CPU address).
+> > > Now said that, for designware we need the first translated PCI
+> > address, that we call
+> > > here bus_addr after Rob Herring suggested the name...honestly I
+> > cannot think of a
+> > > different name
+> > >
+> > >
+> > >
+> > > > I'm trying to imagine how this might be expressed in ACPI.  A host
+> > > > bridge
+> > > > ACPI _CRS contains a CPU physical address and applying a _TRA
+> > > > (translation
+> > > > offset) to the CPU address gives you a PCI bus address.  I know
+> > this
+> > > > code
+> > > > is OF, not ACPI, but I assume that it should be possible to
+> > describe
+> > > > your
+> > > > hardware via ACPI as well as by OF.
+> > 
+> > > > > diff --git a/include/linux/of_address.h
+> > b/include/linux/of_address.h
+> > > > > index d88e81b..865f96e 100644
+> > > > > --- a/include/linux/of_address.h
+> > > > > +++ b/include/linux/of_address.h
+> > > > > @@ -16,6 +16,7 @@ struct of_pci_range {
+> > > > >  	u32 pci_space;
+> > > > >  	u64 pci_addr;
+> > > > >  	u64 cpu_addr;
+> > > > > +	u64 bus_addr;
+> > > > >  	u64 size;
+> > > > >  	u32 flags;
+> > > > >  };
+> 
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
