@@ -1,140 +1,102 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 30 Jul 2015 19:08:13 +0000 (UTC)
-Subject: OMAP baseline test results for v4.2-rc4
-Message-ID: <alpine.DEB.2.02.1507301907320.2344@utopia.booyaka.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 30 Jul 2015 20:08:57 +0100
+Subject: [PATCH] iommu/arm-smmu-v2: ThunderX(errata-23399) mis-extends
+ 64bit registers
+In-Reply-To: <20150730184523.GC16663@arm.com>
+References: <1438278906-29627-1-git-send-email-tchalamarla@caviumnetworks.com>
+ <20150730184523.GC16663@arm.com>
+Message-ID: <55BA7649.3080608@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 30/07/15 19:45, Will Deacon wrote:
+> Hello,
+>
+> On Thu, Jul 30, 2015 at 06:55:06PM +0100, tchalamarla at caviumnetworks.com wrote:
+>> From: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
+>>
+>> The SMMU architecture defines two different behaviors when 64-bit
+>> registers are written with 32-bit writes.  The first behavior causes
+>> zero extension into the upper 32-bits.  The second behavior splits a
+>> 64-bit register into "normal" 32-bit register pairs.
+>>
+>> On some passes of ThunderX,
+>> the following registers incorrectly zero extended when they should
+>> instead behave as normal 32-bit register pairs:
+>>
+>>    SMMU()_(S)GFAR
+>>    SMMU()_NSGFAR
+>>    SMMU()_CB()_TTBR0
+>>    SMMU()_CB()_TTBR1
+>>    SMMU()_CB()_FAR
+>>
+>> Signed-off-by: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
+>> ---
+>>   drivers/iommu/arm-smmu.c | 51 ++++++++++++++++++++++++++++++++++--------------
+>>   1 file changed, 36 insertions(+), 15 deletions(-)
+>
+> [...]
+>
+>> @@ -762,22 +766,39 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
+>>
+>>   	/* TTBRs */
+>>   	if (stage1) {
+>> -		reg = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[0];
+>> -		writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR0_LO);
+>> -		reg = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[0] >> 32;
+>> -		reg |= ARM_SMMU_CB_ASID(cfg) << TTBRn_HI_ASID_SHIFT;
+>> -		writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR0_HI);
+>> -
+>> -		reg = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[1];
+>> -		writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR1_LO);
+>> -		reg = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[1] >> 32;
+>> -		reg |= ARM_SMMU_CB_ASID(cfg) << TTBRn_HI_ASID_SHIFT;
+>> -		writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR1_HI);
+>> +		if (smmu->options & ARM_SMMU_OPT_64BIT_WRITES_ONLY) {
+>> +			reg64 = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[0];
+>> +			reg64 |= ((u64) ARM_SMMU_CB_ASID(cfg)) <<
+>> +						(TTBRn_HI_ASID_SHIFT + 32);
+>> +			writeq_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR0_LO);
+>> +
+>> +			reg64 = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[1];
+>> +			reg64 |= ((u64)ARM_SMMU_CB_ASID(cfg)) <<
+>> +						(TTBRn_HI_ASID_SHIFT + 32);
+>> +			writeq_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR1_LO);
+>> +		} else {
+>> +			reg = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[0];
+>> +			writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR0_LO);
+>> +			reg = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[0] >> 32;
+>> +			reg |= ARM_SMMU_CB_ASID(cfg) << TTBRn_HI_ASID_SHIFT;
+>> +			writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR0_HI);
+>> +
+>> +			reg = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[1];
+>> +			writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR1_LO);
+>> +			reg = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[1] >> 32;
+>> +			reg |= ARM_SMMU_CB_ASID(cfg) << TTBRn_HI_ASID_SHIFT;
+>> +			writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR1_HI);
+>> +		}
+>
+> I'm fine with making this sort of change if you need it, but this is pretty
+> ugly. Worse, it won't compile for 32-bit ARM.
+>
+> How about we add a wrapper around these, say smmu_writeq(...), which can
+> then either expand to 2x writel_relaxed or 1x writeq_relaxed depending on
+> CONFIG_64BIT and your erratum workaround?
 
-Here are some basic OMAP test results for Linux v4.2-rc4.
-Logs and other details at:
+Would we even need a specific erratum workaround then? I don't see an 
+issue with always using writeq on 64-bit, and there's not much we can do 
+for 32-bit if it has no way to write the upper half of the TTBR on this 
+thing.
 
-    http://www.pwsan.com/omap/testlogs/test_v4.2-rc4/20150730100856/
+Robin.
 
-
-Test summary
-------------
-
-Build: uImage:
-    Pass ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
-		  omap1_defconfig_5912osk_only
-
-Build: uImage+dtb:
-    Pass (13/13): omap2plus_defconfig_am33xx_only/am335x-bone,
-		  omap2plus_defconfig/omap4-panda,
-		  omap2plus_defconfig/omap4-panda-es,
-		  omap2plus_defconfig/omap4-var-stk-om44,
-		  omap2plus_defconfig/omap3-evm-37xx,
-		  omap2plus_defconfig_n800_only_a/omap2420-n800,
-		  omap2plus_defconfig/omap2430-sdp,
-		  omap2plus_defconfig/am3517-evm,
-		  omap2plus_defconfig/omap3-beagle,
-		  omap2plus_defconfig/omap3-beagle-xm,
-		  omap2plus_defconfig/omap3-sbc-t3517,
-		  omap2plus_defconfig/omap5-uevm,
-		  omap2plus_defconfig/omap5-sbc-t54
-
-Build: zImage:
-    Pass (17/17): omap2plus_defconfig, omap2plus_defconfig_am33xx_only,
-		  omap2plus_defconfig_n800_only_a,
-		  omap2plus_defconfig_n800_multi_omap2xxx,
-		  omap2plus_defconfig_2430sdp_only,
-		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
-		  omap2plus_defconfig_omap2_4_only,
-		  omap2plus_defconfig_omap3_4_only,
-		  omap2plus_defconfig_omap5_only,
-		  omap2plus_defconfig_dra7xx_only,
-		  omap2plus_defconfig_am43xx_only,
-		  rmk_omap3430_ldp_oldconfig,
-		  rmk_omap3430_ldp_allnoconfig,
-		  rmk_omap4430_sdp_oldconfig,
-		  rmk_omap4430_sdp_allnoconfig, multi_v7_defconfig
-
-Build warnings from toolchain: uImage:
-    (none)
-
-Build warnings from toolchain: uImage+dtb:
-    (none)
-
-Build warnings from toolchain: zImage:
-    FAIL (10/17): omap2plus_defconfig, omap2plus_defconfig_am33xx_only,
-		  omap2plus_defconfig_2430sdp_only,
-		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
-		  omap2plus_defconfig_omap2_4_only,
-		  omap2plus_defconfig_omap3_4_only,
-		  omap2plus_defconfig_omap5_only,
-		  omap2plus_defconfig_dra7xx_only,
-		  omap2plus_defconfig_am43xx_only
-
-Boot to userspace:
-    FAIL ( 1/17): 2430sdp
-    skip ( 3/17): 5912osk, 3517evm, 5430es2sbct54
-    Pass (13/17): am335xbonelt, am335xbone, 4430es2panda, 4460pandaes,
-		  4460varsomom, 37xxevm, 3530es3beagle, 3530es31beagle,
-		  3730beaglexm, 3730es12beaglexm, cmt3517, 5430es2uevm,
-		  2420n800
-
-Kernel warnings during boot to userspace:
-    FAIL ( 2/17): 4430es2panda, cmt3517
-
-PM: chip retention via suspend:
-    FAIL ( 6/11): am335xbonelt, 4430es2panda, 4460varsomom, 37xxevm,
-		  2430sdp, 5430es2uevm
-    Pass ( 5/11): 4460pandaes, 3530es3beagle, 3530es31beagle,
-		  3730beaglexm, 3730es12beaglexm
-
-PM: chip retention via dynamic idle:
-    FAIL ( 6/11): am335xbonelt, 4430es2panda, 4460varsomom, 37xxevm,
-		  2430sdp, 5430es2uevm
-    Pass ( 5/11): 4460pandaes, 3530es3beagle, 3530es31beagle,
-		  3730beaglexm, 3730es12beaglexm
-
-PM: chip off (except CORE, due to errata) via suspend:
-    Pass ( 1/ 1): 3730beaglexm
-
-PM: chip off (except CORE, due to errata) via dynamic idle:
-    Pass ( 1/ 1): 3730beaglexm
-
-PM: chip off via suspend:
-    FAIL ( 1/ 4): 37xxevm
-    Pass ( 3/ 4): 3530es3beagle, 3530es31beagle, 3730es12beaglexm
-
-PM: chip off via dynamic idle:
-    FAIL ( 1/ 4): 37xxevm
-    Pass ( 3/ 4): 3530es3beagle, 3530es31beagle, 3730es12beaglexm
-
-Kernel warnings during PM test:
-    FAIL ( 1/17): 4430es2panda
-
-Obsolete Kconfig symbols:
-    FAIL ( 1/20): multi_v7_defconfig
-
-
-vmlinux object size
-(delta in bytes from test_v4.2-rc3 (52721d9d3334c1cb1f76219a161084094ec634dc)):
-   text     data      bss    total  kernel
-   +819      +64        0     +883  omap1_defconfig
-   +819      +96        0     +915  omap1_defconfig_1510innovator_only
-   +851      +64        0     +915  omap1_defconfig_5912osk_only
-    +99     +128        0     +227  multi_v7_defconfig
-   +356        0        0     +356  omap2plus_defconfig
-   +792        0        0     +792  omap2plus_defconfig_2430sdp_only
-   +356        0        0     +356  omap2plus_defconfig_am33xx_only
-  +4452        0        0    +4452  omap2plus_defconfig_am43xx_only
-   +356        0        0     +356  omap2plus_defconfig_cpupm
-   +356        0        0     +356  omap2plus_defconfig_dra7xx_only
-    -47        0      -32      -79  omap2plus_defconfig_n800_multi_omap2xxx
-   -228        0        0     -228  omap2plus_defconfig_n800_only_a
-   +540        0        0     +540  omap2plus_defconfig_no_pm
-   +356        0        0     +356  omap2plus_defconfig_omap2_4_only
-   +356        0        0     +356  omap2plus_defconfig_omap3_4_only
-   +356        0        0     +356  omap2plus_defconfig_omap5_only
-   +196        0      -16     +180  rmk_omap3430_ldp_allnoconfig
-  +7213     +456        0    +7669  rmk_omap3430_ldp_oldconfig
-   +244        0      -32     +212  rmk_omap4430_sdp_allnoconfig
-   +633        0        0     +633  rmk_omap4430_sdp_oldconfig
-
-Boot-time memory difference
-(delta in bytes from test_v4.2-rc3 (52721d9d3334c1cb1f76219a161084094ec634dc))
-  avail  rsrvd   high  freed  board          kconfig
-     4k    -4k      .      .  4460varsomom   omap2plus_defconfig
+>
+> Don't forgot to update the ATOS code too (so you need to write the high word
+> first).
+>
+> Will
+> _______________________________________________
+> iommu mailing list
+> iommu at lists.linux-foundation.org
+> https://lists.linuxfoundation.org/mailman/listinfo/iommu
+>
