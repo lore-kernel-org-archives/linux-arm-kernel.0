@@ -1,39 +1,186 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 30 Jul 2015 13:16:28 +0530
-Subject: [PATCH 05/11] mmc: host: omap_hsmmc: set clk rate to the max frequency
+Date: Thu, 30 Jul 2015 13:16:27 +0530
+Subject: [PATCH 04/11] mmc: host: omap_hsmmc: add voltage switch support for
+ UHS SD card
 In-Reply-To: <1438242394-25599-1-git-send-email-kishon@ti.com>
 References: <1438242394-25599-1-git-send-email-kishon@ti.com>
-Message-ID: <1438242394-25599-6-git-send-email-kishon@ti.com>
+Message-ID: <1438242394-25599-5-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Set the clock rate of the functional clock to the max frequency
-that is passed to the driver either using pdata or dt.
+From: Balaji T K <balajitk@ti.com>
 
-Also remove unnecessary setting of host->fclk to NULL.
+UHS sd card i/o data line can operate at 3V and 1.8V on UHS speed
+modes. Add support for signal voltage switch and check for card_busy.
 
+Signed-off-by: Balaji T K <balajitk@ti.com>
+Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
+[kishon at ti.com : cleanup the voltage switch sequence]
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- drivers/mmc/host/omap_hsmmc.c |    7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+ drivers/mmc/host/omap_hsmmc.c |  129 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 129 insertions(+)
 
 diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-index e960b5c..0452a8b 100644
+index 306e5c0..e960b5c 100644
 --- a/drivers/mmc/host/omap_hsmmc.c
 +++ b/drivers/mmc/host/omap_hsmmc.c
-@@ -2219,7 +2219,12 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
- 	host->fclk = devm_clk_get(&pdev->dev, "fck");
- 	if (IS_ERR(host->fclk)) {
- 		ret = PTR_ERR(host->fclk);
--		host->fclk = NULL;
-+		goto err1;
+@@ -112,6 +112,9 @@
+ /* PSTATE */
+ #define DLEV_DAT(x)		(1 << (20 + (x)))
+ 
++/* AC12 */
++#define AC12_V1V8_SIGEN		(1 << 19)
++
+ /* Interrupt masks for IE and ISE register */
+ #define CC_EN			(1 << 0)
+ #define TC_EN			(1 << 1)
+@@ -151,6 +154,12 @@
+ #define VDD_1V8			1800000		/* 180000 uV */
+ #define VDD_3V0			3000000		/* 300000 uV */
+ #define VDD_165_195		(ffs(MMC_VDD_165_195) - 1)
++#define VDD_30_31		(ffs(MMC_VDD_30_31) - 1)
++
++#define CON_CLKEXTFREE		(1 << 16)
++#define CON_PADEN		(1 << 15)
++#define PSTATE_CLEV		(1 << 24)
++#define PSTATE_DLEV		(0xF << 20)
+ 
+ /*
+  * One controller can have multiple slots, like on some omap boards using
+@@ -1851,6 +1860,124 @@ static int omap_hsmmc_multi_io_quirk(struct mmc_card *card,
+ 	return blk_size;
+ }
+ 
++static int omap_hsmmc_start_signal_voltage_switch(struct mmc_host *mmc,
++						  struct mmc_ios *ios)
++{
++	struct omap_hsmmc_host *host;
++	u32 val = 0;
++	int ret = 0;
++
++	host  = mmc_priv(mmc);
++
++	if (ios->signal_voltage == MMC_SIGNAL_VOLTAGE_330) {
++		val = OMAP_HSMMC_READ(host->base, CAPA);
++		if (!(val & VS30))
++			return -EOPNOTSUPP;
++
++		omap_hsmmc_conf_bus_power(host, ios->signal_voltage);
++
++		val = OMAP_HSMMC_READ(host->base, AC12);
++		val &= ~AC12_V1V8_SIGEN;
++		OMAP_HSMMC_WRITE(host->base, AC12, val);
++
++		ret = mmc_pdata(host)->set_power(host->dev, 1, VDD_30_31);
++		if (ret) {
++			dev_dbg(mmc_dev(host->mmc), "failed to switch to 3v\n");
++			return ret;
++		}
++
++		dev_dbg(mmc_dev(host->mmc), " i/o voltage switch to 3V\n");
++	} else if (ios->signal_voltage == MMC_SIGNAL_VOLTAGE_180) {
++		val = OMAP_HSMMC_READ(host->base, CAPA);
++		if (!(val & VS18))
++			return -EOPNOTSUPP;
++
++		omap_hsmmc_conf_bus_power(host, ios->signal_voltage);
++
++		val = OMAP_HSMMC_READ(host->base, AC12);
++		val |= AC12_V1V8_SIGEN;
++		OMAP_HSMMC_WRITE(host->base, AC12, val);
++
++		ret = mmc_pdata(host)->set_power(host->dev, 1, VDD_165_195);
++		if (ret < 0) {
++			dev_dbg(mmc_dev(host->mmc), "failed to switch 1.8v\n");
++			return ret;
++		}
++	} else {
++		return -EOPNOTSUPP;
 +	}
 +
-+	ret = clk_set_rate(host->fclk, mmc->f_max);
-+	if (ret) {
-+		dev_err(&pdev->dev, "failed to set clock to %d\n", mmc->f_max);
- 		goto err1;
- 	}
++	return 0;
++}
++
++static int omap_hsmmc_card_busy_low(struct omap_hsmmc_host *host)
++{
++	u32 val;
++	unsigned long timeout;
++
++	val = OMAP_HSMMC_READ(host->base, CON);
++	val &= ~CON_CLKEXTFREE;
++	val |= CON_PADEN;
++	OMAP_HSMMC_WRITE(host->base, CON, val);
++
++	timeout = jiffies + msecs_to_jiffies(1);
++	do {
++		val = OMAP_HSMMC_READ(host->base, PSTATE);
++		if (!(val & (PSTATE_CLEV | PSTATE_DLEV)))
++			return true;
++
++		usleep_range(100, 200);
++	} while (!time_after(jiffies, timeout));
++
++	dev_err(mmc_dev(host->mmc), "timeout : i/o low 0x%x\n", val);
++
++	return false;
++}
++
++static int omap_hsmmc_card_busy_high(struct omap_hsmmc_host *host)
++{
++	u32 val;
++	unsigned long timeout;
++
++	val = OMAP_HSMMC_READ(host->base, CON);
++	val |= CLKEXTFREE;
++	OMAP_HSMMC_WRITE(host->base, CON, val);
++
++	timeout = jiffies + msecs_to_jiffies(1);
++	do {
++		val = OMAP_HSMMC_READ(host->base, PSTATE);
++		if ((val & PSTATE_CLEV) && (val & PSTATE_DLEV)) {
++			val = OMAP_HSMMC_READ(host->base, CON);
++			val &= ~(CON_CLKEXTFREE | CON_PADEN);
++			OMAP_HSMMC_WRITE(host->base, CON, val);
++			return false;
++		}
++
++		usleep_range(100, 200);
++	} while (!time_after(jiffies, timeout));
++
++	dev_err(mmc_dev(host->mmc), "timeout : i/o high 0x%x\n", val);
++
++	return true;
++}
++
++static int omap_hsmmc_card_busy(struct mmc_host *mmc)
++{
++	struct omap_hsmmc_host *host;
++	u32 val;
++	int ret;
++
++	host  = mmc_priv(mmc);
++
++	val = OMAP_HSMMC_READ(host->base, AC12);
++	if (val & AC12_V1V8_SIGEN)
++		ret = omap_hsmmc_card_busy_high(host);
++	else
++		ret = omap_hsmmc_card_busy_low(host);
++
++	return ret;
++}
++
+ static struct mmc_host_ops omap_hsmmc_ops = {
+ 	.post_req = omap_hsmmc_post_req,
+ 	.pre_req = omap_hsmmc_pre_req,
+@@ -1860,6 +1987,8 @@ static struct mmc_host_ops omap_hsmmc_ops = {
+ 	.get_ro = mmc_gpio_get_ro,
+ 	.init_card = omap_hsmmc_init_card,
+ 	.enable_sdio_irq = omap_hsmmc_enable_sdio_irq,
++	.start_signal_voltage_switch = omap_hsmmc_start_signal_voltage_switch,
++	.card_busy = omap_hsmmc_card_busy,
+ };
  
+ #ifdef CONFIG_DEBUG_FS
 -- 
 1.7.9.5
