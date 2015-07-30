@@ -1,45 +1,50 @@
-From: rsahu@apm.com (Rameshwar Sahu)
-Date: Thu, 30 Jul 2015 17:50:58 +0530
-Subject: [PATCH v1 0/4] Crypto: tcrypt: Add test case for APM X-Gene SoC
- CRC32C algo
-In-Reply-To: <1438258268-3099-1-git-send-email-rsahu@apm.com>
-References: <1438258268-3099-1-git-send-email-rsahu@apm.com>
-Message-ID: <CAFd313wpsfYtK=fZ4Qin1y8vtX7-tgAEPPBtVDqAW8wxtisgAw@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 30 Jul 2015 14:20:25 +0200
+Subject: [PATCH v2 2/2] ARM: at91: at91_dt_defconfig: enable ISI and ov2640
+ support
+In-Reply-To: <55B73A10.4040608@atmel.com>
+References: <1434449315-9243-1-git-send-email-josh.wu@atmel.com>
+ <1434449315-9243-2-git-send-email-josh.wu@atmel.com>
+ <55B7312F.9040505@atmel.com> <55B73A10.4040608@atmel.com>
+Message-ID: <55BA1689.4090008@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+Le 28/07/2015 10:15, Josh Wu a ?crit :
+> On 7/28/2015 3:37 PM, Nicolas Ferre wrote:
+>> Le 16/06/2015 12:08, Josh Wu a ?crit :
+>>> Add Atmel-isi and ov2640 driver in defconfig
+>>>
+>>> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+>>> ---
+>>>
+>>> Changes in v2: None
+>>>
+>>>   arch/arm/configs/at91_dt_defconfig | 6 ++++++
+>>>   1 file changed, 6 insertions(+)
+>>>
+>>> diff --git a/arch/arm/configs/at91_dt_defconfig b/arch/arm/configs/at91_dt_defconfig
+>>> index bcef49a..d089ec9 100644
+>>> --- a/arch/arm/configs/at91_dt_defconfig
+>>> +++ b/arch/arm/configs/at91_dt_defconfig
+>>> @@ -131,6 +131,12 @@ CONFIG_POWER_RESET=y
+>>>   CONFIG_WATCHDOG=y
+>>>   CONFIG_AT91SAM9X_WATCHDOG=y
+>>>   CONFIG_SSB=m
+>>> +CONFIG_MEDIA_SUPPORT=y
+>>> +CONFIG_MEDIA_CAMERA_SUPPORT=y
+>>> +CONFIG_V4L_PLATFORM_DRIVERS=y
+>>> +CONFIG_SOC_CAMERA=y
+>>> +CONFIG_VIDEO_ATMEL_ISI=y
+>>> +CONFIG_SOC_CAMERA_OV2640=y
+>> I would select this camera driver as a module. Your thoughts?
+> 
+> yes, I agree.
+> Do I need to resent the patch for this?
 
-On Thu, Jul 30, 2015 at 5:41 PM, Rameshwar Prasad Sahu <rsahu@apm.com> wrote:
-> This patch adds test case for APM X-Gene SoC CRC32C algorithm.
+Nope, no need: I do it while am queuing this patch in at91-4.3-dt with my:
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Please discard this patch description and subject line in this cover
-letter, I have resent it again.
-
-Thanks,
-Ram
-
->
-> Signed-off-by: Rameshwar Prasad Sahu <rsahu@apm.com>
-> ---
->
-> Rameshwar Prasad Sahu (4):
->   dmaengine: Add support for new feature CRC32C
->   dmaengine: xgene-dma: Add support for CRC32C calculation via DMA
->     engine
->   Crypto: Add support for APM X-Gene SoC CRC32C h/w accelerator driver
->   Crypto: tcrypt: Add test case for APM X-Gene SoC CRC32C algo
->
->  crypto/tcrypt.c               |   4 +
->  crypto/testmgr.c              |   9 ++
->  drivers/crypto/Kconfig        |   8 ++
->  drivers/crypto/Makefile       |   1 +
->  drivers/crypto/xgene-crc32c.c | 244 ++++++++++++++++++++++++++++++++
->  drivers/dma/dmaengine.c       |   2 +
->  drivers/dma/xgene-dma.c       | 317 ++++++++++++++++++++++++++++++++++++++++--
->  include/linux/dmaengine.h     |   5 +
->  8 files changed, 575 insertions(+), 15 deletions(-)
->  create mode 100755 drivers/crypto/xgene-crc32c.c
->
-> --
-> 1.8.2.1
+Bye,
+-- 
+Nicolas Ferre
