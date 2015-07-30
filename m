@@ -1,86 +1,87 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 30 Jul 2015 19:11:14 +0100
-Subject: [PATCH 2/2] irqchip/gic: Ensure gic_cpu_if_up/down() programs
- correct GIC instance
-In-Reply-To: <55BA6538.2050606@nvidia.com>
-References: <1438273573-27958-1-git-send-email-jonathanh@nvidia.com>
- <1438273573-27958-2-git-send-email-jonathanh@nvidia.com>
- <55BA55F4.2060001@arm.com> <55BA6538.2050606@nvidia.com>
-Message-ID: <55BA68C2.9040209@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 30 Jul 2015 19:45:23 +0100
+Subject: [PATCH] iommu/arm-smmu-v2: ThunderX(errata-23399) mis-extends
+ 64bit registers
+In-Reply-To: <1438278906-29627-1-git-send-email-tchalamarla@caviumnetworks.com>
+References: <1438278906-29627-1-git-send-email-tchalamarla@caviumnetworks.com>
+Message-ID: <20150730184523.GC16663@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/07/15 18:56, Jon Hunter wrote:
+Hello,
+
+On Thu, Jul 30, 2015 at 06:55:06PM +0100, tchalamarla at caviumnetworks.com wrote:
+> From: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
 > 
-> On 30/07/15 17:51, Marc Zyngier wrote:
->> On 30/07/15 17:26, Jon Hunter wrote:
->>> Commit 3228950621d9 ("irqchip: gic: Preserve gic V2 bypass bits in cpu
->>> ctrl register") added a new function, gic_cpu_if_up(), to program the
->>> GIC CPU_CTRL register. This function assumes that there is only one GIC
->>> instance present and hence always uses the chip data for the primary GIC
->>> controller. Although it is not common for there to be a secondary, some
->>> devices do support a secondary. Therefore, fix this by passing
->>> gic_cpu_if_up() a pointer to the appropriate chip data structure.
->>>
->>> Similarly, the function gic_cpu_if_down() only assumes that there is a
->>> single GIC instance present. Update this function so that an instance
->>> number is passed for the appropriate GIC. The vexpress TC2 (which has
->>> a single GIC) is currently the only user of this function and so update
->>> it accordingly.
->>>
->>> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
->>> ---
->>> I was hoping to make the gic_cpu_if_up/down function more symmetric as we
->>> discussed but it is not possible to pass the gic_nr to gic_cpu_if_up()
->>> from all the places called without making more changes. However, given
->>> that gic_cpu_if_up() is a local function and gic_cpu_if_down() is public,
->>> may be it does not matter too much.
->>>
->>>  arch/arm/mach-vexpress/tc2_pm.c |  2 +-
->>>  drivers/irqchip/irq-gic.c       | 14 +++++++-------
->>>  include/linux/irqchip/arm-gic.h |  2 +-
->>>  3 files changed, 9 insertions(+), 9 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-vexpress/tc2_pm.c b/arch/arm/mach-vexpress/tc2_pm.c
->>> index b3328cd46c33..1aa4ccece69f 100644
->>> --- a/arch/arm/mach-vexpress/tc2_pm.c
->>> +++ b/arch/arm/mach-vexpress/tc2_pm.c
->>> @@ -80,7 +80,7 @@ static void tc2_pm_cpu_powerdown_prepare(unsigned int cpu, unsigned int cluster)
->>>  	 * to the CPU by disabling the GIC CPU IF to prevent wfi
->>>  	 * from completing execution behind power controller back
->>>  	 */
->>> -	gic_cpu_if_down();
->>> +	gic_cpu_if_down(0);
->>>  }
->>>  
->>>  static void tc2_pm_cluster_powerdown_prepare(unsigned int cluster)
->>> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
->>> index 7566fe259d27..cf9aca22120f 100644
->>> --- a/drivers/irqchip/irq-gic.c
->>> +++ b/drivers/irqchip/irq-gic.c
->>> @@ -356,10 +356,10 @@ static u8 gic_get_cpumask(struct gic_chip_data *gic)
->>>  	return mask;
->>>  }
->>>  
->>> -static void gic_cpu_if_up(void)
->>> +static void gic_cpu_if_up(struct gic_chip_data *gic)
->>>  {
->>> -	void __iomem *cpu_base = gic_data_cpu_base(&gic_data[0]);
->>> -	void __iomem *dist_base = gic_data_dist_base(&gic_data[0]);
->>> +	void __iomem *cpu_base = gic_data_cpu_base(gic);
->>> +	void __iomem *dist_base = gic_data_dist_base(gic);
->>
->> Which tree is that against? I don't have a dist_base in mainline...
+> The SMMU architecture defines two different behaviors when 64-bit
+> registers are written with 32-bit writes.  The first behavior causes
+> zero extension into the upper 32-bits.  The second behavior splits a
+> 64-bit register into "normal" 32-bit register pairs.
 > 
-> It is based upon linux-next. I can rebase on the current mainline if you
-> want them for v4.2.
+> On some passes of ThunderX,
+> the following registers incorrectly zero extended when they should
+> instead behave as normal 32-bit register pairs:
+> 
+>   SMMU()_(S)GFAR
+>   SMMU()_NSGFAR
+>   SMMU()_CB()_TTBR0
+>   SMMU()_CB()_TTBR1
+>   SMMU()_CB()_FAR
+> 
+> Signed-off-by: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
+> ---
+>  drivers/iommu/arm-smmu.c | 51 ++++++++++++++++++++++++++++++++++--------------
+>  1 file changed, 36 insertions(+), 15 deletions(-)
 
-It'd be good to fix it in mainline ASAP, as the Realview platforms are a
-tiny bit dead at the moment, so a 4.2-rc would be good. The conflict
-with Russell's FIQ work won't be hard to solve anyway.
+[...]
 
-Thanks,
+> @@ -762,22 +766,39 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
+>  
+>  	/* TTBRs */
+>  	if (stage1) {
+> -		reg = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[0];
+> -		writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR0_LO);
+> -		reg = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[0] >> 32;
+> -		reg |= ARM_SMMU_CB_ASID(cfg) << TTBRn_HI_ASID_SHIFT;
+> -		writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR0_HI);
+> -
+> -		reg = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[1];
+> -		writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR1_LO);
+> -		reg = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[1] >> 32;
+> -		reg |= ARM_SMMU_CB_ASID(cfg) << TTBRn_HI_ASID_SHIFT;
+> -		writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR1_HI);
+> +		if (smmu->options & ARM_SMMU_OPT_64BIT_WRITES_ONLY) {
+> +			reg64 = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[0];
+> +			reg64 |= ((u64) ARM_SMMU_CB_ASID(cfg)) <<
+> +						(TTBRn_HI_ASID_SHIFT + 32);
+> +			writeq_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR0_LO);
+> +
+> +			reg64 = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[1];
+> +			reg64 |= ((u64)ARM_SMMU_CB_ASID(cfg)) <<
+> +						(TTBRn_HI_ASID_SHIFT + 32);
+> +			writeq_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR1_LO);
+> +		} else {
+> +			reg = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[0];
+> +			writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR0_LO);
+> +			reg = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[0] >> 32;
+> +			reg |= ARM_SMMU_CB_ASID(cfg) << TTBRn_HI_ASID_SHIFT;
+> +			writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR0_HI);
+> +
+> +			reg = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[1];
+> +			writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR1_LO);
+> +			reg = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[1] >> 32;
+> +			reg |= ARM_SMMU_CB_ASID(cfg) << TTBRn_HI_ASID_SHIFT;
+> +			writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR1_HI);
+> +		}
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+I'm fine with making this sort of change if you need it, but this is pretty
+ugly. Worse, it won't compile for 32-bit ARM.
+
+How about we add a wrapper around these, say smmu_writeq(...), which can
+then either expand to 2x writel_relaxed or 1x writeq_relaxed depending on
+CONFIG_64BIT and your erratum workaround?
+
+Don't forgot to update the ATOS code too (so you need to write the high word
+first).
+
+Will
