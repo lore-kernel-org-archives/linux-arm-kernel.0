@@ -1,38 +1,136 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Thu, 30 Jul 2015 18:08:52 +0100
-Subject: [PATCH v2 02/11] [media] stv0367: Add support for 16Mhz reference
- clock
+Date: Thu, 30 Jul 2015 18:08:54 +0100
+Subject: [PATCH v2 04/11] [media] c8sectpfe: Add DT bindings documentation for
+ c8sectpfe driver.
 In-Reply-To: <1438276141-16902-1-git-send-email-peter.griffin@linaro.org>
 References: <1438276141-16902-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1438276141-16902-3-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1438276141-16902-5-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The B2100A dvb NIM card from ST has 2x stv0367 demodulators
-and 2x TDA18212 silicon tuners, with a 16Mhz crystal. To
-get this working properly with the upstream driver we need
-to add support for the 16Mhz reference clock.
+This patch adds the DT bindings documentation for the c8sectpfe LinuxDVB
+demux driver whose IP is in the STiH407 family silicon SoC's.
 
 Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
 ---
- drivers/media/dvb-frontends/stv0367.c | 5 +++++
- 1 file changed, 5 insertions(+)
+ .../bindings/media/stih407-c8sectpfe.txt           | 89 ++++++++++++++++++++++
+ include/dt-bindings/media/c8sectpfe.h              | 12 +++
+ 2 files changed, 101 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/media/stih407-c8sectpfe.txt
+ create mode 100644 include/dt-bindings/media/c8sectpfe.h
 
-diff --git a/drivers/media/dvb-frontends/stv0367.c b/drivers/media/dvb-frontends/stv0367.c
-index 9a49db1..44cb73f 100644
---- a/drivers/media/dvb-frontends/stv0367.c
-+++ b/drivers/media/dvb-frontends/stv0367.c
-@@ -1554,6 +1554,11 @@ static int stv0367ter_init(struct dvb_frontend *fe)
- 
- 	switch (state->config->xtal) {
- 		/*set internal freq to 53.125MHz */
-+	case 16000000:
-+		stv0367_writereg(state, R367TER_PLLMDIV, 0x2);
-+		stv0367_writereg(state, R367TER_PLLNDIV, 0x1b);
-+		stv0367_writereg(state, R367TER_PLLSETUP, 0x18);
-+		break;
- 	case 25000000:
- 		stv0367_writereg(state, R367TER_PLLMDIV, 0xa);
- 		stv0367_writereg(state, R367TER_PLLNDIV, 0x55);
+diff --git a/Documentation/devicetree/bindings/media/stih407-c8sectpfe.txt b/Documentation/devicetree/bindings/media/stih407-c8sectpfe.txt
+new file mode 100644
+index 0000000..d4def76
+--- /dev/null
++++ b/Documentation/devicetree/bindings/media/stih407-c8sectpfe.txt
+@@ -0,0 +1,89 @@
++STMicroelectronics STi c8sectpfe binding
++============================================
++
++This document describes the c8sectpfe device bindings that is used to get transport
++stream data into the SoC on the TS pins, and into DDR for further processing.
++
++It is typically used in conjunction with one or more demodulator and tuner devices
++which converts from the RF to digital domain. Demodulators and tuners are usually
++located on an external DVB frontend card connected to SoC TS input pins.
++
++Currently 7 TS input (tsin) channels are supported on the stih407 family SoC.
++
++Required properties (controller (parent) node):
++- compatible	: Should be "stih407-c8sectpfe"
++
++- reg		: Address and length of register sets for each device in
++		  "reg-names"
++
++- reg-names	: The names of the register addresses corresponding to the
++		  registers filled in "reg":
++			- c8sectpfe: c8sectpfe registers
++			- c8sectpfe-ram: c8sectpfe internal sram
++
++- clocks	: phandle list of c8sectpfe clocks
++- clock-names	: should be "c8sectpfe"
++See: Documentation/devicetree/bindings/clock/clock-bindings.txt
++
++- pinctrl-names	: a pinctrl state named tsin%d-serial or tsin%d-parallel (where %d is tsin-num)
++		   must be defined for each tsin child node.
++- pinctrl-0	: phandle referencing pin configuration for this tsin configuration
++See: Documentation/devicetree/bindings/pinctrl/pinctrl-binding.txt
++
++
++Required properties (tsin (child) node):
++
++- tsin-num	: tsin id of the InputBlock (must be between 0 to 6)
++- i2c-bus	: phandle to the I2C bus DT node which the demodulators & tuners on this tsin channel are connected.
++- rst-gpio	: reset gpio for this tsin channel.
++
++Optional properties (tsin (child) node):
++
++- invert-ts-clk		: Bool property to control sense of ts input clock (data stored on falling edge of clk).
++- serial-not-parallel	: Bool property to configure input bus width (serial on ts_data<7>).
++- async-not-sync	: Bool property to control if data is received in asynchronous mode
++			   (all bits/bytes with ts_valid or ts_packet asserted are valid).
++
++- dvb-card		: Describes the NIM card connected to this tsin channel.
++
++Example:
++
++/* stih410 SoC b2120 + b2004a + stv0367-pll(NIMB) + stv0367-tda18212 (NIMA) DT example) */
++
++	c8sectpfe at 08a20000 {
++		compatible = "st,stih407-c8sectpfe";
++		status = "okay";
++		reg = <0x08a20000 0x10000>, <0x08a00000 0x4000>;
++		reg-names = "stfe", "stfe-ram";
++		interrupts = <0 34 0>, <0 35 0>;
++		interrupt-names = "stfe-error-irq", "stfe-idle-irq";
++
++		pinctrl-names	= "tsin0-serial", "tsin0-parallel", "tsin3-serial",
++				"tsin4-serial", "tsin5-serial";
++
++		pinctrl-0	= <&pinctrl_tsin0_serial>;
++		pinctrl-1	= <&pinctrl_tsin0_parallel>;
++		pinctrl-2	= <&pinctrl_tsin3_serial>;
++		pinctrl-3	= <&pinctrl_tsin4_serial_alt3>;
++		pinctrl-4	= <&pinctrl_tsin5_serial_alt1>;
++
++		clocks = <&clk_s_c0_flexgen CLK_PROC_STFE>;
++		clock-names = "stfe";
++
++		/* tsin0 is TSA on NIMA */
++		tsin0: port at 0 {
++			tsin-num		= <0>;
++			serial-not-parallel;
++			i2c-bus			= <&ssc2>;
++			rst-gpio		= <&pio15 4 0>;
++			dvb-card		= <STV0367_TDA18212_NIMA_1>;
++		};
++
++		tsin3: port at 3 {
++			tsin-num		= <3>;
++			serial-not-parallel;
++			i2c-bus			= <&ssc3>;
++			rst-gpio		= <&pio15 7 0>;
++			dvb-card		= <STV0367_TDA18212_NIMB_1>;
++		};
++	};
+diff --git a/include/dt-bindings/media/c8sectpfe.h b/include/dt-bindings/media/c8sectpfe.h
+new file mode 100644
+index 0000000..a0b5c7b
+--- /dev/null
++++ b/include/dt-bindings/media/c8sectpfe.h
+@@ -0,0 +1,12 @@
++#ifndef __DT_C8SECTPFE_H
++#define __DT_C8SECTPFE_H
++
++#define STV0367_TDA18212_NIMA_1	0
++#define STV0367_TDA18212_NIMA_2	1
++#define STV0367_TDA18212_NIMB_1	2
++#define STV0367_TDA18212_NIMB_2	3
++
++#define STV0903_6110_LNB24_NIMA	4
++#define STV0903_6110_LNB24_NIMB	5
++
++#endif /* __DT_C8SECTPFE_H */
 -- 
 1.9.1
