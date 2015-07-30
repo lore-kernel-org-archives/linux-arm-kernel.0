@@ -1,10 +1,9 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 30 Jul 2015 02:22:06 +0200
-Subject: [PATCH 20/20] clk: at91: Revert "keep slow clk enabled to prevent
- system hang"
+Date: Thu, 30 Jul 2015 02:22:01 +0200
+Subject: [PATCH 15/20] watchdog: at91sam9: get and use slow clock
 In-Reply-To: <1438215726-27452-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1438215726-27452-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1438215726-27452-21-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1438215726-27452-16-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,72 +11,82 @@ Commit dca1a4b5ff6e ("clk: at91: keep slow clk enabled to prevent system
 hang") added a workaround for the slow clock as it is not properly handled
 by its users.
 
-Now that the slow clock is taken properly by the drivers, this workaround
-is not necessary anymore, revert it.
+Get and use the slow clock as it is necessary for the at91sam9 watchdog.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
-Cc: Michael Turquette <mturquette@baylibre.com>
-Cc: Stephen Boyd <sboyd@codeaurora.org>
-Cc: linux-clk at vger.kernel.org
- drivers/clk/at91/clk-slow.c | 27 ---------------------------
- 1 file changed, 27 deletions(-)
+Cc: Wim Van Sebroeck <wim@iguana.be>
+Cc: linux-watchdog at vger.kernel.org
+ drivers/watchdog/at91sam9_wdt.c | 22 ++++++++++++++++++++--
+ 1 file changed, 20 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/clk/at91/clk-slow.c b/drivers/clk/at91/clk-slow.c
-index 98a84a865fe1..2c59d6a64dd5 100644
---- a/drivers/clk/at91/clk-slow.c
-+++ b/drivers/clk/at91/clk-slow.c
-@@ -70,7 +70,6 @@ struct clk_sam9x5_slow {
+diff --git a/drivers/watchdog/at91sam9_wdt.c b/drivers/watchdog/at91sam9_wdt.c
+index e4698f7c5f93..7e6acaf3ece4 100644
+--- a/drivers/watchdog/at91sam9_wdt.c
++++ b/drivers/watchdog/at91sam9_wdt.c
+@@ -17,6 +17,7 @@
  
- #define to_clk_sam9x5_slow(hw) container_of(hw, struct clk_sam9x5_slow, hw)
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
  
--static struct clk *slow_clk;
++#include <linux/clk.h>
+ #include <linux/errno.h>
+ #include <linux/init.h>
+ #include <linux/interrupt.h>
+@@ -90,6 +91,7 @@ struct at91wdt {
+ 	unsigned long heartbeat;	/* WDT heartbeat in jiffies */
+ 	bool nowayout;
+ 	unsigned int irq;
++	struct clk *sclk;
+ };
  
- static int clk_slow_osc_prepare(struct clk_hw *hw)
- {
-@@ -358,8 +357,6 @@ at91_clk_register_sam9x5_slow(void __iomem *sckcr,
- 	clk = clk_register(NULL, &slowck->hw);
- 	if (IS_ERR(clk))
- 		kfree(slowck);
--	else
--		slow_clk = clk;
+ /* ......................................................................... */
+@@ -352,15 +354,25 @@ static int __init at91wdt_probe(struct platform_device *pdev)
+ 	if (IS_ERR(wdt->base))
+ 		return PTR_ERR(wdt->base);
  
- 	return clk;
++	wdt->sclk = devm_clk_get(&pdev->dev, NULL);
++	if (IS_ERR(wdt->sclk))
++		return PTR_ERR(wdt->sclk);
++
++	err = clk_prepare_enable(wdt->sclk);
++	if (err) {
++		dev_err(&pdev->dev, "Could not enable slow clock\n");
++		return err;
++	}
++
+ 	if (pdev->dev.of_node) {
+ 		err = of_at91wdt_init(pdev->dev.of_node, wdt);
+ 		if (err)
+-			return err;
++			goto err_clk;
+ 	}
+ 
+ 	err = at91_wdt_init(pdev, wdt);
+ 	if (err)
+-		return err;
++		goto err_clk;
+ 
+ 	platform_set_drvdata(pdev, wdt);
+ 
+@@ -368,6 +380,11 @@ static int __init at91wdt_probe(struct platform_device *pdev)
+ 		wdt->wdd.timeout, wdt->nowayout);
+ 
+ 	return 0;
++
++err_clk:
++	clk_disable_unprepare(wdt->sclk);
++
++	return err;
  }
-@@ -436,8 +433,6 @@ at91_clk_register_sam9260_slow(struct at91_pmc *pmc,
- 	clk = clk_register(NULL, &slowck->hw);
- 	if (IS_ERR(clk))
- 		kfree(slowck);
--	else
--		slow_clk = clk;
  
- 	return clk;
- }
-@@ -470,25 +465,3 @@ void __init of_at91sam9260_clk_slow_setup(struct device_node *np,
+ static int __exit at91wdt_remove(struct platform_device *pdev)
+@@ -377,6 +394,7 @@ static int __exit at91wdt_remove(struct platform_device *pdev)
  
- 	of_clk_add_provider(np, of_clk_src_simple_get, clk);
+ 	pr_warn("I quit now, hardware will probably reboot!\n");
+ 	del_timer(&wdt->timer);
++	clk_disable_unprepare(wdt->sclk);
+ 
+ 	return 0;
  }
--
--/*
-- * FIXME: All slow clk users are not properly claiming it (get + prepare +
-- * enable) before using it.
-- * If all users properly claiming this clock decide that they don't need it
-- * anymore (or are removed), it is disabled while faulty users are still
-- * requiring it, and the system hangs.
-- * Prevent this clock from being disabled until all users are properly
-- * requesting it.
-- * Once this is done we should remove this function and the slow_clk variable.
-- */
--static int __init of_at91_clk_slow_retain(void)
--{
--	if (!slow_clk)
--		return 0;
--
--	__clk_get(slow_clk);
--	clk_prepare_enable(slow_clk);
--
--	return 0;
--}
--arch_initcall(of_at91_clk_slow_retain);
 -- 
 2.1.4
