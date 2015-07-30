@@ -1,44 +1,44 @@
-From: rnayak@codeaurora.org (Rajendra Nayak)
-Date: Thu, 30 Jul 2015 01:39:02 -0000
-Subject: [PATCH v6 04/13] clk: qcom: gdsc: Manage clocks with !CONFIG_PM
-In-Reply-To: <20150730001357.GF3159@codeaurora.org>
-References: <1437549069-29655-1-git-send-email-rnayak@codeaurora.org>
- <1437549069-29655-5-git-send-email-rnayak@codeaurora.org>
- <55B03D65.8040207@codeaurora.org> <55B0A764.6010708@codeaurora.org>
- <55B826B0.2090705@codeaurora.org> <55B85870.7060900@codeaurora.org>
- <20150730001357.GF3159@codeaurora.org>
-Message-ID: <6e298dc64bccec3aabe4914fd7835129.squirrel@www.codeaurora.org>
+From: jamesjj.liao@mediatek.com (James Liao)
+Date: Thu, 30 Jul 2015 10:23:33 +0800
+Subject: [PATCH v5 06/10] clk: mediatek: mt8173: Fix enabling of
+ critical clocks
+In-Reply-To: <20150730002754.GG3159@codeaurora.org>
+References: <1438152754-11970-1-git-send-email-jamesjj.liao@mediatek.com>
+ <1438152754-11970-7-git-send-email-jamesjj.liao@mediatek.com>
+ <20150730002754.GG3159@codeaurora.org>
+Message-ID: <1438223013.17770.42.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Stephen,
 
-> On 07/29, Rajendra Nayak wrote:
->>
->> On 07/29/2015 06:34 AM, Stephen Boyd wrote:
->> >
->> >Sorry, I read the thread and I tried to understand what was going on
->> but
->> >I'm still lost. Can you clarify further in the commit text somehow?
->>
->> So I can add this in the commit text, if it seems fine
->>
->> "The use of pm_clk_add_notifier() isn't appropriate here since we need
->> to only manage clocks with valid power domain associations done via
->> DT, instead of what pm_clk_add_notifier() does, which is manage clocks
->> for all on SoC/off SoC devices associating all of them to a dummy
->> power domain instead"
->>
->
-> Yes that's good, thanks. But I still wonder why the code isn't
-> generic so that we don't have lots of drivers duplicating the
-> same logic. I guess we can consolidate another day.
+On Wed, 2015-07-29 at 17:27 -0700, Stephen Boyd wrote:
+> On 07/29, James Liao wrote:
+> > From: Sascha Hauer <s.hauer@pengutronix.de>
+> > 
+> > On the MT8173 the clocks are provided by different units. To enable
+> > the critical clocks we must be sure that all parent clocks are already
+> > registered, otherwise the parents of the critical clocks end up being
+> > unused and get disabled later.
+> > 
+> > On MT8173, for example, it is the CLK_TOP clocks that have CLK_APMIXED
+> > PLLs as their parents, so we cannot enable the CLK_TOP critical clocks
+> > until the CLK_APMIXED clocks have all been registered.
+> > 
+> > To find a place where all parents are registered we try each time
+> > after we've registered some clocks if all known providers are present
+> > now and only then we enable the critical clocks.
+> > 
+> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> > Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
+> > ---
+> 
+> Please move up to v4.2-rc2 so that this patch can be dropped. I
+> already applied this and sent it off to Linus so it's in -rc2.
 
-Yes, the code is quite generic and probably needs to be some
-place so it can be resued across drivers. For now I don;t
-see anyone else needing it, maybe sh mobile might plan to use
-something like it at a later time which is when we should probably
-consolidate.
+OK. I'll rebase to v4.2-rc2 in next patchset.
 
--- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
-of Code Aurora Forum, hosted by The Linux Foundation
+
+Best regards,
+
+James
