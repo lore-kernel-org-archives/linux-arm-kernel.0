@@ -1,134 +1,96 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Thu, 30 Jul 2015 16:37:30 +0200
-Subject: [RFCv2 1/3] docs: dts: Added documentation for Xilinx Zynq Reset
- Controller bindings.
-In-Reply-To: <20150729173802.GO2650@xsjsorenbubuntu>
-References: <1437783682-13632-1-git-send-email-moritz.fischer@ettus.com>
- <1437783682-13632-2-git-send-email-moritz.fischer@ettus.com>
- <20150728025833.GQ2650@xsjsorenbubuntu>
- <CAAtXAHejK2vL2qSdhqrtHmkV_RBfkLzQNM8ZbDvREvienNqzXw@mail.gmail.com>
- <20150728225337.GF2650@xsjsorenbubuntu>
- <CAAtXAHd8kG_FtKTW-2T2KToXesWgsgxkZ3vpXZ_oRjGCSfpFgw@mail.gmail.com>
- <20150729173802.GO2650@xsjsorenbubuntu>
-Message-ID: <55BA36AA.2030601@xilinx.com>
+From: stuart.yoder@freescale.com (Stuart Yoder)
+Date: Thu, 30 Jul 2015 14:52:40 +0000
+Subject: [RFC] arm64: defconfig: enable 48-bit VA by default
+In-Reply-To: <20150730101358.GA30796@e104818-lin.cambridge.arm.com>
+References: <CY1PR0301MB07488D6DC5F0B171D6B290E187830@CY1PR0301MB0748.namprd03.prod.outlook.com>
+ <55B0E1AD.60409@arm.com>
+ <BY2PR0301MB0743CBCFC5476E39A5D1EC0B878C0@BY2PR0301MB0743.namprd03.prod.outlook.com>
+ <CAKv+Gu9LHBd7wM6P4H0X5WigzDETtpr2++_Ebo=adg5QtTOW2w@mail.gmail.com>
+ <BY2PR0301MB074300C5F31701D9211827F0878C0@BY2PR0301MB0743.namprd03.prod.outlook.com>
+ <20150730101358.GA30796@e104818-lin.cambridge.arm.com>
+Message-ID: <CY1PR0301MB074850E27D5D298D1B8495D2878B0@CY1PR0301MB0748.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/29/2015 07:38 PM, S?ren Brinkmann wrote:
-> On Tue, 2015-07-28 at 11:14PM -0700, Moritz Fischer wrote:
->> Hi S?ren,
->>
->> On Tue, Jul 28, 2015 at 3:53 PM, S?ren Brinkmann
->> <soren.brinkmann@xilinx.com> wrote:
->>> On Mon, 2015-07-27 at 09:52PM -0700, Moritz Fischer wrote:
->>>> Hi S?ren,
->>>>
->>>> thanks for your feedback.
->>>>
->>>> On Mon, Jul 27, 2015 at 7:58 PM, S?ren Brinkmann
->>>> <soren.brinkmann@xilinx.com> wrote:
->>>>> Hi Moritz,
->>>>>
->>>>> On Fri, 2015-07-24 at 05:21PM -0700, Moritz Fischer wrote:
->>>>>> Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
->>>>>> ---
->>>>>>  Documentation/devicetree/bindings/reset/zynq-reset-pl.txt | 13 +++++++++++++
->>>>>>  1 file changed, 13 insertions(+)
->>>>>>  create mode 100644 Documentation/devicetree/bindings/reset/zynq-reset-pl.txt
->>>>>>
->>>>>> diff --git a/Documentation/devicetree/bindings/reset/zynq-reset-pl.txt b/Documentation/devicetree/bindings/reset/zynq-reset-pl.txt
->>>>>> new file mode 100644
->>>>>> index 0000000..ac4499e
->>>>>> --- /dev/null
->>>>>> +++ b/Documentation/devicetree/bindings/reset/zynq-reset-pl.txt
->>>>>> @@ -0,0 +1,13 @@
->>>>>> +Xilinx Zynq PL Reset Manager
->>>>>> +
->>>>>> +Required properties:
->>>>>> +- compatible: "xlnx,zynq-reset-pl"
->>>>>> +- syscon <&slcr>;
->>>>>> +- #reset-cells: 1
->>>>>> +
->>>>>> +Example:
->>>>>> +     rstc: rstc at 240 {
->>>>>> +             #reset-cells = <1>;
->>>>>> +             compatible = "xlnx,zynq-reset-pl";
->>>>>> +             syscon = <&slcr>;
->>>>>> +     };
->>>>>
->>>>> I think you also have to add the outputs and make them part of the
->>>>> binding. Otherwise you'd have to read the implementation to find
->>>>> out what device should be hooked up to which output of the reset-controller.
->>>>
->>>> Is something like this what you had in mind? I had that prepared for
->>>> the next round of patches:
->>>>
->>>> Reset outputs:
->>>>  0  : soft reset
->>>>  32 : ddr reset
->>>>  64 : topsw reset
->>>>  96 : dmac reset
->>>>  128: usb0 reset
->>>>  129: usb1 reset
->>>>  160: gem0 reset
->>>>  161: gem1 reset
->>>>  164: gem0 rx reset
->>>>  165: gem1 rx reset
->>>>  166: gem0 ref reset
->>>>  167: gem1 ref reset
->>>>  192: sdio0 reset
->>>>  193: sdio1 reset
->>>>  196: sdio0 ref reset
->>>>  197: sdio1 ref reset
->>>>  224: spi0 reset
->>>>  225: spi1 reset
->>>>  226: spi0 ref reset
->>>>  227: spi1 ref reset
->>>>  256: can0 reset
->>>>  257: can1 reset
->>>>  258: can0 ref reset
->>>>  259: can1 ref reset
->>>>  288: i2c0 reset
->>>>  289: i2c1 reset
->>>>  320: uart0 reset
->>>>  321: uart1 reset
->>>>  322: uart0 ref reset
->>>>  323: uart1 ref reset
->>>>  352: gpio reset
->>>>  384: lqspi reset
->>>>  385: qspi ref reset
->>>>  416: smc reset
->>>>  417: smc ref reset
->>>>  448: ocm reset
->>>>  512: fpga0 out reset
->>>>  513: fpga1 out reset
->>>>  514: fpga2 out reset
->>>>  515: fpga3 out reset
->>>>  544: a9 reset 0
->>>>  545: a9 reset 1
->>>>  552: peri reset
->>>
->>> Basically, yes. I guess the gaps are due to directly mapping this number
->>> to bank and bit instead of doing some more complex mapping in between?
->>> I'm not sure whether I like this :) I guess if a number is off the
->>> driver would still toggle the addressed bit?
->>
->> My assumption was that people would use a #include
->> <dt-bindings/xlnx,zynq-reset.h> in their dts. Assuming I got the
->> numbers in there right this makes it hard to misuse by accident.
->> I'm not saying it's perfect ...
-> 
-> Michal always turned down the #include patches with the argument of
-> re-using the dts files outside of the Linux sources where those includes
-> etc may not be available in this form.
 
-yes. All these includes end up in more work when you want to generate
-them or move to any other project.
-I don't think that make sense to caused another problem just because of
-that. Simple add these values to reset binding doc and then you <&rstc
-number> in nodes.
-Because we agreed that it has to be done on driver basis this is just
-copy that macros from one file to another.
+
+> -----Original Message-----
+> From: Catalin Marinas [mailto:catalin.marinas at arm.com]
+> >
+[cut]
+> > Yes, our physical memory layout for RAM looks like this:
+> > 2 GB at 0x8000_0000
+> > 510 GB at 0x80_8000_0000
+> 
+> So your platform currently only has 16GB of RAM. Shouldn't the last 14GB
+> be placed at 34GB offset (according to the "Principles of ARM Memory
+> Maps")?
+
+Yes, but it looks like our hardware designer didn't follow it exactly.  And
+instead created a variant by dropping the middle region.  The reasoning
+seems to be that our SoC architecture is 40-bit PA only and thus it seemed
+unnecessary to have the middle region at 34GB offset.  Plus, they wanted
+that middle region for other I/O.
+
+> > > To be honest, I think this is poorly designed, and I am not sure we
+> > > should cater for such configurations in the defconfig.
+> >
+> > Agree, if this is a one-off weird platform then we shouldn't.
+> >
+> > But, the 'Principles of ARM Memory Maps' doc proposes this:
+> > 2 GB at 0x8000_0000
+> > 30 GB at 0x8_8000_0000
+> > 480 GB at 0x88_0000_0000
+> 
+> I'm not particularly recommending this layout, at least not without some
+> clarifications on DRAM aliases (I'll ping people internally about it
+> again). The original layout pre-dates ARMv8, it was meant for ARMv7/LPAE
+> and all the memory beyond 32-bit was highmem anyway. It was later
+> updated for AArch64 but only to allow 44/48-bit PA (a few sections
+> added).
+
+Published guidance from ARM I think is important here.  If the aarch64
+kernel maintainers have issues with the proposed map in the 'Principles' doc,
+I consider that's a problem.
+
+> How I understood it at the time is that in hardware you place the large
+> DRAM (chip select) at high addresses, e.g. 64GB would be at a 512GB
+> offset, but lower 2GB+30GB aliased in the lower space with the
+> corresponding high address remaining a hole (that produces external
+> aborts if accessed). The first alias at 2GB was meant for 32-bit
+> initialisation code before the MMU is enabled. With AArch64, you don't
+> really need this low alias (assuming your EL3/EL2/secure-EL1 code is
+> 64-bit) since PC can use >32-bit addresses.
+
+I think the intent with our SoC was to do that, but ommitting the
+middle alias, because there was no obivous reason why it was needed.
+ 
+> > ...i.e. if you have > 32 GB then your RAM regions are split into 3
+> > chunks.  The aarch64 kernel will support > than 32GB right?  A
+> > basic server will have that much or more.
+> >
+> > How will we deal with systems with > 32GB of memory that follow that
+> > map?
+> 
+> My recommendation would be to avoid the lower alias (in hardware or some
+> EL3 configuration change) and keep all the RAM at 0x80_0000_0000, just
+> boot the system in AArch64 mode.
+
+Unfortunately, for our existing armv8 silicon I am not aware any mechanism to
+change the aliasing and keeping all RAM at 512GB offset.  So, we're stuck
+for now with 2 discontiguous regions.  And things are ok as long as we
+turn on 48-bit VA or 64K pages, but that's not the case with the default
+defconfig.
+
+My interest in the default defconfig is related to distro support.  When
+a distro (Fedora, Debian, Ubuntu,etc) has a binary kernel image we want
+it to run on our hardware.  I don't know to what degree the upstream
+defconfig informs distros on what defconfig options are enabled in their
+kernels...but we want to be as compatible as possible with the default
+defconfig.
+
+(BTW, Fedora 22 for aarch64 appears to have 64KB pages enabled, which
+is good for our memory map)
 
 Thanks,
-Michal
+Stuart
