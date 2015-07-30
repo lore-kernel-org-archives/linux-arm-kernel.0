@@ -1,114 +1,105 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 30 Jul 2015 09:08:29 -0500
-Subject: [PATCH v4 04/46] staging: emxx_udc: add ep capabilities support
-In-Reply-To: <55B9CF1A.1070107@samsung.com>
-References: <1437988616-6962-1-git-send-email-r.baldyga@samsung.com>
- <1437988616-6962-5-git-send-email-r.baldyga@samsung.com>
- <20150729152029.GB32418@saruman.tx.rr.com>
- <55B9CF1A.1070107@samsung.com>
-Message-ID: <20150730140829.GA18246@saruman.tx.rr.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Thu, 30 Jul 2015 15:11:19 +0100
+Subject: [PATCH] irqchip/gic: Only allow the primary GIC to set the CPU map
+Message-ID: <1438265479-15427-1-git-send-email-jonathanh@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The gic_init_bases() function initialises an array that stores the mapping
+between the GIC and CPUs. This array is a global array that is
+unconditionally initialised on every call to gic_init_bases(). Although,
+it is not common for there to be more than one GIC instance, there are
+some devices that do support nested GIC controllers and gic_init_bases()
+can be called more than once.
 
-On Thu, Jul 30, 2015 at 09:15:38AM +0200, Robert Baldyga wrote:
-> On 07/29/2015 05:20 PM, Felipe Balbi wrote:
-> > On Mon, Jul 27, 2015 at 11:16:14AM +0200, Robert Baldyga wrote:
-> >> Convert endpoint configuration to new capabilities model.
-> >>
-> >> Fixed typo in "epc-nulk" to "epc-bulk".
-> >>
-> >> Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
-> >> ---
-> >>  drivers/staging/emxx_udc/emxx_udc.c | 60 ++++++++++++++++++-------------------
-> >>  1 file changed, 29 insertions(+), 31 deletions(-)
-> >>
-> >> diff --git a/drivers/staging/emxx_udc/emxx_udc.c b/drivers/staging/emxx_udc/emxx_udc.c
-> >> index 3b7aa36..0d64bee 100644
-> >> --- a/drivers/staging/emxx_udc/emxx_udc.c
-> >> +++ b/drivers/staging/emxx_udc/emxx_udc.c
-> >> @@ -3153,36 +3153,33 @@ static const struct usb_gadget_ops nbu2ss_gadget_ops = {
-> >>  	.ioctl			= nbu2ss_gad_ioctl,
-> >>  };
-> >>  
-> >> -static const char g_ep0_name[] = "ep0";
-> >> -static const char g_ep1_name[] = "ep1-bulk";
-> >> -static const char g_ep2_name[] = "ep2-bulk";
-> >> -static const char g_ep3_name[] = "ep3in-int";
-> >> -static const char g_ep4_name[] = "ep4-iso";
-> >> -static const char g_ep5_name[] = "ep5-iso";
-> >> -static const char g_ep6_name[] = "ep6-bulk";
-> >> -static const char g_ep7_name[] = "ep7-bulk";
-> >> -static const char g_ep8_name[] = "ep8in-int";
-> >> -static const char g_ep9_name[] = "ep9-iso";
-> >> -static const char g_epa_name[] = "epa-iso";
-> >> -static const char g_epb_name[] = "epb-bulk";
-> >> -static const char g_epc_name[] = "epc-nulk";
-> >> -static const char g_epd_name[] = "epdin-int";
-> >> -
-> >> -static const char *gp_ep_name[NUM_ENDPOINTS] = {
-> >> -	g_ep0_name,
-> >> -	g_ep1_name,
-> >> -	g_ep2_name,
-> >> -	g_ep3_name,
-> >> -	g_ep4_name,
-> >> -	g_ep5_name,
-> >> -	g_ep6_name,
-> >> -	g_ep7_name,
-> >> -	g_ep8_name,
-> >> -	g_ep9_name,
-> >> -	g_epa_name,
-> >> -	g_epb_name,
-> >> -	g_epc_name,
-> >> -	g_epd_name,
-> >> +static const struct {
-> >> +	const char *name;
-> >> +	const struct usb_ep_caps caps;
-> >> +} ep_info[NUM_ENDPOINTS] = {
-> >> +#define EP_INFO(_name, _type, _dir) \
-> >> +	{ \
-> >> +		.name = _name, \
-> >> +		.caps = USB_EP_CAPS(USB_EP_CAPS_TYPE_ ## _type, \
-> >> +				USB_EP_CAPS_DIR_ ## _dir), \
-> >> +	}
-> >> +
-> >> +	EP_INFO("ep0",		CONTROL, ALL),
-> >> +	EP_INFO("ep1-bulk",	BULK,	ALL),
-> >> +	EP_INFO("ep2-bulk",	BULK,	ALL),
-> >> +	EP_INFO("ep3in-int",	INT,	IN),
-> >> +	EP_INFO("ep4-iso",	INT,	ALL),
-> >> +	EP_INFO("ep5-iso",	ISO,	ALL),
-> >> +	EP_INFO("ep6-bulk",	ISO,	ALL),
-> >> +	EP_INFO("ep7-bulk",	BULK,	ALL),
-> >> +	EP_INFO("ep8in-int",	INT,	IN),
-> >> +	EP_INFO("ep9-iso",	ISO,	ALL),
-> >> +	EP_INFO("epa-iso",	ISO,	ALL),
-> >> +	EP_INFO("epb-bulk",	BULK,	ALL),
-> >> +	EP_INFO("epc-bulk",	BULK,	ALL),
-> >> +	EP_INFO("epdin-int",	INT,	IN),
-> > 
-> > IMO, this is pointless obfuscation. It just makes it a pain to grep
-> > source around. Why don't you have UDC drivers initialize the 1-bit flags
-> > directly ?
-> > 
-> 
-> Do you mean something like this? It just makes it a pain to scroll this
-> source ;)
+A 2nd call to gic_init_bases() will clear the previous CPU mapping and
+will only setup the mapping again for the CPU calling gic_init_bases().
+Fix this by only allowing the CPU map to be configured for the primary GIC.
 
-but it's at least easy to grep. Another option would be the following:
+For secondary GICs the CPU map is not relevant because these GICs do not
+directly route the interrupts to the main CPU(s) but to other GICs or
+devices.
 
-EP_INFO("ep0", USB_EP_CAPS(USB_EP_CAPS_TYPE_CONTROL,
-			USB_EP_CAPS_DIR_ALL)),
+Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
+---
+This is a follow-up to the patch titled "irqchip: gic: Add a cpu map for
+each GIC instance" and discussed here [1]. Based upon the discussion I have
+re-worked and re-titled it approriately.
 
-that also helps grepping.
+[1] http://www.spinics.net/lists/kernel/msg2044421.html
 
+ drivers/irqchip/irq-gic.c | 43 +++++++++++++++++++++++++------------------
+ 1 file changed, 25 insertions(+), 18 deletions(-)
+
+diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+index a530d9a9b810..7566fe259d27 100644
+--- a/drivers/irqchip/irq-gic.c
++++ b/drivers/irqchip/irq-gic.c
+@@ -416,19 +416,26 @@ static void gic_cpu_init(struct gic_chip_data *gic)
+ 	int i;
+ 
+ 	/*
+-	 * Get what the GIC says our CPU mask is.
++	 * Setting up the CPU map is only relevant for the primary GIC
++	 * because any nested/secondary GICs do not directly interface
++	 * with the CPU(s).
+ 	 */
+-	BUG_ON(cpu >= NR_GIC_CPU_IF);
+-	cpu_mask = gic_get_cpumask(gic);
+-	gic_cpu_map[cpu] = cpu_mask;
++	if (gic == &gic_data[0]) {
++		/*
++		 * Get what the GIC says our CPU mask is.
++		 */
++		BUG_ON(cpu >= NR_GIC_CPU_IF);
++		cpu_mask = gic_get_cpumask(gic);
++		gic_cpu_map[cpu] = cpu_mask;
+ 
+-	/*
+-	 * Clear our mask from the other map entries in case they're
+-	 * still undefined.
+-	 */
+-	for (i = 0; i < NR_GIC_CPU_IF; i++)
+-		if (i != cpu)
+-			gic_cpu_map[i] &= ~cpu_mask;
++		/*
++		 * Clear our mask from the other map entries in case they're
++		 * still undefined.
++		 */
++		for (i = 0; i < NR_GIC_CPU_IF; i++)
++			if (i != cpu)
++				gic_cpu_map[i] &= ~cpu_mask;
++	}
+ 
+ 	gic_cpu_config(dist_base, NULL);
+ 
+@@ -977,13 +984,6 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+ 	}
+ 
+ 	/*
+-	 * Initialize the CPU interface map to all CPUs.
+-	 * It will be refined as each CPU probes its ID.
+-	 */
+-	for (i = 0; i < NR_GIC_CPU_IF; i++)
+-		gic_cpu_map[i] = 0xff;
+-
+-	/*
+ 	 * Find out how many interrupts are supported.
+ 	 * The GIC only supports up to 1020 interrupt sources.
+ 	 */
+@@ -1028,6 +1028,13 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+ 		return;
+ 
+ 	if (gic_nr == 0) {
++		/*
++		 * Initialize the CPU interface map to all CPUs.
++		 * It will be refined as each CPU probes its ID.
++		 * This is only necessary for the primary GIC.
++		 */
++		for (i = 0; i < NR_GIC_CPU_IF; i++)
++			gic_cpu_map[i] = 0xff;
+ #ifdef CONFIG_SMP
+ 		set_smp_cross_call(gic_raise_softirq);
+ 		register_cpu_notifier(&gic_cpu_notifier);
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150730/6b98a016/attachment-0001.sig>
+2.1.4
