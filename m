@@ -1,180 +1,79 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Thu, 30 Jul 2015 08:30:41 +0000
-Subject: [PATCH v6] PCI: Store PCIe bus address in struct of_pci_range
-In-Reply-To: <20150729214710.GE9640@google.com>
-References: <1438010223-124422-1-git-send-email-gabriele.paoloni@huawei.com>
- <20150729172053.GE31170@google.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E01D6F350@lhreml503-mbs>
- <20150729214710.GE9640@google.com>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E01D6F6F8@lhreml503-mbs>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Thu, 30 Jul 2015 09:33:09 +0100
+Subject: [PATCH] irqchip: gic: Add a cpu map for each GIC instance
+In-Reply-To: <55B9DE44.1010102@arm.com>
+References: <1438180984-18219-1-git-send-email-jonathanh@nvidia.com>
+ <20150729183321.GP7557@n2100.arm.linux.org.uk> <55B92939.5040101@nvidia.com>
+ <55B9DE44.1010102@arm.com>
+Message-ID: <55B9E145.9050202@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Bjorn Helgaas [mailto:bhelgaas at google.com]
-> Sent: Wednesday, July 29, 2015 10:47 PM
-> To: Gabriele Paoloni
-> Cc: arnd at arndb.de; lorenzo.pieralisi at arm.com; Wangzhou (B);
-> robh+dt at kernel.org; james.morse at arm.com; Liviu.Dudau at arm.com; linux-
-> pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> devicetree at vger.kernel.org; Yuanzhichang; Zhudacai; zhangjukuo;
-> qiuzhenfa; Liguozhu (Kenneth); Andrew Murray
-> Subject: Re: [PATCH v6] PCI: Store PCIe bus address in struct
-> of_pci_range
-> 
-> [+cc Andrew]
-> 
-> On Wed, Jul 29, 2015 at 07:44:18PM +0000, Gabriele Paoloni wrote:
-> > > -----Original Message-----
-> > > From: Bjorn Helgaas [mailto:bhelgaas at google.com]
-> > > Sent: Wednesday, July 29, 2015 6:21 PM
-> > > To: Gabriele Paoloni
-> 
-> > > On Mon, Jul 27, 2015 at 11:17:03PM +0800, Gabriele Paoloni wrote:
-> > > > From: gabriele paoloni <gabriele.paoloni@huawei.com>
-> 
-> > > >     This patch adds a new field in "struct of_pci_range" to store
-> the
-> > > >     pci bus start address; it fills the field in
-> > > of_pci_range_parser_one();
-> > > >     in of_pci_get_host_bridge_resources() it retrieves the
-> resource
-> > > entry
-> > > >     after it is created and added to the resource list and uses
-> > > >     entry->__res.start to store the pci controller address
-> > >
-> > > struct of_pci_range is starting to get confusing to non-OF folks
-> like
-> > > me.
-> > > It now contains:
-> > >
-> > >   u32 pci_space;
-> > >   u64 pci_addr;
-> > >   u64 cpu_addr;
-> > >   u64 bus_addr;
-> > >
-> > > Can you explain what all these things mean, and maybe even add one-
-> line
-> > > comments to the structure?
-> 
-> > > pci_space: The only uses I see are to determine whether to print
-> > > "Prefetch".  I don't see any real functionality that uses this.
-> >
-> > Looking at the code I agree. it's seems to be used only in powerpc
-> > and microblaze to print out.
-> > However from my understanding pci_space is the phys.hi field of the
-> > ranges property: it defines the properties of the address space
-> associated
-> > to the PCI address. if you're curious you can find a nice and quick
-> to read
-> > "guide" in http://devicetree.org/MPC5200:PCI
-> 
-> I think pci_space should be removed and the users should test
-> "range.flags & IORESOURCE_PREFETCH" instead.  That's already set by
-> of_bus_pci_get_flags().  This is separate from your current patch, of
-> course.
 
-Ok so I'll do nothing in my patch about this; maybe I can propose a separate
-patch for this, but I cannot test it (I've got no microblaze and powerpc 
-neither....)
-
+On 30/07/15 09:20, Marc Zyngier wrote:
+> On 29/07/15 20:27, Jon Hunter wrote:
+>>
+>> On 29/07/15 19:33, Russell King - ARM Linux wrote:
+>>> On Wed, Jul 29, 2015 at 03:43:04PM +0100, Jon Hunter wrote:
+>>>> The gic_init_bases() function initialises an array that stores the mapping
+>>>> between the GIC and CPUs. This array is a global array that is
+>>>> unconditionally initialised on every call to gic_init_bases(). Although,
+>>>> it is not common for there to be more than one GIC instance, there are
+>>>> some devices that do support nested GIC controllers and gic_init_bases()
+>>>> can be called more than once.
+>>>>
+>>>> A 2nd call to gic_init_bases() will clear the previous CPU mapping and
+>>>> will only setup the mapping again for CPU0. This is because for child GIC
+>>>> controllers there is most likely only one recipient of the interrupt.
+>>>>
+>>>> Fix this by moving the CPU mapping array to the GIC chip data structure
+>>>> so that it is initialised for each GIC instance separately. It is assumed
+>>>> that the bL switcher code is only interested in the root or primary GIC
+>>>> instance.
+>>>
+>>> Does it make sense to expose the per-CPU-ness of the non-primary GIC?
+>>> If they are chained off a primary GIC SPI interrupt, then all IRQs on
+>>> the secondary GIC are routed to the same CPU that the SPI on the primary
+>>> GIC is routed to.
+>>
+>> I am looking at a use-case where there is a secondary GIC and the secondary
+>> GIC is used as a interrupt router between the main CPU cluster and another
+>> CPU. So in this case the mapping of a secondary is still of interest. This
+>> patch does not address setting up the secondary mapping, but avoids a
+>> secondary GIC overwriting the primary map (which we don't want).
+>>  
+>>> Other features like the PPIs and SGIs in the secondary CPU should also
+>>> be ignored - they probably aren't used anyway.
+>>
+>> Yes, agree.
+>>  
+>>> I have to say though... are the 1020 IRQs that the primary GIC provides
+>>> really not enough?  What insane hardware needs more than 1020 IRQs?
+>>
+>> Ha. I guess some realview boards for a start ...
+>>
+>> # grep -r "gic_init(1" arch/arm/
+>> arch/arm/mach-realview/realview_pb1176.c:	gic_init(1, IRQ_PB1176_GIC_START,
+>> arch/arm/mach-realview/realview_eb.c:		gic_init(1, 96, __io_address(REALVIEW_EB_GIC_DIST_BASE),
+>> arch/arm/mach-realview/realview_pb11mp.c:	gic_init(1, IRQ_PB11MP_GIC_START,
 > 
-> 29b635c00f3e ("of/pci: Provide support for parsing PCI DT ranges
-> property") added struct of_pci_range, and even at the time,
-> of_bus_pci_get_flags() set IORESOURCE_PREFETCH in of_pci_range.flags.
-> 
-> 654837e8fe8d ("powerpc/pci: Use of_pci_range_parser helper in
-> pci_process_bridge_OF_ranges") converted powerpc to use
-> of_pci_range_parser() instead of parsing manually.  It converted other
-> references to look at struct of_pci_range.flags; I'm not sure why it
-> didn't do that for the prefetch bit.
-> 
-> I copied Andrew in case there's some subtlety here.
-> 
-> > > pci_addr: I assume this is a PCI bus address, like what you would
-> see
-> > > if
-> > > you put an analyzer on the bus/link.  This address could go in a
-> BAR.
-> >
-> > Yes, this is the PCI start address of the range: phys.mid + phys.low
-> in the
-> > guide mentioned above
-> >
-> > > cpu_addr: I assume this is a CPU physical address, like what you
-> would
-> > > see
-> > > in /proc/iomem and what you would pass to ioremap().
-> >
-> > Yes correct
-> >
-> > > bus_addr: ?
-> >
-> > According to the guide above, this is the address into which the
-> pci_address
-> > get translated to and that is passed to the root complex. Between the
-> root
-> > complex and the CPU there can be intermediate translation layers:
-> 
-> I can't quite parse this, but I do understand how a host bridge can
-> translate CPU physical addresses to a different range of PCI bus
-> addresses.  What I don't understand is the difference between
-> "pci_addr"
-> and the "bus_addr" you're adding.
+> Different use case. These are development boards with a relatively
+> modular design, where the SoC may or may not have a GIC by itself. When
+> it has one, you end up with the on-board GIC being a secondary one.
 
-For example see:
-http://lxr.free-electrons.com/source/arch/arm/boot/dts/imx6qdl.dtsi#L148
+Yes, I understand that the use-case may be different, but I highlighted
+this as a use where the primary map would be overwritten as the driver
+is today.
 
-ranges = <0x00000800 0 0x01f00000 0x01f00000 0 0x00080000   /* configuration space */
-          0x81000000 0 0          0x01f80000 0 0x00010000   /* downstream I/O */
-          0x82000000 0 0x01000000 0x01000000 0 0x00f00000>; /* non-prefetchable memory *
-               /\          /\          /\
-           pci_space    pci_addr     bus_addr            
+> I never thought someone would quote these designs as an example to
+> follow... ;-)
 
+I can't say if this example was followed, but nevertheless hardware
+designers certainly do get creative ;-)
 
-The host bridge performs the first translation from pci_addr to bus_addr.
-If there are other ranges in the parents nodes in the DT bus_addr gets 
-translated further till you get the cpu_addr.
+So we need to ensure the primary cpu map does not get overwritten by a
+secondary and I have a case where the secondary map is of interest. So
+are ok with this?
 
-Hope it is a bit clearer now....
-
-> 
-> > see that to
-> > get pci_address we call "of_translate_address"; this will apply all
-> the
-> > translation layers (ranges in the DT) that it finds till it comes to
-> the root
-> > node of the DT (thus retrieving the CPU address).
-> > Now said that, for designware we need the first translated PCI
-> address, that we call
-> > here bus_addr after Rob Herring suggested the name...honestly I
-> cannot think of a
-> > different name
-> >
-> >
-> >
-> > > I'm trying to imagine how this might be expressed in ACPI.  A host
-> > > bridge
-> > > ACPI _CRS contains a CPU physical address and applying a _TRA
-> > > (translation
-> > > offset) to the CPU address gives you a PCI bus address.  I know
-> this
-> > > code
-> > > is OF, not ACPI, but I assume that it should be possible to
-> describe
-> > > your
-> > > hardware via ACPI as well as by OF.
-> 
-> > > > diff --git a/include/linux/of_address.h
-> b/include/linux/of_address.h
-> > > > index d88e81b..865f96e 100644
-> > > > --- a/include/linux/of_address.h
-> > > > +++ b/include/linux/of_address.h
-> > > > @@ -16,6 +16,7 @@ struct of_pci_range {
-> > > >  	u32 pci_space;
-> > > >  	u64 pci_addr;
-> > > >  	u64 cpu_addr;
-> > > > +	u64 bus_addr;
-> > > >  	u64 size;
-> > > >  	u32 flags;
-> > > >  };
+Cheers
+Jon
