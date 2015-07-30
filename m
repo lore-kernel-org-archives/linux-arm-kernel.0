@@ -1,26 +1,19 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 30 Jul 2015 08:28:29 +0200
-Subject: [PATCH] soc: mediatek: Fix SCPSYS compilation
-In-Reply-To: <1438192988-17115-1-git-send-email-matthias.bgg@gmail.com>
-References: <1438192988-17115-1-git-send-email-matthias.bgg@gmail.com>
-Message-ID: <20150730062829.GL18700@pengutronix.de>
+From: davem@davemloft.net (David Miller)
+Date: Wed, 29 Jul 2015 23:53:11 -0700 (PDT)
+Subject: [PATCH net 00/11] net: thunderx: Misc fixes
+In-Reply-To: <1438177787-20940-1-git-send-email-aleksey.makarov@caviumnetworks.com>
+References: <1438177787-20940-1-git-send-email-aleksey.makarov@caviumnetworks.com>
+Message-ID: <20150729.235311.963011786178943323.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 29, 2015 at 08:03:08PM +0200, Matthias Brugger wrote:
-> SCPSYS driver misses the module.h include which makes it fail
-> when compiling with allmodconf.
+From: Aleksey Makarov <aleksey.makarov@caviumnetworks.com>
+Date: Wed, 29 Jul 2015 16:49:35 +0300
+
+> Miscellaneous fixes for the ThunderX VNIC driver
 > 
-> This patch fixes this.
-> 
-> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
+> All the patches can be applied individually.
+> It's ok to drop some if the maintainer feels uncomfortable
+> with applying for 4.2.
 
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Series applied to 'net', thanks.
