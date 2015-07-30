@@ -1,142 +1,117 @@
-From: shenwei.wang@freescale.com (Shenwei Wang)
-Date: Thu, 30 Jul 2015 11:11:21 -0500
-Subject: [PATCH v3 1/1] misc: sram: add dev_pm_ops to support module power gate
-Message-ID: <1438272681-29338-1-git-send-email-shenwei.wang@freescale.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 30 Jul 2015 17:12:11 +0100
+Subject: [RFC] arm64: defconfig: enable 48-bit VA by default
+In-Reply-To: <CY1PR0301MB074850E27D5D298D1B8495D2878B0@CY1PR0301MB0748.namprd03.prod.outlook.com>
+References: <CY1PR0301MB07488D6DC5F0B171D6B290E187830@CY1PR0301MB0748.namprd03.prod.outlook.com>
+ <55B0E1AD.60409@arm.com>
+ <BY2PR0301MB0743CBCFC5476E39A5D1EC0B878C0@BY2PR0301MB0743.namprd03.prod.outlook.com>
+ <CAKv+Gu9LHBd7wM6P4H0X5WigzDETtpr2++_Ebo=adg5QtTOW2w@mail.gmail.com>
+ <BY2PR0301MB074300C5F31701D9211827F0878C0@BY2PR0301MB0743.namprd03.prod.outlook.com>
+ <20150730101358.GA30796@e104818-lin.cambridge.arm.com>
+ <CY1PR0301MB074850E27D5D298D1B8495D2878B0@CY1PR0301MB0748.namprd03.prod.outlook.com>
+Message-ID: <20150730161210.GE407@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When system goes into low power states like SUSPEND_MEM and
-HIBERNATION, the hardware IP block may be powered off to reduce
-the power consumption. This power down will lost all the
-data inside the ram. This patch added the dev_pm_ops and
-implemented two callbacks: suspend_noirq and resume_noirq, which
-will save the data in the on-chip-ram right before power down
-and restore it after system resumes.
+On Thu, Jul 30, 2015 at 02:52:40PM +0000, Stuart Yoder wrote:
+> > -----Original Message-----
+> > From: Catalin Marinas [mailto:catalin.marinas at arm.com]
+> > > Yes, our physical memory layout for RAM looks like this:
+> > > 2 GB at 0x8000_0000
+> > > 510 GB at 0x80_8000_0000
+> > 
+> > So your platform currently only has 16GB of RAM. Shouldn't the last 14GB
+> > be placed at 34GB offset (according to the "Principles of ARM Memory
+> > Maps")?
+> 
+> Yes, but it looks like our hardware designer didn't follow it exactly.  And
+> instead created a variant by dropping the middle region.  The reasoning
+> seems to be that our SoC architecture is 40-bit PA only and thus it seemed
+> unnecessary to have the middle region at 34GB offset.  Plus, they wanted
+> that middle region for other I/O.
 
-A new property string named "can-power-gate" is added to
-the devicetree bindings too.
+Ah, so you can't blame the ARM Memory Maps document since you haven't
+followed it properly ;).
 
-Signed-off-by: Shenwei Wang <shenwei.wang@freescale.com>
-Signed-off-by: Anson Huang <b20788@freescale.com>
----
-Change log:
+> > > > To be honest, I think this is poorly designed, and I am not sure we
+> > > > should cater for such configurations in the defconfig.
+> > >
+> > > Agree, if this is a one-off weird platform then we shouldn't.
+> > >
+> > > But, the 'Principles of ARM Memory Maps' doc proposes this:
+> > > 2 GB at 0x8000_0000
+> > > 30 GB at 0x8_8000_0000
+> > > 480 GB at 0x88_0000_0000
+> > 
+> > I'm not particularly recommending this layout, at least not without some
+> > clarifications on DRAM aliases (I'll ping people internally about it
+> > again). The original layout pre-dates ARMv8, it was meant for ARMv7/LPAE
+> > and all the memory beyond 32-bit was highmem anyway. It was later
+> > updated for AArch64 but only to allow 44/48-bit PA (a few sections
+> > added).
+> 
+> Published guidance from ARM I think is important here.  If the aarch64
+> kernel maintainers have issues with the proposed map in the 'Principles' doc,
+> I consider that's a problem.
 
-PATCH v3
-	Removed the unnecessary clk_enable/clk_disable.
+As I said, the problem I have with it is around the mandated aliases and
+holes (and I'll raise it internally). But I won't complain about SoC
+vendors following the recommendation (correctly; which doesn't seem to
+be the case here).
 
-PATCH v2
-	Use vmalloc to allocate the SRAM backup memory.
-	Code clean up.
+> > How I understood it at the time is that in hardware you place the large
+> > DRAM (chip select) at high addresses, e.g. 64GB would be at a 512GB
+> > offset, but lower 2GB+30GB aliased in the lower space with the
+> > corresponding high address remaining a hole (that produces external
+> > aborts if accessed). The first alias at 2GB was meant for 32-bit
+> > initialisation code before the MMU is enabled. With AArch64, you don't
+> > really need this low alias (assuming your EL3/EL2/secure-EL1 code is
+> > 64-bit) since PC can use >32-bit addresses.
+> 
+> I think the intent with our SoC was to do that, but ommitting the
+> middle alias, because there was no obivous reason why it was needed.
 
- Documentation/devicetree/bindings/misc/sram.txt |  2 ++
- drivers/misc/sram.c                             | 42 +++++++++++++++++++++++++
- 2 files changed, 44 insertions(+)
+Can you avoid the low alias as well and keep all the RAM at
+0x80_0000_0000? That's pretty much what we have on AMD's Seattle.
 
-diff --git a/Documentation/devicetree/bindings/misc/sram.txt b/Documentation/devicetree/bindings/misc/sram.txt
-index 36cbe5a..1170086 100644
---- a/Documentation/devicetree/bindings/misc/sram.txt
-+++ b/Documentation/devicetree/bindings/misc/sram.txt
-@@ -33,6 +33,8 @@ Optional properties in the area nodes:
+> > > ...i.e. if you have > 32 GB then your RAM regions are split into 3
+> > > chunks.  The aarch64 kernel will support > than 32GB right?  A
+> > > basic server will have that much or more.
+> > >
+> > > How will we deal with systems with > 32GB of memory that follow that
+> > > map?
+> > 
+> > My recommendation would be to avoid the lower alias (in hardware or some
+> > EL3 configuration change) and keep all the RAM at 0x80_0000_0000, just
+> > boot the system in AArch64 mode.
+> 
+> Unfortunately, for our existing armv8 silicon I am not aware any mechanism to
+> change the aliasing and keeping all RAM at 512GB offset.  So, we're stuck
+> for now with 2 discontiguous regions.  And things are ok as long as we
+> turn on 48-bit VA or 64K pages, but that's not the case with the default
+> defconfig.
 
- - compatible : standard definition, should contain a vendor specific string
-                in the form <vendor>,[<device>-]<usage>
-+- can-power-gate: a property to tell the driver that the sram can support
-+		power gate
+OK, so there is no hardware configuration you can change at this stage.
+You could ignore the lower 2GB and only use 14GB (load the kernel at the
+high address and it should ignore the lower memory block in the DT).
 
- Example:
+> My interest in the default defconfig is related to distro support.  When
+> a distro (Fedora, Debian, Ubuntu,etc) has a binary kernel image we want
+> it to run on our hardware.  I don't know to what degree the upstream
+> defconfig informs distros on what defconfig options are enabled in their
+> kernels...but we want to be as compatible as possible with the default
+> defconfig.
 
-diff --git a/drivers/misc/sram.c b/drivers/misc/sram.c
-index 15c33cc..db9f1fa 100644
---- a/drivers/misc/sram.c
-+++ b/drivers/misc/sram.c
-@@ -30,7 +30,9 @@
+For the time being, I would keep defconfig to 39-bit VA. If we start
+seeing systems with lots of RAM (over 256GB), we'll probably change the
+defconfig. Enabling another page table level has implications on
+performance.
 
- struct sram_dev {
- 	struct device *dev;
-+	void *power_off_save;
- 	void __iomem *virt_base;
-+	u32 size;
+> (BTW, Fedora 22 for aarch64 appears to have 64KB pages enabled, which
+> is good for our memory map)
 
- 	struct gen_pool *pool;
- 	struct clk *clk;
-@@ -156,6 +158,33 @@ static int sram_reserve_regions(struct sram_dev *sram, struct resource *res)
- 	return ret;
- }
+Yes, Fedora should work. I'm not sure what other distros do but in
+general they ship their own config.
 
-+static int sram_suspend_noirq(struct device *dev)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct sram_dev *sram = platform_get_drvdata(pdev);
-+
-+	if (!sram->power_off_save)
-+		return 0;
-+
-+	/* Save necessary regs */
-+	memcpy(sram->power_off_save, sram->virt_base, sram->size);
-+
-+	return 0;
-+}
-+
-+static int sram_resume_noirq(struct device *dev)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct sram_dev *sram = platform_get_drvdata(pdev);
-+
-+	if (!sram->power_off_save)
-+		return 0;
-+
-+	memcpy(sram->virt_base, sram->power_off_save, sram->size);
-+
-+	return 0;
-+}
-+
- static int sram_probe(struct platform_device *pdev)
- {
- 	struct sram_dev *sram;
-@@ -176,6 +205,7 @@ static int sram_probe(struct platform_device *pdev)
- 	}
-
- 	size = resource_size(res);
-+	sram->size = size;
-
- 	if (!devm_request_mem_region(sram->dev, res->start, size, pdev->name)) {
- 		dev_err(sram->dev, "could not request region for resource\n");
-@@ -203,6 +233,9 @@ static int sram_probe(struct platform_device *pdev)
-
- 	platform_set_drvdata(pdev, sram);
-
-+	if (of_property_read_bool(pdev->dev.of_node, "can-power-gate"))
-+		sram->power_off_save = vmalloc(size);
-+
- 	dev_dbg(sram->dev, "SRAM pool: %zu KiB @ 0x%p\n",
- 		gen_pool_size(sram->pool) / 1024, sram->virt_base);
-
-@@ -219,6 +252,9 @@ static int sram_remove(struct platform_device *pdev)
- 	if (sram->clk)
- 		clk_disable_unprepare(sram->clk);
-
-+	if (sram->power_off_save)
-+		vfree(sram->power_off_save);
-+
- 	return 0;
- }
-
-@@ -229,10 +265,16 @@ static const struct of_device_id sram_dt_ids[] = {
- };
- #endif
-
-+static const struct dev_pm_ops sram_pm_ops = {
-+	.suspend_noirq = sram_suspend_noirq,
-+	.resume_noirq = sram_resume_noirq,
-+};
-+
- static struct platform_driver sram_driver = {
- 	.driver = {
- 		.name = "sram",
- 		.of_match_table = of_match_ptr(sram_dt_ids),
-+		.pm	= &sram_pm_ops,
- 	},
- 	.probe = sram_probe,
- 	.remove = sram_remove,
---
-2.5.0.rc2
+-- 
+Catalin
