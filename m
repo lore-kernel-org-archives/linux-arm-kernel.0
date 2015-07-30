@@ -1,90 +1,89 @@
 From: dan.j.williams@intel.com (Dan Williams)
-Date: Thu, 30 Jul 2015 12:55:31 -0400
-Subject: [PATCH v3 20/24] arch: kill ioremap_cached()
+Date: Thu, 30 Jul 2015 12:55:02 -0400
+Subject: [PATCH v3 15/24] libnvdimm,
+ pmem: push call to ioremap_cache out of line
 In-Reply-To: <20150730165155.33962.64121.stgit@dwillia2-desk3.amr.corp.intel.com>
 References: <20150730165155.33962.64121.stgit@dwillia2-desk3.amr.corp.intel.com>
-Message-ID: <20150730165531.33962.12151.stgit@dwillia2-desk3.amr.corp.intel.com>
+Message-ID: <20150730165502.33962.1808.stgit@dwillia2-desk3.amr.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nothing calls this helper, and now that ioremap_cache() is being
-deprecated these can also be removed.
+In preparation for deprecating ioremap_cache() push its usage into arch
+code where it deleted in a later globabl conversion of ioremap_cache()
+to arch_memremap().
 
 Signed-off-by: Dan Williams <dan.j.williams@intel.com>
 ---
- arch/arm/mm/mmu.c               |    2 +-
- arch/metag/include/asm/io.h     |    3 ---
- arch/unicore32/include/asm/io.h |    4 +---
- arch/unicore32/mm/ioremap.c     |    8 --------
- 4 files changed, 2 insertions(+), 15 deletions(-)
+ arch/x86/include/asm/io.h         |    7 +------
+ arch/x86/mm/ioremap.c             |    6 ++++++
+ tools/testing/nvdimm/Kbuild       |    2 +-
+ tools/testing/nvdimm/test/iomap.c |    6 +++---
+ 4 files changed, 11 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index 870838a46d52..3888018d1a36 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -259,7 +259,7 @@ static struct mem_type mem_types[] = {
- 		.prot_sect	= PROT_SECT_DEVICE,
- 		.domain		= DOMAIN_IO,
- 	},
--	[MT_DEVICE_CACHED] = {	  /* ioremap_cached */
-+	[MT_DEVICE_CACHED] = {	  /* memremap(MEMREMAP_WB) */
- 		.prot_pte	= PROT_PTE_DEVICE | L_PTE_MT_DEV_CACHED,
- 		.prot_l1	= PMD_TYPE_TABLE,
- 		.prot_sect	= PROT_SECT_DEVICE | PMD_SECT_WB,
-diff --git a/arch/metag/include/asm/io.h b/arch/metag/include/asm/io.h
-index 9890f21eadbe..5432949e627e 100644
---- a/arch/metag/include/asm/io.h
-+++ b/arch/metag/include/asm/io.h
-@@ -154,9 +154,6 @@ extern void __iounmap(void __iomem *addr);
- #define ioremap_nocache(offset, size)           \
- 	__ioremap((offset), (size), 0)
- 
--#define ioremap_cached(offset, size)            \
--	__ioremap((offset), (size), _PAGE_CACHEABLE)
--
- #define ioremap_wc(offset, size)                \
- 	__ioremap((offset), (size), _PAGE_WR_COMBINE)
- 
-diff --git a/arch/unicore32/include/asm/io.h b/arch/unicore32/include/asm/io.h
-index cb1d8fd2b16b..1eea482b3cb9 100644
---- a/arch/unicore32/include/asm/io.h
-+++ b/arch/unicore32/include/asm/io.h
-@@ -21,10 +21,9 @@
- #include <asm-generic/io.h>
- 
- /*
-- * __uc32_ioremap and __uc32_ioremap_cached takes CPU physical address.
-+ * __uc32_ioremap takes CPU physical address.
-  */
- extern void __iomem *__uc32_ioremap(unsigned long, size_t);
--extern void __iomem *__uc32_ioremap_cached(unsigned long, size_t);
- extern void __uc32_iounmap(volatile void __iomem *addr);
- 
- /*
-@@ -35,7 +34,6 @@ extern void __uc32_iounmap(volatile void __iomem *addr);
-  *
-  */
- #define ioremap(cookie, size)		__uc32_ioremap(cookie, size)
--#define ioremap_cached(cookie, size)	__uc32_ioremap_cached(cookie, size)
- #define ioremap_nocache(cookie, size)	__uc32_ioremap(cookie, size)
- #define iounmap(cookie)			__uc32_iounmap(cookie)
- 
-diff --git a/arch/unicore32/mm/ioremap.c b/arch/unicore32/mm/ioremap.c
-index bf012b2b71a9..f9b6d918de6f 100644
---- a/arch/unicore32/mm/ioremap.c
-+++ b/arch/unicore32/mm/ioremap.c
-@@ -224,14 +224,6 @@ __uc32_ioremap(unsigned long phys_addr, size_t size)
+diff --git a/arch/x86/include/asm/io.h b/arch/x86/include/asm/io.h
+index cc9c61bc1abe..8aeb6456188a 100644
+--- a/arch/x86/include/asm/io.h
++++ b/arch/x86/include/asm/io.h
+@@ -248,12 +248,7 @@ static inline void flush_write_buffers(void)
+ #endif
  }
- EXPORT_SYMBOL(__uc32_ioremap);
  
--void __iomem *
--__uc32_ioremap_cached(unsigned long phys_addr, size_t size)
+-static inline void __pmem *arch_memremap_pmem(resource_size_t offset,
+-	unsigned long size)
 -{
--	return __uc32_ioremap_caller(phys_addr, size, MT_DEVICE_CACHED,
--			__builtin_return_address(0));
+-	return (void __force __pmem *) ioremap_cache(offset, size);
 -}
--EXPORT_SYMBOL(__uc32_ioremap_cached);
 -
- void __uc32_iounmap(volatile void __iomem *io_addr)
++void __pmem *arch_memremap_pmem(resource_size_t offset, size_t size);
+ #endif /* __KERNEL__ */
+ 
+ extern void native_io_delay(void);
+diff --git a/arch/x86/mm/ioremap.c b/arch/x86/mm/ioremap.c
+index ce53e6cff75c..dcaadc6a125b 100644
+--- a/arch/x86/mm/ioremap.c
++++ b/arch/x86/mm/ioremap.c
+@@ -317,6 +317,12 @@ void __iomem *ioremap_cache(resource_size_t phys_addr, unsigned long size)
+ }
+ EXPORT_SYMBOL(ioremap_cache);
+ 
++void __pmem *arch_memremap_pmem(resource_size_t offset, size_t size)
++{
++	return (void __force __pmem *) ioremap_cache(offset, size);
++}
++EXPORT_SYMBOL(arch_memremap_pmem);
++
+ void __iomem *ioremap_prot(resource_size_t phys_addr, unsigned long size,
+ 				unsigned long prot_val)
  {
- 	void *addr = (void *)(PAGE_MASK & (unsigned long)io_addr);
+diff --git a/tools/testing/nvdimm/Kbuild b/tools/testing/nvdimm/Kbuild
+index f56914c7929b..de2912ea78e8 100644
+--- a/tools/testing/nvdimm/Kbuild
++++ b/tools/testing/nvdimm/Kbuild
+@@ -1,7 +1,7 @@
+ ldflags-y += --wrap=ioremap_wt
+ ldflags-y += --wrap=ioremap_wc
+ ldflags-y += --wrap=devm_ioremap_nocache
+-ldflags-y += --wrap=ioremap_cache
++ldflags-y += --wrap=arch_memremap_pmem
+ ldflags-y += --wrap=ioremap_nocache
+ ldflags-y += --wrap=iounmap
+ ldflags-y += --wrap=__request_region
+diff --git a/tools/testing/nvdimm/test/iomap.c b/tools/testing/nvdimm/test/iomap.c
+index 64bfaa50831c..f8486f98f860 100644
+--- a/tools/testing/nvdimm/test/iomap.c
++++ b/tools/testing/nvdimm/test/iomap.c
+@@ -80,11 +80,11 @@ void __iomem *__wrap_devm_ioremap_nocache(struct device *dev,
+ }
+ EXPORT_SYMBOL(__wrap_devm_ioremap_nocache);
+ 
+-void __iomem *__wrap_ioremap_cache(resource_size_t offset, unsigned long size)
++void *__wrap_arch_memremap_pmem(resource_size_t offset, size_t size)
+ {
+-	return __nfit_test_ioremap(offset, size, ioremap_cache);
++	return __nfit_test_ioremap(offset, size, arch_memremap_pmem);
+ }
+-EXPORT_SYMBOL(__wrap_ioremap_cache);
++EXPORT_SYMBOL(__wrap_arch_memremap_pmem);
+ 
+ void __iomem *__wrap_ioremap_nocache(resource_size_t offset, unsigned long size)
+ {
