@@ -1,68 +1,42 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 30 Jul 2015 09:21:36 +0900
-Subject: [GIT PULL] Renesas ARM Based SoC Marzen Board Removal for v4.3
-In-Reply-To: <20150727123327.GF14224@localhost>
-References: <cover.1437726584.git.horms+renesas@verge.net.au>
- <20150727123327.GF14224@localhost>
-Message-ID: <20150730002136.GA3450@verge.net.au>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 30 Jul 2015 02:21:48 +0200
+Subject: [PATCH 02/20] Documentation: watchdog: at91sam9_wdt: add clocks
+ property
+In-Reply-To: <1438215726-27452-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1438215726-27452-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1438215726-27452-3-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+The watchdog has an input clock, the slow clock. It is required as it will
+not function without it.
 
-On Mon, Jul 27, 2015 at 02:33:27PM +0200, Olof Johansson wrote:
-> On Fri, Jul 24, 2015 at 05:41:47PM +0900, Simon Horman wrote:
-> > Hi Olof, Hi Kevin, Hi Arnd,
-> > 
-> > Please consider these Renesas ARM based SoC marzen board removal for v4.3.
-> > 
-> > This series removes legacy r8a7779 SoC and marzen board code.
-> > It does so in a way that does not introduce feature regressions
-> > when when booting the r8a7779/marzen board using shmobile_defconfig,
-> > which provides for booting using multiplatform, a scenario which previously
-> > used board code to provide some features including SMP.
-> > 
-> > Because of the above this series modifies SoC and DT files,
-> > and then removes code. And because of that it was not entirely clear to
-> > me which branch it should go into, so I have provided it in a stand-alone
-> > branch.
-> > 
-> > Unfortunately this branch has a number of minor conflicts with the "Renesas
-> > ARM Based SoC Cleanup for v4.3", tagged as renesas-cleanup-for-v4.3, which
-> > you have previously pulled.
-> > 
-> > A resolution to those conflicts can be found in the
-> > renesas-next-20150724-v4.2-rc1 tag of the renesas tree.
-> > 
-> > I would be happy to rebase these patches on top of renesas-cleanup-for-v4.3
-> > and resubmit a conflict-free pull request if you like.
-> > 
-> > On a more positive note, I believe this to well over 8000 lines of legacy
-> > code removed in this cycle :)
-> 
-> Organization is OK since the additions were small. If there were more
-> additions needed, doing the enablement one release and removing the
-> legacy code the release after would make more sense. But here that's fine.
-> 
-> The only thing I'd like to see different is to please send the defconfig
-> updates separately. They just take out no-longer-existent entries anyway, so
-> the series should do fine without them here.
-> 
-> So, please respin without the defconfig updates and provide them
-> separately, if you want to avoid bisectability problems just do them
-> next release.
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+Cc: Wim Van Sebroeck <wim@iguana.be>
+Cc: linux-watchdog at vger.kernel.org
+ Documentation/devicetree/bindings/watchdog/atmel-wdt.txt | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Understood.
-
-I am fine with breaking out the following, most likely deferring them to
-the next release as I am concerned about bisectability:
-
-* ARM: multi_v7_defconfig: Remove Marzen
-* ARM: shmobile: Remove Marzen from shmobile_defconfig
-
-There is another defconfig change, which I will resubmit in the
-defconfig branch for this release.
-
-* ARM: shmobile: Enable fixed voltage regulator in shmobile_defconfig
-
-Without the above a number of devices do not function.
+diff --git a/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
+index a4d869744f59..86fa6de1019b 100644
+--- a/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
++++ b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
+@@ -6,6 +6,7 @@ Required properties:
+ - compatible: must be "atmel,at91sam9260-wdt".
+ - reg: physical base address of the controller and length of memory mapped
+   region.
++- clocks: phandle to input clock.
+ 
+ Optional properties:
+ - timeout-sec: contains the watchdog timeout in seconds.
+@@ -39,6 +40,7 @@ Example:
+ 		compatible = "atmel,at91sam9260-wdt";
+ 		reg = <0xfffffd40 0x10>;
+ 		interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
++		clocks = <&clk32k>;
+ 		timeout-sec = <15>;
+ 		atmel,watchdog-type = "hardware";
+ 		atmel,reset-type = "all";
+-- 
+2.1.4
