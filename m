@@ -1,41 +1,75 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 31 Jul 2015 11:39:12 +0200
-Subject: [GIT PULL] ARM: mvebu: config changes for v4.3 #2
-Message-ID: <55BB4240.1060008@free-electrons.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri, 31 Jul 2015 11:39:37 +0200
+Subject: [PATCH 01/23] Documentation: dt: atmel-at91: add clocks to system
+ timer, rstc and shdwc
+In-Reply-To: <1438335599-3301-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1438335599-3301-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1438335599-3301-2-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The system timer (at91rm9200), the reset controller and the shutdown
+controller need an input clock. This is the slow clock and they will not
+function without it.
 
-Here is the second pull request for config change for mvebu for v4.3
+Also fix the shutdown controller example.
 
-Gregory
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+Cc: Sebastian Reichel <sre@kernel.org>
+Cc: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+Cc: linux-pm at vger.kernel.org
+ Documentation/devicetree/bindings/arm/atmel-at91.txt | 11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
 
-The following changes since commit adfe5f267dd005d0bbe8d71820a7fa38945d08bd:
-
-  ARM: mvebu: update mvebu_v7_defconfig with features needed for Armada 388 GP (2015-07-09 15:32:55 +0200)
-
-are available in the git repository at:
-
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-config-4.3-2
-
-for you to fetch changes up to 9e07b491bc004259e42739ecd7483ab5a0b8b150:
-
-  ARM: defconfig: orion5x: add DT support (2015-07-25 16:21:06 +0200)
-
-----------------------------------------------------------------
-mvebu config changes for v4.3 (part #2)
-
-Improve dt support for orion5x
-
-----------------------------------------------------------------
-Roger Shimizu (1):
-      ARM: defconfig: orion5x: add DT support
-
- arch/arm/configs/orion5x_defconfig | 3 +++
- 1 file changed, 3 insertions(+)
+diff --git a/Documentation/devicetree/bindings/arm/atmel-at91.txt b/Documentation/devicetree/bindings/arm/atmel-at91.txt
+index 424ac8cbfa08..209710cdf3aa 100644
+--- a/Documentation/devicetree/bindings/arm/atmel-at91.txt
++++ b/Documentation/devicetree/bindings/arm/atmel-at91.txt
+@@ -50,6 +50,7 @@ System Timer (ST) required properties:
+ - reg: Should contain registers location and length
+ - interrupts: Should contain interrupt for the ST which is the IRQ line
+   shared across all System Controller members.
++- clocks: phandle to input clock.
+ Its subnodes can be:
+ - watchdog: compatible should be "atmel,at91rm9200-wdt"
+ 
+@@ -89,12 +90,14 @@ RSTC Reset Controller required properties:
+ - compatible: Should be "atmel,<chip>-rstc".
+   <chip> can be "at91sam9260" or "at91sam9g45"
+ - reg: Should contain registers location and length
++- clocks: phandle to input clock.
+ 
+ Example:
+ 
+ 	rstc at fffffd00 {
+ 		compatible = "atmel,at91sam9260-rstc";
+ 		reg = <0xfffffd00 0x10>;
++		clocks = <&clk32k>;
+ 	};
+ 
+ RAMC SDRAM/DDR Controller required properties:
+@@ -117,6 +120,7 @@ required properties:
+ - compatible: Should be "atmel,<chip>-shdwc".
+   <chip> can be "at91sam9260", "at91sam9rl" or "at91sam9x5".
+ - reg: Should contain registers location and length
++- clocks: phandle to input clock.
+ 
+ optional properties:
+ - atmel,wakeup-mode: String, operation mode of the wakeup mode.
+@@ -135,9 +139,10 @@ optional at91sam9x5 properties:
+ 
+ Example:
+ 
+-	rstc at fffffd00 {
+-		compatible = "atmel,at91sam9260-rstc";
+-		reg = <0xfffffd00 0x10>;
++	shdwc at fffffd10 {
++		compatible = "atmel,at91sam9260-shdwc";
++		reg = <0xfffffd10 0x10>;
++		clocks = <&clk32k>;
+ 	};
+ 
+ Special Function Registers (SFR)
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+2.1.4
