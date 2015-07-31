@@ -1,41 +1,44 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Fri, 31 Jul 2015 14:28:47 -0700
-Subject: [RFC PATCH 4/5] ARM: dts: DRA7: Add memory map region entries
- for qspi
-In-Reply-To: <1438072876-16338-5-git-send-email-vigneshr@ti.com>
-References: <1438072876-16338-1-git-send-email-vigneshr@ti.com>
- <1438072876-16338-5-git-send-email-vigneshr@ti.com>
-Message-ID: <20150731212847.GH10676@google.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 31 Jul 2015 14:34:25 -0700
+Subject: [PATCH 23/23] clk: at91: Revert "keep slow clk enabled to prevent
+ system hang"
+In-Reply-To: <20150731212724.GN27985@piout.net>
+References: <1438335599-3301-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1438335599-3301-24-git-send-email-alexandre.belloni@free-electrons.com>
+ <55BBC5CC.80406@codeaurora.org> <20150731210905.GM27985@piout.net>
+ <55BBE47F.3010307@codeaurora.org> <20150731212724.GN27985@piout.net>
+Message-ID: <55BBE9E1.4010707@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 28, 2015 at 02:11:15PM +0530, Vignesh R wrote:
-> Add qspi memory mapped region entries for DRA7xx based SoCs.
-> 
-> Signed-off-by: Vignesh R <vigneshr@ti.com>
-> ---
->  arch/arm/boot/dts/am4372.dtsi | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
-> index ade28c790f4b..5317a0f24ab9 100644
-> --- a/arch/arm/boot/dts/am4372.dtsi
-> +++ b/arch/arm/boot/dts/am4372.dtsi
-> @@ -902,7 +902,9 @@
->  
->  		qspi: qspi at 47900000 {
->  			compatible = "ti,am4372-qspi";
-> -			reg = <0x47900000 0x100>;
-> +			reg = <0x47900000 0x100>,
-> +			      <0x30000000 0x3ffffff>;
+On 07/31/2015 02:27 PM, Alexandre Belloni wrote:
+> On 31/07/2015 at 14:11:27 -0700, Stephen Boyd wrote :
+>> On 07/31/2015 02:09 PM, Alexandre Belloni wrote:
+>>> On 31/07/2015 at 12:00:28 -0700, Stephen Boyd wrote :
+>>>> On 07/31/2015 02:39 AM, Alexandre Belloni wrote:
+>>>>> -	clk_prepare_enable(slow_clk);
+>>>>> -
+>>>>> -	return 0;
+>>>>> -}
+>>>>> -arch_initcall(of_at91_clk_slow_retain);
+>>>> Can you drop the include of clk.h in this file too?
+>>>>
+>>> Sure! I will do that in v3. However, I'll wait for some feedback from
+>>> the other maintainers before sending again.
+>>>
+>> Cool. Also, are you going to take this through arm-soc? If so, feel free to
+>> add my ack.
+>>
+> Actually, clk.h has never been included in that file.
+>
+> I was thinking you could take it once the other patch made it in each
+> subsystem. It is not urgent, it can probably skip one or two cycles.
+>
 
-Are you sure this region is 1 byte shy of 64MB in length? Same question
-for patch 5.
+Ok that's fine. I added clk.h into this file when I removed clk.h from 
+clk-provider.h so that it keeps compiling. Please remind us to pick this 
+up when you think it's ready.
 
-> +			reg-names = "qspi_base", "qspi_mmap";
->  			#address-cells = <1>;
->  			#size-cells = <0>;
->  			ti,hwmods = "qspi";
-> -- 
-> 2.4.6
-> 
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
