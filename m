@@ -1,118 +1,29 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Fri, 31 Jul 2015 09:44:12 +0100
-Subject: [PATCH V2 2/2] irqchip/gic: Ensure gic_cpu_if_up/down() programs
- correct GIC instance
-In-Reply-To: <1438332252-25248-1-git-send-email-jonathanh@nvidia.com>
-References: <1438332252-25248-1-git-send-email-jonathanh@nvidia.com>
-Message-ID: <1438332252-25248-2-git-send-email-jonathanh@nvidia.com>
+From: johan@kernel.org (Johan Hovold)
+Date: Fri, 31 Jul 2015 10:44:56 +0200
+Subject: [PATCH 7/9] gpiolib-sysfs: Add gpio name parsing for sysfs export
+In-Reply-To: <20150729065736.GE30895@pengutronix.de>
+References: <1437125570-28623-1-git-send-email-mpa@pengutronix.de>
+ <1437125570-28623-8-git-send-email-mpa@pengutronix.de>
+ <20150728095004.GM28535@localhost>
+ <20150729065736.GE30895@pengutronix.de>
+Message-ID: <20150731084456.GN28535@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 3228950621d9 ("irqchip: gic: Preserve gic V2 bypass bits in cpu
-ctrl register") added a new function, gic_cpu_if_up(), to program the
-GIC CPU_CTRL register. This function assumes that there is only one GIC
-instance present and hence always uses the chip data for the primary GIC
-controller. Although it is not common for there to be a secondary, some
-devices do support a secondary. Therefore, fix this by passing
-gic_cpu_if_up() a pointer to the appropriate chip data structure.
+On Wed, Jul 29, 2015 at 08:57:36AM +0200, Markus Pargmann wrote:
+> On Tue, Jul 28, 2015 at 11:50:04AM +0200, Johan Hovold wrote:
+> > On Fri, Jul 17, 2015 at 11:32:48AM +0200, Markus Pargmann wrote:
 
-Similarly, the function gic_cpu_if_down() only assumes that there is a
-single GIC instance present. Update this function so that an instance
-number is passed for the appropriate GIC and return an error code on
-failure. The vexpress TC2 (which has a single GIC) is currently the only
-user of this function and so update it accordingly. Note that because the
-TC2 only has a single GIC, the call to gic_cpu_if_down() should always
-be successful.
+> > > +		char *gpio_name = kstrdup(buf, GFP_KERNEL);
+> > 
+> > Must check for allocation failures, but why use kstrdup at all?
+> 
+> Yes have to check that.
+> strim() may modify the buf variable which is constant.
+>
+> > > +
+> > > +		desc = gpio_name_to_desc(strim(gpio_name));
 
-Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
----
-V2 changes:
-- Rebased on v4.2-rc4
-- Added test to ensure GIC instance is valid to gic_cpu_if_down() and
-  updated gic_cpu_if_down() to return an error code on failure.
+Ah, I missed that strim.
 
- arch/arm/mach-vexpress/tc2_pm.c |  2 +-
- drivers/irqchip/irq-gic.c       | 18 ++++++++++++------
- include/linux/irqchip/arm-gic.h |  2 +-
- 3 files changed, 14 insertions(+), 8 deletions(-)
-
-diff --git a/arch/arm/mach-vexpress/tc2_pm.c b/arch/arm/mach-vexpress/tc2_pm.c
-index b3328cd46c33..1aa4ccece69f 100644
---- a/arch/arm/mach-vexpress/tc2_pm.c
-+++ b/arch/arm/mach-vexpress/tc2_pm.c
-@@ -80,7 +80,7 @@ static void tc2_pm_cpu_powerdown_prepare(unsigned int cpu, unsigned int cluster)
- 	 * to the CPU by disabling the GIC CPU IF to prevent wfi
- 	 * from completing execution behind power controller back
- 	 */
--	gic_cpu_if_down();
-+	gic_cpu_if_down(0);
- }
- 
- static void tc2_pm_cluster_powerdown_prepare(unsigned int cluster)
-diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index dc5090543eca..fdd1b0e6e5c3 100644
---- a/drivers/irqchip/irq-gic.c
-+++ b/drivers/irqchip/irq-gic.c
-@@ -355,9 +355,9 @@ static u8 gic_get_cpumask(struct gic_chip_data *gic)
- 	return mask;
- }
- 
--static void gic_cpu_if_up(void)
-+static void gic_cpu_if_up(struct gic_chip_data *gic)
- {
--	void __iomem *cpu_base = gic_data_cpu_base(&gic_data[0]);
-+	void __iomem *cpu_base = gic_data_cpu_base(gic);
- 	u32 bypass = 0;
- 
- 	/*
-@@ -425,17 +425,23 @@ static void gic_cpu_init(struct gic_chip_data *gic)
- 	gic_cpu_config(dist_base, NULL);
- 
- 	writel_relaxed(GICC_INT_PRI_THRESHOLD, base + GIC_CPU_PRIMASK);
--	gic_cpu_if_up();
-+	gic_cpu_if_up(gic);
- }
- 
--void gic_cpu_if_down(void)
-+int gic_cpu_if_down(unsigned int gic_nr)
- {
--	void __iomem *cpu_base = gic_data_cpu_base(&gic_data[0]);
-+	void __iomem *cpu_base;
- 	u32 val = 0;
- 
-+	if (gic_nr >= MAX_GIC_NR)
-+		return -EINVAL;
-+
-+	cpu_base = gic_data_cpu_base(&gic_data[gic_nr]);
- 	val = readl(cpu_base + GIC_CPU_CTRL);
- 	val &= ~GICC_ENABLE;
- 	writel_relaxed(val, cpu_base + GIC_CPU_CTRL);
-+
-+	return 0;
- }
- 
- #ifdef CONFIG_CPU_PM
-@@ -571,7 +577,7 @@ static void gic_cpu_restore(unsigned int gic_nr)
- 					dist_base + GIC_DIST_PRI + i * 4);
- 
- 	writel_relaxed(GICC_INT_PRI_THRESHOLD, cpu_base + GIC_CPU_PRIMASK);
--	gic_cpu_if_up();
-+	gic_cpu_if_up(&gic_data[gic_nr]);
- }
- 
- static int gic_notifier(struct notifier_block *self, unsigned long cmd,	void *v)
-diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
-index 9de976b4f9a7..da6aced1105e 100644
---- a/include/linux/irqchip/arm-gic.h
-+++ b/include/linux/irqchip/arm-gic.h
-@@ -99,7 +99,7 @@ void gic_set_irqchip_flags(unsigned long flags);
- void gic_init_bases(unsigned int, int, void __iomem *, void __iomem *,
- 		    u32 offset, struct device_node *);
- void gic_cascade_irq(unsigned int gic_nr, unsigned int irq);
--void gic_cpu_if_down(void);
-+int gic_cpu_if_down(unsigned int gic_nr);
- 
- static inline void gic_init(unsigned int nr, int start,
- 			    void __iomem *dist , void __iomem *cpu)
--- 
-2.1.4
+Johan
