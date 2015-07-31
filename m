@@ -1,69 +1,74 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 31 Jul 2015 16:23:43 +0530
-Subject: [PATCH 9/15 V2] drivers: rtc: Drop (un)likely before IS_ERR(_OR_NULL)
-In-Reply-To: <cdfa3fb76901fe1c4a5756e7e64cb3370cf6317a.1438331416.git.viresh.kumar@linaro.org>
-References: <cdfa3fb76901fe1c4a5756e7e64cb3370cf6317a.1438331416.git.viresh.kumar@linaro.org>
-Message-ID: <b8be698a8625ceb9adc8da51cd9474626db7c3d1.1438339891.git.viresh.kumar@linaro.org>
+From: ian.campbell@citrix.com (Ian Campbell)
+Date: Fri, 31 Jul 2015 11:55:42 +0100
+Subject: [PATCH 1/8] arm/xen: Remove helpers which are PV specific
+In-Reply-To: <alpine.DEB.2.02.1507311142580.11337@kaball.uk.xensource.com>
+References: <1438095769-2560-1-git-send-email-julien.grall@citrix.com>
+ <1438095769-2560-2-git-send-email-julien.grall@citrix.com>
+ <alpine.DEB.2.02.1507311142580.11337@kaball.uk.xensource.com>
+Message-ID: <1438340142.30740.57.camel@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-IS_ERR(_OR_NULL) already contain an 'unlikely' compiler flag and there
-is no need to do that again from its callers. Drop it.
+On Fri, 2015-07-31 at 11:44 +0100, Stefano Stabellini wrote:
+> On Tue, 28 Jul 2015, Julien Grall wrote:
+> > ARM guests are assimilated to HVM guest on ARM. The current
+> > implementation is assuming a 1:1 mapping which is only true for DOM0 
+> > and
+> > may not be at all in the future.
+> > 
+> > Furthermore, all the helpers but arbitrary_virt_to_machine are used in
+> > x86 specific code (or only compiled for).
+> > 
+> > The helper arbitrary_virt_to_machine is only used in PV specific code.
+> > Therefore we should never call the function.
+> > 
+> > Add a BUG() in this helper and drop all the others.
+> > 
+> > Signed-off-by: Julien Grall <julien.grall@citrix.com>
+> > Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> > Cc: Russell King <linux@arm.linux.org.uk>
+> > Cc: linux-arm-kernel at lists.infradead.org
+> > ---
+> >  arch/arm/include/asm/xen/page.h | 16 ++--------------
+> >  1 file changed, 2 insertions(+), 14 deletions(-)
+> > 
+> > diff --git a/arch/arm/include/asm/xen/page.h 
+> > b/arch/arm/include/asm/xen/page.h
+> > index 1bee8ca..c2e9dcd 100644
+> > --- a/arch/arm/include/asm/xen/page.h
+> > +++ b/arch/arm/include/asm/xen/page.h
+> > @@ -54,26 +54,14 @@ static inline unsigned long mfn_to_pfn(unsigned 
+> > long mfn)
+> >  
+> >  #define mfn_to_local_pfn(mfn) mfn_to_pfn(mfn)
+> >  
+> > -static inline xmaddr_t phys_to_machine(xpaddr_t phys)
+> > -{
+> > -	unsigned offset = phys.paddr & ~PAGE_MASK;
+> > -	return XMADDR(PFN_PHYS(pfn_to_mfn(PFN_DOWN(phys.paddr))) | 
+> > offset);
+> > -}
+> > -
+> > -static inline xpaddr_t machine_to_phys(xmaddr_t machine)
+> > -{
+> > -	unsigned offset = machine.maddr & ~PAGE_MASK;
+> > -	return XPADDR(PFN_PHYS(mfn_to_pfn(PFN_DOWN(machine.maddr))) | 
+> > offset);
+> > -}
+> >  /* VIRT <-> MACHINE conversion */
+> > -#define virt_to_machine(v)	(phys_to_machine(XPADDR(__pa(v))))
+> >  #define virt_to_mfn(v)		(pfn_to_mfn(virt_to_pfn(v)))
+> >  #define mfn_to_virt(m)		(__va(mfn_to_pfn(m) << PAGE_SHIFT))
+> >  
+> > +/* Only used in PV code. However ARM guest is always assimilated as 
+> > HVM. */
+>                                ^ "However" doesn't make sense here from an
+>                                english grammer point of view.
 
-gemini driver was using likely() for a failure case while the rtc driver
-is getting registered. That looks wrong and it should really be
-unlikely. But because we are killing all the unlikely() flags, lets kill
-that too.
+"English grammar" :-P
 
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
----
-V1->V2:
-- Removed the likely() part from gemini driver and the changelog wasn't
-  updated to match that. Fixed the changelog now.
+Sorry. What I really meant to say was that "assimilated" doesn't make sense
+in this context either. I think maybe what was meant is "ARM guests are
+always HVM".
 
- drivers/rtc/interface.c  | 2 +-
- drivers/rtc/rtc-bfin.c   | 2 +-
- drivers/rtc/rtc-gemini.c | 2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/rtc/interface.c b/drivers/rtc/interface.c
-index 11b639067312..5836751b8203 100644
---- a/drivers/rtc/interface.c
-+++ b/drivers/rtc/interface.c
-@@ -564,7 +564,7 @@ enum hrtimer_restart rtc_pie_update_irq(struct hrtimer *timer)
- void rtc_update_irq(struct rtc_device *rtc,
- 		unsigned long num, unsigned long events)
- {
--	if (unlikely(IS_ERR_OR_NULL(rtc)))
-+	if (IS_ERR_OR_NULL(rtc))
- 		return;
- 
- 	pm_stay_awake(rtc->dev.parent);
-diff --git a/drivers/rtc/rtc-bfin.c b/drivers/rtc/rtc-bfin.c
-index 3d44b11721ea..535a5f9338d0 100644
---- a/drivers/rtc/rtc-bfin.c
-+++ b/drivers/rtc/rtc-bfin.c
-@@ -361,7 +361,7 @@ static int bfin_rtc_probe(struct platform_device *pdev)
- 	/* Register our RTC with the RTC framework */
- 	rtc->rtc_dev = devm_rtc_device_register(dev, pdev->name, &bfin_rtc_ops,
- 						THIS_MODULE);
--	if (unlikely(IS_ERR(rtc->rtc_dev)))
-+	if (IS_ERR(rtc->rtc_dev))
- 		return PTR_ERR(rtc->rtc_dev);
- 
- 	/* Grab the IRQ and init the hardware */
-diff --git a/drivers/rtc/rtc-gemini.c b/drivers/rtc/rtc-gemini.c
-index 35f4486738fc..2fed93e1114a 100644
---- a/drivers/rtc/rtc-gemini.c
-+++ b/drivers/rtc/rtc-gemini.c
-@@ -148,7 +148,7 @@ static int gemini_rtc_probe(struct platform_device *pdev)
- 
- 	rtc->rtc_dev = rtc_device_register(pdev->name, dev,
- 					   &gemini_rtc_ops, THIS_MODULE);
--	if (likely(IS_ERR(rtc->rtc_dev)))
-+	if (IS_ERR(rtc->rtc_dev))
- 		return PTR_ERR(rtc->rtc_dev);
- 
- 	return 0;
--- 
-2.4.0
+Ian.
