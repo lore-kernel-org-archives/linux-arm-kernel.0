@@ -1,139 +1,178 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Sat,  1 Aug 2015 00:58:25 +0200
-Subject: [PATCH 4/9] ARM: at91/dt: enable lcd support for at91sam9x5 SoCs
+Date: Sat,  1 Aug 2015 00:58:22 +0200
+Subject: [PATCH 1/9] ARM: at91/dt: define hlcdc node in at91sam9x5_lcd.dtsi
 In-Reply-To: <1438383510-10521-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1438383510-10521-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1438383510-10521-5-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1438383510-10521-2-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Boris BREZILLON <boris.brezillon@free-electrons.com>
 
-Use the at91sam9x5 display module dtsi in the relevant board dts.
+Define at91sam9x5 hlcdc node for the SoCs with an LCD controller.
 
 Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/boot/dts/at91sam9g15ek.dts | 25 +++++++++++++++++++++++++
- arch/arm/boot/dts/at91sam9g35ek.dts | 21 +++++++++++++++++++++
- arch/arm/boot/dts/at91sam9x35ek.dts | 20 ++++++++++++++++++++
- 3 files changed, 66 insertions(+)
+ arch/arm/boot/dts/at91sam9x5_lcd.dtsi | 139 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 139 insertions(+)
 
-diff --git a/arch/arm/boot/dts/at91sam9g15ek.dts b/arch/arm/boot/dts/at91sam9g15ek.dts
-index 26b0444b0f96..d1d2b400f1c6 100644
---- a/arch/arm/boot/dts/at91sam9g15ek.dts
-+++ b/arch/arm/boot/dts/at91sam9g15ek.dts
-@@ -8,9 +8,34 @@
-  */
- /dts-v1/;
- #include "at91sam9g15.dtsi"
-+#include "at91sam9x5dm.dtsi"
- #include "at91sam9x5ek.dtsi"
- 
+diff --git a/arch/arm/boot/dts/at91sam9x5_lcd.dtsi b/arch/arm/boot/dts/at91sam9x5_lcd.dtsi
+index 485302e8233d..1629db9dd563 100644
+--- a/arch/arm/boot/dts/at91sam9x5_lcd.dtsi
++++ b/arch/arm/boot/dts/at91sam9x5_lcd.dtsi
+@@ -13,6 +13,137 @@
  / {
- 	model = "Atmel AT91SAM9G15-EK";
- 	compatible = "atmel,at91sam9g15ek", "atmel,at91sam9x5ek", "atmel,at91sam9x5", "atmel,at91sam9";
-+
-+	ahb {
-+		apb {
+ 	ahb {
+ 		apb {
 +			hlcdc: hlcdc at f8038000 {
-+				status = "okay";
++				compatible = "atmel,at91sam9x5-hlcdc";
++				reg = <0xf8038000 0x4000>;
++				interrupts = <25 IRQ_TYPE_LEVEL_HIGH 0>;
++				clocks = <&lcdc_clk>, <&lcdck>, <&clk32k>;
++				clock-names = "periph_clk","sys_clk", "slow_clk";
++				status = "disabled";
++
++				hlcdc-display-controller {
++					compatible = "atmel,hlcdc-display-controller";
++					#address-cells = <1>;
++					#size-cells = <0>;
++
++					port at 0 {
++						#address-cells = <1>;
++						#size-cells = <0>;
++						reg = <0>;
++					};
++				};
++
++				hlcdc_pwm: hlcdc-pwm {
++					compatible = "atmel,hlcdc-pwm";
++					pinctrl-names = "default";
++					pinctrl-0 = <&pinctrl_lcd_pwm>;
++					#pwm-cells = <3>;
++				};
 +			};
-+		};
-+	};
 +
-+	backlight: backlight {
-+		status = "okay";
-+	};
++			pinctrl at fffff400 {
++				lcd {
++					pinctrl_lcd_base: lcd-base-0 {
++						atmel,pins =
++							<AT91_PIOC 27 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDVSYNC */
++							 AT91_PIOC 28 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDHSYNC */
++							 AT91_PIOC 24 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDDISP */
++							 AT91_PIOC 29 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDDEN */
++							 AT91_PIOC 30 AT91_PERIPH_A AT91_PINCTRL_NONE>;	/* LCDPCK */
++					};
 +
-+	bl_reg: backlight_regulator {
-+		status = "okay";
-+	};
++					pinctrl_lcd_pwm: lcd-pwm-0 {
++						atmel,pins = <AT91_PIOC 26 AT91_PERIPH_A AT91_PINCTRL_NONE>;	/* LCDPWM */
++					};
 +
-+	panel: panel {
-+		status = "okay";
-+	};
++					pinctrl_lcd_rgb444: lcd-rgb-0 {
++						atmel,pins =
++							<AT91_PIOC 0 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD0 pin */
++							 AT91_PIOC 1 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD1 pin */
++							 AT91_PIOC 2 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD2 pin */
++							 AT91_PIOC 3 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD3 pin */
++							 AT91_PIOC 4 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD4 pin */
++							 AT91_PIOC 5 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD5 pin */
++							 AT91_PIOC 6 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD6 pin */
++							 AT91_PIOC 7 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD7 pin */
++							 AT91_PIOC 8 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD8 pin */
++							 AT91_PIOC 9 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD9 pin */
++							 AT91_PIOC 10 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD10 pin */
++							 AT91_PIOC 11 AT91_PERIPH_A AT91_PINCTRL_NONE>;	/* LCDD11 pin */
++					};
 +
-+	panel_reg: panel_regulator {
-+		status = "okay";
-+	};
- };
-diff --git a/arch/arm/boot/dts/at91sam9g35ek.dts b/arch/arm/boot/dts/at91sam9g35ek.dts
-index 641a9bf89ed1..23ec8b13f30a 100644
---- a/arch/arm/boot/dts/at91sam9g35ek.dts
-+++ b/arch/arm/boot/dts/at91sam9g35ek.dts
-@@ -8,6 +8,7 @@
-  */
- /dts-v1/;
- #include "at91sam9g35.dtsi"
-+#include "at91sam9x5dm.dtsi"
- #include "at91sam9x5ek.dtsi"
- 
- / {
-@@ -20,6 +21,26 @@
- 				phy-mode = "rmii";
- 				status = "okay";
++					pinctrl_lcd_rgb565: lcd-rgb-1 {
++						atmel,pins =
++							<AT91_PIOC 0 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD0 pin */
++							 AT91_PIOC 1 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD1 pin */
++							 AT91_PIOC 2 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD2 pin */
++							 AT91_PIOC 3 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD3 pin */
++							 AT91_PIOC 4 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD4 pin */
++							 AT91_PIOC 5 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD5 pin */
++							 AT91_PIOC 6 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD6 pin */
++							 AT91_PIOC 7 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD7 pin */
++							 AT91_PIOC 8 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD8 pin */
++							 AT91_PIOC 9 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD9 pin */
++							 AT91_PIOC 10 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD10 pin */
++							 AT91_PIOC 11 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD11 pin */
++							 AT91_PIOC 12 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD12 pin */
++							 AT91_PIOC 13 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD13 pin */
++							 AT91_PIOC 14 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD14 pin */
++							 AT91_PIOC 15 AT91_PERIPH_A AT91_PINCTRL_NONE>;	/* LCDD15 pin */
++					};
++
++					pinctrl_lcd_rgb666: lcd-rgb-2 {
++						atmel,pins =
++							<AT91_PIOC 0 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD0 pin */
++							 AT91_PIOC 1 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD1 pin */
++							 AT91_PIOC 2 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD2 pin */
++							 AT91_PIOC 3 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD3 pin */
++							 AT91_PIOC 4 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD4 pin */
++							 AT91_PIOC 5 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD5 pin */
++							 AT91_PIOC 6 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD6 pin */
++							 AT91_PIOC 7 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD7 pin */
++							 AT91_PIOC 8 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD8 pin */
++							 AT91_PIOC 9 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD9 pin */
++							 AT91_PIOC 10 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD10 pin */
++							 AT91_PIOC 11 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD11 pin */
++							 AT91_PIOC 12 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD12 pin */
++							 AT91_PIOC 13 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD13 pin */
++							 AT91_PIOC 14 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD14 pin */
++							 AT91_PIOC 15 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD15 pin */
++							 AT91_PIOC 16 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD16 pin */
++							 AT91_PIOC 17 AT91_PERIPH_A AT91_PINCTRL_NONE>;	/* LCDD17 pin */
++					};
++
++					pinctrl_lcd_rgb888: lcd-rgb-3 {
++						atmel,pins =
++							<AT91_PIOC 0 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD0 pin */
++							 AT91_PIOC 1 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD1 pin */
++							 AT91_PIOC 2 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD2 pin */
++							 AT91_PIOC 3 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD3 pin */
++							 AT91_PIOC 4 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD4 pin */
++							 AT91_PIOC 5 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD5 pin */
++							 AT91_PIOC 6 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD6 pin */
++							 AT91_PIOC 7 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD7 pin */
++							 AT91_PIOC 8 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD8 pin */
++							 AT91_PIOC 9 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD9 pin */
++							 AT91_PIOC 10 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD10 pin */
++							 AT91_PIOC 11 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD11 pin */
++							 AT91_PIOC 12 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD12 pin */
++							 AT91_PIOC 13 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD13 pin */
++							 AT91_PIOC 14 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD14 pin */
++							 AT91_PIOC 15 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD15 pin */
++							 AT91_PIOC 16 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD16 pin */
++							 AT91_PIOC 17 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD17 pin */
++							 AT91_PIOC 18 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD18 pin */
++							 AT91_PIOC 19 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD19 pin */
++							 AT91_PIOC 20 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD20 pin */
++							 AT91_PIOC 21 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD21 pin */
++							 AT91_PIOC 22 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD22 pin */
++							 AT91_PIOC 23 AT91_PERIPH_A AT91_PINCTRL_NONE>;	/* LCDD23 pin */
++					};
++				};
++			};
++
+ 			pmc: pmc at fffffc00 {
+ 				periphck {
+ 					lcdc_clk: lcdc_clk {
+@@ -20,6 +151,14 @@
+ 						reg = <25>;
+ 					};
+ 				};
++
++				systemck {
++					lcdck: lcdck {
++						#clock-cells = <0>;
++						reg = <3>;
++						clocks = <&mck>;
++					};
++				};
  			};
-+
-+			hlcdc: hlcdc at f8038000 {
-+				status = "okay";
-+			};
  		};
  	};
-+
-+	backlight: backlight {
-+		status = "okay";
-+	};
-+
-+	bl_reg: backlight_regulator {
-+		status = "okay";
-+	};
-+
-+	panel: panel {
-+		status = "okay";
-+	};
-+
-+	panel_reg: panel_regulator {
-+		status = "okay";
-+	};
- };
-diff --git a/arch/arm/boot/dts/at91sam9x35ek.dts b/arch/arm/boot/dts/at91sam9x35ek.dts
-index 343d32818ca3..fcb67180ea26 100644
---- a/arch/arm/boot/dts/at91sam9x35ek.dts
-+++ b/arch/arm/boot/dts/at91sam9x35ek.dts
-@@ -8,6 +8,7 @@
-  */
- /dts-v1/;
- #include "at91sam9x35.dtsi"
-+#include "at91sam9x5dm.dtsi"
- #include "at91sam9x5ek.dtsi"
- 
- / {
-@@ -20,6 +21,25 @@
- 				phy-mode = "rmii";
- 				status = "okay";
- 			};
-+			hlcdc: hlcdc at f8038000 {
-+				status = "okay";
-+			};
- 		};
- 	};
-+
-+	backlight: backlight {
-+		status = "okay";
-+	};
-+
-+	bl_reg: backlight_regulator {
-+		status = "okay";
-+	};
-+
-+	panel: panel {
-+		status = "okay";
-+	};
-+
-+	panel_reg: panel_regulator {
-+		status = "okay";
-+	};
- };
 -- 
 2.1.4
