@@ -1,43 +1,37 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 31 Jul 2015 09:37:29 -0600
-Subject: [PATCH 09/10] Doc: trace: Fix typo in coresight.txt
+Date: Fri, 31 Jul 2015 09:37:30 -0600
+Subject: [PATCH 10/10] coresight: Fix implicit inclusion of linux/sched.h
 In-Reply-To: <1438357050-22486-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1438357050-22486-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1438357050-22486-10-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1438357050-22486-11-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Masanari Iida <standby24x7@gmail.com>
+From: Mark Brown <broonie@kernel.org>
 
-This patch fix spelling typos found in coresight.txt
+The patch "Coresight: Add an interface for supporting ETM3/4 Context ID
+tracing" adds uses of find_task_by_vpid() and task_pid_nr() from
+linux/sched.h but does not include that header causing build errors in
+at least an ARM allmodconfig where it is not implicitly included. Add an
+explicit include to fix that.
 
-Signed-off-by: Masanari Iida <standby24x7@gmail.com>
+Signed-off-by: Mark Brown <broonie@kernel.org>
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- Documentation/trace/coresight.txt | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ include/linux/coresight.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/trace/coresight.txt b/Documentation/trace/coresight.txt
-index 77d14d51a670..0a5c3290e732 100644
---- a/Documentation/trace/coresight.txt
-+++ b/Documentation/trace/coresight.txt
-@@ -15,7 +15,7 @@ HW assisted tracing is becoming increasingly useful when dealing with systems
- that have many SoCs and other components like GPU and DMA engines.  ARM has
- developed a HW assisted tracing solution by means of different components, each
- being added to a design at synthesis time to cater to specific tracing needs.
--Compoments are generally categorised as source, link and sinks and are
-+Components are generally categorised as source, link and sinks and are
- (usually) discovered using the AMBA bus.
+diff --git a/include/linux/coresight.h b/include/linux/coresight.h
+index 626da6948ca2..c69e1b932809 100644
+--- a/include/linux/coresight.h
++++ b/include/linux/coresight.h
+@@ -14,6 +14,7 @@
+ #define _LINUX_CORESIGHT_H
  
- "Sources" generate a compressed stream representing the processor instruction
-@@ -138,7 +138,7 @@ void coresight_unregister(struct coresight_device *csdev);
+ #include <linux/device.h>
++#include <linux/sched.h>
  
- The registering function is taking a "struct coresight_device *csdev" and
- register the device with the core framework.  The unregister function takes
--a reference to a "strut coresight_device", obtained at registration time.
-+a reference to a "struct coresight_device", obtained at registration time.
- 
- If everything goes well during the registration process the new devices will
- show up under /sys/bus/coresight/devices, as showns here for a TC2 platform:
+ /* Peripheral id registers (0xFD0-0xFEC) */
+ #define CORESIGHT_PERIPHIDR4	0xfd0
 -- 
 1.9.1
