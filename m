@@ -1,86 +1,33 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 31 Jul 2015 10:01:41 +0200
-Subject: [PATCH 2/3] phy-sun4i-sub: Move vbus-detect helper functions up in
- the file
-In-Reply-To: <1438329702-10365-1-git-send-email-hdegoede@redhat.com>
-References: <1438329702-10365-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1438329702-10365-3-git-send-email-hdegoede@redhat.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Fri, 31 Jul 2015 10:09:29 +0200
+Subject: [RFCv3 4/4] ARM: zynq: Select ARCH_HAS_RESET_CONTROLLER
+In-Reply-To: <1438305237-18497-5-git-send-email-moritz.fischer@ettus.com>
+References: <1438305237-18497-1-git-send-email-moritz.fischer@ettus.com>
+ <1438305237-18497-5-git-send-email-moritz.fischer@ettus.com>
+Message-ID: <55BB2D39.6000004@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move vbus-detect helper functions up in the file, just moving some code
-around, no functional changes what so ever.
+On 07/31/2015 03:13 AM, Moritz Fischer wrote:
+> Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
+> ---
+>  arch/arm/mach-zynq/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/mach-zynq/Kconfig b/arch/arm/mach-zynq/Kconfig
+> index 78e5e00..77d7df7 100644
+> --- a/arch/arm/mach-zynq/Kconfig
+> +++ b/arch/arm/mach-zynq/Kconfig
+> @@ -1,5 +1,6 @@
+>  config ARCH_ZYNQ
+>  	bool "Xilinx Zynq ARM Cortex A9 Platform" if ARCH_MULTI_V7
+> +	select ARCH_HAS_RESET_CONTROLLER
+>  	select ARCH_SUPPORTS_BIG_ENDIAN
+>  	select ARM_AMBA
+>  	select ARM_GIC
+> 
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- drivers/phy/phy-sun4i-usb.c | 48 ++++++++++++++++++++++-----------------------
- 1 file changed, 24 insertions(+), 24 deletions(-)
+Reviewed-by: Michal Simek <michal.simek@xilinx.com>
 
-diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
-index d514a9b..ddb9fd2 100644
---- a/drivers/phy/phy-sun4i-usb.c
-+++ b/drivers/phy/phy-sun4i-usb.c
-@@ -294,6 +294,30 @@ static int sun4i_usb_phy_exit(struct phy *_phy)
- 	return 0;
- }
- 
-+static int sun4i_usb_phy0_get_vbus_det(struct sun4i_usb_phy_data *data)
-+{
-+	if (data->vbus_det_gpio)
-+		return gpiod_get_value_cansleep(data->vbus_det_gpio);
-+
-+	if (data->vbus_power_supply) {
-+		union power_supply_propval val;
-+		int r;
-+
-+		r = power_supply_get_property(data->vbus_power_supply,
-+					      POWER_SUPPLY_PROP_PRESENT, &val);
-+		if (r == 0)
-+			return val.intval;
-+	}
-+
-+	/* Fallback: report vbus as high */
-+	return 1;
-+}
-+
-+static bool sun4i_usb_phy0_have_vbus_det(struct sun4i_usb_phy_data *data)
-+{
-+	return data->vbus_det_gpio || data->vbus_power_supply;
-+}
-+
- static int sun4i_usb_phy_power_on(struct phy *_phy)
- {
- 	struct sun4i_usb_phy *phy = phy_get_drvdata(_phy);
-@@ -357,30 +381,6 @@ static struct phy_ops sun4i_usb_phy_ops = {
- 	.owner		= THIS_MODULE,
- };
- 
--static int sun4i_usb_phy0_get_vbus_det(struct sun4i_usb_phy_data *data)
--{
--	if (data->vbus_det_gpio)
--		return gpiod_get_value_cansleep(data->vbus_det_gpio);
--
--	if (data->vbus_power_supply) {
--		union power_supply_propval val;
--		int r;
--
--		r = power_supply_get_property(data->vbus_power_supply,
--					      POWER_SUPPLY_PROP_PRESENT, &val);
--		if (r == 0)
--			return val.intval;
--	}
--
--	/* Fallback: report vbus as high */
--	return 1;
--}
--
--static bool sun4i_usb_phy0_have_vbus_det(struct sun4i_usb_phy_data *data)
--{
--	return data->vbus_det_gpio || data->vbus_power_supply;
--}
--
- static void sun4i_usb_phy0_id_vbus_det_scan(struct work_struct *work)
- {
- 	struct sun4i_usb_phy_data *data =
--- 
-2.4.3
+Thanks,
+Michal
