@@ -1,105 +1,164 @@
-From: bonbons@linux-vserver.org (Bruno =?UTF-8?B?UHLDqW1vbnQ=?=)
-Date: Fri, 31 Jul 2015 08:35:41 +0200
-Subject: [linux-sunxi] [PATCH 6/8] ARM: dts: axp209: Add
- usb_power_supply child node to the ax209 node
-In-Reply-To: <CAGb2v67nM7pauyjyhBdfgX7p_Rud6TEsNqphB+gx4ROekVqtbw@mail.gmail.com>
-References: <1433885881-19809-1-git-send-email-hdegoede@redhat.com>
- <1433885881-19809-7-git-send-email-hdegoede@redhat.com>
- <CAGb2v66X79dK84hG8NVTho-kPPMNcKXQspvT2pCM8Zbmnme53A@mail.gmail.com>
- <20150731075104.48c467e6@pluto.restena.lu>
- <CAGb2v67nM7pauyjyhBdfgX7p_Rud6TEsNqphB+gx4ROekVqtbw@mail.gmail.com>
-Message-ID: <20150731083541.5f2c683a@pluto.restena.lu>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 31 Jul 2015 09:03:50 +0200
+Subject: [PATCH v7 3/5] clk: Supply the critical clock {init, enable,
+ disable} framework
+In-Reply-To: <20150728130055.GV14943@x1>
+References: <1437570255-21049-1-git-send-email-lee.jones@linaro.org>
+ <1437570255-21049-4-git-send-email-lee.jones@linaro.org>
+ <20150727072549.GP2564@lukather> <20150727085338.GW3436@x1>
+ <20150728114022.GW2564@lukather> <20150728130055.GV14943@x1>
+Message-ID: <20150731070350.GT2564@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 31 Jul 2015 14:14:28 +0800 Chen-Yu Tsai wrote:
-> On Fri, Jul 31, 2015 at 1:51 PM, Bruno Pr?mont wrote:
-> > Hi ChenYu,
-> >
-> > On Fri, 31 Jul 2015 13:31:53 +0800 Chen-Yu Tsai wrote:
-> >> Hi Hans,
-> >>
-> >> On Wed, Jun 10, 2015 at 5:37 AM, Hans de Goede wrote:
-> >> > Add a node representing the usb power supply part of the axp209 pmic, note
-> >> > that the usb power supply and the (to be added later) ac power supply will
-> >> > each have their own child-node, so that they can be separately specified
-> >> > as power-supply for other nodes using a power-supply property with a
-> >> > phandle pointing to the right axp209 child-node.
-> >> >
-> >> > Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> >> > ---
-> >> >  arch/arm/boot/dts/axp209.dtsi | 5 +++++
-> >> >  1 file changed, 5 insertions(+)
-> >> >
-> >> > diff --git a/arch/arm/boot/dts/axp209.dtsi b/arch/arm/boot/dts/axp209.dtsi
-> >> > index 24c935c..051ab3b 100644
-> >> > --- a/arch/arm/boot/dts/axp209.dtsi
-> >> > +++ b/arch/arm/boot/dts/axp209.dtsi
-> >> > @@ -89,4 +89,9 @@
-> >> >                         regulator-name = "ldo5";
-> >> >                 };
-> >> >         };
-> >> > +
-> >> > +       usb_power_supply: usb_power_supply {
-> >> > +               compatible = "x-powers,axp202-usb-power-supply";
-> >> > +               status = "disabled";
-> >>
-> >> Is there any reason to have this disabled by default?
-> >> AFAIK this is not something configurable in hardware,
-> >> and the driver just gives readouts and status updates.
-> >
-> > There are some devices that only have 'AC-IN' instead of usb/otg power
-> > (set-top boxes) so having the devices tell what power sources they
-> > have makes sense (otherwise those that have ac-in instead of otg would
-> > have to disable usb_power_supply) and avoids confusion by explicitly
-> > stating presence in device dts.
+On Tue, Jul 28, 2015 at 02:00:55PM +0100, Lee Jones wrote:
+> > > I don't think we can use reference counting, because we'd need as
+> > > many critical clock owners as there are critical clocks.
+> > 
+> > Which we can have if we replace the call to clk_prepare_enable you add
+> > in your fourth patch in __set_critical_clocks.
 > 
-> That's true. But this is a bit of hardware inside the AXP.
-> If it's power isn't routed, it should report it, shouldn't it?
+> What should it be replaced with?
 
-If the device does not use the input there are two cases:
-- ac-in and usb/otg in short-circuited (there is a bit in AXP registers
-  to provide this indication)
-- the unused one is just not connected/connectable
+clk->critical_count++
+clk_prepare_enable
 
-In either case the voltage of the unused/unusable branch is not really
-useful, nor is it useful to have it show up in sysfs.
+?
 
-> And normal users would probably expect to read the input
-> voltage/current/status through sysfs (or maybe hwmon?),
-> instead of not finding the device and having to look through
-> the DTS.
-
-Only those supplies effectively present (in-use or with connectors
-to eventually use them) should be visible in sysfs.
-Having more of them will just confuse the users, they would be searching
-how they can connect the supply while there is no means to do so
-except soldering to the tiny AXP pins.
-
-hwmon makes more sense for output voltages of the AXP or temperature
-of AXP chip itself, not so much for the input side if that side is
-covered by power_supply devices (otherwise the information is being
-duplicated and if so should only be via power_supply class, not
-individual drivers).
-
-> If you're using a distro, you might not have the kernel sources
-> around, and digging through the in-system device tree isn't that
-> straightforward if you don't know where to look.
-
-If the dts is incomplete that's another issue.
-
-> > NB: I should hopefully get my battery supply driver ported this WE,
-> > ac-in/rtc are done, this WE. I'm going to default-off for them as well
-> > (note that for some extra details should be provided in dts).
 > 
-> I'm guessing we won't be using the axp288 one?
+> > > Cast your mind back to the reasons for this critical clock API.  One
+> > > of the most important intentions of this API is the requirement
+> > > mitigation for each of the critical clocks to have an owner
+> > > (driver).
+> > > 
+> > > With regards to your second point, that's what 'critical.enabled'
+> > > is for.  Take a look at clk_enable_critical().
+> > 
+> > I don't think this addresses the issue, if you just throw more
+> > customers at it, the issue remain with your implementation.
+> > 
+> > If you have three customers that used the critical API, and if on of
+> > these calls clk_disable_critical, you're losing leave_on.
+> 
+> That's the idea.  See my point above, the one you replied "Indeed"
+> to.  So when a driver uses clk_disable_critical() it's saying, "I know
+> why this clock is a critical clock, and I know that nothing terrible
+> will happen if I disable it, as I have that covered".
 
-In a first step I won't be using it.
+We do agree on the semantic of clk_disable_critical :)
 
-There are a few reasons for that:
-- axp288 is based on ACPI/platform to provide configuration information
-  instead of dts
-- it makes extensive use of OCV and registers that are possibly present
-  on axp20x but undocumented there.
+> So then if it's not the last user to call clk_disable(), the last
+> one out the door will be allowed to finally gate the clock,
+> regardless whether it's critical aware or not.
 
-Bruno
+That's right, but what I mean would be a case where you have two users
+that are aware that it is a critical clock (A and B), and one which is
+not (C).
+
+If I understood correctly your code, if A calls clk_disable_critical,
+leave_on is set to false. That means that now, if C calls clk_disable
+on that clock, it will actually be shut down, while B still considers
+it a critical clock.
+
+> Then, when we come to enable the clock again, the critical aware user
+> then re-marks the clock as leave_on, so not critical un-aware user can
+> take the final reference and disable the clock.
+> 
+> > Which means that if there's one of the two users left that calls
+> > clk_disable on it, the clock will actually be disabled, which is
+> > clearly not what we want to do, as we have still a user that want the
+> > clock to be enabled.
+> 
+> That's not what happens (at least it shouldn't if I've coded it up
+> right).  The API _still_ requires all of the users to give-up their
+> reference.
+
+Ah, right. So I guess it all boils down to the discussion you're
+having with Mike regarding whether critical users should expect to
+already have a reference taken or calling clk_prepare / clk_enable
+themselves.
+
+> 
+> > It would be much more robust to have another count for the critical
+> > stuff, initialised to one by the __set_critical_clocks function.
+> 
+> If I understand you correctly, we already have a count.  We use the
+> original reference count.  No need for one of our own.
+> 
+> Using your RAM Clock (Clock 4) as an example
+> --------------------------------------------
+> 
+> Early start-up:
+>   Clock 4 is marked as critical and a reference is taken (ref == 1)
+> 
+> Driver probe:
+>   SPI enables Clock 4 (ref == 2)
+>   I2C enables Clock 4 (ref == 3)
+> 
+> Suspend (without RAM driver's permission):
+>   SPI disables Clock 4 (ref == 2)
+>   I2C disables Clock 4 (ref == 1)
+>   /*
+>    * Clock won't be gated because:
+>    *   .leave_on is True - can't dec final reference
+>    */
+> 
+> Suspend (with RAM driver's permission):
+>   /* Order is unimportant */
+>   SPI disables Clock 4 (ref == 2)
+>   RAM disables Clock 4 (ref == 1) /* Won't turn off here (ref > 0)
+>   I2C disables Clock 4 (ref == 0) /* (.leave_on == False) last ref can be taken */
+>   /*
+>    * Clock will be gated because:
+>    *   .leave_on is False, so (ref == 0)
+>    */
+> 
+> Resume:
+>   /* Order is unimportant */
+>   SPI enables Clock 4 (ref == 1)
+>   RAM enables Clock 4 and re-enables .leave_on (ref == 2)
+>   I2C enables Clock 4 (ref == 3)
+> 
+> Hopefully that clears things up.
+
+It does indeed. I simply forgot to take into account the fact that it
+would still need the reference to be set to 0. My bad.
+
+Still, If we take the same kind of scenario:
+
+Early start-up:
+  Clock 4 is marked as critical and a reference is taken (ref == 1, leave_on = true)
+
+Driver probe:
+  SPI enables Clock 4 (ref == 2)
+  I2C enables Clock 4 (ref == 3)
+  RAM enables Clock 4 (ref == 4, leave_on = true )
+  CPUIdle enables Clock 4 (ref == 5, leave_on = true )
+
+Suspend (with CPUIdle and RAM permissions):
+  /* Order is unimportant */
+  SPI disables Clock 4 (ref == 4)
+  CPUIdle disables Clock 4 (ref == 3, leave_on = false ) 
+  RAM disables Clock 4 (ref == 2, leave_on = false )
+  I2C disables Clock 4 (ref == 1)
+
+And even though the clock will still be running when CPUIdle calls
+clk_disable_critical because of the enable_count, the status of
+leave_on is off, as the RAM driver still considers it to be left on
+(ie, hasn't called clk_disable_critical yet).
+
+Or at least, that's what I understood of it.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150731/780c6dca/attachment.sig>
