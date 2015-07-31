@@ -1,27 +1,28 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 30 Jul 2015 23:10:23 -0700
-Subject: [PATCH V3 12/16] PM / OPP: add dev_pm_opp_is_turbo() helper
-In-Reply-To: <1e1445bc7f79eb4adc5bf1a0f5eddf118dc60345.1438166099.git.viresh.kumar@linaro.org>
+Date: Thu, 30 Jul 2015 23:11:08 -0700
+Subject: [PATCH V3 13/16] cpufreq: Update boost flag while initializing
+ freq table from OPPs
+In-Reply-To: <62971ce19528d707b89e6521f50779fef3ecf145.1438166099.git.viresh.kumar@linaro.org>
 References: <cover.1438166099.git.viresh.kumar@linaro.org>
- <1e1445bc7f79eb4adc5bf1a0f5eddf118dc60345.1438166099.git.viresh.kumar@linaro.org>
-Message-ID: <20150731061023.GL3159@codeaurora.org>
+ <62971ce19528d707b89e6521f50779fef3ecf145.1438166099.git.viresh.kumar@linaro.org>
+Message-ID: <20150731061108.GM3159@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 07/29, Viresh Kumar wrote:
-> +bool dev_pm_opp_is_turbo(struct dev_pm_opp *opp)
-> +{
-> +	struct dev_pm_opp *tmp_opp;
-> +
-> +	opp_rcu_lockdep_assert();
-> +
-> +	tmp_opp = rcu_dereference(opp);
-> +	if (unlikely(IS_ERR_OR_NULL(tmp_opp)) || !tmp_opp->available) {
-
-IS_ERR_OR_NULL already has unlikely inside it on the error
-pointer path so it seems redundant here.
-
-Otherwise
+> From: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> 
+> cpufreq table entries for OPPs with turbo modes enabled, should be
+> marked with CPUFREQ_BOOST_FREQ flag. This ensures that these states are
+> only used while operating in boost or turbo mode.
+> 
+> Cc: Tomasz Figa <tomasz.figa@gmail.com>
+> Cc: Michael Turquette <mturquette@baylibre.com>
+> Cc: Javier Martinez Canillas <javier@dowhile0.org>
+> Cc: Thomas Abraham <thomas.ab@samsung.com>
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> ---
 
 Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
 
