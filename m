@@ -1,262 +1,113 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 31 Jul 2015 10:59:54 +0200
-Subject: [PATCH 5/5] ARM: dts: sun7i: Add dts file for Wits Pro A20 DKT
-In-Reply-To: <1438333194-21181-1-git-send-email-hdegoede@redhat.com>
-References: <1438333194-21181-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1438333194-21181-6-git-send-email-hdegoede@redhat.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 31 Jul 2015 17:00:43 +0800
+Subject: [linux-sunxi] [PATCH 6/8] ARM: dts: axp209: Add usb_power_supply
+ child node to the ax209 node
+In-Reply-To: <55BB3262.5000403@redhat.com>
+References: <1433885881-19809-1-git-send-email-hdegoede@redhat.com>
+ <1433885881-19809-7-git-send-email-hdegoede@redhat.com>
+ <CAGb2v66X79dK84hG8NVTho-kPPMNcKXQspvT2pCM8Zbmnme53A@mail.gmail.com>
+ <20150731075104.48c467e6@pluto.restena.lu>
+ <CAGb2v67nM7pauyjyhBdfgX7p_Rud6TEsNqphB+gx4ROekVqtbw@mail.gmail.com>
+ <20150731083541.5f2c683a@pluto.restena.lu> <55BB3262.5000403@redhat.com>
+Message-ID: <CAGb2v66+CZe0v=CuYOLfnNwkX70kwPOP28Nya2Y8xw8yrg4-8Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jelle de Jong <jelledejong@powercraft.nl>
+On Fri, Jul 31, 2015 at 4:31 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+> Hi,
+>
+>
+> On 31-07-15 08:35, Bruno Pr?mont wrote:
+>>
+>> On Fri, 31 Jul 2015 14:14:28 +0800 Chen-Yu Tsai wrote:
+>>>
+>>> On Fri, Jul 31, 2015 at 1:51 PM, Bruno Pr?mont wrote:
+>>>>
+>>>> Hi ChenYu,
+>>>>
+>>>> On Fri, 31 Jul 2015 13:31:53 +0800 Chen-Yu Tsai wrote:
+>>>>>
+>>>>> Hi Hans,
+>>>>>
+>>>>> On Wed, Jun 10, 2015 at 5:37 AM, Hans de Goede wrote:
+>>>>>>
+>>>>>> Add a node representing the usb power supply part of the axp209 pmic,
+>>>>>> note
+>>>>>> that the usb power supply and the (to be added later) ac power supply
+>>>>>> will
+>>>>>> each have their own child-node, so that they can be separately
+>>>>>> specified
+>>>>>> as power-supply for other nodes using a power-supply property with a
+>>>>>> phandle pointing to the right axp209 child-node.
+>>>>>>
+>>>>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>>>>>> ---
+>>>>>>   arch/arm/boot/dts/axp209.dtsi | 5 +++++
+>>>>>>   1 file changed, 5 insertions(+)
+>>>>>>
+>>>>>> diff --git a/arch/arm/boot/dts/axp209.dtsi
+>>>>>> b/arch/arm/boot/dts/axp209.dtsi
+>>>>>> index 24c935c..051ab3b 100644
+>>>>>> --- a/arch/arm/boot/dts/axp209.dtsi
+>>>>>> +++ b/arch/arm/boot/dts/axp209.dtsi
+>>>>>> @@ -89,4 +89,9 @@
+>>>>>>                          regulator-name = "ldo5";
+>>>>>>                  };
+>>>>>>          };
+>>>>>> +
+>>>>>> +       usb_power_supply: usb_power_supply {
+>>>>>> +               compatible = "x-powers,axp202-usb-power-supply";
+>>>>>> +               status = "disabled";
+>>>>>
+>>>>>
+>>>>> Is there any reason to have this disabled by default?
+>>>>> AFAIK this is not something configurable in hardware,
+>>>>> and the driver just gives readouts and status updates.
+>>>>
+>>>>
+>>>> There are some devices that only have 'AC-IN' instead of usb/otg power
+>>>> (set-top boxes) so having the devices tell what power sources they
+>>>> have makes sense (otherwise those that have ac-in instead of otg would
+>>>> have to disable usb_power_supply) and avoids confusion by explicitly
+>>>> stating presence in device dts.
+>>>
+>>>
+>>> That's true. But this is a bit of hardware inside the AXP.
+>>> If it's power isn't routed, it should report it, shouldn't it?
+>>
+>>
+>> If the device does not use the input there are two cases:
+>> - ac-in and usb/otg in short-circuited (there is a bit in AXP registers
+>>    to provide this indication)
+>> - the unused one is just not connected/connectable
+>>
+>> In either case the voltage of the unused/unusable branch is not really
+>> useful, nor is it useful to have it show up in sysfs.
+>
+>
+> Exactly my thinking on this, +1 .
+>
+>>> And normal users would probably expect to read the input
+>>> voltage/current/status through sysfs (or maybe hwmon?),
+>>> instead of not finding the device and having to look through
+>>> the DTS.
+>>
+>>
+>> Only those supplies effectively present (in-use or with connectors
+>> to eventually use them) should be visible in sysfs.
+>> Having more of them will just confuse the users, they would be searching
+>> how they can connect the supply while there is no means to do so
+>> except soldering to the tiny AXP pins.
+>
+>
+> +1
 
-The Wits Pro A20 DKT is an A20 Development KiT with 1G RAM, 4G NAND,
-sdio wifi, 1Gbit ethernet, 1024x768 lcd screen with ft5x_ts touchscreen
-and a ton of IO connectors.
+OK. So mostly tablets and dev boards would benefit from having both
+power supplies. Is there a preference for usb-power-supply over
+vbus-det-gpio if both are available? Or just list them both and
+let the driver sort it out?
 
-Note there seem to be multiple sdcard slots on the board (4 in total), but
-other then mmc0 none of these are hooked up by default, there is a ton of
-dip-switches which likely allow hooking some of these up, but the
-documentation of the board only describes the use of a fraction of them,
-so for now we only support mmc0.
+Thanks.
 
-Signed-off-by: Jelle de Jong <jelledejong@powercraft.nl>
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
-Also see: http://www.merrii.com/en/pla_d.asp?id=163
----
- arch/arm/boot/dts/Makefile                       |   3 +-
- arch/arm/boot/dts/sun7i-a20-wits-pro-a20-dkt.dts | 209 +++++++++++++++++++++++
- 2 files changed, 211 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/sun7i-a20-wits-pro-a20-dkt.dts
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index f830e1f..151a413 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -595,7 +595,8 @@ dtb-$(CONFIG_MACH_SUN7I) += \
- 	sun7i-a20-orangepi-mini.dtb \
- 	sun7i-a20-pcduino3.dtb \
- 	sun7i-a20-pcduino3-nano.dtb \
--	sun7i-a20-wexler-tab7200.dtb
-+	sun7i-a20-wexler-tab7200.dtb \
-+        sun7i-a20-wits-pro-a20-dkt.dtb
- dtb-$(CONFIG_MACH_SUN8I) += \
- 	sun8i-a23-evb.dtb \
- 	sun8i-a23-ippo-q8h-v5.dtb \
-diff --git a/arch/arm/boot/dts/sun7i-a20-wits-pro-a20-dkt.dts b/arch/arm/boot/dts/sun7i-a20-wits-pro-a20-dkt.dts
-new file mode 100644
-index 0000000..db4d32c
---- /dev/null
-+++ b/arch/arm/boot/dts/sun7i-a20-wits-pro-a20-dkt.dts
-@@ -0,0 +1,209 @@
-+/*
-+ * Copyright 2015 Jelle de Jong <jelledejong@powercraft.nl>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include "sun7i-a20.dtsi"
-+#include "sunxi-common-regulators.dtsi"
-+
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/input/input.h>
-+#include <dt-bindings/interrupt-controller/irq.h>
-+
-+/ {
-+	model = "Wits Pro A20 DKT";
-+	compatible = "wits,pro-a20-dkt", "allwinner,sun7i-a20";
-+
-+	aliases {
-+		serial0 = &uart0;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	reg_vmmc3: vmmc3 {
-+		compatible = "regulator-fixed";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&vmmc3_pin_ap6xxx_wl_regon>;
-+		regulator-name = "vmmc3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		enable-active-high;
-+		gpio = <&pio 7 9 GPIO_ACTIVE_HIGH>; /* PH9 */
-+	};
-+};
-+
-+&cpu0 {
-+	cpu-supply = <&reg_dcdc2>;
-+};
-+
-+&ehci0 {
-+	status = "okay";
-+};
-+
-+&ehci1 {
-+	status = "okay";
-+};
-+
-+&i2c0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c0_pins_a>;
-+	status = "okay";
-+
-+	axp209: pmic at 34 {
-+		reg = <0x34>;
-+		interrupt-parent = <&nmi_intc>;
-+		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-+	};
-+};
-+
-+#include "axp209.dtsi"
-+
-+&mmc0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_reference_design>;
-+	vmmc-supply = <&reg_vcc3v3>;
-+	bus-width = <4>;
-+	cd-gpios = <&pio 7 1 GPIO_ACTIVE_HIGH>; /* PH1 */
-+	cd-inverted;
-+	status = "okay";
-+};
-+
-+&mmc3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc3_pins_a>;
-+	vmmc-supply = <&reg_vmmc3>;
-+	bus-width = <4>;
-+	non-removable;
-+	status = "okay";
-+};
-+
-+&ohci0 {
-+	status = "okay";
-+};
-+
-+&ohci1 {
-+	status = "okay";
-+};
-+
-+&otg_sram {
-+	status = "okay";
-+};
-+
-+&pio {
-+	vmmc3_pin_ap6xxx_wl_regon: vmmc3_pin at 0 {
-+		allwinner,pins = "PH9";
-+		allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+
-+	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
-+		allwinner,pins = "PH4";
-+		allwinner,function = "gpio_in";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
-+	};
-+};
-+
-+&reg_dcdc2 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <1000000>;
-+	regulator-max-microvolt = <1450000>;
-+	regulator-name = "vdd-cpu";
-+};
-+
-+&reg_dcdc3 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <1000000>;
-+	regulator-max-microvolt = <1400000>;
-+	regulator-name = "vdd-int-dll";
-+};
-+
-+&reg_ldo1 {
-+	regulator-name = "vdd-rtc";
-+};
-+
-+&reg_ldo2 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <3000000>;
-+	regulator-max-microvolt = <3000000>;
-+	regulator-name = "avcc";
-+};
-+
-+&reg_usb0_vbus {
-+	status = "okay";
-+};
-+
-+&reg_usb1_vbus {
-+	status = "okay";
-+};
-+
-+&reg_usb2_vbus {
-+	status = "okay";
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_pins_a>;
-+	status = "okay";
-+};
-+
-+&usb_otg {
-+	dr_mode = "otg";
-+	status = "okay";
-+};
-+
-+&usb_power_supply {
-+	status = "okay";
-+};
-+
-+&usbphy {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&usb0_id_detect_pin>;
-+	usb0_id_det-gpio = <&pio 7 4 GPIO_ACTIVE_HIGH>; /* PH4 */
-+	usb0_vbus_power-supply = <&usb_power_supply>;
-+	usb0_vbus-supply = <&reg_usb0_vbus>;
-+	usb1_vbus-supply = <&reg_usb1_vbus>;
-+	usb2_vbus-supply = <&reg_usb2_vbus>;
-+	status = "okay";
-+};
--- 
-2.4.3
+ChenYu
