@@ -1,82 +1,77 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 31 Jul 2015 11:39:49 +0200
-Subject: [PATCH 13/23] ARM: at91/dt: sama5d3: use slow clock where necessary
+Date: Fri, 31 Jul 2015 11:39:45 +0200
+Subject: [PATCH 09/23] ARM: at91/dt: at91sam9g45: use slow clock where
+ necessary
 In-Reply-To: <1438335599-3301-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1438335599-3301-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1438335599-3301-14-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1438335599-3301-10-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The watchdog, the reset controller, the RTC, the shutdown controller, the
-timer counters and the LCD PWM need the slow clock, add it where necessary.
+The watchdog, the reset controller, the RTC, the real-time timer, the
+shutdown controller and the timer counters need the slow clock, add it
+where necessary.
 
-[boris.brezillon at free-electrons.com: add tcb clocks]
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/boot/dts/sama5d3.dtsi      | 8 ++++++--
- arch/arm/boot/dts/sama5d3_tcb1.dtsi | 4 ++--
- 2 files changed, 8 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/at91sam9g45.dtsi | 12 ++++++++----
+ 1 file changed, 8 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
-index 9e2444b07bce..db667f773ebe 100644
---- a/arch/arm/boot/dts/sama5d3.dtsi
-+++ b/arch/arm/boot/dts/sama5d3.dtsi
-@@ -145,8 +145,8 @@
- 				compatible = "atmel,at91sam9x5-tcb";
- 				reg = <0xf0010000 0x100>;
- 				interrupts = <26 IRQ_TYPE_LEVEL_HIGH 0>;
--				clocks = <&tcb0_clk>;
--				clock-names = "t0_clk";
-+				clocks = <&tcb0_clk>, <&clk32k>;
-+				clock-names = "t0_clk", "slow_clk";
- 			};
- 
- 			i2c0: i2c at f0014000 {
-@@ -1261,11 +1261,13 @@
- 			rstc at fffffe00 {
+diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
+index 18177f5a7464..b8b878c25227 100644
+--- a/arch/arm/boot/dts/at91sam9g45.dtsi
++++ b/arch/arm/boot/dts/at91sam9g45.dtsi
+@@ -387,6 +387,7 @@
+ 			rstc at fffffd00 {
  				compatible = "atmel,at91sam9g45-rstc";
- 				reg = <0xfffffe00 0x10>;
+ 				reg = <0xfffffd00 0x10>;
 +				clocks = <&clk32k>;
  			};
  
- 			shutdown-controller at fffffe10 {
- 				compatible = "atmel,at91sam9x5-shdwc";
- 				reg = <0xfffffe10 0x10>;
+ 			pit: timer at fffffd30 {
+@@ -400,22 +401,23 @@
+ 			shdwc at fffffd10 {
+ 				compatible = "atmel,at91sam9rl-shdwc";
+ 				reg = <0xfffffd10 0x10>;
 +				clocks = <&clk32k>;
  			};
  
- 			pit: timer at fffffe30 {
-@@ -1279,6 +1281,7 @@
+ 			tcb0: timer at fff7c000 {
+ 				compatible = "atmel,at91rm9200-tcb";
+ 				reg = <0xfff7c000 0x100>;
+ 				interrupts = <18 IRQ_TYPE_LEVEL_HIGH 0>;
+-				clocks = <&tcb0_clk>, <&tcb0_clk>, <&tcb0_clk>;
+-				clock-names = "t0_clk", "t1_clk", "t2_clk";
++				clocks = <&tcb0_clk>, <&tcb0_clk>, <&tcb0_clk>, <&clk32k>;
++				clock-names = "t0_clk", "t1_clk", "t2_clk", "slow_clk";
+ 			};
+ 
+ 			tcb1: timer at fffd4000 {
+ 				compatible = "atmel,at91rm9200-tcb";
+ 				reg = <0xfffd4000 0x100>;
+ 				interrupts = <18 IRQ_TYPE_LEVEL_HIGH 0>;
+-				clocks = <&tcb0_clk>, <&tcb0_clk>, <&tcb0_clk>;
+-				clock-names = "t0_clk", "t1_clk", "t2_clk";
++				clocks = <&tcb0_clk>, <&tcb0_clk>, <&tcb0_clk>, <&clk32k>;
++				clock-names = "t0_clk", "t1_clk", "t2_clk", "slow_clk";
+ 			};
+ 
+ 			dma: dma-controller at ffffec00 {
+@@ -1113,6 +1115,7 @@
  				compatible = "atmel,at91sam9260-wdt";
- 				reg = <0xfffffe40 0x10>;
- 				interrupts = <4 IRQ_TYPE_LEVEL_HIGH 7>;
+ 				reg = <0xfffffd40 0x10>;
+ 				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
 +				clocks = <&clk32k>;
  				atmel,watchdog-type = "hardware";
  				atmel,reset-type = "all";
  				atmel,dbg-halt;
-@@ -1315,6 +1318,7 @@
+@@ -1247,6 +1250,7 @@
  				compatible = "atmel,at91rm9200-rtc";
- 				reg = <0xfffffeb0 0x30>;
+ 				reg = <0xfffffdb0 0x30>;
  				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
 +				clocks = <&clk32k>;
+ 				status = "disabled";
  			};
- 		};
  
-diff --git a/arch/arm/boot/dts/sama5d3_tcb1.dtsi b/arch/arm/boot/dts/sama5d3_tcb1.dtsi
-index f7fa58fe09f1..801f9745e82f 100644
---- a/arch/arm/boot/dts/sama5d3_tcb1.dtsi
-+++ b/arch/arm/boot/dts/sama5d3_tcb1.dtsi
-@@ -31,8 +31,8 @@
- 				compatible = "atmel,at91sam9x5-tcb";
- 				reg = <0xf8014000 0x100>;
- 				interrupts = <27 IRQ_TYPE_LEVEL_HIGH 0>;
--				clocks = <&tcb1_clk>;
--				clock-names = "t0_clk";
-+				clocks = <&tcb1_clk>, <&clk32k>;
-+				clock-names = "t0_clk", "slow_clk";
- 			};
- 		};
- 	};
 -- 
 2.1.4
