@@ -1,89 +1,71 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 31 Jul 2015 15:46:17 +0100
-Subject: [PATCHv5 2/5] drivers: psci: support native SMC{32,64} calls
-In-Reply-To: <1438353980-7611-1-git-send-email-mark.rutland@arm.com>
-References: <1438353980-7611-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1438353980-7611-3-git-send-email-mark.rutland@arm.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 31 Jul 2015 22:56:41 +0800
+Subject: [PATCH v2 1/2] ARM: sunxi_defconfig: Enable DMA_SUN6I, P2WI, PWM,
+ cryptodev, EXTCON, FHANDLE
+In-Reply-To: <1438354602-6361-1-git-send-email-wens@csie.org>
+References: <1438354602-6361-1-git-send-email-wens@csie.org>
+Message-ID: <1438354602-6361-2-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A 32-bit OS cannot make calls with SMC64 IDs, while a 64-bit OS must
-invoke some PSCI functions with SMC64 IDs.
+Enable sun6i DMA engine, sun6i P2WI, PWM, and crypto engine (Security
+System) drivers by default. EXTCON is needed by the updated sun4i USB
+PHY driver.
 
-This patch introduces and makes use of a new macro to choose the
-appropriate IDs based on the register width of the OS, which will allow
-32-bit callers to use the PSCI client code.
+While at it, enable FHANDLE, which is needed by systemd and newer
+versions of udev. Also enable CGROUPS for systemd.
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+And get rid of POWER_RESET, as the sun6i power reset driver has been
+removed in favor of proper sun6i watchdog support.
+
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/firmware/psci.c | 25 +++++++++++++++++++------
- 1 file changed, 19 insertions(+), 6 deletions(-)
+ arch/arm/configs/sunxi_defconfig | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
-index 07b2daa..81b70da 100644
---- a/drivers/firmware/psci.c
-+++ b/drivers/firmware/psci.c
-@@ -28,6 +28,18 @@
- #include <asm/smp_plat.h>
- 
- /*
-+ * While a 64-bit OS can make calls with SMC32 calling conventions, for some
-+ * calls it is necessary to use SMC64 to pass or return 64-bit values. For such
-+ * calls PSCI_0_2_FN_NATIVE(x) will choose the appropriate (native-width)
-+ * function ID.
-+ */
-+#ifdef CONFIG_64BIT
-+#define PSCI_0_2_FN_NATIVE(name)	PSCI_0_2_FN64_##name
-+#else
-+#define PSCI_0_2_FN_NATIVE(name)	PSCI_0_2_FN_##name
-+#endif
-+
-+/*
-  * The CPU any Trusted OS is resident on. The trusted OS may reject CPU_OFF
-  * calls to its resident CPU, so we must avoid issuing those. We never migrate
-  * a Trusted OS even if it claims to be capable of migration -- doing so will
-@@ -122,8 +134,8 @@ static int psci_migrate(unsigned long cpuid)
- static int psci_affinity_info(unsigned long target_affinity,
- 		unsigned long lowest_affinity_level)
- {
--	return invoke_psci_fn(PSCI_0_2_FN64_AFFINITY_INFO, target_affinity,
--			      lowest_affinity_level, 0);
-+	return invoke_psci_fn(PSCI_0_2_FN_NATIVE(AFFINITY_INFO),
-+			      target_affinity, lowest_affinity_level, 0);
- }
- 
- static int psci_migrate_info_type(void)
-@@ -133,7 +145,8 @@ static int psci_migrate_info_type(void)
- 
- static unsigned long psci_migrate_info_up_cpu(void)
- {
--	return invoke_psci_fn(PSCI_0_2_FN64_MIGRATE_INFO_UP_CPU, 0, 0, 0);
-+	return invoke_psci_fn(PSCI_0_2_FN_NATIVE(MIGRATE_INFO_UP_CPU),
-+			      0, 0, 0);
- }
- 
- static int get_set_conduit_method(struct device_node *np)
-@@ -211,16 +224,16 @@ static void __init psci_init_migrate(void)
- static void __init psci_0_2_set_functions(void)
- {
- 	pr_info("Using standard PSCI v0.2 function IDs\n");
--	psci_function_id[PSCI_FN_CPU_SUSPEND] = PSCI_0_2_FN64_CPU_SUSPEND;
-+	psci_function_id[PSCI_FN_CPU_SUSPEND] = PSCI_0_2_FN_NATIVE(CPU_SUSPEND);
- 	psci_ops.cpu_suspend = psci_cpu_suspend;
- 
- 	psci_function_id[PSCI_FN_CPU_OFF] = PSCI_0_2_FN_CPU_OFF;
- 	psci_ops.cpu_off = psci_cpu_off;
- 
--	psci_function_id[PSCI_FN_CPU_ON] = PSCI_0_2_FN64_CPU_ON;
-+	psci_function_id[PSCI_FN_CPU_ON] = PSCI_0_2_FN_NATIVE(CPU_ON);
- 	psci_ops.cpu_on = psci_cpu_on;
- 
--	psci_function_id[PSCI_FN_MIGRATE] = PSCI_0_2_FN64_MIGRATE;
-+	psci_function_id[PSCI_FN_MIGRATE] = PSCI_0_2_FN_NATIVE(MIGRATE);
- 	psci_ops.migrate = psci_migrate;
- 
- 	psci_ops.affinity_info = psci_affinity_info;
+diff --git a/arch/arm/configs/sunxi_defconfig b/arch/arm/configs/sunxi_defconfig
+index 7ebc346bf9fa..51eea220baae 100644
+--- a/arch/arm/configs/sunxi_defconfig
++++ b/arch/arm/configs/sunxi_defconfig
+@@ -1,5 +1,7 @@
++CONFIG_FHANDLE=y
+ CONFIG_NO_HZ=y
+ CONFIG_HIGH_RES_TIMERS=y
++CONFIG_CGROUPS=y
+ CONFIG_BLK_DEV_INITRD=y
+ CONFIG_PERF_EVENTS=y
+ CONFIG_MODULES=y
+@@ -72,12 +74,12 @@ CONFIG_SERIAL_OF_PLATFORM=y
+ CONFIG_I2C=y
+ CONFIG_I2C_CHARDEV=y
+ CONFIG_I2C_MV64XXX=y
++CONFIG_I2C_SUN6I_P2WI=y
+ CONFIG_SPI=y
+ CONFIG_SPI_SUN4I=y
+ CONFIG_SPI_SUN6I=y
+ CONFIG_GPIO_SYSFS=y
+ CONFIG_POWER_SUPPLY=y
+-CONFIG_POWER_RESET=y
+ CONFIG_THERMAL=y
+ CONFIG_CPU_THERMAL=y
+ CONFIG_WATCHDOG=y
+@@ -109,7 +111,12 @@ CONFIG_RTC_CLASS=y
+ # CONFIG_RTC_INTF_PROC is not set
+ CONFIG_RTC_DRV_SUN6I=y
+ CONFIG_RTC_DRV_SUNXI=y
++CONFIG_DMADEVICES=y
++CONFIG_DMA_SUN6I=y
+ # CONFIG_IOMMU_SUPPORT is not set
++CONFIG_EXTCON=y
++CONFIG_PWM=y
++CONFIG_PWM_SUN4I=y
+ CONFIG_PHY_SUN4I_USB=y
+ CONFIG_PHY_SUN9I_USB=y
+ CONFIG_EXT4_FS=y
+@@ -123,3 +130,4 @@ CONFIG_NLS_CODEPAGE_437=y
+ CONFIG_NLS_ISO8859_1=y
+ CONFIG_PRINTK_TIME=y
+ CONFIG_DEBUG_FS=y
++CONFIG_CRYPTO_DEV_SUN4I_SS=y
 -- 
-1.9.1
+2.5.0
