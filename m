@@ -1,9 +1,10 @@
 From: r.baldyga@samsung.com (Robert Baldyga)
-Date: Fri, 31 Jul 2015 16:00:28 +0200
-Subject: [PATCH v5 16/46] usb: gadget: fusb300_udc: add ep capabilities support
+Date: Fri, 31 Jul 2015 16:00:41 +0200
+Subject: [PATCH v5 29/46] usb: gadget: r8a66597-udc: add ep capabilities
+ support
 In-Reply-To: <1438351258-31578-1-git-send-email-r.baldyga@samsung.com>
 References: <1438351258-31578-1-git-send-email-r.baldyga@samsung.com>
-Message-ID: <1438351258-31578-17-git-send-email-r.baldyga@samsung.com>
+Message-ID: <1438351258-31578-30-git-send-email-r.baldyga@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,17 +12,17 @@ Convert endpoint configuration to new capabilities model.
 
 Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
 ---
- drivers/usb/gadget/udc/fusb300_udc.c | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ drivers/usb/gadget/udc/r8a66597-udc.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/drivers/usb/gadget/udc/fusb300_udc.c b/drivers/usb/gadget/udc/fusb300_udc.c
-index 3970f45..948845c 100644
---- a/drivers/usb/gadget/udc/fusb300_udc.c
-+++ b/drivers/usb/gadget/udc/fusb300_udc.c
-@@ -1450,6 +1450,17 @@ static int fusb300_probe(struct platform_device *pdev)
- 		ep->ep.name = fusb300_ep_name[i];
- 		ep->ep.ops = &fusb300_ep_ops;
- 		usb_ep_set_maxpacket_limit(&ep->ep, HS_BULK_MAX_PACKET_SIZE);
+diff --git a/drivers/usb/gadget/udc/r8a66597-udc.c b/drivers/usb/gadget/udc/r8a66597-udc.c
+index 0293f71..baa0609 100644
+--- a/drivers/usb/gadget/udc/r8a66597-udc.c
++++ b/drivers/usb/gadget/udc/r8a66597-udc.c
+@@ -1935,6 +1935,16 @@ static int r8a66597_probe(struct platform_device *pdev)
+ 		ep->ep.name = r8a66597_ep_name[i];
+ 		ep->ep.ops = &r8a66597_ep_ops;
+ 		usb_ep_set_maxpacket_limit(&ep->ep, 512);
 +
 +		if (i == 0) {
 +			ep->ep.caps.type_control = true;
@@ -30,11 +31,10 @@ index 3970f45..948845c 100644
 +			ep->ep.caps.type_bulk = true;
 +			ep->ep.caps.type_int = true;
 +		}
-+
 +		ep->ep.caps.dir_in = true;
 +		ep->ep.caps.dir_out = true;
  	}
- 	usb_ep_set_maxpacket_limit(&fusb300->ep[0]->ep, HS_CTL_MAX_PACKET_SIZE);
- 	fusb300->ep[0]->epnum = 0;
+ 	usb_ep_set_maxpacket_limit(&r8a66597->ep[0].ep, 64);
+ 	r8a66597->ep[0].pipenum = 0;
 -- 
 1.9.1
