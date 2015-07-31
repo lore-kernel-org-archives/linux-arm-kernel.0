@@ -1,40 +1,35 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Fri, 31 Jul 2015 09:47:07 -0700
-Subject: [RFCv3 4/4] ARM: zynq: Select ARCH_HAS_RESET_CONTROLLER
-In-Reply-To: <55BB2D39.6000004@xilinx.com>
-References: <1438305237-18497-1-git-send-email-moritz.fischer@ettus.com>
- <1438305237-18497-5-git-send-email-moritz.fischer@ettus.com>
- <55BB2D39.6000004@xilinx.com>
-Message-ID: <20150731164707.GF2650@xsjsorenbubuntu>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Fri, 31 Jul 2015 18:51:20 +0200
+Subject: [PATCH] ARM: at91: pwm: atmel-hlcdc: add at91sam9n12 entry for the
+ errata
+Message-ID: <1438361480-10898-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-07-31 at 10:09AM +0200, Michal Simek wrote:
-> On 07/31/2015 03:13 AM, Moritz Fischer wrote:
-> > Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
-> > ---
-> >  arch/arm/mach-zynq/Kconfig | 1 +
-> >  1 file changed, 1 insertion(+)
-> > 
-> > diff --git a/arch/arm/mach-zynq/Kconfig b/arch/arm/mach-zynq/Kconfig
-> > index 78e5e00..77d7df7 100644
-> > --- a/arch/arm/mach-zynq/Kconfig
-> > +++ b/arch/arm/mach-zynq/Kconfig
-> > @@ -1,5 +1,6 @@
-> >  config ARCH_ZYNQ
-> >  	bool "Xilinx Zynq ARM Cortex A9 Platform" if ARCH_MULTI_V7
-> > +	select ARCH_HAS_RESET_CONTROLLER
-> >  	select ARCH_SUPPORTS_BIG_ENDIAN
-> >  	select ARM_AMBA
-> >  	select ARM_GIC
-> > 
-> 
-> Reviewed-by: Michal Simek <michal.simek@xilinx.com>
-Acked-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
+From: Josh Wu <josh.wu@atmel.com>
 
-I personally, would prefer to decouple the logical outputs of the
-reset-controller from the HW. But, as Moritz pointed out, that seems
-rather uncommon for reset controllers. I think this is good to go.
+The errata for pwm hlcdc of at91sam9n12 is same as at91sam9x5.
 
-	Thanks,
-	S?ren
+Signed-off-by: Josh Wu <josh.wu@atmel.com>
+---
+ drivers/pwm/pwm-atmel-hlcdc.c | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/drivers/pwm/pwm-atmel-hlcdc.c b/drivers/pwm/pwm-atmel-hlcdc.c
+index fa5feab..3f76d77 100644
+--- a/drivers/pwm/pwm-atmel-hlcdc.c
++++ b/drivers/pwm/pwm-atmel-hlcdc.c
+@@ -218,6 +218,11 @@ static const struct atmel_hlcdc_pwm_errata atmel_hlcdc_pwm_sama5d3_errata = {
+ 
+ static const struct of_device_id atmel_hlcdc_dt_ids[] = {
+ 	{
++		.compatible = "atmel,at91sam9n12-hlcdc",
++		/* 9n12 has same errata as 9x5 pwm */
++		.data = &atmel_hlcdc_pwm_at91sam9x5_errata,
++	},
++	{
+ 		.compatible = "atmel,at91sam9x5-hlcdc",
+ 		.data = &atmel_hlcdc_pwm_at91sam9x5_errata,
+ 	},
+-- 
+1.9.1
