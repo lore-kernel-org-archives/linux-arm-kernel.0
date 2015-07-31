@@ -1,603 +1,165 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 31 Jul 2015 13:34:13 +0100
-Subject: [PATCH v2 2/5] pci:host: Add Altera PCIe host controller driver
-In-Reply-To: <1438337715-22594-3-git-send-email-lftan@altera.com>
-References: <1438337715-22594-1-git-send-email-lftan@altera.com>
- <1438337715-22594-3-git-send-email-lftan@altera.com>
-Message-ID: <55BB6B45.7010705@arm.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Fri, 31 Jul 2015 14:45:52 +0200
+Subject: [linux-sunxi] Re: [PATCH 5/5] ARM: dts: sun7i: Add dts file for
+ Wits Pro A20 DKT
+In-Reply-To: <CAGb2v65TEogqYFAfen1VnOaiepvez5t8Oh+Q=OYsRS_aZUMO3A@mail.gmail.com>
+References: <1438333194-21181-1-git-send-email-hdegoede@redhat.com>
+ <1438333194-21181-6-git-send-email-hdegoede@redhat.com>
+ <20150731102028.GE2564@lukather>
+ <CAGb2v65TEogqYFAfen1VnOaiepvez5t8Oh+Q=OYsRS_aZUMO3A@mail.gmail.com>
+Message-ID: <55BB6E00.9090202@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31/07/15 11:15, Ley Foon Tan wrote:
-> This patch adds the Altera PCIe host controller driver.
-> 
-> Signed-off-by: Ley Foon Tan <lftan@altera.com>
-> ---
->  drivers/pci/host/Kconfig       |   8 +
->  drivers/pci/host/Makefile      |   1 +
->  drivers/pci/host/pcie-altera.c | 526 +++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 535 insertions(+)
->  create mode 100644 drivers/pci/host/pcie-altera.c
-> 
-> diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
-> index 675c2d1..108500a 100644
-> --- a/drivers/pci/host/Kconfig
-> +++ b/drivers/pci/host/Kconfig
-> @@ -145,4 +145,12 @@ config PCIE_IPROC_BCMA
->  	  Say Y here if you want to use the Broadcom iProc PCIe controller
->  	  through the BCMA bus interface
->  
-> +config PCIE_ALTERA
-> +	tristate "Altera PCIe controller"
-> +	depends on ARCH_SOCFPGA
-> +	select PCI_MSI_IRQ_DOMAIN if PCI_MSI
+Hi,
 
-Why would you select this here? MSI support is in another driver, so I
-don't see the point.
+On 31-07-15 12:25, Chen-Yu Tsai wrote:
+> On Fri, Jul 31, 2015 at 6:20 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+>> On Fri, Jul 31, 2015 at 10:59:54AM +0200, Hans de Goede wrote:
+>>> From: Jelle de Jong <jelledejong@powercraft.nl>
+>>>
+>>> The Wits Pro A20 DKT is an A20 Development KiT with 1G RAM, 4G NAND,
+>>> sdio wifi, 1Gbit ethernet, 1024x768 lcd screen with ft5x_ts touchscreen
+>>> and a ton of IO connectors.
+>>>
+>>> Note there seem to be multiple sdcard slots on the board (4 in total), but
+>>> other then mmc0 none of these are hooked up by default, there is a ton of
+>>> dip-switches which likely allow hooking some of these up, but the
+>>> documentation of the board only describes the use of a fraction of them,
+>>> so for now we only support mmc0.
+>>>
+>>> Signed-off-by: Jelle de Jong <jelledejong@powercraft.nl>
+>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>>> ---
+>>> Also see: http://www.merrii.com/en/pla_d.asp?id=163
+>>> ---
+>>>   arch/arm/boot/dts/Makefile                       |   3 +-
+>>>   arch/arm/boot/dts/sun7i-a20-wits-pro-a20-dkt.dts | 209 +++++++++++++++++++++++
+>>>   2 files changed, 211 insertions(+), 1 deletion(-)
+>>>   create mode 100644 arch/arm/boot/dts/sun7i-a20-wits-pro-a20-dkt.dts
+>>>
+>>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+>>> index f830e1f..151a413 100644
+>>> --- a/arch/arm/boot/dts/Makefile
+>>> +++ b/arch/arm/boot/dts/Makefile
+>>> @@ -595,7 +595,8 @@ dtb-$(CONFIG_MACH_SUN7I) += \
+>>>        sun7i-a20-orangepi-mini.dtb \
+>>>        sun7i-a20-pcduino3.dtb \
+>>>        sun7i-a20-pcduino3-nano.dtb \
+>>> -     sun7i-a20-wexler-tab7200.dtb
+>>> +     sun7i-a20-wexler-tab7200.dtb \
+>>> +        sun7i-a20-wits-pro-a20-dkt.dtb
+>>
+>> The indentation is off.
+>>
+>>>   dtb-$(CONFIG_MACH_SUN8I) += \
+>>>        sun8i-a23-evb.dtb \
+>>>        sun8i-a23-ippo-q8h-v5.dtb \
+>>> diff --git a/arch/arm/boot/dts/sun7i-a20-wits-pro-a20-dkt.dts b/arch/arm/boot/dts/sun7i-a20-wits-pro-a20-dkt.dts
+>>> new file mode 100644
+>>> index 0000000..db4d32c
+>>> --- /dev/null
+>>> +++ b/arch/arm/boot/dts/sun7i-a20-wits-pro-a20-dkt.dts
+>>> @@ -0,0 +1,209 @@
+>>> +/*
+>>> + * Copyright 2015 Jelle de Jong <jelledejong@powercraft.nl>
+>>> + *
+>>> + * This file is dual-licensed: you can use it either under the terms
+>>> + * of the GPL or the X11 license, at your option. Note that this dual
+>>> + * licensing only applies to this file, and not this project as a
+>>> + * whole.
+>>> + *
+>>> + *  a) This file is free software; you can redistribute it and/or
+>>> + *     modify it under the terms of the GNU General Public License as
+>>> + *     published by the Free Software Foundation; either version 2 of the
+>>> + *     License, or (at your option) any later version.
+>>> + *
+>>> + *     This file is distributed in the hope that it will be useful,
+>>> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+>>> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>>> + *     GNU General Public License for more details.
+>>> + *
+>>> + * Or, alternatively,
+>>> + *
+>>> + *  b) Permission is hereby granted, free of charge, to any person
+>>> + *     obtaining a copy of this software and associated documentation
+>>> + *     files (the "Software"), to deal in the Software without
+>>> + *     restriction, including without limitation the rights to use,
+>>> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+>>> + *     sell copies of the Software, and to permit persons to whom the
+>>> + *     Software is furnished to do so, subject to the following
+>>> + *     conditions:
+>>> + *
+>>> + *     The above copyright notice and this permission notice shall be
+>>> + *     included in all copies or substantial portions of the Software.
+>>> + *
+>>> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+>>> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+>>> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+>>> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+>>> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+>>> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+>>> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+>>> + *     OTHER DEALINGS IN THE SOFTWARE.
+>>> + */
+>>> +
+>>> +/dts-v1/;
+>>> +#include "sun7i-a20.dtsi"
+>>> +#include "sunxi-common-regulators.dtsi"
+>>> +
+>>> +#include <dt-bindings/gpio/gpio.h>
+>>> +#include <dt-bindings/input/input.h>
+>>> +#include <dt-bindings/interrupt-controller/irq.h>
+>>> +
+>>> +/ {
+>>> +     model = "Wits Pro A20 DKT";
+>>> +     compatible = "wits,pro-a20-dkt", "allwinner,sun7i-a20";
+>>> +
+>>> +     aliases {
+>>> +             serial0 = &uart0;
+>>> +     };
+>>> +
+>>> +     chosen {
+>>> +             stdout-path = "serial0:115200n8";
+>>> +     };
+>>> +
+>>> +     reg_vmmc3: vmmc3 {
+>>> +             compatible = "regulator-fixed";
+>>> +             pinctrl-names = "default";
+>>> +             pinctrl-0 = <&vmmc3_pin_ap6xxx_wl_regon>;
+>>> +             regulator-name = "vmmc3";
+>>> +             regulator-min-microvolt = <3300000>;
+>>> +             regulator-max-microvolt = <3300000>;
+>>> +             enable-active-high;
+>>> +             gpio = <&pio 7 9 GPIO_ACTIVE_HIGH>; /* PH9 */
+>>> +     };
+>>
+>> It's not really vmmc. The reg_on stuff is actually more of a reset
+>> line: when tied to VCC, the WLAN part of the chip and its regulators
+>> are enabled, while when it's tied to ground, the WLAN is in reset, and
+>> the internal regulators disabled.
+>>
+>> So it can be seen as either an active-low reset line, or an
+>> active-high regulator for the WiFi part, but VMMC is the power line of
+>> the MMC bus itself, which usually is provided by a regulator through
+>> the pin 22 of the AP6210, usually tied directly to the 3.3V line.
+>>
+>> So you actually have two regulators here: one for vmmc (reg_3v3), and
+>> one for reg_on which is the one that you just defined.
+>>
+>> Note that it's a bit of a pain for now to support such cases, as
+>> there's nothing to tie something from the DT to an SDIO device. I
+>> don't have a better solution than marking it always-on at the moment,
+>> with a big FIXME comment on top... :/
+>
+> One could use the mmc-pwr-seq stuff. I don't know if it has been
+> extended for multiple GPIOs, not that you would need it in this use
+> case.
 
-> +	help
-> +	  Say Y here if you want to enable PCIe controller support for Altera
-> +	  SoCFPGA family of SoCs.
-> +
->  endmenu
-> diff --git a/drivers/pci/host/Makefile b/drivers/pci/host/Makefile
-> index 140d66f..6954f76 100644
-> --- a/drivers/pci/host/Makefile
-> +++ b/drivers/pci/host/Makefile
-> @@ -17,3 +17,4 @@ obj-$(CONFIG_PCI_VERSATILE) += pci-versatile.o
->  obj-$(CONFIG_PCIE_IPROC) += pcie-iproc.o
->  obj-$(CONFIG_PCIE_IPROC_PLATFORM) += pcie-iproc-platform.o
->  obj-$(CONFIG_PCIE_IPROC_BCMA) += pcie-iproc-bcma.o
-> +obj-$(CONFIG_PCIE_ALTERA) += pcie-altera.o
-> diff --git a/drivers/pci/host/pcie-altera.c b/drivers/pci/host/pcie-altera.c
-> new file mode 100644
-> index 0000000..3ec51c7
-> --- /dev/null
-> +++ b/drivers/pci/host/pcie-altera.c
-> @@ -0,0 +1,526 @@
-> +/*
-> + * Copyright Altera Corporation (C) 2013-2015. All rights reserved
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms and conditions of the GNU General Public License,
-> + * version 2, as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope it will be useful, but WITHOUT
-> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-> + * more details.
-> + *
-> + * You should have received a copy of the GNU General Public License along with
-> + * this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +#include <linux/interrupt.h>
-> +#include <linux/module.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_irq.h>
-> +#include <linux/of_pci.h>
-> +#include <linux/pci.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/slab.h>
-> +
-> +#define A2P_ADDR_MAP_LO0		0x1000
-> +#define A2P_ADDR_MAP_HI0		0x1004
-> +#define RP_TX_REG0			0x2000
-> +#define RP_TX_REG1			0x2004
-> +#define RP_TX_CNTRL			0x2008
-> +#define RP_TX_EOP			0x2
-> +#define RP_TX_SOP			0x1
-> +#define RP_RXCPL_STATUS		0x2010
-> +#define RP_RXCPL_EOP			0x2
-> +#define RP_RXCPL_SOP			0x1
-> +#define RP_RXCPL_REG0			0x2014
-> +#define RP_RXCPL_REG1			0x2018
-> +#define P2A_INT_STATUS			0x3060
-> +#define P2A_INT_STS_ALL			0xF
-> +#define P2A_INT_ENABLE			0x3070
-> +#define P2A_INT_ENA_ALL			0xF
-> +#define RP_LTSSM			0x3C64
-> +#define LTSSM_L0			0xF
-> +
-> +/* TLP configuration type 0 and 1 */
-> +#define TLP_FMTTYPE_CFGRD0		0x04	/* Configuration Read Type 0 */
-> +#define TLP_FMTTYPE_CFGWR0		0x44	/* Configuration Write Type 0 */
-> +#define TLP_FMTTYPE_CFGRD1		0x05	/* Configuration Read Type 1 */
-> +#define TLP_FMTTYPE_CFGWR1		0x45	/* Configuration Write Type 1 */
-> +#define TLP_PAYLOAD_SIZE		0x01
-> +#define TLP_READ_TAG			0x1D
-> +#define TLP_WRITE_TAG			0x10
-> +#define TLP_CFG_DW0(fmttype)		(((fmttype) << 24) | TLP_PAYLOAD_SIZE)
-> +#define TLP_CFG_DW1(reqid, tag)		(((reqid) << 16) | (tag << 8) | 0xF)
-> +#define TLP_CFG_DW2(bus, devfn, offset)	\
-> +				(((bus) << 24) | ((devfn) << 16) | (offset))
-> +#define TLP_REQ_ID(bus, devfn)		(((bus) << 8) | (devfn))
-> +#define TLP_COMPL_STATUS(hdr)		(((hdr) & 0xE0) >> 13)
-> +#define TLP_HDR_SIZE			3
-> +#define TLP_LOOP			10
-> +
-> +#define INTX_NUM		4
-> +
-> +/* Address translation table entry size */
-> +#define ATT_ENTRY_SIZE		8
-> +
-> +#define DWORD_MASK		3
-> +
-> +struct altera_pcie {
-> +	struct platform_device	*pdev;
-> +	struct resource		*txs;
-> +	void __iomem		*cra_base;
-> +	int			hwirq;
-> +	u8			root_bus_nr;
-> +	struct irq_domain		*irq_domain;
-> +	struct resource		bus_range;
-> +	struct list_head		resources;
-> +};
-> +
-> +struct tlp_rp_regpair_t {
-> +	u32 ctrl;
-> +	u32 reg0;
-> +	u32 reg1;
-> +};
-> +
-> +static void altera_pcie_retrain(struct pci_dev *dev)
-> +{
-> +	u16 linkcap, linkstat;
-> +
-> +	/*
-> +	 * Set the retrain bit if the PCIe rootport support > 2.5GB/s, but
-> +	 * current speed is 2.5 GB/s.
-> +	 */
-> +	pcie_capability_read_word(dev, PCI_EXP_LNKCAP, &linkcap);
-> +
-> +	if ((linkcap & PCI_EXP_LNKCAP_SLS) <= PCI_EXP_LNKCAP_SLS_2_5GB)
-> +		return;
-> +
-> +	pcie_capability_read_word(dev, PCI_EXP_LNKSTA, &linkstat);
-> +	if ((linkstat & PCI_EXP_LNKSTA_CLS) == PCI_EXP_LNKSTA_CLS_2_5GB)
-> +		pcie_capability_set_word(dev, PCI_EXP_LNKCTL,
-> +					PCI_EXP_LNKCTL_RL);
-> +
-> +}
-> +DECLARE_PCI_FIXUP_EARLY(PCI_ANY_ID, PCI_ANY_ID, altera_pcie_retrain);
-> +
-> +static inline void cra_writel(struct altera_pcie *pcie, u32 value, u32 reg)
-> +{
-> +	writel_relaxed(value, pcie->cra_base + reg);
-> +}
-> +
-> +static inline u32 cra_readl(struct altera_pcie *pcie, u32 reg)
-> +{
-> +	return readl_relaxed(pcie->cra_base + reg);
-> +}
-> +
-> +static void tlp_read_rx(struct altera_pcie *pcie,
-> +			struct tlp_rp_regpair_t *tlp_rp_regdata)
-> +{
-> +	tlp_rp_regdata->ctrl = cra_readl(pcie, RP_RXCPL_STATUS);
-> +	tlp_rp_regdata->reg0 = cra_readl(pcie, RP_RXCPL_REG0);
-> +	tlp_rp_regdata->reg1 = cra_readl(pcie, RP_RXCPL_REG1);
-> +}
-> +
-> +static void tlp_write_tx(struct altera_pcie *pcie,
-> +			struct tlp_rp_regpair_t *tlp_rp_regdata)
-> +{
-> +	cra_writel(pcie, tlp_rp_regdata->reg0, RP_TX_REG0);
-> +	cra_writel(pcie, tlp_rp_regdata->reg1, RP_TX_REG1);
-> +	cra_writel(pcie, tlp_rp_regdata->ctrl, RP_TX_CNTRL);
-> +}
-> +
-> +static bool altera_pcie_link_is_up(struct altera_pcie *pcie)
-> +{
-> +	return !!(cra_readl(pcie, RP_LTSSM) & LTSSM_L0);
-> +}
-> +
-> +static bool altera_pcie_valid_config(struct altera_pcie *pcie,
-> +				struct pci_bus *bus, int dev)
-> +{
-> +	/* If there is no link, then there is no device */
-> +	if (bus->number != pcie->root_bus_nr) {
-> +		if (!altera_pcie_link_is_up(pcie))
-> +			return false;
-> +	}
-> +
-> +	/* access only one slot on each root port */
-> +	if (bus->number == pcie->root_bus_nr && dev > 0)
-> +		return false;
-> +
-> +	/*
-> +	 * Do not read more than one device on the bus directly attached
-> +	 * to RC.
-> +	 */
-> +	if (bus->primary == pcie->root_bus_nr && dev > 0)
-> +		return false;
-> +
-> +	 return true;
-> +}
-> +
-> +static int tlp_read_packet(struct altera_pcie *pcie, u32 *value)
-> +{
-> +	u8 loop;
-> +	struct tlp_rp_regpair_t tlp_rp_regdata;
-> +
-> +	for (loop = TLP_LOOP; loop > 0; loop--) {
-> +		tlp_read_rx(pcie, &tlp_rp_regdata);
-> +		if (tlp_rp_regdata.ctrl & RP_RXCPL_EOP) {
-> +			if (value)
-> +				*value = tlp_rp_regdata.reg0;
-> +			return PCIBIOS_SUCCESSFUL;
-> +		}
-> +	}
-> +
-> +	return -ENOENT;
-> +}
-> +
-> +static void tlp_write_packet(struct altera_pcie *pcie, u32 *headers, u32 data)
-> +{
-> +	struct tlp_rp_regpair_t tlp_rp_regdata;
-> +
-> +	tlp_rp_regdata.reg0 = headers[0];
-> +	tlp_rp_regdata.reg1 = headers[1];
-> +	tlp_rp_regdata.ctrl = RP_TX_SOP;
-> +	tlp_write_tx(pcie, &tlp_rp_regdata);
-> +
-> +	tlp_rp_regdata.reg0 = headers[2];
-> +	tlp_rp_regdata.reg1 = data;
-> +	tlp_rp_regdata.ctrl = RP_TX_EOP;
-> +	tlp_write_tx(pcie, &tlp_rp_regdata);
-> +}
-> +
-> +static int tlp_cfg_dword_read(struct altera_pcie *pcie, u8 bus, u32 devfn,
-> +			      int where, u32 *value)
-> +{
-> +	int ret;
-> +	u32 headers[TLP_HDR_SIZE];
-> +
-> +	if (bus == pcie->root_bus_nr)
-> +		headers[0] = TLP_CFG_DW0(TLP_FMTTYPE_CFGRD0);
-> +	else
-> +		headers[0] = TLP_CFG_DW0(TLP_FMTTYPE_CFGRD1);
-> +
-> +	headers[1] = TLP_CFG_DW1(TLP_REQ_ID(pcie->root_bus_nr, devfn),
-> +					TLP_READ_TAG);
-> +	headers[2] = TLP_CFG_DW2(bus, devfn, where);
-> +
-> +	tlp_write_packet(pcie, headers, 0);
-> +
-> +	ret = tlp_read_packet(pcie, value);
-> +	if (ret)
-> +		*value = ~0UL;	/* return 0xFFFFFFFF if error */
-> +
-> +	return ret;
-> +}
-> +
-> +static int tlp_cfg_dword_write(struct altera_pcie *pcie, u8 bus, u32 devfn,
-> +			       int where, u32 value)
-> +{
-> +	u32 headers[TLP_HDR_SIZE];
-> +
-> +	if (bus == pcie->root_bus_nr)
-> +		headers[0] = TLP_CFG_DW0(TLP_FMTTYPE_CFGWR0);
-> +	else
-> +		headers[0] = TLP_CFG_DW0(TLP_FMTTYPE_CFGWR1);
-> +
-> +	headers[1] = TLP_CFG_DW1(TLP_REQ_ID(pcie->root_bus_nr, devfn),
-> +					TLP_WRITE_TAG);
-> +	headers[2] = TLP_CFG_DW2(bus, devfn, where);
-> +
-> +	tlp_write_packet(pcie, headers, value);
-> +
-> +	tlp_read_packet(pcie, NULL);
-> +
-> +	/* Keep an eye out for changes to the root bus number */
-> +	if ((bus == pcie->root_bus_nr) && (where == PCI_PRIMARY_BUS))
-> +		pcie->root_bus_nr = (u8)(value);
-> +
-> +	return PCIBIOS_SUCCESSFUL;
-> +}
-> +
-> +static int altera_pcie_cfg_read(struct pci_bus *bus, unsigned int devfn,
-> +			       int where, int size, u32 *value)
-> +{
-> +	struct altera_pcie *pcie = bus->sysdata;
-> +	int ret;
-> +
-> +	if (!altera_pcie_valid_config(pcie, bus, PCI_SLOT(devfn))) {
-> +		*value = ~0UL;
-> +		return PCIBIOS_DEVICE_NOT_FOUND;
-> +	}
-> +
-> +	ret = tlp_cfg_dword_read(pcie, bus->number, devfn,
-> +		(where & ~DWORD_MASK), value);
-> +	if (ret != PCIBIOS_SUCCESSFUL)
-> +		return ret;
-> +
-> +	if (size == 1)
-> +		*value = (*value >> (8 * (where & 0x3))) & 0xff;
-> +	else if (size == 2)
-> +		*value = (*value >> (8 * (where & 0x2))) & 0xffff;
-> +
-> +	return PCIBIOS_SUCCESSFUL;
-> +}
-> +
-> +static int altera_pcie_cfg_write(struct pci_bus *bus, unsigned int devfn,
-> +				int where, int size, u32 value)
-> +{
-> +	struct altera_pcie *pcie = bus->sysdata;
-> +	u32 data32 = value;
-> +	u32 shift = 8 * (where & 3);
-> +	int ret;
-> +
-> +	if (!altera_pcie_valid_config(pcie, bus, PCI_SLOT(devfn)))
-> +		return PCIBIOS_DEVICE_NOT_FOUND;
-> +
-> +	/* write partial */
-> +	if (size != sizeof(u32)) {
-> +		ret = tlp_cfg_dword_read(pcie, bus->number, devfn,
-> +			where & ~DWORD_MASK, &data32);
-> +		if (ret)
-> +			return ret;
-> +
-> +		if (size == 2)
-> +			data32 = (data32 & ~(0xffff << shift)) |
-> +					((value & 0xffff) << shift);
-> +		 else if (size == 1)
-> +			data32 = (data32 & ~(0xff << shift)) |
-> +					((value & 0xff) << shift);
-> +	}
-> +
-> +	return tlp_cfg_dword_write(pcie, bus->number, devfn,
-> +		(where & ~DWORD_MASK), data32);
-> +}
-> +
-> +static struct pci_ops altera_pcie_ops = {
-> +	.read = altera_pcie_cfg_read,
-> +	.write = altera_pcie_cfg_write,
-> +};
-> +
-> +static int altera_pcie_intx_map(struct irq_domain *domain, unsigned int irq,
-> +				irq_hw_number_t hwirq)
-> +{
-> +	irq_set_chip_and_handler(irq, &dummy_irq_chip, handle_simple_irq);
-> +	irq_set_chip_data(irq, domain->host_data);
-> +	set_irq_flags(irq, IRQF_VALID);
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct irq_domain_ops intx_domain_ops = {
-> +	.map = altera_pcie_intx_map,
-> +};
-> +
-> +static irqreturn_t altera_pcie_isr(int irq, void *arg)
-> +{
-> +	struct altera_pcie *pcie = arg;
-> +	u32 status, i;
-> +
-> +	status = cra_readl(pcie, P2A_INT_STATUS) & P2A_INT_STS_ALL;
-> +
-> +	/* clear interrupts */
-> +	cra_writel(pcie, status, P2A_INT_STATUS);
-> +
-> +	for (i = 0; i < INTX_NUM; i++) {
-> +		if (status & (1 << i))
+Yes the mmc-pwr-seq stuff seems to be the right thing to use for this,
+I'll try to get that to work and post a new version of this patch.
 
-find_first/next_set_bit?
+Regards,
 
-> +			generic_handle_irq(irq_find_mapping(pcie->irq_domain,
-> +							i + 1));
-
-Rule of thumb: if you're calling generic_handle_irq from an interrupt
-handler, this is a chained IRQ controller. Please implement it as such.
-
-> +	}
-> +
-> +	return IRQ_HANDLED;
-> +}
-> +
-> +static void altera_pcie_release_of_pci_ranges(struct altera_pcie *pcie)
-> +{
-> +	pci_free_resource_list(&pcie->resources);
-> +}
-> +
-> +static int altera_pcie_parse_request_of_pci_ranges(struct altera_pcie *pcie)
-> +{
-> +	int err, res_valid = 0;
-> +	struct device *dev = &pcie->pdev->dev;
-> +	struct device_node *np = dev->of_node;
-> +	resource_size_t iobase;
-> +	struct resource_entry *win;
-> +	int offset = 0;
-> +
-> +	err = of_pci_get_host_bridge_resources(np, 0, 0xff, &pcie->resources,
-> +					       &iobase);
-> +	if (err)
-> +		return err;
-> +
-> +	resource_list_for_each_entry(win, &pcie->resources) {
-> +		struct resource *parent, *res = win->res;
-> +
-> +		switch (resource_type(res)) {
-> +		case IORESOURCE_MEM:
-> +			parent = &iomem_resource;
-> +			res_valid |= !(res->flags & IORESOURCE_PREFETCH);
-> +			cra_writel(pcie, res->start,
-> +				A2P_ADDR_MAP_LO0 + offset);
-> +			cra_writel(pcie, 0,
-> +				A2P_ADDR_MAP_HI0 + offset);
-> +			offset += ATT_ENTRY_SIZE;
-> +			break;
-> +		default:
-> +			continue;
-> +		}
-> +
-> +		err = devm_request_resource(dev, parent, res);
-> +		if (err)
-> +			goto out_release_res;
-> +	}
-> +
-> +	if (!res_valid) {
-> +		dev_err(dev, "non-prefetchable memory resource required\n");
-> +		err = -EINVAL;
-> +		goto out_release_res;
-> +	}
-> +
-> +	return 0;
-> +
-> +out_release_res:
-> +	altera_pcie_release_of_pci_ranges(pcie);
-> +	return err;
-> +}
-> +
-> +static void altera_pcie_free_irq_domain(struct altera_pcie *pcie)
-> +{
-> +	int i;
-> +	u32 irq;
-> +
-> +	for (i = 0; i < INTX_NUM; i++) {
-> +		irq = irq_find_mapping(pcie->irq_domain, i);
-> +		if (irq > 0)
-> +			irq_dispose_mapping(irq);
-> +	}
-> +
-> +	irq_domain_remove(pcie->irq_domain);
-> +}
-> +
-> +static int altera_pcie_init_irq_domain(struct altera_pcie *pcie)
-> +{
-> +	struct device *dev = &pcie->pdev->dev;
-> +	struct device_node *node = dev->of_node;
-> +
-> +	/* Setup INTx */
-> +	pcie->irq_domain = irq_domain_add_linear(node, INTX_NUM,
-> +					&intx_domain_ops, pcie);
-> +	if (!pcie->irq_domain) {
-> +		dev_err(dev, "Failed to get a INTx IRQ domain\n");
-> +		return PTR_ERR(pcie->irq_domain);
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static int altera_pcie_parse_dt(struct altera_pcie *pcie)
-> +{
-> +	struct resource *cra;
-> +	int ret;
-> +	struct platform_device *pdev = pcie->pdev;
-> +
-> +	cra = platform_get_resource_byname(pdev, IORESOURCE_MEM, "Cra");
-> +	pcie->cra_base = devm_ioremap_resource(&pdev->dev, cra);
-> +	if (IS_ERR(pcie->cra_base)) {
-> +		dev_err(&pdev->dev, "get Cra resource failed\n");
-> +		return PTR_ERR(pcie->cra_base);
-> +	}
-> +
-> +	/* setup IRQ */
-> +	pcie->hwirq = platform_get_irq(pdev, 0);
-> +	if (pcie->hwirq <= 0) {
-
-This is definitely not a hardware interrupt number. It is completely
-virtual. I suggest you give it a better name.
-
-> +		dev_err(&pdev->dev, "failed to get IRQ: %d\n", pcie->hwirq);
-> +		return -EINVAL;
-> +	}
-> +	ret = devm_request_irq(&pdev->dev, pcie->hwirq, altera_pcie_isr,
-> +			IRQF_SHARED, pdev->name, pcie);
-
-You're implementing a cascading interrupt controller again. Please fix
-it just like you did for your MSI support.
-
-> +
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "failed to request irq %d\n", pcie->hwirq);
-> +		return ret;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static int altera_pcie_probe(struct platform_device *pdev)
-> +{
-> +	struct altera_pcie *pcie;
-> +	struct pci_bus *bus;
-> +	int ret;
-> +
-> +	pcie = devm_kzalloc(&pdev->dev, sizeof(*pcie), GFP_KERNEL);
-> +	if (!pcie)
-> +		return -ENOMEM;
-> +
-> +	pcie->pdev = pdev;
-> +
-> +	ret = altera_pcie_parse_dt(pcie);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "Parsing DT failed\n");
-> +		return ret;
-> +	}
-> +
-> +	INIT_LIST_HEAD(&pcie->resources);
-> +
-> +	ret = altera_pcie_parse_request_of_pci_ranges(pcie);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "Failed add resources\n");
-> +		return ret;
-> +	}
-> +
-> +	ret = altera_pcie_init_irq_domain(pcie);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "Failed creating IRQ Domain\n");
-> +		return ret;
-> +	}
-> +
-> +	pcie->root_bus_nr = 0;
-> +
-> +	/* clear all interrupts */
-> +	cra_writel(pcie, P2A_INT_STS_ALL, P2A_INT_STATUS);
-> +	/* enable all interrupts */
-> +	cra_writel(pcie, P2A_INT_ENA_ALL, P2A_INT_ENABLE);
-> +
-> +	bus = pci_scan_root_bus(&pdev->dev, pcie->root_bus_nr, &altera_pcie_ops,
-> +					pcie, &pcie->resources);
-> +	if (!bus)
-> +		return -ENOMEM;
-> +
-> +	pci_assign_unassigned_bus_resources(bus);
-> +	pci_bus_add_devices(bus);
-> +
-> +	platform_set_drvdata(pdev, pcie);
-> +	return ret;
-> +}
-> +
-> +static int __exit altera_pcie_remove(struct platform_device *pdev)
-> +{
-> +	struct altera_pcie *pcie = platform_get_drvdata(pdev);
-> +
-> +	altera_pcie_free_irq_domain(pcie);
-> +	platform_set_drvdata(pdev, NULL);
-> +	return 0;
-> +}
-> +
-> +static const struct of_device_id altera_pcie_of_match[] = {
-> +	{ .compatible = "altr,pcie-root-port-1.0", },
-> +	{},
-> +};
-> +MODULE_DEVICE_TABLE(of, altera_pcie_of_match);
-> +
-> +static struct platform_driver altera_pcie_driver = {
-> +	.probe		= altera_pcie_probe,
-> +	.remove		= altera_pcie_remove,
-> +	.driver = {
-> +		.name	= "altera-pcie",
-> +		.of_match_table = altera_pcie_of_match,
-> +	},
-> +};
-> +
-> +module_platform_driver(altera_pcie_driver);
-> +
-> +MODULE_AUTHOR("Ley Foon Tan <lftan@altera.com>");
-> +MODULE_DESCRIPTION("Altera PCIe host controller driver");
-> +MODULE_LICENSE("GPL v2");
-> 
-
-
--- 
-Jazz is not dead. It just smells funny...
+Hans
