@@ -1,72 +1,89 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Fri, 31 Jul 2015 10:29:28 +0200
-Subject: [GIT PULL] Xilinx Zynq changes for v4.3
-Message-ID: <55BB31E8.7040806@monstr.eu>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Fri, 31 Jul 2015 10:31:30 +0200
+Subject: [linux-sunxi] [PATCH 6/8] ARM: dts: axp209: Add usb_power_supply
+ child node to the ax209 node
+In-Reply-To: <20150731083541.5f2c683a@pluto.restena.lu>
+References: <1433885881-19809-1-git-send-email-hdegoede@redhat.com>
+ <1433885881-19809-7-git-send-email-hdegoede@redhat.com>
+ <CAGb2v66X79dK84hG8NVTho-kPPMNcKXQspvT2pCM8Zbmnme53A@mail.gmail.com>
+ <20150731075104.48c467e6@pluto.restena.lu>
+ <CAGb2v67nM7pauyjyhBdfgX7p_Rud6TEsNqphB+gx4ROekVqtbw@mail.gmail.com>
+ <20150731083541.5f2c683a@pluto.restena.lu>
+Message-ID: <55BB3262.5000403@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-please pull these SoC changes to your tree.
+On 31-07-15 08:35, Bruno Pr?mont wrote:
+> On Fri, 31 Jul 2015 14:14:28 +0800 Chen-Yu Tsai wrote:
+>> On Fri, Jul 31, 2015 at 1:51 PM, Bruno Pr?mont wrote:
+>>> Hi ChenYu,
+>>>
+>>> On Fri, 31 Jul 2015 13:31:53 +0800 Chen-Yu Tsai wrote:
+>>>> Hi Hans,
+>>>>
+>>>> On Wed, Jun 10, 2015 at 5:37 AM, Hans de Goede wrote:
+>>>>> Add a node representing the usb power supply part of the axp209 pmic, note
+>>>>> that the usb power supply and the (to be added later) ac power supply will
+>>>>> each have their own child-node, so that they can be separately specified
+>>>>> as power-supply for other nodes using a power-supply property with a
+>>>>> phandle pointing to the right axp209 child-node.
+>>>>>
+>>>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>>>>> ---
+>>>>>   arch/arm/boot/dts/axp209.dtsi | 5 +++++
+>>>>>   1 file changed, 5 insertions(+)
+>>>>>
+>>>>> diff --git a/arch/arm/boot/dts/axp209.dtsi b/arch/arm/boot/dts/axp209.dtsi
+>>>>> index 24c935c..051ab3b 100644
+>>>>> --- a/arch/arm/boot/dts/axp209.dtsi
+>>>>> +++ b/arch/arm/boot/dts/axp209.dtsi
+>>>>> @@ -89,4 +89,9 @@
+>>>>>                          regulator-name = "ldo5";
+>>>>>                  };
+>>>>>          };
+>>>>> +
+>>>>> +       usb_power_supply: usb_power_supply {
+>>>>> +               compatible = "x-powers,axp202-usb-power-supply";
+>>>>> +               status = "disabled";
+>>>>
+>>>> Is there any reason to have this disabled by default?
+>>>> AFAIK this is not something configurable in hardware,
+>>>> and the driver just gives readouts and status updates.
+>>>
+>>> There are some devices that only have 'AC-IN' instead of usb/otg power
+>>> (set-top boxes) so having the devices tell what power sources they
+>>> have makes sense (otherwise those that have ac-in instead of otg would
+>>> have to disable usb_power_supply) and avoids confusion by explicitly
+>>> stating presence in device dts.
+>>
+>> That's true. But this is a bit of hardware inside the AXP.
+>> If it's power isn't routed, it should report it, shouldn't it?
+>
+> If the device does not use the input there are two cases:
+> - ac-in and usb/otg in short-circuited (there is a bit in AXP registers
+>    to provide this indication)
+> - the unused one is just not connected/connectable
+>
+> In either case the voltage of the unused/unusable branch is not really
+> useful, nor is it useful to have it show up in sysfs.
 
-Thanks,
-Michal
+Exactly my thinking on this, +1 .
 
-The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
+>> And normal users would probably expect to read the input
+>> voltage/current/status through sysfs (or maybe hwmon?),
+>> instead of not finding the device and having to look through
+>> the DTS.
+>
+> Only those supplies effectively present (in-use or with connectors
+> to eventually use them) should be visible in sysfs.
+> Having more of them will just confuse the users, they would be searching
+> how they can connect the supply while there is no means to do so
+> except soldering to the tiny AXP pins.
 
-  Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
++1
 
-are available in the git repository at:
+Regards,
 
-  https://github.com/Xilinx/linux-xlnx.git tags/zynq-soc-for-4.3
-
-for you to fetch changes up to e4a9288942392965bd5cfad93d9996b83c0dc4a6:
-
-  ARM: zynq: reserve space for jump target in secondary trampoline
-(2015-07-31 10:24:41 +0200)
-
-----------------------------------------------------------------
-arm: Xilinx Zynq SoC patches for v4.2
-
-- Fix earlyprintk, jump trampoline for SMP
-- Update git tree location
-- Setup PL310 aux (bit 22)
-
-----------------------------------------------------------------
-Arun Chandran (1):
-      ARM: zynq: Fix earlyprintk in big endian mode
-
-Masahiro Yamada (1):
-      clk: zynq: remove redundant $(CONFIG_ARCH_ZYNQ) in Makefile
-
-Nathan Lynch (1):
-      ARM: zynq: reserve space for jump target in secondary trampoline
-
-Soren Brinkmann (1):
-      MAINTAINERS: Update Zynq git tree location
-
-Thomas Betker (1):
-      ARM: zynq: Set bit 22 in PL310 AuxCtrl register (6395/1)
-
- MAINTAINERS                   | 2 +-
- arch/arm/include/debug/zynq.S | 2 +-
- arch/arm/mach-zynq/common.c   | 4 ++--
- arch/arm/mach-zynq/headsmp.S  | 2 +-
- drivers/clk/zynq/Makefile     | 2 +-
- 5 files changed, 6 insertions(+), 6 deletions(-)
-
--- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150731/85e4fd8e/attachment.sig>
+Hans
