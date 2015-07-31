@@ -1,74 +1,22 @@
-From: ian.campbell@citrix.com (Ian Campbell)
-Date: Fri, 31 Jul 2015 11:55:42 +0100
-Subject: [PATCH 1/8] arm/xen: Remove helpers which are PV specific
-In-Reply-To: <alpine.DEB.2.02.1507311142580.11337@kaball.uk.xensource.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 31 Jul 2015 11:54:27 +0100
+Subject: [Xen-devel] [PATCH 2/8] xen: Make clear that swiotlb and biomerge
+ are dealing with DMA address
+In-Reply-To: <55B7A526.30105@citrix.com>
 References: <1438095769-2560-1-git-send-email-julien.grall@citrix.com>
- <1438095769-2560-2-git-send-email-julien.grall@citrix.com>
- <alpine.DEB.2.02.1507311142580.11337@kaball.uk.xensource.com>
-Message-ID: <1438340142.30740.57.camel@citrix.com>
+ <1438095769-2560-3-git-send-email-julien.grall@citrix.com>
+ <55B7A526.30105@citrix.com>
+Message-ID: <alpine.DEB.2.02.1507311154120.11337@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-07-31 at 11:44 +0100, Stefano Stabellini wrote:
-> On Tue, 28 Jul 2015, Julien Grall wrote:
-> > ARM guests are assimilated to HVM guest on ARM. The current
-> > implementation is assuming a 1:1 mapping which is only true for DOM0 
-> > and
-> > may not be at all in the future.
+On Tue, 28 Jul 2015, David Vrabel wrote:
+> On 28/07/15 16:02, Julien Grall wrote:
 > > 
-> > Furthermore, all the helpers but arbitrary_virt_to_machine are used in
-> > x86 specific code (or only compiled for).
-> > 
-> > The helper arbitrary_virt_to_machine is only used in PV specific code.
-> > Therefore we should never call the function.
-> > 
-> > Add a BUG() in this helper and drop all the others.
-> > 
-> > Signed-off-by: Julien Grall <julien.grall@citrix.com>
-> > Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> > Cc: Russell King <linux@arm.linux.org.uk>
-> > Cc: linux-arm-kernel at lists.infradead.org
-> > ---
-> >  arch/arm/include/asm/xen/page.h | 16 ++--------------
-> >  1 file changed, 2 insertions(+), 14 deletions(-)
-> > 
-> > diff --git a/arch/arm/include/asm/xen/page.h 
-> > b/arch/arm/include/asm/xen/page.h
-> > index 1bee8ca..c2e9dcd 100644
-> > --- a/arch/arm/include/asm/xen/page.h
-> > +++ b/arch/arm/include/asm/xen/page.h
-> > @@ -54,26 +54,14 @@ static inline unsigned long mfn_to_pfn(unsigned 
-> > long mfn)
-> >  
-> >  #define mfn_to_local_pfn(mfn) mfn_to_pfn(mfn)
-> >  
-> > -static inline xmaddr_t phys_to_machine(xpaddr_t phys)
-> > -{
-> > -	unsigned offset = phys.paddr & ~PAGE_MASK;
-> > -	return XMADDR(PFN_PHYS(pfn_to_mfn(PFN_DOWN(phys.paddr))) | 
-> > offset);
-> > -}
-> > -
-> > -static inline xpaddr_t machine_to_phys(xmaddr_t machine)
-> > -{
-> > -	unsigned offset = machine.maddr & ~PAGE_MASK;
-> > -	return XPADDR(PFN_PHYS(mfn_to_pfn(PFN_DOWN(machine.maddr))) | 
-> > offset);
-> > -}
-> >  /* VIRT <-> MACHINE conversion */
-> > -#define virt_to_machine(v)	(phys_to_machine(XPADDR(__pa(v))))
-> >  #define virt_to_mfn(v)		(pfn_to_mfn(virt_to_pfn(v)))
-> >  #define mfn_to_virt(m)		(__va(mfn_to_pfn(m) << PAGE_SHIFT))
-> >  
-> > +/* Only used in PV code. However ARM guest is always assimilated as 
-> > HVM. */
->                                ^ "However" doesn't make sense here from an
->                                english grammer point of view.
+> > +/* Pseudo-physical <-> DMA conversion */
+> > +static inline unsigned long pfn_to_dfn(unsigned long pfn)
+> 
+> Use BFN for bus frame number.  This is the terminology that is used in
+> the (proposed) pv-iommu hypercall.
 
-"English grammar" :-P
-
-Sorry. What I really meant to say was that "assimilated" doesn't make sense
-in this context either. I think maybe what was meant is "ARM guests are
-always HVM".
-
-Ian.
+Yes, certainly better than DFN.
