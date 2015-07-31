@@ -1,54 +1,139 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Sat,  1 Aug 2015 00:58:27 +0200
-Subject: [PATCH 6/9] ARM: at91/defconfig: at91_dt: enable DRM hlcdc support
+Date: Sat,  1 Aug 2015 00:58:25 +0200
+Subject: [PATCH 4/9] ARM: at91/dt: enable lcd support for at91sam9x5 SoCs
 In-Reply-To: <1438383510-10521-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1438383510-10521-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1438383510-10521-7-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1438383510-10521-5-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Josh Wu <josh.wu@atmel.com>
+From: Boris BREZILLON <boris.brezillon@free-electrons.com>
 
-This patch adds drm atmel lcdc, simple panel and backlight options.
+Use the at91sam9x5 display module dtsi in the relevant board dts.
 
-Signed-off-by: Josh Wu <josh.wu@atmel.com>
+Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/configs/at91_dt_defconfig | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/boot/dts/at91sam9g15ek.dts | 25 +++++++++++++++++++++++++
+ arch/arm/boot/dts/at91sam9g35ek.dts | 21 +++++++++++++++++++++
+ arch/arm/boot/dts/at91sam9x35ek.dts | 20 ++++++++++++++++++++
+ 3 files changed, 66 insertions(+)
 
-diff --git a/arch/arm/configs/at91_dt_defconfig b/arch/arm/configs/at91_dt_defconfig
-index 94b5dcabdecc..ace0e5d3ed6b 100644
---- a/arch/arm/configs/at91_dt_defconfig
-+++ b/arch/arm/configs/at91_dt_defconfig
-@@ -131,8 +131,12 @@ CONFIG_POWER_RESET=y
- CONFIG_WATCHDOG=y
- CONFIG_AT91SAM9X_WATCHDOG=y
- CONFIG_SSB=m
-+CONFIG_MFD_ATMEL_HLCDC=y
- CONFIG_REGULATOR=y
- CONFIG_REGULATOR_FIXED_VOLTAGE=y
-+CONFIG_DRM=y
-+CONFIG_DRM_ATMEL_HLCDC=y
-+CONFIG_DRM_PANEL_SIMPLE=y
- CONFIG_FB=y
- CONFIG_FB_ATMEL=y
- CONFIG_BACKLIGHT_LCD_SUPPORT=y
-@@ -140,6 +144,7 @@ CONFIG_BACKLIGHT_LCD_SUPPORT=y
- CONFIG_BACKLIGHT_CLASS_DEVICE=y
- CONFIG_BACKLIGHT_ATMEL_LCDC=y
- # CONFIG_BACKLIGHT_GENERIC is not set
-+CONFIG_BACKLIGHT_PWM=y
- CONFIG_FRAMEBUFFER_CONSOLE=y
- CONFIG_FRAMEBUFFER_CONSOLE_DETECT_PRIMARY=y
- CONFIG_LOGO=y
-@@ -186,6 +191,7 @@ CONFIG_IIO=y
- CONFIG_AT91_ADC=y
- CONFIG_PWM=y
- CONFIG_PWM_ATMEL=y
-+CONFIG_PWM_ATMEL_HLCDC_PWM=y
- CONFIG_PWM_ATMEL_TCB=y
- CONFIG_EXT4_FS=y
- CONFIG_FANOTIFY=y
+diff --git a/arch/arm/boot/dts/at91sam9g15ek.dts b/arch/arm/boot/dts/at91sam9g15ek.dts
+index 26b0444b0f96..d1d2b400f1c6 100644
+--- a/arch/arm/boot/dts/at91sam9g15ek.dts
++++ b/arch/arm/boot/dts/at91sam9g15ek.dts
+@@ -8,9 +8,34 @@
+  */
+ /dts-v1/;
+ #include "at91sam9g15.dtsi"
++#include "at91sam9x5dm.dtsi"
+ #include "at91sam9x5ek.dtsi"
+ 
+ / {
+ 	model = "Atmel AT91SAM9G15-EK";
+ 	compatible = "atmel,at91sam9g15ek", "atmel,at91sam9x5ek", "atmel,at91sam9x5", "atmel,at91sam9";
++
++	ahb {
++		apb {
++			hlcdc: hlcdc at f8038000 {
++				status = "okay";
++			};
++		};
++	};
++
++	backlight: backlight {
++		status = "okay";
++	};
++
++	bl_reg: backlight_regulator {
++		status = "okay";
++	};
++
++	panel: panel {
++		status = "okay";
++	};
++
++	panel_reg: panel_regulator {
++		status = "okay";
++	};
+ };
+diff --git a/arch/arm/boot/dts/at91sam9g35ek.dts b/arch/arm/boot/dts/at91sam9g35ek.dts
+index 641a9bf89ed1..23ec8b13f30a 100644
+--- a/arch/arm/boot/dts/at91sam9g35ek.dts
++++ b/arch/arm/boot/dts/at91sam9g35ek.dts
+@@ -8,6 +8,7 @@
+  */
+ /dts-v1/;
+ #include "at91sam9g35.dtsi"
++#include "at91sam9x5dm.dtsi"
+ #include "at91sam9x5ek.dtsi"
+ 
+ / {
+@@ -20,6 +21,26 @@
+ 				phy-mode = "rmii";
+ 				status = "okay";
+ 			};
++
++			hlcdc: hlcdc at f8038000 {
++				status = "okay";
++			};
+ 		};
+ 	};
++
++	backlight: backlight {
++		status = "okay";
++	};
++
++	bl_reg: backlight_regulator {
++		status = "okay";
++	};
++
++	panel: panel {
++		status = "okay";
++	};
++
++	panel_reg: panel_regulator {
++		status = "okay";
++	};
+ };
+diff --git a/arch/arm/boot/dts/at91sam9x35ek.dts b/arch/arm/boot/dts/at91sam9x35ek.dts
+index 343d32818ca3..fcb67180ea26 100644
+--- a/arch/arm/boot/dts/at91sam9x35ek.dts
++++ b/arch/arm/boot/dts/at91sam9x35ek.dts
+@@ -8,6 +8,7 @@
+  */
+ /dts-v1/;
+ #include "at91sam9x35.dtsi"
++#include "at91sam9x5dm.dtsi"
+ #include "at91sam9x5ek.dtsi"
+ 
+ / {
+@@ -20,6 +21,25 @@
+ 				phy-mode = "rmii";
+ 				status = "okay";
+ 			};
++			hlcdc: hlcdc at f8038000 {
++				status = "okay";
++			};
+ 		};
+ 	};
++
++	backlight: backlight {
++		status = "okay";
++	};
++
++	bl_reg: backlight_regulator {
++		status = "okay";
++	};
++
++	panel: panel {
++		status = "okay";
++	};
++
++	panel_reg: panel_regulator {
++		status = "okay";
++	};
+ };
 -- 
 2.1.4
