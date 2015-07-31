@@ -1,103 +1,62 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 31 Jul 2015 09:30:19 +0200
-Subject: [PATCH v7 3/5] clk: Supply the critical clock {init, enable,
- disable} framework
-In-Reply-To: <20150730224720.23791.6722@quantum>
-References: <1437570255-21049-1-git-send-email-lee.jones@linaro.org>
- <1437570255-21049-4-git-send-email-lee.jones@linaro.org>
- <20150727072549.GP2564@lukather> <20150727085338.GW3436@x1>
- <20150728114022.GW2564@lukather> <20150728130055.GV14943@x1>
- <20150730011932.642.85168@quantum> <20150730095014.GD14642@x1>
- <20150730224720.23791.6722@quantum>
-Message-ID: <20150731073019.GU2564@lukather>
+From: yalin.wang2010@gmail.com (yalin wang)
+Date: Fri, 31 Jul 2015 15:41:37 +0800
+Subject: [RFC] arm64:change jump_label to use branch instruction,
+ not use  NOP instr
+Message-ID: <94E2034B-9DE4-4ADF-8B2F-197D38A363CF@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 30, 2015 at 03:47:20PM -0700, Michael Turquette wrote:
-> > > >    */
-> > > > 
-> > > > Resume:
-> > > >   /* Order is unimportant */
-> > > >   SPI enables Clock 4 (ref == 1)
-> > > >   RAM enables Clock 4 and re-enables .leave_on (ref == 2)
-> > > >   I2C enables Clock 4 (ref == 3)
-> > > 
-> > > Same again. As soon as RAM calls clk_enable_critical the ref count goes
-> > > up. .leave_on does nothing as far as I can tell. The all works because
-> > > of the reference counting, which already exists before this patch
-> > > series.
-> > 
-> > So fundamentally you're right in what you say.  All you really need to
-> > disable a critical clock is write a knowledgeable driver, which is
-> > intentionally unbalanced i.e. just calls clk_disable().  All this
-> 
-> OK, the line above is helpful. What you really want is a formalized
-> hand-off mechanism, whereby the clock is enabled at registration-time
-> and it cannot be turned off until the right driver claims it and decides
-> turning it off is OK (with a priori knowledge that the clock is already
-> enabled).
+This change a little arch_static_branch(), use b . + 4 for false
+return, why? According to aarch64 TRM, if both source and dest
+instr are branch instr, can patch the instr directly, don't need
+all cpu to do ISB for sync, this means we can call
+aarch64_insn_patch_text_nosync() during patch_text(),
+will improve the performance when change a static_key.
 
-There's two things that should be covered, and are related, yet can be
-done in two steps:
+Signed-off-by: yalin wang <yalin.wang2010@gmail.com>
+---
+ arch/arm64/include/asm/jump_label.h |  2 +-
+ arch/arm64/kernel/jump_label.c      | 14 ++++++++------
+ 2 files changed, 9 insertions(+), 7 deletions(-)
 
-  - Have a way to, no matter what (which configuration we have, if we
-    have multiple users or not that might reparent or disable their
-    clocks, etc.), make sure that a clock will always be running by
-    default. This is done through the call in clk-conf, and we
-    identify such clocks using critical-clocks in the DT.
-
-  - Now, even though that information is true, some driver who are
-    aware of that fact might want to disable those critical
-    clocks. This is what the clk_disable_critical and
-    clk_enable_critical functions are here for.
-
-> Note that I don't think this implementation can really work in the near
-> future. Today we do not catch unbalanced calls to clk_enable and
-> clk_disable, but I have a patch that catches this and WARNs loudly in my
-> private tree. More on that in the next stanza.
-> 
-> What I don't understand is if there is ever a case for a clock consumer
-> driver to ever call clk_enable_critical... I do not think there is. What
-> you're trying to protect against is having the clock disabled BEFORE
-> that "knowledgeable driver" has a chance to enable it.
-
-It's really about what we want the API to look like in the second
-case.
-
-Do we want such drivers to still call clk_prepare_enable? Some other
-function? Should they assume that the clock has already been enabled,
-or do we want a handover, or a force disable, or whatever.
-
-I guess we should discuss those questions, before starting to think
-about how to implement it.
-
-IMHO, I think that the existing way of doing should be used, or at
-least with the same mindset to avoid confusion, errors, and
-misinformed reviews.
-
-So I'd expect the drivers to do something like:
-
-probe:
-  clk_get
-  clk_critical_enable
-
-remove / probe error path:
-  clk_critical_disable
-  clk_put
-
-and use the clk_critical_enable and clk_critical_disable whenever
-needed, and thing would just work as intended.
-
-Maxime
-
+diff --git a/arch/arm64/include/asm/jump_label.h b/arch/arm64/include/asm/jump_label.h
+index c0e5165..25b1668 100644
+--- a/arch/arm64/include/asm/jump_label.h
++++ b/arch/arm64/include/asm/jump_label.h
+@@ -28,7 +28,7 @@
+ 
+ static __always_inline bool arch_static_branch(struct static_key *key)
+ {
+-	asm goto("1: nop\n\t"
++	asm goto("1: b . + " __stringify(AARCH64_INSN_SIZE) "\n\t"
+ 		 ".pushsection __jump_table,  \"aw\"\n\t"
+ 		 ".align 3\n\t"
+ 		 ".quad 1b, %l[l_yes], %c0\n\t"
+diff --git a/arch/arm64/kernel/jump_label.c b/arch/arm64/kernel/jump_label.c
+index 4f1fec7..eb09868 100644
+--- a/arch/arm64/kernel/jump_label.c
++++ b/arch/arm64/kernel/jump_label.c
+@@ -28,13 +28,15 @@ void arch_jump_label_transform(struct jump_entry *entry,
+ 	void *addr = (void *)entry->code;
+ 	u32 insn;
+ 
+-	if (type == JUMP_LABEL_ENABLE) {
++	if (type == JUMP_LABEL_ENABLE)
+ 		insn = aarch64_insn_gen_branch_imm(entry->code,
+-						   entry->target,
+-						   AARCH64_INSN_BRANCH_NOLINK);
+-	} else {
+-		insn = aarch64_insn_gen_nop();
+-	}
++			entry->target,
++			AARCH64_INSN_BRANCH_NOLINK);
++	else
++		insn = aarch64_insn_gen_branch_imm(entry->code,
++			(unsigned long)addr + AARCH64_INSN_SIZE,
++			AARCH64_INSN_BRANCH_NOLINK);
++
+ 
+ 	aarch64_insn_patch_text(&addr, &insn, 1);
+ }
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150731/9e5c7098/attachment.sig>
+1.9.1
