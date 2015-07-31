@@ -1,111 +1,42 @@
 From: r.baldyga@samsung.com (Robert Baldyga)
-Date: Fri, 31 Jul 2015 16:00:16 +0200
-Subject: [PATCH v5 04/46] staging: emxx_udc: add ep capabilities support
+Date: Fri, 31 Jul 2015 16:00:18 +0200
+Subject: [PATCH v5 06/46] usb: dwc2: gadget: add ep capabilities support
 In-Reply-To: <1438351258-31578-1-git-send-email-r.baldyga@samsung.com>
 References: <1438351258-31578-1-git-send-email-r.baldyga@samsung.com>
-Message-ID: <1438351258-31578-5-git-send-email-r.baldyga@samsung.com>
+Message-ID: <1438351258-31578-7-git-send-email-r.baldyga@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Convert endpoint configuration to new capabilities model.
 
-Fixed typo in "epc-nulk" to "epc-bulk".
-
 Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
 ---
- drivers/staging/emxx_udc/emxx_udc.c | 73 +++++++++++++++++++++----------------
- 1 file changed, 42 insertions(+), 31 deletions(-)
+ drivers/usb/dwc2/gadget.c | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/drivers/staging/emxx_udc/emxx_udc.c b/drivers/staging/emxx_udc/emxx_udc.c
-index 3b7aa36..b6b76ff 100644
---- a/drivers/staging/emxx_udc/emxx_udc.c
-+++ b/drivers/staging/emxx_udc/emxx_udc.c
-@@ -3153,36 +3153,46 @@ static const struct usb_gadget_ops nbu2ss_gadget_ops = {
- 	.ioctl			= nbu2ss_gad_ioctl,
- };
+diff --git a/drivers/usb/dwc2/gadget.c b/drivers/usb/dwc2/gadget.c
+index 731b13d..3ee5b4c 100644
+--- a/drivers/usb/dwc2/gadget.c
++++ b/drivers/usb/dwc2/gadget.c
+@@ -3289,6 +3289,19 @@ static void s3c_hsotg_initep(struct dwc2_hsotg *hsotg,
+ 	usb_ep_set_maxpacket_limit(&hs_ep->ep, epnum ? 1024 : EP0_MPS_LIMIT);
+ 	hs_ep->ep.ops = &s3c_hsotg_ep_ops;
  
--static const char g_ep0_name[] = "ep0";
--static const char g_ep1_name[] = "ep1-bulk";
--static const char g_ep2_name[] = "ep2-bulk";
--static const char g_ep3_name[] = "ep3in-int";
--static const char g_ep4_name[] = "ep4-iso";
--static const char g_ep5_name[] = "ep5-iso";
--static const char g_ep6_name[] = "ep6-bulk";
--static const char g_ep7_name[] = "ep7-bulk";
--static const char g_ep8_name[] = "ep8in-int";
--static const char g_ep9_name[] = "ep9-iso";
--static const char g_epa_name[] = "epa-iso";
--static const char g_epb_name[] = "epb-bulk";
--static const char g_epc_name[] = "epc-nulk";
--static const char g_epd_name[] = "epdin-int";
--
--static const char *gp_ep_name[NUM_ENDPOINTS] = {
--	g_ep0_name,
--	g_ep1_name,
--	g_ep2_name,
--	g_ep3_name,
--	g_ep4_name,
--	g_ep5_name,
--	g_ep6_name,
--	g_ep7_name,
--	g_ep8_name,
--	g_ep9_name,
--	g_epa_name,
--	g_epb_name,
--	g_epc_name,
--	g_epd_name,
-+static const struct {
-+	const char *name;
-+	const struct usb_ep_caps caps;
-+} ep_info[NUM_ENDPOINTS] = {
-+#define EP_INFO(_name, _caps) \
-+	{ \
-+		.name = _name, \
-+		.caps = _caps, \
++	if (epnum == 0) {
++		hs_ep->ep.caps.type_control = true;
++	} else {
++		hs_ep->ep.caps.type_iso = true;
++		hs_ep->ep.caps.type_bulk = true;
++		hs_ep->ep.caps.type_int = true;
 +	}
 +
-+	EP_INFO("ep0",
-+		USB_EP_CAPS(USB_EP_CAPS_TYPE_CONTROL, USB_EP_CAPS_DIR_ALL)),
-+	EP_INFO("ep1-bulk",
-+		USB_EP_CAPS(USB_EP_CAPS_TYPE_BULK, USB_EP_CAPS_DIR_ALL)),
-+	EP_INFO("ep2-bulk",
-+		USB_EP_CAPS(USB_EP_CAPS_TYPE_BULK, USB_EP_CAPS_DIR_ALL)),
-+	EP_INFO("ep3in-int",
-+		USB_EP_CAPS(USB_EP_CAPS_TYPE_INT, USB_EP_CAPS_DIR_IN)),
-+	EP_INFO("ep4-iso",
-+		USB_EP_CAPS(USB_EP_CAPS_TYPE_ISO, USB_EP_CAPS_DIR_ALL)),
-+	EP_INFO("ep5-iso",
-+		USB_EP_CAPS(USB_EP_CAPS_TYPE_ISO, USB_EP_CAPS_DIR_ALL)),
-+	EP_INFO("ep6-bulk",
-+		USB_EP_CAPS(USB_EP_CAPS_TYPE_BULK, USB_EP_CAPS_DIR_ALL)),
-+	EP_INFO("ep7-bulk",
-+		USB_EP_CAPS(USB_EP_CAPS_TYPE_BULK, USB_EP_CAPS_DIR_ALL)),
-+	EP_INFO("ep8in-int",
-+		USB_EP_CAPS(USB_EP_CAPS_TYPE_INT, USB_EP_CAPS_DIR_IN)),
-+	EP_INFO("ep9-iso",
-+		USB_EP_CAPS(USB_EP_CAPS_TYPE_ISO, USB_EP_CAPS_DIR_ALL)),
-+	EP_INFO("epa-iso",
-+		USB_EP_CAPS(USB_EP_CAPS_TYPE_ISO, USB_EP_CAPS_DIR_ALL)),
-+	EP_INFO("epb-bulk",
-+		USB_EP_CAPS(USB_EP_CAPS_TYPE_BULK, USB_EP_CAPS_DIR_ALL)),
-+	EP_INFO("epc-bulk",
-+		USB_EP_CAPS(USB_EP_CAPS_TYPE_BULK, USB_EP_CAPS_DIR_ALL)),
-+	EP_INFO("epdin-int",
-+		USB_EP_CAPS(USB_EP_CAPS_TYPE_INT, USB_EP_CAPS_DIR_IN)),
++	if (dir_in)
++		hs_ep->ep.caps.dir_in = true;
++	else
++		hs_ep->ep.caps.dir_out = true;
 +
-+#undef EP_INFO
- };
- 
- /*-------------------------------------------------------------------------*/
-@@ -3200,7 +3210,8 @@ static void __init nbu2ss_drv_ep_init(struct nbu2ss_udc *udc)
- 		ep->desc = NULL;
- 
- 		ep->ep.driver_data = NULL;
--		ep->ep.name = gp_ep_name[i];
-+		ep->ep.name = ep_info[i].name;
-+		ep->ep.caps = ep_info[i].caps;
- 		ep->ep.ops = &nbu2ss_ep_ops;
- 
- 		usb_ep_set_maxpacket_limit(&ep->ep,
+ 	/*
+ 	 * if we're using dma, we need to set the next-endpoint pointer
+ 	 * to be something valid.
 -- 
 1.9.1
