@@ -1,59 +1,38 @@
 From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Fri, 31 Jul 2015 20:49:15 +0200
-Subject: [PATCH v3 3/5] ARM: Exynos: switch to using generic cpufreq driver for
- Exynos4x12
-In-Reply-To: <1438368557-2352-1-git-send-email-b.zolnierkie@samsung.com>
-References: <1438368557-2352-1-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <1438368557-2352-4-git-send-email-b.zolnierkie@samsung.com>
+Date: Fri, 31 Jul 2015 20:55:13 +0200
+Subject: [PATCH V3 00/16] OPP: Add code to support operating-points-v2
+ bindings
+In-Reply-To: <cover.1438166099.git.viresh.kumar@linaro.org>
+References: <cover.1438166099.git.viresh.kumar@linaro.org>
+Message-ID: <26644874.9clcJiszPI@amdc1976>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The new CPU clock type allows the use of generic CPUfreq driver.
-Switch Exynos4x12 to using generic cpufreq driver.
 
-Also make CPUFREQ_DT config option select Exynos thermal driver
-if Exynos platform support is enabled.
+Hi,
 
-Please also note that the switch to use the generic cpufreq-dt
-driver fixes the minor issue present with the old code (support
-for 'boost' mode in the exynos-cpufreq driver was enabled for
-all supported SoCs even though 'boost' frequency was provided
-only for Exynos4x12 ones).
+On Wednesday, July 29, 2015 04:22:55 PM Viresh Kumar wrote:
+> Hi Guys,
+> 
+> Resending this again because:
+> - opp-hz is now 64 bit long and so that required a binding update.
+> - There is another 4 patch series that as updating turbo OPP support,
+>   along with updates to cpufreq core and cpufreq-dt driver.
+> - A minor bug-fix in V2 4/11, which caused false positive for duplicate
+>   OPPs in some cases.
+> 
+> Tested this on dual-core exynos board with the driver inbuilt as well as
+> a module. Tried multiple insertion/removals of the module. Have tested
+> cpufreq-dt driver with both old and new bindings.
 
-Cc: Tomasz Figa <tomasz.figa@gmail.com>
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Cc: Thomas Abraham <thomas.ab@samsung.com>
-Cc: Javier Martinez Canillas <javier@osg.samsung.com>
-Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
----
- arch/arm/mach-exynos/exynos.c | 2 ++
- drivers/cpufreq/Kconfig       | 1 +
- 2 files changed, 3 insertions(+)
+I have tested these patches (including boost support) together with my
+cpufreq-dt conversion patches for Exynos4x12 platforms on Odroid-U3 and
+Trats2 boards.
 
-diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
-index 77ac021..1c47aee 100644
---- a/arch/arm/mach-exynos/exynos.c
-+++ b/arch/arm/mach-exynos/exynos.c
-@@ -227,6 +227,8 @@ static void __init exynos_init_irq(void)
- static const struct of_device_id exynos_cpufreq_matches[] = {
- 	{ .compatible = "samsung,exynos3250", .data = "cpufreq-dt" },
- 	{ .compatible = "samsung,exynos4210", .data = "cpufreq-dt" },
-+	{ .compatible = "samsung,exynos4212", .data = "cpufreq-dt" },
-+	{ .compatible = "samsung,exynos4412", .data = "cpufreq-dt" },
- 	{ .compatible = "samsung,exynos5250", .data = "cpufreq-dt" },
- 	{ /* sentinel */ }
- };
-diff --git a/drivers/cpufreq/Kconfig b/drivers/cpufreq/Kconfig
-index 659879a..bf6d596 100644
---- a/drivers/cpufreq/Kconfig
-+++ b/drivers/cpufreq/Kconfig
-@@ -191,6 +191,7 @@ config CPUFREQ_DT
- 	# if CPU_THERMAL is on and THERMAL=m, CPUFREQ_DT cannot be =y:
- 	depends on !CPU_THERMAL || THERMAL
- 	select PM_OPP
-+	select EXYNOS_THERMAL if ARCH_EXYNOS
- 	help
- 	  This adds a generic DT based cpufreq driver for frequency management.
- 	  It supports both uniprocessor (UP) and symmetric multiprocessor (SMP)
--- 
-1.9.1
+Tested-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
