@@ -1,79 +1,40 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 31 Jul 2015 10:59:51 +0200
-Subject: [PATCH 2/5] ARM: dts: sun5i: Enable USB DRC on A10s OLinuxIno Micro
+Date: Fri, 31 Jul 2015 10:59:53 +0200
+Subject: [PATCH 4/5] ARM: dts: sun8i: Enable USB DRC on Ippo Q8H-A33 tablet
 In-Reply-To: <1438333194-21181-1-git-send-email-hdegoede@redhat.com>
 References: <1438333194-21181-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1438333194-21181-3-git-send-email-hdegoede@redhat.com>
+Message-ID: <1438333194-21181-5-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the otg/drc usb controller on the A10s OLinuxIno Micro.
+Enable the otg/drc usb controller on the Ippo Q8H-A33 tablet, for now it
+is enabled in host-only mode, because true OTG support requires support
+for detecting and enabling Vbus through the axp221 pmic.
 
-Note the A10s OlinuxIno Micro always has some voltage on its otg power
-pin, even if the usb-vbus0-regulator is disabled, the leaked voltage is
-enough to make vbus-det always report 1, so we do not use vbus-det on
-this board.
+For this to work the Vbus on the port must be enabled by u-boot,
+or a powered hub must be used.
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts | 30 +++++++++++++++++++++++-
- 1 file changed, 29 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/sun8i-a33-ippo-q8h-v1.2.dts | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts b/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
-index 7b26e17..5eebd21 100644
---- a/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
-+++ b/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
-@@ -196,6 +196,10 @@
+diff --git a/arch/arm/boot/dts/sun8i-a33-ippo-q8h-v1.2.dts b/arch/arm/boot/dts/sun8i-a33-ippo-q8h-v1.2.dts
+index 8bb75ee..361ddb9 100644
+--- a/arch/arm/boot/dts/sun8i-a33-ippo-q8h-v1.2.dts
++++ b/arch/arm/boot/dts/sun8i-a33-ippo-q8h-v1.2.dts
+@@ -116,3 +116,12 @@
+ 	pinctrl-0 = <&r_uart_pins_a>;
  	status = "okay";
  };
- 
-+&otg_sram {
-+	status = "okay";
-+};
 +
- &pio {
- 	mmc0_cd_pin_olinuxino_micro: mmc0_cd_pin at 0 {
- 		allwinner,pins = "PG1";
-@@ -224,6 +228,22 @@
- 		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
- 		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 	};
-+
-+	usb0_vbus_pin_a: usb0_vbus_pin at 0 {
-+		allwinner,pins = "PG11";
-+	};
-+
-+	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
-+		allwinner,pins = "PG12";
-+		allwinner,function = "gpio_in";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
-+	};
-+};
-+
-+&reg_usb0_vbus {
-+	gpio = <&pio 6 11 GPIO_ACTIVE_HIGH>; /* PG11 */
-+	status = "okay";
- };
- 
- &reg_usb1_vbus {
-@@ -250,8 +270,16 @@
- 	status = "okay";
- };
- 
 +&usb_otg {
-+	dr_mode = "otg";
++	dr_mode = "host";
 +	status = "okay";
 +};
 +
- &usbphy {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&usb0_id_detect_pin>;
-+	usb0_id_det-gpio = <&pio 6 12 GPIO_ACTIVE_HIGH>; /* PG12 */
-+	usb0_vbus-supply = <&reg_usb0_vbus>;
- 	usb1_vbus-supply = <&reg_usb1_vbus>;
- 	status = "okay";
- };
--
++&usbphy {
++	status = "okay";
++};
 -- 
 2.4.3
