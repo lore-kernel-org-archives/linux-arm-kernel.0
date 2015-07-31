@@ -1,33 +1,65 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Fri, 31 Jul 2015 10:09:29 +0200
-Subject: [RFCv3 4/4] ARM: zynq: Select ARCH_HAS_RESET_CONTROLLER
-In-Reply-To: <1438305237-18497-5-git-send-email-moritz.fischer@ettus.com>
-References: <1438305237-18497-1-git-send-email-moritz.fischer@ettus.com>
- <1438305237-18497-5-git-send-email-moritz.fischer@ettus.com>
-Message-ID: <55BB2D39.6000004@xilinx.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 31 Jul 2015 10:08:53 +0200
+Subject: [PATCH v3 4/5] Documentation: atmel-quadspi: add binding file
+ for Atmel QSPI driver
+In-Reply-To: <a5ece7085956e97f35ecd5ddb41abd28a7c402a8.1437986785.git.cyrille.pitchen@atmel.com>
+References: <cover.1437986785.git.cyrille.pitchen@atmel.com>
+ <a5ece7085956e97f35ecd5ddb41abd28a7c402a8.1437986785.git.cyrille.pitchen@atmel.com>
+Message-ID: <55BB2D15.2020408@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/31/2015 03:13 AM, Moritz Fischer wrote:
-> Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
+Le 27/07/2015 10:59, Cyrille Pitchen a ?crit :
+> This patch documents the DT bindings for the driver of the Atmel QSPI
+> controller embedded inside sama5d2x SoCs.
+> 
+> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+
+Yes, it seems good:
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
 > ---
->  arch/arm/mach-zynq/Kconfig | 1 +
->  1 file changed, 1 insertion(+)
+>  .../devicetree/bindings/mtd/atmel-quadspi.txt      | 29 ++++++++++++++++++++++
+>  1 file changed, 29 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mtd/atmel-quadspi.txt
 > 
-> diff --git a/arch/arm/mach-zynq/Kconfig b/arch/arm/mach-zynq/Kconfig
-> index 78e5e00..77d7df7 100644
-> --- a/arch/arm/mach-zynq/Kconfig
-> +++ b/arch/arm/mach-zynq/Kconfig
-> @@ -1,5 +1,6 @@
->  config ARCH_ZYNQ
->  	bool "Xilinx Zynq ARM Cortex A9 Platform" if ARCH_MULTI_V7
-> +	select ARCH_HAS_RESET_CONTROLLER
->  	select ARCH_SUPPORTS_BIG_ENDIAN
->  	select ARM_AMBA
->  	select ARM_GIC
+> diff --git a/Documentation/devicetree/bindings/mtd/atmel-quadspi.txt b/Documentation/devicetree/bindings/mtd/atmel-quadspi.txt
+> new file mode 100644
+> index 000000000000..0b8d545bb198
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mtd/atmel-quadspi.txt
+> @@ -0,0 +1,29 @@
+> +* Atmel Quad Serial Peripheral Interface (QSPI)
+> +
+> +Required properties:
+> +- compatible:     should be "atmel,sama5d2-qspi"
+> +- reg:            the first contains the register location and length,
+> +                  the second contains the memory mapping address and length
+> +- interrupts:     should contain the interrupt for the device
+> +- clocks:         the phandle of the clock needed by the QSPI controller
+> +- #address-cells: should be <1>
+> +- #size-cells:    should be <0>
+> +
+> +Example:
+> +
+> +spi at f0020000 {
+> +	compatible = "atmel,sama5d2-qspi";
+> +	reg = <0xf0020000 0x100>,
+> +	      <0xd0000000 0x8000000>;
+> +	interrupts = <52 IRQ_TYPE_LEVEL_HIGH 7>;
+> +	clocks = <&spi0_clk>;
+> +	#address-cells = <1>;
+> +	#size-cells = <0>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_spi0_default>;
+> +	status = "okay";
+> +
+> +	m25p80 at 0 {
+> +		...
+> +	};
+> +};
 > 
 
-Reviewed-by: Michal Simek <michal.simek@xilinx.com>
 
-Thanks,
-Michal
+-- 
+Nicolas Ferre
