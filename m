@@ -1,29 +1,33 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 31 Jul 2015 11:28:06 +0530
-Subject: [PATCH V3 07/16] PM / OPP: Add support to parse
- "operating-points-v2" bindings
-In-Reply-To: <20150731055106.GJ3159@codeaurora.org>
-References: <cover.1438166099.git.viresh.kumar@linaro.org>
- <6d8d9cd0c3ae2d3fa8c3aadedb5ac403785b7675.1438166099.git.viresh.kumar@linaro.org>
- <20150731055106.GJ3159@codeaurora.org>
-Message-ID: <20150731055806.GN17794@linux>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Fri, 31 Jul 2015 14:58:21 +0900
+Subject: [PATCH] soc: tegra: remove redundant $(CONFIG_ARCH_TEGRA) in Makefile
+Message-ID: <1438322301-24584-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30-07-15, 22:51, Stephen Boyd wrote:
-> > +	opp->u_volt = microvolt[0];
-> > +	opp->u_volt_min = microvolt[1];
-> > +	opp->u_volt_max = microvolt[2];
-> 
-> Should the default be 0 and ULONG_MAX for volt_min/volt_max when
-> there's on element?
+Kbuild descends into drivers/soc/tegra/ only when CONFIG_ARCH_TEGRA
+is enabled. (see drivers/soc/Makefile)
 
-I am not still sure how the regulator API is going to look like for
-this target/min/max thing. So, lets defer it until that is resolved.
-For now they are initialized to 0.
+$(CONFIG_ARCH_TEGRA) in drivers/soc/tegra/Makefile always evaluates
+to 'y'.
 
-And, because the user has just passed in a target voltage, maybe all
-three must be == u_volt. :)
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
 
+ drivers/soc/tegra/Makefile | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/soc/tegra/Makefile b/drivers/soc/tegra/Makefile
+index cdaad9d..ae857ff 100644
+--- a/drivers/soc/tegra/Makefile
++++ b/drivers/soc/tegra/Makefile
+@@ -1,4 +1,4 @@
+-obj-$(CONFIG_ARCH_TEGRA) += fuse/
++obj-y += fuse/
+ 
+-obj-$(CONFIG_ARCH_TEGRA) += common.o
+-obj-$(CONFIG_ARCH_TEGRA) += pmc.o
++obj-y += common.o
++obj-y += pmc.o
 -- 
-viresh
+1.9.1
