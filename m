@@ -1,31 +1,49 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 30 Jul 2015 22:43:56 -0700
-Subject: [PATCH V3 06/16] PM / OPP: Break _opp_add_dynamic() into smaller
- functions
-In-Reply-To: <f5778b7bf5d30d888297c9e2fd7097901e9c47d9.1438166099.git.viresh.kumar@linaro.org>
-References: <cover.1438166099.git.viresh.kumar@linaro.org>
- <f5778b7bf5d30d888297c9e2fd7097901e9c47d9.1438166099.git.viresh.kumar@linaro.org>
-Message-ID: <20150731054356.GI3159@codeaurora.org>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Fri, 31 Jul 2015 14:46:18 +0900
+Subject: [PATCH v2] dtb: Create a common home for cross-architecture dtsi
+ files.
+In-Reply-To: <CAK7LNAS_P65k3T_J_vXZ9dxBB-uVbrTW-qFE_fJEOSLcOW4JsA@mail.gmail.com>
+References: <1437993343-9542-1-git-send-email-ian.campbell@citrix.com>
+ <CAK7LNAQKswPzeFYdSVq3JDk2qawZ8e5ogBFMWdor-CibMovU3g@mail.gmail.com>
+ <1438176174.11600.198.camel@citrix.com>
+ <CAL_JsqL7KRcSv5jSneWYj1PJOYbvMQ8HOAGK+w-+MDBMpMatow@mail.gmail.com>
+ <CAK7LNAS_P65k3T_J_vXZ9dxBB-uVbrTW-qFE_fJEOSLcOW4JsA@mail.gmail.com>
+Message-ID: <CAK7LNAQ4hT133v0iH7z6JxfaBDjrGgaX2M9pA9H=sPxsmorDNw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/29, Viresh Kumar wrote:
-> Later commits would add support for new OPP bindings and this would be
-> required then. So, lets do it in a separate patch to make it easily
-> reviewable.
-> 
-> Another change worth noticing is INIT_LIST_HEAD(&opp->node). We weren't
-> doing it earlier as we never tried to delete a list node before it is
-> added to list. But this wouldn't be the case anymore. We might try to
-> delete a node (just to reuse the same code paths), without it being
-> getting added to the list.
-> 
-> Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-> ---
+Hi.
 
-Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
+2015-07-30 10:30 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
+> Hi,
+>
+>
+> 2015-07-30 0:23 GMT+09:00 Rob Herring <robherring2@gmail.com>:
+>> On Wed, Jul 29, 2015 at 8:22 AM, Ian Campbell <ian.campbell@citrix.com> wrote:
+>>> On Wed, 2015-07-29 at 20:07 +0900, Masahiro Yamada wrote:
+>>>> Hi Ian,
+>>>>
+>>>>
+>>>> 2015-07-27 19:35 GMT+09:00 Ian Campbell <ian.campbell@citrix.com>:
+>>>> > Commit 9ccd608070b6 "arm64: dts: add device tree for ARM SMM-A53x2 on
+>>>> > LogicTile Express 20MG" added a new dts file to arch/arm64 which
+>>>> > included "../../../../arm/boot/dts/vexpress-v2m-rs1.dtsi", i.e. a
+>>>> > .dtsi supplied by arch/arm.
+
+
+
+BTW, is there any chance to merge arch/arm64 and arch/arm in the future?
+
+For example, U-boot supports ARM64/32 in a single arch directory, arch/arm/.
+
+
+I guess, the cross-arch home directory for DTSI would be only used to
+share device trees between arm64 and arm32.
+
+
+
+
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Best Regards
+Masahiro Yamada
