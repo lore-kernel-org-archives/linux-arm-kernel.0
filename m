@@ -1,188 +1,53 @@
-From: aisheng.dong@freescale.com (Dong Aisheng)
-Date: Fri, 31 Jul 2015 22:15:08 +0800
-Subject: [PATCH v3 1/6] mmc: sdhci-esdhc-imx: add imx7d support and
- support HS400
-In-Reply-To: <1438160637-28061-2-git-send-email-haibo.chen@freescale.com>
-References: <1438160637-28061-1-git-send-email-haibo.chen@freescale.com>
- <1438160637-28061-2-git-send-email-haibo.chen@freescale.com>
-Message-ID: <20150731141507.GB27806@shlinux1.ap.freescale.net>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Fri, 31 Jul 2015 16:24:31 +0200
+Subject: [linux-sunxi] [PATCH v5 2/7] phy-sun4i-usb: Add extcon support
+ for the otg phy (phy0)
+In-Reply-To: <55BB84D7.70109@gmail.com>
+References: <1434199071-22127-1-git-send-email-hdegoede@redhat.com>
+ <1434199071-22127-3-git-send-email-hdegoede@redhat.com>
+ <55BB84D7.70109@gmail.com>
+Message-ID: <55BB851F.4090602@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 29, 2015 at 05:03:52PM +0800, Haibo Chen wrote:
-> The imx7d usdhc is derived from imx6sx, the difference is that
-> imx7d support HS400.
-> 
-> So introduce a new compatible string for imx7d and add HS400
-> support for imx7d usdhc.
-> 
-> Signed-off-by: Haibo Chen <haibo.chen@freescale.com>
-> ---
->  drivers/mmc/host/sdhci-esdhc-imx.c | 66 ++++++++++++++++++++++++++++++++++++++
->  1 file changed, 66 insertions(+)
-> 
-> diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-> index c6b9f64..b441eed 100644
-> --- a/drivers/mmc/host/sdhci-esdhc-imx.c
-> +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-> @@ -44,6 +44,7 @@
->  #define  ESDHC_MIX_CTRL_EXE_TUNE	(1 << 22)
->  #define  ESDHC_MIX_CTRL_SMPCLK_SEL	(1 << 23)
->  #define  ESDHC_MIX_CTRL_FBCLK_SEL	(1 << 25)
-> +#define  ESDHC_MIX_CTRL_HS400_EN	(1 << 26)
->  /* Bits 3 and 6 are not SDHCI standard definitions */
->  #define  ESDHC_MIX_CTRL_SDHCI_MASK	0xb7
->  /* Tuning bits */
-> @@ -60,6 +61,16 @@
->  #define  ESDHC_TUNE_CTRL_MIN		0
->  #define  ESDHC_TUNE_CTRL_MAX		((1 << 7) - 1)
->  
-> +/* strobe dll register */
-> +#define ESDHC_STROBE_DLL_CTRL		0x70
-> +#define ESDHC_STROBE_DLL_CTRL_ENABLE	(1 << 0)
-> +#define ESDHC_STROBE_DLL_CTRL_RESET	(1 << 1)
-> +#define ESDHC_STROBE_DLL_CTRL_SLV_DLY_TARGET_SHIFT	3
-> +
-> +#define ESDHC_STROBE_DLL_STATUS		0x74
-> +#define ESDHC_STROBE_DLL_STS_REF_LOCK	(1 << 1)
-> +#define ESDHC_STROBE_DLL_STS_SLV_LOCK	0x1
-> +
->  #define ESDHC_TUNING_CTRL		0xcc
->  #define ESDHC_STD_TUNING_EN		(1 << 24)
->  /* NOTE: the minimum valid tuning start tap for mx6sl is 1 */
-> @@ -120,6 +131,8 @@
->  #define ESDHC_FLAG_ERR004536		BIT(7)
->  /* The IP supports HS200 mode */
->  #define ESDHC_FLAG_HS200		BIT(8)
-> +/* The IP supports HS400 mode */
-> +#define ESDHC_FLAG_SUP_HS400		BIT(9)
->  
->  struct esdhc_soc_data {
->  	u32 flags;
-> @@ -156,6 +169,12 @@ static struct esdhc_soc_data usdhc_imx6sx_data = {
->  			| ESDHC_FLAG_HAVE_CAP1 | ESDHC_FLAG_HS200,
->  };
->  
-> +static struct esdhc_soc_data usdhc_imx7d_data = {
-> +	.flags = ESDHC_FLAG_USDHC | ESDHC_FLAG_STD_TUNING
-> +			| ESDHC_FLAG_HAVE_CAP1 | ESDHC_FLAG_HS200
-> +			| ESDHC_FLAG_SUP_HS400,
-> +};
-> +
->  struct pltfm_imx_data {
->  	u32 scratchpad;
->  	struct pinctrl *pinctrl;
-> @@ -199,6 +218,7 @@ static const struct of_device_id imx_esdhc_dt_ids[] = {
->  	{ .compatible = "fsl,imx6sx-usdhc", .data = &usdhc_imx6sx_data, },
->  	{ .compatible = "fsl,imx6sl-usdhc", .data = &usdhc_imx6sl_data, },
->  	{ .compatible = "fsl,imx6q-usdhc", .data = &usdhc_imx6q_data, },
-> +	{ .compatible = "fsl,imx7d-usdhc", .data = &usdhc_imx7d_data, },
->  	{ /* sentinel */ }
->  };
->  MODULE_DEVICE_TABLE(of, imx_esdhc_dt_ids);
-> @@ -274,6 +294,10 @@ static u32 esdhc_readl_le(struct sdhci_host *host, int reg)
->  				val = SDHCI_SUPPORT_DDR50 | SDHCI_SUPPORT_SDR104
->  					| SDHCI_SUPPORT_SDR50
->  					| SDHCI_USE_SDR50_TUNING;
-> +
-> +			/* imx7d does not have a support_hs400 register, fake one */
+Hi,
 
-You could remove this line.
-It's bit, not register and i think no need such comment.
+On 31-07-15 16:23, Jonathan Liu wrote:
+> Hi Hans,
+>
+> On 13/06/2015 10:37 PM, Hans de Goede wrote:
+>> The sunxi musb glue needs to know if a host or normal usb cable is plugged
+>> in, add extcon support so that the musb glue can monitor the host status.
+>>
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>> ---
+>> Changes in v5:
+>> -Split out of the "Add id and vbus detection support" commit
+>> -Ported to the new extcon API queued for 4.2
+>> ---
+>>   drivers/phy/Kconfig         |  1 +
+>>   drivers/phy/phy-sun4i-usb.c | 32 +++++++++++++++++++++++++++++++-
+>>   2 files changed, 32 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+>> index a53bd5b..9841780 100644
+>> --- a/drivers/phy/Kconfig
+>> +++ b/drivers/phy/Kconfig
+>> @@ -173,6 +173,7 @@ config PHY_SUN4I_USB
+>>       tristate "Allwinner sunxi SoC USB PHY driver"
+>>       depends on ARCH_SUNXI && HAS_IOMEM && OF
+>>       depends on RESET_CONTROLLER
+>> +    depends on EXTCON
+>>       select GENERIC_PHY
+>>       help
+>>         Enable this to support the transceiver that is part of Allwinner
+>>
+> Should probably add CONFIG_EXTCON=y to arch/arm/configs/sunxi_defconfig so that CONFIG_PHY_SUN4I_USB=y works out of the box.
 
-> +			if (imx_data->socdata->flags & ESDHC_FLAG_SUP_HS400)
-> +				val |= SDHCI_SUPPORT_HS400;
->  		}
->  	}
->  
-> @@ -774,6 +798,7 @@ static int esdhc_change_pinstate(struct sdhci_host *host,
->  		break;
->  	case MMC_TIMING_UHS_SDR104:
->  	case MMC_TIMING_MMC_HS200:
-> +	case MMC_TIMING_MMC_HS400:
->  		pinctrl = imx_data->pins_200mhz;
->  		break;
->  	default:
-> @@ -784,6 +809,30 @@ static int esdhc_change_pinstate(struct sdhci_host *host,
->  	return pinctrl_select_state(imx_data->pinctrl, pinctrl);
->  }
->  
-> +static void esdhc_set_strobe_dll(struct sdhci_host *host)
+Right, ChenYu just send out 2 defconfig patches fixing this.
 
-It would be good if we can add some comments for this function for better
-understand.
+Thanks for the heads up.
 
-> +{
-> +	u32 v;
-> +
-> +	/* force a reset on strobe dll */
-> +	writel(ESDHC_STROBE_DLL_CTRL_RESET, host->ioaddr + ESDHC_STROBE_DLL_CTRL);
-> +	/*
-> +	 * enable strobe dll ctrl and adjust the delay target
-> +	 * for the uSDHC loopback read clock
-> +	 */
-> +	v = ESDHC_STROBE_DLL_CTRL_ENABLE |
-> +		(7 << ESDHC_STROBE_DLL_CTRL_SLV_DLY_TARGET_SHIFT);
-> +	writel(v, host->ioaddr + ESDHC_STROBE_DLL_CTRL);
-> +	/* wait 1us to make sure strobe dll status register stable */
-> +	udelay(1);
-> +	v = readl(host->ioaddr + ESDHC_STROBE_DLL_STATUS);
-> +	if (!(v & ESDHC_STROBE_DLL_STS_REF_LOCK))
-> +		dev_warn(mmc_dev(host->mmc),
-> +			"warning! HS400 strobe DLL status REF not lock!\n");
-> +	if (!(v & ESDHC_STROBE_DLL_STS_SLV_LOCK))
-> +		dev_warn(mmc_dev(host->mmc),
-> +			"warning! HS400 strobe DLL status SLV not lock!\n");
-> +}
-> +
->  static void esdhc_set_uhs_signaling(struct sdhci_host *host, unsigned timing)
->  {
->  	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-> @@ -795,7 +844,13 @@ static void esdhc_set_uhs_signaling(struct sdhci_host *host, unsigned timing)
->  	case MMC_TIMING_UHS_SDR25:
->  	case MMC_TIMING_UHS_SDR50:
->  	case MMC_TIMING_UHS_SDR104:
-> +		break;
->  	case MMC_TIMING_MMC_HS200:
-> +		/* disable ddr mode and disable HS400 mode */
-> +		writel(readl(host->ioaddr + ESDHC_MIX_CTRL) &
-> +			~(ESDHC_MIX_CTRL_DDREN | ESDHC_MIX_CTRL_HS400_EN),
-> +			host->ioaddr + ESDHC_MIX_CTRL);
-> +		imx_data->is_ddr = 0;
->  		break;
->  	case MMC_TIMING_UHS_DDR50:
->  	case MMC_TIMING_MMC_DDR52:
-> @@ -813,6 +868,14 @@ static void esdhc_set_uhs_signaling(struct sdhci_host *host, unsigned timing)
->  			writel(v, host->ioaddr + ESDHC_DLL_CTRL);
->  		}
->  		break;
-> +	case MMC_TIMING_MMC_HS400:
-> +		writel(readl(host->ioaddr + ESDHC_MIX_CTRL) |
-> +				ESDHC_MIX_CTRL_DDREN | ESDHC_MIX_CTRL_HS400_EN,
-> +				host->ioaddr + ESDHC_MIX_CTRL);
-> +		imx_data->is_ddr = 1;
-> +		if (host->clock == 200000000)
+Regards,
 
-I can't remember, but could this be a range required by SoC?
-
-> +			esdhc_set_strobe_dll(host);
-> +		break;
->  	}
->  
->  	esdhc_change_pinstate(host, timing);
-> @@ -1100,6 +1163,9 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
->  	if (imx_data->socdata->flags & ESDHC_FLAG_ERR004536)
->  		host->quirks |= SDHCI_QUIRK_BROKEN_ADMA;
->  
-> +	if (imx_data->socdata->flags & ESDHC_FLAG_SUP_HS400)
-> +		host->quirks2 |= SDHCI_QUIRK2_CAPS_BIT63_FOR_HS400;
-> +
->  	if (of_id)
->  		err = sdhci_esdhc_imx_probe_dt(pdev, host, imx_data);
->  	else
-> -- 
-> 1.9.1
-> 
-
-Regards
-Dong Aisheng
+Hans
