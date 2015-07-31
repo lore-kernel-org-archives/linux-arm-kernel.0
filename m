@@ -1,69 +1,69 @@
-From: johan@kernel.org (Johan Hovold)
-Date: Fri, 31 Jul 2015 10:54:07 +0200
-Subject: [PATCH 9/9] gpiolib: Add gpio name information to
- /sys/kernel/debug/gpio
-In-Reply-To: <20150729070842.GG30895@pengutronix.de>
-References: <1437125570-28623-1-git-send-email-mpa@pengutronix.de>
- <1437125570-28623-10-git-send-email-mpa@pengutronix.de>
- <20150728095842.GO28535@localhost>
- <20150729070842.GG30895@pengutronix.de>
-Message-ID: <20150731085407.GO28535@localhost>
+From: monstr@monstr.eu (Michal Simek)
+Date: Fri, 31 Jul 2015 10:55:34 +0200
+Subject: [GIT PULL] Xilinx Zynq DT changes for v4.3
+Message-ID: <55BB3806.7080806@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 29, 2015 at 09:08:42AM +0200, Markus Pargmann wrote:
-> On Tue, Jul 28, 2015 at 11:58:42AM +0200, Johan Hovold wrote:
-> > On Fri, Jul 17, 2015 at 11:32:50AM +0200, Markus Pargmann wrote:
-> > > Add some information about gpio names to the debugfs gpio file. name and
-> > > label of a GPIO are then displayed next to each other. This way it is
-> > > easy to see what the real name of GPIO is and what the driver requested
-> > > it for.
-> > > 
-> > > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> > > ---
-> > >  drivers/gpio/gpiolib.c | 11 ++++++++---
-> > >  1 file changed, 8 insertions(+), 3 deletions(-)
-> > > 
-> > > diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
-> > > index dcac3bcf21dd..0f1d1f5faf5d 100644
-> > > --- a/drivers/gpio/gpiolib.c
-> > > +++ b/drivers/gpio/gpiolib.c
-> > > @@ -2308,14 +2308,19 @@ static void gpiolib_dbg_show(struct seq_file *s, struct gpio_chip *chip)
-> > >  	int			is_irq;
-> > >  
-> > >  	for (i = 0; i < chip->ngpio; i++, gpio++, gdesc++) {
-> > > -		if (!test_bit(FLAG_REQUESTED, &gdesc->flags))
-> > > +		if (!test_bit(FLAG_REQUESTED, &gdesc->flags)) {
-> > > +			if (gdesc->name) {
-> > > +				seq_printf(s, " gpio-%-3d (%-20.20s)\n",
-> > > +					   gpio, gdesc->name);
-> > > +			}
-> > 
-> > So now we'd no longer just be listing requested gpios, but on a similar
-> > format to how requested ones used to be represented.
-> 
-> Better suggestions on how to display those extra information in debugfs?
+Hi,
 
-Perhaps a new file only listing the line names.
+please pull these zynq DT changes to your tree.
 
-> > Then there's the debugfs as ABI discussion...
-> 
-> I didn't consider debugfs as ABI as I thought it is just for debugging
-> purposes?
+Thanks,
+Michal
 
-Some people seem to have expressed a different position:
+The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
 
-	"The fact that something is documented (whether correctly or
-        not) has absolutely _zero_ impact on anything at all. What makes
-        something an ABI is that it's useful and available. The only way
-        something isn't an ABI is by _explicitly_ making sure that it's
-        not available even by mistake in a stable form for binary use.
+  Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
 
-        Example: kernel internal data structures and function calls. We
-        make sure that you simply _cannot_ make a binary that works
-        across kernel versions. That is the only way for an ABI to not
-        form."
+are available in the git repository at:
 
-        https://lwn.net/Articles/309298/
+  https://github.com/Xilinx/linux-xlnx.git tags/zynq-dt-for-4.3
 
-Johan
+for you to fetch changes up to b76da4d8758995437a831748dfca6f64a0e31c95:
+
+  ARM: zynq: DT: Add zc702 pushbuttons to DT as gpio-keys (2015-07-31
+10:50:06 +0200)
+
+----------------------------------------------------------------
+arm: Xilinx Zynq dt patches for v4.3
+
+- Add ECC for Synopsys MC
+- Add OCM, pushbuttons to zc702
+
+----------------------------------------------------------------
+Alex Wilson (1):
+      ARM: zynq: DT: Add missing interrupt for L2 pl310
+
+Ezra Savard (1):
+      ARM: zynq: DT: Add zc702 pushbuttons to DT as gpio-keys
+
+Michal Simek (1):
+      ARM: dts: zynq: Add OCM node
+
+Punnaiah Choudary Kalluri (1):
+      Documentation: devicetree: Add ECC information to synopsys ddr
+controller
+
+ Documentation/devicetree/bindings/memory-controllers/synopsys.txt |  4 ++++
+ arch/arm/boot/dts/zynq-7000.dtsi                                  |  3 ++-
+ arch/arm/boot/dts/zynq-zc702.dts                                  | 28
+++++++++++++++++++++++++++++
+ 3 files changed, 34 insertions(+), 1 deletion(-)
+
+
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150731/d7f08a2c/attachment.sig>
