@@ -1,94 +1,92 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 31 Jul 2015 14:53:37 +0200
-Subject: [PATCH v2 2/3] ARM: dts: sun5i: Enable USB DRC on A13 OLinuxIno
-In-Reply-To: <1438347218-8158-1-git-send-email-hdegoede@redhat.com>
-References: <1438347218-8158-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1438347218-8158-2-git-send-email-hdegoede@redhat.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Fri, 31 Jul 2015 14:59:54 +0200
+Subject: [PATCH v2 7/7] KVM: arm: implement kvm_set_msi by gsi direct
+ mapping
+In-Reply-To: <55A05282.6020105@arm.com>
+References: <1436430137-24205-1-git-send-email-eric.auger@linaro.org>
+ <1436430137-24205-8-git-send-email-eric.auger@linaro.org>
+ <55A05282.6020105@arm.com>
+Message-ID: <55BB714A.8030307@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Janssen <mark@sig-io.nl>
+Hi Andre,
+On 07/11/2015 01:17 AM, Andre Przywara wrote:
+> On 09/07/15 09:22, Eric Auger wrote:
+>> If the ITS modality is not available, let's simply support MSI
+>> injection by transforming the MSI.data into an SPI ID.
+>>
+>> This becomes possible to use KVM_SIGNAL_MSI ioctl for arm too.
+>>
+>> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+>>
+>> ---
+>>
+>> v1 -> v2:
+>> - introduce vgic_v2m_inject_msi in vgic-v2-emul.c following Andre's
+>>   advice
+>> ---
+>>  arch/arm/kvm/Kconfig        |  1 +
+>>  virt/kvm/arm/vgic-v2-emul.c | 12 ++++++++++++
+>>  2 files changed, 13 insertions(+)
+>>
+>> diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
+>> index 151e710..0f58baf 100644
+>> --- a/arch/arm/kvm/Kconfig
+>> +++ b/arch/arm/kvm/Kconfig
+>> @@ -31,6 +31,7 @@ config KVM
+>>  	select KVM_VFIO
+>>  	select HAVE_KVM_EVENTFD
+>>  	select HAVE_KVM_IRQFD
+>> +	select HAVE_KVM_MSI
+> 
+> I wonder if this requires some more code to only advertise
+> KVM_CAP_SIGNAL_MSI if userland actually sets up a GICv2M?
+> Otherwise userland could get the idea of being able to inectj MSIs
+> without the guest actually being prepared for that (because the GICv2M
+> driver did not initialize).
+Not sure I get what you mean here. By directly transforming the user
+provided MSI msg into an SPI ID, do we really have to care about GICv2M?
 
-Enable the otg/drc usb controller on the A13 OLinuxIno.
+Best Regards
 
-Signed-off-by: Mark Janssen <mark@sig-io.nl>
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
-Changes in v2:
--Address usb0_vbus_pin_a node by reference instead of by full path
----
- arch/arm/boot/dts/sun5i-a13-olinuxino.dts | 37 +++++++++++++++++++++++++++++++
- 1 file changed, 37 insertions(+)
-
-diff --git a/arch/arm/boot/dts/sun5i-a13-olinuxino.dts b/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
-index 4232400..b3c234c 100644
---- a/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
-+++ b/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
-@@ -159,6 +159,10 @@
- 	status = "okay";
- };
- 
-+&otg_sram {
-+	status = "okay";
-+};
-+
- &pio {
- 	mmc0_cd_pin_olinuxino: mmc0_cd_pin at 0 {
- 		allwinner,pins = "PG0";
-@@ -174,6 +178,20 @@
- 		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 	};
- 
-+	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
-+		allwinner,pins = "PG2";
-+		allwinner,function = "gpio_in";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
-+	};
-+
-+	usb0_vbus_detect_pin: usb0_vbus_detect_pin at 0 {
-+		allwinner,pins = "PG1";
-+		allwinner,function = "gpio_in";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_PULL_DOWN>;
-+	};
-+
- 	usb1_vbus_pin_olinuxino: usb1_vbus_pin at 0 {
- 		allwinner,pins = "PG11";
- 		allwinner,function = "gpio_out";
-@@ -182,6 +200,11 @@
- 	};
- };
- 
-+&reg_usb0_vbus {
-+	status = "okay";
-+	gpio = <&pio 6 12 GPIO_ACTIVE_HIGH>; /* PG12 */
-+};
-+
- &reg_usb1_vbus {
- 	pinctrl-0 = <&usb1_vbus_pin_olinuxino>;
- 	gpio = <&pio 6 11 GPIO_ACTIVE_HIGH>;
-@@ -194,7 +217,21 @@
- 	status = "okay";
- };
- 
-+&usb_otg {
-+	dr_mode = "otg";
-+	status = "okay";
-+};
-+
-+&usb0_vbus_pin_a {
-+	allwinner,pins = "PG12";
-+};
-+
- &usbphy {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&usb0_id_detect_pin>, <&usb0_vbus_detect_pin>;
-+	usb0_id_det-gpio = <&pio 6 2 GPIO_ACTIVE_HIGH>; /* PG2 */
-+	usb0_vbus_det-gpio = <&pio 6 1 GPIO_ACTIVE_HIGH>; /* PG1 */
-+	usb0_vbus-supply = <&reg_usb0_vbus>;
- 	usb1_vbus-supply = <&reg_usb1_vbus>;
- 	status = "okay";
- };
--- 
-2.4.3
+Eric
+> 
+> Cheers,
+> Andre.
+> 
+>>  	select HAVE_KVM_IRQCHIP
+>>  	select HAVE_KVM_IRQ_ROUTING
+>>  	depends on ARM_VIRT_EXT && ARM_LPAE && ARM_ARCH_TIMER
+>> diff --git a/virt/kvm/arm/vgic-v2-emul.c b/virt/kvm/arm/vgic-v2-emul.c
+>> index 1390797..43013cc 100644
+>> --- a/virt/kvm/arm/vgic-v2-emul.c
+>> +++ b/virt/kvm/arm/vgic-v2-emul.c
+>> @@ -478,6 +478,17 @@ static bool vgic_v2_queue_sgi(struct kvm_vcpu *vcpu, int irq)
+>>  }
+>>  
+>>  /**
+>> + * Emulates GICv2M MSI injection by injecting the SPI ID matching
+>> + * the msi data
+>> + * @kvm: pointer to the kvm struct
+>> + * @msi: the msi struct handle
+>> + */
+>> +static int vgic_v2m_inject_msi(struct kvm *kvm, struct kvm_msi *msi)
+>> +{
+>> +	return kvm_vgic_inject_irq(kvm, 0, msi->data, 1);
+>> +}
+>> +
+>> +/**
+>>   * kvm_vgic_map_resources - Configure global VGIC state before running any VCPUs
+>>   * @kvm: pointer to the kvm struct
+>>   *
+>> @@ -566,6 +577,7 @@ void vgic_v2_init_emulation(struct kvm *kvm)
+>>  	dist->vm_ops.add_sgi_source = vgic_v2_add_sgi_source;
+>>  	dist->vm_ops.init_model = vgic_v2_init_model;
+>>  	dist->vm_ops.map_resources = vgic_v2_map_resources;
+>> +	dist->vm_ops.inject_msi = vgic_v2m_inject_msi;
+>>  
+>>  	kvm->arch.max_vcpus = VGIC_V2_MAX_CPUS;
+>>  }
+>>
+> 
