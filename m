@@ -1,56 +1,61 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 31 Jul 2015 09:37:26 -0600
-Subject: [PATCH 06/10] Coresight: Add an interface for supporting ETM3/4
- Context ID tracing
+Date: Fri, 31 Jul 2015 09:37:23 -0600
+Subject: [PATCH 03/10] coresight: replicator: Use builtin_platform_driver()
 In-Reply-To: <1438357050-22486-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1438357050-22486-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1438357050-22486-7-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1438357050-22486-4-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chunyan Zhang <zhang.chunyan@linaro.org>
+From: Vaishali Thakkar <vthakkar1994@gmail.com>
 
-If PID namespace is enabled, everytime users configure the Context ID
-register to trace the specific process, there needs to be a translation
-between the real PID seen from the kernel and VPID seen from the
-namespace in which the user's process resides .
+Macro builtin_platform_driver can be used for builtin drivers
+that don't do anything in driver init. This file depends on
+Kconfig CONFIG_CORESIGHT_LINKS_AND_SINKS which eventually
+depends on CORESIGHT. Both CONFIG_CORESIGHT_LINKS_AND_SINKS and
+CORESIGHT are bool. So, use builtin_platform_driver and remove
+some boilerplate code.
 
-This patch just adds the translation interface for ETMs.
+Also, remove header file init.h as functionality like module_init
+and module_exit is now relocated to module.h.
 
-Signed-off-by: Chunyan Zhang <zhang.chunyan@linaro.org>
+Signed-off-by: Vaishali Thakkar <vthakkar1994@gmail.com>
+Suggested-by: Paul Bolle <pebolle@tiscali.nl>
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- include/linux/coresight.h | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+ drivers/hwtracing/coresight/coresight-replicator.c | 13 +------------
+ 1 file changed, 1 insertion(+), 12 deletions(-)
 
-diff --git a/include/linux/coresight.h b/include/linux/coresight.h
-index 3486b9082adb..626da6948ca2 100644
---- a/include/linux/coresight.h
-+++ b/include/linux/coresight.h
-@@ -248,4 +248,24 @@ static inline struct coresight_platform_data *of_get_coresight_platform_data(
- 	struct device *dev, struct device_node *node) { return NULL; }
- #endif
+diff --git a/drivers/hwtracing/coresight/coresight-replicator.c b/drivers/hwtracing/coresight/coresight-replicator.c
+index 7974b7c3da6b..963ac197c253 100644
+--- a/drivers/hwtracing/coresight/coresight-replicator.c
++++ b/drivers/hwtracing/coresight/coresight-replicator.c
+@@ -12,7 +12,6 @@
  
-+#ifdef CONFIG_PID_NS
-+static inline unsigned long
-+coresight_vpid_to_pid(unsigned long vpid)
-+{
-+	struct task_struct *task = NULL;
-+	unsigned long pid = 0;
-+
-+	rcu_read_lock();
-+	task = find_task_by_vpid(vpid);
-+	if (task)
-+		pid = task_pid_nr(task);
-+	rcu_read_unlock();
-+
-+	return pid;
-+}
-+#else
-+static inline unsigned long
-+coresight_vpid_to_pid(unsigned long vpid) { return vpid; }
-+#endif
-+
- #endif
+ #include <linux/kernel.h>
+ #include <linux/module.h>
+-#include <linux/init.h>
+ #include <linux/device.h>
+ #include <linux/platform_device.h>
+ #include <linux/io.h>
+@@ -184,17 +183,7 @@ static struct platform_driver replicator_driver = {
+ 	},
+ };
+ 
+-static int __init replicator_init(void)
+-{
+-	return platform_driver_register(&replicator_driver);
+-}
+-module_init(replicator_init);
+-
+-static void __exit replicator_exit(void)
+-{
+-	platform_driver_unregister(&replicator_driver);
+-}
+-module_exit(replicator_exit);
++builtin_platform_driver(replicator_driver);
+ 
+ MODULE_LICENSE("GPL v2");
+ MODULE_DESCRIPTION("CoreSight Replicator driver");
 -- 
 1.9.1
