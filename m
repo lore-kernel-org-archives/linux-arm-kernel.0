@@ -1,52 +1,42 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 31 Jul 2015 18:45:54 +0200
-Subject: [PATCH] mfd: atmel-hlcdc: Add support for new SoCs
-Message-ID: <1438361154-10596-1-git-send-email-boris.brezillon@free-electrons.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 31 Jul 2015 17:46:06 +0100
+Subject: Converting "board file" to device tree one device at a time?
+In-Reply-To: <55BB9F87.2050307@free.fr>
+References: <55BB4686.8030509@free.fr> <55BB8C08.1060006@free.fr>
+ <20150731150551.GW7557@n2100.arm.linux.org.uk>
+ <55BB9F87.2050307@free.fr>
+Message-ID: <20150731164605.GZ7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the compatible strings for the at91sam9x5, at91sam9n12, sama5d4 and
-sama5d2 SoCs.
-Update the documentation accordingly.
+On Fri, Jul 31, 2015 at 06:17:11PM +0200, Mason wrote:
+> On 31/07/2015 17:05, Russell King - ARM Linux wrote:
+> 
+> > My /guess/ is that you have an .init_machine callback in place, but that
+> > is not calling of_platform_populate(NULL, of_default_bus_match_table,
+> > NULL, NULL); which means none of the DT-described devices are being
+> > created.
+> 
+> You guessed right. Thanks again!
+> 
+> One more question, if I may.
+> 
+> I deleted the .init_machine callback, but the board init
+> function was still being called!
+> 
+> MACHINE_START(TANGOX_87XX, "TANGOX_87XX")
+>   ...
+>   //.init_machine = tangox_87xx_board_init,
+> MACHINE_END
+> 
+> I suspected it might be called directly from elsewhere,
+> and launched grep:
+> 
+>   arch_initcall(tangox_init_devices);
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- Documentation/devicetree/bindings/mfd/atmel-hlcdc.txt | 4 ++++
- drivers/mfd/atmel-hlcdc.c                             | 4 ++++
- 2 files changed, 8 insertions(+)
+Looks like different function names to me.  Not being able to see the
+code you're modifying means I can't comment.
 
-diff --git a/Documentation/devicetree/bindings/mfd/atmel-hlcdc.txt b/Documentation/devicetree/bindings/mfd/atmel-hlcdc.txt
-index f64de95a..ad5d904 100644
---- a/Documentation/devicetree/bindings/mfd/atmel-hlcdc.txt
-+++ b/Documentation/devicetree/bindings/mfd/atmel-hlcdc.txt
-@@ -2,7 +2,11 @@ Device-Tree bindings for Atmel's HLCDC (High LCD Controller) MFD driver
- 
- Required properties:
-  - compatible: value should be one of the following:
-+   "atmel,at91sam9n12-hlcdc"
-+   "atmel,at91sam9x5-hlcdc"
-+   "atmel,sama5d2-hlcdc"
-    "atmel,sama5d3-hlcdc"
-+   "atmel,sama5d4-hlcdc"
-  - reg: base address and size of the HLCDC device registers.
-  - clock-names: the name of the 3 clocks requested by the HLCDC device.
-    Should contain "periph_clk", "sys_clk" and "slow_clk".
-diff --git a/drivers/mfd/atmel-hlcdc.c b/drivers/mfd/atmel-hlcdc.c
-index d1d6e8f..3fff6b5 100644
---- a/drivers/mfd/atmel-hlcdc.c
-+++ b/drivers/mfd/atmel-hlcdc.c
-@@ -141,7 +141,11 @@ static int atmel_hlcdc_remove(struct platform_device *pdev)
- }
- 
- static const struct of_device_id atmel_hlcdc_match[] = {
-+	{ .compatible = "atmel,at91sam9n12-hlcdc" },
-+	{ .compatible = "atmel,at91sam9x5-hlcdc" },
-+	{ .compatible = "atmel,sama5d2-hlcdc" },
- 	{ .compatible = "atmel,sama5d3-hlcdc" },
-+	{ .compatible = "atmel,sama5d4-hlcdc" },
- 	{ /* sentinel */ },
- };
- 
 -- 
-1.9.1
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
