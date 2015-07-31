@@ -1,75 +1,204 @@
-From: plaes@plaes.org (Priit Laes)
-Date: Fri, 31 Jul 2015 15:57:49 +0300
-Subject: [linux-sunxi] [PATCH 1/2] ARM: sunxi_defconfig: Enable
- DMA_SUN6I, P2WI, PWM, cryptodev, EXTCON, FHANDLE
-In-Reply-To: <1438341127-7175-2-git-send-email-wens@csie.org>
-References: <1438341127-7175-1-git-send-email-wens@csie.org>
- <1438341127-7175-2-git-send-email-wens@csie.org>
-Message-ID: <1438347469.4668.1.camel@plaes.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 31 Jul 2015 15:14:30 +0200
+Subject: [PATCH] ARM/clocksource: use automatic DT probing
+Message-ID: <1438348470-6656-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-07-31 at 19:12 +0800, Chen-Yu Tsai wrote:
-> Enable sun6i DMA engine, sun6i P2WI, PWM, and crypto engine (Security
-> System) drivers by default. EXTCON is needed by the updated sun4i USB
-> PHY driver.
-> 
-> While at it, enable FHANDLE, which is needed by systemd and newer
-> versions of udev.
+The ARM core kernel already calls clocksource_of_init() so why
+go to all the trouble of locating and probing this node in the
+machine. CLOCKSOURCE_OF_DECLARE() will take care of it in the
+clocksource driver, and thus we can also get rid of the
+dangling header file <linux/clksrc-dbx500-prcmu.h>
 
-You might want to also add CONFIG_CGROUPS which is needed by systemd.
+Suggested-by: Arnd Bergmann <arndb@linaro.org>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+Clocksource maintainers: please ACK this so I can take it through
+ARM SoC with a bunch of other cleanups.
+---
+ arch/arm/mach-ux500/Makefile              |  2 +-
+ arch/arm/mach-ux500/cpu-db8500.c          |  2 --
+ arch/arm/mach-ux500/cpu.c                 |  1 -
+ arch/arm/mach-ux500/setup.h               |  3 --
+ arch/arm/mach-ux500/timer.c               | 48 -------------------------------
+ drivers/clocksource/clksrc-dbx500-prcmu.c |  9 ++++--
+ include/linux/clksrc-dbx500-prcmu.h       | 20 -------------
+ 7 files changed, 7 insertions(+), 78 deletions(-)
+ delete mode 100644 arch/arm/mach-ux500/timer.c
+ delete mode 100644 include/linux/clksrc-dbx500-prcmu.h
 
-> 
-> And get rid of POWER_RESET, as the sun6i power reset driver has been
-> removed in favor of proper sun6i watchdog support.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
->  arch/arm/configs/sunxi_defconfig | 9 ++++++++-
->  1 file changed, 8 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/configs/sunxi_defconfig 
-> b/arch/arm/configs/sunxi_defconfig
-> index 7ebc346bf9fa..52cc0686524f 100644
-> --- a/arch/arm/configs/sunxi_defconfig
-> +++ b/arch/arm/configs/sunxi_defconfig
-> @@ -1,3 +1,4 @@
-> +CONFIG_FHANDLE=y
->  CONFIG_NO_HZ=y
->  CONFIG_HIGH_RES_TIMERS=y
->  CONFIG_BLK_DEV_INITRD=y
-> @@ -72,12 +73,12 @@ CONFIG_SERIAL_OF_PLATFORM=y
->  CONFIG_I2C=y
->  CONFIG_I2C_CHARDEV=y
->  CONFIG_I2C_MV64XXX=y
-> +CONFIG_I2C_SUN6I_P2WI=y
->  CONFIG_SPI=y
->  CONFIG_SPI_SUN4I=y
->  CONFIG_SPI_SUN6I=y
->  CONFIG_GPIO_SYSFS=y
->  CONFIG_POWER_SUPPLY=y
-> -CONFIG_POWER_RESET=y
->  CONFIG_THERMAL=y
->  CONFIG_CPU_THERMAL=y
->  CONFIG_WATCHDOG=y
-> @@ -109,7 +110,12 @@ CONFIG_RTC_CLASS=y
->  # CONFIG_RTC_INTF_PROC is not set
->  CONFIG_RTC_DRV_SUN6I=y
->  CONFIG_RTC_DRV_SUNXI=y
-> +CONFIG_DMADEVICES=y
-> +CONFIG_DMA_SUN6I=y
->  # CONFIG_IOMMU_SUPPORT is not set
-> +CONFIG_EXTCON=y
-> +CONFIG_PWM=y
-> +CONFIG_PWM_SUN4I=y
->  CONFIG_PHY_SUN4I_USB=y
->  CONFIG_PHY_SUN9I_USB=y
->  CONFIG_EXT4_FS=y
-> @@ -123,3 +129,4 @@ CONFIG_NLS_CODEPAGE_437=y
->  CONFIG_NLS_ISO8859_1=y
->  CONFIG_PRINTK_TIME=y
->  CONFIG_DEBUG_FS=y
-> +CONFIG_CRYPTO_DEV_SUN4I_SS=y
-> -- 
-> 2.5.0
-> 
+diff --git a/arch/arm/mach-ux500/Makefile b/arch/arm/mach-ux500/Makefile
+index c8643ac5db71..edfff1ae1f8d 100644
+--- a/arch/arm/mach-ux500/Makefile
++++ b/arch/arm/mach-ux500/Makefile
+@@ -2,7 +2,7 @@
+ # Makefile for the linux kernel, U8500 machine.
+ #
+ 
+-obj-y				:= cpu.o id.o timer.o pm.o
++obj-y				:= cpu.o id.o pm.o
+ obj-$(CONFIG_CACHE_L2X0)	+= cache-l2x0.o
+ obj-$(CONFIG_UX500_SOC_DB8500)	+= cpu-db8500.o
+ obj-$(CONFIG_MACH_MOP500)	+= board-mop500-regulators.o \
+diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
+index ba708ce08616..59675d809080 100644
+--- a/arch/arm/mach-ux500/cpu-db8500.c
++++ b/arch/arm/mach-ux500/cpu-db8500.c
+@@ -156,8 +156,6 @@ static const char * stericsson_dt_platform_compat[] = {
+ DT_MACHINE_START(U8500_DT, "ST-Ericsson Ux5x0 platform (Device Tree Support)")
+ 	.map_io		= u8500_map_io,
+ 	.init_irq	= ux500_init_irq,
+-	/* we re-use nomadik timer here */
+-	.init_time	= ux500_timer_init,
+ 	.init_machine	= u8500_init_machine,
+ 	.init_late	= NULL,
+ 	.dt_compat      = stericsson_dt_platform_compat,
+diff --git a/arch/arm/mach-ux500/cpu.c b/arch/arm/mach-ux500/cpu.c
+index b316e18a76aa..9c49922414c2 100644
+--- a/arch/arm/mach-ux500/cpu.c
++++ b/arch/arm/mach-ux500/cpu.c
+@@ -9,7 +9,6 @@
+ #include <linux/platform_device.h>
+ #include <linux/io.h>
+ #include <linux/mfd/dbx500-prcmu.h>
+-#include <linux/clksrc-dbx500-prcmu.h>
+ #include <linux/sys_soc.h>
+ #include <linux/err.h>
+ #include <linux/slab.h>
+diff --git a/arch/arm/mach-ux500/setup.h b/arch/arm/mach-ux500/setup.h
+index 65876eac0761..c704254ab67c 100644
+--- a/arch/arm/mach-ux500/setup.h
++++ b/arch/arm/mach-ux500/setup.h
+@@ -12,7 +12,6 @@
+ #define __ASM_ARCH_SETUP_H
+ 
+ #include <asm/mach/arch.h>
+-#include <asm/mach/time.h>
+ #include <linux/init.h>
+ #include <linux/mfd/abx500/ab8500.h>
+ 
+@@ -24,8 +23,6 @@ extern void __init ux500_init_irq(void);
+ 
+ extern struct device *ux500_soc_device_init(const char *soc_id);
+ 
+-extern void ux500_timer_init(void);
+-
+ extern void ux500_cpu_die(unsigned int cpu);
+ 
+ #endif /*  __ASM_ARCH_SETUP_H */
+diff --git a/arch/arm/mach-ux500/timer.c b/arch/arm/mach-ux500/timer.c
+deleted file mode 100644
+index ff28d8ad1ed7..000000000000
+--- a/arch/arm/mach-ux500/timer.c
++++ /dev/null
+@@ -1,48 +0,0 @@
+-/*
+- * Copyright (C) ST-Ericsson SA 2011
+- *
+- * License Terms: GNU General Public License v2
+- * Author: Mattias Wallin <mattias.wallin@stericsson.com> for ST-Ericsson
+- */
+-#include <linux/io.h>
+-#include <linux/errno.h>
+-#include <linux/clksrc-dbx500-prcmu.h>
+-#include <linux/clocksource.h>
+-#include <linux/of.h>
+-#include <linux/of_address.h>
+-
+-#include "setup.h"
+-
+-#include "db8500-regs.h"
+-#include "id.h"
+-
+-static const struct of_device_id prcmu_timer_of_match[] __initconst = {
+-	{ .compatible = "stericsson,db8500-prcmu-timer-4", },
+-	{ },
+-};
+-
+-void __init ux500_timer_init(void)
+-{
+-	void __iomem *prcmu_timer_base;
+-	void __iomem *tmp_base;
+-	struct device_node *np;
+-
+-	if (cpu_is_u8500_family() || cpu_is_ux540_family())
+-		prcmu_timer_base = __io_address(U8500_PRCMU_TIMER_4_BASE);
+-	else
+-		ux500_unknown_soc();
+-
+-	np = of_find_matching_node(NULL, prcmu_timer_of_match);
+-	if (!np)
+-		goto dt_fail;
+-
+-	tmp_base = of_iomap(np, 0);
+-	if (!tmp_base)
+-		goto dt_fail;
+-
+-	prcmu_timer_base = tmp_base;
+-
+-dt_fail:
+-	clksrc_dbx500_prcmu_init(prcmu_timer_base);
+-	clocksource_of_init();
+-}
+diff --git a/drivers/clocksource/clksrc-dbx500-prcmu.c b/drivers/clocksource/clksrc-dbx500-prcmu.c
+index b375106844d8..dfad6eb99662 100644
+--- a/drivers/clocksource/clksrc-dbx500-prcmu.c
++++ b/drivers/clocksource/clksrc-dbx500-prcmu.c
+@@ -12,8 +12,9 @@
+  * power domain.  We use the Timer 4 for our always-on clock
+  * source on DB8500.
+  */
++#include <linux/of.h>
++#include <linux/of_address.h>
+ #include <linux/clockchips.h>
+-#include <linux/clksrc-dbx500-prcmu.h>
+ #include <linux/sched_clock.h>
+ 
+ #define RATE_32K		32768
+@@ -63,9 +64,9 @@ static u64 notrace dbx500_prcmu_sched_clock_read(void)
+ 
+ #endif
+ 
+-void __init clksrc_dbx500_prcmu_init(void __iomem *base)
++static void __init clksrc_dbx500_prcmu_init(struct device_node *node)
+ {
+-	clksrc_dbx500_timer_base = base;
++	clksrc_dbx500_timer_base = of_iomap(node, 0);
+ 
+ 	/*
+ 	 * The A9 sub system expects the timer to be configured as
+@@ -85,3 +86,5 @@ void __init clksrc_dbx500_prcmu_init(void __iomem *base)
+ #endif
+ 	clocksource_register_hz(&clocksource_dbx500_prcmu, RATE_32K);
+ }
++CLOCKSOURCE_OF_DECLARE(dbx500_prcmu, "stericsson,db8500-prcmu-timer-4",
++		       clksrc_dbx500_prcmu_init);
+diff --git a/include/linux/clksrc-dbx500-prcmu.h b/include/linux/clksrc-dbx500-prcmu.h
+deleted file mode 100644
+index 4fb8119c49e4..000000000000
+--- a/include/linux/clksrc-dbx500-prcmu.h
++++ /dev/null
+@@ -1,20 +0,0 @@
+-/*
+- * Copyright (C) ST-Ericsson SA 2011
+- *
+- * License Terms: GNU General Public License v2
+- * Author: Mattias Wallin <mattias.wallin@stericsson.com>
+- *
+- */
+-#ifndef __CLKSRC_DBX500_PRCMU_H
+-#define __CLKSRC_DBX500_PRCMU_H
+-
+-#include <linux/init.h>
+-#include <linux/io.h>
+-
+-#ifdef CONFIG_CLKSRC_DBX500_PRCMU
+-void __init clksrc_dbx500_prcmu_init(void __iomem *base);
+-#else
+-static inline void __init clksrc_dbx500_prcmu_init(void __iomem *base) {}
+-#endif
+-
+-#endif
+-- 
+2.4.3
