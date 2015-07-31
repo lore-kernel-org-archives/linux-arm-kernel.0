@@ -1,269 +1,74 @@
-From: r.baldyga@samsung.com (Robert Baldyga)
-Date: Fri, 31 Jul 2015 16:00:54 +0200
-Subject: [PATCH v5 42/46] usb: gadget: move ep_matches() from epautoconf to
- udc-core
-In-Reply-To: <1438351258-31578-1-git-send-email-r.baldyga@samsung.com>
-References: <1438351258-31578-1-git-send-email-r.baldyga@samsung.com>
-Message-ID: <1438351258-31578-43-git-send-email-r.baldyga@samsung.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 31 Jul 2015 15:46:15 +0100
+Subject: [PATCHv5 0/5] arm/arm64: Unify PSCI client support
+Message-ID: <1438353980-7611-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move ep_matches() function to udc-core and rename it to
-usb_gadget_ep_match_desc(). This function can be used by UDC drivers
-in 'match_ep' callback to avoid writing lots of repetitive code.
+This series unifies the 32-bit and 64-bit PSCI client code, moving the bulk of
+the FW invocation and probing out to a common location in drivers/firmware. The
+bulk of the PSCI 0.2 cleanups have hit mainline now, so this is just the
+unification portion.
 
-Replace all calls of ep_matches() with usb_gadget_ep_match_desc().
+This results in a reasonable saving in terms of lines of code, and will allow
+for PSCI 1.0 support to be unified form the beginning, avoiding further
+duplication.
 
-Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
----
- drivers/usb/gadget/epautoconf.c   | 95 +++++----------------------------------
- drivers/usb/gadget/udc/udc-core.c | 69 ++++++++++++++++++++++++++++
- include/linux/usb/gadget.h        |  8 ++++
- 3 files changed, 88 insertions(+), 84 deletions(-)
+Since v4 [1]:
+* Apply Rob Herring's ack
+* Rebase to v4.2-rc2 to handle a trivial conflict
+* Reorder the series to keep arch/arm patches together
+Since v3 [2]:
+* Drop the PSCI 0.2 patches as they're in mainline
+* s/__pa/virt_to_idmap/ from Grygorii Strashko
+* Use macros for Calxeda CPU_SUSPEND parameters
 
-diff --git a/drivers/usb/gadget/epautoconf.c b/drivers/usb/gadget/epautoconf.c
-index 1b1fee0..3f0a380 100644
---- a/drivers/usb/gadget/epautoconf.c
-+++ b/drivers/usb/gadget/epautoconf.c
-@@ -22,82 +22,6 @@
- 
- #include "gadget_chips.h"
- 
--static int
--ep_matches (
--	struct usb_gadget		*gadget,
--	struct usb_ep			*ep,
--	struct usb_endpoint_descriptor	*desc,
--	struct usb_ss_ep_comp_descriptor *ep_comp
--)
--{
--	u8              type;
--	u16             max;
--	int             num_req_streams = 0;
--
--	/* endpoint already claimed? */
--	if (ep->claimed)
--		return 0;
--
--	type = usb_endpoint_type(desc);
--	max = 0x7ff & usb_endpoint_maxp(desc);
--
--	if (usb_endpoint_dir_in(desc) && !ep->caps.dir_in)
--		return 0;
--	else if (!ep->caps.dir_out)
--		return 0;
--
--	if (max > ep->maxpacket_limit)
--		return 0;
--
--	/* "high bandwidth" works only at high speed */
--	if (!gadget_is_dualspeed(gadget) && usb_endpoint_maxp(desc) & (3<<11))
--		return 0;
--
--	switch (type) {
--	case USB_ENDPOINT_XFER_CONTROL:
--		/* only support ep0 for portable CONTROL traffic */
--		return 0;
--	case USB_ENDPOINT_XFER_ISOC:
--		if (!ep->caps.type_iso)
--			return 0;
--		/* ISO:  limit 1023 bytes full speed,
--		 * 1024 high/super speed
--		 */
--		if (!gadget_is_dualspeed(gadget) && max > 1023)
--			return 0;
--		break;
--	case USB_ENDPOINT_XFER_BULK:
--		if (!ep->caps.type_bulk)
--			return 0;
--		if (ep_comp && gadget_is_superspeed(gadget)) {
--			/* Get the number of required streams from the
--			 * EP companion descriptor and see if the EP
--			 * matches it
--			 */
--			num_req_streams = ep_comp->bmAttributes & 0x1f;
--			if (num_req_streams > ep->max_streams)
--				return 0;
--		}
--		break;
--	case USB_ENDPOINT_XFER_INT:
--		/* Bulk endpoints handle interrupt transfers,
--		 * except the toggle-quirky iso-synch kind
--		 */
--		if (!ep->caps.type_int && !ep->caps.type_bulk)
--			return 0;
--		/* INT:  limit 64 bytes full speed,
--		 * 1024 high/super speed
--		 */
--		if (!gadget_is_dualspeed(gadget) && max > 64)
--			return 0;
--		break;
--	}
--
--	/* MATCH!! */
--
--	return 1;
--}
--
- static struct usb_ep *
- find_ep (struct usb_gadget *gadget, const char *name)
- {
-@@ -180,10 +104,12 @@ struct usb_ep *usb_ep_autoconfig_ss(
- 		if (type == USB_ENDPOINT_XFER_INT) {
- 			/* ep-e, ep-f are PIO with only 64 byte fifos */
- 			ep = find_ep(gadget, "ep-e");
--			if (ep && ep_matches(gadget, ep, desc, ep_comp))
-+			if (ep && usb_gadget_ep_match_desc(gadget,
-+					ep, desc, ep_comp))
- 				goto found_ep;
- 			ep = find_ep(gadget, "ep-f");
--			if (ep && ep_matches(gadget, ep, desc, ep_comp))
-+			if (ep && usb_gadget_ep_match_desc(gadget,
-+					ep, desc, ep_comp))
- 				goto found_ep;
- 		}
- 
-@@ -191,20 +117,21 @@ struct usb_ep *usb_ep_autoconfig_ss(
- 		snprintf(name, sizeof(name), "ep%d%s", usb_endpoint_num(desc),
- 				usb_endpoint_dir_in(desc) ? "in" : "out");
- 		ep = find_ep(gadget, name);
--		if (ep && ep_matches(gadget, ep, desc, ep_comp))
-+		if (ep && usb_gadget_ep_match_desc(gadget, ep, desc, ep_comp))
- 			goto found_ep;
- 	} else if (gadget_is_goku (gadget)) {
- 		if (USB_ENDPOINT_XFER_INT == type) {
- 			/* single buffering is enough */
- 			ep = find_ep(gadget, "ep3-bulk");
--			if (ep && ep_matches(gadget, ep, desc, ep_comp))
-+			if (ep && usb_gadget_ep_match_desc(gadget,
-+					ep, desc, ep_comp))
- 				goto found_ep;
- 		} else if (USB_ENDPOINT_XFER_BULK == type
- 				&& (USB_DIR_IN & desc->bEndpointAddress)) {
- 			/* DMA may be available */
- 			ep = find_ep(gadget, "ep2-bulk");
--			if (ep && ep_matches(gadget, ep, desc,
--					      ep_comp))
-+			if (ep && usb_gadget_ep_match_desc(gadget,
-+					ep, desc, ep_comp))
- 				goto found_ep;
- 		}
- 
-@@ -223,14 +150,14 @@ struct usb_ep *usb_ep_autoconfig_ss(
- 				ep = find_ep(gadget, "ep2out");
- 		} else
- 			ep = NULL;
--		if (ep && ep_matches(gadget, ep, desc, ep_comp))
-+		if (ep && usb_gadget_ep_match_desc(gadget, ep, desc, ep_comp))
- 			goto found_ep;
- #endif
- 	}
- 
- 	/* Second, look at endpoints until an unclaimed one looks usable */
- 	list_for_each_entry (ep, &gadget->ep_list, ep_list) {
--		if (ep_matches(gadget, ep, desc, ep_comp))
-+		if (usb_gadget_ep_match_desc(gadget, ep, desc, ep_comp))
- 			goto found_ep;
- 	}
- 
-diff --git a/drivers/usb/gadget/udc/udc-core.c b/drivers/usb/gadget/udc/udc-core.c
-index 362ee8a..380ffbd 100644
---- a/drivers/usb/gadget/udc/udc-core.c
-+++ b/drivers/usb/gadget/udc/udc-core.c
-@@ -131,6 +131,75 @@ EXPORT_SYMBOL_GPL(usb_gadget_giveback_request);
- 
- /* ------------------------------------------------------------------------- */
- 
-+int usb_gadget_ep_match_desc(struct usb_gadget *gadget,
-+		struct usb_ep *ep, struct usb_endpoint_descriptor *desc,
-+		struct usb_ss_ep_comp_descriptor *ep_comp)
-+{
-+	u8              type;
-+	u16             max;
-+	int             num_req_streams = 0;
-+
-+	/* endpoint already claimed? */
-+	if (ep->claimed)
-+		return 0;
-+
-+	type = usb_endpoint_type(desc);
-+	max = 0x7ff & usb_endpoint_maxp(desc);
-+
-+	if (usb_endpoint_dir_in(desc) && !ep->caps.dir_in)
-+		return 0;
-+	else if (!ep->caps.dir_out)
-+		return 0;
-+
-+	if (max > ep->maxpacket_limit)
-+		return 0;
-+
-+	/* "high bandwidth" works only at high speed */
-+	if (!gadget_is_dualspeed(gadget) && usb_endpoint_maxp(desc) & (3<<11))
-+		return 0;
-+
-+	switch (type) {
-+	case USB_ENDPOINT_XFER_CONTROL:
-+		/* only support ep0 for portable CONTROL traffic */
-+		return 0;
-+	case USB_ENDPOINT_XFER_ISOC:
-+		if (!ep->caps.type_iso)
-+			return 0;
-+		/* ISO:  limit 1023 bytes full speed, 1024 high/super speed */
-+		if (!gadget_is_dualspeed(gadget) && max > 1023)
-+			return 0;
-+		break;
-+	case USB_ENDPOINT_XFER_BULK:
-+		if (!ep->caps.type_bulk)
-+			return 0;
-+		if (ep_comp && gadget_is_superspeed(gadget)) {
-+			/* Get the number of required streams from the
-+			 * EP companion descriptor and see if the EP
-+			 * matches it
-+			 */
-+			num_req_streams = ep_comp->bmAttributes & 0x1f;
-+			if (num_req_streams > ep->max_streams)
-+				return 0;
-+		}
-+		break;
-+	case USB_ENDPOINT_XFER_INT:
-+		/* Bulk endpoints handle interrupt transfers,
-+		 * except the toggle-quirky iso-synch kind
-+		 */
-+		if (!ep->caps.type_int && !ep->caps.type_bulk)
-+			return 0;
-+		/* INT:  limit 64 bytes full speed, 1024 high/super speed */
-+		if (!gadget_is_dualspeed(gadget) && max > 64)
-+			return 0;
-+		break;
-+	}
-+
-+	return 1;
-+}
-+EXPORT_SYMBOL_GPL(usb_gadget_ep_match_desc);
-+
-+/* ------------------------------------------------------------------------- */
-+
- static void usb_gadget_state_work(struct work_struct *work)
- {
- 	struct usb_gadget *gadget = work_to_gadget(work);
-diff --git a/include/linux/usb/gadget.h b/include/linux/usb/gadget.h
-index 303214b..e04fd63 100644
---- a/include/linux/usb/gadget.h
-+++ b/include/linux/usb/gadget.h
-@@ -1204,6 +1204,14 @@ extern void usb_gadget_giveback_request(struct usb_ep *ep,
- 
- /*-------------------------------------------------------------------------*/
- 
-+/* utility to check if endpoint caps match descriptor needs */
-+
-+extern int usb_gadget_ep_match_desc(struct usb_gadget *gadget,
-+		struct usb_ep *ep, struct usb_endpoint_descriptor *desc,
-+		struct usb_ss_ep_comp_descriptor *ep_comp);
-+
-+/*-------------------------------------------------------------------------*/
-+
- /* utility to update vbus status for udc core, it may be scheduled */
- extern void usb_udc_vbus_handler(struct usb_gadget *gadget, bool status);
- 
+Russell, are you happy with the arch/arm patches? If so, are you happy for them
+to go via another tree, or would you prefer that I set up a stable branch for
+merging?
+
+I was under the impression that you had already taken Grygorii's patch but I
+couldn't spot it in any branches. I can drop that if you already have it.
+
+Thanks,
+Mark.
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/353795.html
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-May/346492.html
+
+Grygorii Strashko (1):
+  ARM: psci: boot_secondary: replace __pa with virt_to_idmap
+
+Mark Rutland (4):
+  arm64: psci: factor invocation code to drivers
+  drivers: psci: support native SMC{32,64} calls
+  ARM: migrate to common PSCI client code
+  MAINTAINERS: add PSCI entry
+
+ MAINTAINERS                       |   9 +
+ arch/arm/Kconfig                  |   1 +
+ arch/arm/include/asm/psci.h       |  23 ---
+ arch/arm/kernel/Makefile          |   2 +-
+ arch/arm/kernel/psci.c            | 299 -----------------------------
+ arch/arm/kernel/psci_smp.c        |  31 ++-
+ arch/arm/kernel/setup.c           |   3 +-
+ arch/arm/mach-highbank/highbank.c |   2 +-
+ arch/arm/mach-highbank/pm.c       |  16 +-
+ arch/arm64/Kconfig                |   1 +
+ arch/arm64/include/asm/acpi.h     |   4 +-
+ arch/arm64/include/asm/psci.h     |  28 ---
+ arch/arm64/kernel/psci.c          | 361 +----------------------------------
+ arch/arm64/kernel/setup.c         |   2 +-
+ drivers/cpuidle/cpuidle-calxeda.c |  15 +-
+ drivers/firmware/Kconfig          |   3 +
+ drivers/firmware/Makefile         |   1 +
+ drivers/firmware/psci.c           | 383 ++++++++++++++++++++++++++++++++++++++
+ include/linux/psci.h              |  52 ++++++
+ 19 files changed, 501 insertions(+), 735 deletions(-)
+ delete mode 100644 arch/arm/kernel/psci.c
+ delete mode 100644 arch/arm64/include/asm/psci.h
+ create mode 100644 drivers/firmware/psci.c
+ create mode 100644 include/linux/psci.h
+
 -- 
 1.9.1
