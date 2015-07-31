@@ -1,89 +1,75 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 31 Jul 2015 15:10:39 +0200
-Subject: [RFC] arm64: defconfig: enable 48-bit VA by default
-In-Reply-To: <20150731125303.GO407@e104818-lin.cambridge.arm.com>
-References: <CY1PR0301MB07488D6DC5F0B171D6B290E187830@CY1PR0301MB0748.namprd03.prod.outlook.com>
- <55B0E1AD.60409@arm.com>
- <BY2PR0301MB0743CBCFC5476E39A5D1EC0B878C0@BY2PR0301MB0743.namprd03.prod.outlook.com>
- <CAKv+Gu9LHBd7wM6P4H0X5WigzDETtpr2++_Ebo=adg5QtTOW2w@mail.gmail.com>
- <BY2PR0301MB074300C5F31701D9211827F0878C0@BY2PR0301MB0743.namprd03.prod.outlook.com>
- <20150730101358.GA30796@e104818-lin.cambridge.arm.com>
- <CAKv+Gu-G9Vpmt_c84OsG0JNRKopJ44uneJaAEpY3AMq6oS-Qdg@mail.gmail.com>
- <20150731125303.GO407@e104818-lin.cambridge.arm.com>
-Message-ID: <CAKv+Gu_KL6F=9DpV=ZqYUgY9wjBF+FBodnLMBw=ZOFo6xK7-2w@mail.gmail.com>
+From: plaes@plaes.org (Priit Laes)
+Date: Fri, 31 Jul 2015 15:57:49 +0300
+Subject: [linux-sunxi] [PATCH 1/2] ARM: sunxi_defconfig: Enable
+ DMA_SUN6I, P2WI, PWM, cryptodev, EXTCON, FHANDLE
+In-Reply-To: <1438341127-7175-2-git-send-email-wens@csie.org>
+References: <1438341127-7175-1-git-send-email-wens@csie.org>
+ <1438341127-7175-2-git-send-email-wens@csie.org>
+Message-ID: <1438347469.4668.1.camel@plaes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31 July 2015 at 14:53, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Thu, Jul 30, 2015 at 09:27:03PM +0200, Ard Biesheuvel wrote:
->> On 30 July 2015 at 12:13, Catalin Marinas <catalin.marinas@arm.com> wrote:
->> > On Wed, Jul 29, 2015 at 08:49:57PM +0000, Stuart Yoder wrote:
->> >> > From: Ard Biesheuvel [mailto:ard.biesheuvel at linaro.org]
->> [...]
->> >> > To be honest, I think this is poorly designed, and I am not sure we
->> >> > should cater for such configurations in the defconfig.
->> >>
->> >> Agree, if this is a one-off weird platform then we shouldn't.
->> >>
->> >> But, the 'Principles of ARM Memory Maps' doc proposes this:
->> >> 2 GB at 0x8000_0000
->> >> 30 GB at 0x8_8000_0000
->> >> 480 GB at 0x88_0000_0000
->> >
->> > I'm not particularly recommending this layout, at least not without some
->> > clarifications on DRAM aliases (I'll ping people internally about it
->> > again). The original layout pre-dates ARMv8, it was meant for ARMv7/LPAE
->> > and all the memory beyond 32-bit was highmem anyway. It was later
->> > updated for AArch64 but only to allow 44/48-bit PA (a few sections
->> > added).
->>
->> As an aside, is there any reason why the direct mapping *must* be a
->> linear mapping?
->> Other than the performance concerns regarding
->> phys_to_virt/virt_to_phys, I mean?
->
-> Mostly performance concerns. You could compact the physical range into a
-> smaller virtual one but the conversion will be costly, especially if you
-> want to make it multi-platform (having to look-up memory ranges,
-> memblock offsets). This would affect page table entry setup, code that
-> requires a page structure (like virt_to_page) and anything else doing
-> the virt/phys conversion.
->
-> I tried something like that for RealView PBX in the past but it was
-> hard-coded (no multi-platform at the time). See
-> arch/arm/mach-realview/include/mach/memory.h.
->
+On Fri, 2015-07-31 at 19:12 +0800, Chen-Yu Tsai wrote:
+> Enable sun6i DMA engine, sun6i P2WI, PWM, and crypto engine (Security
+> System) drivers by default. EXTCON is needed by the updated sun4i USB
+> PHY driver.
+> 
+> While at it, enable FHANDLE, which is needed by systemd and newer
+> versions of udev.
 
-Yes, that looks vaguely like what I had in mind.
+You might want to also add CONFIG_CGROUPS which is needed by systemd.
 
-IOW, we could partition the direct mapping just like the ARM
-recommendation, i.e.,
-
-0 - 2 GB
-2 - 32 GB
-32 - 512 GB
-
-but default to 1:1 correspondence, so that
-
-PHYS_OFFSET = PHYS_OFFSET0 = memstart_addr
-PHYS_OFFSET1 = memstart_addr + 2 GB
-PHYS_OFFSET2 = memstart_addr + 32 GB
-
-and only if the ARM recommended physical memory map is detected (with
-memstart_addr @ 0x8000_0000), switch to
-
-PHYS_OFFSET = PHYS_OFFSET0 = memstart_addr
-PHYS_OFFSET1 = memstart_addr + 30 GB
-PHYS_OFFSET2 = memstart_addr + 480 GB
-
-I guess such a special case would be out of the question for one-off
-crazy designs like Freescale, but since this is the layout recommended
-by ARM itself, I suppose we could try and support it a bit better.
-
-
-
-> As for the mem_map array, on arm64 we have enough VA space available
-> (with vmemmap it takes a few GB to cover a 512GB RAM space).
->
-> --
-> Catalin
+> 
+> And get rid of POWER_RESET, as the sun6i power reset driver has been
+> removed in favor of proper sun6i watchdog support.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+>  arch/arm/configs/sunxi_defconfig | 9 ++++++++-
+>  1 file changed, 8 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/configs/sunxi_defconfig 
+> b/arch/arm/configs/sunxi_defconfig
+> index 7ebc346bf9fa..52cc0686524f 100644
+> --- a/arch/arm/configs/sunxi_defconfig
+> +++ b/arch/arm/configs/sunxi_defconfig
+> @@ -1,3 +1,4 @@
+> +CONFIG_FHANDLE=y
+>  CONFIG_NO_HZ=y
+>  CONFIG_HIGH_RES_TIMERS=y
+>  CONFIG_BLK_DEV_INITRD=y
+> @@ -72,12 +73,12 @@ CONFIG_SERIAL_OF_PLATFORM=y
+>  CONFIG_I2C=y
+>  CONFIG_I2C_CHARDEV=y
+>  CONFIG_I2C_MV64XXX=y
+> +CONFIG_I2C_SUN6I_P2WI=y
+>  CONFIG_SPI=y
+>  CONFIG_SPI_SUN4I=y
+>  CONFIG_SPI_SUN6I=y
+>  CONFIG_GPIO_SYSFS=y
+>  CONFIG_POWER_SUPPLY=y
+> -CONFIG_POWER_RESET=y
+>  CONFIG_THERMAL=y
+>  CONFIG_CPU_THERMAL=y
+>  CONFIG_WATCHDOG=y
+> @@ -109,7 +110,12 @@ CONFIG_RTC_CLASS=y
+>  # CONFIG_RTC_INTF_PROC is not set
+>  CONFIG_RTC_DRV_SUN6I=y
+>  CONFIG_RTC_DRV_SUNXI=y
+> +CONFIG_DMADEVICES=y
+> +CONFIG_DMA_SUN6I=y
+>  # CONFIG_IOMMU_SUPPORT is not set
+> +CONFIG_EXTCON=y
+> +CONFIG_PWM=y
+> +CONFIG_PWM_SUN4I=y
+>  CONFIG_PHY_SUN4I_USB=y
+>  CONFIG_PHY_SUN9I_USB=y
+>  CONFIG_EXT4_FS=y
+> @@ -123,3 +129,4 @@ CONFIG_NLS_CODEPAGE_437=y
+>  CONFIG_NLS_ISO8859_1=y
+>  CONFIG_PRINTK_TIME=y
+>  CONFIG_DEBUG_FS=y
+> +CONFIG_CRYPTO_DEV_SUN4I_SS=y
+> -- 
+> 2.5.0
+> 
