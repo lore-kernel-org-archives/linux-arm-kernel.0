@@ -1,29 +1,32 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 31 Jul 2015 12:11:57 +0200
-Subject: [PATCH 3/5] ARM: dts: sun5i: Enable USB DRC on A13 OLinuxIno
-In-Reply-To: <1438333194-21181-4-git-send-email-hdegoede@redhat.com>
+Date: Fri, 31 Jul 2015 12:11:08 +0200
+Subject: [PATCH 2/5] ARM: dts: sun5i: Enable USB DRC on A10s OLinuxIno
+ Micro
+In-Reply-To: <1438333194-21181-3-git-send-email-hdegoede@redhat.com>
 References: <1438333194-21181-1-git-send-email-hdegoede@redhat.com>
- <1438333194-21181-4-git-send-email-hdegoede@redhat.com>
-Message-ID: <20150731101157.GD2564@lukather>
+ <1438333194-21181-3-git-send-email-hdegoede@redhat.com>
+Message-ID: <20150731101108.GC2564@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 31, 2015 at 10:59:52AM +0200, Hans de Goede wrote:
-> From: Mark Janssen <mark@sig-io.nl>
+On Fri, Jul 31, 2015 at 10:59:51AM +0200, Hans de Goede wrote:
+> Enable the otg/drc usb controller on the A10s OLinuxIno Micro.
 > 
-> Enable the otg/drc usb controller on the A13 OLinuxIno.
+> Note the A10s OlinuxIno Micro always has some voltage on its otg power
+> pin, even if the usb-vbus0-regulator is disabled, the leaked voltage is
+> enough to make vbus-det always report 1, so we do not use vbus-det on
+> this board.
 > 
-> Signed-off-by: Mark Janssen <mark@sig-io.nl>
 > Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 > ---
->  arch/arm/boot/dts/sun5i-a13-olinuxino.dts | 37 +++++++++++++++++++++++++++++++
->  1 file changed, 37 insertions(+)
+>  arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts | 30 +++++++++++++++++++++++-
+>  1 file changed, 29 insertions(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm/boot/dts/sun5i-a13-olinuxino.dts b/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
-> index 4232400..e659482 100644
-> --- a/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
-> +++ b/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
-> @@ -159,6 +159,10 @@
+> diff --git a/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts b/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
+> index 7b26e17..5eebd21 100644
+> --- a/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
+> +++ b/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
+> @@ -196,6 +196,10 @@
 >  	status = "okay";
 >  };
 >  
@@ -32,31 +35,25 @@ On Fri, Jul 31, 2015 at 10:59:52AM +0200, Hans de Goede wrote:
 > +};
 > +
 >  &pio {
->  	mmc0_cd_pin_olinuxino: mmc0_cd_pin at 0 {
->  		allwinner,pins = "PG0";
-> @@ -174,6 +178,24 @@
+>  	mmc0_cd_pin_olinuxino_micro: mmc0_cd_pin at 0 {
+>  		allwinner,pins = "PG1";
+> @@ -224,6 +228,22 @@
+>  		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
 >  		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
 >  	};
->  
-> +	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
-> +		allwinner,pins = "PG2";
-> +		allwinner,function = "gpio_in";
-> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-> +		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
-> +	};
-> +
-> +	usb0_vbus_detect_pin: usb0_vbus_detect_pin at 0 {
-> +		allwinner,pins = "PG1";
-> +		allwinner,function = "gpio_in";
-> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-> +		allwinner,pull = <SUN4I_PINCTRL_PULL_DOWN>;
-> +	};
 > +
 > +	usb0_vbus_pin_a: usb0_vbus_pin at 0 {
-> +		allwinner,pins = "PG12";
+> +		allwinner,pins = "PG11";
 > +	};
 
-Same thing here than in patch 2.
+We usually have this as a reference, instead of doing it through the
+full path.
+
+It makes it clearer that we override something, and we don't define a
+new node.
+
+Thanks,
+Maxime
 
 -- 
 Maxime Ripard, Free Electrons
@@ -68,4 +65,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150731/45dfd99e/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150731/e3a5ee3e/attachment-0001.sig>
