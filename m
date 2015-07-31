@@ -1,128 +1,125 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 31 Jul 2015 09:32:07 +0100
-Subject: [PATCH v7 3/5] clk: Supply the critical clock {init, enable,
- disable} framework
-In-Reply-To: <20150731073019.GU2564@lukather>
-References: <1437570255-21049-1-git-send-email-lee.jones@linaro.org>
- <1437570255-21049-4-git-send-email-lee.jones@linaro.org>
- <20150727072549.GP2564@lukather> <20150727085338.GW3436@x1>
- <20150728114022.GW2564@lukather> <20150728130055.GV14943@x1>
- <20150730011932.642.85168@quantum> <20150730095014.GD14642@x1>
- <20150730224720.23791.6722@quantum>
- <20150731073019.GU2564@lukather>
-Message-ID: <20150731083207.GB3208@x1>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 31 Jul 2015 10:37:54 +0200
+Subject: [PATCH] ARM: ux500: fix ux500 secondary CPU boot regression
+Message-ID: <1438331874-1682-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 31 Jul 2015, Maxime Ripard wrote:
+This fixes a SMP boot regression on the Ux500.
 
-> On Thu, Jul 30, 2015 at 03:47:20PM -0700, Michael Turquette wrote:
-> > > > >    */
-> > > > > 
-> > > > > Resume:
-> > > > >   /* Order is unimportant */
-> > > > >   SPI enables Clock 4 (ref == 1)
-> > > > >   RAM enables Clock 4 and re-enables .leave_on (ref == 2)
-> > > > >   I2C enables Clock 4 (ref == 3)
-> > > > 
-> > > > Same again. As soon as RAM calls clk_enable_critical the ref count goes
-> > > > up. .leave_on does nothing as far as I can tell. The all works because
-> > > > of the reference counting, which already exists before this patch
-> > > > series.
-> > > 
-> > > So fundamentally you're right in what you say.  All you really need to
-> > > disable a critical clock is write a knowledgeable driver, which is
-> > > intentionally unbalanced i.e. just calls clk_disable().  All this
-> > 
-> > OK, the line above is helpful. What you really want is a formalized
-> > hand-off mechanism, whereby the clock is enabled at registration-time
-> > and it cannot be turned off until the right driver claims it and decides
-> > turning it off is OK (with a priori knowledge that the clock is already
-> > enabled).
-> 
-> There's two things that should be covered, and are related, yet can be
-> done in two steps:
-> 
->   - Have a way to, no matter what (which configuration we have, if we
->     have multiple users or not that might reparent or disable their
->     clocks, etc.), make sure that a clock will always be running by
->     default. This is done through the call in clk-conf, and we
->     identify such clocks using critical-clocks in the DT.
-> 
->   - Now, even though that information is true, some driver who are
->     aware of that fact might want to disable those critical
->     clocks. This is what the clk_disable_critical and
->     clk_enable_critical functions are here for.
+commit 2d6dd1711346d1708eacdbb1b5e8a5a573562fd1
+"ARM: ux500: remove static maps from platsmp"
+commit: 58202033faca18198af21dabb7e75481d4a2cd8a
+"ARM: ux500: get SCU base from device tree"
+both assumed that we can use of_ioremap() and thus ioremap()
+in the early platform boot hook in the smp_init_cpus()
+callback from the struct smp_operations vtable. This is
+however way too early: ioremap() is not really working.
 
-+1
+The remaps do not persist and the secondary CPU does not
+boot. It is necessary to use a static remapping for the
+SCU in order to remap it in .smp_init_cpus(), so this
+patch does a half-measure by populating a static map
+with the physical address found in the DT.
 
-> > Note that I don't think this implementation can really work in the near
-> > future. Today we do not catch unbalanced calls to clk_enable and
-> > clk_disable, but I have a patch that catches this and WARNs loudly in my
-> > private tree. More on that in the next stanza.
-> > 
-> > What I don't understand is if there is ever a case for a clock consumer
-> > driver to ever call clk_enable_critical... I do not think there is. What
-> > you're trying to protect against is having the clock disabled BEFORE
-> > that "knowledgeable driver" has a chance to enable it.
+Further, the static ioremap() of the backupram in the same
+early hook did not really work either. For this there was
+possible to to a better fix: move the remapping to
+.smp_prepare_cpus() and take this opportunity to get the
+address from the device tree.
 
-In my mind and in this implementation  clk_disable_critical() will be
-used _first_ by the knowledgeable driver, then when the knowledgeable
-driver has finished whatever it was doing (shutting down banks of RAM
-etc...), it should then call clk_enable_critical() to reset the clock
-state back to the way it found it i.e. enabled and marked as critical.
+There is a better fix for the long term. The .smp_init_cpus()
+hook is not really needed, and both remaps can be deferred
+to the .smp_prepare_cpus() if the CPU topology is correctly
+described on the device tree so that arm_dt_init_cpu_maps()
+can call set_cpu_possible() without us having to go into
+the SCU to count the CPUs like this, but that fix has to
+be postponed to the next development cycle since it gets
+too invasive and includes patching the device tree.
 
-> It's really about what we want the API to look like in the second
-> case.
-> 
-> Do we want such drivers to still call clk_prepare_enable? Some other
-> function? Should they assume that the clock has already been enabled,
-> or do we want a handover, or a force disable, or whatever.
-> 
-> I guess we should discuss those questions, before starting to think
-> about how to implement it.
-> 
-> IMHO, I think that the existing way of doing should be used, or at
-> least with the same mindset to avoid confusion, errors, and
-> misinformed reviews.
-> 
-> So I'd expect the drivers to do something like:
-> 
-> probe:
->   clk_get
->   clk_critical_enable
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ARM SoC folks: please apply this directly for fixes if
+you're OK with it. Sorry for screwing up, this was the
+best I could come up with. Static maps die hard it seems.
+---
+ arch/arm/mach-ux500/platsmp.c | 40 ++++++++++++++++++++++++++++++++++++----
+ 1 file changed, 36 insertions(+), 4 deletions(-)
 
-Well becuase the clock has been marked as critical, a reference has
-already been taken, so even if there are 0 users the clock now has 2
-references attributed to it.
-
-> remove / probe error path:
->   clk_critical_disable
->   clk_put
-
-I think we should assume that the clock is already running in the
-knowledgeable driver:
-
-start-up:
-  __set_critical_clocks()
-
-probe:
-  clk_get()
-
-suspend (or whatever reason the driver wishes to disable the clk):
-  clk_disable_critical()
-
-resume (or whatever ...):
-  clk_enable_critical()
-
-remove:
-  clk_put() /* Or just rely on devm_*() */ 
-
-> and use the clk_critical_enable and clk_critical_disable whenever
-> needed, and thing would just work as intended.
-
+diff --git a/arch/arm/mach-ux500/platsmp.c b/arch/arm/mach-ux500/platsmp.c
+index 62b1de922bd8..55335da3ff5f 100644
+--- a/arch/arm/mach-ux500/platsmp.c
++++ b/arch/arm/mach-ux500/platsmp.c
+@@ -22,6 +22,9 @@
+ #include <asm/cacheflush.h>
+ #include <asm/smp_plat.h>
+ #include <asm/smp_scu.h>
++#include <asm/tlbflush.h>
++#include <asm/mach/map.h>
++
+ 
+ #include "setup.h"
+ 
+@@ -117,6 +120,9 @@ static void __init wakeup_secondary(void)
+ 	mb();
+ }
+ 
++/* Arbitrarily chosen, let's get rid of this ASAP */
++#define SCU_VIRT_ADDRESS 0xf1000000
++
+ /*
+  * Initialise the CPU possible map early - this describes the CPUs
+  * which may be present or become present in the system.
+@@ -125,13 +131,26 @@ static void __init ux500_smp_init_cpus(void)
+ {
+ 	unsigned int i, ncores;
+ 	struct device_node *np;
++	struct map_desc scu_desc = {
++		.virtual	= SCU_VIRT_ADDRESS,
++		.type		= MT_DEVICE,
++	};
++	struct resource res;
+ 
+ 	np = of_find_compatible_node(NULL, NULL, "arm,cortex-a9-scu");
+-	scu_base = of_iomap(np, 0);
+-	of_node_put(np);
+-	if (!scu_base)
++	if (of_address_to_resource(np, 0, &res)) {
++		pr_err("PLATSMP: unable to get SCU resource\n");
+ 		return;
+-	backupram = ioremap(U8500_BACKUPRAM0_BASE, SZ_8K);
++	}
++	scu_desc.pfn = __phys_to_pfn(res.start);
++	scu_desc.length = resource_size(&res);
++	iotable_init(&scu_desc, 1);
++	/* As in devicemaps_init() */
++	local_flush_tlb_all();
++	flush_cache_all();
++	of_node_put(np);
++	scu_base = (void *) SCU_VIRT_ADDRESS;
++
+ 	ncores = scu_get_core_count(scu_base);
+ 
+ 	/* sanity check */
+@@ -147,6 +166,19 @@ static void __init ux500_smp_init_cpus(void)
+ 
+ static void __init ux500_smp_prepare_cpus(unsigned int max_cpus)
+ {
++	struct device_node *np;
++
++	np = of_find_compatible_node(NULL, NULL, "ste,dbx500-backupram");
++	if (!np) {
++		pr_err("No backupram base address\n");
++		return;
++	}
++	backupram = of_iomap(np, 0);
++	of_node_put(np);
++	if (!backupram) {
++		pr_err("No backupram remap\n");
++		return;
++	}
+ 	scu_enable(scu_base);
+ 	wakeup_secondary();
+ }
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+2.4.3
