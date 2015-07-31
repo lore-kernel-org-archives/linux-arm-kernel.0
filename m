@@ -1,73 +1,291 @@
 From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Fri, 31 Jul 2015 20:49:12 +0200
-Subject: [PATCH v3 0/5] cpufreq: use generic cpufreq drivers for Exynos4x12
- platform
-Message-ID: <1438368557-2352-1-git-send-email-b.zolnierkie@samsung.com>
+Date: Fri, 31 Jul 2015 20:49:14 +0200
+Subject: [PATCH v3 2/5] ARM: dts: Exynos4x12: add CPU OPP and regulator supply
+ property
+In-Reply-To: <1438368557-2352-1-git-send-email-b.zolnierkie@samsung.com>
+References: <1438368557-2352-1-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <1438368557-2352-3-git-send-email-b.zolnierkie@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+For Exynos4x12 platforms, add CPU operating points (using
+opp-v2 bindings) and CPU regulator supply properties for
+migrating from Exynos specific cpufreq driver to using
+generic cpufreq driver.
 
-This patch series removes the use of Exynos4x12 specific support
-from cpufreq-exynos driver and enables the use of cpufreq-dt driver
-for this platform.
+Based on the earlier work by Thomas Abraham.
 
-This patch series has been tested on Exynos4412 based Odroid-U3 and
-Trats2 boards.
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Doug Anderson <dianders@chromium.org>
+Cc: Andreas Faerber <afaerber@suse.de>
+Cc: Thomas Abraham <thomas.ab@samsung.com>
+Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+---
+ arch/arm/boot/dts/exynos4212.dtsi               | 81 ++++++++++++++++++++++++
+ arch/arm/boot/dts/exynos4412-odroid-common.dtsi |  4 ++
+ arch/arm/boot/dts/exynos4412-origen.dts         |  4 ++
+ arch/arm/boot/dts/exynos4412-trats2.dts         |  4 ++
+ arch/arm/boot/dts/exynos4412.dtsi               | 83 +++++++++++++++++++++++++
+ 5 files changed, 176 insertions(+)
 
-Depends on:
-- next-20150730 branch of linux-next kernel tree
-- "[PATCH V3 00/16] OPP: Add code to support operating-points-v2 bindings"
-  (http://www.spinics.net/lists/arm-kernel/msg435408.html)
-
-Changes since v2
-(http://thread.gmane.org/gmane.linux.kernel.samsung-soc/46653):
-- rebased on top of next-20150730 branch of linux-next kernel tree
-- ported over V3 of opp-v2 bindings support patch series
-- put cpu0 nodes in alphabetical order in dts files
-- added Reviewed-by tags from Javier and Krzysztof
-- added Acked-by tag from Sylwester
-
-Changes since v1
-(http://thread.gmane.org/gmane.linux.kernel.samsung-soc/44361):
-- rebased on top of next-20150629 branch of linux-next kernel tree
-- rebased on top of Exynos5250 cpufreq-dt support patch series
-- fixed if-statement in exynos4_clk_init() (noticed by Tobias Jakobi)
-- ported over opp-v2 bindings (requested by Viresh Kumar)
-
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
-
-
-Bartlomiej Zolnierkiewicz (5):
-  clk: samsung: exynos4x12: add cpu clock configuration data and
-    instantiate cpu clock
-  ARM: dts: Exynos4x12: add CPU OPP and regulator supply property
-  ARM: Exynos: switch to using generic cpufreq driver for Exynos4x12
-  cpufreq: exynos: remove Exynos4x12 specific cpufreq driver support
-  cpufreq: remove no longer needed CPU_FREQ_BOOST_SW config option
-
- arch/arm/boot/dts/exynos4212.dtsi               |  81 ++++++++
- arch/arm/boot/dts/exynos4412-odroid-common.dtsi |   4 +
- arch/arm/boot/dts/exynos4412-origen.dts         |   4 +
- arch/arm/boot/dts/exynos4412-trats2.dts         |   4 +
- arch/arm/boot/dts/exynos4412.dtsi               |  83 +++++++++
- arch/arm/mach-exynos/exynos.c                   |   2 +
- drivers/clk/samsung/clk-exynos4.c               |  50 +++++
- drivers/cpufreq/Kconfig                         |   5 +-
- drivers/cpufreq/Kconfig.arm                     |  38 ----
- drivers/cpufreq/Makefile                        |   2 -
- drivers/cpufreq/exynos-cpufreq.c                | 236 ------------------------
- drivers/cpufreq/exynos-cpufreq.h                |  72 --------
- drivers/cpufreq/exynos4x12-cpufreq.c            | 236 ------------------------
- drivers/cpufreq/freq_table.c                    |   2 -
- 14 files changed, 229 insertions(+), 590 deletions(-)
- delete mode 100644 drivers/cpufreq/exynos-cpufreq.c
- delete mode 100644 drivers/cpufreq/exynos-cpufreq.h
- delete mode 100644 drivers/cpufreq/exynos4x12-cpufreq.c
-
+diff --git a/arch/arm/boot/dts/exynos4212.dtsi b/arch/arm/boot/dts/exynos4212.dtsi
+index d9c8efee..5389011 100644
+--- a/arch/arm/boot/dts/exynos4212.dtsi
++++ b/arch/arm/boot/dts/exynos4212.dtsi
+@@ -30,6 +30,9 @@
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a9";
+ 			reg = <0xA00>;
++			clocks = <&clock CLK_ARM_CLK>;
++			clock-names = "cpu";
++			operating-points-v2 = <&cpu0_opp_table>;
+ 			cooling-min-level = <13>;
+ 			cooling-max-level = <7>;
+ 			#cooling-cells = <2>; /* min followed by max */
+@@ -39,6 +42,84 @@
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a9";
+ 			reg = <0xA01>;
++			operating-points-v2 = <&cpu0_opp_table>;
++		};
++	};
++
++	cpu0_opp_table: opp_table0 {
++		compatible = "operating-points-v2";
++		opp-shared;
++
++		opp00 {
++			opp-hz = /bits/ 64 <200000000>;
++			opp-microvolt = <900000>;
++			clock-latency-ns = <200000>;
++		};
++		opp01 {
++			opp-hz = /bits/ 64 <300000000>;
++			opp-microvolt = <900000>;
++			clock-latency-ns = <200000>;
++		};
++		opp02 {
++			opp-hz = /bits/ 64 <400000000>;
++			opp-microvolt = <925000>;
++			clock-latency-ns = <200000>;
++		};
++		opp03 {
++			opp-hz = /bits/ 64 <500000000>;
++			opp-microvolt = <950000>;
++			clock-latency-ns = <200000>;
++		};
++		opp04 {
++			opp-hz = /bits/ 64 <600000000>;
++			opp-microvolt = <975000>;
++			clock-latency-ns = <200000>;
++		};
++		opp05 {
++			opp-hz = /bits/ 64 <700000000>;
++			opp-microvolt = <987500>;
++			clock-latency-ns = <200000>;
++		};
++		opp06 {
++			opp-hz = /bits/ 64 <800000000>;
++			opp-microvolt = <1000000>;
++			clock-latency-ns = <200000>;
++		};
++		opp07 {
++			opp-hz = /bits/ 64 <900000000>;
++			opp-microvolt = <1037500>;
++			clock-latency-ns = <200000>;
++		};
++		opp08 {
++			opp-hz = /bits/ 64 <1000000000>;
++			opp-microvolt = <1087500>;
++			clock-latency-ns = <200000>;
++		};
++		opp09 {
++			opp-hz = /bits/ 64 <1100000000>;
++			opp-microvolt = <1137500>;
++			clock-latency-ns = <200000>;
++		};
++		opp10 {
++			opp-hz = /bits/ 64 <1200000000>;
++			opp-microvolt = <1187500>;
++			clock-latency-ns = <200000>;
++		};
++		opp11 {
++			opp-hz = /bits/ 64 <1300000000>;
++			opp-microvolt = <1250000>;
++			clock-latency-ns = <200000>;
++		};
++		opp12 {
++			opp-hz = /bits/ 64 <1400000000>;
++			opp-microvolt = <1287500>;
++			clock-latency-ns = <200000>;
++		};
++		opp13 {
++			opp-hz = /bits/ 64 <1500000000>;
++			opp-microvolt = <1350000>;
++			clock-latency-ns = <200000>;
++			turbo-mode;
+ 		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
+index ca7d168..db52841 100644
+--- a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
++++ b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
+@@ -107,6 +107,10 @@
+ 	};
+ };
+ 
++&cpu0 {
++	cpu0-supply = <&buck2_reg>;
++};
++
+ /* RSTN signal for eMMC */
+ &sd1_cd {
+ 	samsung,pin-pud = <0>;
+diff --git a/arch/arm/boot/dts/exynos4412-origen.dts b/arch/arm/boot/dts/exynos4412-origen.dts
+index 84c7631..9d528af 100644
+--- a/arch/arm/boot/dts/exynos4412-origen.dts
++++ b/arch/arm/boot/dts/exynos4412-origen.dts
+@@ -78,6 +78,10 @@
+ 	};
+ };
+ 
++&cpu0 {
++	cpu0-supply = <&buck2_reg>;
++};
++
+ &fimd {
+ 	pinctrl-0 = <&lcd_clk &lcd_data24 &pwm1_out>;
+ 	pinctrl-names = "default";
+diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
+index 8848400..2a1ebb7 100644
+--- a/arch/arm/boot/dts/exynos4412-trats2.dts
++++ b/arch/arm/boot/dts/exynos4412-trats2.dts
+@@ -288,6 +288,10 @@
+ 	status = "okay";
+ };
+ 
++&cpu0 {
++	cpu0-supply = <&buck2_reg>;
++};
++
+ &csis_0 {
+ 	status = "okay";
+ 	vddcore-supply = <&ldo8_reg>;
+diff --git a/arch/arm/boot/dts/exynos4412.dtsi b/arch/arm/boot/dts/exynos4412.dtsi
+index b78ada7..ca0e3c1 100644
+--- a/arch/arm/boot/dts/exynos4412.dtsi
++++ b/arch/arm/boot/dts/exynos4412.dtsi
+@@ -30,6 +30,9 @@
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a9";
+ 			reg = <0xA00>;
++			clocks = <&clock CLK_ARM_CLK>;
++			clock-names = "cpu";
++			operating-points-v2 = <&cpu0_opp_table>;
+ 			cooling-min-level = <13>;
+ 			cooling-max-level = <7>;
+ 			#cooling-cells = <2>; /* min followed by max */
+@@ -39,18 +42,98 @@
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a9";
+ 			reg = <0xA01>;
++			operating-points-v2 = <&cpu0_opp_table>;
+ 		};
+ 
+ 		cpu at A02 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a9";
+ 			reg = <0xA02>;
++			operating-points-v2 = <&cpu0_opp_table>;
+ 		};
+ 
+ 		cpu at A03 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a9";
+ 			reg = <0xA03>;
++			operating-points-v2 = <&cpu0_opp_table>;
++		};
++	};
++
++	cpu0_opp_table: opp_table0 {
++		compatible = "operating-points-v2";
++		opp-shared;
++
++		opp00 {
++			opp-hz = /bits/ 64 <200000000>;
++			opp-microvolt = <900000>;
++			clock-latency-ns = <200000>;
++		};
++		opp01 {
++			opp-hz = /bits/ 64 <300000000>;
++			opp-microvolt = <900000>;
++			clock-latency-ns = <200000>;
++		};
++		opp02 {
++			opp-hz = /bits/ 64 <400000000>;
++			opp-microvolt = <925000>;
++			clock-latency-ns = <200000>;
++		};
++		opp03 {
++			opp-hz = /bits/ 64 <500000000>;
++			opp-microvolt = <950000>;
++			clock-latency-ns = <200000>;
++		};
++		opp04 {
++			opp-hz = /bits/ 64 <600000000>;
++			opp-microvolt = <975000>;
++			clock-latency-ns = <200000>;
++		};
++		opp05 {
++			opp-hz = /bits/ 64 <700000000>;
++			opp-microvolt = <987500>;
++			clock-latency-ns = <200000>;
++		};
++		opp06 {
++			opp-hz = /bits/ 64 <800000000>;
++			opp-microvolt = <1000000>;
++			clock-latency-ns = <200000>;
++		};
++		opp07 {
++			opp-hz = /bits/ 64 <900000000>;
++			opp-microvolt = <1037500>;
++			clock-latency-ns = <200000>;
++		};
++		opp08 {
++			opp-hz = /bits/ 64 <1000000000>;
++			opp-microvolt = <1087500>;
++			clock-latency-ns = <200000>;
++		};
++		opp09 {
++			opp-hz = /bits/ 64 <1100000000>;
++			opp-microvolt = <1137500>;
++			clock-latency-ns = <200000>;
++		};
++		opp10 {
++			opp-hz = /bits/ 64 <1200000000>;
++			opp-microvolt = <1187500>;
++			clock-latency-ns = <200000>;
++		};
++		opp11 {
++			opp-hz = /bits/ 64 <1300000000>;
++			opp-microvolt = <1250000>;
++			clock-latency-ns = <200000>;
++		};
++		opp12 {
++			opp-hz = /bits/ 64 <1400000000>;
++			opp-microvolt = <1287500>;
++			clock-latency-ns = <200000>;
++		};
++		opp13 {
++			opp-hz = /bits/ 64 <1500000000>;
++			opp-microvolt = <1350000>;
++			clock-latency-ns = <200000>;
++			turbo-mode;
+ 		};
+ 	};
+ 
 -- 
 1.9.1
