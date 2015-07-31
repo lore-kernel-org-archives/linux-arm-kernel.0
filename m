@@ -1,62 +1,89 @@
-From: yalin.wang2010@gmail.com (yalin wang)
-Date: Fri, 31 Jul 2015 15:41:37 +0800
-Subject: [RFC] arm64:change jump_label to use branch instruction,
- not use  NOP instr
-Message-ID: <94E2034B-9DE4-4ADF-8B2F-197D38A363CF@gmail.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Fri, 31 Jul 2015 08:50:49 +0100
+Subject: [PATCH 2/2] irqchip/gic: Ensure gic_cpu_if_up/down() programs
+ correct GIC instance
+In-Reply-To: <1438273573-27958-2-git-send-email-jonathanh@nvidia.com>
+References: <1438273573-27958-1-git-send-email-jonathanh@nvidia.com>
+ <1438273573-27958-2-git-send-email-jonathanh@nvidia.com>
+Message-ID: <55BB28D9.30303@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This change a little arch_static_branch(), use b . + 4 for false
-return, why? According to aarch64 TRM, if both source and dest
-instr are branch instr, can patch the instr directly, don't need
-all cpu to do ISB for sync, this means we can call
-aarch64_insn_patch_text_nosync() during patch_text(),
-will improve the performance when change a static_key.
 
-Signed-off-by: yalin wang <yalin.wang2010@gmail.com>
----
- arch/arm64/include/asm/jump_label.h |  2 +-
- arch/arm64/kernel/jump_label.c      | 14 ++++++++------
- 2 files changed, 9 insertions(+), 7 deletions(-)
+On 30/07/15 17:26, Jon Hunter wrote:
+> Commit 3228950621d9 ("irqchip: gic: Preserve gic V2 bypass bits in cpu
+> ctrl register") added a new function, gic_cpu_if_up(), to program the
+> GIC CPU_CTRL register. This function assumes that there is only one GIC
+> instance present and hence always uses the chip data for the primary GIC
+> controller. Although it is not common for there to be a secondary, some
+> devices do support a secondary. Therefore, fix this by passing
+> gic_cpu_if_up() a pointer to the appropriate chip data structure.
+> 
+> Similarly, the function gic_cpu_if_down() only assumes that there is a
+> single GIC instance present. Update this function so that an instance
+> number is passed for the appropriate GIC. The vexpress TC2 (which has
+> a single GIC) is currently the only user of this function and so update
+> it accordingly.
+> 
+> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
+> ---
+> I was hoping to make the gic_cpu_if_up/down function more symmetric as we
+> discussed but it is not possible to pass the gic_nr to gic_cpu_if_up()
+> from all the places called without making more changes. However, given
+> that gic_cpu_if_up() is a local function and gic_cpu_if_down() is public,
+> may be it does not matter too much.
+> 
+>  arch/arm/mach-vexpress/tc2_pm.c |  2 +-
+>  drivers/irqchip/irq-gic.c       | 14 +++++++-------
+>  include/linux/irqchip/arm-gic.h |  2 +-
+>  3 files changed, 9 insertions(+), 9 deletions(-)
+> 
+> diff --git a/arch/arm/mach-vexpress/tc2_pm.c b/arch/arm/mach-vexpress/tc2_pm.c
+> index b3328cd46c33..1aa4ccece69f 100644
+> --- a/arch/arm/mach-vexpress/tc2_pm.c
+> +++ b/arch/arm/mach-vexpress/tc2_pm.c
+> @@ -80,7 +80,7 @@ static void tc2_pm_cpu_powerdown_prepare(unsigned int cpu, unsigned int cluster)
+>  	 * to the CPU by disabling the GIC CPU IF to prevent wfi
+>  	 * from completing execution behind power controller back
+>  	 */
+> -	gic_cpu_if_down();
+> +	gic_cpu_if_down(0);
+>  }
+>  
+>  static void tc2_pm_cluster_powerdown_prepare(unsigned int cluster)
+> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+> index 7566fe259d27..cf9aca22120f 100644
+> --- a/drivers/irqchip/irq-gic.c
+> +++ b/drivers/irqchip/irq-gic.c
+> @@ -356,10 +356,10 @@ static u8 gic_get_cpumask(struct gic_chip_data *gic)
+>  	return mask;
+>  }
+>  
+> -static void gic_cpu_if_up(void)
+> +static void gic_cpu_if_up(struct gic_chip_data *gic)
+>  {
+> -	void __iomem *cpu_base = gic_data_cpu_base(&gic_data[0]);
+> -	void __iomem *dist_base = gic_data_dist_base(&gic_data[0]);
+> +	void __iomem *cpu_base = gic_data_cpu_base(gic);
+> +	void __iomem *dist_base = gic_data_dist_base(gic);
+>  	u32 bypass = 0;
+>  
+>  	/*
+> @@ -451,12 +451,12 @@ static void gic_cpu_init(struct gic_chip_data *gic)
+>  	}
+>  
+>  	writel_relaxed(GICC_INT_PRI_THRESHOLD, base + GIC_CPU_PRIMASK);
+> -	gic_cpu_if_up();
+> +	gic_cpu_if_up(gic);
+>  }
+>  
+> -void gic_cpu_if_down(void)
+> +void gic_cpu_if_down(unsigned int gic_nr)
+>  {
+> -	void __iomem *cpu_base = gic_data_cpu_base(&gic_data[0]);
+> +	void __iomem *cpu_base = gic_data_cpu_base(&gic_data[gic_nr]);
+>  	u32 val = 0;
 
-diff --git a/arch/arm64/include/asm/jump_label.h b/arch/arm64/include/asm/jump_label.h
-index c0e5165..25b1668 100644
---- a/arch/arm64/include/asm/jump_label.h
-+++ b/arch/arm64/include/asm/jump_label.h
-@@ -28,7 +28,7 @@
- 
- static __always_inline bool arch_static_branch(struct static_key *key)
- {
--	asm goto("1: nop\n\t"
-+	asm goto("1: b . + " __stringify(AARCH64_INSN_SIZE) "\n\t"
- 		 ".pushsection __jump_table,  \"aw\"\n\t"
- 		 ".align 3\n\t"
- 		 ".quad 1b, %l[l_yes], %c0\n\t"
-diff --git a/arch/arm64/kernel/jump_label.c b/arch/arm64/kernel/jump_label.c
-index 4f1fec7..eb09868 100644
---- a/arch/arm64/kernel/jump_label.c
-+++ b/arch/arm64/kernel/jump_label.c
-@@ -28,13 +28,15 @@ void arch_jump_label_transform(struct jump_entry *entry,
- 	void *addr = (void *)entry->code;
- 	u32 insn;
- 
--	if (type == JUMP_LABEL_ENABLE) {
-+	if (type == JUMP_LABEL_ENABLE)
- 		insn = aarch64_insn_gen_branch_imm(entry->code,
--						   entry->target,
--						   AARCH64_INSN_BRANCH_NOLINK);
--	} else {
--		insn = aarch64_insn_gen_nop();
--	}
-+			entry->target,
-+			AARCH64_INSN_BRANCH_NOLINK);
-+	else
-+		insn = aarch64_insn_gen_branch_imm(entry->code,
-+			(unsigned long)addr + AARCH64_INSN_SIZE,
-+			AARCH64_INSN_BRANCH_NOLINK);
-+
- 
- 	aarch64_insn_patch_text(&addr, &insn, 1);
- }
--- 
-1.9.1
+Well, this is rubbish. I need to check the gic_nr is valid. Will update ...
+
+Jon
