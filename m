@@ -1,46 +1,49 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 31 Jul 2015 18:27:25 +0800
-Subject: [PATCH 0/3] ARM: dts: sun5i: hsg-h702: Enable USB OTG and LRADC
- keys
-In-Reply-To: <CAGb2v67inrVy844RjeBUBKOwPBPZfZQ-2OQmkMbDGURvbP4JqQ@mail.gmail.com>
-References: <1438337501-8773-1-git-send-email-wens@csie.org>
- <CAGb2v67inrVy844RjeBUBKOwPBPZfZQ-2OQmkMbDGURvbP4JqQ@mail.gmail.com>
-Message-ID: <CAGb2v64BK=jC=qTzTA-BS3uiy0oCWdBn8n4+EqeOpk_zML5o9w@mail.gmail.com>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Fri, 31 Jul 2015 18:33:32 +0800
+Subject: [PATCH] media: atmel-isi: parse the DT parameters for vsync/hsync
+ polarity
+Message-ID: <1438338812-22329-1-git-send-email-josh.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 31, 2015 at 6:12 PM, Chen-Yu Tsai <wens@csie.org> wrote:
-> On Fri, Jul 31, 2015 at 6:11 PM, Chen-Yu Tsai <wens@csie.org> wrote:
->> Hi Maxime,
->>
->> This series enables USB OTG and the volume buttons on the side of
->> the HSG-H702 tablet.
->
-> Sorry, please ignore. Something bad happened when I split the patches.
+This patch will get the DT parameters of vsync/hsync polarity, and pass to
+the platform data.
 
-PEBCAK .. The series doesn't compile because of the last patch.
+Also add a debug information for test purpose.
 
-Anyway, since you had some comments on the patches Hans posted, I'll
-fix up the same issues in mine as well.
+Signed-off-by: Josh Wu <josh.wu@atmel.com>
+---
 
-ChenYu
+ drivers/media/platform/soc_camera/atmel-isi.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
->> The third patch is just for reference, as the axp209 usb power supply
->> driver hasn't been merged yet.
->>
->>
->> Regards
->> ChenYu
->>
->>
->> Chen-Yu Tsai (3):
->>   ARM: dts: sun5i: hsg-h702: Enable side volume buttons with LRADC
->>   ARM: dts: sun5i: hsg-h702: Enable USB OTG controller
->>   ARM: dts: sun5i: hsg-h702: Enable AXP209 USB power supply
->>
->>  arch/arm/boot/dts/sun5i-a13-hsg-h702.dts | 65 ++++++++++++++++++++++++++++++++
->>  1 file changed, 65 insertions(+)
->>
->> --
->> 2.5.0
->>
+diff --git a/drivers/media/platform/soc_camera/atmel-isi.c b/drivers/media/platform/soc_camera/atmel-isi.c
+index fe9247a..a7de55c 100644
+--- a/drivers/media/platform/soc_camera/atmel-isi.c
++++ b/drivers/media/platform/soc_camera/atmel-isi.c
+@@ -811,6 +811,11 @@ static int isi_camera_set_bus_param(struct soc_camera_device *icd)
+ 	if (common_flags & V4L2_MBUS_PCLK_SAMPLE_FALLING)
+ 		cfg1 |= ISI_CFG1_PIXCLK_POL_ACTIVE_FALLING;
+ 
++	dev_dbg(icd->parent, "vsync is active %s, hsyc is active %s, pix clock is sampling %s\n",
++		common_flags & V4L2_MBUS_VSYNC_ACTIVE_LOW ? "low" : "high",
++		common_flags & V4L2_MBUS_HSYNC_ACTIVE_LOW ? "low" : "high",
++		common_flags & V4L2_MBUS_PCLK_SAMPLE_FALLING ? "fall" : "rise");
++
+ 	if (isi->pdata.has_emb_sync)
+ 		cfg1 |= ISI_CFG1_EMB_SYNC;
+ 	if (isi->pdata.full_mode)
+@@ -898,6 +903,11 @@ static int atmel_isi_probe_dt(struct atmel_isi *isi,
+ 		goto err_probe_dt;
+ 	}
+ 
++	if (ep.bus.parallel.flags & V4L2_MBUS_HSYNC_ACTIVE_LOW)
++		isi->pdata.hsync_act_low = true;
++	if (ep.bus.parallel.flags & V4L2_MBUS_VSYNC_ACTIVE_LOW)
++		isi->pdata.vsync_act_low = true;
++
+ err_probe_dt:
+ 	of_node_put(np);
+ 
+-- 
+1.9.1
