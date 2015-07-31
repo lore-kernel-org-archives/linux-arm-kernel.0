@@ -1,150 +1,81 @@
-From: jchandra@broadcom.com (Jayachandran C.)
-Date: Fri, 31 Jul 2015 21:37:01 +0530
-Subject: [PATCH v3 1/2] PCI: generic: remove dependency on hw_pci
-In-Reply-To: <20150730133521.GA12999@red-moon>
-References: <1438183681-30519-1-git-send-email-jchandra@broadcom.com>
- <20150730133521.GA12999@red-moon>
-Message-ID: <20150731160654.GB31408@jayachandranc.netlogicmicro.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 31 Jul 2015 10:58:10 -0500
+Subject: [PATCH v5 02/46] usb: gadget: add endpoint capabilities flags
+In-Reply-To: <063D6719AE5E284EB5DD2968C1650D6D1CB71091@AcuExch.aculab.com>
+References: <1438351258-31578-1-git-send-email-r.baldyga@samsung.com>
+ <1438351258-31578-3-git-send-email-r.baldyga@samsung.com>
+ <063D6719AE5E284EB5DD2968C1650D6D1CB71091@AcuExch.aculab.com>
+Message-ID: <20150731155810.GI31041@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 30, 2015 at 02:35:21PM +0100, Lorenzo Pieralisi wrote:
-> On Wed, Jul 29, 2015 at 04:28:00PM +0100, Jayachandran C wrote:
-> > The current code in pci-host-generic.c uses pci_common_init_dev()
-> > from ARM platform to do some of the PCI initializations, and this
-> > prevents it from being used in ARM64.
+Hi,
+
+On Fri, Jul 31, 2015 at 03:51:52PM +0000, David Laight wrote:
+> From: Robert Baldyga
+> > Sent: 31 July 2015 15:00
+> > Introduce struct usb_ep_caps which contains information about capabilities
+> > of usb endpoints - supported transfer types and directions. This structure
+> > should be filled by UDC driver for each of its endpoints, and will be
+> > used in epautoconf in new ep matching mechanism which will replace ugly
+> > guessing of endpoint capabilities basing on its name.
 > > 
-> > The initialization done by pci_common_init_dev() that is needed
-> > by pci-host-generic.c is really limited, and can be done easily
-> > in the same file without using hw_pci API. The ARM platform
-> > requires a pci_sys_data as sysdata for the PCI bus, this can be
-> > handled by setting up gen_pci to have a pci_sys_data variable as
-> > the first element.
-> 
-> For the sake of enabling it on ARM64, I am okay with getting
-> this merged, keeping in mind that as I already said pci_sys_data
-> has to go, it is a hack and I do not want it to spread to
-> ALL PCI host drivers that have to work on both ARM/ARM64.
-> 
-> Comments and tags below.
-> 
-> > Signed-off-by: Jayachandran C <jchandra@broadcom.com>
+> > Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
 > > ---
-> > Here's v3 of the patchset.
+> >  include/linux/usb/gadget.h | 21 +++++++++++++++++++++
+> >  1 file changed, 21 insertions(+)
 > > 
-> > v2-v3
-> >  - rebase to 4.2-rc
-> >  - fix PCI_PROBE_ONLY check before calling pcie configure
-> >  - added a comment above sysdata
-> >  - updated the commit message
-> > 
-> > v1->v2
-> >  - Address comments from Arnd Bergmann and Lorenzo Pieralisi
-> >     - move contents of gen_pci_init to gen_pci_probe
-> >     - assign resources only when !probe_only
-> >  - tested on ARM32 with qemu option -M virt
-> > 
-> > Notes:
-> >  - passing a zeroed out pci_sys_data for ARM looks ok, but I haven't
-> >    tested it on ARM.
-> >  - tested it on ARM64 fast model
-> >  - Any information on how this can be tested on arm is welcome.
-> >  - There is only one ifdef, and that can be removed when arm64 gets
-> >    a sysdata, or when arm loses its sysdata.
-> > 
-> >  drivers/pci/host/pci-host-generic.c | 55 ++++++++++++++++++++++++-------------
-> >  1 file changed, 36 insertions(+), 19 deletions(-)
-> > 
-> > diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
-> > index ba46e58..e9d9c80 100644
-> > --- a/drivers/pci/host/pci-host-generic.c
-> > +++ b/drivers/pci/host/pci-host-generic.c
-> > @@ -38,7 +38,15 @@ struct gen_pci_cfg_windows {
-> >  	const struct gen_pci_cfg_bus_ops	*ops;
+> > diff --git a/include/linux/usb/gadget.h b/include/linux/usb/gadget.h
+> > index 68fb5e8..a9a4959 100644
+> > --- a/include/linux/usb/gadget.h
+> > +++ b/include/linux/usb/gadget.h
+> > @@ -141,10 +141,29 @@ struct usb_ep_ops {
 > >  };
-> >  
-> > +/*
-> > + * ARM needs platform specific pci_sys_data as the sysdata for PCI.
-> > + * We add the sys as the first field below to handle this. sys will
-> > + * set to 0, so that the pci functions in do the right thing.
-> > + */
-> >  struct gen_pci {
-> > +#ifdef CONFIG_ARM
-> > +	struct pci_sys_data			sys;
-> > +#endif
-> >  	struct pci_host_bridge			host;
-> >  	struct gen_pci_cfg_windows		cfg;
-> >  	struct list_head			resources;
-> > @@ -48,8 +56,7 @@ static void __iomem *gen_pci_map_cfg_bus_cam(struct pci_bus *bus,
-> >  					     unsigned int devfn,
-> >  					     int where)
-> >  {
-> > -	struct pci_sys_data *sys = bus->sysdata;
-> > -	struct gen_pci *pci = sys->private_data;
-> > +	struct gen_pci *pci = bus->sysdata;
-> >  	resource_size_t idx = bus->number - pci->cfg.bus_range->start;
-> >  
-> >  	return pci->cfg.win[idx] + ((devfn << 8) | where);
-> > @@ -64,8 +71,7 @@ static void __iomem *gen_pci_map_cfg_bus_ecam(struct pci_bus *bus,
-> >  					      unsigned int devfn,
-> >  					      int where)
-> >  {
-> > -	struct pci_sys_data *sys = bus->sysdata;
-> > -	struct gen_pci *pci = sys->private_data;
-> > +	struct gen_pci *pci = bus->sysdata;
-> >  	resource_size_t idx = bus->number - pci->cfg.bus_range->start;
-> >  
-> >  	return pci->cfg.win[idx] + ((devfn << 12) | where);
-> > @@ -198,13 +204,6 @@ static int gen_pci_parse_map_cfg_windows(struct gen_pci *pci)
-> >  	return 0;
-> >  }
-> >  
-> > -static int gen_pci_setup(int nr, struct pci_sys_data *sys)
-> > -{
-> > -	struct gen_pci *pci = sys->private_data;
-> > -	list_splice_init(&pci->resources, &sys->resources);
-> > -	return 1;
-> > -}
-> > -
-> >  static int gen_pci_probe(struct platform_device *pdev)
-> >  {
-> >  	int err;
-> > @@ -214,13 +213,7 @@ static int gen_pci_probe(struct platform_device *pdev)
-> >  	struct device *dev = &pdev->dev;
-> >  	struct device_node *np = dev->of_node;
-> >  	struct gen_pci *pci = devm_kzalloc(dev, sizeof(*pci), GFP_KERNEL);
-> > -	struct hw_pci hw = {
-> > -		.nr_controllers	= 1,
-> > -		.private_data	= (void **)&pci,
-> > -		.setup		= gen_pci_setup,
-> > -		.map_irq	= of_irq_parse_and_map_pci,
-> > -		.ops		= &gen_pci_ops,
-> > -	};
-> > +	struct pci_bus *bus;
-> >  
-> >  	if (!pci)
-> >  		return -ENOMEM;
-> > @@ -258,7 +251,31 @@ static int gen_pci_probe(struct platform_device *pdev)
-> >  		return err;
-> >  	}
-> >  
-> > -	pci_common_init_dev(dev, &hw);
-> > +	/* do not reassign resource if probe only */
-> > +	if (!pci_has_flag(PCI_PROBE_ONLY))
-> > +		pci_add_flags(PCI_REASSIGN_ALL_RSRC);
+> ...
+> > +struct usb_ep_caps {
+> > +	unsigned type_control:1;
+> > +	unsigned type_iso:1;
+> > +	unsigned type_bulk:1;
+> > +	unsigned type_int:1;
+> > +	unsigned dir_in:1;
+> > +	unsigned dir_out:1;
+> > +};
 > 
-> You should add PCI_REASSIGN_ALL_BUS here. As I said in patch 2 comment,
+> With the way this is used (eg below from 13/46)
+> 
+> +
+> +		if (i == 0) {
+> +			ep->ep.caps.type_control = true;
+> +		} else {
+> +			ep->ep.caps.type_iso = true;
+> +			ep->ep.caps.type_bulk = true;
+> +			ep->ep.caps.type_int = true;
+> +		}
+> +
+> +		ep->ep.caps.dir_in = true;
+> +		ep->ep.caps.dir_out = true;
+> 
+> I think it would be more obvious if you used a u8 and explicit bitmasks.
+> The initialisation (as above) would the be explicitly assigning 'not supported'
+> to the other fields.
+> The compiler will also generate much better code...
 
-The idea is to do exactly what pci_common_init_dev does on ARM. There is
-not need to change behavior on ARM and deal with the fallout in this
-patchset.
+compiler should convert single bit flags into u32 just fine. It's all
+static data anyway. Besides, single bit flags allow us to have as many
+as we need without ending up with stuff like:
 
-> please enable setup-irq.c in an explicit commit, re-sequence the
-> series and fold the Kconfig ARM64 enablement in this patch.
+u32 flags;
+u32 flags1;
+u32 flags2;
 
-I would think that the Makefile and Kconfig changes should be
-togethter as the arm64 enablement patch. The previous patch is
-to update the gen_pci driver, and it really makes sense in that
-order.  I am not sure why you suggest this change.
+etc. Just let the compiler do those conversions for us.
 
-JC.
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150731/9f5df1e1/attachment.sig>
