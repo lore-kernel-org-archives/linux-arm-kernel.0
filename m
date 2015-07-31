@@ -1,82 +1,103 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Sat,  1 Aug 2015 00:44:31 +0200
-Subject: [PATCH] drm: panel: simple: add QiaoDian qd43003c0-40
-Message-ID: <1438382671-10098-1-git-send-email-alexandre.belloni@free-electrons.com>
+Date: Sat,  1 Aug 2015 00:58:24 +0200
+Subject: [PATCH 3/9] ARM: at91/dt: add at91sam9x5-ek Display Module dtsi
+In-Reply-To: <1438383510-10521-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1438383510-10521-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1438383510-10521-4-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Josh Wu <josh.wu@atmel.com>
+From: Boris BREZILLON <boris.brezillon@free-electrons.com>
 
-The QiaoDian Xianshi QD43003C0-40 is a 4"3 TFT LCD panel.
+All the at91sam9x5-ek share the share display module, add a dtsi to
+describe it.
 
-Timings from the OTA5180A document, ver 0.9, section
-10.1.1:
-  http://www.orientdisplay.com/pdf/OTA5180A.pdf
-
-Signed-off-by: Josh Wu <josh.wu@atmel.com>
+Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- .../devicetree/bindings/panel/qd,qd43003c0-40.txt  |  7 ++++++
- drivers/gpu/drm/panel/panel-simple.c               | 26 ++++++++++++++++++++++
- 2 files changed, 33 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/panel/qd,qd43003c0-40.txt
+ arch/arm/boot/dts/at91sam9x5dm.dtsi | 74 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 74 insertions(+)
+ create mode 100644 arch/arm/boot/dts/at91sam9x5dm.dtsi
 
-diff --git a/Documentation/devicetree/bindings/panel/qd,qd43003c0-40.txt b/Documentation/devicetree/bindings/panel/qd,qd43003c0-40.txt
+diff --git a/arch/arm/boot/dts/at91sam9x5dm.dtsi b/arch/arm/boot/dts/at91sam9x5dm.dtsi
 new file mode 100644
-index 000000000000..900bc6ebeaff
+index 000000000000..31676f1b6e31
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/panel/qd,qd43003c0-40.txt
-@@ -0,0 +1,7 @@
-+QiaoDian XianShi Corporation 4"3 TFT LCD panel
++++ b/arch/arm/boot/dts/at91sam9x5dm.dtsi
+@@ -0,0 +1,74 @@
++/*
++ * at91sam9x5dm.dtsi - Device Tree file for SAM9x5 display module
++ *
++ *  Copyright (C) 2014 Atmel,
++ *                2014 Free Electrons
++ *
++ *  Author: Boris Brezillon <boris.brezillon@free-electrons.com>
++ *
++ * Licensed under GPLv2 or later.
++ */
 +
-+Required properties:
-+- compatible: should be "qd,qd43003c0-40"
++/ {
++	ahb {
++		apb {
++			hlcdc: hlcdc at f8038000 {
++				hlcdc-display-controller {
++					pinctrl-names = "default";
++					pinctrl-0 = <&pinctrl_lcd_base &pinctrl_lcd_rgb888>;
 +
-+This binding is compatible with the simple-panel binding, which is specified
-+in simple-panel.txt in this directory.
-diff --git a/drivers/gpu/drm/panel/panel-simple.c b/drivers/gpu/drm/panel/panel-simple.c
-index f94201b6e882..e688fa545ae3 100644
---- a/drivers/gpu/drm/panel/panel-simple.c
-+++ b/drivers/gpu/drm/panel/panel-simple.c
-@@ -967,6 +967,29 @@ static const struct panel_desc ortustech_com43h4m85ulc = {
- 	.bus_format = MEDIA_BUS_FMT_RGB888_1X24,
- };
- 
-+static const struct drm_display_mode qd43003c0_40_mode = {
-+	.clock = 9000,
-+	.hdisplay = 480,
-+	.hsync_start = 480 + 8,
-+	.hsync_end = 480 + 8 + 4,
-+	.htotal = 480 + 8 + 4 + 39,
-+	.vdisplay = 272,
-+	.vsync_start = 272 + 4,
-+	.vsync_end = 272 + 4 + 10,
-+	.vtotal = 272 + 4 + 10 + 2,
-+	.vrefresh = 60,
++					port at 0 {
++						hlcdc_panel_output: endpoint at 0 {
++							reg = <0>;
++							remote-endpoint = <&panel_input>;
++						};
++					};
++				};
++			};
++		};
++	};
++
++	backlight: backlight {
++		compatible = "pwm-backlight";
++		pwms = <&hlcdc_pwm 0 50000 0>;
++		brightness-levels = <0 4 8 16 32 64 128 255>;
++		default-brightness-level = <6>;
++		power-supply = <&bl_reg>;
++		status = "disabled";
++	};
++
++	bl_reg: backlight_regulator {
++		compatible = "regulator-fixed";
++		regulator-name = "backlight-power-supply";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		status = "disabled";
++	};
++
++	panel: panel {
++		compatible = "foxlink,fl500wvr00-a0t", "simple-panel";
++		backlight = <&backlight>;
++		power-supply = <&panel_reg>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		status = "disabled";
++
++		port at 0 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			panel_input: endpoint at 0 {
++				reg = <0>;
++				remote-endpoint = <&hlcdc_panel_output>;
++			};
++		};
++	};
++
++	panel_reg: panel_regulator {
++		compatible = "regulator-fixed";
++		regulator-name = "panel-power-supply";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		status = "disabled";
++	};
 +};
-+
-+static const struct panel_desc qd43003c0_40 = {
-+	.modes = &qd43003c0_40_mode,
-+	.num_modes = 1,
-+	.size = {
-+		.width = 95,
-+		.height = 53,
-+	},
-+	.bus_format = MEDIA_BUS_FMT_RGB888_1X24,
-+};
-+
- static const struct drm_display_mode samsung_ltn101nt05_mode = {
- 	.clock = 54030,
- 	.hdisplay = 1024,
-@@ -1116,6 +1139,9 @@ static const struct of_device_id platform_of_match[] = {
- 		.compatible = "ortustech,com43h4m85ulc",
- 		.data = &ortustech_com43h4m85ulc,
- 	}, {
-+		.compatible = "qd,qd43003c0-40",
-+		.data = &qd43003c0_40,
-+	}, {
- 		.compatible = "samsung,ltn101nt05",
- 		.data = &samsung_ltn101nt05,
- 	}, {
 -- 
 2.1.4
