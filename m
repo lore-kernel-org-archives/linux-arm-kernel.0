@@ -1,45 +1,73 @@
-From: net147@gmail.com (Jonathan Liu)
-Date: Sat, 01 Aug 2015 00:23:19 +1000
-Subject: [linux-sunxi] [PATCH v5 2/7] phy-sun4i-usb: Add extcon support
- for the otg phy (phy0)
-In-Reply-To: <1434199071-22127-3-git-send-email-hdegoede@redhat.com>
-References: <1434199071-22127-1-git-send-email-hdegoede@redhat.com>
- <1434199071-22127-3-git-send-email-hdegoede@redhat.com>
-Message-ID: <55BB84D7.70109@gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sat, 1 Aug 2015 01:26:34 +0800
+Subject: [PATCH v2 2/2] ARM: multi_v7_defconfig: Enable Allwinner P2WI,
+ PWM, DMA_SUN6I, cryptodev
+In-Reply-To: <20150731170137.GN2564@lukather>
+References: <1438354602-6361-1-git-send-email-wens@csie.org>
+ <1438354602-6361-3-git-send-email-wens@csie.org>
+ <20150731170137.GN2564@lukather>
+Message-ID: <CAGb2v65-CLkLuwdf+yxQ44Y8ohOko-co8NfLHQ1vuDHDy1oGTA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans,
+On Sat, Aug 1, 2015 at 1:01 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Fri, Jul 31, 2015 at 10:56:42PM +0800, Chen-Yu Tsai wrote:
+>> Enable drivers for Allwinner P2WI, PWM, cryptodev (Security System) and
+>> sun6i DMA engine. Also enable EXTCON as PHY_SUN4I_USB depends on it.
+>>
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> ---
+>>  arch/arm/configs/multi_v7_defconfig | 5 +++++
+>>  1 file changed, 5 insertions(+)
+>>
+>> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+>> index 5fd8df6f50ea..5eaf39ce134e 100644
+>> --- a/arch/arm/configs/multi_v7_defconfig
+>> +++ b/arch/arm/configs/multi_v7_defconfig
+>> @@ -301,6 +301,7 @@ CONFIG_I2C_S3C2410=y
+>>  CONFIG_I2C_SH_MOBILE=y
+>>  CONFIG_I2C_SIRF=y
+>>  CONFIG_I2C_ST=y
+>> +CONFIG_I2C_SUN6I_P2WI=y
+>>  CONFIG_I2C_TEGRA=y
+>>  CONFIG_I2C_XILINX=y
+>>  CONFIG_I2C_RCAR=y
+>> @@ -587,6 +588,7 @@ CONFIG_IMX_DMA=y
+>>  CONFIG_MXS_DMA=y
+>>  CONFIG_DMA_OMAP=y
+>>  CONFIG_XILINX_VDMA=y
+>> +CONFIG_DMA_SUN6I=y
+>>  CONFIG_STAGING=y
+>>  CONFIG_SENSORS_ISL29018=y
+>>  CONFIG_SENSORS_ISL29028=y
+>> @@ -612,6 +614,7 @@ CONFIG_TEGRA_IOMMU_SMMU=y
+>>  CONFIG_PM_DEVFREQ=y
+>>  CONFIG_ARM_TEGRA_DEVFREQ=m
+>>  CONFIG_MEMORY=y
+>> +CONFIG_EXTCON=y
+>>  CONFIG_TI_AEMIF=y
+>>  CONFIG_IIO=y
+>>  CONFIG_AT91_ADC=m
+>> @@ -622,6 +625,7 @@ CONFIG_PWM_ATMEL=m
+>>  CONFIG_PWM_ATMEL_TCB=m
+>>  CONFIG_PWM_RENESAS_TPU=y
+>>  CONFIG_PWM_SAMSUNG=m
+>> +CONFIG_PWM_SUN4I=y
+>>  CONFIG_PWM_TEGRA=y
+>>  CONFIG_PWM_VT8500=y
+>>  CONFIG_PHY_HIX5HD2_SATA=y
+>> @@ -660,6 +664,7 @@ CONFIG_LOCKUP_DETECTOR=y
+>>  CONFIG_CRYPTO_DEV_TEGRA_AES=y
+>>  CONFIG_CPUFREQ_DT=y
+>>  CONFIG_KEYSTONE_IRQ=y
+>> +CONFIG_CRYPTO_DEV_SUN4I_SS=m
 
-On 13/06/2015 10:37 PM, Hans de Goede wrote:
-> The sunxi musb glue needs to know if a host or normal usb cable is plugged
-> in, add extcon support so that the musb glue can monitor the host status.
->
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> ---
-> Changes in v5:
-> -Split out of the "Add id and vbus detection support" commit
-> -Ported to the new extcon API queued for 4.2
-> ---
->   drivers/phy/Kconfig         |  1 +
->   drivers/phy/phy-sun4i-usb.c | 32 +++++++++++++++++++++++++++++++-
->   2 files changed, 32 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
-> index a53bd5b..9841780 100644
-> --- a/drivers/phy/Kconfig
-> +++ b/drivers/phy/Kconfig
-> @@ -173,6 +173,7 @@ config PHY_SUN4I_USB
->   	tristate "Allwinner sunxi SoC USB PHY driver"
->   	depends on ARCH_SUNXI && HAS_IOMEM && OF
->   	depends on RESET_CONTROLLER
-> +	depends on EXTCON
->   	select GENERIC_PHY
->   	help
->   	  Enable this to support the transceiver that is part of Allwinner
->
-Should probably add CONFIG_EXTCON=y to arch/arm/configs/sunxi_defconfig 
-so that CONFIG_PHY_SUN4I_USB=y works out of the box.
+It seems everything under crypto that is enabled and can be built as
+a module (i.e. no one selects it as builtin) is enabled as a module.
+I just followed everything else.
 
-Regards,
-Jonathan
+Hope this helps.
+
+
+ChenYu
