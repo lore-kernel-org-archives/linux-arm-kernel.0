@@ -1,31 +1,37 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 31 Jul 2015 15:38:34 +0200
-Subject: [PATCH] drm: atmel-hlcdc: add the missing DRM_ATOMIC flag
-Message-ID: <1438349914-6609-1-git-send-email-boris.brezillon@free-electrons.com>
+Date: Fri, 31 Jul 2015 15:39:08 +0200
+Subject: [PATCH] drm: atmel-hlcdc: add RGB565 and RGB444 output support
+Message-ID: <1438349948-6716-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The atmel-hlcdc driver already supports atomic operations, add the
-missing DRM_ATOMIC flag to expose the atomic features to userspace.
+The HLCDC IP supports RGB565 and RGB444 output formats.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
-index 2af75e4..51d6c77 100644
---- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
-+++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
-@@ -486,7 +486,8 @@ static const struct file_operations fops = {
+diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c
+index 9c45130..067e4c1 100644
+--- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c
++++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c
+@@ -126,12 +126,16 @@ atmel_hlcdc_rgb_encoder_mode_set(struct drm_encoder *encoder,
  
- static struct drm_driver atmel_hlcdc_dc_driver = {
- 	.driver_features = DRIVER_HAVE_IRQ | DRIVER_GEM |
--			   DRIVER_MODESET | DRIVER_PRIME,
-+			   DRIVER_MODESET | DRIVER_PRIME |
-+			   DRIVER_ATOMIC,
- 	.preclose = atmel_hlcdc_dc_preclose,
- 	.lastclose = atmel_hlcdc_dc_lastclose,
- 	.irq_handler = atmel_hlcdc_dc_irq_handler,
+ 	if (info->num_bus_formats) {
+ 		switch (info->bus_formats[0]) {
++		case MEDIA_BUS_FMT_RGB565_1X16:
++			cfg |= ATMEL_HLCDC_CONNECTOR_RGB565 << 8;
++			break;
+ 		case MEDIA_BUS_FMT_RGB666_1X18:
+ 			cfg |= ATMEL_HLCDC_CONNECTOR_RGB666 << 8;
+ 			break;
+ 		case MEDIA_BUS_FMT_RGB888_1X24:
+ 			cfg |= ATMEL_HLCDC_CONNECTOR_RGB888 << 8;
+ 			break;
++		case MEDIA_BUS_FMT_RGB444_1X12:
+ 		default:
+ 			break;
+ 		}
 -- 
 1.9.1
