@@ -1,137 +1,78 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Fri, 31 Jul 2015 15:09:41 +0000
-Subject: [PATCH v6] PCI: Store PCIe bus address in struct of_pci_range
-In-Reply-To: <55BB8CC6.1080203@ti.com>
-References: <1438010223-124422-1-git-send-email-gabriele.paoloni@huawei.com>
- <20150729172053.GE31170@google.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E01D6F350@lhreml503-mbs>
- <CAL_JsqKs11-sXQTdBD+ZjbVYFWUHBARTW9q5MF1hCXUhZ+nWLQ@mail.gmail.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E01D6F94A@lhreml503-mbs>
- <20150730161447.GG9640@google.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E01D6FB3B@lhreml503-mbs>
- <20150730171445.GI9640@google.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E01D6FC15@lhreml503-mbs>
- <CAL_Jsq+aQVakaZf4xo7sxnVyTmPR+HJ-9ByyS6OYJ0PHDYOwmg@mail.gmail.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E01D70589@lhreml503-mbs>
- <55BB8CC6.1080203@ti.com>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E01D70641@lhreml503-mbs>
+From: mishal@softerra.com (mishal)
+Date: Fri, 31 Jul 2015 18:12:42 +0300
+Subject: [PATCH v4] ARM: dts: add bcm2835-pwm bindings
+In-Reply-To: <20150225145017.GB5132@x1>
+References: <1421325190-7648-1-git-send-email-bart.tanghe@thomasmore.be>
+ <20150225145017.GB5132@x1>
+Message-ID: <55BB906A.9000105@softerra.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Tried with latest rpi kernel from github, branch rpi-4.0.y on RaspberryPi A+
+on pins 18 and 19
+     pwm_pins: pwm {
+         brcm,pins = <18 19>;
+         brcm,function = <2 2>; /* alt5*/
+     };
+
+and pins 12, 13
+
+     pwm_pins: pwm {
+         brcm,pins = <12 13>;
+         brcm,function = <4 4>; /* alt0*/
+     };
+
+different combinations for period/duty_cycle without any output.
+
+(WiringPi library works on pins 18 and 12.)
+Did something changed in recent kernels?
+Thank you.
 
 
-> -----Original Message-----
-> From: Kishon Vijay Abraham I [mailto:kishon at ti.com]
-> Sent: Friday, July 31, 2015 3:57 PM
-> To: Gabriele Paoloni; Rob Herring
-> Cc: Bjorn Helgaas; arnd at arndb.de; lorenzo.pieralisi at arm.com; Wangzhou
-> (B); robh+dt at kernel.org; james.morse at arm.com; Liviu.Dudau at arm.com;
-> linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> devicetree at vger.kernel.org; Yuanzhichang; Zhudacai; zhangjukuo;
-> qiuzhenfa; Liguozhu (Kenneth); Jingoo Han; Pratyush Anand; Arnd
-> Bergmann; Arnd Bergmann
-> Subject: Re: [PATCH v6] PCI: Store PCIe bus address in struct
-> of_pci_range
-> 
-> +Arnd
-> 
-> Hi,
-> 
-> On Friday 31 July 2015 07:55 PM, Gabriele Paoloni wrote:
-> > [+cc Kishon]
-> >
-> >> -----Original Message-----
-> >> From: linux-pci-owner at vger.kernel.org [mailto:linux-pci-
-> >> owner at vger.kernel.org] On Behalf Of Rob Herring
-> >> Sent: Thursday, July 30, 2015 9:42 PM
-> >> To: Gabriele Paoloni
-> >> Cc: Bjorn Helgaas; arnd at arndb.de; lorenzo.pieralisi at arm.com;
-> Wangzhou
-> >> (B); robh+dt at kernel.org; james.morse at arm.com; Liviu.Dudau at arm.com;
-> >> linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> >> devicetree at vger.kernel.org; Yuanzhichang; Zhudacai; zhangjukuo;
-> >> qiuzhenfa; Liguozhu (Kenneth); Jingoo Han; Pratyush Anand
-> >> Subject: Re: [PATCH v6] PCI: Store PCIe bus address in struct
-> >> of_pci_range
-> >>
-> >> On Thu, Jul 30, 2015 at 12:34 PM, Gabriele Paoloni
-> >> <gabriele.paoloni@huawei.com> wrote:
-> >>>> -----Original Message-----
-> >>>> From: Bjorn Helgaas [mailto:bhelgaas at google.com]
-> >>>> Sent: 30 July 2015 18:15
-> >>>> On Thu, Jul 30, 2015 at 04:50:55PM +0000, Gabriele Paoloni wrote:
-> >>>>>> -----Original Message-----
-> >>>>>> From: linux-pci-owner at vger.kernel.org [mailto:linux-pci-
-> >>>>>> owner at vger.kernel.org] On Behalf Of Bjorn Helgaas
-> >>>>>> Sent: Thursday, July 30, 2015 5:15 PM
-> >>>>>> On Thu, Jul 30, 2015 at 01:52:13PM +0000, Gabriele Paoloni wrote:
-> >>
-> >> [...]
-> >>
-> >>>>>>> I don?t think we should rely on [CPU] addresses...what if the
-> >>>>>> intermediate
-> >>>>>>> translation layer changes the lower significant bits of the
-> >> "bus
-> >>>>>> address"
-> >>>>>>> to translate into a cpu address?
-> >>>>>>
-> >>>>>> Is it really a possiblity that the lower bits could be changed?
-> >>>>>
-> >>>>> I've checked all the current deignware users DTs except "pci-
-> >>>> layerscape"
-> >>>>> that I could not find:
-> >>>>> spear1310.dtsi
-> >>>>> spear1340.dtsi
-> >>>>> dra7.dtsi
-> >>>>> imx6qdl.dtsi
-> >>>>> imx6sx.dtsi
-> >>>>> keystone.dtsi
-> >>>>> exynos5440.dtsi
-> >>>>>
-> >>>>> None of them modifies the lower bits. To be more precise the only
-> >> guy
-> >>>>> that provides another translation layer is "dra7.dtsi":
-> >>>>> axi0
-> >>>>> http://lxr.free-
-> >> electrons.com/source/arch/arm/boot/dts/dra7.dtsi#L207
-> >>>>>
-> >>>>> axi1
-> >>>>> http://lxr.free-
-> >> electrons.com/source/arch/arm/boot/dts/dra7.dtsi#L241
-> >>>>>
-> >>>>> For this case masking the top 4bits (bits28 to 31) should make
-> the
-> >> job.
-> >>
-> >> IMO, we should just fix this case. After further study, I don't
-> think
-> >> this is a DW issue, but rather an SOC integration issue.
-> >>
-> >> I believe you can just fixup the address in the pp->ops->host_init
-> hook.
-> >>
-> >
-> > Yes I guess that I could just assign pp->(*)_mod_base to the CPU
-> address
-> > in DW and mask it out in dra7xx_pcie_host_init()...
-> >
-> > Kishon, would you be ok with that?
-> 
-> Initially I was using *base-mask* property from dt. Me and Arnd (cc'ed)
-> had
-> this discussion [1] before we decided the current approach. It'll be
-> good to
-> check with Arnd too.
-> 
-> [1] ->  http://lists.infradead.org/pipermail/linux-arm-kernel/2014-
-> May/253528.html
-
-
-In this patch you use the mask into designware....instead the approach 
-proposed by Rob means to have the mask declared in the dra7 driver and
-you modified the pp members in dra7xx_pcie_host_init by masking them...
-
-BTW good to have Arnd opinion too..
-> 
-> Thanks
-> Kishon
+On 25.02.15 16:50, Lee Jones wrote:
+> On Thu, 15 Jan 2015, Bart Tanghe wrote:
+>
+>> To probe the bcm2835-pwm driver properly, this dts bindings has to be added
+>> to the bcm2835 dtsi file.
+>> In expectation of a bcm2835 clock driver, I've added fixed-clock clock binding.
+>> ---
+>> Changes in v4:
+>>   - node added by reg value
+>>
+>> Signed-off-by: Bart Tanghe <bart.tanghe@thomasmore.be>
+>> Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+> Applied, thanks.
+>
+>> diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
+>> index 3342cb1..e8a0f13 100644
+>> --- a/arch/arm/boot/dts/bcm2835.dtsi
+>> +++ b/arch/arm/boot/dts/bcm2835.dtsi
+>> @@ -122,6 +123,14 @@
+>>   			status = "disabled";
+>>   		};
+>>   
+>> +                pwm: pwm at 7e20c000 {
+>> +                        compatible = "brcm,bcm2835-pwm";
+>> +                        reg = <0x7e20c000 0x28>;
+>> +                        clocks = <&clk_pwm>;
+>> +                        #pwm-cells = <2>;
+>> +                        status = "disabled";
+>> +                };
+>> +
+>>   		sdhci: sdhci at 7e300000 {
+>>   			compatible = "brcm,bcm2835-sdhci";
+>>   			reg = <0x7e300000 0x100>;
+>> @@ -179,5 +188,13 @@
+>>   			clock-output-names = "spi";
+>>   			clock-frequency = <250000000>;
+>>   		};
+>> +
+>> +		clk_pwm: clock at 3 {
+>> +			compatible = "fixed-clock";
+>> +			reg = <3>;
+>> +			#clock-cells = <0>;
+>> +			clock-output-names = "pwm";
+>> +			clock-frequency = <9200000>;
+>> +		};
+>>   	};
+>>   };
