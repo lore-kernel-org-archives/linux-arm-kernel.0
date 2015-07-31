@@ -1,150 +1,82 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 31 Jul 2015 11:39:58 +0200
-Subject: [PATCH 22/23] misc: atmel_tclib: get and use slow clock
+Date: Fri, 31 Jul 2015 11:39:49 +0200
+Subject: [PATCH 13/23] ARM: at91/dt: sama5d3: use slow clock where necessary
 In-Reply-To: <1438335599-3301-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1438335599-3301-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1438335599-3301-23-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1438335599-3301-14-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Boris Brezillon <boris.brezillon@free-electrons.com>
+The watchdog, the reset controller, the RTC, the shutdown controller, the
+timer counters and the LCD PWM need the slow clock, add it where necessary.
 
-Commit dca1a4b5ff6e ("clk: at91: keep slow clk enabled to prevent system
-hang") added a workaround for the slow clock as it is not properly handled
-by its users.
-
-Get and use the slow clock as it is necessary for the timer counters.
-
+[boris.brezillon at free-electrons.com: add tcb clocks]
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Thierry Reding <thierry.reding@gmail.com>
-Cc: linux-pwm at vger.kernel.org
- drivers/clocksource/tcb_clksrc.c |  8 ++++++++
- drivers/misc/atmel_tclib.c       |  4 ++++
- drivers/pwm/pwm-atmel-tcb.c      | 23 ++++++++++++++++-------
- include/linux/atmel_tc.h         |  1 +
- 4 files changed, 29 insertions(+), 7 deletions(-)
+ arch/arm/boot/dts/sama5d3.dtsi      | 8 ++++++--
+ arch/arm/boot/dts/sama5d3_tcb1.dtsi | 4 ++--
+ 2 files changed, 8 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/clocksource/tcb_clksrc.c b/drivers/clocksource/tcb_clksrc.c
-index b9b7277173c2..969ba03633b0 100644
---- a/drivers/clocksource/tcb_clksrc.c
-+++ b/drivers/clocksource/tcb_clksrc.c
-@@ -188,6 +188,13 @@ static int __init setup_clkevents(struct atmel_tc *tc, int clk32k_divisor_idx)
- 	ret = clk_prepare_enable(t2_clk);
- 	if (ret)
- 		return ret;
-+
-+	ret = clk_prepare_enable(tc->slow_clk);
-+	if (ret) {
-+		clk_disable_unprepare(t2_clk);
-+		return ret;
-+	}
-+
- 	clk_disable(t2_clk);
+diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
+index 9e2444b07bce..db667f773ebe 100644
+--- a/arch/arm/boot/dts/sama5d3.dtsi
++++ b/arch/arm/boot/dts/sama5d3.dtsi
+@@ -145,8 +145,8 @@
+ 				compatible = "atmel,at91sam9x5-tcb";
+ 				reg = <0xf0010000 0x100>;
+ 				interrupts = <26 IRQ_TYPE_LEVEL_HIGH 0>;
+-				clocks = <&tcb0_clk>;
+-				clock-names = "t0_clk";
++				clocks = <&tcb0_clk>, <&clk32k>;
++				clock-names = "t0_clk", "slow_clk";
+ 			};
  
- 	clkevt.regs = tc->regs;
-@@ -200,6 +207,7 @@ static int __init setup_clkevents(struct atmel_tc *tc, int clk32k_divisor_idx)
- 	ret = request_irq(irq, ch2_irq, IRQF_TIMER, "tc_clkevt", &clkevt);
- 	if (ret) {
- 		clk_unprepare(t2_clk);
-+		clk_disable_unprepare(tc->slow_clk);
- 		return ret;
- 	}
+ 			i2c0: i2c at f0014000 {
+@@ -1261,11 +1261,13 @@
+ 			rstc at fffffe00 {
+ 				compatible = "atmel,at91sam9g45-rstc";
+ 				reg = <0xfffffe00 0x10>;
++				clocks = <&clk32k>;
+ 			};
  
-diff --git a/drivers/misc/atmel_tclib.c b/drivers/misc/atmel_tclib.c
-index 0ca05c3ec8d6..ac24a4bd63f7 100644
---- a/drivers/misc/atmel_tclib.c
-+++ b/drivers/misc/atmel_tclib.c
-@@ -125,6 +125,10 @@ static int __init tc_probe(struct platform_device *pdev)
- 	if (IS_ERR(clk))
- 		return PTR_ERR(clk);
+ 			shutdown-controller at fffffe10 {
+ 				compatible = "atmel,at91sam9x5-shdwc";
+ 				reg = <0xfffffe10 0x10>;
++				clocks = <&clk32k>;
+ 			};
  
-+	tc->slow_clk = devm_clk_get(&pdev->dev, "slow_clk");
-+	if (IS_ERR(tc->slow_clk))
-+		return PTR_ERR(tc->slow_clk);
-+
- 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	tc->regs = devm_ioremap_resource(&pdev->dev, r);
- 	if (IS_ERR(tc->regs))
-diff --git a/drivers/pwm/pwm-atmel-tcb.c b/drivers/pwm/pwm-atmel-tcb.c
-index d14e0677c92d..070a32a35295 100644
---- a/drivers/pwm/pwm-atmel-tcb.c
-+++ b/drivers/pwm/pwm-atmel-tcb.c
-@@ -305,7 +305,7 @@ static int atmel_tcb_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
- 	 */
- 	if (i == 5) {
- 		i = slowclk;
--		rate = 32768;
-+		rate = clk_get_rate(tc->slow_clk);
- 		min = div_u64(NSEC_PER_SEC, rate);
- 		max = min << tc->tcb_config->counter_width;
+ 			pit: timer at fffffe30 {
+@@ -1279,6 +1281,7 @@
+ 				compatible = "atmel,at91sam9260-wdt";
+ 				reg = <0xfffffe40 0x10>;
+ 				interrupts = <4 IRQ_TYPE_LEVEL_HIGH 7>;
++				clocks = <&clk32k>;
+ 				atmel,watchdog-type = "hardware";
+ 				atmel,reset-type = "all";
+ 				atmel,dbg-halt;
+@@ -1315,6 +1318,7 @@
+ 				compatible = "atmel,at91rm9200-rtc";
+ 				reg = <0xfffffeb0 0x30>;
+ 				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
++				clocks = <&clk32k>;
+ 			};
+ 		};
  
-@@ -387,9 +387,9 @@ static int atmel_tcb_pwm_probe(struct platform_device *pdev)
- 
- 	tcbpwm = devm_kzalloc(&pdev->dev, sizeof(*tcbpwm), GFP_KERNEL);
- 	if (tcbpwm == NULL) {
--		atmel_tc_free(tc);
-+		err = -ENOMEM;
- 		dev_err(&pdev->dev, "failed to allocate memory\n");
--		return -ENOMEM;
-+		goto err_free_tc;
- 	}
- 
- 	tcbpwm->chip.dev = &pdev->dev;
-@@ -400,17 +400,24 @@ static int atmel_tcb_pwm_probe(struct platform_device *pdev)
- 	tcbpwm->chip.npwm = NPWM;
- 	tcbpwm->tc = tc;
- 
-+	err = clk_prepare_enable(tc->slow_clk);
-+	if (err)
-+		goto err_free_tc;
-+
- 	spin_lock_init(&tcbpwm->lock);
- 
- 	err = pwmchip_add(&tcbpwm->chip);
--	if (err < 0) {
--		atmel_tc_free(tc);
--		return err;
--	}
-+	if (err < 0)
-+		goto err_free_tc;
- 
- 	platform_set_drvdata(pdev, tcbpwm);
- 
- 	return 0;
-+
-+err_free_tc:
-+	atmel_tc_free(tc);
-+
-+	return err;
- }
- 
- static int atmel_tcb_pwm_remove(struct platform_device *pdev)
-@@ -418,6 +425,8 @@ static int atmel_tcb_pwm_remove(struct platform_device *pdev)
- 	struct atmel_tcb_pwm_chip *tcbpwm = platform_get_drvdata(pdev);
- 	int err;
- 
-+	clk_disable_unprepare(tcbpwm->tc->slow_clk);
-+
- 	err = pwmchip_remove(&tcbpwm->chip);
- 	if (err < 0)
- 		return err;
-diff --git a/include/linux/atmel_tc.h b/include/linux/atmel_tc.h
-index b87c1c7c242a..468fdfa643f0 100644
---- a/include/linux/atmel_tc.h
-+++ b/include/linux/atmel_tc.h
-@@ -67,6 +67,7 @@ struct atmel_tc {
- 	const struct atmel_tcb_config *tcb_config;
- 	int			irq[3];
- 	struct clk		*clk[3];
-+	struct clk		*slow_clk;
- 	struct list_head	node;
- 	bool			allocated;
- };
+diff --git a/arch/arm/boot/dts/sama5d3_tcb1.dtsi b/arch/arm/boot/dts/sama5d3_tcb1.dtsi
+index f7fa58fe09f1..801f9745e82f 100644
+--- a/arch/arm/boot/dts/sama5d3_tcb1.dtsi
++++ b/arch/arm/boot/dts/sama5d3_tcb1.dtsi
+@@ -31,8 +31,8 @@
+ 				compatible = "atmel,at91sam9x5-tcb";
+ 				reg = <0xf8014000 0x100>;
+ 				interrupts = <27 IRQ_TYPE_LEVEL_HIGH 0>;
+-				clocks = <&tcb1_clk>;
+-				clock-names = "t0_clk";
++				clocks = <&tcb1_clk>, <&clk32k>;
++				clock-names = "t0_clk", "slow_clk";
+ 			};
+ 		};
+ 	};
 -- 
 2.1.4
