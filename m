@@ -1,54 +1,89 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 31 Jul 2015 08:05:50 -0500
-Subject: [PATCH v2] dtb: Create a common home for cross-architecture dtsi
- files.
-In-Reply-To: <CAK7LNAQ4hT133v0iH7z6JxfaBDjrGgaX2M9pA9H=sPxsmorDNw@mail.gmail.com>
-References: <1437993343-9542-1-git-send-email-ian.campbell@citrix.com>
- <CAK7LNAQKswPzeFYdSVq3JDk2qawZ8e5ogBFMWdor-CibMovU3g@mail.gmail.com>
- <1438176174.11600.198.camel@citrix.com>
- <CAL_JsqL7KRcSv5jSneWYj1PJOYbvMQ8HOAGK+w-+MDBMpMatow@mail.gmail.com>
- <CAK7LNAS_P65k3T_J_vXZ9dxBB-uVbrTW-qFE_fJEOSLcOW4JsA@mail.gmail.com>
- <CAK7LNAQ4hT133v0iH7z6JxfaBDjrGgaX2M9pA9H=sPxsmorDNw@mail.gmail.com>
-Message-ID: <CAL_JsqJm1SxvYbkp4B1GteyvtDGKqH3qvRXPHOfqBxA3TRzAXA@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 31 Jul 2015 15:10:39 +0200
+Subject: [RFC] arm64: defconfig: enable 48-bit VA by default
+In-Reply-To: <20150731125303.GO407@e104818-lin.cambridge.arm.com>
+References: <CY1PR0301MB07488D6DC5F0B171D6B290E187830@CY1PR0301MB0748.namprd03.prod.outlook.com>
+ <55B0E1AD.60409@arm.com>
+ <BY2PR0301MB0743CBCFC5476E39A5D1EC0B878C0@BY2PR0301MB0743.namprd03.prod.outlook.com>
+ <CAKv+Gu9LHBd7wM6P4H0X5WigzDETtpr2++_Ebo=adg5QtTOW2w@mail.gmail.com>
+ <BY2PR0301MB074300C5F31701D9211827F0878C0@BY2PR0301MB0743.namprd03.prod.outlook.com>
+ <20150730101358.GA30796@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu-G9Vpmt_c84OsG0JNRKopJ44uneJaAEpY3AMq6oS-Qdg@mail.gmail.com>
+ <20150731125303.GO407@e104818-lin.cambridge.arm.com>
+Message-ID: <CAKv+Gu_KL6F=9DpV=ZqYUgY9wjBF+FBodnLMBw=ZOFo6xK7-2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 31, 2015 at 12:46 AM, Masahiro Yamada
-<yamada.masahiro@socionext.com> wrote:
-> Hi.
->
-> 2015-07-30 10:30 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
->> Hi,
+On 31 July 2015 at 14:53, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Thu, Jul 30, 2015 at 09:27:03PM +0200, Ard Biesheuvel wrote:
+>> On 30 July 2015 at 12:13, Catalin Marinas <catalin.marinas@arm.com> wrote:
+>> > On Wed, Jul 29, 2015 at 08:49:57PM +0000, Stuart Yoder wrote:
+>> >> > From: Ard Biesheuvel [mailto:ard.biesheuvel at linaro.org]
+>> [...]
+>> >> > To be honest, I think this is poorly designed, and I am not sure we
+>> >> > should cater for such configurations in the defconfig.
+>> >>
+>> >> Agree, if this is a one-off weird platform then we shouldn't.
+>> >>
+>> >> But, the 'Principles of ARM Memory Maps' doc proposes this:
+>> >> 2 GB at 0x8000_0000
+>> >> 30 GB at 0x8_8000_0000
+>> >> 480 GB at 0x88_0000_0000
+>> >
+>> > I'm not particularly recommending this layout, at least not without some
+>> > clarifications on DRAM aliases (I'll ping people internally about it
+>> > again). The original layout pre-dates ARMv8, it was meant for ARMv7/LPAE
+>> > and all the memory beyond 32-bit was highmem anyway. It was later
+>> > updated for AArch64 but only to allow 44/48-bit PA (a few sections
+>> > added).
 >>
->>
->> 2015-07-30 0:23 GMT+09:00 Rob Herring <robherring2@gmail.com>:
->>> On Wed, Jul 29, 2015 at 8:22 AM, Ian Campbell <ian.campbell@citrix.com> wrote:
->>>> On Wed, 2015-07-29 at 20:07 +0900, Masahiro Yamada wrote:
->>>>> Hi Ian,
->>>>>
->>>>>
->>>>> 2015-07-27 19:35 GMT+09:00 Ian Campbell <ian.campbell@citrix.com>:
->>>>> > Commit 9ccd608070b6 "arm64: dts: add device tree for ARM SMM-A53x2 on
->>>>> > LogicTile Express 20MG" added a new dts file to arch/arm64 which
->>>>> > included "../../../../arm/boot/dts/vexpress-v2m-rs1.dtsi", i.e. a
->>>>> > .dtsi supplied by arch/arm.
+>> As an aside, is there any reason why the direct mapping *must* be a
+>> linear mapping?
+>> Other than the performance concerns regarding
+>> phys_to_virt/virt_to_phys, I mean?
 >
+> Mostly performance concerns. You could compact the physical range into a
+> smaller virtual one but the conversion will be costly, especially if you
+> want to make it multi-platform (having to look-up memory ranges,
+> memblock offsets). This would affect page table entry setup, code that
+> requires a page structure (like virt_to_page) and anything else doing
+> the virt/phys conversion.
 >
+> I tried something like that for RealView PBX in the past but it was
+> hard-coded (no multi-platform at the time). See
+> arch/arm/mach-realview/include/mach/memory.h.
 >
-> BTW, is there any chance to merge arch/arm64 and arch/arm in the future?
 
-In the kernel tree, not likely. It may happen if we ever move dts
-files out of the kernel.
+Yes, that looks vaguely like what I had in mind.
 
-> For example, U-boot supports ARM64/32 in a single arch directory, arch/arm/.
+IOW, we could partition the direct mapping just like the ARM
+recommendation, i.e.,
+
+0 - 2 GB
+2 - 32 GB
+32 - 512 GB
+
+but default to 1:1 correspondence, so that
+
+PHYS_OFFSET = PHYS_OFFSET0 = memstart_addr
+PHYS_OFFSET1 = memstart_addr + 2 GB
+PHYS_OFFSET2 = memstart_addr + 32 GB
+
+and only if the ARM recommended physical memory map is detected (with
+memstart_addr @ 0x8000_0000), switch to
+
+PHYS_OFFSET = PHYS_OFFSET0 = memstart_addr
+PHYS_OFFSET1 = memstart_addr + 30 GB
+PHYS_OFFSET2 = memstart_addr + 480 GB
+
+I guess such a special case would be out of the question for one-off
+crazy designs like Freescale, but since this is the layout recommended
+by ARM itself, I suppose we could try and support it a bit better.
+
+
+
+> As for the mem_map array, on arm64 we have enough VA space available
+> (with vmemmap it takes a few GB to cover a 512GB RAM space).
 >
->
-> I guess, the cross-arch home directory for DTSI would be only used to
-> share device trees between arm64 and arm32.
-
-For SOC files, I think the amount sharing will be limited. While we
-will probably see very similar SOCs, I'd guess the memory maps and
-irqs will be different. Sharing is going to be limited to things like
-daughter boards such as this case.
-
-Rob
+> --
+> Catalin
