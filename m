@@ -1,44 +1,80 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 31 Jul 2015 12:49:13 +0200
-Subject: [PATCH] i2c: omap: fix bus recovery setup
-In-Reply-To: <1438165650.20986.2.camel@pengutronix.de>
-References: <1436366127-24756-1-git-send-email-jlu@pengutronix.de>
- <20150714111004.GB1517@katana> <55A4FC19.4040709@ti.com>
- <20150714121207.GI1517@katana>
- <1438165650.20986.2.camel@pengutronix.de>
-Message-ID: <20150731104912.GF1522@katana>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Fri, 31 Jul 2015 12:49:44 +0200
+Subject: [PATCH 9/9] gpiolib: Add gpio name information to
+ /sys/kernel/debug/gpio
+In-Reply-To: <20150731085407.GO28535@localhost>
+References: <1437125570-28623-1-git-send-email-mpa@pengutronix.de>
+ <1437125570-28623-10-git-send-email-mpa@pengutronix.de>
+ <20150728095842.GO28535@localhost> <20150729070842.GG30895@pengutronix.de>
+ <20150731085407.GO28535@localhost>
+Message-ID: <1438339784.20618.21.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 29, 2015 at 12:27:30PM +0200, Jan L?bbe wrote:
-> On Di, 2015-07-14 at 14:12 +0200, Wolfram Sang wrote:
-> > On Tue, Jul 14, 2015 at 03:10:01PM +0300, Grygorii Strashko wrote:
-> > > Hi Wolfram,
-> > > 
-> > > On 07/14/2015 02:10 PM, Wolfram Sang wrote:
-> > > > On Wed, Jul 08, 2015 at 04:35:27PM +0200, Jan Luebbe wrote:
-> > > >> At least on the AM335x, enabling OMAP_I2C_SYSTEST_ST_EN is not enough to
+Am Freitag, den 31.07.2015, 10:54 +0200 schrieb Johan Hovold:
+> On Wed, Jul 29, 2015 at 09:08:42AM +0200, Markus Pargmann wrote:
+> > On Tue, Jul 28, 2015 at 11:58:42AM +0200, Johan Hovold wrote:
+> > > On Fri, Jul 17, 2015 at 11:32:50AM +0200, Markus Pargmann wrote:
+> > > > Add some information about gpio names to the debugfs gpio file. name and
+> > > > label of a GPIO are then displayed next to each other. This way it is
+> > > > easy to see what the real name of GPIO is and what the driver requested
+> > > > it for.
 > > > > 
-> > > > Felipe: it seems you did not need this; is this AM335x specific?
+> > > > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> > > > ---
+> > > >  drivers/gpio/gpiolib.c | 11 ++++++++---
+> > > >  1 file changed, 8 insertions(+), 3 deletions(-)
+> > > > 
+> > > > diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
+> > > > index dcac3bcf21dd..0f1d1f5faf5d 100644
+> > > > --- a/drivers/gpio/gpiolib.c
+> > > > +++ b/drivers/gpio/gpiolib.c
+> > > > @@ -2308,14 +2308,19 @@ static void gpiolib_dbg_show(struct seq_file *s, struct gpio_chip *chip)
+> > > >  	int			is_irq;
+> > > >  
+> > > >  	for (i = 0; i < chip->ngpio; i++, gpio++, gdesc++) {
+> > > > -		if (!test_bit(FLAG_REQUESTED, &gdesc->flags))
+> > > > +		if (!test_bit(FLAG_REQUESTED, &gdesc->flags)) {
+> > > > +			if (gdesc->name) {
+> > > > +				seq_printf(s, " gpio-%-3d (%-20.20s)\n",
+> > > > +					   gpio, gdesc->name);
+> > > > +			}
 > > > 
-> > > We need it (Felipe's reply can be delayed).
+> > > So now we'd no longer just be listing requested gpios, but on a similar
+> > > format to how requested ones used to be represented.
 > > 
-> > So, how did it work for him?
-> > 
-> > > It's not AM335x specific. TMODE has to be configured for all OMAP4+ SoCs too.
-> > 
-> > Okay, thanks for the stepping in!
+> > Better suggestions on how to display those extra information in debugfs?
 > 
-> Wolfram, will you pick this as-is?
+> Perhaps a new file only listing the line names.
+> 
+> > > Then there's the debugfs as ABI discussion...
+> > 
+> > I didn't consider debugfs as ABI as I thought it is just for debugging
+> > purposes?
+> 
+> Some people seem to have expressed a different position:
+> 
+> 	"The fact that something is documented (whether correctly or
+>         not) has absolutely _zero_ impact on anything at all. What makes
+>         something an ABI is that it's useful and available. The only way
+>         something isn't an ABI is by _explicitly_ making sure that it's
+>         not available even by mistake in a stable form for binary use.
+> 
+>         Example: kernel internal data structures and function calls. We
+>         make sure that you simply _cannot_ make a binary that works
+>         across kernel versions. That is the only way for an ABI to not
+>         form."
+> 
+>         https://lwn.net/Articles/309298/
 
-Yes, I was hoping for an answer to my above question to get a better
-understanding, but we can still apply the patches meanwhile.
+Assuming debugfs is ABI is completely backwards. debugfs makes no ABI
+guarantees, that's why stuff that needs a stable ABI like tracing is
+actively moving out of debugfs into other places, where ABI stability
+can be assumed.
 
+Regards,
+Lucas 
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150731/936f06db/attachment.sig>
+-- 
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
