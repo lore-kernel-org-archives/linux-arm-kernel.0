@@ -1,88 +1,50 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Fri, 31 Jul 2015 08:53:52 +0100
-Subject: [PATCH 2/2] irqchip/gic: Ensure gic_cpu_if_up/down() programs
- correct GIC instance
-In-Reply-To: <55BA68C2.9040209@arm.com>
-References: <1438273573-27958-1-git-send-email-jonathanh@nvidia.com>
- <1438273573-27958-2-git-send-email-jonathanh@nvidia.com>
- <55BA55F4.2060001@arm.com> <55BA6538.2050606@nvidia.com>
- <55BA68C2.9040209@arm.com>
-Message-ID: <55BB2990.20203@nvidia.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 31 Jul 2015 09:57:18 +0200
+Subject: [linux-sunxi] [PATCH 6/8] ARM: dts: axp209: Add usb_power_supply
+ child node to the ax209 node
+In-Reply-To: <20150731083541.5f2c683a@pluto.restena.lu>
+References: <1433885881-19809-1-git-send-email-hdegoede@redhat.com>
+ <1433885881-19809-7-git-send-email-hdegoede@redhat.com>
+ <CAGb2v66X79dK84hG8NVTho-kPPMNcKXQspvT2pCM8Zbmnme53A@mail.gmail.com>
+ <20150731075104.48c467e6@pluto.restena.lu>
+ <CAGb2v67nM7pauyjyhBdfgX7p_Rud6TEsNqphB+gx4ROekVqtbw@mail.gmail.com>
+ <20150731083541.5f2c683a@pluto.restena.lu>
+Message-ID: <20150731075718.GW2564@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 30/07/15 19:11, Marc Zyngier wrote:
-> On 30/07/15 18:56, Jon Hunter wrote:
->>
->> On 30/07/15 17:51, Marc Zyngier wrote:
->>> On 30/07/15 17:26, Jon Hunter wrote:
->>>> Commit 3228950621d9 ("irqchip: gic: Preserve gic V2 bypass bits in cpu
->>>> ctrl register") added a new function, gic_cpu_if_up(), to program the
->>>> GIC CPU_CTRL register. This function assumes that there is only one GIC
->>>> instance present and hence always uses the chip data for the primary GIC
->>>> controller. Although it is not common for there to be a secondary, some
->>>> devices do support a secondary. Therefore, fix this by passing
->>>> gic_cpu_if_up() a pointer to the appropriate chip data structure.
->>>>
->>>> Similarly, the function gic_cpu_if_down() only assumes that there is a
->>>> single GIC instance present. Update this function so that an instance
->>>> number is passed for the appropriate GIC. The vexpress TC2 (which has
->>>> a single GIC) is currently the only user of this function and so update
->>>> it accordingly.
->>>>
->>>> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
->>>> ---
->>>> I was hoping to make the gic_cpu_if_up/down function more symmetric as we
->>>> discussed but it is not possible to pass the gic_nr to gic_cpu_if_up()
->>>> from all the places called without making more changes. However, given
->>>> that gic_cpu_if_up() is a local function and gic_cpu_if_down() is public,
->>>> may be it does not matter too much.
->>>>
->>>>  arch/arm/mach-vexpress/tc2_pm.c |  2 +-
->>>>  drivers/irqchip/irq-gic.c       | 14 +++++++-------
->>>>  include/linux/irqchip/arm-gic.h |  2 +-
->>>>  3 files changed, 9 insertions(+), 9 deletions(-)
->>>>
->>>> diff --git a/arch/arm/mach-vexpress/tc2_pm.c b/arch/arm/mach-vexpress/tc2_pm.c
->>>> index b3328cd46c33..1aa4ccece69f 100644
->>>> --- a/arch/arm/mach-vexpress/tc2_pm.c
->>>> +++ b/arch/arm/mach-vexpress/tc2_pm.c
->>>> @@ -80,7 +80,7 @@ static void tc2_pm_cpu_powerdown_prepare(unsigned int cpu, unsigned int cluster)
->>>>  	 * to the CPU by disabling the GIC CPU IF to prevent wfi
->>>>  	 * from completing execution behind power controller back
->>>>  	 */
->>>> -	gic_cpu_if_down();
->>>> +	gic_cpu_if_down(0);
->>>>  }
->>>>  
->>>>  static void tc2_pm_cluster_powerdown_prepare(unsigned int cluster)
->>>> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
->>>> index 7566fe259d27..cf9aca22120f 100644
->>>> --- a/drivers/irqchip/irq-gic.c
->>>> +++ b/drivers/irqchip/irq-gic.c
->>>> @@ -356,10 +356,10 @@ static u8 gic_get_cpumask(struct gic_chip_data *gic)
->>>>  	return mask;
->>>>  }
->>>>  
->>>> -static void gic_cpu_if_up(void)
->>>> +static void gic_cpu_if_up(struct gic_chip_data *gic)
->>>>  {
->>>> -	void __iomem *cpu_base = gic_data_cpu_base(&gic_data[0]);
->>>> -	void __iomem *dist_base = gic_data_dist_base(&gic_data[0]);
->>>> +	void __iomem *cpu_base = gic_data_cpu_base(gic);
->>>> +	void __iomem *dist_base = gic_data_dist_base(gic);
->>>
->>> Which tree is that against? I don't have a dist_base in mainline...
->>
->> It is based upon linux-next. I can rebase on the current mainline if you
->> want them for v4.2.
+On Fri, Jul 31, 2015 at 08:35:41AM +0200, Bruno Pr?mont wrote:
+> > > NB: I should hopefully get my battery supply driver ported this WE,
+> > > ac-in/rtc are done, this WE. I'm going to default-off for them as well
+> > > (note that for some extra details should be provided in dts).
+> > 
+> > I'm guessing we won't be using the axp288 one?
 > 
-> It'd be good to fix it in mainline ASAP, as the Realview platforms are a
-> tiny bit dead at the moment, so a 4.2-rc would be good. The conflict
-> with Russell's FIQ work won't be hard to solve anyway.
+> In a first step I won't be using it.
+> 
+> There are a few reasons for that:
+> - axp288 is based on ACPI/platform to provide configuration information
+>   instead of dts
 
-Ok, will rebase on 4.2-rc4. I will also fix-up my incompetence, I just
-pointed out in the above.
+That's not an issue. You have an API to handle lookup in both DT and
+ACPI (the fwnode_* stuff).
 
-Jon
+> - it makes extensive use of OCV and registers that are possibly present
+>   on axp20x but undocumented there.
+
+That will be more problematic. Still I don't see why we wouldn't use a
+similar setup to what they did.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150731/796bb5e1/attachment.sig>
