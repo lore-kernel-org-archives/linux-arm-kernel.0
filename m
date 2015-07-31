@@ -1,61 +1,35 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Fri, 31 Jul 2015 14:16:02 +0800
-Subject: [PATCH 2/3] ARM: berlin: register cpufreq-dt for the BG2Q
-In-Reply-To: <1438259752-16320-3-git-send-email-antoine.tenart@free-electrons.com>
-References: <1438259752-16320-1-git-send-email-antoine.tenart@free-electrons.com>
- <1438259752-16320-3-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <20150731141602.28b28f21@xhacker>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 30 Jul 2015 23:20:13 -0700
+Subject: [PATCH V3 07/16] PM / OPP: Add support to parse
+ "operating-points-v2" bindings
+In-Reply-To: <20150731055806.GN17794@linux>
+References: <cover.1438166099.git.viresh.kumar@linaro.org>
+ <6d8d9cd0c3ae2d3fa8c3aadedb5ac403785b7675.1438166099.git.viresh.kumar@linaro.org>
+ <20150731055106.GJ3159@codeaurora.org>
+ <20150731055806.GN17794@linux>
+Message-ID: <20150731062013.GR3159@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Antoine, 
-
-On Thu, 30 Jul 2015 14:35:51 +0200
-Antoine Tenart <antoine.tenart@free-electrons.com> wrote:
-
-> The BG2Q SoC uses cpufreq-dt for cpufreq. Register a platform device for
-> this.
+On 07/31, Viresh Kumar wrote:
+> On 30-07-15, 22:51, Stephen Boyd wrote:
+> > > +	opp->u_volt = microvolt[0];
+> > > +	opp->u_volt_min = microvolt[1];
+> > > +	opp->u_volt_max = microvolt[2];
+> > 
+> > Should the default be 0 and ULONG_MAX for volt_min/volt_max when
+> > there's on element?
 > 
-> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-> ---
->  arch/arm/mach-berlin/berlin.c | 13 +++++++++++++
->  1 file changed, 13 insertions(+)
+> I am not still sure how the regulator API is going to look like for
+> this target/min/max thing. So, lets defer it until that is resolved.
+> For now they are initialized to 0.
 > 
-> diff --git a/arch/arm/mach-berlin/berlin.c b/arch/arm/mach-berlin/berlin.c
-> index ac181c6797ee..0de906374994 100644
-> --- a/arch/arm/mach-berlin/berlin.c
-> +++ b/arch/arm/mach-berlin/berlin.c
-> @@ -15,9 +15,21 @@
->  #include <linux/io.h>
->  #include <linux/kernel.h>
->  #include <linux/of_platform.h>
-> +#include <linux/platform_device.h>
->  #include <asm/hardware/cache-l2x0.h>
->  #include <asm/mach/arch.h>
->  
-> +static const struct of_device_id berlin2q_match[] = {
-> +	{ .compatible = "marvell,berlin2q" },
-> +	{ },
-> +};
-> +
-> +static void __init berlin_init_late(void)
-> +{
-> +	if (of_find_matching_node(NULL, berlin2q_match))
-> +		platform_device_register_simple("cpufreq-dt", -1, NULL, 0);
+> And, because the user has just passed in a target voltage, maybe all
+> three must be == u_volt. :)
+> 
 
-I'm not sure is it acceptable to always register cpufreq-dt platform device.
-In cpufreq-dt driver, the probe will exit if there's no cpuclk node.
+Ok. Sounds fair enough.
 
-> +}
-> +
->  static const char * const berlin_dt_compat[] = {
->  	"marvell,berlin",
->  	NULL,
-> @@ -25,6 +37,7 @@ static const char * const berlin_dt_compat[] = {
->  
->  DT_MACHINE_START(BERLIN_DT, "Marvell Berlin")
->  	.dt_compat	= berlin_dt_compat,
-> +	.init_late	= berlin_init_late,
->  	/*
->  	 * with DT probing for L2CCs, berlin_init_machine can be removed.
->  	 * Note: 88DE3005 (Armada 1500-mini) uses pl310 l2cc
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
