@@ -1,46 +1,70 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Fri, 31 Jul 2015 11:33:55 +0200
-Subject: [RFC] arm64:change jump_label to use branch instruction, not use
- NOP instr
-In-Reply-To: <8F6A71B0-C7DB-4505-BEE2-79967FC91A8F@gmail.com>
-References: <94E2034B-9DE4-4ADF-8B2F-197D38A363CF@gmail.com>
- <20150731075259.GR25159@twins.programming.kicks-ass.net>
- <8F6A71B0-C7DB-4505-BEE2-79967FC91A8F@gmail.com>
-Message-ID: <20150731093355.GU25159@twins.programming.kicks-ass.net>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Fri, 31 Jul 2015 11:37:41 +0200
+Subject: [PATCH] PM / devfreq: event: Remove incorrect property in
+ exynos-ppmu DT binding
+In-Reply-To: <55B0A616.2070608@osg.samsung.com>
+References: <1436770732-9430-1-git-send-email-javier@osg.samsung.com>
+ <55B0A376.2080906@samsung.com> <55B0A616.2070608@osg.samsung.com>
+Message-ID: <55BB41E5.8010209@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 31, 2015 at 05:25:02PM +0800, yalin wang wrote:
+Hello Myungjoo,
+
+On 07/23/2015 10:30 AM, Javier Martinez Canillas wrote:
+> Hello Chanwoo,
 > 
-> > On Jul 31, 2015, at 15:52, Peter Zijlstra <peterz@infradead.org> wrote:
-> > 
-> > On Fri, Jul 31, 2015 at 03:41:37PM +0800, yalin wang wrote:
-> >> This change a little arch_static_branch(), use b . + 4 for false
-> >> return, why? According to aarch64 TRM, if both source and dest
-> >> instr are branch instr, can patch the instr directly, don't need
-> >> all cpu to do ISB for sync, this means we can call
-> >> aarch64_insn_patch_text_nosync() during patch_text(),
-> >> will improve the performance when change a static_key.
-> > 
-> > This doesn't parse.. What?
-> > 
-> > Also, this conflicts with the jump label patches I've got.
+> On 07/23/2015 10:19 AM, Chanwoo Choi wrote:
+>> Hi Javier,
+>>
+>> On 07/13/2015 03:58 PM, Javier Martinez Canillas wrote:
+>>> The exynos-ppmu driver is only a clock consumer and not a clock
+>>> provider but its Device Tree binding listed #clock-cells as an
+>>> optional property.
+>>>
+>>> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+>>>
+>>> ---
+>>>
+>>> Documentation/devicetree/bindings/devfreq/event/exynos-ppmu.txt | 1
+>>> - 1 file changed, 1 deletion(-)
+>>>
+>>> diff --git
+>>> a/Documentation/devicetree/bindings/devfreq/event/exynos-ppmu.txt
+>>> b/Documentation/devicetree/bindings/devfreq/event/exynos-ppmu.txt 
+>>> index b54bf3a2ff57..aed486692880 100644 ---
+>>> a/Documentation/devicetree/bindings/devfreq/event/exynos-ppmu.txt 
+>>> +++
+>>> b/Documentation/devicetree/bindings/devfreq/event/exynos-ppmu.txt 
+>>> @@ -17,7 +17,6 @@ Required properties: Optional properties: -
+>>> clock-names : the name of clock used by the PPMU, "ppmu" - clocks :
+>>> phandles for clock specified in "clock-names" property --
+>>> #clock-cells: should be 1.
+>>>
+>>> Example1 : PPMU nodes in exynos3250.dtsi are listed below.
+>>>
+>>>
+>>
+>> Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
+>>
+>> + Devfreq maintainer (Myungjoo Ham)
 > 
-> this is arch depend , you can see aarch64_insn_patch_text( ) for more info,
-> if aarch64_insn_hotpatch_safe() is true, will patch the text directly.
+> Thanks for the review and for cc'ing Myungjoo. The get_maintainer.pl script
+> didn't tell me that so I think Documentation/devicetree/bindings/devfreq/
+> sub-dir should be added to the DEVICE FREQUENCY (DEVFREQ) entry in the
+> MAINTAINERS file.
+> 
+>> I think that this patch will be more appropriate on devfreq git tree 
+>> than linux-samsung git tree.
+>>
+> 
+> Agreed.
+> 
 
-So I patched all arches, including aargh64.
+Any comments about this patch?
 
-> what is your git branch base? i make the patch based on linux-next branch,
-> maybe a little delay than yours , could you share your branch git address?
-> i can make a new based on yours .
-
-https://git.kernel.org/cgit/linux/kernel/git/peterz/queue.git/log/?h=locking/jump_label
-
-Don't actually use that branch for anything permanent, this is throw-away
-git stuff.
-
-But you're replacing a NOP with an unconditional branch to the next
-instruction? I suppose I'll leave that to Will and co.. I just had
-trouble understanding your Changelog -- also I was very much not awake
-yet.
+Best regards,
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
