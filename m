@@ -1,45 +1,75 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Fri, 31 Jul 2015 12:42:51 +0200
-Subject: [PATCH 0/9] gpiolib: Add GPIO name support
-In-Reply-To: <20150731094928.GQ28535@localhost>
-References: <1437125570-28623-1-git-send-email-mpa@pengutronix.de>
- <CACRpkdY=SLGyrcvWT355b3Z+pBwb9gPzVcieD8mOn=zdyJ1mFw@mail.gmail.com>
- <CAAVeFuL5F=Y2boCWp_TZEAN-kdT-Ob9r-h1-eNVDjBHftFYkeg@mail.gmail.com>
- <20150721095457.GA9981@pengutronix.de>
- <20150721101037.GB20023@pengutronix.de>
- <CAGmoSHt0Kg-cxe3U6uV40=ttmFbDruRcJZNxtmSZ=gmZQN5fTw@mail.gmail.com>
- <20150731094928.GQ28535@localhost>
-Message-ID: <20150731104251.GC1994@pengutronix.de>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 31 Jul 2015 11:44:24 +0100
+Subject: [PATCH 1/8] arm/xen: Remove helpers which are PV specific
+In-Reply-To: <1438095769-2560-2-git-send-email-julien.grall@citrix.com>
+References: <1438095769-2560-1-git-send-email-julien.grall@citrix.com>
+ <1438095769-2560-2-git-send-email-julien.grall@citrix.com>
+Message-ID: <alpine.DEB.2.02.1507311142580.11337@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 31, 2015 at 11:49:28AM +0200, Johan Hovold wrote:
-> On Thu, Jul 30, 2015 at 05:13:37PM -0700, Arun Bharadwaj wrote:
+On Tue, 28 Jul 2015, Julien Grall wrote:
+> ARM guests are assimilated to HVM guest on ARM. The current
+> implementation is assuming a 1:1 mapping which is only true for DOM0 and
+> may not be at all in the future.
 > 
-> > 2) Some times I get a kernel dump when I try to unexport the gpio or even
-> > when I try to read the "name" file. This is not very repeatable and seems
-> > to happen at random. I haven't had the time to look into this in more
-> > detail yet, but here's the dump FWIW: http://pastebin.com/xq9cpCQE
+> Furthermore, all the helpers but arbitrary_virt_to_machine are used in
+> x86 specific code (or only compiled for).
 > 
-> This is probably because of patch 8/9 erroneously taking the sysfs_lock
-> in gpio_name_show.
+> The helper arbitrary_virt_to_machine is only used in PV specific code.
+> Therefore we should never call the function.
+> 
+> Add a BUG() in this helper and drop all the others.
+> 
+> Signed-off-by: Julien Grall <julien.grall@citrix.com>
+> Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: linux-arm-kernel at lists.infradead.org
+> ---
+>  arch/arm/include/asm/xen/page.h | 16 ++--------------
+>  1 file changed, 2 insertions(+), 14 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/xen/page.h b/arch/arm/include/asm/xen/page.h
+> index 1bee8ca..c2e9dcd 100644
+> --- a/arch/arm/include/asm/xen/page.h
+> +++ b/arch/arm/include/asm/xen/page.h
+> @@ -54,26 +54,14 @@ static inline unsigned long mfn_to_pfn(unsigned long mfn)
+>  
+>  #define mfn_to_local_pfn(mfn) mfn_to_pfn(mfn)
+>  
+> -static inline xmaddr_t phys_to_machine(xpaddr_t phys)
+> -{
+> -	unsigned offset = phys.paddr & ~PAGE_MASK;
+> -	return XMADDR(PFN_PHYS(pfn_to_mfn(PFN_DOWN(phys.paddr))) | offset);
+> -}
+> -
+> -static inline xpaddr_t machine_to_phys(xmaddr_t machine)
+> -{
+> -	unsigned offset = machine.maddr & ~PAGE_MASK;
+> -	return XPADDR(PFN_PHYS(mfn_to_pfn(PFN_DOWN(machine.maddr))) | offset);
+> -}
+>  /* VIRT <-> MACHINE conversion */
+> -#define virt_to_machine(v)	(phys_to_machine(XPADDR(__pa(v))))
+>  #define virt_to_mfn(v)		(pfn_to_mfn(virt_to_pfn(v)))
+>  #define mfn_to_virt(m)		(__va(mfn_to_pfn(m) << PAGE_SHIFT))
+>  
+> +/* Only used in PV code. However ARM guest is always assimilated as HVM. */
+                               ^ "However" doesn't make sense here from an
+                               english grammer point of view.
 
-Arun, thank you for testing. I will send a fixed series at the beginning
-of next week.
+Aside from this:
 
-Best regards,
+Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 
-Markus
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150731/409a0439/attachment.sig>
+>  static inline xmaddr_t arbitrary_virt_to_machine(void *vaddr)
+>  {
+> -	/* TODO: assuming it is mapped in the kernel 1:1 */
+> -	return virt_to_machine(vaddr);
+> +	BUG();
+>  }
+>  
+>  /* TODO: this shouldn't be here but it is because the frontend drivers
+> -- 
+> 2.1.4
+> 
