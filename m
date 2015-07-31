@@ -1,93 +1,108 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 31 Jul 2015 11:39:52 +0200
-Subject: [PATCH 16/23] watchdog: at91sam9: get and use slow clock
+Date: Fri, 31 Jul 2015 11:39:56 +0200
+Subject: [PATCH 20/23] clocksource: atmel-st: get and use slow clock
 In-Reply-To: <1438335599-3301-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1438335599-3301-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1438335599-3301-17-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1438335599-3301-21-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit dca1a4b5ff6e ("clk: at91: keep slow clk enabled to prevent system
-hang") added a workaround for the slow clock as it is not properly handled
-by its users.
-
-Get and use the slow clock as it is necessary for the at91sam9 watchdog.
+The current slow clock rate is hardcoded. Properly get the slow clock
+and use its rate.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Reviewed-by: Guenter Roeck <linux@roeck-us.net>
 ---
-Cc: Wim Van Sebroeck <wim@iguana.be>
-Cc: linux-watchdog at vger.kernel.org
- drivers/watchdog/at91sam9_wdt.c | 22 ++++++++++++++++++++--
- 1 file changed, 20 insertions(+), 2 deletions(-)
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+ drivers/clocksource/timer-atmel-st.c | 31 ++++++++++++++++++++++---------
+ 1 file changed, 22 insertions(+), 9 deletions(-)
 
-diff --git a/drivers/watchdog/at91sam9_wdt.c b/drivers/watchdog/at91sam9_wdt.c
-index e4698f7c5f93..7e6acaf3ece4 100644
---- a/drivers/watchdog/at91sam9_wdt.c
-+++ b/drivers/watchdog/at91sam9_wdt.c
-@@ -17,6 +17,7 @@
- 
- #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
- 
-+#include <linux/clk.h>
- #include <linux/errno.h>
- #include <linux/init.h>
+diff --git a/drivers/clocksource/timer-atmel-st.c b/drivers/clocksource/timer-atmel-st.c
+index 1692e17e096b..d6049ea8b081 100644
+--- a/drivers/clocksource/timer-atmel-st.c
++++ b/drivers/clocksource/timer-atmel-st.c
+@@ -22,6 +22,7 @@
+ #include <linux/kernel.h>
  #include <linux/interrupt.h>
-@@ -90,6 +91,7 @@ struct at91wdt {
- 	unsigned long heartbeat;	/* WDT heartbeat in jiffies */
- 	bool nowayout;
- 	unsigned int irq;
-+	struct clk *sclk;
- };
+ #include <linux/irq.h>
++#include <linux/clk.h>
+ #include <linux/clockchips.h>
+ #include <linux/export.h>
+ #include <linux/mfd/syscon.h>
+@@ -33,9 +34,8 @@ static unsigned long last_crtr;
+ static u32 irqmask;
+ static struct clock_event_device clkevt;
+ static struct regmap *regmap_st;
+-
+-#define AT91_SLOW_CLOCK		32768
+-#define RM9200_TIMER_LATCH	((AT91_SLOW_CLOCK + HZ/2) / HZ)
++static struct clk *sclk;
++static int timer_latch;
  
- /* ......................................................................... */
-@@ -352,15 +354,25 @@ static int __init at91wdt_probe(struct platform_device *pdev)
- 	if (IS_ERR(wdt->base))
- 		return PTR_ERR(wdt->base);
+ /*
+  * The ST_CRTR is updated asynchronously to the master clock ... but
+@@ -82,8 +82,8 @@ static irqreturn_t at91rm9200_timer_interrupt(int irq, void *dev_id)
+ 	if (sr & AT91_ST_PITS) {
+ 		u32	crtr = read_CRTR();
  
-+	wdt->sclk = devm_clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(wdt->sclk))
-+		return PTR_ERR(wdt->sclk);
+-		while (((crtr - last_crtr) & AT91_ST_CRTV) >= RM9200_TIMER_LATCH) {
+-			last_crtr += RM9200_TIMER_LATCH;
++		while (((crtr - last_crtr) & AT91_ST_CRTV) >= timer_latch) {
++			last_crtr += timer_latch;
+ 			clkevt.event_handler(&clkevt);
+ 		}
+ 		return IRQ_HANDLED;
+@@ -120,7 +120,7 @@ clkevt32k_mode(enum clock_event_mode mode, struct clock_event_device *dev)
+ 	case CLOCK_EVT_MODE_PERIODIC:
+ 		/* PIT for periodic irqs; fixed rate of 1/HZ */
+ 		irqmask = AT91_ST_PITS;
+-		regmap_write(regmap_st, AT91_ST_PIMR, RM9200_TIMER_LATCH);
++		regmap_write(regmap_st, AT91_ST_PIMR, timer_latch);
+ 		break;
+ 	case CLOCK_EVT_MODE_ONESHOT:
+ 		/* ALM for oneshot irqs, set by next_event()
+@@ -182,7 +182,7 @@ static struct clock_event_device clkevt = {
+  */
+ static void __init atmel_st_timer_init(struct device_node *node)
+ {
+-	unsigned int val;
++	unsigned int sclk_rate, val;
+ 	int irq, ret;
+ 
+ 	regmap_st = syscon_node_to_regmap(node);
+@@ -206,6 +206,19 @@ static void __init atmel_st_timer_init(struct device_node *node)
+ 	if (ret)
+ 		panic(pr_fmt("Unable to setup IRQ\n"));
+ 
++	sclk = of_clk_get(node, 0);
++	if (IS_ERR(sclk))
++		panic(pr_fmt("Unable to get slow clock\n"));
 +
-+	err = clk_prepare_enable(wdt->sclk);
-+	if (err) {
-+		dev_err(&pdev->dev, "Could not enable slow clock\n");
-+		return err;
-+	}
++	clk_prepare_enable(sclk);
++	if (ret)
++		panic(pr_fmt("Could not enable slow clock\n"));
 +
- 	if (pdev->dev.of_node) {
- 		err = of_at91wdt_init(pdev->dev.of_node, wdt);
- 		if (err)
--			return err;
-+			goto err_clk;
- 	}
- 
- 	err = at91_wdt_init(pdev, wdt);
- 	if (err)
--		return err;
-+		goto err_clk;
- 
- 	platform_set_drvdata(pdev, wdt);
- 
-@@ -368,6 +380,11 @@ static int __init at91wdt_probe(struct platform_device *pdev)
- 		wdt->wdd.timeout, wdt->nowayout);
- 
- 	return 0;
++	sclk_rate = clk_get_rate(sclk);
++	if (!sclk_rate)
++		panic(pr_fmt("Invalid slow clock rate\n"));
++	timer_latch = (sclk_rate + HZ / 2) / HZ;
 +
-+err_clk:
-+	clk_disable_unprepare(wdt->sclk);
-+
-+	return err;
+ 	/* The 32KiHz "Slow Clock" (tick every 30517.58 nanoseconds) is used
+ 	 * directly for the clocksource and all clockevents, after adjusting
+ 	 * its prescaler from the 1 Hz default.
+@@ -214,11 +227,11 @@ static void __init atmel_st_timer_init(struct device_node *node)
+ 
+ 	/* Setup timer clockevent, with minimum of two ticks (important!!) */
+ 	clkevt.cpumask = cpumask_of(0);
+-	clockevents_config_and_register(&clkevt, AT91_SLOW_CLOCK,
++	clockevents_config_and_register(&clkevt, sclk_rate,
+ 					2, AT91_ST_ALMV);
+ 
+ 	/* register clocksource */
+-	clocksource_register_hz(&clk32k, AT91_SLOW_CLOCK);
++	clocksource_register_hz(&clk32k, sclk_rate);
  }
- 
- static int __exit at91wdt_remove(struct platform_device *pdev)
-@@ -377,6 +394,7 @@ static int __exit at91wdt_remove(struct platform_device *pdev)
- 
- 	pr_warn("I quit now, hardware will probably reboot!\n");
- 	del_timer(&wdt->timer);
-+	clk_disable_unprepare(wdt->sclk);
- 
- 	return 0;
- }
+ CLOCKSOURCE_OF_DECLARE(atmel_st_timer, "atmel,at91rm9200-st",
+ 		       atmel_st_timer_init);
 -- 
 2.1.4
