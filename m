@@ -1,336 +1,513 @@
-From: suneel.garapati@xilinx.com (Suneel Garapati)
-Date: Fri, 31 Jul 2015 15:29:17 +0530
-Subject: [PATCH v2 2/2] drivers: rtc: add xilinx zynqmp rtc driver
-In-Reply-To: <1438336757-23404-1-git-send-email-suneel.garapati@xilinx.com>
-References: <1438336757-23404-1-git-send-email-suneel.garapati@xilinx.com>
-Message-ID: <1438336757-23404-2-git-send-email-suneel.garapati@xilinx.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Fri, 31 Jul 2015 11:53:20 +0200
+Subject: [PATCH v5] clk: at91: add generated clock driver
+In-Reply-To: <1438335792-26278-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1438335792-26278-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <20150731115320.642f449f@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-adds support for RTC controller found on
-Xilinx Zynq Ultrascale+ MPSoC platform.
+On Fri, 31 Jul 2015 11:43:12 +0200
+Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
 
-Signed-off-by: Suneel Garapati <suneel.garapati@xilinx.com>
----
-Changes v2
-- change alm to alarm
----
- drivers/rtc/Kconfig      |   7 ++
- drivers/rtc/Makefile     |   1 +
- drivers/rtc/rtc-zynqmp.c | 278 +++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 286 insertions(+)
- create mode 100644 drivers/rtc/rtc-zynqmp.c
+> Add a new type of clocks that can be provided to a peripheral.
+> In addition to the peripheral clock, this new clock that can use several
+> input clocks as parents can generate divided rates.
+> This would allow a peripheral to have finer grained clocks for generating
+> a baud rate, clocking an asynchronous part or having more
+> options in frequency.
+> 
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
-index e132ccb..e44705b 100644
---- a/drivers/rtc/Kconfig
-+++ b/drivers/rtc/Kconfig
-@@ -1116,6 +1116,13 @@ config RTC_DRV_OPAL
-	  This driver can also be built as a module. If so, the module
-	  will be called rtc-opal.
+Looks good to me.
 
-+config RTC_DRV_ZYNQMP
-+	tristate "Xilinx Zynq Ultrascale+ MPSoC RTC"
-+	depends on OF
-+	help
-+	  If you say yes here you get support for the RTC controller found on
-+	  Xilinx Zynq Ultrascale+ MPSoC.
-+
- comment "on-CPU RTC drivers"
+Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 
- config RTC_DRV_DAVINCI
-diff --git a/drivers/rtc/Makefile b/drivers/rtc/Makefile
-index 2797384..e491eb5 100644
---- a/drivers/rtc/Makefile
-+++ b/drivers/rtc/Makefile
-@@ -159,3 +159,4 @@ obj-$(CONFIG_RTC_DRV_WM831X)	+= rtc-wm831x.o
- obj-$(CONFIG_RTC_DRV_WM8350)	+= rtc-wm8350.o
- obj-$(CONFIG_RTC_DRV_X1205)	+= rtc-x1205.o
- obj-$(CONFIG_RTC_DRV_XGENE)	+= rtc-xgene.o
-+obj-$(CONFIG_RTC_DRV_ZYNQMP)	+= rtc-zynqmp.o
-diff --git a/drivers/rtc/rtc-zynqmp.c b/drivers/rtc/rtc-zynqmp.c
-new file mode 100644
-index 0000000..e442746
---- /dev/null
-+++ b/drivers/rtc/rtc-zynqmp.c
-@@ -0,0 +1,278 @@
-+/*
-+ * Xilinx Zynq Ultrascale+ MPSoC Real Time Clock Driver
-+ *
-+ * Copyright (C) 2015 Xilinx, Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along with
-+ * this program. If not, see <http://www.gnu.org/licenses/>.
-+ *
-+ */
-+
-+#include <linux/init.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
-+#include <linux/io.h>
-+#include <linux/delay.h>
-+#include <linux/rtc.h>
-+
-+/* RTC Registers */
-+#define RTC_SET_TM_WR		0x00
-+#define RTC_SET_TM_RD		0x04
-+#define RTC_CALIB_WR		0x08
-+#define RTC_CALIB_RD		0x0C
-+#define RTC_CUR_TM		0x10
-+#define RTC_CUR_TICK		0x14
-+#define RTC_ALRM		0x18
-+#define RTC_INT_STS		0x20
-+#define RTC_INT_MASK		0x24
-+#define RTC_INT_EN		0x28
-+#define RTC_INT_DIS		0x2C
-+#define RTC_CTRL		0x40
-+
-+#define RTC_FR_EN		BIT(20)
-+#define RTC_FR_DATSHIFT		16
-+#define RTC_TICK_MASK		0xFFFF
-+#define RTC_INT_SEC		BIT(0)
-+#define RTC_INT_ALRM		BIT(1)
-+#define RTC_OSC_EN		BIT(24)
-+
-+#define RTC_CALIB_DEF		0x198233
-+#define RTC_CALIB_MASK		0x1FFFFF
-+
-+struct xlnx_rtc_dev {
-+	struct rtc_device	*rtc;
-+	void __iomem		*reg_base;
-+	int			alarm_irq;
-+	int			sec_irq;
-+};
-+
-+static int xlnx_rtc_set_time(struct device *dev, struct rtc_time *tm)
-+{
-+	struct xlnx_rtc_dev *xrtcdev = dev_get_drvdata(dev);
-+	unsigned long new_time;
-+
-+	rtc_tm_to_time(tm, &new_time);
-+	writel(new_time, xrtcdev->reg_base + RTC_SET_TM_WR);
-+
-+	return 0;
-+}
-+
-+static int xlnx_rtc_read_time(struct device *dev, struct rtc_time *tm)
-+{
-+	struct xlnx_rtc_dev *xrtcdev = dev_get_drvdata(dev);
-+
-+	rtc_time_to_tm(readl(xrtcdev->reg_base + RTC_CUR_TM), tm);
-+
-+	return rtc_valid_tm(tm);
-+}
-+
-+static int xlnx_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *alrm)
-+{
-+	struct xlnx_rtc_dev *xrtcdev = dev_get_drvdata(dev);
-+
-+	rtc_time_to_tm(readl(xrtcdev->reg_base + RTC_ALRM), &alrm->time);
-+	alrm->enabled = readl(xrtcdev->reg_base + RTC_INT_MASK) & RTC_INT_ALRM;
-+
-+	return 0;
-+}
-+
-+static int xlnx_rtc_alarm_irq_enable(struct device *dev, u32 enabled)
-+{
-+	struct xlnx_rtc_dev *xrtcdev = dev_get_drvdata(dev);
-+
-+	if (enabled)
-+		writel(RTC_INT_ALRM, xrtcdev->reg_base + RTC_INT_EN);
-+	else
-+		writel(RTC_INT_ALRM, xrtcdev->reg_base + RTC_INT_DIS);
-+
-+	return 0;
-+}
-+
-+static int xlnx_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alrm)
-+{
-+	struct xlnx_rtc_dev *xrtcdev = dev_get_drvdata(dev);
-+	unsigned long alarm_time;
-+
-+	rtc_tm_to_time(&alrm->time, &alarm_time);
-+
-+	writel((u32) alarm_time, (xrtcdev->reg_base + RTC_ALRM));
-+
-+	xlnx_rtc_alarm_irq_enable(dev, alrm->enabled);
-+
-+	return 0;
-+}
-+
-+static void xlnx_init_rtc(struct xlnx_rtc_dev *xrtcdev, u32 calibval)
-+{
-+	/*
-+	 * Based on crystal freq of 33.330 KHz
-+	 * set the secounds counter and enable, set fractions counter
-+	 * to default value suggested as per design spec
-+	 * to correct RTC delay in frequency over period of time.
-+	 */
-+	calibval &= RTC_CALIB_MASK;
-+	writel(calibval, (xrtcdev->reg_base + RTC_CALIB_WR));
-+}
-+
-+static const struct rtc_class_ops xlnx_rtc_ops = {
-+	.set_time	  = xlnx_rtc_set_time,
-+	.read_time	  = xlnx_rtc_read_time,
-+	.read_alarm	  = xlnx_rtc_read_alarm,
-+	.set_alarm	  = xlnx_rtc_set_alarm,
-+	.alarm_irq_enable = xlnx_rtc_alarm_irq_enable,
-+};
-+
-+static irqreturn_t xlnx_rtc_interrupt(int irq, void *id)
-+{
-+	struct xlnx_rtc_dev *xrtcdev = (struct xlnx_rtc_dev *) id;
-+	unsigned int status;
-+
-+	status = readl(xrtcdev->reg_base + RTC_INT_STS);
-+	/* Check if interrupt asserted */
-+	if (!(status & (RTC_INT_SEC | RTC_INT_ALRM)))
-+		return IRQ_NONE;
-+
-+	/* Clear interrupt */
-+	writel(status, xrtcdev->reg_base + RTC_INT_STS);
-+
-+	if (status & RTC_INT_SEC)
-+		rtc_update_irq(xrtcdev->rtc, 1, RTC_IRQF | RTC_UF);
-+	if (status & RTC_INT_ALRM)
-+		rtc_update_irq(xrtcdev->rtc, 1, RTC_IRQF | RTC_AF);
-+	if (status & RTC_INT_ALRM)
-+		printk("alarm interrupt\n");
-+	return IRQ_HANDLED;
-+}
-+
-+static int xlnx_rtc_probe(struct platform_device *pdev)
-+{
-+	struct xlnx_rtc_dev *xrtcdev;
-+	struct resource *res;
-+	int ret;
-+	unsigned int calibvalue;
-+
-+	xrtcdev = devm_kzalloc(&pdev->dev, sizeof(*xrtcdev), GFP_KERNEL);
-+	if (!xrtcdev)
-+		return -ENOMEM;
-+
-+	platform_set_drvdata(pdev, xrtcdev);
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+
-+	xrtcdev->reg_base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(xrtcdev->reg_base))
-+		return PTR_ERR(xrtcdev->reg_base);
-+
-+	xrtcdev->alarm_irq = platform_get_irq_byname(pdev, "alarm");
-+	if (xrtcdev->alarm_irq < 0) {
-+		dev_err(&pdev->dev, "no irq resource\n");
-+		return xrtcdev->alarm_irq;
-+	}
-+	ret = devm_request_irq(&pdev->dev, xrtcdev->alarm_irq,
-+				xlnx_rtc_interrupt, 0,
-+				dev_name(&pdev->dev), xrtcdev);
-+	if (ret) {
-+		dev_err(&pdev->dev, "request irq failed\n");
-+		return ret;
-+	}
-+
-+	xrtcdev->sec_irq = platform_get_irq_byname(pdev, "sec");
-+	if (xrtcdev->sec_irq < 0) {
-+		dev_err(&pdev->dev, "no irq resource\n");
-+		return xrtcdev->sec_irq;
-+	}
-+	ret = devm_request_irq(&pdev->dev, xrtcdev->sec_irq,
-+				xlnx_rtc_interrupt, 0,
-+				dev_name(&pdev->dev), xrtcdev);
-+	if (ret) {
-+		dev_err(&pdev->dev, "request irq failed\n");
-+		return ret;
-+	}
-+
-+	ret = of_property_read_u32(pdev->dev.of_node, "calibration",
-+					&calibvalue);
-+	if (ret)
-+		calibvalue = RTC_CALIB_DEF;
-+
-+	xlnx_init_rtc(xrtcdev, calibvalue);
-+
-+	device_init_wakeup(&pdev->dev, 1);
-+
-+	xrtcdev->rtc = devm_rtc_device_register(&pdev->dev, pdev->name,
-+					 &xlnx_rtc_ops, THIS_MODULE);
-+	if (IS_ERR(xrtcdev->rtc)) {
-+		return PTR_ERR(xrtcdev->rtc);
-+	}
-+
-+	return 0;
-+}
-+
-+static int xlnx_rtc_remove(struct platform_device *pdev)
-+{
-+	xlnx_rtc_alarm_irq_enable(&pdev->dev, 0);
-+	device_init_wakeup(&pdev->dev, 0);
-+
-+	return 0;
-+}
-+
-+static int __maybe_unused xlnx_rtc_suspend(struct device *dev)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct xlnx_rtc_dev *xrtcdev = platform_get_drvdata(pdev);
-+
-+	if (device_may_wakeup(&pdev->dev)) {
-+		enable_irq_wake(xrtcdev->alarm_irq);
-+	} else {
-+		xlnx_rtc_alarm_irq_enable(dev, 0);
-+	}
-+
-+	return 0;
-+}
-+
-+static int __maybe_unused xlnx_rtc_resume(struct device *dev)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct xlnx_rtc_dev *xrtcdev = platform_get_drvdata(pdev);
-+
-+	if (device_may_wakeup(&pdev->dev)) {
-+		disable_irq_wake(xrtcdev->alarm_irq);
-+	} else {
-+		xlnx_rtc_alarm_irq_enable(dev, 1);
-+	}
-+
-+	return 0;
-+}
-+
-+static SIMPLE_DEV_PM_OPS(xlnx_rtc_pm_ops, xlnx_rtc_suspend, xlnx_rtc_resume);
-+
-+static const struct of_device_id xlnx_rtc_of_match[] = {
-+	{.compatible = "xlnx,zynqmp-rtc" },
-+	{ }
-+};
-+MODULE_DEVICE_TABLE(of, xlnx_rtc_of_match);
-+
-+static struct platform_driver xlnx_rtc_driver = {
-+	.probe		= xlnx_rtc_probe,
-+	.remove		= xlnx_rtc_remove,
-+	.driver		= {
-+		.name	= KBUILD_MODNAME,
-+		.pm	= &xlnx_rtc_pm_ops,
-+		.of_match_table	= xlnx_rtc_of_match,
-+	},
-+};
-+
-+module_platform_driver(xlnx_rtc_driver);
-+
-+MODULE_DESCRIPTION("Xilinx Zynq MPSoC RTC driver");
-+MODULE_AUTHOR("Xilinx Inc.");
-+MODULE_LICENSE("GPL v2");
---
-2.1.2
+Mike, Stephen, if you're okay with this new version I'll prepare a PR
+containing all the clk related changes for the sama5d2.
+
+Best Regards,
+
+Boris
+
+> ---
+> 
+> Changes in v5:
+> - remove the protection of parent_id: won't happen with correct DT
+> - update DT documentation to add the 6th clock
+> - remove the Ack from Boris: better to add it again after latest
+>   modifications
+> 
+> Changes in v4:
+> - protect stored parent_id from incoherency
+> - use of of_count_phandle_with_args()
+> - collect Ack tag by Boris
+> 
+> Changes in v3:
+> - rebase on top of next-20150727
+> - make use of of_clk_parent_fill helper function
+> - change determine_rate() according to new prototype
+> 
+> Changes in v2:
+> - adapt to new xxx_determine_rate() callback prototype
+> - fix checkpatch errors and use __func__
+> - fix handling of clocks without clk-output-range property specified.
+>   Test if range.max is present before using it
+> - test clock id only at probe time instead of at each API call
+> - remove useless tests in clk_generated_set_rate()
+> - change the meaningless config HAVE_AT91_GENERATED to HAVE_AT91_GENERATED_CLK
+> - wrap some lines over 80 characters
+> 
+>  .../devicetree/bindings/clock/at91-clock.txt       |  35 +++
+>  arch/arm/mach-at91/Kconfig                         |   3 +
+>  drivers/clk/at91/Makefile                          |   1 +
+>  drivers/clk/at91/clk-generated.c                   | 306 +++++++++++++++++++++
+>  drivers/clk/at91/pmc.c                             |   6 +
+>  drivers/clk/at91/pmc.h                             |   3 +
+>  include/linux/clk/at91_pmc.h                       |   7 +
+>  7 files changed, 361 insertions(+)
+>  create mode 100644 drivers/clk/at91/clk-generated.c
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/at91-clock.txt b/Documentation/devicetree/bindings/clock/at91-clock.txt
+> index 5ba6450693b9..181bc8ac4e3a 100644
+> --- a/Documentation/devicetree/bindings/clock/at91-clock.txt
+> +++ b/Documentation/devicetree/bindings/clock/at91-clock.txt
+> @@ -77,6 +77,9 @@ Required properties:
+>  	"atmel,sama5d4-clk-h32mx":
+>  		at91 h32mx clock
+>  
+> +	"atmel,sama5d2-clk-generated":
+> +		at91 generated clock
+> +
+>  Required properties for SCKC node:
+>  - reg : defines the IO memory reserved for the SCKC.
+>  - #size-cells : shall be 0 (reg is used to encode clk id).
+> @@ -461,3 +464,35 @@ For example:
+>  		compatible = "atmel,sama5d4-clk-h32mx";
+>  		clocks = <&mck>;
+>  	};
+> +
+> +Required properties for generated clocks:
+> +- #size-cells : shall be 0 (reg is used to encode clk id).
+> +- #address-cells : shall be 1 (reg is used to encode clk id).
+> +- clocks : shall be the generated clock source phandles.
+> +	e.g. clocks = <&clk32k>, <&main>, <&plladiv>, <&utmi>, <&mck>, <&audio_pll_pmc>;
+> +- name: device tree node describing a specific generated clock.
+> +	* #clock-cells : from common clock binding; shall be set to 0.
+> +	* reg: peripheral id. See Atmel's datasheets to get a full
+> +	  list of peripheral ids.
+> +	* atmel,clk-output-range : minimum and maximum clock frequency
+> +	  (two u32 fields).
+> +
+> +For example:
+> +	gck {
+> +		compatible = "atmel,sama5d2-clk-generated";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		clocks = <&clk32k>, <&main>, <&plladiv>, <&utmi>, <&mck>, <&audio_pll_pmc>;
+> +
+> +		tcb0_gclk: tcb0_gclk {
+> +			#clock-cells = <0>;
+> +			reg = <35>;
+> +			atmel,clk-output-range = <0 83000000>;
+> +		};
+> +
+> +		pwm_gclk: pwm_gclk {
+> +			#clock-cells = <0>;
+> +			reg = <38>;
+> +			atmel,clk-output-range = <0 83000000>;
+> +		};
+> +	};
+> diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+> index fd95f34945f4..e8273e79f6ba 100644
+> --- a/arch/arm/mach-at91/Kconfig
+> +++ b/arch/arm/mach-at91/Kconfig
+> @@ -90,6 +90,9 @@ config HAVE_AT91_SMD
+>  config HAVE_AT91_H32MX
+>  	bool
+>  
+> +config HAVE_AT91_GENERATED_CLK
+> +	bool
+> +
+>  config SOC_SAM_V4_V5
+>  	bool
+>  
+> diff --git a/drivers/clk/at91/Makefile b/drivers/clk/at91/Makefile
+> index 89a48a7bd5df..13e67bd35cff 100644
+> --- a/drivers/clk/at91/Makefile
+> +++ b/drivers/clk/at91/Makefile
+> @@ -10,3 +10,4 @@ obj-$(CONFIG_HAVE_AT91_UTMI)		+= clk-utmi.o
+>  obj-$(CONFIG_HAVE_AT91_USB_CLK)		+= clk-usb.o
+>  obj-$(CONFIG_HAVE_AT91_SMD)		+= clk-smd.o
+>  obj-$(CONFIG_HAVE_AT91_H32MX)		+= clk-h32mx.o
+> +obj-$(CONFIG_HAVE_AT91_GENERATED_CLK)	+= clk-generated.o
+> diff --git a/drivers/clk/at91/clk-generated.c b/drivers/clk/at91/clk-generated.c
+> new file mode 100644
+> index 000000000000..631123ca6f85
+> --- /dev/null
+> +++ b/drivers/clk/at91/clk-generated.c
+> @@ -0,0 +1,306 @@
+> +/*
+> + *  Copyright (C) 2015 Atmel Corporation,
+> + *                     Nicolas Ferre <nicolas.ferre@atmel.com>
+> + *
+> + * Based on clk-programmable & clk-peripheral drivers by Boris BREZILLON.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + */
+> +
+> +#include <linux/clk-provider.h>
+> +#include <linux/clkdev.h>
+> +#include <linux/clk/at91_pmc.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/io.h>
+> +
+> +#include "pmc.h"
+> +
+> +#define PERIPHERAL_MAX		64
+> +#define PERIPHERAL_ID_MIN	2
+> +
+> +#define GENERATED_SOURCE_MAX	6
+> +#define GENERATED_MAX_DIV	255
+> +
+> +struct clk_generated {
+> +	struct clk_hw hw;
+> +	struct at91_pmc *pmc;
+> +	struct clk_range range;
+> +	u32 id;
+> +	u32 gckdiv;
+> +	u8 parent_id;
+> +};
+> +
+> +#define to_clk_generated(hw) \
+> +	container_of(hw, struct clk_generated, hw)
+> +
+> +static int clk_generated_enable(struct clk_hw *hw)
+> +{
+> +	struct clk_generated *gck = to_clk_generated(hw);
+> +	struct at91_pmc *pmc = gck->pmc;
+> +	u32 tmp;
+> +
+> +	pr_debug("GCLK: %s, gckdiv = %d, parent id = %d\n",
+> +		 __func__, gck->gckdiv, gck->parent_id);
+> +
+> +	pmc_lock(pmc);
+> +	pmc_write(pmc, AT91_PMC_PCR, (gck->id & AT91_PMC_PCR_PID_MASK));
+> +	tmp = pmc_read(pmc, AT91_PMC_PCR) &
+> +			~(AT91_PMC_PCR_GCKDIV_MASK | AT91_PMC_PCR_GCKCSS_MASK);
+> +	pmc_write(pmc, AT91_PMC_PCR, tmp | AT91_PMC_PCR_GCKCSS(gck->parent_id)
+> +					 | AT91_PMC_PCR_CMD
+> +					 | AT91_PMC_PCR_GCKDIV(gck->gckdiv)
+> +					 | AT91_PMC_PCR_GCKEN);
+> +	pmc_unlock(pmc);
+> +	return 0;
+> +}
+> +
+> +static void clk_generated_disable(struct clk_hw *hw)
+> +{
+> +	struct clk_generated *gck = to_clk_generated(hw);
+> +	struct at91_pmc *pmc = gck->pmc;
+> +	u32 tmp;
+> +
+> +	pmc_lock(pmc);
+> +	pmc_write(pmc, AT91_PMC_PCR, (gck->id & AT91_PMC_PCR_PID_MASK));
+> +	tmp = pmc_read(pmc, AT91_PMC_PCR) & ~AT91_PMC_PCR_GCKEN;
+> +	pmc_write(pmc, AT91_PMC_PCR, tmp | AT91_PMC_PCR_CMD);
+> +	pmc_unlock(pmc);
+> +}
+> +
+> +static int clk_generated_is_enabled(struct clk_hw *hw)
+> +{
+> +	struct clk_generated *gck = to_clk_generated(hw);
+> +	struct at91_pmc *pmc = gck->pmc;
+> +	int ret;
+> +
+> +	pmc_lock(pmc);
+> +	pmc_write(pmc, AT91_PMC_PCR, (gck->id & AT91_PMC_PCR_PID_MASK));
+> +	ret = !!(pmc_read(pmc, AT91_PMC_PCR) & AT91_PMC_PCR_GCKEN);
+> +	pmc_unlock(pmc);
+> +
+> +	return ret;
+> +}
+> +
+> +static unsigned long
+> +clk_generated_recalc_rate(struct clk_hw *hw,
+> +			  unsigned long parent_rate)
+> +{
+> +	struct clk_generated *gck = to_clk_generated(hw);
+> +
+> +	return DIV_ROUND_CLOSEST(parent_rate, gck->gckdiv + 1);
+> +}
+> +
+> +static int clk_generated_determine_rate(struct clk_hw *hw,
+> +					struct clk_rate_request *req)
+> +{
+> +	struct clk_generated *gck = to_clk_generated(hw);
+> +	struct clk *parent = NULL;
+> +	long best_rate = -EINVAL;
+> +	unsigned long tmp_rate, min_rate;
+> +	int best_diff = -1;
+> +	int tmp_diff;
+> +	int i;
+> +
+> +	for (i = 0; i < __clk_get_num_parents(hw->clk); i++) {
+> +		u32 div;
+> +		unsigned long parent_rate;
+> +
+> +		parent = clk_get_parent_by_index(hw->clk, i);
+> +		if (!parent)
+> +			continue;
+> +
+> +		parent_rate = __clk_get_rate(parent);
+> +		min_rate = DIV_ROUND_CLOSEST(parent_rate, GENERATED_MAX_DIV + 1);
+> +		if (!parent_rate ||
+> +		    (gck->range.max && min_rate > gck->range.max))
+> +			continue;
+> +
+> +		for (div = 1; div < GENERATED_MAX_DIV + 2; div++) {
+> +			tmp_rate = DIV_ROUND_CLOSEST(parent_rate, div);
+> +			tmp_diff = abs(req->rate - tmp_rate);
+> +
+> +			if (best_diff < 0 || best_diff > tmp_diff) {
+> +				best_rate = tmp_rate;
+> +				best_diff = tmp_diff;
+> +				req->best_parent_rate = parent_rate;
+> +				req->best_parent_hw = __clk_get_hw(parent);
+> +			}
+> +
+> +			if (!best_diff || tmp_rate < req->rate)
+> +				break;
+> +		}
+> +
+> +		if (!best_diff)
+> +			break;
+> +	}
+> +
+> +	pr_debug("GCLK: %s, best_rate = %ld, parent clk: %s @ %ld\n",
+> +		 __func__, best_rate,
+> +		 __clk_get_name((req->best_parent_hw)->clk),
+> +		 req->best_parent_rate);
+> +
+> +	if (best_rate < 0)
+> +		return best_rate;
+> +
+> +	req->rate = best_rate;
+> +	return 0;
+> +}
+> +
+> +/* No modification of hardware as we have the flag CLK_SET_PARENT_GATE set */
+> +static int clk_generated_set_parent(struct clk_hw *hw, u8 index)
+> +{
+> +	struct clk_generated *gck = to_clk_generated(hw);
+> +
+> +	if (index >= __clk_get_num_parents(hw->clk))
+> +		return -EINVAL;
+> +
+> +	gck->parent_id = index;
+> +	return 0;
+> +}
+> +
+> +static u8 clk_generated_get_parent(struct clk_hw *hw)
+> +{
+> +	struct clk_generated *gck = to_clk_generated(hw);
+> +
+> +	return gck->parent_id;
+> +}
+> +
+> +/* No modification of hardware as we have the flag CLK_SET_RATE_GATE set */
+> +static int clk_generated_set_rate(struct clk_hw *hw,
+> +				  unsigned long rate,
+> +				  unsigned long parent_rate)
+> +{
+> +	struct clk_generated *gck = to_clk_generated(hw);
+> +	u32 div;
+> +
+> +	if (!rate)
+> +		return -EINVAL;
+> +
+> +	if (gck->range.max && rate > gck->range.max)
+> +		return -EINVAL;
+> +
+> +	div = DIV_ROUND_CLOSEST(parent_rate, rate);
+> +	if (div > GENERATED_MAX_DIV + 1 || !div)
+> +		return -EINVAL;
+> +
+> +	gck->gckdiv = div - 1;
+> +	return 0;
+> +}
+> +
+> +static const struct clk_ops generated_ops = {
+> +	.enable = clk_generated_enable,
+> +	.disable = clk_generated_disable,
+> +	.is_enabled = clk_generated_is_enabled,
+> +	.recalc_rate = clk_generated_recalc_rate,
+> +	.determine_rate = clk_generated_determine_rate,
+> +	.get_parent = clk_generated_get_parent,
+> +	.set_parent = clk_generated_set_parent,
+> +	.set_rate = clk_generated_set_rate,
+> +};
+> +
+> +/**
+> + * clk_generated_startup - Initialize a given clock to its default parent and
+> + * divisor parameter.
+> + *
+> + * @gck:	Generated clock to set the startup parameters for.
+> + *
+> + * Take parameters from the hardware and update local clock configuration
+> + * accordingly.
+> + */
+> +static void clk_generated_startup(struct clk_generated *gck)
+> +{
+> +	struct at91_pmc *pmc = gck->pmc;
+> +	u32 tmp;
+> +
+> +	pmc_lock(pmc);
+> +	pmc_write(pmc, AT91_PMC_PCR, (gck->id & AT91_PMC_PCR_PID_MASK));
+> +	tmp = pmc_read(pmc, AT91_PMC_PCR);
+> +	pmc_unlock(pmc);
+> +
+> +	gck->parent_id = (tmp & AT91_PMC_PCR_GCKCSS_MASK)
+> +					>> AT91_PMC_PCR_GCKCSS_OFFSET;
+> +	gck->gckdiv = (tmp & AT91_PMC_PCR_GCKDIV_MASK)
+> +					>> AT91_PMC_PCR_GCKDIV_OFFSET;
+> +}
+> +
+> +static struct clk * __init
+> +at91_clk_register_generated(struct at91_pmc *pmc, const char *name,
+> +			    const char **parent_names, u8 num_parents,
+> +			    u8 id, const struct clk_range *range)
+> +{
+> +	struct clk_generated *gck;
+> +	struct clk *clk = NULL;
+> +	struct clk_init_data init;
+> +
+> +	gck = kzalloc(sizeof(*gck), GFP_KERNEL);
+> +	if (!gck)
+> +		return ERR_PTR(-ENOMEM);
+> +
+> +	init.name = name;
+> +	init.ops = &generated_ops;
+> +	init.parent_names = parent_names;
+> +	init.num_parents = num_parents;
+> +	init.flags = CLK_SET_RATE_GATE | CLK_SET_PARENT_GATE;
+> +
+> +	gck->id = id;
+> +	gck->hw.init = &init;
+> +	gck->pmc = pmc;
+> +	gck->range = *range;
+> +
+> +	clk = clk_register(NULL, &gck->hw);
+> +	if (IS_ERR(clk))
+> +		kfree(gck);
+> +	else
+> +		clk_generated_startup(gck);
+> +
+> +	return clk;
+> +}
+> +
+> +void __init of_sama5d2_clk_generated_setup(struct device_node *np,
+> +					   struct at91_pmc *pmc)
+> +{
+> +	int num;
+> +	u32 id;
+> +	const char *name;
+> +	struct clk *clk;
+> +	int num_parents;
+> +	const char *parent_names[GENERATED_SOURCE_MAX];
+> +	struct device_node *gcknp;
+> +	struct clk_range range = CLK_RANGE(0, 0);
+> +
+> +	num_parents = of_clk_get_parent_count(np);
+> +	if (num_parents <= 0 || num_parents > GENERATED_SOURCE_MAX)
+> +		return;
+> +
+> +	of_clk_parent_fill(np, parent_names, num_parents);
+> +
+> +	num = of_get_child_count(np);
+> +	if (!num || num > PERIPHERAL_MAX)
+> +		return;
+> +
+> +	for_each_child_of_node(np, gcknp) {
+> +		if (of_property_read_u32(gcknp, "reg", &id))
+> +			continue;
+> +
+> +		if (id < PERIPHERAL_ID_MIN || id >= PERIPHERAL_MAX)
+> +			continue;
+> +
+> +		if (of_property_read_string(np, "clock-output-names", &name))
+> +			name = gcknp->name;
+> +
+> +		of_at91_get_clk_range(gcknp, "atmel,clk-output-range",
+> +				      &range);
+> +
+> +		clk = at91_clk_register_generated(pmc, name, parent_names,
+> +						  num_parents, id, &range);
+> +		if (IS_ERR(clk))
+> +			continue;
+> +
+> +		of_clk_add_provider(gcknp, of_clk_src_simple_get, clk);
+> +	}
+> +}
+> diff --git a/drivers/clk/at91/pmc.c b/drivers/clk/at91/pmc.c
+> index 39be2be82b0a..3775d82c213d 100644
+> --- a/drivers/clk/at91/pmc.c
+> +++ b/drivers/clk/at91/pmc.c
+> @@ -370,6 +370,12 @@ static const struct of_device_id pmc_clk_ids[] __initconst = {
+>  		.data = of_sama5d4_clk_h32mx_setup,
+>  	},
+>  #endif
+> +#if defined(CONFIG_HAVE_AT91_GENERATED_CLK)
+> +	{
+> +		.compatible = "atmel,sama5d2-clk-generated",
+> +		.data = of_sama5d2_clk_generated_setup,
+> +	},
+> +#endif
+>  	{ /*sentinel*/ }
+>  };
+>  
+> diff --git a/drivers/clk/at91/pmc.h b/drivers/clk/at91/pmc.h
+> index 8b87771c69b2..f65739272779 100644
+> --- a/drivers/clk/at91/pmc.h
+> +++ b/drivers/clk/at91/pmc.h
+> @@ -118,4 +118,7 @@ void of_at91sam9x5_clk_smd_setup(struct device_node *np,
+>  void of_sama5d4_clk_h32mx_setup(struct device_node *np,
+>  				struct at91_pmc *pmc);
+>  
+> +void of_sama5d2_clk_generated_setup(struct device_node *np,
+> +				    struct at91_pmc *pmc);
+> +
+>  #endif /* __PMC_H_ */
+> diff --git a/include/linux/clk/at91_pmc.h b/include/linux/clk/at91_pmc.h
+> index dfc59e2b64fb..ae61860e6892 100644
+> --- a/include/linux/clk/at91_pmc.h
+> +++ b/include/linux/clk/at91_pmc.h
+> @@ -183,10 +183,17 @@ extern void __iomem *at91_pmc_base;
+>  
+>  #define AT91_PMC_PCR		0x10c			/* Peripheral Control Register [some SAM9 and SAMA5] */
+>  #define		AT91_PMC_PCR_PID_MASK		0x3f
+> +#define		AT91_PMC_PCR_GCKCSS_OFFSET	8
+> +#define		AT91_PMC_PCR_GCKCSS_MASK	(0x7  << AT91_PMC_PCR_GCKCSS_OFFSET)
+> +#define		AT91_PMC_PCR_GCKCSS(n)		((n)  << AT91_PMC_PCR_GCKCSS_OFFSET)	/* GCK Clock Source Selection */
+>  #define		AT91_PMC_PCR_CMD		(0x1  <<  12)				/* Command (read=0, write=1) */
+>  #define		AT91_PMC_PCR_DIV_OFFSET		16
+>  #define		AT91_PMC_PCR_DIV_MASK		(0x3  << AT91_PMC_PCR_DIV_OFFSET)
+>  #define		AT91_PMC_PCR_DIV(n)		((n)  << AT91_PMC_PCR_DIV_OFFSET)	/* Divisor Value */
+> +#define		AT91_PMC_PCR_GCKDIV_OFFSET	20
+> +#define		AT91_PMC_PCR_GCKDIV_MASK	(0xff  << AT91_PMC_PCR_GCKDIV_OFFSET)
+> +#define		AT91_PMC_PCR_GCKDIV(n)		((n)  << AT91_PMC_PCR_GCKDIV_OFFSET)	/* Generated Clock Divisor Value */
+>  #define		AT91_PMC_PCR_EN			(0x1  <<  28)				/* Enable */
+> +#define		AT91_PMC_PCR_GCKEN		(0x1  <<  29)				/* GCK Enable */
+>  
+>  #endif
+
+
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
