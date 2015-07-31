@@ -1,92 +1,42 @@
 From: moritz.fischer@ettus.com (Moritz Fischer)
-Date: Thu, 30 Jul 2015 18:13:54 -0700
-Subject: [RFCv3 1/4] docs: dts: Added documentation for Xilinx Zynq Reset
- Controller bindings.
+Date: Thu, 30 Jul 2015 18:13:55 -0700
+Subject: [RFCv3 2/4] dts: zynq: Add devicetree entry for Xilinx Zynq reset
+ controller.
 In-Reply-To: <1438305237-18497-1-git-send-email-moritz.fischer@ettus.com>
 References: <1438305237-18497-1-git-send-email-moritz.fischer@ettus.com>
-Message-ID: <1438305237-18497-2-git-send-email-moritz.fischer@ettus.com>
+Message-ID: <1438305237-18497-3-git-send-email-moritz.fischer@ettus.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
 ---
- .../devicetree/bindings/reset/zynq-reset.txt       | 68 ++++++++++++++++++++++
- 1 file changed, 68 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/reset/zynq-reset.txt
+ arch/arm/boot/dts/zynq-7000.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/reset/zynq-reset.txt b/Documentation/devicetree/bindings/reset/zynq-reset.txt
-new file mode 100644
-index 0000000..498c037a
---- /dev/null
-+++ b/Documentation/devicetree/bindings/reset/zynq-reset.txt
-@@ -0,0 +1,68 @@
-+Xilinx Zynq Reset Manager
+diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
+index 0691508..6bebf02 100644
+--- a/arch/arm/boot/dts/zynq-7000.dtsi
++++ b/arch/arm/boot/dts/zynq-7000.dtsi
+@@ -1,5 +1,6 @@
+ /*
+  *  Copyright (C) 2011 - 2014 Xilinx
++ *  Copyright (C) 2015 National Instruments Corp.
+  *
+  * This software is licensed under the terms of the GNU General Public
+  * License version 2, as published by the Free Software Foundation, and
+@@ -258,6 +259,13 @@
+ 				reg = <0x100 0x100>;
+ 			};
+ 
++			rstc: rstc at 200 {
++				compatible = "xlnx,zynq-reset";
++				reg = <0x200 0x48>;
++				#reset-cells = <1>;
++				syscon = <&slcr>;
++			};
 +
-+The Zynq AP-SoC has several different resets.
-+
-+See Chapter 26 of the Zynq TRM (UG585) for more information about Zynq resets.
-+
-+Required properties:
-+- compatible: "xlnx,zynq-reset"
-+- reg: SLCR offset and size taken via syscon <0x200 0x48>
-+- syscon: <&slcr>
-+  This should be a phandle to the Zynq's SLCR register.
-+- #reset-cells: Must be 1
-+
-+The Zynq Reset Manager needs to be a childnode of the SLCR.
-+
-+Example:
-+	rstc: rstc at 200 {
-+		compatible = "xlnx,zynq-reset";
-+		reg = <0x200 0x48>;
-+		#reset-cells = <1>;
-+		syscon = <&slcr>;
-+	};
-+
-+Reset outputs:
-+ 0  : soft reset
-+ 32 : ddr reset
-+ 64 : topsw reset
-+ 96 : dmac reset
-+ 128: usb0 reset
-+ 129: usb1 reset
-+ 160: gem0 reset
-+ 161: gem1 reset
-+ 164: gem0 rx reset
-+ 165: gem1 rx reset
-+ 166: gem0 ref reset
-+ 167: gem1 ref reset
-+ 192: sdio0 reset
-+ 193: sdio1 reset
-+ 196: sdio0 ref reset
-+ 197: sdio1 ref reset
-+ 224: spi0 reset
-+ 225: spi1 reset
-+ 226: spi0 ref reset
-+ 227: spi1 ref reset
-+ 256: can0 reset
-+ 257: can1 reset
-+ 258: can0 ref reset
-+ 259: can1 ref reset
-+ 288: i2c0 reset
-+ 289: i2c1 reset
-+ 320: uart0 reset
-+ 321: uart1 reset
-+ 322: uart0 ref reset
-+ 323: uart1 ref reset
-+ 352: gpio reset
-+ 384: lqspi reset
-+ 385: qspi ref reset
-+ 416: smc reset
-+ 417: smc ref reset
-+ 448: ocm reset
-+ 512: fpga0 out reset
-+ 513: fpga1 out reset
-+ 514: fpga2 out reset
-+ 515: fpga3 out reset
-+ 544: a9 reset 0
-+ 545: a9 reset 1
-+ 552: peri reset
-+
+ 			pinctrl0: pinctrl at 700 {
+ 				compatible = "xlnx,pinctrl-zynq";
+ 				reg = <0x700 0x200>;
 -- 
 2.4.3
