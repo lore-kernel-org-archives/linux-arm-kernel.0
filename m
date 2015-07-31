@@ -1,72 +1,41 @@
-From: aisheng.dong@freescale.com (Dong Aisheng)
-Date: Fri, 31 Jul 2015 22:55:17 +0800
-Subject: [PATCH v3 5/6] mmc: sdhci-esdhc-imx: config watermark level
- and burst length
-In-Reply-To: <1438160637-28061-6-git-send-email-haibo.chen@freescale.com>
-References: <1438160637-28061-1-git-send-email-haibo.chen@freescale.com>
- <1438160637-28061-6-git-send-email-haibo.chen@freescale.com>
-Message-ID: <20150731145516.GF27806@shlinux1.ap.freescale.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 31 Jul 2015 16:05:51 +0100
+Subject: Converting "board file" to device tree one device at a time?
+In-Reply-To: <55BB8C08.1060006@free.fr>
+References: <55BB4686.8030509@free.fr>
+ <55BB8C08.1060006@free.fr>
+Message-ID: <20150731150551.GW7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 29, 2015 at 05:03:56PM +0800, Haibo Chen wrote:
-> i.MX7D support eMMC HS400 mode, this mode can run in 8 bit,200MHZ
-> DDR mode. So the I/O speed improve a lot compare to SD3.0
+On Fri, Jul 31, 2015 at 04:54:00PM +0200, Mason wrote:
+> On 31/07/2015 11:57, Mason wrote:
 > 
-> The default burst length is 8, if we don't change this value, in
-> HS400 mode, when we do eMMC read operation, we can find that the
-> clock signal will stop for a period of time. This means the speed
-> of data moving on AHB bus is slower than I/O speed. So we should
-> improve the speed of data moving on AHB bus.
+> > Then I set a breakpoint in of_platform_serial_probe, hoping
+> > to witness the miracle... and nothing. Looks like device is
+> > never registered :-(
 > 
-> For imx7d usdhc, this patch set the burst length as 16, and set
-> watermark level as 64. The test result is the clock signal has
-> no stop during the eMMC HS400 operation. For other imx usdhc, remain
-> the default value: burst length as 8, watermark level as 16.
-> 
+> IIUC, the kernel is supposed to parse my "uart0" node, and
+> register the device. Then the platform framework should see
+> that the node's "compatible" property is equal to one
+> advertized by the of_platform_serial_driver, and the kernel
+> should #!@& call of_platform_serial_probe? Right?!
 
-Add please change patch title a bit since this patch change is actually
-for mx7d:
+No, it doesn't work like that.  The kernel creates platform devices
+from the nodes described in the DT file, which are then used to bind
+to the drivers in a very similar way to non-DT, except that if there's
+an dev->of_node pointer present, the compatible property is used.  If
+there are no devices being created from DT, drivers won't have anything
+to bind to.
 
-mmc: sdhci-esdhc-imx: change watermark level and burst length for imx7d
+> I just can't believe how much time I've been pulling my hair
+> over this trivial issue...
 
-Regards
-Dong Aisheng
+My /guess/ is that you have an .init_machine callback in place, but that
+is not calling of_platform_populate(NULL, of_default_bus_match_table,
+NULL, NULL); which means none of the DT-described devices are being
+created.
 
-> Signed-off-by: Haibo Chen <haibo.chen@freescale.com>
-> ---
->  drivers/mmc/host/sdhci-esdhc-imx.c | 11 ++++++++++-
->  1 file changed, 10 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-> index 158f93b..37d0095 100644
-> --- a/drivers/mmc/host/sdhci-esdhc-imx.c
-> +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-> @@ -239,6 +239,11 @@ static inline int is_imx6q_usdhc(struct pltfm_imx_data *data)
->  	return data->socdata == &usdhc_imx6q_data;
->  }
->  
-> +static inline int is_imx7d_usdhc(struct pltfm_imx_data *data)
-> +{
-> +	return data->socdata == &usdhc_imx7d_data;
-> +}
-> +
->  static inline int esdhc_is_usdhc(struct pltfm_imx_data *data)
->  {
->  	return !!(data->socdata->flags & ESDHC_FLAG_USDHC);
-> @@ -1145,7 +1150,11 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
->  	 * to something insane.  Change it back here.
->  	 */
->  	if (esdhc_is_usdhc(imx_data)) {
-> -		writel(0x08100810, host->ioaddr + ESDHC_WTMK_LVL);
-> +		if (is_imx7d_usdhc(imx_data))
-> +			writel(0x10401040, host->ioaddr + ESDHC_WTMK_LVL);
-> +		else
-> +			writel(0x08100810, host->ioaddr + ESDHC_WTMK_LVL);
-> +
->  		host->quirks2 |= SDHCI_QUIRK2_PRESET_VALUE_BROKEN;
->  		host->mmc->caps |= MMC_CAP_1_8V_DDR;
->  
-> -- 
-> 1.9.1
-> 
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
