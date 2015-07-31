@@ -1,60 +1,103 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 31 Jul 2015 14:08:29 +0530
-Subject: [PATCH 09/15] drivers: rtc: Drop unlikely before IS_ERR(_OR_NULL)
-In-Reply-To: <cover.1438331416.git.viresh.kumar@linaro.org>
-References: <cover.1438331416.git.viresh.kumar@linaro.org>
-Message-ID: <cdfa3fb76901fe1c4a5756e7e64cb3370cf6317a.1438331416.git.viresh.kumar@linaro.org>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Fri, 31 Jul 2015 09:44:11 +0100
+Subject: [PATCH V2 1/2] irqchip/gic: Only allow the primary GIC to set the CPU
+ map
+Message-ID: <1438332252-25248-1-git-send-email-jonathanh@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-IS_ERR(_OR_NULL) already contain an 'unlikely' compiler flag and there
-is no need to do that again from its callers. Drop it.
+The gic_init_bases() function initialises an array that stores the mapping
+between the GIC and CPUs. This array is a global array that is
+unconditionally initialised on every call to gic_init_bases(). Although,
+it is not common for there to be more than one GIC instance, there are
+some devices that do support nested GIC controllers and gic_init_bases()
+can be called more than once.
 
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+A 2nd call to gic_init_bases() will clear the previous CPU mapping and
+will only setup the mapping again for the CPU calling gic_init_bases().
+Fix this by only allowing the CPU map to be configured for the primary GIC.
+
+For secondary GICs the CPU map is not relevant because these GICs do not
+directly route the interrupts to the main CPU(s) but to other GICs or
+devices.
+
+Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
 ---
- drivers/rtc/interface.c  | 2 +-
- drivers/rtc/rtc-bfin.c   | 2 +-
- drivers/rtc/rtc-gemini.c | 2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+V2 changes:
+- Rebased on v4.2-rc4
 
-diff --git a/drivers/rtc/interface.c b/drivers/rtc/interface.c
-index 11b639067312..5836751b8203 100644
---- a/drivers/rtc/interface.c
-+++ b/drivers/rtc/interface.c
-@@ -564,7 +564,7 @@ enum hrtimer_restart rtc_pie_update_irq(struct hrtimer *timer)
- void rtc_update_irq(struct rtc_device *rtc,
- 		unsigned long num, unsigned long events)
- {
--	if (unlikely(IS_ERR_OR_NULL(rtc)))
-+	if (IS_ERR_OR_NULL(rtc))
+ drivers/irqchip/irq-gic.c | 43 +++++++++++++++++++++++++------------------
+ 1 file changed, 25 insertions(+), 18 deletions(-)
+
+diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+index 4dd88264dff5..dc5090543eca 100644
+--- a/drivers/irqchip/irq-gic.c
++++ b/drivers/irqchip/irq-gic.c
+@@ -401,19 +401,26 @@ static void gic_cpu_init(struct gic_chip_data *gic)
+ 	int i;
+ 
+ 	/*
+-	 * Get what the GIC says our CPU mask is.
++	 * Setting up the CPU map is only relevant for the primary GIC
++	 * because any nested/secondary GICs do not directly interface
++	 * with the CPU(s).
+ 	 */
+-	BUG_ON(cpu >= NR_GIC_CPU_IF);
+-	cpu_mask = gic_get_cpumask(gic);
+-	gic_cpu_map[cpu] = cpu_mask;
++	if (gic == &gic_data[0]) {
++		/*
++		 * Get what the GIC says our CPU mask is.
++		 */
++		BUG_ON(cpu >= NR_GIC_CPU_IF);
++		cpu_mask = gic_get_cpumask(gic);
++		gic_cpu_map[cpu] = cpu_mask;
+ 
+-	/*
+-	 * Clear our mask from the other map entries in case they're
+-	 * still undefined.
+-	 */
+-	for (i = 0; i < NR_GIC_CPU_IF; i++)
+-		if (i != cpu)
+-			gic_cpu_map[i] &= ~cpu_mask;
++		/*
++		 * Clear our mask from the other map entries in case they're
++		 * still undefined.
++		 */
++		for (i = 0; i < NR_GIC_CPU_IF; i++)
++			if (i != cpu)
++				gic_cpu_map[i] &= ~cpu_mask;
++	}
+ 
+ 	gic_cpu_config(dist_base, NULL);
+ 
+@@ -930,13 +937,6 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+ 	}
+ 
+ 	/*
+-	 * Initialize the CPU interface map to all CPUs.
+-	 * It will be refined as each CPU probes its ID.
+-	 */
+-	for (i = 0; i < NR_GIC_CPU_IF; i++)
+-		gic_cpu_map[i] = 0xff;
+-
+-	/*
+ 	 * Find out how many interrupts are supported.
+ 	 * The GIC only supports up to 1020 interrupt sources.
+ 	 */
+@@ -981,6 +981,13 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
  		return;
  
- 	pm_stay_awake(rtc->dev.parent);
-diff --git a/drivers/rtc/rtc-bfin.c b/drivers/rtc/rtc-bfin.c
-index 3d44b11721ea..535a5f9338d0 100644
---- a/drivers/rtc/rtc-bfin.c
-+++ b/drivers/rtc/rtc-bfin.c
-@@ -361,7 +361,7 @@ static int bfin_rtc_probe(struct platform_device *pdev)
- 	/* Register our RTC with the RTC framework */
- 	rtc->rtc_dev = devm_rtc_device_register(dev, pdev->name, &bfin_rtc_ops,
- 						THIS_MODULE);
--	if (unlikely(IS_ERR(rtc->rtc_dev)))
-+	if (IS_ERR(rtc->rtc_dev))
- 		return PTR_ERR(rtc->rtc_dev);
- 
- 	/* Grab the IRQ and init the hardware */
-diff --git a/drivers/rtc/rtc-gemini.c b/drivers/rtc/rtc-gemini.c
-index 35f4486738fc..2fed93e1114a 100644
---- a/drivers/rtc/rtc-gemini.c
-+++ b/drivers/rtc/rtc-gemini.c
-@@ -148,7 +148,7 @@ static int gemini_rtc_probe(struct platform_device *pdev)
- 
- 	rtc->rtc_dev = rtc_device_register(pdev->name, dev,
- 					   &gemini_rtc_ops, THIS_MODULE);
--	if (likely(IS_ERR(rtc->rtc_dev)))
-+	if (IS_ERR(rtc->rtc_dev))
- 		return PTR_ERR(rtc->rtc_dev);
- 
- 	return 0;
+ 	if (gic_nr == 0) {
++		/*
++		 * Initialize the CPU interface map to all CPUs.
++		 * It will be refined as each CPU probes its ID.
++		 * This is only necessary for the primary GIC.
++		 */
++		for (i = 0; i < NR_GIC_CPU_IF; i++)
++			gic_cpu_map[i] = 0xff;
+ #ifdef CONFIG_SMP
+ 		set_smp_cross_call(gic_raise_softirq);
+ 		register_cpu_notifier(&gic_cpu_notifier);
 -- 
-2.4.0
+2.1.4
