@@ -1,64 +1,34 @@
-From: aisheng.dong@freescale.com (Dong Aisheng)
-Date: Fri, 31 Jul 2015 22:57:52 +0800
-Subject: [PATCH v3 6/6] mmc: sdhci-esdhc-imx: set back the
- burst_length_enable bit to 1
-In-Reply-To: <1438160637-28061-7-git-send-email-haibo.chen@freescale.com>
-References: <1438160637-28061-1-git-send-email-haibo.chen@freescale.com>
- <1438160637-28061-7-git-send-email-haibo.chen@freescale.com>
-Message-ID: <20150731145751.GG27806@shlinux1.ap.freescale.net>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Fri, 31 Jul 2015 17:08:07 +0200
+Subject: [RFC PATCH 0/3] New Atmel PIO4 pinctrl/gpio driver
+Message-ID: <1438355290-28255-1-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 29, 2015 at 05:03:57PM +0800, Haibo Chen wrote:
-> Currently we find that if a usdhc is choosed to boot system, then ROM
-> code will set the burst length enable bit of this usdhc as 0.
-> 
-> This will make performance drop a lot if this usdhc's burst length is
-> 16. So this patch set back the burst_length_enable bit as 1, which is
-> the default value, and means burst length is enabled for INCR.
-> 
-> Signed-off-by: Haibo Chen <haibo.chen@freescale.com>
-> ---
->  drivers/mmc/host/sdhci-esdhc-imx.c | 11 +++++++++++
->  1 file changed, 11 insertions(+)
-> 
-> diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-> index 37d0095..dd945e5 100644
-> --- a/drivers/mmc/host/sdhci-esdhc-imx.c
-> +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-> @@ -32,6 +32,7 @@
->  #include "sdhci-esdhc.h"
->  
->  #define	ESDHC_CTRL_D3CD			0x08
-> +#define ESDHC_BURST_LEN_EN_INCR		(1 << 27)
->  /* VENDOR SPEC register */
->  #define ESDHC_VENDOR_SPEC		0xc0
->  #define  ESDHC_VENDOR_SPEC_SDIO_QUIRK	(1 << 1)
-> @@ -1158,6 +1159,16 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
->  		host->quirks2 |= SDHCI_QUIRK2_PRESET_VALUE_BROKEN;
->  		host->mmc->caps |= MMC_CAP_1_8V_DDR;
->  
-> +		/*
-> +		 * ROM code will change the burst_length_enable setting to
-> +		 * zero if this usdhc is choosed to boot system. Change it
-> +		 * back here, otherwise it will impact the performance a
-> +		 * lot if the burst length is 16.
+Hi,
 
-Can you clarify a bit more on why performance drops a lot if burst
-length is 16?
-Caused by the burst length setting did not work due to ROM disabled it?
+Following our discussion, I send an RFC version of my driver. RFC because it is
+not totally achieved, some cleanup and feature addition is needed.
 
-Regards
-Dong Aisheng
+At least, we could discuss about the 'core' part. I have used the pinmux
+property as Mediatek driver. Patch 3 is the internal dt files we are using.
 
-> +		 */
-> +		writel(readl(host->ioaddr + SDHCI_HOST_CONTROL)
-> +			| ESDHC_BURST_LEN_EN_INCR,
-> +			host->ioaddr + SDHCI_HOST_CONTROL);
-> +
->  		if (!(imx_data->socdata->flags & ESDHC_FLAG_HS200))
->  			host->quirks2 |= SDHCI_QUIRK2_BROKEN_HS200;
->  
-> -- 
-> 1.9.1
-> 
+Thanks for your reviews.
+
+Ludovic Desroches (3):
+  pinctrl: introduce driver for Atmel PIO4 controller
+  ARM: at91/dt: add sama5d2 pinmux
+  ARM: at91/dt: add pinctrl
+
+ arch/arm/boot/dts/at91-sama5d2_xplained.dts |  386 ++++++++++
+ arch/arm/boot/dts/sama5d2-pinfunc.h         |  760 +++++++++++++++++++
+ arch/arm/boot/dts/sama5d2.dtsi              | 1076 +++++++++++++++++++++++++++
+ drivers/pinctrl/pinctrl-at91-pio4.c         |  959 ++++++++++++++++++++++++
+ 4 files changed, 3181 insertions(+)
+ create mode 100644 arch/arm/boot/dts/at91-sama5d2_xplained.dts
+ create mode 100644 arch/arm/boot/dts/sama5d2-pinfunc.h
+ create mode 100644 arch/arm/boot/dts/sama5d2.dtsi
+ create mode 100644 drivers/pinctrl/pinctrl-at91-pio4.c
+
+-- 
+2.5.0
