@@ -1,45 +1,84 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 31 Jul 2015 16:19:42 +0200
-Subject: [linux-sunxi] [PATCH v2 1/3] ARM: dts: sun5i: Enable USB DRC on
- A10s OLinuxIno Micro
-In-Reply-To: <CAOMqctQtyBkqfTwHTNfLo+DRg9JvgAUZ0spL_gzyVw_3bsDqaw@mail.gmail.com>
-References: <1438347218-8158-1-git-send-email-hdegoede@redhat.com>
- <CAOMqctQtyBkqfTwHTNfLo+DRg9JvgAUZ0spL_gzyVw_3bsDqaw@mail.gmail.com>
-Message-ID: <55BB83FE.2010207@redhat.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Fri, 31 Jul 2015 10:20:02 -0400
+Subject: [PATCH 2/2] ARM: dts: keystone: fix dt bindings to use post div
+ register for mainpll
+In-Reply-To: <1432915453-409-2-git-send-email-m-karicheri2@ti.com>
+References: <1432915453-409-1-git-send-email-m-karicheri2@ti.com>
+ <1432915453-409-2-git-send-email-m-karicheri2@ti.com>
+Message-ID: <55BB8412.2000905@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 31-07-15 16:13, Michal Suchanek wrote:
-> Hello,
+On 05/29/2015 12:04 PM, Murali Karicheri wrote:
+> All of the keystone devices have a separate register to hold post
+> divider value for main pll clock. Currently the fixed-postdiv
+> value used for k2hk/l/e SoCs works by sheer luck as u-boot happens to
+> use a value of 2 for this. Now that we have fixed this in the pll
+> clock driver change the dt bindings for the same.
 >
-> On 31 July 2015 at 14:53, Hans de Goede <hdegoede@redhat.com> wrote:
->> Enable the otg/drc usb controller on the A10s OLinuxIno Micro.
->>
->> Note the A10s OlinuxIno Micro always has some voltage on its otg power
->> pin, even if the usb-vbus0-regulator is disabled, the leaked voltage is
->> enough to make vbus-det always report 1, so we do not use vbus-det on
->> this board.
+> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+> ---
+>   arch/arm/boot/dts/k2e-clocks.dtsi  | 5 ++---
+>   arch/arm/boot/dts/k2hk-clocks.dtsi | 5 ++---
+>   arch/arm/boot/dts/k2l-clocks.dtsi  | 5 ++---
+>   3 files changed, 6 insertions(+), 9 deletions(-)
 >
-> What board revision do you have?
-
-Rev C.
-
-> Also does this not go down when you connect a device which draws power?
-
-No it does not, the leaked power is enough to fully power some
-USB devices (but not others, where as making the Vbus enable pin
-high results in enough power for all normal USB devices).
-
-> It is useless for self-powered device detection, though :-s
+> diff --git a/arch/arm/boot/dts/k2e-clocks.dtsi b/arch/arm/boot/dts/k2e-clocks.dtsi
+> index 4773d6a..d56d68f 100644
+> --- a/arch/arm/boot/dts/k2e-clocks.dtsi
+> +++ b/arch/arm/boot/dts/k2e-clocks.dtsi
+> @@ -13,9 +13,8 @@ clocks {
+>   		#clock-cells = <0>;
+>   		compatible = "ti,keystone,main-pll-clock";
+>   		clocks = <&refclksys>;
+> -		reg = <0x02620350 4>, <0x02310110 4>;
+> -		reg-names = "control", "multiplier";
+> -		fixed-postdiv = <2>;
+> +		reg = <0x02620350 4>, <0x02310110 4>, <0x02310108 4>;
+> +		reg-names = "control", "multiplier", "post-divider";
+>   	};
 >
-> Still the Olinuxino is not battery powered normally so powering the
-> bus at all times is probably ok.
+>   	papllclk: papllclk at 2620358 {
+> diff --git a/arch/arm/boot/dts/k2hk-clocks.dtsi b/arch/arm/boot/dts/k2hk-clocks.dtsi
+> index d5adee3..af9b719 100644
+> --- a/arch/arm/boot/dts/k2hk-clocks.dtsi
+> +++ b/arch/arm/boot/dts/k2hk-clocks.dtsi
+> @@ -22,9 +22,8 @@ clocks {
+>   		#clock-cells = <0>;
+>   		compatible = "ti,keystone,main-pll-clock";
+>   		clocks = <&refclksys>;
+> -		reg = <0x02620350 4>, <0x02310110 4>;
+> -		reg-names = "control", "multiplier";
+> -		fixed-postdiv = <2>;
+> +		reg = <0x02620350 4>, <0x02310110 4>, <0x02310108 4>;
+> +		reg-names = "control", "multiplier", "post-divider";
+>   	};
+>
+>   	papllclk: papllclk at 2620358 {
+> diff --git a/arch/arm/boot/dts/k2l-clocks.dtsi b/arch/arm/boot/dts/k2l-clocks.dtsi
+> index eb1e3e2..ef8464b 100644
+> --- a/arch/arm/boot/dts/k2l-clocks.dtsi
+> +++ b/arch/arm/boot/dts/k2l-clocks.dtsi
+> @@ -22,9 +22,8 @@ clocks {
+>   		#clock-cells = <0>;
+>   		compatible = "ti,keystone,main-pll-clock";
+>   		clocks = <&refclksys>;
+> -		reg = <0x02620350 4>, <0x02310110 4>;
+> -		reg-names = "control", "multiplier";
+> -		fixed-postdiv = <2>;
+> +		reg = <0x02620350 4>, <0x02310110 4>, <0x02310108 4>;
+> +		reg-names = "control", "multiplier", "post-divider";
+>   	};
+>
+>   	papllclk: papllclk at 2620358 {
+>
+Santosh,
 
-We are note enabling the regulator there is simply some way for 5V
-DC to get to the otg connector even with the regulator disabled.
+The clk driver update is already merged to v4.2-rc. Could you send this 
+DT update as well for 4.2-rc?
 
-Regards,
+Murali
 
-Hans
+-- 
+Murali Karicheri
+Linux Kernel, Keystone
