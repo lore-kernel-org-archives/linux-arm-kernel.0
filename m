@@ -1,165 +1,58 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 31 Jul 2015 14:45:52 +0200
-Subject: [linux-sunxi] Re: [PATCH 5/5] ARM: dts: sun7i: Add dts file for
- Wits Pro A20 DKT
-In-Reply-To: <CAGb2v65TEogqYFAfen1VnOaiepvez5t8Oh+Q=OYsRS_aZUMO3A@mail.gmail.com>
-References: <1438333194-21181-1-git-send-email-hdegoede@redhat.com>
- <1438333194-21181-6-git-send-email-hdegoede@redhat.com>
- <20150731102028.GE2564@lukather>
- <CAGb2v65TEogqYFAfen1VnOaiepvez5t8Oh+Q=OYsRS_aZUMO3A@mail.gmail.com>
-Message-ID: <55BB6E00.9090202@redhat.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 31 Jul 2015 13:53:03 +0100
+Subject: [RFC] arm64: defconfig: enable 48-bit VA by default
+In-Reply-To: <CAKv+Gu-G9Vpmt_c84OsG0JNRKopJ44uneJaAEpY3AMq6oS-Qdg@mail.gmail.com>
+References: <CY1PR0301MB07488D6DC5F0B171D6B290E187830@CY1PR0301MB0748.namprd03.prod.outlook.com>
+ <55B0E1AD.60409@arm.com>
+ <BY2PR0301MB0743CBCFC5476E39A5D1EC0B878C0@BY2PR0301MB0743.namprd03.prod.outlook.com>
+ <CAKv+Gu9LHBd7wM6P4H0X5WigzDETtpr2++_Ebo=adg5QtTOW2w@mail.gmail.com>
+ <BY2PR0301MB074300C5F31701D9211827F0878C0@BY2PR0301MB0743.namprd03.prod.outlook.com>
+ <20150730101358.GA30796@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu-G9Vpmt_c84OsG0JNRKopJ44uneJaAEpY3AMq6oS-Qdg@mail.gmail.com>
+Message-ID: <20150731125303.GO407@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Jul 30, 2015 at 09:27:03PM +0200, Ard Biesheuvel wrote:
+> On 30 July 2015 at 12:13, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > On Wed, Jul 29, 2015 at 08:49:57PM +0000, Stuart Yoder wrote:
+> >> > From: Ard Biesheuvel [mailto:ard.biesheuvel at linaro.org]
+> [...]
+> >> > To be honest, I think this is poorly designed, and I am not sure we
+> >> > should cater for such configurations in the defconfig.
+> >>
+> >> Agree, if this is a one-off weird platform then we shouldn't.
+> >>
+> >> But, the 'Principles of ARM Memory Maps' doc proposes this:
+> >> 2 GB at 0x8000_0000
+> >> 30 GB at 0x8_8000_0000
+> >> 480 GB at 0x88_0000_0000
+> >
+> > I'm not particularly recommending this layout, at least not without some
+> > clarifications on DRAM aliases (I'll ping people internally about it
+> > again). The original layout pre-dates ARMv8, it was meant for ARMv7/LPAE
+> > and all the memory beyond 32-bit was highmem anyway. It was later
+> > updated for AArch64 but only to allow 44/48-bit PA (a few sections
+> > added).
+> 
+> As an aside, is there any reason why the direct mapping *must* be a
+> linear mapping?
+> Other than the performance concerns regarding
+> phys_to_virt/virt_to_phys, I mean?
 
-On 31-07-15 12:25, Chen-Yu Tsai wrote:
-> On Fri, Jul 31, 2015 at 6:20 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
->> On Fri, Jul 31, 2015 at 10:59:54AM +0200, Hans de Goede wrote:
->>> From: Jelle de Jong <jelledejong@powercraft.nl>
->>>
->>> The Wits Pro A20 DKT is an A20 Development KiT with 1G RAM, 4G NAND,
->>> sdio wifi, 1Gbit ethernet, 1024x768 lcd screen with ft5x_ts touchscreen
->>> and a ton of IO connectors.
->>>
->>> Note there seem to be multiple sdcard slots on the board (4 in total), but
->>> other then mmc0 none of these are hooked up by default, there is a ton of
->>> dip-switches which likely allow hooking some of these up, but the
->>> documentation of the board only describes the use of a fraction of them,
->>> so for now we only support mmc0.
->>>
->>> Signed-off-by: Jelle de Jong <jelledejong@powercraft.nl>
->>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->>> ---
->>> Also see: http://www.merrii.com/en/pla_d.asp?id=163
->>> ---
->>>   arch/arm/boot/dts/Makefile                       |   3 +-
->>>   arch/arm/boot/dts/sun7i-a20-wits-pro-a20-dkt.dts | 209 +++++++++++++++++++++++
->>>   2 files changed, 211 insertions(+), 1 deletion(-)
->>>   create mode 100644 arch/arm/boot/dts/sun7i-a20-wits-pro-a20-dkt.dts
->>>
->>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->>> index f830e1f..151a413 100644
->>> --- a/arch/arm/boot/dts/Makefile
->>> +++ b/arch/arm/boot/dts/Makefile
->>> @@ -595,7 +595,8 @@ dtb-$(CONFIG_MACH_SUN7I) += \
->>>        sun7i-a20-orangepi-mini.dtb \
->>>        sun7i-a20-pcduino3.dtb \
->>>        sun7i-a20-pcduino3-nano.dtb \
->>> -     sun7i-a20-wexler-tab7200.dtb
->>> +     sun7i-a20-wexler-tab7200.dtb \
->>> +        sun7i-a20-wits-pro-a20-dkt.dtb
->>
->> The indentation is off.
->>
->>>   dtb-$(CONFIG_MACH_SUN8I) += \
->>>        sun8i-a23-evb.dtb \
->>>        sun8i-a23-ippo-q8h-v5.dtb \
->>> diff --git a/arch/arm/boot/dts/sun7i-a20-wits-pro-a20-dkt.dts b/arch/arm/boot/dts/sun7i-a20-wits-pro-a20-dkt.dts
->>> new file mode 100644
->>> index 0000000..db4d32c
->>> --- /dev/null
->>> +++ b/arch/arm/boot/dts/sun7i-a20-wits-pro-a20-dkt.dts
->>> @@ -0,0 +1,209 @@
->>> +/*
->>> + * Copyright 2015 Jelle de Jong <jelledejong@powercraft.nl>
->>> + *
->>> + * This file is dual-licensed: you can use it either under the terms
->>> + * of the GPL or the X11 license, at your option. Note that this dual
->>> + * licensing only applies to this file, and not this project as a
->>> + * whole.
->>> + *
->>> + *  a) This file is free software; you can redistribute it and/or
->>> + *     modify it under the terms of the GNU General Public License as
->>> + *     published by the Free Software Foundation; either version 2 of the
->>> + *     License, or (at your option) any later version.
->>> + *
->>> + *     This file is distributed in the hope that it will be useful,
->>> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
->>> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->>> + *     GNU General Public License for more details.
->>> + *
->>> + * Or, alternatively,
->>> + *
->>> + *  b) Permission is hereby granted, free of charge, to any person
->>> + *     obtaining a copy of this software and associated documentation
->>> + *     files (the "Software"), to deal in the Software without
->>> + *     restriction, including without limitation the rights to use,
->>> + *     copy, modify, merge, publish, distribute, sublicense, and/or
->>> + *     sell copies of the Software, and to permit persons to whom the
->>> + *     Software is furnished to do so, subject to the following
->>> + *     conditions:
->>> + *
->>> + *     The above copyright notice and this permission notice shall be
->>> + *     included in all copies or substantial portions of the Software.
->>> + *
->>> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
->>> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
->>> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
->>> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
->>> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
->>> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
->>> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
->>> + *     OTHER DEALINGS IN THE SOFTWARE.
->>> + */
->>> +
->>> +/dts-v1/;
->>> +#include "sun7i-a20.dtsi"
->>> +#include "sunxi-common-regulators.dtsi"
->>> +
->>> +#include <dt-bindings/gpio/gpio.h>
->>> +#include <dt-bindings/input/input.h>
->>> +#include <dt-bindings/interrupt-controller/irq.h>
->>> +
->>> +/ {
->>> +     model = "Wits Pro A20 DKT";
->>> +     compatible = "wits,pro-a20-dkt", "allwinner,sun7i-a20";
->>> +
->>> +     aliases {
->>> +             serial0 = &uart0;
->>> +     };
->>> +
->>> +     chosen {
->>> +             stdout-path = "serial0:115200n8";
->>> +     };
->>> +
->>> +     reg_vmmc3: vmmc3 {
->>> +             compatible = "regulator-fixed";
->>> +             pinctrl-names = "default";
->>> +             pinctrl-0 = <&vmmc3_pin_ap6xxx_wl_regon>;
->>> +             regulator-name = "vmmc3";
->>> +             regulator-min-microvolt = <3300000>;
->>> +             regulator-max-microvolt = <3300000>;
->>> +             enable-active-high;
->>> +             gpio = <&pio 7 9 GPIO_ACTIVE_HIGH>; /* PH9 */
->>> +     };
->>
->> It's not really vmmc. The reg_on stuff is actually more of a reset
->> line: when tied to VCC, the WLAN part of the chip and its regulators
->> are enabled, while when it's tied to ground, the WLAN is in reset, and
->> the internal regulators disabled.
->>
->> So it can be seen as either an active-low reset line, or an
->> active-high regulator for the WiFi part, but VMMC is the power line of
->> the MMC bus itself, which usually is provided by a regulator through
->> the pin 22 of the AP6210, usually tied directly to the 3.3V line.
->>
->> So you actually have two regulators here: one for vmmc (reg_3v3), and
->> one for reg_on which is the one that you just defined.
->>
->> Note that it's a bit of a pain for now to support such cases, as
->> there's nothing to tie something from the DT to an SDIO device. I
->> don't have a better solution than marking it always-on at the moment,
->> with a big FIXME comment on top... :/
->
-> One could use the mmc-pwr-seq stuff. I don't know if it has been
-> extended for multiple GPIOs, not that you would need it in this use
-> case.
+Mostly performance concerns. You could compact the physical range into a
+smaller virtual one but the conversion will be costly, especially if you
+want to make it multi-platform (having to look-up memory ranges,
+memblock offsets). This would affect page table entry setup, code that
+requires a page structure (like virt_to_page) and anything else doing
+the virt/phys conversion.
 
-Yes the mmc-pwr-seq stuff seems to be the right thing to use for this,
-I'll try to get that to work and post a new version of this patch.
+I tried something like that for RealView PBX in the past but it was
+hard-coded (no multi-platform at the time). See
+arch/arm/mach-realview/include/mach/memory.h.
 
-Regards,
+As for the mem_map array, on arm64 we have enough VA space available
+(with vmemmap it takes a few GB to cover a 512GB RAM space).
 
-Hans
+-- 
+Catalin
