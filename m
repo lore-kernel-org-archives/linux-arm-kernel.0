@@ -1,136 +1,98 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Thu, 30 Jul 2015 13:37:18 +0200
-Subject: [PATCH v3 1/2] mmc: sdhci: fix abort due to missing runtime PM
-In-Reply-To: <1432192504-3601-1-git-send-email-stefan@agner.ch>
-References: <1432192504-3601-1-git-send-email-stefan@agner.ch>
-Message-ID: <f2ab27135652e987ba9bf3b152e9652d@agner.ch>
+Date: Fri, 31 Jul 2015 18:52:56 +0200
+Subject: [PATCH v9 0/5] mtd: nand: vf610_nfc: Freescale NFC for VF610
+Message-ID: <1438361581-2702-1-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
+The ninth revision fixes 16-Bit NAND flash support.
 
-What is the status on that?
+More information and the full test log of earlier patchset version
+can be found in the cover letter of the last revision v6:
+http://thread.gmane.org/gmane.linux.kernel/1979868
 
---
-Stefan
+Changes since v8:
+- Fix 16-Bit NAND flash support by splitting up initialization
+  (introduce vf610_nfc_preinit_controller)
+- Updated comments in initialziation functions
 
-On 2015-05-21 09:15, Stefan Agner wrote:
-> When using i.MX ESDHC driver, while entering suspend while the device
-> is in runtime PM, the sdhci_(suspend|resume)_host function are called
-> with disabled clocks. Since this functions access the SDHC host
-> registers, this leads to an external abort on Vybrid SoC:
-> 
-> [   37.772967] Unhandled fault: imprecise external abort (0x1c06) at 0x76f5f000
-> [   37.780304] Internal error: : 1c06 [#1] ARM
-> [   37.784670] Modules linked in:
-> [   37.787908] CPU: 0 PID: 428 Comm: sh Not tainted
-> 3.18.0-rc5-00119-geefd097-dirty #1540
-> [   37.796142] task: 8e246c00 ti: 8ca6c000 task.ti: 8ca6c000
-> [   37.801785] PC is at esdhc_writel_le+0x40/0xec
-> [   37.806431] LR is at sdhci_set_card_detection+0xe0/0xe4
-> [   37.811877] pc : [<803f0584>]    lr : [<803eaaa0>]    psr: 400f0013
-> [   37.811877] sp : 8ca6dd28  ip : 00000001  fp : 8ca6dd3c
-> [   37.823766] r10: 807a233c  r9 : 00000000  r8 : 8e8b7210
-> [   37.829194] r7 : 802d8a08  r6 : 8082e928  r5 : 00000000  r4 : 00000002
-> [   37.835974] r3 : 8ea34e90  r2 : 00000038  r1 : 00000000  r0 : 8ea32ac0
-> ...
-> 
-> Clocks need to be enabled to access the registers. Fix the issue by
-> add runtime PM enabled pltfm implementation of suspend/resume which
-> take care of clocks by using the runtime PM API properly.
-> 
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> ---
-> Changes since v2:
-> - Implement a generic pltfm suspend/resume function instead of a local
->   function in sdhci-esdhc-imx.c
-> - Convert sdhci-pxav3 to use the runtime PM enabled pltfm suspend/resume
->   function too
-> 
->  drivers/mmc/host/sdhci-esdhc-imx.c |  2 +-
->  drivers/mmc/host/sdhci-pltfm.c     | 36 ++++++++++++++++++++++++++++++++++++
->  drivers/mmc/host/sdhci-pltfm.h     |  2 ++
->  3 files changed, 39 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c
-> b/drivers/mmc/host/sdhci-esdhc-imx.c
-> index 82f512d..7b7b3a3 100644
-> --- a/drivers/mmc/host/sdhci-esdhc-imx.c
-> +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-> @@ -1132,7 +1132,7 @@ static int sdhci_esdhc_runtime_resume(struct device *dev)
->  #endif
->  
->  static const struct dev_pm_ops sdhci_esdhc_pmops = {
-> -	SET_SYSTEM_SLEEP_PM_OPS(sdhci_pltfm_suspend, sdhci_pltfm_resume)
-> +	SET_SYSTEM_SLEEP_PM_OPS(sdhci_pltfm_rpm_suspend, sdhci_pltfm_rpm_resume)
->  	SET_RUNTIME_PM_OPS(sdhci_esdhc_runtime_suspend,
->  				sdhci_esdhc_runtime_resume, NULL)
->  };
-> diff --git a/drivers/mmc/host/sdhci-pltfm.c b/drivers/mmc/host/sdhci-pltfm.c
-> index a207f5a..38c03cd 100644
-> --- a/drivers/mmc/host/sdhci-pltfm.c
-> +++ b/drivers/mmc/host/sdhci-pltfm.c
-> @@ -31,6 +31,7 @@
->  #include <linux/err.h>
->  #include <linux/module.h>
->  #include <linux/of.h>
-> +#include <linux/pm_runtime.h>
->  #ifdef CONFIG_PPC
->  #include <asm/machdep.h>
->  #endif
-> @@ -256,6 +257,41 @@ const struct dev_pm_ops sdhci_pltfm_pmops = {
->  	.resume		= sdhci_pltfm_resume,
->  };
->  EXPORT_SYMBOL_GPL(sdhci_pltfm_pmops);
-> +
-> +int sdhci_pltfm_rpm_suspend(struct device *dev)
-> +{
-> +	int ret;
-> +	struct sdhci_host *host = dev_get_drvdata(dev);
-> +
-> +	pm_runtime_get_sync(dev);
-> +	ret = sdhci_suspend_host(host);
-> +	pm_runtime_mark_last_busy(dev);
-> +	pm_runtime_put_autosuspend(dev);
-> +	if (ret)
-> +		return ret;
-> +
-> +	return pm_runtime_force_suspend(dev);
-> +}
-> +EXPORT_SYMBOL_GPL(sdhci_pltfm_rpm_suspend);
-> +
-> +int sdhci_pltfm_rpm_resume(struct device *dev)
-> +{
-> +	int ret;
-> +	struct sdhci_host *host = dev_get_drvdata(dev);
-> +
-> +	ret = pm_runtime_force_resume(dev);
-> +
-> +	if (ret)
-> +		return ret;
-> +
-> +	pm_runtime_get_sync(dev);
-> +	ret = sdhci_resume_host(host);
-> +	pm_runtime_mark_last_busy(dev);
-> +	pm_runtime_put_autosuspend(dev);
-> +
-> +	return ret;
-> +}
-> +EXPORT_SYMBOL_GPL(sdhci_pltfm_rpm_resume);
->  #endif	/* CONFIG_PM */
->  
->  static int __init sdhci_pltfm_drv_init(void)
-> diff --git a/drivers/mmc/host/sdhci-pltfm.h b/drivers/mmc/host/sdhci-pltfm.h
-> index 04bc248..ac5f6ea 100644
-> --- a/drivers/mmc/host/sdhci-pltfm.h
-> +++ b/drivers/mmc/host/sdhci-pltfm.h
-> @@ -114,6 +114,8 @@ static inline void *sdhci_pltfm_priv(struct
-> sdhci_pltfm_host *host)
->  extern int sdhci_pltfm_suspend(struct device *dev);
->  extern int sdhci_pltfm_resume(struct device *dev);
->  extern const struct dev_pm_ops sdhci_pltfm_pmops;
-> +extern int sdhci_pltfm_rpm_suspend(struct device *dev);
-> +extern int sdhci_pltfm_rpm_resume(struct device *dev);
->  #define SDHCI_PLTFM_PMOPS (&sdhci_pltfm_pmops)
->  #else
->  #define SDHCI_PLTFM_PMOPS NULL
+Changes since v7:
+- vf610-twr.dts: Moved NFC pinmux into the existing iomuxc node
+  and sort new nfc node behind the existing iomuxc node as well.
+- vf610-twr.dts/vf-colibri.dtsi: Dropped _1 suffixes
+
+Changes since v6:
+- Rebased ontop of l2-mtd/master (v4.2-rc1 based)
+- Removed HAVE_NAND_VF610_NFC and use depends on. This made
+  "[PATCH v6 4/6] ARM: vf610: enable NAND Flash Controller" unnecessary
+
+Changes since v5:
+- Removed fsl,mpc5125-nfc compatible string
+- Removed readl/writel_relaxed
+- Change interface of vf610_nfc_transfer_size to match other accessors
+
+Changes since v4:
+- Rebased ontop of l2-mtd/master (v4.1-rc4 based)
+- Eliminate unnecessary page read (NAND_CMD_SEQIN) since the driver does
+  not support sub-page writes anyway (improves write performance)
+- Support ONFI by enabling READID command with offset and parameter page
+  reads (CMD_PARAM)
+- Change to dedicated read_page/write_page function, enables raw writes
+- Use __LITTLE_ENDIAN to distingush between LE/BE relevant statements
+- Eliminated vf610_nfc_probe_dt in favor of common DT init code
+- Use wait_for_completion_timeout
+- Some style fixes (spaces, etc.)
+
+Changes since v3:
+- Make the driver selectable when COMPILE_TEST is set
+- Fix compile error due to superfluous ECC_STATUS configuration in initial
+  patch (without ECC correction ECC_STATUS does not need to be configured)
+- Remove custom BBT pattern and switch to in-band BBT in the initial patch
+- Include two bug fixes, for details see the corresponding U-Boot patches:
+  http://thread.gmane.org/gmane.comp.boot-loaders.u-boot/215802
+
+Changes since v2:
+- Updated binding documentation
+
+Changes since v1:
+- Nest nfc_config struct within the main nfc struct
+- Use assigned clock binding to specify NFC clock
+- Rebased ontop of MSCM IR patchset (driver parts have been merged)
+- Split out arch Kconfig in a separate config
+- Fix module license
+- Updated MAINTAINERS
+
+Changes since RFC (Bill Pringlemeir):
+- Renamed driver from fsl_nfc to vf610_nfc
+- Use readl/writel for all register in accessor functions
+- Optimized field accessor functions
+- Implemented PM (suspend/resume) functions
+- Implemented basic support for ECC strength/ECC step size from dt
+- Improved performance of count_written_bits by using hweight32
+- Support ECC with 60-bytes to correct up to 32 bit errors
+- Changed to in-band BBT (NAND_BBT_NO_OOB) which also allows ECC modes
+  which uses up to 60 bytes on 64 byte OOB
+- Removed custom (downstream) BBT pattern since BBT table won't be
+  compatible anyway (due to the change above)
+
+Stefan Agner (5):
+  mtd: nand: vf610_nfc: Freescale NFC for VF610, MPC5125 and others
+  mtd: nand: vf610_nfc: add hardware BCH-ECC support
+  mtd: nand: vf610_nfc: add device tree bindings
+  ARM: dts: vf610twr: add NAND flash controller peripherial
+  ARM: dts: vf-colibri: enable NAND flash controller
+
+ .../devicetree/bindings/mtd/vf610-nfc.txt          |  45 ++
+ MAINTAINERS                                        |   6 +
+ arch/arm/boot/dts/vf-colibri.dtsi                  |  32 +
+ arch/arm/boot/dts/vf610-twr.dts                    |  40 +
+ arch/arm/boot/dts/vfxxx.dtsi                       |   8 +
+ drivers/mtd/nand/Kconfig                           |  11 +
+ drivers/mtd/nand/Makefile                          |   1 +
+ drivers/mtd/nand/vf610_nfc.c                       | 843 +++++++++++++++++++++
+ 8 files changed, 986 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mtd/vf610-nfc.txt
+ create mode 100644 drivers/mtd/nand/vf610_nfc.c
+
+-- 
+2.4.5
