@@ -1,80 +1,27 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Fri, 31 Jul 2015 12:49:44 +0200
-Subject: [PATCH 9/9] gpiolib: Add gpio name information to
- /sys/kernel/debug/gpio
-In-Reply-To: <20150731085407.GO28535@localhost>
-References: <1437125570-28623-1-git-send-email-mpa@pengutronix.de>
- <1437125570-28623-10-git-send-email-mpa@pengutronix.de>
- <20150728095842.GO28535@localhost> <20150729070842.GG30895@pengutronix.de>
- <20150731085407.GO28535@localhost>
-Message-ID: <1438339784.20618.21.camel@pengutronix.de>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 31 Jul 2015 12:51:37 +0200
+Subject: [PATCH] i2c: core: only use set_scl for bus recovery after
+ calling prepare_recovery
+In-Reply-To: <1436366106-11779-1-git-send-email-jlu@pengutronix.de>
+References: <1436366106-11779-1-git-send-email-jlu@pengutronix.de>
+Message-ID: <20150731105137.GG1522@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, den 31.07.2015, 10:54 +0200 schrieb Johan Hovold:
-> On Wed, Jul 29, 2015 at 09:08:42AM +0200, Markus Pargmann wrote:
-> > On Tue, Jul 28, 2015 at 11:58:42AM +0200, Johan Hovold wrote:
-> > > On Fri, Jul 17, 2015 at 11:32:50AM +0200, Markus Pargmann wrote:
-> > > > Add some information about gpio names to the debugfs gpio file. name and
-> > > > label of a GPIO are then displayed next to each other. This way it is
-> > > > easy to see what the real name of GPIO is and what the driver requested
-> > > > it for.
-> > > > 
-> > > > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> > > > ---
-> > > >  drivers/gpio/gpiolib.c | 11 ++++++++---
-> > > >  1 file changed, 8 insertions(+), 3 deletions(-)
-> > > > 
-> > > > diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
-> > > > index dcac3bcf21dd..0f1d1f5faf5d 100644
-> > > > --- a/drivers/gpio/gpiolib.c
-> > > > +++ b/drivers/gpio/gpiolib.c
-> > > > @@ -2308,14 +2308,19 @@ static void gpiolib_dbg_show(struct seq_file *s, struct gpio_chip *chip)
-> > > >  	int			is_irq;
-> > > >  
-> > > >  	for (i = 0; i < chip->ngpio; i++, gpio++, gdesc++) {
-> > > > -		if (!test_bit(FLAG_REQUESTED, &gdesc->flags))
-> > > > +		if (!test_bit(FLAG_REQUESTED, &gdesc->flags)) {
-> > > > +			if (gdesc->name) {
-> > > > +				seq_printf(s, " gpio-%-3d (%-20.20s)\n",
-> > > > +					   gpio, gdesc->name);
-> > > > +			}
-> > > 
-> > > So now we'd no longer just be listing requested gpios, but on a similar
-> > > format to how requested ones used to be represented.
-> > 
-> > Better suggestions on how to display those extra information in debugfs?
+On Wed, Jul 08, 2015 at 04:35:06PM +0200, Jan Luebbe wrote:
+> Using set_scl may be ineffective before calling the driver specific
+> prepare_recovery callback, which might change into a test mode. So
+> instead of setting SCL in i2c_generic_scl_recovery, move it to
+> i2c_generic_recovery (after the optional prepare_recovery).
 > 
-> Perhaps a new file only listing the line names.
-> 
-> > > Then there's the debugfs as ABI discussion...
-> > 
-> > I didn't consider debugfs as ABI as I thought it is just for debugging
-> > purposes?
-> 
-> Some people seem to have expressed a different position:
-> 
-> 	"The fact that something is documented (whether correctly or
->         not) has absolutely _zero_ impact on anything at all. What makes
->         something an ABI is that it's useful and available. The only way
->         something isn't an ABI is by _explicitly_ making sure that it's
->         not available even by mistake in a stable form for binary use.
-> 
->         Example: kernel internal data structures and function calls. We
->         make sure that you simply _cannot_ make a binary that works
->         across kernel versions. That is the only way for an ABI to not
->         form."
-> 
->         https://lwn.net/Articles/309298/
+> Signed-off-by: Jan Luebbe <jlu@pengutronix.de>
 
-Assuming debugfs is ABI is completely backwards. debugfs makes no ABI
-guarantees, that's why stuff that needs a stable ABI like tracing is
-actively moving out of debugfs into other places, where ABI stability
-can be assumed.
+Applied to for-current, thanks!
 
-Regards,
-Lucas 
-
--- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150731/77823461/attachment-0001.sig>
