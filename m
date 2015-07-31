@@ -1,58 +1,26 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 31 Jul 2015 20:59:58 +0530
-Subject: [PATCH 01/17] mmc: host: omap_hsmmc: use
- devm_regulator_get_optional() for vmmc
-In-Reply-To: <55B8C265.1050801@ti.com>
-References: <1438168187-1614-1-git-send-email-kishon@ti.com>
- <1438168187-1614-2-git-send-email-kishon@ti.com> <55B8C265.1050801@ti.com>
-Message-ID: <55BB9476.7070105@ti.com>
+From: santosh.shilimkar@oracle.com (santosh shilimkar)
+Date: Fri, 31 Jul 2015 08:30:03 -0700
+Subject: [PATCH 2/2] ARM: dts: keystone: fix dt bindings to use post div
+ register for mainpll
+In-Reply-To: <1432915453-409-2-git-send-email-m-karicheri2@ti.com>
+References: <1432915453-409-1-git-send-email-m-karicheri2@ti.com>
+ <1432915453-409-2-git-send-email-m-karicheri2@ti.com>
+Message-ID: <55BB947B.7090608@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grygorii,
+Olof,
 
-On Wednesday 29 July 2015 05:39 PM, Grygorii Strashko wrote:
-> On 07/29/2015 02:09 PM, Kishon Vijay Abraham I wrote:
->> Since vmmc can be optional for some platforms, use
->> devm_regulator_get_optional() for vmmc. Now return error only
->> in the case of -EPROBE_DEFER and for all other cases set
->> host->vcc to NULL.
->>
->> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
->> ---
->>   drivers/mmc/host/omap_hsmmc.c |    8 +++++---
->>   1 file changed, 5 insertions(+), 3 deletions(-)
->>
->> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
->> index 4d12032..b673e59 100644
->> --- a/drivers/mmc/host/omap_hsmmc.c
->> +++ b/drivers/mmc/host/omap_hsmmc.c
->> @@ -344,11 +344,13 @@ static int omap_hsmmc_reg_get(struct omap_hsmmc_host *host)
->>   	struct regulator *reg;
->>   	int ocr_value = 0;
->>   
->> -	reg = devm_regulator_get(host->dev, "vmmc");
->> +	reg = devm_regulator_get_optional(host->dev, "vmmc");
->>   	if (IS_ERR(reg)) {
->> -		dev_err(host->dev, "unable to get vmmc regulator %ld\n",
->> +		if (PTR_ERR(reg) == -EPROBE_DEFER)
->> +			return -EPROBE_DEFER;
->> +		host->vcc = NULL;
->> +		dev_dbg(host->dev, "unable to get vmmc regulator %ld\n",
->>   			PTR_ERR(reg));
->> -		return PTR_ERR(reg);
-> 
-> I think, It could be unsafe to just drop this return.
-> regulator_get_optional may return:
-> 1 valid pointer on regulator : success;
-> 2 ERR_PTR(-ENODEV)           : regulator is not assigned, can proceed.
-> 3 ERR_PTR(-EPROBE_DEFER)     : regulator is assigned, but not ready yet, retry.
-> 4 ERR_PTR(<other error codes>: regulator is assigned, but can't be retrieved, failure, can't proceed
-> 
-> So, It's allowed to continue with host->vcc = NULL; only in case [2], while
-> in case [4] probe should fail.
+As discussed patch 1/2 is already made it via clock tree. Please
+pick the subject fix for your upcoming fixes pull request.
 
-You are right. Will fix it and resend the patch.
-
-Thanks
-Kishon
+On 5/29/2015 9:04 AM, Murali Karicheri wrote:
+> All of the keystone devices have a separate register to hold post
+> divider value for main pll clock. Currently the fixed-postdiv
+> value used for k2hk/l/e SoCs works by sheer luck as u-boot happens to
+> use a value of 2 for this. Now that we have fixed this in the pll
+> clock driver change the dt bindings for the same.
+>
+> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+> ---
+Acked-by: Santosh Shilimkar <ssantosh@kernel.org>
