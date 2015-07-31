@@ -1,56 +1,62 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 31 Jul 2015 11:16:35 +0200
-Subject: [GIT PULL] ARM: mvebu: soc changes for v4.3
-Message-ID: <55BB3CF3.7050000@free-electrons.com>
+From: panand@redhat.com (Pratyush Anand)
+Date: Fri, 31 Jul 2015 14:51:02 +0530
+Subject: [PATCH] arm64:ftrace: add save_stack_trace_regs()
+Message-ID: <1e8882680fd875de22db27c897727d0466a7e2e0.1438333085.git.panand@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Implement save_stack_trace_regs, so that stacktrace of a kprobe events can be
+obtained.
 
-Here is the first pull request for soc change for mvebu for v4.3
+Signed-off-by: Pratyush Anand <panand@redhat.com>
+---
+Function will be useful only after having ARM64 kprobes upstreamed.
+However, since there is no dependency in applying the patch, so it may be
+upstreamed independently (if there is no other review comment).
 
-Gregory
+I see following stack trace for kfree with this patch in one of the case.
 
-The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
+echo stacktrace > /sys/kernel/debug/tracing/trace_options
+echo "p kfree" >> /sys/kernel/debug/tracing/kprobe_events
+echo 1 > /sys/kernel/debug/tracing/events/kprobes/enable
+more /sys/kernel/debug/tracing/trace
+            bash-3868  [001] d...  2863.068271: p_kfree_0: (kfree+0x0/0x194)
+            bash-3868  [001] d...  2863.068276: <stack trace>
+ => kfree
+ => syscall_trace_exit
+ => __sys_trace_return_skipped
 
-  Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
+ arch/arm64/kernel/stacktrace.c | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
-are available in the git repository at:
-
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-soc-4.3-1
-
-for you to fetch changes up to 482d638f98cc626bf01d4c9f6d6d35fc77d630c8:
-
-  ARM: mvebu: Warn about the wake-up sources not taken into account in suspend (2015-07-28 11:40:47 +0200)
-
-----------------------------------------------------------------
-mvebu soc changes for v4.3 (part #1)
-
-- Extend suspend to RAM support in order to add new mvebu SoC
-- Add standby support for all Armada 3xx/XP SoCs
-
-----------------------------------------------------------------
-Gregory CLEMENT (3):
-      ARM: mvebu: Use __init for the PM initialization functions
-      ARM: mvebu: Add standby support
-      ARM: mvebu: Warn about the wake-up sources not taken into account in suspend
-
-Nadav Haklai (1):
-      ARM: mvebu: prepare set_cpu_coherent() for future extension
-
-Thomas Petazzoni (3):
-      ARM: mvebu: do not check machine in mvebu_pm_init()
-      ARM: mvebu: prepare mvebu_pm_store_bootinfo() to support multiple SoCs
-      ARM: mvebu: prepare pm-board.c for the introduction of Armada 38x support
-
- arch/arm/mach-mvebu/coherency.c | 29 +++++++++++++++++------------
- arch/arm/mach-mvebu/common.h    |  4 ++--
- arch/arm/mach-mvebu/pm-board.c  | 30 +++++++++++++++++++-----------
- arch/arm/mach-mvebu/pm.c        | 79 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++--------------
- 4 files changed, 103 insertions(+), 39 deletions(-)
-
+diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
+index 407991bf79f5..c7fa0431ef3e 100644
+--- a/arch/arm64/kernel/stacktrace.c
++++ b/arch/arm64/kernel/stacktrace.c
+@@ -97,6 +97,24 @@ static int save_trace(struct stackframe *frame, void *d)
+ 	return trace->nr_entries >= trace->max_entries;
+ }
+ 
++void save_stack_trace_regs(struct pt_regs *regs, struct stack_trace *trace)
++{
++	struct stack_trace_data data;
++	struct stackframe frame;
++
++	data.trace = trace;
++	data.skip = trace->skip;
++	data.no_sched_functions = 0;
++
++	frame.fp = regs->regs[29];
++	frame.sp = regs->sp;
++	frame.pc = regs->pc;
++
++	walk_stackframe(&frame, save_trace, &data);
++	if (trace->nr_entries < trace->max_entries)
++		trace->entries[trace->nr_entries++] = ULONG_MAX;
++}
++
+ void save_stack_trace_tsk(struct task_struct *tsk, struct stack_trace *trace)
+ {
+ 	struct stack_trace_data data;
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+2.4.3
