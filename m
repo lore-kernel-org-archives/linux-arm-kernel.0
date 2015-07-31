@@ -1,27 +1,45 @@
-From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Mon, 31 Aug 2015 22:06:44 -0700
-Subject: [PATCH 3/3] soc: qcom: smd: Handle big endian CPUs
-In-Reply-To: <1441071594-15941-4-git-send-email-sboyd@codeaurora.org>
-References: <1441071594-15941-1-git-send-email-sboyd@codeaurora.org>
- <1441071594-15941-4-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20150901050644.GD13472@usrtlx11787.corpusers.net>
+From: net147@gmail.com (Jonathan Liu)
+Date: Sat, 01 Aug 2015 00:23:19 +1000
+Subject: [linux-sunxi] [PATCH v5 2/7] phy-sun4i-usb: Add extcon support
+ for the otg phy (phy0)
+In-Reply-To: <1434199071-22127-3-git-send-email-hdegoede@redhat.com>
+References: <1434199071-22127-1-git-send-email-hdegoede@redhat.com>
+ <1434199071-22127-3-git-send-email-hdegoede@redhat.com>
+Message-ID: <55BB84D7.70109@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 31 Aug 18:39 PDT 2015, Stephen Boyd wrote:
+Hi Hans,
 
-> The smd structures are always in little endian, but the smd
-> driver is not capable of being used on big endian CPUs. Annotate
-> the little endian data members and update the code to do the
-> proper byte swapping.
-> 
-
-I think this looks good, but I think it would be better to reference
-the 8-bit entries of the info struct as "flags" rather than INFO8s.
-
-Could you please change the name of the macros to
-{G,S}ET_{R,T}X_CHANNEL_FLAG() to make the code slightly easier to
-follow?
+On 13/06/2015 10:37 PM, Hans de Goede wrote:
+> The sunxi musb glue needs to know if a host or normal usb cable is plugged
+> in, add extcon support so that the musb glue can monitor the host status.
+>
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> ---
+> Changes in v5:
+> -Split out of the "Add id and vbus detection support" commit
+> -Ported to the new extcon API queued for 4.2
+> ---
+>   drivers/phy/Kconfig         |  1 +
+>   drivers/phy/phy-sun4i-usb.c | 32 +++++++++++++++++++++++++++++++-
+>   2 files changed, 32 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+> index a53bd5b..9841780 100644
+> --- a/drivers/phy/Kconfig
+> +++ b/drivers/phy/Kconfig
+> @@ -173,6 +173,7 @@ config PHY_SUN4I_USB
+>   	tristate "Allwinner sunxi SoC USB PHY driver"
+>   	depends on ARCH_SUNXI && HAS_IOMEM && OF
+>   	depends on RESET_CONTROLLER
+> +	depends on EXTCON
+>   	select GENERIC_PHY
+>   	help
+>   	  Enable this to support the transceiver that is part of Allwinner
+>
+Should probably add CONFIG_EXTCON=y to arch/arm/configs/sunxi_defconfig 
+so that CONFIG_PHY_SUN4I_USB=y works out of the box.
 
 Regards,
-Bjorn
+Jonathan
