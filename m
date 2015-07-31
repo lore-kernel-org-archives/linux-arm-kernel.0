@@ -1,71 +1,65 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 31 Jul 2015 11:39:55 +0200
-Subject: [PATCH 19/23] power/reset: at91-poweroff: get and use slow clock
+Date: Fri, 31 Jul 2015 11:39:47 +0200
+Subject: [PATCH 11/23] ARM: at91/dt: at91sam9rl: use slow clock where necessary
 In-Reply-To: <1438335599-3301-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1438335599-3301-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1438335599-3301-20-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1438335599-3301-12-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit dca1a4b5ff6e ("clk: at91: keep slow clk enabled to prevent system
-hang") added a workaround for the slow clock as it is not properly handled
-by its users.
-
-Get and use the slow clock as it is necessary for the at91 shutdown
-controller.
+The watchdog, the reset controller, the RTC, the real-time timer, the
+shutdown controller and the timer counter need the slow clock, add it where
+necessary.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
-Cc: Sebastian Reichel <sre@kernel.org>
-Cc: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
-Cc: linux-pm at vger.kernel.org
- drivers/power/reset/at91-poweroff.c | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ arch/arm/boot/dts/at91sam9rl.dtsi | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/power/reset/at91-poweroff.c b/drivers/power/reset/at91-poweroff.c
-index 9847cfb7e23d..fadd1a41729b 100644
---- a/drivers/power/reset/at91-poweroff.c
-+++ b/drivers/power/reset/at91-poweroff.c
-@@ -10,6 +10,7 @@
-  * warranty of any kind, whether express or implied.
-  */
+diff --git a/arch/arm/boot/dts/at91sam9rl.dtsi b/arch/arm/boot/dts/at91sam9rl.dtsi
+index c9920c64791c..a0b90aedd3b8 100644
+--- a/arch/arm/boot/dts/at91sam9rl.dtsi
++++ b/arch/arm/boot/dts/at91sam9rl.dtsi
+@@ -121,8 +121,8 @@
+ 				interrupts = <16 IRQ_TYPE_LEVEL_HIGH 0>,
+ 					     <17 IRQ_TYPE_LEVEL_HIGH 0>,
+ 					     <18 IRQ_TYPE_LEVEL_HIGH 0>;
+-				clocks = <&tc0_clk>, <&tc1_clk>, <&tc2_clk>;
+-				clock-names = "t0_clk", "t1_clk", "t2_clk";
++				clocks = <&tc0_clk>, <&tc1_clk>, <&tc2_clk>, <&clk32k>;
++				clock-names = "t0_clk", "t1_clk", "t2_clk", "slow_clk";
+ 			};
  
-+#include <linux/clk.h>
- #include <linux/io.h>
- #include <linux/module.h>
- #include <linux/of.h>
-@@ -48,6 +49,7 @@ static const char *shdwc_wakeup_modes[] = {
- };
+ 			mmc0: mmc at fffa4000 {
+@@ -1018,11 +1018,13 @@
+ 			rstc at fffffd00 {
+ 				compatible = "atmel,at91sam9260-rstc";
+ 				reg = <0xfffffd00 0x10>;
++				clocks = <&clk32k>;
+ 			};
  
- static void __iomem *at91_shdwc_base;
-+static struct clk *sclk;
+ 			shdwc at fffffd10 {
+ 				compatible = "atmel,at91sam9260-shdwc";
+ 				reg = <0xfffffd10 0x10>;
++				clocks = <&clk32k>;
+ 			};
  
- static void __init at91_wakeup_status(void)
- {
-@@ -122,6 +124,7 @@ static void at91_poweroff_dt_set_wakeup_mode(struct platform_device *pdev)
- static int at91_poweroff_probe(struct platform_device *pdev)
- {
- 	struct resource *res;
-+	int ret;
+ 			pit: timer at fffffd30 {
+@@ -1036,6 +1038,7 @@
+ 				compatible = "atmel,at91sam9260-wdt";
+ 				reg = <0xfffffd40 0x10>;
+ 				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
++				clocks = <&clk32k>;
+ 				status = "disabled";
+ 			};
  
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	at91_shdwc_base = devm_ioremap_resource(&pdev->dev, res);
-@@ -130,6 +133,16 @@ static int at91_poweroff_probe(struct platform_device *pdev)
- 		return PTR_ERR(at91_shdwc_base);
- 	}
+@@ -1083,6 +1086,7 @@
+ 				compatible = "atmel,at91rm9200-rtc";
+ 				reg = <0xfffffe00 0x40>;
+ 				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
++				clocks = <&clk32k>;
+ 				status = "disabled";
+ 			};
  
-+	sclk = devm_clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(sclk))
-+		return PTR_ERR(sclk);
-+
-+	ret = clk_prepare_enable(sclk);
-+	if (ret) {
-+		dev_err(&pdev->dev, "Could not enable slow clock\n");
-+		return ret;
-+	}
-+
- 	at91_wakeup_status();
- 
- 	if (pdev->dev.of_node)
 -- 
 2.1.4
