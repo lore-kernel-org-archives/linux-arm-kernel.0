@@ -1,91 +1,262 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 31 Jul 2015 10:59:52 +0200
-Subject: [PATCH 3/5] ARM: dts: sun5i: Enable USB DRC on A13 OLinuxIno
+Date: Fri, 31 Jul 2015 10:59:54 +0200
+Subject: [PATCH 5/5] ARM: dts: sun7i: Add dts file for Wits Pro A20 DKT
 In-Reply-To: <1438333194-21181-1-git-send-email-hdegoede@redhat.com>
 References: <1438333194-21181-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1438333194-21181-4-git-send-email-hdegoede@redhat.com>
+Message-ID: <1438333194-21181-6-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Janssen <mark@sig-io.nl>
+From: Jelle de Jong <jelledejong@powercraft.nl>
 
-Enable the otg/drc usb controller on the A13 OLinuxIno.
+The Wits Pro A20 DKT is an A20 Development KiT with 1G RAM, 4G NAND,
+sdio wifi, 1Gbit ethernet, 1024x768 lcd screen with ft5x_ts touchscreen
+and a ton of IO connectors.
 
-Signed-off-by: Mark Janssen <mark@sig-io.nl>
+Note there seem to be multiple sdcard slots on the board (4 in total), but
+other then mmc0 none of these are hooked up by default, there is a ton of
+dip-switches which likely allow hooking some of these up, but the
+documentation of the board only describes the use of a fraction of them,
+so for now we only support mmc0.
+
+Signed-off-by: Jelle de Jong <jelledejong@powercraft.nl>
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- arch/arm/boot/dts/sun5i-a13-olinuxino.dts | 37 +++++++++++++++++++++++++++++++
- 1 file changed, 37 insertions(+)
+Also see: http://www.merrii.com/en/pla_d.asp?id=163
+---
+ arch/arm/boot/dts/Makefile                       |   3 +-
+ arch/arm/boot/dts/sun7i-a20-wits-pro-a20-dkt.dts | 209 +++++++++++++++++++++++
+ 2 files changed, 211 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/sun7i-a20-wits-pro-a20-dkt.dts
 
-diff --git a/arch/arm/boot/dts/sun5i-a13-olinuxino.dts b/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
-index 4232400..e659482 100644
---- a/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
-+++ b/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
-@@ -159,6 +159,10 @@
- 	status = "okay";
- };
- 
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index f830e1f..151a413 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -595,7 +595,8 @@ dtb-$(CONFIG_MACH_SUN7I) += \
+ 	sun7i-a20-orangepi-mini.dtb \
+ 	sun7i-a20-pcduino3.dtb \
+ 	sun7i-a20-pcduino3-nano.dtb \
+-	sun7i-a20-wexler-tab7200.dtb
++	sun7i-a20-wexler-tab7200.dtb \
++        sun7i-a20-wits-pro-a20-dkt.dtb
+ dtb-$(CONFIG_MACH_SUN8I) += \
+ 	sun8i-a23-evb.dtb \
+ 	sun8i-a23-ippo-q8h-v5.dtb \
+diff --git a/arch/arm/boot/dts/sun7i-a20-wits-pro-a20-dkt.dts b/arch/arm/boot/dts/sun7i-a20-wits-pro-a20-dkt.dts
+new file mode 100644
+index 0000000..db4d32c
+--- /dev/null
++++ b/arch/arm/boot/dts/sun7i-a20-wits-pro-a20-dkt.dts
+@@ -0,0 +1,209 @@
++/*
++ * Copyright 2015 Jelle de Jong <jelledejong@powercraft.nl>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++#include "sun7i-a20.dtsi"
++#include "sunxi-common-regulators.dtsi"
++
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/input/input.h>
++#include <dt-bindings/interrupt-controller/irq.h>
++
++/ {
++	model = "Wits Pro A20 DKT";
++	compatible = "wits,pro-a20-dkt", "allwinner,sun7i-a20";
++
++	aliases {
++		serial0 = &uart0;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
++	reg_vmmc3: vmmc3 {
++		compatible = "regulator-fixed";
++		pinctrl-names = "default";
++		pinctrl-0 = <&vmmc3_pin_ap6xxx_wl_regon>;
++		regulator-name = "vmmc3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		enable-active-high;
++		gpio = <&pio 7 9 GPIO_ACTIVE_HIGH>; /* PH9 */
++	};
++};
++
++&cpu0 {
++	cpu-supply = <&reg_dcdc2>;
++};
++
++&ehci0 {
++	status = "okay";
++};
++
++&ehci1 {
++	status = "okay";
++};
++
++&i2c0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c0_pins_a>;
++	status = "okay";
++
++	axp209: pmic at 34 {
++		reg = <0x34>;
++		interrupt-parent = <&nmi_intc>;
++		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
++	};
++};
++
++#include "axp209.dtsi"
++
++&mmc0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_reference_design>;
++	vmmc-supply = <&reg_vcc3v3>;
++	bus-width = <4>;
++	cd-gpios = <&pio 7 1 GPIO_ACTIVE_HIGH>; /* PH1 */
++	cd-inverted;
++	status = "okay";
++};
++
++&mmc3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc3_pins_a>;
++	vmmc-supply = <&reg_vmmc3>;
++	bus-width = <4>;
++	non-removable;
++	status = "okay";
++};
++
++&ohci0 {
++	status = "okay";
++};
++
++&ohci1 {
++	status = "okay";
++};
++
 +&otg_sram {
 +	status = "okay";
 +};
 +
- &pio {
- 	mmc0_cd_pin_olinuxino: mmc0_cd_pin at 0 {
- 		allwinner,pins = "PG0";
-@@ -174,6 +178,24 @@
- 		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 	};
- 
++&pio {
++	vmmc3_pin_ap6xxx_wl_regon: vmmc3_pin at 0 {
++		allwinner,pins = "PH9";
++		allwinner,function = "gpio_out";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
++
 +	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
-+		allwinner,pins = "PG2";
++		allwinner,pins = "PH4";
 +		allwinner,function = "gpio_in";
 +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
 +		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
 +	};
-+
-+	usb0_vbus_detect_pin: usb0_vbus_detect_pin at 0 {
-+		allwinner,pins = "PG1";
-+		allwinner,function = "gpio_in";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_PULL_DOWN>;
-+	};
-+
-+	usb0_vbus_pin_a: usb0_vbus_pin at 0 {
-+		allwinner,pins = "PG12";
-+	};
-+
- 	usb1_vbus_pin_olinuxino: usb1_vbus_pin at 0 {
- 		allwinner,pins = "PG11";
- 		allwinner,function = "gpio_out";
-@@ -182,6 +204,11 @@
- 	};
- };
- 
-+&reg_usb0_vbus {
-+	status = "okay";
-+	gpio = <&pio 6 12 GPIO_ACTIVE_HIGH>; /* PG12 */
 +};
 +
- &reg_usb1_vbus {
- 	pinctrl-0 = <&usb1_vbus_pin_olinuxino>;
- 	gpio = <&pio 6 11 GPIO_ACTIVE_HIGH>;
-@@ -194,7 +221,17 @@
- 	status = "okay";
- };
- 
++&reg_dcdc2 {
++	regulator-always-on;
++	regulator-min-microvolt = <1000000>;
++	regulator-max-microvolt = <1450000>;
++	regulator-name = "vdd-cpu";
++};
++
++&reg_dcdc3 {
++	regulator-always-on;
++	regulator-min-microvolt = <1000000>;
++	regulator-max-microvolt = <1400000>;
++	regulator-name = "vdd-int-dll";
++};
++
++&reg_ldo1 {
++	regulator-name = "vdd-rtc";
++};
++
++&reg_ldo2 {
++	regulator-always-on;
++	regulator-min-microvolt = <3000000>;
++	regulator-max-microvolt = <3000000>;
++	regulator-name = "avcc";
++};
++
++&reg_usb0_vbus {
++	status = "okay";
++};
++
++&reg_usb1_vbus {
++	status = "okay";
++};
++
++&reg_usb2_vbus {
++	status = "okay";
++};
++
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_pins_a>;
++	status = "okay";
++};
++
 +&usb_otg {
 +	dr_mode = "otg";
 +	status = "okay";
 +};
 +
- &usbphy {
++&usb_power_supply {
++	status = "okay";
++};
++
++&usbphy {
 +	pinctrl-names = "default";
-+	pinctrl-0 = <&usb0_id_detect_pin>, <&usb0_vbus_detect_pin>;
-+	usb0_id_det-gpio = <&pio 6 2 GPIO_ACTIVE_HIGH>; /* PG2 */
-+	usb0_vbus_det-gpio = <&pio 6 1 GPIO_ACTIVE_HIGH>; /* PG1 */
++	pinctrl-0 = <&usb0_id_detect_pin>;
++	usb0_id_det-gpio = <&pio 7 4 GPIO_ACTIVE_HIGH>; /* PH4 */
++	usb0_vbus_power-supply = <&usb_power_supply>;
 +	usb0_vbus-supply = <&reg_usb0_vbus>;
- 	usb1_vbus-supply = <&reg_usb1_vbus>;
- 	status = "okay";
- };
++	usb1_vbus-supply = <&reg_usb1_vbus>;
++	usb2_vbus-supply = <&reg_usb2_vbus>;
++	status = "okay";
++};
 -- 
 2.4.3
