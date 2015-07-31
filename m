@@ -1,164 +1,165 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 31 Jul 2015 09:03:50 +0200
-Subject: [PATCH v7 3/5] clk: Supply the critical clock {init, enable,
- disable} framework
-In-Reply-To: <20150728130055.GV14943@x1>
-References: <1437570255-21049-1-git-send-email-lee.jones@linaro.org>
- <1437570255-21049-4-git-send-email-lee.jones@linaro.org>
- <20150727072549.GP2564@lukather> <20150727085338.GW3436@x1>
- <20150728114022.GW2564@lukather> <20150728130055.GV14943@x1>
-Message-ID: <20150731070350.GT2564@lukather>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 31 Jul 2015 09:03:20 +0200
+Subject: [PATCH linux-next 1/1] tty/serial: at91: fix I/O accesses on
+ RHR and THR for AVR32
+In-Reply-To: <20150730174605.GE27985@piout.net>
+References: <b950edd352e715d7f1f0d5ca4856ae4fec56890f.1438260564.git.cyrille.pitchen@atmel.com>
+ <20150730174605.GE27985@piout.net>
+Message-ID: <55BB1DB8.4010601@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 28, 2015 at 02:00:55PM +0100, Lee Jones wrote:
-> > > I don't think we can use reference counting, because we'd need as
-> > > many critical clock owners as there are critical clocks.
-> > 
-> > Which we can have if we replace the call to clk_prepare_enable you add
-> > in your fourth patch in __set_critical_clocks.
+Le 30/07/2015 19:46, Alexandre Belloni a ?crit :
+> On 30/07/2015 at 16:33:38 +0200, Cyrille Pitchen wrote :
+>> This patch fixes I/O accesses on the Receiver Holding Register and on the
+>> Transmitter Holding Register. Indeed AVR32 can only perform 32bit I/O
+>> accesses on registers: using 8bit I/O accesses would read or write garbage
+>> data.
+>>
+>> Fixes: commit b5199d468177 ("tty/serial: at91: add support to FIFOs")
+>> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 > 
-> What should it be replaced with?
+> Also, tested on at91rm9200ek.
 
-clk->critical_count++
-clk_prepare_enable
+Great! thanks Alexandre.
 
-?
 
+>> ---
+>> Hi all,
+>>
+>> this patch fixes a bug on AVR32 introduced by the support of FIFOs for
+>> AT91. Indeed when FIFOs are enabled they work in Multiple Data mode.
+>> The Multiple Data mode allows to read up to 4 data from the Receiver
+>> Holding Register (RHR) or write up to 4 data into the Transmitter Holding
+>> Register (THR) in a single I/O access. Hence when only one data is to be
+>> read from the RHR or written into the THR, the driver cannot use 32bit I/O
+>> access anymore but must use 8bit I/O access instead.
+>>
+>> For ARM-base AT91 SoCs, 8bit I/O accesses can always be used even when
+>> FIFOs are not available. However AV32 can only use 32bit I/O accesses.
+>>
+>> Since atmel_uart_readb(), resp. atmel_uart_writeb(), was created by the
+>> FIFO support patch to access the RHR, resp. the THR, this patch replaces
+>> it by atmel_uart_read_char(), resp. atmel_uart_write_char(). Hence the
+>> actual width of the I/O access now depends only on the architecture.
+>>
+>> All registers but RHR and THR use 32bit I/O accesses.
+>>
+>> This patch was tested on a at91sam9260ek board.
+>>
+>> Best Regards,
+>>
+>> Cyrille
+>>
+>> ChangeLog:
+>>
+>> v1: initial version
+>>
+>>  drivers/tty/serial/atmel_serial.c | 37 +++++++++++++++++++++++++++----------
+>>  1 file changed, 27 insertions(+), 10 deletions(-)
+>>
+>> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+>> index e91b3b2f0590..5ca5cf3e9359 100644
+>> --- a/drivers/tty/serial/atmel_serial.c
+>> +++ b/drivers/tty/serial/atmel_serial.c
+>> @@ -204,16 +204,33 @@ static inline void atmel_uart_writel(struct uart_port *port, u32 reg, u32 value)
+>>  	__raw_writel(value, port->membase + reg);
+>>  }
+>>  
+>> -static inline u8 atmel_uart_readb(struct uart_port *port, u32 reg)
+>> +#ifdef CONFIG_AVR32
+>> +
+>> +/* AVR32 cannot handle 8 or 16bit I/O accesses but only 32bit I/O accesses */
+>> +static inline u8 atmel_uart_read_char(struct uart_port *port)
+>> +{
+>> +	return __raw_readl(port->membase + ATMEL_US_RHR);
+>> +}
+>> +
+>> +static inline void atmel_uart_write_char(struct uart_port *port, u8 value)
+>>  {
+>> -	return __raw_readb(port->membase + reg);
+>> +	__raw_writel(value, port->membase + ATMEL_US_THR);
+>>  }
+>>  
+>> -static inline void atmel_uart_writeb(struct uart_port *port, u32 reg, u8 value)
+>> +#else
+>> +
+>> +static inline u8 atmel_uart_read_char(struct uart_port *port)
+>>  {
+>> -	__raw_writeb(value, port->membase + reg);
+>> +	return __raw_readb(port->membase + ATMEL_US_RHR);
+>>  }
+>>  
+>> +static inline void atmel_uart_write_char(struct uart_port *port, u8 value)
+>> +{
+>> +	__raw_writeb(value, port->membase + ATMEL_US_THR);
+>> +}
+>> +
+>> +#endif
+>> +
+>>  #ifdef CONFIG_SERIAL_ATMEL_PDC
+>>  static bool atmel_use_pdc_rx(struct uart_port *port)
+>>  {
+>> @@ -658,7 +675,7 @@ static void atmel_rx_chars(struct uart_port *port)
+>>  
+>>  	status = atmel_uart_readl(port, ATMEL_US_CSR);
+>>  	while (status & ATMEL_US_RXRDY) {
+>> -		ch = atmel_uart_readb(port, ATMEL_US_RHR);
+>> +		ch = atmel_uart_read_char(port);
+>>  
+>>  		/*
+>>  		 * note that the error handling code is
+>> @@ -709,7 +726,7 @@ static void atmel_tx_chars(struct uart_port *port)
+>>  
+>>  	if (port->x_char &&
+>>  	    (atmel_uart_readl(port, ATMEL_US_CSR) & atmel_port->tx_done_mask)) {
+>> -		atmel_uart_writeb(port, ATMEL_US_THR, port->x_char);
+>> +		atmel_uart_write_char(port, port->x_char);
+>>  		port->icount.tx++;
+>>  		port->x_char = 0;
+>>  	}
+>> @@ -718,7 +735,7 @@ static void atmel_tx_chars(struct uart_port *port)
+>>  
+>>  	while (atmel_uart_readl(port, ATMEL_US_CSR) &
+>>  	       atmel_port->tx_done_mask) {
+>> -		atmel_uart_writeb(port, ATMEL_US_THR, xmit->buf[xmit->tail]);
+>> +		atmel_uart_write_char(port, xmit->buf[xmit->tail]);
+>>  		xmit->tail = (xmit->tail + 1) & (UART_XMIT_SIZE - 1);
+>>  		port->icount.tx++;
+>>  		if (uart_circ_empty(xmit))
+>> @@ -2294,7 +2311,7 @@ static int atmel_poll_get_char(struct uart_port *port)
+>>  	while (!(atmel_uart_readl(port, ATMEL_US_CSR) & ATMEL_US_RXRDY))
+>>  		cpu_relax();
+>>  
+>> -	return atmel_uart_readb(port, ATMEL_US_RHR);
+>> +	return atmel_uart_read_char(port);
+>>  }
+>>  
+>>  static void atmel_poll_put_char(struct uart_port *port, unsigned char ch)
+>> @@ -2302,7 +2319,7 @@ static void atmel_poll_put_char(struct uart_port *port, unsigned char ch)
+>>  	while (!(atmel_uart_readl(port, ATMEL_US_CSR) & ATMEL_US_TXRDY))
+>>  		cpu_relax();
+>>  
+>> -	atmel_uart_writeb(port, ATMEL_US_THR, ch);
+>> +	atmel_uart_write_char(port, ch);
+>>  }
+>>  #endif
+>>  
+>> @@ -2409,7 +2426,7 @@ static void atmel_console_putchar(struct uart_port *port, int ch)
+>>  {
+>>  	while (!(atmel_uart_readl(port, ATMEL_US_CSR) & ATMEL_US_TXRDY))
+>>  		cpu_relax();
+>> -	atmel_uart_writeb(port, ATMEL_US_THR, ch);
+>> +	atmel_uart_write_char(port, ch);
+>>  }
+>>  
+>>  /*
+>> -- 
+>> 1.8.2.2
+>>
 > 
-> > > Cast your mind back to the reasons for this critical clock API.  One
-> > > of the most important intentions of this API is the requirement
-> > > mitigation for each of the critical clocks to have an owner
-> > > (driver).
-> > > 
-> > > With regards to your second point, that's what 'critical.enabled'
-> > > is for.  Take a look at clk_enable_critical().
-> > 
-> > I don't think this addresses the issue, if you just throw more
-> > customers at it, the issue remain with your implementation.
-> > 
-> > If you have three customers that used the critical API, and if on of
-> > these calls clk_disable_critical, you're losing leave_on.
-> 
-> That's the idea.  See my point above, the one you replied "Indeed"
-> to.  So when a driver uses clk_disable_critical() it's saying, "I know
-> why this clock is a critical clock, and I know that nothing terrible
-> will happen if I disable it, as I have that covered".
 
-We do agree on the semantic of clk_disable_critical :)
-
-> So then if it's not the last user to call clk_disable(), the last
-> one out the door will be allowed to finally gate the clock,
-> regardless whether it's critical aware or not.
-
-That's right, but what I mean would be a case where you have two users
-that are aware that it is a critical clock (A and B), and one which is
-not (C).
-
-If I understood correctly your code, if A calls clk_disable_critical,
-leave_on is set to false. That means that now, if C calls clk_disable
-on that clock, it will actually be shut down, while B still considers
-it a critical clock.
-
-> Then, when we come to enable the clock again, the critical aware user
-> then re-marks the clock as leave_on, so not critical un-aware user can
-> take the final reference and disable the clock.
-> 
-> > Which means that if there's one of the two users left that calls
-> > clk_disable on it, the clock will actually be disabled, which is
-> > clearly not what we want to do, as we have still a user that want the
-> > clock to be enabled.
-> 
-> That's not what happens (at least it shouldn't if I've coded it up
-> right).  The API _still_ requires all of the users to give-up their
-> reference.
-
-Ah, right. So I guess it all boils down to the discussion you're
-having with Mike regarding whether critical users should expect to
-already have a reference taken or calling clk_prepare / clk_enable
-themselves.
-
-> 
-> > It would be much more robust to have another count for the critical
-> > stuff, initialised to one by the __set_critical_clocks function.
-> 
-> If I understand you correctly, we already have a count.  We use the
-> original reference count.  No need for one of our own.
-> 
-> Using your RAM Clock (Clock 4) as an example
-> --------------------------------------------
-> 
-> Early start-up:
->   Clock 4 is marked as critical and a reference is taken (ref == 1)
-> 
-> Driver probe:
->   SPI enables Clock 4 (ref == 2)
->   I2C enables Clock 4 (ref == 3)
-> 
-> Suspend (without RAM driver's permission):
->   SPI disables Clock 4 (ref == 2)
->   I2C disables Clock 4 (ref == 1)
->   /*
->    * Clock won't be gated because:
->    *   .leave_on is True - can't dec final reference
->    */
-> 
-> Suspend (with RAM driver's permission):
->   /* Order is unimportant */
->   SPI disables Clock 4 (ref == 2)
->   RAM disables Clock 4 (ref == 1) /* Won't turn off here (ref > 0)
->   I2C disables Clock 4 (ref == 0) /* (.leave_on == False) last ref can be taken */
->   /*
->    * Clock will be gated because:
->    *   .leave_on is False, so (ref == 0)
->    */
-> 
-> Resume:
->   /* Order is unimportant */
->   SPI enables Clock 4 (ref == 1)
->   RAM enables Clock 4 and re-enables .leave_on (ref == 2)
->   I2C enables Clock 4 (ref == 3)
-> 
-> Hopefully that clears things up.
-
-It does indeed. I simply forgot to take into account the fact that it
-would still need the reference to be set to 0. My bad.
-
-Still, If we take the same kind of scenario:
-
-Early start-up:
-  Clock 4 is marked as critical and a reference is taken (ref == 1, leave_on = true)
-
-Driver probe:
-  SPI enables Clock 4 (ref == 2)
-  I2C enables Clock 4 (ref == 3)
-  RAM enables Clock 4 (ref == 4, leave_on = true )
-  CPUIdle enables Clock 4 (ref == 5, leave_on = true )
-
-Suspend (with CPUIdle and RAM permissions):
-  /* Order is unimportant */
-  SPI disables Clock 4 (ref == 4)
-  CPUIdle disables Clock 4 (ref == 3, leave_on = false ) 
-  RAM disables Clock 4 (ref == 2, leave_on = false )
-  I2C disables Clock 4 (ref == 1)
-
-And even though the clock will still be running when CPUIdle calls
-clk_disable_critical because of the enable_count, the status of
-leave_on is off, as the RAM driver still considers it to be left on
-(ie, hasn't called clk_disable_critical yet).
-
-Or at least, that's what I understood of it.
-
-Maxime
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150731/780c6dca/attachment.sig>
+Nicolas Ferre
