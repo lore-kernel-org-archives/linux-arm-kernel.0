@@ -1,58 +1,37 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Thu, 30 Jul 2015 14:14:50 +0200
-Subject: [PATCH] irqchip: gic: Add a cpu map for each GIC instance
-In-Reply-To: <55B9F0A5.8030309@arm.com>
-References: <1438180984-18219-1-git-send-email-jonathanh@nvidia.com>
- <20150729183321.GP7557@n2100.arm.linux.org.uk> <55B92939.5040101@nvidia.com>
- <55B9DE44.1010102@arm.com> <55B9E145.9050202@nvidia.com>
- <55B9E89E.5050905@arm.com> <55B9EEA7.4090903@nvidia.com>
- <55B9F0A5.8030309@arm.com>
-Message-ID: <e9c6df1524d9e11b090222c1443dba1a@agner.ch>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 31 Jul 2015 16:44:42 -0700
+Subject: [PATCH 0/3] Move clk-sp810 to assigned clock parents
+In-Reply-To: <55BBB2FC.9030102@codeaurora.org>
+References: <55BBB2FC.9030102@codeaurora.org>
+Message-ID: <1438386285-5070-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-07-30 11:38, Marc Zyngier wrote:
-> On 30/07/15 10:30, Jon Hunter wrote:
->> Yes the "other CPU" may not run Linux, but it is certainly under the
->> control of Linux as a slave CPU. Linux will decide whether it wants to
->> receive the interrupts from this GIC or route them to the other CPU.
->>
->> Yes, I see that this may not be technically a cpu map and may be that is
->> a mis-use. Following that I assume that using set_affinity here would
->> also not be correct and a custom API should be employed?
-> 
-> Indeed. set_affinity is only concerned with delivering interrupts to the
-> CPUs, and not to other entities. It looks like we need an different API,
-> but I would refrain from declaring it "custom". There is at least one
-> other example of a platform doing similar things (vybrid), and I'd like
-> to see some collaboration on that (Stefan on CC).
+This patch set converts this code to use the assigned-clock-parents
+property instead of doing some interesting stuff in the .prepare
+op. I can route the dts patches through arm-soc but I'd like to take
+the clk patch through clk tree because it removes some usage of the
+struct clk based provider APIs that we're trying to get rid of. Also,
+this is completely untested, so testing would be appreciated.
+Can this be tested with qemu? I haven't tried but I was thinking
+that might be an option.
 
-The Vybrid SoC allows to assign CPU "complex" affinity through something
-called interrupt router (which is part of a miscellaneous module, hence
-the driver is called vf610-mscm-ir). Typically on the secondary core
-(Cortex-M4) a RTOS has been used. So far each CPU complex configured the
-affinity of the interrupts to the own CPU on interrupt enable (e.g.
-under Linux handled the vf610-mscm-ir driver). In this mode, the whole
-router is somewhat pointless since you could also only mask/unmask your
-local interrupt controller. Either way, this can lead to conflicts,
-hence it is up to the developer to configure the operating systems
-peripheral access (and hence interrupts) orthogonal.
+Cc: Pawel Moll <pawel.moll@arm.com>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Sudeep Holla <sudeep.holla@arm.com>
 
-The question in those heterogeneous architectures is who should be
-responsible for resource control? The vf610-mscm-ir driver only cares
-about the local CPU, so no "resource control" for the other CPU complex.
+Stephen Boyd (3):
+  clk: versatile: Switch to assigned clock parents
+  ARM: dts: vexpress: Use assigned-clock-parents for sp810
+  ARM64: dts: vexpress: Use assigned-clock-parents for sp810
 
-I guess from a security standpoint one should be the master and restrict
-access of the other CPU complex as much as possible. On Vybrid, there
-are only limited options in that regard, and access to the interrupt
-router could not be disabled without disabling other peripherals too.
+ arch/arm/boot/dts/vexpress-v2m-rs1.dtsi          |  2 +
+ arch/arm/boot/dts/vexpress-v2m.dtsi              |  2 +
+ arch/arm64/boot/dts/arm/juno-motherboard.dtsi    |  2 +
+ arch/arm64/boot/dts/arm/rtsm_ve-motherboard.dtsi |  2 +
+ drivers/clk/versatile/clk-sp810.c                | 76 +++++-------------------
+ 5 files changed, 23 insertions(+), 61 deletions(-)
 
-Newer heterogeneous Freescale SoCs (e.g. i.MX 7) don't have this
-interrupt router at all. However, there is now a Resource Domain
-Controller which allow to restrict access of memory regions
-(peripherals..). However, afaik there is no control over interrupts
-there, so only the local interrupt controller which allow to
-enable/disable the shared peripheral interrupts.
-
---
-Stefan
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
