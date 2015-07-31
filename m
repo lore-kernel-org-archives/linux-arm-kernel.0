@@ -1,147 +1,141 @@
 From: r.baldyga@samsung.com (Robert Baldyga)
-Date: Fri, 31 Jul 2015 16:00:49 +0200
-Subject: [PATCH v5 37/46] usb: gadget: epautoconf: add endpoint capabilities
- flags verification
+Date: Fri, 31 Jul 2015 16:00:52 +0200
+Subject: [PATCH v5 40/46] usb: gadget: epautoconf: rework ep_matches() function
 In-Reply-To: <1438351258-31578-1-git-send-email-r.baldyga@samsung.com>
 References: <1438351258-31578-1-git-send-email-r.baldyga@samsung.com>
-Message-ID: <1438351258-31578-38-git-send-email-r.baldyga@samsung.com>
+Message-ID: <1438351258-31578-41-git-send-email-r.baldyga@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce endpoint matching mechanism basing on endpoint capabilities
-flags. We check if endpoint supports transfer type and direction requested
-in ep descriptor. Since we have this new endpoint matching mechanism
-there is no need to have old code guessing endpoint capabilities basing
-on its name, so we are getting rid of it. Remove also the obsolete comment.
+Rework ep_matches() function to make it shorter and more readable.
 
 Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
 ---
- drivers/usb/gadget/epautoconf.c | 96 +++++++++++++----------------------------
- 1 file changed, 30 insertions(+), 66 deletions(-)
+ drivers/usb/gadget/epautoconf.c | 87 +++++++++++++++++------------------------
+ 1 file changed, 35 insertions(+), 52 deletions(-)
 
 diff --git a/drivers/usb/gadget/epautoconf.c b/drivers/usb/gadget/epautoconf.c
-index 8e00ca7..af4b10a 100644
+index 7bb28f1..4fa6f5d 100644
 --- a/drivers/usb/gadget/epautoconf.c
 +++ b/drivers/usb/gadget/epautoconf.c
-@@ -22,22 +22,6 @@
- 
- #include "gadget_chips.h"
- 
--/*
-- * This should work with endpoints from controller drivers sharing the
-- * same endpoint naming convention.  By example:
-- *
-- *	- ep1, ep2, ... address is fixed, not direction or type
-- *	- ep1in, ep2out, ... address and direction are fixed, not type
-- *	- ep1-bulk, ep2-bulk, ... address and type are fixed, not direction
-- *	- ep1in-bulk, ep2out-iso, ... all three are fixed
-- *	- ep-* ... no functionality restrictions
-- *
-- * Type suffixes are "-bulk", "-iso", or "-int".  Numbers are decimal.
-- * Less common restrictions are implied by gadget_is_*().
-- *
-- * NOTE:  each endpoint is unidirectional, as specified by its USB
-- * descriptor; and isn't specific to a configuration or altsetting.
-- */
- static int
- ep_matches (
- 	struct usb_gadget		*gadget,
-@@ -47,7 +31,6 @@ ep_matches (
+@@ -30,16 +30,29 @@ ep_matches (
+ 	struct usb_ss_ep_comp_descriptor *ep_comp
  )
  {
- 	u8		type;
--	const char	*tmp;
- 	u16		max;
+-	u8		type;
+-	u16		max;
+-
+-	int		num_req_streams = 0;
++	u8              type;
++	u16             max;
++	int             num_req_streams = 0;
  
- 	int		num_req_streams = 0;
-@@ -56,58 +39,39 @@ ep_matches (
+ 	/* endpoint already claimed? */
  	if (ep->claimed)
  		return 0;
  
--	/* only support ep0 for portable CONTROL traffic */
  	type = usb_endpoint_type(desc);
--	if (USB_ENDPOINT_XFER_CONTROL == type)
--		return 0;
++	max = 0x7ff & usb_endpoint_maxp(desc);
++
++	if (usb_endpoint_dir_in(desc) && !ep->caps.dir_in)
++		return 0;
++	else if (!ep->caps.dir_out)
++		return 0;
++
++	if (max > ep->maxpacket_limit)
++		return 0;
++
++	/* "high bandwidth" works only at high speed */
++	if (!gadget_is_dualspeed(gadget) && usb_endpoint_maxp(desc) & (3<<11))
++		return 0;
++
+ 	switch (type) {
+ 	case USB_ENDPOINT_XFER_CONTROL:
+ 		/* only support ep0 for portable CONTROL traffic */
+@@ -47,66 +60,36 @@ ep_matches (
+ 	case USB_ENDPOINT_XFER_ISOC:
+ 		if (!ep->caps.type_iso)
+ 			return 0;
++		/* ISO:  limit 1023 bytes full speed,
++		 * 1024 high/super speed
++		 */
++		if (!gadget_is_dualspeed(gadget) && max > 1023)
++			return 0;
+ 		break;
+ 	case USB_ENDPOINT_XFER_BULK:
+ 		if (!ep->caps.type_bulk)
+ 			return 0;
++		if (ep_comp && gadget_is_superspeed(gadget)) {
++			/* Get the number of required streams from the
++			 * EP companion descriptor and see if the EP
++			 * matches it
++			 */
++			num_req_streams = ep_comp->bmAttributes & 0x1f;
++			if (num_req_streams > ep->max_streams)
++				return 0;
++		}
+ 		break;
+ 	case USB_ENDPOINT_XFER_INT:
+-		/* bulk endpoints handle interrupt transfers,
++		/* Bulk endpoints handle interrupt transfers,
+ 		 * except the toggle-quirky iso-synch kind
+ 		 */
+ 		if (!ep->caps.type_int && !ep->caps.type_bulk)
+ 			return 0;
+-		break;
+-	}
 -
--	/* some other naming convention */
--	if ('e' != ep->name[0])
-+	switch (type) {
-+	case USB_ENDPOINT_XFER_CONTROL:
-+		/* only support ep0 for portable CONTROL traffic */
- 		return 0;
-+	case USB_ENDPOINT_XFER_ISOC:
-+		if (!ep->caps.type_iso)
-+			return 0;
-+		break;
-+	case USB_ENDPOINT_XFER_BULK:
-+		if (!ep->caps.type_bulk)
-+			return 0;
-+		break;
-+	case USB_ENDPOINT_XFER_INT:
-+		/* bulk endpoints handle interrupt transfers,
-+		 * except the toggle-quirky iso-synch kind
-+		 */
-+		if (!ep->caps.type_int && !ep->caps.type_bulk)
-+			return 0;
-+		/* for now, avoid PXA "interrupt-in";
-+		 * it's documented as never using DATA1.
-+		 */
-+		if (gadget_is_pxa(gadget) && ep->caps.type_int)
-+			return 0;
-+		break;
-+	}
- 
--	/* type-restriction:  "-iso", "-bulk", or "-int".
--	 * direction-restriction:  "in", "out".
+-	if (usb_endpoint_dir_in(desc)) {
+-		if (!ep->caps.dir_in)
+-			return 0;
+-	} else {
+-		if (!ep->caps.dir_out)
+-			return 0;
+-	}
+-
+-	/*
+-	 * Get the number of required streams from the EP companion
+-	 * descriptor and see if the EP matches it
 -	 */
--	if ('-' != ep->name[2]) {
--		tmp = strrchr (ep->name, '-');
--		if (tmp) {
--			switch (type) {
--			case USB_ENDPOINT_XFER_INT:
--				/* bulk endpoints handle interrupt transfers,
--				 * except the toggle-quirky iso-synch kind
--				 */
--				if ('s' == tmp[2])	// == "-iso"
--					return 0;
--				/* for now, avoid PXA "interrupt-in";
--				 * it's documented as never using DATA1.
--				 */
--				if (gadget_is_pxa (gadget)
--						&& 'i' == tmp [1])
--					return 0;
--				break;
--			case USB_ENDPOINT_XFER_BULK:
--				if ('b' != tmp[1])	// != "-bulk"
--					return 0;
--				break;
--			case USB_ENDPOINT_XFER_ISOC:
--				if ('s' != tmp[2])	// != "-iso"
--					return 0;
--			}
--		} else {
--			tmp = ep->name + strlen (ep->name);
+-	if (usb_endpoint_xfer_bulk(desc)) {
+-		if (ep_comp && gadget->max_speed >= USB_SPEED_SUPER) {
+-			num_req_streams = ep_comp->bmAttributes & 0x1f;
+-			if (num_req_streams > ep->max_streams)
+-				return 0;
 -		}
 -
--		/* direction-restriction:  "..in-..", "out-.." */
--		tmp--;
--		if (!isdigit (*tmp)) {
--			if (desc->bEndpointAddress & USB_DIR_IN) {
--				if ('n' != *tmp)
--					return 0;
--			} else {
--				if ('t' != *tmp)
--					return 0;
--			}
+-	}
+-
+-	/* endpoint maxpacket size is an input parameter, except for bulk
+-	 * where it's an output parameter representing the full speed limit.
+-	 * the usb spec fixes high speed bulk maxpacket at 512 bytes.
+-	 */
+-	max = 0x7ff & usb_endpoint_maxp(desc);
+-	switch (type) {
+-	case USB_ENDPOINT_XFER_INT:
+-		/* INT:  limit 64 bytes full speed, 1024 high/super speed */
++		/* INT:  limit 64 bytes full speed,
++		 * 1024 high/super speed
++		 */
+ 		if (!gadget_is_dualspeed(gadget) && max > 64)
+ 			return 0;
+-		/* FALLTHROUGH */
+-
+-	case USB_ENDPOINT_XFER_ISOC:
+-		/* ISO:  limit 1023 bytes full speed, 1024 high/super speed */
+-		if (ep->maxpacket_limit < max)
+-			return 0;
+-		if (!gadget_is_dualspeed(gadget) && max > 1023)
+-			return 0;
+-
+-		/* BOTH:  "high bandwidth" works only at high speed */
+-		if ((desc->wMaxPacketSize & cpu_to_le16(3<<11))) {
+-			if (!gadget_is_dualspeed(gadget))
+-				return 0;
+-			/* configure your hardware with enough buffering!! */
 -		}
-+	if (usb_endpoint_dir_in(desc)) {
-+		if (!ep->caps.dir_in)
-+			return 0;
-+	} else {
-+		if (!ep->caps.dir_out)
-+			return 0;
+ 		break;
  	}
  
- 	/*
 -- 
 1.9.1
