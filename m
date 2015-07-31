@@ -1,57 +1,71 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 31 Jul 2015 18:11:39 +0800
-Subject: [PATCH 1/3] ARM: dts: sun5i: hsg-h702: Enable side volume buttons
- with LRADC
-In-Reply-To: <1438337501-8773-1-git-send-email-wens@csie.org>
-References: <1438337501-8773-1-git-send-email-wens@csie.org>
-Message-ID: <1438337501-8773-2-git-send-email-wens@csie.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 31 Jul 2015 12:11:57 +0200
+Subject: [PATCH 3/5] ARM: dts: sun5i: Enable USB DRC on A13 OLinuxIno
+In-Reply-To: <1438333194-21181-4-git-send-email-hdegoede@redhat.com>
+References: <1438333194-21181-1-git-send-email-hdegoede@redhat.com>
+ <1438333194-21181-4-git-send-email-hdegoede@redhat.com>
+Message-ID: <20150731101157.GD2564@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The tablet has volume up/down buttons on the side, connected to the LRADC.
+On Fri, Jul 31, 2015 at 10:59:52AM +0200, Hans de Goede wrote:
+> From: Mark Janssen <mark@sig-io.nl>
+> 
+> Enable the otg/drc usb controller on the A13 OLinuxIno.
+> 
+> Signed-off-by: Mark Janssen <mark@sig-io.nl>
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> ---
+>  arch/arm/boot/dts/sun5i-a13-olinuxino.dts | 37 +++++++++++++++++++++++++++++++
+>  1 file changed, 37 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/sun5i-a13-olinuxino.dts b/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
+> index 4232400..e659482 100644
+> --- a/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
+> +++ b/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
+> @@ -159,6 +159,10 @@
+>  	status = "okay";
+>  };
+>  
+> +&otg_sram {
+> +	status = "okay";
+> +};
+> +
+>  &pio {
+>  	mmc0_cd_pin_olinuxino: mmc0_cd_pin at 0 {
+>  		allwinner,pins = "PG0";
+> @@ -174,6 +178,24 @@
+>  		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+>  	};
+>  
+> +	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
+> +		allwinner,pins = "PG2";
+> +		allwinner,function = "gpio_in";
+> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> +		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+> +	};
+> +
+> +	usb0_vbus_detect_pin: usb0_vbus_detect_pin at 0 {
+> +		allwinner,pins = "PG1";
+> +		allwinner,function = "gpio_in";
+> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> +		allwinner,pull = <SUN4I_PINCTRL_PULL_DOWN>;
+> +	};
+> +
+> +	usb0_vbus_pin_a: usb0_vbus_pin at 0 {
+> +		allwinner,pins = "PG12";
+> +	};
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- arch/arm/boot/dts/sun5i-a13-hsg-h702.dts | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+Same thing here than in patch 2.
 
-diff --git a/arch/arm/boot/dts/sun5i-a13-hsg-h702.dts b/arch/arm/boot/dts/sun5i-a13-hsg-h702.dts
-index 990f9d61ae4d..4b8808ab9711 100644
---- a/arch/arm/boot/dts/sun5i-a13-hsg-h702.dts
-+++ b/arch/arm/boot/dts/sun5i-a13-hsg-h702.dts
-@@ -45,6 +45,7 @@
- #include "sunxi-common-regulators.dtsi"
- 
- #include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/input/input.h>
- #include <dt-bindings/pinctrl/sun4i-a10.h>
- 
- / {
-@@ -96,6 +97,25 @@
- 	status = "okay";
- };
- 
-+&lradc {
-+	vref-supply = <&reg_ldo2>;
-+	status = "okay";
-+
-+	button at 200 {
-+		label = "Volume Up";
-+		linux,code = <KEY_VOLUMEUP>;
-+		channel = <0>;
-+		voltage = <200000>;
-+	};
-+
-+	button at 400 {
-+		label = "Volume Down";
-+		linux,code = <KEY_VOLUMEDOWN>;
-+		channel = <0>;
-+		voltage = <400000>;
-+	};
-+};
-+
- &mmc0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_h702>;
 -- 
-2.5.0
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150731/45dfd99e/attachment-0001.sig>
