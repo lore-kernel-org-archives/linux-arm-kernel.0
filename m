@@ -1,75 +1,105 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 31 Jul 2015 11:56:30 +0530
-Subject: [PATCH V3 10/16] PM / OPP: Add support for opp-suspend
-In-Reply-To: <20150731062406.GS3159@codeaurora.org>
-References: <cover.1438166099.git.viresh.kumar@linaro.org>
- <3d1b8d7de9f2ad34d979540e367ed691bcb7bb77.1438166099.git.viresh.kumar@linaro.org>
- <20150731062406.GS3159@codeaurora.org>
-Message-ID: <20150731062630.GR17794@linux>
+From: bonbons@linux-vserver.org (Bruno =?UTF-8?B?UHLDqW1vbnQ=?=)
+Date: Fri, 31 Jul 2015 08:35:41 +0200
+Subject: [linux-sunxi] [PATCH 6/8] ARM: dts: axp209: Add
+ usb_power_supply child node to the ax209 node
+In-Reply-To: <CAGb2v67nM7pauyjyhBdfgX7p_Rud6TEsNqphB+gx4ROekVqtbw@mail.gmail.com>
+References: <1433885881-19809-1-git-send-email-hdegoede@redhat.com>
+ <1433885881-19809-7-git-send-email-hdegoede@redhat.com>
+ <CAGb2v66X79dK84hG8NVTho-kPPMNcKXQspvT2pCM8Zbmnme53A@mail.gmail.com>
+ <20150731075104.48c467e6@pluto.restena.lu>
+ <CAGb2v67nM7pauyjyhBdfgX7p_Rud6TEsNqphB+gx4ROekVqtbw@mail.gmail.com>
+Message-ID: <20150731083541.5f2c683a@pluto.restena.lu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30-07-15, 23:24, Stephen Boyd wrote:
-> On 07/29, Viresh Kumar wrote:
-> > With "operating-points-v2" bindings, its possible to specify the OPP to
+On Fri, 31 Jul 2015 14:14:28 +0800 Chen-Yu Tsai wrote:
+> On Fri, Jul 31, 2015 at 1:51 PM, Bruno Pr?mont wrote:
+> > Hi ChenYu,
+> >
+> > On Fri, 31 Jul 2015 13:31:53 +0800 Chen-Yu Tsai wrote:
+> >> Hi Hans,
+> >>
+> >> On Wed, Jun 10, 2015 at 5:37 AM, Hans de Goede wrote:
+> >> > Add a node representing the usb power supply part of the axp209 pmic, note
+> >> > that the usb power supply and the (to be added later) ac power supply will
+> >> > each have their own child-node, so that they can be separately specified
+> >> > as power-supply for other nodes using a power-supply property with a
+> >> > phandle pointing to the right axp209 child-node.
+> >> >
+> >> > Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> >> > ---
+> >> >  arch/arm/boot/dts/axp209.dtsi | 5 +++++
+> >> >  1 file changed, 5 insertions(+)
+> >> >
+> >> > diff --git a/arch/arm/boot/dts/axp209.dtsi b/arch/arm/boot/dts/axp209.dtsi
+> >> > index 24c935c..051ab3b 100644
+> >> > --- a/arch/arm/boot/dts/axp209.dtsi
+> >> > +++ b/arch/arm/boot/dts/axp209.dtsi
+> >> > @@ -89,4 +89,9 @@
+> >> >                         regulator-name = "ldo5";
+> >> >                 };
+> >> >         };
+> >> > +
+> >> > +       usb_power_supply: usb_power_supply {
+> >> > +               compatible = "x-powers,axp202-usb-power-supply";
+> >> > +               status = "disabled";
+> >>
+> >> Is there any reason to have this disabled by default?
+> >> AFAIK this is not something configurable in hardware,
+> >> and the driver just gives readouts and status updates.
+> >
+> > There are some devices that only have 'AC-IN' instead of usb/otg power
+> > (set-top boxes) so having the devices tell what power sources they
+> > have makes sense (otherwise those that have ac-in instead of otg would
+> > have to disable usb_power_supply) and avoids confusion by explicitly
+> > stating presence in device dts.
 > 
-> s/its/it's/ ?
+> That's true. But this is a bit of hardware inside the AXP.
+> If it's power isn't routed, it should report it, shouldn't it?
+
+If the device does not use the input there are two cases:
+- ac-in and usb/otg in short-circuited (there is a bit in AXP registers
+  to provide this indication)
+- the unused one is just not connected/connectable
+
+In either case the voltage of the unused/unusable branch is not really
+useful, nor is it useful to have it show up in sysfs.
+
+> And normal users would probably expect to read the input
+> voltage/current/status through sysfs (or maybe hwmon?),
+> instead of not finding the device and having to look through
+> the DTS.
+
+Only those supplies effectively present (in-use or with connectors
+to eventually use them) should be visible in sysfs.
+Having more of them will just confuse the users, they would be searching
+how they can connect the supply while there is no means to do so
+except soldering to the tiny AXP pins.
+
+hwmon makes more sense for output voltages of the AXP or temperature
+of AXP chip itself, not so much for the input side if that side is
+covered by power_supply devices (otherwise the information is being
+duplicated and if so should only be via power_supply class, not
+individual drivers).
+
+> If you're using a distro, you might not have the kernel sources
+> around, and digging through the in-system device tree isn't that
+> straightforward if you don't know where to look.
+
+If the dts is incomplete that's another issue.
+
+> > NB: I should hopefully get my battery supply driver ported this WE,
+> > ac-in/rtc are done, this WE. I'm going to default-off for them as well
+> > (note that for some extra details should be provided in dts).
 > 
-> > which the device must be switched, before suspending.
-> > 
-> > This patch adds support for getting that information.
-> > 
-> > Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> > Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-> > ---
-> 
-> Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
+> I'm guessing we won't be using the axp288 one?
 
----------------------8<-------------------
+In a first step I won't be using it.
 
-Message-Id: <5e0cf40cc78bfa327cbbccae016d03a1dfbd1a84.1438323941.git.viresh.kumar@linaro.org>
-From: Viresh Kumar <viresh.kumar@linaro.org>
-Date: Sat, 13 Jun 2015 15:10:21 +0530
-Subject: [PATCH] PM / OPP: Add support for opp-suspend
+There are a few reasons for that:
+- axp288 is based on ACPI/platform to provide configuration information
+  instead of dts
+- it makes extensive use of OCV and registers that are possibly present
+  on axp20x but undocumented there.
 
-With "operating-points-v2" bindings, it's possible to specify the OPP to
-which the device must be switched, before suspending.
-
-This patch adds support for getting that information.
-
-Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
-Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
----
- drivers/base/power/opp.c | 11 +++++++++++
- 1 file changed, 11 insertions(+)
-
-diff --git a/drivers/base/power/opp.c b/drivers/base/power/opp.c
-index 5d699e3ec136..0ebcea49145a 100644
---- a/drivers/base/power/opp.c
-+++ b/drivers/base/power/opp.c
-@@ -133,6 +133,7 @@ struct device_opp {
- 	struct device_node *np;
- 	unsigned long clock_latency_ns_max;
- 	bool shared_opp;
-+	struct dev_pm_opp *suspend_opp;
- };
- 
- /*
-@@ -923,6 +924,16 @@ static int _opp_add_static_v2(struct device *dev, struct device_node *np)
- 	if (ret)
- 		goto free_opp;
- 
-+	/* OPP to select on device suspend */
-+	if (of_property_read_bool(np, "opp-suspend")) {
-+		if (dev_opp->suspend_opp)
-+			dev_warn(dev, "%s: Multiple suspend OPPs found (%lu %lu)\n",
-+				 __func__, dev_opp->suspend_opp->rate,
-+				 new_opp->rate);
-+		else
-+			dev_opp->suspend_opp = new_opp;
-+	}
-+
- 	if (new_opp->clock_latency_ns > dev_opp->clock_latency_ns_max)
- 		dev_opp->clock_latency_ns_max = new_opp->clock_latency_ns;
- 
+Bruno
