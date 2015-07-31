@@ -1,89 +1,128 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 31 Jul 2015 10:31:30 +0200
-Subject: [linux-sunxi] [PATCH 6/8] ARM: dts: axp209: Add usb_power_supply
- child node to the ax209 node
-In-Reply-To: <20150731083541.5f2c683a@pluto.restena.lu>
-References: <1433885881-19809-1-git-send-email-hdegoede@redhat.com>
- <1433885881-19809-7-git-send-email-hdegoede@redhat.com>
- <CAGb2v66X79dK84hG8NVTho-kPPMNcKXQspvT2pCM8Zbmnme53A@mail.gmail.com>
- <20150731075104.48c467e6@pluto.restena.lu>
- <CAGb2v67nM7pauyjyhBdfgX7p_Rud6TEsNqphB+gx4ROekVqtbw@mail.gmail.com>
- <20150731083541.5f2c683a@pluto.restena.lu>
-Message-ID: <55BB3262.5000403@redhat.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 31 Jul 2015 09:32:07 +0100
+Subject: [PATCH v7 3/5] clk: Supply the critical clock {init, enable,
+ disable} framework
+In-Reply-To: <20150731073019.GU2564@lukather>
+References: <1437570255-21049-1-git-send-email-lee.jones@linaro.org>
+ <1437570255-21049-4-git-send-email-lee.jones@linaro.org>
+ <20150727072549.GP2564@lukather> <20150727085338.GW3436@x1>
+ <20150728114022.GW2564@lukather> <20150728130055.GV14943@x1>
+ <20150730011932.642.85168@quantum> <20150730095014.GD14642@x1>
+ <20150730224720.23791.6722@quantum>
+ <20150731073019.GU2564@lukather>
+Message-ID: <20150731083207.GB3208@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, 31 Jul 2015, Maxime Ripard wrote:
 
-On 31-07-15 08:35, Bruno Pr?mont wrote:
-> On Fri, 31 Jul 2015 14:14:28 +0800 Chen-Yu Tsai wrote:
->> On Fri, Jul 31, 2015 at 1:51 PM, Bruno Pr?mont wrote:
->>> Hi ChenYu,
->>>
->>> On Fri, 31 Jul 2015 13:31:53 +0800 Chen-Yu Tsai wrote:
->>>> Hi Hans,
->>>>
->>>> On Wed, Jun 10, 2015 at 5:37 AM, Hans de Goede wrote:
->>>>> Add a node representing the usb power supply part of the axp209 pmic, note
->>>>> that the usb power supply and the (to be added later) ac power supply will
->>>>> each have their own child-node, so that they can be separately specified
->>>>> as power-supply for other nodes using a power-supply property with a
->>>>> phandle pointing to the right axp209 child-node.
->>>>>
->>>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->>>>> ---
->>>>>   arch/arm/boot/dts/axp209.dtsi | 5 +++++
->>>>>   1 file changed, 5 insertions(+)
->>>>>
->>>>> diff --git a/arch/arm/boot/dts/axp209.dtsi b/arch/arm/boot/dts/axp209.dtsi
->>>>> index 24c935c..051ab3b 100644
->>>>> --- a/arch/arm/boot/dts/axp209.dtsi
->>>>> +++ b/arch/arm/boot/dts/axp209.dtsi
->>>>> @@ -89,4 +89,9 @@
->>>>>                          regulator-name = "ldo5";
->>>>>                  };
->>>>>          };
->>>>> +
->>>>> +       usb_power_supply: usb_power_supply {
->>>>> +               compatible = "x-powers,axp202-usb-power-supply";
->>>>> +               status = "disabled";
->>>>
->>>> Is there any reason to have this disabled by default?
->>>> AFAIK this is not something configurable in hardware,
->>>> and the driver just gives readouts and status updates.
->>>
->>> There are some devices that only have 'AC-IN' instead of usb/otg power
->>> (set-top boxes) so having the devices tell what power sources they
->>> have makes sense (otherwise those that have ac-in instead of otg would
->>> have to disable usb_power_supply) and avoids confusion by explicitly
->>> stating presence in device dts.
->>
->> That's true. But this is a bit of hardware inside the AXP.
->> If it's power isn't routed, it should report it, shouldn't it?
->
-> If the device does not use the input there are two cases:
-> - ac-in and usb/otg in short-circuited (there is a bit in AXP registers
->    to provide this indication)
-> - the unused one is just not connected/connectable
->
-> In either case the voltage of the unused/unusable branch is not really
-> useful, nor is it useful to have it show up in sysfs.
-
-Exactly my thinking on this, +1 .
-
->> And normal users would probably expect to read the input
->> voltage/current/status through sysfs (or maybe hwmon?),
->> instead of not finding the device and having to look through
->> the DTS.
->
-> Only those supplies effectively present (in-use or with connectors
-> to eventually use them) should be visible in sysfs.
-> Having more of them will just confuse the users, they would be searching
-> how they can connect the supply while there is no means to do so
-> except soldering to the tiny AXP pins.
+> On Thu, Jul 30, 2015 at 03:47:20PM -0700, Michael Turquette wrote:
+> > > > >    */
+> > > > > 
+> > > > > Resume:
+> > > > >   /* Order is unimportant */
+> > > > >   SPI enables Clock 4 (ref == 1)
+> > > > >   RAM enables Clock 4 and re-enables .leave_on (ref == 2)
+> > > > >   I2C enables Clock 4 (ref == 3)
+> > > > 
+> > > > Same again. As soon as RAM calls clk_enable_critical the ref count goes
+> > > > up. .leave_on does nothing as far as I can tell. The all works because
+> > > > of the reference counting, which already exists before this patch
+> > > > series.
+> > > 
+> > > So fundamentally you're right in what you say.  All you really need to
+> > > disable a critical clock is write a knowledgeable driver, which is
+> > > intentionally unbalanced i.e. just calls clk_disable().  All this
+> > 
+> > OK, the line above is helpful. What you really want is a formalized
+> > hand-off mechanism, whereby the clock is enabled at registration-time
+> > and it cannot be turned off until the right driver claims it and decides
+> > turning it off is OK (with a priori knowledge that the clock is already
+> > enabled).
+> 
+> There's two things that should be covered, and are related, yet can be
+> done in two steps:
+> 
+>   - Have a way to, no matter what (which configuration we have, if we
+>     have multiple users or not that might reparent or disable their
+>     clocks, etc.), make sure that a clock will always be running by
+>     default. This is done through the call in clk-conf, and we
+>     identify such clocks using critical-clocks in the DT.
+> 
+>   - Now, even though that information is true, some driver who are
+>     aware of that fact might want to disable those critical
+>     clocks. This is what the clk_disable_critical and
+>     clk_enable_critical functions are here for.
 
 +1
 
-Regards,
+> > Note that I don't think this implementation can really work in the near
+> > future. Today we do not catch unbalanced calls to clk_enable and
+> > clk_disable, but I have a patch that catches this and WARNs loudly in my
+> > private tree. More on that in the next stanza.
+> > 
+> > What I don't understand is if there is ever a case for a clock consumer
+> > driver to ever call clk_enable_critical... I do not think there is. What
+> > you're trying to protect against is having the clock disabled BEFORE
+> > that "knowledgeable driver" has a chance to enable it.
 
-Hans
+In my mind and in this implementation  clk_disable_critical() will be
+used _first_ by the knowledgeable driver, then when the knowledgeable
+driver has finished whatever it was doing (shutting down banks of RAM
+etc...), it should then call clk_enable_critical() to reset the clock
+state back to the way it found it i.e. enabled and marked as critical.
+
+> It's really about what we want the API to look like in the second
+> case.
+> 
+> Do we want such drivers to still call clk_prepare_enable? Some other
+> function? Should they assume that the clock has already been enabled,
+> or do we want a handover, or a force disable, or whatever.
+> 
+> I guess we should discuss those questions, before starting to think
+> about how to implement it.
+> 
+> IMHO, I think that the existing way of doing should be used, or at
+> least with the same mindset to avoid confusion, errors, and
+> misinformed reviews.
+> 
+> So I'd expect the drivers to do something like:
+> 
+> probe:
+>   clk_get
+>   clk_critical_enable
+
+Well becuase the clock has been marked as critical, a reference has
+already been taken, so even if there are 0 users the clock now has 2
+references attributed to it.
+
+> remove / probe error path:
+>   clk_critical_disable
+>   clk_put
+
+I think we should assume that the clock is already running in the
+knowledgeable driver:
+
+start-up:
+  __set_critical_clocks()
+
+probe:
+  clk_get()
+
+suspend (or whatever reason the driver wishes to disable the clk):
+  clk_disable_critical()
+
+resume (or whatever ...):
+  clk_enable_critical()
+
+remove:
+  clk_put() /* Or just rely on devm_*() */ 
+
+> and use the clk_critical_enable and clk_critical_disable whenever
+> needed, and thing would just work as intended.
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
