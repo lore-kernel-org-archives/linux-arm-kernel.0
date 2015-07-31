@@ -1,94 +1,47 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 31 Jul 2015 12:27:40 +0100
-Subject: [PATCH] iommu/arm-smmu-v2: ThunderX(errata-23399) mis-extends
- 64bit registers
-In-Reply-To: <91236962-23EF-4306-B0FA-0F7DAE4F06CD@caviumnetworks.com>
-References: <1438278906-29627-1-git-send-email-tchalamarla@caviumnetworks.com>
- <20150730184523.GC16663@arm.com>
- <96AD8EF9-D416-43AB-BA6F-2C25098BB8BB@caviumnetworks.com>
- <91236962-23EF-4306-B0FA-0F7DAE4F06CD@caviumnetworks.com>
-Message-ID: <20150731112740.GC29497@arm.com>
+Date: Fri, 31 Jul 2015 12:32:17 +0100
+Subject: [PATCH v3 3/6] iommu: add ARM short descriptor page table
+ allocator.
+In-Reply-To: <1438329337.25925.147.camel@mhfsdcap03>
+References: <1437037475-9065-1-git-send-email-yong.wu@mediatek.com>
+ <1437037475-9065-4-git-send-email-yong.wu@mediatek.com>
+ <20150721171101.GN31095@arm.com>
+ <1437715466.23932.68.camel@mhfsdcap03>
+ <20150724165325.GC21177@arm.com>
+ <1437970868.25925.20.camel@mhfsdcap03>
+ <1438329337.25925.147.camel@mhfsdcap03>
+Message-ID: <20150731113217.GE29497@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 30, 2015 at 09:54:04PM +0100, Chalamarla, Tirumalesh wrote:
-> is some thing like this looks good
+On Fri, Jul 31, 2015 at 08:55:37AM +0100, Yong Wu wrote:
+>     About the AP bits, I may have to add a new quirk for it...
+> 
+>   Current I add AP in pte like this:
+> #define ARM_SHORT_PTE_RD_WR        (3 << 4)
+> #define ARM_SHORT_PTE_RDONLY       BIT(9)
+> 
+> pteprot |=  ARM_SHORT_PTE_RD_WR;
+> 
+> 
+>  If(!(prot & IOMMU_WRITE) && (prot & IOMMU_READ))
+> 
+> 
+>       pteprot |= ARM_SHORT_PTE_RDONLY;
+> 
+> The problem is that the BIT(9) in the level1 and level2 pagetable of our
+> HW has been used for PA[32] that is for the dram size over 4G.
 
-That's the right sort of idea, but please send a proper patch that you've
-actually tested. The diff below mixes up reg64 and reg.
+Aha, now *thats* a case of page-table abuse!
+
+> so I had to add a quirk to disable bit9 while RDONLY case.
+> (If BIT9 isn't disabled, the HW treat it as the PA[32] case then it will
+> translation fault..)
+> 
+> like: IO_PGTABLE_QUIRK_SHORT_MTK ?
+
+Given that you don't have XN either, maybe IO_PGTABLE_QUIRK_NO_PERMS?
+When set, IOMMU_READ/WRITE/EXEC are ignored and the mapping will never
+generate a permission fault.
 
 Will
-
-> +#ifdef CONFIG_64BIT
-> +#define smmu_writeq(reg64, addr)       writeq_relaxed((reg64), (addr))
-> +#else
-> +#define smmu_writeq(reg64, addr)                       \
-> +               writel_relaxed(((reg64) >> 32), ((addr) + 4));  \
-> +               writel_relaxed((reg64), (addr))
-> +
-> +
->  /* Configuration registers */
->  #define ARM_SMMU_GR0_sCR0              0x0
->  #define sCR0_CLIENTPD                  (1 << 0)
-> @@ -226,7 +234,7 @@
->  #define TTBCR2_SEP_SHIFT               15
->  #define TTBCR2_SEP_UPSTREAM            (0x7 << TTBCR2_SEP_SHIFT)
-> 
-> -#define TTBRn_HI_ASID_SHIFT            16
-> +#define TTBRn_ASID_SHIFT               48
-> 
->  #define FSR_MULTI                      (1 << 31)
->  #define FSR_SS                         (1 << 30)
-> @@ -719,6 +727,7 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
->                                        struct io_pgtable_cfg *pgtbl_cfg)
->  {
->         u32 reg;
-> +       u64 reg64;
->         bool stage1;
->         struct arm_smmu_cfg *cfg = &smmu_domain->cfg;
->         struct arm_smmu_device *smmu = smmu_domain->smmu;
-> @@ -762,22 +771,16 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
-> 
->         /* TTBRs */
->         if (stage1) {
-> -               reg = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[0];
-> -               writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR0_LO);
-> -               reg = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[0] >> 32;
-> -               reg |= ARM_SMMU_CB_ASID(cfg) << TTBRn_HI_ASID_SHIFT;
-> -               writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR0_HI);
-> -
-> -               reg = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[1];
-> -               writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR1_LO);
-> -               reg = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[1] >> 32;
-> -               reg |= ARM_SMMU_CB_ASID(cfg) << TTBRn_HI_ASID_SHIFT;
-> -               writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR1_HI);
-> +               reg64 = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[0];
-> +               reg64 |= ((u64)ARM_SMMU_CB_ASID(cfg)) << TTBRn_ASID_SHIFT;
-> +               smmu_writeq(reg64, cb_base + ARM_SMMU_CB_TTBR0_LO);
-> +
-> +               reg64 = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[1];
-> +               reg64 |= ARM_SMMU_CB_ASID(cfg) << TTBRn_ASID_SHIFT;
-> +               smmu_writeq(reg, cb_base + ARM_SMMU_CB_TTBR1_LO);
->         } else {
-> -               reg = pgtbl_cfg->arm_lpae_s2_cfg.vttbr;
-> -               writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR0_LO);
-> -               reg = pgtbl_cfg->arm_lpae_s2_cfg.vttbr >> 32;
-> -               writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR0_HI);
-> +               reg64 = pgtbl_cfg->arm_lpae_s2_cfg.vttbr;
-> +               smmu_writeq(reg, cb_base + ARM_SMMU_CB_TTBR0_LO);
->         }
-> 
->         /* TTBCR */
-> @@ -1236,10 +1239,8 @@ static phys_addr_t arm_smmu_iova_to_phys_hard(struct iommu_domain *domain,
->                 u32 reg = iova & ~0xfff;
->                 writel_relaxed(reg, cb_base + ARM_SMMU_CB_ATS1PR_LO);
->         } else {
-> -               u32 reg = iova & ~0xfff;
-> -               writel_relaxed(reg, cb_base + ARM_SMMU_CB_ATS1PR_LO);
-> -               reg = ((u64)iova & ~0xfff) >> 32;
-> -               writel_relaxed(reg, cb_base + ARM_SMMU_CB_ATS1PR_HI);
-> +               u64 reg = iova & ~0xfff;
-> +               smmu_writeq(reg, cb_base + ARM_SMMU_CB_ATS1PR_LO);
->         }
-> 
->         if (readl_poll_timeout_atomic(cb_base + ARM_SMMU_CB_ATSR, tmp,
