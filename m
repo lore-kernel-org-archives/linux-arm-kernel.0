@@ -1,105 +1,89 @@
-From: r.baldyga@samsung.com (Robert Baldyga)
-Date: Fri, 31 Jul 2015 16:00:57 +0200
-Subject: [PATCH v5 45/46] usb: gadget: goku_udc: add goku_match_ep() function
-In-Reply-To: <1438351258-31578-1-git-send-email-r.baldyga@samsung.com>
-References: <1438351258-31578-1-git-send-email-r.baldyga@samsung.com>
-Message-ID: <1438351258-31578-46-git-send-email-r.baldyga@samsung.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 31 Jul 2015 22:40:59 +0800
+Subject: [PATCH v2 2/2] ARM: dts: sun5i: hsg-h702: Enable USB OTG controller
+In-Reply-To: <1438353659-3360-1-git-send-email-wens@csie.org>
+References: <1438353659-3360-1-git-send-email-wens@csie.org>
+Message-ID: <1438353659-3360-3-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add 'match_ep' callback to utilize chip-specific knowledge in endpoint matching
-process. Function does the same that was done by chip-specific code inside
-of epautoconf. Now this code can be removed from there to separate generic code
-from platform specific logic.
+This tablet has proper USB OTG support, using 3 GPIO pins for
+ID and VBUS detection, and also VBUS control.
 
-Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/usb/gadget/epautoconf.c   | 20 ++------------------
- drivers/usb/gadget/udc/goku_udc.c | 25 +++++++++++++++++++++++++
- 2 files changed, 27 insertions(+), 18 deletions(-)
+ arch/arm/boot/dts/sun5i-a13-hsg-h702.dts | 38 ++++++++++++++++++++++++++++++++
+ 1 file changed, 38 insertions(+)
 
-diff --git a/drivers/usb/gadget/epautoconf.c b/drivers/usb/gadget/epautoconf.c
-index d41fd82..da45371 100644
---- a/drivers/usb/gadget/epautoconf.c
-+++ b/drivers/usb/gadget/epautoconf.c
-@@ -86,24 +86,8 @@ struct usb_ep *usb_ep_autoconfig_ss(
- 	/* First, apply chip-specific "best usage" knowledge.
- 	 * This might make a good usb_gadget_ops hook ...
- 	 */
--	if (gadget_is_goku (gadget)) {
--		if (USB_ENDPOINT_XFER_INT == type) {
--			/* single buffering is enough */
--			ep = gadget_find_ep_by_name(gadget, "ep3-bulk");
--			if (ep && usb_gadget_ep_match_desc(gadget,
--					ep, desc, ep_comp))
--				goto found_ep;
--		} else if (USB_ENDPOINT_XFER_BULK == type
--				&& (USB_DIR_IN & desc->bEndpointAddress)) {
--			/* DMA may be available */
--			ep = gadget_find_ep_by_name(gadget, "ep2-bulk");
--			if (ep && usb_gadget_ep_match_desc(gadget,
--					ep, desc, ep_comp))
--				goto found_ep;
--		}
--
- #ifdef CONFIG_BLACKFIN
--	} else if (gadget_is_musbhdrc(gadget)) {
-+	if (gadget_is_musbhdrc(gadget)) {
- 		if ((USB_ENDPOINT_XFER_BULK == type) ||
- 		    (USB_ENDPOINT_XFER_ISOC == type)) {
- 			if (USB_DIR_IN & desc->bEndpointAddress)
-@@ -119,8 +103,8 @@ struct usb_ep *usb_ep_autoconfig_ss(
- 			ep = NULL;
- 		if (ep && usb_gadget_ep_match_desc(gadget, ep, desc, ep_comp))
- 			goto found_ep;
--#endif
- 	}
-+#endif
+diff --git a/arch/arm/boot/dts/sun5i-a13-hsg-h702.dts b/arch/arm/boot/dts/sun5i-a13-hsg-h702.dts
+index 4b8808ab9711..3724b988064e 100644
+--- a/arch/arm/boot/dts/sun5i-a13-hsg-h702.dts
++++ b/arch/arm/boot/dts/sun5i-a13-hsg-h702.dts
+@@ -130,6 +130,10 @@
+ 	status = "okay";
+ };
  
- 	/* Second, look at endpoints until an unclaimed one looks usable */
- 	list_for_each_entry (ep, &gadget->ep_list, ep_list) {
-diff --git a/drivers/usb/gadget/udc/goku_udc.c b/drivers/usb/gadget/udc/goku_udc.c
-index 46b8d14..d5a93ea 100644
---- a/drivers/usb/gadget/udc/goku_udc.c
-+++ b/drivers/usb/gadget/udc/goku_udc.c
-@@ -990,6 +990,30 @@ static int goku_get_frame(struct usb_gadget *_gadget)
- 	return -EOPNOTSUPP;
- }
++&otg_sram {
++	status = "okay";
++};
++
+ &pio {
+ 	mmc0_cd_pin_h702: mmc0_cd_pin at 0 {
+ 		allwinner,pins = "PG0";
+@@ -137,6 +141,20 @@
+ 		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+ 		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+ 	};
++
++	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
++		allwinner,pins = "PG2";
++		allwinner,function = "gpio_in";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
++	};
++
++	usb0_vbus_detect_pin: usb0_vbus_detect_pin at 0 {
++		allwinner,pins = "PG1";
++		allwinner,function = "gpio_in";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
+ };
  
-+static struct usb_ep *goku_match_ep(struct usb_gadget *g,
-+		struct usb_endpoint_descriptor *desc,
-+		struct usb_ss_ep_comp_descriptor *ep_comp)
-+{
-+	struct goku_udc	*dev = to_goku_udc(g);
-+	struct usb_ep *ep;
-+	u8 type = usb_endpoint_type(desc);
+ #include "axp209.dtsi"
+@@ -172,13 +190,33 @@
+ 	regulator-name = "vcc-wifi";
+ };
+ 
++&reg_usb0_vbus {
++	pinctrl-0 = <&usb0_vbus_pin_a>;
++	gpio = <&pio 6 12 GPIO_ACTIVE_HIGH>; /* PG12 */
++	status = "okay";
++};
 +
-+	if (type == USB_ENDPOINT_XFER_INT) {
-+		/* single buffering is enough */
-+		ep = &dev->ep[3].ep;
-+		if (ep && usb_gadget_ep_match_desc(g, ep, desc, ep_comp))
-+			return ep;
-+	} else if (type == USB_ENDPOINT_XFER_BULK
-+			&& usb_endpoint_dir_in(desc)) {
-+		/* DMA may be available */
-+		ep = &dev->ep[2].ep;
-+		if (ep && usb_gadget_ep_match_desc(g, ep, desc, ep_comp))
-+			return ep;
-+	}
+ &uart1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart1_pins_b>;
+ 	status = "okay";
+ };
+ 
++&usb_otg {
++	dr_mode = "otg";
++	status = "okay";
++};
 +
-+	return NULL;
-+}
++&usb0_vbus_pin_a {
++	allwinner,pins = "PG12";
++};
 +
- static int goku_udc_start(struct usb_gadget *g,
- 		struct usb_gadget_driver *driver);
- static int goku_udc_stop(struct usb_gadget *g);
-@@ -998,6 +1022,7 @@ static const struct usb_gadget_ops goku_ops = {
- 	.get_frame	= goku_get_frame,
- 	.udc_start	= goku_udc_start,
- 	.udc_stop	= goku_udc_stop,
-+	.match_ep	= goku_match_ep,
- 	// no remote wakeup
- 	// not selfpowered
+ &usbphy {
++	pinctrl-names = "default";
++	pinctrl-0 = <&usb0_id_detect_pin>, <&usb0_vbus_detect_pin>;
++	usb0_id_det-gpios = <&pio 6 2 GPIO_ACTIVE_HIGH>; /* PG2 */
++	usb0_vbus_det-gpios = <&pio 6 1 GPIO_ACTIVE_HIGH>; /* PG1 */
++	usb0_vbus-supply = <&reg_usb0_vbus>;
+ 	usb1_vbus-supply = <&reg_ldo3>;
+ 	status = "okay";
  };
 -- 
-1.9.1
+2.5.0
