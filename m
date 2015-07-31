@@ -1,92 +1,78 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Fri, 31 Jul 2015 14:59:54 +0200
-Subject: [PATCH v2 7/7] KVM: arm: implement kvm_set_msi by gsi direct
- mapping
-In-Reply-To: <55A05282.6020105@arm.com>
-References: <1436430137-24205-1-git-send-email-eric.auger@linaro.org>
- <1436430137-24205-8-git-send-email-eric.auger@linaro.org>
- <55A05282.6020105@arm.com>
-Message-ID: <55BB714A.8030307@linaro.org>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Fri, 31 Jul 2015 21:03:53 +0800
+Subject: [PATCH v4 2/5] dt-bindings: Add a binding for Mediatek xHCI host
+ controller
+In-Reply-To: <1438347836-29060-1-git-send-email-chunfeng.yun@mediatek.com>
+References: <1438347836-29060-1-git-send-email-chunfeng.yun@mediatek.com>
+Message-ID: <1438347836-29060-3-git-send-email-chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andre,
-On 07/11/2015 01:17 AM, Andre Przywara wrote:
-> On 09/07/15 09:22, Eric Auger wrote:
->> If the ITS modality is not available, let's simply support MSI
->> injection by transforming the MSI.data into an SPI ID.
->>
->> This becomes possible to use KVM_SIGNAL_MSI ioctl for arm too.
->>
->> Signed-off-by: Eric Auger <eric.auger@linaro.org>
->>
->> ---
->>
->> v1 -> v2:
->> - introduce vgic_v2m_inject_msi in vgic-v2-emul.c following Andre's
->>   advice
->> ---
->>  arch/arm/kvm/Kconfig        |  1 +
->>  virt/kvm/arm/vgic-v2-emul.c | 12 ++++++++++++
->>  2 files changed, 13 insertions(+)
->>
->> diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
->> index 151e710..0f58baf 100644
->> --- a/arch/arm/kvm/Kconfig
->> +++ b/arch/arm/kvm/Kconfig
->> @@ -31,6 +31,7 @@ config KVM
->>  	select KVM_VFIO
->>  	select HAVE_KVM_EVENTFD
->>  	select HAVE_KVM_IRQFD
->> +	select HAVE_KVM_MSI
-> 
-> I wonder if this requires some more code to only advertise
-> KVM_CAP_SIGNAL_MSI if userland actually sets up a GICv2M?
-> Otherwise userland could get the idea of being able to inectj MSIs
-> without the guest actually being prepared for that (because the GICv2M
-> driver did not initialize).
-Not sure I get what you mean here. By directly transforming the user
-provided MSI msg into an SPI ID, do we really have to care about GICv2M?
+add a DT binding documentation of xHCI host controller for the
+MT8173 SoC from Mediatek.
 
-Best Regards
+Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+---
+ .../devicetree/bindings/usb/mt8173-xhci.txt        | 51 ++++++++++++++++++++++
+ 1 file changed, 51 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/usb/mt8173-xhci.txt
 
-Eric
-> 
-> Cheers,
-> Andre.
-> 
->>  	select HAVE_KVM_IRQCHIP
->>  	select HAVE_KVM_IRQ_ROUTING
->>  	depends on ARM_VIRT_EXT && ARM_LPAE && ARM_ARCH_TIMER
->> diff --git a/virt/kvm/arm/vgic-v2-emul.c b/virt/kvm/arm/vgic-v2-emul.c
->> index 1390797..43013cc 100644
->> --- a/virt/kvm/arm/vgic-v2-emul.c
->> +++ b/virt/kvm/arm/vgic-v2-emul.c
->> @@ -478,6 +478,17 @@ static bool vgic_v2_queue_sgi(struct kvm_vcpu *vcpu, int irq)
->>  }
->>  
->>  /**
->> + * Emulates GICv2M MSI injection by injecting the SPI ID matching
->> + * the msi data
->> + * @kvm: pointer to the kvm struct
->> + * @msi: the msi struct handle
->> + */
->> +static int vgic_v2m_inject_msi(struct kvm *kvm, struct kvm_msi *msi)
->> +{
->> +	return kvm_vgic_inject_irq(kvm, 0, msi->data, 1);
->> +}
->> +
->> +/**
->>   * kvm_vgic_map_resources - Configure global VGIC state before running any VCPUs
->>   * @kvm: pointer to the kvm struct
->>   *
->> @@ -566,6 +577,7 @@ void vgic_v2_init_emulation(struct kvm *kvm)
->>  	dist->vm_ops.add_sgi_source = vgic_v2_add_sgi_source;
->>  	dist->vm_ops.init_model = vgic_v2_init_model;
->>  	dist->vm_ops.map_resources = vgic_v2_map_resources;
->> +	dist->vm_ops.inject_msi = vgic_v2m_inject_msi;
->>  
->>  	kvm->arch.max_vcpus = VGIC_V2_MAX_CPUS;
->>  }
->>
-> 
+diff --git a/Documentation/devicetree/bindings/usb/mt8173-xhci.txt b/Documentation/devicetree/bindings/usb/mt8173-xhci.txt
+new file mode 100644
+index 0000000..364be5a
+--- /dev/null
++++ b/Documentation/devicetree/bindings/usb/mt8173-xhci.txt
+@@ -0,0 +1,51 @@
++MT65XX xhci
++
++The device node for Mediatek SOC usb3.0 host controller
++
++Required properties:
++ - compatible : Supports "mediatek,mt8173-xhci"
++ - reg : Specifies physical base address and size of the registers,
++	the first one for MAC, the second for IPPC
++ - interrupts : Interrupt mode, number and trigger mode
++ - power-domains : To enable usb's mtcmos
++ - vusb33-supply : Regulator of usb avdd3.3v
++ - clocks : Must support all clocks that xhci needs
++ - clock-names : Should be "sys_mac" for sys and mac clocks, and
++	"wakeup_deb_p0", "wakeup_deb_p1" for wakeup debounce control
++	clocks
++ - phys : List of PHY specifiers (used by generic PHY framework).
++ - phy-names : Must be "usb-phy0", "usb-phy1",.., "usb-phyN", based on
++	the number of PHYs as specified in @phys property.
++ - usb3-lpm-capable : Supports USB3 LPM
++ - mediatek,usb-wakeup : To access usb wakeup control register
++ - mediatek,wakeup-src : 1: Ip sleep wakeup mode; 2: line state wakeup
++	mode; others means don't enable wakeup source of usb
++ - mediatek,u2port-num : The number should not greater than the number
++	of phys
++
++Optional properties:
++ - vbus-supply : Reference to the VBUS regulator;
++
++Example:
++usb: usb at 11270000 {
++	compatible = "mediatek,mt8173-xhci";
++	reg = <0 0x11270000 0 0x4000>,
++	      <0 0x11280000 0 0x0800>;
++	interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_LOW>;
++	power-domains = <&scpsys MT8173_POWER_DOMAIN_USB>;
++	clocks = <&topckgen CLK_TOP_USB30_SEL>,
++		 <&pericfg CLK_PERI_USB0>,
++		 <&pericfg CLK_PERI_USB1>;
++	clock-names = "sys_mac",
++		      "wakeup_deb_p0",
++		      "wakeup_deb_p1";
++	phys = <&u3phy 0>, <&u3phy 1>;
++	phy-names = "usb-phy0", "usb-phy1";
++	vusb33-supply = <&mt6397_vusb_reg>;
++	vbus-supply = <&usb_p1_vbus>;
++	usb3-lpm-capable;
++	mediatek,usb-wakeup = <&pericfg>;
++	mediatek,wakeup-src = <1>;
++	mediatek,u2port-num = <2>;
++	status = "okay";
++};
+-- 
+1.8.1.1.dirty
