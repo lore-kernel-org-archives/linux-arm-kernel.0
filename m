@@ -1,75 +1,43 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 31 Jul 2015 11:39:37 +0200
-Subject: [PATCH 01/23] Documentation: dt: atmel-at91: add clocks to system
- timer, rstc and shdwc
+Date: Fri, 31 Jul 2015 11:39:39 +0200
+Subject: [PATCH 03/23] Documentation: watchdog: at91sam9_wdt: add clocks
+ property
 In-Reply-To: <1438335599-3301-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1438335599-3301-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1438335599-3301-2-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1438335599-3301-4-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The system timer (at91rm9200), the reset controller and the shutdown
-controller need an input clock. This is the slow clock and they will not
-function without it.
-
-Also fix the shutdown controller example.
+The watchdog has an input clock, the slow clock. It is required as it will
+not function without it.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Reviewed-by: Guenter Roeck <linux@roeck-us.net>
 ---
-Cc: Sebastian Reichel <sre@kernel.org>
-Cc: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
-Cc: linux-pm at vger.kernel.org
- Documentation/devicetree/bindings/arm/atmel-at91.txt | 11 ++++++++---
- 1 file changed, 8 insertions(+), 3 deletions(-)
+Cc: Wim Van Sebroeck <wim@iguana.be>
+Cc: linux-watchdog at vger.kernel.org
+ Documentation/devicetree/bindings/watchdog/atmel-wdt.txt | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/atmel-at91.txt b/Documentation/devicetree/bindings/arm/atmel-at91.txt
-index 424ac8cbfa08..209710cdf3aa 100644
---- a/Documentation/devicetree/bindings/arm/atmel-at91.txt
-+++ b/Documentation/devicetree/bindings/arm/atmel-at91.txt
-@@ -50,6 +50,7 @@ System Timer (ST) required properties:
- - reg: Should contain registers location and length
- - interrupts: Should contain interrupt for the ST which is the IRQ line
-   shared across all System Controller members.
-+- clocks: phandle to input clock.
- Its subnodes can be:
- - watchdog: compatible should be "atmel,at91rm9200-wdt"
- 
-@@ -89,12 +90,14 @@ RSTC Reset Controller required properties:
- - compatible: Should be "atmel,<chip>-rstc".
-   <chip> can be "at91sam9260" or "at91sam9g45"
- - reg: Should contain registers location and length
+diff --git a/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
+index a4d869744f59..86fa6de1019b 100644
+--- a/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
++++ b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
+@@ -6,6 +6,7 @@ Required properties:
+ - compatible: must be "atmel,at91sam9260-wdt".
+ - reg: physical base address of the controller and length of memory mapped
+   region.
 +- clocks: phandle to input clock.
  
- Example:
- 
- 	rstc at fffffd00 {
- 		compatible = "atmel,at91sam9260-rstc";
- 		reg = <0xfffffd00 0x10>;
+ Optional properties:
+ - timeout-sec: contains the watchdog timeout in seconds.
+@@ -39,6 +40,7 @@ Example:
+ 		compatible = "atmel,at91sam9260-wdt";
+ 		reg = <0xfffffd40 0x10>;
+ 		interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
 +		clocks = <&clk32k>;
- 	};
- 
- RAMC SDRAM/DDR Controller required properties:
-@@ -117,6 +120,7 @@ required properties:
- - compatible: Should be "atmel,<chip>-shdwc".
-   <chip> can be "at91sam9260", "at91sam9rl" or "at91sam9x5".
- - reg: Should contain registers location and length
-+- clocks: phandle to input clock.
- 
- optional properties:
- - atmel,wakeup-mode: String, operation mode of the wakeup mode.
-@@ -135,9 +139,10 @@ optional at91sam9x5 properties:
- 
- Example:
- 
--	rstc at fffffd00 {
--		compatible = "atmel,at91sam9260-rstc";
--		reg = <0xfffffd00 0x10>;
-+	shdwc at fffffd10 {
-+		compatible = "atmel,at91sam9260-shdwc";
-+		reg = <0xfffffd10 0x10>;
-+		clocks = <&clk32k>;
- 	};
- 
- Special Function Registers (SFR)
+ 		timeout-sec = <15>;
+ 		atmel,watchdog-type = "hardware";
+ 		atmel,reset-type = "all";
 -- 
 2.1.4
