@@ -1,72 +1,64 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 30 Jul 2015 22:51:06 -0700
-Subject: [PATCH V3 07/16] PM / OPP: Add support to parse
- "operating-points-v2" bindings
-In-Reply-To: <6d8d9cd0c3ae2d3fa8c3aadedb5ac403785b7675.1438166099.git.viresh.kumar@linaro.org>
-References: <cover.1438166099.git.viresh.kumar@linaro.org>
- <6d8d9cd0c3ae2d3fa8c3aadedb5ac403785b7675.1438166099.git.viresh.kumar@linaro.org>
-Message-ID: <20150731055106.GJ3159@codeaurora.org>
+From: bonbons@linux-vserver.org (Bruno =?UTF-8?B?UHLDqW1vbnQ=?=)
+Date: Fri, 31 Jul 2015 07:51:04 +0200
+Subject: [linux-sunxi] [PATCH 6/8] ARM: dts: axp209: Add
+ usb_power_supply child node to the ax209 node
+In-Reply-To: <CAGb2v66X79dK84hG8NVTho-kPPMNcKXQspvT2pCM8Zbmnme53A@mail.gmail.com>
+References: <1433885881-19809-1-git-send-email-hdegoede@redhat.com>
+ <1433885881-19809-7-git-send-email-hdegoede@redhat.com>
+ <CAGb2v66X79dK84hG8NVTho-kPPMNcKXQspvT2pCM8Zbmnme53A@mail.gmail.com>
+Message-ID: <20150731075104.48c467e6@pluto.restena.lu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/29, Viresh Kumar wrote:
-> This adds support in OPP library to parse and create list of OPPs from
-> operating-points-v2 bindings. It takes care of most of the properties of
-> new bindings (except shared-opp, which will be handled separately).
+Hi ChenYu,
+
+On Fri, 31 Jul 2015 13:31:53 +0800 Chen-Yu Tsai wrote:
+> Hi Hans,
 > 
-> For backward compatibility, we keep supporting earlier bindings. We try
-> to search for the new bindings first, in case they aren't present we
-> look for the old deprecated ones.
+> On Wed, Jun 10, 2015 at 5:37 AM, Hans de Goede <hdegoede@redhat.com> wrote:
+> > Add a node representing the usb power supply part of the axp209 pmic, note
+> > that the usb power supply and the (to be added later) ac power supply will
+> > each have their own child-node, so that they can be separately specified
+> > as power-supply for other nodes using a power-supply property with a
+> > phandle pointing to the right axp209 child-node.
+> >
+> > Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> > ---
+> >  arch/arm/boot/dts/axp209.dtsi | 5 +++++
+> >  1 file changed, 5 insertions(+)
+> >
+> > diff --git a/arch/arm/boot/dts/axp209.dtsi b/arch/arm/boot/dts/axp209.dtsi
+> > index 24c935c..051ab3b 100644
+> > --- a/arch/arm/boot/dts/axp209.dtsi
+> > +++ b/arch/arm/boot/dts/axp209.dtsi
+> > @@ -89,4 +89,9 @@
+> >                         regulator-name = "ldo5";
+> >                 };
+> >         };
+> > +
+> > +       usb_power_supply: usb_power_supply {
+> > +               compatible = "x-powers,axp202-usb-power-supply";
+> > +               status = "disabled";
 > 
-> There are few things marked as TODO:
-> - Support for multiple OPP tables
-> - Support for multiple regulators
+> Is there any reason to have this disabled by default?
+> AFAIK this is not something configurable in hardware,
+> and the driver just gives readouts and status updates.
+
+There are some devices that only have 'AC-IN' instead of usb/otg power
+(set-top boxes) so having the devices tell what power sources they
+have makes sense (otherwise those that have ac-in instead of otg would
+have to disable usb_power_supply) and avoids confusion by explicitly
+stating presence in device dts.
+
+NB: I should hopefully get my battery supply driver ported this WE,
+ac-in/rtc are done, this WE. I'm going to default-off for them as well
+(note that for some extra details should be provided in dts).
+
+Bruno
+
+> ChenYu
 > 
-> They should be fixed separately.
-> 
-> Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-
-Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
-
-One question below:
-
-> @@ -679,6 +691,125 @@ static int _opp_add_dynamic(struct device *dev, unsigned long freq,
->  	return ret;
->  }
->  
-> +/* TODO: Support multiple regulators */
-> +static int opp_get_microvolt(struct dev_pm_opp *opp, struct device *dev)
-> +{
-> +	u32 microvolt[3] = {0};
-> +	int count, ret;
-> +
-> +	count = of_property_count_u32_elems(opp->np, "opp-microvolt");
-> +	if (!count)
-> +		return 0;
-> +
-> +	/* There can be one or three elements here */
-> +	if (count != 1 && count != 3) {
-> +		dev_err(dev, "%s: Invalid number of elements in opp-microvolt property (%d)\n",
-> +			__func__, count);
-> +		return -EINVAL;
-> +	}
-> +
-> +	ret = of_property_read_u32_array(opp->np, "opp-microvolt", microvolt,
-> +					 count);
-> +	if (ret) {
-> +		dev_err(dev, "%s: error parsing opp-microvolt: %d\n", __func__,
-> +			ret);
-> +		return -EINVAL;
-> +	}
-> +
-> +	opp->u_volt = microvolt[0];
-> +	opp->u_volt_min = microvolt[1];
-> +	opp->u_volt_max = microvolt[2];
-
-Should the default be 0 and ULONG_MAX for volt_min/volt_max when
-there's on element?
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+> > +       };
+> >  };
+> > --
+> > 2.3.6
