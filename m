@@ -1,57 +1,38 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Fri, 31 Jul 2015 16:47:55 -0500
-Subject: [GIT PULL] qcom SoC changes for 4.3 *CORRECTED*
-Message-ID: <1438379275-6314-1-git-send-email-agross@codeaurora.org>
+From: santosh.shilimkar@oracle.com (santosh.shilimkar at oracle.com)
+Date: Fri, 31 Jul 2015 15:06:50 -0700
+Subject: [PATCH 2/2] ARM: dts: keystone: fix dt bindings to use post div
+ register for mainpll
+In-Reply-To: <20150731203035.GA23144@localhost>
+References: <1432915453-409-1-git-send-email-m-karicheri2@ti.com>
+ <1432915453-409-2-git-send-email-m-karicheri2@ti.com>
+ <55BB947B.7090608@oracle.com> <20150731203035.GA23144@localhost>
+Message-ID: <55BBF17A.2030102@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
+On 7/31/15 1:30 PM, Olof Johansson wrote:
+> On Fri, Jul 31, 2015 at 08:30:03AM -0700, santosh shilimkar wrote:
+>> Olof,
+>>
+>> As discussed patch 1/2 is already made it via clock tree. Please
+>> pick the subject fix for your upcoming fixes pull request.
+>>
+>> On 5/29/2015 9:04 AM, Murali Karicheri wrote:
+>>> All of the keystone devices have a separate register to hold post
+>>> divider value for main pll clock. Currently the fixed-postdiv
+>>> value used for k2hk/l/e SoCs works by sheer luck as u-boot happens to
+>>> use a value of 2 for this. Now that we have fixed this in the pll
+>>> clock driver change the dt bindings for the same.
+>>>
+>>> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+>>> ---
+>> Acked-by: Santosh Shilimkar <ssantosh@kernel.org>
+>>
+>>
+>
+> Thanks, applied.
+>
+Thanks Olof !!
 
-  Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
-
-are available in the git repository at:
-
-  git://codeaurora.org/quic/kernel/agross-msm.git tags/qcom-soc-for-4.3
-
-for you to fetch changes up to ba68227e610cec8e0bef7da7e04af3f479d9797d:
-
-  devicetree: soc: Add Qualcomm SMD based RPM DT binding (2015-07-29 14:13:48 -0500)
-
-----------------------------------------------------------------
-Qualcomm ARM Based SoC Updates for 4.3
-
-* Add SMEM driver
-* Add SMD driver
-* Add RPM over SMD driver
-* Select QCOM_SCM by default
-
-----------------------------------------------------------------
-Bjorn Andersson (5):
-      soc: qcom: Add Shared Memory Manager driver
-      soc: qcom: Add device tree binding for Shared Memory Device
-      soc: qcom: Add Shared Memory Driver
-      soc: qcom: Driver for the Qualcomm RPM over SMD
-      devicetree: soc: Add Qualcomm SMD based RPM DT binding
-
-Lina Iyer (1):
-      drivers: qcom: Select QCOM_SCM unconditionally for QCOM_PM
-
- .../devicetree/bindings/soc/qcom,smd-rpm.txt       |  117 ++
- .../devicetree/bindings/soc/qcom/qcom,smd.txt      |   79 ++
- drivers/soc/qcom/Kconfig                           |   31 +
- drivers/soc/qcom/Makefile                          |    3 +
- drivers/soc/qcom/smd-rpm.c                         |  244 ++++
- drivers/soc/qcom/smd.c                             | 1319 ++++++++++++++++++++
- drivers/soc/qcom/smem.c                            |  775 ++++++++++++
- include/linux/soc/qcom/smd-rpm.h                   |   35 +
- include/linux/soc/qcom/smd.h                       |   46 +
- include/linux/soc/qcom/smem.h                      |   11 +
- 10 files changed, 2660 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/soc/qcom,smd-rpm.txt
- create mode 100644 Documentation/devicetree/bindings/soc/qcom/qcom,smd.txt
- create mode 100644 drivers/soc/qcom/smd-rpm.c
- create mode 100644 drivers/soc/qcom/smd.c
- create mode 100644 drivers/soc/qcom/smem.c
- create mode 100644 include/linux/soc/qcom/smd-rpm.h
- create mode 100644 include/linux/soc/qcom/smd.h
- create mode 100644 include/linux/soc/qcom/smem.h
+Regards,
+Santosh
