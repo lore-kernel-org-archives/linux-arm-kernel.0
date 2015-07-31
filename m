@@ -1,92 +1,83 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 31 Jul 2015 11:39:53 +0200
-Subject: [PATCH 17/23] power/reset: at91-reset: remove useless
- at91_reset_platform_probe()
+Date: Fri, 31 Jul 2015 11:39:59 +0200
+Subject: [PATCH 23/23] clk: at91: Revert "keep slow clk enabled to prevent
+ system hang"
 In-Reply-To: <1438335599-3301-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1438335599-3301-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1438335599-3301-18-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1438335599-3301-24-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since all the at91 platforms are now DT only, at91_reset_platform_probe()
-is now useless, remove it.
+Commit dca1a4b5ff6e ("clk: at91: keep slow clk enabled to prevent system
+hang") added a workaround for the slow clock as it is not properly handled
+by its users.
+
+Now that the slow clock is taken properly by the drivers, this workaround
+is not necessary anymore, revert it.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
-Cc: Sebastian Reichel <sre@kernel.org>
-Cc: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
-Cc: linux-pm at vger.kernel.or
- drivers/power/reset/at91-reset.c | 47 +++-------------------------------------
- 1 file changed, 3 insertions(+), 44 deletions(-)
+Cc: Michael Turquette <mturquette@baylibre.com>
+Cc: Stephen Boyd <sboyd@codeaurora.org>
+Cc: linux-clk at vger.kernel.org
+ drivers/clk/at91/clk-slow.c | 27 ---------------------------
+ 1 file changed, 27 deletions(-)
 
-diff --git a/drivers/power/reset/at91-reset.c b/drivers/power/reset/at91-reset.c
-index 36dc52fb2ec8..3225c8590ed0 100644
---- a/drivers/power/reset/at91-reset.c
-+++ b/drivers/power/reset/at91-reset.c
-@@ -169,11 +169,11 @@ static struct notifier_block at91_restart_nb = {
- 	.priority = 192,
- };
+diff --git a/drivers/clk/at91/clk-slow.c b/drivers/clk/at91/clk-slow.c
+index 98a84a865fe1..2c59d6a64dd5 100644
+--- a/drivers/clk/at91/clk-slow.c
++++ b/drivers/clk/at91/clk-slow.c
+@@ -70,7 +70,6 @@ struct clk_sam9x5_slow {
  
--static int at91_reset_of_probe(struct platform_device *pdev)
-+static int at91_reset_probe(struct platform_device *pdev)
+ #define to_clk_sam9x5_slow(hw) container_of(hw, struct clk_sam9x5_slow, hw)
+ 
+-static struct clk *slow_clk;
+ 
+ static int clk_slow_osc_prepare(struct clk_hw *hw)
  {
- 	const struct of_device_id *match;
- 	struct device_node *np;
--	int idx = 0;
-+	int ret, idx = 0;
- 
- 	at91_rstc_base = of_iomap(pdev->dev.of_node, 0);
- 	if (!at91_rstc_base) {
-@@ -192,49 +192,8 @@ static int at91_reset_of_probe(struct platform_device *pdev)
- 
- 	match = of_match_node(at91_reset_of_match, pdev->dev.of_node);
- 	at91_restart_nb.notifier_call = match->data;
--	return register_restart_handler(&at91_restart_nb);
--}
--
--static int at91_reset_platform_probe(struct platform_device *pdev)
--{
--	const struct platform_device_id *match;
--	struct resource *res;
--	int idx = 0;
--
--	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	at91_rstc_base = devm_ioremap_resource(&pdev->dev, res);
--	if (IS_ERR(at91_rstc_base)) {
--		dev_err(&pdev->dev, "Could not map reset controller address\n");
--		return PTR_ERR(at91_rstc_base);
--	}
--
--	for (idx = 0; idx < 2; idx++) {
--		res = platform_get_resource(pdev, IORESOURCE_MEM, idx + 1 );
--		at91_ramc_base[idx] = devm_ioremap(&pdev->dev, res->start,
--						   resource_size(res));
--		if (!at91_ramc_base[idx]) {
--			dev_err(&pdev->dev, "Could not map ram controller address\n");
--			return -ENOMEM;
--		}
--	}
--
--	match = platform_get_device_id(pdev);
--	at91_restart_nb.notifier_call =
--		(int (*)(struct notifier_block *,
--			 unsigned long, void *)) match->driver_data;
--
--	return register_restart_handler(&at91_restart_nb);
--}
--
--static int at91_reset_probe(struct platform_device *pdev)
--{
--	int ret;
--
--	if (pdev->dev.of_node)
--		ret = at91_reset_of_probe(pdev);
+@@ -358,8 +357,6 @@ at91_clk_register_sam9x5_slow(void __iomem *sckcr,
+ 	clk = clk_register(NULL, &slowck->hw);
+ 	if (IS_ERR(clk))
+ 		kfree(slowck);
 -	else
--		ret = at91_reset_platform_probe(pdev);
+-		slow_clk = clk;
  
-+	ret = register_restart_handler(&at91_restart_nb);
- 	if (ret)
- 		return ret;
+ 	return clk;
+ }
+@@ -436,8 +433,6 @@ at91_clk_register_sam9260_slow(struct at91_pmc *pmc,
+ 	clk = clk_register(NULL, &slowck->hw);
+ 	if (IS_ERR(clk))
+ 		kfree(slowck);
+-	else
+-		slow_clk = clk;
  
+ 	return clk;
+ }
+@@ -470,25 +465,3 @@ void __init of_at91sam9260_clk_slow_setup(struct device_node *np,
+ 
+ 	of_clk_add_provider(np, of_clk_src_simple_get, clk);
+ }
+-
+-/*
+- * FIXME: All slow clk users are not properly claiming it (get + prepare +
+- * enable) before using it.
+- * If all users properly claiming this clock decide that they don't need it
+- * anymore (or are removed), it is disabled while faulty users are still
+- * requiring it, and the system hangs.
+- * Prevent this clock from being disabled until all users are properly
+- * requesting it.
+- * Once this is done we should remove this function and the slow_clk variable.
+- */
+-static int __init of_at91_clk_slow_retain(void)
+-{
+-	if (!slow_clk)
+-		return 0;
+-
+-	__clk_get(slow_clk);
+-	clk_prepare_enable(slow_clk);
+-
+-	return 0;
+-}
+-arch_initcall(of_at91_clk_slow_retain);
 -- 
 2.1.4
