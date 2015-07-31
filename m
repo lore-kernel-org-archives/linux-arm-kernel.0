@@ -1,14 +1,14 @@
 From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Fri, 31 Jul 2015 12:41:21 -0700
-Subject: [PATCH 4.1 230/267] clocksource: exynos_mct: Avoid blocking calls in
+Date: Fri, 31 Jul 2015 12:41:46 -0700
+Subject: [PATCH 3.14 106/125] clocksource: exynos_mct: Avoid blocking calls in
  the cpu hotplug notifier
-In-Reply-To: <20150731194001.933895871@linuxfoundation.org>
-References: <20150731194001.933895871@linuxfoundation.org>
-Message-ID: <20150731194010.521475458@linuxfoundation.org>
+In-Reply-To: <20150731194027.037807932@linuxfoundation.org>
+References: <20150731194027.037807932@linuxfoundation.org>
+Message-ID: <20150731194030.865176167@linuxfoundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-4.1-stable review patch.  If anyone has any objections, please let me know.
+3.14-stable review patch.  If anyone has any objections, please let me know.
 
 ------------------
 
@@ -76,7 +76,7 @@ Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 
 --- a/drivers/clocksource/exynos_mct.c
 +++ b/drivers/clocksource/exynos_mct.c
-@@ -466,15 +466,12 @@ static int exynos4_local_timer_setup(str
+@@ -422,15 +422,12 @@ static int exynos4_local_timer_setup(str
  	exynos4_mct_write(TICK_BASE_CNT, mevt->base + MCT_L_TCNTB_OFFSET);
  
  	if (mct_int_type == MCT_INT_SPI) {
@@ -97,7 +97,7 @@ Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
  	} else {
  		enable_percpu_irq(mct_irqs[MCT_L0_IRQ], 0);
  	}
-@@ -487,10 +484,12 @@ static int exynos4_local_timer_setup(str
+@@ -443,10 +440,12 @@ static int exynos4_local_timer_setup(str
  static void exynos4_local_timer_stop(struct clock_event_device *evt)
  {
  	evt->set_mode(CLOCK_EVT_MODE_UNUSED, evt);
@@ -113,7 +113,7 @@ Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
  }
  
  static int exynos4_mct_cpu_notify(struct notifier_block *self,
-@@ -522,7 +521,7 @@ static struct notifier_block exynos4_mct
+@@ -478,7 +477,7 @@ static struct notifier_block exynos4_mct
  
  static void __init exynos4_timer_resources(struct device_node *np, void __iomem *base)
  {
@@ -122,7 +122,7 @@ Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
  	struct mct_clock_event_device *mevt = this_cpu_ptr(&percpu_mct_tick);
  	struct clk *mct_clk, *tick_clk;
  
-@@ -549,7 +548,25 @@ static void __init exynos4_timer_resourc
+@@ -505,7 +504,25 @@ static void __init exynos4_timer_resourc
  		WARN(err, "MCT: can't request IRQ %d (%d)\n",
  		     mct_irqs[MCT_L0_IRQ], err);
  	} else {
