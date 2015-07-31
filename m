@@ -1,83 +1,142 @@
 From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Fri, 31 Jul 2015 12:28:13 +0200
-Subject: [PATCH v2 0/22] On-demand device probing
-In-Reply-To: <CAL_Jsq+2q=c6JbER8EMOGFtR=a6gvHermb8DRo9dKyj6fvdnXg@mail.gmail.com>
+Date: Fri, 31 Jul 2015 12:32:45 +0200
+Subject: [PATCH v2 04/22] of/platform: add of_platform_device_find()
+In-Reply-To: <CAL_Jsq+2b4+pf9G1ynWSkDgyC1agmS-TdTVjzdfQKNBWuuOHgw@mail.gmail.com>
 References: <1438089593-7696-1-git-send-email-tomeu.vizoso@collabora.com>
- <CAL_Jsq+2q=c6JbER8EMOGFtR=a6gvHermb8DRo9dKyj6fvdnXg@mail.gmail.com>
-Message-ID: <CAAObsKDALm94ZFwY+jBv3o8++-trTviiaGctAvvuySw9sxmLRQ@mail.gmail.com>
+ <1438089593-7696-5-git-send-email-tomeu.vizoso@collabora.com>
+ <CAL_JsqJGhFXDKuayuKc2E58X5A7ZGN=uYCVDLnXw_t3_auBg+w@mail.gmail.com>
+ <CAAObsKBfRLdPc0gs55ARfa+qZJAOEyEgRyTf8krZnQMb6-j03g@mail.gmail.com>
+ <CAL_Jsq+RqGAxHE5-ocD-htddBHckG24oZNqfgmMF3Jak6wDXBQ@mail.gmail.com>
+ <CAAObsKA+vMsgiC52jReJckeDjXhdd=_NBocFbMapdwFReiY1SQ@mail.gmail.com>
+ <CAAObsKD9BN7dsEiNB=OvJkoOQPwxwnP794w=X4AwtYz3oxEJqw@mail.gmail.com>
+ <CAL_Jsq+2b4+pf9G1ynWSkDgyC1agmS-TdTVjzdfQKNBWuuOHgw@mail.gmail.com>
+Message-ID: <CAAObsKDjF9uOpX+m-AG0HRcwVrbveDwWP+swxo7-xPCHw_-voQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 July 2015 at 05:06, Rob Herring <robherring2@gmail.com> wrote:
-> On Tue, Jul 28, 2015 at 8:19 AM, Tomeu Vizoso
+On 29 July 2015 at 17:27, Rob Herring <robherring2@gmail.com> wrote:
+> On Wed, Jul 29, 2015 at 6:20 AM, Tomeu Vizoso
 > <tomeu.vizoso@collabora.com> wrote:
->> Hello,
->>
->> I have a problem with the panel on my Tegra Chromebook taking longer
->> than expected to be ready during boot (St?phane Marchesin reported what
->> is basically the same issue in [0]), and have looked into ordered
->> probing as a better way of solving this than moving nodes around in the
->> DT or playing with initcall levels and linking order.
->>
->> While reading the thread [1] that Alexander Holler started with his
->> series to make probing order deterministic, it occurred to me that it
->> should be possible to achieve the same by probing devices as they are
->> referenced by other devices.
->>
->> This basically reuses the information that is already implicit in the
->> probe() implementations, saving us from refactoring existing drivers or
->> adding information to DTBs.
->>
->> During review of v1 of this series Linus Walleij suggested that it
->> should be the device driver core to make sure that dependencies are
->> ready before probing a device. I gave this idea a try [2] but Mark Brown
->> pointed out to the logic duplication between the resource acquisition
->> and dependency discovery code paths (though I think it's fairly minor).
->>
->> To address that code duplication I experimented with Arnd's devm_probe
->> [3] concept of having drivers declare their dependencies instead of
->> acquiring them during probe, and while it worked [4], I don't think we
->> end up winning anything when compared to just probing devices on-demand
->> from resource getters.
->>
->> One remaining objection is to the "sprinkling" of calls to
->> fwnode_ensure_device() in the resource getters of each subsystem, but I
->> think it's the right thing to do given that the storage of resources is
->> currently subsystem-specific.
+>> On 29 July 2015 at 08:14, Tomeu Vizoso <tomeu.vizoso@collabora.com> wrote:
+>>> On 28 July 2015 at 17:31, Rob Herring <robherring2@gmail.com> wrote:
+>>>> On Tue, Jul 28, 2015 at 8:54 AM, Tomeu Vizoso
+>>>> <tomeu.vizoso@collabora.com> wrote:
+>>>>> On 28 July 2015 at 15:39, Rob Herring <robherring2@gmail.com> wrote:
+>>>>>> On Tue, Jul 28, 2015 at 8:19 AM, Tomeu Vizoso
+>>>>>> <tomeu.vizoso@collabora.com> wrote:
+>>>>>>> From an arbitrary node in the tree, find the enclosing node that
+>>>>>>> corresponds to a platform device, as registered by
+>>>>>>> of_platform_populate().
 >
-> Seems like a minor change to me.
+> [...]
 >
->> We could avoid the above by moving resource storage into the core, but I
->> don't think there's a compelling case for that.
+>>>>> If I had a way to get, say, a i2c device from its fwnode then I would
+>>>>> just need to make sure that a device's parent is probed before probing
+>>>>> it and everything would be cleaner in the OF case.
+>>>>
+>>>> If you have the struct device from the device_node, then you should be
+>>>> able to do this, right?
+>>>
+>>> Yes, if I could go back from the device_node to the struct device that
+>>> was registered from it, for all buses, then all this would be much
+>>> simpler and more robust. It would basically work like in the ACPI
+>>> case.
+>>>
+>>> I will play with this idea.
+>>>
+>>>>>> That is probably not the
+>>>>>> most efficient search, but we could fix that. We could add struct
+>>>>>> device ptr to struct device_node and check without searching for
+>>>>>> example.
+>>>>>
+>>>>> That would be great, but I thought there was an issue with a OF node
+>>>>> being able to be related to more than one struct device (but I haven't
+>>>>> found this myself yet).
+>>>>
+>>>> I think it pretty much should be one to one. I'm not aware of any
+>>>> examples where that is not the case. This function would already be
+>>>> broken if you could have more than one struct device.
+>>>
+>>> Well, for platform devices we currently know that there can only be
+>>> one struct device for a given device_node, but that's not so clear for
+>>> other devices.
 >>
->> I have tested this on boards with Tegra, iMX.6, Exynos and OMAP SoCs,
->> and these patches were enough to eliminate all the deferred probes
->> (except one in PandaBoard because omap_dma_system doesn't have a
->> firmware node as of yet).
+>> Just found this case:
 >>
->> With this series I get the kernel to output to the panel in 0.5s,
->> instead of 2.8s.
+>> http://lxr.free-electrons.com/source/drivers/spi/spi-tegra114.c#L1124
+>>
+>> Looks like SPI master devices point to the same device_node as the
+>> platform device that registers them.
 >
-> Generally, I think this looks pretty good. It is simple and the error
-> path is simply falling back to deferred probe.
+> I don't think this is a problem. The device ptr would only point to
+> the platform device. Nothing else is going to know about the ptr,
+> modify it nor expect that it points to the same struct device that
+> contains the of_node ptr.
 >
-> One overall comment is I'm not so sure if fwnode_ensure_device
-> shouldn't just be of_ensure_device. At least currently, it looks like
-> all the calling locations are DT specific functions anyway. There's
-> very little logic within the function to really benefit sharing with
-> ACPI. It is basically just a call to of_platform_device_find and then
-> bus_probe_device. I expect the get functions will always call into
-> DT/ACPI specific functions which can then call the firmware specific
-> device find function.
+> So I think any instances of struct device like this are ones you don't
+> care about for purposes of probe dependencies.
 
-That's fine with me. I just went that way because I assumed the plan
-was for subsystems to move to consume fw data through fwnode and drop
-as much fw-specific code as possible.
+Ok, I think I got it now. This is what I came up with and works fine
+on all the boards I'm testing with:
 
-But I have just looked at fwnode_get_named_gpiod and the OF and ACPI
-code paths are so dissimilar that I guess that's not so and would be
-better to do as you say.
+diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+index 89c5cd513027..e14518b5e1ce 100644
+--- a/drivers/of/platform.c
++++ b/drivers/of/platform.c
+@@ -192,6 +192,8 @@ static struct platform_device
+*of_platform_device_create_pdata(
+         goto err_clear_flag;
+     }
+
++    np->platform_dev = dev;
++
+     return dev;
+
+ err_clear_flag:
+@@ -501,59 +503,29 @@ void of_platform_depopulate(struct device *parent)
+ }
+ EXPORT_SYMBOL_GPL(of_platform_depopulate);
+
+ /**
+  * of_platform_device_find() - Find nearest ancestor that is a platform device
+  * @np: node to find platform device for
+  *
+- * Walks the tree up and finds the closest ancestor that has match data and
+- * either is at the root of the tree or is a child of a simple memory mapped
+- * bus.
++ * Walks the OF tree up and finds the closest ancestor that has a platform
++ * device associated with it.
+  *
+  * Returns such a device, or NULL if none could be found.
+  */
+ struct device *of_platform_device_find(struct device_node *np)
+ {
+     struct device_node *target;
+-    struct platform_device *pdev;
++    struct platform_device *pdev = NULL;
+
+     of_node_get(np);
+
+     for (target = np;
+          !of_node_is_root(target);
+          target = of_get_next_parent(target))
+-        if (of_is_platform(target))
++        if (target->platform_dev) {
++            pdev = target->platform_dev;
+             break;
+-
+-    pdev = of_find_device_by_node(target);
++        }
+
+     of_node_put(target);
 
 Thanks,
 
 Tomeu
+
+> Rob
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
