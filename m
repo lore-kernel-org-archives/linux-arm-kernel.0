@@ -1,9 +1,10 @@
 From: r.baldyga@samsung.com (Robert Baldyga)
-Date: Fri, 31 Jul 2015 16:00:34 +0200
-Subject: [PATCH v5 22/46] usb: gadget: mv_udc_core: add ep capabilities support
+Date: Fri, 31 Jul 2015 16:00:48 +0200
+Subject: [PATCH v5 36/46] usb: gadget: atmel_usba_udc: add ep capabilities
+ support
 In-Reply-To: <1438351258-31578-1-git-send-email-r.baldyga@samsung.com>
 References: <1438351258-31578-1-git-send-email-r.baldyga@samsung.com>
-Message-ID: <1438351258-31578-23-git-send-email-r.baldyga@samsung.com>
+Message-ID: <1438351258-31578-37-git-send-email-r.baldyga@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,43 +12,30 @@ Convert endpoint configuration to new capabilities model.
 
 Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
 ---
- drivers/usb/gadget/udc/mv_udc_core.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ drivers/usb/gadget/udc/atmel_usba_udc.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/drivers/usb/gadget/udc/mv_udc_core.c b/drivers/usb/gadget/udc/mv_udc_core.c
-index 5da37c9..339af51 100644
---- a/drivers/usb/gadget/udc/mv_udc_core.c
-+++ b/drivers/usb/gadget/udc/mv_udc_core.c
-@@ -1257,6 +1257,9 @@ static int eps_init(struct mv_udc *udc)
- 	ep->wedge = 0;
- 	ep->stopped = 0;
- 	usb_ep_set_maxpacket_limit(&ep->ep, EP0_MAX_PKT_SIZE);
-+	ep->ep.caps.type_control = true;
-+	ep->ep.caps.dir_in = true;
-+	ep->ep.caps.dir_out = true;
- 	ep->ep_num = 0;
- 	ep->ep.desc = &mv_ep0_desc;
- 	INIT_LIST_HEAD(&ep->queue);
-@@ -1269,14 +1272,20 @@ static int eps_init(struct mv_udc *udc)
- 		if (i % 2) {
- 			snprintf(name, sizeof(name), "ep%din", i / 2);
- 			ep->direction = EP_DIR_IN;
-+			ep->ep.caps.dir_in = true;
- 		} else {
- 			snprintf(name, sizeof(name), "ep%dout", i / 2);
- 			ep->direction = EP_DIR_OUT;
-+			ep->ep.caps.dir_out = true;
- 		}
- 		ep->udc = udc;
- 		strncpy(ep->name, name, sizeof(ep->name));
- 		ep->ep.name = ep->name;
+diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
+index 37d414e..267d84f 100644
+--- a/drivers/usb/gadget/udc/atmel_usba_udc.c
++++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
+@@ -2067,6 +2067,17 @@ static struct usba_ep * usba_udc_pdata(struct platform_device *pdev,
+ 		ep->can_dma = pdata->ep[i].can_dma;
+ 		ep->can_isoc = pdata->ep[i].can_isoc;
  
-+		ep->ep.caps.type_iso = true;
-+		ep->ep.caps.type_bulk = true;
-+		ep->ep.caps.type_int = true;
++		if (i == 0) {
++			ep->ep.caps.type_control = true;
++		} else {
++			ep->ep.caps.type_iso = ep->can_isoc;
++			ep->ep.caps.type_bulk = true;
++			ep->ep.caps.type_int = true;
++		}
 +
- 		ep->ep.ops = &mv_ep_ops;
- 		ep->stopped = 0;
- 		usb_ep_set_maxpacket_limit(&ep->ep, (unsigned short) ~0);
++		ep->ep.caps.dir_in = true;
++		ep->ep.caps.dir_out = true;
++
+ 		if (i)
+ 			list_add_tail(&ep->ep.ep_list, &udc->gadget.ep_list);
+ 	}
 -- 
 1.9.1
