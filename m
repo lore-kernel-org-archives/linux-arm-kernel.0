@@ -1,43 +1,210 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 31 Jul 2015 18:28:34 +0100
-Subject: [PATCH] arm64: dma-mapping: Simplify pgprot handling
-Message-ID: <a82d2ce0db8d1511ea91bb37ef8432ce33b4719e.1438363644.git.robin.murphy@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Fri, 31 Jul 2015 18:43:04 +0100
+Subject: [PATCH v6 1/8] Documentation: add DT binding for ARM System Control
+ and Power Interface(SCPI) protocol
+In-Reply-To: <1438364591-1144-1-git-send-email-sudeep.holla@arm.com>
+References: <1438364591-1144-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1438364591-1144-2-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since __get_dma_pgprot() does The Right Thing(TM) in the non-coherent
-case, and the non-cacheable alias for DMA buffers is private to the
-kernel anyway, we can simplify things slightly and make the code more
-readable by just using PAGE_KERNEL as the base pgprot.
+This patch adds devicetree binding for System Control and Power
+Interface (SCPI) Message Protocol used between the Application Cores(AP)
+and the System Control Processor(SCP). The MHU peripheral provides a
+mechanism for inter-processor communication between SCP's M3 processor
+and AP.
 
-Suggested-by: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+SCP offers control and management of the core/cluster power states,
+various power domain DVFS including the core/cluster, certain system
+clocks configuration, thermal sensors and many others.
+
+Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Rob Herring <robh+dt@kernel.org>
+CC: Jassi Brar <jassisinghbrar@gmail.com>
+Cc: Liviu Dudau <Liviu.Dudau@arm.com>
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Jon Medhurst (Tixy) <tixy@linaro.org>
+Cc: devicetree at vger.kernel.org
 ---
- arch/arm64/mm/dma-mapping.c | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
+ Documentation/devicetree/bindings/arm/arm,scpi.txt | 150 +++++++++++++++++++++
+ MAINTAINERS                                        |   6 +
+ 2 files changed, 156 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/arm,scpi.txt
 
-diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-index e5d74cd..0bcc4bc 100644
---- a/arch/arm64/mm/dma-mapping.c
-+++ b/arch/arm64/mm/dma-mapping.c
-@@ -144,6 +144,7 @@ static void *__dma_alloc(struct device *dev, size_t size,
- 	struct page *page;
- 	void *ptr, *coherent_ptr;
- 	bool coherent = is_device_dma_coherent(dev);
-+	pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL, false);
+diff --git a/Documentation/devicetree/bindings/arm/arm,scpi.txt b/Documentation/devicetree/bindings/arm/arm,scpi.txt
+new file mode 100644
+index 000000000000..e309249db536
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/arm,scpi.txt
+@@ -0,0 +1,150 @@
++System Control and Power Interface (SCPI) Message Protocol
++----------------------------------------------------------
++
++Firmware implementing the SCPI described in ARM document number ARM DUI 0922B
++("ARM Compute Subsystem SCP: Message Interface Protocols")[0] can be used
++by Linux to initiate various system control and power operations.
++
++Required properties:
++
++- compatible : should be "arm,scpi"
++- mboxes: List of phandle and mailbox channel specifiers
++	  All the channels reserved by remote SCP firmware for use by
++	  SCPI message protocol should be specified in any order
++- shmem : List of phandle pointing to the shared memory(SHM) area between the
++	  processors using these mailboxes for IPC, one for each mailbox
++	  SHM can be any memory reserved for the purpose of this communication
++	  between the processors.
++
++See Documentation/devicetree/bindings/mailbox/mailbox.txt
++for more details about the generic mailbox controller and
++client driver bindings.
++
++Clock bindings for the clocks based on SCPI Message Protocol
++------------------------------------------------------------
++
++This binding uses the common clock binding[1].
++
++Container Node
++==============
++Required properties:
++- compatible : should be "arm,scpi-clocks"
++	       All the clocks provided by SCP firmware via SCPI message
++	       protocol much be listed as sub-nodes under this node.
++
++Sub-nodes
++=========
++Required properties:
++- compatible : shall include one of the following
++	"arm,scpi-dvfs-clocks" - all the clocks that are variable and index based.
++		These clocks don't provide an entire range of values between the
++		limits but only discrete points within the range. The firmware
++		provides the mapping for each such operating frequency and the
++		index associated with it. The firmware also manages the
++		voltage scaling appropriately with the clock scaling.
++	"arm,scpi-variable-clocks" - all the clocks that are variable and provide full
++		range within the specified range. The firmware provides the
++		range of values within a specified range.
++
++Other required properties for all clocks(all from common clock binding):
++- #clock-cells : Should be 1. Contains the Clock ID value used by SCPI commands.
++- clock-output-names : shall be the corresponding names of the outputs.
++- clock-indices: The identifying number for the clocks(i.e.clock_id) in the
++	node. It can be non linear and hence provide the mapping of identifiers
++	into the clock-output-names array.
++
++SRAM and Shared Memory for SCPI
++-------------------------------
++
++A small area of SRAM is reserved for SCPI communication between application
++processors and SCP.
++
++Required properties:
++- compatible : should be "arm,juno-sram-ns" for Non-secure SRAM on Juno
++
++The rest of the properties should follow the generic mmio-sram description
++found in ../../misc/sysram.txt
++
++Each sub-node represents the reserved area for SCPI.
++
++Required sub-node properties:
++- reg : The base offset and size of the reserved area with the SRAM
++- compatible : should be "arm,juno-scp-shmem" for Non-secure SRAM based
++	       shared memory on Juno platforms
++
++[0] http://community.arm.com/servlet/JiveServlet/download/8401-45-18326/DUI0922B_scp_message_interface.pdf
++[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
++
++Example:
++
++sram: sram at 50000000 {
++	compatible = "arm,juno-sram-ns", "mmio-sram";
++	reg = <0x0 0x50000000 0x0 0x10000>;
++
++	#address-cells = <1>;
++	#size-cells = <1>;
++	ranges = <0 0x0 0x50000000 0x10000>;
++
++	cpu_scp_lpri: scp-shmem at 0 {
++		compatible = "arm,juno-scp-shmem";
++		reg = <0x0 0x200>;
++	};
++
++	cpu_scp_hpri: scp-shmem at 200 {
++		compatible = "arm,juno-scp-shmem";
++		reg = <0x200 0x200>;
++	};
++};
++
++mailbox: mailbox0 at 40000000 {
++	....
++	#mbox-cells = <1>;
++};
++
++scpi_protocol: scpi at 2e000000 {
++	compatible = "arm,scpi";
++	mboxes = <&mailbox 0 &mailbox 1>;
++	shmem = <&cpu_scp_lpri &cpu_scp_hpri>;
++
++	clocks {
++		compatible = "arm,scpi-clocks";
++
++		scpi_dvfs: scpi_clocks at 0 {
++			compatible = "arm,scpi-dvfs-clocks";
++			#clock-cells = <1>;
++			clock-indices = <0>, <1>, <2>;
++			clock-output-names = "atlclk", "aplclk","gpuclk";
++		};
++		scpi_clk: scpi_clocks at 3 {
++			compatible = "arm,scpi-variable-clocks";
++			#clock-cells = <1>;
++			clock-indices = <3>, <4>;
++			clock-output-names = "pxlclk0", "pxlclk1";
++		};
++	};
++};
++
++cpu at 0 {
++	...
++	reg = <0 0>;
++	clocks = <&scpi_dvfs 0>;
++};
++
++hdlcd at 7ff60000 {
++	...
++	reg = <0 0x7ff60000 0 0x1000>;
++	clocks = <&scpi_clk 4>;
++};
++
++In the above example, the #clock-cells is set to 1 as required.
++scpi_dvfs has 3 output clocks namely: atlclk, aplclk, and gpuclk with 0,
++1 and 2 as clock-indices. scpi_clk has 2 output clocks namely: pxlclk0
++and pxlclk1 with 3 and 4 as clock-indices.
++
++The first consumer in the example is cpu at 0 and it has '0' as the clock
++specifier which points to the first entry in the output clocks of
++scpi_dvfs i.e. "atlclk".
++
++Similarly the second example is hdlcd at 7ff60000 and it has pxlclk1 as input
++clock. '4' in the clock specifier here points to the second entry
++in the output clocks of scpi_clocks  i.e. "pxlclk1"
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 9289ecb57b68..7dadaa87afac 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -8960,6 +8960,12 @@ W:	http://www.sunplus.com
+ S:	Supported
+ F:	arch/score/
  
- 	size = PAGE_ALIGN(size);
- 
-@@ -171,9 +172,7 @@ static void *__dma_alloc(struct device *dev, size_t size,
- 	/* create a coherent mapping */
- 	page = virt_to_page(ptr);
- 	coherent_ptr = dma_common_contiguous_remap(page, size, VM_USERMAP,
--				__get_dma_pgprot(attrs,
--					__pgprot(PROT_NORMAL_NC), false),
--					NULL);
-+						   prot, NULL);
- 	if (!coherent_ptr)
- 		goto no_map;
- 
++SYSTEM CONTROL & POWER INTERFACE (SCPI) Message Protocol drivers
++M:	Sudeep Holla <sudeep.holla@arm.com>
++L:	linux-arm-kernel at lists.infradead.org
++S:	Maintained
++F:	Documentation/devicetree/bindings/arm/arm,scpi.txt
++
+ SCSI CDROM DRIVER
+ M:	Jens Axboe <axboe@kernel.dk>
+ L:	linux-scsi at vger.kernel.org
 -- 
 1.9.1
