@@ -1,159 +1,167 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Fri, 31 Jul 2015 14:25:09 +0000
-Subject: [PATCH v6] PCI: Store PCIe bus address in struct of_pci_range
-In-Reply-To: <CAL_Jsq+aQVakaZf4xo7sxnVyTmPR+HJ-9ByyS6OYJ0PHDYOwmg@mail.gmail.com>
-References: <1438010223-124422-1-git-send-email-gabriele.paoloni@huawei.com>
- <20150729172053.GE31170@google.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E01D6F350@lhreml503-mbs>
- <CAL_JsqKs11-sXQTdBD+ZjbVYFWUHBARTW9q5MF1hCXUhZ+nWLQ@mail.gmail.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E01D6F94A@lhreml503-mbs>
- <20150730161447.GG9640@google.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E01D6FB3B@lhreml503-mbs>
- <20150730171445.GI9640@google.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E01D6FC15@lhreml503-mbs>
- <CAL_Jsq+aQVakaZf4xo7sxnVyTmPR+HJ-9ByyS6OYJ0PHDYOwmg@mail.gmail.com>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E01D70589@lhreml503-mbs>
+From: ian.campbell@citrix.com (Ian Campbell)
+Date: Fri, 31 Jul 2015 15:31:49 +0100
+Subject: [PATCH v3] dtb: Create a common home for cross-architecture dtsi
+ files.
+Message-ID: <1438353109-373-1-git-send-email-ian.campbell@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+cc Kishon]
+Commit 9ccd608070b6 "arm64: dts: add device tree for ARM SMM-A53x2 on
+LogicTile Express 20MG" added a new dts file to arch/arm64 which
+included "../../../../arm/boot/dts/vexpress-v2m-rs1.dtsi", i.e. a
+.dtsi supplied by arch/arm.
 
-> -----Original Message-----
-> From: linux-pci-owner at vger.kernel.org [mailto:linux-pci-
-> owner at vger.kernel.org] On Behalf Of Rob Herring
-> Sent: Thursday, July 30, 2015 9:42 PM
-> To: Gabriele Paoloni
-> Cc: Bjorn Helgaas; arnd at arndb.de; lorenzo.pieralisi at arm.com; Wangzhou
-> (B); robh+dt at kernel.org; james.morse at arm.com; Liviu.Dudau at arm.com;
-> linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> devicetree at vger.kernel.org; Yuanzhichang; Zhudacai; zhangjukuo;
-> qiuzhenfa; Liguozhu (Kenneth); Jingoo Han; Pratyush Anand
-> Subject: Re: [PATCH v6] PCI: Store PCIe bus address in struct
-> of_pci_range
-> 
-> On Thu, Jul 30, 2015 at 12:34 PM, Gabriele Paoloni
-> <gabriele.paoloni@huawei.com> wrote:
-> >> -----Original Message-----
-> >> From: Bjorn Helgaas [mailto:bhelgaas at google.com]
-> >> Sent: 30 July 2015 18:15
-> >> On Thu, Jul 30, 2015 at 04:50:55PM +0000, Gabriele Paoloni wrote:
-> >> > > -----Original Message-----
-> >> > > From: linux-pci-owner at vger.kernel.org [mailto:linux-pci-
-> >> > > owner at vger.kernel.org] On Behalf Of Bjorn Helgaas
-> >> > > Sent: Thursday, July 30, 2015 5:15 PM
-> >> > > On Thu, Jul 30, 2015 at 01:52:13PM +0000, Gabriele Paoloni wrote:
-> 
-> [...]
-> 
-> >> > > > I don?t think we should rely on [CPU] addresses...what if the
-> >> > > intermediate
-> >> > > > translation layer changes the lower significant bits of the
-> "bus
-> >> > > address"
-> >> > > > to translate into a cpu address?
-> >> > >
-> >> > > Is it really a possiblity that the lower bits could be changed?
-> >> >
-> >> > I've checked all the current deignware users DTs except "pci-
-> >> layerscape"
-> >> > that I could not find:
-> >> > spear1310.dtsi
-> >> > spear1340.dtsi
-> >> > dra7.dtsi
-> >> > imx6qdl.dtsi
-> >> > imx6sx.dtsi
-> >> > keystone.dtsi
-> >> > exynos5440.dtsi
-> >> >
-> >> > None of them modifies the lower bits. To be more precise the only
-> guy
-> >> > that provides another translation layer is "dra7.dtsi":
-> >> > axi0
-> >> > http://lxr.free-
-> electrons.com/source/arch/arm/boot/dts/dra7.dtsi#L207
-> >> >
-> >> > axi1
-> >> > http://lxr.free-
-> electrons.com/source/arch/arm/boot/dts/dra7.dtsi#L241
-> >> >
-> >> > For this case masking the top 4bits (bits28 to 31) should make the
-> job.
-> 
-> IMO, we should just fix this case. After further study, I don't think
-> this is a DW issue, but rather an SOC integration issue.
-> 
-> I believe you can just fixup the address in the pp->ops->host_init hook.
-> 
+Unfortunately this causes some issues for the split device tree
+repository[0], since things get moved around there. In that context
+the new .dts ends up at src/arm64/arm/vexpress-v2f-1xv7-ca53x2.dts
+while the include is at src/arm/vexpress-v2m-rs1.dtsi.
 
-Yes I guess that I could just assign pp->(*)_mod_base to the CPU address 
-in DW and mask it out in dra7xx_pcie_host_init()...
+The sharing of the .dtsi is legitimate since the baseboard is the same
+for various vexpress systems whatever processor they use.
 
-Kishon, would you be ok with that? 
+Rather than using ../../ tricks to pickup .dtsi files from another
+arch this patch creates a new directory include/dt-dtsi as a
+home for such cross-arch .dtsi files, arranges for it to be in the
+include path when the .dts files are processed by cpp and switches the
+.dts files to use cpp #include instead of /include/. The dtsi file
+itself is moved into a vendor subdir in this case "arm" (the vendor,
+not the ARCH=).
 
+[0] https://git.kernel.org/cgit/linux/kernel/git/devicetree/devicetree-rebasing.git/
 
-> In looking at this, I'm curious why only 2 ATU viewports are used by
-> default as this causes switching on config accesses. Probably some
-> configuration only has 2 viewports. This would not even work on SMP
-> systems! Memory and i/o accesses do not have any lock. A config access
-> on one core will temporarily disable the i/o or memory viewport which
-> will cause an abort, dropped, or garbage data on an i/o or memory
-> access from another core. You would have to be accessing cfg space on
-> a bus other than the root bus, so maybe no one is doing that.
-> 
-> >> >
-> >> > Speaking in general terms so far I've always seen linear mappings
-> >> > that differ by bitmask offset, however linear does not mean that
-> you
-> >> > cannot affect the lower bits: e.g. <0x0> to <0x0 + size> can map
-> to
-> >> > <0x0000cafe to 0x0000cafe + size>, but I guess that for HW design
-> >> reasons
-> >> > it is much easier to remap directly using a bitmask...but I was
-> not
-> >> sure
-> >> > and I didn't think about the problems that can arise with ACPI.
-> 
-> For higher speed buses, the h/w designs are not going to be doing
-> complicated translations in order to meet timing requirements. At the
-> top level only the highest order bits are going to be looked at. For
-> downstream segments, the high order bits may get dropped to simplify
-> routing. If an IP block has full address bits in this case, they could
-> either be tied to 0 or tied off to the correct address. Either is
-> reasonable, so I'm sure there is h/w doing both. That doesn't mean h/w
-> designers haven't done something crazy, too.
-> 
-> >> As I said, it wouldn't make sense for the bits that comprise the
-> >> offset into the window to change, so the mapping only has to be
-> linear
-> >> inside the window.
-> >>
-> >> For the bits outside the window offset, I don't know enough to say
-> >> whether masking is sufficient or safe.
-> >>
-> >> > If you think the bitmask is Ok then I can directly define it in
-> >> > designware and we can drop this patch.
-> >>
-> >> It's OK by me, but I know nothing about the actual hardware involved.
-> >> For the DesignWare question, I think you would just have to convince
-> >> Jingoo and Pratyush (cc'd).
-> >
-> > Yes actually looking at
-> > http://lxr.free-
-> electrons.com/source/arch/arm/boot/dts/spear1310.dtsi#L99
-> > I can see that pci_addr=0 is mapped to bus_addr 0x80020000, so
-> clearing
-> > the top 4 bits would alter the behaviour of the current designware
-> > SW framework...now I don't know if DW needs only the low 28b of that
-> > value or not....
-> 
-> Given that most cases have same cpu and bus address, masking is not
-> the right solution in general.
-> 
-> There is also a bug here BTW. pcie0 and pcie2 have the same CPU
-> address for the memory range.
-> 
-> Rob
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Signed-off-by: Ian Campbell <ian.campbell@citrix.com>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Pawel Moll <pawel.moll@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Kumar Gala <galak@codeaurora.org>
+Cc: Liviu Dudau <liviu.dudau@arm.com>
+Cc: Sudeep Holla <sudeep.holla@arm.com>
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Kristina Martsenko <kristina.martsenko@arm.com>
+Cc: Kevin Hilman <khilman@linaro.org>
+Cc: devicetree at vger.kernel.org
+Cc: linux-kernel at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kbuild at vger.kernel.org
+---
+v2: Move to include/dt-dtsi and introduce a per-vendor subdirectory.
+
+v3: Move to kernel/dts.
+    Include new directory in DTC include path as well as cpp path, and
+    therefore switch back to /include/.
+    Update MAINTAINERS
+---
+ Documentation/devicetree/bindings/arm/vexpress.txt          | 2 +-
+ MAINTAINERS                                                 | 1 +
+ arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts                 | 2 +-
+ arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts                  | 2 +-
+ arch/arm/boot/dts/vexpress-v2p-ca5s.dts                     | 2 +-
+ arch/arm64/boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts        | 2 +-
+ {arch/arm/boot/dts => kernel/dts/arm}/vexpress-v2m-rs1.dtsi | 0
+ scripts/Makefile.lib                                        | 3 ++-
+ 8 files changed, 8 insertions(+), 6 deletions(-)
+ rename {arch/arm/boot/dts => kernel/dts/arm}/vexpress-v2m-rs1.dtsi (100%)
+
+diff --git a/Documentation/devicetree/bindings/arm/vexpress.txt b/Documentation/devicetree/bindings/arm/vexpress.txt
+index 39844cd..b6031d9 100644
+--- a/Documentation/devicetree/bindings/arm/vexpress.txt
++++ b/Documentation/devicetree/bindings/arm/vexpress.txt
+@@ -223,7 +223,7 @@ Example of a VE tile description (simplified)
+ 		/* Active high IRQ 0 is connected to GIC's SPI0 */
+ 		interrupt-map = <0 0 0 &gic 0 0 4>;
+ 
+-		/include/ "vexpress-v2m-rs1.dtsi"
++		/include/ "arm/vexpress-v2m-rs1.dtsi"
+ 	};
+ };
+ 
+diff --git a/MAINTAINERS b/MAINTAINERS
+index a226416..1941078 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -7537,6 +7537,7 @@ S:	Maintained
+ F:	Documentation/devicetree/
+ F:	arch/*/boot/dts/
+ F:	include/dt-bindings/
++F:	kernel/dts/
+ 
+ OPEN FIRMWARE AND DEVICE TREE OVERLAYS
+ M:	Pantelis Antoniou <pantelis.antoniou@konsulko.com>
+diff --git a/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts b/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
+index 9420053..b144092 100644
+--- a/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
++++ b/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
+@@ -278,6 +278,6 @@
+ 				<0 0 41 &gic 0 41 4>,
+ 				<0 0 42 &gic 0 42 4>;
+ 
+-		/include/ "vexpress-v2m-rs1.dtsi"
++		/include/ "arm/vexpress-v2m-rs1.dtsi"
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
+index 17f63f7..350f402 100644
+--- a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
++++ b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
+@@ -636,6 +636,6 @@
+ 				<0 0 41 &gic 0 41 4>,
+ 				<0 0 42 &gic 0 42 4>;
+ 
+-		/include/ "vexpress-v2m-rs1.dtsi"
++		/include/ "arm/vexpress-v2m-rs1.dtsi"
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/vexpress-v2p-ca5s.dts b/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
+index d2709b7..585ced0 100644
+--- a/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
++++ b/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
+@@ -248,6 +248,6 @@
+ 				<0 0 41 &gic 0 41 4>,
+ 				<0 0 42 &gic 0 42 4>;
+ 
+-		/include/ "vexpress-v2m-rs1.dtsi"
++		/include/ "arm/vexpress-v2m-rs1.dtsi"
+ 	};
+ };
+diff --git a/arch/arm64/boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts b/arch/arm64/boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts
+index 5b1d018..c044804 100644
+--- a/arch/arm64/boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts
++++ b/arch/arm64/boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts
+@@ -186,6 +186,6 @@
+ 				<0 0 41 &gic GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>,
+ 				<0 0 42 &gic GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>;
+ 
+-		/include/ "../../../../arm/boot/dts/vexpress-v2m-rs1.dtsi"
++		/include/ "arm/vexpress-v2m-rs1.dtsi"
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi b/kernel/dts/arm/vexpress-v2m-rs1.dtsi
+similarity index 100%
+rename from arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
+rename to kernel/dts/arm/vexpress-v2m-rs1.dtsi
+diff --git a/scripts/Makefile.lib b/scripts/Makefile.lib
+index 79e8661..b4d9fb6 100644
+--- a/scripts/Makefile.lib
++++ b/scripts/Makefile.lib
+@@ -163,6 +163,7 @@ dtc_cpp_flags  = -Wp,-MD,$(depfile).pre.tmp -nostdinc                    \
+ 		 -I$(srctree)/arch/$(SRCARCH)/boot/dts                   \
+ 		 -I$(srctree)/arch/$(SRCARCH)/boot/dts/include           \
+ 		 -I$(srctree)/drivers/of/testcase-data                   \
++		 -I$(srctree)/kernel/dts                                 \
+ 		 -undef -D__DTS__
+ 
+ # Finds the multi-part object the current object will be linked into
+@@ -285,7 +286,7 @@ quiet_cmd_dtc = DTC     $@
+ cmd_dtc = mkdir -p $(dir ${dtc-tmp}) ; \
+ 	$(CPP) $(dtc_cpp_flags) -x assembler-with-cpp -o $(dtc-tmp) $< ; \
+ 	$(objtree)/scripts/dtc/dtc -O dtb -o $@ -b 0 \
+-		-i $(dir $<) $(DTC_FLAGS) \
++		-i $(dir $<) -i $(srctree)/kernel/dts $(DTC_FLAGS) \
+ 		-d $(depfile).dtc.tmp $(dtc-tmp) ; \
+ 	cat $(depfile).pre.tmp $(depfile).dtc.tmp > $(depfile)
+ 
+-- 
+2.1.4
