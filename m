@@ -1,34 +1,31 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 31 Jul 2015 12:10:06 +0200
-Subject: [PATCH 1/5] ARM: dts: sun4i: Enable USB DRC on A10 OLinuxIno Lime
-In-Reply-To: <1438333194-21181-2-git-send-email-hdegoede@redhat.com>
-References: <1438333194-21181-1-git-send-email-hdegoede@redhat.com>
- <1438333194-21181-2-git-send-email-hdegoede@redhat.com>
-Message-ID: <20150731101006.GB2564@lukather>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 31 Jul 2015 18:11:41 +0800
+Subject: [PATCH 3/3] ARM: dts: sun5i: hsg-h702: Enable AXP209 USB power supply
+In-Reply-To: <1438337501-8773-1-git-send-email-wens@csie.org>
+References: <1438337501-8773-1-git-send-email-wens@csie.org>
+Message-ID: <1438337501-8773-4-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-1;3803;0c
-On Fri, Jul 31, 2015 at 10:59:50AM +0200, Hans de Goede wrote:
-> From: Remy van Elst <relst@relst.nl>
-> 
-> Enable the otg/drc usb controller on the A10 OLinuxIno Lime.
-> 
-> Signed-off-by: Remy van Elst <relst@relst.nl>
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ arch/arm/boot/dts/sun5i-a13-hsg-h702.dts | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-Applied, thanks!
-
-Maxime
-
+diff --git a/arch/arm/boot/dts/sun5i-a13-hsg-h702.dts b/arch/arm/boot/dts/sun5i-a13-hsg-h702.dts
+index 672f88a8bfbe..c69844891027 100644
+--- a/arch/arm/boot/dts/sun5i-a13-hsg-h702.dts
++++ b/arch/arm/boot/dts/sun5i-a13-hsg-h702.dts
+@@ -214,6 +214,10 @@
+ 	status = "okay";
+ };
+ 
++&usb_power_supply {
++	status = "okay";
++};
++
+ &usbphy {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&usb0_id_detect_pin>, <&usb0_vbus_detect_pin>;
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150731/c9821f7c/attachment.sig>
+2.5.0
