@@ -1,42 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 31 Jul 2015 17:46:06 +0100
-Subject: Converting "board file" to device tree one device at a time?
-In-Reply-To: <55BB9F87.2050307@free.fr>
-References: <55BB4686.8030509@free.fr> <55BB8C08.1060006@free.fr>
- <20150731150551.GW7557@n2100.arm.linux.org.uk>
- <55BB9F87.2050307@free.fr>
-Message-ID: <20150731164605.GZ7557@n2100.arm.linux.org.uk>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Fri, 31 Jul 2015 09:47:07 -0700
+Subject: [RFCv3 4/4] ARM: zynq: Select ARCH_HAS_RESET_CONTROLLER
+In-Reply-To: <55BB2D39.6000004@xilinx.com>
+References: <1438305237-18497-1-git-send-email-moritz.fischer@ettus.com>
+ <1438305237-18497-5-git-send-email-moritz.fischer@ettus.com>
+ <55BB2D39.6000004@xilinx.com>
+Message-ID: <20150731164707.GF2650@xsjsorenbubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 31, 2015 at 06:17:11PM +0200, Mason wrote:
-> On 31/07/2015 17:05, Russell King - ARM Linux wrote:
+On Fri, 2015-07-31 at 10:09AM +0200, Michal Simek wrote:
+> On 07/31/2015 03:13 AM, Moritz Fischer wrote:
+> > Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
+> > ---
+> >  arch/arm/mach-zynq/Kconfig | 1 +
+> >  1 file changed, 1 insertion(+)
+> > 
+> > diff --git a/arch/arm/mach-zynq/Kconfig b/arch/arm/mach-zynq/Kconfig
+> > index 78e5e00..77d7df7 100644
+> > --- a/arch/arm/mach-zynq/Kconfig
+> > +++ b/arch/arm/mach-zynq/Kconfig
+> > @@ -1,5 +1,6 @@
+> >  config ARCH_ZYNQ
+> >  	bool "Xilinx Zynq ARM Cortex A9 Platform" if ARCH_MULTI_V7
+> > +	select ARCH_HAS_RESET_CONTROLLER
+> >  	select ARCH_SUPPORTS_BIG_ENDIAN
+> >  	select ARM_AMBA
+> >  	select ARM_GIC
+> > 
 > 
-> > My /guess/ is that you have an .init_machine callback in place, but that
-> > is not calling of_platform_populate(NULL, of_default_bus_match_table,
-> > NULL, NULL); which means none of the DT-described devices are being
-> > created.
-> 
-> You guessed right. Thanks again!
-> 
-> One more question, if I may.
-> 
-> I deleted the .init_machine callback, but the board init
-> function was still being called!
-> 
-> MACHINE_START(TANGOX_87XX, "TANGOX_87XX")
->   ...
->   //.init_machine = tangox_87xx_board_init,
-> MACHINE_END
-> 
-> I suspected it might be called directly from elsewhere,
-> and launched grep:
-> 
->   arch_initcall(tangox_init_devices);
+> Reviewed-by: Michal Simek <michal.simek@xilinx.com>
+Acked-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
 
-Looks like different function names to me.  Not being able to see the
-code you're modifying means I can't comment.
+I personally, would prefer to decouple the logical outputs of the
+reset-controller from the HW. But, as Moritz pointed out, that seems
+rather uncommon for reset controllers. I think this is good to go.
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+	Thanks,
+	S?ren
