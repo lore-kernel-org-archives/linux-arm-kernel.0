@@ -1,57 +1,32 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 31 Jul 2015 22:40:58 +0800
-Subject: [PATCH v2 1/2] ARM: dts: sun5i: hsg-h702: Enable side volume buttons
- with LRADC
-In-Reply-To: <1438353659-3360-1-git-send-email-wens@csie.org>
-References: <1438353659-3360-1-git-send-email-wens@csie.org>
-Message-ID: <1438353659-3360-2-git-send-email-wens@csie.org>
+From: hramrach@gmail.com (Michal Suchanek)
+Date: Fri, 31 Jul 2015 16:13:24 +0200
+Subject: [linux-sunxi] [PATCH v2 1/3] ARM: dts: sun5i: Enable USB DRC on
+ A10s OLinuxIno Micro
+In-Reply-To: <1438347218-8158-1-git-send-email-hdegoede@redhat.com>
+References: <1438347218-8158-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <CAOMqctQtyBkqfTwHTNfLo+DRg9JvgAUZ0spL_gzyVw_3bsDqaw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The tablet has volume up/down buttons on the side, connected to the LRADC.
+Hello,
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- arch/arm/boot/dts/sun5i-a13-hsg-h702.dts | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+On 31 July 2015 at 14:53, Hans de Goede <hdegoede@redhat.com> wrote:
+> Enable the otg/drc usb controller on the A10s OLinuxIno Micro.
+>
+> Note the A10s OlinuxIno Micro always has some voltage on its otg power
+> pin, even if the usb-vbus0-regulator is disabled, the leaked voltage is
+> enough to make vbus-det always report 1, so we do not use vbus-det on
+> this board.
 
-diff --git a/arch/arm/boot/dts/sun5i-a13-hsg-h702.dts b/arch/arm/boot/dts/sun5i-a13-hsg-h702.dts
-index 990f9d61ae4d..4b8808ab9711 100644
---- a/arch/arm/boot/dts/sun5i-a13-hsg-h702.dts
-+++ b/arch/arm/boot/dts/sun5i-a13-hsg-h702.dts
-@@ -45,6 +45,7 @@
- #include "sunxi-common-regulators.dtsi"
- 
- #include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/input/input.h>
- #include <dt-bindings/pinctrl/sun4i-a10.h>
- 
- / {
-@@ -96,6 +97,25 @@
- 	status = "okay";
- };
- 
-+&lradc {
-+	vref-supply = <&reg_ldo2>;
-+	status = "okay";
-+
-+	button at 200 {
-+		label = "Volume Up";
-+		linux,code = <KEY_VOLUMEUP>;
-+		channel = <0>;
-+		voltage = <200000>;
-+	};
-+
-+	button at 400 {
-+		label = "Volume Down";
-+		linux,code = <KEY_VOLUMEDOWN>;
-+		channel = <0>;
-+		voltage = <400000>;
-+	};
-+};
-+
- &mmc0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_h702>;
--- 
-2.5.0
+What board revision do you have?
+
+Also does this not go down when you connect a device which draws power?
+
+It is useless for self-powered device detection, though :-s
+
+Still the Olinuxino is not battery powered normally so powering the
+bus at all times is probably ok.
+
+Thanks
+
+Michal
