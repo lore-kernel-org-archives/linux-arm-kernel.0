@@ -1,29 +1,44 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 31 Jul 2015 09:39:02 +0900
-Subject: [PATCH v2 2/2] ARM: EXYNOS: fix double of_node_put() on error path
-In-Reply-To: <1438301390-7397-3-git-send-email-vz@mleia.com>
-References: <1438301390-7397-1-git-send-email-vz@mleia.com>
- <1438301390-7397-3-git-send-email-vz@mleia.com>
-Message-ID: <55BAC3A6.8080807@samsung.com>
+From: moritz.fischer@ettus.com (Moritz Fischer)
+Date: Thu, 30 Jul 2015 18:13:53 -0700
+Subject: [RFCv3 0/4] Adding support for Zynq Reset Controller
+Message-ID: <1438305237-18497-1-git-send-email-moritz.fischer@ettus.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31.07.2015 09:09, Vladimir Zapolskiy wrote:
-> The change removes the second of_node_put(), if
-> for_each_compatible_node() body execution is not terminated. This
-> prevents from object refcounter overflow over zero in OF_DYNAMIC
-> build.
-> 
-> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
-> ---
-> Changes from v1 to v2:
-> * split a single change v1 into two
-> 
->  arch/arm/mach-exynos/pm_domains.c | 1 -
->  1 file changed, 1 deletion(-)
-> 
+Hi all,
 
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+I made another RFC addressing most of the feedback that I got so far.
 
-Best regards,
-Krzysztof
+I haven't completly given up on S?ren's idea of getting rid of having
+some sort of protection against people using wrong bits by accident,
+but haven't come up with a clean way to do so yet (especially when looking at
+the possiblity of also supporting the upcoming Zynq's reset controller).
+
+I changed the reg property to <0x200 0x48> but I'm not sure if that's correct.
+At 0x24C there's the RS_AWDT_CTRL which is not a reset. The last legit one
+is A9_CPU_RST_CTRL at 0x244.
+
+As Michal requested I removed the #include syntax from the devicetree bindings.
+
+Thanks for your reviews,
+
+Moritz
+
+Moritz Fischer (4):
+  docs: dts: Added documentation for Xilinx Zynq Reset Controller
+    bindings.
+  dts: zynq: Add devicetree entry for Xilinx Zynq reset controller.
+  reset: reset-zynq: Adding support for Xilinx Zynq reset controller.
+  ARM: zynq: Select ARCH_HAS_RESET_CONTROLLER
+
+ .../devicetree/bindings/reset/zynq-reset.txt       |  68 +++++++++
+ arch/arm/boot/dts/zynq-7000.dtsi                   |   8 ++
+ arch/arm/mach-zynq/Kconfig                         |   1 +
+ drivers/reset/Makefile                             |   1 +
+ drivers/reset/reset-zynq.c                         | 155 +++++++++++++++++++++
+ 5 files changed, 233 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/reset/zynq-reset.txt
+ create mode 100644 drivers/reset/reset-zynq.c
+
+-- 
+2.4.3
