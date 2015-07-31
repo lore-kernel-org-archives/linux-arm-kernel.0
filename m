@@ -1,123 +1,140 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 31 Jul 2015 15:36:32 +0200
-Subject: [PATCH 3/3] drm: atmel-hlcdc: add support for sama5d4 SoCs
-In-Reply-To: <1438349792-6398-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1438349792-6398-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1438349792-6398-4-git-send-email-boris.brezillon@free-electrons.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 31 Jul 2015 14:45:56 +0100
+Subject: [PATCH v4 2/5] dt-bindings: Add a binding for Mediatek xHCI host
+ controller
+In-Reply-To: <1438347836-29060-3-git-send-email-chunfeng.yun@mediatek.com>
+References: <1438347836-29060-1-git-send-email-chunfeng.yun@mediatek.com>
+ <1438347836-29060-3-git-send-email-chunfeng.yun@mediatek.com>
+Message-ID: <20150731134556.GC25118@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Describe capabilities of the HLCDC IP found on sama5d4 SoCs and add a
-new entry to the atmel_hlcdc_of_match table.
+Hi,
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
----
- drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c | 86 ++++++++++++++++++++++++++++
- 1 file changed, 86 insertions(+)
+Sorry for my late reply to a prior version of this series, but I still
+have concerns with some of the properties.
 
-diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
-index 266a893..af1bbff 100644
---- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
-+++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
-@@ -241,6 +241,88 @@ static const struct atmel_hlcdc_dc_desc atmel_hlcdc_dc_sama5d3 = {
- 	.layers = atmel_hlcdc_sama5d3_layers,
- };
- 
-+static const struct atmel_hlcdc_layer_desc atmel_hlcdc_sama5d4_layers[] = {
-+	{
-+		.name = "base",
-+		.formats = &atmel_hlcdc_plane_rgb_formats,
-+		.regs_offset = 0x40,
-+		.id = 0,
-+		.type = ATMEL_HLCDC_BASE_LAYER,
-+		.nconfigs = 7,
-+		.layout = {
-+			.xstride = { 2 },
-+			.default_color = 3,
-+			.general_config = 4,
-+			.disc_pos = 5,
-+			.disc_size = 6,
-+		},
-+	},
-+	{
-+		.name = "overlay1",
-+		.formats = &atmel_hlcdc_plane_rgb_formats,
-+		.regs_offset = 0x140,
-+		.id = 1,
-+		.type = ATMEL_HLCDC_OVERLAY_LAYER,
-+		.nconfigs = 10,
-+		.layout = {
-+			.pos = 2,
-+			.size = 3,
-+			.xstride = { 4 },
-+			.pstride = { 5 },
-+			.default_color = 6,
-+			.chroma_key = 7,
-+			.chroma_key_mask = 8,
-+			.general_config = 9,
-+		},
-+	},
-+	{
-+		.name = "overlay2",
-+		.formats = &atmel_hlcdc_plane_rgb_formats,
-+		.regs_offset = 0x240,
-+		.id = 2,
-+		.type = ATMEL_HLCDC_OVERLAY_LAYER,
-+		.nconfigs = 10,
-+		.layout = {
-+			.pos = 2,
-+			.size = 3,
-+			.xstride = { 4 },
-+			.pstride = { 5 },
-+			.default_color = 6,
-+			.chroma_key = 7,
-+			.chroma_key_mask = 8,
-+			.general_config = 9,
-+		},
-+	},
-+	{
-+		.name = "high-end-overlay",
-+		.formats = &atmel_hlcdc_plane_rgb_and_yuv_formats,
-+		.regs_offset = 0x340,
-+		.id = 3,
-+		.type = ATMEL_HLCDC_OVERLAY_LAYER,
-+		.nconfigs = 42,
-+		.layout = {
-+			.pos = 2,
-+			.size = 3,
-+			.memsize = 4,
-+			.xstride = { 5, 7 },
-+			.pstride = { 6, 8 },
-+			.default_color = 9,
-+			.chroma_key = 10,
-+			.chroma_key_mask = 11,
-+			.general_config = 12,
-+			.csc = 14,
-+		},
-+	},
-+};
-+
-+static const struct atmel_hlcdc_dc_desc atmel_hlcdc_dc_sama5d4 = {
-+	.min_width = 0,
-+	.min_height = 0,
-+	.max_width = 2048,
-+	.max_height = 2048,
-+	.nlayers = ARRAY_SIZE(atmel_hlcdc_sama5d4_layers),
-+	.layers = atmel_hlcdc_sama5d4_layers,
-+};
- static const struct of_device_id atmel_hlcdc_of_match[] = {
- 	{
- 		.compatible = "atmel,at91sam9n12-hlcdc",
-@@ -254,6 +336,10 @@ static const struct of_device_id atmel_hlcdc_of_match[] = {
- 		.compatible = "atmel,sama5d3-hlcdc",
- 		.data = &atmel_hlcdc_dc_sama5d3,
- 	},
-+	{
-+		.compatible = "atmel,sama5d4-hlcdc",
-+		.data = &atmel_hlcdc_dc_sama5d4,
-+	},
- 	{ /* sentinel */ },
- };
- 
--- 
-1.9.1
+I'll repeat those below.
+
+On Fri, Jul 31, 2015 at 02:03:53PM +0100, Chunfeng Yun wrote:
+> add a DT binding documentation of xHCI host controller for the
+> MT8173 SoC from Mediatek.
+> 
+> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+> ---
+>  .../devicetree/bindings/usb/mt8173-xhci.txt        | 51 ++++++++++++++++++++++
+>  1 file changed, 51 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/usb/mt8173-xhci.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/usb/mt8173-xhci.txt b/Documentation/devicetree/bindings/usb/mt8173-xhci.txt
+> new file mode 100644
+> index 0000000..364be5a
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/usb/mt8173-xhci.txt
+> @@ -0,0 +1,51 @@
+> +MT65XX xhci
+> +
+> +The device node for Mediatek SOC usb3.0 host controller
+> +
+> +Required properties:
+> + - compatible : Supports "mediatek,mt8173-xhci"
+
+s/Supports/should contain/
+
+> + - reg : Specifies physical base address and size of the registers,
+> +	the first one for MAC, the second for IPPC
+> + - interrupts : Interrupt mode, number and trigger mode
+
+Just specify what this logically corresponds to; the format of the
+interrupts proeprty depends on the interrupt controller.
+
+> + - power-domains : To enable usb's mtcmos
+
+Please describe what this contains. I assume you exped a single power
+domain to be described, covering the whole xHCI controller?
+
+> + - vusb33-supply : Regulator of usb avdd3.3v
+> + - clocks : Must support all clocks that xhci needs
+
+- clocks: a list of phandle + clock-specifier pairs, one for each entry
+  in clock-names.
+
+> + - clock-names : Should be "sys_mac" for sys and mac clocks, and
+> +	"wakeup_deb_p0", "wakeup_deb_p1" for wakeup debounce control
+> +	clocks
+
+This would be better as a list, e.g.
+
+- clock-names: should contain:
+  * "sys_mac" <description here if necessary>
+  * "wakeup_deb_p0" <description here if necessary>
+  * "wakeup_deb_p1" <description here if necessary>
+
+Is sys_mac a single clock input line? Or is it jsut the case that a
+single line feeds two inputs currently? if the latter they should be
+separate entries.
+
+> + - phys : List of PHY specifiers (used by generic PHY framework).
+
+The bracketed part should go. The bidnigns should know nothing of Linux
+internals.
+
+> + - phy-names : Must be "usb-phy0", "usb-phy1",.., "usb-phyN", based on
+> +	the number of PHYs as specified in @phys property.
+
+This is useless.
+
+You either don't need names, and can acquire the phys by index, or you
+need names which correspond to those on the data sheet for the xHCI
+controller.
+
+> + - mediatek,usb-wakeup : To access usb wakeup control register
+
+Please describe what this points to (I guess it's a syscon)/
+
+> + - mediatek,wakeup-src : 1: Ip sleep wakeup mode; 2: line state wakeup
+> +	mode; others means don't enable wakeup source of usb
+
+This sounds like a runtime decision.
+
+_why_ do you think this needs to be in the DT?
+
+> + - mediatek,u2port-num : The number should not greater than the number
+> +	of phys
+
+This is useless. Either this is implied by the entries in the phys
+property, or it should be a runtime decision.
+
+Thanks,
+Mark.
+
+> +
+> +Optional properties:
+> + - vbus-supply : Reference to the VBUS regulator;
+> +
+> +Example:
+> +usb: usb at 11270000 {
+> +	compatible = "mediatek,mt8173-xhci";
+> +	reg = <0 0x11270000 0 0x4000>,
+> +	      <0 0x11280000 0 0x0800>;
+> +	interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_LOW>;
+> +	power-domains = <&scpsys MT8173_POWER_DOMAIN_USB>;
+> +	clocks = <&topckgen CLK_TOP_USB30_SEL>,
+> +		 <&pericfg CLK_PERI_USB0>,
+> +		 <&pericfg CLK_PERI_USB1>;
+> +	clock-names = "sys_mac",
+> +		      "wakeup_deb_p0",
+> +		      "wakeup_deb_p1";
+> +	phys = <&u3phy 0>, <&u3phy 1>;
+> +	phy-names = "usb-phy0", "usb-phy1";
+> +	vusb33-supply = <&mt6397_vusb_reg>;
+> +	vbus-supply = <&usb_p1_vbus>;
+> +	usb3-lpm-capable;
+> +	mediatek,usb-wakeup = <&pericfg>;
+> +	mediatek,wakeup-src = <1>;
+> +	mediatek,u2port-num = <2>;
+> +	status = "okay";
+> +};
+> -- 
+> 1.8.1.1.dirty
+> 
