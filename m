@@ -1,32 +1,30 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 31 Jul 2015 09:00:08 -0500
-Subject: [PATCH] drivers/usb/: Simplify return statements
-In-Reply-To: <20150731050558.GA2481@alcatraz>
-References: <20150730131337.GA2715@alcatraz>
- <20150730162527.GL18246@saruman.tx.rr.com>
- <20150731050558.GA2481@alcatraz>
-Message-ID: <20150731140008.GD31041@saruman.tx.rr.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 31 Jul 2015 22:40:57 +0800
+Subject: [PATCH v2 0/2] ARM: dts: sun5i: hsg-h702: Enable USB OTG and LRADC
+ keys
+Message-ID: <1438353659-3360-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Maxime,
 
-(no top-posting)
+This series enables USB OTG and the volume buttons on the side of
+the HSG-H702 tablet.
 
-On Fri, Jul 31, 2015 at 05:06:07AM +0000, Karajgaonkar, Saurabh (S.) wrote:
-> Sure, I'll do that. Just wanted to know whether I should split the
-> patches and send them in this same mail thread (may be something like
-> [PATCH 01/04 V2]) or should I start new threads and send them
-> separately to the respective maintainers.
+v2 uses a reference for usb0_vbus_pin_a, instead of full path.
+The third patch is also dropped to avoid confusion.
 
-single thread is fine, maintainers will pick single patches.
+
+Regards
+ChenYu
+
+
+Chen-Yu Tsai (2):
+  ARM: dts: sun5i: hsg-h702: Enable side volume buttons with LRADC
+  ARM: dts: sun5i: hsg-h702: Enable USB OTG controller
+
+ arch/arm/boot/dts/sun5i-a13-hsg-h702.dts | 58 ++++++++++++++++++++++++++++++++
+ 1 file changed, 58 insertions(+)
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150731/2e1b76f8/attachment.sig>
+2.5.0
