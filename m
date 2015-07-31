@@ -1,76 +1,68 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 31 Jul 2015 16:13:45 +0100
-Subject: [PATCH v3 5/6] mmc: sdhci-esdhc-imx: config watermark level and
- burst length
-In-Reply-To: <20150731145140.GE27806@shlinux1.ap.freescale.net>
-References: <1438160637-28061-1-git-send-email-haibo.chen@freescale.com>
- <1438160637-28061-6-git-send-email-haibo.chen@freescale.com>
- <20150731145140.GE27806@shlinux1.ap.freescale.net>
-Message-ID: <20150731151345.GX7557@n2100.arm.linux.org.uk>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 31 Jul 2015 17:14:16 +0200
+Subject: [PATCH v4 RESEND 0/3] clk: Add regmap support for basic clocks
+Message-ID: <1438355659-21558-1-git-send-email-matthias.bgg@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 31, 2015 at 10:51:41PM +0800, Dong Aisheng wrote:
-> On Wed, Jul 29, 2015 at 05:03:56PM +0800, Haibo Chen wrote:
-> > i.MX7D support eMMC HS400 mode, this mode can run in 8 bit,200MHZ
-> > DDR mode. So the I/O speed improve a lot compare to SD3.0
-> > 
-> > The default burst length is 8, if we don't change this value, in
-> > HS400 mode, when we do eMMC read operation, we can find that the
-> > clock signal will stop for a period of time. This means the speed
-> > of data moving on AHB bus is slower than I/O speed. So we should
-> > improve the speed of data moving on AHB bus.
-> > 
-> > For imx7d usdhc, this patch set the burst length as 16, and set
-> > watermark level as 64. The test result is the clock signal has
-> > no stop during the eMMC HS400 operation. For other imx usdhc, remain
-> > the default value: burst length as 8, watermark level as 16.
-> > 
-> > Signed-off-by: Haibo Chen <haibo.chen@freescale.com>
-> > ---
-> >  drivers/mmc/host/sdhci-esdhc-imx.c | 11 ++++++++++-
-> >  1 file changed, 10 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-> > index 158f93b..37d0095 100644
-> > --- a/drivers/mmc/host/sdhci-esdhc-imx.c
-> > +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-> > @@ -239,6 +239,11 @@ static inline int is_imx6q_usdhc(struct pltfm_imx_data *data)
-> >  	return data->socdata == &usdhc_imx6q_data;
-> >  }
-> >  
-> > +static inline int is_imx7d_usdhc(struct pltfm_imx_data *data)
-> > +{
-> > +	return data->socdata == &usdhc_imx7d_data;
-> > +}
-> 
-> Can we using flag to check instead of adding more is_imx_usdhc()?
+This patch set adds regmap support for the simple clock multiplexer,
+the divider clock and the clock gate.
+Regmap use, apart from a pointer to the regmap struct needs an
+offset value to know where in the regmap it has to read/write.
+We add both fields to the corresponding structs.
 
-No, not more flags.  Do the job properly and parameterise the differences.
+The driver will distinguish between a clock which is based on regmap or not
+through a flag specified in the clock hardware struct.
+The approach does not break the existing clock framework API but adds
+new functions for registering regmap clocks. Unregistering the clocks is
+independent of the use of regmap or not, so that no new functions were
+implemented.
 
-> >  static inline int esdhc_is_usdhc(struct pltfm_imx_data *data)
-> >  {
-> >  	return !!(data->socdata->flags & ESDHC_FLAG_USDHC);
-> > @@ -1145,7 +1150,11 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
-> >  	 * to something insane.  Change it back here.
-> >  	 */
-> >  	if (esdhc_is_usdhc(imx_data)) {
-> > -		writel(0x08100810, host->ioaddr + ESDHC_WTMK_LVL);
-> > +		if (is_imx7d_usdhc(imx_data))
-> > +			writel(0x10401040, host->ioaddr + ESDHC_WTMK_LVL);
-> > +		else
-> > +			writel(0x08100810, host->ioaddr + ESDHC_WTMK_LVL);
+As an example user of the regmap clock multiplexer, it was implemented on
+the mt8135. When accepted it will also be applied to the other Mediatek SoCs.
+Other possible user are Qualcomm SoCs which up to now implement their own
+regmap based clock multiplexer.
 
-So the value to be written to this register should come from the
-driver data, which is already used as a struct esdhc_soc_data to
-extrapolate out the differences.
+This patch set is based on linux next.
 
-Going down the flag path will lead you to an even more of a stinking
-shitpile than sdhci already is - if another version of the SoC requires
-a different value there, what are you going to do?  Add yet another
-flag for the next value?  What are you going to do when you have 16
-different values?  Use 16 different flags?  Clearly that path is insane.
+Changes for v4-resend:
+- add reviewed-by and acked-by
+
+Changes for v4:
+- fix style issues
+- use __clk_get_flags
+- delete #ifdef CONFIG_REGMAP
+
+Changes for v3:
+- rebase against linux-next
+- provide regmap access to all three clock types in a unified way
+
+Changes for v2:
+- use regmap_update_bits instead of read-write
+- fix flag check
+- add union in struct clk_mux
+- fix typo in commit message
+
+---
+
+Matthias Brugger (3):
+  clk: Add regmap support
+  clk: mediatek: Add support for clk-mux using regmap
+  clk: mediatek: Use regmap clk-mux for mt8135
+
+ drivers/clk/Makefile              |  1 +
+ drivers/clk/clk-divider.c         | 68 ++++++++++++++++++++++------
+ drivers/clk/clk-gate.c            | 57 +++++++++++++++++++-----
+ drivers/clk/clk-io.c              | 48 ++++++++++++++++++++
+ drivers/clk/clk-io.h              | 22 +++++++++
+ drivers/clk/clk-mux.c             | 94 ++++++++++++++++++++++++++++++++-------
+ drivers/clk/mediatek/clk-mt8135.c | 21 +++------
+ drivers/clk/mediatek/clk-mtk.c    | 37 +++++++++++++++
+ drivers/clk/mediatek/clk-mtk.h    | 26 +++++++++++
+ include/linux/clk-provider.h      | 54 ++++++++++++++++++++--
+ 10 files changed, 370 insertions(+), 58 deletions(-)
+ create mode 100644 drivers/clk/clk-io.c
+ create mode 100644 drivers/clk/clk-io.h
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+1.9.1
