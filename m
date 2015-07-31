@@ -1,103 +1,118 @@
 From: jonathanh@nvidia.com (Jon Hunter)
-Date: Fri, 31 Jul 2015 09:44:11 +0100
-Subject: [PATCH V2 1/2] irqchip/gic: Only allow the primary GIC to set the CPU
- map
-Message-ID: <1438332252-25248-1-git-send-email-jonathanh@nvidia.com>
+Date: Fri, 31 Jul 2015 09:44:12 +0100
+Subject: [PATCH V2 2/2] irqchip/gic: Ensure gic_cpu_if_up/down() programs
+ correct GIC instance
+In-Reply-To: <1438332252-25248-1-git-send-email-jonathanh@nvidia.com>
+References: <1438332252-25248-1-git-send-email-jonathanh@nvidia.com>
+Message-ID: <1438332252-25248-2-git-send-email-jonathanh@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The gic_init_bases() function initialises an array that stores the mapping
-between the GIC and CPUs. This array is a global array that is
-unconditionally initialised on every call to gic_init_bases(). Although,
-it is not common for there to be more than one GIC instance, there are
-some devices that do support nested GIC controllers and gic_init_bases()
-can be called more than once.
+Commit 3228950621d9 ("irqchip: gic: Preserve gic V2 bypass bits in cpu
+ctrl register") added a new function, gic_cpu_if_up(), to program the
+GIC CPU_CTRL register. This function assumes that there is only one GIC
+instance present and hence always uses the chip data for the primary GIC
+controller. Although it is not common for there to be a secondary, some
+devices do support a secondary. Therefore, fix this by passing
+gic_cpu_if_up() a pointer to the appropriate chip data structure.
 
-A 2nd call to gic_init_bases() will clear the previous CPU mapping and
-will only setup the mapping again for the CPU calling gic_init_bases().
-Fix this by only allowing the CPU map to be configured for the primary GIC.
-
-For secondary GICs the CPU map is not relevant because these GICs do not
-directly route the interrupts to the main CPU(s) but to other GICs or
-devices.
+Similarly, the function gic_cpu_if_down() only assumes that there is a
+single GIC instance present. Update this function so that an instance
+number is passed for the appropriate GIC and return an error code on
+failure. The vexpress TC2 (which has a single GIC) is currently the only
+user of this function and so update it accordingly. Note that because the
+TC2 only has a single GIC, the call to gic_cpu_if_down() should always
+be successful.
 
 Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
 ---
 V2 changes:
 - Rebased on v4.2-rc4
+- Added test to ensure GIC instance is valid to gic_cpu_if_down() and
+  updated gic_cpu_if_down() to return an error code on failure.
 
- drivers/irqchip/irq-gic.c | 43 +++++++++++++++++++++++++------------------
- 1 file changed, 25 insertions(+), 18 deletions(-)
+ arch/arm/mach-vexpress/tc2_pm.c |  2 +-
+ drivers/irqchip/irq-gic.c       | 18 ++++++++++++------
+ include/linux/irqchip/arm-gic.h |  2 +-
+ 3 files changed, 14 insertions(+), 8 deletions(-)
 
+diff --git a/arch/arm/mach-vexpress/tc2_pm.c b/arch/arm/mach-vexpress/tc2_pm.c
+index b3328cd46c33..1aa4ccece69f 100644
+--- a/arch/arm/mach-vexpress/tc2_pm.c
++++ b/arch/arm/mach-vexpress/tc2_pm.c
+@@ -80,7 +80,7 @@ static void tc2_pm_cpu_powerdown_prepare(unsigned int cpu, unsigned int cluster)
+ 	 * to the CPU by disabling the GIC CPU IF to prevent wfi
+ 	 * from completing execution behind power controller back
+ 	 */
+-	gic_cpu_if_down();
++	gic_cpu_if_down(0);
+ }
+ 
+ static void tc2_pm_cluster_powerdown_prepare(unsigned int cluster)
 diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index 4dd88264dff5..dc5090543eca 100644
+index dc5090543eca..fdd1b0e6e5c3 100644
 --- a/drivers/irqchip/irq-gic.c
 +++ b/drivers/irqchip/irq-gic.c
-@@ -401,19 +401,26 @@ static void gic_cpu_init(struct gic_chip_data *gic)
- 	int i;
+@@ -355,9 +355,9 @@ static u8 gic_get_cpumask(struct gic_chip_data *gic)
+ 	return mask;
+ }
+ 
+-static void gic_cpu_if_up(void)
++static void gic_cpu_if_up(struct gic_chip_data *gic)
+ {
+-	void __iomem *cpu_base = gic_data_cpu_base(&gic_data[0]);
++	void __iomem *cpu_base = gic_data_cpu_base(gic);
+ 	u32 bypass = 0;
  
  	/*
--	 * Get what the GIC says our CPU mask is.
-+	 * Setting up the CPU map is only relevant for the primary GIC
-+	 * because any nested/secondary GICs do not directly interface
-+	 * with the CPU(s).
- 	 */
--	BUG_ON(cpu >= NR_GIC_CPU_IF);
--	cpu_mask = gic_get_cpumask(gic);
--	gic_cpu_map[cpu] = cpu_mask;
-+	if (gic == &gic_data[0]) {
-+		/*
-+		 * Get what the GIC says our CPU mask is.
-+		 */
-+		BUG_ON(cpu >= NR_GIC_CPU_IF);
-+		cpu_mask = gic_get_cpumask(gic);
-+		gic_cpu_map[cpu] = cpu_mask;
- 
--	/*
--	 * Clear our mask from the other map entries in case they're
--	 * still undefined.
--	 */
--	for (i = 0; i < NR_GIC_CPU_IF; i++)
--		if (i != cpu)
--			gic_cpu_map[i] &= ~cpu_mask;
-+		/*
-+		 * Clear our mask from the other map entries in case they're
-+		 * still undefined.
-+		 */
-+		for (i = 0; i < NR_GIC_CPU_IF; i++)
-+			if (i != cpu)
-+				gic_cpu_map[i] &= ~cpu_mask;
-+	}
- 
+@@ -425,17 +425,23 @@ static void gic_cpu_init(struct gic_chip_data *gic)
  	gic_cpu_config(dist_base, NULL);
  
-@@ -930,13 +937,6 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
- 	}
+ 	writel_relaxed(GICC_INT_PRI_THRESHOLD, base + GIC_CPU_PRIMASK);
+-	gic_cpu_if_up();
++	gic_cpu_if_up(gic);
+ }
  
- 	/*
--	 * Initialize the CPU interface map to all CPUs.
--	 * It will be refined as each CPU probes its ID.
--	 */
--	for (i = 0; i < NR_GIC_CPU_IF; i++)
--		gic_cpu_map[i] = 0xff;
--
--	/*
- 	 * Find out how many interrupts are supported.
- 	 * The GIC only supports up to 1020 interrupt sources.
- 	 */
-@@ -981,6 +981,13 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
- 		return;
+-void gic_cpu_if_down(void)
++int gic_cpu_if_down(unsigned int gic_nr)
+ {
+-	void __iomem *cpu_base = gic_data_cpu_base(&gic_data[0]);
++	void __iomem *cpu_base;
+ 	u32 val = 0;
  
- 	if (gic_nr == 0) {
-+		/*
-+		 * Initialize the CPU interface map to all CPUs.
-+		 * It will be refined as each CPU probes its ID.
-+		 * This is only necessary for the primary GIC.
-+		 */
-+		for (i = 0; i < NR_GIC_CPU_IF; i++)
-+			gic_cpu_map[i] = 0xff;
- #ifdef CONFIG_SMP
- 		set_smp_cross_call(gic_raise_softirq);
- 		register_cpu_notifier(&gic_cpu_notifier);
++	if (gic_nr >= MAX_GIC_NR)
++		return -EINVAL;
++
++	cpu_base = gic_data_cpu_base(&gic_data[gic_nr]);
+ 	val = readl(cpu_base + GIC_CPU_CTRL);
+ 	val &= ~GICC_ENABLE;
+ 	writel_relaxed(val, cpu_base + GIC_CPU_CTRL);
++
++	return 0;
+ }
+ 
+ #ifdef CONFIG_CPU_PM
+@@ -571,7 +577,7 @@ static void gic_cpu_restore(unsigned int gic_nr)
+ 					dist_base + GIC_DIST_PRI + i * 4);
+ 
+ 	writel_relaxed(GICC_INT_PRI_THRESHOLD, cpu_base + GIC_CPU_PRIMASK);
+-	gic_cpu_if_up();
++	gic_cpu_if_up(&gic_data[gic_nr]);
+ }
+ 
+ static int gic_notifier(struct notifier_block *self, unsigned long cmd,	void *v)
+diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
+index 9de976b4f9a7..da6aced1105e 100644
+--- a/include/linux/irqchip/arm-gic.h
++++ b/include/linux/irqchip/arm-gic.h
+@@ -99,7 +99,7 @@ void gic_set_irqchip_flags(unsigned long flags);
+ void gic_init_bases(unsigned int, int, void __iomem *, void __iomem *,
+ 		    u32 offset, struct device_node *);
+ void gic_cascade_irq(unsigned int gic_nr, unsigned int irq);
+-void gic_cpu_if_down(void);
++int gic_cpu_if_down(unsigned int gic_nr);
+ 
+ static inline void gic_init(unsigned int nr, int start,
+ 			    void __iomem *dist , void __iomem *cpu)
 -- 
 2.1.4
