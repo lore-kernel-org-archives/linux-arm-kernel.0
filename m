@@ -1,99 +1,154 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 31 Jul 2015 09:37:27 -0600
-Subject: [PATCH 07/10] coresight-etm3x: Support context-ID tracing when PID
- namespace is enabled
+Date: Fri, 31 Jul 2015 09:37:25 -0600
+Subject: [PATCH 05/10] coresight-etm4x: Change the name of the ctxid_val to
+ ctxid_pid
 In-Reply-To: <1438357050-22486-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1438357050-22486-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1438357050-22486-8-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1438357050-22486-6-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Chunyan Zhang <zhang.chunyan@linaro.org>
 
-The Coresight ETM drivers already support context-ID tracing, but it won't
-work when PID namespace is enabled. This is because when using PID
-namespace a process id (ie. VPID) seen from the current namespace differs
-from the id (ie. PID) seen by kernel.
+'ctxid_val' array was used to store the value of ETM context ID comparator
+which actually stores the process ID to be traced, so using 'ctxid_pid' as
+its name instead make it easier to understand.
 
-So when users write the process id seen by themselves to ETM, there needs
-to be a translation from VPID to PID, as such ETM drivers will write the
-PID into the Context ID register correctly.
+This patch also changes the ABI, it is normally not allowed, but
+fortunately it is a testing ABI and very new for now. Nevertheless,
+if you don't think it should be changed, we could always add an alias
+for userspace.
 
 Signed-off-by: Chunyan Zhang <zhang.chunyan@linaro.org>
+Reviewed-by: Mark Brown <broonie@kernel.org>
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-etm.h   |  3 +++
- drivers/hwtracing/coresight/coresight-etm3x.c | 16 +++++++++++-----
- 2 files changed, 14 insertions(+), 5 deletions(-)
+ .../ABI/testing/sysfs-bus-coresight-devices-etm4x    |  2 +-
+ drivers/hwtracing/coresight/coresight-etm4x.c        | 20 ++++++++++----------
+ drivers/hwtracing/coresight/coresight-etm4x.h        |  4 ++--
+ 3 files changed, 13 insertions(+), 13 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-etm.h b/drivers/hwtracing/coresight/coresight-etm.h
-index 52af5f0adbed..b4481eb29304 100644
---- a/drivers/hwtracing/coresight/coresight-etm.h
-+++ b/drivers/hwtracing/coresight/coresight-etm.h
-@@ -184,6 +184,8 @@
-  * @seq_curr_state: current value of the sequencer register.
-  * @ctxid_idx: index for the context ID registers.
-  * @ctxid_pid: value for the context ID to trigger on.
-+ * @ctxid_vpid:	Virtual PID seen by users if PID namespace is enabled, otherwise
-+ *		the same value of ctxid_pid.
-  * @ctxid_mask: mask applicable to all the context IDs.
-  * @sync_freq:	Synchronisation frequency.
-  * @timestamp_event: Defines an event that requests the insertion
-@@ -236,6 +238,7 @@ struct etm_drvdata {
- 	u32				seq_curr_state;
- 	u8				ctxid_idx;
- 	u32				ctxid_pid[ETM_MAX_CTXID_CMP];
-+	u32				ctxid_vpid[ETM_MAX_CTXID_CMP];
- 	u32				ctxid_mask;
- 	u32				sync_freq;
- 	u32				timestamp_event;
-diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
-index 361b82068dda..bf2476ed9356 100644
---- a/drivers/hwtracing/coresight/coresight-etm3x.c
-+++ b/drivers/hwtracing/coresight/coresight-etm3x.c
-@@ -237,8 +237,11 @@ static void etm_set_default(struct etm_drvdata *drvdata)
+diff --git a/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x b/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x
+index 2fe2e3dae487..2355ed8ae31f 100644
+--- a/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x
++++ b/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x
+@@ -249,7 +249,7 @@ KernelVersion:	4.01
+ Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
+ Description:	(RW) Select which context ID comparator to work with.
  
- 	drvdata->seq_curr_state = 0x0;
+-What:		/sys/bus/coresight/devices/<memory_map>.etm/ctxid_val
++What:		/sys/bus/coresight/devices/<memory_map>.etm/ctxid_pid
+ Date:		April 2015
+ KernelVersion:	4.01
+ Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
+diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
+index 1312e993c501..9afbda54b013 100644
+--- a/drivers/hwtracing/coresight/coresight-etm4x.c
++++ b/drivers/hwtracing/coresight/coresight-etm4x.c
+@@ -155,7 +155,7 @@ static void etm4_enable_hw(void *info)
+ 			       drvdata->base + TRCACATRn(i));
+ 	}
+ 	for (i = 0; i < drvdata->numcidc; i++)
+-		writeq_relaxed(drvdata->ctxid_val[i],
++		writeq_relaxed(drvdata->ctxid_pid[i],
+ 			       drvdata->base + TRCCIDCVRn(i));
+ 	writel_relaxed(drvdata->ctxid_mask0, drvdata->base + TRCCIDCCTLR0);
+ 	writel_relaxed(drvdata->ctxid_mask1, drvdata->base + TRCCIDCCTLR1);
+@@ -507,7 +507,7 @@ static ssize_t reset_store(struct device *dev,
+ 
  	drvdata->ctxid_idx = 0x0;
--	for (i = 0; i < drvdata->nr_ctxid_cmp; i++)
-+	for (i = 0; i < drvdata->nr_ctxid_cmp; i++) {
- 		drvdata->ctxid_pid[i] = 0x0;
-+		drvdata->ctxid_vpid[i] = 0x0;
-+	}
-+
- 	drvdata->ctxid_mask = 0x0;
+ 	for (i = 0; i < drvdata->numcidc; i++)
+-		drvdata->ctxid_val[i] = 0x0;
++		drvdata->ctxid_pid[i] = 0x0;
+ 	drvdata->ctxid_mask0 = 0x0;
+ 	drvdata->ctxid_mask1 = 0x0;
+ 
+@@ -1815,7 +1815,7 @@ static ssize_t ctxid_idx_store(struct device *dev,
+ }
+ static DEVICE_ATTR_RW(ctxid_idx);
+ 
+-static ssize_t ctxid_val_show(struct device *dev,
++static ssize_t ctxid_pid_show(struct device *dev,
+ 			      struct device_attribute *attr,
+ 			      char *buf)
+ {
+@@ -1825,12 +1825,12 @@ static ssize_t ctxid_val_show(struct device *dev,
+ 
+ 	spin_lock(&drvdata->spinlock);
+ 	idx = drvdata->ctxid_idx;
+-	val = (unsigned long)drvdata->ctxid_val[idx];
++	val = (unsigned long)drvdata->ctxid_pid[idx];
+ 	spin_unlock(&drvdata->spinlock);
+ 	return scnprintf(buf, PAGE_SIZE, "%#lx\n", val);
  }
  
-@@ -1393,7 +1396,7 @@ static ssize_t ctxid_pid_show(struct device *dev,
- 	struct etm_drvdata *drvdata = dev_get_drvdata(dev->parent);
- 
- 	spin_lock(&drvdata->spinlock);
--	val = drvdata->ctxid_pid[drvdata->ctxid_idx];
-+	val = drvdata->ctxid_vpid[drvdata->ctxid_idx];
- 	spin_unlock(&drvdata->spinlock);
- 
- 	return sprintf(buf, "%#lx\n", val);
-@@ -1404,15 +1407,18 @@ static ssize_t ctxid_pid_store(struct device *dev,
+-static ssize_t ctxid_val_store(struct device *dev,
++static ssize_t ctxid_pid_store(struct device *dev,
+ 			       struct device_attribute *attr,
  			       const char *buf, size_t size)
  {
- 	int ret;
--	unsigned long val;
-+	unsigned long vpid, pid;
- 	struct etm_drvdata *drvdata = dev_get_drvdata(dev->parent);
+@@ -1850,11 +1850,11 @@ static ssize_t ctxid_val_store(struct device *dev,
  
--	ret = kstrtoul(buf, 16, &val);
-+	ret = kstrtoul(buf, 16, &vpid);
- 	if (ret)
- 		return ret;
- 
-+	pid = coresight_vpid_to_pid(vpid);
-+
  	spin_lock(&drvdata->spinlock);
--	drvdata->ctxid_pid[drvdata->ctxid_idx] = val;
-+	drvdata->ctxid_pid[drvdata->ctxid_idx] = pid;
-+	drvdata->ctxid_vpid[drvdata->ctxid_idx] = vpid;
+ 	idx = drvdata->ctxid_idx;
+-	drvdata->ctxid_val[idx] = (u64)val;
++	drvdata->ctxid_pid[idx] = (u64)val;
  	spin_unlock(&drvdata->spinlock);
- 
  	return size;
+ }
+-static DEVICE_ATTR_RW(ctxid_val);
++static DEVICE_ATTR_RW(ctxid_pid);
+ 
+ static ssize_t ctxid_masks_show(struct device *dev,
+ 				struct device_attribute *attr,
+@@ -1949,7 +1949,7 @@ static ssize_t ctxid_masks_store(struct device *dev,
+ 		 */
+ 		for (j = 0; j < 8; j++) {
+ 			if (maskbyte & 1)
+-				drvdata->ctxid_val[i] &= ~(0xFF << (j * 8));
++				drvdata->ctxid_pid[i] &= ~(0xFF << (j * 8));
+ 			maskbyte >>= 1;
+ 		}
+ 		/* Select the next ctxid comparator mask value */
+@@ -2193,7 +2193,7 @@ static struct attribute *coresight_etmv4_attrs[] = {
+ 	&dev_attr_res_idx.attr,
+ 	&dev_attr_res_ctrl.attr,
+ 	&dev_attr_ctxid_idx.attr,
+-	&dev_attr_ctxid_val.attr,
++	&dev_attr_ctxid_pid.attr,
+ 	&dev_attr_ctxid_masks.attr,
+ 	&dev_attr_vmid_idx.attr,
+ 	&dev_attr_vmid_val.attr,
+@@ -2514,7 +2514,7 @@ static void etm4_init_default_data(struct etmv4_drvdata *drvdata)
+ 	}
+ 
+ 	for (i = 0; i < drvdata->numcidc; i++)
+-		drvdata->ctxid_val[i] = 0x0;
++		drvdata->ctxid_pid[i] = 0x0;
+ 	drvdata->ctxid_mask0 = 0x0;
+ 	drvdata->ctxid_mask1 = 0x0;
+ 
+diff --git a/drivers/hwtracing/coresight/coresight-etm4x.h b/drivers/hwtracing/coresight/coresight-etm4x.h
+index e08e983dd2d9..1e8fb369daaf 100644
+--- a/drivers/hwtracing/coresight/coresight-etm4x.h
++++ b/drivers/hwtracing/coresight/coresight-etm4x.h
+@@ -265,7 +265,7 @@
+  * @addr_type:	Current status of the comparator register.
+  * @ctxid_idx:	Context ID index selector.
+  * @ctxid_size:	Size of the context ID field to consider.
+- * @ctxid_val:	Value of the context ID comparator.
++ * @ctxid_pid:	Value of the context ID comparator.
+  * @ctxid_mask0:Context ID comparator mask for comparator 0-3.
+  * @ctxid_mask1:Context ID comparator mask for comparator 4-7.
+  * @vmid_idx:	VM ID index selector.
+@@ -352,7 +352,7 @@ struct etmv4_drvdata {
+ 	u8				addr_type[ETM_MAX_SINGLE_ADDR_CMP];
+ 	u8				ctxid_idx;
+ 	u8				ctxid_size;
+-	u64				ctxid_val[ETMv4_MAX_CTXID_CMP];
++	u64				ctxid_pid[ETMv4_MAX_CTXID_CMP];
+ 	u32				ctxid_mask0;
+ 	u32				ctxid_mask1;
+ 	u8				vmid_idx;
 -- 
 1.9.1
