@@ -1,23 +1,35 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 31 Jul 2015 10:01:39 +0200
-Subject: [PATCH 0/3] phy-sun4i-usb: 3 misc. fixes
-Message-ID: <1438329702-10365-1-git-send-email-hdegoede@redhat.com>
+Date: Fri, 31 Jul 2015 10:01:40 +0200
+Subject: [PATCH 1/3] phy-sun4i-usb: Add missing EXPORT_SYMBOL for
+ sun4i_usb_phy_set_squelch_detect
+In-Reply-To: <1438329702-10365-1-git-send-email-hdegoede@redhat.com>
+References: <1438329702-10365-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <1438329702-10365-2-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kishon,
+sun4i_usb_phy_set_squelch_detect is used by other code, which may be built
+as a module, so it should be exported.
 
-Here are 3 small patches for the phy-sun4i-usb code.
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+Changes in v6:
+-New patch in v6 of the sunxi musb support series
+---
+ drivers/phy/phy-sun4i-usb.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-The first patch is a small bugfix for building the sun4i musb code as
-module which seems to have fallen through the cracks.
-
-The second patch is a preparation patch for the third patch which
-fixes the case of boards with a working VBus regulator, but broken
-VBus detection support, yes unfortunately such boards exist.
-
-Can you please merge these 3 into linux-phy/next ?
-
-Thanks & Regards,
-
-Hans
+diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
+index 5138843..d514a9b 100644
+--- a/drivers/phy/phy-sun4i-usb.c
++++ b/drivers/phy/phy-sun4i-usb.c
+@@ -347,6 +347,7 @@ void sun4i_usb_phy_set_squelch_detect(struct phy *_phy, bool enabled)
+ 
+ 	sun4i_usb_phy_write(phy, PHY_SQUELCH_DETECT, enabled ? 0 : 2, 2);
+ }
++EXPORT_SYMBOL(sun4i_usb_phy_set_squelch_detect);
+ 
+ static struct phy_ops sun4i_usb_phy_ops = {
+ 	.init		= sun4i_usb_phy_init,
+-- 
+2.4.3
