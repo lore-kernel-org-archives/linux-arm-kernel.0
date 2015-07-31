@@ -1,44 +1,92 @@
 From: moritz.fischer@ettus.com (Moritz Fischer)
-Date: Thu, 30 Jul 2015 18:13:53 -0700
-Subject: [RFCv3 0/4] Adding support for Zynq Reset Controller
-Message-ID: <1438305237-18497-1-git-send-email-moritz.fischer@ettus.com>
+Date: Thu, 30 Jul 2015 18:13:54 -0700
+Subject: [RFCv3 1/4] docs: dts: Added documentation for Xilinx Zynq Reset
+ Controller bindings.
+In-Reply-To: <1438305237-18497-1-git-send-email-moritz.fischer@ettus.com>
+References: <1438305237-18497-1-git-send-email-moritz.fischer@ettus.com>
+Message-ID: <1438305237-18497-2-git-send-email-moritz.fischer@ettus.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
-
-I made another RFC addressing most of the feedback that I got so far.
-
-I haven't completly given up on S?ren's idea of getting rid of having
-some sort of protection against people using wrong bits by accident,
-but haven't come up with a clean way to do so yet (especially when looking at
-the possiblity of also supporting the upcoming Zynq's reset controller).
-
-I changed the reg property to <0x200 0x48> but I'm not sure if that's correct.
-At 0x24C there's the RS_AWDT_CTRL which is not a reset. The last legit one
-is A9_CPU_RST_CTRL at 0x244.
-
-As Michal requested I removed the #include syntax from the devicetree bindings.
-
-Thanks for your reviews,
-
-Moritz
-
-Moritz Fischer (4):
-  docs: dts: Added documentation for Xilinx Zynq Reset Controller
-    bindings.
-  dts: zynq: Add devicetree entry for Xilinx Zynq reset controller.
-  reset: reset-zynq: Adding support for Xilinx Zynq reset controller.
-  ARM: zynq: Select ARCH_HAS_RESET_CONTROLLER
-
- .../devicetree/bindings/reset/zynq-reset.txt       |  68 +++++++++
- arch/arm/boot/dts/zynq-7000.dtsi                   |   8 ++
- arch/arm/mach-zynq/Kconfig                         |   1 +
- drivers/reset/Makefile                             |   1 +
- drivers/reset/reset-zynq.c                         | 155 +++++++++++++++++++++
- 5 files changed, 233 insertions(+)
+Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
+---
+ .../devicetree/bindings/reset/zynq-reset.txt       | 68 ++++++++++++++++++++++
+ 1 file changed, 68 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/reset/zynq-reset.txt
- create mode 100644 drivers/reset/reset-zynq.c
 
+diff --git a/Documentation/devicetree/bindings/reset/zynq-reset.txt b/Documentation/devicetree/bindings/reset/zynq-reset.txt
+new file mode 100644
+index 0000000..498c037a
+--- /dev/null
++++ b/Documentation/devicetree/bindings/reset/zynq-reset.txt
+@@ -0,0 +1,68 @@
++Xilinx Zynq Reset Manager
++
++The Zynq AP-SoC has several different resets.
++
++See Chapter 26 of the Zynq TRM (UG585) for more information about Zynq resets.
++
++Required properties:
++- compatible: "xlnx,zynq-reset"
++- reg: SLCR offset and size taken via syscon <0x200 0x48>
++- syscon: <&slcr>
++  This should be a phandle to the Zynq's SLCR register.
++- #reset-cells: Must be 1
++
++The Zynq Reset Manager needs to be a childnode of the SLCR.
++
++Example:
++	rstc: rstc at 200 {
++		compatible = "xlnx,zynq-reset";
++		reg = <0x200 0x48>;
++		#reset-cells = <1>;
++		syscon = <&slcr>;
++	};
++
++Reset outputs:
++ 0  : soft reset
++ 32 : ddr reset
++ 64 : topsw reset
++ 96 : dmac reset
++ 128: usb0 reset
++ 129: usb1 reset
++ 160: gem0 reset
++ 161: gem1 reset
++ 164: gem0 rx reset
++ 165: gem1 rx reset
++ 166: gem0 ref reset
++ 167: gem1 ref reset
++ 192: sdio0 reset
++ 193: sdio1 reset
++ 196: sdio0 ref reset
++ 197: sdio1 ref reset
++ 224: spi0 reset
++ 225: spi1 reset
++ 226: spi0 ref reset
++ 227: spi1 ref reset
++ 256: can0 reset
++ 257: can1 reset
++ 258: can0 ref reset
++ 259: can1 ref reset
++ 288: i2c0 reset
++ 289: i2c1 reset
++ 320: uart0 reset
++ 321: uart1 reset
++ 322: uart0 ref reset
++ 323: uart1 ref reset
++ 352: gpio reset
++ 384: lqspi reset
++ 385: qspi ref reset
++ 416: smc reset
++ 417: smc ref reset
++ 448: ocm reset
++ 512: fpga0 out reset
++ 513: fpga1 out reset
++ 514: fpga2 out reset
++ 515: fpga3 out reset
++ 544: a9 reset 0
++ 545: a9 reset 1
++ 552: peri reset
++
 -- 
 2.4.3
