@@ -1,53 +1,30 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 31 Jul 2015 09:37:20 -0600
-Subject: [PATCH 00/10] coresight: next v4.2-rc4
-Message-ID: <1438357050-22486-1-git-send-email-mathieu.poirier@linaro.org>
+Date: Fri, 31 Jul 2015 09:37:21 -0600
+Subject: [PATCH 01/10] coresight: binding for ETMv4 coresight drivers
+In-Reply-To: <1438357050-22486-1-git-send-email-mathieu.poirier@linaro.org>
+References: <1438357050-22486-1-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1438357050-22486-2-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Good day Greg, 
+Adding compatible string for new coresight ETMv4 tracer.
 
-Those are the latest coresight enhancement for the 4.3 cycle.  Please consider
-for inclusion.
+Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+---
+ Documentation/devicetree/bindings/arm/coresight.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-Thanks,
-Mathieu
-
-Chunyan Zhang (5):
-  coresight-etm3x: Change the name of the ctxid_val to ctxid_pid
-  coresight-etm4x: Change the name of the ctxid_val to ctxid_pid
-  Coresight: Add an interface for supporting ETM3/4 Context ID tracing
-  coresight-etm3x: Support context-ID tracing when PID namespace is
-    enabled
-  coresight-etm4x: Support context-ID tracing when PID namespace is
-    enabled
-
-Ivan T. Ivanov (1):
-  coresight-etm3x: Add Qualcomm PTM v1.1 peripheral ID
-
-Mark Brown (1):
-  coresight: Fix implicit inclusion of linux/sched.h
-
-Masanari Iida (1):
-  Doc: trace: Fix typo in coresight.txt
-
-Mathieu Poirier (1):
-  coresight: binding for ETMv4 coresight drivers
-
-Vaishali Thakkar (1):
-  coresight: replicator: Use builtin_platform_driver()
-
- .../ABI/testing/sysfs-bus-coresight-devices-etm3x  |  2 +-
- .../ABI/testing/sysfs-bus-coresight-devices-etm4x  |  2 +-
- .../devicetree/bindings/arm/coresight.txt          |  1 +
- Documentation/trace/coresight.txt                  |  4 +--
- drivers/hwtracing/coresight/coresight-etm.h        |  7 ++--
- drivers/hwtracing/coresight/coresight-etm3x.c      | 33 ++++++++++++-------
- drivers/hwtracing/coresight/coresight-etm4x.c      | 37 ++++++++++++++--------
- drivers/hwtracing/coresight/coresight-etm4x.h      |  7 ++--
- drivers/hwtracing/coresight/coresight-replicator.c | 13 +-------
- include/linux/coresight.h                          | 21 ++++++++++++
- 10 files changed, 82 insertions(+), 45 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/arm/coresight.txt b/Documentation/devicetree/bindings/arm/coresight.txt
+index 65a6db2271a2..62938eb9697f 100644
+--- a/Documentation/devicetree/bindings/arm/coresight.txt
++++ b/Documentation/devicetree/bindings/arm/coresight.txt
+@@ -17,6 +17,7 @@ its hardware characteristcs.
+ 		- "arm,coresight-tmc", "arm,primecell";
+ 		- "arm,coresight-funnel", "arm,primecell";
+ 		- "arm,coresight-etm3x", "arm,primecell";
++		- "arm,coresight-etm4x", "arm,primecell";
+ 		- "qcom,coresight-replicator1x", "arm,primecell";
+ 
+ 	* reg: physical base address and length of the register
 -- 
 1.9.1
