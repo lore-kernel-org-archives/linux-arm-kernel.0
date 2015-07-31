@@ -1,73 +1,42 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat, 1 Aug 2015 01:26:34 +0800
-Subject: [PATCH v2 2/2] ARM: multi_v7_defconfig: Enable Allwinner P2WI,
- PWM, DMA_SUN6I, cryptodev
-In-Reply-To: <20150731170137.GN2564@lukather>
-References: <1438354602-6361-1-git-send-email-wens@csie.org>
- <1438354602-6361-3-git-send-email-wens@csie.org>
- <20150731170137.GN2564@lukather>
-Message-ID: <CAGb2v65-CLkLuwdf+yxQ44Y8ohOko-co8NfLHQ1vuDHDy1oGTA@mail.gmail.com>
+Date: Sat, 1 Aug 2015 01:28:01 +0800
+Subject: [linux-sunxi] Re: [PATCH 5/5] ARM: dts: sun7i: Add dts file for
+ Wits Pro A20 DKT
+In-Reply-To: <20150731165655.GG2564@lukather>
+References: <1438333194-21181-1-git-send-email-hdegoede@redhat.com>
+ <1438333194-21181-6-git-send-email-hdegoede@redhat.com>
+ <20150731102028.GE2564@lukather>
+ <CAGb2v65TEogqYFAfen1VnOaiepvez5t8Oh+Q=OYsRS_aZUMO3A@mail.gmail.com>
+ <20150731165655.GG2564@lukather>
+Message-ID: <CAGb2v64_QzUwVcj4guDBuVTasW=sc3OnTkmArfTtog+=--omww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 1, 2015 at 1:01 AM, Maxime Ripard
+On Sat, Aug 1, 2015 at 12:56 AM, Maxime Ripard
 <maxime.ripard@free-electrons.com> wrote:
-> On Fri, Jul 31, 2015 at 10:56:42PM +0800, Chen-Yu Tsai wrote:
->> Enable drivers for Allwinner P2WI, PWM, cryptodev (Security System) and
->> sun6i DMA engine. Also enable EXTCON as PHY_SUN4I_USB depends on it.
+> On Fri, Jul 31, 2015 at 06:25:29PM +0800, Chen-Yu Tsai wrote:
+>> > Note that it's a bit of a pain for now to support such cases, as
+>> > there's nothing to tie something from the DT to an SDIO device. I
+>> > don't have a better solution than marking it always-on at the moment,
+>> > with a big FIXME comment on top... :/
 >>
->> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->> ---
->>  arch/arm/configs/multi_v7_defconfig | 5 +++++
->>  1 file changed, 5 insertions(+)
->>
->> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
->> index 5fd8df6f50ea..5eaf39ce134e 100644
->> --- a/arch/arm/configs/multi_v7_defconfig
->> +++ b/arch/arm/configs/multi_v7_defconfig
->> @@ -301,6 +301,7 @@ CONFIG_I2C_S3C2410=y
->>  CONFIG_I2C_SH_MOBILE=y
->>  CONFIG_I2C_SIRF=y
->>  CONFIG_I2C_ST=y
->> +CONFIG_I2C_SUN6I_P2WI=y
->>  CONFIG_I2C_TEGRA=y
->>  CONFIG_I2C_XILINX=y
->>  CONFIG_I2C_RCAR=y
->> @@ -587,6 +588,7 @@ CONFIG_IMX_DMA=y
->>  CONFIG_MXS_DMA=y
->>  CONFIG_DMA_OMAP=y
->>  CONFIG_XILINX_VDMA=y
->> +CONFIG_DMA_SUN6I=y
->>  CONFIG_STAGING=y
->>  CONFIG_SENSORS_ISL29018=y
->>  CONFIG_SENSORS_ISL29028=y
->> @@ -612,6 +614,7 @@ CONFIG_TEGRA_IOMMU_SMMU=y
->>  CONFIG_PM_DEVFREQ=y
->>  CONFIG_ARM_TEGRA_DEVFREQ=m
->>  CONFIG_MEMORY=y
->> +CONFIG_EXTCON=y
->>  CONFIG_TI_AEMIF=y
->>  CONFIG_IIO=y
->>  CONFIG_AT91_ADC=m
->> @@ -622,6 +625,7 @@ CONFIG_PWM_ATMEL=m
->>  CONFIG_PWM_ATMEL_TCB=m
->>  CONFIG_PWM_RENESAS_TPU=y
->>  CONFIG_PWM_SAMSUNG=m
->> +CONFIG_PWM_SUN4I=y
->>  CONFIG_PWM_TEGRA=y
->>  CONFIG_PWM_VT8500=y
->>  CONFIG_PHY_HIX5HD2_SATA=y
->> @@ -660,6 +664,7 @@ CONFIG_LOCKUP_DETECTOR=y
->>  CONFIG_CRYPTO_DEV_TEGRA_AES=y
->>  CONFIG_CPUFREQ_DT=y
->>  CONFIG_KEYSTONE_IRQ=y
->> +CONFIG_CRYPTO_DEV_SUN4I_SS=m
+>> One could use the mmc-pwr-seq stuff. I don't know if it has been
+>> extended for multiple GPIOs, not that you would need it in this use
+>> case.
+>
+> It doesn't really improve the situation. It doesn't handle the
+> regulators, it doesn't allow the real driver to get its resources
+> either, basically, it's just a hack.
 
-It seems everything under crypto that is enabled and can be built as
-a module (i.e. no one selects it as builtin) is enabled as a module.
-I just followed everything else.
+Yeah, it's still lacking support for upstream regulators, like LDOs
+from the PMICs.
 
-Hope this helps.
+>> Maybe we ought to fix up the other ones, like the CubieTruck and A31
+>> Hummingbird?
+>
+> I'll do it.
+
+Thanks
 
 
 ChenYu
