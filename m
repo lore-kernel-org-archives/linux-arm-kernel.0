@@ -1,42 +1,51 @@
 From: r.baldyga@samsung.com (Robert Baldyga)
-Date: Fri, 31 Jul 2015 16:00:18 +0200
-Subject: [PATCH v5 06/46] usb: dwc2: gadget: add ep capabilities support
+Date: Fri, 31 Jul 2015 16:00:15 +0200
+Subject: [PATCH v5 03/46] usb: gadget: add endpoint capabilities helper macros
 In-Reply-To: <1438351258-31578-1-git-send-email-r.baldyga@samsung.com>
 References: <1438351258-31578-1-git-send-email-r.baldyga@samsung.com>
-Message-ID: <1438351258-31578-7-git-send-email-r.baldyga@samsung.com>
+Message-ID: <1438351258-31578-4-git-send-email-r.baldyga@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert endpoint configuration to new capabilities model.
+Add macros useful while initializing array of endpoint capabilities
+structures. These macros makes structure initialization more compact
+to decrease number of code lines and increase readability of code.
 
 Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
 ---
- drivers/usb/dwc2/gadget.c | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ include/linux/usb/gadget.h | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-diff --git a/drivers/usb/dwc2/gadget.c b/drivers/usb/dwc2/gadget.c
-index 731b13d..3ee5b4c 100644
---- a/drivers/usb/dwc2/gadget.c
-+++ b/drivers/usb/dwc2/gadget.c
-@@ -3289,6 +3289,19 @@ static void s3c_hsotg_initep(struct dwc2_hsotg *hsotg,
- 	usb_ep_set_maxpacket_limit(&hs_ep->ep, epnum ? 1024 : EP0_MPS_LIMIT);
- 	hs_ep->ep.ops = &s3c_hsotg_ep_ops;
+diff --git a/include/linux/usb/gadget.h b/include/linux/usb/gadget.h
+index a9a4959..82b5bcb 100644
+--- a/include/linux/usb/gadget.h
++++ b/include/linux/usb/gadget.h
+@@ -158,6 +158,26 @@ struct usb_ep_caps {
+ 	unsigned dir_out:1;
+ };
  
-+	if (epnum == 0) {
-+		hs_ep->ep.caps.type_control = true;
-+	} else {
-+		hs_ep->ep.caps.type_iso = true;
-+		hs_ep->ep.caps.type_bulk = true;
-+		hs_ep->ep.caps.type_int = true;
++#define USB_EP_CAPS_TYPE_CONTROL     0x01
++#define USB_EP_CAPS_TYPE_ISO         0x02
++#define USB_EP_CAPS_TYPE_BULK        0x04
++#define USB_EP_CAPS_TYPE_INT         0x08
++#define USB_EP_CAPS_TYPE_ALL \
++	(USB_EP_CAPS_TYPE_ISO | USB_EP_CAPS_TYPE_BULK | USB_EP_CAPS_TYPE_INT)
++#define USB_EP_CAPS_DIR_IN           0x01
++#define USB_EP_CAPS_DIR_OUT          0x02
++#define USB_EP_CAPS_DIR_ALL  (USB_EP_CAPS_DIR_IN | USB_EP_CAPS_DIR_OUT)
++
++#define USB_EP_CAPS(_type, _dir) \
++	{ \
++		.type_control = !!(_type & USB_EP_CAPS_TYPE_CONTROL), \
++		.type_iso = !!(_type & USB_EP_CAPS_TYPE_ISO), \
++		.type_bulk = !!(_type & USB_EP_CAPS_TYPE_BULK), \
++		.type_int = !!(_type & USB_EP_CAPS_TYPE_INT), \
++		.dir_in = !!(_dir & USB_EP_CAPS_DIR_IN), \
++		.dir_out = !!(_dir & USB_EP_CAPS_DIR_OUT), \
 +	}
 +
-+	if (dir_in)
-+		hs_ep->ep.caps.dir_in = true;
-+	else
-+		hs_ep->ep.caps.dir_out = true;
-+
- 	/*
- 	 * if we're using dma, we need to set the next-endpoint pointer
- 	 * to be something valid.
+ /**
+  * struct usb_ep - device side representation of USB endpoint
+  * @name:identifier for the endpoint, such as "ep-a" or "ep9in-bulk"
 -- 
 1.9.1
