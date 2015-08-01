@@ -1,74 +1,80 @@
-From: chunfeng.yun@mediatek.com (chunfeng yun)
-Date: Sat, 1 Aug 2015 11:42:02 +0800
-Subject: [PATCH v3 2/5] dt-bindings: Add a binding for Mediatek xHCI
- host controller
-In-Reply-To: <20150731133707.GB25118@leverpostej>
-References: <1437573945-31586-1-git-send-email-chunfeng.yun@mediatek.com>
- <1437573945-31586-3-git-send-email-chunfeng.yun@mediatek.com>
- <20150722142208.GC15809@leverpostej> <1437882325.3040.22.camel@mhfsdcap03>
- <20150731133707.GB25118@leverpostej>
-Message-ID: <1438400522.31933.25.camel@mhfsdcap03>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Sat, 1 Aug 2015 15:21:15 +0900
+Subject: [PATCH v3] dtb: Create a common home for cross-architecture dtsi
+ files.
+In-Reply-To: <1438353109-373-1-git-send-email-ian.campbell@citrix.com>
+References: <1438353109-373-1-git-send-email-ian.campbell@citrix.com>
+Message-ID: <CAK7LNATj96OKFDTgyPC8Uu0qt=4NQ7ZVeLKEEP3K7-smFP2SCw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi,
-On Fri, 2015-07-31 at 14:37 +0100, Mark Rutland wrote:
-> Hi,
-> 
-> > > > + - mediatek,usb-wakeup: to access usb wakeup control register
-> > > 
-> > > What exactly does this property imply?
-> > > 
-> > There are some control registers for usb wakeup which are put in another
-> > module, here to get the node of that module, and then use regmap and
-> > syscon to operate it.
-> 
-> Ok. You need to specify the type of this property (i.e. that it is a
-> phandle to a syscon node). The description makes it sound like a boolean.
-> 
-Is it ok to add a prefix of syscon, and name it syscon-usb-wakeup?
+2015-07-31 23:31 GMT+09:00 Ian Campbell <ian.campbell@citrix.com>:
+> Commit 9ccd608070b6 "arm64: dts: add device tree for ARM SMM-A53x2 on
+> LogicTile Express 20MG" added a new dts file to arch/arm64 which
+> included "../../../../arm/boot/dts/vexpress-v2m-rs1.dtsi", i.e. a
+> .dtsi supplied by arch/arm.
+>
+> Unfortunately this causes some issues for the split device tree
+> repository[0], since things get moved around there. In that context
+> the new .dts ends up at src/arm64/arm/vexpress-v2f-1xv7-ca53x2.dts
+> while the include is at src/arm/vexpress-v2m-rs1.dtsi.
 
-> > 
-> > > > + - mediatek,wakeup-src: 1: ip sleep wakeup mode; 2: line state wakeup
-> > > > +	mode; others means don't enable wakeup source of usb
-> > > 
-> > > This sounds like configuration rather than a hardware property. Why do
-> > > you think this needs to be in the DT?
-> > > 
-> > Yes, it's better to put it in the DT. 
-> 
-> That doesn't answer my question.
-> 
-> _why_ do you think this needs to be in the DT? What do you think is
-> better for it being there?
-> 
-It is unthoughtful to put it here;
-There is different configuration on platforms, such as on tablet which
-only needs line-state wakeup (because system can't enter suspend when
-plug in usb cable, so don't need ip-sleep-wakeup to remote wakeup
-system), and on box just needs ip-sleep wakeup mode. so it is better to
-put in each board's dts.
- 
-> > 
-> > > > + - mediatek,u2port-num: the number should not greater than the number
-> > > > +	of phys
-> > > 
-> > > What exactly does this property imply?
-> > > 
-> > On some platform, it only makes use of partial usb ports, so disable
-> > others to save power.
-> 
-> What exactly do you mean by "partial USB ports"?
-> 
-> If a phy isn't wired up, it won't be listed in the phys property, if it
-> is then disabling it sounds like a run-time decision.
-> 
-Yes, you are right.
-This confuse me a little before. It was a property of old phy driver at
-first, and then ported it here, so did not remove it temp.
-After I re-write the phy driver, I will remove it.
+Typo?
 
-Thanks a lot.
+src/arm64  ->  arch/arm64
+src/arm    ->  arch/arm
 
-> Thanks,
-> Mark.
+
+
+> The sharing of the .dtsi is legitimate since the baseboard is the same
+> for various vexpress systems whatever processor they use.
+>
+> Rather than using ../../ tricks to pickup .dtsi files from another
+> arch this patch creates a new directory include/dt-dtsi as a
+> home for such cross-arch .dtsi files, arranges for it to be in the
+> include path when the .dts files are processed by cpp and switches the
+> .dts files to use cpp #include instead of /include/. The dtsi file
+> itself is moved into a vendor subdir in this case "arm" (the vendor,
+> not the ARCH=).
+
+As Rob pointed out, this does not match the code.
+
+
+> [0] https://git.kernel.org/cgit/linux/kernel/git/devicetree/devicetree-rebasing.git/
+
+
+
+
+Nit just in case.
+
+scripts/checkpatch.pl reported 1 error, 1 warning:
+
+
+ERROR: Please use git commit description style 'commit <12+ chars of
+sha1> ("<title line>")' - ie: 'Commit 9ccd608070b6 ("arm64: dts: add
+device tree for ARM SMM-A53x2 on LogicTile Express 20MG")'
+#23:
+Commit 9ccd608070b6 "arm64: dts: add device tree for ARM SMM-A53x2 on
+
+WARNING: Possible unwrapped commit description (prefer a maximum 75
+chars per line)
+#44:
+[0] https://git.kernel.org/cgit/linux/kernel/git/devicetree/devicetree-rebasing.git/
+
+total: 1 errors, 1 warnings, 58 lines checked
+
+
+
+The URL should not be split into two lines, so I think the warning can
+be ignored.
+But I think it is better to fix the error of commit description style.
+
+
+Apart from the git-description,
+
+Reviewed-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+
+
+-- 
+Best Regards
+Masahiro Yamada
