@@ -1,23 +1,41 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Sat, 1 Aug 2015 17:06:02 +0530
-Subject: [PATCH v4 2/2] dt: power: st: Provide bindings for ST's OPPs
-In-Reply-To: <20150731163715.GV3159@codeaurora.org>
-References: <1438010430-5802-1-git-send-email-lee.jones@linaro.org>
- <1438010430-5802-2-git-send-email-lee.jones@linaro.org>
- <20150728022936.GB1229@linux>
- <20150728225510.GB3159@codeaurora.org> <20150729081403.GH2284@x1>
- <20150729221526.GE3159@codeaurora.org> <20150730084634.GD9319@x1>
- <CAL_JsqKQLQ15qSt95zBZykzzPhcUrtZzhk29a76n+r_3719AiA@mail.gmail.com>
- <20150731163715.GV3159@codeaurora.org>
-Message-ID: <20150801113602.GM899@linux>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Sat, 01 Aug 2015 14:35:18 +0200
+Subject: [PATCH 1/2] ARM: dts: rockchip: reserve unusable memory region on
+ rk3288
+Message-ID: <15143985.aGzb1oeyb9@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31-07-15, 09:37, Stephen Boyd wrote:
-> Do we need vendor specific properties for that though?
+The rk3288 has problems accessing the memory region 0xfe000000~0xff000000.
+So block off the affected region to prevent its use.
 
-Sorry Lee :), but this is exactly why I wanted this thread to exist. We must and
-should do this in a generic enough way.
+Tested on 4GB Veyron Minnie and 2GB Veyron Jerry devices.
 
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ arch/arm/boot/dts/rk3288.dtsi | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+index 2db91c9..19766af 100644
+--- a/arch/arm/boot/dts/rk3288.dtsi
++++ b/arch/arm/boot/dts/rk3288.dtsi
+@@ -169,6 +169,16 @@
+ 		};
+ 	};
+ 
++	reserved-memory {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++
++		unusable at fe000000 {
++			reg = <0xfe000000 0x1000000>;
++		};
++	};
++
+ 	xin24m: oscillator {
+ 		compatible = "fixed-clock";
+ 		clock-frequency = <24000000>;
 -- 
-viresh
+2.1.4
