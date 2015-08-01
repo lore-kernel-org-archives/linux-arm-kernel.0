@@ -1,41 +1,313 @@
 From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Sat, 01 Aug 2015 14:35:18 +0200
-Subject: [PATCH 1/2] ARM: dts: rockchip: reserve unusable memory region on
- rk3288
-Message-ID: <15143985.aGzb1oeyb9@diego>
+Date: Sat, 01 Aug 2015 14:36:33 +0200
+Subject: [PATCH 2/2] ARM: dts: rockchip: add veyron-minnie board
+In-Reply-To: <15143985.aGzb1oeyb9@diego>
+References: <15143985.aGzb1oeyb9@diego>
+Message-ID: <46403642.3tph1CqEDH@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The rk3288 has problems accessing the memory region 0xfe000000~0xff000000.
-So block off the affected region to prevent its use.
+From: Alexandru M Stan <amstan@chromium.org>
 
-Tested on 4GB Veyron Minnie and 2GB Veyron Jerry devices.
+Also known as the Asus Chromebook Flip.
 
+Signed-off-by: Alexandru M Stan <amstan@chromium.org>
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- arch/arm/boot/dts/rk3288.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ Documentation/devicetree/bindings/arm/rockchip.txt |   7 +
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/rk3288-veyron-minnie.dts         | 253 +++++++++++++++++++++
+ 3 files changed, 261 insertions(+)
+ create mode 100644 arch/arm/boot/dts/rk3288-veyron-minnie.dts
 
-diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index 2db91c9..19766af 100644
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -169,6 +169,16 @@
- 		};
- 	};
+diff --git a/Documentation/devicetree/bindings/arm/rockchip.txt b/Documentation/devicetree/bindings/arm/rockchip.txt
+index c7411cc..af58cd7 100644
+--- a/Documentation/devicetree/bindings/arm/rockchip.txt
++++ b/Documentation/devicetree/bindings/arm/rockchip.txt
+@@ -38,6 +38,13 @@ Rockchip platforms device tree bindings
+ 		     "google,veyron-jerry-rev3", "google,veyron-jerry",
+ 		     "google,veyron", "rockchip,rk3288";
  
-+	reserved-memory {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
++- Google Minnie (Asus Chromebook Flip C100P):
++    Required root node properties:
++      - compatible = "google,veyron-minnie-rev4", "google,veyron-minnie-rev3",
++		     "google,veyron-minnie-rev2", "google,veyron-minnie-rev1",
++		     "google,veyron-minnie-rev0", "google,veyron-minnie",
++		     "google,veyron", "rockchip,rk3288";
 +
-+		unusable at fe000000 {
-+			reg = <0xfe000000 0x1000000>;
+ - Google Pinky (dev-board):
+     Required root node properties:
+       - compatible = "google,veyron-pinky-rev2", "google,veyron-pinky",
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 7017d8e..7805a65 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -491,6 +491,7 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += \
+ 	rk3288-firefly.dtb \
+ 	rk3288-r89.dtb \
+ 	rk3288-veyron-jerry.dtb \
++	rk3288-veyron-minnie.dtb \
+ 	rk3288-veyron-pinky.dtb \
+ 	rk3288-veyron-speedy.dtb
+ dtb-$(CONFIG_ARCH_S3C24XX) += \
+diff --git a/arch/arm/boot/dts/rk3288-veyron-minnie.dts b/arch/arm/boot/dts/rk3288-veyron-minnie.dts
+new file mode 100644
+index 0000000..4ce1ec9
+--- /dev/null
++++ b/arch/arm/boot/dts/rk3288-veyron-minnie.dts
+@@ -0,0 +1,253 @@
++/*
++ * Google Veyron Minnie Rev 0+ board device tree source
++ *
++ * Copyright 2015 Google, Inc
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ *  Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++#include "rk3288-veyron-chromebook.dtsi"
++
++/ {
++	model = "Google Minnie";
++	compatible = "google,veyron-minnie-rev4", "google,veyron-minnie-rev3",
++		     "google,veyron-minnie-rev2", "google,veyron-minnie-rev1",
++		     "google,veyron-minnie-rev0", "google,veyron-minnie",
++		     "google,veyron", "rockchip,rk3288";
++
++	backlight_regulator: backlight-regulator {
++		compatible = "regulator-fixed";
++		enable-active-high;
++		gpio = <&gpio2 12 GPIO_ACTIVE_HIGH>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&bl_pwr_en>;
++		regulator-name = "backlight_regulator";
++		vin-supply = <&vcc33_sys>;
++		startup-delay-us = <15000>;
++	};
++
++	panel_regulator: panel-regulator {
++		compatible = "regulator-fixed";
++		enable-active-high;
++		gpio = <&gpio7 14 GPIO_ACTIVE_HIGH>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&lcd_enable_h>;
++		regulator-name = "panel_regulator";
++		vin-supply = <&vcc33_sys>;
++	};
++
++	vcc18_lcd: vcc18-lcd {
++		compatible = "regulator-fixed";
++		enable-active-high;
++		gpio = <&gpio2 13 GPIO_ACTIVE_HIGH>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&avdd_1v8_disp_en>;
++		regulator-name = "vcc18_lcd";
++		regulator-always-on;
++		regulator-boot-on;
++		vin-supply = <&vcc18_wl>;
++	};
++};
++
++&gpio_keys {
++	pinctrl-0 = <&pwr_key_l &ap_lid_int_l &volum_down_l &volum_up_l>;
++
++	volum_down {
++		label = "Volum_down";
++		gpios = <&gpio5 11 GPIO_ACTIVE_LOW>;
++		linux,code = <KEY_VOLUMEDOWN>;
++		debounce-interval = <100>;
++	};
++
++	volum_up {
++		label = "Volum_up";
++		gpios = <&gpio5 10 GPIO_ACTIVE_LOW>;
++		linux,code = <KEY_VOLUMEUP>;
++		debounce-interval = <100>;
++	};
++};
++
++&i2c_tunnel {
++	battery: bq27500 at 55 {
++		compatible = "ti,bq27500";
++		reg = <0x55>;
++	};
++};
++
++&i2c3 {
++	status = "okay";
++
++	/*
++	 * Touchscreen pin control is shared between Atmel and Elan devices,
++	 * so we have to pull it up to the bus level.
++	 */
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c3_xfer &touch_int &touch_rst>;
++
++	clock-frequency = <400000>;
++	i2c-scl-falling-time-ns = <50>;
++	i2c-scl-rising-time-ns = <300>;
++
++	touchscreen at 10 {
++		compatible = "elan,ekth3500";
++		reg = <0x10>;
++		interrupt-parent = <&gpio2>;
++		interrupts = <14 IRQ_TYPE_EDGE_FALLING>;
++		reset-gpios = <&gpio2 15 GPIO_ACTIVE_LOW>;
++		vcc33-supply = <&vcc33_touch>;
++		vccio-supply = <&vcc33_touch>;
++	};
++
++	touchscreen at 4a {
++		compatible = "atmel,atmel_mxt_ts";
++		reg = <0x4a>;
++		atmel,reset-gpios = <&gpio2 15 GPIO_ACTIVE_LOW>;
++		avdd-supply = <&vcc5v_touch>;
++		interrupt-parent = <&gpio2>;
++		interrupts = <14 IRQ_TYPE_EDGE_FALLING>;
++		vdd-supply = <&vcc33_touch>;
++	};
++};
++
++&rk808 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pmic_int_l &dvs_1 &dvs_2>;
++
++	regulators {
++		vcc33_touch: LDO_REG2 {
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
++			regulator-name = "vcc33_touch";
++			regulator-suspend-mem-disabled;
++		};
++
++		vcc5v_touch: SWITCH_REG2 {
++			regulator-name = "vcc5v_touch";
++			regulator-suspend-mem-disabled;
++		};
++	};
++};
++
++&sdmmc {
++	disable-wp;
++	pinctrl-names = "default";
++	pinctrl-0 = <&sdmmc_clk &sdmmc_cmd &sdmmc_cd_disabled &sdmmc_cd_gpio
++			&sdmmc_bus4>;
++};
++
++&vcc_5v {
++	enable-active-high;
++	gpio = <&gpio7 21 GPIO_ACTIVE_HIGH>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&drv_5v>;
++};
++
++&vcc50_hdmi {
++	enable-active-high;
++	gpio = <&gpio5 19 GPIO_ACTIVE_HIGH>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&vcc50_hdmi_en>;
++};
++
++&pinctrl {
++	backlight {
++		bl_pwr_en: bl_pwr_en {
++			rockchip,pins = <2 12 RK_FUNC_GPIO &pcfg_pull_none>;
 +		};
 +	};
 +
- 	xin24m: oscillator {
- 		compatible = "fixed-clock";
- 		clock-frequency = <24000000>;
++	buck-5v {
++		drv_5v: drv-5v {
++			rockchip,pins = <7 21 RK_FUNC_GPIO &pcfg_pull_none>;
++		};
++	};
++
++	buttons {
++		volum_down_l: volum-down-l {
++			rockchip,pins = <5 11 RK_FUNC_GPIO &pcfg_pull_up>;
++		};
++
++		volum_up_l: volum-up-l {
++			rockchip,pins = <5 10 RK_FUNC_GPIO &pcfg_pull_up>;
++		};
++	};
++
++	hdmi {
++		vcc50_hdmi_en: vcc50-hdmi-en {
++			rockchip,pins = <5 19 RK_FUNC_GPIO &pcfg_pull_none>;
++		};
++	};
++
++	lcd {
++		lcd_enable_h: lcd-en {
++			rockchip,pins = <7 14 RK_FUNC_GPIO &pcfg_pull_none>;
++		};
++
++		avdd_1v8_disp_en: avdd-1v8-disp-en {
++			rockchip,pins = <2 13 RK_FUNC_GPIO &pcfg_pull_none>;
++		};
++	};
++
++	pmic {
++		dvs_1: dvs-1 {
++			rockchip,pins = <7 12 RK_FUNC_GPIO &pcfg_pull_down>;
++		};
++
++		dvs_2: dvs-2 {
++			rockchip,pins = <7 15 RK_FUNC_GPIO &pcfg_pull_down>;
++		};
++	};
++
++	prochot {
++		gpio_prochot: gpio-prochot {
++			rockchip,pins = <2 8 RK_FUNC_GPIO &pcfg_pull_none>;
++		};
++	};
++
++	touchscreen {
++		touch_int: touch-int {
++			rockchip,pins = <2 14 RK_FUNC_GPIO &pcfg_pull_none>;
++		};
++
++		touch_rst: touch-rst {
++			rockchip,pins = <2 15 RK_FUNC_GPIO &pcfg_pull_none>;
++		};
++	};
++};
 -- 
 2.1.4
