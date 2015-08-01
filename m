@@ -1,67 +1,39 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Sat, 01 Aug 2015 16:43:58 +0900
-Subject: [PATCH v3 3/5] ARM: Exynos: switch to using generic cpufreq driver
- for Exynos4x12
-In-Reply-To: <1438368557-2352-4-git-send-email-b.zolnierkie@samsung.com>
-References: <1438368557-2352-1-git-send-email-b.zolnierkie@samsung.com>
- <1438368557-2352-4-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <55BC78BE.5020102@samsung.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sat, 1 Aug 2015 09:44:05 +0200
+Subject: [PATCH v3 4/4] power: Add an axp20x-usb-power driver
+In-Reply-To: <20150724151020.GH27569@earth>
+References: <1435316357-26606-1-git-send-email-hdegoede@redhat.com>
+ <1435316357-26606-4-git-send-email-hdegoede@redhat.com>
+ <20150724151020.GH27569@earth>
+Message-ID: <55BC78C5.8090400@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-W dniu 01.08.2015 o 03:49, Bartlomiej Zolnierkiewicz pisze:
-> The new CPU clock type allows the use of generic CPUfreq driver.
-> Switch Exynos4x12 to using generic cpufreq driver.
-> 
-> Also make CPUFREQ_DT config option select Exynos thermal driver
-> if Exynos platform support is enabled.
+Hi,
 
-Why? I think this wasn't in your previous patch.
+On 24-07-15 17:10, Sebastian Reichel wrote:
+> Hi,
+>
+> On Fri, Jun 26, 2015 at 12:59:17PM +0200, Hans de Goede wrote:
+>> This adds a driver for the usb power_supply bits of the axp20x PMICs.
+>>
+>> I initially started writing my own driver, before coming aware of
+>> Bruno Pr?mont's excellent earlier RFC with a driver for this.
+>>
+>> My driver was lacking CURRENT_MAX and VOLTAGE_MIN support Bruno's
+>> drvier has, so I've copied the code for those from his driver.
+>>
+>> Note that the AC-power-supply and battery charger bits will need separate
+>> drivers. Each one needs its own devictree child-node so that other
+>> devicetree nodes can reference the right power-supply, and thus each one
+>> will get its own mfd-cell / platform_device and platform-driver.
+>
+> Once the other comments have been taken care of, the driver looks ok
+> to me.
 
-Best regards,
-Krzysztof
+Ok, I will do a v4 of the power-supply part of this patch set, with the
+various remarks on this patch fixed.
 
+Thanks & Regards,
 
-> 
-> Please also note that the switch to use the generic cpufreq-dt
-> driver fixes the minor issue present with the old code (support
-> for 'boost' mode in the exynos-cpufreq driver was enabled for
-> all supported SoCs even though 'boost' frequency was provided
-> only for Exynos4x12 ones).
-> 
-> Cc: Tomasz Figa <tomasz.figa@gmail.com>
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> Cc: Thomas Abraham <thomas.ab@samsung.com>
-> Cc: Javier Martinez Canillas <javier@osg.samsung.com>
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> ---
->  arch/arm/mach-exynos/exynos.c | 2 ++
->  drivers/cpufreq/Kconfig       | 1 +
->  2 files changed, 3 insertions(+)
-> 
-> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
-> index 77ac021..1c47aee 100644
-> --- a/arch/arm/mach-exynos/exynos.c
-> +++ b/arch/arm/mach-exynos/exynos.c
-> @@ -227,6 +227,8 @@ static void __init exynos_init_irq(void)
->  static const struct of_device_id exynos_cpufreq_matches[] = {
->  	{ .compatible = "samsung,exynos3250", .data = "cpufreq-dt" },
->  	{ .compatible = "samsung,exynos4210", .data = "cpufreq-dt" },
-> +	{ .compatible = "samsung,exynos4212", .data = "cpufreq-dt" },
-> +	{ .compatible = "samsung,exynos4412", .data = "cpufreq-dt" },
->  	{ .compatible = "samsung,exynos5250", .data = "cpufreq-dt" },
->  	{ /* sentinel */ }
->  };
-> diff --git a/drivers/cpufreq/Kconfig b/drivers/cpufreq/Kconfig
-> index 659879a..bf6d596 100644
-> --- a/drivers/cpufreq/Kconfig
-> +++ b/drivers/cpufreq/Kconfig
-> @@ -191,6 +191,7 @@ config CPUFREQ_DT
->  	# if CPU_THERMAL is on and THERMAL=m, CPUFREQ_DT cannot be =y:
->  	depends on !CPU_THERMAL || THERMAL
->  	select PM_OPP
-> +	select EXYNOS_THERMAL if ARCH_EXYNOS
->  	help
->  	  This adds a generic DT based cpufreq driver for frequency management.
->  	  It supports both uniprocessor (UP) and symmetric multiprocessor (SMP)
-> 
+Hans
