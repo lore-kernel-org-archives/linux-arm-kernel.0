@@ -1,370 +1,164 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat,  1 Aug 2015 10:39:38 +0200
-Subject: [PATCH v4 2/2] power: Add an axp20x-usb-power driver
-In-Reply-To: <1438418378-32656-1-git-send-email-hdegoede@redhat.com>
-References: <1438418378-32656-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1438418378-32656-2-git-send-email-hdegoede@redhat.com>
+Date: Sat, 1 Aug 2015 11:01:18 +0200
+Subject: [PATCH v2] mmc: sunxi: Don't start commands while the card is busy
+In-Reply-To: <CAPDyKFoNe0bghfSXs48stHzZToTc7Hjd5gVPy-VbDF8bzdVVMQ@mail.gmail.com>
+References: <1436541284-11800-1-git-send-email-hdegoede@redhat.com>
+ <CAPDyKFoNe0bghfSXs48stHzZToTc7Hjd5gVPy-VbDF8bzdVVMQ@mail.gmail.com>
+Message-ID: <55BC8ADE.3070802@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a driver for the usb power_supply bits of the axp20x PMICs.
+Hi,
 
-I initially started writing my own driver, before coming aware of
-Bruno Pr?mont's excellent earlier RFC with a driver for this.
+On 21-07-15 14:15, Ulf Hansson wrote:
+> On 10 July 2015 at 17:14, Hans de Goede <hdegoede@redhat.com> wrote:
+>> Some sdio wifi modules have not been working reliable with the sunxi-mmc
+>> host code. This turns out to be caused by it starting new commands while
+>> the card signals that it is still busy processing a previous command.
+>
+> Which are those commands?
 
-My driver was lacking CURRENT_MAX and VOLTAGE_MIN support Bruno's
-drvier has, so I've copied the code for those from his driver.
+The code were things get stuck when not waiting for the busy signal uses
+the following sdio helper functions:
 
-Note that the AC-power-supply and battery charger bits will need separate
-drivers. Each one needs its own devictree child-node so that other
-devicetree nodes can reference the right power-supply, and thus each one
-will get its own mfd-cell / platform_device and platform-driver.
+sdio_readb/sdio_writeb
+sdio_f0_readb/sdio_f0_writeb
+sdio_readw/sdio_writew
+sdio_readl/sdio_writel
+sdio_readsb
+sdio_memcpy_fromio/sdio_memcpy_toio
 
-Cc: Bruno Pr?mont <bonbons@linux-vserver.org>
-Acked-by: Lee Jones <lee.jones@linaro.org>
-Signed-off-by: Bruno Pr?mont <bonbons@linux-vserver.org>
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
-Changes in v2:
--Split out the dt-bindings documentation into a separate patch
--Renamed axp20x_read_16bit to axp20x_read_variable_width
--Use better local variable names inside axp20x_read_variable_width
-Changes in v3:
--Add Bruno's S-o-b
-Changes in v4:
--Check that parent drv data is not NULL
--Replace "r" local variable with a "ret" variable
----
- drivers/power/Kconfig            |   7 ++
- drivers/power/Makefile           |   1 +
- drivers/power/axp20x_usb_power.c | 248 +++++++++++++++++++++++++++++++++++++++
- include/linux/mfd/axp20x.h       |  24 ++++
- 4 files changed, 280 insertions(+)
- create mode 100644 drivers/power/axp20x_usb_power.c
+And directly issues the following command:
 
-diff --git a/drivers/power/Kconfig b/drivers/power/Kconfig
-index 08beeed..29b447f 100644
---- a/drivers/power/Kconfig
-+++ b/drivers/power/Kconfig
-@@ -467,6 +467,13 @@ config CHARGER_RT9455
- 	help
- 	  Say Y to enable support for Richtek RT9455 battery charger.
- 
-+config AXP20X_POWER
-+	tristate "AXP20x power supply driver"
-+	depends on MFD_AXP20X
-+	help
-+	  This driver provides support for the power supply features of
-+	  AXP20x PMIC.
-+
- source "drivers/power/reset/Kconfig"
- 
- endif # POWER_SUPPLY
-diff --git a/drivers/power/Makefile b/drivers/power/Makefile
-index 5752ce8..fb4413e 100644
---- a/drivers/power/Makefile
-+++ b/drivers/power/Makefile
-@@ -9,6 +9,7 @@ obj-$(CONFIG_GENERIC_ADC_BATTERY)	+= generic-adc-battery.o
- 
- obj-$(CONFIG_PDA_POWER)		+= pda_power.o
- obj-$(CONFIG_APM_POWER)		+= apm_power.o
-+obj-$(CONFIG_AXP20X_POWER)	+= axp20x_usb_power.o
- obj-$(CONFIG_MAX8925_POWER)	+= max8925_power.o
- obj-$(CONFIG_WM831X_BACKUP)	+= wm831x_backup.o
- obj-$(CONFIG_WM831X_POWER)	+= wm831x_power.o
-diff --git a/drivers/power/axp20x_usb_power.c b/drivers/power/axp20x_usb_power.c
-new file mode 100644
-index 0000000..421a90b
---- /dev/null
-+++ b/drivers/power/axp20x_usb_power.c
-@@ -0,0 +1,248 @@
-+/*
-+ * AXP20x PMIC USB power supply status driver
-+ *
-+ * Copyright (C) 2015 Hans de Goede <hdegoede@redhat.com>
-+ * Copyright (C) 2014 Bruno Pr?mont <bonbons@linux-vserver.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under  the terms of the GNU General  Public License as published by the
-+ * Free Software Foundation;  either version 2 of the License, or (at your
-+ * option) any later version.
-+ */
-+
-+#include <linux/device.h>
-+#include <linux/init.h>
-+#include <linux/interrupt.h>
-+#include <linux/kernel.h>
-+#include <linux/mfd/axp20x.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
-+#include <linux/power_supply.h>
-+#include <linux/regmap.h>
-+#include <linux/slab.h>
-+
-+#define DRVNAME "axp20x-usb-power-supply"
-+
-+#define AXP20X_PWR_STATUS_VBUS_PRESENT	BIT(5)
-+#define AXP20X_PWR_STATUS_VBUS_USED	BIT(4)
-+
-+#define AXP20X_USB_STATUS_VBUS_VALID	BIT(2)
-+
-+#define AXP20X_VBUS_VHOLD_uV(b)		(4000000 + (((b) >> 3) & 7) * 100000)
-+#define AXP20X_VBUS_CLIMIT_MASK		3
-+#define AXP20X_VBUC_CLIMIT_900mA	0
-+#define AXP20X_VBUC_CLIMIT_500mA	1
-+#define AXP20X_VBUC_CLIMIT_100mA	2
-+#define AXP20X_VBUC_CLIMIT_NONE		3
-+
-+#define AXP20X_ADC_EN1_VBUS_CURR	BIT(2)
-+#define AXP20X_ADC_EN1_VBUS_VOLT	BIT(3)
-+
-+#define AXP20X_VBUS_MON_VBUS_VALID	BIT(3)
-+
-+struct axp20x_usb_power {
-+	struct regmap *regmap;
-+	struct power_supply *supply;
-+};
-+
-+static irqreturn_t axp20x_usb_power_irq(int irq, void *devid)
-+{
-+	struct axp20x_usb_power *power = devid;
-+
-+	power_supply_changed(power->supply);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static int axp20x_usb_power_get_property(struct power_supply *psy,
-+	enum power_supply_property psp, union power_supply_propval *val)
-+{
-+	struct axp20x_usb_power *power = power_supply_get_drvdata(psy);
-+	unsigned int input, v;
-+	int ret;
-+
-+	switch (psp) {
-+	case POWER_SUPPLY_PROP_VOLTAGE_MIN:
-+		ret = regmap_read(power->regmap, AXP20X_VBUS_IPSOUT_MGMT, &v);
-+		if (ret)
-+			return ret;
-+
-+		val->intval = AXP20X_VBUS_VHOLD_uV(v);
-+		return 0;
-+	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
-+		ret = axp20x_read_variable_width(power->regmap,
-+						 AXP20X_VBUS_V_ADC_H, 12);
-+		if (ret < 0)
-+			return ret;
-+
-+		val->intval = ret * 1700; /* 1 step = 1.7 mV */
-+		return 0;
-+	case POWER_SUPPLY_PROP_CURRENT_MAX:
-+		ret = regmap_read(power->regmap, AXP20X_VBUS_IPSOUT_MGMT, &v);
-+		if (ret)
-+			return ret;
-+
-+		switch (v & AXP20X_VBUS_CLIMIT_MASK) {
-+		case AXP20X_VBUC_CLIMIT_100mA:
-+			val->intval = 100000;
-+			break;
-+		case AXP20X_VBUC_CLIMIT_500mA:
-+			val->intval = 500000;
-+			break;
-+		case AXP20X_VBUC_CLIMIT_900mA:
-+			val->intval = 900000;
-+			break;
-+		case AXP20X_VBUC_CLIMIT_NONE:
-+			val->intval = -1;
-+			break;
-+		}
-+		return 0;
-+	case POWER_SUPPLY_PROP_CURRENT_NOW:
-+		ret = axp20x_read_variable_width(power->regmap,
-+						 AXP20X_VBUS_I_ADC_H, 12);
-+		if (ret < 0)
-+			return ret;
-+
-+		val->intval = ret * 375; /* 1 step = 0.375 mA */
-+		return 0;
-+	default:
-+		break;
-+	}
-+
-+	/* All the properties below need the input-status reg value */
-+	ret = regmap_read(power->regmap, AXP20X_PWR_INPUT_STATUS, &input);
-+	if (ret)
-+		return ret;
-+
-+	switch (psp) {
-+	case POWER_SUPPLY_PROP_HEALTH:
-+		if (!(input & AXP20X_PWR_STATUS_VBUS_PRESENT)) {
-+			val->intval = POWER_SUPPLY_HEALTH_UNKNOWN;
-+			break;
-+		}
-+
-+		ret = regmap_read(power->regmap, AXP20X_USB_OTG_STATUS, &v);
-+		if (ret)
-+			return ret;
-+
-+		if (!(v & AXP20X_USB_STATUS_VBUS_VALID)) {
-+			val->intval = POWER_SUPPLY_HEALTH_UNSPEC_FAILURE;
-+			break;
-+		}
-+
-+		val->intval = POWER_SUPPLY_HEALTH_GOOD;
-+		break;
-+	case POWER_SUPPLY_PROP_PRESENT:
-+		val->intval = !!(input & AXP20X_PWR_STATUS_VBUS_PRESENT);
-+		break;
-+	case POWER_SUPPLY_PROP_ONLINE:
-+		val->intval = !!(input & AXP20X_PWR_STATUS_VBUS_USED);
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+
-+	return 0;
-+}
-+
-+static enum power_supply_property axp20x_usb_power_properties[] = {
-+	POWER_SUPPLY_PROP_HEALTH,
-+	POWER_SUPPLY_PROP_PRESENT,
-+	POWER_SUPPLY_PROP_ONLINE,
-+	POWER_SUPPLY_PROP_VOLTAGE_MIN,
-+	POWER_SUPPLY_PROP_VOLTAGE_NOW,
-+	POWER_SUPPLY_PROP_CURRENT_MAX,
-+	POWER_SUPPLY_PROP_CURRENT_NOW,
-+};
-+
-+static const struct power_supply_desc axp20x_usb_power_desc = {
-+	.name = "axp20x-usb",
-+	.type = POWER_SUPPLY_TYPE_USB,
-+	.properties = axp20x_usb_power_properties,
-+	.num_properties = ARRAY_SIZE(axp20x_usb_power_properties),
-+	.get_property = axp20x_usb_power_get_property,
-+};
-+
-+static int axp20x_usb_power_probe(struct platform_device *pdev)
-+{
-+	struct axp20x_dev *axp20x = dev_get_drvdata(pdev->dev.parent);
-+	struct power_supply_config psy_cfg = {};
-+	struct axp20x_usb_power *power;
-+	static const char * const irq_names[] = { "VBUS_PLUGIN",
-+		"VBUS_REMOVAL", "VBUS_VALID", "VBUS_NOT_VALID" };
-+	int i, irq, ret;
-+
-+	if (!of_device_is_available(pdev->dev.of_node))
-+		return -ENODEV;
-+
-+	if (!axp20x) {
-+		dev_err(&pdev->dev, "Parent drvdata not set\n");
-+		return -EINVAL;
-+	}
-+
-+	power = devm_kzalloc(&pdev->dev, sizeof(*power), GFP_KERNEL);
-+	if (!power)
-+		return -ENOMEM;
-+
-+	power->regmap = axp20x->regmap;
-+
-+	/* Enable vbus valid checking */
-+	ret = regmap_update_bits(power->regmap, AXP20X_VBUS_MON,
-+		    AXP20X_VBUS_MON_VBUS_VALID, AXP20X_VBUS_MON_VBUS_VALID);
-+	if (ret)
-+		return ret;
-+
-+	/* Enable vbus voltage and current measurement */
-+	ret = regmap_update_bits(power->regmap, AXP20X_ADC_EN1,
-+			AXP20X_ADC_EN1_VBUS_CURR | AXP20X_ADC_EN1_VBUS_VOLT,
-+			AXP20X_ADC_EN1_VBUS_CURR | AXP20X_ADC_EN1_VBUS_VOLT);
-+	if (ret)
-+		return ret;
-+
-+	psy_cfg.of_node = pdev->dev.of_node;
-+	psy_cfg.drv_data = power;
-+
-+	power->supply = devm_power_supply_register(&pdev->dev,
-+					&axp20x_usb_power_desc, &psy_cfg);
-+	if (IS_ERR(power->supply))
-+		return PTR_ERR(power->supply);
-+
-+	/* Request irqs after registering, as irqs may trigger immediately */
-+	for (i = 0; i < ARRAY_SIZE(irq_names); i++) {
-+		irq = platform_get_irq_byname(pdev, irq_names[i]);
-+		if (irq < 0) {
-+			dev_warn(&pdev->dev, "No IRQ for %s: %d\n",
-+				 irq_names[i], irq);
-+			continue;
-+		}
-+		irq = regmap_irq_get_virq(axp20x->regmap_irqc, irq);
-+		ret = devm_request_any_context_irq(&pdev->dev, irq,
-+				axp20x_usb_power_irq, 0, DRVNAME, power);
-+		if (ret < 0)
-+			dev_warn(&pdev->dev, "Error requesting %s IRQ: %d\n",
-+				 irq_names[i], ret);
-+	}
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id axp20x_usb_power_match[] = {
-+	{ .compatible = "x-powers,axp202-usb-power-supply" },
-+	{ }
-+};
-+MODULE_DEVICE_TABLE(of, axp20x_usb_power_match);
-+
-+static struct platform_driver axp20x_usb_power_driver = {
-+	.probe = axp20x_usb_power_probe,
-+	.driver = {
-+		.name = DRVNAME,
-+		.of_match_table = axp20x_usb_power_match,
-+	},
-+};
-+
-+module_platform_driver(axp20x_usb_power_driver);
-+
-+MODULE_AUTHOR("Hans de Goede <hdegoede@redhat.com>");
-+MODULE_DESCRIPTION("AXP20x PMIC USB power supply status driver");
-+MODULE_LICENSE("GPL");
-diff --git a/include/linux/mfd/axp20x.h b/include/linux/mfd/axp20x.h
-index cc8ad1e..b24c771 100644
---- a/include/linux/mfd/axp20x.h
-+++ b/include/linux/mfd/axp20x.h
-@@ -11,6 +11,8 @@
- #ifndef __LINUX_MFD_AXP20X_H
- #define __LINUX_MFD_AXP20X_H
- 
-+#include <linux/regmap.h>
-+
- enum {
- 	AXP152_ID = 0,
- 	AXP202_ID,
-@@ -438,4 +440,26 @@ struct axp288_extcon_pdata {
- 	struct gpio_desc *gpio_mux_cntl;
- };
- 
-+/* generic helper function for reading 9-16 bit wide regs */
-+static inline int axp20x_read_variable_width(struct regmap *regmap,
-+	unsigned int reg, unsigned int width)
-+{
-+	unsigned int reg_val, result;
-+	int err;
-+
-+	err = regmap_read(regmap, reg, &reg_val);
-+	if (err)
-+		return err;
-+
-+	result = reg_val << (width - 8);
-+
-+	err = regmap_read(regmap, reg + 1, &reg_val);
-+	if (err)
-+		return err;
-+
-+	result |= reg_val;
-+
-+	return result;
-+}
-+
- #endif /* __LINUX_MFD_AXP20X_H */
--- 
-2.4.3
+         mmc_dat.flags = write ? MMC_DATA_WRITE : MMC_DATA_READ;
+         mmc_cmd.opcode = SD_IO_RW_EXTENDED;
+         mmc_cmd.arg = write ? 1<<31 : 0;        /* write flag  */
+         mmc_cmd.arg |= (fn & 0x7) << 28;        /* SDIO func num */
+         mmc_cmd.arg |= 1<<27;                   /* block mode */
+         /* for function 1 the addr will be incremented */
+         mmc_cmd.arg |= (fn == 1) ? 1<<26 : 0;
+         mmc_cmd.flags = MMC_RSP_SPI_R5 | MMC_RSP_R5 | MMC_CMD_ADTC;
+
+I do not know if the busy wait is necessary for all
+of these, but the hack in the android kernel code,
+which inserts calls to a wait_card_busy function directly
+into: drivers/net/wireless/brcm80211/brcmfmac/bcmsdh.c
+
+Does so for all of these.
+
+ > Or more interesting, which response types do
+> these commands expect?
+> I don't think this is a sunxi specific issue, I have seen similar
+> issues for other host controllers.
+
+Agreed, recent dw-mmc patches address the same issue, also involving
+broadcom sdio wifi chips.
+
+> I am thinking that perhaps this should be managed by the mmc core
+> instead of local hacks to sunxi. Potentially we could make the core to
+> invoke the already existing host_ops->card_busy() callback when
+> needed...
+
+I'm fine with solving this either way, implementing host_ops->card_busy()
+for sunxi is easy, and if the core os modified to call that function
+before issue sdio io ops (which seems to be the common thing here),
+then that indeed is better then having the sunxi code always do
+the busy check.
+
+> Within this context, could I ask whether you controller supports IRQ
+> based HW-busy detection? Or you need polling of the status register?
+
+I'm afraid that we need to poll the status register. I've been unable
+to find an irq flag corresponding to this.
+
+Regards,
+
+Hans
+
+
+>> This commit fixes this, thereby fixing the wifi reliability issues on
+>> the Cubietruck and other sunxi boards using sdio wifi.
+>>
+>> Reported-by: Eugene K <sigintmailru@gmail.com>
+>> Suggested-by: Eugene K <sigintmailru@gmail.com>
+>> Cc: Eugene K <sigintmailru@gmail.com>
+>> Cc: Arend van Spriel <arend@broadcom.com>
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>> ---
+>> Changes in v2:
+>> -Properly accredit Eugene K for coming up with the fix for this
+>> ---
+>>   drivers/mmc/host/sunxi-mmc.c | 32 ++++++++++++++++++++++++++++++++
+>>   1 file changed, 32 insertions(+)
+>>
+>> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+>> index 4d3e1ff..daa90b7 100644
+>> --- a/drivers/mmc/host/sunxi-mmc.c
+>> +++ b/drivers/mmc/host/sunxi-mmc.c
+>> @@ -289,6 +289,24 @@ static int sunxi_mmc_init_host(struct mmc_host *mmc)
+>>          return 0;
+>>   }
+>>
+>> +/* Wait for card to report ready before starting a new cmd */
+>> +static int sunxi_mmc_wait_card_ready(struct sunxi_mmc_host *host)
+>> +{
+>> +       unsigned long expire = jiffies + msecs_to_jiffies(500);
+>> +       u32 rval;
+>> +
+>> +       do {
+>> +               rval = mmc_readl(host, REG_STAS);
+>> +       } while (time_before(jiffies, expire) && (rval & SDXC_CARD_DATA_BUSY));
+>> +
+>> +       if (rval & SDXC_CARD_DATA_BUSY) {
+>> +               dev_err(mmc_dev(host->mmc), "Error R1 ready timeout\n");
+>> +               return -EIO;
+>> +       }
+>> +
+>> +       return 0;
+>> +}
+>> +
+>>   static void sunxi_mmc_init_idma_des(struct sunxi_mmc_host *host,
+>>                                      struct mmc_data *data)
+>>   {
+>> @@ -383,6 +401,8 @@ static void sunxi_mmc_send_manual_stop(struct sunxi_mmc_host *host,
+>>          u32 arg, cmd_val, ri;
+>>          unsigned long expire = jiffies + msecs_to_jiffies(1000);
+>>
+>> +       sunxi_mmc_wait_card_ready(host);
+>> +
+>>          cmd_val = SDXC_START | SDXC_RESP_EXPIRE |
+>>                    SDXC_STOP_ABORT_CMD | SDXC_CHECK_RESPONSE_CRC;
+>>
+>> @@ -597,6 +617,11 @@ static int sunxi_mmc_oclk_onoff(struct sunxi_mmc_host *host, u32 oclk_en)
+>>   {
+>>          unsigned long expire = jiffies + msecs_to_jiffies(250);
+>>          u32 rval;
+>> +       int ret;
+>> +
+>> +       ret = sunxi_mmc_wait_card_ready(host);
+>> +       if (ret)
+>> +               return ret;
+>>
+>>          rval = mmc_readl(host, REG_CLKCR);
+>>          rval &= ~(SDXC_CARD_CLOCK_ON | SDXC_LOW_POWER_ON);
+>> @@ -785,6 +810,13 @@ static void sunxi_mmc_request(struct mmc_host *mmc, struct mmc_request *mrq)
+>>                  return;
+>>          }
+>>
+>> +       ret = sunxi_mmc_wait_card_ready(host);
+>> +       if (ret) {
+>> +               mrq->cmd->error = ret;
+>> +               mmc_request_done(mmc, mrq);
+>> +               return;
+>> +       }
+>> +
+>>          if (data) {
+>>                  ret = sunxi_mmc_map_dma(host, data);
+>>                  if (ret < 0) {
+>> --
+>> 2.4.3
+>>
+>
+> Kind regards
+> Uffe
+>
