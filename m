@@ -1,45 +1,43 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat, 1 Aug 2015 11:30:46 +0200
-Subject: [linux-sunxi] Re: [PATCH 5/5] ARM: dts: sun7i: Add dts file for
- Wits Pro A20 DKT
-In-Reply-To: <55BB9E92.30604@redhat.com>
-References: <1438333194-21181-1-git-send-email-hdegoede@redhat.com>
- <1438333194-21181-6-git-send-email-hdegoede@redhat.com>
- <20150731102028.GE2564@lukather>
- <CAGb2v65TEogqYFAfen1VnOaiepvez5t8Oh+Q=OYsRS_aZUMO3A@mail.gmail.com>
- <55BB9E92.30604@redhat.com>
-Message-ID: <20150801093046.GX2564@lukather>
+Date: Sat, 1 Aug 2015 11:26:38 +0200
+Subject: [PATCH] ARM: dts: sun7i: Change cubietruck wifi enable pin to
+ use mmc-pwrseq
+In-Reply-To: <1438357312-17378-1-git-send-email-hdegoede@redhat.com>
+References: <1438357312-17378-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <20150801092638.GW2564@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 31, 2015 at 06:13:06PM +0200, Hans de Goede wrote:
-> mmc-pwrseq-simple supports multiple reset/enable gpios (by listing
-> them all as reset-gpios and setting GPIO_ACTIVE_LOW/HIGH depending
-> on which value they need to be to activate things).
+On Fri, Jul 31, 2015 at 05:41:52PM +0200, Hans de Goede wrote:
+> The wifi-enable pin of the ap6210 module is not really a regulator,
+> switch to the mmc-pwrseq framework for controlling it. This more
+> accurately reflects how the hardware actually works.
 > 
-> It also supports listing clocks which need to be enabled. I think
-> that it may be a good idea to use this to also enable the bluetooth
-> bits of the ap6210 module on the cubietruck. I know that the
-> actual bt is interfaced over an uart, and we really should have
-> a mechanism to enable/disable it separately, but for not this seems
-> like a good way to get bluetooth to work.
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> ---
+>  arch/arm/boot/dts/sun7i-a20-cubietruck.dts | 13 +++++--------
+>  1 file changed, 5 insertions(+), 8 deletions(-)
 > 
-> We should ofcourse add a comment to the dts file that this is not a
-> 100% ideal solution, but other then that I think this should work
-> nicely. Maxime would enabling the bluetooth bits of this sdio
-> module via mmc-pwrseq be acceptable to you?
+> diff --git a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+> index de3e195..0b2f914 100644
+> --- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+> +++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+> @@ -88,15 +88,11 @@
+>  		};
+>  	};
+>  
+> -	reg_vmmc3: vmmc3 {
+> -		compatible = "regulator-fixed";
+> +	mmc3_pwrseq: mmc3_pwrseq {
+> +		compatible = "mmc-pwrseq-simple";
+>  		pinctrl-names = "default";
+>  		pinctrl-0 = <&vmmc3_pin_cubietruck>;
 
-As long as we have some comment on top, yep.
+The pinctrl name shouldn't be called that way anymore.
 
-> ChenYu if Maxime acks this solution I hope you can write a patch for
-> this, since you've been working on the bluetooth support before.
+Changed it to mmc3_pwrseq_pin_cubietruck, and applied the patch.
 
-Note that I'm in holidays starting today. I plan on doing my
-pull-requests for 4.3 later today, and will probably not be able to
-merge any patches during the next two weeks, which mean that your
-mmc-power seq patch for the cubietruck was probably the last one I was
-merging for the 4.3 merge window.
-
+Thanks!
 Maxime
 
 -- 
@@ -52,4 +50,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150801/a03c54cf/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150801/e8beae06/attachment.sig>
