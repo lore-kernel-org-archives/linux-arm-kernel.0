@@ -1,62 +1,55 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Sat, 1 Aug 2015 21:03:56 +0530
-Subject: [PATCH] ARM: davinci: cp_intc: use IRQCHIP_SKIP_SET_WAKE instead of
- irq_set_wake callback
-In-Reply-To: <1435941754-21102-1-git-send-email-sudeep.holla@arm.com>
-References: <1435941754-21102-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1438443236-30206-1-git-send-email-nsekhar@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sat, 1 Aug 2015 11:30:46 +0200
+Subject: [linux-sunxi] Re: [PATCH 5/5] ARM: dts: sun7i: Add dts file for
+ Wits Pro A20 DKT
+In-Reply-To: <55BB9E92.30604@redhat.com>
+References: <1438333194-21181-1-git-send-email-hdegoede@redhat.com>
+ <1438333194-21181-6-git-send-email-hdegoede@redhat.com>
+ <20150731102028.GE2564@lukather>
+ <CAGb2v65TEogqYFAfen1VnOaiepvez5t8Oh+Q=OYsRS_aZUMO3A@mail.gmail.com>
+ <55BB9E92.30604@redhat.com>
+Message-ID: <20150801093046.GX2564@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sudeep Holla <sudeep.holla@arm.com>
+On Fri, Jul 31, 2015 at 06:13:06PM +0200, Hans de Goede wrote:
+> mmc-pwrseq-simple supports multiple reset/enable gpios (by listing
+> them all as reset-gpios and setting GPIO_ACTIVE_LOW/HIGH depending
+> on which value they need to be to activate things).
+> 
+> It also supports listing clocks which need to be enabled. I think
+> that it may be a good idea to use this to also enable the bluetooth
+> bits of the ap6210 module on the cubietruck. I know that the
+> actual bt is interfaced over an uart, and we really should have
+> a mechanism to enable/disable it separately, but for not this seems
+> like a good way to get bluetooth to work.
+> 
+> We should ofcourse add a comment to the dts file that this is not a
+> 100% ideal solution, but other then that I think this should work
+> nicely. Maxime would enabling the bluetooth bits of this sdio
+> module via mmc-pwrseq be acceptable to you?
 
-Commit 60f96b41f71d ("genirq: Add IRQCHIP_SKIP_SET_WAKE flag")
-introduced a new flag to skip the irq_set_wake callback in the irqchip
-core to avoid adding dummy irq_set_wake in the irqchip implementations.
+As long as we have some comment on top, yep.
 
-This patch removes the dummy callback and sets the IRQCHIP_SKIP_SET_WAKE
-flags.
+> ChenYu if Maxime acks this solution I hope you can write a patch for
+> this, since you've been working on the bluetooth support before.
 
-Cc: Sekhar Nori <nsekhar@ti.com>
-Cc: Kevin Hilman <khilman@deeprootsystems.com>
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-Signed-off-by: Sekhar Nori <nsekhar@ti.com>
----
-ARM-SoC, can you please apply this patch directly?
-I do not have any other patches queued, so not sending
-a pull request.
+Note that I'm in holidays starting today. I plan on doing my
+pull-requests for 4.3 later today, and will probably not be able to
+merge any patches during the next two weeks, which mean that your
+mmc-power seq patch for the cubietruck was probably the last one I was
+merging for the 4.3 merge window.
 
- arch/arm/mach-davinci/cp_intc.c | 12 +-----------
- 1 file changed, 1 insertion(+), 11 deletions(-)
+Maxime
 
-diff --git a/arch/arm/mach-davinci/cp_intc.c b/arch/arm/mach-davinci/cp_intc.c
-index 006dae8dfe44..9fda75c18c04 100644
---- a/arch/arm/mach-davinci/cp_intc.c
-+++ b/arch/arm/mach-davinci/cp_intc.c
-@@ -85,23 +85,13 @@ static int cp_intc_set_irq_type(struct irq_data *d, unsigned int flow_type)
- 	return 0;
- }
- 
--/*
-- * Faking this allows us to to work with suspend functions of
-- * generic drivers which call {enable|disable}_irq_wake for
-- * wake up interrupt sources (eg RTC on DA850).
-- */
--static int cp_intc_set_wake(struct irq_data *d, unsigned int on)
--{
--	return 0;
--}
--
- static struct irq_chip cp_intc_irq_chip = {
- 	.name		= "cp_intc",
- 	.irq_ack	= cp_intc_ack_irq,
- 	.irq_mask	= cp_intc_mask_irq,
- 	.irq_unmask	= cp_intc_unmask_irq,
- 	.irq_set_type	= cp_intc_set_irq_type,
--	.irq_set_wake	= cp_intc_set_wake,
-+	.flags		= IRQCHIP_SKIP_SET_WAKE,
- };
- 
- static struct irq_domain *cp_intc_domain;
 -- 
-2.4.4.408.g16da57c
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150801/a03c54cf/attachment.sig>
