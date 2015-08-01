@@ -1,39 +1,140 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Sat, 1 Aug 2015 15:54:27 +0530
-Subject: [PATCH 1/3] phy-sun4i-usb: Add missing EXPORT_SYMBOL for
- sun4i_usb_phy_set_squelch_detect
-In-Reply-To: <1438329702-10365-2-git-send-email-hdegoede@redhat.com>
-References: <1438329702-10365-1-git-send-email-hdegoede@redhat.com>
- <1438329702-10365-2-git-send-email-hdegoede@redhat.com>
-Message-ID: <55BC9E5B.7010201@ti.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Sat, 1 Aug 2015 16:18:25 +0530
+Subject: [PATCH v3 2/5] ARM: dts: Exynos4x12: add CPU OPP and regulator
+ supply property
+In-Reply-To: <1438368557-2352-3-git-send-email-b.zolnierkie@samsung.com>
+References: <1438368557-2352-1-git-send-email-b.zolnierkie@samsung.com>
+ <1438368557-2352-3-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <20150801104825.GF899@linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Friday 31 July 2015 01:31 PM, Hans de Goede wrote:
-> sun4i_usb_phy_set_squelch_detect is used by other code, which may be built
-> as a module, so it should be exported.
+On 31-07-15, 20:49, Bartlomiej Zolnierkiewicz wrote:
+> For Exynos4x12 platforms, add CPU operating points (using
+> opp-v2 bindings) and CPU regulator supply properties for
+> migrating from Exynos specific cpufreq driver to using
+> generic cpufreq driver.
 > 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> ---
-> Changes in v6:
-> -New patch in v6 of the sunxi musb support series
-> ---
->  drivers/phy/phy-sun4i-usb.c | 1 +
->  1 file changed, 1 insertion(+)
+> Based on the earlier work by Thomas Abraham.
 > 
-> diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
-> index 5138843..d514a9b 100644
-> --- a/drivers/phy/phy-sun4i-usb.c
-> +++ b/drivers/phy/phy-sun4i-usb.c
-> @@ -347,6 +347,7 @@ void sun4i_usb_phy_set_squelch_detect(struct phy *_phy, bool enabled)
->  
->  	sun4i_usb_phy_write(phy, PHY_SQUELCH_DETECT, enabled ? 0 : 2, 2);
->  }
-> +EXPORT_SYMBOL(sun4i_usb_phy_set_squelch_detect);
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Cc: Doug Anderson <dianders@chromium.org>
+> Cc: Andreas Faerber <afaerber@suse.de>
+> Cc: Thomas Abraham <thomas.ab@samsung.com>
+> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos4212.dtsi               | 81 ++++++++++++++++++++++++
+>  arch/arm/boot/dts/exynos4412-odroid-common.dtsi |  4 ++
+>  arch/arm/boot/dts/exynos4412-origen.dts         |  4 ++
+>  arch/arm/boot/dts/exynos4412-trats2.dts         |  4 ++
+>  arch/arm/boot/dts/exynos4412.dtsi               | 83 +++++++++++++++++++++++++
+>  5 files changed, 176 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/exynos4212.dtsi b/arch/arm/boot/dts/exynos4212.dtsi
+> index d9c8efee..5389011 100644
+> --- a/arch/arm/boot/dts/exynos4212.dtsi
+> +++ b/arch/arm/boot/dts/exynos4212.dtsi
+> @@ -30,6 +30,9 @@
+>  			device_type = "cpu";
+>  			compatible = "arm,cortex-a9";
+>  			reg = <0xA00>;
+> +			clocks = <&clock CLK_ARM_CLK>;
+> +			clock-names = "cpu";
+> +			operating-points-v2 = <&cpu0_opp_table>;
+>  			cooling-min-level = <13>;
+>  			cooling-max-level = <7>;
+>  			#cooling-cells = <2>; /* min followed by max */
+> @@ -39,6 +42,84 @@
+>  			device_type = "cpu";
+>  			compatible = "arm,cortex-a9";
+>  			reg = <0xA01>;
+> +			operating-points-v2 = <&cpu0_opp_table>;
+> +		};
+> +	};
+> +
+> +	cpu0_opp_table: opp_table0 {
+> +		compatible = "operating-points-v2";
+> +		opp-shared;
+> +
+> +		opp00 {
+> +			opp-hz = /bits/ 64 <200000000>;
+> +			opp-microvolt = <900000>;
+> +			clock-latency-ns = <200000>;
+> +		};
+> +		opp01 {
+> +			opp-hz = /bits/ 64 <300000000>;
+> +			opp-microvolt = <900000>;
+> +			clock-latency-ns = <200000>;
+> +		};
+> +		opp02 {
+> +			opp-hz = /bits/ 64 <400000000>;
+> +			opp-microvolt = <925000>;
+> +			clock-latency-ns = <200000>;
+> +		};
+> +		opp03 {
+> +			opp-hz = /bits/ 64 <500000000>;
+> +			opp-microvolt = <950000>;
+> +			clock-latency-ns = <200000>;
+> +		};
+> +		opp04 {
+> +			opp-hz = /bits/ 64 <600000000>;
+> +			opp-microvolt = <975000>;
+> +			clock-latency-ns = <200000>;
+> +		};
+> +		opp05 {
+> +			opp-hz = /bits/ 64 <700000000>;
+> +			opp-microvolt = <987500>;
+> +			clock-latency-ns = <200000>;
+> +		};
+> +		opp06 {
+> +			opp-hz = /bits/ 64 <800000000>;
+> +			opp-microvolt = <1000000>;
+> +			clock-latency-ns = <200000>;
+> +		};
+> +		opp07 {
+> +			opp-hz = /bits/ 64 <900000000>;
+> +			opp-microvolt = <1037500>;
+> +			clock-latency-ns = <200000>;
+> +		};
+> +		opp08 {
+> +			opp-hz = /bits/ 64 <1000000000>;
+> +			opp-microvolt = <1087500>;
+> +			clock-latency-ns = <200000>;
+> +		};
+> +		opp09 {
+> +			opp-hz = /bits/ 64 <1100000000>;
+> +			opp-microvolt = <1137500>;
+> +			clock-latency-ns = <200000>;
+> +		};
+> +		opp10 {
+> +			opp-hz = /bits/ 64 <1200000000>;
+> +			opp-microvolt = <1187500>;
+> +			clock-latency-ns = <200000>;
+> +		};
+> +		opp11 {
+> +			opp-hz = /bits/ 64 <1300000000>;
+> +			opp-microvolt = <1250000>;
+> +			clock-latency-ns = <200000>;
+> +		};
+> +		opp12 {
+> +			opp-hz = /bits/ 64 <1400000000>;
+> +			opp-microvolt = <1287500>;
+> +			clock-latency-ns = <200000>;
+> +		};
+> +		opp13 {
+> +			opp-hz = /bits/ 64 <1500000000>;
+> +			opp-microvolt = <1350000>;
+> +			clock-latency-ns = <200000>;
+> +			turbo-mode;
+>  		};
+>  	};
+>  };
 
-changed it to EXPORT_SYMBOL_GPL and merged it.
+I'm lovin' it :)
 
-Thanks
-Kishon
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+
+-- 
+viresh
