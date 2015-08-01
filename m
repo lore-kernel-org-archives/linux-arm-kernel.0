@@ -1,39 +1,63 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat, 1 Aug 2015 09:44:05 +0200
-Subject: [PATCH v3 4/4] power: Add an axp20x-usb-power driver
-In-Reply-To: <20150724151020.GH27569@earth>
-References: <1435316357-26606-1-git-send-email-hdegoede@redhat.com>
- <1435316357-26606-4-git-send-email-hdegoede@redhat.com>
- <20150724151020.GH27569@earth>
-Message-ID: <55BC78C5.8090400@redhat.com>
+Date: Sat,  1 Aug 2015 10:39:37 +0200
+Subject: [PATCH v4 1/2] ARM: dts: Add binding documentation for AXP20x pmic
+ usb power supply
+Message-ID: <1438418378-32656-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Add binding documentation for the usb power supply part of the AXP20x pmic.
 
-On 24-07-15 17:10, Sebastian Reichel wrote:
-> Hi,
->
-> On Fri, Jun 26, 2015 at 12:59:17PM +0200, Hans de Goede wrote:
->> This adds a driver for the usb power_supply bits of the axp20x PMICs.
->>
->> I initially started writing my own driver, before coming aware of
->> Bruno Pr?mont's excellent earlier RFC with a driver for this.
->>
->> My driver was lacking CURRENT_MAX and VOLTAGE_MIN support Bruno's
->> drvier has, so I've copied the code for those from his driver.
->>
->> Note that the AC-power-supply and battery charger bits will need separate
->> drivers. Each one needs its own devictree child-node so that other
->> devicetree nodes can reference the right power-supply, and thus each one
->> will get its own mfd-cell / platform_device and platform-driver.
->
-> Once the other comments have been taken care of, the driver looks ok
-> to me.
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+Changes in v2:
+-Split out into a separate patch from the actual driver commit
+Changes in v4:
+-s/usb_power_supply/usb-power-supply/ in the dts example code
+---
+ .../bindings/power_supply/axp20x_usb_power.txt     | 34 ++++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/power_supply/axp20x_usb_power.txt
 
-Ok, I will do a v4 of the power-supply part of this patch set, with the
-various remarks on this patch fixed.
-
-Thanks & Regards,
-
-Hans
+diff --git a/Documentation/devicetree/bindings/power_supply/axp20x_usb_power.txt b/Documentation/devicetree/bindings/power_supply/axp20x_usb_power.txt
+new file mode 100644
+index 0000000..862f4a4
+--- /dev/null
++++ b/Documentation/devicetree/bindings/power_supply/axp20x_usb_power.txt
+@@ -0,0 +1,34 @@
++AXP20x USB power supply
++
++Required Properties:
++-compatible: "x-powers,axp202-usb-power-supply"
++
++This node is a subnode of the axp20x PMIC.
++
++Example:
++
++axp209: pmic at 34 {
++	compatible = "x-powers,axp209";
++	reg = <0x34>;
++	interrupt-parent = <&nmi_intc>;
++	interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
++	interrupt-controller;
++	#interrupt-cells = <1>;
++
++	regulators {
++		x-powers,dcdc-freq = <1500>;
++
++		vdd_cpu: dcdc2 {
++			regulator-always-on;
++			regulator-min-microvolt = <1000000>;
++			regulator-max-microvolt = <1450000>;
++			regulator-name = "vdd-cpu";
++		};
++
++		...
++	};
++
++	usb-power-supply: usb-power-supply {
++		compatible = "x-powers,axp202-usb-power-supply";
++	};
++};
+-- 
+2.4.3
