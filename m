@@ -1,24 +1,16 @@
 From: linux@roeck-us.net (Guenter Roeck)
-Date: Sat, 01 Aug 2015 11:52:00 -0700
-Subject: [PATCH v5 1/2] watchdog: NXP LPC18xx Watchdog Timer Driver
-In-Reply-To: <1438454237-22043-2-git-send-email-ariel@vanguardiasur.com.ar>
+Date: Sat, 01 Aug 2015 11:52:45 -0700
+Subject: [PATCH v5 2/2] DT: watchdog: Add NXP LPC18xx Watchdog Timer
+ binding documentation
+In-Reply-To: <1438454237-22043-3-git-send-email-ariel@vanguardiasur.com.ar>
 References: <1438454237-22043-1-git-send-email-ariel@vanguardiasur.com.ar>
- <1438454237-22043-2-git-send-email-ariel@vanguardiasur.com.ar>
-Message-ID: <55BD1550.708@roeck-us.net>
+ <1438454237-22043-3-git-send-email-ariel@vanguardiasur.com.ar>
+Message-ID: <55BD157D.2020404@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 08/01/2015 11:37 AM, Ariel D'Alessandro wrote:
-> This commit adds support for the watchdog timer found in NXP LPC SoCs
-> family, which includes LPC18xx/LPC43xx. Other SoCs in that family may
-> share the same watchdog hardware.
->
-> Watchdog driver registers a restart handler that will restart the system
-> by performing an incorrect feed after ensuring the watchdog is enabled in
-> reset mode.
->
-> As watchdog cannot be disabled in hardware, driver's stop routine will
-> regularly send a keepalive ping using a timer.
+> Add the devicetree binding document for NXP LPC18xx Watchdog Timer.
 >
 > Signed-off-by: Ariel D'Alessandro <ariel@vanguardiasur.com.ar>
 
