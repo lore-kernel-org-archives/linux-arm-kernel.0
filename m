@@ -1,96 +1,67 @@
-From: gregory.0xf0@gmail.com (Gregory Fong)
-Date: Fri, 31 Jul 2015 18:17:45 -0700
-Subject: [PATCH v4 4/4] ARM: dts: brcmstb: add BCM7445 GPIO nodes
-In-Reply-To: <1438391865-7862-1-git-send-email-gregory.0xf0@gmail.com>
-References: <1438391865-7862-1-git-send-email-gregory.0xf0@gmail.com>
-Message-ID: <1438391865-7862-5-git-send-email-gregory.0xf0@gmail.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Fri, 31 Jul 2015 18:50:58 -0700
+Subject: [PATCH v9 2/5] mtd: nand: vf610_nfc: add hardware BCH-ECC support
+In-Reply-To: <e0e476c1106c814c4eaadf1b7e5e2b47@agner.ch>
+References: <1438361581-2702-1-git-send-email-stefan@agner.ch>
+ <1438361581-2702-3-git-send-email-stefan@agner.ch>
+ <20150731230901.GK10676@google.com>
+ <9dd7975072cf16dd6ea1947bd4ae830a@agner.ch>
+ <20150731234718.GO10676@google.com>
+ <e0e476c1106c814c4eaadf1b7e5e2b47@agner.ch>
+Message-ID: <20150801015058.GA11837@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Need the aon_pm_l2_intc and irq0_aon_intc descriptions, so included
-those as well.
+On Sat, Aug 01, 2015 at 02:28:06AM +0200, Stefan Agner wrote:
+> Did the measurement:
+> 
+> As is:
+> ...
+> [   30.955675] mtd_speedtest: testing eraseblock write speed
+> [  143.349572] mtd_speedtest: eraseblock write speed is 4641 KiB/s
+> [  143.355606] mtd_speedtest: testing eraseblock read speed
+> [  183.816690] mtd_speedtest: eraseblock read speed is 12893 KiB/s
+> [  185.874702] mtd_speedtest: testing page write speed
+> [  302.608719] mtd_speedtest: page write speed is 4468 KiB/s
+> [  302.614229] mtd_speedtest: testing page read speed
+> [  343.831663] mtd_speedtest: page read speed is 12656 KiB/s
+> ...
+> 
+> Unconditionally read OOB:
+> ...
+> [   29.076983] mtd_speedtest: testing eraseblock write speed
+> [  140.829920] mtd_speedtest: eraseblock write speed is 4667 KiB/s
+> [  140.835960] mtd_speedtest: testing eraseblock read speed
+> [  181.594498] mtd_speedtest: eraseblock read speed is 12798 KiB/s
+> [  183.652793] mtd_speedtest: testing page write speed
+> [  299.772069] mtd_speedtest: page write speed is 4492 KiB/s
+> [  299.777583] mtd_speedtest: testing page read speed
+> [  341.283668] mtd_speedtest: page read speed is 12568 KiB/s
+> ...
+> 
+> And with conditional OOB again, reading OOB if required in
+> vf610_nfc_correct_data.
+> ...
+> [   29.907147] mtd_speedtest: testing eraseblock write speed
+> [  141.146171] mtd_speedtest: eraseblock write speed is 4689 KiB/s
+> [  141.152185] mtd_speedtest: testing eraseblock read speed
+> [  181.644380] mtd_speedtest: eraseblock read speed is 12883 KiB/s
+> [  183.703198] mtd_speedtest: testing page write speed
+> [  299.423179] mtd_speedtest: page write speed is 4507 KiB/s
+> [  299.428671] mtd_speedtest: testing page read speed
+> [  340.695925] mtd_speedtest: page read speed is 12640 KiB/s
+> [  342.747510] mtd_speedtest: testing 2 page write speed
+> ...
+> 
+> The last test is probably pointless since we never read a empty page in
+> the speedtest. So performance hit is measurable but small (somewhat
+> below 100KiB/s).
+> 
+> This is with 64 bytes OOB. Since OOB sizes are only getting bigger, I
+> would rather still consider it... What do you think?
 
-Signed-off-by: Gregory Fong <gregory.0xf0@gmail.com>
----
-New in v4.
+If the code isn't that ugly, then keep the conditional OOB. But I'd
+consider that performance difference almost negligible, given the noise
+for the write tests is on the order of 40 KB/s.
 
- arch/arm/boot/dts/bcm7445.dtsi | 50 ++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 50 insertions(+)
-
-diff --git a/arch/arm/boot/dts/bcm7445.dtsi b/arch/arm/boot/dts/bcm7445.dtsi
-index 58dcd66..3b6b175 100644
---- a/arch/arm/boot/dts/bcm7445.dtsi
-+++ b/arch/arm/boot/dts/bcm7445.dtsi
-@@ -109,6 +109,20 @@
- 			brcm,int-fwd-mask = <0x70000>;
- 		};
- 
-+		irq0_aon_intc: interrupt-controller at 417280 {
-+			compatible = "brcm,bcm7120-l2-intc";
-+			reg = <0x417280 0x8>;
-+			interrupt-parent = <&gic>;
-+			#interrupt-cells = <1>;
-+			interrupt-controller;
-+			interrupts = <GIC_SPI 0x46 0x0>,
-+				     <GIC_SPI 0x44 0x0>,
-+				     <GIC_SPI 0x49 0x0>;
-+			brcm,int-map-mask = <0x1e3 0x18000000 0x100000>;
-+			brcm,int-fwd-mask = <0x0>;
-+			brcm,irq-can-wake;
-+		};
-+
- 		hif_intr2_intc: interrupt-controller at 3e1000 {
- 			compatible = "brcm,l2-intc";
- 			reg = <0x3e1000 0x30>;
-@@ -119,6 +133,16 @@
- 			interrupt-names = "hif";
- 		};
- 
-+                aon_pm_l2_intc: interrupt-controller at 410640 {
-+			compatible = "brcm,l2-intc";
-+			reg = <0x410640 0x30>;
-+			interrupt-controller;
-+			#interrupt-cells = <1>;
-+			interrupts = <GIC_SPI 0x40 0x0>;
-+			interrupt-parent = <&gic>;
-+			brcm,irq-can-wake;
-+		};
-+
- 		nand: nand at 3e2800 {
- 			status = "disabled";
- 			#address-cells = <1>;
-@@ -167,6 +191,32 @@
- 				#phy-cells = <0>;
- 			};
- 		};
-+
-+		upg_gio: gpio at 40a700 {
-+			compatible = "brcm,bcm7445-gpio", "brcm,brcmstb-gpio";
-+			reg = <0x40a700 0x80>;
-+			#gpio-cells = <2>;
-+			#interrupt-cells = <2>;
-+			gpio-controller;
-+			interrupt-controller;
-+			interrupt-parent = <&irq0_intc>;
-+			interrupts = <6>;
-+			brcm,gpio-bank-widths = <32 32 32 24>;
-+		};
-+
-+		upg_gio_aon: gpio at 4172c0 {
-+			compatible = "brcm,bcm7445-gpio", "brcm,brcmstb-gpio";
-+			reg = <0x4172c0 0x40>;
-+			#gpio-cells = <2>;
-+			#interrupt-cells = <2>;
-+			gpio-controller;
-+			interrupt-controller;
-+			interrupts-extended = <&irq0_aon_intc 0x6>,
-+					      <&aon_pm_l2_intc 0x5>;
-+			wakeup-source;
-+			brcm,gpio-bank-widths = <18 4>;
-+		};
-+
- 	};
- 
- 	smpboot {
--- 
-1.9.1
+Brian
