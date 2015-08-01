@@ -1,45 +1,25 @@
-From: ariel@vanguardiasur.com.ar (Ariel D'Alessandro)
-Date: Sat,  1 Aug 2015 15:37:17 -0300
-Subject: [PATCH v5 2/2] DT: watchdog: Add NXP LPC18xx Watchdog Timer binding
- documentation
-In-Reply-To: <1438454237-22043-1-git-send-email-ariel@vanguardiasur.com.ar>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Sat, 01 Aug 2015 11:52:00 -0700
+Subject: [PATCH v5 1/2] watchdog: NXP LPC18xx Watchdog Timer Driver
+In-Reply-To: <1438454237-22043-2-git-send-email-ariel@vanguardiasur.com.ar>
 References: <1438454237-22043-1-git-send-email-ariel@vanguardiasur.com.ar>
-Message-ID: <1438454237-22043-3-git-send-email-ariel@vanguardiasur.com.ar>
+ <1438454237-22043-2-git-send-email-ariel@vanguardiasur.com.ar>
+Message-ID: <55BD1550.708@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the devicetree binding document for NXP LPC18xx Watchdog Timer.
+On 08/01/2015 11:37 AM, Ariel D'Alessandro wrote:
+> This commit adds support for the watchdog timer found in NXP LPC SoCs
+> family, which includes LPC18xx/LPC43xx. Other SoCs in that family may
+> share the same watchdog hardware.
+>
+> Watchdog driver registers a restart handler that will restart the system
+> by performing an incorrect feed after ensuring the watchdog is enabled in
+> reset mode.
+>
+> As watchdog cannot be disabled in hardware, driver's stop routine will
+> regularly send a keepalive ping using a timer.
+>
+> Signed-off-by: Ariel D'Alessandro <ariel@vanguardiasur.com.ar>
 
-Signed-off-by: Ariel D'Alessandro <ariel@vanguardiasur.com.ar>
----
- .../devicetree/bindings/watchdog/lpc18xx-wdt.txt      | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/watchdog/lpc18xx-wdt.txt
-
-diff --git a/Documentation/devicetree/bindings/watchdog/lpc18xx-wdt.txt b/Documentation/devicetree/bindings/watchdog/lpc18xx-wdt.txt
-new file mode 100644
-index 0000000..09f6b24
---- /dev/null
-+++ b/Documentation/devicetree/bindings/watchdog/lpc18xx-wdt.txt
-@@ -0,0 +1,19 @@
-+* NXP LPC18xx Watchdog Timer (WDT)
-+
-+Required properties:
-+- compatible: Should be "nxp,lpc1850-wwdt"
-+- reg: Should contain WDT registers location and length
-+- clocks: Must contain an entry for each entry in clock-names.
-+- clock-names: Should contain "wdtclk" and "reg"; the watchdog counter
-+               clock and register interface clock respectively.
-+- interrupts: Should contain WDT interrupt
-+
-+Examples:
-+
-+watchdog at 40080000 {
-+	compatible = "nxp,lpc1850-wwdt";
-+	reg = <0x40080000 0x24>;
-+	clocks = <&cgu BASE_SAFE_CLK>, <&ccu1 CLK_CPU_WWDT>;
-+	clock-names = "wdtclk", "reg";
-+	interrupts = <49>;
-+};
--- 
-1.9.1
+Reviewed-by: Guenter Roeck <linux@roeck-us.net>
