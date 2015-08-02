@@ -1,55 +1,241 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sun, 2 Aug 2015 15:00:37 +0200
-Subject: [linux-sunxi] Re: [PATCH 5/5] ARM: dts: sun7i: Add dts file for
- Wits Pro A20 DKT
-In-Reply-To: <20150801093046.GX2564@lukather>
-References: <1438333194-21181-1-git-send-email-hdegoede@redhat.com>
- <1438333194-21181-6-git-send-email-hdegoede@redhat.com>
- <20150731102028.GE2564@lukather>
- <CAGb2v65TEogqYFAfen1VnOaiepvez5t8Oh+Q=OYsRS_aZUMO3A@mail.gmail.com>
- <55BB9E92.30604@redhat.com> <20150801093046.GX2564@lukather>
-Message-ID: <55BE1475.6040904@redhat.com>
+From: andreyknvl@google.com (Andrey Konovalov)
+Date: Sun,  2 Aug 2015 17:11:04 +0200
+Subject: [PATCH v2] arch: use WRITE_ONCE/READ_ONCE in
+ smp_store_release/smp_load_acquire
+Message-ID: <1438528264-714-1-git-send-email-andreyknvl@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Replace ACCESS_ONCE() macro in smp_store_release() and smp_load_acquire()
+with WRITE_ONCE() and READ_ONCE() on x86, arm, arm64, ia64, metag, mips,
+powerpc, s390, sparc and asm-generic since ACCESS_ONCE does not work
+reliably on non-scalar types.
 
-On 01-08-15 11:30, Maxime Ripard wrote:
-> On Fri, Jul 31, 2015 at 06:13:06PM +0200, Hans de Goede wrote:
->> mmc-pwrseq-simple supports multiple reset/enable gpios (by listing
->> them all as reset-gpios and setting GPIO_ACTIVE_LOW/HIGH depending
->> on which value they need to be to activate things).
->>
->> It also supports listing clocks which need to be enabled. I think
->> that it may be a good idea to use this to also enable the bluetooth
->> bits of the ap6210 module on the cubietruck. I know that the
->> actual bt is interfaced over an uart, and we really should have
->> a mechanism to enable/disable it separately, but for not this seems
->> like a good way to get bluetooth to work.
->>
->> We should ofcourse add a comment to the dts file that this is not a
->> 100% ideal solution, but other then that I think this should work
->> nicely. Maxime would enabling the bluetooth bits of this sdio
->> module via mmc-pwrseq be acceptable to you?
->
-> As long as we have some comment on top, yep.
->
->> ChenYu if Maxime acks this solution I hope you can write a patch for
->> this, since you've been working on the bluetooth support before.
->
-> Note that I'm in holidays starting today. I plan on doing my
-> pull-requests for 4.3 later today, and will probably not be able to
-> merge any patches during the next two weeks, which mean that your
-> mmc-power seq patch for the cubietruck was probably the last one I was
-> merging for the 4.3 merge window.
+WRITE_ONCE() and READ_ONCE() were introduced in the commits 230fa253df63
+("kernel: Provide READ_ONCE and ASSIGN_ONCE") and 43239cbe79fc ("kernel:
+Change ASSIGN_ONCE(val, x) to WRITE_ONCE(x, val)").
 
-I just noticed that your last push to
+Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
+---
+Changed in v2:
+  - Other archs besides x86.
 
-https://git.kernel.org/cgit/linux/kernel/git/mripard/linux.git/log/?h=sunxi/for-next
+ arch/arm/include/asm/barrier.h      | 4 ++--
+ arch/arm64/include/asm/barrier.h    | 4 ++--
+ arch/ia64/include/asm/barrier.h     | 4 ++--
+ arch/metag/include/asm/barrier.h    | 4 ++--
+ arch/mips/include/asm/barrier.h     | 4 ++--
+ arch/powerpc/include/asm/barrier.h  | 4 ++--
+ arch/s390/include/asm/barrier.h     | 4 ++--
+ arch/sparc/include/asm/barrier_64.h | 4 ++--
+ arch/x86/include/asm/barrier.h      | 8 ++++----
+ include/asm-generic/barrier.h       | 4 ++--
+ 10 files changed, 22 insertions(+), 22 deletions(-)
 
-Is not in your github sunxi-next branch, it would be good if you could
-merge the last changes there (when your back from your holliday).
-
-Regards,
-
-Hans
+diff --git a/arch/arm/include/asm/barrier.h b/arch/arm/include/asm/barrier.h
+index 6c2327e..7039357 100644
+--- a/arch/arm/include/asm/barrier.h
++++ b/arch/arm/include/asm/barrier.h
+@@ -67,12 +67,12 @@
+ do {									\
+ 	compiletime_assert_atomic_type(*p);				\
+ 	smp_mb();							\
+-	ACCESS_ONCE(*p) = (v);						\
++	WRITE_ONCE(*p, v);						\
+ } while (0)
+ 
+ #define smp_load_acquire(p)						\
+ ({									\
+-	typeof(*p) ___p1 = ACCESS_ONCE(*p);				\
++	typeof(*p) ___p1 = READ_ONCE(*p);				\
+ 	compiletime_assert_atomic_type(*p);				\
+ 	smp_mb();							\
+ 	___p1;								\
+diff --git a/arch/arm64/include/asm/barrier.h b/arch/arm64/include/asm/barrier.h
+index 0fa47c4..ef93b20 100644
+--- a/arch/arm64/include/asm/barrier.h
++++ b/arch/arm64/include/asm/barrier.h
+@@ -44,12 +44,12 @@
+ do {									\
+ 	compiletime_assert_atomic_type(*p);				\
+ 	barrier();							\
+-	ACCESS_ONCE(*p) = (v);						\
++	WRITE_ONCE(*p, v);						\
+ } while (0)
+ 
+ #define smp_load_acquire(p)						\
+ ({									\
+-	typeof(*p) ___p1 = ACCESS_ONCE(*p);				\
++	typeof(*p) ___p1 = READ_ONCE(*p);				\
+ 	compiletime_assert_atomic_type(*p);				\
+ 	barrier();							\
+ 	___p1;								\
+diff --git a/arch/ia64/include/asm/barrier.h b/arch/ia64/include/asm/barrier.h
+index 843ba43..df896a1 100644
+--- a/arch/ia64/include/asm/barrier.h
++++ b/arch/ia64/include/asm/barrier.h
+@@ -66,12 +66,12 @@
+ do {									\
+ 	compiletime_assert_atomic_type(*p);				\
+ 	barrier();							\
+-	ACCESS_ONCE(*p) = (v);						\
++	WRITE_ONCE(*p, v);						\
+ } while (0)
+ 
+ #define smp_load_acquire(p)						\
+ ({									\
+-	typeof(*p) ___p1 = ACCESS_ONCE(*p);				\
++	typeof(*p) ___p1 = READ_ONCE(*p);				\
+ 	compiletime_assert_atomic_type(*p);				\
+ 	barrier();							\
+ 	___p1;								\
+diff --git a/arch/metag/include/asm/barrier.h b/arch/metag/include/asm/barrier.h
+index 5a696e5..172b7e5 100644
+--- a/arch/metag/include/asm/barrier.h
++++ b/arch/metag/include/asm/barrier.h
+@@ -90,12 +90,12 @@ static inline void fence(void)
+ do {									\
+ 	compiletime_assert_atomic_type(*p);				\
+ 	smp_mb();							\
+-	ACCESS_ONCE(*p) = (v);						\
++	WRITE_ONCE(*p, v);						\
+ } while (0)
+ 
+ #define smp_load_acquire(p)						\
+ ({									\
+-	typeof(*p) ___p1 = ACCESS_ONCE(*p);				\
++	typeof(*p) ___p1 = READ_ONCE(*p);				\
+ 	compiletime_assert_atomic_type(*p);				\
+ 	smp_mb();							\
+ 	___p1;								\
+diff --git a/arch/mips/include/asm/barrier.h b/arch/mips/include/asm/barrier.h
+index 7ecba84..752e0b8 100644
+--- a/arch/mips/include/asm/barrier.h
++++ b/arch/mips/include/asm/barrier.h
+@@ -133,12 +133,12 @@
+ do {									\
+ 	compiletime_assert_atomic_type(*p);				\
+ 	smp_mb();							\
+-	ACCESS_ONCE(*p) = (v);						\
++	WRITE_ONCE(*p, v);						\
+ } while (0)
+ 
+ #define smp_load_acquire(p)						\
+ ({									\
+-	typeof(*p) ___p1 = ACCESS_ONCE(*p);				\
++	typeof(*p) ___p1 = READ_ONCE(*p);				\
+ 	compiletime_assert_atomic_type(*p);				\
+ 	smp_mb();							\
+ 	___p1;								\
+diff --git a/arch/powerpc/include/asm/barrier.h b/arch/powerpc/include/asm/barrier.h
+index 51ccc72..0eca6ef 100644
+--- a/arch/powerpc/include/asm/barrier.h
++++ b/arch/powerpc/include/asm/barrier.h
+@@ -76,12 +76,12 @@
+ do {									\
+ 	compiletime_assert_atomic_type(*p);				\
+ 	smp_lwsync();							\
+-	ACCESS_ONCE(*p) = (v);						\
++	WRITE_ONCE(*p, v);						\
+ } while (0)
+ 
+ #define smp_load_acquire(p)						\
+ ({									\
+-	typeof(*p) ___p1 = ACCESS_ONCE(*p);				\
++	typeof(*p) ___p1 = READ_ONCE(*p);				\
+ 	compiletime_assert_atomic_type(*p);				\
+ 	smp_lwsync();							\
+ 	___p1;								\
+diff --git a/arch/s390/include/asm/barrier.h b/arch/s390/include/asm/barrier.h
+index e6f8615..d48fe01 100644
+--- a/arch/s390/include/asm/barrier.h
++++ b/arch/s390/include/asm/barrier.h
+@@ -42,12 +42,12 @@
+ do {									\
+ 	compiletime_assert_atomic_type(*p);				\
+ 	barrier();							\
+-	ACCESS_ONCE(*p) = (v);						\
++	WRITE_ONCE(*p, v);						\
+ } while (0)
+ 
+ #define smp_load_acquire(p)						\
+ ({									\
+-	typeof(*p) ___p1 = ACCESS_ONCE(*p);				\
++	typeof(*p) ___p1 = READ_ONCE(*p);				\
+ 	compiletime_assert_atomic_type(*p);				\
+ 	barrier();							\
+ 	___p1;								\
+diff --git a/arch/sparc/include/asm/barrier_64.h b/arch/sparc/include/asm/barrier_64.h
+index 809941e..14a9286 100644
+--- a/arch/sparc/include/asm/barrier_64.h
++++ b/arch/sparc/include/asm/barrier_64.h
+@@ -60,12 +60,12 @@ do {	__asm__ __volatile__("ba,pt	%%xcc, 1f\n\t" \
+ do {									\
+ 	compiletime_assert_atomic_type(*p);				\
+ 	barrier();							\
+-	ACCESS_ONCE(*p) = (v);						\
++	WRITE_ONCE(*p, v);						\
+ } while (0)
+ 
+ #define smp_load_acquire(p)						\
+ ({									\
+-	typeof(*p) ___p1 = ACCESS_ONCE(*p);				\
++	typeof(*p) ___p1 = READ_ONCE(*p);				\
+ 	compiletime_assert_atomic_type(*p);				\
+ 	barrier();							\
+ 	___p1;								\
+diff --git a/arch/x86/include/asm/barrier.h b/arch/x86/include/asm/barrier.h
+index e51a8f8..d2bcfbe 100644
+--- a/arch/x86/include/asm/barrier.h
++++ b/arch/x86/include/asm/barrier.h
+@@ -57,12 +57,12 @@
+ do {									\
+ 	compiletime_assert_atomic_type(*p);				\
+ 	smp_mb();							\
+-	ACCESS_ONCE(*p) = (v);						\
++	WRITE_ONCE(*p, v);						\
+ } while (0)
+ 
+ #define smp_load_acquire(p)						\
+ ({									\
+-	typeof(*p) ___p1 = ACCESS_ONCE(*p);				\
++	typeof(*p) ___p1 = READ_ONCE(*p);				\
+ 	compiletime_assert_atomic_type(*p);				\
+ 	smp_mb();							\
+ 	___p1;								\
+@@ -74,12 +74,12 @@ do {									\
+ do {									\
+ 	compiletime_assert_atomic_type(*p);				\
+ 	barrier();							\
+-	ACCESS_ONCE(*p) = (v);						\
++	WRITE_ONCE(*p, v);						\
+ } while (0)
+ 
+ #define smp_load_acquire(p)						\
+ ({									\
+-	typeof(*p) ___p1 = ACCESS_ONCE(*p);				\
++	typeof(*p) ___p1 = READ_ONCE(*p);				\
+ 	compiletime_assert_atomic_type(*p);				\
+ 	barrier();							\
+ 	___p1;								\
+diff --git a/include/asm-generic/barrier.h b/include/asm-generic/barrier.h
+index 55e3abc..b42afad 100644
+--- a/include/asm-generic/barrier.h
++++ b/include/asm-generic/barrier.h
+@@ -108,12 +108,12 @@
+ do {									\
+ 	compiletime_assert_atomic_type(*p);				\
+ 	smp_mb();							\
+-	ACCESS_ONCE(*p) = (v);						\
++	WRITE_ONCE(*p, v);						\
+ } while (0)
+ 
+ #define smp_load_acquire(p)						\
+ ({									\
+-	typeof(*p) ___p1 = ACCESS_ONCE(*p);				\
++	typeof(*p) ___p1 = READ_ONCE(*p);				\
+ 	compiletime_assert_atomic_type(*p);				\
+ 	smp_mb();							\
+ 	___p1;								\
+-- 
+2.5.0.rc2.392.g76e840b
