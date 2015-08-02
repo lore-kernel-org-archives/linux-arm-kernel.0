@@ -1,40 +1,29 @@
-From: public_timo.s@silentcreek.de (Timo Sigurdsson)
-Date: Mon,  3 Aug 2015 00:00:06 +0200 (CEST)
-Subject: [linux-sunxi] [RFC] ARM: dts: sunxi: Add regulators and
- board-specific operating points for LeMaker BananaPi
-In-Reply-To: <55B79FCA.7070907@redhat.com>
-References: <1437960486-2809-1-git-send-email-public_timo.s@silentcreek.de>
- <55B5E6DB.8020009@redhat.com>
- <20150727120918.191F76C82FB4@dd34104.kasserver.com>
- <55B62768.6040403@redhat.com>
- <20150728124911.GA2564@lukather><55B790BA.5000509@redhat.com>
- <20150728150929.233B56C80391@dd34104.kasserver.com><55B79FCA.7070907@redhat.com>
-Message-ID: <20150802220006.E5BE06C810BC@dd34104.kasserver.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 2 Aug 2015 23:06:26 +0100
+Subject: [PATCH 3/4] ARM: nomadik: move l2x0 setup to device tree
+In-Reply-To: <1438552593-4578-1-git-send-email-linus.walleij@linaro.org>
+References: <1438552593-4578-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20150802220626.GG7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
+On Sun, Aug 02, 2015 at 11:56:33PM +0200, Linus Walleij wrote:
+> -	/* At full speed latency must be >=2, so 0x249 in low bits */
+> -	.l2c_aux_val	= 0x00700249,
+> -	.l2c_aux_mask	= 0xfe0fefff,
+> +	.l2c_aux_val	= 0x0,
+> +	.l2c_aux_mask	= ~0x0UL,
 
-you didn't include me in your answer, hence the late reply...
+It always amazes me by the things people come up with... what prompted
+the addition of "UL" on that constant?  Why do you think it needs it?
 
-Stefan Monnier schrieb am 29.07.2015 02:02:
->> IMHO for a common maximum opp that's a good approach. But for the lowest
->> frequency setting, it would seem more logical to me, to raise the voltage
->> to a point where all boards will run fine with them, unless those boards
->> cannot handle the frequency regardless of the higher voltage.
+A simple:
 
-> I generally agre, tho IIRC some measurements seem to indicate that the
-> lowest frequency settings did not bring much (if any) reduction in power
-> consumption, making them rather useless.
+	.l2c_aux_val	= 0,
+	.l2c_aux_mask	= ~0,
 
-That's an interesting point. However, that would be a different discussion. I
-wouldn't mind if the 144MHz would be removed - my point was just that if it's 
-supposed to be a common setting, it should work on all boards. I posted a patch
-today to fix this. [1] That might be a good place to discuss whether this
-setting should be removed entirely.
+will suffice.
 
-Regards,
-
-Timo
-
-[1] https://groups.google.com/forum/#!topic/linux-sunxi/fIfbdn7mrQA
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
