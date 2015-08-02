@@ -1,52 +1,57 @@
-From: hauke@hauke-m.de (Hauke Mehrtens)
-Date: Sun, 02 Aug 2015 20:03:46 +0200
-Subject: [PATCH] bcma: populate bus DT subnodes as platform_device-s
-In-Reply-To: <1435504633-20831-1-git-send-email-zajec5@gmail.com>
-References: <1435504633-20831-1-git-send-email-zajec5@gmail.com>
-Message-ID: <55BE5B82.7060301@hauke-m.de>
+From: matwey.kornilov@gmail.com (Matwey V. Kornilov)
+Date: Sun, 2 Aug 2015 21:42:18 +0300
+Subject: [PATCH v2 0/7] uio_pruss cleanup and platform support
+In-Reply-To: <20121003150058.GB11180@beef>
+References: <1348861072-14507-1-git-send-email-mporter@ti.com>
+ <20121003150058.GB11180@beef>
+Message-ID: <CAJs94EZAEmab8K=sxtBFu4+86XFmS9UfbvafUFSiZaf5ecoqEg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/28/2015 05:17 PM, Rafa? Mi?ecki wrote:
-> Our bus should allow defining children nodes as we may want to specify
-> devices attached to the bus. This is required e.g. to specify NAND or
-> ChipCommon cores and use bus's address and IRQ mappings.
-> 
-> Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
-> ---
->  drivers/bcma/main.c | 8 ++++++++
->  1 file changed, 8 insertions(+)
-> 
-> diff --git a/drivers/bcma/main.c b/drivers/bcma/main.c
-> index 9635f10..5912847 100644
-> --- a/drivers/bcma/main.c
-> +++ b/drivers/bcma/main.c
-> @@ -12,6 +12,7 @@
->  #include <linux/slab.h>
->  #include <linux/of_address.h>
->  #include <linux/of_irq.h>
-> +#include <linux/of_platform.h>
->  
->  MODULE_DESCRIPTION("Broadcom's specific AMBA driver");
->  MODULE_LICENSE("GPL");
-> @@ -409,6 +410,13 @@ int bcma_bus_register(struct bcma_bus *bus)
->  		bcma_core_pci_early_init(&bus->drv_pci[0]);
->  	}
->  
-> +	if (bus->host_pdev) {
+2012-10-03 19:00 GMT+04:00 Matt Porter <mporter@ti.com>:
+> On Fri, Sep 28, 2012 at 03:37:45PM -0400, Matt Porter wrote:
+>> Changes since v1:
+>>       - Replaced uio_pruss private SRAM API use with genalloc
+>>       - Added DA850 platform device and clock support
+>>       - Added DA850 L3 RAM gen_pool support
+>>       - Split out DT binding
+>>
+>> This series enables uio_pruss on both DA850 and AM33xx. The driver
+>> previously was not enabled by any platform and the private SRAM API
+>> was accessing an invalid SRAM bank for use on DA850. For AM33xx,
+>> DT, pinctrl, and runtime PM support are added since AM33xx only
+>> boots via DT.
+>
+> I'm dropping AM33xx/OMAP support from v3 for this series since the
+> focus has turned to fixing Davinci SRAM to provide genalloc support
+> and the associated use of that in the driver.
+>
+> I'll have a separate series with AM33xx support since dealing cleanly
+> with external resets on OMAP is a bigger issue.
 
-Here is an other problem. So many bugs in this line. ;-)
-host_pdev is in a union so this is also true for PCIe devices, but then
-the offset of the dev structure probably is wrong. You should check for
-the hosttype. I will send a patch.
+Hello Matt,
 
-> +		struct device *dev = &bus->host_pdev->dev;
-> +
-> +		of_platform_populate(dev->of_node, of_default_bus_match_table,
-> +				     NULL, dev);
-> +	}
-> +
->  	/* Cores providing flash access go before SPROM init */
->  	list_for_each_entry(core, &bus->cores, list) {
->  		if (bcma_is_core_needed_early(core->id.id))
-> 
+Any news on AM33xx support here?
+
+I would even try to implement it by myself, but at the moment stuff
+about external resets is too complicated to me, I even can not
+understand where problem is. Fetching config from DT instead of
+platform in pruss_probe seems to be trivial.
+
+>
+> -Matt
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+>
+>
+
+
+
+-- 
+With best regards,
+Matwey V. Kornilov
+http://blog.matwey.name
+xmpp://0x2207 at jabber.ru
