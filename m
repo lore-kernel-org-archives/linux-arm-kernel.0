@@ -1,5 +1,5 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Sun, 2 Aug 2015 14:58:11 +0200
+Date: Sun, 2 Aug 2015 15:00:37 +0200
 Subject: [linux-sunxi] Re: [PATCH 5/5] ARM: dts: sun7i: Add dts file for
  Wits Pro A20 DKT
 In-Reply-To: <20150801093046.GX2564@lukather>
@@ -8,7 +8,7 @@ References: <1438333194-21181-1-git-send-email-hdegoede@redhat.com>
  <20150731102028.GE2564@lukather>
  <CAGb2v65TEogqYFAfen1VnOaiepvez5t8Oh+Q=OYsRS_aZUMO3A@mail.gmail.com>
  <55BB9E92.30604@redhat.com> <20150801093046.GX2564@lukather>
-Message-ID: <55BE13E3.8060503@redhat.com>
+Message-ID: <55BE1475.6040904@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -33,9 +33,7 @@ On 01-08-15 11:30, Maxime Ripard wrote:
 >> module via mmc-pwrseq be acceptable to you?
 >
 > As long as we have some comment on top, yep.
-
-Great, thanks.
-
+>
 >> ChenYu if Maxime acks this solution I hope you can write a patch for
 >> this, since you've been working on the bluetooth support before.
 >
@@ -45,7 +43,12 @@ Great, thanks.
 > mmc-power seq patch for the cubietruck was probably the last one I was
 > merging for the 4.3 merge window.
 
-OK, that is good to know, thanks for the headsup and enjoy your hollidays.
+I just noticed that your last push to
+
+https://git.kernel.org/cgit/linux/kernel/git/mripard/linux.git/log/?h=sunxi/for-next
+
+Is not in your github sunxi-next branch, it would be good if you could
+merge the last changes there (when your back from your holliday).
 
 Regards,
 
