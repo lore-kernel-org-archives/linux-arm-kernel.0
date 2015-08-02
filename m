@@ -1,33 +1,36 @@
-From: colin.king@canonical.com (Colin King)
-Date: Mon,  3 Aug 2015 00:10:45 +0100
-Subject: [PATCH] pinctrl/mediatek: fix spelling mistake in dev_err error
- message
-Message-ID: <1438557045-3590-1-git-send-email-colin.king@canonical.com>
+From: julian.calaby@gmail.com (Julian Calaby)
+Date: Mon, 3 Aug 2015 09:35:51 +1000
+Subject: [linux-sunxi] [PATCH] ARM: dts: sunxi: Raise minimum CPU voltage
+ for sun7i-a20 to a level all boards can supply
+In-Reply-To: <1438543386-7253-1-git-send-email-public_timo.s@silentcreek.de>
+References: <1438543386-7253-1-git-send-email-public_timo.s@silentcreek.de>
+Message-ID: <CAGRGNgV6b9yt2HnB2x2Wyc05KEahoX-Y+mVhxsryztcfA36H1g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Colin Ian King <colin.king@canonical.com>
+Hi Timo,
 
-Trivial change, fix spelling mistake 'invaild' -> 'invalid' in
-dev_err message.
+On Mon, Aug 3, 2015 at 5:23 AM, Timo Sigurdsson
+<public_timo.s@silentcreek.de> wrote:
+> sun7i-a20.dtsi contains an cpufreq operating point at 0.9 volts. Most A20 boards
+> (or all?), however, do not allow the voltage to go below 1.0V. Thus, raise the
+> voltage for the lowest operating point to 1.0V so all boards can actually use
+> it.
 
-Signed-off-by: Colin Ian King <colin.king@canonical.com>
----
- drivers/pinctrl/mediatek/pinctrl-mtk-common.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Surely it wouldn't be added here if some could supply 0.9v.
 
-diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-index ad1ea16..5af5441 100644
---- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-+++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-@@ -702,7 +702,7 @@ static int mtk_pmx_set_mux(struct pinctrl_dev *pctldev,
- 
- 	ret = mtk_pctrl_is_function_valid(pctl, g->pin, function);
- 	if (!ret) {
--		dev_err(pctl->dev, "invaild function %d on group %d .\n",
-+		dev_err(pctl->dev, "invalid function %d on group %d .\n",
- 				function, group);
- 		return -EINVAL;
- 	}
+Is the code that uses this smart enough to sensibly switch between two
+operating points with the same frequency and different voltages? If
+so, maybe just add a 144MHz @ 1.0v operating point?
+
+(Alternatively, would it make sense to modify the code that uses this
+to use frequencies with voltages specified that are lower than can be
+supplied with the lowest voltage it can?)
+
+Thanks,
+
 -- 
-2.5.0
+Julian Calaby
+
+Email: julian.calaby at gmail.com
+Profile: http://www.google.com/profiles/julian.calaby/
