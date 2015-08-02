@@ -1,27 +1,33 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 3 Aug 2015 00:43:23 +0200
-Subject: [PATCH 3/4] ARM: nomadik: move l2x0 setup to device tree
-In-Reply-To: <20150802220626.GG7557@n2100.arm.linux.org.uk>
-References: <1438552593-4578-1-git-send-email-linus.walleij@linaro.org>
- <20150802220626.GG7557@n2100.arm.linux.org.uk>
-Message-ID: <CACRpkdZAU8Mjs=uTGs4iFLQ6xYcK1ZUeyh_jL0VbTpRn8yyV2g@mail.gmail.com>
+From: colin.king@canonical.com (Colin King)
+Date: Mon,  3 Aug 2015 00:10:45 +0100
+Subject: [PATCH] pinctrl/mediatek: fix spelling mistake in dev_err error
+ message
+Message-ID: <1438557045-3590-1-git-send-email-colin.king@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 3, 2015 at 12:06 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Sun, Aug 02, 2015 at 11:56:33PM +0200, Linus Walleij wrote:
->> -     /* At full speed latency must be >=2, so 0x249 in low bits */
->> -     .l2c_aux_val    = 0x00700249,
->> -     .l2c_aux_mask   = 0xfe0fefff,
->> +     .l2c_aux_val    = 0x0,
->> +     .l2c_aux_mask   = ~0x0UL,
->
-> It always amazes me by the things people come up with... what prompted
-> the addition of "UL" on that constant?  Why do you think it needs it?
+From: Colin Ian King <colin.king@canonical.com>
 
-Good old mindless cut'n'paste.
-Will fix, thanks!
+Trivial change, fix spelling mistake 'invaild' -> 'invalid' in
+dev_err message.
 
-Yours,
-Linus Walleij
+Signed-off-by: Colin Ian King <colin.king@canonical.com>
+---
+ drivers/pinctrl/mediatek/pinctrl-mtk-common.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+index ad1ea16..5af5441 100644
+--- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
++++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+@@ -702,7 +702,7 @@ static int mtk_pmx_set_mux(struct pinctrl_dev *pctldev,
+ 
+ 	ret = mtk_pctrl_is_function_valid(pctl, g->pin, function);
+ 	if (!ret) {
+-		dev_err(pctl->dev, "invaild function %d on group %d .\n",
++		dev_err(pctl->dev, "invalid function %d on group %d .\n",
+ 				function, group);
+ 		return -EINVAL;
+ 	}
+-- 
+2.5.0
