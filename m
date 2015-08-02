@@ -1,71 +1,40 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun,  2 Aug 2015 23:56:46 +0200
-Subject: [PATCH 4/4] ARM: nomadik: push accelerometer down to boards
-Message-ID: <1438552606-4625-1-git-send-email-linus.walleij@linaro.org>
+From: public_timo.s@silentcreek.de (Timo Sigurdsson)
+Date: Mon,  3 Aug 2015 00:00:06 +0200 (CEST)
+Subject: [linux-sunxi] [RFC] ARM: dts: sunxi: Add regulators and
+ board-specific operating points for LeMaker BananaPi
+In-Reply-To: <55B79FCA.7070907@redhat.com>
+References: <1437960486-2809-1-git-send-email-public_timo.s@silentcreek.de>
+ <55B5E6DB.8020009@redhat.com>
+ <20150727120918.191F76C82FB4@dd34104.kasserver.com>
+ <55B62768.6040403@redhat.com>
+ <20150728124911.GA2564@lukather><55B790BA.5000509@redhat.com>
+ <20150728150929.233B56C80391@dd34104.kasserver.com><55B79FCA.7070907@redhat.com>
+Message-ID: <20150802220006.E5BE06C810BC@dd34104.kasserver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The two Nomadik variants have the accelerometer mounted on
-different I2C lines. Push the definition down to the top-level
-board DTS files to get things right.
+Hi Stefan,
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/boot/dts/ste-nomadik-nhk15.dts    | 5 +++++
- arch/arm/boot/dts/ste-nomadik-s8815.dts    | 8 ++++++++
- arch/arm/boot/dts/ste-nomadik-stn8815.dtsi | 5 -----
- 3 files changed, 13 insertions(+), 5 deletions(-)
+you didn't include me in your answer, hence the late reply...
 
-diff --git a/arch/arm/boot/dts/ste-nomadik-nhk15.dts b/arch/arm/boot/dts/ste-nomadik-nhk15.dts
-index 9d888b0e75af..4a21c6492dbb 100644
---- a/arch/arm/boot/dts/ste-nomadik-nhk15.dts
-+++ b/arch/arm/boot/dts/ste-nomadik-nhk15.dts
-@@ -83,6 +83,11 @@
- 	};
- 
- 	i2c0 {
-+		lis3lv02dl at 1d {
-+			/* Accelerometer */
-+			compatible = "st,lis3lv02dl-accel";
-+			reg = <0x1d>;
-+		};
- 		stmpe0: stmpe2401 at 43 {
- 			compatible = "st,stmpe2401";
- 			reg = <0x43>;
-diff --git a/arch/arm/boot/dts/ste-nomadik-s8815.dts b/arch/arm/boot/dts/ste-nomadik-s8815.dts
-index 11b5e34150b8..35282c0105c6 100644
---- a/arch/arm/boot/dts/ste-nomadik-s8815.dts
-+++ b/arch/arm/boot/dts/ste-nomadik-s8815.dts
-@@ -105,6 +105,14 @@
- 		};
- 	};
- 
-+	i2c1 {
-+		lis3lv02dl at 1d {
-+			/* Accelerometer */
-+			compatible = "st,lis3lv02dl-accel";
-+			reg = <0x1d>;
-+		};
-+	};
-+
- 	/* GPIO I2C connected to the USB portions of the STw4811 only */
- 	gpio-i2c {
- 		compatible = "i2c-gpio";
-diff --git a/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi b/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
-index defabe053114..314f59c12162 100644
---- a/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
-+++ b/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
-@@ -726,11 +726,6 @@
- 			   compatible = "st,stw5095";
- 			   reg = <0x1a>;
- 		};
--		lis3lv02dl at 1d {
--			/* Accelerometer */
--			compatible = "st,lis3lv02dl-accel";
--			reg = <0x1d>;
--		};
- 	};
- 
- 	amba {
--- 
-2.4.3
+Stefan Monnier schrieb am 29.07.2015 02:02:
+>> IMHO for a common maximum opp that's a good approach. But for the lowest
+>> frequency setting, it would seem more logical to me, to raise the voltage
+>> to a point where all boards will run fine with them, unless those boards
+>> cannot handle the frequency regardless of the higher voltage.
+
+> I generally agre, tho IIRC some measurements seem to indicate that the
+> lowest frequency settings did not bring much (if any) reduction in power
+> consumption, making them rather useless.
+
+That's an interesting point. However, that would be a different discussion. I
+wouldn't mind if the 144MHz would be removed - my point was just that if it's 
+supposed to be a common setting, it should work on all boards. I posted a patch
+today to fix this. [1] That might be a good place to discuss whether this
+setting should be removed entirely.
+
+Regards,
+
+Timo
+
+[1] https://groups.google.com/forum/#!topic/linux-sunxi/fIfbdn7mrQA
