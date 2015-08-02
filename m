@@ -1,84 +1,105 @@
-From: bonbons@linux-vserver.org (Bruno =?UTF-8?B?UHLDqW1vbnQ=?=)
-Date: Sun, 2 Aug 2015 21:43:10 +0200
-Subject: [PATCH v3 resend 1/2] mfd: axp20x: Add missing registers, and
- mark more registers volatile
-In-Reply-To: <1438413918-15765-2-git-send-email-hdegoede@redhat.com>
-References: <1438413918-15765-1-git-send-email-hdegoede@redhat.com>
- <1438413918-15765-2-git-send-email-hdegoede@redhat.com>
-Message-ID: <20150802214310.7ac05f25@uranus>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Sun, 2 Aug 2015 21:20:49 +0100
+Subject: [PATCH v2 14/15] KVM: arm64: implement MSI injection in ITS
+ emulation
+In-Reply-To: <55BB7678.5080105@linaro.org>
+References: <1436538111-4294-1-git-send-email-andre.przywara@arm.com>
+ <1436538111-4294-15-git-send-email-andre.przywara@arm.com>
+ <55BB7678.5080105@linaro.org>
+Message-ID: <55BE7BA1.40403@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat,  1 Aug 2015 09:25:17 Hans de Goede <hdegoede@redhat.com> wrote:
-> From: Bruno Pr?mont <bonbons@linux-vserver.org>
-> 
-> Add an extra set of registers which is necessary tu support the PMICs
-> battery charger function, and mark registers which contain status bits,
-> gpio status, and adc readings as volatile.
-> 
-> Cc: Bruno Pr?mont <bonbons@linux-vserver.org>
-> Signed-off-by: Bruno Pr?mont <bonbons@linux-vserver.org>
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> Acked-by: Lee Jones <lee.jones@linaro.org>
-> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
-> Changes in v2:
-> -Add a AXP20X_OCV_MAX define
-> Changes in v3:
-> -Add Bruno's S-o-b
-> ---
->  drivers/mfd/axp20x.c       | 8 +++++++-
->  include/linux/mfd/axp20x.h | 6 ++++++
->  2 files changed, 13 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
-> index b369cfc..8bd3283 100644
-> --- a/drivers/mfd/axp20x.c
-> +++ b/drivers/mfd/axp20x.c
-> @@ -61,10 +61,16 @@ static const struct regmap_access_table axp152_volatile_table = {
->  static const struct regmap_range axp20x_writeable_ranges[] = {
->  	regmap_reg_range(AXP20X_DATACACHE(0), AXP20X_IRQ5_STATE),
->  	regmap_reg_range(AXP20X_DCDC_MODE, AXP20X_FG_RES),
-> +	regmap_reg_range(AXP20X_RDC_H, AXP20X_OCV(15)),
+On 31/07/15 14:22, Eric Auger wrote:
 
-As AXP20X_OCV_MAX has been added, this should be:
-+	regmap_reg_range(AXP20X_RDC_H, AXP20X_OCV(AXP20X_OCV_MAX)),
+Salut Eric,
 
->  };
->  
->  static const struct regmap_range axp20x_volatile_ranges[] = {
-> +	regmap_reg_range(AXP20X_PWR_INPUT_STATUS, AXP20X_USB_OTG_STATUS),
-> +	regmap_reg_range(AXP20X_CHRG_CTRL1, AXP20X_CHRG_CTRL2),
->  	regmap_reg_range(AXP20X_IRQ1_EN, AXP20X_IRQ5_STATE),
-> +	regmap_reg_range(AXP20X_ACIN_V_ADC_H, AXP20X_IPSOUT_V_HIGH_L),
-> +	regmap_reg_range(AXP20X_GPIO20_SS, AXP20X_GPIO3_CTRL),
-> +	regmap_reg_range(AXP20X_FG_RES, AXP20X_RDC_L),
->  };
->  
->  static const struct regmap_access_table axp20x_writeable_table = {
-> @@ -195,7 +201,7 @@ static const struct regmap_config axp20x_regmap_config = {
->  	.val_bits	= 8,
->  	.wr_table	= &axp20x_writeable_table,
->  	.volatile_table	= &axp20x_volatile_table,
-> -	.max_register	= AXP20X_FG_RES,
-> +	.max_register	= AXP20X_OCV(AXP20X_OCV_MAX),
->  	.cache_type	= REGCACHE_RBTREE,
->  };
->  
-> diff --git a/include/linux/mfd/axp20x.h b/include/linux/mfd/axp20x.h
-> index 52203d5..cc8ad1e 100644
-> --- a/include/linux/mfd/axp20x.h
-> +++ b/include/linux/mfd/axp20x.h
-> @@ -190,6 +190,12 @@ enum {
->  #define AXP20X_CC_CTRL			0xb8
->  #define AXP20X_FG_RES			0xb9
->  
-> +/* OCV */
-> +#define AXP20X_RDC_H			0xba
-> +#define AXP20X_RDC_L			0xbb
-> +#define AXP20X_OCV(m)			(0xc0 + (m))
-> +#define AXP20X_OCV_MAX			0xf
-> +
->  /* AXP22X specific registers */
->  #define AXP22X_BATLOW_THRES1		0xe6
->  
+> On 07/10/2015 04:21 PM, Andre Przywara wrote:
+>> When userland wants to inject a MSI into the guest, we have to use
+>> our data structures to find the LPI number and the VCPU to receive
+>> the interrupt.
+>> Use the wrapper functions to iterate the linked lists and find the
+>> proper Interrupt Translation Table Entry. Then set the pending bit
+>> in this ITTE to be later picked up by the LR handling code. Kick
+>> the VCPU which is meant to handle this interrupt.
+>> We provide a VGIC emulation model specific routine for the actual
+>> MSI injection. The wrapper functions return an error for models not
+>> (yet) implementing MSIs (like the GICv2 emulation).
+>> We also provide the handler for the ITS "INT" command, which allows a
+>> guest to trigger an MSI via the ITS command queue.
+>>
+>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>> ---
+>>  include/kvm/arm_vgic.h      |  1 +
+>>  virt/kvm/arm/its-emul.c     | 65 +++++++++++++++++++++++++++++++++++++++++++++
+>>  virt/kvm/arm/its-emul.h     |  2 ++
+>>  virt/kvm/arm/vgic-v3-emul.c |  1 +
+>>  4 files changed, 69 insertions(+)
+>>
+>> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+>> index 323c33a..9e1abf9 100644
+>> --- a/include/kvm/arm_vgic.h
+>> +++ b/include/kvm/arm_vgic.h
+>> @@ -149,6 +149,7 @@ struct vgic_vm_ops {
+>>  	int	(*map_resources)(struct kvm *, const struct vgic_params *);
+>>  	bool	(*queue_lpis)(struct kvm_vcpu *);
+>>  	void	(*unqueue_lpi)(struct kvm_vcpu *, int irq);
+>> +	int	(*inject_msi)(struct kvm *, struct kvm_msi *);
+>>  };
+>>  
+>>  struct vgic_io_device {
+>> diff --git a/virt/kvm/arm/its-emul.c b/virt/kvm/arm/its-emul.c
+>> index 89534c6..a1c12bb 100644
+>> --- a/virt/kvm/arm/its-emul.c
+>> +++ b/virt/kvm/arm/its-emul.c
+>> @@ -323,6 +323,55 @@ static bool handle_mmio_gits_idregs(struct kvm_vcpu *vcpu,
+>>  }
+>>  
+>>  /*
+>> + * Translates an incoming MSI request into the redistributor (=VCPU) and
+>> + * the associated LPI number. Sets the LPI pending bit and also marks the
+>> + * VCPU as having a pending interrupt.
+>> + */
+>> +int vits_inject_msi(struct kvm *kvm, struct kvm_msi *msi)
+>> +{
+>> +	struct vgic_dist *dist = &kvm->arch.vgic;
+>> +	struct vgic_its *its = &dist->its;
+>> +	struct its_itte *itte;
+>> +	int cpuid;
+>> +	bool inject = false;
+>> +	int ret = 0;
+>> +
+>> +	if (!vgic_has_its(kvm))
+>> +		return -ENODEV;
+>> +
+>> +	if (!(msi->flags & KVM_MSI_VALID_DEVID))
+>> +		return -EINVAL;
+> I am currently reworking the GSI routing series according to latest
+> comments (flag usage on userside and removal of EXTENDED_MSI type on
+> kernel side as you suggested). Given the data path,
+> 
+> kvm_send_userspace_msi (kvm_msi*)
+> |_ kvm_set_msi (kvm_kernel_irq_routing_entry *)
+> 	|_ kvm->arch.vgic.vm_ops.inject_msi (kvm_msi *)
+> 
+> the above check is useless I think since in kvm_set_msi I need to
+> populate a kvm_msi struct from a kernel routing entry struct. The kernel
+> routing entry struct has no info about the validity of devid so I
+> systematically sets the flag in kvm_msi.
+> 
+> I am still dubious about not storing the KVM_MSI_VALID_DEVID info
+> somewhere in the kernel routing entry struct.
+
+When I reworked our code to only use a flag and not a separate routing
+type I ended up with the flag only guarding assignments, which wouldn't
+hurt if done unconditionally (since they are all u32's). So the whole
+usage of the flag is somewhat in jeopardy now.
+Either the eventual MSI consumer requires a DevID (ITS emulation, which
+will not work without it) or the consumer does not care at all and can
+totally ignore it (GICv2m). So I think we can always pass on the DevID
+field and let the final function decide whether to use it or not. But
+somehow this doesn't sound right to me, so maybe I am missing something
+here?
+
+Cheers,
+Andre.
