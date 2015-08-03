@@ -1,42 +1,67 @@
-From: hongzhou.yang@mediatek.com (Hongzhou Yang)
-Date: Mon, 3 Aug 2015 12:08:26 -0700
-Subject: [PATCH] pinctrl/mediatek: fix spelling mistake in dev_err error
- message
-In-Reply-To: <1438557045-3590-1-git-send-email-colin.king@canonical.com>
-References: <1438557045-3590-1-git-send-email-colin.king@canonical.com>
-Message-ID: <1438628906.32493.1.camel@mussux00.eus.mediatek.inc>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 3 Aug 2015 20:09:35 +0100
+Subject: [PATCH 0/2] drivers: PL061: Add platform driver probing support
+In-Reply-To: <20150803162623.GB30867@kroah.com>
+References: <1438585198-8764-1-git-send-email-zhaoshenglong@huawei.com>
+ <20150803075848.GH7557@n2100.arm.linux.org.uk>
+ <55BF33AD.5040502@huawei.com>
+ <20150803094923.GI7557@n2100.arm.linux.org.uk>
+ <20150803162623.GB30867@kroah.com>
+Message-ID: <20150803190935.GL7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-08-03 at 00:10 +0100, Colin King wrote:
-> From: Colin Ian King <colin.king@canonical.com>
+On Mon, Aug 03, 2015 at 09:26:23AM -0700, Greg Kroah-Hartman wrote:
+> On Mon, Aug 03, 2015 at 10:49:23AM +0100, Russell King - ARM Linux wrote:
+> > On Mon, Aug 03, 2015 at 05:26:05PM +0800, Shannon Zhao wrote:
+> > > Hi Russell,
+> > > 
+> > > On 2015/8/3 15:58, Russell King - ARM Linux wrote:
+> > > > On Mon, Aug 03, 2015 at 02:59:56PM +0800, Shannon Zhao wrote:
+> > > >> From: Shannon Zhao <shannon.zhao@linaro.org>
+> > > >>
+> > > >> According to ACPI SPEC, it supports ARM boards to use "GPIO-signaled
+> > > >> ACPI Events". These events can be used for input events. And to QEMU, it
+> > > >> uses GPIO PL061 controller for input events.
+> > > >>
+> > > >> These two patches add platform driver support for PL061 probed by DT or
+> > > >> ACPI.
+> > > > 
+> > > > This certainly is incorrect for DT, and is probably wrong for ACPI too.
+> > > > DT creates amba devices, so binds via the amba device driver.
+> > > > 
+> > > 
+> > > Oh, sorry. The changes for DT are not necessary. But for ACPI I think it
+> > > needs to convert pl061 to platform device since ACPI doesn't support
+> > > AMBA devices. The Pl011 also does the same thing to support ACPI
+> > > probing. See drivers/tty/serial/amba-pl011.c
+> > 
+> > Maybe rather than having every AMBA driver also converted to a platform
+> > driver (which GregKH hates) maybe ACPI should support the AMBA bus
+> > instead?
+> > 
+> > Greg?
 > 
-> Trivial change, fix spelling mistake 'invaild' -> 'invalid' in
-> dev_err message.
+> The ACPI developers have been doing work to allow a driver to handle
+> getting the resources from either DT or ACPI no matter what bus it is
+> on, so converting anything to a platform driver shouldn't be needed.
 > 
-> Signed-off-by: Colin Ian King <colin.king@canonical.com>
-> ---
->  drivers/pinctrl/mediatek/pinctrl-mtk-common.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-> index ad1ea16..5af5441 100644
-> --- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-> +++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-> @@ -702,7 +702,7 @@ static int mtk_pmx_set_mux(struct pinctrl_dev *pctldev,
->  
->  	ret = mtk_pctrl_is_function_valid(pctl, g->pin, function);
->  	if (!ret) {
-> -		dev_err(pctl->dev, "invaild function %d on group %d .\n",
-> +		dev_err(pctl->dev, "invalid function %d on group %d .\n",
->  				function, group);
->  		return -EINVAL;
->  	}
+> but I don't really know the details here, and this isn't being sent to
+> the ACPI mailing list, so I don't know what to suggest...
 
-Hi Colin,
+Greg,
 
-Thank you very much.
+You're the one who's said many times that you'd like to see platform
+devices and platform device drivers to go away.  So, when I give you
+the opportunity to comment on platform devices being used to augment
+existing device drivers such as the AMBA bus drivers (which you've
+also previously said is a more preferable way to use the driver model)
+why not support that view?
 
-Acked-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
+Right now, there seems to be a move to convert _all_ AMBA device drivers
+to become dual-drivers: an amba bus driver and a platform driver.  Is
+that something you really want to see, irrespective of ACPI issues?
 
-Hongzhou
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
