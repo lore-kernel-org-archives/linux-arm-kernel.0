@@ -1,37 +1,119 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Mon, 03 Aug 2015 12:47:57 +0200
-Subject: [PATCH v3 3/5] ARM: Exynos: switch to using generic cpufreq driver
- for Exynos4x12
-In-Reply-To: <20150803104044.GB21529@linux>
-References: <1438368557-2352-1-git-send-email-b.zolnierkie@samsung.com>
- <4532306.AVvo5hem3c@amdc1976> <20150803104044.GB21529@linux>
-Message-ID: <2295533.OBI6Q4a3b9@amdc1976>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 03 Aug 2015 11:53:36 +0100
+Subject: [PATCH v2 3/5] pci: altera: Add Altera PCIe MSI driver
+In-Reply-To: <CAFiDJ5-5eZEBFwbuzrPB+XKX_E2Fd0qEeP-_H3Wz2jT8pcbJfQ@mail.gmail.com>
+References: <1438337715-22594-1-git-send-email-lftan@altera.com>	<1438337715-22594-4-git-send-email-lftan@altera.com>	<55BB6621.9060505@arm.com>
+ <CAFiDJ5-5eZEBFwbuzrPB+XKX_E2Fd0qEeP-_H3Wz2jT8pcbJfQ@mail.gmail.com>
+Message-ID: <55BF4830.9050104@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, August 03, 2015 04:10:44 PM Viresh Kumar wrote:
-> On 03-08-15, 12:36, Bartlomiej Zolnierkiewicz wrote:
-> > I would really like it to be dependency not an option (+ I think
-> > that ideally it should be checked at runtime, IOW we should be
-> > checking from cpufreq-dt driver if the thermal support is enabled
-> > before enabling boost support).
+On 03/08/15 11:37, Ley Foon Tan wrote:
+> On Fri, Jul 31, 2015 at 8:12 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> On 31/07/15 11:15, Ley Foon Tan wrote:
+>>> This patch adds Altera PCIe MSI driver. This soft IP supports configurable
+>>> number of vectors, which is a dts parameter.
+>>
+>> I've reviewed the initial drop of this code; basic courtesy would be to
+>> keep me CCed on the follow-up series.
+> Will keep you in CC for the following revision. Sorry about this.
 > 
-> I don't think boost has any dependency on thermal support. Yeah, it
-> may be true for your platform but we can't force it. People might have
-> different algorithms to control boost modes, thermal is just one
-> option they may look at. For few, enabling boost may not be a thermal
-> issue, but power. So, they want to allow it only when they want, but
-> that wouldn't burn their chip.
+>>>
+>>> Signed-off-by: Ley Foon Tan <lftan@altera.com>
+>>> ---
+>>>  drivers/pci/host/Kconfig           |   7 +
+>>>  drivers/pci/host/Makefile          |   1 +
+>>>  drivers/pci/host/pcie-altera-msi.c | 324 +++++++++++++++++++++++++++++++++++++
+>>>  3 files changed, 332 insertions(+)
+>>>  create mode 100644 drivers/pci/host/pcie-altera-msi.c
+>>>
 
-OK, I see your point (I have not thought about power being the boost
-limitation previously).
+[...]
 
-> So, a platform can choose how it wants to have it. :)
+>>> +
+>>> +     msg->address_lo = lower_32_bits(addr);
+>>> +     msg->address_hi = upper_32_bits(addr);
+>>> +     msg->data = data->hwirq;
+>>> +
+>>> +     mask = msi_readl(msi, MSI_INTMASK);
+>>> +     mask |= 1 << data->hwirq;
+>>> +     msi_writel(msi, mask, MSI_INTMASK);
+>>
+>> It feels a bit weird to unmask the interrupt when you compose the
+>> message. I'd expect this to be done in the mask/unmask methods.
+> Do you refer to these 2 callbacks?
+> .irq_mask = pci_msi_mask_irq,
+> .irq_unmask = pci_msi_unmask_irq,
+> 
+> How about we move this INTMASK code above to altera_irq_domain_alloc()?
+> We have unmask code in altera_irq_domain_free() now.
 
-I'll re-do this patch.  Thank you.
+Either you move the mask/unmask code to local irq_mask/irq_unmask
+methods (and call pci_msi_(un)mask_irq from there), or you move it
+entierely to alloc/free.
 
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+Some level of symmetry helps following what is going on in the code.
+
+[...]
+
+>>> +static int altera_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
+>>> +                               unsigned int nr_irqs, void *args)
+>>> +{
+>>> +     struct altera_msi *msi = domain->host_data;
+>>> +     int bit;
+>>> +
+>>> +     mutex_lock(&msi->lock);
+>>> +
+>>> +     bit = find_first_zero_bit(msi->used, msi->num_of_vectors);
+>>> +     if (bit < msi->num_of_vectors)
+>>> +             set_bit(bit, msi->used);
+>>> +
+>>> +     mutex_unlock(&msi->lock);
+>>> +
+>>> +     if (bit < 0)
+>>> +             return bit;
+>>
+>> How can "bit" be negative here? find_first_zero_bit returns an unsigned
+>> long... You probably want to change the type of "bit" to reflect that.
+> Okay, will change to "unsigned long" type.
+>>
+>>> +     else if (bit >= msi->num_of_vectors)
+>>
+>> Useless "else" anyway.
+> 
+> I think we still need to check for failing case, if we don't have
+> available unused bit.
+> This could be rewritten  as below:
+> 
+> bit = find_first_zero_bit(msi->used, msi->num_of_vectors);
+> if (bit < msi->num_of_vectors)
+>       set_bit(bit, msi->used);
+> else
+>       return -ENOSPC;
+
+The more logical to write this is:
+
+	if (bit >= msi->num_of_vectors)
+		return -ENOSPC;
+
+	set_bit(bit, msi->used);
+
+which gets rid of the error case early and streamlines the normal case.
+
+> 
+>>
+>>> +             return -ENOSPC;
+>>> +
+>>> +     irq_domain_set_info(domain, virq, bit, &altera_msi_bottom_irq_chip,
+>>> +                         domain->host_data, handle_simple_irq,
+>>> +                         NULL, NULL);
+>>> +     set_irq_flags(virq, IRQF_VALID);
+>>> +
+>>> +     return 0;
+>>> +}
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
