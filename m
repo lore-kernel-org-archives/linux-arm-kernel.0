@@ -1,49 +1,27 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Mon, 3 Aug 2015 22:23:42 +0300
-Subject: [PATCH] usb: ehci-platform: Fix using multiple controllers from OF
-In-Reply-To: <1438629150-11662-1-git-send-email-albeu@free.fr>
-References: <1438629150-11662-1-git-send-email-albeu@free.fr>
-Message-ID: <55BFBFBE.5050905@cogentembedded.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 3 Aug 2015 12:24:27 -0700
+Subject: [PATCH v7 01/13] clk: qcom: Add support for GDSCs
+In-Reply-To: <1438076046-4706-2-git-send-email-rnayak@codeaurora.org>
+References: <1438076046-4706-1-git-send-email-rnayak@codeaurora.org>
+ <1438076046-4706-2-git-send-email-rnayak@codeaurora.org>
+Message-ID: <20150803192427.GA7096@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/03/2015 10:12 PM, Alban Bedel wrote:
+On 07/28, Rajendra Nayak wrote:
+> +
+> +#define PWR_ON_MASK		BIT(31)
+> +#define EN_REST_WAIT_MASK	GENMASK(23, 20)
+> +#define EN_FEW_WAIT_MASK	GENMASK(19, 16)
+> +#define CLK_DIS_WAIT_MASK	GENMASK(15, 12)
 
-> When using OF defined controllers the platform data struct is shared
-> between all devices, so it can't be used for device specific settings.
-> However it is currently used for the OF properties
-> needs-reset-on-resume and has-transaction-translator.
+This trips up some static checker...
 
-> To fix this issue move setting hcd->has_tt to the probe and
-> move pdata->reset_on_resume to the private data.
+drivers/clk/qcom/gdsc.c:234:53: warning: cast truncates bits from
+constant value (fffffffffff006 becomes fffff006)
 
-> Signed-off-by: Alban Bedel <albeu@free.fr>
-> ---
->   drivers/usb/host/ehci-platform.c | 13 +++++++++----
->   1 file changed, 9 insertions(+), 4 deletions(-)
+So I think we can use GENMASK_ULL here instead.
 
-> diff --git a/drivers/usb/host/ehci-platform.c b/drivers/usb/host/ehci-platform.c
-> index 2593def..40d029e 100644
-> --- a/drivers/usb/host/ehci-platform.c
-> +++ b/drivers/usb/host/ehci-platform.c
-> @@ -45,6 +45,7 @@ struct ehci_platform_priv {
->   	struct reset_control *rst;
->   	struct phy **phys;
->   	int num_phys;
-> +	bool reset_on_resume;
->   };
->
->   static const char hcd_name[] = "ehci-platform";
-[...]
-> @@ -193,11 +193,11 @@ static int ehci_platform_probe(struct platform_device *dev)
->
->   		if (of_property_read_bool(dev->dev.of_node,
->   					  "needs-reset-on-resume"))
-> -			pdata->reset_on_resume = 1;
-> +			priv->reset_on_resume = 1;
-
-    'true' since the typi is 'bool'.
-
-[...]
-
-MBR, Sergei
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
