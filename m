@@ -1,80 +1,49 @@
 From: leo.yan@linaro.org (Leo Yan)
-Date: Mon,  3 Aug 2015 09:13:10 +0800
-Subject: [RFC PATCH 3/3] arm64: dts: add Hi6220 mailbox node
-In-Reply-To: <1438564390-28111-1-git-send-email-leo.yan@linaro.org>
-References: <1438564390-28111-1-git-send-email-leo.yan@linaro.org>
-Message-ID: <1438564390-28111-4-git-send-email-leo.yan@linaro.org>
+Date: Mon,  3 Aug 2015 09:13:33 +0800
+Subject: [PATCH v3 0/5] clk: hisilicon: support stub clock
+Message-ID: <1438564418-15948-1-git-send-email-leo.yan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Hi6220, below memory regions in DDR have specific purpose:
+This series adds support for hisilicon stub clock driver. On hi6220,
+the bootloader needs load the firmware image and set info for OPPs;
+after run into kernel, the stub clock driver is used to communicate
+w/t firmware for cpu dynamic frequency scaling.
 
-- 0x05e0,0000 - 0x05ef,ffff: For MCU firmware using at runtime;
-- 0x0740,f000 - 0x0740,ffff: For MCU firmware's section;
-- 0x06df,f000 - 0x06df,ffff: For mailbox message data.
+In patch series v1/v2, the stub clock driver simply writes request in
+sram and send ipc to firmware; For patch series v3, the firmware has
+been upgraded to use mailbox, so stub clock driver will call standard
+mailbox APIs to request mailbox channel and send message to firmware.
 
-This patch reserves these memory regions and add device node for
-mailbox in dts.
+These patches have been tested on 96board hikey and is used by cpufreq
+driver.
 
-Signed-off-by: Leo Yan <leo.yan@linaro.org>
----
- arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 20 +++++++++++++++++---
- arch/arm64/boot/dts/hisilicon/hi6220.dtsi      |  8 ++++++++
- 2 files changed, 25 insertions(+), 3 deletions(-)
+Changes from v2:
+* Use platform_device's probe for clock's initialization
+* Use mailbox channel for clock frequency change
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-index e36a539..1715f9d 100644
---- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-+++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-@@ -7,9 +7,6 @@
- 
- /dts-v1/;
- 
--/*Reserved 1MB memory for MCU*/
--/memreserve/ 0x05e00000 0x00100000;
--
- #include "hi6220.dtsi"
- 
- / {
-@@ -28,4 +25,21 @@
- 		device_type = "memory";
- 		reg = <0x0 0x0 0x0 0x40000000>;
- 	};
-+
-+	reserved-memory {
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		ranges;
-+
-+		mcu-buf at 05e00000 {
-+			no-map;
-+			reg = <0x0 0x0740f000 0x0 0x00001000>,	/* MCU firmware section */
-+			      <0x0 0x05e00000 0x0 0x00100000>;	/* MCU firmware buffer */
-+		};
-+
-+		mbox-buf at 06dff000 {
-+			no-map;
-+			reg = <0x0 0x06dff000 0x0 0x00001000>;	/* Mailbox message buf */
-+		};
-+	};
- };
-diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-index 3f03380..b42a9b7 100644
---- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-@@ -167,5 +167,13 @@
- 			clocks = <&ao_ctrl 36>, <&ao_ctrl 36>;
- 			clock-names = "uartclk", "apb_pclk";
- 		};
-+
-+		mailbox: mailbox {
-+			#mbox-cells = <1>;
-+			compatible = "hisilicon,hi6220-mbox";
-+			reg = <0x0 0xf7510000 0x0 0x1000>, /* IPC_S */
-+			      <0x0 0x06dff800 0x0 0x0800>; /* Mailbox buffer */
-+			interrupts = <GIC_SPI 94 IRQ_TYPE_LEVEL_HIGH>;
-+		};
- 	};
- };
+Changes from v1:
+* Refine parameter checking for init flow
+* Remove unnecessary debugging info
+* Modify to check spinlock pointer when register clocks
+
+
+Leo Yan (5):
+  clk: hisi: refine parameter checking for init
+  dt-bindings: arm: Hi6220: add doc for SRAM controller
+  dt-bindings: clk: Hi6220: Document stub clock driver
+  clk: Hi6220: add stub clock driver
+  arm64: dts: add Hi6220's stub clock node
+
+ .../bindings/arm/hisilicon/hisilicon.txt           |  18 ++
+ .../devicetree/bindings/clock/hi6220-clock.txt     |  19 +-
+ arch/arm64/boot/dts/hisilicon/hi6220.dtsi          |  23 ++
+ drivers/clk/hisilicon/Kconfig                      |   2 +-
+ drivers/clk/hisilicon/Makefile                     |   2 +-
+ drivers/clk/hisilicon/clk-hi6220-stub.c            | 279 +++++++++++++++++++++
+ drivers/clk/hisilicon/clk.c                        |  11 +-
+ 7 files changed, 343 insertions(+), 11 deletions(-)
+ create mode 100644 drivers/clk/hisilicon/clk-hi6220-stub.c
+
 -- 
 1.9.1
