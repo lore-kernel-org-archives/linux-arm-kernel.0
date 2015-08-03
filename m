@@ -1,8 +1,8 @@
 From: ian.campbell@citrix.com (Ian Campbell)
-Date: Mon, 3 Aug 2015 17:06:33 +0100
-Subject: [PATCH v4] dtb: Create a common home for cross-architecture dtsi
+Date: Mon, 3 Aug 2015 17:06:40 +0100
+Subject: [PATCH v5] dtb: Create a common home for cross-architecture dtsi
  files.
-Message-ID: <1438617993-1012-1-git-send-email-ian.campbell@citrix.com>
+Message-ID: <1438618000-1091-1-git-send-email-ian.campbell@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
