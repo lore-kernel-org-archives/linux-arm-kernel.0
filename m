@@ -1,296 +1,68 @@
-From: pi-cheng.chen@linaro.org (Pi-Cheng Chen)
-Date: Mon, 3 Aug 2015 19:13:36 +0800
-Subject: [PATCH] clk: mediatek: Export CPU mux clocks for CPU frequency
- control
-In-Reply-To: <1436942326-19747-1-git-send-email-pi-cheng.chen@linaro.org>
-References: <CAGS+omAa=3W+SZLmFaDD6uJuhXtu2zX12TsvL2etDif+mKkoVA@mail.gmail.com>
- <1436942326-19747-1-git-send-email-pi-cheng.chen@linaro.org>
-Message-ID: <20150803111335.GA5165@gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 03 Aug 2015 20:15:13 +0900
+Subject: [PATCH v3 3/5] ARM: Exynos: switch to using generic cpufreq driver
+ for Exynos4x12
+In-Reply-To: <4532306.AVvo5hem3c@amdc1976>
+References: <1438368557-2352-1-git-send-email-b.zolnierkie@samsung.com>
+ <5201904.0cZWHobiJs@amdc1976> <20150803102926.GA21529@linux>
+ <4532306.AVvo5hem3c@amdc1976>
+Message-ID: <55BF4D41.1060903@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 15, 2015 at 02:38:46PM +0800, Pi-Cheng Chen wrote:
-> From: "pi-cheng.chen" <pi-cheng.chen@linaro.org>
+W dniu 03.08.2015 o 19:36, Bartlomiej Zolnierkiewicz pisze:
+> On Monday, August 03, 2015 03:59:26 PM Viresh Kumar wrote:
+>> On 03-08-15, 12:17, Bartlomiej Zolnierkiewicz wrote:
+>>>
+>>> Hi,
+>>>
+>>> On Saturday, August 01, 2015 04:47:21 PM Viresh Kumar wrote:
+>>>> On 31-07-15, 20:49, Bartlomiej Zolnierkiewicz wrote:
+>>>>> diff --git a/drivers/cpufreq/Kconfig b/drivers/cpufreq/Kconfig
+>>>>> index 659879a..bf6d596 100644
+>>>>> --- a/drivers/cpufreq/Kconfig
+>>>>> +++ b/drivers/cpufreq/Kconfig
+>>>>> @@ -191,6 +191,7 @@ config CPUFREQ_DT
+>>>>>  	# if CPU_THERMAL is on and THERMAL=m, CPUFREQ_DT cannot be =y:
+>>>>>  	depends on !CPU_THERMAL || THERMAL
+>>>>>  	select PM_OPP
+>>>>> +	select EXYNOS_THERMAL if ARCH_EXYNOS
+>>>>>  	help
+>>>>>  	  This adds a generic DT based cpufreq driver for frequency management.
+>>>>>  	  It supports both uniprocessor (UP) and symmetric multiprocessor (SMP)
+>>>>
+>>>> No, we shouldn't pollute generic Kconfig options with platform specific stuff.
+>>>
+>>> The old code depended on this.  You couldn't enable boost support
+>>> without enabling thermal support (ARM_EXYNOS_CPU_FREQ_BOOST_SW
+>>> config option selected EXYNOS_THERMAL).
+>>>
+>>>> Why don't you enable thermal in your .config?
+>>>
+>>> It is enabled in exynos_defconfig but without the above change it
+>>> can disabled manually which is something that we don't want.
+>>
+>> You are not getting it. I am not asking you to not select thermal, but
+>> to select it from within your architecture Kconfig option if you want.
 > 
-> This patch adds CPU mux clocks which are used by Mediatek cpufreq driver
-> for intermediate clock source switching.
+> OK.  Krzysztof/Kukjin do you agree with selecting EXYNOS_THERMAL
+> from ARCH_EXYNOS in the platform code?
 
-Hi Mike and Stephen,
-
-since the MT8173 cpufreq driver is likely going to be merged[1] and we still
-need the CPU MUX clocks consumed by MT8173 cpufreq driver, may I have some
-comments from you to get this patch moving forwards so that MT8173 cpufreq
-driver could work completely?
-
-Or the regmap supported basic clock type[2] is the prefered way?
-Thanks.
-
-Best Regards,
-Pi-Cheng
-
-[1] http://marc.info/?l=linux-pm&m=143850044118837&w=2
-[2] http://marc.info/?l=linux-kernel&m=143835585905028&w=2
+I agree, with your explanation it seems good. Can you just add this
+justification to the commit message?
 
 > 
-> Signed-off-by: Pi-Cheng Chen <pi-cheng.chen@linaro.org>
-> Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
-> ---
-> Changes in v4:
-> - Address comments for v3
-> - Rebase to the patch that adds 13mhz clock for MT8173[1]
+>> Over that, thermal is really an option, not a dependency. So, if
+>> someone manually disables it, its his problem not yours :)
 > 
-> Changes in v3:
-> - Rebase to 4.2-rc1
-> - Fix some issues of v2
-> 
-> Changes in v2:
-> - Remove use of .determine_rate callback
-> 
-> [1] http://patchwork.kernerl.xyz/patch/6777041/
-> ---
->  drivers/clk/mediatek/Makefile          |   2 +-
->  drivers/clk/mediatek/clk-cpumux.c      | 127 +++++++++++++++++++++++++++++++++
->  drivers/clk/mediatek/clk-cpumux.h      |  22 ++++++
->  drivers/clk/mediatek/clk-mt8173.c      |  23 ++++++
->  include/dt-bindings/clock/mt8173-clk.h |   4 +-
->  5 files changed, 176 insertions(+), 2 deletions(-)
->  create mode 100644 drivers/clk/mediatek/clk-cpumux.c
->  create mode 100644 drivers/clk/mediatek/clk-cpumux.h
-> 
-> diff --git a/drivers/clk/mediatek/Makefile b/drivers/clk/mediatek/Makefile
-> index 8e4b2a4..299917a 100644
-> --- a/drivers/clk/mediatek/Makefile
-> +++ b/drivers/clk/mediatek/Makefile
-> @@ -1,4 +1,4 @@
-> -obj-y += clk-mtk.o clk-pll.o clk-gate.o
-> +obj-y += clk-mtk.o clk-pll.o clk-gate.o clk-cpumux.o
->  obj-$(CONFIG_RESET_CONTROLLER) += reset.o
->  obj-y += clk-mt8135.o
->  obj-y += clk-mt8173.o
-> diff --git a/drivers/clk/mediatek/clk-cpumux.c b/drivers/clk/mediatek/clk-cpumux.c
-> new file mode 100644
-> index 0000000..fb04fe1
-> --- /dev/null
-> +++ b/drivers/clk/mediatek/clk-cpumux.c
-> @@ -0,0 +1,127 @@
-> +/*
-> + * Copyright (c) 2015 Linaro Ltd.
-> + * Author: Pi-Cheng Chen <pi-cheng.chen@linaro.org>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/clk-provider.h>
-> +#include <linux/mfd/syscon.h>
-> +#include <linux/slab.h>
-> +
-> +#include "clk-mtk.h"
-> +#include "clk-cpumux.h"
-> +
-> +struct mtk_clk_cpumux {
-> +	struct clk_hw	hw;
-> +	struct regmap	*regmap;
-> +	u32		reg;
-> +	u32		mask;
-> +	u8		shift;
-> +};
-> +
-> +static inline struct mtk_clk_cpumux *to_clk_mux(struct clk_hw *_hw)
-> +{
-> +	return container_of(_hw, struct mtk_clk_cpumux, hw);
-> +}
-> +
-> +static u8 clk_cpumux_get_parent(struct clk_hw *hw)
-> +{
-> +	struct mtk_clk_cpumux *mux = to_clk_mux(hw);
-> +	int num_parents = __clk_get_num_parents(hw->clk);
-> +	unsigned int val;
-> +
-> +	regmap_read(mux->regmap, mux->reg, &val);
-> +
-> +	val >>= mux->shift;
-> +	val &= mux->mask;
-> +
-> +	if (val >= num_parents)
-> +		return -EINVAL;
-> +
-> +	return val;
-> +}
-> +
-> +static int clk_cpumux_set_parent(struct clk_hw *hw, u8 index)
-> +{
-> +	struct mtk_clk_cpumux *mux = to_clk_mux(hw);
-> +	u32 mask, val;
-> +
-> +	val = index << mux->shift;
-> +	mask = mux->mask << mux->shift;
-> +
-> +	return regmap_update_bits(mux->regmap, mux->reg, mask, val);
-> +}
-> +
-> +static const struct clk_ops clk_cpumux_ops = {
-> +	.get_parent = clk_cpumux_get_parent,
-> +	.set_parent = clk_cpumux_set_parent,
-> +};
-> +
-> +static struct clk __init *mtk_clk_register_cpumux(const struct mtk_composite *mux,
-> +					   struct regmap *regmap)
-> +{
-> +	struct mtk_clk_cpumux *cpumux;
-> +	struct clk *clk;
-> +	struct clk_init_data init;
-> +
-> +	cpumux = kzalloc(sizeof(*cpumux), GFP_KERNEL);
-> +	if (!cpumux)
-> +		return ERR_PTR(-ENOMEM);
-> +
-> +	init.name = mux->name;
-> +	init.ops = &clk_cpumux_ops;
-> +	init.parent_names = mux->parent_names;
-> +	init.num_parents = mux->num_parents;
-> +	init.flags = mux->flags;
-> +
-> +	cpumux->reg = mux->mux_reg;
-> +	cpumux->shift = mux->mux_shift;
-> +	cpumux->mask = BIT(mux->mux_width) - 1;
-> +	cpumux->regmap = regmap;
-> +	cpumux->hw.init = &init;
-> +
-> +	clk = clk_register(NULL, &cpumux->hw);
-> +	if (IS_ERR(clk))
-> +		kfree(cpumux);
-> +
-> +	return clk;
-> +}
-> +
-> +int __init mtk_clk_register_cpumuxes(struct device_node *node,
-> +			      const struct mtk_composite *clks, int num,
-> +			      struct clk_onecell_data *clk_data)
-> +{
-> +	int i;
-> +	struct clk *clk;
-> +	struct regmap *regmap;
-> +
-> +	regmap = syscon_node_to_regmap(node);
-> +	if (IS_ERR(regmap)) {
-> +		pr_err("Cannot find regmap for %s: %ld\n", node->full_name,
-> +		       PTR_ERR(regmap));
-> +		return PTR_ERR(regmap);
-> +	}
-> +
-> +	for (i = 0; i < num; i++) {
-> +		const struct mtk_composite *mux = &clks[i];
-> +
-> +		clk = mtk_clk_register_cpumux(mux, regmap);
-> +		if (IS_ERR(clk)) {
-> +			pr_err("Failed to register clk %s: %ld\n",
-> +			       mux->name, PTR_ERR(clk));
-> +			continue;
-> +		}
-> +
-> +		clk_data->clks[mux->id] = clk;
-> +	}
-> +
-> +	return 0;
-> +}
-> diff --git a/drivers/clk/mediatek/clk-cpumux.h b/drivers/clk/mediatek/clk-cpumux.h
-> new file mode 100644
-> index 0000000..52c769f
-> --- /dev/null
-> +++ b/drivers/clk/mediatek/clk-cpumux.h
-> @@ -0,0 +1,22 @@
-> +/*
-> + * Copyright (c) 2015 Linaro Ltd.
-> + * Author: Pi-Cheng Chen <pi-cheng.chen@linaro.org>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#ifndef __DRV_CLK_CPUMUX_H
-> +#define __DRV_CLK_CPUMUX_H
-> +
-> +int mtk_clk_register_cpumuxes(struct device_node *node,
-> +			      const struct mtk_composite *clks, int num,
-> +			      struct clk_onecell_data *clk_data);
-> +
-> +#endif /* __DRV_CLK_CPUMUX_H */
-> diff --git a/drivers/clk/mediatek/clk-mt8173.c b/drivers/clk/mediatek/clk-mt8173.c
-> index 540c5c3..053ca27 100644
-> --- a/drivers/clk/mediatek/clk-mt8173.c
-> +++ b/drivers/clk/mediatek/clk-mt8173.c
-> @@ -19,6 +19,7 @@
->  
->  #include "clk-mtk.h"
->  #include "clk-gate.h"
-> +#include "clk-cpumux.h"
->  
->  #include <dt-bindings/clock/mt8173-clk.h>
->  
-> @@ -517,6 +518,25 @@ static const char * const i2s3_b_ck_parents[] __initconst = {
->  	"apll2_div5"
->  };
->  
-> +static const char * const ca53_parents[] __initconst = {
-> +	"clk26m",
-> +	"armca7pll",
-> +	"mainpll",
-> +	"univpll"
-> +};
-> +
-> +static const char * const ca57_parents[] __initconst = {
-> +	"clk26m",
-> +	"armca15pll",
-> +	"mainpll",
-> +	"univpll"
-> +};
-> +
-> +static const struct mtk_composite cpu_muxes[] __initconst = {
-> +	MUX(CLK_INFRA_CA53SEL, "infra_ca53_sel", ca53_parents, 0x0000, 0, 2),
-> +	MUX(CLK_INFRA_CA57SEL, "infra_ca57_sel", ca57_parents, 0x0000, 2, 2),
-> +};
-> +
->  static const struct mtk_composite top_muxes[] __initconst = {
->  	/* CLK_CFG_0 */
->  	MUX(CLK_TOP_AXI_SEL, "axi_sel", axi_parents, 0x0040, 0, 3),
-> @@ -743,6 +763,9 @@ static void __init mtk_infrasys_init(struct device_node *node)
->  						clk_data);
->  	mtk_clk_register_factors(infra_divs, ARRAY_SIZE(infra_divs), clk_data);
->  
-> +	mtk_clk_register_cpumuxes(node, cpu_muxes, ARRAY_SIZE(cpu_muxes),
-> +						clk_data);
-> +
->  	r = of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
->  	if (r)
->  		pr_err("%s(): could not register clock provider: %d\n",
-> diff --git a/include/dt-bindings/clock/mt8173-clk.h b/include/dt-bindings/clock/mt8173-clk.h
-> index fa2a2bb..a17cbaa 100644
-> --- a/include/dt-bindings/clock/mt8173-clk.h
-> +++ b/include/dt-bindings/clock/mt8173-clk.h
-> @@ -188,7 +188,9 @@
->  #define CLK_INFRA_PMICSPI		10
->  #define CLK_INFRA_PMICWRAP		11
->  #define CLK_INFRA_CLK_13M		12
-> -#define CLK_INFRA_NR_CLK		13
-> +#define CLK_INFRA_CA53SEL		13
-> +#define CLK_INFRA_CA57SEL		14
-> +#define CLK_INFRA_NR_CLK		15
->  
->  /* PERI_SYS */
->  
-> -- 
-> 1.9.1
-> 
+> I would really like it to be dependency not an option (+ I think
+> that ideally it should be checked at runtime, IOW we should be
+> checking from cpufreq-dt driver if the thermal support is enabled
+> before enabling boost support).
+
+That would be the best. It is fine with me if you want to do this in
+consecutive patches (after applying patch selecting/depending on it in
+mach-exynos code).
+
+Best regards,
+Krzysztof
