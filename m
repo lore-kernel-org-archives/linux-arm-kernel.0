@@ -1,38 +1,76 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 3 Aug 2015 15:04:36 +0100
-Subject: [RFC 2/3] arm64: refactor save_stack_trace()
-In-Reply-To: <20150803100140.31ad51dd@gandalf.local.home>
-References: <20150716121658.7982fdf5@gandalf.local.home>
- <20150717124054.GE26091@leverpostej>
- <20150717090009.720f6bd0@gandalf.local.home>
- <77EA0F10-D5F6-48BD-8652-3B979A978659@gmail.com>
- <20150717104144.6588b2f7@gandalf.local.home>
- <0886A996-40E1-49E9-823C-85E55A858716@gmail.com>
- <1357EA74-B972-4B99-ADB0-BC7E8F06DDB5@gmail.com>
- <20150720162004.GL9908@arm.com> <20150803090951.GA10501@arm.com>
- <20150803100140.31ad51dd@gandalf.local.home>
-Message-ID: <20150803140436.GG10501@arm.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 3 Aug 2015 09:04:27 -0500
+Subject: [PATCH v2 06/10] usb: chipidea: add ahb burst configuration
+ interface
+In-Reply-To: <1438577238-10153-7-git-send-email-peter.chen@freescale.com>
+References: <1438577238-10153-1-git-send-email-peter.chen@freescale.com>
+ <1438577238-10153-7-git-send-email-peter.chen@freescale.com>
+Message-ID: <CAL_JsqJn16OvfL_Ggf1wSi2XkJkjDMrmuRit3q8eVY5bNp8oYw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 03, 2015 at 03:01:40PM +0100, Steven Rostedt wrote:
-> On Mon, 3 Aug 2015 10:09:51 +0100
-> Will Deacon <will.deacon@arm.com> wrote:
-> 
->  
-> > > The arm64 bits look fine to me:
-> > > 
-> > >   Acked-by: Will Deacon <will.deacon@arm.com>
-> > 
-> > What happened to this? Is it queued someplace, or are we waiting for a
-> > new version?
-> 
-> I went on vacation :-)  I'm back and trying to catch up. I'll be
-> pulling in a bunch of things today. Hopefully I can get to this.
+On Sun, Aug 2, 2015 at 11:47 PM, Peter Chen <peter.chen@freescale.com> wrote:
+> The users can change it through dts or platform data if they
+> want to change the default value.
+>
+> Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> ---
+>  drivers/usb/chipidea/bits.h  |  3 +++
+>  drivers/usb/chipidea/core.c  | 14 ++++++++++++++
+>  include/linux/usb/chipidea.h |  2 ++
+>  3 files changed, 19 insertions(+)
+>
+> diff --git a/drivers/usb/chipidea/bits.h b/drivers/usb/chipidea/bits.h
+> index 831a8f6..462ad02 100644
+> --- a/drivers/usb/chipidea/bits.h
+> +++ b/drivers/usb/chipidea/bits.h
+> @@ -25,6 +25,9 @@
+>  #define VERSION                      (0xF << 25)
+>  #define CIVERSION            (0x7 << 29)
+>
+> +/* SBUSCFG */
+> +#define AHBBRST_MASK           0x7
+> +
+>  /* HCCPARAMS */
+>  #define HCCPARAMS_LEN         BIT(17)
+>
+> diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
+> index 38bd036..f60cbf6 100644
+> --- a/drivers/usb/chipidea/core.c
+> +++ b/drivers/usb/chipidea/core.c
+> @@ -439,6 +439,9 @@ void ci_platform_configure(struct ci_hdrc *ci)
+>
+>         hw_write(ci, OP_USBCMD, 0xff0000, ci->platdata->itc_setting << 16);
+>
+> +       if (ci->platdata->flags & CI_HDRC_OVERRIDE_AHB_BURST)
+> +               hw_write_id_reg(ci, ID_SBUSCFG, AHBBRST_MASK,
+> +                       ci->platdata->ahb_burst_config);
+>  }
+>
+>  /**
+> @@ -647,6 +650,17 @@ static int ci_get_platdata(struct device *dev,
+>                 }
+>         }
+>
+> +       if (of_find_property(dev->of_node, "ahb-burst-config", NULL)) {
+> +               ret = of_property_read_u32(dev->of_node, "ahb-burst-config",
+> +                       &platdata->ahb_burst_config);
+> +               if (ret) {
+> +                       dev_err(dev,
+> +                               "failed to get ahb-burst-config\n");
+> +                       return ret;
+> +               }
+> +               platdata->flags |= CI_HDRC_OVERRIDE_AHB_BURST;
+> +       }
+> +
 
-Cheers, Steve. Just wanted to make sure it didn't got lost (I'd briefly
-forgotten about it myself!).
+This can be simplified to:
 
-I hope you had a good holiday.
+ret = of_property_read_u32(dev->of_node, "ahb-burst-config",
+&platdata->ahb_burst_config);
+if (!ret)
+  platdata->flags |= CI_HDRC_OVERRIDE_AHB_BURST;
 
-Will
+The error condition can't really happen.
+
+Rob
