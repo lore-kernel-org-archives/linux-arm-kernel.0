@@ -1,91 +1,90 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Mon,  3 Aug 2015 17:31:22 +0200
-Subject: [PATCH v3 0/7] KVM: arm/arm64: gsi routing support
-Message-ID: <1438615889-10892-1-git-send-email-eric.auger@linaro.org>
+Date: Mon,  3 Aug 2015 17:31:23 +0200
+Subject: [PATCH v3 1/7] KVM: api: pass the devid in the msi routing entry
+In-Reply-To: <1438615889-10892-1-git-send-email-eric.auger@linaro.org>
+References: <1438615889-10892-1-git-send-email-eric.auger@linaro.org>
+Message-ID: <1438615889-10892-2-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the advent of GICv3 ITS in-kernel emulation, KVM GSI routing
-appears to be requested. More specifically MSI routing is needed.
-irqchip routing does not sound to be really useful on arm but usage of
-MSI routing also mandates to integrate irqchip routing. The initial
-implementation of irqfd on arm must be upgraded with the integration
-of kvm irqchip.c code and the implementation of its standard hooks
-in the architecture specific part.
+On ARM, the MSI msg (address and data) comes along with
+out-of-band device ID information. The device ID encodes the
+device that writes the MSI msg. Let's convey the device id in
+kvm_irq_routing_msi and use KVM_MSI_VALID_DEVID flag value in
+kvm_irq_routing_entry to indicate the msi devid is populated.
 
-In case KVM_SET_GSI_ROUTING ioctl is not called, a default routing
-table with flat irqchip routing entries is built enabling to inject gsi
-corresponding to the SPI indexes seen by the guest.
+Signed-off-by: Eric Auger <eric.auger@linaro.org>
 
-As soon as KVM_SET_GSI_ROUTING is called, user-space overwrites this
-default routing table and is responsible for building the whole routing
-table.
-
-for arm/arm64 KVM_SET_GSI_ROUTING has a limited support:
-- only applies to KVM_IRQFD and not to KVM_IRQ_LINE
-
-- irqchip routing was tested on Calxeda midway (VFIO with irqfd)
-  with and without explicit routing
-- MSI routing without GICv3 ITS was tested using APM Xgene-I
-  (qemu VIRTIO-PCI vhost-net without gsi_direct_mapping).
-- MSI routing with GICv3 ITS is *NOT* tested.
-
-Code can be found at https://git.linaro.org/people/eric.auger/linux.git/shortlog/refs/heads/v4.2-rc4-gsi-routing-v3
-
-It applies on Andre's [PATCH v2 00/15] KVM: arm64: GICv3 ITS emulation
-(http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/355727.html)
-
-History:
+---
 v2 -> v3:
-- eventually got rid of KVM_IRQ_ROUTING_EXTENDED_MSI new type at user
-  api level and use KVM_MSI_VALID_DEVID flag instead
-- remove usage of KVM_IRQ_ROUTING_EXTENDED_MSI type at kernel level too.
-- propagate user flags downto the kernel to make sure the userspace
-  correctly set devid in GICv3 ITS case (still under discussion)
+- replace usage of KVM_IRQ_ROUTING_EXTENDED_MSI type by
+  usage of KVM_MSI_VALID_DEVID flag
+- add note about KVM_CAP_MSI_DEVID capability
 
 v1 -> v2:
-- user API changed:
-  x devid id passed in kvm_irq_routing_msi
-  x kept the new routing entry type: KVM_IRQ_ROUTING_EXTENDED_MSI
-- kvm_host.h: adopt Andre's proposal to replace the msi_msg by a struct
-  composed of the msi_msg and devid in kvm_kernel_irq_routing_entry
-- Fix bug reported by Pavel: Added KVM_IRQ_ROUTING_EXTENDED_MSI handling
-  in eventfd.c
-- added vgic_v2m_inject_msi in vgic-v2-emul.c as suggested by Andre
-- fix bug reported by Andre: bad setting of msi.flags and msi.devid
-  in kvm_send_userspace_msi
-- avoid injecting reserved IRQ numbers in vgic_irqfd_set_irq
+- devid id passed in kvm_irq_routing_msi instead of in
+  kvm_irq_routing_entry
 
-RFC -> PATCH:
-- clearly state limited support on arm/arm64:
-  KVM_IRQ_LINE not impacted by GSI routing
-- add default routing table feature (new patch file)
-- changed uapi to use padding field area
-- reword api.txt
+RFC -> PATCH
+- remove kvm_irq_routing_extended_msi and use union instead
+---
+ Documentation/virtual/kvm/api.txt | 18 ++++++++++++++++--
+ include/uapi/linux/kvm.h          |  5 ++++-
+ 2 files changed, 20 insertions(+), 3 deletions(-)
 
-Eric Auger (7):
-  KVM: api: pass the devid in the msi routing entry
-  KVM: kvm_host: add devid in kvm_kernel_irq_routing_entry
-  KVM: irqchip: convey devid to kvm_set_msi
-  KVM: arm/arm64: enable irqchip routing
-  KVM: arm/arm64: build a default routing table
-  KVM: arm/arm64: enable MSI routing
-  KVM: arm: enable KVM_SIGNAL_MSI and MSI routing
-
- Documentation/virtual/kvm/api.txt |  35 ++++++++++---
- arch/arm/include/asm/kvm_host.h   |   2 +
- arch/arm/kvm/Kconfig              |   3 ++
- arch/arm/kvm/Makefile             |   2 +-
- arch/arm64/include/asm/kvm_host.h |   1 +
- arch/arm64/kvm/Kconfig            |   2 +
- arch/arm64/kvm/Makefile           |   2 +-
- include/kvm/arm_vgic.h            |   2 -
- include/linux/kvm_host.h          |   8 ++-
- include/uapi/linux/kvm.h          |   5 +-
- virt/kvm/arm/vgic-v2-emul.c       |  16 ++++++
- virt/kvm/arm/vgic.c               | 107 ++++++++++++++++++++++++++++++--------
- virt/kvm/irqchip.c                |   8 ++-
- 13 files changed, 158 insertions(+), 35 deletions(-)
-
+diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+index 1b53155..d4b29df 100644
+--- a/Documentation/virtual/kvm/api.txt
++++ b/Documentation/virtual/kvm/api.txt
+@@ -1454,7 +1454,10 @@ struct kvm_irq_routing_entry {
+ #define KVM_IRQ_ROUTING_MSI 2
+ #define KVM_IRQ_ROUTING_S390_ADAPTER 3
+ 
+-No flags are specified so far, the corresponding field must be set to zero.
++flags:
++- KVM_MSI_VALID_DEVID: used along with KVM_IRQ_ROUTING_MSI
++  routing entry type, it tells the msi devid contains a valid value.
++- zero otherwise
+ 
+ struct kvm_irq_routing_irqchip {
+ 	__u32 irqchip;
+@@ -1465,9 +1468,20 @@ struct kvm_irq_routing_msi {
+ 	__u32 address_lo;
+ 	__u32 address_hi;
+ 	__u32 data;
+-	__u32 pad;
++	union {
++		__u32 pad;
++		__u32 devid;
++	};
+ };
+ 
++devid: If KVM_MSI_VALID_DEVID is set, contains a unique device identifier
++       for the device that wrote the MSI message.
++       For PCI, this is usually a BFD identifier in the lower 16 bits.
++
++The per-VM KVM_CAP_MSI_DEVID capability advertises the need to provide
++the device ID. If this capability is not set, userland cannot rely on
++the kernel to allow the KVM_MSI_VALID_DEVID flag being set.
++
+ struct kvm_irq_routing_s390_adapter {
+ 	__u64 ind_addr;
+ 	__u64 summary_addr;
+diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+index 1c48def..3c865b9 100644
+--- a/include/uapi/linux/kvm.h
++++ b/include/uapi/linux/kvm.h
+@@ -830,7 +830,10 @@ struct kvm_irq_routing_msi {
+ 	__u32 address_lo;
+ 	__u32 address_hi;
+ 	__u32 data;
+-	__u32 pad;
++	union {
++		__u32 pad;
++		__u32 devid;
++	};
+ };
+ 
+ struct kvm_irq_routing_s390_adapter {
 -- 
 1.9.1
