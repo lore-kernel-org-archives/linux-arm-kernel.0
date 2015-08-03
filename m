@@ -1,48 +1,42 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 3 Aug 2015 20:07:00 +0100
-Subject: [PATCH 1/2] drivers: PL061: add support for platform driver
- probing
-In-Reply-To: <1438614811.2338188.346456017.5D258EC5@webmail.messagingengine.com>
-References: <1438585198-8764-1-git-send-email-zhaoshenglong@huawei.com>
- <1438585198-8764-2-git-send-email-zhaoshenglong@huawei.com>
- <CACRpkdY6ZfB-gnnr49He+BYELy4fhiV0g5jkEHhyVsJOc_SBFw@mail.gmail.com>
- <1438614811.2338188.346456017.5D258EC5@webmail.messagingengine.com>
-Message-ID: <20150803190700.GK7557@n2100.arm.linux.org.uk>
+From: hongzhou.yang@mediatek.com (Hongzhou Yang)
+Date: Mon, 3 Aug 2015 12:08:26 -0700
+Subject: [PATCH] pinctrl/mediatek: fix spelling mistake in dev_err error
+ message
+In-Reply-To: <1438557045-3590-1-git-send-email-colin.king@canonical.com>
+References: <1438557045-3590-1-git-send-email-colin.king@canonical.com>
+Message-ID: <1438628906.32493.1.camel@mussux00.eus.mediatek.inc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 03, 2015 at 04:13:31PM +0100, Graeme Gregory wrote:
+On Mon, 2015-08-03 at 00:10 +0100, Colin King wrote:
+> From: Colin Ian King <colin.king@canonical.com>
 > 
+> Trivial change, fix spelling mistake 'invaild' -> 'invalid' in
+> dev_err message.
 > 
-> On Mon, 3 Aug 2015, at 01:40 PM, Linus Walleij wrote:
-> > On Mon, Aug 3, 2015 at 8:59 AM, Shannon Zhao <zhaoshenglong@huawei.com>
-> > wrote:
-> > 
-> > > From: Shannon Zhao <shannon.zhao@linaro.org>
-> > >
-> > > Since PL061 currently only supports AMBA driver, to support using GPIO
-> > > PL061 by DT or ACPI, it needs to add support for platform driver.
-> > > A DT binding is provided with this patch, ACPI support is added in a
-> > > separate one.
-> > >
-> > > Signed-off-by: Shannon Zhao <zhaoshenglong@huawei.com>
-> > > Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> > 
-> > I already stated in 0/2 what the problem is with this, and it's obviously
-> > adding
-> > a huge codechunk, very similar to the AMBA probe path.
-> > 
-> > We need to investigate if ACPI can just spawn AMBA/PrimeCell type devices
-> > instead.
-> > 
-> AMBA DT support is a hideous hack, we had kind of hoped to avoid doing
-> that in ACPI.
+> Signed-off-by: Colin Ian King <colin.king@canonical.com>
+> ---
+>  drivers/pinctrl/mediatek/pinctrl-mtk-common.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> If you notice ARM already updated pl011 driver to support platform
-> device type probing this seems to be the way to go.
+> diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+> index ad1ea16..5af5441 100644
+> --- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+> +++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+> @@ -702,7 +702,7 @@ static int mtk_pmx_set_mux(struct pinctrl_dev *pctldev,
+>  
+>  	ret = mtk_pctrl_is_function_valid(pctl, g->pin, function);
+>  	if (!ret) {
+> -		dev_err(pctl->dev, "invaild function %d on group %d .\n",
+> +		dev_err(pctl->dev, "invalid function %d on group %d .\n",
+>  				function, group);
+>  		return -EINVAL;
+>  	}
 
-As the AMBA bus maintainer, NAK on that.
+Hi Colin,
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Thank you very much.
+
+Acked-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
+
+Hongzhou
