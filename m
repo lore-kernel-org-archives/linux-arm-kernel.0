@@ -1,46 +1,54 @@
-From: public_timo.s@silentcreek.de (Timo Sigurdsson)
-Date: Mon,  3 Aug 2015 10:37:51 +0200 (CEST)
-Subject: [linux-sunxi] [PATCH] ARM: dts: sunxi: Raise minimum CPU voltage
- for sun7i-a20 to a level all boards can supply
-In-Reply-To: <CAGRGNgV6b9yt2HnB2x2Wyc05KEahoX-Y+mVhxsryztcfA36H1g@mail.gmail.com>
-References: <1438543386-7253-1-git-send-email-public_timo.s@silentcreek.de><CAGRGNgV6b9yt2HnB2x2Wyc05KEahoX-Y+mVhxsryztcfA36H1g@mail.gmail.com>
-Message-ID: <20150803083751.1BCF56C80391@dd34104.kasserver.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Mon, 3 Aug 2015 09:38:37 +0100
+Subject: Tegra baseline test results for v4.2-rc5
+Message-ID: <55BF288D.6070109@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Julian,
+Here are some basic Tegra test results for Linux v4.2-rc5.
+Logs and other details at:
 
-Julian Calaby schrieb am 03.08.2015 01:35:
->> sun7i-a20.dtsi contains an cpufreq operating point at 0.9 volts. Most A20
->> boards
->> (or all?), however, do not allow the voltage to go below 1.0V. Thus, raise the
->> voltage for the lowest operating point to 1.0V so all boards can actually use
->> it.
-> 
-> Surely it wouldn't be added here if some could supply 0.9v.
-
-Maybe. I just know some boards don't (e.g. Cubieboard 2, Cubietruck, BananaPi)
-and don't know of any that does. But that's not my point. I think that a common
-minimum operating point, defined on the SOC level, should be defined in a way
-that works on all boards.
-
-> 
-> Is the code that uses this smart enough to sensibly switch between two
-> operating points with the same frequency and different voltages? If
-> so, maybe just add a 144MHz @ 1.0v operating point?
-
-I never tried and I probably won't have time to test that before the weekend.
-The current behaviour is this, though: On boards that set their minimum CPU
-voltage to 1.0V, the lowest operating point will simply not be available to
-the user.
-
-> (Alternatively, would it make sense to modify the code that uses this
-> to use frequencies with voltages specified that are lower than can be
-> supplied with the lowest voltage it can?)
-
-Considering OPPv2 is in the works, maybe not?
+    https://nvtb.github.io//linux/test_v4.2-rc5/20150802190102/
 
 
-Thanks,
+Test summary
+------------
 
-Timo
+Build: zImage:
+    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
+
+Build: Image:
+    Pass: ( 1/ 1): defconfig
+
+Boot to userspace: defconfig:
+    Pass: ( 1/ 1): qemu-vexpress64
+
+Boot to userspace: multi_v7_defconfig:
+    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice, tegra30-beaver
+
+Boot to userspace: tegra_defconfig:
+    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice, tegra30-beaver
+
+
+vmlinux object size
+(delta in bytes from test_v4.2-rc4 (cbfe8fa6cd672011c755c3cd85c9ffd4e2d10a6f)):
+   text     data      bss    total  kernel
+    +24        0        0      +24  defconfig
+  +2240        0        0    +2240  multi_v7_defconfig
+   +592     +256        0     +848  tegra_defconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v4.2-rc4 (cbfe8fa6cd672011c755c3cd85c9ffd4e2d10a6f))
+    avail    rsrvd     high    freed                board              kconfig                  dtb
+        .        .        .        .      qemu-vexpress64            defconfig           __internal
+        .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
+        .        .        .      -4k tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
+        .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
+        .        .        .      -4k  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
+        .        .        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
+        .        .        .      -4k    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
+        .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+        .        .        .      -4k       tegra30-beaver      tegra_defconfig       tegra30-beaver
