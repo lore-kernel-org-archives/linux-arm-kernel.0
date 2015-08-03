@@ -1,39 +1,77 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Mon, 03 Aug 2015 16:23:09 -0700
-Subject: [PATCH] irqchip: bcm2836: Use a CPU notifier enable IPIs.
-In-Reply-To: <alpine.DEB.2.11.1508021221370.3825@nanos>
-References: <55B67C81.1010900@gmail.com>
- <1438027789-1637-1-git-send-email-eric@anholt.net>
- <alpine.DEB.2.11.1508021221370.3825@nanos>
-Message-ID: <87fv40lzxe.fsf@eliezer.anholt.net>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Mon, 3 Aug 2015 18:24:39 -0500
+Subject: [PATCH v3 1/2] PCI: generic: remove dependency on hw_pci
+In-Reply-To: <20150803131131.GF10501@arm.com>
+References: <1438183681-30519-1-git-send-email-jchandra@broadcom.com>
+ <20150730133521.GA12999@red-moon>
+ <20150731160654.GB31408@jayachandranc.netlogicmicro.com>
+ <20150731162716.GA7182@red-moon> <20150803131131.GF10501@arm.com>
+Message-ID: <20150803232439.GD11144@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas Gleixner <tglx@linutronix.de> writes:
+On Mon, Aug 03, 2015 at 02:11:32PM +0100, Will Deacon wrote:
+> Hi Jayachandran, Bjorn,
+> 
+> On Fri, Jul 31, 2015 at 05:27:16PM +0100, Lorenzo Pieralisi wrote:
+> > On Fri, Jul 31, 2015 at 05:07:01PM +0100, Jayachandran C. wrote:
+> > > On Thu, Jul 30, 2015 at 02:35:21PM +0100, Lorenzo Pieralisi wrote:
+> > > > On Wed, Jul 29, 2015 at 04:28:00PM +0100, Jayachandran C wrote:
+> > > > > -	pci_common_init_dev(dev, &hw);
+> > > > > +	/* do not reassign resource if probe only */
+> > > > > +	if (!pci_has_flag(PCI_PROBE_ONLY))
+> > > > > +		pci_add_flags(PCI_REASSIGN_ALL_RSRC);
+> > > > 
+> > > > You should add PCI_REASSIGN_ALL_BUS here. As I said in patch 2 comment,
+> > > 
+> > > The idea is to do exactly what pci_common_init_dev does on ARM. There is
+> > > not need to change behavior on ARM and deal with the fallout in this
+> > > patchset.
+> > 
+> > You are enabling this driver on ARM64, and on ARM64 that flag does
+> > make a difference, it does not on ARM as far as I can tell, but you do
+> > not seem to care.
+> > 
+> > Actually Rob asked you to put together a function since most of
+> > this code is replicated across ARM drivers eg:
+> > 
+> > drivers/pci/host/pci-versatile.c
+> > 
+> > Leave the code as it is and I will consolidate the code later.
+> > 
+> > > > please enable setup-irq.c in an explicit commit, re-sequence the
+> > > > series and fold the Kconfig ARM64 enablement in this patch.
+> > > 
+> > > I would think that the Makefile and Kconfig changes should be
+> > > togethter as the arm64 enablement patch. The previous patch is
+> > > to update the gen_pci driver, and it really makes sense in that
+> > > order.  I am not sure why you suggest this change.
+> > 
+> > Because this is not the only driver that requires compiling
+> > drivers/pci/setup-irq.c on ARM64, I thought it made more sense
+> > to do it in a separate patch to make that change standalone.
+> > 
+> > If for any reason we have to revert your patch that enables
+> > PCI host generic on ARM64 (and we remove with it the compilation
+> > of setup-irq.c) we would break other ARM64 PCI hosts that require it,
+> > right ?
+> > 
+> > I leave the decision to Bjorn since I am away next week, I am fine
+> > with the code as it is so please go ahead.
+> 
+> In the interest of getting something merged, can I suggest you
+> (Jayachandran) repost the patches with Lorenzo's suggestions to reorder
+> the series and split up the setup-irq compilation into a separate patch?
+> 
+> You can also add his ack to this patch.
+> 
+> It's a pity that the code isn't quite how we'd like it to end up, but
+> this at least enables people for 4.3 and I know that Lorenzo is working
+> on tidying up the loose ends as additional patches (but he's on holiday
+> this week). That includes removal of the PROBE_ONLY bodge that I've got
+> queued in arch/arm64/kernel/pci.c.
+> 
+> Bjorn, does that sound ok to you? I'm keen to have something working, as
+> I'm starting to get beaten up about the lack of generic PCI on arm64.
 
-> On Mon, 27 Jul 2015, Eric Anholt wrote:
->> +/* Unmasks the IPI on the CPU wen it's first brought online. */
->
-> when
->
->> +static int bcm2836_arm_irqchip_cpu_notify(struct notifier_block *nfb,
->> +					  unsigned long action, void *hcpu)
->> +{
->> +	unsigned int cpu = (unsigned long)hcpu;
->> +	unsigned int int_reg = LOCAL_MAILBOX_INT_CONTROL0;
->> +	unsigned int mailbox = 0;
->> +
->> +	if (action == CPU_STARTING || action == CPU_STARTING_FROZEN)
->> +		bcm2836_arm_irqchip_unmask_per_cpu_irq(int_reg, mailbox, cpu);
->
-> Shouldn't you mask the irq on CPU_DYING?
-
-I was just following what other drivers were doing.  Is CPU_DYING the
-only thing that needs masking?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150803/f573d5f4/attachment.sig>
+Sounds good to me.
