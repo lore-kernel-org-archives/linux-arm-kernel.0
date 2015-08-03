@@ -1,68 +1,223 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 03 Aug 2015 20:15:13 +0900
-Subject: [PATCH v3 3/5] ARM: Exynos: switch to using generic cpufreq driver
- for Exynos4x12
-In-Reply-To: <4532306.AVvo5hem3c@amdc1976>
-References: <1438368557-2352-1-git-send-email-b.zolnierkie@samsung.com>
- <5201904.0cZWHobiJs@amdc1976> <20150803102926.GA21529@linux>
- <4532306.AVvo5hem3c@amdc1976>
-Message-ID: <55BF4D41.1060903@samsung.com>
+From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
+Date: Mon, 3 Aug 2015 11:18:09 +0000
+Subject: [PATCH v6] PCI: Store PCIe bus address in struct of_pci_range
+In-Reply-To: <CAL_JsqJqjiWVaKs-3ghQ1EBQzRRQ38GzkMV+FELPj53bSF-yXQ@mail.gmail.com>
+References: <1438010223-124422-1-git-send-email-gabriele.paoloni@huawei.com>
+ <20150729172053.GE31170@google.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E01D6F350@lhreml503-mbs>
+ <CAL_JsqKs11-sXQTdBD+ZjbVYFWUHBARTW9q5MF1hCXUhZ+nWLQ@mail.gmail.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E01D6F94A@lhreml503-mbs>
+ <20150730161447.GG9640@google.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E01D6FB3B@lhreml503-mbs>
+ <20150730171445.GI9640@google.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E01D6FC15@lhreml503-mbs>
+ <CAL_Jsq+aQVakaZf4xo7sxnVyTmPR+HJ-9ByyS6OYJ0PHDYOwmg@mail.gmail.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E01D70589@lhreml503-mbs>
+ <55BB8CC6.1080203@ti.com>
+ <CAL_JsqJqjiWVaKs-3ghQ1EBQzRRQ38GzkMV+FELPj53bSF-yXQ@mail.gmail.com>
+Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E01D712E7@lhreml503-mbs>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-W dniu 03.08.2015 o 19:36, Bartlomiej Zolnierkiewicz pisze:
-> On Monday, August 03, 2015 03:59:26 PM Viresh Kumar wrote:
->> On 03-08-15, 12:17, Bartlomiej Zolnierkiewicz wrote:
->>>
->>> Hi,
->>>
->>> On Saturday, August 01, 2015 04:47:21 PM Viresh Kumar wrote:
->>>> On 31-07-15, 20:49, Bartlomiej Zolnierkiewicz wrote:
->>>>> diff --git a/drivers/cpufreq/Kconfig b/drivers/cpufreq/Kconfig
->>>>> index 659879a..bf6d596 100644
->>>>> --- a/drivers/cpufreq/Kconfig
->>>>> +++ b/drivers/cpufreq/Kconfig
->>>>> @@ -191,6 +191,7 @@ config CPUFREQ_DT
->>>>>  	# if CPU_THERMAL is on and THERMAL=m, CPUFREQ_DT cannot be =y:
->>>>>  	depends on !CPU_THERMAL || THERMAL
->>>>>  	select PM_OPP
->>>>> +	select EXYNOS_THERMAL if ARCH_EXYNOS
->>>>>  	help
->>>>>  	  This adds a generic DT based cpufreq driver for frequency management.
->>>>>  	  It supports both uniprocessor (UP) and symmetric multiprocessor (SMP)
->>>>
->>>> No, we shouldn't pollute generic Kconfig options with platform specific stuff.
->>>
->>> The old code depended on this.  You couldn't enable boost support
->>> without enabling thermal support (ARM_EXYNOS_CPU_FREQ_BOOST_SW
->>> config option selected EXYNOS_THERMAL).
->>>
->>>> Why don't you enable thermal in your .config?
->>>
->>> It is enabled in exynos_defconfig but without the above change it
->>> can disabled manually which is something that we don't want.
->>
->> You are not getting it. I am not asking you to not select thermal, but
->> to select it from within your architecture Kconfig option if you want.
+Rob, Kishon what about the following solution?....
+
+---
+ drivers/pci/host/pci-dra7xx.c      | 12 ++++++++++++
+ drivers/pci/host/pcie-designware.c |  9 +++------
+ 2 files changed, 15 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/pci/host/pci-dra7xx.c b/drivers/pci/host/pci-dra7xx.c
+index 80db09e..bb2635f 100644
+--- a/drivers/pci/host/pci-dra7xx.c
++++ b/drivers/pci/host/pci-dra7xx.c
+@@ -61,6 +61,7 @@
+ 
+ #define	PCIECTRL_DRA7XX_CONF_PHY_CS			0x010C
+ #define	LINK_UP						BIT(16)
++#define CPU_TO_BUS_ADDR             0x0FFFFFFF
+ 
+ struct dra7xx_pcie {
+ 	void __iomem		*base;
+@@ -138,6 +139,17 @@ static void dra7xx_pcie_enable_interrupts(struct pcie_port *pp)
+ 
+ static void dra7xx_pcie_host_init(struct pcie_port *pp)
+ {
++	if (pp->io_mod_base)
++		pp->io_mod_base &= CPU_TO_BUS_ADDR;
++
++	if (pp->mem_mod_base)
++		pp->mem_mod_base &= CPU_TO_BUS_ADDR;
++
++	if (pp->cfg0_mod_base) {
++		pp->cfg0_mod_base &= CPU_TO_BUS_ADDR;
++		pp->cfg1_mod_base &= CPU_TO_BUS_ADDR;
++	}
++
+ 	dw_pcie_setup_rc(pp);
+ 	dra7xx_pcie_establish_link(pp);
+ 	if (IS_ENABLED(CONFIG_PCI_MSI))
+diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
+index 69486be..06c682b 100644
+--- a/drivers/pci/host/pcie-designware.c
++++ b/drivers/pci/host/pcie-designware.c
+@@ -416,8 +416,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
+ 			pp->io_base = range.cpu_addr;
+ 
+ 			/* Find the untranslated IO space address */
+-			pp->io_mod_base = of_read_number(parser.range -
+-							 parser.np + na, ns);
++			pp->io_mod_base = range.cpu_addr;;
+ 		}
+ 		if (restype == IORESOURCE_MEM) {
+ 			of_pci_range_to_resource(&range, np, &pp->mem);
+@@ -426,8 +425,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
+ 			pp->mem_bus_addr = range.pci_addr;
+ 
+ 			/* Find the untranslated MEM space address */
+-			pp->mem_mod_base = of_read_number(parser.range -
+-							  parser.np + na, ns);
++			pp->mem_mod_base = range.cpu_addr;
+ 		}
+ 		if (restype == 0) {
+ 			of_pci_range_to_resource(&range, np, &pp->cfg);
+@@ -437,8 +435,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
+ 			pp->cfg1_base = pp->cfg.start + pp->cfg0_size;
+ 
+ 			/* Find the untranslated configuration space address */
+-			pp->cfg0_mod_base = of_read_number(parser.range -
+-							   parser.np + na, ns);
++			pp->cfg0_mod_base = range.cpu_addr;
+ 			pp->cfg1_mod_base = pp->cfg0_mod_base +
+ 					    pp->cfg0_size;
+ 		}
+-- 
+1.9.1
+
+
+> -----Original Message-----
+> From: linux-pci-owner at vger.kernel.org [mailto:linux-pci-
+> owner at vger.kernel.org] On Behalf Of Rob Herring
+> Sent: Friday, July 31, 2015 5:53 PM
+> To: Kishon Vijay Abraham I
+> Cc: Gabriele Paoloni; Bjorn Helgaas; arnd at arndb.de;
+> lorenzo.pieralisi at arm.com; Wangzhou (B); robh+dt at kernel.org;
+> james.morse at arm.com; Liviu.Dudau at arm.com; linux-pci at vger.kernel.org;
+> linux-arm-kernel at lists.infradead.org; devicetree at vger.kernel.org;
+> Yuanzhichang; Zhudacai; zhangjukuo; qiuzhenfa; Liguozhu (Kenneth);
+> Jingoo Han; Pratyush Anand; Arnd Bergmann
+> Subject: Re: [PATCH v6] PCI: Store PCIe bus address in struct
+> of_pci_range
 > 
-> OK.  Krzysztof/Kukjin do you agree with selecting EXYNOS_THERMAL
-> from ARCH_EXYNOS in the platform code?
-
-I agree, with your explanation it seems good. Can you just add this
-justification to the commit message?
-
+> On Fri, Jul 31, 2015 at 9:57 AM, Kishon Vijay Abraham I <kishon@ti.com>
+> wrote:
+> > +Arnd
+> >
+> > Hi,
+> >
+> > On Friday 31 July 2015 07:55 PM, Gabriele Paoloni wrote:
+> >> [+cc Kishon]
+> >>
+> >>> -----Original Message-----
+> >>> From: linux-pci-owner at vger.kernel.org [mailto:linux-pci-
+> >>> owner at vger.kernel.org] On Behalf Of Rob Herring
+> >>> Sent: Thursday, July 30, 2015 9:42 PM
+> >>> To: Gabriele Paoloni
+> >>> Cc: Bjorn Helgaas; arnd at arndb.de; lorenzo.pieralisi at arm.com;
+> Wangzhou
+> >>> (B); robh+dt at kernel.org; james.morse at arm.com; Liviu.Dudau at arm.com;
+> >>> linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> >>> devicetree at vger.kernel.org; Yuanzhichang; Zhudacai; zhangjukuo;
+> >>> qiuzhenfa; Liguozhu (Kenneth); Jingoo Han; Pratyush Anand
+> >>> Subject: Re: [PATCH v6] PCI: Store PCIe bus address in struct
+> >>> of_pci_range
+> >>>
+> >>> On Thu, Jul 30, 2015 at 12:34 PM, Gabriele Paoloni
+> >>> <gabriele.paoloni@huawei.com> wrote:
+> >>>>> -----Original Message-----
+> >>>>> From: Bjorn Helgaas [mailto:bhelgaas at google.com]
+> >>>>> Sent: 30 July 2015 18:15
+> >>>>> On Thu, Jul 30, 2015 at 04:50:55PM +0000, Gabriele Paoloni wrote:
+> >>>>>>> -----Original Message-----
+> >>>>>>> From: linux-pci-owner at vger.kernel.org [mailto:linux-pci-
+> >>>>>>> owner at vger.kernel.org] On Behalf Of Bjorn Helgaas
+> >>>>>>> Sent: Thursday, July 30, 2015 5:15 PM
+> >>>>>>> On Thu, Jul 30, 2015 at 01:52:13PM +0000, Gabriele Paoloni
+> wrote:
+> >>>
+> >>> [...]
+> >>>
+> >>>>>>>> I don?t think we should rely on [CPU] addresses...what if the
+> >>>>>>> intermediate
+> >>>>>>>> translation layer changes the lower significant bits of the
+> >>> "bus
+> >>>>>>> address"
+> >>>>>>>> to translate into a cpu address?
+> >>>>>>>
+> >>>>>>> Is it really a possiblity that the lower bits could be changed?
+> >>>>>>
+> >>>>>> I've checked all the current deignware users DTs except "pci-
+> >>>>> layerscape"
+> >>>>>> that I could not find:
+> >>>>>> spear1310.dtsi
+> >>>>>> spear1340.dtsi
+> >>>>>> dra7.dtsi
+> >>>>>> imx6qdl.dtsi
+> >>>>>> imx6sx.dtsi
+> >>>>>> keystone.dtsi
+> >>>>>> exynos5440.dtsi
+> >>>>>>
+> >>>>>> None of them modifies the lower bits. To be more precise the
+> only
+> >>> guy
+> >>>>>> that provides another translation layer is "dra7.dtsi":
+> >>>>>> axi0
+> >>>>>> http://lxr.free-
+> >>> electrons.com/source/arch/arm/boot/dts/dra7.dtsi#L207
+> >>>>>>
+> >>>>>> axi1
+> >>>>>> http://lxr.free-
+> >>> electrons.com/source/arch/arm/boot/dts/dra7.dtsi#L241
+> >>>>>>
+> >>>>>> For this case masking the top 4bits (bits28 to 31) should make
+> the
+> >>> job.
+> >>>
+> >>> IMO, we should just fix this case. After further study, I don't
+> think
+> >>> this is a DW issue, but rather an SOC integration issue.
+> >>>
+> >>> I believe you can just fixup the address in the pp->ops->host_init
+> hook.
+> >>>
+> >>
+> >> Yes I guess that I could just assign pp->(*)_mod_base to the CPU
+> address
+> >> in DW and mask it out in dra7xx_pcie_host_init()...
+> >>
+> >> Kishon, would you be ok with that?
+> >
+> > Initially I was using *base-mask* property from dt. Me and Arnd
+> (cc'ed) had
+> > this discussion [1] before we decided the current approach. It'll be
+> good to
+> > check with Arnd too.
+> >
+> > [1] ->  http://lists.infradead.org/pipermail/linux-arm-kernel/2014-
+> May/253528.html
 > 
->> Over that, thermal is really an option, not a dependency. So, if
->> someone manually disables it, its his problem not yours :)
+> The problem I have here is the use of ranges does not necessarily mean
+> fewer address bits are available. It can be used just for convenience
+> of not putting the full address into every node's reg property. And
+> vice versa, there are probably plenty of cases where we have the full
+> address in the nodes, but really only some of the address bits are
+> decoded at the IP block. Whether the address bits are present is
+> rarely cared about or known by s/w folks until you hit a problem like
+> this. Given this is an isolated case ATM, I would fix it in an
+> isolated way. It does not affect the binding and could be changed in
+> the kernel later if this becomes a common need.
 > 
-> I would really like it to be dependency not an option (+ I think
-> that ideally it should be checked at runtime, IOW we should be
-> checking from cpufreq-dt driver if the thermal support is enabled
-> before enabling boost support).
-
-That would be the best. It is fine with me if you want to do this in
-consecutive patches (after applying patch selecting/depending on it in
-mach-exynos code).
-
-Best regards,
-Krzysztof
+> Rob
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
