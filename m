@@ -1,43 +1,47 @@
 From: leo.yan@linaro.org (Leo Yan)
-Date: Mon,  3 Aug 2015 09:13:34 +0800
-Subject: [PATCH v3 1/5] clk: hisi: refine parameter checking for init
+Date: Mon,  3 Aug 2015 09:13:35 +0800
+Subject: [PATCH v3 2/5] dt-bindings: arm: Hi6220: add doc for SRAM controller
 In-Reply-To: <1438564418-15948-1-git-send-email-leo.yan@linaro.org>
 References: <1438564418-15948-1-git-send-email-leo.yan@linaro.org>
-Message-ID: <1438564418-15948-2-git-send-email-leo.yan@linaro.org>
+Message-ID: <1438564418-15948-3-git-send-email-leo.yan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-*of_iomap()* will check the device node pointer, and if the pointer is
-NULL it will return error code. So refine clock's init flow by checking
-the device node with this simple way; and polish a little for the print
-out message.
+Document "hisilicon,hi6220-sramctrl" for SRAM controller.
 
 Signed-off-by: Leo Yan <leo.yan@linaro.org>
 ---
- drivers/clk/hisilicon/clk.c | 11 +++--------
- 1 file changed, 3 insertions(+), 8 deletions(-)
+ .../devicetree/bindings/arm/hisilicon/hisilicon.txt    | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
-diff --git a/drivers/clk/hisilicon/clk.c b/drivers/clk/hisilicon/clk.c
-index c90a897..156435d 100644
---- a/drivers/clk/hisilicon/clk.c
-+++ b/drivers/clk/hisilicon/clk.c
-@@ -45,14 +45,9 @@ struct hisi_clock_data __init *hisi_clk_init(struct device_node *np,
- 	struct clk **clk_table;
- 	void __iomem *base;
+diff --git a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+index c431c67..c733e28 100644
+--- a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
++++ b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+@@ -127,6 +127,24 @@ Example:
+ 		#clock-cells = <1>;
+ 	};
  
--	if (np) {
--		base = of_iomap(np, 0);
--		if (!base) {
--			pr_err("failed to map Hisilicon clock registers\n");
--			goto err;
--		}
--	} else {
--		pr_err("failed to find Hisilicon clock node in DTS\n");
-+	base = of_iomap(np, 0);
-+	if (!base) {
-+		pr_err("%s: failed to map clock registers\n", __func__);
- 		goto err;
- 	}
++
++Hisilicon Hi6220 SRAM controller
++
++Required properties:
++- compatible : "hisilicon,hi6220-sramctrl", "syscon"
++- reg : Register address and size
++
++Hisilicon's SoCs use sram for multiple purpose; on Hi6220 there have several
++SRAM banks for power management, modem, security, etc. Further, use "syscon"
++managing the common sram which can be shared by multiple modules.
++
++Example:
++	/*for Hi6220*/
++	sram: sram at fff80000 {
++		compatible = "hisilicon,hi6220-sramctrl", "syscon";
++		reg = <0x0 0xfff80000 0x0 0x12000>;
++	};
++
+ -----------------------------------------------------------------------
+ Hisilicon HiP01 system controller
  
 -- 
 1.9.1
