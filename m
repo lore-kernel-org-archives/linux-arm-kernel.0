@@ -1,57 +1,39 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 3 Aug 2015 15:53:46 -0700
-Subject: [PATCH 1/2] ARM: dts: rockchip: reserve unusable memory region on
- rk3288
-In-Reply-To: <10674303.GIsaEKUXGC@diego>
-References: <15143985.aGzb1oeyb9@diego>
- <CAD=FV=W2LSQh4e9+=ooTf34VzM_yPZn497DqSVEdb1kehZbqQQ@mail.gmail.com>
- <10674303.GIsaEKUXGC@diego>
-Message-ID: <CAD=FV=V3=2azZJzNtfqBa-RZ_s+p5rbGFbPveRtuYudd_TJk6Q@mail.gmail.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Mon, 03 Aug 2015 16:23:09 -0700
+Subject: [PATCH] irqchip: bcm2836: Use a CPU notifier enable IPIs.
+In-Reply-To: <alpine.DEB.2.11.1508021221370.3825@nanos>
+References: <55B67C81.1010900@gmail.com>
+ <1438027789-1637-1-git-send-email-eric@anholt.net>
+ <alpine.DEB.2.11.1508021221370.3825@nanos>
+Message-ID: <87fv40lzxe.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Thomas Gleixner <tglx@linutronix.de> writes:
 
-On Mon, Aug 3, 2015 at 3:38 PM, Heiko St?bner <heiko@sntech.de> wrote:
->> I don't object to just reserving this memory, but I do object a little
->> to this implementation.
->>
->> It's 16 MB we're talking about here, which is pretty small compared to
->> the 4G of memory that you must have when this is a problem.  However,
->> at some point we might want to try to actually use this 16 MB.
->>
->> The memory is actually _not_ unusable, it's only unusable for DMA.  In
->> theory the kernel is supposed to have a way to mark memory as unusable
->> for DMA which would then allow us to use this memory for non-DMA
->> purposes...
->>
->> Nobody ever managed to figure this out in the Chrome OS tree (it was
->> 16 megs so we just reserved it and never got back around to it), but
->> when folks were looking at it they looked at things like ZONE_DMA,
->> dma_set_mask_and_coherent, etc.
->>
->> In any case, to leave the door open for people to fix this in the
->> future, it seems prudent to fix this in code like
->> <https://chromium-review.googlesource.com/#/c/245107/> rather than to
->> put the limit in DTS.
+> On Mon, 27 Jul 2015, Eric Anholt wrote:
+>> +/* Unmasks the IPI on the CPU wen it's first brought online. */
 >
-> hmm, a counter argument in favor of even having the stopgap section disabling
-> the memory in the dts might be, that as Jeffy said all current Rockchip socs
-> are affected, even the rk3368.
+> when
 >
-> So a future real solution would be declaring the usable dma area in devicetree
-> anyway and not in kernel code. So in my mind devices can disable the memory
-> for now in dt and later (once something usable is defined) can switch the soc-
-> level devicetree to this one, describing the actually usable dma area.
+>> +static int bcm2836_arm_irqchip_cpu_notify(struct notifier_block *nfb,
+>> +					  unsigned long action, void *hcpu)
+>> +{
+>> +	unsigned int cpu = (unsigned long)hcpu;
+>> +	unsigned int int_reg = LOCAL_MAILBOX_INT_CONTROL0;
+>> +	unsigned int mailbox = 0;
+>> +
+>> +	if (action == CPU_STARTING || action == CPU_STARTING_FROZEN)
+>> +		bcm2836_arm_irqchip_unmask_per_cpu_irq(int_reg, mailbox, cpu);
 >
-> Old devicetrees would keep working anyway and could switch at their
-> convenience. So I don't see a real transistion problem here (aka no API
-> breakage or so)?
+> Shouldn't you mask the irq on CPU_DYING?
 
-OK, interesting point.
-
-OK, we can do this in device tree, but we should probably at least
-have a comment saying that it's only a problem for DMA?  ...or at
-least something in the commit message?
-
--Doug
+I was just following what other drivers were doing.  Is CPU_DYING the
+only thing that needs masking?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150803/f573d5f4/attachment.sig>
