@@ -1,27 +1,42 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 3 Aug 2015 12:24:27 -0700
-Subject: [PATCH v7 01/13] clk: qcom: Add support for GDSCs
-In-Reply-To: <1438076046-4706-2-git-send-email-rnayak@codeaurora.org>
-References: <1438076046-4706-1-git-send-email-rnayak@codeaurora.org>
- <1438076046-4706-2-git-send-email-rnayak@codeaurora.org>
-Message-ID: <20150803192427.GA7096@codeaurora.org>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Mon,  3 Aug 2015 21:24:44 +0200
+Subject: [GIT PULL] ARM: berlin: Initial Marvell Berlin ARM64 support
+Message-ID: <1438629886-6390-1-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/28, Rajendra Nayak wrote:
-> +
-> +#define PWR_ON_MASK		BIT(31)
-> +#define EN_REST_WAIT_MASK	GENMASK(23, 20)
-> +#define EN_FEW_WAIT_MASK	GENMASK(19, 16)
-> +#define CLK_DIS_WAIT_MASK	GENMASK(15, 12)
+Hi Arnd, Kevin, Olof,
 
-This trips up some static checker...
+this is initial Marvell Berlin4CT ARM64 support for v4.3. It contains minimum SoC
+dtsi and basic dts for the development board. The patches have been posted by
+Marvell's Jisheng Zhang a while ago on the lists.
 
-drivers/clk/qcom/gdsc.c:234:53: warning: cast truncates bits from
-constant value (fffffffffff006 becomes fffff006)
+Please pull.
 
-So I think we can use GENMASK_ULL here instead.
+The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+  Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
+
+are available in the git repository at:
+
+  git://git.infradead.org/users/hesselba/linux-berlin.git tags/berlin64-for-v4.3-1
+
+for you to fetch changes up to d93ac74ad150c89f2d0a3b90754cbccdc6ab102c:
+
+  arm64: dts: Add dts files for Marvell Berlin4CT SoC (2015-08-03 20:45:54 +0200)
+
+----------------------------------------------------------------
+Initial support for Marvell Berlin4CT ARM64 SoC
+
+----------------------------------------------------------------
+Jisheng Zhang (1):
+      arm64: dts: Add dts files for Marvell Berlin4CT SoC
+
+ arch/arm64/boot/dts/Makefile                  |   1 +
+ arch/arm64/boot/dts/marvell/Makefile          |   5 +
+ arch/arm64/boot/dts/marvell/berlin4ct-dmp.dts |  66 +++++++++++
+ arch/arm64/boot/dts/marvell/berlin4ct.dtsi    | 164 ++++++++++++++++++++++++++
+ 4 files changed, 236 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/marvell/Makefile
+ create mode 100644 arch/arm64/boot/dts/marvell/berlin4ct-dmp.dts
+ create mode 100644 arch/arm64/boot/dts/marvell/berlin4ct.dtsi
