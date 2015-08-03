@@ -1,38 +1,31 @@
-From: k.kozlowski.k@gmail.com (Krzysztof Kozlowski)
-Date: Mon,  3 Aug 2015 21:37:27 +0900
-Subject: [PATCH 2/2] ARM: dts: Fix power off method on exynos5422-odroidxu3
-In-Reply-To: <1438605447-6836-1-git-send-email-k.kozlowski.k@gmail.com>
-References: <1438605447-6836-1-git-send-email-k.kozlowski.k@gmail.com>
-Message-ID: <1438605447-6836-3-git-send-email-k.kozlowski.k@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 3 Aug 2015 14:40:07 +0200
+Subject: [PATCH 1/2] drivers: PL061: add support for platform driver
+ probing
+In-Reply-To: <1438585198-8764-2-git-send-email-zhaoshenglong@huawei.com>
+References: <1438585198-8764-1-git-send-email-zhaoshenglong@huawei.com>
+ <1438585198-8764-2-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <CACRpkdY6ZfB-gnnr49He+BYELy4fhiV0g5jkEHhyVsJOc_SBFw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Odroid XU3 family boards have ACOKB pin of PMIC grounded, instead of
-pulled up as usual. This means that PMIC must manually set PWRHOLD field
-in its CTRL1 register to low before initiating power down.
+On Mon, Aug 3, 2015 at 8:59 AM, Shannon Zhao <zhaoshenglong@huawei.com> wrote:
 
-This fixes Odroid XU3 powering off:
-[   25.966053] reboot: Power down
-[   25.967679] Power down.
-[   26.070174] Power down failed, please power off system manually.
+> From: Shannon Zhao <shannon.zhao@linaro.org>
+>
+> Since PL061 currently only supports AMBA driver, to support using GPIO
+> PL061 by DT or ACPI, it needs to add support for platform driver.
+> A DT binding is provided with this patch, ACPI support is added in a
+> separate one.
+>
+> Signed-off-by: Shannon Zhao <zhaoshenglong@huawei.com>
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
-Reported-by: Anand Moon <linux.amoon@gmail.com>
----
- arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi | 1 +
- 1 file changed, 1 insertion(+)
+I already stated in 0/2 what the problem is with this, and it's obviously adding
+a huge codechunk, very similar to the AMBA probe path.
 
-diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-index 1565667e6f69..48cecc8cf26e 100644
---- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-+++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-@@ -159,6 +159,7 @@
- 		s2mps11,buck2-ramp-enable = <1>;
- 		s2mps11,buck3-ramp-enable = <1>;
- 		s2mps11,buck4-ramp-enable = <1>;
-+		samsung,s2mps11-acokb-ground;
- 
- 		interrupt-parent = <&gpx0>;
- 		interrupts = <4 IRQ_TYPE_EDGE_FALLING>;
--- 
-2.1.4
+We need to investigate if ACPI can just spawn AMBA/PrimeCell type devices
+instead.
+
+Yours,
+Linus Walleij
