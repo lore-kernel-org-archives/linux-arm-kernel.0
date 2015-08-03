@@ -1,53 +1,36 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 03 Aug 2015 10:55:29 -0700
-Subject: [PATCH 1/3] clk: versatile: Switch to assigned clock parents
-In-Reply-To: <1438610480.2142.14.camel@arm.com>
-References: <55BBB2FC.9030102@codeaurora.org>
- <1438386285-5070-1-git-send-email-sboyd@codeaurora.org>
- <1438386285-5070-2-git-send-email-sboyd@codeaurora.org>
- <1438610480.2142.14.camel@arm.com>
-Message-ID: <55BFAB11.7080600@codeaurora.org>
+From: jdelvare@suse.de (Jean Delvare)
+Date: Mon, 03 Aug 2015 19:06:52 +0200
+Subject: [lm-sensors] MAINTAINERS/s5p: Kamil Debski no longer with Samsung?
+In-Reply-To: <5606140.737HZuKSvR@amdc1976>
+References: <20150802203128.1B6952691B2@smtprelay05.hostedemail.com>
+ <1438548040.30149.1.camel@perches.com>  <5606140.737HZuKSvR@amdc1976>
+Message-ID: <1438621612.10722.27.camel@chaos.site>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/03/2015 07:01 AM, Pawel Moll wrote:
-> On Sat, 2015-08-01 at 00:44 +0100, Stephen Boyd wrote:
->> @@ -179,6 +124,15 @@ static void __init clk_sp810_of_setup(struct device_node *node)
->>   		sp810->timerclken[i].channel = i;
->>   		sp810->timerclken[i].hw.init = &init;
->>   
->> +		/*
->> +		 * If DT isn't setting the parent, force it to be
->> +		 * the 1 MHz clock without going through the framework.
->> +		 * We do this before clk_register() so that it can determine
->> +		 * the parent and setup the tree properly.
->> +		 */
->> +		if (deprecated)
->> +			init.ops->set_parent(&sp810->timerclken[i].hw, 1);
->> +
->>   		sp810->timerclken[i].clk = clk_register(NULL,
->>   				&sp810->timerclken[i].hw);
->>   		WARN_ON(IS_ERR(sp810->timerclken[i].clk));
-> So that's one thing I've got a (small) problem here...
->
-> The above change assumes that SP810 always have 32kHz clock on input 0
-> and 1MHz clock on input 1. Yes, this is how it made on VExpress, but it
-> doesn't have to be the case. The magic picking up the faster clock was
-> added to handle all possible cases.
->
-> The bottom line is: if all we care is VExpress than it works, but it's
-> still a hack. Personally I don't like it, however I won't nak the patch
-> because of this.
->
+Hi Bartlomiej,
 
-All current dts files in the kernel tree have 1MHz on input 1, so we 
-make this change here to set the parent to input 1 if there isn't an 
-assigned-clock-parents property. Presumably new dts files should have 
-the new property so that things work properly. I tried to find the 
-binding document, but it doesn't look to exist, so I didn't have 
-anything to update.
+Le Monday 03 August 2015 ? 17:33 +0200, Bartlomiej Zolnierkiewicz a
+?crit :
+> Hi,
+> 
+> On Sunday, August 02, 2015 01:40:40 PM Joe Perches wrote:
+> > On Sun, 2015-08-02 at 20:31 +0000, Mail Delivery System wrote:
+> > > <k.debski@samsung.com>: host mailin.samsung.com[203.254.224.12] 
+> > > said: 550 5.1.1
+> > >     Recipient address rejected: User unknown (in reply to RCPT TO 
+> > > command)
+> > 
+> > His email address bounces.
+> > 
+> > Should MAINTAINERS be updated?
+> 
+> Please wait with these changes, the situation should be clarified soon
+> (I've added Kamil to Cc).
 
+Already clarified behind the scenes ;-) The patch should be discarded.
 
+Thanks,
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Jean Delvare
+SUSE L3 Support
