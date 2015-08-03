@@ -1,37 +1,55 @@
-From: public_timo.s@silentcreek.de (Timo Sigurdsson)
-Date: Mon,  3 Aug 2015 11:03:52 +0200 (CEST)
-Subject: [linux-sunxi] [PATCH] ARM: dts: sunxi: Raise minimum CPU voltage
- for sun7i-a20 to a level all boards can supply
-In-Reply-To: <CAGRGNgXH90m9h0DDejd5MTf8enduGFQ8dPKrRhmc8Z6y_PaC1w@mail.gmail.com>
-References: <1438543386-7253-1-git-send-email-public_timo.s@silentcreek.de>
- <CAGRGNgV6b9yt2HnB2x2Wyc05KEahoX-Y+mVhxsryztcfA36H1g@mail.gmail.com>
- <CAGb2v67o-=_cL2RWfXJ+3C86zfQ_1b5DYRi3_zwvwy6su6+gdw@mail.gmail.com><CAGRGNgXH90m9h0DDejd5MTf8enduGFQ8dPKrRhmc8Z6y_PaC1w@mail.gmail.com>
-Message-ID: <20150803090352.621CC6C80865@dd34104.kasserver.com>
+From: ranjit.waghmode@xilinx.com (Ranjit Waghmode)
+Date: Mon, 3 Aug 2015 14:35:05 +0530
+Subject: [LINUX RFC 0/2] spi: add dual parallel mode support in Zynq MPSoC
+ GQSPI controller
+Message-ID: <1438592707-30713-1-git-send-email-ranjit.waghmode@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi again,
+This series is to add dual parallel mode support for Zynq Ultrascale+ MPSoC GQSPI controller driver.
 
-Julian Calaby schrieb am 03.08.2015 06:22:
-> My only real objection here is are there boards that can go down to
-> 0.9v and if so, won't this change make them less power efficient in
-> the almost-idle case? And are those power savings enough to justify
-> not accepting this patch?
+What is dual parallel mode?
+---------------------------
+ZynqMP GQSPI controller supports Dual Parallel mode with following functionalities:
+1) Supporting two SPI flash memories operating in parallel. 8 I/O lines.
+2) Chip selects and clock are shared to both the flash devices
+3) This mode is targeted for faster read/write speed and also doubles the size
+4) Commands/data can be transmitted/received from both the devices(mirror),
+   or only upper or only lower flash memory devices.
+5) Data arrangement:
+   With stripe enabled,
+   Even bytes i.e. 0, 2, 4,... are transmitted on Lower Data Bus
+   Odd bytes i.e. 1, 3, 5,.. are transmitted on Upper Data Bus.
 
-It will probably make those boards less power efficient, yes. On the
-other hand, boards that have their CPU regulator set to min. 1.0V might
-also draw more power because the lowest frequency is not available, 
-even though the savings due to frequency are likely to be lower than
-the savings due to voltage.
+This series also updated MTD layer files for adding parallel mode support.
 
-However, Stefan Monnier (added to CC) mentioned in an earlier
-discussion that the savings for the lowest opp are rather small and
-thus the benefit of the 144MHz opp would be questionable.
+MTD layer dependency changes:
+-----------------------------
+1) Added Support for two flashes
+2) Support to enable/disable data stripe as and when required.
+3) Added required parameters to spi_nor structure. Initialized all
+   added parameters in spi_nor_scan()
+4) Added support for dual parallel in spi_nor_read/write/erase functions by:
+   a) Increasing page_size, sector_size, erase_size and toatal flash size
+      as and when required.
+   b) Dividing address by 2
+   c) Updating spi->master->flags for qspi driver to change CS
+5) Updated read_sr() to get status of both flashes
+6) Also updated read_fsr() to get status of both flashes
 
-Unfortunately, I don't have measurement equipment precise enough to
-test this myself and haven't found a way to read power consumption
-internally via the PMU in mainline yet.
+These all are very high level changes and expected to make an idea clear.
+Comments and suggestions are always welcomed.
 
-Thanks,
+Ranjit Waghmode (2):
+  mtd: spi-nor: add dual parallel mode support
+  spi: zynqmp: gqspi: add support for dual parallel mode configuration
 
-Timo
+ drivers/mtd/devices/m25p80.c   |  1 +
+ drivers/mtd/spi-nor/spi-nor.c  | 92 +++++++++++++++++++++++++++++++++---------
+ drivers/spi/spi-zynqmp-gqspi.c | 24 ++++++++++-
+ include/linux/mtd/spi-nor.h    |  3 ++
+ include/linux/spi/spi.h        |  2 +
+ 5 files changed, 102 insertions(+), 20 deletions(-)
+
+--
+2.1.2
