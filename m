@@ -1,39 +1,78 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 3 Aug 2015 15:00:32 +0200
-Subject: [PATCH v3] ARM: shmobile: silk: initial device tree
-In-Reply-To: <2360526.88foRQAOiM@wasted.cogentembedded.com>
-References: <201404250239.39150.sergei.shtylyov@cogentembedded.com>
- <2360526.88foRQAOiM@wasted.cogentembedded.com>
-Message-ID: <CAMuHMdWT=nzsFuM-vfe5GoAtDE-AtW4LAZoEnBGGVZm54-mAzg@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 3 Aug 2015 14:11:32 +0100
+Subject: [PATCH v3 1/2] PCI: generic: remove dependency on hw_pci
+In-Reply-To: <20150731162716.GA7182@red-moon>
+References: <1438183681-30519-1-git-send-email-jchandra@broadcom.com>
+ <20150730133521.GA12999@red-moon>
+ <20150731160654.GB31408@jayachandranc.netlogicmicro.com>
+ <20150731162716.GA7182@red-moon>
+Message-ID: <20150803131131.GF10501@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+Hi Jayachandran, Bjorn,
 
-On Wed, Jul 29, 2015 at 12:14 AM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
-> --- /dev/null
-> +++ renesas/arch/arm/boot/dts/r8a7794-silk.dts
-> @@ -0,0 +1,51 @@
+On Fri, Jul 31, 2015 at 05:27:16PM +0100, Lorenzo Pieralisi wrote:
+> On Fri, Jul 31, 2015 at 05:07:01PM +0100, Jayachandran C. wrote:
+> > On Thu, Jul 30, 2015 at 02:35:21PM +0100, Lorenzo Pieralisi wrote:
+> > > On Wed, Jul 29, 2015 at 04:28:00PM +0100, Jayachandran C wrote:
+> > > > -	pci_common_init_dev(dev, &hw);
+> > > > +	/* do not reassign resource if probe only */
+> > > > +	if (!pci_has_flag(PCI_PROBE_ONLY))
+> > > > +		pci_add_flags(PCI_REASSIGN_ALL_RSRC);
+> > > 
+> > > You should add PCI_REASSIGN_ALL_BUS here. As I said in patch 2 comment,
+> > 
+> > The idea is to do exactly what pci_common_init_dev does on ARM. There is
+> > not need to change behavior on ARM and deal with the fallout in this
+> > patchset.
+> 
+> You are enabling this driver on ARM64, and on ARM64 that flag does
+> make a difference, it does not on ARM as far as I can tell, but you do
+> not seem to care.
+> 
+> Actually Rob asked you to put together a function since most of
+> this code is replicated across ARM drivers eg:
+> 
+> drivers/pci/host/pci-versatile.c
+> 
+> Leave the code as it is and I will consolidate the code later.
+> 
+> > > please enable setup-irq.c in an explicit commit, re-sequence the
+> > > series and fold the Kconfig ARM64 enablement in this patch.
+> > 
+> > I would think that the Makefile and Kconfig changes should be
+> > togethter as the arm64 enablement patch. The previous patch is
+> > to update the gen_pci driver, and it really makes sense in that
+> > order.  I am not sure why you suggest this change.
+> 
+> Because this is not the only driver that requires compiling
+> drivers/pci/setup-irq.c on ARM64, I thought it made more sense
+> to do it in a separate patch to make that change standalone.
+> 
+> If for any reason we have to revert your patch that enables
+> PCI host generic on ARM64 (and we remove with it the compilation
+> of setup-irq.c) we would break other ARM64 PCI hosts that require it,
+> right ?
+> 
+> I leave the decision to Bjorn since I am away next week, I am fine
+> with the code as it is so please go ahead.
 
-> +/ {
-> +       model = "SILK";
-> +       compatible = "renesas,silk", "renesas,r8a7794";
+In the interest of getting something merged, can I suggest you
+(Jayachandran) repost the patches with Lorenzo's suggestions to reorder
+the series and split up the setup-irq compilation into a separate patch?
 
-WARNING: DT compatible string "renesas,silk" appears un-documented --
-check ./Documentation/devicetree/bindings/
+You can also add his ack to this patch.
 
-Do you plan to update Documentation/devicetree/bindings/arm/shmobile.txt?
+It's a pity that the code isn't quite how we'd like it to end up, but
+this at least enables people for 4.3 and I know that Lorenzo is working
+on tidying up the loose ends as additional patches (but he's on holiday
+this week). That includes removal of the PROBE_ONLY bodge that I've got
+queued in arch/arm64/kernel/pci.c.
 
-Thanks!
+Bjorn, does that sound ok to you? I'm keen to have something working, as
+I'm starting to get beaten up about the lack of generic PCI on arm64.
 
-Gr{oetje,eeting}s,
+Cheers,
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Will
