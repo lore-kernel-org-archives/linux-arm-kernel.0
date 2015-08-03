@@ -1,100 +1,43 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 3 Aug 2015 11:47:23 +0200
-Subject: [PATCH v2] ARM: dts: sunxi: Add regulators for LeMaker BananaPi
-In-Reply-To: <1438532305-5884-1-git-send-email-public_timo.s@silentcreek.de>
-References: <1438532305-5884-1-git-send-email-public_timo.s@silentcreek.de>
-Message-ID: <20150803094723.GD2564@lukather>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 3 Aug 2015 10:49:23 +0100
+Subject: [PATCH 0/2] drivers: PL061: Add platform driver probing support
+In-Reply-To: <55BF33AD.5040502@huawei.com>
+References: <1438585198-8764-1-git-send-email-zhaoshenglong@huawei.com>
+ <20150803075848.GH7557@n2100.arm.linux.org.uk>
+ <55BF33AD.5040502@huawei.com>
+Message-ID: <20150803094923.GI7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 02, 2015 at 06:18:25PM +0200, Timo Sigurdsson wrote:
-> sun7i-a20-bananapi.dts doesn't contain regulator nodes for the AXP209 PMU
-> driver, so add them to allow for voltage-scaling with cpufreq-dt.
+On Mon, Aug 03, 2015 at 05:26:05PM +0800, Shannon Zhao wrote:
+> Hi Russell,
 > 
-> Signed-off-by: Timo Sigurdsson <public_timo.s@silentcreek.de>
-> ---
-> Changes since v1 (RFC):
+> On 2015/8/3 15:58, Russell King - ARM Linux wrote:
+> > On Mon, Aug 03, 2015 at 02:59:56PM +0800, Shannon Zhao wrote:
+> >> From: Shannon Zhao <shannon.zhao@linaro.org>
+> >>
+> >> According to ACPI SPEC, it supports ARM boards to use "GPIO-signaled
+> >> ACPI Events". These events can be used for input events. And to QEMU, it
+> >> uses GPIO PL061 controller for input events.
+> >>
+> >> These two patches add platform driver support for PL061 probed by DT or
+> >> ACPI.
+> > 
+> > This certainly is incorrect for DT, and is probably wrong for ACPI too.
+> > DT creates amba devices, so binds via the amba device driver.
+> > 
 > 
-> - Dropped the changes to the cpufreq operating points and renamed the patch
-> accordingly
-> - Limited the CPU voltage range so it doesn't exceed the SOC specifications
-> ---
->  arch/arm/boot/dts/sun7i-a20-bananapi.dts | 35 ++++++++++++++++++++++++++++----
->  1 file changed, 31 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/sun7i-a20-bananapi.dts b/arch/arm/boot/dts/sun7i-a20-bananapi.dts
-> index 9f7b472..74382f3 100644
-> --- a/arch/arm/boot/dts/sun7i-a20-bananapi.dts
-> +++ b/arch/arm/boot/dts/sun7i-a20-bananapi.dts
-> @@ -92,6 +92,10 @@
->  	status = "okay";
->  };
->  
-> +&cpu0 {
-> +	cpu-supply = <&reg_dcdc2>;
-> +};
-> +
->  &ehci0 {
->  	status = "okay";
->  };
-> @@ -119,13 +123,9 @@
->  	status = "okay";
->  
->  	axp209: pmic at 34 {
-> -		compatible = "x-powers,axp209";
->  		reg = <0x34>;
->  		interrupt-parent = <&nmi_intc>;
->  		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-> -
-> -		interrupt-controller;
-> -		#interrupt-cells = <1>;
->  	};
->  };
->  
-> @@ -182,6 +182,33 @@
->  	};
->  };
->  
-> +#include "axp209.dtsi"
-> +
-> +&reg_dcdc2 {
-> +	regulator-always-on;
-> +	regulator-min-microvolt = <1000000>;
-> +	regulator-max-microvolt = <1400000>;
-> +	regulator-name = "vdd-cpu";
-> +};
-> +
-> +&reg_dcdc3 {
-> +	regulator-always-on;
-> +	regulator-min-microvolt = <1000000>;
-> +	regulator-max-microvolt = <1400000>;
-> +	regulator-name = "vdd-int-dll";
-> +};
-> +
-> +&reg_ldo1 {
-> +	regulator-name = "vdd-rtc";
-> +};
-> +
-> +&reg_ldo2 {
-> +	regulator-always-on;
-> +	regulator-min-microvolt = <3000000>;
-> +	regulator-max-microvolt = <3000000>;
-> +	regulator-name = "avcc";
-> +};
+> Oh, sorry. The changes for DT are not necessary. But for ACPI I think it
+> needs to convert pl061 to platform device since ACPI doesn't support
+> AMBA devices. The Pl011 also does the same thing to support ACPI
+> probing. See drivers/tty/serial/amba-pl011.c
 
-What regulator provides the 3.3V regulator used in the rest of this DT
-then (MMC, GMAC) ?
+Maybe rather than having every AMBA driver also converted to a platform
+driver (which GregKH hates) maybe ACPI should support the AMBA bus
+instead?
 
-Maxime
+Greg?
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150803/fd1a3c05/attachment.sig>
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
