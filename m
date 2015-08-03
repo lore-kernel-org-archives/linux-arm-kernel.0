@@ -1,46 +1,32 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Mon, 03 Aug 2015 12:17:51 +0200
-Subject: [PATCH v3 3/5] ARM: Exynos: switch to using generic cpufreq driver
- for Exynos4x12
-In-Reply-To: <20150801111721.GI899@linux>
-References: <1438368557-2352-1-git-send-email-b.zolnierkie@samsung.com>
- <1438368557-2352-4-git-send-email-b.zolnierkie@samsung.com>
- <20150801111721.GI899@linux>
-Message-ID: <5201904.0cZWHobiJs@amdc1976>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 03 Aug 2015 11:18:43 +0100
+Subject: [PATCH 0/3] Move clk-sp810 to assigned clock parents
+In-Reply-To: <1438386285-5070-1-git-send-email-sboyd@codeaurora.org>
+References: <55BBB2FC.9030102@codeaurora.org>
+ <1438386285-5070-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <55BF4003.3040708@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Stephen,
 
-Hi,
+On 01/08/15 00:44, Stephen Boyd wrote:
+> This patch set converts this code to use the assigned-clock-parents
+> property instead of doing some interesting stuff in the .prepare
+> op. I can route the dts patches through arm-soc but I'd like to take
+> the clk patch through clk tree because it removes some usage of the
+> struct clk based provider APIs that we're trying to get rid of. Also,
+> this is completely untested, so testing would be appreciated.
+> Can this be tested with qemu? I haven't tried but I was thinking
+> that might be an option.
+>
+> Cc: Pawel Moll <pawel.moll@arm.com>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Sudeep Holla <sudeep.holla@arm.com>
+>
 
-On Saturday, August 01, 2015 04:47:21 PM Viresh Kumar wrote:
-> On 31-07-15, 20:49, Bartlomiej Zolnierkiewicz wrote:
-> > diff --git a/drivers/cpufreq/Kconfig b/drivers/cpufreq/Kconfig
-> > index 659879a..bf6d596 100644
-> > --- a/drivers/cpufreq/Kconfig
-> > +++ b/drivers/cpufreq/Kconfig
-> > @@ -191,6 +191,7 @@ config CPUFREQ_DT
-> >  	# if CPU_THERMAL is on and THERMAL=m, CPUFREQ_DT cannot be =y:
-> >  	depends on !CPU_THERMAL || THERMAL
-> >  	select PM_OPP
-> > +	select EXYNOS_THERMAL if ARCH_EXYNOS
-> >  	help
-> >  	  This adds a generic DT based cpufreq driver for frequency management.
-> >  	  It supports both uniprocessor (UP) and symmetric multiprocessor (SMP)
-> 
-> No, we shouldn't pollute generic Kconfig options with platform specific stuff.
+Tested-by: Sudeep Holla <sudeep.holla@arm.com>
+(Tested the series on Juno R0 and Vexpress TC2 platform)
 
-The old code depended on this.  You couldn't enable boost support
-without enabling thermal support (ARM_EXYNOS_CPU_FREQ_BOOST_SW
-config option selected EXYNOS_THERMAL).
-
-> Why don't you enable thermal in your .config?
-
-It is enabled in exynos_defconfig but without the above change it
-can disabled manually which is something that we don't want.
-
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+Regards,
+Sudeep
