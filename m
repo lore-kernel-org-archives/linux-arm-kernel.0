@@ -1,133 +1,86 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 03 Aug 2015 11:02:41 +0100
-Subject: [PATCH V2 2/2] irqchip/gic: Ensure gic_cpu_if_up/down() programs
- correct GIC instance
-In-Reply-To: <1438332252-25248-2-git-send-email-jonathanh@nvidia.com>
-References: <1438332252-25248-1-git-send-email-jonathanh@nvidia.com>
- <1438332252-25248-2-git-send-email-jonathanh@nvidia.com>
-Message-ID: <55BF3C41.7000000@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 3 Aug 2015 11:02:51 +0100
+Subject: [Query] ARM64: Softlockup when using PSCI for secondary CPU_ON
+In-Reply-To: <BY1PR0301MB1303EC5AAE8F0B4DAA70D15F82770@BY1PR0301MB1303.namprd03.prod.outlook.com>
+References: <BY1PR0301MB1303EC5AAE8F0B4DAA70D15F82770@BY1PR0301MB1303.namprd03.prod.outlook.com>
+Message-ID: <20150803100248.GA25627@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31/07/15 09:44, Jon Hunter wrote:
-> Commit 3228950621d9 ("irqchip: gic: Preserve gic V2 bypass bits in cpu
-> ctrl register") added a new function, gic_cpu_if_up(), to program the
-> GIC CPU_CTRL register. This function assumes that there is only one GIC
-> instance present and hence always uses the chip data for the primary GIC
-> controller. Although it is not common for there to be a secondary, some
-> devices do support a secondary. Therefore, fix this by passing
-> gic_cpu_if_up() a pointer to the appropriate chip data structure.
+On Mon, Aug 03, 2015 at 05:12:00AM +0100, Sharma Bhupesh wrote:
+> Hi ARM64 experts,
 > 
-> Similarly, the function gic_cpu_if_down() only assumes that there is a
-> single GIC instance present. Update this function so that an instance
-> number is passed for the appropriate GIC and return an error code on
-> failure. The vexpress TC2 (which has a single GIC) is currently the only
-> user of this function and so update it accordingly. Note that because the
-> TC2 only has a single GIC, the call to gic_cpu_if_down() should always
-> be successful.
+> I am working on a Freescale ARM64 based SoC, which has 4 Cortex-A53 cores and I am using the
+> PSCI conducts to turn on the secondary CPUs via a custom implementation of a secure runtime
+> firmware (something similar to the ARM Trusted Firmware).
 > 
-> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
+> Following is my boot-flow:
+> 
+> - BootROM (runs in EL3, All secondaries are held up in reset) ->
+> 
+> - UEFI bootloader- PEI Phase (Runs only on Primary, starts up in EL3) ->
+> 
+> - Secure Firmware (runs in EL3, transitions primary core to EL2) ->
+> 
+> - UEFI bootloader- Rest of the Phases (Runs only on Primary, in EL2) ->
+> 
+> - UEFI Linux loader launches linux (Runs only on Primary, transitions core to EL1) ->
+>
+> - Linux runs and calls PSCI conducts to turn on secondary cores via smc calls to secure run-time firmware ->
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+Which version of Linux are you using?
 
-I also gave both patches a test run on Realview EB11MP and PB1176, and
-both seem happy enough.
+Is Linux itself booted at EL1 or EL2?
+
+EL2 is very strongly preferable unless you're already running a
+hypervisor at EL2. That way Linux can ensure that things are initialised
+correctly at EL2 (e.g. CNTVOFF), regardless of whether you want to use
+KVM.
+
+> - Now I can see that the ARM64 linux is able to recognize that the secondaries are boot'ed properly:
+> 
+> PSCI Logs:
+> ----------
+> psci: probing for conduit method from DT.
+> psci: PSCIv0.2 detected in firmware.
+> psci: Using standard PSCI v0.2 function IDs
+> ..
+> 
+> Architected cp15 timer(s) running at 25.00MHz (phys).
+> sched_clock: 56 bits at 25MHz, resolution 40ns, wraps every 2748779069440ns
+> 
+> ..
+> 
+> CPU1: Booted secondary processor
+> Detected VIPT I-cache on CPU1
+> CPU2: Booted secondary processor
+> Detected VIPT I-cache on CPU2
+> CPU3: Booted secondary processor
+> Detected VIPT I-cache on CPU3
+> Brought up 4 CPUs
+> SMP: Total of 4 processors activated.
+
+Ok. This all looks fine.
+
+> - However, when the Linux boot proceeds further, I see softlockups which usually show that one
+> of the secondaries was stuck in 'secondary_start_kernel' (detailed logs below).
+>
+> - When I turn of CONFIG_SMP from the .config, I can see that the softlockups disappear. So, I am
+> correlating these softlockups to SMP and PSCI conducts.
+
+Ok, that likely means it's in the idle loop. Given that the CPUs made it
+into the kernel this sounds like a generic SMP issue rather than
+something specific to PSCI.
+
+> preempt self-detected stall on CPU { 3}  (t=17194 jiffies g=-267 c=-268 q=1)
+
+> INFO: rcu_preempt detected stalls on CPUs/tasks: { 1 2} (detected by 0, t=287104493908 jiffies, g=-267, c=-268, q=2)
+
+It looks like your timekeeping has gone wrong. As mentioned above, I'd
+suspect that CNTVOFF_EL2 is not programmed consistently across all CPUs.
+
+Are you able to boot Linux at EL2 instead? Or can you verify that
+CNTVOFF_EL2 is initialised?
 
 Thanks,
-
-	M.
-
-> ---
-> V2 changes:
-> - Rebased on v4.2-rc4
-> - Added test to ensure GIC instance is valid to gic_cpu_if_down() and
->   updated gic_cpu_if_down() to return an error code on failure.
-> 
->  arch/arm/mach-vexpress/tc2_pm.c |  2 +-
->  drivers/irqchip/irq-gic.c       | 18 ++++++++++++------
->  include/linux/irqchip/arm-gic.h |  2 +-
->  3 files changed, 14 insertions(+), 8 deletions(-)
-> 
-> diff --git a/arch/arm/mach-vexpress/tc2_pm.c b/arch/arm/mach-vexpress/tc2_pm.c
-> index b3328cd46c33..1aa4ccece69f 100644
-> --- a/arch/arm/mach-vexpress/tc2_pm.c
-> +++ b/arch/arm/mach-vexpress/tc2_pm.c
-> @@ -80,7 +80,7 @@ static void tc2_pm_cpu_powerdown_prepare(unsigned int cpu, unsigned int cluster)
->  	 * to the CPU by disabling the GIC CPU IF to prevent wfi
->  	 * from completing execution behind power controller back
->  	 */
-> -	gic_cpu_if_down();
-> +	gic_cpu_if_down(0);
->  }
->  
->  static void tc2_pm_cluster_powerdown_prepare(unsigned int cluster)
-> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-> index dc5090543eca..fdd1b0e6e5c3 100644
-> --- a/drivers/irqchip/irq-gic.c
-> +++ b/drivers/irqchip/irq-gic.c
-> @@ -355,9 +355,9 @@ static u8 gic_get_cpumask(struct gic_chip_data *gic)
->  	return mask;
->  }
->  
-> -static void gic_cpu_if_up(void)
-> +static void gic_cpu_if_up(struct gic_chip_data *gic)
->  {
-> -	void __iomem *cpu_base = gic_data_cpu_base(&gic_data[0]);
-> +	void __iomem *cpu_base = gic_data_cpu_base(gic);
->  	u32 bypass = 0;
->  
->  	/*
-> @@ -425,17 +425,23 @@ static void gic_cpu_init(struct gic_chip_data *gic)
->  	gic_cpu_config(dist_base, NULL);
->  
->  	writel_relaxed(GICC_INT_PRI_THRESHOLD, base + GIC_CPU_PRIMASK);
-> -	gic_cpu_if_up();
-> +	gic_cpu_if_up(gic);
->  }
->  
-> -void gic_cpu_if_down(void)
-> +int gic_cpu_if_down(unsigned int gic_nr)
->  {
-> -	void __iomem *cpu_base = gic_data_cpu_base(&gic_data[0]);
-> +	void __iomem *cpu_base;
->  	u32 val = 0;
->  
-> +	if (gic_nr >= MAX_GIC_NR)
-> +		return -EINVAL;
-> +
-> +	cpu_base = gic_data_cpu_base(&gic_data[gic_nr]);
->  	val = readl(cpu_base + GIC_CPU_CTRL);
->  	val &= ~GICC_ENABLE;
->  	writel_relaxed(val, cpu_base + GIC_CPU_CTRL);
-> +
-> +	return 0;
->  }
->  
->  #ifdef CONFIG_CPU_PM
-> @@ -571,7 +577,7 @@ static void gic_cpu_restore(unsigned int gic_nr)
->  					dist_base + GIC_DIST_PRI + i * 4);
->  
->  	writel_relaxed(GICC_INT_PRI_THRESHOLD, cpu_base + GIC_CPU_PRIMASK);
-> -	gic_cpu_if_up();
-> +	gic_cpu_if_up(&gic_data[gic_nr]);
->  }
->  
->  static int gic_notifier(struct notifier_block *self, unsigned long cmd,	void *v)
-> diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
-> index 9de976b4f9a7..da6aced1105e 100644
-> --- a/include/linux/irqchip/arm-gic.h
-> +++ b/include/linux/irqchip/arm-gic.h
-> @@ -99,7 +99,7 @@ void gic_set_irqchip_flags(unsigned long flags);
->  void gic_init_bases(unsigned int, int, void __iomem *, void __iomem *,
->  		    u32 offset, struct device_node *);
->  void gic_cascade_irq(unsigned int gic_nr, unsigned int irq);
-> -void gic_cpu_if_down(void);
-> +int gic_cpu_if_down(unsigned int gic_nr);
->  
->  static inline void gic_init(unsigned int nr, int start,
->  			    void __iomem *dist , void __iomem *cpu)
-> 
-
-
--- 
-Jazz is not dead. It just smells funny...
+Mark.
