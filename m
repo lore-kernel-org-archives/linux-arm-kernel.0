@@ -1,37 +1,50 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 3 Aug 2015 12:24:53 +0200
-Subject: [Query] ARM64: Softlockup when using PSCI for secondary CPU_ON
-In-Reply-To: <BY1PR0301MB1303EC5AAE8F0B4DAA70D15F82770@BY1PR0301MB1303.namprd03.prod.outlook.com>
-References: <BY1PR0301MB1303EC5AAE8F0B4DAA70D15F82770@BY1PR0301MB1303.namprd03.prod.outlook.com>
-Message-ID: <CAKv+Gu8i-HC7zb-CuCaVE5vcoEO6T19_=s3JtHqnNHaUmdwQqg@mail.gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 3 Aug 2015 15:59:26 +0530
+Subject: [PATCH v3 3/5] ARM: Exynos: switch to using generic cpufreq
+ driver for Exynos4x12
+In-Reply-To: <5201904.0cZWHobiJs@amdc1976>
+References: <1438368557-2352-1-git-send-email-b.zolnierkie@samsung.com>
+ <1438368557-2352-4-git-send-email-b.zolnierkie@samsung.com>
+ <20150801111721.GI899@linux> <5201904.0cZWHobiJs@amdc1976>
+Message-ID: <20150803102926.GA21529@linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 August 2015 at 06:12, Sharma Bhupesh <bhupesh.sharma@freescale.com> wrote:
-> Hi ARM64 experts,
->
-> I am working on a Freescale ARM64 based SoC, which has 4 Cortex-A53 cores and I am using the
-> PSCI conducts to turn on the secondary CPUs via a custom implementation of a secure runtime
-> firmware (something similar to the ARM Trusted Firmware).
->
-> Following is my boot-flow:
->
-> - BootROM (runs in EL3, All secondaries are held up in reset) ->
->
-> - UEFI bootloader- PEI Phase (Runs only on Primary, starts up in EL3) ->
->
-> - Secure Firmware (runs in EL3, transitions primary core to EL2) ->
->
-> - UEFI bootloader- Rest of the Phases (Runs only on Primary, in EL2) ->
->
-> - UEFI Linux loader launches linux (Runs only on Primary, transitions core to EL1) ->
->
+On 03-08-15, 12:17, Bartlomiej Zolnierkiewicz wrote:
+> 
+> Hi,
+> 
+> On Saturday, August 01, 2015 04:47:21 PM Viresh Kumar wrote:
+> > On 31-07-15, 20:49, Bartlomiej Zolnierkiewicz wrote:
+> > > diff --git a/drivers/cpufreq/Kconfig b/drivers/cpufreq/Kconfig
+> > > index 659879a..bf6d596 100644
+> > > --- a/drivers/cpufreq/Kconfig
+> > > +++ b/drivers/cpufreq/Kconfig
+> > > @@ -191,6 +191,7 @@ config CPUFREQ_DT
+> > >  	# if CPU_THERMAL is on and THERMAL=m, CPUFREQ_DT cannot be =y:
+> > >  	depends on !CPU_THERMAL || THERMAL
+> > >  	select PM_OPP
+> > > +	select EXYNOS_THERMAL if ARCH_EXYNOS
+> > >  	help
+> > >  	  This adds a generic DT based cpufreq driver for frequency management.
+> > >  	  It supports both uniprocessor (UP) and symmetric multiprocessor (SMP)
+> > 
+> > No, we shouldn't pollute generic Kconfig options with platform specific stuff.
+> 
+> The old code depended on this.  You couldn't enable boost support
+> without enabling thermal support (ARM_EXYNOS_CPU_FREQ_BOOST_SW
+> config option selected EXYNOS_THERMAL).
+> 
+> > Why don't you enable thermal in your .config?
+> 
+> It is enabled in exynos_defconfig but without the above change it
+> can disabled manually which is something that we don't want.
 
-Why are you using the Linux loader? The arm64 kernel can be booted
-directly from UEFI, which is strongly preferred since you will not
-have access to the UEFI Runtime Services otherwise.
-Also, the ARM BDS and the LinuxLoader for arm64 in Tianocore/EDK2 are
-quite badly broken and may be removed completely in the future.
+You are not getting it. I am not asking you to not select thermal, but
+to select it from within your architecture Kconfig option if you want.
+
+Over that, thermal is really an option, not a dependency. So, if
+someone manually disables it, its his problem not yours :)
 
 -- 
-Ard.
+viresh
