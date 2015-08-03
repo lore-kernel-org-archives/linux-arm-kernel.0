@@ -1,31 +1,33 @@
-From: henryc.chen@mediatek.com (Henry Chen)
-Date: Mon, 3 Aug 2015 22:15:51 +0800
-Subject: [PATCH] regulator: mt6311: Modify the maximum voltage of buck.
-Message-ID: <1438611351-4245-1-git-send-email-henryc.chen@mediatek.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Mon, 3 Aug 2015 10:01:40 -0400
+Subject: [RFC 2/3] arm64: refactor save_stack_trace()
+In-Reply-To: <20150803090951.GA10501@arm.com>
+References: <12F47692-3010-4886-B87D-3D7820609177@gmail.com>
+ <20150716113115.45a17f17@gandalf.local.home>
+ <20150716121658.7982fdf5@gandalf.local.home>
+ <20150717124054.GE26091@leverpostej>
+ <20150717090009.720f6bd0@gandalf.local.home>
+ <77EA0F10-D5F6-48BD-8652-3B979A978659@gmail.com>
+ <20150717104144.6588b2f7@gandalf.local.home>
+ <0886A996-40E1-49E9-823C-85E55A858716@gmail.com>
+ <1357EA74-B972-4B99-ADB0-BC7E8F06DDB5@gmail.com>
+ <20150720162004.GL9908@arm.com> <20150803090951.GA10501@arm.com>
+Message-ID: <20150803100140.31ad51dd@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The maximum voltage of buck should be 1.39375V.
-1.39375V = 0.6V + 0.00625V * 127, 127 is the max_sel of linear range.
+On Mon, 3 Aug 2015 10:09:51 +0100
+Will Deacon <will.deacon@arm.com> wrote:
 
-Reported-by: Axel Lin <axel.lin@ingics.com>
-signed-off-by: Henry Chen <henryc.chen@mediatek.com>
----
- drivers/regulator/mt6311-regulator.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ 
+> > The arm64 bits look fine to me:
+> > 
+> >   Acked-by: Will Deacon <will.deacon@arm.com>
+> 
+> What happened to this? Is it queued someplace, or are we waiting for a
+> new version?
 
-diff --git a/drivers/regulator/mt6311-regulator.c b/drivers/regulator/mt6311-regulator.c
-index 096e620..b140da0 100644
---- a/drivers/regulator/mt6311-regulator.c
-+++ b/drivers/regulator/mt6311-regulator.c
-@@ -34,7 +34,7 @@ static const struct regmap_config mt6311_regmap_config = {
- 
- /* Default limits measured in millivolts and milliamps */
- #define MT6311_MIN_UV		600000
--#define MT6311_MAX_UV		1400000
-+#define MT6311_MAX_UV		1393750
- #define MT6311_STEP_UV		6250
- 
- static const struct regulator_linear_range buck_volt_range[] = {
--- 
-1.8.1.1.dirty
+I went on vacation :-)  I'm back and trying to catch up. I'll be
+pulling in a bunch of things today. Hopefully I can get to this.
+
+-- Steve
