@@ -1,51 +1,116 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 3 Aug 2015 10:09:51 +0100
-Subject: [RFC 2/3] arm64: refactor save_stack_trace()
-In-Reply-To: <20150720162004.GL9908@arm.com>
-References: <12F47692-3010-4886-B87D-3D7820609177@gmail.com>
- <20150716113115.45a17f17@gandalf.local.home>
- <20150716121658.7982fdf5@gandalf.local.home>
- <20150717124054.GE26091@leverpostej>
- <20150717090009.720f6bd0@gandalf.local.home>
- <77EA0F10-D5F6-48BD-8652-3B979A978659@gmail.com>
- <20150717104144.6588b2f7@gandalf.local.home>
- <0886A996-40E1-49E9-823C-85E55A858716@gmail.com>
- <1357EA74-B972-4B99-ADB0-BC7E8F06DDB5@gmail.com>
- <20150720162004.GL9908@arm.com>
-Message-ID: <20150803090951.GA10501@arm.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Mon, 03 Aug 2015 11:11:19 +0200
+Subject: [PATCH v2 7/7] KVM: arm: implement kvm_set_msi by gsi direct
+ mapping
+In-Reply-To: <55BE7C32.8070707@arm.com>
+References: <1436430137-24205-1-git-send-email-eric.auger@linaro.org>
+ <1436430137-24205-8-git-send-email-eric.auger@linaro.org>
+ <55A05282.6020105@arm.com> <55BB714A.8030307@linaro.org>
+ <55BE7C32.8070707@arm.com>
+Message-ID: <55BF3037.4090605@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi guys,
-
-On Mon, Jul 20, 2015 at 05:20:04PM +0100, Will Deacon wrote:
-> On Fri, Jul 17, 2015 at 04:34:21PM +0100, Jungseok Lee wrote:
-> > On Jul 17, 2015, at 11:59 PM, Jungseok Lee wrote:
-> > > On Jul 17, 2015, at 11:41 PM, Steven Rostedt wrote:
-> > >> Thanks! Can you repost patch 1 with the changes I recommended, so that
-> > >> I can get an Acked-by from the arm64 maintainers and pull all the
-> > >> changes in together. This is fine for a 4.3 release, right? That is, it
-> > >> doesn't need to go into 4.2-rcs.
-> > >> 
-> > > 
-> > > It's not hard to repost a patch, but I feel like we have to wait for Akashi's response.
-> > > Also, it might be needed to consider Mark's comment on arch part.
-> > > 
-> > > If they are okay, I will proceed.
-> > 
-> > The [RFC 1/3] patch used in my environment is shaped as follows.
-> > I leave the hunk for *only* clear synchronization. This is why I choose this format
-> > instead of reposting a patch. I hope it would help to track down this thread.
-> > 
-> > I think this is my best at this point.
-
-[...]
-
-> The arm64 bits look fine to me:
+On 08/02/2015 10:23 PM, Andre Przywara wrote:
+> On 31/07/15 13:59, Eric Auger wrote:
+>> Hi Andre,
+>> On 07/11/2015 01:17 AM, Andre Przywara wrote:
+>>> On 09/07/15 09:22, Eric Auger wrote:
+>>>> If the ITS modality is not available, let's simply support MSI
+>>>> injection by transforming the MSI.data into an SPI ID.
+>>>>
+>>>> This becomes possible to use KVM_SIGNAL_MSI ioctl for arm too.
+>>>>
+>>>> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+>>>>
+>>>> ---
+>>>>
+>>>> v1 -> v2:
+>>>> - introduce vgic_v2m_inject_msi in vgic-v2-emul.c following Andre's
+>>>>   advice
+>>>> ---
+>>>>  arch/arm/kvm/Kconfig        |  1 +
+>>>>  virt/kvm/arm/vgic-v2-emul.c | 12 ++++++++++++
+>>>>  2 files changed, 13 insertions(+)
+>>>>
+>>>> diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
+>>>> index 151e710..0f58baf 100644
+>>>> --- a/arch/arm/kvm/Kconfig
+>>>> +++ b/arch/arm/kvm/Kconfig
+>>>> @@ -31,6 +31,7 @@ config KVM
+>>>>  	select KVM_VFIO
+>>>>  	select HAVE_KVM_EVENTFD
+>>>>  	select HAVE_KVM_IRQFD
+>>>> +	select HAVE_KVM_MSI
+>>>
+>>> I wonder if this requires some more code to only advertise
+>>> KVM_CAP_SIGNAL_MSI if userland actually sets up a GICv2M?
+>>> Otherwise userland could get the idea of being able to inectj MSIs
+>>> without the guest actually being prepared for that (because the GICv2M
+>>> driver did not initialize).
+>> Not sure I get what you mean here. By directly transforming the user
+>> provided MSI msg into an SPI ID, do we really have to care about GICv2M?
 > 
->   Acked-by: Will Deacon <will.deacon@arm.com>
+> By user provided message you mean from user space? So this is an
+> emulated device, which the guest programs with an MSI payload and a
+> doorbell address at least? So how would a guest know these things
+> without having a MSI capable interrupt controller?
+> 
+> Or are we talking about different things here?
 
-What happened to this? Is it queued someplace, or are we waiting for a
-new version?
+I meant GICv2m is emulated on user-side today so I don't see how the
+kernel could check anything. For the MSI injection, in that case, we
+only use irqfd standard IRQ injection.
 
-Will
+Cheers
+
+Eric
+> 
+> Cheers,
+> Andre.
+> 
+>>
+>> Best Regards
+>>
+>> Eric
+>>>
+>>> Cheers,
+>>> Andre.
+>>>
+>>>>  	select HAVE_KVM_IRQCHIP
+>>>>  	select HAVE_KVM_IRQ_ROUTING
+>>>>  	depends on ARM_VIRT_EXT && ARM_LPAE && ARM_ARCH_TIMER
+>>>> diff --git a/virt/kvm/arm/vgic-v2-emul.c b/virt/kvm/arm/vgic-v2-emul.c
+>>>> index 1390797..43013cc 100644
+>>>> --- a/virt/kvm/arm/vgic-v2-emul.c
+>>>> +++ b/virt/kvm/arm/vgic-v2-emul.c
+>>>> @@ -478,6 +478,17 @@ static bool vgic_v2_queue_sgi(struct kvm_vcpu *vcpu, int irq)
+>>>>  }
+>>>>  
+>>>>  /**
+>>>> + * Emulates GICv2M MSI injection by injecting the SPI ID matching
+>>>> + * the msi data
+>>>> + * @kvm: pointer to the kvm struct
+>>>> + * @msi: the msi struct handle
+>>>> + */
+>>>> +static int vgic_v2m_inject_msi(struct kvm *kvm, struct kvm_msi *msi)
+>>>> +{
+>>>> +	return kvm_vgic_inject_irq(kvm, 0, msi->data, 1);
+>>>> +}
+>>>> +
+>>>> +/**
+>>>>   * kvm_vgic_map_resources - Configure global VGIC state before running any VCPUs
+>>>>   * @kvm: pointer to the kvm struct
+>>>>   *
+>>>> @@ -566,6 +577,7 @@ void vgic_v2_init_emulation(struct kvm *kvm)
+>>>>  	dist->vm_ops.add_sgi_source = vgic_v2_add_sgi_source;
+>>>>  	dist->vm_ops.init_model = vgic_v2_init_model;
+>>>>  	dist->vm_ops.map_resources = vgic_v2_map_resources;
+>>>> +	dist->vm_ops.inject_msi = vgic_v2m_inject_msi;
+>>>>  
+>>>>  	kvm->arch.max_vcpus = VGIC_V2_MAX_CPUS;
+>>>>  }
+>>>>
+>>>
+>>
+> 
