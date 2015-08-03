@@ -1,84 +1,49 @@
-From: albeu@free.fr (Alban Bedel)
-Date: Mon,  3 Aug 2015 21:12:30 +0200
-Subject: [PATCH] usb: ehci-platform: Fix using multiple controllers from OF
-Message-ID: <1438629150-11662-1-git-send-email-albeu@free.fr>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 3 Aug 2015 20:13:40 +0100
+Subject: [PATCH] ARM/PCI: set MPS before pci_bus_add_devices()
+In-Reply-To: <1437514519-18545-1-git-send-email-m-karicheri2@ti.com>
+References: <1437514519-18545-1-git-send-email-m-karicheri2@ti.com>
+Message-ID: <20150803191340.GM7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When using OF defined controllers the platform data struct is shared
-between all devices, so it can't be used for device specific settings.
-However it is currently used for the OF properties
-needs-reset-on-resume and has-transaction-translator.
+On Tue, Jul 21, 2015 at 05:35:19PM -0400, Murali Karicheri wrote:
+> The MPS configuration should be done *before* pci_bus_add_devices().
+> After pci_bus_add_devices(), drivers may be bound to devices, and
+> the PCI core shouldn't touch device configuration while a driver
+> owns the device.
+> 
+> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+> Reported-by: Bjorn Helgaas <bhelgaas@google.com>
+> ---
+>  arch/arm/kernel/bios32.c | 19 +++++--------------
+>  1 file changed, 5 insertions(+), 14 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+> index fcbbbb1..17efde7 100644
+> --- a/arch/arm/kernel/bios32.c
+> +++ b/arch/arm/kernel/bios32.c
+> @@ -520,7 +520,8 @@ void pci_common_init_dev(struct device *parent, struct hw_pci *hw)
+>  	list_for_each_entry(sys, &head, node) {
+>  		struct pci_bus *bus = sys->bus;
+>  
+> -		if (!pci_has_flag(PCI_PROBE_ONLY)) {
+> +		if (bus && !pci_has_flag(PCI_PROBE_ONLY)) {
 
-To fix this issue move setting hcd->has_tt to the probe and
-move pdata->reset_on_resume to the private data.
+Let's get rid of that useless check.  bus can't be NULL here.
 
-Signed-off-by: Alban Bedel <albeu@free.fr>
----
- drivers/usb/host/ehci-platform.c | 13 +++++++++----
- 1 file changed, 9 insertions(+), 4 deletions(-)
+In the original code (below) if bus was NULL, then we would've already
+oopsed before we got here.  As we don't oops here, no one is ever
+seeing it being NULL, so the test is redundant.
 
-diff --git a/drivers/usb/host/ehci-platform.c b/drivers/usb/host/ehci-platform.c
-index 2593def..40d029e 100644
---- a/drivers/usb/host/ehci-platform.c
-+++ b/drivers/usb/host/ehci-platform.c
-@@ -45,6 +45,7 @@ struct ehci_platform_priv {
- 	struct reset_control *rst;
- 	struct phy **phys;
- 	int num_phys;
-+	bool reset_on_resume;
- };
- 
- static const char hcd_name[] = "ehci-platform";
-@@ -56,7 +57,6 @@ static int ehci_platform_reset(struct usb_hcd *hcd)
- 	struct ehci_hcd *ehci = hcd_to_ehci(hcd);
- 	int retval;
- 
--	hcd->has_tt = pdata->has_tt;
- 	ehci->has_synopsys_hc_bug = pdata->has_synopsys_hc_bug;
- 
- 	if (pdata->pre_setup) {
-@@ -193,11 +193,11 @@ static int ehci_platform_probe(struct platform_device *dev)
- 
- 		if (of_property_read_bool(dev->dev.of_node,
- 					  "needs-reset-on-resume"))
--			pdata->reset_on_resume = 1;
-+			priv->reset_on_resume = 1;
- 
- 		if (of_property_read_bool(dev->dev.of_node,
- 					  "has-transaction-translator"))
--			pdata->has_tt = 1;
-+			hcd->has_tt = 1;
- 
- 		priv->num_phys = of_count_phandle_with_args(dev->dev.of_node,
- 				"phys", "#phy-cells");
-@@ -247,6 +247,10 @@ static int ehci_platform_probe(struct platform_device *dev)
- 		ehci->big_endian_desc = 1;
- 	if (pdata->big_endian_mmio)
- 		ehci->big_endian_mmio = 1;
-+	if (pdata->has_tt)
-+		hcd->has_tt = 1;
-+	if (pdata->reset_on_resume)
-+		priv->reset_on_resume = true;
- 
- #ifndef CONFIG_USB_EHCI_BIG_ENDIAN_MMIO
- 	if (ehci->big_endian_mmio) {
-@@ -359,6 +363,7 @@ static int ehci_platform_resume(struct device *dev)
- 	struct usb_ehci_pdata *pdata = dev_get_platdata(dev);
- 	struct platform_device *pdev =
- 		container_of(dev, struct platform_device, dev);
-+	struct ehci_platform_priv *priv = hcd_to_ehci_priv(hcd);
- 
- 	if (pdata->power_on) {
- 		int err = pdata->power_on(pdev);
-@@ -366,7 +371,7 @@ static int ehci_platform_resume(struct device *dev)
- 			return err;
- 	}
- 
--	ehci_resume(hcd, pdata->reset_on_resume);
-+	ehci_resume(hcd, priv->reset_on_resume);
- 	return 0;
- }
- #endif /* CONFIG_PM_SLEEP */
+> -	list_for_each_entry(sys, &head, node) {
+> -		struct pci_bus *bus = sys->bus;
+> -
+> -		/* Configure PCI Express settings */
+> -		if (bus && !pci_has_flag(PCI_PROBE_ONLY)) {
+
+Thanks.
+
 -- 
-2.0.0
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
