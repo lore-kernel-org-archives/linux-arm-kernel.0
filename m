@@ -1,31 +1,96 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 3 Aug 2015 14:40:07 +0200
-Subject: [PATCH 1/2] drivers: PL061: add support for platform driver
- probing
-In-Reply-To: <1438585198-8764-2-git-send-email-zhaoshenglong@huawei.com>
-References: <1438585198-8764-1-git-send-email-zhaoshenglong@huawei.com>
- <1438585198-8764-2-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <CACRpkdY6ZfB-gnnr49He+BYELy4fhiV0g5jkEHhyVsJOc_SBFw@mail.gmail.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 03 Aug 2015 13:43:09 +0100
+Subject: [PATCH v6 6/8] arm64: dts: add SRAM, MHU mailbox and SCPI support
+ on Juno
+In-Reply-To: <1438602393.5218.3.camel@linaro.org>
+References: <1438364591-1144-1-git-send-email-sudeep.holla@arm.com>	
+ <1438364591-1144-7-git-send-email-sudeep.holla@arm.com>	
+ <20150803112353.GV20890@e106497-lin.cambridge.arm.com>
+ <1438602393.5218.3.camel@linaro.org>
+Message-ID: <55BF61DD.7020003@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 3, 2015 at 8:59 AM, Shannon Zhao <zhaoshenglong@huawei.com> wrote:
 
-> From: Shannon Zhao <shannon.zhao@linaro.org>
+
+On 03/08/15 12:46, Jon Medhurst (Tixy) wrote:
+> On Mon, 2015-08-03 at 12:23 +0100, Liviu Dudau wrote:
+>> On Fri, Jul 31, 2015 at 06:43:09PM +0100, Sudeep Holla wrote:
+>>> This patch adds support for the MHU mailbox peripheral used on Juno by
+>>> application processors to communicate with remote SCP handling most of
+>>> the CPU/system power management. It also adds the SRAM reserving the
+>>> shared memory and SCPI message protocol using that shared memory.
+>>>
+>>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+>>> Acked-by: Liviu Dudau <Liviu.Dudau@arm.com>
+>>> Cc: Jon Medhurst (Tixy) <tixy@linaro.org>
+>>> ---
+>>>   arch/arm64/boot/dts/arm/juno-base.dtsi | 54 ++++++++++++++++++++++++++++++++++
+>>>   1 file changed, 54 insertions(+)
+>>>
+>>> diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
+>>> index e3ee96036eca..c624208edef6 100644
+>>> --- a/arch/arm64/boot/dts/arm/juno-base.dtsi
+>>> +++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
+> [...]
+>>> +	scpi {
+>>> +		compatible = "arm,scpi";
+>>> +		mboxes = <&mailbox 1>;
+>>> +		shmem = <&cpu_scp_hpri>;
+>>> +
+>>> +		clocks {
+>>> +			compatible = "arm,scpi-clocks";
+>>> +
+>>> +			scpi_dvfs: scpi_clocks at 0 {
+>>> +				compatible = "arm,scpi-dvfs-clocks";
+>>> +				#clock-cells = <1>;
+>>> +				clock-indices = <0>, <1>, <2>;
+>>> +				clock-output-names = "atlclk", "aplclk","gpuclk";
+>>> +			};
+>>> +			scpi_clk: scpi_clocks at 3 {
+>>> +				compatible = "arm,scpi-variable-clocks";
+>>> +				#clock-cells = <1>;
+>>> +				clock-indices = <3>, <4>;
+>>> +				clock-output-names = "pxlclk0", "pxlclk1";
+>>> +			};
+>>> +		};
+>>> +	};
+>>> +
+>>
+>> Sorry for noticing this after the ACK, is there any reason why the scpi node is not inside
+>> the juno-clocks.dtsi file?
 >
-> Since PL061 currently only supports AMBA driver, to support using GPIO
-> PL061 by DT or ACPI, it needs to add support for platform driver.
-> A DT binding is provided with this patch, ACPI support is added in a
-> separate one.
+> Because SCPI is not just about clocks? Just happens that these first
+> patches are but there's thermal sensors and other things as well.
 >
-> Signed-off-by: Shannon Zhao <zhaoshenglong@huawei.com>
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 
-I already stated in 0/2 what the problem is with this, and it's obviously adding
-a huge codechunk, very similar to the AMBA probe path.
+I think we cross posted. Anyways I completely agree with you.
+However I wanted the clock nodes to be put in juno-clock.dtsi but got
+into horrible issue with the way we include headers. It may need some
+reworking to get that working.
 
-We need to investigate if ACPI can just spawn AMBA/PrimeCell type devices
-instead.
+The idea was:
+/* in juno-base.dtsi */
+SCPI: scpi {
+	compatible = "arm,scpi";
+	mboxes = <&mailbox 1>;
+	shmem = <&cpu_scp_hpri>;
+	...
+};
+/* in juno-clock.dtsi */
+&SCPI {
+         clocks {
+                 compatible = "arm,scpi-clocks";
+                 scpi_dvfs: scpi_clocks at 0 {
+                         compatible = "arm,scpi-dvfs-clocks";
+                         #clock-cells = <1>;
+                         clock-indices = <0>, <1>, <2>;
+                         clock-output-names = "atlclk","aplclk","gpuclk";
+                 };
+};
 
-Yours,
-Linus Walleij
+I will look at that when I get some time. There are many DTS files
+already using something similar.
+
+Regards,
+Sudeep
