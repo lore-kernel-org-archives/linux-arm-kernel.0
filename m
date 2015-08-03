@@ -1,36 +1,34 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Mon, 3 Aug 2015 14:40:18 +0800
-Subject: [RFC PATCH 2/3] ARM: at91/dt: add sama5d2 pinmux
-In-Reply-To: <1438355290-28255-3-git-send-email-ludovic.desroches@atmel.com>
-References: <1438355290-28255-1-git-send-email-ludovic.desroches@atmel.com>
- <1438355290-28255-3-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <55BF0CD2.5030204@atmel.com>
+From: p.fedin@samsung.com (Pavel Fedin)
+Date: Mon, 03 Aug 2015 09:41:33 +0300
+Subject: [PATCH v2 14/15] KVM: arm64: implement MSI injection in ITS
+ emulation
+In-Reply-To: <55BE7BA1.40403@arm.com>
+References: <1436538111-4294-1-git-send-email-andre.przywara@arm.com>
+ <1436538111-4294-15-git-send-email-andre.przywara@arm.com>
+ <55BB7678.5080105@linaro.org> <55BE7BA1.40403@arm.com>
+Message-ID: <00a201d0cdb7$70a623f0$51f26bd0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Ludovic
+ Hi!
 
-On 7/31/2015 11:08 PM, Ludovic Desroches wrote:
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> ---
->   arch/arm/boot/dts/sama5d2-pinfunc.h | 760 ++++++++++++++++++++++++++++++++++++
->   1 file changed, 760 insertions(+)
->   create mode 100644 arch/arm/boot/dts/sama5d2-pinfunc.h
->
-> diff --git a/arch/arm/boot/dts/sama5d2-pinfunc.h b/arch/arm/boot/dts/sama5d2-pinfunc.h
-> new file mode 100644
-> index 0000000..046d1d5
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/sama5d2-pinfunc.h
->
+> When I reworked our code to only use a flag and not a separate routing
+> type I ended up with the flag only guarding assignments, which wouldn't
+> hurt if done unconditionally (since they are all u32's). So the whole
+> usage of the flag is somewhat in jeopardy now.
+> Either the eventual MSI consumer requires a DevID (ITS emulation, which
+> will not work without it) or the consumer does not care at all and can
+> totally ignore it (GICv2m). So I think we can always pass on the DevID
 
-[snip...]
+ I have just checked my current code, and you know what... You are right. We already have a per-VM
+capability which actually tells us that MSIs for this VM require devID. Therefore, we really don't
+need this flag at all, neither for MSI doorbell, nor for GSI routing.
+ All we need is 'devid' field, which indeed can be just ignored for GICv2(m), just for simplicity.
+Ignoring would happen automatically, because IIRC older kernels do not explicitly check 'pad' for
+being zero, do they? And indeed in this case the userland can supply devid unconditionally, making
+things even simpler.
 
-> +#define PIN_PB24__FLEXCOM3_IO3		PINMUX_PIN(PIN_PB24, 5, 3)
-> +#define PIN_PB24__ISI_D10		PINMUX_PIN(PIN_PB24, 6, 3)
-
-As sama5d2 use ISC, so It's better to run  s/ISI_/ISC_/ in this file, 
-which is consistent with the datasheet.
-
-Best Regards,
-Josh Wu
+Kind regards,
+Pavel Fedin
+Expert Engineer
+Samsung Electronics Research center Russia
