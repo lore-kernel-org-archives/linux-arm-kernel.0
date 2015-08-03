@@ -1,73 +1,75 @@
-From: ross.zwisler@linux.intel.com (Ross Zwisler)
-Date: Mon, 03 Aug 2015 11:21:27 -0600
-Subject: [PATCH v3 24/24] pmem: convert to generic memremap
-In-Reply-To: <20150730165553.33962.20257.stgit@dwillia2-desk3.amr.corp.intel.com>
-References: <20150730165155.33962.64121.stgit@dwillia2-desk3.amr.corp.intel.com>
- <20150730165553.33962.20257.stgit@dwillia2-desk3.amr.corp.intel.com>
-Message-ID: <1438622487.9404.2.camel@linux.intel.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Mon,  3 Aug 2015 19:20:39 +0200
+Subject: [PATCH v4 0/5] KVM: irqfd consumer based on IRQ bypass manager
+Message-ID: <1438622444-25444-1-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2015-07-30 at 12:55 -0400, Dan Williams wrote:
-> Update memremap_pmem() to query the architecture for the mapping type of
-> the given persistent memory range  and then pass those flags to generic
-> memremap().  arch_memremap_pmem_flags() is provided an address range to
-> evaluate in the event an arch has a need for different mapping types by
-> address range.  For example the ACPI NFIT carries EFI mapping types in
-> its memory range description table.
-> 
-> Cc: Ross Zwisler <ross.zwisler@linux.intel.com>
-> Signed-off-by: Dan Williams <dan.j.williams@intel.com>
-> ---
->  arch/x86/include/asm/io.h |    2 +-
->  arch/x86/mm/ioremap.c     |   16 ++++++++++------
->  include/linux/pmem.h      |   26 +++++++++++++++-----------
->  3 files changed, 26 insertions(+), 18 deletions(-)
-> 
-> diff --git a/arch/x86/include/asm/io.h b/arch/x86/include/asm/io.h
-> index 1a9d44ee9ed0..26c81b01419c 100644
-> --- a/arch/x86/include/asm/io.h
-> +++ b/arch/x86/include/asm/io.h
-> @@ -245,7 +245,7 @@ static inline void flush_write_buffers(void)
->  #endif
->  }
->  
-> -void __pmem *arch_memremap_pmem(resource_size_t offset, size_t size);
-> +unsigned long arch_memremap_pmem_flags(resource_size_t offset, size_t size);
->  #endif /* __KERNEL__ */
->  
->  extern void native_io_delay(void);
-> diff --git a/arch/x86/mm/ioremap.c b/arch/x86/mm/ioremap.c
-> index ffbfcf2e701b..5a41e3e4ea1e 100644
-> --- a/arch/x86/mm/ioremap.c
-> +++ b/arch/x86/mm/ioremap.c
-> @@ -205,6 +205,16 @@ err_free_memtype:
->  	return NULL;
->  }
->  
-> +unsigned long arch_memremap_pmem_flags(resource_size_t offset, size_t size)
-> +{
-> +	/*
-> +	 * TODO: check the mapping type provided by platform firmware,
-> +	 * per range.
-> +	 */
-> +	return MEMREMAP_WB;
-> +}
-> +EXPORT_SYMBOL(arch_memremap_pmem_flags);
+This series transforms irqfd into an IRQ bypass consumer and
+introduce the infrastructure shared by Intel posted-interrupts
+and ARM forwarded IRQ series.
 
-I'm not sure that the architecture code has the right information to be able
-to tell the caller what the correct mapping is.
+The bypass manager gets compiled for x86 and arm/arm64 when
+KVM is used. A new kvm_irqfd.h header is created to externalize
+some irqfd declarations going to be used by architecture specific
+code. A new CONFIG_HAVE_KVM_IRQ_BYPASS option is introduced
+to enable architecture specific IRQ manager hooks.
 
-I think what you are ultimately looking for is the "Address Range Memory
-Mapping Attribute" found in the System Physical Address Range Structure of the
-NFIT, right?  (ACPI 6.0, table 5-128)  How can we get to that structure from
-nfit-independent architecture code like arch_memremap_pmem_flags()?  It seems
-like that if we want to make the mapping type dynamic we should get the flags
-from ND when the SPA range is provided by ND, and provide a reasonable default
-(WB, it seems) when we are dealing with legacy PMEM?  If PMEM had the flag
-from whatever source, it could then pass it in to memremap_pmem(), and get a
-mapping of the appropriate caching.
+the series depends on the IRQ bypass manager:
+- [PATCH v2] virt: IRQ bypass manager
+  (https://lkml.org/lkml/2015/7/16/810)
 
-Another option of course is to just ignore the mapping attribute in the NFIT
-like we've been doing, and just say "we know WB will be good enough", and
-remove the TODO.
+can be found at:
+https://git.linaro.org/people/eric.auger/linux.git/shortlog/refs/heads/v4.2-rc5-irqfd-consumer-v4
+
+Best Regards
+
+Eric
+
+History:
+
+v3 -> v4:
+- fix compilation for arm/arm64
+- rearrange signoffs/history on some patch files
+
+v2 -> v3 (Feng Wu):
+- rebase on IRQ bypass manager [PATCH v2] virt: IRQ bypass manager:
+  https://lkml.org/lkml/2015/7/16/810
+- Correct some minor errors and typo
+- Add something needed for posted-interrupts
+
+v1 -> v2:
+- isolate the bypass manager and irqfd consumer in this series
+- take into account Paolo's comments and use container_of strategy and
+  remove additional fields introduced in v1.
+- create kvm_irqfd.h
+- add unregistration in irqfd_shutdown
+
+v1: originally part of [RFC 00/17] ARM IRQ forward control based on IRQ
+    bypass manager (https://lkml.org/lkml/2015/7/2/268)
+
+
+Eric Auger (4):
+  KVM: arm/arm64: select IRQ_BYPASS_MANAGER
+  KVM: create kvm_irqfd.h
+  KVM: introduce kvm_arch functions for IRQ bypass
+  KVM: eventfd: add irq bypass consumer management
+
+Feng Wu (1):
+  KVM: x86: select IRQ_BYPASS_MANAGER
+
+ arch/arm/kvm/Kconfig      |   2 +
+ arch/arm/kvm/Makefile     |   1 +
+ arch/arm64/kvm/Kconfig    |   2 +
+ arch/arm64/kvm/Makefile   |   1 +
+ arch/x86/kvm/Kconfig      |   2 +
+ arch/x86/kvm/Makefile     |   3 ++
+ include/linux/kvm_host.h  |  33 +++++++++++++++
+ include/linux/kvm_irqfd.h |  71 +++++++++++++++++++++++++++++++
+ virt/kvm/Kconfig          |   3 ++
+ virt/kvm/eventfd.c        | 105 +++++++++++++++-------------------------------
+ 10 files changed, 151 insertions(+), 72 deletions(-)
+ create mode 100644 include/linux/kvm_irqfd.h
+
+-- 
+1.9.1
