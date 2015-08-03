@@ -1,223 +1,116 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Mon, 3 Aug 2015 11:18:09 +0000
-Subject: [PATCH v6] PCI: Store PCIe bus address in struct of_pci_range
-In-Reply-To: <CAL_JsqJqjiWVaKs-3ghQ1EBQzRRQ38GzkMV+FELPj53bSF-yXQ@mail.gmail.com>
-References: <1438010223-124422-1-git-send-email-gabriele.paoloni@huawei.com>
- <20150729172053.GE31170@google.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E01D6F350@lhreml503-mbs>
- <CAL_JsqKs11-sXQTdBD+ZjbVYFWUHBARTW9q5MF1hCXUhZ+nWLQ@mail.gmail.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E01D6F94A@lhreml503-mbs>
- <20150730161447.GG9640@google.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E01D6FB3B@lhreml503-mbs>
- <20150730171445.GI9640@google.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E01D6FC15@lhreml503-mbs>
- <CAL_Jsq+aQVakaZf4xo7sxnVyTmPR+HJ-9ByyS6OYJ0PHDYOwmg@mail.gmail.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E01D70589@lhreml503-mbs>
- <55BB8CC6.1080203@ti.com>
- <CAL_JsqJqjiWVaKs-3ghQ1EBQzRRQ38GzkMV+FELPj53bSF-yXQ@mail.gmail.com>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E01D712E7@lhreml503-mbs>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Mon, 3 Aug 2015 12:23:53 +0100
+Subject: [PATCH v6 6/8] arm64: dts: add SRAM, MHU mailbox and SCPI
+ support on Juno
+In-Reply-To: <1438364591-1144-7-git-send-email-sudeep.holla@arm.com>
+References: <1438364591-1144-1-git-send-email-sudeep.holla@arm.com>
+ <1438364591-1144-7-git-send-email-sudeep.holla@arm.com>
+Message-ID: <20150803112353.GV20890@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rob, Kishon what about the following solution?....
+On Fri, Jul 31, 2015 at 06:43:09PM +0100, Sudeep Holla wrote:
+> This patch adds support for the MHU mailbox peripheral used on Juno by
+> application processors to communicate with remote SCP handling most of
+> the CPU/system power management. It also adds the SRAM reserving the
+> shared memory and SCPI message protocol using that shared memory.
+> 
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> Acked-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> Cc: Jon Medhurst (Tixy) <tixy@linaro.org>
+> ---
+>  arch/arm64/boot/dts/arm/juno-base.dtsi | 54 ++++++++++++++++++++++++++++++++++
+>  1 file changed, 54 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
+> index e3ee96036eca..c624208edef6 100644
+> --- a/arch/arm64/boot/dts/arm/juno-base.dtsi
+> +++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
+> @@ -17,6 +17,18 @@
+>  		};
+>  	};
+>  
+> +	mailbox: mhu at 2b1f0000 {
+> +		compatible = "arm,mhu", "arm,primecell";
+> +		reg = <0x0 0x2b1f0000 0x0 0x1000>;
+> +		interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>;
+> +		interrupt-names = "mhu_lpri_rx",
+> +				  "mhu_hpri_rx";
+> +		#mbox-cells = <1>;
+> +		clocks = <&soc_refclk100mhz>;
+> +		clock-names = "apb_pclk";
+> +	};
+> +
+>  	gic: interrupt-controller at 2c010000 {
+>  		compatible = "arm,gic-400", "arm,cortex-a15-gic";
+>  		reg = <0x0 0x2c010000 0 0x1000>,
+> @@ -44,6 +56,48 @@
+>  			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>;
+>  	};
+>  
+> +	sram: sram at 2e000000 {
+> +		compatible = "arm,juno-sram-ns", "mmio-sram";
+> +		reg = <0x0 0x2e000000 0x0 0x8000>;
+> +
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges = <0 0x0 0x2e000000 0x8000>;
+> +
+> +		cpu_scp_lpri: scp-shmem at 0 {
+> +			compatible = "arm,juno-scp-shmem";
+> +			reg = <0x0 0x200>;
+> +		};
+> +
+> +		cpu_scp_hpri: scp-shmem at 200 {
+> +			compatible = "arm,juno-scp-shmem";
+> +			reg = <0x200 0x200>;
+> +		};
+> +	};
+> +
+> +	scpi {
+> +		compatible = "arm,scpi";
+> +		mboxes = <&mailbox 1>;
+> +		shmem = <&cpu_scp_hpri>;
+> +
+> +		clocks {
+> +			compatible = "arm,scpi-clocks";
+> +
+> +			scpi_dvfs: scpi_clocks at 0 {
+> +				compatible = "arm,scpi-dvfs-clocks";
+> +				#clock-cells = <1>;
+> +				clock-indices = <0>, <1>, <2>;
+> +				clock-output-names = "atlclk", "aplclk","gpuclk";
+> +			};
+> +			scpi_clk: scpi_clocks at 3 {
+> +				compatible = "arm,scpi-variable-clocks";
+> +				#clock-cells = <1>;
+> +				clock-indices = <3>, <4>;
+> +				clock-output-names = "pxlclk0", "pxlclk1";
+> +			};
+> +		};
+> +	};
+> +
 
----
- drivers/pci/host/pci-dra7xx.c      | 12 ++++++++++++
- drivers/pci/host/pcie-designware.c |  9 +++------
- 2 files changed, 15 insertions(+), 6 deletions(-)
+Sorry for noticing this after the ACK, is there any reason why the scpi node is not inside
+the juno-clocks.dtsi file?
 
-diff --git a/drivers/pci/host/pci-dra7xx.c b/drivers/pci/host/pci-dra7xx.c
-index 80db09e..bb2635f 100644
---- a/drivers/pci/host/pci-dra7xx.c
-+++ b/drivers/pci/host/pci-dra7xx.c
-@@ -61,6 +61,7 @@
- 
- #define	PCIECTRL_DRA7XX_CONF_PHY_CS			0x010C
- #define	LINK_UP						BIT(16)
-+#define CPU_TO_BUS_ADDR             0x0FFFFFFF
- 
- struct dra7xx_pcie {
- 	void __iomem		*base;
-@@ -138,6 +139,17 @@ static void dra7xx_pcie_enable_interrupts(struct pcie_port *pp)
- 
- static void dra7xx_pcie_host_init(struct pcie_port *pp)
- {
-+	if (pp->io_mod_base)
-+		pp->io_mod_base &= CPU_TO_BUS_ADDR;
-+
-+	if (pp->mem_mod_base)
-+		pp->mem_mod_base &= CPU_TO_BUS_ADDR;
-+
-+	if (pp->cfg0_mod_base) {
-+		pp->cfg0_mod_base &= CPU_TO_BUS_ADDR;
-+		pp->cfg1_mod_base &= CPU_TO_BUS_ADDR;
-+	}
-+
- 	dw_pcie_setup_rc(pp);
- 	dra7xx_pcie_establish_link(pp);
- 	if (IS_ENABLED(CONFIG_PCI_MSI))
-diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
-index 69486be..06c682b 100644
---- a/drivers/pci/host/pcie-designware.c
-+++ b/drivers/pci/host/pcie-designware.c
-@@ -416,8 +416,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
- 			pp->io_base = range.cpu_addr;
- 
- 			/* Find the untranslated IO space address */
--			pp->io_mod_base = of_read_number(parser.range -
--							 parser.np + na, ns);
-+			pp->io_mod_base = range.cpu_addr;;
- 		}
- 		if (restype == IORESOURCE_MEM) {
- 			of_pci_range_to_resource(&range, np, &pp->mem);
-@@ -426,8 +425,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
- 			pp->mem_bus_addr = range.pci_addr;
- 
- 			/* Find the untranslated MEM space address */
--			pp->mem_mod_base = of_read_number(parser.range -
--							  parser.np + na, ns);
-+			pp->mem_mod_base = range.cpu_addr;
- 		}
- 		if (restype == 0) {
- 			of_pci_range_to_resource(&range, np, &pp->cfg);
-@@ -437,8 +435,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
- 			pp->cfg1_base = pp->cfg.start + pp->cfg0_size;
- 
- 			/* Find the untranslated configuration space address */
--			pp->cfg0_mod_base = of_read_number(parser.range -
--							   parser.np + na, ns);
-+			pp->cfg0_mod_base = range.cpu_addr;
- 			pp->cfg1_mod_base = pp->cfg0_mod_base +
- 					    pp->cfg0_size;
- 		}
+Best regards,
+Liviu
+
+>  	/include/ "juno-clocks.dtsi"
+>  
+>  	dma at 7ff00000 {
+> -- 
+> 1.9.1
+> 
+
 -- 
-1.9.1
-
-
-> -----Original Message-----
-> From: linux-pci-owner at vger.kernel.org [mailto:linux-pci-
-> owner at vger.kernel.org] On Behalf Of Rob Herring
-> Sent: Friday, July 31, 2015 5:53 PM
-> To: Kishon Vijay Abraham I
-> Cc: Gabriele Paoloni; Bjorn Helgaas; arnd at arndb.de;
-> lorenzo.pieralisi at arm.com; Wangzhou (B); robh+dt at kernel.org;
-> james.morse at arm.com; Liviu.Dudau at arm.com; linux-pci at vger.kernel.org;
-> linux-arm-kernel at lists.infradead.org; devicetree at vger.kernel.org;
-> Yuanzhichang; Zhudacai; zhangjukuo; qiuzhenfa; Liguozhu (Kenneth);
-> Jingoo Han; Pratyush Anand; Arnd Bergmann
-> Subject: Re: [PATCH v6] PCI: Store PCIe bus address in struct
-> of_pci_range
-> 
-> On Fri, Jul 31, 2015 at 9:57 AM, Kishon Vijay Abraham I <kishon@ti.com>
-> wrote:
-> > +Arnd
-> >
-> > Hi,
-> >
-> > On Friday 31 July 2015 07:55 PM, Gabriele Paoloni wrote:
-> >> [+cc Kishon]
-> >>
-> >>> -----Original Message-----
-> >>> From: linux-pci-owner at vger.kernel.org [mailto:linux-pci-
-> >>> owner at vger.kernel.org] On Behalf Of Rob Herring
-> >>> Sent: Thursday, July 30, 2015 9:42 PM
-> >>> To: Gabriele Paoloni
-> >>> Cc: Bjorn Helgaas; arnd at arndb.de; lorenzo.pieralisi at arm.com;
-> Wangzhou
-> >>> (B); robh+dt at kernel.org; james.morse at arm.com; Liviu.Dudau at arm.com;
-> >>> linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> >>> devicetree at vger.kernel.org; Yuanzhichang; Zhudacai; zhangjukuo;
-> >>> qiuzhenfa; Liguozhu (Kenneth); Jingoo Han; Pratyush Anand
-> >>> Subject: Re: [PATCH v6] PCI: Store PCIe bus address in struct
-> >>> of_pci_range
-> >>>
-> >>> On Thu, Jul 30, 2015 at 12:34 PM, Gabriele Paoloni
-> >>> <gabriele.paoloni@huawei.com> wrote:
-> >>>>> -----Original Message-----
-> >>>>> From: Bjorn Helgaas [mailto:bhelgaas at google.com]
-> >>>>> Sent: 30 July 2015 18:15
-> >>>>> On Thu, Jul 30, 2015 at 04:50:55PM +0000, Gabriele Paoloni wrote:
-> >>>>>>> -----Original Message-----
-> >>>>>>> From: linux-pci-owner at vger.kernel.org [mailto:linux-pci-
-> >>>>>>> owner at vger.kernel.org] On Behalf Of Bjorn Helgaas
-> >>>>>>> Sent: Thursday, July 30, 2015 5:15 PM
-> >>>>>>> On Thu, Jul 30, 2015 at 01:52:13PM +0000, Gabriele Paoloni
-> wrote:
-> >>>
-> >>> [...]
-> >>>
-> >>>>>>>> I don?t think we should rely on [CPU] addresses...what if the
-> >>>>>>> intermediate
-> >>>>>>>> translation layer changes the lower significant bits of the
-> >>> "bus
-> >>>>>>> address"
-> >>>>>>>> to translate into a cpu address?
-> >>>>>>>
-> >>>>>>> Is it really a possiblity that the lower bits could be changed?
-> >>>>>>
-> >>>>>> I've checked all the current deignware users DTs except "pci-
-> >>>>> layerscape"
-> >>>>>> that I could not find:
-> >>>>>> spear1310.dtsi
-> >>>>>> spear1340.dtsi
-> >>>>>> dra7.dtsi
-> >>>>>> imx6qdl.dtsi
-> >>>>>> imx6sx.dtsi
-> >>>>>> keystone.dtsi
-> >>>>>> exynos5440.dtsi
-> >>>>>>
-> >>>>>> None of them modifies the lower bits. To be more precise the
-> only
-> >>> guy
-> >>>>>> that provides another translation layer is "dra7.dtsi":
-> >>>>>> axi0
-> >>>>>> http://lxr.free-
-> >>> electrons.com/source/arch/arm/boot/dts/dra7.dtsi#L207
-> >>>>>>
-> >>>>>> axi1
-> >>>>>> http://lxr.free-
-> >>> electrons.com/source/arch/arm/boot/dts/dra7.dtsi#L241
-> >>>>>>
-> >>>>>> For this case masking the top 4bits (bits28 to 31) should make
-> the
-> >>> job.
-> >>>
-> >>> IMO, we should just fix this case. After further study, I don't
-> think
-> >>> this is a DW issue, but rather an SOC integration issue.
-> >>>
-> >>> I believe you can just fixup the address in the pp->ops->host_init
-> hook.
-> >>>
-> >>
-> >> Yes I guess that I could just assign pp->(*)_mod_base to the CPU
-> address
-> >> in DW and mask it out in dra7xx_pcie_host_init()...
-> >>
-> >> Kishon, would you be ok with that?
-> >
-> > Initially I was using *base-mask* property from dt. Me and Arnd
-> (cc'ed) had
-> > this discussion [1] before we decided the current approach. It'll be
-> good to
-> > check with Arnd too.
-> >
-> > [1] ->  http://lists.infradead.org/pipermail/linux-arm-kernel/2014-
-> May/253528.html
-> 
-> The problem I have here is the use of ranges does not necessarily mean
-> fewer address bits are available. It can be used just for convenience
-> of not putting the full address into every node's reg property. And
-> vice versa, there are probably plenty of cases where we have the full
-> address in the nodes, but really only some of the address bits are
-> decoded at the IP block. Whether the address bits are present is
-> rarely cared about or known by s/w folks until you hit a problem like
-> this. Given this is an isolated case ATM, I would fix it in an
-> isolated way. It does not affect the binding and could be changed in
-> the kernel later if this becomes a common need.
-> 
-> Rob
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
