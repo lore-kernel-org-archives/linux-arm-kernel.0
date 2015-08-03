@@ -1,44 +1,25 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 3 Aug 2015 11:16:24 +0200
-Subject: [linux-sunxi] [PATCH] ARM: dts: sunxi: Raise minimum CPU voltage
- for sun7i-a20 to a level all boards can supply
-In-Reply-To: <CAGRGNgV6b9yt2HnB2x2Wyc05KEahoX-Y+mVhxsryztcfA36H1g@mail.gmail.com>
-References: <1438543386-7253-1-git-send-email-public_timo.s@silentcreek.de>
- <CAGRGNgV6b9yt2HnB2x2Wyc05KEahoX-Y+mVhxsryztcfA36H1g@mail.gmail.com>
-Message-ID: <20150803091624.GZ2564@lukather>
+From: p.fedin@samsung.com (Pavel Fedin)
+Date: Mon, 03 Aug 2015 12:16:27 +0300
+Subject: [PATCH v2 14/15] KVM: arm64: implement MSI injection in ITS
+ emulation
+In-Reply-To: <55BF2F51.6020701@linaro.org>
+References: <1436538111-4294-1-git-send-email-andre.przywara@arm.com>
+ <1436538111-4294-15-git-send-email-andre.przywara@arm.com>
+ <55BB7678.5080105@linaro.org> <55BE7BA1.40403@arm.com>
+ <00a201d0cdb7$70a623f0$51f26bd0$@samsung.com> <55BF2F51.6020701@linaro.org>
+Message-ID: <00f101d0cdcd$146a6090$3d3f21b0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 03, 2015 at 09:35:51AM +1000, Julian Calaby wrote:
-> Hi Timo,
-> 
-> On Mon, Aug 3, 2015 at 5:23 AM, Timo Sigurdsson
-> <public_timo.s@silentcreek.de> wrote:
-> > sun7i-a20.dtsi contains an cpufreq operating point at 0.9 volts. Most A20 boards
-> > (or all?), however, do not allow the voltage to go below 1.0V. Thus, raise the
-> > voltage for the lowest operating point to 1.0V so all boards can actually use
-> > it.
-> 
-> Surely it wouldn't be added here if some could supply 0.9v.
-> 
-> Is the code that uses this smart enough to sensibly switch between two
-> operating points with the same frequency and different voltages? If
-> so, maybe just add a 144MHz @ 1.0v operating point?
+ Hello!
 
-And how would it choose between the two exactly ? Switch to the 144MHz
-@ 0.9V and see if it works ? If it doesn't you might have screwed your
-system already, and might not be able to recover from it at all.
+> Again the case that leaves me uncomfortable is the one where the
+> userspace does not provide the devid whereas it must (GICv3 ITS case).
 
-Maxime
+ Hypothetical broken userland which does not exist for now ?
+ IMHO the userland should just know, that if it supports ITS, it has to provide devIDs.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150803/08e0c339/attachment.sig>
+Kind regards,
+Pavel Fedin
+Expert Engineer
+Samsung Electronics Research center Russia
