@@ -1,40 +1,70 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 3 Aug 2015 09:30:47 +0200
-Subject: [PATCH 1/2] ARM: integrator: move framebuffers to driver
-In-Reply-To: <20150729193846.GQ7557@n2100.arm.linux.org.uk>
-References: <1438172831-11450-1-git-send-email-linus.walleij@linaro.org>
- <20150729193846.GQ7557@n2100.arm.linux.org.uk>
-Message-ID: <CACRpkdYkHgKJHDGp+6gS==9829tUsnFyPrdrevyyUuod04mNvw@mail.gmail.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Mon, 3 Aug 2015 09:38:28 +0200
+Subject: [PATCH] PM / devfreq: event: Remove incorrect property in
+ exynos-ppmu DT binding
+In-Reply-To: <1733224792.341671438577931309.JavaMail.weblogic@epmlwas06d>
+References: <1733224792.341671438577931309.JavaMail.weblogic@epmlwas06d>
+Message-ID: <55BF1A74.50105@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 29, 2015 at 9:38 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, Jul 29, 2015 at 02:27:11PM +0200, Linus Walleij wrote:
->> Commit 11c32d7b6274cb0f554943d65bd4a126c4a86dcd
->> "video: move Versatile CLCD helpers" already moved the
->> CLCD mode setting helpers for Versatile and Integrator/CP
->> to drivers/video/fbdev. Let's do the same for the IM-PD1
->> add-on board, copy the missing displays into the database
->> and simplify the code.
->
-> And thereby break the support.  The IM-PD1 CLCD can only access the memory
-> on the IM-PD1.  That's why the CLCD driver itself doesn't just allocate
-> the frame buffer using dma_alloc_writecombine().  Where the memory comes
-> from is platform specific.  In this case...
->
->> -static int impd1fb_clcd_setup(struct clcd_fb *fb)
->> -{
->> -     unsigned long framebase = fb->dev->res.start + 0x01000000;
->> -     unsigned long framesize = SZ_1M;
->
-> It's a chunk of SRAM offset by the specified value and of the specified
-> size above.
+Hello MyungJoo,
 
-Argh how typical. I need to get one of these PROSPECTOR displays
-so I can actually test this stuff. I have tried to get VGA out working with
-the IM-PD1 but it just doesn't seem to come up no matter how I
-try.
+On 08/03/2015 06:58 AM, MyungJoo Ham wrote:
+>> Hello Myungjoo,
+>>
+>> On 07/23/2015 10:30 AM, Javier Martinez Canillas wrote:
+>>> Hello Chanwoo,
+>>>
+>>> On 07/23/2015 10:19 AM, Chanwoo Choi wrote:
+>>>> Hi Javier,
+>>>>
+>>>> On 07/13/2015 03:58 PM, Javier Martinez Canillas wrote:
+>>>>> The exynos-ppmu driver is only a clock consumer and not a clock
+>>>>> provider but its Device Tree binding listed #clock-cells as an
+>>>>> optional property.
+>>>>>
+>>>>> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+>>>>>
+> []
+>>>>>
+>>>>> Example1 : PPMU nodes in exynos3250.dtsi are listed below.
+>>>>>
+>>>>>
+>>>>
+>>>> Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
+>>>>
+>>>> + Devfreq maintainer (Myungjoo Ham)
+>>>
+>>> Thanks for the review and for cc'ing Myungjoo. The get_maintainer.pl script
+>>> didn't tell me that so I think Documentation/devicetree/bindings/devfreq/
+>>> sub-dir should be added to the DEVICE FREQUENCY (DEVFREQ) entry in the
+>>> MAINTAINERS file.
+>>>
+>>>> I think that this patch will be more appropriate on devfreq git tree
+>>>> than linux-samsung git tree.
+>>>>
+>>>
+>>> Agreed.
+>>>
+>>
+>> Any comments about this patch?
+> 
+> Nope. It's applied.
+> 
+> 
+> Thanks.
+> 
+>
 
-Yours,
-Linus Walleij
+Great, thanks a lot.
+ 
+> 
+> MyungJoo
+> 
+
+Best regards,
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
