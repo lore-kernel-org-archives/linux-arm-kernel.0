@@ -1,38 +1,46 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon,  3 Aug 2015 21:24:46 +0200
-Subject: [PATCH 2/2] arm64: Enable Marvell Berlin SoC family in defconfig
+Date: Mon,  3 Aug 2015 21:24:45 +0200
+Subject: [PATCH 1/2] arm64: Enable Marvell Berlin SoC family in Kconfig
 In-Reply-To: <1438629886-6390-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1438629886-6390-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1438629886-6390-3-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1438629886-6390-2-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jisheng Zhang <jszhang@marvell.com>
 
-Enable Marvell Berlin SoC family in arm64 defconfig.
+This patch introduces ARCH_BERLIN to enable Marvell Berlin SoC family in
+Kconfig.
 
 Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
-Also discussed with Olof on IRC, this is the defconfig changes singled
-out from Jisheng's original patch.
+As discussed with Olof on IRC, this is Jisheng's Kconfig patch for
+ARM64 Berlin. Olof agreed to rework this to finally land in
+Kconfig.platforms, i.e. after
+  eed6b3eb20b9 ("arm64: Split out platform options to separate Kconfig")
 
 Sebastian
 ---
- arch/arm64/configs/defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm64/Kconfig | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index f38c94f1d898..9e8978c35772 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -31,6 +31,7 @@ CONFIG_MODULES=y
- CONFIG_MODULE_UNLOAD=y
- # CONFIG_BLK_DEV_BSG is not set
- # CONFIG_IOSCHED_DEADLINE is not set
-+CONFIG_ARCH_BERLIN=y
- CONFIG_ARCH_EXYNOS7=y
- CONFIG_ARCH_FSL_LS2085A=y
- CONFIG_ARCH_HISI=y
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 0f6edb14b7e4..d5c615312d87 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -162,6 +162,12 @@ source "kernel/Kconfig.freezer"
+ 
+ menu "Platform selection"
+ 
++config ARCH_BERLIN
++	bool "Marvell Berlin SoC Family"
++	select DW_APB_ICTL
++	help
++	  This enables support for Marvell Berlin SoC Family
++
+ config ARCH_EXYNOS
+ 	bool
+ 	help
 -- 
 2.1.0
