@@ -1,87 +1,37 @@
-From: dan.j.williams@intel.com (Dan Williams)
-Date: Mon, 3 Aug 2015 11:01:46 -0700
-Subject: [PATCH v3 24/24] pmem: convert to generic memremap
-In-Reply-To: <1438622487.9404.2.camel@linux.intel.com>
-References: <20150730165155.33962.64121.stgit@dwillia2-desk3.amr.corp.intel.com>
- <20150730165553.33962.20257.stgit@dwillia2-desk3.amr.corp.intel.com>
- <1438622487.9404.2.camel@linux.intel.com>
-Message-ID: <CAPcyv4gCPyXwwgjidaUaNyNe8ZitmwVa-NF7pBT-y3rV4XBUzA@mail.gmail.com>
+From: joe@perches.com (Joe Perches)
+Date: Mon, 03 Aug 2015 11:02:50 -0700
+Subject: [lm-sensors] MAINTAINERS/s5p: Kamil Debski no longer with Samsung?
+In-Reply-To: <1438621612.10722.27.camel@chaos.site>
+References: <20150802203128.1B6952691B2@smtprelay05.hostedemail.com>
+ <1438548040.30149.1.camel@perches.com>  <5606140.737HZuKSvR@amdc1976>
+ <1438621612.10722.27.camel@chaos.site>
+Message-ID: <1438624970.16753.9.camel@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 3, 2015 at 10:21 AM, Ross Zwisler
-<ross.zwisler@linux.intel.com> wrote:
-> On Thu, 2015-07-30 at 12:55 -0400, Dan Williams wrote:
->> Update memremap_pmem() to query the architecture for the mapping type of
->> the given persistent memory range  and then pass those flags to generic
->> memremap().  arch_memremap_pmem_flags() is provided an address range to
->> evaluate in the event an arch has a need for different mapping types by
->> address range.  For example the ACPI NFIT carries EFI mapping types in
->> its memory range description table.
->>
->> Cc: Ross Zwisler <ross.zwisler@linux.intel.com>
->> Signed-off-by: Dan Williams <dan.j.williams@intel.com>
->> ---
->>  arch/x86/include/asm/io.h |    2 +-
->>  arch/x86/mm/ioremap.c     |   16 ++++++++++------
->>  include/linux/pmem.h      |   26 +++++++++++++++-----------
->>  3 files changed, 26 insertions(+), 18 deletions(-)
->>
->> diff --git a/arch/x86/include/asm/io.h b/arch/x86/include/asm/io.h
->> index 1a9d44ee9ed0..26c81b01419c 100644
->> --- a/arch/x86/include/asm/io.h
->> +++ b/arch/x86/include/asm/io.h
->> @@ -245,7 +245,7 @@ static inline void flush_write_buffers(void)
->>  #endif
->>  }
->>
->> -void __pmem *arch_memremap_pmem(resource_size_t offset, size_t size);
->> +unsigned long arch_memremap_pmem_flags(resource_size_t offset, size_t size);
->>  #endif /* __KERNEL__ */
->>
->>  extern void native_io_delay(void);
->> diff --git a/arch/x86/mm/ioremap.c b/arch/x86/mm/ioremap.c
->> index ffbfcf2e701b..5a41e3e4ea1e 100644
->> --- a/arch/x86/mm/ioremap.c
->> +++ b/arch/x86/mm/ioremap.c
->> @@ -205,6 +205,16 @@ err_free_memtype:
->>       return NULL;
->>  }
->>
->> +unsigned long arch_memremap_pmem_flags(resource_size_t offset, size_t size)
->> +{
->> +     /*
->> +      * TODO: check the mapping type provided by platform firmware,
->> +      * per range.
->> +      */
->> +     return MEMREMAP_WB;
->> +}
->> +EXPORT_SYMBOL(arch_memremap_pmem_flags);
->
-> I'm not sure that the architecture code has the right information to be able
-> to tell the caller what the correct mapping is.
->
+On Mon, 2015-08-03 at 19:06 +0200, Jean Delvare wrote:
+> Hi Bartlomiej,
+> 
+> Le Monday 03 August 2015 ? 17:33 +0200, Bartlomiej Zolnierkiewicz a
+> ?crit :
+> > Hi,
+> > 
+> > On Sunday, August 02, 2015 01:40:40 PM Joe Perches wrote:
+> > > On Sun, 2015-08-02 at 20:31 +0000, Mail Delivery System wrote:
+> > > > <k.debski@samsung.com>: host mailin.samsung.com[203.254.224.12] 
+> > > > said: 550 5.1.1
+> > > >     Recipient address rejected: User unknown (in reply to RCPT TO 
+> > > > command)
+> > > 
+> > > His email address bounces.
+> > > 
+> > > Should MAINTAINERS be updated?
+> > 
+> > Please wait with these changes, the situation should be clarified soon
+> > (I've added Kamil to Cc).
+> 
+> Already clarified behind the scenes ;-) The patch should be 
+> discarded.
 
-It does in this instance as it has to pick a mapping type that is
-compatible with memcpy_to_pmem() and wmb_pmem().
-
-> I think what you are ultimately looking for is the "Address Range Memory
-> Mapping Attribute" found in the System Physical Address Range Structure of the
-> NFIT, right?  (ACPI 6.0, table 5-128)  How can we get to that structure from
-> nfit-independent architecture code like arch_memremap_pmem_flags()?  It seems
-> like that if we want to make the mapping type dynamic we should get the flags
-> from ND when the SPA range is provided by ND, and provide a reasonable default
-> (WB, it seems) when we are dealing with legacy PMEM?  If PMEM had the flag
-> from whatever source, it could then pass it in to memremap_pmem(), and get a
-> mapping of the appropriate caching.
-
-We can do what ioremap() does and look it up through other means.
-
-> Another option of course is to just ignore the mapping attribute in the NFIT
-> like we've been doing, and just say "we know WB will be good enough", and
-> remove the TODO.
-
-I agree, but there may be a non-zero chance that a platform
-implementation wants strict adherence.  Maybe move the TODO to a
-dev_dbg() that flags platforms where the NFIT mapping type is not
-"WB"?
+It wasn't a patch, it was a question with a list of
+sections that might be modified, and it wasn't signed.
