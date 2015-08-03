@@ -1,92 +1,46 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Mon,  3 Aug 2015 19:20:41 +0200
-Subject: [PATCH v4 2/5] KVM: arm/arm64: select IRQ_BYPASS_MANAGER
-In-Reply-To: <1438622444-25444-1-git-send-email-eric.auger@linaro.org>
-References: <1438622444-25444-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1438622444-25444-3-git-send-email-eric.auger@linaro.org>
+From: jungseoklee85@gmail.com (Jungseok Lee)
+Date: Tue, 4 Aug 2015 02:22:16 +0900
+Subject: [RFC 2/3] arm64: refactor save_stack_trace()
+In-Reply-To: <20150803125711.65463359@gandalf.local.home>
+References: <12F47692-3010-4886-B87D-3D7820609177@gmail.com>
+ <20150716113115.45a17f17@gandalf.local.home>
+ <20150716121658.7982fdf5@gandalf.local.home>
+ <20150717124054.GE26091@leverpostej>
+ <20150717090009.720f6bd0@gandalf.local.home>
+ <77EA0F10-D5F6-48BD-8652-3B979A978659@gmail.com>
+ <20150717104144.6588b2f7@gandalf.local.home>
+ <0886A996-40E1-49E9-823C-85E55A858716@gmail.com>
+ <1357EA74-B972-4B99-ADB0-BC7E8F06DDB5@gmail.com>
+ <20150720162004.GL9908@arm.com> <20150803090951.GA10501@arm.com>
+ <D7BD8A9F-8710-42D5-A0ED-8747D2B6B268@gmail.com>
+ <20150803125711.65463359@gandalf.local.home>
+Message-ID: <24AFDCDB-55DE-4A23-A26A-750B48AC365C@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Select IRQ_BYPASS_MANAGER when CONFIG_KVM is set
-Also add compilation of virt/lib.
+On Aug 4, 2015, at 1:57 AM, Steven Rostedt wrote:
+> On Tue, 4 Aug 2015 01:30:50 +0900
+> Jungseok Lee <jungseoklee85@gmail.com> wrote:
+> 
+> 
+>> There are two issues in the current version.
+>> 1) The change does not work correctly when function_graph feature is enabled.
+>> 2) Akashi have raised an issue that size field of stack tracer is inaccurate.
+>> 
+>> So, I think this patch set is not ready yet.
+> 
+> Do you still want me to add code that does:
+> 
+> if (*p == (stack_dump_trace[i] + FTRACE_STACK_FRAME_OFFSET)) {
+> 
+> ?
+> 
+> If you expect to need that, I can get it into the next merge window and
+> you can base the code of that in the merge window after that.
 
-Signed-off-by: Eric Auger <eric.auger@linaro.org>
-Signed-off-by: Feng Wu <feng.wu@intel.com>
+It would be better to add the snippet when a new version is ready.
+That way might help to figure out easily why the macro is introduced and how
+it can be used in architecture code.
 
----
-
-v3 -> v4:
-- add compilation of virt/lib in arm/arm64 KVM
-
-v2 -> v3:
-- [Feng Wu] Correct a typo in 'arch/arm64/kvm/Kconfig'
-
-v1 -> v2:
-- also set IRQ_BYPASS_MANAGER for arm64
----
- arch/arm/kvm/Kconfig    | 2 ++
- arch/arm/kvm/Makefile   | 1 +
- arch/arm64/kvm/Kconfig  | 2 ++
- arch/arm64/kvm/Makefile | 1 +
- 4 files changed, 6 insertions(+)
-
-diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
-index bfb915d..3c565b9 100644
---- a/arch/arm/kvm/Kconfig
-+++ b/arch/arm/kvm/Kconfig
-@@ -3,6 +3,7 @@
- #
- 
- source "virt/kvm/Kconfig"
-+source "virt/lib/Kconfig"
- 
- menuconfig VIRTUALIZATION
- 	bool "Virtualization"
-@@ -31,6 +32,7 @@ config KVM
- 	select KVM_VFIO
- 	select HAVE_KVM_EVENTFD
- 	select HAVE_KVM_IRQFD
-+	select IRQ_BYPASS_MANAGER
- 	depends on ARM_VIRT_EXT && ARM_LPAE && ARM_ARCH_TIMER
- 	---help---
- 	  Support hosting virtualized guest machines.
-diff --git a/arch/arm/kvm/Makefile b/arch/arm/kvm/Makefile
-index c5eef02c..a6a41dd 100644
---- a/arch/arm/kvm/Makefile
-+++ b/arch/arm/kvm/Makefile
-@@ -24,3 +24,4 @@ obj-y += $(KVM)/arm/vgic.o
- obj-y += $(KVM)/arm/vgic-v2.o
- obj-y += $(KVM)/arm/vgic-v2-emul.o
- obj-y += $(KVM)/arm/arch_timer.o
-+obj-y += ../../../virt/lib/
-diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
-index bfffe8f..2509539 100644
---- a/arch/arm64/kvm/Kconfig
-+++ b/arch/arm64/kvm/Kconfig
-@@ -3,6 +3,7 @@
- #
- 
- source "virt/kvm/Kconfig"
-+source "virt/lib/Kconfig"
- 
- menuconfig VIRTUALIZATION
- 	bool "Virtualization"
-@@ -31,6 +32,7 @@ config KVM
- 	select KVM_VFIO
- 	select HAVE_KVM_EVENTFD
- 	select HAVE_KVM_IRQFD
-+	select IRQ_BYPASS_MANAGER
- 	---help---
- 	  Support hosting virtualized guest machines.
- 
-diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
-index f90f4aa..55eec69 100644
---- a/arch/arm64/kvm/Makefile
-+++ b/arch/arm64/kvm/Makefile
-@@ -27,3 +27,4 @@ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v3.o
- kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v3-emul.o
- kvm-$(CONFIG_KVM_ARM_HOST) += vgic-v3-switch.o
- kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/arch_timer.o
-+kvm-$(CONFIG_KVM_ARM_HOST) += ../../../virt/lib/
--- 
-1.9.1
+Best Regards
+Jungseok Lee
