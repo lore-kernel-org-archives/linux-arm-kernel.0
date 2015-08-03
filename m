@@ -1,52 +1,84 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Mon, 3 Aug 2015 17:34:36 -0500
-Subject: [PATCH] ARM/PCI: set MPS before pci_bus_add_devices()
-In-Reply-To: <20150803191340.GM7557@n2100.arm.linux.org.uk>
-References: <1437514519-18545-1-git-send-email-m-karicheri2@ti.com>
- <20150803191340.GM7557@n2100.arm.linux.org.uk>
-Message-ID: <CAErSpo4PBKL9KFf80C6n8CwGRB6zq02rJ9i-LhG5RQYaYKcsWg@mail.gmail.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 04 Aug 2015 00:38:03 +0200
+Subject: [PATCH 1/2] ARM: dts: rockchip: reserve unusable memory region on
+ rk3288
+In-Reply-To: <CAD=FV=W2LSQh4e9+=ooTf34VzM_yPZn497DqSVEdb1kehZbqQQ@mail.gmail.com>
+References: <15143985.aGzb1oeyb9@diego>
+ <CAD=FV=W2LSQh4e9+=ooTf34VzM_yPZn497DqSVEdb1kehZbqQQ@mail.gmail.com>
+Message-ID: <10674303.GIsaEKUXGC@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 3, 2015 at 2:13 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Jul 21, 2015 at 05:35:19PM -0400, Murali Karicheri wrote:
->> The MPS configuration should be done *before* pci_bus_add_devices().
->> After pci_bus_add_devices(), drivers may be bound to devices, and
->> the PCI core shouldn't touch device configuration while a driver
->> owns the device.
->>
->> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
->> Reported-by: Bjorn Helgaas <bhelgaas@google.com>
->> ---
->>  arch/arm/kernel/bios32.c | 19 +++++--------------
->>  1 file changed, 5 insertions(+), 14 deletions(-)
->>
->> diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
->> index fcbbbb1..17efde7 100644
->> --- a/arch/arm/kernel/bios32.c
->> +++ b/arch/arm/kernel/bios32.c
->> @@ -520,7 +520,8 @@ void pci_common_init_dev(struct device *parent, struct hw_pci *hw)
->>       list_for_each_entry(sys, &head, node) {
->>               struct pci_bus *bus = sys->bus;
->>
->> -             if (!pci_has_flag(PCI_PROBE_ONLY)) {
->> +             if (bus && !pci_has_flag(PCI_PROBE_ONLY)) {
->
-> Let's get rid of that useless check.  bus can't be NULL here.
->
-> In the original code (below) if bus was NULL, then we would've already
-> oopsed before we got here.  As we don't oops here, no one is ever
-> seeing it being NULL, so the test is redundant.
->
->> -     list_for_each_entry(sys, &head, node) {
->> -             struct pci_bus *bus = sys->bus;
->> -
->> -             /* Configure PCI Express settings */
->> -             if (bus && !pci_has_flag(PCI_PROBE_ONLY)) {
->
+Am Samstag, 1. August 2015, 14:32:32 schrieb Doug Anderson:
+> Heiko
+> 
+> On Sat, Aug 1, 2015 at 5:35 AM, Heiko St?bner <heiko@sntech.de> wrote:
+> > The rk3288 has problems accessing the memory region 0xfe000000~0xff000000.
+> > So block off the affected region to prevent its use.
+> > 
+> > Tested on 4GB Veyron Minnie and 2GB Veyron Jerry devices.
+> > 
+> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> > ---
+> > 
+> >  arch/arm/boot/dts/rk3288.dtsi | 10 ++++++++++
+> >  1 file changed, 10 insertions(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+> > index 2db91c9..19766af 100644
+> > --- a/arch/arm/boot/dts/rk3288.dtsi
+> > +++ b/arch/arm/boot/dts/rk3288.dtsi
+> > @@ -169,6 +169,16 @@
+> > 
+> >                 };
+> >         
+> >         };
+> > 
+> > +       reserved-memory {
+> > +               #address-cells = <1>;
+> > +               #size-cells = <1>;
+> > +               ranges;
+> > +
+> > +               unusable at fe000000 {
+> > +                       reg = <0xfe000000 0x1000000>;
+> > +               };
+> > +       };
+> > +
+> 
+> I don't object to just reserving this memory, but I do object a little
+> to this implementation.
+> 
+> It's 16 MB we're talking about here, which is pretty small compared to
+> the 4G of memory that you must have when this is a problem.  However,
+> at some point we might want to try to actually use this 16 MB.
+> 
+> The memory is actually _not_ unusable, it's only unusable for DMA.  In
+> theory the kernel is supposed to have a way to mark memory as unusable
+> for DMA which would then allow us to use this memory for non-DMA
+> purposes...
+> 
+> Nobody ever managed to figure this out in the Chrome OS tree (it was
+> 16 megs so we just reserved it and never got back around to it), but
+> when folks were looking at it they looked at things like ZONE_DMA,
+> dma_set_mask_and_coherent, etc.
+> 
+> In any case, to leave the door open for people to fix this in the
+> future, it seems prudent to fix this in code like
+> <https://chromium-review.googlesource.com/#/c/245107/> rather than to
+> put the limit in DTS.
 
-Sorry, I had forgotten to push this branch, but I did already get rid
-of the check for bus being NULL:
+hmm, a counter argument in favor of even having the stopgap section disabling 
+the memory in the dts might be, that as Jeffy said all current Rockchip socs 
+are affected, even the rk3368.
 
-http://git.kernel.org/cgit/linux/kernel/git/helgaas/pci.git/commit/?id=808b27a5ae05
+So a future real solution would be declaring the usable dma area in devicetree 
+anyway and not in kernel code. So in my mind devices can disable the memory 
+for now in dt and later (once something usable is defined) can switch the soc-
+level devicetree to this one, describing the actually usable dma area.
+
+Old devicetrees would keep working anyway and could switch at their 
+convenience. So I don't see a real transistion problem here (aka no API 
+breakage or so)?
+
+
+Heiko
