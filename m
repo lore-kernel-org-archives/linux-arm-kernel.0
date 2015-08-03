@@ -1,78 +1,104 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 3 Aug 2015 14:11:32 +0100
-Subject: [PATCH v3 1/2] PCI: generic: remove dependency on hw_pci
-In-Reply-To: <20150731162716.GA7182@red-moon>
-References: <1438183681-30519-1-git-send-email-jchandra@broadcom.com>
- <20150730133521.GA12999@red-moon>
- <20150731160654.GB31408@jayachandranc.netlogicmicro.com>
- <20150731162716.GA7182@red-moon>
-Message-ID: <20150803131131.GF10501@arm.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Mon, 3 Aug 2015 15:11:41 +0200
+Subject: [linux-sunxi] Re: [PATCH v2] ARM: dts: sunxi: Add regulators for
+ LeMaker BananaPi
+In-Reply-To: <20150803094723.GD2564@lukather>
+References: <1438532305-5884-1-git-send-email-public_timo.s@silentcreek.de>
+ <20150803094723.GD2564@lukather>
+Message-ID: <55BF688D.5010905@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jayachandran, Bjorn,
+Hi,
 
-On Fri, Jul 31, 2015 at 05:27:16PM +0100, Lorenzo Pieralisi wrote:
-> On Fri, Jul 31, 2015 at 05:07:01PM +0100, Jayachandran C. wrote:
-> > On Thu, Jul 30, 2015 at 02:35:21PM +0100, Lorenzo Pieralisi wrote:
-> > > On Wed, Jul 29, 2015 at 04:28:00PM +0100, Jayachandran C wrote:
-> > > > -	pci_common_init_dev(dev, &hw);
-> > > > +	/* do not reassign resource if probe only */
-> > > > +	if (!pci_has_flag(PCI_PROBE_ONLY))
-> > > > +		pci_add_flags(PCI_REASSIGN_ALL_RSRC);
-> > > 
-> > > You should add PCI_REASSIGN_ALL_BUS here. As I said in patch 2 comment,
-> > 
-> > The idea is to do exactly what pci_common_init_dev does on ARM. There is
-> > not need to change behavior on ARM and deal with the fallout in this
-> > patchset.
-> 
-> You are enabling this driver on ARM64, and on ARM64 that flag does
-> make a difference, it does not on ARM as far as I can tell, but you do
-> not seem to care.
-> 
-> Actually Rob asked you to put together a function since most of
-> this code is replicated across ARM drivers eg:
-> 
-> drivers/pci/host/pci-versatile.c
-> 
-> Leave the code as it is and I will consolidate the code later.
-> 
-> > > please enable setup-irq.c in an explicit commit, re-sequence the
-> > > series and fold the Kconfig ARM64 enablement in this patch.
-> > 
-> > I would think that the Makefile and Kconfig changes should be
-> > togethter as the arm64 enablement patch. The previous patch is
-> > to update the gen_pci driver, and it really makes sense in that
-> > order.  I am not sure why you suggest this change.
-> 
-> Because this is not the only driver that requires compiling
-> drivers/pci/setup-irq.c on ARM64, I thought it made more sense
-> to do it in a separate patch to make that change standalone.
-> 
-> If for any reason we have to revert your patch that enables
-> PCI host generic on ARM64 (and we remove with it the compilation
-> of setup-irq.c) we would break other ARM64 PCI hosts that require it,
-> right ?
-> 
-> I leave the decision to Bjorn since I am away next week, I am fine
-> with the code as it is so please go ahead.
+On 03-08-15 11:47, Maxime Ripard wrote:
+> On Sun, Aug 02, 2015 at 06:18:25PM +0200, Timo Sigurdsson wrote:
+>> sun7i-a20-bananapi.dts doesn't contain regulator nodes for the AXP209 PMU
+>> driver, so add them to allow for voltage-scaling with cpufreq-dt.
+>>
+>> Signed-off-by: Timo Sigurdsson <public_timo.s@silentcreek.de>
+>> ---
+>> Changes since v1 (RFC):
+>>
+>> - Dropped the changes to the cpufreq operating points and renamed the patch
+>> accordingly
+>> - Limited the CPU voltage range so it doesn't exceed the SOC specifications
+>> ---
+>>   arch/arm/boot/dts/sun7i-a20-bananapi.dts | 35 ++++++++++++++++++++++++++++----
+>>   1 file changed, 31 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/sun7i-a20-bananapi.dts b/arch/arm/boot/dts/sun7i-a20-bananapi.dts
+>> index 9f7b472..74382f3 100644
+>> --- a/arch/arm/boot/dts/sun7i-a20-bananapi.dts
+>> +++ b/arch/arm/boot/dts/sun7i-a20-bananapi.dts
+>> @@ -92,6 +92,10 @@
+>>   	status = "okay";
+>>   };
+>>
+>> +&cpu0 {
+>> +	cpu-supply = <&reg_dcdc2>;
+>> +};
+>> +
+>>   &ehci0 {
+>>   	status = "okay";
+>>   };
+>> @@ -119,13 +123,9 @@
+>>   	status = "okay";
+>>
+>>   	axp209: pmic at 34 {
+>> -		compatible = "x-powers,axp209";
+>>   		reg = <0x34>;
+>>   		interrupt-parent = <&nmi_intc>;
+>>   		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
+>> -
+>> -		interrupt-controller;
+>> -		#interrupt-cells = <1>;
+>>   	};
+>>   };
+>>
+>> @@ -182,6 +182,33 @@
+>>   	};
+>>   };
+>>
+>> +#include "axp209.dtsi"
+>> +
+>> +&reg_dcdc2 {
+>> +	regulator-always-on;
+>> +	regulator-min-microvolt = <1000000>;
+>> +	regulator-max-microvolt = <1400000>;
+>> +	regulator-name = "vdd-cpu";
+>> +};
+>> +
+>> +&reg_dcdc3 {
+>> +	regulator-always-on;
+>> +	regulator-min-microvolt = <1000000>;
+>> +	regulator-max-microvolt = <1400000>;
+>> +	regulator-name = "vdd-int-dll";
+>> +};
+>> +
+>> +&reg_ldo1 {
+>> +	regulator-name = "vdd-rtc";
+>> +};
+>> +
+>> +&reg_ldo2 {
+>> +	regulator-always-on;
+>> +	regulator-min-microvolt = <3000000>;
+>> +	regulator-max-microvolt = <3000000>;
+>> +	regulator-name = "avcc";
+>> +};
+>
+> What regulator provides the 3.3V regulator used in the rest of this DT
+> then (MMC, GMAC) ?
 
-In the interest of getting something merged, can I suggest you
-(Jayachandran) repost the patches with Lorenzo's suggestions to reorder
-the series and split up the setup-irq compilation into a separate patch?
+A separate fixed regulator, like most (all?) other axp209 using boards,
+e.g. the cubieboard has a TCS4199 regulator for this, and the banana
+boards use a XL8206/UP1746 for this, according to the schematics I
+have.
 
-You can also add his ack to this patch.
+Regards,
 
-It's a pity that the code isn't quite how we'd like it to end up, but
-this at least enables people for 4.3 and I know that Lorenzo is working
-on tidying up the loose ends as additional patches (but he's on holiday
-this week). That includes removal of the PROBE_ONLY bodge that I've got
-queued in arch/arm64/kernel/pci.c.
+Hans
 
-Bjorn, does that sound ok to you? I'm keen to have something working, as
-I'm starting to get beaten up about the lack of generic PCI on arm64.
-
-Cheers,
-
-Will
+>
+> Maxime
+>
