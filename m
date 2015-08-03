@@ -1,147 +1,133 @@
-From: yong.wu@mediatek.com (Yong Wu)
-Date: Mon, 3 Aug 2015 18:21:19 +0800
-Subject: [PATCH v4 6/6] dts: mt8173: Add iommu/smi nodes for mt8173
-In-Reply-To: <1438597279-2937-1-git-send-email-yong.wu@mediatek.com>
-References: <1438597279-2937-1-git-send-email-yong.wu@mediatek.com>
-Message-ID: <1438597279-2937-7-git-send-email-yong.wu@mediatek.com>
+From: aisheng.dong@freescale.com (Dong Aisheng)
+Date: Mon, 3 Aug 2015 18:14:26 +0800
+Subject: [PATCH v3 5/6] mmc: sdhci-esdhc-imx: config watermark level
+ and burst length
+In-Reply-To: <20150731151345.GX7557@n2100.arm.linux.org.uk>
+References: <1438160637-28061-1-git-send-email-haibo.chen@freescale.com>
+ <1438160637-28061-6-git-send-email-haibo.chen@freescale.com>
+ <20150731145140.GE27806@shlinux1.ap.freescale.net>
+ <20150731151345.GX7557@n2100.arm.linux.org.uk>
+Message-ID: <20150803101423.GA24870@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add the iommu/larbs nodes for mt8173
+On Fri, Jul 31, 2015 at 04:13:45PM +0100, Russell King - ARM Linux wrote:
+> On Fri, Jul 31, 2015 at 10:51:41PM +0800, Dong Aisheng wrote:
+> > On Wed, Jul 29, 2015 at 05:03:56PM +0800, Haibo Chen wrote:
+> > > i.MX7D support eMMC HS400 mode, this mode can run in 8 bit,200MHZ
+> > > DDR mode. So the I/O speed improve a lot compare to SD3.0
+> > > 
+> > > The default burst length is 8, if we don't change this value, in
+> > > HS400 mode, when we do eMMC read operation, we can find that the
+> > > clock signal will stop for a period of time. This means the speed
+> > > of data moving on AHB bus is slower than I/O speed. So we should
+> > > improve the speed of data moving on AHB bus.
+> > > 
+> > > For imx7d usdhc, this patch set the burst length as 16, and set
+> > > watermark level as 64. The test result is the clock signal has
+> > > no stop during the eMMC HS400 operation. For other imx usdhc, remain
+> > > the default value: burst length as 8, watermark level as 16.
+> > > 
+> > > Signed-off-by: Haibo Chen <haibo.chen@freescale.com>
+> > > ---
+> > >  drivers/mmc/host/sdhci-esdhc-imx.c | 11 ++++++++++-
+> > >  1 file changed, 10 insertions(+), 1 deletion(-)
+> > > 
+> > > diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+> > > index 158f93b..37d0095 100644
+> > > --- a/drivers/mmc/host/sdhci-esdhc-imx.c
+> > > +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+> > > @@ -239,6 +239,11 @@ static inline int is_imx6q_usdhc(struct pltfm_imx_data *data)
+> > >  	return data->socdata == &usdhc_imx6q_data;
+> > >  }
+> > >  
+> > > +static inline int is_imx7d_usdhc(struct pltfm_imx_data *data)
+> > > +{
+> > > +	return data->socdata == &usdhc_imx7d_data;
+> > > +}
+> > 
+> > Can we using flag to check instead of adding more is_imx_usdhc()?
+> 
+> No, not more flags.  Do the job properly and parameterise the differences.
+> 
 
-Signed-off-by: Yong Wu <yong.wu@mediatek.com>
----
- arch/arm64/boot/dts/mediatek/mt8173.dtsi | 81 ++++++++++++++++++++++++++++++++
- 1 file changed, 81 insertions(+)
+Hi Russell,
 
-diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-index 6c3f047..a92956d 100644
---- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-+++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-@@ -14,6 +14,7 @@
- #include <dt-bindings/clock/mt8173-clk.h>
- #include <dt-bindings/interrupt-controller/irq.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/memory/mt8173-larb-port.h>
- #include <dt-bindings/power/mt8173-power.h>
- #include <dt-bindings/reset-controller/mt8173-resets.h>
- #include "mt8173-pinfunc.h"
-@@ -265,6 +266,17 @@
- 			reg = <0 0x10200620 0 0x20>;
- 		};
- 
-+		iommu: iommu at 10205000 {
-+			compatible = "mediatek,mt8173-m4u";
-+			reg = <0 0x10205000 0 0x1000>;
-+			interrupts = <GIC_SPI 139 IRQ_TYPE_LEVEL_LOW>;
-+			clocks = <&infracfg CLK_INFRA_M4U>;
-+			clock-names = "bclk";
-+			mediatek,larb = <&larb0 &larb1 &larb2
-+					 &larb3 &larb4 &larb5>;
-+			#iommu-cells = <2>;
-+		};
-+
- 		apmixedsys: clock-controller at 10209000 {
- 			compatible = "mediatek,mt8173-apmixedsys";
- 			reg = <0 0x10209000 0 0x1000>;
-@@ -501,29 +513,98 @@
- 			#clock-cells = <1>;
- 		};
- 
-+		larb0: larb at 14021000 {
-+			compatible = "mediatek,mt8173-smi-larb";
-+			reg = <0 0x14021000 0 0x1000>;
-+			mediatek,smi = <&smi_common>;
-+			power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
-+			clocks = <&mmsys CLK_MM_SMI_LARB0>,
-+				 <&mmsys CLK_MM_SMI_LARB0>;
-+			clock-names = "apb", "smi";
-+		};
-+
-+		smi_common: smi at 14022000 {
-+			compatible = "mediatek,mt8173-smi";
-+			reg = <0 0x14022000 0 0x1000>;
-+			power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
-+			clocks = <&mmsys CLK_MM_SMI_COMMON>,
-+				 <&mmsys CLK_MM_SMI_COMMON>;
-+			clock-names = "apb", "smi";
-+		};
-+
-+		larb4: larb at 14027000 {
-+			compatible = "mediatek,mt8173-smi-larb";
-+			reg = <0 0x14027000 0 0x1000>;
-+			mediatek,smi = <&smi_common>;
-+			power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
-+			clocks = <&mmsys CLK_MM_SMI_LARB4>,
-+				 <&mmsys CLK_MM_SMI_LARB4>;
-+			clock-names = "apb", "smi";
-+		};
-+
- 		imgsys: clock-controller at 15000000 {
- 			compatible = "mediatek,mt8173-imgsys", "syscon";
- 			reg = <0 0x15000000 0 0x1000>;
- 			#clock-cells = <1>;
- 		};
- 
-+		larb2: larb at 15001000 {
-+			compatible = "mediatek,mt8173-smi-larb";
-+			reg = <0 0x15001000 0 0x1000>;
-+			mediatek,smi = <&smi_common>;
-+			power-domains = <&scpsys MT8173_POWER_DOMAIN_ISP>;
-+			clocks = <&imgsys CLK_IMG_LARB2_SMI>,
-+				 <&imgsys CLK_IMG_LARB2_SMI>;
-+			clock-names = "apb", "smi";
-+		};
-+
- 		vdecsys: clock-controller at 16000000 {
- 			compatible = "mediatek,mt8173-vdecsys", "syscon";
- 			reg = <0 0x16000000 0 0x1000>;
- 			#clock-cells = <1>;
- 		};
- 
-+		larb1: larb at 16010000 {
-+			compatible = "mediatek,mt8173-smi-larb";
-+			reg = <0 0x16010000 0 0x1000>;
-+			mediatek,smi = <&smi_common>;
-+			power-domains = <&scpsys MT8173_POWER_DOMAIN_VDEC>;
-+			clocks = <&vdecsys CLK_VDEC_CKEN>,
-+				 <&vdecsys CLK_VDEC_LARB_CKEN>;
-+			clock-names = "apb", "smi";
-+		};
-+
- 		vencsys: clock-controller at 18000000 {
- 			compatible = "mediatek,mt8173-vencsys", "syscon";
- 			reg = <0 0x18000000 0 0x1000>;
- 			#clock-cells = <1>;
- 		};
- 
-+		larb3: larb at 18001000 {
-+			compatible = "mediatek,mt8173-smi-larb";
-+			reg = <0 0x18001000 0 0x1000>;
-+			mediatek,smi = <&smi_common>;
-+			power-domains = <&scpsys MT8173_POWER_DOMAIN_VENC>;
-+			clocks = <&vencsys CLK_VENC_CKE1>,
-+				 <&vencsys CLK_VENC_CKE0>;
-+			clock-names = "apb", "smi";
-+		};
-+
- 		vencltsys: clock-controller at 19000000 {
- 			compatible = "mediatek,mt8173-vencltsys", "syscon";
- 			reg = <0 0x19000000 0 0x1000>;
- 			#clock-cells = <1>;
- 		};
-+
-+		larb5: larb at 19001000 {
-+			compatible = "mediatek,mt8173-smi-larb";
-+			reg = <0 0x19001000 0 0x1000>;
-+			mediatek,smi = <&smi_common>;
-+			power-domains = <&scpsys MT8173_POWER_DOMAIN_VENC_LT>;
-+			clocks = <&vencltsys CLK_VENCLT_CKE1>,
-+				 <&vencltsys CLK_VENCLT_CKE0>;
-+			clock-names = "apb", "smi";
-+		};
- 	};
- };
- 
--- 
-1.8.1.1.dirty
+Thanks for the review.
+
+I mean using the exist flag to do like:
+if (imx_data->socdata->flags & ESDHC_FLAG_SUP_HS400)
+        writel(0x10401040, host->ioaddr + ESDHC_WTMK_LVL);
+else    
+        writel(0x08100810, host->ioaddr + ESDHC_WTMK_LVL);
+Not adding another new flag.
+
+ESDHC_FLAG_SUP_HS400 represents the new feature support of HS400 which is
+already added in patch
+[PATCH v3 1/6] mmc: sdhci-esdhc-imx: add imx7d support and support HS400
+
+> > >  static inline int esdhc_is_usdhc(struct pltfm_imx_data *data)
+> > >  {
+> > >  	return !!(data->socdata->flags & ESDHC_FLAG_USDHC);
+> > > @@ -1145,7 +1150,11 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
+> > >  	 * to something insane.  Change it back here.
+> > >  	 */
+> > >  	if (esdhc_is_usdhc(imx_data)) {
+> > > -		writel(0x08100810, host->ioaddr + ESDHC_WTMK_LVL);
+> > > +		if (is_imx7d_usdhc(imx_data))
+> > > +			writel(0x10401040, host->ioaddr + ESDHC_WTMK_LVL);
+> > > +		else
+> > > +			writel(0x08100810, host->ioaddr + ESDHC_WTMK_LVL);
+> 
+> So the value to be written to this register should come from the
+> driver data, which is already used as a struct esdhc_soc_data to
+> extrapolate out the differences.
+> 
+> Going down the flag path will lead you to an even more of a stinking
+> shitpile than sdhci already is - if another version of the SoC requires
+> a different value there, what are you going to do?  Add yet another
+> flag for the next value?  What are you going to do when you have 16
+> different values?  Use 16 different flags?  Clearly that path is insane.
+> 
+
+I understand your concern for the potential bad situation.
+
+Here the watermark level setting of mx7d is dependant on the new feature
+of HS400, so it seems make senese to use that flag to set value and does
+not need adding new flag.
+
+Actually that is the current approach for uSDHC driver to distinguish
+the difference between register offset/settings by checking feature flags.
+e.g. ESDHC_FLAG_USDHC, ESDHC_FLAG_STD_TUNING, ESDHC_FLAG_HS200 and etc.
+This approach can save us a lot more flags for SoC checking for common
+feature part. And up till now, things seem good.
+
+If really new SoC comes while it requires a different value, if it's feature
+dependant, we may still use feature flag for it.
+If not, probably a quirk may be needed if it's IP limitation.
+
+If it's normal situation and such situation happened too many in the future,
+we may choose to parameterise all these normal feature independent settings
+into esdhc_soc_data to avoid adding meaningless flags.
+e.g.
+static struct esdhc_soc_data usdhc_imx6sx_data = {
+        .flags = ESDHC_FLAG_USDHC | ESDHC_FLAG_STD_TUNING
+                        | ESDHC_FLAG_HAVE_CAP1 | ESDHC_FLAG_HS200,
+        .wml = 32,
+};
+
+static struct esdhc_soc_data usdhc_imx7d_data = {
+        .flags = ESDHC_FLAG_USDHC | ESDHC_FLAG_STD_TUNING
+                        | ESDHC_FLAG_HAVE_CAP1 | ESDHC_FLAG_HS200,
+        .wml = 64,
+};
+
+But currently i still did not see such urgent requirement to do it for only
+water mark level settings.
+
+Regards
+Dong Aisheng
+
+> -- 
+> FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+> according to speedtest.net.
