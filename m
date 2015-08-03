@@ -1,40 +1,73 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 3 Aug 2015 19:20:47 +0200
-Subject: [PATCH v3 00/16] ARM: shmobile: Add CPG/MSTP Clock Domain
-In-Reply-To: <CAPDyKFp=zoo1OY9K-dYh9e2OV-OFVp36MbXX83vT19uFWB+0Yg@mail.gmail.com>
-References: <1435766290-3005-1-git-send-email-geert+renesas@glider.be>
- <CAPDyKFp=zoo1OY9K-dYh9e2OV-OFVp36MbXX83vT19uFWB+0Yg@mail.gmail.com>
-Message-ID: <CAMuHMdUxCgXnF6AM=LefR7ZHX0d8XNcn-O=eA7o4C18O4kJbAg@mail.gmail.com>
+From: ross.zwisler@linux.intel.com (Ross Zwisler)
+Date: Mon, 03 Aug 2015 11:21:27 -0600
+Subject: [PATCH v3 24/24] pmem: convert to generic memremap
+In-Reply-To: <20150730165553.33962.20257.stgit@dwillia2-desk3.amr.corp.intel.com>
+References: <20150730165155.33962.64121.stgit@dwillia2-desk3.amr.corp.intel.com>
+ <20150730165553.33962.20257.stgit@dwillia2-desk3.amr.corp.intel.com>
+Message-ID: <1438622487.9404.2.camel@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 22, 2015 at 3:00 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> On 1 July 2015 at 17:57, Geert Uytterhoeven <geert+renesas@glider.be> wrote:
->> This patch series adds Clock Domain support to the Clock Pulse Generator
->> (CPG) Module Stop (MSTP) Clocks driver using the generic PM Domain, to
->> be used on shmobile SoCs without device power domains (R-Car Gen1 and
->> Gen2, RZ).  This allows to power-manage the module clocks of SoC devices
->> that are part of the CPG/MSTP Clock Domain using Runtime PM, or for
->> system suspend/resume, similar to SoCs with device power domains
->> (SH-Mobile and R-Mobile).
+On Thu, 2015-07-30 at 12:55 -0400, Dan Williams wrote:
+> Update memremap_pmem() to query the architecture for the mapping type of
+> the given persistent memory range  and then pass those flags to generic
+> memremap().  arch_memremap_pmem_flags() is provided an address range to
+> evaluate in the event an arch has a need for different mapping types by
+> address range.  For example the ACPI NFIT carries EFI mapping types in
+> its memory range description table.
+> 
+> Cc: Ross Zwisler <ross.zwisler@linux.intel.com>
+> Signed-off-by: Dan Williams <dan.j.williams@intel.com>
+> ---
+>  arch/x86/include/asm/io.h |    2 +-
+>  arch/x86/mm/ioremap.c     |   16 ++++++++++------
+>  include/linux/pmem.h      |   26 +++++++++++++++-----------
+>  3 files changed, 26 insertions(+), 18 deletions(-)
+> 
+> diff --git a/arch/x86/include/asm/io.h b/arch/x86/include/asm/io.h
+> index 1a9d44ee9ed0..26c81b01419c 100644
+> --- a/arch/x86/include/asm/io.h
+> +++ b/arch/x86/include/asm/io.h
+> @@ -245,7 +245,7 @@ static inline void flush_write_buffers(void)
+>  #endif
+>  }
+>  
+> -void __pmem *arch_memremap_pmem(resource_size_t offset, size_t size);
+> +unsigned long arch_memremap_pmem_flags(resource_size_t offset, size_t size);
+>  #endif /* __KERNEL__ */
+>  
+>  extern void native_io_delay(void);
+> diff --git a/arch/x86/mm/ioremap.c b/arch/x86/mm/ioremap.c
+> index ffbfcf2e701b..5a41e3e4ea1e 100644
+> --- a/arch/x86/mm/ioremap.c
+> +++ b/arch/x86/mm/ioremap.c
+> @@ -205,6 +205,16 @@ err_free_memtype:
+>  	return NULL;
+>  }
+>  
+> +unsigned long arch_memremap_pmem_flags(resource_size_t offset, size_t size)
+> +{
+> +	/*
+> +	 * TODO: check the mapping type provided by platform firmware,
+> +	 * per range.
+> +	 */
+> +	return MEMREMAP_WB;
+> +}
+> +EXPORT_SYMBOL(arch_memremap_pmem_flags);
 
-[...]
+I'm not sure that the architecture code has the right information to be able
+to tell the caller what the correct mapping is.
 
-> Unless it's too late; for the series - feel free to add:
->
-> Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
+I think what you are ultimately looking for is the "Address Range Memory
+Mapping Attribute" found in the System Physical Address Range Structure of the
+NFIT, right?  (ACPI 6.0, table 5-128)  How can we get to that structure from
+nfit-independent architecture code like arch_memremap_pmem_flags()?  It seems
+like that if we want to make the mapping type dynamic we should get the flags
+from ND when the SPA range is provided by ND, and provide a reasonable default
+(WB, it seems) when we are dealing with legacy PMEM?  If PMEM had the flag
+from whatever source, it could then pass it in to memremap_pmem(), and get a
+mapping of the appropriate caching.
 
-Thank you.
-
-I have to respin anyway, as new nodes have been added to various .dtsi files.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Another option of course is to just ignore the mapping attribute in the NFIT
+like we've been doing, and just say "we know WB will be good enough", and
+remove the TODO.
