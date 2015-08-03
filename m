@@ -1,201 +1,103 @@
-From: lftan@altera.com (Ley Foon Tan)
-Date: Mon, 3 Aug 2015 18:34:41 +0800
-Subject: [PATCH v2 2/5] pci:host: Add Altera PCIe host controller driver
-In-Reply-To: <55BB6B45.7010705@arm.com>
-References: <1438337715-22594-1-git-send-email-lftan@altera.com>
- <1438337715-22594-3-git-send-email-lftan@altera.com>
- <55BB6B45.7010705@arm.com>
-Message-ID: <CAFiDJ59i89hhj94KN3JwcPCxkpX4-KmV3uCg=-vn+1Y1hHdL2g@mail.gmail.com>
+From: albert.aribaud@3adev.fr (Albert ARIBAUD)
+Date: Mon, 3 Aug 2015 12:35:41 +0200
+Subject: [PATCH v10 0/5] mtd: nand: vf610_nfc: Freescale NFC for VF610
+In-Reply-To: <1438594050-4595-1-git-send-email-stefan@agner.ch>
+References: <1438594050-4595-1-git-send-email-stefan@agner.ch>
+Message-ID: <20150803123541.54d4228e.albert.aribaud@3adev.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 31, 2015 at 8:34 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 31/07/15 11:15, Ley Foon Tan wrote:
->> This patch adds the Altera PCIe host controller driver.
->>
->> Signed-off-by: Ley Foon Tan <lftan@altera.com>
->> ---
->>  drivers/pci/host/Kconfig       |   8 +
->>  drivers/pci/host/Makefile      |   1 +
->>  drivers/pci/host/pcie-altera.c | 526 +++++++++++++++++++++++++++++++++++++++++
->>  3 files changed, 535 insertions(+)
->>  create mode 100644 drivers/pci/host/pcie-altera.c
->>
->> diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
->> index 675c2d1..108500a 100644
->> --- a/drivers/pci/host/Kconfig
->> +++ b/drivers/pci/host/Kconfig
->> @@ -145,4 +145,12 @@ config PCIE_IPROC_BCMA
->>         Say Y here if you want to use the Broadcom iProc PCIe controller
->>         through the BCMA bus interface
->>
->> +config PCIE_ALTERA
->> +     tristate "Altera PCIe controller"
->> +     depends on ARCH_SOCFPGA
->> +     select PCI_MSI_IRQ_DOMAIN if PCI_MSI
->
-> Why would you select this here? MSI support is in another driver, so I
-> don't see the point.
-Will move select PCI_MSI_IRQ_DOMAIN to config  PCIE_ALTERA_MSI section.
+Hi Stefan,
 
->
->> +     help
->> +       Say Y here if you want to enable PCIe controller support for Altera
->> +       SoCFPGA family of SoCs.
->> +
->>  endmenu
+Le Mon,  3 Aug 2015 11:27:25 +0200, Stefan Agner <stefan@agner.ch> a
+?crit :
 
->> +static const struct irq_domain_ops intx_domain_ops = {
->> +     .map = altera_pcie_intx_map,
->> +};
->> +
->> +static irqreturn_t altera_pcie_isr(int irq, void *arg)
->> +{
->> +     struct altera_pcie *pcie = arg;
->> +     u32 status, i;
->> +
->> +     status = cra_readl(pcie, P2A_INT_STATUS) & P2A_INT_STS_ALL;
->> +
->> +     /* clear interrupts */
->> +     cra_writel(pcie, status, P2A_INT_STATUS);
->> +
->> +     for (i = 0; i < INTX_NUM; i++) {
->> +             if (status & (1 << i))
->
-> find_first/next_set_bit?
-Yes, change this to find_first_bit().
+> The 10th revision includes some more review comments, including an
+> improved handling of empty NAND pages with hardware ECC.
+> 
+> More information and the full test log of earlier patchset version
+> can be found in the cover letter of the last revision v6:
+> http://thread.gmane.org/gmane.linux.kernel/1979868
+> 
+> Changes since v9:
+> - Remove inline of vf610_nfc_done
+> - Add __iomem to src argument of vf610_nfc_memcpy
+> - Handle return value of mtd_device_parse_register correctly
+> - Count bits in OOB too (only non-ECC bits)
+> - Return bitflips in ecc.read_page callback vf610_nfc_read_page
+> - Fall-through ALT_BUF_ONFI
+> - Use BIT macros
+> 
+> Changes since v8:
+> - Fix 16-Bit NAND flash support by splitting up initialization
+>   (introduce vf610_nfc_preinit_controller)
+> - Updated comments in initialziation functions
+> 
+> Changes since v7:
+> - vf610-twr.dts: Moved NFC pinmux into the existing iomuxc node
+>   and sort new nfc node behind the existing iomuxc node as well.
+> - vf610-twr.dts/vf-colibri.dtsi: Dropped _1 suffixes
+> 
+> Changes since v6:
+> - Rebased ontop of l2-mtd/master (v4.2-rc1 based)
+> - Removed HAVE_NAND_VF610_NFC and use depends on. This made
+>   "[PATCH v6 4/6] ARM: vf610: enable NAND Flash Controller" unnecessary
+> 
+> Changes since v5:
+> - Removed fsl,mpc5125-nfc compatible string
+> - Removed readl/writel_relaxed
+> - Change interface of vf610_nfc_transfer_size to match other accessors
+> 
+> Changes since v4:
+> - Rebased ontop of l2-mtd/master (v4.1-rc4 based)
+> - Eliminate unnecessary page read (NAND_CMD_SEQIN) since the driver does
+>   not support sub-page writes anyway (improves write performance)
+> - Support ONFI by enabling READID command with offset and parameter page
+>   reads (CMD_PARAM)
+> - Change to dedicated read_page/write_page function, enables raw writes
+> - Use __LITTLE_ENDIAN to distingush between LE/BE relevant statements
+> - Eliminated vf610_nfc_probe_dt in favor of common DT init code
+> - Use wait_for_completion_timeout
+> - Some style fixes (spaces, etc.)
+> 
+> Changes since v3:
+> - Make the driver selectable when COMPILE_TEST is set
+> - Fix compile error due to superfluous ECC_STATUS configuration in initial
+>   patch (without ECC correction ECC_STATUS does not need to be configured)
+> - Remove custom BBT pattern and switch to in-band BBT in the initial patch
+> - Include two bug fixes, for details see the corresponding U-Boot patches:
+>   http://thread.gmane.org/gmane.comp.boot-loaders.u-boot/215802
+> 
+> Changes since v2:
+> - Updated binding documentation
+> 
+> Changes since v1:
+> - Nest nfc_config struct within the main nfc struct
+> - Use assigned clock binding to specify NFC clock
+> - Rebased ontop of MSCM IR patchset (driver parts have been merged)
+> - Split out arch Kconfig in a separate config
+> - Fix module license
+> - Updated MAINTAINERS
+> 
+> Changes since RFC (Bill Pringlemeir):
+> - Renamed driver from fsl_nfc to vf610_nfc
+> - Use readl/writel for all register in accessor functions
+> - Optimized field accessor functions
+> - Implemented PM (suspend/resume) functions
+> - Implemented basic support for ECC strength/ECC step size from dt
+> - Improved performance of count_written_bits by using hweight32
+> - Support ECC with 60-bytes to correct up to 32 bit errors
+> - Changed to in-band BBT (NAND_BBT_NO_OOB) which also allows ECC modes
+>   which uses up to 60 bytes on 64 byte OOB
+> - Removed custom (downstream) BBT pattern since BBT table won't be
+>   compatible anyway (due to the change above)
 
->
->> +                     generic_handle_irq(irq_find_mapping(pcie->irq_domain,
->> +                                                     i + 1));
->
-> Rule of thumb: if you're calling generic_handle_irq from an interrupt
-> handler, this is a chained IRQ controller. Please implement it as such.
-Okay, will change this to chained_irq_enter/chained_irq_exit implementation.
->
->> +     }
->> +
->> +     return IRQ_HANDLED;
->> +}
->> +
->> +static void altera_pcie_release_of_pci_ranges(struct altera_pcie *pcie)
->> +{
->> +     pci_free_resource_list(&pcie->resources);
->> +}
->> +
->> +static int altera_pcie_parse_request_of_pci_ranges(struct altera_pcie *pcie)
->> +{
->> +     int err, res_valid = 0;
->> +     struct device *dev = &pcie->pdev->dev;
->> +     struct device_node *np = dev->of_node;
->> +     resource_size_t iobase;
->> +     struct resource_entry *win;
->> +     int offset = 0;
->> +
->> +     err = of_pci_get_host_bridge_resources(np, 0, 0xff, &pcie->resources,
->> +                                            &iobase);
->> +     if (err)
->> +             return err;
->> +
->> +     resource_list_for_each_entry(win, &pcie->resources) {
->> +             struct resource *parent, *res = win->res;
->> +
->> +             switch (resource_type(res)) {
->> +             case IORESOURCE_MEM:
->> +                     parent = &iomem_resource;
->> +                     res_valid |= !(res->flags & IORESOURCE_PREFETCH);
->> +                     cra_writel(pcie, res->start,
->> +                             A2P_ADDR_MAP_LO0 + offset);
->> +                     cra_writel(pcie, 0,
->> +                             A2P_ADDR_MAP_HI0 + offset);
->> +                     offset += ATT_ENTRY_SIZE;
->> +                     break;
->> +             default:
->> +                     continue;
->> +             }
->> +
->> +             err = devm_request_resource(dev, parent, res);
->> +             if (err)
->> +                     goto out_release_res;
->> +     }
->> +
->> +     if (!res_valid) {
->> +             dev_err(dev, "non-prefetchable memory resource required\n");
->> +             err = -EINVAL;
->> +             goto out_release_res;
->> +     }
->> +
->> +     return 0;
->> +
->> +out_release_res:
->> +     altera_pcie_release_of_pci_ranges(pcie);
->> +     return err;
->> +}
->> +
->> +static void altera_pcie_free_irq_domain(struct altera_pcie *pcie)
->> +{
->> +     int i;
->> +     u32 irq;
->> +
->> +     for (i = 0; i < INTX_NUM; i++) {
->> +             irq = irq_find_mapping(pcie->irq_domain, i);
->> +             if (irq > 0)
->> +                     irq_dispose_mapping(irq);
->> +     }
->> +
->> +     irq_domain_remove(pcie->irq_domain);
->> +}
->> +
->> +static int altera_pcie_init_irq_domain(struct altera_pcie *pcie)
->> +{
->> +     struct device *dev = &pcie->pdev->dev;
->> +     struct device_node *node = dev->of_node;
->> +
->> +     /* Setup INTx */
->> +     pcie->irq_domain = irq_domain_add_linear(node, INTX_NUM,
->> +                                     &intx_domain_ops, pcie);
->> +     if (!pcie->irq_domain) {
->> +             dev_err(dev, "Failed to get a INTx IRQ domain\n");
->> +             return PTR_ERR(pcie->irq_domain);
->> +     }
->> +
->> +     return 0;
->> +}
->> +
->> +static int altera_pcie_parse_dt(struct altera_pcie *pcie)
->> +{
->> +     struct resource *cra;
->> +     int ret;
->> +     struct platform_device *pdev = pcie->pdev;
->> +
->> +     cra = platform_get_resource_byname(pdev, IORESOURCE_MEM, "Cra");
->> +     pcie->cra_base = devm_ioremap_resource(&pdev->dev, cra);
->> +     if (IS_ERR(pcie->cra_base)) {
->> +             dev_err(&pdev->dev, "get Cra resource failed\n");
->> +             return PTR_ERR(pcie->cra_base);
->> +     }
->> +
->> +     /* setup IRQ */
->> +     pcie->hwirq = platform_get_irq(pdev, 0);
->> +     if (pcie->hwirq <= 0) {
->
-> This is definitely not a hardware interrupt number. It is completely
-> virtual. I suggest you give it a better name.
-Noted.
+For the sake of regression testing:
 
->
->> +             dev_err(&pdev->dev, "failed to get IRQ: %d\n", pcie->hwirq);
->> +             return -EINVAL;
->> +     }
->> +     ret = devm_request_irq(&pdev->dev, pcie->hwirq, altera_pcie_isr,
->> +                     IRQF_SHARED, pdev->name, pcie);
->
-> You're implementing a cascading interrupt controller again. Please fix
-> it just like you did for your MSI support.
-Sure, will change to irq_set_chained_handler_and_data here.
+Tested-by: Albert ARIBAUD <albert.aribaud@3adev.fr>
 
+Still works fine here on a Vybrid and 16-bit Micron NAND.
 
-Thanks for reviewing.
-
-Regards
-Ley Foon
+Cordialement,
+Albert ARIBAUD
+3ADEV
