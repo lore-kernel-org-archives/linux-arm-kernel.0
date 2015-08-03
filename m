@@ -1,278 +1,137 @@
-From: pmeerw@pmeerw.net (Peter Meerwald)
-Date: Mon, 3 Aug 2015 17:24:48 +0200 (CEST)
-Subject: [PATCH] iio: adc: vf610: Add IIO buffer support for Vybrid ADC
-In-Reply-To: <1f11be7d7bc1c3fcebf7d0bcf274f1fcbef35999.1438610517.git.maitysanchayan@gmail.com>
-References: <cover.1438610517.git.maitysanchayan@gmail.com>
- <1f11be7d7bc1c3fcebf7d0bcf274f1fcbef35999.1438610517.git.maitysanchayan@gmail.com>
-Message-ID: <alpine.DEB.2.02.1508031716370.12576@pmeerw.net>
+From: maitysanchayan@gmail.com (maitysanchayan at gmail.com)
+Date: Mon, 3 Aug 2015 20:55:44 +0530
+Subject: [PATCH v2 3/4] touchscreen: colibri-vf50-ts: Add touchscreen
+ support for Colibri VF50
+In-Reply-To: <20150721172044.GC39076@dtor-ws>
+References: <cover.1437058481.git.maitysanchayan@gmail.com>
+ <26748bd9a7bde7c2304b6b971f1150bb575e4938.1437058481.git.maitysanchayan@gmail.com>
+ <20150717234242.GJ39282@dtor-ws>
+ <40d7c372e64c7f25b7df3e48930386de@agner.ch>
+ <20150721172044.GC39076@dtor-ws>
+Message-ID: <20150803152544.GA9716@Sanchayan-Arch.toradex.int>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 3 Aug 2015, Sanchayan Maity wrote:
+Hello Dmitry,
 
-> This patch adds support for IIO buffer to the Vybrid ADC driver.
-> IIO triggered buffer infrastructure along with iio sysfs trigger
-> is used to leverage continuous sampling support provided by the
-> ADC block.
-
-comments below
- 
-> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
-> ---
->  drivers/iio/adc/Kconfig     |   4 ++
->  drivers/iio/adc/vf610_adc.c | 122 +++++++++++++++++++++++++++++++++++++++++---
->  2 files changed, 120 insertions(+), 6 deletions(-)
+On 15-07-21 10:20:44, Dmitry Torokhov wrote:
+> Hi Stefan,
 > 
-> diff --git a/drivers/iio/adc/Kconfig b/drivers/iio/adc/Kconfig
-> index 7c55658..4661241 100644
-> --- a/drivers/iio/adc/Kconfig
-> +++ b/drivers/iio/adc/Kconfig
-> @@ -337,6 +337,10 @@ config TWL6030_GPADC
->  config VF610_ADC
->  	tristate "Freescale vf610 ADC driver"
->  	depends on OF
-> +	select IIO_BUFFER
-> +	select IIO_TRIGGER
-> +	select IIO_SYSFS_TRIGGER
-> +	select IIO_TRIGGERED_BUFFER
->  	help
->  	  Say yes here to support for Vybrid board analog-to-digital converter.
->  	  Since the IP is used for i.MX6SLX, the driver also support i.MX6SLX.
-> diff --git a/drivers/iio/adc/vf610_adc.c b/drivers/iio/adc/vf610_adc.c
-> index 23b8fb9..af72b9a 100644
-> --- a/drivers/iio/adc/vf610_adc.c
-> +++ b/drivers/iio/adc/vf610_adc.c
-> @@ -34,8 +34,11 @@
->  #include <linux/err.h>
->  
->  #include <linux/iio/iio.h>
-> +#include <linux/iio/buffer.h>
->  #include <linux/iio/sysfs.h>
-> -#include <linux/iio/driver.h>
-> +#include <linux/iio/trigger.h>
-> +#include <linux/iio/trigger_consumer.h>
-> +#include <linux/iio/triggered_buffer.h>
->  
->  /* This will be the driver name the kernel reports */
->  #define DRIVER_NAME "vf610-adc"
-> @@ -170,6 +173,7 @@ struct vf610_adc {
->  	u32 sample_freq_avail[5];
->  
->  	struct completion completion;
-> +	u16 *buffer;
->  };
->  
->  static const u32 vf610_hw_avgs[] = { 1, 4, 8, 16, 32 };
-> @@ -505,12 +509,22 @@ static const struct iio_chan_spec_ext_info vf610_ext_info[] = {
->  	.info_mask_shared_by_type = BIT(IIO_CHAN_INFO_SCALE) |	\
->  				BIT(IIO_CHAN_INFO_SAMP_FREQ),	\
->  	.ext_info = vf610_ext_info,				\
-> +	.address = (_idx),				\
-
-address is not used, no need to set it
-
-> +	.scan_index = (_idx),			\
-
-often this is written .scan_type = {.sign = 'u', ...}
-
-> +	.scan_type.sign = 'u',			\
-> +	.scan_type.realbits = 12,		\
-> +	.scan_type.storagebits = 16,	\
->  }
->  
->  #define VF610_ADC_TEMPERATURE_CHAN(_idx, _chan_type) {	\
->  	.type = (_chan_type),	\
->  	.channel = (_idx),		\
->  	.info_mask_separate = BIT(IIO_CHAN_INFO_PROCESSED),	\
-> +	.address = (_idx),						\
-> +	.scan_index = (_idx),					\
-> +	.scan_type.sign = 'u',					\
-> +	.scan_type.realbits = 12,				\
-> +	.scan_type.storagebits = 16,			\
->  }
->  
->  static const struct iio_chan_spec vf610_adc_iio_channels[] = {
-> @@ -531,6 +545,7 @@ static const struct iio_chan_spec vf610_adc_iio_channels[] = {
->  	VF610_ADC_CHAN(14, IIO_VOLTAGE),
->  	VF610_ADC_CHAN(15, IIO_VOLTAGE),
->  	VF610_ADC_TEMPERATURE_CHAN(26, IIO_TEMP),
-> +	IIO_CHAN_SOFT_TIMESTAMP(32),
->  	/* sentinel */
->  };
->  
-> @@ -559,13 +574,21 @@ static int vf610_adc_read_data(struct vf610_adc *info)
->  
->  static irqreturn_t vf610_adc_isr(int irq, void *dev_id)
->  {
-> -	struct vf610_adc *info = (struct vf610_adc *)dev_id;
-> +	struct iio_dev *indio_dev = (struct iio_dev *)dev_id;
-> +	struct vf610_adc *info = iio_priv(indio_dev);
->  	int coco;
->  
->  	coco = readl(info->regs + VF610_REG_ADC_HS);
->  	if (coco & VF610_ADC_HS_COCO0) {
->  		info->value = vf610_adc_read_data(info);
-> -		complete(&info->completion);
-> +		if (iio_buffer_enabled(indio_dev)) {
-> +			info->buffer[0] = info->value;
-> +			writel(0, info->regs + VF610_REG_ADC_HS);
-> +			iio_push_to_buffers_with_timestamp(indio_dev,
-> +					info->buffer, iio_get_time_ns());
-> +			iio_trigger_notify_done(indio_dev->trig);
-> +		} else
-> +			complete(&info->completion);
->  	}
->  
->  	return IRQ_HANDLED;
-> @@ -612,6 +635,9 @@ static int vf610_read_raw(struct iio_dev *indio_dev,
->  	switch (mask) {
->  	case IIO_CHAN_INFO_RAW:
->  	case IIO_CHAN_INFO_PROCESSED:
-> +		if (iio_buffer_enabled(indio_dev))
-> +			return -EBUSY;
-> +
->  		mutex_lock(&indio_dev->mlock);
->  		reinit_completion(&info->completion);
->  
-> @@ -694,6 +720,81 @@ static int vf610_write_raw(struct iio_dev *indio_dev,
->  	return -EINVAL;
->  }
->  
-> +static int vf610_adc_buffer_postenable(struct iio_dev *indio_dev)
-> +{
-> +	struct vf610_adc *info = iio_priv(indio_dev);
-> +	unsigned int channel;
-> +	int ret;
-> +	int val;
-> +
-> +	ret = iio_triggered_buffer_postenable(indio_dev);
-> +	if (ret)
-> +		return ret;
-> +
-> +	val = readl(info->regs + VF610_REG_ADC_GC);
-> +	val |= VF610_ADC_ADCON;
-> +	writel(val, info->regs + VF610_REG_ADC_GC);
-> +
-> +	channel = find_first_bit(indio_dev->active_scan_mask,
-> +						indio_dev->masklength);
-> +
-> +	val = VF610_ADC_ADCHC(channel);
-> +	val |= VF610_ADC_AIEN;
-> +
-> +	writel(val, info->regs + VF610_REG_ADC_HC0);
-> +
-> +	return 0;
-> +}
-> +
-> +static int vf610_adc_buffer_postdisable(struct iio_dev *indio_dev)
-> +{
-> +	struct vf610_adc *info = iio_priv(indio_dev);
-> +	unsigned int hc_cfg = 0;
-> +	int val;
-> +
-> +	val = readl(info->regs + VF610_REG_ADC_GC);
-> +	val &= ~VF610_ADC_ADCON;
-> +	writel(val, info->regs + VF610_REG_ADC_GC);
-> +
-> +	hc_cfg |= VF610_ADC_CONV_DISABLE;
-> +	hc_cfg &= ~VF610_ADC_AIEN;
-> +
-> +	writel(hc_cfg, info->regs + VF610_REG_ADC_HC0);
-> +
-> +	return 0;
-> +}
-> +
-> +static int vf610_adc_update_scan_mode(struct iio_dev *indio_dev,
-> +	const unsigned long *scan_mask)
-> +{
-> +	struct vf610_adc *info = iio_priv(indio_dev);
-> +
-> +	kfree(info->buffer);
-
-only one channel can be read (onehot), why not use a fixed size buffer 
-(one u16, perhaps as a local variable in _adc_isr()?
-
-> +	info->buffer = kmalloc(indio_dev->scan_bytes, GFP_KERNEL);
-> +	if (!info->buffer)
-> +		return -ENOMEM;
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct iio_buffer_setup_ops iio_triggered_buffer_setup_ops = {
-> +	.postenable = &vf610_adc_buffer_postenable,
-> +	.predisable = &iio_triggered_buffer_predisable,
-> +	.postdisable = &vf610_adc_buffer_postdisable,
-> +	.validate_scan_mask = &iio_validate_scan_mask_onehot,
-> +};
-> +
-> +static int vf610_adc_buffer_init(struct iio_dev *indio_dev)
-> +{
-> +	return iio_triggered_buffer_setup(indio_dev, &iio_pollfunc_store_time,
-> +		NULL, &iio_triggered_buffer_setup_ops);
-> +}
-> +
-> +static void vf610_adc_buffer_remove(struct iio_dev *indio_dev)
-> +{
-> +	iio_triggered_buffer_cleanup(indio_dev);
-> +}
-> +
->  static int vf610_adc_reg_access(struct iio_dev *indio_dev,
->  			unsigned reg, unsigned writeval,
->  			unsigned *readval)
-> @@ -714,6 +815,7 @@ static const struct iio_info vf610_adc_iio_info = {
->  	.read_raw = &vf610_read_raw,
->  	.write_raw = &vf610_write_raw,
->  	.debugfs_reg_access = &vf610_adc_reg_access,
-> +	.update_scan_mode = &vf610_adc_update_scan_mode,
->  	.attrs = &vf610_attribute_group,
->  };
->  
-> @@ -753,7 +855,7 @@ static int vf610_adc_probe(struct platform_device *pdev)
->  
->  	ret = devm_request_irq(info->dev, irq,
->  				vf610_adc_isr, 0,
-> -				dev_name(&pdev->dev), info);
-> +				dev_name(&pdev->dev), indio_dev);
->  	if (ret < 0) {
->  		dev_err(&pdev->dev, "failed requesting irq, irq = %d\n", irq);
->  		return ret;
-> @@ -806,15 +908,22 @@ static int vf610_adc_probe(struct platform_device *pdev)
->  	vf610_adc_cfg_init(info);
->  	vf610_adc_hw_init(info);
->  
-> +	ret = vf610_adc_buffer_init(indio_dev);
-> +	if (ret < 0) {
-> +		dev_err(&pdev->dev, "Couldn't initialise the buffer\n");
-> +		goto error_iio_device_register;
-> +	}
-> +
->  	ret = iio_device_register(indio_dev);
->  	if (ret) {
->  		dev_err(&pdev->dev, "Couldn't register the device.\n");
-> -		goto error_iio_device_register;
-> +		goto error_adc_buffer_init;
->  	}
->  
->  	return 0;
->  
-> -
-> +error_adc_buffer_init:
-> +	vf610_adc_buffer_remove(indio_dev);
->  error_iio_device_register:
->  	clk_disable_unprepare(info->clk);
->  error_adc_clk_enable:
-> @@ -829,6 +938,7 @@ static int vf610_adc_remove(struct platform_device *pdev)
->  	struct vf610_adc *info = iio_priv(indio_dev);
->  
->  	iio_device_unregister(indio_dev);
-> +	vf610_adc_buffer_remove(indio_dev);
->  	regulator_disable(info->vref);
->  	clk_disable_unprepare(info->clk);
->  
+> On Tue, Jul 21, 2015 at 04:43:36PM +0200, Stefan Agner wrote:
+> > Hi Dmitry,
+> > 
+> > As the original author of the driver I have some remarks to your review
+> > 
+> > On 2015-07-18 01:42, Dmitry Torokhov wrote:
+> > >> +		/*
+> > >> +		 * If touch pressure is too low, stop measuring and reenable
+> > >> +		 * touch detection
+> > >> +		 */
+> > >> +		if (val_p < min_pressure || val_p > 2000)
+> > >> +			break;
+> > 
+> > This is where the modules touch pressure is used to stop the measurement
+> > process and switch back to interrupt mode. See my remarks at the end.
+> > 
+> > >> +
+> > >> +		/*
+> > >> +		 * The pressure may not be enough for the first x and the
+> > >> +		 * second y measurement, but, the pressure is ok when the
+> > >> +		 * driver is doing the third and fourth measurement. To
+> > >> +		 * take care of this, we drop the first measurement always.
+> > >> +		 */
+> > >> +		if (discard_val_on_start) {
+> > >> +			discard_val_on_start = false;
+> > >> +		} else {
+> > >> +			/*
+> > >> +			 * Report touch position and sleep for
+> > >> +			 * next measurement
+> > >> +			 */
+> > >> +			input_report_abs(vf50_ts->ts_input,
+> > >> +					ABS_X, VF_ADC_MAX - val_x);
+> > >> +			input_report_abs(vf50_ts->ts_input,
+> > >> +					ABS_Y, VF_ADC_MAX - val_y);
+> > >> +			input_report_abs(vf50_ts->ts_input,
+> > >> +					ABS_PRESSURE, val_p);
+> > >> +			input_report_key(vf50_ts->ts_input, BTN_TOUCH, 1);
+> > >> +			input_sync(vf50_ts->ts_input);
+> > >> +		}
+> > >> +
+> > >> +		msleep(10);
+> > >> +	}
+> > >> +
+> > >> +	/* Report no more touch, reenable touch detection */
+> > >> +	input_report_abs(vf50_ts->ts_input, ABS_PRESSURE, 0);
+> > >> +	input_report_key(vf50_ts->ts_input, BTN_TOUCH, 0);
+> > >> +	input_sync(vf50_ts->ts_input);
+> > >> +
+> > >> +	vf50_ts_enable_touch_detection(vf50_ts);
+> > >> +
+> > >> +	/* Wait for the pull-up to be stable on high */
+> > >> +	msleep(10);
+> > >> +
+> > >> +	/* Reenable IRQ to detect touch */
+> > >> +	enable_irq(vf50_ts->pen_irq);
+> > >> +
+> > >> +	dev_dbg(dev, "Reenabled touch detection interrupt\n");
+> > >> +}
+> > >> +
+> > >> +static irqreturn_t vf50_ts_touched(int irq, void *dev_id)
+> > >> +{
+> > >> +	struct vf50_touch_device *vf50_ts = (struct vf50_touch_device *)dev_id;
+> > >> +	struct device *dev = &vf50_ts->pdev->dev;
+> > >> +
+> > >> +	dev_dbg(dev, "Touch detected, start worker thread\n");
+> > >> +
+> > >> +	disable_irq_nosync(irq);
+> > >> +
+> > >> +	/* Disable the touch detection plates */
+> > >> +	gpiod_set_value(vf50_ts->gpio_ym, 0);
+> > >> +
+> > >> +	/* Let the platform mux to default state in order to mux as ADC */
+> > >> +	pinctrl_pm_select_default_state(dev);
+> > >> +
+> > >> +	queue_work(vf50_ts->ts_workqueue, &vf50_ts->ts_work);
+> > > 
+> > > If you convert this to a threaded interrupt you won't need to
+> > > disable/reenable interrupt or queue work. You should also be able to use
+> > > gpiod_set_value_cansleep() extending the range of ways the controller
+> > > could be connected to systems.
+> > > 
+> > 
+> > I'm not sure if a threaded interrupt is the right thing here. While the
+> > pen is on the touchscreen (which can be for several seconds)
+> > measurements have to be made in a continuous loop. Is it ok for a
+> > threaded interrupt to run that long?
 > 
+> Yes, why not? Threaded interrupt is simply a kernel thread that is woken
+> when hard interrupt handler tells it to wake up. Very similar to
+> interrupt + work queue, except that the kernel manages interactions
+> properly for you. There are several drivers in kernel that do that, for
+> example auo-pixcir-ts.c or tsc2007.c
+> 
+> > 
+> > I'm also not sure if it is really safe to _not_ disable the pen down
+> > GPIO interrupt. If we get a interrupt while measuring, we should ignore
+> > that interrupt.
+> 
+> The interrupt management core (you'll have to annotate it as
+> IRQF_ONESHOT) will make sure it stays masked properly until the threaded
+> handler completes so you do not need to disable it explicitly.
 
--- 
+After working some more on threaded irq implementation, if IRQ_ONESHOT
+flag is used while requesting threaded irq, on entering the IRQ handler
+the vf610_gpio_irq_mask is not called and vf610_gpio_irq_unmask is not
+called on exiting the thread function, not something we expected.
 
-Peter Meerwald
-+43-664-2444418 (mobile)
+In contrast, using explicit disable_irq_nosync and enable_irq in the IRQ
+handler and thread respectively results in the respective mask and unmask
+function being called.
+
+The vf610_gpio_irq_*mask functions are in the gpio driver for Vybrid in
+drivers/gpio/gpio-vf610.c.
+
+Can you point me in the right direction?
+
+Thanks & Regards,
+Sanchayan.
