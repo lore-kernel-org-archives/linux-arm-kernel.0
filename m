@@ -1,61 +1,78 @@
-From: jungseoklee85@gmail.com (Jungseok Lee)
-Date: Tue, 4 Aug 2015 01:30:50 +0900
-Subject: [RFC 2/3] arm64: refactor save_stack_trace()
-In-Reply-To: <20150803090951.GA10501@arm.com>
-References: <12F47692-3010-4886-B87D-3D7820609177@gmail.com>
- <20150716113115.45a17f17@gandalf.local.home>
- <20150716121658.7982fdf5@gandalf.local.home>
- <20150717124054.GE26091@leverpostej>
- <20150717090009.720f6bd0@gandalf.local.home>
- <77EA0F10-D5F6-48BD-8652-3B979A978659@gmail.com>
- <20150717104144.6588b2f7@gandalf.local.home>
- <0886A996-40E1-49E9-823C-85E55A858716@gmail.com>
- <1357EA74-B972-4B99-ADB0-BC7E8F06DDB5@gmail.com>
- <20150720162004.GL9908@arm.com> <20150803090951.GA10501@arm.com>
-Message-ID: <D7BD8A9F-8710-42D5-A0ED-8747D2B6B268@gmail.com>
+From: frowand.list@gmail.com (Frank Rowand)
+Date: Mon, 03 Aug 2015 09:47:42 -0700
+Subject: [PATCH v5] dtb: Create a common home for cross-architecture dtsi
+ files.
+In-Reply-To: <1438618000-1091-1-git-send-email-ian.campbell@citrix.com>
+References: <1438618000-1091-1-git-send-email-ian.campbell@citrix.com>
+Message-ID: <55BF9B2E.1060206@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Aug 3, 2015, at 6:09 PM, Will Deacon wrote:
-> Hi guys,
-
-Hi Will,
-
-> On Mon, Jul 20, 2015 at 05:20:04PM +0100, Will Deacon wrote:
->> On Fri, Jul 17, 2015 at 04:34:21PM +0100, Jungseok Lee wrote:
->>> On Jul 17, 2015, at 11:59 PM, Jungseok Lee wrote:
->>>> On Jul 17, 2015, at 11:41 PM, Steven Rostedt wrote:
->>>>> Thanks! Can you repost patch 1 with the changes I recommended, so that
->>>>> I can get an Acked-by from the arm64 maintainers and pull all the
->>>>> changes in together. This is fine for a 4.3 release, right? That is, it
->>>>> doesn't need to go into 4.2-rcs.
->>>>> 
->>>> 
->>>> It's not hard to repost a patch, but I feel like we have to wait for Akashi's response.
->>>> Also, it might be needed to consider Mark's comment on arch part.
->>>> 
->>>> If they are okay, I will proceed.
->>> 
->>> The [RFC 1/3] patch used in my environment is shaped as follows.
->>> I leave the hunk for *only* clear synchronization. This is why I choose this format
->>> instead of reposting a patch. I hope it would help to track down this thread.
->>> 
->>> I think this is my best at this point.
+On 8/3/2015 9:06 AM, Ian Campbell wrote:
+> Commit 9ccd608070b6 ("arm64: dts: add device tree for ARM SMM-A53x2 on
+> LogicTile Express 20MG") added a new dts file to arch/arm64 which
+> included "../../../../arm/boot/dts/vexpress-v2m-rs1.dtsi", i.e. a
+> .dtsi supplied by arch/arm.
 > 
-> [...]
+> Unfortunately this causes some issues for the split device tree
+> repository[0], since things get moved around there. In that context
+> the new .dts ends up at src/arm64/arm/vexpress-v2f-1xv7-ca53x2.dts
+> while the include is at src/arm/vexpress-v2m-rs1.dtsi.
 > 
->> The arm64 bits look fine to me:
->> 
->>  Acked-by: Will Deacon <will.deacon@arm.com>
+> The sharing of the .dtsi is legitimate since the baseboard is the same
+> for various vexpress systems whatever processor they use.
 > 
-> What happened to this? Is it queued someplace, or are we waiting for a
-> new version?
+> Rather than using ../../ tricks to pickup .dtsi files from another
+> arch this patch creates a new directory kernel/dts as a home for such
+> cross-arch .dtsi files and arranges for it to be in the include path
+> for both dtc and cpp. The dtsi file itself is moved into a vendor
+> subdir in this case "arm" (the vendor, not the ARCH=).
+> 
+> [0] https://git.kernel.org/cgit/linux/kernel/git/devicetree/devicetree-rebasing.git/
+> 
+> Signed-off-by: Ian Campbell <ian.campbell@citrix.com>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Pawel Moll <pawel.moll@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Kumar Gala <galak@codeaurora.org>
+> Cc: Liviu Dudau <liviu.dudau@arm.com>
+> Cc: Sudeep Holla <sudeep.holla@arm.com>
+> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Kristina Martsenko <kristina.martsenko@arm.com>
+> Cc: Kevin Hilman <khilman@linaro.org>
+> Cc: devicetree at vger.kernel.org
+> Cc: linux-kernel at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kbuild at vger.kernel.org
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
+> Acked-by: Rob Herring <robh@kernel.org>
+> Acked-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> Reviewed-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> ---
+> v2: Move to include/dt-dtsi and introduce a per-vendor subdirectory.
+> 
+> v3: Move to kernel/dts.
+>     Include new directory in DTC include path as well as cpp path, and
+>     therefore switch back to /include/.
+>     Update MAINTAINERS
+> 
+> v4: Change path in changelog too.
+>     Add ()s to title of 9ccd608070b6.
+> 
+> v5: Remove stale reference to switching from /include/ to #include.
+> ---
+>  Documentation/devicetree/bindings/arm/vexpress.txt          | 2 +-
+>  MAINTAINERS                                                 | 1 +
+>  arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts                 | 2 +-
+>  arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts                  | 2 +-
+>  arch/arm/boot/dts/vexpress-v2p-ca5s.dts                     | 2 +-
+>  arch/arm64/boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts        | 2 +-
+>  {arch/arm/boot/dts => kernel/dts/arm}/vexpress-v2m-rs1.dtsi | 0
+>  scripts/Makefile.lib                                        | 3 ++-
+>  8 files changed, 8 insertions(+), 6 deletions(-)
+>  rename {arch/arm/boot/dts => kernel/dts/arm}/vexpress-v2m-rs1.dtsi (100%)
 
-There are two issues in the current version.
-1) The change does not work correctly when function_graph feature is enabled.
-2) Akashi have raised an issue that size field of stack tracer is inaccurate.
-
-So, I think this patch set is not ready yet.
-
-Best Regards
-Jungseok Lee
+Reviewed-by: Frank Rowand <frank.rowand@sonymobile.com>
