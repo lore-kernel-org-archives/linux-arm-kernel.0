@@ -1,49 +1,38 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 3 Aug 2015 09:00:46 -0500
-Subject: [PATCH v2 04/10] Doc: usb: ci-hdrc-usb2: add ahb-burst-config for
- binding doc
-In-Reply-To: <1438577238-10153-5-git-send-email-peter.chen@freescale.com>
-References: <1438577238-10153-1-git-send-email-peter.chen@freescale.com>
- <1438577238-10153-5-git-send-email-peter.chen@freescale.com>
-Message-ID: <CAL_Jsq+GNQq+SQCeMhy=W-XTPJn1ROAYHpm2+W9wwUa9+t-XwA@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 3 Aug 2015 15:04:36 +0100
+Subject: [RFC 2/3] arm64: refactor save_stack_trace()
+In-Reply-To: <20150803100140.31ad51dd@gandalf.local.home>
+References: <20150716121658.7982fdf5@gandalf.local.home>
+ <20150717124054.GE26091@leverpostej>
+ <20150717090009.720f6bd0@gandalf.local.home>
+ <77EA0F10-D5F6-48BD-8652-3B979A978659@gmail.com>
+ <20150717104144.6588b2f7@gandalf.local.home>
+ <0886A996-40E1-49E9-823C-85E55A858716@gmail.com>
+ <1357EA74-B972-4B99-ADB0-BC7E8F06DDB5@gmail.com>
+ <20150720162004.GL9908@arm.com> <20150803090951.GA10501@arm.com>
+ <20150803100140.31ad51dd@gandalf.local.home>
+Message-ID: <20150803140436.GG10501@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 2, 2015 at 11:47 PM, Peter Chen <peter.chen@freescale.com> wrote:
-> It is used to change ahb burst configuration for platforms, it is
-> vendor specific.
->
-> Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> ---
->  Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt | 4 ++++
->  1 file changed, 4 insertions(+)
->
-> diff --git a/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt b/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt
-> index 4159c8c..3c377a3 100644
-> --- a/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt
-> +++ b/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt
-> @@ -32,6 +32,8 @@ Optional properties:
->  - external-vbus-divider: (FSL only) enables off-chip resistor divider for Vbus
->  - itc-setting: interrupt threshold control register control, the setting
->    should be aligned with ITC bits at register USBCMD.
-> +- ahb-burst-config: it is vendor dependent, the required value should be
-> +  aligned with AHBBRST at SBUSCFG, the range is from 0x0 to 0x7.
+On Mon, Aug 03, 2015 at 03:01:40PM +0100, Steven Rostedt wrote:
+> On Mon, 3 Aug 2015 10:09:51 +0100
+> Will Deacon <will.deacon@arm.com> wrote:
+> 
+>  
+> > > The arm64 bits look fine to me:
+> > > 
+> > >   Acked-by: Will Deacon <will.deacon@arm.com>
+> > 
+> > What happened to this? Is it queued someplace, or are we waiting for a
+> > new version?
+> 
+> I went on vacation :-)  I'm back and trying to catch up. I'll be
+> pulling in a bunch of things today. Hopefully I can get to this.
 
-What do the values mean and what happens if the property is not
-present? Please define that here.
+Cheers, Steve. Just wanted to make sure it didn't got lost (I'd briefly
+forgotten about it myself!).
 
-Rob
+I hope you had a good holiday.
 
->
->  Example:
->
-> @@ -44,4 +46,6 @@ Example:
->                 phy-names = "usb-phy";
->                 vbus-supply = <&reg_usb0_vbus>;
->                 gadget-itc-setting = <0x4>; /* 4 micro-frames */
-> +                /* Incremental burst of unspecified length */
-> +               ahb-burst-config = <0x0>;
->         };
-> --
-> 1.9.1
->
+Will
