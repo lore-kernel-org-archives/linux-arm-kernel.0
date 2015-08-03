@@ -1,67 +1,75 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 3 Aug 2015 20:09:35 +0100
-Subject: [PATCH 0/2] drivers: PL061: Add platform driver probing support
-In-Reply-To: <20150803162623.GB30867@kroah.com>
-References: <1438585198-8764-1-git-send-email-zhaoshenglong@huawei.com>
- <20150803075848.GH7557@n2100.arm.linux.org.uk>
- <55BF33AD.5040502@huawei.com>
- <20150803094923.GI7557@n2100.arm.linux.org.uk>
- <20150803162623.GB30867@kroah.com>
-Message-ID: <20150803190935.GL7557@n2100.arm.linux.org.uk>
+From: santosh.shilimkar@oracle.com (santosh.shilimkar at oracle.com)
+Date: Mon, 03 Aug 2015 12:00:27 -0700
+Subject: [PATCH 1/2] ARM: dts: keystone: fix the clock node for mdio
+In-Reply-To: <55BFB7EC.4060408@ti.com>
+References: <1438625518-21315-1-git-send-email-m-karicheri2@ti.com>
+ <55BFB15B.8040207@ti.com> <55BFB32C.6080201@oracle.com>
+ <55BFB7EC.4060408@ti.com>
+Message-ID: <55BFBA4B.6070406@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 03, 2015 at 09:26:23AM -0700, Greg Kroah-Hartman wrote:
-> On Mon, Aug 03, 2015 at 10:49:23AM +0100, Russell King - ARM Linux wrote:
-> > On Mon, Aug 03, 2015 at 05:26:05PM +0800, Shannon Zhao wrote:
-> > > Hi Russell,
-> > > 
-> > > On 2015/8/3 15:58, Russell King - ARM Linux wrote:
-> > > > On Mon, Aug 03, 2015 at 02:59:56PM +0800, Shannon Zhao wrote:
-> > > >> From: Shannon Zhao <shannon.zhao@linaro.org>
-> > > >>
-> > > >> According to ACPI SPEC, it supports ARM boards to use "GPIO-signaled
-> > > >> ACPI Events". These events can be used for input events. And to QEMU, it
-> > > >> uses GPIO PL061 controller for input events.
-> > > >>
-> > > >> These two patches add platform driver support for PL061 probed by DT or
-> > > >> ACPI.
-> > > > 
-> > > > This certainly is incorrect for DT, and is probably wrong for ACPI too.
-> > > > DT creates amba devices, so binds via the amba device driver.
-> > > > 
-> > > 
-> > > Oh, sorry. The changes for DT are not necessary. But for ACPI I think it
-> > > needs to convert pl061 to platform device since ACPI doesn't support
-> > > AMBA devices. The Pl011 also does the same thing to support ACPI
-> > > probing. See drivers/tty/serial/amba-pl011.c
-> > 
-> > Maybe rather than having every AMBA driver also converted to a platform
-> > driver (which GregKH hates) maybe ACPI should support the AMBA bus
-> > instead?
-> > 
-> > Greg?
-> 
-> The ACPI developers have been doing work to allow a driver to handle
-> getting the resources from either DT or ACPI no matter what bus it is
-> on, so converting anything to a platform driver shouldn't be needed.
-> 
-> but I don't really know the details here, and this isn't being sent to
-> the ACPI mailing list, so I don't know what to suggest...
 
-Greg,
 
-You're the one who's said many times that you'd like to see platform
-devices and platform device drivers to go away.  So, when I give you
-the opportunity to comment on platform devices being used to augment
-existing device drivers such as the AMBA bus drivers (which you've
-also previously said is a more preferable way to use the driver model)
-why not support that view?
+On 8/3/15 11:50 AM, Murali Karicheri wrote:
+> On 08/03/2015 02:30 PM, santosh.shilimkar at oracle.com wrote:
+>> On 8/3/15 11:22 AM, Murali Karicheri wrote:
+>>> On 08/03/2015 02:11 PM, Murali Karicheri wrote:
+>>>> Currently the MDIO clock is pointing to clkpa instead of clkcpgmac.
+>>>> MDIO is part of the ethss and the clock should be clkcpgmac.
+>>>>
+>>>> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+>>>> ---
+>>>>   arch/arm/boot/dts/keystone.dtsi | 2 +-
+>>>>   1 file changed, 1 insertion(+), 1 deletion(-)
+>>>>
+>>>> diff --git a/arch/arm/boot/dts/keystone.dtsi
+>>>> b/arch/arm/boot/dts/keystone.dtsi
+>>>> index e7a6f6d..6245a17 100644
+>>>> --- a/arch/arm/boot/dts/keystone.dtsi
+>>>> +++ b/arch/arm/boot/dts/keystone.dtsi
+>>>> @@ -273,7 +273,7 @@
+>>>>               #size-cells = <0>;
+>>>>               reg        = <0x02090300 0x100>;
+>>>>               status = "disabled";
+>>>> -            clocks = <&clkpa>;
+>>>> +            clocks = <&clkcpgmac>;
+>>>>               clock-names = "fck";
+>>>>               bus_freq    = <2500000>;
+>>>>           };
+>>>>
+>>> Santosh,
+>>>
+>>> This is a big fix and needs to go in v4.2-rc. So please review and apply
+>>> asap. v4.2 is the first release that has netcp driver fully functional
+>>> and I want to fix as many known bugs as possible.
+>>>
+>> Do you have more fixes ? If yes, please post them so that I can include
+>> them along with these two. I will try to send them up next week.
+>
+> I think we have got most of the know issues fixed in the netcp driver
+> and dts for v4.2-rc. Another lingering issue is the one with multiple
+> clock handling not supported in run time pm API causing us to use the
+> work around 'clk_ignore_unused'. Probably this needs to be addressed in
+> the future as fixing this is not trivial. Generic PD support would
+> partially solve the issue for Keystone, but also needs to handle
+> multiple clocks for keystone.
+>
+Yeah. I was also wondering on what happened to that work which was
+active at some point of time.
 
-Right now, there seems to be a move to convert _all_ AMBA device drivers
-to become dual-drivers: an amba bus driver and a platform driver.  Is
-that something you really want to see, irrespective of ACPI issues?
+> Another option is to  fix the NetCP and QMSS/KNAV driver for now in
+> v4.0-rc using explicit clock APIs so that we don't have to use
+> 'clk_ignore_unused'. And then migrate all of the drivers to run time PM
+> API later when proper framework is implemented along with K2G support.
+> Does this make sense?
+>
+Multiple clock node support work which was started needs to be revived.
+Direct clock isn't the way to go about it.
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+> Anyways, please submit these patches at your earliest opportunity.
+>
+Sure.
+
+Regards,
+Santosh
