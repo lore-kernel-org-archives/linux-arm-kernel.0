@@ -1,62 +1,43 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Mon, 03 Aug 2015 14:22:30 +0200
-Subject: [PATCH v5 2/2] ARM: dts: add property for maximum ADC clock
- frequencies
-In-Reply-To: <557477BE.5050108@kernel.org>
-References: <1432730872-14325-1-git-send-email-stefan@agner.ch>
- <1432730872-14325-3-git-send-email-stefan@agner.ch>
- <557477BE.5050108@kernel.org>
-Message-ID: <f598169164aaacc28292d8ccc6afb32d@agner.ch>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 3 Aug 2015 14:32:48 +0200
+Subject: [PATCH 0/2] drivers: PL061: Add platform driver probing support
+In-Reply-To: <20150803094923.GI7557@n2100.arm.linux.org.uk>
+References: <1438585198-8764-1-git-send-email-zhaoshenglong@huawei.com>
+ <20150803075848.GH7557@n2100.arm.linux.org.uk>
+ <55BF33AD.5040502@huawei.com>
+ <20150803094923.GI7557@n2100.arm.linux.org.uk>
+Message-ID: <CACRpkdbDduYxcubVKAuqdmwnw6d6R8bvQfYa0uRRYCF_Q6+MyQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+On Mon, Aug 3, 2015 at 11:49 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Aug 03, 2015 at 05:26:05PM +0800, Shannon Zhao wrote:
 
-I guess this will go through your tree? Haven't seen it appear on imx/dt
-so far...
+>> Oh, sorry. The changes for DT are not necessary. But for ACPI I think it
+>> needs to convert pl061 to platform device since ACPI doesn't support
+>> AMBA devices. The Pl011 also does the same thing to support ACPI
+>> probing. See drivers/tty/serial/amba-pl011.c
+>
+> Maybe rather than having every AMBA driver also converted to a platform
+> driver (which GregKH hates) maybe ACPI should support the AMBA bus
+> instead?
 
---
-Stefan
+I agree with Russell, and overall I'm not sure I'm very happy with
+commit 0dd1e247fd39aed20fd2baacc62ca44d82534798
+"drivers: PL011: add support for the ARM SBSA generic UART"
+either.
 
-On 2015-06-07 18:56, Jonathan Cameron wrote:
-> On 27/05/15 13:47, Stefan Agner wrote:
->> The ADC clock frequency is limited depending on modes used. Add
->> device tree property which allow to set the mode used and the
->> maximum frequency ratings for the instance. These allows to
->> set the ADC clock to a frequency which is within specification
->> according to the actual mode used.
->>
->> Acked-by: Fugang Duan <B38611@freescale.com>
->> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> I'm happy to take this via IIO if people want me to, otherwise give
-> it's connection to the previous patch that I just applied,
-> 
-> Acked-by: Jonathan Cameron <jic23@kernel.org>
-> 
->> ---
->>  arch/arm/boot/dts/vfxxx.dtsi | 4 ++++
->>  1 file changed, 4 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
->> index a29c7ce..c6609bd 100644
->> --- a/arch/arm/boot/dts/vfxxx.dtsi
->> +++ b/arch/arm/boot/dts/vfxxx.dtsi
->> @@ -189,6 +189,8 @@
->>  				clocks = <&clks VF610_CLK_ADC0>;
->>  				clock-names = "adc";
->>  				status = "disabled";
->> +				fsl,adck-max-frequency = <30000000>, <40000000>,
->> +							<20000000>;
->>  			};
->>
->>  			wdoga5: wdog at 4003e000 {
->> @@ -387,6 +389,8 @@
->>  				clocks = <&clks VF610_CLK_ADC1>;
->>  				clock-names = "adc";
->>  				status = "disabled";
->> +				fsl,adck-max-frequency = <30000000>, <40000000>,
->> +							<20000000>;
->>  			};
->>
->>  			esdhc1: esdhc at 400b2000 {
->>
+I can see how this works, but it adds a big chunk of overhead to
+every driver that want to support both PrimeCell MMIO probing
+and devicetree and ACPI.
+
+Devicetree is spawning awesome AMBA devices for PrimeCells
+in drivers/of/platform.c, so why can't ACPI do the same?
+
+The AMBA bus is intelligent and very helpful with things like
+runtime suspend/resume. It also supports reading the version
+registers to autodetect device characteristics.
+
+Yours,
+Linus Walleij
