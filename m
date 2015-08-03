@@ -1,49 +1,49 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 3 Aug 2015 20:13:40 +0100
-Subject: [PATCH] ARM/PCI: set MPS before pci_bus_add_devices()
-In-Reply-To: <1437514519-18545-1-git-send-email-m-karicheri2@ti.com>
-References: <1437514519-18545-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <20150803191340.GM7557@n2100.arm.linux.org.uk>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 3 Aug 2015 22:23:42 +0300
+Subject: [PATCH] usb: ehci-platform: Fix using multiple controllers from OF
+In-Reply-To: <1438629150-11662-1-git-send-email-albeu@free.fr>
+References: <1438629150-11662-1-git-send-email-albeu@free.fr>
+Message-ID: <55BFBFBE.5050905@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 21, 2015 at 05:35:19PM -0400, Murali Karicheri wrote:
-> The MPS configuration should be done *before* pci_bus_add_devices().
-> After pci_bus_add_devices(), drivers may be bound to devices, and
-> the PCI core shouldn't touch device configuration while a driver
-> owns the device.
-> 
-> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
-> Reported-by: Bjorn Helgaas <bhelgaas@google.com>
+On 08/03/2015 10:12 PM, Alban Bedel wrote:
+
+> When using OF defined controllers the platform data struct is shared
+> between all devices, so it can't be used for device specific settings.
+> However it is currently used for the OF properties
+> needs-reset-on-resume and has-transaction-translator.
+
+> To fix this issue move setting hcd->has_tt to the probe and
+> move pdata->reset_on_resume to the private data.
+
+> Signed-off-by: Alban Bedel <albeu@free.fr>
 > ---
->  arch/arm/kernel/bios32.c | 19 +++++--------------
->  1 file changed, 5 insertions(+), 14 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-> index fcbbbb1..17efde7 100644
-> --- a/arch/arm/kernel/bios32.c
-> +++ b/arch/arm/kernel/bios32.c
-> @@ -520,7 +520,8 @@ void pci_common_init_dev(struct device *parent, struct hw_pci *hw)
->  	list_for_each_entry(sys, &head, node) {
->  		struct pci_bus *bus = sys->bus;
->  
-> -		if (!pci_has_flag(PCI_PROBE_ONLY)) {
-> +		if (bus && !pci_has_flag(PCI_PROBE_ONLY)) {
+>   drivers/usb/host/ehci-platform.c | 13 +++++++++----
+>   1 file changed, 9 insertions(+), 4 deletions(-)
 
-Let's get rid of that useless check.  bus can't be NULL here.
+> diff --git a/drivers/usb/host/ehci-platform.c b/drivers/usb/host/ehci-platform.c
+> index 2593def..40d029e 100644
+> --- a/drivers/usb/host/ehci-platform.c
+> +++ b/drivers/usb/host/ehci-platform.c
+> @@ -45,6 +45,7 @@ struct ehci_platform_priv {
+>   	struct reset_control *rst;
+>   	struct phy **phys;
+>   	int num_phys;
+> +	bool reset_on_resume;
+>   };
+>
+>   static const char hcd_name[] = "ehci-platform";
+[...]
+> @@ -193,11 +193,11 @@ static int ehci_platform_probe(struct platform_device *dev)
+>
+>   		if (of_property_read_bool(dev->dev.of_node,
+>   					  "needs-reset-on-resume"))
+> -			pdata->reset_on_resume = 1;
+> +			priv->reset_on_resume = 1;
 
-In the original code (below) if bus was NULL, then we would've already
-oopsed before we got here.  As we don't oops here, no one is ever
-seeing it being NULL, so the test is redundant.
+    'true' since the typi is 'bool'.
 
-> -	list_for_each_entry(sys, &head, node) {
-> -		struct pci_bus *bus = sys->bus;
-> -
-> -		/* Configure PCI Express settings */
-> -		if (bus && !pci_has_flag(PCI_PROBE_ONLY)) {
+[...]
 
-Thanks.
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+MBR, Sergei
