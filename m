@@ -1,42 +1,37 @@
-From: gg@slimlogic.co.uk (Graeme Gregory)
-Date: Mon, 03 Aug 2015 16:13:31 +0100
-Subject: [PATCH 1/2] drivers: PL061: add support for platform driver
- probing
-In-Reply-To: <CACRpkdY6ZfB-gnnr49He+BYELy4fhiV0g5jkEHhyVsJOc_SBFw@mail.gmail.com>
-References: <1438585198-8764-1-git-send-email-zhaoshenglong@huawei.com>
- <1438585198-8764-2-git-send-email-zhaoshenglong@huawei.com>
- <CACRpkdY6ZfB-gnnr49He+BYELy4fhiV0g5jkEHhyVsJOc_SBFw@mail.gmail.com>
-Message-ID: <1438614811.2338188.346456017.5D258EC5@webmail.messagingengine.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 3 Aug 2015 18:13:38 +0300
+Subject: [PATCH v3] ARM: shmobile: silk: initial device tree
+In-Reply-To: <CAMuHMdWT=nzsFuM-vfe5GoAtDE-AtW4LAZoEnBGGVZm54-mAzg@mail.gmail.com>
+References: <201404250239.39150.sergei.shtylyov@cogentembedded.com>
+ <2360526.88foRQAOiM@wasted.cogentembedded.com>
+ <CAMuHMdWT=nzsFuM-vfe5GoAtDE-AtW4LAZoEnBGGVZm54-mAzg@mail.gmail.com>
+Message-ID: <55BF8522.1010906@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello.
 
+On 08/03/2015 04:00 PM, Geert Uytterhoeven wrote:
 
-On Mon, 3 Aug 2015, at 01:40 PM, Linus Walleij wrote:
-> On Mon, Aug 3, 2015 at 8:59 AM, Shannon Zhao <zhaoshenglong@huawei.com>
-> wrote:
-> 
-> > From: Shannon Zhao <shannon.zhao@linaro.org>
-> >
-> > Since PL061 currently only supports AMBA driver, to support using GPIO
-> > PL061 by DT or ACPI, it needs to add support for platform driver.
-> > A DT binding is provided with this patch, ACPI support is added in a
-> > separate one.
-> >
-> > Signed-off-by: Shannon Zhao <zhaoshenglong@huawei.com>
-> > Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> 
-> I already stated in 0/2 what the problem is with this, and it's obviously
-> adding
-> a huge codechunk, very similar to the AMBA probe path.
-> 
-> We need to investigate if ACPI can just spawn AMBA/PrimeCell type devices
-> instead.
-> 
-AMBA DT support is a hideous hack, we had kind of hoped to avoid doing
-that in ACPI.
+>> --- /dev/null
+>> +++ renesas/arch/arm/boot/dts/r8a7794-silk.dts
+>> @@ -0,0 +1,51 @@
 
-If you notice ARM already updated pl011 driver to support platform
-device type probing this seems to be the way to go.
+>> +/ {
+>> +       model = "SILK";
+>> +       compatible = "renesas,silk", "renesas,r8a7794";
 
-Graeme
+> WARNING: DT compatible string "renesas,silk" appears un-documented --
+> check ./Documentation/devicetree/bindings/
+
+> Do you plan to update Documentation/devicetree/bindings/arm/shmobile.txt?
+
+    No, I had no idea I should record the board names somewhere too...
+
+> Thanks!
+
+> Gr{oetje,eeting}s,
+
+>                          Geert
+
+MBR, Sergei
