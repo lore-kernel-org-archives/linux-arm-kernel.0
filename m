@@ -1,106 +1,62 @@
-From: aisheng.dong@freescale.com (Dong Aisheng)
-Date: Mon, 3 Aug 2015 20:12:36 +0800
-Subject: [PATCH v3 6/6] mmc: sdhci-esdhc-imx: set back the
- burst_length_enable bit to 1
-In-Reply-To: <BY1PR03MB138838EFB0DE8834DE5889669A770@BY1PR03MB1388.namprd03.prod.outlook.com>
-References: <1438160637-28061-1-git-send-email-haibo.chen@freescale.com>
- <1438160637-28061-7-git-send-email-haibo.chen@freescale.com>
- <20150731145751.GG27806@shlinux1.ap.freescale.net>
- <BY1PR03MB138838EFB0DE8834DE5889669A770@BY1PR03MB1388.namprd03.prod.outlook.com>
-Message-ID: <20150803121235.GC24870@shlinux1.ap.freescale.net>
+From: stefan@agner.ch (Stefan Agner)
+Date: Mon, 03 Aug 2015 14:22:30 +0200
+Subject: [PATCH v5 2/2] ARM: dts: add property for maximum ADC clock
+ frequencies
+In-Reply-To: <557477BE.5050108@kernel.org>
+References: <1432730872-14325-1-git-send-email-stefan@agner.ch>
+ <1432730872-14325-3-git-send-email-stefan@agner.ch>
+ <557477BE.5050108@kernel.org>
+Message-ID: <f598169164aaacc28292d8ccc6afb32d@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 03, 2015 at 09:08:28AM +0800, Chen Haibo-B51421 wrote:
-> 
-> 
-> > -----Original Message-----
-> > From: Dong Aisheng [mailto:aisheng.dong at freescale.com]
-> > Sent: Friday, July 31, 2015 10:58 PM
-> > To: Chen Haibo-B51421
-> > Cc: robh+dt at kernel.org; pawel.moll at arm.com; mark.rutland at arm.com;
-> > ijc+devicetree at hellion.org.uk; galak at codeaurora.org; shawnguo at kernel.org;
-> > kernel at pengutronix.de; linux at arm.linux.org.uk; ulf.hansson at linaro.org;
-> > johan.derycke at barco.com; Estevam Fabio-R49496; Dong Aisheng-B29396;
-> > devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-
-> > kernel at lists.infradead.org; linux-mmc at vger.kernel.org
-> > Subject: Re: [PATCH v3 6/6] mmc: sdhci-esdhc-imx: set back the
-> > burst_length_enable bit to 1
-> > 
-> > On Wed, Jul 29, 2015 at 05:03:57PM +0800, Haibo Chen wrote:
-> > > Currently we find that if a usdhc is choosed to boot system, then ROM
-> > > code will set the burst length enable bit of this usdhc as 0.
-> > >
-> > > This will make performance drop a lot if this usdhc's burst length is
-> > > 16. So this patch set back the burst_length_enable bit as 1, which is
-> > > the default value, and means burst length is enabled for INCR.
-> > >
-> > > Signed-off-by: Haibo Chen <haibo.chen@freescale.com>
-> > > ---
-> > >  drivers/mmc/host/sdhci-esdhc-imx.c | 11 +++++++++++
-> > >  1 file changed, 11 insertions(+)
-> > >
-> > > diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c
-> > > b/drivers/mmc/host/sdhci-esdhc-imx.c
-> > > index 37d0095..dd945e5 100644
-> > > --- a/drivers/mmc/host/sdhci-esdhc-imx.c
-> > > +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-> > > @@ -32,6 +32,7 @@
-> > >  #include "sdhci-esdhc.h"
-> > >
-> > >  #define	ESDHC_CTRL_D3CD			0x08
-> > > +#define ESDHC_BURST_LEN_EN_INCR		(1 << 27)
-> > >  /* VENDOR SPEC register */
-> > >  #define ESDHC_VENDOR_SPEC		0xc0
-> > >  #define  ESDHC_VENDOR_SPEC_SDIO_QUIRK	(1 << 1)
-> > > @@ -1158,6 +1159,16 @@ static int sdhci_esdhc_imx_probe(struct
-> > platform_device *pdev)
-> > >  		host->quirks2 |= SDHCI_QUIRK2_PRESET_VALUE_BROKEN;
-> > >  		host->mmc->caps |= MMC_CAP_1_8V_DDR;
-> > >
-> > > +		/*
-> > > +		 * ROM code will change the burst_length_enable setting to
-> > > +		 * zero if this usdhc is choosed to boot system. Change it
-> > > +		 * back here, otherwise it will impact the performance a
-> > > +		 * lot if the burst length is 16.
-> > 
-> > Can you clarify a bit more on why performance drops a lot if burst length
-> > is 16?
-> > Caused by the burst length setting did not work due to ROM disabled it?
-> 
-> 
-> [haibo] this bit is used to enable/disable the burst length for the external AHB2AXI bridge, 
-> It's useful especially for INCR transfer because without burst length indicator, the AHB2AXI 
-> bridge doesn't know the burst length in advance. And without burst length indicator, AHB INCR 
-> transfers can only be converted to singles on the AXI side.
-> 
-> Seting this bit means burst length enabled for INCR.
-> If this bit is not set, performance will drop a lot when burst length is 8 or 16. I will add 
-> this in the commit log.
->  
+Hi Shawn,
 
-Thanks for clarify.
-One question: with this patch, can we set the default watermark level to 64 by default for all
-SoC types?
+I guess this will go through your tree? Haven't seen it appear on imx/dt
+so far...
 
-If yes, we may not need patch 5 anymore.
-[PATCH v3 5/6] mmc: sdhci-esdhc-imx: config watermark level and burst length
+--
+Stefan
 
-Regards
-Dong Aisheng
-
-> > 
-> > Regards
-> > Dong Aisheng
-> > 
-> > > +		 */
-> > > +		writel(readl(host->ioaddr + SDHCI_HOST_CONTROL)
-> > > +			| ESDHC_BURST_LEN_EN_INCR,
-> > > +			host->ioaddr + SDHCI_HOST_CONTROL);
-> > > +
-> > >  		if (!(imx_data->socdata->flags & ESDHC_FLAG_HS200))
-> > >  			host->quirks2 |= SDHCI_QUIRK2_BROKEN_HS200;
-> > >
-> > > --
-> > > 1.9.1
-> > >
+On 2015-06-07 18:56, Jonathan Cameron wrote:
+> On 27/05/15 13:47, Stefan Agner wrote:
+>> The ADC clock frequency is limited depending on modes used. Add
+>> device tree property which allow to set the mode used and the
+>> maximum frequency ratings for the instance. These allows to
+>> set the ADC clock to a frequency which is within specification
+>> according to the actual mode used.
+>>
+>> Acked-by: Fugang Duan <B38611@freescale.com>
+>> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> I'm happy to take this via IIO if people want me to, otherwise give
+> it's connection to the previous patch that I just applied,
+> 
+> Acked-by: Jonathan Cameron <jic23@kernel.org>
+> 
+>> ---
+>>  arch/arm/boot/dts/vfxxx.dtsi | 4 ++++
+>>  1 file changed, 4 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
+>> index a29c7ce..c6609bd 100644
+>> --- a/arch/arm/boot/dts/vfxxx.dtsi
+>> +++ b/arch/arm/boot/dts/vfxxx.dtsi
+>> @@ -189,6 +189,8 @@
+>>  				clocks = <&clks VF610_CLK_ADC0>;
+>>  				clock-names = "adc";
+>>  				status = "disabled";
+>> +				fsl,adck-max-frequency = <30000000>, <40000000>,
+>> +							<20000000>;
+>>  			};
+>>
+>>  			wdoga5: wdog at 4003e000 {
+>> @@ -387,6 +389,8 @@
+>>  				clocks = <&clks VF610_CLK_ADC1>;
+>>  				clock-names = "adc";
+>>  				status = "disabled";
+>> +				fsl,adck-max-frequency = <30000000>, <40000000>,
+>> +							<20000000>;
+>>  			};
+>>
+>>  			esdhc1: esdhc at 400b2000 {
+>>
