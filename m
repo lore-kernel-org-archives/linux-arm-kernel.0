@@ -1,103 +1,61 @@
-From: albert.aribaud@3adev.fr (Albert ARIBAUD)
-Date: Mon, 3 Aug 2015 12:35:41 +0200
-Subject: [PATCH v10 0/5] mtd: nand: vf610_nfc: Freescale NFC for VF610
-In-Reply-To: <1438594050-4595-1-git-send-email-stefan@agner.ch>
-References: <1438594050-4595-1-git-send-email-stefan@agner.ch>
-Message-ID: <20150803123541.54d4228e.albert.aribaud@3adev.fr>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Mon, 03 Aug 2015 12:36:14 +0200
+Subject: [PATCH v3 3/5] ARM: Exynos: switch to using generic cpufreq driver
+ for Exynos4x12
+In-Reply-To: <20150803102926.GA21529@linux>
+References: <1438368557-2352-1-git-send-email-b.zolnierkie@samsung.com>
+ <5201904.0cZWHobiJs@amdc1976> <20150803102926.GA21529@linux>
+Message-ID: <4532306.AVvo5hem3c@amdc1976>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
+On Monday, August 03, 2015 03:59:26 PM Viresh Kumar wrote:
+> On 03-08-15, 12:17, Bartlomiej Zolnierkiewicz wrote:
+> > 
+> > Hi,
+> > 
+> > On Saturday, August 01, 2015 04:47:21 PM Viresh Kumar wrote:
+> > > On 31-07-15, 20:49, Bartlomiej Zolnierkiewicz wrote:
+> > > > diff --git a/drivers/cpufreq/Kconfig b/drivers/cpufreq/Kconfig
+> > > > index 659879a..bf6d596 100644
+> > > > --- a/drivers/cpufreq/Kconfig
+> > > > +++ b/drivers/cpufreq/Kconfig
+> > > > @@ -191,6 +191,7 @@ config CPUFREQ_DT
+> > > >  	# if CPU_THERMAL is on and THERMAL=m, CPUFREQ_DT cannot be =y:
+> > > >  	depends on !CPU_THERMAL || THERMAL
+> > > >  	select PM_OPP
+> > > > +	select EXYNOS_THERMAL if ARCH_EXYNOS
+> > > >  	help
+> > > >  	  This adds a generic DT based cpufreq driver for frequency management.
+> > > >  	  It supports both uniprocessor (UP) and symmetric multiprocessor (SMP)
+> > > 
+> > > No, we shouldn't pollute generic Kconfig options with platform specific stuff.
+> > 
+> > The old code depended on this.  You couldn't enable boost support
+> > without enabling thermal support (ARM_EXYNOS_CPU_FREQ_BOOST_SW
+> > config option selected EXYNOS_THERMAL).
+> > 
+> > > Why don't you enable thermal in your .config?
+> > 
+> > It is enabled in exynos_defconfig but without the above change it
+> > can disabled manually which is something that we don't want.
+> 
+> You are not getting it. I am not asking you to not select thermal, but
+> to select it from within your architecture Kconfig option if you want.
 
-Le Mon,  3 Aug 2015 11:27:25 +0200, Stefan Agner <stefan@agner.ch> a
-?crit :
+OK.  Krzysztof/Kukjin do you agree with selecting EXYNOS_THERMAL
+from ARCH_EXYNOS in the platform code?
 
-> The 10th revision includes some more review comments, including an
-> improved handling of empty NAND pages with hardware ECC.
-> 
-> More information and the full test log of earlier patchset version
-> can be found in the cover letter of the last revision v6:
-> http://thread.gmane.org/gmane.linux.kernel/1979868
-> 
-> Changes since v9:
-> - Remove inline of vf610_nfc_done
-> - Add __iomem to src argument of vf610_nfc_memcpy
-> - Handle return value of mtd_device_parse_register correctly
-> - Count bits in OOB too (only non-ECC bits)
-> - Return bitflips in ecc.read_page callback vf610_nfc_read_page
-> - Fall-through ALT_BUF_ONFI
-> - Use BIT macros
-> 
-> Changes since v8:
-> - Fix 16-Bit NAND flash support by splitting up initialization
->   (introduce vf610_nfc_preinit_controller)
-> - Updated comments in initialziation functions
-> 
-> Changes since v7:
-> - vf610-twr.dts: Moved NFC pinmux into the existing iomuxc node
->   and sort new nfc node behind the existing iomuxc node as well.
-> - vf610-twr.dts/vf-colibri.dtsi: Dropped _1 suffixes
-> 
-> Changes since v6:
-> - Rebased ontop of l2-mtd/master (v4.2-rc1 based)
-> - Removed HAVE_NAND_VF610_NFC and use depends on. This made
->   "[PATCH v6 4/6] ARM: vf610: enable NAND Flash Controller" unnecessary
-> 
-> Changes since v5:
-> - Removed fsl,mpc5125-nfc compatible string
-> - Removed readl/writel_relaxed
-> - Change interface of vf610_nfc_transfer_size to match other accessors
-> 
-> Changes since v4:
-> - Rebased ontop of l2-mtd/master (v4.1-rc4 based)
-> - Eliminate unnecessary page read (NAND_CMD_SEQIN) since the driver does
->   not support sub-page writes anyway (improves write performance)
-> - Support ONFI by enabling READID command with offset and parameter page
->   reads (CMD_PARAM)
-> - Change to dedicated read_page/write_page function, enables raw writes
-> - Use __LITTLE_ENDIAN to distingush between LE/BE relevant statements
-> - Eliminated vf610_nfc_probe_dt in favor of common DT init code
-> - Use wait_for_completion_timeout
-> - Some style fixes (spaces, etc.)
-> 
-> Changes since v3:
-> - Make the driver selectable when COMPILE_TEST is set
-> - Fix compile error due to superfluous ECC_STATUS configuration in initial
->   patch (without ECC correction ECC_STATUS does not need to be configured)
-> - Remove custom BBT pattern and switch to in-band BBT in the initial patch
-> - Include two bug fixes, for details see the corresponding U-Boot patches:
->   http://thread.gmane.org/gmane.comp.boot-loaders.u-boot/215802
-> 
-> Changes since v2:
-> - Updated binding documentation
-> 
-> Changes since v1:
-> - Nest nfc_config struct within the main nfc struct
-> - Use assigned clock binding to specify NFC clock
-> - Rebased ontop of MSCM IR patchset (driver parts have been merged)
-> - Split out arch Kconfig in a separate config
-> - Fix module license
-> - Updated MAINTAINERS
-> 
-> Changes since RFC (Bill Pringlemeir):
-> - Renamed driver from fsl_nfc to vf610_nfc
-> - Use readl/writel for all register in accessor functions
-> - Optimized field accessor functions
-> - Implemented PM (suspend/resume) functions
-> - Implemented basic support for ECC strength/ECC step size from dt
-> - Improved performance of count_written_bits by using hweight32
-> - Support ECC with 60-bytes to correct up to 32 bit errors
-> - Changed to in-band BBT (NAND_BBT_NO_OOB) which also allows ECC modes
->   which uses up to 60 bytes on 64 byte OOB
-> - Removed custom (downstream) BBT pattern since BBT table won't be
->   compatible anyway (due to the change above)
+> Over that, thermal is really an option, not a dependency. So, if
+> someone manually disables it, its his problem not yours :)
 
-For the sake of regression testing:
+I would really like it to be dependency not an option (+ I think
+that ideally it should be checked at runtime, IOW we should be
+checking from cpufreq-dt driver if the thermal support is enabled
+before enabling boost support).
 
-Tested-by: Albert ARIBAUD <albert.aribaud@3adev.fr>
-
-Still works fine here on a Vybrid and 16-bit Micron NAND.
-
-Cordialement,
-Albert ARIBAUD
-3ADEV
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
