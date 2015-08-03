@@ -1,43 +1,37 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 03 Aug 2015 11:48:37 +0100
-Subject: [PATCH v6 0/8] ARM64: juno: add SCPI mailbox protocol, clock
- and CPUFreq support
-In-Reply-To: <20150803101845.GU20890@e106497-lin.cambridge.arm.com>
-References: <1438364591-1144-1-git-send-email-sudeep.holla@arm.com>
- <20150803101845.GU20890@e106497-lin.cambridge.arm.com>
-Message-ID: <55BF4705.9030300@arm.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Mon, 03 Aug 2015 12:47:57 +0200
+Subject: [PATCH v3 3/5] ARM: Exynos: switch to using generic cpufreq driver
+ for Exynos4x12
+In-Reply-To: <20150803104044.GB21529@linux>
+References: <1438368557-2352-1-git-send-email-b.zolnierkie@samsung.com>
+ <4532306.AVvo5hem3c@amdc1976> <20150803104044.GB21529@linux>
+Message-ID: <2295533.OBI6Q4a3b9@amdc1976>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Monday, August 03, 2015 04:10:44 PM Viresh Kumar wrote:
+> On 03-08-15, 12:36, Bartlomiej Zolnierkiewicz wrote:
+> > I would really like it to be dependency not an option (+ I think
+> > that ideally it should be checked at runtime, IOW we should be
+> > checking from cpufreq-dt driver if the thermal support is enabled
+> > before enabling boost support).
+> 
+> I don't think boost has any dependency on thermal support. Yeah, it
+> may be true for your platform but we can't force it. People might have
+> different algorithms to control boost modes, thermal is just one
+> option they may look at. For few, enabling boost may not be a thermal
+> issue, but power. So, they want to allow it only when they want, but
+> that wouldn't burn their chip.
 
+OK, I see your point (I have not thought about power being the boost
+limitation previously).
 
-On 03/08/15 11:18, Liviu Dudau wrote:
-> On Fri, Jul 31, 2015 at 06:43:03PM +0100, Sudeep Holla wrote:
->> Hi ARM-SoC guys,
->>
->> It has been on the list for a while and have got all the necessary ACKs.
->> Can you please pull this series for v4.3 ?
->>
->> Regards,
->> Sudeep
->>
->> This patch series adds support for:
->>    1. SCPI(System Control and Power Interface) mailbox protocol driver.
->>       It uses ARM MHU mailbox controller driver on Juno but can work with
->>       any mailbox controllers using standard mailbox APIs
->>    2. Add support for clocks provided by SCP firmware through the SCPI
->>       interface
->>    3. Using the existing arm_big_little cpufreq driver and the newly
->>       added SCPI clock driver, it also adds support for CPU DVFS on
->>       ARM64 JUNO development platforms.
->
-> Hi Sudeep,
->
-> Is there a branch where I can pull this series from?
->
+> So, a platform can choose how it wants to have it. :)
 
-Yes, you can pull from
-git://linux-arm.org/linux-skn.git juno_dvfs
+I'll re-do this patch.  Thank you.
 
-Regards,
-Sudeep
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
