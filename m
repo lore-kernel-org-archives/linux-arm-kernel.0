@@ -1,132 +1,92 @@
 From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Mon, 3 Aug 2015 14:11:58 -0400
-Subject: [PATCH 2/2] ARM: dts: keystone: Fix the mdio bindings by moving it to
- soc specific file
-In-Reply-To: <1438625518-21315-1-git-send-email-m-karicheri2@ti.com>
-References: <1438625518-21315-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <1438625518-21315-2-git-send-email-m-karicheri2@ti.com>
+Date: Mon, 3 Aug 2015 14:18:18 -0400
+Subject: [PATCH] ARM/PCI: set MPS before pci_bus_add_devices()
+In-Reply-To: <20150723145936.GX21967@google.com>
+References: <1437514519-18545-1-git-send-email-m-karicheri2@ti.com>
+ <20150723145936.GX21967@google.com>
+Message-ID: <55BFB06A.3040904@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently mdio bindings are defined in keystone.dtsi and this results
-in incorrect unit address for the node on K2E and K2L SoCs. Fix this
-by moving them to SoC specific DTS file.
+On 07/23/2015 10:59 AM, Bjorn Helgaas wrote:
+> On Tue, Jul 21, 2015 at 05:35:19PM -0400, Murali Karicheri wrote:
+>> The MPS configuration should be done *before* pci_bus_add_devices().
+>> After pci_bus_add_devices(), drivers may be bound to devices, and
+>> the PCI core shouldn't touch device configuration while a driver
+>> owns the device.
+>>
+>> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+>> Reported-by: Bjorn Helgaas <bhelgaas@google.com>
+>
+> Applied to pci/enumeration for v4.3, thanks!  I removed the "bus" test; let
+> me know if you think that's incorrect.
+Ok. Will do. Thanks.
 
-Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
----
- arch/arm/boot/dts/k2e.dtsi      | 15 +++++++++++----
- arch/arm/boot/dts/k2hk.dtsi     | 11 +++++++++++
- arch/arm/boot/dts/k2l.dtsi      | 16 +++++++++++-----
- arch/arm/boot/dts/keystone.dtsi | 11 -----------
- 4 files changed, 33 insertions(+), 20 deletions(-)
+Murali
 
-diff --git a/arch/arm/boot/dts/k2e.dtsi b/arch/arm/boot/dts/k2e.dtsi
-index 1b6494f..675fb8e 100644
---- a/arch/arm/boot/dts/k2e.dtsi
-+++ b/arch/arm/boot/dts/k2e.dtsi
-@@ -131,10 +131,17 @@
- 					<GIC_SPI 376 IRQ_TYPE_EDGE_RISING>;
- 			};
- 		};
-+
-+		mdio: mdio at 24200f00 {
-+			compatible	= "ti,keystone_mdio", "ti,davinci_mdio";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x24200f00 0x100>;
-+			status = "disabled";
-+			clocks = <&clkcpgmac>;
-+			clock-names = "fck";
-+			bus_freq	= <2500000>;
-+		};
- 		/include/ "k2e-netcp.dtsi"
- 	};
- };
--
--&mdio {
--	reg = <0x24200f00 0x100>;
--};
-diff --git a/arch/arm/boot/dts/k2hk.dtsi b/arch/arm/boot/dts/k2hk.dtsi
-index ae64724..d0810a5 100644
---- a/arch/arm/boot/dts/k2hk.dtsi
-+++ b/arch/arm/boot/dts/k2hk.dtsi
-@@ -98,6 +98,17 @@
- 			#gpio-cells = <2>;
- 			gpio,syscon-dev = <&devctrl 0x25c>;
- 		};
-+
-+		mdio: mdio at 02090300 {
-+			compatible	= "ti,keystone_mdio", "ti,davinci_mdio";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x02090300 0x100>;
-+			status = "disabled";
-+			clocks = <&clkcpgmac>;
-+			clock-names = "fck";
-+			bus_freq	= <2500000>;
-+		};
- 		/include/ "k2hk-netcp.dtsi"
- 	};
- };
-diff --git a/arch/arm/boot/dts/k2l.dtsi b/arch/arm/boot/dts/k2l.dtsi
-index 0e00748..49fd414 100644
---- a/arch/arm/boot/dts/k2l.dtsi
-+++ b/arch/arm/boot/dts/k2l.dtsi
-@@ -29,7 +29,6 @@
- 	};
- 
- 	soc {
--
- 		/include/ "k2l-clocks.dtsi"
- 
- 		uart2: serial at 02348400 {
-@@ -79,6 +78,17 @@
- 			#gpio-cells = <2>;
- 			gpio,syscon-dev = <&devctrl 0x24c>;
- 		};
-+
-+		mdio: mdio at 26200f00 {
-+			compatible	= "ti,keystone_mdio", "ti,davinci_mdio";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x26200f00 0x100>;
-+			status = "disabled";
-+			clocks = <&clkcpgmac>;
-+			clock-names = "fck";
-+			bus_freq	= <2500000>;
-+		};
- 		/include/ "k2l-netcp.dtsi"
- 	};
- };
-@@ -96,7 +106,3 @@
-        /* Pin muxed. Enabled and configured by Bootloader */
-        status = "disabled";
- };
--
--&mdio {
--	reg = <0x26200f00 0x100>;
--};
-diff --git a/arch/arm/boot/dts/keystone.dtsi b/arch/arm/boot/dts/keystone.dtsi
-index 6245a17..72816d6 100644
---- a/arch/arm/boot/dts/keystone.dtsi
-+++ b/arch/arm/boot/dts/keystone.dtsi
-@@ -267,17 +267,6 @@
- 				  1 0 0x21000A00 0x00000100>;
- 		};
- 
--		mdio: mdio at 02090300 {
--			compatible	= "ti,keystone_mdio", "ti,davinci_mdio";
--			#address-cells = <1>;
--			#size-cells = <0>;
--			reg		= <0x02090300 0x100>;
--			status = "disabled";
--			clocks = <&clkcpgmac>;
--			clock-names = "fck";
--			bus_freq	= <2500000>;
--		};
--
- 		kirq0: keystone_irq at 26202a0 {
- 			compatible = "ti,keystone-irq";
- 			interrupts = <GIC_SPI 4 IRQ_TYPE_EDGE_RISING>;
+>
+>> ---
+>>   arch/arm/kernel/bios32.c | 19 +++++--------------
+>>   1 file changed, 5 insertions(+), 14 deletions(-)
+>>
+>> diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+>> index fcbbbb1..17efde7 100644
+>> --- a/arch/arm/kernel/bios32.c
+>> +++ b/arch/arm/kernel/bios32.c
+>> @@ -520,7 +520,8 @@ void pci_common_init_dev(struct device *parent, struct hw_pci *hw)
+>>   	list_for_each_entry(sys, &head, node) {
+>>   		struct pci_bus *bus = sys->bus;
+>>
+>> -		if (!pci_has_flag(PCI_PROBE_ONLY)) {
+>> +		if (bus && !pci_has_flag(PCI_PROBE_ONLY)) {
+>
+> I think the test for "bus" being non-NULL is superfluous here.  If "bus"
+> were NULL, we would already oops in pci_bus_add_devices().
+>
+>> +			struct pci_bus *child;
+>>   			/*
+>>   			 * Size the bridge windows.
+>>   			 */
+>> @@ -530,25 +531,15 @@ void pci_common_init_dev(struct device *parent, struct hw_pci *hw)
+>>   			 * Assign resources.
+>>   			 */
+>>   			pci_bus_assign_resources(bus);
+>> -		}
+>>
+>> +			list_for_each_entry(child, &bus->children, node)
+>> +				pcie_bus_configure_settings(child);
+>> +		}
+>>   		/*
+>>   		 * Tell drivers about devices found.
+>>   		 */
+>>   		pci_bus_add_devices(bus);
+>>   	}
+>> -
+>> -	list_for_each_entry(sys, &head, node) {
+>> -		struct pci_bus *bus = sys->bus;
+>> -
+>> -		/* Configure PCI Express settings */
+>> -		if (bus && !pci_has_flag(PCI_PROBE_ONLY)) {
+>> -			struct pci_bus *child;
+>> -
+>> -			list_for_each_entry(child, &bus->children, node)
+>> -				pcie_bus_configure_settings(child);
+>> -		}
+>> -	}
+>>   }
+>>
+>>   #ifndef CONFIG_PCI_HOST_ITE8152
+>> --
+>> 1.9.1
+>>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+
+
 -- 
-1.9.1
+Murali Karicheri
+Linux Kernel, Keystone
