@@ -1,44 +1,116 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Mon, 3 Aug 2015 10:54:56 +0100
-Subject: [PATCH] arm/xen: Drop the definition of
- xen_pci_platform_unplug
-In-Reply-To: <1437845641-32052-1-git-send-email-julien.grall@citrix.com>
-References: <1437845641-32052-1-git-send-email-julien.grall@citrix.com>
-Message-ID: <alpine.DEB.2.02.1508031054310.11337@kaball.uk.xensource.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 03 Aug 2015 10:58:47 +0100
+Subject: [PATCH V2 1/2] irqchip/gic: Only allow the primary GIC to set
+ the CPU map
+In-Reply-To: <1438332252-25248-1-git-send-email-jonathanh@nvidia.com>
+References: <1438332252-25248-1-git-send-email-jonathanh@nvidia.com>
+Message-ID: <55BF3B57.3090203@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 25 Jul 2015, Julien Grall wrote:
-> the xen_platform_pci int." makes the x86 version of
-> xen_pci_platform_unplug static.
+On 31/07/15 09:44, Jon Hunter wrote:
+> The gic_init_bases() function initialises an array that stores the mapping
+> between the GIC and CPUs. This array is a global array that is
+> unconditionally initialised on every call to gic_init_bases(). Although,
+> it is not common for there to be more than one GIC instance, there are
+> some devices that do support nested GIC controllers and gic_init_bases()
+> can be called more than once.
 > 
-> Therefore we don't need anymore to define a dummy xen_pci_platform_unplug
-> for ARM.
+> A 2nd call to gic_init_bases() will clear the previous CPU mapping and
+> will only setup the mapping again for the CPU calling gic_init_bases().
+> Fix this by only allowing the CPU map to be configured for the primary GIC.
 > 
-> Signed-off-by: Julien Grall <julien.grall@citrix.com>
-> Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-
-Queued for 4.3.
-
-
->  arch/arm/xen/enlighten.c | 3 ---
->  1 file changed, 3 deletions(-)
+> For secondary GICs the CPU map is not relevant because these GICs do not
+> directly route the interrupts to the main CPU(s) but to other GICs or
+> devices.
 > 
-> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-> index 6c09cc4..9055c92 100644
-> --- a/arch/arm/xen/enlighten.c
-> +++ b/arch/arm/xen/enlighten.c
-> @@ -49,9 +49,6 @@ struct xen_memory_region xen_extra_mem[XEN_EXTRA_MEM_MAX_REGIONS] __initdata;
->  __read_mostly int xen_have_vector_callback;
->  EXPORT_SYMBOL_GPL(xen_have_vector_callback);
+> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
+
+Looks good to me:
+
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+
+	M.
+
+> ---
+> V2 changes:
+> - Rebased on v4.2-rc4
+> 
+>  drivers/irqchip/irq-gic.c | 43 +++++++++++++++++++++++++------------------
+>  1 file changed, 25 insertions(+), 18 deletions(-)
+> 
+> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+> index 4dd88264dff5..dc5090543eca 100644
+> --- a/drivers/irqchip/irq-gic.c
+> +++ b/drivers/irqchip/irq-gic.c
+> @@ -401,19 +401,26 @@ static void gic_cpu_init(struct gic_chip_data *gic)
+>  	int i;
 >  
-> -int xen_platform_pci_unplug = XEN_UNPLUG_ALL;
-> -EXPORT_SYMBOL_GPL(xen_platform_pci_unplug);
+>  	/*
+> -	 * Get what the GIC says our CPU mask is.
+> +	 * Setting up the CPU map is only relevant for the primary GIC
+> +	 * because any nested/secondary GICs do not directly interface
+> +	 * with the CPU(s).
+>  	 */
+> -	BUG_ON(cpu >= NR_GIC_CPU_IF);
+> -	cpu_mask = gic_get_cpumask(gic);
+> -	gic_cpu_map[cpu] = cpu_mask;
+> +	if (gic == &gic_data[0]) {
+> +		/*
+> +		 * Get what the GIC says our CPU mask is.
+> +		 */
+> +		BUG_ON(cpu >= NR_GIC_CPU_IF);
+> +		cpu_mask = gic_get_cpumask(gic);
+> +		gic_cpu_map[cpu] = cpu_mask;
+>  
+> -	/*
+> -	 * Clear our mask from the other map entries in case they're
+> -	 * still undefined.
+> -	 */
+> -	for (i = 0; i < NR_GIC_CPU_IF; i++)
+> -		if (i != cpu)
+> -			gic_cpu_map[i] &= ~cpu_mask;
+> +		/*
+> +		 * Clear our mask from the other map entries in case they're
+> +		 * still undefined.
+> +		 */
+> +		for (i = 0; i < NR_GIC_CPU_IF; i++)
+> +			if (i != cpu)
+> +				gic_cpu_map[i] &= ~cpu_mask;
+> +	}
+>  
+>  	gic_cpu_config(dist_base, NULL);
+>  
+> @@ -930,13 +937,6 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+>  	}
+>  
+>  	/*
+> -	 * Initialize the CPU interface map to all CPUs.
+> -	 * It will be refined as each CPU probes its ID.
+> -	 */
+> -	for (i = 0; i < NR_GIC_CPU_IF; i++)
+> -		gic_cpu_map[i] = 0xff;
 > -
->  static __read_mostly unsigned int xen_events_irq;
+> -	/*
+>  	 * Find out how many interrupts are supported.
+>  	 * The GIC only supports up to 1020 interrupt sources.
+>  	 */
+> @@ -981,6 +981,13 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+>  		return;
 >  
->  static __initdata struct device_node *xen_node;
-> -- 
-> 2.1.4
+>  	if (gic_nr == 0) {
+> +		/*
+> +		 * Initialize the CPU interface map to all CPUs.
+> +		 * It will be refined as each CPU probes its ID.
+> +		 * This is only necessary for the primary GIC.
+> +		 */
+> +		for (i = 0; i < NR_GIC_CPU_IF; i++)
+> +			gic_cpu_map[i] = 0xff;
+>  #ifdef CONFIG_SMP
+>  		set_smp_cross_call(gic_raise_softirq);
+>  		register_cpu_notifier(&gic_cpu_notifier);
 > 
+
+
+-- 
+Jazz is not dead. It just smells funny...
