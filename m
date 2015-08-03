@@ -1,63 +1,40 @@
-From: afenkart@gmail.com (Andreas Fenkart)
-Date: Mon, 3 Aug 2015 09:28:24 +0200
-Subject: [PATCH 00/17] omap_hsmmc: regulator usage cleanup and fixes
-In-Reply-To: <1438168187-1614-1-git-send-email-kishon@ti.com>
-References: <1438168187-1614-1-git-send-email-kishon@ti.com>
-Message-ID: <CALtMJEDP1-Q9W=x-0hq3tZQ1QZ2LVwVj47=ADYDjT7BsfanffA@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 3 Aug 2015 09:30:47 +0200
+Subject: [PATCH 1/2] ARM: integrator: move framebuffers to driver
+In-Reply-To: <20150729193846.GQ7557@n2100.arm.linux.org.uk>
+References: <1438172831-11450-1-git-send-email-linus.walleij@linaro.org>
+ <20150729193846.GQ7557@n2100.arm.linux.org.uk>
+Message-ID: <CACRpkdYkHgKJHDGp+6gS==9829tUsnFyPrdrevyyUuod04mNvw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kishon,
+On Wed, Jul 29, 2015 at 9:38 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Jul 29, 2015 at 02:27:11PM +0200, Linus Walleij wrote:
+>> Commit 11c32d7b6274cb0f554943d65bd4a126c4a86dcd
+>> "video: move Versatile CLCD helpers" already moved the
+>> CLCD mode setting helpers for Versatile and Integrator/CP
+>> to drivers/video/fbdev. Let's do the same for the IM-PD1
+>> add-on board, copy the missing displays into the database
+>> and simplify the code.
+>
+> And thereby break the support.  The IM-PD1 CLCD can only access the memory
+> on the IM-PD1.  That's why the CLCD driver itself doesn't just allocate
+> the frame buffer using dma_alloc_writecombine().  Where the memory comes
+> from is platform specific.  In this case...
+>
+>> -static int impd1fb_clcd_setup(struct clcd_fb *fb)
+>> -{
+>> -     unsigned long framebase = fb->dev->res.start + 0x01000000;
+>> -     unsigned long framesize = SZ_1M;
+>
+> It's a chunk of SRAM offset by the specified value and of the specified
+> size above.
 
-Thanks for taking a look at the regulator code. Do you have a public
-git repository so I can pull your patches instead of cherry picking
-1-by-1?
+Argh how typical. I need to get one of these PROSPECTOR displays
+so I can actually test this stuff. I have tried to get VGA out working with
+the IM-PD1 but it just doesn't seem to come up no matter how I
+try.
 
-/Andi
-
-2015-07-29 13:09 GMT+02:00 Kishon Vijay Abraham I <kishon@ti.com>:
-> This patch series does the following
-> *) Uses devm_regulator_get_optional() for vmmc and then removes the
->    CONFIG_REGULATOR check altogether.
-> *) return on -EPROBE_DEFER
-> *) enable/disable vmmc_aux regulator based on prior state
->
-> This series is in preparation for implementing the voltage switch
-> sequence so that UHS cards can be supported.
->
-> Did basic read/write test in J6, J6 Eco, Beagle-x15, AM437x EVM,
-> Beaglebone black, OMAP5 uEVM and OMAP4 PANDA.
->
-> Kishon Vijay Abraham I (16):
->   mmc: host: omap_hsmmc: use devm_regulator_get_optional() for vmmc
->   mmc: host: omap_hsmmc: return error from omap_hsmmc_reg_get on
->     -EPROBE_DEFER
->   mmc: host: omap_hsmmc: cleanup omap_hsmmc_reg_get()
->   mmc: host: omap_hsmmc: use the ocrmask provided by the vmmc regulator
->   mmc: host: omap_hsmmc: use mmc_host's vmmc and vqmmc
->   mmc: host: omap_hsmmc: remove unnecessary pbias set_voltage
->   mmc: host: omap_hsmmc: return error if any of the regulator APIs fail
->   mmc: host: omap_hsmmc: add separate functions for enable/disable
->     supply
->   mmc: host: omap_hsmmc: add separate function to set pbias
->   mmc: host: omap_hsmmc: avoid pbias regulator enable on power off
->   mmc: host: omap_hsmmc: don't use ->set_power to set initial regulator
->     state
->   ARM: dts: am57xx-beagle-x15: Fix regulator populated in MMC1 dt node
->   mmc: host: omap_hsmmc: enable/disable vmmc_aux regulator based on
->     prior state
->   mmc: host: omap_hsmmc: use regulator_is_enabled to find pbias status
->   mmc: host: omap_hsmmc: use ios->vdd for setting vmmc voltage
->   mmc: host: omap_hsmmc: remove CONFIG_REGULATOR check
->
-> Roger Quadros (1):
->   mmc: host: omap_hsmmc: use "mmc_of_parse_voltage" to get ocr_avail
->
->  .../devicetree/bindings/mmc/ti-omap-hsmmc.txt      |    2 +
->  arch/arm/boot/dts/am57xx-beagle-x15.dts            |    1 -
->  drivers/mmc/host/omap_hsmmc.c                      |  333 +++++++++++++-------
->  3 files changed, 216 insertions(+), 120 deletions(-)
->
-> --
-> 1.7.9.5
->
+Yours,
+Linus Walleij
