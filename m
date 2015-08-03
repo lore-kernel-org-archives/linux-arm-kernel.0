@@ -1,91 +1,42 @@
 From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Mon, 3 Aug 2015 14:18:18 -0400
-Subject: [PATCH] ARM/PCI: set MPS before pci_bus_add_devices()
-In-Reply-To: <20150723145936.GX21967@google.com>
-References: <1437514519-18545-1-git-send-email-m-karicheri2@ti.com>
- <20150723145936.GX21967@google.com>
-Message-ID: <55BFB06A.3040904@ti.com>
+Date: Mon, 3 Aug 2015 14:22:19 -0400
+Subject: [PATCH 1/2] ARM: dts: keystone: fix the clock node for mdio
+In-Reply-To: <1438625518-21315-1-git-send-email-m-karicheri2@ti.com>
+References: <1438625518-21315-1-git-send-email-m-karicheri2@ti.com>
+Message-ID: <55BFB15B.8040207@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/23/2015 10:59 AM, Bjorn Helgaas wrote:
-> On Tue, Jul 21, 2015 at 05:35:19PM -0400, Murali Karicheri wrote:
->> The MPS configuration should be done *before* pci_bus_add_devices().
->> After pci_bus_add_devices(), drivers may be bound to devices, and
->> the PCI core shouldn't touch device configuration while a driver
->> owns the device.
->>
->> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
->> Reported-by: Bjorn Helgaas <bhelgaas@google.com>
+On 08/03/2015 02:11 PM, Murali Karicheri wrote:
+> Currently the MDIO clock is pointing to clkpa instead of clkcpgmac.
+> MDIO is part of the ethss and the clock should be clkcpgmac.
 >
-> Applied to pci/enumeration for v4.3, thanks!  I removed the "bus" test; let
-> me know if you think that's incorrect.
-Ok. Will do. Thanks.
+> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+> ---
+>   arch/arm/boot/dts/keystone.dtsi | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/boot/dts/keystone.dtsi b/arch/arm/boot/dts/keystone.dtsi
+> index e7a6f6d..6245a17 100644
+> --- a/arch/arm/boot/dts/keystone.dtsi
+> +++ b/arch/arm/boot/dts/keystone.dtsi
+> @@ -273,7 +273,7 @@
+>   			#size-cells = <0>;
+>   			reg		= <0x02090300 0x100>;
+>   			status = "disabled";
+> -			clocks = <&clkpa>;
+> +			clocks = <&clkcpgmac>;
+>   			clock-names = "fck";
+>   			bus_freq	= <2500000>;
+>   		};
+>
+Santosh,
 
-Murali
+This is a big fix and needs to go in v4.2-rc. So please review and apply 
+asap. v4.2 is the first release that has netcp driver fully functional 
+and I want to fix as many known bugs as possible.
 
->
->> ---
->>   arch/arm/kernel/bios32.c | 19 +++++--------------
->>   1 file changed, 5 insertions(+), 14 deletions(-)
->>
->> diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
->> index fcbbbb1..17efde7 100644
->> --- a/arch/arm/kernel/bios32.c
->> +++ b/arch/arm/kernel/bios32.c
->> @@ -520,7 +520,8 @@ void pci_common_init_dev(struct device *parent, struct hw_pci *hw)
->>   	list_for_each_entry(sys, &head, node) {
->>   		struct pci_bus *bus = sys->bus;
->>
->> -		if (!pci_has_flag(PCI_PROBE_ONLY)) {
->> +		if (bus && !pci_has_flag(PCI_PROBE_ONLY)) {
->
-> I think the test for "bus" being non-NULL is superfluous here.  If "bus"
-> were NULL, we would already oops in pci_bus_add_devices().
->
->> +			struct pci_bus *child;
->>   			/*
->>   			 * Size the bridge windows.
->>   			 */
->> @@ -530,25 +531,15 @@ void pci_common_init_dev(struct device *parent, struct hw_pci *hw)
->>   			 * Assign resources.
->>   			 */
->>   			pci_bus_assign_resources(bus);
->> -		}
->>
->> +			list_for_each_entry(child, &bus->children, node)
->> +				pcie_bus_configure_settings(child);
->> +		}
->>   		/*
->>   		 * Tell drivers about devices found.
->>   		 */
->>   		pci_bus_add_devices(bus);
->>   	}
->> -
->> -	list_for_each_entry(sys, &head, node) {
->> -		struct pci_bus *bus = sys->bus;
->> -
->> -		/* Configure PCI Express settings */
->> -		if (bus && !pci_has_flag(PCI_PROBE_ONLY)) {
->> -			struct pci_bus *child;
->> -
->> -			list_for_each_entry(child, &bus->children, node)
->> -				pcie_bus_configure_settings(child);
->> -		}
->> -	}
->>   }
->>
->>   #ifndef CONFIG_PCI_HOST_ITE8152
->> --
->> 1.9.1
->>
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
-
+Thanks.
 
 -- 
 Murali Karicheri
