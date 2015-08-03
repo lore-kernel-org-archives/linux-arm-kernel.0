@@ -1,42 +1,38 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon,  3 Aug 2015 21:24:44 +0200
-Subject: [GIT PULL] ARM: berlin: Initial Marvell Berlin ARM64 support
-Message-ID: <1438629886-6390-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Date: Mon,  3 Aug 2015 21:24:46 +0200
+Subject: [PATCH 2/2] arm64: Enable Marvell Berlin SoC family in defconfig
+In-Reply-To: <1438629886-6390-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1438629886-6390-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1438629886-6390-3-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Kevin, Olof,
+From: Jisheng Zhang <jszhang@marvell.com>
 
-this is initial Marvell Berlin4CT ARM64 support for v4.3. It contains minimum SoC
-dtsi and basic dts for the development board. The patches have been posted by
-Marvell's Jisheng Zhang a while ago on the lists.
+Enable Marvell Berlin SoC family in arm64 defconfig.
 
-Please pull.
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+---
+Also discussed with Olof on IRC, this is the defconfig changes singled
+out from Jisheng's original patch.
 
-The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
+Sebastian
+---
+ arch/arm64/configs/defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-  Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
-
-are available in the git repository at:
-
-  git://git.infradead.org/users/hesselba/linux-berlin.git tags/berlin64-for-v4.3-1
-
-for you to fetch changes up to d93ac74ad150c89f2d0a3b90754cbccdc6ab102c:
-
-  arm64: dts: Add dts files for Marvell Berlin4CT SoC (2015-08-03 20:45:54 +0200)
-
-----------------------------------------------------------------
-Initial support for Marvell Berlin4CT ARM64 SoC
-
-----------------------------------------------------------------
-Jisheng Zhang (1):
-      arm64: dts: Add dts files for Marvell Berlin4CT SoC
-
- arch/arm64/boot/dts/Makefile                  |   1 +
- arch/arm64/boot/dts/marvell/Makefile          |   5 +
- arch/arm64/boot/dts/marvell/berlin4ct-dmp.dts |  66 +++++++++++
- arch/arm64/boot/dts/marvell/berlin4ct.dtsi    | 164 ++++++++++++++++++++++++++
- 4 files changed, 236 insertions(+)
- create mode 100644 arch/arm64/boot/dts/marvell/Makefile
- create mode 100644 arch/arm64/boot/dts/marvell/berlin4ct-dmp.dts
- create mode 100644 arch/arm64/boot/dts/marvell/berlin4ct.dtsi
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index f38c94f1d898..9e8978c35772 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -31,6 +31,7 @@ CONFIG_MODULES=y
+ CONFIG_MODULE_UNLOAD=y
+ # CONFIG_BLK_DEV_BSG is not set
+ # CONFIG_IOSCHED_DEADLINE is not set
++CONFIG_ARCH_BERLIN=y
+ CONFIG_ARCH_EXYNOS7=y
+ CONFIG_ARCH_FSL_LS2085A=y
+ CONFIG_ARCH_HISI=y
+-- 
+2.1.0
