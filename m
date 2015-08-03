@@ -1,114 +1,294 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon,  3 Aug 2015 09:26:41 +0200
-Subject: [PATCH 1/2] ARM: ux500: add an SMP enablement type and move cpu nodes
-Message-ID: <1438586801-30115-1-git-send-email-linus.walleij@linaro.org>
+Date: Mon,  3 Aug 2015 09:26:52 +0200
+Subject: [PATCH 2/2] ARM: ux500: simplify secondary CPU boot
+Message-ID: <1438586812-30164-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The "cpus" node cannot be inside the "soc" node, while this
-works for the CoreSight blocks, the early boot code will look
-for "cpus" directly under the root node, so this is a hard
-convention. So move the CPU nodes.
+This removes a lot of ancient cruft from the Ux500 SMP boot.
+Instead of the pen grab/release, just point the ROM to
+secondary_boot() and start the second CPU there, then send
+the IPI.
 
-Augment the "reg" property to match what is actually in the
-hardware: 0x300 and 0x301 respectively.
+Use our own SMP enable method. This enables us to remove the
+last static mapping and get both CPUs booting properly.
 
-Then add an SMP enablement type to be used by the SMP init
-code, "ste,dbx500-smp".
+Tested this and it just works.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
-Hi ARM SoC people: please apply this as a fix for v4.2
-as it is prerequisite for 2/2 which is a more proper fix
-for the secondary CPU boot regression addressed by the
-fixed remappings patch.
+Hi ARM SoC folks: please apply this to fixes for v4.2. I was
+intending it for v4.3 but we might as well just kill off the
+legacy boot method right now so we do not need to restore any
+static maps and undo the cleanup (which would be just as
+invasive).
 ---
- Documentation/devicetree/bindings/arm/cpus.txt |  1 +
- arch/arm/boot/dts/ste-dbx5x0.dtsi              | 53 +++++++++++++-------------
- 2 files changed, 28 insertions(+), 26 deletions(-)
+ arch/arm/mach-ux500/Makefile     |   2 +-
+ arch/arm/mach-ux500/cpu-db8500.c |   1 -
+ arch/arm/mach-ux500/headsmp.S    |  37 -----------
+ arch/arm/mach-ux500/platsmp.c    | 132 ++++++++++++---------------------------
+ arch/arm/mach-ux500/setup.h      |   1 -
+ 5 files changed, 40 insertions(+), 133 deletions(-)
+ delete mode 100644 arch/arm/mach-ux500/headsmp.S
 
-diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
-index d6b794cef0b8..91e6e5c478d0 100644
---- a/Documentation/devicetree/bindings/arm/cpus.txt
-+++ b/Documentation/devicetree/bindings/arm/cpus.txt
-@@ -199,6 +199,7 @@ nodes to be present and contain the properties described below.
- 			    "qcom,kpss-acc-v1"
- 			    "qcom,kpss-acc-v2"
- 			    "rockchip,rk3066-smp"
-+			    "ste,dbx500-smp"
+diff --git a/arch/arm/mach-ux500/Makefile b/arch/arm/mach-ux500/Makefile
+index 4418a5078833..c8643ac5db71 100644
+--- a/arch/arm/mach-ux500/Makefile
++++ b/arch/arm/mach-ux500/Makefile
+@@ -7,7 +7,7 @@ obj-$(CONFIG_CACHE_L2X0)	+= cache-l2x0.o
+ obj-$(CONFIG_UX500_SOC_DB8500)	+= cpu-db8500.o
+ obj-$(CONFIG_MACH_MOP500)	+= board-mop500-regulators.o \
+ 				board-mop500-audio.o
+-obj-$(CONFIG_SMP)		+= platsmp.o headsmp.o
++obj-$(CONFIG_SMP)		+= platsmp.o
+ obj-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
+ obj-$(CONFIG_PM_GENERIC_DOMAINS) += pm_domains.o
  
- 	- cpu-release-addr
- 		Usage: required for systems that have an "enable-method"
-diff --git a/arch/arm/boot/dts/ste-dbx5x0.dtsi b/arch/arm/boot/dts/ste-dbx5x0.dtsi
-index a75f3289e653..b8f81fb418ce 100644
---- a/arch/arm/boot/dts/ste-dbx5x0.dtsi
-+++ b/arch/arm/boot/dts/ste-dbx5x0.dtsi
-@@ -15,6 +15,33 @@
- #include "skeleton.dtsi"
+diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
+index 16913800bbf9..ba708ce08616 100644
+--- a/arch/arm/mach-ux500/cpu-db8500.c
++++ b/arch/arm/mach-ux500/cpu-db8500.c
+@@ -154,7 +154,6 @@ static const char * stericsson_dt_platform_compat[] = {
+ };
  
- / {
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		enable-method = "ste,dbx500-smp";
-+
-+		cpu-map {
-+			cluster0 {
-+				core0 {
-+					cpu = <&CPU0>;
-+				};
-+				core1 {
-+					cpu = <&CPU1>;
-+				};
-+			};
-+		};
-+		CPU0: cpu at 300 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <0x300>;
-+		};
-+		CPU1: cpu at 301 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <0x301>;
-+		};
-+	};
-+
- 	soc {
- 		#address-cells = <1>;
- 		#size-cells = <1>;
-@@ -22,32 +49,6 @@
- 		interrupt-parent = <&intc>;
- 		ranges;
- 
--		cpus {
--			#address-cells = <1>;
--			#size-cells = <0>;
+ DT_MACHINE_START(U8500_DT, "ST-Ericsson Ux5x0 platform (Device Tree Support)")
+-	.smp            = smp_ops(ux500_smp_ops),
+ 	.map_io		= u8500_map_io,
+ 	.init_irq	= ux500_init_irq,
+ 	/* we re-use nomadik timer here */
+diff --git a/arch/arm/mach-ux500/headsmp.S b/arch/arm/mach-ux500/headsmp.S
+deleted file mode 100644
+index 9cdea049485d..000000000000
+--- a/arch/arm/mach-ux500/headsmp.S
++++ /dev/null
+@@ -1,37 +0,0 @@
+-/*
+- *  Copyright (c) 2009 ST-Ericsson
+- *	This file is based  ARM Realview platform
+- *  Copyright (c) 2003 ARM Limited
+- *  All Rights Reserved
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
+-#include <linux/linkage.h>
+-#include <linux/init.h>
 -
--			cpu-map {
--				cluster0 {
--					core0 {
--						cpu = <&CPU0>;
--					};
--					core1 {
--						cpu = <&CPU1>;
--					};
--				};
--			};
--			CPU0: cpu at 0 {
--				device_type = "cpu";
--				compatible = "arm,cortex-a9";
--				reg = <0>;
--			};
--			CPU1: cpu at 1 {
--				device_type = "cpu";
--				compatible = "arm,cortex-a9";
--				reg = <1>;
--			};
--		};
+-/*
+- * U8500 specific entry point for secondary CPUs.
+- */
+-ENTRY(u8500_secondary_startup)
+-	mrc	p15, 0, r0, c0, c0, 5
+-	and	r0, r0, #15
+-	adr	r4, 1f
+-	ldmia	r4, {r5, r6}
+-	sub	r4, r4, r5
+-	add	r6, r6, r4
+-pen:	ldr	r7, [r6]
+-	cmp	r7, r0
+-	bne	pen
 -
- 		ptm at 801ae000 {
- 			compatible = "arm,coresight-etm3x", "arm,primecell";
- 			reg = <0x801ae000 0x1000>;
+-	/*
+-	 * we've been released from the holding pen: secondary_stack
+-	 * should now contain the SVC stack for this core
+-	 */
+-	b	secondary_startup
+-ENDPROC(u8500_secondary_startup)
+-
+-	.align 2
+-1:	.long	.
+-	.long	pen_release
+diff --git a/arch/arm/mach-ux500/platsmp.c b/arch/arm/mach-ux500/platsmp.c
+index 62b1de922bd8..70766b963758 100644
+--- a/arch/arm/mach-ux500/platsmp.c
++++ b/arch/arm/mach-ux500/platsmp.c
+@@ -28,135 +28,81 @@
+ #include "db8500-regs.h"
+ #include "id.h"
+ 
+-static void __iomem *scu_base;
+-static void __iomem *backupram;
+-
+-/* This is called from headsmp.S to wakeup the secondary core */
+-extern void u8500_secondary_startup(void);
+-
+-/*
+- * Write pen_release in a way that is guaranteed to be visible to all
+- * observers, irrespective of whether they're taking part in coherency
+- * or not.  This is necessary for the hotplug code to work reliably.
+- */
+-static void write_pen_release(int val)
+-{
+-	pen_release = val;
+-	smp_wmb();
+-	sync_cache_w(&pen_release);
+-}
+-
+-static DEFINE_SPINLOCK(boot_lock);
+-
+-static void ux500_secondary_init(unsigned int cpu)
+-{
+-	/*
+-	 * let the primary processor know we're out of the
+-	 * pen, then head off into the C entry point
+-	 */
+-	write_pen_release(-1);
+-
+-	/*
+-	 * Synchronise with the boot thread.
+-	 */
+-	spin_lock(&boot_lock);
+-	spin_unlock(&boot_lock);
+-}
++/* Magic triggers in backup RAM */
++#define UX500_CPU1_JUMPADDR_OFFSET 0x1FF4
++#define UX500_CPU1_WAKEMAGIC_OFFSET 0x1FF0
+ 
+-static int ux500_boot_secondary(unsigned int cpu, struct task_struct *idle)
++static void wakeup_secondary(void)
+ {
+-	unsigned long timeout;
+-
+-	/*
+-	 * set synchronisation state between this boot processor
+-	 * and the secondary one
+-	 */
+-	spin_lock(&boot_lock);
+-
+-	/*
+-	 * The secondary processor is waiting to be released from
+-	 * the holding pen - release it, then wait for it to flag
+-	 * that it has been released by resetting pen_release.
+-	 */
+-	write_pen_release(cpu_logical_map(cpu));
+-
+-	arch_send_wakeup_ipi_mask(cpumask_of(cpu));
++	struct device_node *np;
++	static void __iomem *backupram;
+ 
+-	timeout = jiffies + (1 * HZ);
+-	while (time_before(jiffies, timeout)) {
+-		if (pen_release == -1)
+-			break;
++	np = of_find_compatible_node(NULL, NULL, "ste,dbx500-backupram");
++	if (!np) {
++		pr_err("No backupram base address\n");
++		return;
++	}
++	backupram = of_iomap(np, 0);
++	of_node_put(np);
++	if (!backupram) {
++		pr_err("No backupram remap\n");
++		return;
+ 	}
+ 
+ 	/*
+-	 * now the secondary core is starting up let it run its
+-	 * calibrations, then wait for it to finish
+-	 */
+-	spin_unlock(&boot_lock);
+-
+-	return pen_release != -1 ? -ENOSYS : 0;
+-}
+-
+-static void __init wakeup_secondary(void)
+-{
+-	/*
+ 	 * write the address of secondary startup into the backup ram register
+ 	 * at offset 0x1FF4, then write the magic number 0xA1FEED01 to the
+ 	 * backup ram register at offset 0x1FF0, which is what boot rom code
+-	 * is waiting for. This would wake up the secondary core from WFE
++	 * is waiting for. This will wake up the secondary core from WFE.
+ 	 */
+-#define UX500_CPU1_JUMPADDR_OFFSET 0x1FF4
+-	__raw_writel(virt_to_phys(u8500_secondary_startup),
+-		     backupram + UX500_CPU1_JUMPADDR_OFFSET);
+-
+-#define UX500_CPU1_WAKEMAGIC_OFFSET 0x1FF0
+-	__raw_writel(0xA1FEED01,
+-		     backupram + UX500_CPU1_WAKEMAGIC_OFFSET);
++	writel(virt_to_phys(secondary_startup),
++	       backupram + UX500_CPU1_JUMPADDR_OFFSET);
++	writel(0xA1FEED01,
++	       backupram + UX500_CPU1_WAKEMAGIC_OFFSET);
+ 
+ 	/* make sure write buffer is drained */
+ 	mb();
++	iounmap(backupram);
+ }
+ 
+-/*
+- * Initialise the CPU possible map early - this describes the CPUs
+- * which may be present or become present in the system.
+- */
+-static void __init ux500_smp_init_cpus(void)
++static void __init ux500_smp_prepare_cpus(unsigned int max_cpus)
+ {
+-	unsigned int i, ncores;
+ 	struct device_node *np;
++	static void __iomem *scu_base;
++	unsigned int ncores;
++	int i;
+ 
+ 	np = of_find_compatible_node(NULL, NULL, "arm,cortex-a9-scu");
++	if (!np) {
++		pr_err("No SCU base address\n");
++		return;
++	}
+ 	scu_base = of_iomap(np, 0);
+ 	of_node_put(np);
+-	if (!scu_base)
++	if (!scu_base) {
++		pr_err("No SCU remap\n");
+ 		return;
+-	backupram = ioremap(U8500_BACKUPRAM0_BASE, SZ_8K);
+-	ncores = scu_get_core_count(scu_base);
+-
+-	/* sanity check */
+-	if (ncores > nr_cpu_ids) {
+-		pr_warn("SMP: %u cores greater than maximum (%u), clipping\n",
+-			ncores, nr_cpu_ids);
+-		ncores = nr_cpu_ids;
+ 	}
+ 
++	scu_enable(scu_base);
++	ncores = scu_get_core_count(scu_base);
+ 	for (i = 0; i < ncores; i++)
+ 		set_cpu_possible(i, true);
++	iounmap(scu_base);
+ }
+ 
+-static void __init ux500_smp_prepare_cpus(unsigned int max_cpus)
++static int ux500_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ {
+-	scu_enable(scu_base);
+ 	wakeup_secondary();
++	arch_send_wakeup_ipi_mask(cpumask_of(cpu));
++	return 0;
+ }
+ 
+ struct smp_operations ux500_smp_ops __initdata = {
+-	.smp_init_cpus		= ux500_smp_init_cpus,
+ 	.smp_prepare_cpus	= ux500_smp_prepare_cpus,
+-	.smp_secondary_init	= ux500_secondary_init,
+ 	.smp_boot_secondary	= ux500_boot_secondary,
+ #ifdef CONFIG_HOTPLUG_CPU
+ 	.cpu_die		= ux500_cpu_die,
+ #endif
+ };
++CPU_METHOD_OF_DECLARE(ux500_smp, "ste,dbx500-smp", &ux500_smp_ops);
+diff --git a/arch/arm/mach-ux500/setup.h b/arch/arm/mach-ux500/setup.h
+index 1fb6ad2789f1..65876eac0761 100644
+--- a/arch/arm/mach-ux500/setup.h
++++ b/arch/arm/mach-ux500/setup.h
+@@ -26,7 +26,6 @@ extern struct device *ux500_soc_device_init(const char *soc_id);
+ 
+ extern void ux500_timer_init(void);
+ 
+-extern struct smp_operations ux500_smp_ops;
+ extern void ux500_cpu_die(unsigned int cpu);
+ 
+ #endif /*  __ASM_ARCH_SETUP_H */
 -- 
 2.4.3
