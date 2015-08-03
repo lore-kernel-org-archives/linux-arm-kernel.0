@@ -1,39 +1,39 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Mon, 3 Aug 2015 12:57:11 -0400
-Subject: [RFC 2/3] arm64: refactor save_stack_trace()
-In-Reply-To: <D7BD8A9F-8710-42D5-A0ED-8747D2B6B268@gmail.com>
-References: <12F47692-3010-4886-B87D-3D7820609177@gmail.com>
- <20150716113115.45a17f17@gandalf.local.home>
- <20150716121658.7982fdf5@gandalf.local.home>
- <20150717124054.GE26091@leverpostej>
- <20150717090009.720f6bd0@gandalf.local.home>
- <77EA0F10-D5F6-48BD-8652-3B979A978659@gmail.com>
- <20150717104144.6588b2f7@gandalf.local.home>
- <0886A996-40E1-49E9-823C-85E55A858716@gmail.com>
- <1357EA74-B972-4B99-ADB0-BC7E8F06DDB5@gmail.com>
- <20150720162004.GL9908@arm.com> <20150803090951.GA10501@arm.com>
- <D7BD8A9F-8710-42D5-A0ED-8747D2B6B268@gmail.com>
-Message-ID: <20150803125711.65463359@gandalf.local.home>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 03 Aug 2015 18:06:56 +0100
+Subject: [PATCH v2 14/15] KVM: arm64: implement MSI injection in ITS
+ emulation
+In-Reply-To: <55BF8AB8.5050408@linaro.org>
+References: <1436538111-4294-1-git-send-email-andre.przywara@arm.com>
+ <1436538111-4294-15-git-send-email-andre.przywara@arm.com>
+ <55BB7678.5080105@linaro.org> <55BE7BA1.40403@arm.com>
+ <00a201d0cdb7$70a623f0$51f26bd0$@samsung.com> <55BF2F51.6020701@linaro.org>
+ <00f101d0cdcd$146a6090$3d3f21b0$@samsung.com> <55BF8AB8.5050408@linaro.org>
+Message-ID: <55BF9FB0.6070804@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 4 Aug 2015 01:30:50 +0900
-Jungseok Lee <jungseoklee85@gmail.com> wrote:
-
-
-> There are two issues in the current version.
-> 1) The change does not work correctly when function_graph feature is enabled.
-> 2) Akashi have raised an issue that size field of stack tracer is inaccurate.
+On 03/08/15 16:37, Eric Auger wrote:
+> Andre, Pavel,
+> On 08/03/2015 11:16 AM, Pavel Fedin wrote:
+>>  Hello!
+>>
+>>> Again the case that leaves me uncomfortable is the one where the
+>>> userspace does not provide the devid whereas it must (GICv3 ITS case).
+>>
+>>  Hypothetical broken userland which does not exist for now ?
+> Yes but that's the rule to be not confident in *any* userspace, isn't it?
 > 
-> So, I think this patch set is not ready yet.
+> As of now I prefer keeping the flags at uapi level and propagate it
+> downto the kernel, as long as I don't have any answer for the unset
+> devid discrimination question. Please apologize for my stubbornness ;-)
 
-Do you still want me to add code that does:
+I think this flag should be kept, as it really indicates what is valid
+in the MSI structure. It also has other benefits such as making obvious
+what userspace expects, which can then be checked against the kernel's
+own expectations.
 
- if (*p == (stack_dump_trace[i] + FTRACE_STACK_FRAME_OFFSET)) {
+Thanks,
 
-?
-
-If you expect to need that, I can get it into the next merge window and
-you can base the code of that in the merge window after that.
-
--- Steve
+	M.
+-- 
+Jazz is not dead. It just smells funny...
