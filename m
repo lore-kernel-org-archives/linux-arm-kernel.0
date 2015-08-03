@@ -1,127 +1,138 @@
-From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
-Date: Mon, 3 Aug 2015 10:48:55 -0300
-Subject: [PATCH v2 0/4] mtd: pxa3xx_nand: rework the timing setup
-In-Reply-To: <87si81m15m.fsf@belgarion.home>
-References: <1436281707-20106-1-git-send-email-antoine.tenart@free-electrons.com>
- <20150717134159.GC10608@kwain>
- <55A912F0.7080605@vanguardiasur.com.ar>
- <87h9p2is8e.fsf@belgarion.home>
- <CAAEAJfCcdioVQKZs9U3DP6H94BiuQ2qU21DsMKevS5+j+-XEKA@mail.gmail.com>
- <87wpxufw2v.fsf@belgarion.home>
- <CAAEAJfB3caa+DmJN=Pa8brx0uGC11QA29KJb3NQdJjXTgw-yuA@mail.gmail.com>
- <87si81m15m.fsf@belgarion.home>
-Message-ID: <CAAEAJfBMpQ8nf5aLTUqrCsJkMQbnkQTB1yA5MBiJ6R4h6RgupQ@mail.gmail.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Mon, 03 Aug 2015 15:55:17 +0200
+Subject: [PATCH v3 3/5] ARM: Exynos: switch to using generic cpufreq driver
+ for Exynos4x12
+In-Reply-To: <55BF4D41.1060903@samsung.com>
+References: <1438368557-2352-1-git-send-email-b.zolnierkie@samsung.com>
+ <4532306.AVvo5hem3c@amdc1976> <55BF4D41.1060903@samsung.com>
+Message-ID: <2347616.SxxJmTVssu@amdc1976>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 August 2015 at 01:44, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
-> Ezequiel Garcia <ezequiel@vanguardiasur.com.ar> writes:
->
->> Just tested linux-next (hence *without* the patchset) and I see
->> the same "Wait time out". In other words, pxa3xx-nand is broken
->> on PXA :/
->>
->> Interestingly, the culprit doesn't seem to be in pxa3xx-nand itself.
->> Reverting the recent commits on pxa3xx-nand doesn't help.
->>
->> ce914e6 mtd: nand: pxa3xx: fix build on ARM64
->> afca11e mtd: nand: pxa3xx: Switch FIFO draining to jiffies-based timeout
->> e5860c1 mtd: pxa3xx_nand: cleanup wait_for_completion handling
->> 7c2f717 mtd: pxa3xx_nand: initialiaze pxa3xx_flash_ids to 0
->> ed446cc Merge MTD updates into -next
->> e423c90 mtd: pxa3xx_nand: fix driver when num_cs is 0
->> 2454225 mtd: pxa3xx-nand: handle PIO in threaded interrupt
->> 8dad038 mtd: nand: pxa3xx: Fix PIO FIFO draining
->> b7e46062 mtd: pxa3xx_nand: make the driver work on big-endian systems
->> 5b3e507 mtd: nand: pxa3xx: Use ECC strength and step size devicetree binding
->> eee0166 mtd: nand: pxa3xx: Clean pxa_ecc_init() error handling
->> 17754ad mtd: nand: pxa3xx: Make of_device_id array const
->> e634ce5 mtd: nand: pxa3xx: Print actual ECC strength in error message
->>
->> Yet v3.18 succeeds to pass a few NAND blocks on nandtest.
->>
->> Robert: any ideas?
-> Actually yes, I worked on that this weekend.
-> Would you try the following patch [1] to see if it works for you ?
->
-> The issue I see is that :
->  - there is a bug in the clk driver for pxa3xx I introduced (CKEN_AB)
->  - and shutting down the GCU clock prevents the NAND from working (I can't
->  explain that one yet)
->
 
-IIRC, on Armada 370/XP SoCs we have two clocks feeding the NAND
-controller: one for the NAND logic (not really sure?), and one for the
-NAND ECC engine.
+Hi,
 
-Maybe the GCU feeds the ECC?
+On Monday, August 03, 2015 08:15:13 PM Krzysztof Kozlowski wrote:
+> W dniu 03.08.2015 o 19:36, Bartlomiej Zolnierkiewicz pisze:
+> > On Monday, August 03, 2015 03:59:26 PM Viresh Kumar wrote:
+> >> On 03-08-15, 12:17, Bartlomiej Zolnierkiewicz wrote:
+> >>>
+> >>> Hi,
+> >>>
+> >>> On Saturday, August 01, 2015 04:47:21 PM Viresh Kumar wrote:
+> >>>> On 31-07-15, 20:49, Bartlomiej Zolnierkiewicz wrote:
+> >>>>> diff --git a/drivers/cpufreq/Kconfig b/drivers/cpufreq/Kconfig
+> >>>>> index 659879a..bf6d596 100644
+> >>>>> --- a/drivers/cpufreq/Kconfig
+> >>>>> +++ b/drivers/cpufreq/Kconfig
+> >>>>> @@ -191,6 +191,7 @@ config CPUFREQ_DT
+> >>>>>  	# if CPU_THERMAL is on and THERMAL=m, CPUFREQ_DT cannot be =y:
+> >>>>>  	depends on !CPU_THERMAL || THERMAL
+> >>>>>  	select PM_OPP
+> >>>>> +	select EXYNOS_THERMAL if ARCH_EXYNOS
+> >>>>>  	help
+> >>>>>  	  This adds a generic DT based cpufreq driver for frequency management.
+> >>>>>  	  It supports both uniprocessor (UP) and symmetric multiprocessor (SMP)
+> >>>>
+> >>>> No, we shouldn't pollute generic Kconfig options with platform specific stuff.
+> >>>
+> >>> The old code depended on this.  You couldn't enable boost support
+> >>> without enabling thermal support (ARM_EXYNOS_CPU_FREQ_BOOST_SW
+> >>> config option selected EXYNOS_THERMAL).
+> >>>
+> >>>> Why don't you enable thermal in your .config?
+> >>>
+> >>> It is enabled in exynos_defconfig but without the above change it
+> >>> can disabled manually which is something that we don't want.
+> >>
+> >> You are not getting it. I am not asking you to not select thermal, but
+> >> to select it from within your architecture Kconfig option if you want.
+> > 
+> > OK.  Krzysztof/Kukjin do you agree with selecting EXYNOS_THERMAL
+> > from ARCH_EXYNOS in the platform code?
+> 
+> I agree, with your explanation it seems good. Can you just add this
+> justification to the commit message?
 
-> Cheers.
->
-> --
-> Robert
->
-> [1] Clocks patch
+Updated patch below (I'm not resending the whole series as all other
+patches remain unchanged).
 
-Ah, good. I was almost sure it was the clock (after trying a bunch of
-other stuff it was the only big change left).
+> > 
+> >> Over that, thermal is really an option, not a dependency. So, if
+> >> someone manually disables it, its his problem not yours :)
+> > 
+> > I would really like it to be dependency not an option (+ I think
+> > that ideally it should be checked at runtime, IOW we should be
+> > checking from cpufreq-dt driver if the thermal support is enabled
+> > before enabling boost support).
+> 
+> That would be the best. It is fine with me if you want to do this in
+> consecutive patches (after applying patch selecting/depending on it in
+> mach-exynos code).
 
-I'll try this and will let you know.
+---------------------8<-------------------
 
-> ---8>---
-> diff --git a/drivers/clk/pxa/clk-pxa3xx.c b/drivers/clk/pxa/clk-pxa3xx.c
-> index c677b9ab5367..a47a0c40f937 100644
-> --- a/drivers/clk/pxa/clk-pxa3xx.c
-> +++ b/drivers/clk/pxa/clk-pxa3xx.c
-> @@ -126,7 +126,7 @@ PARENTS(pxa3xx_ac97_bus) = { "ring_osc_60mhz", "ac97" };
->  PARENTS(pxa3xx_sbus) = { "ring_osc_60mhz", "system_bus" };
->  PARENTS(pxa3xx_smemcbus) = { "ring_osc_60mhz", "smemc" };
->
-> -#define CKEN_AB(bit) ((CKEN_ ## bit > 31) ? &CKENA : &CKENB)
-> +#define CKEN_AB(bit) ((CKEN_ ## bit > 31) ? &CKENB : &CKENA)
->  #define PXA3XX_CKEN(dev_id, con_id, parents, mult_lp, div_lp, mult_hp, \
->                     div_hp, bit, is_lp, flags)                          \
->         PXA_CKEN(dev_id, con_id, bit, parents, mult_lp, div_lp,         \
-> @@ -136,6 +136,10 @@ PARENTS(pxa3xx_smemcbus) = { "ring_osc_60mhz", "smemc" };
->                          mult_hp, div_hp, delay)                        \
->         PXA3XX_CKEN(dev_id, con_id, pxa3xx_pbus_parents, mult_lp,       \
->                     div_lp, mult_hp, div_hp, bit, pxa3xx_is_ring_osc_forced, 0)
-> +#define PXA3XX_PBUS_CKENF(dev_id, con_id, bit, mult_lp, div_lp,                \
-> +                         mult_hp, div_hp, delay, flag)                 \
-> +       PXA3XX_CKEN(dev_id, con_id, pxa3xx_pbus_parents, mult_lp,       \
-> +                   div_lp, mult_hp, div_hp, bit, pxa3xx_is_ring_osc_forced, flag)
->  #define PXA3XX_CKEN_1RATE(dev_id, con_id, bit, parents)                        \
->         PXA_CKEN_1RATE(dev_id, con_id, bit, parents,                    \
->                        CKEN_AB(bit), (CKEN_ ## bit % 32), 0)
-> @@ -173,13 +177,13 @@ static struct desc_clk_cken pxa3xx_clocks[] __initdata = {
->
->  static struct desc_clk_cken pxa300_310_clocks[] __initdata = {
->
-> -       PXA3XX_PBUS_CKEN("pxa3xx-gcu", NULL, PXA300_GCU, 1, 1, 1, 1, 0),
-> -       PXA3XX_PBUS_CKEN("pxa3xx-nand", NULL, NAND, 1, 2, 1, 4, 0),
-> +       PXA3XX_PBUS_CKENF("pxa3xx-gcu", NULL, PXA300_GCU, 1, 1, 1, 1, 0, CLK_IGNORE_UNUSED),
-> +       PXA3XX_PBUS_CKENF("pxa3xx-nand", NULL, NAND, 1, 2, 1, 4, 0, CLK_IGNORE_UNUSED),
->         PXA3XX_CKEN_1RATE("pxa3xx-gpio", NULL, GPIO, pxa3xx_13MHz_bus_parents),
->  };
->
->  static struct desc_clk_cken pxa320_clocks[] __initdata = {
-> -       PXA3XX_PBUS_CKEN("pxa3xx-nand", NULL, NAND, 1, 2, 1, 6, 0),
-> +       PXA3XX_PBUS_CKENF("pxa3xx-nand", NULL, NAND, 1, 2, 1, 4, 0, CLK_IGNORE_UNUSED),
->         PXA3XX_PBUS_CKEN("pxa3xx-gcu", NULL, PXA320_GCU, 1, 1, 1, 1, 0),
->         PXA3XX_CKEN_1RATE("pxa3xx-gpio", NULL, GPIO, pxa3xx_13MHz_bus_parents),
->  };
-> @@ -187,7 +191,7 @@ static struct desc_clk_cken pxa320_clocks[] __initdata = {
->  static struct desc_clk_cken pxa93x_clocks[] __initdata = {
->
->         PXA3XX_PBUS_CKEN("pxa3xx-gcu", NULL, PXA300_GCU, 1, 1, 1, 1, 0),
-> -       PXA3XX_PBUS_CKEN("pxa3xx-nand", NULL, NAND, 1, 2, 1, 4, 0),
-> +       PXA3XX_PBUS_CKENF("pxa3xx-nand", NULL, NAND, 1, 2, 1, 4, 0, CLK_IGNORE_UNUSED),
->         PXA3XX_CKEN_1RATE("pxa93x-gpio", NULL, GPIO, pxa3xx_13MHz_bus_parents),
->  };
->
+>From 2595b5e6164a2d1b76626e14302b148b7af5e050 Mon Sep 17 00:00:00 2001
+From: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+Date: Mon, 3 Aug 2015 15:49:06 +0200
+Subject: [PATCH] ARM: Exynos: switch to using generic cpufreq driver for
+ Exynos4x12
 
+The new CPU clock type allows the use of generic CPUfreq driver.
+Switch Exynos4x12 to using generic cpufreq driver.
 
+Previously (when exynos-cpufreq driver was used with boost
+functionality) ARM_EXYNOS_CPU_FREQ_BOOST_SW config option
+(which enabled boost functionality) selected EXYNOS_THERMAL
+one.  After switching Exynos4x12 platforms to use cpufreq-dt
+driver boost support is enabled in the cpufreq-dt driver
+itself (because there are turbo OPPs defined in the board's
+DTS file).  However we still would like to allow enabling
+boost support only if thermal support is also enabled for
+Exynos platforms.  To achieve this make ARCH_EXYNOS config
+option select THERMAL and EXYNOS_THERMAL ones.
 
+Please also note that the switch to use the generic cpufreq-dt
+driver fixes the minor issue present with the old code (support
+for 'boost' mode in the exynos-cpufreq driver was enabled for
+all supported SoCs even though 'boost' frequency was provided
+only for Exynos4x12 ones).
+
+Cc: Tomasz Figa <tomasz.figa@gmail.com>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Thomas Abraham <thomas.ab@samsung.com>
+Cc: Javier Martinez Canillas <javier@osg.samsung.com>
+Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+---
+ arch/arm/mach-exynos/Kconfig  | 2 ++
+ arch/arm/mach-exynos/exynos.c | 2 ++
+ 2 files changed, 4 insertions(+)
+
+diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+index 81064cd..491914c 100644
+--- a/arch/arm/mach-exynos/Kconfig
++++ b/arch/arm/mach-exynos/Kconfig
+@@ -25,6 +25,8 @@ menuconfig ARCH_EXYNOS
+ 	select S5P_DEV_MFC
+ 	select SRAM
+ 	select MFD_SYSCON
++	select THERMAL
++	select EXYNOS_THERMAL
+ 	help
+ 	  Support for SAMSUNG EXYNOS SoCs (EXYNOS4/5)
+ 
+diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+index 77ac021..1c47aee 100644
+--- a/arch/arm/mach-exynos/exynos.c
++++ b/arch/arm/mach-exynos/exynos.c
+@@ -227,6 +227,8 @@ static void __init exynos_init_irq(void)
+ static const struct of_device_id exynos_cpufreq_matches[] = {
+ 	{ .compatible = "samsung,exynos3250", .data = "cpufreq-dt" },
+ 	{ .compatible = "samsung,exynos4210", .data = "cpufreq-dt" },
++	{ .compatible = "samsung,exynos4212", .data = "cpufreq-dt" },
++	{ .compatible = "samsung,exynos4412", .data = "cpufreq-dt" },
+ 	{ .compatible = "samsung,exynos5250", .data = "cpufreq-dt" },
+ 	{ /* sentinel */ }
+ };
 -- 
-Ezequiel Garc?a, VanguardiaSur
-www.vanguardiasur.com.ar
+1.9.1
