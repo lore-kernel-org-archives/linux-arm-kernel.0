@@ -1,147 +1,42 @@
-From: jingoohan1@gmail.com (Jingoo Han)
-Date: Mon, 3 Aug 2015 23:41:20 +0900
-Subject: [PATCH v6] PCI: Store PCIe bus address in struct of_pci_range
-In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E01D70641@lhreml503-mbs>
-References: <1438010223-124422-1-git-send-email-gabriele.paoloni@huawei.com>
- <20150729172053.GE31170@google.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E01D6F350@lhreml503-mbs>
- <CAL_JsqKs11-sXQTdBD+ZjbVYFWUHBARTW9q5MF1hCXUhZ+nWLQ@mail.gmail.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E01D6F94A@lhreml503-mbs>
- <20150730161447.GG9640@google.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E01D6FB3B@lhreml503-mbs>
- <20150730171445.GI9640@google.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E01D6FC15@lhreml503-mbs>
- <CAL_Jsq+aQVakaZf4xo7sxnVyTmPR+HJ-9ByyS6OYJ0PHDYOwmg@mail.gmail.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E01D70589@lhreml503-mbs>
- <55BB8CC6.1080203@ti.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E01D70641@lhreml503-mbs>
-Message-ID: <D6845CEF-67C3-4777-A219-D224C84BACE4@gmail.com>
+From: gg@slimlogic.co.uk (Graeme Gregory)
+Date: Mon, 03 Aug 2015 16:13:31 +0100
+Subject: [PATCH 1/2] drivers: PL061: add support for platform driver
+ probing
+In-Reply-To: <CACRpkdY6ZfB-gnnr49He+BYELy4fhiV0g5jkEHhyVsJOc_SBFw@mail.gmail.com>
+References: <1438585198-8764-1-git-send-email-zhaoshenglong@huawei.com>
+ <1438585198-8764-2-git-send-email-zhaoshenglong@huawei.com>
+ <CACRpkdY6ZfB-gnnr49He+BYELy4fhiV0g5jkEHhyVsJOc_SBFw@mail.gmail.com>
+Message-ID: <1438614811.2338188.346456017.5D258EC5@webmail.messagingengine.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015. 8. 1., at AM 12:09, Gabriele Paoloni <gabriele.paoloni@huawei.com> wrote:
+
+
+On Mon, 3 Aug 2015, at 01:40 PM, Linus Walleij wrote:
+> On Mon, Aug 3, 2015 at 8:59 AM, Shannon Zhao <zhaoshenglong@huawei.com>
+> wrote:
 > 
->> -----Original Message-----
->> From: Kishon Vijay Abraham I [mailto:kishon at ti.com]
->> Sent: Friday, July 31, 2015 3:57 PM
->> To: Gabriele Paoloni; Rob Herring
->> Cc: Bjorn Helgaas; arnd at arndb.de; lorenzo.pieralisi at arm.com; Wangzhou
->> (B); robh+dt at kernel.org; james.morse at arm.com; Liviu.Dudau at arm.com;
->> linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
->> devicetree at vger.kernel.org; Yuanzhichang; Zhudacai; zhangjukuo;
->> qiuzhenfa; Liguozhu (Kenneth); Jingoo Han; Pratyush Anand; Arnd
->> Bergmann; Arnd Bergmann
->> Subject: Re: [PATCH v6] PCI: Store PCIe bus address in struct
->> of_pci_range
->> 
->> +Arnd
->> 
->> Hi,
->> 
->>> On Friday 31 July 2015 07:55 PM, Gabriele Paoloni wrote:
->>> [+cc Kishon]
->>> 
->>>> -----Original Message-----
->>>> From: linux-pci-owner at vger.kernel.org [mailto:linux-pci-
->>>> owner at vger.kernel.org] On Behalf Of Rob Herring
->>>> Sent: Thursday, July 30, 2015 9:42 PM
->>>> To: Gabriele Paoloni
->>>> Cc: Bjorn Helgaas; arnd at arndb.de; lorenzo.pieralisi at arm.com;
->> Wangzhou
->>>> (B); robh+dt at kernel.org; james.morse at arm.com; Liviu.Dudau at arm.com;
->>>> linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
->>>> devicetree at vger.kernel.org; Yuanzhichang; Zhudacai; zhangjukuo;
->>>> qiuzhenfa; Liguozhu (Kenneth); Jingoo Han; Pratyush Anand
->>>> Subject: Re: [PATCH v6] PCI: Store PCIe bus address in struct
->>>> of_pci_range
->>>> 
->>>> On Thu, Jul 30, 2015 at 12:34 PM, Gabriele Paoloni
->>>> <gabriele.paoloni@huawei.com> wrote:
->>>>>> -----Original Message-----
->>>>>> From: Bjorn Helgaas [mailto:bhelgaas at google.com]
->>>>>> Sent: 30 July 2015 18:15
->>>>>> On Thu, Jul 30, 2015 at 04:50:55PM +0000, Gabriele Paoloni wrote:
->>>>>>>> -----Original Message-----
->>>>>>>> From: linux-pci-owner at vger.kernel.org [mailto:linux-pci-
->>>>>>>> owner at vger.kernel.org] On Behalf Of Bjorn Helgaas
->>>>>>>> Sent: Thursday, July 30, 2015 5:15 PM
->>>>>>>> On Thu, Jul 30, 2015 at 01:52:13PM +0000, Gabriele Paoloni wrote:
->>>> 
->>>> [...]
->>>> 
->>>>>>>>> I don?t think we should rely on [CPU] addresses...what if the
->>>>>>>> intermediate
->>>>>>>>> translation layer changes the lower significant bits of the
->>>> "bus
->>>>>>>> address"
->>>>>>>>> to translate into a cpu address?
->>>>>>>> 
->>>>>>>> Is it really a possiblity that the lower bits could be changed?
->>>>>>> 
->>>>>>> I've checked all the current deignware users DTs except "pci-
->>>>>> layerscape"
->>>>>>> that I could not find:
->>>>>>> spear1310.dtsi
->>>>>>> spear1340.dtsi
->>>>>>> dra7.dtsi
->>>>>>> imx6qdl.dtsi
->>>>>>> imx6sx.dtsi
->>>>>>> keystone.dtsi
->>>>>>> exynos5440.dtsi
->>>>>>> 
->>>>>>> None of them modifies the lower bits. To be more precise the only
->>>> guy
->>>>>>> that provides another translation layer is "dra7.dtsi":
->>>>>>> axi0
->>>>>>> http://lxr.free-
->>>> electrons.com/source/arch/arm/boot/dts/dra7.dtsi#L207
->>>>>>> 
->>>>>>> axi1
->>>>>>> http://lxr.free-
->>>> electrons.com/source/arch/arm/boot/dts/dra7.dtsi#L241
->>>>>>> 
->>>>>>> For this case masking the top 4bits (bits28 to 31) should make
->> the
->>>> job.
->>>> 
->>>> IMO, we should just fix this case. After further study, I don't
->> think
->>>> this is a DW issue, but rather an SOC integration issue.
->>>> 
->>>> I believe you can just fixup the address in the pp->ops->host_init
->> hook.
-
-Yep, it is SOC specific code for dra7.
-This is NOT a DW issue.
-
->>> 
->>> Yes I guess that I could just assign pp->(*)_mod_base to the CPU
->> address
->>> in DW and mask it out in dra7xx_pcie_host_init()...
->>> 
->>> Kishon, would you be ok with that?
->> 
->> Initially I was using *base-mask* property from dt. Me and Arnd (cc'ed)
->> had
->> this discussion [1] before we decided the current approach. It'll be
->> good to
->> check with Arnd too.
->> 
->> [1] ->  http://lists.infradead.org/pipermail/linux-arm-kernel/2014-
->> May/253528.html
+> > From: Shannon Zhao <shannon.zhao@linaro.org>
+> >
+> > Since PL061 currently only supports AMBA driver, to support using GPIO
+> > PL061 by DT or ACPI, it needs to add support for platform driver.
+> > A DT binding is provided with this patch, ACPI support is added in a
+> > separate one.
+> >
+> > Signed-off-by: Shannon Zhao <zhaoshenglong@huawei.com>
+> > Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 > 
+> I already stated in 0/2 what the problem is with this, and it's obviously
+> adding
+> a huge codechunk, very similar to the AMBA probe path.
 > 
-> In this patch you use the mask into designware....instead the approach 
-> proposed by Rob means to have the mask declared in the dra7 driver and
-> you modified the pp members in dra7xx_pcie_host_init by masking them...
+> We need to investigate if ACPI can just spawn AMBA/PrimeCell type devices
+> instead.
+> 
+AMBA DT support is a hideous hack, we had kind of hoped to avoid doing
+that in ACPI.
 
-I want to move that code to dra7 driver,
-because that code is dra7-specific.
+If you notice ARM already updated pl011 driver to support platform
+device type probing this seems to be the way to go.
 
-Best regards,
-Jingoo Han
-
-> BTW good to have Arnd opinion too..
->> 
->> Thanks
->> Kishon
+Graeme
