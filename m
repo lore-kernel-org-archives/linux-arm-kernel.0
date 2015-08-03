@@ -1,35 +1,58 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Mon, 3 Aug 2015 17:26:05 +0800
-Subject: [PATCH 0/2] drivers: PL061: Add platform driver probing support
-In-Reply-To: <20150803075848.GH7557@n2100.arm.linux.org.uk>
-References: <1438585198-8764-1-git-send-email-zhaoshenglong@huawei.com>
- <20150803075848.GH7557@n2100.arm.linux.org.uk>
-Message-ID: <55BF33AD.5040502@huawei.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Mon, 03 Aug 2015 11:28:43 +0200
+Subject: [PATCH v10 2/5] mtd: nand: vf610_nfc: add hardware BCH-ECC support
+In-Reply-To: <1438594050-4595-3-git-send-email-stefan@agner.ch>
+References: <1438594050-4595-1-git-send-email-stefan@agner.ch>
+ <1438594050-4595-3-git-send-email-stefan@agner.ch>
+Message-ID: <ff2e2716578a1ae5f0c4b0e0ca8bbdc3@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Hi Brian,
 
-On 2015/8/3 15:58, Russell King - ARM Linux wrote:
-> On Mon, Aug 03, 2015 at 02:59:56PM +0800, Shannon Zhao wrote:
->> From: Shannon Zhao <shannon.zhao@linaro.org>
->>
->> According to ACPI SPEC, it supports ARM boards to use "GPIO-signaled
->> ACPI Events". These events can be used for input events. And to QEMU, it
->> uses GPIO PL061 controller for input events.
->>
->> These two patches add platform driver support for PL061 probed by DT or
->> ACPI.
-> 
-> This certainly is incorrect for DT, and is probably wrong for ACPI too.
-> DT creates amba devices, so binds via the amba device driver.
-> 
+On 2015-08-03 11:27, Stefan Agner wrote:
+<snip>
+> +static inline int vf610_nfc_correct_data(struct mtd_info *mtd, uint8_t *dat,
+> +					 uint8_t *oob, int oob_loaded)
+> +{
+> +	struct vf610_nfc *nfc = mtd_to_nfc(mtd);
+> +	u8 ecc_status;
+> +	u8 ecc_count;
+> +	int flip;
+> +
+> +	ecc_status = __raw_readb(nfc->regs + ECC_SRAM_ADDR * 8 + ECC_OFFSET);
+> +	ecc_count = ecc_status & ECC_ERR_COUNT;
+> +
+> +	if (!(ecc_status & ECC_STATUS_MASK))
+> +		return ecc_count;
+> +
+> +	if (!oob_loaded)
+> +		vf610_nfc_read_buf(mtd, oob, mtd->oobsize);
+> +
+> +	/*
+> +	 * On an erased page, bit count (including OOB) should be zero or
+> +	 * at least less then half of the ECC strength.
+> +	 */
+> +	flip = count_written_bits(dat, nfc->chip.ecc.size, ecc_count);
+> +	flip += count_written_bits(oob, mtd->oobsize - nfc->chip.ecc.bytes,
+> +				   ecc_count);
 
-Oh, sorry. The changes for DT are not necessary. But for ACPI I think it
-needs to convert pl061 to platform device since ACPI doesn't support
-AMBA devices. The Pl011 also does the same thing to support ACPI
-probing. See drivers/tty/serial/amba-pl011.c
+With ECC the controller seems to clear the ECC bytes in SRAM buffer.
+This is a dump of 64 Bit OOB with the 32-error ECC mode which requires
+60 bytes of OOB for ECC:
 
-Thanks,
--- 
-Shannon
+[   22.190273] ff ff ff ff 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+[   22.209698] vf610_nfc_correct_data, flips 1
+
+Not sure if this is acceptable, but I now only count the bits in the
+non-ECC area of the OOB.
+
+Btw, if the ECC check fails, the controller seems kind of count the
+amount of bitflips. It works for most devices reliable, but we had
+devices for which that number was not accurate, see:
+http://thread.gmane.org/gmane.linux.ports.arm.kernel/357439
+
+--
+Stefan
