@@ -1,122 +1,71 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon,  3 Aug 2015 15:04:54 +0900
-Subject: [PATCH 3/6] ARM: shmobile: marzen-reference: Remove C board code
+Date: Mon,  3 Aug 2015 15:04:55 +0900
+Subject: [PATCH 4/6] ARM: shmobile: r8a7779: Cleanup header file
 In-Reply-To: <cover.1438581659.git.horms+renesas@verge.net.au>
 References: <cover.1438581659.git.horms+renesas@verge.net.au>
-Message-ID: <26f9e03fb1c8b8b5dd2f1ad34da775cc129df98a.1438581659.git.horms+renesas@verge.net.au>
+Message-ID: <640780efdd97eefd9ee78e1cd03ba97b1a1e1d9a.1438581659.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm+renesas@opensource.se>
 
-The generic r8a7779 machine vector is now feature-wise equivalent
-to the Marzen-reference case, so simply remove the Marzen C board
-code to fall over on the generic r8a7779 machine vector.
+Remove unused function prototypes from r8a7779.h and
+make the functions static.
 
 Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
 Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/Kconfig                  |  7 ----
- arch/arm/mach-shmobile/Makefile                 |  4 +-
- arch/arm/mach-shmobile/board-marzen-reference.c | 56 -------------------------
- 3 files changed, 1 insertion(+), 66 deletions(-)
- delete mode 100644 arch/arm/mach-shmobile/board-marzen-reference.c
+ arch/arm/mach-shmobile/clock-r8a7779.c | 2 +-
+ arch/arm/mach-shmobile/r8a7779.h       | 2 --
+ arch/arm/mach-shmobile/setup-r8a7779.c | 2 +-
+ 3 files changed, 2 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index 45006479d461..3d6f46cb8b18 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -89,13 +89,6 @@ config ARCH_SH73A0
- 	select ARCH_RMOBILE
- 	select RENESAS_INTC_IRQPIN
+diff --git a/arch/arm/mach-shmobile/clock-r8a7779.c b/arch/arm/mach-shmobile/clock-r8a7779.c
+index fa8ab2cc9187..a376ba3b67c0 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7779.c
++++ b/arch/arm/mach-shmobile/clock-r8a7779.c
+@@ -201,7 +201,7 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_DEV_ID("rcar-du-r8a7779", &mstp_clks[MSTP103]), /* DU */
+ };
  
--comment "Renesas ARM SoCs Board Type"
--
--config MACH_MARZEN
--	bool "MARZEN board"
--	depends on ARCH_R8A7779
--	select REGULATOR_FIXED_VOLTAGE if REGULATOR
--
- comment "Renesas ARM SoCs System Configuration"
- endif
+-void __init r8a7779_clock_init(void)
++static void __init r8a7779_clock_init(void)
+ {
+ 	u32 mode = r8a7779_read_mode_pins();
+ 	int k, ret = 0;
+diff --git a/arch/arm/mach-shmobile/r8a7779.h b/arch/arm/mach-shmobile/r8a7779.h
+index 19f97046dd70..f69c7477178b 100644
+--- a/arch/arm/mach-shmobile/r8a7779.h
++++ b/arch/arm/mach-shmobile/r8a7779.h
+@@ -11,7 +11,6 @@ enum {
+ };
  
-diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
-index 89e463de4479..08b12b4d3f90 100644
---- a/arch/arm/mach-shmobile/Makefile
-+++ b/arch/arm/mach-shmobile/Makefile
-@@ -51,9 +51,7 @@ obj-$(CONFIG_PM_RMOBILE)	+= pm-rmobile.o
- obj-$(CONFIG_ARCH_RCAR_GEN2)	+= pm-rcar-gen2.o
+ extern void r8a7779_init_irq_extpin(int irlm);
+-extern void r8a7779_init_irq_extpin_dt(int irlm);
+ extern void r8a7779_init_irq_dt(void);
+ extern void r8a7779_map_io(void);
+ extern void r8a7779_earlytimer_init(void);
+@@ -19,7 +18,6 @@ extern void r8a7779_add_early_devices(void);
+ extern void r8a7779_add_standard_devices(void);
+ extern void r8a7779_init_late(void);
+ extern u32 r8a7779_read_mode_pins(void);
+-extern void r8a7779_clock_init(void);
+ extern void r8a7779_pinmux_init(void);
+ extern void r8a7779_pm_init(void);
+ extern void r8a7779_register_twd(void);
+diff --git a/arch/arm/mach-shmobile/setup-r8a7779.c b/arch/arm/mach-shmobile/setup-r8a7779.c
+index 2c3e433f84ca..f436cba958fa 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7779.c
++++ b/arch/arm/mach-shmobile/setup-r8a7779.c
+@@ -99,7 +99,7 @@ static struct resource irqpin0_resources[] __initdata = {
+ 	DEFINE_RES_IRQ(gic_spi(30)), /* IRQ3 */
+ };
  
- # Board objects
--ifdef CONFIG_ARCH_SHMOBILE_MULTI
--obj-$(CONFIG_MACH_MARZEN)	+= board-marzen-reference.o
--else
-+ifndef CONFIG_ARCH_SHMOBILE_MULTI
- obj-$(CONFIG_MACH_BOCKW)	+= board-bockw.o
- obj-$(CONFIG_MACH_BOCKW_REFERENCE)	+= board-bockw-reference.o
- obj-$(CONFIG_MACH_MARZEN)	+= board-marzen.o
-diff --git a/arch/arm/mach-shmobile/board-marzen-reference.c b/arch/arm/mach-shmobile/board-marzen-reference.c
-deleted file mode 100644
-index b15eb923263f..000000000000
---- a/arch/arm/mach-shmobile/board-marzen-reference.c
-+++ /dev/null
-@@ -1,56 +0,0 @@
--/*
-- * marzen board support - Reference DT implementation
-- *
-- * Copyright (C) 2011  Renesas Solutions Corp.
-- * Copyright (C) 2011  Magnus Damm
-- * Copyright (C) 2013  Simon Horman
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; version 2 of the License.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- */
--
--#include <linux/clk/shmobile.h>
--#include <linux/clocksource.h>
--#include <linux/of_platform.h>
--
--#include <asm/irq.h>
--#include <asm/mach/arch.h>
--
--#include "common.h"
--#include "irqs.h"
--#include "r8a7779.h"
--
--static void __init marzen_init_timer(void)
--{
--	r8a7779_clocks_init(r8a7779_read_mode_pins());
--	clocksource_of_init();
--}
--
--static void __init marzen_init(void)
--{
--	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
--	r8a7779_init_irq_extpin_dt(1); /* IRQ1 as individual interrupt */
--}
--
--static const char *marzen_boards_compat_dt[] __initdata = {
--	"renesas,marzen",
--	"renesas,marzen-reference",
--	NULL,
--};
--
--DT_MACHINE_START(MARZEN, "marzen")
--	.smp		= smp_ops(r8a7779_smp_ops),
--	.map_io		= r8a7779_map_io,
--	.init_early	= shmobile_init_delay,
--	.init_time	= marzen_init_timer,
--	.init_irq	= r8a7779_init_irq_dt,
--	.init_machine	= marzen_init,
--	.init_late	= shmobile_init_late,
--	.dt_compat	= marzen_boards_compat_dt,
--MACHINE_END
+-void __init r8a7779_init_irq_extpin_dt(int irlm)
++static void __init r8a7779_init_irq_extpin_dt(int irlm)
+ {
+ 	void __iomem *icr0 = ioremap_nocache(0xfe780000, PAGE_SIZE);
+ 	u32 tmp;
 -- 
 2.1.4
