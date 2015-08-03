@@ -1,58 +1,49 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Mon, 03 Aug 2015 11:28:43 +0200
-Subject: [PATCH v10 2/5] mtd: nand: vf610_nfc: add hardware BCH-ECC support
-In-Reply-To: <1438594050-4595-3-git-send-email-stefan@agner.ch>
-References: <1438594050-4595-1-git-send-email-stefan@agner.ch>
- <1438594050-4595-3-git-send-email-stefan@agner.ch>
-Message-ID: <ff2e2716578a1ae5f0c4b0e0ca8bbdc3@agner.ch>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 3 Aug 2015 11:34:20 +0200
+Subject: [linux-sunxi] [PATCH] ARM: dts: sunxi: Raise minimum CPU voltage
+ for sun7i-a20 to a level all boards can supply
+In-Reply-To: <20150803090352.621CC6C80865@dd34104.kasserver.com>
+References: <1438543386-7253-1-git-send-email-public_timo.s@silentcreek.de>
+ <CAGRGNgV6b9yt2HnB2x2Wyc05KEahoX-Y+mVhxsryztcfA36H1g@mail.gmail.com>
+ <CAGb2v67o-=_cL2RWfXJ+3C86zfQ_1b5DYRi3_zwvwy6su6+gdw@mail.gmail.com>
+ <CAGRGNgXH90m9h0DDejd5MTf8enduGFQ8dPKrRhmc8Z6y_PaC1w@mail.gmail.com>
+ <20150803090352.621CC6C80865@dd34104.kasserver.com>
+Message-ID: <20150803093420.GC2564@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Brian,
+On Mon, Aug 03, 2015 at 11:03:52AM +0200, Timo Sigurdsson wrote:
+> Hi again,
+> 
+> Julian Calaby schrieb am 03.08.2015 06:22:
+> > My only real objection here is are there boards that can go down to
+> > 0.9v and if so, won't this change make them less power efficient in
+> > the almost-idle case? And are those power savings enough to justify
+> > not accepting this patch?
+> 
+> It will probably make those boards less power efficient, yes. On the
+> other hand, boards that have their CPU regulator set to min. 1.0V might
+> also draw more power because the lowest frequency is not available, 
+> even though the savings due to frequency are likely to be lower than
+> the savings due to voltage.
 
-On 2015-08-03 11:27, Stefan Agner wrote:
-<snip>
-> +static inline int vf610_nfc_correct_data(struct mtd_info *mtd, uint8_t *dat,
-> +					 uint8_t *oob, int oob_loaded)
-> +{
-> +	struct vf610_nfc *nfc = mtd_to_nfc(mtd);
-> +	u8 ecc_status;
-> +	u8 ecc_count;
-> +	int flip;
-> +
-> +	ecc_status = __raw_readb(nfc->regs + ECC_SRAM_ADDR * 8 + ECC_OFFSET);
-> +	ecc_count = ecc_status & ECC_ERR_COUNT;
-> +
-> +	if (!(ecc_status & ECC_STATUS_MASK))
-> +		return ecc_count;
-> +
-> +	if (!oob_loaded)
-> +		vf610_nfc_read_buf(mtd, oob, mtd->oobsize);
-> +
-> +	/*
-> +	 * On an erased page, bit count (including OOB) should be zero or
-> +	 * at least less then half of the ECC strength.
-> +	 */
-> +	flip = count_written_bits(dat, nfc->chip.ecc.size, ecc_count);
-> +	flip += count_written_bits(oob, mtd->oobsize - nfc->chip.ecc.bytes,
-> +				   ecc_count);
+Guys, isn't this whole discussion a bit moot? We're not doing any kind
+of power management but cpufreq, so maybe there's a lot more to do
+before we actually can have these kind of arguments?
 
-With ECC the controller seems to clear the ECC bytes in SRAM buffer.
-This is a dump of 64 Bit OOB with the 32-error ECC mode which requires
-60 bytes of OOB for ECC:
+Plus this OPP has never been used anyway, so this patch is not going
+to increase the power consumption either.
 
-[   22.190273] ff ff ff ff 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-[   22.209698] vf610_nfc_correct_data, flips 1
+Maxime
 
-Not sure if this is acceptable, but I now only count the bits in the
-non-ECC area of the OOB.
-
-Btw, if the ECC check fails, the controller seems kind of count the
-amount of bitflips. It works for most devices reliable, but we had
-devices for which that number was not accurate, see:
-http://thread.gmane.org/gmane.linux.ports.arm.kernel/357439
-
---
-Stefan
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150803/6e4a74ec/attachment.sig>
