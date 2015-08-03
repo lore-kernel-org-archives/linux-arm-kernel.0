@@ -1,72 +1,43 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Mon,  3 Aug 2015 11:27:30 +0200
-Subject: [PATCH v10 5/5] ARM: dts: vf-colibri: enable NAND flash controller
-In-Reply-To: <1438594050-4595-1-git-send-email-stefan@agner.ch>
-References: <1438594050-4595-1-git-send-email-stefan@agner.ch>
-Message-ID: <1438594050-4595-6-git-send-email-stefan@agner.ch>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 3 Aug 2015 11:28:39 +0200
+Subject: [linux-sunxi] [PATCH] ARM: dts: sunxi: Raise minimum CPU voltage
+ for sun7i-a20 to a level all boards can supply
+In-Reply-To: <CAGRGNgXH90m9h0DDejd5MTf8enduGFQ8dPKrRhmc8Z6y_PaC1w@mail.gmail.com>
+References: <1438543386-7253-1-git-send-email-public_timo.s@silentcreek.de>
+ <CAGRGNgV6b9yt2HnB2x2Wyc05KEahoX-Y+mVhxsryztcfA36H1g@mail.gmail.com>
+ <CAGb2v67o-=_cL2RWfXJ+3C86zfQ_1b5DYRi3_zwvwy6su6+gdw@mail.gmail.com>
+ <CAGRGNgXH90m9h0DDejd5MTf8enduGFQ8dPKrRhmc8Z6y_PaC1w@mail.gmail.com>
+Message-ID: <20150803092839.GB2564@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable NAND access by adding pinmux and NAND flash controller node
-to device tree. The NAND chips currently used on the Colibri VF61
-requires 8-bit ECC per 512 byte page, hence specify 32-bit ECC
-strength per 2k page size.
+On Mon, Aug 03, 2015 at 02:22:13PM +1000, Julian Calaby wrote:
+> >> Is the code that uses this smart enough to sensibly switch between two
+> >> operating points with the same frequency and different voltages? If
+> >> so, maybe just add a 144MHz @ 1.0v operating point?
+> >
+> > You could try. Though I really don't see much to gain here.
+> 
+> From what I recall, lower frequency = less power usage, though my
+> experience is from x86 laptops, not ARM SoCs and I'm sure I'm missing
+> a lot of details. This is the sort of thing that requires thorough
+> testing on a dev board.
 
-Reviewed-by: Brian Norris <computersforpeace@gmail.com>
-Signed-off-by: Stefan Agner <stefan@agner.ch>
----
- arch/arm/boot/dts/vf-colibri.dtsi | 32 ++++++++++++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
+Not on *a* dev board. On virtually all the A20 SoCs ever produced. If
+you have a setting that works better for *your* SoC, fine, patch your
+DT, but that's not going to be a default if it's outside of the SoC
+operating range.
 
-diff --git a/arch/arm/boot/dts/vf-colibri.dtsi b/arch/arm/boot/dts/vf-colibri.dtsi
-index 68ca125..ab2e74b 100644
---- a/arch/arm/boot/dts/vf-colibri.dtsi
-+++ b/arch/arm/boot/dts/vf-colibri.dtsi
-@@ -52,6 +52,19 @@
- 	pinctrl-0 = <&pinctrl_i2c0>;
- };
- 
-+&nfc {
-+	assigned-clocks = <&clks VF610_CLK_NFC>;
-+	assigned-clock-rates = <33000000>;
-+	nand-bus-width = <8>;
-+	nand-ecc-mode = "hw";
-+	nand-ecc-step-size = <2048>;
-+	nand-ecc-strength = <32>;
-+	nand-on-flash-bbt;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_nfc>;
-+	status = "okay";
-+};
-+
- &pwm0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_pwm0>;
-@@ -156,6 +169,25 @@
- 			>;
- 		};
- 
-+		pinctrl_nfc: nfcgrp {
-+			fsl,pins = <
-+				VF610_PAD_PTD23__NF_IO7		0x28df
-+				VF610_PAD_PTD22__NF_IO6		0x28df
-+				VF610_PAD_PTD21__NF_IO5		0x28df
-+				VF610_PAD_PTD20__NF_IO4		0x28df
-+				VF610_PAD_PTD19__NF_IO3		0x28df
-+				VF610_PAD_PTD18__NF_IO2		0x28df
-+				VF610_PAD_PTD17__NF_IO1		0x28df
-+				VF610_PAD_PTD16__NF_IO0		0x28df
-+				VF610_PAD_PTB24__NF_WE_B	0x28c2
-+				VF610_PAD_PTB25__NF_CE0_B	0x28c2
-+				VF610_PAD_PTB27__NF_RE_B	0x28c2
-+				VF610_PAD_PTC26__NF_RB_B	0x283d
-+				VF610_PAD_PTC27__NF_ALE		0x28c2
-+				VF610_PAD_PTC28__NF_CLE		0x28c2
-+			>;
-+		};
-+
- 		pinctrl_pwm0: pwm0grp {
- 			fsl,pins = <
- 				VF610_PAD_PTB0__FTM0_CH0		0x1182
+Maxime
+
 -- 
-2.5.0
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150803/94c58540/attachment.sig>
