@@ -1,82 +1,53 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Mon,  3 Aug 2015 19:20:44 +0200
-Subject: [PATCH v4 5/5] KVM: eventfd: add irq bypass consumer management
-In-Reply-To: <1438622444-25444-1-git-send-email-eric.auger@linaro.org>
-References: <1438622444-25444-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1438622444-25444-6-git-send-email-eric.auger@linaro.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 03 Aug 2015 10:55:29 -0700
+Subject: [PATCH 1/3] clk: versatile: Switch to assigned clock parents
+In-Reply-To: <1438610480.2142.14.camel@arm.com>
+References: <55BBB2FC.9030102@codeaurora.org>
+ <1438386285-5070-1-git-send-email-sboyd@codeaurora.org>
+ <1438386285-5070-2-git-send-email-sboyd@codeaurora.org>
+ <1438610480.2142.14.camel@arm.com>
+Message-ID: <55BFAB11.7080600@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the registration/unregistration of an
-irq_bypass_consumer on irqfd assignment/deassignment.
+On 08/03/2015 07:01 AM, Pawel Moll wrote:
+> On Sat, 2015-08-01 at 00:44 +0100, Stephen Boyd wrote:
+>> @@ -179,6 +124,15 @@ static void __init clk_sp810_of_setup(struct device_node *node)
+>>   		sp810->timerclken[i].channel = i;
+>>   		sp810->timerclken[i].hw.init = &init;
+>>   
+>> +		/*
+>> +		 * If DT isn't setting the parent, force it to be
+>> +		 * the 1 MHz clock without going through the framework.
+>> +		 * We do this before clk_register() so that it can determine
+>> +		 * the parent and setup the tree properly.
+>> +		 */
+>> +		if (deprecated)
+>> +			init.ops->set_parent(&sp810->timerclken[i].hw, 1);
+>> +
+>>   		sp810->timerclken[i].clk = clk_register(NULL,
+>>   				&sp810->timerclken[i].hw);
+>>   		WARN_ON(IS_ERR(sp810->timerclken[i].clk));
+> So that's one thing I've got a (small) problem here...
+>
+> The above change assumes that SP810 always have 32kHz clock on input 0
+> and 1MHz clock on input 1. Yes, this is how it made on VExpress, but it
+> doesn't have to be the case. The magic picking up the faster clock was
+> added to handle all possible cases.
+>
+> The bottom line is: if all we care is VExpress than it works, but it's
+> still a hack. Personally I don't like it, however I won't nak the patch
+> because of this.
+>
 
-Signed-off-by: Eric Auger <eric.auger@linaro.org>
-Signed-off-by: Feng Wu <feng.wu@intel.com>
+All current dts files in the kernel tree have 1MHz on input 1, so we 
+make this change here to set the parent to input 1 if there isn't an 
+assigned-clock-parents property. Presumably new dts files should have 
+the new property so that things work properly. I tried to find the 
+binding document, but it doesn't look to exist, so I didn't have 
+anything to update.
 
----
 
-v2 -> v3 (Feng Wu):
-- Use kvm_arch_irq_bypass_start
-- Remove kvm_arch_irq_bypass_update
-- Add member 'struct irq_bypass_producer *producer' in
-  'struct kvm_kernel_irqfd', it is needed by posted interrupt.
-- Remove 'irq_bypass_unregister_consumer' in kvm_irqfd_deassign()
-
-v1 -> v2:
-- populate of kvm and gsi removed
-- unregister the consumer on irqfd_shutdown
----
- include/linux/kvm_irqfd.h |  2 ++
- virt/kvm/eventfd.c        | 10 ++++++++++
- 2 files changed, 12 insertions(+)
-
-diff --git a/include/linux/kvm_irqfd.h b/include/linux/kvm_irqfd.h
-index f926b39..0c1de05 100644
---- a/include/linux/kvm_irqfd.h
-+++ b/include/linux/kvm_irqfd.h
-@@ -64,6 +64,8 @@ struct kvm_kernel_irqfd {
- 	struct list_head list;
- 	poll_table pt;
- 	struct work_struct shutdown;
-+	struct irq_bypass_consumer consumer;
-+	struct irq_bypass_producer *producer;
- };
- 
- #endif /* __LINUX_KVM_IRQFD_H */
-diff --git a/virt/kvm/eventfd.c b/virt/kvm/eventfd.c
-index 647ffb8..08855de 100644
---- a/virt/kvm/eventfd.c
-+++ b/virt/kvm/eventfd.c
-@@ -35,6 +35,7 @@
- #include <linux/srcu.h>
- #include <linux/slab.h>
- #include <linux/seqlock.h>
-+#include <linux/irqbypass.h>
- #include <trace/events/kvm.h>
- 
- #include <kvm/iodev.h>
-@@ -140,6 +141,7 @@ irqfd_shutdown(struct work_struct *work)
- 	/*
- 	 * It is now safe to release the object's resources
- 	 */
-+	irq_bypass_unregister_consumer(&irqfd->consumer);
- 	eventfd_ctx_put(irqfd->eventfd);
- 	kfree(irqfd);
- }
-@@ -380,6 +382,14 @@ kvm_irqfd_assign(struct kvm *kvm, struct kvm_irqfd *args)
- 	 */
- 	fdput(f);
- 
-+	irqfd->consumer.token = (void *)irqfd->eventfd;
-+	irqfd->consumer.add_producer = kvm_arch_irq_bypass_add_producer;
-+	irqfd->consumer.del_producer = kvm_arch_irq_bypass_del_producer;
-+	irqfd->consumer.stop = kvm_arch_irq_bypass_stop;
-+	irqfd->consumer.start = kvm_arch_irq_bypass_start;
-+	ret = irq_bypass_register_consumer(&irqfd->consumer);
-+	WARN_ON(ret);
-+
- 	return 0;
- 
- fail:
 -- 
-1.9.1
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
