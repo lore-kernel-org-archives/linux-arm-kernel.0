@@ -1,137 +1,91 @@
-From: maitysanchayan@gmail.com (maitysanchayan at gmail.com)
-Date: Mon, 3 Aug 2015 20:55:44 +0530
-Subject: [PATCH v2 3/4] touchscreen: colibri-vf50-ts: Add touchscreen
- support for Colibri VF50
-In-Reply-To: <20150721172044.GC39076@dtor-ws>
-References: <cover.1437058481.git.maitysanchayan@gmail.com>
- <26748bd9a7bde7c2304b6b971f1150bb575e4938.1437058481.git.maitysanchayan@gmail.com>
- <20150717234242.GJ39282@dtor-ws>
- <40d7c372e64c7f25b7df3e48930386de@agner.ch>
- <20150721172044.GC39076@dtor-ws>
-Message-ID: <20150803152544.GA9716@Sanchayan-Arch.toradex.int>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Mon,  3 Aug 2015 17:31:22 +0200
+Subject: [PATCH v3 0/7] KVM: arm/arm64: gsi routing support
+Message-ID: <1438615889-10892-1-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Dmitry,
+With the advent of GICv3 ITS in-kernel emulation, KVM GSI routing
+appears to be requested. More specifically MSI routing is needed.
+irqchip routing does not sound to be really useful on arm but usage of
+MSI routing also mandates to integrate irqchip routing. The initial
+implementation of irqfd on arm must be upgraded with the integration
+of kvm irqchip.c code and the implementation of its standard hooks
+in the architecture specific part.
 
-On 15-07-21 10:20:44, Dmitry Torokhov wrote:
-> Hi Stefan,
-> 
-> On Tue, Jul 21, 2015 at 04:43:36PM +0200, Stefan Agner wrote:
-> > Hi Dmitry,
-> > 
-> > As the original author of the driver I have some remarks to your review
-> > 
-> > On 2015-07-18 01:42, Dmitry Torokhov wrote:
-> > >> +		/*
-> > >> +		 * If touch pressure is too low, stop measuring and reenable
-> > >> +		 * touch detection
-> > >> +		 */
-> > >> +		if (val_p < min_pressure || val_p > 2000)
-> > >> +			break;
-> > 
-> > This is where the modules touch pressure is used to stop the measurement
-> > process and switch back to interrupt mode. See my remarks at the end.
-> > 
-> > >> +
-> > >> +		/*
-> > >> +		 * The pressure may not be enough for the first x and the
-> > >> +		 * second y measurement, but, the pressure is ok when the
-> > >> +		 * driver is doing the third and fourth measurement. To
-> > >> +		 * take care of this, we drop the first measurement always.
-> > >> +		 */
-> > >> +		if (discard_val_on_start) {
-> > >> +			discard_val_on_start = false;
-> > >> +		} else {
-> > >> +			/*
-> > >> +			 * Report touch position and sleep for
-> > >> +			 * next measurement
-> > >> +			 */
-> > >> +			input_report_abs(vf50_ts->ts_input,
-> > >> +					ABS_X, VF_ADC_MAX - val_x);
-> > >> +			input_report_abs(vf50_ts->ts_input,
-> > >> +					ABS_Y, VF_ADC_MAX - val_y);
-> > >> +			input_report_abs(vf50_ts->ts_input,
-> > >> +					ABS_PRESSURE, val_p);
-> > >> +			input_report_key(vf50_ts->ts_input, BTN_TOUCH, 1);
-> > >> +			input_sync(vf50_ts->ts_input);
-> > >> +		}
-> > >> +
-> > >> +		msleep(10);
-> > >> +	}
-> > >> +
-> > >> +	/* Report no more touch, reenable touch detection */
-> > >> +	input_report_abs(vf50_ts->ts_input, ABS_PRESSURE, 0);
-> > >> +	input_report_key(vf50_ts->ts_input, BTN_TOUCH, 0);
-> > >> +	input_sync(vf50_ts->ts_input);
-> > >> +
-> > >> +	vf50_ts_enable_touch_detection(vf50_ts);
-> > >> +
-> > >> +	/* Wait for the pull-up to be stable on high */
-> > >> +	msleep(10);
-> > >> +
-> > >> +	/* Reenable IRQ to detect touch */
-> > >> +	enable_irq(vf50_ts->pen_irq);
-> > >> +
-> > >> +	dev_dbg(dev, "Reenabled touch detection interrupt\n");
-> > >> +}
-> > >> +
-> > >> +static irqreturn_t vf50_ts_touched(int irq, void *dev_id)
-> > >> +{
-> > >> +	struct vf50_touch_device *vf50_ts = (struct vf50_touch_device *)dev_id;
-> > >> +	struct device *dev = &vf50_ts->pdev->dev;
-> > >> +
-> > >> +	dev_dbg(dev, "Touch detected, start worker thread\n");
-> > >> +
-> > >> +	disable_irq_nosync(irq);
-> > >> +
-> > >> +	/* Disable the touch detection plates */
-> > >> +	gpiod_set_value(vf50_ts->gpio_ym, 0);
-> > >> +
-> > >> +	/* Let the platform mux to default state in order to mux as ADC */
-> > >> +	pinctrl_pm_select_default_state(dev);
-> > >> +
-> > >> +	queue_work(vf50_ts->ts_workqueue, &vf50_ts->ts_work);
-> > > 
-> > > If you convert this to a threaded interrupt you won't need to
-> > > disable/reenable interrupt or queue work. You should also be able to use
-> > > gpiod_set_value_cansleep() extending the range of ways the controller
-> > > could be connected to systems.
-> > > 
-> > 
-> > I'm not sure if a threaded interrupt is the right thing here. While the
-> > pen is on the touchscreen (which can be for several seconds)
-> > measurements have to be made in a continuous loop. Is it ok for a
-> > threaded interrupt to run that long?
-> 
-> Yes, why not? Threaded interrupt is simply a kernel thread that is woken
-> when hard interrupt handler tells it to wake up. Very similar to
-> interrupt + work queue, except that the kernel manages interactions
-> properly for you. There are several drivers in kernel that do that, for
-> example auo-pixcir-ts.c or tsc2007.c
-> 
-> > 
-> > I'm also not sure if it is really safe to _not_ disable the pen down
-> > GPIO interrupt. If we get a interrupt while measuring, we should ignore
-> > that interrupt.
-> 
-> The interrupt management core (you'll have to annotate it as
-> IRQF_ONESHOT) will make sure it stays masked properly until the threaded
-> handler completes so you do not need to disable it explicitly.
+In case KVM_SET_GSI_ROUTING ioctl is not called, a default routing
+table with flat irqchip routing entries is built enabling to inject gsi
+corresponding to the SPI indexes seen by the guest.
 
-After working some more on threaded irq implementation, if IRQ_ONESHOT
-flag is used while requesting threaded irq, on entering the IRQ handler
-the vf610_gpio_irq_mask is not called and vf610_gpio_irq_unmask is not
-called on exiting the thread function, not something we expected.
+As soon as KVM_SET_GSI_ROUTING is called, user-space overwrites this
+default routing table and is responsible for building the whole routing
+table.
 
-In contrast, using explicit disable_irq_nosync and enable_irq in the IRQ
-handler and thread respectively results in the respective mask and unmask
-function being called.
+for arm/arm64 KVM_SET_GSI_ROUTING has a limited support:
+- only applies to KVM_IRQFD and not to KVM_IRQ_LINE
 
-The vf610_gpio_irq_*mask functions are in the gpio driver for Vybrid in
-drivers/gpio/gpio-vf610.c.
+- irqchip routing was tested on Calxeda midway (VFIO with irqfd)
+  with and without explicit routing
+- MSI routing without GICv3 ITS was tested using APM Xgene-I
+  (qemu VIRTIO-PCI vhost-net without gsi_direct_mapping).
+- MSI routing with GICv3 ITS is *NOT* tested.
 
-Can you point me in the right direction?
+Code can be found at https://git.linaro.org/people/eric.auger/linux.git/shortlog/refs/heads/v4.2-rc4-gsi-routing-v3
 
-Thanks & Regards,
-Sanchayan.
+It applies on Andre's [PATCH v2 00/15] KVM: arm64: GICv3 ITS emulation
+(http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/355727.html)
+
+History:
+v2 -> v3:
+- eventually got rid of KVM_IRQ_ROUTING_EXTENDED_MSI new type at user
+  api level and use KVM_MSI_VALID_DEVID flag instead
+- remove usage of KVM_IRQ_ROUTING_EXTENDED_MSI type at kernel level too.
+- propagate user flags downto the kernel to make sure the userspace
+  correctly set devid in GICv3 ITS case (still under discussion)
+
+v1 -> v2:
+- user API changed:
+  x devid id passed in kvm_irq_routing_msi
+  x kept the new routing entry type: KVM_IRQ_ROUTING_EXTENDED_MSI
+- kvm_host.h: adopt Andre's proposal to replace the msi_msg by a struct
+  composed of the msi_msg and devid in kvm_kernel_irq_routing_entry
+- Fix bug reported by Pavel: Added KVM_IRQ_ROUTING_EXTENDED_MSI handling
+  in eventfd.c
+- added vgic_v2m_inject_msi in vgic-v2-emul.c as suggested by Andre
+- fix bug reported by Andre: bad setting of msi.flags and msi.devid
+  in kvm_send_userspace_msi
+- avoid injecting reserved IRQ numbers in vgic_irqfd_set_irq
+
+RFC -> PATCH:
+- clearly state limited support on arm/arm64:
+  KVM_IRQ_LINE not impacted by GSI routing
+- add default routing table feature (new patch file)
+- changed uapi to use padding field area
+- reword api.txt
+
+Eric Auger (7):
+  KVM: api: pass the devid in the msi routing entry
+  KVM: kvm_host: add devid in kvm_kernel_irq_routing_entry
+  KVM: irqchip: convey devid to kvm_set_msi
+  KVM: arm/arm64: enable irqchip routing
+  KVM: arm/arm64: build a default routing table
+  KVM: arm/arm64: enable MSI routing
+  KVM: arm: enable KVM_SIGNAL_MSI and MSI routing
+
+ Documentation/virtual/kvm/api.txt |  35 ++++++++++---
+ arch/arm/include/asm/kvm_host.h   |   2 +
+ arch/arm/kvm/Kconfig              |   3 ++
+ arch/arm/kvm/Makefile             |   2 +-
+ arch/arm64/include/asm/kvm_host.h |   1 +
+ arch/arm64/kvm/Kconfig            |   2 +
+ arch/arm64/kvm/Makefile           |   2 +-
+ include/kvm/arm_vgic.h            |   2 -
+ include/linux/kvm_host.h          |   8 ++-
+ include/uapi/linux/kvm.h          |   5 +-
+ virt/kvm/arm/vgic-v2-emul.c       |  16 ++++++
+ virt/kvm/arm/vgic.c               | 107 ++++++++++++++++++++++++++++++--------
+ virt/kvm/irqchip.c                |   8 ++-
+ 13 files changed, 158 insertions(+), 35 deletions(-)
+
+-- 
+1.9.1
