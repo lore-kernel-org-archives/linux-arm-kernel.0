@@ -1,43 +1,35 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 3 Aug 2015 11:28:39 +0200
-Subject: [linux-sunxi] [PATCH] ARM: dts: sunxi: Raise minimum CPU voltage
- for sun7i-a20 to a level all boards can supply
-In-Reply-To: <CAGRGNgXH90m9h0DDejd5MTf8enduGFQ8dPKrRhmc8Z6y_PaC1w@mail.gmail.com>
-References: <1438543386-7253-1-git-send-email-public_timo.s@silentcreek.de>
- <CAGRGNgV6b9yt2HnB2x2Wyc05KEahoX-Y+mVhxsryztcfA36H1g@mail.gmail.com>
- <CAGb2v67o-=_cL2RWfXJ+3C86zfQ_1b5DYRi3_zwvwy6su6+gdw@mail.gmail.com>
- <CAGRGNgXH90m9h0DDejd5MTf8enduGFQ8dPKrRhmc8Z6y_PaC1w@mail.gmail.com>
-Message-ID: <20150803092839.GB2564@lukather>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Mon, 3 Aug 2015 17:26:05 +0800
+Subject: [PATCH 0/2] drivers: PL061: Add platform driver probing support
+In-Reply-To: <20150803075848.GH7557@n2100.arm.linux.org.uk>
+References: <1438585198-8764-1-git-send-email-zhaoshenglong@huawei.com>
+ <20150803075848.GH7557@n2100.arm.linux.org.uk>
+Message-ID: <55BF33AD.5040502@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 03, 2015 at 02:22:13PM +1000, Julian Calaby wrote:
-> >> Is the code that uses this smart enough to sensibly switch between two
-> >> operating points with the same frequency and different voltages? If
-> >> so, maybe just add a 144MHz @ 1.0v operating point?
-> >
-> > You could try. Though I really don't see much to gain here.
+Hi Russell,
+
+On 2015/8/3 15:58, Russell King - ARM Linux wrote:
+> On Mon, Aug 03, 2015 at 02:59:56PM +0800, Shannon Zhao wrote:
+>> From: Shannon Zhao <shannon.zhao@linaro.org>
+>>
+>> According to ACPI SPEC, it supports ARM boards to use "GPIO-signaled
+>> ACPI Events". These events can be used for input events. And to QEMU, it
+>> uses GPIO PL061 controller for input events.
+>>
+>> These two patches add platform driver support for PL061 probed by DT or
+>> ACPI.
 > 
-> From what I recall, lower frequency = less power usage, though my
-> experience is from x86 laptops, not ARM SoCs and I'm sure I'm missing
-> a lot of details. This is the sort of thing that requires thorough
-> testing on a dev board.
+> This certainly is incorrect for DT, and is probably wrong for ACPI too.
+> DT creates amba devices, so binds via the amba device driver.
+> 
 
-Not on *a* dev board. On virtually all the A20 SoCs ever produced. If
-you have a setting that works better for *your* SoC, fine, patch your
-DT, but that's not going to be a default if it's outside of the SoC
-operating range.
+Oh, sorry. The changes for DT are not necessary. But for ACPI I think it
+needs to convert pl061 to platform device since ACPI doesn't support
+AMBA devices. The Pl011 also does the same thing to support ACPI
+probing. See drivers/tty/serial/amba-pl011.c
 
-Maxime
-
+Thanks,
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150803/94c58540/attachment.sig>
+Shannon
