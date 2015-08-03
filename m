@@ -1,46 +1,106 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon,  3 Aug 2015 21:24:45 +0200
-Subject: [PATCH 1/2] arm64: Enable Marvell Berlin SoC family in Kconfig
-In-Reply-To: <1438629886-6390-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1438629886-6390-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1438629886-6390-2-git-send-email-sebastian.hesselbarth@gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 3 Aug 2015 21:39:03 +0200
+Subject: [PATCH 04/18] KVM: ARM64: Add reset and access handlers for
+ PMCR_EL0 register
+In-Reply-To: <55AD9D89.7010502@linaro.org>
+References: <1436149068-3784-1-git-send-email-shannon.zhao@linaro.org>
+ <1436149068-3784-5-git-send-email-shannon.zhao@linaro.org>
+ <20150716195534.GD14024@cbox> <55A8C0B8.1000101@linaro.org>
+ <20150717102133.GN14024@cbox> <55AD9D89.7010502@linaro.org>
+Message-ID: <20150803193903.GA4690@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jisheng Zhang <jszhang@marvell.com>
+On Tue, Jul 21, 2015 at 09:16:57AM +0800, Shannon Zhao wrote:
+> 
+> 
+> On 2015/7/17 18:21, Christoffer Dall wrote:
+> > On Fri, Jul 17, 2015 at 04:45:44PM +0800, Shannon Zhao wrote:
+> >>
+> >>
+> >> On 2015/7/17 3:55, Christoffer Dall wrote:
+> >>> On Mon, Jul 06, 2015 at 10:17:34AM +0800, shannon.zhao at linaro.org wrote:
+> >>>> From: Shannon Zhao <shannon.zhao@linaro.org>
+> >>>>
+> >>>> Add reset handler which gets host value of PMCR_EL0 and make writable
+> >>>> bits architecturally UNKNOWN. Add access handler which emulates
+> >>>> writing and reading PMCR_EL0 register.
+> >>>>
+> >>>> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> >>>> ---
+> >>>>  arch/arm64/kvm/sys_regs.c | 41 ++++++++++++++++++++++++++++++++++++++++-
+> >>>>  1 file changed, 40 insertions(+), 1 deletion(-)
+> >>>>
+> >>>> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+> >>>> index c370b40..152ee17 100644
+> >>>> --- a/arch/arm64/kvm/sys_regs.c
+> >>>> +++ b/arch/arm64/kvm/sys_regs.c
+> >>>> @@ -33,6 +33,7 @@
+> >>>>  #include <asm/kvm_emulate.h>
+> >>>>  #include <asm/kvm_host.h>
+> >>>>  #include <asm/kvm_mmu.h>
+> >>>> +#include <asm/pmu.h>
+> >>>>  
+> >>>>  #include <trace/events/kvm.h>
+> >>>>  
+> >>>> @@ -236,6 +237,44 @@ static void reset_mpidr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
+> >>>>  	vcpu_sys_reg(vcpu, MPIDR_EL1) = (1ULL << 31) | mpidr;
+> >>>>  }
+> >>>>  
+> >>>> +static void reset_pmcr_el0(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
+> >>>> +{
+> >>>> +	u32 pmcr;
+> >>>> +
+> >>>> +	asm volatile("mrs %0, pmcr_el0\n" : "=r" (pmcr));
+> >>>> +	vcpu_sys_reg(vcpu, PMCR_EL0) = (pmcr & ~ARMV8_PMCR_MASK)
+> >>>> +				       | (ARMV8_PMCR_MASK & 0xdecafbad);
+> >>>
+> >>> You could add a comment that this resets to UNKNOWN as to not make
+> >>> people confused about the pseudo-random hex value.
+> >>>
+> >> Ok.
+> >>
+> >>> Have we thought about whether we want to tell the guest that it has the
+> >>> same PMU as available on the real hardware, or does the virtualization
+> >>> layer suggest to us that we should adjust this somehow?
+> >>>
+> >> I guess here the number of PMU counters is what we can adjust, right?
+> >> Are we worried about that the host will run out of counters when guest
+> >> and host register lots of events?
+> > 
+> > that's what I wonder; if perf itself reserves a counter for example,
+> > then we'll at best be able to measure with N-1 counters for the guest (N
+> > being the number of counters on the physical CPU), so why tell the guest
+> > we have N counters?
+> > 
+> 
+> I'm not sure whether perf itself reserves one counter. Here I just pass
+> the hardware information to guest.
+> 
+> > Of course, we can never even be guaranteed to have N-1 counters
+> > avaialable either, so maybe the sane choice is just to tell the guest
+> > what kind of hardware we have, and then fiddle the best we can with the
+> > remaining counters?  After all, correct functionality of the guest
+> > doesn't depend on this, it's a best-effort kind of thing...
+> > 
+> > Thoughts?
+> > 
+> >> The PMU of cortex-a57 has 6 counters. IIUC, if one of the guest vcpu
+> >> process registers 6 events and some host process register 6 events too,
+> >> these events will be monitored in real hardware PMU counter when the
+> >> related process runs on the cpu. And when other processes are scheduled
+> >> to run, it will switch the contexts of PMU counters.
+> > 
+> > That depends on the way the counters are used by perf I think.  What if
+> > you have system wide events?  What if the KVM (vcpu) process itself is
+> > being monitored for some events?
+> > 
+> 
+> Not sure what will happen when the number of monitored events is greater
+> than counters. I guess the perf layer may balance the events?
+> 
+I'm not sure either, but we need to have thought about these things, I
+suppose.  You should probably look at the code or try it out.
 
-This patch introduces ARCH_BERLIN to enable Marvell Berlin SoC family in
-Kconfig.
-
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
----
-As discussed with Olof on IRC, this is Jisheng's Kconfig patch for
-ARM64 Berlin. Olof agreed to rework this to finally land in
-Kconfig.platforms, i.e. after
-  eed6b3eb20b9 ("arm64: Split out platform options to separate Kconfig")
-
-Sebastian
----
- arch/arm64/Kconfig | 6 ++++++
- 1 file changed, 6 insertions(+)
-
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 0f6edb14b7e4..d5c615312d87 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -162,6 +162,12 @@ source "kernel/Kconfig.freezer"
- 
- menu "Platform selection"
- 
-+config ARCH_BERLIN
-+	bool "Marvell Berlin SoC Family"
-+	select DW_APB_ICTL
-+	help
-+	  This enables support for Marvell Berlin SoC Family
-+
- config ARCH_EXYNOS
- 	bool
- 	help
--- 
-2.1.0
+Thanks,
+-Christoffer
