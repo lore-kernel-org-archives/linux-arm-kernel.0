@@ -1,77 +1,80 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 3 Aug 2015 12:26:17 +0800
-Subject: [linux-sunxi] [PATCH] ARM: dts: sunxi: Raise minimum CPU voltage
- for sun7i-a20 to a level all boards can supply
-In-Reply-To: <CAGRGNgXH90m9h0DDejd5MTf8enduGFQ8dPKrRhmc8Z6y_PaC1w@mail.gmail.com>
-References: <1438543386-7253-1-git-send-email-public_timo.s@silentcreek.de>
- <CAGRGNgV6b9yt2HnB2x2Wyc05KEahoX-Y+mVhxsryztcfA36H1g@mail.gmail.com>
- <CAGb2v67o-=_cL2RWfXJ+3C86zfQ_1b5DYRi3_zwvwy6su6+gdw@mail.gmail.com>
- <CAGRGNgXH90m9h0DDejd5MTf8enduGFQ8dPKrRhmc8Z6y_PaC1w@mail.gmail.com>
-Message-ID: <CAGb2v67p5UhZ9Kwd_YEEQQzgiK7dgHqeQMckS7aw4HCFCCGoUA@mail.gmail.com>
+From: ulli.kroll@googlemail.com (Hans Ulli Kroll)
+Date: Mon, 3 Aug 2015 06:32:02 +0200 (CEST)
+Subject: [PATCH 9/15 V2] drivers: rtc: Drop (un)likely before
+ IS_ERR(_OR_NULL)
+In-Reply-To: <b8be698a8625ceb9adc8da51cd9474626db7c3d1.1438339891.git.viresh.kumar@linaro.org>
+References: <cdfa3fb76901fe1c4a5756e7e64cb3370cf6317a.1438331416.git.viresh.kumar@linaro.org>
+ <b8be698a8625ceb9adc8da51cd9474626db7c3d1.1438339891.git.viresh.kumar@linaro.org>
+Message-ID: <alpine.LNX.2.00.1508030631150.8913@T520.work>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 3, 2015 at 12:22 PM, Julian Calaby <julian.calaby@gmail.com> wrote:
-> Hi Chen-Yu,
->
-> On Mon, Aug 3, 2015 at 12:37 PM, Chen-Yu Tsai <wens@csie.org> wrote:
->> Hi,
->>
->> On Mon, Aug 3, 2015 at 7:35 AM, Julian Calaby <julian.calaby@gmail.com> wrote:
->>> Hi Timo,
->>>
->>> On Mon, Aug 3, 2015 at 5:23 AM, Timo Sigurdsson
->>> <public_timo.s@silentcreek.de> wrote:
->>>> sun7i-a20.dtsi contains an cpufreq operating point at 0.9 volts. Most A20 boards
->>>> (or all?), however, do not allow the voltage to go below 1.0V. Thus, raise the
->>>> voltage for the lowest operating point to 1.0V so all boards can actually use
->>>> it.
->>>
->>> Surely it wouldn't be added here if some could supply 0.9v.
->>
->> On the side, the original OPPs in the FEX files are actually
->> frequency/voltage ranges, and not just points. Mainlines OPPv2
->> will support these, along with turbo frequencies.
->
-> Ah, that makes sense.
->
->> Furthermore, the FEX files also have fields that limit the
->> minimum and maximum frequencies.
->
-> Is this going to be supported by OPPv2 too?
+Hi
 
-IIRC yes, OPPv2 moves to a range profile. OPPv2 is not merged yet.
+On Fri, 31 Jul 2015, Viresh Kumar wrote:
 
->>> Is the code that uses this smart enough to sensibly switch between two
->>> operating points with the same frequency and different voltages? If
->>> so, maybe just add a 144MHz @ 1.0v operating point?
->>
->> You could try. Though I really don't see much to gain here.
->
-> From what I recall, lower frequency = less power usage, though my
-> experience is from x86 laptops, not ARM SoCs and I'm sure I'm missing
-> a lot of details. This is the sort of thing that requires thorough
-> testing on a dev board.
+> IS_ERR(_OR_NULL) already contain an 'unlikely' compiler flag and there
+> is no need to do that again from its callers. Drop it.
+> 
+> gemini driver was using likely() for a failure case while the rtc driver
+> is getting registered. That looks wrong and it should really be
+> unlikely. But because we are killing all the unlikely() flags, lets kill
+> that too.
+> 
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> ---
+> V1->V2:
+> - Removed the likely() part from gemini driver and the changelog wasn't
+>   updated to match that. Fixed the changelog now.
+> 
+>  drivers/rtc/interface.c  | 2 +-
+>  drivers/rtc/rtc-bfin.c   | 2 +-
+>  drivers/rtc/rtc-gemini.c | 2 +-
+>  3 files changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/rtc/interface.c b/drivers/rtc/interface.c
+> index 11b639067312..5836751b8203 100644
+> --- a/drivers/rtc/interface.c
+> +++ b/drivers/rtc/interface.c
+> @@ -564,7 +564,7 @@ enum hrtimer_restart rtc_pie_update_irq(struct hrtimer *timer)
+>  void rtc_update_irq(struct rtc_device *rtc,
+>  		unsigned long num, unsigned long events)
+>  {
+> -	if (unlikely(IS_ERR_OR_NULL(rtc)))
+> +	if (IS_ERR_OR_NULL(rtc))
+>  		return;
+>  
+>  	pm_stay_awake(rtc->dev.parent);
+> diff --git a/drivers/rtc/rtc-bfin.c b/drivers/rtc/rtc-bfin.c
+> index 3d44b11721ea..535a5f9338d0 100644
+> --- a/drivers/rtc/rtc-bfin.c
+> +++ b/drivers/rtc/rtc-bfin.c
+> @@ -361,7 +361,7 @@ static int bfin_rtc_probe(struct platform_device *pdev)
+>  	/* Register our RTC with the RTC framework */
+>  	rtc->rtc_dev = devm_rtc_device_register(dev, pdev->name, &bfin_rtc_ops,
+>  						THIS_MODULE);
+> -	if (unlikely(IS_ERR(rtc->rtc_dev)))
+> +	if (IS_ERR(rtc->rtc_dev))
+>  		return PTR_ERR(rtc->rtc_dev);
+>  
+>  	/* Grab the IRQ and init the hardware */
+> diff --git a/drivers/rtc/rtc-gemini.c b/drivers/rtc/rtc-gemini.c
+> index 35f4486738fc..2fed93e1114a 100644
+> --- a/drivers/rtc/rtc-gemini.c
+> +++ b/drivers/rtc/rtc-gemini.c
+> @@ -148,7 +148,7 @@ static int gemini_rtc_probe(struct platform_device *pdev)
+>  
+>  	rtc->rtc_dev = rtc_device_register(pdev->name, dev,
+>  					   &gemini_rtc_ops, THIS_MODULE);
+> -	if (likely(IS_ERR(rtc->rtc_dev)))
+> +	if (IS_ERR(rtc->rtc_dev))
+>  		return PTR_ERR(rtc->rtc_dev);
+>  
+>  	return 0;
+> -- 
+> 2.4.0
+> 
+> 
 
-I agree, though my limited experiences tell me that the major savings
-come from lowering the core voltage.
-
->>> (Alternatively, would it make sense to modify the code that uses this
->>> to use frequencies with voltages specified that are lower than can be
->>> supplied with the lowest voltage it can?)
->>
->> I think that's a bit harder to get accepted.
->
-> Oh, definitely. It kinda makes sense, but at the same time it'll
-> require some seriously thorough testing on a lot of different boards.
->
-> My only real objection here is are there boards that can go down to
-> 0.9v and if so, won't this change make them less power efficient in
-> the almost-idle case? And are those power savings enough to justify
-> not accepting this patch?
-
-This will require most testing as well. (sigh) Alas, my boards aren't
-stable enough at 0.9V, so I can't say much about it.
-
-
-ChenYu
+For the mach-gemini part
+Acked-by: Hans Ulli Kroll <ulli.kroll@googlemail.com>
