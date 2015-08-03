@@ -1,73 +1,87 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Mon, 03 Aug 2015 22:50:33 +0200
-Subject: [PATCH v1 2/2] pinctrl: rockchip: only enable gpio clock when it
- setting
-In-Reply-To: <CAD=FV=WCGtBgzy6=dWqZ5ZKLhxUsxLom56UfWwXNp+ospR4JRA@mail.gmail.com>
-References: <1438574211-4887-1-git-send-email-hl@rock-chips.com>
- <1438574211-4887-2-git-send-email-hl@rock-chips.com>
- <CAD=FV=WCGtBgzy6=dWqZ5ZKLhxUsxLom56UfWwXNp+ospR4JRA@mail.gmail.com>
-Message-ID: <2472708.6oReK8jXV2@diego>
+From: tjakobi@math.uni-bielefeld.de (Tobias Jakobi)
+Date: Mon, 03 Aug 2015 22:55:00 +0200
+Subject: [PATCH v3 0/5] cpufreq: use generic cpufreq drivers for
+ Exynos4x12 platform
+In-Reply-To: <1438368557-2352-1-git-send-email-b.zolnierkie@samsung.com>
+References: <1438368557-2352-1-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <55BFD524.6080102@math.uni-bielefeld.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 3. August 2015, 13:21:27 schrieb Doug Anderson:
-> hl
-> 
-> On Sun, Aug 2, 2015 at 8:56 PM, huang lin <hl@rock-chips.com> wrote:
-> > gpio can keep state even the clock disable, for save power
-> > consumption, only enable gpio clock when it setting
-> > 
-> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> > Signed-off-by: huang lin <hl@rock-chips.com>
-> > 
-> > Signed-off-by: huang lin <hl@rock-chips.com>
-> 
-> Your "Signed-off-by"s are a little wonky here...  Can you fix up?
-> 
-> > ---
-> > 
-> >  drivers/pinctrl/pinctrl-rockchip.c | 60
-> >  ++++++++++++++++++++++++++++++++++---- 1 file changed, 54 insertions(+),
-> >  6 deletions(-)
-> > 
-> > diff --git a/drivers/pinctrl/pinctrl-rockchip.c
-> > b/drivers/pinctrl/pinctrl-rockchip.c index cc2843a..445829f 100644
-> > --- a/drivers/pinctrl/pinctrl-rockchip.c
-> > +++ b/drivers/pinctrl/pinctrl-rockchip.c
-> > @@ -945,17 +945,20 @@ static int _rockchip_pmx_gpio_set_direction(struct
-> > gpio_chip *chip,> 
-> >         if (ret < 0)
-> >         
-> >                 return ret;
-> > 
-> > +       clk_enable(bank->clk);
-> > 
-> >         spin_lock_irqsave(&bank->slock, flags);
-> > 
-> > -       data = readl_relaxed(bank->reg_base + GPIO_SWPORT_DDR);
-> > +       data = readl(bank->reg_base + GPIO_SWPORT_DDR);
-> 
-> I am a little curious why you need to change the readl_relaxed() to a
-> read().  Are you trying to ensure that the clock was on before the
-> read happened?  If so, I think this won't help.  I see:
-> 
-> #define readl(c) ({ u32 __v = readl_relaxed(c); __iormb(); __v; })
-> 
-> ...so that means that the iormb() is _after_ the readl.
-> 
-> ...but I would believe that the clk_enable() call itself would be
-> guaranteeing that the clock was enabled in time.  ...and if not then
-> grabbing the spinlock is another barrier, right?  I think you do this
-> in a few places...
-> 
-> Other than that this patch looks good to me....
+Hello,
 
-I think that was my fault ... looking at stuff before figuring out that we're 
-actually loosing the pd_pmu clock, and then forgetting to take this out again, 
-before getting it to hl.
+Bartlomiej Zolnierkiewicz wrote:
+> Hi,
+> 
+> This patch series removes the use of Exynos4x12 specific support
+> from cpufreq-exynos driver and enables the use of cpufreq-dt driver
+> for this platform.
+> 
+> This patch series has been tested on Exynos4412 based Odroid-U3 and
+> Trats2 boards.
+I've tested this series on my Odroid-X2 (also Exynos4412) with
+powersave, performance and ondemand governor. Scaling works like
+expected, so no issues to report!
 
-In retospect it also seems silly to have changed them in the first place ;-) .
-So yes, they should be changed back to their original.
+Tested-by: Tobias Jakobi <tjakobi@math.uni-bielefeld.de>
 
 
-Heiko
+With best wishes,
+Tobias
+
+
+> 
+> Depends on:
+> - next-20150730 branch of linux-next kernel tree
+> - "[PATCH V3 00/16] OPP: Add code to support operating-points-v2 bindings"
+>   (http://www.spinics.net/lists/arm-kernel/msg435408.html)
+> 
+> Changes since v2
+> (http://thread.gmane.org/gmane.linux.kernel.samsung-soc/46653):
+> - rebased on top of next-20150730 branch of linux-next kernel tree
+> - ported over V3 of opp-v2 bindings support patch series
+> - put cpu0 nodes in alphabetical order in dts files
+> - added Reviewed-by tags from Javier and Krzysztof
+> - added Acked-by tag from Sylwester
+> 
+> Changes since v1
+> (http://thread.gmane.org/gmane.linux.kernel.samsung-soc/44361):
+> - rebased on top of next-20150629 branch of linux-next kernel tree
+> - rebased on top of Exynos5250 cpufreq-dt support patch series
+> - fixed if-statement in exynos4_clk_init() (noticed by Tobias Jakobi)
+> - ported over opp-v2 bindings (requested by Viresh Kumar)
+> 
+> Best regards,
+> --
+> Bartlomiej Zolnierkiewicz
+> Samsung R&D Institute Poland
+> Samsung Electronics
+> 
+> 
+> Bartlomiej Zolnierkiewicz (5):
+>   clk: samsung: exynos4x12: add cpu clock configuration data and
+>     instantiate cpu clock
+>   ARM: dts: Exynos4x12: add CPU OPP and regulator supply property
+>   ARM: Exynos: switch to using generic cpufreq driver for Exynos4x12
+>   cpufreq: exynos: remove Exynos4x12 specific cpufreq driver support
+>   cpufreq: remove no longer needed CPU_FREQ_BOOST_SW config option
+> 
+>  arch/arm/boot/dts/exynos4212.dtsi               |  81 ++++++++
+>  arch/arm/boot/dts/exynos4412-odroid-common.dtsi |   4 +
+>  arch/arm/boot/dts/exynos4412-origen.dts         |   4 +
+>  arch/arm/boot/dts/exynos4412-trats2.dts         |   4 +
+>  arch/arm/boot/dts/exynos4412.dtsi               |  83 +++++++++
+>  arch/arm/mach-exynos/exynos.c                   |   2 +
+>  drivers/clk/samsung/clk-exynos4.c               |  50 +++++
+>  drivers/cpufreq/Kconfig                         |   5 +-
+>  drivers/cpufreq/Kconfig.arm                     |  38 ----
+>  drivers/cpufreq/Makefile                        |   2 -
+>  drivers/cpufreq/exynos-cpufreq.c                | 236 ------------------------
+>  drivers/cpufreq/exynos-cpufreq.h                |  72 --------
+>  drivers/cpufreq/exynos4x12-cpufreq.c            | 236 ------------------------
+>  drivers/cpufreq/freq_table.c                    |   2 -
+>  14 files changed, 229 insertions(+), 590 deletions(-)
+>  delete mode 100644 drivers/cpufreq/exynos-cpufreq.c
+>  delete mode 100644 drivers/cpufreq/exynos-cpufreq.h
+>  delete mode 100644 drivers/cpufreq/exynos4x12-cpufreq.c
+> 
