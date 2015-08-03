@@ -1,58 +1,138 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 3 Aug 2015 13:21:27 -0700
-Subject: [PATCH v1 2/2] pinctrl: rockchip: only enable gpio clock when it
- setting
-In-Reply-To: <1438574211-4887-2-git-send-email-hl@rock-chips.com>
-References: <1438574211-4887-1-git-send-email-hl@rock-chips.com>
- <1438574211-4887-2-git-send-email-hl@rock-chips.com>
-Message-ID: <CAD=FV=WCGtBgzy6=dWqZ5ZKLhxUsxLom56UfWwXNp+ospR4JRA@mail.gmail.com>
+From: bhupesh.sharma@freescale.com (Sharma Bhupesh)
+Date: Mon, 3 Aug 2015 20:38:53 +0000
+Subject: [Query] ARM64: Softlockup when using PSCI for secondary CPU_ON
+In-Reply-To: <BY1PR0301MB1303B775B1D5D318A64350C582770@BY1PR0301MB1303.namprd03.prod.outlook.com>
+References: <BY1PR0301MB1303EC5AAE8F0B4DAA70D15F82770@BY1PR0301MB1303.namprd03.prod.outlook.com>
+ <20150803100248.GA25627@leverpostej>
+ <BY1PR0301MB1303B775B1D5D318A64350C582770@BY1PR0301MB1303.namprd03.prod.outlook.com>
+Message-ID: <BY1PR0301MB13035E3B09536F34F4C281CF82770@BY1PR0301MB1303.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hl
+Hi Mark,
 
-On Sun, Aug 2, 2015 at 8:56 PM, huang lin <hl@rock-chips.com> wrote:
-> gpio can keep state even the clock disable, for save power
-> consumption, only enable gpio clock when it setting
->
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> Signed-off-by: huang lin <hl@rock-chips.com>
->
-> Signed-off-by: huang lin <hl@rock-chips.com>
+> On Behalf Of Sharma Bhupesh
+> Sent: Monday, August 03, 2015 3:47 PM
+> 
+> Hi Mark,
+> 
+> Thanks for the reply.
+> 
+> > From: Mark Rutland [mailto:mark.rutland at arm.com]
+> > Sent: Monday, August 03, 2015 3:33 PM
+> >
+> > On Mon, Aug 03, 2015 at 05:12:00AM +0100, Sharma Bhupesh wrote:
+> > > Hi ARM64 experts,
+> > >
+> > > I am working on a Freescale ARM64 based SoC, which has 4 Cortex-A53
+> > > cores and I am using the PSCI conducts to turn on the secondary CPUs
+> > > via a custom implementation of a secure runtime firmware (something
+> > similar to the ARM Trusted Firmware).
+> > >
+> > > Following is my boot-flow:
+> > >
+> > > - BootROM (runs in EL3, All secondaries are held up in reset) ->
+> > >
+> > > - UEFI bootloader- PEI Phase (Runs only on Primary, starts up in
+> > > EL3)
+> > > ->
+> > >
+> > > - Secure Firmware (runs in EL3, transitions primary core to EL2) ->
+> > >
+> > > - UEFI bootloader- Rest of the Phases (Runs only on Primary, in EL2)
+> > > ->
+> > >
+> > > - UEFI Linux loader launches linux (Runs only on Primary,
+> > > transitions core to EL1) ->
+> > >
+> > > - Linux runs and calls PSCI conducts to turn on secondary cores via
+> > > smc calls to secure run-time firmware ->
+> >
+> > Which version of Linux are you using?
+> 
+> I am using 3.19.3
+> 
+> > Is Linux itself booted at EL1 or EL2?
+> 
+> UEFI leaves the execution level of the primary core in EL2.
+> KVM is turned-off in my defconfig, so I am not loading any hypervisor at
+> EL2 as of now.
+> 
+> > EL2 is very strongly preferable unless you're already running a
+> > hypervisor at EL2. That way Linux can ensure that things are
+> > initialised correctly at EL2 (e.g. CNTVOFF), regardless of whether you
+> > want to use KVM.
+> 
+> I notice that in the kernel primary core successfully switches to EL1 and
+> starts executing the relevant 'start_kernel' routine.
+> 
+> > > - Now I can see that the ARM64 linux is able to recognize that the
+> > secondaries are boot'ed properly:
+> > >
+> > > PSCI Logs:
+> > > ----------
+> > > psci: probing for conduit method from DT.
+> > > psci: PSCIv0.2 detected in firmware.
+> > > psci: Using standard PSCI v0.2 function IDs ..
+> > >
+> > > Architected cp15 timer(s) running at 25.00MHz (phys).
+> > > sched_clock: 56 bits at 25MHz, resolution 40ns, wraps every
+> > > 2748779069440ns
+> > >
+> > > ..
+> > >
+> > > CPU1: Booted secondary processor
+> > > Detected VIPT I-cache on CPU1
+> > > CPU2: Booted secondary processor
+> > > Detected VIPT I-cache on CPU2
+> > > CPU3: Booted secondary processor
+> > > Detected VIPT I-cache on CPU3
+> > > Brought up 4 CPUs
+> > > SMP: Total of 4 processors activated.
+> >
+> > Ok. This all looks fine.
+> >
+> > > - However, when the Linux boot proceeds further, I see softlockups
+> > > which usually show that one of the secondaries was stuck in
+> > 'secondary_start_kernel' (detailed logs below).
+> > >
+> > > - When I turn of CONFIG_SMP from the .config, I can see that the
+> > > softlockups disappear. So, I am correlating these softlockups to SMP
+> > and PSCI conducts.
+> >
+> > Ok, that likely means it's in the idle loop. Given that the CPUs made
+> > it into the kernel this sounds like a generic SMP issue rather than
+> > something specific to PSCI.
+> 
+> Ok.
+> 
+> > > preempt self-detected stall on CPU { 3}  (t=17194 jiffies g=-267
+> > > c=-268 q=1)
+> >
+> > > INFO: rcu_preempt detected stalls on CPUs/tasks: { 1 2} (detected by
+> > > 0, t=287104493908 jiffies, g=-267, c=-268, q=2)
+> >
+> > It looks like your timekeeping has gone wrong. As mentioned above, I'd
+> > suspect that CNTVOFF_EL2 is not programmed consistently across all CPUs.
+> >
+> > Are you able to boot Linux at EL2 instead? Or can you verify that
+> > CNTVOFF_EL2 is initialised?
+> >
+> 
+> Ok, let me check the CNTVOFF_EL2 part then.
+> I will get back with details soon.
+> 
 
-Your "Signed-off-by"s are a little wonky here...  Can you fix up?
+Indeed. Using the following code in the run-time EL3 firmware to correctly set the
+CNTVOFF_EL2 to zero for secondaries solves the soft-lockup. I took a reference from your u-boot
+patch (see [1]).
 
-> ---
->  drivers/pinctrl/pinctrl-rockchip.c | 60 ++++++++++++++++++++++++++++++++++----
->  1 file changed, 54 insertions(+), 6 deletions(-)
->
-> diff --git a/drivers/pinctrl/pinctrl-rockchip.c b/drivers/pinctrl/pinctrl-rockchip.c
-> index cc2843a..445829f 100644
-> --- a/drivers/pinctrl/pinctrl-rockchip.c
-> +++ b/drivers/pinctrl/pinctrl-rockchip.c
-> @@ -945,17 +945,20 @@ static int _rockchip_pmx_gpio_set_direction(struct gpio_chip *chip,
->         if (ret < 0)
->                 return ret;
->
-> +       clk_enable(bank->clk);
->         spin_lock_irqsave(&bank->slock, flags);
->
-> -       data = readl_relaxed(bank->reg_base + GPIO_SWPORT_DDR);
-> +       data = readl(bank->reg_base + GPIO_SWPORT_DDR);
++	/* Initialize Generic Timers */
++	msr	cntvoff_el2, xzr
 
-I am a little curious why you need to change the readl_relaxed() to a
-read().  Are you trying to ensure that the clock was on before the
-read happened?  If so, I think this won't help.  I see:
+[1] http://marc.info/?l=u-boot&m=140230240621878&w=2
 
-#define readl(c) ({ u32 __v = readl_relaxed(c); __iormb(); __v; })
+Many thanks for the quick pointers.
 
-...so that means that the iormb() is _after_ the readl.
-
-...but I would believe that the clk_enable() call itself would be
-guaranteeing that the clock was enabled in time.  ...and if not then
-grabbing the spinlock is another barrier, right?  I think you do this
-in a few places...
-
-Other than that this patch looks good to me....
-
--Doug
+Regards,
+Bhupesh
