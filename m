@@ -1,133 +1,37 @@
-From: aisheng.dong@freescale.com (Dong Aisheng)
-Date: Mon, 3 Aug 2015 18:14:26 +0800
-Subject: [PATCH v3 5/6] mmc: sdhci-esdhc-imx: config watermark level
- and burst length
-In-Reply-To: <20150731151345.GX7557@n2100.arm.linux.org.uk>
-References: <1438160637-28061-1-git-send-email-haibo.chen@freescale.com>
- <1438160637-28061-6-git-send-email-haibo.chen@freescale.com>
- <20150731145140.GE27806@shlinux1.ap.freescale.net>
- <20150731151345.GX7557@n2100.arm.linux.org.uk>
-Message-ID: <20150803101423.GA24870@shlinux1.ap.freescale.net>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 3 Aug 2015 12:24:53 +0200
+Subject: [Query] ARM64: Softlockup when using PSCI for secondary CPU_ON
+In-Reply-To: <BY1PR0301MB1303EC5AAE8F0B4DAA70D15F82770@BY1PR0301MB1303.namprd03.prod.outlook.com>
+References: <BY1PR0301MB1303EC5AAE8F0B4DAA70D15F82770@BY1PR0301MB1303.namprd03.prod.outlook.com>
+Message-ID: <CAKv+Gu8i-HC7zb-CuCaVE5vcoEO6T19_=s3JtHqnNHaUmdwQqg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 31, 2015 at 04:13:45PM +0100, Russell King - ARM Linux wrote:
-> On Fri, Jul 31, 2015 at 10:51:41PM +0800, Dong Aisheng wrote:
-> > On Wed, Jul 29, 2015 at 05:03:56PM +0800, Haibo Chen wrote:
-> > > i.MX7D support eMMC HS400 mode, this mode can run in 8 bit,200MHZ
-> > > DDR mode. So the I/O speed improve a lot compare to SD3.0
-> > > 
-> > > The default burst length is 8, if we don't change this value, in
-> > > HS400 mode, when we do eMMC read operation, we can find that the
-> > > clock signal will stop for a period of time. This means the speed
-> > > of data moving on AHB bus is slower than I/O speed. So we should
-> > > improve the speed of data moving on AHB bus.
-> > > 
-> > > For imx7d usdhc, this patch set the burst length as 16, and set
-> > > watermark level as 64. The test result is the clock signal has
-> > > no stop during the eMMC HS400 operation. For other imx usdhc, remain
-> > > the default value: burst length as 8, watermark level as 16.
-> > > 
-> > > Signed-off-by: Haibo Chen <haibo.chen@freescale.com>
-> > > ---
-> > >  drivers/mmc/host/sdhci-esdhc-imx.c | 11 ++++++++++-
-> > >  1 file changed, 10 insertions(+), 1 deletion(-)
-> > > 
-> > > diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-> > > index 158f93b..37d0095 100644
-> > > --- a/drivers/mmc/host/sdhci-esdhc-imx.c
-> > > +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-> > > @@ -239,6 +239,11 @@ static inline int is_imx6q_usdhc(struct pltfm_imx_data *data)
-> > >  	return data->socdata == &usdhc_imx6q_data;
-> > >  }
-> > >  
-> > > +static inline int is_imx7d_usdhc(struct pltfm_imx_data *data)
-> > > +{
-> > > +	return data->socdata == &usdhc_imx7d_data;
-> > > +}
-> > 
-> > Can we using flag to check instead of adding more is_imx_usdhc()?
-> 
-> No, not more flags.  Do the job properly and parameterise the differences.
-> 
+On 3 August 2015 at 06:12, Sharma Bhupesh <bhupesh.sharma@freescale.com> wrote:
+> Hi ARM64 experts,
+>
+> I am working on a Freescale ARM64 based SoC, which has 4 Cortex-A53 cores and I am using the
+> PSCI conducts to turn on the secondary CPUs via a custom implementation of a secure runtime
+> firmware (something similar to the ARM Trusted Firmware).
+>
+> Following is my boot-flow:
+>
+> - BootROM (runs in EL3, All secondaries are held up in reset) ->
+>
+> - UEFI bootloader- PEI Phase (Runs only on Primary, starts up in EL3) ->
+>
+> - Secure Firmware (runs in EL3, transitions primary core to EL2) ->
+>
+> - UEFI bootloader- Rest of the Phases (Runs only on Primary, in EL2) ->
+>
+> - UEFI Linux loader launches linux (Runs only on Primary, transitions core to EL1) ->
+>
 
-Hi Russell,
+Why are you using the Linux loader? The arm64 kernel can be booted
+directly from UEFI, which is strongly preferred since you will not
+have access to the UEFI Runtime Services otherwise.
+Also, the ARM BDS and the LinuxLoader for arm64 in Tianocore/EDK2 are
+quite badly broken and may be removed completely in the future.
 
-Thanks for the review.
-
-I mean using the exist flag to do like:
-if (imx_data->socdata->flags & ESDHC_FLAG_SUP_HS400)
-        writel(0x10401040, host->ioaddr + ESDHC_WTMK_LVL);
-else    
-        writel(0x08100810, host->ioaddr + ESDHC_WTMK_LVL);
-Not adding another new flag.
-
-ESDHC_FLAG_SUP_HS400 represents the new feature support of HS400 which is
-already added in patch
-[PATCH v3 1/6] mmc: sdhci-esdhc-imx: add imx7d support and support HS400
-
-> > >  static inline int esdhc_is_usdhc(struct pltfm_imx_data *data)
-> > >  {
-> > >  	return !!(data->socdata->flags & ESDHC_FLAG_USDHC);
-> > > @@ -1145,7 +1150,11 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
-> > >  	 * to something insane.  Change it back here.
-> > >  	 */
-> > >  	if (esdhc_is_usdhc(imx_data)) {
-> > > -		writel(0x08100810, host->ioaddr + ESDHC_WTMK_LVL);
-> > > +		if (is_imx7d_usdhc(imx_data))
-> > > +			writel(0x10401040, host->ioaddr + ESDHC_WTMK_LVL);
-> > > +		else
-> > > +			writel(0x08100810, host->ioaddr + ESDHC_WTMK_LVL);
-> 
-> So the value to be written to this register should come from the
-> driver data, which is already used as a struct esdhc_soc_data to
-> extrapolate out the differences.
-> 
-> Going down the flag path will lead you to an even more of a stinking
-> shitpile than sdhci already is - if another version of the SoC requires
-> a different value there, what are you going to do?  Add yet another
-> flag for the next value?  What are you going to do when you have 16
-> different values?  Use 16 different flags?  Clearly that path is insane.
-> 
-
-I understand your concern for the potential bad situation.
-
-Here the watermark level setting of mx7d is dependant on the new feature
-of HS400, so it seems make senese to use that flag to set value and does
-not need adding new flag.
-
-Actually that is the current approach for uSDHC driver to distinguish
-the difference between register offset/settings by checking feature flags.
-e.g. ESDHC_FLAG_USDHC, ESDHC_FLAG_STD_TUNING, ESDHC_FLAG_HS200 and etc.
-This approach can save us a lot more flags for SoC checking for common
-feature part. And up till now, things seem good.
-
-If really new SoC comes while it requires a different value, if it's feature
-dependant, we may still use feature flag for it.
-If not, probably a quirk may be needed if it's IP limitation.
-
-If it's normal situation and such situation happened too many in the future,
-we may choose to parameterise all these normal feature independent settings
-into esdhc_soc_data to avoid adding meaningless flags.
-e.g.
-static struct esdhc_soc_data usdhc_imx6sx_data = {
-        .flags = ESDHC_FLAG_USDHC | ESDHC_FLAG_STD_TUNING
-                        | ESDHC_FLAG_HAVE_CAP1 | ESDHC_FLAG_HS200,
-        .wml = 32,
-};
-
-static struct esdhc_soc_data usdhc_imx7d_data = {
-        .flags = ESDHC_FLAG_USDHC | ESDHC_FLAG_STD_TUNING
-                        | ESDHC_FLAG_HAVE_CAP1 | ESDHC_FLAG_HS200,
-        .wml = 64,
-};
-
-But currently i still did not see such urgent requirement to do it for only
-water mark level settings.
-
-Regards
-Dong Aisheng
-
-> -- 
-> FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-> according to speedtest.net.
+-- 
+Ard.
