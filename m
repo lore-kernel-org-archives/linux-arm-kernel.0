@@ -1,93 +1,53 @@
-From: Haibo.Chen@freescale.com (Chen Bough)
-Date: Mon, 3 Aug 2015 01:08:28 +0000
-Subject: [PATCH v3 6/6] mmc: sdhci-esdhc-imx: set back the
- burst_length_enable bit to 1
-In-Reply-To: <20150731145751.GG27806@shlinux1.ap.freescale.net>
-References: <1438160637-28061-1-git-send-email-haibo.chen@freescale.com>
- <1438160637-28061-7-git-send-email-haibo.chen@freescale.com>
- <20150731145751.GG27806@shlinux1.ap.freescale.net>
-Message-ID: <BY1PR03MB138838EFB0DE8834DE5889669A770@BY1PR03MB1388.namprd03.prod.outlook.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Mon,  3 Aug 2015 09:13:07 +0800
+Subject: [RFC PATCH 0/3] mailbox: hisilicon: add mailbox driver
+Message-ID: <1438564390-28111-1-git-send-email-leo.yan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch series is to implement Hisilicon's mailbox driver and enable
+the mailbox controller on Hi6220.
+
+The Hisilicon mailbox supports up to 32 channels. Each channel is
+unidirectional with a maximum message size of 8 words. I/O is performed
+using register access (there is no DMA) and the cell raises an interrupt
+when messages are received.
+
+For easily extending for Hisilicon series SoCs (SoCs may have difference
+for register's definition with each other), so firstly implement common
+mailbox driver; this common mailbox driver provides three mainly
+functionality:
+
+ - help register channels into framework;
+ - hook low level callback functions for register's operations;
+ - Enhance rx channel's message queue, which is based on the code in
+   drivers/mailbox/omap-mailbox.c.
+
+Base on this common driver, also has enabled Hi6220 mailbox controller.
 
 
-> -----Original Message-----
-> From: Dong Aisheng [mailto:aisheng.dong at freescale.com]
-> Sent: Friday, July 31, 2015 10:58 PM
-> To: Chen Haibo-B51421
-> Cc: robh+dt at kernel.org; pawel.moll at arm.com; mark.rutland at arm.com;
-> ijc+devicetree at hellion.org.uk; galak at codeaurora.org; shawnguo at kernel.org;
-> kernel at pengutronix.de; linux at arm.linux.org.uk; ulf.hansson at linaro.org;
-> johan.derycke at barco.com; Estevam Fabio-R49496; Dong Aisheng-B29396;
-> devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; linux-mmc at vger.kernel.org
-> Subject: Re: [PATCH v3 6/6] mmc: sdhci-esdhc-imx: set back the
-> burst_length_enable bit to 1
-> 
-> On Wed, Jul 29, 2015 at 05:03:57PM +0800, Haibo Chen wrote:
-> > Currently we find that if a usdhc is choosed to boot system, then ROM
-> > code will set the burst length enable bit of this usdhc as 0.
-> >
-> > This will make performance drop a lot if this usdhc's burst length is
-> > 16. So this patch set back the burst_length_enable bit as 1, which is
-> > the default value, and means burst length is enabled for INCR.
-> >
-> > Signed-off-by: Haibo Chen <haibo.chen@freescale.com>
-> > ---
-> >  drivers/mmc/host/sdhci-esdhc-imx.c | 11 +++++++++++
-> >  1 file changed, 11 insertions(+)
-> >
-> > diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c
-> > b/drivers/mmc/host/sdhci-esdhc-imx.c
-> > index 37d0095..dd945e5 100644
-> > --- a/drivers/mmc/host/sdhci-esdhc-imx.c
-> > +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-> > @@ -32,6 +32,7 @@
-> >  #include "sdhci-esdhc.h"
-> >
-> >  #define	ESDHC_CTRL_D3CD			0x08
-> > +#define ESDHC_BURST_LEN_EN_INCR		(1 << 27)
-> >  /* VENDOR SPEC register */
-> >  #define ESDHC_VENDOR_SPEC		0xc0
-> >  #define  ESDHC_VENDOR_SPEC_SDIO_QUIRK	(1 << 1)
-> > @@ -1158,6 +1159,16 @@ static int sdhci_esdhc_imx_probe(struct
-> platform_device *pdev)
-> >  		host->quirks2 |= SDHCI_QUIRK2_PRESET_VALUE_BROKEN;
-> >  		host->mmc->caps |= MMC_CAP_1_8V_DDR;
-> >
-> > +		/*
-> > +		 * ROM code will change the burst_length_enable setting to
-> > +		 * zero if this usdhc is choosed to boot system. Change it
-> > +		 * back here, otherwise it will impact the performance a
-> > +		 * lot if the burst length is 16.
-> 
-> Can you clarify a bit more on why performance drops a lot if burst length
-> is 16?
-> Caused by the burst length setting did not work due to ROM disabled it?
+Leo Yan (3):
+  dt-bindings: mailbox: Document Hisilicon mailbox driver
+  mailbox: Hisilicon: add mailbox driver
+  arm64: dts: add Hi6220 mailbox node
 
+ .../devicetree/bindings/mailbox/hisi-mailbox.txt   |  57 ++++
+ arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts     |  20 +-
+ arch/arm64/boot/dts/hisilicon/hi6220.dtsi          |   8 +
+ drivers/mailbox/Kconfig                            |   2 +
+ drivers/mailbox/Makefile                           |   2 +
+ drivers/mailbox/hisilicon/Kconfig                  |  13 +
+ drivers/mailbox/hisilicon/Makefile                 |   2 +
+ drivers/mailbox/hisilicon/common.c                 | 282 +++++++++++++++++++
+ drivers/mailbox/hisilicon/common.h                 | 114 ++++++++
+ drivers/mailbox/hisilicon/hi6220-mailbox.c         | 305 +++++++++++++++++++++
+ 10 files changed, 802 insertions(+), 3 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mailbox/hisi-mailbox.txt
+ create mode 100644 drivers/mailbox/hisilicon/Kconfig
+ create mode 100644 drivers/mailbox/hisilicon/Makefile
+ create mode 100644 drivers/mailbox/hisilicon/common.c
+ create mode 100644 drivers/mailbox/hisilicon/common.h
+ create mode 100644 drivers/mailbox/hisilicon/hi6220-mailbox.c
 
-[haibo] this bit is used to enable/disable the burst length for the external AHB2AXI bridge, 
-It's useful especially for INCR transfer because without burst length indicator, the AHB2AXI 
-bridge doesn't know the burst length in advance. And without burst length indicator, AHB INCR 
-transfers can only be converted to singles on the AXI side.
-
-Seting this bit means burst length enabled for INCR.
-If this bit is not set, performance will drop a lot when burst length is 8 or 16. I will add 
-this in the commit log.
- 
-> 
-> Regards
-> Dong Aisheng
-> 
-> > +		 */
-> > +		writel(readl(host->ioaddr + SDHCI_HOST_CONTROL)
-> > +			| ESDHC_BURST_LEN_EN_INCR,
-> > +			host->ioaddr + SDHCI_HOST_CONTROL);
-> > +
-> >  		if (!(imx_data->socdata->flags & ESDHC_FLAG_HS200))
-> >  			host->quirks2 |= SDHCI_QUIRK2_BROKEN_HS200;
-> >
-> > --
-> > 1.9.1
-> >
+-- 
+1.9.1
