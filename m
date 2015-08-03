@@ -1,50 +1,50 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 3 Aug 2015 17:08:29 +0100
-Subject: [LINUX RFC 1/2] mtd: spi-nor: add dual parallel mode support
-In-Reply-To: <1438592707-30713-2-git-send-email-ranjit.waghmode@xilinx.com>
-References: <1438592707-30713-1-git-send-email-ranjit.waghmode@xilinx.com>
- <1438592707-30713-2-git-send-email-ranjit.waghmode@xilinx.com>
-Message-ID: <20150803160829.GX20873@sirena.org.uk>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Mon, 3 Aug 2015 09:26:23 -0700
+Subject: [PATCH 0/2] drivers: PL061: Add platform driver probing support
+In-Reply-To: <20150803094923.GI7557@n2100.arm.linux.org.uk>
+References: <1438585198-8764-1-git-send-email-zhaoshenglong@huawei.com>
+ <20150803075848.GH7557@n2100.arm.linux.org.uk>
+ <55BF33AD.5040502@huawei.com>
+ <20150803094923.GI7557@n2100.arm.linux.org.uk>
+Message-ID: <20150803162623.GB30867@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 03, 2015 at 02:35:06PM +0530, Ranjit Waghmode wrote:
+On Mon, Aug 03, 2015 at 10:49:23AM +0100, Russell King - ARM Linux wrote:
+> On Mon, Aug 03, 2015 at 05:26:05PM +0800, Shannon Zhao wrote:
+> > Hi Russell,
+> > 
+> > On 2015/8/3 15:58, Russell King - ARM Linux wrote:
+> > > On Mon, Aug 03, 2015 at 02:59:56PM +0800, Shannon Zhao wrote:
+> > >> From: Shannon Zhao <shannon.zhao@linaro.org>
+> > >>
+> > >> According to ACPI SPEC, it supports ARM boards to use "GPIO-signaled
+> > >> ACPI Events". These events can be used for input events. And to QEMU, it
+> > >> uses GPIO PL061 controller for input events.
+> > >>
+> > >> These two patches add platform driver support for PL061 probed by DT or
+> > >> ACPI.
+> > > 
+> > > This certainly is incorrect for DT, and is probably wrong for ACPI too.
+> > > DT creates amba devices, so binds via the amba device driver.
+> > > 
+> > 
+> > Oh, sorry. The changes for DT are not necessary. But for ACPI I think it
+> > needs to convert pl061 to platform device since ACPI doesn't support
+> > AMBA devices. The Pl011 also does the same thing to support ACPI
+> > probing. See drivers/tty/serial/amba-pl011.c
+> 
+> Maybe rather than having every AMBA driver also converted to a platform
+> driver (which GregKH hates) maybe ACPI should support the AMBA bus
+> instead?
+> 
+> Greg?
 
->  drivers/mtd/devices/m25p80.c  |  1 +
->  drivers/mtd/spi-nor/spi-nor.c | 92 ++++++++++++++++++++++++++++++++++---------
->  include/linux/mtd/spi-nor.h   |  3 ++
->  include/linux/spi/spi.h       |  2 +
->  4 files changed, 79 insertions(+), 19 deletions(-)
+The ACPI developers have been doing work to allow a driver to handle
+getting the resources from either DT or ACPI no matter what bus it is
+on, so converting anything to a platform driver shouldn't be needed.
 
-You need to at least split this into two patches, one adding a new SPI
-interface and another using it in MTD.  Probably the MTD core and driver
-changes need splitting too.  Please see SubmittingPatches for discussion
-of splitting things.
+but I don't really know the details here, and this isn't being sent to
+the ACPI mailing list, so I don't know what to suggest...
 
-> diff --git a/include/linux/spi/spi.h b/include/linux/spi/spi.h
-> index d673072..8dec349 100644
-> --- a/include/linux/spi/spi.h
-> +++ b/include/linux/spi/spi.h
-> @@ -355,6 +355,8 @@ struct spi_master {
->  #define SPI_MASTER_NO_TX	BIT(2)		/* can't do buffer write */
->  #define SPI_MASTER_MUST_RX      BIT(3)		/* requires rx */
->  #define SPI_MASTER_MUST_TX      BIT(4)		/* requires tx */
-> +#define SPI_MASTER_DATA_STRIPE		BIT(7)		/* support data stripe */
-> +#define SPI_MASTER_BOTH_CS		BIT(8)		/* enable both chips */
-
-This is really not adequate description for a new API, I can't tell what
-"data stripe" is supposed to mean at all and I've got at best a vague
-idea what "both chips" really means.  This means other developers won't
-be able to tell how to use or implement these flags either, and it means
-I can't really review this.  You need to provide more information here,
-both in the code and in the commit message.
-
-I'd also expect some handling in the core for these, for example error
-handling if they can't be supported.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150803/e21281f6/attachment.sig>
+greg k-h
