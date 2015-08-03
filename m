@@ -1,76 +1,31 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 3 Aug 2015 09:04:27 -0500
-Subject: [PATCH v2 06/10] usb: chipidea: add ahb burst configuration
- interface
-In-Reply-To: <1438577238-10153-7-git-send-email-peter.chen@freescale.com>
-References: <1438577238-10153-1-git-send-email-peter.chen@freescale.com>
- <1438577238-10153-7-git-send-email-peter.chen@freescale.com>
-Message-ID: <CAL_JsqJn16OvfL_Ggf1wSi2XkJkjDMrmuRit3q8eVY5bNp8oYw@mail.gmail.com>
+From: henryc.chen@mediatek.com (Henry Chen)
+Date: Mon, 3 Aug 2015 22:15:51 +0800
+Subject: [PATCH] regulator: mt6311: Modify the maximum voltage of buck.
+Message-ID: <1438611351-4245-1-git-send-email-henryc.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 2, 2015 at 11:47 PM, Peter Chen <peter.chen@freescale.com> wrote:
-> The users can change it through dts or platform data if they
-> want to change the default value.
->
-> Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> ---
->  drivers/usb/chipidea/bits.h  |  3 +++
->  drivers/usb/chipidea/core.c  | 14 ++++++++++++++
->  include/linux/usb/chipidea.h |  2 ++
->  3 files changed, 19 insertions(+)
->
-> diff --git a/drivers/usb/chipidea/bits.h b/drivers/usb/chipidea/bits.h
-> index 831a8f6..462ad02 100644
-> --- a/drivers/usb/chipidea/bits.h
-> +++ b/drivers/usb/chipidea/bits.h
-> @@ -25,6 +25,9 @@
->  #define VERSION                      (0xF << 25)
->  #define CIVERSION            (0x7 << 29)
->
-> +/* SBUSCFG */
-> +#define AHBBRST_MASK           0x7
-> +
->  /* HCCPARAMS */
->  #define HCCPARAMS_LEN         BIT(17)
->
-> diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-> index 38bd036..f60cbf6 100644
-> --- a/drivers/usb/chipidea/core.c
-> +++ b/drivers/usb/chipidea/core.c
-> @@ -439,6 +439,9 @@ void ci_platform_configure(struct ci_hdrc *ci)
->
->         hw_write(ci, OP_USBCMD, 0xff0000, ci->platdata->itc_setting << 16);
->
-> +       if (ci->platdata->flags & CI_HDRC_OVERRIDE_AHB_BURST)
-> +               hw_write_id_reg(ci, ID_SBUSCFG, AHBBRST_MASK,
-> +                       ci->platdata->ahb_burst_config);
->  }
->
->  /**
-> @@ -647,6 +650,17 @@ static int ci_get_platdata(struct device *dev,
->                 }
->         }
->
-> +       if (of_find_property(dev->of_node, "ahb-burst-config", NULL)) {
-> +               ret = of_property_read_u32(dev->of_node, "ahb-burst-config",
-> +                       &platdata->ahb_burst_config);
-> +               if (ret) {
-> +                       dev_err(dev,
-> +                               "failed to get ahb-burst-config\n");
-> +                       return ret;
-> +               }
-> +               platdata->flags |= CI_HDRC_OVERRIDE_AHB_BURST;
-> +       }
-> +
+The maximum voltage of buck should be 1.39375V.
+1.39375V = 0.6V + 0.00625V * 127, 127 is the max_sel of linear range.
 
-This can be simplified to:
+Reported-by: Axel Lin <axel.lin@ingics.com>
+signed-off-by: Henry Chen <henryc.chen@mediatek.com>
+---
+ drivers/regulator/mt6311-regulator.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-ret = of_property_read_u32(dev->of_node, "ahb-burst-config",
-&platdata->ahb_burst_config);
-if (!ret)
-  platdata->flags |= CI_HDRC_OVERRIDE_AHB_BURST;
-
-The error condition can't really happen.
-
-Rob
+diff --git a/drivers/regulator/mt6311-regulator.c b/drivers/regulator/mt6311-regulator.c
+index 096e620..b140da0 100644
+--- a/drivers/regulator/mt6311-regulator.c
++++ b/drivers/regulator/mt6311-regulator.c
+@@ -34,7 +34,7 @@ static const struct regmap_config mt6311_regmap_config = {
+ 
+ /* Default limits measured in millivolts and milliamps */
+ #define MT6311_MIN_UV		600000
+-#define MT6311_MAX_UV		1400000
++#define MT6311_MAX_UV		1393750
+ #define MT6311_STEP_UV		6250
+ 
+ static const struct regulator_linear_range buck_volt_range[] = {
+-- 
+1.8.1.1.dirty
