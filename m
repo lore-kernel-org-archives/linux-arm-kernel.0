@@ -1,75 +1,84 @@
-From: santosh.shilimkar@oracle.com (santosh.shilimkar at oracle.com)
-Date: Mon, 03 Aug 2015 12:00:27 -0700
-Subject: [PATCH 1/2] ARM: dts: keystone: fix the clock node for mdio
-In-Reply-To: <55BFB7EC.4060408@ti.com>
-References: <1438625518-21315-1-git-send-email-m-karicheri2@ti.com>
- <55BFB15B.8040207@ti.com> <55BFB32C.6080201@oracle.com>
- <55BFB7EC.4060408@ti.com>
-Message-ID: <55BFBA4B.6070406@oracle.com>
+From: albeu@free.fr (Alban Bedel)
+Date: Mon,  3 Aug 2015 21:12:30 +0200
+Subject: [PATCH] usb: ehci-platform: Fix using multiple controllers from OF
+Message-ID: <1438629150-11662-1-git-send-email-albeu@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+When using OF defined controllers the platform data struct is shared
+between all devices, so it can't be used for device specific settings.
+However it is currently used for the OF properties
+needs-reset-on-resume and has-transaction-translator.
 
+To fix this issue move setting hcd->has_tt to the probe and
+move pdata->reset_on_resume to the private data.
 
-On 8/3/15 11:50 AM, Murali Karicheri wrote:
-> On 08/03/2015 02:30 PM, santosh.shilimkar at oracle.com wrote:
->> On 8/3/15 11:22 AM, Murali Karicheri wrote:
->>> On 08/03/2015 02:11 PM, Murali Karicheri wrote:
->>>> Currently the MDIO clock is pointing to clkpa instead of clkcpgmac.
->>>> MDIO is part of the ethss and the clock should be clkcpgmac.
->>>>
->>>> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
->>>> ---
->>>>   arch/arm/boot/dts/keystone.dtsi | 2 +-
->>>>   1 file changed, 1 insertion(+), 1 deletion(-)
->>>>
->>>> diff --git a/arch/arm/boot/dts/keystone.dtsi
->>>> b/arch/arm/boot/dts/keystone.dtsi
->>>> index e7a6f6d..6245a17 100644
->>>> --- a/arch/arm/boot/dts/keystone.dtsi
->>>> +++ b/arch/arm/boot/dts/keystone.dtsi
->>>> @@ -273,7 +273,7 @@
->>>>               #size-cells = <0>;
->>>>               reg        = <0x02090300 0x100>;
->>>>               status = "disabled";
->>>> -            clocks = <&clkpa>;
->>>> +            clocks = <&clkcpgmac>;
->>>>               clock-names = "fck";
->>>>               bus_freq    = <2500000>;
->>>>           };
->>>>
->>> Santosh,
->>>
->>> This is a big fix and needs to go in v4.2-rc. So please review and apply
->>> asap. v4.2 is the first release that has netcp driver fully functional
->>> and I want to fix as many known bugs as possible.
->>>
->> Do you have more fixes ? If yes, please post them so that I can include
->> them along with these two. I will try to send them up next week.
->
-> I think we have got most of the know issues fixed in the netcp driver
-> and dts for v4.2-rc. Another lingering issue is the one with multiple
-> clock handling not supported in run time pm API causing us to use the
-> work around 'clk_ignore_unused'. Probably this needs to be addressed in
-> the future as fixing this is not trivial. Generic PD support would
-> partially solve the issue for Keystone, but also needs to handle
-> multiple clocks for keystone.
->
-Yeah. I was also wondering on what happened to that work which was
-active at some point of time.
+Signed-off-by: Alban Bedel <albeu@free.fr>
+---
+ drivers/usb/host/ehci-platform.c | 13 +++++++++----
+ 1 file changed, 9 insertions(+), 4 deletions(-)
 
-> Another option is to  fix the NetCP and QMSS/KNAV driver for now in
-> v4.0-rc using explicit clock APIs so that we don't have to use
-> 'clk_ignore_unused'. And then migrate all of the drivers to run time PM
-> API later when proper framework is implemented along with K2G support.
-> Does this make sense?
->
-Multiple clock node support work which was started needs to be revived.
-Direct clock isn't the way to go about it.
-
-> Anyways, please submit these patches at your earliest opportunity.
->
-Sure.
-
-Regards,
-Santosh
+diff --git a/drivers/usb/host/ehci-platform.c b/drivers/usb/host/ehci-platform.c
+index 2593def..40d029e 100644
+--- a/drivers/usb/host/ehci-platform.c
++++ b/drivers/usb/host/ehci-platform.c
+@@ -45,6 +45,7 @@ struct ehci_platform_priv {
+ 	struct reset_control *rst;
+ 	struct phy **phys;
+ 	int num_phys;
++	bool reset_on_resume;
+ };
+ 
+ static const char hcd_name[] = "ehci-platform";
+@@ -56,7 +57,6 @@ static int ehci_platform_reset(struct usb_hcd *hcd)
+ 	struct ehci_hcd *ehci = hcd_to_ehci(hcd);
+ 	int retval;
+ 
+-	hcd->has_tt = pdata->has_tt;
+ 	ehci->has_synopsys_hc_bug = pdata->has_synopsys_hc_bug;
+ 
+ 	if (pdata->pre_setup) {
+@@ -193,11 +193,11 @@ static int ehci_platform_probe(struct platform_device *dev)
+ 
+ 		if (of_property_read_bool(dev->dev.of_node,
+ 					  "needs-reset-on-resume"))
+-			pdata->reset_on_resume = 1;
++			priv->reset_on_resume = 1;
+ 
+ 		if (of_property_read_bool(dev->dev.of_node,
+ 					  "has-transaction-translator"))
+-			pdata->has_tt = 1;
++			hcd->has_tt = 1;
+ 
+ 		priv->num_phys = of_count_phandle_with_args(dev->dev.of_node,
+ 				"phys", "#phy-cells");
+@@ -247,6 +247,10 @@ static int ehci_platform_probe(struct platform_device *dev)
+ 		ehci->big_endian_desc = 1;
+ 	if (pdata->big_endian_mmio)
+ 		ehci->big_endian_mmio = 1;
++	if (pdata->has_tt)
++		hcd->has_tt = 1;
++	if (pdata->reset_on_resume)
++		priv->reset_on_resume = true;
+ 
+ #ifndef CONFIG_USB_EHCI_BIG_ENDIAN_MMIO
+ 	if (ehci->big_endian_mmio) {
+@@ -359,6 +363,7 @@ static int ehci_platform_resume(struct device *dev)
+ 	struct usb_ehci_pdata *pdata = dev_get_platdata(dev);
+ 	struct platform_device *pdev =
+ 		container_of(dev, struct platform_device, dev);
++	struct ehci_platform_priv *priv = hcd_to_ehci_priv(hcd);
+ 
+ 	if (pdata->power_on) {
+ 		int err = pdata->power_on(pdev);
+@@ -366,7 +371,7 @@ static int ehci_platform_resume(struct device *dev)
+ 			return err;
+ 	}
+ 
+-	ehci_resume(hcd, pdata->reset_on_resume);
++	ehci_resume(hcd, priv->reset_on_resume);
+ 	return 0;
+ }
+ #endif /* CONFIG_PM_SLEEP */
+-- 
+2.0.0
