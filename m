@@ -1,9 +1,9 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon,  3 Aug 2015 14:25:53 +0100
-Subject: [PATCH 11/13] iommu/arm-smmu: Remove arm_smmu_flush_pgtable()
+Date: Mon,  3 Aug 2015 14:25:52 +0100
+Subject: [PATCH 10/13] iommu/arm-smmu: Remove arm_smmu_flush_pgtable()
 In-Reply-To: <1438608355-7335-1-git-send-email-will.deacon@arm.com>
 References: <1438608355-7335-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1438608355-7335-12-git-send-email-will.deacon@arm.com>
+Message-ID: <1438608355-7335-11-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,23 +16,26 @@ remove it altogether.
 Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- drivers/iommu/arm-smmu-v3.c | 10 ----------
- 1 file changed, 10 deletions(-)
+ drivers/iommu/arm-smmu.c | 13 -------------
+ 1 file changed, 13 deletions(-)
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 38a891e28e13..15fb669282b4 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -1331,20 +1331,10 @@ static void arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
- 	arm_smmu_cmdq_issue_cmd(smmu, &cmd);
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index 5770ab98fa38..48a39dfa9777 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -608,23 +608,10 @@ static void arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
+ 	}
  }
  
 -static void arm_smmu_flush_pgtable(void *addr, size_t size, void *cookie)
 -{
 -	struct arm_smmu_domain *smmu_domain = cookie;
 -
--	/* The page table code handles flushing in the non-coherent case */
--	if (smmu_domain->smmu->features & ARM_SMMU_FEAT_COHERENCY)
+-	/*
+-	 * Ensure new page tables are visible to a coherent hardware walker.
+-	 * The page table code deals with flushing for the non-coherent case.
+-	 */
+-	if (smmu_domain->smmu->features & ARM_SMMU_FEAT_COHERENT_WALK)
 -		dsb(ishst);
 -}
 -
@@ -43,6 +46,6 @@ index 38a891e28e13..15fb669282b4 100644
 -	.flush_pgtable	= arm_smmu_flush_pgtable,
  };
  
- /* IOMMU API */
+ static irqreturn_t arm_smmu_context_fault(int irq, void *dev)
 -- 
 2.1.4
