@@ -1,49 +1,48 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Mon,  3 Aug 2015 17:31:24 +0200
-Subject: [PATCH v3 2/7] KVM: kvm_host: add devid in
- kvm_kernel_irq_routing_entry
+Date: Mon,  3 Aug 2015 17:31:25 +0200
+Subject: [PATCH v3 3/7] KVM: irqchip: convey devid to kvm_set_msi
 In-Reply-To: <1438615889-10892-1-git-send-email-eric.auger@linaro.org>
 References: <1438615889-10892-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1438615889-10892-3-git-send-email-eric.auger@linaro.org>
+Message-ID: <1438615889-10892-4-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Extend kvm_kernel_irq_routing_entry to transport the device id
-field, devid. A new flags field makes possible to indicate the
-devid is valid. Those additions are used for ARM GICv3 ITS MSI
-injection.
+on ARM, a devid field is populated in kvm_msi struct in case the
+flag is set to KVM_MSI_VALID_DEVID. Let's propagate both flags and
+devid field in kvm_kernel_irq_routing_entry.
 
 Signed-off-by: Eric Auger <eric.auger@linaro.org>
 
 ---
+
 v2 -> v3:
-- add flags
-
-v1 -> v2:
-- replace msi_msg field by a struct composed of msi_msg and devid
-
-RFC -> PATCH:
-- reword the commit message after change in first patch (uapi)
+- do not set the type to KVM_IRQ_ROUTING_EXTENDED_MSI anymore as
+  suggested by Andre
+- correct msi->flags check
+- propagate the flags
 ---
- include/linux/kvm_host.h | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+ virt/kvm/irqchip.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
-index 05e99b8..b784465 100644
---- a/include/linux/kvm_host.h
-+++ b/include/linux/kvm_host.h
-@@ -321,7 +321,11 @@ struct kvm_kernel_irq_routing_entry {
- 			unsigned irqchip;
- 			unsigned pin;
- 		} irqchip;
--		struct msi_msg msi;
-+		struct {
-+			struct msi_msg msi;
-+			u32 flags;
-+			u32 devid;
-+		};
- 		struct kvm_s390_adapter_int adapter;
- 	};
- 	struct hlist_node link;
+diff --git a/virt/kvm/irqchip.c b/virt/kvm/irqchip.c
+index 21c1424..75c9931 100644
+--- a/virt/kvm/irqchip.c
++++ b/virt/kvm/irqchip.c
+@@ -72,12 +72,14 @@ int kvm_send_userspace_msi(struct kvm *kvm, struct kvm_msi *msi)
+ {
+ 	struct kvm_kernel_irq_routing_entry route;
+ 
+-	if (!irqchip_in_kernel(kvm) || msi->flags != 0)
++	if (!irqchip_in_kernel(kvm) || (msi->flags & ~KVM_MSI_VALID_DEVID))
+ 		return -EINVAL;
+ 
+ 	route.msi.address_lo = msi->address_lo;
+ 	route.msi.address_hi = msi->address_hi;
+ 	route.msi.data = msi->data;
++	route.flags = msi->flags;
++	route.devid = msi->devid;
+ 
+ 	return kvm_set_msi(&route, kvm, KVM_USERSPACE_IRQ_SOURCE_ID, 1, false);
+ }
 -- 
 1.9.1
