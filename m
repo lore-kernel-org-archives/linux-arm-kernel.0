@@ -1,66 +1,32 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 04 Aug 2015 16:57:02 +0900
-Subject: [GIT PULL 1/5] Samsung non-critical-fixes for v4.3
-In-Reply-To: <052201d0ce8a$aba37790$02ea66b0$@kernel.org>
-References: <55C06995.2030600@kernel.org> <55C06C2D.2010804@samsung.com>
- <052201d0ce8a$aba37790$02ea66b0$@kernel.org>
-Message-ID: <55C0704E.7020907@samsung.com>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Tue, 04 Aug 2015 10:01:36 +0200
+Subject: [PATCH v3] iio: adc: xilinx-xadc: Push interrupts into threaded
+ context
+In-Reply-To: <55BFCC9C.5040305@ni.com>
+References: <CAKfKVtGTO81wLWk50M303t2WjcBEMEt_LUnsJ3_WmvR_3izUjg@mail.gmail.com>
+ <1437434050-32907-1-git-send-email-xander.huff@ni.com>
+ <55B231DE.4080308@metafoo.de> <55BFCC9C.5040305@ni.com>
+Message-ID: <55C07160.5040907@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04.08.2015 16:53, Kukjin Kim wrote:
-> Krzysztof Kozlowski wrote:
+On 08/03/2015 10:18 PM, Xander Huff wrote:
+> On 7/24/2015 7:38 AM, Lars-Peter Clausen wrote:
+>> Hi,
 >>
->> On 04.08.2015 16:28, Kukjin Kim wrote:
->>> Hi Arnd, Olof, Kevin,
->>>
->>> Here is Samsung non-critical-fixes for v4.3.
->>> Please pull.
->>>
->>> Thanks,
->>> Kukjin
->>>
->>> The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
->>>
->>>   Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
->>>
->>> are available in the git repository at:
->>>
->>>   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
->>> tags/samsung-non-critical-1
->>>
->>> for you to fetch changes up to 2cc6b813579415c4f627b08a043079bdc5b87a33:
->>>
->>>   ARM: EXYNOS: Use IOMEM_ERR_PTR when function returns iomem (2015-07-21
->>> 13:19:06 +0900)
->>>
->>> ----------------------------------------------------------------
->>> Samsung non-critical fixes for v4.3
->>>
->>> - fix sparse warning for returning iomem
->>> - fix clock-frequency of display timing0 for exynos3250-rinato
+>> Sorry, but I don't think this patch has been sufficiently tested against a
+>> mainline kernel. The driver wont even probe the way it is right now.
 >>
-> Hi,
-> 
->> One more set, which we agreed for pushing to v4.2, is missing:
->> 1. cpufreq: exynos: Fix for memory leak in case SOC name does not match
-> 
-> As you can see in ml, I've sent it to Rafael because it would be handled in
-> cpufreq tree not samsung tree/arm-soc tree.
-> 
->> 2. video: fbdev: s3c-fb: Constify platform_device_id (this can actually
-> 
-> Same as above, this would be handled in fb tree? Can you please send it?
+> Thanks for your responses. I'm not sure why it doesn't probe for you since I
+> was able to do a fair amount of tests with it on our device.
 
-This was on LKML for 3 months (including a resend). As this is S3C frame
-buffer I think this can go via samsung-soc tree, since fb guys did not
-picked it.
+genirq: Threaded irq requested with handler=NULL and !ONESHOT for irq 157
+xadc: probe of f8007100.xadc failed with error -22
 
-On list of patches few more are also missing:
-1. cpufreq: exynos: remove Exynos5250 specific cpufreq driver support
-2. clk: samsung: exynos5250: add cpu clock configuration data and
-instantiate cpu clock
-3. defconfig changes (separate pull request?)
+You can' request a threaded IRQ without having IRQF_ONESHOT set, since this
+will effectively result in a IRQ storm.
 
-Best regards,
-Krzysztof
+> 
+> I'll get to work on your suggestions and hopefully having a v4 out sometime
+> next week.
+> 
