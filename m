@@ -1,81 +1,48 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Tue, 04 Aug 2015 17:11:26 +0900
-Subject: [GIT PULL 1/5] Samsung non-critical-fixes for v4.3
-In-Reply-To: <55C0704E.7020907@samsung.com>
-References: <55C06995.2030600@kernel.org> <55C06C2D.2010804@samsung.com>
- <052201d0ce8a$aba37790$02ea66b0$@kernel.org> <55C0704E.7020907@samsung.com>
-Message-ID: <053301d0ce8d$293eda80$7bbc8f80$@kernel.org>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Tue, 4 Aug 2015 10:13:50 +0200
+Subject: [RFCv3 2/4] dts: zynq: Add devicetree entry for Xilinx Zynq reset
+ controller.
+In-Reply-To: <1438305237-18497-3-git-send-email-moritz.fischer@ettus.com>
+References: <1438305237-18497-1-git-send-email-moritz.fischer@ettus.com>
+ <1438305237-18497-3-git-send-email-moritz.fischer@ettus.com>
+Message-ID: <55C0743E.1090406@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Krzysztof Kozlowski wrote:
+On 07/31/2015 03:13 AM, Moritz Fischer wrote:
+> Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
+> ---
+>  arch/arm/boot/dts/zynq-7000.dtsi | 8 ++++++++
+>  1 file changed, 8 insertions(+)
 > 
-> On 04.08.2015 16:53, Kukjin Kim wrote:
-> > Krzysztof Kozlowski wrote:
-> >>
-> >> On 04.08.2015 16:28, Kukjin Kim wrote:
-> >>> Hi Arnd, Olof, Kevin,
-> >>>
-> >>> Here is Samsung non-critical-fixes for v4.3.
-> >>> Please pull.
-> >>>
-> >>> Thanks,
-> >>> Kukjin
-> >>>
-> >>> The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
-> >>>
-> >>>   Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
-> >>>
-> >>> are available in the git repository at:
-> >>>
-> >>>   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> >>> tags/samsung-non-critical-1
-> >>>
-> >>> for you to fetch changes up to 2cc6b813579415c4f627b08a043079bdc5b87a33:
-> >>>
-> >>>   ARM: EXYNOS: Use IOMEM_ERR_PTR when function returns iomem (2015-07-21
-> >>> 13:19:06 +0900)
-> >>>
-> >>> ----------------------------------------------------------------
-> >>> Samsung non-critical fixes for v4.3
-> >>>
-> >>> - fix sparse warning for returning iomem
-> >>> - fix clock-frequency of display timing0 for exynos3250-rinato
-> >>
-> > Hi,
-> >
-Hi,
-
-> >> One more set, which we agreed for pushing to v4.2, is missing:
-> >> 1. cpufreq: exynos: Fix for memory leak in case SOC name does not match
-> >
-> > As you can see in ml, I've sent it to Rafael because it would be handled in
-> > cpufreq tree not samsung tree/arm-soc tree.
-> >
-> >> 2. video: fbdev: s3c-fb: Constify platform_device_id (this can actually
-> >
-> > Same as above, this would be handled in fb tree? Can you please send it?
+> diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
+> index 0691508..6bebf02 100644
+> --- a/arch/arm/boot/dts/zynq-7000.dtsi
+> +++ b/arch/arm/boot/dts/zynq-7000.dtsi
+> @@ -1,5 +1,6 @@
+>  /*
+>   *  Copyright (C) 2011 - 2014 Xilinx
+> + *  Copyright (C) 2015 National Instruments Corp.
+>   *
+>   * This software is licensed under the terms of the GNU General Public
+>   * License version 2, as published by the Free Software Foundation, and
+> @@ -258,6 +259,13 @@
+>  				reg = <0x100 0x100>;
+>  			};
+>  
+> +			rstc: rstc at 200 {
+> +				compatible = "xlnx,zynq-reset";
+> +				reg = <0x200 0x48>;
+> +				#reset-cells = <1>;
+> +				syscon = <&slcr>;
+> +			};
+> +
+>  			pinctrl0: pinctrl at 700 {
+>  				compatible = "xlnx,pinctrl-zynq";
+>  				reg = <0x700 0x200>;
 > 
-> This was on LKML for 3 months (including a resend). As this is S3C frame
-> buffer I think this can go via samsung-soc tree, since fb guys did not
-> picked it.
-> 
-Oh, OK. Let me look at its status again. Thanks.
 
-> On list of patches few more are also missing:
-> 1. cpufreq: exynos: remove Exynos5250 specific cpufreq driver support
-
-This is included in tags/samsung-driver...let me note in the pull-request to
-clarify.
-
-> 2. clk: samsung: exynos5250: add cpu clock configuration data and
-> instantiate cpu clock
-
-Yeah, I'm aware of that and I need to sort it out soon.
-
-> 3. defconfig changes (separate pull request?)
-> 
-Yeah, I'm sorting out some other defconfig updates and it will be sent out soon.
+Acked-by: Michal Simek <michal.simek@xilinx.com>
 
 Thanks,
-Kukjin
+Michal
