@@ -1,28 +1,25 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 04 Aug 2015 16:26:41 +0200
-Subject: [PATCH] ARM/clocksource: use automatic DT probing
-In-Reply-To: <1438348470-6656-1-git-send-email-linus.walleij@linaro.org>
-References: <1438348470-6656-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <55C0CBA1.9000602@linaro.org>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Tue, 4 Aug 2015 10:29:56 -0400 (EDT)
+Subject: [PATCH v2] usb: ehci-platform: Fix using multiple controllers
+ from OF
+In-Reply-To: <1438678757-26582-1-git-send-email-albeu@free.fr>
+Message-ID: <Pine.LNX.4.44L0.1508041029250.1577-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/31/2015 03:14 PM, Linus Walleij wrote:
-> The ARM core kernel already calls clocksource_of_init() so why
-> go to all the trouble of locating and probing this node in the
-> machine. CLOCKSOURCE_OF_DECLARE() will take care of it in the
-> clocksource driver, and thus we can also get rid of the
-> dangling header file <linux/clksrc-dbx500-prcmu.h>
->
-> Suggested-by: Arnd Bergmann <arndb@linaro.org>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+On Tue, 4 Aug 2015, Alban Bedel wrote:
+
+> When using OF defined controllers the platform data struct is shared
+> between all devices, so it can't be used for device specific settings.
+> However it is currently used for the OF properties
+> needs-reset-on-resume and has-transaction-translator.
+> 
+> To fix this issue move setting hcd->has_tt to the probe and
+> move pdata->reset_on_resume to the private data.
+> 
+> Signed-off-by: Alban Bedel <albeu@free.fr>
 > ---
-> Clocksource maintainers: please ACK this so I can take it through
-> ARM SoC with a bunch of other cleanups.
+> Changelog:
+> v2: * Use true instead of 1 to set boolean type
 
-Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Acked-by: Alan Stern <stern@rowland.harvard.edu>
