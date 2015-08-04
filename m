@@ -1,42 +1,36 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Tue, 4 Aug 2015 16:51:48 +0100
-Subject: [RFC PATCH 1/5] spi: introduce flag for memory mapped read
-In-Reply-To: <55BEF4AF.5090704@ti.com>
+Date: Tue, 4 Aug 2015 16:52:36 +0100
+Subject: [RFC PATCH 4/5] ARM: dts: DRA7: Add memory map region entries
+ for qspi
+In-Reply-To: <55BEF5D1.1050608@ti.com>
 References: <1438072876-16338-1-git-send-email-vigneshr@ti.com>
- <1438072876-16338-2-git-send-email-vigneshr@ti.com>
- <20150731181745.GM20873@sirena.org.uk> <55BEF4AF.5090704@ti.com>
-Message-ID: <20150804155148.GR20873@sirena.org.uk>
+ <1438072876-16338-5-git-send-email-vigneshr@ti.com>
+ <20150731181903.GN20873@sirena.org.uk> <55BEF5D1.1050608@ti.com>
+Message-ID: <20150804155236.GS20873@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 03, 2015 at 10:27:19AM +0530, Vignesh R wrote:
+On Mon, Aug 03, 2015 at 10:32:09AM +0530, Vignesh R wrote:
+> On 07/31/2015 11:49 PM, Mark Brown wrote:
 
-> @use_mmap_mode: Some SPI controller chips are optimized for interacting
-> with serial flash memories. These chips have memory mapped interface,
-> through which entire serial flash memory slave can be read/written as if
-> though they are physical memories (like RAM). Using this interface,
-> flash can be accessed using memcpy() function and the spi controller
-> hardware will take care of communicating with serial flash over SPI.
-> Setting this flag will indicate the SPI controller driver that the
-> spi_message is from mtd layer to read from/write to flash. The SPI
-> master driver can then appropriately switch the controller to memory
-> mapped interface to read from/write to flash, based on this flag (See
-> drivers/spi/spi-ti-qspi.c for example).
-> NOTE: If the SPI controller chip lacks memory mapped interface, then the
-> driver will ignore this flag and use normal SPI protocol to read
-> from/write to flash. Communication with non-flash SPI devices is not
-> possible using the memory mapped interface.
+> >> -			reg = <0x47900000 0x100>;
+> >> +			reg = <0x47900000 0x100>,
+> >> +			      <0x30000000 0x3ffffff>;
+> >> +			reg-names = "qspi_base", "qspi_mmap";
 
-I still can't tell from the above what this interface is supposed to do.
-It sounds like the use of memory mapped mode is supposed to be
-transparent to users, it should just affect how the controller interacts
-with the hardware, but if that's the case why do we need to expose it to
-users at all?  Shouldn't the driver just use memory mapped mode if it's
-faster?
+> > The DT binding document for the controller needs to be extended to
+> > document this change in the binding.
+
+> DT bindings are already documented at
+> Documentation/devicetree/bindings/spi/ti_qspi.txt. Did you mean to add
+> this node as an example in that file?
+
+No, I mean you're changing the binding to add this new memory region -
+that new region needs to be added to the documentation.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 473 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150804/381b434f/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150804/9f6981ad/attachment.sig>
