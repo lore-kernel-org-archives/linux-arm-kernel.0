@@ -1,9 +1,9 @@
 From: skarajga@visteon.com (Karajgaonkar, Saurabh (S.))
-Date: Tue, 4 Aug 2015 09:09:11 +0000
-Subject: [PATCH 2/9] usb: phy: phy-keystone: Simplify return statement
+Date: Tue, 4 Aug 2015 09:09:42 +0000
+Subject: [PATCH 3/9] usb: musb: musb_dsps: Simplify return statement
 In-Reply-To: <cover.1438678566.git.skarajga@visteon.com>
 References: <cover.1438678566.git.skarajga@visteon.com>
-Message-ID: <40402eeb0cd861569faf838efccc1ef4672da83c.1438678566.git.skarajga@visteon.com>
+Message-ID: <0484e5c9da0a2f46386c79115be618f228b42443.1438678566.git.skarajga@visteon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,25 +13,25 @@ Replace redundant variable use in return statement.
 
 Signed-off-by: Saurabh Karajgaonkar <skarajga@visteon.com>
 ---
- drivers/usb/phy/phy-keystone.c | 6 +-----
+ drivers/usb/musb/musb_dsps.c | 6 +-----
  1 file changed, 1 insertion(+), 5 deletions(-)
 
-diff --git a/drivers/usb/phy/phy-keystone.c b/drivers/usb/phy/phy-keystone.c
-index e0556f7..01d4e4c 100644
---- a/drivers/usb/phy/phy-keystone.c
-+++ b/drivers/usb/phy/phy-keystone.c
-@@ -96,11 +96,7 @@ static int keystone_usbphy_probe(struct platform_device *pdev)
+diff --git a/drivers/usb/musb/musb_dsps.c b/drivers/usb/musb/musb_dsps.c
+index 1334a3d..a0cfead 100644
+--- a/drivers/usb/musb/musb_dsps.c
++++ b/drivers/usb/musb/musb_dsps.c
+@@ -482,11 +482,7 @@ static int dsps_musb_init(struct musb *musb)
+ 		dsps_writeb(musb->mregs, MUSB_BABBLE_CTL, val);
+ 	}
  
- 	platform_set_drvdata(pdev, k_phy);
- 
--	ret = usb_add_phy_dev(&k_phy->usb_phy_gen.phy);
+-	ret = dsps_musb_dbg_init(musb, glue);
 -	if (ret)
 -		return ret;
 -
 -	return 0;
-+	return usb_add_phy_dev(&k_phy->usb_phy_gen.phy);
++	return dsps_musb_dbg_init(musb, glue);
  }
  
- static int keystone_usbphy_remove(struct platform_device *pdev)
+ static int dsps_musb_exit(struct musb *musb)
 -- 
 1.9.1
