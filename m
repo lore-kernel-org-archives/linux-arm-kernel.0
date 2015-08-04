@@ -1,50 +1,41 @@
-From: skarajga@visteon.com (Karajgaonkar, Saurabh (S.))
-Date: Tue, 4 Aug 2015 09:12:28 +0000
-Subject: [PATCH 9/9] usb: misc: ftdi-elan: Simplify return statement
-In-Reply-To: <cover.1438678566.git.skarajga@visteon.com>
-References: <cover.1438678566.git.skarajga@visteon.com>
-Message-ID: <21701034f1472a3d154c77dd8d8be017565885f6.1438678566.git.skarajga@visteon.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Tue, 04 Aug 2015 11:17:39 +0200
+Subject: [RFC PATCH 2/3] mailbox: Hisilicon: add mailbox driver
+In-Reply-To: <20150804084930.GA27609@leoy-linaro>
+References: <1438564390-28111-1-git-send-email-leo.yan@linaro.org>
+ <1438564390-28111-3-git-send-email-leo.yan@linaro.org>
+ <1438677024.8734.24.camel@tiscali.nl> <20150804084930.GA27609@leoy-linaro>
+Message-ID: <1438679859.8734.35.camel@tiscali.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Saurabh Karajgaonkar <skarajga@visteon.com>
+On di, 2015-08-04 at 16:49 +0800, Leo Yan wrote:
+> On Tue, Aug 04, 2015 at 10:30:24AM +0200, Paul Bolle wrote:
+> > On ma, 2015-08-03 at 09:13 +0800, Leo Yan wrote:
+> > > --- /dev/null
+> > > +++ b/drivers/mailbox/hisilicon/Kconfig
+> > 
+> > > +config HISI_MBOX
+> > > +	bool "Hisilicon's Mailbox"
+> > > +	depends on ARCH_HISI || OF
+> > 
+> > ARCH_HISI is available on either ARM64 or ARM. ARM64 selects OF. On ARM
+> > ARCH_HISI depends on ARCH_MULTIV7 which depends on ARCH_MULTIPLATFORM.
+> > That selects USE_OF which on its turn selects OF.
+> > 
+> > So, HISI_MBOX implies OF, correct?
+> 
+> Exactly, will simply use "depends on ARCH_HISI".
 
-Replace redundant variable use in return statement.
+That change would alter the dependencies. My remark was made just to
+make clear why I think CONFIG_OF will always be defined. But now I guess
+you actually meant
+	depends on ARCH_HISI && OF
 
-Signed-off-by: Saurabh Karajgaonkar <skarajga@visteon.com>
----
- drivers/usb/misc/ftdi-elan.c | 10 ++--------
- 1 file changed, 2 insertions(+), 8 deletions(-)
+And that would, I think, indeed be equivalent to
+	depends on ARCH_HISI
 
-diff --git a/drivers/usb/misc/ftdi-elan.c b/drivers/usb/misc/ftdi-elan.c
-index 8ab1f8f..1545f12 100644
---- a/drivers/usb/misc/ftdi-elan.c
-+++ b/drivers/usb/misc/ftdi-elan.c
-@@ -2568,11 +2568,8 @@ static int ftdi_elan_close_controller(struct usb_ftdi *ftdi, int fn)
- 					    0x00);
- 	if (UxxxStatus)
- 		return UxxxStatus;
--	UxxxStatus = ftdi_elan_read_config(ftdi, activePCIfn | reg, 0,
-+	return ftdi_elan_read_config(ftdi, activePCIfn | reg, 0,
- 					   &pcidata);
--	if (UxxxStatus)
--		return UxxxStatus;
--	return 0;
- }
- 
- static int ftdi_elan_found_controller(struct usb_ftdi *ftdi, int fn, int quirk)
-@@ -2695,11 +2692,8 @@ static int ftdi_elan_setupOHCI(struct usb_ftdi *ftdi)
- 		}
- 	}
- 	if (ftdi->function > 0) {
--		UxxxStatus = ftdi_elan_setup_controller(ftdi,
-+		return ftdi_elan_setup_controller(ftdi,
- 							ftdi->function - 1);
--		if (UxxxStatus)
--			return UxxxStatus;
--		return 0;
- 	} else if (controllers > 0) {
- 		return -ENXIO;
- 	} else if (unrecognized > 0) {
--- 
-1.9.1
+Thanks,
+
+
+Paul Bolle
