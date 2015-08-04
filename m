@@ -1,123 +1,53 @@
 From: julien.grall@citrix.com (Julien Grall)
-Date: Tue, 4 Aug 2015 19:12:44 +0100
-Subject: [PATCH v2 0/8] Use correctly the Xen memory terminologies in Linux
-Message-ID: <1438711972-18752-1-git-send-email-julien.grall@citrix.com>
+Date: Tue, 4 Aug 2015 19:12:47 +0100
+Subject: [PATCH v2 3/8] arm/xen: implement correctly pfn_to_mfn
+In-Reply-To: <1438711972-18752-1-git-send-email-julien.grall@citrix.com>
+References: <1438711972-18752-1-git-send-email-julien.grall@citrix.com>
+Message-ID: <1438711972-18752-4-git-send-email-julien.grall@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+After the commit introducing convertion between DMA and guest address,
+all the callers of pfn_to_mfn are expecting to get a GFN (Guest Frame
+Number). On ARM, all the guests are auto-translated so the GFN is equal
+to the Linux PFN (Pseudo-physical Frame Number).
 
-This patch series aims to use the memory terminologies described in
-include/xen/mm.h [1] for Linux xen code.
+The current implementation may return an MFN if the caller is passing a
+PFN associated to a mapped foreign grant. In pratical, I haven't seen
+the problem on running guest but we should fix it for the sake of
+correctness.
 
-Linux is using mistakenly MFN when GFN is meant, I suspect this is because the
-first support of Xen was for PV. This has brought some misimplementation
-of memory helpers on ARM and make the developper confused about the expected
-behavior.
+Correct the implementation by always returning the pfn passed in parameter.
 
-For instance, with pfn_to_mfn, we expect to get a MFN based on the name.
-Although, if we look at the implementation on x86, it's returning a GFN.
-Most of the callers are also using it this way.
+A follow-up patch will take care to rename pfn_to_mfn to a suitable
+name.
 
-The first 2 patches of this series is ARM related in order to remove
-PV specific helpers which should not be used and fixing the implementation of
-pfn_to_mfn.
-
-The rest of the series is here rename most of the usage in the common code
-of MFN to GFN. I also took the opportunity to replace most of the call to
-pfn_to_gfn in the common code by page_to_gfn avoid construction such
-as pfn_to_gfn(page_to_pfn(...).
-
-Note the one xen-blkfront will be dropped by 64K series [2], I can include it
-if necessary.
-
-Major changes in v2:
-    - Use bfn rather than dfn for the DMA address
-    - Re-introduced pfn_to_mfn for PV guests only
-    - Typoes
-
-For all the changes see in each patch.
-
-This series is based on linus's branch. A branch with all the patches
-can be found here:
-    git://xenbits.xen.org/people/julieng/linux-arm.git branch page-renaming-v2
-
-It was been boot tested on ARM64 and only built for x86 and ARM32.
-I would be happy if someone can give a try on x86 as I don't have a x86
-box setup with Xen.
-
-Sincerely yours,
-
-[1] http://xenbits.xen.org/gitweb/?p=xen.git;a=commitdiff;h=e758ed14f390342513405dd766e874934573e6cb
-[2] https://lkml.org/lkml/2015/7/9/628
-
-Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
-Cc: David Vrabel <david.vrabel@citrix.com>
-Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: "H. Peter Anvin" <hpa@zytor.com>
-Cc: Ian Campbell <ian.campbell@citrix.com>
-Cc: Ingo Molnar <mingo@redhat.com>
-Cc: "James E.J. Bottomley" <JBottomley@odin.com>
-Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-Cc: Jiri Slaby <jslaby@suse.com>
-Cc: Juergen Gross <jgross@suse.com>
-Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-Cc: linux-api at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-fbdev at vger.kernel.org
-Cc: linux-input at vger.kernel.org
-Cc: linuxppc-dev at lists.ozlabs.org
-Cc: linux-scsi at vger.kernel.org
-Cc: netdev at vger.kernel.org
-Cc: "Roger Pau Monn?" <roger.pau@citrix.com>
-Cc: Russell King <linux@arm.linux.org.uk>
+Signed-off-by: Julien Grall <julien.grall@citrix.com>
 Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
-Cc: Wei Liu <wei.liu2@citrix.com>
-Cc: x86 at kernel.org
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: linux-arm-kernel at lists.infradead.org
+---
+ arch/arm/include/asm/xen/page.h | 8 --------
+ 1 file changed, 8 deletions(-)
 
-Julien Grall (8):
-  arm/xen: Remove helpers which are PV specific
-  xen: Make clear that swiotlb and biomerge are dealing with DMA address
-  arm/xen: implement correctly pfn_to_mfn
-  xen: Use the correctly the Xen memory terminologies
-  xen/tmem: Use page_to_gfn rather than pfn_to_gfn
-  video/xen-fbfront: Further s/MFN/GFN clean-up
-  hvc/xen: Further s/MFN/GFN clean-up
-  xen/privcmd: Further s/MFN/GFN/ clean-up
-
- arch/arm/include/asm/xen/page.h         | 44 ++++++++++++++++-----------------
- arch/arm/xen/enlighten.c                | 18 +++++++-------
- arch/arm/xen/mm.c                       |  4 +--
- arch/x86/include/asm/xen/page.h         | 37 +++++++++++++++++++++------
- arch/x86/xen/mmu.c                      | 32 ++++++++++++------------
- arch/x86/xen/smp.c                      |  2 +-
- drivers/block/xen-blkfront.c            |  6 ++---
- drivers/input/misc/xen-kbdfront.c       |  4 +--
- drivers/net/xen-netback/netback.c       |  4 +--
- drivers/net/xen-netfront.c              |  8 +++---
- drivers/scsi/xen-scsifront.c            |  8 +++---
- drivers/tty/hvc/hvc_xen.c               | 18 ++++++--------
- drivers/video/fbdev/xen-fbfront.c       | 20 +++++++--------
- drivers/xen/balloon.c                   |  2 +-
- drivers/xen/biomerge.c                  |  6 ++---
- drivers/xen/events/events_base.c        |  2 +-
- drivers/xen/events/events_fifo.c        |  4 +--
- drivers/xen/gntalloc.c                  |  3 ++-
- drivers/xen/manage.c                    |  2 +-
- drivers/xen/privcmd.c                   | 44 ++++++++++++++++-----------------
- drivers/xen/swiotlb-xen.c               | 16 ++++++------
- drivers/xen/tmem.c                      | 21 ++++++----------
- drivers/xen/xenbus/xenbus_client.c      |  2 +-
- drivers/xen/xenbus/xenbus_dev_backend.c |  2 +-
- drivers/xen/xenbus/xenbus_probe.c       |  8 +++---
- drivers/xen/xlate_mmu.c                 | 18 +++++++-------
- include/uapi/xen/privcmd.h              |  4 +++
- include/xen/page.h                      |  4 +--
- include/xen/xen-ops.h                   | 10 ++++----
- 29 files changed, 183 insertions(+), 170 deletions(-)
-
+diff --git a/arch/arm/include/asm/xen/page.h b/arch/arm/include/asm/xen/page.h
+index bc5e77c..087d86e 100644
+--- a/arch/arm/include/asm/xen/page.h
++++ b/arch/arm/include/asm/xen/page.h
+@@ -36,14 +36,6 @@ extern struct rb_root phys_to_mach;
+ 
+ static inline unsigned long pfn_to_mfn(unsigned long pfn)
+ {
+-	unsigned long mfn;
+-
+-	if (phys_to_mach.rb_node != NULL) {
+-		mfn = __pfn_to_mfn(pfn);
+-		if (mfn != INVALID_P2M_ENTRY)
+-			return mfn;
+-	}
+-
+ 	return pfn;
+ }
+ 
 -- 
 2.1.4
