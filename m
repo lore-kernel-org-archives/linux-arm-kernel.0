@@ -1,55 +1,92 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Tue, 4 Aug 2015 10:18:54 +0200
-Subject: [RFCv3 1/4] docs: dts: Added documentation for Xilinx Zynq Reset
- Controller bindings.
-In-Reply-To: <1438675772.3793.18.camel@pengutronix.de>
-References: <1438305237-18497-1-git-send-email-moritz.fischer@ettus.com>
- <1438305237-18497-2-git-send-email-moritz.fischer@ettus.com>
- <1438675772.3793.18.camel@pengutronix.de>
-Message-ID: <55C0756E.8050003@xilinx.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Tue, 04 Aug 2015 10:30:24 +0200
+Subject: [RFC PATCH 2/3] mailbox: Hisilicon: add mailbox driver
+In-Reply-To: <1438564390-28111-3-git-send-email-leo.yan@linaro.org>
+References: <1438564390-28111-1-git-send-email-leo.yan@linaro.org>
+ <1438564390-28111-3-git-send-email-leo.yan@linaro.org>
+Message-ID: <1438677024.8734.24.camel@tiscali.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/04/2015 10:09 AM, Philipp Zabel wrote:
-> Hi Moritz,
-> 
-> Am Donnerstag, den 30.07.2015, 18:13 -0700 schrieb Moritz Fischer:
->> Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
->> ---
->>  .../devicetree/bindings/reset/zynq-reset.txt       | 68 ++++++++++++++++++++++
->>  1 file changed, 68 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/reset/zynq-reset.txt
->>
->> diff --git a/Documentation/devicetree/bindings/reset/zynq-reset.txt b/Documentation/devicetree/bindings/reset/zynq-reset.txt
->> new file mode 100644
->> index 0000000..498c037a
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/reset/zynq-reset.txt
->> @@ -0,0 +1,68 @@
->> +Xilinx Zynq Reset Manager
->> +
->> +The Zynq AP-SoC has several different resets.
->> +
->> +See Chapter 26 of the Zynq TRM (UG585) for more information about Zynq resets.
->> +
->> +Required properties:
->> +- compatible: "xlnx,zynq-reset"
->> +- reg: SLCR offset and size taken via syscon <0x200 0x48>
->> +- syscon: <&slcr>
->> +  This should be a phandle to the Zynq's SLCR register.
-> 
->                                                  ^ register singular?
-> 
-> I still think the syscon phandle property is superfluous,
-> but I'm fine with keeping it for consistency.
-> It could always be made optional later.
+(This RFC was part of this mornings catch of my crude mail filter. So,
+for what it's worth, what follows are a few random comments for the few
+things I'm able to spot.)
 
-Great.
+On ma, 2015-08-03 at 09:13 +0800, Leo Yan wrote:
+> --- /dev/null
+> +++ b/drivers/mailbox/hisilicon/Kconfig
 
-Philipp: I expect you want to take at least 1/4 and 3/4 via your tree.
-I am fine if you also want to add 2/4 and 4/4 via your tree.
-If you think that they should go via arm-soc please let me know and I
-will add them to the queue.
+> +config HISI_MBOX
+> +	bool "Hisilicon's Mailbox"
+> +	depends on ARCH_HISI || OF
+
+ARCH_HISI is available on either ARM64 or ARM. ARM64 selects OF. On ARM
+ARCH_HISI depends on ARCH_MULTIV7 which depends on ARCH_MULTIPLATFORM.
+That selects USE_OF which on its turn selects OF.
+
+So, HISI_MBOX implies OF, correct?
+
+> +	help
+> +	  Support for mailbox drivers on Hisilicon series of SoCs.
+> +
+> +config HI6220_MBOX
+> +	tristate "Hi6220 Mailbox Controller"
+> +	depends on HISI_MBOX
+> +	help
+> +	  An implementation of the hi6220 mailbox. It is used to send message
+> +	  between application processors and MCU. Say Y here if you want to build
+> +	  the Hi6220 mailbox controller driver.
+
+> --- /dev/null
+> +++ b/drivers/mailbox/hisilicon/common.c
+
+> +int hisi_mbox_register(struct hisi_mbox_hw *mbox_hw)
+> +{
+> +	[...]
+> +
+> +	mbox->chan = devm_kzalloc(dev,
+> +		mbox_hw->chan_num * sizeof(struct mbox_chan), GFP_KERNEL);
+> +	if (!mbox)
+
+	if (!mbox->chan)
+
+> +		return -ENOMEM;
+> +
+> +	[...]
+> +}
+
+> --- /dev/null
+> +++ b/drivers/mailbox/hisilicon/hi6220-mailbox.c
+
+> +static struct platform_driver hi6220_mbox_driver = {
+> +	.driver = {
+> +		[...]
+> +		.of_match_table = of_match_ptr(hi6220_mbox_of_match),
+
+of_match_ptr(x) becomes NULL when CONFIG_OF is not defined. But I think
+CONFIG_OF will always be defined, see above. So of_match_ptr() isn't per
+se needed.
+
+> +	},
+> +	[...]
+> +};
+
+> +static int __init hi6220_mbox_init(void)
+> +{
+> +	return platform_driver_register(&hi6220_mbox_driver);
+> +}
+> +module_init(hi6220_mbox_init);
+> +
+> +static void __exit hi6220_mbox_exit(void)
+> +{
+> +	platform_driver_unregister(&hi6220_mbox_driver);
+> +}
+> +module_exit(hi6220_mbox_exit);
+
+This could be flattened into one line:
+    module_platform_driver(hi6220_mbox_driver);
 
 Thanks,
-Michal
+
+
+Paul Bolle
