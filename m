@@ -1,83 +1,116 @@
 From: jamesjj.liao@mediatek.com (James Liao)
-Date: Tue, 4 Aug 2015 16:16:49 +0800
-Subject: [PATCH v6 0/9] Fixes and new clocks support for Mediatek MT8173
-Message-ID: <1438676218-11310-1-git-send-email-jamesjj.liao@mediatek.com>
+Date: Tue, 4 Aug 2015 16:16:52 +0800
+Subject: [PATCH v6 3/9] clk: mediatek: Add __initdata and __init for data and
+ functions
+In-Reply-To: <1438676218-11310-1-git-send-email-jamesjj.liao@mediatek.com>
+References: <1438676218-11310-1-git-send-email-jamesjj.liao@mediatek.com>
+Message-ID: <1438676218-11310-4-git-send-email-jamesjj.liao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset is based on 4.2-rc2 and [1], and contains minor fixes and
-subsystem clocks support for Mediatek MT8173.
+Add __init for clock registration functions, and add __initdata for
+mtk_gate_regs initial structures.
 
-The previous reviews can be found in [2]. The most different from previous
-patchset is rebasing to 4.2-rc2.
+Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
+---
+ drivers/clk/mediatek/clk-gate.c   |  2 +-
+ drivers/clk/mediatek/clk-mt8173.c |  6 +++---
+ drivers/clk/mediatek/clk-mtk.c    | 13 +++++++------
+ 3 files changed, 11 insertions(+), 10 deletions(-)
 
-changes since v5:
-- Rebase to 4.2-rc2.
-- Patch "Fix enabling of critical clocks" had been included in 4.2-rc2,
-  so it need not be included in this patchset.
-
-changes since v4:
-- Add a separated patch to remove unused dpi_ck.
-- Add separated patches to fix clk/mediatek in release 4.2-rc1.
-- Add __init* for initialization data and functions.
-- Rename dummy_clk with oscillator in DT.
-- Remove mtk_clk_register_apmixed_ex(), call mtk_clk_register_ref2usb_tx()
-  directly to register USB clock.
-
-changes since v3:
-- Remove clk_null dependency from root clocks.
-- Use fixed-rate clocks with typical rate to replace clk_null.
-- Separate ref2usb_tx implementation to clk-apmixed.c
-- Use clock-controller as the name of clock providers.
-
-changes since v2:
-- Rebase to 4.2-rc1.
-- Add device tree nodes for subsystem clocks.
-- Fine tune comments of patches.
-- Add __init, __initconst and const to init data and functions.
-- Removed unused code from init functions of subsystem clocks.
-
-changes since v1:
-- Add CA7PLL and CA15PLL as critical clocks.
-- Use the same register descriptor for imgsys, vensys and vencltsys.
-- Generalize apmixedsys special clocks registration.
-
-[1] https://patchwork.kernel.org/patch/6446341/
-[2] http://lists.infradead.org/pipermail/linux-mediatek/2015-July/001800.html
-
-James Liao (9):
-  clk: mediatek: Removed unused dpi_ck clock from MT8173
-  clk: mediatek: Remove unused code from MT8173.
-  clk: mediatek: Add __initdata and __init for data and functions
-  clk: mediatek: Add fixed clocks support for Mediatek SoC.
-  clk: mediatek: Fix rate and dependency of MT8173 clocks
-  dt-bindings: ARM: Mediatek: Document devicetree bindings for clock
-    controllers
-  clk: mediatek: Add subsystem clocks of MT8173
-  clk: mediatek: Add USB clock support in MT8173 APMIXEDSYS
-  arm64: dts: mt8173: Add subsystem clock controller device nodes
-
- .../bindings/arm/mediatek/mediatek,imgsys.txt      |  22 ++
- .../bindings/arm/mediatek/mediatek,mmsys.txt       |  22 ++
- .../bindings/arm/mediatek/mediatek,vdecsys.txt     |  22 ++
- .../bindings/arm/mediatek/mediatek,vencltsys.txt   |  22 ++
- .../bindings/arm/mediatek/mediatek,vencsys.txt     |  22 ++
- arch/arm64/boot/dts/mediatek/mt8173.dtsi           |  37 +++
- drivers/clk/mediatek/Makefile                      |   2 +-
- drivers/clk/mediatek/clk-apmixed.c                 | 107 +++++++
- drivers/clk/mediatek/clk-gate.c                    |   2 +-
- drivers/clk/mediatek/clk-mt8173.c                  | 335 ++++++++++++++++++++-
- drivers/clk/mediatek/clk-mtk.c                     |  36 ++-
- drivers/clk/mediatek/clk-mtk.h                     |  24 +-
- drivers/clk/mediatek/clk-pll.c                     |   7 +-
- include/dt-bindings/clock/mt8173-clk.h             | 101 ++++++-
- 14 files changed, 728 insertions(+), 33 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,imgsys.txt
- create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt
- create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,vdecsys.txt
- create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,vencltsys.txt
- create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,vencsys.txt
- create mode 100644 drivers/clk/mediatek/clk-apmixed.c
-
---
+diff --git a/drivers/clk/mediatek/clk-gate.c b/drivers/clk/mediatek/clk-gate.c
+index 5702036..576bdb7 100644
+--- a/drivers/clk/mediatek/clk-gate.c
++++ b/drivers/clk/mediatek/clk-gate.c
+@@ -97,7 +97,7 @@ const struct clk_ops mtk_clk_gate_ops_setclr_inv = {
+ 	.disable	= mtk_cg_disable_inv,
+ };
+ 
+-struct clk *mtk_clk_register_gate(
++struct clk * __init mtk_clk_register_gate(
+ 		const char *name,
+ 		const char *parent_name,
+ 		struct regmap *regmap,
+diff --git a/drivers/clk/mediatek/clk-mt8173.c b/drivers/clk/mediatek/clk-mt8173.c
+index 13aa432..361fe32 100644
+--- a/drivers/clk/mediatek/clk-mt8173.c
++++ b/drivers/clk/mediatek/clk-mt8173.c
+@@ -586,7 +586,7 @@ static const struct mtk_composite top_muxes[] __initconst = {
+ 	MUX(CLK_TOP_I2S3_B_SEL, "i2s3_b_ck_sel", i2s3_b_ck_parents, 0x120, 8, 1),
+ };
+ 
+-static const struct mtk_gate_regs infra_cg_regs = {
++static const struct mtk_gate_regs infra_cg_regs __initconst = {
+ 	.set_ofs = 0x0040,
+ 	.clr_ofs = 0x0044,
+ 	.sta_ofs = 0x0048,
+@@ -615,13 +615,13 @@ static const struct mtk_gate infra_clks[] __initconst = {
+ 	GATE_ICG(CLK_INFRA_PMICWRAP, "infra_pmicwrap", "axi_sel", 23),
+ };
+ 
+-static const struct mtk_gate_regs peri0_cg_regs = {
++static const struct mtk_gate_regs peri0_cg_regs __initconst = {
+ 	.set_ofs = 0x0008,
+ 	.clr_ofs = 0x0010,
+ 	.sta_ofs = 0x0018,
+ };
+ 
+-static const struct mtk_gate_regs peri1_cg_regs = {
++static const struct mtk_gate_regs peri1_cg_regs __initconst = {
+ 	.set_ofs = 0x000c,
+ 	.clr_ofs = 0x0014,
+ 	.sta_ofs = 0x001c,
+diff --git a/drivers/clk/mediatek/clk-mtk.c b/drivers/clk/mediatek/clk-mtk.c
+index 18444ae..268b6ff 100644
+--- a/drivers/clk/mediatek/clk-mtk.c
++++ b/drivers/clk/mediatek/clk-mtk.c
+@@ -24,7 +24,7 @@
+ #include "clk-mtk.h"
+ #include "clk-gate.h"
+ 
+-struct clk_onecell_data *mtk_alloc_clk_data(unsigned int clk_num)
++struct clk_onecell_data * __init mtk_alloc_clk_data(unsigned int clk_num)
+ {
+ 	int i;
+ 	struct clk_onecell_data *clk_data;
+@@ -49,8 +49,8 @@ err_out:
+ 	return NULL;
+ }
+ 
+-void mtk_clk_register_factors(const struct mtk_fixed_factor *clks, int num,
+-		struct clk_onecell_data *clk_data)
++void __init mtk_clk_register_factors(const struct mtk_fixed_factor *clks,
++		int num, struct clk_onecell_data *clk_data)
+ {
+ 	int i;
+ 	struct clk *clk;
+@@ -72,7 +72,8 @@ void mtk_clk_register_factors(const struct mtk_fixed_factor *clks, int num,
+ 	}
+ }
+ 
+-int mtk_clk_register_gates(struct device_node *node, const struct mtk_gate *clks,
++int __init mtk_clk_register_gates(struct device_node *node,
++		const struct mtk_gate *clks,
+ 		int num, struct clk_onecell_data *clk_data)
+ {
+ 	int i;
+@@ -111,7 +112,7 @@ int mtk_clk_register_gates(struct device_node *node, const struct mtk_gate *clks
+ 	return 0;
+ }
+ 
+-struct clk *mtk_clk_register_composite(const struct mtk_composite *mc,
++struct clk * __init mtk_clk_register_composite(const struct mtk_composite *mc,
+ 		void __iomem *base, spinlock_t *lock)
+ {
+ 	struct clk *clk;
+@@ -196,7 +197,7 @@ err_out:
+ 	return ERR_PTR(ret);
+ }
+ 
+-void mtk_clk_register_composites(const struct mtk_composite *mcs,
++void __init mtk_clk_register_composites(const struct mtk_composite *mcs,
+ 		int num, void __iomem *base, spinlock_t *lock,
+ 		struct clk_onecell_data *clk_data)
+ {
+-- 
 1.8.1.1.dirty
