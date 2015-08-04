@@ -1,57 +1,56 @@
 From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Tue, 04 Aug 2015 16:53:48 -0500
-Subject: [PATCH v5 0/9] ARM: PCI: kill pcibios_msi_controller()
-Message-ID: <20150804214234.9189.42548.stgit@bhelgaas-glaptop2.roam.corp.google.com>
+Date: Tue, 04 Aug 2015 16:53:57 -0500
+Subject: [PATCH v5 1/9] ARM/PCI: Replace panic with WARN messages on failures
+In-Reply-To: <20150804214234.9189.42548.stgit@bhelgaas-glaptop2.roam.corp.google.com>
+References: <20150804214234.9189.42548.stgit@bhelgaas-glaptop2.roam.corp.google.com>
+Message-ID: <20150804215357.9189.11942.stgit@bhelgaas-glaptop2.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The first 5 patches here are essentially the same as Lorenzo's v4 posting
-at
-http://lkml.kernel.org/1438169598-24490-1-git-send-email-lorenzo.pieralisi at arm.com
+From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 
-I added some at the end to fix what look like some X-Gene bugs to me, and
-to make X-Gene use pci_scan_root_bus_msi() like the other drivers that use
-msi_controller.
+In the ARM PCI bios32 layer, failures to dynamically allocate pci_sys_data
+for a PCI bus, or a PCI bus scan failure have to be considered serious
+warnings but they should not trigger a system panic so that at least the
+system is given a chance to be debugged.
 
-v4->v5 changes:
-- Declare pci_scan_root_bus_msi() in drivers/pci/pci.h instead of
-  include/linux/pci.h.  I like the idea, but I hope we can replace this and
-  other "scan_root_bus" interfaces with a single, more-generic interface,
-  so I'd rather not expose this one widely.
-- Split "kill pcibios_msi_controller" into several patches.  My intent was
-  to make it easier to review; I don't think I made any actual code
-  changes.  I did drop Marc's ack because I fiddled with stuff enough
-  that I wasn't comfortable keeping it.
-- I added of_node_put() after of_parse_phandle() in MVEBU and X-Gene.
-  I'm not an OF guy, so tell me if this is the wrong thing.
-- I changed a couple X-Gene OF "msi-parent" things to match (I think) what
-  MVEBU does.  Again, tell me if I got this wrong.
-- I used pci_scan_root_bus_msi() in X-Gene to follow what Lorenzo already
-  did in DesignWare and Xilinx.
+This patch replaces the panic statements with WARN() messages to improve
+error reporting in the ARM PCI bios32 layer.
 
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+CC: Russell King <linux@arm.linux.org.uk>
+CC: Marc Zyngier <marc.zyngier@arm.com>
 ---
+ arch/arm/kernel/bios32.c |   10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
 
-Lorenzo Pieralisi (5):
-      ARM/PCI: Replace panic with WARN messages on failures
-      PCI: Add pci_scan_root_bus_msi()
-      ARM/PCI, designware, xilinx: Use pci_scan_root_bus_msi()
-      ARM/PCI: Remove msi_controller from struct pci_sys_data
-      PCI/MSI: Remove unused pcibios_msi_controller() hook
-
-Bjorn Helgaas (4):
-      PCI: Drop references acquired by of_parse_phandle()
-      PCI: xgene: Set msi_controller->dev to platform_device, not pci_bus
-      PCI: xgene: Look for OF "msi-parent" in host controller, not root bus
-      PCI: xgene: Use pci_scan_root_bus_msi()
-
-
- arch/arm/include/asm/mach/pci.h    |    5 -----
- arch/arm/kernel/bios32.c           |   27 +++++++++------------------
- drivers/pci/host/pci-mvebu.c       |    1 +
- drivers/pci/host/pci-xgene.c       |   26 +++++++++++++-------------
- drivers/pci/host/pcie-designware.c |    6 +++---
- drivers/pci/host/pcie-xilinx.c     |    5 ++---
- drivers/pci/msi.c                  |   17 +----------------
- drivers/pci/pci.h                  |    5 +++++
- drivers/pci/probe.c                |   14 ++++++++++++--
- 9 files changed, 46 insertions(+), 60 deletions(-)
+diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+index bf370bc..4e95260 100644
+--- a/arch/arm/kernel/bios32.c
++++ b/arch/arm/kernel/bios32.c
+@@ -459,8 +459,8 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
+ 
+ 	for (nr = busnr = 0; nr < hw->nr_controllers; nr++) {
+ 		sys = kzalloc(sizeof(struct pci_sys_data), GFP_KERNEL);
+-		if (!sys)
+-			panic("PCI: unable to allocate sys data!");
++		if (WARN(!sys, "PCI: unable to allocate sys data!"))
++			break;
+ 
+ #ifdef CONFIG_PCI_MSI
+ 		sys->msi_ctrl = hw->msi_ctrl;
+@@ -489,8 +489,10 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
+ 				sys->bus = pci_scan_root_bus(parent, sys->busnr,
+ 						hw->ops, sys, &sys->resources);
+ 
+-			if (!sys->bus)
+-				panic("PCI: unable to scan bus!");
++			if (WARN(!sys->bus, "PCI: unable to scan bus!")) {
++				kfree(sys);
++				break;
++			}
+ 
+ 			busnr = sys->bus->busn_res.end + 1;
+ 
