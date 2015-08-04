@@ -1,82 +1,271 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 04 Aug 2015 16:23:02 +0200
-Subject: MUSB dual-role on AM335x behaving weirdly
-In-Reply-To: <55C0B954.3020106@free-electrons.com>
-References: <20150514190429.GT24269@saruman.tx.rr.com>	<CADYTM3Zso8bV_8yFyx1-ATbL5AgkKBjvWWR4AsoZUNuLvFe1bQ@mail.gmail.com>	<20150514192125.GU24269@saruman.tx.rr.com>	<CADYTM3bbEAVefFZtivJf5Z+2Q+1zDZEvNhqE5ytsOxDX7hjbdA@mail.gmail.com>	<20150514192946.GV24269@saruman.tx.rr.com>	<CADYTM3Zk2iD8YMj75CoLJn=4kpoXoXEKUWj2QzdXKGCJjtfG2A@mail.gmail.com>	<CADYTM3a1QWnec1D=wT=fgZ-RCXAx_qZYYoFg5gWOy0yT4vovHA@mail.gmail.com>	<20150514212653.GC3338@piout.net>	<CADYTM3baVqoEBdWoQb5JFyGR2_GKm1FHMYWST1YkZV=m=ZdycQ@mail.gmail.com>	<20150526145118.GD26599@saruman.tx.rr.com>	<20150527094205.GO3199@piout.net>	<5594E56B.3040200@free-electrons.com>
- <CADYTM3ZF5m++N1NqmOJoH5agbYrzpvSbLnuLVgttxwzdzwmGwQ@mail.gmail.com>
- <55C0B954.3020106@free-electrons.com>
-Message-ID: <55C0CAC6.3020603@free-electrons.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 04 Aug 2015 15:23:00 +0100
+Subject: [PATCH v4 10/10] irqchip / gicv2m: Introducing gicv2m_acpi_init()
+In-Reply-To: <1438164539-29256-11-git-send-email-hanjun.guo@linaro.org>
+References: <1438164539-29256-1-git-send-email-hanjun.guo@linaro.org>
+ <1438164539-29256-11-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <55C0CAC4.3010202@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi again,
-On 04/08/2015 15:08, Gregory CLEMENT wrote:
-> Hi Bin,
+On 29/07/15 11:08, Hanjun Guo wrote:
+> From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 > 
-> On 02/07/2015 19:05, Bin Liu wrote:
->> Hi,
->>
->> On Thu, Jul 2, 2015 at 2:16 AM, Gregory CLEMENT
->> <gregory.clement@free-electrons.com> wrote:
->>> Hi Felipe,
->>>
->>> On 27/05/2015 11:42, Alexandre Belloni wrote:
->>>> Hi,
->>>>
->>>> On 26/05/2015 at 09:51:18 -0500, Felipe Balbi wrote :
->>>>> On Thu, May 14, 2015 at 04:36:33PM -0500, Bin Liu wrote:
->>>>>> Alexandre,
->>>>>>
->>>>>> On Thu, May 14, 2015 at 4:26 PM, Alexandre Belloni
->>>>>> <alexandre.belloni@free-electrons.com> wrote:
->>>>>>> On 14/05/2015 at 16:16:12 -0500, Bin Liu wrote :
->>>>>>>> I think I found the root cause of the problem: board design issue - I
->>>>>>>> bet the custom board has too much cap on VBUS line. It should be <
->>>>>>>> 10uF.
->>>>>>>>
->>>>>>>
->>>>>>> We have a custom board that exhibits the issue but it only has a 100nF
->>>>>>> cap on VBUS.
->>>>>>
->>>>>> Have you measured the VBUS discharging? Is there any way to share your
->>>>>> schematics?
->>>>>
->>>>> Alexandre, any further comments ?
->>>>>
->>>>
->>>> Yeah, I have just got more info.
->>>>
->>>> This is the relevant part of the schematic:
->>>> http://free-electrons.com/~alexandre/usb.png
->>>>
->>>> The total VBUS capacitance is 200nF and the USB0 pins are connected
->>>> directly to the AM3358 pins. U1 is actually not fitted.
->>>>
->>>> We didn't measure VBUS discharging but we observe the OTG pin sensing
->>>> stops when plugging an OTG cable without any device.
->>>
->>> Do you have any news about this topic?
->>>
->>>
->>> Is there something else that we can do to help solving this issue?
->>
->> In the case of CONFIG_USB_MUSB_DUAL_ROLE=y and dr_mode=otg, how is the
->> gadget driver configured? It has to be a module not built-in.
+> This patch introduces gicv2m_acpi_init(), which uses information
+> in MADT GIC MSI frames structure to initialize GICv2m driver.
+> It also refactors gicv2m_init_one() to handle both DT and ACPI
+> initialization path.
 > 
-> Indeed when I configured CONFIG_USB_MUSB_HDRC=m and CONFIG_USB_MUSB_DSPS=m
-> it worked seamless.
+> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> ---
+>  drivers/irqchip/irq-gic-v2m.c   | 111 +++++++++++++++++++++++++++++++---------
+>  drivers/irqchip/irq-gic.c       |   3 ++
+>  include/linux/irqchip/arm-gic.h |   7 +++
+>  3 files changed, 98 insertions(+), 23 deletions(-)
+> 
+> diff --git a/drivers/irqchip/irq-gic-v2m.c b/drivers/irqchip/irq-gic-v2m.c
+> index d0fcbf8..c491a08 100644
+> --- a/drivers/irqchip/irq-gic-v2m.c
+> +++ b/drivers/irqchip/irq-gic-v2m.c
+> @@ -15,6 +15,7 @@
+>  
+>  #define pr_fmt(fmt) "GICv2m: " fmt
+>  
+> +#include <linux/acpi.h>
+>  #include <linux/irq.h>
+>  #include <linux/irqdomain.h>
+>  #include <linux/kernel.h>
+> @@ -211,6 +212,10 @@ static bool is_msi_spi_valid(u32 base, u32 num)
+>  	return true;
+>  }
+>  
+> +char gicv2m_domain_name[] = "GICV2M";
+> +char gicv2m_pci_msi_domain_name[] = "GICV2M-PCI-MSI";
+> +char gicv2m_plat_msi_domain_name[] = "GICV2M-PLAT-MSI";
+> +
+
+Can't these be static? Why do we need them?
+
+>  static struct irq_chip gicv2m_pmsi_irq_chip = {
+>  	.name			= "pMSI",
+>  };
+> @@ -224,8 +229,9 @@ static struct msi_domain_info gicv2m_pmsi_domain_info = {
+>  	.chip	= &gicv2m_pmsi_irq_chip,
+>  };
+>  
+> -static int __init gicv2m_init_one(struct device_node *node,
+> -				  struct irq_domain *parent)
+> +static int __init gicv2m_init_one(struct irq_domain *parent,
+> +				  u32 *spi_start, u32 *nr_spis,
+> +				  struct resource *res, void *token)
+>  {
+>  	int ret;
+>  	struct v2m_data *v2m;
+> @@ -237,28 +243,22 @@ static int __init gicv2m_init_one(struct device_node *node,
+>  		return -ENOMEM;
+>  	}
+>  
+> -	ret = of_address_to_resource(node, 0, &v2m->res);
+> -	if (ret) {
+> -		pr_err("Failed to allocate v2m resource.\n");
+> -		goto err_free_v2m;
+> -	}
+> -
+> -	v2m->base = ioremap(v2m->res.start, resource_size(&v2m->res));
+> +	v2m->base = ioremap(res->start, resource_size(res));
+>  	if (!v2m->base) {
+>  		pr_err("Failed to map GICv2m resource\n");
+>  		ret = -ENOMEM;
+>  		goto err_free_v2m;
+>  	}
+> +	memcpy(&v2m->res, res, sizeof(struct resource));
+>  
+> -	if (!of_property_read_u32(node, "arm,msi-base-spi", &v2m->spi_start) &&
+> -	    !of_property_read_u32(node, "arm,msi-num-spis", &v2m->nr_spis)) {
+> -		pr_info("Overriding V2M MSI_TYPER (base:%u, num:%u)\n",
+> -			v2m->spi_start, v2m->nr_spis);
+> +	if (*spi_start && *nr_spis) {
+> +		v2m->spi_start = *spi_start;
+> +		v2m->nr_spis = *nr_spis;
+>  	} else {
+>  		u32 typer = readl_relaxed(v2m->base + V2M_MSI_TYPER);
+>  
+> -		v2m->spi_start = V2M_MSI_TYPER_BASE_SPI(typer);
+> -		v2m->nr_spis = V2M_MSI_TYPER_NUM_SPI(typer);
+> +		v2m->spi_start = *spi_start = V2M_MSI_TYPER_BASE_SPI(typer);
+> +		v2m->nr_spis = *nr_spis = V2M_MSI_TYPER_NUM_SPI(typer);
+>  	}
+>  
+>  	if (!is_msi_spi_valid(v2m->spi_start, v2m->nr_spis)) {
+> @@ -273,7 +273,7 @@ static int __init gicv2m_init_one(struct device_node *node,
+>  		goto err_iounmap;
+>  	}
+>  
+> -	inner_domain = irq_domain_add_tree(node, &gicv2m_domain_ops, v2m);
+> +	inner_domain = irq_domain_add_tree(token, &gicv2m_domain_ops, v2m);
+>  	if (!inner_domain) {
+>  		pr_err("Failed to create GICv2m domain\n");
+>  		ret = -ENOMEM;
+> @@ -282,9 +282,11 @@ static int __init gicv2m_init_one(struct device_node *node,
+>  
+>  	inner_domain->bus_token = DOMAIN_BUS_NEXUS;
+>  	inner_domain->parent = parent;
+> -	pci_domain = pci_msi_create_irq_domain(node, &gicv2m_msi_domain_info,
+> +	inner_domain->name = gicv2m_domain_name;
+> +
+> +	pci_domain = pci_msi_create_irq_domain(token, &gicv2m_msi_domain_info,
+>  					       inner_domain);
+> -	plat_domain = platform_msi_create_irq_domain(node,
+> +	plat_domain = platform_msi_create_irq_domain(token,
+>  						     &gicv2m_pmsi_domain_info,
+>  						     inner_domain);
+>  	if (!pci_domain || !plat_domain) {
+> @@ -293,11 +295,10 @@ static int __init gicv2m_init_one(struct device_node *node,
+>  		goto err_free_domains;
+>  	}
+>  
+> -	spin_lock_init(&v2m->msi_cnt_lock);
+> +	pci_domain->name = gicv2m_pci_msi_domain_name;
+> +	plat_domain->name = gicv2m_plat_msi_domain_name;
+>  
+> -	pr_info("Node %s: range[%#lx:%#lx], SPI[%d:%d]\n", node->name,
+> -		(unsigned long)v2m->res.start, (unsigned long)v2m->res.end,
+> -		v2m->spi_start, (v2m->spi_start + v2m->nr_spis));
+> +	spin_lock_init(&v2m->msi_cnt_lock);
+>  
+>  	return 0;
+>  
+> @@ -329,15 +330,79 @@ int __init gicv2m_of_init(struct device_node *node, struct irq_domain *parent)
+>  
+>  	for (child = of_find_matching_node(node, gicv2m_device_id); child;
+>  	     child = of_find_matching_node(child, gicv2m_device_id)) {
+> +		u32 spi_start = 0, nr_spis = 0;
+> +		struct resource res;
+> +
+>  		if (!of_find_property(child, "msi-controller", NULL))
+>  			continue;
+>  
+> -		ret = gicv2m_init_one(child, parent);
+> +		ret = of_address_to_resource(child, 0, &res);
+> +		if (ret) {
+> +			pr_err("Failed to allocate v2m resource.\n");
+> +			break;
+> +		}
+> +
+> +		if (!of_property_read_u32(child, "arm,msi-base-spi", &spi_start) &&
+> +		    !of_property_read_u32(child, "arm,msi-num-spis", &nr_spis))
+> +			pr_info("Overriding V2M MSI_TYPER (base:%u, num:%u)\n",
+> +				spi_start, nr_spis);
+> +
+> +		ret = gicv2m_init_one(parent, &spi_start, &nr_spis, &res,
+
+If these spi_start and nr_spis pointers passed to gicv2m_init_one are
+only for the benefit of printing the message below, just move the
+message inside the function...
+
+> +				      child);
+>  		if (ret) {
+>  			of_node_put(node);
+>  			break;
+>  		}
+> +
+> +		pr_info("Node %s: range[%#lx:%#lx], SPI[%d:%d]\n", child->name,
+> +			(unsigned long)res.start, (unsigned long)res.end,
+> +			spi_start, (spi_start + nr_spis));
+>  	}
+>  
+>  	return ret;
+>  }
+> +
+> +#ifdef CONFIG_ACPI
+> +int __init gicv2m_acpi_init(struct acpi_table_header *table,
+> +			    struct irq_domain *parent)
+> +{
+> +	int i, ret;
+> +
+> +	ret = acpi_gic_msi_init(table);
+> +	if (ret)
+> +		return ret;
+> +
+> +	for (i = 0; i < acpi_gic_get_num_msi_frame(); i++) {
+> +		struct resource res;
+> +		u32 spi_start = 0, nr_spis = 0;
+> +		struct acpi_madt_generic_msi_frame *m;
+> +
+> +		ret = acpi_gic_get_msi_frame(i, &m);
+> +		if (ret)
+> +			return ret;
+> +
+
+All of that should be moved here. And we don't need to build an
+intermediate representation. Just build the v2m_data structures as you go.
+
+> +		res.start = m->base_address;
+> +		res.end = m->base_address + 0x1000;
+> +
+> +		if (m->flags & ACPI_MADT_OVERRIDE_SPI_VALUES) {
+> +			spi_start = m->spi_base;
+> +			nr_spis = m->spi_count;
+> +
+> +			pr_info("ACPI overriding V2M MSI_TYPER (base:%u, num:%u)\n",
+> +				spi_start, nr_spis);
+> +		}
+> +
+> +		ret = gicv2m_init_one(parent, &spi_start, &nr_spis, &res,
+> +				      (void *)(m->base_address));
+> +		if (ret)
+> +			break;
+> +
+> +		pr_info("MSI frame ID %u: range[%#lx:%#lx], SPI[%d:%d]\n",
+> +			m->msi_frame_id,
+> +			(unsigned long)res.start, (unsigned long)res.end,
+> +			spi_start, (spi_start + nr_spis));
+> +	}
+> +	return ret;
+> +}
+> +
+> +#endif /* CONFIG_ACPI */
+> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+> index bec6b00..531ebbc 100644
+> --- a/drivers/irqchip/irq-gic.c
+> +++ b/drivers/irqchip/irq-gic.c
+> @@ -1159,6 +1159,9 @@ gic_v2_acpi_init(struct acpi_table_header *table)
+>  	 */
+>  	gic_init_bases(0, -1, dist_base, cpu_base, 0, (void *)ACPI_IRQ_MODEL_GIC);
+>  
+> +	if (IS_ENABLED(CONFIG_ARM_GIC_V2M))
+> +		gicv2m_acpi_init(table, gic_data[0].domain);
+> +
+>  	acpi_set_irq_model(ACPI_IRQ_MODEL_GIC, ACPI_IRQ_MODEL_GIC,
+>  			   gic_acpi_gsi_desc_populate);
+>  	return 0;
+> diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
+> index 97799b7..27d8196 100644
+> --- a/include/linux/irqchip/arm-gic.h
+> +++ b/include/linux/irqchip/arm-gic.h
+> @@ -109,6 +109,13 @@ static inline void gic_init(unsigned int nr, int start,
+>  
+>  int gicv2m_of_init(struct device_node *node, struct irq_domain *parent);
+>  
+> +#ifdef CONFIG_ACPI
+> +struct acpi_table_header;
+> +
+> +int gicv2m_acpi_init(struct acpi_table_header *table,
+> +		     struct irq_domain *parent);
+> +#endif
+> +
+>  void gic_send_sgi(unsigned int cpu_id, unsigned int irq);
+>  int gic_get_cpu_id(unsigned int cpu);
+>  void gic_migrate_target(unsigned int new_cpu_id);
 > 
 
-Actually it didn't worked. And now sometimes I even received continuously
-the following message:
+This needs rework to do the parsing of the tables in this driver. Just
+expose the domain_token through a function that you register with the
+ACPI layer.
 
- musb_bus_suspend 2484: trying to suspend as a_wait_vfall while active
+Thanks,
 
-Gregory
-
-
+	M.
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Jazz is not dead. It just smells funny...
