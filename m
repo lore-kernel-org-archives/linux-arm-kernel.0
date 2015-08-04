@@ -1,88 +1,79 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 4 Aug 2015 21:00:26 +0530
-Subject: [PATCH 03/10] ARM: dts: dra7: Use "syscon-phy-power" and "syscon-pcs"
- in PCIe PHY node
+Date: Tue, 4 Aug 2015 21:00:28 +0530
+Subject: [PATCH 05/10] ARM: dts: dra7: Use "syscon-phy-power" instead of
+ "ctrl-module" in USB PHY node
 In-Reply-To: <1438702233-8027-1-git-send-email-kishon@ti.com>
 References: <1438702233-8027-1-git-send-email-kishon@ti.com>
-Message-ID: <1438702233-8027-4-git-send-email-kishon@ti.com>
+Message-ID: <1438702233-8027-6-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add "syscon-phy-power" property and "syscon-pcs" property which can
-be used to perform the control module initializations and remove
-the deprecated "ctrl-module" property from PCIe PHY dt nodes.
+Add "syscon-phy-power" property and remove the deprecated "ctrl-module"
+property from USB PHY devicetree nodes.
 
-Phandle to "sysclk" clock node is also added to the PCIe PHY node
-since some of the syscon initializations is based on system clock
-frequency.
-
-Since "omap_control_pcie1phy" and "omap_control_pcie2phy" devicetree
-nodes are no longer used, remove it.
+Since "omap_control_usb2phy1", "omap_control_usb3phy1" and
+"omap_control_usb2phy2" devicetree nodes are no longer used, remove it.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- arch/arm/boot/dts/dra7.dtsi |   28 +++++++---------------------
- 1 file changed, 7 insertions(+), 21 deletions(-)
+ arch/arm/boot/dts/dra7.dtsi |   24 +++---------------------
+ 1 file changed, 3 insertions(+), 21 deletions(-)
 
 diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index 6854385..0ebb808 100644
+index dfefd17..191ffae 100644
 --- a/arch/arm/boot/dts/dra7.dtsi
 +++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -1140,16 +1140,18 @@
- 				reg = <0x4a094000 0x80>, /* phy_rx */
- 				      <0x4a094400 0x64>; /* phy_tx */
- 				reg-names = "phy_rx", "phy_tx";
--				ctrl-module = <&omap_control_pcie1phy>;
-+				syscon-phy-power = <&scm_conf2 0x1c>;
-+				syscon-pcs = <&scm_conf2 0x10>;
- 				clocks = <&dpll_pcie_ref_ck>,
- 					 <&dpll_pcie_ref_m2ldo_ck>,
- 					 <&optfclk_pciephy1_32khz>,
- 					 <&optfclk_pciephy1_clk>,
- 					 <&optfclk_pciephy1_div_clk>,
--					 <&optfclk_pciephy_div>;
-+					 <&optfclk_pciephy_div>,
-+					 <&sys_clkin1>;
- 				clock-names = "dpll_ref", "dpll_ref_m2",
- 					      "wkupclk", "refclk",
--					      "div-clk", "phy-div";
-+					      "div-clk", "phy-div", "sysclk";
- 				#phy-cells = <0>;
- 			};
- 
-@@ -1158,7 +1160,8 @@
- 				reg = <0x4a095000 0x80>, /* phy_rx */
- 				      <0x4a095400 0x64>; /* phy_tx */
- 				reg-names = "phy_rx", "phy_tx";
--				ctrl-module = <&omap_control_pcie2phy>;
-+				syscon-phy-power = <&scm_conf2 0x20>;
-+				syscon-pcs = <&scm_conf2 0x10>;
- 				clocks = <&dpll_pcie_ref_ck>,
- 					 <&dpll_pcie_ref_m2ldo_ck>,
- 					 <&optfclk_pciephy2_32khz>,
-@@ -1183,23 +1186,6 @@
- 			ti,hwmods = "sata";
+@@ -1195,24 +1195,6 @@
+ 			clocks = <&sys_32k_ck>;
  		};
  
--		omap_control_pcie1phy: control-phy at 0x4a003c40 {
--			compatible = "ti,control-phy-pcie";
--			reg = <0x4a003c40 0x4>, <0x4a003c14 0x4>, <0x4a003c34 0x4>;
--			reg-names = "power", "control_sma", "pcie_pcs";
--			clocks = <&sys_clkin1>;
--			clock-names = "sysclk";
+-		omap_control_usb2phy1: control-phy at 4a002300 {
+-			compatible = "ti,control-phy-usb2";
+-			reg = <0x4a002300 0x4>;
+-			reg-names = "power";
 -		};
 -
--		omap_control_pcie2phy: control-pcie at 0x4a003c44 {
--			compatible = "ti,control-phy-pcie";
--			reg = <0x4a003c44 0x4>, <0x4a003c14 0x4>, <0x4a003c34 0x4>;
--			reg-names = "power", "control_sma", "pcie_pcs";
--			clocks = <&sys_clkin1>;
--			clock-names = "sysclk";
--			status = "disabled";
+-		omap_control_usb3phy1: control-phy at 4a002370 {
+-			compatible = "ti,control-phy-pipe3";
+-			reg = <0x4a002370 0x4>;
+-			reg-names = "power";
 -		};
 -
- 		rtc: rtc at 48838000 {
- 			compatible = "ti,am3352-rtc";
- 			reg = <0x48838000 0x100>;
+-		omap_control_usb2phy2: control-phy at 0x4a002e74 {
+-			compatible = "ti,control-phy-usb2-dra7";
+-			reg = <0x4a002e74 0x4>;
+-			reg-names = "power";
+-		};
+-
+ 		/* OCP2SCP1 */
+ 		ocp2scp at 4a080000 {
+ 			compatible = "ti,omap-ocp2scp";
+@@ -1225,7 +1207,7 @@
+ 			usb2_phy1: phy at 4a084000 {
+ 				compatible = "ti,omap-usb2";
+ 				reg = <0x4a084000 0x400>;
+-				ctrl-module = <&omap_control_usb2phy1>;
++				syscon-phy-power = <&scm_conf 0x300>;
+ 				clocks = <&usb_phy1_always_on_clk32k>,
+ 					 <&usb_otg_ss1_refclk960m>;
+ 				clock-names =	"wkupclk",
+@@ -1236,7 +1218,7 @@
+ 			usb2_phy2: phy at 4a085000 {
+ 				compatible = "ti,dra7x-usb2-phy2", "ti,omap-usb2";
+ 				reg = <0x4a085000 0x400>;
+-				ctrl-module = <&omap_control_usb2phy2>;
++				syscon-phy-power = <&scm_conf 0xe74>;
+ 				clocks = <&usb_phy2_always_on_clk32k>,
+ 					 <&usb_otg_ss2_refclk960m>;
+ 				clock-names =	"wkupclk",
+@@ -1250,7 +1232,7 @@
+ 				      <0x4a084800 0x64>,
+ 				      <0x4a084c00 0x40>;
+ 				reg-names = "phy_rx", "phy_tx", "pll_ctrl";
+-				ctrl-module = <&omap_control_usb3phy1>;
++				syscon-phy-power = <&scm_conf 0x370>;
+ 				clocks = <&usb_phy3_always_on_clk32k>,
+ 					 <&sys_clkin1>,
+ 					 <&usb_otg_ss1_refclk960m>;
 -- 
 1.7.9.5
