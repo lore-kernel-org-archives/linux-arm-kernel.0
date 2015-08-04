@@ -1,73 +1,92 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Tue,  4 Aug 2015 11:23:20 +0200
-Subject: [PATCH 3/6] gpiolib-of: Reuse 'line-name' from DT as gpio descriptor
- name
+Date: Tue, 4 Aug 2015 11:25:19 +0200
+Subject: [PATCH 0/6 v2] gpiolib: Add GPIO name support
 In-Reply-To: <1438680203-13432-1-git-send-email-mpa@pengutronix.de>
 References: <1438680203-13432-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1438680203-13432-4-git-send-email-mpa@pengutronix.de>
+Message-ID: <20150804092519.GG19600@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DT describes gpios with subnodes. These subnodes can contain a
-property 'line-name'. This information can be useful in other areas
-where we want to identify a GPIO by its name.
+On Tue, Aug 04, 2015 at 11:23:17AM +0200, Markus Pargmann wrote:
+> Hi,
+> 
+> Changes in v2:
 
-This patch stores the line-name in the gpio descriptor.
+Sorry, forgot to add v2 into the subject.
 
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
----
- drivers/gpio/gpiolib-of.c | 27 ++++++++++++++++++---------
- 1 file changed, 18 insertions(+), 9 deletions(-)
+Best regards,
 
-diff --git a/drivers/gpio/gpiolib-of.c b/drivers/gpio/gpiolib-of.c
-index 41a4945b346e..fbf449a4120b 100644
---- a/drivers/gpio/gpiolib-of.c
-+++ b/drivers/gpio/gpiolib-of.c
-@@ -184,11 +184,6 @@ static struct gpio_desc *of_parse_gpio(struct device_node *np,
- 		*dflags |= GPIOD_OUT_LOW;
- 	else if (of_property_read_bool(np, "output-high"))
- 		*dflags |= GPIOD_OUT_HIGH;
--	else {
--		pr_warn("GPIO line %d (%s): no hogging state specified, bailing out\n",
--			desc_to_gpio(gg_data.out_gpio), np->name);
--		return ERR_PTR(-EINVAL);
--	}
- 
- 	if (name && of_property_read_string(np, "line-name", name))
- 		*name = np->name;
-@@ -214,15 +209,29 @@ static void of_gpiochip_scan_gpios(struct gpio_chip *chip)
- 	enum gpiod_flags dflags;
- 
- 	for_each_child_of_node(chip->of_node, np) {
--		if (!of_property_read_bool(np, "gpio-hog"))
--			continue;
-+		struct gpio_desc *name_desc;
- 
- 		desc = of_parse_gpio(np, &name, &lflags, &dflags);
- 		if (IS_ERR(desc))
- 			continue;
- 
--		if (gpiod_hog(desc, name, lflags, dflags))
--			continue;
-+		name_desc = gpio_name_to_desc(name);
-+		if (name_desc)
-+			pr_warn("GPIO name collision for '%s' detected at GPIO line %d (%s)\n",
-+				name, desc_to_gpio(desc), np->name);
-+		else
-+			desc->name = name;
-+
-+		if (of_property_read_bool(np, "gpio-hog")) {
-+			if (!dflags) {
-+				pr_warn("GPIO line %d (%s): no hogging state specified, bailing out\n",
-+					desc_to_gpio(desc), np->name);
-+				continue;
-+			}
-+
-+			if (gpiod_hog(desc, name, lflags, dflags))
-+				continue;
-+		}
- 	}
- }
- 
+Markus
+
+>  - Removed patch 'gpiolib: Fix possible use of wrong name'
+>  - Removed discussed patch 'gpio: Allow hogged gpios to be requested' from this
+>    series
+>  - Fixed show gpio name patch (locks, (null) printing, and getting the descriptor)
+>  - Merged gpio name patch into gpio_name_to_desc() patch
+> 
+> Description from v1:
+> 
+> This is a proposal to add GPIO names to the kernel based on devicetree
+> descriptions.
+> 
+> This series adds GPIO name support. Until now it is only possible to use names
+> for already requested GPIOs (for example what they are used for). It is not
+> possible to identify GPIOs by a name although most of them have a name for
+> example in the schematics of the board. This makes it difficult to identify
+> a specific GPIO from userspace.
+> 
+> As the GPIO name information is a hardware description this series uses the
+> devicetree bindings introduced by the GPIO hogging mechanism, specifically
+> 'line-name', to identify GPIOs. The sysfs 'export' file is changed to accept
+> names as fallback. The gpio numbers still have a higher priority to ensure
+> backwards compatibility.
+> 
+> Exported GPIOs are still using their number as directory name (gpio<ID>). But the
+> directories now contain a 'name' file which is '' for non-existent names and
+> the name otherwise.
+> 
+> This series can be used to have an easy name mapping for udev with a quite
+> simple rule similar to this:
+> 	SUBSYSTEM=="gpio", KERNEL=="gpio*", ATTR{name}!="(null)", ACTION=="add", \
+> 	PROGRAM+="/bin/sh -c 'mkdir -p /dev/gpios; rm -f /dev/gpios/$attr{name}; ln -s /sys%p/ /dev/gpios/$attr{name}"
+> With this rule udev adds a link for each exported GPIO with a name into
+> /dev/gpios/. This way it is not necessary to know the number of a GPIO to use
+> it.
+> 
+> Best Regards,
+> 
+> Markus
+> 
+> 
+> Markus Pargmann (6):
+>   gpiolib-of: Rename gpio_hog functions to be generic
+>   gpio: Introduce gpio descriptor 'name'
+>   gpiolib-of: Reuse 'line-name' from DT as gpio descriptor name
+>   gpiolib-sysfs: Add gpio name parsing for sysfs export
+>   gpiolib-sysfs: Show gpio-name in /sys/class/gpio/gpio*/name
+>   gpiolib: Add gpio name information to /sys/kernel/debug/gpio
+> 
+>  drivers/gpio/gpiolib-of.c     | 41 ++++++++++++++++++------------
+>  drivers/gpio/gpiolib-sysfs.c  | 59 +++++++++++++++++++++++++++++++++----------
+>  drivers/gpio/gpiolib.c        | 43 ++++++++++++++++++++++++++++---
+>  drivers/gpio/gpiolib.h        |  3 +++
+>  include/linux/gpio/consumer.h |  7 +++++
+>  5 files changed, 121 insertions(+), 32 deletions(-)
+> 
+> -- 
+> 2.1.4
+> 
+> 
+
 -- 
-2.1.4
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150804/8fc4f720/attachment-0001.sig>
