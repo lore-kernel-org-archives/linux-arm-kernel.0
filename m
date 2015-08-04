@@ -1,124 +1,82 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 04 Aug 2015 17:19:57 +0300
-Subject: [PATCH v2 6/6] pinctrl: sh-pfc: Confine legacy function GPIOs to
- SH
-In-Reply-To: <1438696519-13727-7-git-send-email-geert+renesas@glider.be>
-References: <1438696519-13727-1-git-send-email-geert+renesas@glider.be>
- <1438696519-13727-7-git-send-email-geert+renesas@glider.be>
-Message-ID: <2553252.oFXfDSh3t2@avalon>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 04 Aug 2015 16:23:02 +0200
+Subject: MUSB dual-role on AM335x behaving weirdly
+In-Reply-To: <55C0B954.3020106@free-electrons.com>
+References: <20150514190429.GT24269@saruman.tx.rr.com>	<CADYTM3Zso8bV_8yFyx1-ATbL5AgkKBjvWWR4AsoZUNuLvFe1bQ@mail.gmail.com>	<20150514192125.GU24269@saruman.tx.rr.com>	<CADYTM3bbEAVefFZtivJf5Z+2Q+1zDZEvNhqE5ytsOxDX7hjbdA@mail.gmail.com>	<20150514192946.GV24269@saruman.tx.rr.com>	<CADYTM3Zk2iD8YMj75CoLJn=4kpoXoXEKUWj2QzdXKGCJjtfG2A@mail.gmail.com>	<CADYTM3a1QWnec1D=wT=fgZ-RCXAx_qZYYoFg5gWOy0yT4vovHA@mail.gmail.com>	<20150514212653.GC3338@piout.net>	<CADYTM3baVqoEBdWoQb5JFyGR2_GKm1FHMYWST1YkZV=m=ZdycQ@mail.gmail.com>	<20150526145118.GD26599@saruman.tx.rr.com>	<20150527094205.GO3199@piout.net>	<5594E56B.3040200@free-electrons.com>
+ <CADYTM3ZF5m++N1NqmOJoH5agbYrzpvSbLnuLVgttxwzdzwmGwQ@mail.gmail.com>
+ <55C0B954.3020106@free-electrons.com>
+Message-ID: <55C0CAC6.3020603@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
+Hi again,
+On 04/08/2015 15:08, Gregory CLEMENT wrote:
+> Hi Bin,
+> 
+> On 02/07/2015 19:05, Bin Liu wrote:
+>> Hi,
+>>
+>> On Thu, Jul 2, 2015 at 2:16 AM, Gregory CLEMENT
+>> <gregory.clement@free-electrons.com> wrote:
+>>> Hi Felipe,
+>>>
+>>> On 27/05/2015 11:42, Alexandre Belloni wrote:
+>>>> Hi,
+>>>>
+>>>> On 26/05/2015 at 09:51:18 -0500, Felipe Balbi wrote :
+>>>>> On Thu, May 14, 2015 at 04:36:33PM -0500, Bin Liu wrote:
+>>>>>> Alexandre,
+>>>>>>
+>>>>>> On Thu, May 14, 2015 at 4:26 PM, Alexandre Belloni
+>>>>>> <alexandre.belloni@free-electrons.com> wrote:
+>>>>>>> On 14/05/2015 at 16:16:12 -0500, Bin Liu wrote :
+>>>>>>>> I think I found the root cause of the problem: board design issue - I
+>>>>>>>> bet the custom board has too much cap on VBUS line. It should be <
+>>>>>>>> 10uF.
+>>>>>>>>
+>>>>>>>
+>>>>>>> We have a custom board that exhibits the issue but it only has a 100nF
+>>>>>>> cap on VBUS.
+>>>>>>
+>>>>>> Have you measured the VBUS discharging? Is there any way to share your
+>>>>>> schematics?
+>>>>>
+>>>>> Alexandre, any further comments ?
+>>>>>
+>>>>
+>>>> Yeah, I have just got more info.
+>>>>
+>>>> This is the relevant part of the schematic:
+>>>> http://free-electrons.com/~alexandre/usb.png
+>>>>
+>>>> The total VBUS capacitance is 200nF and the USB0 pins are connected
+>>>> directly to the AM3358 pins. U1 is actually not fitted.
+>>>>
+>>>> We didn't measure VBUS discharging but we observe the OTG pin sensing
+>>>> stops when plugging an OTG cable without any device.
+>>>
+>>> Do you have any news about this topic?
+>>>
+>>>
+>>> Is there something else that we can do to help solving this issue?
+>>
+>> In the case of CONFIG_USB_MUSB_DUAL_ROLE=y and dr_mode=otg, how is the
+>> gadget driver configured? It has to be a module not built-in.
+> 
+> Indeed when I configured CONFIG_USB_MUSB_HDRC=m and CONFIG_USB_MUSB_DSPS=m
+> it worked seamless.
+> 
 
-Thank you for the patch.
+Actually it didn't worked. And now sometimes I even received continuously
+the following message:
 
-On Tuesday 04 August 2015 15:55:19 Geert Uytterhoeven wrote:
-> Legacy function GPIOs are no longer used on ARM since commit
-> a27c5cd1a08cc95c ("sh-pfc: sh73a0: Remove function GPIOs").
-> Extract its setup code into a separate function, and make all function
-> GPIO related code and data depend on CONFIG_SUPERH.
-> 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+ musb_bus_suspend 2484: trying to suspend as a_wait_vfall while active
 
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Gregory
 
-We now need a volunteer to port SH to proper pinctrl to remove the function 
-GPIOs completely :-)
-
-> ---
-> Compile-tested on sh using se7724_defconfig.
-> 
-> v2:
->   - Add Acked-by,
->   - #ifdef out the code instead of introducing helper and dummy
->     functions.
-> ---
->  drivers/pinctrl/sh-pfc/core.h   | 2 ++
->  drivers/pinctrl/sh-pfc/gpio.c   | 7 ++++++-
->  drivers/pinctrl/sh-pfc/sh_pfc.h | 2 ++
->  3 files changed, 10 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/pinctrl/sh-pfc/core.h b/drivers/pinctrl/sh-pfc/core.h
-> index 4c3c37bf7161804d..c38ace46d7111b0d 100644
-> --- a/drivers/pinctrl/sh-pfc/core.h
-> +++ b/drivers/pinctrl/sh-pfc/core.h
-> @@ -46,7 +46,9 @@ struct sh_pfc {
->  	unsigned int nr_gpio_pins;
-> 
->  	struct sh_pfc_chip *gpio;
-> +#ifdef CONFIG_SUPERH
->  	struct sh_pfc_chip *func;
-> +#endif
-> 
->  	struct sh_pfc_pinctrl *pinctrl;
->  };
-> diff --git a/drivers/pinctrl/sh-pfc/gpio.c b/drivers/pinctrl/sh-pfc/gpio.c
-> index e46439030914ad13..685b3c24627daf03 100644
-> --- a/drivers/pinctrl/sh-pfc/gpio.c
-> +++ b/drivers/pinctrl/sh-pfc/gpio.c
-> @@ -261,6 +261,7 @@ static int gpio_pin_setup(struct sh_pfc_chip *chip)
->   * Function GPIOs
->   */
-> 
-> +#ifdef CONFIG_SUPERH
->  static int gpio_function_request(struct gpio_chip *gc, unsigned offset)
->  {
->  	static bool __print_once;
-> @@ -300,6 +301,7 @@ static int gpio_function_setup(struct sh_pfc_chip *chip)
-> 
->  	return 0;
->  }
-> +#endif
-> 
->  /*
-> ---------------------------------------------------------------------------
-> -- * Register/unregister
-> @@ -399,6 +401,7 @@ int sh_pfc_register_gpiochip(struct sh_pfc *pfc)
->  		}
->  	}
-> 
-> +#ifdef CONFIG_SUPERH
->  	/* Register the function GPIOs chip. */
->  	if (pfc->info->nr_func_gpios == 0)
->  		return 0;
-> @@ -408,6 +411,7 @@ int sh_pfc_register_gpiochip(struct sh_pfc *pfc)
->  		return PTR_ERR(chip);
-> 
->  	pfc->func = chip;
-> +#endif /* CONFIG_SUPERH */
-> 
->  	return 0;
->  }
-> @@ -415,7 +419,8 @@ int sh_pfc_register_gpiochip(struct sh_pfc *pfc)
->  int sh_pfc_unregister_gpiochip(struct sh_pfc *pfc)
->  {
->  	gpiochip_remove(&pfc->gpio->gpio_chip);
-> +#ifdef CONFIG_SUPERH
->  	gpiochip_remove(&pfc->func->gpio_chip);
-> -
-> +#endif
->  	return 0;
->  }
-> diff --git a/drivers/pinctrl/sh-pfc/sh_pfc.h
-> b/drivers/pinctrl/sh-pfc/sh_pfc.h index 0874cfee6889afa1..1f43bae56065e659
-> 100644
-> --- a/drivers/pinctrl/sh-pfc/sh_pfc.h
-> +++ b/drivers/pinctrl/sh-pfc/sh_pfc.h
-> @@ -138,8 +138,10 @@ struct sh_pfc_soc_info {
->  	const struct sh_pfc_function *functions;
->  	unsigned int nr_functions;
-> 
-> +#ifdef CONFIG_SUPERH
->  	const struct pinmux_func *func_gpios;
->  	unsigned int nr_func_gpios;
-> +#endif
-> 
->  	const struct pinmux_cfg_reg *cfg_regs;
->  	const struct pinmux_data_reg *data_regs;
 
 -- 
-Regards,
-
-Laurent Pinchart
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
