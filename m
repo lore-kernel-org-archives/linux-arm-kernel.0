@@ -1,84 +1,121 @@
 From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Tue, 04 Aug 2015 16:54:04 -0500
-Subject: [PATCH v5 2/9] PCI: Add pci_scan_root_bus_msi()
+Date: Tue, 04 Aug 2015 16:54:11 -0500
+Subject: [PATCH v5 3/9] ARM/PCI, designware,
+ xilinx: Use pci_scan_root_bus_msi()
 In-Reply-To: <20150804214234.9189.42548.stgit@bhelgaas-glaptop2.roam.corp.google.com>
 References: <20150804214234.9189.42548.stgit@bhelgaas-glaptop2.roam.corp.google.com>
-Message-ID: <20150804215404.9189.41823.stgit@bhelgaas-glaptop2.roam.corp.google.com>
+Message-ID: <20150804215411.9189.53901.stgit@bhelgaas-glaptop2.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 
-Add a pci_scan_root_bus_msi() interface so an arch can specify the MSI
-controller up front.  This removes the need for a pcibios callback to set
-the MSI controller later.
+ARM previously stored the msi_controller pointer in its sysdata, struct
+pci_sys_data, and implemented pcibios_msi_controller() to retrieve it.
+That made PCI host controller drivers specific to ARM because they had to
+put the msi_controller pointer in the ARM-specific pci_sys_data.
 
-This is not exported because I'd like to replace the variety of "scan root
-bus" interfaces with a single, more extensible interface that can handle
-the MSI controller, domain, pci_ops, resources, etc.  I hope this interface
-is temporary.
+There is now a generic mechanism, pci_scan_root_bus_msi(), for giving the
+msi_controller pointer to the PCI core.  Use this for all ARM systems and
+for the DesignWare and Xilinx PCI host controller drivers.
 
-[bhelgaas: changelog, split into separate patch, move to drivers/pci/pci.h]
+This removes an ARM dependency from the DesignWare, DRA7xx, EXYNOS, i.MX6,
+Keystone, Layerscape, SPEAr13xx, and Xilinx drivers.
+
+[bhelgaas: changelog, split into separate patch]
 Suggested-by: Russell King <linux@arm.linux.org.uk>
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+CC: Pratyush Anand <pratyush.anand@gmail.com>
+CC: Arnd Bergmann <arnd@arndb.de>
+CC: Jingoo Han <jingoohan1@gmail.com>
+CC: Simon Horman <horms@verge.net.au>
+CC: Russell King <linux@arm.linux.org.uk>
+CC: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+CC: Thierry Reding <thierry.reding@gmail.com>
+CC: Michal Simek <michal.simek@xilinx.com>
+CC: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/pci/pci.h   |    5 +++++
- drivers/pci/probe.c |   14 ++++++++++++--
- 2 files changed, 17 insertions(+), 2 deletions(-)
+ arch/arm/include/asm/mach/pci.h    |    2 --
+ arch/arm/kernel/bios32.c           |    5 +++--
+ drivers/pci/host/pcie-designware.c |    6 +++---
+ drivers/pci/host/pcie-xilinx.c     |    5 ++---
+ 4 files changed, 8 insertions(+), 10 deletions(-)
 
-diff --git a/drivers/pci/pci.h b/drivers/pci/pci.h
-index 4ff0ff1..1d4c95c 100644
---- a/drivers/pci/pci.h
-+++ b/drivers/pci/pci.h
-@@ -223,6 +223,11 @@ enum pci_bar_type {
- 	pci_bar_mem64,		/* A 64-bit memory BAR */
- };
+diff --git a/arch/arm/include/asm/mach/pci.h b/arch/arm/include/asm/mach/pci.h
+index 28b9bb3..c074e7a 100644
+--- a/arch/arm/include/asm/mach/pci.h
++++ b/arch/arm/include/asm/mach/pci.h
+@@ -19,9 +19,7 @@ struct pci_bus;
+ struct device;
  
-+struct pci_bus *pci_scan_root_bus_msi(struct device *parent, int bus,
-+				      struct pci_ops *ops, void *sysdata,
-+				      struct list_head *resources,
-+				      struct msi_controller *msi);
+ struct hw_pci {
+-#ifdef CONFIG_PCI_MSI
+ 	struct msi_controller *msi_ctrl;
+-#endif
+ 	struct pci_ops	*ops;
+ 	int		nr_controllers;
+ 	void		**private_data;
+diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+index 4e95260..283bc1c 100644
+--- a/arch/arm/kernel/bios32.c
++++ b/arch/arm/kernel/bios32.c
+@@ -486,8 +486,9 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
+ 			if (hw->scan)
+ 				sys->bus = hw->scan(nr, sys);
+ 			else
+-				sys->bus = pci_scan_root_bus(parent, sys->busnr,
+-						hw->ops, sys, &sys->resources);
++				sys->bus = pci_scan_root_bus_msi(parent,
++					sys->busnr, hw->ops, sys,
++					&sys->resources, hw->msi_ctrl);
+ 
+ 			if (WARN(!sys->bus, "PCI: unable to scan bus!")) {
+ 				kfree(sys);
+diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
+index 69486be..bd0aeec 100644
+--- a/drivers/pci/host/pcie-designware.c
++++ b/drivers/pci/host/pcie-designware.c
+@@ -526,7 +526,6 @@ int dw_pcie_host_init(struct pcie_port *pp)
+ 
+ #ifdef CONFIG_PCI_MSI
+ 	dw_pcie_msi_chip.dev = pp->dev;
+-	dw_pci.msi_ctrl = &dw_pcie_msi_chip;
+ #endif
+ 
+ 	dw_pci.nr_controllers = 1;
+@@ -708,8 +707,9 @@ static struct pci_bus *dw_pcie_scan_bus(int nr, struct pci_sys_data *sys)
+ 	struct pcie_port *pp = sys_to_pcie(sys);
+ 
+ 	pp->root_bus_nr = sys->busnr;
+-	bus = pci_scan_root_bus(pp->dev, sys->busnr,
+-				  &dw_pcie_ops, sys, &sys->resources);
++	bus = pci_scan_root_bus_msi(pp->dev, sys->busnr, &dw_pcie_ops, sys,
++				    &sys->resources, &dw_pcie_msi_chip);
 +
- bool pci_bus_read_dev_vendor_id(struct pci_bus *bus, int devfn, u32 *pl,
- 				int crs_timeout);
- int pci_setup_device(struct pci_dev *dev);
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index cefd636..9ff4df0 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -2096,8 +2096,9 @@ void pci_bus_release_busn_res(struct pci_bus *b)
- 			res, ret ? "can not be" : "is");
- }
- 
--struct pci_bus *pci_scan_root_bus(struct device *parent, int bus,
--		struct pci_ops *ops, void *sysdata, struct list_head *resources)
-+struct pci_bus *pci_scan_root_bus_msi(struct device *parent, int bus,
-+		struct pci_ops *ops, void *sysdata,
-+		struct list_head *resources, struct msi_controller *msi)
- {
- 	struct resource_entry *window;
- 	bool found = false;
-@@ -2114,6 +2115,8 @@ struct pci_bus *pci_scan_root_bus(struct device *parent, int bus,
- 	if (!b)
+ 	if (!bus)
  		return NULL;
  
-+	b->msi = msi;
-+
- 	if (!found) {
- 		dev_info(&b->dev,
- 		 "No busn resource found for root bus, will use [bus %02x-ff]\n",
-@@ -2128,6 +2131,13 @@ struct pci_bus *pci_scan_root_bus(struct device *parent, int bus,
+diff --git a/drivers/pci/host/pcie-xilinx.c b/drivers/pci/host/pcie-xilinx.c
+index f1a06a0..526807d 100644
+--- a/drivers/pci/host/pcie-xilinx.c
++++ b/drivers/pci/host/pcie-xilinx.c
+@@ -647,8 +647,8 @@ static struct pci_bus *xilinx_pcie_scan_bus(int nr, struct pci_sys_data *sys)
+ 	struct pci_bus *bus;
  
- 	return b;
+ 	port->root_busno = sys->busnr;
+-	bus = pci_scan_root_bus(port->dev, sys->busnr, &xilinx_pcie_ops,
+-				sys, &sys->resources);
++	bus = pci_scan_root_bus_msi(port->dev, sys->busnr, &xilinx_pcie_ops,
++				sys, &sys->resources, &xilinx_pcie_msi_chip);
+ 
+ 	return bus;
  }
-+
-+struct pci_bus *pci_scan_root_bus(struct device *parent, int bus,
-+		struct pci_ops *ops, void *sysdata, struct list_head *resources)
-+{
-+	return pci_scan_root_bus_msi(parent, bus, ops, sysdata, resources,
-+				     NULL);
-+}
- EXPORT_SYMBOL(pci_scan_root_bus);
+@@ -847,7 +847,6 @@ static int xilinx_pcie_probe(struct platform_device *pdev)
  
- struct pci_bus *pci_scan_bus(int bus, struct pci_ops *ops,
+ #ifdef CONFIG_PCI_MSI
+ 	xilinx_pcie_msi_chip.dev = port->dev;
+-	hw.msi_ctrl = &xilinx_pcie_msi_chip;
+ #endif
+ 	pci_common_init_dev(dev, &hw);
+ 
