@@ -1,47 +1,76 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Tue,  4 Aug 2015 15:55:18 +0200
-Subject: [PATCH v2 5/6] pinctrl: sh-pfc: Remove empty gpio_function_free()
-In-Reply-To: <1438696519-13727-1-git-send-email-geert+renesas@glider.be>
-References: <1438696519-13727-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1438696519-13727-6-git-send-email-geert+renesas@glider.be>
+Date: Tue,  4 Aug 2015 15:55:13 +0200
+Subject: [PATCH v2 0/6] ARM: shmobile: Move gpio ranges from C code to DT
+Message-ID: <1438696519-13727-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-gpio_chip.free() is optional, and can just be left unimplemented.
+	Hi Simon, Magnus,
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
----
-Untested due to lack of hardware (used on sh only).
+This patch series moves the setup of the GPIO-PFC pin mapping for
+Renesas PFC/GPIO combos from C code to DT, and does some cleanups.
+The move to DT is needed to make the GPIO hogging mechanism work, cfr.
+the discussion following "[PATCH] [RFC] gpio: Retry deferred GPIO
+hogging on pin range change" (https://lkml.org/lkml/2015/6/16/455).
 
-v2:
+The series consists of 3 parts:
+  a. Patches 1-3 add the missing "gpio-ranges" properties to the dtsi
+     files for all affected SoCs,
+  b. Patch 4 disables the C code to set up the mapping on DT platforms
+     (it's still needed on SH or ARM-legacy),
+  c. Patches 5-6 do a few more cleanups in the sh-pfc gpio code.
+
+Changes compared to v1 ("[PATCH 0/7] ARM: shmobile: Move gpio ranges
+from C code to DT",
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-June/353124.html):
+  - Add check for CONFIG_OF and pfc->dev->of_node,
+  - #ifdef out the code instead of introducing helper and dummy
+    functions,
+  - Drop "pinctrl: sh-pfc: Move sh_pfc_add_gpiochip() up", as it's no
+    longer needed due to the #ifdefs,
   - Add Acked-by.
----
- drivers/pinctrl/sh-pfc/gpio.c | 5 -----
- 1 file changed, 5 deletions(-)
 
-diff --git a/drivers/pinctrl/sh-pfc/gpio.c b/drivers/pinctrl/sh-pfc/gpio.c
-index b380e3f17b121bbb..e46439030914ad13 100644
---- a/drivers/pinctrl/sh-pfc/gpio.c
-+++ b/drivers/pinctrl/sh-pfc/gpio.c
-@@ -286,17 +286,12 @@ static int gpio_function_request(struct gpio_chip *gc, unsigned offset)
- 	return ret;
- }
- 
--static void gpio_function_free(struct gpio_chip *gc, unsigned offset)
--{
--}
--
- static int gpio_function_setup(struct sh_pfc_chip *chip)
- {
- 	struct sh_pfc *pfc = chip->pfc;
- 	struct gpio_chip *gc = &chip->gpio_chip;
- 
- 	gc->request = gpio_function_request;
--	gc->free = gpio_function_free;
- 
- 	gc->label = pfc->info->name;
- 	gc->owner = THIS_MODULE;
+Dependencies:
+  - This series applies against renesas-devel-20150803-v4.2-rc5,
+  - Part a must go in first, to avoid regressions,
+  - While I didn't notice any bad behavior by having part a only, part b
+    should go in immediately after part a. Hence I think it's best if
+    Simon can take this one, too.
+  - Part c is independent (it doesn't touch the same code), so it can go
+    in before or after the other parts, or in parallel.
+
+Given this fixes the LCD on r8a7740/armadillo, which is a regression
+introduced by the removal of armadillo-legacy support, I think at least
+patch 2 should be queued for v4.3.
+
+Thanks for applying!
+
+Geert Uytterhoeven (6):
+  ARM: shmobile: r8a73a4 dtsi: Add missing "gpio-ranges" to gpio node
+  ARM: shmobile: r8a7740 dtsi: Add missing "gpio-ranges" to gpio node
+  ARM: shmobile: sh73a0 dtsi: Add missing "gpio-ranges" to gpio node
+  pinctrl: sh-pfc: Stop calling gpiochip_add_pin_range() on DT platforms
+  pinctrl: sh-pfc: Remove empty gpio_function_free()
+  pinctrl: sh-pfc: Confine legacy function GPIOs to SH
+
+ arch/arm/boot/dts/r8a73a4.dtsi  |  7 ++++++
+ arch/arm/boot/dts/r8a7740.dtsi  |  1 +
+ arch/arm/boot/dts/sh73a0.dtsi   |  3 +++
+ drivers/pinctrl/sh-pfc/core.h   |  2 ++
+ drivers/pinctrl/sh-pfc/gpio.c   | 49 +++++++++++++++++++++++------------------
+ drivers/pinctrl/sh-pfc/sh_pfc.h |  2 ++
+ 6 files changed, 43 insertions(+), 21 deletions(-)
+
 -- 
 1.9.1
+
+Gr{oetje,eeting}s,
+
+						Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+							    -- Linus Torvalds
