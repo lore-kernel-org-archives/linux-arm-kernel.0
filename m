@@ -1,53 +1,26 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Tue, 04 Aug 2015 16:30:18 +0900
-Subject: [GIT PULL 5/5] Samsung driver updates for v4.3
-Message-ID: <55C06A0A.6040407@kernel.org>
+From: p.fedin@samsung.com (Pavel Fedin)
+Date: Tue, 04 Aug 2015 10:35:59 +0300
+Subject: [PATCH v3 1/2] PCI: generic: remove dependency on hw_pci
+In-Reply-To: <1438183681-30519-1-git-send-email-jchandra@broadcom.com>
+References: <1438183681-30519-1-git-send-email-jchandra@broadcom.com>
+Message-ID: <00b601d0ce88$35b2f8a0$a118e9e0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+ Hello!
 
-This branch is including to support generic cpufreq driver in
-mach-exynos dir. for exynos3250 and exynos5250 even the tag name is
-driver. Because it is depending on clk and cpufreq changes which acked
-by regarding maintainers, Mike and Viresh.
+> Notes:
+>  - passing a zeroed out pci_sys_data for ARM looks ok, but I haven't
+>    tested it on ARM.
+>  - tested it on ARM64 fast model
+>  - Any information on how this can be tested on arm is welcome.
 
-Please pull and if any problems, please kindly let me know.
+ I have tested it on SMDK5410, works OK. By the way, PCI generic is missing MSI support, i had to
+add it. I can share the patch if interested, it's very small.
 
-Thanks,
-Kukjin
+Tested-by: Pavel Fedin <p.fedin@samsung.com>
 
-The following changes since commit 995008abdf5146feb0ffdeb15ddb0e90010aff50:
-
-  Merge branch 'v4.3-next/dt-samsung-2' into
-v4.3-next/clk-cpufreq-samsung (2015-08-04 15:59:14 +0900)
-
-are available in the git repository at:
-
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-tags/samsung-driver
-
-for you to fetch changes up to 6b1621c4a15b9110cda7cc2e2eb3e8e1a0c2bcfc:
-
-  ARM: EXYNOS: Add exynos3250 compatible to use generic cpufreq driver
-(2015-08-04 15:59:33 +0900)
-
-----------------------------------------------------------------
-Samsung mach-exynos and driver updates for v4.3
-
-- Use generic cpufreq driver for exynos3250 and exynos5250
-  : note depends on the following
-    v4.3-topic/clk-samsung (acked by clk maintainer, Mike)
-    v4.3-topic/cpufreq-samsung (acked by cpufreq maintainer, Viresh)
-    v4.3-next/dt-samsung-2 (add CPU OPP and regulator supply)
-
-----------------------------------------------------------------
-Chanwoo Choi (1):
-      ARM: EXYNOS: Add exynos3250 compatible to use generic cpufreq driver
-
-Thomas Abraham (1):
-      ARM: EXYNOS: switch to using generic cpufreq driver for exynos5250
-
- arch/arm/mach-exynos/exynos.c | 2 ++
- 1 file changed, 2 insertions(+)
+Kind regards,
+Pavel Fedin
+Expert Engineer
+Samsung Electronics Research center Russia
