@@ -1,69 +1,89 @@
 From: lina.iyer@linaro.org (Lina Iyer)
-Date: Tue,  4 Aug 2015 17:35:37 -0600
-Subject: [PATCH 7/9] ARM: cpuidle: Add runtime PM support for CPU idle
+Date: Tue,  4 Aug 2015 17:35:39 -0600
+Subject: [PATCH 9/9] ARM: smp: Add runtime PM support for CPU hotplug
 In-Reply-To: <1438731339-58317-1-git-send-email-lina.iyer@linaro.org>
 References: <1438731339-58317-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1438731339-58317-8-git-send-email-lina.iyer@linaro.org>
+Message-ID: <1438731339-58317-10-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Notify runtime PM when the CPU is going to be powered off in the idle
-state. This allows for runtime PM suspend/resume of the CPU as well as
-its  PM domain.
+Enable runtime PM for CPU devices. Do a runtime get of the CPU device
+when the CPU is hotplugged in and a runtime put of the CPU device when
+the CPU is hotplugged off. When all the CPUs in a domain are hotplugged
+off, the domain may also be powered off and cluster_pm_enter/exit()
+notifications are be sent out.
 
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
 Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
 ---
- drivers/cpuidle/cpuidle-arm.c | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm/kernel/smp.c | 18 +++++++++++++++++-
+ 1 file changed, 17 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/cpuidle/cpuidle-arm.c b/drivers/cpuidle/cpuidle-arm.c
-index 545069d..ca118ed 100644
---- a/drivers/cpuidle/cpuidle-arm.c
-+++ b/drivers/cpuidle/cpuidle-arm.c
-@@ -11,12 +11,14 @@
- 
- #define pr_fmt(fmt) "CPUidle arm: " fmt
- 
-+#include <linux/cpu.h>
- #include <linux/cpuidle.h>
- #include <linux/cpumask.h>
- #include <linux/cpu_pm.h>
- #include <linux/kernel.h>
- #include <linux/module.h>
- #include <linux/of.h>
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 0496b48..1d614b8 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -27,6 +27,7 @@
+ #include <linux/completion.h>
+ #include <linux/cpufreq.h>
+ #include <linux/irq_work.h>
 +#include <linux/pm_runtime.h>
- #include <linux/slab.h>
  
- #include <asm/cpuidle.h>
-@@ -37,6 +39,7 @@ static int arm_enter_idle_state(struct cpuidle_device *dev,
- 				struct cpuidle_driver *drv, int idx)
- {
- 	int ret;
-+	struct device *cpu_dev = get_cpu_device(dev->cpu);
- 
- 	if (!idx) {
- 		cpu_do_idle();
-@@ -46,12 +49,19 @@ static int arm_enter_idle_state(struct cpuidle_device *dev,
- 	ret = cpu_pm_enter();
- 	if (!ret) {
- 		/*
-+		* Notify runtime PM as well of this cpu powering down
-+		* TODO: Merge CPU_PM and runtime PM.
-+		*/
-+		pm_runtime_put_sync(cpu_dev);
-+
-+		/*
- 		 * Pass idle state index to cpu_suspend which in turn will
- 		 * call the CPU ops suspend protocol with idle index as a
- 		 * parameter.
- 		 */
- 		arm_cpuidle_suspend(idx);
- 
-+		pm_runtime_get_sync(cpu_dev);
- 		cpu_pm_exit();
+ #include <linux/atomic.h>
+ #include <asm/smp.h>
+@@ -137,7 +138,6 @@ int __cpu_up(unsigned int cpu, struct task_struct *idle)
+ 		pr_err("CPU%u: failed to boot: %d\n", cpu, ret);
  	}
  
+-
+ 	memset(&secondary_data, 0, sizeof(secondary_data));
+ 	return ret;
+ }
+@@ -205,6 +205,9 @@ int __cpu_disable(void)
+ 	unsigned int cpu = smp_processor_id();
+ 	int ret;
+ 
++	/* We dont need the CPU device anymore. */
++	pm_runtime_put_sync(get_cpu_device(cpu));
++
+ 	ret = platform_cpu_disable(cpu);
+ 	if (ret)
+ 		return ret;
+@@ -272,6 +275,13 @@ void __ref cpu_die(void)
+ {
+ 	unsigned int cpu = smp_processor_id();
+ 
++	/*
++	 * We dont need the CPU device anymore.
++	 * Lets do this before IRQs are disabled to allow
++	 * runtime PM to suspend the domain as well.
++	 */
++	pm_runtime_put_sync(get_cpu_device(cpu));
++
+ 	idle_task_exit();
+ 
+ 	local_irq_disable();
+@@ -352,6 +362,7 @@ asmlinkage void secondary_start_kernel(void)
+ {
+ 	struct mm_struct *mm = &init_mm;
+ 	unsigned int cpu;
++	struct device *cpu_dev;
+ 
+ 	/*
+ 	 * The identity mapping is uncached (strongly ordered), so
+@@ -401,6 +412,11 @@ asmlinkage void secondary_start_kernel(void)
+ 	local_irq_enable();
+ 	local_fiq_enable();
+ 
++	/* We are running, enable runtime PM for the CPU. */
++	cpu_dev = get_cpu_device(cpu);
++	if (cpu_dev)
++		pm_runtime_get_sync(cpu_dev);
++
+ 	/*
+ 	 * OK, it's off to the idle thread for us
+ 	 */
 -- 
 2.1.4
