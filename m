@@ -1,74 +1,238 @@
-From: aisheng.dong@freescale.com (Dong Aisheng)
-Date: Tue, 4 Aug 2015 11:25:15 +0800
-Subject: [PATCH v3 1/6] mmc: sdhci-esdhc-imx: add imx7d support and
- support HS400
-In-Reply-To: <1438160637-28061-2-git-send-email-haibo.chen@freescale.com>
-References: <1438160637-28061-1-git-send-email-haibo.chen@freescale.com>
- <1438160637-28061-2-git-send-email-haibo.chen@freescale.com>
-Message-ID: <20150804032513.GD24870@shlinux1.ap.freescale.net>
+From: jingoohan1@gmail.com (Jingoo Han)
+Date: Tue, 4 Aug 2015 13:19:50 +0900
+Subject: [PATCH v6] PCI: Store PCIe bus address in struct of_pci_range
+In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E01D712E7@lhreml503-mbs>
+References: <1438010223-124422-1-git-send-email-gabriele.paoloni@huawei.com>
+ <20150729172053.GE31170@google.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E01D6F350@lhreml503-mbs>
+ <CAL_JsqKs11-sXQTdBD+ZjbVYFWUHBARTW9q5MF1hCXUhZ+nWLQ@mail.gmail.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E01D6F94A@lhreml503-mbs>
+ <20150730161447.GG9640@google.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E01D6FB3B@lhreml503-mbs>
+ <20150730171445.GI9640@google.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E01D6FC15@lhreml503-mbs>
+ <CAL_Jsq+aQVakaZf4xo7sxnVyTmPR+HJ-9ByyS6OYJ0PHDYOwmg@mail.gmail.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E01D70589@lhreml503-mbs>
+ <55BB8CC6.1080203@ti.com>
+ <CAL_JsqJqjiWVaKs-3ghQ1EBQzRRQ38GzkMV+FELPj53bSF-yXQ@mail.gmail.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E01D712E7@lhreml503-mbs>
+Message-ID: <7F6386B4-D2F5-4840-AC72-F8C76CBC3B94@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 29, 2015 at 05:03:52PM +0800, Haibo Chen wrote:
-> The imx7d usdhc is derived from imx6sx, the difference is that
-> imx7d support HS400.
+On 2015. 8. 3., at PM 8:18, Gabriele Paoloni <gabriele.paoloni@huawei.com> wrote:
 > 
-> So introduce a new compatible string for imx7d and add HS400
-> support for imx7d usdhc.
+> Rob, Kishon what about the following solution?....
 > 
-> Signed-off-by: Haibo Chen <haibo.chen@freescale.com>
 > ---
->  drivers/mmc/host/sdhci-esdhc-imx.c | 66 ++++++++++++++++++++++++++++++++++++++
->  1 file changed, 66 insertions(+)
+> drivers/pci/host/pci-dra7xx.c      | 12 ++++++++++++
+> drivers/pci/host/pcie-designware.c |  9 +++------
+
+Hi Paoloni,
+
+OK, it looks good.
+I want you to revert the following patch. 
+
+commit "f4c55c5a3f7f (PCI: designware: Program ATU with untranslated address)"
+
+Would you remove all '*_mode_base's?
+
+Best regards,
+Jingoo Han
+
+> 2 files changed, 15 insertions(+), 6 deletions(-)
 > 
-> diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-> index c6b9f64..b441eed 100644
-> --- a/drivers/mmc/host/sdhci-esdhc-imx.c
-> +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-> @@ -44,6 +44,7 @@
->  #define  ESDHC_MIX_CTRL_EXE_TUNE	(1 << 22)
->  #define  ESDHC_MIX_CTRL_SMPCLK_SEL	(1 << 23)
->  #define  ESDHC_MIX_CTRL_FBCLK_SEL	(1 << 25)
-> +#define  ESDHC_MIX_CTRL_HS400_EN	(1 << 26)
->  /* Bits 3 and 6 are not SDHCI standard definitions */
->  #define  ESDHC_MIX_CTRL_SDHCI_MASK	0xb7
->  /* Tuning bits */
-> @@ -60,6 +61,16 @@
->  #define  ESDHC_TUNE_CTRL_MIN		0
->  #define  ESDHC_TUNE_CTRL_MAX		((1 << 7) - 1)
->  
-> +/* strobe dll register */
-> +#define ESDHC_STROBE_DLL_CTRL		0x70
-> +#define ESDHC_STROBE_DLL_CTRL_ENABLE	(1 << 0)
-> +#define ESDHC_STROBE_DLL_CTRL_RESET	(1 << 1)
-> +#define ESDHC_STROBE_DLL_CTRL_SLV_DLY_TARGET_SHIFT	3
+> diff --git a/drivers/pci/host/pci-dra7xx.c b/drivers/pci/host/pci-dra7xx.c
+> index 80db09e..bb2635f 100644
+> --- a/drivers/pci/host/pci-dra7xx.c
+> +++ b/drivers/pci/host/pci-dra7xx.c
+> @@ -61,6 +61,7 @@
+> 
+> #define    PCIECTRL_DRA7XX_CONF_PHY_CS            0x010C
+> #define    LINK_UP                        BIT(16)
+> +#define CPU_TO_BUS_ADDR             0x0FFFFFFF
+> 
+> struct dra7xx_pcie {
+>    void __iomem        *base;
+> @@ -138,6 +139,17 @@ static void dra7xx_pcie_enable_interrupts(struct pcie_port *pp)
+> 
+> static void dra7xx_pcie_host_init(struct pcie_port *pp)
+> {
+> +    if (pp->io_mod_base)
+> +        pp->io_mod_base &= CPU_TO_BUS_ADDR;
 > +
-> +#define ESDHC_STROBE_DLL_STATUS		0x74
-> +#define ESDHC_STROBE_DLL_STS_REF_LOCK	(1 << 1)
-> +#define ESDHC_STROBE_DLL_STS_SLV_LOCK	0x1
+> +    if (pp->mem_mod_base)
+> +        pp->mem_mod_base &= CPU_TO_BUS_ADDR;
 > +
->  #define ESDHC_TUNING_CTRL		0xcc
->  #define ESDHC_STD_TUNING_EN		(1 << 24)
->  /* NOTE: the minimum valid tuning start tap for mx6sl is 1 */
-> @@ -120,6 +131,8 @@
->  #define ESDHC_FLAG_ERR004536		BIT(7)
->  /* The IP supports HS200 mode */
->  #define ESDHC_FLAG_HS200		BIT(8)
-> +/* The IP supports HS400 mode */
-> +#define ESDHC_FLAG_SUP_HS400		BIT(9)
->  
->  struct esdhc_soc_data {
->  	u32 flags;
-> @@ -156,6 +169,12 @@ static struct esdhc_soc_data usdhc_imx6sx_data = {
->  			| ESDHC_FLAG_HAVE_CAP1 | ESDHC_FLAG_HS200,
->  };
->  
-> +static struct esdhc_soc_data usdhc_imx7d_data = {
-> +	.flags = ESDHC_FLAG_USDHC | ESDHC_FLAG_STD_TUNING
-> +			| ESDHC_FLAG_HAVE_CAP1 | ESDHC_FLAG_HS200
-> +			| ESDHC_FLAG_SUP_HS400,
-
-Better to use ESDHC_FLAG_HS400 to keep align with exist ESDHC_FLAG_HS200.
-
-Regards
-Dong Aisheng
+> +    if (pp->cfg0_mod_base) {
+> +        pp->cfg0_mod_base &= CPU_TO_BUS_ADDR;
+> +        pp->cfg1_mod_base &= CPU_TO_BUS_ADDR;
+> +    }
+> +
+>    dw_pcie_setup_rc(pp);
+>    dra7xx_pcie_establish_link(pp);
+>    if (IS_ENABLED(CONFIG_PCI_MSI))
+> diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
+> index 69486be..06c682b 100644
+> --- a/drivers/pci/host/pcie-designware.c
+> +++ b/drivers/pci/host/pcie-designware.c
+> @@ -416,8 +416,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
+>            pp->io_base = range.cpu_addr;
+> 
+>            /* Find the untranslated IO space address */
+> -            pp->io_mod_base = of_read_number(parser.range -
+> -                             parser.np + na, ns);
+> +            pp->io_mod_base = range.cpu_addr;;
+>        }
+>        if (restype == IORESOURCE_MEM) {
+>            of_pci_range_to_resource(&range, np, &pp->mem);
+> @@ -426,8 +425,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
+>            pp->mem_bus_addr = range.pci_addr;
+> 
+>            /* Find the untranslated MEM space address */
+> -            pp->mem_mod_base = of_read_number(parser.range -
+> -                              parser.np + na, ns);
+> +            pp->mem_mod_base = range.cpu_addr;
+>        }
+>        if (restype == 0) {
+>            of_pci_range_to_resource(&range, np, &pp->cfg);
+> @@ -437,8 +435,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
+>            pp->cfg1_base = pp->cfg.start + pp->cfg0_size;
+> 
+>            /* Find the untranslated configuration space address */
+> -            pp->cfg0_mod_base = of_read_number(parser.range -
+> -                               parser.np + na, ns);
+> +            pp->cfg0_mod_base = range.cpu_addr;
+>            pp->cfg1_mod_base = pp->cfg0_mod_base +
+>                        pp->cfg0_size;
+>        }
+> -- 
+> 1.9.1
+> 
+> 
+>> -----Original Message-----
+>> From: linux-pci-owner at vger.kernel.org [mailto:linux-pci-
+>> owner at vger.kernel.org] On Behalf Of Rob Herring
+>> Sent: Friday, July 31, 2015 5:53 PM
+>> To: Kishon Vijay Abraham I
+>> Cc: Gabriele Paoloni; Bjorn Helgaas; arnd at arndb.de;
+>> lorenzo.pieralisi at arm.com; Wangzhou (B); robh+dt at kernel.org;
+>> james.morse at arm.com; Liviu.Dudau at arm.com; linux-pci at vger.kernel.org;
+>> linux-arm-kernel at lists.infradead.org; devicetree at vger.kernel.org;
+>> Yuanzhichang; Zhudacai; zhangjukuo; qiuzhenfa; Liguozhu (Kenneth);
+>> Jingoo Han; Pratyush Anand; Arnd Bergmann
+>> Subject: Re: [PATCH v6] PCI: Store PCIe bus address in struct
+>> of_pci_range
+>> 
+>> On Fri, Jul 31, 2015 at 9:57 AM, Kishon Vijay Abraham I <kishon@ti.com>
+>> wrote:
+>>> +Arnd
+>>> 
+>>> Hi,
+>>> 
+>>>> On Friday 31 July 2015 07:55 PM, Gabriele Paoloni wrote:
+>>>> [+cc Kishon]
+>>>> 
+>>>>> -----Original Message-----
+>>>>> From: linux-pci-owner at vger.kernel.org [mailto:linux-pci-
+>>>>> owner at vger.kernel.org] On Behalf Of Rob Herring
+>>>>> Sent: Thursday, July 30, 2015 9:42 PM
+>>>>> To: Gabriele Paoloni
+>>>>> Cc: Bjorn Helgaas; arnd at arndb.de; lorenzo.pieralisi at arm.com;
+>> Wangzhou
+>>>>> (B); robh+dt at kernel.org; james.morse at arm.com; Liviu.Dudau at arm.com;
+>>>>> linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+>>>>> devicetree at vger.kernel.org; Yuanzhichang; Zhudacai; zhangjukuo;
+>>>>> qiuzhenfa; Liguozhu (Kenneth); Jingoo Han; Pratyush Anand
+>>>>> Subject: Re: [PATCH v6] PCI: Store PCIe bus address in struct
+>>>>> of_pci_range
+>>>>> 
+>>>>> On Thu, Jul 30, 2015 at 12:34 PM, Gabriele Paoloni
+>>>>> <gabriele.paoloni@huawei.com> wrote:
+>>>>>>> -----Original Message-----
+>>>>>>> From: Bjorn Helgaas [mailto:bhelgaas at google.com]
+>>>>>>> Sent: 30 July 2015 18:15
+>>>>>>> On Thu, Jul 30, 2015 at 04:50:55PM +0000, Gabriele Paoloni wrote:
+>>>>>>>>> -----Original Message-----
+>>>>>>>>> From: linux-pci-owner at vger.kernel.org [mailto:linux-pci-
+>>>>>>>>> owner at vger.kernel.org] On Behalf Of Bjorn Helgaas
+>>>>>>>>> Sent: Thursday, July 30, 2015 5:15 PM
+>>>>>>>>> On Thu, Jul 30, 2015 at 01:52:13PM +0000, Gabriele Paoloni
+>> wrote:
+>>>>> 
+>>>>> [...]
+>>>>> 
+>>>>>>>>>> I don?t think we should rely on [CPU] addresses...what if the
+>>>>>>>>> intermediate
+>>>>>>>>>> translation layer changes the lower significant bits of the
+>>>>> "bus
+>>>>>>>>> address"
+>>>>>>>>>> to translate into a cpu address?
+>>>>>>>>> 
+>>>>>>>>> Is it really a possiblity that the lower bits could be changed?
+>>>>>>>> 
+>>>>>>>> I've checked all the current deignware users DTs except "pci-
+>>>>>>> layerscape"
+>>>>>>>> that I could not find:
+>>>>>>>> spear1310.dtsi
+>>>>>>>> spear1340.dtsi
+>>>>>>>> dra7.dtsi
+>>>>>>>> imx6qdl.dtsi
+>>>>>>>> imx6sx.dtsi
+>>>>>>>> keystone.dtsi
+>>>>>>>> exynos5440.dtsi
+>>>>>>>> 
+>>>>>>>> None of them modifies the lower bits. To be more precise the
+>> only
+>>>>> guy
+>>>>>>>> that provides another translation layer is "dra7.dtsi":
+>>>>>>>> axi0
+>>>>>>>> http://lxr.free-
+>>>>> electrons.com/source/arch/arm/boot/dts/dra7.dtsi#L207
+>>>>>>>> 
+>>>>>>>> axi1
+>>>>>>>> http://lxr.free-
+>>>>> electrons.com/source/arch/arm/boot/dts/dra7.dtsi#L241
+>>>>>>>> 
+>>>>>>>> For this case masking the top 4bits (bits28 to 31) should make
+>> the
+>>>>> job.
+>>>>> 
+>>>>> IMO, we should just fix this case. After further study, I don't
+>> think
+>>>>> this is a DW issue, but rather an SOC integration issue.
+>>>>> 
+>>>>> I believe you can just fixup the address in the pp->ops->host_init
+>> hook.
+>>>> 
+>>>> Yes I guess that I could just assign pp->(*)_mod_base to the CPU
+>> address
+>>>> in DW and mask it out in dra7xx_pcie_host_init()...
+>>>> 
+>>>> Kishon, would you be ok with that?
+>>> 
+>>> Initially I was using *base-mask* property from dt. Me and Arnd
+>> (cc'ed) had
+>>> this discussion [1] before we decided the current approach. It'll be
+>> good to
+>>> check with Arnd too.
+>>> 
+>>> [1] ->  http://lists.infradead.org/pipermail/linux-arm-kernel/2014-
+>> May/253528.html
+>> 
+>> The problem I have here is the use of ranges does not necessarily mean
+>> fewer address bits are available. It can be used just for convenience
+>> of not putting the full address into every node's reg property. And
+>> vice versa, there are probably plenty of cases where we have the full
+>> address in the nodes, but really only some of the address bits are
+>> decoded at the IP block. Whether the address bits are present is
+>> rarely cared about or known by s/w folks until you hit a problem like
+>> this. Given this is an isolated case ATM, I would fix it in an
+>> isolated way. It does not affect the binding and could be changed in
+>> the kernel later if this becomes a common need.
+>> 
+>> Rob
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
