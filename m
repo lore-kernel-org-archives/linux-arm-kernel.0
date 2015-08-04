@@ -1,53 +1,66 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Tue, 04 Aug 2015 16:53:37 +0900
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 04 Aug 2015 16:57:02 +0900
 Subject: [GIT PULL 1/5] Samsung non-critical-fixes for v4.3
-In-Reply-To: <55C06C2D.2010804@samsung.com>
+In-Reply-To: <052201d0ce8a$aba37790$02ea66b0$@kernel.org>
 References: <55C06995.2030600@kernel.org> <55C06C2D.2010804@samsung.com>
-Message-ID: <052201d0ce8a$aba37790$02ea66b0$@kernel.org>
+ <052201d0ce8a$aba37790$02ea66b0$@kernel.org>
+Message-ID: <55C0704E.7020907@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Krzysztof Kozlowski wrote:
+On 04.08.2015 16:53, Kukjin Kim wrote:
+> Krzysztof Kozlowski wrote:
+>>
+>> On 04.08.2015 16:28, Kukjin Kim wrote:
+>>> Hi Arnd, Olof, Kevin,
+>>>
+>>> Here is Samsung non-critical-fixes for v4.3.
+>>> Please pull.
+>>>
+>>> Thanks,
+>>> Kukjin
+>>>
+>>> The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
+>>>
+>>>   Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
+>>>
+>>> are available in the git repository at:
+>>>
+>>>   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+>>> tags/samsung-non-critical-1
+>>>
+>>> for you to fetch changes up to 2cc6b813579415c4f627b08a043079bdc5b87a33:
+>>>
+>>>   ARM: EXYNOS: Use IOMEM_ERR_PTR when function returns iomem (2015-07-21
+>>> 13:19:06 +0900)
+>>>
+>>> ----------------------------------------------------------------
+>>> Samsung non-critical fixes for v4.3
+>>>
+>>> - fix sparse warning for returning iomem
+>>> - fix clock-frequency of display timing0 for exynos3250-rinato
+>>
+> Hi,
 > 
-> On 04.08.2015 16:28, Kukjin Kim wrote:
-> > Hi Arnd, Olof, Kevin,
-> >
-> > Here is Samsung non-critical-fixes for v4.3.
-> > Please pull.
-> >
-> > Thanks,
-> > Kukjin
-> >
-> > The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
-> >
-> >   Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
-> >
-> > are available in the git repository at:
-> >
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> > tags/samsung-non-critical-1
-> >
-> > for you to fetch changes up to 2cc6b813579415c4f627b08a043079bdc5b87a33:
-> >
-> >   ARM: EXYNOS: Use IOMEM_ERR_PTR when function returns iomem (2015-07-21
-> > 13:19:06 +0900)
-> >
-> > ----------------------------------------------------------------
-> > Samsung non-critical fixes for v4.3
-> >
-> > - fix sparse warning for returning iomem
-> > - fix clock-frequency of display timing0 for exynos3250-rinato
+>> One more set, which we agreed for pushing to v4.2, is missing:
+>> 1. cpufreq: exynos: Fix for memory leak in case SOC name does not match
 > 
-Hi,
+> As you can see in ml, I've sent it to Rafael because it would be handled in
+> cpufreq tree not samsung tree/arm-soc tree.
+> 
+>> 2. video: fbdev: s3c-fb: Constify platform_device_id (this can actually
+> 
+> Same as above, this would be handled in fb tree? Can you please send it?
 
-> One more set, which we agreed for pushing to v4.2, is missing:
-> 1. cpufreq: exynos: Fix for memory leak in case SOC name does not match
+This was on LKML for 3 months (including a resend). As this is S3C frame
+buffer I think this can go via samsung-soc tree, since fb guys did not
+picked it.
 
-As you can see in ml, I've sent it to Rafael because it would be handled in
-cpufreq tree not samsung tree/arm-soc tree.
+On list of patches few more are also missing:
+1. cpufreq: exynos: remove Exynos5250 specific cpufreq driver support
+2. clk: samsung: exynos5250: add cpu clock configuration data and
+instantiate cpu clock
+3. defconfig changes (separate pull request?)
 
-> 2. video: fbdev: s3c-fb: Constify platform_device_id (this can actually
-
-Same as above, this would be handled in fb tree? Can you please send it?
-
-- Kukjin
+Best regards,
+Krzysztof
