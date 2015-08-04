@@ -1,12 +1,13 @@
 From: b20788@freescale.com (Anson Huang)
-Date: Wed, 5 Aug 2015 01:48:35 +0800
-Subject: [PATCH 1/3] ARM: dts: imx6ul: add sram support for i.mx6ul
-Message-ID: <1438710517-6515-1-git-send-email-b20788@freescale.com>
+Date: Wed, 5 Aug 2015 01:48:36 +0800
+Subject: [PATCH 2/3] ARM: dts: imx6ul: add mmdc support for i.mx6ul
+In-Reply-To: <1438710517-6515-1-git-send-email-b20788@freescale.com>
+References: <1438710517-6515-1-git-send-email-b20788@freescale.com>
+Message-ID: <1438710517-6515-2-git-send-email-b20788@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add SRAM support for i.MX6UL, it has 128KB ocram
-starting from 0x900000.
+Add MMDC support for i.MX6UL.
 
 Signed-off-by: Anson Huang <b20788@freescale.com>
 ---
@@ -14,20 +15,20 @@ Signed-off-by: Anson Huang <b20788@freescale.com>
  1 file changed, 5 insertions(+)
 
 diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
-index b6c6c31..227ba6e 100644
+index 227ba6e..d3c7ae1 100644
 --- a/arch/arm/boot/dts/imx6ul.dtsi
 +++ b/arch/arm/boot/dts/imx6ul.dtsi
-@@ -133,6 +133,11 @@
- 			status = "disabled";
- 		};
+@@ -585,6 +585,11 @@
+ 				status = "disabled";
+ 			};
  
-+		ocram: sram at 00900000 {
-+			compatible = "mmio-sram";
-+			reg = <0x00900000 0x20000>;
-+		};
++			mmdc: mmdc at 021b0000 {
++				compatible = "fsl,imx6ul-mmdc", "fsl,imx6q-mmdc";
++				reg = <0x021b0000 0x4000>;
++			};
 +
- 		aips1: aips-bus at 02000000 {
- 			compatible = "fsl,aips-bus", "simple-bus";
- 			#address-cells = <1>;
+ 			qspi: qspi at 021e0000 {
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
 -- 
 1.9.1
