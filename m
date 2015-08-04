@@ -1,85 +1,94 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Tue, 4 Aug 2015 08:36:02 +0800
-Subject: [PATCH v2 06/10] usb: chipidea: add ahb burst configuration
- interface
-In-Reply-To: <CAL_JsqJn16OvfL_Ggf1wSi2XkJkjDMrmuRit3q8eVY5bNp8oYw@mail.gmail.com>
-References: <1438577238-10153-1-git-send-email-peter.chen@freescale.com>
- <1438577238-10153-7-git-send-email-peter.chen@freescale.com>
- <CAL_JsqJn16OvfL_Ggf1wSi2XkJkjDMrmuRit3q8eVY5bNp8oYw@mail.gmail.com>
-Message-ID: <20150804003600.GA20208@shlinux2>
+From: scott.shu@mediatek.com (Scott Shu)
+Date: Tue, 4 Aug 2015 10:47:37 +0800
+Subject: [PATCH] ARM64: dts: mt6795: enable basic SMP bringup for MT6795
+Message-ID: <1438656457-60278-1-git-send-email-scott.shu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 03, 2015 at 09:04:27AM -0500, Rob Herring wrote:
-> On Sun, Aug 2, 2015 at 11:47 PM, Peter Chen <peter.chen@freescale.com> wrote:
-> > The users can change it through dts or platform data if they
-> > want to change the default value.
-> >
-> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> > ---
-> >  drivers/usb/chipidea/bits.h  |  3 +++
-> >  drivers/usb/chipidea/core.c  | 14 ++++++++++++++
-> >  include/linux/usb/chipidea.h |  2 ++
-> >  3 files changed, 19 insertions(+)
-> >
-> > diff --git a/drivers/usb/chipidea/bits.h b/drivers/usb/chipidea/bits.h
-> > index 831a8f6..462ad02 100644
-> > --- a/drivers/usb/chipidea/bits.h
-> > +++ b/drivers/usb/chipidea/bits.h
-> > @@ -25,6 +25,9 @@
-> >  #define VERSION                      (0xF << 25)
-> >  #define CIVERSION            (0x7 << 29)
-> >
-> > +/* SBUSCFG */
-> > +#define AHBBRST_MASK           0x7
-> > +
-> >  /* HCCPARAMS */
-> >  #define HCCPARAMS_LEN         BIT(17)
-> >
-> > diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-> > index 38bd036..f60cbf6 100644
-> > --- a/drivers/usb/chipidea/core.c
-> > +++ b/drivers/usb/chipidea/core.c
-> > @@ -439,6 +439,9 @@ void ci_platform_configure(struct ci_hdrc *ci)
-> >
-> >         hw_write(ci, OP_USBCMD, 0xff0000, ci->platdata->itc_setting << 16);
-> >
-> > +       if (ci->platdata->flags & CI_HDRC_OVERRIDE_AHB_BURST)
-> > +               hw_write_id_reg(ci, ID_SBUSCFG, AHBBRST_MASK,
-> > +                       ci->platdata->ahb_burst_config);
-> >  }
-> >
-> >  /**
-> > @@ -647,6 +650,17 @@ static int ci_get_platdata(struct device *dev,
-> >                 }
-> >         }
-> >
-> > +       if (of_find_property(dev->of_node, "ahb-burst-config", NULL)) {
-> > +               ret = of_property_read_u32(dev->of_node, "ahb-burst-config",
-> > +                       &platdata->ahb_burst_config);
-> > +               if (ret) {
-> > +                       dev_err(dev,
-> > +                               "failed to get ahb-burst-config\n");
-> > +                       return ret;
-> > +               }
-> > +               platdata->flags |= CI_HDRC_OVERRIDE_AHB_BURST;
-> > +       }
-> > +
-> 
-> This can be simplified to:
-> 
-> ret = of_property_read_u32(dev->of_node, "ahb-burst-config",
-> &platdata->ahb_burst_config);
-> if (!ret)
->   platdata->flags |= CI_HDRC_OVERRIDE_AHB_BURST;
-> 
-> The error condition can't really happen.
-> 
-> Rob
+This patch adds support SMP on MediaTek MT6795 Cortex-A53 Octa-core SoC.
 
-Thanks, I will change others accordingly.
+The patch is based on v4.2-rc1 and following patch series:
+(1) Mars Cheng's "Add mt6795 basic chip support" [1]
 
+[1] https://lkml.org/lkml/2015/7/14/63
+
+Signed-off-by: Scott Shu <scott.shu@mediatek.com>
+---
+ arch/arm64/boot/dts/mediatek/mt6795.dtsi |   13 +++++++++++++
+ 1 file changed, 13 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/mediatek/mt6795.dtsi b/arch/arm64/boot/dts/mediatek/mt6795.dtsi
+index da200e7..c85659d 100644
+--- a/arch/arm64/boot/dts/mediatek/mt6795.dtsi
++++ b/arch/arm64/boot/dts/mediatek/mt6795.dtsi
+@@ -20,6 +20,11 @@
+ 	#address-cells = <2>;
+ 	#size-cells = <2>;
+ 
++	psci {
++		compatible = "arm,psci-0.2";
++		method = "smc";
++	};
++
+ 	cpus {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+@@ -27,48 +32,56 @@
+ 		cpu0: cpu at 0 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a53";
++			enable-method = "psci";
+ 			reg = <0x000>;
+ 		};
+ 
+ 		cpu1: cpu at 1 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a53";
++			enable-method = "psci";
+ 			reg = <0x001>;
+ 		};
+ 
+ 		cpu2: cpu at 2 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a53";
++			enable-method = "psci";
+ 			reg = <0x002>;
+ 		};
+ 
+ 		cpu3: cpu at 3 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a53";
++			enable-method = "psci";
+ 			reg = <0x003>;
+ 		};
+ 
+ 		cpu4: cpu at 100 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a53";
++			enable-method = "psci";
+ 			reg = <0x100>;
+ 		};
+ 
+ 		cpu5: cpu at 101 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a53";
++			enable-method = "psci";
+ 			reg = <0x101>;
+ 		};
+ 
+ 		cpu6: cpu at 102 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a53";
++			enable-method = "psci";
+ 			reg = <0x102>;
+ 		};
+ 
+ 		cpu7: cpu at 103 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a53";
++			enable-method = "psci";
+ 			reg = <0x103>;
+ 		};
+ 	};
 -- 
-
-Best Regards,
-Peter Chen
+1.7.9.5
