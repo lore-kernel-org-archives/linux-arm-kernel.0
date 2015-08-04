@@ -1,23 +1,37 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 04 Aug 2015 10:38:01 +0200
-Subject: [RFCv3 4/4] ARM: zynq: Select ARCH_HAS_RESET_CONTROLLER
-In-Reply-To: <20150731164707.GF2650@xsjsorenbubuntu>
-References: <1438305237-18497-1-git-send-email-moritz.fischer@ettus.com>
- <1438305237-18497-5-git-send-email-moritz.fischer@ettus.com>
- <55BB2D39.6000004@xilinx.com> <20150731164707.GF2650@xsjsorenbubuntu>
-Message-ID: <1438677481.3793.22.camel@pengutronix.de>
+From: public_timo.s@silentcreek.de (Timo Sigurdsson)
+Date: Tue,  4 Aug 2015 10:38:19 +0200 (CEST)
+Subject: [PATCH] ARM: dts: sunxi: Raise minimum CPU voltage for sun7i-a20
+ to a level all boards can supply
+In-Reply-To: <20150803091300.GY2564@lukather>
+References: <1438543386-7253-1-git-send-email-public_timo.s@silentcreek.de><20150803091300.GY2564@lukather>
+Message-ID: <20150804083819.2F3EE6C83EF9@dd34104.kasserver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Maxime,
 
-Am Freitag, den 31.07.2015, 09:47 -0700 schrieb S?ren Brinkmann:
-> On Fri, 2015-07-31 at 10:09AM +0200, Michal Simek wrote:
-[...]
-> > Reviewed-by: Michal Simek <michal.simek@xilinx.com>
-> Acked-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
+Maxime Ripard schrieb am 03.08.2015 11:13:
+> On Sun, Aug 02, 2015 at 09:23:06PM +0200, Timo Sigurdsson wrote:
+>> sun7i-a20.dtsi contains an cpufreq operating point at 0.9 volts. Most A20
+>> boards
+>> (or all?), however, do not allow the voltage to go below 1.0V. Thus, raise the
+>> voltage for the lowest operating point to 1.0V so all boards can actually use
+>> it.
+> 
+> This is not a property of a board, but is the actual limit documented
+> by Allwinner for the A20. Some individual SoCs might have wider
+> tolerances, but that's not a property of a board, it's really a
+> property of a single SoC, and we cannot make any assumption on the
+> board.
 
-I'll assume these apply to the whole series and queue patches 1 and 3.
+Thanks for the clarification. That was a misunderstanding on my side. I can 
+update the commit message in a second version of the patch, but the actual
+code change can be kept as is then, I guess.
 
-best regards
-Philipp
+> (and please make sure to run checkpatch before sending your patches)
+
+Sorry about that. Will do when I post a second version of the patch.
+
+Thanks,
+
+Timo
