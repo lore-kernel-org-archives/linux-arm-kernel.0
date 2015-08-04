@@ -1,102 +1,49 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Tue, 4 Aug 2015 16:49:30 +0800
-Subject: [RFC PATCH 2/3] mailbox: Hisilicon: add mailbox driver
-In-Reply-To: <1438677024.8734.24.camel@tiscali.nl>
-References: <1438564390-28111-1-git-send-email-leo.yan@linaro.org>
- <1438564390-28111-3-git-send-email-leo.yan@linaro.org>
- <1438677024.8734.24.camel@tiscali.nl>
-Message-ID: <20150804084930.GA27609@leoy-linaro>
+From: public_timo.s@silentcreek.de (Timo Sigurdsson)
+Date: Tue,  4 Aug 2015 10:51:30 +0200 (CEST)
+Subject: [linux-sunxi] [PATCH] ARM: dts: sunxi: Raise minimum CPU voltage
+ for sun7i-a20 to a level all boards can supply
+In-Reply-To: <20150803093420.GC2564@lukather>
+References: <1438543386-7253-1-git-send-email-public_timo.s@silentcreek.de>
+ <CAGRGNgV6b9yt2HnB2x2Wyc05KEahoX-Y+mVhxsryztcfA36H1g@mail.gmail.com>
+ <CAGb2v67o-=_cL2RWfXJ+3C86zfQ_1b5DYRi3_zwvwy6su6+gdw@mail.gmail.com>
+ <CAGRGNgXH90m9h0DDejd5MTf8enduGFQ8dPKrRhmc8Z6y_PaC1w@mail.gmail.com>
+ <20150803090352.621CC6C80865@dd34104.kasserver.com><20150803093420.GC2564@lukather>
+Message-ID: <20150804085130.602FA6C83EF9@dd34104.kasserver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+Hi Maxime,
 
-On Tue, Aug 04, 2015 at 10:30:24AM +0200, Paul Bolle wrote:
-> (This RFC was part of this mornings catch of my crude mail filter. So,
-> for what it's worth, what follows are a few random comments for the few
-> things I'm able to spot.)
-> 
-> On ma, 2015-08-03 at 09:13 +0800, Leo Yan wrote:
-> > --- /dev/null
-> > +++ b/drivers/mailbox/hisilicon/Kconfig
-> 
-> > +config HISI_MBOX
-> > +	bool "Hisilicon's Mailbox"
-> > +	depends on ARCH_HISI || OF
-> 
-> ARCH_HISI is available on either ARM64 or ARM. ARM64 selects OF. On ARM
-> ARCH_HISI depends on ARCH_MULTIV7 which depends on ARCH_MULTIPLATFORM.
-> That selects USE_OF which on its turn selects OF.
-> 
-> So, HISI_MBOX implies OF, correct?
+Maxime Ripard schrieb am 03.08.2015 11:34:
 
-Exactly, will simply use "depends on ARCH_HISI".
+> On Mon, Aug 03, 2015 at 11:03:52AM +0200, Timo Sigurdsson wrote:
+>> Julian Calaby schrieb am 03.08.2015 06:22:
+>> > My only real objection here is are there boards that can go down to
+>> > 0.9v and if so, won't this change make them less power efficient in
+>> > the almost-idle case? And are those power savings enough to justify
+>> > not accepting this patch?
+>> 
+>> It will probably make those boards less power efficient, yes. On the
+>> other hand, boards that have their CPU regulator set to min. 1.0V might
+>> also draw more power because the lowest frequency is not available, 
+>> even though the savings due to frequency are likely to be lower than
+>> the savings due to voltage.
+> 
+> Guys, isn't this whole discussion a bit moot? We're not doing any kind
+> of power management but cpufreq, so maybe there's a lot more to do
+> before we actually can have these kind of arguments?
+> 
+> Plus this OPP has never been used anyway, so this patch is not going
+> to increase the power consumption either.
 
-> > +	help
-> > +	  Support for mailbox drivers on Hisilicon series of SoCs.
-> > +
-> > +config HI6220_MBOX
-> > +	tristate "Hi6220 Mailbox Controller"
-> > +	depends on HISI_MBOX
-> > +	help
-> > +	  An implementation of the hi6220 mailbox. It is used to send message
-> > +	  between application processors and MCU. Say Y here if you want to build
-> > +	  the Hi6220 mailbox controller driver.
-> 
-> > --- /dev/null
-> > +++ b/drivers/mailbox/hisilicon/common.c
-> 
-> > +int hisi_mbox_register(struct hisi_mbox_hw *mbox_hw)
-> > +{
-> > +	[...]
-> > +
-> > +	mbox->chan = devm_kzalloc(dev,
-> > +		mbox_hw->chan_num * sizeof(struct mbox_chan), GFP_KERNEL);
-> > +	if (!mbox)
-> 
-> 	if (!mbox->chan)
-
-Will fix.
-
-> > +		return -ENOMEM;
-> > +
-> > +	[...]
-> > +}
-> 
-> > --- /dev/null
-> > +++ b/drivers/mailbox/hisilicon/hi6220-mailbox.c
-> 
-> > +static struct platform_driver hi6220_mbox_driver = {
-> > +	.driver = {
-> > +		[...]
-> > +		.of_match_table = of_match_ptr(hi6220_mbox_of_match),
-> 
-> of_match_ptr(x) becomes NULL when CONFIG_OF is not defined. But I think
-> CONFIG_OF will always be defined, see above. So of_match_ptr() isn't per
-> se needed.
-
-Will fix.
-
-> > +	},
-> > +	[...]
-> > +};
-> 
-> > +static int __init hi6220_mbox_init(void)
-> > +{
-> > +	return platform_driver_register(&hi6220_mbox_driver);
-> > +}
-> > +module_init(hi6220_mbox_init);
-> > +
-> > +static void __exit hi6220_mbox_exit(void)
-> > +{
-> > +	platform_driver_unregister(&hi6220_mbox_driver);
-> > +}
-> > +module_exit(hi6220_mbox_exit);
-> 
-> This could be flattened into one line:
->     module_platform_driver(hi6220_mbox_driver);
-
-Will refine. And thanks a lot for your review.
+You are right. When I wrote that, I was under the impression that the
+Olinuxino Lime 2 board at least used this setting since it has has a cpu
+regulator defined to go as low as 0.7V. But now I checked again and see
+the regulator is not referenced in the cpu node, so I guess cpufreq
+doesn't use it. So, this discussion was really hypothetical and more
+importantly, as you mentioned, it's an out-of-spec opp that shouldn't
+be supported anyway.
 
 Thanks,
-Leo Yan
+
+Timo
