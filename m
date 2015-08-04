@@ -1,53 +1,107 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 4 Aug 2015 11:09:48 -0500
-Subject: [PATCH v5 07/46] usb: dwc3: gadget: add ep capabilities support
-In-Reply-To: <1438351258-31578-8-git-send-email-r.baldyga@samsung.com>
-References: <1438351258-31578-1-git-send-email-r.baldyga@samsung.com>
- <1438351258-31578-8-git-send-email-r.baldyga@samsung.com>
-Message-ID: <20150804160948.GJ23659@saruman.tx.rr.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Tue, 04 Aug 2015 17:11:26 +0100
+Subject: [PATCH v2 0/3] Add the efuse driver on rockchip platform
+In-Reply-To: <55BB3F92.9030701@gmail.com>
+References: <1434439665-27781-1-git-send-email-wxt@rock-chips.com>
+ <557FE3EA.4000306@i2se.com> <557FEAB2.1040101@linaro.org>
+ <557FF50C.10809@rock-chips.com> <55800070.5030509@linaro.org>
+ <55826D9D.2060106@i2se.com> <5582816B.5020208@linaro.org>
+ <55BB3F92.9030701@gmail.com>
+Message-ID: <55C0E42E.3060509@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 31, 2015 at 04:00:19PM +0200, Robert Baldyga wrote:
-> Convert endpoint configuration to new capabilities model.
-> 
-> Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
-> ---
->  drivers/usb/dwc3/gadget.c | 13 +++++++++++++
->  1 file changed, 13 insertions(+)
-> 
-> diff --git a/drivers/usb/dwc3/gadget.c b/drivers/usb/dwc3/gadget.c
-> index 2feed9e..bd4c3db 100644
-> --- a/drivers/usb/dwc3/gadget.c
-> +++ b/drivers/usb/dwc3/gadget.c
-> @@ -1715,6 +1715,19 @@ static int dwc3_gadget_init_hw_endpoints(struct dwc3 *dwc,
->  				return ret;
->  		}
->  
-> +		if (epnum == 0 || epnum == 1) {
-> +			dep->endpoint.caps.type_control = true;
-> +		} else {
-> +			dep->endpoint.caps.type_iso = true;
-> +			dep->endpoint.caps.type_bulk = true;
-> +			dep->endpoint.caps.type_int = true;
-> +		}
-> +
-> +		if (direction)
-> +			dep->endpoint.caps.dir_in = true;
-> +		else
-> +			dep->endpoint.caps.dir_out = true;
+Hi Shunqian,
 
-you can avoid the branch for the direction:
+Sorry for delay in reply, I was on Holidays..
 
-		dep->endpoint.caps.dir_in = !!direction;
-		dep->endpoint.caps.dir_out = !direction;
+Thanks for testing.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150804/de171f73/attachment-0001.sig>
+On 31/07/15 10:27, Shunqian Zheng wrote:
+>
+> 1. Without the following diff, `hexdump
+> /sys/bus/nvmem/devices/rockchip-efuse0/nvmem` is wrong with "INVALID
+> ARGUMENT":
+>
+> +++ b/drivers/nvmem/core.c
+> @@ -67,7 +67,7 @@ static ssize_t bin_attr_nvmem_read(struct file *filp,
+> struct kobject *kobj,
+>          int rc;
+>
+>          /* Stop the user from reading */
+> -       if (pos > nvmem->size)
+> +       if (pos > nvmem->size - 1)
+>                  return 0;
+
+Yes, this should have been something like this
+-       if (pos > nvmem->size)
++       if (pos >= nvmem->size)
+                 return 0;
+
+We can send a fix on top of v9 once its merged.
+
+>
+>          if (pos + count > nvmem->size)
+>
+> RK3288-efuse has  32 x 8bit regs, in dts "reg = <0xffb40000 0x20>;"
+> Here is the message dump from nvmem_device:
+> [    2.158314] nvmem:
+> [    2.158314]           name (null)
+> [    2.158314]           stride 1
+> [    2.158314]           word_size 1
+> [    2.158314]           ncells 0
+> [    2.158314]           id 0
+> [    2.158314]           users 0
+> [    2.158314]           size 32
+> [    2.158314]           read_only 0
+>
+> Do you think there is a leak or I'm messing up ?
+>
+> 2. About the read operation, eFuse data can be read during device
+> probe() and cached, OR,
+>      read from eFuse when needed every time. I prefer the second one but
+> then, the clock of eFuse may be
+>      gated. So before/after reading I have to enable/disable clk like :
+>            devm_clk_get(dev, "hclk_efuse256");
+>      The trouble is I can't find a way to get the "dev" hander in :
+>            static int rockchip_efuse_read(void *context, const void
+> *reg, size_t reg_size, void *val, size_t val_size)
+>      I am appreciated if you can give some advice.
+
+
+May be you should use regmap_init_mmio_clk() instead of 
+regmap_init_mmio() it will take care of clks.
+
+>      Or, do you think it's reasonable to add hooks before/after read in
+> nvmem/core.c like :
+>            +       before_read(dev, ...);
+>                     rc = regmap_raw_read(nvmem->regmap, pos, buf, count);
+>            +       after_read(dev, ...);
+>
+
+
+> 3. In the /sys/bus/nvmem/devices/rockchip-efuse0/, there are files:
+>           /sys/devices/platform/ffb40000.efuse/rockchip-efuse0 # ls
+>           nvmem      of_node    power      subsystem  uevent
+>      Do you have a plan to add the nvmem consumers to /sys/ in nvmem
+> framework?
+yes, Am waiting for the framework to be merged, I have plans to add this 
+feature.
+
+>      For example,  in dts defined the "cpu_leakage":
+>          efuse: efuse at ffb40000 {
+>                  compatible = "rockchip,rk3x-efuse";
+>                  reg = <0xffb40000 0x20>;
+>                  #address-cells = <1>;
+>                  #size-cells = <1>;
+>                  clocks = <&cru PCLK_EFUSE256>;
+>                  clock-names = "pclk_efuse_256";
+>
+>                  cpu_leakage: cpu_leakage {
+>                          reg = <0x17 0x1>;
+>                  };
+>          };
+>     Then nvmem exposes the "cpu_leakage" file in /sys which can be
+> read/write.
+
+--srini
