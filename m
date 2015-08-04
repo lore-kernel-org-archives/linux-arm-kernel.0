@@ -1,58 +1,44 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue,  4 Aug 2015 23:30:09 +0200
-Subject: [PATCH] ARM: dts: sun4i: Enable otg in host only mode on Jesurun Q5
-Message-ID: <1438723809-9010-1-git-send-email-hdegoede@redhat.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 4 Aug 2015 16:35:53 -0500
+Subject: [PATCH] musb: sunxi: Ignore VBus errors in host-only mode
+In-Reply-To: <1438723553-4136-1-git-send-email-hdegoede@redhat.com>
+References: <1438723553-4136-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <20150804213553.GI9623@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Jesurun Q5 has the musb hooked up to an usb-a receptacle, enable it
-in host-only mode.
+On Tue, Aug 04, 2015 at 11:25:53PM +0200, Hans de Goede wrote:
+> For some unclear reason sometimes we get VBus errors in host-only mode,
+> even though we do not have any vbus-detection then. Ignore these.
+> 
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> ---
+>  drivers/usb/musb/sunxi.c | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/drivers/usb/musb/sunxi.c b/drivers/usb/musb/sunxi.c
+> index f9f6304..34ce5df 100644
+> --- a/drivers/usb/musb/sunxi.c
+> +++ b/drivers/usb/musb/sunxi.c
+> @@ -194,6 +194,10 @@ static irqreturn_t sunxi_musb_interrupt(int irq, void *__hci)
+>  		musb_writeb(musb->mregs, MUSB_FADDR, 0);
+>  	}
+>  
+> +	/*  Ignore Vbus errors when in host only mode */
+> +	if (musb->port_mode == MUSB_PORT_MODE_HOST)
+> +		musb->int_usb &= ~MUSB_INTR_VBUSERROR;
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- arch/arm/boot/dts/sun4i-a10-jesurun-q5.dts | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+check with a scope if VBUS is really dropping. Host does VBUS detection
+indeed, at a minimum, for overcurrent protection. You might have
+something causing VBUS to drop and that something needs to be found,
+rather than masked.
 
-diff --git a/arch/arm/boot/dts/sun4i-a10-jesurun-q5.dts b/arch/arm/boot/dts/sun4i-a10-jesurun-q5.dts
-index dc2f2ae..7afc7a6 100644
---- a/arch/arm/boot/dts/sun4i-a10-jesurun-q5.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-jesurun-q5.dts
-@@ -156,6 +156,10 @@
- 	status = "okay";
- };
- 
-+&otg_sram {
-+	status = "okay";
-+};
-+
- &pio {
- 	emac_power_pin_q5: emac_power_pin at 0 {
- 		allwinner,pins = "PH19";
-@@ -172,6 +176,11 @@
- 	};
- };
- 
-+&reg_usb0_vbus {
-+	regulator-boot-on;
-+	status = "okay";
-+};
-+
- &reg_usb1_vbus {
- 	status = "okay";
- };
-@@ -186,7 +195,13 @@
- 	status = "okay";
- };
- 
-+&usb_otg {
-+	dr_mode = "host";
-+	status = "okay";
-+};
-+
- &usbphy {
-+	usb0_vbus-supply = <&reg_usb0_vbus>;
- 	usb1_vbus-supply = <&reg_usb1_vbus>;
- 	usb2_vbus-supply = <&reg_usb2_vbus>;
- 	status = "okay";
 -- 
-2.4.3
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150804/4dbbb53a/attachment.sig>
