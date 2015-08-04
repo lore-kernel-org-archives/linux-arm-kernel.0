@@ -1,32 +1,31 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue,  4 Aug 2015 23:25:53 +0200
-Subject: [PATCH] musb: sunxi: Ignore VBus errors in host-only mode
-Message-ID: <1438723553-4136-1-git-send-email-hdegoede@redhat.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Wed,  5 Aug 2015 06:30:48 +0900
+Subject: [PATCH] ARM: shmobile: Add silk device tree bindings documentation
+Message-ID: <1438723848-14812-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For some unclear reason sometimes we get VBus errors in host-only mode,
-even though we do not have any vbus-detection then. Ignore these.
+Add Silk Device tree bindings Documentation, listing it as a supported board.
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+This allows to use checkpatch to validate DTSes referring to the Silk board.
+
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- drivers/usb/musb/sunxi.c | 4 ++++
- 1 file changed, 4 insertions(+)
+ Documentation/devicetree/bindings/arm/shmobile.txt | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/drivers/usb/musb/sunxi.c b/drivers/usb/musb/sunxi.c
-index f9f6304..34ce5df 100644
---- a/drivers/usb/musb/sunxi.c
-+++ b/drivers/usb/musb/sunxi.c
-@@ -194,6 +194,10 @@ static irqreturn_t sunxi_musb_interrupt(int irq, void *__hci)
- 		musb_writeb(musb->mregs, MUSB_FADDR, 0);
- 	}
+diff --git a/Documentation/devicetree/bindings/arm/shmobile.txt b/Documentation/devicetree/bindings/arm/shmobile.txt
+index c4f19b2e7dd9..f3f96b5a7418 100644
+--- a/Documentation/devicetree/bindings/arm/shmobile.txt
++++ b/Documentation/devicetree/bindings/arm/shmobile.txt
+@@ -57,6 +57,8 @@ Boards:
+     compatible = "renesas,lager", "renesas,r8a7790"
+   - Marzen
+     compatible = "renesas,marzen", "renesas,r8a7779"
++  - Silk
++    compatible = "renesas,silk", "renesas,r8a7794";
  
-+	/*  Ignore Vbus errors when in host only mode */
-+	if (musb->port_mode == MUSB_PORT_MODE_HOST)
-+		musb->int_usb &= ~MUSB_INTR_VBUSERROR;
-+
- 	musb->int_tx = readw(musb->mregs + SUNXI_MUSB_INTRTX);
- 	if (musb->int_tx)
- 		writew(musb->int_tx, musb->mregs + SUNXI_MUSB_INTRTX);
+ Note: Reference Device Tree Implementations are temporary implementations
+       to ease the migration from platform devices to Device Tree, and are
 -- 
-2.4.3
+2.1.4
