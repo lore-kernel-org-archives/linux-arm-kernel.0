@@ -1,92 +1,62 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Tue, 4 Aug 2015 11:25:19 +0200
-Subject: [PATCH 0/6 v2] gpiolib: Add GPIO name support
-In-Reply-To: <1438680203-13432-1-git-send-email-mpa@pengutronix.de>
-References: <1438680203-13432-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <20150804092519.GG19600@pengutronix.de>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Tue, 4 Aug 2015 17:37:49 +0800
+Subject: [PATCH v3] media: atmel-isi: parse the DT parameters for
+ vsync/hsync/pixclock polarity
+Message-ID: <1438681069-16981-1-git-send-email-josh.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 04, 2015 at 11:23:17AM +0200, Markus Pargmann wrote:
-> Hi,
-> 
-> Changes in v2:
+This patch will get the DT parameters of vsync/hsync/pixclock polarity, and
+pass to driver.
 
-Sorry, forgot to add v2 into the subject.
+Also add a debug information for test purpose.
 
-Best regards,
+Signed-off-by: Josh Wu <josh.wu@atmel.com>
+---
 
-Markus
+Changes in v3:
+- add embedded sync dt property support.
 
->  - Removed patch 'gpiolib: Fix possible use of wrong name'
->  - Removed discussed patch 'gpio: Allow hogged gpios to be requested' from this
->    series
->  - Fixed show gpio name patch (locks, (null) printing, and getting the descriptor)
->  - Merged gpio name patch into gpio_name_to_desc() patch
-> 
-> Description from v1:
-> 
-> This is a proposal to add GPIO names to the kernel based on devicetree
-> descriptions.
-> 
-> This series adds GPIO name support. Until now it is only possible to use names
-> for already requested GPIOs (for example what they are used for). It is not
-> possible to identify GPIOs by a name although most of them have a name for
-> example in the schematics of the board. This makes it difficult to identify
-> a specific GPIO from userspace.
-> 
-> As the GPIO name information is a hardware description this series uses the
-> devicetree bindings introduced by the GPIO hogging mechanism, specifically
-> 'line-name', to identify GPIOs. The sysfs 'export' file is changed to accept
-> names as fallback. The gpio numbers still have a higher priority to ensure
-> backwards compatibility.
-> 
-> Exported GPIOs are still using their number as directory name (gpio<ID>). But the
-> directories now contain a 'name' file which is '' for non-existent names and
-> the name otherwise.
-> 
-> This series can be used to have an easy name mapping for udev with a quite
-> simple rule similar to this:
-> 	SUBSYSTEM=="gpio", KERNEL=="gpio*", ATTR{name}!="(null)", ACTION=="add", \
-> 	PROGRAM+="/bin/sh -c 'mkdir -p /dev/gpios; rm -f /dev/gpios/$attr{name}; ln -s /sys%p/ /dev/gpios/$attr{name}"
-> With this rule udev adds a link for each exported GPIO with a name into
-> /dev/gpios/. This way it is not necessary to know the number of a GPIO to use
-> it.
-> 
-> Best Regards,
-> 
-> Markus
-> 
-> 
-> Markus Pargmann (6):
->   gpiolib-of: Rename gpio_hog functions to be generic
->   gpio: Introduce gpio descriptor 'name'
->   gpiolib-of: Reuse 'line-name' from DT as gpio descriptor name
->   gpiolib-sysfs: Add gpio name parsing for sysfs export
->   gpiolib-sysfs: Show gpio-name in /sys/class/gpio/gpio*/name
->   gpiolib: Add gpio name information to /sys/kernel/debug/gpio
-> 
->  drivers/gpio/gpiolib-of.c     | 41 ++++++++++++++++++------------
->  drivers/gpio/gpiolib-sysfs.c  | 59 +++++++++++++++++++++++++++++++++----------
->  drivers/gpio/gpiolib.c        | 43 ++++++++++++++++++++++++++++---
->  drivers/gpio/gpiolib.h        |  3 +++
->  include/linux/gpio/consumer.h |  7 +++++
->  5 files changed, 121 insertions(+), 32 deletions(-)
-> 
-> -- 
-> 2.1.4
-> 
-> 
+Changes in v2:
+- rewrite the debug message and add pix clock polarity setup thanks to
+  Laurent.
+- update the commit log.
 
+ drivers/media/platform/soc_camera/atmel-isi.c | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
+
+diff --git a/drivers/media/platform/soc_camera/atmel-isi.c b/drivers/media/platform/soc_camera/atmel-isi.c
+index fead841..4efc939 100644
+--- a/drivers/media/platform/soc_camera/atmel-isi.c
++++ b/drivers/media/platform/soc_camera/atmel-isi.c
+@@ -1061,6 +1061,11 @@ static int isi_camera_set_bus_param(struct soc_camera_device *icd)
+ 	if (common_flags & V4L2_MBUS_PCLK_SAMPLE_FALLING)
+ 		cfg1 |= ISI_CFG1_PIXCLK_POL_ACTIVE_FALLING;
+ 
++	dev_dbg(icd->parent, "vsync active %s, hsync active %s, sampling on pix clock %s edge\n",
++		common_flags & V4L2_MBUS_VSYNC_ACTIVE_LOW ? "low" : "high",
++		common_flags & V4L2_MBUS_HSYNC_ACTIVE_LOW ? "low" : "high",
++		common_flags & V4L2_MBUS_PCLK_SAMPLE_FALLING ? "falling" : "rising");
++
+ 	if (isi->pdata.has_emb_sync)
+ 		cfg1 |= ISI_CFG1_EMB_SYNC;
+ 	if (isi->pdata.full_mode)
+@@ -1148,6 +1153,16 @@ static int atmel_isi_parse_dt(struct atmel_isi *isi,
+ 		return -EINVAL;
+ 	}
+ 
++	if (ep.bus.parallel.flags & V4L2_MBUS_HSYNC_ACTIVE_LOW)
++		isi->pdata.hsync_act_low = true;
++	if (ep.bus.parallel.flags & V4L2_MBUS_VSYNC_ACTIVE_LOW)
++		isi->pdata.vsync_act_low = true;
++	if (ep.bus.parallel.flags & V4L2_MBUS_PCLK_SAMPLE_FALLING)
++		isi->pdata.pclk_act_falling = true;
++
++	if (ep.bus_type == V4L2_MBUS_BT656)
++		isi->pdata.has_emb_sync = true;
++
+ 	return 0;
+ }
+ 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150804/8fc4f720/attachment-0001.sig>
+1.9.1
