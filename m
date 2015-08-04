@@ -1,307 +1,184 @@
 From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Tue, 4 Aug 2015 10:12:05 +0000
-Subject: [PATCH v6] PCI: Store PCIe bus address in struct of_pci_range
-In-Reply-To: <7F6386B4-D2F5-4840-AC72-F8C76CBC3B94@gmail.com>
-References: <1438010223-124422-1-git-send-email-gabriele.paoloni@huawei.com>
- <20150729172053.GE31170@google.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E01D6F350@lhreml503-mbs>
- <CAL_JsqKs11-sXQTdBD+ZjbVYFWUHBARTW9q5MF1hCXUhZ+nWLQ@mail.gmail.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E01D6F94A@lhreml503-mbs>
- <20150730161447.GG9640@google.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E01D6FB3B@lhreml503-mbs>
- <20150730171445.GI9640@google.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E01D6FC15@lhreml503-mbs>
- <CAL_Jsq+aQVakaZf4xo7sxnVyTmPR+HJ-9ByyS6OYJ0PHDYOwmg@mail.gmail.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E01D70589@lhreml503-mbs>
- <55BB8CC6.1080203@ti.com>
- <CAL_JsqJqjiWVaKs-3ghQ1EBQzRRQ38GzkMV+FELPj53bSF-yXQ@mail.gmail.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E01D712E7@lhreml503-mbs>
- <7F6386B4-D2F5-4840-AC72-F8C76CBC3B94@gmail.com>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E01D719D1@lhreml503-mbs>
+Date: Tue, 4 Aug 2015 10:23:58 +0000
+Subject: [PATCH v5 2/5] PCI: designware: Add ARM64 support
+In-Reply-To: <55C0872E.9060507@arm.com>
+References: <1437794486-21134-1-git-send-email-wangzhou1@hisilicon.com>
+ <1437794486-21134-3-git-send-email-wangzhou1@hisilicon.com>
+ <55B71F75.5030907@hisilicon.com> <55C0872E.9060507@arm.com>
+Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E01D719E9@lhreml503-mbs>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi James
 
+Please see "[PATCH v6] PCI: Store PCIe bus address in struct of_pci_range"
+
+I think if you apply this patch your problem should be solved...
+
+If you follow the discussion you see that this patch is going to be part 
+of the next designware patchset...
+
+Wang Zhou said "You need apply Gabriele's patch before applying this patch."
+but he didn't specify which one and obviously this patch should have been part
+of the patch-set
+
+Sorry for the confusion 
+
+Gab
 
 > -----Original Message-----
-> From: Jingoo Han [mailto:jingoohan1 at gmail.com]
-> Sent: Tuesday, August 04, 2015 5:20 AM
-> To: Gabriele Paoloni
-> Cc: Rob Herring; Kishon Vijay Abraham I; Bjorn Helgaas; arnd at arndb.de;
-> lorenzo.pieralisi at arm.com; Wangzhou (B); robh+dt at kernel.org;
-> james.morse at arm.com; Liviu.Dudau at arm.com; linux-pci at vger.kernel.org;
+> From: James Morse [mailto:james.morse at arm.com]
+> Sent: Tuesday, August 04, 2015 10:35 AM
+> To: Wangzhou (B)
+> Cc: Bjorn Helgaas; Jingoo Han; Pratyush Anand; Arnd Bergmann; Gabriele
+> Paoloni; Lorenzo Pieralisi; Liviu Dudau; thomas.petazzoni at free-
+> electrons.com; Jason Cooper; robh at kernel.org; linux-pci at vger.kernel.org;
 > linux-arm-kernel at lists.infradead.org; devicetree at vger.kernel.org;
-> Yuanzhichang; Zhudacai; zhangjukuo; qiuzhenfa; Liguozhu (Kenneth);
-> Pratyush Anand; Arnd Bergmann; jingoohan1 at gmail.com
-> Subject: Re: [PATCH v6] PCI: Store PCIe bus address in struct
-> of_pci_range
+> Yuanzhichang; Zhudacai; zhangjukuo; qiuzhenfa; liudongdong (C);
+> qiujiang; Kangfenglong; Liguozhu (Kenneth)
+> Subject: Re: [PATCH v5 2/5] PCI: designware: Add ARM64 support
 > 
-> On 2015. 8. 3., at PM 8:18, Gabriele Paoloni
-> <gabriele.paoloni@huawei.com> wrote:
-> >
-> > Rob, Kishon what about the following solution?....
-> >
-> > ---
-> > drivers/pci/host/pci-dra7xx.c      | 12 ++++++++++++
-> > drivers/pci/host/pcie-designware.c |  9 +++------
-> 
-> Hi Paoloni,
-> 
-> OK, it looks good.
-> I want you to revert the following patch.
-> 
-> commit "f4c55c5a3f7f (PCI: designware: Program ATU with untranslated
-> address)"
-> 
-> Would you remove all '*_mode_base's?
-
-Hi Jingoo Han,
-
-If I reverted the commit, in order to get designware working, dra7 
-should mask directly the CPU addresses stored in pp->cfg0_base, 
-pp->cfg1_base, pp->mem_base and pp->io_base.
-
-The masking would happen at this point: 
-http://lxr.free-electrons.com/source/drivers/pci/host/pcie-designware.c#L493
-
-Now:
-- I see that pp->cfg<0/1>_base are used in devm_ioremap before that 
-  point and nowhere else, so they should be ok.
-- pp->mem_base is used in dw_pcie_setup_rc(); dw_pcie_setup_rc() is called
-  in dra7xx_pcie_host_init()...so here I should move the masking after
-  dw_pcie_setup() retuned, but I think it should be ok
-- pp->io_base is used in pci_ioremap_io() in dw_pcie_setup(). Now currently
-  in designware this is called by pci_bios_init_hw(); this is after the 
-  masking....so here we would have a the wrong value passed
-
-Said that if you look at "[PATCH v5 2/5] PCI: designware: Add ARM64 support",
-that is the patchset where this patch is needed, you can see that 
-dw_pcie_setup() is removed and pp->io_base is used in pci_remap_iospace() before 
-the masking would happen in dra7xx_pcie_host_init()...so for this patchset we 
-should be good to revert the commit.
-
-I propose to add a new patch in the patchset "[PATCH v5 0/5] PCI: hisi: Add PCIe 
-host support for HiSilicon SoC Hip05" as the one I just posted in this 
-thread (this would not revert the commit but just moves the masking to dra7xx)
-
-I would revert the commit in "[PATCH v5 2/5] PCI: designware: Add ARM64 support"
-together with the rest of designware rework. 
-
-So we would have always a working version of designware...
-
-Are you ok with this?
-
-> 
-> Best regards,
-> Jingoo Han
-> 
-> > 2 files changed, 15 insertions(+), 6 deletions(-)
-> >
-> > diff --git a/drivers/pci/host/pci-dra7xx.c b/drivers/pci/host/pci-
-> dra7xx.c
-> > index 80db09e..bb2635f 100644
-> > --- a/drivers/pci/host/pci-dra7xx.c
-> > +++ b/drivers/pci/host/pci-dra7xx.c
-> > @@ -61,6 +61,7 @@
-> >
-> > #define    PCIECTRL_DRA7XX_CONF_PHY_CS            0x010C
-> > #define    LINK_UP                        BIT(16)
-> > +#define CPU_TO_BUS_ADDR             0x0FFFFFFF
-> >
-> > struct dra7xx_pcie {
-> >    void __iomem        *base;
-> > @@ -138,6 +139,17 @@ static void dra7xx_pcie_enable_interrupts(struct
-> pcie_port *pp)
-> >
-> > static void dra7xx_pcie_host_init(struct pcie_port *pp)
-> > {
-> > +    if (pp->io_mod_base)
-> > +        pp->io_mod_base &= CPU_TO_BUS_ADDR;
-> > +
-> > +    if (pp->mem_mod_base)
-> > +        pp->mem_mod_base &= CPU_TO_BUS_ADDR;
-> > +
-> > +    if (pp->cfg0_mod_base) {
-> > +        pp->cfg0_mod_base &= CPU_TO_BUS_ADDR;
-> > +        pp->cfg1_mod_base &= CPU_TO_BUS_ADDR;
-> > +    }
-> > +
-> >    dw_pcie_setup_rc(pp);
-> >    dra7xx_pcie_establish_link(pp);
-> >    if (IS_ENABLED(CONFIG_PCI_MSI))
-> > diff --git a/drivers/pci/host/pcie-designware.c
-> b/drivers/pci/host/pcie-designware.c
-> > index 69486be..06c682b 100644
-> > --- a/drivers/pci/host/pcie-designware.c
-> > +++ b/drivers/pci/host/pcie-designware.c
-> > @@ -416,8 +416,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
-> >            pp->io_base = range.cpu_addr;
-> >
-> >            /* Find the untranslated IO space address */
-> > -            pp->io_mod_base = of_read_number(parser.range -
-> > -                             parser.np + na, ns);
-> > +            pp->io_mod_base = range.cpu_addr;;
-> >        }
-> >        if (restype == IORESOURCE_MEM) {
-> >            of_pci_range_to_resource(&range, np, &pp->mem);
-> > @@ -426,8 +425,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
-> >            pp->mem_bus_addr = range.pci_addr;
-> >
-> >            /* Find the untranslated MEM space address */
-> > -            pp->mem_mod_base = of_read_number(parser.range -
-> > -                              parser.np + na, ns);
-> > +            pp->mem_mod_base = range.cpu_addr;
-> >        }
-> >        if (restype == 0) {
-> >            of_pci_range_to_resource(&range, np, &pp->cfg);
-> > @@ -437,8 +435,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
-> >            pp->cfg1_base = pp->cfg.start + pp->cfg0_size;
-> >
-> >            /* Find the untranslated configuration space address */
-> > -            pp->cfg0_mod_base = of_read_number(parser.range -
-> > -                               parser.np + na, ns);
-> > +            pp->cfg0_mod_base = range.cpu_addr;
-> >            pp->cfg1_mod_base = pp->cfg0_mod_base +
-> >                        pp->cfg0_size;
-> >        }
-> > --
-> > 1.9.1
-> >
-> >
-> >> -----Original Message-----
-> >> From: linux-pci-owner at vger.kernel.org [mailto:linux-pci-
-> >> owner at vger.kernel.org] On Behalf Of Rob Herring
-> >> Sent: Friday, July 31, 2015 5:53 PM
-> >> To: Kishon Vijay Abraham I
-> >> Cc: Gabriele Paoloni; Bjorn Helgaas; arnd at arndb.de;
-> >> lorenzo.pieralisi at arm.com; Wangzhou (B); robh+dt at kernel.org;
-> >> james.morse at arm.com; Liviu.Dudau at arm.com; linux-pci at vger.kernel.org;
-> >> linux-arm-kernel at lists.infradead.org; devicetree at vger.kernel.org;
-> >> Yuanzhichang; Zhudacai; zhangjukuo; qiuzhenfa; Liguozhu (Kenneth);
-> >> Jingoo Han; Pratyush Anand; Arnd Bergmann
-> >> Subject: Re: [PATCH v6] PCI: Store PCIe bus address in struct
-> >> of_pci_range
+> On 28/07/15 07:21, Zhou Wang wrote:
+> > On 2015/7/25 11:21, Zhou Wang wrote:
+> >> This patch tries to unify ARM32 and ARM64 PCIe in designware driver.
+> Delete
+> >> function dw_pcie_setup, dw_pcie_scan_bus, dw_pcie_map_irq and struct
+> hw_pci,
+> >> move related operations to dw_pcie_host_init. Also set pp-
+> >root_bus_nr = 0 in
+> >> each PCIe host driver which is based on pcie-designware. This patch
+> also try
+> >> to use of_pci_get_host_bridge_resources for ARM32 and ARM64
+> according to the
+> >> suggestion for Gabriele[1]
 > >>
-> >> On Fri, Jul 31, 2015 at 9:57 AM, Kishon Vijay Abraham I
-> <kishon@ti.com>
-> >> wrote:
-> >>> +Arnd
-> >>>
-> >>> Hi,
-> >>>
-> >>>> On Friday 31 July 2015 07:55 PM, Gabriele Paoloni wrote:
-> >>>> [+cc Kishon]
-> >>>>
-> >>>>> -----Original Message-----
-> >>>>> From: linux-pci-owner at vger.kernel.org [mailto:linux-pci-
-> >>>>> owner at vger.kernel.org] On Behalf Of Rob Herring
-> >>>>> Sent: Thursday, July 30, 2015 9:42 PM
-> >>>>> To: Gabriele Paoloni
-> >>>>> Cc: Bjorn Helgaas; arnd at arndb.de; lorenzo.pieralisi at arm.com;
-> >> Wangzhou
-> >>>>> (B); robh+dt at kernel.org; james.morse at arm.com; Liviu.Dudau at arm.com;
-> >>>>> linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> >>>>> devicetree at vger.kernel.org; Yuanzhichang; Zhudacai; zhangjukuo;
-> >>>>> qiuzhenfa; Liguozhu (Kenneth); Jingoo Han; Pratyush Anand
-> >>>>> Subject: Re: [PATCH v6] PCI: Store PCIe bus address in struct
-> >>>>> of_pci_range
-> >>>>>
-> >>>>> On Thu, Jul 30, 2015 at 12:34 PM, Gabriele Paoloni
-> >>>>> <gabriele.paoloni@huawei.com> wrote:
-> >>>>>>> -----Original Message-----
-> >>>>>>> From: Bjorn Helgaas [mailto:bhelgaas at google.com]
-> >>>>>>> Sent: 30 July 2015 18:15
-> >>>>>>> On Thu, Jul 30, 2015 at 04:50:55PM +0000, Gabriele Paoloni
-> wrote:
-> >>>>>>>>> -----Original Message-----
-> >>>>>>>>> From: linux-pci-owner at vger.kernel.org [mailto:linux-pci-
-> >>>>>>>>> owner at vger.kernel.org] On Behalf Of Bjorn Helgaas
-> >>>>>>>>> Sent: Thursday, July 30, 2015 5:15 PM
-> >>>>>>>>> On Thu, Jul 30, 2015 at 01:52:13PM +0000, Gabriele Paoloni
-> >> wrote:
-> >>>>>
-> >>>>> [...]
-> >>>>>
-> >>>>>>>>>> I don?t think we should rely on [CPU] addresses...what if
-> the
-> >>>>>>>>> intermediate
-> >>>>>>>>>> translation layer changes the lower significant bits of the
-> >>>>> "bus
-> >>>>>>>>> address"
-> >>>>>>>>>> to translate into a cpu address?
-> >>>>>>>>>
-> >>>>>>>>> Is it really a possiblity that the lower bits could be
-> changed?
-> >>>>>>>>
-> >>>>>>>> I've checked all the current deignware users DTs except "pci-
-> >>>>>>> layerscape"
-> >>>>>>>> that I could not find:
-> >>>>>>>> spear1310.dtsi
-> >>>>>>>> spear1340.dtsi
-> >>>>>>>> dra7.dtsi
-> >>>>>>>> imx6qdl.dtsi
-> >>>>>>>> imx6sx.dtsi
-> >>>>>>>> keystone.dtsi
-> >>>>>>>> exynos5440.dtsi
-> >>>>>>>>
-> >>>>>>>> None of them modifies the lower bits. To be more precise the
-> >> only
-> >>>>> guy
-> >>>>>>>> that provides another translation layer is "dra7.dtsi":
-> >>>>>>>> axi0
-> >>>>>>>> http://lxr.free-
-> >>>>> electrons.com/source/arch/arm/boot/dts/dra7.dtsi#L207
-> >>>>>>>>
-> >>>>>>>> axi1
-> >>>>>>>> http://lxr.free-
-> >>>>> electrons.com/source/arch/arm/boot/dts/dra7.dtsi#L241
-> >>>>>>>>
-> >>>>>>>> For this case masking the top 4bits (bits28 to 31) should make
-> >> the
-> >>>>> job.
-> >>>>>
-> >>>>> IMO, we should just fix this case. After further study, I don't
-> >> think
-> >>>>> this is a DW issue, but rather an SOC integration issue.
-> >>>>>
-> >>>>> I believe you can just fixup the address in the pp->ops-
-> >host_init
-> >> hook.
-> >>>>
-> >>>> Yes I guess that I could just assign pp->(*)_mod_base to the CPU
-> >> address
-> >>>> in DW and mask it out in dra7xx_pcie_host_init()...
-> >>>>
-> >>>> Kishon, would you be ok with that?
-> >>>
-> >>> Initially I was using *base-mask* property from dt. Me and Arnd
-> >> (cc'ed) had
-> >>> this discussion [1] before we decided the current approach. It'll
-> be
-> >> good to
-> >>> check with Arnd too.
-> >>>
-> >>> [1] ->  http://lists.infradead.org/pipermail/linux-arm-kernel/2014-
-> >> May/253528.html
+> >> This patch is based on Gabriele's patch about of_pci_range fix[2]
 > >>
-> >> The problem I have here is the use of ranges does not necessarily
-> mean
-> >> fewer address bits are available. It can be used just for
-> convenience
-> >> of not putting the full address into every node's reg property. And
-> >> vice versa, there are probably plenty of cases where we have the
-> full
-> >> address in the nodes, but really only some of the address bits are
-> >> decoded at the IP block. Whether the address bits are present is
-> >> rarely cared about or known by s/w folks until you hit a problem
-> like
-> >> this. Given this is an isolated case ATM, I would fix it in an
-> >> isolated way. It does not affect the binding and could be changed in
-> >> the kernel later if this becomes a common need.
+> >> I have compiled the driver with multi_v7_defconfig. However, I don't
+> have
+> >> ARM32 PCIe related board to do test. It will be appreciated if
+> someone could
+> >> help to test it.
 > >>
-> >> Rob
-> >> --
-> >> To unsubscribe from this list: send the line "unsubscribe linux-pci"
-> in
-> >> the body of a message to majordomo at vger.kernel.org
-> >> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> >
+> > Hi James,
+> >
+> > If you have time, could you help to test this patch on i.MX 6Quad
+> board?
+> > You need apply Gabriele's patch before applying this patch.
+> >
+> > It will be very appreciate and helpful if we can get test result from
+> you.
+> 
+> Applying patches 1 and 2, from v5, onto 4.2-rc5, I still get the same
+> problem as before: config cycles to enumerate the second bus aren't
+> working. (good news - I have a workaround)
+> 
+> Output from dmesg below, the lines 'dw_pcie_cfg_read(0xf0180000, 0x0,
+> 0x4,
+> =0x8878086)' were added by me, 0x8878086 is the intel wireless card
+> attached to the board.
+> 
+> From v4.2-rc5:
+> -----------------------------------------------------------------------
+> -----------
+> imx6q-pcie 1ffc000.pcie: PCI host bridge to bus 0000:00
+> pci_bus 0000:00: root bus resource [io 0x1000-0xffff]
+> pci_bus 0000:00: root bus resource [mem 0x01000000-0x01efffff]
+> pci_bus 0000:00: root bus resource [bus 00-ff]
+> pci 0000:00:00.0: [16c3:abcd] type 01 class 0x060400
+> pci 0000:00:00.0: reg 0x10: [mem 0x00000000-0x000fffff]
+> pci 0000:00:00.0: reg 0x38: [mem 0x00000000-0x0000ffff pref]
+> pci 0000:00:00.0: IOMMU is currently not supported for PCI
+> pci 0000:00:00.0: supports D1
+> pci 0000:00:00.0: PME# supported from D0 D1 D3hot D3cold
+> PCI: bus0: Fast back to back transfers disabled
+> dw_pcie_cfg_read(0xf0180000, 0x0, 0x4, =0x8878086)
+> pci 0000:01:00.0: [8086:0887] type 00 class 0x028000
+> dw_pcie_cfg_read(0xf0180000, 0x0, 0x4, =0x8878086)
+> pci 0000:01:00.0: reg 0x10: [mem 0x00000000-0x00001fff 64bit]
+> pci 0000:01:00.0: IOMMU is currently not supported for PCI
+> pci 0000:01:00.0: PME# supported from D0 D3hot D3cold
+> PCI: bus1: Fast back to back transfers disabled
+> pci_bus 0000:01: busn_res: [bus 01-ff] end is updated to 01
+> pci 0000:00:00.0: BAR 0: assigned [mem 0x01000000-0x010fffff]
+> pci 0000:00:00.0: BAR 8: assigned [mem 0x01100000-0x011fffff]
+> pci 0000:00:00.0: BAR 6: assigned [mem 0x01200000-0x0120ffff pref
+> ]
+> pci 0000:01:00.0: BAR 0: assigned [mem 0x01100000-0x01101fff 64bi
+> t]
+> pci 0000:00:00.0: PCI bridge to [bus 01]
+> pci 0000:00:00.0:bridge window [mem 0x01100000-0x011fffff]
+> pcieport 0000:00:00.0: Signaling PME through PCIe PME interrupt
+> pci 0000:01:00.0: Signaling PME through PCIe PME interrupt
+> pcie_pme 0000:00:00.0:pcie01: service driver pcie_pme loaded
+> -----------------------------------------------------------------------
+> -----------
+> 
+> And then with your two patches:
+> -----------------------------------------------------------------------
+> -----------
+> PCI host bridge /soc/pcie at 0x01000000 ranges:
+> No bus range found for /soc/pcie at 0x01000000, using [bus 00-ff]
+> err 0x01f00000..0x01f7ffff -> 0x01f00000
+> IO 0x01f80000..0x01f8ffff -> 0x00000000
+> MEM 0x01000000..0x01efffff -> 0x01000000
+> imx6q-pcie 1ffc000.pcie: PCI host bridge to bus 0000:00
+> pci_bus 0000:00: root bus resource [bus 00-ff]
+> pci_bus 0000:00: root bus resource [??? 0x01f00000-0x01f7ffff fla
+> gs 0x0]
+> pci_bus 0000:00: root bus resource [io 0x0000-0xffff]
+> pci_bus 0000:00: root bus resource [mem 0x01000000-0x01efffff]
+> pci 0000:00:00.0: [16c3:abcd] type 01 class 0x060400
+> pci 0000:00:00.0: reg 0x10: [mem 0x00000000-0x000fffff]
+> pci 0000:00:00.0: reg 0x38: [mem 0x00000000-0x0000ffff pref]
+> pci 0000:00:00.0: IOMMU is currently not supported for PCI
+> pci 0000:00:00.0: supports D1
+> pci 0000:00:00.0: PME# supported from D0 D1 D3hot D3cold
+> PCI: bus0: Fast back to back transfers disabled
+> dw_pcie_cfg_read(0xf0180000, 0x0, 0x4, =0x0)
+> PCI: bus1: Fast back to back transfers enabled
+> pci 0000:00:00.0: BAR 0: assigned [mem 0x01000000-0x010fffff]
+> pci 0000:00:00.0: BAR 6: assigned [mem 0x01100000-0x0110ffff pref
+> ]
+> pci 0000:00:00.0: PCI bridge to [bus 01]
+> pcieport 0000:00:00.0: Signaling PME through PCIe PME interrupt
+> pcie_pme 0000:00:00.0:pcie01: service driver pcie_pme loaded
+> -----------------------------------------------------------------------
+> -----------
+> 
+> Root-cause appears to be that the designware driver relies on ATU for
+> config and IO accesses. dw_pcie_rd_other_conf() does the appropriate
+> magic,
+> but with your patches 'pp->cfg0_base' is NULL, despite being correctly
+> initialised in dw_pcie_host_init().
+> 
+> dw_pcie_host_init() initialises the pp->cfg* values correctly after its
+> call:
+> >  platform_get_resource_byname(pdev, IORESOURCE_MEM, "config");
+> 
+> But the new code introduced by patch 2 then walks the whole
+> resource_list
+> and re-initialises the pp->cfg* values. The fault occurs at:
+> > /* Find the untranslated configuration space address */
+> > pp->cfg0_mod_base = win->__res.start
+> 
+> where win->__res is uninitialised. The comment in linux/resource_ext.h
+> says
+> this is the 'default storage for res', so its not valid to assume it
+> contains different values to win->res. (in this case, it contains no
+> useful
+> values).
+> 
+> The workaround is to remove the re-initialisation of the pp->cfg*
+> values,
+> as they were already correctly initialised earlier. However, other
+> resource
+> types are accessing __res directly ... which is probably not correct.
+> 
+> I need to read-up on what these 'untranslated' addresses are for...
+> 
+> 
+> 
+> James
+> 
