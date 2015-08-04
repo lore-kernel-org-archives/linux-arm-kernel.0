@@ -1,270 +1,221 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 4 Aug 2015 14:26:01 +0200
-Subject: [PATCH v2 10/10] KVM: arm/arm64: vgic: Allow non-shared device
- HW interrupts
-In-Reply-To: <55AE88E9.1070802@arm.com>
-References: <1436378202-20224-1-git-send-email-marc.zyngier@arm.com>
- <1436378202-20224-11-git-send-email-marc.zyngier@arm.com>
- <20150717221521.GH14024@cbox> <55AE88E9.1070802@arm.com>
-Message-ID: <20150804122601.GB29453@cbox>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 04 Aug 2015 13:27:14 +0100
+Subject: [PATCH v4 02/10] ACPI / irqchip: Add self-probe infrastructure
+ to initialize IRQ controller
+In-Reply-To: <1438164539-29256-3-git-send-email-hanjun.guo@linaro.org>
+References: <1438164539-29256-1-git-send-email-hanjun.guo@linaro.org>
+ <1438164539-29256-3-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <55C0AFA2.8050704@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 21, 2015 at 07:01:13PM +0100, Marc Zyngier wrote:
-> On 17/07/15 23:15, Christoffer Dall wrote:
-> > On Wed, Jul 08, 2015 at 06:56:42PM +0100, Marc Zyngier wrote:
-> >> So far, the only use of the HW interrupt facility is the timer,
-> >> implying that the active state is context-switched for each vcpu,
-> >> as the device is is shared across all vcpus.
-> >>
-> >> This does not work for a device that has been assigned to a VM,
-> >> as the guest is entierely in control of that device (the HW is
-> >> not shared). In that case, it makes sense to bypass the whole
-> >> active state switchint, and only track the deactivation of the
-> > 
-> > switching
-> > 
-> >> interrupt.
-> >>
-> >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> >> ---
-> >>  include/kvm/arm_vgic.h    |  5 ++--
-> >>  virt/kvm/arm/arch_timer.c |  2 +-
-> >>  virt/kvm/arm/vgic.c       | 62 ++++++++++++++++++++++++++++++++++++-----------
-> >>  3 files changed, 52 insertions(+), 17 deletions(-)
-> >>
-> >> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-> >> index 9fd4023..31c987a 100644
-> >> --- a/include/kvm/arm_vgic.h
-> >> +++ b/include/kvm/arm_vgic.h
-> >> @@ -163,7 +163,8 @@ struct irq_phys_map {
-> >>  	u32			virt_irq;
-> >>  	u32			phys_irq;
-> >>  	u32			irq;
-> >> -	bool			active;
-> >> +	bool			shared;
-> >> +	bool			active; /* Only valid if shared */
-> >>  };
-> >>  
-> >>  struct irq_phys_map_entry {
-> >> @@ -354,7 +355,7 @@ void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg);
-> >>  int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
-> >>  int kvm_vgic_vcpu_active_irq(struct kvm_vcpu *vcpu);
-> >>  struct irq_phys_map *vgic_map_phys_irq(struct kvm_vcpu *vcpu,
-> >> -				       int virt_irq, int irq);
-> >> +				       int virt_irq, int irq, bool shared);
-> >>  int vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, struct irq_phys_map *map);
-> >>  bool vgic_get_phys_irq_active(struct irq_phys_map *map);
-> >>  void vgic_set_phys_irq_active(struct irq_phys_map *map, bool active);
-> >> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-> >> index b9fff78..9544d79 100644
-> >> --- a/virt/kvm/arm/arch_timer.c
-> >> +++ b/virt/kvm/arm/arch_timer.c
-> >> @@ -202,7 +202,7 @@ void kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
-> >>  	 * Tell the VGIC that the virtual interrupt is tied to a
-> >>  	 * physical interrupt. We do that once per VCPU.
-> >>  	 */
-> >> -	timer->map = vgic_map_phys_irq(vcpu, irq->irq, host_vtimer_irq);
-> >> +	timer->map = vgic_map_phys_irq(vcpu, irq->irq, host_vtimer_irq, true);
-> >>  	WARN_ON(!timer->map);
-> >>  }
-> >>  
-> >> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> >> index 39f9479..3585bb0 100644
-> >> --- a/virt/kvm/arm/vgic.c
-> >> +++ b/virt/kvm/arm/vgic.c
-> >> @@ -1123,18 +1123,21 @@ static void vgic_queue_irq_to_lr(struct kvm_vcpu *vcpu, int irq,
-> >>  		map = vgic_irq_map_search(vcpu, irq);
-> >>  
-> >>  		if (map) {
-> >> -			int ret;
-> >> -
-> >> -			BUG_ON(!map->active);
-> >>  			vlr.hwirq = map->phys_irq;
-> >>  			vlr.state |= LR_HW;
-> >>  			vlr.state &= ~LR_EOI_INT;
-> >>  
-> >> -			ret = irq_set_irqchip_state(map->irq,
-> >> -						    IRQCHIP_STATE_ACTIVE,
-> >> -						    true);
-> >>  			vgic_irq_set_queued(vcpu, irq);
-> >> -			WARN_ON(ret);
-> >> +
-> >> +			if (map->shared) {
-> >> +				int ret;
-> >> +
-> >> +				BUG_ON(!map->active);
-> >> +				ret = irq_set_irqchip_state(map->irq,
-> >> +							    IRQCHIP_STATE_ACTIVE,
-> >> +							    true);
-> >> +				WARN_ON(ret);
-> > 
-> > do we have any other example of a shared device or is this really simply
-> > because the timer hardware is fscking strangely tied to the gic and is a
-> > total one-off?
+On 29/07/15 11:08, Hanjun Guo wrote:
+> This self-probe infrastructure works in the similar way as OF,
+> but there is some different in the mechanism:
 > 
-> I don't think of it as a one-off. PMUs could very well be in the same
-> category.
+> For DT, the init fn will be called once it finds compatible strings
+> in DT,  but for ACPI, we init irqchips by static tables, and in
+> static ACPI tables, there are no compatible strings to indicate
+> irqchips, but thanks to the GIC version presented in ACPI table,
+> we can call the corresponding GIC drivers matching the GIC version
+> with this framework.
 > 
-> > In the latter case, would it be cleaner to drop this notion of a shared
-> > device entirely and put all this logic in the arch timer code instead?
+> This mechanism can also be used for clock declare and may also works
+> on x86 for some table parsing too.
 > 
-> My initial implementation did exactly that (hence the cut-n-paste crap
-> you spotted in patch #6). It wasn't bad, but it did put a lot of GIC
-> knowledge inside the timer code, and a few callbacks too many between
-> the two subsystems.
+> This patch is based on Tomasz Nowicki <tomasz.nowicki@linaro.org>'s
+> work.
 > 
-> >> +			}
-> >>  		}
-> >>  	}
-> >>  
-> >> @@ -1366,21 +1369,37 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
-> >>  static int vgic_sync_hwirq(struct kvm_vcpu *vcpu, struct vgic_lr vlr)
-> >>  {
-> >>  	struct irq_phys_map *map;
-> >> +	bool active;
-> >>  	int ret;
-> >>  
-> >>  	if (!(vlr.state & LR_HW))
-> >>  		return 0;
-> >>  
-> >>  	map = vgic_irq_map_search(vcpu, vlr.irq);
-> >> -	BUG_ON(!map || !map->active);
-> >> +	BUG_ON(!map);
-> >> +	BUG_ON(map->shared && !map->active);
-> >>  
-> >>  	ret = irq_get_irqchip_state(map->irq,
-> >>  				    IRQCHIP_STATE_ACTIVE,
-> >> -				    &map->active);
-> >> +				    &active);
-> >>  
-> >>  	WARN_ON(ret);
-> >>  
-> >> -	if (map->active) {
-> >> +	/*
-> >> +	 * For a non-shared interrupt, we have to catter for two
-> > 
-> > s/catter/cater/ ?
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> ---
+>  drivers/irqchip/irq-gic-acpi.c    | 33 +++++++++++++++++++++++++++++++++
+>  include/asm-generic/vmlinux.lds.h | 13 +++++++++++++
+>  include/linux/acpi.h              | 16 ++++++++++++++++
+>  include/linux/irqchip.h           | 13 +++++++++++++
+>  include/linux/mod_devicetable.h   |  8 ++++++++
+>  5 files changed, 83 insertions(+)
 > 
-> Yup.
-> 
-> >> +	 * possible deactivation conditions
-> > 
-> > conditions:
-> > 
-> >> +	 *
-> >> +	 * - the interrupt is now inactive
-> >> +	 * - the interrupt is still active, but is flagged as not
-> >> +	 *   queued, indicating another interrupt has fired before we
-> >> +	 *   could observe the deactivate.
-> > 
-> > are these physical or virtual interrupts we are talking about?  I assume
-> > virtual, but it would be good to be specific.  It's not like we're going
-> > to remember any of this in a little bit.
-> 
-> There is a massive ambiguity here. It should read:
-> - the physical interrupt is now inactive (EOIed from the guest)
-> - the physical interrupt is still active, but its virtual counterpart is
-> flagged as "not queued", indicating another interrupt has fired between
-> the EOI and the guest exit.
-> 
-> >> +	 */
-> >> +	if (!map->shared)
-> >> +		return !active || !vgic_irq_is_queued(vcpu, vlr.irq);
-> > 
-> > if the second part of the disjunction returns true, doesn't this mean
-> > we can potentially write the active+pending state in the LR for a HW
-> > interrupt, which is not allowed?
-> 
-> I don't think so. If the physical interrupt has fired, it is because it
-> has been EOIed (hence deactivated) first (the active state would
-> otherwise prevent it from firing).
-> 
-> >> +
-> >> +	map->active = active;
-> >> +
-> >> +	if (active) {
-> > 
-> > should you be doing this for a non-shared interrupt?
-> 
-> No. A non-shared interrupt is only dealt with by a single VM, so there
-> is no need to clear its state. That would actually completely confuse
-> both the device and the VM if you did, because you could now inject a
-> new interrupt while the previous one is still in progress. Mayhem follows...
-> 
-> >>  		ret = irq_set_irqchip_state(map->irq,
-> >>  					    IRQCHIP_STATE_ACTIVE,
-> >>  					    false);
-> >> @@ -1523,6 +1542,7 @@ static int vgic_update_irq_pending(struct kvm *kvm, int cpuid,
-> >>  	int edge_triggered, level_triggered;
-> >>  	int enabled;
-> >>  	bool ret = true, can_inject = true;
-> >> +	struct irq_phys_map *map;
-> >>  
-> >>  	spin_lock(&dist->lock);
-> >>  
-> >> @@ -1569,6 +1589,18 @@ static int vgic_update_irq_pending(struct kvm *kvm, int cpuid,
-> >>  		goto out;
-> >>  	}
-> >>  
-> >> +	map = vgic_irq_map_search(vcpu, irq_num);
-> >> +	if (map && !map->shared) {
-> >> +		/*
-> >> +		 * We are told to inject a HW irq, so we have to trust
-> >> +		 * the caller that the previous one has been EOIed,
-> >> +		 * and that a new one is now active. Clearing the
-> >> +		 * queued state will have the effect of making it
-> >> +		 * sample-able again.
-> >> +		 */
-> >> +		vgic_irq_clear_queued(vcpu, irq_num);
-> > 
-> > see my question above about active+pending
-> 
-> I hope I convinced you above. I realize there is one thing missing
-> though. Userspace shouldn't be allowed to inject a mapped interrupt.
-> Ever. I'll fix that.
+> diff --git a/drivers/irqchip/irq-gic-acpi.c b/drivers/irqchip/irq-gic-acpi.c
+> index 6537b43..011468d 100644
+> --- a/drivers/irqchip/irq-gic-acpi.c
+> +++ b/drivers/irqchip/irq-gic-acpi.c
+> @@ -107,3 +107,36 @@ static int __init acpi_gic_version_init(void)
+>  
+>  	return 0;
+>  }
+> +
+> +/*
+> + * This special acpi_table_id is the sentinel at the end of the
+> + * acpi_table_id[] array of all irqchips. It is automatically placed at
+> + * the end of the array by the linker, thanks to being part of a
+> + * special section.
+> + */
+> +static const struct acpi_table_id
+> +irqchip_acpi_match_end __used __section(__irqchip_acpi_table_end);
+
+What is this thing for? Nobody refers to it (I know
+drivers/irqchip/irqchip.c has a similar thing, but that's not enough a
+reason...).
+
+> +
+> +extern struct acpi_table_id __irqchip_acpi_table[];
+> +
+> +void __init acpi_irqchip_init(void)
+> +{
+> +	struct acpi_table_id *id;
+> +
+> +	if (acpi_disabled)
+> +		return;
+> +
+> +	if (acpi_gic_version_init())
+> +		return;
+
+This is the only place where we need the version, right? So just get
+acpi_gic_version_init to return the version number, and loose the global
+variable.
+
+> +
+> +	/* scan the irqchip table to match the GIC version and its driver */
+> +	for (id = __irqchip_acpi_table; id->id[0]; id++) {
+> +		if (gic_version == (u8)id->driver_data) {
+> +			acpi_table_parse(id->id,
+> +					 (acpi_tbl_table_handler)id->handler);
+> +			return;
+> +		}
+> +	}
+> +
+> +	pr_err("No matched driver GIC version %d\n", gic_version);
+> +}
+> diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
+> index 8bd374d..625776c 100644
+> --- a/include/asm-generic/vmlinux.lds.h
+> +++ b/include/asm-generic/vmlinux.lds.h
+> @@ -181,6 +181,18 @@
+>  #define CPUIDLE_METHOD_OF_TABLES() OF_TABLE(CONFIG_CPU_IDLE, cpuidle_method)
+>  #define EARLYCON_OF_TABLES()	OF_TABLE(CONFIG_SERIAL_EARLYCON, earlycon)
+>  
+> +#ifdef CONFIG_ACPI
+> +#define ACPI_TABLE(name)						\
+> +	. = ALIGN(8);							\
+> +	VMLINUX_SYMBOL(__##name##_acpi_table) = .;			\
+> +	*(__##name##_acpi_table)					\
+> +	*(__##name##_acpi_table_end)
+> +
+> +#define IRQCHIP_ACPI_MATCH_TABLE()	ACPI_TABLE(irqchip)
+> +#else
+> +#define IRQCHIP_ACPI_MATCH_TABLE()
+> +#endif
+> +
+>  #define KERNEL_DTB()							\
+>  	STRUCT_ALIGN();							\
+>  	VMLINUX_SYMBOL(__dtb_start) = .;				\
+> @@ -516,6 +528,7 @@
+>  	CPUIDLE_METHOD_OF_TABLES()					\
+>  	KERNEL_DTB()							\
+>  	IRQCHIP_OF_MATCH_TABLE()					\
+> +	IRQCHIP_ACPI_MATCH_TABLE()					\
+>  	EARLYCON_TABLE()						\
+>  	EARLYCON_OF_TABLES()
+>  
+> diff --git a/include/linux/acpi.h b/include/linux/acpi.h
+> index 0820cb1..04dd0bb 100644
+> --- a/include/linux/acpi.h
+> +++ b/include/linux/acpi.h
+> @@ -829,4 +829,20 @@ static inline struct acpi_device *acpi_get_next_child(struct device *dev,
+>  
+>  #endif
+>  
+> +#ifdef CONFIG_ACPI
+> +#define ACPI_DECLARE(table, name, table_id, data, fn)			\
+> +	static const struct acpi_table_id __acpi_table_##name		\
+> +		__used __section(__##table##_acpi_table)		\
+> +		 = { .id = table_id,					\
+> +		     .handler = (void *)fn,				\
+> +		     .driver_data = data }
+> +#else
+> +#define ACPI_DECLARE(table, name, table_id, data, fn)			\
+> +	static const struct acpi_table_id __acpi_table_##name		\
+> +		__attribute__((unused))					\
+> +		 = { .id = table_id,					\
+> +		     .handler = (void *)fn,				\
+> +		     .driver_data = data }
+> +#endif
+> +
+>  #endif	/*_LINUX_ACPI_H*/
+> diff --git a/include/linux/irqchip.h b/include/linux/irqchip.h
+> index 6388873..6b66d3e 100644
+> --- a/include/linux/irqchip.h
+> +++ b/include/linux/irqchip.h
+> @@ -11,6 +11,7 @@
+>  #ifndef _LINUX_IRQCHIP_H
+>  #define _LINUX_IRQCHIP_H
+>  
+> +#include <linux/acpi.h>
+>  #include <linux/of.h>
+>  
+>  /*
+> @@ -25,6 +26,18 @@
+>   */
+>  #define IRQCHIP_DECLARE(name, compat, fn) OF_DECLARE_2(irqchip, name, compat, fn)
+>  
+> +/*
+> + * This macro must be used by the different ARM GIC drivers to declare
+> + * the association between their version and their initialization function.
+> + *
+> + * @name: name that must be unique accross all IRQCHIP_ACPI_DECLARE of the
+> + * same file.
+> + * @gic_version: version of GIC
+> + * @fn: initialization function
+> + */
+> +#define IRQCHIP_ACPI_DECLARE(name, gic_version, fn)	\
+> +	ACPI_DECLARE(irqchip, name, ACPI_SIG_MADT, gic_version, fn)
+
+I don't think this is the right approach. The MADT table has a *huge*
+number of possible subtables, and none of them is matched by the GIC
+version.
+
+What you *really* want is MADT -> GICD -> GIC type. Your ACPI_DECLARE
+macro doesn't reflect this at all (you've basically cloned OF, and
+that's clearly not good enough).
+
+This probably require an intermediate matching function, ending up with
+something like:
+
+#define IRQCHIP_ACPI_DECLARE(name, subtable, version, fn) \
+	ACPI_DECLARE(irqchip, name, ACPI_SIG_MADT, match_madt_subtable,\
+		subtable, version, fn)
+
+where match_madt_subtable is going to check that a given subtable is
+really suitable for a given irqchip. None of that should be GIC
+specific, really.
+
+> +
+>  #ifdef CONFIG_IRQCHIP
+>  void irqchip_init(void);
+>  #else
+> diff --git a/include/linux/mod_devicetable.h b/include/linux/mod_devicetable.h
+> index 34f25b7..105be1f 100644
+> --- a/include/linux/mod_devicetable.h
+> +++ b/include/linux/mod_devicetable.h
+> @@ -193,6 +193,14 @@ struct acpi_device_id {
+>  	__u32 cls_msk;
+>  };
+>  
+> +#define ACPI_TABLE_ID_LEN	5
+> +
+> +struct acpi_table_id {
+> +	__u8 id[ACPI_TABLE_ID_LEN];
+> +	const void *handler;
+> +	kernel_ulong_t driver_data;
+> +};
+> +
+>  #define PNP_ID_LEN	8
+>  #define PNP_MAX_DEVICES	8
+>  
 > 
 
-I think I get it; I think the confusion comes from the fact that all
-this depends on the non-shared forwareded interrupts must be configured
-with separate deactivate and priority drop (correct?), and since this
-support is not in nor is a requirement for this series, it's kind of
-hard to understand.
+Thanks,
 
-I noticed now that you had in the cover letter that this patch wasn't
-intended for merging, but I didn't before...
-
-> >> +	}
-> >> +
-> >>  	if (!vgic_can_sample_irq(vcpu, irq_num)) {
-> >>  		/*
-> >>  		 * Level interrupt in progress, will be picked up
-> >> @@ -1662,7 +1694,7 @@ static struct list_head *vgic_get_irq_phys_map(struct kvm_vcpu *vcpu,
-> >>  }
-> >>  
-> >>  struct irq_phys_map *vgic_map_phys_irq(struct kvm_vcpu *vcpu,
-> >> -				       int virt_irq, int irq)
-> >> +				       int virt_irq, int irq, bool shared)
-> >>  {
-> >>  	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-> >>  	struct list_head *root = vgic_get_irq_phys_map(vcpu, virt_irq);
-> >> @@ -1691,7 +1723,8 @@ struct irq_phys_map *vgic_map_phys_irq(struct kvm_vcpu *vcpu,
-> >>  	if (map) {
-> >>  		/* Make sure this mapping matches */
-> >>  		if (map->phys_irq != phys_irq	||
-> >> -		    map->irq      != irq)
-> >> +		    map->irq      != irq	||
-> >> +		    map->shared   != shared)
-> > 
-> > this really feels like a BUG() - if we have an existing mapping for the
-> > same virtual IRQ, but it's shared in one case and not shared in the
-> > other?  Shouldn we even allow the caller to get this far?
-> 
-> How early do you want to detect it? All we can do is tell the caller to
-> bugger off by returning an error (we return NULL at the moment, meaning
-> that the caller doesn't get a mapping at all).
-> 
-
-fair enough, I hope the caller then has a BUG_ON(mapping == NULL).
-
--Christoffer
+	M.
+-- 
+Jazz is not dead. It just smells funny...
