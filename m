@@ -1,67 +1,113 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Tue,  4 Aug 2015 11:23:17 +0200
-Subject: [PATCH 0/6] gpiolib: Add GPIO name support
-Message-ID: <1438680203-13432-1-git-send-email-mpa@pengutronix.de>
+Date: Tue,  4 Aug 2015 11:23:19 +0200
+Subject: [PATCH 2/6] gpio: Introduce gpio descriptor 'name'
+In-Reply-To: <1438680203-13432-1-git-send-email-mpa@pengutronix.de>
+References: <1438680203-13432-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <1438680203-13432-3-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The latest gpio hogging mechanism assigns each gpio a 'line-name' in the
+devicetree. The 'name' field is different from the 'label' field.
+'label' is only used for requested GPIOs to describe its current use by
+driver or userspace.
 
-Changes in v2:
- - Removed patch 'gpiolib: Fix possible use of wrong name'
- - Removed discussed patch 'gpio: Allow hogged gpios to be requested' from this
-   series
- - Fixed show gpio name patch (locks, (null) printing, and getting the descriptor)
- - Merged gpio name patch into gpio_name_to_desc() patch
+The 'name' field describes the GPIO itself, not the use. This is most
+likely identical to the label in the schematic on the GPIO line and
+should help to find this particular GPIO.
 
-Description from v1:
+This patch adds a helper function to find gpio descriptors by name
+instead of gpio number.
 
-This is a proposal to add GPIO names to the kernel based on devicetree
-descriptions.
-
-This series adds GPIO name support. Until now it is only possible to use names
-for already requested GPIOs (for example what they are used for). It is not
-possible to identify GPIOs by a name although most of them have a name for
-example in the schematics of the board. This makes it difficult to identify
-a specific GPIO from userspace.
-
-As the GPIO name information is a hardware description this series uses the
-devicetree bindings introduced by the GPIO hogging mechanism, specifically
-'line-name', to identify GPIOs. The sysfs 'export' file is changed to accept
-names as fallback. The gpio numbers still have a higher priority to ensure
-backwards compatibility.
-
-Exported GPIOs are still using their number as directory name (gpio<ID>). But the
-directories now contain a 'name' file which is '' for non-existent names and
-the name otherwise.
-
-This series can be used to have an easy name mapping for udev with a quite
-simple rule similar to this:
-	SUBSYSTEM=="gpio", KERNEL=="gpio*", ATTR{name}!="(null)", ACTION=="add", \
-	PROGRAM+="/bin/sh -c 'mkdir -p /dev/gpios; rm -f /dev/gpios/$attr{name}; ln -s /sys%p/ /dev/gpios/$attr{name}"
-With this rule udev adds a link for each exported GPIO with a name into
-/dev/gpios/. This way it is not necessary to know the number of a GPIO to use
-it.
-
-Best Regards,
-
-Markus
-
-
-Markus Pargmann (6):
-  gpiolib-of: Rename gpio_hog functions to be generic
-  gpio: Introduce gpio descriptor 'name'
-  gpiolib-of: Reuse 'line-name' from DT as gpio descriptor name
-  gpiolib-sysfs: Add gpio name parsing for sysfs export
-  gpiolib-sysfs: Show gpio-name in /sys/class/gpio/gpio*/name
-  gpiolib: Add gpio name information to /sys/kernel/debug/gpio
-
- drivers/gpio/gpiolib-of.c     | 41 ++++++++++++++++++------------
- drivers/gpio/gpiolib-sysfs.c  | 59 +++++++++++++++++++++++++++++++++----------
- drivers/gpio/gpiolib.c        | 43 ++++++++++++++++++++++++++++---
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+---
+ drivers/gpio/gpiolib.c        | 32 ++++++++++++++++++++++++++++++++
  drivers/gpio/gpiolib.h        |  3 +++
- include/linux/gpio/consumer.h |  7 +++++
- 5 files changed, 121 insertions(+), 32 deletions(-)
+ include/linux/gpio/consumer.h |  7 +++++++
+ 3 files changed, 42 insertions(+)
 
+diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
+index bf4bd1d120c3..edfeb0485112 100644
+--- a/drivers/gpio/gpiolib.c
++++ b/drivers/gpio/gpiolib.c
+@@ -90,6 +90,38 @@ struct gpio_desc *gpio_to_desc(unsigned gpio)
+ EXPORT_SYMBOL_GPL(gpio_to_desc);
+ 
+ /**
++ * Convert a GPIO name to its descriptor
++ */
++struct gpio_desc *gpio_name_to_desc(const char *name)
++{
++	struct gpio_chip *chip;
++	unsigned long flags;
++
++	spin_lock_irqsave(&gpio_lock, flags);
++
++	list_for_each_entry(chip, &gpio_chips, list) {
++		int i;
++
++		for (i = 0; i != chip->ngpio; ++i) {
++			struct gpio_desc *gpio = &chip->desc[i];
++
++			if (!gpio->name)
++				continue;
++
++			if (!strcmp(gpio->name, name)) {
++				spin_unlock_irqrestore(&gpio_lock, flags);
++				return gpio;
++			}
++		}
++	}
++
++	spin_unlock_irqrestore(&gpio_lock, flags);
++
++	return NULL;
++}
++EXPORT_SYMBOL_GPL(gpio_name_to_desc);
++
++/**
+  * Get the GPIO descriptor corresponding to the given hw number for this chip.
+  */
+ struct gpio_desc *gpiochip_get_desc(struct gpio_chip *chip,
+diff --git a/drivers/gpio/gpiolib.h b/drivers/gpio/gpiolib.h
+index bf343004b008..78e634d1c719 100644
+--- a/drivers/gpio/gpiolib.h
++++ b/drivers/gpio/gpiolib.h
+@@ -89,7 +89,10 @@ struct gpio_desc {
+ #define FLAG_USED_AS_IRQ 9	/* GPIO is connected to an IRQ */
+ #define FLAG_IS_HOGGED	11	/* GPIO is hogged */
+ 
++	/* Connection label */
+ 	const char		*label;
++	/* Name of the GPIO */
++	const char		*name;
+ };
+ 
+ int gpiod_request(struct gpio_desc *desc, const char *label);
+diff --git a/include/linux/gpio/consumer.h b/include/linux/gpio/consumer.h
+index adac255aee86..a873b8b47ab3 100644
+--- a/include/linux/gpio/consumer.h
++++ b/include/linux/gpio/consumer.h
+@@ -130,6 +130,7 @@ int gpiod_to_irq(const struct gpio_desc *desc);
+ /* Convert between the old gpio_ and new gpiod_ interfaces */
+ struct gpio_desc *gpio_to_desc(unsigned gpio);
+ int desc_to_gpio(const struct gpio_desc *desc);
++struct gpio_desc *gpio_name_to_desc(const char *name);
+ 
+ /* Child properties interface */
+ struct fwnode_handle;
+@@ -400,6 +401,12 @@ static inline struct gpio_desc *gpio_to_desc(unsigned gpio)
+ {
+ 	return ERR_PTR(-EINVAL);
+ }
++
++static inline struct gpio_desc *gpio_name_to_desc(const char *name)
++{
++	return ERR_PTR(-EINVAL);
++}
++
+ static inline int desc_to_gpio(const struct gpio_desc *desc)
+ {
+ 	/* GPIO can never have been requested */
 -- 
 2.1.4
