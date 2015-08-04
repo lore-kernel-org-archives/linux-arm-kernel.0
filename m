@@ -1,154 +1,333 @@
-From: jslaby@suse.cz (Jiri Slaby)
-Date: Tue,  4 Aug 2015 16:40:50 +0200
-Subject: [PATCH 3.12 106/123] clocksource: exynos_mct: Avoid blocking calls in
- the cpu hotplug notifier
-In-Reply-To: <fe2a2e06fd8af3a00d18691ffeb2b636f685bee4.1438699154.git.jslaby@suse.cz>
-References: <fe2a2e06fd8af3a00d18691ffeb2b636f685bee4.1438699154.git.jslaby@suse.cz>
-Message-ID: <e3c69a44b6ce185cd00a85fca03984d17c305338.1438699154.git.jslaby@suse.cz>
+From: scott.shu@mediatek.com (Scott Shu)
+Date: Tue, 4 Aug 2015 21:54:19 +0800
+Subject: [PATCH v3 3/8] soc: Mediatek: Add SCPSYS CPU power domain driver
+In-Reply-To: <1438696464-59858-1-git-send-email-scott.shu@mediatek.com>
+References: <1438696464-59858-1-git-send-email-scott.shu@mediatek.com>
+Message-ID: <1438696464-59858-4-git-send-email-scott.shu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Damian Eppel <d.eppel@samsung.com>
+This adds a CPU power domain driver for the Mediatek SCPSYS unit on
+MT6580.
 
-3.12-stable review patch.  If anyone has any objections, please let me know.
-
-===============
-
-commit 56a94f13919c0db5958611b388e1581b4852f3c9 upstream.
-
-Whilst testing cpu hotplug events on kernel configured with
-DEBUG_PREEMPT and DEBUG_ATOMIC_SLEEP we get following BUG message,
-caused by calling request_irq() and free_irq() in the context of
-hotplug notification (which is in this case atomic context).
-
-[   40.785859] CPU1: Software reset
-[   40.786660] BUG: sleeping function called from invalid context at mm/slub.c:1241
-[   40.786668] in_atomic(): 1, irqs_disabled(): 128, pid: 0, name: swapper/1
-[   40.786678] Preemption disabled at:[<  (null)>]   (null)
-[   40.786681]
-[   40.786692] CPU: 1 PID: 0 Comm: swapper/1 Not tainted 3.19.0-rc4-00024-g7dca860 #36
-[   40.786698] Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
-[   40.786728] [<c0014a00>] (unwind_backtrace) from [<c0011980>] (show_stack+0x10/0x14)
-[   40.786747] [<c0011980>] (show_stack) from [<c0449ba0>] (dump_stack+0x70/0xbc)
-[   40.786767] [<c0449ba0>] (dump_stack) from [<c00c6124>] (kmem_cache_alloc+0xd8/0x170)
-[   40.786785] [<c00c6124>] (kmem_cache_alloc) from [<c005d6f8>] (request_threaded_irq+0x64/0x128)
-[   40.786804] [<c005d6f8>] (request_threaded_irq) from [<c0350b8c>] (exynos4_local_timer_setup+0xc0/0x13c)
-[   40.786820] [<c0350b8c>] (exynos4_local_timer_setup) from [<c0350ca8>] (exynos4_mct_cpu_notify+0x30/0xa8)
-[   40.786838] [<c0350ca8>] (exynos4_mct_cpu_notify) from [<c003b330>] (notifier_call_chain+0x44/0x84)
-[   40.786857] [<c003b330>] (notifier_call_chain) from [<c0022fd4>] (__cpu_notify+0x28/0x44)
-[   40.786873] [<c0022fd4>] (__cpu_notify) from [<c0013714>] (secondary_start_kernel+0xec/0x150)
-[   40.786886] [<c0013714>] (secondary_start_kernel) from [<40008764>] (0x40008764)
-
-Interrupts cannot be requested/freed in the CPU_STARTING/CPU_DYING
-notifications which run on the hotplugged cpu with interrupts and
-preemption disabled.
-
-To avoid the issue, request the interrupts for all possible cpus in
-the boot code. The interrupts are marked NO_AUTOENABLE to avoid a racy
-request_irq/disable_irq() sequence. The flag prevents the
-request_irq() code from enabling the interrupt immediately.
-
-The interrupt is then enabled in the CPU_STARTING notifier of the
-hotplugged cpu and again disabled with disable_irq_nosync() in the
-CPU_DYING notifier.
-
-[ tglx: Massaged changelog to match the patch ]
-
-Fixes: 7114cd749a12 ("clocksource: exynos_mct: use (request/free)_irq calls for local timer registration")
-Reported-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Tested-by: Marcin Jabrzyk <m.jabrzyk@samsung.com>
-Signed-off-by: Damian Eppel <d.eppel@samsung.com>
-Cc: m.szyprowski at samsung.com
-Cc: kyungmin.park at samsung.com
-Cc: daniel.lezcano at linaro.org
-Cc: kgene at kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Link: http://lkml.kernel.org/r/1435324984-7328-1-git-send-email-d.eppel at samsung.com
-Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-Cc: <stable@vger.kernel.org>
-Signed-off-by: Jiri Slaby <jslaby@suse.cz>
+Signed-off-by: Scott Shu <scott.shu@mediatek.com>
 ---
- drivers/clocksource/exynos_mct.c | 43 ++++++++++++++++++++++++++++------------
- 1 file changed, 30 insertions(+), 13 deletions(-)
+ drivers/soc/mediatek/mtk-scpsys.c   |  250 +++++++++++++++++++++++++++++++++++
+ include/linux/soc/mediatek/scpsys.h |    9 ++
+ 2 files changed, 259 insertions(+)
+ create mode 100644 include/linux/soc/mediatek/scpsys.h
 
-diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
-index 12fbec743fac..fc0e502022de 100644
---- a/drivers/clocksource/exynos_mct.c
-+++ b/drivers/clocksource/exynos_mct.c
-@@ -418,15 +418,12 @@ static int exynos4_local_timer_setup(struct clock_event_device *evt)
- 	exynos4_mct_write(TICK_BASE_CNT, mevt->base + MCT_L_TCNTB_OFFSET);
+diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
+index 43a79ed..ca0f2dd 100644
+--- a/drivers/soc/mediatek/mtk-scpsys.c
++++ b/drivers/soc/mediatek/mtk-scpsys.c
+@@ -15,18 +15,30 @@
+ #include <linux/io.h>
+ #include <linux/kernel.h>
+ #include <linux/mfd/syscon.h>
++#include <linux/of.h>
+ #include <linux/of_device.h>
++#include <linux/of_address.h>
+ #include <linux/platform_device.h>
+ #include <linux/pm_domain.h>
+ #include <linux/regmap.h>
+ #include <linux/soc/mediatek/infracfg.h>
++#include <linux/soc/mediatek/scpsys.h>
+ #include <dt-bindings/power/mt8173-power.h>
  
- 	if (mct_int_type == MCT_INT_SPI) {
--		evt->irq = mct_irqs[MCT_L0_IRQ + cpu];
--		if (request_irq(evt->irq, exynos4_mct_tick_isr,
--				IRQF_TIMER | IRQF_NOBALANCING,
--				evt->name, mevt)) {
--			pr_err("exynos-mct: cannot register IRQ %d\n",
--				evt->irq);
-+
-+		if (evt->irq == -1)
- 			return -EIO;
--		}
--		irq_force_affinity(mct_irqs[MCT_L0_IRQ + cpu], cpumask_of(cpu));
-+
-+		irq_force_affinity(evt->irq, cpumask_of(cpu));
-+		enable_irq(evt->irq);
- 	} else {
- 		enable_percpu_irq(mct_irqs[MCT_L0_IRQ], 0);
- 	}
-@@ -439,10 +436,12 @@ static int exynos4_local_timer_setup(struct clock_event_device *evt)
- static void exynos4_local_timer_stop(struct clock_event_device *evt)
- {
- 	evt->set_mode(CLOCK_EVT_MODE_UNUSED, evt);
--	if (mct_int_type == MCT_INT_SPI)
--		free_irq(evt->irq, this_cpu_ptr(&percpu_mct_tick));
--	else
-+	if (mct_int_type == MCT_INT_SPI) {
-+		if (evt->irq != -1)
-+			disable_irq_nosync(evt->irq);
-+	} else {
- 		disable_percpu_irq(mct_irqs[MCT_L0_IRQ]);
-+	}
- }
++#define SPM_POWERON_CONFIG_SET		0x0000
++#define SPM_CA7_CPU0_PWR_CON		0x0200
+ #define SPM_VDE_PWR_CON			0x0210
+ #define SPM_MFG_PWR_CON			0x0214
++#define SPM_CA7_CPU1_PWR_CON		0x0218
++#define SPM_CA7_CPU2_PWR_CON		0x021c
++#define SPM_CA7_CPU3_PWR_CON		0x0220
+ #define SPM_VEN_PWR_CON			0x0230
+ #define SPM_ISP_PWR_CON			0x0238
+ #define SPM_DIS_PWR_CON			0x023c
++#define SPM_CA7_CPU0_L1_PDN		0x025c
++#define SPM_CA7_CPU1_L1_PDN		0x0264
++#define SPM_CA7_CPU2_L1_PDN		0x026c
++#define SPM_CA7_CPU3_L1_PDN		0x0274
+ #define SPM_VEN2_PWR_CON		0x0298
+ #define SPM_AUDIO_PWR_CON		0x029c
+ #define SPM_MFG_2D_PWR_CON		0x02c0
+@@ -34,12 +46,20 @@
+ #define SPM_USB_PWR_CON			0x02cc
+ #define SPM_PWR_STATUS			0x060c
+ #define SPM_PWR_STATUS_2ND		0x0610
++#define SPM_SLEEP_TIMER_STA		0x0720
  
- static int exynos4_mct_cpu_notify(struct notifier_block *self,
-@@ -474,7 +473,7 @@ static struct notifier_block exynos4_mct_cpu_nb = {
++/* bit definition in SPM_CA7_CPUx_PWR_CON */
+ #define PWR_RST_B_BIT			BIT(0)
+ #define PWR_ISO_BIT			BIT(1)
+ #define PWR_ON_BIT			BIT(2)
+ #define PWR_ON_2ND_BIT			BIT(3)
+ #define PWR_CLK_DIS_BIT			BIT(4)
++#define SRAM_CKISO_BIT			BIT(5)
++#define SRAM_ISOINT_B_BIT		BIT(6)
++
++/* bit definition in SPM_CA7_CPUx_L1_PDN */
++#define L1_PDN				BIT(0)
++#define L1_PDN_ACK			BIT(8)
  
- static void __init exynos4_timer_resources(struct device_node *np, void __iomem *base)
- {
--	int err;
-+	int err, cpu;
- 	struct mct_clock_event_device *mevt = this_cpu_ptr(&percpu_mct_tick);
- 	struct clk *mct_clk, *tick_clk;
+ #define PWR_STATUS_DISP			BIT(3)
+ #define PWR_STATUS_MFG			BIT(4)
+@@ -52,6 +72,28 @@
+ #define PWR_STATUS_AUDIO		BIT(24)
+ #define PWR_STATUS_USB			BIT(25)
  
-@@ -501,7 +500,25 @@ static void __init exynos4_timer_resources(struct device_node *np, void __iomem
- 		WARN(err, "MCT: can't request IRQ %d (%d)\n",
- 		     mct_irqs[MCT_L0_IRQ], err);
- 	} else {
--		irq_set_affinity(mct_irqs[MCT_L0_IRQ], cpumask_of(0));
-+		for_each_possible_cpu(cpu) {
-+			int mct_irq = mct_irqs[MCT_L0_IRQ + cpu];
-+			struct mct_clock_event_device *pcpu_mevt =
-+				per_cpu_ptr(&percpu_mct_tick, cpu);
++#define MT6580_MAX_CPUS			4
 +
-+			pcpu_mevt->evt.irq = -1;
++#ifdef CONFIG_SMP
++static DEFINE_SPINLOCK(spm_cpu_lock);
 +
-+			irq_set_status_flags(mct_irq, IRQ_NOAUTOEN);
-+			if (request_irq(mct_irq,
-+					exynos4_mct_tick_isr,
-+					IRQF_TIMER | IRQF_NOBALANCING,
-+					pcpu_mevt->name, pcpu_mevt)) {
-+				pr_err("exynos-mct: cannot register IRQ (cpu%d)\n",
-+									cpu);
++static void __iomem *spm_cpu_base;
 +
-+				continue;
-+			}
-+			pcpu_mevt->evt.irq = mct_irq;
++static const u32 spm_cpu_pwr_con[MT6580_MAX_CPUS] = {
++	SPM_CA7_CPU0_PWR_CON,
++	SPM_CA7_CPU1_PWR_CON,
++	SPM_CA7_CPU2_PWR_CON,
++	SPM_CA7_CPU3_PWR_CON,
++};
++
++static const u32 spm_cpu_l1_pdn[MT6580_MAX_CPUS] = {
++	SPM_CA7_CPU0_L1_PDN,
++	SPM_CA7_CPU1_L1_PDN,
++	SPM_CA7_CPU2_L1_PDN,
++	SPM_CA7_CPU3_L1_PDN,
++};
++#endif
++
+ enum clk_id {
+ 	MT8173_CLK_MM,
+ 	MT8173_CLK_MFG,
+@@ -485,3 +527,211 @@ static struct platform_driver scpsys_drv = {
+ };
+ 
+ module_platform_driver_probe(scpsys_drv, scpsys_probe);
++
++#define SPM_REGWR_EN		BIT(0)
++#define SPM_PROJECT_CODE	0x0B16
++
++#ifdef CONFIG_SMP
++int spm_cpu_mtcmos_on(int cpu)
++{
++	unsigned long flags;
++	static u32 spmcpu_pwr_con, spmcpu_l1_pdn;
++	unsigned int cbit, temp;
++	int timeout = 10;
++	int ret = 0;
++
++	temp = (SPM_PROJECT_CODE << 16) | SPM_REGWR_EN;
++	writel_relaxed(temp, spm_cpu_base + SPM_POWERON_CONFIG_SET);
++
++	spmcpu_pwr_con = spm_cpu_pwr_con[cpu];
++	spmcpu_l1_pdn = spm_cpu_l1_pdn[cpu];
++
++	spin_lock_irqsave(&spm_cpu_lock, flags);
++
++	/* Set PWR_ON */
++	temp = readl_relaxed(spm_cpu_base + spmcpu_pwr_con);
++	temp |= PWR_ON_BIT;
++	writel_relaxed(temp, spm_cpu_base + spmcpu_pwr_con);
++
++	/* Wait for charging core power */
++	udelay(1);
++
++	/* Set PWR_ON_2ND */
++	temp = readl_relaxed(spm_cpu_base + spmcpu_pwr_con);
++	temp |= PWR_ON_2ND_BIT;
++	writel_relaxed(temp, spm_cpu_base + spmcpu_pwr_con);
++
++	/* Wait for the power-ack */
++	cbit = BIT(13 - cpu);
++	while (((readl_relaxed(spm_cpu_base + SPM_PWR_STATUS) &
++		 cbit) != cbit) ||
++	       (readl_relaxed(spm_cpu_base + SPM_PWR_STATUS_2ND) &
++		 cbit) != cbit) {
++		if (--timeout == 0) {
++			ret = -ENXIO;
++			goto fail;
 +		}
- 	}
- 
- 	err = register_cpu_notifier(&exynos4_mct_cpu_nb);
++		udelay(1);
++	}
++
++	temp = readl_relaxed(spm_cpu_base + spmcpu_pwr_con);
++	temp &= ~PWR_ISO_BIT;
++	writel_relaxed(temp, spm_cpu_base + spmcpu_pwr_con);
++
++	/* L1 power on */
++	temp = readl_relaxed(spm_cpu_base + spmcpu_l1_pdn);
++	temp &= ~L1_PDN;
++	writel_relaxed(temp, spm_cpu_base + spmcpu_l1_pdn);
++	timeout = 10;
++	while ((readl_relaxed(spm_cpu_base + spmcpu_l1_pdn) &
++		L1_PDN_ACK) != 0) {
++		if (--timeout == 0) {
++			ret = -ENXIO;
++			goto fail;
++		}
++		udelay(1);
++	}
++
++	/* Wait for memory power ready */
++	udelay(1);
++
++	/* Set SRAM_ISOINT_B */
++	temp = readl_relaxed(spm_cpu_base + spmcpu_pwr_con);
++	temp |= SRAM_ISOINT_B_BIT;
++	writel_relaxed(temp, spm_cpu_base + spmcpu_pwr_con);
++
++	/* Clear SRAM_CKISO */
++	temp = readl_relaxed(spm_cpu_base + spmcpu_pwr_con);
++	temp &= ~SRAM_CKISO_BIT;
++	writel_relaxed(temp, spm_cpu_base + spmcpu_pwr_con);
++
++	/* Clear PWR_CLK_DIS */
++	temp = readl_relaxed(spm_cpu_base + spmcpu_pwr_con);
++	temp &= ~PWR_CLK_DIS_BIT;
++	writel_relaxed(temp, spm_cpu_base + spmcpu_pwr_con);
++
++	/* Set PWR_RST_B to finish power on and reset sequences */
++	temp = readl_relaxed(spm_cpu_base + spmcpu_pwr_con);
++	temp |= PWR_RST_B_BIT;
++	writel_relaxed(temp, spm_cpu_base + spmcpu_pwr_con);
++fail:
++	spin_unlock_irqrestore(&spm_cpu_lock, flags);
++
++	return ret;
++}
++
++int spm_cpu_mtcmos_off(int cpu, bool wfi)
++{
++	unsigned long flags;
++	static u32 spmcpu_pwr_con, spmcpu_l1_pdn;
++	unsigned int cbit, temp;
++	int timeout = 10;
++	int ret = 0;
++
++	temp = (SPM_PROJECT_CODE << 16) | SPM_REGWR_EN;
++	writel_relaxed(temp, spm_cpu_base + SPM_POWERON_CONFIG_SET);
++
++	spmcpu_pwr_con = spm_cpu_pwr_con[cpu];
++	spmcpu_l1_pdn = spm_cpu_l1_pdn[cpu];
++
++	if (wfi) {
++		while ((readl_relaxed(spm_cpu_base + SPM_SLEEP_TIMER_STA) &
++			(1U << (16 + cpu))) == 0) {
++			if (--timeout == 0)
++				return -ENXIO;
++			udelay(1);
++		}
++	}
++
++	spin_lock_irqsave(&spm_cpu_lock, flags);
++
++	/* Set PWR_ISO */
++	temp = readl_relaxed(spm_cpu_base + spmcpu_pwr_con);
++	temp |= PWR_ISO_BIT;
++	writel_relaxed(temp, spm_cpu_base + spmcpu_pwr_con);
++
++	/* Set SRAM_CKISO */
++	temp = readl_relaxed(spm_cpu_base + spmcpu_pwr_con);
++	temp |= SRAM_CKISO_BIT;
++	writel_relaxed(temp, spm_cpu_base + spmcpu_pwr_con);
++
++	/* Clear SRAM_ISOINT_B */
++	temp = readl_relaxed(spm_cpu_base + spmcpu_pwr_con);
++	temp &= ~SRAM_ISOINT_B_BIT;
++	writel_relaxed(temp, spm_cpu_base + spmcpu_pwr_con);
++
++	/* L1 power off */
++	temp = readl_relaxed(spm_cpu_base + spmcpu_l1_pdn);
++	temp |= L1_PDN;
++	writel_relaxed(temp, spm_cpu_base + spmcpu_l1_pdn);
++	timeout = 10;
++	while ((readl_relaxed(spm_cpu_base + spmcpu_l1_pdn) &
++		L1_PDN_ACK) != L1_PDN_ACK) {
++		if (--timeout == 0) {
++			ret = -ENXIO;
++			goto fail;
++		}
++		udelay(1);
++	}
++
++	/* Clear PWR_RST_B */
++	temp = readl_relaxed(spm_cpu_base + spmcpu_pwr_con);
++	temp &= ~PWR_RST_B_BIT;
++	writel_relaxed(temp, spm_cpu_base + spmcpu_pwr_con);
++
++	/* Set PWR_CLK_DIS */
++	temp = readl_relaxed(spm_cpu_base + spmcpu_pwr_con);
++	temp |= PWR_CLK_DIS_BIT;
++	writel_relaxed(temp, spm_cpu_base + spmcpu_pwr_con);
++
++	/* Clear PWR_ON */
++	temp = readl_relaxed(spm_cpu_base + spmcpu_pwr_con);
++	temp &= ~PWR_ON_BIT;
++	writel_relaxed(temp, spm_cpu_base + spmcpu_pwr_con);
++
++	/* Clear PWR_ON_2ND */
++	temp = readl_relaxed(spm_cpu_base + spmcpu_pwr_con);
++	temp &= ~PWR_ON_2ND_BIT;
++	writel_relaxed(temp, spm_cpu_base + spmcpu_pwr_con);
++
++	timeout = 10;
++	cbit = BIT(13 - cpu);
++	while (((readl_relaxed(spm_cpu_base + SPM_PWR_STATUS) & cbit) != 0) ||
++	       ((readl_relaxed(spm_cpu_base + SPM_PWR_STATUS_2ND) &
++		 cbit) != 0)) {
++		if (--timeout == 0) {
++			ret = -ENXIO;
++			goto fail;
++		}
++		udelay(1);
++	}
++fail:
++	spin_unlock_irqrestore(&spm_cpu_lock, flags);
++
++	return ret;
++}
++#endif /* CONFIG_SMP */
++
++static int __init mtk_scpsys_early_init(void)
++{
++	struct device_node *node;
++	struct resource regs;
++
++	node = of_find_compatible_node(NULL, NULL, "mediatek,mt6580-scpsys");
++	if (node) {
++		if (of_address_to_resource(node, 0, &regs) < 0) {
++			pr_err("Failed to get SCPSYS registers\n");
++			return -ENXIO;
++		}
++
++		spm_cpu_base = ioremap_nocache(regs.start,
++					       resource_size(&regs));
++		if (!spm_cpu_base) {
++			pr_err("%s: Unable to map I/O memory\n", __func__);
++			return -ENODEV;
++		}
++	}
++
++	return 0;
++}
++early_initcall(mtk_scpsys_early_init);
+diff --git a/include/linux/soc/mediatek/scpsys.h b/include/linux/soc/mediatek/scpsys.h
+new file mode 100644
+index 0000000..a14b7a3
+--- /dev/null
++++ b/include/linux/soc/mediatek/scpsys.h
+@@ -0,0 +1,9 @@
++#ifndef __SOC_MEDIATEK_SCPSYS_H
++#define __SOC_MEDIATEK_SCPSYS_H
++
++#include <linux/kernel.h>
++
++int spm_cpu_mtcmos_on(int cpu);
++int spm_cpu_mtcmos_off(int cpu, bool wfi);
++
++#endif
 -- 
-2.5.0
+1.7.9.5
