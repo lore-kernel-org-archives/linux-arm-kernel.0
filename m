@@ -1,44 +1,103 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 4 Aug 2015 16:35:53 -0500
-Subject: [PATCH] musb: sunxi: Ignore VBus errors in host-only mode
-In-Reply-To: <1438723553-4136-1-git-send-email-hdegoede@redhat.com>
-References: <1438723553-4136-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <20150804213553.GI9623@saruman.tx.rr.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 4 Aug 2015 22:45:23 +0100
+Subject: [PATCH] arm64: mm: ensure patched kernel text is fetched from PoC
+In-Reply-To: <1438715013-4625-1-git-send-email-will.deacon@arm.com>
+References: <1438715013-4625-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20150804214522.GA14625@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 04, 2015 at 11:25:53PM +0200, Hans de Goede wrote:
-> For some unclear reason sometimes we get VBus errors in host-only mode,
-> even though we do not have any vbus-detection then. Ignore these.
+Hi Will,
+
+I assume that you meant PoU rather than PoC in the subject.
+
+On Tue, Aug 04, 2015 at 08:03:33PM +0100, Will Deacon wrote:
+> The arm64 booting document requires that the bootloader has cleaned the
+> kernel image to the PoC. However, when a CPU re-enters the kernel due to
+> either a CPU hotplug "on" event or resuming from a low-power state (e.g.
+> cpuidle), the kernel text may in-fact be dirty at the PoU due to things
+> like alternative patching or even module loading.
 > 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> Thanks to I-cache speculation with the MMU off, stale instructions could
+> be fetched prior to enabling the MMU, potentially leading to crashes
+> when executing regions of code that have been modified at runtime.
+> 
+> This patch addresses the issue by ensuring that the local I-cache is
+> invalidated immediately after a CPU has enabled its MMU but before
+> jumping out of the identity mapping. Any stale instructions fetched from
+> the PoC will then be discarded and refetched correctly from the PoU.
+
+It may be worth mentioning that none of the instructions executed up to
+this point will have been patched, so we know that they have remained
+clean to the PoC. Otherwise we'd need to flush those to the PoC
+explicitly.
+
+Other than the typo in the subject, this looks good to me. With that
+fixed:
+
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+
+Thanks,
+Mark.
+
+> 
+> Tested-by: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 > ---
->  drivers/usb/musb/sunxi.c | 4 ++++
->  1 file changed, 4 insertions(+)
+>  arch/arm64/kernel/head.S  | 8 ++++++++
+>  arch/arm64/kernel/sleep.S | 8 ++++++++
+>  arch/arm64/mm/proc.S      | 1 -
+>  3 files changed, 16 insertions(+), 1 deletion(-)
 > 
-> diff --git a/drivers/usb/musb/sunxi.c b/drivers/usb/musb/sunxi.c
-> index f9f6304..34ce5df 100644
-> --- a/drivers/usb/musb/sunxi.c
-> +++ b/drivers/usb/musb/sunxi.c
-> @@ -194,6 +194,10 @@ static irqreturn_t sunxi_musb_interrupt(int irq, void *__hci)
->  		musb_writeb(musb->mregs, MUSB_FADDR, 0);
->  	}
+> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+> index 3a0654173997..a055be6125cf 100644
+> --- a/arch/arm64/kernel/head.S
+> +++ b/arch/arm64/kernel/head.S
+> @@ -634,5 +634,13 @@ __enable_mmu:
+>  	isb
+>  	msr	sctlr_el1, x0
+>  	isb
+> +	/*
+> +	 * Invalidate the local I-cache so that any instructions fetched
+> +	 * speculatively from the PoC are discarded, since they may have
+> +	 * been dynamically patched at the PoU.
+> +	 */
+> +	ic	iallu
+> +	dsb	nsh
+> +	isb
+>  	br	x27
+>  ENDPROC(__enable_mmu)
+> diff --git a/arch/arm64/kernel/sleep.S b/arch/arm64/kernel/sleep.S
+> index 5686a3ae3940..38d37c539a30 100644
+> --- a/arch/arm64/kernel/sleep.S
+> +++ b/arch/arm64/kernel/sleep.S
+> @@ -133,6 +133,14 @@ ENTRY(cpu_resume_mmu)
+>  	ldr	x3, =cpu_resume_after_mmu
+>  	msr	sctlr_el1, x0		// restore sctlr_el1
+>  	isb
+> +	/*
+> +	 * Invalidate the local I-cache so that any instructions fetched
+> +	 * speculatively from the PoC are discarded, since they may have
+> +	 * been dynamically patched at the PoU.
+> +	 */
+> +	ic	iallu
+> +	dsb	nsh
+> +	isb
+>  	br	x3			// global jump to virtual address
+>  ENDPROC(cpu_resume_mmu)
+>  	.popsection
+> diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+> index eff4f627358a..716c673cbd8e 100644
+> --- a/arch/arm64/mm/proc.S
+> +++ b/arch/arm64/mm/proc.S
+> @@ -146,7 +146,6 @@ ENDPROC(cpu_do_switch_mm)
+>   *	value of the SCTLR_EL1 register.
+>   */
+>  ENTRY(__cpu_setup)
+> -	ic	iallu				// I+BTB cache invalidate
+>  	tlbi	vmalle1is			// invalidate I + D TLBs
+>  	dsb	ish
 >  
-> +	/*  Ignore Vbus errors when in host only mode */
-> +	if (musb->port_mode == MUSB_PORT_MODE_HOST)
-> +		musb->int_usb &= ~MUSB_INTR_VBUSERROR;
-
-check with a scope if VBUS is really dropping. Host does VBUS detection
-indeed, at a minimum, for overcurrent protection. You might have
-something causing VBUS to drop and that something needs to be found,
-rather than masked.
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150804/4dbbb53a/attachment.sig>
+> -- 
+> 2.1.4
+> 
