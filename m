@@ -1,116 +1,169 @@
 From: jamesjj.liao@mediatek.com (James Liao)
-Date: Tue, 4 Aug 2015 16:16:52 +0800
-Subject: [PATCH v6 3/9] clk: mediatek: Add __initdata and __init for data and
- functions
+Date: Tue, 4 Aug 2015 16:16:55 +0800
+Subject: [PATCH v6 6/9] dt-bindings: ARM: Mediatek: Document devicetree
+ bindings for clock controllers
 In-Reply-To: <1438676218-11310-1-git-send-email-jamesjj.liao@mediatek.com>
 References: <1438676218-11310-1-git-send-email-jamesjj.liao@mediatek.com>
-Message-ID: <1438676218-11310-4-git-send-email-jamesjj.liao@mediatek.com>
+Message-ID: <1438676218-11310-7-git-send-email-jamesjj.liao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add __init for clock registration functions, and add __initdata for
-mtk_gate_regs initial structures.
+This adds the binding documentation for the mmsys, imgsys, vdecsys,
+vencsys and vencltsys controllers found on Mediatek SoCs.
 
 Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
 ---
- drivers/clk/mediatek/clk-gate.c   |  2 +-
- drivers/clk/mediatek/clk-mt8173.c |  6 +++---
- drivers/clk/mediatek/clk-mtk.c    | 13 +++++++------
- 3 files changed, 11 insertions(+), 10 deletions(-)
+ .../bindings/arm/mediatek/mediatek,imgsys.txt      | 22 ++++++++++++++++++++++
+ .../bindings/arm/mediatek/mediatek,mmsys.txt       | 22 ++++++++++++++++++++++
+ .../bindings/arm/mediatek/mediatek,vdecsys.txt     | 22 ++++++++++++++++++++++
+ .../bindings/arm/mediatek/mediatek,vencltsys.txt   | 22 ++++++++++++++++++++++
+ .../bindings/arm/mediatek/mediatek,vencsys.txt     | 22 ++++++++++++++++++++++
+ 5 files changed, 110 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,imgsys.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,vdecsys.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,vencltsys.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,vencsys.txt
 
-diff --git a/drivers/clk/mediatek/clk-gate.c b/drivers/clk/mediatek/clk-gate.c
-index 5702036..576bdb7 100644
---- a/drivers/clk/mediatek/clk-gate.c
-+++ b/drivers/clk/mediatek/clk-gate.c
-@@ -97,7 +97,7 @@ const struct clk_ops mtk_clk_gate_ops_setclr_inv = {
- 	.disable	= mtk_cg_disable_inv,
- };
- 
--struct clk *mtk_clk_register_gate(
-+struct clk * __init mtk_clk_register_gate(
- 		const char *name,
- 		const char *parent_name,
- 		struct regmap *regmap,
-diff --git a/drivers/clk/mediatek/clk-mt8173.c b/drivers/clk/mediatek/clk-mt8173.c
-index 13aa432..361fe32 100644
---- a/drivers/clk/mediatek/clk-mt8173.c
-+++ b/drivers/clk/mediatek/clk-mt8173.c
-@@ -586,7 +586,7 @@ static const struct mtk_composite top_muxes[] __initconst = {
- 	MUX(CLK_TOP_I2S3_B_SEL, "i2s3_b_ck_sel", i2s3_b_ck_parents, 0x120, 8, 1),
- };
- 
--static const struct mtk_gate_regs infra_cg_regs = {
-+static const struct mtk_gate_regs infra_cg_regs __initconst = {
- 	.set_ofs = 0x0040,
- 	.clr_ofs = 0x0044,
- 	.sta_ofs = 0x0048,
-@@ -615,13 +615,13 @@ static const struct mtk_gate infra_clks[] __initconst = {
- 	GATE_ICG(CLK_INFRA_PMICWRAP, "infra_pmicwrap", "axi_sel", 23),
- };
- 
--static const struct mtk_gate_regs peri0_cg_regs = {
-+static const struct mtk_gate_regs peri0_cg_regs __initconst = {
- 	.set_ofs = 0x0008,
- 	.clr_ofs = 0x0010,
- 	.sta_ofs = 0x0018,
- };
- 
--static const struct mtk_gate_regs peri1_cg_regs = {
-+static const struct mtk_gate_regs peri1_cg_regs __initconst = {
- 	.set_ofs = 0x000c,
- 	.clr_ofs = 0x0014,
- 	.sta_ofs = 0x001c,
-diff --git a/drivers/clk/mediatek/clk-mtk.c b/drivers/clk/mediatek/clk-mtk.c
-index 18444ae..268b6ff 100644
---- a/drivers/clk/mediatek/clk-mtk.c
-+++ b/drivers/clk/mediatek/clk-mtk.c
-@@ -24,7 +24,7 @@
- #include "clk-mtk.h"
- #include "clk-gate.h"
- 
--struct clk_onecell_data *mtk_alloc_clk_data(unsigned int clk_num)
-+struct clk_onecell_data * __init mtk_alloc_clk_data(unsigned int clk_num)
- {
- 	int i;
- 	struct clk_onecell_data *clk_data;
-@@ -49,8 +49,8 @@ err_out:
- 	return NULL;
- }
- 
--void mtk_clk_register_factors(const struct mtk_fixed_factor *clks, int num,
--		struct clk_onecell_data *clk_data)
-+void __init mtk_clk_register_factors(const struct mtk_fixed_factor *clks,
-+		int num, struct clk_onecell_data *clk_data)
- {
- 	int i;
- 	struct clk *clk;
-@@ -72,7 +72,8 @@ void mtk_clk_register_factors(const struct mtk_fixed_factor *clks, int num,
- 	}
- }
- 
--int mtk_clk_register_gates(struct device_node *node, const struct mtk_gate *clks,
-+int __init mtk_clk_register_gates(struct device_node *node,
-+		const struct mtk_gate *clks,
- 		int num, struct clk_onecell_data *clk_data)
- {
- 	int i;
-@@ -111,7 +112,7 @@ int mtk_clk_register_gates(struct device_node *node, const struct mtk_gate *clks
- 	return 0;
- }
- 
--struct clk *mtk_clk_register_composite(const struct mtk_composite *mc,
-+struct clk * __init mtk_clk_register_composite(const struct mtk_composite *mc,
- 		void __iomem *base, spinlock_t *lock)
- {
- 	struct clk *clk;
-@@ -196,7 +197,7 @@ err_out:
- 	return ERR_PTR(ret);
- }
- 
--void mtk_clk_register_composites(const struct mtk_composite *mcs,
-+void __init mtk_clk_register_composites(const struct mtk_composite *mcs,
- 		int num, void __iomem *base, spinlock_t *lock,
- 		struct clk_onecell_data *clk_data)
- {
+diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,imgsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,imgsys.txt
+new file mode 100644
+index 0000000..b1f2ce1
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,imgsys.txt
+@@ -0,0 +1,22 @@
++Mediatek imgsys controller
++============================
++
++The Mediatek imgsys controller provides various clocks to the system.
++
++Required Properties:
++
++- compatible: Should be:
++	- "mediatek,mt8173-imgsys", "syscon"
++- #clock-cells: Must be 1
++
++The imgsys controller uses the common clk binding from
++Documentation/devicetree/bindings/clock/clock-bindings.txt
++The available clocks are defined in dt-bindings/clock/mt*-clk.h.
++
++Example:
++
++imgsys: clock-controller at 15000000 {
++	compatible = "mediatek,mt8173-imgsys", "syscon";
++	reg = <0 0x15000000 0 0x1000>;
++	#clock-cells = <1>;
++};
+diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt
+new file mode 100644
+index 0000000..4385946
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt
+@@ -0,0 +1,22 @@
++Mediatek mmsys controller
++============================
++
++The Mediatek mmsys controller provides various clocks to the system.
++
++Required Properties:
++
++- compatible: Should be:
++	- "mediatek,mt8173-mmsys", "syscon"
++- #clock-cells: Must be 1
++
++The mmsys controller uses the common clk binding from
++Documentation/devicetree/bindings/clock/clock-bindings.txt
++The available clocks are defined in dt-bindings/clock/mt*-clk.h.
++
++Example:
++
++mmsys: clock-controller at 14000000 {
++	compatible = "mediatek,mt8173-mmsys", "syscon";
++	reg = <0 0x14000000 0 0x1000>;
++	#clock-cells = <1>;
++};
+diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,vdecsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,vdecsys.txt
+new file mode 100644
+index 0000000..1faacf1
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,vdecsys.txt
+@@ -0,0 +1,22 @@
++Mediatek vdecsys controller
++============================
++
++The Mediatek vdecsys controller provides various clocks to the system.
++
++Required Properties:
++
++- compatible: Should be:
++	- "mediatek,mt8173-vdecsys", "syscon"
++- #clock-cells: Must be 1
++
++The vdecsys controller uses the common clk binding from
++Documentation/devicetree/bindings/clock/clock-bindings.txt
++The available clocks are defined in dt-bindings/clock/mt*-clk.h.
++
++Example:
++
++vdecsys: clock-controller at 16000000 {
++	compatible = "mediatek,mt8173-vdecsys", "syscon";
++	reg = <0 0x16000000 0 0x1000>;
++	#clock-cells = <1>;
++};
+diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,vencltsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,vencltsys.txt
+new file mode 100644
+index 0000000..3cc299f
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,vencltsys.txt
+@@ -0,0 +1,22 @@
++Mediatek vencltsys controller
++============================
++
++The Mediatek vencltsys controller provides various clocks to the system.
++
++Required Properties:
++
++- compatible: Should be:
++	- "mediatek,mt8173-vencltsys", "syscon"
++- #clock-cells: Must be 1
++
++The vencltsys controller uses the common clk binding from
++Documentation/devicetree/bindings/clock/clock-bindings.txt
++The available clocks are defined in dt-bindings/clock/mt*-clk.h.
++
++Example:
++
++vencltsys: clock-controller at 19000000 {
++	compatible = "mediatek,mt8173-vencltsys", "syscon";
++	reg = <0 0x19000000 0 0x1000>;
++	#clock-cells = <1>;
++};
+diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,vencsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,vencsys.txt
+new file mode 100644
+index 0000000..5bb2866
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,vencsys.txt
+@@ -0,0 +1,22 @@
++Mediatek vencsys controller
++============================
++
++The Mediatek vencsys controller provides various clocks to the system.
++
++Required Properties:
++
++- compatible: Should be:
++	- "mediatek,mt8173-vencsys", "syscon"
++- #clock-cells: Must be 1
++
++The vencsys controller uses the common clk binding from
++Documentation/devicetree/bindings/clock/clock-bindings.txt
++The available clocks are defined in dt-bindings/clock/mt*-clk.h.
++
++Example:
++
++vencsys: clock-controller at 18000000 {
++	compatible = "mediatek,mt8173-vencsys", "syscon";
++	reg = <0 0x18000000 0 0x1000>;
++	#clock-cells = <1>;
++};
 -- 
 1.8.1.1.dirty
