@@ -1,41 +1,36 @@
 From: scott.shu@mediatek.com (Scott Shu)
-Date: Tue, 4 Aug 2015 21:54:22 +0800
-Subject: [PATCH v3 6/8] ARM: Mediatek: enable GPT6 on boot up to make arch
- timer working for MT6580
+Date: Tue, 4 Aug 2015 21:54:23 +0800
+Subject: [PATCH v3 7/8] ARM: dts: mt6580: Add device nodes to the MT6580 dtsi
+ file
 In-Reply-To: <1438696464-59858-1-git-send-email-scott.shu@mediatek.com>
 References: <1438696464-59858-1-git-send-email-scott.shu@mediatek.com>
-Message-ID: <1438696464-59858-7-git-send-email-scott.shu@mediatek.com>
+Message-ID: <1438696464-59858-8-git-send-email-scott.shu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We enable GTP6 which ungates the arch timer clock.
+This adds the SCPSYS device node to the MT6580 dtsi file.
 
 Signed-off-by: Scott Shu <scott.shu@mediatek.com>
 ---
- arch/arm/mach-mediatek/mediatek.c |    4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/mt6580.dtsi |    6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm/mach-mediatek/mediatek.c b/arch/arm/mach-mediatek/mediatek.c
-index 6b38d67..469d332 100644
---- a/arch/arm/mach-mediatek/mediatek.c
-+++ b/arch/arm/mach-mediatek/mediatek.c
-@@ -28,7 +28,8 @@ static void __init mediatek_timer_init(void)
- {
- 	void __iomem *gpt_base = 0;
+diff --git a/arch/arm/boot/dts/mt6580.dtsi b/arch/arm/boot/dts/mt6580.dtsi
+index 06fdf6c..40957d3 100644
+--- a/arch/arm/boot/dts/mt6580.dtsi
++++ b/arch/arm/boot/dts/mt6580.dtsi
+@@ -67,6 +67,12 @@
+ 		#clock-cells = <0>;
+ 	};
  
--	if (of_machine_is_compatible("mediatek,mt6589") ||
-+	if (of_machine_is_compatible("mediatek,mt6580") ||
-+	    of_machine_is_compatible("mediatek,mt6589") ||
- 	    of_machine_is_compatible("mediatek,mt8135") ||
- 	    of_machine_is_compatible("mediatek,mt8127")) {
- 		/* turn on GPT6 which ungates arch timer clocks */
-@@ -46,6 +47,7 @@ static void __init mediatek_timer_init(void)
- };
- 
- static const char * const mediatek_board_dt_compat[] = {
-+	"mediatek,mt6580",
- 	"mediatek,mt6589",
- 	"mediatek,mt6592",
- 	"mediatek,mt8127",
++	scpsys: scpsys at 10006000 {
++		#power-domain-cells = <1>;
++		compatible = "mediatek,mt6580-scpsys";
++		reg = <0x10006000 0x1000>;
++	};
++
+ 	timer: timer at 10008000 {
+ 		compatible = "mediatek,mt6580-timer",
+ 			     "mediatek,mt6577-timer";
 -- 
 1.7.9.5
