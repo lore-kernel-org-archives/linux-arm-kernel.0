@@ -1,48 +1,44 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Tue, 4 Aug 2015 10:13:50 +0200
-Subject: [RFCv3 2/4] dts: zynq: Add devicetree entry for Xilinx Zynq reset
- controller.
-In-Reply-To: <1438305237-18497-3-git-send-email-moritz.fischer@ettus.com>
-References: <1438305237-18497-1-git-send-email-moritz.fischer@ettus.com>
- <1438305237-18497-3-git-send-email-moritz.fischer@ettus.com>
-Message-ID: <55C0743E.1090406@xilinx.com>
+From: jamesjj.liao@mediatek.com (James Liao)
+Date: Tue, 4 Aug 2015 16:16:50 +0800
+Subject: [PATCH v6 1/9] clk: mediatek: Removed unused dpi_ck clock from MT8173
+In-Reply-To: <1438676218-11310-1-git-send-email-jamesjj.liao@mediatek.com>
+References: <1438676218-11310-1-git-send-email-jamesjj.liao@mediatek.com>
+Message-ID: <1438676218-11310-2-git-send-email-jamesjj.liao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/31/2015 03:13 AM, Moritz Fischer wrote:
-> Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
-> ---
->  arch/arm/boot/dts/zynq-7000.dtsi | 8 ++++++++
->  1 file changed, 8 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
-> index 0691508..6bebf02 100644
-> --- a/arch/arm/boot/dts/zynq-7000.dtsi
-> +++ b/arch/arm/boot/dts/zynq-7000.dtsi
-> @@ -1,5 +1,6 @@
->  /*
->   *  Copyright (C) 2011 - 2014 Xilinx
-> + *  Copyright (C) 2015 National Instruments Corp.
->   *
->   * This software is licensed under the terms of the GNU General Public
->   * License version 2, as published by the Free Software Foundation, and
-> @@ -258,6 +259,13 @@
->  				reg = <0x100 0x100>;
->  			};
->  
-> +			rstc: rstc at 200 {
-> +				compatible = "xlnx,zynq-reset";
-> +				reg = <0x200 0x48>;
-> +				#reset-cells = <1>;
-> +				syscon = <&slcr>;
-> +			};
-> +
->  			pinctrl0: pinctrl at 700 {
->  				compatible = "xlnx,pinctrl-zynq";
->  				reg = <0x700 0x200>;
-> 
+The dpi_ck clock can be removed because it not actually used
+in topckgen and subsystems.
 
-Acked-by: Michal Simek <michal.simek@xilinx.com>
+Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
+---
+ drivers/clk/mediatek/clk-mt8173.c      | 1 -
+ include/dt-bindings/clock/mt8173-clk.h | 1 -
+ 2 files changed, 2 deletions(-)
 
-Thanks,
-Michal
+diff --git a/drivers/clk/mediatek/clk-mt8173.c b/drivers/clk/mediatek/clk-mt8173.c
+index 8b6523d..80871e2 100644
+--- a/drivers/clk/mediatek/clk-mt8173.c
++++ b/drivers/clk/mediatek/clk-mt8173.c
+@@ -26,7 +26,6 @@ static DEFINE_SPINLOCK(mt8173_clk_lock);
+ 
+ static const struct mtk_fixed_factor root_clk_alias[] __initconst = {
+ 	FACTOR(CLK_TOP_CLKPH_MCK_O, "clkph_mck_o", "clk_null", 1, 1),
+-	FACTOR(CLK_TOP_DPI, "dpi_ck", "clk_null", 1, 1),
+ 	FACTOR(CLK_TOP_USB_SYSPLL_125M, "usb_syspll_125m", "clk_null", 1, 1),
+ 	FACTOR(CLK_TOP_HDMITX_DIG_CTS, "hdmitx_dig_cts", "clk_null", 1, 1),
+ };
+diff --git a/include/dt-bindings/clock/mt8173-clk.h b/include/dt-bindings/clock/mt8173-clk.h
+index 4ad76ed..7230c38 100644
+--- a/include/dt-bindings/clock/mt8173-clk.h
++++ b/include/dt-bindings/clock/mt8173-clk.h
+@@ -18,7 +18,6 @@
+ /* TOPCKGEN */
+ 
+ #define CLK_TOP_CLKPH_MCK_O		1
+-#define CLK_TOP_DPI			2
+ #define CLK_TOP_USB_SYSPLL_125M		3
+ #define CLK_TOP_HDMITX_DIG_CTS		4
+ #define CLK_TOP_ARMCA7PLL_754M		5
+-- 
+1.8.1.1.dirty
