@@ -1,78 +1,73 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Tue,  4 Aug 2015 15:55:17 +0200
-Subject: [PATCH v2 4/6] pinctrl: sh-pfc: Stop calling gpiochip_add_pin_range()
- on DT platforms
+Date: Tue,  4 Aug 2015 15:55:14 +0200
+Subject: [PATCH v2 1/6] ARM: shmobile: r8a73a4 dtsi: Add missing "gpio-ranges"
+ to gpio node
 In-Reply-To: <1438696519-13727-1-git-send-email-geert+renesas@glider.be>
 References: <1438696519-13727-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1438696519-13727-5-git-send-email-geert+renesas@glider.be>
+Message-ID: <1438696519-13727-2-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On platforms where the PFC/GPIO controller is instantiated from DT, the
-mapping between GPIOs and pins is set up using the "gpio-ranges"
-property in DT.
+If a GPIO driver uses gpiochip_add_pin_range() (which is usually the
+case for GPIO/PFC combos), the GPIO hogging mechanism configured from DT
+doesn't work:
 
-Hence stop setting up the mapping from C code on DT platforms.
-This code is still used for SH or ARM-legacy platforms.
+    requesting hog GPIO led1-high (chip r8a73a4_pfc, offset 28) failed
+
+The actual error code is -517 == -EPROBE_DEFER.
+
+The problem is that PFC+GPIO registration is handled in multiple steps:
+  1. pinctrl_register(),
+  2. gpiochip_add(),
+  3. gpiochip_add_pin_range().
+
+Configuration of the hogs is handled in gpiochip_add():
+
+    gpiochip_add
+        of_gpiochip_add
+            of_gpiochip_scan_hogs
+                gpiod_hog
+                    gpiochip_request_own_desc
+                        __gpiod_request
+                            chip->request
+                                pinctrl_request_gpio
+                                    pinctrl_get_device_gpio_range
+
+However, at this point the GPIO controller hasn't been added to
+pinctrldev_list yet, so the range can't be found, and the operation fails
+with -EPROBE_DEFER.
+
+To fix this, add a "gpio-ranges" property to the gpio device node, so
+the ranges are added by of_gpiochip_add_pin_range(), which is called by
+of_gpiochip_add() before the call to of_gpiochip_scan_hogs().
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 ---
 v2:
-  - Add Acked-by,
-  - Add check for CONFIG_OF and pfc->dev->of_node.
+  - Add Acked-by.
 ---
- drivers/pinctrl/sh-pfc/gpio.c | 37 ++++++++++++++++++++++---------------
- 1 file changed, 22 insertions(+), 15 deletions(-)
+ arch/arm/boot/dts/r8a73a4.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/drivers/pinctrl/sh-pfc/gpio.c b/drivers/pinctrl/sh-pfc/gpio.c
-index ba353735ecf2be9a..b380e3f17b121bbb 100644
---- a/drivers/pinctrl/sh-pfc/gpio.c
-+++ b/drivers/pinctrl/sh-pfc/gpio.c
-@@ -379,22 +379,29 @@ int sh_pfc_register_gpiochip(struct sh_pfc *pfc)
- 
- 	pfc->gpio = chip;
- 
--	/* Register the GPIO to pin mappings. As pins with GPIO ports must come
--	 * first in the ranges, skip the pins without GPIO ports by stopping at
--	 * the first range that contains such a pin.
--	 */
--	for (i = 0; i < pfc->nr_ranges; ++i) {
--		const struct sh_pfc_pin_range *range = &pfc->ranges[i];
--
--		if (range->start >= pfc->nr_gpio_pins)
--			break;
-+	if (IS_ENABLED(CONFIG_OF) && pfc->dev->of_node)
-+		return 0;
- 
--		ret = gpiochip_add_pin_range(&chip->gpio_chip,
--					     dev_name(pfc->dev),
--					     range->start, range->start,
--					     range->end - range->start + 1);
--		if (ret < 0)
--			return ret;
-+	if (IS_ENABLED(CONFIG_SUPERH) ||
-+	    IS_ENABLED(CONFIG_ARCH_SHMOBILE_LEGACY)) {
-+		/*
-+		 * Register the GPIO to pin mappings. As pins with GPIO ports
-+		 * must come first in the ranges, skip the pins without GPIO
-+		 * ports by stopping@the first range that contains such a
-+		 * pin.
-+		 */
-+		for (i = 0; i < pfc->nr_ranges; ++i) {
-+			const struct sh_pfc_pin_range *range = &pfc->ranges[i];
-+
-+			if (range->start >= pfc->nr_gpio_pins)
-+				break;
-+
-+			ret = gpiochip_add_pin_range(&chip->gpio_chip,
-+				dev_name(pfc->dev), range->start, range->start,
-+				range->end - range->start + 1);
-+			if (ret < 0)
-+				return ret;
-+		}
- 	}
- 
- 	/* Register the function GPIOs chip. */
+diff --git a/arch/arm/boot/dts/r8a73a4.dtsi b/arch/arm/boot/dts/r8a73a4.dtsi
+index 5090d1a8f652e8be..cb4f7b2798fe23be 100644
+--- a/arch/arm/boot/dts/r8a73a4.dtsi
++++ b/arch/arm/boot/dts/r8a73a4.dtsi
+@@ -207,6 +207,13 @@
+ 		reg = <0 0xe6050000 0 0x9000>;
+ 		gpio-controller;
+ 		#gpio-cells = <2>;
++		gpio-ranges =
++			<&pfc 0 0 31>, <&pfc 32 32 9>,
++			<&pfc 64 64 22>, <&pfc 96 96 31>,
++			<&pfc 128 128 7>, <&pfc 160 160 19>,
++			<&pfc 192 192 31>, <&pfc 224 224 27>,
++			<&pfc 256 256 28>, <&pfc 288 288 21>,
++			<&pfc 320 320 10>;
+ 		interrupts-extended =
+ 			<&irqc0  0 0>, <&irqc0  1 0>, <&irqc0  2 0>, <&irqc0  3 0>,
+ 			<&irqc0  4 0>, <&irqc0  5 0>, <&irqc0  6 0>, <&irqc0  7 0>,
 -- 
 1.9.1
