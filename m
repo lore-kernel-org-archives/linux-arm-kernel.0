@@ -1,41 +1,99 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Tue, 04 Aug 2015 11:17:39 +0200
-Subject: [RFC PATCH 2/3] mailbox: Hisilicon: add mailbox driver
-In-Reply-To: <20150804084930.GA27609@leoy-linaro>
-References: <1438564390-28111-1-git-send-email-leo.yan@linaro.org>
- <1438564390-28111-3-git-send-email-leo.yan@linaro.org>
- <1438677024.8734.24.camel@tiscali.nl> <20150804084930.GA27609@leoy-linaro>
-Message-ID: <1438679859.8734.35.camel@tiscali.nl>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Tue,  4 Aug 2015 11:23:21 +0200
+Subject: [PATCH 4/6] gpiolib-sysfs: Add gpio name parsing for sysfs export
+In-Reply-To: <1438680203-13432-1-git-send-email-mpa@pengutronix.de>
+References: <1438680203-13432-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <1438680203-13432-5-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On di, 2015-08-04 at 16:49 +0800, Leo Yan wrote:
-> On Tue, Aug 04, 2015 at 10:30:24AM +0200, Paul Bolle wrote:
-> > On ma, 2015-08-03 at 09:13 +0800, Leo Yan wrote:
-> > > --- /dev/null
-> > > +++ b/drivers/mailbox/hisilicon/Kconfig
-> > 
-> > > +config HISI_MBOX
-> > > +	bool "Hisilicon's Mailbox"
-> > > +	depends on ARCH_HISI || OF
-> > 
-> > ARCH_HISI is available on either ARM64 or ARM. ARM64 selects OF. On ARM
-> > ARCH_HISI depends on ARCH_MULTIV7 which depends on ARCH_MULTIPLATFORM.
-> > That selects USE_OF which on its turn selects OF.
-> > 
-> > So, HISI_MBOX implies OF, correct?
-> 
-> Exactly, will simply use "depends on ARCH_HISI".
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+---
+ drivers/gpio/gpiolib-sysfs.c | 47 ++++++++++++++++++++++++++++++++------------
+ 1 file changed, 34 insertions(+), 13 deletions(-)
 
-That change would alter the dependencies. My remark was made just to
-make clear why I think CONFIG_OF will always be defined. But now I guess
-you actually meant
-	depends on ARCH_HISI && OF
-
-And that would, I think, indeed be equivalent to
-	depends on ARCH_HISI
-
-Thanks,
-
-
-Paul Bolle
+diff --git a/drivers/gpio/gpiolib-sysfs.c b/drivers/gpio/gpiolib-sysfs.c
+index b57ed8e55ab5..e22a86e31c90 100644
+--- a/drivers/gpio/gpiolib-sysfs.c
++++ b/drivers/gpio/gpiolib-sysfs.c
+@@ -443,18 +443,28 @@ static ssize_t export_store(struct class *class,
+ 				const char *buf, size_t len)
+ {
+ 	long			gpio;
+-	struct gpio_desc	*desc;
++	struct gpio_desc	*desc = NULL;
+ 	int			status;
+ 
+ 	status = kstrtol(buf, 0, &gpio);
+-	if (status < 0)
+-		goto done;
++	if (!status)
++		desc = gpio_to_desc(gpio);
+ 
+-	desc = gpio_to_desc(gpio);
+-	/* reject invalid GPIOs */
++	/* Fall back on detection by name */
+ 	if (!desc) {
+-		pr_warn("%s: invalid GPIO %ld\n", __func__, gpio);
+-		return -EINVAL;
++		char *gpio_name = kstrdup(buf, GFP_KERNEL);
++
++		if (!gpio_name)
++			return -ENOMEM;
++
++		desc = gpio_name_to_desc(strim(gpio_name));
++		kfree(gpio_name);
++
++		/* reject invalid GPIOs */
++		if (!desc) {
++			pr_warn("%s: invalid GPIO %s\n", __func__, buf);
++			return -EINVAL;
++		}
+ 	}
+ 
+ 	/* No extra locking here; FLAG_SYSFS just signifies that the
+@@ -485,17 +495,28 @@ static ssize_t unexport_store(struct class *class,
+ 				const char *buf, size_t len)
+ {
+ 	long			gpio;
+-	struct gpio_desc	*desc;
++	struct gpio_desc	*desc = NULL;
+ 	int			status;
+ 
+ 	status = kstrtol(buf, 0, &gpio);
+-	if (status < 0)
+-		goto done;
++	if (!status)
++		desc = gpio_to_desc(gpio);
++
++	/* Fall back on detection by name */
++	if (!desc) {
++		char *gpio_name = kstrdup(buf, GFP_KERNEL);
++
++		if (!gpio_name)
++			return -ENOMEM;
++
++		desc = gpio_name_to_desc(strim(gpio_name));
++		kfree(gpio_name);
++	}
++
+ 
+-	desc = gpio_to_desc(gpio);
+ 	/* reject bogus commands (gpio_unexport ignores them) */
+ 	if (!desc) {
+-		pr_warn("%s: invalid GPIO %ld\n", __func__, gpio);
++		pr_warn("%s: invalid GPIO %s\n", __func__, buf);
+ 		return -EINVAL;
+ 	}
+ 
+@@ -509,7 +530,7 @@ static ssize_t unexport_store(struct class *class,
+ 		status = 0;
+ 		gpiod_free(desc);
+ 	}
+-done:
++
+ 	if (status)
+ 		pr_debug("%s: status %d\n", __func__, status);
+ 	return status ? : len;
+-- 
+2.1.4
