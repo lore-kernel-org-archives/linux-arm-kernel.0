@@ -1,42 +1,51 @@
-From: p.fedin@samsung.com (Pavel Fedin)
-Date: Tue, 04 Aug 2015 12:59:49 +0300
-Subject: [PATCH TRIVIAL] Enable GICv2m on ARM virt machine
-Message-ID: <00f501d0ce9c$4d57bcc0$e8073640$@samsung.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 4 Aug 2015 13:03:17 +0300
+Subject: [PATCH 9/9] usb: misc: ftdi-elan: Simplify return statement
+In-Reply-To: <21701034f1472a3d154c77dd8d8be017565885f6.1438678566.git.skarajga@visteon.com>
+References: <cover.1438678566.git.skarajga@visteon.com>
+ <21701034f1472a3d154c77dd8d8be017565885f6.1438678566.git.skarajga@visteon.com>
+Message-ID: <55C08DE5.3060106@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-qemu implementation of "virt" includes GICv2m. This commit allows to use
-it also on ARM32 architecture.
+Hello.
 
-Signed-off-by: Pavel Fedin <p.fedin@samsung.com>
----
- arch/arm/Kconfig            | 1 +
- arch/arm/include/asm/Kbuild | 1 +
- 2 files changed, 2 insertions(+)
+On 8/4/2015 12:12 PM, Karajgaonkar, Saurabh (S.) wrote:
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 45df48b..1091025 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -815,6 +815,7 @@ config ARCH_VIRT
- 	bool "Dummy Virtual Machine" if ARCH_MULTI_V7
- 	select ARM_AMBA
- 	select ARM_GIC
-+	select ARM_GIC_V2M if PCI_MSI
- 	select ARM_PSCI
- 	select HAVE_ARM_ARCH_TIMER
- 
-diff --git a/arch/arm/include/asm/Kbuild b/arch/arm/include/asm/Kbuild
-index 3c4596d..01806f5 100644
---- a/arch/arm/include/asm/Kbuild
-+++ b/arch/arm/include/asm/Kbuild
-@@ -14,6 +14,7 @@ generic-y += local.h
- generic-y += local64.h
- generic-y += mcs_spinlock.h
- generic-y += msgbuf.h
-+generic-y += msi.h
- generic-y += param.h
- generic-y += parport.h
- generic-y += poll.h
--- 
-1.9.5.msysgit.0
+> From: Saurabh Karajgaonkar <skarajga@visteon.com>
+
+> Replace redundant variable use in return statement.
+
+> Signed-off-by: Saurabh Karajgaonkar <skarajga@visteon.com>
+> ---
+>   drivers/usb/misc/ftdi-elan.c | 10 ++--------
+>   1 file changed, 2 insertions(+), 8 deletions(-)
+
+> diff --git a/drivers/usb/misc/ftdi-elan.c b/drivers/usb/misc/ftdi-elan.c
+> index 8ab1f8f..1545f12 100644
+> --- a/drivers/usb/misc/ftdi-elan.c
+> +++ b/drivers/usb/misc/ftdi-elan.c
+> @@ -2568,11 +2568,8 @@ static int ftdi_elan_close_controller(struct usb_ftdi *ftdi, int fn)
+>   					    0x00);
+>   	if (UxxxStatus)
+>   		return UxxxStatus;
+> -	UxxxStatus = ftdi_elan_read_config(ftdi, activePCIfn | reg, 0,
+> +	return ftdi_elan_read_config(ftdi, activePCIfn | reg, 0,
+>   					   &pcidata);
+
+    Please keep the continuation line aligned by starting it under 'ftdi'.
+
+[...]
+> @@ -2695,11 +2692,8 @@ static int ftdi_elan_setupOHCI(struct usb_ftdi *ftdi)
+>   		}
+>   	}
+>   	if (ftdi->function > 0) {
+> -		UxxxStatus = ftdi_elan_setup_controller(ftdi,
+> +		return ftdi_elan_setup_controller(ftdi,
+>   							ftdi->function - 1);
+
+    Likewise.
+
+[...]
+
+MBR, Sergei
