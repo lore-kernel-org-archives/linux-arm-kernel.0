@@ -1,14 +1,13 @@
 From: kgene@kernel.org (Kukjin Kim)
-Date: Tue, 04 Aug 2015 16:28:47 +0900
-Subject: [GIT PULL 2/5] Samsung cleanup for v4.3
-Message-ID: <55C069AF.5050300@kernel.org>
+Date: Tue, 04 Aug 2015 16:29:06 +0900
+Subject: [GIT PULL 3/5] Samsung DT updates for v4.3
+Message-ID: <55C069C2.7040208@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-Please pull Samsung cleanup for v4.3.
-Note I'm going to cleanup non-used definitions based on this soon.
+Please pull Samsung DT updates for v4.3.
 
 Thanks,
 Kukjin
@@ -21,107 +20,79 @@ The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
 are available in the git repository at:
 
   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-tags/samsung-cleanup
+tags/samsung-dt-1
 
-for you to fetch changes up to d306d08f07183fe1504257101b25b5b33d77bae9:
+for you to fetch changes up to 5e080b078fa1f929d9aa5586985d5e7c0739d207:
 
-  ARM: SAMSUNG: remove keypad-core header in plat-samsung (2015-07-30
-02:02:06 +0900)
-
-----------------------------------------------------------------
-Samsung cleanup for v4.3
-
-- make the following headers local
-  watchdog-reset, onenand-core, irq-uart, backlight,
-  ata-core, regs-usb-hsotg-phy, spi-core, nand-core,
-  fb-core and regs-srom headers
-- make the following c file local
-  s5p-dev-mfc, dev-backlight and setup-camif c file
-- remove keypad-core.h file
-- drop owner assignment in pmu.c
-- remove duplicated define of SLEEP_MAGIC
-- make exynos5420_powerdown_conf() staic
+  ARM: dts: Extend exynos5420-pinctrl nodes using labels instead of
+paths (2015-07-21 13:01:23 +0900)
 
 ----------------------------------------------------------------
-Krzysztof Kozlowski (3):
-      ARM: EXYNOS: Make local function static
-      ARM: EXYNOS: Remove duplicated define of SLEEP_MAGIC
-      ARM: EXYNOS: Drop owner assignment in pmu.c
+Samsung 1st DT updates for v4.3
 
-Kukjin Kim (14):
-      ARM: SAMSUNG: make local setup-camif in mach-s3c24xx
-      ARM: SAMSUNG: make local dev-backlight in mach-s3c64xx
-      ARM: SAMSUNG: make local s5p-dev-mfc in mach-exynos
-      ARM: SAMSUNG: local regs-srom header in mach-exynos
-      ARM: SAMSUNG: local fb-core header in mach-s3c24xx
-      ARM: SAMSUNG: local nand-core header in mach-s3c24xx
-      ARM: SAMSUNG: local spi-core header in mach-s3c24xx
-      ARM: SAMSUNG: local regs-usb-hsotg-phy header in mach-s3c64xx
-      ARM: SAMSUNG: local ata-core header in mach-s3c64xx
-      ARM: SAMSUNG: local backlight header in mach-s3c64xx
-      ARM: SAMSUNG: local irq-uart header in mach-s3c64xx
-      ARM: SAMSUNG: local onenand-core header in mach-s3c64xx
-      ARM: SAMSUNG: local watchdog-reset header in mach-s3c64xx
-      ARM: SAMSUNG: remove keypad-core header in plat-samsung
+- for exynos3250
+  : update video-phy node with syscon phandle
+- for exynos4210
+  : add CPU OPP and regulator supply property
+  : use labels for overriding nodes for exynos4210-universal_c210
+- for exynos4412-trats2
+  : set max17047 over heat and voltage thresholds
+- for exynos5250 and 5420
+  : extend exynos5250/5420-pinctrl nodes using labels
+  : include exynos5250/5420-pinctrl after the nodes definitions
+- for exynos5410-smdk5410
+  : clean up indentation
+- for exynos5422-odroidxu3
+  : define default thermal-zones for exynos5422
+  : enable USB3 regulators, TMU and thermal-zones
+  : add pwm-fan node
 
- arch/arm/mach-exynos/Kconfig                       |  5 ++++
- arch/arm/mach-exynos/Makefile                      |  2 ++
- arch/arm/mach-exynos/common.h                      |  6 +++++
- arch/arm/mach-exynos/firmware.c                    |  2 --
- arch/arm/mach-exynos/pmu.c                         |  3 +--
- .../include/plat => mach-exynos}/regs-srom.h       |  3 +--
- .../{plat-samsung => mach-exynos}/s5p-dev-mfc.c    |  0
- arch/arm/mach-exynos/suspend.c                     |  8 +++---
- arch/arm/mach-s3c24xx/Kconfig                      |  5 ++++
- arch/arm/mach-s3c24xx/Makefile                     |  1 +
- .../include/plat => mach-s3c24xx}/fb-core.h        |  2 --
- .../include/plat => mach-s3c24xx}/nand-core.h      |  3 +--
- arch/arm/mach-s3c24xx/s3c2412.c                    |  2 +-
- arch/arm/mach-s3c24xx/s3c2416.c                    |  6 ++---
- arch/arm/mach-s3c24xx/s3c2443.c                    |  7 ++---
- arch/arm/mach-s3c24xx/s3c244x.c                    |  2 +-
- .../{plat-samsung => mach-s3c24xx}/setup-camif.c   |  0
- .../include/plat => mach-s3c24xx}/spi-core.h       |  0
- arch/arm/mach-s3c64xx/Kconfig                      |  6 +++++
- arch/arm/mach-s3c64xx/Makefile                     |  2 ++
- .../include/plat => mach-s3c64xx}/ata-core.h       |  3 +--
- .../include/plat => mach-s3c64xx}/backlight.h      |  3 +--
- arch/arm/mach-s3c64xx/common.c                     |  4 +--
- .../{plat-samsung => mach-s3c64xx}/dev-backlight.c |  6 ++---
- .../include/plat => mach-s3c64xx}/irq-uart.h       |  3 +--
- arch/arm/mach-s3c64xx/mach-s3c64xx-dt.c            |  3 +--
- arch/arm/mach-s3c64xx/mach-smdk6410.c              |  2 +-
- .../include/plat => mach-s3c64xx}/onenand-core.h   |  2 --
- .../plat => mach-s3c64xx}/regs-usb-hsotg-phy.h     |  3 +--
- arch/arm/mach-s3c64xx/s3c6400.c                    |  2 +-
- arch/arm/mach-s3c64xx/s3c6410.c                    |  4 +--
- arch/arm/mach-s3c64xx/setup-usb-phy.c              |  2 +-
- .../include/plat => mach-s3c64xx}/watchdog-reset.h |  3 +--
- arch/arm/plat-samsung/Kconfig                      | 17 ------------
- arch/arm/plat-samsung/Makefile                     |  5 ----
- arch/arm/plat-samsung/include/plat/keypad-core.h   | 31
-----------------------
- 36 files changed, 58 insertions(+), 100 deletions(-)
- rename arch/arm/{plat-samsung/include/plat => mach-exynos}/regs-srom.h
-(96%)
- rename arch/arm/{plat-samsung => mach-exynos}/s5p-dev-mfc.c (100%)
- rename arch/arm/{plat-samsung/include/plat => mach-s3c24xx}/fb-core.h (93%)
- rename arch/arm/{plat-samsung/include/plat => mach-s3c24xx}/nand-core.h
-(93%)
- rename arch/arm/{plat-samsung => mach-s3c24xx}/setup-camif.c (100%)
- rename arch/arm/{plat-samsung/include/plat => mach-s3c24xx}/spi-core.h
-(100%)
- rename arch/arm/{plat-samsung/include/plat => mach-s3c64xx}/ata-core.h
-(92%)
- rename arch/arm/{plat-samsung/include/plat => mach-s3c64xx}/backlight.h
-(92%)
- rename arch/arm/{plat-samsung => mach-s3c64xx}/dev-backlight.c (98%)
- rename arch/arm/{plat-samsung/include/plat => mach-s3c64xx}/irq-uart.h
-(90%)
- rename arch/arm/{plat-samsung/include/plat =>
-mach-s3c64xx}/onenand-core.h (95%)
- rename arch/arm/{plat-samsung/include/plat =>
-mach-s3c64xx}/regs-usb-hsotg-phy.h (96%)
- rename arch/arm/{plat-samsung/include/plat =>
-mach-s3c64xx}/watchdog-reset.h (91%)
- delete mode 100644 arch/arm/plat-samsung/include/plat/keypad-core.h
+----------------------------------------------------------------
+Anand Moon (5):
+      ARM: dts: Enable USB3 regulators for exynos5422-odroidxu3
+      ARM: dts: Add pwm-fan node for exynos5422-odroidxu3
+      ARM: dts: Enable TMU for exynos5422-odroidxu3
+      ARM: dts: Define default thermal-zones for exynos5422
+      ARM: dts: Enable thermal-zones for exynos5422-odroidxu3
+
+Andreas Faerber (1):
+      ARM: dts: Clean up indentation for exynos5410-smdk5410
+
+Beata Michalska (1):
+      ARM: dts: Update video-phy node with syscon phandle for exynos3250
+
+Javier Martinez Canillas (4):
+      ARM: dts: Include exynos5250-pinctrl after the nodes were defined
+for exynos5250
+      ARM: dts: Extend exynos5250-pinctrl nodes using labels instead of
+paths
+      ARM: dts: Include exynos5420-pinctrl after the nodes were defined
+for exynos5420
+      ARM: dts: Extend exynos5420-pinctrl nodes using labels instead of
+paths
+
+Krzysztof Kozlowski (2):
+      ARM: dts: Set max17047 over heat and voltage thresholds for
+exynos4412-trats2
+      ARM: dts: Use labels for overriding nodes for
+exynos4210-universal_c210
+
+Thomas Abraham (1):
+      ARM: dts: add CPU OPP and regulator supply property for exynos4210
+
+ arch/arm/boot/dts/exynos3250.dtsi                  |    2 +-
+ arch/arm/boot/dts/exynos4210-origen.dts            |    4 +
+ arch/arm/boot/dts/exynos4210-trats.dts             |    4 +
+ arch/arm/boot/dts/exynos4210-universal_c210.dts    |  618 ++++----
+ arch/arm/boot/dts/exynos4210.dtsi                  |   12 +
+ arch/arm/boot/dts/exynos4412-trats2.dts            |    3 +
+ arch/arm/boot/dts/exynos5250-pinctrl.dtsi          | 1600
+++++++++++----------
+ arch/arm/boot/dts/exynos5250.dtsi                  |    3 +-
+ arch/arm/boot/dts/exynos5410-smdk5410.dts          |    6 +-
+ arch/arm/boot/dts/exynos5420-pinctrl.dtsi          | 1411 +++++++++--------
+ arch/arm/boot/dts/exynos5420.dtsi                  |    3 +-
+ arch/arm/boot/dts/exynos5422-cpu-thermal.dtsi      |   59 +
+ arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi |   46 +
+ 13 files changed, 1951 insertions(+), 1820 deletions(-)
+ create mode 100644 arch/arm/boot/dts/exynos5422-cpu-thermal.dtsi
