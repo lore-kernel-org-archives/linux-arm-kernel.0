@@ -1,53 +1,44 @@
 From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Tue, 04 Aug 2015 16:54:28 -0500
-Subject: [PATCH v5 5/9] PCI/MSI: Remove unused pcibios_msi_controller() hook
+Date: Tue, 04 Aug 2015 16:54:35 -0500
+Subject: [PATCH v5 6/9] PCI: Drop references acquired by of_parse_phandle()
 In-Reply-To: <20150804214234.9189.42548.stgit@bhelgaas-glaptop2.roam.corp.google.com>
 References: <20150804214234.9189.42548.stgit@bhelgaas-glaptop2.roam.corp.google.com>
-Message-ID: <20150804215428.9189.60846.stgit@bhelgaas-glaptop2.roam.corp.google.com>
+Message-ID: <20150804215435.9189.94410.stgit@bhelgaas-glaptop2.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+of_parse_phandle() returns a device_node pointer with the refcount
+incremented.  We should dispose of this reference when we're finished.
 
-The pcibios_msi_controller() hook was only implemented by ARM, and it sets
-pci_bus->msi now, so it doesn't need this hook anymore.
+Drop the reference acquired by of_parse_phandle().
 
-Remove the unused pcibios_msi_controller() hook.
-
-[bhelgaas: changelog, split into separate patch]
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
 ---
- drivers/pci/msi.c |   17 +----------------
- 1 file changed, 1 insertion(+), 16 deletions(-)
+ drivers/pci/host/pci-mvebu.c |    1 +
+ drivers/pci/host/pci-xgene.c |    1 +
+ 2 files changed, 2 insertions(+)
 
-diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
-index f66be868..0d20142 100644
---- a/drivers/pci/msi.c
-+++ b/drivers/pci/msi.c
-@@ -77,24 +77,9 @@ static void pci_msi_teardown_msi_irqs(struct pci_dev *dev)
+diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+index 70aa095..67ec5e1 100644
+--- a/drivers/pci/host/pci-mvebu.c
++++ b/drivers/pci/host/pci-mvebu.c
+@@ -879,6 +879,7 @@ static void mvebu_pcie_msi_enable(struct mvebu_pcie *pcie)
+ 		return;
  
- /* Arch hooks */
+ 	pcie->msi = of_pci_find_msi_chip_by_node(msi_node);
++	of_node_put(msi_node);
  
--struct msi_controller * __weak pcibios_msi_controller(struct pci_dev *dev)
--{
--	return NULL;
--}
--
--static struct msi_controller *pci_msi_controller(struct pci_dev *dev)
--{
--	struct msi_controller *msi_ctrl = dev->bus->msi;
--
--	if (msi_ctrl)
--		return msi_ctrl;
--
--	return pcibios_msi_controller(dev);
--}
--
- int __weak arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
- {
--	struct msi_controller *chip = pci_msi_controller(dev);
-+	struct msi_controller *chip = dev->bus->msi;
- 	int err;
+ 	if (pcie->msi)
+ 		pcie->msi->dev = &pcie->pdev->dev;
+diff --git a/drivers/pci/host/pci-xgene.c b/drivers/pci/host/pci-xgene.c
+index a9dfb70..4c2fb1f 100644
+--- a/drivers/pci/host/pci-xgene.c
++++ b/drivers/pci/host/pci-xgene.c
+@@ -514,6 +514,7 @@ static int xgene_pcie_msi_enable(struct pci_bus *bus)
+ 	if (!bus->msi)
+ 		return -ENODEV;
  
- 	if (!chip || !chip->setup_irq)
++	of_node_put(msi_node);
+ 	bus->msi->dev = &bus->dev;
+ 	return 0;
+ }
