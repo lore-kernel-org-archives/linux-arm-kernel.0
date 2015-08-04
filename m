@@ -1,25 +1,38 @@
-From: public_timo.s@silentcreek.de (Timo Sigurdsson)
-Date: Tue,  4 Aug 2015 11:02:24 +0200 (CEST)
-Subject: [PATCH v2] ARM: dts: sunxi: Add regulators for LeMaker BananaPi
-In-Reply-To: <20150803094723.GD2564@lukather>
-References: <1438532305-5884-1-git-send-email-public_timo.s@silentcreek.de><20150803094723.GD2564@lukather>
-Message-ID: <20150804090224.4B5676C83963@dd34104.kasserver.com>
+From: skarajga@visteon.com (Karajgaonkar, Saurabh (S.))
+Date: Tue, 4 Aug 2015 09:07:30 +0000
+Subject: [PATCH 0/9] usb: Simplify return statements
+Message-ID: <cover.1438678566.git.skarajga@visteon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+From: Saurabh Karajgaonkar <skarajga@visteon.com>
 
-Maxime Ripard schrieb am 03.08.2015 11:47:
-> What regulator provides the 3.3V regulator used in the rest of this DT
-> then (MMC, GMAC) ?
+This patch series is created using simple_return.cocci coccinelle script.
+It replaces the redundant instances where variable is first assigned
+return value from a function call and then used in return statement,
+by direct function call in the return statement.
 
-For GMAC, there is a reg_gmac_3v3 defined in sun7i-a20-bananapi.dts [1].
-MMC uses reg_vcc3v3 included from sunxi-common-regulators.dtsi. Am I
-missing something? Is this not sufficient?
+Saurabh Karajgaonkar (9):
+  usb: phy: phy-mxs-usb: Simplify return statement
+  usb: phy: phy-keystone: Simplify return statement
+  usb: musb: musb_dsps: Simplify return statement
+  usb: host: ehci-st: Simplify return statement
+  usb: host: oxu210hp-hcd: Simplify return statement
+  usb: host: u132-hcd: Simplify return statement
+  usb: host: xhci: Simplify return statement
+  usb: serial: mxuport: Simplify return statement
+  usb: misc: ftdi-elan: Simplify return statement
 
+ drivers/usb/host/ehci-st.c      |  7 +------
+ drivers/usb/host/oxu210hp-hcd.c |  7 +------
+ drivers/usb/host/u132-hcd.c     | 27 +++++----------------------
+ drivers/usb/host/xhci.c         |  6 +-----
+ drivers/usb/misc/ftdi-elan.c    | 10 ++--------
+ drivers/usb/musb/musb_dsps.c    |  6 +-----
+ drivers/usb/phy/phy-keystone.c  |  6 +-----
+ drivers/usb/phy/phy-mxs-usb.c   |  6 +-----
+ drivers/usb/serial/mxuport.c    |  6 +-----
+ 9 files changed, 14 insertions(+), 67 deletions(-)
 
-Thanks,
-
-Timo
-
-[1] https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/arch/arm/boot/dts/sun7i-a20-bananapi.dts?id=v4.2-rc5#n78
+-- 
+1.9.1
