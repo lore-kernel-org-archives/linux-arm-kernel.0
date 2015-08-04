@@ -1,84 +1,54 @@
-From: bhupesh.sharma@freescale.com (Sharma Bhupesh)
-Date: Tue, 4 Aug 2015 11:22:09 +0000
-Subject: [Query] ARM64: Softlockup when using PSCI for secondary CPU_ON
-In-Reply-To: <20150804111258.GC7056@leverpostej>
-References: <BY1PR0301MB1303EC5AAE8F0B4DAA70D15F82770@BY1PR0301MB1303.namprd03.prod.outlook.com>
- <20150803100248.GA25627@leverpostej>
- <BY1PR0301MB1303B775B1D5D318A64350C582770@BY1PR0301MB1303.namprd03.prod.outlook.com>
- <BY1PR0301MB13035E3B09536F34F4C281CF82770@BY1PR0301MB1303.namprd03.prod.outlook.com>
- <20150804111258.GC7056@leverpostej>
-Message-ID: <BY1PR0301MB130325110AF84E5C7D1A1F3182760@BY1PR0301MB1303.namprd03.prod.outlook.com>
+From: eddie.huang@mediatek.com (Eddie Huang)
+Date: Tue, 4 Aug 2015 19:44:53 +0800
+Subject: [PATCH 2/2] i2c: mediatek: Fixup i2c ack error interrupt handling
+In-Reply-To: <1438688693-60275-1-git-send-email-eddie.huang@mediatek.com>
+References: <1438688693-60275-1-git-send-email-eddie.huang@mediatek.com>
+Message-ID: <1438688693-60275-3-git-send-email-eddie.huang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+When occur i2c ack error, mtk_i2c_irq is called twice,
+first is the ack error interrupt, then the complete interrupt.
+i2c interrupt handler should keep the two interrupt value, and only
+call complete() for the complete interrupt.
 
-> From: Mark Rutland [mailto:mark.rutland at arm.com]
-> Sent: Tuesday, August 04, 2015 4:43 PM
-> 
-> Hi,
-> 
-> > > > Is Linux itself booted at EL1 or EL2?
-> > >
-> > > UEFI leaves the execution level of the primary core in EL2.
-> > > KVM is turned-off in my defconfig, so I am not loading any
-> > > hypervisor at
-> > > EL2 as of now.
-> 
-> [...]
-> 
-> > > > > preempt self-detected stall on CPU { 3}  (t=17194 jiffies g=-267
-> > > > > c=-268 q=1)
-> > > >
-> > > > > INFO: rcu_preempt detected stalls on CPUs/tasks: { 1 2}
-> > > > > (detected by 0, t=287104493908 jiffies, g=-267, c=-268, q=2)
-> > > >
-> > > > It looks like your timekeeping has gone wrong. As mentioned above,
-> > > > I'd suspect that CNTVOFF_EL2 is not programmed consistently across
-> all CPUs.
-> > > >
-> > > > Are you able to boot Linux at EL2 instead? Or can you verify that
-> > > > CNTVOFF_EL2 is initialised?
-> > > >
-> > >
-> > > Ok, let me check the CNTVOFF_EL2 part then.
-> > > I will get back with details soon.
-> > >
-> >
-> > Indeed. Using the following code in the run-time EL3 firmware to
-> > correctly set the
-> > CNTVOFF_EL2 to zero for secondaries solves the soft-lockup. I took a
-> > reference from your u-boot patch (see [1]).
-> >
-> > +	/* Initialize Generic Timers */
-> > +	msr	cntvoff_el2, xzr
-> >
-> > [1] http://marc.info/?l=u-boot&m=140230240621878&w=2
-> 
-> That's good to hear!
-> 
-> However, this implies there are a couple of other issues. It sounds like
-> your UEFI Linux Loader doesn't correctly initialise EL2 state, and drops
-> EL1N before starting the kernel (or the kernel would have initialised
-> CNTVOFF itself).
-> 
-> PSCI should boot CPUs into the first available non-secure exception
-> level, which in this case is EL2, but it sounds like your implementation
-> boots them to EL1N instead, which is incorrect and prevents Linux from
-> being able to initialise EL2 correctly.
-> 
-> In the absence of a hypervisor, you should enter the kernel on all CPUs
-> at EL2. That means we can configure more EL2 state in the kernel and your
-> bootlaoder/firmware needs to do less.
-> 
-> I would also strongly recommend booting Linux as an EFI application
-> rather than using the Linux Loader, as the loader isn't even compliant
-> with the Linux boot protocol and hampers Linux booting correctly.
+Signed-off-by: Liguo Zhang <liguo.zhang@mediatek.com>
+Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
+---
+ drivers/i2c/busses/i2c-mt65xx.c |   18 +++++++++++-------
+ 1 file changed, 11 insertions(+), 7 deletions(-)
 
-Right. I am planning soon to move to using the Linux EFI application and
-the EFI_STUB, rather than relying on the UEFI Linux BDS loader. That
-seems to be the next step in the logical direction as the conventional
-UEFI BDS Linux Loader doesn't support EFI_STUB layer.
-
-Regards,
-Bhupesh
+diff --git a/drivers/i2c/busses/i2c-mt65xx.c b/drivers/i2c/busses/i2c-mt65xx.c
+index 055159d..12ce7f8 100644
+--- a/drivers/i2c/busses/i2c-mt65xx.c
++++ b/drivers/i2c/busses/i2c-mt65xx.c
+@@ -558,16 +558,20 @@ err_exit:
+ static irqreturn_t mtk_i2c_irq(int irqno, void *dev_id)
+ {
+ 	struct mtk_i2c *i2c = dev_id;
+-	u16 restart_flag = 0;
++	u16 intr_stat = 0;
+ 
+-	if (i2c->dev_comp->auto_restart)
+-		restart_flag = I2C_RS_TRANSFER;
++	intr_stat = readw(i2c->base + OFFSET_INTR_STAT);
++	writew(intr_stat, i2c->base + OFFSET_INTR_STAT);
+ 
+-	i2c->irq_stat = readw(i2c->base + OFFSET_INTR_STAT);
+-	writew(restart_flag | I2C_HS_NACKERR | I2C_ACKERR
+-		| I2C_TRANSAC_COMP, i2c->base + OFFSET_INTR_STAT);
++	/*
++	 * when occurs i2c ack error, mtk_i2c_irq is called twice,
++	 * first is the ack error interrupt, then the complete interrupt,
++	 * i2c->irq_stat need keep the two interrupt value.
++	 */
++	i2c->irq_stat |= intr_stat;
+ 
+-	complete(&i2c->msg_complete);
++	if (i2c->irq_stat & I2C_TRANSAC_COMP)
++		complete(&i2c->msg_complete);
+ 
+ 	return IRQ_HANDLED;
+ }
+-- 
+1.7.9.5
