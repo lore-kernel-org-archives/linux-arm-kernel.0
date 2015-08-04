@@ -1,9 +1,9 @@
 From: skarajga@visteon.com (Karajgaonkar, Saurabh (S.))
-Date: Tue, 4 Aug 2015 09:11:59 +0000
-Subject: [PATCH 8/9] usb: serial: mxuport: Simplify return statement
+Date: Tue, 4 Aug 2015 09:12:28 +0000
+Subject: [PATCH 9/9] usb: misc: ftdi-elan: Simplify return statement
 In-Reply-To: <cover.1438678566.git.skarajga@visteon.com>
 References: <cover.1438678566.git.skarajga@visteon.com>
-Message-ID: <1d0403e01eb663ac195926d1976974bec5c08f12.1438678566.git.skarajga@visteon.com>
+Message-ID: <21701034f1472a3d154c77dd8d8be017565885f6.1438678566.git.skarajga@visteon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,27 +13,38 @@ Replace redundant variable use in return statement.
 
 Signed-off-by: Saurabh Karajgaonkar <skarajga@visteon.com>
 ---
- drivers/usb/serial/mxuport.c | 6 +-----
- 1 file changed, 1 insertion(+), 5 deletions(-)
+ drivers/usb/misc/ftdi-elan.c | 10 ++--------
+ 1 file changed, 2 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/usb/serial/mxuport.c b/drivers/usb/serial/mxuport.c
-index 460a406..7792407 100644
---- a/drivers/usb/serial/mxuport.c
-+++ b/drivers/usb/serial/mxuport.c
-@@ -1137,13 +1137,9 @@ static int mxuport_port_probe(struct usb_serial_port *port)
- 		return err;
- 
- 	/* Set interface (RS-232) */
--	err = mxuport_send_ctrl_urb(serial, RQ_VENDOR_SET_INTERFACE,
-+	return mxuport_send_ctrl_urb(serial, RQ_VENDOR_SET_INTERFACE,
- 				    MX_INT_RS232,
- 				    port->port_number);
--	if (err)
--		return err;
--
+diff --git a/drivers/usb/misc/ftdi-elan.c b/drivers/usb/misc/ftdi-elan.c
+index 8ab1f8f..1545f12 100644
+--- a/drivers/usb/misc/ftdi-elan.c
++++ b/drivers/usb/misc/ftdi-elan.c
+@@ -2568,11 +2568,8 @@ static int ftdi_elan_close_controller(struct usb_ftdi *ftdi, int fn)
+ 					    0x00);
+ 	if (UxxxStatus)
+ 		return UxxxStatus;
+-	UxxxStatus = ftdi_elan_read_config(ftdi, activePCIfn | reg, 0,
++	return ftdi_elan_read_config(ftdi, activePCIfn | reg, 0,
+ 					   &pcidata);
+-	if (UxxxStatus)
+-		return UxxxStatus;
 -	return 0;
  }
  
- static int mxuport_alloc_write_urb(struct usb_serial *serial,
+ static int ftdi_elan_found_controller(struct usb_ftdi *ftdi, int fn, int quirk)
+@@ -2695,11 +2692,8 @@ static int ftdi_elan_setupOHCI(struct usb_ftdi *ftdi)
+ 		}
+ 	}
+ 	if (ftdi->function > 0) {
+-		UxxxStatus = ftdi_elan_setup_controller(ftdi,
++		return ftdi_elan_setup_controller(ftdi,
+ 							ftdi->function - 1);
+-		if (UxxxStatus)
+-			return UxxxStatus;
+-		return 0;
+ 	} else if (controllers > 0) {
+ 		return -ENXIO;
+ 	} else if (unrecognized > 0) {
 -- 
 1.9.1
