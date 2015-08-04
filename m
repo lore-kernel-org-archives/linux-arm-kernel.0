@@ -1,521 +1,76 @@
-From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
-Date: Tue,  4 Aug 2015 13:18:17 +0200
-Subject: [PATCH v2 2/4] ASoc: rockchip: Add rockchip SPDIF transceiver driver
-In-Reply-To: <1438687099-14282-1-git-send-email-sjoerd.simons@collabora.co.uk>
-References: <1438687099-14282-1-git-send-email-sjoerd.simons@collabora.co.uk>
-Message-ID: <1438687099-14282-3-git-send-email-sjoerd.simons@collabora.co.uk>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 04 Aug 2015 14:22:13 +0300
+Subject: [PATCH v3] media: atmel-isi: parse the DT parameters for
+ vsync/hsync/pixclock polarity
+In-Reply-To: <1438681069-16981-1-git-send-email-josh.wu@atmel.com>
+References: <1438681069-16981-1-git-send-email-josh.wu@atmel.com>
+Message-ID: <3317317.RTpCstaHHn@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a driver for the SDPIF transceiver available on RK3066, RK3188 and
-RK3288. Heavily based on the rockchip i2s driver.
+Hi Josh,
 
-Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+Thank you for the patch.
 
----
+On Tuesday 04 August 2015 17:37:49 Josh Wu wrote:
+> This patch will get the DT parameters of vsync/hsync/pixclock polarity, and
+> pass to driver.
+> 
+> Also add a debug information for test purpose.
+> 
+> Signed-off-by: Josh Wu <josh.wu@atmel.com>
 
-Changes in v2:
-- Remove platform: module alias as it was unused
-- Call MODULE_DEVICE_TABLE(of, ) right after the of match table
-- use rk_spdif as a prefix consistenly throughout the driver
-- Check return code of regmap_update and bubble it up
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
- sound/soc/rockchip/Kconfig          |   8 +
- sound/soc/rockchip/Makefile         |   2 +
- sound/soc/rockchip/rockchip_spdif.c | 381 ++++++++++++++++++++++++++++++++++++
- sound/soc/rockchip/rockchip_spdif.h |  63 ++++++
- 4 files changed, 454 insertions(+)
- create mode 100644 sound/soc/rockchip/rockchip_spdif.c
- create mode 100644 sound/soc/rockchip/rockchip_spdif.h
+> ---
+> 
+> Changes in v3:
+> - add embedded sync dt property support.
+> 
+> Changes in v2:
+> - rewrite the debug message and add pix clock polarity setup thanks to
+>   Laurent.
+> - update the commit log.
+> 
+>  drivers/media/platform/soc_camera/atmel-isi.c | 15 +++++++++++++++
+>  1 file changed, 15 insertions(+)
+> 
+> diff --git a/drivers/media/platform/soc_camera/atmel-isi.c
+> b/drivers/media/platform/soc_camera/atmel-isi.c index fead841..4efc939
+> 100644
+> --- a/drivers/media/platform/soc_camera/atmel-isi.c
+> +++ b/drivers/media/platform/soc_camera/atmel-isi.c
+> @@ -1061,6 +1061,11 @@ static int isi_camera_set_bus_param(struct
+> soc_camera_device *icd) if (common_flags & V4L2_MBUS_PCLK_SAMPLE_FALLING)
+>  		cfg1 |= ISI_CFG1_PIXCLK_POL_ACTIVE_FALLING;
+> 
+> +	dev_dbg(icd->parent, "vsync active %s, hsync active %s, sampling on pix
+> clock %s edge\n", +		common_flags & V4L2_MBUS_VSYNC_ACTIVE_LOW ? "low" :
+> "high",
+> +		common_flags & V4L2_MBUS_HSYNC_ACTIVE_LOW ? "low" : "high",
+> +		common_flags & V4L2_MBUS_PCLK_SAMPLE_FALLING ? "falling" : "rising");
+> +
+>  	if (isi->pdata.has_emb_sync)
+>  		cfg1 |= ISI_CFG1_EMB_SYNC;
+>  	if (isi->pdata.full_mode)
+> @@ -1148,6 +1153,16 @@ static int atmel_isi_parse_dt(struct atmel_isi *isi,
+>  		return -EINVAL;
+>  	}
+> 
+> +	if (ep.bus.parallel.flags & V4L2_MBUS_HSYNC_ACTIVE_LOW)
+> +		isi->pdata.hsync_act_low = true;
+> +	if (ep.bus.parallel.flags & V4L2_MBUS_VSYNC_ACTIVE_LOW)
+> +		isi->pdata.vsync_act_low = true;
+> +	if (ep.bus.parallel.flags & V4L2_MBUS_PCLK_SAMPLE_FALLING)
+> +		isi->pdata.pclk_act_falling = true;
+> +
+> +	if (ep.bus_type == V4L2_MBUS_BT656)
+> +		isi->pdata.has_emb_sync = true;
+> +
+>  	return 0;
+>  }
 
-diff --git a/sound/soc/rockchip/Kconfig b/sound/soc/rockchip/Kconfig
-index 58bae8e..603fd1f 100644
---- a/sound/soc/rockchip/Kconfig
-+++ b/sound/soc/rockchip/Kconfig
-@@ -15,6 +15,14 @@ config SND_SOC_ROCKCHIP_I2S
- 	  Rockchip I2S device. The device supports upto maximum of
- 	  8 channels each for play and record.
- 
-+config SND_SOC_ROCKCHIP_SPDIF
-+	tristate "Rockchip SPDIF Device Driver"
-+	depends on CLKDEV_LOOKUP && SND_SOC_ROCKCHIP
-+	select SND_SOC_GENERIC_DMAENGINE_PCM
-+	help
-+	  Say Y or M if you want to add support for SPDIF driver for
-+	  Rockchip SPDIF transceiver device.
-+
- config SND_SOC_ROCKCHIP_MAX98090
- 	tristate "ASoC support for Rockchip boards using a MAX98090 codec"
- 	depends on SND_SOC_ROCKCHIP && I2C && GPIOLIB
-diff --git a/sound/soc/rockchip/Makefile b/sound/soc/rockchip/Makefile
-index 1bc1dc3..9a244d7 100644
---- a/sound/soc/rockchip/Makefile
-+++ b/sound/soc/rockchip/Makefile
-@@ -1,7 +1,9 @@
- # ROCKCHIP Platform Support
- snd-soc-i2s-objs := rockchip_i2s.o
-+snd-soc-spdif-objs := rockchip_spdif.o
- 
- obj-$(CONFIG_SND_SOC_ROCKCHIP_I2S) += snd-soc-i2s.o
-+obj-$(CONFIG_SND_SOC_ROCKCHIP_SPDIF) += snd-soc-spdif.o
- 
- snd-soc-rockchip-max98090-objs := rockchip_max98090.o
- snd-soc-rockchip-rt5645-objs := rockchip_rt5645.o
-diff --git a/sound/soc/rockchip/rockchip_spdif.c b/sound/soc/rockchip/rockchip_spdif.c
-new file mode 100644
-index 0000000..39d33c0
---- /dev/null
-+++ b/sound/soc/rockchip/rockchip_spdif.c
-@@ -0,0 +1,381 @@
-+/* sound/soc/rockchip/rk_spdif.c
-+ *
-+ * ALSA SoC Audio Layer - Rockchip I2S Controller driver
-+ *
-+ * Copyright (c) 2014 Rockchip Electronics Co. Ltd.
-+ * Author: Jianqun <jay.xu@rock-chips.com>
-+ * Copyright (c) 2015 Collabora Ltd.
-+ * Author: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/module.h>
-+#include <linux/delay.h>
-+#include <linux/of_gpio.h>
-+#include <linux/clk.h>
-+#include <linux/pm_runtime.h>
-+#include <linux/regmap.h>
-+#include <sound/pcm_params.h>
-+#include <sound/dmaengine_pcm.h>
-+
-+#include "rockchip_spdif.h"
-+
-+struct rk_spdif_dev {
-+	struct device *dev;
-+
-+	struct clk *mclk;
-+	struct clk *hclk;
-+
-+	struct snd_dmaengine_dai_dma_data playback_dma_data;
-+
-+	struct regmap *regmap;
-+};
-+
-+static int rk_spdif_runtime_suspend(struct device *dev)
-+{
-+	struct rk_spdif_dev *spdif = dev_get_drvdata(dev);
-+
-+	clk_disable_unprepare(spdif->mclk);
-+
-+	return 0;
-+}
-+
-+static int rk_spdif_runtime_resume(struct device *dev)
-+{
-+	struct rk_spdif_dev *spdif = dev_get_drvdata(dev);
-+	int ret;
-+
-+	ret = clk_prepare_enable(spdif->mclk);
-+	if (ret) {
-+		dev_err(spdif->dev, "clock enable failed %d\n", ret);
-+		return ret;
-+	}
-+
-+	return 0;
-+}
-+
-+static inline struct rk_spdif_dev *to_info(struct snd_soc_dai *dai)
-+{
-+	return snd_soc_dai_get_drvdata(dai);
-+}
-+
-+static int rk_spdif_snd_txctrl(struct rk_spdif_dev *spdif, int on)
-+{
-+	int ret;
-+
-+	if (on) {
-+		ret = regmap_update_bits(spdif->regmap, SPDIF_DMACR,
-+				   SPDIF_DMACR_TDE_ENABLE,
-+				   SPDIF_DMACR_TDE_ENABLE);
-+
-+		if (ret != 0)
-+			goto bail;
-+
-+		ret = regmap_update_bits(spdif->regmap, SPDIF_XFER,
-+				   SPDIF_XFER_TXS_START,
-+				   SPDIF_XFER_TXS_START);
-+	} else {
-+		ret = regmap_update_bits(spdif->regmap, SPDIF_DMACR,
-+				   SPDIF_DMACR_TDE_ENABLE,
-+				   SPDIF_DMACR_TDE_DISABLE);
-+
-+		if (ret != 0)
-+			goto bail;
-+
-+		ret = regmap_update_bits(spdif->regmap, SPDIF_XFER,
-+				   SPDIF_XFER_TXS_START,
-+				   SPDIF_XFER_TXS_STOP);
-+	}
-+
-+bail:
-+	return ret;
-+}
-+
-+static int rk_spdif_hw_params(struct snd_pcm_substream *substream,
-+				  struct snd_pcm_hw_params *params,
-+				  struct snd_soc_dai *dai)
-+{
-+	struct rk_spdif_dev *spdif = to_info(dai);
-+	unsigned int val = SPDIF_CFGR_HALFWORD_ENABLE;
-+	int srate, mclk;
-+
-+	srate = params_rate(params);
-+	switch (srate) {
-+	case 32000:
-+	case 48000:
-+	case 96000:
-+		mclk = 12288000;
-+		break;
-+	case 44100:
-+		mclk = 11289600;
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+
-+	switch (params_format(params)) {
-+	case SNDRV_PCM_FORMAT_S16_LE:
-+		val |= SPDIF_CFGR_VDW_16;
-+		break;
-+	case SNDRV_PCM_FORMAT_S20_3LE:
-+		val |= SPDIF_CFGR_VDW_20;
-+		break;
-+	case SNDRV_PCM_FORMAT_S24_LE:
-+		val |= SPDIF_CFGR_VDW_24;
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+
-+	/* Set clock and calculate divider */
-+	clk_set_rate(spdif->mclk, mclk);
-+	val |= SPDIF_CFGR_CLK_DIV(mclk/(srate * 256));
-+
-+	return regmap_update_bits(spdif->regmap, SPDIF_CFGR,
-+		SPDIF_CFGR_CLK_DIV_MASK | SPDIF_CFGR_HALFWORD_ENABLE |
-+		SDPIF_CFGR_VDW_MASK,
-+		val);
-+}
-+
-+static int rk_spdif_trigger(struct snd_pcm_substream *substream,
-+				int cmd, struct snd_soc_dai *dai)
-+{
-+	struct rk_spdif_dev *spdif = to_info(dai);
-+	int ret;
-+
-+	switch (cmd) {
-+	case SNDRV_PCM_TRIGGER_START:
-+	case SNDRV_PCM_TRIGGER_RESUME:
-+	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
-+		ret = rk_spdif_snd_txctrl(spdif, true);
-+		break;
-+	case SNDRV_PCM_TRIGGER_SUSPEND:
-+	case SNDRV_PCM_TRIGGER_STOP:
-+	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
-+		ret = rk_spdif_snd_txctrl(spdif, false);
-+		break;
-+	default:
-+		ret = -EINVAL;
-+		break;
-+	}
-+
-+	return ret;
-+}
-+
-+static int rk_spdif_dai_probe(struct snd_soc_dai *dai)
-+{
-+	struct rk_spdif_dev *spdif = snd_soc_dai_get_drvdata(dai);
-+
-+	dai->playback_dma_data = &spdif->playback_dma_data;
-+
-+	return 0;
-+}
-+
-+static const struct snd_soc_dai_ops rk_spdif_dai_ops = {
-+	.hw_params = rk_spdif_hw_params,
-+	.trigger = rk_spdif_trigger,
-+};
-+
-+static struct snd_soc_dai_driver rk_spdif_dai = {
-+	.probe = rk_spdif_dai_probe,
-+	.playback = {
-+		.stream_name = "Playback",
-+		.channels_min = 2,
-+		.channels_max = 2,
-+		.rates = (SNDRV_PCM_RATE_32000 |
-+			  SNDRV_PCM_RATE_44100 |
-+			  SNDRV_PCM_RATE_48000 |
-+			  SNDRV_PCM_RATE_96000),
-+		.formats = (SNDRV_PCM_FMTBIT_S16_LE |
-+			    SNDRV_PCM_FMTBIT_S20_3LE |
-+			    SNDRV_PCM_FMTBIT_S24_LE),
-+	},
-+	.ops = &rk_spdif_dai_ops,
-+};
-+
-+static const struct snd_soc_component_driver rk_spdif_component = {
-+	.name = "rockchip-spdif",
-+};
-+
-+static bool rk_spdif_wr_reg(struct device *dev, unsigned int reg)
-+{
-+	switch (reg) {
-+	case SPDIF_CFGR:
-+	case SPDIF_DMACR:
-+	case SPDIF_INTCR:
-+	case SPDIF_XFER:
-+	case SPDIF_SMPDR:
-+		return true;
-+	default:
-+		return false;
-+	}
-+}
-+
-+static bool rk_spdif_rd_reg(struct device *dev, unsigned int reg)
-+{
-+	switch (reg) {
-+	case SPDIF_CFGR:
-+	case SPDIF_SDBLR:
-+	case SPDIF_INTCR:
-+	case SPDIF_INTSR:
-+	case SPDIF_XFER:
-+		return true;
-+	default:
-+		return false;
-+	}
-+}
-+
-+static bool rk_spdif_volatile_reg(struct device *dev, unsigned int reg)
-+{
-+	switch (reg) {
-+	case SPDIF_INTSR:
-+	case SPDIF_SDBLR:
-+		return true;
-+	default:
-+		return false;
-+	}
-+}
-+
-+static const struct regmap_config rk_spdif_regmap_config = {
-+	.reg_bits = 32,
-+	.reg_stride = 4,
-+	.val_bits = 32,
-+	.max_register = SPDIF_SMPDR,
-+	.writeable_reg = rk_spdif_wr_reg,
-+	.readable_reg = rk_spdif_rd_reg,
-+	.volatile_reg = rk_spdif_volatile_reg,
-+	.cache_type = REGCACHE_FLAT,
-+};
-+
-+static int rk_spdif_probe(struct platform_device *pdev)
-+{
-+	struct rk_spdif_dev *spdif;
-+	struct resource *res;
-+	void __iomem *regs;
-+	int ret;
-+
-+	spdif = devm_kzalloc(&pdev->dev, sizeof(*spdif), GFP_KERNEL);
-+	if (!spdif)
-+		return -ENOMEM;
-+
-+	spdif->hclk = devm_clk_get(&pdev->dev, "spdif_hclk");
-+	if (IS_ERR(spdif->hclk)) {
-+		dev_err(&pdev->dev, "Can't retrieve rk_spdif bus clock\n");
-+		return PTR_ERR(spdif->hclk);
-+	}
-+	ret = clk_prepare_enable(spdif->hclk);
-+	if (ret) {
-+		dev_err(spdif->dev, "hclock enable failed %d\n", ret);
-+		return ret;
-+	}
-+
-+	spdif->mclk = devm_clk_get(&pdev->dev, "spdif_clk");
-+	if (IS_ERR(spdif->mclk)) {
-+		dev_err(&pdev->dev, "Can't retrieve rk_spdif master clock\n");
-+		return PTR_ERR(spdif->hclk);
-+	}
-+
-+	ret = clk_prepare_enable(spdif->mclk);
-+	if (ret) {
-+		dev_err(spdif->dev, "clock enable failed %d\n", ret);
-+		return ret;
-+	}
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	regs = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(regs))
-+		return PTR_ERR(regs);
-+
-+	spdif->regmap = devm_regmap_init_mmio(&pdev->dev, regs,
-+					    &rk_spdif_regmap_config);
-+	if (IS_ERR(spdif->regmap)) {
-+		dev_err(&pdev->dev,
-+			"Failed to initialise managed register map\n");
-+		return PTR_ERR(spdif->regmap);
-+	}
-+
-+	spdif->playback_dma_data.addr = res->start + SPDIF_SMPDR;
-+	spdif->playback_dma_data.addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
-+	spdif->playback_dma_data.maxburst = 4;
-+
-+	spdif->dev = &pdev->dev;
-+	dev_set_drvdata(&pdev->dev, spdif);
-+
-+	pm_runtime_enable(&pdev->dev);
-+	if (!pm_runtime_enabled(&pdev->dev)) {
-+		ret = rk_spdif_runtime_resume(&pdev->dev);
-+		if (ret)
-+			goto err_pm_disable;
-+	}
-+
-+	ret = devm_snd_soc_register_component(&pdev->dev,
-+					      &rk_spdif_component,
-+					      &rk_spdif_dai, 1);
-+	if (ret) {
-+		dev_err(&pdev->dev, "Could not register DAI\n");
-+		goto err_suspend;
-+	}
-+
-+	ret = snd_dmaengine_pcm_register(&pdev->dev, NULL, 0);
-+	if (ret) {
-+		dev_err(&pdev->dev, "Could not register PCM\n");
-+		goto err_pcm_register;
-+	}
-+
-+	return 0;
-+
-+err_pcm_register:
-+	snd_dmaengine_pcm_unregister(&pdev->dev);
-+err_suspend:
-+	if (!pm_runtime_status_suspended(&pdev->dev))
-+		rk_spdif_runtime_suspend(&pdev->dev);
-+err_pm_disable:
-+	pm_runtime_disable(&pdev->dev);
-+
-+	return ret;
-+}
-+
-+static int rk_spdif_remove(struct platform_device *pdev)
-+{
-+	struct rk_spdif_dev *spdif = dev_get_drvdata(&pdev->dev);
-+
-+	pm_runtime_disable(&pdev->dev);
-+	if (!pm_runtime_status_suspended(&pdev->dev))
-+		rk_spdif_runtime_suspend(&pdev->dev);
-+
-+	clk_disable_unprepare(spdif->mclk);
-+	clk_disable_unprepare(spdif->hclk);
-+	snd_dmaengine_pcm_unregister(&pdev->dev);
-+	snd_soc_unregister_component(&pdev->dev);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id rk_spdif_match[] = {
-+	{ .compatible = "rockchip,rk3066-spdif", },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, rk_spdif_match);
-+
-+static const struct dev_pm_ops rk_spdif_pm_ops = {
-+	SET_RUNTIME_PM_OPS(rk_spdif_runtime_suspend, rk_spdif_runtime_resume,
-+			   NULL)
-+};
-+
-+static struct platform_driver rk_spdif_driver = {
-+	.probe = rk_spdif_probe,
-+	.remove = rk_spdif_remove,
-+	.driver = {
-+		.name = "rockchip-spdif",
-+		.of_match_table = of_match_ptr(rk_spdif_match),
-+		.pm = &rk_spdif_pm_ops,
-+	},
-+};
-+module_platform_driver(rk_spdif_driver);
-+
-+MODULE_DESCRIPTION("ROCKCHIP SPDIF transceiver Interface");
-+MODULE_AUTHOR("Sjoerd Simons <sjoerd.simons@collabora.co.uk>");
-+MODULE_LICENSE("GPL v2");
-diff --git a/sound/soc/rockchip/rockchip_spdif.h b/sound/soc/rockchip/rockchip_spdif.h
-new file mode 100644
-index 0000000..07f86a2
---- /dev/null
-+++ b/sound/soc/rockchip/rockchip_spdif.h
-@@ -0,0 +1,63 @@
-+/*
-+ * ALSA SoC Audio Layer - Rockchip SPDIF transceiver driver
-+ *
-+ * Copyright (c) 2015 Collabora Ltd.
-+ * Author: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef _ROCKCHIP_SPDIF_H
-+#define _ROCKCHIP_SPDIF_H
-+
-+/*
-+ * CFGR
-+ * transfer configuration register
-+*/
-+#define SPDIF_CFGR_CLK_DIV_SHIFT	(16)
-+#define SPDIF_CFGR_CLK_DIV_MASK		(0xff << SPDIF_CFGR_CLK_DIV_SHIFT)
-+#define SPDIF_CFGR_CLK_DIV(x)		(x << SPDIF_CFGR_CLK_DIV_SHIFT)
-+
-+#define SPDIF_CFGR_HALFWORD_SHIFT	2
-+#define SPDIF_CFGR_HALFWORD_DISABLE	(0 << SPDIF_CFGR_HALFWORD_SHIFT)
-+#define SPDIF_CFGR_HALFWORD_ENABLE	(1 << SPDIF_CFGR_HALFWORD_SHIFT)
-+
-+#define SPDIF_CFGR_VDW_SHIFT	0
-+#define SPDIF_CFGR_VDW(x)	(x << SPDIF_CFGR_VDW_SHIFT)
-+#define SDPIF_CFGR_VDW_MASK	(0xf << SPDIF_CFGR_VDW_SHIFT)
-+
-+#define SPDIF_CFGR_VDW_16	SPDIF_CFGR_VDW(0x00)
-+#define SPDIF_CFGR_VDW_20	SPDIF_CFGR_VDW(0x01)
-+#define SPDIF_CFGR_VDW_24	SPDIF_CFGR_VDW(0x10)
-+
-+/*
-+ * DMACR
-+ * DMA control register
-+*/
-+#define SPDIF_DMACR_TDE_SHIFT	5
-+#define SPDIF_DMACR_TDE_DISABLE	(0 << SPDIF_DMACR_TDE_SHIFT)
-+#define SPDIF_DMACR_TDE_ENABLE	(1 << SPDIF_DMACR_TDE_SHIFT)
-+
-+#define SPDIF_DMACR_TDL_SHIFT	0
-+#define SPDIF_DMACR_TDL(x)	((x) << SPDIF_DMACR_TDL_SHIFT)
-+#define SPDIF_DMACR_TDL_MASK	(0x1f << SDPIF_DMACR_TDL_SHIFT)
-+
-+/*
-+ * XFER
-+ * Transfer control register
-+*/
-+#define SPDIF_XFER_TXS_SHIFT	0
-+#define SPDIF_XFER_TXS_STOP	(0 << SPDIF_XFER_TXS_SHIFT)
-+#define SPDIF_XFER_TXS_START	(1 << SPDIF_XFER_TXS_SHIFT)
-+
-+#define SPDIF_CFGR	(0x0000)
-+#define SPDIF_SDBLR	(0x0004)
-+#define SPDIF_DMACR	(0x0008)
-+#define SPDIF_INTCR	(0x000c)
-+#define SPDIF_INTSR	(0x0010)
-+#define SPDIF_XFER	(0x0018)
-+#define SPDIF_SMPDR	(0x0020)
-+
-+#endif /* _ROCKCHIP_SPDIF_H */
 -- 
-2.5.0
+Regards,
+
+Laurent Pinchart
