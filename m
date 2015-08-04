@@ -1,31 +1,21 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 4 Aug 2015 13:30:59 -0500
-Subject: [PATCH v5 40/46] usb: gadget: epautoconf: rework ep_matches()
- function
-In-Reply-To: <1438351258-31578-41-git-send-email-r.baldyga@samsung.com>
-References: <1438351258-31578-1-git-send-email-r.baldyga@samsung.com>
- <1438351258-31578-41-git-send-email-r.baldyga@samsung.com>
-Message-ID: <20150804183059.GC9623@saruman.tx.rr.com>
+From: agross@codeaurora.org (Andy Gross)
+Date: Tue, 4 Aug 2015 13:48:22 -0500
+Subject: [PATCH 02/18] firmware: qcom_scm-32: replace open-coded call to
+ __cpuc_flush_dcache_area()
+In-Reply-To: <E1ZJhWZ-00043Z-Ft@rmk-PC.arm.linux.org.uk>
+References: <20150727122824.GH7557@n2100.arm.linux.org.uk>
+ <E1ZJhWZ-00043Z-Ft@rmk-PC.arm.linux.org.uk>
+Message-ID: <20150804184822.GA10826@qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 31, 2015 at 04:00:52PM +0200, Robert Baldyga wrote:
-> Rework ep_matches() function to make it shorter and more readable.
-> 
-> Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
+On Mon, Jul 27, 2015 at 01:28:55PM +0100, Russell King wrote:
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
 
-this regresses at least mass storage. How did you test it ? I'll keep
-all patches up to this one, please fix the problem, rebase on
-testing/next and resend the remaining patches.
-
-cheers
+Acked-by: Andy Gross <agross@codeaurora.org>
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150804/640cca5b/attachment.sig>
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
