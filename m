@@ -1,64 +1,81 @@
-From: vigneshr@ti.com (R, Vignesh)
-Date: Tue, 4 Aug 2015 23:29:52 +0530
-Subject: [RFC PATCH 1/5] spi: introduce flag for memory mapped read
-In-Reply-To: <20150804155148.GR20873@sirena.org.uk>
-References: <1438072876-16338-1-git-send-email-vigneshr@ti.com>
- <1438072876-16338-2-git-send-email-vigneshr@ti.com>
- <20150731181745.GM20873@sirena.org.uk> <55BEF4AF.5090704@ti.com>
- <20150804155148.GR20873@sirena.org.uk>
-Message-ID: <55C0FD98.1090107@ti.com>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Tue,  4 Aug 2015 20:03:08 +0200
+Subject: [PATCH 3/7] ARM: shmobile: Remove obsolete custom earlyprintk code
+In-Reply-To: <1438711392-23763-1-git-send-email-geert+renesas@glider.be>
+References: <1438711392-23763-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1438711392-23763-4-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The last caller of shmobile_setup_console() was removed in commit
+44d88c754e57a6d9 ("ARM: shmobile: Remove legacy SoC code for R-Mobile
+A1").
 
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+ arch/arm/mach-shmobile/Makefile  |  2 +-
+ arch/arm/mach-shmobile/common.h  |  1 -
+ arch/arm/mach-shmobile/console.c | 27 ---------------------------
+ 3 files changed, 1 insertion(+), 29 deletions(-)
+ delete mode 100644 arch/arm/mach-shmobile/console.c
 
-On 8/4/2015 9:21 PM, Mark Brown wrote:
-> On Mon, Aug 03, 2015 at 10:27:19AM +0530, Vignesh R wrote:
-> 
->> @use_mmap_mode: Some SPI controller chips are optimized for interacting
->> with serial flash memories. These chips have memory mapped interface,
->> through which entire serial flash memory slave can be read/written as if
->> though they are physical memories (like RAM). Using this interface,
->> flash can be accessed using memcpy() function and the spi controller
->> hardware will take care of communicating with serial flash over SPI.
->> Setting this flag will indicate the SPI controller driver that the
->> spi_message is from mtd layer to read from/write to flash. The SPI
->> master driver can then appropriately switch the controller to memory
->> mapped interface to read from/write to flash, based on this flag (See
->> drivers/spi/spi-ti-qspi.c for example).
->> NOTE: If the SPI controller chip lacks memory mapped interface, then the
->> driver will ignore this flag and use normal SPI protocol to read
->> from/write to flash. Communication with non-flash SPI devices is not
->> possible using the memory mapped interface.
-> 
-> I still can't tell from the above what this interface is supposed to do.
-> It sounds like the use of memory mapped mode is supposed to be
-> transparent to users, it should just affect how the controller interacts
-> with the hardware, but if that's the case why do we need to expose it to
-> users at all?  Shouldn't the driver just use memory mapped mode if it's
-> faster?
-> 
-
-TI QSPI controller has two blocks:
-1. SPI_CORE: This is generic(normal) spi mode. This can be used to
-communicate with any SPI devices (serial flashes as well as non-flash
-devices like touchscreen).
-2. SFI_MM_IF(SPI memory mapped interface): The SFI_MM_IF block only
-allows reading and writing to an SPI flash device only. Used to speed up
-flash reads. It _cannot_ be used to communicate with non flash devices.
-Now, the spi_message that ti-qspi receives in transfer_one() callback
-can be from mtd device(in which case SFI_MM_IF can be used) or from any
-other non flash SPI device (in which case SFI_MM_IF must not be used
-instead SPI_CORE is to be used) but there is no way(is there?) to
-distinguish where spi_message is from. Therefore I introduced flag
-(use_mmap_mode) to struct spi_message. mtd driver will set flag to true,
-this helps the ti-qspi driver to determine that the user is flash device
-and thus can do read via SFI_MM_IF. If this flag is not set then the
-user is assumed to be non flash SPI driver and will use SPI_CORE block
-to communicate.
-
-On the whole, I just need a way to determine that the user is a flash
-device in order to switch to memory mapped interface.
-
-Regards
-Vignesh
+diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
+index 476de30798d7290b..b02841528e05bbdb 100644
+--- a/arch/arm/mach-shmobile/Makefile
++++ b/arch/arm/mach-shmobile/Makefile
+@@ -3,7 +3,7 @@
+ #
+ 
+ # Common objects
+-obj-y				:= timer.o console.o
++obj-y				:= timer.o
+ 
+ # CPU objects
+ obj-$(CONFIG_ARCH_SH73A0)	+= setup-sh73a0.o
+diff --git a/arch/arm/mach-shmobile/common.h b/arch/arm/mach-shmobile/common.h
+index 8d27ec546a35f4b9..ee8fe9e473d72895 100644
+--- a/arch/arm/mach-shmobile/common.h
++++ b/arch/arm/mach-shmobile/common.h
+@@ -4,7 +4,6 @@
+ extern void shmobile_earlytimer_init(void);
+ extern void shmobile_init_delay(void);
+ struct twd_local_timer;
+-extern void shmobile_setup_console(void);
+ extern void shmobile_boot_vector(void);
+ extern unsigned long shmobile_boot_fn;
+ extern unsigned long shmobile_boot_arg;
+diff --git a/arch/arm/mach-shmobile/console.c b/arch/arm/mach-shmobile/console.c
+deleted file mode 100644
+index e329ccbd0a6734f1..0000000000000000
+--- a/arch/arm/mach-shmobile/console.c
++++ /dev/null
+@@ -1,27 +0,0 @@
+-/*
+- * SH-Mobile Console
+- *
+- * Copyright (C) 2010  Magnus Damm
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; version 2 of the License.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- */
+-#include <linux/kernel.h>
+-#include <linux/init.h>
+-#include <linux/platform_device.h>
+-#include <asm/mach/map.h>
+-#include "common.h"
+-
+-void __init shmobile_setup_console(void)
+-{
+-	parse_early_param();
+-
+-	/* Let earlyprintk output early console messages */
+-	early_platform_driver_probe("earlyprintk", 1, 1);
+-}
+-- 
+1.9.1
