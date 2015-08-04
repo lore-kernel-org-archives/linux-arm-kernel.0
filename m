@@ -1,81 +1,61 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Tue,  4 Aug 2015 20:03:08 +0200
-Subject: [PATCH 3/7] ARM: shmobile: Remove obsolete custom earlyprintk code
+Date: Tue,  4 Aug 2015 20:03:11 +0200
+Subject: [PATCH 6/7] ARM: shmobile: Remove obsolete earlytimer registration
 In-Reply-To: <1438711392-23763-1-git-send-email-geert+renesas@glider.be>
 References: <1438711392-23763-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1438711392-23763-4-git-send-email-geert+renesas@glider.be>
+Message-ID: <1438711392-23763-7-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The last caller of shmobile_setup_console() was removed in commit
-44d88c754e57a6d9 ("ARM: shmobile: Remove legacy SoC code for R-Mobile
-A1").
+The last caller of shmobile_earlytimer_init() was removed in commit
+c99cd90d98a98aa1 ("ARM: shmobile: r8a7779: Remove legacy SoC code").
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/mach-shmobile/Makefile  |  2 +-
- arch/arm/mach-shmobile/common.h  |  1 -
- arch/arm/mach-shmobile/console.c | 27 ---------------------------
- 3 files changed, 1 insertion(+), 29 deletions(-)
- delete mode 100644 arch/arm/mach-shmobile/console.c
+ arch/arm/mach-shmobile/common.h |  1 -
+ arch/arm/mach-shmobile/timer.c  | 21 ---------------------
+ 2 files changed, 22 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
-index 476de30798d7290b..b02841528e05bbdb 100644
---- a/arch/arm/mach-shmobile/Makefile
-+++ b/arch/arm/mach-shmobile/Makefile
-@@ -3,7 +3,7 @@
- #
- 
- # Common objects
--obj-y				:= timer.o console.o
-+obj-y				:= timer.o
- 
- # CPU objects
- obj-$(CONFIG_ARCH_SH73A0)	+= setup-sh73a0.o
 diff --git a/arch/arm/mach-shmobile/common.h b/arch/arm/mach-shmobile/common.h
-index 8d27ec546a35f4b9..ee8fe9e473d72895 100644
+index ee8fe9e473d72895..2a350b48b893a1b6 100644
 --- a/arch/arm/mach-shmobile/common.h
 +++ b/arch/arm/mach-shmobile/common.h
-@@ -4,7 +4,6 @@
- extern void shmobile_earlytimer_init(void);
+@@ -1,7 +1,6 @@
+ #ifndef __ARCH_MACH_COMMON_H
+ #define __ARCH_MACH_COMMON_H
+ 
+-extern void shmobile_earlytimer_init(void);
  extern void shmobile_init_delay(void);
  struct twd_local_timer;
--extern void shmobile_setup_console(void);
  extern void shmobile_boot_vector(void);
- extern unsigned long shmobile_boot_fn;
- extern unsigned long shmobile_boot_arg;
-diff --git a/arch/arm/mach-shmobile/console.c b/arch/arm/mach-shmobile/console.c
-deleted file mode 100644
-index e329ccbd0a6734f1..0000000000000000
---- a/arch/arm/mach-shmobile/console.c
-+++ /dev/null
-@@ -1,27 +0,0 @@
--/*
-- * SH-Mobile Console
-- *
-- * Copyright (C) 2010  Magnus Damm
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; version 2 of the License.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- */
--#include <linux/kernel.h>
--#include <linux/init.h>
--#include <linux/platform_device.h>
--#include <asm/mach/map.h>
--#include "common.h"
+diff --git a/arch/arm/mach-shmobile/timer.c b/arch/arm/mach-shmobile/timer.c
+index f1d027aa7a81ac33..c17d4d3881ffc45e 100644
+--- a/arch/arm/mach-shmobile/timer.c
++++ b/arch/arm/mach-shmobile/timer.c
+@@ -77,24 +77,3 @@ void __init shmobile_init_delay(void)
+ 			shmobile_setup_delay_hz(max_freq, 2, 4);
+ 	}
+ }
 -
--void __init shmobile_setup_console(void)
+-static void __init shmobile_late_time_init(void)
 -{
--	parse_early_param();
--
--	/* Let earlyprintk output early console messages */
--	early_platform_driver_probe("earlyprintk", 1, 1);
+-	/*
+-	 * Make sure all compiled-in early timers register themselves.
+-	 *
+-	 * Run probe() for two "earlytimer" devices, these will be the
+-	 * clockevents and clocksource devices respectively. In the event
+-	 * that only a clockevents device is available, we -ENODEV on the
+-	 * clocksource and the jiffies clocksource is used transparently
+-	 * instead. No error handling is necessary here.
+-	 */
+-	early_platform_driver_register_all("earlytimer");
+-	early_platform_driver_probe("earlytimer", 2, 0);
 -}
+-
+-void __init shmobile_earlytimer_init(void)
+-{
+-	late_time_init = shmobile_late_time_init;
+-}
+-
 -- 
 1.9.1
