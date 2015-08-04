@@ -1,32 +1,47 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Tue, 04 Aug 2015 16:54:50 -0500
-Subject: [PATCH v5 8/9] PCI: xgene: Look for OF "msi-parent" in host
- controller, not root bus
-In-Reply-To: <20150804214234.9189.42548.stgit@bhelgaas-glaptop2.roam.corp.google.com>
-References: <20150804214234.9189.42548.stgit@bhelgaas-glaptop2.roam.corp.google.com>
-Message-ID: <20150804215450.9189.61176.stgit@bhelgaas-glaptop2.roam.corp.google.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 05 Aug 2015 01:50:45 +0300
+Subject: [PATCH v3 0/5] iommu/arm-smmu: add support for non-pci devices
+In-Reply-To: <20150728124847.GL29209@arm.com>
+References: <1437463833-16112-1-git-send-email-thunder.leizhen@huawei.com>
+ <55AE1F2F.3090106@arm.com> <20150728124847.GL29209@arm.com>
+Message-ID: <2351780.FdaR8mZqKs@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Look for the "msi-parent" in the PCI host controller OF node, not the root
-bus OF node.  This makes it the same as MVEBU.
+Hi Will,
 
-Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
----
- drivers/pci/host/pci-xgene.c |    3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+On Tuesday 28 July 2015 13:48:47 Will Deacon wrote:
+> On Tue, Jul 21, 2015 at 11:30:07AM +0100, Robin Murphy wrote:
+> > On 21/07/15 08:30, Zhen Lei wrote:
+> > > Changelog:
+> > > v2 -> v3:
+> > > 1. add support for pci device hotplug, which missed in patch v2.
+> > > 2. only support #iommu-cells = <1>, add corresponding description in
+> > > arm,smmu-v3.txt. 3. add function find_smmu_by_device which extracted
+> > > from find_smmu_by_node, to resolve> > 
+> > >     the problem mentioned by Robin Murphy in [PATCH v2 7/9].
+> > >     Additionally:
+> > >     +    platform_set_drvdata(pdev, smmu);       //Patch v2
+> > >     +	dev->archdata.iommu = smmu;             //Patch v3, dev =
+> > >     &pdev->dev
+> > 
+> > I didn't give any Reviewed-by tags, much less to revised patches that
+> > I've not even looked at yet; please see section 13 of
+> > Documentation/SubmittingPatches for what the Reviewed-by tag means.
+> 
+> That said, it would be great if you could review the patches anyway ;)
+> 
+> Also, it looks like this is all based on Laurent's IOMMU probe deferral
+> series which hasn't seen any movement for a while.
+> 
+> Laurent: are you planning to repost that, or is it worth us picking up
+> the original version and bashing it into shape ourselves?
 
-diff --git a/drivers/pci/host/pci-xgene.c b/drivers/pci/host/pci-xgene.c
-index 5e0d6de..3cb58a3 100644
---- a/drivers/pci/host/pci-xgene.c
-+++ b/drivers/pci/host/pci-xgene.c
-@@ -506,8 +506,7 @@ static int xgene_pcie_msi_enable(struct xgene_pcie_port *port,
- {
- 	struct device_node *msi_node;
- 
--	msi_node = of_parse_phandle(bus->dev.of_node,
--					"msi-parent", 0);
-+	msi_node = of_parse_phandle(port->dev.of_node, "msi-parent", 0);
- 	if (!msi_node)
- 		return -ENODEV;
- 
+I'd really appreciate if you could take it where I left it and get into shape 
+for upstream. I have no time to work on IOMMU at the moment I'm afraid :-( 
+I'll try to review patches though.
+
+-- 
+Regards,
+
+Laurent Pinchart
