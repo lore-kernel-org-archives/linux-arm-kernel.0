@@ -1,73 +1,69 @@
 From: lina.iyer@linaro.org (Lina Iyer)
-Date: Tue,  4 Aug 2015 17:35:38 -0600
-Subject: [PATCH 8/9] ARM64: smp: Add runtime PM support for CPU hotplug
+Date: Tue,  4 Aug 2015 17:35:37 -0600
+Subject: [PATCH 7/9] ARM: cpuidle: Add runtime PM support for CPU idle
 In-Reply-To: <1438731339-58317-1-git-send-email-lina.iyer@linaro.org>
 References: <1438731339-58317-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1438731339-58317-9-git-send-email-lina.iyer@linaro.org>
+Message-ID: <1438731339-58317-8-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable runtime PM for CPU devices. Do a runtime get of the CPU device
-when the CPU is hotplugged in and runtime put of the CPU device when the
-CPU is hotplugged off. When all the CPUs in a domain are hotplugged off,
-the domain may also be powered off and cluster_pm_enter/exit()
-notifications are be sent out.
+Notify runtime PM when the CPU is going to be powered off in the idle
+state. This allows for runtime PM suspend/resume of the CPU as well as
+its  PM domain.
 
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
 Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
 ---
- arch/arm64/kernel/smp.c | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ drivers/cpuidle/cpuidle-arm.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index dbdaacd..fbeeffa 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -135,6 +135,7 @@ asmlinkage void secondary_start_kernel(void)
+diff --git a/drivers/cpuidle/cpuidle-arm.c b/drivers/cpuidle/cpuidle-arm.c
+index 545069d..ca118ed 100644
+--- a/drivers/cpuidle/cpuidle-arm.c
++++ b/drivers/cpuidle/cpuidle-arm.c
+@@ -11,12 +11,14 @@
+ 
+ #define pr_fmt(fmt) "CPUidle arm: " fmt
+ 
++#include <linux/cpu.h>
+ #include <linux/cpuidle.h>
+ #include <linux/cpumask.h>
+ #include <linux/cpu_pm.h>
+ #include <linux/kernel.h>
+ #include <linux/module.h>
+ #include <linux/of.h>
++#include <linux/pm_runtime.h>
+ #include <linux/slab.h>
+ 
+ #include <asm/cpuidle.h>
+@@ -37,6 +39,7 @@ static int arm_enter_idle_state(struct cpuidle_device *dev,
+ 				struct cpuidle_driver *drv, int idx)
  {
- 	struct mm_struct *mm = &init_mm;
- 	unsigned int cpu = smp_processor_id();
-+	struct device *cpu_dev;
- 
- 	/*
- 	 * All kernel threads share the same mm context; grab a
-@@ -185,6 +186,11 @@ asmlinkage void secondary_start_kernel(void)
- 	local_irq_enable();
- 	local_async_enable();
- 
-+	/* We are running, enable runtime PM for the CPU. */
-+	cpu_dev = get_cpu_device(cpu);
-+	if (cpu_dev)
-+		pm_runtime_get_sync(cpu_dev);
-+
- 	/*
- 	 * OK, it's off to the idle thread for us
- 	 */
-@@ -219,6 +225,9 @@ int __cpu_disable(void)
- 	unsigned int cpu = smp_processor_id();
  	int ret;
++	struct device *cpu_dev = get_cpu_device(dev->cpu);
  
-+	/* We dont need the CPU device anymore. */
-+	pm_runtime_put_sync(get_cpu_device(cpu));
+ 	if (!idx) {
+ 		cpu_do_idle();
+@@ -46,12 +49,19 @@ static int arm_enter_idle_state(struct cpuidle_device *dev,
+ 	ret = cpu_pm_enter();
+ 	if (!ret) {
+ 		/*
++		* Notify runtime PM as well of this cpu powering down
++		* TODO: Merge CPU_PM and runtime PM.
++		*/
++		pm_runtime_put_sync(cpu_dev);
 +
- 	ret = op_cpu_disable(cpu);
- 	if (ret)
- 		return ret;
-@@ -293,6 +302,13 @@ void cpu_die(void)
- {
- 	unsigned int cpu = smp_processor_id();
++		/*
+ 		 * Pass idle state index to cpu_suspend which in turn will
+ 		 * call the CPU ops suspend protocol with idle index as a
+ 		 * parameter.
+ 		 */
+ 		arm_cpuidle_suspend(idx);
  
-+	/*
-+	 * We dont need the CPU device anymore.
-+	 * Lets do this before IRQs are disabled to allow
-+	 * runtime PM to suspend the domain as well.
-+	 */
-+	pm_runtime_put_sync(get_cpu_device(cpu));
-+
- 	idle_task_exit();
++		pm_runtime_get_sync(cpu_dev);
+ 		cpu_pm_exit();
+ 	}
  
- 	local_irq_disable();
 -- 
 2.1.4
