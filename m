@@ -1,29 +1,75 @@
-From: bob@xsdiecasting.cn (Bob)
-Date: Tue, 4 Aug 2015 14:06:31 +0800
-Subject: Low pressure die castings
-Message-ID: <201508041406311098023@xsdiecasting.cn>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Tue, 4 Aug 2015 14:21:45 +0800
+Subject: [PATCH] media: atmel-isi: parse the DT parameters for vsync/hsync
+ polarity
+In-Reply-To: <1896672.nsMcFlgNH5@avalon>
+References: <1438338812-22329-1-git-send-email-josh.wu@atmel.com>
+ <1896672.nsMcFlgNH5@avalon>
+Message-ID: <55C059F9.6070906@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi, Laurent
 
-Here is the prefossional aluminum foundry with advanced machining equipments.
-To reduce cost, manufacturers in your market are buying casting parts and component from us.
+On 8/1/2015 5:11 PM, Laurent Pinchart wrote:
+> Hi Josh,
+>
+> Thank you for the patch.
+>
+> On Friday 31 July 2015 18:33:32 Josh Wu wrote:
+>> This patch will get the DT parameters of vsync/hsync polarity, and pass to
+>> the platform data.
+>>
+>> Also add a debug information for test purpose.
+>>
+>> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+>> ---
+>>
+>>   drivers/media/platform/soc_camera/atmel-isi.c | 10 ++++++++++
+>>   1 file changed, 10 insertions(+)
+>>
+>> diff --git a/drivers/media/platform/soc_camera/atmel-isi.c
+>> b/drivers/media/platform/soc_camera/atmel-isi.c index fe9247a..a7de55c
+>> 100644
+>> --- a/drivers/media/platform/soc_camera/atmel-isi.c
+>> +++ b/drivers/media/platform/soc_camera/atmel-isi.c
+>> @@ -811,6 +811,11 @@ static int isi_camera_set_bus_param(struct
+>> soc_camera_device *icd) if (common_flags & V4L2_MBUS_PCLK_SAMPLE_FALLING)
+>>   		cfg1 |= ISI_CFG1_PIXCLK_POL_ACTIVE_FALLING;
+>>
+>> +	dev_dbg(icd->parent, "vsync is active %s, hsyc is active %s, pix clock is
+>> sampling %s\n",
+> s/hsyc/hsync/
+>
+> I'd write it as "vsync active %s, hsync active %s, sampling on pix clock %s
+> edge\n" with "falling" and "rising" instead of "fall" and "rise".
 
-We have developed the low pressure die castings for their parts instead of gravity casting and sand casting, so that they are more pressure tight and leak free.
-Of course, other castings are also available from us, like gravity die casting, sand casting, premanent mold casting to meet your different demand.
-All molds made by ourself to reduce your cost. Advanced machining equipments and testing equipments are available from us.
+Thanks, I'll correct it.
 
-40% of our shipment are for your market, which are proving our competitive in pricing and quality.
-Shall you have any interest, pls contact for possible deal.
+>
+>> +		common_flags & V4L2_MBUS_VSYNC_ACTIVE_LOW ? "low" : "high",
+>> +		common_flags & V4L2_MBUS_HSYNC_ACTIVE_LOW ? "low" : "high",
+>> +		common_flags & V4L2_MBUS_PCLK_SAMPLE_FALLING ? "fall" : "rise");
+>> +
+>>   	if (isi->pdata.has_emb_sync)
+>>   		cfg1 |= ISI_CFG1_EMB_SYNC;
+>>   	if (isi->pdata.full_mode)
+>> @@ -898,6 +903,11 @@ static int atmel_isi_probe_dt(struct atmel_isi *isi,
+>>   		goto err_probe_dt;
+>>   	}
+>>
+>> +	if (ep.bus.parallel.flags & V4L2_MBUS_HSYNC_ACTIVE_LOW)
+>> +		isi->pdata.hsync_act_low = true;
+>> +	if (ep.bus.parallel.flags & V4L2_MBUS_VSYNC_ACTIVE_LOW)
+>> +		isi->pdata.vsync_act_low = true;
+> While you're at it, how about setting has_emb_sync based on ep.bus_type and
+> pclk_act_falling from flags & V4L2_MBUS_PCLK_SAMPLE_FALLING ?
 
-b.rgds
------------------------------------------------------------
-Bob Hu
+I will add the pclk_act_falling handling code as well. And rebase this 
+patch on top of your dt modifications.
 
-Ningbo Yinzhou Xusheng Machinery Factory
-Skype: bobhu1
-Tel: 0086-574-88128603
-Cell: 0086-1395832 7774
-bob at xs-aluminumcasting.com
-www.xs-aluminumcasting.com
+Best Regards
+Josh Wu
+>
+>>   err_probe_dt:
+>>   	of_node_put(np);
