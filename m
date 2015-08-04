@@ -1,61 +1,211 @@
-From: eddie.huang@mediatek.com (Eddie Huang)
-Date: Tue, 4 Aug 2015 19:44:52 +0800
-Subject: [PATCH 1/2] i2c: mediatek: Reset DMA engine in hardware init function
-In-Reply-To: <1438688693-60275-1-git-send-email-eddie.huang@mediatek.com>
-References: <1438688693-60275-1-git-send-email-eddie.huang@mediatek.com>
-Message-ID: <1438688693-60275-2-git-send-email-eddie.huang@mediatek.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 04 Aug 2015 13:06:34 +0100
+Subject: [PATCH v4 01/10] irqchip / GIC: Add GIC version support in ACPI
+ MADT
+In-Reply-To: <1438164539-29256-2-git-send-email-hanjun.guo@linaro.org>
+References: <1438164539-29256-1-git-send-email-hanjun.guo@linaro.org>
+ <1438164539-29256-2-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <55C0AACA.9090001@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reset DMA in hardware init function to avoid unknown hardware state
-before do any I2C operation.
+On 29/07/15 11:08, Hanjun Guo wrote:
+> There is a field added in ACPI 6.0 MADT table to indicate the
+> GIC version, so parse the table to get its value for later use.
+> 
+> If GIC version presented in MADT is 0, we need to fallback to
+> hardware discovery to get the GIC version.
+> 
+> In ACPI MADT table there is no compatible strings to indicate
+> various irqchips and also ACPI doesn't support irqchips which
+> are not compatible with ARM GIC spec, so GIC version can be used
+> to load different GIC drivers which is needed for the later patch.
+> 
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> ---
+>  arch/arm64/Kconfig                   |   1 +
+>  drivers/irqchip/Kconfig              |   3 +
+>  drivers/irqchip/Makefile             |   1 +
+>  drivers/irqchip/irq-gic-acpi.c       | 109 +++++++++++++++++++++++++++++++++++
+>  include/linux/irqchip/arm-gic-acpi.h |   1 +
+>  5 files changed, 115 insertions(+)
+>  create mode 100644 drivers/irqchip/irq-gic-acpi.c
+> 
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 318175f..f2ff61f 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -16,6 +16,7 @@ config ARM64
+>  	select ARM_AMBA
+>  	select ARM_ARCH_TIMER
+>  	select ARM_GIC
+> +	select ARM_GIC_ACPI if ACPI
+>  	select AUDIT_ARCH_COMPAT_GENERIC
+>  	select ARM_GIC_V2M if PCI_MSI
+>  	select ARM_GIC_V3
+> diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
+> index 120d815..557ec2f 100644
+> --- a/drivers/irqchip/Kconfig
+> +++ b/drivers/irqchip/Kconfig
+> @@ -47,6 +47,9 @@ config ARM_VIC_NR
+>  	  The maximum number of VICs available in the system, for
+>  	  power management.
+>  
+> +config ARM_GIC_ACPI
+> +	bool
+> +
+>  config ATMEL_AIC_IRQ
+>  	bool
+>  	select GENERIC_IRQ_CHIP
+> diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
+> index 11d08c9..383f421 100644
+> --- a/drivers/irqchip/Makefile
+> +++ b/drivers/irqchip/Makefile
+> @@ -23,6 +23,7 @@ obj-$(CONFIG_ARM_GIC)			+= irq-gic.o irq-gic-common.o
+>  obj-$(CONFIG_ARM_GIC_V2M)		+= irq-gic-v2m.o
+>  obj-$(CONFIG_ARM_GIC_V3)		+= irq-gic-v3.o irq-gic-common.o
+>  obj-$(CONFIG_ARM_GIC_V3_ITS)		+= irq-gic-v3-its.o irq-gic-v3-its-pci-msi.o irq-gic-v3-its-platform-msi.o
+> +obj-$(CONFIG_ARM_GIC_ACPI)		+= irq-gic-acpi.o
+>  obj-$(CONFIG_ARM_NVIC)			+= irq-nvic.o
+>  obj-$(CONFIG_ARM_VIC)			+= irq-vic.o
+>  obj-$(CONFIG_ATMEL_AIC_IRQ)		+= irq-atmel-aic-common.o irq-atmel-aic.o
+> diff --git a/drivers/irqchip/irq-gic-acpi.c b/drivers/irqchip/irq-gic-acpi.c
+> new file mode 100644
+> index 0000000..6537b43
+> --- /dev/null
+> +++ b/drivers/irqchip/irq-gic-acpi.c
+> @@ -0,0 +1,109 @@
+> +/*
+> + * ACPI based support for ARM GIC init
+> + *
+> + * Copyright (C) 2015, Linaro Ltd.
+> + * 	Author: Hanjun Guo <hanjun.guo@linaro.org>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#define pr_fmt(fmt) "ACPI: GIC: " fmt
+> +
+> +#include <linux/acpi.h>
+> +#include <linux/init.h>
+> +#include <linux/irqchip/arm-gic-acpi.h>
+> +#include <linux/irqchip/arm-gic-v3.h>
+> +
+> +/* GIC version presented in MADT GIC distributor structure */
+> +static u8 gic_version __initdata = ACPI_MADT_GIC_VERSION_NONE;
+> +
+> +static phys_addr_t dist_phy_base __initdata;
+> +
+> +static int __init
+> +acpi_gic_parse_distributor(struct acpi_subtable_header *header,
+> +			   const unsigned long end)
+> +{
+> +	struct acpi_madt_generic_distributor *dist;
+> +
+> +	dist = (struct acpi_madt_generic_distributor *)header;
+> +
+> +	if (BAD_MADT_ENTRY(dist, end))
+> +		return -EINVAL;
+> +
+> +	gic_version = dist->version;
+> +	dist_phy_base = dist->base_address;
+> +	return 0;
+> +}
+> +
+> +static int __init
+> +match_gic_redist(struct acpi_subtable_header *header, const unsigned long end)
+> +{
+> +	return 0;
+> +}
+> +
+> +static bool __init acpi_gic_redist_is_present(void)
+> +{
+> +	int count;
+> +
+> +	/* scan MADT table to find if we have redistributor entries */
+> +	count  =  acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_REDISTRIBUTOR,
+> +					match_gic_redist, 0);
+> +
+> +	/* that's true if we have at least one GIC redistributor entry */
+> +	return count > 0;
+> +}
+> +
+> +static int __init acpi_gic_version_init(void)
+> +{
+> +	int count;
+> +	u32 reg;
+> +	void __iomem *dist_base;
+> +
+> +	count = acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR,
+> +				      acpi_gic_parse_distributor, 0);
+> +
+> +	if (count <= 0) {
+> +		pr_err("No valid GIC distributor entry exists\n");
+> +		return -ENODEV;
+> +	}
+> +
+> +	if (gic_version >= ACPI_MADT_GIC_VERSION_RESERVED) {
+> +		pr_err("Invalid GIC version %d in MADT\n", gic_version);
+> +		return -EINVAL;
+> +	}
+> +
+> +	/*
+> +	 * when the GIC version is 0, we fallback to hardware discovery.
+> +	 * this is also needed to keep compatiable with ACPI 5.1,
+> +	 * which has no gic_version field in distributor structure and
+> +	 * reserved as 0.
+> +	 *
+> +	 * For hardware discovery, the offset for GICv1/2 and GICv3/4 to
+> +	 * get the GIC version is different (0xFE8 for GICv1/2 and 0xFFE8
+> +	 * for GICv3/4), so we need to handle it separately.
+> +	 */
+> +	if (gic_version	== ACPI_MADT_GIC_VERSION_NONE) {
+> +		/* it's GICv3/v4 if redistributor is present */
+> +		if (acpi_gic_redist_is_present()) {
+> +			dist_base = ioremap(dist_phy_base,
+> +					    ACPI_GICV3_DIST_MEM_SIZE);
+> +			if (!dist_base)
+> +				return -ENOMEM;
+> +
+> +			reg = readl_relaxed(dist_base + GICD_PIDR2) &
+> +					    GIC_PIDR2_ARCH_MASK;
+> +			if (reg == GIC_PIDR2_ARCH_GICv3)
+> +				gic_version = ACPI_MADT_GIC_VERSION_V3;
+> +			else
+> +				gic_version = ACPI_MADT_GIC_VERSION_V4;
 
-Signed-off-by: Liguo Zhang <liguo.zhang@mediatek.com>
-Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
----
- drivers/i2c/busses/i2c-mt65xx.c |   10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
+Frankly, why should we care? If there is no redistributor, this is a V2.
+If there are redistributors, then it is a V3/V4, and it shouldn't matter
+which one this is as the GICv3 driver can find out all by itself. Also,
+the GICv4 feature only matter for KVM, which can probe this on its own.
 
-diff --git a/drivers/i2c/busses/i2c-mt65xx.c b/drivers/i2c/busses/i2c-mt65xx.c
-index 9920eef..055159d 100644
---- a/drivers/i2c/busses/i2c-mt65xx.c
-+++ b/drivers/i2c/busses/i2c-mt65xx.c
-@@ -1,6 +1,8 @@
- /*
-  * Copyright (c) 2014 MediaTek Inc.
-- * Author: Xudong Chen <xudong.chen@mediatek.com>
-+ * Author:
-+ *   Xudong Chen <xudong.chen@mediatek.com>
-+ *   Liguo Zhang <liguo.zhang@mediatek.com>
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 as
-@@ -59,6 +61,7 @@
- #define I2C_DMA_START_EN		0x0001
- #define I2C_DMA_INT_FLAG_NONE		0x0000
- #define I2C_DMA_CLR_FLAG		0x0000
-+#define I2C_DMA_HARD_RST		0x0002
- 
- #define I2C_DEFAULT_SPEED		100000	/* hz */
- #define MAX_FS_MODE_SPEED		400000
-@@ -81,6 +84,7 @@ enum DMA_REGS_OFFSET {
- 	OFFSET_INT_FLAG = 0x0,
- 	OFFSET_INT_EN = 0x04,
- 	OFFSET_EN = 0x08,
-+	OFFSET_RST = 0x0c,
- 	OFFSET_CON = 0x18,
- 	OFFSET_TX_MEM_ADDR = 0x1c,
- 	OFFSET_RX_MEM_ADDR = 0x20,
-@@ -262,6 +266,10 @@ static void mtk_i2c_init_hw(struct mtk_i2c *i2c)
- 		      I2C_CONTROL_CLK_EXT_EN | I2C_CONTROL_DMA_EN;
- 	writew(control_reg, i2c->base + OFFSET_CONTROL);
- 	writew(I2C_DELAY_LEN, i2c->base + OFFSET_DELAY_LEN);
-+
-+	writel(I2C_DMA_HARD_RST, i2c->pdmabase + OFFSET_RST);
-+	udelay(50);
-+	writel(I2C_DMA_CLR_FLAG, i2c->pdmabase + OFFSET_RST);
- }
- 
- /*
+> +
+> +			iounmap(dist_base);
+> +		} else {
+> +			gic_version = ACPI_MADT_GIC_VERSION_V2;
+> +		}
+> +	}
+> +
+> +	return 0;
+> +}
+> diff --git a/include/linux/irqchip/arm-gic-acpi.h b/include/linux/irqchip/arm-gic-acpi.h
+> index de3419e..13bc676 100644
+> --- a/include/linux/irqchip/arm-gic-acpi.h
+> +++ b/include/linux/irqchip/arm-gic-acpi.h
+> @@ -19,6 +19,7 @@
+>   */
+>  #define ACPI_GICV2_DIST_MEM_SIZE	(SZ_4K)
+>  #define ACPI_GIC_CPU_IF_MEM_SIZE	(SZ_8K)
+> +#define ACPI_GICV3_DIST_MEM_SIZE	(SZ_64K)
+>  
+>  struct acpi_table_header;
+>  
+> 
+
+Thanks,
+
+	M.
 -- 
-1.7.9.5
+Jazz is not dead. It just smells funny...
