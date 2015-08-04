@@ -1,333 +1,186 @@
-From: scott.shu@mediatek.com (Scott Shu)
-Date: Tue, 4 Aug 2015 21:54:19 +0800
-Subject: [PATCH v3 3/8] soc: Mediatek: Add SCPSYS CPU power domain driver
-In-Reply-To: <1438696464-59858-1-git-send-email-scott.shu@mediatek.com>
-References: <1438696464-59858-1-git-send-email-scott.shu@mediatek.com>
-Message-ID: <1438696464-59858-4-git-send-email-scott.shu@mediatek.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 04 Aug 2015 15:47:13 +0100
+Subject: [PATCH 05/13] iommu/io-pgtable-arm: Allow appropriate DMA API use
+In-Reply-To: <1652248.uq2uhTW4Yd@avalon>
+References: <1438608355-7335-1-git-send-email-will.deacon@arm.com>
+ <1438608355-7335-6-git-send-email-will.deacon@arm.com>
+ <1652248.uq2uhTW4Yd@avalon>
+Message-ID: <55C0D071.1040104@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a CPU power domain driver for the Mediatek SCPSYS unit on
-MT6580.
+Hi Laurent,
 
-Signed-off-by: Scott Shu <scott.shu@mediatek.com>
----
- drivers/soc/mediatek/mtk-scpsys.c   |  250 +++++++++++++++++++++++++++++++++++
- include/linux/soc/mediatek/scpsys.h |    9 ++
- 2 files changed, 259 insertions(+)
- create mode 100644 include/linux/soc/mediatek/scpsys.h
+[ +RMK, as his patch is indirectly involved here ]
 
-diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
-index 43a79ed..ca0f2dd 100644
---- a/drivers/soc/mediatek/mtk-scpsys.c
-+++ b/drivers/soc/mediatek/mtk-scpsys.c
-@@ -15,18 +15,30 @@
- #include <linux/io.h>
- #include <linux/kernel.h>
- #include <linux/mfd/syscon.h>
-+#include <linux/of.h>
- #include <linux/of_device.h>
-+#include <linux/of_address.h>
- #include <linux/platform_device.h>
- #include <linux/pm_domain.h>
- #include <linux/regmap.h>
- #include <linux/soc/mediatek/infracfg.h>
-+#include <linux/soc/mediatek/scpsys.h>
- #include <dt-bindings/power/mt8173-power.h>
- 
-+#define SPM_POWERON_CONFIG_SET		0x0000
-+#define SPM_CA7_CPU0_PWR_CON		0x0200
- #define SPM_VDE_PWR_CON			0x0210
- #define SPM_MFG_PWR_CON			0x0214
-+#define SPM_CA7_CPU1_PWR_CON		0x0218
-+#define SPM_CA7_CPU2_PWR_CON		0x021c
-+#define SPM_CA7_CPU3_PWR_CON		0x0220
- #define SPM_VEN_PWR_CON			0x0230
- #define SPM_ISP_PWR_CON			0x0238
- #define SPM_DIS_PWR_CON			0x023c
-+#define SPM_CA7_CPU0_L1_PDN		0x025c
-+#define SPM_CA7_CPU1_L1_PDN		0x0264
-+#define SPM_CA7_CPU2_L1_PDN		0x026c
-+#define SPM_CA7_CPU3_L1_PDN		0x0274
- #define SPM_VEN2_PWR_CON		0x0298
- #define SPM_AUDIO_PWR_CON		0x029c
- #define SPM_MFG_2D_PWR_CON		0x02c0
-@@ -34,12 +46,20 @@
- #define SPM_USB_PWR_CON			0x02cc
- #define SPM_PWR_STATUS			0x060c
- #define SPM_PWR_STATUS_2ND		0x0610
-+#define SPM_SLEEP_TIMER_STA		0x0720
- 
-+/* bit definition in SPM_CA7_CPUx_PWR_CON */
- #define PWR_RST_B_BIT			BIT(0)
- #define PWR_ISO_BIT			BIT(1)
- #define PWR_ON_BIT			BIT(2)
- #define PWR_ON_2ND_BIT			BIT(3)
- #define PWR_CLK_DIS_BIT			BIT(4)
-+#define SRAM_CKISO_BIT			BIT(5)
-+#define SRAM_ISOINT_B_BIT		BIT(6)
-+
-+/* bit definition in SPM_CA7_CPUx_L1_PDN */
-+#define L1_PDN				BIT(0)
-+#define L1_PDN_ACK			BIT(8)
- 
- #define PWR_STATUS_DISP			BIT(3)
- #define PWR_STATUS_MFG			BIT(4)
-@@ -52,6 +72,28 @@
- #define PWR_STATUS_AUDIO		BIT(24)
- #define PWR_STATUS_USB			BIT(25)
- 
-+#define MT6580_MAX_CPUS			4
-+
-+#ifdef CONFIG_SMP
-+static DEFINE_SPINLOCK(spm_cpu_lock);
-+
-+static void __iomem *spm_cpu_base;
-+
-+static const u32 spm_cpu_pwr_con[MT6580_MAX_CPUS] = {
-+	SPM_CA7_CPU0_PWR_CON,
-+	SPM_CA7_CPU1_PWR_CON,
-+	SPM_CA7_CPU2_PWR_CON,
-+	SPM_CA7_CPU3_PWR_CON,
-+};
-+
-+static const u32 spm_cpu_l1_pdn[MT6580_MAX_CPUS] = {
-+	SPM_CA7_CPU0_L1_PDN,
-+	SPM_CA7_CPU1_L1_PDN,
-+	SPM_CA7_CPU2_L1_PDN,
-+	SPM_CA7_CPU3_L1_PDN,
-+};
-+#endif
-+
- enum clk_id {
- 	MT8173_CLK_MM,
- 	MT8173_CLK_MFG,
-@@ -485,3 +527,211 @@ static struct platform_driver scpsys_drv = {
- };
- 
- module_platform_driver_probe(scpsys_drv, scpsys_probe);
-+
-+#define SPM_REGWR_EN		BIT(0)
-+#define SPM_PROJECT_CODE	0x0B16
-+
-+#ifdef CONFIG_SMP
-+int spm_cpu_mtcmos_on(int cpu)
-+{
-+	unsigned long flags;
-+	static u32 spmcpu_pwr_con, spmcpu_l1_pdn;
-+	unsigned int cbit, temp;
-+	int timeout = 10;
-+	int ret = 0;
-+
-+	temp = (SPM_PROJECT_CODE << 16) | SPM_REGWR_EN;
-+	writel_relaxed(temp, spm_cpu_base + SPM_POWERON_CONFIG_SET);
-+
-+	spmcpu_pwr_con = spm_cpu_pwr_con[cpu];
-+	spmcpu_l1_pdn = spm_cpu_l1_pdn[cpu];
-+
-+	spin_lock_irqsave(&spm_cpu_lock, flags);
-+
-+	/* Set PWR_ON */
-+	temp = readl_relaxed(spm_cpu_base + spmcpu_pwr_con);
-+	temp |= PWR_ON_BIT;
-+	writel_relaxed(temp, spm_cpu_base + spmcpu_pwr_con);
-+
-+	/* Wait for charging core power */
-+	udelay(1);
-+
-+	/* Set PWR_ON_2ND */
-+	temp = readl_relaxed(spm_cpu_base + spmcpu_pwr_con);
-+	temp |= PWR_ON_2ND_BIT;
-+	writel_relaxed(temp, spm_cpu_base + spmcpu_pwr_con);
-+
-+	/* Wait for the power-ack */
-+	cbit = BIT(13 - cpu);
-+	while (((readl_relaxed(spm_cpu_base + SPM_PWR_STATUS) &
-+		 cbit) != cbit) ||
-+	       (readl_relaxed(spm_cpu_base + SPM_PWR_STATUS_2ND) &
-+		 cbit) != cbit) {
-+		if (--timeout == 0) {
-+			ret = -ENXIO;
-+			goto fail;
-+		}
-+		udelay(1);
-+	}
-+
-+	temp = readl_relaxed(spm_cpu_base + spmcpu_pwr_con);
-+	temp &= ~PWR_ISO_BIT;
-+	writel_relaxed(temp, spm_cpu_base + spmcpu_pwr_con);
-+
-+	/* L1 power on */
-+	temp = readl_relaxed(spm_cpu_base + spmcpu_l1_pdn);
-+	temp &= ~L1_PDN;
-+	writel_relaxed(temp, spm_cpu_base + spmcpu_l1_pdn);
-+	timeout = 10;
-+	while ((readl_relaxed(spm_cpu_base + spmcpu_l1_pdn) &
-+		L1_PDN_ACK) != 0) {
-+		if (--timeout == 0) {
-+			ret = -ENXIO;
-+			goto fail;
-+		}
-+		udelay(1);
-+	}
-+
-+	/* Wait for memory power ready */
-+	udelay(1);
-+
-+	/* Set SRAM_ISOINT_B */
-+	temp = readl_relaxed(spm_cpu_base + spmcpu_pwr_con);
-+	temp |= SRAM_ISOINT_B_BIT;
-+	writel_relaxed(temp, spm_cpu_base + spmcpu_pwr_con);
-+
-+	/* Clear SRAM_CKISO */
-+	temp = readl_relaxed(spm_cpu_base + spmcpu_pwr_con);
-+	temp &= ~SRAM_CKISO_BIT;
-+	writel_relaxed(temp, spm_cpu_base + spmcpu_pwr_con);
-+
-+	/* Clear PWR_CLK_DIS */
-+	temp = readl_relaxed(spm_cpu_base + spmcpu_pwr_con);
-+	temp &= ~PWR_CLK_DIS_BIT;
-+	writel_relaxed(temp, spm_cpu_base + spmcpu_pwr_con);
-+
-+	/* Set PWR_RST_B to finish power on and reset sequences */
-+	temp = readl_relaxed(spm_cpu_base + spmcpu_pwr_con);
-+	temp |= PWR_RST_B_BIT;
-+	writel_relaxed(temp, spm_cpu_base + spmcpu_pwr_con);
-+fail:
-+	spin_unlock_irqrestore(&spm_cpu_lock, flags);
-+
-+	return ret;
-+}
-+
-+int spm_cpu_mtcmos_off(int cpu, bool wfi)
-+{
-+	unsigned long flags;
-+	static u32 spmcpu_pwr_con, spmcpu_l1_pdn;
-+	unsigned int cbit, temp;
-+	int timeout = 10;
-+	int ret = 0;
-+
-+	temp = (SPM_PROJECT_CODE << 16) | SPM_REGWR_EN;
-+	writel_relaxed(temp, spm_cpu_base + SPM_POWERON_CONFIG_SET);
-+
-+	spmcpu_pwr_con = spm_cpu_pwr_con[cpu];
-+	spmcpu_l1_pdn = spm_cpu_l1_pdn[cpu];
-+
-+	if (wfi) {
-+		while ((readl_relaxed(spm_cpu_base + SPM_SLEEP_TIMER_STA) &
-+			(1U << (16 + cpu))) == 0) {
-+			if (--timeout == 0)
-+				return -ENXIO;
-+			udelay(1);
-+		}
-+	}
-+
-+	spin_lock_irqsave(&spm_cpu_lock, flags);
-+
-+	/* Set PWR_ISO */
-+	temp = readl_relaxed(spm_cpu_base + spmcpu_pwr_con);
-+	temp |= PWR_ISO_BIT;
-+	writel_relaxed(temp, spm_cpu_base + spmcpu_pwr_con);
-+
-+	/* Set SRAM_CKISO */
-+	temp = readl_relaxed(spm_cpu_base + spmcpu_pwr_con);
-+	temp |= SRAM_CKISO_BIT;
-+	writel_relaxed(temp, spm_cpu_base + spmcpu_pwr_con);
-+
-+	/* Clear SRAM_ISOINT_B */
-+	temp = readl_relaxed(spm_cpu_base + spmcpu_pwr_con);
-+	temp &= ~SRAM_ISOINT_B_BIT;
-+	writel_relaxed(temp, spm_cpu_base + spmcpu_pwr_con);
-+
-+	/* L1 power off */
-+	temp = readl_relaxed(spm_cpu_base + spmcpu_l1_pdn);
-+	temp |= L1_PDN;
-+	writel_relaxed(temp, spm_cpu_base + spmcpu_l1_pdn);
-+	timeout = 10;
-+	while ((readl_relaxed(spm_cpu_base + spmcpu_l1_pdn) &
-+		L1_PDN_ACK) != L1_PDN_ACK) {
-+		if (--timeout == 0) {
-+			ret = -ENXIO;
-+			goto fail;
-+		}
-+		udelay(1);
-+	}
-+
-+	/* Clear PWR_RST_B */
-+	temp = readl_relaxed(spm_cpu_base + spmcpu_pwr_con);
-+	temp &= ~PWR_RST_B_BIT;
-+	writel_relaxed(temp, spm_cpu_base + spmcpu_pwr_con);
-+
-+	/* Set PWR_CLK_DIS */
-+	temp = readl_relaxed(spm_cpu_base + spmcpu_pwr_con);
-+	temp |= PWR_CLK_DIS_BIT;
-+	writel_relaxed(temp, spm_cpu_base + spmcpu_pwr_con);
-+
-+	/* Clear PWR_ON */
-+	temp = readl_relaxed(spm_cpu_base + spmcpu_pwr_con);
-+	temp &= ~PWR_ON_BIT;
-+	writel_relaxed(temp, spm_cpu_base + spmcpu_pwr_con);
-+
-+	/* Clear PWR_ON_2ND */
-+	temp = readl_relaxed(spm_cpu_base + spmcpu_pwr_con);
-+	temp &= ~PWR_ON_2ND_BIT;
-+	writel_relaxed(temp, spm_cpu_base + spmcpu_pwr_con);
-+
-+	timeout = 10;
-+	cbit = BIT(13 - cpu);
-+	while (((readl_relaxed(spm_cpu_base + SPM_PWR_STATUS) & cbit) != 0) ||
-+	       ((readl_relaxed(spm_cpu_base + SPM_PWR_STATUS_2ND) &
-+		 cbit) != 0)) {
-+		if (--timeout == 0) {
-+			ret = -ENXIO;
-+			goto fail;
-+		}
-+		udelay(1);
-+	}
-+fail:
-+	spin_unlock_irqrestore(&spm_cpu_lock, flags);
-+
-+	return ret;
-+}
-+#endif /* CONFIG_SMP */
-+
-+static int __init mtk_scpsys_early_init(void)
-+{
-+	struct device_node *node;
-+	struct resource regs;
-+
-+	node = of_find_compatible_node(NULL, NULL, "mediatek,mt6580-scpsys");
-+	if (node) {
-+		if (of_address_to_resource(node, 0, &regs) < 0) {
-+			pr_err("Failed to get SCPSYS registers\n");
-+			return -ENXIO;
-+		}
-+
-+		spm_cpu_base = ioremap_nocache(regs.start,
-+					       resource_size(&regs));
-+		if (!spm_cpu_base) {
-+			pr_err("%s: Unable to map I/O memory\n", __func__);
-+			return -ENODEV;
-+		}
-+	}
-+
-+	return 0;
-+}
-+early_initcall(mtk_scpsys_early_init);
-diff --git a/include/linux/soc/mediatek/scpsys.h b/include/linux/soc/mediatek/scpsys.h
-new file mode 100644
-index 0000000..a14b7a3
---- /dev/null
-+++ b/include/linux/soc/mediatek/scpsys.h
-@@ -0,0 +1,9 @@
-+#ifndef __SOC_MEDIATEK_SCPSYS_H
-+#define __SOC_MEDIATEK_SCPSYS_H
-+
-+#include <linux/kernel.h>
-+
-+int spm_cpu_mtcmos_on(int cpu);
-+int spm_cpu_mtcmos_off(int cpu, bool wfi);
-+
-+#endif
--- 
-1.7.9.5
+On 04/08/15 14:16, Laurent Pinchart wrote:
+> Hi Will and Robin,
+>
+> Thank you for the patch.
+>
+> On Monday 03 August 2015 14:25:47 Will Deacon wrote:
+>> From: Robin Murphy <Robin.Murphy@arm.com>
+>>
+>> Currently, users of the LPAE page table code are (ab)using dma_map_page()
+>> as a means to flush page table updates for non-coherent IOMMUs. Since
+>> from the CPU's point of view, creating IOMMU page tables *is* passing
+>> DMA buffers to a device (the IOMMU's page table walker), there's little
+>> reason not to use the DMA API correctly.
+>>
+>> Allow IOMMU drivers to opt into DMA API operations for page table
+>> allocation and updates by providing their appropriate device pointer.
+>> The expectation is that an LPAE IOMMU should have a full view of system
+>> memory, so use streaming mappings to avoid unnecessary pressure on
+>> ZONE_DMA, and treat any DMA translation as a warning sign.
+>
+> I like the idea of doing this in core code rather than in individual drivers,
+> but I believe we're not using the right API. Please see below.
+
+Perhaps this could have one of my trademark "for now"s - the aim of this 
+series is really just to stop the per-driver hacks proliferating, as per 
+Russell's comment[1]. I left the semi-artificial DMA==phys restriction 
+for expediency, since it follows the current usage and keeps the code 
+changes minimal. With this series in place I'd be happy to go back and 
+try a full-blown DMA conversion if and when a real need shows up, but I 
+think it would significantly complicate all the current software page 
+table walking.
+
+>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>> Signed-off-by: Will Deacon <will.deacon@arm.com>
+>> ---
+>>   drivers/iommu/Kconfig          |   3 +-
+>>   drivers/iommu/io-pgtable-arm.c | 107 +++++++++++++++++++++++++++++---------
+>>   drivers/iommu/io-pgtable.h     |   3 ++
+>>   3 files changed, 89 insertions(+), 24 deletions(-)
+>>
+>> diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
+>> index f1fb1d3ccc56..d77a848d50de 100644
+>> --- a/drivers/iommu/Kconfig
+>> +++ b/drivers/iommu/Kconfig
+>> @@ -23,7 +23,8 @@ config IOMMU_IO_PGTABLE
+>>   config IOMMU_IO_PGTABLE_LPAE
+>>   	bool "ARMv7/v8 Long Descriptor Format"
+>>   	select IOMMU_IO_PGTABLE
+>> -	depends on ARM || ARM64 || COMPILE_TEST
+>> +	# SWIOTLB guarantees a dma_to_phys() implementation
+>> +	depends on ARM || ARM64 || (COMPILE_TEST && SWIOTLB)
+>>   	help
+>>   	  Enable support for the ARM long descriptor pagetable format.
+>>   	  This allocator supports 4K/2M/1G, 16K/32M and 64K/512M page
+>> diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
+>> index 4e460216bd16..28cca8a652f9 100644
+>> --- a/drivers/iommu/io-pgtable-arm.c
+>> +++ b/drivers/iommu/io-pgtable-arm.c
+>> @@ -200,12 +200,76 @@ typedef u64 arm_lpae_iopte;
+>>
+>>   static bool selftest_running = false;
+>>
+>> +static dma_addr_t __arm_lpae_dma_addr(struct device *dev, void *pages)
+>> +{
+>> +	return phys_to_dma(dev, virt_to_phys(pages));
+>> +}
+>> +
+>> +static void *__arm_lpae_alloc_pages(size_t size, gfp_t gfp,
+>> +				    struct io_pgtable_cfg *cfg)
+>> +{
+>> +	struct device *dev = cfg->iommu_dev;
+>> +	dma_addr_t dma;
+>> +	void *pages = alloc_pages_exact(size, gfp | __GFP_ZERO);
+>> +
+>> +	if (!pages)
+>> +		return NULL;
+>> +
+>> +	if (dev) {
+>> +		dma = dma_map_single(dev, pages, size, DMA_TO_DEVICE);
+>> +		if (dma_mapping_error(dev, dma))
+>> +			goto out_free;
+>> +		/*
+>> +		 * We depend on the IOMMU being able to work with any physical
+>> +		 * address directly, so if the DMA layer suggests it can't by
+>> +		 * giving us back some translation, that bodes very badly...
+>> +		 */
+>> +		if (dma != __arm_lpae_dma_addr(dev, pages))
+>> +			goto out_unmap;
+>
+> Why do we need to create a mapping at all then ? Because
+> dma_sync_single_for_device() requires it ?
+
+We still need to expose this new table to the device. If we never update 
+it, we'll never have reason to call dma_sync_, but we definitely want 
+the IOMMU to know there's a page of invalid PTEs there.
+
+>> +	}
+>> +
+>> +	return pages;
+>> +
+>> +out_unmap:
+>> +	dev_err(dev, "Cannot accommodate DMA translation for IOMMU page
+>> tables\n");
+>> +	dma_unmap_single(dev, dma, size, DMA_TO_DEVICE);
+>> +out_free:
+>> +	free_pages_exact(pages, size);
+>> +	return NULL;
+>> +}
+>> +
+>> +static void __arm_lpae_free_pages(void *pages, size_t size,
+>> +				  struct io_pgtable_cfg *cfg)
+>> +{
+>> +	struct device *dev = cfg->iommu_dev;
+>> +
+>> +	if (dev)
+>> +		dma_unmap_single(dev, __arm_lpae_dma_addr(dev, pages),
+>> +				 size, DMA_TO_DEVICE);
+>> +	free_pages_exact(pages, size);
+>> +}
+>> +
+>> +static void __arm_lpae_set_pte(arm_lpae_iopte *ptep, arm_lpae_iopte pte,
+>> +			       struct io_pgtable_cfg *cfg, void *cookie)
+>> +{
+>> +	struct device *dev = cfg->iommu_dev;
+>> +
+>> +	*ptep = pte;
+>> +
+>> +	if (dev)
+>> +		dma_sync_single_for_device(dev, __arm_lpae_dma_addr(dev, ptep),
+>> +					   sizeof(pte), DMA_TO_DEVICE);
+>
+> This is what I believe to be an API abuse. The dma_sync_single_for_device()
+> API is meant to pass ownership of a buffer to the device. Unless I'm mistaken,
+> once that's done the CPU isn't allowed to touch the buffer anymore until
+> dma_sync_single_for_cpu() is called to get ownership of the buffer back. Sure,
+> it might work on many ARM systems, but we really should be careful not to use
+> APIs as delicate as DMA mapping and cache handling for purposes different than
+> what they explicitly allow.
+>
+> It might be that I'm wrong and that the streaming DMA API allows this exact
+> kind of usage, but I haven't found a clear indication of that in the
+> documentation. It could also be that all implementations would support it
+> today, and that we would then consider it should be explicitly allowed by the
+> API. In both cases a documentation patch would be welcome.
+
+TBH, I was largely going by Russell's Tegra patch, which similarly 
+elides any sync_*_for_cpu. In reality, since everything is DMA_TO_DEVICE 
+and the IOMMU itself can't modify the page tables[3], I can't think of 
+any situation where sync_*_for_cpu would actually do anything.
+
+ From reading this part of DMA-API.txt:
+
+   Notes:  You must do this:
+
+   - Before reading values that have been written by DMA from the device
+     (use the DMA_FROM_DEVICE direction)
+   - After writing values that will be written to the device using DMA
+     (use the DMA_TO_DEVICE) direction
+   - before *and* after handing memory to the device if the memory is
+     DMA_BIDIRECTIONAL
+
+I would conclude that since a sync using DMA_TO_DEVICE *before* writing 
+is not a "must", then it's probably unnecessary.
+
+Robin.
+
+[1]:http://article.gmane.org/gmane.linux.kernel/2005551
+[2]:http://article.gmane.org/gmane.linux.ports.tegra/23150
+[3]:Yes, there may generally be exceptions to that, but not in the 
+context of this code. Unless the Renesas IPMMU does something I don't 
+know about?
