@@ -1,56 +1,30 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Tue, 4 Aug 2015 14:47:07 +0800
-Subject: [PATCH v2] media: atmel-isi: parse the DT parameters for
- vsync/hsync/pixclock polarity
-Message-ID: <1438670828-19845-1-git-send-email-josh.wu@atmel.com>
+From: p.fedin@samsung.com (Pavel Fedin)
+Date: Tue, 04 Aug 2015 09:53:07 +0300
+Subject: [PATCH v2 14/15] KVM: arm64: implement MSI injection in ITS
+ emulation
+In-Reply-To: <55BF9FB0.6070804@arm.com>
+References: <1436538111-4294-1-git-send-email-andre.przywara@arm.com>
+ <1436538111-4294-15-git-send-email-andre.przywara@arm.com>
+ <55BB7678.5080105@linaro.org> <55BE7BA1.40403@arm.com>
+ <00a201d0cdb7$70a623f0$51f26bd0$@samsung.com> <55BF2F51.6020701@linaro.org>
+ <00f101d0cdcd$146a6090$3d3f21b0$@samsung.com> <55BF8AB8.5050408@linaro.org>
+ <55BF9FB0.6070804@arm.com>
+Message-ID: <00b101d0ce82$38caa7a0$aa5ff6e0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch will get the DT parameters of vsync/hsync/pixclock polarity, and
-pass to driver.
+ Hello!
 
-Also add a debug information for test purpose.
+> I think this flag should be kept, as it really indicates what is valid
+> in the MSI structure. It also has other benefits such as making obvious
+> what userspace expects, which can then be checked against the kernel's
+> own expectations.
 
-Signed-off-by: Josh Wu <josh.wu@atmel.com>
----
+ I'm OK with the flag despite it's indeed a small bit redundant. But i see that kernel's policy is
+to have insurance against all possible and impossible bad inputs, and the flag really fits into the
+concept.
 
-Changes in v2:
-- rewrite the debug message and add pix clock polarity setup thanks to
-  Laurent.
-- update the commit log.
-
- drivers/media/platform/soc_camera/atmel-isi.c | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
-
-diff --git a/drivers/media/platform/soc_camera/atmel-isi.c b/drivers/media/platform/soc_camera/atmel-isi.c
-index fead841..d6f8def 100644
---- a/drivers/media/platform/soc_camera/atmel-isi.c
-+++ b/drivers/media/platform/soc_camera/atmel-isi.c
-@@ -1061,6 +1061,11 @@ static int isi_camera_set_bus_param(struct soc_camera_device *icd)
- 	if (common_flags & V4L2_MBUS_PCLK_SAMPLE_FALLING)
- 		cfg1 |= ISI_CFG1_PIXCLK_POL_ACTIVE_FALLING;
- 
-+	dev_dbg(icd->parent, "vsync active %s, hsync active %s, sampling on pix clock %s\n",
-+		common_flags & V4L2_MBUS_VSYNC_ACTIVE_LOW ? "low" : "high",
-+		common_flags & V4L2_MBUS_HSYNC_ACTIVE_LOW ? "low" : "high",
-+		common_flags & V4L2_MBUS_PCLK_SAMPLE_FALLING ? "falling" : "rising");
-+
- 	if (isi->pdata.has_emb_sync)
- 		cfg1 |= ISI_CFG1_EMB_SYNC;
- 	if (isi->pdata.full_mode)
-@@ -1148,6 +1153,13 @@ static int atmel_isi_parse_dt(struct atmel_isi *isi,
- 		return -EINVAL;
- 	}
- 
-+	if (ep.bus.parallel.flags & V4L2_MBUS_HSYNC_ACTIVE_LOW)
-+		isi->pdata.hsync_act_low = true;
-+	if (ep.bus.parallel.flags & V4L2_MBUS_VSYNC_ACTIVE_LOW)
-+		isi->pdata.vsync_act_low = true;
-+	if (ep.bus.parallel.flags & V4L2_MBUS_PCLK_SAMPLE_FALLING)
-+		isi->pdata.pclk_act_falling = true;
-+
- 	return 0;
- }
- 
--- 
-1.9.1
+Kind regards,
+Pavel Fedin
+Expert Engineer
+Samsung Electronics Research center Russia
