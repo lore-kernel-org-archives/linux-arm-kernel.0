@@ -1,176 +1,185 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Tue,  4 Aug 2015 16:44:06 +0900
-Subject: [RFC v2 1/4] ftrace: allow arch-specific check_stack()
+Date: Tue,  4 Aug 2015 16:44:07 +0900
+Subject: [RFC v2 2/4] arm64: ftrace: add arch-specific stack tracer
 In-Reply-To: <1438674249-3447-1-git-send-email-takahiro.akashi@linaro.org>
 References: <1438674249-3447-1-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <1438674249-3447-2-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <1438674249-3447-3-git-send-email-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A stack frame pointer may be used in a different way depending on
-cpu architecture. Thus it is not always appropriate to slurp the stack
-contents, as currently done in check_stack(), in order to calcurate
-a stack index (height) at a given function call. At least not on arm64.
-
-This patch extract potentially arch-specific code from check_stack()
-and puts it into a new arch_check_stack(), which is declared as weak.
-So we will be able to add arch-specific and most efficient way of
-stack traversing Later.
+This patch uses walk_stackframe(), instead of slurping stack contents
+as orignal check_stack() does, to identify each stack frame.
+return_to_handler() is handled in a special way because it is not
+a function, but invoked via function graph tracer by faking a saved lr
+register on stack.
 
 Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 ---
- include/linux/stacktrace.h |    4 ++
- kernel/trace/trace_stack.c |   88 ++++++++++++++++++++++++++------------------
- 2 files changed, 56 insertions(+), 36 deletions(-)
+ arch/arm64/include/asm/ftrace.h |    2 ++
+ arch/arm64/kernel/ftrace.c      |   37 +++++++++++++++++++++++++
+ arch/arm64/kernel/stacktrace.c  |   58 +++++++++++++++++++++++++++++++++++++--
+ 3 files changed, 95 insertions(+), 2 deletions(-)
 
-diff --git a/include/linux/stacktrace.h b/include/linux/stacktrace.h
-index 0a34489..bfae605 100644
---- a/include/linux/stacktrace.h
-+++ b/include/linux/stacktrace.h
-@@ -10,6 +10,10 @@ struct pt_regs;
- struct stack_trace {
- 	unsigned int nr_entries, max_entries;
- 	unsigned long *entries;
-+#ifdef CONFIG_STACK_TRACER
-+	unsigned *index;
-+	unsigned long *sp;
-+#endif
- 	int skip;	/* input argument: How many entries to skip */
- };
+diff --git a/arch/arm64/include/asm/ftrace.h b/arch/arm64/include/asm/ftrace.h
+index 2b43e20..b7d597c 100644
+--- a/arch/arm64/include/asm/ftrace.h
++++ b/arch/arm64/include/asm/ftrace.h
+@@ -29,6 +29,8 @@ struct dyn_arch_ftrace {
  
-diff --git a/kernel/trace/trace_stack.c b/kernel/trace/trace_stack.c
-index 3d9356b..021b8c3 100644
---- a/kernel/trace/trace_stack.c
-+++ b/kernel/trace/trace_stack.c
-@@ -27,9 +27,10 @@ static unsigned stack_dump_index[STACK_TRACE_ENTRIES];
-  * us to remove most or all of the stack size overhead
-  * added by the stack tracer itself.
-  */
--static struct stack_trace max_stack_trace = {
-+	struct stack_trace max_stack_trace = {
- 	.max_entries		= STACK_TRACE_ENTRIES - 1,
- 	.entries		= &stack_dump_trace[0],
-+	.index			= &stack_dump_index[0],
- };
+ extern unsigned long ftrace_graph_call;
  
- static unsigned long max_stack_size;
-@@ -65,42 +66,15 @@ static inline void print_max_stack(void)
- 	}
- }
- 
--static inline void
--check_stack(unsigned long ip, unsigned long *stack)
-+void __weak
-+arch_check_stack(unsigned long ip, unsigned long *stack,
-+			unsigned long *max_size, unsigned int *tracer_size)
++extern void return_to_handler(void);
++
+ static inline unsigned long ftrace_call_adjust(unsigned long addr)
  {
--	unsigned long this_size, flags; unsigned long *p, *top, *start;
--	static int tracer_frame;
--	int frame_size = ACCESS_ONCE(tracer_frame);
-+	unsigned long *p, *top, *start;
-+	unsigned long this_size;
- 	int i, x;
- 
--	this_size = ((unsigned long)stack) & (THREAD_SIZE-1);
--	this_size = THREAD_SIZE - this_size;
--	/* Remove the frame of the tracer */
--	this_size -= frame_size;
--
--	if (this_size <= max_stack_size)
--		return;
--
--	/* we do not handle interrupt stacks yet */
--	if (!object_is_on_stack(stack))
--		return;
--
--	local_irq_save(flags);
--	arch_spin_lock(&max_stack_lock);
--
--	/* In case another CPU set the tracer_frame on us */
--	if (unlikely(!frame_size))
--		this_size -= tracer_frame;
--
--	/* a race could have already updated it */
--	if (this_size <= max_stack_size)
--		goto out;
--
--	max_stack_size = this_size;
--
--	max_stack_trace.nr_entries = 0;
- 	max_stack_trace.skip = 3;
--
- 	save_stack_trace(&max_stack_trace);
- 
- 	/* Skip over the overhead of the stack tracer itself */
-@@ -116,6 +90,7 @@ check_stack(unsigned long ip, unsigned long *stack)
- 	start = stack;
- 	top = (unsigned long *)
- 		(((unsigned long)start & ~(THREAD_SIZE-1)) + THREAD_SIZE);
-+	this_size = *max_size;
- 
  	/*
- 	 * Loop through all the entries. One of the entries may
-@@ -146,10 +121,10 @@ check_stack(unsigned long ip, unsigned long *stack)
- 				 * out what that is, then figure it out
- 				 * now.
- 				 */
--				if (unlikely(!tracer_frame)) {
--					tracer_frame = (p - stack) *
-+				if (unlikely(!*tracer_size)) {
-+					*tracer_size = (p - stack) *
- 						sizeof(unsigned long);
--					max_stack_size -= tracer_frame;
-+					*max_size -= *tracer_size;
- 				}
- 			}
- 		}
-@@ -161,6 +136,47 @@ check_stack(unsigned long ip, unsigned long *stack)
- 	max_stack_trace.nr_entries = x;
- 	for (; x < i; x++)
- 		stack_dump_trace[x] = ULONG_MAX;
-+}
+diff --git a/arch/arm64/kernel/ftrace.c b/arch/arm64/kernel/ftrace.c
+index c851be7..d812870 100644
+--- a/arch/arm64/kernel/ftrace.c
++++ b/arch/arm64/kernel/ftrace.c
+@@ -176,3 +176,40 @@ int ftrace_disable_ftrace_graph_caller(void)
+ }
+ #endif /* CONFIG_DYNAMIC_FTRACE */
+ #endif /* CONFIG_FUNCTION_GRAPH_TRACER */
 +
-+static inline void
-+check_stack(unsigned long ip, unsigned long *stack)
++#ifdef CONFIG_STACK_TRACER
++#define stack_top(fp) (((fp) & ~(THREAD_SIZE-1)) + THREAD_SIZE)
++#define stack_index(fp) (stack_top((fp)) - (fp))
++
++extern struct stack_trace max_stack_trace;
++extern void save_stack_trace_index(struct stack_trace *trace);
++
++void arch_check_stack(unsigned long ip, unsigned long *stack,
++		      unsigned long *max_size, int *tracer_size)
 +{
-+	unsigned long this_size, flags;
-+	static int tracer_frame;
-+	int frame_size = ACCESS_ONCE(tracer_frame);
++	int i, j;
 +
-+	this_size = ((unsigned long)stack) & (THREAD_SIZE-1);
-+	this_size = THREAD_SIZE - this_size;
-+	/* for safety, depending on arch_check_stack() */
-+	if (this_size < frame_size)
-+		return;
++	max_stack_trace.skip = 0;
++	save_stack_trace_index(&max_stack_trace);
++	max_stack_trace.nr_entries--; /* for '-1' entry */
 +
-+	/* Remove the frame of the tracer */
-+	this_size -= frame_size;
++	/* Skip over the overhead of the stack tracer itself */
++	for (i = 0; i < max_stack_trace.nr_entries; i++) {
++		if ((max_stack_trace.entries[i] + FTRACE_STACK_FRAME_OFFSET)
++				== ip)
++			break;
++	}
 +
-+	if (this_size <= max_stack_size)
-+		return;
++	if (unlikely(!*tracer_size)) {
++		*tracer_size = stack_index((unsigned long)stack)
++			- max_stack_trace.index[i];
++		*max_size -= *tracer_size;
++	}
 +
-+	/* we do not handle interrupt stacks yet */
-+	if (!object_is_on_stack(stack))
-+		return;
-+
-+	local_irq_save(flags);
-+	arch_spin_lock(&max_stack_lock);
-+
-+	/* In case another CPU set the tracer_frame on us */
-+	if (unlikely(!frame_size))
-+		this_size -= tracer_frame;
-+
-+	/* a race could have already updated it */
-+	if (this_size <= max_stack_size)
-+		goto out;
-+
-+	max_stack_size = this_size;
-+
-+	max_stack_trace.nr_entries = 0;
-+
-+	arch_check_stack(ip, stack, &max_stack_size, &tracer_frame);
++	max_stack_trace.nr_entries -= i;
++	for (j = 0; j < max_stack_trace.nr_entries; j++) {
++		max_stack_trace.index[j] = max_stack_trace.index[j + i];
++		max_stack_trace.entries[j] = max_stack_trace.entries[j + i];
++	}
++}
++#endif /* CONFIG_STACK_TRACER */
+diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
+index bc0689a..496ab0f 100644
+--- a/arch/arm64/kernel/stacktrace.c
++++ b/arch/arm64/kernel/stacktrace.c
+@@ -17,12 +17,15 @@
+  */
+ #include <linux/kernel.h>
+ #include <linux/export.h>
++#include <linux/ftrace.h>
+ #include <linux/sched.h>
+ #include <linux/stacktrace.h>
  
- 	if (task_stack_end_corrupted(current)) {
- 		print_max_stack();
+ #include <asm/insn.h>
+ #include <asm/stacktrace.h>
+ 
++#define S_FRAME_SIZE sizeof(struct pt_regs) /* asm-offsets.h */
++
+ /*
+  * AArch64 PCS assigns the frame pointer to x29.
+  *
+@@ -78,9 +81,29 @@ struct stack_trace_data {
+ 	struct stack_trace *trace;
+ 	unsigned int no_sched_functions;
+ 	unsigned int skip;
++#ifdef CONFIG_STACK_TRACER
++	int ftracer;
++	int ret_stack_index;
++#endif
+ };
+ 
+-static int save_trace(struct stackframe *frame, void *d)
++#ifdef CONFIG_STACK_TRACER
++static void notrace arm64_stack_index(struct stackframe *frame,
++		struct stack_trace_data *data)
++{
++	struct stack_trace *trace = data->trace;
++	unsigned long top;
++	unsigned int x = trace->nr_entries;
++
++	top = (frame->fp & ~(THREAD_SIZE-1)) + THREAD_SIZE;
++	trace->index[x] = top - frame->fp;
++	/* should not go beyond this frame */
++	if (trace->index[x] == THREAD_SIZE)
++		trace->index[x] = 0;
++}
++#endif /* CONFIG_STACK_TRACER */
++
++static int notrace save_trace(struct stackframe *frame, void *d)
+ {
+ 	struct stack_trace_data *data = d;
+ 	struct stack_trace *trace = data->trace;
+@@ -93,7 +116,13 @@ static int save_trace(struct stackframe *frame, void *d)
+ 		return 0;
+ 	}
+ 
+-	trace->entries[trace->nr_entries++] = addr;
++	trace->entries[trace->nr_entries] = addr;
++#ifdef CONFIG_STACK_TRACER
++	if (data->ftracer) {
++		arm64_stack_index(frame, data);
++	}
++#endif
++	trace->nr_entries++;
+ 
+ 	return trace->nr_entries >= trace->max_entries;
+ }
+@@ -105,6 +134,9 @@ void save_stack_trace_tsk(struct task_struct *tsk, struct stack_trace *trace)
+ 
+ 	data.trace = trace;
+ 	data.skip = trace->skip;
++#ifdef CONFIG_STACK_TRACER
++	data.ftracer = 0;
++#endif
+ 
+ 	if (tsk != current) {
+ 		data.no_sched_functions = 1;
+@@ -128,4 +160,26 @@ void save_stack_trace(struct stack_trace *trace)
+ 	save_stack_trace_tsk(current, trace);
+ }
+ EXPORT_SYMBOL_GPL(save_stack_trace);
++
++#ifdef CONFIG_STACK_TRACER
++void notrace save_stack_trace_index(struct stack_trace *trace)
++{
++	struct stack_trace_data data;
++	struct stackframe frame;
++
++	data.trace = trace;
++	data.skip = trace->skip;
++	data.ftracer = 1;
++	data.ret_stack_index = current->curr_ret_stack;
++
++	data.no_sched_functions = 0;
++	frame.fp = (unsigned long)__builtin_frame_address(0);
++	frame.sp = current_stack_pointer;
++	frame.pc = (unsigned long)save_stack_trace_index;
++
++	walk_stackframe(&frame, save_trace, &data);
++	if (trace->nr_entries < trace->max_entries)
++		trace->entries[trace->nr_entries++] = ULONG_MAX;
++}
++#endif /* CONFIG_STACK_TRACER */
+ #endif
 -- 
 1.7.9.5
