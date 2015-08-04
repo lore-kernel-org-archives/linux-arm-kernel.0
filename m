@@ -1,47 +1,42 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 05 Aug 2015 01:50:45 +0300
-Subject: [PATCH v3 0/5] iommu/arm-smmu: add support for non-pci devices
-In-Reply-To: <20150728124847.GL29209@arm.com>
-References: <1437463833-16112-1-git-send-email-thunder.leizhen@huawei.com>
- <55AE1F2F.3090106@arm.com> <20150728124847.GL29209@arm.com>
-Message-ID: <2351780.FdaR8mZqKs@avalon>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 05 Aug 2015 00:50:39 +0200
+Subject: [PATCH v3 1/3] ARM: rockchip: rename osc_switch_to_32k variable
+Message-ID: <2128609.Kb18M8K28F@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+The variable name is misleading, as the deep suspend mode always switches
+the main supplying clock to the 32kHz source. Additionally the main
+oscillator remain running in some cases, which this var indicates.
 
-On Tuesday 28 July 2015 13:48:47 Will Deacon wrote:
-> On Tue, Jul 21, 2015 at 11:30:07AM +0100, Robin Murphy wrote:
-> > On 21/07/15 08:30, Zhen Lei wrote:
-> > > Changelog:
-> > > v2 -> v3:
-> > > 1. add support for pci device hotplug, which missed in patch v2.
-> > > 2. only support #iommu-cells = <1>, add corresponding description in
-> > > arm,smmu-v3.txt. 3. add function find_smmu_by_device which extracted
-> > > from find_smmu_by_node, to resolve> > 
-> > >     the problem mentioned by Robin Murphy in [PATCH v2 7/9].
-> > >     Additionally:
-> > >     +    platform_set_drvdata(pdev, smmu);       //Patch v2
-> > >     +	dev->archdata.iommu = smmu;             //Patch v3, dev =
-> > >     &pdev->dev
-> > 
-> > I didn't give any Reviewed-by tags, much less to revised patches that
-> > I've not even looked at yet; please see section 13 of
-> > Documentation/SubmittingPatches for what the Reviewed-by tag means.
-> 
-> That said, it would be great if you could review the patches anyway ;)
-> 
-> Also, it looks like this is all based on Laurent's IOMMU probe deferral
-> series which hasn't seen any movement for a while.
-> 
-> Laurent: are you planning to repost that, or is it worth us picking up
-> the original version and bashing it into shape ourselves?
+So rename it to osc_disable to clarity.
 
-I'd really appreciate if you could take it where I left it and get into shape 
-for upstream. I have no time to work on IOMMU at the moment I'm afraid :-( 
-I'll try to review patches though.
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ arch/arm/mach-rockchip/pm.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
+diff --git a/arch/arm/mach-rockchip/pm.c b/arch/arm/mach-rockchip/pm.c
+index 892bace..2ca1170 100644
+--- a/arch/arm/mach-rockchip/pm.c
++++ b/arch/arm/mach-rockchip/pm.c
+@@ -96,7 +96,7 @@ static bool rk3288_slp_disable_osc(void)
+ static void rk3288_slp_mode_set(int level)
+ {
+ 	u32 mode_set, mode_set1;
+-	bool osc_switch_to_32k = rk3288_slp_disable_osc();
++	bool osc_disable = rk3288_slp_disable_osc();
+ 
+ 	regmap_read(sgrf_regmap, RK3288_SGRF_CPU_CON0, &rk3288_sgrf_cpu_con0);
+ 	regmap_read(sgrf_regmap, RK3288_SGRF_SOC_CON0, &rk3288_sgrf_soc_con0);
+@@ -140,7 +140,7 @@ static void rk3288_slp_mode_set(int level)
+ 			    BIT(PMU_DDR1IO_RET_EN) | BIT(PMU_DDR0IO_RET_EN) |
+ 			    BIT(PMU_ALIVE_USE_LF) | BIT(PMU_PLL_PD_EN);
+ 
+-		if (osc_switch_to_32k)
++		if (osc_disable)
+ 			mode_set |= BIT(PMU_OSC_24M_DIS);
+ 
+ 		mode_set1 |= BIT(PMU_CLR_ALIVE) | BIT(PMU_CLR_BUS) |
 -- 
-Regards,
-
-Laurent Pinchart
+2.1.4
