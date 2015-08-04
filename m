@@ -1,33 +1,27 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 4 Aug 2015 09:53:41 +0900
-Subject: [PATCH v3] ARM: shmobile: silk: initial device tree
-In-Reply-To: <55BF8522.1010906@cogentembedded.com>
-References: <201404250239.39150.sergei.shtylyov@cogentembedded.com>
- <2360526.88foRQAOiM@wasted.cogentembedded.com>
- <CAMuHMdWT=nzsFuM-vfe5GoAtDE-AtW4LAZoEnBGGVZm54-mAzg@mail.gmail.com>
- <55BF8522.1010906@cogentembedded.com>
-Message-ID: <20150804005341.GB16257@verge.net.au>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 03 Aug 2015 18:14:17 -0700
+Subject: [PATCH v2 1/2] clk: rockchip: add pclk_pd_pmu to the list of
+ rk3288 critical clocks
+In-Reply-To: <1438650222-14357-1-git-send-email-hl@rock-chips.com>
+References: <1438650222-14357-1-git-send-email-hl@rock-chips.com>
+Message-ID: <55C011E9.3000002@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 03, 2015 at 06:13:38PM +0300, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 08/03/2015 04:00 PM, Geert Uytterhoeven wrote:
-> 
-> >>--- /dev/null
-> >>+++ renesas/arch/arm/boot/dts/r8a7794-silk.dts
-> >>@@ -0,0 +1,51 @@
-> 
-> >>+/ {
-> >>+       model = "SILK";
-> >>+       compatible = "renesas,silk", "renesas,r8a7794";
-> 
-> >WARNING: DT compatible string "renesas,silk" appears un-documented --
-> >check ./Documentation/devicetree/bindings/
-> 
-> >Do you plan to update Documentation/devicetree/bindings/arm/shmobile.txt?
-> 
->    No, I had no idea I should record the board names somewhere too...
+On 08/03/2015 06:03 PM, Lin Huang wrote:
+> From: huang lin <hl@rock-chips.com>
+>
+> pclk_pd_pmu needs to keep running and with the upcoming gpio clock
+> handling this is not always the case anymore. So add it to the list
+> of critical clocks for now.
+>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> Signed-off-by: Lin Huang <hl@rock-chips.com>
 
-Sergei, please submit a parch as suggested by Geert.
+From: says huang lin, first signed-off-by is Heiko Stuebner, and final 
+signed-off-by is Lin Huang... who actually authored this patch? Is Lin 
+Huang the same person as huang lin ?
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
