@@ -1,36 +1,42 @@
-From: santosh.shilimkar@oracle.com (santosh.shilimkar at oracle.com)
-Date: Tue, 04 Aug 2015 16:09:27 -0700
-Subject: [Resend: PATCH] ARM: keystone: add documentation for SoCs and EVMs
-In-Reply-To: <55C112E9.6020709@ti.com>
-References: <1438706203-3748-1-git-send-email-m-karicheri2@ti.com>
- <55C10F2D.9050805@oracle.com> <55C112E9.6020709@ti.com>
-Message-ID: <55C14627.4090901@oracle.com>
+From: boris.ostrovsky@oracle.com (Boris Ostrovsky)
+Date: Tue, 04 Aug 2015 19:16:45 -0400
+Subject: [PATCH v2 4/8] xen: Use the correctly the Xen memory terminologies
+In-Reply-To: <1438711972-18752-5-git-send-email-julien.grall@citrix.com>
+References: <1438711972-18752-1-git-send-email-julien.grall@citrix.com>
+ <1438711972-18752-5-git-send-email-julien.grall@citrix.com>
+Message-ID: <55C147DD.7000600@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/4/15 12:30 PM, Murali Karicheri wrote:
-> On 08/04/2015 03:14 PM, santosh shilimkar wrote:
->> On 8/4/2015 9:36 AM, Murali Karicheri wrote:
->>> Currently there is no general documentation on Keystone SoCs in the
->>> Linux Documentation folder of the source tree. This patch adds some
->>> essential documentation with links to help users of Keystone Linux and
->>> also provide links to existing documents where necessary.
->>>
->>> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
->>> ---
->> Good writeup Murali. This will be handy.
->> I can queue this up via arm-soc for 4.3 if the doc maintainers are
->> happy with it.
->>
->> Thanks !!
->>
+On 08/04/2015 02:12 PM, Julien Grall wrote:
+>   
+>   /*
+>    * We detect special mappings in one of two ways:
+> @@ -217,9 +232,13 @@ static inline unsigned long bfn_to_local_pfn(unsigned long mfn)
+>   
+>   /* VIRT <-> MACHINE conversion */
+>   #define virt_to_machine(v)	(phys_to_machine(XPADDR(__pa(v))))
+> -#define virt_to_pfn(v)          (PFN_DOWN(__pa(v)))
+>   #define virt_to_mfn(v)		(pfn_to_mfn(virt_to_pfn(v)))
+>   #define mfn_to_virt(m)		(__va(mfn_to_pfn(m) << PAGE_SHIFT))
+> +#define virt_to_pfn(v)          (PFN_DOWN(__pa(v)))
 
->
-> Thanks. BTW, there is one more DTS update for netcp from Wingman which
-> will be posted soon. FYI. Also one from me as there is a OSR clock
-> missing in K2L netcp binding.
->
-Sounds good. Thanks for the note.
+This looks like unnecessary change.
 
-Regards,
-Santosh
+
+> diff --git a/drivers/video/fbdev/xen-fbfront.c b/drivers/video/fbdev/xen-fbfront.c
+> index 09dc447..25e3cce 100644
+> --- a/drivers/video/fbdev/xen-fbfront.c
+> +++ b/drivers/video/fbdev/xen-fbfront.c
+> @@ -539,7 +539,7 @@ static int xenfb_remove(struct xenbus_device *dev)
+>   
+>   static unsigned long vmalloc_to_mfn(void *address)
+>   {
+> -	return pfn_to_mfn(vmalloc_to_pfn(address));
+> +	return pfn_to_gfn(vmalloc_to_pfn(address));
+>   }
+
+Are you sure? This will return vmalloc_to_pfn(address)).
+
+
+-boris
