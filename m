@@ -1,203 +1,307 @@
-From: b20788@freescale.com (Anson Huang)
-Date: Wed, 5 Aug 2015 01:59:24 +0800
-Subject: [PATCH V2] ARM: imx: add cpuidle support for i.mx6ul
-Message-ID: <1438711164-9106-1-git-send-email-b20788@freescale.com>
+From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
+Date: Tue, 4 Aug 2015 10:12:05 +0000
+Subject: [PATCH v6] PCI: Store PCIe bus address in struct of_pci_range
+In-Reply-To: <7F6386B4-D2F5-4840-AC72-F8C76CBC3B94@gmail.com>
+References: <1438010223-124422-1-git-send-email-gabriele.paoloni@huawei.com>
+ <20150729172053.GE31170@google.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E01D6F350@lhreml503-mbs>
+ <CAL_JsqKs11-sXQTdBD+ZjbVYFWUHBARTW9q5MF1hCXUhZ+nWLQ@mail.gmail.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E01D6F94A@lhreml503-mbs>
+ <20150730161447.GG9640@google.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E01D6FB3B@lhreml503-mbs>
+ <20150730171445.GI9640@google.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E01D6FC15@lhreml503-mbs>
+ <CAL_Jsq+aQVakaZf4xo7sxnVyTmPR+HJ-9ByyS6OYJ0PHDYOwmg@mail.gmail.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E01D70589@lhreml503-mbs>
+ <55BB8CC6.1080203@ti.com>
+ <CAL_JsqJqjiWVaKs-3ghQ1EBQzRRQ38GzkMV+FELPj53bSF-yXQ@mail.gmail.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E01D712E7@lhreml503-mbs>
+ <7F6386B4-D2F5-4840-AC72-F8C76CBC3B94@gmail.com>
+Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E01D719D1@lhreml503-mbs>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch introduces an independent cpuidle driver for
-i.MX6UL, totally 3 levels of cpuidle are supported as below:
 
-1. ARM WFI;
-2. SOC in WAIT mode;
-3. SOC in WAIT mode + ARM power off.
 
-Signed-off-by: Anson Huang <b20788@freescale.com>
----
-change from V1:
-	remove CPUIDLE_FLAG_TIMER_STOP flag as i.MX6UL does
-NOT use local timer.
- arch/arm/mach-imx/Makefile         |   1 +
- arch/arm/mach-imx/cpuidle-imx6ul.c | 105 +++++++++++++++++++++++++++++++++++++
- arch/arm/mach-imx/cpuidle.h        |   5 ++
- arch/arm/mach-imx/mach-imx6ul.c    |   8 +++
- 4 files changed, 119 insertions(+)
- create mode 100644 arch/arm/mach-imx/cpuidle-imx6ul.c
+> -----Original Message-----
+> From: Jingoo Han [mailto:jingoohan1 at gmail.com]
+> Sent: Tuesday, August 04, 2015 5:20 AM
+> To: Gabriele Paoloni
+> Cc: Rob Herring; Kishon Vijay Abraham I; Bjorn Helgaas; arnd at arndb.de;
+> lorenzo.pieralisi at arm.com; Wangzhou (B); robh+dt at kernel.org;
+> james.morse at arm.com; Liviu.Dudau at arm.com; linux-pci at vger.kernel.org;
+> linux-arm-kernel at lists.infradead.org; devicetree at vger.kernel.org;
+> Yuanzhichang; Zhudacai; zhangjukuo; qiuzhenfa; Liguozhu (Kenneth);
+> Pratyush Anand; Arnd Bergmann; jingoohan1 at gmail.com
+> Subject: Re: [PATCH v6] PCI: Store PCIe bus address in struct
+> of_pci_range
+> 
+> On 2015. 8. 3., at PM 8:18, Gabriele Paoloni
+> <gabriele.paoloni@huawei.com> wrote:
+> >
+> > Rob, Kishon what about the following solution?....
+> >
+> > ---
+> > drivers/pci/host/pci-dra7xx.c      | 12 ++++++++++++
+> > drivers/pci/host/pcie-designware.c |  9 +++------
+> 
+> Hi Paoloni,
+> 
+> OK, it looks good.
+> I want you to revert the following patch.
+> 
+> commit "f4c55c5a3f7f (PCI: designware: Program ATU with untranslated
+> address)"
+> 
+> Would you remove all '*_mode_base's?
 
-diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-index fb689d8..1d7df9c 100644
---- a/arch/arm/mach-imx/Makefile
-+++ b/arch/arm/mach-imx/Makefile
-@@ -28,6 +28,7 @@ obj-$(CONFIG_SOC_IMX5) += cpuidle-imx5.o
- obj-$(CONFIG_SOC_IMX6Q) += cpuidle-imx6q.o
- obj-$(CONFIG_SOC_IMX6SL) += cpuidle-imx6sl.o
- obj-$(CONFIG_SOC_IMX6SX) += cpuidle-imx6sx.o
-+obj-$(CONFIG_SOC_IMX6UL) += cpuidle-imx6ul.o
- endif
- 
- ifdef CONFIG_SND_IMX_SOC
-diff --git a/arch/arm/mach-imx/cpuidle-imx6ul.c b/arch/arm/mach-imx/cpuidle-imx6ul.c
-new file mode 100644
-index 0000000..27ab28a
---- /dev/null
-+++ b/arch/arm/mach-imx/cpuidle-imx6ul.c
-@@ -0,0 +1,105 @@
-+/*
-+ * Copyright (C) 2015 Freescale Semiconductor, Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/cpuidle.h>
-+#include <linux/cpu_pm.h>
-+#include <linux/module.h>
-+#include <asm/cacheflush.h>
-+#include <asm/cpuidle.h>
-+#include <asm/suspend.h>
-+
-+#include "common.h"
-+#include "cpuidle.h"
-+
-+static int imx6ul_idle_finish(unsigned long val)
-+{
-+	flush_cache_all();
-+	cpu_do_idle();
-+
-+	return 0;
-+}
-+
-+static int imx6ul_enter_wait(struct cpuidle_device *dev,
-+			    struct cpuidle_driver *drv, int index)
-+{
-+	imx6_set_lpm(WAIT_UNCLOCKED);
-+
-+	switch (index) {
-+	case 1:
-+		cpu_do_idle();
-+		break;
-+	case 2:
-+		imx6_enable_rbc(true);
-+		imx_gpc_set_arm_power_in_lpm(true);
-+		imx_set_cpu_jump(0, v7_cpu_resume);
-+		/* Need to notify there is a cpu pm operation. */
-+		cpu_pm_enter();
-+		cpu_cluster_pm_enter();
-+
-+		cpu_suspend(0, imx6ul_idle_finish);
-+
-+		cpu_cluster_pm_exit();
-+		cpu_pm_exit();
-+		imx_gpc_set_arm_power_in_lpm(false);
-+		imx6_enable_rbc(false);
-+		break;
-+	default:
-+		break;
-+	}
-+
-+	imx6_set_lpm(WAIT_CLOCKED);
-+
-+	return index;
-+}
-+
-+static struct cpuidle_driver imx6ul_cpuidle_driver = {
-+	.name = "imx6ul_cpuidle",
-+	.owner = THIS_MODULE,
-+	.states = {
-+		/* WFI */
-+		ARM_CPUIDLE_WFI_STATE,
-+		/* WAIT */
-+		{
-+			.exit_latency = 50,
-+			.target_residency = 75,
-+			.enter = imx6ul_enter_wait,
-+			.name = "WAIT",
-+			.desc = "Clock off",
-+		},
-+		/* WAIT + ARM power off  */
-+		{
-+			/*
-+			 * ARM gating 31us * 5 + RBC clear 65us
-+			 * and some margin for SW execution, here set it
-+			 * to 300us.
-+			 */
-+			.exit_latency = 300,
-+			.target_residency = 500,
-+			.enter = imx6ul_enter_wait,
-+			.name = "LOW-POWER-IDLE",
-+			.desc = "ARM power off",
-+		},
-+	},
-+	.state_count = 3,
-+	.safe_state_index = 0,
-+};
-+
-+int __init imx6ul_cpuidle_init(void)
-+{
-+	imx6_enable_rbc(false);
-+	/*
-+	 * set ARM power up/down timing to the fastest,
-+	 * sw2iso and sw can be set to one 32K cycle = 31us
-+	 * except for power up sw2iso which need to be
-+	 * larger than LDO ramp up time.
-+	 */
-+	imx_gpc_set_arm_power_up_timing(2, 1);
-+	imx_gpc_set_arm_power_down_timing(1, 1);
-+
-+	return cpuidle_register(&imx6ul_cpuidle_driver, NULL);
-+}
-diff --git a/arch/arm/mach-imx/cpuidle.h b/arch/arm/mach-imx/cpuidle.h
-index f914012..4dcf71d 100644
---- a/arch/arm/mach-imx/cpuidle.h
-+++ b/arch/arm/mach-imx/cpuidle.h
-@@ -15,6 +15,7 @@ extern int imx5_cpuidle_init(void);
- extern int imx6q_cpuidle_init(void);
- extern int imx6sl_cpuidle_init(void);
- extern int imx6sx_cpuidle_init(void);
-+extern int imx6ul_cpuidle_init(void);
- #else
- static inline int imx5_cpuidle_init(void)
- {
-@@ -32,4 +33,8 @@ static inline int imx6sx_cpuidle_init(void)
- {
- 	return 0;
- }
-+static inline int imx6ul_cpuidle_init(void)
-+{
-+	return 0;
-+}
- #endif
-diff --git a/arch/arm/mach-imx/mach-imx6ul.c b/arch/arm/mach-imx/mach-imx6ul.c
-index f206506..0f4b95c 100644
---- a/arch/arm/mach-imx/mach-imx6ul.c
-+++ b/arch/arm/mach-imx/mach-imx6ul.c
-@@ -11,6 +11,7 @@
- #include <asm/mach/map.h>
- 
- #include "common.h"
-+#include "cpuidle.h"
- 
- static void __init imx6ul_init_machine(void)
- {
-@@ -29,6 +30,12 @@ static void __init imx6ul_init_irq(void)
- 	imx_init_revision_from_anatop();
- 	imx_src_init();
- 	irqchip_init();
-+	imx6_pm_ccm_init("fsl,imx6ul-ccm");
-+}
-+
-+static void __init imx6ul_init_late(void)
-+{
-+	imx6ul_cpuidle_init();
- }
- 
- static const char *imx6ul_dt_compat[] __initconst = {
-@@ -40,4 +47,5 @@ DT_MACHINE_START(IMX6UL, "Freescale i.MX6 Ultralite (Device Tree)")
- 	.init_irq	= imx6ul_init_irq,
- 	.init_machine	= imx6ul_init_machine,
- 	.dt_compat	= imx6ul_dt_compat,
-+	.init_late	= imx6ul_init_late,
- MACHINE_END
--- 
-1.9.1
+Hi Jingoo Han,
+
+If I reverted the commit, in order to get designware working, dra7 
+should mask directly the CPU addresses stored in pp->cfg0_base, 
+pp->cfg1_base, pp->mem_base and pp->io_base.
+
+The masking would happen at this point: 
+http://lxr.free-electrons.com/source/drivers/pci/host/pcie-designware.c#L493
+
+Now:
+- I see that pp->cfg<0/1>_base are used in devm_ioremap before that 
+  point and nowhere else, so they should be ok.
+- pp->mem_base is used in dw_pcie_setup_rc(); dw_pcie_setup_rc() is called
+  in dra7xx_pcie_host_init()...so here I should move the masking after
+  dw_pcie_setup() retuned, but I think it should be ok
+- pp->io_base is used in pci_ioremap_io() in dw_pcie_setup(). Now currently
+  in designware this is called by pci_bios_init_hw(); this is after the 
+  masking....so here we would have a the wrong value passed
+
+Said that if you look at "[PATCH v5 2/5] PCI: designware: Add ARM64 support",
+that is the patchset where this patch is needed, you can see that 
+dw_pcie_setup() is removed and pp->io_base is used in pci_remap_iospace() before 
+the masking would happen in dra7xx_pcie_host_init()...so for this patchset we 
+should be good to revert the commit.
+
+I propose to add a new patch in the patchset "[PATCH v5 0/5] PCI: hisi: Add PCIe 
+host support for HiSilicon SoC Hip05" as the one I just posted in this 
+thread (this would not revert the commit but just moves the masking to dra7xx)
+
+I would revert the commit in "[PATCH v5 2/5] PCI: designware: Add ARM64 support"
+together with the rest of designware rework. 
+
+So we would have always a working version of designware...
+
+Are you ok with this?
+
+> 
+> Best regards,
+> Jingoo Han
+> 
+> > 2 files changed, 15 insertions(+), 6 deletions(-)
+> >
+> > diff --git a/drivers/pci/host/pci-dra7xx.c b/drivers/pci/host/pci-
+> dra7xx.c
+> > index 80db09e..bb2635f 100644
+> > --- a/drivers/pci/host/pci-dra7xx.c
+> > +++ b/drivers/pci/host/pci-dra7xx.c
+> > @@ -61,6 +61,7 @@
+> >
+> > #define    PCIECTRL_DRA7XX_CONF_PHY_CS            0x010C
+> > #define    LINK_UP                        BIT(16)
+> > +#define CPU_TO_BUS_ADDR             0x0FFFFFFF
+> >
+> > struct dra7xx_pcie {
+> >    void __iomem        *base;
+> > @@ -138,6 +139,17 @@ static void dra7xx_pcie_enable_interrupts(struct
+> pcie_port *pp)
+> >
+> > static void dra7xx_pcie_host_init(struct pcie_port *pp)
+> > {
+> > +    if (pp->io_mod_base)
+> > +        pp->io_mod_base &= CPU_TO_BUS_ADDR;
+> > +
+> > +    if (pp->mem_mod_base)
+> > +        pp->mem_mod_base &= CPU_TO_BUS_ADDR;
+> > +
+> > +    if (pp->cfg0_mod_base) {
+> > +        pp->cfg0_mod_base &= CPU_TO_BUS_ADDR;
+> > +        pp->cfg1_mod_base &= CPU_TO_BUS_ADDR;
+> > +    }
+> > +
+> >    dw_pcie_setup_rc(pp);
+> >    dra7xx_pcie_establish_link(pp);
+> >    if (IS_ENABLED(CONFIG_PCI_MSI))
+> > diff --git a/drivers/pci/host/pcie-designware.c
+> b/drivers/pci/host/pcie-designware.c
+> > index 69486be..06c682b 100644
+> > --- a/drivers/pci/host/pcie-designware.c
+> > +++ b/drivers/pci/host/pcie-designware.c
+> > @@ -416,8 +416,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
+> >            pp->io_base = range.cpu_addr;
+> >
+> >            /* Find the untranslated IO space address */
+> > -            pp->io_mod_base = of_read_number(parser.range -
+> > -                             parser.np + na, ns);
+> > +            pp->io_mod_base = range.cpu_addr;;
+> >        }
+> >        if (restype == IORESOURCE_MEM) {
+> >            of_pci_range_to_resource(&range, np, &pp->mem);
+> > @@ -426,8 +425,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
+> >            pp->mem_bus_addr = range.pci_addr;
+> >
+> >            /* Find the untranslated MEM space address */
+> > -            pp->mem_mod_base = of_read_number(parser.range -
+> > -                              parser.np + na, ns);
+> > +            pp->mem_mod_base = range.cpu_addr;
+> >        }
+> >        if (restype == 0) {
+> >            of_pci_range_to_resource(&range, np, &pp->cfg);
+> > @@ -437,8 +435,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
+> >            pp->cfg1_base = pp->cfg.start + pp->cfg0_size;
+> >
+> >            /* Find the untranslated configuration space address */
+> > -            pp->cfg0_mod_base = of_read_number(parser.range -
+> > -                               parser.np + na, ns);
+> > +            pp->cfg0_mod_base = range.cpu_addr;
+> >            pp->cfg1_mod_base = pp->cfg0_mod_base +
+> >                        pp->cfg0_size;
+> >        }
+> > --
+> > 1.9.1
+> >
+> >
+> >> -----Original Message-----
+> >> From: linux-pci-owner at vger.kernel.org [mailto:linux-pci-
+> >> owner at vger.kernel.org] On Behalf Of Rob Herring
+> >> Sent: Friday, July 31, 2015 5:53 PM
+> >> To: Kishon Vijay Abraham I
+> >> Cc: Gabriele Paoloni; Bjorn Helgaas; arnd at arndb.de;
+> >> lorenzo.pieralisi at arm.com; Wangzhou (B); robh+dt at kernel.org;
+> >> james.morse at arm.com; Liviu.Dudau at arm.com; linux-pci at vger.kernel.org;
+> >> linux-arm-kernel at lists.infradead.org; devicetree at vger.kernel.org;
+> >> Yuanzhichang; Zhudacai; zhangjukuo; qiuzhenfa; Liguozhu (Kenneth);
+> >> Jingoo Han; Pratyush Anand; Arnd Bergmann
+> >> Subject: Re: [PATCH v6] PCI: Store PCIe bus address in struct
+> >> of_pci_range
+> >>
+> >> On Fri, Jul 31, 2015 at 9:57 AM, Kishon Vijay Abraham I
+> <kishon@ti.com>
+> >> wrote:
+> >>> +Arnd
+> >>>
+> >>> Hi,
+> >>>
+> >>>> On Friday 31 July 2015 07:55 PM, Gabriele Paoloni wrote:
+> >>>> [+cc Kishon]
+> >>>>
+> >>>>> -----Original Message-----
+> >>>>> From: linux-pci-owner at vger.kernel.org [mailto:linux-pci-
+> >>>>> owner at vger.kernel.org] On Behalf Of Rob Herring
+> >>>>> Sent: Thursday, July 30, 2015 9:42 PM
+> >>>>> To: Gabriele Paoloni
+> >>>>> Cc: Bjorn Helgaas; arnd at arndb.de; lorenzo.pieralisi at arm.com;
+> >> Wangzhou
+> >>>>> (B); robh+dt at kernel.org; james.morse at arm.com; Liviu.Dudau at arm.com;
+> >>>>> linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> >>>>> devicetree at vger.kernel.org; Yuanzhichang; Zhudacai; zhangjukuo;
+> >>>>> qiuzhenfa; Liguozhu (Kenneth); Jingoo Han; Pratyush Anand
+> >>>>> Subject: Re: [PATCH v6] PCI: Store PCIe bus address in struct
+> >>>>> of_pci_range
+> >>>>>
+> >>>>> On Thu, Jul 30, 2015 at 12:34 PM, Gabriele Paoloni
+> >>>>> <gabriele.paoloni@huawei.com> wrote:
+> >>>>>>> -----Original Message-----
+> >>>>>>> From: Bjorn Helgaas [mailto:bhelgaas at google.com]
+> >>>>>>> Sent: 30 July 2015 18:15
+> >>>>>>> On Thu, Jul 30, 2015 at 04:50:55PM +0000, Gabriele Paoloni
+> wrote:
+> >>>>>>>>> -----Original Message-----
+> >>>>>>>>> From: linux-pci-owner at vger.kernel.org [mailto:linux-pci-
+> >>>>>>>>> owner at vger.kernel.org] On Behalf Of Bjorn Helgaas
+> >>>>>>>>> Sent: Thursday, July 30, 2015 5:15 PM
+> >>>>>>>>> On Thu, Jul 30, 2015 at 01:52:13PM +0000, Gabriele Paoloni
+> >> wrote:
+> >>>>>
+> >>>>> [...]
+> >>>>>
+> >>>>>>>>>> I don?t think we should rely on [CPU] addresses...what if
+> the
+> >>>>>>>>> intermediate
+> >>>>>>>>>> translation layer changes the lower significant bits of the
+> >>>>> "bus
+> >>>>>>>>> address"
+> >>>>>>>>>> to translate into a cpu address?
+> >>>>>>>>>
+> >>>>>>>>> Is it really a possiblity that the lower bits could be
+> changed?
+> >>>>>>>>
+> >>>>>>>> I've checked all the current deignware users DTs except "pci-
+> >>>>>>> layerscape"
+> >>>>>>>> that I could not find:
+> >>>>>>>> spear1310.dtsi
+> >>>>>>>> spear1340.dtsi
+> >>>>>>>> dra7.dtsi
+> >>>>>>>> imx6qdl.dtsi
+> >>>>>>>> imx6sx.dtsi
+> >>>>>>>> keystone.dtsi
+> >>>>>>>> exynos5440.dtsi
+> >>>>>>>>
+> >>>>>>>> None of them modifies the lower bits. To be more precise the
+> >> only
+> >>>>> guy
+> >>>>>>>> that provides another translation layer is "dra7.dtsi":
+> >>>>>>>> axi0
+> >>>>>>>> http://lxr.free-
+> >>>>> electrons.com/source/arch/arm/boot/dts/dra7.dtsi#L207
+> >>>>>>>>
+> >>>>>>>> axi1
+> >>>>>>>> http://lxr.free-
+> >>>>> electrons.com/source/arch/arm/boot/dts/dra7.dtsi#L241
+> >>>>>>>>
+> >>>>>>>> For this case masking the top 4bits (bits28 to 31) should make
+> >> the
+> >>>>> job.
+> >>>>>
+> >>>>> IMO, we should just fix this case. After further study, I don't
+> >> think
+> >>>>> this is a DW issue, but rather an SOC integration issue.
+> >>>>>
+> >>>>> I believe you can just fixup the address in the pp->ops-
+> >host_init
+> >> hook.
+> >>>>
+> >>>> Yes I guess that I could just assign pp->(*)_mod_base to the CPU
+> >> address
+> >>>> in DW and mask it out in dra7xx_pcie_host_init()...
+> >>>>
+> >>>> Kishon, would you be ok with that?
+> >>>
+> >>> Initially I was using *base-mask* property from dt. Me and Arnd
+> >> (cc'ed) had
+> >>> this discussion [1] before we decided the current approach. It'll
+> be
+> >> good to
+> >>> check with Arnd too.
+> >>>
+> >>> [1] ->  http://lists.infradead.org/pipermail/linux-arm-kernel/2014-
+> >> May/253528.html
+> >>
+> >> The problem I have here is the use of ranges does not necessarily
+> mean
+> >> fewer address bits are available. It can be used just for
+> convenience
+> >> of not putting the full address into every node's reg property. And
+> >> vice versa, there are probably plenty of cases where we have the
+> full
+> >> address in the nodes, but really only some of the address bits are
+> >> decoded at the IP block. Whether the address bits are present is
+> >> rarely cared about or known by s/w folks until you hit a problem
+> like
+> >> this. Given this is an isolated case ATM, I would fix it in an
+> >> isolated way. It does not affect the binding and could be changed in
+> >> the kernel later if this becomes a common need.
+> >>
+> >> Rob
+> >> --
+> >> To unsubscribe from this list: send the line "unsubscribe linux-pci"
+> in
+> >> the body of a message to majordomo at vger.kernel.org
+> >> More majordomo info at  http://vger.kernel.org/majordomo-info.html
