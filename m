@@ -1,99 +1,28 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 4 Aug 2015 14:32:57 -0500
-Subject: MUSB dual-role on AM335x behaving weirdly
-In-Reply-To: <55C0CAC6.3020603@free-electrons.com>
-References: <CADYTM3Zk2iD8YMj75CoLJn=4kpoXoXEKUWj2QzdXKGCJjtfG2A@mail.gmail.com>
- <CADYTM3a1QWnec1D=wT=fgZ-RCXAx_qZYYoFg5gWOy0yT4vovHA@mail.gmail.com>
- <20150514212653.GC3338@piout.net>
- <CADYTM3baVqoEBdWoQb5JFyGR2_GKm1FHMYWST1YkZV=m=ZdycQ@mail.gmail.com>
- <20150526145118.GD26599@saruman.tx.rr.com>
- <20150527094205.GO3199@piout.net>
- <5594E56B.3040200@free-electrons.com>
- <CADYTM3ZF5m++N1NqmOJoH5agbYrzpvSbLnuLVgttxwzdzwmGwQ@mail.gmail.com>
- <55C0B954.3020106@free-electrons.com>
- <55C0CAC6.3020603@free-electrons.com>
-Message-ID: <20150804193257.GF9623@saruman.tx.rr.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 04 Aug 2015 12:34:39 -0700
+Subject: [PATCH v3 1/2] clk: rockchip: add pclk_pd_pmu to the list of
+ rk3288 critical clocks
+In-Reply-To: <1588782.u2WKR6eVuV@diego>
+References: <1438670487-27598-1-git-send-email-hl@rock-chips.com>
+ <1588782.u2WKR6eVuV@diego>
+Message-ID: <55C113CF.2000601@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 04, 2015 at 04:23:02PM +0200, Gregory CLEMENT wrote:
-> Hi again,
-> On 04/08/2015 15:08, Gregory CLEMENT wrote:
-> > Hi Bin,
-> > 
-> > On 02/07/2015 19:05, Bin Liu wrote:
-> >> Hi,
-> >>
-> >> On Thu, Jul 2, 2015 at 2:16 AM, Gregory CLEMENT
-> >> <gregory.clement@free-electrons.com> wrote:
-> >>> Hi Felipe,
-> >>>
-> >>> On 27/05/2015 11:42, Alexandre Belloni wrote:
-> >>>> Hi,
-> >>>>
-> >>>> On 26/05/2015 at 09:51:18 -0500, Felipe Balbi wrote :
-> >>>>> On Thu, May 14, 2015 at 04:36:33PM -0500, Bin Liu wrote:
-> >>>>>> Alexandre,
-> >>>>>>
-> >>>>>> On Thu, May 14, 2015 at 4:26 PM, Alexandre Belloni
-> >>>>>> <alexandre.belloni@free-electrons.com> wrote:
-> >>>>>>> On 14/05/2015 at 16:16:12 -0500, Bin Liu wrote :
-> >>>>>>>> I think I found the root cause of the problem: board design issue - I
-> >>>>>>>> bet the custom board has too much cap on VBUS line. It should be <
-> >>>>>>>> 10uF.
-> >>>>>>>>
-> >>>>>>>
-> >>>>>>> We have a custom board that exhibits the issue but it only has a 100nF
-> >>>>>>> cap on VBUS.
-> >>>>>>
-> >>>>>> Have you measured the VBUS discharging? Is there any way to share your
-> >>>>>> schematics?
-> >>>>>
-> >>>>> Alexandre, any further comments ?
-> >>>>>
-> >>>>
-> >>>> Yeah, I have just got more info.
-> >>>>
-> >>>> This is the relevant part of the schematic:
-> >>>> http://free-electrons.com/~alexandre/usb.png
-> >>>>
-> >>>> The total VBUS capacitance is 200nF and the USB0 pins are connected
-> >>>> directly to the AM3358 pins. U1 is actually not fitted.
-> >>>>
-> >>>> We didn't measure VBUS discharging but we observe the OTG pin sensing
-> >>>> stops when plugging an OTG cable without any device.
-> >>>
-> >>> Do you have any news about this topic?
-> >>>
-> >>>
-> >>> Is there something else that we can do to help solving this issue?
-> >>
-> >> In the case of CONFIG_USB_MUSB_DUAL_ROLE=y and dr_mode=otg, how is the
-> >> gadget driver configured? It has to be a module not built-in.
-> > 
-> > Indeed when I configured CONFIG_USB_MUSB_HDRC=m and CONFIG_USB_MUSB_DSPS=m
-> > it worked seamless.
-> > 
-> 
-> Actually it didn't worked. And now sometimes I even received continuously
-> the following message:
-> 
->  musb_bus_suspend 2484: trying to suspend as a_wait_vfall while active
+On 08/04/2015 01:54 AM, Heiko St?bner wrote:
+> Hi,
+>
+> Am Dienstag, 4. August 2015, 14:41:26 schrieb Lin Huang:
+>
+> I guess this patch then would need a
+>
+> From: Heiko Stuebner <heiko@sntech.de>
+>
+> at this point to override the author then.
 
-this is likely because your VBUS hasn't dropped below 0.8V fast enough.
-
-I could only trigger this message in that situation. Use a scope to poke
-at VBUS and see how long is takes to reach 0.8V, this could all be cause
-by too much capacitance on VBUS line.
-
-cheers
+Sounds right. Please resend the patch properly. Also, is there a 2/2? I 
+never got it.
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150804/2369ce05/attachment.sig>
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
