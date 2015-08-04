@@ -1,24 +1,34 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 4 Aug 2015 16:36:49 +0100
-Subject: [PATCH v2 0/4] Add SPDIF support for rockchip
-In-Reply-To: <1438687099-14282-1-git-send-email-sjoerd.simons@collabora.co.uk>
-References: <1438687099-14282-1-git-send-email-sjoerd.simons@collabora.co.uk>
-Message-ID: <20150804153649.GP20873@sirena.org.uk>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 4 Aug 2015 17:34:39 +0200
+Subject: Armadaxp GPIO interrupts
+In-Reply-To: <CAG1O52Xg88OsifBzmpSdqvC8wQaOW78nC9nnfxugFv1VU1m1LQ@mail.gmail.com>
+References: <CAG1O52Xg88OsifBzmpSdqvC8wQaOW78nC9nnfxugFv1VU1m1LQ@mail.gmail.com>
+Message-ID: <20150804153439.GA28673@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 04, 2015 at 01:18:15PM +0200, Sjoerd Simons wrote:
+On Tue, Aug 04, 2015 at 08:52:17PM +0530, raghu MG wrote:
+> Hello,
+> 
+> I am working on a card which as GPIOs connected to external I/O's. The
+> board consists of ARMADAXP 78460 host cpu.
+> 
+> Board currently runs Linux-4.1 with modified  armada-xp-gp.dtb for ArmadaXP.
+> I enabled "orion-gpio" driver to initialize GPIOs as given in
+> armada-xp-mv78460.
 
-> Sjoerd Simons (4):
->   ASoC: dt-bindings: add rockchip tranceiver bindings
->   ASoc: rockchip: Add rockchip SPDIF transceiver driver
+What kernel configuration are you using? Do you have the same problem
+with multi_v7_defconfig and mvebu_v7_defconfig?
+ 
+> The driver while initializing calls irq_domain_add_simple which throws up
+> following warning
+> "irq: Cannot allocate irq_descs @ IRQ47, assuming pre-allocated"
+> The warning repeats for next set(32-63  & 64-66).
+>
+> Also the GPIO IRQs are not getting listed in cat /proc/interrupts
 
-I only appear to have patch 2 (with the misspelt subject), not the
-binding documentation.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150804/870592a3/attachment.sig>
+irq_domain_add_simple() returning an error is fatal for the probe. The
+driver will not be loaded, so more than interrupts will be missing,
+all the gpios will be missing.
+
+    Andrew
