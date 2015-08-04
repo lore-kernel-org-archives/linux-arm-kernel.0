@@ -1,27 +1,46 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 03 Aug 2015 18:14:17 -0700
-Subject: [PATCH v2 1/2] clk: rockchip: add pclk_pd_pmu to the list of
- rk3288 critical clocks
-In-Reply-To: <1438650222-14357-1-git-send-email-hl@rock-chips.com>
-References: <1438650222-14357-1-git-send-email-hl@rock-chips.com>
-Message-ID: <55C011E9.3000002@codeaurora.org>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 04 Aug 2015 10:31:59 +0900
+Subject: [PATCH v2 2/7] cpufreq: opp: fix handling of turbo modes
+In-Reply-To: <55BA36A7.3050107@kernel.org>
+References: <1436456621-29839-1-git-send-email-b.zolnierkie@samsung.com>
+ <3141301.RS9TLygaba@amdc1976> <20150727113641.GB10181@linux>
+ <2681271.3UazeZ9PAQ@amdc1976> <55BA36A7.3050107@kernel.org>
+Message-ID: <55C0160F.6080301@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/03/2015 06:03 PM, Lin Huang wrote:
-> From: huang lin <hl@rock-chips.com>
->
-> pclk_pd_pmu needs to keep running and with the upcoming gpio clock
-> handling this is not always the case anymore. So add it to the list
-> of critical clocks for now.
->
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> Signed-off-by: Lin Huang <hl@rock-chips.com>
+On 30.07.2015 23:37, Kukjin Kim wrote:
+> On 07/27/15 20:47, Bartlomiej Zolnierkiewicz wrote:
+>> On Monday, July 27, 2015 05:06:41 PM Viresh Kumar wrote:
+>>> On 27-07-15, 13:14, Bartlomiej Zolnierkiewicz wrote:
+>>>> Sorry but you don't seem to understand the issue.
+>>>
+>>> :)
+>>>
+>>> No, I did. I understand that if someone uses opp bindings today with
+>>> some entries as turbo OPPs, cpufreq will use them as normal
+>>> frequencies. And that may harm the board.
+>>>
+>>> BUT, opp-v2 code isn't ready to be used yet. And platforms should see
+>>> what all is implemented before trying to use them.
+>>
+>> OK.
+>>
+>>> All I was saying is, this isn't a FIX as we haven't introduced the
+>>> feature yet. Otherwise I had no issues with the patch.
+>>
+>> I will update the description for the next patchset revision.
+>>
+> Hi Bart,
+> 
+> When will you re-post v3? Because I have a plan to send a pull-request
+> to arm-soc until this weekend...
 
-From: says huang lin, first signed-off-by is Heiko Stuebner, and final 
-signed-off-by is Lin Huang... who actually authored this patch? Is Lin 
-Huang the same person as huang lin ?
+Dear Kukjin,
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+We are already at 4.2-rc5 and you did not send the pull request before
+the weekend as you said. It is really late and there is no special
+reason for delaying the request. What happened?
+
+Best regards,
+Krzysztof
