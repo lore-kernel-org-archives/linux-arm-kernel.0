@@ -1,24 +1,25 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 4 Aug 2015 16:33:52 +0200
-Subject: [PATCH v3 07/11] KVM: arm/arm64: vgic: Allow HW interrupts to be
- queued to a guest
-In-Reply-To: <1437753309-17989-8-git-send-email-marc.zyngier@arm.com>
-References: <1437753309-17989-1-git-send-email-marc.zyngier@arm.com>
- <1437753309-17989-8-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20150804143352.GF29335@cbox>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Tue,  4 Aug 2015 14:45:25 +0000
+Subject: [PATCH 0/7 v2] clk: atlas7: a bind of fixes
+Message-ID: <1438699532-13860-1-git-send-email-21cnbao@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 24, 2015 at 04:55:05PM +0100, Marc Zyngier wrote:
-> To allow a HW interrupt to be injected into a guest, we lookup the
-> guest virtual interrupt in the irq_phys_map list, and if we have
-> a match, encode both interrupts in the LR.
-> 
-> We also mark the interrupt as "active" at the host distributor level.
-> 
-> On guest EOI on the virtual interrupt, the host interrupt will be
-> deactivated.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+-v2: refine commit title according to the feedback of Stephen Boyd
 
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Guo Zeng (5):
+  clk: atlas7: add lost pwm unit clks
+  clk: atlas7: export mux clks so that consumers can get them
+  clk: atlas7: fix the clock tree for bluetooth stuff
+  clk: atlas7: fix bit field and its root clk for coresight_tpiu
+  clk: atlas7: fix pll missed divide NR in fraction mode
+
+Yibo Cai (2):
+  clk: atlas7: fix integer overflow in dto rate calculation
+  clk: atlas7: replace dto resolution magic number by macro
+
+ drivers/clk/sirf/clk-atlas7.c | 33 +++++++++++++++++++++------------
+ 1 file changed, 21 insertions(+), 12 deletions(-)
+
+-- 
+1.9.1
