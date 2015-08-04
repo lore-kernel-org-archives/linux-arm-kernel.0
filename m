@@ -1,18 +1,18 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 4 Aug 2015 21:00:32 +0530
-Subject: [PATCH 09/10] ARM: dts: omap4: Use "syscon-phy-power" instead of
- "ctrl-module" in USB PHY node
+Date: Tue, 4 Aug 2015 21:00:33 +0530
+Subject: [PATCH 10/10] ARM: dts: omap4: Use "syscon-otghs" instead of
+ "ctrl-module" in USB node
 In-Reply-To: <1438702233-8027-1-git-send-email-kishon@ti.com>
 References: <1438702233-8027-1-git-send-email-kishon@ti.com>
-Message-ID: <1438702233-8027-10-git-send-email-kishon@ti.com>
+Message-ID: <1438702233-8027-11-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add "syscon-phy-power" property and remove the deprecated "ctrl-module"
-property from USB PHY dt node.
+Add "syscon-otghs" property and remove the deprecated "ctrl-module"
+property from MUSB devicetree node.
 
-Since "omap_control_usb2phy" devicetree node is no longer used,
-remove it.
+Since "omap_control_usbotg" devicetree node is no longer used, remove
+it.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
@@ -20,30 +20,30 @@ Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
  1 file changed, 1 insertion(+), 7 deletions(-)
 
 diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-index 7d31c6f..b27634d 100644
+index b27634d..2fb49a5 100644
 --- a/arch/arm/boot/dts/omap4.dtsi
 +++ b/arch/arm/boot/dts/omap4.dtsi
-@@ -703,7 +703,7 @@
- 			usb2_phy: usb2phy at 4a0ad080 {
- 				compatible = "ti,omap-usb2";
- 				reg = <0x4a0ad080 0x58>;
--				ctrl-module = <&omap_control_usb2phy>;
-+				syscon-phy-power = <&scm_conf 0x300>;
- 				clocks = <&usb_phy_cm_clk32k>;
- 				clock-names = "wkupclk";
- 				#phy-cells = <0>;
 @@ -854,12 +854,6 @@
  			};
  		};
  
--		omap_control_usb2phy: control-phy at 4a002300 {
--			compatible = "ti,control-phy-usb2";
--			reg = <0x4a002300 0x4>;
--			reg-names = "power";
+-		omap_control_usbotg: control-phy at 4a00233c {
+-			compatible = "ti,control-phy-otghs";
+-			reg = <0x4a00233c 0x4>;
+-			reg-names = "otghs_control";
 -		};
 -
- 		omap_control_usbotg: control-phy at 4a00233c {
- 			compatible = "ti,control-phy-otghs";
- 			reg = <0x4a00233c 0x4>;
+ 		usb_otg_hs: usb_otg_hs at 4a0ab000 {
+ 			compatible = "ti,omap4-musb";
+ 			reg = <0x4a0ab000 0x7ff>;
+@@ -872,7 +866,7 @@
+ 			multipoint = <1>;
+ 			num-eps = <16>;
+ 			ram-bits = <12>;
+-			ctrl-module = <&omap_control_usbotg>;
++			syscon-otghs = <&scm_conf 0x33c>;
+ 		};
+ 
+ 		aes: aes at 4b501000 {
 -- 
 1.7.9.5
