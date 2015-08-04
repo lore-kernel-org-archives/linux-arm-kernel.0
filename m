@@ -1,40 +1,70 @@
 From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
-Date: Tue,  4 Aug 2015 13:18:15 +0200
-Subject: [PATCH v2 0/4] Add SPDIF support for rockchip
-Message-ID: <1438687099-14282-1-git-send-email-sjoerd.simons@collabora.co.uk>
+Date: Tue,  4 Aug 2015 13:18:16 +0200
+Subject: [PATCH v2 1/4] ASoC: dt-bindings: add rockchip tranceiver bindings
+In-Reply-To: <1438687099-14282-1-git-send-email-sjoerd.simons@collabora.co.uk>
+References: <1438687099-14282-1-git-send-email-sjoerd.simons@collabora.co.uk>
+Message-ID: <1438687099-14282-2-git-send-email-sjoerd.simons@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds support for the Rockchip SPDIF transceiver as present
-on RK3066, RK3188 and RK3288 boards and enables it on a Radxa rock pro.
-Tested on a Radxa Rock Pro board.
+Add devicetree bindings for the spdif tranceiver found on
+found on rk3066, rk3188 and rk3288 SoCs
 
-Changes in v2:
-- Remove platform: module alias as it was unused
-- Call MODULE_DEVICE_TABLE(of, ) right after the of match table
-- use rk_spdif as a prefix consistenly throughout the driver
-- Check return code of regmap_update and bubble it up
-- Sort the spdif node properties
-- Drop the 0x prefix from the node name
-- Rename the spdif@ node to sound@
+Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+---
 
-Sjoerd Simons (4):
-  ASoC: dt-bindings: add rockchip tranceiver bindings
-  ASoc: rockchip: Add rockchip SPDIF transceiver driver
-  ARM: dts: rockchip: Add SPDIF transceiver for RK3188
-  ARM: dts: rockchip: Add SPDIF optical out on Radxa Rock
+Changes in v2: None
 
- .../devicetree/bindings/sound/rockchip-spdif.txt   |  41 +++
- arch/arm/boot/dts/rk3188-radxarock.dts             |  19 +
- arch/arm/boot/dts/rk3188.dtsi                      |  22 ++
- sound/soc/rockchip/Kconfig                         |   8 +
- sound/soc/rockchip/Makefile                        |   2 +
- sound/soc/rockchip/rockchip_spdif.c                | 381 +++++++++++++++++++++
- sound/soc/rockchip/rockchip_spdif.h                |  63 ++++
- 7 files changed, 536 insertions(+)
+ .../devicetree/bindings/sound/rockchip-spdif.txt   | 41 ++++++++++++++++++++++
+ 1 file changed, 41 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/sound/rockchip-spdif.txt
- create mode 100644 sound/soc/rockchip/rockchip_spdif.c
- create mode 100644 sound/soc/rockchip/rockchip_spdif.h
 
+diff --git a/Documentation/devicetree/bindings/sound/rockchip-spdif.txt b/Documentation/devicetree/bindings/sound/rockchip-spdif.txt
+new file mode 100644
+index 0000000..2da8a09
+--- /dev/null
++++ b/Documentation/devicetree/bindings/sound/rockchip-spdif.txt
+@@ -0,0 +1,41 @@
++* Rockchip SPDIF transceiver
++
++The S/PDIF audio block is a stereo transceiver that allows the
++processor to receive and transmit digital audio via an coaxial cable or
++a fibre cable.
++
++Required properties:
++
++- compatible: should be one of the following:
++   - "rockchip,rk3066-spdif": for rk3066
++   - "rockchip,rk3188-spdif", "rockchip,rk3066-spdif": for rk3188
++   - "rockchip,rk3288-spdif", "rockchip,rk3066-spdif": for rk3288
++- reg: physical base address of the controller and length of memory mapped
++  region.
++- interrupts: should contain the SPDIF interrupt.
++- #address-cells: should be 1.
++- #size-cells: should be 0.
++- dmas: DMA specifiers for tx dma. See the DMA client binding,
++  Documentation/devicetree/bindings/dma/dma.txt
++- dma-names: should be "tx"
++- clocks: a list of phandle + clock-specifier pairs, one for each entry
++  in clock-names.
++- clock-names: should contain following:
++   - "spdif_hclk": clock for SPPIF controller
++   - "spdif_clk" : clock for SPDIF bus
++
++Example for the rk3188 SPDIF controller:
++
++spdif: spdif at 0x1011e000 {
++	compatible = "rockchip,rk3188-spdif", "rockchip,rk3066-spdif";
++	reg = <0x1011e000 0x2000>;
++	interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
++	#address-cells = <1>;
++	#size-cells = <0>;
++	dmas = <&dmac1_s 8>;
++	dma-names = "tx";
++	clock-names = "spdif_hclk", "spdif_clk";
++	clocks = <&cru HCLK_SPDIF>, <&cru SCLK_SPDIF>;
++	status = "disabled";
++	#sound-dai-cells = <0>;
++};
 -- 
 2.5.0
