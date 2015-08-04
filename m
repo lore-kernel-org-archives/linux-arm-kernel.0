@@ -1,37 +1,37 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 04 Aug 2015 17:10:17 +0200
-Subject: [RFCv3 1/4] docs: dts: Added documentation for Xilinx Zynq
- Reset Controller bindings.
-In-Reply-To: <CAAtXAHeauiD5smAqMbheJWuv4BT-2YqJWOSBjYPq900icpT1Rg@mail.gmail.com>
-References: <1438305237-18497-1-git-send-email-moritz.fischer@ettus.com>
- <1438305237-18497-2-git-send-email-moritz.fischer@ettus.com>
- <1438675772.3793.18.camel@pengutronix.de>
- <CAAtXAHeauiD5smAqMbheJWuv4BT-2YqJWOSBjYPq900icpT1Rg@mail.gmail.com>
-Message-ID: <1438701017.3793.45.camel@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 4 Aug 2015 15:56:42 +0100
+Subject: [PATCH 05/13] iommu/io-pgtable-arm: Allow appropriate DMA API use
+In-Reply-To: <55C0D071.1040104@arm.com>
+References: <1438608355-7335-1-git-send-email-will.deacon@arm.com>
+ <1438608355-7335-6-git-send-email-will.deacon@arm.com>
+ <1652248.uq2uhTW4Yd@avalon> <55C0D071.1040104@arm.com>
+Message-ID: <20150804145642.GQ7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Moritz,
-
-Am Dienstag, den 04.08.2015, 08:05 -0700 schrieb Moritz Fischer:
-> Hi Philip,
+On Tue, Aug 04, 2015 at 03:47:13PM +0100, Robin Murphy wrote:
+> Hi Laurent,
 > 
-> On Tue, Aug 4, 2015 at 1:09 AM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
-> > Hi Moritz,
-> >
-> > Am Donnerstag, den 30.07.2015, 18:13 -0700 schrieb Moritz Fischer:
-[...]
-> >> +Required properties:
-> >> +- compatible: "xlnx,zynq-reset"
-> >> +- reg: SLCR offset and size taken via syscon <0x200 0x48>
-> >> +- syscon: <&slcr>
-> >> +  This should be a phandle to the Zynq's SLCR register.
-> >
-> >                                                  ^ register singular?
-> Do you want me to resend the entire set, or are you cool with just git
-> amending the 's' for registers?
+> [ +RMK, as his patch is indirectly involved here ]
+> 
+> On 04/08/15 14:16, Laurent Pinchart wrote:
+> >This is what I believe to be an API abuse. The dma_sync_single_for_device()
+> >API is meant to pass ownership of a buffer to the device. Unless I'm mistaken,
+> >once that's done the CPU isn't allowed to touch the buffer anymore until
+> >dma_sync_single_for_cpu() is called to get ownership of the buffer back.
 
-Amended and applied, thanks.
+That's what I thought up until recently, but it's not strictly true - see
+Documentation/DMA-API.txt which Robin quoted.
 
-regards
-Philipp
+> [3]:Yes, there may generally be exceptions to that, but not in the context
+> of this code. Unless the Renesas IPMMU does something I don't know about?
+
+If an IOMMU does write to its page tables, then the only way to handle
+those is using DMA-coherent memory, either via a coherent mapping or
+allocated via dma_alloc_coherent().  The streaming DMA API is wholely
+unsuitable for any mapping where both the CPU and DMA device both want
+to simultaneously alter the contained data.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
