@@ -1,317 +1,308 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 04 Aug 2015 16:16:28 +0300
-Subject: [PATCH 05/13] iommu/io-pgtable-arm: Allow appropriate DMA API use
-In-Reply-To: <1438608355-7335-6-git-send-email-will.deacon@arm.com>
-References: <1438608355-7335-1-git-send-email-will.deacon@arm.com>
- <1438608355-7335-6-git-send-email-will.deacon@arm.com>
-Message-ID: <1652248.uq2uhTW4Yd@avalon>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 04 Aug 2015 14:17:18 +0100
+Subject: [PATCH v4 06/10] irqchip / GICv3: Add ACPI support for GICv3+
+ initialization
+In-Reply-To: <1438164539-29256-7-git-send-email-hanjun.guo@linaro.org>
+References: <1438164539-29256-1-git-send-email-hanjun.guo@linaro.org>
+ <1438164539-29256-7-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <55C0BB5E.2080706@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will and Robin,
-
-Thank you for the patch.
-
-On Monday 03 August 2015 14:25:47 Will Deacon wrote:
-> From: Robin Murphy <Robin.Murphy@arm.com>
+On 29/07/15 11:08, Hanjun Guo wrote:
+> From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
 > 
-> Currently, users of the LPAE page table code are (ab)using dma_map_page()
-> as a means to flush page table updates for non-coherent IOMMUs. Since
-> from the CPU's point of view, creating IOMMU page tables *is* passing
-> DMA buffers to a device (the IOMMU's page table walker), there's little
-> reason not to use the DMA API correctly.
+> With the refator of gic_of_init(), GICv3/4 can be initialized
+> by gic_init_bases() with gic distributor base address and gic
+> redistributor region(s).
 > 
-> Allow IOMMU drivers to opt into DMA API operations for page table
-> allocation and updates by providing their appropriate device pointer.
-> The expectation is that an LPAE IOMMU should have a full view of system
-> memory, so use streaming mappings to avoid unnecessary pressure on
-> ZONE_DMA, and treat any DMA translation as a warning sign.
-
-I like the idea of doing this in core code rather than in individual drivers, 
-but I believe we're not using the right API. Please see below.
-
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> So get the redistributor region base addresses from MADT GIC
+> redistributor subtable, and the distributor base address from
+> GICD subtable to init GICv3 irqchip in ACPI way.
+> 
+> Note: GIC redistributor base address may also be provided in
+> GICC structures on systems supporting GICv3 and above if the GIC
+> Redistributors are not in the always-on power domain, this
+> patch didn't implement such feature yet.
+> 
+> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+> [hj: Rework this patch and fix multi issues]
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 > ---
->  drivers/iommu/Kconfig          |   3 +-
->  drivers/iommu/io-pgtable-arm.c | 107 +++++++++++++++++++++++++++++---------
->  drivers/iommu/io-pgtable.h     |   3 ++
->  3 files changed, 89 insertions(+), 24 deletions(-)
+>  drivers/irqchip/irq-gic-v3.c | 174 +++++++++++++++++++++++++++++++++++++++++--
+>  1 file changed, 169 insertions(+), 5 deletions(-)
 > 
-> diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
-> index f1fb1d3ccc56..d77a848d50de 100644
-> --- a/drivers/iommu/Kconfig
-> +++ b/drivers/iommu/Kconfig
-> @@ -23,7 +23,8 @@ config IOMMU_IO_PGTABLE
->  config IOMMU_IO_PGTABLE_LPAE
->  	bool "ARMv7/v8 Long Descriptor Format"
->  	select IOMMU_IO_PGTABLE
-> -	depends on ARM || ARM64 || COMPILE_TEST
-> +	# SWIOTLB guarantees a dma_to_phys() implementation
-> +	depends on ARM || ARM64 || (COMPILE_TEST && SWIOTLB)
->  	help
->  	  Enable support for the ARM long descriptor pagetable format.
->  	  This allocator supports 4K/2M/1G, 16K/32M and 64K/512M page
-> diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
-> index 4e460216bd16..28cca8a652f9 100644
-> --- a/drivers/iommu/io-pgtable-arm.c
-> +++ b/drivers/iommu/io-pgtable-arm.c
-> @@ -200,12 +200,76 @@ typedef u64 arm_lpae_iopte;
-> 
->  static bool selftest_running = false;
-> 
-> +static dma_addr_t __arm_lpae_dma_addr(struct device *dev, void *pages)
+> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+> index c0b96c6..ebc5604 100644
+> --- a/drivers/irqchip/irq-gic-v3.c
+> +++ b/drivers/irqchip/irq-gic-v3.c
+> @@ -15,6 +15,7 @@
+>   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>   */
+>  
+> +#include <linux/acpi.h>
+>  #include <linux/cpu.h>
+>  #include <linux/cpu_pm.h>
+>  #include <linux/delay.h>
+> @@ -25,6 +26,7 @@
+>  #include <linux/percpu.h>
+>  #include <linux/slab.h>
+>  
+> +#include <linux/irqchip/arm-gic-acpi.h>
+>  #include <linux/irqchip/arm-gic-v3.h>
+>  
+>  #include <asm/cputype.h>
+> @@ -802,7 +804,8 @@ static int __init gic_init_bases(void __iomem *dist_base,
+>  	set_handle_irq(gic_handle_irq);
+>  
+>  	if (IS_ENABLED(CONFIG_ARM_GIC_V3_ITS) && gic_dist_supports_lpis())
+> -		its_init(domain_token, &gic_data.rdists, gic_data.domain);
+> +		its_init(irq_domain_token_to_of_node(domain_token),
+> +			 &gic_data.rdists, gic_data.domain);
+
+This doesn't make much sense. The first parameter to its_init is indeed
+supposed to be an of_node, but what is the point of calling its_init if
+you *know* you don't have the necessary topological information to parse
+the firmware tables?
+
+I don't see *any* code that is going to parse the ITS table in this
+series, so please don't call its_init passing a NULL pointer to it. This
+is just gross.
+
+>  
+>  	gic_smp_init();
+>  	gic_dist_init();
+> @@ -818,6 +821,16 @@ out_free:
+>  	return err;
+>  }
+>  
+> +static int __init detect_distributor(void __iomem *dist_base)
+
+We do have a naming convention in this file. All functions start with gic_.
+
 > +{
-> +	return phys_to_dma(dev, virt_to_phys(pages));
+> +	u32 reg = readl_relaxed(dist_base + GICD_PIDR2) & GIC_PIDR2_ARCH_MASK;
+> +
+> +	if (reg != GIC_PIDR2_ARCH_GICv3 && reg != GIC_PIDR2_ARCH_GICv4)
+> +		return -ENODEV;
+> +
+> +	return 0;
 > +}
+
+This function doesn't detect anything, it validates that we have
+something sensible. Please rename it to gic_validate_dist_version, or
+something similar.
+
 > +
-> +static void *__arm_lpae_alloc_pages(size_t size, gfp_t gfp,
-> +				    struct io_pgtable_cfg *cfg)
+>  #ifdef CONFIG_OF
+>  static int __init gic_of_init(struct device_node *node, struct device_node *parent)
+>  {
+> @@ -825,7 +838,6 @@ static int __init gic_of_init(struct device_node *node, struct device_node *pare
+>  	struct redist_region *rdist_regs;
+>  	u64 redist_stride;
+>  	u32 nr_redist_regions;
+> -	u32 reg;
+>  	int err, i;
+>  
+>  	dist_base = of_iomap(node, 0);
+> @@ -835,11 +847,10 @@ static int __init gic_of_init(struct device_node *node, struct device_node *pare
+>  		return -ENXIO;
+>  	}
+>  
+> -	reg = readl_relaxed(dist_base + GICD_PIDR2) & GIC_PIDR2_ARCH_MASK;
+> -	if (reg != GIC_PIDR2_ARCH_GICv3 && reg != GIC_PIDR2_ARCH_GICv4) {
+> +	err = detect_distributor(dist_base);
+> +	if (err) {
+>  		pr_err("%s: no distributor detected, giving up\n",
+>  			node->full_name);
+> -		err = -ENODEV;
+>  		goto out_unmap_dist;
+>  	}
+>  
+> @@ -887,3 +898,156 @@ out_unmap_dist:
+>  
+>  IRQCHIP_DECLARE(gic_v3, "arm,gic-v3", gic_of_init);
+>  #endif
+> +
+> +#ifdef CONFIG_ACPI
+> +static struct redist_region *redist_regs __initdata;
+> +static u32 nr_redist_regions __initdata;
+> +static phys_addr_t dist_phys_base __initdata;
+> +
+> +static int __init
+> +gic_acpi_register_redist(u64 phys_base, u64 size)
+
+A physical address must use phys_addr_t.
+
 > +{
-> +	struct device *dev = cfg->iommu_dev;
-> +	dma_addr_t dma;
-> +	void *pages = alloc_pages_exact(size, gfp | __GFP_ZERO);
+> +	struct redist_region *redist_regs_new;
+> +	void __iomem *redist_base;
 > +
-> +	if (!pages)
-> +		return NULL;
-> +
-> +	if (dev) {
-> +		dma = dma_map_single(dev, pages, size, DMA_TO_DEVICE);
-> +		if (dma_mapping_error(dev, dma))
-> +			goto out_free;
-> +		/*
-> +		 * We depend on the IOMMU being able to work with any physical
-> +		 * address directly, so if the DMA layer suggests it can't by
-> +		 * giving us back some translation, that bodes very badly...
-> +		 */
-> +		if (dma != __arm_lpae_dma_addr(dev, pages))
-> +			goto out_unmap;
+> +	redist_regs_new = krealloc(redist_regs,
+> +				   sizeof(*redist_regs) * (nr_redist_regions + 1),
+> +				   GFP_KERNEL);
 
-Why do we need to create a mapping at all then ? Because 
-dma_sync_single_for_device() requires it ?
+NAK. If you have multiple regions, you count them, you allocate the
+right number of regions. This will be far more efficient than doing this
+realloc dance. It is not like we're not parsing the tables a zillion
+times already. Doing it one more time won't hurt.
 
+> +	if (!redist_regs_new) {
+> +		pr_err("Couldn't allocate resource for GICR region\n");
+> +		return -ENOMEM;
 > +	}
 > +
-> +	return pages;
+> +	redist_regs = redist_regs_new;
 > +
-> +out_unmap:
-> +	dev_err(dev, "Cannot accommodate DMA translation for IOMMU page
-> tables\n");
-> +	dma_unmap_single(dev, dma, size, DMA_TO_DEVICE);
-> +out_free:
-> +	free_pages_exact(pages, size);
-> +	return NULL;
+> +	redist_base = ioremap(phys_base, size);
+> +	if (!redist_base) {
+> +		pr_err("Couldn't map GICR region @%llx\n", phys_base);
+> +		return -ENOMEM;
+> +	}
+> +
+> +	redist_regs[nr_redist_regions].phys_base = phys_base;
+> +	redist_regs[nr_redist_regions].redist_base = redist_base;
+> +	nr_redist_regions++;
+> +	return 0;
 > +}
 > +
-> +static void __arm_lpae_free_pages(void *pages, size_t size,
-> +				  struct io_pgtable_cfg *cfg)
+> +static int __init
+> +gic_acpi_parse_madt_redist(struct acpi_subtable_header *header,
+> +			const unsigned long end)
 > +{
-> +	struct device *dev = cfg->iommu_dev;
+> +	struct acpi_madt_generic_redistributor *redist;
 > +
-> +	if (dev)
-> +		dma_unmap_single(dev, __arm_lpae_dma_addr(dev, pages),
-> +				 size, DMA_TO_DEVICE);
-> +	free_pages_exact(pages, size);
+> +	if (BAD_MADT_ENTRY(header, end))
+> +		return -EINVAL;
+> +
+> +	redist = (struct acpi_madt_generic_redistributor *)header;
+> +	if (!redist->base_address)
+> +		return -EINVAL;
+> +
+> +	return gic_acpi_register_redist(redist->base_address, redist->length);
 > +}
 > +
-> +static void __arm_lpae_set_pte(arm_lpae_iopte *ptep, arm_lpae_iopte pte,
-> +			       struct io_pgtable_cfg *cfg, void *cookie)
+> +static int __init
+> +gic_acpi_parse_madt_distributor(struct acpi_subtable_header *header,
+> +				const unsigned long end)
 > +{
-> +	struct device *dev = cfg->iommu_dev;
+
+How many versions of gic_acpi_parse_madt_distributor are we going to
+get? Why isn't the ACPI parsing in a common file? Why do I have to read
+the same code on and on until my eyes bleed?
+
+> +	struct acpi_madt_generic_distributor *dist;
 > +
-> +	*ptep = pte;
+> +	dist = (struct acpi_madt_generic_distributor *)header;
 > +
-> +	if (dev)
-> +		dma_sync_single_for_device(dev, __arm_lpae_dma_addr(dev, ptep),
-> +					   sizeof(pte), DMA_TO_DEVICE);
-
-This is what I believe to be an API abuse. The dma_sync_single_for_device() 
-API is meant to pass ownership of a buffer to the device. Unless I'm mistaken, 
-once that's done the CPU isn't allowed to touch the buffer anymore until 
-dma_sync_single_for_cpu() is called to get ownership of the buffer back. Sure, 
-it might work on many ARM systems, but we really should be careful not to use 
-APIs as delicate as DMA mapping and cache handling for purposes different than 
-what they explicitly allow.
-
-It might be that I'm wrong and that the streaming DMA API allows this exact 
-kind of usage, but I haven't found a clear indication of that in the 
-documentation. It could also be that all implementations would support it 
-today, and that we would then consider it should be explicitly allowed by the 
-API. In both cases a documentation patch would be welcome.
-
-> +	else if (cfg->tlb->flush_pgtable)
-> +		cfg->tlb->flush_pgtable(ptep, sizeof(pte), cookie);
+> +	if (BAD_MADT_ENTRY(dist, end))
+> +		return -EINVAL;
+> +
+> +	dist_phys_base = dist->base_address;
+> +	return 0;
 > +}
 > +
->  static int arm_lpae_init_pte(struct arm_lpae_io_pgtable *data,
->  			     unsigned long iova, phys_addr_t paddr,
->  			     arm_lpae_iopte prot, int lvl,
->  			     arm_lpae_iopte *ptep)
->  {
->  	arm_lpae_iopte pte = prot;
-> +	struct io_pgtable_cfg *cfg = &data->iop.cfg;
-> 
->  	/* We require an unmap first */
->  	if (iopte_leaf(*ptep, lvl)) {
-> @@ -213,7 +277,7 @@ static int arm_lpae_init_pte(struct arm_lpae_io_pgtable
-> *data, return -EEXIST;
->  	}
-> 
-> -	if (data->iop.cfg.quirks & IO_PGTABLE_QUIRK_ARM_NS)
-> +	if (cfg->quirks & IO_PGTABLE_QUIRK_ARM_NS)
->  		pte |= ARM_LPAE_PTE_NS;
-> 
->  	if (lvl == ARM_LPAE_MAX_LEVELS - 1)
-> @@ -224,8 +288,7 @@ static int arm_lpae_init_pte(struct arm_lpae_io_pgtable
-> *data, pte |= ARM_LPAE_PTE_AF | ARM_LPAE_PTE_SH_IS;
->  	pte |= pfn_to_iopte(paddr >> data->pg_shift, data);
-> 
-> -	*ptep = pte;
-> -	data->iop.cfg.tlb->flush_pgtable(ptep, sizeof(*ptep), data->iop.cookie);
-> +	__arm_lpae_set_pte(ptep, pte, cfg, data->iop.cookie);
->  	return 0;
->  }
-> 
-> @@ -236,12 +299,13 @@ static int __arm_lpae_map(struct arm_lpae_io_pgtable
-> *data, unsigned long iova, arm_lpae_iopte *cptep, pte;
->  	void *cookie = data->iop.cookie;
->  	size_t block_size = ARM_LPAE_BLOCK_SIZE(lvl, data);
-> +	struct io_pgtable_cfg *cfg = &data->iop.cfg;
-> 
->  	/* Find our entry at the current level */
->  	ptep += ARM_LPAE_LVL_IDX(iova, lvl, data);
-> 
->  	/* If we can install a leaf entry at this level, then do so */
-> -	if (size == block_size && (size & data->iop.cfg.pgsize_bitmap))
-> +	if (size == block_size && (size & cfg->pgsize_bitmap))
->  		return arm_lpae_init_pte(data, iova, paddr, prot, lvl, ptep);
-> 
->  	/* We can't allocate tables at the final level */
-> @@ -251,18 +315,15 @@ static int __arm_lpae_map(struct arm_lpae_io_pgtable
-> *data, unsigned long iova, /* Grab a pointer to the next level */
->  	pte = *ptep;
->  	if (!pte) {
-> -		cptep = alloc_pages_exact(1UL << data->pg_shift,
-> -					 GFP_ATOMIC | __GFP_ZERO);
-> +		cptep = __arm_lpae_alloc_pages(1UL << data->pg_shift,
-> +					       GFP_ATOMIC, cfg);
->  		if (!cptep)
->  			return -ENOMEM;
-> 
-> -		data->iop.cfg.tlb->flush_pgtable(cptep, 1UL << data->pg_shift,
-> -						 cookie);
->  		pte = __pa(cptep) | ARM_LPAE_PTE_TYPE_TABLE;
-> -		if (data->iop.cfg.quirks & IO_PGTABLE_QUIRK_ARM_NS)
-> +		if (cfg->quirks & IO_PGTABLE_QUIRK_ARM_NS)
->  			pte |= ARM_LPAE_PTE_NSTABLE;
-> -		*ptep = pte;
-> -		data->iop.cfg.tlb->flush_pgtable(ptep, sizeof(*ptep), cookie);
-> +		__arm_lpae_set_pte(ptep, pte, cfg, cookie);
->  	} else {
->  		cptep = iopte_deref(pte, data);
->  	}
-> @@ -347,7 +408,7 @@ static void __arm_lpae_free_pgtable(struct
-> arm_lpae_io_pgtable *data, int lvl, __arm_lpae_free_pgtable(data, lvl + 1,
-> iopte_deref(pte, data)); }
-> 
-> -	free_pages_exact(start, table_size);
-> +	__arm_lpae_free_pages(start, table_size, &data->iop.cfg);
->  }
-> 
->  static void arm_lpae_free_pgtable(struct io_pgtable *iop)
-> @@ -366,8 +427,8 @@ static int arm_lpae_split_blk_unmap(struct
-> arm_lpae_io_pgtable *data, unsigned long blk_start, blk_end;
->  	phys_addr_t blk_paddr;
->  	arm_lpae_iopte table = 0;
-> +	struct io_pgtable_cfg *cfg = &data->iop.cfg;
->  	void *cookie = data->iop.cookie;
-> -	const struct iommu_gather_ops *tlb = data->iop.cfg.tlb;
-> 
->  	blk_start = iova & ~(blk_size - 1);
->  	blk_end = blk_start + blk_size;
-> @@ -393,10 +454,9 @@ static int arm_lpae_split_blk_unmap(struct
-> arm_lpae_io_pgtable *data, }
->  	}
-> 
-> -	*ptep = table;
-> -	tlb->flush_pgtable(ptep, sizeof(*ptep), cookie);
-> +	__arm_lpae_set_pte(ptep, table, cfg, cookie);
->  	iova &= ~(blk_size - 1);
-> -	tlb->tlb_add_flush(iova, blk_size, true, cookie);
-> +	cfg->tlb->tlb_add_flush(iova, blk_size, true, cookie);
->  	return size;
->  }
-> 
-> @@ -418,13 +478,12 @@ static int __arm_lpae_unmap(struct arm_lpae_io_pgtable
-> *data,
-> 
->  	/* If the size matches this level, we're in the right place */
->  	if (size == blk_size) {
-> -		*ptep = 0;
-> -		tlb->flush_pgtable(ptep, sizeof(*ptep), cookie);
-> +		__arm_lpae_set_pte(ptep, 0, &data->iop.cfg, cookie);
-> 
->  		if (!iopte_leaf(pte, lvl)) {
->  			/* Also flush any partial walks */
->  			tlb->tlb_add_flush(iova, size, false, cookie);
-> -			tlb->tlb_sync(data->iop.cookie);
-> +			tlb->tlb_sync(cookie);
->  			ptep = iopte_deref(pte, data);
->  			__arm_lpae_free_pgtable(data, lvl + 1, ptep);
->  		} else {
-> @@ -640,11 +699,12 @@ arm_64_lpae_alloc_pgtable_s1(struct io_pgtable_cfg
-> *cfg, void *cookie) cfg->arm_lpae_s1_cfg.mair[1] = 0;
-> 
->  	/* Looking good; allocate a pgd */
-> -	data->pgd = alloc_pages_exact(data->pgd_size, GFP_KERNEL | __GFP_ZERO);
-> +	data->pgd = __arm_lpae_alloc_pages(data->pgd_size, GFP_KERNEL, cfg);
->  	if (!data->pgd)
->  		goto out_free_data;
-> 
-> -	cfg->tlb->flush_pgtable(data->pgd, data->pgd_size, cookie);
-> +	if (cfg->tlb->flush_pgtable)
-> +		cfg->tlb->flush_pgtable(data->pgd, data->pgd_size, cookie);
-> 
->  	/* TTBRs */
->  	cfg->arm_lpae_s1_cfg.ttbr[0] = virt_to_phys(data->pgd);
-> @@ -728,11 +788,12 @@ arm_64_lpae_alloc_pgtable_s2(struct io_pgtable_cfg
-> *cfg, void *cookie) cfg->arm_lpae_s2_cfg.vtcr = reg;
-> 
->  	/* Allocate pgd pages */
-> -	data->pgd = alloc_pages_exact(data->pgd_size, GFP_KERNEL | __GFP_ZERO);
-> +	data->pgd = __arm_lpae_alloc_pages(data->pgd_size, GFP_KERNEL, cfg);
->  	if (!data->pgd)
->  		goto out_free_data;
-> 
-> -	cfg->tlb->flush_pgtable(data->pgd, data->pgd_size, cookie);
-> +	if (cfg->tlb->flush_pgtable)
-> +		cfg->tlb->flush_pgtable(data->pgd, data->pgd_size, cookie);
-> 
->  	/* VTTBR */
->  	cfg->arm_lpae_s2_cfg.vttbr = virt_to_phys(data->pgd);
-> diff --git a/drivers/iommu/io-pgtable.h b/drivers/iommu/io-pgtable.h
-> index 10e32f69c668..c69529c78914 100644
-> --- a/drivers/iommu/io-pgtable.h
-> +++ b/drivers/iommu/io-pgtable.h
-> @@ -41,6 +41,8 @@ struct iommu_gather_ops {
->   * @ias:           Input address (iova) size, in bits.
->   * @oas:           Output address (paddr) size, in bits.
->   * @tlb:           TLB management callbacks for this set of tables.
-> + * @iommu_dev:     The device representing the DMA configuration for the
-> + *                 page table walker.
->   */
->  struct io_pgtable_cfg {
->  	#define IO_PGTABLE_QUIRK_ARM_NS	(1 << 0)	/* Set NS bit in PTEs */
-> @@ -49,6 +51,7 @@ struct io_pgtable_cfg {
->  	unsigned int			ias;
->  	unsigned int			oas;
->  	const struct iommu_gather_ops	*tlb;
-> +	struct device			*iommu_dev;
-> 
->  	/* Low-level data specific to the table format */
->  	union {
+> +static int gic_acpi_gsi_desc_populate(struct acpi_gsi_descriptor *data,
+> +				      u32 gsi, unsigned int irq_type)
+> +{
+> +	/*
+> +	 * Encode GSI and triggering information the way the GIC likes
+> +	 * them.
+> +	 */
+> +	if (WARN_ON(gsi < 16))
+> +		return -EINVAL;
+> +
+> +	if (gsi >= 32) {
+> +		data->param[0] = 0;		/* SPI */
+> +		data->param[1] = gsi - 32;
+> +		data->param[2] = irq_type;
+> +	} else {
+> +		data->param[0] = 1; 		/* PPI */
+> +		data->param[1] = gsi - 16;
+> +		data->param[2] = 0xff << 4 | irq_type;
+> +	}
+> +
+> +	data->param_count = 3;
+> +
+> +	return 0;
+> +}
+> +
+> +static int __init
+> +gic_acpi_init(struct acpi_table_header *table)
+> +{
+> +	int count, i, err = 0;
+> +	void __iomem *dist_base;
+> +
+> +	/* Get distributor base address */
+> +	count = acpi_parse_entries(ACPI_SIG_MADT,
+> +				sizeof(struct acpi_table_madt),
+> +				gic_acpi_parse_madt_distributor, table,
+> +				ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR, 0);
+> +	if (count <= 0) {
+> +		pr_err("No valid GICD entry exist\n");
+> +		return -EINVAL;
+> +	} else if (count > 1) {
+> +		pr_err("More than one GICD entry detected\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	dist_base = ioremap(dist_phys_base, ACPI_GICV3_DIST_MEM_SIZE);
+> +	if (!dist_base) {
+> +		pr_err("Unable to map GICD registers\n");
+> +		return -ENOMEM;
+> +	}
+> +
+> +	err = detect_distributor(dist_base);
+> +	if (err) {
+> +		pr_err("No distributor detected at @%p, giving up", dist_base);
+> +		goto out_dist_unmap;
+> +	}
+> +
+> +	/* Collect redistributor base addresses */
+> +	count = acpi_parse_entries(ACPI_SIG_MADT,
+> +			sizeof(struct acpi_table_madt),
+> +			gic_acpi_parse_madt_redist, table,
+> +			ACPI_MADT_TYPE_GENERIC_REDISTRIBUTOR, 0);
+> +	if (count <= 0) {
+> +		pr_info("No valid GICR entries exist\n");
+> +		err = -EINVAL;
+> +		goto out_redist_unmap;
+> +	}
+> +
+> +	err = gic_init_bases(dist_base, redist_regs, nr_redist_regions, 0,
+> +			     (void *)ACPI_IRQ_MODEL_GIC);
 
+There is no other global identifier for GICv3? It feels a bit weird to
+use the same ID as GICv2 (though probably not harmful as you can't have
+both as the same time). What are you planning to use for the ITS then?
+You must make sure you have a global namespace.
+
+> +	if (err)
+> +		goto out_redist_unmap;
+> +
+> +	acpi_set_irq_model(ACPI_IRQ_MODEL_GIC, ACPI_IRQ_MODEL_GIC,
+> +			   gic_acpi_gsi_desc_populate);
+> +	return 0;
+> +
+> +out_redist_unmap:
+> +	for (i = 0; i < nr_redist_regions; i++)
+> +		if (redist_regs[i].redist_base)
+> +			iounmap(redist_regs[i].redist_base);
+> +	kfree(redist_regs);
+> +out_dist_unmap:
+> +	iounmap(dist_base);
+> +	return err;
+> +}
+> +IRQCHIP_ACPI_DECLARE(gic_v3, ACPI_MADT_GIC_VERSION_V3, gic_acpi_init);
+> +IRQCHIP_ACPI_DECLARE(gic_v4, ACPI_MADT_GIC_VERSION_V4, gic_acpi_init);
+
+As mentioned before, this doesn't work.
+
+> +#endif
+> 
+
+Thanks,
+
+	M.
 -- 
-Regards,
-
-Laurent Pinchart
+Jazz is not dead. It just smells funny...
