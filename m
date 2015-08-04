@@ -1,69 +1,42 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Tue,  4 Aug 2015 15:55:16 +0200
-Subject: [PATCH v2 3/6] ARM: shmobile: sh73a0 dtsi: Add missing "gpio-ranges"
- to gpio node
-In-Reply-To: <1438696519-13727-1-git-send-email-geert+renesas@glider.be>
-References: <1438696519-13727-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1438696519-13727-4-git-send-email-geert+renesas@glider.be>
+From: skarajga@visteon.com (Karajgaonkar, Saurabh (S.))
+Date: Tue, 4 Aug 2015 14:01:01 +0000
+Subject: [PATCH v2 0/9] usb: Simplify return statements
+Message-ID: <cover.1438695318.git.skarajga@visteon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If a GPIO driver uses gpiochip_add_pin_range() (which is usually the
-case for GPIO/PFC combos), the GPIO hogging mechanism configured from DT
-doesn't work:
+From: Saurabh Karajgaonkar <skarajga@visteon.com>
 
-    requesting hog GPIO led1-high (chip sh73a0_pfc, offset 20) failed
+This patch series is created using simple_return.cocci coccinelle script.
+It replaces the redundant instances where variable is first assigned
+return value from a function call and then used in return statement,
+by direct function call in the return statement.
 
-The actual error code is -517 == -EPROBE_DEFER.
+Changes for v2:
+- corrected indentation issues [Patch 06/09, 08/09, 09/09]
+- Patch 04/09 Acked by Patrice Chotard <patrice.chotard@st.com>
 
-The problem is that PFC+GPIO registration is handled in multiple steps:
-  1. pinctrl_register(),
-  2. gpiochip_add(),
-  3. gpiochip_add_pin_range().
+Saurabh Karajgaonkar (9):
+  usb: phy: phy-mxs-usb: Simplify return statement
+  usb: phy: phy-keystone: Simplify return statement
+  usb: musb: musb_dsps: Simplify return statement
+  usb: host: ehci-st: Simplify return statement
+  usb: host: oxu210hp-hcd: Simplify return statement
+  usb: host: u132-hcd: Simplify return statement
+  usb: host: xhci: Simplify return statement
+  usb: serial: mxuport: Simplify return statement
+  usb: misc: ftdi-elan: Simplify return statement
 
-Configuration of the hogs is handled in gpiochip_add():
+ drivers/usb/host/ehci-st.c      |  7 +------
+ drivers/usb/host/oxu210hp-hcd.c |  7 +------
+ drivers/usb/host/u132-hcd.c     | 35 +++++++++--------------------------
+ drivers/usb/host/xhci.c         |  6 +-----
+ drivers/usb/misc/ftdi-elan.c    | 12 ++----------
+ drivers/usb/musb/musb_dsps.c    |  6 +-----
+ drivers/usb/phy/phy-keystone.c  |  6 +-----
+ drivers/usb/phy/phy-mxs-usb.c   |  6 +-----
+ drivers/usb/serial/mxuport.c    | 10 +++-------
+ 9 files changed, 20 insertions(+), 75 deletions(-)
 
-    gpiochip_add
-        of_gpiochip_add
-            of_gpiochip_scan_hogs
-                gpiod_hog
-                    gpiochip_request_own_desc
-                        __gpiod_request
-                            chip->request
-                                pinctrl_request_gpio
-                                    pinctrl_get_device_gpio_range
-
-However, at this point the GPIO controller hasn't been added to
-pinctrldev_list yet, so the range can't be found, and the operation fails
-with -EPROBE_DEFER.
-
-To fix this, add a "gpio-ranges" property to the gpio device node, so
-the ranges are added by of_gpiochip_add_pin_range(), which is called by
-of_gpiochip_add() before the call to of_gpiochip_scan_hogs().
-
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
----
-v2:
-  - Add Acked-by.
----
- arch/arm/boot/dts/sh73a0.dtsi | 3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
-index 11e17c5f26e2cae2..ff7c8f298f30a58d 100644
---- a/arch/arm/boot/dts/sh73a0.dtsi
-+++ b/arch/arm/boot/dts/sh73a0.dtsi
-@@ -392,6 +392,9 @@
- 		      <0xe605801c 0x1c>;
- 		gpio-controller;
- 		#gpio-cells = <2>;
-+		gpio-ranges =
-+			<&pfc 0 0 119>, <&pfc 128 128 37>, <&pfc 192 192 91>,
-+			<&pfc 288 288 22>;
- 		interrupts-extended =
- 			<&irqpin0 0 0>, <&irqpin0 1 0>, <&irqpin0 2 0>, <&irqpin0 3 0>,
- 			<&irqpin0 4 0>, <&irqpin0 5 0>, <&irqpin0 6 0>, <&irqpin0 7 0>,
 -- 
 1.9.1
