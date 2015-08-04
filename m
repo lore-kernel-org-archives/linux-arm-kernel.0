@@ -1,40 +1,23 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 4 Aug 2015 13:00:44 +0200
-Subject: [PATCH 19/20] clocksource: atmel-st: get and use slow clock
-In-Reply-To: <55C09477.3080209@linaro.org>
-References: <1438215726-27452-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1438215726-27452-20-git-send-email-alexandre.belloni@free-electrons.com>
- <55C09477.3080209@linaro.org>
-Message-ID: <20150804110044.GK3486@piout.net>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 4 Aug 2015 12:00:41 +0100
+Subject: [PATCH 3/3] spi: s3c24xx: Convert spinlock to mutex
+In-Reply-To: <1438668598-6678-3-git-send-email-drinkcat@chromium.org>
+References: <1438668598-6678-1-git-send-email-drinkcat@chromium.org>
+ <1438668598-6678-3-git-send-email-drinkcat@chromium.org>
+Message-ID: <20150804110040.GJ20873@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/08/2015 at 12:31:19 +0200, Daniel Lezcano wrote :
-> On 07/30/2015 02:22 AM, Alexandre Belloni wrote:
-> >The current slow clock rate is hardcoded. Properly get the slow clock
-> >and use its rate.
-> >
-> >Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> >---
-> 
-> [ ... ]
-> 
-> >+struct clk *sclk;
-> 
-> Do you need this variable global ? AFAICS, its scope is in the init
-> function, no ?
-> 
+On Tue, Aug 04, 2015 at 02:09:58PM +0800, Nicolas Boichat wrote:
+> bitbang->lock is now a mutex: replace spinlock function calls
+> by mutex functions.
 
-Indeed.
-
-> >+int timer_latch;
-> 
-> static.
-> 
-
-Yeah, this was changed in v2 (that I forgot to label as v2).
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+This would need to be combined with the first patch, individual patches
+shouldn't break the build.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150804/c4a9c636/attachment.sig>
