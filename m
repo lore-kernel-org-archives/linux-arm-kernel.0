@@ -1,92 +1,73 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Tue, 04 Aug 2015 10:30:24 +0200
-Subject: [RFC PATCH 2/3] mailbox: Hisilicon: add mailbox driver
-In-Reply-To: <1438564390-28111-3-git-send-email-leo.yan@linaro.org>
-References: <1438564390-28111-1-git-send-email-leo.yan@linaro.org>
- <1438564390-28111-3-git-send-email-leo.yan@linaro.org>
-Message-ID: <1438677024.8734.24.camel@tiscali.nl>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 04 Aug 2015 11:33:55 +0300
+Subject: [PATCH v2] media: atmel-isi: parse the DT parameters for
+ vsync/hsync/pixclock polarity
+In-Reply-To: <1438670828-19845-1-git-send-email-josh.wu@atmel.com>
+References: <1438670828-19845-1-git-send-email-josh.wu@atmel.com>
+Message-ID: <1733630.bVGppG7AmL@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(This RFC was part of this mornings catch of my crude mail filter. So,
-for what it's worth, what follows are a few random comments for the few
-things I'm able to spot.)
+Hi Josh,
 
-On ma, 2015-08-03 at 09:13 +0800, Leo Yan wrote:
-> --- /dev/null
-> +++ b/drivers/mailbox/hisilicon/Kconfig
+Thank you for the patch.
 
-> +config HISI_MBOX
-> +	bool "Hisilicon's Mailbox"
-> +	depends on ARCH_HISI || OF
+On Tuesday 04 August 2015 14:47:07 Josh Wu wrote:
+> This patch will get the DT parameters of vsync/hsync/pixclock polarity, and
+> pass to driver.
+> 
+> Also add a debug information for test purpose.
+> 
+> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+> ---
+> 
+> Changes in v2:
+> - rewrite the debug message and add pix clock polarity setup thanks to
+>   Laurent.
+> - update the commit log.
+> 
+>  drivers/media/platform/soc_camera/atmel-isi.c | 12 ++++++++++++
+>  1 file changed, 12 insertions(+)
+> 
+> diff --git a/drivers/media/platform/soc_camera/atmel-isi.c
+> b/drivers/media/platform/soc_camera/atmel-isi.c index fead841..d6f8def
+> 100644
+> --- a/drivers/media/platform/soc_camera/atmel-isi.c
+> +++ b/drivers/media/platform/soc_camera/atmel-isi.c
+> @@ -1061,6 +1061,11 @@ static int isi_camera_set_bus_param(struct
+> soc_camera_device *icd) if (common_flags & V4L2_MBUS_PCLK_SAMPLE_FALLING)
+>  		cfg1 |= ISI_CFG1_PIXCLK_POL_ACTIVE_FALLING;
+> 
+> +	dev_dbg(icd->parent, "vsync active %s, hsync active %s, sampling on pix
+> clock %s\n",
 
-ARCH_HISI is available on either ARM64 or ARM. ARM64 selects OF. On ARM
-ARCH_HISI depends on ARCH_MULTIV7 which depends on ARCH_MULTIPLATFORM.
-That selects USE_OF which on its turn selects OF.
+You forgot " edge" right before "\n" :-)
 
-So, HISI_MBOX implies OF, correct?
-
-> +	help
-> +	  Support for mailbox drivers on Hisilicon series of SoCs.
+> +		common_flags & V4L2_MBUS_VSYNC_ACTIVE_LOW ? "low" : "high",
+> +		common_flags & V4L2_MBUS_HSYNC_ACTIVE_LOW ? "low" : "high",
+> +		common_flags & V4L2_MBUS_PCLK_SAMPLE_FALLING ? "falling" : "rising");
 > +
-> +config HI6220_MBOX
-> +	tristate "Hi6220 Mailbox Controller"
-> +	depends on HISI_MBOX
-> +	help
-> +	  An implementation of the hi6220 mailbox. It is used to send message
-> +	  between application processors and MCU. Say Y here if you want to build
-> +	  the Hi6220 mailbox controller driver.
-
-> --- /dev/null
-> +++ b/drivers/mailbox/hisilicon/common.c
-
-> +int hisi_mbox_register(struct hisi_mbox_hw *mbox_hw)
-> +{
-> +	[...]
+>  	if (isi->pdata.has_emb_sync)
+>  		cfg1 |= ISI_CFG1_EMB_SYNC;
+>  	if (isi->pdata.full_mode)
+> @@ -1148,6 +1153,13 @@ static int atmel_isi_parse_dt(struct atmel_isi *isi,
+>  		return -EINVAL;
+>  	}
+> 
+> +	if (ep.bus.parallel.flags & V4L2_MBUS_HSYNC_ACTIVE_LOW)
+> +		isi->pdata.hsync_act_low = true;
+> +	if (ep.bus.parallel.flags & V4L2_MBUS_VSYNC_ACTIVE_LOW)
+> +		isi->pdata.vsync_act_low = true;
+> +	if (ep.bus.parallel.flags & V4L2_MBUS_PCLK_SAMPLE_FALLING)
+> +		isi->pdata.pclk_act_falling = true;
 > +
-> +	mbox->chan = devm_kzalloc(dev,
-> +		mbox_hw->chan_num * sizeof(struct mbox_chan), GFP_KERNEL);
-> +	if (!mbox)
 
-	if (!mbox->chan)
+How about has_emb_sync, which can be set from ep.bus_type ?
 
-> +		return -ENOMEM;
-> +
-> +	[...]
-> +}
+>  	return 0;
+>  }
 
-> --- /dev/null
-> +++ b/drivers/mailbox/hisilicon/hi6220-mailbox.c
+-- 
+Regards,
 
-> +static struct platform_driver hi6220_mbox_driver = {
-> +	.driver = {
-> +		[...]
-> +		.of_match_table = of_match_ptr(hi6220_mbox_of_match),
-
-of_match_ptr(x) becomes NULL when CONFIG_OF is not defined. But I think
-CONFIG_OF will always be defined, see above. So of_match_ptr() isn't per
-se needed.
-
-> +	},
-> +	[...]
-> +};
-
-> +static int __init hi6220_mbox_init(void)
-> +{
-> +	return platform_driver_register(&hi6220_mbox_driver);
-> +}
-> +module_init(hi6220_mbox_init);
-> +
-> +static void __exit hi6220_mbox_exit(void)
-> +{
-> +	platform_driver_unregister(&hi6220_mbox_driver);
-> +}
-> +module_exit(hi6220_mbox_exit);
-
-This could be flattened into one line:
-    module_platform_driver(hi6220_mbox_driver);
-
-Thanks,
-
-
-Paul Bolle
+Laurent Pinchart
