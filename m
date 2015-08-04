@@ -1,272 +1,74 @@
-From: fugang.duan@freescale.com (Duan Andy)
-Date: Tue, 4 Aug 2015 03:18:46 +0000
-Subject: [PATCH] iio: adc: vf610: Add IIO buffer support for Vybrid ADC
-In-Reply-To: <1f11be7d7bc1c3fcebf7d0bcf274f1fcbef35999.1438610517.git.maitysanchayan@gmail.com>
-References: <cover.1438610517.git.maitysanchayan@gmail.com>
- <1f11be7d7bc1c3fcebf7d0bcf274f1fcbef35999.1438610517.git.maitysanchayan@gmail.com>
-Message-ID: <BN3PR0301MB12191A12387C829F111B612BF5760@BN3PR0301MB1219.namprd03.prod.outlook.com>
+From: aisheng.dong@freescale.com (Dong Aisheng)
+Date: Tue, 4 Aug 2015 11:25:15 +0800
+Subject: [PATCH v3 1/6] mmc: sdhci-esdhc-imx: add imx7d support and
+ support HS400
+In-Reply-To: <1438160637-28061-2-git-send-email-haibo.chen@freescale.com>
+References: <1438160637-28061-1-git-send-email-haibo.chen@freescale.com>
+ <1438160637-28061-2-git-send-email-haibo.chen@freescale.com>
+Message-ID: <20150804032513.GD24870@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sanchayan Maity <maitysanchayan@gmail.com> Sent: Monday, August 03, 2015 11:10 PM
-> To: jic23 at kernel.org; linux-iio at vger.kernel.org
-> Cc: stefan at agner.ch; Duan Fugang-B38611; hofrat at osadl.org;
-> sanjeev_sharma at mentor.com; Estevam Fabio-R49496; knaack.h at gmx.de;
-> lars at metafoo.de; pmeerw at pmeerw.net; antoine.tenart at free-electrons.com;
-> linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> Sanchayan Maity
-> Subject: [PATCH] iio: adc: vf610: Add IIO buffer support for Vybrid ADC
+On Wed, Jul 29, 2015 at 05:03:52PM +0800, Haibo Chen wrote:
+> The imx7d usdhc is derived from imx6sx, the difference is that
+> imx7d support HS400.
 > 
-> This patch adds support for IIO buffer to the Vybrid ADC driver.
-> IIO triggered buffer infrastructure along with iio sysfs trigger is used
-> to leverage continuous sampling support provided by the ADC block.
+> So introduce a new compatible string for imx7d and add HS400
+> support for imx7d usdhc.
 > 
-> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+> Signed-off-by: Haibo Chen <haibo.chen@freescale.com>
 > ---
->  drivers/iio/adc/Kconfig     |   4 ++
->  drivers/iio/adc/vf610_adc.c | 122
-> +++++++++++++++++++++++++++++++++++++++++---
->  2 files changed, 120 insertions(+), 6 deletions(-)
+>  drivers/mmc/host/sdhci-esdhc-imx.c | 66 ++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 66 insertions(+)
 > 
-> diff --git a/drivers/iio/adc/Kconfig b/drivers/iio/adc/Kconfig index
-> 7c55658..4661241 100644
-> --- a/drivers/iio/adc/Kconfig
-> +++ b/drivers/iio/adc/Kconfig
-> @@ -337,6 +337,10 @@ config TWL6030_GPADC  config VF610_ADC
->  	tristate "Freescale vf610 ADC driver"
->  	depends on OF
-> +	select IIO_BUFFER
-> +	select IIO_TRIGGER
-> +	select IIO_SYSFS_TRIGGER
-> +	select IIO_TRIGGERED_BUFFER
->  	help
->  	  Say yes here to support for Vybrid board analog-to-digital
-> converter.
->  	  Since the IP is used for i.MX6SLX, the driver also support
-> i.MX6SLX.
-> diff --git a/drivers/iio/adc/vf610_adc.c b/drivers/iio/adc/vf610_adc.c
-> index 23b8fb9..af72b9a 100644
-> --- a/drivers/iio/adc/vf610_adc.c
-> +++ b/drivers/iio/adc/vf610_adc.c
-> @@ -34,8 +34,11 @@
->  #include <linux/err.h>
-> 
->  #include <linux/iio/iio.h>
-> +#include <linux/iio/buffer.h>
->  #include <linux/iio/sysfs.h>
-> -#include <linux/iio/driver.h>
-> +#include <linux/iio/trigger.h>
-> +#include <linux/iio/trigger_consumer.h> #include
-> +<linux/iio/triggered_buffer.h>
-> 
->  /* This will be the driver name the kernel reports */  #define
-> DRIVER_NAME "vf610-adc"
-> @@ -170,6 +173,7 @@ struct vf610_adc {
->  	u32 sample_freq_avail[5];
-> 
->  	struct completion completion;
-> +	u16 *buffer;
+> diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+> index c6b9f64..b441eed 100644
+> --- a/drivers/mmc/host/sdhci-esdhc-imx.c
+> +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+> @@ -44,6 +44,7 @@
+>  #define  ESDHC_MIX_CTRL_EXE_TUNE	(1 << 22)
+>  #define  ESDHC_MIX_CTRL_SMPCLK_SEL	(1 << 23)
+>  #define  ESDHC_MIX_CTRL_FBCLK_SEL	(1 << 25)
+> +#define  ESDHC_MIX_CTRL_HS400_EN	(1 << 26)
+>  /* Bits 3 and 6 are not SDHCI standard definitions */
+>  #define  ESDHC_MIX_CTRL_SDHCI_MASK	0xb7
+>  /* Tuning bits */
+> @@ -60,6 +61,16 @@
+>  #define  ESDHC_TUNE_CTRL_MIN		0
+>  #define  ESDHC_TUNE_CTRL_MAX		((1 << 7) - 1)
+>  
+> +/* strobe dll register */
+> +#define ESDHC_STROBE_DLL_CTRL		0x70
+> +#define ESDHC_STROBE_DLL_CTRL_ENABLE	(1 << 0)
+> +#define ESDHC_STROBE_DLL_CTRL_RESET	(1 << 1)
+> +#define ESDHC_STROBE_DLL_CTRL_SLV_DLY_TARGET_SHIFT	3
+> +
+> +#define ESDHC_STROBE_DLL_STATUS		0x74
+> +#define ESDHC_STROBE_DLL_STS_REF_LOCK	(1 << 1)
+> +#define ESDHC_STROBE_DLL_STS_SLV_LOCK	0x1
+> +
+>  #define ESDHC_TUNING_CTRL		0xcc
+>  #define ESDHC_STD_TUNING_EN		(1 << 24)
+>  /* NOTE: the minimum valid tuning start tap for mx6sl is 1 */
+> @@ -120,6 +131,8 @@
+>  #define ESDHC_FLAG_ERR004536		BIT(7)
+>  /* The IP supports HS200 mode */
+>  #define ESDHC_FLAG_HS200		BIT(8)
+> +/* The IP supports HS400 mode */
+> +#define ESDHC_FLAG_SUP_HS400		BIT(9)
+>  
+>  struct esdhc_soc_data {
+>  	u32 flags;
+> @@ -156,6 +169,12 @@ static struct esdhc_soc_data usdhc_imx6sx_data = {
+>  			| ESDHC_FLAG_HAVE_CAP1 | ESDHC_FLAG_HS200,
 >  };
-> 
->  static const u32 vf610_hw_avgs[] = { 1, 4, 8, 16, 32 }; @@ -505,12
-> +509,22 @@ static const struct iio_chan_spec_ext_info vf610_ext_info[] =
-> {
->  	.info_mask_shared_by_type = BIT(IIO_CHAN_INFO_SCALE) |	\
->  				BIT(IIO_CHAN_INFO_SAMP_FREQ),	\
->  	.ext_info = vf610_ext_info,				\
-> +	.address = (_idx),				\
-> +	.scan_index = (_idx),			\
-> +	.scan_type.sign = 'u',			\
-> +	.scan_type.realbits = 12,		\
-> +	.scan_type.storagebits = 16,	\
->  }
-> 
->  #define VF610_ADC_TEMPERATURE_CHAN(_idx, _chan_type) {	\
->  	.type = (_chan_type),	\
->  	.channel = (_idx),		\
->  	.info_mask_separate = BIT(IIO_CHAN_INFO_PROCESSED),	\
-> +	.address = (_idx),						\
-> +	.scan_index = (_idx),					\
-> +	.scan_type.sign = 'u',					\
-> +	.scan_type.realbits = 12,				\
-> +	.scan_type.storagebits = 16,			\
->  }
-> 
->  static const struct iio_chan_spec vf610_adc_iio_channels[] = { @@ -531,6
-> +545,7 @@ static const struct iio_chan_spec vf610_adc_iio_channels[] = {
->  	VF610_ADC_CHAN(14, IIO_VOLTAGE),
->  	VF610_ADC_CHAN(15, IIO_VOLTAGE),
->  	VF610_ADC_TEMPERATURE_CHAN(26, IIO_TEMP),
-> +	IIO_CHAN_SOFT_TIMESTAMP(32),
->  	/* sentinel */
->  };
-> 
-> @@ -559,13 +574,21 @@ static int vf610_adc_read_data(struct vf610_adc
-> *info)
-> 
->  static irqreturn_t vf610_adc_isr(int irq, void *dev_id)  {
-> -	struct vf610_adc *info = (struct vf610_adc *)dev_id;
-> +	struct iio_dev *indio_dev = (struct iio_dev *)dev_id;
-> +	struct vf610_adc *info = iio_priv(indio_dev);
->  	int coco;
-> 
->  	coco = readl(info->regs + VF610_REG_ADC_HS);
->  	if (coco & VF610_ADC_HS_COCO0) {
->  		info->value = vf610_adc_read_data(info);
-> -		complete(&info->completion);
-> +		if (iio_buffer_enabled(indio_dev)) {
-> +			info->buffer[0] = info->value;
-> +			writel(0, info->regs + VF610_REG_ADC_HS);
-The register is read only. After ADC_Rn is read, the coco bit is cleared.
+>  
+> +static struct esdhc_soc_data usdhc_imx7d_data = {
+> +	.flags = ESDHC_FLAG_USDHC | ESDHC_FLAG_STD_TUNING
+> +			| ESDHC_FLAG_HAVE_CAP1 | ESDHC_FLAG_HS200
+> +			| ESDHC_FLAG_SUP_HS400,
 
-> +			iio_push_to_buffers_with_timestamp(indio_dev,
-> +					info->buffer, iio_get_time_ns());
-> +			iio_trigger_notify_done(indio_dev->trig);
-> +		} else
-> +			complete(&info->completion);
->  	}
-> 
->  	return IRQ_HANDLED;
-> @@ -612,6 +635,9 @@ static int vf610_read_raw(struct iio_dev *indio_dev,
->  	switch (mask) {
->  	case IIO_CHAN_INFO_RAW:
->  	case IIO_CHAN_INFO_PROCESSED:
-> +		if (iio_buffer_enabled(indio_dev))
-> +			return -EBUSY;
-> +
->  		mutex_lock(&indio_dev->mlock);
->  		reinit_completion(&info->completion);
-> 
-> @@ -694,6 +720,81 @@ static int vf610_write_raw(struct iio_dev *indio_dev,
->  	return -EINVAL;
->  }
-> 
-> +static int vf610_adc_buffer_postenable(struct iio_dev *indio_dev) {
-> +	struct vf610_adc *info = iio_priv(indio_dev);
-> +	unsigned int channel;
-> +	int ret;
-> +	int val;
-> +
-> +	ret = iio_triggered_buffer_postenable(indio_dev);
-> +	if (ret)
-> +		return ret;
-> +
-> +	val = readl(info->regs + VF610_REG_ADC_GC);
-> +	val |= VF610_ADC_ADCON;
-> +	writel(val, info->regs + VF610_REG_ADC_GC);
-> +
-> +	channel = find_first_bit(indio_dev->active_scan_mask,
-> +						indio_dev->masklength);
-> +
-> +	val = VF610_ADC_ADCHC(channel);
-> +	val |= VF610_ADC_AIEN;
-> +
-> +	writel(val, info->regs + VF610_REG_ADC_HC0);
-> +
-> +	return 0;
-> +}
-> +
-> +static int vf610_adc_buffer_postdisable(struct iio_dev *indio_dev) {
-> +	struct vf610_adc *info = iio_priv(indio_dev);
-> +	unsigned int hc_cfg = 0;
-> +	int val;
-> +
-> +	val = readl(info->regs + VF610_REG_ADC_GC);
-> +	val &= ~VF610_ADC_ADCON;
-> +	writel(val, info->regs + VF610_REG_ADC_GC);
-> +
-> +	hc_cfg |= VF610_ADC_CONV_DISABLE;
-> +	hc_cfg &= ~VF610_ADC_AIEN;
-> +
-> +	writel(hc_cfg, info->regs + VF610_REG_ADC_HC0);
-> +
-> +	return 0;
-> +}
-> +
-> +static int vf610_adc_update_scan_mode(struct iio_dev *indio_dev,
-> +	const unsigned long *scan_mask)
-> +{
-> +	struct vf610_adc *info = iio_priv(indio_dev);
-> +
-> +	kfree(info->buffer);
-> +	info->buffer = kmalloc(indio_dev->scan_bytes, GFP_KERNEL);
-> +	if (!info->buffer)
-> +		return -ENOMEM;
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct iio_buffer_setup_ops iio_triggered_buffer_setup_ops
-> = {
-> +	.postenable = &vf610_adc_buffer_postenable,
-> +	.predisable = &iio_triggered_buffer_predisable,
-> +	.postdisable = &vf610_adc_buffer_postdisable,
-> +	.validate_scan_mask = &iio_validate_scan_mask_onehot, };
-> +
-> +static int vf610_adc_buffer_init(struct iio_dev *indio_dev) {
-> +	return iio_triggered_buffer_setup(indio_dev,
-> &iio_pollfunc_store_time,
-> +		NULL, &iio_triggered_buffer_setup_ops); }
-> +
-> +static void vf610_adc_buffer_remove(struct iio_dev *indio_dev) {
-> +	iio_triggered_buffer_cleanup(indio_dev);
-> +}
-> +
->  static int vf610_adc_reg_access(struct iio_dev *indio_dev,
->  			unsigned reg, unsigned writeval,
->  			unsigned *readval)
-> @@ -714,6 +815,7 @@ static const struct iio_info vf610_adc_iio_info = {
->  	.read_raw = &vf610_read_raw,
->  	.write_raw = &vf610_write_raw,
->  	.debugfs_reg_access = &vf610_adc_reg_access,
-> +	.update_scan_mode = &vf610_adc_update_scan_mode,
->  	.attrs = &vf610_attribute_group,
->  };
-> 
-> @@ -753,7 +855,7 @@ static int vf610_adc_probe(struct platform_device
-> *pdev)
-> 
->  	ret = devm_request_irq(info->dev, irq,
->  				vf610_adc_isr, 0,
-> -				dev_name(&pdev->dev), info);
-> +				dev_name(&pdev->dev), indio_dev);
->  	if (ret < 0) {
->  		dev_err(&pdev->dev, "failed requesting irq, irq = %d\n", irq);
->  		return ret;
-> @@ -806,15 +908,22 @@ static int vf610_adc_probe(struct platform_device
-> *pdev)
->  	vf610_adc_cfg_init(info);
->  	vf610_adc_hw_init(info);
-> 
-> +	ret = vf610_adc_buffer_init(indio_dev);
-> +	if (ret < 0) {
-> +		dev_err(&pdev->dev, "Couldn't initialise the buffer\n");
-> +		goto error_iio_device_register;
-> +	}
-> +
->  	ret = iio_device_register(indio_dev);
->  	if (ret) {
->  		dev_err(&pdev->dev, "Couldn't register the device.\n");
-> -		goto error_iio_device_register;
-> +		goto error_adc_buffer_init;
->  	}
-> 
->  	return 0;
-> 
-> -
-> +error_adc_buffer_init:
-> +	vf610_adc_buffer_remove(indio_dev);
->  error_iio_device_register:
->  	clk_disable_unprepare(info->clk);
->  error_adc_clk_enable:
-> @@ -829,6 +938,7 @@ static int vf610_adc_remove(struct platform_device
-> *pdev)
->  	struct vf610_adc *info = iio_priv(indio_dev);
-> 
->  	iio_device_unregister(indio_dev);
-> +	vf610_adc_buffer_remove(indio_dev);
->  	regulator_disable(info->vref);
->  	clk_disable_unprepare(info->clk);
-> 
-> --
-> 2.5.0
+Better to use ESDHC_FLAG_HS400 to keep align with exist ESDHC_FLAG_HS200.
+
+Regards
+Dong Aisheng
