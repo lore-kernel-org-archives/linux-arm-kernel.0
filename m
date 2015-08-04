@@ -1,30 +1,42 @@
-From: p.fedin@samsung.com (Pavel Fedin)
-Date: Tue, 04 Aug 2015 09:53:07 +0300
-Subject: [PATCH v2 14/15] KVM: arm64: implement MSI injection in ITS
- emulation
-In-Reply-To: <55BF9FB0.6070804@arm.com>
-References: <1436538111-4294-1-git-send-email-andre.przywara@arm.com>
- <1436538111-4294-15-git-send-email-andre.przywara@arm.com>
- <55BB7678.5080105@linaro.org> <55BE7BA1.40403@arm.com>
- <00a201d0cdb7$70a623f0$51f26bd0$@samsung.com> <55BF2F51.6020701@linaro.org>
- <00f101d0cdcd$146a6090$3d3f21b0$@samsung.com> <55BF8AB8.5050408@linaro.org>
- <55BF9FB0.6070804@arm.com>
-Message-ID: <00b101d0ce82$38caa7a0$aa5ff6e0$@samsung.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 4 Aug 2015 09:14:34 +0200 (CEST)
+Subject: [PATCH] irqchip: bcm2836: Use a CPU notifier enable IPIs.
+In-Reply-To: <87fv40lzxe.fsf@eliezer.anholt.net>
+References: <55B67C81.1010900@gmail.com>
+ <1438027789-1637-1-git-send-email-eric@anholt.net>
+ <alpine.DEB.2.11.1508021221370.3825@nanos>
+ <87fv40lzxe.fsf@eliezer.anholt.net>
+Message-ID: <alpine.DEB.2.11.1508040913490.3959@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Hello!
+On Mon, 3 Aug 2015, Eric Anholt wrote:
 
-> I think this flag should be kept, as it really indicates what is valid
-> in the MSI structure. It also has other benefits such as making obvious
-> what userspace expects, which can then be checked against the kernel's
-> own expectations.
+> Thomas Gleixner <tglx@linutronix.de> writes:
+> 
+> > On Mon, 27 Jul 2015, Eric Anholt wrote:
+> >> +/* Unmasks the IPI on the CPU wen it's first brought online. */
+> >
+> > when
+> >
+> >> +static int bcm2836_arm_irqchip_cpu_notify(struct notifier_block *nfb,
+> >> +					  unsigned long action, void *hcpu)
+> >> +{
+> >> +	unsigned int cpu = (unsigned long)hcpu;
+> >> +	unsigned int int_reg = LOCAL_MAILBOX_INT_CONTROL0;
+> >> +	unsigned int mailbox = 0;
+> >> +
+> >> +	if (action == CPU_STARTING || action == CPU_STARTING_FROZEN)
+> >> +		bcm2836_arm_irqchip_unmask_per_cpu_irq(int_reg, mailbox, cpu);
+> >
+> > Shouldn't you mask the irq on CPU_DYING?
+> 
+> I was just following what other drivers were doing.  Is CPU_DYING the
+> only thing that needs masking?
 
- I'm OK with the flag despite it's indeed a small bit redundant. But i see that kernel's policy is
-to have insurance against all possible and impossible bad inputs, and the flag really fits into the
-concept.
+CPPU_DYING is the counterpart of CPU_STARTING. It's called from the
+CPU which goes down.
 
-Kind regards,
-Pavel Fedin
-Expert Engineer
-Samsung Electronics Research center Russia
+Thanks,
+
+	tglx
