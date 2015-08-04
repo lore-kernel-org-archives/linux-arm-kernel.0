@@ -1,186 +1,117 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 04 Aug 2015 15:47:13 +0100
-Subject: [PATCH 05/13] iommu/io-pgtable-arm: Allow appropriate DMA API use
-In-Reply-To: <1652248.uq2uhTW4Yd@avalon>
-References: <1438608355-7335-1-git-send-email-will.deacon@arm.com>
- <1438608355-7335-6-git-send-email-will.deacon@arm.com>
- <1652248.uq2uhTW4Yd@avalon>
-Message-ID: <55C0D071.1040104@arm.com>
+From: moritz.fischer@ettus.com (Moritz Fischer)
+Date: Tue, 4 Aug 2015 08:05:36 -0700
+Subject: [RFCv3 1/4] docs: dts: Added documentation for Xilinx Zynq Reset
+ Controller bindings.
+In-Reply-To: <1438675772.3793.18.camel@pengutronix.de>
+References: <1438305237-18497-1-git-send-email-moritz.fischer@ettus.com>
+ <1438305237-18497-2-git-send-email-moritz.fischer@ettus.com>
+ <1438675772.3793.18.camel@pengutronix.de>
+Message-ID: <CAAtXAHeauiD5smAqMbheJWuv4BT-2YqJWOSBjYPq900icpT1Rg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
+Hi Philip,
 
-[ +RMK, as his patch is indirectly involved here ]
-
-On 04/08/15 14:16, Laurent Pinchart wrote:
-> Hi Will and Robin,
+On Tue, Aug 4, 2015 at 1:09 AM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
+> Hi Moritz,
 >
-> Thank you for the patch.
->
-> On Monday 03 August 2015 14:25:47 Will Deacon wrote:
->> From: Robin Murphy <Robin.Murphy@arm.com>
->>
->> Currently, users of the LPAE page table code are (ab)using dma_map_page()
->> as a means to flush page table updates for non-coherent IOMMUs. Since
->> from the CPU's point of view, creating IOMMU page tables *is* passing
->> DMA buffers to a device (the IOMMU's page table walker), there's little
->> reason not to use the DMA API correctly.
->>
->> Allow IOMMU drivers to opt into DMA API operations for page table
->> allocation and updates by providing their appropriate device pointer.
->> The expectation is that an LPAE IOMMU should have a full view of system
->> memory, so use streaming mappings to avoid unnecessary pressure on
->> ZONE_DMA, and treat any DMA translation as a warning sign.
->
-> I like the idea of doing this in core code rather than in individual drivers,
-> but I believe we're not using the right API. Please see below.
-
-Perhaps this could have one of my trademark "for now"s - the aim of this 
-series is really just to stop the per-driver hacks proliferating, as per 
-Russell's comment[1]. I left the semi-artificial DMA==phys restriction 
-for expediency, since it follows the current usage and keeps the code 
-changes minimal. With this series in place I'd be happy to go back and 
-try a full-blown DMA conversion if and when a real need shows up, but I 
-think it would significantly complicate all the current software page 
-table walking.
-
->> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> Am Donnerstag, den 30.07.2015, 18:13 -0700 schrieb Moritz Fischer:
+>> Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
 >> ---
->>   drivers/iommu/Kconfig          |   3 +-
->>   drivers/iommu/io-pgtable-arm.c | 107 +++++++++++++++++++++++++++++---------
->>   drivers/iommu/io-pgtable.h     |   3 ++
->>   3 files changed, 89 insertions(+), 24 deletions(-)
+>>  .../devicetree/bindings/reset/zynq-reset.txt       | 68 ++++++++++++++++++++++
+>>  1 file changed, 68 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/reset/zynq-reset.txt
 >>
->> diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
->> index f1fb1d3ccc56..d77a848d50de 100644
->> --- a/drivers/iommu/Kconfig
->> +++ b/drivers/iommu/Kconfig
->> @@ -23,7 +23,8 @@ config IOMMU_IO_PGTABLE
->>   config IOMMU_IO_PGTABLE_LPAE
->>   	bool "ARMv7/v8 Long Descriptor Format"
->>   	select IOMMU_IO_PGTABLE
->> -	depends on ARM || ARM64 || COMPILE_TEST
->> +	# SWIOTLB guarantees a dma_to_phys() implementation
->> +	depends on ARM || ARM64 || (COMPILE_TEST && SWIOTLB)
->>   	help
->>   	  Enable support for the ARM long descriptor pagetable format.
->>   	  This allocator supports 4K/2M/1G, 16K/32M and 64K/512M page
->> diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
->> index 4e460216bd16..28cca8a652f9 100644
->> --- a/drivers/iommu/io-pgtable-arm.c
->> +++ b/drivers/iommu/io-pgtable-arm.c
->> @@ -200,12 +200,76 @@ typedef u64 arm_lpae_iopte;
->>
->>   static bool selftest_running = false;
->>
->> +static dma_addr_t __arm_lpae_dma_addr(struct device *dev, void *pages)
->> +{
->> +	return phys_to_dma(dev, virt_to_phys(pages));
->> +}
+>> diff --git a/Documentation/devicetree/bindings/reset/zynq-reset.txt b/Documentation/devicetree/bindings/reset/zynq-reset.txt
+>> new file mode 100644
+>> index 0000000..498c037a
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/reset/zynq-reset.txt
+>> @@ -0,0 +1,68 @@
+>> +Xilinx Zynq Reset Manager
 >> +
->> +static void *__arm_lpae_alloc_pages(size_t size, gfp_t gfp,
->> +				    struct io_pgtable_cfg *cfg)
->> +{
->> +	struct device *dev = cfg->iommu_dev;
->> +	dma_addr_t dma;
->> +	void *pages = alloc_pages_exact(size, gfp | __GFP_ZERO);
+>> +The Zynq AP-SoC has several different resets.
 >> +
->> +	if (!pages)
->> +		return NULL;
+>> +See Chapter 26 of the Zynq TRM (UG585) for more information about Zynq resets.
 >> +
->> +	if (dev) {
->> +		dma = dma_map_single(dev, pages, size, DMA_TO_DEVICE);
->> +		if (dma_mapping_error(dev, dma))
->> +			goto out_free;
->> +		/*
->> +		 * We depend on the IOMMU being able to work with any physical
->> +		 * address directly, so if the DMA layer suggests it can't by
->> +		 * giving us back some translation, that bodes very badly...
->> +		 */
->> +		if (dma != __arm_lpae_dma_addr(dev, pages))
->> +			goto out_unmap;
+>> +Required properties:
+>> +- compatible: "xlnx,zynq-reset"
+>> +- reg: SLCR offset and size taken via syscon <0x200 0x48>
+>> +- syscon: <&slcr>
+>> +  This should be a phandle to the Zynq's SLCR register.
 >
-> Why do we need to create a mapping at all then ? Because
-> dma_sync_single_for_device() requires it ?
+>                                                  ^ register singular?
+Do you want me to resend the entire set, or are you cool with just git
+amending the 's' for registers?
 
-We still need to expose this new table to the device. If we never update 
-it, we'll never have reason to call dma_sync_, but we definitely want 
-the IOMMU to know there's a page of invalid PTEs there.
+> I still think the syscon phandle property is superfluous,
+> but I'm fine with keeping it for consistency.
 
->> +	}
->> +
->> +	return pages;
->> +
->> +out_unmap:
->> +	dev_err(dev, "Cannot accommodate DMA translation for IOMMU page
->> tables\n");
->> +	dma_unmap_single(dev, dma, size, DMA_TO_DEVICE);
->> +out_free:
->> +	free_pages_exact(pages, size);
->> +	return NULL;
->> +}
->> +
->> +static void __arm_lpae_free_pages(void *pages, size_t size,
->> +				  struct io_pgtable_cfg *cfg)
->> +{
->> +	struct device *dev = cfg->iommu_dev;
->> +
->> +	if (dev)
->> +		dma_unmap_single(dev, __arm_lpae_dma_addr(dev, pages),
->> +				 size, DMA_TO_DEVICE);
->> +	free_pages_exact(pages, size);
->> +}
->> +
->> +static void __arm_lpae_set_pte(arm_lpae_iopte *ptep, arm_lpae_iopte pte,
->> +			       struct io_pgtable_cfg *cfg, void *cookie)
->> +{
->> +	struct device *dev = cfg->iommu_dev;
->> +
->> +	*ptep = pte;
->> +
->> +	if (dev)
->> +		dma_sync_single_for_device(dev, __arm_lpae_dma_addr(dev, ptep),
->> +					   sizeof(pte), DMA_TO_DEVICE);
+Thanks.
+> It could always be made optional later.
 >
-> This is what I believe to be an API abuse. The dma_sync_single_for_device()
-> API is meant to pass ownership of a buffer to the device. Unless I'm mistaken,
-> once that's done the CPU isn't allowed to touch the buffer anymore until
-> dma_sync_single_for_cpu() is called to get ownership of the buffer back. Sure,
-> it might work on many ARM systems, but we really should be careful not to use
-> APIs as delicate as DMA mapping and cache handling for purposes different than
-> what they explicitly allow.
+>> +- #reset-cells: Must be 1
+>> +
+>> +The Zynq Reset Manager needs to be a childnode of the SLCR.
+>> +
+>> +Example:
+>> +     rstc: rstc at 200 {
+>> +             compatible = "xlnx,zynq-reset";
+>> +             reg = <0x200 0x48>;
+>> +             #reset-cells = <1>;
+>> +             syscon = <&slcr>;
+>> +     };
+>> +
+>> +Reset outputs:
+>> + 0  : soft reset
+>> + 32 : ddr reset
+>> + 64 : topsw reset
+>> + 96 : dmac reset
+>> + 128: usb0 reset
+>> + 129: usb1 reset
+>> + 160: gem0 reset
+>> + 161: gem1 reset
+>> + 164: gem0 rx reset
+>> + 165: gem1 rx reset
+>> + 166: gem0 ref reset
+>> + 167: gem1 ref reset
+>> + 192: sdio0 reset
+>> + 193: sdio1 reset
+>> + 196: sdio0 ref reset
+>> + 197: sdio1 ref reset
+>> + 224: spi0 reset
+>> + 225: spi1 reset
+>> + 226: spi0 ref reset
+>> + 227: spi1 ref reset
+>> + 256: can0 reset
+>> + 257: can1 reset
+>> + 258: can0 ref reset
+>> + 259: can1 ref reset
+>> + 288: i2c0 reset
+>> + 289: i2c1 reset
+>> + 320: uart0 reset
+>> + 321: uart1 reset
+>> + 322: uart0 ref reset
+>> + 323: uart1 ref reset
+>> + 352: gpio reset
+>> + 384: lqspi reset
+>> + 385: qspi ref reset
+>> + 416: smc reset
+>> + 417: smc ref reset
+>> + 448: ocm reset
+>> + 512: fpga0 out reset
+>> + 513: fpga1 out reset
+>> + 514: fpga2 out reset
+>> + 515: fpga3 out reset
+>> + 544: a9 reset 0
+>> + 545: a9 reset 1
+>> + 552: peri reset
+>> +
 >
-> It might be that I'm wrong and that the streaming DMA API allows this exact
-> kind of usage, but I haven't found a clear indication of that in the
-> documentation. It could also be that all implementations would support it
-> today, and that we would then consider it should be explicitly allowed by the
-> API. In both cases a documentation patch would be welcome.
+> regards
+> Philipp
+>
 
-TBH, I was largely going by Russell's Tegra patch, which similarly 
-elides any sync_*_for_cpu. In reality, since everything is DMA_TO_DEVICE 
-and the IOMMU itself can't modify the page tables[3], I can't think of 
-any situation where sync_*_for_cpu would actually do anything.
+Cheers,
 
- From reading this part of DMA-API.txt:
-
-   Notes:  You must do this:
-
-   - Before reading values that have been written by DMA from the device
-     (use the DMA_FROM_DEVICE direction)
-   - After writing values that will be written to the device using DMA
-     (use the DMA_TO_DEVICE) direction
-   - before *and* after handing memory to the device if the memory is
-     DMA_BIDIRECTIONAL
-
-I would conclude that since a sync using DMA_TO_DEVICE *before* writing 
-is not a "must", then it's probably unnecessary.
-
-Robin.
-
-[1]:http://article.gmane.org/gmane.linux.kernel/2005551
-[2]:http://article.gmane.org/gmane.linux.ports.tegra/23150
-[3]:Yes, there may generally be exceptions to that, but not in the 
-context of this code. Unless the Renesas IPMMU does something I don't 
-know about?
+Moritz
