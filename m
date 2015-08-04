@@ -1,211 +1,162 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 04 Aug 2015 13:06:34 +0100
-Subject: [PATCH v4 01/10] irqchip / GIC: Add GIC version support in ACPI
- MADT
-In-Reply-To: <1438164539-29256-2-git-send-email-hanjun.guo@linaro.org>
-References: <1438164539-29256-1-git-send-email-hanjun.guo@linaro.org>
- <1438164539-29256-2-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <55C0AACA.9090001@arm.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 4 Aug 2015 14:14:11 +0200
+Subject: [PATCH v2 04/10] KVM: arm/arm64: vgic: Allow HW irq to be
+ encoded in LR
+In-Reply-To: <55AE759C.7090809@arm.com>
+References: <1436378202-20224-1-git-send-email-marc.zyngier@arm.com>
+ <1436378202-20224-5-git-send-email-marc.zyngier@arm.com>
+ <20150717195008.GE14024@cbox> <55AE759C.7090809@arm.com>
+Message-ID: <20150804121411.GA29453@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/07/15 11:08, Hanjun Guo wrote:
-> There is a field added in ACPI 6.0 MADT table to indicate the
-> GIC version, so parse the table to get its value for later use.
+On Tue, Jul 21, 2015 at 05:38:52PM +0100, Marc Zyngier wrote:
+> On 17/07/15 20:50, Christoffer Dall wrote:
+> > On Wed, Jul 08, 2015 at 06:56:36PM +0100, Marc Zyngier wrote:
+> >> Now that struct vgic_lr supports the LR_HW bit and carries a hwirq
+> >> field, we can encode that information into the list registers.
+> >>
+> >> This patch provides implementations for both GICv2 and GICv3.
+> >>
+> >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> >> ---
+> >>  include/linux/irqchip/arm-gic-v3.h |  3 +++
+> >>  include/linux/irqchip/arm-gic.h    |  3 ++-
+> >>  virt/kvm/arm/vgic-v2.c             | 16 +++++++++++++++-
+> >>  virt/kvm/arm/vgic-v3.c             | 21 ++++++++++++++++++---
+> >>  4 files changed, 38 insertions(+), 5 deletions(-)
+> >>
+> >> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+> >> index ffbc034..cf637d6 100644
+> >> --- a/include/linux/irqchip/arm-gic-v3.h
+> >> +++ b/include/linux/irqchip/arm-gic-v3.h
+> >> @@ -268,9 +268,12 @@
+> >>  
+> >>  #define ICH_LR_EOI			(1UL << 41)
+> >>  #define ICH_LR_GROUP			(1UL << 60)
+> >> +#define ICH_LR_HW			(1UL << 61)
+> >>  #define ICH_LR_STATE			(3UL << 62)
+> >>  #define ICH_LR_PENDING_BIT		(1UL << 62)
+> >>  #define ICH_LR_ACTIVE_BIT		(1UL << 63)
+> >> +#define ICH_LR_PHYS_ID_SHIFT		32
+> >> +#define ICH_LR_PHYS_ID_MASK		(0x3ffUL << ICH_LR_PHYS_ID_SHIFT)
+> >>  
+> >>  #define ICH_MISR_EOI			(1 << 0)
+> >>  #define ICH_MISR_U			(1 << 1)
+> >> diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
+> >> index 9de976b..ca88dad 100644
+> >> --- a/include/linux/irqchip/arm-gic.h
+> >> +++ b/include/linux/irqchip/arm-gic.h
+> >> @@ -71,11 +71,12 @@
+> >>  
+> >>  #define GICH_LR_VIRTUALID		(0x3ff << 0)
+> >>  #define GICH_LR_PHYSID_CPUID_SHIFT	(10)
+> >> -#define GICH_LR_PHYSID_CPUID		(7 << GICH_LR_PHYSID_CPUID_SHIFT)
+> >> +#define GICH_LR_PHYSID_CPUID		(0x3ff << GICH_LR_PHYSID_CPUID_SHIFT)
+> >>  #define GICH_LR_STATE			(3 << 28)
+> >>  #define GICH_LR_PENDING_BIT		(1 << 28)
+> >>  #define GICH_LR_ACTIVE_BIT		(1 << 29)
+> >>  #define GICH_LR_EOI			(1 << 19)
+> >> +#define GICH_LR_HW			(1 << 31)
+> >>  
+> >>  #define GICH_VMCR_CTRL_SHIFT		0
+> >>  #define GICH_VMCR_CTRL_MASK		(0x21f << GICH_VMCR_CTRL_SHIFT)
+> >> diff --git a/virt/kvm/arm/vgic-v2.c b/virt/kvm/arm/vgic-v2.c
+> >> index f9b9c7c..8d7b04d 100644
+> >> --- a/virt/kvm/arm/vgic-v2.c
+> >> +++ b/virt/kvm/arm/vgic-v2.c
+> >> @@ -48,6 +48,10 @@ static struct vgic_lr vgic_v2_get_lr(const struct kvm_vcpu *vcpu, int lr)
+> >>  		lr_desc.state |= LR_STATE_ACTIVE;
+> >>  	if (val & GICH_LR_EOI)
+> >>  		lr_desc.state |= LR_EOI_INT;
+> >> +	if (val & GICH_LR_HW) {
+> >> +		lr_desc.state |= LR_HW;
+> >> +		lr_desc.hwirq = (val & GICH_LR_PHYSID_CPUID) >> GICH_LR_PHYSID_CPUID_SHIFT;
+> >> +	}
+> >>  
+> >>  	return lr_desc;
+> >>  }
+> >> @@ -55,7 +59,9 @@ static struct vgic_lr vgic_v2_get_lr(const struct kvm_vcpu *vcpu, int lr)
+> >>  static void vgic_v2_set_lr(struct kvm_vcpu *vcpu, int lr,
+> >>  			   struct vgic_lr lr_desc)
+> >>  {
+> >> -	u32 lr_val = (lr_desc.source << GICH_LR_PHYSID_CPUID_SHIFT) | lr_desc.irq;
+> >> +	u32 lr_val;
+> >> +
+> >> +	lr_val = lr_desc.irq;
+> >>  
+> >>  	if (lr_desc.state & LR_STATE_PENDING)
+> >>  		lr_val |= GICH_LR_PENDING_BIT;
+> >> @@ -64,6 +70,14 @@ static void vgic_v2_set_lr(struct kvm_vcpu *vcpu, int lr,
+> >>  	if (lr_desc.state & LR_EOI_INT)
+> >>  		lr_val |= GICH_LR_EOI;
+> >>  
+> >> +	if (lr_desc.state & LR_HW) {
+> >> +		lr_val |= GICH_LR_HW;
+> >> +		lr_val |= (u32)lr_desc.hwirq << GICH_LR_PHYSID_CPUID_SHIFT;
+> >> +	}
+> >> +
+> >> +	if (lr_desc.irq < VGIC_NR_SGIS)
+> >> +		lr_val |= (lr_desc.source << GICH_LR_PHYSID_CPUID_SHIFT);
+> >> +
+> >>  	vcpu->arch.vgic_cpu.vgic_v2.vgic_lr[lr] = lr_val;
+> >>  }
+> >>  
+> >> diff --git a/virt/kvm/arm/vgic-v3.c b/virt/kvm/arm/vgic-v3.c
+> >> index dff0602..afbf925 100644
+> >> --- a/virt/kvm/arm/vgic-v3.c
+> >> +++ b/virt/kvm/arm/vgic-v3.c
+> >> @@ -67,6 +67,10 @@ static struct vgic_lr vgic_v3_get_lr(const struct kvm_vcpu *vcpu, int lr)
+> >>  		lr_desc.state |= LR_STATE_ACTIVE;
+> >>  	if (val & ICH_LR_EOI)
+> >>  		lr_desc.state |= LR_EOI_INT;
+> >> +	if (val & ICH_LR_HW) {
+> >> +		lr_desc.state |= LR_HW;
+> >> +		lr_desc.hwirq = (val >> ICH_LR_PHYS_ID_SHIFT) & GENMASK(9, 0);
+> >> +	}
+> >>  
+> >>  	return lr_desc;
+> >>  }
+> >> @@ -84,10 +88,17 @@ static void vgic_v3_set_lr(struct kvm_vcpu *vcpu, int lr,
+> >>  	 * Eventually we want to make this configurable, so we may revisit
+> >>  	 * this in the future.
+> >>  	 */
+> >> -	if (vcpu->kvm->arch.vgic.vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3)
+> >> +	switch (vcpu->kvm->arch.vgic.vgic_model) {
+> >> +	case KVM_DEV_TYPE_ARM_VGIC_V3:
+> >>  		lr_val |= ICH_LR_GROUP;
+> >> -	else
+> >> -		lr_val |= (u32)lr_desc.source << GICH_LR_PHYSID_CPUID_SHIFT;
+> >> +		break;
+> >> +	case  KVM_DEV_TYPE_ARM_VGIC_V2:
+> >> +		if (lr_desc.irq < VGIC_NR_SGIS)
+> >> +			lr_val |= (u32)lr_desc.source << GICH_LR_PHYSID_CPUID_SHIFT;
+> > 
+> > I forget how this works: Why are we mixing GICH_LR_ stuff with ICH_LR_
+> > in the same function?  Aren't we always accessing these registers via
+> > the system registers interface from the hypervisor control point of
+> > view, regardless of which GIC version the guest sees?
 > 
-> If GIC version presented in MADT is 0, we need to fallback to
-> hardware discovery to get the GIC version.
+> That's a bit odd indeed, but there's a small trick here:
 > 
-> In ACPI MADT table there is no compatible strings to indicate
-> various irqchips and also ACPI doesn't support irqchips which
-> are not compatible with ARM GIC spec, so GIC version can be used
-> to load different GIC drivers which is needed for the later patch.
+> - GICv2 has the CPUID as part of the PHYSID field.
+> - GICv3 "native" has no CPUID
+> - GICv3, when used with a GICv2 guest, puts CPUID as part of the the
+> bottom 32bit of the ICH_LRn_EL2 register, which happens to be the VIRTID.
 > 
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> ---
->  arch/arm64/Kconfig                   |   1 +
->  drivers/irqchip/Kconfig              |   3 +
->  drivers/irqchip/Makefile             |   1 +
->  drivers/irqchip/irq-gic-acpi.c       | 109 +++++++++++++++++++++++++++++++++++
->  include/linux/irqchip/arm-gic-acpi.h |   1 +
->  5 files changed, 115 insertions(+)
->  create mode 100644 drivers/irqchip/irq-gic-acpi.c
+> And that VIRTID, when used with a GICv2 guest, actually contains most of
+> the GICH_LR fields. Crucially, CPUID is located at VIRTID[12:10], which
+> happens to be GICH_LRn[12:10], exactly where it is on a GICv2.
 > 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 318175f..f2ff61f 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -16,6 +16,7 @@ config ARM64
->  	select ARM_AMBA
->  	select ARM_ARCH_TIMER
->  	select ARM_GIC
-> +	select ARM_GIC_ACPI if ACPI
->  	select AUDIT_ARCH_COMPAT_GENERIC
->  	select ARM_GIC_V2M if PCI_MSI
->  	select ARM_GIC_V3
-> diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
-> index 120d815..557ec2f 100644
-> --- a/drivers/irqchip/Kconfig
-> +++ b/drivers/irqchip/Kconfig
-> @@ -47,6 +47,9 @@ config ARM_VIC_NR
->  	  The maximum number of VICs available in the system, for
->  	  power management.
->  
-> +config ARM_GIC_ACPI
-> +	bool
-> +
->  config ATMEL_AIC_IRQ
->  	bool
->  	select GENERIC_IRQ_CHIP
-> diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
-> index 11d08c9..383f421 100644
-> --- a/drivers/irqchip/Makefile
-> +++ b/drivers/irqchip/Makefile
-> @@ -23,6 +23,7 @@ obj-$(CONFIG_ARM_GIC)			+= irq-gic.o irq-gic-common.o
->  obj-$(CONFIG_ARM_GIC_V2M)		+= irq-gic-v2m.o
->  obj-$(CONFIG_ARM_GIC_V3)		+= irq-gic-v3.o irq-gic-common.o
->  obj-$(CONFIG_ARM_GIC_V3_ITS)		+= irq-gic-v3-its.o irq-gic-v3-its-pci-msi.o irq-gic-v3-its-platform-msi.o
-> +obj-$(CONFIG_ARM_GIC_ACPI)		+= irq-gic-acpi.o
->  obj-$(CONFIG_ARM_NVIC)			+= irq-nvic.o
->  obj-$(CONFIG_ARM_VIC)			+= irq-vic.o
->  obj-$(CONFIG_ATMEL_AIC_IRQ)		+= irq-atmel-aic-common.o irq-atmel-aic.o
-> diff --git a/drivers/irqchip/irq-gic-acpi.c b/drivers/irqchip/irq-gic-acpi.c
-> new file mode 100644
-> index 0000000..6537b43
-> --- /dev/null
-> +++ b/drivers/irqchip/irq-gic-acpi.c
-> @@ -0,0 +1,109 @@
-> +/*
-> + * ACPI based support for ARM GIC init
-> + *
-> + * Copyright (C) 2015, Linaro Ltd.
-> + * 	Author: Hanjun Guo <hanjun.guo@linaro.org>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#define pr_fmt(fmt) "ACPI: GIC: " fmt
-> +
-> +#include <linux/acpi.h>
-> +#include <linux/init.h>
-> +#include <linux/irqchip/arm-gic-acpi.h>
-> +#include <linux/irqchip/arm-gic-v3.h>
-> +
-> +/* GIC version presented in MADT GIC distributor structure */
-> +static u8 gic_version __initdata = ACPI_MADT_GIC_VERSION_NONE;
-> +
-> +static phys_addr_t dist_phy_base __initdata;
-> +
-> +static int __init
-> +acpi_gic_parse_distributor(struct acpi_subtable_header *header,
-> +			   const unsigned long end)
-> +{
-> +	struct acpi_madt_generic_distributor *dist;
-> +
-> +	dist = (struct acpi_madt_generic_distributor *)header;
-> +
-> +	if (BAD_MADT_ENTRY(dist, end))
-> +		return -EINVAL;
-> +
-> +	gic_version = dist->version;
-> +	dist_phy_base = dist->base_address;
-> +	return 0;
-> +}
-> +
-> +static int __init
-> +match_gic_redist(struct acpi_subtable_header *header, const unsigned long end)
-> +{
-> +	return 0;
-> +}
-> +
-> +static bool __init acpi_gic_redist_is_present(void)
-> +{
-> +	int count;
-> +
-> +	/* scan MADT table to find if we have redistributor entries */
-> +	count  =  acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_REDISTRIBUTOR,
-> +					match_gic_redist, 0);
-> +
-> +	/* that's true if we have at least one GIC redistributor entry */
-> +	return count > 0;
-> +}
-> +
-> +static int __init acpi_gic_version_init(void)
-> +{
-> +	int count;
-> +	u32 reg;
-> +	void __iomem *dist_base;
-> +
-> +	count = acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR,
-> +				      acpi_gic_parse_distributor, 0);
-> +
-> +	if (count <= 0) {
-> +		pr_err("No valid GIC distributor entry exists\n");
-> +		return -ENODEV;
-> +	}
-> +
-> +	if (gic_version >= ACPI_MADT_GIC_VERSION_RESERVED) {
-> +		pr_err("Invalid GIC version %d in MADT\n", gic_version);
-> +		return -EINVAL;
-> +	}
-> +
-> +	/*
-> +	 * when the GIC version is 0, we fallback to hardware discovery.
-> +	 * this is also needed to keep compatiable with ACPI 5.1,
-> +	 * which has no gic_version field in distributor structure and
-> +	 * reserved as 0.
-> +	 *
-> +	 * For hardware discovery, the offset for GICv1/2 and GICv3/4 to
-> +	 * get the GIC version is different (0xFE8 for GICv1/2 and 0xFFE8
-> +	 * for GICv3/4), so we need to handle it separately.
-> +	 */
-> +	if (gic_version	== ACPI_MADT_GIC_VERSION_NONE) {
-> +		/* it's GICv3/v4 if redistributor is present */
-> +		if (acpi_gic_redist_is_present()) {
-> +			dist_base = ioremap(dist_phy_base,
-> +					    ACPI_GICV3_DIST_MEM_SIZE);
-> +			if (!dist_base)
-> +				return -ENOMEM;
-> +
-> +			reg = readl_relaxed(dist_base + GICD_PIDR2) &
-> +					    GIC_PIDR2_ARCH_MASK;
-> +			if (reg == GIC_PIDR2_ARCH_GICv3)
-> +				gic_version = ACPI_MADT_GIC_VERSION_V3;
-> +			else
-> +				gic_version = ACPI_MADT_GIC_VERSION_V4;
+> Confusing? You bet. Oh, and that subtle difference seems to have been
+> removed from the architecture spec. Time to file a bug report.
+> 
+> > I guess my question here is: Why should this not be
+> > ICH_LR_PHYSID_CORE_SHIFT?
+> 
+> No, because as explained above, the CPUID doesn't belong to PHYSID...
+> 
+I get it.  Thanks for explanation, you can point me here when I'm going
+to ask you again in a year or so.
 
-Frankly, why should we care? If there is no redistributor, this is a V2.
-If there are redistributors, then it is a V3/V4, and it shouldn't matter
-which one this is as the GICv3 driver can find out all by itself. Also,
-the GICv4 feature only matter for KVM, which can probe this on its own.
-
-> +
-> +			iounmap(dist_base);
-> +		} else {
-> +			gic_version = ACPI_MADT_GIC_VERSION_V2;
-> +		}
-> +	}
-> +
-> +	return 0;
-> +}
-> diff --git a/include/linux/irqchip/arm-gic-acpi.h b/include/linux/irqchip/arm-gic-acpi.h
-> index de3419e..13bc676 100644
-> --- a/include/linux/irqchip/arm-gic-acpi.h
-> +++ b/include/linux/irqchip/arm-gic-acpi.h
-> @@ -19,6 +19,7 @@
->   */
->  #define ACPI_GICV2_DIST_MEM_SIZE	(SZ_4K)
->  #define ACPI_GIC_CPU_IF_MEM_SIZE	(SZ_8K)
-> +#define ACPI_GICV3_DIST_MEM_SIZE	(SZ_64K)
->  
->  struct acpi_table_header;
->  
-> 
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+-Christoffer
