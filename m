@@ -1,73 +1,44 @@
-From: aisheng.dong@freescale.com (Dong Aisheng)
-Date: Tue, 4 Aug 2015 17:45:57 +0800
-Subject: [PATCH V3 0/5] clk: support clocks which requires parent clock
- on during operation
-In-Reply-To: <20150728143824.GB16916@shlinux1.ap.freescale.net>
-References: <1438089585-30103-1-git-send-email-aisheng.dong@freescale.com>
- <20150728143824.GB16916@shlinux1.ap.freescale.net>
-Message-ID: <20150804094556.GE24870@shlinux1.ap.freescale.net>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Tue, 4 Aug 2015 17:56:26 +0800
+Subject: [RFC PATCH 2/3] mailbox: Hisilicon: add mailbox driver
+In-Reply-To: <1438679859.8734.35.camel@tiscali.nl>
+References: <1438564390-28111-1-git-send-email-leo.yan@linaro.org>
+ <1438564390-28111-3-git-send-email-leo.yan@linaro.org>
+ <1438677024.8734.24.camel@tiscali.nl>
+ <20150804084930.GA27609@leoy-linaro>
+ <1438679859.8734.35.camel@tiscali.nl>
+Message-ID: <20150804095626.GC27609@leoy-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 28, 2015 at 10:38:25PM +0800, Dong Aisheng wrote:
-> On Tue, Jul 28, 2015 at 09:19:40PM +0800, Dong Aisheng wrote:
-> > This patch series adds support in clock framework for clocks which operations
-> > requires its parent clock is on.
+On Tue, Aug 04, 2015 at 11:17:39AM +0200, Paul Bolle wrote:
+> On di, 2015-08-04 at 16:49 +0800, Leo Yan wrote:
+> > On Tue, Aug 04, 2015 at 10:30:24AM +0200, Paul Bolle wrote:
+> > > On ma, 2015-08-03 at 09:13 +0800, Leo Yan wrote:
+> > > > --- /dev/null
+> > > > +++ b/drivers/mailbox/hisilicon/Kconfig
+> > > 
+> > > > +config HISI_MBOX
+> > > > +	bool "Hisilicon's Mailbox"
+> > > > +	depends on ARCH_HISI || OF
+> > > 
+> > > ARCH_HISI is available on either ARM64 or ARM. ARM64 selects OF. On ARM
+> > > ARCH_HISI depends on ARCH_MULTIV7 which depends on ARCH_MULTIPLATFORM.
+> > > That selects USE_OF which on its turn selects OF.
+> > > 
+> > > So, HISI_MBOX implies OF, correct?
 > > 
-> > Such clock type is initially met on Freescale i.MX7D platform that all clocks
-> > operations, including enable/disable, rate change and re-parent, requires its
-> > parent clock on. No sure if any other SoC has the similar clock type.
-> > 
-> > Current clock core can not support such type of clock well.
-> > 
-> > This patch introduce a new flag CLK_SET_PARENT_ON to handle this special case
-> > in clock core that enable its parent clock firstly for each operation and disable
-> > it later after operation complete.
-> > 
-> > The most special case is for set_parent() operation which requires both parent,
-> > old one and new one, to be enabled at the same time during the operation.
-> > 
-> > The patch series is based on for-next branch of Michael's git:
-> > git://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git
-> > 
-> > Change Log:
-> > v2->v3:
-> >  * rebased version, no other changes.
-> > 
-> > v1->v2:
-> >  Mainly addressed Stephen Boyd's comments
-> >  * remove dupliciated code with __clk_set_parent_after
-> >  * introduce more clk_core_x APIs for core easily use
-> >  * move clk_disable_unused code position
-> >  * use clk_core_x API to make code more clean and easily read
-> > 
-> > Dong Aisheng (5):
-> >   clk: remove duplicated code with __clk_set_parent_after
-> >   clk: introduce clk_core_enable_lock and clk_core_disable_lock
-> >     functions
-> >   clk: move clk_disable_unused after clk_core_disable_unprepare function
-> >   clk: core: add CLK_OPS_PARENT_ON flags to support clocks require
-> >     parent on
-> >   clk: core: add CLK_OPS_PARENT_ON flags to support clocks require
-> >     parent on
-> > 
-> >  drivers/clk/clk.c            | 338 +++++++++++++++++++++++++------------------
-> >  include/linux/clk-provider.h |   5 +
-> >  2 files changed, 200 insertions(+), 143 deletions(-)
-> > 
+> > Exactly, will simply use "depends on ARCH_HISI".
 > 
-> Sorry, forgot to update Mike's new email address.
-> Updated.
-> 
+> That change would alter the dependencies. My remark was made just to
+> make clear why I think CONFIG_OF will always be defined. But now I guess
+> you actually meant
+> 	depends on ARCH_HISI && OF
 
-Ping...
+Correct, shame for my wrong logic :)
 
-Regards
-Dong Aisheng
+> And that would, I think, indeed be equivalent to
+> 	depends on ARCH_HISI
 
-> Regards
-> Dong Aisheng
-> 
-> > -- 
-> > 1.9.1
-> > 
+Thanks,
+Leo Yan
