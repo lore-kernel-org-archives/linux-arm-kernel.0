@@ -1,39 +1,32 @@
-From: public_timo.s@silentcreek.de (Timo Sigurdsson)
-Date: Tue,  4 Aug 2015 23:08:01 +0200
-Subject: [PATCH v2] ARM: dts: sunxi: Raise minimum CPU voltage for sun7i-a20
- to meet SoC specifications
-Message-ID: <1438722481-2302-1-git-send-email-public_timo.s@silentcreek.de>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue,  4 Aug 2015 23:25:53 +0200
+Subject: [PATCH] musb: sunxi: Ignore VBus errors in host-only mode
+Message-ID: <1438723553-4136-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-sun7i-a20.dtsi contains a cpufreq operating point at 0.9 volts. The minimum
-CPU voltage for the Allwinner A20 SoC, however, is 1.0 volts. Thus, raise
-the voltage for the lowest operating point to 1.0 volts in order to stay
-within the SoC specifications. It is an undervolted setting that isn't
-stable across all SoCs and boards out there.
+For some unclear reason sometimes we get VBus errors in host-only mode,
+even though we do not have any vbus-detection then. Ignore these.
 
-Signed-off-by: Timo Sigurdsson <public_timo.s@silentcreek.de>
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
-Changes since v1:
+ drivers/usb/musb/sunxi.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-- Fixed checkpatch warnings
-- Changed the commit message and title to clarify that this is not a board-specific issue, but rather a limitation by the SoC  
----
- arch/arm/boot/dts/sun7i-a20.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index 6a63f30..f5f384c 100644
---- a/arch/arm/boot/dts/sun7i-a20.dtsi
-+++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -107,7 +107,7 @@
- 				720000	1200000
- 				528000	1100000
- 				312000	1000000
--				144000	900000
-+				144000	1000000
- 				>;
- 			#cooling-cells = <2>;
- 			cooling-min-level = <0>;
+diff --git a/drivers/usb/musb/sunxi.c b/drivers/usb/musb/sunxi.c
+index f9f6304..34ce5df 100644
+--- a/drivers/usb/musb/sunxi.c
++++ b/drivers/usb/musb/sunxi.c
+@@ -194,6 +194,10 @@ static irqreturn_t sunxi_musb_interrupt(int irq, void *__hci)
+ 		musb_writeb(musb->mregs, MUSB_FADDR, 0);
+ 	}
+ 
++	/*  Ignore Vbus errors when in host only mode */
++	if (musb->port_mode == MUSB_PORT_MODE_HOST)
++		musb->int_usb &= ~MUSB_INTR_VBUSERROR;
++
+ 	musb->int_tx = readw(musb->mregs + SUNXI_MUSB_INTRTX);
+ 	if (musb->int_tx)
+ 		writew(musb->int_tx, musb->mregs + SUNXI_MUSB_INTRTX);
 -- 
-2.1.4
+2.4.3
