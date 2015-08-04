@@ -1,44 +1,33 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Tue, 4 Aug 2015 17:56:26 +0800
-Subject: [RFC PATCH 2/3] mailbox: Hisilicon: add mailbox driver
-In-Reply-To: <1438679859.8734.35.camel@tiscali.nl>
-References: <1438564390-28111-1-git-send-email-leo.yan@linaro.org>
- <1438564390-28111-3-git-send-email-leo.yan@linaro.org>
- <1438677024.8734.24.camel@tiscali.nl>
- <20150804084930.GA27609@leoy-linaro>
- <1438679859.8734.35.camel@tiscali.nl>
-Message-ID: <20150804095626.GC27609@leoy-linaro>
+From: b20788@freescale.com (Anson Huang)
+Date: Wed, 5 Aug 2015 01:48:35 +0800
+Subject: [PATCH 1/3] ARM: dts: imx6ul: add sram support for i.mx6ul
+Message-ID: <1438710517-6515-1-git-send-email-b20788@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 04, 2015 at 11:17:39AM +0200, Paul Bolle wrote:
-> On di, 2015-08-04 at 16:49 +0800, Leo Yan wrote:
-> > On Tue, Aug 04, 2015 at 10:30:24AM +0200, Paul Bolle wrote:
-> > > On ma, 2015-08-03 at 09:13 +0800, Leo Yan wrote:
-> > > > --- /dev/null
-> > > > +++ b/drivers/mailbox/hisilicon/Kconfig
-> > > 
-> > > > +config HISI_MBOX
-> > > > +	bool "Hisilicon's Mailbox"
-> > > > +	depends on ARCH_HISI || OF
-> > > 
-> > > ARCH_HISI is available on either ARM64 or ARM. ARM64 selects OF. On ARM
-> > > ARCH_HISI depends on ARCH_MULTIV7 which depends on ARCH_MULTIPLATFORM.
-> > > That selects USE_OF which on its turn selects OF.
-> > > 
-> > > So, HISI_MBOX implies OF, correct?
-> > 
-> > Exactly, will simply use "depends on ARCH_HISI".
-> 
-> That change would alter the dependencies. My remark was made just to
-> make clear why I think CONFIG_OF will always be defined. But now I guess
-> you actually meant
-> 	depends on ARCH_HISI && OF
+Add SRAM support for i.MX6UL, it has 128KB ocram
+starting from 0x900000.
 
-Correct, shame for my wrong logic :)
+Signed-off-by: Anson Huang <b20788@freescale.com>
+---
+ arch/arm/boot/dts/imx6ul.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-> And that would, I think, indeed be equivalent to
-> 	depends on ARCH_HISI
-
-Thanks,
-Leo Yan
+diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
+index b6c6c31..227ba6e 100644
+--- a/arch/arm/boot/dts/imx6ul.dtsi
++++ b/arch/arm/boot/dts/imx6ul.dtsi
+@@ -133,6 +133,11 @@
+ 			status = "disabled";
+ 		};
+ 
++		ocram: sram at 00900000 {
++			compatible = "mmio-sram";
++			reg = <0x00900000 0x20000>;
++		};
++
+ 		aips1: aips-bus at 02000000 {
+ 			compatible = "fsl,aips-bus", "simple-bus";
+ 			#address-cells = <1>;
+-- 
+1.9.1
