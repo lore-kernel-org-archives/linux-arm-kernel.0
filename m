@@ -1,79 +1,73 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Tue,  4 Aug 2015 11:23:18 +0200
-Subject: [PATCH 1/6] gpiolib-of: Rename gpio_hog functions to be generic
-In-Reply-To: <1438680203-13432-1-git-send-email-mpa@pengutronix.de>
-References: <1438680203-13432-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1438680203-13432-2-git-send-email-mpa@pengutronix.de>
+From: aisheng.dong@freescale.com (Dong Aisheng)
+Date: Tue, 4 Aug 2015 17:45:57 +0800
+Subject: [PATCH V3 0/5] clk: support clocks which requires parent clock
+ on during operation
+In-Reply-To: <20150728143824.GB16916@shlinux1.ap.freescale.net>
+References: <1438089585-30103-1-git-send-email-aisheng.dong@freescale.com>
+ <20150728143824.GB16916@shlinux1.ap.freescale.net>
+Message-ID: <20150804094556.GE24870@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The gpio hogging functions are currently only used for gpio-hogging. But
-these functions are widely generic ones which parse gpio device nodes in
-the DT.
+On Tue, Jul 28, 2015 at 10:38:25PM +0800, Dong Aisheng wrote:
+> On Tue, Jul 28, 2015 at 09:19:40PM +0800, Dong Aisheng wrote:
+> > This patch series adds support in clock framework for clocks which operations
+> > requires its parent clock is on.
+> > 
+> > Such clock type is initially met on Freescale i.MX7D platform that all clocks
+> > operations, including enable/disable, rate change and re-parent, requires its
+> > parent clock on. No sure if any other SoC has the similar clock type.
+> > 
+> > Current clock core can not support such type of clock well.
+> > 
+> > This patch introduce a new flag CLK_SET_PARENT_ON to handle this special case
+> > in clock core that enable its parent clock firstly for each operation and disable
+> > it later after operation complete.
+> > 
+> > The most special case is for set_parent() operation which requires both parent,
+> > old one and new one, to be enabled at the same time during the operation.
+> > 
+> > The patch series is based on for-next branch of Michael's git:
+> > git://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git
+> > 
+> > Change Log:
+> > v2->v3:
+> >  * rebased version, no other changes.
+> > 
+> > v1->v2:
+> >  Mainly addressed Stephen Boyd's comments
+> >  * remove dupliciated code with __clk_set_parent_after
+> >  * introduce more clk_core_x APIs for core easily use
+> >  * move clk_disable_unused code position
+> >  * use clk_core_x API to make code more clean and easily read
+> > 
+> > Dong Aisheng (5):
+> >   clk: remove duplicated code with __clk_set_parent_after
+> >   clk: introduce clk_core_enable_lock and clk_core_disable_lock
+> >     functions
+> >   clk: move clk_disable_unused after clk_core_disable_unprepare function
+> >   clk: core: add CLK_OPS_PARENT_ON flags to support clocks require
+> >     parent on
+> >   clk: core: add CLK_OPS_PARENT_ON flags to support clocks require
+> >     parent on
+> > 
+> >  drivers/clk/clk.c            | 338 +++++++++++++++++++++++++------------------
+> >  include/linux/clk-provider.h |   5 +
+> >  2 files changed, 200 insertions(+), 143 deletions(-)
+> > 
+> 
+> Sorry, forgot to update Mike's new email address.
+> Updated.
+> 
 
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
----
- drivers/gpio/gpiolib-of.c | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+Ping...
 
-diff --git a/drivers/gpio/gpiolib-of.c b/drivers/gpio/gpiolib-of.c
-index 9a0ec48a4737..41a4945b346e 100644
---- a/drivers/gpio/gpiolib-of.c
-+++ b/drivers/gpio/gpiolib-of.c
-@@ -119,17 +119,17 @@ int of_get_named_gpio_flags(struct device_node *np, const char *list_name,
- EXPORT_SYMBOL(of_get_named_gpio_flags);
- 
- /**
-- * of_get_gpio_hog() - Get a GPIO hog descriptor, names and flags for GPIO API
-+ * of_parse_gpio() - Get a GPIO hog descriptor, names and flags for GPIO API
-  * @np:		device node to get GPIO from
-  * @name:	GPIO line name
-  * @lflags:	gpio_lookup_flags - returned from of_find_gpio() or
-- *		of_get_gpio_hog()
-+ *		of_parse_gpio()
-  * @dflags:	gpiod_flags - optional GPIO initialization flags
-  *
-  * Returns GPIO descriptor to use with Linux GPIO API, or one of the errno
-  * value on the error condition.
-  */
--static struct gpio_desc *of_get_gpio_hog(struct device_node *np,
-+static struct gpio_desc *of_parse_gpio(struct device_node *np,
- 				  const char **name,
- 				  enum gpio_lookup_flags *lflags,
- 				  enum gpiod_flags *dflags)
-@@ -199,13 +199,13 @@ static struct gpio_desc *of_get_gpio_hog(struct device_node *np,
- }
- 
- /**
-- * of_gpiochip_scan_hogs - Scan gpio-controller and apply GPIO hog as requested
-+ * of_gpiochip_scan_gpios - Scan gpio-controller for gpio definitions
-  * @chip:	gpio chip to act on
-  *
-  * This is only used by of_gpiochip_add to request/set GPIO initial
-  * configuration.
-  */
--static void of_gpiochip_scan_hogs(struct gpio_chip *chip)
-+static void of_gpiochip_scan_gpios(struct gpio_chip *chip)
- {
- 	struct gpio_desc *desc = NULL;
- 	struct device_node *np;
-@@ -217,7 +217,7 @@ static void of_gpiochip_scan_hogs(struct gpio_chip *chip)
- 		if (!of_property_read_bool(np, "gpio-hog"))
- 			continue;
- 
--		desc = of_get_gpio_hog(np, &name, &lflags, &dflags);
-+		desc = of_parse_gpio(np, &name, &lflags, &dflags);
- 		if (IS_ERR(desc))
- 			continue;
- 
-@@ -436,7 +436,7 @@ void of_gpiochip_add(struct gpio_chip *chip)
- 	of_gpiochip_add_pin_range(chip);
- 	of_node_get(chip->of_node);
- 
--	of_gpiochip_scan_hogs(chip);
-+	of_gpiochip_scan_gpios(chip);
- }
- 
- void of_gpiochip_remove(struct gpio_chip *chip)
--- 
-2.1.4
+Regards
+Dong Aisheng
+
+> Regards
+> Dong Aisheng
+> 
+> > -- 
+> > 1.9.1
+> > 
