@@ -1,39 +1,64 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 4 Aug 2015 18:42:26 +0100
-Subject: [PATCH v4 1/3] dt-binding: spi: Mediatek: Document devicetree
- bindings for spi bus
-In-Reply-To: <1438167874-1305-2-git-send-email-leilk.liu@mediatek.com>
-References: <1438167874-1305-1-git-send-email-leilk.liu@mediatek.com>
- <1438167874-1305-2-git-send-email-leilk.liu@mediatek.com>
-Message-ID: <20150804174226.GE20873@sirena.org.uk>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Tue, 04 Aug 2015 18:56:23 +0200
+Subject: [PATCH v2 0/4] mtd: pxa3xx_nand: rework the timing setup
+In-Reply-To: <CAAEAJfBMpQ8nf5aLTUqrCsJkMQbnkQTB1yA5MBiJ6R4h6RgupQ@mail.gmail.com>
+ (Ezequiel Garcia's message of "Mon, 3 Aug 2015 10:48:55 -0300")
+References: <1436281707-20106-1-git-send-email-antoine.tenart@free-electrons.com>
+ <20150717134159.GC10608@kwain> <55A912F0.7080605@vanguardiasur.com.ar>
+ <87h9p2is8e.fsf@belgarion.home>
+ <CAAEAJfCcdioVQKZs9U3DP6H94BiuQ2qU21DsMKevS5+j+-XEKA@mail.gmail.com>
+ <87wpxufw2v.fsf@belgarion.home>
+ <CAAEAJfB3caa+DmJN=Pa8brx0uGC11QA29KJb3NQdJjXTgw-yuA@mail.gmail.com>
+ <87si81m15m.fsf@belgarion.home>
+ <CAAEAJfBMpQ8nf5aLTUqrCsJkMQbnkQTB1yA5MBiJ6R4h6RgupQ@mail.gmail.com>
+Message-ID: <87d1z3m1qg.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 29, 2015 at 07:04:32PM +0800, Leilk Liu wrote:
-> Signed-off-by: Leilk Liu <leilk.liu@mediatek.com>
+Ezequiel Garcia <ezequiel@vanguardiasur.com.ar> writes:
 
-Please use subject lines reflecting the style for the subsystem so
-people can spot if patches are relevant to them.
+>>
+>> The issue I see is that :
+>>  - there is a bug in the clk driver for pxa3xx I introduced (CKEN_AB)
 
-> +- clocks: phandles to input clocks.
-> +
-> +- clock-names: tuple listing input clock names.
-> +	Required elements: "main"
+>>  - and shutting down the GCU clock prevents the NAND from working (I can't
+>>  explain that one yet)
 
-...and there are no optional values?
+Ah actually it's even trickier, but it has nothing to do with the GCU clock,
+that was a wrong interpretation of the test sequence.
 
-> +- pad-select: should specify spi pad used, only required for MT8173.
-> +        This value should be 0~3.
+What actually happens is that on the platform I have, the NAND is sharing the
+DFI bus with the Static Memory Controller. Now let's see what happens on
+boot-up, knowing that my pxa3xx-nand is a module, not builtin :
+ - the kernel boots
+ - the core clock initializes
+ - the ethernet card initializes (it is on the static memory controller)
+ - the kernel finishes the boot sequence
+   => the NAND clock is unused
+   => as such, the core clock framework disables it
 
-What do the values 0-3 mean?  I guess it's the value for some register
-or other part of the device, the binding should say so people can go and
-check the datasheet, schematic or whatever to figure out what to set.
+And here is the catch : on the next ethernet access, the system bus will be
+stalled forever. The reason behind is that because the bootloader left the
+"NDCR_ND_ARB_EN" bit enabled, the DFI bus sees the ethernet register access, and
+asks for arbitration; as the NAND clock is down, the arbitration never happens,
+and the pxa3xx is stalled forever.
 
-This property should be optional, not required
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150804/2584c731/attachment.sig>
+The very same thing happens when you load and unload pxa3xx-nand with a platform
+where it was loaded with "enable-arbiter" platform-data, and if that platform
+has any driver mapped in the SMC address space (0x0 .. 0x14000000).
+
+If you have an opportunity to load/unload a pxa3xx-nand, I'd be glad to have
+someone verify this theory.
+
+The first fix comming to my mind would be to :
+ - disable the NDCR_ND_ARB_EN in the pxa3xx core bring up
+ - keep enablement in pxa3xx-nand
+ - ensure it is disabled on the probe error path or remove of pxa3xx-nand
+
+Cheers.
+
+--
+Robert
+
+PS: That also means that the fix I posted for CKENA/CKENB inversion should fix
+the issues you see.
