@@ -1,25 +1,59 @@
-From: santosh.shilimkar@oracle.com (santosh shilimkar)
-Date: Tue, 4 Aug 2015 12:14:53 -0700
-Subject: [Resend: PATCH] ARM: keystone: add documentation for SoCs and EVMs
-In-Reply-To: <1438706203-3748-1-git-send-email-m-karicheri2@ti.com>
-References: <1438706203-3748-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <55C10F2D.9050805@oracle.com>
+From: ijc@hellion.org.uk (Ian Campbell)
+Date: Tue,  4 Aug 2015 20:25:55 +0100
+Subject: [PATCH net] net: thunderx: remove effective "default y" from Kconfig
+ if ARCH_THUNDER=y
+Message-ID: <1438716355-11515-1-git-send-email-ijc@hellion.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/4/2015 9:36 AM, Murali Karicheri wrote:
-> Currently there is no general documentation on Keystone SoCs in the
-> Linux Documentation folder of the source tree. This patch adds some
-> essential documentation with links to help users of Keystone Linux and
-> also provide links to existing documents where necessary.
->
-> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
-> ---
-Good writeup Murali. This will be handy.
-I can queue this up via arm-soc for 4.3 if the doc maintainers are
-happy with it.
+As well as for kernels built only for ThunderX ARCH_THUNDERX is also enabled
+for kernels which support multiple platforms (such as distro kernels). Thus
+"default ARCH_THUNDER" is inappropriate.
 
-Thanks !!
+I believe default m is equally frowned upon, so remove the line completely
+rather than "default m if ARCH_THUNDER".
 
-Regards,
-Santosh
+Signed-off-by: Ian Campbell <ijc@hellion.org.uk>
+Cc: Sunil Goutham <sgoutham@cavium.com>
+Cc: Robert Richter <rric@kernel.org>
+Cc: Derek Chickles <derek.chickles@caviumnetworks.com>
+Cc: Satanand Burla <satananda.burla@caviumnetworks.com>
+Cc: Felix Manlunas <felix.manlunas@caviumnetworks.com>
+Cc: Raghu Vatsavayi <raghu.vatsavayi@caviumnetworks.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: netdev at vger.kernel.org
+Cc: linux-kernel at vger.kernel.org
+---
+ drivers/net/ethernet/cavium/Kconfig | 3 ---
+ 1 file changed, 3 deletions(-)
+
+diff --git a/drivers/net/ethernet/cavium/Kconfig b/drivers/net/ethernet/cavium/Kconfig
+index 3584420..9b35d14 100644
+--- a/drivers/net/ethernet/cavium/Kconfig
++++ b/drivers/net/ethernet/cavium/Kconfig
+@@ -16,7 +16,6 @@ if NET_VENDOR_CAVIUM
+ config THUNDER_NIC_PF
+ 	tristate "Thunder Physical function driver"
+ 	depends on 64BIT
+-	default ARCH_THUNDER
+ 	select THUNDER_NIC_BGX
+ 	---help---
+ 	  This driver supports Thunder's NIC physical function.
+@@ -29,14 +28,12 @@ config THUNDER_NIC_PF
+ config THUNDER_NIC_VF
+ 	tristate "Thunder Virtual function driver"
+ 	depends on 64BIT
+-	default ARCH_THUNDER
+ 	---help---
+ 	  This driver supports Thunder's NIC virtual function
+ 
+ config	THUNDER_NIC_BGX
+ 	tristate "Thunder MAC interface driver (BGX)"
+ 	depends on 64BIT
+-	default ARCH_THUNDER
+ 	select PHYLIB
+ 	select MDIO_OCTEON
+ 	---help---
+-- 
+2.1.4
