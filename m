@@ -1,89 +1,222 @@
 From: lina.iyer@linaro.org (Lina Iyer)
-Date: Tue,  4 Aug 2015 17:35:39 -0600
-Subject: [PATCH 9/9] ARM: smp: Add runtime PM support for CPU hotplug
+Date: Tue,  4 Aug 2015 17:35:36 -0600
+Subject: [PATCH 6/9] ARM: domain: Add platform handlers for CPU PM domains
 In-Reply-To: <1438731339-58317-1-git-send-email-lina.iyer@linaro.org>
 References: <1438731339-58317-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1438731339-58317-10-git-send-email-lina.iyer@linaro.org>
+Message-ID: <1438731339-58317-7-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable runtime PM for CPU devices. Do a runtime get of the CPU device
-when the CPU is hotplugged in and a runtime put of the CPU device when
-the CPU is hotplugged off. When all the CPUs in a domain are hotplugged
-off, the domain may also be powered off and cluster_pm_enter/exit()
-notifications are be sent out.
+In addition to the common power up/down actions of CPU PM domain core,
+platforms may have additional configuration before the CPU domain can be
+powered off or considered active. Allow platform drivers to register
+handlers for CPU PM domains.
 
+Platform drivers may register their callbacks against a compatible
+string defined by their PM domain provider device node in the DT. At
+domain init, the platform driver can initialize the platform specific
+genpd attributes. The init callback would need to return successfully,
+for the platform power_on/off handlers to be registered with the CPU PM
+domain.
+
+The code uses __init section to reduce memory needed for platform
+handlers and therefore can be freed after the driver is initialized, a
+desirable outcome for single kernel image.
+
+Cc: Rob Herring <robh@kernel.org>
+Cc: Stephen Boyd <sboyd@codeaurora.org>
+Cc: Kevin Hilman <khilman@linaro.org>
+Cc: Ulf Hansson <ulf.hansson@linaro.org>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Mark Rutland <mark.rutland@arm.com>
 Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
 ---
- arch/arm/kernel/smp.c | 18 +++++++++++++++++-
- 1 file changed, 17 insertions(+), 1 deletion(-)
+ Documentation/arm/cpu-domains.txt | 26 ++++++++++++++++++++++++++
+ arch/arm/common/domains.c         | 37 +++++++++++++++++++++++++++++++++++++
+ arch/arm/include/asm/arm-pd.h     | 30 ++++++++++++++++++++++++++++++
+ include/asm-generic/vmlinux.lds.h |  2 ++
+ 4 files changed, 95 insertions(+)
+ create mode 100644 arch/arm/include/asm/arm-pd.h
 
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 0496b48..1d614b8 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -27,6 +27,7 @@
- #include <linux/completion.h>
- #include <linux/cpufreq.h>
- #include <linux/irq_work.h>
-+#include <linux/pm_runtime.h>
- 
- #include <linux/atomic.h>
- #include <asm/smp.h>
-@@ -137,7 +138,6 @@ int __cpu_up(unsigned int cpu, struct task_struct *idle)
- 		pr_err("CPU%u: failed to boot: %d\n", cpu, ret);
- 	}
- 
--
- 	memset(&secondary_data, 0, sizeof(secondary_data));
- 	return ret;
- }
-@@ -205,6 +205,9 @@ int __cpu_disable(void)
- 	unsigned int cpu = smp_processor_id();
- 	int ret;
- 
-+	/* We dont need the CPU device anymore. */
-+	pm_runtime_put_sync(get_cpu_device(cpu));
+diff --git a/Documentation/arm/cpu-domains.txt b/Documentation/arm/cpu-domains.txt
+index 3e535b7..a0b98f3 100644
+--- a/Documentation/arm/cpu-domains.txt
++++ b/Documentation/arm/cpu-domains.txt
+@@ -47,3 +47,29 @@ attaches the domains' CPU devices to as specified in the DT. This happens
+ automatically at kernel init, when the domain is specified as compatible with
+ "arm,pd". Powering on/off the common cluster hardware would also be done when
+ the PM domain is runtime suspended or resumed.
 +
- 	ret = platform_cpu_disable(cpu);
- 	if (ret)
- 		return ret;
-@@ -272,6 +275,13 @@ void __ref cpu_die(void)
++SoCs may have additional configuration for the CPU PM domain. The ARM code
++provides a way for the platform driver to add those properties to the genpd
++before the genpd object is initialized. Additionally, platform driver may also
++register for CPU domain power_on/power_off callbacks.
++
++Platform drivers may register the callbacks using the __init section macro
++ARM_PD_METHOD_OF_DECLARE. The callbacks in of_arm_pd_ops, can be specified
++against a compatible flag for the domain provider.
++
++Callback for platform drivers -
++
++int (*init)(struct device_node *dn, struct generic_pm_domain *d)
++The init() callback is called before the generic PM domain is registered with
++the GenPD framework. The device node is provided to identify the domain that
++is being initialized. The init function must return 0, in order for the
++power_on and power_off callbacks to be registered with the CPU PD framework.
++
++int (*power_on)(struct generic_pm_domain *d);
++The power_on() callback is called when the first CPU in the cluster is ready
++to resume execution. The domain may be considered active at this point.
++
++int (*power_off)(struct generic_pm_domain *d);
++The power_off() callback is called when the last CPU in the cluster enters
++idle. The domain may be configured to power off and wait for a CPU's wakeup
++interrupt.
+diff --git a/arch/arm/common/domains.c b/arch/arm/common/domains.c
+index 15981e9..bbffeed 100644
+--- a/arch/arm/common/domains.c
++++ b/arch/arm/common/domains.c
+@@ -18,12 +18,19 @@
+ #include <linux/pm_runtime.h>
+ #include <linux/slab.h>
+ 
++#include <asm/arm-pd.h>
++
+ #define NAME_MAX 36
+ 
+ struct arm_pm_domain {
+ 	struct generic_pm_domain genpd;
++	struct of_arm_pd_ops platform_ops;
+ };
+ 
++extern struct of_arm_pd_method __arm_pd_method_of_table[];
++static const struct of_arm_pd_method __arm_pd_method_of_table_sentinel
++	__used __section(__arm_pd_method_of_table_end);
++
+ static inline
+ struct arm_pm_domain *to_arm_pd(struct generic_pm_domain *d)
  {
- 	unsigned int cpu = smp_processor_id();
+@@ -32,20 +39,30 @@ struct arm_pm_domain *to_arm_pd(struct generic_pm_domain *d)
  
-+	/*
-+	 * We dont need the CPU device anymore.
-+	 * Lets do this before IRQs are disabled to allow
-+	 * runtime PM to suspend the domain as well.
-+	 */
-+	pm_runtime_put_sync(get_cpu_device(cpu));
-+
- 	idle_task_exit();
- 
- 	local_irq_disable();
-@@ -352,6 +362,7 @@ asmlinkage void secondary_start_kernel(void)
+ static int arm_pd_power_down(struct generic_pm_domain *genpd)
  {
- 	struct mm_struct *mm = &init_mm;
- 	unsigned int cpu;
-+	struct device *cpu_dev;
- 
- 	/*
- 	 * The identity mapping is uncached (strongly ordered), so
-@@ -401,6 +412,11 @@ asmlinkage void secondary_start_kernel(void)
- 	local_irq_enable();
- 	local_fiq_enable();
- 
-+	/* We are running, enable runtime PM for the CPU. */
-+	cpu_dev = get_cpu_device(cpu);
-+	if (cpu_dev)
-+		pm_runtime_get_sync(cpu_dev);
++	struct arm_pm_domain *pd = to_arm_pd(genpd);
 +
  	/*
- 	 * OK, it's off to the idle thread for us
+ 	 * Notify CPU PM domain power down
+ 	 * TODO: Call the notificated directly from here.
  	 */
+ 	cpu_cluster_pm_enter();
+ 
++	if (pd->platform_ops.power_off)
++		return pd->platform_ops.power_off(genpd);
++
+ 	return 0;
+ }
+ 
+ static int arm_pd_power_up(struct generic_pm_domain *genpd)
+ {
++	struct arm_pm_domain *pd = to_arm_pd(genpd);
++
+ 	/* Notify CPU PM domain power up */
+ 	cpu_cluster_pm_exit();
+ 
++	if (pd->platform_ops.power_on)
++		return pd->platform_ops.power_on(genpd);
++
+ 	return 0;
+ }
+ 
+@@ -134,6 +151,7 @@ static int __init arm_domain_init(void)
+ {
+ 	struct device_node *np;
+ 	int count = 0;
++	struct of_arm_pd_method *m = __arm_pd_method_of_table;
+ 
+ 	for_each_compatible_node(np, NULL, "arm,pd") {
+ 		struct arm_pm_domain *pd;
+@@ -145,6 +163,25 @@ static int __init arm_domain_init(void)
+ 		if (!pd)
+ 			return -ENOMEM;
+ 
++		/* Invoke platform initialization for the PM domain */
++		for (; m->handle; m++) {
++			int ret;
++
++			if (of_device_is_compatible(np, m->handle)) {
++				ret = m->ops->init(np, &pd->genpd);
++				if (!ret) {
++					pr_debug("CPU PD ops found for %s\n",
++							m->handle);
++					pd->platform_ops.power_on =
++						m->ops->power_on;
++					pd->platform_ops.power_off =
++						m->ops->power_off;
++				}
++				break;
++			}
++		}
++
++		/* Initialize rest of CPU PM domain specifics */
+ 		pd->genpd.name = kstrndup(np->name, NAME_MAX, GFP_KERNEL);
+ 		pd->genpd.power_off = arm_pd_power_down;
+ 		pd->genpd.power_on = arm_pd_power_up;
+diff --git a/arch/arm/include/asm/arm-pd.h b/arch/arm/include/asm/arm-pd.h
+new file mode 100644
+index 0000000..fc44abf
+--- /dev/null
++++ b/arch/arm/include/asm/arm-pd.h
+@@ -0,0 +1,30 @@
++/*
++ * linux/arch/arm/include/asm/arm-pd.h
++ *
++ * Copyright (C) 2015 Linaro Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#ifndef __ARM_PD_H__
++#define __ARM_PD_H__
++
++struct of_arm_pd_ops {
++	int (*init)(struct device_node *dn, struct generic_pm_domain *d);
++	int (*power_on)(struct generic_pm_domain *d);
++	int (*power_off)(struct generic_pm_domain *d);
++};
++
++struct of_arm_pd_method {
++	const char *handle;
++	struct of_arm_pd_ops *ops;
++};
++
++#define ARM_PD_METHOD_OF_DECLARE(_name, _handle, _ops)	\
++	static const struct of_arm_pd_method __arm_pd_method_of_table_##_name \
++	__used __section(__arm_pd_method_of_table)		\
++	= { .handle = _handle, .ops = _ops }
++
++#endif /* __ARM_PD_H__ */
+diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
+index 8bd374d..bd97a69 100644
+--- a/include/asm-generic/vmlinux.lds.h
++++ b/include/asm-generic/vmlinux.lds.h
+@@ -179,6 +179,7 @@
+ #define RESERVEDMEM_OF_TABLES()	OF_TABLE(CONFIG_OF_RESERVED_MEM, reservedmem)
+ #define CPU_METHOD_OF_TABLES()	OF_TABLE(CONFIG_SMP, cpu_method)
+ #define CPUIDLE_METHOD_OF_TABLES() OF_TABLE(CONFIG_CPU_IDLE, cpuidle_method)
++#define ARM_PD_METHOD_OF_TABLES() OF_TABLE(CONFIG_PM_GENERIC_DOMAINS, arm_pd_method)
+ #define EARLYCON_OF_TABLES()	OF_TABLE(CONFIG_SERIAL_EARLYCON, earlycon)
+ 
+ #define KERNEL_DTB()							\
+@@ -514,6 +515,7 @@
+ 	IOMMU_OF_TABLES()						\
+ 	CPU_METHOD_OF_TABLES()						\
+ 	CPUIDLE_METHOD_OF_TABLES()					\
++	ARM_PD_METHOD_OF_TABLES()					\
+ 	KERNEL_DTB()							\
+ 	IRQCHIP_OF_MATCH_TABLE()					\
+ 	EARLYCON_TABLE()						\
 -- 
 2.1.4
