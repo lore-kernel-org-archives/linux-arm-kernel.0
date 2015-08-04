@@ -1,50 +1,104 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Tue, 04 Aug 2015 10:05:00 +0200
-Subject: [PATCH v3] iio: adc: xilinx-xadc: Push interrupts into threaded
- context
-In-Reply-To: <CAKfKVtGegy2P_YWQAtKEzByN-+q+bq=uus4zNvO4sghXRjpGPQ@mail.gmail.com>
-References: <CAKfKVtGTO81wLWk50M303t2WjcBEMEt_LUnsJ3_WmvR_3izUjg@mail.gmail.com>	<1437434050-32907-1-git-send-email-xander.huff@ni.com>	<55B231DE.4080308@metafoo.de>
- <CAKfKVtGegy2P_YWQAtKEzByN-+q+bq=uus4zNvO4sghXRjpGPQ@mail.gmail.com>
-Message-ID: <55C0722C.7080904@metafoo.de>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Tue, 04 Aug 2015 10:09:32 +0200
+Subject: [RFCv3 1/4] docs: dts: Added documentation for Xilinx Zynq
+ Reset Controller bindings.
+In-Reply-To: <1438305237-18497-2-git-send-email-moritz.fischer@ettus.com>
+References: <1438305237-18497-1-git-send-email-moritz.fischer@ettus.com>
+ <1438305237-18497-2-git-send-email-moritz.fischer@ettus.com>
+Message-ID: <1438675772.3793.18.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/04/2015 07:34 AM, Shubhrajyoti Datta wrote:
-> On Fri, Jul 24, 2015 at 6:08 PM, Lars-Peter Clausen <lars@metafoo.de> wrote:
->> Hi,
->>
->> Sorry, but I don't think this patch has been sufficiently tested against a
->> mainline kernel. The driver wont even probe the way it is right now.
->>
->> On 07/21/2015 01:14 AM, Xander Huff wrote:
->>>
->>> The driver currently registers a pair of irq handlers using
->>> request_threaded_irq(), however the synchronization mechanism between the
->>> hardirq and the threadedirq handler is a regular spinlock.
->>
->>
->> If everything runs in threaded context we don't really need the spinlock
->> anymore and can use the mutex throughout.
-> 
-> that should be better from the performance point of view.
-> 
->>
->>>
->>> Unfortunately, this breaks PREEMPT_RT builds, where a spinlock can sleep,
->>> and is thus not able to be acquired from a hardirq handler. This patch
->>> gets
->>> rid of the hardirq handler and pushes all interrupt handling into the
->>> threaded context.
->>
->>
->> We actually might as well run everything in the hardirq handler (which will
->> be threaded in PREEMPT_RT). The reason why we have the threaded handler is
->> because xadc_handle_event() used to sleep, but it doesn't do this anymore.
-> 
-> The point is why have the hard irq. If we use hardirq then not mutex
-> can be used and spinlock will
-> be busy.
+Hi Moritz,
 
-Well there is no need to use a threaded IRQ. The interrupt handler is quite
-small and doesn't take too much time and doesn't have any delays or sleeps
-in it either.
+Am Donnerstag, den 30.07.2015, 18:13 -0700 schrieb Moritz Fischer:
+> Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
+> ---
+>  .../devicetree/bindings/reset/zynq-reset.txt       | 68 ++++++++++++++++++++++
+>  1 file changed, 68 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/reset/zynq-reset.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/reset/zynq-reset.txt b/Documentation/devicetree/bindings/reset/zynq-reset.txt
+> new file mode 100644
+> index 0000000..498c037a
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/reset/zynq-reset.txt
+> @@ -0,0 +1,68 @@
+> +Xilinx Zynq Reset Manager
+> +
+> +The Zynq AP-SoC has several different resets.
+> +
+> +See Chapter 26 of the Zynq TRM (UG585) for more information about Zynq resets.
+> +
+> +Required properties:
+> +- compatible: "xlnx,zynq-reset"
+> +- reg: SLCR offset and size taken via syscon <0x200 0x48>
+> +- syscon: <&slcr>
+> +  This should be a phandle to the Zynq's SLCR register.
+
+                                                 ^ register singular?
+
+I still think the syscon phandle property is superfluous,
+but I'm fine with keeping it for consistency.
+It could always be made optional later.
+
+> +- #reset-cells: Must be 1
+> +
+> +The Zynq Reset Manager needs to be a childnode of the SLCR.
+> +
+> +Example:
+> +	rstc: rstc at 200 {
+> +		compatible = "xlnx,zynq-reset";
+> +		reg = <0x200 0x48>;
+> +		#reset-cells = <1>;
+> +		syscon = <&slcr>;
+> +	};
+> +
+> +Reset outputs:
+> + 0  : soft reset
+> + 32 : ddr reset
+> + 64 : topsw reset
+> + 96 : dmac reset
+> + 128: usb0 reset
+> + 129: usb1 reset
+> + 160: gem0 reset
+> + 161: gem1 reset
+> + 164: gem0 rx reset
+> + 165: gem1 rx reset
+> + 166: gem0 ref reset
+> + 167: gem1 ref reset
+> + 192: sdio0 reset
+> + 193: sdio1 reset
+> + 196: sdio0 ref reset
+> + 197: sdio1 ref reset
+> + 224: spi0 reset
+> + 225: spi1 reset
+> + 226: spi0 ref reset
+> + 227: spi1 ref reset
+> + 256: can0 reset
+> + 257: can1 reset
+> + 258: can0 ref reset
+> + 259: can1 ref reset
+> + 288: i2c0 reset
+> + 289: i2c1 reset
+> + 320: uart0 reset
+> + 321: uart1 reset
+> + 322: uart0 ref reset
+> + 323: uart1 ref reset
+> + 352: gpio reset
+> + 384: lqspi reset
+> + 385: qspi ref reset
+> + 416: smc reset
+> + 417: smc ref reset
+> + 448: ocm reset
+> + 512: fpga0 out reset
+> + 513: fpga1 out reset
+> + 514: fpga2 out reset
+> + 515: fpga3 out reset
+> + 544: a9 reset 0
+> + 545: a9 reset 1
+> + 552: peri reset
+> +
+
+regards
+Philipp
