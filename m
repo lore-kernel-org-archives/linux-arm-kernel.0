@@ -1,38 +1,39 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Tue, 4 Aug 2015 15:58:41 -0500
-Subject: [PATCH v2 3/3] soc: ti: Add wkup_m3_ipc driver
-In-Reply-To: <20150720061559.GX17550@atomide.com>
-References: <1437166592-25378-1-git-send-email-d-gerlach@ti.com>
- <1437166592-25378-4-git-send-email-d-gerlach@ti.com>
- <20150720061559.GX17550@atomide.com>
-Message-ID: <55C12781.1070007@ti.com>
+From: public_timo.s@silentcreek.de (Timo Sigurdsson)
+Date: Tue,  4 Aug 2015 23:08:01 +0200
+Subject: [PATCH v2] ARM: dts: sunxi: Raise minimum CPU voltage for sun7i-a20
+ to meet SoC specifications
+Message-ID: <1438722481-2302-1-git-send-email-public_timo.s@silentcreek.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/20/2015 01:16 AM, Tony Lindgren wrote:
-> * Dave Gerlach <d-gerlach@ti.com> [150717 13:59]:
->> +
->> +/* Public functions */
-> ...
->> +EXPORT_SYMBOL_GPL(wkup_m3_set_mem_type);
->> +EXPORT_SYMBOL_GPL(wkup_m3_set_resume_address);
->> +EXPORT_SYMBOL_GPL(wkup_m3_request_pm_status);
->> +EXPORT_SYMBOL_GPL(wkup_m3_prepare_low_power);
->> +EXPORT_SYMBOL_GPL(wkup_m3_finish_low_power);
->
-> I think you can avoid exporting these SoC specific functions
-> by just exporting wkup_m3_request() and wkup_m3_free() type
-> functions with a data structure containing the necessary
-> function pointers.
+sun7i-a20.dtsi contains a cpufreq operating point at 0.9 volts. The minimum
+CPU voltage for the Allwinner A20 SoC, however, is 1.0 volts. Thus, raise
+the voltage for the lowest operating point to 1.0 volts in order to stay
+within the SoC specifications. It is an undervolted setting that isn't
+stable across all SoCs and boards out there.
 
-Ok thanks for the comment, I can try that change out, I agree it 
-probably isn't necessary to export so much.
+Signed-off-by: Timo Sigurdsson <public_timo.s@silentcreek.de>
+---
+Changes since v1:
 
-Regards,
-Dave
+- Fixed checkpatch warnings
+- Changed the commit message and title to clarify that this is not a board-specific issue, but rather a limitation by the SoC  
+---
+ arch/arm/boot/dts/sun7i-a20.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
->
-> Regards,
->
-> Tony
->
+diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+index 6a63f30..f5f384c 100644
+--- a/arch/arm/boot/dts/sun7i-a20.dtsi
++++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+@@ -107,7 +107,7 @@
+ 				720000	1200000
+ 				528000	1100000
+ 				312000	1000000
+-				144000	900000
++				144000	1000000
+ 				>;
+ 			#cooling-cells = <2>;
+ 			cooling-min-level = <0>;
+-- 
+2.1.4
