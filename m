@@ -1,24 +1,29 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 5 Aug 2015 11:00:28 +0530
-Subject: [PATCH 0/2] dmaengine: Add scatter-gathered memset support
-In-Reply-To: <1436177964-19380-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1436177964-19380-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20150805053028.GP11789@localhost>
+From: rnayak@codeaurora.org (Rajendra Nayak)
+Date: Wed, 05 Aug 2015 11:01:16 +0530
+Subject: [PATCH v7 01/13] clk: qcom: Add support for GDSCs
+In-Reply-To: <20150803192427.GA7096@codeaurora.org>
+References: <1438076046-4706-1-git-send-email-rnayak@codeaurora.org>
+ <1438076046-4706-2-git-send-email-rnayak@codeaurora.org>
+ <20150803192427.GA7096@codeaurora.org>
+Message-ID: <55C19FA4.4070402@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 06, 2015 at 12:19:22PM +0200, Maxime Ripard wrote:
-> Hi Vinod,
-> 
-> Here is a patch serie that adds a new dmaengine operation for
-> scatter-gathered memset.
-> 
-> Indeed, doing a memset over a discontiguous buffer is quite
-> inefficient at the moment, since you have to create and submit each
-> chunk separately, which might result in a huge list of transfers,
-> while some controllers can handle that just fine.
 
-Applied, thanks
 
--- 
-~Vinod
+On 08/04/2015 12:54 AM, Stephen Boyd wrote:
+> On 07/28, Rajendra Nayak wrote:
+>> +
+>> +#define PWR_ON_MASK		BIT(31)
+>> +#define EN_REST_WAIT_MASK	GENMASK(23, 20)
+>> +#define EN_FEW_WAIT_MASK	GENMASK(19, 16)
+>> +#define CLK_DIS_WAIT_MASK	GENMASK(15, 12)
+>
+> This trips up some static checker...
+>
+> drivers/clk/qcom/gdsc.c:234:53: warning: cast truncates bits from
+> constant value (fffffffffff006 becomes fffff006)
+>
+> So I think we can use GENMASK_ULL here instead.
+
+Sure. btw, what static checker is this? I did not see it with sparse.
