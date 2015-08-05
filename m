@@ -1,77 +1,47 @@
-From: haibo.chen@freescale.com (Haibo Chen)
-Date: Wed, 5 Aug 2015 18:38:38 +0800
-Subject: [PATCH v4 2/6] mmc: sdhci-esdhc-imx: add tuning-step seting support
-In-Reply-To: <1438771122-8601-1-git-send-email-haibo.chen@freescale.com>
-References: <1438771122-8601-1-git-send-email-haibo.chen@freescale.com>
-Message-ID: <1438771122-8601-3-git-send-email-haibo.chen@freescale.com>
+From: zyw@rock-chips.com (Chris Zhong)
+Date: Wed, 05 Aug 2015 18:36:06 +0800
+Subject: [PATCH v3 1/3] ARM: rockchip: rename osc_switch_to_32k variable
+In-Reply-To: <2128609.Kb18M8K28F@diego>
+References: <2128609.Kb18M8K28F@diego>
+Message-ID: <55C1E716.4010901@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tuning-step is the delay cell steps in tuning procedure. The default value
-of tuning-step is 1. Some boards or cards need another value to pass the
-tuning procedure. For example, imx7d-sdb board need the tuning-step value
-as 2, otherwise it can't pass the tuning procedure.
 
-So this patch add the tuning-step setting in driver, so that user can set
-the tuning-step value in dts.
 
-Signed-off-by: Haibo Chen <haibo.chen@freescale.com>
----
- drivers/mmc/host/sdhci-esdhc-imx.c          | 9 +++++++++
- include/linux/platform_data/mmc-esdhc-imx.h | 1 +
- 2 files changed, 10 insertions(+)
-
-diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-index 48f009c..803d24f 100644
---- a/drivers/mmc/host/sdhci-esdhc-imx.c
-+++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-@@ -75,6 +75,7 @@
- #define ESDHC_STD_TUNING_EN		(1 << 24)
- /* NOTE: the minimum valid tuning start tap for mx6sl is 1 */
- #define ESDHC_TUNING_START_TAP		0x1
-+#define ESDHC_TUNING_STEP_SHIFT		16
- 
- /* pinctrl state */
- #define ESDHC_PINCTRL_STATE_100MHZ	"state_100mhz"
-@@ -474,6 +475,7 @@ static void esdhc_writew_le(struct sdhci_host *host, u16 val, int reg)
- 		} else if (imx_data->socdata->flags & ESDHC_FLAG_STD_TUNING) {
- 			u32 v = readl(host->ioaddr + SDHCI_ACMD12_ERR);
- 			u32 m = readl(host->ioaddr + ESDHC_MIX_CTRL);
-+			u32 tuning_ctrl;
- 			if (val & SDHCI_CTRL_TUNED_CLK) {
- 				v |= ESDHC_MIX_CTRL_SMPCLK_SEL;
- 			} else {
-@@ -484,6 +486,11 @@ static void esdhc_writew_le(struct sdhci_host *host, u16 val, int reg)
- 			if (val & SDHCI_CTRL_EXEC_TUNING) {
- 				v |= ESDHC_MIX_CTRL_EXE_TUNE;
- 				m |= ESDHC_MIX_CTRL_FBCLK_SEL;
-+				tuning_ctrl = readl(host->ioaddr + ESDHC_TUNING_CTRL);
-+				tuning_ctrl |= ESDHC_STD_TUNING_EN | ESDHC_TUNING_START_TAP;
-+				if (imx_data->boarddata.tuning_step)
-+					tuning_ctrl |= imx_data->boarddata.tuning_step << ESDHC_TUNING_STEP_SHIFT;
-+					writel(tuning_ctrl, host->ioaddr + ESDHC_TUNING_CTRL);
- 			} else {
- 				v &= ~ESDHC_MIX_CTRL_EXE_TUNE;
- 			}
-@@ -964,6 +971,8 @@ sdhci_esdhc_imx_probe_dt(struct platform_device *pdev,
- 	if (gpio_is_valid(boarddata->wp_gpio))
- 		boarddata->wp_type = ESDHC_WP_GPIO;
- 
-+	of_property_read_u32(np, "fsl,tuning-step", &boarddata->tuning_step);
-+
- 	if (of_find_property(np, "no-1-8-v", NULL))
- 		boarddata->support_vsel = false;
- 	else
-diff --git a/include/linux/platform_data/mmc-esdhc-imx.h b/include/linux/platform_data/mmc-esdhc-imx.h
-index e1571ef..95ccab3 100644
---- a/include/linux/platform_data/mmc-esdhc-imx.h
-+++ b/include/linux/platform_data/mmc-esdhc-imx.h
-@@ -45,5 +45,6 @@ struct esdhc_platform_data {
- 	int max_bus_width;
- 	bool support_vsel;
- 	unsigned int delay_line;
-+	unsigned int tuning_step;       /* The delay cell steps in tuning procedure */
- };
- #endif /* __ASM_ARCH_IMX_ESDHC_H */
--- 
-1.9.1
+On 08/05/2015 06:50 AM, Heiko St?bner wrote:
+> The variable name is misleading, as the deep suspend mode always switches
+> the main supplying clock to the 32kHz source. Additionally the main
+> oscillator remain running in some cases, which this var indicates.
+>
+> So rename it to osc_disable to clarity.
+>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+>   arch/arm/mach-rockchip/pm.c | 4 ++--
+>   1 file changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/mach-rockchip/pm.c b/arch/arm/mach-rockchip/pm.c
+> index 892bace..2ca1170 100644
+> --- a/arch/arm/mach-rockchip/pm.c
+> +++ b/arch/arm/mach-rockchip/pm.c
+> @@ -96,7 +96,7 @@ static bool rk3288_slp_disable_osc(void)
+>   static void rk3288_slp_mode_set(int level)
+>   {
+>   	u32 mode_set, mode_set1;
+> -	bool osc_switch_to_32k = rk3288_slp_disable_osc();
+> +	bool osc_disable = rk3288_slp_disable_osc();
+>   
+>   	regmap_read(sgrf_regmap, RK3288_SGRF_CPU_CON0, &rk3288_sgrf_cpu_con0);
+>   	regmap_read(sgrf_regmap, RK3288_SGRF_SOC_CON0, &rk3288_sgrf_soc_con0);
+> @@ -140,7 +140,7 @@ static void rk3288_slp_mode_set(int level)
+>   			    BIT(PMU_DDR1IO_RET_EN) | BIT(PMU_DDR0IO_RET_EN) |
+>   			    BIT(PMU_ALIVE_USE_LF) | BIT(PMU_PLL_PD_EN);
+>   
+> -		if (osc_switch_to_32k)
+> +		if (osc_disable)
+>   			mode_set |= BIT(PMU_OSC_24M_DIS);
+>   
+>   		mode_set1 |= BIT(PMU_CLR_ALIVE) | BIT(PMU_CLR_BUS) |
+Reviewed-by: Chris Zhong <zyw@rock-chips.com>
+Tested-by: Chris Zhong <zyw@rock-chips.com>
