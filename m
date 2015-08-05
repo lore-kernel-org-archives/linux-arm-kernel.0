@@ -1,34 +1,85 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 5 Aug 2015 09:31:17 +0200
-Subject: [RFC PATCH 0/3] New Atmel PIO4 pinctrl/gpio driver
-In-Reply-To: <1438355290-28255-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1438355290-28255-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <20150805073117.GP5161@pengutronix.de>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Wed, 05 Aug 2015 09:32:09 +0200
+Subject: [PATCH v3 09/11] KVM: arm/arm64: vgic: Prevent userspace injection
+ of a mapped interrupt
+In-Reply-To: <55C0EBF5.2060708@arm.com>
+References: <1437753309-17989-1-git-send-email-marc.zyngier@arm.com>
+ <1437753309-17989-10-git-send-email-marc.zyngier@arm.com>
+ <55C0E690.1090808@linaro.org> <55C0EBF5.2060708@arm.com>
+Message-ID: <55C1BBF9.2060004@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 31, 2015 at 05:08:07PM +0200, Ludovic Desroches wrote:
-> Hi,
+Hi Marc,
+On 08/04/2015 06:44 PM, Marc Zyngier wrote:
+> On 04/08/15 17:21, Eric Auger wrote:
+>> Hi Marc,
+>> On 07/24/2015 05:55 PM, Marc Zyngier wrote:
+>>> Virtual interrupts mapped to a HW interrupt should only be triggered
+>>> from inside the kernel. Otherwise, you could end up confusing the
+>>> kernel (and the GIC's) state machine.
+>>>
+>>> Rearrange the injection path so that kvm_vgic_inject_irq is
+>>> used for non-mapped interrupts, and kvm_vgic_inject_mapped_irq is
+>>> used for mapped interrupts. The latter should only be called from
+>>> inside the kernel (timer, VFIO).
+>> nit: I would replace VFIO by irqfd.
+>> VFIO just triggers the eventfd/irqfd. This is KVM/irqfd that injects the
+>> virtual irq upon the irqfd signaling and he irqfd adaptation/ARM
+>> currently is implemented in vgic.c
 > 
-> Following our discussion, I send an RFC version of my driver. RFC because it is
-> not totally achieved, some cleanup and feature addition is needed.
+> Ah, thanks for reminding me of the right terminology, I tend to think of
+> it as one big bag of nasty tricks... ;-)
 > 
-> At least, we could discuss about the 'core' part. I have used the pinmux
-> property as Mediatek driver. Patch 3 is the internal dt files we are using.
+> I'll update the commit message.
+> 
+>>>
+>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>> ---
+>>>  include/kvm/arm_vgic.h |  2 +
+>>>  virt/kvm/arm/vgic.c    | 99 ++++++++++++++++++++++++++++++++++----------------
+>>>  2 files changed, 70 insertions(+), 31 deletions(-)
+>>>
+>>> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+>>> index 7306b4b..f6bfd79 100644
+>>> --- a/include/kvm/arm_vgic.h
+>>> +++ b/include/kvm/arm_vgic.h
+>>> @@ -351,6 +351,8 @@ void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu);
+>>>  void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu);
+>>>  int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int irq_num,
+>>>  			bool level);
+>>> +int kvm_vgic_inject_mapped_irq(struct kvm *kvm, int cpuid,
+>>> +			       struct irq_phys_map *map, bool level);
+>>>  void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg);
+>>>  int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
+>>>  int kvm_vgic_vcpu_active_irq(struct kvm_vcpu *vcpu);
+>>> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+>>> index 3f7b690..e40ef70 100644
+>>> --- a/virt/kvm/arm/vgic.c
+>>> +++ b/virt/kvm/arm/vgic.c
+>>> @@ -1533,7 +1533,8 @@ static int vgic_validate_injection(struct kvm_vcpu *vcpu, int irq, int level)
+>>>  }
+>>>  
+>>>  static int vgic_update_irq_pending(struct kvm *kvm, int cpuid,
+>>> -				  unsigned int irq_num, bool level)
+>>> +				   struct irq_phys_map *map,
+>>> +				   unsigned int irq_num, bool level)
+>>>  {
+>> In vgic_update_irq_pending, I needed to modify the following line and
+>> add the "&& !map".
+>>
+>>         if (!vgic_validate_injection(vcpu, irq_num, level) && !map) {
+>>
+>> Without that, the level being not properly modeled for level sensitive
+>> forwarded IRQs, the 2d injection fails.
+> 
+> Ah! Is that because we never see the line being reset to zero, and the
+> VGIC still sees the line as pending at the distributor level?
+yes indeed
 
-As you can imagine I am fine with the binding, so I can add my acked-by
-once you send a non-RFC version.
-
-The only thing I never understood is what's so special about GPIOs that
-they have to bypass the pinctrl framework and instead a gpio_request
-magically translates a gpio into a pin. Wouldn't it make sense to at
-least add the pins in their GPIO mode to
-arch/arm/boot/dts/sama5d2-pinfunc.h?
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Eric
+> 
+> Thanks,
+> 
+> 	M.
+> 
