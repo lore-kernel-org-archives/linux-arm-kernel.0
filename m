@@ -1,96 +1,72 @@
-From: raghumag@gmail.com (raghu MG)
-Date: Wed, 5 Aug 2015 10:37:08 +0530
-Subject: Armadaxp GPIO interrupts
-In-Reply-To: <20150804153439.GA28673@lunn.ch>
-References: <CAG1O52Xg88OsifBzmpSdqvC8wQaOW78nC9nnfxugFv1VU1m1LQ@mail.gmail.com>
- <20150804153439.GA28673@lunn.ch>
-Message-ID: <CAG1O52W2Gy_6_DfewtUqoK_J+Y=KwVGyygNaPu2xyPM_ZkLfcQ@mail.gmail.com>
+From: hramrach@gmail.com (Michal Suchanek)
+Date: Wed, 5 Aug 2015 07:21:00 +0200
+Subject: [RFC PATCH 1/5] spi: introduce flag for memory mapped read
+In-Reply-To: <55C0FD98.1090107@ti.com>
+References: <1438072876-16338-1-git-send-email-vigneshr@ti.com>
+ <1438072876-16338-2-git-send-email-vigneshr@ti.com>
+ <20150731181745.GM20873@sirena.org.uk>
+ <55BEF4AF.5090704@ti.com> <20150804155148.GR20873@sirena.org.uk>
+ <55C0FD98.1090107@ti.com>
+Message-ID: <CAOMqctThys1C3vw7u8UU6iX8c9EDCWowaWg5F1O3i3X-w7KQhA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+Hello,
 
-Thanks for your quick response,dont mind for the delay(India,US timings).
-I checked with both multi_v7_defconfig & mvebu_v7_defconfig , the result is same
-"irq: Cannot allocate irq_descs @ IRQ47, assuming pre-allocated"
-
-Pasting here the GPIO driver probe debug statements
-
-armada-xp-pinctrl f1018000.pin-ctrl: registered pinctrl driver
-drivers/gpio/gpio-mvebu.c mvebu_gpio_probe 680
-mvebu_gpio_probe 682 match->name=
-mvebu_gpio_probe 683 match->compatible=marvell,orion-gpio
-drivers/gpio/gpio-mvebu.c mvebu_gpio_probe 727
-drivers/gpio/gpio-mvebu.c mvebu_gpio_probe 734 res->start=f1018100
-mvchip->membase=cf8c0100
-drivers/gpio/gpio-mvebu.c mvebu_gpio_probe 747 soc_variant=1
-drivers/gpio/gpio-mvebu.c mvebu_gpio_probe 785
-drivers/gpio/gpio-mvebu.c mvebu_gpio_probe 788
-drivers/gpio/gpio-mvebu.c mvebu_gpio_probe 805
-drivers/gpio/gpio-mvebu.c mvebu_gpio_probe 840
-drivers/gpio/gpio-mvebu.c mvebu_gpio_probe 844 mvchip->irqbase=47
-irq: Cannot allocate irq_descs @ IRQ47, assuming pre-allocated
-drivers/gpio/gpio-mvebu.c mvebu_gpio_probe 850 mvchip->domain->name=(null)
-drivers/gpio/gpio-mvebu.c mvebu_gpio_probe 859
-drivers/gpio/gpio-mvebu.c mvebu_gpio_probe 680
-mvebu_gpio_probe 682 match->name=
-mvebu_gpio_probe 683 match->compatible=marvell,orion-gpio
-drivers/gpio/gpio-mvebu.c mvebu_gpio_probe 727
-drivers/gpio/gpio-mvebu.c mvebu_gpio_probe 734 res->start=f1018140
-mvchip->membase=cf8c2140
-drivers/gpio/gpio-mvebu.c mvebu_gpio_probe 747 soc_variant=1
-drivers/gpio/gpio-mvebu.c mvebu_gpio_probe 785
-drivers/gpio/gpio-mvebu.c mvebu_gpio_probe 788
-drivers/gpio/gpio-mvebu.c mvebu_gpio_probe 805
-drivers/gpio/gpio-mvebu.c mvebu_gpio_probe 840
-drivers/gpio/gpio-mvebu.c mvebu_gpio_probe 844 mvchip->irqbase=79
-irq: Cannot allocate irq_descs @ IRQ79, assuming pre-allocated
-drivers/gpio/gpio-mvebu.c mvebu_gpio_probe 850 mvchip->domain->name=(null)
-drivers/gpio/gpio-mvebu.c mvebu_gpio_probe 859
-drivers/gpio/gpio-mvebu.c mvebu_gpio_probe 680
-mvebu_gpio_probe 682 match->name=
-mvebu_gpio_probe 683 match->compatible=marvell,orion-gpio
-drivers/gpio/gpio-mvebu.c mvebu_gpio_probe 727
-drivers/gpio/gpio-mvebu.c mvebu_gpio_probe 734 res->start=f1018180
-mvchip->membase=cf8c4180
-drivers/gpio/gpio-mvebu.c mvebu_gpio_probe 747 soc_variant=1
-drivers/gpio/gpio-mvebu.c mvebu_gpio_probe 785
-drivers/gpio/gpio-mvebu.c mvebu_gpio_probe 788
-drivers/gpio/gpio-mvebu.c mvebu_gpio_probe 805
-drivers/gpio/gpio-mvebu.c mvebu_gpio_probe 840
-drivers/gpio/gpio-mvebu.c mvebu_gpio_probe 844 mvchip->irqbase=111
-irq: Cannot allocate irq_descs @ IRQ111, assuming pre-allocated
-drivers/gpio/gpio-mvebu.c mvebu_gpio_probe 850 mvchip->domain->name=(null)
-drivers/gpio/gpio-mvebu.c mvebu_gpio_probe 859
-
-
-
-I will try to dig in more information in the probe & irq_domain_add_simple
-
-
-On Tue, Aug 4, 2015 at 9:04 PM, Andrew Lunn <andrew@lunn.ch> wrote:
-> On Tue, Aug 04, 2015 at 08:52:17PM +0530, raghu MG wrote:
->> Hello,
+On 4 August 2015 at 19:59, R, Vignesh <vigneshr@ti.com> wrote:
+>
+>
+> On 8/4/2015 9:21 PM, Mark Brown wrote:
+>> On Mon, Aug 03, 2015 at 10:27:19AM +0530, Vignesh R wrote:
 >>
->> I am working on a card which as GPIOs connected to external I/O's. The
->> board consists of ARMADAXP 78460 host cpu.
+>>> @use_mmap_mode: Some SPI controller chips are optimized for interacting
+>>> with serial flash memories. These chips have memory mapped interface,
+>>> through which entire serial flash memory slave can be read/written as if
+>>> though they are physical memories (like RAM). Using this interface,
+>>> flash can be accessed using memcpy() function and the spi controller
+>>> hardware will take care of communicating with serial flash over SPI.
+>>> Setting this flag will indicate the SPI controller driver that the
+>>> spi_message is from mtd layer to read from/write to flash. The SPI
+>>> master driver can then appropriately switch the controller to memory
+>>> mapped interface to read from/write to flash, based on this flag (See
+>>> drivers/spi/spi-ti-qspi.c for example).
+>>> NOTE: If the SPI controller chip lacks memory mapped interface, then the
+>>> driver will ignore this flag and use normal SPI protocol to read
+>>> from/write to flash. Communication with non-flash SPI devices is not
+>>> possible using the memory mapped interface.
 >>
->> Board currently runs Linux-4.1 with modified  armada-xp-gp.dtb for ArmadaXP.
->> I enabled "orion-gpio" driver to initialize GPIOs as given in
->> armada-xp-mv78460.
->
-> What kernel configuration are you using? Do you have the same problem
-> with multi_v7_defconfig and mvebu_v7_defconfig?
->
->> The driver while initializing calls irq_domain_add_simple which throws up
->> following warning
->> "irq: Cannot allocate irq_descs @ IRQ47, assuming pre-allocated"
->> The warning repeats for next set(32-63  & 64-66).
+>> I still can't tell from the above what this interface is supposed to do.
+>> It sounds like the use of memory mapped mode is supposed to be
+>> transparent to users, it should just affect how the controller interacts
+>> with the hardware, but if that's the case why do we need to expose it to
+>> users at all?  Shouldn't the driver just use memory mapped mode if it's
+>> faster?
 >>
->> Also the GPIO IRQs are not getting listed in cat /proc/interrupts
 >
-> irq_domain_add_simple() returning an error is fatal for the probe. The
-> driver will not be loaded, so more than interrupts will be missing,
-> all the gpios will be missing.
+> TI QSPI controller has two blocks:
+> 1. SPI_CORE: This is generic(normal) spi mode. This can be used to
+> communicate with any SPI devices (serial flashes as well as non-flash
+> devices like touchscreen).
+> 2. SFI_MM_IF(SPI memory mapped interface): The SFI_MM_IF block only
+> allows reading and writing to an SPI flash device only. Used to speed up
+> flash reads. It _cannot_ be used to communicate with non flash devices.
+> Now, the spi_message that ti-qspi receives in transfer_one() callback
+> can be from mtd device(in which case SFI_MM_IF can be used) or from any
+> other non flash SPI device (in which case SFI_MM_IF must not be used
+> instead SPI_CORE is to be used) but there is no way(is there?) to
+> distinguish where spi_message is from. Therefore I introduced flag
+> (use_mmap_mode) to struct spi_message. mtd driver will set flag to true,
+> this helps the ti-qspi driver to determine that the user is flash device
+> and thus can do read via SFI_MM_IF. If this flag is not set then the
+> user is assumed to be non flash SPI driver and will use SPI_CORE block
+> to communicate.
 >
->     Andrew
+> On the whole, I just need a way to determine that the user is a flash
+> device in order to switch to memory mapped interface.
+>
+
+Maybe it can be set on the SPI slave rather than each message.
+
+Thanks
+
+Michal
