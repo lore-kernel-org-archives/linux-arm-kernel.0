@@ -1,83 +1,78 @@
-From: raghumag@gmail.com (raghu MG)
-Date: Wed, 5 Aug 2015 20:32:57 +0530
-Subject: Armadaxp GPIO interrupts
-In-Reply-To: <20150804153439.GA28673@lunn.ch>
-References: <CAG1O52Xg88OsifBzmpSdqvC8wQaOW78nC9nnfxugFv1VU1m1LQ@mail.gmail.com>
- <20150804153439.GA28673@lunn.ch>
-Message-ID: <CAG1O52XtYJho9M4TggtvzdY8HnXhpjkX79FFKRQMyyw=KhgSgQ@mail.gmail.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Wed, 5 Aug 2015 17:03:03 +0200
+Subject: [GIT PULL] Xilinx ZynqMP DT changes for v4.3
+In-Reply-To: <20150805090016.GI6390@localhost>
+References: <55BB369F.4080100@monstr.eu> <20150805090016.GI6390@localhost>
+Message-ID: <55C225A7.9050704@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+Hi Olof,
 
-The issue I found was  irq_alloc_descs is called twice
-1st time inside   mvebu_gpio_probe & 2nd time inside irq_domain_add_simple.
-
-The warning is thrown up when irq_alloc_descs is called 2nd
-time(irq_domain_add_simple) & bitmap_find_next_zero_area gives new
-value of start which is not equal to irq & the following condition
-returns with error.
-
-irq_alloc_descs(....)
-.................
-....................
-..............
-start = bitmap_find_next_zero_area(
-allocated_irqs, IRQ_BITMAP_BITS,
-                                           from, cnt, 0);
-ret=-EEXIST;
-if (irq >=0 && start != irq){
-                goto err;
-        }
-...........................
-................
-err:
-       mutex_unlock(&sparse_irq_lock);
-        return ret;
-
-
-I could bypass the error/warning by giving calling
-irq_domain_add_simple(np, mvchip->chip.ngpio,
-                                               0,
-                                               &irq_domain_simple_ops,
-                                               mvchip);
-I  passed zero instead of mvchip->irqbase as first_irq .
-The warning is not appearing.& I think driver is registered in kernel.
-
-But driver & gpio entry is not found in /proc/interrupts.
-
-The GPIO ISR is not getting invoked by driver.
-But I wrote a simple module where I register simple handler & then
-both mvebu_gpio_irq_handler & modules registered handler is called.
-
-My doubt is whether the gpio-driver in the kernel needs bit more
-tweaking to suit the board & devices connected to gpio.
-
-I would appreciate bit of guidance here
-
-On Tue, Aug 4, 2015 at 9:04 PM, Andrew Lunn <andrew@lunn.ch> wrote:
-> On Tue, Aug 04, 2015 at 08:52:17PM +0530, raghu MG wrote:
->> Hello,
+On 08/05/2015 11:00 AM, Olof Johansson wrote:
+> On Fri, Jul 31, 2015 at 10:49:35AM +0200, Michal Simek wrote:
+>> Hi,
 >>
->> I am working on a card which as GPIOs connected to external I/O's. The
->> board consists of ARMADAXP 78460 host cpu.
+>> please pull these ARM64 DT patches to your tree.
 >>
->> Board currently runs Linux-4.1 with modified  armada-xp-gp.dtb for ArmadaXP.
->> I enabled "orion-gpio" driver to initialize GPIOs as given in
->> armada-xp-mv78460.
->
-> What kernel configuration are you using? Do you have the same problem
-> with multi_v7_defconfig and mvebu_v7_defconfig?
->
->> The driver while initializing calls irq_domain_add_simple which throws up
->> following warning
->> "irq: Cannot allocate irq_descs @ IRQ47, assuming pre-allocated"
->> The warning repeats for next set(32-63  & 64-66).
+>> Thanks,
+>> Michal
 >>
->> Also the GPIO IRQs are not getting listed in cat /proc/interrupts
->
-> irq_domain_add_simple() returning an error is fatal for the probe. The
-> driver will not be loaded, so more than interrupts will be missing,
-> all the gpios will be missing.
->
->     Andrew
+>>
+>> The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
+>>
+>>   Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
+>>
+>> are available in the git repository at:
+>>
+>>   https://github.com/Xilinx/linux-xlnx.git tags/zynqmp-dt-for-4.3
+>>
+>> for you to fetch changes up to f49310dc62f68ae9f905f9a1e42224fa23867f47:
+>>
+>>   ARM64: zynqmp: Move SPI nodes to the right location (2015-07-31
+>> 10:46:34 +0200)
+>>
+>> ----------------------------------------------------------------
+>> arm: Xilinx ZynqMP dt patches for v4.3
+>>
+>> - Add SATA, GPIO, CAN, SMMU, USB, SPI, I2C, watchdog and sdhci for zynqmp
+>> - Sort nodes in dtsi
+> 
+> You seem to sort these alphabetically. We normally encourage sorting by unit
+> address instead. Was there some reason you chose alphabetical?
+
+Normally if you look for something you can't remember addresses but you
+remember names that's why this sorting is more natural at least for me.
+
+I have checked APM/EXYNOS/Juno/SPR for example (and probably others) and
+there is no order at all.
+If this is any strict requirement to sort nodes by addresses I am happy
+to send patch on the top of this series to fix it. That's why please let
+me know.
+
+There are other questions what to do with clocks for example - having
+them on the bus like it is done for us and Cavium/Exynos/Seattle or
+having separate node on the bus like APM.
+Using soc node is another question.
+
+I know that Grant wanted to update any guide which should cover these
+stuff but I am not aware if we have any doc which describe it.
+
+Thanks,
+Michal
+
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150805/8e2493c0/attachment.sig>
