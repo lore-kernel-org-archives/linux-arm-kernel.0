@@ -1,80 +1,76 @@
-From: julien.grall@citrix.com (Julien Grall)
-Date: Wed, 5 Aug 2015 15:30:11 +0100
-Subject: [Xen-devel] [PATCH v2 02/20] xen: Introduce a function to split
- a Linux page into Xen page
-In-Reply-To: <55B20F1F.60902@citrix.com>
-References: <1436474552-31789-1-git-send-email-julien.grall@citrix.com>
- <1436474552-31789-3-git-send-email-julien.grall@citrix.com>
- <55B205FB.5080209@citrix.com> <55B20B56.7020605@citrix.com>
- <55B20F1F.60902@citrix.com>
-Message-ID: <55C21DF3.2090201@citrix.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 5 Aug 2015 09:45:22 -0500
+Subject: [PATCH 6/9] ARM: domain: Add platform handlers for CPU PM domains
+In-Reply-To: <1438731339-58317-7-git-send-email-lina.iyer@linaro.org>
+References: <1438731339-58317-1-git-send-email-lina.iyer@linaro.org>
+ <1438731339-58317-7-git-send-email-lina.iyer@linaro.org>
+Message-ID: <CAL_JsqKWekSGiFbZz6++3ibAzY_8Y6+0nOBQinFVw4cBk6JvEw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+On Tue, Aug 4, 2015 at 6:35 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
+> In addition to the common power up/down actions of CPU PM domain core,
+> platforms may have additional configuration before the CPU domain can be
+> powered off or considered active. Allow platform drivers to register
+> handlers for CPU PM domains.
+>
+> Platform drivers may register their callbacks against a compatible
+> string defined by their PM domain provider device node in the DT. At
+> domain init, the platform driver can initialize the platform specific
+> genpd attributes. The init callback would need to return successfully,
+> for the platform power_on/off handlers to be registered with the CPU PM
+> domain.
+>
+> The code uses __init section to reduce memory needed for platform
+> handlers and therefore can be freed after the driver is initialized, a
+> desirable outcome for single kernel image.
 
-On 24/07/15 11:10, David Vrabel wrote:
-> On 24/07/15 10:54, Julien Grall wrote:
->> On 24/07/15 10:31, David Vrabel wrote:
->>> On 09/07/15 21:42, Julien Grall wrote:
->>>> The Xen interface is always using 4KB page. This means that a Linux page
->>>> may be split across multiple Xen page when the page granularity is not
->>>> the same.
->>>>
->>>> This helper will break down a Linux page into 4KB chunk and call the
->>>> helper on each of them.
->>> [...]
->>>> --- a/include/xen/page.h
->>>> +++ b/include/xen/page.h
->>>> @@ -39,4 +39,24 @@ struct xen_memory_region xen_extra_mem[XEN_EXTRA_MEM_MAX_REGIONS];
->>>>  
->>>>  extern unsigned long xen_released_pages;
->>>>  
->>>> +typedef int (*xen_pfn_fn_t)(struct page *page, unsigned long pfn, void *data);
->>>> +
->>>> +/* Break down the page in 4KB granularity and call fn foreach xen pfn */
->>>> +static inline int xen_apply_to_page(struct page *page, xen_pfn_fn_t fn,
->>>> +				    void *data)
->>>
->>> I think this should be outlined (unless you have measurements that
->>> support making it inlined).
->>
->> I don't have any performance measurements. Although, when Linux is using
->> 4KB page granularity, the loop in this helper will be dropped by the
->> helper. The code would look like:
->>
->> unsigned long pfn = xen_page_to_pfn(page);
->>
->> ret = fn(page, fn, data);
->> if (ret)
->>   return ret;
->>
->> The compiler could even inline the callback (fn). So it drops 2
->> functions call.
-> 
-> Ok, keep it inlined.
-> 
->>> Also perhaps make it
->>>
->>> int xen_for_each_gfn(struct page *page,
->>>                      xen_gfn_fn_t fn, void *data);
->>
->> gfn standing for Guest Frame Number right?
-> 
-> Yes.  This suggestion is just changing the name to make it more obvious
-> what it does.
+[...]
 
-Thinking more about this suggestion. The callback (fn) is getting a 4K
-PFN in parameter and not a GFN.
+> diff --git a/arch/arm/include/asm/arm-pd.h b/arch/arm/include/asm/arm-pd.h
+> new file mode 100644
+> index 0000000..fc44abf
+> --- /dev/null
+> +++ b/arch/arm/include/asm/arm-pd.h
+> @@ -0,0 +1,30 @@
+> +/*
+> + * linux/arch/arm/include/asm/arm-pd.h
+> + *
+> + * Copyright (C) 2015 Linaro Ltd.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#ifndef __ARM_PD_H__
+> +#define __ARM_PD_H__
+> +
+> +struct of_arm_pd_ops {
+> +       int (*init)(struct device_node *dn, struct generic_pm_domain *d);
+> +       int (*power_on)(struct generic_pm_domain *d);
+> +       int (*power_off)(struct generic_pm_domain *d);
+> +};
+> +
+> +struct of_arm_pd_method {
+> +       const char *handle;
+> +       struct of_arm_pd_ops *ops;
+> +};
+> +
+> +#define ARM_PD_METHOD_OF_DECLARE(_name, _handle, _ops) \
+> +       static const struct of_arm_pd_method __arm_pd_method_of_table_##_name \
+> +       __used __section(__arm_pd_method_of_table)              \
+> +       = { .handle = _handle, .ops = _ops }
 
-This is because the balloon code seems to require having a 4K PFN in
-hand in few places. For instance XENMEM_populate_physmap and
-HYPERVISOR_update_va_mapping.
+AFAICT, you are not using this in this series. You should add it when
+you have a user.
 
-Although, I'm not sure to understand the difference between GMFN, and
-GPFN in the hypercall doc.
+Ideally, we keep some amount of uniformity across various *_OF_DECLARE
+which is why we have OF_DECLARE_1 and OF_DECLARE_2. This makes all the
+sections just arrays of struct of_device_id. Not all users follow
+this, but most do. So instead of putting the ops in here, platforms
+can provide a function callback which can then set the ops. Then you
+also don't need the .init() ops function as the callback function can
+do any initialization too.
 
-Regards,
-
--- 
-Julien Grall
+Rob
