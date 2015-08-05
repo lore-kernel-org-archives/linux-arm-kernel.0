@@ -1,133 +1,61 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Wed, 05 Aug 2015 13:47:27 +0200
-Subject: [PATCH v3 09/11] KVM: arm/arm64: vgic: Prevent userspace injection
- of a mapped interrupt
-In-Reply-To: <20150805105345.GA4657@cbox>
-References: <1437753309-17989-1-git-send-email-marc.zyngier@arm.com>
- <1437753309-17989-10-git-send-email-marc.zyngier@arm.com>
- <55C0E690.1090808@linaro.org> <55C0EBF5.2060708@arm.com>
- <55C1BBF9.2060004@linaro.org> <55C1DAE9.1050609@arm.com>
- <20150805105345.GA4657@cbox>
-Message-ID: <55C1F7CF.5070904@linaro.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 5 Aug 2015 12:50:13 +0100
+Subject: [RFC PATCH 1/5] spi: introduce flag for memory mapped read
+In-Reply-To: <55C0FD98.1090107@ti.com>
+References: <1438072876-16338-1-git-send-email-vigneshr@ti.com>
+ <1438072876-16338-2-git-send-email-vigneshr@ti.com>
+ <20150731181745.GM20873@sirena.org.uk> <55BEF4AF.5090704@ti.com>
+ <20150804155148.GR20873@sirena.org.uk> <55C0FD98.1090107@ti.com>
+Message-ID: <20150805115013.GJ20873@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/05/2015 12:53 PM, Christoffer Dall wrote:
-> On Wed, Aug 05, 2015 at 10:44:09AM +0100, Marc Zyngier wrote:
->> On 05/08/15 08:32, Eric Auger wrote:
->>> Hi Marc,
->>> On 08/04/2015 06:44 PM, Marc Zyngier wrote:
->>>> On 04/08/15 17:21, Eric Auger wrote:
->>>>> Hi Marc,
->>>>> On 07/24/2015 05:55 PM, Marc Zyngier wrote:
->>>>>> Virtual interrupts mapped to a HW interrupt should only be triggered
->>>>>> from inside the kernel. Otherwise, you could end up confusing the
->>>>>> kernel (and the GIC's) state machine.
->>>>>>
->>>>>> Rearrange the injection path so that kvm_vgic_inject_irq is
->>>>>> used for non-mapped interrupts, and kvm_vgic_inject_mapped_irq is
->>>>>> used for mapped interrupts. The latter should only be called from
->>>>>> inside the kernel (timer, VFIO).
->>>>> nit: I would replace VFIO by irqfd.
->>>>> VFIO just triggers the eventfd/irqfd. This is KVM/irqfd that injects the
->>>>> virtual irq upon the irqfd signaling and he irqfd adaptation/ARM
->>>>> currently is implemented in vgic.c
->>>>
->>>> Ah, thanks for reminding me of the right terminology, I tend to think of
->>>> it as one big bag of nasty tricks... ;-)
->>>>
->>>> I'll update the commit message.
->>>>
->>>>>>
->>>>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>>>>> ---
->>>>>>  include/kvm/arm_vgic.h |  2 +
->>>>>>  virt/kvm/arm/vgic.c    | 99 ++++++++++++++++++++++++++++++++++----------------
->>>>>>  2 files changed, 70 insertions(+), 31 deletions(-)
->>>>>>
->>>>>> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
->>>>>> index 7306b4b..f6bfd79 100644
->>>>>> --- a/include/kvm/arm_vgic.h
->>>>>> +++ b/include/kvm/arm_vgic.h
->>>>>> @@ -351,6 +351,8 @@ void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu);
->>>>>>  void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu);
->>>>>>  int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int irq_num,
->>>>>>  			bool level);
->>>>>> +int kvm_vgic_inject_mapped_irq(struct kvm *kvm, int cpuid,
->>>>>> +			       struct irq_phys_map *map, bool level);
->>>>>>  void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg);
->>>>>>  int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
->>>>>>  int kvm_vgic_vcpu_active_irq(struct kvm_vcpu *vcpu);
->>>>>> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
->>>>>> index 3f7b690..e40ef70 100644
->>>>>> --- a/virt/kvm/arm/vgic.c
->>>>>> +++ b/virt/kvm/arm/vgic.c
->>>>>> @@ -1533,7 +1533,8 @@ static int vgic_validate_injection(struct kvm_vcpu *vcpu, int irq, int level)
->>>>>>  }
->>>>>>  
->>>>>>  static int vgic_update_irq_pending(struct kvm *kvm, int cpuid,
->>>>>> -				  unsigned int irq_num, bool level)
->>>>>> +				   struct irq_phys_map *map,
->>>>>> +				   unsigned int irq_num, bool level)
->>>>>>  {
->>>>> In vgic_update_irq_pending, I needed to modify the following line and
->>>>> add the "&& !map".
->>>>>
->>>>>         if (!vgic_validate_injection(vcpu, irq_num, level) && !map) {
->>>>>
->>>>> Without that, the level being not properly modeled for level sensitive
->>>>> forwarded IRQs, the 2d injection fails.
->>>>
->>>> Ah! Is that because we never see the line being reset to zero, and the
->>>> VGIC still sees the line as pending at the distributor level?
->>> yes indeed
->>
->> Then it is a bigger problem we need to solve, and your solution just
->> papers over the issue.
->>
->> The main problem is that irqfd is essentially an edge-triggered
->> signalling. Fire and forget. Given that we're dealing with a level
->> triggered interrupt, we end up with the interrupt still marked as
->> pending (nobody took the signal down).
-this does not really relate to irqfd: irqfd also comes with the concept
-of resamplefd. in case the IRQ is not forwarded, this is the
-irqfd_resampler_ack function that toggles the IRQ down (eventfd.c). Its
-execution is triggered in vgic_process_maintenance. With forwarding the
-EOI is not trappable anymore so this disappears.
+On Tue, Aug 04, 2015 at 11:29:52PM +0530, R, Vignesh wrote:
+> On 8/4/2015 9:21 PM, Mark Brown wrote:
+> > On Mon, Aug 03, 2015 at 10:27:19AM +0530, Vignesh R wrote:
 
+> > I still can't tell from the above what this interface is supposed to do.
+> > It sounds like the use of memory mapped mode is supposed to be
+> > transparent to users, it should just affect how the controller interacts
+> > with the hardware, but if that's the case why do we need to expose it to
+> > users at all?  Shouldn't the driver just use memory mapped mode if it's
+> > faster?
 
->> The usual way to get out of that mess in is to evaluate the state of the
->> level on EOI. But we can't trap on EOI for a HW interrupt.
->>
->> So it raises the question: should we instead consider the HW pending
->> state instead of the software one for mapped interrupts? It is
->> expensive, but it feels more correct.
->>
-> I thought we already covered this at LCA.  For mapped interrupts
-> (forwarded) we should never consider the software pending state, because
-> that state is managed by the hardware.  Or am I confusing concepts here?
+> 2. SFI_MM_IF(SPI memory mapped interface): The SFI_MM_IF block only
+> allows reading and writing to an SPI flash device only. Used to speed up
+> flash reads. It _cannot_ be used to communicate with non flash devices.
+> Now, the spi_message that ti-qspi receives in transfer_one() callback
+> can be from mtd device(in which case SFI_MM_IF can be used) or from any
+> other non flash SPI device (in which case SFI_MM_IF must not be used
+> instead SPI_CORE is to be used) but there is no way(is there?) to
+> distinguish where spi_message is from. Therefore I introduced flag
+> (use_mmap_mode) to struct spi_message. mtd driver will set flag to true,
+> this helps the ti-qspi driver to determine that the user is flash device
+> and thus can do read via SFI_MM_IF. If this flag is not set then the
+> user is assumed to be non flash SPI driver and will use SPI_CORE block
+> to communicate.
 
-Yes we discussed we should bypass most of the SW states.
+So if you're trying to do this you need to document it adequately so
+that other people can understand what it is supposed to do and how to
+use and implement it.  People can't really tell how the interface is
+supposed to work based on what was in the patch and the above isn't
+really helping.  For example, how does this change or restrict what the
+contents of the spi_message are?
 
-in my previous integration I proposed a patch "KVM: arm: vgic: fix state
-machine for forwarded IRQ". What's wrong with the below approach?
+> On the whole, I just need a way to determine that the user is a flash
+> device in order to switch to memory mapped interface.
 
-
-    Fix multiple injection of level sensitive forwarded IRQs.
-    With current code, the second injection fails since the
-    state bitmaps are not reset (process_maintenance is not
-    called anymore).
-
-    New implementation follows those principles:
-    - A forwarded IRQ only can be sampled when it is pending
-    - when queueing the IRQ (programming the LR), the pending state
-      is removed as for edge sensitive IRQs
-    - an injection of a forwarded IRQ is considered always valid since
-      coming from the HW and level always is 1.
-
-Eric
-
-> 
-> Thanks,
-> -Christoffer
-> 
+As far as I can tell you want to set a per spi_message flag saying that
+the message is a flash read command?  If that's what this is trying to
+do then why do you need to set the flag at all?  If the message is in a
+clearly defined format and it's more efficient to use this mmap mode
+then surely the driver can just recognise that the format is approprate
+and switch into mmap mode without being explicitly told - I'm not clear
+what the flag adds here.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150805/1f75d591/attachment.sig>
