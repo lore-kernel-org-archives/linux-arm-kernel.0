@@ -1,42 +1,30 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 5 Aug 2015 18:53:03 +0100
-Subject: [PATCH 3/4] arm64: Juno: Add HDLCD support to the Juno boards.
-In-Reply-To: <1438784892-27888-4-git-send-email-Liviu.Dudau@arm.com>
-References: <1438784892-27888-1-git-send-email-Liviu.Dudau@arm.com>
- <1438784892-27888-4-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <20150805175303.GB7557@n2100.arm.linux.org.uk>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 05 Aug 2015 10:56:38 -0700
+Subject: [PATCH 1/3] clk: versatile: Switch to assigned clock parents
+In-Reply-To: <1438770574.2142.80.camel@arm.com>
+References: <55BBB2FC.9030102@codeaurora.org>
+ <1438386285-5070-1-git-send-email-sboyd@codeaurora.org>
+ <1438386285-5070-2-git-send-email-sboyd@codeaurora.org>
+ <1438610480.2142.14.camel@arm.com> <55BFAB11.7080600@codeaurora.org>
+ <1438770574.2142.80.camel@arm.com>
+Message-ID: <55C24E56.3020004@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 05, 2015 at 03:28:11PM +0100, Liviu Dudau wrote:
-> +		hdmi-transmitter at 71 {
->  			compatible = "nxp,tda998x";
->  			reg = <0x71>;
-> +			port {
-> +				tda998x_1_input: endpoint at 0 {
-> +					remote-endpoint = <&hdlcd1_output>;
-> +				};
-> +
-> +				tda998x_1_output: endpoint at 1 {
-> +					remote-endpoint = <&hdmi1_connector_output>;
-> +				};
-> +			};
+On 08/05/2015 03:29 AM, Pawel Moll wrote:
+>
+> Right, that's probably my fault. The sp810 nodes appeared in the VE
+> trees very early (in terms of the "DT era"), when we weren't so strict
+> about documentation. So far, it would be fairly simple, something like
+> the text below - feel free to take it, mend it, extend it with your
+> changes and include in the series:
+>
+> Thanks!
 
-This isn't compliant with the TDA998x binding, and is very likely to
-screw Jean's work on adding audio support.  See emails on lakml and
-Documentation/devicetree/bindings/drm/i2c/tda998x.txt (which looks
-like it needs updating to include the ports stuff.)
-
-Also, the whole question of representing connectors in a DRM model is
-yet to be established.  Yes, DT should describe the hardware, but we
-don't yet know _how_ to describe physical connectors with stuff
-implemented on top of DRM yet, and we have nothing that makes use of
-this.
-
-Also note that ePAPR requires a reg= property if you specify a
-unit-address (the bit after the @ sign) so the above is non-compliant
-with ePAPR as well.
+Great! Can you please provide your signed-off-by? I can make it up into 
+a patch with some commit text that either you or I provide and throw it 
+into the series.
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
