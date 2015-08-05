@@ -1,37 +1,55 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Wed, 5 Aug 2015 16:57:20 +0800
-Subject: [PATCH v3 0/2] add a new driver to support SAMA5D4 watchdog timer
-Message-ID: <1438765043-11030-1-git-send-email-wenyou.yang@atmel.com>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Wed,  5 Aug 2015 10:58:07 +0200
+Subject: [PATCH v4 3/6] ARM: shmobile: sh73a0 dtsi: Add L2 cache-controller
+ node
+In-Reply-To: <1438765090-823-1-git-send-email-geert+renesas@glider.be>
+References: <1438765090-823-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1438765090-823-4-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Add the missing L2 cache-controller node. This will allow migration to
+the generic l2c OF initialization.
 
-Because the watchdog WDT_MR register can be written more than once,
-its work mechanism is different from the at91sam9260 watchdog driver.
-Open the device file to enable the watchdog hardware, close to disable it,
-and ping it from the user space directly to keep it alive.
+The L2 cache is an ARM L2C-310 (r3p1), of size 512 KiB (64 KiB x 8
+ways).
 
-Thank for Guenter's review, the version 2.0 changes are listed as below.
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+v4:
+  - New,
+  - Commit eeedcea69e927857 ("ARM: 8395/1: l2c: Add support for the
+    "arm,shared-override" property") is queued for 4.3 in arm/for-next.
+---
+ arch/arm/boot/dts/sh73a0.dtsi | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-Changes from v2.0
- 1./ Use a specific driver name, at91_sama5d4_wdt.c.
- 2./ Remove '-' at the end of macro name and unnecessary check.
- 3./ Use alphabetic order for include files.
-
-Wenyou Yang (2):
-  drivers: watchdog: add a driver to support SAMA5D4 watchdog timer
-  Documentation: dt: binding: atmel-sama5d4-wdt: for SAMA5D4 watchdog
-    driver
-
- .../bindings/watchdog/atmel-sama5d4-wdt.txt        |   35 +++
- drivers/watchdog/Kconfig                           |    9 +
- drivers/watchdog/Makefile                          |    1 +
- drivers/watchdog/at91_sama5d4_wdt.c                |  279 ++++++++++++++++++++
- drivers/watchdog/at91sam9_wdt.h                    |    2 +
- 5 files changed, 326 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/watchdog/atmel-sama5d4-wdt.txt
- create mode 100644 drivers/watchdog/at91_sama5d4_wdt.c
-
+diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
+index 11e17c5f26e2cae2..e84fce5e4090f4ab 100644
+--- a/arch/arm/boot/dts/sh73a0.dtsi
++++ b/arch/arm/boot/dts/sh73a0.dtsi
+@@ -53,6 +53,22 @@
+ 		      <0xf0000100 0x100>;
+ 	};
+ 
++	L2: cache-controller {
++		compatible = "arm,pl310-cache";
++		reg = <0xf0100000 0x1000>;
++		interrupts = <0 44 IRQ_TYPE_LEVEL_HIGH>;
++		power-domains = <&pd_a3sm>;
++		arm,data-latency = <3 3 3>;
++		arm,tag-latency = <2 2 2>;
++		arm,shared-override;
++		cache-unified;
++		cache-level = <2>;
++		cache-size = <0x80000>;
++		cache-sets = <2048>;
++		cache-block-size = <32>;
++		cache-line-size = <32>;
++	};
++
+ 	sbsc2: memory-controller at fb400000 {
+ 		compatible = "renesas,sbsc-sh73a0";
+ 		reg = <0xfb400000 0x400>;
 -- 
-1.7.9.5
+1.9.1
