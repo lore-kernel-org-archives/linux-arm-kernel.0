@@ -1,19 +1,20 @@
 From: rogerq@ti.com (Roger Quadros)
-Date: Wed, 5 Aug 2015 10:59:39 +0300
-Subject: [PATCH 08/10] ARM: dts: OMAP5: Use "syscon-phy-power" instead
- of "ctrl-module" in SATA PHY node
-In-Reply-To: <1438702233-8027-9-git-send-email-kishon@ti.com>
+Date: Wed, 5 Aug 2015 11:01:22 +0300
+Subject: [PATCH 09/10] ARM: dts: omap4: Use "syscon-phy-power" instead
+ of "ctrl-module" in USB PHY node
+In-Reply-To: <1438702233-8027-10-git-send-email-kishon@ti.com>
 References: <1438702233-8027-1-git-send-email-kishon@ti.com>
- <1438702233-8027-9-git-send-email-kishon@ti.com>
-Message-ID: <55C1C26B.4040809@ti.com>
+ <1438702233-8027-10-git-send-email-kishon@ti.com>
+Message-ID: <55C1C2D2.1080200@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 04/08/15 18:30, Kishon Vijay Abraham I wrote:
 > Add "syscon-phy-power" property and remove the deprecated "ctrl-module"
-> property from SATA PHY node.
+> property from USB PHY dt node.
 > 
-> Since "omap_control_sata" devicetree node is no longer used, remove it.
+> Since "omap_control_usb2phy" devicetree node is no longer used,
+> remove it.
 > 
 > Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 
@@ -23,35 +24,33 @@ cheers,
 -roger
 
 > ---
->  arch/arm/boot/dts/omap5.dtsi |   10 +---------
->  1 file changed, 1 insertion(+), 9 deletions(-)
+>  arch/arm/boot/dts/omap4.dtsi |    8 +-------
+>  1 file changed, 1 insertion(+), 7 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-> index f0b6cd6..c3ca5b7 100644
-> --- a/arch/arm/boot/dts/omap5.dtsi
-> +++ b/arch/arm/boot/dts/omap5.dtsi
-> @@ -946,14 +946,6 @@
->  			#thermal-sensor-cells = <1>;
+> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+> index 7d31c6f..b27634d 100644
+> --- a/arch/arm/boot/dts/omap4.dtsi
+> +++ b/arch/arm/boot/dts/omap4.dtsi
+> @@ -703,7 +703,7 @@
+>  			usb2_phy: usb2phy at 4a0ad080 {
+>  				compatible = "ti,omap-usb2";
+>  				reg = <0x4a0ad080 0x58>;
+> -				ctrl-module = <&omap_control_usb2phy>;
+> +				syscon-phy-power = <&scm_conf 0x300>;
+>  				clocks = <&usb_phy_cm_clk32k>;
+>  				clock-names = "wkupclk";
+>  				#phy-cells = <0>;
+> @@ -854,12 +854,6 @@
+>  			};
 >  		};
 >  
-> -		omap_control_sata: control-phy at 4a002374 {
-> -			compatible = "ti,control-phy-pipe3";
-> -			reg = <0x4a002374 0x4>;
+> -		omap_control_usb2phy: control-phy at 4a002300 {
+> -			compatible = "ti,control-phy-usb2";
+> -			reg = <0x4a002300 0x4>;
 > -			reg-names = "power";
-> -			clocks = <&sys_clkin>;
-> -			clock-names = "sysclk";
 > -		};
 > -
->  		/* OCP2SCP3 */
->  		ocp2scp at 4a090000 {
->  			compatible = "ti,omap-ocp2scp";
-> @@ -968,7 +960,7 @@
->  				      <0x4A096400 0x64>, /* phy_tx */
->  				      <0x4A096800 0x40>; /* pll_ctrl */
->  				reg-names = "phy_rx", "phy_tx", "pll_ctrl";
-> -				ctrl-module = <&omap_control_sata>;
-> +				syscon-phy-power = <&scm_conf 0x374>;
->  				clocks = <&sys_clkin>, <&sata_ref_clk>;
->  				clock-names = "sysclk", "refclk";
->  				#phy-cells = <0>;
+>  		omap_control_usbotg: control-phy at 4a00233c {
+>  			compatible = "ti,control-phy-otghs";
+>  			reg = <0x4a00233c 0x4>;
 > 
