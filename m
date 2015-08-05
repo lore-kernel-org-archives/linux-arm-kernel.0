@@ -1,35 +1,79 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 5 Aug 2015 19:13:49 +0530
-Subject: [PATCH] ARM: omap2plus_defconfig: make PCF857x built-in
-Message-ID: <1438782229-25118-1-git-send-email-kishon@ti.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Wed, 5 Aug 2015 21:46:03 +0800
+Subject: [PATCH v5 2/2] ARM: dts: add property for maximum ADC clock
+ frequencies
+In-Reply-To: <f598169164aaacc28292d8ccc6afb32d@agner.ch>
+References: <1432730872-14325-1-git-send-email-stefan@agner.ch>
+ <1432730872-14325-3-git-send-email-stefan@agner.ch>
+ <557477BE.5050108@kernel.org>
+ <f598169164aaacc28292d8ccc6afb32d@agner.ch>
+Message-ID: <20150805134603.GN12927@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-One of the lines from PCF857x is connected to the vdd line of MMC1
-in DRA74x and DRA72x EVMs and is modelled as a regulator. If PCF857x
-is not made as built-in, the regulator_get in omap_hsmmc fails making
-it difficult to use MMC1 as rootfs.
+On Mon, Aug 03, 2015 at 02:22:30PM +0200, Stefan Agner wrote:
+> Hi Shawn,
+> 
+> I guess this will go through your tree? Haven't seen it appear on imx/dt
+> so far...
 
-Make PCF857x built-in.
+Sorry.  I missed it.  Please use my kernel.org mailbox, which I'm using
+for kernel maintenance now.
 
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-Signed-off-by: Sekhar Nori <nsekhar@ti.com>
----
- arch/arm/configs/omap2plus_defconfig |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Applied, thanks.
 
-diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
-index ac521e7..7cedfe9 100644
---- a/arch/arm/configs/omap2plus_defconfig
-+++ b/arch/arm/configs/omap2plus_defconfig
-@@ -236,7 +236,7 @@ CONFIG_SSI_PROTOCOL=m
- CONFIG_PINCTRL_SINGLE=y
- CONFIG_DEBUG_GPIO=y
- CONFIG_GPIO_SYSFS=y
--CONFIG_GPIO_PCF857X=m
-+CONFIG_GPIO_PCF857X=y
- CONFIG_GPIO_TWL4030=y
- CONFIG_GPIO_PALMAS=y
- CONFIG_W1=m
--- 
-1.7.9.5
+Shawn
+
+> 
+> --
+> Stefan
+> 
+> On 2015-06-07 18:56, Jonathan Cameron wrote:
+> > On 27/05/15 13:47, Stefan Agner wrote:
+> >> The ADC clock frequency is limited depending on modes used. Add
+> >> device tree property which allow to set the mode used and the
+> >> maximum frequency ratings for the instance. These allows to
+> >> set the ADC clock to a frequency which is within specification
+> >> according to the actual mode used.
+> >>
+> >> Acked-by: Fugang Duan <B38611@freescale.com>
+> >> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> > I'm happy to take this via IIO if people want me to, otherwise give
+> > it's connection to the previous patch that I just applied,
+> > 
+> > Acked-by: Jonathan Cameron <jic23@kernel.org>
+> > 
+> >> ---
+> >>  arch/arm/boot/dts/vfxxx.dtsi | 4 ++++
+> >>  1 file changed, 4 insertions(+)
+> >>
+> >> diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
+> >> index a29c7ce..c6609bd 100644
+> >> --- a/arch/arm/boot/dts/vfxxx.dtsi
+> >> +++ b/arch/arm/boot/dts/vfxxx.dtsi
+> >> @@ -189,6 +189,8 @@
+> >>  				clocks = <&clks VF610_CLK_ADC0>;
+> >>  				clock-names = "adc";
+> >>  				status = "disabled";
+> >> +				fsl,adck-max-frequency = <30000000>, <40000000>,
+> >> +							<20000000>;
+> >>  			};
+> >>
+> >>  			wdoga5: wdog at 4003e000 {
+> >> @@ -387,6 +389,8 @@
+> >>  				clocks = <&clks VF610_CLK_ADC1>;
+> >>  				clock-names = "adc";
+> >>  				status = "disabled";
+> >> +				fsl,adck-max-frequency = <30000000>, <40000000>,
+> >> +							<20000000>;
+> >>  			};
+> >>
+> >>  			esdhc1: esdhc at 400b2000 {
+> >>
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
