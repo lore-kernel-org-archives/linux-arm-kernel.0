@@ -1,75 +1,64 @@
-From: zyw@rock-chips.com (Chris Zhong)
-Date: Wed, 05 Aug 2015 18:51:59 +0800
-Subject: [PATCH v3 3/3] ARM: rockchip: enable PMU_GPIOINT_WAKEUP_EN when
- entering shallow suspend
-In-Reply-To: <1544453.8uqOvAiDmD@diego>
-References: <2128609.Kb18M8K28F@diego> <1544453.8uqOvAiDmD@diego>
-Message-ID: <55C1EACF.1060702@rock-chips.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 05 Aug 2015 13:53:35 +0300
+Subject: [PATCH v3 0/5] iommu/arm-smmu: add support for non-pci devices
+In-Reply-To: <20150805104524.GD6092@arm.com>
+References: <1437463833-16112-1-git-send-email-thunder.leizhen@huawei.com>
+ <2351780.FdaR8mZqKs@avalon> <20150805104524.GD6092@arm.com>
+Message-ID: <2055191.Tg39UMkbi6@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Will,
 
+On Wednesday 05 August 2015 11:45:24 Will Deacon wrote:
+> On Tue, Aug 04, 2015 at 11:50:45PM +0100, Laurent Pinchart wrote:
+> > On Tuesday 28 July 2015 13:48:47 Will Deacon wrote:
+> >> On Tue, Jul 21, 2015 at 11:30:07AM +0100, Robin Murphy wrote:
+> >>> On 21/07/15 08:30, Zhen Lei wrote:
+> >>>> Changelog:
+> >>>> v2 -> v3:
+> >>>> 1. add support for pci device hotplug, which missed in patch v2.
+> >>>> 2. only support #iommu-cells = <1>, add corresponding description in
+> >>>> arm,smmu-v3.txt. 3. add function find_smmu_by_device which extracted
+> >>>> from find_smmu_by_node, to resolve> >
+> >>>> 
+> >>>>     the problem mentioned by Robin Murphy in [PATCH v2 7/9].
+> >>>>     Additionally:
+> >>>>     +    platform_set_drvdata(pdev, smmu);       //Patch v2
+> >>>>     +	dev->archdata.iommu = smmu;             //Patch v3, dev =
+> >>>>     &pdev->dev
+> >>> 
+> >>> I didn't give any Reviewed-by tags, much less to revised patches that
+> >>> I've not even looked at yet; please see section 13 of
+> >>> Documentation/SubmittingPatches for what the Reviewed-by tag means.
+> >> 
+> >> That said, it would be great if you could review the patches anyway ;)
+> >> 
+> >> Also, it looks like this is all based on Laurent's IOMMU probe deferral
+> >> series which hasn't seen any movement for a while.
+> >> 
+> >> Laurent: are you planning to repost that, or is it worth us picking up
+> >> the original version and bashing it into shape ourselves?
+> > 
+> > I'd really appreciate if you could take it where I left it and get into
+> > shape for upstream. I have no time to work on IOMMU at the moment I'm
+> > afraid :-(
+>
+> No problem at all. It will probably be Robin doing most of the hacking,
+> since he's the platform_device guy and I'm the PCI guy in the office at
+> the moment :)
+> 
+> I think he's also currently got a rebased version of your series with
+> some changes on top, so stay tuned.
 
-On 08/05/2015 06:51 AM, Heiko St?bner wrote:
-> PMU_GPIOINT_WAKEUP_EN seems needed when entering the shallow suspend
-> (with logic staying on) but does not seem to be needed for the deep
-> suspend for unknown reasons.
-> Testing revealed that this setting really is necessary to reliably
-> resume the veyron devices from suspend.
->
-> Reported-by: Chris Zhong <zyw@rock-chips.com>
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> ---
->   arch/arm/mach-rockchip/pm.c | 9 ++++++---
->   arch/arm/mach-rockchip/pm.h | 1 +
->   2 files changed, 7 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/arm/mach-rockchip/pm.c b/arch/arm/mach-rockchip/pm.c
-> index c11a30b..156cd23 100644
-> --- a/arch/arm/mach-rockchip/pm.c
-> +++ b/arch/arm/mach-rockchip/pm.c
-> @@ -123,9 +123,6 @@ static void rk3288_slp_mode_set(int level)
->   	regmap_write(sgrf_regmap, RK3288_SGRF_FAST_BOOT_ADDR,
->   		     rk3288_bootram_phy);
->   
-> -	regmap_write(pmu_regmap, RK3288_PMU_WAKEUP_CFG1,
-> -		     PMU_ARMINT_WAKEUP_EN);
-> -
->   	mode_set = BIT(PMU_GLOBAL_INT_DISABLE) | BIT(PMU_L2FLUSH_EN) |
->   		   BIT(PMU_SREF0_ENTER_EN) | BIT(PMU_SREF1_ENTER_EN) |
->   		   BIT(PMU_DDR0_GATING_EN) | BIT(PMU_DDR1_GATING_EN) |
-> @@ -146,6 +143,9 @@ static void rk3288_slp_mode_set(int level)
->   		mode_set1 |= BIT(PMU_CLR_ALIVE) | BIT(PMU_CLR_BUS) |
->   			     BIT(PMU_CLR_PERI) | BIT(PMU_CLR_DMA);
->   
-> +		regmap_write(pmu_regmap, RK3288_PMU_WAKEUP_CFG1,
-> +			     PMU_ARMINT_WAKEUP_EN);
-> +
->   		/*
->   		 * In deep suspend we use PMU_PMU_USE_LF to let the rk3288
->   		 * switch its main clock supply to the alternative 32kHz
-> @@ -166,6 +166,9 @@ static void rk3288_slp_mode_set(int level)
->   		 */
->   		mode_set |= BIT(PMU_CLK_CORE_SRC_GATE_EN);
->   
-> +		regmap_write(pmu_regmap, RK3288_PMU_WAKEUP_CFG1,
-> +			     PMU_ARMINT_WAKEUP_EN | PMU_GPIOINT_WAKEUP_EN);
-> +
->   		/* 30ms on a 24MHz clock for pmic stabilization */
->   		regmap_write(pmu_regmap, RK3288_PMU_STABL_CNT, 24000 * 30);
->   
-> diff --git a/arch/arm/mach-rockchip/pm.h b/arch/arm/mach-rockchip/pm.h
-> index 8a55ee2..b5af26f 100644
-> --- a/arch/arm/mach-rockchip/pm.h
-> +++ b/arch/arm/mach-rockchip/pm.h
-> @@ -61,6 +61,7 @@ static inline void rockchip_suspend_init(void)
->   
->   /* PMU_WAKEUP_CFG1 bits */
->   #define PMU_ARMINT_WAKEUP_EN		BIT(0)
-> +#define PMU_GPIOINT_WAKEUP_EN		BIT(3)
->   
->   enum rk3288_pwr_mode_con {
->   	PMU_PWR_MODE_EN = 0,
->
-Reviewed-by: Chris Zhong <zyw@rock-chips.com>
-Tested-by: Chris Zhong <zyw@rock-chips.com>
+Great ! As they say here, paljon kiitoksia (yes, Finnish can be used on 
+mailing lists for other purposes than cursing ;-)).
+
+> > I'll try to review patches though.
+> 
+> That would certainly be appreciated, cheers!
+
+-- 
+Regards,
+
+Laurent Pinchart
