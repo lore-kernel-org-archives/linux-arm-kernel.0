@@ -1,45 +1,74 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 5 Aug 2015 17:01:12 +0100
-Subject: [PATCH 7/7] ARM: redo TTBR setup code for LPAE
-In-Reply-To: <55C22B21.8000700@free-electrons.com>
-References: <20150506103000.GF2067@n2100.arm.linux.org.uk>
- <E1YpwbQ-0000wm-Jx@rmk-PC.arm.linux.org.uk>
- <55C22B21.8000700@free-electrons.com>
-Message-ID: <20150805160112.GZ7557@n2100.arm.linux.org.uk>
+From: julien.grall@citrix.com (Julien Grall)
+Date: Wed, 5 Aug 2015 17:06:14 +0100
+Subject: [Xen-devel] [PATCH v2 02/20] xen: Introduce a function to split
+ a Linux page into Xen page
+In-Reply-To: <55C230C9.7060506@citrix.com>
+References: <1436474552-31789-1-git-send-email-julien.grall@citrix.com>
+ <1436474552-31789-3-git-send-email-julien.grall@citrix.com>
+ <55B205FB.5080209@citrix.com> <55B20B56.7020605@citrix.com>
+ <55B20F1F.60902@citrix.com> <55C21DF3.2090201@citrix.com>
+ <55C230C9.7060506@citrix.com>
+Message-ID: <55C23476.8020104@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 05, 2015 at 05:26:25PM +0200, Gregory CLEMENT wrote:
-> It seems that since the merge of this commit the secondary CPUs on
-> Armada XP failed to come online in Big Endian (my configuration is
-> mvebu_v7_defconfig+CONFIG_CPU_BIG_ENDIAN=y).
+On 05/08/15 16:50, David Vrabel wrote:
+>>>>> Also perhaps make it
+>>>>>
+>>>>> int xen_for_each_gfn(struct page *page,
+>>>>>                      xen_gfn_fn_t fn, void *data);
+>>>>
+>>>> gfn standing for Guest Frame Number right?
+>>>
+>>> Yes.  This suggestion is just changing the name to make it more obvious
+>>> what it does.
+>>
+>> Thinking more about this suggestion. The callback (fn) is getting a 4K
+>> PFN in parameter and not a GFN.
+> 
+> I would like only APIs that deal with 64 KiB PFNs and 4 KiB GFNs.  I
+> think having a 4 KiB "PFN" is confusing.
 
-That's probably because I don't test big endian at all, never have done,
-and I suspect never will as I've never had systems using BE.  So, I regard
-BE as something of a troublesome untestable burden on kernel development.
-(And I've always regarded BE to be an abomination.)  In short, I loath
-big endian, which really doesn't bode well for me not constantly cocking
-it up...
+I agree with that. Note that helpers splitting Linux page in 4K chunk
+such as gnttab_for_each_grant (see patch #3) and this one may still have
+the concept of 4K "PFN" for internal purpose.
 
-My guess is that it all comes down to much of the new code expecting the
-value in r4/r5 to be the least significant 32bits in r4 and the most
-significant 32bits in r5.  However, in the secondary code, we load this
-using ldrd, which on BE probably reverses that.
+> Can you rework this xen_for_each_gfn() to pass GFNs to fn, instead?
 
-> Once I found that this commit introduced the regression I also tested
-> but with LPAE but I had the same result: only the first CPU boot.
+I will do.
 
-Not surprising.  I guess BE would need the two registers to mcrr reversing
-if they were a 64-bit value loaded with ldrd.
+> 
+>> This is because the balloon code seems to require having a 4K PFN in
+>> hand in few places. For instance XENMEM_populate_physmap and
+>> HYPERVISOR_update_va_mapping.
+> 
+> Ug. For an auto-xlate guest frame-list needs GFNs, for a PV guest
+> XENMEM_populate_physmap does want PFNs (so it can fill in the M2P).
+> 
+> Perhaps in increase_reservation:
+> 
+> if (auto-xlate)
+>    frame_list[i] = page_to_gfn(page);
+>    /* Or whatever per-GFN loop you need. */
+> else
+>    frame_list[i] = page_to_pfn(page);
+> 
+> update_va_mapping takes VAs (e.g, __va(pfn << PAGE_SHIFT) could be
+> page_to_virt(page).
 
-The simple answer may just be to swap r4/r5 after the ldrd.  Trying to do
-something different is likely to get into very troublesome problems,
-ensuring that r5 doesn't get overwritten (eg, the code which loads the
-domain access register would have to switch to a different register -
-maybe r4? - but then that needs to be dependent on LE or BE...) and we're
-really not going to end up with lots of conditional register usage just
-because of annoying BE differences scattered throughout the code.
+I though about a similar approach but I wanted to keep the code generic,
+i.e support the splitting even for non auto-translated guest. Hence the
+implementation xen_apply_to_page.
+
+Anyway, I will see to do what you suggest.
+
+> Sorry for being so picky here, but the inconsistency of terminology and
+> API misuse is already confusing and I don't want to see it get worse.
+
+No worry, I'm happy to rework this code to be able to drop the 4K PFN
+concept.
+
+Regards,
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Julien Grall
