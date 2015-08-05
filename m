@@ -1,51 +1,102 @@
-From: hramrach@gmail.com (Michal Suchanek)
-Date: Wed, 5 Aug 2015 14:56:09 +0200
-Subject: [RFC PATCH 1/5] spi: introduce flag for memory mapped read
-In-Reply-To: <20150805124412.GN20873@sirena.org.uk>
-References: <1438072876-16338-1-git-send-email-vigneshr@ti.com>
- <1438072876-16338-2-git-send-email-vigneshr@ti.com>
- <20150731181745.GM20873@sirena.org.uk>
- <55BEF4AF.5090704@ti.com> <20150804155148.GR20873@sirena.org.uk>
- <55C0FD98.1090107@ti.com> <20150805115013.GJ20873@sirena.org.uk>
- <CAOMqctQXwcHyiWBwtugSDSE_k65qrNfrwnhjQMDJkLoJMmGzUw@mail.gmail.com>
- <20150805124412.GN20873@sirena.org.uk>
-Message-ID: <CAOMqctS9Y5FxpUCCJew6+cnjH5iTvbzkH3g-8yrXs4OuS2pSGA@mail.gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Wed, 5 Aug 2015 20:56:50 +0800
+Subject: [PATCH v2 2/4] ARM: imx6ul: add fec MAC refrence clock and phy
+ fixup init
+In-Reply-To: <1438068642-6876-3-git-send-email-b38611@freescale.com>
+References: <1438068642-6876-1-git-send-email-b38611@freescale.com>
+ <1438068642-6876-3-git-send-email-b38611@freescale.com>
+Message-ID: <20150805125650.GL12927@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 August 2015 at 14:44, Mark Brown <broonie@kernel.org> wrote:
-> On Wed, Aug 05, 2015 at 02:40:01PM +0200, Michal Suchanek wrote:
->> On 5 August 2015 at 13:50, Mark Brown <broonie@kernel.org> wrote:
->
->> > As far as I can tell you want to set a per spi_message flag saying that
->> > the message is a flash read command?  If that's what this is trying to
->> > do then why do you need to set the flag at all?  If the message is in a
->> > clearly defined format and it's more efficient to use this mmap mode
->> > then surely the driver can just recognise that the format is approprate
->> > and switch into mmap mode without being explicitly told - I'm not clear
->> > what the flag adds here.
->
->> ehm, the read command is just one byte.
->
->> I don't think sending 03 or other random byte as the first byte of a
->> SPI transfer can be used as reliable detection that we are talking to
->> a SPI flash memory.
->
-> Why care - if something is physically in the same format as a flash read
-> command how would a device be able to tell that it wasn't actually a
-> flash read command?  The signals sent on the bus are going to be
-> identical anyway.
+On Tue, Jul 28, 2015 at 03:30:40PM +0800, Fugang Duan wrote:
+> Add FEC MAC refrence clock init.
+> Add phy fixup init for i.MX6ul 14x14 evk board that installs KSZ8081 phy.
+> For the phy, there needs extra phy fixup for MII and RMII mode.
+> 
+> Signed-off-by: Fugang Duan <b38611@freescale.com>
+> ---
+>  arch/arm/mach-imx/mach-imx6ul.c | 43 +++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 43 insertions(+)
+> 
+> diff --git a/arch/arm/mach-imx/mach-imx6ul.c b/arch/arm/mach-imx/mach-imx6ul.c
+> index f206506..0d81152 100644
+> --- a/arch/arm/mach-imx/mach-imx6ul.c
+> +++ b/arch/arm/mach-imx/mach-imx6ul.c
+> @@ -7,11 +7,53 @@
+>   */
+>  #include <linux/irqchip.h>
+>  #include <linux/of_platform.h>
+> +#include <linux/mfd/syscon.h>
+> +#include <linux/mfd/syscon/imx6q-iomuxc-gpr.h>
+> +#include <linux/micrel_phy.h>
 
-Not only must the command be the same but also the response must be tha same.
+'m' should go above 'o', right?  I fixed the ordering and applied the
+whole series.
 
-The flash chip responds by sending arbitrary amount of data. Given
-that transfer_one gets only the part that sends the read command and
-the part to do the actual read may or may not follow this is getting a
-bit hairy. Add in dummy bytes due to fast-read lag and page write
-wrap-around and you get something that you definitely do not want
-unless you are really sure that there is a flash memory on the other
-end of the wire.
+Shawn
 
-Thanks
-
-Michal
+> +#include <linux/phy.h>
+> +#include <linux/regmap.h>
+>  #include <asm/mach/arch.h>
+>  #include <asm/mach/map.h>
+>  
+>  #include "common.h"
+>  
+> +static void __init imx6ul_enet_clk_init(void)
+> +{
+> +	struct regmap *gpr;
+> +
+> +	gpr = syscon_regmap_lookup_by_compatible("fsl,imx6ul-iomuxc-gpr");
+> +	if (!IS_ERR(gpr))
+> +		regmap_update_bits(gpr, IOMUXC_GPR1, IMX6UL_GPR1_ENET_CLK_DIR,
+> +				   IMX6UL_GPR1_ENET_CLK_OUTPUT);
+> +	else
+> +		pr_err("failed to find fsl,imx6ul-iomux-gpr regmap\n");
+> +
+> +}
+> +
+> +static int ksz8081_phy_fixup(struct phy_device *dev)
+> +{
+> +	if (dev && dev->interface == PHY_INTERFACE_MODE_MII) {
+> +		phy_write(dev, 0x1f, 0x8110);
+> +		phy_write(dev, 0x16, 0x201);
+> +	} else if (dev && dev->interface == PHY_INTERFACE_MODE_RMII) {
+> +		phy_write(dev, 0x1f, 0x8190);
+> +		phy_write(dev, 0x16, 0x202);
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static void __init imx6ul_enet_phy_init(void)
+> +{
+> +	phy_register_fixup_for_uid(PHY_ID_KSZ8081, 0xffffffff, ksz8081_phy_fixup);
+> +}
+> +
+> +static inline void imx6ul_enet_init(void)
+> +{
+> +	imx6ul_enet_clk_init();
+> +	imx6ul_enet_phy_init();
+> +}
+> +
+>  static void __init imx6ul_init_machine(void)
+>  {
+>  	struct device *parent;
+> @@ -21,6 +63,7 @@ static void __init imx6ul_init_machine(void)
+>  		pr_warn("failed to initialize soc device\n");
+>  
+>  	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+> +	imx6ul_enet_init();
+>  	imx_anatop_init();
+>  }
+>  
+> -- 
+> 1.9.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
