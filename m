@@ -1,34 +1,43 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 5 Aug 2015 17:26:27 +0200
-Subject: [patch 00/11] ARM: Interrupt cleanups and API change preparation
-In-Reply-To: <20150713090726.316699641@linutronix.de>
-References: <20150713090726.316699641@linutronix.de>
-Message-ID: <20150805152627.GA31397@localhost>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Wed,  5 Aug 2015 15:28:12 +0100
+Subject: [PATCH 4/4] MAINTAINERS: Add Liviu Dudau as maintainer for ARM HDLCD
+ driver.
+In-Reply-To: <1438784892-27888-1-git-send-email-Liviu.Dudau@arm.com>
+References: <1438784892-27888-1-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <1438784892-27888-5-git-send-email-Liviu.Dudau@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 13, 2015 at 08:28:58PM -0000, Thomas Gleixner wrote:
-> The following patch series contains the following changes:
-> 
->     - Consolidation of chained interrupt handler setup/removal
-> 
->     - Switch to functions which avoid a redundant interrupt
->       descriptor lookup
-> 
->     - Preparation of interrupt flow handlers for the 'irq' argument
->       removal
-> 
-> The series has no dependencies and is also available as a git branch
-> for your convenience:
-> 
->  git://git.kernel.org/pub/scm/linux/kernel/git/tip/tip.git irq/arm
-> 
-> If you want me to carry the patches in the irq/core branch of tip,
-> please let me know.
+Update MAINTAINERS file for HDLCD driver.
 
-I've now merged this into next/cleanup in arm-soc (for 4.3).
+Cc: Andrew Morton <akpm@linux-foundation.org>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
+Cc: Greg KH <gregkh@linuxfoundation.org>
+Cc: Joe Perches <joe@perches.com>
+Cc: Jiri Slaby <jslaby@suse.com>
 
-Thanks!
+Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+---
+ MAINTAINERS | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-
--Olof
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 443dc62..084818e 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -790,6 +790,12 @@ S:	Maintained
+ F:	drivers/video/fbdev/arcfb.c
+ F:	drivers/video/fbdev/core/fb_defio.c
+ 
++ARM HDLCD DRM DRIVER
++M:	Liviu Dudau <liviu.dudau@arm.com>
++S:	Maintained
++F:	drivers/gpu/drm/arm/
++F:	Documentation/devicetree/bindings/arm/arm,hdlcd.txt
++
+ ARM MFM AND FLOPPY DRIVERS
+ M:	Ian Molton <spyro@f2s.com>
+ S:	Maintained
+-- 
+2.4.6
