@@ -1,34 +1,101 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 5 Aug 2015 11:34:57 +0200
-Subject: [PATCH] ARM: davinci: cp_intc: use IRQCHIP_SKIP_SET_WAKE instead
- of irq_set_wake callback
-In-Reply-To: <1438443236-30206-1-git-send-email-nsekhar@ti.com>
-References: <1435941754-21102-1-git-send-email-sudeep.holla@arm.com>
- <1438443236-30206-1-git-send-email-nsekhar@ti.com>
-Message-ID: <20150805093457.GO6390@localhost>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 05 Aug 2015 10:44:09 +0100
+Subject: [PATCH v3 09/11] KVM: arm/arm64: vgic: Prevent userspace injection
+ of a mapped interrupt
+In-Reply-To: <55C1BBF9.2060004@linaro.org>
+References: <1437753309-17989-1-git-send-email-marc.zyngier@arm.com>
+ <1437753309-17989-10-git-send-email-marc.zyngier@arm.com>
+ <55C0E690.1090808@linaro.org> <55C0EBF5.2060708@arm.com>
+ <55C1BBF9.2060004@linaro.org>
+Message-ID: <55C1DAE9.1050609@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 01, 2015 at 09:03:56PM +0530, Sekhar Nori wrote:
-> From: Sudeep Holla <sudeep.holla@arm.com>
-> 
-> Commit 60f96b41f71d ("genirq: Add IRQCHIP_SKIP_SET_WAKE flag")
-> introduced a new flag to skip the irq_set_wake callback in the irqchip
-> core to avoid adding dummy irq_set_wake in the irqchip implementations.
-> 
-> This patch removes the dummy callback and sets the IRQCHIP_SKIP_SET_WAKE
-> flags.
-> 
-> Cc: Sekhar Nori <nsekhar@ti.com>
-> Cc: Kevin Hilman <khilman@deeprootsystems.com>
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
-> ---
-> ARM-SoC, can you please apply this patch directly?
-> I do not have any other patches queued, so not sending
-> a pull request.
+On 05/08/15 08:32, Eric Auger wrote:
+> Hi Marc,
+> On 08/04/2015 06:44 PM, Marc Zyngier wrote:
+>> On 04/08/15 17:21, Eric Auger wrote:
+>>> Hi Marc,
+>>> On 07/24/2015 05:55 PM, Marc Zyngier wrote:
+>>>> Virtual interrupts mapped to a HW interrupt should only be triggered
+>>>> from inside the kernel. Otherwise, you could end up confusing the
+>>>> kernel (and the GIC's) state machine.
+>>>>
+>>>> Rearrange the injection path so that kvm_vgic_inject_irq is
+>>>> used for non-mapped interrupts, and kvm_vgic_inject_mapped_irq is
+>>>> used for mapped interrupts. The latter should only be called from
+>>>> inside the kernel (timer, VFIO).
+>>> nit: I would replace VFIO by irqfd.
+>>> VFIO just triggers the eventfd/irqfd. This is KVM/irqfd that injects the
+>>> virtual irq upon the irqfd signaling and he irqfd adaptation/ARM
+>>> currently is implemented in vgic.c
+>>
+>> Ah, thanks for reminding me of the right terminology, I tend to think of
+>> it as one big bag of nasty tricks... ;-)
+>>
+>> I'll update the commit message.
+>>
+>>>>
+>>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>>> ---
+>>>>  include/kvm/arm_vgic.h |  2 +
+>>>>  virt/kvm/arm/vgic.c    | 99 ++++++++++++++++++++++++++++++++++----------------
+>>>>  2 files changed, 70 insertions(+), 31 deletions(-)
+>>>>
+>>>> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+>>>> index 7306b4b..f6bfd79 100644
+>>>> --- a/include/kvm/arm_vgic.h
+>>>> +++ b/include/kvm/arm_vgic.h
+>>>> @@ -351,6 +351,8 @@ void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu);
+>>>>  void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu);
+>>>>  int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int irq_num,
+>>>>  			bool level);
+>>>> +int kvm_vgic_inject_mapped_irq(struct kvm *kvm, int cpuid,
+>>>> +			       struct irq_phys_map *map, bool level);
+>>>>  void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg);
+>>>>  int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
+>>>>  int kvm_vgic_vcpu_active_irq(struct kvm_vcpu *vcpu);
+>>>> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+>>>> index 3f7b690..e40ef70 100644
+>>>> --- a/virt/kvm/arm/vgic.c
+>>>> +++ b/virt/kvm/arm/vgic.c
+>>>> @@ -1533,7 +1533,8 @@ static int vgic_validate_injection(struct kvm_vcpu *vcpu, int irq, int level)
+>>>>  }
+>>>>  
+>>>>  static int vgic_update_irq_pending(struct kvm *kvm, int cpuid,
+>>>> -				  unsigned int irq_num, bool level)
+>>>> +				   struct irq_phys_map *map,
+>>>> +				   unsigned int irq_num, bool level)
+>>>>  {
+>>> In vgic_update_irq_pending, I needed to modify the following line and
+>>> add the "&& !map".
+>>>
+>>>         if (!vgic_validate_injection(vcpu, irq_num, level) && !map) {
+>>>
+>>> Without that, the level being not properly modeled for level sensitive
+>>> forwarded IRQs, the 2d injection fails.
+>>
+>> Ah! Is that because we never see the line being reset to zero, and the
+>> VGIC still sees the line as pending at the distributor level?
+> yes indeed
 
-Merged, thanks.
+Then it is a bigger problem we need to solve, and your solution just
+papers over the issue.
 
+The main problem is that irqfd is essentially an edge-triggered
+signalling. Fire and forget. Given that we're dealing with a level
+triggered interrupt, we end up with the interrupt still marked as
+pending (nobody took the signal down).
 
--Olof
+The usual way to get out of that mess in is to evaluate the state of the
+level on EOI. But we can't trap on EOI for a HW interrupt.
+
+So it raises the question: should we instead consider the HW pending
+state instead of the software one for mapped interrupts? It is
+expensive, but it feels more correct.
+
+Thoughts?
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
