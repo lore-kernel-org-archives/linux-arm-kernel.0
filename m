@@ -1,55 +1,51 @@
-From: boris.ostrovsky@oracle.com (Boris Ostrovsky)
-Date: Wed, 05 Aug 2015 08:44:03 -0400
-Subject: [Xen-devel] [PATCH v2 4/8] xen: Use the correctly the Xen memory
- terminologies
-In-Reply-To: <55C2029C.9030705@citrix.com>
-References: <1438711972-18752-1-git-send-email-julien.grall@citrix.com>	<1438711972-18752-5-git-send-email-julien.grall@citrix.com>	<55C147DD.7000600@oracle.com>
- <55C1EA95.5060504@citrix.com> <55C1FF54.8060409@oracle.com>
- <55C2029C.9030705@citrix.com>
-Message-ID: <55C20513.2070407@oracle.com>
+From: hramrach@gmail.com (Michal Suchanek)
+Date: Wed, 5 Aug 2015 14:56:09 +0200
+Subject: [RFC PATCH 1/5] spi: introduce flag for memory mapped read
+In-Reply-To: <20150805124412.GN20873@sirena.org.uk>
+References: <1438072876-16338-1-git-send-email-vigneshr@ti.com>
+ <1438072876-16338-2-git-send-email-vigneshr@ti.com>
+ <20150731181745.GM20873@sirena.org.uk>
+ <55BEF4AF.5090704@ti.com> <20150804155148.GR20873@sirena.org.uk>
+ <55C0FD98.1090107@ti.com> <20150805115013.GJ20873@sirena.org.uk>
+ <CAOMqctQXwcHyiWBwtugSDSE_k65qrNfrwnhjQMDJkLoJMmGzUw@mail.gmail.com>
+ <20150805124412.GN20873@sirena.org.uk>
+Message-ID: <CAOMqctS9Y5FxpUCCJew6+cnjH5iTvbzkH3g-8yrXs4OuS2pSGA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/05/2015 08:33 AM, Julien Grall wrote:
-> On 05/08/15 13:19, Boris Ostrovsky wrote:
->> On 08/05/2015 06:51 AM, Julien Grall wrote:
->>>>> diff --git a/drivers/video/fbdev/xen-fbfront.c
->>>>> b/drivers/video/fbdev/xen-fbfront.c
->>>>> index 09dc447..25e3cce 100644
->>>>> --- a/drivers/video/fbdev/xen-fbfront.c
->>>>> +++ b/drivers/video/fbdev/xen-fbfront.c
->>>>> @@ -539,7 +539,7 @@ static int xenfb_remove(struct xenbus_device *dev)
->>>>>       static unsigned long vmalloc_to_mfn(void *address)
->>>>>     {
->>>>> -    return pfn_to_mfn(vmalloc_to_pfn(address));
->>>>> +    return pfn_to_gfn(vmalloc_to_pfn(address));
->>>>>     }
->>>> Are you sure? This will return vmalloc_to_pfn(address)).
->>> I guess you mean vmalloc_to_mfn will return vmalloc_to_pfn?
->>>
->>> If so, it will be only the case on auto-translated case (because pfn ==
->>> gfn). In the case of PV, the mfn will be returned.
->> How will mfn be returned on PV when pfn_to_gfn() is an identity function?
->>
->> static inline unsigned long pfn_to_gfn(unsigned long pfn)
->>   {
->>       return pfn;
->>   }
-> The identity function is only for ARM guest which are always
-> auto-translated (arch/arm/include/asm/xen/page.h).
+On 5 August 2015 at 14:44, Mark Brown <broonie@kernel.org> wrote:
+> On Wed, Aug 05, 2015 at 02:40:01PM +0200, Michal Suchanek wrote:
+>> On 5 August 2015 at 13:50, Mark Brown <broonie@kernel.org> wrote:
 >
-> The x86 version contains a check if the guest is auto-translated or not
-> (arch/x86/include/asm/xen/page.):
+>> > As far as I can tell you want to set a per spi_message flag saying that
+>> > the message is a flash read command?  If that's what this is trying to
+>> > do then why do you need to set the flag at all?  If the message is in a
+>> > clearly defined format and it's more efficient to use this mmap mode
+>> > then surely the driver can just recognise that the format is approprate
+>> > and switch into mmap mode without being explicitly told - I'm not clear
+>> > what the flag adds here.
 >
-> static inline unsigned long pfn_to_gfn(unsigned long pfn)
-> {
->          if (xen_feature(XENFEAT_auto_translated_physmap))
->                  return pfn;
->          else
->                  return pfn_to_mfn(pfn);
-> }
+>> ehm, the read command is just one byte.
+>
+>> I don't think sending 03 or other random byte as the first byte of a
+>> SPI transfer can be used as reliable detection that we are talking to
+>> a SPI flash memory.
+>
+> Why care - if something is physically in the same format as a flash read
+> command how would a device be able to tell that it wasn't actually a
+> flash read command?  The signals sent on the bus are going to be
+> identical anyway.
 
-Of course --- I was looking at the top of the patch and didn't realize 
-it was ARM changes. Sorry for the noise.
+Not only must the command be the same but also the response must be tha same.
 
--boris
+The flash chip responds by sending arbitrary amount of data. Given
+that transfer_one gets only the part that sends the read command and
+the part to do the actual read may or may not follow this is getting a
+bit hairy. Add in dummy bytes due to fast-read lag and page write
+wrap-around and you get something that you definitely do not want
+unless you are really sure that there is a flash memory on the other
+end of the wire.
+
+Thanks
+
+Michal
