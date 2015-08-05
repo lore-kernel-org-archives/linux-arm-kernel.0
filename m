@@ -1,57 +1,67 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 5 Aug 2015 09:55:44 +0900
-Subject: [PATCH v4 00/16] ARM: shmobile: Add CPG/MSTP Clock Domain
-In-Reply-To: <20150804134824.GA10194@verge.net.au>
-References: <1438691297-29235-1-git-send-email-geert+renesas@glider.be>
- <20150804134824.GA10194@verge.net.au>
-Message-ID: <20150805005543.GC20726@verge.net.au>
+From: wangzhou1@hisilicon.com (Zhou Wang)
+Date: Wed, 5 Aug 2015 09:40:50 +0800
+Subject: [PATCH v5 2/5] PCI: designware: Add ARM64 support
+In-Reply-To: <55C09694.30506@arm.com>
+References: <1437794486-21134-1-git-send-email-wangzhou1@hisilicon.com>
+ <1437794486-21134-3-git-send-email-wangzhou1@hisilicon.com>
+ <55B71F75.5030907@hisilicon.com> <55C0872E.9060507@arm.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E01D719E9@lhreml503-mbs>
+ <55C09694.30506@arm.com>
+Message-ID: <55C169A2.10900@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 04, 2015 at 10:48:28PM +0900, Simon Horman wrote:
-> Thanks Geert,
+On 2015/8/4 18:40, James Morse wrote:
+> On 04/08/15 11:23, Gabriele Paoloni wrote:
+>> Hi James
+>>
+>> Please see "[PATCH v6] PCI: Store PCIe bus address in struct of_pci_range"
+>>
+>> I think if you apply this patch your problem should be solved...
+>>
+>> If you follow the discussion you see that this patch is going to be part 
+>> of the next designware patchset...
 > 
-> I have tentatively queued this up in its own branch,
-> cpg-mstp-clock-domain-for-v4.3.
+> Yes I just spotted that series after continuing through my email backlog.
+> 
+>> Wang Zhou said "You need apply Gabriele's patch before applying this patch."
+>> but he didn't specify which one and obviously this patch should have been part
+>> of the patch-set
+> 
+> I assumed he meant your patch 1 in the same series, (given the reply was to
+> patch 2).
+> 
+> With the '[PATCH v6] PCI: Store PCIe bus address in struct of_pci_range'
+> applied before patches and 1 and 2 of this series - pcie on the
+> 'Freescale i.MX6 Quad SABRE Lite Board' works fine.
+> 
+> I can rescan the bus, load firmware, list nearby APs, and even get MSIs
+> coming from the card.
+> 
+> Tested-by: James Morse <james.morse@arm.com>
+> 
+> 
+> 
+> James
+> 
+> .
+>
 
-Where possible I prefer not to apply non-DTS/DTSI patches on top of
-DTS/DTSI patches, I believe this is in keeping with how the ARM SoC
-maintainers like things handled.  With this in mind I have shuffled things
-around a little, the result is:
+Hi James,
 
-1. The following are (still) queued up for v4.3 in their own
-   cpg-mstp-clock-domain-for-v4.3 branch:
+Many thanks for your help to test!
 
-   clk: shmobile: Add CPG/MSTP Clock Domain support
-   clk: shmobile: r8a7778: Add CPG/MSTP Clock Domain support
-   clk: shmobile: r8a7779: Add CPG/MSTP Clock Domain support
-   clk: shmobile: rcar-gen2: Add CPG/MSTP Clock Domain support
-   clk: shmobile: rz: Add CPG/MSTP Clock Domain support
-   ARM: shmobile: r7s72100 dtsi: Add CPG/MSTP Clock Domain
-   ARM: shmobile: r8a7778 dtsi: Add CPG/MSTP Clock Domain
-   ARM: shmobile: r8a7779 dtsi: Add CPG/MSTP Clock Domain
-   ARM: shmobile: r8a7790 dtsi: Add CPG/MSTP Clock Domain
-   ARM: shmobile: r8a7791 dtsi: Add CPG/MSTP Clock Domain
-   ARM: shmobile: r8a7793 dtsi: Add CPG/MSTP Clock Domain
-   ARM: shmobile: r8a7794 dtsi: Add CPG/MSTP Clock Domain
+I need apologize for not giving a clear message. What I mean is applying
+Gab's '[PATCH v6] PCI: Store PCIe bus address in struct of_pci_range'.
+I am very sorry for wasting your time :(
 
-2. The following are now queued up for v4.3 in a separate
-   sh-drivers-for-v4.3 branch. That branch is on top of the
-   cpg-mstp-clock-domain-for-v4.3 branch and I intend to send it directly
-   to Linus if/when a v4.3-rc has been released with the patches
-   listed in 1. present.
+Above Gab's patch will be merged in my next series. Hope that will make
+thing clearer.
 
-   drivers: sh: Disable legacy default PM Domain on emev2
-   drivers: sh: Disable PM runtime for multi-platform ARM with genpd
+It is good that these patches work fine on your board! Hope we can get
+more tests on other ARM32 boards.
 
-3. I have deferred the remaining two patches, listed below, for v4.4.
-   they currently reside in cpg-mstp-clock-domain-for-v4.4. That
-   branch is based on the sh-drivers-for-v4.3 branch.
+Thanks again,
+Zhou
 
-   clk: shmobile: mstp: Consider "zb_clk" suitable for power management
-   ARM: shmobile: R-Mobile: Use CPG/MSTP Clock Domain attach/detach helpers
-
-
-This means that the last two patches will disappear from next until
-after v4.3-rc1 is released but they, along with all the other patches,
-will be present in the renesas devel branch.
+.
