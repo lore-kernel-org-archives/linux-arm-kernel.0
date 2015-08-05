@@ -1,47 +1,35 @@
-From: boris.ostrovsky@oracle.com (Boris Ostrovsky)
-Date: Wed, 05 Aug 2015 08:19:32 -0400
-Subject: [PATCH v2 4/8] xen: Use the correctly the Xen memory terminologies
-In-Reply-To: <55C1EA95.5060504@citrix.com>
-References: <1438711972-18752-1-git-send-email-julien.grall@citrix.com>
- <1438711972-18752-5-git-send-email-julien.grall@citrix.com>
- <55C147DD.7000600@oracle.com> <55C1EA95.5060504@citrix.com>
-Message-ID: <55C1FF54.8060409@oracle.com>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Wed,  5 Aug 2015 14:22:20 +0200
+Subject: [PATCH] ARM: ux500: fix typo in regulator names
+Message-ID: <1438777340-27511-1-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/05/2015 06:51 AM, Julien Grall wrote:
->
->>> diff --git a/drivers/video/fbdev/xen-fbfront.c
->>> b/drivers/video/fbdev/xen-fbfront.c
->>> index 09dc447..25e3cce 100644
->>> --- a/drivers/video/fbdev/xen-fbfront.c
->>> +++ b/drivers/video/fbdev/xen-fbfront.c
->>> @@ -539,7 +539,7 @@ static int xenfb_remove(struct xenbus_device *dev)
->>>      static unsigned long vmalloc_to_mfn(void *address)
->>>    {
->>> -    return pfn_to_mfn(vmalloc_to_pfn(address));
->>> +    return pfn_to_gfn(vmalloc_to_pfn(address));
->>>    }
->> Are you sure? This will return vmalloc_to_pfn(address)).
-> I guess you mean vmalloc_to_mfn will return vmalloc_to_pfn?
->
-> If so, it will be only the case on auto-translated case (because pfn ==
-> gfn). In the case of PV, the mfn will be returned.
+Apparently an extra _reg suffix was appended to the end of the names of
+regulators ab8500_ext2_reg and ab8500_ext3_reg.
 
-How will mfn be returned on PV when pfn_to_gfn() is an identity function?
+Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+---
+ arch/arm/boot/dts/ste-snowball.dts | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-static inline unsigned long pfn_to_gfn(unsigned long pfn)
-  {
-      return pfn;
-  }
-
-
--boris
-
->
-> Although, this function is misnamed. It's fixed in a follow-up patch
-> (see #6) because it's required more renaming than this function. I
-> didn't want to add such changes within this patch.
->
-> Regards,
->
+diff --git a/arch/arm/boot/dts/ste-snowball.dts b/arch/arm/boot/dts/ste-snowball.dts
+index 32a5ccb14e7e..07c0e346942c 100644
+--- a/arch/arm/boot/dts/ste-snowball.dts
++++ b/arch/arm/boot/dts/ste-snowball.dts
+@@ -360,11 +360,11 @@
+ 						regulator-name = "ab8500-ext-supply1";
+ 					};
+ 
+-					ab8500_ext2_reg_reg: ab8500_ext2 {
++					ab8500_ext2_reg: ab8500_ext2 {
+ 						regulator-name = "ab8500-ext-supply2";
+ 					};
+ 
+-					ab8500_ext3_reg_reg: ab8500_ext3 {
++					ab8500_ext3_reg: ab8500_ext3 {
+ 						regulator-name = "ab8500-ext-supply3";
+ 					};
+ 				};
+-- 
+2.4.3
