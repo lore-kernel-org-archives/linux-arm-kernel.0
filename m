@@ -1,93 +1,67 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Wed,  5 Aug 2015 10:58:04 +0200
-Subject: [PATCH v4 0/6] ARM: shmobile: r8a7740/sh73a0 DT Cache Handling
-Message-ID: <1438765090-823-1-git-send-email-geert+renesas@glider.be>
+From: maitysanchayan@gmail.com (Sanchayan Maity)
+Date: Wed,  5 Aug 2015 14:25:48 +0530
+Subject: [PATCH v3 0/3] Add support for touchscreen on Colibri VF50
+Message-ID: <cover.1438763030.git.maitysanchayan@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-	Hi Simon, Magnus,
+Hello,
 
-This patch series add L1 and L2 cache descriptions to DT for r8a7740 and
-sh73a0, and migrates the shmobile DT-based generic r8a7740 and
-armadillo legacy platforms from calling l2x0_of_init() to the generic
-l2c OF initialization.
+The patchset adds support for 4 wire touchscreen on Toradex Colibri
+VF50 modules. Patches are tested on top of shawn's for-next branch.
 
-Note that the conversion to the generic l2c OF initialization is not
-done yet for sh73a0, as this initializes the L2 cache earlier, breaking
-the (fragile) sh73a0 secondary CPU bringup code.
+Changes since v2:
+1. Fix pin multiplexing for pins in idle state. Configuration of the
+pen detect pull up viz. PTA19__GPIO_9 resulted in generation of pen
+irq's on a continuous basis.
+2. Fix pinmux of the ADC pins as per the recommended pinmux in TRM.
+3. Use a threaded irq handler instead of a irq handler plus workqueue
+approach.
+4. Use a low level trigger with oneshot flag specifier instead of the
+previous falling edge triggered irq's. This coupled with the fix in
+point 1 fixes the previous continuous spurious irq generation bug.
+5. Change/fix the TS measurement logic to account for the fact that
+iio_channel_read_raw might actually return an error. To be more
+specific use break instead of continue and take care to close the
+FET's in case of channel read error.
+6. Drop the first patch "Add io-channel-cells property for ADC node"
+as it has already been applied.
+7. Move the iio channel get call again at the start. Having it in
+the end resulted in crashes sometimes when iio was not probed and
+the ts device got probed and opened earlier.
 
-Also note that this conversion should be done on r8a7778, and r8a7779,
-too.
+Changes since v1:
+1. Fix/drop comments
+2. Use an inline function for multiple gpiod_get calls in probe
+3. Remove the pull up in the pinmux specified in DT for touchctrl_gpios
+4. Add the io-channel-cells property before status property.
+5. Add GPIOLIB as dependency in the Kconfig file
 
-Changes compared to v3 ("[PATCH v3 0/6] ARM: l2c / shmobile: r8a7740 : Shared
-Override",
-http://lists.infradead.org/pipermail/linux-arm-kernel/2015-May/340636.html):
-  - "l2c: Add support for the "arm,shared-override" property" was split
-    off into an independent patch, and is now queued for v4.3 in
-    arm/for-next,
-  - Dropped armadillo legacy migration, as it no longer exists,
-  - Added sh73a0 L1 and L2 DT cache description.
+Version 2 of the patchset can be found here
+https://www.mail-archive.com/linux-input at vger.kernel.org/msg18090.html
 
-Changes compared to v2 ("[PATCH v2 0/5] ARM: shmobile: r8a7740/armadillo:
-Migrate to generic l2c OF",
-http://www.spinics.net/lists/devicetree/msg68176.html):
-  - Add DT support for Shared Override,
-  - Setting Shared Override is done only if CMA is not available (as
-    Russell claims it's not needed if CMA is available),
-  - Use 0/~0 in machine_desc.l2c_aux_{val,mask}, as DT now supports
-    "arm,shared-override".
+Version 1 of the patchset can be found here
+https://lkml.org/lkml/2015/6/30/103
 
-Changes compared to v1:
-  - Fix interrupt reference in DT,
-  - Describe L2 better in DT,
-  - Keep only {,~}L2C_AUX_CTRL_SHARED_OVERRIDE in
-    machine_desc.l2c_aux_{val,mask}, as there's no DT property for
-    this.
-  - Add L1 cache to DT.
+Thank you very much for the feedback till now.
 
-Dependencies:
-  - This series applies to renesas-devel-20150805-v4.2-rc5,
-  - Patch 2 depends on patch 1,
-  - Patch 4 depends on patch 2,
-  - Patch 5 depends on patch 1 and on "ARM: 8395/1: l2c: Add support for
-    the "arm,shared-override" property" in arm/for-next,
-  - Patch 6 depends on patch 5.
+Regards,
+Sanchayan.
 
-Given C code patches depending on DT patches in the same branch are
-frowned upon, I think it would be best if patch 1 (and patch 3, if
-anyone thinks we may fix the secondary CPU bringup issue during the next
-3 months) are queued for v4.3. The other patches can be queued for
-2016^H^H^H^Hv4.4.
+Sanchayan Maity (3):
+  ARM: dts: vf500-colibri: Add device tree node for touchscreen support
+  input: Add DT binding documentation for Colibri VF50 touchscreen
+  touchscreen: colibri-vf50-ts: Add touchscreen support for Colibri VF50
 
-I've been running this on r8a7740/armadillo and sh73a0/kzm9g during the
-past 9 months.
-
-Thanks!
-
-Geert Uytterhoeven (6):
-  ARM: shmobile: r8a7740 dtsi: Add L2 cache-controller node
-  ARM: shmobile: r8a7740 dtsi: Add L1 cache information to CPU node
-  ARM: shmobile: sh73a0 dtsi: Add L2 cache-controller node
-  ARM: shmobile: sh73a0 dtsi: Add L1 cache information to CPU nodes
-  ARM: shmobile: r8a7740: Migrate to generic l2c OF initialization
-  ARM: shmobile: r8a7740: Remove mapping of L2 cache controller
-    registers
-
- arch/arm/boot/dts/r8a7740.dtsi         | 25 +++++++++++++++++++++++++
- arch/arm/boot/dts/sh73a0.dtsi          | 34 ++++++++++++++++++++++++++++++++++
- arch/arm/mach-shmobile/setup-r8a7740.c | 18 ++----------------
- 3 files changed, 61 insertions(+), 16 deletions(-)
+ .../bindings/input/touchscreen/colibri-vf50-ts.txt |  32 ++
+ arch/arm/boot/dts/vf500-colibri-eval-v3.dts        |   4 +
+ arch/arm/boot/dts/vf500-colibri.dtsi               |  45 +++
+ drivers/input/touchscreen/Kconfig                  |  12 +
+ drivers/input/touchscreen/Makefile                 |   1 +
+ drivers/input/touchscreen/colibri-vf50-ts.c        | 404 +++++++++++++++++++++
+ 6 files changed, 498 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/input/touchscreen/colibri-vf50-ts.txt
+ create mode 100644 drivers/input/touchscreen/colibri-vf50-ts.c
 
 -- 
-1.9.1
-
-Gr{oetje,eeting}s,
-
-						Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-							    -- Linus Torvalds
+2.5.0
