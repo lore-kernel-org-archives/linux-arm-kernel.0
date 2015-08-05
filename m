@@ -1,196 +1,74 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 5 Aug 2015 17:51:20 +0100
-Subject: [PATCH 1/3] Docs: dt: add generic MSI bindings
-In-Reply-To: <1437670365-20704-2-git-send-email-mark.rutland@arm.com>
-References: <1437670365-20704-1-git-send-email-mark.rutland@arm.com>
- <1437670365-20704-2-git-send-email-mark.rutland@arm.com>
-Message-ID: <20150805165120.GB28849@leverpostej>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Wed, 5 Aug 2015 09:52:25 -0700
+Subject: [PATCH v2 4/8] xen: Use the correctly the Xen memory terminologies
+In-Reply-To: <alpine.DEB.2.02.1508051108100.11337@kaball.uk.xensource.com>
+References: <1438711972-18752-1-git-send-email-julien.grall@citrix.com>
+ <1438711972-18752-5-git-send-email-julien.grall@citrix.com>
+ <alpine.DEB.2.02.1508051108100.11337@kaball.uk.xensource.com>
+Message-ID: <20150805165225.GC3603@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rob,
+On Wed, Aug 05, 2015 at 11:08:55AM +0100, Stefano Stabellini wrote:
+> On Tue, 4 Aug 2015, Julien Grall wrote:
+> > Based on include/xen/mm.h [1], Linux is mistakenly using MFN when GFN
+> > is meant, I suspect this is because the first support for Xen was for
+> > PV. This resulted in some misimplementation of helpers on ARM and
+> > confused developers about the expected behavior.
+> > 
+> > For instance, with pfn_to_mfn, we expect to get an MFN based on the name.
+> > Although, if we look at the implementation on x86, it's returning a GFN.
+> > 
+> > For clarity and avoid new confusion, replace any reference to mfn with
+> > gfn in any helpers used by PV drivers. The x86 code will still keep some
+> > reference of pfn_to_mfn but exclusively for PV (a BUG_ON has been added
+> > to ensure this). No changes as been made in the hypercall field, even
+> > though they may be invalid, in order to keep the same as the defintion
+> > in xen repo.
+> > 
+> > Take also the opportunity to simplify simple construction such
+> > as pfn_to_mfn(page_to_pfn(page)) into page_to_gfn. More complex clean up
+> > will come in follow-up patches.
+> > 
+> > [1] http://xenbits.xen.org/gitweb/?p=xen.git;a=commitdiff;h=e758ed14f390342513405dd766e874934573e6cb
+> > 
+> > Signed-off-by: Julien Grall <julien.grall@citrix.com>
+> > Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> > Cc: Russell King <linux@arm.linux.org.uk>
+> > Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+> > Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
+> > Cc: David Vrabel <david.vrabel@citrix.com>
+> > Cc: Thomas Gleixner <tglx@linutronix.de>
+> > Cc: Ingo Molnar <mingo@redhat.com>
+> > Cc: "H. Peter Anvin" <hpa@zytor.com>
+> > Cc: x86 at kernel.org
+> > Cc: "Roger Pau Monn?" <roger.pau@citrix.com>
+> > Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> > Cc: Ian Campbell <ian.campbell@citrix.com>
+> > Cc: Wei Liu <wei.liu2@citrix.com>
+> > Cc: Juergen Gross <jgross@suse.com>
+> > Cc: "James E.J. Bottomley" <JBottomley@odin.com>
+> > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> > Cc: Jiri Slaby <jslaby@suse.com>
+> > Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+> > Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> > Cc: linux-input at vger.kernel.org
+> > Cc: netdev at vger.kernel.org
+> > Cc: linux-scsi at vger.kernel.org
+> > Cc: linuxppc-dev at lists.ozlabs.org
+> > Cc: linux-fbdev at vger.kernel.org
+> > Cc: linux-arm-kernel at lists.infradead.org
+> 
+> Aside from the x86 bits:
+> 
+> Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 
-Do you have any objections to this, or are you happy to take this patch?
+Not really important, but just in case anyone waits for my ack on input
+bits:
 
-There's a user of this binding (the GICv3 ITS) queued for v4.3 already in
-the tip tree, so either we either need to be ok with this binding or we
-need to rework that before v4.3.
+Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
 
-Marc, can I take it from your use of the binding that you are happy to
-provide your ack?
+Thanks.
 
-Thanks,
-Mark.
-
-On Thu, Jul 23, 2015 at 05:52:43PM +0100, Mark Rutland wrote:
-> Currently msi-parent is used in a couple of drivers despite being fairly
-> underspecified. This patch adds a generic binding for MSIs (including
-> the existing msi-parent property) enabling the description of platform
-> devices capable of using MSIs.
-> 
-> While MSIs are primarily distinguished by doorbell and payload, some MSI
-> controllers (e.g. the GICv3 ITS) also use side-band information
-> accompanying the write to identify the master which originated the MSI,
-> to allow for sandboxing. This sideband information is non-probeable and
-> needs to be described in the DT. Other MSI controllers may have
-> additional configuration details which need to be described per-master.
-> 
-> This patch adds a generic msi-parent binding document, extending the
-> de-facto standard with a new (optional) #msi-cells which can be used to
-> express any per-master configuration and/or sideband data. This is
-> sufficient to describe non-hotpluggable devices.
-> 
-> For busses where sideband data may be derived from some bus-specific
-> master ID scheme, other properties will be required to describe the
-> mapping.
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> ---
->  .../bindings/interrupt-controller/msi.txt          | 135 +++++++++++++++++++++
->  1 file changed, 135 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/msi.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/interrupt-controller/msi.txt b/Documentation/devicetree/bindings/interrupt-controller/msi.txt
-> new file mode 100644
-> index 0000000..c60c034
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/interrupt-controller/msi.txt
-> @@ -0,0 +1,135 @@
-> +This document describes the generic device tree binding for MSI controllers and
-> +their master(s).
-> +
-> +Message Signaled Interrupts (MSIs) are a class of interrupts generated by a
-> +write to an MMIO address.
-> +
-> +MSIs were originally specified by PCI (and are used with PCIe), but may also be
-> +used with other busses, and hence a mechanism is required to relate devices on
-> +those busses to the MSI controllers which they are capable of using,
-> +potentially including additional information.
-> +
-> +MSIs are distinguished by some combination of:
-> +
-> +- The doorbell (the MMIO address written to).
-> +  
-> +  Devices may be configured by software to write to arbitrary doorbells which
-> +  they can address. An MSI controller may feature a number of doorbells.
-> +
-> +- The payload (the value written to the doorbell).
-> +  
-> +  Devices may be configured to write an arbitrary payload chosen by software.
-> +  MSI controllers may have restrictions on permitted payloads.
-> +
-> +- Sideband information accompanying the write.
-> +  
-> +  Typically this is neither configurable nor probeable, and depends on the path
-> +  taken through the memory system (i.e. it is a property of the combination of
-> +  MSI controller and device rather than a property of either in isolation).
-> +
-> +
-> +MSI controllers:
-> +================
-> +
-> +An MSI controller signals interrupts to a CPU when a write is made to an MMIO
-> +address by some master. An MSI controller may feature a number of doorbells.
-> +
-> +Required properties:
-> +--------------------
-> +
-> +- msi-controller: Identifies the node as an MSI controller.
-> +
-> +Optional properties:
-> +--------------------
-> +
-> +- #msi-cells: The number of cells in an msi-specifier, required if not zero.
-> +
-> +  Typically this will encode information related to sideband data, and will
-> +  not encode doorbells or payloads as these can be configured dynamically.
-> +
-> +  The meaning of the msi-specifier is defined by the device tree binding of
-> +  the specific MSI controller. 
-> +
-> +
-> +MSI clients
-> +===========
-> +
-> +MSI clients are devices which generate MSIs. For each MSI they wish to
-> +generate, the doorbell and payload may be configured, though sideband
-> +information may not be configurable.
-> +
-> +Required properties:
-> +--------------------
-> +
-> +- msi-parent: A list of phandle + msi-specifier pairs, one for each MSI
-> +  controller which the device is capable of using.
-> +
-> +  This property is unordered, and MSIs may be allocated from any combination of
-> +  MSI controllers listed in the msi-parent property.
-> +
-> +  If a device has restrictions on the allocation of MSIs, these restrictions
-> +  must be described with additional properties.
-> +
-> +  When #msi-cells is non-zero, busses with an msi-parent will require
-> +  additional properties to describe the relationship between devices on the bus
-> +  and the set of MSIs they can potentially generate.
-> +
-> +
-> +Example
-> +=======
-> +
-> +/ {
-> +	#address-cells = <1>;
-> +	#size-cells = <1>;
-> +
-> +	msi_a: msi-controller at a {
-> +		reg = <0xa 0xf00>;
-> +		compatible = "vendor-a,some-controller";
-> +		msi-controller;
-> +		/* No sideband data, so #msi-cells omitted */
-> +	};
-> +
-> +	msi_b: msi-controller at b {
-> +		reg = <0xb 0xf00>;
-> +		compatible = "vendor-b,another-controller";
-> +		msi-controller;
-> +		/* Each device has some unique ID */
-> +		#msi-cells = <1>;
-> +	};
-> +
-> +	msi_c: msi-controller at c {
-> +		reg = <0xb 0xf00>;
-> +		compatible = "vendor-b,another-controller";
-> +		msi-controller;
-> +		/* Each device has some unique ID */
-> +		#msi-cells = <1>;
-> +	};
-> +
-> +	dev at 0 {
-> +		reg = <0x0 0xf00>;
-> +		compatible = "vendor-c,some-device";
-> +
-> +		/* Can only generate MSIs to msi_a */
-> +		msi-parent = <&msi_a>;
-> +	};
-> +
-> +	dev at 1 {
-> +		reg = <0x1 0xf00>;
-> +		compatible = "vendor-c,some-device";
-> +
-> +		/* 
-> +		 * Can generate MSIs to either A or B.
-> +		 */
-> +		msi-parent = <&msi_a>, <&msi_b 0x17>;
-> +	};
-> +
-> +	dev at 2 {
-> +		reg = <0x2 0xf00>;
-> +		compatible = "vendor-c,some-device";
-> +		/*
-> +		 * Has different IDs at each MSI controller.
-> +		 * Can generate MSIs to all of the MSI controllers.
-> +		 */
-> +		msi-parent = <&msi_a>, <&msi_b 0x17>, <&msi_c 0x53>;
-> +	};
-> +};
-> -- 
-> 1.9.1
-> 
+-- 
+Dmitry
