@@ -1,42 +1,66 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 5 Aug 2015 10:25:34 +0100
-Subject: [PATCH v4 1/3] PCI: generic: remove dependency on hw_pci
-In-Reply-To: <20150805092318.GB6092@arm.com>
-References: <1438721620-15493-1-git-send-email-jchandra@broadcom.com>
- <20150804234956.GF17327@google.com> <20150805092318.GB6092@arm.com>
-Message-ID: <20150805092533.GC6092@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed, 05 Aug 2015 10:34:12 +0100
+Subject: [PATCH v4 1/6] ARM: shmobile: r8a7740 dtsi: Add L2
+ cache-controller node
+In-Reply-To: <1438765090-823-2-git-send-email-geert+renesas@glider.be>
+References: <1438765090-823-1-git-send-email-geert+renesas@glider.be>
+ <1438765090-823-2-git-send-email-geert+renesas@glider.be>
+Message-ID: <55C1D894.8070302@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 05, 2015 at 10:23:18AM +0100, Will Deacon wrote:
-> That said, I just tried to build this and it fails to compile the x-gene
-> PCI host driver. Fixup below.
 
-Wait, there's more!
 
-Will
+On 05/08/15 09:58, Geert Uytterhoeven wrote:
+> Add the missing L2 cache-controller node. This will allow migration to
+> the generic l2c OF initialization.
+>
+> The L2 cache is an ARM L2C-310 (r3p1-150rel0), of size 256 KiB (32 KiB x
+> 8 ways).
+>
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> ---
+> v4:
+>    - Commit eeedcea69e927857 ("ARM: 8395/1: l2c: Add support for the
+>      "arm,shared-override" property") is queued for 4.3 in arm/for-next,
+>
+> v3:
+>    - Add "arm,shared-override",
+>
+> v2:
+>    - Fix interrupt (should be 3 cells, not 1),
+>    - Describe cache better.
+> ---
+>   arch/arm/boot/dts/r8a7740.dtsi | 16 ++++++++++++++++
+>   1 file changed, 16 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
+> index d84714468cce18df..ddef5b1c68fa06b3 100644
+> --- a/arch/arm/boot/dts/r8a7740.dtsi
+> +++ b/arch/arm/boot/dts/r8a7740.dtsi
+> @@ -37,6 +37,22 @@
+>   		      <0xc2000000 0x1000>;
+>   	};
+>
+> +	L2: cache-controller {
+> +		compatible = "arm,pl310-cache";
+> +		reg = <0xf0100000 0x1000>;
+> +		interrupts = <0 84 IRQ_TYPE_LEVEL_HIGH>;
+> +		power-domains = <&pd_a3sm>;
+> +		arm,data-latency = <3 3 3>;
+> +		arm,tag-latency = <2 2 2>;
+> +		arm,shared-override;
+> +		cache-unified;
+> +		cache-level = <2>;
+> +		cache-size = <0x40000>;
+> +		cache-sets = <1024>;
+> +		cache-block-size = <32>;
+> +		cache-line-size = <32>;
 
---->8
+Any particular reason whey you need all this cache-* properties ? Is
+something broken on these SoCs ? We should be able to get most of these
+information from the SoC(reading some registers). It's good to avoid
+passing them via DT if they can be discovered from hardware.
 
-diff --git a/drivers/pci/host/pci-xgene.c b/drivers/pci/host/pci-xgene.c
-index 514f41b86c49..8ab3bd098424 100644
---- a/drivers/pci/host/pci-xgene.c
-+++ b/drivers/pci/host/pci-xgene.c
-@@ -506,7 +506,7 @@ static int xgene_pcie_msi_enable(struct xgene_pcie_port *port)
- {
- 	struct device_node *msi_node;
- 
--	msi_node = of_parse_phandle(port->dev.of_node, "msi-parent", 0);
-+	msi_node = of_parse_phandle(port->dev->of_node, "msi-parent", 0);
- 	if (!msi_node)
- 		return -ENODEV;
- 
-@@ -515,7 +515,7 @@ static int xgene_pcie_msi_enable(struct xgene_pcie_port *port)
- 		return -ENODEV;
- 
- 	of_node_put(msi_node);
--	port->msi->dev = &port->dev;
-+	port->msi->dev = port->dev;
- 	return 0;
- }
- 
+Regards,
+Sudeep
