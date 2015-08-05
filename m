@@ -1,52 +1,20 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 5 Aug 2015 18:09:20 +0100
-Subject: [PATCH v2] drm/i2c: tda998x: Fix bad checksum of the HDMI AVI
- infoframe
-In-Reply-To: <20150804230153.GT7557@n2100.arm.linux.org.uk>
-References: <E1ZK5bb-00079F-WC@bombadil.infradead.org>
- <20150804080557.58244c7c@armhf>
- <20150804230153.GT7557@n2100.arm.linux.org.uk>
-Message-ID: <20150805170920.GA7557@n2100.arm.linux.org.uk>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 05 Aug 2015 10:11:52 -0700
+Subject: [PATCH] ARM: BCM: Enable ARM erratum 798181 for BRCMSTB
+In-Reply-To: <1438739008-16718-1-git-send-email-gregory.0xf0@gmail.com>
+References: <1438739008-16718-1-git-send-email-gregory.0xf0@gmail.com>
+Message-ID: <55C243D8.8050704@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 05, 2015 at 12:01:53AM +0100, Russell King - ARM Linux wrote:
-> On Tue, Aug 04, 2015 at 08:05:57AM +0200, Jean-Francois Moine wrote:
-> > On Tue, 28 Jul 2015 15:59:17 +0200
-> > Jean-Francois Moine <moinejf@free.fr> wrote:
-> > 
-> > > Using hdmi_avi_infoframe_pack() to create the AVI infoframe calculates
-> > > the checksum of the frame and breaks the second calculation which is
-> > > done in tda998x_write_if(). Then the HDMI AVI frame is wrong and
-> > > the display device does not handle correctly the video frames.
-> > > 
-> > > Fixes: 8c7a075da9f7980c ("use drm_hdmi_avi_infoframe_from_display_mode()")
-> > > Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
-> > 
-> > Ping!
+On 04/08/15 18:43, Gregory Fong wrote:
+> Commit 04fcab32d3fa1d3f6afe97e0ab431c5572e07a2c ("ARM: 8111/1: Enable
+> erratum 798181 for Broadcom Brahma-B15") enables this erratum for
+> affected Broadcom Brahma-B15 CPUs when CONFIG_ARM_ERRATA_798181=y.
+> Let's make sure that config option is actually set.
 > 
-> I applied the patch a while back (July 17th to be exact) and in the queue
-> to be sent - I'll update the commit message prior to doing that.  Thanks.
+> Signed-off-by: Gregory Fong <gregory.0xf0@gmail.com>
 
-I've been able to get my hands on an AV amp, and I was hoping to use
-that to validate things like the info frames.  Having investigated
-today, while I'm able to get information from it, it's not as complete
-as I'd like - for example, it gives me for the AVI:
-
-	82 02 0D 12 28 08 1F 00 00 00 00 00 00 00 00 00
-
-which is the CEA-861-D AVI, not the HDMI AVI (it's missing the checksum
-between bytes 2 and 3).  Even more unfortunate is that it accepts the
-transmitted AVI frame whether or not the checksum is valid.  However,
-the AV amp reports that it sends the AVI frame onto the TV with a correct
-checksum:
-
-	82 02 0D 0E 12 28 08 1F ...
-
-What this means is that I now have a way to read the various control
-packets on HDMI, but not with their checksums, and no way to validate
-whether the checksums are correct.
-
+Applied, to soc/next, thanks!
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Florian
