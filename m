@@ -1,27 +1,40 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 5 Aug 2015 03:31:55 -0700
-Subject: [PATCH 4/4] ARM: dts: AM4372: Add the wkup_m3_ipc node
-In-Reply-To: <1437167284-25659-5-git-send-email-d-gerlach@ti.com>
-References: <1437167284-25659-1-git-send-email-d-gerlach@ti.com>
- <1437167284-25659-5-git-send-email-d-gerlach@ti.com>
-Message-ID: <20150805103155.GB16878@atomide.com>
+From: julien.grall@citrix.com (Julien Grall)
+Date: Wed, 5 Aug 2015 11:31:09 +0100
+Subject: [PATCH v2 2/8] xen: Make clear that swiotlb and biomerge are
+ dealing with DMA address
+In-Reply-To: <alpine.DEB.2.02.1508051041060.11337@kaball.uk.xensource.com>
+References: <1438711972-18752-1-git-send-email-julien.grall@citrix.com>
+ <1438711972-18752-3-git-send-email-julien.grall@citrix.com>
+ <alpine.DEB.2.02.1508051041060.11337@kaball.uk.xensource.com>
+Message-ID: <55C1E5ED.10103@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Dave Gerlach <d-gerlach@ti.com> [150717 14:10]:
-> From: Suman Anna <s-anna@ti.com>
+Hi Stefano,
+
+On 05/08/15 10:49, Stefano Stabellini wrote:
+>>  /* VIRT <-> MACHINE conversion */
+>>  #define virt_to_mfn(v)		(pfn_to_mfn(virt_to_pfn(v)))
+>> @@ -96,7 +115,7 @@ static inline bool set_phys_to_machine(unsigned long pfn, unsigned long mfn)
+>>  
+>>  bool xen_arch_need_swiotlb(struct device *dev,
+>>  			   unsigned long pfn,
+>> -			   unsigned long mfn);
+>> +			   unsigned long dfn);
+>>  unsigned long xen_get_swiotlb_free_pages(unsigned int order);
 > 
-> Add the Wakeup M3 IPC device node for the wkup_m3_ipc driver on
-> AM4372 SoC. This node uses the IPC registers, part of the Control
-> Module, and is therefore added as a child of the scm node.
+> You missed a bunch of dfn->bfn renamings.
 
-Applying the last two patches in this series into omap-for-v4.3/dt
-thanks.
+Sorry, I forgot to double check that before sending the patch. I will
+fix it in the next version.
 
-Probably the send-no-irq quirk you can do in the driver based
-on the compatible flag like I suggested in the related mailbox
-thread so not applying those until that's been discussed.
+> Aside from those and the commit message error:
+> 
+> Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+
+Thank you!
 
 Regards,
 
-Tony
+-- 
+Julien Grall
