@@ -1,40 +1,96 @@
-From: pbrobinson@gmail.com (Peter Robinson)
-Date: Wed, 5 Aug 2015 11:13:07 +0100
-Subject: arm kernel oops in highmem.c with 4.2
-In-Reply-To: <20150805100701.GV7557@n2100.arm.linux.org.uk>
-References: <CALeDE9Ox3=sh3AXQ0NUG6BBfU5i5YrMY=LDpcTHQWqz2=60F2g@mail.gmail.com>
- <20150805100701.GV7557@n2100.arm.linux.org.uk>
-Message-ID: <CALeDE9PXF=gQCaBCiHpHy2nXOooQOmsCQvSgOv+wQw3mta=P6A@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 5 Aug 2015 12:20:39 +0200
+Subject: [PATCH 2/3] thermal: Add Mediatek thermal controller support
+In-Reply-To: <CAGS+omAsTBMhfLPs5V68Ou1E5WXnQzZ3_E5+9qCCbAja3dgY-w@mail.gmail.com>
+References: <1437465566-16299-1-git-send-email-s.hauer@pengutronix.de>
+ <1437465566-16299-3-git-send-email-s.hauer@pengutronix.de>
+ <CAGS+omAsTBMhfLPs5V68Ou1E5WXnQzZ3_E5+9qCCbAja3dgY-w@mail.gmail.com>
+Message-ID: <20150805102039.GH18700@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 5, 2015 at 11:07 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, Aug 05, 2015 at 11:01:01AM +0100, Peter Robinson wrote:
->> Hi All,
->>
->> On Fedora 23 with recent 4.2 kernels we're seeing a crash (below) in
->> highmem.c on a fairly regular occurrence across a number of different
->> SoCs, I've seen it with at least AllWinner A20, i.MX6Q, Tegra2 and 124
->> with both a LPAE and non LPAE kernel, seen it happen when doing a
->> number of different things but regenerating a initrd, applying updates
->> (dnf/yum) and starting X are all pretty good triggers.
->
-> I've yet to see any problems with mainline 4.2-rc5 kernels on any of my
-> iMX6 platforms, which includes initramfs regeneration, apt-get updates
-> and X.
->
->> [71751.658105] ------------[ cut here ]------------
->> [71751.658153] kernel BUG at arch/arm/mm/highmem.c:114!
->
-> Well, in mainline kernels, the BUG is on line 113, not line 114.  So at
-> least this file is modified from mainline kernels.  Maybe the problem is
-> caused by patches applied to Fedora kernels?
+On Tue, Jul 21, 2015 at 11:13:22PM +0800, Daniel Kurtz wrote:
+> Hi Sascha,
+> 
+> Review comments inline...
+> 
+> > + *
+> > + * This converts the raw ADC value to mcelsius using the SoC specific
+> > + * calibration constants
+> > + */
+> > +static int raw_to_mcelsius(struct mtk_thermal *mt, u32 raw)
+> > +{
+> > +       s32 format_1, format_2, format_3, format_4;
+> 
+> The formula would be easier to follow with better variable names than
+> "format_X".
+> 
+> > +       s32 xtoomt;
+> 
+> What does "xtoomt" mean?
+> 
+> > +       s32 gain;
+> > +
+> > +       raw &= 0xfff;
+> > +
+> > +       gain = (10000 + mt->adc_ge);
+> 
+> no outer ()
+> 
+> > +
+> > +       xtoomt = ((((mt->vts + 3350 - mt->adc_oe) * 10000) / 4096) * 10000) /
+> > +               gain;
+> > +
+> > +       format_1 = ((mt->degc_cali * 10) >> 1);
+> 
+> When doing computations, I think "A / 2" is preferred over "A >> 1".
+> Also, no outer ().
+> 
+> > +       format_2 = (raw - mt->adc_oe);
+> > +       format_3 = (((((format_2) * 10000) >> 12) * 10000) / gain) - xtoomt;
+> 
+> This is just:
+>   format_3 = ((((raw - mt->vts - 3350) * 10000) / 4096) * 10000) / gain;
+> 
+> No wonder mt->adc_oe = 512-512 = 0... it just cancels itself out here, anyway.
+> 
+> > +       format_3 = format_3 * 15 / 18;
+> 
+> Of course we should multiply by 15/18!
+> What is going on here?  Why this magic 5/6 ratio?
+> 
+> > +       format_4 = ((format_3 * 100) / (165 + mt->o_slope));
+> 
+> no outer ()
+> 
+> > +       format_4 = format_4 - (format_4 << 1);
+> 
+> Hmm...
+>  A = X - 2*X;
+> otherwise known as:
+>  A = -X;
+> 
+> > +       return (format_1 + format_4) * 100;
+> 
+> Or just:
+>   return (format_1 - format_4) * 100;
 
-We apply a crash driver patch [1] which has been there forever (long
-enough that I'd forgotten it) but other than that for arm kernels we
-currently don't apply any arm specific patches in 4.2.
+I must admit I took this calculation from the original driver and never
+looked at it. Simplifying this further this goes down to:
 
-Peter
+static int raw_to_mcelsius(struct mtk_thermal *mt, u32 raw)
+{
+	return mt->calib_b + mt->calib_a * (raw & 0xfff);
+}
 
-[1] http://pkgs.fedoraproject.org/cgit/kernel.git/tree/crash-driver.patch
+with calib_a = -123 and calib_b = 465124.
+
+I'll address this and the other comments in v2.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
