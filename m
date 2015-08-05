@@ -1,74 +1,140 @@
-From: julien.grall@citrix.com (Julien Grall)
-Date: Wed, 5 Aug 2015 17:06:14 +0100
-Subject: [Xen-devel] [PATCH v2 02/20] xen: Introduce a function to split
- a Linux page into Xen page
-In-Reply-To: <55C230C9.7060506@citrix.com>
-References: <1436474552-31789-1-git-send-email-julien.grall@citrix.com>
- <1436474552-31789-3-git-send-email-julien.grall@citrix.com>
- <55B205FB.5080209@citrix.com> <55B20B56.7020605@citrix.com>
- <55B20F1F.60902@citrix.com> <55C21DF3.2090201@citrix.com>
- <55C230C9.7060506@citrix.com>
-Message-ID: <55C23476.8020104@citrix.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 05 Aug 2015 17:11:37 +0100
+Subject: [PATCH v4 1/2] arm64: KVM: Optimize arm64 skip 30-50% vfp/simd
+ save/restore on exits
+In-Reply-To: <1437082178-11039-2-git-send-email-m.smarduch@samsung.com>
+References: <1437082178-11039-1-git-send-email-m.smarduch@samsung.com>
+ <1437082178-11039-2-git-send-email-m.smarduch@samsung.com>
+Message-ID: <55C235B9.3000800@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/08/15 16:50, David Vrabel wrote:
->>>>> Also perhaps make it
->>>>>
->>>>> int xen_for_each_gfn(struct page *page,
->>>>>                      xen_gfn_fn_t fn, void *data);
->>>>
->>>> gfn standing for Guest Frame Number right?
->>>
->>> Yes.  This suggestion is just changing the name to make it more obvious
->>> what it does.
->>
->> Thinking more about this suggestion. The callback (fn) is getting a 4K
->> PFN in parameter and not a GFN.
+On 16/07/15 22:29, Mario Smarduch wrote:
+> This patch only saves and restores FP/SIMD registers on Guest access. To do
+> this cptr_el2 FP/SIMD trap is set on Guest entry and later checked on exit.
+> lmbench, hackbench show significant improvements, for 30-50% exits FP/SIMD
+> context is not saved/restored
 > 
-> I would like only APIs that deal with 64 KiB PFNs and 4 KiB GFNs.  I
-> think having a 4 KiB "PFN" is confusing.
+> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
 
-I agree with that. Note that helpers splitting Linux page in 4K chunk
-such as gnttab_for_each_grant (see patch #3) and this one may still have
-the concept of 4K "PFN" for internal purpose.
+So this patch seems to break 32bit guests on arm64.  I've had a look,
+squashed a few bugs that I dangerously overlooked during the review, but
+it still doesn't work (it doesn't crash anymore, but I get random
+illegal VFP instructions in 32bit guests).
 
-> Can you rework this xen_for_each_gfn() to pass GFNs to fn, instead?
+I'd be glad if someone could eyeball the following patch and tell me
+what's going wrong. If we don't find the root cause quickly enough, I'll
+have to drop the series from -next, and that'd be a real shame.
 
-I will do.
+Thanks,
 
-> 
->> This is because the balloon code seems to require having a 4K PFN in
->> hand in few places. For instance XENMEM_populate_physmap and
->> HYPERVISOR_update_va_mapping.
-> 
-> Ug. For an auto-xlate guest frame-list needs GFNs, for a PV guest
-> XENMEM_populate_physmap does want PFNs (so it can fill in the M2P).
-> 
-> Perhaps in increase_reservation:
-> 
-> if (auto-xlate)
->    frame_list[i] = page_to_gfn(page);
->    /* Or whatever per-GFN loop you need. */
-> else
->    frame_list[i] = page_to_pfn(page);
-> 
-> update_va_mapping takes VAs (e.g, __va(pfn << PAGE_SHIFT) could be
-> page_to_virt(page).
+	M.
 
-I though about a similar approach but I wanted to keep the code generic,
-i.e support the splitting even for non auto-translated guest. Hence the
-implementation xen_apply_to_page.
+commit 5777dc55fbc170426a85e00c26002dd5a795cfa5
+Author: Marc Zyngier <marc.zyngier@arm.com>
+Date:   Wed Aug 5 16:53:01 2015 +0100
 
-Anyway, I will see to do what you suggest.
+    KVM: arm64: NOTAFIX: Prevent crash when 32bit guest uses VFP
 
-> Sorry for being so picky here, but the inconsistency of terminology and
-> API misuse is already confusing and I don't want to see it get worse.
+    Since we switch FPSIMD in a lazy way, access to FPEXC32_EL2
+    must be guarded by skip_fpsimd_state. Otherwise, all hell
+    break loose.
 
-No worry, I'm happy to rework this code to be able to drop the 4K PFN
-concept.
+    Also, FPEXC32_EL2 must be restored when we trap to EL2 to
+    enable floating point.
 
-Regards,
+    Note that while it prevents the host from catching fire, the
+    guest still doesn't work properly, and I don't understand why just
+    yet.
+
+    Not-really-signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+
+diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+index c8e0c70..b53ec5d 100644
+--- a/arch/arm64/kvm/hyp.S
++++ b/arch/arm64/kvm/hyp.S
+@@ -431,10 +431,12 @@
+ 	add	x3, x2, #CPU_SYSREG_OFFSET(DACR32_EL2)
+ 	mrs	x4, dacr32_el2
+ 	mrs	x5, ifsr32_el2
+-	mrs	x6, fpexc32_el2
+ 	stp	x4, x5, [x3]
+-	str	x6, [x3, #16]
+
++	skip_fpsimd_state x8, 3f
++	mrs	x6, fpexc32_el2
++	str	x6, [x3, #16]
++3:
+ 	skip_debug_state x8, 2f
+ 	mrs	x7, dbgvcr32_el2
+ 	str	x7, [x3, #24]
+@@ -461,10 +463,8 @@
+
+ 	add	x3, x2, #CPU_SYSREG_OFFSET(DACR32_EL2)
+ 	ldp	x4, x5, [x3]
+-	ldr	x6, [x3, #16]
+ 	msr	dacr32_el2, x4
+ 	msr	ifsr32_el2, x5
+-	msr	fpexc32_el2, x6
+
+ 	skip_debug_state x8, 2f
+ 	ldr	x7, [x3, #24]
+@@ -669,12 +669,14 @@ __restore_debug:
+ 	ret
+
+ __save_fpsimd:
++	skip_fpsimd_state x3, 1f
+ 	save_fpsimd
+-	ret
++1:	ret
+
+ __restore_fpsimd:
++	skip_fpsimd_state x3, 1f
+ 	restore_fpsimd
+-	ret
++1:	ret
+
+ switch_to_guest_fpsimd:
+ 	push	x4, lr
+@@ -682,6 +684,7 @@ switch_to_guest_fpsimd:
+ 	mrs	x2, cptr_el2
+ 	bic	x2, x2, #CPTR_EL2_TFP
+ 	msr	cptr_el2, x2
++	isb
+
+ 	mrs	x0, tpidr_el2
+
+@@ -692,6 +695,10 @@ switch_to_guest_fpsimd:
+ 	add	x2, x0, #VCPU_CONTEXT
+ 	bl __restore_fpsimd
+
++	skip_32bit_state x3, 1f
++	ldr	x4, [x2, #CPU_SYSREG_OFFSET(FPEXC32_EL2)]
++	msr	fpexc32_el2, x4
++1:
+ 	pop	x4, lr
+ 	pop	x2, x3
+ 	pop	x0, x1
+@@ -754,9 +761,7 @@ __kvm_vcpu_return:
+ 	add	x2, x0, #VCPU_CONTEXT
+
+ 	save_guest_regs
+-	skip_fpsimd_state x3, 1f
+ 	bl __save_fpsimd
+-1:
+ 	bl __save_sysregs
+
+ 	skip_debug_state x3, 1f
+@@ -777,9 +782,7 @@ __kvm_vcpu_return:
+ 	kern_hyp_va x2
+
+ 	bl __restore_sysregs
+-	skip_fpsimd_state x3, 1f
+ 	bl __restore_fpsimd
+-1:
+ 	/* Clear FPSIMD and Trace trapping */
+ 	msr     cptr_el2, xzr
+
 
 -- 
-Julien Grall
+Jazz is not dead. It just smells funny...
