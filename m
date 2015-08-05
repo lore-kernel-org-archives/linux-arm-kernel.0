@@ -1,85 +1,78 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Wed, 05 Aug 2015 09:32:09 +0200
-Subject: [PATCH v3 09/11] KVM: arm/arm64: vgic: Prevent userspace injection
- of a mapped interrupt
-In-Reply-To: <55C0EBF5.2060708@arm.com>
-References: <1437753309-17989-1-git-send-email-marc.zyngier@arm.com>
- <1437753309-17989-10-git-send-email-marc.zyngier@arm.com>
- <55C0E690.1090808@linaro.org> <55C0EBF5.2060708@arm.com>
-Message-ID: <55C1BBF9.2060004@linaro.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 5 Aug 2015 09:36:45 +0200
+Subject: [PATCH v6 7/9] clk: mediatek: Add subsystem clocks of MT8173
+In-Reply-To: <CAGS+omDmgxO9jHaPRb1hXO7fMRE=CnH=WNP3DeMm1axBswK_Aw@mail.gmail.com>
+References: <1438676218-11310-1-git-send-email-jamesjj.liao@mediatek.com>
+ <1438676218-11310-8-git-send-email-jamesjj.liao@mediatek.com>
+ <20150805064605.GZ18700@pengutronix.de>
+ <CAGS+omDmgxO9jHaPRb1hXO7fMRE=CnH=WNP3DeMm1axBswK_Aw@mail.gmail.com>
+Message-ID: <20150805073645.GB18700@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
-On 08/04/2015 06:44 PM, Marc Zyngier wrote:
-> On 04/08/15 17:21, Eric Auger wrote:
->> Hi Marc,
->> On 07/24/2015 05:55 PM, Marc Zyngier wrote:
->>> Virtual interrupts mapped to a HW interrupt should only be triggered
->>> from inside the kernel. Otherwise, you could end up confusing the
->>> kernel (and the GIC's) state machine.
->>>
->>> Rearrange the injection path so that kvm_vgic_inject_irq is
->>> used for non-mapped interrupts, and kvm_vgic_inject_mapped_irq is
->>> used for mapped interrupts. The latter should only be called from
->>> inside the kernel (timer, VFIO).
->> nit: I would replace VFIO by irqfd.
->> VFIO just triggers the eventfd/irqfd. This is KVM/irqfd that injects the
->> virtual irq upon the irqfd signaling and he irqfd adaptation/ARM
->> currently is implemented in vgic.c
+On Wed, Aug 05, 2015 at 03:26:29PM +0800, Daniel Kurtz wrote:
+> On Wed, Aug 5, 2015 at 2:46 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> > On Tue, Aug 04, 2015 at 04:16:56PM +0800, James Liao wrote:
+> >> Most multimedia subsystem clocks will be accessed by multiple
+> >> drivers, so it's a better way to manage these clocks in CCF.
+> >> This patch adds clock support for MM, IMG, VDEC, VENC and VENC_LT
+> >> subsystems.
+> >>
+> >> Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
+> >> ---
+> >>  drivers/clk/mediatek/clk-mt8173.c      | 267 +++++++++++++++++++++++++++++++++
+> >>  include/dt-bindings/clock/mt8173-clk.h |  97 +++++++++++-
+> >>  2 files changed, 361 insertions(+), 3 deletions(-)
+> >>
+> >> diff --git a/drivers/clk/mediatek/clk-mt8173.c b/drivers/clk/mediatek/clk-mt8173.c
+> >> index f37ace6..05335e5 100644
+> >> --- a/drivers/clk/mediatek/clk-mt8173.c
+> >> +++ b/drivers/clk/mediatek/clk-mt8173.c
+> >> @@ -25,6 +25,10 @@ static DEFINE_SPINLOCK(mt8173_clk_lock);
+> >>  static const struct mtk_fixed_clk fixed_clks[] __initconst = {
+> >>       FIXED_CLK(CLK_TOP_CLKPH_MCK_O, "clkph_mck_o", "clk26m", 400 * MHZ),
+> >>       FIXED_CLK(CLK_TOP_USB_SYSPLL_125M, "usb_syspll_125m", "clk26m", 125 * MHZ),
+> >> +     FIXED_CLK(CLK_TOP_DSI0_DIG, "dsi0_dig", "clk26m", 130 * MHZ),
+> >> +     FIXED_CLK(CLK_TOP_DSI1_DIG, "dsi1_dig", "clk26m", 130 * MHZ),
+> >> +     FIXED_CLK(CLK_TOP_LVDS_PXL, "lvds_pxl", "lvdspll", 148.5 * MHZ),
+> >> +     FIXED_CLK(CLK_TOP_LVDS_CTS, "lvds_cts", "lvdspll", 51.975 * MHZ),
+> >
+> > I would expect 51975 * KHZ here to avoid fractional numbers. Probably
+> > gcc calculates that during compile time so this will work as expected,
+> > still I'm not sure this is good style to use fractional numbers here.
 > 
-> Ah, thanks for reminding me of the right terminology, I tend to think of
-> it as one big bag of nasty tricks... ;-)
+> I thought this looked a bit strange too, but for what its worth, these
+> two evaluate correctly:
 > 
-> I'll update the commit message.
+> localhost ~ # cat /sys/kernel/debug/clk/clk_summary  | grep lvds
+>     lvdspll                               0            0   149999878
+>        0 0
+>        lvds_pxl                           0            0   148500000
+>        0 0
+>        lvds_cts                           0            0    51975000
+>        0 0
 > 
->>>
->>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>> ---
->>>  include/kvm/arm_vgic.h |  2 +
->>>  virt/kvm/arm/vgic.c    | 99 ++++++++++++++++++++++++++++++++++----------------
->>>  2 files changed, 70 insertions(+), 31 deletions(-)
->>>
->>> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
->>> index 7306b4b..f6bfd79 100644
->>> --- a/include/kvm/arm_vgic.h
->>> +++ b/include/kvm/arm_vgic.h
->>> @@ -351,6 +351,8 @@ void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu);
->>>  void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu);
->>>  int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int irq_num,
->>>  			bool level);
->>> +int kvm_vgic_inject_mapped_irq(struct kvm *kvm, int cpuid,
->>> +			       struct irq_phys_map *map, bool level);
->>>  void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg);
->>>  int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
->>>  int kvm_vgic_vcpu_active_irq(struct kvm_vcpu *vcpu);
->>> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
->>> index 3f7b690..e40ef70 100644
->>> --- a/virt/kvm/arm/vgic.c
->>> +++ b/virt/kvm/arm/vgic.c
->>> @@ -1533,7 +1533,8 @@ static int vgic_validate_injection(struct kvm_vcpu *vcpu, int irq, int level)
->>>  }
->>>  
->>>  static int vgic_update_irq_pending(struct kvm *kvm, int cpuid,
->>> -				  unsigned int irq_num, bool level)
->>> +				   struct irq_phys_map *map,
->>> +				   unsigned int irq_num, bool level)
->>>  {
->> In vgic_update_irq_pending, I needed to modify the following line and
->> add the "&& !map".
->>
->>         if (!vgic_validate_injection(vcpu, irq_num, level) && !map) {
->>
->> Without that, the level being not properly modeled for level sensitive
->> forwarded IRQs, the 2d injection fails.
+> >
+> > Anyway, on my system lvdspll is running at 150MHz. Are you sure there is
+> > a clock derived from this running at 148.5MHz? Is it really correct to
+> > use a fixed clock here or should it rather be lvdspll directly?
 > 
-> Ah! Is that because we never see the line being reset to zero, and the
-> VGIC still sees the line as pending at the distributor level?
-yes indeed
+> I agree it does look strange to have a 51.975 MHz and 148.5 MHz clocks
+> with a 150 MHz PLL as their parent...  However, I'm not sure how much
+> this matters?  I think the idea here was that these frequencies are
+> best effort "nominal" clock values provided by Mediatek "designers".
+> The important point is that for the hardware to generate these either
+> of these clocks, lvdspll must be enabled.
 
-Eric
-> 
-> Thanks,
-> 
-> 	M.
-> 
+This assumes that the lvdspll always runs at frequency the designers
+thought that might be a good value. Should we really provide wrong clock
+values when on some board for whatever reason the lvdspll is configured
+for a different frequency?
+
+sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
