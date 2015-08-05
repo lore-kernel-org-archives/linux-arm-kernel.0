@@ -1,42 +1,104 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Wed,  5 Aug 2015 18:54:37 +0200
-Subject: [PATCH] ARM: imx6: correct i.MX6 PCIe interrupt routing
-Message-ID: <1438793677-19153-1-git-send-email-l.stach@pengutronix.de>
+From: tchalamarla@caviumnetworks.com (Tirumalesh Chalamarla)
+Date: Wed, 5 Aug 2015 09:54:28 -0700
+Subject: [PATCH V2] iommu/arm-smmu-v2: ThunderX mis-extends 64bit registers
+Message-ID: <1438793668-15597-1-git-send-email-tchalamarla@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PCIe interrupts are also routed through the GPC. This has been
-missed from the conversion to stacked IRQ domains as the PCIe
-controller uses an explicit interrupt map and thus doesn't inherit
-the SoC global interrupt parent.
+The SMMU architecture defines two different behaviors when 64-bit
+registers are written with 32-bit writes.  The first behavior causes
+zero extension into the upper 32-bits.  The second behavior splits a
+64-bit register into "normal" 32-bit register pairs.
 
-Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
----
-This commit does not change the i.MX6SX PCIe node, as PCIe isn't
-functional in mainline on this SoC and the DT node needs a major
-rewrite to account for the specifics of this SoC anyway.
----
- arch/arm/boot/dts/imx6qdl.dtsi | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+On some buggy implementations, registers incorrectly zero extended
+when they should instead behave as normal 32-bit register pairs.
 
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index e6d13592080d..b57033e8c633 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -181,10 +181,10 @@
- 			interrupt-names = "msi";
- 			#interrupt-cells = <1>;
- 			interrupt-map-mask = <0 0 0 0x7>;
--			interrupt-map = <0 0 0 1 &intc GIC_SPI 123 IRQ_TYPE_LEVEL_HIGH>,
--			                <0 0 0 2 &intc GIC_SPI 122 IRQ_TYPE_LEVEL_HIGH>,
--			                <0 0 0 3 &intc GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>,
--			                <0 0 0 4 &intc GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-map = <0 0 0 1 &gpc GIC_SPI 123 IRQ_TYPE_LEVEL_HIGH>,
-+			                <0 0 0 2 &gpc GIC_SPI 122 IRQ_TYPE_LEVEL_HIGH>,
-+			                <0 0 0 3 &gpc GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>,
-+			                <0 0 0 4 &gpc GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&clks IMX6QDL_CLK_PCIE_AXI>,
- 				 <&clks IMX6QDL_CLK_LVDS1_GATE>,
- 				 <&clks IMX6QDL_CLK_PCIE_REF_125M>;
+Signed-off-by: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
+---
+
+Changes from V1:
+	- Introduced smmu_writeq
+
+ drivers/iommu/arm-smmu.c | 45 +++++++++++++++++++++++++--------------------
+ 1 file changed, 25 insertions(+), 20 deletions(-)
+
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index 66a803b..0912c78 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -69,6 +69,18 @@
+ 		((smmu->options & ARM_SMMU_OPT_SECURE_CFG_ACCESS)	\
+ 			? 0x400 : 0))
+ 
++#ifdef CONFIG_64BIT
++#define smmu_writeq(reg64, addr)	writeq_relaxed((reg64), (addr))
++#else
++#define smmu_writeq(reg64, addr)				\
++	do {							\
++		u64 __val = (reg64);				\
++		void __iomem *__addr = (addr);			\
++		writel_relaxed(__val >> 32, __addr + 4);	\
++		writel_relaxed(__val, __addr);			\
++	} while (0)
++#endif
++
+ /* Configuration registers */
+ #define ARM_SMMU_GR0_sCR0		0x0
+ #define sCR0_CLIENTPD			(1 << 0)
+@@ -226,7 +238,7 @@
+ #define TTBCR2_SEP_SHIFT		15
+ #define TTBCR2_SEP_UPSTREAM		(0x7 << TTBCR2_SEP_SHIFT)
+ 
+-#define TTBRn_HI_ASID_SHIFT            16
++#define TTBRn_ASID_SHIFT		48
+ 
+ #define FSR_MULTI			(1 << 31)
+ #define FSR_SS				(1 << 30)
+@@ -762,22 +774,17 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
+ 
+ 	/* TTBRs */
+ 	if (stage1) {
+-		reg = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[0];
+-		writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR0_LO);
+-		reg = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[0] >> 32;
+-		reg |= ARM_SMMU_CB_ASID(cfg) << TTBRn_HI_ASID_SHIFT;
+-		writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR0_HI);
+-
+-		reg = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[1];
+-		writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR1_LO);
+-		reg = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[1] >> 32;
+-		reg |= ARM_SMMU_CB_ASID(cfg) << TTBRn_HI_ASID_SHIFT;
+-		writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR1_HI);
++		u64 reg64 = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[0];
++
++		reg64 |= ((u64)ARM_SMMU_CB_ASID(cfg)) << TTBRn_ASID_SHIFT;
++		smmu_writeq(reg64, cb_base + ARM_SMMU_CB_TTBR0_LO);
++
++		reg64 = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[1];
++		reg64 |= ((u64)ARM_SMMU_CB_ASID(cfg)) << TTBRn_ASID_SHIFT;
++		smmu_writeq(reg64, cb_base + ARM_SMMU_CB_TTBR1_LO);
+ 	} else {
+-		reg = pgtbl_cfg->arm_lpae_s2_cfg.vttbr;
+-		writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR0_LO);
+-		reg = pgtbl_cfg->arm_lpae_s2_cfg.vttbr >> 32;
+-		writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR0_HI);
++		u64 reg64 = pgtbl_cfg->arm_lpae_s2_cfg.vttbr;
++		smmu_writeq(reg64, cb_base + ARM_SMMU_CB_TTBR0_LO);
+ 	}
+ 
+ 	/* TTBCR */
+@@ -1236,10 +1243,8 @@ static phys_addr_t arm_smmu_iova_to_phys_hard(struct iommu_domain *domain,
+ 		u32 reg = iova & ~0xfff;
+ 		writel_relaxed(reg, cb_base + ARM_SMMU_CB_ATS1PR_LO);
+ 	} else {
+-		u32 reg = iova & ~0xfff;
+-		writel_relaxed(reg, cb_base + ARM_SMMU_CB_ATS1PR_LO);
+-		reg = ((u64)iova & ~0xfff) >> 32;
+-		writel_relaxed(reg, cb_base + ARM_SMMU_CB_ATS1PR_HI);
++		u64 reg64 = iova & ~0xfff;
++		smmu_writeq(reg64, cb_base + ARM_SMMU_CB_ATS1PR_LO);
+ 	}
+ 
+ 	if (readl_poll_timeout_atomic(cb_base + ARM_SMMU_CB_ATSR, tmp,
 -- 
-2.4.6
+2.1.0
