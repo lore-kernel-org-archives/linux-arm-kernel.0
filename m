@@ -1,55 +1,32 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Wed,  5 Aug 2015 10:58:07 +0200
-Subject: [PATCH v4 3/6] ARM: shmobile: sh73a0 dtsi: Add L2 cache-controller
- node
-In-Reply-To: <1438765090-823-1-git-send-email-geert+renesas@glider.be>
-References: <1438765090-823-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1438765090-823-4-git-send-email-geert+renesas@glider.be>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 5 Aug 2015 11:12:11 +0200
+Subject: [GIT PULL] ARM: mvebu: config changes for v4.3 #2
+In-Reply-To: <55BB4240.1060008@free-electrons.com>
+References: <55BB4240.1060008@free-electrons.com>
+Message-ID: <20150805091211.GM6390@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the missing L2 cache-controller node. This will allow migration to
-the generic l2c OF initialization.
+On Fri, Jul 31, 2015 at 11:39:12AM +0200, Gregory CLEMENT wrote:
+> Hi,
+> 
+> Here is the second pull request for config change for mvebu for v4.3
+> 
+> Gregory
+> 
+> The following changes since commit adfe5f267dd005d0bbe8d71820a7fa38945d08bd:
+> 
+>   ARM: mvebu: update mvebu_v7_defconfig with features needed for Armada 388 GP (2015-07-09 15:32:55 +0200)
+> 
+> are available in the git repository at:
+> 
+>   git://git.infradead.org/linux-mvebu.git tags/mvebu-config-4.3-2
+> 
+> for you to fetch changes up to 9e07b491bc004259e42739ecd7483ab5a0b8b150:
+> 
+>   ARM: defconfig: orion5x: add DT support (2015-07-25 16:21:06 +0200)
 
-The L2 cache is an ARM L2C-310 (r3p1), of size 512 KiB (64 KiB x 8
-ways).
+Merged, thanks.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
-v4:
-  - New,
-  - Commit eeedcea69e927857 ("ARM: 8395/1: l2c: Add support for the
-    "arm,shared-override" property") is queued for 4.3 in arm/for-next.
----
- arch/arm/boot/dts/sh73a0.dtsi | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
-index 11e17c5f26e2cae2..e84fce5e4090f4ab 100644
---- a/arch/arm/boot/dts/sh73a0.dtsi
-+++ b/arch/arm/boot/dts/sh73a0.dtsi
-@@ -53,6 +53,22 @@
- 		      <0xf0000100 0x100>;
- 	};
- 
-+	L2: cache-controller {
-+		compatible = "arm,pl310-cache";
-+		reg = <0xf0100000 0x1000>;
-+		interrupts = <0 44 IRQ_TYPE_LEVEL_HIGH>;
-+		power-domains = <&pd_a3sm>;
-+		arm,data-latency = <3 3 3>;
-+		arm,tag-latency = <2 2 2>;
-+		arm,shared-override;
-+		cache-unified;
-+		cache-level = <2>;
-+		cache-size = <0x80000>;
-+		cache-sets = <2048>;
-+		cache-block-size = <32>;
-+		cache-line-size = <32>;
-+	};
-+
- 	sbsc2: memory-controller at fb400000 {
- 		compatible = "renesas,sbsc-sh73a0";
- 		reg = <0xfb400000 0x400>;
--- 
-1.9.1
+-Olof
