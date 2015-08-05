@@ -1,44 +1,58 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Wed, 5 Aug 2015 16:22:01 +0530
-Subject: [RFC PATCH 0/3] mailbox: hisilicon: add mailbox driver
-In-Reply-To: <1438564390-28111-1-git-send-email-leo.yan@linaro.org>
-References: <1438564390-28111-1-git-send-email-leo.yan@linaro.org>
-Message-ID: <CABb+yY0-RQ80q92EBsuBoYpjxW5zR=nXr+j3zCXw3wKkCf33OQ@mail.gmail.com>
+From: haibo.chen@freescale.com (Haibo Chen)
+Date: Wed, 5 Aug 2015 18:38:42 +0800
+Subject: [PATCH v4 6/6] mmc: sdhci-esdhc-imx: set back the burst_length_enable
+ bit to 1
+In-Reply-To: <1438771122-8601-1-git-send-email-haibo.chen@freescale.com>
+References: <1438771122-8601-1-git-send-email-haibo.chen@freescale.com>
+Message-ID: <1438771122-8601-7-git-send-email-haibo.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 3, 2015 at 6:43 AM, Leo Yan <leo.yan@linaro.org> wrote:
-> This patch series is to implement Hisilicon's mailbox driver and enable
-> the mailbox controller on Hi6220.
->
-Cool.
+Currently we find that if a usdhc is choosed to boot system, then ROM
+code will set the burst length enable bit of this usdhc as 0.
 
-> The Hisilicon mailbox supports up to 32 channels. Each channel is
-> unidirectional with a maximum message size of 8 words. I/O is performed
-> using register access (there is no DMA) and the cell raises an interrupt
-> when messages are received.
->
-FYI, none of other platforms has mailbox with DMA. 8-word deep fifo,
-RX interrupt
-and optional TX interrupt is pretty common. So cool still.
+This will make performance drop a lot if this usdhc's burst length is
+configed. So this patch set back the burst_length_enable bit as 1,
+which is the default value, and means burst length is enabled for INCR.
 
-> For easily extending for Hisilicon series SoCs (SoCs may have difference
-> for register's definition with each other), so firstly implement common
-> mailbox driver; this common mailbox driver provides three mainly
-> functionality:
->
->  - help register channels into framework;
->  - hook low level callback functions for register's operations;
->  - Enhance rx channel's message queue, which is based on the code in
->    drivers/mailbox/omap-mailbox.c.
->
-Not cool.
- Please don't reinvent the wheel by having platform specific
-implementation of the mailbox api. Which vendor doesn't plan to roll
-out new SoCs, and hence variations of mailbox controllers?  The OMAP
-stack predates the common api, and was actually supposed to be
-converted over eventually. Please implement just the
-drivers/mailbox/hi6220-mailbox.c (preferably by the name of the
-mailbox controller, if any)
+Signed-off-by: Haibo Chen <haibo.chen@freescale.com>
+---
+ drivers/mmc/host/sdhci-esdhc-imx.c | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-Thanks.
+diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+index 97aa944..3334762 100644
+--- a/drivers/mmc/host/sdhci-esdhc-imx.c
++++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+@@ -32,6 +32,7 @@
+ #include "sdhci-esdhc.h"
+ 
+ #define	ESDHC_CTRL_D3CD			0x08
++#define ESDHC_BURST_LEN_EN_INCR		(1 << 27)
+ /* VENDOR SPEC register */
+ #define ESDHC_VENDOR_SPEC		0xc0
+ #define  ESDHC_VENDOR_SPEC_SDIO_QUIRK	(1 << 1)
+@@ -1165,6 +1166,21 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
+ 		host->quirks2 |= SDHCI_QUIRK2_PRESET_VALUE_BROKEN;
+ 		host->mmc->caps |= MMC_CAP_1_8V_DDR;
+ 
++		/*
++		 * ROM code will change the bit burst_length_enable setting
++		 * to zero if this usdhc is choosed to boot system. Change
++		 * it back here, otherwise it will impact the performance a
++		 * lot. This bit is used to enable/disable the burst length
++		 * for the external AHB2AXI bridge, it's usefully especially
++		 * for INCR transfer because without burst length indicator,
++		 * the AHB2AXI bridge does not know the burst length in
++		 * advance. And without burst length indicator, AHB INCR
++		 * transfer can only be converted to singles on the AXI side.
++		 */
++		writel(readl(host->ioaddr + SDHCI_HOST_CONTROL)
++			| ESDHC_BURST_LEN_EN_INCR,
++			host->ioaddr + SDHCI_HOST_CONTROL);
++
+ 		if (!(imx_data->socdata->flags & ESDHC_FLAG_HS200))
+ 			host->quirks2 |= SDHCI_QUIRK2_BROKEN_HS200;
+ 
+-- 
+1.9.1
