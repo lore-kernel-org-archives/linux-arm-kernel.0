@@ -1,96 +1,96 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 5 Aug 2015 12:20:39 +0200
-Subject: [PATCH 2/3] thermal: Add Mediatek thermal controller support
-In-Reply-To: <CAGS+omAsTBMhfLPs5V68Ou1E5WXnQzZ3_E5+9qCCbAja3dgY-w@mail.gmail.com>
-References: <1437465566-16299-1-git-send-email-s.hauer@pengutronix.de>
- <1437465566-16299-3-git-send-email-s.hauer@pengutronix.de>
- <CAGS+omAsTBMhfLPs5V68Ou1E5WXnQzZ3_E5+9qCCbAja3dgY-w@mail.gmail.com>
-Message-ID: <20150805102039.GH18700@pengutronix.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 5 Aug 2015 03:22:34 -0700
+Subject: [PATCH 0/3] ARM: multi_v7_defconfig: Enable more OMAP family
+ platforms
+In-Reply-To: <1428614121-3374-1-git-send-email-nm@ti.com>
+References: <1428614121-3374-1-git-send-email-nm@ti.com>
+Message-ID: <20150805102234.GZ16878@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 21, 2015 at 11:13:22PM +0800, Daniel Kurtz wrote:
-> Hi Sascha,
-> 
-> Review comments inline...
-> 
-> > + *
-> > + * This converts the raw ADC value to mcelsius using the SoC specific
-> > + * calibration constants
-> > + */
-> > +static int raw_to_mcelsius(struct mtk_thermal *mt, u32 raw)
-> > +{
-> > +       s32 format_1, format_2, format_3, format_4;
-> 
-> The formula would be easier to follow with better variable names than
-> "format_X".
-> 
-> > +       s32 xtoomt;
-> 
-> What does "xtoomt" mean?
-> 
-> > +       s32 gain;
-> > +
-> > +       raw &= 0xfff;
-> > +
-> > +       gain = (10000 + mt->adc_ge);
-> 
-> no outer ()
-> 
-> > +
-> > +       xtoomt = ((((mt->vts + 3350 - mt->adc_oe) * 10000) / 4096) * 10000) /
-> > +               gain;
-> > +
-> > +       format_1 = ((mt->degc_cali * 10) >> 1);
-> 
-> When doing computations, I think "A / 2" is preferred over "A >> 1".
-> Also, no outer ().
-> 
-> > +       format_2 = (raw - mt->adc_oe);
-> > +       format_3 = (((((format_2) * 10000) >> 12) * 10000) / gain) - xtoomt;
-> 
-> This is just:
->   format_3 = ((((raw - mt->vts - 3350) * 10000) / 4096) * 10000) / gain;
-> 
-> No wonder mt->adc_oe = 512-512 = 0... it just cancels itself out here, anyway.
-> 
-> > +       format_3 = format_3 * 15 / 18;
-> 
-> Of course we should multiply by 15/18!
-> What is going on here?  Why this magic 5/6 ratio?
-> 
-> > +       format_4 = ((format_3 * 100) / (165 + mt->o_slope));
-> 
-> no outer ()
-> 
-> > +       format_4 = format_4 - (format_4 << 1);
-> 
-> Hmm...
->  A = X - 2*X;
-> otherwise known as:
->  A = -X;
-> 
-> > +       return (format_1 + format_4) * 100;
-> 
-> Or just:
->   return (format_1 - format_4) * 100;
+Ping, looks like these are still pending. Probably should be
+applied directly by the arm-soc maintainers.
 
-I must admit I took this calculation from the original driver and never
-looked at it. Simplifying this further this goes down to:
+Regards,
 
-static int raw_to_mcelsius(struct mtk_thermal *mt, u32 raw)
-{
-	return mt->calib_b + mt->calib_a * (raw & 0xfff);
-}
+Tony
 
-with calib_a = -123 and calib_b = 465124.
-
-I'll address this and the other comments in v2.
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+* Nishanth Menon <nm@ti.com> [150409 14:17]:
+> Hi,
+> 
+> As of next-20150409 tag, the following platforms (I have access
+> to) report failures for AM437x-sk and legacy beaglebone (white).
+> omap2plus_defconfig boots up fine on these platforms.
+> 
+> So, the basic minimum stuff I could pickup to fix up beaglebone-white
+> and am437x-sk.
+> 
+> This series is still missing the magic sauce for LDP - will try to
+> track that down later as well.
+> 
+> This series is based on next-20150409
+> 
+> multi_v7_defconfig (as on next-20150409)
+>  1:                     am335x-evm: BOOT: PASS: am335x-evm.txt
+>  2:                      am335x-sk: BOOT: PASS: am335x-sk.txt
+>  3:                     am3517-evm: BOOT: PASS: am3517-evm.txt
+>  4:                      am37x-evm: BOOT: PASS: am37x-evm.txt
+>  5:                      am437x-sk: BOOT: FAIL: am437x-sk.txt
+>  6:                    am43xx-epos: BOOT: PASS: am43xx-epos.txt
+>  7:                   am43xx-gpevm: BOOT: PASS: am43xx-gpevm.txt
+>  8:                 BeagleBoard-XM: BOOT: PASS: beagleboard.txt
+>  9:            beagleboard-vanilla: BOOT: PASS: beagleboard-vanilla.txt
+> 10:               beaglebone-black: BOOT: PASS: beaglebone-black.txt
+> 11:                     beaglebone: BOOT: FAIL: beaglebone.txt
+> 12:                     craneboard: BOOT: PASS: craneboard.txt
+> 13:                     dra72x-evm: BOOT: PASS: dra72x-evm.txt
+> 14:                     dra7xx-evm: BOOT: PASS: dra7xx-evm.txt
+> 15:         OMAP3430-Labrador(LDP): BOOT: FAIL: ldp.txt
+> 16:                           n900: BOOT: PASS: n900.txt
+> 17:                      omap5-evm: BOOT: PASS: omap5-evm.txt
+> 18:                  pandaboard-es: BOOT: PASS: pandaboard-es.txt
+> 19:             pandaboard-vanilla: BOOT: PASS: pandaboard-vanilla.txt
+> 20:                        sdp3430: BOOT: PASS: sdp3430.txt
+> 21:                        sdp4430: BOOT: PASS: sdp4430.txt
+> 
+> After this series:
+>  1:                     am335x-evm: BOOT: PASS: am335x-evm.txt
+>  2:                     am3517-evm: BOOT: PASS: am3517-evm.txt
+>  3:                      am37x-evm: BOOT: PASS: am37x-evm.txt
+>  4:                      am437x-sk: BOOT: PASS: am437x-sk.txt
+>  5:                    am43xx-epos: BOOT: PASS: am43xx-epos.txt
+>  6:                   am43xx-gpevm: BOOT: PASS: am43xx-gpevm.txt
+>  7:                 BeagleBoard-XM: BOOT: PASS: beagleboard.txt
+>  8:            beagleboard-vanilla: BOOT: PASS: beagleboard-vanilla.txt
+>  9:               beaglebone-black: BOOT: PASS: beaglebone-black.txt
+> 10:                     beaglebone: BOOT: PASS: beaglebone.txt
+> 11:                     craneboard: BOOT: PASS: craneboard.txt
+> 12:                     dra72x-evm: BOOT: PASS: dra72x-evm.txt
+> 13:                     dra7xx-evm: BOOT: PASS: dra7xx-evm.txt
+> 14:         OMAP3430-Labrador(LDP): BOOT: FAIL: ldp.txt
+> 15:                           n900: BOOT: PASS: n900.txt
+> 16:                      omap5-evm: BOOT: PASS: omap5-evm.txt
+> 17:                  pandaboard-es: BOOT: PASS: pandaboard-es.txt
+> 18:             pandaboard-vanilla: BOOT: PASS: pandaboard-vanilla.txt
+> 19:                        sdp3430: BOOT: PASS: sdp3430.txt
+> 20:                        sdp4430: BOOT: PASS: sdp4430.txt
+> TOTAL = 20 boards, Booted Boards = 19, No Boot boards = 1
+> 
+> Nishanth Menon (3):
+>   ARM: multi_v7_defconfig: Enable beaglebone PMIC TPS65217
+>   ARM: multi_v7_defconfig: Enable AM437x PMIC TPS65218
+>   ARM: multi_v7_defconfig: Enable generic SoC internal OMAP regulators
+> 
+>  arch/arm/configs/multi_v7_defconfig |    6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> Regards,
+> Nishanth Menon
+> -- 
+> 1.7.9.5
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
