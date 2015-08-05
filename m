@@ -1,40 +1,152 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 05 Aug 2015 13:53:23 +0200
-Subject: [GIT PULL] ARM: mvebu: dt changes for v4.3 #2
-In-Reply-To: <20150805091128.GL6390@localhost>
-References: <55BB3FAE.1020907@free-electrons.com>
- <20150805091128.GL6390@localhost>
-Message-ID: <55C1F933.2010500@free-electrons.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Wed, 5 Aug 2015 19:57:02 +0800
+Subject: [PATCH,v3 2/3] ARM: dts: ls1021a: Add the eTSEC controller nodes
+In-Reply-To: <1438094636-20421-2-git-send-email-claudiu.manoil@freescale.com>
+References: <20150727142816.GP12927@tiger>
+ <1438094636-20421-1-git-send-email-claudiu.manoil@freescale.com>
+ <1438094636-20421-2-git-send-email-claudiu.manoil@freescale.com>
+Message-ID: <20150805115702.GI12927@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
-
-
-> One tip:
+On Tue, Jul 28, 2015 at 05:43:55PM +0300, Claudiu Manoil wrote:
+> Add basic support for all the eTSEC controllers on the
+> ls1021a SoC.  Second interrupt group register blocks
+> and their corresponding Rx/Tx/Err interrupt sources are
+> included as well for each eTSEC node.
 > 
->>
->>  arch/arm/boot/dts/Makefile                       |   1 +
->>  arch/arm/boot/dts/orion5x-linkstation-lswtgl.dts | 273 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
->>  2 files changed, 274 insertions(+)
->>  create mode 100644 arch/arm/boot/dts/orion5x-linkstation-lswtgl.dts
+> Signed-off-by: Alison Wang <alison.wang@freescale.com>
+> Signed-off-by: Claudiu Manoil <claudiu.manoil@freescale.com>
+
+Applied both with a minor change below.
+
+> ---
+> v2: various findings, added 2nd interrupt group;
+> v3: addressed findings from Shawn Guo -
+>     - initial patch split in soc, boards and bindings patches;
+>     - removed redundant all zero local-mac-address;
+>     - subject prefix;
 > 
-> If you redirect "git request-pull" to a file (or even pipe it through cat
-> instead of straight onto your terminal) it'll default to ~78 character lines
-> instead of the width of your terminal.
+>  arch/arm/boot/dts/ls1021a.dtsi | 88 ++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 88 insertions(+)
 > 
+> diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
+> index 1b306c7..0638cda 100644
+> --- a/arch/arm/boot/dts/ls1021a.dtsi
+> +++ b/arch/arm/boot/dts/ls1021a.dtsi
+> @@ -59,6 +59,9 @@
+>  		serial3 = &lpuart3;
+>  		serial4 = &lpuart4;
+>  		serial5 = &lpuart5;
+> +		ethernet0 = &enet0;
+> +		ethernet1 = &enet1;
+> +		ethernet2 = &enet2;
 
-Thanks for the tip!
+I moved these above serial to keep them sort alphabetically.
 
-Gregory
+Shawn
 
+>  		sysclk = &sysclk;
+>  	};
+>  
+> @@ -391,6 +394,91 @@
+>  			reg = <0x0 0x2d24000 0x0 0x4000>;
+>  		};
+>  
+> +		enet0: ethernet at 2d10000 {
+> +			compatible = "fsl,etsec2";
+> +			device_type = "network";
+> +			#address-cells = <2>;
+> +			#size-cells = <2>;
+> +			interrupt-parent = <&gic>;
+> +			model = "eTSEC";
+> +			fsl,magic-packet;
+> +			ranges;
+> +
+> +			queue-group at 2d10000 {
+> +				#address-cells = <2>;
+> +				#size-cells = <2>;
+> +				reg = <0x0 0x2d10000 0x0 0x1000>;
+> +				interrupts = <GIC_SPI 144 IRQ_TYPE_LEVEL_HIGH>,
+> +					<GIC_SPI 145 IRQ_TYPE_LEVEL_HIGH>,
+> +					<GIC_SPI 146 IRQ_TYPE_LEVEL_HIGH>;
+> +			};
+> +
+> +			queue-group at 2d14000  {
+> +				#address-cells = <2>;
+> +				#size-cells = <2>;
+> +				reg = <0x0 0x2d14000 0x0 0x1000>;
+> +				interrupts = <GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>,
+> +					<GIC_SPI 148 IRQ_TYPE_LEVEL_HIGH>,
+> +					<GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH>;
+> +			};
+> +		};
+> +
+> +		enet1: ethernet at 2d50000 {
+> +			compatible = "fsl,etsec2";
+> +			device_type = "network";
+> +			#address-cells = <2>;
+> +			#size-cells = <2>;
+> +			interrupt-parent = <&gic>;
+> +			model = "eTSEC";
+> +			ranges;
+> +
+> +			queue-group at 2d50000  {
+> +				#address-cells = <2>;
+> +				#size-cells = <2>;
+> +				reg = <0x0 0x2d50000 0x0 0x1000>;
+> +				interrupts = <GIC_SPI 150 IRQ_TYPE_LEVEL_HIGH>,
+> +					<GIC_SPI 152 IRQ_TYPE_LEVEL_HIGH>,
+> +					<GIC_SPI 153 IRQ_TYPE_LEVEL_HIGH>;
+> +			};
+> +
+> +			queue-group at 2d54000  {
+> +				#address-cells = <2>;
+> +				#size-cells = <2>;
+> +				reg = <0x0 0x2d54000 0x0 0x1000>;
+> +				interrupts = <GIC_SPI 154 IRQ_TYPE_LEVEL_HIGH>,
+> +					<GIC_SPI 155 IRQ_TYPE_LEVEL_HIGH>,
+> +					<GIC_SPI 156 IRQ_TYPE_LEVEL_HIGH>;
+> +			};
+> +		};
+> +
+> +		enet2: ethernet at 2d90000 {
+> +			compatible = "fsl,etsec2";
+> +			device_type = "network";
+> +			#address-cells = <2>;
+> +			#size-cells = <2>;
+> +			interrupt-parent = <&gic>;
+> +			model = "eTSEC";
+> +			ranges;
+> +
+> +			queue-group at 2d90000  {
+> +				#address-cells = <2>;
+> +				#size-cells = <2>;
+> +				reg = <0x0 0x2d90000 0x0 0x1000>;
+> +				interrupts = <GIC_SPI 157 IRQ_TYPE_LEVEL_HIGH>,
+> +					<GIC_SPI 158 IRQ_TYPE_LEVEL_HIGH>,
+> +					<GIC_SPI 159 IRQ_TYPE_LEVEL_HIGH>;
+> +			};
+> +
+> +			queue-group at 2d94000  {
+> +				#address-cells = <2>;
+> +				#size-cells = <2>;
+> +				reg = <0x0 0x2d94000 0x0 0x1000>;
+> +				interrupts = <GIC_SPI 160 IRQ_TYPE_LEVEL_HIGH>,
+> +					<GIC_SPI 161 IRQ_TYPE_LEVEL_HIGH>,
+> +					<GIC_SPI 162 IRQ_TYPE_LEVEL_HIGH>;
+> +			};
+> +		};
+> +
+>  		usb at 8600000 {
+>  			compatible = "fsl-usb2-dr-v2.5", "fsl-usb2-dr";
+>  			reg = <0x0 0x8600000 0x0 0x1000>;
+> -- 
+> 1.7.11.7
 > 
-> -Olof
 > 
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
