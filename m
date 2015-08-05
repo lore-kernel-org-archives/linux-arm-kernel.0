@@ -1,71 +1,94 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Wed, 5 Aug 2015 10:58:02 +0300
-Subject: [PATCH 06/10] ARM: dts: am4372: Use "syscon-phy-power" instead
- of "ctrl-module" in USB PHY node
-In-Reply-To: <1438702233-8027-7-git-send-email-kishon@ti.com>
-References: <1438702233-8027-1-git-send-email-kishon@ti.com>
- <1438702233-8027-7-git-send-email-kishon@ti.com>
-Message-ID: <55C1C20A.5070003@ti.com>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Wed, 5 Aug 2015 15:58:03 +0800
+Subject: [PATCH v6 7/9] clk: mediatek: Add subsystem clocks of MT8173
+In-Reply-To: <20150805075058.GC18700@pengutronix.de>
+References: <1438676218-11310-1-git-send-email-jamesjj.liao@mediatek.com>
+ <1438676218-11310-8-git-send-email-jamesjj.liao@mediatek.com>
+ <20150805064605.GZ18700@pengutronix.de>
+ <CAGS+omDmgxO9jHaPRb1hXO7fMRE=CnH=WNP3DeMm1axBswK_Aw@mail.gmail.com>
+ <20150805073645.GB18700@pengutronix.de>
+ <CAGS+omAFpWHO5w22Lq5fF6aXxf0bWi0KG7OB4u-FEFNUxPiceA@mail.gmail.com>
+ <20150805075058.GC18700@pengutronix.de>
+Message-ID: <CAGS+omAjME7Rw9CASFbhPidLrhkxmKh91G5mZpHwdQHBN6wJmg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/08/15 18:30, Kishon Vijay Abraham I wrote:
-> Add "syscon-phy-power" property and remove the deprecated "ctrl-module"
-> property from USB PHY device tree node.
-> 
-> Since "am43xx_control_usb2phy1" and "am43xx_control_usb2phy2"
-> devicetree nodes are no longer used, remove it.
-> 
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+On Wed, Aug 5, 2015 at 3:50 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> On Wed, Aug 05, 2015 at 03:41:49PM +0800, Daniel Kurtz wrote:
+>> On Wed, Aug 5, 2015 at 3:36 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+>> > On Wed, Aug 05, 2015 at 03:26:29PM +0800, Daniel Kurtz wrote:
+>> >> On Wed, Aug 5, 2015 at 2:46 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+>> >> > On Tue, Aug 04, 2015 at 04:16:56PM +0800, James Liao wrote:
+>> >> >> Most multimedia subsystem clocks will be accessed by multiple
+>> >> >> drivers, so it's a better way to manage these clocks in CCF.
+>> >> >> This patch adds clock support for MM, IMG, VDEC, VENC and VENC_LT
+>> >> >> subsystems.
+>> >> >>
+>> >> >> Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
+>> >> >> ---
+>> >> >>  drivers/clk/mediatek/clk-mt8173.c      | 267 +++++++++++++++++++++++++++++++++
+>> >> >>  include/dt-bindings/clock/mt8173-clk.h |  97 +++++++++++-
+>> >> >>  2 files changed, 361 insertions(+), 3 deletions(-)
+>> >> >>
+>> >> >> diff --git a/drivers/clk/mediatek/clk-mt8173.c b/drivers/clk/mediatek/clk-mt8173.c
+>> >> >> index f37ace6..05335e5 100644
+>> >> >> --- a/drivers/clk/mediatek/clk-mt8173.c
+>> >> >> +++ b/drivers/clk/mediatek/clk-mt8173.c
+>> >> >> @@ -25,6 +25,10 @@ static DEFINE_SPINLOCK(mt8173_clk_lock);
+>> >> >>  static const struct mtk_fixed_clk fixed_clks[] __initconst = {
+>> >> >>       FIXED_CLK(CLK_TOP_CLKPH_MCK_O, "clkph_mck_o", "clk26m", 400 * MHZ),
+>> >> >>       FIXED_CLK(CLK_TOP_USB_SYSPLL_125M, "usb_syspll_125m", "clk26m", 125 * MHZ),
+>> >> >> +     FIXED_CLK(CLK_TOP_DSI0_DIG, "dsi0_dig", "clk26m", 130 * MHZ),
+>> >> >> +     FIXED_CLK(CLK_TOP_DSI1_DIG, "dsi1_dig", "clk26m", 130 * MHZ),
+>> >> >> +     FIXED_CLK(CLK_TOP_LVDS_PXL, "lvds_pxl", "lvdspll", 148.5 * MHZ),
+>> >> >> +     FIXED_CLK(CLK_TOP_LVDS_CTS, "lvds_cts", "lvdspll", 51.975 * MHZ),
+>> >> >
+>> >> > I would expect 51975 * KHZ here to avoid fractional numbers. Probably
+>> >> > gcc calculates that during compile time so this will work as expected,
+>> >> > still I'm not sure this is good style to use fractional numbers here.
+>> >>
+>> >> I thought this looked a bit strange too, but for what its worth, these
+>> >> two evaluate correctly:
+>> >>
+>> >> localhost ~ # cat /sys/kernel/debug/clk/clk_summary  | grep lvds
+>> >>     lvdspll                               0            0   149999878
+>> >>        0 0
+>> >>        lvds_pxl                           0            0   148500000
+>> >>        0 0
+>> >>        lvds_cts                           0            0    51975000
+>> >>        0 0
+>> >>
+>> >> >
+>> >> > Anyway, on my system lvdspll is running at 150MHz. Are you sure there is
+>> >> > a clock derived from this running at 148.5MHz? Is it really correct to
+>> >> > use a fixed clock here or should it rather be lvdspll directly?
+>> >>
+>> >> I agree it does look strange to have a 51.975 MHz and 148.5 MHz clocks
+>> >> with a 150 MHz PLL as their parent...  However, I'm not sure how much
+>> >> this matters?  I think the idea here was that these frequencies are
+>> >> best effort "nominal" clock values provided by Mediatek "designers".
+>> >> The important point is that for the hardware to generate these either
+>> >> of these clocks, lvdspll must be enabled.
+>> >
+>> > This assumes that the lvdspll always runs at frequency the designers
+>> > thought that might be a good value. Should we really provide wrong clock
+>> > values when on some board for whatever reason the lvdspll is configured
+>> > for a different frequency?
+>>
+>> Do you have an alternative suggestion for estimating the frequency of
+>> a non-software controllable or measurable hardware clock?
+>
+> What's the problem with using lvdspll directly? The consumers of these
+> clocks should be able to cope with the deviation between nomial
+> frequency and actual frequency.
 
-Acked-by: Roger Quadros <rogerq@ti.com>
+Oh, I'm totally fine with that too.  Although I think the way James
+has it better models the hardware.
 
-cheers,
--roger
-
-> ---
->  arch/arm/boot/dts/am4372.dtsi |   16 ++--------------
->  1 file changed, 2 insertions(+), 14 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
-> index ade28c79..24fa073 100644
-> --- a/arch/arm/boot/dts/am4372.dtsi
-> +++ b/arch/arm/boot/dts/am4372.dtsi
-> @@ -802,18 +802,6 @@
->  			status = "disabled";
->  		};
->  
-> -		am43xx_control_usb2phy1: control-phy at 44e10620 {
-> -			compatible = "ti,control-phy-usb2-am437";
-> -			reg = <0x44e10620 0x4>;
-> -			reg-names = "power";
-> -		};
-> -
-> -		am43xx_control_usb2phy2: control-phy at 0x44e10628 {
-> -			compatible = "ti,control-phy-usb2-am437";
-> -			reg = <0x44e10628 0x4>;
-> -			reg-names = "power";
-> -		};
-> -
->  		ocp2scp0: ocp2scp at 483a8000 {
->  			compatible = "ti,am437x-ocp2scp", "ti,omap-ocp2scp";
->  			#address-cells = <1>;
-> @@ -824,7 +812,7 @@
->  			usb2_phy1: phy at 483a8000 {
->  				compatible = "ti,am437x-usb2";
->  				reg = <0x483a8000 0x8000>;
-> -				ctrl-module = <&am43xx_control_usb2phy1>;
-> +				syscon-phy-power = <&scm_conf 0x620>;
->  				clocks = <&usb_phy0_always_on_clk32k>,
->  					 <&usb_otg_ss0_refclk960m>;
->  				clock-names = "wkupclk", "refclk";
-> @@ -843,7 +831,7 @@
->  			usb2_phy2: phy at 483e8000 {
->  				compatible = "ti,am437x-usb2";
->  				reg = <0x483e8000 0x8000>;
-> -				ctrl-module = <&am43xx_control_usb2phy2>;
-> +				syscon-phy-power = <&scm_conf 0x628>;
->  				clocks = <&usb_phy1_always_on_clk32k>,
->  					 <&usb_otg_ss1_refclk960m>;
->  				clock-names = "wkupclk", "refclk";
-> 
+> Sascha
+>
+> --
+> Pengutronix e.K.                           |                             |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
