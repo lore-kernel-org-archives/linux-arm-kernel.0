@@ -1,96 +1,64 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 5 Aug 2015 03:22:34 -0700
-Subject: [PATCH 0/3] ARM: multi_v7_defconfig: Enable more OMAP family
- platforms
-In-Reply-To: <1428614121-3374-1-git-send-email-nm@ti.com>
-References: <1428614121-3374-1-git-send-email-nm@ti.com>
-Message-ID: <20150805102234.GZ16878@atomide.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed, 05 Aug 2015 11:22:51 +0100
+Subject: [GIT PULL] ARM64: juno: SCPI and dependent drivers for v4.3
+Message-ID: <55C1E3FB.5090309@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ping, looks like these are still pending. Probably should be
-applied directly by the arm-soc maintainers.
+Hi Olof,
+
+
+Here is the first pull request for SCPI, clock and cpufreq support on
+ARM64 Juno development platform for v4.3
 
 Regards,
+Sudeep
 
-Tony
+The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
 
-* Nishanth Menon <nm@ti.com> [150409 14:17]:
-> Hi,
-> 
-> As of next-20150409 tag, the following platforms (I have access
-> to) report failures for AM437x-sk and legacy beaglebone (white).
-> omap2plus_defconfig boots up fine on these platforms.
-> 
-> So, the basic minimum stuff I could pickup to fix up beaglebone-white
-> and am437x-sk.
-> 
-> This series is still missing the magic sauce for LDP - will try to
-> track that down later as well.
-> 
-> This series is based on next-20150409
-> 
-> multi_v7_defconfig (as on next-20150409)
->  1:                     am335x-evm: BOOT: PASS: am335x-evm.txt
->  2:                      am335x-sk: BOOT: PASS: am335x-sk.txt
->  3:                     am3517-evm: BOOT: PASS: am3517-evm.txt
->  4:                      am37x-evm: BOOT: PASS: am37x-evm.txt
->  5:                      am437x-sk: BOOT: FAIL: am437x-sk.txt
->  6:                    am43xx-epos: BOOT: PASS: am43xx-epos.txt
->  7:                   am43xx-gpevm: BOOT: PASS: am43xx-gpevm.txt
->  8:                 BeagleBoard-XM: BOOT: PASS: beagleboard.txt
->  9:            beagleboard-vanilla: BOOT: PASS: beagleboard-vanilla.txt
-> 10:               beaglebone-black: BOOT: PASS: beaglebone-black.txt
-> 11:                     beaglebone: BOOT: FAIL: beaglebone.txt
-> 12:                     craneboard: BOOT: PASS: craneboard.txt
-> 13:                     dra72x-evm: BOOT: PASS: dra72x-evm.txt
-> 14:                     dra7xx-evm: BOOT: PASS: dra7xx-evm.txt
-> 15:         OMAP3430-Labrador(LDP): BOOT: FAIL: ldp.txt
-> 16:                           n900: BOOT: PASS: n900.txt
-> 17:                      omap5-evm: BOOT: PASS: omap5-evm.txt
-> 18:                  pandaboard-es: BOOT: PASS: pandaboard-es.txt
-> 19:             pandaboard-vanilla: BOOT: PASS: pandaboard-vanilla.txt
-> 20:                        sdp3430: BOOT: PASS: sdp3430.txt
-> 21:                        sdp4430: BOOT: PASS: sdp4430.txt
-> 
-> After this series:
->  1:                     am335x-evm: BOOT: PASS: am335x-evm.txt
->  2:                     am3517-evm: BOOT: PASS: am3517-evm.txt
->  3:                      am37x-evm: BOOT: PASS: am37x-evm.txt
->  4:                      am437x-sk: BOOT: PASS: am437x-sk.txt
->  5:                    am43xx-epos: BOOT: PASS: am43xx-epos.txt
->  6:                   am43xx-gpevm: BOOT: PASS: am43xx-gpevm.txt
->  7:                 BeagleBoard-XM: BOOT: PASS: beagleboard.txt
->  8:            beagleboard-vanilla: BOOT: PASS: beagleboard-vanilla.txt
->  9:               beaglebone-black: BOOT: PASS: beaglebone-black.txt
-> 10:                     beaglebone: BOOT: PASS: beaglebone.txt
-> 11:                     craneboard: BOOT: PASS: craneboard.txt
-> 12:                     dra72x-evm: BOOT: PASS: dra72x-evm.txt
-> 13:                     dra7xx-evm: BOOT: PASS: dra7xx-evm.txt
-> 14:         OMAP3430-Labrador(LDP): BOOT: FAIL: ldp.txt
-> 15:                           n900: BOOT: PASS: n900.txt
-> 16:                      omap5-evm: BOOT: PASS: omap5-evm.txt
-> 17:                  pandaboard-es: BOOT: PASS: pandaboard-es.txt
-> 18:             pandaboard-vanilla: BOOT: PASS: pandaboard-vanilla.txt
-> 19:                        sdp3430: BOOT: PASS: sdp3430.txt
-> 20:                        sdp4430: BOOT: PASS: sdp4430.txt
-> TOTAL = 20 boards, Booted Boards = 19, No Boot boards = 1
-> 
-> Nishanth Menon (3):
->   ARM: multi_v7_defconfig: Enable beaglebone PMIC TPS65217
->   ARM: multi_v7_defconfig: Enable AM437x PMIC TPS65218
->   ARM: multi_v7_defconfig: Enable generic SoC internal OMAP regulators
-> 
->  arch/arm/configs/multi_v7_defconfig |    6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> Regards,
-> Nishanth Menon
-> -- 
-> 1.7.9.5
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+    Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
+
+are available in the git repository at:
+
+    git://linux-arm.org/linux-skn.git juno_dvfs
+
+for you to fetch changes up to a42b1bbf7bf9a2a1fa4b0deff66581b83541b819:
+
+    arm64: dts: add clock support for all the cpus (2015-08-05 11:03:09 
++0100)
+
+----------------------------------------------------------------
+Sudeep Holla (8):
+        Documentation: add DT binding for ARM System Control and Power 
+Interface(SCPI) protocol
+        firmware: add support for ARM System Control and Power 
+Interface(SCPI) protocol
+        clk: add support for clocks provided by SCP(System Control 
+Processor)
+        clk: scpi: add support for cpufreq virtual device
+        cpufreq: arm_big_little: add SCPI interface driver
+        arm64: dts: add SRAM, MHU mailbox and SCPI support on Juno
+        arm64: dts: add CPU topology on Juno
+        arm64: dts: add clock support for all the cpus
+
+   Documentation/devicetree/bindings/arm/arm,scpi.txt | 150 +++
+   MAINTAINERS                                        |  10 +
+   arch/arm64/boot/dts/arm/juno-base.dtsi             |  54 ++
+   arch/arm64/boot/dts/arm/juno-r1.dts                |  32 +
+   arch/arm64/boot/dts/arm/juno.dts                   |  32 +
+   drivers/clk/Kconfig                                |  10 +
+   drivers/clk/Makefile                               |   1 +
+   drivers/clk/clk-scpi.c                             | 325 +++++++
+   drivers/cpufreq/Kconfig.arm                        |   9 +
+   drivers/cpufreq/Makefile                           |   1 +
+   drivers/cpufreq/scpi-cpufreq.c                     | 124 +++
+   drivers/firmware/Kconfig                           |  19 +
+   drivers/firmware/Makefile                          |   1 +
+   drivers/firmware/arm_scpi.c                        | 711 +++++++++++++
+   include/linux/scpi_protocol.h                      |  61 ++
+   15 files changed, 1540 insertions(+)
+   create mode 100644 Documentation/devicetree/bindings/arm/arm,scpi.txt
+   create mode 100644 drivers/clk/clk-scpi.c
+   create mode 100644 drivers/cpufreq/scpi-cpufreq.c
+   create mode 100644 drivers/firmware/arm_scpi.c
+   create mode 100644 include/linux/scpi_protocol.h
