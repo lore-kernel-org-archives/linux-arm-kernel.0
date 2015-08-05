@@ -1,66 +1,36 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 05 Aug 2015 10:34:12 +0100
-Subject: [PATCH v4 1/6] ARM: shmobile: r8a7740 dtsi: Add L2
- cache-controller node
-In-Reply-To: <1438765090-823-2-git-send-email-geert+renesas@glider.be>
-References: <1438765090-823-1-git-send-email-geert+renesas@glider.be>
- <1438765090-823-2-git-send-email-geert+renesas@glider.be>
-Message-ID: <55C1D894.8070302@arm.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 5 Aug 2015 10:36:50 +0200
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Defconfig
+ Updates for v4.3
+In-Reply-To: <cover.1438215768.git.horms+renesas@verge.net.au>
+References: <cover.1438215768.git.horms+renesas@verge.net.au>
+Message-ID: <20150805083650.GA6390@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Jul 30, 2015 at 09:23:50AM +0900, Simon Horman wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
+> 
+> Please consider these second round of Renesas ARM based SoC defconfig updates for v4.3.
+> 
+> This pull request is based on the previous round of
+> such requests, tagged as renesas-defconfig-for-v4.3,
+> which I have already sent a pull-request for.
+> 
+> 
+> The following changes since commit 821e79cb5686695f0adaef61587a184e953a937e:
+> 
+>   ARM: shmobile: Remove marzen_defconfig (2015-07-17 08:29:45 +0900)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-defconfig2-for-v4.3
+> 
+> for you to fetch changes up to 4055a722d260ca30610fc52238d0aa49ff5bffa9:
+> 
+>   ARM: shmobile: Enable fixed voltage regulator in shmobile_defconfig (2015-07-28 09:27:00 +0900)
+
+Merged, thanks.
 
 
-On 05/08/15 09:58, Geert Uytterhoeven wrote:
-> Add the missing L2 cache-controller node. This will allow migration to
-> the generic l2c OF initialization.
->
-> The L2 cache is an ARM L2C-310 (r3p1-150rel0), of size 256 KiB (32 KiB x
-> 8 ways).
->
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> ---
-> v4:
->    - Commit eeedcea69e927857 ("ARM: 8395/1: l2c: Add support for the
->      "arm,shared-override" property") is queued for 4.3 in arm/for-next,
->
-> v3:
->    - Add "arm,shared-override",
->
-> v2:
->    - Fix interrupt (should be 3 cells, not 1),
->    - Describe cache better.
-> ---
->   arch/arm/boot/dts/r8a7740.dtsi | 16 ++++++++++++++++
->   1 file changed, 16 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
-> index d84714468cce18df..ddef5b1c68fa06b3 100644
-> --- a/arch/arm/boot/dts/r8a7740.dtsi
-> +++ b/arch/arm/boot/dts/r8a7740.dtsi
-> @@ -37,6 +37,22 @@
->   		      <0xc2000000 0x1000>;
->   	};
->
-> +	L2: cache-controller {
-> +		compatible = "arm,pl310-cache";
-> +		reg = <0xf0100000 0x1000>;
-> +		interrupts = <0 84 IRQ_TYPE_LEVEL_HIGH>;
-> +		power-domains = <&pd_a3sm>;
-> +		arm,data-latency = <3 3 3>;
-> +		arm,tag-latency = <2 2 2>;
-> +		arm,shared-override;
-> +		cache-unified;
-> +		cache-level = <2>;
-> +		cache-size = <0x40000>;
-> +		cache-sets = <1024>;
-> +		cache-block-size = <32>;
-> +		cache-line-size = <32>;
-
-Any particular reason whey you need all this cache-* properties ? Is
-something broken on these SoCs ? We should be able to get most of these
-information from the SoC(reading some registers). It's good to avoid
-passing them via DT if they can be discovered from hardware.
-
-Regards,
-Sudeep
+-Olof
