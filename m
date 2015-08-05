@@ -1,18 +1,16 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Wed,  5 Aug 2015 10:58:06 +0200
-Subject: [PATCH v4 2/6] ARM: shmobile: r8a7740 dtsi: Add L1 cache information
- to CPU node
+Date: Wed,  5 Aug 2015 10:58:10 +0200
+Subject: [PATCH v4 6/6] ARM: shmobile: r8a7740: Remove mapping of L2 cache
+ controller registers
 In-Reply-To: <1438765090-823-1-git-send-email-geert+renesas@glider.be>
 References: <1438765090-823-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1438765090-823-3-git-send-email-geert+renesas@glider.be>
+Message-ID: <1438765090-823-7-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Describe the L1 cache in the CPU node:
-  - L1 instruction cache: 32 KiB (8 KiB x 4 ways),
-  - L1 data cache: 32 KiB (8 KiB x 4 ways).
-
-Add a link to the L2 cache.
+Now all r8a7740-based platforms have been migrated to the generic l2c OF
+initialization, it's no longer needed to map the L2 cache controller
+registers from .map_io().
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
@@ -23,30 +21,33 @@ v3:
   - No changes,
 
 v2:
-  - New.
+  - No changes.
 ---
- arch/arm/boot/dts/r8a7740.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ arch/arm/mach-shmobile/setup-r8a7740.c | 12 ------------
+ 1 file changed, 12 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
-index ddef5b1c68fa06b3..3aaab195132bfc2c 100644
---- a/arch/arm/boot/dts/r8a7740.dtsi
-+++ b/arch/arm/boot/dts/r8a7740.dtsi
-@@ -26,6 +26,15 @@
- 			reg = <0x0>;
- 			clock-frequency = <800000000>;
- 			power-domains = <&pd_a3sm>;
-+			i-cache-size = <0x8000>;
-+			i-cache-sets = <256>;
-+			i-cache-block-size = <32>;
-+			i-cache-line-size = <32>;
-+			d-cache-size = <0x8000>;
-+			d-cache-sets = <256>;
-+			d-cache-block-size = <32>;
-+			d-cache-line-size = <32>;
-+			next-level-cache = <&L2>;
- 		};
- 	};
+diff --git a/arch/arm/mach-shmobile/setup-r8a7740.c b/arch/arm/mach-shmobile/setup-r8a7740.c
+index 7b16c12e3f816f7f..496569f9d578b863 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7740.c
++++ b/arch/arm/mach-shmobile/setup-r8a7740.c
+@@ -38,18 +38,6 @@ static struct map_desc r8a7740_io_desc[] __initdata = {
+ 		.length		= 160 << 20,
+ 		.type		= MT_DEVICE_NONSHARED
+ 	},
+-#ifdef CONFIG_CACHE_L2X0
+-	/*
+-	 * for l2x0_init()
+-	 * 0xf0100000-0xf0101000 -> 0xf0002000-0xf0003000
+-	 */
+-	{
+-		.virtual	= 0xf0002000,
+-		.pfn		= __phys_to_pfn(0xf0100000),
+-		.length		= PAGE_SIZE,
+-		.type		= MT_DEVICE_NONSHARED
+-	},
+-#endif
+ };
  
+ static void __init r8a7740_map_io(void)
 -- 
 1.9.1
