@@ -1,64 +1,134 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Wed, 5 Aug 2015 11:02:45 +0300
-Subject: [PATCH 10/10] ARM: dts: omap4: Use "syscon-otghs" instead of
- "ctrl-module" in USB node
-In-Reply-To: <1438702233-8027-11-git-send-email-kishon@ti.com>
-References: <1438702233-8027-1-git-send-email-kishon@ti.com>
- <1438702233-8027-11-git-send-email-kishon@ti.com>
-Message-ID: <55C1C325.5040703@ti.com>
+From: maitysanchayan@gmail.com (maitysanchayan at gmail.com)
+Date: Wed, 5 Aug 2015 13:30:45 +0530
+Subject: [PATCH] iio: adc: vf610: Add IIO buffer support for Vybrid ADC
+In-Reply-To: <BN3PR0301MB12191A12387C829F111B612BF5760@BN3PR0301MB1219.namprd03.prod.outlook.com>
+References: <cover.1438610517.git.maitysanchayan@gmail.com>
+ <1f11be7d7bc1c3fcebf7d0bcf274f1fcbef35999.1438610517.git.maitysanchayan@gmail.com>
+ <BN3PR0301MB12191A12387C829F111B612BF5760@BN3PR0301MB1219.namprd03.prod.outlook.com>
+Message-ID: <20150805080044.GB17211@Sanchayan-Arch.toradex.int>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kishon,
+Hello,
 
-On 04/08/15 18:30, Kishon Vijay Abraham I wrote:
-> Add "syscon-otghs" property and remove the deprecated "ctrl-module"
-> property from MUSB devicetree node.
-> 
-> Since "omap_control_usbotg" devicetree node is no longer used, remove
-> it.
-> 
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> ---
->  arch/arm/boot/dts/omap4.dtsi |    8 +-------
->  1 file changed, 1 insertion(+), 7 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-> index b27634d..2fb49a5 100644
-> --- a/arch/arm/boot/dts/omap4.dtsi
-> +++ b/arch/arm/boot/dts/omap4.dtsi
-> @@ -854,12 +854,6 @@
->  			};
->  		};
->  
-> -		omap_control_usbotg: control-phy at 4a00233c {
-> -			compatible = "ti,control-phy-otghs";
-> -			reg = <0x4a00233c 0x4>;
-> -			reg-names = "otghs_control";
-> -		};
-> -
->  		usb_otg_hs: usb_otg_hs at 4a0ab000 {
->  			compatible = "ti,omap4-musb";
->  			reg = <0x4a0ab000 0x7ff>;
-> @@ -872,7 +866,7 @@
->  			multipoint = <1>;
->  			num-eps = <16>;
->  			ram-bits = <12>;
-> -			ctrl-module = <&omap_control_usbotg>;
-> +			syscon-otghs = <&scm_conf 0x33c>;
+On 15-08-04 03:18:46, Duan Andy wrote:
+> From: Sanchayan Maity <maitysanchayan@gmail.com> Sent: Monday, August 03, 2015 11:10 PM
+> > To: jic23 at kernel.org; linux-iio at vger.kernel.org
+> > Cc: stefan at agner.ch; Duan Fugang-B38611; hofrat at osadl.org;
+> > sanjeev_sharma at mentor.com; Estevam Fabio-R49496; knaack.h at gmx.de;
+> > lars at metafoo.de; pmeerw at pmeerw.net; antoine.tenart at free-electrons.com;
+> > linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> > Sanchayan Maity
+> > Subject: [PATCH] iio: adc: vf610: Add IIO buffer support for Vybrid ADC
+> > 
+> > This patch adds support for IIO buffer to the Vybrid ADC driver.
+> > IIO triggered buffer infrastructure along with iio sysfs trigger is used
+> > to leverage continuous sampling support provided by the ADC block.
+> > 
+> > Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+> > ---
+> >  drivers/iio/adc/Kconfig     |   4 ++
+> >  drivers/iio/adc/vf610_adc.c | 122
+> > +++++++++++++++++++++++++++++++++++++++++---
+> >  2 files changed, 120 insertions(+), 6 deletions(-)
+> > 
+> > diff --git a/drivers/iio/adc/Kconfig b/drivers/iio/adc/Kconfig index
+> > 7c55658..4661241 100644
+> > --- a/drivers/iio/adc/Kconfig
+> > +++ b/drivers/iio/adc/Kconfig
+> > @@ -337,6 +337,10 @@ config TWL6030_GPADC  config VF610_ADC
+> >  	tristate "Freescale vf610 ADC driver"
+> >  	depends on OF
+> > +	select IIO_BUFFER
+> > +	select IIO_TRIGGER
+> > +	select IIO_SYSFS_TRIGGER
+> > +	select IIO_TRIGGERED_BUFFER
+> >  	help
+> >  	  Say yes here to support for Vybrid board analog-to-digital
+> > converter.
+> >  	  Since the IP is used for i.MX6SLX, the driver also support
+> > i.MX6SLX.
+> > diff --git a/drivers/iio/adc/vf610_adc.c b/drivers/iio/adc/vf610_adc.c
+> > index 23b8fb9..af72b9a 100644
+> > --- a/drivers/iio/adc/vf610_adc.c
+> > +++ b/drivers/iio/adc/vf610_adc.c
+> > @@ -34,8 +34,11 @@
+> >  #include <linux/err.h>
+> > 
+> >  #include <linux/iio/iio.h>
+> > +#include <linux/iio/buffer.h>
+> >  #include <linux/iio/sysfs.h>
+> > -#include <linux/iio/driver.h>
+> > +#include <linux/iio/trigger.h>
+> > +#include <linux/iio/trigger_consumer.h> #include
+> > +<linux/iio/triggered_buffer.h>
+> > 
+> >  /* This will be the driver name the kernel reports */  #define
+> > DRIVER_NAME "vf610-adc"
+> > @@ -170,6 +173,7 @@ struct vf610_adc {
+> >  	u32 sample_freq_avail[5];
+> > 
+> >  	struct completion completion;
+> > +	u16 *buffer;
+> >  };
+> > 
+> >  static const u32 vf610_hw_avgs[] = { 1, 4, 8, 16, 32 }; @@ -505,12
+> > +509,22 @@ static const struct iio_chan_spec_ext_info vf610_ext_info[] =
+> > {
+> >  	.info_mask_shared_by_type = BIT(IIO_CHAN_INFO_SCALE) |	\
+> >  				BIT(IIO_CHAN_INFO_SAMP_FREQ),	\
+> >  	.ext_info = vf610_ext_info,				\
+> > +	.address = (_idx),				\
+> > +	.scan_index = (_idx),			\
+> > +	.scan_type.sign = 'u',			\
+> > +	.scan_type.realbits = 12,		\
+> > +	.scan_type.storagebits = 16,	\
+> >  }
+> > 
+> >  #define VF610_ADC_TEMPERATURE_CHAN(_idx, _chan_type) {	\
+> >  	.type = (_chan_type),	\
+> >  	.channel = (_idx),		\
+> >  	.info_mask_separate = BIT(IIO_CHAN_INFO_PROCESSED),	\
+> > +	.address = (_idx),						\
+> > +	.scan_index = (_idx),					\
+> > +	.scan_type.sign = 'u',					\
+> > +	.scan_type.realbits = 12,				\
+> > +	.scan_type.storagebits = 16,			\
+> >  }
+> > 
+> >  static const struct iio_chan_spec vf610_adc_iio_channels[] = { @@ -531,6
+> > +545,7 @@ static const struct iio_chan_spec vf610_adc_iio_channels[] = {
+> >  	VF610_ADC_CHAN(14, IIO_VOLTAGE),
+> >  	VF610_ADC_CHAN(15, IIO_VOLTAGE),
+> >  	VF610_ADC_TEMPERATURE_CHAN(26, IIO_TEMP),
+> > +	IIO_CHAN_SOFT_TIMESTAMP(32),
+> >  	/* sentinel */
+> >  };
+> > 
+> > @@ -559,13 +574,21 @@ static int vf610_adc_read_data(struct vf610_adc
+> > *info)
+> > 
+> >  static irqreturn_t vf610_adc_isr(int irq, void *dev_id)  {
+> > -	struct vf610_adc *info = (struct vf610_adc *)dev_id;
+> > +	struct iio_dev *indio_dev = (struct iio_dev *)dev_id;
+> > +	struct vf610_adc *info = iio_priv(indio_dev);
+> >  	int coco;
+> > 
+> >  	coco = readl(info->regs + VF610_REG_ADC_HS);
+> >  	if (coco & VF610_ADC_HS_COCO0) {
+> >  		info->value = vf610_adc_read_data(info);
+> > -		complete(&info->completion);
+> > +		if (iio_buffer_enabled(indio_dev)) {
+> > +			info->buffer[0] = info->value;
+> > +			writel(0, info->regs + VF610_REG_ADC_HS);
+> The register is read only. After ADC_Rn is read, the coco bit is cleared.
 
-All other properties were of the format "syscon-phy-foo".
-Why use a different format here?
+Right. This crept in from a different implementation which I was trying with
+PDB and perhaps a wrong interpretation of the TRM.
 
-Other than that
+Will fix.
 
-Acked-by: Roger Quadros <rogerq@ti.com>
+Regards,
+Sanchayan.
 
-cheers,
--roger
-
-
->  		};
->  
->  		aes: aes at 4b501000 {
-> 
+(snip)
