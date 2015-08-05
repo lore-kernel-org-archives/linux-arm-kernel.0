@@ -1,104 +1,55 @@
-From: tchalamarla@caviumnetworks.com (Tirumalesh Chalamarla)
-Date: Wed, 5 Aug 2015 09:54:28 -0700
-Subject: [PATCH V2] iommu/arm-smmu-v2: ThunderX mis-extends 64bit registers
-Message-ID: <1438793668-15597-1-git-send-email-tchalamarla@caviumnetworks.com>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Wed, 5 Aug 2015 18:59:05 +0200
+Subject: [PATCH] kvm:arm:Fix error handling in the function vgic_v3_probe
+In-Reply-To: <1438793303-30228-1-git-send-email-xerofoify@gmail.com>
+References: <1438793303-30228-1-git-send-email-xerofoify@gmail.com>
+Message-ID: <55C240D9.5060900@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SMMU architecture defines two different behaviors when 64-bit
-registers are written with 32-bit writes.  The first behavior causes
-zero extension into the upper 32-bits.  The second behavior splits a
-64-bit register into "normal" 32-bit register pairs.
 
-On some buggy implementations, registers incorrectly zero extended
-when they should instead behave as normal 32-bit register pairs.
 
-Signed-off-by: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
----
+On 05/08/2015 18:48, Nicholas Krause wrote:
+> This fixes the error handling in the function vgic_v3_probe
+> for when calling the function kvm_register_device_ops to check
+> if the call to this function has returned a error code and if
+> so jump to the label out with goto to cleanup no longer required
+> resources used by the function vgic_v3_probe before returning the
+> error code from the call to kvm_register_device_ops to the caller
+> of the function vgic_v3_probe.
+> 
+> Signed-off-by: Nicholas Krause <xerofoify@gmail.com>
+> ---
+>  virt/kvm/arm/vgic-v3.c | 10 +++++++---
+>  1 file changed, 7 insertions(+), 3 deletions(-)
+> 
+> diff --git a/virt/kvm/arm/vgic-v3.c b/virt/kvm/arm/vgic-v3.c
+> index dff0602..5102aa2 100644
+> --- a/virt/kvm/arm/vgic-v3.c
+> +++ b/virt/kvm/arm/vgic-v3.c
+> @@ -264,12 +264,16 @@ int vgic_v3_probe(struct device_node *vgic_node,
+>  	} else {
+>  		vgic->vcpu_base = vcpu_res.start;
+>  		vgic->can_emulate_gicv2 = true;
+> -		kvm_register_device_ops(&kvm_arm_vgic_v2_ops,
+> -					KVM_DEV_TYPE_ARM_VGIC_V2);
+> +		ret = kvm_register_device_ops(&kvm_arm_vgic_v2_ops,
+> +					      KVM_DEV_TYPE_ARM_VGIC_V2);
+> +		if (ret)
+> +			goto out;
+>  	}
+>  	if (vgic->vcpu_base == 0)
+>  		kvm_info("disabling GICv2 emulation\n");
+> -	kvm_register_device_ops(&kvm_arm_vgic_v3_ops, KVM_DEV_TYPE_ARM_VGIC_V3);
+> +	ret = kvm_register_device_ops(&kvm_arm_vgic_v3_ops, KVM_DEV_TYPE_ARM_VGIC_V3);
+> +	if (ret)
+> +		goto out;
+>  
+>  	vgic->vctrl_base = NULL;
+>  	vgic->type = VGIC_V3;
+> 
 
-Changes from V1:
-	- Introduced smmu_writeq
+This really should never happen.  Perhaps kvm_register_device_ops should
+instead return void, and WARN() when it currently returns an error.
 
- drivers/iommu/arm-smmu.c | 45 +++++++++++++++++++++++++--------------------
- 1 file changed, 25 insertions(+), 20 deletions(-)
-
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 66a803b..0912c78 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -69,6 +69,18 @@
- 		((smmu->options & ARM_SMMU_OPT_SECURE_CFG_ACCESS)	\
- 			? 0x400 : 0))
- 
-+#ifdef CONFIG_64BIT
-+#define smmu_writeq(reg64, addr)	writeq_relaxed((reg64), (addr))
-+#else
-+#define smmu_writeq(reg64, addr)				\
-+	do {							\
-+		u64 __val = (reg64);				\
-+		void __iomem *__addr = (addr);			\
-+		writel_relaxed(__val >> 32, __addr + 4);	\
-+		writel_relaxed(__val, __addr);			\
-+	} while (0)
-+#endif
-+
- /* Configuration registers */
- #define ARM_SMMU_GR0_sCR0		0x0
- #define sCR0_CLIENTPD			(1 << 0)
-@@ -226,7 +238,7 @@
- #define TTBCR2_SEP_SHIFT		15
- #define TTBCR2_SEP_UPSTREAM		(0x7 << TTBCR2_SEP_SHIFT)
- 
--#define TTBRn_HI_ASID_SHIFT            16
-+#define TTBRn_ASID_SHIFT		48
- 
- #define FSR_MULTI			(1 << 31)
- #define FSR_SS				(1 << 30)
-@@ -762,22 +774,17 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
- 
- 	/* TTBRs */
- 	if (stage1) {
--		reg = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[0];
--		writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR0_LO);
--		reg = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[0] >> 32;
--		reg |= ARM_SMMU_CB_ASID(cfg) << TTBRn_HI_ASID_SHIFT;
--		writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR0_HI);
--
--		reg = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[1];
--		writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR1_LO);
--		reg = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[1] >> 32;
--		reg |= ARM_SMMU_CB_ASID(cfg) << TTBRn_HI_ASID_SHIFT;
--		writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR1_HI);
-+		u64 reg64 = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[0];
-+
-+		reg64 |= ((u64)ARM_SMMU_CB_ASID(cfg)) << TTBRn_ASID_SHIFT;
-+		smmu_writeq(reg64, cb_base + ARM_SMMU_CB_TTBR0_LO);
-+
-+		reg64 = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[1];
-+		reg64 |= ((u64)ARM_SMMU_CB_ASID(cfg)) << TTBRn_ASID_SHIFT;
-+		smmu_writeq(reg64, cb_base + ARM_SMMU_CB_TTBR1_LO);
- 	} else {
--		reg = pgtbl_cfg->arm_lpae_s2_cfg.vttbr;
--		writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR0_LO);
--		reg = pgtbl_cfg->arm_lpae_s2_cfg.vttbr >> 32;
--		writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR0_HI);
-+		u64 reg64 = pgtbl_cfg->arm_lpae_s2_cfg.vttbr;
-+		smmu_writeq(reg64, cb_base + ARM_SMMU_CB_TTBR0_LO);
- 	}
- 
- 	/* TTBCR */
-@@ -1236,10 +1243,8 @@ static phys_addr_t arm_smmu_iova_to_phys_hard(struct iommu_domain *domain,
- 		u32 reg = iova & ~0xfff;
- 		writel_relaxed(reg, cb_base + ARM_SMMU_CB_ATS1PR_LO);
- 	} else {
--		u32 reg = iova & ~0xfff;
--		writel_relaxed(reg, cb_base + ARM_SMMU_CB_ATS1PR_LO);
--		reg = ((u64)iova & ~0xfff) >> 32;
--		writel_relaxed(reg, cb_base + ARM_SMMU_CB_ATS1PR_HI);
-+		u64 reg64 = iova & ~0xfff;
-+		smmu_writeq(reg64, cb_base + ARM_SMMU_CB_ATS1PR_LO);
- 	}
- 
- 	if (readl_poll_timeout_atomic(cb_base + ARM_SMMU_CB_ATSR, tmp,
--- 
-2.1.0
+Paolo
