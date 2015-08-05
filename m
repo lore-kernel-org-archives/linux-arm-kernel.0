@@ -1,64 +1,75 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 05 Aug 2015 11:22:51 +0100
-Subject: [GIT PULL] ARM64: juno: SCPI and dependent drivers for v4.3
-Message-ID: <55C1E3FB.5090309@arm.com>
+From: drinkcat@chromium.org (Nicolas Boichat)
+Date: Wed, 5 Aug 2015 18:24:05 +0800
+Subject: [PATCH 1/3] spi: bitbang: Replace spinlock by mutex when calling
+ chipselect
+In-Reply-To: <20150804105957.GI20873@sirena.org.uk>
+References: <1438668598-6678-1-git-send-email-drinkcat@chromium.org>
+ <20150804105957.GI20873@sirena.org.uk>
+Message-ID: <CANMq1KB2zxPPCbxh4K-REUgp-83s=MPcGRjz-p1fK1PQMzyLdw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+On Tue, Aug 4, 2015 at 6:59 PM, Mark Brown <broonie@kernel.org> wrote:
+> On Tue, Aug 04, 2015 at 02:09:56PM +0800, Nicolas Boichat wrote:
+[snip]
+>> Actually, I'm not sure if I understand the existing code: why are we not
+>> waiting for busy to go down to 0, then call chipselect, instead of not calling
+>> it at all if the bus happens to be busy when we setup the device? With the
+>> current approach, it would be easy to just use an unconditional mutex_lock.
+>
+> We shouldn't be blocking waiting for the bus to become free, that's not
+> how the interface works.
 
+Noted.
 
-Here is the first pull request for SCPI, clock and cpufreq support on
-ARM64 Juno development platform for v4.3
+>> Also, is it harmful to deactivate the newly setup device in spi_bitbang_setup,
+>> even if the bus is busy with another device? chipselect should be independent
+>> for each device (or is it not?). So I'm not clear why we need any locking at
+>> all...
+>
+> If you assert chip select on one device while another device is still
+> being interacted with then the new device will see the traffic for the
+> old device and become confused.
 
-Regards,
-Sudeep
+Here in spi_bitbang_setup, we do:
+bitbang->chipselect(spi, BITBANG_CS_INACTIVE);
+That is, we make sure that the current device is _not_ selected.
 
-The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
+Looking a bit more into this, the issue here is that some drivers use
+chipselect to chip select individual devices separately, while, on
+others, the above command unselects all devices (which is a bad idea
+if the bus is currently transferring data...). So, in short, it's
+probably better not to touch this code.
 
-    Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
+>> Anyway, this patch series does not change the existing behaviour, applies on
+>> top of broonie-sound/for-next, and, along with the 2 follow-up patches, was
+>> compile-tested on x86-64/arm (allyesconfig) and ppc44x (defconfig+SPI driver),
+>> and runtime-tested on an arm platform.
+>
+> I'm not seeing enough analysis in the commit log of what's being locked
+> and why - I don't fully understand what the busy stuff is for either
+> (not that I've looked at the code in detail just now) but I think that's
+> going to be the key thing here.
 
-are available in the git repository at:
+Regarding deleting prepare/unprepare and moving the lock into transfer_one.
 
-    git://linux-arm.org/linux-skn.git juno_dvfs
+spi.c:__spi_pump_messages, which calls these functions, does the following:
+ - If no more messages need to be sent, call unprepare_transfer_hardware
+ - If messages need to be sent:
+   + call prepare_transfer_hardware
+   + call prepare_message (NULL for bitbang)
+   + call transfer_one_message
 
-for you to fetch changes up to a42b1bbf7bf9a2a1fa4b0deff66581b83541b819:
+I don't think it makes a big difference if we set busy (or hold a
+mutex) in prepare/unprepare, or we just do it in transfer_one_message,
+since chipselect is only set in transfer_one_message, and is
+deselected at the end of the function anyway (in most cases, and if
+it's not, it will be selected again at the next transfer anyway).
 
-    arm64: dts: add clock support for all the cpus (2015-08-05 11:03:09 
-+0100)
+Anyway, the "safer" way to fix this would be to keep the
+prepare/unprepare functions, busy variable, and just protect it with a
+mutex instead of a spinlock...
 
-----------------------------------------------------------------
-Sudeep Holla (8):
-        Documentation: add DT binding for ARM System Control and Power 
-Interface(SCPI) protocol
-        firmware: add support for ARM System Control and Power 
-Interface(SCPI) protocol
-        clk: add support for clocks provided by SCP(System Control 
-Processor)
-        clk: scpi: add support for cpufreq virtual device
-        cpufreq: arm_big_little: add SCPI interface driver
-        arm64: dts: add SRAM, MHU mailbox and SCPI support on Juno
-        arm64: dts: add CPU topology on Juno
-        arm64: dts: add clock support for all the cpus
+Thanks.
 
-   Documentation/devicetree/bindings/arm/arm,scpi.txt | 150 +++
-   MAINTAINERS                                        |  10 +
-   arch/arm64/boot/dts/arm/juno-base.dtsi             |  54 ++
-   arch/arm64/boot/dts/arm/juno-r1.dts                |  32 +
-   arch/arm64/boot/dts/arm/juno.dts                   |  32 +
-   drivers/clk/Kconfig                                |  10 +
-   drivers/clk/Makefile                               |   1 +
-   drivers/clk/clk-scpi.c                             | 325 +++++++
-   drivers/cpufreq/Kconfig.arm                        |   9 +
-   drivers/cpufreq/Makefile                           |   1 +
-   drivers/cpufreq/scpi-cpufreq.c                     | 124 +++
-   drivers/firmware/Kconfig                           |  19 +
-   drivers/firmware/Makefile                          |   1 +
-   drivers/firmware/arm_scpi.c                        | 711 +++++++++++++
-   include/linux/scpi_protocol.h                      |  61 ++
-   15 files changed, 1540 insertions(+)
-   create mode 100644 Documentation/devicetree/bindings/arm/arm,scpi.txt
-   create mode 100644 drivers/clk/clk-scpi.c
-   create mode 100644 drivers/cpufreq/scpi-cpufreq.c
-   create mode 100644 drivers/firmware/arm_scpi.c
-   create mode 100644 include/linux/scpi_protocol.h
+Best,
