@@ -1,42 +1,36 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Wed, 5 Aug 2015 13:27:53 -0700
-Subject: next-20150729 build: 2 failures 49 warnings (next-20150729)
-In-Reply-To: <17C303E7-B358-486E-9E0F-83CF58F28481@gmail.com>
-References: <E1ZKPJk-0007VU-Fg@optimist> <20150729124410.GE20130@sirena.org.uk>
- <20150804173849.GD20873@sirena.org.uk>
- <17C303E7-B358-486E-9E0F-83CF58F28481@gmail.com>
-Message-ID: <CAMAWPa8n2fdAQFU+D6tm1e1Bv=uNKUimpB1OQjym6Nea-yhwWg@mail.gmail.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Wed, 5 Aug 2015 13:45:31 -0700
+Subject: [PATCH 22/23] misc: atmel_tclib: get and use slow clock
+In-Reply-To: <1438335599-3301-23-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1438335599-3301-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1438335599-3301-23-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <20150805204531.GA9784@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 4, 2015 at 12:12 PM, Matthias Brugger
-<matthias.bgg@gmail.com> wrote:
->
->
-> On August 4, 2015 7:38:49 PM CEST, Mark Brown <broonie@kernel.org> wrote:
->>On Wed, Jul 29, 2015 at 01:44:10PM +0100, Mark Brown wrote:
->>> On Wed, Jul 29, 2015 at 12:14:36PM +0100, Build bot for Mark Brown
->>wrote:
->>
->>> Today's linux-next fails to build an arm64 allmodconfig due to:
->>
->>> >    arm64-allmodconfig
->>> > ../include/linux/platform_device.h:245:1: error: type defaults to
->>'int' in declaration of 'module_init' [-Werror=implicit-int]
->>> > ../include/linux/platform_device.h:250:1: error: type defaults to
->>'int' in declaration of 'module_exit' [-Werror=implicit-int]
->>
->>> caused by c84e358718a66f76 (soc: Mediatek: Add SCPSYS power domain
->>> driver) which does not include module.h.  Arguably platform_device.h
->>> should do that, though it's only an issue if the macro is used so...
->>
->>This is still breaking the build and the fix should be trivial - is
->>there any ETA for a fix getting into -next?
->
-> I send a fix to arm at kernel.org but no reply yet. (sorry I'm not in front of a computer so I can't send you the link right now).
->
-> I will send a pull request tomorrow, let's see if that helps...
+On Fri, Jul 31, 2015 at 11:39:58AM +0200, Alexandre Belloni wrote:
+> From: Boris Brezillon <boris.brezillon@free-electrons.com>
+> 
+> Commit dca1a4b5ff6e ("clk: at91: keep slow clk enabled to prevent system
+> hang") added a workaround for the slow clock as it is not properly handled
+> by its users.
+> 
+> Get and use the slow clock as it is necessary for the timer counters.
+> 
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> ---
+> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Thierry Reding <thierry.reding@gmail.com>
+> Cc: linux-pwm at vger.kernel.org
+>  drivers/clocksource/tcb_clksrc.c |  8 ++++++++
+>  drivers/misc/atmel_tclib.c       |  4 ++++
+>  drivers/pwm/pwm-atmel-tcb.c      | 23 ++++++++++++++++-------
+>  include/linux/atmel_tc.h         |  1 +
+>  4 files changed, 29 insertions(+), 7 deletions(-)
+> 
 
-Fix was applied today.
-
-Kevin
+Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
