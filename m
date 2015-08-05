@@ -1,104 +1,103 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Wed, 5 Aug 2015 12:40:30 +0200
-Subject: [PATCH v3 1/2] drivers: watchdog: add a driver to support
- SAMA5D4 watchdog timer
-In-Reply-To: <1438765043-11030-2-git-send-email-wenyou.yang@atmel.com>
-References: <1438765043-11030-1-git-send-email-wenyou.yang@atmel.com>
- <1438765043-11030-2-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <20150805124030.6e73b975@ipc1.ka-ro>
+From: zyw@rock-chips.com (Chris Zhong)
+Date: Wed, 05 Aug 2015 18:41:14 +0800
+Subject: [PATCH v3 2/3] ARM: rockchip: set correct stabilization thresholds
+ in suspend
+In-Reply-To: <1709899.JJDRtF09u7@diego>
+References: <2128609.Kb18M8K28F@diego> <1709899.JJDRtF09u7@diego>
+Message-ID: <55C1E84A.9050501@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-> From SAMA5D4, the watchdog timer is upgrated with a new feature,
-> which is describled as in the datasheet, "WDT_MR can be written
-> until a LOCKMR command is issued in WDT_CR".
-> That is to say, as long as the bootstrap and u-boot don't issue
-> a LOCKMR command, WDT_MR can be written more than once in the driver.
-> 
-> So the SAMA5D4 watchdog driver's implementation is different from
-> the at91sam9260 watchdog driver implemented in file at91sam9_wdt.c.
-> The user application open the device file to enable the watchdog timer
-> hardware, and close to disable it, and set the watchdog timer timeout
-> by seting WDV and WDD fields of WDT_MR register, and ping the watchdog
-> by issuing WDRSTT command to WDT_CR register with hard-coded key.
-> 
-> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-> ---
->  drivers/watchdog/Kconfig            |    9 ++
->  drivers/watchdog/Makefile           |    1 +
->  drivers/watchdog/at91_sama5d4_wdt.c |  279 +++++++++++++++++++++++++++++++++++
->  drivers/watchdog/at91sam9_wdt.h     |    2 +
->  4 files changed, 291 insertions(+)
->  create mode 100644 drivers/watchdog/at91_sama5d4_wdt.c
-> 
-> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-> index e5e7c55..4ce8346 100644
-> --- a/drivers/watchdog/Kconfig
-> +++ b/drivers/watchdog/Kconfig
-> @@ -152,6 +152,15 @@ config ARM_SP805_WATCHDOG
->  	  ARM Primecell SP805 Watchdog timer. This will reboot your system when
->  	  the timeout is reached.
->  
-> +config AT91_SAMA5D4_WATCHDOG
-> +	tristate "Atmel SAMA5D4 Watchdog Timer"
-> +	depends on ARCH_AT91
-> +	select WATCHDOG_CORE
-> +	help
-> +	  Atmel SAMA5D4 watchdog timer is embedded into SAMA5D4 chips.
-> +	  Its Watchdog Timer Mode Register can be written more than once.
-> +	  This will reboot your system when the timeout is reached.
-> +
->  config AT91RM9200_WATCHDOG
->  	tristate "AT91RM9200 watchdog"
->  	depends on SOC_AT91RM9200 && MFD_SYSCON
-> diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
-> index 5c19294..c57569c 100644
-> --- a/drivers/watchdog/Makefile
-> +++ b/drivers/watchdog/Makefile
-> @@ -30,6 +30,7 @@ obj-$(CONFIG_USBPCWATCHDOG) += pcwd_usb.o
->  
->  # ARM Architecture
->  obj-$(CONFIG_ARM_SP805_WATCHDOG) += sp805_wdt.o
-> +obj-$(CONFIG_AT91_SAMA5D4_WATCHDOG) += at91_sama5d4_wdt.o
-consistency? Other AT91 entries don't have an '_' between 'AT91' and
-the remainder of the Kconfig name.
 
->  obj-$(CONFIG_AT91RM9200_WATCHDOG) += at91rm9200_wdt.o
->  obj-$(CONFIG_AT91SAM9X_WATCHDOG) += at91sam9_wdt.o
-[...]
-> +static irqreturn_t atmel_wdt_irq_handler(int irq, void *dev_id)
-> +{
-> +	struct atmel_wdt *wdt = platform_get_drvdata(dev_id);
-> +
-> +	if (wdt_read(wdt, AT91_WDT_SR)) {
-> +		pr_crit("Atmel Watchdog Software Reset\n");
-> +		emergency_restart();
-> +		pr_crit("Reboot didn't ?????\n");
+On 08/05/2015 06:51 AM, Heiko St?bner wrote:
+> Currently the stabilization thresholds for the oscillator and external pmu
+> are statically set to 30ms based on a 32kHz clock rate. This leaves out the
+> case when we don't switch to the 32kHz clock when only entering the shallow
+> suspend mode where the logic keeps running.
 >
-Reboot didn't what? 'succeed' perhaps?
-
-> +static const struct of_device_id atmel_wdt_of_match[] = {
-> +	{ .compatible = "atmel,sama5d4-wdt", },
-> +	{ },
-The empty initializer must always be the last element of the array, so
-there is no point in having a trailing ',' (whose purpose is to
-facilitate adding more entries after the last one).
-Without the comma there will be a compile error if (e.g. due to a
-badly resolved merge conflict) an additional entry would be added after
-the stop marker. With the comma after the stop marker any trailing
-entries would silently be ignored.
-
-
-Lothar Wa?mann
--- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+> So, set the correct threshold after we have determined if we switch to the
+> 32kHz clock or stay with the 24MHz one. Also set the oscillator-
+> stabilization to 0 if it is kept running during suspend, as it of course
+> does not need to stabilize then.
+>
+> Reported-by: Chris Zhong <zyw@rock-chips.com>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+> changes since v2:
+> - describe 32kHz vs 24MHz
+> - don't wait for oscillator stabilization if it's still running,
+>    as explained by Chris Zhong in v2
+> changes since v1:
+> - 24MHz oriented threshold is only needed in shallow suspend, the deep
+>    suspend always switches to 32kHz and only leaves the 24MHz oscillator
+>    running if needed for stuff like usb wakeup
+>
+>   arch/arm/mach-rockchip/pm.c | 22 +++++++++++++++++++---
+>   arch/arm/mach-rockchip/pm.h |  4 ----
+>   2 files changed, 19 insertions(+), 7 deletions(-)
+>
+> diff --git a/arch/arm/mach-rockchip/pm.c b/arch/arm/mach-rockchip/pm.c
+> index 2ca1170..c11a30b 100644
+> --- a/arch/arm/mach-rockchip/pm.c
+> +++ b/arch/arm/mach-rockchip/pm.c
+> @@ -145,6 +145,19 @@ static void rk3288_slp_mode_set(int level)
+>   
+>   		mode_set1 |= BIT(PMU_CLR_ALIVE) | BIT(PMU_CLR_BUS) |
+>   			     BIT(PMU_CLR_PERI) | BIT(PMU_CLR_DMA);
+> +
+> +		/*
+> +		 * In deep suspend we use PMU_PMU_USE_LF to let the rk3288
+> +		 * switch its main clock supply to the alternative 32kHz
+> +		 * source. Therefore set 30ms on a 32kHz clock for pmic
+> +		 * stabilization. Similar 30ms on 24MHz for the other
+> +		 * mode below.
+> +		 */
+> +		regmap_write(pmu_regmap, RK3288_PMU_STABL_CNT, 32 * 30);
+> +
+> +		/* only wait for stabilization, if we turned the osc off */
+> +		regmap_write(pmu_regmap, RK3288_PMU_OSC_CNT,
+> +					 osc_disable ? 32 * 30 : 0);
+>   	} else {
+>   		/*
+>   		 * arm off, logic normal
+> @@ -152,6 +165,12 @@ static void rk3288_slp_mode_set(int level)
+>   		 * wakeup will be error
+>   		 */
+>   		mode_set |= BIT(PMU_CLK_CORE_SRC_GATE_EN);
+> +
+> +		/* 30ms on a 24MHz clock for pmic stabilization */
+> +		regmap_write(pmu_regmap, RK3288_PMU_STABL_CNT, 24000 * 30);
+> +
+> +		/* oscillator is still running, so no need to wait */
+> +		regmap_write(pmu_regmap, RK3288_PMU_OSC_CNT, 0);
+>   	}
+>   
+>   	regmap_write(pmu_regmap, RK3288_PMU_PWRMODE_CON, mode_set);
+> @@ -262,9 +281,6 @@ static int rk3288_suspend_init(struct device_node *np)
+>   	memcpy(rk3288_bootram_base, rockchip_slp_cpu_resume,
+>   	       rk3288_bootram_sz);
+>   
+> -	regmap_write(pmu_regmap, RK3288_PMU_OSC_CNT, OSC_STABL_CNT_THRESH);
+> -	regmap_write(pmu_regmap, RK3288_PMU_STABL_CNT, PMU_STABL_CNT_THRESH);
+> -
+>   	return 0;
+>   }
+>   
+> diff --git a/arch/arm/mach-rockchip/pm.h b/arch/arm/mach-rockchip/pm.h
+> index b6494c2..8a55ee2 100644
+> --- a/arch/arm/mach-rockchip/pm.h
+> +++ b/arch/arm/mach-rockchip/pm.h
+> @@ -62,10 +62,6 @@ static inline void rockchip_suspend_init(void)
+>   /* PMU_WAKEUP_CFG1 bits */
+>   #define PMU_ARMINT_WAKEUP_EN		BIT(0)
+>   
+> -/* wait 30ms for OSC stable and 30ms for pmic stable */
+> -#define OSC_STABL_CNT_THRESH	(32 * 30)
+> -#define PMU_STABL_CNT_THRESH	(32 * 30)
+> -
+>   enum rk3288_pwr_mode_con {
+>   	PMU_PWR_MODE_EN = 0,
+>   	PMU_CLK_CORE_SRC_GATE_EN,
+Reviewed-by: Chris Zhong <zyw@rock-chips.com>
+Tested-by: Chris Zhong <zyw@rock-chips.com>
