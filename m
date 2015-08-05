@@ -1,34 +1,42 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed,  5 Aug 2015 10:44:42 -0700
-Subject: [GIT PULL] Broadcom MAINTAINERS file updates for 4.3
-In-Reply-To: <1438796683-18581-1-git-send-email-f.fainelli@gmail.com>
-References: <1438796683-18581-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <1438796683-18581-2-git-send-email-f.fainelli@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 5 Aug 2015 18:53:03 +0100
+Subject: [PATCH 3/4] arm64: Juno: Add HDLCD support to the Juno boards.
+In-Reply-To: <1438784892-27888-4-git-send-email-Liviu.Dudau@arm.com>
+References: <1438784892-27888-1-git-send-email-Liviu.Dudau@arm.com>
+ <1438784892-27888-4-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <20150805175303.GB7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
+On Wed, Aug 05, 2015 at 03:28:11PM +0100, Liviu Dudau wrote:
+> +		hdmi-transmitter at 71 {
+>  			compatible = "nxp,tda998x";
+>  			reg = <0x71>;
+> +			port {
+> +				tda998x_1_input: endpoint at 0 {
+> +					remote-endpoint = <&hdlcd1_output>;
+> +				};
+> +
+> +				tda998x_1_output: endpoint at 1 {
+> +					remote-endpoint = <&hdmi1_connector_output>;
+> +				};
+> +			};
 
-  Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
+This isn't compliant with the TDA998x binding, and is very likely to
+screw Jean's work on adding audio support.  See emails on lakml and
+Documentation/devicetree/bindings/drm/i2c/tda998x.txt (which looks
+like it needs updating to include the ports stuff.)
 
-are available in the git repository at:
+Also, the whole question of representing connectors in a DRM model is
+yet to be established.  Yes, DT should describe the hardware, but we
+don't yet know _how_ to describe physical connectors with stuff
+implemented on top of DRM yet, and we have nothing that makes use of
+this.
 
-  http://github.com/broadcom/stblinux tags/arm-soc/for-4.3/maintainers
+Also note that ePAPR requires a reg= property if you specify a
+unit-address (the bit after the @ sign) so the above is non-compliant
+with ePAPR as well.
 
-for you to fetch changes up to 824811293538f5cafaa6d19e3458a13eafa92a32:
-
-  MAINTAINERS: Explicitly add linux-arm-kernel for bcm2835 (2015-08-05 10:14:00 -0700)
-
-----------------------------------------------------------------
-This pull request contains the following changes to the MAINTAINERS file:
-
-- Add Eric Anholt as a 3rd maintainer for the Raspberry Pi platform code/drivers
-- Add linux-arm-kernel for all bcm2835 related drivers
-
-----------------------------------------------------------------
-Eric Anholt (2):
-      MAINTAINERS: Add myself as a bcm2835 co-maintainer.
-      MAINTAINERS: Explicitly add linux-arm-kernel for bcm2835
-
- MAINTAINERS | 2 ++
- 1 file changed, 2 insertions(+)
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
