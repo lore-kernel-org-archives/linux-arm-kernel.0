@@ -1,36 +1,43 @@
-From: wei.liu2@citrix.com (Wei Liu)
-Date: Wed, 5 Aug 2015 18:01:23 +0100
-Subject: [PATCH v2 4/8] xen: Use the correctly the Xen memory terminologies
-In-Reply-To: <1438711972-18752-5-git-send-email-julien.grall@citrix.com>
-References: <1438711972-18752-1-git-send-email-julien.grall@citrix.com>
- <1438711972-18752-5-git-send-email-julien.grall@citrix.com>
-Message-ID: <20150805170123.GB14224@zion.uk.xensource.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed,  5 Aug 2015 10:44:41 -0700
+Subject: [GIT PULL] Broadcom Device Tree changes for 4.3 (part 2)
+Message-ID: <1438796683-18581-1-git-send-email-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 04, 2015 at 07:12:48PM +0100, Julien Grall wrote:
-[...]
-> diff --git a/drivers/net/xen-netback/netback.c b/drivers/net/xen-netback/netback.c
-> index 7d50711..3b7b7c3 100644
-> --- a/drivers/net/xen-netback/netback.c
-> +++ b/drivers/net/xen-netback/netback.c
-> @@ -314,7 +314,7 @@ static void xenvif_gop_frag_copy(struct xenvif_queue *queue, struct sk_buff *skb
->  		} else {
->  			copy_gop->source.domid = DOMID_SELF;
->  			copy_gop->source.u.gmfn =
-> -				virt_to_mfn(page_address(page));
-> +				virt_to_gfn(page_address(page));
->  		}
->  		copy_gop->source.offset = offset;
->  
-> @@ -1284,7 +1284,7 @@ static void xenvif_tx_build_gops(struct xenvif_queue *queue,
->  		queue->tx_copy_ops[*copy_ops].source.offset = txreq.offset;
->  
->  		queue->tx_copy_ops[*copy_ops].dest.u.gmfn =
-> -			virt_to_mfn(skb->data);
-> +			virt_to_gfn(skb->data);
->  		queue->tx_copy_ops[*copy_ops].dest.domid = DOMID_SELF;
->  		queue->tx_copy_ops[*copy_ops].dest.offset =
->  			offset_in_page(skb->data);
+The following changes since commit ee224e175e9d837b3d572e863ac96109b58707ac:
 
-Acked-by: Wei Liu <wei.liu2@citrix.com>
+  Merge tag 'mvebu-dt-4.3-2' of git://git.infradead.org/linux-mvebu into next/dt (2015-08-05 11:10:30 +0200)
+
+are available in the git repository at:
+
+  http://github.com/broadcom/stblinux tags/arm-soc/for-4.3/dts-part2
+
+for you to fetch changes up to 62c5fd2c319ae72e82abc3de689d8a8a4df5a3e9:
+
+  ARM: dts: brcmstb: add BCM7445 GPIO nodes (2015-08-05 10:20:23 -0700)
+
+----------------------------------------------------------------
+This pull requests contains the following changes:
+
+- Hauke enables additional I and D cache line prefetching for the BCM5301X L2
+  cache controller (PL310)
+
+- Felix adds the Cortex-A9 PMU DT nodes to allow profiling on BCM53101X
+
+- Gregory adds L2 interrupt controllers and GPIO nodes to the reference BCM7445
+  Device Tree include file
+
+----------------------------------------------------------------
+Felix Fietkau (1):
+      ARM: BCM5301X: Add profiling support
+
+Gregory Fong (1):
+      ARM: dts: brcmstb: add BCM7445 GPIO nodes
+
+Hauke Mehrtens (1):
+      ARM: BCM5301X: activate some additional options in pl310 cache controller
+
+ arch/arm/boot/dts/bcm5301x.dtsi | 10 +++++++++
+ arch/arm/boot/dts/bcm7445.dtsi  | 50 +++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 60 insertions(+)
