@@ -1,59 +1,93 @@
-From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Wed, 05 Aug 2015 14:23:32 +0530
-Subject: [PATCH 1/4] mfd: 88pm800: Update the header file with 32K clk
- related macros
-In-Reply-To: <20150723155233.GT3436@x1>
-References: <1437476823-3358-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1437476823-3358-2-git-send-email-vaibhav.hiremath@linaro.org>
- <20150723155233.GT3436@x1>
-Message-ID: <55C1CF0C.1010805@linaro.org>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Wed,  5 Aug 2015 10:58:04 +0200
+Subject: [PATCH v4 0/6] ARM: shmobile: r8a7740/sh73a0 DT Cache Handling
+Message-ID: <1438765090-823-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+	Hi Simon, Magnus,
 
+This patch series add L1 and L2 cache descriptions to DT for r8a7740 and
+sh73a0, and migrates the shmobile DT-based generic r8a7740 and
+armadillo legacy platforms from calling l2x0_of_init() to the generic
+l2c OF initialization.
 
-On Thursday 23 July 2015 09:22 PM, Lee Jones wrote:
-> On Tue, 21 Jul 2015, Vaibhav Hiremath wrote:
->
->> Update header file with required macros for 32KHz buffered clock
->> output of 88PM800 family of device.
->> These macros will be used in clk provider driver.
->>
->> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
->> ---
->>   include/linux/mfd/88pm80x.h | 12 ++++++++++++
->>   1 file changed, 12 insertions(+)
->>
->> diff --git a/include/linux/mfd/88pm80x.h b/include/linux/mfd/88pm80x.h
->> index 05d9bad..680e4eb 100644
->> --- a/include/linux/mfd/88pm80x.h
->> +++ b/include/linux/mfd/88pm80x.h
->> @@ -91,6 +91,7 @@ enum {
->>   /* Referance and low power registers */
->>   #define PM800_LOW_POWER1		(0x20)
->>   #define PM800_LOW_POWER2		(0x21)
->> +#define PM800_LOW_POWER2_XO_LJ_EN	BIT(5)
->>
->>   #define PM800_LOW_POWER_CONFIG3		(0x22)
->>   #define PM800_LDOBK_FREEZE		BIT(7)
->> @@ -138,6 +139,13 @@ enum {
->>   #define PM800_ALARM			BIT(5)
->>   #define PM800_RTC1_USE_XO		BIT(7)
->>
->> +#define PM800_32K_OUTX_SEL_MASK		(0x3)
->> +/* 32KHz clk output sel mode */
->> +#define PM800_32K_OUTX_SEL_ZERO		(0x0)
->> +#define PM800_32K_OUTX_SEL_INT_32KHZ	(0x1)
->> +#define PM800_32K_OUTX_SEL_XO_32KHZ	(0x2)
->> +#define PM800_32K_OUTX_SEL_HIZ		(0x3)
->
-> Why do these need to be in brackets?
->
+Note that the conversion to the generic l2c OF initialization is not
+done yet for sh73a0, as this initializes the L2 cache earlier, breaking
+the (fragile) sh73a0 secondary CPU bringup code.
 
-No specific reason, just made it consistent with other definitions in
-the file.
+Also note that this conversion should be done on r8a7778, and r8a7779,
+too.
 
-I will fix in V2.
+Changes compared to v3 ("[PATCH v3 0/6] ARM: l2c / shmobile: r8a7740 : Shared
+Override",
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-May/340636.html):
+  - "l2c: Add support for the "arm,shared-override" property" was split
+    off into an independent patch, and is now queued for v4.3 in
+    arm/for-next,
+  - Dropped armadillo legacy migration, as it no longer exists,
+  - Added sh73a0 L1 and L2 DT cache description.
 
-Thanks,
-Vaibhav
+Changes compared to v2 ("[PATCH v2 0/5] ARM: shmobile: r8a7740/armadillo:
+Migrate to generic l2c OF",
+http://www.spinics.net/lists/devicetree/msg68176.html):
+  - Add DT support for Shared Override,
+  - Setting Shared Override is done only if CMA is not available (as
+    Russell claims it's not needed if CMA is available),
+  - Use 0/~0 in machine_desc.l2c_aux_{val,mask}, as DT now supports
+    "arm,shared-override".
+
+Changes compared to v1:
+  - Fix interrupt reference in DT,
+  - Describe L2 better in DT,
+  - Keep only {,~}L2C_AUX_CTRL_SHARED_OVERRIDE in
+    machine_desc.l2c_aux_{val,mask}, as there's no DT property for
+    this.
+  - Add L1 cache to DT.
+
+Dependencies:
+  - This series applies to renesas-devel-20150805-v4.2-rc5,
+  - Patch 2 depends on patch 1,
+  - Patch 4 depends on patch 2,
+  - Patch 5 depends on patch 1 and on "ARM: 8395/1: l2c: Add support for
+    the "arm,shared-override" property" in arm/for-next,
+  - Patch 6 depends on patch 5.
+
+Given C code patches depending on DT patches in the same branch are
+frowned upon, I think it would be best if patch 1 (and patch 3, if
+anyone thinks we may fix the secondary CPU bringup issue during the next
+3 months) are queued for v4.3. The other patches can be queued for
+2016^H^H^H^Hv4.4.
+
+I've been running this on r8a7740/armadillo and sh73a0/kzm9g during the
+past 9 months.
+
+Thanks!
+
+Geert Uytterhoeven (6):
+  ARM: shmobile: r8a7740 dtsi: Add L2 cache-controller node
+  ARM: shmobile: r8a7740 dtsi: Add L1 cache information to CPU node
+  ARM: shmobile: sh73a0 dtsi: Add L2 cache-controller node
+  ARM: shmobile: sh73a0 dtsi: Add L1 cache information to CPU nodes
+  ARM: shmobile: r8a7740: Migrate to generic l2c OF initialization
+  ARM: shmobile: r8a7740: Remove mapping of L2 cache controller
+    registers
+
+ arch/arm/boot/dts/r8a7740.dtsi         | 25 +++++++++++++++++++++++++
+ arch/arm/boot/dts/sh73a0.dtsi          | 34 ++++++++++++++++++++++++++++++++++
+ arch/arm/mach-shmobile/setup-r8a7740.c | 18 ++----------------
+ 3 files changed, 61 insertions(+), 16 deletions(-)
+
+-- 
+1.9.1
+
+Gr{oetje,eeting}s,
+
+						Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+							    -- Linus Torvalds
