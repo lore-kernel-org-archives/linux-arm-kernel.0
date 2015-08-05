@@ -1,71 +1,80 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Wed, 5 Aug 2015 11:08:38 +0300
-Subject: [PATCH 10/10] ARM: dts: omap4: Use "syscon-otghs" instead of
- "ctrl-module" in USB node
-In-Reply-To: <55C1C325.5040703@ti.com>
-References: <1438702233-8027-1-git-send-email-kishon@ti.com>
- <1438702233-8027-11-git-send-email-kishon@ti.com> <55C1C325.5040703@ti.com>
-Message-ID: <55C1C486.6050202@ti.com>
+From: slash.tmp@free.fr (Mason)
+Date: Wed, 05 Aug 2015 10:40:01 +0200
+Subject: IRQ setup on multicore systems (routing, balancing, etc)
+In-Reply-To: <55C0C102.7050600@free.fr>
+References: <55C0C102.7050600@free.fr>
+Message-ID: <55C1CBE1.1040009@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/08/15 11:02, Roger Quadros wrote:
-> Kishon,
-> 
-> On 04/08/15 18:30, Kishon Vijay Abraham I wrote:
->> Add "syscon-otghs" property and remove the deprecated "ctrl-module"
->> property from MUSB devicetree node.
->>
->> Since "omap_control_usbotg" devicetree node is no longer used, remove
->> it.
->>
->> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
->> ---
->>  arch/arm/boot/dts/omap4.dtsi |    8 +-------
->>  1 file changed, 1 insertion(+), 7 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
->> index b27634d..2fb49a5 100644
->> --- a/arch/arm/boot/dts/omap4.dtsi
->> +++ b/arch/arm/boot/dts/omap4.dtsi
->> @@ -854,12 +854,6 @@
->>  			};
->>  		};
->>  
->> -		omap_control_usbotg: control-phy at 4a00233c {
->> -			compatible = "ti,control-phy-otghs";
->> -			reg = <0x4a00233c 0x4>;
->> -			reg-names = "otghs_control";
->> -		};
->> -
->>  		usb_otg_hs: usb_otg_hs at 4a0ab000 {
->>  			compatible = "ti,omap4-musb";
->>  			reg = <0x4a0ab000 0x7ff>;
->> @@ -872,7 +866,7 @@
->>  			multipoint = <1>;
->>  			num-eps = <16>;
->>  			ram-bits = <12>;
->> -			ctrl-module = <&omap_control_usbotg>;
->> +			syscon-otghs = <&scm_conf 0x33c>;
-> 
-> All other properties were of the format "syscon-phy-foo".
-> Why use a different format here?
-> 
+On 04/08/2015 15:41, Mason wrote:
 
-Ah, looks like we don't have a dedicated phy driver for this?
-We will need to add a PHY driver I guess then and handle this register
-in that driver rather than in the musb driver.
+> I have a few very naive questions about interrupts.
+> 
+> How are interrupts set up on multicore systems?
+> 
+> If I write a device tree node for some peripheral, am I supposed
+> to specify which core each interrupt should be routed to?
+> 
+> On my system, there is a custom interrupt controller, but the ARM
+> chip also provides a Generic Interrupt Controller (GIC).
+> 
+> Am I supposed to use both, or can I use just the GIC?
+> (I suspect the answer is very platform-dependent.)
+> 
+> I've seen a lot of articles discussing interrupt "management"
+> on x86 (with APIC) but my search-foo is failing me for more
+> generic Linux "Howto set up". Are there good references?
+> 
+> I suppose I should take a look at these?
+> Documentation/devicetree/bindings/interrupt-controller/*
+> Documentation/devicetree/bindings/arm/gic.txt
+> 
+> 
+> For my own reference:
+> 
+> ARM Generic Interrupt Controller Architecture Specification v1.0 (IHI0048A)
+> Cortex-A9 MPCore (Revision: r3p0) Technical Reference Manual
 
-cheers,
--roger
+This thread seems relevant:
+
+[RFC] ARM: Let GIC to route IRQs to any allowed CPUs
+http://thread.gmane.org/gmane.linux.ports.arm.kernel/102251
+
+Russell's answer particularly so:
+http://article.gmane.org/gmane.linux.ports.arm.kernel/102289
+
+On 2011-01-12, Russell King wrote:
+
+> There's quite a bit of history behind interrupt balancing across CPU
+> cores, and it's not a simple issue to get to grips with.
 > 
+> I believe the x86 kernel uses software to balance interrupts across the
+> cores using an algorithm in the kernel.  This tries to distribute the
+> interrupts between the cores.  When this was tried on ARM, although it
+> moved interrupts around the cores, it was no better than having all
+> interrupts routed to one core.
 > 
->>  		};
->>  
->>  		aes: aes at 4b501000 {
->>
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> On x86 they now do away with their kernel algorithm, and instead run a
+> boot-time utility (irqbalance) which does a one-time distribution of
+> interrupts across the cores.  The idea is that it is more important to
+> keep an interrupt handler running on the same core than it is to
+> constantly switch it between the cores.
 > 
+> If a handler keeps switching between the cores, you have to migrate cache
+> lines between the cores, which adds to the cache coherency traffic, and
+> on x86 results in a reduction in performance.
+> 
+> So, with all that in mind, when I was sorting out the initial SMP merging,
+> I tried out various algorithms for automatic interrupt distribution, and
+> never got any of them to work satisfactorily.  In light of discussions with
+> x86 folk, particularly Arjan van de Ven, I decided not to merge any of them
+> and leave it as a matter for userspace policy to control how interrupts are
+> distributed to the cores - just like the majority of x86 platforms now do.
+> 
+> AFAIK, there's nothing stopping anyone running 'irqbalance' (the x86
+> utility) on ARM - it should just be accessing procfs files.  See
+> http://irqbalance.org/ for more information on the program, and on the
+> issues surrounding IRQ distribution in SMP systems.
+
+Regards.
