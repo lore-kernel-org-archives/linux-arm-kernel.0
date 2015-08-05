@@ -1,23 +1,105 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 05 Aug 2015 10:15:12 -0700
-Subject: [PATCH 2/2] MAINTAINERS: Explicitly add linux-arm-kernel for
- bcm2835
-In-Reply-To: <1437594937-28583-2-git-send-email-eric@anholt.net>
-References: <1437594937-28583-1-git-send-email-eric@anholt.net>
- <1437594937-28583-2-git-send-email-eric@anholt.net>
-Message-ID: <55C244A0.1060101@gmail.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Wed, 05 Aug 2015 19:24:56 +0200
+Subject: [PATCH] ARM64: dts: mt6795: enable basic SMP bringup for MT6795
+In-Reply-To: <1438656457-60278-1-git-send-email-scott.shu@mediatek.com>
+References: <1438656457-60278-1-git-send-email-scott.shu@mediatek.com>
+Message-ID: <3934554.inAhhRLsAY@ubix>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/07/15 12:55, Eric Anholt wrote:
-> get_maintainers.pl would list linux-arm-kernel for most bcm2835
-> changes because it's under arch/arm, but might not for other bcm2835
-> drivers.  Most ARM architectures appear to list linux-arm-kernel as an
-> appropriate list as well.
-> 
-> Signed-off-by: Eric Anholt <eric@anholt.net>
-> Suggested-by: Stephen Warren <swarren@wwwdotorg.org>
+On Tuesday, August 04, 2015 10:47:37 AM Scott Shu wrote:
+> This patch adds support SMP on MediaTek MT6795 Cortex-A53 Octa-core SoC.
 
-Also applied, thanks!
--- 
-Florian
+applied to v4.2-next/arm64-2
+
+> 
+> The patch is based on v4.2-rc1 and following patch series:
+> (1) Mars Cheng's "Add mt6795 basic chip support" [1]
+> 
+> [1] https://lkml.org/lkml/2015/7/14/63
+
+Please this extra information below the "---" as this should not show up in 
+the commit message.
+
+Thanks,
+Matthias
+
+> 
+> Signed-off-by: Scott Shu <scott.shu@mediatek.com>
+> ---
+>  arch/arm64/boot/dts/mediatek/mt6795.dtsi |   13 +++++++++++++
+>  1 file changed, 13 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/mediatek/mt6795.dtsi
+> b/arch/arm64/boot/dts/mediatek/mt6795.dtsi index da200e7..c85659d 100644
+> --- a/arch/arm64/boot/dts/mediatek/mt6795.dtsi
+> +++ b/arch/arm64/boot/dts/mediatek/mt6795.dtsi
+> @@ -20,6 +20,11 @@
+>  	#address-cells = <2>;
+>  	#size-cells = <2>;
+> 
+> +	psci {
+> +		compatible = "arm,psci-0.2";
+> +		method = "smc";
+> +	};
+> +
+>  	cpus {
+>  		#address-cells = <1>;
+>  		#size-cells = <0>;
+> @@ -27,48 +32,56 @@
+>  		cpu0: cpu at 0 {
+>  			device_type = "cpu";
+>  			compatible = "arm,cortex-a53";
+> +			enable-method = "psci";
+>  			reg = <0x000>;
+>  		};
+> 
+>  		cpu1: cpu at 1 {
+>  			device_type = "cpu";
+>  			compatible = "arm,cortex-a53";
+> +			enable-method = "psci";
+>  			reg = <0x001>;
+>  		};
+> 
+>  		cpu2: cpu at 2 {
+>  			device_type = "cpu";
+>  			compatible = "arm,cortex-a53";
+> +			enable-method = "psci";
+>  			reg = <0x002>;
+>  		};
+> 
+>  		cpu3: cpu at 3 {
+>  			device_type = "cpu";
+>  			compatible = "arm,cortex-a53";
+> +			enable-method = "psci";
+>  			reg = <0x003>;
+>  		};
+> 
+>  		cpu4: cpu at 100 {
+>  			device_type = "cpu";
+>  			compatible = "arm,cortex-a53";
+> +			enable-method = "psci";
+>  			reg = <0x100>;
+>  		};
+> 
+>  		cpu5: cpu at 101 {
+>  			device_type = "cpu";
+>  			compatible = "arm,cortex-a53";
+> +			enable-method = "psci";
+>  			reg = <0x101>;
+>  		};
+> 
+>  		cpu6: cpu at 102 {
+>  			device_type = "cpu";
+>  			compatible = "arm,cortex-a53";
+> +			enable-method = "psci";
+>  			reg = <0x102>;
+>  		};
+> 
+>  		cpu7: cpu at 103 {
+>  			device_type = "cpu";
+>  			compatible = "arm,cortex-a53";
+> +			enable-method = "psci";
+>  			reg = <0x103>;
+>  		};
+>  	};
