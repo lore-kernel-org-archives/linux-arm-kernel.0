@@ -1,68 +1,67 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 5 Aug 2015 12:09:30 +0100
-Subject: [PATCHv5 0/5] arm/arm64: Unify PSCI client support
-In-Reply-To: <CAOesGMh9Lx=eVTzSQcU63ttLWX8St5T5cFDDKozO4nmvoqU0Lw@mail.gmail.com>
-References: <1438353980-7611-1-git-send-email-mark.rutland@arm.com>
- <20150803143703.GH10501@arm.com>
- <CAOesGMh9Lx=eVTzSQcU63ttLWX8St5T5cFDDKozO4nmvoqU0Lw@mail.gmail.com>
-Message-ID: <20150805110930.GE6092@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 5 Aug 2015 12:27:13 +0100
+Subject: arm kernel oops in highmem.c with 4.2
+In-Reply-To: <CALeDE9PXF=gQCaBCiHpHy2nXOooQOmsCQvSgOv+wQw3mta=P6A@mail.gmail.com>
+References: <CALeDE9Ox3=sh3AXQ0NUG6BBfU5i5YrMY=LDpcTHQWqz2=60F2g@mail.gmail.com>
+ <20150805100701.GV7557@n2100.arm.linux.org.uk>
+ <CALeDE9PXF=gQCaBCiHpHy2nXOooQOmsCQvSgOv+wQw3mta=P6A@mail.gmail.com>
+Message-ID: <20150805112713.GY7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 05, 2015 at 08:41:31AM +0100, Olof Johansson wrote:
-> On Mon, Aug 3, 2015 at 4:37 PM, Will Deacon <will.deacon@arm.com> wrote:
-> > On Fri, Jul 31, 2015 at 03:46:15PM +0100, Mark Rutland wrote:
-> >> This series unifies the 32-bit and 64-bit PSCI client code, moving the bulk of
-> >> the FW invocation and probing out to a common location in drivers/firmware. The
-> >> bulk of the PSCI 0.2 cleanups have hit mainline now, so this is just the
-> >> unification portion.
+On Wed, Aug 05, 2015 at 11:13:07AM +0100, Peter Robinson wrote:
+> On Wed, Aug 5, 2015 at 11:07 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Wed, Aug 05, 2015 at 11:01:01AM +0100, Peter Robinson wrote:
+> >> Hi All,
 > >>
-> >> This results in a reasonable saving in terms of lines of code, and will allow
-> >> for PSCI 1.0 support to be unified form the beginning, avoiding further
-> >> duplication.
-> >>
-> >> Since v4 [1]:
-> >> * Apply Rob Herring's ack
-> >> * Rebase to v4.2-rc2 to handle a trivial conflict
-> >> * Reorder the series to keep arch/arm patches together
-> >> Since v3 [2]:
-> >> * Drop the PSCI 0.2 patches as they're in mainline
-> >> * s/__pa/virt_to_idmap/ from Grygorii Strashko
-> >> * Use macros for Calxeda CPU_SUSPEND parameters
-> >>
-> >> Russell, are you happy with the arch/arm patches? If so, are you happy for them
-> >> to go via another tree, or would you prefer that I set up a stable branch for
-> >> merging?
-> >>
-> >> I was under the impression that you had already taken Grygorii's patch but I
-> >> couldn't spot it in any branches. I can drop that if you already have it.
+> >> On Fedora 23 with recent 4.2 kernels we're seeing a crash (below) in
+> >> highmem.c on a fairly regular occurrence across a number of different
+> >> SoCs, I've seen it with at least AllWinner A20, i.MX6Q, Tegra2 and 124
+> >> with both a LPAE and non LPAE kernel, seen it happen when doing a
+> >> number of different things but regenerating a initrd, applying updates
+> >> (dnf/yum) and starting X are all pretty good triggers.
 > >
-> > I've been looking at merging this, but it's a tad fiddly touching all of
-> > arm, arm64 and drivers. One way to do it would be:
+> > I've yet to see any problems with mainline 4.2-rc5 kernels on any of my
+> > iMX6 platforms, which includes initramfs regeneration, apt-get updates
+> > and X.
 > >
-> >   (1) I create a branch containing patches 1,2 and 5 based on -rc2 and
-> >       merge that into the arm64/for-next/core branch. There's a minor
-> >       conflict, but it's easy to resolve.
+> >> [71751.658105] ------------[ cut here ]------------
+> >> [71751.658153] kernel BUG at arch/arm/mm/highmem.c:114!
 > >
-> >   (2) I create another branch, which is just the branch merged in (1) +
-> >       patches 3 and 4 on top. I send a pull request for that to rmk.
-> >
-> >   (3) Torvalds will get the minor conflict resolved in (1) when he merges
-> >       the arm and arm64 trees.
-> >
-> > If we're not comfortable with (3), then the whole lot could go via
-> > arm-soc instead (including the conflict resolution).
-> >
-> > Russell, Olof, any preferences?
+> > Well, in mainline kernels, the BUG is on line 113, not line 114.  So at
+> > least this file is modified from mainline kernels.  Maybe the problem is
+> > caused by patches applied to Fedora kernels?
 > 
-> Wouldn't it be easiest to just get acks on patch 3 and 4 and just
-> merge it all through your tree?
+> We apply a crash driver patch [1] which has been there forever (long
+> enough that I'd forgotten it) but other than that for arm kernels we
+> currently don't apply any arm specific patches in 4.2.
 
-That would work if Russell is ok with it (it needs his acks).
+It helps if I look at 4.2 rather than an older kernel :)
 
-Russell: would you prefer to ack 3+4 and have me take them via the arm64
-tree or instead have me send you a pull request with a conflict resolution
-for Torvalds? Yet another option is to postpone the arch/arm/ part to
-4.4.
+However, I've checked that I have DEBUG_HIGHMEM enabled, which I do, and
+I'm unable to reproduce this here.  My kernels are built with gcc 4.7.4.
 
-Will
+What it looks like from your oops is that the address which was passed
+in was 0xffedf000, but the address we calculated via the following for
+the current index was 0xfff00000:
+
+type = kmap_atomic_idx();
+idx = type + KM_TYPE_NR * smp_processor_id();
+__fix_to_virt(idx)
+
+Doing a bit of maths... the address 0xffedf000 corresponds to a fixmap
+index of... (0xffeff000 - 0xffedf000) >> 12 = 32.  KM_TYPE_NR is 16 on
+ARM, so the mapping was created by CPU 2, and type was zero.
+
+On unmap, 0xfff00000 gives... (0xffeff000 - 0xfff00000) >> 12 = -1.
+That suggests we're on CPU 0, and type is -1 - in other words, there
+are no atomically mapped mappings on CPU 0.
+
+Since kmap_atomic() disables preemption and page faults, how did your
+kernel migrate this thread from CPU 2 to CPU 0... and I can't see how
+that happened.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
