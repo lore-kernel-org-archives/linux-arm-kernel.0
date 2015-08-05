@@ -1,44 +1,77 @@
 From: haibo.chen@freescale.com (Haibo Chen)
-Date: Wed, 5 Aug 2015 18:38:39 +0800
-Subject: [PATCH v4 3/6] mmc: sdhci-esdhc-imx: add compatible string in
- bingding doc
+Date: Wed, 5 Aug 2015 18:38:38 +0800
+Subject: [PATCH v4 2/6] mmc: sdhci-esdhc-imx: add tuning-step seting support
 In-Reply-To: <1438771122-8601-1-git-send-email-haibo.chen@freescale.com>
 References: <1438771122-8601-1-git-send-email-haibo.chen@freescale.com>
-Message-ID: <1438771122-8601-4-git-send-email-haibo.chen@freescale.com>
+Message-ID: <1438771122-8601-3-git-send-email-haibo.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a required property "fsl,imx7d-usdhc" in binding doc.
-Add an optional property "fsl,tuning-step" in binding doc.
+tuning-step is the delay cell steps in tuning procedure. The default value
+of tuning-step is 1. Some boards or cards need another value to pass the
+tuning procedure. For example, imx7d-sdb board need the tuning-step value
+as 2, otherwise it can't pass the tuning procedure.
+
+So this patch add the tuning-step setting in driver, so that user can set
+the tuning-step value in dts.
 
 Signed-off-by: Haibo Chen <haibo.chen@freescale.com>
 ---
- Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt | 6 ++++++
- 1 file changed, 6 insertions(+)
+ drivers/mmc/host/sdhci-esdhc-imx.c          | 9 +++++++++
+ include/linux/platform_data/mmc-esdhc-imx.h | 1 +
+ 2 files changed, 10 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt b/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt
-index 211e778..dca56d6 100644
---- a/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt
-+++ b/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt
-@@ -15,6 +15,7 @@ Required properties:
- 	       "fsl,imx6q-usdhc"
- 	       "fsl,imx6sl-usdhc"
- 	       "fsl,imx6sx-usdhc"
-+	       "fsl,imx7d-usdhc"
+diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+index 48f009c..803d24f 100644
+--- a/drivers/mmc/host/sdhci-esdhc-imx.c
++++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+@@ -75,6 +75,7 @@
+ #define ESDHC_STD_TUNING_EN		(1 << 24)
+ /* NOTE: the minimum valid tuning start tap for mx6sl is 1 */
+ #define ESDHC_TUNING_START_TAP		0x1
++#define ESDHC_TUNING_STEP_SHIFT		16
  
- Optional properties:
- - fsl,wp-controller : Indicate to use controller internal write protection
-@@ -27,6 +28,11 @@ Optional properties:
-   transparent level shifters on the outputs of the controller. Two cells are
-   required, first cell specifies minimum slot voltage (mV), second cell
-   specifies maximum slot voltage (mV). Several ranges could be specified.
-+- fsl,tuning-step: Specify the increasing delay cell steps in tuning procedure.
-+  The uSDHC use one delay cell as default increasing step to do tuning process.
-+  This property allows user to change the tuning step to more than one delay
-+  cells which is useful for some special boards or cards when the default
-+  tuning step can't find the proper delay window within limited tuning retries.
+ /* pinctrl state */
+ #define ESDHC_PINCTRL_STATE_100MHZ	"state_100mhz"
+@@ -474,6 +475,7 @@ static void esdhc_writew_le(struct sdhci_host *host, u16 val, int reg)
+ 		} else if (imx_data->socdata->flags & ESDHC_FLAG_STD_TUNING) {
+ 			u32 v = readl(host->ioaddr + SDHCI_ACMD12_ERR);
+ 			u32 m = readl(host->ioaddr + ESDHC_MIX_CTRL);
++			u32 tuning_ctrl;
+ 			if (val & SDHCI_CTRL_TUNED_CLK) {
+ 				v |= ESDHC_MIX_CTRL_SMPCLK_SEL;
+ 			} else {
+@@ -484,6 +486,11 @@ static void esdhc_writew_le(struct sdhci_host *host, u16 val, int reg)
+ 			if (val & SDHCI_CTRL_EXEC_TUNING) {
+ 				v |= ESDHC_MIX_CTRL_EXE_TUNE;
+ 				m |= ESDHC_MIX_CTRL_FBCLK_SEL;
++				tuning_ctrl = readl(host->ioaddr + ESDHC_TUNING_CTRL);
++				tuning_ctrl |= ESDHC_STD_TUNING_EN | ESDHC_TUNING_START_TAP;
++				if (imx_data->boarddata.tuning_step)
++					tuning_ctrl |= imx_data->boarddata.tuning_step << ESDHC_TUNING_STEP_SHIFT;
++					writel(tuning_ctrl, host->ioaddr + ESDHC_TUNING_CTRL);
+ 			} else {
+ 				v &= ~ESDHC_MIX_CTRL_EXE_TUNE;
+ 			}
+@@ -964,6 +971,8 @@ sdhci_esdhc_imx_probe_dt(struct platform_device *pdev,
+ 	if (gpio_is_valid(boarddata->wp_gpio))
+ 		boarddata->wp_type = ESDHC_WP_GPIO;
  
- Examples:
- 
++	of_property_read_u32(np, "fsl,tuning-step", &boarddata->tuning_step);
++
+ 	if (of_find_property(np, "no-1-8-v", NULL))
+ 		boarddata->support_vsel = false;
+ 	else
+diff --git a/include/linux/platform_data/mmc-esdhc-imx.h b/include/linux/platform_data/mmc-esdhc-imx.h
+index e1571ef..95ccab3 100644
+--- a/include/linux/platform_data/mmc-esdhc-imx.h
++++ b/include/linux/platform_data/mmc-esdhc-imx.h
+@@ -45,5 +45,6 @@ struct esdhc_platform_data {
+ 	int max_bus_width;
+ 	bool support_vsel;
+ 	unsigned int delay_line;
++	unsigned int tuning_step;       /* The delay cell steps in tuning procedure */
+ };
+ #endif /* __ASM_ARCH_IMX_ESDHC_H */
 -- 
 1.9.1
