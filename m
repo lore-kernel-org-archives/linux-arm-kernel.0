@@ -1,58 +1,75 @@
-From: haibo.chen@freescale.com (Haibo Chen)
-Date: Wed, 5 Aug 2015 18:38:42 +0800
-Subject: [PATCH v4 6/6] mmc: sdhci-esdhc-imx: set back the burst_length_enable
- bit to 1
-In-Reply-To: <1438771122-8601-1-git-send-email-haibo.chen@freescale.com>
-References: <1438771122-8601-1-git-send-email-haibo.chen@freescale.com>
-Message-ID: <1438771122-8601-7-git-send-email-haibo.chen@freescale.com>
+From: zyw@rock-chips.com (Chris Zhong)
+Date: Wed, 05 Aug 2015 18:51:59 +0800
+Subject: [PATCH v3 3/3] ARM: rockchip: enable PMU_GPIOINT_WAKEUP_EN when
+ entering shallow suspend
+In-Reply-To: <1544453.8uqOvAiDmD@diego>
+References: <2128609.Kb18M8K28F@diego> <1544453.8uqOvAiDmD@diego>
+Message-ID: <55C1EACF.1060702@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently we find that if a usdhc is choosed to boot system, then ROM
-code will set the burst length enable bit of this usdhc as 0.
 
-This will make performance drop a lot if this usdhc's burst length is
-configed. So this patch set back the burst_length_enable bit as 1,
-which is the default value, and means burst length is enabled for INCR.
 
-Signed-off-by: Haibo Chen <haibo.chen@freescale.com>
----
- drivers/mmc/host/sdhci-esdhc-imx.c | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
-
-diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-index 97aa944..3334762 100644
---- a/drivers/mmc/host/sdhci-esdhc-imx.c
-+++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-@@ -32,6 +32,7 @@
- #include "sdhci-esdhc.h"
- 
- #define	ESDHC_CTRL_D3CD			0x08
-+#define ESDHC_BURST_LEN_EN_INCR		(1 << 27)
- /* VENDOR SPEC register */
- #define ESDHC_VENDOR_SPEC		0xc0
- #define  ESDHC_VENDOR_SPEC_SDIO_QUIRK	(1 << 1)
-@@ -1165,6 +1166,21 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
- 		host->quirks2 |= SDHCI_QUIRK2_PRESET_VALUE_BROKEN;
- 		host->mmc->caps |= MMC_CAP_1_8V_DDR;
- 
-+		/*
-+		 * ROM code will change the bit burst_length_enable setting
-+		 * to zero if this usdhc is choosed to boot system. Change
-+		 * it back here, otherwise it will impact the performance a
-+		 * lot. This bit is used to enable/disable the burst length
-+		 * for the external AHB2AXI bridge, it's usefully especially
-+		 * for INCR transfer because without burst length indicator,
-+		 * the AHB2AXI bridge does not know the burst length in
-+		 * advance. And without burst length indicator, AHB INCR
-+		 * transfer can only be converted to singles on the AXI side.
-+		 */
-+		writel(readl(host->ioaddr + SDHCI_HOST_CONTROL)
-+			| ESDHC_BURST_LEN_EN_INCR,
-+			host->ioaddr + SDHCI_HOST_CONTROL);
-+
- 		if (!(imx_data->socdata->flags & ESDHC_FLAG_HS200))
- 			host->quirks2 |= SDHCI_QUIRK2_BROKEN_HS200;
- 
--- 
-1.9.1
+On 08/05/2015 06:51 AM, Heiko St?bner wrote:
+> PMU_GPIOINT_WAKEUP_EN seems needed when entering the shallow suspend
+> (with logic staying on) but does not seem to be needed for the deep
+> suspend for unknown reasons.
+> Testing revealed that this setting really is necessary to reliably
+> resume the veyron devices from suspend.
+>
+> Reported-by: Chris Zhong <zyw@rock-chips.com>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+>   arch/arm/mach-rockchip/pm.c | 9 ++++++---
+>   arch/arm/mach-rockchip/pm.h | 1 +
+>   2 files changed, 7 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm/mach-rockchip/pm.c b/arch/arm/mach-rockchip/pm.c
+> index c11a30b..156cd23 100644
+> --- a/arch/arm/mach-rockchip/pm.c
+> +++ b/arch/arm/mach-rockchip/pm.c
+> @@ -123,9 +123,6 @@ static void rk3288_slp_mode_set(int level)
+>   	regmap_write(sgrf_regmap, RK3288_SGRF_FAST_BOOT_ADDR,
+>   		     rk3288_bootram_phy);
+>   
+> -	regmap_write(pmu_regmap, RK3288_PMU_WAKEUP_CFG1,
+> -		     PMU_ARMINT_WAKEUP_EN);
+> -
+>   	mode_set = BIT(PMU_GLOBAL_INT_DISABLE) | BIT(PMU_L2FLUSH_EN) |
+>   		   BIT(PMU_SREF0_ENTER_EN) | BIT(PMU_SREF1_ENTER_EN) |
+>   		   BIT(PMU_DDR0_GATING_EN) | BIT(PMU_DDR1_GATING_EN) |
+> @@ -146,6 +143,9 @@ static void rk3288_slp_mode_set(int level)
+>   		mode_set1 |= BIT(PMU_CLR_ALIVE) | BIT(PMU_CLR_BUS) |
+>   			     BIT(PMU_CLR_PERI) | BIT(PMU_CLR_DMA);
+>   
+> +		regmap_write(pmu_regmap, RK3288_PMU_WAKEUP_CFG1,
+> +			     PMU_ARMINT_WAKEUP_EN);
+> +
+>   		/*
+>   		 * In deep suspend we use PMU_PMU_USE_LF to let the rk3288
+>   		 * switch its main clock supply to the alternative 32kHz
+> @@ -166,6 +166,9 @@ static void rk3288_slp_mode_set(int level)
+>   		 */
+>   		mode_set |= BIT(PMU_CLK_CORE_SRC_GATE_EN);
+>   
+> +		regmap_write(pmu_regmap, RK3288_PMU_WAKEUP_CFG1,
+> +			     PMU_ARMINT_WAKEUP_EN | PMU_GPIOINT_WAKEUP_EN);
+> +
+>   		/* 30ms on a 24MHz clock for pmic stabilization */
+>   		regmap_write(pmu_regmap, RK3288_PMU_STABL_CNT, 24000 * 30);
+>   
+> diff --git a/arch/arm/mach-rockchip/pm.h b/arch/arm/mach-rockchip/pm.h
+> index 8a55ee2..b5af26f 100644
+> --- a/arch/arm/mach-rockchip/pm.h
+> +++ b/arch/arm/mach-rockchip/pm.h
+> @@ -61,6 +61,7 @@ static inline void rockchip_suspend_init(void)
+>   
+>   /* PMU_WAKEUP_CFG1 bits */
+>   #define PMU_ARMINT_WAKEUP_EN		BIT(0)
+> +#define PMU_GPIOINT_WAKEUP_EN		BIT(3)
+>   
+>   enum rk3288_pwr_mode_con {
+>   	PMU_PWR_MODE_EN = 0,
+>
+Reviewed-by: Chris Zhong <zyw@rock-chips.com>
+Tested-by: Chris Zhong <zyw@rock-chips.com>
