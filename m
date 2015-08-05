@@ -1,43 +1,32 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Tue, 4 Aug 2015 18:49:56 -0500
-Subject: [PATCH v4 1/3] PCI: generic: remove dependency on hw_pci
-In-Reply-To: <1438721620-15493-1-git-send-email-jchandra@broadcom.com>
-References: <1438721620-15493-1-git-send-email-jchandra@broadcom.com>
-Message-ID: <20150804234956.GF17327@google.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 5 Aug 2015 09:55:37 +0900
+Subject: [PATCH 0/7] ARM: shmobile: Misc removals
+In-Reply-To: <1438711392-23763-1-git-send-email-geert+renesas@glider.be>
+References: <1438711392-23763-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <20150805005537.GA20726@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 05, 2015 at 02:23:38AM +0530, Jayachandran C wrote:
-> The current code in pci-host-generic.c uses pci_common_init_dev()
-> from arm architecture to do some part of the PCI setup, and this
-> prevents it from being used with arm64 architecture.
+On Tue, Aug 04, 2015 at 08:03:05PM +0200, Geert Uytterhoeven wrote:
+> 	Hi Simon, Magnus,
 > 
-> The part of pci_common_init_dev() that is really needed by
-> pci-host-generic.c is very limited and can be done in the same
-> file without using hw_pci API of ARM. The ARM platform requires
-> a pci_sys_data as sysdata for the PCI bus, this can be handled by
-> setting up gen_pci to have a pci_sys_data variable as the first
-> element.
+> This patch series (against renesas-devel-20150804-v4.2-rc5) removes
+> various header files, source files, declarations and definitions that
+> are no longer in use.
 > 
-> Signed-off-by: Jayachandran C <jchandra@broadcom.com>
-> Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Tested-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Tested-by: Pavel Fedin <p.fedin@samsung.com>
+> Dependencies:
+>   - Patch 1 depends on v3.12,
+>   - Patches 2-5 depend on the sh73a0/kzm9g and r8a7740/armadillo legacy
+>     removal, which is in arm-soc/for-next,
+>   - Patches 6-7 depend on the r8a7779/marzen legacy removal, which is in
+>     marzen-board-removal-for-v4.3.
+> 
+> Note that I didn't remove the now unused r8a7779_init_pm_domains() et al
+> yet, as I need to have a closer look on what to retain for R-Car DT SYSC
+> PM Domains first.
+> 
+> Thanks!
 
-I applied all three of these to my pci/enumeration branch for v4.3.
-
-I made a few changes, the most important being to call
-pcie_bus_configure_settings() before pci_bus_add_devices(), because drivers
-may claim devices in pci_bus_add_devices(), and the PCI core shouldn't
-touch devices after drivers claim them.
-
-I dropped the acks and tested-by because of that change, but I'll happily
-add them back if Lorenzo and Pavel confirm.  The patches are here if you
-want to review/test them:
-
-https://git.kernel.org/cgit/linux/kernel/git/helgaas/pci.git/log/?h=pci/enumeration
-
-I'm sure the other patches on that branch will need some tweaks, too, so I
-don't have any problem with updating these.
-
-Bjorn
+Thanks, I have tentatively queued these up for v4.4 as I feel
+that the bottom of our stack of patches at a fresh cycle is
+the best place for these kinds of cleanups.
