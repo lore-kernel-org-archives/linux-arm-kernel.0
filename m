@@ -1,35 +1,70 @@
 From: lina.iyer@linaro.org (Lina Iyer)
-Date: Wed,  5 Aug 2015 10:32:42 -0600
-Subject: [PATCH RFC 06/10] drivers: qcom: Enable genpd on selecting QCOM_PM
+Date: Wed,  5 Aug 2015 10:32:41 -0600
+Subject: [PATCH RFC 05/10] arm: dts: Add power domain device bindings for
+ APQ8084
 In-Reply-To: <1438792366-2737-1-git-send-email-lina.iyer@linaro.org>
 References: <438731339-58317-1-git-send-email-lina.iyer@linaro.org>
  <1438792366-2737-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1438792366-2737-7-git-send-email-lina.iyer@linaro.org>
+Message-ID: <1438792366-2737-6-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable PM_CPU_DOMAIN and its PM_GENERIC_DOMAINS dependenciesd to provide
-cpu domain support for QCOM SoCs.
+Define L2 SAW as the power domain provider and individual cpus are the
+power domain consumers.
 
 Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
 ---
- drivers/soc/qcom/Kconfig | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/boot/dts/qcom-apq8084.dtsi | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/soc/qcom/Kconfig b/drivers/soc/qcom/Kconfig
-index ba47b70..b6c2e5d 100644
---- a/drivers/soc/qcom/Kconfig
-+++ b/drivers/soc/qcom/Kconfig
-@@ -14,6 +14,10 @@ config QCOM_PM
- 	bool "Qualcomm Power Management"
- 	depends on ARCH_QCOM && !ARM64
- 	select QCOM_SCM
-+	select ARM_CPU_SUSPEND
-+	select PM_GENERIC_DOMAINS
-+	select PM_GENERIC_DOMAINS_SLEEP
-+	select PM_GENERIC_DOMAINS_OF
- 	help
- 	  QCOM Platform specific power driver to manage cores and L2 low power
- 	  modes. It interface with various system drivers to put the cores in
+diff --git a/arch/arm/boot/dts/qcom-apq8084.dtsi b/arch/arm/boot/dts/qcom-apq8084.dtsi
+index 900ef1f..4a61f8d 100644
+--- a/arch/arm/boot/dts/qcom-apq8084.dtsi
++++ b/arch/arm/boot/dts/qcom-apq8084.dtsi
+@@ -23,6 +23,7 @@
+ 			qcom,acc = <&acc0>;
+ 			qcom,saw = <&saw0>;
+ 			cpu-idle-states = <&CPU_SPC>;
++			power-domains = <&saw_l2>;
+ 		};
+ 
+ 		cpu at 1 {
+@@ -34,6 +35,7 @@
+ 			qcom,acc = <&acc1>;
+ 			qcom,saw = <&saw1>;
+ 			cpu-idle-states = <&CPU_SPC>;
++			power-domains = <&saw_l2>;
+ 		};
+ 
+ 		cpu at 2 {
+@@ -45,6 +47,7 @@
+ 			qcom,acc = <&acc2>;
+ 			qcom,saw = <&saw2>;
+ 			cpu-idle-states = <&CPU_SPC>;
++			power-domains = <&saw_l2>;
+ 		};
+ 
+ 		cpu at 3 {
+@@ -56,6 +59,7 @@
+ 			qcom,acc = <&acc3>;
+ 			qcom,saw = <&saw3>;
+ 			cpu-idle-states = <&CPU_SPC>;
++			power-domains = <&saw_l2>;
+ 		};
+ 
+ 		L2: l2-cache {
+@@ -183,9 +187,11 @@
+ 		};
+ 
+ 		saw_l2: power-controller at f9012000 {
+-			compatible = "qcom,apq8084-saw2-v2.1-l2", "qcom,saw2";
++			compatible = "qcom,apq8084-saw2-v2.1-l2", "qcom,saw2",
++					 "arm,pd";
+ 			reg = <0xf9012000 0x1000>;
+ 			regulator;
++			#power-domain-cells = <0>;
+ 		};
+ 
+ 		acc0: clock-controller at f9088000 {
 -- 
 2.1.4
