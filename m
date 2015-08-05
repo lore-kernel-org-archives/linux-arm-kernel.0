@@ -1,99 +1,42 @@
-From: stuart.yoder@freescale.com (Stuart Yoder)
-Date: Wed, 5 Aug 2015 19:53:59 +0000
-Subject: [PATCH 2/3] Docs: dt: Add PCI MSI map bindings
-In-Reply-To: <CALRxmdA32xiSX7DDKAJPLR8=bh_9j-6MN124u4KjYGRT8bAKNg@mail.gmail.com>
-References: <1437670365-20704-1-git-send-email-mark.rutland@arm.com>
- <1437670365-20704-3-git-send-email-mark.rutland@arm.com>
- <CALRxmdA32xiSX7DDKAJPLR8=bh_9j-6MN124u4KjYGRT8bAKNg@mail.gmail.com>
-Message-ID: <CY1PR0301MB07486794749E499F71BDFCD287750@CY1PR0301MB0748.namprd03.prod.outlook.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Wed, 5 Aug 2015 13:27:53 -0700
+Subject: next-20150729 build: 2 failures 49 warnings (next-20150729)
+In-Reply-To: <17C303E7-B358-486E-9E0F-83CF58F28481@gmail.com>
+References: <E1ZKPJk-0007VU-Fg@optimist> <20150729124410.GE20130@sirena.org.uk>
+ <20150804173849.GD20873@sirena.org.uk>
+ <17C303E7-B358-486E-9E0F-83CF58F28481@gmail.com>
+Message-ID: <CAMAWPa8n2fdAQFU+D6tm1e1Bv=uNKUimpB1OQjym6Nea-yhwWg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> From: Mark Rutland <mark.rutland@arm.com>
-> Date: Thu, Jul 23, 2015 at 11:52 AM
+On Tue, Aug 4, 2015 at 12:12 PM, Matthias Brugger
+<matthias.bgg@gmail.com> wrote:
+>
+>
+> On August 4, 2015 7:38:49 PM CEST, Mark Brown <broonie@kernel.org> wrote:
+>>On Wed, Jul 29, 2015 at 01:44:10PM +0100, Mark Brown wrote:
+>>> On Wed, Jul 29, 2015 at 12:14:36PM +0100, Build bot for Mark Brown
+>>wrote:
+>>
+>>> Today's linux-next fails to build an arm64 allmodconfig due to:
+>>
+>>> >    arm64-allmodconfig
+>>> > ../include/linux/platform_device.h:245:1: error: type defaults to
+>>'int' in declaration of 'module_init' [-Werror=implicit-int]
+>>> > ../include/linux/platform_device.h:250:1: error: type defaults to
+>>'int' in declaration of 'module_exit' [-Werror=implicit-int]
+>>
+>>> caused by c84e358718a66f76 (soc: Mediatek: Add SCPSYS power domain
+>>> driver) which does not include module.h.  Arguably platform_device.h
+>>> should do that, though it's only an issue if the macro is used so...
+>>
+>>This is still breaking the build and the fix should be trivial - is
+>>there any ETA for a fix getting into -next?
+>
+> I send a fix to arm at kernel.org but no reply yet. (sorry I'm not in front of a computer so I can't send you the link right now).
+>
+> I will send a pull request tomorrow, let's see if that helps...
 
-[cut]
+Fix was applied today.
 
-> diff --git a/Documentation/devicetree/bindings/pci/pci-msi.txt
-> b/Documentation/devicetree/bindings/pci/pci-msi.txt
-> new file mode 100644
-> index 0000000..9b3cc81
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pci/pci-msi.txt
-> @@ -0,0 +1,220 @@
-> +This document describes the generic device tree binding for describing the
-> +relationship between PCI devices and MSI controllers.
-> +
-> +Each PCI device under a root complex is uniquely identified by its Requester ID
-> +(AKA RID). A Requester ID is a triplet of a Bus number, Device number, and
-> +Function number.
-> +
-> +For the purpose of this document, when treated as a numeric value, a RID is
-> +formatted such that:
-> +
-> +* Bits [15:8] are the Bus number.
-> +* Bits [7:3] are the Device number.
-> +* Bits [2:0] are the Function number.
-> +* Any other bits required for padding must be zero.
-> +
-> +MSIs may be distinguished in part through the use of sideband data accompanying
-> +writes. In the case of PCI devices, this sideband data may be derived from the
-> +Requester ID. A mechanism is required to associate a device with both the MSI
-> +controllers it can address, and the sideband data that will be associated with
-> +its writes to those controllers.
-> +
-> +For generic MSI bindings, see
-> +Documentation/devicetree/bindings/interrupt-controller/msi.txt.
-> +
-> +
-> +PCI root complex
-> +================
-> +
-> +Optional properties
-> +-------------------
-> +
-> +- msi-map: Maps a Requester ID to an MSI controller and associated
-> +  msi-specifier data. The property is an arbitrary number of tuples of
-> +  (rid-base,msi-controller,msi-base,length), where:
-> +
-> +  * rid-base is a single cell describing the first RID matched by the entry.
-> +
-> +  * msi-controller is a single phandle to an MSI controller
-> +
-> +  * msi-base is an msi-specifier describing the msi-specifier produced for the
-> +    first RID matched by the entry.
-> +
-> +  * length is a single cell describing how many consecutive RIDs are matched
-> +    following the rid-base.
-> +
-> +  Any RID r in the interval [rid-base, rid-base + length) is associated with
-> +  the listed msi-controller, with the msi-specifier (r - rid-base + msi-base).
-> +
-> +- msi-map-mask: A mask to be applied to each Requester ID prior to being mapped
-> +  to an msi-specifier per the msi-map property.
-
-Can we extend the msi-map-mask definition to say:  "A mask value of 0x0 is valid
-and indicates that no RIDs are _currently_ mapped to any msi-specifier."
-
-We have an SoC with a programmable hardware table in the PCI controller that maps
-requester ID to stream ID, so the overall msi-map (and iommu-map) definition fit
-into that scheme.  But, we would like to be able make the RID->stream-ID mapping
-decision _lazily_, in Linux, based on actual usage of PCI devices.
-
-      pcie at 3600000 {
-              compatible = "fsl,ls2085a-pcie", "snps,dw-pcie";
-              device_type = "pci";
-              ...
-              msi-map = <0x0 &msi_a 0x7 4>,
-              msi-map-mask = <0x0>
-      };
-
-That specifies the there are 4 stream IDs starting at stream ID 0x7, 
-but the requester ID's are not mapped (because the mask is 0x0).
-This tells the PCI controller driver that there are 4 msi-specifiers
-(e.g. stream IDs) available and what they are.
-
-(same definition would apply to the iommu-map-mask)
-
-Thanks,
-Stuart
+Kevin
