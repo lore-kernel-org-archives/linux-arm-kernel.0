@@ -1,75 +1,157 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Wed, 5 Aug 2015 15:26:29 +0800
-Subject: [PATCH v6 7/9] clk: mediatek: Add subsystem clocks of MT8173
-In-Reply-To: <20150805064605.GZ18700@pengutronix.de>
-References: <1438676218-11310-1-git-send-email-jamesjj.liao@mediatek.com>
- <1438676218-11310-8-git-send-email-jamesjj.liao@mediatek.com>
- <20150805064605.GZ18700@pengutronix.de>
-Message-ID: <CAGS+omDmgxO9jHaPRb1hXO7fMRE=CnH=WNP3DeMm1axBswK_Aw@mail.gmail.com>
+From: maitysanchayan@gmail.com (maitysanchayan at gmail.com)
+Date: Wed, 5 Aug 2015 12:57:43 +0530
+Subject: [PATCH v2 3/4] touchscreen: colibri-vf50-ts: Add touchscreen
+ support for Colibri VF50
+In-Reply-To: <20150803210409.GG38878@dtor-ws>
+References: <cover.1437058481.git.maitysanchayan@gmail.com>
+ <26748bd9a7bde7c2304b6b971f1150bb575e4938.1437058481.git.maitysanchayan@gmail.com>
+ <20150717234242.GJ39282@dtor-ws>
+ <40d7c372e64c7f25b7df3e48930386de@agner.ch>
+ <20150721172044.GC39076@dtor-ws>
+ <20150803152544.GA9716@Sanchayan-Arch.toradex.int>
+ <20150803210409.GG38878@dtor-ws>
+Message-ID: <20150805072742.GB2497@Sanchayan-Arch.toradex.int>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 5, 2015 at 2:46 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> On Tue, Aug 04, 2015 at 04:16:56PM +0800, James Liao wrote:
->> Most multimedia subsystem clocks will be accessed by multiple
->> drivers, so it's a better way to manage these clocks in CCF.
->> This patch adds clock support for MM, IMG, VDEC, VENC and VENC_LT
->> subsystems.
->>
->> Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
->> ---
->>  drivers/clk/mediatek/clk-mt8173.c      | 267 +++++++++++++++++++++++++++++++++
->>  include/dt-bindings/clock/mt8173-clk.h |  97 +++++++++++-
->>  2 files changed, 361 insertions(+), 3 deletions(-)
->>
->> diff --git a/drivers/clk/mediatek/clk-mt8173.c b/drivers/clk/mediatek/clk-mt8173.c
->> index f37ace6..05335e5 100644
->> --- a/drivers/clk/mediatek/clk-mt8173.c
->> +++ b/drivers/clk/mediatek/clk-mt8173.c
->> @@ -25,6 +25,10 @@ static DEFINE_SPINLOCK(mt8173_clk_lock);
->>  static const struct mtk_fixed_clk fixed_clks[] __initconst = {
->>       FIXED_CLK(CLK_TOP_CLKPH_MCK_O, "clkph_mck_o", "clk26m", 400 * MHZ),
->>       FIXED_CLK(CLK_TOP_USB_SYSPLL_125M, "usb_syspll_125m", "clk26m", 125 * MHZ),
->> +     FIXED_CLK(CLK_TOP_DSI0_DIG, "dsi0_dig", "clk26m", 130 * MHZ),
->> +     FIXED_CLK(CLK_TOP_DSI1_DIG, "dsi1_dig", "clk26m", 130 * MHZ),
->> +     FIXED_CLK(CLK_TOP_LVDS_PXL, "lvds_pxl", "lvdspll", 148.5 * MHZ),
->> +     FIXED_CLK(CLK_TOP_LVDS_CTS, "lvds_cts", "lvdspll", 51.975 * MHZ),
->
-> I would expect 51975 * KHZ here to avoid fractional numbers. Probably
-> gcc calculates that during compile time so this will work as expected,
-> still I'm not sure this is good style to use fractional numbers here.
+Hello Dmitry,
 
-I thought this looked a bit strange too, but for what its worth, these
-two evaluate correctly:
+On 15-08-03 14:04:09, Dmitry Torokhov wrote:
+> Hi Sanchayan,
+> 
+> On Mon, Aug 03, 2015 at 08:55:44PM +0530, maitysanchayan at gmail.com wrote:
+> > Hello Dmitry,
+> > 
+> > On 15-07-21 10:20:44, Dmitry Torokhov wrote:
+> > > Hi Stefan,
+> > > 
+> > > On Tue, Jul 21, 2015 at 04:43:36PM +0200, Stefan Agner wrote:
+> > > > Hi Dmitry,
+> > > > 
+> > > > As the original author of the driver I have some remarks to your review
+> > > > 
+> > > > On 2015-07-18 01:42, Dmitry Torokhov wrote:
+> > > > >> +		/*
+> > > > >> +		 * If touch pressure is too low, stop measuring and reenable
+> > > > >> +		 * touch detection
+> > > > >> +		 */
+> > > > >> +		if (val_p < min_pressure || val_p > 2000)
+> > > > >> +			break;
+> > > > 
+> > > > This is where the modules touch pressure is used to stop the measurement
+> > > > process and switch back to interrupt mode. See my remarks at the end.
+> > > > 
+> > > > >> +
+> > > > >> +		/*
+> > > > >> +		 * The pressure may not be enough for the first x and the
+> > > > >> +		 * second y measurement, but, the pressure is ok when the
+> > > > >> +		 * driver is doing the third and fourth measurement. To
+> > > > >> +		 * take care of this, we drop the first measurement always.
+> > > > >> +		 */
+> > > > >> +		if (discard_val_on_start) {
+> > > > >> +			discard_val_on_start = false;
+> > > > >> +		} else {
+> > > > >> +			/*
+> > > > >> +			 * Report touch position and sleep for
+> > > > >> +			 * next measurement
+> > > > >> +			 */
+> > > > >> +			input_report_abs(vf50_ts->ts_input,
+> > > > >> +					ABS_X, VF_ADC_MAX - val_x);
+> > > > >> +			input_report_abs(vf50_ts->ts_input,
+> > > > >> +					ABS_Y, VF_ADC_MAX - val_y);
+> > > > >> +			input_report_abs(vf50_ts->ts_input,
+> > > > >> +					ABS_PRESSURE, val_p);
+> > > > >> +			input_report_key(vf50_ts->ts_input, BTN_TOUCH, 1);
+> > > > >> +			input_sync(vf50_ts->ts_input);
+> > > > >> +		}
+> > > > >> +
+> > > > >> +		msleep(10);
+> > > > >> +	}
+> > > > >> +
+> > > > >> +	/* Report no more touch, reenable touch detection */
+> > > > >> +	input_report_abs(vf50_ts->ts_input, ABS_PRESSURE, 0);
+> > > > >> +	input_report_key(vf50_ts->ts_input, BTN_TOUCH, 0);
+> > > > >> +	input_sync(vf50_ts->ts_input);
+> > > > >> +
+> > > > >> +	vf50_ts_enable_touch_detection(vf50_ts);
+> > > > >> +
+> > > > >> +	/* Wait for the pull-up to be stable on high */
+> > > > >> +	msleep(10);
+> > > > >> +
+> > > > >> +	/* Reenable IRQ to detect touch */
+> > > > >> +	enable_irq(vf50_ts->pen_irq);
+> > > > >> +
+> > > > >> +	dev_dbg(dev, "Reenabled touch detection interrupt\n");
+> > > > >> +}
+> > > > >> +
+> > > > >> +static irqreturn_t vf50_ts_touched(int irq, void *dev_id)
+> > > > >> +{
+> > > > >> +	struct vf50_touch_device *vf50_ts = (struct vf50_touch_device *)dev_id;
+> > > > >> +	struct device *dev = &vf50_ts->pdev->dev;
+> > > > >> +
+> > > > >> +	dev_dbg(dev, "Touch detected, start worker thread\n");
+> > > > >> +
+> > > > >> +	disable_irq_nosync(irq);
+> > > > >> +
+> > > > >> +	/* Disable the touch detection plates */
+> > > > >> +	gpiod_set_value(vf50_ts->gpio_ym, 0);
+> > > > >> +
+> > > > >> +	/* Let the platform mux to default state in order to mux as ADC */
+> > > > >> +	pinctrl_pm_select_default_state(dev);
+> > > > >> +
+> > > > >> +	queue_work(vf50_ts->ts_workqueue, &vf50_ts->ts_work);
+> > > > > 
+> > > > > If you convert this to a threaded interrupt you won't need to
+> > > > > disable/reenable interrupt or queue work. You should also be able to use
+> > > > > gpiod_set_value_cansleep() extending the range of ways the controller
+> > > > > could be connected to systems.
+> > > > > 
+> > > > 
+> > > > I'm not sure if a threaded interrupt is the right thing here. While the
+> > > > pen is on the touchscreen (which can be for several seconds)
+> > > > measurements have to be made in a continuous loop. Is it ok for a
+> > > > threaded interrupt to run that long?
+> > > 
+> > > Yes, why not? Threaded interrupt is simply a kernel thread that is woken
+> > > when hard interrupt handler tells it to wake up. Very similar to
+> > > interrupt + work queue, except that the kernel manages interactions
+> > > properly for you. There are several drivers in kernel that do that, for
+> > > example auo-pixcir-ts.c or tsc2007.c
+> > > 
+> > > > 
+> > > > I'm also not sure if it is really safe to _not_ disable the pen down
+> > > > GPIO interrupt. If we get a interrupt while measuring, we should ignore
+> > > > that interrupt.
+> > > 
+> > > The interrupt management core (you'll have to annotate it as
+> > > IRQF_ONESHOT) will make sure it stays masked properly until the threaded
+> > > handler completes so you do not need to disable it explicitly.
+> > 
+> > After working some more on threaded irq implementation, if IRQ_ONESHOT
+> > flag is used while requesting threaded irq, on entering the IRQ handler
+> > the vf610_gpio_irq_mask is not called and vf610_gpio_irq_unmask is not
+> > called on exiting the thread function, not something we expected.
+> > 
+> > In contrast, using explicit disable_irq_nosync and enable_irq in the IRQ
+> > handler and thread respectively results in the respective mask and unmask
+> > function being called.
+> > 
+> > The vf610_gpio_irq_*mask functions are in the gpio driver for Vybrid in
+> > drivers/gpio/gpio-vf610.c.
+> 
+> Well, for edge interrupts we normally do not mask/unmask IRQ as we
+> expect the controller to latch onto the state and not re-raise intil
+> interrupt is acked and I believe goes through edge condition again.
+> For level-triggered IRQs we do mask the interrupt line. See
+> kernel/irq/handle.c::handle_level_irq() and handle_edge_irq().
 
-localhost ~ # cat /sys/kernel/debug/clk/clk_summary  | grep lvds
-    lvdspll                               0            0   149999878
-       0 0
-       lvds_pxl                           0            0   148500000
-       0 0
-       lvds_cts                           0            0    51975000
-       0 0
+Thank you very much for pointing me in the right direction. While using
+threaded irqs we notice two different bugs which seem to have been there
+for a while. One related to pinmux and other with gpio driver for Vybrid
+in how it handled the irq's.
 
->
-> Anyway, on my system lvdspll is running at 150MHz. Are you sure there is
-> a clock derived from this running at 148.5MHz? Is it really correct to
-> use a fixed clock here or should it rather be lvdspll directly?
+Will send out a new version with the changes incoporated. The GPIO driver
+fix will be send in a separate patch by my colleague.
 
-I agree it does look strange to have a 51.975 MHz and 148.5 MHz clocks
-with a 150 MHz PLL as their parent...  However, I'm not sure how much
-this matters?  I think the idea here was that these frequencies are
-best effort "nominal" clock values provided by Mediatek "designers".
-The important point is that for the hardware to generate these either
-of these clocks, lvdspll must be enabled.
-
--Dan
-
-
-> Sascha
->
->
-> --
-> Pengutronix e.K.                           |                             |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Thanks & Regards,
+Sanchayan.
