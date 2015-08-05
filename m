@@ -1,49 +1,74 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Wed, 5 Aug 2015 12:54:30 +0200
-Subject: [PATCH 2/2] ARM: dts: Fix power off method on exynos5422-odroidxu3
-In-Reply-To: <1438605447-6836-3-git-send-email-k.kozlowski.k@gmail.com>
-References: <1438605447-6836-1-git-send-email-k.kozlowski.k@gmail.com>
- <1438605447-6836-3-git-send-email-k.kozlowski.k@gmail.com>
-Message-ID: <55C1EB66.4030706@osg.samsung.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed, 05 Aug 2015 11:58:04 +0100
+Subject: [PATCH v4 1/6] ARM: shmobile: r8a7740 dtsi: Add L2
+ cache-controller node
+In-Reply-To: <CAMuHMdXdEV+41mH338bDbazzqOErDLQkBUAj2+uVX4Wupn1ABQ@mail.gmail.com>
+References: <1438765090-823-1-git-send-email-geert+renesas@glider.be>	<1438765090-823-2-git-send-email-geert+renesas@glider.be>	<55C1D894.8070302@arm.com>
+ <CAMuHMdXdEV+41mH338bDbazzqOErDLQkBUAj2+uVX4Wupn1ABQ@mail.gmail.com>
+Message-ID: <55C1EC3C.9000407@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+Hi Geert,
 
-On 08/03/2015 02:37 PM, Krzysztof Kozlowski wrote:
-> The Odroid XU3 family boards have ACOKB pin of PMIC grounded, instead of
-> pulled up as usual. This means that PMIC must manually set PWRHOLD field
-> in its CTRL1 register to low before initiating power down.
-> 
-> This fixes Odroid XU3 powering off:
-> [   25.966053] reboot: Power down
-> [   25.967679] Power down.
-> [   26.070174] Power down failed, please power off system manually.
-> 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
-> Reported-by: Anand Moon <linux.amoon@gmail.com>
-> ---
->  arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-> index 1565667e6f69..48cecc8cf26e 100644
-> --- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-> +++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-> @@ -159,6 +159,7 @@
->  		s2mps11,buck2-ramp-enable = <1>;
->  		s2mps11,buck3-ramp-enable = <1>;
->  		s2mps11,buck4-ramp-enable = <1>;
-> +		samsung,s2mps11-acokb-ground;
->  
->  		interrupt-parent = <&gpx0>;
->  		interrupts = <4 IRQ_TYPE_EDGE_FALLING>;
-> 
+On 05/08/15 11:44, Geert Uytterhoeven wrote:
+> Hi Sudeep,
+>
+> On Wed, Aug 5, 2015 at 11:34 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>> On 05/08/15 09:58, Geert Uytterhoeven wrote:
+>>> Add the missing L2 cache-controller node. This will allow migration to
+>>> the generic l2c OF initialization.
+>>>
+>>> The L2 cache is an ARM L2C-310 (r3p1-150rel0), of size 256 KiB (32 KiB x
+>>> 8 ways).
+>>>
+>>> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>
+>>> diff --git a/arch/arm/boot/dts/r8a7740.dtsi
+>>> b/arch/arm/boot/dts/r8a7740.dtsi
+>>> index d84714468cce18df..ddef5b1c68fa06b3 100644
+>>> --- a/arch/arm/boot/dts/r8a7740.dtsi
+>>> +++ b/arch/arm/boot/dts/r8a7740.dtsi
+>>> @@ -37,6 +37,22 @@
+>>>                        <0xc2000000 0x1000>;
+>>>          };
+>>>
+>>> +       L2: cache-controller {
+>>> +               compatible = "arm,pl310-cache";
+>>> +               reg = <0xf0100000 0x1000>;
+>>> +               interrupts = <0 84 IRQ_TYPE_LEVEL_HIGH>;
+>>> +               power-domains = <&pd_a3sm>;
+>>> +               arm,data-latency = <3 3 3>;
+>>> +               arm,tag-latency = <2 2 2>;
+>>> +               arm,shared-override;
+>>> +               cache-unified;
+>>> +               cache-level = <2>;
+>>> +               cache-size = <0x40000>;
+>>> +               cache-sets = <1024>;
+>>> +               cache-block-size = <32>;
+>>> +               cache-line-size = <32>;
+>>
+>>
+>> Any particular reason whey you need all this cache-* properties ? Is
+>
+> To describe the cache as good as possible.
+>
 
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+Why if you can probe it ? IMO DT is mostly useful to describe things
+that can't be probed/discovered using hardware.
 
-Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+>> something broken on these SoCs ? We should be able to get most of these
+>> information from the SoC(reading some registers). It's good to avoid
+>> passing them via DT if they can be discovered from hardware.
+>
+> So we have all these documented properties in
+> Documentation/devicetree/bindings/arm/l2cc.txt, but they're not meant to
+> be used?
+>
+
+No I didn't mean that, I just wanted to know if they can't be probed due
+to some hardware issue. It would avoid issues with wrong DTs especially
+if they are not so easy to upgrade.
+
+Regards,
+Sudeep
