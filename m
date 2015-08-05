@@ -1,47 +1,43 @@
-From: zyw@rock-chips.com (Chris Zhong)
-Date: Wed, 05 Aug 2015 18:36:06 +0800
-Subject: [PATCH v3 1/3] ARM: rockchip: rename osc_switch_to_32k variable
-In-Reply-To: <2128609.Kb18M8K28F@diego>
-References: <2128609.Kb18M8K28F@diego>
-Message-ID: <55C1E716.4010901@rock-chips.com>
+From: haibo.chen@freescale.com (Haibo Chen)
+Date: Wed, 5 Aug 2015 18:38:40 +0800
+Subject: [PATCH v4 4/6] ARM: dts: imx7d-sdb: add eMMC5.0 support
+In-Reply-To: <1438771122-8601-1-git-send-email-haibo.chen@freescale.com>
+References: <1438771122-8601-1-git-send-email-haibo.chen@freescale.com>
+Message-ID: <1438771122-8601-5-git-send-email-haibo.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+imx7d-sdb board has a eMMC5.0 on usdhc3. This eMMC support HS400.
+This patch add usdhc3 support for HS400
 
+Signed-off-by: Haibo Chen <haibo.chen@freescale.com>
+---
+ arch/arm/boot/dts/imx7d-sdb.dts | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-On 08/05/2015 06:50 AM, Heiko St?bner wrote:
-> The variable name is misleading, as the deep suspend mode always switches
-> the main supplying clock to the 32kHz source. Additionally the main
-> oscillator remain running in some cases, which this var indicates.
->
-> So rename it to osc_disable to clarity.
->
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> ---
->   arch/arm/mach-rockchip/pm.c | 4 ++--
->   1 file changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/mach-rockchip/pm.c b/arch/arm/mach-rockchip/pm.c
-> index 892bace..2ca1170 100644
-> --- a/arch/arm/mach-rockchip/pm.c
-> +++ b/arch/arm/mach-rockchip/pm.c
-> @@ -96,7 +96,7 @@ static bool rk3288_slp_disable_osc(void)
->   static void rk3288_slp_mode_set(int level)
->   {
->   	u32 mode_set, mode_set1;
-> -	bool osc_switch_to_32k = rk3288_slp_disable_osc();
-> +	bool osc_disable = rk3288_slp_disable_osc();
->   
->   	regmap_read(sgrf_regmap, RK3288_SGRF_CPU_CON0, &rk3288_sgrf_cpu_con0);
->   	regmap_read(sgrf_regmap, RK3288_SGRF_SOC_CON0, &rk3288_sgrf_soc_con0);
-> @@ -140,7 +140,7 @@ static void rk3288_slp_mode_set(int level)
->   			    BIT(PMU_DDR1IO_RET_EN) | BIT(PMU_DDR0IO_RET_EN) |
->   			    BIT(PMU_ALIVE_USE_LF) | BIT(PMU_PLL_PD_EN);
->   
-> -		if (osc_switch_to_32k)
-> +		if (osc_disable)
->   			mode_set |= BIT(PMU_OSC_24M_DIS);
->   
->   		mode_set1 |= BIT(PMU_CLR_ALIVE) | BIT(PMU_CLR_BUS) |
-Reviewed-by: Chris Zhong <zyw@rock-chips.com>
-Tested-by: Chris Zhong <zyw@rock-chips.com>
+diff --git a/arch/arm/boot/dts/imx7d-sdb.dts b/arch/arm/boot/dts/imx7d-sdb.dts
+index fdd1d7c..8059458 100644
+--- a/arch/arm/boot/dts/imx7d-sdb.dts
++++ b/arch/arm/boot/dts/imx7d-sdb.dts
+@@ -241,6 +241,19 @@
+ 	status = "okay";
+ };
+ 
++&usdhc3 {
++	pinctrl-names = "default", "state_100mhz", "state_200mhz";
++	pinctrl-0 = <&pinctrl_usdhc3>;
++	pinctrl-1 = <&pinctrl_usdhc3_100mhz>;
++	pinctrl-2 = <&pinctrl_usdhc3_200mhz>;
++	assigned-clocks = <&clks IMX7D_USDHC3_ROOT_CLK>;
++	assigned-clock-rates = <400000000>;
++	bus-width = <8>;
++	fsl,tuning-step = <2>;
++	non-removable;
++	status = "okay";
++};
++
+ &iomuxc {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_hog>;
+-- 
+1.9.1
