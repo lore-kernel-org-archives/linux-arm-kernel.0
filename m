@@ -1,74 +1,68 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 05 Aug 2015 11:58:04 +0100
-Subject: [PATCH v4 1/6] ARM: shmobile: r8a7740 dtsi: Add L2
- cache-controller node
-In-Reply-To: <CAMuHMdXdEV+41mH338bDbazzqOErDLQkBUAj2+uVX4Wupn1ABQ@mail.gmail.com>
-References: <1438765090-823-1-git-send-email-geert+renesas@glider.be>	<1438765090-823-2-git-send-email-geert+renesas@glider.be>	<55C1D894.8070302@arm.com>
- <CAMuHMdXdEV+41mH338bDbazzqOErDLQkBUAj2+uVX4Wupn1ABQ@mail.gmail.com>
-Message-ID: <55C1EC3C.9000407@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 5 Aug 2015 12:09:30 +0100
+Subject: [PATCHv5 0/5] arm/arm64: Unify PSCI client support
+In-Reply-To: <CAOesGMh9Lx=eVTzSQcU63ttLWX8St5T5cFDDKozO4nmvoqU0Lw@mail.gmail.com>
+References: <1438353980-7611-1-git-send-email-mark.rutland@arm.com>
+ <20150803143703.GH10501@arm.com>
+ <CAOesGMh9Lx=eVTzSQcU63ttLWX8St5T5cFDDKozO4nmvoqU0Lw@mail.gmail.com>
+Message-ID: <20150805110930.GE6092@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
+On Wed, Aug 05, 2015 at 08:41:31AM +0100, Olof Johansson wrote:
+> On Mon, Aug 3, 2015 at 4:37 PM, Will Deacon <will.deacon@arm.com> wrote:
+> > On Fri, Jul 31, 2015 at 03:46:15PM +0100, Mark Rutland wrote:
+> >> This series unifies the 32-bit and 64-bit PSCI client code, moving the bulk of
+> >> the FW invocation and probing out to a common location in drivers/firmware. The
+> >> bulk of the PSCI 0.2 cleanups have hit mainline now, so this is just the
+> >> unification portion.
+> >>
+> >> This results in a reasonable saving in terms of lines of code, and will allow
+> >> for PSCI 1.0 support to be unified form the beginning, avoiding further
+> >> duplication.
+> >>
+> >> Since v4 [1]:
+> >> * Apply Rob Herring's ack
+> >> * Rebase to v4.2-rc2 to handle a trivial conflict
+> >> * Reorder the series to keep arch/arm patches together
+> >> Since v3 [2]:
+> >> * Drop the PSCI 0.2 patches as they're in mainline
+> >> * s/__pa/virt_to_idmap/ from Grygorii Strashko
+> >> * Use macros for Calxeda CPU_SUSPEND parameters
+> >>
+> >> Russell, are you happy with the arch/arm patches? If so, are you happy for them
+> >> to go via another tree, or would you prefer that I set up a stable branch for
+> >> merging?
+> >>
+> >> I was under the impression that you had already taken Grygorii's patch but I
+> >> couldn't spot it in any branches. I can drop that if you already have it.
+> >
+> > I've been looking at merging this, but it's a tad fiddly touching all of
+> > arm, arm64 and drivers. One way to do it would be:
+> >
+> >   (1) I create a branch containing patches 1,2 and 5 based on -rc2 and
+> >       merge that into the arm64/for-next/core branch. There's a minor
+> >       conflict, but it's easy to resolve.
+> >
+> >   (2) I create another branch, which is just the branch merged in (1) +
+> >       patches 3 and 4 on top. I send a pull request for that to rmk.
+> >
+> >   (3) Torvalds will get the minor conflict resolved in (1) when he merges
+> >       the arm and arm64 trees.
+> >
+> > If we're not comfortable with (3), then the whole lot could go via
+> > arm-soc instead (including the conflict resolution).
+> >
+> > Russell, Olof, any preferences?
+> 
+> Wouldn't it be easiest to just get acks on patch 3 and 4 and just
+> merge it all through your tree?
 
-On 05/08/15 11:44, Geert Uytterhoeven wrote:
-> Hi Sudeep,
->
-> On Wed, Aug 5, 2015 at 11:34 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->> On 05/08/15 09:58, Geert Uytterhoeven wrote:
->>> Add the missing L2 cache-controller node. This will allow migration to
->>> the generic l2c OF initialization.
->>>
->>> The L2 cache is an ARM L2C-310 (r3p1-150rel0), of size 256 KiB (32 KiB x
->>> 8 ways).
->>>
->>> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
->
->>> diff --git a/arch/arm/boot/dts/r8a7740.dtsi
->>> b/arch/arm/boot/dts/r8a7740.dtsi
->>> index d84714468cce18df..ddef5b1c68fa06b3 100644
->>> --- a/arch/arm/boot/dts/r8a7740.dtsi
->>> +++ b/arch/arm/boot/dts/r8a7740.dtsi
->>> @@ -37,6 +37,22 @@
->>>                        <0xc2000000 0x1000>;
->>>          };
->>>
->>> +       L2: cache-controller {
->>> +               compatible = "arm,pl310-cache";
->>> +               reg = <0xf0100000 0x1000>;
->>> +               interrupts = <0 84 IRQ_TYPE_LEVEL_HIGH>;
->>> +               power-domains = <&pd_a3sm>;
->>> +               arm,data-latency = <3 3 3>;
->>> +               arm,tag-latency = <2 2 2>;
->>> +               arm,shared-override;
->>> +               cache-unified;
->>> +               cache-level = <2>;
->>> +               cache-size = <0x40000>;
->>> +               cache-sets = <1024>;
->>> +               cache-block-size = <32>;
->>> +               cache-line-size = <32>;
->>
->>
->> Any particular reason whey you need all this cache-* properties ? Is
->
-> To describe the cache as good as possible.
->
+That would work if Russell is ok with it (it needs his acks).
 
-Why if you can probe it ? IMO DT is mostly useful to describe things
-that can't be probed/discovered using hardware.
+Russell: would you prefer to ack 3+4 and have me take them via the arm64
+tree or instead have me send you a pull request with a conflict resolution
+for Torvalds? Yet another option is to postpone the arch/arm/ part to
+4.4.
 
->> something broken on these SoCs ? We should be able to get most of these
->> information from the SoC(reading some registers). It's good to avoid
->> passing them via DT if they can be discovered from hardware.
->
-> So we have all these documented properties in
-> Documentation/devicetree/bindings/arm/l2cc.txt, but they're not meant to
-> be used?
->
-
-No I didn't mean that, I just wanted to know if they can't be probed due
-to some hardware issue. It would avoid issues with wrong DTs especially
-if they are not so easy to upgrade.
-
-Regards,
-Sudeep
+Will
