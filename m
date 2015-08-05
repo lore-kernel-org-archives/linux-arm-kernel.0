@@ -1,140 +1,52 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 05 Aug 2015 17:11:37 +0100
-Subject: [PATCH v4 1/2] arm64: KVM: Optimize arm64 skip 30-50% vfp/simd
- save/restore on exits
-In-Reply-To: <1437082178-11039-2-git-send-email-m.smarduch@samsung.com>
-References: <1437082178-11039-1-git-send-email-m.smarduch@samsung.com>
- <1437082178-11039-2-git-send-email-m.smarduch@samsung.com>
-Message-ID: <55C235B9.3000800@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 5 Aug 2015 17:24:52 +0100
+Subject: [PATCH 05/13] iommu/io-pgtable-arm: Allow appropriate DMA API use
+In-Reply-To: <1987558.GfG8OCqzMM@avalon>
+References: <1438608355-7335-1-git-send-email-will.deacon@arm.com>
+ <55C0D071.1040104@arm.com>
+ <20150804145642.GQ7557@n2100.arm.linux.org.uk>
+ <1987558.GfG8OCqzMM@avalon>
+Message-ID: <20150805162452.GH6092@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/07/15 22:29, Mario Smarduch wrote:
-> This patch only saves and restores FP/SIMD registers on Guest access. To do
-> this cptr_el2 FP/SIMD trap is set on Guest entry and later checked on exit.
-> lmbench, hackbench show significant improvements, for 30-50% exits FP/SIMD
-> context is not saved/restored
+Hi Laurent,
+
+On Tue, Aug 04, 2015 at 09:54:27PM +0100, Laurent Pinchart wrote:
+> On Tuesday 04 August 2015 15:56:42 Russell King - ARM Linux wrote:
+> > On Tue, Aug 04, 2015 at 03:47:13PM +0100, Robin Murphy wrote:
+> > > On 04/08/15 14:16, Laurent Pinchart wrote:
+> > >> This is what I believe to be an API abuse. The
+> > >> dma_sync_single_for_device()
+> > >> API is meant to pass ownership of a buffer to the device. Unless I'm
+> > >> mistaken, once that's done the CPU isn't allowed to touch the buffer
+> > >> anymore until dma_sync_single_for_cpu() is called to get ownership of
+> > >> the buffer back.
+> >
+> > That's what I thought up until recently, but it's not strictly true - see
+> > Documentation/DMA-API.txt which Robin quoted.
 > 
-> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+> I find the documentation slightly unclear on this topic. I have nothing 
+> against updating it to state that the sync functions ensure visibility of the 
+> data to the device or CPU instead of transferring ownership if that's the 
+> general understanding of how the API work (or should work). This would of 
+> course need to be carefully reviewed to ensure that the current implementation 
+> really works that way across all architectures, or at least that it can be 
+> made to work that way.
 
-So this patch seems to break 32bit guests on arm64.  I've had a look,
-squashed a few bugs that I dangerously overlooked during the review, but
-it still doesn't work (it doesn't crash anymore, but I get random
-illegal VFP instructions in 32bit guests).
+I was hoping to send this lot off to Joerg tomorrow morning, since it's
+removing a hack from the io-pgtable users before it has chance to spread
+further. This use of the API is certainly ok on arm and arm64 (where
+these drivers currently run) and I don't see why it wouldn't work for
+any IOMMU that treats the page tables as read-only. Once we start getting
+into hardware access/dirty bits, then the streaming-DMA API is a lost
+cause but I would expect those systems to be using SVM with the CPU page
+tables anyway and therefore be cache-coherent.
 
-I'd be glad if someone could eyeball the following patch and tell me
-what's going wrong. If we don't find the root cause quickly enough, I'll
-have to drop the series from -next, and that'd be a real shame.
+I agree that the Documentation isn't brilliant, but that could be addressed
+in a separate patch (especially since I don't think it would be merged
+via the iommu tree).
 
-Thanks,
+Is that alright?
 
-	M.
-
-commit 5777dc55fbc170426a85e00c26002dd5a795cfa5
-Author: Marc Zyngier <marc.zyngier@arm.com>
-Date:   Wed Aug 5 16:53:01 2015 +0100
-
-    KVM: arm64: NOTAFIX: Prevent crash when 32bit guest uses VFP
-
-    Since we switch FPSIMD in a lazy way, access to FPEXC32_EL2
-    must be guarded by skip_fpsimd_state. Otherwise, all hell
-    break loose.
-
-    Also, FPEXC32_EL2 must be restored when we trap to EL2 to
-    enable floating point.
-
-    Note that while it prevents the host from catching fire, the
-    guest still doesn't work properly, and I don't understand why just
-    yet.
-
-    Not-really-signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-
-diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-index c8e0c70..b53ec5d 100644
---- a/arch/arm64/kvm/hyp.S
-+++ b/arch/arm64/kvm/hyp.S
-@@ -431,10 +431,12 @@
- 	add	x3, x2, #CPU_SYSREG_OFFSET(DACR32_EL2)
- 	mrs	x4, dacr32_el2
- 	mrs	x5, ifsr32_el2
--	mrs	x6, fpexc32_el2
- 	stp	x4, x5, [x3]
--	str	x6, [x3, #16]
-
-+	skip_fpsimd_state x8, 3f
-+	mrs	x6, fpexc32_el2
-+	str	x6, [x3, #16]
-+3:
- 	skip_debug_state x8, 2f
- 	mrs	x7, dbgvcr32_el2
- 	str	x7, [x3, #24]
-@@ -461,10 +463,8 @@
-
- 	add	x3, x2, #CPU_SYSREG_OFFSET(DACR32_EL2)
- 	ldp	x4, x5, [x3]
--	ldr	x6, [x3, #16]
- 	msr	dacr32_el2, x4
- 	msr	ifsr32_el2, x5
--	msr	fpexc32_el2, x6
-
- 	skip_debug_state x8, 2f
- 	ldr	x7, [x3, #24]
-@@ -669,12 +669,14 @@ __restore_debug:
- 	ret
-
- __save_fpsimd:
-+	skip_fpsimd_state x3, 1f
- 	save_fpsimd
--	ret
-+1:	ret
-
- __restore_fpsimd:
-+	skip_fpsimd_state x3, 1f
- 	restore_fpsimd
--	ret
-+1:	ret
-
- switch_to_guest_fpsimd:
- 	push	x4, lr
-@@ -682,6 +684,7 @@ switch_to_guest_fpsimd:
- 	mrs	x2, cptr_el2
- 	bic	x2, x2, #CPTR_EL2_TFP
- 	msr	cptr_el2, x2
-+	isb
-
- 	mrs	x0, tpidr_el2
-
-@@ -692,6 +695,10 @@ switch_to_guest_fpsimd:
- 	add	x2, x0, #VCPU_CONTEXT
- 	bl __restore_fpsimd
-
-+	skip_32bit_state x3, 1f
-+	ldr	x4, [x2, #CPU_SYSREG_OFFSET(FPEXC32_EL2)]
-+	msr	fpexc32_el2, x4
-+1:
- 	pop	x4, lr
- 	pop	x2, x3
- 	pop	x0, x1
-@@ -754,9 +761,7 @@ __kvm_vcpu_return:
- 	add	x2, x0, #VCPU_CONTEXT
-
- 	save_guest_regs
--	skip_fpsimd_state x3, 1f
- 	bl __save_fpsimd
--1:
- 	bl __save_sysregs
-
- 	skip_debug_state x3, 1f
-@@ -777,9 +782,7 @@ __kvm_vcpu_return:
- 	kern_hyp_va x2
-
- 	bl __restore_sysregs
--	skip_fpsimd_state x3, 1f
- 	bl __restore_fpsimd
--1:
- 	/* Clear FPSIMD and Trace trapping */
- 	msr     cptr_el2, xzr
-
-
--- 
-Jazz is not dead. It just smells funny...
+Will
