@@ -1,43 +1,48 @@
 From: haibo.chen@freescale.com (Haibo Chen)
-Date: Wed, 5 Aug 2015 18:38:40 +0800
-Subject: [PATCH v4 4/6] ARM: dts: imx7d-sdb: add eMMC5.0 support
+Date: Wed, 5 Aug 2015 18:38:41 +0800
+Subject: [PATCH v4 5/6] mmc: sdhci-esdhc-imx: change default watermark level
+ and burst length
 In-Reply-To: <1438771122-8601-1-git-send-email-haibo.chen@freescale.com>
 References: <1438771122-8601-1-git-send-email-haibo.chen@freescale.com>
-Message-ID: <1438771122-8601-5-git-send-email-haibo.chen@freescale.com>
+Message-ID: <1438771122-8601-6-git-send-email-haibo.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-imx7d-sdb board has a eMMC5.0 on usdhc3. This eMMC support HS400.
-This patch add usdhc3 support for HS400
+By default, for all imx SoC types, the watermark level is 16, and the
+burst length is 8. But if the SDIO/SD/MMC I/O speed is fast enough,
+this default watermark level and burst length will be the performance
+bottleneck.
+
+For example, i.MX7D support eMMC HS400 mode, this mode can run in 8 bit,
+200MHZ DDR mode. So the I/O speed improve a lot compare to SD3.0.
+The default burst length is 8, if we don't change this value, in
+HS400 mode, when we do eMMC read operation, we can find that the
+clock signal will stop for a period of time. This means the speed
+of data moving on AHB bus is slower than I/O speed. So we should
+improve the speed of data moving on AHB bus.
+
+This patch set the default burst length as 16, and set the default
+watermark level as 64. The test result is the clock signal has
+no stop during the eMMC HS400 operation.
 
 Signed-off-by: Haibo Chen <haibo.chen@freescale.com>
 ---
- arch/arm/boot/dts/imx7d-sdb.dts | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ drivers/mmc/host/sdhci-esdhc-imx.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/imx7d-sdb.dts b/arch/arm/boot/dts/imx7d-sdb.dts
-index fdd1d7c..8059458 100644
---- a/arch/arm/boot/dts/imx7d-sdb.dts
-+++ b/arch/arm/boot/dts/imx7d-sdb.dts
-@@ -241,6 +241,19 @@
- 	status = "okay";
- };
- 
-+&usdhc3 {
-+	pinctrl-names = "default", "state_100mhz", "state_200mhz";
-+	pinctrl-0 = <&pinctrl_usdhc3>;
-+	pinctrl-1 = <&pinctrl_usdhc3_100mhz>;
-+	pinctrl-2 = <&pinctrl_usdhc3_200mhz>;
-+	assigned-clocks = <&clks IMX7D_USDHC3_ROOT_CLK>;
-+	assigned-clock-rates = <400000000>;
-+	bus-width = <8>;
-+	fsl,tuning-step = <2>;
-+	non-removable;
-+	status = "okay";
-+};
+diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+index 803d24f..97aa944 100644
+--- a/drivers/mmc/host/sdhci-esdhc-imx.c
++++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+@@ -1160,7 +1160,8 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
+ 	 * to something insane.  Change it back here.
+ 	 */
+ 	if (esdhc_is_usdhc(imx_data)) {
+-		writel(0x08100810, host->ioaddr + ESDHC_WTMK_LVL);
++		writel(0x10401040, host->ioaddr + ESDHC_WTMK_LVL);
 +
- &iomuxc {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_hog>;
+ 		host->quirks2 |= SDHCI_QUIRK2_PRESET_VALUE_BROKEN;
+ 		host->mmc->caps |= MMC_CAP_1_8V_DDR;
+ 
 -- 
 1.9.1
