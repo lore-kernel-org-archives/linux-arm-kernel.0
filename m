@@ -1,20 +1,42 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 05 Aug 2015 10:11:52 -0700
-Subject: [PATCH] ARM: BCM: Enable ARM erratum 798181 for BRCMSTB
-In-Reply-To: <1438739008-16718-1-git-send-email-gregory.0xf0@gmail.com>
-References: <1438739008-16718-1-git-send-email-gregory.0xf0@gmail.com>
-Message-ID: <55C243D8.8050704@gmail.com>
+Date: Wed, 05 Aug 2015 10:14:40 -0700
+Subject: [PATCH 1/2] MAINTAINERS: Add myself as a bcm2835 co-maintainer.
+In-Reply-To: <1437594937-28583-1-git-send-email-eric@anholt.net>
+References: <1437594937-28583-1-git-send-email-eric@anholt.net>
+Message-ID: <55C24480.7080102@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/08/15 18:43, Gregory Fong wrote:
-> Commit 04fcab32d3fa1d3f6afe97e0ab431c5572e07a2c ("ARM: 8111/1: Enable
-> erratum 798181 for Broadcom Brahma-B15") enables this erratum for
-> affected Broadcom Brahma-B15 CPUs when CONFIG_ARM_ERRATA_798181=y.
-> Let's make sure that config option is actually set.
+On 22/07/15 12:55, Eric Anholt wrote:
+> The current maintainers have limited free time to work on the
+> architecture, and I'm motivated to do so for my work on graphics for
+> Broadcom.  Arnd and Florian suggested to me that this might be the way
+> forward.
 > 
-> Signed-off-by: Gregory Fong <gregory.0xf0@gmail.com>
+> Signed-off-by: Eric Anholt <eric@anholt.net>
 
-Applied, to soc/next, thanks!
+Applied to maintainers/next with Stephen's Ack at
+github.com/Broadcom/stblinux, will submit this shortly with other
+Broadcom SoC changes, thanks!
+
+> ---
+>  MAINTAINERS | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 2d3d55c..1c51379 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -2217,6 +2217,7 @@ F:	drivers/clocksource/bcm_kona_timer.c
+>  BROADCOM BCM2835 ARM ARCHITECTURE
+>  M:	Stephen Warren <swarren@wwwdotorg.org>
+>  M:	Lee Jones <lee@kernel.org>
+> +M:	Eric Anholt <eric@anholt.net>
+>  L:	linux-rpi-kernel at lists.infradead.org (moderated for non-subscribers)
+>  T:	git git://git.kernel.org/pub/scm/linux/kernel/git/rpi/linux-rpi.git
+>  S:	Maintained
+> 
+
+
 -- 
 Florian
