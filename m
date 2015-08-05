@@ -1,131 +1,328 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 5 Aug 2015 15:47:54 +0200
-Subject: [PATCH v3 09/11] KVM: arm/arm64: vgic: Prevent userspace
- injection of a mapped interrupt
-In-Reply-To: <55C1F7CF.5070904@linaro.org>
-References: <1437753309-17989-1-git-send-email-marc.zyngier@arm.com>
- <1437753309-17989-10-git-send-email-marc.zyngier@arm.com>
- <55C0E690.1090808@linaro.org> <55C0EBF5.2060708@arm.com>
- <55C1BBF9.2060004@linaro.org> <55C1DAE9.1050609@arm.com>
- <20150805105345.GA4657@cbox> <55C1F7CF.5070904@linaro.org>
-Message-ID: <20150805134754.GB4657@cbox>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Wed, 05 Aug 2015 22:00:41 +0800
+Subject: [PATCH v4 06/10] irqchip / GICv3: Add ACPI support for GICv3+
+ initialization
+In-Reply-To: <55C0BB5E.2080706@arm.com>
+References: <1438164539-29256-1-git-send-email-hanjun.guo@linaro.org>
+ <1438164539-29256-7-git-send-email-hanjun.guo@linaro.org>
+ <55C0BB5E.2080706@arm.com>
+Message-ID: <55C21709.3070907@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 05, 2015 at 01:47:27PM +0200, Eric Auger wrote:
-> On 08/05/2015 12:53 PM, Christoffer Dall wrote:
-> > On Wed, Aug 05, 2015 at 10:44:09AM +0100, Marc Zyngier wrote:
-> >> On 05/08/15 08:32, Eric Auger wrote:
-> >>> Hi Marc,
-> >>> On 08/04/2015 06:44 PM, Marc Zyngier wrote:
-> >>>> On 04/08/15 17:21, Eric Auger wrote:
-> >>>>> Hi Marc,
-> >>>>> On 07/24/2015 05:55 PM, Marc Zyngier wrote:
-> >>>>>> Virtual interrupts mapped to a HW interrupt should only be triggered
-> >>>>>> from inside the kernel. Otherwise, you could end up confusing the
-> >>>>>> kernel (and the GIC's) state machine.
-> >>>>>>
-> >>>>>> Rearrange the injection path so that kvm_vgic_inject_irq is
-> >>>>>> used for non-mapped interrupts, and kvm_vgic_inject_mapped_irq is
-> >>>>>> used for mapped interrupts. The latter should only be called from
-> >>>>>> inside the kernel (timer, VFIO).
-> >>>>> nit: I would replace VFIO by irqfd.
-> >>>>> VFIO just triggers the eventfd/irqfd. This is KVM/irqfd that injects the
-> >>>>> virtual irq upon the irqfd signaling and he irqfd adaptation/ARM
-> >>>>> currently is implemented in vgic.c
-> >>>>
-> >>>> Ah, thanks for reminding me of the right terminology, I tend to think of
-> >>>> it as one big bag of nasty tricks... ;-)
-> >>>>
-> >>>> I'll update the commit message.
-> >>>>
-> >>>>>>
-> >>>>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> >>>>>> ---
-> >>>>>>  include/kvm/arm_vgic.h |  2 +
-> >>>>>>  virt/kvm/arm/vgic.c    | 99 ++++++++++++++++++++++++++++++++++----------------
-> >>>>>>  2 files changed, 70 insertions(+), 31 deletions(-)
-> >>>>>>
-> >>>>>> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-> >>>>>> index 7306b4b..f6bfd79 100644
-> >>>>>> --- a/include/kvm/arm_vgic.h
-> >>>>>> +++ b/include/kvm/arm_vgic.h
-> >>>>>> @@ -351,6 +351,8 @@ void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu);
-> >>>>>>  void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu);
-> >>>>>>  int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int irq_num,
-> >>>>>>  			bool level);
-> >>>>>> +int kvm_vgic_inject_mapped_irq(struct kvm *kvm, int cpuid,
-> >>>>>> +			       struct irq_phys_map *map, bool level);
-> >>>>>>  void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg);
-> >>>>>>  int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
-> >>>>>>  int kvm_vgic_vcpu_active_irq(struct kvm_vcpu *vcpu);
-> >>>>>> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> >>>>>> index 3f7b690..e40ef70 100644
-> >>>>>> --- a/virt/kvm/arm/vgic.c
-> >>>>>> +++ b/virt/kvm/arm/vgic.c
-> >>>>>> @@ -1533,7 +1533,8 @@ static int vgic_validate_injection(struct kvm_vcpu *vcpu, int irq, int level)
-> >>>>>>  }
-> >>>>>>  
-> >>>>>>  static int vgic_update_irq_pending(struct kvm *kvm, int cpuid,
-> >>>>>> -				  unsigned int irq_num, bool level)
-> >>>>>> +				   struct irq_phys_map *map,
-> >>>>>> +				   unsigned int irq_num, bool level)
-> >>>>>>  {
-> >>>>> In vgic_update_irq_pending, I needed to modify the following line and
-> >>>>> add the "&& !map".
-> >>>>>
-> >>>>>         if (!vgic_validate_injection(vcpu, irq_num, level) && !map) {
-> >>>>>
-> >>>>> Without that, the level being not properly modeled for level sensitive
-> >>>>> forwarded IRQs, the 2d injection fails.
-> >>>>
-> >>>> Ah! Is that because we never see the line being reset to zero, and the
-> >>>> VGIC still sees the line as pending at the distributor level?
-> >>> yes indeed
-> >>
-> >> Then it is a bigger problem we need to solve, and your solution just
-> >> papers over the issue.
-> >>
-> >> The main problem is that irqfd is essentially an edge-triggered
-> >> signalling. Fire and forget. Given that we're dealing with a level
-> >> triggered interrupt, we end up with the interrupt still marked as
-> >> pending (nobody took the signal down).
-> this does not really relate to irqfd: irqfd also comes with the concept
-> of resamplefd. in case the IRQ is not forwarded, this is the
-> irqfd_resampler_ack function that toggles the IRQ down (eventfd.c). Its
-> execution is triggered in vgic_process_maintenance. With forwarding the
-> EOI is not trappable anymore so this disappears.
-> 
-> 
-> >> The usual way to get out of that mess in is to evaluate the state of the
-> >> level on EOI. But we can't trap on EOI for a HW interrupt.
-> >>
-> >> So it raises the question: should we instead consider the HW pending
-> >> state instead of the software one for mapped interrupts? It is
-> >> expensive, but it feels more correct.
-> >>
-> > I thought we already covered this at LCA.  For mapped interrupts
-> > (forwarded) we should never consider the software pending state, because
-> > that state is managed by the hardware.  Or am I confusing concepts here?
-> 
-> Yes we discussed we should bypass most of the SW states.
-> 
-> in my previous integration I proposed a patch "KVM: arm: vgic: fix state
-> machine for forwarded IRQ". What's wrong with the below approach?
-> 
-> 
->     Fix multiple injection of level sensitive forwarded IRQs.
->     With current code, the second injection fails since the
->     state bitmaps are not reset (process_maintenance is not
->     called anymore).
-> 
->     New implementation follows those principles:
->     - A forwarded IRQ only can be sampled when it is pending
->     - when queueing the IRQ (programming the LR), the pending state
->       is removed as for edge sensitive IRQs
->     - an injection of a forwarded IRQ is considered always valid since
->       coming from the HW and level always is 1.
-> 
-I don't see anything wrong, and I thought this was what we discussed.
+On 08/04/2015 09:17 PM, Marc Zyngier wrote:
+> On 29/07/15 11:08, Hanjun Guo wrote:
+>> From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+>>
+>> With the refator of gic_of_init(), GICv3/4 can be initialized
+>> by gic_init_bases() with gic distributor base address and gic
+>> redistributor region(s).
+>>
+>> So get the redistributor region base addresses from MADT GIC
+>> redistributor subtable, and the distributor base address from
+>> GICD subtable to init GICv3 irqchip in ACPI way.
+>>
+>> Note: GIC redistributor base address may also be provided in
+>> GICC structures on systems supporting GICv3 and above if the GIC
+>> Redistributors are not in the always-on power domain, this
+>> patch didn't implement such feature yet.
+>>
+>> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+>> [hj: Rework this patch and fix multi issues]
+>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>> ---
+>>   drivers/irqchip/irq-gic-v3.c | 174 +++++++++++++++++++++++++++++++++++++++++--
+>>   1 file changed, 169 insertions(+), 5 deletions(-)
+>>
+>> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+>> index c0b96c6..ebc5604 100644
+>> --- a/drivers/irqchip/irq-gic-v3.c
+>> +++ b/drivers/irqchip/irq-gic-v3.c
+>> @@ -15,6 +15,7 @@
+>>    * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>>    */
+>>
+>> +#include <linux/acpi.h>
+>>   #include <linux/cpu.h>
+>>   #include <linux/cpu_pm.h>
+>>   #include <linux/delay.h>
+>> @@ -25,6 +26,7 @@
+>>   #include <linux/percpu.h>
+>>   #include <linux/slab.h>
+>>
+>> +#include <linux/irqchip/arm-gic-acpi.h>
+>>   #include <linux/irqchip/arm-gic-v3.h>
+>>
+>>   #include <asm/cputype.h>
+>> @@ -802,7 +804,8 @@ static int __init gic_init_bases(void __iomem *dist_base,
+>>   	set_handle_irq(gic_handle_irq);
+>>
+>>   	if (IS_ENABLED(CONFIG_ARM_GIC_V3_ITS) && gic_dist_supports_lpis())
+>> -		its_init(domain_token, &gic_data.rdists, gic_data.domain);
+>> +		its_init(irq_domain_token_to_of_node(domain_token),
+>> +			 &gic_data.rdists, gic_data.domain);
+>
+> This doesn't make much sense. The first parameter to its_init is indeed
+> supposed to be an of_node, but what is the point of calling its_init if
+> you *know* you don't have the necessary topological information to parse
+> the firmware tables?
+>
+> I don't see *any* code that is going to parse the ITS table in this
+> series, so please don't call its_init passing a NULL pointer to it. This
+> is just gross.
 
--Christoffer
+OK, the ITS ACPI code is in later patch which combined with IORT. How
+about moving it to the GIC of init code temporary?
+
+>
+>>
+>>   	gic_smp_init();
+>>   	gic_dist_init();
+>> @@ -818,6 +821,16 @@ out_free:
+>>   	return err;
+>>   }
+>>
+>> +static int __init detect_distributor(void __iomem *dist_base)
+>
+> We do have a naming convention in this file. All functions start with gic_.
+>
+>> +{
+>> +	u32 reg = readl_relaxed(dist_base + GICD_PIDR2) & GIC_PIDR2_ARCH_MASK;
+>> +
+>> +	if (reg != GIC_PIDR2_ARCH_GICv3 && reg != GIC_PIDR2_ARCH_GICv4)
+>> +		return -ENODEV;
+>> +
+>> +	return 0;
+>> +}
+>
+> This function doesn't detect anything, it validates that we have
+> something sensible. Please rename it to gic_validate_dist_version, or
+> something similar.
+
+Ok.
+
+>
+>> +
+>>   #ifdef CONFIG_OF
+>>   static int __init gic_of_init(struct device_node *node, struct device_node *parent)
+>>   {
+>> @@ -825,7 +838,6 @@ static int __init gic_of_init(struct device_node *node, struct device_node *pare
+>>   	struct redist_region *rdist_regs;
+>>   	u64 redist_stride;
+>>   	u32 nr_redist_regions;
+>> -	u32 reg;
+>>   	int err, i;
+>>
+>>   	dist_base = of_iomap(node, 0);
+>> @@ -835,11 +847,10 @@ static int __init gic_of_init(struct device_node *node, struct device_node *pare
+>>   		return -ENXIO;
+>>   	}
+>>
+>> -	reg = readl_relaxed(dist_base + GICD_PIDR2) & GIC_PIDR2_ARCH_MASK;
+>> -	if (reg != GIC_PIDR2_ARCH_GICv3 && reg != GIC_PIDR2_ARCH_GICv4) {
+>> +	err = detect_distributor(dist_base);
+>> +	if (err) {
+>>   		pr_err("%s: no distributor detected, giving up\n",
+>>   			node->full_name);
+>> -		err = -ENODEV;
+>>   		goto out_unmap_dist;
+>>   	}
+>>
+>> @@ -887,3 +898,156 @@ out_unmap_dist:
+>>
+>>   IRQCHIP_DECLARE(gic_v3, "arm,gic-v3", gic_of_init);
+>>   #endif
+>> +
+>> +#ifdef CONFIG_ACPI
+>> +static struct redist_region *redist_regs __initdata;
+>> +static u32 nr_redist_regions __initdata;
+>> +static phys_addr_t dist_phys_base __initdata;
+>> +
+>> +static int __init
+>> +gic_acpi_register_redist(u64 phys_base, u64 size)
+>
+> A physical address must use phys_addr_t.
+
+OK.
+
+>
+>> +{
+>> +	struct redist_region *redist_regs_new;
+>> +	void __iomem *redist_base;
+>> +
+>> +	redist_regs_new = krealloc(redist_regs,
+>> +				   sizeof(*redist_regs) * (nr_redist_regions + 1),
+>> +				   GFP_KERNEL);
+>
+> NAK. If you have multiple regions, you count them, you allocate the
+> right number of regions. This will be far more efficient than doing this
+> realloc dance. It is not like we're not parsing the tables a zillion
+> times already. Doing it one more time won't hurt.
+
+Agreed, will update in next version.
+
+>
+>> +	if (!redist_regs_new) {
+>> +		pr_err("Couldn't allocate resource for GICR region\n");
+>> +		return -ENOMEM;
+>> +	}
+>> +
+>> +	redist_regs = redist_regs_new;
+>> +
+>> +	redist_base = ioremap(phys_base, size);
+>> +	if (!redist_base) {
+>> +		pr_err("Couldn't map GICR region @%llx\n", phys_base);
+>> +		return -ENOMEM;
+>> +	}
+>> +
+>> +	redist_regs[nr_redist_regions].phys_base = phys_base;
+>> +	redist_regs[nr_redist_regions].redist_base = redist_base;
+>> +	nr_redist_regions++;
+>> +	return 0;
+>> +}
+>> +
+>> +static int __init
+>> +gic_acpi_parse_madt_redist(struct acpi_subtable_header *header,
+>> +			const unsigned long end)
+>> +{
+>> +	struct acpi_madt_generic_redistributor *redist;
+>> +
+>> +	if (BAD_MADT_ENTRY(header, end))
+>> +		return -EINVAL;
+>> +
+>> +	redist = (struct acpi_madt_generic_redistributor *)header;
+>> +	if (!redist->base_address)
+>> +		return -EINVAL;
+>> +
+>> +	return gic_acpi_register_redist(redist->base_address, redist->length);
+>> +}
+>> +
+>> +static int __init
+>> +gic_acpi_parse_madt_distributor(struct acpi_subtable_header *header,
+>> +				const unsigned long end)
+>> +{
+>
+> How many versions of gic_acpi_parse_madt_distributor are we going to
+> get? Why isn't the ACPI parsing in a common file? Why do I have to read
+> the same code on and on until my eyes bleed?
+
+I will try to move it to common file irq-gic-acpi.c.
+
+>
+>> +	struct acpi_madt_generic_distributor *dist;
+>> +
+>> +	dist = (struct acpi_madt_generic_distributor *)header;
+>> +
+>> +	if (BAD_MADT_ENTRY(dist, end))
+>> +		return -EINVAL;
+>> +
+>> +	dist_phys_base = dist->base_address;
+>> +	return 0;
+>> +}
+>> +
+>> +static int gic_acpi_gsi_desc_populate(struct acpi_gsi_descriptor *data,
+>> +				      u32 gsi, unsigned int irq_type)
+>> +{
+>> +	/*
+>> +	 * Encode GSI and triggering information the way the GIC likes
+>> +	 * them.
+>> +	 */
+>> +	if (WARN_ON(gsi < 16))
+>> +		return -EINVAL;
+>> +
+>> +	if (gsi >= 32) {
+>> +		data->param[0] = 0;		/* SPI */
+>> +		data->param[1] = gsi - 32;
+>> +		data->param[2] = irq_type;
+>> +	} else {
+>> +		data->param[0] = 1; 		/* PPI */
+>> +		data->param[1] = gsi - 16;
+>> +		data->param[2] = 0xff << 4 | irq_type;
+>> +	}
+>> +
+>> +	data->param_count = 3;
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static int __init
+>> +gic_acpi_init(struct acpi_table_header *table)
+>> +{
+>> +	int count, i, err = 0;
+>> +	void __iomem *dist_base;
+>> +
+>> +	/* Get distributor base address */
+>> +	count = acpi_parse_entries(ACPI_SIG_MADT,
+>> +				sizeof(struct acpi_table_madt),
+>> +				gic_acpi_parse_madt_distributor, table,
+>> +				ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR, 0);
+>> +	if (count <= 0) {
+>> +		pr_err("No valid GICD entry exist\n");
+>> +		return -EINVAL;
+>> +	} else if (count > 1) {
+>> +		pr_err("More than one GICD entry detected\n");
+>> +		return -EINVAL;
+>> +	}
+>> +
+>> +	dist_base = ioremap(dist_phys_base, ACPI_GICV3_DIST_MEM_SIZE);
+>> +	if (!dist_base) {
+>> +		pr_err("Unable to map GICD registers\n");
+>> +		return -ENOMEM;
+>> +	}
+>> +
+>> +	err = detect_distributor(dist_base);
+>> +	if (err) {
+>> +		pr_err("No distributor detected at @%p, giving up", dist_base);
+>> +		goto out_dist_unmap;
+>> +	}
+>> +
+>> +	/* Collect redistributor base addresses */
+>> +	count = acpi_parse_entries(ACPI_SIG_MADT,
+>> +			sizeof(struct acpi_table_madt),
+>> +			gic_acpi_parse_madt_redist, table,
+>> +			ACPI_MADT_TYPE_GENERIC_REDISTRIBUTOR, 0);
+>> +	if (count <= 0) {
+>> +		pr_info("No valid GICR entries exist\n");
+>> +		err = -EINVAL;
+>> +		goto out_redist_unmap;
+>> +	}
+>> +
+>> +	err = gic_init_bases(dist_base, redist_regs, nr_redist_regions, 0,
+>> +			     (void *)ACPI_IRQ_MODEL_GIC);
+>
+> There is no other global identifier for GICv3? It feels a bit weird to
+> use the same ID as GICv2 (though probably not harmful as you can't have
+> both as the same time). What are you planning to use for the ITS then?
+> You must make sure you have a global namespace.
+
+I will use the ITS physical base address as the token for ITS, maybe I
+can use the GICD physical base address here instead?
+
+>
+>> +	if (err)
+>> +		goto out_redist_unmap;
+>> +
+>> +	acpi_set_irq_model(ACPI_IRQ_MODEL_GIC, ACPI_IRQ_MODEL_GIC,
+>> +			   gic_acpi_gsi_desc_populate);
+>> +	return 0;
+>> +
+>> +out_redist_unmap:
+>> +	for (i = 0; i < nr_redist_regions; i++)
+>> +		if (redist_regs[i].redist_base)
+>> +			iounmap(redist_regs[i].redist_base);
+>> +	kfree(redist_regs);
+>> +out_dist_unmap:
+>> +	iounmap(dist_base);
+>> +	return err;
+>> +}
+>> +IRQCHIP_ACPI_DECLARE(gic_v3, ACPI_MADT_GIC_VERSION_V3, gic_acpi_init);
+>> +IRQCHIP_ACPI_DECLARE(gic_v4, ACPI_MADT_GIC_VERSION_V4, gic_acpi_init);
+>
+> As mentioned before, this doesn't work.
+
+hmm, I think we need more discussion for this one, but we need to match
+V4 for GICv3 drivers, and everything will be the same in the dirver
+as I said before.
+
+Thanks
+Hanjun
