@@ -1,163 +1,103 @@
-From: Shenwei.Wang@freescale.com (Shenwei Wang)
-Date: Wed, 5 Aug 2015 21:11:19 +0000
-Subject: [PATCH v3 1/1] misc: sram: add dev_pm_ops to support module power
- gate
-In-Reply-To: <1438272681-29338-1-git-send-email-shenwei.wang@freescale.com>
-References: <1438272681-29338-1-git-send-email-shenwei.wang@freescale.com>
-Message-ID: <CY1PR0301MB0843E511B3A98E7EADDD25D483750@CY1PR0301MB0843.namprd03.prod.outlook.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 5 Aug 2015 22:48:54 +0100
+Subject: [PATCH 3/4] arm64: Juno: Add HDLCD support to the Juno boards.
+In-Reply-To: <20150805190312.GA31066@e106497-lin.cambridge.arm.com>
+References: <1438784892-27888-1-git-send-email-Liviu.Dudau@arm.com>
+ <1438784892-27888-4-git-send-email-Liviu.Dudau@arm.com>
+ <20150805175303.GB7557@n2100.arm.linux.org.uk>
+ <20150805190312.GA31066@e106497-lin.cambridge.arm.com>
+Message-ID: <20150805214854.GC7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ping.
+On Wed, Aug 05, 2015 at 08:03:12PM +0100, Liviu Dudau wrote:
+> I have to confess that I am not entirely up to speed with the TDA19988
+> situation at the moment. Andrew Jackson was dealing with that and
+> working with Jean to get that in the upstream, but his contract has
+> ended and he has moved to other things.
 
-Shenwei
+Umm, I'm the maintainer for TDA998x:
 
-> -----Original Message-----
-> From: linux-arm-kernel [mailto:linux-arm-kernel-bounces at lists.infradead.org] On
-> Behalf Of Shenwei Wang
-> Sent: 2015?7?30? 11:11
-> To: gregkh at linuxfoundation.org; arnd at arndb.de
-> Cc: Huang Yongcai-B20788; linux-arm-kernel at lists.infradead.org
-> Subject: [PATCH v3 1/1] misc: sram: add dev_pm_ops to support module power
-> gate
+NXP TDA998X DRM DRIVER
+M:      Russell King <rmk+kernel@arm.linux.org.uk>
+S:      Supported
+F:      drivers/gpu/drm/i2c/tda998x_drv.c
+F:      include/drm/i2c/tda998x.h
+
+It would be nice if people worked with the actual maintainers of things
+rather than random other people...
+
+> > Also, the whole question of representing connectors in a DRM model is
+> > yet to be established.  Yes, DT should describe the hardware, but we
+> > don't yet know _how_ to describe physical connectors with stuff
+> > implemented on top of DRM yet, and we have nothing that makes use of
+> > this.
 > 
-> When system goes into low power states like SUSPEND_MEM and HIBERNATION,
-> the hardware IP block may be powered off to reduce the power consumption.
-> This power down will lost all the data inside the ram. This patch added the
-> dev_pm_ops and implemented two callbacks: suspend_noirq and resume_noirq,
-> which will save the data in the on-chip-ram right before power down and restore
-> it after system resumes.
-> 
-> A new property string named "can-power-gate" is added to the devicetree
-> bindings too.
-> 
-> Signed-off-by: Shenwei Wang <shenwei.wang@freescale.com>
-> Signed-off-by: Anson Huang <b20788@freescale.com>
-> ---
-> Change log:
-> 
-> PATCH v3
-> 	Removed the unnecessary clk_enable/clk_disable.
-> 
-> PATCH v2
-> 	Use vmalloc to allocate the SRAM backup memory.
-> 	Code clean up.
-> 
->  Documentation/devicetree/bindings/misc/sram.txt |  2 ++
->  drivers/misc/sram.c                             | 42
-> +++++++++++++++++++++++++
->  2 files changed, 44 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/misc/sram.txt
-> b/Documentation/devicetree/bindings/misc/sram.txt
-> index 36cbe5a..1170086 100644
-> --- a/Documentation/devicetree/bindings/misc/sram.txt
-> +++ b/Documentation/devicetree/bindings/misc/sram.txt
-> @@ -33,6 +33,8 @@ Optional properties in the area nodes:
-> 
->  - compatible : standard definition, should contain a vendor specific string
->                 in the form <vendor>,[<device>-]<usage>
-> +- can-power-gate: a property to tell the driver that the sram can support
-> +		power gate
-> 
->  Example:
-> 
-> diff --git a/drivers/misc/sram.c b/drivers/misc/sram.c index 15c33cc..db9f1fa
-> 100644
-> --- a/drivers/misc/sram.c
-> +++ b/drivers/misc/sram.c
-> @@ -30,7 +30,9 @@
-> 
->  struct sram_dev {
->  	struct device *dev;
-> +	void *power_off_save;
->  	void __iomem *virt_base;
-> +	u32 size;
-> 
->  	struct gen_pool *pool;
->  	struct clk *clk;
-> @@ -156,6 +158,33 @@ static int sram_reserve_regions(struct sram_dev
-> *sram, struct resource *res)
->  	return ret;
->  }
-> 
-> +static int sram_suspend_noirq(struct device *dev) {
-> +	struct platform_device *pdev = to_platform_device(dev);
-> +	struct sram_dev *sram = platform_get_drvdata(pdev);
-> +
-> +	if (!sram->power_off_save)
-> +		return 0;
-> +
-> +	/* Save necessary regs */
-> +	memcpy(sram->power_off_save, sram->virt_base, sram->size);
-> +
-> +	return 0;
-> +}
-> +
-> +static int sram_resume_noirq(struct device *dev) {
-> +	struct platform_device *pdev = to_platform_device(dev);
-> +	struct sram_dev *sram = platform_get_drvdata(pdev);
-> +
-> +	if (!sram->power_off_save)
-> +		return 0;
-> +
-> +	memcpy(sram->virt_base, sram->power_off_save, sram->size);
-> +
-> +	return 0;
-> +}
-> +
->  static int sram_probe(struct platform_device *pdev)  {
->  	struct sram_dev *sram;
-> @@ -176,6 +205,7 @@ static int sram_probe(struct platform_device *pdev)
->  	}
-> 
->  	size = resource_size(res);
-> +	sram->size = size;
-> 
->  	if (!devm_request_mem_region(sram->dev, res->start, size, pdev->name)) {
->  		dev_err(sram->dev, "could not request region for resource\n"); @@
-> -203,6 +233,9 @@ static int sram_probe(struct platform_device *pdev)
-> 
->  	platform_set_drvdata(pdev, sram);
-> 
-> +	if (of_property_read_bool(pdev->dev.of_node, "can-power-gate"))
-> +		sram->power_off_save = vmalloc(size);
-> +
->  	dev_dbg(sram->dev, "SRAM pool: %zu KiB @ 0x%p\n",
->  		gen_pool_size(sram->pool) / 1024, sram->virt_base);
-> 
-> @@ -219,6 +252,9 @@ static int sram_remove(struct platform_device *pdev)
->  	if (sram->clk)
->  		clk_disable_unprepare(sram->clk);
-> 
-> +	if (sram->power_off_save)
-> +		vfree(sram->power_off_save);
-> +
->  	return 0;
->  }
-> 
-> @@ -229,10 +265,16 @@ static const struct of_device_id sram_dt_ids[] = {  };
-> #endif
-> 
-> +static const struct dev_pm_ops sram_pm_ops = {
-> +	.suspend_noirq = sram_suspend_noirq,
-> +	.resume_noirq = sram_resume_noirq,
-> +};
-> +
->  static struct platform_driver sram_driver = {
->  	.driver = {
->  		.name = "sram",
->  		.of_match_table = of_match_ptr(sram_dt_ids),
-> +		.pm	= &sram_pm_ops,
->  	},
->  	.probe = sram_probe,
->  	.remove = sram_remove,
-> --
-> 2.5.0.rc2
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Please help me understand the current situation: you have added
+> support for components that the video drivers can use and the bindings
+> for that are described in Documentation/devicetree/bindings/media/video-interfaces.txt.
+
+No.  I added the component helpers, which are entirely firmware agnostic.
+The media bindings were created by others, and through development done
+by Pengutronix, they were factored out of media into common DT code and
+re-used for the IMX DRM driver.  The binding document which describes
+that work is not the one you refer to above, but this one:
+
+Documentation/devicetree/bindings/graph.txt
+
+This started them as a basis for DRM drivers on ARM - but it's never been
+officially "adopted" as a method to describe DRM drivers - it's only what
+some drivers are using.  It ought to be nailed down as a way to ensure
+inter-operability between components though, but no one has really made
+that decision.
+
+> According to that document my patch should be compliant once I add the
+> reg= property. Is that something that cannot be used with tda998x driver
+> or is there any other reason why you think the patch is not compliant?
+
+Jean's proposal to add audio support to the TDA998x driver does it via
+this change to the binding spec:
+
++Optional nodes:
++
++  - port: up to three ports.
++       The ports are defined according to [1].
++
++    Video port.
++       There may be only one video port.
++       This one must contain the following property:
++
++       - port-type: must be "rgb"
++
++       and may contain the optional property:
++
++       - reg: 24 bits value which defines how the video controller
++               output is wired to the TDA998x input (video pins)
++               When absent, the default value is <0x230145>.
++
++    Audio ports.
++       There may be one or two audio ports.
++       These ones must contain the following properties:
++
++       - port-type: must be "i2s" or "spdif"
++
++       - reg: 8 bits value which defines how the audio controller
++               output is wired to the TDA998x input (audio pins)
++
++[1] Documentation/devicetree/bindings/graph.txt
+
+(That's not a particularly precise definition, but it's what we have at
+the moment.)
+
+> If you are referring to connecting an encoder with a HDMI connector, I
+> have tested that and it seems to work, although my situation is simple
+> because there are no options in my setup: one HDLCD connects to one
+> TDA19988 which connects to one HDMI output.
+
+Right now, the TDA998x will ignore the additional information, but that
+won't be the case with Jean's audio work (see the above binding
+information.)
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
