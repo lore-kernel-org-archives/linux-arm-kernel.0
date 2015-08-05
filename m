@@ -1,69 +1,103 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 5 Aug 2015 19:55:17 +0530
-Subject: [PATCH 10/10] ARM: dts: omap4: Use "syscon-otghs" instead of
- "ctrl-module" in USB node
-In-Reply-To: <55C1C486.6050202@ti.com>
-References: <1438702233-8027-1-git-send-email-kishon@ti.com>
- <1438702233-8027-11-git-send-email-kishon@ti.com> <55C1C325.5040703@ti.com>
- <55C1C486.6050202@ti.com>
-Message-ID: <55C21CCD.6050101@ti.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Wed,  5 Aug 2015 15:28:09 +0100
+Subject: [PATCH 1/4] drm: arm: Add DT bindings documentation for HDLCD driver.
+In-Reply-To: <1438784892-27888-1-git-send-email-Liviu.Dudau@arm.com>
+References: <1438784892-27888-1-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <1438784892-27888-2-git-send-email-Liviu.Dudau@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Roger,
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Pawel Moll <pawel.moll@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+Cc: Kumar Gala <galak@codeaurora.org>
 
-On Wednesday 05 August 2015 01:38 PM, Roger Quadros wrote:
-> On 05/08/15 11:02, Roger Quadros wrote:
->> Kishon,
->>
->> On 04/08/15 18:30, Kishon Vijay Abraham I wrote:
->>> Add "syscon-otghs" property and remove the deprecated "ctrl-module"
->>> property from MUSB devicetree node.
->>>
->>> Since "omap_control_usbotg" devicetree node is no longer used, remove
->>> it.
->>>
->>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
->>> ---
->>>  arch/arm/boot/dts/omap4.dtsi |    8 +-------
->>>  1 file changed, 1 insertion(+), 7 deletions(-)
->>>
->>> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
->>> index b27634d..2fb49a5 100644
->>> --- a/arch/arm/boot/dts/omap4.dtsi
->>> +++ b/arch/arm/boot/dts/omap4.dtsi
->>> @@ -854,12 +854,6 @@
->>>  			};
->>>  		};
->>>  
->>> -		omap_control_usbotg: control-phy at 4a00233c {
->>> -			compatible = "ti,control-phy-otghs";
->>> -			reg = <0x4a00233c 0x4>;
->>> -			reg-names = "otghs_control";
->>> -		};
->>> -
->>>  		usb_otg_hs: usb_otg_hs at 4a0ab000 {
->>>  			compatible = "ti,omap4-musb";
->>>  			reg = <0x4a0ab000 0x7ff>;
->>> @@ -872,7 +866,7 @@
->>>  			multipoint = <1>;
->>>  			num-eps = <16>;
->>>  			ram-bits = <12>;
->>> -			ctrl-module = <&omap_control_usbotg>;
->>> +			syscon-otghs = <&scm_conf 0x33c>;
->>
->> All other properties were of the format "syscon-phy-foo".
->> Why use a different format here?
->>
-> 
-> Ah, looks like we don't have a dedicated phy driver for this?
-> We will need to add a PHY driver I guess then and handle this register
-> in that driver rather than in the musb driver.
+Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+---
+ .../devicetree/bindings/drm/arm/arm,hdlcd.txt      | 74 ++++++++++++++++++++++
+ 1 file changed, 74 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/drm/arm/arm,hdlcd.txt
 
-I was explaining in the other thread to Tony on why this shouldn't be done in a
-PHY driver [1].
-
-Thanks
-Kishon
-
-[1] -> https://lkml.org/lkml/2015/8/5/455
+diff --git a/Documentation/devicetree/bindings/drm/arm/arm,hdlcd.txt b/Documentation/devicetree/bindings/drm/arm/arm,hdlcd.txt
+new file mode 100644
+index 0000000..b57f1b9
+--- /dev/null
++++ b/Documentation/devicetree/bindings/drm/arm/arm,hdlcd.txt
+@@ -0,0 +1,74 @@
++ARM HDLCD
++
++This is a display controller found on several development platforms produced
++by ARM Ltd and in more modern of its' Fast Models. The HDLCD is an RGB
++streamer that reads the data from a framebuffer and sends it to a single
++digital encoder (DVI or HDMI).
++
++Required properties:
++  - compatible: "arm,hdlcd"
++  - reg: Physical base address and length of the controller's registers.
++    If a second pair of address and length values is present this specifies
++    the presence of a DMA coherent memory area that the HDLCD can use as
++    framebuffer instead of normal CMA memory.
++  - interrupts: One interrupt used by the display controller to notify the
++    interrupt controller when any of the interrupt sources programmed in
++    the interrupt mask register have activated.
++  - clocks: A list of phandle + clock-specifier pairs, one for each
++    entry in 'clock-names'.
++  - clock-names: A list of clock names. For HDLD it should contain:
++      - "pxlclk" for the clock feeding the output PLL of the controller.
++  - port: The HDLCD connection to an encoder chip. The connection is modelled
++    using the OF graph bindings specified in Documentation/devicetree/bindings/graph.txt.
++
++
++Example:
++
++/ {
++	...
++
++	hdlcd at 2b000000 {
++		compatible = "arm,hdlcd";
++		reg = <0 0x2b000000 0 0x1000>;
++		interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&oscclk5>;
++		clock-names = "pxlclk";
++		port {
++			hdlcd_output: endpoint at 0 {
++				remote-endpoint = <&hdmi_enc_input>;
++			};
++		};
++	};
++
++	/* HDMI encoder on I2C bus */
++	i2c at 7ffa0000 {
++		....
++		hdmi-transmitter at 70 {
++			compatible = ".....";
++			reg = <0x70>;
++			video-ports = <0x234501>;
++			port at 0 {
++				hdmi_enc_input: endpoint {
++					remote-endpoint = <&hdlcd_output>;
++				};
++
++				hdmi_enc_output: endpoint {
++					remote-endpoint = <&hdmi_1_port>;
++				};
++			};
++		};
++
++	};
++
++	hdmi1: connector at 1 {
++		compatible = "hdmi-connector";
++		type = "a";
++		port {
++			hdmi_1_port: endpoint {
++				remote-endpoint = <&hdmi_enc_output>;
++			};
++		};
++	};
++
++	...
++};
+-- 
+2.4.6
