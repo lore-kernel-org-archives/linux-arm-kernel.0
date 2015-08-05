@@ -1,76 +1,206 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 5 Aug 2015 09:45:22 -0500
-Subject: [PATCH 6/9] ARM: domain: Add platform handlers for CPU PM domains
-In-Reply-To: <1438731339-58317-7-git-send-email-lina.iyer@linaro.org>
-References: <1438731339-58317-1-git-send-email-lina.iyer@linaro.org>
- <1438731339-58317-7-git-send-email-lina.iyer@linaro.org>
-Message-ID: <CAL_JsqKWekSGiFbZz6++3ibAzY_8Y6+0nOBQinFVw4cBk6JvEw@mail.gmail.com>
+From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
+Date: Wed, 05 Aug 2015 15:58:51 +0100
+Subject: [RFC PATCH 05/10] arm64: Keep track of CPU feature registers
+In-Reply-To: <1437731037-25795-6-git-send-email-suzuki.poulose@arm.com>
+References: <1437731037-25795-1-git-send-email-suzuki.poulose@arm.com>
+ <1437731037-25795-6-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <55C224AB.8020402@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 4, 2015 at 6:35 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
-> In addition to the common power up/down actions of CPU PM domain core,
-> platforms may have additional configuration before the CPU domain can be
-> powered off or considered active. Allow platform drivers to register
-> handlers for CPU PM domains.
+On 24/07/15 10:43, Suzuki K. Poulose wrote:
+> From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
 >
-> Platform drivers may register their callbacks against a compatible
-> string defined by their PM domain provider device node in the DT. At
-> domain init, the platform driver can initialize the platform specific
-> genpd attributes. The init callback would need to return successfully,
-> for the platform power_on/off handlers to be registered with the CPU PM
-> domain.
+> This patch adds an infrastructure to keep track of the CPU feature
+> registers on the system. This patch also consolidates the cpuinfo
+> SANITY checks which ensures that we don't have conflicting feature
+> supports across the CPUs.
 >
-> The code uses __init section to reduce memory needed for platform
-> handlers and therefore can be freed after the driver is initialized, a
-> desirable outcome for single kernel image.
+> Each register has a set of feature bits defined by the architecture.
+> We define the following attributes:
+>
+>   1) strict - If strict matching is required for the field across the
+>      all the CPUs for SANITY checks.
+>   2) visible - If the field is exposed to the userspace (See documentation
+>      for more details).
+>
+> The default 'safe' value for the feature is also defined, which will be
+> used:
+>   1) To set the value for a 'discrete' feature with conflicting values.
+>   2) To set the value for an 'invisible' feature for the userspace.
+>
+> The infrastructure keeps track of the following values for a feature
+> register:
+>   - user visible value
+>   - system wide safe value
+>
+> Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
+> ---
+>   arch/arm64/include/asm/cpu.h |  149 ++++++++++++++++
+>   arch/arm64/kernel/cpuinfo.c  |  399 ++++++++++++++++++++++++++++++++++++++----
+>   2 files changed, 511 insertions(+), 37 deletions(-)
+>
+> diff --git a/arch/arm64/include/asm/cpu.h b/arch/arm64/include/asm/cpu.h
+> index a34de72..c7b0b89 100644
+> --- a/arch/arm64/include/asm/cpu.h
+> +++ b/arch/arm64/include/asm/cpu.h
+...
+> diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
+> index a13468b..ae2a37f 100644
+> --- a/arch/arm64/kernel/cpuinfo.c
+> +++ b/arch/arm64/kernel/cpuinfo.c
+> @@ -31,6 +31,207 @@
+>   #include <linux/sched.h>
+>   #include <linux/smp.h>
+>
+...
+> -#define CHECK_MASK(field, mask, boot, cur, cpu) \
+> -       check_reg_mask(#field, mask, (boot)->reg_ ## field, (cur)->reg_ ## field, cpu)
+> -
+> -#define CHECK(field, boot, cur, cpu) \
+> -       CHECK_MASK(field, ~0ULL, boot, cur, cpu)
+> +#define CHECK_CPUINFO(field)                                                           \
+> +       ({                                                                              \
+> +               int __rc = 0;                                                           \
+> +               struct arm64_ftr_reg *__regp = get_arm64_sys_reg(sys_ ## field);        \
+> +               if (__regp) {                                                           \
+> +                       __rc = check_reg_mask(__regp,                                   \
+> +                                               (boot)->reg_ ## field,                  \
+> +                                               (cur)->reg_ ## field, cpu);             \
+> +                       update_cpu_ftr_reg(__regp, cur->reg_ ## field, cpu);            \
+> +               }                                                                       \
+> +               __rc;                                                                   \
+> +       })
+>
+>   /*
+>    * Verify that CPUs don't have unexpected differences that will cause problems.
+> @@ -123,17 +448,17 @@ static void cpuinfo_sanity_check(struct cpuinfo_arm64 *cur)
+>           * caches should look identical. Userspace JITs will make use of
+>           * *minLine.
+>           */
+> -       diff |= CHECK_MASK(ctr, 0xffff3fff, boot, cur, cpu);
+> +       diff |= CHECK_CPUINFO(ctr);
+>
+>          /*
+>           * Userspace may perform DC ZVA instructions. Mismatched block sizes
+>           * could result in too much or too little memory being zeroed if a
+>           * process is preempted and migrated between CPUs.
+>           */
+> -       diff |= CHECK(dczid, boot, cur, cpu);
+> +       diff |= CHECK_CPUINFO(dczid);
+>
+>          /* If different, timekeeping will be broken (especially with KVM) */
+> -       diff |= CHECK(cntfrq, boot, cur, cpu);
+> +       diff |= CHECK_CPUINFO(cntfrq);
+>
+>          /*
+>           * The kernel uses self-hosted debug features and expects CPUs to
+> @@ -141,15 +466,15 @@ static void cpuinfo_sanity_check(struct cpuinfo_arm64 *cur)
+>           * and BRPs to be identical.
+>           * ID_AA64DFR1 is currently RES0.
+>           */
+> -       diff |= CHECK(id_aa64dfr0, boot, cur, cpu);
+> -       diff |= CHECK(id_aa64dfr1, boot, cur, cpu);
+> +       diff |= CHECK_CPUINFO(id_aa64dfr0);
+> +       diff |= CHECK_CPUINFO(id_aa64dfr1);
+>
+>          /*
+>           * Even in big.LITTLE, processors should be identical instruction-set
+>           * wise.
+>           */
+> -       diff |= CHECK(id_aa64isar0, boot, cur, cpu);
+> -       diff |= CHECK(id_aa64isar1, boot, cur, cpu);
+> +       diff |= CHECK_CPUINFO(id_aa64isar0);
+> +       diff |= CHECK_CPUINFO(id_aa64isar1);
+>
+>          /*
+>           * Differing PARange support is fine as long as all peripherals and
+> @@ -157,42 +482,42 @@ static void cpuinfo_sanity_check(struct cpuinfo_arm64 *cur)
+>           * Linux should not care about secure memory.
+>           * ID_AA64MMFR1 is currently RES0.
+>           */
+> -       diff |= CHECK_MASK(id_aa64mmfr0, 0xffffffffffff0ff0, boot, cur, cpu);
+> -       diff |= CHECK(id_aa64mmfr1, boot, cur, cpu);
+> +       diff |= CHECK_CPUINFO(id_aa64mmfr0);
+> +       diff |= CHECK_CPUINFO(id_aa64mmfr1);
+>
+>          /*
+>           * EL3 is not our concern.
+>           * ID_AA64PFR1 is currently RES0.
+>           */
+> -       diff |= CHECK_MASK(id_aa64pfr0, 0xffffffffffff0fff, boot, cur, cpu);
+> -       diff |= CHECK(id_aa64pfr1, boot, cur, cpu);
+> +       diff |= CHECK_CPUINFO(id_aa64pfr0);
+> +       diff |= CHECK_CPUINFO(id_aa64pfr1);
+>
+>          /*
+>           * If we have AArch32, we care about 32-bit features for compat. These
+>           * registers should be RES0 otherwise.
+>           */
+> -       diff |= CHECK(id_dfr0, boot, cur, cpu);
+> -       diff |= CHECK(id_isar0, boot, cur, cpu);
+> -       diff |= CHECK(id_isar1, boot, cur, cpu);
+> -       diff |= CHECK(id_isar2, boot, cur, cpu);
+> -       diff |= CHECK(id_isar3, boot, cur, cpu);
+> -       diff |= CHECK(id_isar4, boot, cur, cpu);
+> -       diff |= CHECK(id_isar5, boot, cur, cpu);
+> +       diff |= CHECK_CPUINFO(id_dfr0);
+> +       diff |= CHECK_CPUINFO(id_isar0);
+> +       diff |= CHECK_CPUINFO(id_isar1);
+> +       diff |= CHECK_CPUINFO(id_isar2);
+> +       diff |= CHECK_CPUINFO(id_isar3);
+> +       diff |= CHECK_CPUINFO(id_isar4);
+> +       diff |= CHECK_CPUINFO(id_isar5);
+>          /*
+>           * Regardless of the value of the AuxReg field, the AIFSR, ADFSR, and
+>           * ACTLR formats could differ across CPUs and therefore would have to
+>           * be trapped for virtualization anyway.
+>           */
+> -       diff |= CHECK_MASK(id_mmfr0, 0xff0fffff, boot, cur, cpu);
+> -       diff |= CHECK(id_mmfr1, boot, cur, cpu);
+> -       diff |= CHECK(id_mmfr2, boot, cur, cpu);
+> -       diff |= CHECK(id_mmfr3, boot, cur, cpu);
+> -       diff |= CHECK(id_pfr0, boot, cur, cpu);
+> -       diff |= CHECK(id_pfr1, boot, cur, cpu);
+> +       diff |= CHECK_CPUINFO(id_mmfr0);
+> +       diff |= CHECK_CPUINFO(id_mmfr1);
+> +       diff |= CHECK_CPUINFO(id_mmfr2);
+> +       diff |= CHECK_CPUINFO(id_mmfr3);
+> +       diff |= CHECK_CPUINFO(id_pfr0);
+> +       diff |= CHECK_CPUINFO(id_pfr1);
+>
+> -       diff |= CHECK(mvfr0, boot, cur, cpu);
+> -       diff |= CHECK(mvfr1, boot, cur, cpu);
+> -       diff |= CHECK(mvfr2, boot, cur, cpu);
+> +       diff |= CHECK_CPUINFO(mvfr0);
+> +       diff |= CHECK_CPUINFO(mvfr1);
+> +       diff |= CHECK_CPUINFO(mvfr2);
+>
+>          /*
+>           * Mismatched CPU features are a recipe for disaster. Don't even
+> @@ -239,7 +564,7 @@ static void __cpuinfo_store_cpu(struct cpuinfo_arm64 *info)
+>          cpuinfo_detect_icache_policy(info);
+>
+>          check_local_cpu_errata();
+> -       check_local_cpu_features();
+> +       cpuinfo_sanity_check(info);
+These two changes shouldn't be there, I have fixed it locally.
+>          update_cpu_features(info);
+>   }
+>
+> @@ -247,13 +572,13 @@ void cpuinfo_store_cpu(void)
+>   {
+>          struct cpuinfo_arm64 *info = this_cpu_ptr(&cpu_data);
+>          __cpuinfo_store_cpu(info);
+> -       cpuinfo_sanity_check(info);
+As above, this line should be retained here.
+>   }
+>
+>   void __init cpuinfo_store_boot_cpu(void)
+>   {
+>          struct cpuinfo_arm64 *info = &per_cpu(cpu_data, 0);
+>          __cpuinfo_store_cpu(info);
+> +       init_cpu_ftrs(info);
 
-[...]
-
-> diff --git a/arch/arm/include/asm/arm-pd.h b/arch/arm/include/asm/arm-pd.h
-> new file mode 100644
-> index 0000000..fc44abf
-> --- /dev/null
-> +++ b/arch/arm/include/asm/arm-pd.h
-> @@ -0,0 +1,30 @@
-> +/*
-> + * linux/arch/arm/include/asm/arm-pd.h
-> + *
-> + * Copyright (C) 2015 Linaro Ltd.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#ifndef __ARM_PD_H__
-> +#define __ARM_PD_H__
-> +
-> +struct of_arm_pd_ops {
-> +       int (*init)(struct device_node *dn, struct generic_pm_domain *d);
-> +       int (*power_on)(struct generic_pm_domain *d);
-> +       int (*power_off)(struct generic_pm_domain *d);
-> +};
-> +
-> +struct of_arm_pd_method {
-> +       const char *handle;
-> +       struct of_arm_pd_ops *ops;
-> +};
-> +
-> +#define ARM_PD_METHOD_OF_DECLARE(_name, _handle, _ops) \
-> +       static const struct of_arm_pd_method __arm_pd_method_of_table_##_name \
-> +       __used __section(__arm_pd_method_of_table)              \
-> +       = { .handle = _handle, .ops = _ops }
-
-AFAICT, you are not using this in this series. You should add it when
-you have a user.
-
-Ideally, we keep some amount of uniformity across various *_OF_DECLARE
-which is why we have OF_DECLARE_1 and OF_DECLARE_2. This makes all the
-sections just arrays of struct of_device_id. Not all users follow
-this, but most do. So instead of putting the ops in here, platforms
-can provide a function callback which can then set the ops. Then you
-also don't need the .init() ops function as the callback function can
-do any initialization too.
-
-Rob
+Thanks
+Suzuki
