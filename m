@@ -1,40 +1,28 @@
-From: julien.grall@citrix.com (Julien Grall)
-Date: Wed, 5 Aug 2015 11:31:09 +0100
-Subject: [PATCH v2 2/8] xen: Make clear that swiotlb and biomerge are
- dealing with DMA address
-In-Reply-To: <alpine.DEB.2.02.1508051041060.11337@kaball.uk.xensource.com>
-References: <1438711972-18752-1-git-send-email-julien.grall@citrix.com>
- <1438711972-18752-3-git-send-email-julien.grall@citrix.com>
- <alpine.DEB.2.02.1508051041060.11337@kaball.uk.xensource.com>
-Message-ID: <55C1E5ED.10103@citrix.com>
+From: haibo.chen@freescale.com (Haibo Chen)
+Date: Wed, 5 Aug 2015 18:38:36 +0800
+Subject: [PATCH v4 0/6] mmc: imx: a few fixes and new feature
+Message-ID: <1438771122-8601-1-git-send-email-haibo.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefano,
+Changes for v4:
+-Call esdhc_set_strobe_dll() only when device clock is over 100MHz in HS400 mode.
+-Add detail description of tuning-step.
+-Change to default watermark level and burst length for all imx SoC, not only imx7d.
 
-On 05/08/15 10:49, Stefano Stabellini wrote:
->>  /* VIRT <-> MACHINE conversion */
->>  #define virt_to_mfn(v)		(pfn_to_mfn(virt_to_pfn(v)))
->> @@ -96,7 +115,7 @@ static inline bool set_phys_to_machine(unsigned long pfn, unsigned long mfn)
->>  
->>  bool xen_arch_need_swiotlb(struct device *dev,
->>  			   unsigned long pfn,
->> -			   unsigned long mfn);
->> +			   unsigned long dfn);
->>  unsigned long xen_get_swiotlb_free_pages(unsigned int order);
-> 
-> You missed a bunch of dfn->bfn renamings.
+Haibo Chen (6):
+  mmc: sdhci-esdhc-imx: add imx7d support and support HS400
+  mmc: sdhci-esdhc-imx: add tuning-step seting support
+  mmc: sdhci-esdhc-imx: add compatible string in bingding doc
+  ARM: dts: imx7d-sdb: add eMMC5.0 support
+  mmc: sdhci-esdhc-imx: change default watermark level and burst length
+  mmc: sdhci-esdhc-imx: set back the burst_length_enable bit to 1
 
-Sorry, I forgot to double check that before sending the patch. I will
-fix it in the next version.
-
-> Aside from those and the commit message error:
-> 
-> Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-
-Thank you!
-
-Regards,
+ .../devicetree/bindings/mmc/fsl-imx-esdhc.txt      |   6 ++
+ arch/arm/boot/dts/imx7d-sdb.dts                    |  13 +++
+ drivers/mmc/host/sdhci-esdhc-imx.c                 | 109 ++++++++++++++++++++-
+ include/linux/platform_data/mmc-esdhc-imx.h        |   1 +
+ 4 files changed, 128 insertions(+), 1 deletion(-)
 
 -- 
-Julien Grall
+1.9.1
