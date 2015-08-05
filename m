@@ -1,43 +1,67 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 5 Aug 2015 10:16:08 +0100
-Subject: [PATCH] arm64: mm: ensure patched kernel text is fetched from PoC
-In-Reply-To: <20150804214522.GA14625@leverpostej>
-References: <1438715013-4625-1-git-send-email-will.deacon@arm.com>
- <20150804214522.GA14625@leverpostej>
-Message-ID: <20150805091607.GA6092@arm.com>
+Date: Wed, 5 Aug 2015 10:23:19 +0100
+Subject: [PATCH v4 1/3] PCI: generic: remove dependency on hw_pci
+In-Reply-To: <20150804234956.GF17327@google.com>
+References: <1438721620-15493-1-git-send-email-jchandra@broadcom.com>
+ <20150804234956.GF17327@google.com>
+Message-ID: <20150805092318.GB6092@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 04, 2015 at 10:45:23PM +0100, Mark Rutland wrote:
-> I assume that you meant PoU rather than PoC in the subject.
-
-Oops, well spotted!
-
-> On Tue, Aug 04, 2015 at 08:03:33PM +0100, Will Deacon wrote:
-> > The arm64 booting document requires that the bootloader has cleaned the
-> > kernel image to the PoC. However, when a CPU re-enters the kernel due to
-> > either a CPU hotplug "on" event or resuming from a low-power state (e.g.
-> > cpuidle), the kernel text may in-fact be dirty at the PoU due to things
-> > like alternative patching or even module loading.
+On Wed, Aug 05, 2015 at 12:49:56AM +0100, Bjorn Helgaas wrote:
+> On Wed, Aug 05, 2015 at 02:23:38AM +0530, Jayachandran C wrote:
+> > The current code in pci-host-generic.c uses pci_common_init_dev()
+> > from arm architecture to do some part of the PCI setup, and this
+> > prevents it from being used with arm64 architecture.
 > > 
-> > Thanks to I-cache speculation with the MMU off, stale instructions could
-> > be fetched prior to enabling the MMU, potentially leading to crashes
-> > when executing regions of code that have been modified at runtime.
+> > The part of pci_common_init_dev() that is really needed by
+> > pci-host-generic.c is very limited and can be done in the same
+> > file without using hw_pci API of ARM. The ARM platform requires
+> > a pci_sys_data as sysdata for the PCI bus, this can be handled by
+> > setting up gen_pci to have a pci_sys_data variable as the first
+> > element.
 > > 
-> > This patch addresses the issue by ensuring that the local I-cache is
-> > invalidated immediately after a CPU has enabled its MMU but before
-> > jumping out of the identity mapping. Any stale instructions fetched from
-> > the PoC will then be discarded and refetched correctly from the PoU.
+> > Signed-off-by: Jayachandran C <jchandra@broadcom.com>
+> > Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > Tested-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > Tested-by: Pavel Fedin <p.fedin@samsung.com>
 > 
-> It may be worth mentioning that none of the instructions executed up to
-> this point will have been patched, so we know that they have remained
-> clean to the PoC. Otherwise we'd need to flush those to the PoC
-> explicitly.
+> I applied all three of these to my pci/enumeration branch for v4.3.
+> 
+> I made a few changes, the most important being to call
+> pcie_bus_configure_settings() before pci_bus_add_devices(), because drivers
+> may claim devices in pci_bus_add_devices(), and the PCI core shouldn't
+> touch devices after drivers claim them.
+> 
+> I dropped the acks and tested-by because of that change, but I'll happily
+> add them back if Lorenzo and Pavel confirm.  The patches are here if you
+> want to review/test them:
+> 
+> https://git.kernel.org/cgit/linux/kernel/git/helgaas/pci.git/log/?h=pci/enumeration
+> 
+> I'm sure the other patches on that branch will need some tweaks, too, so I
+> don't have any problem with updating these.
 
-I'll add something to the log.
+Excellent, thanks Bjorn! Marc and I will take these for a spin in
+conjunction with tip/irq/core and the arm64 queue.
 
-> Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-
-Cheers,
+That said, I just tried to build this and it fails to compile the x-gene
+PCI host driver. Fixup below.
 
 Will
+
+--->8
+
+diff --git a/drivers/pci/host/pci-xgene.c b/drivers/pci/host/pci-xgene.c
+index 514f41b86c49..57ac0c7108a8 100644
+--- a/drivers/pci/host/pci-xgene.c
++++ b/drivers/pci/host/pci-xgene.c
+@@ -506,7 +506,7 @@ static int xgene_pcie_msi_enable(struct xgene_pcie_port *port)
+ {
+ 	struct device_node *msi_node;
+ 
+-	msi_node = of_parse_phandle(port->dev.of_node, "msi-parent", 0);
++	msi_node = of_parse_phandle(port->dev->of_node, "msi-parent", 0);
+ 	if (!msi_node)
+ 		return -ENODEV;
+ 
