@@ -1,30 +1,34 @@
-From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Wed, 05 Aug 2015 15:11:32 +0530
-Subject: [PATCH-v5 1/5] Documentation: binding: add new property
- 'disable_after_xfer' to i2c-pxa
-In-Reply-To: <20150805084917.GA1523@katana>
-References: <1437482466-16126-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1437482466-16126-2-git-send-email-vaibhav.hiremath@linaro.org>
- <20150727140911.GB15004@beef> <55C1AE71.3010700@linaro.org>
- <20150805084917.GA1523@katana>
-Message-ID: <55C1DA4C.6040700@linaro.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 5 Aug 2015 11:34:57 +0200
+Subject: [PATCH] ARM: davinci: cp_intc: use IRQCHIP_SKIP_SET_WAKE instead
+ of irq_set_wake callback
+In-Reply-To: <1438443236-30206-1-git-send-email-nsekhar@ti.com>
+References: <1435941754-21102-1-git-send-email-sudeep.holla@arm.com>
+ <1438443236-30206-1-git-send-email-nsekhar@ti.com>
+Message-ID: <20150805093457.GO6390@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sat, Aug 01, 2015 at 09:03:56PM +0530, Sekhar Nori wrote:
+> From: Sudeep Holla <sudeep.holla@arm.com>
+> 
+> Commit 60f96b41f71d ("genirq: Add IRQCHIP_SKIP_SET_WAKE flag")
+> introduced a new flag to skip the irq_set_wake callback in the irqchip
+> core to avoid adding dummy irq_set_wake in the irqchip implementations.
+> 
+> This patch removes the dummy callback and sets the IRQCHIP_SKIP_SET_WAKE
+> flags.
+> 
+> Cc: Sekhar Nori <nsekhar@ti.com>
+> Cc: Kevin Hilman <khilman@deeprootsystems.com>
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+> ---
+> ARM-SoC, can you please apply this patch directly?
+> I do not have any other patches queued, so not sending
+> a pull request.
+
+Merged, thanks.
 
 
-On Wednesday 05 August 2015 02:19 PM, Wolfram Sang wrote:
-> I will start such a file today as part of the i2c slave framework
-> update which introduces flags to the reg property. Will post to the i2c
-> list this week.
-
-Great and thanks for taking this.
-
-I believe, better to wait for your patch and then rebase my patch-
-series against it. right?
-
-Request to review the this patch-series, so that I can incorporate all
-comments in V6.
-
-Thanks,
-Vaibhav
+-Olof
