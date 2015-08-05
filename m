@@ -1,72 +1,96 @@
-From: ranjit.waghmode@xilinx.com (Ranjit Abhimanyu Waghmode)
-Date: Wed, 5 Aug 2015 05:01:15 +0000
-Subject: [LINUX RFC 1/2] mtd: spi-nor: add dual parallel mode support
-In-Reply-To: <20150803160829.GX20873@sirena.org.uk>
-References: <1438592707-30713-1-git-send-email-ranjit.waghmode@xilinx.com>
- <1438592707-30713-2-git-send-email-ranjit.waghmode@xilinx.com>
- <20150803160829.GX20873@sirena.org.uk>
-Message-ID: <7CFCFE83B8145347A1D424EC939F1C3C01492420@XAP-PVEXMBX01.xlnx.xilinx.com>
+From: raghumag@gmail.com (raghu MG)
+Date: Wed, 5 Aug 2015 10:37:08 +0530
+Subject: Armadaxp GPIO interrupts
+In-Reply-To: <20150804153439.GA28673@lunn.ch>
+References: <CAG1O52Xg88OsifBzmpSdqvC8wQaOW78nC9nnfxugFv1VU1m1LQ@mail.gmail.com>
+ <20150804153439.GA28673@lunn.ch>
+Message-ID: <CAG1O52W2Gy_6_DfewtUqoK_J+Y=KwVGyygNaPu2xyPM_ZkLfcQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Hi Andrew,
 
-> -----Original Message-----
-> From: Mark Brown [mailto:broonie at kernel.org]
-> Sent: Monday, August 03, 2015 9:38 PM
-> To: Ranjit Abhimanyu Waghmode
-> Cc: dwmw2 at infradead.org; computersforpeace at gmail.com; Michal Simek;
-> Soren Brinkmann; zajec5 at gmail.com; ben at decadent.org.uk; marex at denx.de;
-> b32955 at freescale.com; knut.wohlrab at de.bosch.com; juhosg at openwrt.org;
-> beanhuo at micron.com; linux-mtd at lists.infradead.org; linux-
-> kernel at vger.kernel.org; linux-spi at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; Harini Katakam; Punnaiah Choudary Kalluri; Ranjit
-> Abhimanyu Waghmode; ran27jit at gmail.com
-> Subject: Re: [LINUX RFC 1/2] mtd: spi-nor: add dual parallel mode support
-> 
-> On Mon, Aug 03, 2015 at 02:35:06PM +0530, Ranjit Waghmode wrote:
-> 
-> >  drivers/mtd/devices/m25p80.c  |  1 +
-> >  drivers/mtd/spi-nor/spi-nor.c | 92 ++++++++++++++++++++++++++++++++++--
-> -------
-> >  include/linux/mtd/spi-nor.h   |  3 ++
-> >  include/linux/spi/spi.h       |  2 +
-> >  4 files changed, 79 insertions(+), 19 deletions(-)
-> 
-> You need to at least split this into two patches, one adding a new SPI interface
-> and another using it in MTD.  Probably the MTD core and driver changes need
-> splitting too.  Please see SubmittingPatches for discussion of splitting things.
-> 
+Thanks for your quick response,dont mind for the delay(India,US timings).
+I checked with both multi_v7_defconfig & mvebu_v7_defconfig , the result is same
+"irq: Cannot allocate irq_descs @ IRQ47, assuming pre-allocated"
 
-I will split and resend the same.
+Pasting here the GPIO driver probe debug statements
 
-> > diff --git a/include/linux/spi/spi.h b/include/linux/spi/spi.h index
-> > d673072..8dec349 100644
-> > --- a/include/linux/spi/spi.h
-> > +++ b/include/linux/spi/spi.h
-> > @@ -355,6 +355,8 @@ struct spi_master {
-> >  #define SPI_MASTER_NO_TX	BIT(2)		/* can't do buffer write */
-> >  #define SPI_MASTER_MUST_RX      BIT(3)		/* requires rx */
-> >  #define SPI_MASTER_MUST_TX      BIT(4)		/* requires tx */
-> > +#define SPI_MASTER_DATA_STRIPE		BIT(7)		/* support
-> data stripe */
-> > +#define SPI_MASTER_BOTH_CS		BIT(8)		/* enable both
-> chips */
-> 
-> This is really not adequate description for a new API, I can't tell what "data
-> stripe" is supposed to mean at all and I've got at best a vague idea what "both
-> chips" really means.  This means other developers won't be able to tell how to
-> use or implement these flags either, and it means I can't really review this.  You
-> need to provide more information here, both in the code and in the commit
-> message.
-> 
+armada-xp-pinctrl f1018000.pin-ctrl: registered pinctrl driver
+drivers/gpio/gpio-mvebu.c mvebu_gpio_probe 680
+mvebu_gpio_probe 682 match->name=
+mvebu_gpio_probe 683 match->compatible=marvell,orion-gpio
+drivers/gpio/gpio-mvebu.c mvebu_gpio_probe 727
+drivers/gpio/gpio-mvebu.c mvebu_gpio_probe 734 res->start=f1018100
+mvchip->membase=cf8c0100
+drivers/gpio/gpio-mvebu.c mvebu_gpio_probe 747 soc_variant=1
+drivers/gpio/gpio-mvebu.c mvebu_gpio_probe 785
+drivers/gpio/gpio-mvebu.c mvebu_gpio_probe 788
+drivers/gpio/gpio-mvebu.c mvebu_gpio_probe 805
+drivers/gpio/gpio-mvebu.c mvebu_gpio_probe 840
+drivers/gpio/gpio-mvebu.c mvebu_gpio_probe 844 mvchip->irqbase=47
+irq: Cannot allocate irq_descs @ IRQ47, assuming pre-allocated
+drivers/gpio/gpio-mvebu.c mvebu_gpio_probe 850 mvchip->domain->name=(null)
+drivers/gpio/gpio-mvebu.c mvebu_gpio_probe 859
+drivers/gpio/gpio-mvebu.c mvebu_gpio_probe 680
+mvebu_gpio_probe 682 match->name=
+mvebu_gpio_probe 683 match->compatible=marvell,orion-gpio
+drivers/gpio/gpio-mvebu.c mvebu_gpio_probe 727
+drivers/gpio/gpio-mvebu.c mvebu_gpio_probe 734 res->start=f1018140
+mvchip->membase=cf8c2140
+drivers/gpio/gpio-mvebu.c mvebu_gpio_probe 747 soc_variant=1
+drivers/gpio/gpio-mvebu.c mvebu_gpio_probe 785
+drivers/gpio/gpio-mvebu.c mvebu_gpio_probe 788
+drivers/gpio/gpio-mvebu.c mvebu_gpio_probe 805
+drivers/gpio/gpio-mvebu.c mvebu_gpio_probe 840
+drivers/gpio/gpio-mvebu.c mvebu_gpio_probe 844 mvchip->irqbase=79
+irq: Cannot allocate irq_descs @ IRQ79, assuming pre-allocated
+drivers/gpio/gpio-mvebu.c mvebu_gpio_probe 850 mvchip->domain->name=(null)
+drivers/gpio/gpio-mvebu.c mvebu_gpio_probe 859
+drivers/gpio/gpio-mvebu.c mvebu_gpio_probe 680
+mvebu_gpio_probe 682 match->name=
+mvebu_gpio_probe 683 match->compatible=marvell,orion-gpio
+drivers/gpio/gpio-mvebu.c mvebu_gpio_probe 727
+drivers/gpio/gpio-mvebu.c mvebu_gpio_probe 734 res->start=f1018180
+mvchip->membase=cf8c4180
+drivers/gpio/gpio-mvebu.c mvebu_gpio_probe 747 soc_variant=1
+drivers/gpio/gpio-mvebu.c mvebu_gpio_probe 785
+drivers/gpio/gpio-mvebu.c mvebu_gpio_probe 788
+drivers/gpio/gpio-mvebu.c mvebu_gpio_probe 805
+drivers/gpio/gpio-mvebu.c mvebu_gpio_probe 840
+drivers/gpio/gpio-mvebu.c mvebu_gpio_probe 844 mvchip->irqbase=111
+irq: Cannot allocate irq_descs @ IRQ111, assuming pre-allocated
+drivers/gpio/gpio-mvebu.c mvebu_gpio_probe 850 mvchip->domain->name=(null)
+drivers/gpio/gpio-mvebu.c mvebu_gpio_probe 859
 
-I'm sorry about that. I have added description in cover letter, but will add more information about the same here too.
 
-> I'd also expect some handling in the core for these, for example error handling if
-> they can't be supported.
 
-Will update and send you the updated version.
+I will try to dig in more information in the probe & irq_domain_add_simple
 
-Thanks,
-Ranjit
+
+On Tue, Aug 4, 2015 at 9:04 PM, Andrew Lunn <andrew@lunn.ch> wrote:
+> On Tue, Aug 04, 2015 at 08:52:17PM +0530, raghu MG wrote:
+>> Hello,
+>>
+>> I am working on a card which as GPIOs connected to external I/O's. The
+>> board consists of ARMADAXP 78460 host cpu.
+>>
+>> Board currently runs Linux-4.1 with modified  armada-xp-gp.dtb for ArmadaXP.
+>> I enabled "orion-gpio" driver to initialize GPIOs as given in
+>> armada-xp-mv78460.
+>
+> What kernel configuration are you using? Do you have the same problem
+> with multi_v7_defconfig and mvebu_v7_defconfig?
+>
+>> The driver while initializing calls irq_domain_add_simple which throws up
+>> following warning
+>> "irq: Cannot allocate irq_descs @ IRQ47, assuming pre-allocated"
+>> The warning repeats for next set(32-63  & 64-66).
+>>
+>> Also the GPIO IRQs are not getting listed in cat /proc/interrupts
+>
+> irq_domain_add_simple() returning an error is fatal for the probe. The
+> driver will not be loaded, so more than interrupts will be missing,
+> all the gpios will be missing.
+>
+>     Andrew
