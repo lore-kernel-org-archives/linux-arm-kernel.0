@@ -1,44 +1,98 @@
 From: lina.iyer@linaro.org (Lina Iyer)
-Date: Wed,  5 Aug 2015 10:32:40 -0600
-Subject: [PATCH RFC 04/10] arm: dts: Add L2 power-controller device bindings
- for APQ8084
+Date: Wed,  5 Aug 2015 10:32:44 -0600
+Subject: [PATCH RFC 08/10] hwspinlock: qcom: Lock #7 is special lock,
+ uses dynamic proc_id
 In-Reply-To: <1438792366-2737-1-git-send-email-lina.iyer@linaro.org>
 References: <438731339-58317-1-git-send-email-lina.iyer@linaro.org>
  <1438792366-2737-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1438792366-2737-5-git-send-email-lina.iyer@linaro.org>
+Message-ID: <1438792366-2737-9-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add power controller (SAW) device nodes for L2 caches. L2 SAW enable L2
-to enter idle states and be powered off. Also, on 8084 the L2 SAW may be
-used to regulate the active voltage for the cpu and L2.
+Hwspinlocks are widely used between processors in an SoC, and also
+between elevation levels within in the same processor.  QCOM SoC's use
+hwspinlock to serialize entry into a low power mode when the context
+switches from Linux to secure monitor.
 
+Lock #7 has been assigned for this purpose. In order to differentiate
+between one cpu core holding a lock while another cpu is contending for
+the same lock, the proc id written into the lock is (128 + cpu id). This
+makes it unique value among the cpu cores and therefore when a core
+locks the hwspinlock, other cores would wait for the lock to be released
+since they would have a different proc id.  This value is specific for
+the lock #7 only.
+
+Declare lock #7 as raw capable, so the hwspinlock framework would not
+enfore acquiring a s/w spinlock before acquiring the hwspinlock.
+
+Cc: Jeffrey Hugo <jhugo@codeaurora.org>
+Cc: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+Cc: Andy Gross <agross@codeaurora.org>
 Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
 ---
- arch/arm/boot/dts/qcom-apq8084.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/hwspinlock/qcom_hwspinlock.c | 22 +++++++++++++++++-----
+ 1 file changed, 17 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/qcom-apq8084.dtsi b/arch/arm/boot/dts/qcom-apq8084.dtsi
-index 7084010..900ef1f 100644
---- a/arch/arm/boot/dts/qcom-apq8084.dtsi
-+++ b/arch/arm/boot/dts/qcom-apq8084.dtsi
-@@ -59,7 +59,7 @@
- 		};
+diff --git a/drivers/hwspinlock/qcom_hwspinlock.c b/drivers/hwspinlock/qcom_hwspinlock.c
+index c752447..573f0dd 100644
+--- a/drivers/hwspinlock/qcom_hwspinlock.c
++++ b/drivers/hwspinlock/qcom_hwspinlock.c
+@@ -25,16 +25,26 @@
  
- 		L2: l2-cache {
--			compatible = "qcom,arch-cache";
-+			compatible = "cache";
- 			cache-level = <2>;
- 			qcom,saw = <&saw_l2>;
- 		};
-@@ -183,7 +183,7 @@
- 		};
+ #include "hwspinlock_internal.h"
  
- 		saw_l2: power-controller at f9012000 {
--			compatible = "qcom,saw2";
-+			compatible = "qcom,apq8084-saw2-v2.1-l2", "qcom,saw2";
- 			reg = <0xf9012000 0x1000>;
- 			regulator;
- 		};
+-#define QCOM_MUTEX_APPS_PROC_ID	1
+-#define QCOM_MUTEX_NUM_LOCKS	32
++#define QCOM_MUTEX_APPS_PROC_ID		1
++#define QCOM_MUTEX_CPUIDLE_OFFSET	128
++#define QCOM_CPUIDLE_LOCK		7
++#define QCOM_MUTEX_NUM_LOCKS		32
++
++static inline u32 __qcom_get_proc_id(struct hwspinlock *lock)
++{
++	return hwspin_lock_get_id(lock) == QCOM_CPUIDLE_LOCK ?
++			(QCOM_MUTEX_CPUIDLE_OFFSET + smp_processor_id()) :
++			QCOM_MUTEX_APPS_PROC_ID;
++}
+ 
+ static int qcom_hwspinlock_trylock(struct hwspinlock *lock)
+ {
+ 	struct regmap_field *field = lock->priv;
+ 	u32 lock_owner;
+ 	int ret;
++	u32 proc_id = __qcom_get_proc_id(lock);
+ 
+-	ret = regmap_field_write(field, QCOM_MUTEX_APPS_PROC_ID);
++	ret = regmap_field_write(field, proc_id);
+ 	if (ret)
+ 		return ret;
+ 
+@@ -42,7 +52,7 @@ static int qcom_hwspinlock_trylock(struct hwspinlock *lock)
+ 	if (ret)
+ 		return ret;
+ 
+-	return lock_owner == QCOM_MUTEX_APPS_PROC_ID;
++	return lock_owner == proc_id;
+ }
+ 
+ static void qcom_hwspinlock_unlock(struct hwspinlock *lock)
+@@ -57,7 +67,7 @@ static void qcom_hwspinlock_unlock(struct hwspinlock *lock)
+ 		return;
+ 	}
+ 
+-	if (lock_owner != QCOM_MUTEX_APPS_PROC_ID) {
++	if (lock_owner != __qcom_get_proc_id(lock)) {
+ 		pr_err("%s: spinlock not owned by us (actual owner is %d)\n",
+ 				__func__, lock_owner);
+ 	}
+@@ -129,6 +139,8 @@ static int qcom_hwspinlock_probe(struct platform_device *pdev)
+ 							     regmap, field);
+ 	}
+ 
++	bank->lock[QCOM_CPUIDLE_LOCK].hwcaps = HWL_CAP_ALLOW_RAW;
++
+ 	pm_runtime_enable(&pdev->dev);
+ 
+ 	ret = hwspin_lock_register(bank, &pdev->dev, &qcom_hwspinlock_ops,
 -- 
 2.1.4
