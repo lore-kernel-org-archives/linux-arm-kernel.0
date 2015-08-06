@@ -1,59 +1,84 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Thu, 6 Aug 2015 23:00:47 +0800
-Subject: [RFC PATCH 0/8] Add Analogix Core Display Port Driver
-In-Reply-To: <000201d0d056$06cff040$146fd0c0$@com>
-References: <1438868947-22132-1-git-send-email-ykk@rock-chips.com>
- <000201d0d056$06cff040$146fd0c0$@com>
-Message-ID: <55C3769F.2010405@rock-chips.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Thu, 06 Aug 2015 16:05:13 +0100
+Subject: [PATCH 1/3] clk: versatile: Switch to assigned clock parents
+In-Reply-To: <55C24E56.3020004@codeaurora.org>
+References: <55BBB2FC.9030102@codeaurora.org>
+ <1438386285-5070-1-git-send-email-sboyd@codeaurora.org>
+ <1438386285-5070-2-git-send-email-sboyd@codeaurora.org>
+ <1438610480.2142.14.camel@arm.com> <55BFAB11.7080600@codeaurora.org>
+ <1438770574.2142.80.camel@arm.com> <55C24E56.3020004@codeaurora.org>
+Message-ID: <1438873513.2142.95.camel@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jingoo,
+On Wed, 2015-08-05 at 18:56 +0100, Stephen Boyd wrote:
+> On 08/05/2015 03:29 AM, Pawel Moll wrote:
+> >
+> > Right, that's probably my fault. The sp810 nodes appeared in the VE
+> > trees very early (in terms of the "DT era"), when we weren't so strict
+> > about documentation. So far, it would be fairly simple, something like
+> > the text below - feel free to take it, mend it, extend it with your
+> > changes and include in the series:
+> >
+> > Thanks!
+> 
+> Great! Can you please provide your signed-off-by? 
 
-? 2015/8/6 22:41, Jingoo Han ??:
-> On Thursday, August 06, 2015 10:49 PM, Yakir Yang wrote:
->> Hi all,
->>     Samsung exynos and Rockchip rk3288 almost share same dp controller,
->> so I split the common code out, then rk3288 and exynos can re-used the
->> same dp core driver. Cause I can't find the exact IP name of exynos dp
->> controller, so I decide to name dp core driver with "analogix" which I
->> find in rk3288 eDP TRM ;)
->
-> OK, I see.
-> The Samsung Exynos eDP contoller and Rockchip rk3288 eDP contoller share
-> the same IP. So, a lot of parts can be re-used. I agree with this.
-> However, we have to review the code carefully, as others did.
-Yeah, feel happy to be reviewed  ;)
+Sure. 
 
-> I also cannot find the exact IP name. The "analogix" may be the vendor name
-> of this IP.
-Okay, so "analogix" is okay for now
+8<--------------------------------------------------------
 
-Thanks,
-- Yakir
-> Best regards,
-> Jingoo Han
->
->> Beyond that, there are three light registers setting differents bewteen
->> exynos and rk3288.
->> 1. RK3288 have five special pll resigters which not indicata in exynos
->>     dp controller.
->> 2. The address of DP_PHY_PD(dp phy power manager register) are different
->>     between rk3288 and exynos.
->> 3. Rk3288 and exynos have different setting with AUX_HW_RETRY_CTL(dp debug
->>     register).
->>
->> My series patches can be divider into two parts: One for spliting the
->> analogix_dp code from exynos dp driver. Another are trying to add rk3288
->> dp driver support.
->>
->> Best regards,
->> - Yakir
->>
->>
->> --
->> 2.1.2
->
->
->
->
+>From cddb00e4c8b6b57e82008fa23a7359560e5c997c Mon Sep 17 00:00:00 2001
+From: Pawel Moll <pawel.moll@arm.com>
+Date: Thu, 6 Aug 2015 16:04:10 +0100
+Subject: [PATCH] clk: versatile: Add SP810 device tree bindings document
+
+Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+---
+ Documentation/devicetree/bindings/arm/sp810.txt | 35 +++++++++++++++++++++++++
+ 1 file changed, 35 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/sp810.txt
+
+diff --git a/Documentation/devicetree/bindings/arm/sp810.txt b/Documentation/devicetree/bindings/arm/sp810.txt
+new file mode 100644
+index 0000000..440ee08
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/sp810.txt
+@@ -0,0 +1,35 @@
++SP810 System Controller
++-----------------------
++
++Required properties:
++
++- compatible:	standard compatible string for a Primecell peripheral,
++		see Documentation/devicetree/bindings/arm/primecell.txt
++		for more details
++		should be: "arm,sp810", "arm,primecell"
++
++- reg:		standard registers property, physical address and size
++		of the control registers
++
++- clock-names:	from the common clock bindings, for more details see
++		Documentation/devicetree/bindings/clock/clock-bindings.txt;
++		should be: "refclk", "timclk", "apb_pclk"
++
++- clocks:	from the common clock bindings, phandle and clock
++		specifier pairs for the entries of clock-names property
++
++- #clock-cells: from the common clock bindings;
++		should be: <1>
++
++- clock-output-names: from the common clock bindings;
++		should be: "timerclken0", "timerclken1", "timerclken2", "timerclken3"
++
++Example:
++	sysctl at 020000 {
++		compatible = "arm,sp810", "arm,primecell";
++		reg = <0x020000 0x1000>;
++		clocks = <&v2m_refclk32khz>, <&v2m_refclk1mhz>, <&smbclk>;
++		clock-names = "refclk", "timclk", "apb_pclk";
++		#clock-cells = <1>;
++		clock-output-names = "timerclken0", "timerclken1", "timerclken2", "timerclken3";
++	};
+-- 
+2.1.4
