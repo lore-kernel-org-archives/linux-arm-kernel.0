@@ -1,49 +1,49 @@
-From: b20788@freescale.com (Anson Huang)
-Date: Thu, 6 Aug 2015 22:13:56 +0800
-Subject: [PATCH] clk: imx: increase AXI clock rate to 264MHz for i.MX6UL
-Message-ID: <1438870436-16061-1-git-send-email-b20788@freescale.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 5 Aug 2015 23:29:23 -0700
+Subject: [PATCH v2 1/3] mailbox/omap: Add ti, mbox-send-noirq quirk to fix
+ AM33xx CPU Idle
+In-Reply-To: <55C22C8E.3000506@ti.com>
+References: <1437166592-25378-1-git-send-email-d-gerlach@ti.com>
+ <1437166592-25378-2-git-send-email-d-gerlach@ti.com>
+ <20150805102840.GA16878@atomide.com> <55C22C8E.3000506@ti.com>
+Message-ID: <20150806062923.GN16878@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On i.MX6UL, AXI clock rate's design target is 264MHz, but by default
-it is only set to 198MHz which is NOT good enough for performance,
-this patch increases AXI clock rate from 198MHz to 264MHz to meet
-the design target, this is done by switching its parent clock
-"periph" from 396MHz PFD to 528MHz PLL.
+* Suman Anna <s-anna@ti.com> [150805 08:35]:
+> Hi Tony,
+> 
+> On 08/05/2015 05:28 AM, Tony Lindgren wrote:
+> > * Dave Gerlach <d-gerlach@ti.com> [150717 13:59]:
+> >> --- a/Documentation/devicetree/bindings/mailbox/omap-mailbox.txt
+> >> +++ b/Documentation/devicetree/bindings/mailbox/omap-mailbox.txt
+> >> @@ -75,6 +75,14 @@ data that represent the following:
+> >>      Cell #3 (usr_id)  - mailbox user id for identifying the interrupt line
+> >>                          associated with generating a tx/rx fifo interrupt.
+> >>  
+> >> +Optional Properties:
+> >> +--------------------
+> >> +- ti,mbox-send-noirq:   Quirk flag to allow the client user of this sub-mailbox
+> >> +                        to send messages without triggering a Tx ready interrupt,
+> >> +                        and to control the Tx ticker. Should be used only on
+> >> +                        sub-mailboxes used to communicate with WkupM3 remote
+> >> +                        processor on AM33xx/AM43xx SoCs.
+> >> +
+> > 
+> > Hmm can't you do this just by setting a flag in the device driver
+> > based on the compatible string?
+> 
+> We can't because there can be other users like PRUSS which will use a
+> sub-mailbox in a regular fashion. The compatible serves the IP and there
+> can be multiple sub-mailboxes underneath it, and this quirk is needed
+> only on the one that's used by the WkupM3.
 
-Signed-off-by: Anson Huang <b20788@freescale.com>
----
- drivers/clk/imx/clk-imx6ul.c | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+OK
 
-diff --git a/drivers/clk/imx/clk-imx6ul.c b/drivers/clk/imx/clk-imx6ul.c
-index aaa3665..01718d0 100644
---- a/drivers/clk/imx/clk-imx6ul.c
-+++ b/drivers/clk/imx/clk-imx6ul.c
-@@ -407,6 +407,24 @@ static void __init imx6ul_clocks_init(struct device_node *ccm_node)
- 	clk_data.clk_num = ARRAY_SIZE(clks);
- 	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
- 
-+	/*
-+	 * Lower the AHB clock rate before changing the parent clock source,
-+	 * as AHB clock rate can NOT be higher than 133MHz, but its parent
-+	 * will be switched from 396MHz PFD to 528MHz PLL in order to increase
-+	 * AXI clock rate, so we need to lower AHB rate first to make sure at
-+	 * any time, AHB rate is <= 133MHz.
-+	 */
-+	clk_set_rate(clks[IMX6UL_CLK_AHB], 99000000);
-+
-+	/* Change periph_pre clock to pll2_bus to adjust AXI rate to 264MHz */
-+	clk_set_parent(clks[IMX6UL_CLK_PERIPH_CLK2_SEL], clks[IMX6UL_CLK_PLL3_USB_OTG]);
-+	clk_set_parent(clks[IMX6UL_CLK_PERIPH], clks[IMX6UL_CLK_PERIPH_CLK2]);
-+	clk_set_parent(clks[IMX6UL_CLK_PERIPH_PRE], clks[IMX6UL_CLK_PLL2_BUS]);
-+	clk_set_parent(clks[IMX6UL_CLK_PERIPH], clks[IMX6UL_CLK_PERIPH_PRE]);
-+
-+	/* Make sure AHB rate is 132MHz  */
-+	clk_set_rate(clks[IMX6UL_CLK_AHB], 132000000);
-+
- 	/* set perclk to from OSC */
- 	clk_set_parent(clks[IMX6UL_CLK_PERCLK_SEL], clks[IMX6UL_CLK_OSC]);
- 
--- 
-1.9.1
+> Do you have any comments on this?
+
+Up to you guys then to figure out what property is used for it then.
+
+Regards,
+
+Tony
