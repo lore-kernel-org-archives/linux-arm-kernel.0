@@ -1,67 +1,146 @@
 From: rnayak@codeaurora.org (Rajendra Nayak)
-Date: Thu,  6 Aug 2015 16:07:51 +0530
-Subject: [PATCH v8 10/13] arm: dts: qcom: Add #power-domain-cells property
+Date: Thu,  6 Aug 2015 16:07:52 +0530
+Subject: [PATCH v8 11/13] clk: qcom: gdsc: Use PM clocks to control gdsc clocks
 In-Reply-To: <1438857474-20262-1-git-send-email-rnayak@codeaurora.org>
 References: <1438857474-20262-1-git-send-email-rnayak@codeaurora.org>
-Message-ID: <1438857474-20262-11-git-send-email-rnayak@codeaurora.org>
+Message-ID: <1438857474-20262-12-git-send-email-rnayak@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-msm8974 has gcc and mmcc nodes, and apq8084 has a gcc node which
-implement gdsc powerdomains. Add the #power-domain-cells property
-to them.
+The devices within a gdsc power domain, quite often have additional
+clocks to be turned on/off along with the power domain itself.
+Once the drivers for these devices are converted to use runtime PM,
+it would be possible to remove all clock handling from the drivers if
+the gdsc driver can handle it.
+Use PM clocks to add support for this. A list of clock ids specified
+per gdsc would be the clocks turned on/off on every device start/stop
+callbacks.
 
 Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
 ---
- arch/arm/boot/dts/qcom-apq8084.dtsi   | 1 +
- arch/arm/boot/dts/qcom-msm8974.dtsi   | 2 ++
- arch/arm64/boot/dts/qcom/msm8916.dtsi | 1 +
- 3 files changed, 4 insertions(+)
+ drivers/clk/qcom/gdsc.c | 58 +++++++++++++++++++++++++++++++++++++++++++++++++
+ drivers/clk/qcom/gdsc.h |  7 ++++++
+ 2 files changed, 65 insertions(+)
 
-diff --git a/arch/arm/boot/dts/qcom-apq8084.dtsi b/arch/arm/boot/dts/qcom-apq8084.dtsi
-index 7084010..1cdb568 100644
---- a/arch/arm/boot/dts/qcom-apq8084.dtsi
-+++ b/arch/arm/boot/dts/qcom-apq8084.dtsi
-@@ -221,6 +221,7 @@
- 			compatible = "qcom,gcc-apq8084";
- 			#clock-cells = <1>;
- 			#reset-cells = <1>;
-+			#power-domain-cells = <1>;
- 			reg = <0xfc400000 0x4000>;
- 		};
+diff --git a/drivers/clk/qcom/gdsc.c b/drivers/clk/qcom/gdsc.c
+index da9fad8..ec1dfb5 100644
+--- a/drivers/clk/qcom/gdsc.c
++++ b/drivers/clk/qcom/gdsc.c
+@@ -12,10 +12,12 @@
+  */
  
-diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
-index 37b47b5..8a2dfa6 100644
---- a/arch/arm/boot/dts/qcom-msm8974.dtsi
-+++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
-@@ -217,6 +217,7 @@
- 			compatible = "qcom,gcc-msm8974";
- 			#clock-cells = <1>;
- 			#reset-cells = <1>;
-+			#power-domain-cells = <1>;
- 			reg = <0xfc400000 0x4000>;
- 		};
+ #include <linux/bitops.h>
++#include <linux/clk.h>
+ #include <linux/delay.h>
+ #include <linux/err.h>
+ #include <linux/jiffies.h>
+ #include <linux/kernel.h>
++#include <linux/pm_clock.h>
+ #include <linux/pm_domain.h>
+ #include <linux/regmap.h>
+ #include <linux/reset-controller.h>
+@@ -161,6 +163,59 @@ static int gdsc_disable(struct generic_pm_domain *domain)
+ 	return gdsc_toggle_logic(sc, false);
+ }
  
-@@ -224,6 +225,7 @@
- 			compatible = "qcom,mmcc-msm8974";
- 			#clock-cells = <1>;
- 			#reset-cells = <1>;
-+			#power-domain-cells = <1>;
- 			reg = <0xfd8c0000 0x6000>;
- 		};
++static inline bool match(unsigned int id, unsigned int *ids, unsigned int count)
++{
++	int i;
++
++	for (i = 0; i < count; i++)
++		if (id == ids[i])
++			return true;
++	return false;
++}
++
++static int gdsc_attach(struct generic_pm_domain *domain, struct device *dev)
++{
++	int ret, i = 0, j = 0;
++	struct gdsc *sc = domain_to_gdsc(domain);
++	struct of_phandle_args clkspec;
++	struct device_node *np = dev->of_node;
++
++	if (!sc->clock_count)
++		return 0;
++
++	ret = pm_clk_create(dev);
++	if (ret) {
++		dev_dbg(dev, "pm_clk_create failed %d\n", ret);
++		return ret;
++	}
++
++	sc->clks = devm_kcalloc(dev, sc->clock_count, sizeof(sc->clks),
++				       GFP_KERNEL);
++	if (!sc->clks)
++		return -ENOMEM;
++
++	while (!of_parse_phandle_with_args(np, "clocks", "#clock-cells", i,
++					   &clkspec)) {
++		if (match(clkspec.args[0], sc->clocks, sc->clock_count)) {
++			sc->clks[j] = of_clk_get_from_provider(&clkspec);
++			pm_clk_add_clk(dev, sc->clks[j]);
++			j++;
++		}
++		i++;
++	}
++	return 0;
++};
++
++static void gdsc_detach(struct generic_pm_domain *domain, struct device *dev)
++{
++	struct gdsc *sc = domain_to_gdsc(domain);
++
++	if (!sc->clock_count)
++		return;
++
++	pm_clk_destroy(dev);
++};
++
+ static int gdsc_init(struct gdsc *sc)
+ {
+ 	u32 mask, val;
+@@ -196,6 +251,9 @@ static int gdsc_init(struct gdsc *sc)
  
-diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-index 0f49ebd..3b0645a 100644
---- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
-+++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-@@ -120,6 +120,7 @@
- 			compatible = "qcom,gcc-msm8916";
- 			#clock-cells = <1>;
- 			#reset-cells = <1>;
-+			#power-domain-cells = <1>;
- 			reg = <0x1800000 0x80000>;
- 		};
+ 	sc->pd.power_off = gdsc_disable;
+ 	sc->pd.power_on = gdsc_enable;
++	sc->pd.attach_dev = gdsc_attach;
++	sc->pd.detach_dev = gdsc_detach;
++	sc->pd.flags = GENPD_FLAG_PM_CLK;
+ 	pm_genpd_init(&sc->pd, NULL, !on);
  
+ 	return 0;
+diff --git a/drivers/clk/qcom/gdsc.h b/drivers/clk/qcom/gdsc.h
+index 5ded268..2fdb332 100644
+--- a/drivers/clk/qcom/gdsc.h
++++ b/drivers/clk/qcom/gdsc.h
+@@ -17,6 +17,7 @@
+ #include <linux/err.h>
+ #include <linux/pm_domain.h>
+ 
++struct clk;
+ struct regmap;
+ struct reset_controller_dev;
+ 
+@@ -38,6 +39,9 @@ struct reset_controller_dev;
+  * @resets: ids of resets associated with this gdsc
+  * @reset_count: number of @resets
+  * @rcdev: reset controller
++ * @clocks: ids of clocks associated with the gdsc
++ * @clock_count: number of @clocks
++ * @clks: clock pointers to gdsc clocks
+  */
+ struct gdsc {
+ 	struct generic_pm_domain	pd;
+@@ -49,6 +53,9 @@ struct gdsc {
+ 	struct reset_controller_dev	*rcdev;
+ 	unsigned int			*resets;
+ 	unsigned int			reset_count;
++	unsigned int			*clocks;
++	unsigned int			clock_count;
++	struct clk			**clks;
+ };
+ 
+ #ifdef CONFIG_QCOM_GDSC
 -- 
 QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
 of Code Aurora Forum, hosted by The Linux Foundation
