@@ -1,119 +1,69 @@
-From: hermr2d2@gmail.com (Hermann Kraus)
-Date: Thu, 06 Aug 2015 22:51:10 +0200
-Subject: [PATCH v2] spi: spi-sun4i, spi-sun6i: Fix bit rate calculation
-In-Reply-To: <20150804171931.GZ20873@sirena.org.uk>
-References: <op.x2pmc5kiltbbtz@localhost>
- <20150804171931.GZ20873@sirena.org.uk>
-Message-ID: <op.x2yr7kbcltbbtz@localhost>
+From: al.stone@linaro.org (Al Stone)
+Date: Thu,  6 Aug 2015 14:59:25 -0600
+Subject: [PATCH 0/5] ACPI: Provide better MADT subtable sanity checks
+Message-ID: <1438894770-31163-1-git-send-email-al.stone@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use requested bit rate instead of maximum possible and correctly calculate
-the divider.
+Currently, the BAD_MADT_ENTRY macro is used to do a very simple sanity
+check on the various subtables that are defined for the MADT.  The check
+compares the size of the subtable data structure as defined by ACPICA to
+the length entry in the subtable.  If they are not the same, the assumption
+is that the subtable is incorrect.
 
-There are two different maximum bitrates. "max_speed_hz" which is the
-maximum for a given SPI device and "speed_hz" in "struct spi_transfer"
-which is the rate used for this transfer. "speed_hz" must always be
-used as the actual transfer rate.
-The divider must be calculated by calling ilog2 only once, because this
-function truncates the fractional part. Calling it twice increases
-the error so much that certain bit rates which are available from the
-hardware can't be reached by the kernel.
-The result of this calculation must be checked to fit into the register
-size instead of being truncated silently.
+Over time, the ACPI spec has allowed for MADT subtables where this can
+never be true (the local SAPIC subtable, for example).  Or, more recently,
+the spec has accumulated some minor flaws where there are three possible 
+sizes for a subtable, all of which are valid, but only for specific versions
+of the spec (the GICC subtable).  In both cases, BAD_MADT_ENTRY reports these
+subtables as bad when they are not.  In order to retain some sanity check
+on the MADT subtables, we now have to special case these subtables.  Of
+necessity, these special cases have ended up in arch-dependent code (arm64)
+or an arch has simply decided to forgo the check (ia64).
 
-Signed-off-by: Hermann Kraus <hermr2d2@gmail.com>
----
+This patch set replaces the BAD_MADT_ENTRY macro with a function called
+bad_madt_entry().  This function uses a data set of details about the
+subtables to provide more sanity checking than before:
 
-Changes to v1: Unconditionally use tfr->speed_hz as requested by Mark  
-Brown.
+	-- is the subtable legal for the version given in the FADT?
+
+	-- is the subtable legal for the revision of the MADT in use?
+
+	-- is the subtable of the proper length (including checking
+	   on the one variable length subtable that is currently ignored),
+	   given the FADT version and the MADT revision?
+
+Further, this patch set adds in the call to bad_madt_entry() from the 
+acpi_table_parse_madt() function, allowing it to be used consistently
+by all architectures, for all subtables, and removing the need for each
+of the subtable traversal callback functions to use BAD_MADT_ENTRY.
+
+In theory, as the ACPI specification changes, we would only have to add
+additional information to the data set describing the MADT subtables in
+order to continue providing sanity checks, even when new subtables are
+added.
+
+These patches have been tested on an APM Mustang (arm64) and are known to
+work there.  They have also been cross-compiled for x86 and ia64 with no
+known failures.
 
 
-  drivers/spi/spi-sun4i.c | 15 +++++++++++----
-  drivers/spi/spi-sun6i.c | 15 +++++++++++----
-  2 files changed, 22 insertions(+), 8 deletions(-)
+Al Stone (5):
+  ACPI: add in a bad_madt_entry() function to eventually replace the
+    macro
+  ACPI / ARM64: remove usage of BAD_MADT_ENTRY/BAD_MADT_GICC_ENTRY
+  ACPI / IA64: remove usage of BAD_MADT_ENTRY
+  ACPI / X86: remove usage of BAD_MADT_ENTRY
+  ACPI: remove definition of BAD_MADT_ENTRY macro
 
-diff --git a/drivers/spi/spi-sun4i.c b/drivers/spi/spi-sun4i.c
-index fbb0a4d..729d70b 100644
---- a/drivers/spi/spi-sun4i.c
-+++ b/drivers/spi/spi-sun4i.c
-@@ -229,8 +229,8 @@ static int sun4i_spi_transfer_one(struct spi_master  
-*master,
-
-  	/* Ensure that we have a parent clock fast enough */
-  	mclk_rate = clk_get_rate(sspi->mclk);
--	if (mclk_rate < (2 * spi->max_speed_hz)) {
--		clk_set_rate(sspi->mclk, 2 * spi->max_speed_hz);
-+	if (mclk_rate < (2 * tfr->speed_hz)) {
-+		clk_set_rate(sspi->mclk, 2 * tfr->speed_hz);
-  		mclk_rate = clk_get_rate(sspi->mclk);
-  	}
-
-@@ -248,14 +248,21 @@ static int sun4i_spi_transfer_one(struct spi_master  
-*master,
-  	 * First try CDR2, and if we can't reach the expected
-  	 * frequency, fall back to CDR1.
-  	 */
--	div = mclk_rate / (2 * spi->max_speed_hz);
-+	div = mclk_rate / (2 * tfr->speed_hz);
-  	if (div <= (SUN4I_CLK_CTL_CDR2_MASK + 1)) {
-  		if (div > 0)
-  			div--;
-
-  		reg = SUN4I_CLK_CTL_CDR2(div) | SUN4I_CLK_CTL_DRS;
-  	} else {
--		div = ilog2(mclk_rate) - ilog2(spi->max_speed_hz);
-+		/* ilog2 truncates the fractional part. Therefore we don't
-+		 * subtract 1 from the result. */
-+		div = ilog2(mclk_rate / tfr->speed_hz + 1);
-+		if (div & ~SUN4I_CLK_CTL_CDR1_MASK) {
-+			/* Can't reach low enough bit rate. */
-+			ret = -EINVAL;
-+			goto out;
-+		}
-  		reg = SUN4I_CLK_CTL_CDR1(div);
-  	}
-
-diff --git a/drivers/spi/spi-sun6i.c b/drivers/spi/spi-sun6i.c
-index ac48f59..2d3dcda 100644
---- a/drivers/spi/spi-sun6i.c
-+++ b/drivers/spi/spi-sun6i.c
-@@ -217,8 +217,8 @@ static int sun6i_spi_transfer_one(struct spi_master  
-*master,
-
-  	/* Ensure that we have a parent clock fast enough */
-  	mclk_rate = clk_get_rate(sspi->mclk);
--	if (mclk_rate < (2 * spi->max_speed_hz)) {
--		clk_set_rate(sspi->mclk, 2 * spi->max_speed_hz);
-+	if (mclk_rate < (2 * tfr->speed_hz)) {
-+		clk_set_rate(sspi->mclk, 2 * tfr->speed_hz);
-  		mclk_rate = clk_get_rate(sspi->mclk);
-  	}
-
-@@ -236,14 +236,21 @@ static int sun6i_spi_transfer_one(struct spi_master  
-*master,
-  	 * First try CDR2, and if we can't reach the expected
-  	 * frequency, fall back to CDR1.
-  	 */
--	div = mclk_rate / (2 * spi->max_speed_hz);
-+	div = mclk_rate / (2 * tfr->speed_hz);
-  	if (div <= (SUN6I_CLK_CTL_CDR2_MASK + 1)) {
-  		if (div > 0)
-  			div--;
-
-  		reg = SUN6I_CLK_CTL_CDR2(div) | SUN6I_CLK_CTL_DRS;
-  	} else {
--		div = ilog2(mclk_rate) - ilog2(spi->max_speed_hz);
-+		/* ilog2 truncates the fractional part. Therefore we don't
-+		 * subtract 1 from the result. */
-+		div = ilog2(mclk_rate / tfr->speed_hz + 1);
-+		if (div & ~SUN6I_CLK_CTL_CDR1_MASK) {
-+			/* Can't reach low enough bit rate. */
-+			ret = -EINVAL;
-+			goto out;
-+		}
-  		reg = SUN6I_CLK_CTL_CDR1(div);
-  	}
+ arch/arm64/include/asm/acpi.h |   8 --
+ arch/arm64/kernel/smp.c       |   2 -
+ arch/ia64/kernel/acpi.c       |  20 ----
+ arch/x86/kernel/acpi/boot.c   |  27 -----
+ drivers/acpi/tables.c         | 241 ++++++++++++++++++++++++++++++++++++++++++
+ drivers/irqchip/irq-gic.c     |   6 --
+ include/linux/acpi.h          |   4 -
+ 7 files changed, 241 insertions(+), 67 deletions(-)
 
 -- 
-2.1.4
+2.4.3
