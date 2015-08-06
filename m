@@ -1,96 +1,47 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 6 Aug 2015 18:43:24 +0100
-Subject: [PATCH 00/13] arm64: Virtualization Host Extension support
-In-Reply-To: <1436372356-30410-1-git-send-email-marc.zyngier@arm.com>
-References: <1436372356-30410-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20150806174324.GD17691@e104818-lin.cambridge.arm.com>
+From: drew.richardson@arm.com (Drew Richardson)
+Date: Thu, 6 Aug 2015 10:52:47 -0700
+Subject: [PATCH] ARM: Mark ret_fast_syscall as a function
+In-Reply-To: <alpine.LFD.2.20.1508061327510.1515@knanqh.ubzr>
+References: <1436877957-18127-1-git-send-email-drew.richardson@arm.com>
+ <20150806170758.GA26691@dreric01-gentoo.localdomain>
+ <alpine.LFD.2.20.1508061327510.1515@knanqh.ubzr>
+Message-ID: <20150806175246.GA13323@dreric01-gentoo.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 08, 2015 at 05:19:03PM +0100, Marc Zyngier wrote:
-> Marc Zyngier (13):
->   arm/arm64: Add new is_kernel_in_hyp_mode predicate
->   arm64: Allow the arch timer to use the HYP timer
->   arm64: Add ARM64_HAS_VIRT_HOST_EXTN feature
->   arm64: KVM: skip HYP setup when already running in HYP
->   arm64: KVM: VHE: macroize VTCR_EL2 setup
->   arm64: KVM: VHE: Patch out kern_hyp_va
->   arm64: KVM: VHE: Patch out use of HVC
->   arm64: KVM: VHE: Preserve VHE config in world switch
->   arm64: KVM: VHE: Add alternatives for VHE-enabled world-switch
->   arm64: Add support for running Linux in EL2 mode
->   arm64: Panic when VHE and non VHE CPUs coexist
->   arm64: KVM: Split sysreg save/restore
->   arm64: KVM: VHE: Early interrupt handling
+On Thu, Aug 06, 2015 at 06:30:40PM +0100, Nicolas Pitre wrote:
+> On Thu, 6 Aug 2015, Drew Richardson wrote:
+> 
+> > On Tue, Jul 14, 2015 at 01:45:57PM +0100, Drew Richardson wrote:
+> > > ret_fast_syscall runs when user space makes a syscall. However it
+> > > needs to be marked as such so the ELF information is correct. Before
+> > > it was:
+> > > 
+> > >    101: 8000f300     0 NOTYPE  LOCAL  DEFAULT    2 ret_fast_syscall
+> > > 
+> > > But with this change it correctly shows as:
+> > > 
+> > >    101: 8000f300    96 FUNC    LOCAL  DEFAULT    2 ret_fast_syscall
+> > > 
+> > > I see this function when using perf to unwind call stacks from kernel
+> > > space to user space. Without this change I would need to add some
+> > > special case logic when using the vmlinux ELF information.
+> > > 
+> > > Signed-off-by: Drew Richardson <drew.richardson@arm.com>
+> > 
+> > I haven't heard any further comments on this, did this get merged and
+> > I just didn't notice? Or did I forget to add someone?
+> 
+> Most likely that it is so trivial that nobody paid much attention.
+> 
+> FWIW, you can add
+> 
+> Acked-by: Nicolas Pitre <nico@linaro.org>
+> 
+> and submit it here: http://www.arm.linux.org.uk/developer/patches/
+> 
+> 
+> Nicolas
+> 
 
-Do we need to do anything with the debug code? Do we have any
-hardware breakpoints/watchpoints targeting kernel space (kgdb doesn't
-seem to support this)?
-
-If a breakpoint target is EL1, I don't think we trigger it when running
-in the EL2/VHE mode, in which case we need a different
-DBGBCR.{HMC,SSC,PMC} combination - {1,11,00}.
-
-Another random untested patch below but we need to get Will to remember
-the code he wrote (and the VHE implications):
-
-diff --git a/arch/arm64/include/asm/hw_breakpoint.h b/arch/arm64/include/asm/hw_breakpoint.h
-index 52b484b6aa1a..197af39a5ffb 100644
---- a/arch/arm64/include/asm/hw_breakpoint.h
-+++ b/arch/arm64/include/asm/hw_breakpoint.h
-@@ -34,8 +34,12 @@ struct arch_hw_breakpoint {
- 
- static inline u32 encode_ctrl_reg(struct arch_hw_breakpoint_ctrl ctrl)
- {
--	return (ctrl.len << 5) | (ctrl.type << 3) | (ctrl.privilege << 1) |
-+	u32 reg = (ctrl.len << 5) | (ctrl.type << 3) | (ctrl.privilege << 1) |
- 		ctrl.enabled;
-+	/* set HMC and SSC when debug target is EL2 */
-+	if (ctrl.privilege == AARCH64_BREAKPOINT_EL2)
-+		reg |= (3 << 14) | (1 << 13);
-+	return reg
- }
- 
- static inline void decode_ctrl_reg(u32 reg,
-@@ -59,6 +63,7 @@ static inline void decode_ctrl_reg(u32 reg,
- #define AARCH64_ESR_ACCESS_MASK	(1 << 6)
- 
- /* Privilege Levels */
-+#define AARCH64_BREAKPOINT_EL2	0
- #define AARCH64_BREAKPOINT_EL1	1
- #define AARCH64_BREAKPOINT_EL0	2
- 
-diff --git a/arch/arm64/kernel/hw_breakpoint.c b/arch/arm64/kernel/hw_breakpoint.c
-index 7a1a5da6c8c1..77866839d1e8 100644
---- a/arch/arm64/kernel/hw_breakpoint.c
-+++ b/arch/arm64/kernel/hw_breakpoint.c
-@@ -162,6 +162,7 @@ static enum debug_el debug_exception_level(int privilege)
- 	case AARCH64_BREAKPOINT_EL0:
- 		return DBG_ACTIVE_EL0;
- 	case AARCH64_BREAKPOINT_EL1:
-+	case AARCH64_BREAKPOINT_EL2:
- 		return DBG_ACTIVE_EL1;
- 	default:
- 		pr_warning("invalid breakpoint privilege level %d\n", privilege);
-@@ -456,7 +457,8 @@ static int arch_build_bp_info(struct perf_event *bp)
- 	 * that would complicate the stepping code.
- 	 */
- 	if (arch_check_bp_in_kernelspace(bp))
--		info->ctrl.privilege = AARCH64_BREAKPOINT_EL1;
-+		info->ctrl.privilege = is_kernel_in_hyp_mode() ?
-+			AARCH64_BREAKPOINT_EL2 : AARCH64_BREAKPOINT_EL1;
- 	else
- 		info->ctrl.privilege = AARCH64_BREAKPOINT_EL0;
- 
-@@ -526,7 +528,7 @@ int arch_validate_hwbkpt_settings(struct perf_event *bp)
- 	 * Disallow per-task kernel breakpoints since these would
- 	 * complicate the stepping code.
- 	 */
--	if (info->ctrl.privilege == AARCH64_BREAKPOINT_EL1 && bp->hw.target)
-+	if (info->ctrl.privilege != AARCH64_BREAKPOINT_EL0 && bp->hw.target)
- 		return -EINVAL;
- 
- 	return 0;
-
--- 
-Catalin
+Done, thanks.
