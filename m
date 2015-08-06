@@ -1,62 +1,75 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu,  6 Aug 2015 14:41:13 +0530
-Subject: [PATCH] ARM/EP93xx/timer: Migrate to new 'set-state' interface
-Message-ID: <744dca162a7626694770a9f51457566a33c3e08f.1438852023.git.viresh.kumar@linaro.org>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Thu, 6 Aug 2015 17:13:21 +0800
+Subject: [PATCH v6 7/9] clk: mediatek: Add subsystem clocks of MT8173
+In-Reply-To: <1438851644.27884.21.camel@mtksdaap41>
+References: <1438676218-11310-1-git-send-email-jamesjj.liao@mediatek.com>
+ <1438676218-11310-8-git-send-email-jamesjj.liao@mediatek.com>
+ <20150805064605.GZ18700@pengutronix.de> <1438849431.27884.9.camel@mtksdaap41>
+ <20150806085354.GN18700@pengutronix.de> <1438851644.27884.21.camel@mtksdaap41>
+Message-ID: <CAGS+omAAYZyZJ4+eSdu2jmwThvHg1YpVoehui_cqNp4A5fURWg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Migrate EP93xx driver to the new 'set-state' interface provided by
-clockevents core, the earlier 'set-mode' interface is marked obsolete
-now.
+On Thu, Aug 6, 2015 at 5:00 PM, James Liao <jamesjj.liao@mediatek.com> wrote:
+> Hi Sascha,
+>
+> On Thu, 2015-08-06 at 10:53 +0200, Sascha Hauer wrote:
+>> On Thu, Aug 06, 2015 at 04:23:51PM +0800, James Liao wrote:
+>> > On Wed, 2015-08-05 at 08:46 +0200, Sascha Hauer wrote:
+>> > > On Tue, Aug 04, 2015 at 04:16:56PM +0800, James Liao wrote:
+>> > > >  static const struct mtk_fixed_clk fixed_clks[] __initconst = {
+>> > > >         FIXED_CLK(CLK_TOP_CLKPH_MCK_O, "clkph_mck_o", "clk26m", 400 * MHZ),
+>> > > >         FIXED_CLK(CLK_TOP_USB_SYSPLL_125M, "usb_syspll_125m", "clk26m", 125 * MHZ),
+>> > > > +       FIXED_CLK(CLK_TOP_DSI0_DIG, "dsi0_dig", "clk26m", 130 * MHZ),
+>> > > > +       FIXED_CLK(CLK_TOP_DSI1_DIG, "dsi1_dig", "clk26m", 130 * MHZ),
+>> > > > +       FIXED_CLK(CLK_TOP_LVDS_PXL, "lvds_pxl", "lvdspll", 148.5 * MHZ),
+>> > > > +       FIXED_CLK(CLK_TOP_LVDS_CTS, "lvds_cts", "lvdspll", 51.975 * MHZ),
+>> > >
+>> > > I would expect 51975 * KHZ here to avoid fractional numbers. Probably
+>> > > gcc calculates that during compile time so this will work as expected,
+>> > > still I'm not sure this is good style to use fractional numbers here.
+>> >
+>> > As I know all constants will be calculated in compile time, so there
+>> > should be no difference between 51.975 * MHZ and 51975 * KHz.
+>> >
+>> > > Anyway, on my system lvdspll is running at 150MHz. Are you sure there is
+>> > > a clock derived from this running at 148.5MHz? Is it really correct to
+>> > > use a fixed clock here or should it rather be lvdspll directly?
+>> >
+>> > Here is the clock hierarchy between lvdspll and lvds_pxl:
+>> >
+>> >             --------       AD_VPLL_DPIX_CK  --------   lvds_pxl  -----
+>> >            |        |--------------------->|        |---------->|
+>> >            |        |                      | cksys  |           |
+>> > LVDSPLL -->| LVDSTX |                      | buffer |           | MMSYS
+>> >            |        | AD_LVDSTX_CLKDIG_CTS | test   |  lvds_cts |
+>> >            |        |--------------------->|        |---------->|
+>> >             --------                        --------             -----
+>> >
+>> > Some clocks and blocks are not modeled into CCF. But we prefer to enable
+>> > lvdspll before enabling lvds_pxl. So I modeled lvds_pxl (and lvds_cts)
+>> > as a fixed-rate clock with a source from lvdspll.
+>> >
+>> > The frequency of these fixed-rate clocks (such as 148.5 MHz) are typical
+>> > rate. In fact, we don't care about the actual rate of these clocks. We
+>> > just care about the enable / disable sequence of them.
+>>
+>> Please either use the real rate or 0 (along with a explaining why). Using
+>> a frequency with four to five significant digits makes me think that the
+>> actual rate is very important.
+>
+> Oops, your suggestion is much different from Daniel's.
+>
+> Daniel, could you help to comment about how we model these clocks?
 
-This also enables us to implement callbacks for new states of clockevent
-devices, for example: ONESHOT_STOPPED.
+First of all, for clocks where the rate doesn't matter, it doesn't
+matters to what rate we set the clock.
 
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
----
-Linus,
+As for the color of our shed, "the designer says these are the typical
+rates" sounds good enough to me for a "real rate", so I prefer using
+the rates in James' patch.
 
-All other clockevent drivers are migrated to the new interface and yours
-was left as it adapted generic clockevents framework just now.
+If not sure what Sascha's concern is, but if he insists on 0, I'm fine
+with that too.
 
-Probably Olof can apply it directly to ARM SoC tree..
-
- arch/arm/mach-ep93xx/timer-ep93xx.c | 17 ++++++++++-------
- 1 file changed, 10 insertions(+), 7 deletions(-)
-
-diff --git a/arch/arm/mach-ep93xx/timer-ep93xx.c b/arch/arm/mach-ep93xx/timer-ep93xx.c
-index ac48ac1fd16d..e5f791145bd0 100644
---- a/arch/arm/mach-ep93xx/timer-ep93xx.c
-+++ b/arch/arm/mach-ep93xx/timer-ep93xx.c
-@@ -86,19 +86,22 @@ static int ep93xx_clkevt_set_next_event(unsigned long next,
- }
- 
- 
--static void ep93xx_clkevt_set_mode(enum clock_event_mode mode,
--				   struct clock_event_device *evt)
-+static int ep93xx_clkevt_shutdown(struct clock_event_device *evt)
- {
- 	/* Disable timer */
- 	writel(0, EP93XX_TIMER3_CONTROL);
-+
-+	return 0;
- }
- 
- static struct clock_event_device ep93xx_clockevent = {
--	.name		= "timer1",
--	.features	= CLOCK_EVT_FEAT_ONESHOT,
--	.set_mode	= ep93xx_clkevt_set_mode,
--	.set_next_event	= ep93xx_clkevt_set_next_event,
--	.rating		= 300,
-+	.name			= "timer1",
-+	.features		= CLOCK_EVT_FEAT_ONESHOT,
-+	.set_state_shutdown	= ep93xx_clkevt_shutdown,
-+	.set_state_oneshot	= ep93xx_clkevt_shutdown,
-+	.tick_resume		= ep93xx_clkevt_shutdown,
-+	.set_next_event		= ep93xx_clkevt_set_next_event,
-+	.rating			= 300,
- };
- 
- static irqreturn_t ep93xx_timer_interrupt(int irq, void *dev_id)
--- 
-2.4.0
+-Dan
