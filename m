@@ -1,107 +1,157 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Thu, 6 Aug 2015 17:55:23 +0530
-Subject: [RFC PATCH 1/5] spi: introduce flag for memory mapped read
-In-Reply-To: <20150806102225.GI7576@n2100.arm.linux.org.uk>
-References: <20150731181745.GM20873@sirena.org.uk> <55BEF4AF.5090704@ti.com>
- <20150804155148.GR20873@sirena.org.uk> <55C0FD98.1090107@ti.com>
- <20150805115013.GJ20873@sirena.org.uk>
- <CAOMqctQXwcHyiWBwtugSDSE_k65qrNfrwnhjQMDJkLoJMmGzUw@mail.gmail.com>
- <20150805124412.GN20873@sirena.org.uk>
- <CAOMqctS9Y5FxpUCCJew6+cnjH5iTvbzkH3g-8yrXs4OuS2pSGA@mail.gmail.com>
- <20150806090202.GO20873@sirena.org.uk>
- <CAOMqctQZRZ4zG_yYy=CeX3DX4NVNWN1COP4Q-2YvMun9xYOA7g@mail.gmail.com>
- <20150806102225.GI7576@n2100.arm.linux.org.uk>
-Message-ID: <55C35233.2000105@ti.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 06 Aug 2015 13:46:31 +0100
+Subject: [PATCH v4 1/2] arm64: KVM: Optimize arm64 skip 30-50% vfp/simd
+ save/restore on exits
+In-Reply-To: <20150806115436.GC4657@cbox>
+References: <1437082178-11039-1-git-send-email-m.smarduch@samsung.com>
+ <1437082178-11039-2-git-send-email-m.smarduch@samsung.com>
+ <55C235B9.3000800@arm.com> <20150806115436.GC4657@cbox>
+Message-ID: <55C35727.6060208@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Christoffer,
 
-
-On 08/06/2015 03:52 PM, Russell King - ARM Linux wrote:
-> On Thu, Aug 06, 2015 at 12:01:37PM +0200, Michal Suchanek wrote:
->> Disclaimer: I am not familiar with the hardware for which this patch
->> adds support.
+On 06/08/15 12:54, Christoffer Dall wrote:
+> On Wed, Aug 05, 2015 at 05:11:37PM +0100, Marc Zyngier wrote:
+>> On 16/07/15 22:29, Mario Smarduch wrote:
+>>> This patch only saves and restores FP/SIMD registers on Guest access. To do
+>>> this cptr_el2 FP/SIMD trap is set on Guest entry and later checked on exit.
+>>> lmbench, hackbench show significant improvements, for 30-50% exits FP/SIMD
+>>> context is not saved/restored
+>>>
+>>> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
 >>
->> However, I am familiar m25p80.c and as I understand it the controller
->> is basically supposed to implement m25p80.c in hardware when this flag
->> is set.
+>> So this patch seems to break 32bit guests on arm64.  I've had a look,
+>> squashed a few bugs that I dangerously overlooked during the review, but
+>> it still doesn't work (it doesn't crash anymore, but I get random
+>> illegal VFP instructions in 32bit guests).
+>>
+>> I'd be glad if someone could eyeball the following patch and tell me
+>> what's going wrong. If we don't find the root cause quickly enough, I'll
+>> have to drop the series from -next, and that'd be a real shame.
+>>
+>> Thanks,
+>>
+>> 	M.
+>>
+>> commit 5777dc55fbc170426a85e00c26002dd5a795cfa5
+>> Author: Marc Zyngier <marc.zyngier@arm.com>
+>> Date:   Wed Aug 5 16:53:01 2015 +0100
+>>
+>>     KVM: arm64: NOTAFIX: Prevent crash when 32bit guest uses VFP
+>>
+>>     Since we switch FPSIMD in a lazy way, access to FPEXC32_EL2
+>>     must be guarded by skip_fpsimd_state. Otherwise, all hell
+>>     break loose.
+>>
+>>     Also, FPEXC32_EL2 must be restored when we trap to EL2 to
+>>     enable floating point.
+>>
+>>     Note that while it prevents the host from catching fire, the
+>>     guest still doesn't work properly, and I don't understand why just
+>>     yet.
+>>
+>>     Not-really-signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>
+>> diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+>> index c8e0c70..b53ec5d 100644
+>> --- a/arch/arm64/kvm/hyp.S
+>> +++ b/arch/arm64/kvm/hyp.S
+>> @@ -431,10 +431,12 @@
+>>  	add	x3, x2, #CPU_SYSREG_OFFSET(DACR32_EL2)
+>>  	mrs	x4, dacr32_el2
+>>  	mrs	x5, ifsr32_el2
+>> -	mrs	x6, fpexc32_el2
+>>  	stp	x4, x5, [x3]
+>> -	str	x6, [x3, #16]
+>>
+>> +	skip_fpsimd_state x8, 3f
+>> +	mrs	x6, fpexc32_el2
+>> +	str	x6, [x3, #16]
+>> +3:
+>>  	skip_debug_state x8, 2f
+>>  	mrs	x7, dbgvcr32_el2
+>>  	str	x7, [x3, #24]
+>> @@ -461,10 +463,8 @@
+>>
+>>  	add	x3, x2, #CPU_SYSREG_OFFSET(DACR32_EL2)
+>>  	ldp	x4, x5, [x3]
+>> -	ldr	x6, [x3, #16]
+>>  	msr	dacr32_el2, x4
+>>  	msr	ifsr32_el2, x5
+>> -	msr	fpexc32_el2, x6
+>>
+>>  	skip_debug_state x8, 2f
+>>  	ldr	x7, [x3, #24]
+>> @@ -669,12 +669,14 @@ __restore_debug:
+>>  	ret
+>>
+>>  __save_fpsimd:
+>> +	skip_fpsimd_state x3, 1f
+>>  	save_fpsimd
+>> -	ret
+>> +1:	ret
+>>
+>>  __restore_fpsimd:
+>> +	skip_fpsimd_state x3, 1f
+>>  	restore_fpsimd
+>> -	ret
+>> +1:	ret
+>>
+>>  switch_to_guest_fpsimd:
+>>  	push	x4, lr
+>> @@ -682,6 +684,7 @@ switch_to_guest_fpsimd:
+>>  	mrs	x2, cptr_el2
+>>  	bic	x2, x2, #CPTR_EL2_TFP
+>>  	msr	cptr_el2, x2
+>> +	isb
 > 
-> That, to me, sounds like what you have is:
+> ah, EL2 accesses themselves trap too, ouch.
+
+Yeah, the FP architecture has all kind of nasty tricks like this.
+
+>>
+>>  	mrs	x0, tpidr_el2
+>>
+>> @@ -692,6 +695,10 @@ switch_to_guest_fpsimd:
+>>  	add	x2, x0, #VCPU_CONTEXT
+>>  	bl __restore_fpsimd
+>>
+>> +	skip_32bit_state x3, 1f
+>> +	ldr	x4, [x2, #CPU_SYSREG_OFFSET(FPEXC32_EL2)]
+>> +	msr	fpexc32_el2, x4
+>> +1:
 > 
-> ---m25p80 specific interface--->SPI bus--->m25p80 device
-> 
-> Where the m25p80 specific interface does not expose direct access to the
-> SPI bus?
-> 
+> wait, it looks like you're missing a store of the host fpsimd state in
+> the switch_to_guest_fpsimd situation.
 
-Let me give overview of ti-qspi controller:
+A store of FPEXC32_EL2 for the host? No, this register has no
+significance whatsoever for a 64bit host. Its sole purpose is to
+accommodate a 32bit guest (see D7.2.31). Or are you thinking of
+something else?
 
-There are two interfaces in the controller, one exposes direct access to
-SPI bus and the other doesn't. It is possible to dynamically switch
-between these ports by writing to QSPI_SPI_SWITCH_REG.
+> It think this would be easier to follow if the aarch32 FP registers were
+> handled as part of the __save_fpsimd  and __restore_fpsimd routines
+> instead.
 
-The two interface are [1]:
-1) Generic SPI interface: (config port): with this interface, ti-qspi
-controller can communicate with *any* spi device (flash and non-flash).
-This interface is provides direct access to SPI bus.
+Maybe. This code needs some rework...
 
-2) SPI memory mapped interface (memory mapped port): This is m25p80
-specific interface which can be use to read data from flash.
-But if the flash has to be configured to some particular mode like QUAD
-READ MODE, then the controller needs to be put in to config port to read
-and modify serial flash's config register and then switch to memory
-mapped port in order to read data stored on flash.
+> Does this help anything?
 
-For example on DRA74 evm, if a 64 MB flash is connected as a slave,
-entire flash memory is visible from 0x5C000000 to 0x5FFFFFFF L3_MAIN
-address. In order to read using memory mapped port following will be the
-sequence:
+Not really, sorry... :-(
 
-1.Write to flash config register via config port to switch to QUAD MODE
-(or any mode that flash supports).
-2. Populate QSPI_SPI_SETUP_REGx with flash read command, number of
-address bytes to use and dummy bytes required.
-3. Switch to memory mapped port by writing to QSPI_SPI_SWITCH_REG.
-4. Now, its possible to perform read from 0x5C000000 to 0x5FFFFFFF using
-memcpy. The qspi controller hardware will communicate over SPI bus and
-get the data. This data is directly sent to RAM via SoC's interconnect.
+> Otherwise, I assume you've tested thoroughly between something like
+> v4.2-rc2 and this patch, so that you're sure we didn't have the 32-bit
+> processed crash before?
 
-Advantages of memory mapped port are: improved read performance,
-MEM_TO_MEM DMA support can be added (ti-qspi hardware as such does not
-provide DMA events).
+Without the lazy switching, we seem to be rock solid. With lazy
+switching, I get these illegal instructions, always on VFP ops. My
+current thinking is that it has something to do with CPACR_EL1, and the
+fact that the 32bit kernel turns it VFP on/off all the time.
 
-Advantages of config port: can be used to communicate with *any* SPI
-device, provides direct read/write access to SPI bus.
+/me puzzled...
 
-On the whole following are my requirements:
-1. to be able to communicate with non -flash SPI devices via config port
-( this functionality is supported by current driver, I dont want to
-break it). Or pump any spi_message on to SPI bus directly.
-2. take advantage of memory mapped port in order to increase read
-throughput( and use dma in future) when the slave is a m25p80 type flash.
-3. handle m25p80 as well as other slave on multiple chipselects.
-
-I just need to know whether the user that requested the transfer is
-m25p80 driver. If yes, ti-qspi driver can take advantage of memory
-mapped interface, else just use config port to access SPI bus directly.
-
-Writing separate driver based on spi-nor framework to interface with
-m25p80 is not an option because, I would lose the ability to interface
-with non-flash devices.
-
-The spi_message that is received in transfer_one_message() is too
-generic to imply the slave device that is on the other side of the wire.
-IMO, the read command does not imply that the slave is m25p80 flash
-(besides the read opcodes vary across vendors of m25p80 and across modes).
-
-As Michal suggested, adding a flag to spi_device to distinguish whether
-the slave is a m25p80 flash type will help spi master to handle
-optimizations specific to m25p80s while being generic enough to handle
-all other spi devices. Is that ok? Is there any other way to imply what
-slave as at the other end?
-
-[1] TRM: http://www.ti.com/lit/ug/spruhz6/spruhz6.pdf 24.5.4 QSPI
-Functional Description
+	M.
 -- 
-Regards
-Vignesh
+Jazz is not dead. It just smells funny...
