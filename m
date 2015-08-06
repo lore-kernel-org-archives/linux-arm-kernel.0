@@ -1,56 +1,49 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 6 Aug 2015 08:19:18 +0200
-Subject: [PATCH v3 5/8] ARM: mediatek: add smp bringup code for MT6580
-In-Reply-To: <1801910.hz53dYUgta@ubix>
-References: <1438696464-59858-1-git-send-email-scott.shu@mediatek.com>
- <1438696464-59858-6-git-send-email-scott.shu@mediatek.com>
- <1801910.hz53dYUgta@ubix>
-Message-ID: <20150806061918.GK18700@pengutronix.de>
+From: b20788@freescale.com (Anson Huang)
+Date: Thu, 6 Aug 2015 22:13:56 +0800
+Subject: [PATCH] clk: imx: increase AXI clock rate to 264MHz for i.MX6UL
+Message-ID: <1438870436-16061-1-git-send-email-b20788@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 05, 2015 at 06:47:03PM +0200, Matthias Brugger wrote:
-> On Tuesday, August 04, 2015 09:54:21 PM Scott Shu wrote:
-> > Add support for cpu enable-method "mediatek,mt6580-smp" for booting
-> > secondary CPUs on MT6580.
-> > 
-> > Signed-off-by: Scott Shu <scott.shu@mediatek.com>
-> > ---
-> >  arch/arm/mach-mediatek/platsmp.c |  137
-> > ++++++++++++++++++++++++++++++++++++++ 1 file changed, 137 insertions(+)
-> > +
-> > +static void __init mt6580_smp_prepare_cpus(unsigned int max_cpus)
-> > +{
-> > +	static void __iomem *infracfg_ao_base;
-> > +
-> > +	infracfg_ao_base = ioremap(MT6580_INFRACFG_AO, 0x1000);
-> > +	if (!infracfg_ao_base) {
-> > +		pr_err("%s: Unable to map I/O memory\n", __func__);
-> > +		return;
-> > +	}
-> > +
-> > +	/* Enable bootrom power down mode */
-> > +	writel_relaxed(readl(infracfg_ao_base + 0x804) | SW_ROM_PD,
-> > +		       infracfg_ao_base + 0x804);
-> 
-> Please use a define for the offset.
-> I prefer to not cascade reads and writes but to use a temporary variable. But 
-> if this is fine with the kernel coding style (I doubt, but I'm not sure) then 
-> this is fine.
+On i.MX6UL, AXI clock rate's design target is 264MHz, but by default
+it is only set to 198MHz which is NOT good enough for performance,
+this patch increases AXI clock rate from 198MHz to 264MHz to meet
+the design target, this is done by switching its parent clock
+"periph" from 396MHz PFD to 528MHz PLL.
 
-For what it's worth I also prefer
+Signed-off-by: Anson Huang <b20788@freescale.com>
+---
+ drivers/clk/imx/clk-imx6ul.c | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
-	val = readl(infracfg_ao_base + 0x804);
-	val |= SW_ROM_PD:
-	writel_relaxed(val, infracfg_ao_base + 0x804);
-
-I find this better readable. I don't think though that there's common
-agreement that this style is better.
-
-Sascha
-
+diff --git a/drivers/clk/imx/clk-imx6ul.c b/drivers/clk/imx/clk-imx6ul.c
+index aaa3665..01718d0 100644
+--- a/drivers/clk/imx/clk-imx6ul.c
++++ b/drivers/clk/imx/clk-imx6ul.c
+@@ -407,6 +407,24 @@ static void __init imx6ul_clocks_init(struct device_node *ccm_node)
+ 	clk_data.clk_num = ARRAY_SIZE(clks);
+ 	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
+ 
++	/*
++	 * Lower the AHB clock rate before changing the parent clock source,
++	 * as AHB clock rate can NOT be higher than 133MHz, but its parent
++	 * will be switched from 396MHz PFD to 528MHz PLL in order to increase
++	 * AXI clock rate, so we need to lower AHB rate first to make sure at
++	 * any time, AHB rate is <= 133MHz.
++	 */
++	clk_set_rate(clks[IMX6UL_CLK_AHB], 99000000);
++
++	/* Change periph_pre clock to pll2_bus to adjust AXI rate to 264MHz */
++	clk_set_parent(clks[IMX6UL_CLK_PERIPH_CLK2_SEL], clks[IMX6UL_CLK_PLL3_USB_OTG]);
++	clk_set_parent(clks[IMX6UL_CLK_PERIPH], clks[IMX6UL_CLK_PERIPH_CLK2]);
++	clk_set_parent(clks[IMX6UL_CLK_PERIPH_PRE], clks[IMX6UL_CLK_PLL2_BUS]);
++	clk_set_parent(clks[IMX6UL_CLK_PERIPH], clks[IMX6UL_CLK_PERIPH_PRE]);
++
++	/* Make sure AHB rate is 132MHz  */
++	clk_set_rate(clks[IMX6UL_CLK_AHB], 132000000);
++
+ 	/* set perclk to from OSC */
+ 	clk_set_parent(clks[IMX6UL_CLK_PERCLK_SEL], clks[IMX6UL_CLK_OSC]);
+ 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.9.1
