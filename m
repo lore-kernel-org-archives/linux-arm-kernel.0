@@ -1,42 +1,120 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 6 Aug 2015 17:18:22 +0200
-Subject: [PATCH 2/2] ARM: ux500: simplify secondary CPU boot
-In-Reply-To: <CACRpkdZDyVjLmOcdUVBmRQo_fLf0TA84kA8yJNpsYGBkn5Jzzg@mail.gmail.com>
-References: <1438586812-30164-1-git-send-email-linus.walleij@linaro.org>
- <20150806081130.GC16520@localhost>
- <CACRpkdZDyVjLmOcdUVBmRQo_fLf0TA84kA8yJNpsYGBkn5Jzzg@mail.gmail.com>
-Message-ID: <CAOesGMgtC=cGZJ1GqETyQN5Ap=g1HbvWyU61Y3c6Araq5F_5iw@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu,  6 Aug 2015 17:18:48 +0200
+Subject: [PATCH] rtc: armada38x: Align RTC set time procedure with the
+ official errata
+Message-ID: <1438874328-31844-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 6, 2015 at 4:40 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Thu, Aug 6, 2015 at 10:11 AM, Olof Johansson <olof@lixom.net> wrote:
->> On Mon, Aug 03, 2015 at 09:26:52AM +0200, Linus Walleij wrote:
->>> This removes a lot of ancient cruft from the Ux500 SMP boot.
->>> Instead of the pen grab/release, just point the ROM to
->>> secondary_boot() and start the second CPU there, then send
->>> the IPI.
->>>
->>> Use our own SMP enable method. This enables us to remove the
->>> last static mapping and get both CPUs booting properly.
->>>
->>> Tested this and it just works.
->>>
->>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
->>> ---
->>> Hi ARM SoC folks: please apply this to fixes for v4.2. I was
->>> intending it for v4.3 but we might as well just kill off the
->>> legacy boot method right now so we do not need to restore any
->>> static maps and undo the cleanup (which would be just as
->>> invasive).
->>
->> It's a bit late in the cycle for that. I'll apply it in cleanup for 4.3 though.
->
-> OK I've got a bunch of cleanups for Ux500, shall I include these
-> in the pull request or will you apply this separately?
+From: Nadav Haklai <nadavh@marvell.com>
 
-I've applied it already so just send a pull request with the rest of
-it (hopefully not too much conflicts).
+According to the Armada38x functional errata FE-3124064, writing to
+the RTC TIME register may fail. As a workaround, after writing to RTC
+TIME register, issue a dummy write of 0x0 twice to the RTC Status
+register.  This is the updated implementation of the Errata that
+eliminates the need of the long 100ms delay during the RTC set time
+procedure.
+
+[gregory.clement at free-electrons.com]: removed the mutex and use the
+spinlock again
+
+Signed-off-by: Nadav Haklai <nadavh@marvell.com>
+Reviewed-by: Neta Zur Hershkovits <neta@marvell.com>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+Hi,
+
+Finally the long 100ms wait was not needed! So we can remove the mutex
+introduced in an earlier commit.
+It would be great if this patch could be part of the 4.2-rc.
+
+Thanks
+
+Gregory
 
 
--Olof
+ drivers/rtc/rtc-armada38x.c | 32 ++++++++++++--------------------
+ 1 file changed, 12 insertions(+), 20 deletions(-)
+
+diff --git a/drivers/rtc/rtc-armada38x.c b/drivers/rtc/rtc-armada38x.c
+index 2b08cac62f07..06c6bd5eab41 100644
+--- a/drivers/rtc/rtc-armada38x.c
++++ b/drivers/rtc/rtc-armada38x.c
+@@ -40,13 +40,6 @@ struct armada38x_rtc {
+ 	void __iomem	    *regs;
+ 	void __iomem	    *regs_soc;
+ 	spinlock_t	    lock;
+-	/*
+-	 * While setting the time, the RTC TIME register should not be
+-	 * accessed. Setting the RTC time involves sleeping during
+-	 * 100ms, so a mutex instead of a spinlock is used to protect
+-	 * it
+-	 */
+-	struct mutex	    mutex_time;
+ 	int		    irq;
+ };
+ 
+@@ -64,9 +57,9 @@ static void rtc_delayed_write(u32 val, struct armada38x_rtc *rtc, int offset)
+ static int armada38x_rtc_read_time(struct device *dev, struct rtc_time *tm)
+ {
+ 	struct armada38x_rtc *rtc = dev_get_drvdata(dev);
+-	unsigned long time, time_check;
++	unsigned long time, time_check, flags;
+ 
+-	mutex_lock(&rtc->mutex_time);
++	spin_lock_irqsave(&rtc->lock, flags);
+ 	time = readl(rtc->regs + RTC_TIME);
+ 	/*
+ 	 * WA for failing time set attempts. As stated in HW ERRATA if
+@@ -77,7 +70,7 @@ static int armada38x_rtc_read_time(struct device *dev, struct rtc_time *tm)
+ 	if ((time_check - time) > 1)
+ 		time_check = readl(rtc->regs + RTC_TIME);
+ 
+-	mutex_unlock(&rtc->mutex_time);
++	spin_unlock_irqrestore(&rtc->lock, flags);
+ 
+ 	rtc_time_to_tm(time_check, tm);
+ 
+@@ -88,23 +81,23 @@ static int armada38x_rtc_set_time(struct device *dev, struct rtc_time *tm)
+ {
+ 	struct armada38x_rtc *rtc = dev_get_drvdata(dev);
+ 	int ret = 0;
+-	unsigned long time;
++	unsigned long time, flags;
+ 
+ 	ret = rtc_tm_to_time(tm, &time);
+ 
+ 	if (ret)
+ 		goto out;
+ 	/*
+-	 * Setting the RTC time not always succeeds. According to the
+-	 * errata we need to first write on the status register and
+-	 * then wait for 100ms before writing to the time register to be
+-	 * sure that the data will be taken into account.
++	 * According to errata FE-3124064, Write to RTC TIME register
++	 * may fail. As a workaround, after writing to RTC TIME
++	 * register, issue a dummy write of 0x0 twice to RTC Status
++	 * register.
+ 	 */
+-	mutex_lock(&rtc->mutex_time);
+-	rtc_delayed_write(0, rtc, RTC_STATUS);
+-	msleep(100);
++	spin_lock_irqsave(&rtc->lock, flags);
+ 	rtc_delayed_write(time, rtc, RTC_TIME);
+-	mutex_unlock(&rtc->mutex_time);
++	rtc_delayed_write(0, rtc, RTC_STATUS);
++	rtc_delayed_write(0, rtc, RTC_STATUS);
++	spin_unlock_irqrestore(&rtc->lock, flags);
+ 
+ out:
+ 	return ret;
+@@ -229,7 +222,6 @@ static __init int armada38x_rtc_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
+ 
+ 	spin_lock_init(&rtc->lock);
+-	mutex_init(&rtc->mutex_time);
+ 
+ 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "rtc");
+ 	rtc->regs = devm_ioremap_resource(&pdev->dev, res);
+-- 
+2.1.0
