@@ -1,60 +1,25 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Thu, 06 Aug 2015 18:33:55 +0200
-Subject: [PATCH 1/3] nvmem: Add i.MX6 OCOTP device tree binding
- documentation
-In-Reply-To: <55C38752.3040406@linaro.org>
-References: <1438693342-605-1-git-send-email-p.zabel@pengutronix.de>
- <55C38752.3040406@linaro.org>
-Message-ID: <1438878835.3223.14.camel@pengutronix.de>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 6 Aug 2015 18:34:24 +0200
+Subject: [PATCH v3] ARM: dts: Convert Linkstation Mini to Device Tree
+In-Reply-To: <1438878592.15635.89.camel@dolka.fr>
+References: <1438878592.15635.89.camel@dolka.fr>
+Message-ID: <20150806163424.GH13421@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, den 06.08.2015, 17:12 +0100 schrieb Srinivas Kandagatla:
+On Thu, Aug 06, 2015 at 06:29:52PM +0200, Benjamin Cama wrote:
+> The title says it all. The name of the dts file as been changed to
+> better reflect the manufacturer's device name (LS-WSGL), rather than
+> the original "lsmini", which exists in a kirkwood version too.
 > 
-> On 04/08/15 14:02, Philipp Zabel wrote:
-> > This patch documents the i.MX6 OCOTP device tree binding.
-> >
-> > Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> > ---
-> >   .../devicetree/bindings/nvmem/imx-ocotp.txt          | 20 ++++++++++++++++++++
-> >   1 file changed, 20 insertions(+)
-> >   create mode 100644 Documentation/devicetree/bindings/nvmem/imx-ocotp.txt
-> >
-> > diff --git a/Documentation/devicetree/bindings/nvmem/imx-ocotp.txt b/Documentation/devicetree/bindings/nvmem/imx-ocotp.txt
-> > new file mode 100644
-> > index 0000000..7d9a3fc
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/nvmem/imx-ocotp.txt
-> > @@ -0,0 +1,20 @@
-> > +Freescale i.MX6 On-Chip OTP Controller (OCOTP) device tree bindings
-> > +
-> > +This binding represents the on-chip eFuse OTP controller found on
-> > +i.MX6Q/D, i.MX6DL/S, i.MX6SL, and i.MX6SX SoCs.
-> > +
-> > +Required properties:
-> > +- compatible: should be one of
-> > +	"fsl,imx6q-ocotp" (i.MX6Q/D/DL/S),
-> > +        "fsl,imx6sl-ocotp" (i.MX6SL), or
-> > +	"fsl,imx6sx-ocotp" (i.MX6SX), followed by "syscon".
-> > +- reg: Should contain the register base and length.
-> > +- clocks: Should contain a phandle pointing to the gated peripheral clock.
-> > +
-> > +Example:
-> > +
-> > +	ocotp: ocotp at 021bc000 {
-> > +		compatible = "fsl,imx6q-ocotp", "syscon";
-> Do you still need syscon?
+> Signed-off-by: Benjamin Cama <benoar@dolka.fr>
 
-Currently the imx_tempmon driver still accesses ocotp via syscon. I'd
-like to change that and drop "syscon" after the nvmem framework lands in
-mainline.
+Hi Benjamin
 
-> > +		reg = <0x021bc000 0x4000>;
-> Can't we just have a register range specific to the OTP device?
+It would be normal to add the various Acked-by: here, both Alexey and
+mine. It is not an issue, Gregory can add them, when he adds is own.
+I'm just mentioning it for any future patches you might submit.
 
-In the i.MX device trees it is common to specify the register range from
-the memory map. In any case, we have to support old device trees where
-this is already set.
+Thanks for the good work converting this,
 
-regards
-Philipp
+       Andrew
