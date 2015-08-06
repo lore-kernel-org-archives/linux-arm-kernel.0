@@ -1,47 +1,28 @@
-From: drew.richardson@arm.com (Drew Richardson)
-Date: Thu, 6 Aug 2015 10:52:47 -0700
-Subject: [PATCH] ARM: Mark ret_fast_syscall as a function
-In-Reply-To: <alpine.LFD.2.20.1508061327510.1515@knanqh.ubzr>
-References: <1436877957-18127-1-git-send-email-drew.richardson@arm.com>
- <20150806170758.GA26691@dreric01-gentoo.localdomain>
- <alpine.LFD.2.20.1508061327510.1515@knanqh.ubzr>
-Message-ID: <20150806175246.GA13323@dreric01-gentoo.localdomain>
+From: joro@8bytes.org (joro at 8bytes.org)
+Date: Thu, 6 Aug 2015 19:54:39 +0200
+Subject: [PATCH v5 1/3] iommu: Implement common IOMMU ops for DMA mapping
+In-Reply-To: <20150806152327.GH25483@arm.com>
+References: <cover.1438362603.git.robin.murphy@arm.com>
+ <6ce6b501501f611297ae0eae31e07b0d2060eaae.1438362603.git.robin.murphy@arm.com>
+ <20150806152327.GH25483@arm.com>
+Message-ID: <20150806175439.GS14980@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 06, 2015 at 06:30:40PM +0100, Nicolas Pitre wrote:
-> On Thu, 6 Aug 2015, Drew Richardson wrote:
-> 
-> > On Tue, Jul 14, 2015 at 01:45:57PM +0100, Drew Richardson wrote:
-> > > ret_fast_syscall runs when user space makes a syscall. However it
-> > > needs to be marked as such so the ELF information is correct. Before
-> > > it was:
-> > > 
-> > >    101: 8000f300     0 NOTYPE  LOCAL  DEFAULT    2 ret_fast_syscall
-> > > 
-> > > But with this change it correctly shows as:
-> > > 
-> > >    101: 8000f300    96 FUNC    LOCAL  DEFAULT    2 ret_fast_syscall
-> > > 
-> > > I see this function when using perf to unwind call stacks from kernel
-> > > space to user space. Without this change I would need to add some
-> > > special case logic when using the vmlinux ELF information.
-> > > 
-> > > Signed-off-by: Drew Richardson <drew.richardson@arm.com>
-> > 
-> > I haven't heard any further comments on this, did this get merged and
-> > I just didn't notice? Or did I forget to add someone?
-> 
-> Most likely that it is so trivial that nobody paid much attention.
-> 
-> FWIW, you can add
-> 
-> Acked-by: Nicolas Pitre <nico@linaro.org>
-> 
-> and submit it here: http://www.arm.linux.org.uk/developer/patches/
-> 
-> 
-> Nicolas
-> 
+Hi Will,
 
-Done, thanks.
+On Thu, Aug 06, 2015 at 04:23:27PM +0100, Will Deacon wrote:
+> We're quite keen to get this in for arm64, since we're without IOMMU DMA
+> ops and need to get something upstream. Do you think this is likely to
+> be merged for 4.3/4.4 or would we be better off doing our own
+> arch-private implementation instead?
+> 
+> Sorry to pester, but we've got people basing their patches and products
+> on this and I don't want to end up having to support out-of-tree code.
+
+I definitly plan to merge it soon, but not sure if its getting into
+v4.3. There are a few things I have questions about or need rework, but
+I am sure we can work this out.
+
+
+	Joerg
