@@ -1,38 +1,95 @@
 From: al.stone@linaro.org (Al Stone)
-Date: Thu,  6 Aug 2015 14:59:30 -0600
-Subject: [PATCH 5/5] ACPI: remove definition of BAD_MADT_ENTRY macro
+Date: Thu,  6 Aug 2015 14:59:28 -0600
+Subject: [PATCH 3/5] ACPI / IA64: remove usage of BAD_MADT_ENTRY
 In-Reply-To: <1438894770-31163-1-git-send-email-al.stone@linaro.org>
 References: <1438894770-31163-1-git-send-email-al.stone@linaro.org>
-Message-ID: <1438894770-31163-6-git-send-email-al.stone@linaro.org>
+Message-ID: <1438894770-31163-4-git-send-email-al.stone@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have introduced to bad_madt_entry(), and we have removed
-all the usages of the BAD_MADT_ENTRY macro from all of the various
-architectures that use it (arm64, ia64, x86), we can remove the macro
-definition since it is no longer used.
+Now that we have introduced the bad_madt_entry() function, and that
+function is being invoked in acpi_table_parse_madt() for us, there
+is no longer any need to use the BAD_MADT_ENTRY macro.
 
 Signed-off-by: Al Stone <al.stone@linaro.org>
-Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
-Cc: Len Brown <lenb@kernel.org>
+Cc: Tony Luck <tony.luck@intel.com>
+Cc: Fenghua Yu <fenghua.yu@intel.com>
 ---
- include/linux/acpi.h | 4 ----
- 1 file changed, 4 deletions(-)
+ arch/ia64/kernel/acpi.c | 20 --------------------
+ 1 file changed, 20 deletions(-)
 
-diff --git a/include/linux/acpi.h b/include/linux/acpi.h
-index d2445fa..06072d8 100644
---- a/include/linux/acpi.h
-+++ b/include/linux/acpi.h
-@@ -131,10 +131,6 @@ static inline void acpi_initrd_override(void *data, size_t size)
- }
- #endif
+diff --git a/arch/ia64/kernel/acpi.c b/arch/ia64/kernel/acpi.c
+index b1698bc..efa3f0a 100644
+--- a/arch/ia64/kernel/acpi.c
++++ b/arch/ia64/kernel/acpi.c
+@@ -184,9 +184,6 @@ acpi_parse_lapic_addr_ovr(struct acpi_subtable_header * header,
  
--#define BAD_MADT_ENTRY(entry, end) (					    \
--		(!entry) || (unsigned long)entry + sizeof(*entry) > end ||  \
--		((struct acpi_subtable_header *)entry)->length < sizeof(*entry))
+ 	lapic = (struct acpi_madt_local_apic_override *)header;
+ 
+-	if (BAD_MADT_ENTRY(lapic, end))
+-		return -EINVAL;
 -
- char * __acpi_map_table (unsigned long phys_addr, unsigned long size);
- void __acpi_unmap_table(char *map, unsigned long size);
- int early_acpi_boot_init(void);
+ 	if (lapic->address) {
+ 		iounmap(ipi_base_addr);
+ 		ipi_base_addr = ioremap(lapic->address, 0);
+@@ -201,8 +198,6 @@ acpi_parse_lsapic(struct acpi_subtable_header * header, const unsigned long end)
+ 
+ 	lsapic = (struct acpi_madt_local_sapic *)header;
+ 
+-	/*Skip BAD_MADT_ENTRY check, as lsapic size could vary */
+-
+ 	if (lsapic->lapic_flags & ACPI_MADT_ENABLED) {
+ #ifdef CONFIG_SMP
+ 		smp_boot_data.cpu_phys_id[available_cpus] =
+@@ -222,9 +217,6 @@ acpi_parse_lapic_nmi(struct acpi_subtable_header * header, const unsigned long e
+ 
+ 	lacpi_nmi = (struct acpi_madt_local_apic_nmi *)header;
+ 
+-	if (BAD_MADT_ENTRY(lacpi_nmi, end))
+-		return -EINVAL;
+-
+ 	/* TBD: Support lapic_nmi entries */
+ 	return 0;
+ }
+@@ -236,9 +228,6 @@ acpi_parse_iosapic(struct acpi_subtable_header * header, const unsigned long end
+ 
+ 	iosapic = (struct acpi_madt_io_sapic *)header;
+ 
+-	if (BAD_MADT_ENTRY(iosapic, end))
+-		return -EINVAL;
+-
+ 	return iosapic_init(iosapic->address, iosapic->global_irq_base);
+ }
+ 
+@@ -253,9 +242,6 @@ acpi_parse_plat_int_src(struct acpi_subtable_header * header,
+ 
+ 	plintsrc = (struct acpi_madt_interrupt_source *)header;
+ 
+-	if (BAD_MADT_ENTRY(plintsrc, end))
+-		return -EINVAL;
+-
+ 	/*
+ 	 * Get vector assignment for this interrupt, set attributes,
+ 	 * and program the IOSAPIC routing table.
+@@ -336,9 +322,6 @@ acpi_parse_int_src_ovr(struct acpi_subtable_header * header,
+ 
+ 	p = (struct acpi_madt_interrupt_override *)header;
+ 
+-	if (BAD_MADT_ENTRY(p, end))
+-		return -EINVAL;
+-
+ 	iosapic_override_isa_irq(p->source_irq, p->global_irq,
+ 				 ((p->inti_flags & ACPI_MADT_POLARITY_MASK) ==
+ 				  ACPI_MADT_POLARITY_ACTIVE_LOW) ?
+@@ -356,9 +339,6 @@ acpi_parse_nmi_src(struct acpi_subtable_header * header, const unsigned long end
+ 
+ 	nmi_src = (struct acpi_madt_nmi_source *)header;
+ 
+-	if (BAD_MADT_ENTRY(nmi_src, end))
+-		return -EINVAL;
+-
+ 	/* TBD: Support nimsrc entries */
+ 	return 0;
+ }
 -- 
 2.4.3
