@@ -1,40 +1,62 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu,  6 Aug 2015 13:27:32 +0200
-Subject: [PATCH] ARM: Fix the secondary_startup function in Big Endian case
-Message-ID: <1438860452-6347-1-git-send-email-gregory.clement@free-electrons.com>
+From: hramrach@gmail.com (Michal Suchanek)
+Date: Thu, 6 Aug 2015 13:42:32 +0200
+Subject: [RFC PATCH 1/5] spi: introduce flag for memory mapped read
+In-Reply-To: <20150806112353.GT20873@sirena.org.uk>
+References: <20150731181745.GM20873@sirena.org.uk> <55BEF4AF.5090704@ti.com>
+ <20150804155148.GR20873@sirena.org.uk> <55C0FD98.1090107@ti.com>
+ <20150805115013.GJ20873@sirena.org.uk>
+ <CAOMqctQXwcHyiWBwtugSDSE_k65qrNfrwnhjQMDJkLoJMmGzUw@mail.gmail.com>
+ <20150805124412.GN20873@sirena.org.uk>
+ <CAOMqctS9Y5FxpUCCJew6+cnjH5iTvbzkH3g-8yrXs4OuS2pSGA@mail.gmail.com>
+ <20150806090202.GO20873@sirena.org.uk>
+ <CAOMqctQZRZ4zG_yYy=CeX3DX4NVNWN1COP4Q-2YvMun9xYOA7g@mail.gmail.com>
+ <20150806112353.GT20873@sirena.org.uk>
+Message-ID: <CAOMqctQKc6f5Mbe_CSd-ghguUfZvf6v_BRvYxQJVqPne73iESA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the commit "b2c3e38a5471 ARM: redo TTBR setup code for LPAE",
-the setup code had been reworked. As a result the secondary CPUs
-failed to come online in Big Endian.
+On 6 August 2015 at 13:23, Mark Brown <broonie@kernel.org> wrote:
+> On Thu, Aug 06, 2015 at 12:01:37PM +0200, Michal Suchanek wrote:
+>
+>> However, I am familiar m25p80.c and as I understand it the controller
+>> is basically supposed to implement m25p80.c in hardware when this flag
+>> is set.
+>
+> But what in concrete terms is that supposed to mean?  It's currently
+> just an essentially undocumented flag on a message rather than something
+> operating at the level of a flash chip.  That's pretty much where
+> Russell's comments come from.
+>
+>> If I was using m25p80.c to talk to anything but an actual flash chip
+>> it would get me quite worried.
+>
+> Sure, but at the end of the day it's just emitting standard SPI messages
+> which don't know anything about flash.  If those messages are a sensible
+> interface here then why bother with the flag, we can just pattern match
+> on the format of the message.  If that doesn't work then probably this
+> isn't a great interface and a separate, application specific interface
+> makes more sense.
 
-As explained by Russell, the new code expected the value in r4/r5 to
-be the least significant 32bits in r4 and the most significant 32bits
-in r5. However, in the secondary code, we load this using ldrd, which
-on BE reverses that.
+The messages are sensible interface for communicating with a device
+that interprets a particular part of the mesasge as address and
+another particular part of the message as command and sends same
+amount of junk before reply as the flash chip would. If your device
+happens to send reply immediately part of it is trashed. If it happens
+to interpret address differently the data ends up in random part of
+your memory. So no, that is not something you can autodetect.
 
-This patch swap r4/r5 after the ldrd. It is done using the xor
-instructions in order to not use a temporary register.
+At the end of the day you have valid SPI messages but the m25p80 layer
+adds interpretation to those messages which may not always give
+correct result.
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- arch/arm/kernel/head.S | 3 +++
- 1 file changed, 3 insertions(+)
+On the other hand, if you ever get to m25p80 or spi-nor you can assume
+any message you send goes to a flash chip and insist that the
+controller uses the flash-specific interface.
 
-diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-index bd755d97e459..75cbcf34c2e9 100644
---- a/arch/arm/kernel/head.S
-+++ b/arch/arm/kernel/head.S
-@@ -399,6 +399,9 @@ ENTRY(secondary_startup)
- 	sub	lr, r4, r5			@ mmu has been enabled
- 	add	r3, r7, lr
- 	ldrd	r4, [r3, #0]			@ get secondary_data.pgdir
-+ARM_BE8(eor	r4, r4, r5)			@ swap r5 and r4 in BE
-+ARM_BE8(eor	r5, r4, r5)			@ it can be done in 3 step
-+ARM_BE8(eor	r4, r4, r5)			@ without using an temp reg
- 	ldr	r8, [r3, #8]			@ get secondary_data.swapper_pg_dir
- 	badr	lr, __enable_mmu		@ return address
- 	mov	r13, r12			@ __secondary_switched address
--- 
-2.1.0
+If there is possibility of connecting different kind of devices to
+multiple chipselects on the same master then you probably want to
+select this option per message or per slave.
+
+Thanks
+
+Michal
