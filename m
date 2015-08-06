@@ -1,78 +1,77 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Thu, 06 Aug 2015 10:11:30 +0200
-Subject: [PATCH] ARM: imx6: correct i.MX6 PCIe interrupt routing
-In-Reply-To: <20150806012832.GP12927@tiger>
-References: <1438793677-19153-1-git-send-email-l.stach@pengutronix.de>
- <20150806012832.GP12927@tiger>
-Message-ID: <1438848690.24317.3.camel@pengutronix.de>
+From: Wenyou.Yang@atmel.com (Yang, Wenyou)
+Date: Thu, 6 Aug 2015 08:18:52 +0000
+Subject: [PATCH v4 1/2] drivers: watchdog: add a driver to support
+ SAMA5D4 watchdog timer
+In-Reply-To: <55C31547.2040207@roeck-us.net>
+References: <1438837170-4518-1-git-send-email-wenyou.yang@atmel.com>
+ <1438837170-4518-2-git-send-email-wenyou.yang@atmel.com>
+ <55C31547.2040207@roeck-us.net>
+Message-ID: <B256D81BAE5131468A838E5D7A243641C9F875EB@penmbx01>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, den 06.08.2015, 09:28 +0800 schrieb Shawn Guo:
-> On Wed, Aug 05, 2015 at 06:54:37PM +0200, Lucas Stach wrote:
-> > The PCIe interrupts are also routed through the GPC. This has been
-> > missed from the conversion to stacked IRQ domains as the PCIe
-> > controller uses an explicit interrupt map and thus doesn't inherit
-> > the SoC global interrupt parent.
-> > 
-> > Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-> 
-> So this is a fix and need copy stable?
-> 
-I'm a bit on the fence with this. It only fixes PCIe wake-up and I'm not
-aware of anyone using this functionality and haven't seen any bug
-reports yet.
+Hi Guenter,
 
-On the other hand it is a clear fix and has practically zero chances for
-regressions, so yes please add stable 4.0+ to this.
+Thank you for your correct.
 
-Thanks,
-Lucas
-
-> Shawn
+> -----Original Message-----
+> From: Guenter Roeck [mailto:linux at roeck-us.net]
+> Sent: 2015?8?6? 16:05
+> To: Yang, Wenyou; wim at iguana.be; robh+dt at kernel.org; pawel.moll at arm.com;
+> mark.rutland at arm.com; ijc+devicetree at hellion.org.uk; galak at codeaurora.org
+> Cc: sylvain.rochet at finsecur.com; Ferre, Nicolas; boris.brezillon at free-
+> electrons.com; devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; linux-
+> watchdog at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH v4 1/2] drivers: watchdog: add a driver to support SAMA5D4
+> watchdog timer
 > 
+> On 08/05/2015 09:59 PM, Wenyou Yang wrote:
+> >>From SAMA5D4, the watchdog timer is upgrated with a new feature,
+> > which is describled as in the datasheet, "WDT_MR can be written until
+> > a LOCKMR command is issued in WDT_CR".
+> > That is to say, as long as the bootstrap and u-boot don't issue a
+> > LOCKMR command, WDT_MR can be written more than once in the driver.
+> >
+> > So the SAMA5D4 watchdog driver's implementation is different from the
+> > at91sam9260 watchdog driver implemented in file at91sam9_wdt.c.
+> > The user application open the device file to enable the watchdog timer
+> > hardware, and close to disable it, and set the watchdog timer timeout
+> > by seting WDV and WDD fields of WDT_MR register, and ping the watchdog
+> > by issuing WDRSTT command to WDT_CR register with hard-coded key.
+> >
+> > Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
 > > ---
-> > This commit does not change the i.MX6SX PCIe node, as PCIe isn't
-> > functional in mainline on this SoC and the DT node needs a major
-> > rewrite to account for the specifics of this SoC anyway.
-> > ---
-> >  arch/arm/boot/dts/imx6qdl.dtsi | 8 ++++----
-> >  1 file changed, 4 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-> > index e6d13592080d..b57033e8c633 100644
-> > --- a/arch/arm/boot/dts/imx6qdl.dtsi
-> > +++ b/arch/arm/boot/dts/imx6qdl.dtsi
-> > @@ -181,10 +181,10 @@
-> >  			interrupt-names = "msi";
-> >  			#interrupt-cells = <1>;
-> >  			interrupt-map-mask = <0 0 0 0x7>;
-> > -			interrupt-map = <0 0 0 1 &intc GIC_SPI 123 IRQ_TYPE_LEVEL_HIGH>,
-> > -			                <0 0 0 2 &intc GIC_SPI 122 IRQ_TYPE_LEVEL_HIGH>,
-> > -			                <0 0 0 3 &intc GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>,
-> > -			                <0 0 0 4 &intc GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>;
-> > +			interrupt-map = <0 0 0 1 &gpc GIC_SPI 123 IRQ_TYPE_LEVEL_HIGH>,
-> > +			                <0 0 0 2 &gpc GIC_SPI 122 IRQ_TYPE_LEVEL_HIGH>,
-> > +			                <0 0 0 3 &gpc GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>,
-> > +			                <0 0 0 4 &gpc GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>;
-> >  			clocks = <&clks IMX6QDL_CLK_PCIE_AXI>,
-> >  				 <&clks IMX6QDL_CLK_LVDS1_GATE>,
-> >  				 <&clks IMX6QDL_CLK_PCIE_REF_125M>;
-> > -- 
-> > 2.4.6
-> > 
-> > 
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> > 
+> [ ... ]
+> > +
+> > +/* minimum and maximum watchdog timeout, in seconds */
+> > +#define	MIN_WDT_TIMEOUT		1
+> > +#define	MAX_WDT_TIMEOUT		16
+> > +#define	WDT_DEFAULT_TIMEOUT	MAX_WDT_TIMEOUT
+> > +
+> > +#define	WDT_SEC2TICKS(s)	((s) ? (((s) << 8) - 1) : 0)
+> > +
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Why did you replace the spaces after #define with tabs ?
+> I understand this is done in the at91.h file, but that is bad enough, it doesn't add
+> any value, and I don't see a reason to do it here.
+Accepted, Using spaces, not tabs.
 
--- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+> 
+> > +
+> > +	if ((wdt->config & AT91_WDT_WDFIEN) && irq) {
+> > +		ret = devm_request_irq(&pdev->dev, irq,
+> sama5d4_wdt_irq_handler,
+> > +				       0, pdev->name, pdev);
+> 
+> I just realized - this interrupt is registered with flags set to 0, while in the at91sam
+> driver the flags are "IRQF_SHARED | IRQF_IRQPOLL | IRQF_NO_SUSPEND". Is
+> this different with the new SOC ?
+No, it is same. It is my carelessness.
+
+> 
+> Thanks,
+> Guenter
+
+
+Best Regards,
+Wenyou Yang
