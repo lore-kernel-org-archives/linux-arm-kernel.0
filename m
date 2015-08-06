@@ -1,29 +1,42 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 6 Aug 2015 18:27:52 +0100
-Subject: next-20150806 build: 2 failures 52 warnings (next-20150806)
-In-Reply-To: <E1ZNIul-0007IF-Ev@optimist>
-References: <E1ZNIul-0007IF-Ev@optimist>
-Message-ID: <20150806172752.GA20873@sirena.org.uk>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 6 Aug 2015 13:30:40 -0400 (EDT)
+Subject: [PATCH] ARM: Mark ret_fast_syscall as a function
+In-Reply-To: <20150806170758.GA26691@dreric01-gentoo.localdomain>
+References: <1436877957-18127-1-git-send-email-drew.richardson@arm.com>
+ <20150806170758.GA26691@dreric01-gentoo.localdomain>
+Message-ID: <alpine.LFD.2.20.1508061327510.1515@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 06, 2015 at 12:00:47PM +0100, Build bot for Mark Brown wrote:
+On Thu, 6 Aug 2015, Drew Richardson wrote:
 
-Today's linux-next fails to build an ARM allmodconfig with:
+> On Tue, Jul 14, 2015 at 01:45:57PM +0100, Drew Richardson wrote:
+> > ret_fast_syscall runs when user space makes a syscall. However it
+> > needs to be marked as such so the ELF information is correct. Before
+> > it was:
+> > 
+> >    101: 8000f300     0 NOTYPE  LOCAL  DEFAULT    2 ret_fast_syscall
+> > 
+> > But with this change it correctly shows as:
+> > 
+> >    101: 8000f300    96 FUNC    LOCAL  DEFAULT    2 ret_fast_syscall
+> > 
+> > I see this function when using perf to unwind call stacks from kernel
+> > space to user space. Without this change I would need to add some
+> > special case logic when using the vmlinux ELF information.
+> > 
+> > Signed-off-by: Drew Richardson <drew.richardson@arm.com>
+> 
+> I haven't heard any further comments on this, did this get merged and
+> I just didn't notice? Or did I forget to add someone?
 
-> 	arm-allmodconfig
-> ../lib/test_user_copy.c:67:2: error: implicit declaration of function 'copy_in_user' [-Werror=implicit-function-declaration]
-> ../lib/test_user_copy.c:94:2: error: implicit declaration of function '__copy_in_user' [-Werror=implicit-function-declaration]
+Most likely that it is so trivial that nobody paid much attention.
 
-due to 3a646f02c7 (lib/test_user_copy.c: check
-__copy_in_user()/copy_in_user()) which attempts to test copy_in_user()
-which doesn't appear to be defined, at least with the set of include
-files and/or config options you get with an allmodconfig and not at all
-as far as I can tell.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150806/6b5baeb9/attachment.sig>
+FWIW, you can add
+
+Acked-by: Nicolas Pitre <nico@linaro.org>
+
+and submit it here: http://www.arm.linux.org.uk/developer/patches/
+
+
+Nicolas
