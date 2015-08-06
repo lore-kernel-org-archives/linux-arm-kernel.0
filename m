@@ -1,7 +1,7 @@
-From: hramrach@gmail.com (Michal Suchanek)
-Date: Thu, 6 Aug 2015 20:20:02 +0200
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 6 Aug 2015 19:20:29 +0100
 Subject: [RFC PATCH 1/5] spi: introduce flag for memory mapped read
-In-Reply-To: <CAMuHMdWWDwZ=ziGQXFCnOX8pErXpsEi533J73_Hh=sEqq4hR6Q@mail.gmail.com>
+In-Reply-To: <55C35233.2000105@ti.com>
 References: <20150804155148.GR20873@sirena.org.uk> <55C0FD98.1090107@ti.com>
  <20150805115013.GJ20873@sirena.org.uk>
  <CAOMqctQXwcHyiWBwtugSDSE_k65qrNfrwnhjQMDJkLoJMmGzUw@mail.gmail.com>
@@ -9,87 +9,67 @@ References: <20150804155148.GR20873@sirena.org.uk> <55C0FD98.1090107@ti.com>
  <CAOMqctS9Y5FxpUCCJew6+cnjH5iTvbzkH3g-8yrXs4OuS2pSGA@mail.gmail.com>
  <20150806090202.GO20873@sirena.org.uk>
  <CAOMqctQZRZ4zG_yYy=CeX3DX4NVNWN1COP4Q-2YvMun9xYOA7g@mail.gmail.com>
- <20150806102225.GI7576@n2100.arm.linux.org.uk> <55C35233.2000105@ti.com>
- <20150806135129.GJ7576@n2100.arm.linux.org.uk>
- <CAMuHMdWWDwZ=ziGQXFCnOX8pErXpsEi533J73_Hh=sEqq4hR6Q@mail.gmail.com>
-Message-ID: <CAOMqctTisUv4YcSSojKadotX5XAB4Ro0bxT4Wn9tRP=Jyc0iqw@mail.gmail.com>
+ <20150806102225.GI7576@n2100.arm.linux.org.uk>
+ <55C35233.2000105@ti.com>
+Message-ID: <20150806182029.GD20873@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 August 2015 at 18:14, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
-> On Thu, Aug 6, 2015 at 3:51 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
->> On Thu, Aug 06, 2015 at 05:55:23PM +0530, Vignesh R wrote:
->>> On the whole following are my requirements:
->>> 1. to be able to communicate with non -flash SPI devices via config port
->>> ( this functionality is supported by current driver, I dont want to
->>> break it). Or pump any spi_message on to SPI bus directly.
->>> 2. take advantage of memory mapped port in order to increase read
->>> throughput( and use dma in future) when the slave is a m25p80 type flash.
->>> 3. handle m25p80 as well as other slave on multiple chipselects.
->>>
->>> I just need to know whether the user that requested the transfer is
->>> m25p80 driver. If yes, ti-qspi driver can take advantage of memory
->>> mapped interface, else just use config port to access SPI bus directly.
->>
->> The problem with this approach is that it's an abomination.  It's adding
->> a SPI-user specific hack which is detected by a specific driver.  That's
->> really not sane - what happens when we have lots of these kinds of "I'm
->> an X SPI-user" with drivers detecting that?  It's not maintainable in the
->> long term.
->>
->> Yes, your requirements _today_ seem simple and easy, but you're only
->> thinking about today, not tomorrow when you've moved on and someone else
->> has to maintain the mess left behind (or delete it from mainline because
->> they're sick of dealing with a hack.)
->>
->>> The spi_message that is received in transfer_one_message() is too
->>> generic to imply the slave device that is on the other side of the wire.
->>> IMO, the read command does not imply that the slave is m25p80 flash
->>> (besides the read opcodes vary across vendors of m25p80 and across modes).
->>
->> I can see both sides of the argument.
->>
->> Mark is saying: if the SPI driver detects that the message to be transmitted
->> is a read command followed by the appropriate number of dummy bytes, and
->> then the data being read _and_ it's using quad-mode access, and the hardware
->> generates _exactly_ that in hardware using the memory mapped mode, there is
->> no reason _not_ to use the hardware to achieve that SPI transaction.  The
->> bus activity will be identical to what happens when the SPI controller is
->> used manually to achieve that bus sequence.
->>
->> You're saying: but the documentation says you can't use it for anything
->> except m25p80.  If you look at 24.5.4.1.2, it tells you what the SFI
->> generates on the bus, which is:
->>
->> 1. CS active
->> 2. Read command byte sent
->> 3. 1-4 address bytes sent
->> 4. 0-3 dummy bytes sent
->> 5. data bytes read from bus
->> 6. CS inactive
->>
->> So, Mark's point is "if we can detect a transaction which fits _that_
->> bus activity, there's no reason not to use this acceleration for the
->> transaction."
->>
->> What you're failing to counter with is: we don't have enough information
->> in the SPI driver to know how many dummy bytes there are between the
->> address bytes and the data read from the bus.
->
-> Irrespective of the dummy bytes.
-> What if the spi device is not a FLASH ROM, but some other device,
-> which receives a data packet that accidentally looks like an m25p80 READ
-> command?
->
+On Thu, Aug 06, 2015 at 05:55:23PM +0530, Vignesh R wrote:
 
-Presumably the driver would interpret some random part of the message
-as address and map the reply in your address space at that address
-from the flash mmap base.
+> 1.Write to flash config register via config port to switch to QUAD MODE
+> (or any mode that flash supports).
+> 2. Populate QSPI_SPI_SETUP_REGx with flash read command, number of
+> address bytes to use and dummy bytes required.
 
-If you happen to overflow the flash memory mmap space the behaviour
-will probably not be well defined.
+These things being constant for a given flash?
 
-Thanks
+> 3. Switch to memory mapped port by writing to QSPI_SPI_SWITCH_REG.
+> 4. Now, its possible to perform read from 0x5C000000 to 0x5FFFFFFF using
+> memcpy. The qspi controller hardware will communicate over SPI bus and
+> get the data. This data is directly sent to RAM via SoC's interconnect.
 
-Michal
+Presumably if it's done via memcpy() it won't go direct to RAM but
+rather be bounced through the CPU which is a bit interesting for
+performance (it might help, but it does mean that there's a core stalled
+waiting for the flash which might not be the best use of resources if
+there's other things it can be getting on with).  With DMA it'd be a
+direct to memory transfer though.
+
+> Advantages of memory mapped port are: improved read performance,
+> MEM_TO_MEM DMA support can be added (ti-qspi hardware as such does not
+> provide DMA events).
+
+DMA would definitely help here.
+
+> I just need to know whether the user that requested the transfer is
+> m25p80 driver. If yes, ti-qspi driver can take advantage of memory
+> mapped interface, else just use config port to access SPI bus directly.
+
+You don't *really* care if it's that specific user so much as that it's
+that particular pattern.
+
+> Writing separate driver based on spi-nor framework to interface with
+> m25p80 is not an option because, I would lose the ability to interface
+> with non-flash devices.
+
+You could, however, expose an explicit flash mapping interface for this
+functionality.  That does seem like it's going to be an awful lot easier 
+and help with keeping things like DMA support out of the driver and in
+the core (which would be useful if there's other controllers with the
+same functionality, I seem to recall that there are).
+
+> The spi_message that is received in transfer_one_message() is too
+> generic to imply the slave device that is on the other side of the wire.
+> IMO, the read command does not imply that the slave is m25p80 flash
+> (besides the read opcodes vary across vendors of m25p80 and across modes).
+
+Again, it doesn't matter if it's actually a read command only that it's
+got a compatible format on the bus.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150806/3969a89c/attachment.sig>
