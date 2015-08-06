@@ -1,85 +1,229 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 6 Aug 2015 17:16:25 +0100
-Subject: [PATCH V2] iommu/arm-smmu-v2: ThunderX mis-extends 64bit registers
-In-Reply-To: <1438793668-15597-1-git-send-email-tchalamarla@caviumnetworks.com>
-References: <1438793668-15597-1-git-send-email-tchalamarla@caviumnetworks.com>
-Message-ID: <20150806161625.GJ25483@arm.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Thu, 06 Aug 2015 17:20:17 +0100
+Subject: [PATCH 2/3] nvmem: imx-ocotp: Add i.MX6 OCOTP driver
+In-Reply-To: <1438693342-605-2-git-send-email-p.zabel@pengutronix.de>
+References: <1438693342-605-1-git-send-email-p.zabel@pengutronix.de>
+ <1438693342-605-2-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <55C38941.9090709@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tirumalesh,
+Few Nits..
 
-I think this looks pretty good now, just one small comment below.
-
-On Wed, Aug 05, 2015 at 05:54:28PM +0100, Tirumalesh Chalamarla wrote:
-> The SMMU architecture defines two different behaviors when 64-bit
-> registers are written with 32-bit writes.  The first behavior causes
-> zero extension into the upper 32-bits.  The second behavior splits a
-> 64-bit register into "normal" 32-bit register pairs.
-> 
-> On some buggy implementations, registers incorrectly zero extended
-> when they should instead behave as normal 32-bit register pairs.
-> 
-> Signed-off-by: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
+On 04/08/15 14:02, Philipp Zabel wrote:
+> This driver handles the i.MX On-Chip OTP Controller found in
+> i.MX6Q/D, i.MX6S/DL, i.MX6SL, and i.MX6SX SoCs. Currently it
+> just returns the values stored in the shadow registers.
+>
+> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 > ---
-> 
-> Changes from V1:
-> 	- Introduced smmu_writeq
-> 
->  drivers/iommu/arm-smmu.c | 45 +++++++++++++++++++++++++--------------------
->  1 file changed, 25 insertions(+), 20 deletions(-)
-> 
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index 66a803b..0912c78 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -69,6 +69,18 @@
->  		((smmu->options & ARM_SMMU_OPT_SECURE_CFG_ACCESS)	\
->  			? 0x400 : 0))
->  
-> +#ifdef CONFIG_64BIT
-> +#define smmu_writeq(reg64, addr)	writeq_relaxed((reg64), (addr))
-> +#else
-> +#define smmu_writeq(reg64, addr)				\
-> +	do {							\
-> +		u64 __val = (reg64);				\
-> +		void __iomem *__addr = (addr);			\
-> +		writel_relaxed(__val >> 32, __addr + 4);	\
-> +		writel_relaxed(__val, __addr);			\
-> +	} while (0)
-> +#endif
+> This patch is based on the v9 "Add simple NVMEM Framework via regmap"
+> series which can be found here: https://lkml.org/lkml/2015/7/27/342
+> ---
+>   drivers/nvmem/Kconfig     |  11 ++++
+>   drivers/nvmem/Makefile    |   2 +
+>   drivers/nvmem/imx-ocotp.c | 155 ++++++++++++++++++++++++++++++++++++++++++++++
+>   3 files changed, 168 insertions(+)
+>   create mode 100644 drivers/nvmem/imx-ocotp.c
+>
+> diff --git a/drivers/nvmem/Kconfig b/drivers/nvmem/Kconfig
+> index 8db2978..0b33014 100644
+> --- a/drivers/nvmem/Kconfig
+> +++ b/drivers/nvmem/Kconfig
+> @@ -36,4 +36,15 @@ config NVMEM_SUNXI_SID
+>   	  This driver can also be built as a module. If so, the module
+>   	  will be called nvmem_sunxi_sid.
+>
+> +config NVMEM_IMX_OCOTP
+> +	tristate "i.MX6 On-Chip OTP Controller support"
+> +	depends on SOC_IMX6
+> +	help
+> +	  This is a driver for the On-Chip OTP Controller (OCOTP) available on
+> +	  i.MX6 SoCs, providing access to 4 Kbits of one-time programmable
+> +	  eFuses.
 > +
->  /* Configuration registers */
->  #define ARM_SMMU_GR0_sCR0		0x0
->  #define sCR0_CLIENTPD			(1 << 0)
-> @@ -226,7 +238,7 @@
->  #define TTBCR2_SEP_SHIFT		15
->  #define TTBCR2_SEP_UPSTREAM		(0x7 << TTBCR2_SEP_SHIFT)
->  
-> -#define TTBRn_HI_ASID_SHIFT            16
-> +#define TTBRn_ASID_SHIFT		48
->  
->  #define FSR_MULTI			(1 << 31)
->  #define FSR_SS				(1 << 30)
-> @@ -762,22 +774,17 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
->  
->  	/* TTBRs */
->  	if (stage1) {
-> -		reg = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[0];
-> -		writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR0_LO);
-> -		reg = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[0] >> 32;
-> -		reg |= ARM_SMMU_CB_ASID(cfg) << TTBRn_HI_ASID_SHIFT;
-> -		writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR0_HI);
-> -
-> -		reg = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[1];
-> -		writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR1_LO);
-> -		reg = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[1] >> 32;
-> -		reg |= ARM_SMMU_CB_ASID(cfg) << TTBRn_HI_ASID_SHIFT;
-> -		writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR1_HI);
-> +		u64 reg64 = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[0];
+> +	  This driver can also be built as a module. If so, the module
+> +	  will be called nvmem-imx-ocotp.
+> +
+>   endif
+> diff --git a/drivers/nvmem/Makefile b/drivers/nvmem/Makefile
+> index 4328b93..b512d77 100644
+> --- a/drivers/nvmem/Makefile
+> +++ b/drivers/nvmem/Makefile
+> @@ -10,3 +10,5 @@ obj-$(CONFIG_QCOM_QFPROM)	+= nvmem_qfprom.o
+>   nvmem_qfprom-y			:= qfprom.o
+>   obj-$(CONFIG_NVMEM_SUNXI_SID)	+= nvmem_sunxi_sid.o
+>   nvmem_sunxi_sid-y		:= sunxi_sid.o
+> +obj-$(CONFIG_NVMEM_IMX_OCOTP)	+= nvmem-imx-ocotp.o
+> +nvmem-imx-ocotp-y		:= imx-ocotp.o
+> diff --git a/drivers/nvmem/imx-ocotp.c b/drivers/nvmem/imx-ocotp.c
+> new file mode 100644
+> index 0000000..e918967
+> --- /dev/null
+> +++ b/drivers/nvmem/imx-ocotp.c
+> @@ -0,0 +1,155 @@
+> +/*
+> + * i.MX6 OCOTP fusebox driver
+> + *
+> + * Copyright (c) 2015 Pengutronix, Philipp Zabel <p.zabel@pengutronix.de>
+> + *
+> + * Based on the barebox ocotp driver,
+> + * Copyright (c) 2010 Baruch Siach <baruch@tkos.co.il>,
+> + *	Orex Computed Radiography
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2
+> + * as published by the Free Software Foundation.
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
+> +
+> +#include <linux/clk.h>
+May be you can drop this?
 
-Can we move this declaration to the start of the function along with
-u32 reg, please? It's used in both cases of the if/else block so it
-might be a tad cleaner.
+BTW, who is taking care of the gated peripheral clock controlled for 
+this driver?
 
-Will
+
+> +#include <linux/device.h>
+> +#include <linux/io.h>
+> +#include <linux/module.h>
+> +#include <linux/nvmem-provider.h>
+> +#include <linux/of.h>
+> +#include <linux/of_device.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/regmap.h>
+> +#include <linux/slab.h>
+> +
+> +struct ocotp_priv {
+> +	struct device *dev;
+> +	void __iomem *base;
+> +	unsigned int nregs;
+> +};
+> +
+> +static int imx_ocotp_read(void *context, const void *reg, size_t reg_size,
+> +			  void *val, size_t val_size)
+> +{
+> +	struct ocotp_priv *priv = context;
+> +	unsigned int offset = *(u32 *)reg;
+> +	unsigned int count;
+> +	int i;
+> +	u32 index;
+> +
+> +	index = offset >> 2;
+> +	count = val_size >> 2;
+> +
+> +	if (count > (priv->nregs - index))
+> +		count = priv->nregs - index;
+> +
+> +	for (i = index; i < (index + count); i++) {
+> +		*(u32 *)val = readl(priv->base + 0x400 + i * 0x10);
+> +		val += 4;
+> +	}
+> +
+> +	return (i - index) * 4;
+> +}
+> +
+> +static int imx_ocotp_write(void *context, const void *data, size_t count)
+> +{
+> +	/* Not implemented */
+> +	return 0;
+> +}
+> +
+> +static struct regmap_bus imx_ocotp_bus = {
+> +	.read = imx_ocotp_read,
+> +	.write = imx_ocotp_write,
+> +	.reg_format_endian_default = REGMAP_ENDIAN_NATIVE,
+> +	.val_format_endian_default = REGMAP_ENDIAN_NATIVE,
+> +};
+> +
+> +static bool imx_ocotp_writeable_reg(struct device *dev, unsigned int reg)
+> +{
+> +	return false;
+> +}
+> +
+> +static struct regmap_config imx_ocotp_regmap_config = {
+> +	.reg_bits = 32,
+> +	.val_bits = 32,
+> +	.reg_stride = 4,
+> +	.writeable_reg = imx_ocotp_writeable_reg,
+> +	.name = "imx-ocotp",
+> +};
+> +
+> +static struct nvmem_config imx_ocotp_nvmem_config = {
+> +	.name = "imx-ocotp",
+> +	.read_only = true,
+> +	.owner = THIS_MODULE,
+> +};
+> +
+> +static const struct of_device_id imx_ocotp_dt_ids[] = {
+> +	{ .compatible = "fsl,imx6q-ocotp",  (void *)128 },
+> +	{ .compatible = "fsl,imx6sl-ocotp", (void *)32 },
+> +	{ .compatible = "fsl,imx6sx-ocotp", (void *)128 },
+> +	{ },
+> +};
+> +MODULE_DEVICE_TABLE(of, imx_ocotp_dt_ids);
+> +
+> +static int imx_ocotp_probe(struct platform_device *pdev)
+> +{
+> +	const struct of_device_id *of_id;
+> +	struct device *dev = &pdev->dev;
+> +	struct resource *res;
+> +	struct regmap *regmap;
+> +	struct ocotp_priv *priv;
+> +	struct nvmem_device *nvmem;
+> +
+> +	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
+> +	if (!priv)
+> +		return -ENOMEM;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	priv->base = devm_ioremap_resource(dev, res);
+> +	if (IS_ERR(priv->base))
+> +		return PTR_ERR(priv->base);
+> +
+> +	of_id = of_match_device(imx_ocotp_dt_ids, dev);
+> +	priv->nregs = (unsigned int)of_id->data;
+> +	imx_ocotp_regmap_config.max_register = 4 * priv->nregs - 4;
+> +
+> +	regmap = devm_regmap_init(dev, &imx_ocotp_bus, priv,
+> +				  &imx_ocotp_regmap_config);
+> +	if (IS_ERR(regmap)) {
+> +		dev_err(dev, "regmap init failed\n");
+> +		return PTR_ERR(regmap);
+> +	}
+> +	imx_ocotp_nvmem_config.dev = dev;
+> +	nvmem = nvmem_register(&imx_ocotp_nvmem_config);
+> +	if (IS_ERR(nvmem))
+> +		return PTR_ERR(nvmem);
+> +
+> +	platform_set_drvdata(pdev, nvmem);
+> +
+> +	return 0;
+> +}
+> +
+> +static int imx_ocotp_remove(struct platform_device *pdev)
+> +{
+> +	struct nvmem_device *nvmem = platform_get_drvdata(pdev);
+> +
+> +	return nvmem_unregister(nvmem);
+> +}
+> +
+> +static struct platform_driver imx_ocotp_driver = {
+> +	.probe	= imx_ocotp_probe,
+> +	.remove	= imx_ocotp_remove,
+> +	.driver = {
+> +		.name	= "imx_ocotp",
+> +		.of_match_table = imx_ocotp_dt_ids,
+> +	},
+> +};
+> +module_platform_driver(imx_ocotp_driver);
+> +
+> +MODULE_AUTHOR("Philipp Zabel <p.zabel@pengutronix.de>");
+> +MODULE_DESCRIPTION("i.MX6 OCOTP fuse box driver");
+> +MODULE_LICENSE("GPL");
+
+GPL v2 ?
+
+>
