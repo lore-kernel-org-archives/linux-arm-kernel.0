@@ -1,120 +1,60 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu,  6 Aug 2015 17:18:48 +0200
-Subject: [PATCH] rtc: armada38x: Align RTC set time procedure with the
- official errata
-Message-ID: <1438874328-31844-1-git-send-email-gregory.clement@free-electrons.com>
+From: ykk@rock-chips.com (Yakir Yang)
+Date: Thu, 6 Aug 2015 23:20:48 +0800
+Subject: [RFC PATCH 1/8] drm: exynos/dp: fix code style
+In-Reply-To: <1438873536.2679.61.camel@perches.com>
+References: <1438868947-22132-1-git-send-email-ykk@rock-chips.com>
+ <1438869866-23028-1-git-send-email-ykk@rock-chips.com>
+ <1438873536.2679.61.camel@perches.com>
+Message-ID: <55C37B50.6050706@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nadav Haklai <nadavh@marvell.com>
+Joe,
 
-According to the Armada38x functional errata FE-3124064, writing to
-the RTC TIME register may fail. As a workaround, after writing to RTC
-TIME register, issue a dummy write of 0x0 twice to the RTC Status
-register.  This is the updated implementation of the Errata that
-eliminates the need of the long 100ms delay during the RTC set time
-procedure.
+? 2015/8/6 23:05, Joe Perches ??:
+> On Thu, 2015-08-06 at 09:04 -0500, Yakir Yang wrote:
+>> make checkpatch.pl script happy
+> That should not be the primary reason to submit a patch.
+>
+> Making it easier for human code reader to understand
+> what the code does should be though.
+Thanks for your reply, but I do think that fix code style and make 
+checkpatch.pl passed is my primary reason to submit this patch. I can't 
+think out more directly words ;( ,
 
-[gregory.clement at free-electrons.com]: removed the mutex and use the
-spinlock again
+>> diff --git a/drivers/gpu/drm/exynos/exynos_dp_core.c b/drivers/gpu/drm/exynos/exynos_dp_core.c
+> []
+>> @@ -123,10 +123,11 @@ static int exynos_dp_read_edid(struct exynos_dp_device *dp)
+>>   		dev_dbg(dp->dev, "EDID data includes a single extension!\n");
+>>   
+>>   		/* Read EDID data */
+>> -		retval = exynos_dp_read_bytes_from_i2c(dp, I2C_EDID_DEVICE_ADDR,
+>> -						EDID_HEADER_PATTERN,
+>> -						EDID_BLOCK_LENGTH,
+>> -						&edid[EDID_HEADER_PATTERN]);
+>> +		retval =
+>> +		exynos_dp_read_bytes_from_i2c(dp, I2C_EDID_DEVICE_ADDR,
+>> +					      EDID_HEADER_PATTERN,
+>> +					      EDID_BLOCK_LENGTH,
+>> +					      &edid[EDID_HEADER_PATTERN]);
+> This is a relatively uncommon style.
+>
+> Because the code uses relatively long variable and
+> function names as well as longish macro #defines,
+> prefer to ignore the 80 column limit.
+Okay, I think it would be better to modify like those:
 
-Signed-off-by: Nadav Haklai <nadavh@marvell.com>
-Reviewed-by: Neta Zur Hershkovits <neta@marvell.com>
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
-Hi,
-
-Finally the long 100ms wait was not needed! So we can remove the mutex
-introduced in an earlier commit.
-It would be great if this patch could be part of the 4.2-rc.
-
-Thanks
-
-Gregory
+retval = exynos_dp_read_bytes_from_i2c(
+		dp, I2C_EDID_DEVICE_ADDR,
+		EDID_HEADER_PATTERN,
+		EDID_BLOCK_LENGTH,
+		&edid[EDID_HEADER_PATTERN]);
 
 
- drivers/rtc/rtc-armada38x.c | 32 ++++++++++++--------------------
- 1 file changed, 12 insertions(+), 20 deletions(-)
+Is it okay ?
 
-diff --git a/drivers/rtc/rtc-armada38x.c b/drivers/rtc/rtc-armada38x.c
-index 2b08cac62f07..06c6bd5eab41 100644
---- a/drivers/rtc/rtc-armada38x.c
-+++ b/drivers/rtc/rtc-armada38x.c
-@@ -40,13 +40,6 @@ struct armada38x_rtc {
- 	void __iomem	    *regs;
- 	void __iomem	    *regs_soc;
- 	spinlock_t	    lock;
--	/*
--	 * While setting the time, the RTC TIME register should not be
--	 * accessed. Setting the RTC time involves sleeping during
--	 * 100ms, so a mutex instead of a spinlock is used to protect
--	 * it
--	 */
--	struct mutex	    mutex_time;
- 	int		    irq;
- };
- 
-@@ -64,9 +57,9 @@ static void rtc_delayed_write(u32 val, struct armada38x_rtc *rtc, int offset)
- static int armada38x_rtc_read_time(struct device *dev, struct rtc_time *tm)
- {
- 	struct armada38x_rtc *rtc = dev_get_drvdata(dev);
--	unsigned long time, time_check;
-+	unsigned long time, time_check, flags;
- 
--	mutex_lock(&rtc->mutex_time);
-+	spin_lock_irqsave(&rtc->lock, flags);
- 	time = readl(rtc->regs + RTC_TIME);
- 	/*
- 	 * WA for failing time set attempts. As stated in HW ERRATA if
-@@ -77,7 +70,7 @@ static int armada38x_rtc_read_time(struct device *dev, struct rtc_time *tm)
- 	if ((time_check - time) > 1)
- 		time_check = readl(rtc->regs + RTC_TIME);
- 
--	mutex_unlock(&rtc->mutex_time);
-+	spin_unlock_irqrestore(&rtc->lock, flags);
- 
- 	rtc_time_to_tm(time_check, tm);
- 
-@@ -88,23 +81,23 @@ static int armada38x_rtc_set_time(struct device *dev, struct rtc_time *tm)
- {
- 	struct armada38x_rtc *rtc = dev_get_drvdata(dev);
- 	int ret = 0;
--	unsigned long time;
-+	unsigned long time, flags;
- 
- 	ret = rtc_tm_to_time(tm, &time);
- 
- 	if (ret)
- 		goto out;
- 	/*
--	 * Setting the RTC time not always succeeds. According to the
--	 * errata we need to first write on the status register and
--	 * then wait for 100ms before writing to the time register to be
--	 * sure that the data will be taken into account.
-+	 * According to errata FE-3124064, Write to RTC TIME register
-+	 * may fail. As a workaround, after writing to RTC TIME
-+	 * register, issue a dummy write of 0x0 twice to RTC Status
-+	 * register.
- 	 */
--	mutex_lock(&rtc->mutex_time);
--	rtc_delayed_write(0, rtc, RTC_STATUS);
--	msleep(100);
-+	spin_lock_irqsave(&rtc->lock, flags);
- 	rtc_delayed_write(time, rtc, RTC_TIME);
--	mutex_unlock(&rtc->mutex_time);
-+	rtc_delayed_write(0, rtc, RTC_STATUS);
-+	rtc_delayed_write(0, rtc, RTC_STATUS);
-+	spin_unlock_irqrestore(&rtc->lock, flags);
- 
- out:
- 	return ret;
-@@ -229,7 +222,6 @@ static __init int armada38x_rtc_probe(struct platform_device *pdev)
- 		return -ENOMEM;
- 
- 	spin_lock_init(&rtc->lock);
--	mutex_init(&rtc->mutex_time);
- 
- 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "rtc");
- 	rtc->regs = devm_ioremap_resource(&pdev->dev, res);
--- 
-2.1.0
+- Yakir
+>
+>
+>
+>
