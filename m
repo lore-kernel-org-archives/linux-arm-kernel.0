@@ -1,57 +1,59 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 06 Aug 2015 17:53:50 +0100
-Subject: [PATCH v5 9/9] PCI: xgene: Use pci_scan_root_bus_msi()
-In-Reply-To: <CAFiDJ58U9u0YOzqVbty8+z+sF82h=F09Y0q-Ks8zMDokdiSEbg@mail.gmail.com>
-References: <20150804214234.9189.42548.stgit@bhelgaas-glaptop2.roam.corp.google.com>	<20150804215457.9189.27595.stgit@bhelgaas-glaptop2.roam.corp.google.com>	<55C37C92.1020509@arm.com>
- <CAFiDJ58U9u0YOzqVbty8+z+sF82h=F09Y0q-Ks8zMDokdiSEbg@mail.gmail.com>
-Message-ID: <55C3911E.9090907@arm.com>
+From: raghumag@gmail.com (raghu MG)
+Date: Thu, 6 Aug 2015 22:28:12 +0530
+Subject: Armadaxp GPIO interrupts
+In-Reply-To: <20150806132926.GB19896@lunn.ch>
+References: <CAG1O52Xg88OsifBzmpSdqvC8wQaOW78nC9nnfxugFv1VU1m1LQ@mail.gmail.com>
+ <20150804153439.GA28673@lunn.ch>
+ <CAG1O52W2Gy_6_DfewtUqoK_J+Y=KwVGyygNaPu2xyPM_ZkLfcQ@mail.gmail.com>
+ <CAG1O52VQPpeGkA8bqYbPMTiT9Mua1yHi3H3osqJsHqm-RRKzow@mail.gmail.com>
+ <20150805162155.GE32760@lunn.ch>
+ <CAG1O52WPFfm+XGk01iUVWLu=-Dm7bcDVmhv3P8iQDH+HHjsLUA@mail.gmail.com>
+ <20150806132926.GB19896@lunn.ch>
+Message-ID: <CAG1O52XUyPkgTTRKftujZBNK1=n6GBdWgBg_kq6SsC5XMaeU3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/08/15 17:41, Ley Foon Tan wrote:
-> On Thu, Aug 6, 2015 at 11:26 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> Hi Bjorn,
->>
->> On 04/08/15 22:54, Bjorn Helgaas wrote:
->>> Previously there was no way to specify the MSI controller when creating a
->>> new PCI root bus, so we had to create the bus, set its MSI controller, then
->>> scan the bus.  With the new pci_scan_root_bus_msi() interface, we can
->>> specify the MSI controller up front and get rid of that intermediate step.
->>>
->>> Look up the MSI controller first, then use pci_scan_root_bus_msi() to
->>> create and scan the root PCI bus.
->>
->> I'm wondering about these XGene patches.
->>
->> With the code that is queued for v4.3 in tip/irq/core, the X-Gene MSI
->> driver doesn't export a struct msi_controller anymore, and entirely
->> relies on IRQ domains to identify to be matched with the actual PCI driver.
->>
->> Do you intend this as a cleanup until everything lands in mainline? At
->> that point, we'd be able to remove all traces of struct msi_controller
->> from this driver.
->>
->> Alternatively, we could ask tglx to add an extra patch to the existing
->> queue in order to clean up pci-xgene.c (nuking the whole
->> xgene_pcie_msi_enable function).
->>
->> Thoughts?
-> 
-> In pcie-altera driver, it uses pci_scan_root_bus() and it doesn't call
-> to of_pci_find_msi_chip_by_node() to retrieve msi_controller struct as
-> well.
-> But, the msi domain stuff is still working. Should I change it to
-> pci_scan_root_bus_msi()?
+Ok,I think I need to understand more about this gpio driver.
 
-If you're not using struct msi_controller, I don't see a reason to use
-pci_scan_root_bus_msi(). The MSI irq domain patches are queued for 4.3,
-and I don't believe your driver will be merged before that.
+As you said its registering chained handler,but why are they(IRQs) not
+visible in cat /proc/interrupts.
+What could be the reason.?
 
-Eventually, I'd like to kill msi_controller entirely. It is completely
-redundant with the use of irq domains.
+Do I need to further initialize marvell GPIO registers to trigger
+these events. The driver is unmasking all interrupts in probe function
+                writel_relaxed(0, mvchip->membase + GPIO_EDGE_CAUSE_OFF);
+                writel_relaxed(0, mvchip->membase + GPIO_EDGE_MASK_OFF);
+                writel_relaxed(0, mvchip->membase + GPIO_LEVEL_MASK_OFF);
 
-Thanks,
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Do I need to change the polarity in polarity register to suit the
+board requirements in probe function.
+
+I will try this in the morning.
+
+
+Regards
+Raghu
+
+On Thu, Aug 6, 2015 at 6:59 PM, Andrew Lunn <andrew@lunn.ch> wrote:
+>> mvebu_gpio_irq_handler is only called if I register a another handler
+>> at irq=82/83/84/85/87/88/89/90/92. I am registering this handler using
+>> minimal kernel module.
+>
+> This is totally wrong. The gpio driver needs these interrupts, and
+> will register a chained interrupt handle for these. Don't mess around
+> with them. Here is the code in the driver:
+>
+>         /* Setup the interrupt handlers. Each chip can have up to 4
+>          * interrupt handlers, with each handler dealing with 8 GPIO
+>          * pins. */
+>         for (i = 0; i < 4; i++) {
+>                 int irq = platform_get_irq(pdev, i);
+>
+>                 if (irq < 0)
+>                         continue;
+>                 irq_set_handler_data(irq, mvchip);
+>                 irq_set_chained_handler(irq, mvebu_gpio_irq_handler);
+>         }
+>
+>         Andrew
