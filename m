@@ -1,47 +1,43 @@
-From: julien.grall@citrix.com (Julien Grall)
-Date: Thu, 6 Aug 2015 12:17:36 +0100
-Subject: [Xen-devel] [PATCH v2 4/8] xen: Use the correctly the Xen memory
- terminologies
-In-Reply-To: <alpine.DEB.2.02.1508061205190.11337@kaball.uk.xensource.com>
-References: <1438711972-18752-1-git-send-email-julien.grall@citrix.com>
- <1438711972-18752-5-git-send-email-julien.grall@citrix.com>
- <55C33E4E.4050704@citrix.com>
- <alpine.DEB.2.02.1508061205190.11337@kaball.uk.xensource.com>
-Message-ID: <55C34250.3040801@citrix.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 6 Aug 2015 12:23:53 +0100
+Subject: [RFC PATCH 1/5] spi: introduce flag for memory mapped read
+In-Reply-To: <CAOMqctQZRZ4zG_yYy=CeX3DX4NVNWN1COP4Q-2YvMun9xYOA7g@mail.gmail.com>
+References: <20150731181745.GM20873@sirena.org.uk> <55BEF4AF.5090704@ti.com>
+ <20150804155148.GR20873@sirena.org.uk> <55C0FD98.1090107@ti.com>
+ <20150805115013.GJ20873@sirena.org.uk>
+ <CAOMqctQXwcHyiWBwtugSDSE_k65qrNfrwnhjQMDJkLoJMmGzUw@mail.gmail.com>
+ <20150805124412.GN20873@sirena.org.uk>
+ <CAOMqctS9Y5FxpUCCJew6+cnjH5iTvbzkH3g-8yrXs4OuS2pSGA@mail.gmail.com>
+ <20150806090202.GO20873@sirena.org.uk>
+ <CAOMqctQZRZ4zG_yYy=CeX3DX4NVNWN1COP4Q-2YvMun9xYOA7g@mail.gmail.com>
+Message-ID: <20150806112353.GT20873@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/08/15 12:06, Stefano Stabellini wrote:
-> On Thu, 6 Aug 2015, Julien Grall wrote:
->> Hi,
->>
->>
->> On 04/08/15 19:12, Julien Grall wrote:
->>> diff --git a/include/xen/page.h b/include/xen/page.h
->>> index c5ed20b..e7e1425 100644
->>> --- a/include/xen/page.h
->>> +++ b/include/xen/page.h
->>> @@ -3,9 +3,9 @@
->>>  
->>>  #include <asm/xen/page.h>
->>>  
->>> -static inline unsigned long page_to_mfn(struct page *page)
->>> +static inline unsigned long page_to_gfn(struct page *page)
->>>  {
->>> -	return pfn_to_mfn(page_to_pfn(page));
->>> +	return pfn_to_gfn(page_to_pfn(page));
->>>  }
->>
->> I've just noticed that there is a function gfn_to_page used for KVM.
->>
->> Maybe I should rename page_to_gfn to xen_page_to_gfn to avoid confusion
->> with KVM one?
-> 
-> Yeah, prepending xen would help to avoid namespace pollution.
+On Thu, Aug 06, 2015 at 12:01:37PM +0200, Michal Suchanek wrote:
 
-Will do. May I keep your Reviewed-by for this mechanical change?
+> However, I am familiar m25p80.c and as I understand it the controller
+> is basically supposed to implement m25p80.c in hardware when this flag
+> is set.
 
-Regards,
+But what in concrete terms is that supposed to mean?  It's currently
+just an essentially undocumented flag on a message rather than something
+operating at the level of a flash chip.  That's pretty much where
+Russell's comments come from.
 
--- 
-Julien Grall
+> If I was using m25p80.c to talk to anything but an actual flash chip
+> it would get me quite worried.
+
+Sure, but at the end of the day it's just emitting standard SPI messages
+which don't know anything about flash.  If those messages are a sensible
+interface here then why bother with the flag, we can just pattern match
+on the format of the message.  If that doesn't work then probably this
+isn't a great interface and a separate, application specific interface
+makes more sense.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150806/3c0b0c61/attachment.sig>
