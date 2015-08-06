@@ -1,201 +1,46 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Wed, 5 Aug 2015 22:30:17 -0500
-Subject: [PATCH v5 2/2] firmware: qcom: scm: Add support for ARM64 SoCs
-In-Reply-To: <55C2B7FC.5090402@codeaurora.org>
-References: <1430249038-30987-1-git-send-email-galak@codeaurora.org>
- <1430249038-30987-2-git-send-email-galak@codeaurora.org>
- <55C2B7FC.5090402@codeaurora.org>
-Message-ID: <20150806033017.GB11996@qualcomm.com>
+From: axel.lin@ingics.com (Axel Lin)
+Date: Thu, 06 Aug 2015 12:28:18 +0800
+Subject: [PATCH v2] ata: ahci_brcmstb: Fix misuse of IS_ENABLED
+Message-ID: <1438835298.28215.1.camel@ingics.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 05, 2015 at 06:27:24PM -0700, Stephen Boyd wrote:
-> On 04/28/2015 12:23 PM, Kumar Gala wrote:
-> >+
-> >+int __qcom_scm_call_armv8_64(u64 x0, u64 x1, u64 x2, u64 x3, u64 x4, u64 x5,
-> >+				u64 *ret1, u64 *ret2, u64 *ret3)
-> >+{
-> >+	register u64 r0 asm("r0") = x0;
-> >+	register u64 r1 asm("r1") = x1;
-> >+	register u64 r2 asm("r2") = x2;
-> >+	register u64 r3 asm("r3") = x3;
-> >+	register u64 r4 asm("r4") = x4;
-> >+	register u64 r5 asm("r5") = x5;
-> 
-> This should set x6 to 0.
-> 
->     register u32 r6 asm("r6") = 0;
-> 
-> for example.
-> 
-> >+
-> >+	do {
-> >+		asm volatile(
-> >+			__asmeq("%0", "x0")
-> >+			__asmeq("%1", "x1")
-> >+			__asmeq("%2", "x2")
-> >+			__asmeq("%3", "x3")
-> >+			__asmeq("%4", "x0")
-> >+			__asmeq("%5", "x1")
-> >+			__asmeq("%6", "x2")
-> >+			__asmeq("%7", "x3")
-> >+			__asmeq("%8", "x4")
-> >+			__asmeq("%9", "x5")
-> 
-> And then the asmeq thing here for x6.
-> 
-> >+#ifdef REQUIRES_SEC
-> >+			".arch_extension sec\n"
-> >+#endif
-> >+			"smc	#0\n"
-> >+			: "=r" (r0), "=r" (r1), "=r" (r2), "=r" (r3)
-> >+			: "r" (r0), "r" (r1), "r" (r2), "r" (r3), "r" (r4),
-> >+			  "r" (r5)
-> 
-> And add x6 as an input here.
-> 
-> >+			: "x6", "x7", "x8", "x9", "x10", "x11", "x12", "x13",
-> 
-> and remove x6 as a clobber.
-> 
-> >+			  "x14", "x15", "x16", "x17");
-> >+	} while (r0 == QCOM_SCM_INTERRUPTED);
-> >+
-> >+	if (ret1)
-> >+		*ret1 = r1;
-> >+	if (ret2)
-> >+		*ret2 = r2;
-> >+	if (ret3)
-> >+		*ret3 = r3;
-> >+
-> >+	return r0;
-> >+}
-> >+
-> >+int __qcom_scm_call_armv8_32(u32 w0, u32 w1, u32 w2, u32 w3, u32 w4, u32 w5,
-> >+				u64 *ret1, u64 *ret2, u64 *ret3)
-> >+{
-> >+	register u32 r0 asm("r0") = w0;
-> >+	register u32 r1 asm("r1") = w1;
-> >+	register u32 r2 asm("r2") = w2;
-> >+	register u32 r3 asm("r3") = w3;
-> >+	register u32 r4 asm("r4") = w4;
-> >+	register u32 r5 asm("r5") = w5;
-> 
-> This needs to set r6 to 0 as well
-> 
->     register u32 r6 asm("r6") = 0;
-> 
-> for example.
-> 
-> >+
-> >+	do {
-> >+		asm volatile(
-> >+			__asmeq("%0", "x0")
-> >+			__asmeq("%1", "x1")
-> >+			__asmeq("%2", "x2")
-> >+			__asmeq("%3", "x3")
-> >+			__asmeq("%4", "x0")
-> >+			__asmeq("%5", "x1")
-> >+			__asmeq("%6", "x2")
-> >+			__asmeq("%7", "x3")
-> >+			__asmeq("%8", "x4")
-> >+			__asmeq("%9", "x5")
-> 
-> And then another asmeq thing here for x6.
-> 
-> >+#ifdef REQUIRES_SEC
-> >+			".arch_extension sec\n"
-> >+#endif
-> >+			"smc	#0\n"
-> >+			: "=r" (r0), "=r" (r1), "=r" (r2), "=r" (r3)
-> >+			: "r" (r0), "r" (r1), "r" (r2), "r" (r3), "r" (r4),
-> >+			  "r" (r5)
-> 
-> And then add r6 here as an input
-> 
-> >+			: "x6", "x7", "x8", "x9", "x10", "x11", "x12", "x13",
-> 
-> And remove r6 from the clobber.
-> 
-> >+			"x14", "x15", "x16", "x17");
-> >+
-> >+	} while (r0 == QCOM_SCM_INTERRUPTED);
-> >+
-> >+	if (ret1)
-> >+		*ret1 = r1;
-> >+	if (ret2)
-> >+		*ret2 = r2;
-> >+	if (ret3)
-> >+		*ret3 = r3;
-> >+
-> >+	return r0;
-> >+}
-> >+
-> >
-> 
-> Here's a totally untested patch for that.
-> 
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ----8<-----
-> 
-> diff --git a/drivers/firmware/qcom_scm-64.c b/drivers/firmware/qcom_scm-64.c
-> index a95fd9b5d576..8f7e65ff524c 100644
-> --- a/drivers/firmware/qcom_scm-64.c
-> +++ b/drivers/firmware/qcom_scm-64.c
-> @@ -114,6 +114,7 @@ int __qcom_scm_call_armv8_64(u64 x0, u64 x1, u64 x2, u64 x3, u64 x4, u64 x5,
->  	register u64 r3 asm("r3") = x3;
->  	register u64 r4 asm("r4") = x4;
->  	register u64 r5 asm("r5") = x5;
-> +	register u64 r6 asm("r5") = 0;
->  	do {
->  		asm volatile(
-> @@ -127,14 +128,15 @@ int __qcom_scm_call_armv8_64(u64 x0, u64 x1, u64 x2, u64 x3, u64 x4, u64 x5,
->  			__asmeq("%7", "x3")
->  			__asmeq("%8", "x4")
->  			__asmeq("%9", "x5")
-> +			__asmeq("%10", "x6")
->  #ifdef REQUIRES_SEC
->  			".arch_extension sec\n"
->  #endif
->  			"smc	#0\n"
->  			: "=r" (r0), "=r" (r1), "=r" (r2), "=r" (r3)
->  			: "r" (r0), "r" (r1), "r" (r2), "r" (r3), "r" (r4),
-> -			  "r" (r5)
-> -			: "x6", "x7", "x8", "x9", "x10", "x11", "x12", "x13",
-> +			  "r" (r5), "r" (r6)
-> +			: "x7", "x8", "x9", "x10", "x11", "x12", "x13",
->  			  "x14", "x15", "x16", "x17");
->  	} while (r0 == QCOM_SCM_INTERRUPTED);
-> @@ -157,6 +159,7 @@ int __qcom_scm_call_armv8_32(u32 w0, u32 w1, u32 w2, u32 w3, u32 w4, u32 w5,
->  	register u32 r3 asm("r3") = w3;
->  	register u32 r4 asm("r4") = w4;
->  	register u32 r5 asm("r5") = w5;
-> +	register u32 r6 asm("r6") = 0;
->  	do {
->  		asm volatile(
-> @@ -170,14 +173,15 @@ int __qcom_scm_call_armv8_32(u32 w0, u32 w1, u32 w2, u32 w3, u32 w4, u32 w5,
->  			__asmeq("%7", "x3")
->  			__asmeq("%8", "x4")
->  			__asmeq("%9", "x5")
-> +			__asmeq("%10", "x6")
->  #ifdef REQUIRES_SEC
->  			".arch_extension sec\n"
->  #endif
->  			"smc	#0\n"
->  			: "=r" (r0), "=r" (r1), "=r" (r2), "=r" (r3)
->  			: "r" (r0), "r" (r1), "r" (r2), "r" (r3), "r" (r4),
-> -			  "r" (r5)
-> -			: "x6", "x7", "x8", "x9", "x10", "x11", "x12", "x13",
-> +			  "r" (r5), "r" (r6)
-> +			: "x7", "x8", "x9", "x10", "x11", "x12", "x13",
->  			"x14", "x15", "x16", "x17");
->  	} while (r0 == QCOM_SCM_INTERRUPTED);
-> 
-> -- 
+While IS_ENABLED() is perfectly fine for CONFIG_* symbols, it is not
+for other symbols such as __BIG_ENDIAN that is provided directly by
+the compiler.
 
-Stephen, I'll incorporate this in the next version.  Thanks!
+Switch to use CONFIG_CPU_BIG_ENDIAN instead of __BIG_ENDIAN.
 
+Signed-off-by: Axel Lin <axel.lin@ingics.com>
+---
+v2:
+Based on Florian's comment:
+Switch to use CONFIG_CPU_BIG_ENDIAN instead of __BIG_ENDIAN.
+
+ drivers/ata/ahci_brcmstb.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/ata/ahci_brcmstb.c b/drivers/ata/ahci_brcmstb.c
+index 42b6cf4..14b7305 100644
+--- a/drivers/ata/ahci_brcmstb.c
++++ b/drivers/ata/ahci_brcmstb.c
+@@ -92,7 +92,7 @@ static inline u32 brcm_sata_readreg(void __iomem *addr)
+ 	 * Other architectures (e.g., ARM) either do not support big endian, or
+ 	 * else leave I/O in little endian mode.
+ 	 */
+-	if (IS_ENABLED(CONFIG_MIPS) && IS_ENABLED(__BIG_ENDIAN))
++	if (IS_ENABLED(CONFIG_MIPS) && IS_ENABLED(CONFIG_CPU_BIG_ENDIAN))
+ 		return __raw_readl(addr);
+ 	else
+ 		return readl_relaxed(addr);
+@@ -101,7 +101,7 @@ static inline u32 brcm_sata_readreg(void __iomem *addr)
+ static inline void brcm_sata_writereg(u32 val, void __iomem *addr)
+ {
+ 	/* See brcm_sata_readreg() comments */
+-	if (IS_ENABLED(CONFIG_MIPS) && IS_ENABLED(__BIG_ENDIAN))
++	if (IS_ENABLED(CONFIG_MIPS) && IS_ENABLED(CONFIG_CPU_BIG_ENDIAN))
+ 		__raw_writel(val, addr);
+ 	else
+ 		writel_relaxed(val, addr);
 -- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+2.1.0
