@@ -1,157 +1,49 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 06 Aug 2015 13:46:31 +0100
-Subject: [PATCH v4 1/2] arm64: KVM: Optimize arm64 skip 30-50% vfp/simd
- save/restore on exits
-In-Reply-To: <20150806115436.GC4657@cbox>
-References: <1437082178-11039-1-git-send-email-m.smarduch@samsung.com>
- <1437082178-11039-2-git-send-email-m.smarduch@samsung.com>
- <55C235B9.3000800@arm.com> <20150806115436.GC4657@cbox>
-Message-ID: <55C35727.6060208@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 06 Aug 2015 15:07:03 +0200
+Subject: [PATCH v2] ARM: dts: Convert Linkstation Mini to Device Tree
+In-Reply-To: <CAO10ksyxsZ=Xv4iPn4uSjTC1z9D6dR9hZq6Mk7yuMJhFin9ZhA@mail.gmail.com>
+References: <1436885641.7145.9.camel@dolka.fr>	<20150718185238.GH17961@lunn.ch>	<55B396A1.1090509@free-electrons.com>	<1438027893.15635.41.camel@dolka.fr>	<55C23FA8.9030504@free-electrons.com>
+ <CAO10ksyxsZ=Xv4iPn4uSjTC1z9D6dR9hZq6Mk7yuMJhFin9ZhA@mail.gmail.com>
+Message-ID: <55C35BF7.1090105@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
+Hi Alexey,
 
-On 06/08/15 12:54, Christoffer Dall wrote:
-> On Wed, Aug 05, 2015 at 05:11:37PM +0100, Marc Zyngier wrote:
->> On 16/07/15 22:29, Mario Smarduch wrote:
->>> This patch only saves and restores FP/SIMD registers on Guest access. To do
->>> this cptr_el2 FP/SIMD trap is set on Guest entry and later checked on exit.
->>> lmbench, hackbench show significant improvements, for 30-50% exits FP/SIMD
->>> context is not saved/restored
+On 06/08/2015 02:33, Alexey Kopytko wrote:
+> On Thu, Aug 6, 2015 at 1:54 AM, Gregory CLEMENT
+> <gregory.clement@free-electrons.com> wrote:
+> 
+>>>> With the Acked-by from  Andrew Lunn I am ready to apply your patch.
+>>>> However for the device tree I need the acked-by from Thomas Petazzoni but I
+>>>> am sure he will give it as he already agreed for the armada-*.dts* files.
+>>>>
+>>>> I am not sure we need the formal acked-by from Alexey because the dts is
+>>>> not based on a dts written by him.
 >>>
->>> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+>>> It's just that I took all the devices definition from his .c; to me, it
+>>> counts as derived work, but IANAL.
 >>
->> So this patch seems to break 32bit guests on arm64.  I've had a look,
->> squashed a few bugs that I dangerously overlooked during the review, but
->> it still doesn't work (it doesn't crash anymore, but I get random
->> illegal VFP instructions in 32bit guests).
+>> For me it is still the decription of the hardware not an derivated work.
+>> Andrew what is your opinion on it?
 >>
->> I'd be glad if someone could eyeball the following patch and tell me
->> what's going wrong. If we don't find the root cause quickly enough, I'll
->> have to drop the series from -next, and that'd be a real shame.
+>> But if we consider it as a derivated work then we need Alexey acked-by soon,
+>> or going back to GPL only license.
 >>
->> Thanks,
->>
->> 	M.
->>
->> commit 5777dc55fbc170426a85e00c26002dd5a795cfa5
->> Author: Marc Zyngier <marc.zyngier@arm.com>
->> Date:   Wed Aug 5 16:53:01 2015 +0100
->>
->>     KVM: arm64: NOTAFIX: Prevent crash when 32bit guest uses VFP
->>
->>     Since we switch FPSIMD in a lazy way, access to FPEXC32_EL2
->>     must be guarded by skip_fpsimd_state. Otherwise, all hell
->>     break loose.
->>
->>     Also, FPEXC32_EL2 must be restored when we trap to EL2 to
->>     enable floating point.
->>
->>     Note that while it prevents the host from catching fire, the
->>     guest still doesn't work properly, and I don't understand why just
->>     yet.
->>
->>     Not-really-signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>
->> diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
->> index c8e0c70..b53ec5d 100644
->> --- a/arch/arm64/kvm/hyp.S
->> +++ b/arch/arm64/kvm/hyp.S
->> @@ -431,10 +431,12 @@
->>  	add	x3, x2, #CPU_SYSREG_OFFSET(DACR32_EL2)
->>  	mrs	x4, dacr32_el2
->>  	mrs	x5, ifsr32_el2
->> -	mrs	x6, fpexc32_el2
->>  	stp	x4, x5, [x3]
->> -	str	x6, [x3, #16]
->>
->> +	skip_fpsimd_state x8, 3f
->> +	mrs	x6, fpexc32_el2
->> +	str	x6, [x3, #16]
->> +3:
->>  	skip_debug_state x8, 2f
->>  	mrs	x7, dbgvcr32_el2
->>  	str	x7, [x3, #24]
->> @@ -461,10 +463,8 @@
->>
->>  	add	x3, x2, #CPU_SYSREG_OFFSET(DACR32_EL2)
->>  	ldp	x4, x5, [x3]
->> -	ldr	x6, [x3, #16]
->>  	msr	dacr32_el2, x4
->>  	msr	ifsr32_el2, x5
->> -	msr	fpexc32_el2, x6
->>
->>  	skip_debug_state x8, 2f
->>  	ldr	x7, [x3, #24]
->> @@ -669,12 +669,14 @@ __restore_debug:
->>  	ret
->>
->>  __save_fpsimd:
->> +	skip_fpsimd_state x3, 1f
->>  	save_fpsimd
->> -	ret
->> +1:	ret
->>
->>  __restore_fpsimd:
->> +	skip_fpsimd_state x3, 1f
->>  	restore_fpsimd
->> -	ret
->> +1:	ret
->>
->>  switch_to_guest_fpsimd:
->>  	push	x4, lr
->> @@ -682,6 +684,7 @@ switch_to_guest_fpsimd:
->>  	mrs	x2, cptr_el2
->>  	bic	x2, x2, #CPTR_EL2_TFP
->>  	msr	cptr_el2, x2
->> +	isb
 > 
-> ah, EL2 accesses themselves trap too, ouch.
-
-Yeah, the FP architecture has all kind of nasty tricks like this.
-
->>
->>  	mrs	x0, tpidr_el2
->>
->> @@ -692,6 +695,10 @@ switch_to_guest_fpsimd:
->>  	add	x2, x0, #VCPU_CONTEXT
->>  	bl __restore_fpsimd
->>
->> +	skip_32bit_state x3, 1f
->> +	ldr	x4, [x2, #CPU_SYSREG_OFFSET(FPEXC32_EL2)]
->> +	msr	fpexc32_el2, x4
->> +1:
+> Since the patch touches files I had a part creating, the patch itself
+> is clearly a derivative work. Therefore, without further ado...
 > 
-> wait, it looks like you're missing a store of the host fpsimd state in
-> the switch_to_guest_fpsimd situation.
+> Acked-by: Alexey Kopytko <alexey@kopytko.ru>
 
-A store of FPEXC32_EL2 for the host? No, this register has no
-significance whatsoever for a 64bit host. Its sole purpose is to
-accommodate a 32bit guest (see D7.2.31). Or are you thinking of
-something else?
 
-> It think this would be easier to follow if the aarch32 FP registers were
-> handled as part of the __save_fpsimd  and __restore_fpsimd routines
-> instead.
+Thanks for your acked-by it will allow us to move forward,
 
-Maybe. This code needs some rework...
+Gregory
 
-> Does this help anything?
 
-Not really, sorry... :-(
-
-> Otherwise, I assume you've tested thoroughly between something like
-> v4.2-rc2 and this patch, so that you're sure we didn't have the 32-bit
-> processed crash before?
-
-Without the lazy switching, we seem to be rock solid. With lazy
-switching, I get these illegal instructions, always on VFP ops. My
-current thinking is that it has something to do with CPACR_EL1, and the
-fact that the 32bit kernel turns it VFP on/off all the time.
-
-/me puzzled...
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
