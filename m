@@ -1,62 +1,99 @@
-From: raghumag@gmail.com (raghu MG)
-Date: Thu, 6 Aug 2015 11:24:36 +0530
-Subject: Armadaxp GPIO interrupts
-In-Reply-To: <20150805162155.GE32760@lunn.ch>
-References: <CAG1O52Xg88OsifBzmpSdqvC8wQaOW78nC9nnfxugFv1VU1m1LQ@mail.gmail.com>
- <20150804153439.GA28673@lunn.ch>
- <CAG1O52W2Gy_6_DfewtUqoK_J+Y=KwVGyygNaPu2xyPM_ZkLfcQ@mail.gmail.com>
- <CAG1O52VQPpeGkA8bqYbPMTiT9Mua1yHi3H3osqJsHqm-RRKzow@mail.gmail.com>
- <20150805162155.GE32760@lunn.ch>
-Message-ID: <CAG1O52WPFfm+XGk01iUVWLu=-Dm7bcDVmhv3P8iQDH+HHjsLUA@mail.gmail.com>
+From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
+Date: Thu, 06 Aug 2015 11:33:56 +0530
+Subject: [PATCH-v2 2/2] regulator: 88pm800: Add support for configuration
+ of dual phase on BUCK1
+In-Reply-To: <55C2A340.6020809@samsung.com>
+References: <1437495782-15767-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1437495782-15767-3-git-send-email-vaibhav.hiremath@linaro.org>
+ <CAJKOXPcMd9VvfA48kaBa0BYeHAfHTu6MzAbQv0HuRy9wbgz0wg@mail.gmail.com>
+ <55C1CD47.3060400@linaro.org> <55C2A340.6020809@samsung.com>
+Message-ID: <55C2F8CC.1010308@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
-
-My platform/board is ATCA carrier card which is getting interface to I/O card.
-The I/O card is hot-pluggable  or Jack-in or Jack out.
-Also I/O card consists of hot-plugable SFP interface.
-These events are triggered using GPIO's
-
-So the events the carrier card recieves are
-1) If I/O card is either Jacked-in or Jacked-out ,respective GPIO
-pin-x triggers an event
-2) If SFP is pushed into I/O card the respective GPIO pin-y triggers an event.
 
 
-
-
-Another observation about  "irq: Cannot allocate irq_descs @ IRQ47/79/111".
-This is warning & irq_descs are already allocated , the overall
-initialization/probe function doesn't get effected.
-mvebu_gpio_irq_handler is only called if I register a another handler
-at irq=82/83/84/85/87/88/89/90/92. I am registering this handler using
-minimal kernel module.
-My understanding of Linux IRQ/interrupt mechanism is limited to
-request_irq, but registering domain & then IRQ is bit not clear.
-
-Regards
-Raghu
-
-
-
-
-On Wed, Aug 5, 2015 at 9:51 PM, Andrew Lunn <andrew@lunn.ch> wrote:
-> On Wed, Aug 05, 2015 at 08:31:27PM +0530, raghu MG wrote:
->> Hi Andrew,
+On Thursday 06 August 2015 05:28 AM, Krzysztof Kozlowski wrote:
+> On 05.08.2015 17:45, Vaibhav Hiremath wrote:
 >>
->> The issue I found was  irq_alloc_descs is called twice
->> 1st time inside   mvebu_gpio_probe & 2nd time inside irq_domain_add_simple.
+>>
+>> On Thursday 23 July 2015 10:21 AM, Krzysztof Kozlowski wrote:
+>>> 2015-07-22 1:23 GMT+09:00 Vaibhav Hiremath <vaibhav.hiremath@linaro.org>:
+>>>> 88PM860 device supports dual phase mode on BUCK1 output.
+>>>> In normal usecase, BUCK1A and BUCK1B operates independently with 3A
+>>>> capacity. And they both can work as a dual phase providing 6A capacity.
+>>>>
+>>>> This patch updates the regulator driver to read the respective
+>>>> DT property and enable dual-phase mode on BUCK1.
+>>>>
+>>>> Note that, this is init time (one time) initialization.
+>>>>
+>>
+>> Sorry for delayed response, was on bed rest almost for week.
+>>
+>>>> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
+>>>> ---
+>>>>    drivers/regulator/88pm800.c | 31 +++++++++++++++++++++++++++++++
+>>>>    include/linux/mfd/88pm80x.h |  3 +++
+>>>>    2 files changed, 34 insertions(+)
+>>>
+>>> Don't you need to update the constraints also? I think the BUCK1
+>>> regulator has fixed constraint of 3 A:
+>>>     PM800_BUCK(buck1, BUCK1, BUCK_ENA, 0, 3000000, buck1_volt_range,
+>>> 0x55),
+>>> and now it can handle 6 A.
+>>>
+>>
+>> Actually, BUCK1A and BUCK1B both combined together provide 6A capacity.
+>> And as discussed earlier, we need board change for this.
+>>
+>> I am quite not sure.
 >
-> So i'm somewhat confused. I just tested on my Kirkwood and 370
-> platforms, and an Armada XP WRT1900AC using 4.2.0-rc5, all which use
-> the same gpio driver.
+> AFAIU the regulator driver creates one BUCK1 regulator with constraints
+> 3 A. However after your change the regulator will handle up to 6 A.
 >
-> They boot fine, the gpio driver is loaded, and the interrupt for the
-> gpio connected to a button are listed in /proc/interrupts. The
-> gpio-key driver is also able to use the gpio and the input-events
-> program does show events when i press the button.
+> This means that constraints set by driver are wrong.
 >
-> So what is different with your platform?
+> Additionally I can't find BUCK1A and BUCK1B regulators. Driver provides
+> only BUCK1.
 >
->    Andrew
+
+My patch does add BUCK1A and BUCK1B, please refer to the PATCH[4/5] of
+earlier series, which is accepted.
+
+https://patchwork.kernel.org/patch/6810461/
+
+
+>>
+>> Should I read the property and update the constraint runtime during
+>> probe?
+>
+> Driver should provide real constraints. Find the proper way to do this.
+>
+> The pm800_regulator_info[] array is not const so you can change it in
+> whatever way you want (although it should be const for existing driver
+> because regulator core accepts const and passing it to driver_data is
+> not necessary).
+>
+
+
+Probably that is the only way to handle this.
+
+how about,
+
+As you mentioned, pm800_regulator_info[] is not constant, so I can 
+update the constraint before regulator_register() and also do not
+register BUCK1B, if dual phase is enabled.
+
+So in summary,
+
+if (dual phase is enabled)
+{
+	Update constraint of BUCK1 to 6A
+	and do not register BUCK1B
+} else {
+	register both BUCK1A and BUCK1B with default constraint of 3A.
+}
+
+Thanks,
+Vaibhav
