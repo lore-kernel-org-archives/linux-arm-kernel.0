@@ -1,25 +1,32 @@
-From: jroedel@suse.de (Joerg Roedel)
-Date: Thu, 6 Aug 2015 22:17:24 +0200
-Subject: next-20150806 build: 2 failures 52 warnings (next-20150806)
-In-Reply-To: <20150806180156.GC20873@sirena.org.uk>
-References: <E1ZNIul-0007IF-Ev@optimist> <20150806180156.GC20873@sirena.org.uk>
-Message-ID: <20150806201724.GC10112@suse.de>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 6 Aug 2015 15:19:12 -0500
+Subject: [PATCH v3 01/18] platform: delay OF device-driver matches until
+ late_initcall
+In-Reply-To: <1438870315-18689-2-git-send-email-tomeu.vizoso@collabora.com>
+References: <1438870315-18689-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1438870315-18689-2-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <CAL_Jsq+GLMZe-f6qEi=7i1YrrWc6k99RpGkOyCd5KkYDiyt0QA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 06, 2015 at 07:01:56PM +0100, Mark Brown wrote:
-> On Thu, Aug 06, 2015 at 12:00:47PM +0100, Build bot for Mark Brown wrote:
-> 
-> Today's linux-next fails to build an ARM allmodconfig with:
-> 
-> > ../drivers/iommu/omap-iommu-debug.c:138:2: error: void value not ignored as it ought to be
-> 
-> caused by a combination of 1ba2f20ac (fs/seq_file: convert int
-> seq_vprint/seq_printf/etc... returns to void) which made seq_printf()
-> return void and e203db293863fa15 (iommu/omap: Fix debug_read_tlb() to
-> use seq_printf()) which has been in -next for a little while now.
+On Thu, Aug 6, 2015 at 9:11 AM, Tomeu Vizoso <tomeu.vizoso@collabora.com> wrote:
+> Delay matches of platform devices with OF nodes until late_initcall,
+> when we are sure that all built-in drivers have been registered already.
+> This is needed to prevent deferred probes because of some drivers not
+> having registered yet.
+>
+> The reason why only platform devices are delayed is that some other
+> devices are expected to be probed earlier than late_initcall, for
+> example, the system PNP driver needs to probe its devices in
+> fs_initcall.
+>
+> Additionally, only platform devices with OF nodes are delayed because
+> some machines may depend on oter platform devices being registered at
+> specific times.
 
-Whoops. Thanks for the report, I'll fix it tomorrow.
+How do we know that these probes occur before the unused clocks and
+regulators are turned off? Just getting lucky (as is deferred probe)?
+Can we do this one level earlier so we have a level left to do things
+after probe.
 
-
-	Joerg
+Rob
