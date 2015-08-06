@@ -1,44 +1,20 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Wed, 5 Aug 2015 17:46:03 -0700
-Subject: [PATCH v3 15/31] arm64: SMP support
-In-Reply-To: <1347035226-18649-16-git-send-email-catalin.marinas@arm.com>
-References: <1347035226-18649-1-git-send-email-catalin.marinas@arm.com>
- <1347035226-18649-16-git-send-email-catalin.marinas@arm.com>
-Message-ID: <CAOZdJXVoDJM3y2mnKO+91yf2EHogKfMjumjhhi85REAfhcJM=Q@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 6 Aug 2015 09:47:14 +0900
+Subject: [PATCH v2 0/2] Add R8A7794 GPIO DT support
+In-Reply-To: <6388101.Drn6rL87rl@wasted.cogentembedded.com>
+References: <6388101.Drn6rL87rl@wasted.cogentembedded.com>
+Message-ID: <20150806004714.GD17231@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Catalin,
+On Tue, Aug 04, 2015 at 12:36:27AM +0300, Sergei Shtylyov wrote:
+> Hello.
+> 
+>    Here's the set of 2 patches against Simon Horman's 'renesas.git' repo,
+> 'renesas-devel-20150803-v4.2-rc5' tag. Here we add the GPIO device tree support
+> for the R8A7794 SoC.
+> 
+> [1/2] ARM: shmobile: r8a7794: add GPIO clocks
+> [2/2] ARM: shmobile: r8a7794: add GPIO DT support
 
-I know this patch is three years old, but I have a question about it:
-
-On Fri, Sep 7, 2012 at 9:26 AM, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> +static void ipi_cpu_stop(unsigned int cpu)
-> +{
-> +       if (system_state == SYSTEM_BOOTING ||
-> +           system_state == SYSTEM_RUNNING) {
-> +               raw_spin_lock(&stop_lock);
-> +               pr_crit("CPU%u: stopping\n", cpu);
-> +               dump_stack();
-> +               raw_spin_unlock(&stop_lock);
-> +       }
-> +
-> +       set_cpu_online(cpu, false);
-> +
-> +       local_fiq_disable();
-> +       local_irq_disable();
-> +
-> +       while (1)
-> +               cpu_relax();
-> +}
-
-Why do you display a message and dump the stack when a CPU is stopped?
- I ask because emergency_restart() calls this function, and so
-whenever I want to do an "emergency" reboot, it dumps the stack for
-each core.  On an ARM64 system with lots of cores, this produces a ton
-of output.  That makes emergency_restart() almost useless.
-
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+Thanks, I have queued these up for v4.4.
