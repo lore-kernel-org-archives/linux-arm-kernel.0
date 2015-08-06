@@ -1,69 +1,132 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 6 Aug 2015 12:03:11 +0200
-Subject: [PATCH v3 3/8] soc: Mediatek: Add SCPSYS CPU power domain driver
-In-Reply-To: <1438829942.9435.24.camel@mtkswgap22>
-References: <1438696464-59858-1-git-send-email-scott.shu@mediatek.com>
- <1438696464-59858-4-git-send-email-scott.shu@mediatek.com>
- <20150805085034.GG18700@pengutronix.de>
- <1438829942.9435.24.camel@mtkswgap22>
-Message-ID: <20150806100311.GP18700@pengutronix.de>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Thu, 6 Aug 2015 11:16:37 +0100
+Subject: [PATCH 3/4] arm64: Juno: Add HDLCD support to the Juno boards.
+In-Reply-To: <20150805214854.GC7557@n2100.arm.linux.org.uk>
+References: <1438784892-27888-1-git-send-email-Liviu.Dudau@arm.com>
+ <1438784892-27888-4-git-send-email-Liviu.Dudau@arm.com>
+ <20150805175303.GB7557@n2100.arm.linux.org.uk>
+ <20150805190312.GA31066@e106497-lin.cambridge.arm.com>
+ <20150805214854.GC7557@n2100.arm.linux.org.uk>
+Message-ID: <20150806101637.GI20890@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 06, 2015 at 10:59:02AM +0800, Scott Shu wrote:
-> On Wed, 2015-08-05 at 10:50 +0200, Sascha Hauer wrote:
-> > don't do this then it indeed doesn't make much sense to put it into the
-> > same file.
-> > 
-> > From what I see we would need to change the prototype to something like
-> > 
-> > static int __scpsys_power_on(struct scp_domain_data *)
-> > 
-> > (maybe with some additional base addresses and stuff)
-> > 
-> > struct scp_domain_data would additionally need sram_isoint_b and sram_ckiso
-> > members.
-> > 
-> > Sascha
-> > 
-> Hi Sascha,
->    The CPU power sequence is quite different with the others, as
-> described below.
+On Wed, Aug 05, 2015 at 10:48:54PM +0100, Russell King - ARM Linux wrote:
+> On Wed, Aug 05, 2015 at 08:03:12PM +0100, Liviu Dudau wrote:
+> > I have to confess that I am not entirely up to speed with the TDA19988
+> > situation at the moment. Andrew Jackson was dealing with that and
+> > working with Jean to get that in the upstream, but his contract has
+> > ended and he has moved to other things.
 > 
-> * Non-CPU
->    1) Set PWR_ON_BIT, PWR_ON_2ND_BIT
->    2) Wait PWR_ACK
->    3) Clear PWR_CLK_DIS_BIT
->    4) Clear PWR_ISO_BIT
->    5) Set PWR_RST_B_BIT
->    6) Clear SRAM_PDN
->    7) Wait SRAM_PDN_ACK
-> * CPU
->    1) Set PWR_ON_BIT, PWR_ON_2ND_BIT
->    2) Wait PWR_ACK
->    3) Clear PWR_ISO_BIT
->    4) Clear L1_PDN to power on L1
->    5) Wait L1_PDN_ACK
->    6) Set SRAM_ISOINT_B
->    7) Clear SRAM_CKISO
->    8) Clear PWR_CLK_DIS
->    9) Set PWR_RST_B
-> For multi-cluster SoC, the cluster power sequence is also different.
+> Umm, I'm the maintainer for TDA998x:
 > 
-> Please think if this is a good idea if we integrate the CPU support into
-> the scpsys_power_on()? Based on the readability and compatible
-> considerations, we provide this patch.
+> NXP TDA998X DRM DRIVER
+> M:      Russell King <rmk+kernel@arm.linux.org.uk>
+> S:      Supported
+> F:      drivers/gpu/drm/i2c/tda998x_drv.c
+> F:      include/drm/i2c/tda998x.h
+> 
+> It would be nice if people worked with the actual maintainers of things
+> rather than random other people...
 
-Maybe it's best if you go back to the v1 layout and put your scpsys code
-to arch/arm/mach-mediatek/. While I think it's possible to share some
-more code I am not sure anymore if this buys us something. We'll know in
-the future.
+Sorry, it was my mistake, I have blindly followed the get_maintainers.pl
+generated list of email rather than engage my brain and realise that part
+of the patch also affects TDA19988 driver.
 
-Sascha
+> 
+> > > Also, the whole question of representing connectors in a DRM model is
+> > > yet to be established.  Yes, DT should describe the hardware, but we
+> > > don't yet know _how_ to describe physical connectors with stuff
+> > > implemented on top of DRM yet, and we have nothing that makes use of
+> > > this.
+> > 
+> > Please help me understand the current situation: you have added
+> > support for components that the video drivers can use and the bindings
+> > for that are described in Documentation/devicetree/bindings/media/video-interfaces.txt.
+> 
+> No.  I added the component helpers, which are entirely firmware agnostic.
+> The media bindings were created by others, and through development done
+> by Pengutronix, they were factored out of media into common DT code and
+> re-used for the IMX DRM driver.  The binding document which describes
+> that work is not the one you refer to above, but this one:
+> 
+> Documentation/devicetree/bindings/graph.txt
+> 
+> This started them as a basis for DRM drivers on ARM - but it's never been
+> officially "adopted" as a method to describe DRM drivers - it's only what
+> some drivers are using.  It ought to be nailed down as a way to ensure
+> inter-operability between components though, but no one has really made
+> that decision.
 
+OK, I'm interested on whom do I need to talk to in order for the official
+"adoption" to happen here. 
+
+> 
+> > According to that document my patch should be compliant once I add the
+> > reg= property. Is that something that cannot be used with tda998x driver
+> > or is there any other reason why you think the patch is not compliant?
+> 
+> Jean's proposal to add audio support to the TDA998x driver does it via
+> this change to the binding spec:
+> 
+> +Optional nodes:
+> +
+> +  - port: up to three ports.
+> +       The ports are defined according to [1].
+> +
+> +    Video port.
+> +       There may be only one video port.
+> +       This one must contain the following property:
+> +
+> +       - port-type: must be "rgb"
+> +
+> +       and may contain the optional property:
+> +
+> +       - reg: 24 bits value which defines how the video controller
+> +               output is wired to the TDA998x input (video pins)
+> +               When absent, the default value is <0x230145>.
+> +
+> +    Audio ports.
+> +       There may be one or two audio ports.
+> +       These ones must contain the following properties:
+> +
+> +       - port-type: must be "i2s" or "spdif"
+> +
+> +       - reg: 8 bits value which defines how the audio controller
+> +               output is wired to the TDA998x input (audio pins)
+> +
+> +[1] Documentation/devicetree/bindings/graph.txt
+> 
+> (That's not a particularly precise definition, but it's what we have at
+> the moment.)
+> 
+> > If you are referring to connecting an encoder with a HDMI connector, I
+> > have tested that and it seems to work, although my situation is simple
+> > because there are no options in my setup: one HDLCD connects to one
+> > TDA19988 which connects to one HDMI output.
+> 
+> Right now, the TDA998x will ignore the additional information, but that
+> won't be the case with Jean's audio work (see the above binding
+> information.)
+
+Yes, I have seen that patchset. I will apply it to my tree and send an
+updated version with the port-type property when I send v2.
+
+Best regards,
+Liviu
+
+> 
+> -- 
+> FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+> according to speedtest.net.
+> 
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
