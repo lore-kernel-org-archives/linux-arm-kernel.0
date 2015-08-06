@@ -1,76 +1,121 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 6 Aug 2015 09:50:30 +0900
-Subject: [PATCH v4 00/16] ARM: shmobile: Add CPG/MSTP Clock Domain
-In-Reply-To: <CAMuHMdUFjgVWBc0hdm_L0Z0Os1OT8H4NzwQyQTGZQt8Bu7-9PQ@mail.gmail.com>
-References: <1438691297-29235-1-git-send-email-geert+renesas@glider.be>
- <20150804134824.GA10194@verge.net.au>
- <20150805005543.GC20726@verge.net.au>
- <CAMuHMdUFjgVWBc0hdm_L0Z0Os1OT8H4NzwQyQTGZQt8Bu7-9PQ@mail.gmail.com>
-Message-ID: <20150806005029.GE17231@verge.net.au>
+From: shunqian.zheng@gmail.com (Shunqian Zheng)
+Date: Thu, 06 Aug 2015 09:10:00 +0800
+Subject: [PATCH v2 0/3] Add the efuse driver on rockchip platform
+In-Reply-To: <55C0E42E.3060509@linaro.org>
+References: <1434439665-27781-1-git-send-email-wxt@rock-chips.com>
+ <557FE3EA.4000306@i2se.com> <557FEAB2.1040101@linaro.org>
+ <557FF50C.10809@rock-chips.com> <55800070.5030509@linaro.org>
+ <55826D9D.2060106@i2se.com> <5582816B.5020208@linaro.org>
+ <55BB3F92.9030701@gmail.com> <55C0E42E.3060509@linaro.org>
+Message-ID: <55C2B3E8.2070000@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 05, 2015 at 08:58:29AM +0200, Geert Uytterhoeven wrote:
-> Hi Simon,
-> 
-> On Wed, Aug 5, 2015 at 2:55 AM, Simon Horman <horms@verge.net.au> wrote:
-> > On Tue, Aug 04, 2015 at 10:48:28PM +0900, Simon Horman wrote:
-> >> I have tentatively queued this up in its own branch,
-> >> cpg-mstp-clock-domain-for-v4.3.
-> >
-> > Where possible I prefer not to apply non-DTS/DTSI patches on top of
-> > DTS/DTSI patches, I believe this is in keeping with how the ARM SoC
-> > maintainers like things handled.  With this in mind I have shuffled things
-> > around a little, the result is:
-> >
-> > 1. The following are (still) queued up for v4.3 in their own
-> >    cpg-mstp-clock-domain-for-v4.3 branch:
-> >
-> >    clk: shmobile: Add CPG/MSTP Clock Domain support
-> >    clk: shmobile: r8a7778: Add CPG/MSTP Clock Domain support
-> >    clk: shmobile: r8a7779: Add CPG/MSTP Clock Domain support
-> >    clk: shmobile: rcar-gen2: Add CPG/MSTP Clock Domain support
-> >    clk: shmobile: rz: Add CPG/MSTP Clock Domain support
-> >    ARM: shmobile: r7s72100 dtsi: Add CPG/MSTP Clock Domain
-> >    ARM: shmobile: r8a7778 dtsi: Add CPG/MSTP Clock Domain
-> >    ARM: shmobile: r8a7779 dtsi: Add CPG/MSTP Clock Domain
-> >    ARM: shmobile: r8a7790 dtsi: Add CPG/MSTP Clock Domain
-> >    ARM: shmobile: r8a7791 dtsi: Add CPG/MSTP Clock Domain
-> >    ARM: shmobile: r8a7793 dtsi: Add CPG/MSTP Clock Domain
-> >    ARM: shmobile: r8a7794 dtsi: Add CPG/MSTP Clock Domain
-> 
-> OK.
-> 
-> > 2. The following are now queued up for v4.3 in a separate
-> >    sh-drivers-for-v4.3 branch. That branch is on top of the
-> >    cpg-mstp-clock-domain-for-v4.3 branch and I intend to send it directly
-> >    to Linus if/when a v4.3-rc has been released with the patches
-> >    listed in 1. present.
-> >
-> >    drivers: sh: Disable legacy default PM Domain on emev2
-> >    drivers: sh: Disable PM runtime for multi-platform ARM with genpd
-> 
-> OK
-> 
-> > 3. I have deferred the remaining two patches, listed below, for v4.4.
-> >    they currently reside in cpg-mstp-clock-domain-for-v4.4. That
-> >    branch is based on the sh-drivers-for-v4.3 branch.
-> >
-> >    clk: shmobile: mstp: Consider "zb_clk" suitable for power management
-> >    ARM: shmobile: R-Mobile: Use CPG/MSTP Clock Domain attach/detach helpers
-> >
-> > This means that the last two patches will disappear from next until
-> > after v4.3-rc1 is released but they, along with all the other patches,
-> > will be present in the renesas devel branch.
-> 
-> OK.
-> 
-> Note that as the last two depend on patch 1 only, you could e.g. queue
-> them up in group 1, between the clk and dtsi patches.
-> But it's up to you to reconsider.
-> I'm happy as-is, as the last two patches are just a code duplication clean up.
 
-Thanks, and sorry for not realising that.
 
-For now I will keep things as-is because I would like to stabilise my
-branches.
+On 2015?08?05? 00:11, Srinivas Kandagatla wrote:
+> Hi Shunqian,
+>
+> Sorry for delay in reply, I was on Holidays..
+>
+> Thanks for testing.
+>
+> On 31/07/15 10:27, Shunqian Zheng wrote:
+>>
+>> 1. Without the following diff, `hexdump
+>> /sys/bus/nvmem/devices/rockchip-efuse0/nvmem` is wrong with "INVALID
+>> ARGUMENT":
+>>
+>> +++ b/drivers/nvmem/core.c
+>> @@ -67,7 +67,7 @@ static ssize_t bin_attr_nvmem_read(struct file *filp,
+>> struct kobject *kobj,
+>>          int rc;
+>>
+>>          /* Stop the user from reading */
+>> -       if (pos > nvmem->size)
+>> +       if (pos > nvmem->size - 1)
+>>                  return 0;
+>
+> Yes, this should have been something like this
+> -       if (pos > nvmem->size)
+> +       if (pos >= nvmem->size)
+>                 return 0;
+>
+> We can send a fix on top of v9 once its merged.
+>
+>>
+>>          if (pos + count > nvmem->size)
+>>
+>> RK3288-efuse has  32 x 8bit regs, in dts "reg = <0xffb40000 0x20>;"
+>> Here is the message dump from nvmem_device:
+>> [    2.158314] nvmem:
+>> [    2.158314]           name (null)
+>> [    2.158314]           stride 1
+>> [    2.158314]           word_size 1
+>> [    2.158314]           ncells 0
+>> [    2.158314]           id 0
+>> [    2.158314]           users 0
+>> [    2.158314]           size 32
+>> [    2.158314]           read_only 0
+>>
+>> Do you think there is a leak or I'm messing up ?
+>>
+>> 2. About the read operation, eFuse data can be read during device
+>> probe() and cached, OR,
+>>      read from eFuse when needed every time. I prefer the second one but
+>> then, the clock of eFuse may be
+>>      gated. So before/after reading I have to enable/disable clk like :
+>>            devm_clk_get(dev, "hclk_efuse256");
+>>      The trouble is I can't find a way to get the "dev" hander in :
+>>            static int rockchip_efuse_read(void *context, const void
+>> *reg, size_t reg_size, void *val, size_t val_size)
+>>      I am appreciated if you can give some advice.
+>
+>
+> May be you should use regmap_init_mmio_clk() instead of 
+> regmap_init_mmio() it will take care of clks.
+Thank you for you reply.
+Although the regmap_init_mmio_clk() and it's series interface deal with 
+the clks, but
+MMIO uses its own regmap_bus{}, while the eFuse of RK3X need special 
+read/write
+callback functions.
+
+I still can't find a good way to resolve this. Can you help?
+
+Shunqian
+>
+>>      Or, do you think it's reasonable to add hooks before/after read in
+>> nvmem/core.c like :
+>>            +       before_read(dev, ...);
+>>                     rc = regmap_raw_read(nvmem->regmap, pos, buf, 
+>> count);
+>>            +       after_read(dev, ...);
+>>
+>
+>
+>> 3. In the /sys/bus/nvmem/devices/rockchip-efuse0/, there are files:
+>>           /sys/devices/platform/ffb40000.efuse/rockchip-efuse0 # ls
+>>           nvmem      of_node    power      subsystem  uevent
+>>      Do you have a plan to add the nvmem consumers to /sys/ in nvmem
+>> framework?
+> yes, Am waiting for the framework to be merged, I have plans to add 
+> this feature.
+>
+>>      For example,  in dts defined the "cpu_leakage":
+>>          efuse: efuse at ffb40000 {
+>>                  compatible = "rockchip,rk3x-efuse";
+>>                  reg = <0xffb40000 0x20>;
+>>                  #address-cells = <1>;
+>>                  #size-cells = <1>;
+>>                  clocks = <&cru PCLK_EFUSE256>;
+>>                  clock-names = "pclk_efuse_256";
+>>
+>>                  cpu_leakage: cpu_leakage {
+>>                          reg = <0x17 0x1>;
+>>                  };
+>>          };
+>>     Then nvmem exposes the "cpu_leakage" file in /sys which can be
+>> read/write.
+>
+> --srini
