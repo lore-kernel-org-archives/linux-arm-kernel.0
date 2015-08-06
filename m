@@ -1,58 +1,33 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 6 Aug 2015 10:10:00 +0200
-Subject: [GIT PULL v2] Renesas ARM Based SoC Marzen Board Removal for v4.3
-In-Reply-To: <cover.1438581659.git.horms+renesas@verge.net.au>
-References: <cover.1438581659.git.horms+renesas@verge.net.au>
-Message-ID: <20150806081000.GA16520@localhost>
+Date: Thu, 6 Aug 2015 10:10:52 +0200
+Subject: [PATCH 1/2] ARM: ux500: add an SMP enablement type and move cpu
+ nodes
+In-Reply-To: <1438586801-30115-1-git-send-email-linus.walleij@linaro.org>
+References: <1438586801-30115-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20150806081052.GB16520@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 03, 2015 at 03:04:55PM +0900, Simon Horman wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
+On Mon, Aug 03, 2015 at 09:26:41AM +0200, Linus Walleij wrote:
+> The "cpus" node cannot be inside the "soc" node, while this
+> works for the CoreSight blocks, the early boot code will look
+> for "cpus" directly under the root node, so this is a hard
+> convention. So move the CPU nodes.
 > 
-> Please consider these Renesas ARM based SoC marzen board removal for v4.3.
+> Augment the "reg" property to match what is actually in the
+> hardware: 0x300 and 0x301 respectively.
 > 
+> Then add an SMP enablement type to be used by the SMP init
+> code, "ste,dbx500-smp".
 > 
-> This series removes legacy r8a7779 SoC and marzen board code.
-> It aims to do do so in a way that does not introduce feature regressions
-> when when booting the r8a7779/marzen board using shmobile_defconfig,
-> which provides for booting using multiplatform, a scenario which previously
-> used board code to provide some features including SMP.
-> 
-> Because of the above this series modifies SoC and DT files,
-> and then removes code. And because of that it was not entirely clear to
-> me which branch it should go into, so I have provided it in a stand-alone
-> branch.
-> 
-> Unfortunately this branch has a number of minor conflicts with the "Renesas
-> ARM Based SoC Cleanup for v4.3", tagged as renesas-cleanup-for-v4.3, which
-> you have previously pulled.
-> 
-> A resolution to those conflicts can be found in the
-> renesas-next-20150730-v4.2-rc1 tag of the renesas tree.
-> 
-> On a more positive note, I believe this to well over 8000 lines of legacy
-> code removed in this cycle :)
-> 
-> 
-> Changes between v1 and v2:
-> 
-> * As requested by Olof: Do not include defconfig updates;
->   these will be handled separately
-> 
-> 
-> The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
-> 
->   Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-marzen-board-removal-for-v4.3
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> Hi ARM SoC people: please apply this as a fix for v4.2
+> as it is prerequisite for 2/2 which is a more proper fix
+> for the secondary CPU boot regression addressed by the
+> fixed remappings patch.
 
-Merged, but it was a messy one and it's awkward to diff with your proposed
-resolution due to other differences.
-
-Please double-check that I resolved things correctly. Thanks!
+Applied, thanks.
 
 
 -Olof
