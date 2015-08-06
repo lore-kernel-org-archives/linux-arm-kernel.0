@@ -1,84 +1,57 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 05 Aug 2015 18:27:29 -0700
-Subject: [PATCH v1 4/7] ARM: dts: apq8064: Add MDP support
-In-Reply-To: <1438088049-17479-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1438087956-17307-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1438088049-17479-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <55C2B801.1030806@codeaurora.org>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 6 Aug 2015 09:28:32 +0800
+Subject: [PATCH] ARM: imx6: correct i.MX6 PCIe interrupt routing
+In-Reply-To: <1438793677-19153-1-git-send-email-l.stach@pengutronix.de>
+References: <1438793677-19153-1-git-send-email-l.stach@pengutronix.de>
+Message-ID: <20150806012832.GP12927@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/28/2015 05:54 AM, Srinivas Kandagatla wrote:
-> @@ -618,5 +633,77 @@
->   			compatible = "qcom,tcsr-apq8064", "syscon";
->   			reg = <0x1a400000 0x100>;
->   		};
-> +
-> +		hdmi: qcom,hdmi-tx at 4a00000 {
-> +			compatible = "qcom,hdmi-tx-8960";
-> +			reg-names = "core_physical";
-> +			reg = <0x04a00000 0x1000>;
-> +			interrupts = <GIC_SPI 79 0>;
-> +			clock-names =
-> +			    "core_clk",
-> +			    "master_iface_clk",
-> +			    "slave_iface_clk";
-> +			clocks =
-> +			    <&mmcc HDMI_APP_CLK>,
-> +			    <&mmcc HDMI_M_AHB_CLK>,
-> +			    <&mmcc HDMI_S_AHB_CLK>;
-> +			qcom,hdmi-tx-ddc-clk = <&tlmm_pinmux 70 GPIO_ACTIVE_HIGH>;
-> +			qcom,hdmi-tx-ddc-data = <&tlmm_pinmux 71 GPIO_ACTIVE_HIGH>;
-> +			qcom,hdmi-tx-hpd = <&tlmm_pinmux 72 GPIO_ACTIVE_HIGH>;
+On Wed, Aug 05, 2015 at 06:54:37PM +0200, Lucas Stach wrote:
+> The PCIe interrupts are also routed through the GPC. This has been
+> missed from the conversion to stacked IRQ domains as the PCIe
+> controller uses an explicit interrupt map and thus doesn't inherit
+> the SoC global interrupt parent.
+> 
+> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
 
-These should use standard "-gpios" syntax. Please fix the binding/driver.
+So this is a fix and need copy stable?
 
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&hdmi_pinctrl>;
-> +		};
-> +
-> +		gpu: qcom,adreno-3xx at 4300000 {
-> +			compatible = "qcom,adreno-3xx";
-> +			reg = <0x04300000 0x20000>;
-> +			reg-names = "kgsl_3d0_reg_memory";
-> +			interrupts = <GIC_SPI 80 0>;
-> +			interrupt-names = "kgsl_3d0_irq";
-> +			clock-names =
-> +			    "core_clk",
-> +			    "iface_clk",
-> +			    "mem_clk",
-> +			    "mem_iface_clk";
+Shawn
 
-Please drop "_clk" and fix driver code as we've done for all other drivers.
-
-> +			clocks =
-> +			    <&mmcc GFX3D_CLK>,
-> +			    <&mmcc GFX3D_AHB_CLK>,
-> +			    <&mmcc GFX3D_AXI_CLK>,
-> +			    <&mmcc MMSS_IMEM_AHB_CLK>;
-> +			qcom,chipid = <0x03020002>;
-> +			qcom,gpu-pwrlevels {
-> +				compatible = "qcom,gpu-pwrlevels";
-> +				qcom,gpu-pwrlevel at 0 {
-> +					qcom,gpu-freq = <450000000>;
-> +				};
-> +				qcom,gpu-pwrlevel at 1 {
-> +					qcom,gpu-freq = <27000000>;
-> +				};
-> +			};
-
-These should be OPPs. I see in the cover-letter we're asking to ignore 
-this part of the binding. When is the binding and driver going to be 
-fixed? The dts has been out of tree for quite some time and I assume 
-work has been progressing on the driver even without this dts being in 
-mainline so it doesn't make sense how pushing half-baked dts upstream is 
-going to help. In fact, it's going to make things worse if someone 
-complains that we're not maintaining backwards compatibility and then 
-have to hack up driver code to work both ways. At which point there's 
-practically zero incentive to change anything in the binding or driver. 
-It's better to fix the driver now and avoid these sorts of problems 
-entirely.
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+> ---
+> This commit does not change the i.MX6SX PCIe node, as PCIe isn't
+> functional in mainline on this SoC and the DT node needs a major
+> rewrite to account for the specifics of this SoC anyway.
+> ---
+>  arch/arm/boot/dts/imx6qdl.dtsi | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+> index e6d13592080d..b57033e8c633 100644
+> --- a/arch/arm/boot/dts/imx6qdl.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
+> @@ -181,10 +181,10 @@
+>  			interrupt-names = "msi";
+>  			#interrupt-cells = <1>;
+>  			interrupt-map-mask = <0 0 0 0x7>;
+> -			interrupt-map = <0 0 0 1 &intc GIC_SPI 123 IRQ_TYPE_LEVEL_HIGH>,
+> -			                <0 0 0 2 &intc GIC_SPI 122 IRQ_TYPE_LEVEL_HIGH>,
+> -			                <0 0 0 3 &intc GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>,
+> -			                <0 0 0 4 &intc GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>;
+> +			interrupt-map = <0 0 0 1 &gpc GIC_SPI 123 IRQ_TYPE_LEVEL_HIGH>,
+> +			                <0 0 0 2 &gpc GIC_SPI 122 IRQ_TYPE_LEVEL_HIGH>,
+> +			                <0 0 0 3 &gpc GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>,
+> +			                <0 0 0 4 &gpc GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>;
+>  			clocks = <&clks IMX6QDL_CLK_PCIE_AXI>,
+>  				 <&clks IMX6QDL_CLK_LVDS1_GATE>,
+>  				 <&clks IMX6QDL_CLK_PCIE_REF_125M>;
+> -- 
+> 2.4.6
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
