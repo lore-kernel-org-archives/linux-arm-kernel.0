@@ -1,44 +1,64 @@
-From: leilk.liu@mediatek.com (leilk liu)
-Date: Thu, 6 Aug 2015 09:45:40 +0800
-Subject: [PATCH v4 1/3] dt-binding: spi: Mediatek: Document devicetree
- bindings for spi bus
-In-Reply-To: <20150804174226.GE20873@sirena.org.uk>
-References: <1438167874-1305-1-git-send-email-leilk.liu@mediatek.com>
- <1438167874-1305-2-git-send-email-leilk.liu@mediatek.com>
- <20150804174226.GE20873@sirena.org.uk>
-Message-ID: <1438825540.2163.5.camel@mhfsdcap03>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 5 Aug 2015 18:54:06 -0700
+Subject: [PATCH v3 2/3] ARM: rockchip: set correct stabilization
+ thresholds in suspend
+In-Reply-To: <1709899.JJDRtF09u7@diego>
+References: <2128609.Kb18M8K28F@diego>
+	<1709899.JJDRtF09u7@diego>
+Message-ID: <CAD=FV=VWehNnr-NaZy=m7p-ciXi1ACpwb0Wr2nDLSrjvZT-oUQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2015-08-04 at 18:42 +0100, Mark Brown wrote:
-> On Wed, Jul 29, 2015 at 07:04:32PM +0800, Leilk Liu wrote:
-> > Signed-off-by: Leilk Liu <leilk.liu@mediatek.com>
-> 
-> Please use subject lines reflecting the style for the subsystem so
-> people can spot if patches are relevant to them.
-> 
+Heiko,
 
-OK, I will change the title to "spi: Mediatek: Document devicetree
-bindings for spi bus".
+On Tue, Aug 4, 2015 at 3:51 PM, Heiko St?bner <heiko@sntech.de> wrote:
+> Currently the stabilization thresholds for the oscillator and external pmu
+> are statically set to 30ms based on a 32kHz clock rate. This leaves out the
+> case when we don't switch to the 32kHz clock when only entering the shallow
+> suspend mode where the logic keeps running.
+>
+> So, set the correct threshold after we have determined if we switch to the
+> 32kHz clock or stay with the 24MHz one. Also set the oscillator-
+> stabilization to 0 if it is kept running during suspend, as it of course
+> does not need to stabilize then.
+>
+> Reported-by: Chris Zhong <zyw@rock-chips.com>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+> changes since v2:
+> - describe 32kHz vs 24MHz
+> - don't wait for oscillator stabilization if it's still running,
+>   as explained by Chris Zhong in v2
+> changes since v1:
+> - 24MHz oriented threshold is only needed in shallow suspend, the deep
+>   suspend always switches to 32kHz and only leaves the 24MHz oscillator
+>   running if needed for stuff like usb wakeup
+>
+>  arch/arm/mach-rockchip/pm.c | 22 +++++++++++++++++++---
+>  arch/arm/mach-rockchip/pm.h |  4 ----
+>  2 files changed, 19 insertions(+), 7 deletions(-)
+>
+> diff --git a/arch/arm/mach-rockchip/pm.c b/arch/arm/mach-rockchip/pm.c
+> index 2ca1170..c11a30b 100644
+> --- a/arch/arm/mach-rockchip/pm.c
+> +++ b/arch/arm/mach-rockchip/pm.c
+> @@ -145,6 +145,19 @@ static void rk3288_slp_mode_set(int level)
+>
+>                 mode_set1 |= BIT(PMU_CLR_ALIVE) | BIT(PMU_CLR_BUS) |
+>                              BIT(PMU_CLR_PERI) | BIT(PMU_CLR_DMA);
+> +
+> +               /*
+> +                * In deep suspend we use PMU_PMU_USE_LF to let the rk3288
+> +                * switch its main clock supply to the alternative 32kHz
+> +                * source. Therefore set 30ms on a 32kHz clock for pmic
+> +                * stabilization. Similar 30ms on 24MHz for the other
+> +                * mode below.
+> +                */
+> +               regmap_write(pmu_regmap, RK3288_PMU_STABL_CNT, 32 * 30);
 
-> > +- clocks: phandles to input clocks.
-> > +
-> > +- clock-names: tuple listing input clock names.
-> > +	Required elements: "main"
-> 
-> ...and there are no optional values?
-> 
+Took me a little while to parse the comment, but it looks right.
+Basically we need 30ms for PMIC stabilization both here and in the
+other mode.  That is programmed as 32 * 30 here and 2400 * 30 there.
+...and we know we're on 32k clock because of PMU_PMU_USE_LF.
 
-clock tree provides some source clocks, CLK_PERI_SPI0 is the default
-one. I will support optional values on the next version.
-
-> > +- pad-select: should specify spi pad used, only required for MT8173.
-> > +        This value should be 0~3.
-> 
-> What do the values 0-3 mean?  I guess it's the value for some register
-> or other part of the device, the binding should say so people can go and
-> check the datasheet, schematic or whatever to figure out what to set.
-> 
-> This property should be optional, not required
-
-OK, I will explain what the values 0-3 mean.
+Reviewed-by: Douglas Anderson <dianders@chromium.org>
