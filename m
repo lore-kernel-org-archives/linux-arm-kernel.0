@@ -1,121 +1,134 @@
-From: al.stone@linaro.org (Al Stone)
-Date: Thu,  6 Aug 2015 14:59:29 -0600
-Subject: [PATCH 4/5] ACPI / X86: remove usage of BAD_MADT_ENTRY
-In-Reply-To: <1438894770-31163-1-git-send-email-al.stone@linaro.org>
-References: <1438894770-31163-1-git-send-email-al.stone@linaro.org>
-Message-ID: <1438894770-31163-5-git-send-email-al.stone@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 6 Aug 2015 22:33:40 +0100
+Subject: [RFC PATCH 1/5] spi: introduce flag for memory mapped read
+In-Reply-To: <CAMuHMdWWDwZ=ziGQXFCnOX8pErXpsEi533J73_Hh=sEqq4hR6Q@mail.gmail.com>
+References: <20150805115013.GJ20873@sirena.org.uk>
+ <CAOMqctQXwcHyiWBwtugSDSE_k65qrNfrwnhjQMDJkLoJMmGzUw@mail.gmail.com>
+ <20150805124412.GN20873@sirena.org.uk>
+ <CAOMqctS9Y5FxpUCCJew6+cnjH5iTvbzkH3g-8yrXs4OuS2pSGA@mail.gmail.com>
+ <20150806090202.GO20873@sirena.org.uk>
+ <CAOMqctQZRZ4zG_yYy=CeX3DX4NVNWN1COP4Q-2YvMun9xYOA7g@mail.gmail.com>
+ <20150806102225.GI7576@n2100.arm.linux.org.uk>
+ <55C35233.2000105@ti.com>
+ <20150806135129.GJ7576@n2100.arm.linux.org.uk>
+ <CAMuHMdWWDwZ=ziGQXFCnOX8pErXpsEi533J73_Hh=sEqq4hR6Q@mail.gmail.com>
+Message-ID: <20150806213340.GK7576@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have introduced the bad_madt_entry() function, and that
-function is being invoked in acpi_table_parse_madt() for us, there
-is no longer any need to use the BAD_MADT_ENTRY macro.
+On Thu, Aug 06, 2015 at 06:14:00PM +0200, Geert Uytterhoeven wrote:
+> On Thu, Aug 6, 2015 at 3:51 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Thu, Aug 06, 2015 at 05:55:23PM +0530, Vignesh R wrote:
+> >> On the whole following are my requirements:
+> >> 1. to be able to communicate with non -flash SPI devices via config port
+> >> ( this functionality is supported by current driver, I dont want to
+> >> break it). Or pump any spi_message on to SPI bus directly.
+> >> 2. take advantage of memory mapped port in order to increase read
+> >> throughput( and use dma in future) when the slave is a m25p80 type flash.
+> >> 3. handle m25p80 as well as other slave on multiple chipselects.
+> >>
+> >> I just need to know whether the user that requested the transfer is
+> >> m25p80 driver. If yes, ti-qspi driver can take advantage of memory
+> >> mapped interface, else just use config port to access SPI bus directly.
+> >
+> > The problem with this approach is that it's an abomination.  It's adding
+> > a SPI-user specific hack which is detected by a specific driver.  That's
+> > really not sane - what happens when we have lots of these kinds of "I'm
+> > an X SPI-user" with drivers detecting that?  It's not maintainable in the
+> > long term.
+> >
+> > Yes, your requirements _today_ seem simple and easy, but you're only
+> > thinking about today, not tomorrow when you've moved on and someone else
+> > has to maintain the mess left behind (or delete it from mainline because
+> > they're sick of dealing with a hack.)
+> >
+> >> The spi_message that is received in transfer_one_message() is too
+> >> generic to imply the slave device that is on the other side of the wire.
+> >> IMO, the read command does not imply that the slave is m25p80 flash
+> >> (besides the read opcodes vary across vendors of m25p80 and across modes).
+> >
+> > I can see both sides of the argument.
+> >
+> > Mark is saying: if the SPI driver detects that the message to be transmitted
+> > is a read command followed by the appropriate number of dummy bytes, and
+> > then the data being read _and_ it's using quad-mode access, and the hardware
+> > generates _exactly_ that in hardware using the memory mapped mode, there is
+> > no reason _not_ to use the hardware to achieve that SPI transaction.  The
+> > bus activity will be identical to what happens when the SPI controller is
+> > used manually to achieve that bus sequence.
+> >
+> > You're saying: but the documentation says you can't use it for anything
+> > except m25p80.  If you look at 24.5.4.1.2, it tells you what the SFI
+> > generates on the bus, which is:
+> >
+> > 1. CS active
+> > 2. Read command byte sent
+> > 3. 1-4 address bytes sent
+> > 4. 0-3 dummy bytes sent
+> > 5. data bytes read from bus
+> > 6. CS inactive
+> >
+> > So, Mark's point is "if we can detect a transaction which fits _that_
+> > bus activity, there's no reason not to use this acceleration for the
+> > transaction."
+> >
+> > What you're failing to counter with is: we don't have enough information
+> > in the SPI driver to know how many dummy bytes there are between the
+> > address bytes and the data read from the bus.
+> 
+> Irrespective of the dummy bytes.
+> What if the spi device is not a FLASH ROM, but some other device,
+> which receives a data packet that accidentally looks like an m25p80 READ
+> command?
 
-Signed-off-by: Al Stone <al.stone@linaro.org>
-Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
-Cc: Len Brown <len.brown@intel.com>
-Cc: Pavel Machek <pavel@ucw.cz>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Ingo Molnar <mingo@redhat.com>
-Cc: H. Peter Anvin <hpa@zytor.com>
-Cc: x86 at kernel.org
----
- arch/x86/kernel/acpi/boot.c | 27 ---------------------------
- 1 file changed, 27 deletions(-)
+Well, for the most part it looks like it should still work, but there
+could be a gotcha, but first, let's get rid of a myth there.
 
-diff --git a/arch/x86/kernel/acpi/boot.c b/arch/x86/kernel/acpi/boot.c
-index e49ee24..9bdf786 100644
---- a/arch/x86/kernel/acpi/boot.c
-+++ b/arch/x86/kernel/acpi/boot.c
-@@ -194,9 +194,6 @@ acpi_parse_x2apic(struct acpi_subtable_header *header, const unsigned long end)
- 
- 	processor = (struct acpi_madt_local_x2apic *)header;
- 
--	if (BAD_MADT_ENTRY(processor, end))
--		return -EINVAL;
--
- 	acpi_table_print_madt_entry(header);
- 
- 	apic_id = processor->local_apic_id;
-@@ -227,9 +224,6 @@ acpi_parse_lapic(struct acpi_subtable_header * header, const unsigned long end)
- 
- 	processor = (struct acpi_madt_local_apic *)header;
- 
--	if (BAD_MADT_ENTRY(processor, end))
--		return -EINVAL;
--
- 	acpi_table_print_madt_entry(header);
- 
- 	/*
-@@ -252,9 +246,6 @@ acpi_parse_sapic(struct acpi_subtable_header *header, const unsigned long end)
- 
- 	processor = (struct acpi_madt_local_sapic *)header;
- 
--	if (BAD_MADT_ENTRY(processor, end))
--		return -EINVAL;
--
- 	acpi_table_print_madt_entry(header);
- 
- 	acpi_register_lapic((processor->id << 8) | processor->eid,/* APIC ID */
-@@ -271,9 +262,6 @@ acpi_parse_lapic_addr_ovr(struct acpi_subtable_header * header,
- 
- 	lapic_addr_ovr = (struct acpi_madt_local_apic_override *)header;
- 
--	if (BAD_MADT_ENTRY(lapic_addr_ovr, end))
--		return -EINVAL;
--
- 	acpi_lapic_addr = lapic_addr_ovr->address;
- 
- 	return 0;
-@@ -287,9 +275,6 @@ acpi_parse_x2apic_nmi(struct acpi_subtable_header *header,
- 
- 	x2apic_nmi = (struct acpi_madt_local_x2apic_nmi *)header;
- 
--	if (BAD_MADT_ENTRY(x2apic_nmi, end))
--		return -EINVAL;
--
- 	acpi_table_print_madt_entry(header);
- 
- 	if (x2apic_nmi->lint != 1)
-@@ -305,9 +290,6 @@ acpi_parse_lapic_nmi(struct acpi_subtable_header * header, const unsigned long e
- 
- 	lapic_nmi = (struct acpi_madt_local_apic_nmi *)header;
- 
--	if (BAD_MADT_ENTRY(lapic_nmi, end))
--		return -EINVAL;
--
- 	acpi_table_print_madt_entry(header);
- 
- 	if (lapic_nmi->lint != 1)
-@@ -411,9 +393,6 @@ acpi_parse_ioapic(struct acpi_subtable_header * header, const unsigned long end)
- 
- 	ioapic = (struct acpi_madt_io_apic *)header;
- 
--	if (BAD_MADT_ENTRY(ioapic, end))
--		return -EINVAL;
--
- 	acpi_table_print_madt_entry(header);
- 
- 	/* Statically assign IRQ numbers for IOAPICs hosting legacy IRQs */
-@@ -462,9 +441,6 @@ acpi_parse_int_src_ovr(struct acpi_subtable_header * header,
- 
- 	intsrc = (struct acpi_madt_interrupt_override *)header;
- 
--	if (BAD_MADT_ENTRY(intsrc, end))
--		return -EINVAL;
--
- 	acpi_table_print_madt_entry(header);
- 
- 	if (intsrc->source_irq == acpi_gbl_FADT.sci_interrupt) {
-@@ -503,9 +479,6 @@ acpi_parse_nmi_src(struct acpi_subtable_header * header, const unsigned long end
- 
- 	nmi_src = (struct acpi_madt_nmi_source *)header;
- 
--	if (BAD_MADT_ENTRY(nmi_src, end))
--		return -EINVAL;
--
- 	acpi_table_print_madt_entry(header);
- 
- 	/* TBD: Support nimsrc entries? */
+The QSPI is _not_ specific to the M25P80.  The manual says nothing
+about being specific to that device.  What it says is that it's for
+SPI NOR memory.  It will work with bus widths of 1, 2 or 4 data lines,
+so it probably works with non-M25P80 SPI NOR devices too - and the fact
+that the read and write commands are completely programmable suggests
+that using it with SPI NOR devices which do not use the M25P80 read
+command value is intended.
+
+
+The SFI is a state machine based translator which sits behind the SPI
+interface (look at the manual).  It sequence sthe SPI bus through a
+series of standard SPI states which happen to be the states I detailed
+above.
+
+Now, the first byte of the SFI-generated SPI message can be programmed
+to any 8 bit value.  So the first byte of the SPI message is totally
+under software control.  The next one to four bytes which comprise the
+"address" can be controlled to by deciding where in the memory map to
+start reading from.  Hence, the value of those bytes is also totally
+under software control.  The number of dummy bytes can be programmed
+too.  So far so good.
+
+So, if we know that we have a SPI message which says "send 0x01 0x20
+0x30, send one dummy byte, read 32 bytes", if we program the SFI to
+send a read command as 0x01, program an address length of 2 bytes
+with one dummy byte, and then read the next 32 bytes at the appropriate
+offset in the memory mapping to cause the next two bytes to be 0x20,
+0x30, then what we end up with on the bus is:
+
+	send 0x01, 0x20, 0x30
+	send one dummy byte
+
+That much is good, but now is the problem - how does the SFI know that
+we're going to require to read 32 bytes?  I think the answer to that
+is that it doesn't know, so it probably just reads the number of bytes
+which the access on the SoC bus is asking for, which makes it
+indeterminant from a software point of view to control how many bytes
+will be read without provoking another "send 0x01, next address, dummy
+byte" sequence.
+
+So, I'm now on the side of not parsing commands in the SPI driver, and
+back on the idea that this needs to be handled in some other manner
+which doesn't involve polluting the SPI core with flag-hacks.
+
 -- 
-2.4.3
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
