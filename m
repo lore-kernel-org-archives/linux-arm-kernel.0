@@ -1,38 +1,38 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 6 Aug 2015 12:06:00 +0100
-Subject: [Xen-devel] [PATCH v2 4/8] xen: Use the correctly the Xen memory
- terminologies
-In-Reply-To: <55C33E4E.4050704@citrix.com>
-References: <1438711972-18752-1-git-send-email-julien.grall@citrix.com>
- <1438711972-18752-5-git-send-email-julien.grall@citrix.com>
- <55C33E4E.4050704@citrix.com>
-Message-ID: <alpine.DEB.2.02.1508061205190.11337@kaball.uk.xensource.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Thu, 06 Aug 2015 13:10:55 +0200
+Subject: [PATCH v3 3/3] ARM: rockchip: enable PMU_GPIOINT_WAKEUP_EN when
+ entering shallow suspend
+In-Reply-To: <CAD=FV=W0L_0iM+15BAUfTA2ij5Ac90aVW9JZYyDhHMDNT2ZUMg@mail.gmail.com>
+References: <2128609.Kb18M8K28F@diego> <1544453.8uqOvAiDmD@diego>
+ <CAD=FV=W0L_0iM+15BAUfTA2ij5Ac90aVW9JZYyDhHMDNT2ZUMg@mail.gmail.com>
+Message-ID: <3564263.VnOXW7qXSg@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 6 Aug 2015, Julien Grall wrote:
-> Hi,
+Am Mittwoch, 5. August 2015, 18:55:52 schrieb Doug Anderson:
+> Heiko,
 > 
+> On Tue, Aug 4, 2015 at 3:51 PM, Heiko St?bner <heiko@sntech.de> wrote:
+> > PMU_GPIOINT_WAKEUP_EN seems needed when entering the shallow suspend
+> > (with logic staying on) but does not seem to be needed for the deep
+> > suspend for unknown reasons.
+> > Testing revealed that this setting really is necessary to reliably
+> > resume the veyron devices from suspend.
+> > 
+> > Reported-by: Chris Zhong <zyw@rock-chips.com>
+> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> > ---
+> > 
+> >  arch/arm/mach-rockchip/pm.c | 9 ++++++---
+> >  arch/arm/mach-rockchip/pm.h | 1 +
+> >  2 files changed, 7 insertions(+), 3 deletions(-)
 > 
-> On 04/08/15 19:12, Julien Grall wrote:
-> > diff --git a/include/xen/page.h b/include/xen/page.h
-> > index c5ed20b..e7e1425 100644
-> > --- a/include/xen/page.h
-> > +++ b/include/xen/page.h
-> > @@ -3,9 +3,9 @@
-> >  
-> >  #include <asm/xen/page.h>
-> >  
-> > -static inline unsigned long page_to_mfn(struct page *page)
-> > +static inline unsigned long page_to_gfn(struct page *page)
-> >  {
-> > -	return pfn_to_mfn(page_to_pfn(page));
-> > +	return pfn_to_gfn(page_to_pfn(page));
-> >  }
-> 
-> I've just noticed that there is a function gfn_to_page used for KVM.
-> 
-> Maybe I should rename page_to_gfn to xen_page_to_gfn to avoid confusion
-> with KVM one?
+> Very odd, but OK by me...
 
-Yeah, prepending xen would help to avoid namespace pollution.
+Hopefully we'll get an explaination from the ic-people soon-ish.
+
+
+> Hopefully we'll eventually end up being
+> able to use deep suspend on mainline.  That'd be nice, wouldn't it?
+
+hehe ... yep, one of the big remaining projects :-)
