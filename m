@@ -1,137 +1,170 @@
 From: rnayak@codeaurora.org (Rajendra Nayak)
-Date: Thu,  6 Aug 2015 16:07:44 +0530
-Subject: [PATCH v8 03/13] clk: qcom: gdsc: Add support for Memory RET/OFF
+Date: Thu,  6 Aug 2015 16:07:45 +0530
+Subject: [PATCH v8 04/13] clk: qcom: gdsc: Add support for ON only state
 In-Reply-To: <1438857474-20262-1-git-send-email-rnayak@codeaurora.org>
 References: <1438857474-20262-1-git-send-email-rnayak@codeaurora.org>
-Message-ID: <1438857474-20262-4-git-send-email-rnayak@codeaurora.org>
+Message-ID: <1438857474-20262-5-git-send-email-rnayak@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Along with the GDSC power switch, there is additional control
-to either retain all memory (core and peripheral) within a given
-powerdomain or to turn them off while the GDSC is powered down.
-Add support for these by modelling a RET state where all
-memory is retained and an OFF state where all memory gets turned
-off.
-The controls provided are granular enough to be able to support
-various differnt levels of RET states, like a 'shallow RET' with all memory
-retained and a 'deep RET' with some memory retained while some others
-are lost. The current patch does not support this and considers
-just one RET state where all memory is retained. Futher work, if
-needed can support multiple different levels of RET state.
+Certain devices can have GDSCs' which support ON as the only state.
+They can't be power collapsed to either hit RET or OFF.
+The clients drivers for these GDSCs' however would expect the state
+of the core to be reset following a GDSC disable and re-enable.
+To do this assert/deassert reset lines every time the client
+driver would request the GDSC to be powered on/off instead.
 
 Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
 ---
- drivers/clk/qcom/gdsc.c | 33 +++++++++++++++++++++++++++++++++
- drivers/clk/qcom/gdsc.h | 13 +++++++++++++
- 2 files changed, 46 insertions(+)
+ drivers/clk/qcom/common.c |  3 ++-
+ drivers/clk/qcom/gdsc.c   | 35 ++++++++++++++++++++++++++++++++++-
+ drivers/clk/qcom/gdsc.h   | 11 ++++++++++-
+ 3 files changed, 46 insertions(+), 3 deletions(-)
 
+diff --git a/drivers/clk/qcom/common.c b/drivers/clk/qcom/common.c
+index a319aa8..4bc87e1 100644
+--- a/drivers/clk/qcom/common.c
++++ b/drivers/clk/qcom/common.c
+@@ -124,7 +124,8 @@ int qcom_cc_really_probe(struct platform_device *pdev,
+ 		goto err_reset;
+ 
+ 	if (desc->gdscs && desc->num_gdscs) {
+-		ret = gdsc_register(dev, desc->gdscs, desc->num_gdscs, regmap);
++		ret = gdsc_register(dev, desc->gdscs, desc->num_gdscs,
++				    &reset->rcdev, regmap);
+ 		if (ret)
+ 			goto err_pd;
+ 	}
 diff --git a/drivers/clk/qcom/gdsc.c b/drivers/clk/qcom/gdsc.c
-index 469b4c4..e6bbb76 100644
+index e6bbb76..da9fad8 100644
 --- a/drivers/clk/qcom/gdsc.c
 +++ b/drivers/clk/qcom/gdsc.c
-@@ -34,6 +34,9 @@
- #define EN_FEW_WAIT_VAL		(0x8 << 16)
- #define CLK_DIS_WAIT_VAL	(0x2 << 12)
+@@ -18,6 +18,7 @@
+ #include <linux/kernel.h>
+ #include <linux/pm_domain.h>
+ #include <linux/regmap.h>
++#include <linux/reset-controller.h>
+ #include <linux/slab.h>
+ #include "gdsc.h"
  
-+#define RETAIN_MEM		BIT(14)
-+#define RETAIN_PERIPH		BIT(13)
-+
- #define TIMEOUT_US		100
- 
- #define domain_to_gdsc(domain) container_of(domain, struct gdsc, pd)
-@@ -81,6 +84,24 @@ static int gdsc_toggle_logic(struct gdsc *sc, bool en)
+@@ -84,6 +85,24 @@ static int gdsc_toggle_logic(struct gdsc *sc, bool en)
  	return -ETIMEDOUT;
  }
  
-+static inline void gdsc_force_mem_on(struct gdsc *sc)
++static inline int gdsc_deassert_reset(struct gdsc *sc)
 +{
 +	int i;
-+	u32 mask = RETAIN_MEM | RETAIN_PERIPH;
 +
-+	for (i = 0; i < sc->cxc_count; i++)
-+		regmap_update_bits(sc->regmap, sc->cxcs[i], mask, mask);
++	for (i = 0; i < sc->reset_count; i++)
++		sc->rcdev->ops->deassert(sc->rcdev, sc->resets[i]);
++	return 0;
 +}
 +
-+static inline void gdsc_clear_mem_on(struct gdsc *sc)
++static inline int gdsc_assert_reset(struct gdsc *sc)
 +{
 +	int i;
-+	u32 mask = RETAIN_MEM | RETAIN_PERIPH;
 +
-+	for (i = 0; i < sc->cxc_count; i++)
-+		regmap_update_bits(sc->regmap, sc->cxcs[i], mask, 0);
++	for (i = 0; i < sc->reset_count; i++)
++		sc->rcdev->ops->assert(sc->rcdev, sc->resets[i]);
++	return 0;
 +}
 +
- static int gdsc_enable(struct generic_pm_domain *domain)
+ static inline void gdsc_force_mem_on(struct gdsc *sc)
  {
+ 	int i;
+@@ -107,6 +126,9 @@ static int gdsc_enable(struct generic_pm_domain *domain)
  	struct gdsc *sc = domain_to_gdsc(domain);
-@@ -89,6 +110,10 @@ static int gdsc_enable(struct generic_pm_domain *domain)
+ 	int ret;
+ 
++	if (sc->pwrsts == PWRSTS_ON)
++		return gdsc_deassert_reset(sc);
++
  	ret = gdsc_toggle_logic(sc, true);
  	if (ret)
  		return ret;
-+
-+	if (sc->pwrsts & PWRSTS_OFF)
-+		gdsc_force_mem_on(sc);
-+
- 	/*
- 	 * If clocks to this power domain were already on, they will take an
- 	 * additional 4 clock cycles to re-enable after the power domain is
-@@ -105,6 +130,9 @@ static int gdsc_disable(struct generic_pm_domain *domain)
+@@ -130,6 +152,9 @@ static int gdsc_disable(struct generic_pm_domain *domain)
  {
  	struct gdsc *sc = domain_to_gdsc(domain);
  
-+	if (sc->pwrsts & PWRSTS_OFF)
-+		gdsc_clear_mem_on(sc);
++	if (sc->pwrsts == PWRSTS_ON)
++		return gdsc_assert_reset(sc);
 +
- 	return gdsc_toggle_logic(sc, false);
- }
+ 	if (sc->pwrsts & PWRSTS_OFF)
+ 		gdsc_clear_mem_on(sc);
  
-@@ -129,6 +157,11 @@ static int gdsc_init(struct gdsc *sc)
+@@ -153,6 +178,13 @@ static int gdsc_init(struct gdsc *sc)
+ 	if (ret)
+ 		return ret;
+ 
++	/* Force gdsc ON if only ON state is supported */
++	if (sc->pwrsts == PWRSTS_ON) {
++		ret = gdsc_toggle_logic(sc, true);
++		if (ret)
++			return ret;
++	}
++
+ 	on = gdsc_is_enabled(sc);
  	if (on < 0)
  		return on;
+@@ -170,7 +202,7 @@ static int gdsc_init(struct gdsc *sc)
+ }
  
-+	if (on || (sc->pwrsts & PWRSTS_RET))
-+		gdsc_force_mem_on(sc);
-+	else
-+		gdsc_clear_mem_on(sc);
-+
- 	sc->pd.power_off = gdsc_disable;
- 	sc->pd.power_on = gdsc_enable;
- 	pm_genpd_init(&sc->pd, NULL, !on);
+ int gdsc_register(struct device *dev, struct gdsc **scs, size_t num,
+-		  struct regmap *regmap)
++		  struct reset_controller_dev *rcdev, struct regmap *regmap)
+ {
+ 	int i, ret;
+ 	struct genpd_onecell_data *data;
+@@ -189,6 +221,7 @@ int gdsc_register(struct device *dev, struct gdsc **scs, size_t num,
+ 		if (!scs[i])
+ 			continue;
+ 		scs[i]->regmap = regmap;
++		scs[i]->rcdev = rcdev;
+ 		ret = gdsc_init(scs[i]);
+ 		if (ret)
+ 			return ret;
 diff --git a/drivers/clk/qcom/gdsc.h b/drivers/clk/qcom/gdsc.h
-index f578a0c..0ff251a 100644
+index 0ff251a..5ded268 100644
 --- a/drivers/clk/qcom/gdsc.h
 +++ b/drivers/clk/qcom/gdsc.h
-@@ -19,16 +19,29 @@
+@@ -18,6 +18,7 @@
+ #include <linux/pm_domain.h>
  
  struct regmap;
++struct reset_controller_dev;
  
-+/* Powerdomain allowable state bitfields */
-+#define PWRSTS_OFF		BIT(0)
-+#define PWRSTS_RET		BIT(1)
-+#define PWRSTS_ON		BIT(2)
-+#define PWRSTS_OFF_ON		(PWRSTS_OFF | PWRSTS_ON)
-+#define PWRSTS_RET_ON		(PWRSTS_RET | PWRSTS_ON)
-+
- /**
-  * struct gdsc - Globally Distributed Switch Controller
-  * @pd: generic power domain
-  * @regmap: regmap for MMIO accesses
-  * @gdscr: gsdc control register
-+ * @cxcs: offsets of branch registers to toggle mem/periph bits in
-+ * @cxc_count: number of @cxcs
-+ * @pwrsts: Possible powerdomain power states
+ /* Powerdomain allowable state bitfields */
+ #define PWRSTS_OFF		BIT(0)
+@@ -34,6 +35,9 @@ struct regmap;
+  * @cxcs: offsets of branch registers to toggle mem/periph bits in
+  * @cxc_count: number of @cxcs
+  * @pwrsts: Possible powerdomain power states
++ * @resets: ids of resets associated with this gdsc
++ * @reset_count: number of @resets
++ * @rcdev: reset controller
   */
  struct gdsc {
  	struct generic_pm_domain	pd;
- 	struct regmap			*regmap;
- 	unsigned int			gdscr;
-+	unsigned int			*cxcs;
-+	unsigned int			cxc_count;
-+	const u8			pwrsts;
+@@ -42,13 +46,18 @@ struct gdsc {
+ 	unsigned int			*cxcs;
+ 	unsigned int			cxc_count;
+ 	const u8			pwrsts;
++	struct reset_controller_dev	*rcdev;
++	unsigned int			*resets;
++	unsigned int			reset_count;
  };
  
  #ifdef CONFIG_QCOM_GDSC
+-int gdsc_register(struct device *, struct gdsc **, size_t n, struct regmap *);
++int gdsc_register(struct device *, struct gdsc **, size_t n,
++		  struct reset_controller_dev *, struct regmap *);
+ void gdsc_unregister(struct device *);
+ #else
+ static inline int gdsc_register(struct device *d, struct gdsc **g, size_t n,
++				struct reset_controller_dev *rcdev,
+ 				struct regmap *r)
+ {
+ 	return -ENOSYS;
 -- 
 QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
 of Code Aurora Forum, hosted by The Linux Foundation
