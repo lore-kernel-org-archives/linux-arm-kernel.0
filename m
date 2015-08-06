@@ -1,80 +1,70 @@
-From: jingoohan1@gmail.com (Jingoo Han)
-Date: Thu, 6 Aug 2015 23:51:24 +0900
-Subject: [PATCH v5 4/9] ARM/PCI: Remove msi_controller from struct
- pci_sys_data
-In-Reply-To: <20150804215420.9189.22914.stgit@bhelgaas-glaptop2.roam.corp.google.com>
-References: <20150804214234.9189.42548.stgit@bhelgaas-glaptop2.roam.corp.google.com>
- <20150804215420.9189.22914.stgit@bhelgaas-glaptop2.roam.corp.google.com>
-Message-ID: <000601d0d057$63c40fb0$2b4c2f10$@com>
+From: ykk@rock-chips.com (Yakir Yang)
+Date: Thu, 6 Aug 2015 22:57:34 +0800
+Subject: [RFC PATCH 3/8] drm: bridge: analogix_dp: split exynos dp driver
+ to bridge dir
+In-Reply-To: <000101d0d054$f34e9c70$d9ebd550$@com>
+References: <1438868947-22132-1-git-send-email-ykk@rock-chips.com>
+ <1438870763-23796-1-git-send-email-ykk@rock-chips.com>
+ <000101d0d054$f34e9c70$d9ebd550$@com>
+Message-ID: <55C375DE.5070001@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, August 05, 2015 6:54 AM, Bjorn Helgaas wrote:
-> 
-> From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> 
-> ARM now uses pci_bus->msi to store the msi_controller pointer, so we don't
-> need to save it in struct pci_sys_data, and we don't need to implement
-> pcibios_msi_controller() to get it out of pci_sys_data.
-> 
-> Remove msi_controller from struct pci_sys_data and
-> pcibios_msi_controller().
-> 
-> [bhelgaas: changelog, split into separate patch]
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+Jingoo,
 
-Reviewed-by: Jingoo Han <jingoohan1@gmail.com>
+? 2015/8/6 22:33, Jingoo Han ??:
+> On Thursday, August 06, 2015 11:19 PM, Yakir Yang wrote:
+>> Split the dp core driver from exynos directory to bridge
+>> directory, and rename the core driver to analogix_dp_*,
+>> leave the platform code to analogix_dp-exynos.
+>>
+>> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+>> ---
+>>   drivers/gpu/drm/bridge/Kconfig                     |    5 +
+>>   drivers/gpu/drm/bridge/Makefile                    |    1 +
+>>   .../exynos_dp_core.c => bridge/analogix_dp_core.c} |  751 +++++-------
+>>   drivers/gpu/drm/bridge/analogix_dp_core.h          |  286 +++++
+>>   drivers/gpu/drm/bridge/analogix_dp_reg.c           | 1266 ++++++++++++++++++++
+>>   .../exynos_dp_reg.h => bridge/analogix_dp_reg.h}   |  260 ++--
+>>   drivers/gpu/drm/exynos/Kconfig                     |    5 +-
+>>   drivers/gpu/drm/exynos/Makefile                    |    2 +-
+>>   drivers/gpu/drm/exynos/analogix_dp-exynos.c        |  240 ++++
+>>   drivers/gpu/drm/exynos/exynos_dp_core.h            |  283 -----
+>>   include/drm/bridge/analogix_dp.h                   |   22 +
+>>   11 files changed, 2287 insertions(+), 834 deletions(-)
+>>   rename drivers/gpu/drm/{exynos/exynos_dp_core.c => bridge/analogix_dp_core.c} (54%)
+>>   create mode 100644 drivers/gpu/drm/bridge/analogix_dp_core.h
+>>   create mode 100644 drivers/gpu/drm/bridge/analogix_dp_reg.c
+>>   rename drivers/gpu/drm/{exynos/exynos_dp_reg.h => bridge/analogix_dp_reg.h} (63%)
+>>   create mode 100644 drivers/gpu/drm/exynos/analogix_dp-exynos.c
+>>   delete mode 100644 drivers/gpu/drm/exynos/exynos_dp_core.h
+>>   create mode 100644 include/drm/bridge/analogix_dp.h
+>>
+>> [...]
+>> rename from drivers/gpu/drm/exynos/exynos_dp_core.c
+>> rename to drivers/gpu/drm/bridge/analogix_dp_core.c
+>> index aa99e23..28724d4 100644
+>> --- a/drivers/gpu/drm/exynos/exynos_dp_core.c
+>> +++ b/drivers/gpu/drm/bridge/analogix_dp_core.c
+>> @@ -1,7 +1,8 @@
+>>   /*
+>> - * Samsung SoC DP (Display Port) interface driver.
+>> + * Analogix Core DP (Display Port) interface driver.
+>>    *
+>>    * Copyright (C) 2012 Samsung Electronics Co., Ltd.
+>> + * Copyright (C) FuZhou Rockchip Electronics Co., Ltd.
+> What is the reason to add this copyright?
+> You just replace 'exynos' prefix with 'analogix' prefix.
+> I cannot find the reason to add the copyright.
+>
 
-Best regards,
-Jingoo Han
+Oh! Thanks for your point out, sorry for this one
 
-> ---
->  arch/arm/include/asm/mach/pci.h |    3 ---
->  arch/arm/kernel/bios32.c        |   12 ------------
->  2 files changed, 15 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/mach/pci.h b/arch/arm/include/asm/mach/pci.h
-> index c074e7a..8857d28 100644
-> --- a/arch/arm/include/asm/mach/pci.h
-> +++ b/arch/arm/include/asm/mach/pci.h
-> @@ -40,9 +40,6 @@ struct hw_pci {
->   * Per-controller structure
->   */
->  struct pci_sys_data {
-> -#ifdef CONFIG_PCI_MSI
-> -	struct msi_controller *msi_ctrl;
-> -#endif
->  	struct list_head node;
->  	int		busnr;		/* primary bus number			*/
->  	u64		mem_offset;	/* bus->cpu memory mapping offset	*/
-> diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-> index 283bc1c..874e182 100644
-> --- a/arch/arm/kernel/bios32.c
-> +++ b/arch/arm/kernel/bios32.c
-> @@ -18,15 +18,6 @@
-> 
->  static int debug_pci;
-> 
-> -#ifdef CONFIG_PCI_MSI
-> -struct msi_controller *pcibios_msi_controller(struct pci_dev *dev)
-> -{
-> -	struct pci_sys_data *sysdata = dev->bus->sysdata;
-> -
-> -	return sysdata->msi_ctrl;
-> -}
-> -#endif
-> -
->  /*
->   * We can't use pci_get_device() here since we are
->   * called from interrupt context.
-> @@ -462,9 +453,6 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
->  		if (WARN(!sys, "PCI: unable to allocate sys data!"))
->  			break;
-> 
-> -#ifdef CONFIG_PCI_MSI
-> -		sys->msi_ctrl = hw->msi_ctrl;
-> -#endif
->  		sys->busnr   = busnr;
->  		sys->swizzle = hw->swizzle;
->  		sys->map_irq = hw->map_irq;
+- Yakir
+>>    *
+>> --
+>> 2.1.2
+>
+>
+>
+>
