@@ -1,47 +1,45 @@
-From: maitysanchayan@gmail.com (Sanchayan Maity)
-Date: Thu,  6 Aug 2015 20:57:30 +0530
-Subject: [PATCH v7 4/4] nvmem: Add DT binding documentation for Vybrid OCOTP
- driver
-In-Reply-To: <cover.1438874125.git.maitysanchayan@gmail.com>
-References: <cover.1438874125.git.maitysanchayan@gmail.com>
-Message-ID: <3713643bb44c39c2126edca2916e1c1aa43eabf8.1438874125.git.maitysanchayan@gmail.com>
+From: julien.grall@citrix.com (Julien Grall)
+Date: Thu, 6 Aug 2015 16:43:15 +0100
+Subject: [Xen-devel] [PATCH v2 13/20] xen/events: fifo: Make it running
+ on 64KB granularity
+In-Reply-To: <55B21527.4010601@citrix.com>
+References: <1436474552-31789-1-git-send-email-julien.grall@citrix.com>
+ <1436474552-31789-14-git-send-email-julien.grall@citrix.com>
+ <55B21527.4010601@citrix.com>
+Message-ID: <55C38093.8080609@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the devicetree bindings for the Freescale Vybrid On-Chip
-OTP driver.
+Hi David,
 
-Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
----
- .../devicetree/bindings/nvmem/vf610-ocotp.txt        | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/nvmem/vf610-ocotp.txt
+On 24/07/15 11:36, David Vrabel wrote:
+> On 09/07/15 21:42, Julien Grall wrote:
+>> Only use the first 4KB of the page to store the events channel info. It
+>> means that we will wast 60KB every time we allocate page for:
+>>      * control block: a page is allocating per CPU
+>>      * event array: a page is allocating everytime we need to expand it
+> 
+> Reviewed-by: David Vrabel <david.vrabel@citrix.com>
 
-diff --git a/Documentation/devicetree/bindings/nvmem/vf610-ocotp.txt b/Documentation/devicetree/bindings/nvmem/vf610-ocotp.txt
-new file mode 100644
-index 0000000..5556810
---- /dev/null
-+++ b/Documentation/devicetree/bindings/nvmem/vf610-ocotp.txt
-@@ -0,0 +1,20 @@
-+On-Chip OTP Memory for Freescale Vybrid
-+
-+Required Properties:
-+  compatible:
-+  - "fsl,vf610-ocotp" for VF5xx/VF6xx
-+  #address-cells : Should be 1
-+  #size-cells : Should be 1
-+  reg : Address and length of OTP controller registers
-+
-+Example for Vybrid VF5xx/VF6xx:
-+
-+	ocotp: ocotp at 400a5000 {
-+		compatible = "fsl,vf610-ocotp";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		reg = <0x400a5000 0xD00>;
-+		clocks = <&clks VF610_CLK_OCOTP>;
-+		clock-names = "ocotp";
-+	};
-+
+Thank you!
+
+>>
+>> I think we can reduce the memory waste for the 2 areas by:
+>>
+>>     * control block: sharing between multiple vCPUs. Although it will
+>>     require some bookkeeping in order to not free the page when the CPU
+>>     goes offline and the other CPUs sharing the page still there
+>>
+>>     * event array: always extend the array event by 64K (i.e 16 4K
+>>     chunk). That would require more care when we fail to expand the
+>>     event channel.
+> 
+> I would extend it by 4 KiB each time but only allocate a new page every
+> 16 times.  This minimizes the resources used in Xen.
+
+I will keep it in mind when I will send a patch to reduce memory waster.
+
+Regards,
+
 -- 
-2.5.0
+Julien Grall
