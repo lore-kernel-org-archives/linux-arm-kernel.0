@@ -1,49 +1,34 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Thu, 6 Aug 2015 18:15:46 +0800
-Subject: [PATCH v6 0/2] add a new driver to support SAMA5D4 watchdog timer
-Message-ID: <1438856146-2459-1-git-send-email-wenyou.yang@atmel.com>
+From: rnayak@codeaurora.org (Rajendra Nayak)
+Date: Thu, 06 Aug 2015 16:01:45 +0530
+Subject: [PATCH v7 12/13] clk: qcom: gdsc: Add GDSCs in apq8084 MMCC
+In-Reply-To: <55BB8C40.507@mm-sol.com>
+References: <1438076046-4706-1-git-send-email-rnayak@codeaurora.org>
+ <1438076046-4706-13-git-send-email-rnayak@codeaurora.org>
+ <55BB8C40.507@mm-sol.com>
+Message-ID: <55C33791.6010506@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-Because the watchdog WDT_MR register can be written more than once,
-its work mechanism is different from the at91sam9260 watchdog driver.
-Open the device file to enable the watchdog hardware, close to disable it,
-and ping it from the user space directly to keep it alive.
-
-Changes from v5.0
- 1./ Add the commas back in after last member for structure variables,
-     sama5d4_wdt_info and sama5d4_wdt_ops.
-
-Changes from v4.0
- 1./ Fix interrupt register function flags argument.
- 2./ Replace the tabs after #define with spaces.
-
-Changes from v3.0
- 1./ Change the driver name to 'sama5d4_wdt' for more acceptable.
- 2./ Change the prefix of function name and struct name
-     from 'atmel_' to 'sama5d4_', and others.
-
-Changes from v2.0
- 1./ Use a specific driver name, at91_sama5d4_wdt.c.
- 2./ Remove '-' at the end of macro name and unnecessary check.
- 3./ Use alphabetic order for include files.
 
 
-Wenyou Yang (2):
-  drivers: watchdog: add a driver to support SAMA5D4 watchdog timer
-  Documentation: dt: binding: atmel-sama5d4-wdt: for SAMA5D4 watchdog
-    driver
+On 07/31/2015 08:24 PM, Stanimir Varbanov wrote:
+>
+> <snip>
+>
+>>
+>> +static struct gdsc venus0_gdsc = {
+>> +	.gdscr = 0x1024,
+>> +	.pd = {
+>> +		.name = "venus0",
+>> +	},
+>> +	.pwrsts = PWRSTS_OFF_ON,
+>> +	.con_ids = { NULL },
+>> +};
+>> +
+>
+> Rajendra, according to downstream kernel apq8084 has second instance of
+> gdsc i.e. venus1_gdsc, is that correct?
 
- .../bindings/watchdog/atmel-sama5d4-wdt.txt        |   35 +++
- drivers/watchdog/Kconfig                           |    9 +
- drivers/watchdog/Makefile                          |    1 +
- drivers/watchdog/at91sam9_wdt.h                    |    2 +
- drivers/watchdog/sama5d4_wdt.c                     |  280 ++++++++++++++++++++
- 5 files changed, 327 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/watchdog/atmel-sama5d4-wdt.txt
- create mode 100644 drivers/watchdog/sama5d4_wdt.c
-
--- 
-1.7.9.5
+Stan, it does seem like there are 3 instances of venus gdscs', venus0,
+venus0_core0 and venus0_core1. I will add the missing ones when I
+repost,thanks.
