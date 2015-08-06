@@ -1,56 +1,60 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 06 Aug 2015 17:31:24 +0100
-Subject: [PATCH V2] iommu/arm-smmu-v2: ThunderX mis-extends 64bit registers
-In-Reply-To: <20150806161625.GJ25483@arm.com>
-References: <1438793668-15597-1-git-send-email-tchalamarla@caviumnetworks.com>
- <20150806161625.GJ25483@arm.com>
-Message-ID: <55C38BDC.4030304@arm.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Thu, 06 Aug 2015 18:33:55 +0200
+Subject: [PATCH 1/3] nvmem: Add i.MX6 OCOTP device tree binding
+ documentation
+In-Reply-To: <55C38752.3040406@linaro.org>
+References: <1438693342-605-1-git-send-email-p.zabel@pengutronix.de>
+ <55C38752.3040406@linaro.org>
+Message-ID: <1438878835.3223.14.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/08/15 17:16, Will Deacon wrote:
-> Hi Tirumalesh,
->
-> I think this looks pretty good now, just one small comment below.
->
-> On Wed, Aug 05, 2015 at 05:54:28PM +0100, Tirumalesh Chalamarla wrote:
-[...]
->> -#define TTBRn_HI_ASID_SHIFT            16
->> +#define TTBRn_ASID_SHIFT		48
->>
->>   #define FSR_MULTI			(1 << 31)
->>   #define FSR_SS				(1 << 30)
->> @@ -762,22 +774,17 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
->>
->>   	/* TTBRs */
->>   	if (stage1) {
->> -		reg = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[0];
->> -		writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR0_LO);
->> -		reg = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[0] >> 32;
->> -		reg |= ARM_SMMU_CB_ASID(cfg) << TTBRn_HI_ASID_SHIFT;
->> -		writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR0_HI);
->> -
->> -		reg = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[1];
->> -		writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR1_LO);
->> -		reg = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[1] >> 32;
->> -		reg |= ARM_SMMU_CB_ASID(cfg) << TTBRn_HI_ASID_SHIFT;
->> -		writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR1_HI);
->> +		u64 reg64 = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[0];
->
-> Can we move this declaration to the start of the function along with
-> u32 reg, please? It's used in both cases of the if/else block so it
-> might be a tad cleaner.
+Am Donnerstag, den 06.08.2015, 17:12 +0100 schrieb Srinivas Kandagatla:
+> 
+> On 04/08/15 14:02, Philipp Zabel wrote:
+> > This patch documents the i.MX6 OCOTP device tree binding.
+> >
+> > Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> > ---
+> >   .../devicetree/bindings/nvmem/imx-ocotp.txt          | 20 ++++++++++++++++++++
+> >   1 file changed, 20 insertions(+)
+> >   create mode 100644 Documentation/devicetree/bindings/nvmem/imx-ocotp.txt
+> >
+> > diff --git a/Documentation/devicetree/bindings/nvmem/imx-ocotp.txt b/Documentation/devicetree/bindings/nvmem/imx-ocotp.txt
+> > new file mode 100644
+> > index 0000000..7d9a3fc
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/nvmem/imx-ocotp.txt
+> > @@ -0,0 +1,20 @@
+> > +Freescale i.MX6 On-Chip OTP Controller (OCOTP) device tree bindings
+> > +
+> > +This binding represents the on-chip eFuse OTP controller found on
+> > +i.MX6Q/D, i.MX6DL/S, i.MX6SL, and i.MX6SX SoCs.
+> > +
+> > +Required properties:
+> > +- compatible: should be one of
+> > +	"fsl,imx6q-ocotp" (i.MX6Q/D/DL/S),
+> > +        "fsl,imx6sl-ocotp" (i.MX6SL), or
+> > +	"fsl,imx6sx-ocotp" (i.MX6SX), followed by "syscon".
+> > +- reg: Should contain the register base and length.
+> > +- clocks: Should contain a phandle pointing to the gated peripheral clock.
+> > +
+> > +Example:
+> > +
+> > +	ocotp: ocotp at 021bc000 {
+> > +		compatible = "fsl,imx6q-ocotp", "syscon";
+> Do you still need syscon?
 
-We could also drop the _LO suffix from the relevant #defines (so they 
-match the architectural names) and remove the now-unused _HI versions 
-entirely.
+Currently the imx_tempmon driver still accesses ocotp via syscon. I'd
+like to change that and drop "syscon" after the nvmem framework lands in
+mainline.
 
-Robin.
+> > +		reg = <0x021bc000 0x4000>;
+> Can't we just have a register range specific to the OTP device?
 
->
-> Will
-> _______________________________________________
-> iommu mailing list
-> iommu at lists.linux-foundation.org
-> https://lists.linuxfoundation.org/mailman/listinfo/iommu
->
+In the i.MX device trees it is common to specify the register range from
+the memory map. In any case, we have to support old device trees where
+this is already set.
+
+regards
+Philipp
