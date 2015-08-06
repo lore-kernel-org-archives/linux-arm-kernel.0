@@ -1,25 +1,47 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 6 Aug 2015 18:34:24 +0200
-Subject: [PATCH v3] ARM: dts: Convert Linkstation Mini to Device Tree
-In-Reply-To: <1438878592.15635.89.camel@dolka.fr>
-References: <1438878592.15635.89.camel@dolka.fr>
-Message-ID: <20150806163424.GH13421@lunn.ch>
+From: lftan.linux@gmail.com (Ley Foon Tan)
+Date: Fri, 7 Aug 2015 00:41:53 +0800
+Subject: [PATCH v5 9/9] PCI: xgene: Use pci_scan_root_bus_msi()
+In-Reply-To: <55C37C92.1020509@arm.com>
+References: <20150804214234.9189.42548.stgit@bhelgaas-glaptop2.roam.corp.google.com>
+ <20150804215457.9189.27595.stgit@bhelgaas-glaptop2.roam.corp.google.com>
+ <55C37C92.1020509@arm.com>
+Message-ID: <CAFiDJ58U9u0YOzqVbty8+z+sF82h=F09Y0q-Ks8zMDokdiSEbg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 06, 2015 at 06:29:52PM +0200, Benjamin Cama wrote:
-> The title says it all. The name of the dts file as been changed to
-> better reflect the manufacturer's device name (LS-WSGL), rather than
-> the original "lsmini", which exists in a kirkwood version too.
-> 
-> Signed-off-by: Benjamin Cama <benoar@dolka.fr>
+On Thu, Aug 6, 2015 at 11:26 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> Hi Bjorn,
+>
+> On 04/08/15 22:54, Bjorn Helgaas wrote:
+>> Previously there was no way to specify the MSI controller when creating a
+>> new PCI root bus, so we had to create the bus, set its MSI controller, then
+>> scan the bus.  With the new pci_scan_root_bus_msi() interface, we can
+>> specify the MSI controller up front and get rid of that intermediate step.
+>>
+>> Look up the MSI controller first, then use pci_scan_root_bus_msi() to
+>> create and scan the root PCI bus.
+>
+> I'm wondering about these XGene patches.
+>
+> With the code that is queued for v4.3 in tip/irq/core, the X-Gene MSI
+> driver doesn't export a struct msi_controller anymore, and entirely
+> relies on IRQ domains to identify to be matched with the actual PCI driver.
+>
+> Do you intend this as a cleanup until everything lands in mainline? At
+> that point, we'd be able to remove all traces of struct msi_controller
+> from this driver.
+>
+> Alternatively, we could ask tglx to add an extra patch to the existing
+> queue in order to clean up pci-xgene.c (nuking the whole
+> xgene_pcie_msi_enable function).
+>
+> Thoughts?
 
-Hi Benjamin
+In pcie-altera driver, it uses pci_scan_root_bus() and it doesn't call
+to of_pci_find_msi_chip_by_node() to retrieve msi_controller struct as
+well.
+But, the msi domain stuff is still working. Should I change it to
+pci_scan_root_bus_msi()?
 
-It would be normal to add the various Acked-by: here, both Alexey and
-mine. It is not an issue, Gregory can add them, when he adds is own.
-I'm just mentioning it for any future patches you might submit.
-
-Thanks for the good work converting this,
-
-       Andrew
+Regards
+Ley Foon
