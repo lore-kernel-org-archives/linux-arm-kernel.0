@@ -1,49 +1,57 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 5 Aug 2015 23:29:23 -0700
-Subject: [PATCH v2 1/3] mailbox/omap: Add ti, mbox-send-noirq quirk to fix
- AM33xx CPU Idle
-In-Reply-To: <55C22C8E.3000506@ti.com>
-References: <1437166592-25378-1-git-send-email-d-gerlach@ti.com>
- <1437166592-25378-2-git-send-email-d-gerlach@ti.com>
- <20150805102840.GA16878@atomide.com> <55C22C8E.3000506@ti.com>
-Message-ID: <20150806062923.GN16878@atomide.com>
+Date: Wed, 5 Aug 2015 23:48:21 -0700
+Subject: [PATCH 00/11] omap_hsmmc: voltage switching and tuning
+In-Reply-To: <55C22524.5050304@ti.com>
+References: <1438242394-25599-1-git-send-email-kishon@ti.com>
+ <20150805104355.GE16878@atomide.com> <55C22524.5050304@ti.com>
+Message-ID: <20150806064821.GO16878@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Suman Anna <s-anna@ti.com> [150805 08:35]:
-> Hi Tony,
+* Kishon Vijay Abraham I <kishon@ti.com> [150805 08:03]:
+> Hi,
 > 
-> On 08/05/2015 05:28 AM, Tony Lindgren wrote:
-> > * Dave Gerlach <d-gerlach@ti.com> [150717 13:59]:
-> >> --- a/Documentation/devicetree/bindings/mailbox/omap-mailbox.txt
-> >> +++ b/Documentation/devicetree/bindings/mailbox/omap-mailbox.txt
-> >> @@ -75,6 +75,14 @@ data that represent the following:
-> >>      Cell #3 (usr_id)  - mailbox user id for identifying the interrupt line
-> >>                          associated with generating a tx/rx fifo interrupt.
-> >>  
-> >> +Optional Properties:
-> >> +--------------------
-> >> +- ti,mbox-send-noirq:   Quirk flag to allow the client user of this sub-mailbox
-> >> +                        to send messages without triggering a Tx ready interrupt,
-> >> +                        and to control the Tx ticker. Should be used only on
-> >> +                        sub-mailboxes used to communicate with WkupM3 remote
-> >> +                        processor on AM33xx/AM43xx SoCs.
-> >> +
+> On Wednesday 05 August 2015 04:13 PM, Tony Lindgren wrote:
+> > * Kishon Vijay Abraham I <kishon@ti.com> [150730 00:49]:
+> >> Patch series implements voltage switching and tuning for omap_hsmmc
+> >> driver.
+> >>
+> >> Did basic read/write test in J6, J6 Eco, Beagle-x15, AM437x EVM,
+> >> Beaglebone black, OMAP5 uEVM and OMAP4 PANDA.
 > > 
-> > Hmm can't you do this just by setting a flag in the device driver
-> > based on the compatible string?
+> > Your tests are missing omap3?
 > 
-> We can't because there can be other users like PRUSS which will use a
-> sub-mailbox in a regular fashion. The compatible serves the IP and there
-> can be multiple sub-mailboxes underneath it, and this quirk is needed
-> only on the one that's used by the WkupM3.
+> I don't have one at my disposal :-( I'll try to find one and add omap3 tests.
 
-OK
+Great :) Beagle xm is a good one to test the USB PHY stuff on
+and also MMC. Having USB cable connected or EHCI loaded blocks the PM
+though, so NFSroot is not very usable for testing on it.
 
-> Do you have any comments on this?
+If you want to test PM over NFSroot, boards with the smsc911x known
+to work with PM  are at least omap3-evm-37xx.dts and
+logicpd-torpedo-37xx-devkit.dts.  Since you tinker with the USB PHYs,
+torpedo has MUSB working the same way as the beagle boards, EVM I
+think can be modified that way but by default has diffent PHY.
 
-Up to you guys then to figure out what property is used for it then.
+Also overo tobi boards work with PM but only for retntion idle and
+not off idle, and map3-sbc-t3517.dts probably can be made to work
+with PM but I have mine as a gateway and have not been able to test
+with it.
 
-Regards,
+Probably also zoom3 boards with later processor boards can be made
+to work, the LDP has early omap34xx variants and can't be made to
+work reliably.
+
+I don't have omap3-lilly, but I'd assume that can also be made
+to work with PM if not already working.
+
+> > I suggest you add some omap3 tests in general as otherwise you are
+> > only testing a subset of the driver features and completely missing
+> > things like rutnime PM and save and restore for the deeper idle
+> > states.
+> 
+> yeah, I'll do those tests and re-post the series.
+
+Thanks!
 
 Tony
