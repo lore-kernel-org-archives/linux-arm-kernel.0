@@ -1,253 +1,641 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 06 Aug 2015 17:29:17 +0100
-Subject: [PATCH v4 02/10] ACPI / irqchip: Add self-probe infrastructure
- to initialize IRQ controller
-In-Reply-To: <55C20E9A.7000906@linaro.org>
-References: <1438164539-29256-1-git-send-email-hanjun.guo@linaro.org>
- <1438164539-29256-3-git-send-email-hanjun.guo@linaro.org>
- <55C0AFA2.8050704@arm.com> <55C20E9A.7000906@linaro.org>
-Message-ID: <55C38B5D.9090407@arm.com>
+From: benoar@dolka.fr (Benjamin Cama)
+Date: Thu, 06 Aug 2015 18:29:52 +0200
+Subject: [PATCH v3] ARM: dts: Convert Linkstation Mini to Device Tree
+Message-ID: <1438878592.15635.89.camel@dolka.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/08/15 14:24, Hanjun Guo wrote:
-> Hi Marc,
-> 
-> On 08/04/2015 08:27 PM, Marc Zyngier wrote:
->> On 29/07/15 11:08, Hanjun Guo wrote:
->>> This self-probe infrastructure works in the similar way as OF,
->>> but there is some different in the mechanism:
->>>
->>> For DT, the init fn will be called once it finds compatible strings
->>> in DT,  but for ACPI, we init irqchips by static tables, and in
->>> static ACPI tables, there are no compatible strings to indicate
->>> irqchips, but thanks to the GIC version presented in ACPI table,
->>> we can call the corresponding GIC drivers matching the GIC version
->>> with this framework.
->>>
->>> This mechanism can also be used for clock declare and may also works
->>> on x86 for some table parsing too.
->>>
->>> This patch is based on Tomasz Nowicki <tomasz.nowicki@linaro.org>'s
->>> work.
->>>
->>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->>> ---
->>>   drivers/irqchip/irq-gic-acpi.c    | 33 +++++++++++++++++++++++++++++++++
->>>   include/asm-generic/vmlinux.lds.h | 13 +++++++++++++
->>>   include/linux/acpi.h              | 16 ++++++++++++++++
->>>   include/linux/irqchip.h           | 13 +++++++++++++
->>>   include/linux/mod_devicetable.h   |  8 ++++++++
->>>   5 files changed, 83 insertions(+)
->>>
->>> diff --git a/drivers/irqchip/irq-gic-acpi.c b/drivers/irqchip/irq-gic-acpi.c
->>> index 6537b43..011468d 100644
->>> --- a/drivers/irqchip/irq-gic-acpi.c
->>> +++ b/drivers/irqchip/irq-gic-acpi.c
->>> @@ -107,3 +107,36 @@ static int __init acpi_gic_version_init(void)
->>>
->>>   	return 0;
->>>   }
->>> +
->>> +/*
->>> + * This special acpi_table_id is the sentinel at the end of the
->>> + * acpi_table_id[] array of all irqchips. It is automatically placed at
->>> + * the end of the array by the linker, thanks to being part of a
->>> + * special section.
->>> + */
->>> +static const struct acpi_table_id
->>> +irqchip_acpi_match_end __used __section(__irqchip_acpi_table_end);
->>
->> What is this thing for? Nobody refers to it (I know
->> drivers/irqchip/irqchip.c has a similar thing, but that's not enough a
->> reason...).
-> 
-> If I'm not mistaken, this is for proper section termination, please
-> see below:
-> 
-> /* scan the irqchip table to match the GIC version and its driver */
-> for (id = __irqchip_acpi_table; id->id[0]; id++) {
-> ...
-> }
-> 
-> Then irqchip_acpi_match_end will be the end of the table section,
-> which will terminate the scanning.
+The title says it all. The name of the dts file as been changed to
+better reflect the manufacturer's device name (LS-WSGL), rather than
+the original "lsmini", which exists in a kirkwood version too.
 
-Yeah, I got that bit, but I didn't realized this was getting pulled into
-the section. It's probably fine then.
+Signed-off-by: Benjamin Cama <benoar@dolka.fr>
+---
+Since v2, I re-ordered the dts in the Makefile, and removed the
+makefile rule for the old .c file.
 
->>
->>> +
->>> +extern struct acpi_table_id __irqchip_acpi_table[];
->>> +
->>> +void __init acpi_irqchip_init(void)
->>> +{
->>> +	struct acpi_table_id *id;
->>> +
->>> +	if (acpi_disabled)
->>> +		return;
->>> +
->>> +	if (acpi_gic_version_init())
->>> +		return;
->>
->> This is the only place where we need the version, right? So just get
->> acpi_gic_version_init to return the version number, and loose the global
->> variable.
-> 
-> The global variable is still needed because we need to get the GIC
-> version when scanning the MADT tables, we can't return the table value
-> directly in acpi_table_parse_madt() at now.
-> 
->>
->>> +
->>> +	/* scan the irqchip table to match the GIC version and its driver */
->>> +	for (id = __irqchip_acpi_table; id->id[0]; id++) {
->>> +		if (gic_version == (u8)id->driver_data) {
->>> +			acpi_table_parse(id->id,
->>> +					 (acpi_tbl_table_handler)id->handler);
->>> +			return;
->>> +		}
->>> +	}
->>> +
->>> +	pr_err("No matched driver GIC version %d\n", gic_version);
->>> +}
->>> diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
->>> index 8bd374d..625776c 100644
->>> --- a/include/asm-generic/vmlinux.lds.h
->>> +++ b/include/asm-generic/vmlinux.lds.h
->>> @@ -181,6 +181,18 @@
->>>   #define CPUIDLE_METHOD_OF_TABLES() OF_TABLE(CONFIG_CPU_IDLE, cpuidle_method)
->>>   #define EARLYCON_OF_TABLES()	OF_TABLE(CONFIG_SERIAL_EARLYCON, earlycon)
->>>
->>> +#ifdef CONFIG_ACPI
->>> +#define ACPI_TABLE(name)						\
->>> +	. = ALIGN(8);							\
->>> +	VMLINUX_SYMBOL(__##name##_acpi_table) = .;			\
->>> +	*(__##name##_acpi_table)					\
->>> +	*(__##name##_acpi_table_end)
->>> +
->>> +#define IRQCHIP_ACPI_MATCH_TABLE()	ACPI_TABLE(irqchip)
->>> +#else
->>> +#define IRQCHIP_ACPI_MATCH_TABLE()
->>> +#endif
->>> +
->>>   #define KERNEL_DTB()							\
->>>   	STRUCT_ALIGN();							\
->>>   	VMLINUX_SYMBOL(__dtb_start) = .;				\
->>> @@ -516,6 +528,7 @@
->>>   	CPUIDLE_METHOD_OF_TABLES()					\
->>>   	KERNEL_DTB()							\
->>>   	IRQCHIP_OF_MATCH_TABLE()					\
->>> +	IRQCHIP_ACPI_MATCH_TABLE()					\
->>>   	EARLYCON_TABLE()						\
->>>   	EARLYCON_OF_TABLES()
->>>
->>> diff --git a/include/linux/acpi.h b/include/linux/acpi.h
->>> index 0820cb1..04dd0bb 100644
->>> --- a/include/linux/acpi.h
->>> +++ b/include/linux/acpi.h
->>> @@ -829,4 +829,20 @@ static inline struct acpi_device *acpi_get_next_child(struct device *dev,
->>>
->>>   #endif
->>>
->>> +#ifdef CONFIG_ACPI
->>> +#define ACPI_DECLARE(table, name, table_id, data, fn)			\
->>> +	static const struct acpi_table_id __acpi_table_##name		\
->>> +		__used __section(__##table##_acpi_table)		\
->>> +		 = { .id = table_id,					\
->>> +		     .handler = (void *)fn,				\
->>> +		     .driver_data = data }
->>> +#else
->>> +#define ACPI_DECLARE(table, name, table_id, data, fn)			\
->>> +	static const struct acpi_table_id __acpi_table_##name		\
->>> +		__attribute__((unused))					\
->>> +		 = { .id = table_id,					\
->>> +		     .handler = (void *)fn,				\
->>> +		     .driver_data = data }
->>> +#endif
->>> +
->>>   #endif	/*_LINUX_ACPI_H*/
->>> diff --git a/include/linux/irqchip.h b/include/linux/irqchip.h
->>> index 6388873..6b66d3e 100644
->>> --- a/include/linux/irqchip.h
->>> +++ b/include/linux/irqchip.h
->>> @@ -11,6 +11,7 @@
->>>   #ifndef _LINUX_IRQCHIP_H
->>>   #define _LINUX_IRQCHIP_H
->>>
->>> +#include <linux/acpi.h>
->>>   #include <linux/of.h>
->>>
->>>   /*
->>> @@ -25,6 +26,18 @@
->>>    */
->>>   #define IRQCHIP_DECLARE(name, compat, fn) OF_DECLARE_2(irqchip, name, compat, fn)
->>>
->>> +/*
->>> + * This macro must be used by the different ARM GIC drivers to declare
->>> + * the association between their version and their initialization function.
->>> + *
->>> + * @name: name that must be unique accross all IRQCHIP_ACPI_DECLARE of the
->>> + * same file.
->>> + * @gic_version: version of GIC
->>> + * @fn: initialization function
->>> + */
->>> +#define IRQCHIP_ACPI_DECLARE(name, gic_version, fn)	\
->>> +	ACPI_DECLARE(irqchip, name, ACPI_SIG_MADT, gic_version, fn)
->>
->> I don't think this is the right approach. The MADT table has a *huge*
->> number of possible subtables, and none of them is matched by the GIC
->> version.
->>
->> What you *really* want is MADT -> GICD -> GIC type. Your ACPI_DECLARE
->> macro doesn't reflect this at all (you've basically cloned OF, and
->> that's clearly not good enough).
->>
->> This probably require an intermediate matching function, ending up with
->> something like:
->>
->> #define IRQCHIP_ACPI_DECLARE(name, subtable, version, fn) \
->> 	ACPI_DECLARE(irqchip, name, ACPI_SIG_MADT, match_madt_subtable,\
->> 		subtable, version, fn)
->>
->> where match_madt_subtable is going to check that a given subtable is
->> really suitable for a given irqchip. None of that should be GIC
->> specific, really.
-> 
-> I'm little confused here, in the previous patch, the gic version is
-> stored, so we only need to match the GIC driver with the gic version.
-> 
-> In the GIC dirver itself, we will match the madt subtable to find
-> information we need to init the GIC, so I'm not sure why
-> match_madt_subtable in the ACPI_DECLARE, I think I missed something,
-> please correct me.
+Thanks everyone for your support in guiding me to make the patch
+acceptable.
 
-What you're missing is that it should be possible to use
-IRQCHIP_ACPI_DECLARE with something that is *not* a GIC. It shouldn't be
-GIC specific in any way.
+ arch/arm/boot/dts/Makefile           |   1 +
+ arch/arm/boot/dts/orion5x-lswsgl.dts | 276 ++++++++++++++++++++++++++++++++++
+ arch/arm/mach-orion5x/Kconfig        |   6 +-
+ arch/arm/mach-orion5x/Makefile       |   1 -
+ arch/arm/mach-orion5x/lsmini-setup.c | 280 -----------------------------------
+ 5 files changed, 280 insertions(+), 284 deletions(-)
+ create mode 100644 arch/arm/boot/dts/orion5x-lswsgl.dts
+ delete mode 100644 arch/arm/mach-orion5x/lsmini-setup.c
 
-You must have a generic way of describing a match in a table by naming
-one of its structures, and possibly a type value inside this structures.
-
-I want to be able to write something like:
-
-IRQCHIP_ACPI_DECLARE(ioapic, ACPI_IOAPIC, 0, ioacpi_acpi_probe);
-
-where ACPI_IOAPIC is 1 (the type for the IOAPIC structure in the MADT
-table).
-
-For GICv3, I want to be able to write:
-
-IRQCHIP_ACPI_DECLARE(gicv3, ACPI_GICD, ACPI_GICD_GICV3, \
-                     gicv3_acpi_probe);
-
-where ACPI_GICD is 0xC, and ACPI_GICD_GICV3 is 3.
-
-Do you see what I'm aiming for? We follow the spec, strictly the spec,
-but all the spec. No shortcut that only ends up matching the GIC in MADT.
-
-Thanks,
-
-	M.
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 992736b..65fc046 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -440,6 +440,7 @@ dtb-$(CONFIG_SOC_DRA7XX) += \
+ dtb-$(CONFIG_ARCH_ORION5X) += \
+ 	orion5x-lacie-d2-network.dtb \
+ 	orion5x-lacie-ethernet-disk-mini-v2.dtb \
++	orion5x-lswsgl.dtb \
+ 	orion5x-maxtor-shared-storage-2.dtb \
+ 	orion5x-rd88f5182-nas.dtb
+ dtb-$(CONFIG_ARCH_PRIMA2) += \
+diff --git a/arch/arm/boot/dts/orion5x-lswsgl.dts b/arch/arm/boot/dts/orion5x-lswsgl.dts
+new file mode 100644
+index 0000000..34816a9
+--- /dev/null
++++ b/arch/arm/boot/dts/orion5x-lswsgl.dts
+@@ -0,0 +1,276 @@
++/*
++ * Copyright (C) 2015 Benjamin Cama <benoar@dolka.fr>
++ * Copyright (C) 2014 Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
++ * Based on the board file arch/arm/mach-orion5x/lsmini-setup.c,
++ * Copyright (C) 2008 Alexey Kopytko <alexey@kopytko.ru>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/input/input.h>
++#include <dt-bindings/interrupt-controller/irq.h>
++#include "orion5x-mv88f5182.dtsi"
++
++/ {
++	model = "Buffalo Linkstation Mini (LS-WSGL)";
++	compatible = "buffalo,lswsgl", "marvell,orion5x-88f5182", "marvell,orion5x";
++
++	memory {
++		reg = <0x00000000 0x8000000>; /* 128 MB */
++	};
++
++	chosen {
++		bootargs = "console=ttyS0,115200 earlyprintk";
++		linux,stdout-path = &uart0;
++	};
++
++	soc {
++		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000>,
++			 <MBUS_ID(0x09, 0x00) 0 0xf2200000 0x800>,
++			 <MBUS_ID(0x01, 0x0f) 0 0xf4000000 0x40000>;
++	};
++
++	gpio-keys {
++		compatible = "gpio-keys";
++		pinctrl-0 = <&pmx_buttons>;
++		pinctrl-names = "default";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		func {
++			label = "Function Button";
++			linux,code = <KEY_OPTION>;
++			gpios = <&gpio0 15 GPIO_ACTIVE_LOW>;
++		};
++
++		power {
++			label = "Power-on Switch";
++			linux,input-type = <5>; /* EV_SW */
++			linux,code = <KEY_RESERVED>; /* LSMINI_SW_POWER */
++			gpios = <&gpio0 18 GPIO_ACTIVE_LOW>;
++		};
++
++		autopower {
++			label = "Power-auto Switch";
++			linux,input-type = <5>; /* EV_SW */
++			linux,code = <KEY_ESC>; /* LSMINI_SW_AUTOPOWER */
++			gpios = <&gpio0 17 GPIO_ACTIVE_LOW>;
++		};
++	};
++
++	gpio-leds {
++		compatible = "gpio-leds";
++		pinctrl-0 = <&pmx_led_alarm &pmx_led_info &pmx_led_func
++			     &pmx_led_power>;
++		pinctrl-names = "default";
++
++		alarm {
++			label = "lswsgl:alarm:red";
++			gpio = <&gpio0 2 GPIO_ACTIVE_LOW>;
++		};
++
++		info {
++			label = "lswsgl:info:amber";
++			gpio = <&gpio0 3 GPIO_ACTIVE_LOW>;
++		};
++
++		func {
++			label = "lswsgl:func:blue:top";
++			gpio = <&gpio0 9 GPIO_ACTIVE_LOW>;
++		};
++
++		power {
++			label = "lswsgl:power:blue:bottom";
++			gpio = <&gpio0 14 GPIO_ACTIVE_LOW>;
++			default-state = "on";
++		};
++	};
++
++	restart_poweroff {
++		compatible = "restart-poweroff";
++	};
++
++	regulators {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		pinctrl-0 = <&pmx_sata0_power &pmx_sata1_power &pmx_usb_power>;
++		pinctrl-names = "default";
++
++		sata0_power: regulator at 0 {
++			compatible = "regulator-fixed";
++			reg = <0>;
++			regulator-name = "SATA0 Power";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			enable-active-high;
++			regulator-always-on;
++			regulator-boot-on;
++			gpio = <&gpio0 1 GPIO_ACTIVE_HIGH>;
++		};
++
++		sata1_power: regulator at 1 {
++			compatible = "regulator-fixed";
++			reg = <1>;
++			regulator-name = "SATA1 Power";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			enable-active-high;
++			regulator-always-on;
++			regulator-boot-on;
++			gpio = <&gpio0 19 GPIO_ACTIVE_HIGH>;
++		};
++
++		usb_power: regulator at 2 {
++			compatible = "regulator-fixed";
++			reg = <2>;
++			regulator-name = "USB Power";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			enable-active-high;
++			regulator-always-on;
++			regulator-boot-on;
++			gpio = <&gpio0 16 GPIO_ACTIVE_HIGH>;
++		};
++	};
++};
++
++&devbus_bootcs {
++	status = "okay";
++
++	devbus,keep-config;
++
++	flash at 0 {
++		compatible = "cfi-flash";
++		reg = <0 0x40000>;
++		bank-width = <1>;
++                #address-cells = <1>;
++		#size-cells = <1>;
++
++		partition at 0 {
++			label = "Full256Kb";
++			reg = <0 0x40000>;
++			read-only;
++		};
++	};
++};
++
++&mdio {
++	status = "okay";
++
++	ethphy: ethernet-phy {
++		reg = <8>;
++	};
++};
++
++&ehci0 {
++	status = "okay";
++};
++
++&eth {
++	status = "okay";
++
++	ethernet-port at 0 {
++		phy-handle = <&ethphy>;
++	};
++};
++
++&i2c {
++	status = "okay";
++	clock-frequency = <100000>;
++	#address-cells = <1>;
++
++	rtc at 32 {
++		compatible = "ricoh,rs5c372a";
++		reg = <0x32>;
++	};
++};
++
++&pinctrl {
++	pmx_buttons: pmx-buttons {
++		marvell,pins = "mpp15", "mpp17", "mpp18";
++		marvell,function = "gpio";
++	};
++
++	pmx_led_alarm: pmx-leds {
++		marvell,pins = "mpp2";
++		marvell,function = "gpio";
++	};
++
++	pmx_led_info: pmx-leds {
++		marvell,pins = "mpp3";
++		marvell,function = "gpio";
++	};
++
++	pmx_led_func: pmx-leds {
++		marvell,pins = "mpp9";
++		marvell,function = "gpio";
++	};
++
++	pmx_led_power: pmx-leds {
++		marvell,pins = "mpp14";
++		marvell,function = "gpio";
++	};
++
++	pmx_sata0_power: pmx-sata0-power {
++		marvell,pins = "mpp1";
++		marvell,function = "gpio";
++	};
++
++	pmx_sata1_power: pmx-sata1-power {
++		marvell,pins = "mpp19";
++		marvell,function = "gpio";
++	};
++
++	pmx_usb_power: pmx-usb-power {
++		marvell,pins = "mpp16";
++		marvell,function = "gpio";
++	};
++};
++
++&sata {
++	status = "okay";
++	nr-ports = <2>;
++};
++
++&uart0 {
++	status = "okay";
++};
+diff --git a/arch/arm/mach-orion5x/Kconfig b/arch/arm/mach-orion5x/Kconfig
+index 2412efb..08d2be2 100644
+--- a/arch/arm/mach-orion5x/Kconfig
++++ b/arch/arm/mach-orion5x/Kconfig
+@@ -78,11 +78,11 @@ config MACH_LINKSTATION_LSCHL
+ 	  Buffalo Linkstation Live v3 (LS-CHL) platform.
+ 
+ config MACH_LINKSTATION_MINI
+-	bool "Buffalo Linkstation Mini"
+-	select I2C_BOARDINFO
++	bool "Buffalo Linkstation Mini (Flattened Device Tree)"
++	select ARCH_ORION5X_DT
+ 	help
+ 	  Say 'Y' here if you want your kernel to support the
+-	  Buffalo Linkstation Mini platform.
++	  Buffalo Linkstation Mini (LS-WSGL) platform.
+ 
+ config MACH_LINKSTATION_LS_HGL
+ 	bool "Buffalo Linkstation LS-HGL"
+diff --git a/arch/arm/mach-orion5x/Makefile b/arch/arm/mach-orion5x/Makefile
+index a40b5c9..a1e0fbe 100644
+--- a/arch/arm/mach-orion5x/Makefile
++++ b/arch/arm/mach-orion5x/Makefile
+@@ -4,7 +4,6 @@ obj-$(CONFIG_MACH_RD88F5182)	+= rd88f5182-setup.o
+ obj-$(CONFIG_MACH_KUROBOX_PRO)	+= kurobox_pro-setup.o
+ obj-$(CONFIG_MACH_TERASTATION_PRO2)	+= terastation_pro2-setup.o
+ obj-$(CONFIG_MACH_LINKSTATION_PRO) += kurobox_pro-setup.o
+-obj-$(CONFIG_MACH_LINKSTATION_MINI) += lsmini-setup.o
+ obj-$(CONFIG_MACH_LINKSTATION_LS_HGL) += ls_hgl-setup.o
+ obj-$(CONFIG_MACH_DNS323)	+= dns323-setup.o
+ obj-$(CONFIG_MACH_TS209)	+= ts209-setup.o tsx09-common.o
+diff --git a/arch/arm/mach-orion5x/lsmini-setup.c b/arch/arm/mach-orion5x/lsmini-setup.c
+deleted file mode 100644
+index a6493e7..0000000
+--- a/arch/arm/mach-orion5x/lsmini-setup.c
++++ /dev/null
+@@ -1,280 +0,0 @@
+-/*
+- * arch/arm/mach-orion5x/lsmini-setup.c
+- *
+- * Maintainer: Alexey Kopytko <alexey@kopytko.ru>
+- *
+- * This file is licensed under the terms of the GNU General Public
+- * License version 2.  This program is licensed "as is" without any
+- * warranty of any kind, whether express or implied.
+- */
+-
+-#include <linux/kernel.h>
+-#include <linux/init.h>
+-#include <linux/platform_device.h>
+-#include <linux/mtd/physmap.h>
+-#include <linux/mv643xx_eth.h>
+-#include <linux/leds.h>
+-#include <linux/gpio_keys.h>
+-#include <linux/input.h>
+-#include <linux/i2c.h>
+-#include <linux/ata_platform.h>
+-#include <linux/gpio.h>
+-#include <asm/mach-types.h>
+-#include <asm/mach/arch.h>
+-#include <mach/orion5x.h>
+-#include "common.h"
+-#include "mpp.h"
+-
+-/*****************************************************************************
+- * Linkstation Mini Info
+- ****************************************************************************/
+-
+-/*
+- * 256K NOR flash Device bus boot chip select
+- */
+-
+-#define LSMINI_NOR_BOOT_BASE	0xf4000000
+-#define LSMINI_NOR_BOOT_SIZE	SZ_256K
+-
+-/*****************************************************************************
+- * 256KB NOR Flash on BOOT Device
+- ****************************************************************************/
+-
+-static struct physmap_flash_data lsmini_nor_flash_data = {
+-	.width		= 1,
+-};
+-
+-static struct resource lsmini_nor_flash_resource = {
+-	.flags	= IORESOURCE_MEM,
+-	.start	= LSMINI_NOR_BOOT_BASE,
+-	.end	= LSMINI_NOR_BOOT_BASE + LSMINI_NOR_BOOT_SIZE - 1,
+-};
+-
+-static struct platform_device lsmini_nor_flash = {
+-	.name			= "physmap-flash",
+-	.id			= 0,
+-	.dev		= {
+-		.platform_data	= &lsmini_nor_flash_data,
+-	},
+-	.num_resources		= 1,
+-	.resource		= &lsmini_nor_flash_resource,
+-};
+-
+-/*****************************************************************************
+- * Ethernet
+- ****************************************************************************/
+-
+-static struct mv643xx_eth_platform_data lsmini_eth_data = {
+-	.phy_addr	= 8,
+-};
+-
+-/*****************************************************************************
+- * RTC 5C372a on I2C bus
+- ****************************************************************************/
+-
+-static struct i2c_board_info __initdata lsmini_i2c_rtc = {
+-	I2C_BOARD_INFO("rs5c372a", 0x32),
+-};
+-
+-/*****************************************************************************
+- * LEDs attached to GPIO
+- ****************************************************************************/
+-
+-#define LSMINI_GPIO_LED_ALARM	2
+-#define LSMINI_GPIO_LED_INFO	3
+-#define LSMINI_GPIO_LED_FUNC	9
+-#define LSMINI_GPIO_LED_PWR	14
+-
+-static struct gpio_led lsmini_led_pins[] = {
+-	{
+-		.name	   = "alarm:red",
+-		.gpio	   = LSMINI_GPIO_LED_ALARM,
+-		.active_low     = 1,
+-	}, {
+-		.name	   = "info:amber",
+-		.gpio	   = LSMINI_GPIO_LED_INFO,
+-		.active_low     = 1,
+-	}, {
+-		.name	   = "func:blue:top",
+-		.gpio	   = LSMINI_GPIO_LED_FUNC,
+-		.active_low     = 1,
+-	}, {
+-		.name	   = "power:blue:bottom",
+-		.gpio	   = LSMINI_GPIO_LED_PWR,
+-	},
+-};
+-
+-static struct gpio_led_platform_data lsmini_led_data = {
+-	.leds	   = lsmini_led_pins,
+-	.num_leds       = ARRAY_SIZE(lsmini_led_pins),
+-};
+-
+-static struct platform_device lsmini_leds = {
+-	.name   = "leds-gpio",
+-	.id     = -1,
+-	.dev    = {
+-		.platform_data  = &lsmini_led_data,
+-	},
+-};
+-
+-/****************************************************************************
+- * GPIO Attached Keys
+- ****************************************************************************/
+-
+-#define LSMINI_GPIO_KEY_FUNC       15
+-#define LSMINI_GPIO_KEY_POWER	   18
+-#define LSMINI_GPIO_KEY_AUTOPOWER 17
+-
+-#define LSMINI_SW_POWER		0x00
+-#define LSMINI_SW_AUTOPOWER	0x01
+-
+-static struct gpio_keys_button lsmini_buttons[] = {
+-	{
+-		.code	   = KEY_OPTION,
+-		.gpio	   = LSMINI_GPIO_KEY_FUNC,
+-		.desc	   = "Function Button",
+-		.active_low     = 1,
+-	}, {
+-		.type		= EV_SW,
+-		.code	   = LSMINI_SW_POWER,
+-		.gpio	   = LSMINI_GPIO_KEY_POWER,
+-		.desc	   = "Power-on Switch",
+-		.active_low     = 1,
+-	}, {
+-		.type		= EV_SW,
+-		.code	   = LSMINI_SW_AUTOPOWER,
+-		.gpio	   = LSMINI_GPIO_KEY_AUTOPOWER,
+-		.desc	   = "Power-auto Switch",
+-		.active_low     = 1,
+-	},
+-};
+-
+-static struct gpio_keys_platform_data lsmini_button_data = {
+-	.buttons	= lsmini_buttons,
+-	.nbuttons       = ARRAY_SIZE(lsmini_buttons),
+-};
+-
+-static struct platform_device lsmini_button_device = {
+-	.name	   = "gpio-keys",
+-	.id	     = -1,
+-	.num_resources  = 0,
+-	.dev	    = {
+-		.platform_data  = &lsmini_button_data,
+-	},
+-};
+-
+-
+-/*****************************************************************************
+- * SATA
+- ****************************************************************************/
+-static struct mv_sata_platform_data lsmini_sata_data = {
+-	.n_ports	= 2,
+-};
+-
+-
+-/*****************************************************************************
+- * Linkstation Mini specific power off method: reboot
+- ****************************************************************************/
+-/*
+- * On the Linkstation Mini, the shutdown process is following:
+- * - Userland monitors key events until the power switch goes to off position
+- * - The board reboots
+- * - U-boot starts and goes into an idle mode waiting for the user
+- *   to move the switch to ON position
+- */
+-
+-static void lsmini_power_off(void)
+-{
+-	orion5x_restart(REBOOT_HARD, NULL);
+-}
+-
+-
+-/*****************************************************************************
+- * General Setup
+- ****************************************************************************/
+-
+-#define LSMINI_GPIO_USB_POWER	16
+-#define LSMINI_GPIO_AUTO_POWER	17
+-#define LSMINI_GPIO_POWER	18
+-
+-#define LSMINI_GPIO_HDD_POWER0	1
+-#define LSMINI_GPIO_HDD_POWER1	19
+-
+-static unsigned int lsmini_mpp_modes[] __initdata = {
+-	MPP0_UNUSED, /* LED_RESERVE1 (unused) */
+-	MPP1_GPIO, /* HDD_PWR */
+-	MPP2_GPIO, /* LED_ALARM */
+-	MPP3_GPIO, /* LED_INFO */
+-	MPP4_UNUSED,
+-	MPP5_UNUSED,
+-	MPP6_UNUSED,
+-	MPP7_UNUSED,
+-	MPP8_UNUSED,
+-	MPP9_GPIO, /* LED_FUNC */
+-	MPP10_UNUSED,
+-	MPP11_UNUSED, /* LED_ETH (dummy) */
+-	MPP12_UNUSED,
+-	MPP13_UNUSED,
+-	MPP14_GPIO, /* LED_PWR */
+-	MPP15_GPIO, /* FUNC */
+-	MPP16_GPIO, /* USB_PWR */
+-	MPP17_GPIO, /* AUTO_POWER */
+-	MPP18_GPIO, /* POWER */
+-	MPP19_GPIO, /* HDD_PWR1 */
+-	0,
+-};
+-
+-static void __init lsmini_init(void)
+-{
+-	/*
+-	 * Setup basic Orion functions. Need to be called early.
+-	 */
+-	orion5x_init();
+-
+-	orion5x_mpp_conf(lsmini_mpp_modes);
+-
+-	/*
+-	 * Configure peripherals.
+-	 */
+-	orion5x_ehci0_init();
+-	orion5x_ehci1_init();
+-	orion5x_eth_init(&lsmini_eth_data);
+-	orion5x_i2c_init();
+-	orion5x_sata_init(&lsmini_sata_data);
+-	orion5x_uart0_init();
+-	orion5x_xor_init();
+-
+-	mvebu_mbus_add_window_by_id(ORION_MBUS_DEVBUS_BOOT_TARGET,
+-				    ORION_MBUS_DEVBUS_BOOT_ATTR,
+-				    LSMINI_NOR_BOOT_BASE,
+-				    LSMINI_NOR_BOOT_SIZE);
+-	platform_device_register(&lsmini_nor_flash);
+-
+-	platform_device_register(&lsmini_button_device);
+-
+-	platform_device_register(&lsmini_leds);
+-
+-	i2c_register_board_info(0, &lsmini_i2c_rtc, 1);
+-
+-	/* enable USB power */
+-	gpio_set_value(LSMINI_GPIO_USB_POWER, 1);
+-
+-	/* register power-off method */
+-	pm_power_off = lsmini_power_off;
+-
+-	pr_info("%s: finished\n", __func__);
+-}
+-
+-#ifdef CONFIG_MACH_LINKSTATION_MINI
+-MACHINE_START(LINKSTATION_MINI, "Buffalo Linkstation Mini")
+-	/* Maintainer: Alexey Kopytko <alexey@kopytko.ru> */
+-	.atag_offset	= 0x100,
+-	.init_machine	= lsmini_init,
+-	.map_io		= orion5x_map_io,
+-	.init_early	= orion5x_init_early,
+-	.init_irq	= orion5x_init_irq,
+-	.init_time	= orion5x_timer_init,
+-	.fixup		= tag_fixup_mem32,
+-	.restart	= orion5x_restart,
+-MACHINE_END
+-#endif
 -- 
-Jazz is not dead. It just smells funny...
+2.1.4
