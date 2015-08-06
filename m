@@ -1,46 +1,47 @@
-From: axel.lin@ingics.com (Axel Lin)
-Date: Thu, 06 Aug 2015 12:28:18 +0800
-Subject: [PATCH v2] ata: ahci_brcmstb: Fix misuse of IS_ENABLED
-Message-ID: <1438835298.28215.1.camel@ingics.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Thu, 6 Aug 2015 06:54:23 +0200
+Subject: [RFCv3 1/4] docs: dts: Added documentation for Xilinx Zynq Reset
+ Controller bindings.
+In-Reply-To: <CAAtXAHfJF-5PAgCc4ZC71omc_ye6L4qa2ks2E1BdoSXxDzZu1A@mail.gmail.com>
+References: <1438305237-18497-1-git-send-email-moritz.fischer@ettus.com>
+ <1438305237-18497-2-git-send-email-moritz.fischer@ettus.com>
+ <1438675772.3793.18.camel@pengutronix.de>
+ <CAAtXAHeauiD5smAqMbheJWuv4BT-2YqJWOSBjYPq900icpT1Rg@mail.gmail.com>
+ <1438701017.3793.45.camel@pengutronix.de>
+ <CAAtXAHfJF-5PAgCc4ZC71omc_ye6L4qa2ks2E1BdoSXxDzZu1A@mail.gmail.com>
+Message-ID: <55C2E87F.7060502@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While IS_ENABLED() is perfectly fine for CONFIG_* symbols, it is not
-for other symbols such as __BIG_ENDIAN that is provided directly by
-the compiler.
+On 08/05/2015 09:43 PM, Moritz Fischer wrote:
+> Michal,
+> 
+> On Tue, Aug 4, 2015 at 8:10 AM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
+>> Hi Moritz,
+>>
+>> Am Dienstag, den 04.08.2015, 08:05 -0700 schrieb Moritz Fischer:
+>>> Hi Philip,
+>>>
+>>> On Tue, Aug 4, 2015 at 1:09 AM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
+>>>> Hi Moritz,
+>>>>
+>>>> Am Donnerstag, den 30.07.2015, 18:13 -0700 schrieb Moritz Fischer:
+>> [...]
+>>>>> +Required properties:
+>>>>> +- compatible: "xlnx,zynq-reset"
+>>>>> +- reg: SLCR offset and size taken via syscon <0x200 0x48>
+>>>>> +- syscon: <&slcr>
+>>>>> +  This should be a phandle to the Zynq's SLCR register.
+>>>>
+>>>>                                                  ^ register singular?
+>>> Do you want me to resend the entire set, or are you cool with just git
+>>> amending the 's' for registers?
+>>
+>> Amended and applied, thanks.
+> 
+> Will you take 4/4 and 2/4 via your tree?
 
-Switch to use CONFIG_CPU_BIG_ENDIAN instead of __BIG_ENDIAN.
+Applied to zynq/dt and zynq/soc.
 
-Signed-off-by: Axel Lin <axel.lin@ingics.com>
----
-v2:
-Based on Florian's comment:
-Switch to use CONFIG_CPU_BIG_ENDIAN instead of __BIG_ENDIAN.
-
- drivers/ata/ahci_brcmstb.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/ata/ahci_brcmstb.c b/drivers/ata/ahci_brcmstb.c
-index 42b6cf4..14b7305 100644
---- a/drivers/ata/ahci_brcmstb.c
-+++ b/drivers/ata/ahci_brcmstb.c
-@@ -92,7 +92,7 @@ static inline u32 brcm_sata_readreg(void __iomem *addr)
- 	 * Other architectures (e.g., ARM) either do not support big endian, or
- 	 * else leave I/O in little endian mode.
- 	 */
--	if (IS_ENABLED(CONFIG_MIPS) && IS_ENABLED(__BIG_ENDIAN))
-+	if (IS_ENABLED(CONFIG_MIPS) && IS_ENABLED(CONFIG_CPU_BIG_ENDIAN))
- 		return __raw_readl(addr);
- 	else
- 		return readl_relaxed(addr);
-@@ -101,7 +101,7 @@ static inline u32 brcm_sata_readreg(void __iomem *addr)
- static inline void brcm_sata_writereg(u32 val, void __iomem *addr)
- {
- 	/* See brcm_sata_readreg() comments */
--	if (IS_ENABLED(CONFIG_MIPS) && IS_ENABLED(__BIG_ENDIAN))
-+	if (IS_ENABLED(CONFIG_MIPS) && IS_ENABLED(CONFIG_CPU_BIG_ENDIAN))
- 		__raw_writel(val, addr);
- 	else
- 		writel_relaxed(val, addr);
--- 
-2.1.0
+Thanks,
+Michal
