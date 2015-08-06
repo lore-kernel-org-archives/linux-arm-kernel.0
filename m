@@ -1,35 +1,68 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Thu,  6 Aug 2015 09:26:33 -0500
-Subject: [RFC PATCH 8/8] drm: bridge/analogix_dp: expand the delay time for
- hpd detect
-In-Reply-To: <1438868947-22132-1-git-send-email-ykk@rock-chips.com>
-References: <1438868947-22132-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <1438871193-24067-1-git-send-email-ykk@rock-chips.com>
+From: jingoohan1@gmail.com (Jingoo Han)
+Date: Thu, 6 Aug 2015 23:46:16 +0900
+Subject: [PATCH v5 1/9] ARM/PCI: Replace panic with WARN messages on
+ failures
+In-Reply-To: <20150804215357.9189.11942.stgit@bhelgaas-glaptop2.roam.corp.google.com>
+References: <20150804214234.9189.42548.stgit@bhelgaas-glaptop2.roam.corp.google.com>
+ <20150804215357.9189.11942.stgit@bhelgaas-glaptop2.roam.corp.google.com>
+Message-ID: <000301d0d056$abf8f990$03eaecb0$@com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some edp screen with no hpd signal would need some delay time
-to ensure that screen would be ready for work, so we can expand
-the delay time in hpd detect function, it works prefectly on my
-rk3288 sdk board.
+On Wednesday, August 05, 2015 6:54 AM, Bjorn Helgaas wrote:
+> 
+> From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> 
+> In the ARM PCI bios32 layer, failures to dynamically allocate pci_sys_data
+> for a PCI bus, or a PCI bus scan failure have to be considered serious
+> warnings but they should not trigger a system panic so that at least the
+> system is given a chance to be debugged.
+> 
+> This patch replaces the panic statements with WARN() messages to improve
+> error reporting in the ARM PCI bios32 layer.
+> 
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> CC: Russell King <linux@arm.linux.org.uk>
+> CC: Marc Zyngier <marc.zyngier@arm.com>
 
-Signed-off-by: Yakir Yang <ykk@rock-chips.com>
----
- drivers/gpu/drm/bridge/analogix_dp_core.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Reviewed-by: Jingoo Han <jingoohan1@gmail.com>
 
-diff --git a/drivers/gpu/drm/bridge/analogix_dp_core.c b/drivers/gpu/drm/bridge/analogix_dp_core.c
-index 7e67f19..447c94d 100644
---- a/drivers/gpu/drm/bridge/analogix_dp_core.c
-+++ b/drivers/gpu/drm/bridge/analogix_dp_core.c
-@@ -73,7 +73,7 @@ static int analogix_dp_detect_hpd(struct analogix_dp_device *dp)
- 			return 0;
- 
- 		timeout_loop++;
--		usleep_range(10, 11);
-+		usleep_range(100, 110);
- 	}
- 
- 	/*
--- 
-2.1.2
+In ARM, WARN message looks good.
+
+Best regards,
+Jingoo Han
+
+> ---
+>  arch/arm/kernel/bios32.c |   10 ++++++----
+>  1 file changed, 6 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+> index bf370bc..4e95260 100644
+> --- a/arch/arm/kernel/bios32.c
+> +++ b/arch/arm/kernel/bios32.c
+> @@ -459,8 +459,8 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
+> 
+>  	for (nr = busnr = 0; nr < hw->nr_controllers; nr++) {
+>  		sys = kzalloc(sizeof(struct pci_sys_data), GFP_KERNEL);
+> -		if (!sys)
+> -			panic("PCI: unable to allocate sys data!");
+> +		if (WARN(!sys, "PCI: unable to allocate sys data!"))
+> +			break;
+> 
+>  #ifdef CONFIG_PCI_MSI
+>  		sys->msi_ctrl = hw->msi_ctrl;
+> @@ -489,8 +489,10 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
+>  				sys->bus = pci_scan_root_bus(parent, sys->busnr,
+>  						hw->ops, sys, &sys->resources);
+> 
+> -			if (!sys->bus)
+> -				panic("PCI: unable to scan bus!");
+> +			if (WARN(!sys->bus, "PCI: unable to scan bus!")) {
+> +				kfree(sys);
+> +				break;
+> +			}
+> 
+>  			busnr = sys->bus->busn_res.end + 1;
+> 
