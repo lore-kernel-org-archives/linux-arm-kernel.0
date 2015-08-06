@@ -1,121 +1,198 @@
-From: shunqian.zheng@gmail.com (Shunqian Zheng)
-Date: Thu, 06 Aug 2015 09:10:00 +0800
-Subject: [PATCH v2 0/3] Add the efuse driver on rockchip platform
-In-Reply-To: <55C0E42E.3060509@linaro.org>
-References: <1434439665-27781-1-git-send-email-wxt@rock-chips.com>
- <557FE3EA.4000306@i2se.com> <557FEAB2.1040101@linaro.org>
- <557FF50C.10809@rock-chips.com> <55800070.5030509@linaro.org>
- <55826D9D.2060106@i2se.com> <5582816B.5020208@linaro.org>
- <55BB3F92.9030701@gmail.com> <55C0E42E.3060509@linaro.org>
-Message-ID: <55C2B3E8.2070000@gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 05 Aug 2015 18:27:24 -0700
+Subject: [PATCH v5 2/2] firmware: qcom: scm: Add support for ARM64 SoCs
+In-Reply-To: <1430249038-30987-2-git-send-email-galak@codeaurora.org>
+References: <1430249038-30987-1-git-send-email-galak@codeaurora.org>
+ <1430249038-30987-2-git-send-email-galak@codeaurora.org>
+Message-ID: <55C2B7FC.5090402@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 04/28/2015 12:23 PM, Kumar Gala wrote:
+> +
+> +int __qcom_scm_call_armv8_64(u64 x0, u64 x1, u64 x2, u64 x3, u64 x4, u64 x5,
+> +				u64 *ret1, u64 *ret2, u64 *ret3)
+> +{
+> +	register u64 r0 asm("r0") = x0;
+> +	register u64 r1 asm("r1") = x1;
+> +	register u64 r2 asm("r2") = x2;
+> +	register u64 r3 asm("r3") = x3;
+> +	register u64 r4 asm("r4") = x4;
+> +	register u64 r5 asm("r5") = x5;
 
+This should set x6 to 0.
 
-On 2015?08?05? 00:11, Srinivas Kandagatla wrote:
-> Hi Shunqian,
->
-> Sorry for delay in reply, I was on Holidays..
->
-> Thanks for testing.
->
-> On 31/07/15 10:27, Shunqian Zheng wrote:
->>
->> 1. Without the following diff, `hexdump
->> /sys/bus/nvmem/devices/rockchip-efuse0/nvmem` is wrong with "INVALID
->> ARGUMENT":
->>
->> +++ b/drivers/nvmem/core.c
->> @@ -67,7 +67,7 @@ static ssize_t bin_attr_nvmem_read(struct file *filp,
->> struct kobject *kobj,
->>          int rc;
->>
->>          /* Stop the user from reading */
->> -       if (pos > nvmem->size)
->> +       if (pos > nvmem->size - 1)
->>                  return 0;
->
-> Yes, this should have been something like this
-> -       if (pos > nvmem->size)
-> +       if (pos >= nvmem->size)
->                 return 0;
->
-> We can send a fix on top of v9 once its merged.
->
->>
->>          if (pos + count > nvmem->size)
->>
->> RK3288-efuse has  32 x 8bit regs, in dts "reg = <0xffb40000 0x20>;"
->> Here is the message dump from nvmem_device:
->> [    2.158314] nvmem:
->> [    2.158314]           name (null)
->> [    2.158314]           stride 1
->> [    2.158314]           word_size 1
->> [    2.158314]           ncells 0
->> [    2.158314]           id 0
->> [    2.158314]           users 0
->> [    2.158314]           size 32
->> [    2.158314]           read_only 0
->>
->> Do you think there is a leak or I'm messing up ?
->>
->> 2. About the read operation, eFuse data can be read during device
->> probe() and cached, OR,
->>      read from eFuse when needed every time. I prefer the second one but
->> then, the clock of eFuse may be
->>      gated. So before/after reading I have to enable/disable clk like :
->>            devm_clk_get(dev, "hclk_efuse256");
->>      The trouble is I can't find a way to get the "dev" hander in :
->>            static int rockchip_efuse_read(void *context, const void
->> *reg, size_t reg_size, void *val, size_t val_size)
->>      I am appreciated if you can give some advice.
->
->
-> May be you should use regmap_init_mmio_clk() instead of 
-> regmap_init_mmio() it will take care of clks.
-Thank you for you reply.
-Although the regmap_init_mmio_clk() and it's series interface deal with 
-the clks, but
-MMIO uses its own regmap_bus{}, while the eFuse of RK3X need special 
-read/write
-callback functions.
+     register u32 r6 asm("r6") = 0;
 
-I still can't find a good way to resolve this. Can you help?
+for example.
 
-Shunqian
+> +
+> +	do {
+> +		asm volatile(
+> +			__asmeq("%0", "x0")
+> +			__asmeq("%1", "x1")
+> +			__asmeq("%2", "x2")
+> +			__asmeq("%3", "x3")
+> +			__asmeq("%4", "x0")
+> +			__asmeq("%5", "x1")
+> +			__asmeq("%6", "x2")
+> +			__asmeq("%7", "x3")
+> +			__asmeq("%8", "x4")
+> +			__asmeq("%9", "x5")
+
+And then the asmeq thing here for x6.
+
+> +#ifdef REQUIRES_SEC
+> +			".arch_extension sec\n"
+> +#endif
+> +			"smc	#0\n"
+> +			: "=r" (r0), "=r" (r1), "=r" (r2), "=r" (r3)
+> +			: "r" (r0), "r" (r1), "r" (r2), "r" (r3), "r" (r4),
+> +			  "r" (r5)
+
+And add x6 as an input here.
+
+> +			: "x6", "x7", "x8", "x9", "x10", "x11", "x12", "x13",
+
+and remove x6 as a clobber.
+
+> +			  "x14", "x15", "x16", "x17");
+> +	} while (r0 == QCOM_SCM_INTERRUPTED);
+> +
+> +	if (ret1)
+> +		*ret1 = r1;
+> +	if (ret2)
+> +		*ret2 = r2;
+> +	if (ret3)
+> +		*ret3 = r3;
+> +
+> +	return r0;
+> +}
+> +
+> +int __qcom_scm_call_armv8_32(u32 w0, u32 w1, u32 w2, u32 w3, u32 w4, u32 w5,
+> +				u64 *ret1, u64 *ret2, u64 *ret3)
+> +{
+> +	register u32 r0 asm("r0") = w0;
+> +	register u32 r1 asm("r1") = w1;
+> +	register u32 r2 asm("r2") = w2;
+> +	register u32 r3 asm("r3") = w3;
+> +	register u32 r4 asm("r4") = w4;
+> +	register u32 r5 asm("r5") = w5;
+
+This needs to set r6 to 0 as well
+
+     register u32 r6 asm("r6") = 0;
+
+for example.
+
+> +
+> +	do {
+> +		asm volatile(
+> +			__asmeq("%0", "x0")
+> +			__asmeq("%1", "x1")
+> +			__asmeq("%2", "x2")
+> +			__asmeq("%3", "x3")
+> +			__asmeq("%4", "x0")
+> +			__asmeq("%5", "x1")
+> +			__asmeq("%6", "x2")
+> +			__asmeq("%7", "x3")
+> +			__asmeq("%8", "x4")
+> +			__asmeq("%9", "x5")
+
+And then another asmeq thing here for x6.
+
+> +#ifdef REQUIRES_SEC
+> +			".arch_extension sec\n"
+> +#endif
+> +			"smc	#0\n"
+> +			: "=r" (r0), "=r" (r1), "=r" (r2), "=r" (r3)
+> +			: "r" (r0), "r" (r1), "r" (r2), "r" (r3), "r" (r4),
+> +			  "r" (r5)
+
+And then add r6 here as an input
+
+> +			: "x6", "x7", "x8", "x9", "x10", "x11", "x12", "x13",
+
+And remove r6 from the clobber.
+
+> +			"x14", "x15", "x16", "x17");
+> +
+> +	} while (r0 == QCOM_SCM_INTERRUPTED);
+> +
+> +	if (ret1)
+> +		*ret1 = r1;
+> +	if (ret2)
+> +		*ret2 = r2;
+> +	if (ret3)
+> +		*ret3 = r3;
+> +
+> +	return r0;
+> +}
+> +
 >
->>      Or, do you think it's reasonable to add hooks before/after read in
->> nvmem/core.c like :
->>            +       before_read(dev, ...);
->>                     rc = regmap_raw_read(nvmem->regmap, pos, buf, 
->> count);
->>            +       after_read(dev, ...);
->>
->
->
->> 3. In the /sys/bus/nvmem/devices/rockchip-efuse0/, there are files:
->>           /sys/devices/platform/ffb40000.efuse/rockchip-efuse0 # ls
->>           nvmem      of_node    power      subsystem  uevent
->>      Do you have a plan to add the nvmem consumers to /sys/ in nvmem
->> framework?
-> yes, Am waiting for the framework to be merged, I have plans to add 
-> this feature.
->
->>      For example,  in dts defined the "cpu_leakage":
->>          efuse: efuse at ffb40000 {
->>                  compatible = "rockchip,rk3x-efuse";
->>                  reg = <0xffb40000 0x20>;
->>                  #address-cells = <1>;
->>                  #size-cells = <1>;
->>                  clocks = <&cru PCLK_EFUSE256>;
->>                  clock-names = "pclk_efuse_256";
->>
->>                  cpu_leakage: cpu_leakage {
->>                          reg = <0x17 0x1>;
->>                  };
->>          };
->>     Then nvmem exposes the "cpu_leakage" file in /sys which can be
->> read/write.
->
-> --srini
+
+Here's a totally untested patch for that.
+
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+----8<-----
+
+diff --git a/drivers/firmware/qcom_scm-64.c b/drivers/firmware/qcom_scm-64.c
+index a95fd9b5d576..8f7e65ff524c 100644
+--- a/drivers/firmware/qcom_scm-64.c
++++ b/drivers/firmware/qcom_scm-64.c
+@@ -114,6 +114,7 @@ int __qcom_scm_call_armv8_64(u64 x0, u64 x1, u64 x2, u64 x3, u64 x4, u64 x5,
+  	register u64 r3 asm("r3") = x3;
+  	register u64 r4 asm("r4") = x4;
+  	register u64 r5 asm("r5") = x5;
++	register u64 r6 asm("r5") = 0;
+  
+  	do {
+  		asm volatile(
+@@ -127,14 +128,15 @@ int __qcom_scm_call_armv8_64(u64 x0, u64 x1, u64 x2, u64 x3, u64 x4, u64 x5,
+  			__asmeq("%7", "x3")
+  			__asmeq("%8", "x4")
+  			__asmeq("%9", "x5")
++			__asmeq("%10", "x6")
+  #ifdef REQUIRES_SEC
+  			".arch_extension sec\n"
+  #endif
+  			"smc	#0\n"
+  			: "=r" (r0), "=r" (r1), "=r" (r2), "=r" (r3)
+  			: "r" (r0), "r" (r1), "r" (r2), "r" (r3), "r" (r4),
+-			  "r" (r5)
+-			: "x6", "x7", "x8", "x9", "x10", "x11", "x12", "x13",
++			  "r" (r5), "r" (r6)
++			: "x7", "x8", "x9", "x10", "x11", "x12", "x13",
+  			  "x14", "x15", "x16", "x17");
+  	} while (r0 == QCOM_SCM_INTERRUPTED);
+  
+@@ -157,6 +159,7 @@ int __qcom_scm_call_armv8_32(u32 w0, u32 w1, u32 w2, u32 w3, u32 w4, u32 w5,
+  	register u32 r3 asm("r3") = w3;
+  	register u32 r4 asm("r4") = w4;
+  	register u32 r5 asm("r5") = w5;
++	register u32 r6 asm("r6") = 0;
+  
+  	do {
+  		asm volatile(
+@@ -170,14 +173,15 @@ int __qcom_scm_call_armv8_32(u32 w0, u32 w1, u32 w2, u32 w3, u32 w4, u32 w5,
+  			__asmeq("%7", "x3")
+  			__asmeq("%8", "x4")
+  			__asmeq("%9", "x5")
++			__asmeq("%10", "x6")
+  #ifdef REQUIRES_SEC
+  			".arch_extension sec\n"
+  #endif
+  			"smc	#0\n"
+  			: "=r" (r0), "=r" (r1), "=r" (r2), "=r" (r3)
+  			: "r" (r0), "r" (r1), "r" (r2), "r" (r3), "r" (r4),
+-			  "r" (r5)
+-			: "x6", "x7", "x8", "x9", "x10", "x11", "x12", "x13",
++			  "r" (r5), "r" (r6)
++			: "x7", "x8", "x9", "x10", "x11", "x12", "x13",
+  			"x14", "x15", "x16", "x17");
+  
+  	} while (r0 == QCOM_SCM_INTERRUPTED);
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
