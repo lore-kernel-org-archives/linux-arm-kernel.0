@@ -1,19 +1,55 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 06 Aug 2015 13:11:49 +0200
-Subject: [PATCH v3 1/3] ARM: rockchip: rename osc_switch_to_32k variable
-In-Reply-To: <2128609.Kb18M8K28F@diego>
-References: <2128609.Kb18M8K28F@diego>
-Message-ID: <39971049.CiZJKWC18V@diego>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 06 Aug 2015 13:14:48 +0200
+Subject: [PATCH 7/7] ARM: redo TTBR setup code for LPAE
+In-Reply-To: <20150805160112.GZ7557@n2100.arm.linux.org.uk>
+References: <20150506103000.GF2067@n2100.arm.linux.org.uk>
+ <E1YpwbQ-0000wm-Jx@rmk-PC.arm.linux.org.uk>
+ <55C22B21.8000700@free-electrons.com>
+ <20150805160112.GZ7557@n2100.arm.linux.org.uk>
+Message-ID: <55C341A8.5040504@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 5. August 2015, 00:50:39 schrieb Heiko St?bner:
-> The variable name is misleading, as the deep suspend mode always switches
-> the main supplying clock to the 32kHz source. Additionally the main
-> oscillator remain running in some cases, which this var indicates.
+On 05/08/2015 18:01, Russell King - ARM Linux wrote:
+> On Wed, Aug 05, 2015 at 05:26:25PM +0200, Gregory CLEMENT wrote:
+>> It seems that since the merge of this commit the secondary CPUs on
+>> Armada XP failed to come online in Big Endian (my configuration is
+>> mvebu_v7_defconfig+CONFIG_CPU_BIG_ENDIAN=y).
 > 
-> So rename it to osc_disable to clarity.
+> That's probably because I don't test big endian at all, never have done,
+> and I suspect never will as I've never had systems using BE.  So, I regard
+> BE as something of a troublesome untestable burden on kernel development.
+> (And I've always regarded BE to be an abomination.)  In short, I loath
+> big endian, which really doesn't bode well for me not constantly cocking
+> it up...
 > 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> My guess is that it all comes down to much of the new code expecting the
+> value in r4/r5 to be the least significant 32bits in r4 and the most
+> significant 32bits in r5.  However, in the secondary code, we load this
+> using ldrd, which on BE probably reverses that.
 
-applied all 3 patches with Chris' and Doug's tags to my soc branch
+Thanks for the explanation.
+
+> 
+>> Once I found that this commit introduced the regression I also tested
+>> but with LPAE but I had the same result: only the first CPU boot.
+> 
+> Not surprising.  I guess BE would need the two registers to mcrr reversing
+> if they were a 64-bit value loaded with ldrd.
+> 
+> The simple answer may just be to swap r4/r5 after the ldrd.  
+
+I tried this and it fixed the issue.
+I will send a patch shortly and if you agree I will submit it to your
+patch system.
+
+Thanks,
+
+Gregory
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
