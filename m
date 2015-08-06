@@ -1,39 +1,44 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 6 Aug 2015 09:37:51 +0900
-Subject: [PATCH] ARM: shmobile: Add silk device tree bindings documentation
-In-Reply-To: <1438723848-14812-1-git-send-email-horms+renesas@verge.net.au>
-References: <1438723848-14812-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <20150806003751.GC17231@verge.net.au>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Wed, 5 Aug 2015 17:46:03 -0700
+Subject: [PATCH v3 15/31] arm64: SMP support
+In-Reply-To: <1347035226-18649-16-git-send-email-catalin.marinas@arm.com>
+References: <1347035226-18649-1-git-send-email-catalin.marinas@arm.com>
+ <1347035226-18649-16-git-send-email-catalin.marinas@arm.com>
+Message-ID: <CAOZdJXVoDJM3y2mnKO+91yf2EHogKfMjumjhhi85REAfhcJM=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 05, 2015 at 06:30:48AM +0900, Simon Horman wrote:
-> Add Silk Device tree bindings Documentation, listing it as a supported board.
-> 
-> This allows to use checkpatch to validate DTSes referring to the Silk board.
-> 
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Catalin,
 
-Thanks, I have queued this up for v4.4 rather than as a fix for v4.3
-as it doesn't have any run or build time effect.
+I know this patch is three years old, but I have a question about it:
 
-> ---
->  Documentation/devicetree/bindings/arm/shmobile.txt | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/shmobile.txt b/Documentation/devicetree/bindings/arm/shmobile.txt
-> index c4f19b2e7dd9..f3f96b5a7418 100644
-> --- a/Documentation/devicetree/bindings/arm/shmobile.txt
-> +++ b/Documentation/devicetree/bindings/arm/shmobile.txt
-> @@ -57,6 +57,8 @@ Boards:
->      compatible = "renesas,lager", "renesas,r8a7790"
->    - Marzen
->      compatible = "renesas,marzen", "renesas,r8a7779"
-> +  - Silk
-> +    compatible = "renesas,silk", "renesas,r8a7794";
->  
->  Note: Reference Device Tree Implementations are temporary implementations
->        to ease the migration from platform devices to Device Tree, and are
-> -- 
-> 2.1.4
-> 
+On Fri, Sep 7, 2012 at 9:26 AM, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> +static void ipi_cpu_stop(unsigned int cpu)
+> +{
+> +       if (system_state == SYSTEM_BOOTING ||
+> +           system_state == SYSTEM_RUNNING) {
+> +               raw_spin_lock(&stop_lock);
+> +               pr_crit("CPU%u: stopping\n", cpu);
+> +               dump_stack();
+> +               raw_spin_unlock(&stop_lock);
+> +       }
+> +
+> +       set_cpu_online(cpu, false);
+> +
+> +       local_fiq_disable();
+> +       local_irq_disable();
+> +
+> +       while (1)
+> +               cpu_relax();
+> +}
+
+Why do you display a message and dump the stack when a CPU is stopped?
+ I ask because emergency_restart() calls this function, and so
+whenever I want to do an "emergency" reboot, it dumps the stack for
+each core.  On an ARM64 system with lots of cores, this produces a ton
+of output.  That makes emergency_restart() almost useless.
+
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
