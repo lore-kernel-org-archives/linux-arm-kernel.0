@@ -1,52 +1,93 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Thu, 06 Aug 2015 17:12:02 +0100
-Subject: [PATCH 1/3] nvmem: Add i.MX6 OCOTP device tree binding
- documentation
-In-Reply-To: <1438693342-605-1-git-send-email-p.zabel@pengutronix.de>
-References: <1438693342-605-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <55C38752.3040406@linaro.org>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 6 Aug 2015 18:14:00 +0200
+Subject: [RFC PATCH 1/5] spi: introduce flag for memory mapped read
+In-Reply-To: <20150806135129.GJ7576@n2100.arm.linux.org.uk>
+References: <20150804155148.GR20873@sirena.org.uk> <55C0FD98.1090107@ti.com>
+ <20150805115013.GJ20873@sirena.org.uk>
+ <CAOMqctQXwcHyiWBwtugSDSE_k65qrNfrwnhjQMDJkLoJMmGzUw@mail.gmail.com>
+ <20150805124412.GN20873@sirena.org.uk>
+ <CAOMqctS9Y5FxpUCCJew6+cnjH5iTvbzkH3g-8yrXs4OuS2pSGA@mail.gmail.com>
+ <20150806090202.GO20873@sirena.org.uk>
+ <CAOMqctQZRZ4zG_yYy=CeX3DX4NVNWN1COP4Q-2YvMun9xYOA7g@mail.gmail.com>
+ <20150806102225.GI7576@n2100.arm.linux.org.uk>
+ <55C35233.2000105@ti.com>
+ <20150806135129.GJ7576@n2100.arm.linux.org.uk>
+Message-ID: <CAMuHMdWWDwZ=ziGQXFCnOX8pErXpsEi533J73_Hh=sEqq4hR6Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 04/08/15 14:02, Philipp Zabel wrote:
-> This patch documents the i.MX6 OCOTP device tree binding.
+On Thu, Aug 6, 2015 at 3:51 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Thu, Aug 06, 2015 at 05:55:23PM +0530, Vignesh R wrote:
+>> On the whole following are my requirements:
+>> 1. to be able to communicate with non -flash SPI devices via config port
+>> ( this functionality is supported by current driver, I dont want to
+>> break it). Or pump any spi_message on to SPI bus directly.
+>> 2. take advantage of memory mapped port in order to increase read
+>> throughput( and use dma in future) when the slave is a m25p80 type flash.
+>> 3. handle m25p80 as well as other slave on multiple chipselects.
+>>
+>> I just need to know whether the user that requested the transfer is
+>> m25p80 driver. If yes, ti-qspi driver can take advantage of memory
+>> mapped interface, else just use config port to access SPI bus directly.
 >
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> ---
->   .../devicetree/bindings/nvmem/imx-ocotp.txt          | 20 ++++++++++++++++++++
->   1 file changed, 20 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/nvmem/imx-ocotp.txt
+> The problem with this approach is that it's an abomination.  It's adding
+> a SPI-user specific hack which is detected by a specific driver.  That's
+> really not sane - what happens when we have lots of these kinds of "I'm
+> an X SPI-user" with drivers detecting that?  It's not maintainable in the
+> long term.
 >
-> diff --git a/Documentation/devicetree/bindings/nvmem/imx-ocotp.txt b/Documentation/devicetree/bindings/nvmem/imx-ocotp.txt
-> new file mode 100644
-> index 0000000..7d9a3fc
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/nvmem/imx-ocotp.txt
-> @@ -0,0 +1,20 @@
-> +Freescale i.MX6 On-Chip OTP Controller (OCOTP) device tree bindings
-> +
-> +This binding represents the on-chip eFuse OTP controller found on
-> +i.MX6Q/D, i.MX6DL/S, i.MX6SL, and i.MX6SX SoCs.
-> +
-> +Required properties:
-> +- compatible: should be one of
-> +	"fsl,imx6q-ocotp" (i.MX6Q/D/DL/S),
-> +        "fsl,imx6sl-ocotp" (i.MX6SL), or
-> +	"fsl,imx6sx-ocotp" (i.MX6SX), followed by "syscon".
-> +- reg: Should contain the register base and length.
-> +- clocks: Should contain a phandle pointing to the gated peripheral clock.
-> +
-> +Example:
-> +
-> +	ocotp: ocotp at 021bc000 {
-> +		compatible = "fsl,imx6q-ocotp", "syscon";
-Do you still need syscon?
-
-> +		reg = <0x021bc000 0x4000>;
-Can't we just have a register range specific to the OTP device?
-
-> +		clocks = <&clks IMX6QDL_CLK_IIM>;
-> +	};
+> Yes, your requirements _today_ seem simple and easy, but you're only
+> thinking about today, not tomorrow when you've moved on and someone else
+> has to maintain the mess left behind (or delete it from mainline because
+> they're sick of dealing with a hack.)
 >
+>> The spi_message that is received in transfer_one_message() is too
+>> generic to imply the slave device that is on the other side of the wire.
+>> IMO, the read command does not imply that the slave is m25p80 flash
+>> (besides the read opcodes vary across vendors of m25p80 and across modes).
+>
+> I can see both sides of the argument.
+>
+> Mark is saying: if the SPI driver detects that the message to be transmitted
+> is a read command followed by the appropriate number of dummy bytes, and
+> then the data being read _and_ it's using quad-mode access, and the hardware
+> generates _exactly_ that in hardware using the memory mapped mode, there is
+> no reason _not_ to use the hardware to achieve that SPI transaction.  The
+> bus activity will be identical to what happens when the SPI controller is
+> used manually to achieve that bus sequence.
+>
+> You're saying: but the documentation says you can't use it for anything
+> except m25p80.  If you look at 24.5.4.1.2, it tells you what the SFI
+> generates on the bus, which is:
+>
+> 1. CS active
+> 2. Read command byte sent
+> 3. 1-4 address bytes sent
+> 4. 0-3 dummy bytes sent
+> 5. data bytes read from bus
+> 6. CS inactive
+>
+> So, Mark's point is "if we can detect a transaction which fits _that_
+> bus activity, there's no reason not to use this acceleration for the
+> transaction."
+>
+> What you're failing to counter with is: we don't have enough information
+> in the SPI driver to know how many dummy bytes there are between the
+> address bytes and the data read from the bus.
+
+Irrespective of the dummy bytes.
+What if the spi device is not a FLASH ROM, but some other device,
+which receives a data packet that accidentally looks like an m25p80 READ
+command?
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
