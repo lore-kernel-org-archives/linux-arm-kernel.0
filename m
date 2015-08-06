@@ -1,82 +1,71 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 5 Aug 2015 22:01:01 -0500
-Subject: [PATCH 6/9] ARM: domain: Add platform handlers for CPU PM domains
-In-Reply-To: <20150805192341.GB52339@linaro.org>
-References: <1438731339-58317-1-git-send-email-lina.iyer@linaro.org>
- <1438731339-58317-7-git-send-email-lina.iyer@linaro.org>
- <CAL_JsqKWekSGiFbZz6++3ibAzY_8Y6+0nOBQinFVw4cBk6JvEw@mail.gmail.com>
- <20150805192341.GB52339@linaro.org>
-Message-ID: <CAL_JsqJ_AK6M5WmyFrGVLtpGg=MdAafxX=1873Je_uB_sQkpiA@mail.gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 05 Aug 2015 20:12:10 -0700
+Subject: [PATCH RFT] ata: ahci_brcmstb: Fix misuse of IS_ENABLED
+In-Reply-To: <1438827394.19066.1.camel@ingics.com>
+References: <1438827394.19066.1.camel@ingics.com>
+Message-ID: <55C2D08A.1040408@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 5, 2015 at 2:23 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
-> On Wed, Aug 05 2015 at 08:45 -0600, Rob Herring wrote:
->>
->> On Tue, Aug 4, 2015 at 6:35 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
->>>
->>> In addition to the common power up/down actions of CPU PM domain core,
->>> platforms may have additional configuration before the CPU domain can be
->>> powered off or considered active. Allow platform drivers to register
->>> handlers for CPU PM domains.
->>>
->>> Platform drivers may register their callbacks against a compatible
->>> string defined by their PM domain provider device node in the DT. At
->>> domain init, the platform driver can initialize the platform specific
->>> genpd attributes. The init callback would need to return successfully,
->>> for the platform power_on/off handlers to be registered with the CPU PM
->>> domain.
->>>
->>> The code uses __init section to reduce memory needed for platform
->>> handlers and therefore can be freed after the driver is initialized, a
->>> desirable outcome for single kernel image.
->>
->>
->> [...]
->>
->>> diff --git a/arch/arm/include/asm/arm-pd.h
->>> b/arch/arm/include/asm/arm-pd.h
->>> new file mode 100644
->>> index 0000000..fc44abf
->
->
-> [...]
->
->>> +#define ARM_PD_METHOD_OF_DECLARE(_name, _handle, _ops) \
->>> +       static const struct of_arm_pd_method
->>> __arm_pd_method_of_table_##_name \
->>> +       __used __section(__arm_pd_method_of_table)              \
->>> +       = { .handle = _handle, .ops = _ops }
->>
->>
->> AFAICT, you are not using this in this series. You should add it when
->> you have a user.
->>
->> Ideally, we keep some amount of uniformity across various *_OF_DECLARE
->> which is why we have OF_DECLARE_1 and OF_DECLARE_2. This makes all the
->> sections just arrays of struct of_device_id. Not all users follow
->> this, but most do. So instead of putting the ops in here, platforms
->> can provide a function callback which can then set the ops. Then you
->> also don't need the .init() ops function as the callback function can
->> do any initialization too.
->>
-> I looked through these and I can switch over to _OF_DECLARE() without any
-> issues, but using OF_DECLARE_1 or OF_DECLARE_2 is pretty limiting.
+Le 08/05/15 19:16, Axel Lin a ?crit :
+> While IS_ENABLED() is perfectly fine for CONFIG_* symbols, it is not
+> for other symbols such as __BIG_ENDIAN that is provided directly by
+> the compiler.
+> 
+> Signed-off-by: Axel Lin <axel.lin@ingics.com>
+> ---
+> Hi,
+> I don't have a big endian machine to test this, so I'd appreciate if
+> someone can review and test this patch.
+> 
+> A similar misuse of IS_ENABLED is reported and fixed in:
+> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/drivers/dma/mv_xor.c?id=0ec9ebc706fbd394bc233d87ac7aaad1c4f3ab54
 
-Well yes, but then we only want to use it for things that will never
-use the driver model.
+Would not CONFIG_CPU_BIG_ENDIAN be more appropriate here? On MIPS at
+least, this is what gets set when selecting a big-endian kernel.
 
-> If I could set up my own function type for the .data member, then its a
-> lot more easier on the code. Like this -
->
-> typedef int (*arm_pd_init)(struct device_node *dn, struct
->                 generic_pm_domain *genpd, struct of_arm_pd_ops *ops);
+Thanks!
 
-You alloc the genpd struct just before calling init. You can just as
-easily have the platform specific code call an allocation function and
-a function to set the ops functions. This is more inline with how a
-driver would work when registering with a subsystem. I also don't
-think "arm,pd" is a good compatible string to be matching on. I'll
-comment on that more in patch 5.
+> 
+>  drivers/ata/ahci_brcmstb.c | 18 ++++++++++--------
+>  1 file changed, 10 insertions(+), 8 deletions(-)
+> 
+> diff --git a/drivers/ata/ahci_brcmstb.c b/drivers/ata/ahci_brcmstb.c
+> index 42b6cf4..fc6413f 100644
+> --- a/drivers/ata/ahci_brcmstb.c
+> +++ b/drivers/ata/ahci_brcmstb.c
+> @@ -92,19 +92,21 @@ static inline u32 brcm_sata_readreg(void __iomem *addr)
+>  	 * Other architectures (e.g., ARM) either do not support big endian, or
+>  	 * else leave I/O in little endian mode.
+>  	 */
+> -	if (IS_ENABLED(CONFIG_MIPS) && IS_ENABLED(__BIG_ENDIAN))
+> -		return __raw_readl(addr);
+> -	else
+> -		return readl_relaxed(addr);
+> +#if defined(__BIG_ENDIAN) && IS_ENABLED(CONFIG_MIPS)
+> +	return __raw_readl(addr);
+> +#else
+> +	return readl_relaxed(addr);
+> +#endif
+>  }
+>  
+>  static inline void brcm_sata_writereg(u32 val, void __iomem *addr)
+>  {
+>  	/* See brcm_sata_readreg() comments */
+> -	if (IS_ENABLED(CONFIG_MIPS) && IS_ENABLED(__BIG_ENDIAN))
+> -		__raw_writel(val, addr);
+> -	else
+> -		writel_relaxed(val, addr);
+> +#if defined(__BIG_ENDIAN) && IS_ENABLED(CONFIG_MIPS)
+> +	__raw_writel(val, addr);
+> +#else
+> +	writel_relaxed(val, addr);
+> +#endif
+>  }
+>  
+>  static void brcm_sata_phy_enable(struct brcm_ahci_priv *priv, int port)
+> 
 
-Rob
+
+-- 
+Florian
