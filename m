@@ -1,54 +1,80 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 6 Aug 2015 16:35:08 +0200
-Subject: [linux-sunxi] [PATCH] musb: sunxi: Ignore VBus errors in
- host-only mode
-In-Reply-To: <55C31963.2010701@schinagl.nl>
-References: <1438723553-4136-1-git-send-email-hdegoede@redhat.com>
- <55C31963.2010701@schinagl.nl>
-Message-ID: <55C3709C.4080609@redhat.com>
+From: boris.ostrovsky@oracle.com (Boris Ostrovsky)
+Date: Thu, 06 Aug 2015 13:34:52 -0400
+Subject: Fw: drivers/xen/pci.c:31:25: fatal error: asm/pci_x86.h: No such
+ file or directory
+In-Reply-To: <20150806170426.GM1820@rric.localhost>
+References: <20150806170426.GM1820@rric.localhost>
+Message-ID: <55C39ABC.5020101@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 06-08-15 10:22, Olliver Schinagl wrote:
-> Hey Hans,
+On 08/06/2015 01:04 PM, Robert Richter wrote:
+> Boris,
 >
-> I've tried getting your musb stuff working on a cubietruck, but i don't seem to see this patch on your linux-sunxi/sunxi-wip branch on github? Is your github branch fully functional at the moment?
+> we are working on acpi pci support for arm64. For this we are enabling
+> PCI_MMCONFIG on arm64 which breaks compiling drivers/xen/pci.c.
 >
-> What I have done so far, is build the kernel using sunxi_defconfig and enabled USB_MUSB_SUNXI with its dependancies (musb isn't enabled there by default): USB_SUPPORT [=y] && USB_MUSB_HDRC [=y] && ARCH_SUNXI [=y] && NOP_USB_XCEIV [=y] && PHY_SUN4I_USB [=y] && EXTCON [=y] && GENERIC_PHY [=y]  Selects: SUNXI_SRAM [=y]
+> Looking into it there is x86 code in generic driver code introduced
+> with:
 >
-> I changed the dts from dr_mode='otg' to dr_mode='host', a) we only need host mode anyway (the id pin isn't properly connected)
-
-If you change the dr_mode to host then you _must_ also remove any id_det and vbus_det
-gpio settings from the usb_phy node in the dts, as the sun4i phy code detects
-host vs otg mode by checking for the presence of these.
-
- > and b) I got an error about an known dr_mode before and this was the quick and easy way.
+>   8deb3eb1461e xen/mcfg: Call PHYSDEVOP_pci_mmcfg_reserved for MCFG areas.
 >
-> Dmesg produces the following related to musb.
+> This implements:
 >
-> [    1.691062] usb_phy_generic.0.auto supply vcc not found, using dummy regulator
-> [    1.691445] musb-hdrc: ConfigData=0xde (UTMI-8, dyn FIFOs, bulk combine, bulk split, HB-ISO Rx, HB-ISO Tx, SoftConn)
-> [    1.691453] musb-hdrc: MHDRC RTL version 0.0
-> [    1.691467] musb-hdrc: 11/11 max ep, 5184/8192 memory
-> [    1.691543] musb-hdrc musb-hdrc.1.auto: MUSB HDRC host driver
-> [    1.691553] musb-hdrc musb-hdrc.1.auto: new USB bus registered, assigned bus number 5
-> [    1.692470] hub 5-0:1.0: USB hub found
-> [    1.692529] hub 5-0:1.0: 1 port detected
-> [    1.699956] sunxi-rtc 1c20d00.rtc: setting system clock to 2015-08-06 07:59:08 UTC (1438847948)
-> [    1.704733] usb0-vbus: disabling
-> [    1.765695] ldo4: disabling
-> [    1.808351] ldo3: disabling
-> [    1.848769] vcc5v0: disabling
-> [    1.848774] vcc3v0: disabling
+> diff --git a/drivers/xen/pci.c b/drivers/xen/pci.c
+> index 18fff88254eb..d15f6e80479f 100644
+> --- a/drivers/xen/pci.c
+> +++ b/drivers/xen/pci.c
+> @@ -26,6 +26,7 @@
+>   #include <asm/xen/hypervisor.h>
+>   #include <asm/xen/hypercall.h>
+>   #include "../pci/pci.h"
+> +#include <asm/pci_x86.h>
+>   
+>   static bool __read_mostly pci_seg_supported = true;
+>   
+> @@ -192,3 +193,49 @@ static int __init register_xen_pci_notifier(void)
+>   }
+>   
+>   arch_initcall(register_xen_pci_notifier);
+> +
+> +#ifdef CONFIG_PCI_MMCONFIG
+> +static int __init xen_mcfg_late(void)
+> +{
+> +       struct pci_mmcfg_region *cfg;
+> +       int rc;
+> +
+> +       if (!xen_initial_domain())
+> +               return 0;
+> +
+> +       if ((pci_probe & PCI_PROBE_MMCONF) == 0)
+> +               return 0;
+> [...]
 >
-> The usb_phy_generic missing shouldn't be too bad? But the usb0-vbus being disabled obviously might be related to the musb port not working?
+> There are no defines for pci_probe and PCI_PROBE_MMCONF other than for
+> the x86 architecture.
+>
+> I see several ways to fix that:
+>
+>   * moving code to arch/x86/pci/xen.c,
 
-Correct.
+If this routine is not going to be used by ARM I think this would be the 
+way to go. Stefano --- will this be needed by ARM?
 
-For starters I would try the dts changes I suggested above.
+>
+>   * make code dependent on arch X86,
+>
+>   * make 'if (pci_probe & PCI_PROBE_MMCONF) ...' an arch function to be
+>     implemented by archs,
 
-Regards,
+Otherwise I'd go with this.
 
-Hans
+-boris
+
+>
+>   * reworking the code by removing the check (not sure if that could be
+>     done).
+>
+> I don't think PCI_XEN is enabled yet for arm64, so we just disalbe it
+> for !X86 or move it to arch/x86. I suggest the latter. Is there any
+> preference you have?
