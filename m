@@ -1,87 +1,56 @@
-From: jingoohan1@gmail.com (Jingoo Han)
-Date: Thu, 6 Aug 2015 23:41:36 +0900
-Subject: [RFC PATCH 0/8] Add Analogix Core Display Port Driver
-In-Reply-To: <1438868947-22132-1-git-send-email-ykk@rock-chips.com>
-References: <1438868947-22132-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <000201d0d056$06cff040$146fd0c0$@com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu,  6 Aug 2015 16:42:42 +0200
+Subject: [PATCH 3/4 v2] ARM: nomadik: move l2x0 setup to device tree
+Message-ID: <1438872162-13565-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, August 06, 2015 10:49 PM, Yakir Yang wrote:
-> 
-> Hi all,
->    Samsung exynos and Rockchip rk3288 almost share same dp controller,
-> so I split the common code out, then rk3288 and exynos can re-used the
-> same dp core driver. Cause I can't find the exact IP name of exynos dp
-> controller, so I decide to name dp core driver with "analogix" which I
-> find in rk3288 eDP TRM ;)
+The cache setup magic value in the Nomadik machine is plain wrong,
+the correct settings can be done using device tree in accordance
+with the settings from ST's own port.
 
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+This v2 version fixes the syntactic minimalism issue with
+just 0/~0 for the AUX val/mask pointed out by Russell.
+---
+ arch/arm/boot/dts/ste-nomadik-stn8815.dtsi | 7 +++++++
+ arch/arm/mach-nomadik/cpu-8815.c           | 5 ++---
+ 2 files changed, 9 insertions(+), 3 deletions(-)
 
-OK, I see.
-The Samsung Exynos eDP contoller and Rockchip rk3288 eDP contoller share
-the same IP. So, a lot of parts can be re-used. I agree with this.
-However, we have to review the code carefully, as others did.
-
-I also cannot find the exact IP name. The "analogix" may be the vendor name
-of this IP.
-
-Best regards,
-Jingoo Han
-
-> 
-> Beyond that, there are three light registers setting differents bewteen
-> exynos and rk3288.
-> 1. RK3288 have five special pll resigters which not indicata in exynos
->    dp controller.
-> 2. The address of DP_PHY_PD(dp phy power manager register) are different
->    between rk3288 and exynos.
-> 3. Rk3288 and exynos have different setting with AUX_HW_RETRY_CTL(dp debug
->    register).
-> 
-> My series patches can be divider into two parts: One for spliting the
-> analogix_dp code from exynos dp driver. Another are trying to add rk3288
-> dp driver support.
-> 
-> Best regards,
-> - Yakir
-> 
-> 
-> Yakir Yang (8):
->   drm: exynos/dp: fix code style
->   drm: exynos/dp: convert to drm bridge mode
->   drm: bridge: analogix_dp: split exynos dp driver to bridge dir
->   drm: rockchip/dp: add rockchip platform dp driver
->   drm: bridge/analogix_dp: add platform device type support
->   drm: bridge: analogix_dp: add some rk3288 special registers setting
->   drm: bridge: analogix_dp: try force hpd after plug in lookup failed
->   drm: bridge/analogix_dp: expand the delay time for hpd detect
-> 
->  drivers/gpu/drm/bridge/Kconfig                     |    5 +
->  drivers/gpu/drm/bridge/Makefile                    |    1 +
->  drivers/gpu/drm/bridge/analogix_dp_core.c          | 1397 +++++++++++++++++++
->  drivers/gpu/drm/bridge/analogix_dp_core.h          |  287 ++++
->  drivers/gpu/drm/bridge/analogix_dp_reg.c           | 1295 ++++++++++++++++++
->  .../exynos_dp_reg.h => bridge/analogix_dp_reg.h}   |  272 ++--
->  drivers/gpu/drm/exynos/Kconfig                     |    5 +-
->  drivers/gpu/drm/exynos/Makefile                    |    2 +-
->  drivers/gpu/drm/exynos/analogix_dp-exynos.c        |  241 ++++
->  drivers/gpu/drm/exynos/exynos_dp_core.c            | 1416 --------------------
->  drivers/gpu/drm/exynos/exynos_dp_core.h            |  282 ----
->  drivers/gpu/drm/exynos/exynos_dp_reg.c             |  100 +-
->  drivers/gpu/drm/rockchip/Kconfig                   |   10 +
->  drivers/gpu/drm/rockchip/Makefile                  |    1 +
->  drivers/gpu/drm/rockchip/analogix_dp-rockchip.c    |  420 ++++++
->  include/drm/bridge/analogix_dp.h                   |   28 +
->  16 files changed, 3880 insertions(+), 1882 deletions(-)
->  create mode 100644 drivers/gpu/drm/bridge/analogix_dp_core.c
->  create mode 100644 drivers/gpu/drm/bridge/analogix_dp_core.h
->  create mode 100644 drivers/gpu/drm/bridge/analogix_dp_reg.c
->  rename drivers/gpu/drm/{exynos/exynos_dp_reg.h => bridge/analogix_dp_reg.h} (62%)
->  create mode 100644 drivers/gpu/drm/exynos/analogix_dp-exynos.c
->  delete mode 100644 drivers/gpu/drm/exynos/exynos_dp_core.c
->  delete mode 100644 drivers/gpu/drm/exynos/exynos_dp_core.h
->  create mode 100644 drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
->  create mode 100644 include/drm/bridge/analogix_dp.h
-> 
-> --
-> 2.1.2
+diff --git a/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi b/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
+index f68988ac800c..ce8936bebe5e 100644
+--- a/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
++++ b/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
+@@ -21,6 +21,13 @@
+ 		interrupts = <30>;
+ 		cache-unified;
+ 		cache-level = <2>;
++		cache-size = <131072>;
++		cache-sets = <512>;
++		cache-line-size = <32>;
++		/* At full speed latency must be >=2 */
++		arm,tag-latency = <2>;
++		arm,data-latency = <2 2>;
++		arm,dirty-latency = <2>;
+ 	};
+ 
+ 	mtu0: mtu at 101e2000 {
+diff --git a/arch/arm/mach-nomadik/cpu-8815.c b/arch/arm/mach-nomadik/cpu-8815.c
+index 82831dc6122f..0c612d95bd5c 100644
+--- a/arch/arm/mach-nomadik/cpu-8815.c
++++ b/arch/arm/mach-nomadik/cpu-8815.c
+@@ -114,9 +114,8 @@ static const char * cpu8815_board_compat[] = {
+ };
+ 
+ DT_MACHINE_START(NOMADIK_DT, "Nomadik STn8815")
+-	/* At full speed latency must be >=2, so 0x249 in low bits */
+-	.l2c_aux_val	= 0x00700249,
+-	.l2c_aux_mask	= 0xfe0fefff,
++	.l2c_aux_val	= 0,
++	.l2c_aux_mask	= ~0,
+ 	.map_io		= cpu8815_map_io,
+ 	.restart	= cpu8815_restart,
+ 	.dt_compat      = cpu8815_board_compat,
+-- 
+2.4.3
