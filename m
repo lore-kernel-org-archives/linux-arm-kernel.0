@@ -1,224 +1,68 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 06 Aug 2015 02:59:47 -0700
-Subject: [PATCH v5 1/2] drivers: watchdog: add a driver to support SAMA5D4
- watchdog timer
-In-Reply-To: <1438850055-30104-2-git-send-email-wenyou.yang@atmel.com>
-References: <1438850055-30104-1-git-send-email-wenyou.yang@atmel.com>
- <1438850055-30104-2-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <55C33013.6020002@roeck-us.net>
+From: hramrach@gmail.com (Michal Suchanek)
+Date: Thu, 6 Aug 2015 12:01:37 +0200
+Subject: [RFC PATCH 1/5] spi: introduce flag for memory mapped read
+In-Reply-To: <20150806090202.GO20873@sirena.org.uk>
+References: <1438072876-16338-1-git-send-email-vigneshr@ti.com>
+ <1438072876-16338-2-git-send-email-vigneshr@ti.com>
+ <20150731181745.GM20873@sirena.org.uk>
+ <55BEF4AF.5090704@ti.com> <20150804155148.GR20873@sirena.org.uk>
+ <55C0FD98.1090107@ti.com> <20150805115013.GJ20873@sirena.org.uk>
+ <CAOMqctQXwcHyiWBwtugSDSE_k65qrNfrwnhjQMDJkLoJMmGzUw@mail.gmail.com>
+ <20150805124412.GN20873@sirena.org.uk>
+ <CAOMqctS9Y5FxpUCCJew6+cnjH5iTvbzkH3g-8yrXs4OuS2pSGA@mail.gmail.com>
+ <20150806090202.GO20873@sirena.org.uk>
+Message-ID: <CAOMqctQZRZ4zG_yYy=CeX3DX4NVNWN1COP4Q-2YvMun9xYOA7g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 08/06/2015 01:34 AM, Wenyou Yang wrote:
->>From SAMA5D4, the watchdog timer is upgrated with a new feature,
-
-Where does the additional ">" come from ?
-
-> which is describled as in the datasheet, "WDT_MR can be written
-> until a LOCKMR command is issued in WDT_CR".
-> That is to say, as long as the bootstrap and u-boot don't issue
-> a LOCKMR command, WDT_MR can be written more than once in the driver.
+On 6 August 2015 at 11:02, Mark Brown <broonie@kernel.org> wrote:
+> On Wed, Aug 05, 2015 at 02:56:09PM +0200, Michal Suchanek wrote:
+>> On 5 August 2015 at 14:44, Mark Brown <broonie@kernel.org> wrote:
+>> > On Wed, Aug 05, 2015 at 02:40:01PM +0200, Michal Suchanek wrote:
 >
-> So the SAMA5D4 watchdog driver's implementation is different from
-> the at91sam9260 watchdog driver implemented in file at91sam9_wdt.c.
-> The user application open the device file to enable the watchdog timer
-> hardware, and close to disable it, and set the watchdog timer timeout
-> by seting WDV and WDD fields of WDT_MR register, and ping the watchdog
-> by issuing WDRSTT command to WDT_CR register with hard-coded key.
+>> >> I don't think sending 03 or other random byte as the first byte of a
+>> >> SPI transfer can be used as reliable detection that we are talking to
+>> >> a SPI flash memory.
 >
-> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-> ---
->   drivers/watchdog/Kconfig        |    9 ++
->   drivers/watchdog/Makefile       |    1 +
->   drivers/watchdog/at91sam9_wdt.h |    2 +
->   drivers/watchdog/sama5d4_wdt.c  |  280 +++++++++++++++++++++++++++++++++++++++
->   4 files changed, 292 insertions(+)
->   create mode 100644 drivers/watchdog/sama5d4_wdt.c
+>> > Why care - if something is physically in the same format as a flash read
+>> > command how would a device be able to tell that it wasn't actually a
+>> > flash read command?  The signals sent on the bus are going to be
+>> > identical anyway.
 >
-> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-> index e5e7c55..47ad39a 100644
-> --- a/drivers/watchdog/Kconfig
-> +++ b/drivers/watchdog/Kconfig
-> @@ -167,6 +167,15 @@ config AT91SAM9X_WATCHDOG
->   	  Watchdog timer embedded into AT91SAM9X and AT91CAP9 chips. This will
->   	  reboot your system when the timeout is reached.
+>> Not only must the command be the same but also the response must be tha same.
 >
-> +config SAMA5D4_WATCHDOG
-> +	tristate "Atmel SAMA5D4 Watchdog Timer"
-> +	depends on ARCH_AT91
-> +	select WATCHDOG_CORE
-> +	help
-> +	  Atmel SAMA5D4 watchdog timer is embedded into SAMA5D4 chips.
-> +	  Its Watchdog Timer Mode Register can be written more than once.
-> +	  This will reboot your system when the timeout is reached.
-> +
->   config CADENCE_WATCHDOG
->   	tristate "Cadence Watchdog Timer"
->   	select WATCHDOG_CORE
-> diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
-> index 5c19294..f24b820 100644
-> --- a/drivers/watchdog/Makefile
-> +++ b/drivers/watchdog/Makefile
-> @@ -41,6 +41,7 @@ obj-$(CONFIG_IXP4XX_WATCHDOG) += ixp4xx_wdt.o
->   obj-$(CONFIG_KS8695_WATCHDOG) += ks8695_wdt.o
->   obj-$(CONFIG_S3C2410_WATCHDOG) += s3c2410_wdt.o
->   obj-$(CONFIG_SA1100_WATCHDOG) += sa1100_wdt.o
-> +obj-$(CONFIG_SAMA5D4_WATCHDOG) += sama5d4_wdt.o
->   obj-$(CONFIG_DW_WATCHDOG) += dw_wdt.o
->   obj-$(CONFIG_EP93XX_WATCHDOG) += ep93xx_wdt.o
->   obj-$(CONFIG_PNX4008_WATCHDOG) += pnx4008_wdt.o
-> diff --git a/drivers/watchdog/at91sam9_wdt.h b/drivers/watchdog/at91sam9_wdt.h
-> index c6fbb2e6..b79a83b 100644
-> --- a/drivers/watchdog/at91sam9_wdt.h
-> +++ b/drivers/watchdog/at91sam9_wdt.h
-> @@ -22,11 +22,13 @@
+> What difference would that make?  The caller is sending a single SPI
+> operation and this is a user visible thing...
 >
->   #define AT91_WDT_MR		0x04			/* Watchdog Mode Register */
->   #define		AT91_WDT_WDV		(0xfff << 0)		/* Counter Value */
-> +#define			AT91_WDT_SET_WDV(x)	((x) & AT91_WDT_WDV)
->   #define		AT91_WDT_WDFIEN		(1     << 12)		/* Fault Interrupt Enable */
->   #define		AT91_WDT_WDRSTEN	(1     << 13)		/* Reset Processor */
->   #define		AT91_WDT_WDRPROC	(1     << 14)		/* Timer Restart */
->   #define		AT91_WDT_WDDIS		(1     << 15)		/* Watchdog Disable */
->   #define		AT91_WDT_WDD		(0xfff << 16)		/* Delta Value */
-> +#define			AT91_WDT_SET_WDD(x)	(((x) << 16) & AT91_WDT_WDD)
->   #define		AT91_WDT_WDDBGHLT	(1     << 28)		/* Debug Halt */
->   #define		AT91_WDT_WDIDLEHLT	(1     << 29)		/* Idle Halt */
+>> The flash chip responds by sending arbitrary amount of data. Given
+>> that transfer_one gets only the part that sends the read command and
+>> the part to do the actual read may or may not follow this is getting a
+>> bit hairy. Add in dummy bytes due to fast-read lag and page write
+>> wrap-around and you get something that you definitely do not want
+>> unless you are really sure that there is a flash memory on the other
+>> end of the wire.
 >
-> diff --git a/drivers/watchdog/sama5d4_wdt.c b/drivers/watchdog/sama5d4_wdt.c
-> new file mode 100644
-> index 0000000..a412215
-> --- /dev/null
-> +++ b/drivers/watchdog/sama5d4_wdt.c
-> @@ -0,0 +1,280 @@
-> +/*
-> + * Driver for Atmel SAMA5D4 Watchdog Timer
-> + *
-> + * Copyright (C) 2015 Atmel Corporation
-> + *
-> + * Licensed under GPLv2.
-> + */
-> +
-> +#include <linux/interrupt.h>
-> +#include <linux/io.h>
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/of_irq.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/reboot.h>
-> +#include <linux/watchdog.h>
-> +
-> +#include "at91sam9_wdt.h"
-> +
-> +/* minimum and maximum watchdog timeout, in seconds */
-> +#define MIN_WDT_TIMEOUT		1
-> +#define MAX_WDT_TIMEOUT		16
-> +#define WDT_DEFAULT_TIMEOUT	MAX_WDT_TIMEOUT
-> +
-> +#define WDT_SEC2TICKS(s)	((s) ? (((s) << 8) - 1) : 0)
-> +
-> +struct sama5d4_wdt {
-> +	struct watchdog_device	wdd;
-> +	void __iomem		*reg_base;
-> +	u32	config;
-> +};
-> +
-> +static int wdt_timeout = WDT_DEFAULT_TIMEOUT;
-> +static bool nowayout = WATCHDOG_NOWAYOUT;
-> +
-> +module_param(wdt_timeout, int, 0);
-> +MODULE_PARM_DESC(wdt_timeout,
-> +	"Watchdog timeout in seconds. (default = "
-> +	__MODULE_STRING(WDT_DEFAULT_TIMEOUT) ")");
-> +
-> +module_param(nowayout, bool, 0);
-> +MODULE_PARM_DESC(nowayout,
-> +	"Watchdog cannot be stopped once started (default="
-> +	__MODULE_STRING(WATCHDOG_NOWAYOUT) ")");
-> +
-> +#define wdt_read(wdt, field) \
-> +	readl_relaxed((wdt)->reg_base + (field))
-> +
-> +#define wdt_write(wtd, field, val) \
-> +	writel_relaxed((val), (wdt)->reg_base + (field))
-> +
-> +static int sama5d4_wdt_start(struct watchdog_device *wdd)
-> +{
-> +	struct sama5d4_wdt *wdt = watchdog_get_drvdata(wdd);
-> +	u32 reg;
-> +
-> +	reg = wdt_read(wdt, AT91_WDT_MR);
-> +	reg &= ~AT91_WDT_WDDIS;
-> +	wdt_write(wdt, AT91_WDT_MR, reg);
-> +
-> +	return 0;
-> +}
-> +
-> +static int sama5d4_wdt_stop(struct watchdog_device *wdd)
-> +{
-> +	struct sama5d4_wdt *wdt = watchdog_get_drvdata(wdd);
-> +	u32 reg;
-> +
-> +	reg = wdt_read(wdt, AT91_WDT_MR);
-> +	reg |= AT91_WDT_WDDIS;
-> +	wdt_write(wdt, AT91_WDT_MR, reg);
-> +
-> +	return 0;
-> +}
-> +
-> +static int sama5d4_wdt_ping(struct watchdog_device *wdd)
-> +{
-> +	struct sama5d4_wdt *wdt = watchdog_get_drvdata(wdd);
-> +
-> +	wdt_write(wdt, AT91_WDT_CR, AT91_WDT_KEY | AT91_WDT_WDRSTT);
-> +
-> +	return 0;
-> +}
-> +
-> +static int sama5d4_wdt_set_timeout(struct watchdog_device *wdd,
-> +				 unsigned int timeout)
-> +{
-> +	struct sama5d4_wdt *wdt = watchdog_get_drvdata(wdd);
-> +	u32 value = WDT_SEC2TICKS(timeout);
-> +	u32 reg;
-> +
-> +	reg = wdt_read(wdt, AT91_WDT_MR);
-> +	reg &= ~AT91_WDT_WDV;
-> +	reg &= ~AT91_WDT_WDD;
-> +	reg |= AT91_WDT_SET_WDV(value);
-> +	reg |= AT91_WDT_SET_WDD(value);
-> +	wdt_write(wdt, AT91_WDT_MR, reg);
-> +
-> +	wdd->timeout = timeout;
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct watchdog_info sama5d4_wdt_info = {
-> +	.options = WDIOF_SETTIMEOUT | WDIOF_MAGICCLOSE | WDIOF_KEEPALIVEPING,
-> +	.identity = "Atmel SAMA5D4 Watchdog"
-> +};
-> +
-> +static struct watchdog_ops sama5d4_wdt_ops = {
-> +	.owner = THIS_MODULE,
-> +	.start = sama5d4_wdt_start,
-> +	.stop = sama5d4_wdt_stop,
-> +	.ping = sama5d4_wdt_ping,
-> +	.set_timeout = sama5d4_wdt_set_timeout
+> So if you're doing this you may have a good reason to implement
+> transfer_one_message() instead.  Or perhaps implement it in the core and
+> provide operations to do the map and unmap.  And of course if this sort
+> of requirement exists that's an obvious thing that must be documented
+> in the interfaces but isn't.
+>
+> We need a lot more thought about the interface here, the lack of any
+> explanation of what the interface is supposed to be and the fact that
+> all questions about it are being answered in terms of describing the
+> specific system are both a bit worrying.
 
-You made another silent change in v4: You dropped the comma here,
-and above after .identity. Now, while it makes sense to have no comma
-after "{ }", it does make sense to have the comma here, because it
-avoids unnecessary conflicts and build errors later on if a member
-is added at the end of the list. Please add those commas back in.
+Disclaimer: I am not familiar with the hardware for which this patch
+adds support.
 
-Also, please stop making silent changes like this. You are making
-it really hard to review your code - now I'll have to go through
-it line by line again and compare it with your earlier patches to see
-if you made any other unannounced changes.
+However, I am familiar m25p80.c and as I understand it the controller
+is basically supposed to implement m25p80.c in hardware when this flag
+is set.
 
-Thanks,
-Guenter
+If I was using m25p80.c to talk to anything but an actual flash chip
+it would get me quite worried.
+
+Thanks
+
+Michal
