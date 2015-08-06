@@ -1,46 +1,208 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 6 Aug 2015 15:20:09 +0100
-Subject: [Xen-devel] [PATCH v2 4/8] xen: Use the correctly the Xen memory
- terminologies
-In-Reply-To: <55C34250.3040801@citrix.com>
-References: <1438711972-18752-1-git-send-email-julien.grall@citrix.com>
- <1438711972-18752-5-git-send-email-julien.grall@citrix.com>
- <55C33E4E.4050704@citrix.com>
- <alpine.DEB.2.02.1508061205190.11337@kaball.uk.xensource.com>
- <55C34250.3040801@citrix.com>
-Message-ID: <alpine.DEB.2.02.1508061520010.11337@kaball.uk.xensource.com>
+From: ykk@rock-chips.com (Yakir Yang)
+Date: Thu,  6 Aug 2015 09:22:05 -0500
+Subject: [RFC PATCH 6/8] drm: bridge: analogix_dp: add some rk3288 special
+ registers setting
+In-Reply-To: <1438868947-22132-1-git-send-email-ykk@rock-chips.com>
+References: <1438868947-22132-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <1438870925-23951-1-git-send-email-ykk@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 6 Aug 2015, Julien Grall wrote:
-> On 06/08/15 12:06, Stefano Stabellini wrote:
-> > On Thu, 6 Aug 2015, Julien Grall wrote:
-> >> Hi,
-> >>
-> >>
-> >> On 04/08/15 19:12, Julien Grall wrote:
-> >>> diff --git a/include/xen/page.h b/include/xen/page.h
-> >>> index c5ed20b..e7e1425 100644
-> >>> --- a/include/xen/page.h
-> >>> +++ b/include/xen/page.h
-> >>> @@ -3,9 +3,9 @@
-> >>>  
-> >>>  #include <asm/xen/page.h>
-> >>>  
-> >>> -static inline unsigned long page_to_mfn(struct page *page)
-> >>> +static inline unsigned long page_to_gfn(struct page *page)
-> >>>  {
-> >>> -	return pfn_to_mfn(page_to_pfn(page));
-> >>> +	return pfn_to_gfn(page_to_pfn(page));
-> >>>  }
-> >>
-> >> I've just noticed that there is a function gfn_to_page used for KVM.
-> >>
-> >> Maybe I should rename page_to_gfn to xen_page_to_gfn to avoid confusion
-> >> with KVM one?
-> > 
-> > Yeah, prepending xen would help to avoid namespace pollution.
-> 
-> Will do. May I keep your Reviewed-by for this mechanical change?
+RK3288 need some special registers setting, we can separate
+them out by the dev_type of plat_data.
 
-Yes
+Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+---
+ drivers/gpu/drm/bridge/analogix_dp_reg.c | 76 ++++++++++++++++++++------------
+ drivers/gpu/drm/bridge/analogix_dp_reg.h | 12 +++++
+ 2 files changed, 60 insertions(+), 28 deletions(-)
+
+diff --git a/drivers/gpu/drm/bridge/analogix_dp_reg.c b/drivers/gpu/drm/bridge/analogix_dp_reg.c
+index dfbbde7..4d6e08a 100644
+--- a/drivers/gpu/drm/bridge/analogix_dp_reg.c
++++ b/drivers/gpu/drm/bridge/analogix_dp_reg.c
+@@ -16,6 +16,8 @@
+ #include <linux/delay.h>
+ #include <linux/gpio.h>
+ 
++#include <drm/bridge/analogix_dp.h>
++
+ #include "analogix_dp_core.h"
+ #include "analogix_dp_reg.h"
+ 
+@@ -73,6 +75,14 @@ void analogix_dp_init_analog_param(struct analogix_dp_device *dp)
+ 	reg = SEL_24M | TX_DVDD_BIT_1_0625V;
+ 	writel(reg, dp->reg_base + ANALOGIX_DP_ANALOG_CTL_2);
+ 
++	if (dp->plat_data && (dp->plat_data->dev_type == RK3288_DP)) {
++		writel(REF_CLK_24M, dp->reg_base + ANALOGIX_DP_PLL_REG_1);
++		writel(0x95, dp->reg_base + ANALOGIX_DP_PLL_REG_2);
++		writel(0x40, dp->reg_base + ANALOGIX_DP_PLL_REG_3);
++		writel(0x58, dp->reg_base + ANALOGIX_DP_PLL_REG_4);
++		writel(0x22, dp->reg_base + ANALOGIX_DP_PLL_REG_5);
++	}
++
+ 	reg = DRIVE_DVDD_BIT_1_0625V | VCO_BIT_600_MICRO;
+ 	writel(reg, dp->reg_base + ANALOGIX_DP_ANALOG_CTL_3);
+ 
+@@ -207,81 +217,85 @@ void analogix_dp_set_analog_power_down(struct analogix_dp_device *dp,
+ 				       bool enable)
+ {
+ 	u32 reg;
++	u32 phy_pd_addr = ANALOGIX_DP_PHY_PD;
++
++	if (dp->plat_data && (dp->plat_data->dev_type == RK3288_DP))
++		phy_pd_addr = ANALOGIX_DP_PD;
+ 
+ 	switch (block) {
+ 	case AUX_BLOCK:
+ 		if (enable) {
+-			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
++			reg = readl(dp->reg_base + phy_dp_addr);
+ 			reg |= AUX_PD;
+-			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
++			writel(reg, dp->reg_base + phy_dp_addr);
+ 		} else {
+-			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
++			reg = readl(dp->reg_base + phy_dp_addr);
+ 			reg &= ~AUX_PD;
+-			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
++			writel(reg, dp->reg_base + phy_dp_addr);
+ 		}
+ 		break;
+ 	case CH0_BLOCK:
+ 		if (enable) {
+-			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
++			reg = readl(dp->reg_base + phy_dp_addr);
+ 			reg |= CH0_PD;
+-			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
++			writel(reg, dp->reg_base + phy_dp_addr);
+ 		} else {
+-			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
++			reg = readl(dp->reg_base + phy_dp_addr);
+ 			reg &= ~CH0_PD;
+-			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
++			writel(reg, dp->reg_base + phy_dp_addr);
+ 		}
+ 		break;
+ 	case CH1_BLOCK:
+ 		if (enable) {
+-			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
++			reg = readl(dp->reg_base + phy_dp_addr);
+ 			reg |= CH1_PD;
+-			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
++			writel(reg, dp->reg_base + phy_dp_addr);
+ 		} else {
+-			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
++			reg = readl(dp->reg_base + phy_dp_addr);
+ 			reg &= ~CH1_PD;
+-			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
++			writel(reg, dp->reg_base + phy_dp_addr);
+ 		}
+ 		break;
+ 	case CH2_BLOCK:
+ 		if (enable) {
+-			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
++			reg = readl(dp->reg_base + phy_dp_addr);
+ 			reg |= CH2_PD;
+-			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
++			writel(reg, dp->reg_base + phy_dp_addr);
+ 		} else {
+-			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
++			reg = readl(dp->reg_base + phy_dp_addr);
+ 			reg &= ~CH2_PD;
+-			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
++			writel(reg, dp->reg_base + phy_dp_addr);
+ 		}
+ 		break;
+ 	case CH3_BLOCK:
+ 		if (enable) {
+-			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
++			reg = readl(dp->reg_base + phy_dp_addr);
+ 			reg |= CH3_PD;
+-			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
++			writel(reg, dp->reg_base + phy_dp_addr);
+ 		} else {
+-			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
++			reg = readl(dp->reg_base + phy_dp_addr);
+ 			reg &= ~CH3_PD;
+-			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
++			writel(reg, dp->reg_base + phy_dp_addr);
+ 		}
+ 		break;
+ 	case ANALOG_TOTAL:
+ 		if (enable) {
+-			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
++			reg = readl(dp->reg_base + phy_dp_addr);
+ 			reg |= DP_PHY_PD;
+-			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
++			writel(reg, dp->reg_base + phy_dp_addr);
+ 		} else {
+-			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
++			reg = readl(dp->reg_base + phy_dp_addr);
+ 			reg &= ~DP_PHY_PD;
+-			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
++			writel(reg, dp->reg_base + phy_dp_addr);
+ 		}
+ 		break;
+ 	case POWER_ALL:
+ 		if (enable) {
+ 			reg = DP_PHY_PD | AUX_PD | CH3_PD | CH2_PD |
+ 				CH1_PD | CH0_PD;
+-			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
++			writel(reg, dp->reg_base + phy_dp_addr);
+ 		} else {
+-			writel(0x00, dp->reg_base + ANALOGIX_DP_PHY_PD);
++			writel(0x00, dp->reg_base + phy_dp_addr);
+ 		}
+ 		break;
+ 	default:
+@@ -400,8 +414,14 @@ void analogix_dp_init_aux(struct analogix_dp_device *dp)
+ 	analogix_dp_reset_aux(dp);
+ 
+ 	/* Disable AUX transaction H/W retry */
+-	reg = AUX_BIT_PERIOD_EXPECTED_DELAY(3) | AUX_HW_RETRY_COUNT_SEL(0) |
+-	      AUX_HW_RETRY_INTERVAL_600_MICROSECONDS;
++	if (dp->plat_data && (dp->plat_data->dev_type == RK3288_DP))
++		reg = AUX_BIT_PERIOD_EXPECTED_DELAY(0) |
++		      AUX_HW_RETRY_COUNT_SEL(3) |
++		      AUX_HW_RETRY_INTERVAL_600_MICROSECONDS;
++	else
++		reg = AUX_BIT_PERIOD_EXPECTED_DELAY(3) |
++		      AUX_HW_RETRY_COUNT_SEL(0) |
++		      AUX_HW_RETRY_INTERVAL_600_MICROSECONDS;
+ 	writel(reg, dp->reg_base + ANALOGIX_DP_AUX_HW_RETRY_CTL);
+ 
+ 	/* Receive AUX Channel DEFER commands equal to DEFFER_COUNT*64 */
+diff --git a/drivers/gpu/drm/bridge/analogix_dp_reg.h b/drivers/gpu/drm/bridge/analogix_dp_reg.h
+index 98153e2..96c538a 100644
+--- a/drivers/gpu/drm/bridge/analogix_dp_reg.h
++++ b/drivers/gpu/drm/bridge/analogix_dp_reg.h
+@@ -24,6 +24,14 @@
+ #define ANALOGIX_DP_VIDEO_CTL_8			0x3C
+ #define ANALOGIX_DP_VIDEO_CTL_10			0x44
+ 
++#define ANALOGIX_DP_PLL_REG_1			0xfc
++#define ANALOGIX_DP_PLL_REG_2			0x9e4
++#define ANALOGIX_DP_PLL_REG_3			0x9e8
++#define ANALOGIX_DP_PLL_REG_4			0x9ec
++#define ANALOGIX_DP_PLL_REG_5			0xa00
++
++#define ANALOGIX_DP_PD                          0x12c
++
+ #define ANALOGIX_DP_LANE_MAP			0x35C
+ 
+ #define ANALOGIX_DP_ANALOG_CTL_1			0x370
+@@ -156,6 +164,10 @@
+ #define VSYNC_POLARITY_CFG			(0x1 << 1)
+ #define HSYNC_POLARITY_CFG			(0x1 << 0)
+ 
++/* ANALOGIX_DP_PLL_REG_1 */
++#define REF_CLK_24M				(0x1 << 1)
++#define REF_CLK_27M				(0x0 << 1)
++
+ /* ANALOGIX_DP_LANE_MAP */
+ #define LANE3_MAP_LOGIC_LANE_0			(0x0 << 6)
+ #define LANE3_MAP_LOGIC_LANE_1			(0x1 << 6)
+-- 
+2.1.2
