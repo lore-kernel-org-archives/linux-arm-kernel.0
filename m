@@ -1,59 +1,80 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 6 Aug 2015 16:50:13 +0200
-Subject: [GIT PULL] Nomadik improvements and cleanups for v4.3
-Message-ID: <CACRpkdbN6ZDhH56PSUmPD5_uYJhk_o+mCqAvi5GVEtys=AftNg@mail.gmail.com>
+From: jingoohan1@gmail.com (Jingoo Han)
+Date: Thu, 6 Aug 2015 23:51:24 +0900
+Subject: [PATCH v5 4/9] ARM/PCI: Remove msi_controller from struct
+ pci_sys_data
+In-Reply-To: <20150804215420.9189.22914.stgit@bhelgaas-glaptop2.roam.corp.google.com>
+References: <20150804214234.9189.42548.stgit@bhelgaas-glaptop2.roam.corp.google.com>
+ <20150804215420.9189.22914.stgit@bhelgaas-glaptop2.roam.corp.google.com>
+Message-ID: <000601d0d057$63c40fb0$2b4c2f10$@com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC folks,
+On Wednesday, August 05, 2015 6:54 AM, Bjorn Helgaas wrote:
+> 
+> From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> 
+> ARM now uses pci_bus->msi to store the msi_controller pointer, so we don't
+> need to save it in struct pci_sys_data, and we don't need to implement
+> pcibios_msi_controller() to get it out of pci_sys_data.
+> 
+> Remove msi_controller from struct pci_sys_data and
+> pcibios_msi_controller().
+> 
+> [bhelgaas: changelog, split into separate patch]
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
 
-these are a four patches of Nomadik cleanups and improvements
-targeted for v4.2.
+Reviewed-by: Jingoo Han <jingoohan1@gmail.com>
 
-Since there is a cross-dependency between the board files and the
-device tree files I just kept them all on the same branch. Also it seems
-a bit overzealous to split patches for this small platform.
+Best regards,
+Jingoo Han
 
-Please pull it in as cleanup/development for v4.3.
-
-Yours,
-Linus Walleij
-
-The following changes since commit 74d33293e467df61de1b1d8b2fbe29e550dec33b:
-
-  Linux 4.2-rc5 (2015-08-02 18:34:55 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git
-tags/nmk-for-4.3-asoc
-
-for you to fetch changes up to 8c6870b07dd20be91fa4f15fbfcbde75a4dccd28:
-
-  ARM: nomadik: push accelerometer down to boards (2015-08-06 11:24:55 +0200)
-
-----------------------------------------------------------------
-Nomadik improvements and cleanups for v4.3:
-- Get rid of some custom code and device tree oddities
-  that were just placeholders for our now in-kernel
-  GPIO hogs.
-- Enable UART0 (connected to bluetooth on NHK15)
-  selectively on the board, according to reference design
-  specs.
-- Do the cache AUX register setup in the device tree so
-  we understand what is going on.
-- Push registration of accelerometers down to the board
-  files.
-
-----------------------------------------------------------------
-Linus Walleij (4):
-      ARM: nomadik: move hog code to use DT hogs
-      ARM: nomadik: selectively enable UART0 on boards
-      ARM: nomadik: move l2x0 setup to device tree
-      ARM: nomadik: push accelerometer down to boards
-
- arch/arm/boot/dts/ste-nomadik-nhk15.dts    | 39 ++++++++++++++++++++------
- arch/arm/boot/dts/ste-nomadik-s8815.dts    | 44 ++++++++++++++++++++++++------
- arch/arm/boot/dts/ste-nomadik-stn8815.dtsi | 22 +++++----------
- arch/arm/mach-nomadik/cpu-8815.c           | 41 ++--------------------------
- 4 files changed, 75 insertions(+), 71 deletions(-)
+> ---
+>  arch/arm/include/asm/mach/pci.h |    3 ---
+>  arch/arm/kernel/bios32.c        |   12 ------------
+>  2 files changed, 15 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/mach/pci.h b/arch/arm/include/asm/mach/pci.h
+> index c074e7a..8857d28 100644
+> --- a/arch/arm/include/asm/mach/pci.h
+> +++ b/arch/arm/include/asm/mach/pci.h
+> @@ -40,9 +40,6 @@ struct hw_pci {
+>   * Per-controller structure
+>   */
+>  struct pci_sys_data {
+> -#ifdef CONFIG_PCI_MSI
+> -	struct msi_controller *msi_ctrl;
+> -#endif
+>  	struct list_head node;
+>  	int		busnr;		/* primary bus number			*/
+>  	u64		mem_offset;	/* bus->cpu memory mapping offset	*/
+> diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+> index 283bc1c..874e182 100644
+> --- a/arch/arm/kernel/bios32.c
+> +++ b/arch/arm/kernel/bios32.c
+> @@ -18,15 +18,6 @@
+> 
+>  static int debug_pci;
+> 
+> -#ifdef CONFIG_PCI_MSI
+> -struct msi_controller *pcibios_msi_controller(struct pci_dev *dev)
+> -{
+> -	struct pci_sys_data *sysdata = dev->bus->sysdata;
+> -
+> -	return sysdata->msi_ctrl;
+> -}
+> -#endif
+> -
+>  /*
+>   * We can't use pci_get_device() here since we are
+>   * called from interrupt context.
+> @@ -462,9 +453,6 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
+>  		if (WARN(!sys, "PCI: unable to allocate sys data!"))
+>  			break;
+> 
+> -#ifdef CONFIG_PCI_MSI
+> -		sys->msi_ctrl = hw->msi_ctrl;
+> -#endif
+>  		sys->busnr   = busnr;
+>  		sys->swizzle = hw->swizzle;
+>  		sys->map_irq = hw->map_irq;
