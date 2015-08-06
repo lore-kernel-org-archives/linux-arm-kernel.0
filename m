@@ -1,77 +1,90 @@
-From: Wenyou.Yang@atmel.com (Yang, Wenyou)
-Date: Thu, 6 Aug 2015 08:18:52 +0000
-Subject: [PATCH v4 1/2] drivers: watchdog: add a driver to support
- SAMA5D4 watchdog timer
-In-Reply-To: <55C31547.2040207@roeck-us.net>
-References: <1438837170-4518-1-git-send-email-wenyou.yang@atmel.com>
- <1438837170-4518-2-git-send-email-wenyou.yang@atmel.com>
- <55C31547.2040207@roeck-us.net>
-Message-ID: <B256D81BAE5131468A838E5D7A243641C9F875EB@penmbx01>
+From: wangzhou1@hisilicon.com (Zhou Wang)
+Date: Thu, 6 Aug 2015 16:09:15 +0800
+Subject: [PATCH v6 2/6] ARM/PCI: remove align_resource in pci_sys_data
+In-Reply-To: <1438848559-232109-1-git-send-email-wangzhou1@hisilicon.com>
+References: <1438848559-232109-1-git-send-email-wangzhou1@hisilicon.com>
+Message-ID: <1438848559-232109-3-git-send-email-wangzhou1@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guenter,
+From: gabriele paoloni <gabriele.paoloni@huawei.com>
 
-Thank you for your correct.
+This patch is needed in order to unify the PCIe designware framework for ARM and
+ARM64 architectures. In the PCIe designware unification process we are calling
+pci_create_root_bus() passing a "sysdata" parameter that is the same for both
+ARM and ARM64 and is of type "struct pcie_port*". In the ARM case this will
+cause a problem with the function pcibios_align_resource(); in fact this will
+cast "dev->sysdata" to "struct pci_sys_data*", whereas designware had passed a
+"struct pcie_port*" pointer.
 
-> -----Original Message-----
-> From: Guenter Roeck [mailto:linux at roeck-us.net]
-> Sent: 2015?8?6? 16:05
-> To: Yang, Wenyou; wim at iguana.be; robh+dt at kernel.org; pawel.moll at arm.com;
-> mark.rutland at arm.com; ijc+devicetree at hellion.org.uk; galak at codeaurora.org
-> Cc: sylvain.rochet at finsecur.com; Ferre, Nicolas; boris.brezillon at free-
-> electrons.com; devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; linux-
-> watchdog at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH v4 1/2] drivers: watchdog: add a driver to support SAMA5D4
-> watchdog timer
-> 
-> On 08/05/2015 09:59 PM, Wenyou Yang wrote:
-> >>From SAMA5D4, the watchdog timer is upgrated with a new feature,
-> > which is describled as in the datasheet, "WDT_MR can be written until
-> > a LOCKMR command is issued in WDT_CR".
-> > That is to say, as long as the bootstrap and u-boot don't issue a
-> > LOCKMR command, WDT_MR can be written more than once in the driver.
-> >
-> > So the SAMA5D4 watchdog driver's implementation is different from the
-> > at91sam9260 watchdog driver implemented in file at91sam9_wdt.c.
-> > The user application open the device file to enable the watchdog timer
-> > hardware, and close to disable it, and set the watchdog timer timeout
-> > by seting WDV and WDD fields of WDT_MR register, and ping the watchdog
-> > by issuing WDRSTT command to WDT_CR register with hard-coded key.
-> >
-> > Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-> > ---
-> [ ... ]
-> > +
-> > +/* minimum and maximum watchdog timeout, in seconds */
-> > +#define	MIN_WDT_TIMEOUT		1
-> > +#define	MAX_WDT_TIMEOUT		16
-> > +#define	WDT_DEFAULT_TIMEOUT	MAX_WDT_TIMEOUT
-> > +
-> > +#define	WDT_SEC2TICKS(s)	((s) ? (((s) << 8) - 1) : 0)
-> > +
-> 
-> Why did you replace the spaces after #define with tabs ?
-> I understand this is done in the at91.h file, but that is bad enough, it doesn't add
-> any value, and I don't see a reason to do it here.
-Accepted, Using spaces, not tabs.
+This patch solves the issue by removing "align_resource" from "pci_sys_data"
+struct and defining a static global function pointer in "bios32.c"
 
-> 
-> > +
-> > +	if ((wdt->config & AT91_WDT_WDFIEN) && irq) {
-> > +		ret = devm_request_irq(&pdev->dev, irq,
-> sama5d4_wdt_irq_handler,
-> > +				       0, pdev->name, pdev);
-> 
-> I just realized - this interrupt is registered with flags set to 0, while in the at91sam
-> driver the flags are "IRQF_SHARED | IRQF_IRQPOLL | IRQF_NO_SUSPEND". Is
-> this different with the new SOC ?
-No, it is same. It is my carelessness.
+Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
+---
+ arch/arm/include/asm/mach/pci.h |  5 -----
+ arch/arm/kernel/bios32.c        | 12 ++++++++----
+ 2 files changed, 8 insertions(+), 9 deletions(-)
 
-> 
-> Thanks,
-> Guenter
-
-
-Best Regards,
-Wenyou Yang
+diff --git a/arch/arm/include/asm/mach/pci.h b/arch/arm/include/asm/mach/pci.h
+index 28b9bb3..8a4e4de 100644
+--- a/arch/arm/include/asm/mach/pci.h
++++ b/arch/arm/include/asm/mach/pci.h
+@@ -58,11 +58,6 @@ struct pci_sys_data {
+ 					/* IRQ mapping				*/
+ 	int		(*map_irq)(const struct pci_dev *, u8, u8);
+ 					/* Resource alignement requirements	*/
+-	resource_size_t (*align_resource)(struct pci_dev *dev,
+-					  const struct resource *res,
+-					  resource_size_t start,
+-					  resource_size_t size,
+-					  resource_size_t align);
+ 	void		*private_data;	/* platform controller private data	*/
+ };
+ 
+diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+index fcbbbb1..4cdc64d 100644
+--- a/arch/arm/kernel/bios32.c
++++ b/arch/arm/kernel/bios32.c
+@@ -17,6 +17,11 @@
+ #include <asm/mach/pci.h>
+ 
+ static int debug_pci;
++static resource_size_t (*align_resource)(struct pci_dev *dev,
++		  const struct resource *res,
++		  resource_size_t start,
++		  resource_size_t size,
++		  resource_size_t align) = NULL;
+ 
+ #ifdef CONFIG_PCI_MSI
+ struct msi_controller *pcibios_msi_controller(struct pci_dev *dev)
+@@ -468,7 +473,7 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
+ 		sys->busnr   = busnr;
+ 		sys->swizzle = hw->swizzle;
+ 		sys->map_irq = hw->map_irq;
+-		sys->align_resource = hw->align_resource;
++		align_resource = hw->align_resource;
+ 		INIT_LIST_HEAD(&sys->resources);
+ 
+ 		if (hw->private_data)
+@@ -589,7 +594,6 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
+ 				resource_size_t size, resource_size_t align)
+ {
+ 	struct pci_dev *dev = data;
+-	struct pci_sys_data *sys = dev->sysdata;
+ 	resource_size_t start = res->start;
+ 
+ 	if (res->flags & IORESOURCE_IO && start & 0x300)
+@@ -597,8 +601,8 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
+ 
+ 	start = (start + align - 1) & ~(align - 1);
+ 
+-	if (sys->align_resource)
+-		return sys->align_resource(dev, res, start, size, align);
++	if (align_resource)
++		return align_resource(dev, res, start, size, align);
+ 
+ 	return start;
+ }
+-- 
+1.9.1
