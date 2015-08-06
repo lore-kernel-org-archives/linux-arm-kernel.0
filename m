@@ -1,72 +1,82 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 06 Aug 2015 19:15:59 +0200
-Subject: [PATCH v3] ARM: dts: Convert Linkstation Mini to Device Tree
-In-Reply-To: <1438880937.15635.92.camel@dolka.fr>
-References: <1438878592.15635.89.camel@dolka.fr>	
- <20150806163424.GH13421@lunn.ch> <1438879473.15635.91.camel@dolka.fr>	
- <55C3929F.3030209@free-electrons.com> <1438880937.15635.92.camel@dolka.fr>
-Message-ID: <55C3964F.5010708@free-electrons.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 6 Aug 2015 19:13:12 +0200
+Subject: Armadaxp GPIO interrupts
+In-Reply-To: <CAG1O52XUyPkgTTRKftujZBNK1=n6GBdWgBg_kq6SsC5XMaeU3w@mail.gmail.com>
+References: <CAG1O52Xg88OsifBzmpSdqvC8wQaOW78nC9nnfxugFv1VU1m1LQ@mail.gmail.com>
+ <20150804153439.GA28673@lunn.ch>
+ <CAG1O52W2Gy_6_DfewtUqoK_J+Y=KwVGyygNaPu2xyPM_ZkLfcQ@mail.gmail.com>
+ <CAG1O52VQPpeGkA8bqYbPMTiT9Mua1yHi3H3osqJsHqm-RRKzow@mail.gmail.com>
+ <20150805162155.GE32760@lunn.ch>
+ <CAG1O52WPFfm+XGk01iUVWLu=-Dm7bcDVmhv3P8iQDH+HHjsLUA@mail.gmail.com>
+ <20150806132926.GB19896@lunn.ch>
+ <CAG1O52XUyPkgTTRKftujZBNK1=n6GBdWgBg_kq6SsC5XMaeU3w@mail.gmail.com>
+Message-ID: <20150806171312.GI13421@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benjamin,
-
-On 06/08/2015 19:08, Benjamin Cama wrote:
-> Hi Gr?gory,
+On Thu, Aug 06, 2015 at 10:28:12PM +0530, raghu MG wrote:
+> Ok,I think I need to understand more about this gpio driver.
 > 
-> Le jeudi 06 ao?t 2015 ? 19:00 +0200, Gregory CLEMENT a ?crit :
->> On 06/08/2015 18:44, Benjamin Cama wrote:
->>> Hi Andrew,
->>>
->>> Le jeudi 06 ao?t 2015 ? 18:34 +0200, Andrew Lunn a ?crit :
->>>> On Thu, Aug 06, 2015 at 06:29:52PM +0200, Benjamin Cama wrote:
->>>>> The title says it all. The name of the dts file as been changed 
->>>>> to
->>>>> better reflect the manufacturer's device name (LS-WSGL), rather 
->>>>>
->>>>> than
->>>>> the original "lsmini", which exists in a kirkwood version too.
->>>>>
->>>>> Signed-off-by: Benjamin Cama <benoar@dolka.fr>
->>>>
->>>> Hi Benjamin
->>>>
->>>> It would be normal to add the various Acked-by: here, both Alexey 
->>>> and
->>>> mine. It is not an issue, Gregory can add them, when he adds is 
->>>> own.
->>>> I'm just mentioning it for any future patches you might submit.
->>>
->>> Ah, OK, I was not sure and didn't want to add them by mistake.
->>
->> applied on mvebu/dt with the Acked-by: flags but also with some minor
->> fixes :I used tab instead of space to indent dts at line 185
-> 
-> Sorry, missed that.
+> As you said its registering chained handler,but why are they(IRQs) not
+> visible in cat /proc/interrupts.
 
-No problem it was very minor, actually I didn't find myself, checpatch did
-it for me :)
+chained interrupts are never visible there. All you see are leaf
+interrupts, i.e. the device interrupts. Here is my Armada XP based
+WRT1900AC:
 
-> 
->> and I
->> also resolved the merge conflict with patch "ARM: dts: orion5x: add
->> buffalo linkstation ls-wtgl" in the file arch/arm/boot/dts/Makefile.
-> 
-> Thanks, I didn't rebase on master for some time?
+$ cat /proc/interrupts 
+            CPU0       CPU1       
+ 16:    8959833   12783597  armada_370_xp_irq   5 Level     armada_370_xp_per_cpu_tick
+ 19:          0          0  armada_370_xp_irq  31 Level     mv64xxx_i2c
+ 20:       1453          0  armada_370_xp_irq  41 Level     serial
+ 26:          0          0  armada_370_xp_irq  45 Level     ehci_hcd:usb3
+ 27:       9682          0  armada_370_xp_irq   8 Level     mvneta
+ 28:          4          0  armada_370_xp_irq  10 Level     mvneta
+ 29:      35078          0  armada_370_xp_irq  55 Level     f10a0000.sata
+ 30:       3839          0  armada_370_xp_irq 113 Level     f10d0000.nand
+ 70:          0          0  f1018140.gpio   0 Edge      WPS
+ 71:         20          0  f1018140.gpio   1 Edge      Factory Reset Button
+ 90:          2          0  armada_370_xp_irq  51 Level     f1060900.xor
+ 91:          2          0  armada_370_xp_irq  52 Level     f1060900.xor
+ 92:          2          0  armada_370_xp_irq  94 Level     f10f0900.xor
+ 93:          2          0  armada_370_xp_irq  95 Level     f10f0900.xor
+ 94:          0          0  armada_370_xp_msi_irq   0 Edge      xhci_hcd
 
-For this one you could not have do better, because the conflict
-comes from a commit in my mvebu/dt branch and when you send a patch
-we expect that it is based on the rc1. So it was really my job to
-do this.
+Notice the two f1018140.gpio, which are the buttons.
 
-> 
-> Thanks again for your time,
+> Do I need to further initialize marvell GPIO registers to trigger
+> these events.
 
-You're welcome and thanks for your contributions,
+Nope, just the normal gpio API and all will work, as demonstrated by
+the two buttons on my board.
 
-Gregory
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+> Do I need to change the polarity in polarity register to suit the
+> board requirements in probe function.
+
+Nope, you put that in the DT file:
+
+        gpio_keys {
+                compatible = "gpio-keys";
+                #address-cells = <1>;
+                #size-cells = <0>;
+                pinctrl-0 = <&keys_pin>;
+                pinctrl-names = "default";
+
+                button at 1 {
+                        label = "WPS";
+                        linux,code = <KEY_WPS_BUTTON>;
+                        gpios = <&gpio1 0 GPIO_ACTIVE_HIGH>;
+                };
+
+                button at 2 {
+                        label = "Factory Reset Button";
+                        linux,code = <KEY_RESTART>;
+                        gpios = <&gpio1 1 GPIO_ACTIVE_HIGH>;
+                };
+        };
+
+You can change GPIO_ACTIVE_HIGH to GPIO_ACTIVE_LOW if that is what you
+need.
+
+	Andrew
+ 
