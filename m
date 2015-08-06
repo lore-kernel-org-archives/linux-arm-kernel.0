@@ -1,48 +1,97 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 6 Aug 2015 10:59:36 +0200
-Subject: [PATCH v6 5/9] clk: mediatek: Fix rate and dependency of MT8173
- clocks
-In-Reply-To: <1438850132.27884.17.camel@mtksdaap41>
-References: <1438676218-11310-1-git-send-email-jamesjj.liao@mediatek.com>
- <1438676218-11310-6-git-send-email-jamesjj.liao@mediatek.com>
- <20150805065341.GA18700@pengutronix.de>
- <1438850132.27884.17.camel@mtksdaap41>
-Message-ID: <20150806085936.GO18700@pengutronix.de>
+From: b20788@freescale.com (Anson Huang)
+Date: Fri, 7 Aug 2015 00:56:22 +0800
+Subject: [PATCH V3] ARM: imx: add cpuidle support for i.mx6ul
+Message-ID: <1438880182-6260-1-git-send-email-b20788@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 06, 2015 at 04:35:32PM +0800, James Liao wrote:
-> Hi Sascha,
-> 
-> On Wed, 2015-08-05 at 08:53 +0200, Sascha Hauer wrote:
-> > On Tue, Aug 04, 2015 at 04:16:54PM +0800, James Liao wrote:
-> > > -static const struct mtk_fixed_factor root_clk_alias[] __initconst = {
-> > > -	FACTOR(CLK_TOP_CLKPH_MCK_O, "clkph_mck_o", "clk_null", 1, 1),
-> > > -	FACTOR(CLK_TOP_USB_SYSPLL_125M, "usb_syspll_125m", "clk_null", 1, 1),
-> > > -	FACTOR(CLK_TOP_HDMITX_DIG_CTS, "hdmitx_dig_cts", "clk_null", 1, 1),
-> > > +static const struct mtk_fixed_clk fixed_clks[] __initconst = {
-> > > +	FIXED_CLK(CLK_TOP_CLKPH_MCK_O, "clkph_mck_o", "clk26m", 400 * MHZ),
-> > > +	FIXED_CLK(CLK_TOP_USB_SYSPLL_125M, "usb_syspll_125m", "clk26m", 125 * MHZ),
-> > 
-> > Hm, it seems you hide PLLs in fixed factor clock. Are you sure that
-> > there is a PLL in the system generating 125MHz from 26MHz which is in no
-> > way configurable? Or is this really some clock derived from the syspll
-> > as the clock name suggests?
-> 
-> According to the datasheet from our clock designer, usb_syspll_125m is
-> the output clock of an analog macro which is named SSUSB_PHY, and its
-> input clock is AD_CLK26M_CK.
-> 
-> SSUSB_PHY is not the same as general PLLs such as MAINPLL. So I don't
-> treat it as a configurable PLL but a fixed clock with the typical rate
-> 125 MHz.
+This patch adds cpuidle support for i.MX6UL,
+it shares cpuidle driver with i.MX6SX, total
+3 levels of cpuidle are supported as below:
 
-Ok then.
+1. ARM WFI;
+2. SOC in WAIT mode;
+3. SOC in WAIT mode + ARM power off.
 
-Sascha
+Signed-off-by: Anson Huang <b20788@freescale.com>
+---
+I am NOT sure if using cpu_is_xxx() here to distinguish i.MX6UL
+from i.MX6SX is good enough, as I saw many other patches
+are trying to avoid using such cpu_is_xxx() API.
 
+Obviously we have many other ways to identify if the ARM core
+is a Cortex-A9 or Cortex-A7, they have different L2 cache implemented,
+so cache operation is different.
+
+Please advise if you have better idea about this point, thanks!
+
+ arch/arm/mach-imx/cpuidle-imx6sx.c | 8 +++++++-
+ arch/arm/mach-imx/mach-imx6ul.c    | 9 +++++++++
+ 2 files changed, 16 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-imx/cpuidle-imx6sx.c b/arch/arm/mach-imx/cpuidle-imx6sx.c
+index 3c6672b..e1ce40c 100644
+--- a/arch/arm/mach-imx/cpuidle-imx6sx.c
++++ b/arch/arm/mach-imx/cpuidle-imx6sx.c
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (C) 2014 Freescale Semiconductor, Inc.
++ * Copyright (C) 2014-2015 Freescale Semiconductor, Inc.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 as
+@@ -9,14 +9,20 @@
+ #include <linux/cpuidle.h>
+ #include <linux/cpu_pm.h>
+ #include <linux/module.h>
++#include <asm/cacheflush.h>
+ #include <asm/cpuidle.h>
+ #include <asm/suspend.h>
+ 
+ #include "common.h"
+ #include "cpuidle.h"
++#include "hardware.h"
+ 
+ static int imx6sx_idle_finish(unsigned long val)
+ {
++	/* flush internal L2 cache if necessary */
++	if (cpu_is_imx6ul())
++		flush_cache_all();
++
+ 	cpu_do_idle();
+ 
+ 	return 0;
+diff --git a/arch/arm/mach-imx/mach-imx6ul.c b/arch/arm/mach-imx/mach-imx6ul.c
+index f206506..3fe37ab 100644
+--- a/arch/arm/mach-imx/mach-imx6ul.c
++++ b/arch/arm/mach-imx/mach-imx6ul.c
+@@ -11,6 +11,7 @@
+ #include <asm/mach/map.h>
+ 
+ #include "common.h"
++#include "cpuidle.h"
+ 
+ static void __init imx6ul_init_machine(void)
+ {
+@@ -29,6 +30,13 @@ static void __init imx6ul_init_irq(void)
+ 	imx_init_revision_from_anatop();
+ 	imx_src_init();
+ 	irqchip_init();
++	imx6_pm_ccm_init("fsl,imx6ul-ccm");
++}
++
++static void __init imx6ul_init_late(void)
++{
++	/* share cpuidle driver with i.MX6SX */
++	imx6sx_cpuidle_init();
+ }
+ 
+ static const char *imx6ul_dt_compat[] __initconst = {
+@@ -40,4 +48,5 @@ DT_MACHINE_START(IMX6UL, "Freescale i.MX6 Ultralite (Device Tree)")
+ 	.init_irq	= imx6ul_init_irq,
+ 	.init_machine	= imx6ul_init_machine,
+ 	.dt_compat	= imx6ul_dt_compat,
++	.init_late	= imx6ul_init_late,
+ MACHINE_END
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.9.1
