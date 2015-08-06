@@ -1,68 +1,69 @@
-From: hramrach@gmail.com (Michal Suchanek)
-Date: Thu, 6 Aug 2015 12:01:37 +0200
-Subject: [RFC PATCH 1/5] spi: introduce flag for memory mapped read
-In-Reply-To: <20150806090202.GO20873@sirena.org.uk>
-References: <1438072876-16338-1-git-send-email-vigneshr@ti.com>
- <1438072876-16338-2-git-send-email-vigneshr@ti.com>
- <20150731181745.GM20873@sirena.org.uk>
- <55BEF4AF.5090704@ti.com> <20150804155148.GR20873@sirena.org.uk>
- <55C0FD98.1090107@ti.com> <20150805115013.GJ20873@sirena.org.uk>
- <CAOMqctQXwcHyiWBwtugSDSE_k65qrNfrwnhjQMDJkLoJMmGzUw@mail.gmail.com>
- <20150805124412.GN20873@sirena.org.uk>
- <CAOMqctS9Y5FxpUCCJew6+cnjH5iTvbzkH3g-8yrXs4OuS2pSGA@mail.gmail.com>
- <20150806090202.GO20873@sirena.org.uk>
-Message-ID: <CAOMqctQZRZ4zG_yYy=CeX3DX4NVNWN1COP4Q-2YvMun9xYOA7g@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 6 Aug 2015 12:03:11 +0200
+Subject: [PATCH v3 3/8] soc: Mediatek: Add SCPSYS CPU power domain driver
+In-Reply-To: <1438829942.9435.24.camel@mtkswgap22>
+References: <1438696464-59858-1-git-send-email-scott.shu@mediatek.com>
+ <1438696464-59858-4-git-send-email-scott.shu@mediatek.com>
+ <20150805085034.GG18700@pengutronix.de>
+ <1438829942.9435.24.camel@mtkswgap22>
+Message-ID: <20150806100311.GP18700@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 August 2015 at 11:02, Mark Brown <broonie@kernel.org> wrote:
-> On Wed, Aug 05, 2015 at 02:56:09PM +0200, Michal Suchanek wrote:
->> On 5 August 2015 at 14:44, Mark Brown <broonie@kernel.org> wrote:
->> > On Wed, Aug 05, 2015 at 02:40:01PM +0200, Michal Suchanek wrote:
->
->> >> I don't think sending 03 or other random byte as the first byte of a
->> >> SPI transfer can be used as reliable detection that we are talking to
->> >> a SPI flash memory.
->
->> > Why care - if something is physically in the same format as a flash read
->> > command how would a device be able to tell that it wasn't actually a
->> > flash read command?  The signals sent on the bus are going to be
->> > identical anyway.
->
->> Not only must the command be the same but also the response must be tha same.
->
-> What difference would that make?  The caller is sending a single SPI
-> operation and this is a user visible thing...
->
->> The flash chip responds by sending arbitrary amount of data. Given
->> that transfer_one gets only the part that sends the read command and
->> the part to do the actual read may or may not follow this is getting a
->> bit hairy. Add in dummy bytes due to fast-read lag and page write
->> wrap-around and you get something that you definitely do not want
->> unless you are really sure that there is a flash memory on the other
->> end of the wire.
->
-> So if you're doing this you may have a good reason to implement
-> transfer_one_message() instead.  Or perhaps implement it in the core and
-> provide operations to do the map and unmap.  And of course if this sort
-> of requirement exists that's an obvious thing that must be documented
-> in the interfaces but isn't.
->
-> We need a lot more thought about the interface here, the lack of any
-> explanation of what the interface is supposed to be and the fact that
-> all questions about it are being answered in terms of describing the
-> specific system are both a bit worrying.
+On Thu, Aug 06, 2015 at 10:59:02AM +0800, Scott Shu wrote:
+> On Wed, 2015-08-05 at 10:50 +0200, Sascha Hauer wrote:
+> > don't do this then it indeed doesn't make much sense to put it into the
+> > same file.
+> > 
+> > From what I see we would need to change the prototype to something like
+> > 
+> > static int __scpsys_power_on(struct scp_domain_data *)
+> > 
+> > (maybe with some additional base addresses and stuff)
+> > 
+> > struct scp_domain_data would additionally need sram_isoint_b and sram_ckiso
+> > members.
+> > 
+> > Sascha
+> > 
+> Hi Sascha,
+>    The CPU power sequence is quite different with the others, as
+> described below.
+> 
+> * Non-CPU
+>    1) Set PWR_ON_BIT, PWR_ON_2ND_BIT
+>    2) Wait PWR_ACK
+>    3) Clear PWR_CLK_DIS_BIT
+>    4) Clear PWR_ISO_BIT
+>    5) Set PWR_RST_B_BIT
+>    6) Clear SRAM_PDN
+>    7) Wait SRAM_PDN_ACK
+> * CPU
+>    1) Set PWR_ON_BIT, PWR_ON_2ND_BIT
+>    2) Wait PWR_ACK
+>    3) Clear PWR_ISO_BIT
+>    4) Clear L1_PDN to power on L1
+>    5) Wait L1_PDN_ACK
+>    6) Set SRAM_ISOINT_B
+>    7) Clear SRAM_CKISO
+>    8) Clear PWR_CLK_DIS
+>    9) Set PWR_RST_B
+> For multi-cluster SoC, the cluster power sequence is also different.
+> 
+> Please think if this is a good idea if we integrate the CPU support into
+> the scpsys_power_on()? Based on the readability and compatible
+> considerations, we provide this patch.
 
-Disclaimer: I am not familiar with the hardware for which this patch
-adds support.
+Maybe it's best if you go back to the v1 layout and put your scpsys code
+to arch/arm/mach-mediatek/. While I think it's possible to share some
+more code I am not sure anymore if this buys us something. We'll know in
+the future.
 
-However, I am familiar m25p80.c and as I understand it the controller
-is basically supposed to implement m25p80.c in hardware when this flag
-is set.
+Sascha
 
-If I was using m25p80.c to talk to anything but an actual flash chip
-it would get me quite worried.
 
-Thanks
-
-Michal
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
