@@ -1,70 +1,135 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Thu,  6 Aug 2015 08:49:07 -0500
-Subject: [RFC PATCH 0/8] Add Analogix Core Display Port Driver
-Message-ID: <1438868947-22132-1-git-send-email-ykk@rock-chips.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 6 Aug 2015 14:51:29 +0100
+Subject: [RFC PATCH 1/5] spi: introduce flag for memory mapped read
+In-Reply-To: <55C35233.2000105@ti.com>
+References: <20150804155148.GR20873@sirena.org.uk> <55C0FD98.1090107@ti.com>
+ <20150805115013.GJ20873@sirena.org.uk>
+ <CAOMqctQXwcHyiWBwtugSDSE_k65qrNfrwnhjQMDJkLoJMmGzUw@mail.gmail.com>
+ <20150805124412.GN20873@sirena.org.uk>
+ <CAOMqctS9Y5FxpUCCJew6+cnjH5iTvbzkH3g-8yrXs4OuS2pSGA@mail.gmail.com>
+ <20150806090202.GO20873@sirena.org.uk>
+ <CAOMqctQZRZ4zG_yYy=CeX3DX4NVNWN1COP4Q-2YvMun9xYOA7g@mail.gmail.com>
+ <20150806102225.GI7576@n2100.arm.linux.org.uk>
+ <55C35233.2000105@ti.com>
+Message-ID: <20150806135129.GJ7576@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
-   Samsung exynos and Rockchip rk3288 almost share same dp controller,
-so I split the common code out, then rk3288 and exynos can re-used the
-same dp core driver. Cause I can't find the exact IP name of exynos dp
-controller, so I decide to name dp core driver with "analogix" which I
-find in rk3288 eDP TRM ;)
+On Thu, Aug 06, 2015 at 05:55:23PM +0530, Vignesh R wrote:
+> On the whole following are my requirements:
+> 1. to be able to communicate with non -flash SPI devices via config port
+> ( this functionality is supported by current driver, I dont want to
+> break it). Or pump any spi_message on to SPI bus directly.
+> 2. take advantage of memory mapped port in order to increase read
+> throughput( and use dma in future) when the slave is a m25p80 type flash.
+> 3. handle m25p80 as well as other slave on multiple chipselects.
+> 
+> I just need to know whether the user that requested the transfer is
+> m25p80 driver. If yes, ti-qspi driver can take advantage of memory
+> mapped interface, else just use config port to access SPI bus directly.
 
-Beyond that, there are three light registers setting differents bewteen
-exynos and rk3288.
-1. RK3288 have five special pll resigters which not indicata in exynos
-   dp controller.
-2. The address of DP_PHY_PD(dp phy power manager register) are different
-   between rk3288 and exynos.
-3. Rk3288 and exynos have different setting with AUX_HW_RETRY_CTL(dp debug
-   register).
+The problem with this approach is that it's an abomination.  It's adding
+a SPI-user specific hack which is detected by a specific driver.  That's
+really not sane - what happens when we have lots of these kinds of "I'm
+an X SPI-user" with drivers detecting that?  It's not maintainable in the
+long term.
 
-My series patches can be divider into two parts: One for spliting the
-analogix_dp code from exynos dp driver. Another are trying to add rk3288
-dp driver support.
+Yes, your requirements _today_ seem simple and easy, but you're only
+thinking about today, not tomorrow when you've moved on and someone else
+has to maintain the mess left behind (or delete it from mainline because
+they're sick of dealing with a hack.)
 
-Best regards,
-- Yakir
+> The spi_message that is received in transfer_one_message() is too
+> generic to imply the slave device that is on the other side of the wire.
+> IMO, the read command does not imply that the slave is m25p80 flash
+> (besides the read opcodes vary across vendors of m25p80 and across modes).
 
+I can see both sides of the argument.
 
-Yakir Yang (8):
-  drm: exynos/dp: fix code style
-  drm: exynos/dp: convert to drm bridge mode
-  drm: bridge: analogix_dp: split exynos dp driver to bridge dir
-  drm: rockchip/dp: add rockchip platform dp driver
-  drm: bridge/analogix_dp: add platform device type support
-  drm: bridge: analogix_dp: add some rk3288 special registers setting
-  drm: bridge: analogix_dp: try force hpd after plug in lookup failed
-  drm: bridge/analogix_dp: expand the delay time for hpd detect
+Mark is saying: if the SPI driver detects that the message to be transmitted
+is a read command followed by the appropriate number of dummy bytes, and
+then the data being read _and_ it's using quad-mode access, and the hardware
+generates _exactly_ that in hardware using the memory mapped mode, there is
+no reason _not_ to use the hardware to achieve that SPI transaction.  The
+bus activity will be identical to what happens when the SPI controller is
+used manually to achieve that bus sequence.
 
- drivers/gpu/drm/bridge/Kconfig                     |    5 +
- drivers/gpu/drm/bridge/Makefile                    |    1 +
- drivers/gpu/drm/bridge/analogix_dp_core.c          | 1397 +++++++++++++++++++
- drivers/gpu/drm/bridge/analogix_dp_core.h          |  287 ++++
- drivers/gpu/drm/bridge/analogix_dp_reg.c           | 1295 ++++++++++++++++++
- .../exynos_dp_reg.h => bridge/analogix_dp_reg.h}   |  272 ++--
- drivers/gpu/drm/exynos/Kconfig                     |    5 +-
- drivers/gpu/drm/exynos/Makefile                    |    2 +-
- drivers/gpu/drm/exynos/analogix_dp-exynos.c        |  241 ++++
- drivers/gpu/drm/exynos/exynos_dp_core.c            | 1416 --------------------
- drivers/gpu/drm/exynos/exynos_dp_core.h            |  282 ----
- drivers/gpu/drm/exynos/exynos_dp_reg.c             |  100 +-
- drivers/gpu/drm/rockchip/Kconfig                   |   10 +
- drivers/gpu/drm/rockchip/Makefile                  |    1 +
- drivers/gpu/drm/rockchip/analogix_dp-rockchip.c    |  420 ++++++
- include/drm/bridge/analogix_dp.h                   |   28 +
- 16 files changed, 3880 insertions(+), 1882 deletions(-)
- create mode 100644 drivers/gpu/drm/bridge/analogix_dp_core.c
- create mode 100644 drivers/gpu/drm/bridge/analogix_dp_core.h
- create mode 100644 drivers/gpu/drm/bridge/analogix_dp_reg.c
- rename drivers/gpu/drm/{exynos/exynos_dp_reg.h => bridge/analogix_dp_reg.h} (62%)
- create mode 100644 drivers/gpu/drm/exynos/analogix_dp-exynos.c
- delete mode 100644 drivers/gpu/drm/exynos/exynos_dp_core.c
- delete mode 100644 drivers/gpu/drm/exynos/exynos_dp_core.h
- create mode 100644 drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
- create mode 100644 include/drm/bridge/analogix_dp.h
+You're saying: but the documentation says you can't use it for anything
+except m25p80.  If you look at 24.5.4.1.2, it tells you what the SFI
+generates on the bus, which is:
+
+1. CS active
+2. Read command byte sent
+3. 1-4 address bytes sent
+4. 0-3 dummy bytes sent
+5. data bytes read from bus
+6. CS inactive
+
+So, Mark's point is "if we can detect a transaction which fits _that_
+bus activity, there's no reason not to use this acceleration for the
+transaction."
+
+What you're failing to counter with is: we don't have enough information
+in the SPI driver to know how many dummy bytes there are between the
+address bytes and the data read from the bus.
+
+The M25P80 driver just appends additional bytes to the message to
+achieve this:
+
+        struct m25p *flash = nor->priv;
+        unsigned int dummy = nor->read_dummy;
+
+        /* convert the dummy cycles to the number of bytes */
+        dummy /= 8;
+
+        flash->command[0] = nor->read_opcode;
+        m25p_addr2cmd(nor, from, flash->command);
+
+        t[0].tx_buf = flash->command;
+        t[0].len = m25p_cmdsz(nor) + dummy;
+        spi_message_add_tail(&t[0], &m);
+
+The reason that the number of dummy bytes can't be detected is because
+it's all hidden in the first transaction as the total number of bytes to
+be transmitted - and the dummy bytes are uninitialised, so you can't
+make any assumptions what value they are.  There is no way for the SPI
+driver to know whether these dummy bytes are dummy bytes or whether they
+have an effect on the targetted device.
+
+I think that comprehensively rules out Mark's idea with the SPI core as
+it stands today: there is no way for the SPI driver to reliably detect
+a message like a SFI read command by parsing the SPI transmitted message
+prior to sending it as we can never be sure whether there are dummy bytes
+to be transmitted.
+
+What may make more sense from the SPI point of view is to communicate to
+all SPI drivers how many dummy bytes are to be transferred.  I'm not fully
+up on SPI, but maybe something like this:
+
+	t[0].tx_buf = flash->command;
+	t[0].len = m25p_cmdsz(nor);
+	spi_message_add_tail(&t[0], &m);
+	t[1].tx_buf = dummy_buffer;
+	t[1].len = dummy;
+	t[1].dummy = 1;
+	spi_message_add_tail(&t[1], &m);
+
+This way, we're describing the transfer to the SPI core, and explicitly
+indicating that there are some dummy bytes.  The SPI driver can then
+tell that these are dummy bytes, and if the SPI message consists of:
+
+- transmit 2 to 5 bytes where the first byte is a recognised read command
+- transmit 0 to 3 dummy bytes
+- read some bytes
+
+then it can make use of the SFI mode to accelerate the operation.
+
+This would not be a hack to the SPI code: we're describing to the SPI
+code what we want to achieve in terms of the activity on the bus, and
+providing that level of description then allows the SPI driver to make
+informed decisions on whether it can handle the transfer using some
+non-standard feature.
 
 -- 
-2.1.2
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
