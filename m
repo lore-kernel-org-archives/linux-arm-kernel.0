@@ -1,59 +1,62 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 6 Aug 2015 10:02:02 +0100
-Subject: [RFC PATCH 1/5] spi: introduce flag for memory mapped read
-In-Reply-To: <CAOMqctS9Y5FxpUCCJew6+cnjH5iTvbzkH3g-8yrXs4OuS2pSGA@mail.gmail.com>
-References: <1438072876-16338-1-git-send-email-vigneshr@ti.com>
- <1438072876-16338-2-git-send-email-vigneshr@ti.com>
- <20150731181745.GM20873@sirena.org.uk> <55BEF4AF.5090704@ti.com>
- <20150804155148.GR20873@sirena.org.uk> <55C0FD98.1090107@ti.com>
- <20150805115013.GJ20873@sirena.org.uk>
- <CAOMqctQXwcHyiWBwtugSDSE_k65qrNfrwnhjQMDJkLoJMmGzUw@mail.gmail.com>
- <20150805124412.GN20873@sirena.org.uk>
- <CAOMqctS9Y5FxpUCCJew6+cnjH5iTvbzkH3g-8yrXs4OuS2pSGA@mail.gmail.com>
-Message-ID: <20150806090202.GO20873@sirena.org.uk>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu,  6 Aug 2015 14:41:13 +0530
+Subject: [PATCH] ARM/EP93xx/timer: Migrate to new 'set-state' interface
+Message-ID: <744dca162a7626694770a9f51457566a33c3e08f.1438852023.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 05, 2015 at 02:56:09PM +0200, Michal Suchanek wrote:
-> On 5 August 2015 at 14:44, Mark Brown <broonie@kernel.org> wrote:
-> > On Wed, Aug 05, 2015 at 02:40:01PM +0200, Michal Suchanek wrote:
+Migrate EP93xx driver to the new 'set-state' interface provided by
+clockevents core, the earlier 'set-mode' interface is marked obsolete
+now.
 
-> >> I don't think sending 03 or other random byte as the first byte of a
-> >> SPI transfer can be used as reliable detection that we are talking to
-> >> a SPI flash memory.
+This also enables us to implement callbacks for new states of clockevent
+devices, for example: ONESHOT_STOPPED.
 
-> > Why care - if something is physically in the same format as a flash read
-> > command how would a device be able to tell that it wasn't actually a
-> > flash read command?  The signals sent on the bus are going to be
-> > identical anyway.
+Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+---
+Linus,
 
-> Not only must the command be the same but also the response must be tha same.
+All other clockevent drivers are migrated to the new interface and yours
+was left as it adapted generic clockevents framework just now.
 
-What difference would that make?  The caller is sending a single SPI
-operation and this is a user visible thing...
+Probably Olof can apply it directly to ARM SoC tree..
 
-> The flash chip responds by sending arbitrary amount of data. Given
-> that transfer_one gets only the part that sends the read command and
-> the part to do the actual read may or may not follow this is getting a
-> bit hairy. Add in dummy bytes due to fast-read lag and page write
-> wrap-around and you get something that you definitely do not want
-> unless you are really sure that there is a flash memory on the other
-> end of the wire.
+ arch/arm/mach-ep93xx/timer-ep93xx.c | 17 ++++++++++-------
+ 1 file changed, 10 insertions(+), 7 deletions(-)
 
-So if you're doing this you may have a good reason to implement
-transfer_one_message() instead.  Or perhaps implement it in the core and
-provide operations to do the map and unmap.  And of course if this sort
-of requirement exists that's an obvious thing that must be documented
-in the interfaces but isn't.
-
-We need a lot more thought about the interface here, the lack of any
-explanation of what the interface is supposed to be and the fact that
-all questions about it are being answered in terms of describing the
-specific system are both a bit worrying.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150806/08a8a314/attachment.sig>
+diff --git a/arch/arm/mach-ep93xx/timer-ep93xx.c b/arch/arm/mach-ep93xx/timer-ep93xx.c
+index ac48ac1fd16d..e5f791145bd0 100644
+--- a/arch/arm/mach-ep93xx/timer-ep93xx.c
++++ b/arch/arm/mach-ep93xx/timer-ep93xx.c
+@@ -86,19 +86,22 @@ static int ep93xx_clkevt_set_next_event(unsigned long next,
+ }
+ 
+ 
+-static void ep93xx_clkevt_set_mode(enum clock_event_mode mode,
+-				   struct clock_event_device *evt)
++static int ep93xx_clkevt_shutdown(struct clock_event_device *evt)
+ {
+ 	/* Disable timer */
+ 	writel(0, EP93XX_TIMER3_CONTROL);
++
++	return 0;
+ }
+ 
+ static struct clock_event_device ep93xx_clockevent = {
+-	.name		= "timer1",
+-	.features	= CLOCK_EVT_FEAT_ONESHOT,
+-	.set_mode	= ep93xx_clkevt_set_mode,
+-	.set_next_event	= ep93xx_clkevt_set_next_event,
+-	.rating		= 300,
++	.name			= "timer1",
++	.features		= CLOCK_EVT_FEAT_ONESHOT,
++	.set_state_shutdown	= ep93xx_clkevt_shutdown,
++	.set_state_oneshot	= ep93xx_clkevt_shutdown,
++	.tick_resume		= ep93xx_clkevt_shutdown,
++	.set_next_event		= ep93xx_clkevt_set_next_event,
++	.rating			= 300,
+ };
+ 
+ static irqreturn_t ep93xx_timer_interrupt(int irq, void *dev_id)
+-- 
+2.4.0
