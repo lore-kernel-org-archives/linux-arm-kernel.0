@@ -1,58 +1,53 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 6 Aug 2015 09:22:45 +0200
-Subject: [PATCH v2 2/2] ARM: shmobile: r8a7794: add GPIO DT support
-In-Reply-To: <2762710.QvQ3jKvG4A@wasted.cogentembedded.com>
-References: <6388101.Drn6rL87rl@wasted.cogentembedded.com>
- <2762710.QvQ3jKvG4A@wasted.cogentembedded.com>
-Message-ID: <CAMuHMdUuHtmZfd7vei0qdP9n_gvd6C1xBbDWkkSdPRTrTPxiOg@mail.gmail.com>
+From: eddie.huang@mediatek.com (Eddie Huang)
+Date: Thu, 6 Aug 2015 15:22:11 +0800
+Subject: [PATCH v2 2/2] i2c: mediatek: Fixup i2c ack error interrupt handling
+In-Reply-To: <1438845731-17805-1-git-send-email-eddie.huang@mediatek.com>
+References: <1438845731-17805-1-git-send-email-eddie.huang@mediatek.com>
+Message-ID: <1438845731-17805-3-git-send-email-eddie.huang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+When occur i2c ack error, i2c controller generate two interrupts,
+first is the ack error interrupt, then the complete interrupt.
+i2c interrupt handler should keep the two interrupt value, and only
+call complete() for the complete interrupt.
 
-On Mon, Aug 3, 2015 at 11:39 PM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
-> Describe GPIO[0-6] controllers in the R8A7794 device tree.
->
-> Based on original patch by Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>.
->
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Liguo Zhang <liguo.zhang@mediatek.com>
+Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
+---
+ drivers/i2c/busses/i2c-mt65xx.c |   15 +++++++++++----
+ 1 file changed, 11 insertions(+), 4 deletions(-)
 
-As CPG/MSTP Clock Domain support is in, I have to withdraw my Acked-by.
-
-> Index: renesas/arch/arm/boot/dts/r8a7794.dtsi
-> ===================================================================
-> --- renesas.orig/arch/arm/boot/dts/r8a7794.dtsi
-> +++ renesas/arch/arm/boot/dts/r8a7794.dtsi
-> @@ -50,6 +50,90 @@
->                 interrupts = <1 9 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>;
->         };
->
-> +       gpio0: gpio at e6050000 {
-> +               compatible = "renesas,gpio-r8a7794", "renesas,gpio-rcar";
-> +               reg = <0 0xe6050000 0 0x50>;
-> +               interrupts = <0 4 IRQ_TYPE_LEVEL_HIGH>;
-> +               #gpio-cells = <2>;
-> +               gpio-controller;
-> +               gpio-ranges = <&pfc 0 0 32>;
-> +               #interrupt-cells = <2>;
-> +               interrupt-controller;
-> +               clocks = <&mstp9_clks R8A7794_CLK_GPIO0>;
-
-Missing "power-domains = <&cpg_clocks>;"
-
-> +       };
-
-Same comment for the other gpio device nodes.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/drivers/i2c/busses/i2c-mt65xx.c b/drivers/i2c/busses/i2c-mt65xx.c
+index e28ad4c..c02e6c0 100644
+--- a/drivers/i2c/busses/i2c-mt65xx.c
++++ b/drivers/i2c/busses/i2c-mt65xx.c
+@@ -557,15 +557,22 @@ static irqreturn_t mtk_i2c_irq(int irqno, void *dev_id)
+ {
+ 	struct mtk_i2c *i2c = dev_id;
+ 	u16 restart_flag = 0;
++	u16 intr_stat;
+ 
+ 	if (i2c->dev_comp->auto_restart)
+ 		restart_flag = I2C_RS_TRANSFER;
+ 
+-	i2c->irq_stat = readw(i2c->base + OFFSET_INTR_STAT);
+-	writew(restart_flag | I2C_HS_NACKERR | I2C_ACKERR
+-		| I2C_TRANSAC_COMP, i2c->base + OFFSET_INTR_STAT);
++	intr_stat = readw(i2c->base + OFFSET_INTR_STAT);
++	writew(intr_stat, i2c->base + OFFSET_INTR_STAT);
+ 
+-	complete(&i2c->msg_complete);
++	/*
++	 * when occurs ack error, i2c controller generate two interrupts
++	 * first is the ack error interrupt, then the complete interrupt
++	 * i2c->irq_stat need keep the two interrupt value.
++	 */
++	i2c->irq_stat |= intr_stat;
++	if (i2c->irq_stat & (I2C_TRANSAC_COMP | restart_flag))
++		complete(&i2c->msg_complete);
+ 
+ 	return IRQ_HANDLED;
+ }
+-- 
+1.7.9.5
