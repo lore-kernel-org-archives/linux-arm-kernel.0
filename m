@@ -1,59 +1,61 @@
-From: raghumag@gmail.com (raghu MG)
-Date: Thu, 6 Aug 2015 22:28:12 +0530
-Subject: Armadaxp GPIO interrupts
-In-Reply-To: <20150806132926.GB19896@lunn.ch>
-References: <CAG1O52Xg88OsifBzmpSdqvC8wQaOW78nC9nnfxugFv1VU1m1LQ@mail.gmail.com>
- <20150804153439.GA28673@lunn.ch>
- <CAG1O52W2Gy_6_DfewtUqoK_J+Y=KwVGyygNaPu2xyPM_ZkLfcQ@mail.gmail.com>
- <CAG1O52VQPpeGkA8bqYbPMTiT9Mua1yHi3H3osqJsHqm-RRKzow@mail.gmail.com>
- <20150805162155.GE32760@lunn.ch>
- <CAG1O52WPFfm+XGk01iUVWLu=-Dm7bcDVmhv3P8iQDH+HHjsLUA@mail.gmail.com>
- <20150806132926.GB19896@lunn.ch>
-Message-ID: <CAG1O52XUyPkgTTRKftujZBNK1=n6GBdWgBg_kq6SsC5XMaeU3w@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 06 Aug 2015 19:00:15 +0200
+Subject: [PATCH v3] ARM: dts: Convert Linkstation Mini to Device Tree
+In-Reply-To: <1438879473.15635.91.camel@dolka.fr>
+References: <1438878592.15635.89.camel@dolka.fr>
+ <20150806163424.GH13421@lunn.ch> <1438879473.15635.91.camel@dolka.fr>
+Message-ID: <55C3929F.3030209@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ok,I think I need to understand more about this gpio driver.
+Hi Benjamin,
 
-As you said its registering chained handler,but why are they(IRQs) not
-visible in cat /proc/interrupts.
-What could be the reason.?
+On 06/08/2015 18:44, Benjamin Cama wrote:
+> Hi Andrew,
+> 
+> Le jeudi 06 ao?t 2015 ? 18:34 +0200, Andrew Lunn a ?crit :
+>> On Thu, Aug 06, 2015 at 06:29:52PM +0200, Benjamin Cama wrote:
+>>> The title says it all. The name of the dts file as been changed to
+>>> better reflect the manufacturer's device name (LS-WSGL), rather 
+>>> than
+>>> the original "lsmini", which exists in a kirkwood version too.
+>>>
+>>> Signed-off-by: Benjamin Cama <benoar@dolka.fr>
+>>
+>> Hi Benjamin
+>>
+>> It would be normal to add the various Acked-by: here, both Alexey and
+>> mine. It is not an issue, Gregory can add them, when he adds is own.
+>> I'm just mentioning it for any future patches you might submit.
+> 
+> Ah, OK, I was not sure and didn't want to add them by mistake.
 
-Do I need to further initialize marvell GPIO registers to trigger
-these events. The driver is unmasking all interrupts in probe function
-                writel_relaxed(0, mvchip->membase + GPIO_EDGE_CAUSE_OFF);
-                writel_relaxed(0, mvchip->membase + GPIO_EDGE_MASK_OFF);
-                writel_relaxed(0, mvchip->membase + GPIO_LEVEL_MASK_OFF);
+applied on mvebu/dt with the Acked-by: flags but also with some minor
+fixes :I used tab instead of space to indent dts at line 185 and I
+also resolved the merge conflict with patch "ARM: dts: orion5x: add
+buffalo linkstation ls-wtgl" in the file arch/arm/boot/dts/Makefile.
+
+Thanks,
+
+Gregory
 
 
-Do I need to change the polarity in polarity register to suit the
-board requirements in probe function.
+> 
+>> Thanks for the good work converting this,
+> 
+> Thanks!
+> --
+> benjamin
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
 
-I will try this in the morning.
 
-
-Regards
-Raghu
-
-On Thu, Aug 6, 2015 at 6:59 PM, Andrew Lunn <andrew@lunn.ch> wrote:
->> mvebu_gpio_irq_handler is only called if I register a another handler
->> at irq=82/83/84/85/87/88/89/90/92. I am registering this handler using
->> minimal kernel module.
->
-> This is totally wrong. The gpio driver needs these interrupts, and
-> will register a chained interrupt handle for these. Don't mess around
-> with them. Here is the code in the driver:
->
->         /* Setup the interrupt handlers. Each chip can have up to 4
->          * interrupt handlers, with each handler dealing with 8 GPIO
->          * pins. */
->         for (i = 0; i < 4; i++) {
->                 int irq = platform_get_irq(pdev, i);
->
->                 if (irq < 0)
->                         continue;
->                 irq_set_handler_data(irq, mvchip);
->                 irq_set_chained_handler(irq, mvebu_gpio_irq_handler);
->         }
->
->         Andrew
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
