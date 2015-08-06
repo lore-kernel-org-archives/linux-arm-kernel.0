@@ -1,208 +1,74 @@
 From: ykk@rock-chips.com (Yakir Yang)
-Date: Thu,  6 Aug 2015 09:22:05 -0500
-Subject: [RFC PATCH 6/8] drm: bridge: analogix_dp: add some rk3288 special
- registers setting
-In-Reply-To: <1438868947-22132-1-git-send-email-ykk@rock-chips.com>
+Date: Thu, 6 Aug 2015 22:29:29 +0800
+Subject: [RFC PATCH 2/8] drm: exynos/dp: convert to drm bridge mode
+In-Reply-To: <000001d0d052$f44fa3a0$dceeeae0$@com>
 References: <1438868947-22132-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <1438870925-23951-1-git-send-email-ykk@rock-chips.com>
+ <1438870041-23130-1-git-send-email-ykk@rock-chips.com>
+ <000001d0d052$f44fa3a0$dceeeae0$@com>
+Message-ID: <55C36F49.6020207@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-RK3288 need some special registers setting, we can separate
-them out by the dev_type of plat_data.
+Hi Jingoo,
 
-Signed-off-by: Yakir Yang <ykk@rock-chips.com>
----
- drivers/gpu/drm/bridge/analogix_dp_reg.c | 76 ++++++++++++++++++++------------
- drivers/gpu/drm/bridge/analogix_dp_reg.h | 12 +++++
- 2 files changed, 60 insertions(+), 28 deletions(-)
+? 2015/8/6 22:19, Jingoo Han ??:
+> On Thursday, August 06, 2015 11:07 PM, Yakir Yang wrote:
+>> In order to move exynos dp code to bridge directory,
+>> we need to convert driver drm bridge mode first. As
+>> dp driver already have a ptn3460 bridge, so we need
+>> to move ptn bridge to the next bridge of dp bridge.
+>>
+>> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+>> ---
+>>   drivers/gpu/drm/exynos/exynos_dp_core.c | 196 ++++++++++++++++++++------------
+>>   drivers/gpu/drm/exynos/exynos_dp_core.h |   2 +
+>>   2 files changed, 126 insertions(+), 72 deletions(-)
+>>
+>> diff --git a/drivers/gpu/drm/exynos/exynos_dp_core.c b/drivers/gpu/drm/exynos/exynos_dp_core.c
+>> index a8097a4..aa99e23 100644
+>> --- a/drivers/gpu/drm/exynos/exynos_dp_core.c
+>> +++ b/drivers/gpu/drm/exynos/exynos_dp_core.c
+>> @@ -3,6 +3,7 @@
+>>    *
+>>    * Copyright (C) 2012 Samsung Electronics Co., Ltd.
+>>    * Author: Jingoo Han <jg1.han@samsung.com>
+>> + *         Yakir Yang <ykk@rock-chips.com>
+> Please don't add this.
+> You just fixed some parts of this code. I don't find the reason
+> why you have to be added to author for this file.
+> If you want the title for an author, please send the patch
+> for a new IP, instead of modifying the exiting codes.
 
-diff --git a/drivers/gpu/drm/bridge/analogix_dp_reg.c b/drivers/gpu/drm/bridge/analogix_dp_reg.c
-index dfbbde7..4d6e08a 100644
---- a/drivers/gpu/drm/bridge/analogix_dp_reg.c
-+++ b/drivers/gpu/drm/bridge/analogix_dp_reg.c
-@@ -16,6 +16,8 @@
- #include <linux/delay.h>
- #include <linux/gpio.h>
- 
-+#include <drm/bridge/analogix_dp.h>
-+
- #include "analogix_dp_core.h"
- #include "analogix_dp_reg.h"
- 
-@@ -73,6 +75,14 @@ void analogix_dp_init_analog_param(struct analogix_dp_device *dp)
- 	reg = SEL_24M | TX_DVDD_BIT_1_0625V;
- 	writel(reg, dp->reg_base + ANALOGIX_DP_ANALOG_CTL_2);
- 
-+	if (dp->plat_data && (dp->plat_data->dev_type == RK3288_DP)) {
-+		writel(REF_CLK_24M, dp->reg_base + ANALOGIX_DP_PLL_REG_1);
-+		writel(0x95, dp->reg_base + ANALOGIX_DP_PLL_REG_2);
-+		writel(0x40, dp->reg_base + ANALOGIX_DP_PLL_REG_3);
-+		writel(0x58, dp->reg_base + ANALOGIX_DP_PLL_REG_4);
-+		writel(0x22, dp->reg_base + ANALOGIX_DP_PLL_REG_5);
-+	}
-+
- 	reg = DRIVE_DVDD_BIT_1_0625V | VCO_BIT_600_MICRO;
- 	writel(reg, dp->reg_base + ANALOGIX_DP_ANALOG_CTL_3);
- 
-@@ -207,81 +217,85 @@ void analogix_dp_set_analog_power_down(struct analogix_dp_device *dp,
- 				       bool enable)
- {
- 	u32 reg;
-+	u32 phy_pd_addr = ANALOGIX_DP_PHY_PD;
-+
-+	if (dp->plat_data && (dp->plat_data->dev_type == RK3288_DP))
-+		phy_pd_addr = ANALOGIX_DP_PD;
- 
- 	switch (block) {
- 	case AUX_BLOCK:
- 		if (enable) {
--			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			reg = readl(dp->reg_base + phy_dp_addr);
- 			reg |= AUX_PD;
--			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			writel(reg, dp->reg_base + phy_dp_addr);
- 		} else {
--			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			reg = readl(dp->reg_base + phy_dp_addr);
- 			reg &= ~AUX_PD;
--			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			writel(reg, dp->reg_base + phy_dp_addr);
- 		}
- 		break;
- 	case CH0_BLOCK:
- 		if (enable) {
--			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			reg = readl(dp->reg_base + phy_dp_addr);
- 			reg |= CH0_PD;
--			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			writel(reg, dp->reg_base + phy_dp_addr);
- 		} else {
--			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			reg = readl(dp->reg_base + phy_dp_addr);
- 			reg &= ~CH0_PD;
--			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			writel(reg, dp->reg_base + phy_dp_addr);
- 		}
- 		break;
- 	case CH1_BLOCK:
- 		if (enable) {
--			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			reg = readl(dp->reg_base + phy_dp_addr);
- 			reg |= CH1_PD;
--			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			writel(reg, dp->reg_base + phy_dp_addr);
- 		} else {
--			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			reg = readl(dp->reg_base + phy_dp_addr);
- 			reg &= ~CH1_PD;
--			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			writel(reg, dp->reg_base + phy_dp_addr);
- 		}
- 		break;
- 	case CH2_BLOCK:
- 		if (enable) {
--			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			reg = readl(dp->reg_base + phy_dp_addr);
- 			reg |= CH2_PD;
--			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			writel(reg, dp->reg_base + phy_dp_addr);
- 		} else {
--			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			reg = readl(dp->reg_base + phy_dp_addr);
- 			reg &= ~CH2_PD;
--			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			writel(reg, dp->reg_base + phy_dp_addr);
- 		}
- 		break;
- 	case CH3_BLOCK:
- 		if (enable) {
--			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			reg = readl(dp->reg_base + phy_dp_addr);
- 			reg |= CH3_PD;
--			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			writel(reg, dp->reg_base + phy_dp_addr);
- 		} else {
--			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			reg = readl(dp->reg_base + phy_dp_addr);
- 			reg &= ~CH3_PD;
--			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			writel(reg, dp->reg_base + phy_dp_addr);
- 		}
- 		break;
- 	case ANALOG_TOTAL:
- 		if (enable) {
--			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			reg = readl(dp->reg_base + phy_dp_addr);
- 			reg |= DP_PHY_PD;
--			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			writel(reg, dp->reg_base + phy_dp_addr);
- 		} else {
--			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			reg = readl(dp->reg_base + phy_dp_addr);
- 			reg &= ~DP_PHY_PD;
--			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			writel(reg, dp->reg_base + phy_dp_addr);
- 		}
- 		break;
- 	case POWER_ALL:
- 		if (enable) {
- 			reg = DP_PHY_PD | AUX_PD | CH3_PD | CH2_PD |
- 				CH1_PD | CH0_PD;
--			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			writel(reg, dp->reg_base + phy_dp_addr);
- 		} else {
--			writel(0x00, dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			writel(0x00, dp->reg_base + phy_dp_addr);
- 		}
- 		break;
- 	default:
-@@ -400,8 +414,14 @@ void analogix_dp_init_aux(struct analogix_dp_device *dp)
- 	analogix_dp_reset_aux(dp);
- 
- 	/* Disable AUX transaction H/W retry */
--	reg = AUX_BIT_PERIOD_EXPECTED_DELAY(3) | AUX_HW_RETRY_COUNT_SEL(0) |
--	      AUX_HW_RETRY_INTERVAL_600_MICROSECONDS;
-+	if (dp->plat_data && (dp->plat_data->dev_type == RK3288_DP))
-+		reg = AUX_BIT_PERIOD_EXPECTED_DELAY(0) |
-+		      AUX_HW_RETRY_COUNT_SEL(3) |
-+		      AUX_HW_RETRY_INTERVAL_600_MICROSECONDS;
-+	else
-+		reg = AUX_BIT_PERIOD_EXPECTED_DELAY(3) |
-+		      AUX_HW_RETRY_COUNT_SEL(0) |
-+		      AUX_HW_RETRY_INTERVAL_600_MICROSECONDS;
- 	writel(reg, dp->reg_base + ANALOGIX_DP_AUX_HW_RETRY_CTL);
- 
- 	/* Receive AUX Channel DEFER commands equal to DEFFER_COUNT*64 */
-diff --git a/drivers/gpu/drm/bridge/analogix_dp_reg.h b/drivers/gpu/drm/bridge/analogix_dp_reg.h
-index 98153e2..96c538a 100644
---- a/drivers/gpu/drm/bridge/analogix_dp_reg.h
-+++ b/drivers/gpu/drm/bridge/analogix_dp_reg.h
-@@ -24,6 +24,14 @@
- #define ANALOGIX_DP_VIDEO_CTL_8			0x3C
- #define ANALOGIX_DP_VIDEO_CTL_10			0x44
- 
-+#define ANALOGIX_DP_PLL_REG_1			0xfc
-+#define ANALOGIX_DP_PLL_REG_2			0x9e4
-+#define ANALOGIX_DP_PLL_REG_3			0x9e8
-+#define ANALOGIX_DP_PLL_REG_4			0x9ec
-+#define ANALOGIX_DP_PLL_REG_5			0xa00
-+
-+#define ANALOGIX_DP_PD                          0x12c
-+
- #define ANALOGIX_DP_LANE_MAP			0x35C
- 
- #define ANALOGIX_DP_ANALOG_CTL_1			0x370
-@@ -156,6 +164,10 @@
- #define VSYNC_POLARITY_CFG			(0x1 << 1)
- #define HSYNC_POLARITY_CFG			(0x1 << 0)
- 
-+/* ANALOGIX_DP_PLL_REG_1 */
-+#define REF_CLK_24M				(0x1 << 1)
-+#define REF_CLK_27M				(0x0 << 1)
-+
- /* ANALOGIX_DP_LANE_MAP */
- #define LANE3_MAP_LOGIC_LANE_0			(0x0 << 6)
- #define LANE3_MAP_LOGIC_LANE_1			(0x1 << 6)
--- 
-2.1.2
+Okay, thanks for your remind ;)
+
+>>   [...]
+>>   MODULE_AUTHOR("Jingoo Han <jg1.han@samsung.com>");
+>> +MODULE_AUTHOR("Yakir Yang <ykk@rock-chips.com>");
+> The same as above.
+
+Done
+>>   MODULE_DESCRIPTION("Samsung SoC DP Driver");
+>>   MODULE_LICENSE("GPL v2");
+>> diff --git a/drivers/gpu/drm/exynos/exynos_dp_core.h b/drivers/gpu/drm/exynos/exynos_dp_core.h
+>> index c321ad5..f2584b8 100644
+>> --- a/drivers/gpu/drm/exynos/exynos_dp_core.h
+>> +++ b/drivers/gpu/drm/exynos/exynos_dp_core.h
+>> @@ -3,6 +3,7 @@
+>>    *
+>>    * Copyright (C) 2012 Samsung Electronics Co., Ltd.
+>>    * Author: Jingoo Han <jg1.han@samsung.com>
+>> + *         Yakir Yang <ykk@rock-chips.com>
+> The same as above.
+> Here, you just added 1 line. If we add someone to author
+> in this way, a lot of people should be added to author.
+
+Done
+
+- Yakir
+> Best regards,
+> Jingoo Han
+>
+>
+>
+>
+>
