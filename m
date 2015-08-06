@@ -1,43 +1,40 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 6 Aug 2015 12:23:53 +0100
-Subject: [RFC PATCH 1/5] spi: introduce flag for memory mapped read
-In-Reply-To: <CAOMqctQZRZ4zG_yYy=CeX3DX4NVNWN1COP4Q-2YvMun9xYOA7g@mail.gmail.com>
-References: <20150731181745.GM20873@sirena.org.uk> <55BEF4AF.5090704@ti.com>
- <20150804155148.GR20873@sirena.org.uk> <55C0FD98.1090107@ti.com>
- <20150805115013.GJ20873@sirena.org.uk>
- <CAOMqctQXwcHyiWBwtugSDSE_k65qrNfrwnhjQMDJkLoJMmGzUw@mail.gmail.com>
- <20150805124412.GN20873@sirena.org.uk>
- <CAOMqctS9Y5FxpUCCJew6+cnjH5iTvbzkH3g-8yrXs4OuS2pSGA@mail.gmail.com>
- <20150806090202.GO20873@sirena.org.uk>
- <CAOMqctQZRZ4zG_yYy=CeX3DX4NVNWN1COP4Q-2YvMun9xYOA7g@mail.gmail.com>
-Message-ID: <20150806112353.GT20873@sirena.org.uk>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu,  6 Aug 2015 13:27:32 +0200
+Subject: [PATCH] ARM: Fix the secondary_startup function in Big Endian case
+Message-ID: <1438860452-6347-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 06, 2015 at 12:01:37PM +0200, Michal Suchanek wrote:
+Since the commit "b2c3e38a5471 ARM: redo TTBR setup code for LPAE",
+the setup code had been reworked. As a result the secondary CPUs
+failed to come online in Big Endian.
 
-> However, I am familiar m25p80.c and as I understand it the controller
-> is basically supposed to implement m25p80.c in hardware when this flag
-> is set.
+As explained by Russell, the new code expected the value in r4/r5 to
+be the least significant 32bits in r4 and the most significant 32bits
+in r5. However, in the secondary code, we load this using ldrd, which
+on BE reverses that.
 
-But what in concrete terms is that supposed to mean?  It's currently
-just an essentially undocumented flag on a message rather than something
-operating at the level of a flash chip.  That's pretty much where
-Russell's comments come from.
+This patch swap r4/r5 after the ldrd. It is done using the xor
+instructions in order to not use a temporary register.
 
-> If I was using m25p80.c to talk to anything but an actual flash chip
-> it would get me quite worried.
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ arch/arm/kernel/head.S | 3 +++
+ 1 file changed, 3 insertions(+)
 
-Sure, but at the end of the day it's just emitting standard SPI messages
-which don't know anything about flash.  If those messages are a sensible
-interface here then why bother with the flag, we can just pattern match
-on the format of the message.  If that doesn't work then probably this
-isn't a great interface and a separate, application specific interface
-makes more sense.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150806/3c0b0c61/attachment.sig>
+diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+index bd755d97e459..75cbcf34c2e9 100644
+--- a/arch/arm/kernel/head.S
++++ b/arch/arm/kernel/head.S
+@@ -399,6 +399,9 @@ ENTRY(secondary_startup)
+ 	sub	lr, r4, r5			@ mmu has been enabled
+ 	add	r3, r7, lr
+ 	ldrd	r4, [r3, #0]			@ get secondary_data.pgdir
++ARM_BE8(eor	r4, r4, r5)			@ swap r5 and r4 in BE
++ARM_BE8(eor	r5, r4, r5)			@ it can be done in 3 step
++ARM_BE8(eor	r4, r4, r5)			@ without using an temp reg
+ 	ldr	r8, [r3, #8]			@ get secondary_data.swapper_pg_dir
+ 	badr	lr, __enable_mmu		@ return address
+ 	mov	r13, r12			@ __secondary_switched address
+-- 
+2.1.0
