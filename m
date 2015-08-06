@@ -1,45 +1,100 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Thu,  6 Aug 2015 16:44:24 +0200
-Subject: [PATCH] ARM: multi_v7_defconfig: Add BQ24735, ANATOP and PWM_IMX
-Message-ID: <1438872264-24953-1-git-send-email-tomeu.vizoso@collabora.com>
+From: ykk@rock-chips.com (Yakir Yang)
+Date: Thu,  6 Aug 2015 09:24:18 -0500
+Subject: [RFC PATCH 7/8] drm: bridge: analogix_dp: try force hpd after plug in
+ lookup failed
+In-Reply-To: <1438868947-22132-1-git-send-email-ykk@rock-chips.com>
+References: <1438868947-22132-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <1438871058-24005-1-git-send-email-ykk@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Found the need for these when testing multiv7 kernels on a bunch of
-boards.
+Some edp screen do not have hpd signal, so we can't just return
+failed when hpd plug in detect failed.
 
-Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+Besides TRM indicate that if HPD_STATUS(RO) is 0, AUX CH will not
+work, so we need to give a force hpd action to set HPD_STATUS manually.
+
+Signed-off-by: Yakir Yang <ykk@rock-chips.com>
 ---
- arch/arm/configs/multi_v7_defconfig | 3 +++
- 1 file changed, 3 insertions(+)
+ drivers/gpu/drm/bridge/analogix_dp_core.c | 28 +++++++++++++++++++++++-----
+ drivers/gpu/drm/bridge/analogix_dp_core.h |  1 +
+ drivers/gpu/drm/bridge/analogix_dp_reg.c  |  9 +++++++++
+ 3 files changed, 33 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 4c5431e99522..827b91d887aa 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -349,6 +349,7 @@ CONFIG_GPIO_SYSCON=y
- CONFIG_GPIO_TPS6586X=y
- CONFIG_GPIO_TPS65910=y
- CONFIG_BATTERY_SBS=y
-+CONFIG_CHARGER_BQ24735=y
- CONFIG_BATTERY_MAX17040=m
- CONFIG_BATTERY_MAX17042=m
- CONFIG_CHARGER_MAX14577=m
-@@ -396,6 +397,7 @@ CONFIG_MFD_TPS65090=y
- CONFIG_MFD_TPS6586X=y
- CONFIG_MFD_TPS65910=y
- CONFIG_REGULATOR_AB8500=y
-+CONFIG_REGULATOR_ANATOP=y
- CONFIG_REGULATOR_AS3711=y
- CONFIG_REGULATOR_AS3722=y
- CONFIG_REGULATOR_AXP20X=y
-@@ -631,6 +633,7 @@ CONFIG_AK8975=y
- CONFIG_PWM=y
- CONFIG_PWM_ATMEL=m
- CONFIG_PWM_ATMEL_TCB=m
-+CONFIG_PWM_IMX=y
- CONFIG_PWM_RENESAS_TPU=y
- CONFIG_PWM_SAMSUNG=y
- CONFIG_PWM_SUN4I=y
+diff --git a/drivers/gpu/drm/bridge/analogix_dp_core.c b/drivers/gpu/drm/bridge/analogix_dp_core.c
+index 28724d4..7e67f19 100644
+--- a/drivers/gpu/drm/bridge/analogix_dp_core.c
++++ b/drivers/gpu/drm/bridge/analogix_dp_core.c
+@@ -68,15 +68,33 @@ static int analogix_dp_detect_hpd(struct analogix_dp_device *dp)
+ {
+ 	int timeout_loop = 0;
+ 
+-	while (analogix_dp_get_plug_in_status(dp) != 0) {
++	while (timeout_loop < DP_TIMEOUT_LOOP_COUNT) {
++		if (analogix_dp_get_plug_in_status(dp) == 0)
++			return 0;
++
+ 		timeout_loop++;
+-		if (DP_TIMEOUT_LOOP_COUNT < timeout_loop) {
+-			dev_err(dp->dev, "failed to get hpd plug status\n");
+-			return -ETIMEDOUT;
+-		}
+ 		usleep_range(10, 11);
+ 	}
+ 
++	/*
++	 * Some edp screen do not have hpd signal, so we can't just
++	 * return failed when hpd plug in detect failed.
++	 *
++	 * Besides TRM indicate that if HPD_STATUS(RO) is 0, AUX CH
++	 * will not work, so we need to give a force hpd action to
++	 * set HPD_STATUS manually.
++	 */
++	dev_dbg(dp->dev, "failed to get hpd plug status, try to force hpd\n");
++
++	analogix_dp_force_hpd(dp);
++
++	if (analogix_dp_get_plug_in_status(dp) != 0) {
++		dev_err(dp->dev, "failed to get hpd plug in status\n");
++		return -ETIMEDOUT;
++	}
++
++	dev_dbg(dp->dev, "success to get plug in status after force hpd\n");
++
+ 	return 0;
+ }
+ 
+diff --git a/drivers/gpu/drm/bridge/analogix_dp_core.h b/drivers/gpu/drm/bridge/analogix_dp_core.h
+index fe72695..43cec77 100644
+--- a/drivers/gpu/drm/bridge/analogix_dp_core.h
++++ b/drivers/gpu/drm/bridge/analogix_dp_core.h
+@@ -183,6 +183,7 @@ void analogix_dp_set_analog_power_down(struct analogix_dp_device *dp,
+ 				       bool enable);
+ void analogix_dp_init_analog_func(struct analogix_dp_device *dp);
+ void analogix_dp_init_hpd(struct analogix_dp_device *dp);
++void analogix_dp_force_hpd(struct analogix_dp_device *dp);
+ enum dp_irq_type analogix_dp_get_irq_type(struct analogix_dp_device *dp);
+ void analogix_dp_clear_hotplug_interrupts(struct analogix_dp_device *dp);
+ void analogix_dp_reset_aux(struct analogix_dp_device *dp);
+diff --git a/drivers/gpu/drm/bridge/analogix_dp_reg.c b/drivers/gpu/drm/bridge/analogix_dp_reg.c
+index 4d6e08a..3fb215b 100644
+--- a/drivers/gpu/drm/bridge/analogix_dp_reg.c
++++ b/drivers/gpu/drm/bridge/analogix_dp_reg.c
+@@ -366,6 +366,15 @@ void analogix_dp_init_hpd(struct analogix_dp_device *dp)
+ 	writel(reg, dp->reg_base + ANALOGIX_DP_SYS_CTL_3);
+ }
+ 
++void analogix_dp_force_hpd(struct analogix_dp_device *dp)
++{
++	u32 reg;
++
++	reg = readl(dp->reg_base + ANALOGIX_DP_SYS_CTL_3);
++	reg = (F_HPD | HPD_CTRL);
++	writel(reg, dp->reg_base + ANALOGIX_DP_SYS_CTL_3);
++}
++
+ enum dp_irq_type analogix_dp_get_irq_type(struct analogix_dp_device *dp)
+ {
+ 	u32 reg;
 -- 
-2.4.3
+2.1.2
