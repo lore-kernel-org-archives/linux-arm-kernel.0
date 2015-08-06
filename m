@@ -1,158 +1,85 @@
-From: slash.tmp@free.fr (Mason)
-Date: Thu, 06 Aug 2015 18:14:46 +0200
-Subject: IRQ setup on multicore systems (routing, balancing, etc)
-In-Reply-To: <20150806152654.GF7557@n2100.arm.linux.org.uk>
-References: <55C0C102.7050600@free.fr> <55C37A72.2090507@free.fr>
- <20150806152654.GF7557@n2100.arm.linux.org.uk>
-Message-ID: <55C387F6.8090708@free.fr>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 6 Aug 2015 17:16:25 +0100
+Subject: [PATCH V2] iommu/arm-smmu-v2: ThunderX mis-extends 64bit registers
+In-Reply-To: <1438793668-15597-1-git-send-email-tchalamarla@caviumnetworks.com>
+References: <1438793668-15597-1-git-send-email-tchalamarla@caviumnetworks.com>
+Message-ID: <20150806161625.GJ25483@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/08/2015 17:26, Russell King - ARM Linux wrote:
-> On Thu, Aug 06, 2015 at 05:17:06PM +0200, Mason wrote:
->> On 04/08/2015 15:41, Mason wrote:
->>
->>> I have a few very naive questions about [snip]
->>
->> [META]
->>
->> Are there perhaps more suitable mailing lists than this one
->> for such beginner questions?
+Hi Tirumalesh,
+
+I think this looks pretty good now, just one small comment below.
+
+On Wed, Aug 05, 2015 at 05:54:28PM +0100, Tirumalesh Chalamarla wrote:
+> The SMMU architecture defines two different behaviors when 64-bit
+> registers are written with 32-bit writes.  The first behavior causes
+> zero extension into the upper 32-bits.  The second behavior splits a
+> 64-bit register into "normal" 32-bit register pairs.
 > 
-> I thought your message yesterday indicated you'd found the answer.
+> On some buggy implementations, registers incorrectly zero extended
+> when they should instead behave as normal 32-bit register pairs.
+> 
+> Signed-off-by: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
+> ---
+> 
+> Changes from V1:
+> 	- Introduced smmu_writeq
+> 
+>  drivers/iommu/arm-smmu.c | 45 +++++++++++++++++++++++++--------------------
+>  1 file changed, 25 insertions(+), 20 deletions(-)
+> 
+> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> index 66a803b..0912c78 100644
+> --- a/drivers/iommu/arm-smmu.c
+> +++ b/drivers/iommu/arm-smmu.c
+> @@ -69,6 +69,18 @@
+>  		((smmu->options & ARM_SMMU_OPT_SECURE_CFG_ACCESS)	\
+>  			? 0x400 : 0))
+>  
+> +#ifdef CONFIG_64BIT
+> +#define smmu_writeq(reg64, addr)	writeq_relaxed((reg64), (addr))
+> +#else
+> +#define smmu_writeq(reg64, addr)				\
+> +	do {							\
+> +		u64 __val = (reg64);				\
+> +		void __iomem *__addr = (addr);			\
+> +		writel_relaxed(__val >> 32, __addr + 4);	\
+> +		writel_relaxed(__val, __addr);			\
+> +	} while (0)
+> +#endif
+> +
+>  /* Configuration registers */
+>  #define ARM_SMMU_GR0_sCR0		0x0
+>  #define sCR0_CLIENTPD			(1 << 0)
+> @@ -226,7 +238,7 @@
+>  #define TTBCR2_SEP_SHIFT		15
+>  #define TTBCR2_SEP_UPSTREAM		(0x7 << TTBCR2_SEP_SHIFT)
+>  
+> -#define TTBRn_HI_ASID_SHIFT            16
+> +#define TTBRn_ASID_SHIFT		48
+>  
+>  #define FSR_MULTI			(1 << 31)
+>  #define FSR_SS				(1 << 30)
+> @@ -762,22 +774,17 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
+>  
+>  	/* TTBRs */
+>  	if (stage1) {
+> -		reg = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[0];
+> -		writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR0_LO);
+> -		reg = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[0] >> 32;
+> -		reg |= ARM_SMMU_CB_ASID(cfg) << TTBRn_HI_ASID_SHIFT;
+> -		writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR0_HI);
+> -
+> -		reg = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[1];
+> -		writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR1_LO);
+> -		reg = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[1] >> 32;
+> -		reg |= ARM_SMMU_CB_ASID(cfg) << TTBRn_HI_ASID_SHIFT;
+> -		writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR1_HI);
+> +		u64 reg64 = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[0];
 
-I have so many questions, I could write a (very boring) book.
+Can we move this declaration to the start of the function along with
+u32 reg, please? It's used in both cases of the if/else block so it
+might be a tad cleaner.
 
-> You don't setup any kind of routing between CPU cores and devices.
-> At boot, initially CPU 0 will "own" all interrupts.
-
-OK.
-
-It doesn't help that the port I'm working on doesn't follow
-"established guidelines". In this case, interrupt routing is
-hard-coded in the platform code:
-
-static inline void tangox_enable(struct irq_data *data)
-{
-	int bit = data->irq - IRQ_CONTROLLER_IRQ_BASE;
-#ifdef ENABLE_INTERRUPT_ON_CPU1
-	if(route_interrupt_to_cpu1(bit))
-		tangox_fiq_enable(bit);
-	else
-#endif
-		tangox_irq_enable(bit);
-}
-
-(tangox_enable is called in the .irq_startup struct irq_chip callback.)
-
-Throw weird naming in the mix (I thought FIQ was reserved for
-the secure world, and my Linux runs in non-secure) and my
-confusion level is up to 11.
-
-> You then run a (fixed) version of irqbalanced (preferably the older
-> version which is not so x86-centric, eg, 0.56) which then distributes
-> the interrupts between the cores according to what the interrupt is
-> used for and the load it is imposing on the system.
-
-OK. Thanks for pointing that out.
-
-Unfortunately, I guess I should have asked the more fundamental
-questions first. Balancing IRQs only makes sense once IRQs are
-working.
-
-I don't understand how to convert my board file mess into the
-equivalent device tree, and the platform IRQ code is ugly.
-
-I still haven't found a good reference explaining "DT for dummies".
-I don't know how the GIC and platform INTC interact.
-
-I tried randomly copy/pasting DT snippets, but unsurprisingly,
-nothing has worked so far.
-
-(I use Mans Rullgard's port as a reference as much as I can.)
-https://github.com/mansr/linux-tangox
-
-/dts-v1/;
-
-/ {
-	compatible = "sigma,tango4-soc";
-
-	#address-cells = <1>;
-	#size-cells = <1>;
-
-	gic: interrupt-controller at 20001000 {
-		compatible = "arm,cortex-a9-gic";
-		interrupt-controller;
-		#interrupt-cells = <3>;
-		reg = <0x20001000 0x1000>,
-		      <0x20000100 0x0100>;
-	};
-
-	soc {
-		compatible = "simple-bus";
-		interrupt-parent = <&irqintc>;
-		#address-cells = <1>;
-		#size-cells = <1>;
-		ranges;
-
-		uart0: serial at 10700 {
-			compatible = "ns16550a";
-			reg = <0x10700 0x100>;
-			clock-frequency = <7372800>;
-			reg-shift = <2>;
-			no-loopback-test;
-		};
-
-		eth0: emac at 26000 {
-			compatible = "sigma,smp8640-emac";
-			reg = <0x26000 0x800>;
-			interrupts = <38>;
-			clocks = <396000000>;
-		};
-	};
-
-	cpublock: cpublock {
-		compatible = "simple-bus";
-		reg = <0x60000 0x10000>;
-		ranges = <0x0 0x60000 0x10000>;
-		interrupt-parent = <&irqintc>;
-		#address-cells = <1>;
-		#size-cells = <1>;
-
-		intc: intc at e000 {
-			compatible = "sigma,smp8640-intc";
-			reg = <0xe000 0x1000>;
-			ranges = <0x0 0xe000 0x1000>;
-			interrupt-parent = <&gic>;
-			interrupt-controller;
-			#address-cells = <1>;
-			#size-cells = <1>;
-
-			irqintc: irq at 000 {
-				reg = <0x000 0x100>;
-				#interrupt-cells = <2>;
-				interrupts = <2>;
-				label = "IRQ";
-			};
-
-			fiqintc: fiq at 100 {
-				reg = <0x100 0x100>;
-				#interrupt-cells = <2>;
-				interrupts = <3>;
-				label = "FIQ";
-			};
-
-			iiqintc: iiq at 300 {
-				reg = <0x300 0x100>;
-				#interrupt-cells = <2>;
-				interrupts = <4>;
-				label = "IIQ";
-			};
-		};
-	};
-
-};
-
-Bleh! I need a break. Be back in a few weeks.
-
-Regards.
+Will
