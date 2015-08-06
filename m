@@ -1,99 +1,111 @@
 From: wangzhou1@hisilicon.com (Zhou Wang)
-Date: Thu, 6 Aug 2015 16:09:13 +0800
-Subject: [PATCH v6 0/6] PCI: hisi: Add PCIe host support for HiSilicon SoC
- Hip05
-Message-ID: <1438848559-232109-1-git-send-email-wangzhou1@hisilicon.com>
+Date: Thu, 6 Aug 2015 16:09:14 +0800
+Subject: [PATCH v6 1/6] PCI: designware: move calculation of bus addresses to
+ DRA7xx
+In-Reply-To: <1438848559-232109-1-git-send-email-wangzhou1@hisilicon.com>
+References: <1438848559-232109-1-git-send-email-wangzhou1@hisilicon.com>
+Message-ID: <1438848559-232109-2-git-send-email-wangzhou1@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds PCIe host support for HiSilicon SoC Hip05. The PCIe hosts
-use PCIe IP core from Synopsys, So this driver is base on designware PCIe driver.
+From: gabriele paoloni <gabriele.paoloni@huawei.com>
 
-Hip05 is an ARMv8 architecture SoC. It should be able to use ARM64 PCIe API in
-designeware PCIe driver. So this patch also adds ARM64 support for designware
-pcie.
+Commit f4c55c5a3f7f "PCI: designware: Program ATU with untranslated
+address" added the calculation of PCI BUS addresses in designware,
+storing them in new fields added in "struct pcie_port". This
+calculation is done for every designware user even if is only
+applicable to DRA7xx.
+This patch moves the calculation of the bus addresses to the DRA7xx
+driver and is needed to allow the rework of designware to use
+the new DT parsing API.
 
-This patchset is based on v4.2-rc1.
+Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
+Signed-off-by: Zhou Wang <wangzhou1@hisilicon.com>
+---
+ drivers/pci/host/pci-dra7xx.c      | 13 +++++++++++++
+ drivers/pci/host/pcie-designware.c | 15 ++++-----------
+ 2 files changed, 17 insertions(+), 11 deletions(-)
 
-Change from v5:
-- Merge 1/6 in this series, discussion about this can be found in [1]
-
-Change from v4:
-- Change the author of 1/5 to Gabriele.
-- Modify problems in 3/5 pointed by Bjorn.
-- Modify spelling problems in 4/5.
-
-Change from v3:
-- Change 1/5 to what Gabriele suggested.
-- Use win->__res.start to get *_mod_base in 2/5, this fix a bug in v3 series.
-
-Change from v2:
-- Move struct pci_dev *dev and struct pci_sys_data *sys in
-  pcibios_align_resource in 1/5.
-- Add Gabriele's codes in 2/5 which delete unnecessary information parse and
-  use of_pci_get_host_bridge_resources for both ARM32 and ARM64.
-- Add maintainer patch 5/5.
-
-Change from RFC v1:
-- Add 1/4 patch by Arnd which removes align_resource callback in ARM
-  pcibios_align_resource.
-- Change head file in pcie-designware from asm/hardirq.h to linux/hardirq.h.
-- Set pp->root_bus_nr = 0 in dra7xx, exynos, imx6, keystone, layerscape,
-  spear13xx.
-- Remove unnecessary parentheses of some macros in pcie-hisi.
-- Use macro to replace some magic values.
-- Merge two loops together and add some comments about it in context_config
-  function in pcie-hisi.
-- Modify some value of items in pcie node example in binding document. 
-
-Change from RFC:
-- delete dw_pcie_setup, dw_pcie_scan_bus, dw_pcie_map_irq and struct hw_pci,
-  merge related operations into dw_pcie_host_init.
-
-Link of v5:
-- http://www.spinics.net/lists/devicetree/msg87959.html
-Link of v4:
-- http://www.spinics.net/lists/arm-kernel/msg433050.html
-Link of v3:
-- http://www.spinics.net/lists/linux-pci/msg42539.html
-Link of v2:
-- http://www.spinics.net/lists/linux-pci/msg41844.html
-Link of RFC v1:
-- http://www.spinics.net/lists/linux-pci/msg41305.html
-Link of RFC:
-- http://www.spinics.net/lists/linux-pci/msg40434.html
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/359741.html
-
-Zhou Wang (4):
-  PCI: designware: Add ARM64 support
-  PCI: hisi: Add PCIe host support for HiSilicon SoC Hip05
-  Documentation: DT: Add HiSilicon PCIe host binding
-  MAINTAINERS: Add pcie-hisi maintainer
-
-gabriele paoloni (2):
-  PCI: designware: move calculation of bus addresses to DRA7xx
-  ARM/PCI: remove align_resource in pci_sys_data
-
- .../devicetree/bindings/pci/hisilicon-pcie.txt     |  46 ++++
- MAINTAINERS                                        |   7 +
- arch/arm/include/asm/mach/pci.h                    |   5 -
- arch/arm/kernel/bios32.c                           |  12 +-
- drivers/pci/host/Kconfig                           |   8 +
- drivers/pci/host/Makefile                          |   1 +
- drivers/pci/host/pci-dra7xx.c                      |  14 ++
- drivers/pci/host/pci-exynos.c                      |   2 +-
- drivers/pci/host/pci-imx6.c                        |   2 +-
- drivers/pci/host/pci-keystone-dw.c                 |   2 +-
- drivers/pci/host/pci-keystone.c                    |   2 +-
- drivers/pci/host/pci-layerscape.c                  |   2 +-
- drivers/pci/host/pcie-designware.c                 | 236 ++++++-------------
- drivers/pci/host/pcie-designware.h                 |  14 +-
- drivers/pci/host/pcie-hisi.c                       | 254 +++++++++++++++++++++
- drivers/pci/host/pcie-spear13xx.c                  |   2 +-
- 16 files changed, 425 insertions(+), 184 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/pci/hisilicon-pcie.txt
- create mode 100644 drivers/pci/host/pcie-hisi.c
-
+diff --git a/drivers/pci/host/pci-dra7xx.c b/drivers/pci/host/pci-dra7xx.c
+index 80db09e..18ae7ff 100644
+--- a/drivers/pci/host/pci-dra7xx.c
++++ b/drivers/pci/host/pci-dra7xx.c
+@@ -61,6 +61,7 @@
+ 
+ #define	PCIECTRL_DRA7XX_CONF_PHY_CS			0x010C
+ #define	LINK_UP						BIT(16)
++#define	CPU_TO_BUS_ADDR					0x0FFFFFFF
+ 
+ struct dra7xx_pcie {
+ 	void __iomem		*base;
+@@ -139,6 +140,18 @@ static void dra7xx_pcie_enable_interrupts(struct pcie_port *pp)
+ static void dra7xx_pcie_host_init(struct pcie_port *pp)
+ {
+ 	dw_pcie_setup_rc(pp);
++
++	if (pp->io_mod_base)
++		pp->io_mod_base &= CPU_TO_BUS_ADDR;
++
++	if (pp->mem_mod_base)
++		pp->mem_mod_base &= CPU_TO_BUS_ADDR;
++
++	if (pp->cfg0_mod_base) {
++		pp->cfg0_mod_base &= CPU_TO_BUS_ADDR;
++		pp->cfg1_mod_base &= CPU_TO_BUS_ADDR;
++	}
++
+ 	dra7xx_pcie_establish_link(pp);
+ 	if (IS_ENABLED(CONFIG_PCI_MSI))
+ 		dw_pcie_msi_init(pp);
+diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
+index 69486be..c5d407c 100644
+--- a/drivers/pci/host/pcie-designware.c
++++ b/drivers/pci/host/pcie-designware.c
+@@ -366,14 +366,10 @@ int dw_pcie_host_init(struct pcie_port *pp)
+ 	struct of_pci_range range;
+ 	struct of_pci_range_parser parser;
+ 	struct resource *cfg_res;
+-	u32 val, na, ns;
++	u32 val, ns;
+ 	const __be32 *addrp;
+ 	int i, index, ret;
+ 
+-	/* Find the address cell size and the number of cells in order to get
+-	 * the untranslated address.
+-	 */
+-	of_property_read_u32(np, "#address-cells", &na);
+ 	ns = of_n_size_cells(np);
+ 
+ 	cfg_res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "config");
+@@ -416,8 +412,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
+ 			pp->io_base = range.cpu_addr;
+ 
+ 			/* Find the untranslated IO space address */
+-			pp->io_mod_base = of_read_number(parser.range -
+-							 parser.np + na, ns);
++			pp->io_mod_base = range.cpu_addr;
+ 		}
+ 		if (restype == IORESOURCE_MEM) {
+ 			of_pci_range_to_resource(&range, np, &pp->mem);
+@@ -426,8 +421,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
+ 			pp->mem_bus_addr = range.pci_addr;
+ 
+ 			/* Find the untranslated MEM space address */
+-			pp->mem_mod_base = of_read_number(parser.range -
+-							  parser.np + na, ns);
++			pp->mem_mod_base = range.cpu_addr;
+ 		}
+ 		if (restype == 0) {
+ 			of_pci_range_to_resource(&range, np, &pp->cfg);
+@@ -437,8 +431,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
+ 			pp->cfg1_base = pp->cfg.start + pp->cfg0_size;
+ 
+ 			/* Find the untranslated configuration space address */
+-			pp->cfg0_mod_base = of_read_number(parser.range -
+-							   parser.np + na, ns);
++			pp->cfg0_mod_base = range.cpu_addr;
+ 			pp->cfg1_mod_base = pp->cfg0_mod_base +
+ 					    pp->cfg0_size;
+ 		}
 -- 
 1.9.1
