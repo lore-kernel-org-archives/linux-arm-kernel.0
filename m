@@ -1,44 +1,32 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Thu, 6 Aug 2015 16:34:13 +0800
-Subject: [PATCH v5 0/2] add a new driver to support SAMA5D4 watchdog timer
-Message-ID: <1438850055-30104-1-git-send-email-wenyou.yang@atmel.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 06 Aug 2015 09:42:47 +0100
+Subject: [PATCH v6 0/8] ARM64: juno: add SCPI mailbox protocol, clock
+ and CPUFreq support
+In-Reply-To: <55C1DE7F.5040002@arm.com>
+References: <1438364591-1144-1-git-send-email-sudeep.holla@arm.com>
+ <55C1DE7F.5040002@arm.com>
+Message-ID: <55C31E07.4090307@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Olof,
 
-Because the watchdog WDT_MR register can be written more than once,
-its work mechanism is different from the at91sam9260 watchdog driver.
-Open the device file to enable the watchdog hardware, close to disable it,
-and ping it from the user space directly to keep it alive.
+On 05/08/15 10:59, Sudeep Holla wrote:
+> Hi Olof,
+>
+> On 31/07/15 18:43, Sudeep Holla wrote:
+>> Hi ARM-SoC guys,
+>>
+>> It has been on the list for a while and have got all the necessary
+>> ACKs. Can you please pull this series for v4.3 ?
+>>
+>
+> Can you pull this patch series directly from the mail or do you prefer
+> pull-request ?
+>
 
-Changes from v4.0
- 1./ Fix interrupt register function flags argument.
- 2./ Replace the tabs after #define with spaces.
+Any issue with this series ? Let me know. I did send a pull request also
+but I haven't got any response so far. Sorry for the nag.
 
-Changes from v3.0
- 1./ Change the driver name to 'sama5d4_wdt' for more acceptable.
- 2./ Change the prefix of function name and struct name
-     from 'atmel_' to 'sama5d4_', and others.
-
-Changes from v2.0
- 1./ Use a specific driver name, at91_sama5d4_wdt.c.
- 2./ Remove '-' at the end of macro name and unnecessary check.
- 3./ Use alphabetic order for include files.
-
-Wenyou Yang (2):
-  drivers: watchdog: add a driver to support SAMA5D4 watchdog timer
-  Documentation: dt: binding: atmel-sama5d4-wdt: for SAMA5D4 watchdog
-    driver
-
- .../bindings/watchdog/atmel-sama5d4-wdt.txt        |   35 +++
- drivers/watchdog/Kconfig                           |    9 +
- drivers/watchdog/Makefile                          |    1 +
- drivers/watchdog/at91sam9_wdt.h                    |    2 +
- drivers/watchdog/sama5d4_wdt.c                     |  280 ++++++++++++++++++++
- 5 files changed, 327 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/watchdog/atmel-sama5d4-wdt.txt
- create mode 100644 drivers/watchdog/sama5d4_wdt.c
-
--- 
-1.7.9.5
+Regards,
+Sudeep
