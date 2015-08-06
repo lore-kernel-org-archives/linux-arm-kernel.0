@@ -1,28 +1,26 @@
-From: joro@8bytes.org (joro at 8bytes.org)
-Date: Thu, 6 Aug 2015 19:54:39 +0200
-Subject: [PATCH v5 1/3] iommu: Implement common IOMMU ops for DMA mapping
-In-Reply-To: <20150806152327.GH25483@arm.com>
-References: <cover.1438362603.git.robin.murphy@arm.com>
- <6ce6b501501f611297ae0eae31e07b0d2060eaae.1438362603.git.robin.murphy@arm.com>
- <20150806152327.GH25483@arm.com>
-Message-ID: <20150806175439.GS14980@8bytes.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 6 Aug 2015 19:01:56 +0100
+Subject: next-20150806 build: 2 failures 52 warnings (next-20150806)
+In-Reply-To: <E1ZNIul-0007IF-Ev@optimist>
+References: <E1ZNIul-0007IF-Ev@optimist>
+Message-ID: <20150806180156.GC20873@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+On Thu, Aug 06, 2015 at 12:00:47PM +0100, Build bot for Mark Brown wrote:
 
-On Thu, Aug 06, 2015 at 04:23:27PM +0100, Will Deacon wrote:
-> We're quite keen to get this in for arm64, since we're without IOMMU DMA
-> ops and need to get something upstream. Do you think this is likely to
-> be merged for 4.3/4.4 or would we be better off doing our own
-> arch-private implementation instead?
-> 
-> Sorry to pester, but we've got people basing their patches and products
-> on this and I don't want to end up having to support out-of-tree code.
+Today's linux-next fails to build an ARM allmodconfig with:
 
-I definitly plan to merge it soon, but not sure if its getting into
-v4.3. There are a few things I have questions about or need rework, but
-I am sure we can work this out.
+> ../drivers/iommu/omap-iommu-debug.c:138:2: error: void value not ignored as it ought to be
 
-
-	Joerg
+caused by a combination of 1ba2f20ac (fs/seq_file: convert int
+seq_vprint/seq_printf/etc... returns to void) which made seq_printf()
+return void and e203db293863fa15 (iommu/omap: Fix debug_read_tlb() to
+use seq_printf()) which has been in -next for a little while now.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150806/41897b91/attachment.sig>
