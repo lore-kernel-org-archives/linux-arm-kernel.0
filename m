@@ -1,25 +1,58 @@
-From: eddie.huang@mediatek.com (Eddie Huang)
-Date: Thu, 6 Aug 2015 15:22:09 +0800
-Subject: [PATCH v2 0/2] Mediatek I2C fixup 
-Message-ID: <1438845731-17805-1-git-send-email-eddie.huang@mediatek.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 6 Aug 2015 09:22:45 +0200
+Subject: [PATCH v2 2/2] ARM: shmobile: r8a7794: add GPIO DT support
+In-Reply-To: <2762710.QvQ3jKvG4A@wasted.cogentembedded.com>
+References: <6388101.Drn6rL87rl@wasted.cogentembedded.com>
+ <2762710.QvQ3jKvG4A@wasted.cogentembedded.com>
+Message-ID: <CAMuHMdUuHtmZfd7vei0qdP9n_gvd6C1xBbDWkkSdPRTrTPxiOg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series provide two patches to optimize mediatek i2c driver.
-The first patch will reset dma hardware in init function to make sure
-hardware work in good state. The second patch fix i2c interrupt handling
-for ACK error. All these patches base on 4.2-rc1.
+Hi Sergei,
 
-Change in v2:
-Fix multi-transfer fail bug - in mtk_i2c_irq(), call complete()
-if get I2C_RS_TRANSFER interrupt
+On Mon, Aug 3, 2015 at 11:39 PM, Sergei Shtylyov
+<sergei.shtylyov@cogentembedded.com> wrote:
+> Describe GPIO[0-6] controllers in the R8A7794 device tree.
+>
+> Based on original patch by Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>.
+>
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Eddie Huang (2):
-  i2c: mediatek: Reset DMA engine in hardware init function
-  i2c: mediatek: Fixup i2c ack error interrupt handling
+As CPG/MSTP Clock Domain support is in, I have to withdraw my Acked-by.
 
- drivers/i2c/busses/i2c-mt65xx.c |   21 +++++++++++++++++----
- 1 file changed, 17 insertions(+), 4 deletions(-)
+> Index: renesas/arch/arm/boot/dts/r8a7794.dtsi
+> ===================================================================
+> --- renesas.orig/arch/arm/boot/dts/r8a7794.dtsi
+> +++ renesas/arch/arm/boot/dts/r8a7794.dtsi
+> @@ -50,6 +50,90 @@
+>                 interrupts = <1 9 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>;
+>         };
+>
+> +       gpio0: gpio at e6050000 {
+> +               compatible = "renesas,gpio-r8a7794", "renesas,gpio-rcar";
+> +               reg = <0 0xe6050000 0 0x50>;
+> +               interrupts = <0 4 IRQ_TYPE_LEVEL_HIGH>;
+> +               #gpio-cells = <2>;
+> +               gpio-controller;
+> +               gpio-ranges = <&pfc 0 0 32>;
+> +               #interrupt-cells = <2>;
+> +               interrupt-controller;
+> +               clocks = <&mstp9_clks R8A7794_CLK_GPIO0>;
 
--- 
-1.7.9.5
+Missing "power-domains = <&cpg_clocks>;"
+
+> +       };
+
+Same comment for the other gpio device nodes.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
