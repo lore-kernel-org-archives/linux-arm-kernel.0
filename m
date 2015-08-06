@@ -1,28 +1,37 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 6 Aug 2015 10:15:14 +0200
-Subject: [PATCH 1/2] arm64: Enable Marvell Berlin SoC family in Kconfig
-In-Reply-To: <1438629886-6390-2-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1438629886-6390-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1438629886-6390-2-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20150806081514.GF16520@localhost>
+Date: Thu, 6 Aug 2015 10:12:36 +0200
+Subject: [GIT PULL] Allwinner DT changes for 4.3
+In-Reply-To: <20150803094143.GA16612@lukather>
+References: <20150803094143.GA16612@lukather>
+Message-ID: <20150806081236.GD16520@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 03, 2015 at 09:24:45PM +0200, Sebastian Hesselbarth wrote:
-> From: Jisheng Zhang <jszhang@marvell.com>
+On Mon, Aug 03, 2015 at 11:41:43AM +0200, Maxime Ripard wrote:
+> Hi Arnd, Kevin, Olof,
 > 
-> This patch introduces ARCH_BERLIN to enable Marvell Berlin SoC family in
-> Kconfig.
+> Here is the DT changes for the 4.3 merge window.
 > 
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> ---
-> As discussed with Olof on IRC, this is Jisheng's Kconfig patch for
-> ARM64 Berlin. Olof agreed to rework this to finally land in
-> Kconfig.platforms, i.e. after
->   eed6b3eb20b9 ("arm64: Split out platform options to separate Kconfig")
+> I'll be in holidays for the three next weeks, so this is probably
+> going to be my last "feature" pull request for the 4.3 merge window.
+> 
+> Thanks!
+> Maxime
+> 
+> 
+> The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
+> 
+>   Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
+> 
+> are available in the git repository at:
+> 
+>   https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-dt-for-4.3
+> 
+> for you to fetch changes up to 60018d027d792bdfe9d98c83a470fa2cdd6a0e1a:
+> 
+>   ARM: dts: sun7i: Change cubietruck wifi enable pin to use mmc-pwrseq (2015-08-01 11:25:11 +0200)
 
-Applied, thanks.
+Merged, thanks!
 
 
 -Olof
