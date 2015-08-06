@@ -1,62 +1,31 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Thu, 6 Aug 2015 16:34:15 +0800
-Subject: [PATCH v5 2/2] Documentation: dt: binding: atmel-sama5d4-wdt: for
- SAMA5D4 watchdog driver
-In-Reply-To: <1438850055-30104-1-git-send-email-wenyou.yang@atmel.com>
-References: <1438850055-30104-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1438850055-30104-3-git-send-email-wenyou.yang@atmel.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 6 Aug 2015 16:46:12 +0800
+Subject: [PATCH] ARM: imx6: correct i.MX6 PCIe interrupt routing
+In-Reply-To: <1438848690.24317.3.camel@pengutronix.de>
+References: <1438793677-19153-1-git-send-email-l.stach@pengutronix.de>
+ <20150806012832.GP12927@tiger>
+ <1438848690.24317.3.camel@pengutronix.de>
+Message-ID: <20150806084612.GF9847@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The compatible "atmel,sama5d4-wdt" supports the SAMA5D4 watchdog driver
-and the watchdog's WDT_MR register can be written more than once.
+On Thu, Aug 06, 2015 at 10:11:30AM +0200, Lucas Stach wrote:
+> Am Donnerstag, den 06.08.2015, 09:28 +0800 schrieb Shawn Guo:
+> > On Wed, Aug 05, 2015 at 06:54:37PM +0200, Lucas Stach wrote:
+> > > The PCIe interrupts are also routed through the GPC. This has been
+> > > missed from the conversion to stacked IRQ domains as the PCIe
+> > > controller uses an explicit interrupt map and thus doesn't inherit
+> > > the SoC global interrupt parent.
+> > > 
+> > > Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> > 
+> > So this is a fix and need copy stable?
+> > 
+> I'm a bit on the fence with this. It only fixes PCIe wake-up and I'm not
+> aware of anyone using this functionality and haven't seen any bug
+> reports yet.
+> 
+> On the other hand it is a clear fix and has practically zero chances for
+> regressions, so yes please add stable 4.0+ to this.
 
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
----
- .../bindings/watchdog/atmel-sama5d4-wdt.txt        |   35 ++++++++++++++++++++
- 1 file changed, 35 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/watchdog/atmel-sama5d4-wdt.txt
-
-diff --git a/Documentation/devicetree/bindings/watchdog/atmel-sama5d4-wdt.txt b/Documentation/devicetree/bindings/watchdog/atmel-sama5d4-wdt.txt
-new file mode 100644
-index 0000000..f7cc7c0
---- /dev/null
-+++ b/Documentation/devicetree/bindings/watchdog/atmel-sama5d4-wdt.txt
-@@ -0,0 +1,35 @@
-+* Atmel SAMA5D4 Watchdog Timer (WDT) Controller
-+
-+Required properties:
-+- compatible: "atmel,sama5d4-wdt"
-+- reg: base physical address and length of memory mapped region.
-+
-+Optional properties:
-+- timeout-sec: watchdog timeout value (in seconds).
-+- interrupts: interrupt number to the CPU.
-+- atmel,watchdog-type: should be "hardware" or "software".
-+	"hardware": enable watchdog fault reset. A watchdog fault triggers
-+		    watchdog reset.
-+	"software": enable watchdog fault interrupt. A watchdog fault asserts
-+		    watchdog interrupt.
-+- atmel,idle-halt: present if you want to stop the watchdog when the CPU is
-+		   in idle state.
-+	CAUTION: This property should be used with care, it actually makes the
-+	watchdog not counting when the CPU is in idle state, therefore the
-+	watchdog reset time depends on mean CPU usage and will not reset at all
-+	if the CPU stop working while it is in idle state, which is probably
-+	not what you want.
-+- atmel,dbg-halt: present if you want to stop the watchdog when the CPU is
-+		  in debug state.
-+
-+Example:
-+	watchdog at fc068640 {
-+		compatible = "atmel,sama5d4-wdt";
-+		reg = <0xfc068640 0x10>;
-+		interrupts = <4 IRQ_TYPE_LEVEL_HIGH 5>;
-+		timeout-sec = <10>;
-+		atmel,watchdog-type = "hardware";
-+		atmel,dbg-halt;
-+		atmel,idle-halt;
-+		status = "okay";
-+	};
--- 
-1.7.9.5
+Applied as a fix, thanks.
