@@ -1,56 +1,86 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu,  6 Aug 2015 16:42:42 +0200
-Subject: [PATCH 3/4 v2] ARM: nomadik: move l2x0 setup to device tree
-Message-ID: <1438872162-13565-1-git-send-email-linus.walleij@linaro.org>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Thu,  6 Aug 2015 16:43:33 +0200
+Subject: [PATCH] ARM: multi_v7_defconfig: Build a few drivers in
+Message-ID: <1438872213-24754-1-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The cache setup magic value in the Nomadik machine is plain wrong,
-the correct settings can be done using device tree in accordance
-with the settings from ST's own port.
+Drivers for devices that are basic dependencies (regulators, mainly) of
+other devices are better built into the image because otherwise we get
+so many probe deferrals that is hard to spot where a device is having
+genuine trouble to probe.
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
 ---
-This v2 version fixes the syntactic minimalism issue with
-just 0/~0 for the AUX val/mask pointed out by Russell.
----
- arch/arm/boot/dts/ste-nomadik-stn8815.dtsi | 7 +++++++
- arch/arm/mach-nomadik/cpu-8815.c           | 5 ++---
- 2 files changed, 9 insertions(+), 3 deletions(-)
+ arch/arm/configs/multi_v7_defconfig | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi b/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
-index f68988ac800c..ce8936bebe5e 100644
---- a/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
-+++ b/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
-@@ -21,6 +21,13 @@
- 		interrupts = <30>;
- 		cache-unified;
- 		cache-level = <2>;
-+		cache-size = <131072>;
-+		cache-sets = <512>;
-+		cache-line-size = <32>;
-+		/* At full speed latency must be >=2 */
-+		arm,tag-latency = <2>;
-+		arm,data-latency = <2 2>;
-+		arm,dirty-latency = <2>;
- 	};
- 
- 	mtu0: mtu at 101e2000 {
-diff --git a/arch/arm/mach-nomadik/cpu-8815.c b/arch/arm/mach-nomadik/cpu-8815.c
-index 82831dc6122f..0c612d95bd5c 100644
---- a/arch/arm/mach-nomadik/cpu-8815.c
-+++ b/arch/arm/mach-nomadik/cpu-8815.c
-@@ -114,9 +114,8 @@ static const char * cpu8815_board_compat[] = {
- };
- 
- DT_MACHINE_START(NOMADIK_DT, "Nomadik STn8815")
--	/* At full speed latency must be >=2, so 0x249 in low bits */
--	.l2c_aux_val	= 0x00700249,
--	.l2c_aux_mask	= 0xfe0fefff,
-+	.l2c_aux_val	= 0,
-+	.l2c_aux_mask	= ~0,
- 	.map_io		= cpu8815_map_io,
- 	.restart	= cpu8815_restart,
- 	.dt_compat      = cpu8815_board_compat,
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index fb587b2330ad..4c5431e99522 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -309,7 +309,7 @@ CONFIG_I2C_SUN6I_P2WI=y
+ CONFIG_I2C_TEGRA=y
+ CONFIG_I2C_XILINX=y
+ CONFIG_I2C_RCAR=y
+-CONFIG_I2C_CROS_EC_TUNNEL=m
++CONFIG_I2C_CROS_EC_TUNNEL=y
+ CONFIG_SPI=y
+ CONFIG_SPI_ATMEL=m
+ CONFIG_SPI_CADENCE=y
+@@ -318,7 +318,7 @@ CONFIG_SPI_OMAP24XX=y
+ CONFIG_SPI_ORION=y
+ CONFIG_SPI_PL022=y
+ CONFIG_SPI_RSPI=y
+-CONFIG_SPI_S3C64XX=m
++CONFIG_SPI_S3C64XX=y
+ CONFIG_SPI_SH_MSIOF=m
+ CONFIG_SPI_SH_HSPI=y
+ CONFIG_SPI_SIRF=y
+@@ -408,7 +408,7 @@ CONFIG_REGULATOR_MAX14577=m
+ CONFIG_REGULATOR_MAX8907=y
+ CONFIG_REGULATOR_MAX8973=y
+ CONFIG_REGULATOR_MAX77686=y
+-CONFIG_REGULATOR_MAX77802=m
++CONFIG_REGULATOR_MAX77802=y
+ CONFIG_REGULATOR_MAX77693=m
+ CONFIG_REGULATOR_PALMAS=y
+ CONFIG_REGULATOR_PWM=m
+@@ -557,7 +557,7 @@ CONFIG_RTC_DRV_AS3722=y
+ CONFIG_RTC_DRV_DS1307=y
+ CONFIG_RTC_DRV_MAX8907=y
+ CONFIG_RTC_DRV_MAX77686=y
+-CONFIG_RTC_DRV_MAX77802=m
++CONFIG_RTC_DRV_MAX77802=y
+ CONFIG_RTC_DRV_RS5C372=m
+ CONFIG_RTC_DRV_PALMAS=y
+ CONFIG_RTC_DRV_ST_LPC=y
+@@ -610,7 +610,7 @@ CONFIG_COMMON_CLK_QCOM=y
+ CONFIG_CHROME_PLATFORMS=y
+ CONFIG_CROS_EC_CHARDEV=m
+ CONFIG_COMMON_CLK_MAX77686=y
+-CONFIG_COMMON_CLK_MAX77802=m
++CONFIG_COMMON_CLK_MAX77802=y
+ CONFIG_COMMON_CLK_S2MPS11=m
+ CONFIG_APQ_MMCC_8084=y
+ CONFIG_MSM_GCC_8660=y
+@@ -632,7 +632,7 @@ CONFIG_PWM=y
+ CONFIG_PWM_ATMEL=m
+ CONFIG_PWM_ATMEL_TCB=m
+ CONFIG_PWM_RENESAS_TPU=y
+-CONFIG_PWM_SAMSUNG=m
++CONFIG_PWM_SAMSUNG=y
+ CONFIG_PWM_SUN4I=y
+ CONFIG_PWM_TEGRA=y
+ CONFIG_PWM_VT8500=y
+@@ -647,7 +647,7 @@ CONFIG_PHY_STIH41X_USB=y
+ CONFIG_PHY_STIH407_USB=y
+ CONFIG_PHY_SUN4I_USB=y
+ CONFIG_PHY_SUN9I_USB=y
+-CONFIG_PHY_SAMSUNG_USB2=m
++CONFIG_PHY_SAMSUNG_USB2=y
+ CONFIG_EXT4_FS=y
+ CONFIG_AUTOFS4_FS=y
+ CONFIG_MSDOS_FS=y
 -- 
 2.4.3
