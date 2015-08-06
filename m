@@ -1,164 +1,82 @@
-From: scott.shu@mediatek.com (Scott Shu)
-Date: Thu, 6 Aug 2015 10:59:02 +0800
-Subject: [PATCH v3 3/8] soc: Mediatek: Add SCPSYS CPU power domain driver
-In-Reply-To: <20150805085034.GG18700@pengutronix.de>
-References: <1438696464-59858-1-git-send-email-scott.shu@mediatek.com>
- <1438696464-59858-4-git-send-email-scott.shu@mediatek.com>
- <20150805085034.GG18700@pengutronix.de>
-Message-ID: <1438829942.9435.24.camel@mtkswgap22>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 5 Aug 2015 22:01:01 -0500
+Subject: [PATCH 6/9] ARM: domain: Add platform handlers for CPU PM domains
+In-Reply-To: <20150805192341.GB52339@linaro.org>
+References: <1438731339-58317-1-git-send-email-lina.iyer@linaro.org>
+ <1438731339-58317-7-git-send-email-lina.iyer@linaro.org>
+ <CAL_JsqKWekSGiFbZz6++3ibAzY_8Y6+0nOBQinFVw4cBk6JvEw@mail.gmail.com>
+ <20150805192341.GB52339@linaro.org>
+Message-ID: <CAL_JsqJ_AK6M5WmyFrGVLtpGg=MdAafxX=1873Je_uB_sQkpiA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-08-05 at 10:50 +0200, Sascha Hauer wrote:
-> On Tue, Aug 04, 2015 at 09:54:19PM +0800, Scott Shu wrote:
-> > This adds a CPU power domain driver for the Mediatek SCPSYS unit on
-> > MT6580.
-> > 
-> > Signed-off-by: Scott Shu <scott.shu@mediatek.com>
-> > ---
-> >  drivers/soc/mediatek/mtk-scpsys.c   |  250 +++++++++++++++++++++++++++++++++++
-> >  include/linux/soc/mediatek/scpsys.h |    9 ++
-> >  2 files changed, 259 insertions(+)
-> >  create mode 100644 include/linux/soc/mediatek/scpsys.h
-> > 
-> > diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
-> > index 43a79ed..ca0f2dd 100644
-> > --- a/drivers/soc/mediatek/mtk-scpsys.c
-> > +++ b/drivers/soc/mediatek/mtk-scpsys.c
-> > @@ -15,18 +15,30 @@
-> >  #include <linux/io.h>
-> >  #include <linux/kernel.h>
-> >  #include <linux/mfd/syscon.h>
-> > +#include <linux/of.h>
-> >  #include <linux/of_device.h>
-> > +#include <linux/of_address.h>
-> >  #include <linux/platform_device.h>
-> >  #include <linux/pm_domain.h>
-> >  #include <linux/regmap.h>
-> >  #include <linux/soc/mediatek/infracfg.h>
-> > +#include <linux/soc/mediatek/scpsys.h>
-> >  #include <dt-bindings/power/mt8173-power.h>
-> >  
-> > +#define SPM_POWERON_CONFIG_SET		0x0000
-> > +#define SPM_CA7_CPU0_PWR_CON		0x0200
-> >  #define SPM_VDE_PWR_CON			0x0210
-> >  #define SPM_MFG_PWR_CON			0x0214
-> > +#define SPM_CA7_CPU1_PWR_CON		0x0218
-> > +#define SPM_CA7_CPU2_PWR_CON		0x021c
-> > +#define SPM_CA7_CPU3_PWR_CON		0x0220
-> >  #define SPM_VEN_PWR_CON			0x0230
-> >  #define SPM_ISP_PWR_CON			0x0238
-> >  #define SPM_DIS_PWR_CON			0x023c
-> > +#define SPM_CA7_CPU0_L1_PDN		0x025c
-> > +#define SPM_CA7_CPU1_L1_PDN		0x0264
-> > +#define SPM_CA7_CPU2_L1_PDN		0x026c
-> > +#define SPM_CA7_CPU3_L1_PDN		0x0274
-> >  #define SPM_VEN2_PWR_CON		0x0298
-> >  #define SPM_AUDIO_PWR_CON		0x029c
-> >  #define SPM_MFG_2D_PWR_CON		0x02c0
-> > @@ -34,12 +46,20 @@
-> >  #define SPM_USB_PWR_CON			0x02cc
-> >  #define SPM_PWR_STATUS			0x060c
-> >  #define SPM_PWR_STATUS_2ND		0x0610
-> > +#define SPM_SLEEP_TIMER_STA		0x0720
-> >  
-> > +/* bit definition in SPM_CA7_CPUx_PWR_CON */
-> >  #define PWR_RST_B_BIT			BIT(0)
-> >  #define PWR_ISO_BIT			BIT(1)
-> >  #define PWR_ON_BIT			BIT(2)
-> >  #define PWR_ON_2ND_BIT			BIT(3)
-> >  #define PWR_CLK_DIS_BIT			BIT(4)
-> > +#define SRAM_CKISO_BIT			BIT(5)
-> > +#define SRAM_ISOINT_B_BIT		BIT(6)
-> > +
-> > +/* bit definition in SPM_CA7_CPUx_L1_PDN */
-> > +#define L1_PDN				BIT(0)
-> > +#define L1_PDN_ACK			BIT(8)
-> >  
-> >  #define PWR_STATUS_DISP			BIT(3)
-> >  #define PWR_STATUS_MFG			BIT(4)
-> > @@ -52,6 +72,28 @@
-> >  #define PWR_STATUS_AUDIO		BIT(24)
-> >  #define PWR_STATUS_USB			BIT(25)
-> >  
-> > +#define MT6580_MAX_CPUS			4
-> > +
-> > +#ifdef CONFIG_SMP
-> > +static DEFINE_SPINLOCK(spm_cpu_lock);
-> > +
-> > +static void __iomem *spm_cpu_base;
-> > +
-> > +static const u32 spm_cpu_pwr_con[MT6580_MAX_CPUS] = {
-> > +	SPM_CA7_CPU0_PWR_CON,
-> > +	SPM_CA7_CPU1_PWR_CON,
-> > +	SPM_CA7_CPU2_PWR_CON,
-> > +	SPM_CA7_CPU3_PWR_CON,
-> > +};
-> > +
-> > +static const u32 spm_cpu_l1_pdn[MT6580_MAX_CPUS] = {
-> > +	SPM_CA7_CPU0_L1_PDN,
-> > +	SPM_CA7_CPU1_L1_PDN,
-> > +	SPM_CA7_CPU2_L1_PDN,
-> > +	SPM_CA7_CPU3_L1_PDN,
-> > +};
-> > +#endif
-> > +
-> >  enum clk_id {
-> >  	MT8173_CLK_MM,
-> >  	MT8173_CLK_MFG,
-> > @@ -485,3 +527,211 @@ static struct platform_driver scpsys_drv = {
-> >  };
-> >  
-> >  module_platform_driver_probe(scpsys_drv, scpsys_probe);
-> > +
-> > +#define SPM_REGWR_EN		BIT(0)
-> > +#define SPM_PROJECT_CODE	0x0B16
-> > +
-> > +#ifdef CONFIG_SMP
-> > +int spm_cpu_mtcmos_on(int cpu)
-> 
-> The idea was that the code that the current driver has in
-> scpsys_power_on/scpsys_power_off is shared with this function. If we
-> don't do this then it indeed doesn't make much sense to put it into the
-> same file.
-> 
-> From what I see we would need to change the prototype to something like
-> 
-> static int __scpsys_power_on(struct scp_domain_data *)
-> 
-> (maybe with some additional base addresses and stuff)
-> 
-> struct scp_domain_data would additionally need sram_isoint_b and sram_ckiso
-> members.
-> 
-> Sascha
-> 
-Hi Sascha,
-   The CPU power sequence is quite different with the others, as
-described below.
+On Wed, Aug 5, 2015 at 2:23 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
+> On Wed, Aug 05 2015 at 08:45 -0600, Rob Herring wrote:
+>>
+>> On Tue, Aug 4, 2015 at 6:35 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
+>>>
+>>> In addition to the common power up/down actions of CPU PM domain core,
+>>> platforms may have additional configuration before the CPU domain can be
+>>> powered off or considered active. Allow platform drivers to register
+>>> handlers for CPU PM domains.
+>>>
+>>> Platform drivers may register their callbacks against a compatible
+>>> string defined by their PM domain provider device node in the DT. At
+>>> domain init, the platform driver can initialize the platform specific
+>>> genpd attributes. The init callback would need to return successfully,
+>>> for the platform power_on/off handlers to be registered with the CPU PM
+>>> domain.
+>>>
+>>> The code uses __init section to reduce memory needed for platform
+>>> handlers and therefore can be freed after the driver is initialized, a
+>>> desirable outcome for single kernel image.
+>>
+>>
+>> [...]
+>>
+>>> diff --git a/arch/arm/include/asm/arm-pd.h
+>>> b/arch/arm/include/asm/arm-pd.h
+>>> new file mode 100644
+>>> index 0000000..fc44abf
+>
+>
+> [...]
+>
+>>> +#define ARM_PD_METHOD_OF_DECLARE(_name, _handle, _ops) \
+>>> +       static const struct of_arm_pd_method
+>>> __arm_pd_method_of_table_##_name \
+>>> +       __used __section(__arm_pd_method_of_table)              \
+>>> +       = { .handle = _handle, .ops = _ops }
+>>
+>>
+>> AFAICT, you are not using this in this series. You should add it when
+>> you have a user.
+>>
+>> Ideally, we keep some amount of uniformity across various *_OF_DECLARE
+>> which is why we have OF_DECLARE_1 and OF_DECLARE_2. This makes all the
+>> sections just arrays of struct of_device_id. Not all users follow
+>> this, but most do. So instead of putting the ops in here, platforms
+>> can provide a function callback which can then set the ops. Then you
+>> also don't need the .init() ops function as the callback function can
+>> do any initialization too.
+>>
+> I looked through these and I can switch over to _OF_DECLARE() without any
+> issues, but using OF_DECLARE_1 or OF_DECLARE_2 is pretty limiting.
 
-* Non-CPU
-   1) Set PWR_ON_BIT, PWR_ON_2ND_BIT
-   2) Wait PWR_ACK
-   3) Clear PWR_CLK_DIS_BIT
-   4) Clear PWR_ISO_BIT
-   5) Set PWR_RST_B_BIT
-   6) Clear SRAM_PDN
-   7) Wait SRAM_PDN_ACK
-* CPU
-   1) Set PWR_ON_BIT, PWR_ON_2ND_BIT
-   2) Wait PWR_ACK
-   3) Clear PWR_ISO_BIT
-   4) Clear L1_PDN to power on L1
-   5) Wait L1_PDN_ACK
-   6) Set SRAM_ISOINT_B
-   7) Clear SRAM_CKISO
-   8) Clear PWR_CLK_DIS
-   9) Set PWR_RST_B
-For multi-cluster SoC, the cluster power sequence is also different.
+Well yes, but then we only want to use it for things that will never
+use the driver model.
 
-Please think if this is a good idea if we integrate the CPU support into
-the scpsys_power_on()? Based on the readability and compatible
-considerations, we provide this patch. 
-Thanks
-Scott
+> If I could set up my own function type for the .data member, then its a
+> lot more easier on the code. Like this -
+>
+> typedef int (*arm_pd_init)(struct device_node *dn, struct
+>                 generic_pm_domain *genpd, struct of_arm_pd_ops *ops);
+
+You alloc the genpd struct just before calling init. You can just as
+easily have the platform specific code call an allocation function and
+a function to set the ops functions. This is more inline with how a
+driver would work when registering with a subsystem. I also don't
+think "arm,pd" is a good compatible string to be matching on. I'll
+comment on that more in patch 5.
+
+Rob
