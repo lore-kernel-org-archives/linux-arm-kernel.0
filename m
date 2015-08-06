@@ -1,57 +1,147 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 5 Aug 2015 23:48:21 -0700
-Subject: [PATCH 00/11] omap_hsmmc: voltage switching and tuning
-In-Reply-To: <55C22524.5050304@ti.com>
-References: <1438242394-25599-1-git-send-email-kishon@ti.com>
- <20150805104355.GE16878@atomide.com> <55C22524.5050304@ti.com>
-Message-ID: <20150806064821.GO16878@atomide.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 06 Aug 2015 16:08:04 +0900
+Subject: [RFC PATCH v4 1/9] mmc: dw_mmc: Add external dma interface support
+In-Reply-To: <1438843491-23853-1-git-send-email-shawn.lin@rock-chips.com>
+References: <1438843469-23807-1-git-send-email-shawn.lin@rock-chips.com>
+ <1438843491-23853-1-git-send-email-shawn.lin@rock-chips.com>
+Message-ID: <55C307D4.1020209@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kishon Vijay Abraham I <kishon@ti.com> [150805 08:03]:
-> Hi,
+On 06.08.2015 15:44, Shawn Lin wrote:
+> DesignWare MMC Controller can supports two types of DMA
+> mode: external dma and internal dma. We get a RK312x platform
+> integrated dw_mmc and ARM pl330 dma controller. This patch add
+> edmac ops to support these platforms. I've tested it on RK312x
+> platform with edmac mode and RK3288 platform with idmac mode.
 > 
-> On Wednesday 05 August 2015 04:13 PM, Tony Lindgren wrote:
-> > * Kishon Vijay Abraham I <kishon@ti.com> [150730 00:49]:
-> >> Patch series implements voltage switching and tuning for omap_hsmmc
-> >> driver.
-> >>
-> >> Did basic read/write test in J6, J6 Eco, Beagle-x15, AM437x EVM,
-> >> Beaglebone black, OMAP5 uEVM and OMAP4 PANDA.
-> > 
-> > Your tests are missing omap3?
+> Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
 > 
-> I don't have one at my disposal :-( I'll try to find one and add omap3 tests.
-
-Great :) Beagle xm is a good one to test the USB PHY stuff on
-and also MMC. Having USB cable connected or EHCI loaded blocks the PM
-though, so NFSroot is not very usable for testing on it.
-
-If you want to test PM over NFSroot, boards with the smsc911x known
-to work with PM  are at least omap3-evm-37xx.dts and
-logicpd-torpedo-37xx-devkit.dts.  Since you tinker with the USB PHYs,
-torpedo has MUSB working the same way as the beagle boards, EVM I
-think can be modified that way but by default has diffent PHY.
-
-Also overo tobi boards work with PM but only for retntion idle and
-not off idle, and map3-sbc-t3517.dts probably can be made to work
-with PM but I have mine as a gateway and have not been able to test
-with it.
-
-Probably also zoom3 boards with later processor boards can be made
-to work, the LDP has early omap34xx variants and can't be made to
-work reliably.
-
-I don't have omap3-lilly, but I'd assume that can also be made
-to work with PM if not already working.
-
-> > I suggest you add some omap3 tests in general as otherwise you are
-> > only testing a subset of the driver features and completely missing
-> > things like rutnime PM and save and restore for the deeper idle
-> > states.
+> ---
 > 
-> yeah, I'll do those tests and re-post the series.
+> Changes in v4:
+> - remove "host->trans_mode" and use "host->use_dma" to indicate
+>   transfer mode.
+> - remove all bt-bindings' changes since we don't need new properities.
+> - check transfer mode at runtime by reading HCON reg
+> - spilt defconfig changes for each sub-architecture
+> - fix the title of cover letter
 
-Thanks!
+How did you fixed the title? It is still empty :)
+	Subject: [RFC PATCH v4 0/9]
 
-Tony
+> - reuse some code for reducing code size
+> 
+> Changes in v3:
+> - choose transfer mode at runtime
+> - remove all CONFIG_MMC_DW_IDMAC config option
+> - add supports-idmac property for some platforms
+> 
+> Changes in v2:
+> - Fix typo of dev_info msg
+> - remove unused dmach from declaration of dw_mci_dma_slave
+> 
+>  drivers/mmc/host/Kconfig        |  11 +-
+>  drivers/mmc/host/dw_mmc-pltfm.c |   2 +
+>  drivers/mmc/host/dw_mmc.c       | 258 ++++++++++++++++++++++++++++++++--------
+>  include/linux/mmc/dw_mmc.h      |  27 ++++-
+>  4 files changed, 232 insertions(+), 66 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
+> index 6a0f9c7..a86c0eb 100644
+> --- a/drivers/mmc/host/Kconfig
+> +++ b/drivers/mmc/host/Kconfig
+> @@ -607,15 +607,7 @@ config MMC_DW
+>  	help
+>  	  This selects support for the Synopsys DesignWare Mobile Storage IP
+>  	  block, this provides host support for SD and MMC interfaces, in both
+> -	  PIO and external DMA modes.
+> -
+> -config MMC_DW_IDMAC
+> -	bool "Internal DMAC interface"
+> -	depends on MMC_DW
+> -	help
+> -	  This selects support for the internal DMAC block within the Synopsys
+> -	  Designware Mobile Storage IP block. This disables the external DMA
+> -	  interface.
+> +	  PIO, internal DMA mode and external DMA modes.
+>  
+>  config MMC_DW_PLTFM
+>  	tristate "Synopsys Designware MCI Support as platform device"
+> @@ -644,7 +636,6 @@ config MMC_DW_K3
+>  	tristate "K3 specific extensions for Synopsys DW Memory Card Interface"
+>  	depends on MMC_DW
+>  	select MMC_DW_PLTFM
+> -	select MMC_DW_IDMAC
+>  	help
+>  	  This selects support for Hisilicon K3 SoC specific extensions to the
+>  	  Synopsys DesignWare Memory Card Interface driver. Select this option
+> diff --git a/drivers/mmc/host/dw_mmc-pltfm.c b/drivers/mmc/host/dw_mmc-pltfm.c
+> index ec6dbcd..7e1d13b 100644
+> --- a/drivers/mmc/host/dw_mmc-pltfm.c
+> +++ b/drivers/mmc/host/dw_mmc-pltfm.c
+> @@ -59,6 +59,8 @@ int dw_mci_pltfm_register(struct platform_device *pdev,
+>  	host->pdata = pdev->dev.platform_data;
+>  
+>  	regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	/* Get registers' physical base address */
+> +	host->phy_regs = (void *)(regs->start);
+>  	host->regs = devm_ioremap_resource(&pdev->dev, regs);
+>  	if (IS_ERR(host->regs))
+>  		return PTR_ERR(host->regs);
+> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+> index 40e9d8e..5d6cdff 100644
+> --- a/drivers/mmc/host/dw_mmc.c
+> +++ b/drivers/mmc/host/dw_mmc.c
+> @@ -56,7 +56,7 @@
+>  #define DW_MCI_FREQ_MAX	200000000	/* unit: HZ */
+>  #define DW_MCI_FREQ_MIN	400000		/* unit: HZ */
+>  
+> -#ifdef CONFIG_MMC_DW_IDMAC
+> +
+>  #define IDMAC_INT_CLR		(SDMMC_IDMAC_INT_AI | SDMMC_IDMAC_INT_NI | \
+>  				 SDMMC_IDMAC_INT_CES | SDMMC_IDMAC_INT_DU | \
+>  				 SDMMC_IDMAC_INT_FBE | SDMMC_IDMAC_INT_RI | \
+> @@ -99,7 +99,6 @@ struct idmac_desc {
+>  
+>  	__le32		des3;	/* buffer 2 physical address */
+>  };
+> -#endif /* CONFIG_MMC_DW_IDMAC */
+>  
+>  static bool dw_mci_reset(struct dw_mci *host);
+>  static bool dw_mci_ctrl_reset(struct dw_mci *host, u32 reset);
+> @@ -403,7 +402,6 @@ static int dw_mci_get_dma_dir(struct mmc_data *data)
+>  		return DMA_FROM_DEVICE;
+>  }
+>  
+> -#ifdef CONFIG_MMC_DW_IDMAC
+>  static void dw_mci_dma_cleanup(struct dw_mci *host)
+>  {
+>  	struct mmc_data *data = host->data;
+> @@ -441,12 +439,21 @@ static void dw_mci_idmac_stop_dma(struct dw_mci *host)
+>  	mci_writel(host, BMOD, temp);
+>  }
+>  
+> -static void dw_mci_idmac_complete_dma(struct dw_mci *host)
+> +static void dw_mci_dmac_complete_dma(void *arg)
+>  {
+> +	struct dw_mci *host = arg;
+
+Why changing the argument to void*?
+
+Best regards,
+Krzysztof
+
+>  	struct mmc_data *data = host->data;
+>  
+>  	dev_vdbg(host->dev, "DMA complete\n");
+>  
+> +	if (host->use_dma == TRANS_MODE_EDMAC)
+> +		if (data && (data->flags & MMC_DATA_READ))
+> +			/* Invalidate cache after read */
+> +			dma_sync_sg_for_cpu(mmc_dev(host->cur_slot->mmc),
+> +					    data->sg,
+> +					    data->sg_len,
+> +					    DMA_FROM_DEVICE);
+> +
+>  	host->dma_ops->cleanup(host);
