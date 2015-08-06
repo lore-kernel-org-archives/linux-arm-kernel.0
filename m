@@ -1,37 +1,44 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 6 Aug 2015 10:12:36 +0200
-Subject: [GIT PULL] Allwinner DT changes for 4.3
-In-Reply-To: <20150803094143.GA16612@lukather>
-References: <20150803094143.GA16612@lukather>
-Message-ID: <20150806081236.GD16520@localhost>
+From: wenyou.yang@atmel.com (Wenyou Yang)
+Date: Thu, 6 Aug 2015 16:34:13 +0800
+Subject: [PATCH v5 0/2] add a new driver to support SAMA5D4 watchdog timer
+Message-ID: <1438850055-30104-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 03, 2015 at 11:41:43AM +0200, Maxime Ripard wrote:
-> Hi Arnd, Kevin, Olof,
-> 
-> Here is the DT changes for the 4.3 merge window.
-> 
-> I'll be in holidays for the three next weeks, so this is probably
-> going to be my last "feature" pull request for the 4.3 merge window.
-> 
-> Thanks!
-> Maxime
-> 
-> 
-> The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
-> 
->   Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
-> 
-> are available in the git repository at:
-> 
->   https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-dt-for-4.3
-> 
-> for you to fetch changes up to 60018d027d792bdfe9d98c83a470fa2cdd6a0e1a:
-> 
->   ARM: dts: sun7i: Change cubietruck wifi enable pin to use mmc-pwrseq (2015-08-01 11:25:11 +0200)
+Hello,
 
-Merged, thanks!
+Because the watchdog WDT_MR register can be written more than once,
+its work mechanism is different from the at91sam9260 watchdog driver.
+Open the device file to enable the watchdog hardware, close to disable it,
+and ping it from the user space directly to keep it alive.
 
+Changes from v4.0
+ 1./ Fix interrupt register function flags argument.
+ 2./ Replace the tabs after #define with spaces.
 
--Olof
+Changes from v3.0
+ 1./ Change the driver name to 'sama5d4_wdt' for more acceptable.
+ 2./ Change the prefix of function name and struct name
+     from 'atmel_' to 'sama5d4_', and others.
+
+Changes from v2.0
+ 1./ Use a specific driver name, at91_sama5d4_wdt.c.
+ 2./ Remove '-' at the end of macro name and unnecessary check.
+ 3./ Use alphabetic order for include files.
+
+Wenyou Yang (2):
+  drivers: watchdog: add a driver to support SAMA5D4 watchdog timer
+  Documentation: dt: binding: atmel-sama5d4-wdt: for SAMA5D4 watchdog
+    driver
+
+ .../bindings/watchdog/atmel-sama5d4-wdt.txt        |   35 +++
+ drivers/watchdog/Kconfig                           |    9 +
+ drivers/watchdog/Makefile                          |    1 +
+ drivers/watchdog/at91sam9_wdt.h                    |    2 +
+ drivers/watchdog/sama5d4_wdt.c                     |  280 ++++++++++++++++++++
+ 5 files changed, 327 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/watchdog/atmel-sama5d4-wdt.txt
+ create mode 100644 drivers/watchdog/sama5d4_wdt.c
+
+-- 
+1.7.9.5
