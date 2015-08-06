@@ -1,41 +1,30 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 6 Aug 2015 15:41:34 +0800
-Subject: [PATCH] ARM: dts: imx6sx: correct property name for wakeup source
-In-Reply-To: <1438783075-15133-1-git-send-email-b20788@freescale.com>
-References: <1438783075-15133-1-git-send-email-b20788@freescale.com>
-Message-ID: <20150806074134.GA9847@tiger>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 06 Aug 2015 08:56:18 +0100
+Subject: [PATCH 1/3] Docs: dt: add generic MSI bindings
+In-Reply-To: <20150805165120.GB28849@leverpostej>
+References: <1437670365-20704-1-git-send-email-mark.rutland@arm.com>
+ <1437670365-20704-2-git-send-email-mark.rutland@arm.com>
+ <20150805165120.GB28849@leverpostej>
+Message-ID: <55C31322.1000608@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 05, 2015 at 09:57:55PM +0800, Anson Huang wrote:
-> Commit(def56bb input: snvs_pwrkey: use "wakeup-source"
-> as deivce tree property name) replaces the property name
-> of "wakeup" with "wakeup-source", update this change
-> in i.MX6SX dtsi accordingly.
+On 05/08/15 17:51, Mark Rutland wrote:
+> Rob,
 > 
-> Signed-off-by: Anson Huang <b20788@freescale.com>
-
-For arch/arm/ patches, please remember to copy linux-arm-kernel.
-
-Applied, thanks.
-
-> ---
->  arch/arm/boot/dts/imx6sx.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> Do you have any objections to this, or are you happy to take this patch?
 > 
-> diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
-> index e391d63..dc7eaae 100644
-> --- a/arch/arm/boot/dts/imx6sx.dtsi
-> +++ b/arch/arm/boot/dts/imx6sx.dtsi
-> @@ -686,7 +686,7 @@
->  					regmap = <&snvs>;
->  					interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
->  					linux,keycode = <KEY_POWER>;
-> -					wakeup;
-> +					wakeup-source;
->  				};
->  			};
->  
-> -- 
-> 1.9.1
+> There's a user of this binding (the GICv3 ITS) queued for v4.3 already in
+> the tip tree, so either we either need to be ok with this binding or we
+> need to rework that before v4.3.
 > 
+> Marc, can I take it from your use of the binding that you are happy to
+> provide your ack?
+
+Definitely.
+
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
