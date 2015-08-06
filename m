@@ -1,13 +1,13 @@
 From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Thu,  6 Aug 2015 16:11:44 +0200
-Subject: [PATCH v3 07/18] drm: Probe panels on demand
+Date: Thu,  6 Aug 2015 16:11:43 +0200
+Subject: [PATCH v3 06/18] regulator: core: Probe regulators on demand
 In-Reply-To: <1438870315-18689-1-git-send-email-tomeu.vizoso@collabora.com>
 References: <1438870315-18689-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <1438870315-18689-8-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <1438870315-18689-7-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When looking up a panel through its OF node, probe it if it hasn't
+When looking up a regulator through its OF node, probe it if it hasn't
 already.
 
 The goal is to reduce deferred probes to a minimum, as it makes it very
@@ -20,29 +20,28 @@ Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
 Changes in v3: None
 Changes in v2: None
 
- drivers/gpu/drm/drm_panel.c | 3 +++
- 1 file changed, 3 insertions(+)
+ drivers/regulator/core.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/drivers/gpu/drm/drm_panel.c b/drivers/gpu/drm/drm_panel.c
-index 2ef988e037b7..8f01574cabda 100644
---- a/drivers/gpu/drm/drm_panel.c
-+++ b/drivers/gpu/drm/drm_panel.c
-@@ -23,6 +23,7 @@
- 
- #include <linux/err.h>
- #include <linux/module.h>
+diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
+index 5f6c76142b08..73ac9fb07f96 100644
+--- a/drivers/regulator/core.c
++++ b/drivers/regulator/core.c
+@@ -26,6 +26,7 @@
+ #include <linux/gpio.h>
+ #include <linux/gpio/consumer.h>
+ #include <linux/of.h>
 +#include <linux/of_platform.h>
- 
- #include <drm/drm_crtc.h>
- #include <drm/drm_panel.h>
-@@ -80,6 +81,8 @@ struct drm_panel *of_drm_find_panel(struct device_node *np)
- {
- 	struct drm_panel *panel;
- 
-+	of_platform_probe(np);
-+
- 	mutex_lock(&panel_lock);
- 
- 	list_for_each_entry(panel, &panel_list, list) {
+ #include <linux/regmap.h>
+ #include <linux/regulator/of_regulator.h>
+ #include <linux/regulator/consumer.h>
+@@ -1336,6 +1337,7 @@ static struct regulator_dev *regulator_dev_lookup(struct device *dev,
+ 	if (dev && dev->of_node) {
+ 		node = of_get_regulator(dev, supply);
+ 		if (node) {
++			of_platform_probe(node);
+ 			mutex_lock(&regulator_list_mutex);
+ 			list_for_each_entry(r, &regulator_list, list)
+ 				if (r->dev.parent &&
 -- 
 2.4.3
