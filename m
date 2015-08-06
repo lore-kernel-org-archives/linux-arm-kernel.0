@@ -1,67 +1,56 @@
 From: ykk@rock-chips.com (Yakir Yang)
-Date: Thu, 6 Aug 2015 22:57:34 +0800
-Subject: [RFC PATCH 3/8] drm: bridge: analogix_dp: split exynos dp driver
- to bridge dir
-In-Reply-To: <000101d0d054$f34e9c70$d9ebd550$@com>
+Date: Thu, 6 Aug 2015 23:00:47 +0800
+Subject: [RFC PATCH 0/8] Add Analogix Core Display Port Driver
+In-Reply-To: <000201d0d056$06cff040$146fd0c0$@com>
 References: <1438868947-22132-1-git-send-email-ykk@rock-chips.com>
- <1438870763-23796-1-git-send-email-ykk@rock-chips.com>
- <000101d0d054$f34e9c70$d9ebd550$@com>
-Message-ID: <55C375DE.5070001@rock-chips.com>
+ <000201d0d056$06cff040$146fd0c0$@com>
+Message-ID: <55C3769F.2010405@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Jingoo,
 
-? 2015/8/6 22:33, Jingoo Han ??:
-> On Thursday, August 06, 2015 11:19 PM, Yakir Yang wrote:
->> Split the dp core driver from exynos directory to bridge
->> directory, and rename the core driver to analogix_dp_*,
->> leave the platform code to analogix_dp-exynos.
->>
->> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
->> ---
->>   drivers/gpu/drm/bridge/Kconfig                     |    5 +
->>   drivers/gpu/drm/bridge/Makefile                    |    1 +
->>   .../exynos_dp_core.c => bridge/analogix_dp_core.c} |  751 +++++-------
->>   drivers/gpu/drm/bridge/analogix_dp_core.h          |  286 +++++
->>   drivers/gpu/drm/bridge/analogix_dp_reg.c           | 1266 ++++++++++++++++++++
->>   .../exynos_dp_reg.h => bridge/analogix_dp_reg.h}   |  260 ++--
->>   drivers/gpu/drm/exynos/Kconfig                     |    5 +-
->>   drivers/gpu/drm/exynos/Makefile                    |    2 +-
->>   drivers/gpu/drm/exynos/analogix_dp-exynos.c        |  240 ++++
->>   drivers/gpu/drm/exynos/exynos_dp_core.h            |  283 -----
->>   include/drm/bridge/analogix_dp.h                   |   22 +
->>   11 files changed, 2287 insertions(+), 834 deletions(-)
->>   rename drivers/gpu/drm/{exynos/exynos_dp_core.c => bridge/analogix_dp_core.c} (54%)
->>   create mode 100644 drivers/gpu/drm/bridge/analogix_dp_core.h
->>   create mode 100644 drivers/gpu/drm/bridge/analogix_dp_reg.c
->>   rename drivers/gpu/drm/{exynos/exynos_dp_reg.h => bridge/analogix_dp_reg.h} (63%)
->>   create mode 100644 drivers/gpu/drm/exynos/analogix_dp-exynos.c
->>   delete mode 100644 drivers/gpu/drm/exynos/exynos_dp_core.h
->>   create mode 100644 include/drm/bridge/analogix_dp.h
->>
->> [...]
->> rename from drivers/gpu/drm/exynos/exynos_dp_core.c
->> rename to drivers/gpu/drm/bridge/analogix_dp_core.c
->> index aa99e23..28724d4 100644
->> --- a/drivers/gpu/drm/exynos/exynos_dp_core.c
->> +++ b/drivers/gpu/drm/bridge/analogix_dp_core.c
->> @@ -1,7 +1,8 @@
->>   /*
->> - * Samsung SoC DP (Display Port) interface driver.
->> + * Analogix Core DP (Display Port) interface driver.
->>    *
->>    * Copyright (C) 2012 Samsung Electronics Co., Ltd.
->> + * Copyright (C) FuZhou Rockchip Electronics Co., Ltd.
-> What is the reason to add this copyright?
-> You just replace 'exynos' prefix with 'analogix' prefix.
-> I cannot find the reason to add the copyright.
+? 2015/8/6 22:41, Jingoo Han ??:
+> On Thursday, August 06, 2015 10:49 PM, Yakir Yang wrote:
+>> Hi all,
+>>     Samsung exynos and Rockchip rk3288 almost share same dp controller,
+>> so I split the common code out, then rk3288 and exynos can re-used the
+>> same dp core driver. Cause I can't find the exact IP name of exynos dp
+>> controller, so I decide to name dp core driver with "analogix" which I
+>> find in rk3288 eDP TRM ;)
 >
+> OK, I see.
+> The Samsung Exynos eDP contoller and Rockchip rk3288 eDP contoller share
+> the same IP. So, a lot of parts can be re-used. I agree with this.
+> However, we have to review the code carefully, as others did.
+Yeah, feel happy to be reviewed  ;)
 
-Oh! Thanks for your point out, sorry for this one
+> I also cannot find the exact IP name. The "analogix" may be the vendor name
+> of this IP.
+Okay, so "analogix" is okay for now
 
+Thanks,
 - Yakir
->>    *
+> Best regards,
+> Jingoo Han
+>
+>> Beyond that, there are three light registers setting differents bewteen
+>> exynos and rk3288.
+>> 1. RK3288 have five special pll resigters which not indicata in exynos
+>>     dp controller.
+>> 2. The address of DP_PHY_PD(dp phy power manager register) are different
+>>     between rk3288 and exynos.
+>> 3. Rk3288 and exynos have different setting with AUX_HW_RETRY_CTL(dp debug
+>>     register).
+>>
+>> My series patches can be divider into two parts: One for spliting the
+>> analogix_dp code from exynos dp driver. Another are trying to add rk3288
+>> dp driver support.
+>>
+>> Best regards,
+>> - Yakir
+>>
+>>
 >> --
 >> 2.1.2
 >
