@@ -1,71 +1,63 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 05 Aug 2015 20:12:10 -0700
-Subject: [PATCH RFT] ata: ahci_brcmstb: Fix misuse of IS_ENABLED
-In-Reply-To: <1438827394.19066.1.camel@ingics.com>
-References: <1438827394.19066.1.camel@ingics.com>
-Message-ID: <55C2D08A.1040408@gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 5 Aug 2015 22:14:51 -0500
+Subject: [PATCH 5/9] ARM: common: Introduce PM domains for CPUs/clusters
+In-Reply-To: <1438731339-58317-6-git-send-email-lina.iyer@linaro.org>
+References: <1438731339-58317-1-git-send-email-lina.iyer@linaro.org>
+ <1438731339-58317-6-git-send-email-lina.iyer@linaro.org>
+Message-ID: <CAL_JsqK67=DTtjZwwnonObLDjLbahkREfm0RvyXVV95bhR-d4Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 08/05/15 19:16, Axel Lin a ?crit :
-> While IS_ENABLED() is perfectly fine for CONFIG_* symbols, it is not
-> for other symbols such as __BIG_ENDIAN that is provided directly by
-> the compiler.
-> 
-> Signed-off-by: Axel Lin <axel.lin@ingics.com>
-> ---
-> Hi,
-> I don't have a big endian machine to test this, so I'd appreciate if
-> someone can review and test this patch.
-> 
-> A similar misuse of IS_ENABLED is reported and fixed in:
-> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/drivers/dma/mv_xor.c?id=0ec9ebc706fbd394bc233d87ac7aaad1c4f3ab54
+On Tue, Aug 4, 2015 at 6:35 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
+> Define and add Generic PM domains (genpd) for ARM CPU clusters. Many new
+> SoCs group CPUs as clusters. Clusters share common resources like GIC,
+> power rail, caches, VFP, Coresight etc. When all CPUs in the cluster are
+> idle, these shared resources may also be put in their idle state.
+>
+> The idle time between the last CPU entering idle and a CPU resuming
+> execution is an opportunity for these shared resources to be powered
+> down. Generic PM domain provides a framework for defining such power
+> domains and attach devices to the domain. When the devices in the domain
+> are idle at runtime, the domain would also be suspended and resumed
+> before the first of the devices resume execution.
+>
+> We define a generic PM domain for each cluster and attach CPU devices in
+> the cluster to that PM domain. The DT definitions for the SoC describe
+> this relationship. Genpd callbacks for power_on and power_off can then
+> be used to power up/down the shared resources for the domain.
 
-Would not CONFIG_CPU_BIG_ENDIAN be more appropriate here? On MIPS at
-least, this is what gets set when selecting a big-endian kernel.
+[...]
 
-Thanks!
+> +ARM CPU Power domains
+> +
+> +The device tree allows describing of CPU power domains in a SoC. In ARM SoC,
+> +CPUs may be grouped as clusters. A cluster may have CPUs, GIC, Coresight,
+> +caches, VFP and power controller and other peripheral hardware. Generally,
+> +when the CPUs in the cluster are idle/suspended, the shared resources may also
+> +be suspended and resumed before any of the CPUs resume execution.
+> +
+> +CPUs are the defined as the PM domain consumers and there is a PM domain
+> +provider for the CPUs. Bindings for generic PM domains (genpd) is described in
+> +[1].
+> +
+> +The ARM CPU PM domain follows the same binding convention as any generic PM
+> +domain. Additional binding properties are -
+> +
+> +- compatible:
+> +       Usage: required
+> +       Value type: <string>
+> +       Definition: Must also have
+> +                       "arm,pd"
+> +               inorder to initialize the genpd provider as ARM CPU PM domain.
 
-> 
->  drivers/ata/ahci_brcmstb.c | 18 ++++++++++--------
->  1 file changed, 10 insertions(+), 8 deletions(-)
-> 
-> diff --git a/drivers/ata/ahci_brcmstb.c b/drivers/ata/ahci_brcmstb.c
-> index 42b6cf4..fc6413f 100644
-> --- a/drivers/ata/ahci_brcmstb.c
-> +++ b/drivers/ata/ahci_brcmstb.c
-> @@ -92,19 +92,21 @@ static inline u32 brcm_sata_readreg(void __iomem *addr)
->  	 * Other architectures (e.g., ARM) either do not support big endian, or
->  	 * else leave I/O in little endian mode.
->  	 */
-> -	if (IS_ENABLED(CONFIG_MIPS) && IS_ENABLED(__BIG_ENDIAN))
-> -		return __raw_readl(addr);
-> -	else
-> -		return readl_relaxed(addr);
-> +#if defined(__BIG_ENDIAN) && IS_ENABLED(CONFIG_MIPS)
-> +	return __raw_readl(addr);
-> +#else
-> +	return readl_relaxed(addr);
-> +#endif
->  }
->  
->  static inline void brcm_sata_writereg(u32 val, void __iomem *addr)
->  {
->  	/* See brcm_sata_readreg() comments */
-> -	if (IS_ENABLED(CONFIG_MIPS) && IS_ENABLED(__BIG_ENDIAN))
-> -		__raw_writel(val, addr);
-> -	else
-> -		writel_relaxed(val, addr);
-> +#if defined(__BIG_ENDIAN) && IS_ENABLED(CONFIG_MIPS)
-> +	__raw_writel(val, addr);
-> +#else
-> +	writel_relaxed(val, addr);
-> +#endif
->  }
->  
->  static void brcm_sata_phy_enable(struct brcm_ahci_priv *priv, int port)
-> 
+A compatible string should represent a particular h/w block. If it is
+generic, it should represent some sort of standard programming
+interface (e.g, AHCI, EHCI, etc.). This doesn't seem to be either and
+is rather just a mapping of what "driver" you want to use.
 
+I would expect that identifying a cpu's or cluster's power domain
+would be done by a phandle between the cpu/cluster node and power
+domain node. But I've not really looked at the power domain bindings
+so who knows.
 
--- 
-Florian
+Rob
