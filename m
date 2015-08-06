@@ -1,132 +1,92 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Thu, 6 Aug 2015 11:16:37 +0100
-Subject: [PATCH 3/4] arm64: Juno: Add HDLCD support to the Juno boards.
-In-Reply-To: <20150805214854.GC7557@n2100.arm.linux.org.uk>
-References: <1438784892-27888-1-git-send-email-Liviu.Dudau@arm.com>
- <1438784892-27888-4-git-send-email-Liviu.Dudau@arm.com>
- <20150805175303.GB7557@n2100.arm.linux.org.uk>
- <20150805190312.GA31066@e106497-lin.cambridge.arm.com>
- <20150805214854.GC7557@n2100.arm.linux.org.uk>
-Message-ID: <20150806101637.GI20890@e106497-lin.cambridge.arm.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 6 Aug 2015 12:20:59 +0200
+Subject: [PATCH v6 7/9] clk: mediatek: Add subsystem clocks of MT8173
+In-Reply-To: <CAGS+omAAYZyZJ4+eSdu2jmwThvHg1YpVoehui_cqNp4A5fURWg@mail.gmail.com>
+References: <1438676218-11310-1-git-send-email-jamesjj.liao@mediatek.com>
+ <1438676218-11310-8-git-send-email-jamesjj.liao@mediatek.com>
+ <20150805064605.GZ18700@pengutronix.de>
+ <1438849431.27884.9.camel@mtksdaap41>
+ <20150806085354.GN18700@pengutronix.de>
+ <1438851644.27884.21.camel@mtksdaap41>
+ <CAGS+omAAYZyZJ4+eSdu2jmwThvHg1YpVoehui_cqNp4A5fURWg@mail.gmail.com>
+Message-ID: <20150806102059.GQ18700@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 05, 2015 at 10:48:54PM +0100, Russell King - ARM Linux wrote:
-> On Wed, Aug 05, 2015 at 08:03:12PM +0100, Liviu Dudau wrote:
-> > I have to confess that I am not entirely up to speed with the TDA19988
-> > situation at the moment. Andrew Jackson was dealing with that and
-> > working with Jean to get that in the upstream, but his contract has
-> > ended and he has moved to other things.
+On Thu, Aug 06, 2015 at 05:13:21PM +0800, Daniel Kurtz wrote:
+> On Thu, Aug 6, 2015 at 5:00 PM, James Liao <jamesjj.liao@mediatek.com> wrote:
+> > Hi Sascha,
+> >
+> > On Thu, 2015-08-06 at 10:53 +0200, Sascha Hauer wrote:
+> >> On Thu, Aug 06, 2015 at 04:23:51PM +0800, James Liao wrote:
+> >> > On Wed, 2015-08-05 at 08:46 +0200, Sascha Hauer wrote:
+> >> > > On Tue, Aug 04, 2015 at 04:16:56PM +0800, James Liao wrote:
+> >> > > >  static const struct mtk_fixed_clk fixed_clks[] __initconst = {
+> >> > > >         FIXED_CLK(CLK_TOP_CLKPH_MCK_O, "clkph_mck_o", "clk26m", 400 * MHZ),
+> >> > > >         FIXED_CLK(CLK_TOP_USB_SYSPLL_125M, "usb_syspll_125m", "clk26m", 125 * MHZ),
+> >> > > > +       FIXED_CLK(CLK_TOP_DSI0_DIG, "dsi0_dig", "clk26m", 130 * MHZ),
+> >> > > > +       FIXED_CLK(CLK_TOP_DSI1_DIG, "dsi1_dig", "clk26m", 130 * MHZ),
+> >> > > > +       FIXED_CLK(CLK_TOP_LVDS_PXL, "lvds_pxl", "lvdspll", 148.5 * MHZ),
+> >> > > > +       FIXED_CLK(CLK_TOP_LVDS_CTS, "lvds_cts", "lvdspll", 51.975 * MHZ),
+> >> > >
+> >> > > I would expect 51975 * KHZ here to avoid fractional numbers. Probably
+> >> > > gcc calculates that during compile time so this will work as expected,
+> >> > > still I'm not sure this is good style to use fractional numbers here.
+> >> >
+> >> > As I know all constants will be calculated in compile time, so there
+> >> > should be no difference between 51.975 * MHZ and 51975 * KHz.
+> >> >
+> >> > > Anyway, on my system lvdspll is running at 150MHz. Are you sure there is
+> >> > > a clock derived from this running at 148.5MHz? Is it really correct to
+> >> > > use a fixed clock here or should it rather be lvdspll directly?
+> >> >
+> >> > Here is the clock hierarchy between lvdspll and lvds_pxl:
+> >> >
+> >> >             --------       AD_VPLL_DPIX_CK  --------   lvds_pxl  -----
+> >> >            |        |--------------------->|        |---------->|
+> >> >            |        |                      | cksys  |           |
+> >> > LVDSPLL -->| LVDSTX |                      | buffer |           | MMSYS
+> >> >            |        | AD_LVDSTX_CLKDIG_CTS | test   |  lvds_cts |
+> >> >            |        |--------------------->|        |---------->|
+> >> >             --------                        --------             -----
+> >> >
+> >> > Some clocks and blocks are not modeled into CCF. But we prefer to enable
+> >> > lvdspll before enabling lvds_pxl. So I modeled lvds_pxl (and lvds_cts)
+> >> > as a fixed-rate clock with a source from lvdspll.
+> >> >
+> >> > The frequency of these fixed-rate clocks (such as 148.5 MHz) are typical
+> >> > rate. In fact, we don't care about the actual rate of these clocks. We
+> >> > just care about the enable / disable sequence of them.
+> >>
+> >> Please either use the real rate or 0 (along with a explaining why). Using
+> >> a frequency with four to five significant digits makes me think that the
+> >> actual rate is very important.
+> >
+> > Oops, your suggestion is much different from Daniel's.
+> >
+> > Daniel, could you help to comment about how we model these clocks?
 > 
-> Umm, I'm the maintainer for TDA998x:
+> First of all, for clocks where the rate doesn't matter, it doesn't
+> matters to what rate we set the clock.
 > 
-> NXP TDA998X DRM DRIVER
-> M:      Russell King <rmk+kernel@arm.linux.org.uk>
-> S:      Supported
-> F:      drivers/gpu/drm/i2c/tda998x_drv.c
-> F:      include/drm/i2c/tda998x.h
+> As for the color of our shed, "the designer says these are the typical
+> rates" sounds good enough to me for a "real rate", so I prefer using
+> the rates in James' patch.
 > 
-> It would be nice if people worked with the actual maintainers of things
-> rather than random other people...
+> If not sure what Sascha's concern is, but if he insists on 0, I'm fine
+> with that too.
 
-Sorry, it was my mistake, I have blindly followed the get_maintainers.pl
-generated list of email rather than engage my brain and realise that part
-of the patch also affects TDA19988 driver.
+I only find it confusing. I'd expect either the correct rate or an
+obviously dummy rate. Whatever we choose a comment explaining the
+background would really help here. Otherwise we won't know later
+whether this 148.5 MHz rate was introduced because a) The consumers
+depend on this rate being reported, b) It really is the correct rate or
+c) we don't care about the rate.
 
-> 
-> > > Also, the whole question of representing connectors in a DRM model is
-> > > yet to be established.  Yes, DT should describe the hardware, but we
-> > > don't yet know _how_ to describe physical connectors with stuff
-> > > implemented on top of DRM yet, and we have nothing that makes use of
-> > > this.
-> > 
-> > Please help me understand the current situation: you have added
-> > support for components that the video drivers can use and the bindings
-> > for that are described in Documentation/devicetree/bindings/media/video-interfaces.txt.
-> 
-> No.  I added the component helpers, which are entirely firmware agnostic.
-> The media bindings were created by others, and through development done
-> by Pengutronix, they were factored out of media into common DT code and
-> re-used for the IMX DRM driver.  The binding document which describes
-> that work is not the one you refer to above, but this one:
-> 
-> Documentation/devicetree/bindings/graph.txt
-> 
-> This started them as a basis for DRM drivers on ARM - but it's never been
-> officially "adopted" as a method to describe DRM drivers - it's only what
-> some drivers are using.  It ought to be nailed down as a way to ensure
-> inter-operability between components though, but no one has really made
-> that decision.
-
-OK, I'm interested on whom do I need to talk to in order for the official
-"adoption" to happen here. 
-
-> 
-> > According to that document my patch should be compliant once I add the
-> > reg= property. Is that something that cannot be used with tda998x driver
-> > or is there any other reason why you think the patch is not compliant?
-> 
-> Jean's proposal to add audio support to the TDA998x driver does it via
-> this change to the binding spec:
-> 
-> +Optional nodes:
-> +
-> +  - port: up to three ports.
-> +       The ports are defined according to [1].
-> +
-> +    Video port.
-> +       There may be only one video port.
-> +       This one must contain the following property:
-> +
-> +       - port-type: must be "rgb"
-> +
-> +       and may contain the optional property:
-> +
-> +       - reg: 24 bits value which defines how the video controller
-> +               output is wired to the TDA998x input (video pins)
-> +               When absent, the default value is <0x230145>.
-> +
-> +    Audio ports.
-> +       There may be one or two audio ports.
-> +       These ones must contain the following properties:
-> +
-> +       - port-type: must be "i2s" or "spdif"
-> +
-> +       - reg: 8 bits value which defines how the audio controller
-> +               output is wired to the TDA998x input (audio pins)
-> +
-> +[1] Documentation/devicetree/bindings/graph.txt
-> 
-> (That's not a particularly precise definition, but it's what we have at
-> the moment.)
-> 
-> > If you are referring to connecting an encoder with a HDMI connector, I
-> > have tested that and it seems to work, although my situation is simple
-> > because there are no options in my setup: one HDLCD connects to one
-> > TDA19988 which connects to one HDMI output.
-> 
-> Right now, the TDA998x will ignore the additional information, but that
-> won't be the case with Jean's audio work (see the above binding
-> information.)
-
-Yes, I have seen that patchset. I will apply it to my tree and send an
-updated version with the port-type property when I send v2.
-
-Best regards,
-Liviu
-
-> 
-> -- 
-> FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-> according to speedtest.net.
-> 
+Sascha
 
 -- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
