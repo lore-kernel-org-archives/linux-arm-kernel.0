@@ -1,112 +1,67 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Thu, 06 Aug 2015 16:09:49 +0900
-Subject: [v2 2/5] arm64: kdump: implement machine_crash_shutdown()
-In-Reply-To: <553A1E62.9030400@arm.com>
-References: <1429861989-8417-1-git-send-email-takahiro.akashi@linaro.org>
- <1429861989-8417-3-git-send-email-takahiro.akashi@linaro.org>
- <20150424103900.GF29183@leverpostej> <553A1E62.9030400@arm.com>
-Message-ID: <55C3083D.1000306@linaro.org>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 6 Aug 2015 09:17:38 +0200
+Subject: [PATCH v4 0/6] ARM: shmobile: r8a7740/sh73a0 DT Cache Handling
+In-Reply-To: <20150806003511.GB17231@verge.net.au>
+References: <1438765090-823-1-git-send-email-geert+renesas@glider.be>
+ <20150806003511.GB17231@verge.net.au>
+Message-ID: <CAMuHMdW5D2LGA=3+JDiAUhVtPmxk3ZJhAx3=JXFuAHBAgU_NTw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc, Mark
+On Thu, Aug 6, 2015 at 2:35 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Wed, Aug 05, 2015 at 10:58:04AM +0200, Geert Uytterhoeven wrote:
+>> This patch series add L1 and L2 cache descriptions to DT for r8a7740 and
+>> sh73a0, and migrates the shmobile DT-based generic r8a7740 and
+>> armadillo legacy platforms from calling l2x0_of_init() to the generic
+>> l2c OF initialization.
 
-Sorry for not revisiting your comment below for a while.
+>> Dependencies:
+>>   - This series applies to renesas-devel-20150805-v4.2-rc5,
+>>   - Patch 2 depends on patch 1,
+>>   - Patch 4 depends on patch 2,
 
-On 04/24/2015 07:43 PM, Marc Zyngier wrote:
-> On 24/04/15 11:39, Mark Rutland wrote:
->> On Fri, Apr 24, 2015 at 08:53:05AM +0100, AKASHI Takahiro wrote:
->>> kdump calls machine_crash_shutdown() to shut down non-boot cpus and
->>> save per-cpu general-purpose registers before restarting the crash dump
->>> kernel. See kernel_kexec().
->>> ipi_cpu_stop() is used and a bit modified to support this behavior.
->>>
->>> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
->>> ---
->>>   arch/arm64/include/asm/kexec.h    |   34 ++++++++++++++++++++++-
->>>   arch/arm64/kernel/machine_kexec.c |   55 ++++++++++++++++++++++++++++++++++++-
->>>   arch/arm64/kernel/smp.c           |   12 ++++++--
->>>   3 files changed, 97 insertions(+), 4 deletions(-)
->>>
->>> diff --git a/arch/arm64/include/asm/kexec.h b/arch/arm64/include/asm/kexec.h
->>> index 3530ff5..eaf3fcb 100644
->>> --- a/arch/arm64/include/asm/kexec.h
->>> +++ b/arch/arm64/include/asm/kexec.h
->>> @@ -30,6 +30,8 @@
->>>
->>>   #if !defined(__ASSEMBLY__)
->>>
->>> +extern bool in_crash_kexec;
->>> +
->>>   /**
->>>    * crash_setup_regs() - save registers for the panic kernel
->>>    *
->>> @@ -40,7 +42,37 @@
->>>   static inline void crash_setup_regs(struct pt_regs *newregs,
->>>   				    struct pt_regs *oldregs)
->>>   {
->>> -	/* Empty routine needed to avoid build errors. */
->>> +	if (oldregs) {
->>> +		memcpy(newregs, oldregs, sizeof(*newregs));
->>> +	} else {
->>> +		__asm__ __volatile__ (
->>> +			"stp	 x0,   x1, [%3]\n\t"
+Sorry, "... on patch 3".
+
+>>   - Patch 5 depends on patch 1 and on "ARM: 8395/1: l2c: Add support for
+>>     the "arm,shared-override" property" in arm/for-next,
+>>   - Patch 6 depends on patch 5.
 >>
->> Why the tabs?
->>
->> Please use #16 * N as the offset for consistency with entry.S, with 0
->> for the first N.
->>
->> [...]
->>
->>> +static void machine_kexec_mask_interrupts(void)
->>> +{
->>> +	unsigned int i;
->>> +	struct irq_desc *desc;
->>> +
->>> +	for_each_irq_desc(i, desc) {
->>> +		struct irq_chip *chip;
->>> +
->>> +		chip = irq_desc_get_chip(desc);
->>> +		if (!chip)
->>> +			continue;
->>> +
->>> +		if (chip->irq_eoi && irqd_irq_inprogress(&desc->irq_data))
->>> +			chip->irq_eoi(&desc->irq_data);
->>> +
->>> +		if (chip->irq_mask)
->>> +			chip->irq_mask(&desc->irq_data);
->>> +
->>> +		if (chip->irq_disable && !irqd_irq_disabled(&desc->irq_data))
->>> +			chip->irq_disable(&desc->irq_data);
->>> +	}
->>> +}
->>
->> I'm surprised that this isn't left to the irqchip driver init code in
->> the crash kernel. For all we know this state could be corrupt anyway.
+>> Given C code patches depending on DT patches in the same branch are
+>> frowned upon, I think it would be best if patch 1 (and patch 3, if
+>> anyone thinks we may fix the secondary CPU bringup issue during the next
+>> 3 months) are queued for v4.3. The other patches can be queued for
+>> 2016^H^H^H^Hv4.4.
 >
-> Indeed, parsing the irqdesc list is a recipe for disaster. Who knows
-> which locks have been taken or simply corrupted, pointers nuked...
->
->> Is there any reason we can't get the GIC driver to nuke all of this at
->> probe time?
+> Sorry for surprising you with that merge-order requirement.
 
-Is it just enough to remove kexec_mask_interrupts() and add gic_eoi_irq()
-at the beginning of gic_cpu_init() in irq-gic.c and irq-gic-v3.c?
+In theory it sounds fine, as DT and code are independent.
+Moving functionality from C to DT is something different...
 
-> This feels like the better option. I can cook a patch or two for that.
+> Unfortunately I am not comfortable with taking patch 1 for v4.3 because:
+> 1. Its now very late in the cycle
 
-If you do, that will be much better :)
+I understand.
 
-BTW, in arm-gic-v3.h, GICD_CTRL_ARE_NS is defined as
-     (1U << 4)
-but should it be 5?
-(I'm referring to the page 8-415 in IHI0069A.)
+> 2. There now seems to be some discussion around it.
 
-Thanks,
--Takahiro AKASHI
+Yeah, that's what v4s are for...
 
-> Thanks,
->
-> 	M.
->
+Let's wait and see if/when it settles...
+
+> I think I am happy to take the other patches for v4.4, now. But perhaps
+> I should wait for the discussion around patch 1 to conclude first?
+
+Which other patches? Patch 3 has the same issue as patch 1. And all
+the rest depends on patch 1 or patch 3... So there's nothing left to
+apply yet...
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
