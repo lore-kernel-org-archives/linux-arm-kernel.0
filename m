@@ -1,197 +1,109 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri,  7 Aug 2015 17:22:33 +0200
-Subject: [PATCH 1/3] ARM: dts: sun5i: Add support for the Auxtek-T003 HDMI
- stick
-Message-ID: <1438960955-6551-1-git-send-email-hdegoede@redhat.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 07 Aug 2015 16:27:56 +0100
+Subject: [PATCH v5 2/3] arm64: Add IOMMU dma_ops
+In-Reply-To: <20150807085233.GV14980@8bytes.org>
+References: <cover.1438362603.git.robin.murphy@arm.com>
+ <8a5abd0a9929aae160ccb74d7a8d9c3698f61910.1438362603.git.robin.murphy@arm.com>
+ <20150807085233.GV14980@8bytes.org>
+Message-ID: <55C4CE7C.7050205@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Auxtek-T003 HDMI stick is an A10s based HDMI stick with USB wifi,
-and composite video out support.
+On 07/08/15 09:52, Joerg Roedel wrote:
+> On Fri, Jul 31, 2015 at 06:18:28PM +0100, Robin Murphy wrote:
+>> +/*
+>> + * TODO: Right now __iommu_setup_dma_ops() gets called too early to do
+>> + * everything it needs to - the device isn't yet fully created, and the
+>> + * IOMMU driver hasn't seen it yet, so we need this delayed attachment
+>> + * dance. Once IOMMU probe ordering is sorted to move the
+>> + * arch_setup_dma_ops() call later, all the notifier bits below become
+>> + * unnecessary, and will go away.
+>> + */
+>> +struct iommu_dma_notifier_data {
+>> +	struct list_head list;
+>> +	struct device *dev;
+>> +	struct iommu_domain *dma_domain;
+>> +};
+>> +static LIST_HEAD(iommu_dma_masters);
+>> +static DEFINE_MUTEX(iommu_dma_notifier_lock);
+>
+> Ugh, thats incredibly ugly. Why can't you do the setup work then the
+> iommu driver sees the device? Just call the dma-api setup functions
+> there (like the x86 iommu drivers do it too) and be done without any
+> notifiers.
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- arch/arm/boot/dts/Makefile                   |   1 +
- arch/arm/boot/dts/sun5i-a10s-auxtek-t003.dts | 159 +++++++++++++++++++++++++++
- 2 files changed, 160 insertions(+)
- create mode 100644 arch/arm/boot/dts/sun5i-a10s-auxtek-t003.dts
+As per the comments, the issue here lies in the order in which the 
+OF/driver core code currently calls things for platform devices: as it 
+stands we can't attach the device to a domain in arch_setup_dma_ops() 
+because it doesn't have a group, and we can't even add it to a group 
+ourselves because it isn't fully created and doesn't exist in sysfs yet. 
+The only reason arch/arm is currently getting away without this 
+workaround is that the few IOMMU drivers there hooked up to the generic 
+infrastructure don't actually mind that they get an attach_device from 
+arch_setup_dma_ops() before they've even seen an add_device (largely 
+because they don't care about groups).
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 151a413..95daf91 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -563,6 +563,7 @@ dtb-$(CONFIG_MACH_SUN4I) += \
- 	sun4i-a10-olinuxino-lime.dtb \
- 	sun4i-a10-pcduino.dtb
- dtb-$(CONFIG_MACH_SUN5I) += \
-+	sun5i-a10s-auxtek-t003.dtb \
- 	sun5i-a10s-auxtek-t004.dtb \
- 	sun5i-a10s-mk802.dtb \
- 	sun5i-a10s-olinuxino-micro.dtb \
-diff --git a/arch/arm/boot/dts/sun5i-a10s-auxtek-t003.dts b/arch/arm/boot/dts/sun5i-a10s-auxtek-t003.dts
-new file mode 100644
-index 0000000..d4ad021
---- /dev/null
-+++ b/arch/arm/boot/dts/sun5i-a10s-auxtek-t003.dts
-@@ -0,0 +1,159 @@
-+/*
-+ * Copyright 2015 Hans de Goede <hdegoede@redhat.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include "sun5i-a10s.dtsi"
-+#include "sunxi-common-regulators.dtsi"
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/pinctrl/sun4i-a10.h>
-+
-+/ {
-+	model = "Auxtek t003 A10s hdmi tv-stick";
-+	compatible = "allwinner,auxtek-t003", "allwinner,sun5i-a10s";
-+
-+	aliases {
-+		serial0 = &uart0;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&led_pins_t003>;
-+
-+		red {
-+			label = "t003-tv-dongle:red:usr";
-+			gpios = <&pio 1 2 GPIO_ACTIVE_HIGH>; /* PB2 */
-+			default-state = "on";
-+		};
-+	};
-+};
-+
-+&ehci0 {
-+	status = "okay";
-+};
-+
-+&i2c0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c0_pins_a>;
-+	status = "okay";
-+
-+	axp152: pmic at 30 {
-+		compatible = "x-powers,axp152";
-+		reg = <0x30>;
-+		interrupts = <0>;
-+		interrupt-controller;
-+		#interrupt-cells = <1>;
-+	};
-+};
-+
-+&mmc0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_t003>;
-+	vmmc-supply = <&reg_vcc3v3>;
-+	bus-width = <4>;
-+	cd-gpios = <&pio 6 1 GPIO_ACTIVE_HIGH>; /* PG1 */
-+	cd-inverted;
-+	status = "okay";
-+};
-+
-+&ohci0 {
-+	status = "okay";
-+};
-+
-+&otg_sram {
-+	status = "okay";
-+};
-+
-+&pio {
-+	mmc0_cd_pin_t003: mmc0_cd_pin at 0 {
-+		allwinner,pins = "PG1";
-+		allwinner,function = "gpio_in";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
-+	};
-+
-+	led_pins_t003: led_pins at 0 {
-+		allwinner,pins = "PB2";
-+		allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_20_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+};
-+
-+&reg_usb0_vbus {
-+	gpio = <&pio 6 13 GPIO_ACTIVE_HIGH>; /* PG13 */
-+	status = "okay";
-+};
-+
-+&reg_usb1_vbus {
-+	gpio = <&pio 1 10 GPIO_ACTIVE_HIGH>; /* PB10 */
-+	status = "okay";
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_pins_a>;
-+	status = "okay";
-+};
-+
-+&usb0_vbus_pin_a {
-+	allwinner,pins = "PG13";
-+};
-+
-+&usb1_vbus_pin_a {
-+	allwinner,pins = "PB10";
-+};
-+
-+&usb_otg {
-+	dr_mode = "host";
-+	status = "okay";
-+};
-+
-+&usbphy {
-+	usb0_vbus-supply = <&reg_usb0_vbus>;
-+	usb1_vbus-supply = <&reg_usb1_vbus>;
-+	status = "okay";
-+};
--- 
-2.4.3
+Laurent's probe-deferral series largely solves these problems in the 
+right place - adding identical boilerplate code to every IOMMU driver to 
+do something they shouldn't have to know about (and don't necessarily 
+have all the right information for) is exactly what we don't want to do. 
+As discussed over on another thread, I'm planning to pick that series up 
+and polish it off after this, but my top priority is getting the basic 
+dma_ops functionality into arm64 that people need right now. I will be 
+only too happy when I can submit the patch removing this notifier 
+workaround ;)
+
+>> +static void __iommu_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
+>> +				  const struct iommu_ops *ops)
+>> +{
+>> +	struct iommu_domain *domain;
+>> +	int err;
+>> +
+>> +	if (!ops)
+>> +		return;
+>> +	/*
+>> +	 * In a perfect world, everything happened in the right order up to
+>> +	 * here, and the IOMMU core has already attached the device to an
+>> +	 * appropriate default domain for us to set up...
+>> +	 */
+>> +	domain = iommu_get_domain_for_dev(dev);
+>> +	if (!domain) {
+>> +		/*
+>> +		 * Urgh. Reliable default domains for platform devices can't
+>> +		 * happen anyway without some sensible way of handling
+>> +		 * non-trivial groups. So until then, HORRIBLE HACKS!
+>> +		 */
+>
+> I don't get this, what is preventing to rely on default domains here?
+
+No driver other than the AMD IOMMU has any support yet. Support for 
+IOMMU_DOMAIN_DMA can easily be added to existing drivers based on patch 
+1 of this series, but more generally it's not entirely clear how default 
+domains are going to work beyond x86. On systems like Juno or Seattle 
+with different sets of masters behind different IOMMU instances (with 
+limited domain contexts each), the most sensible approach would be to 
+have a single default domain per IOMMU (spanning domains across 
+instances would need some hideous synchronisation logic for some 
+implementations), but the current domain_alloc interface gives us no way 
+to do that. On something like RK3288 with two different types of IOMMU 
+on the platform "bus", it breaks down even further as there's no way to 
+guarantee that iommu_domain_alloc() even gives you a domain from the 
+right *driver* (hence bypassing it by going through ops directly here).
+
+>
+>> +		domain = ops->domain_alloc(IOMMU_DOMAIN_DMA);
+>
+> The IOMMU core should already tried to allocate an IOMMU_DOMAIN_DMA type
+> domain. No need to try this again here.
+
+Only for PCI devices, via iommu_group_get_for_pci_dev(). The code here, 
+however, only runs for platform devices - ops will be always null for a 
+PCI device since of_iommu_configure() will have bailed out (see the 
+silly warning removed by my patch you picked up the other day). Once 
+iommu_group_get_for_dev() supports platform devices, this too can go 
+away. In the meantime if someone adds PCI support to 
+of_iommu_configure() and IOMMU_DOMAIN_DMA support to their IOMMU driver, 
+then we'll get a domain back from iommu_get_domain_for_dev() and just 
+use that.
+
+Robin.
