@@ -1,75 +1,45 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  7 Aug 2015 11:11:29 +0900
-Subject: [PATCH 05/10] ARM: shmobile: silk: add Ether DT support
+Date: Fri,  7 Aug 2015 11:11:30 +0900
+Subject: [PATCH 06/10] ARM: shmobile: r8a7794: add MMCIF DT support
 In-Reply-To: <cover.1438911334.git.horms+renesas@verge.net.au>
 References: <cover.1438911334.git.horms+renesas@verge.net.au>
-Message-ID: <dad5c83d71fcfa117ee678fe66ffa5fd2f1f2440.1438911334.git.horms+renesas@verge.net.au>
+Message-ID: <6cdf6ba19c8b9a386ef882206b29d97a49271317.1438911334.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Define the SILK board dependent part of the Ether device node.
-Enable DHCP and NFS root for the kernel booting.
+Define the generic R8A7794 part of the MMCIF0 device node.
 
-Based on the original patch by Vladimir Barinov
-<vladimir.barinov@cogentembedded.com>.
+Based on the orginal patch by Shinobu Uehara <shinobu.uehara.xc@renesas.com>.
 
 Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7794-silk.dts | 28 +++++++++++++++++++++++++++-
- 1 file changed, 27 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/r8a7794.dtsi | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7794-silk.dts b/arch/arm/boot/dts/r8a7794-silk.dts
-index f3da95b1dedd..79bc64b94456 100644
---- a/arch/arm/boot/dts/r8a7794-silk.dts
-+++ b/arch/arm/boot/dts/r8a7794-silk.dts
-@@ -22,7 +22,7 @@
+diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
+index 51cc2b975c3f..43acf185ecc4 100644
+--- a/arch/arm/boot/dts/r8a7794.dtsi
++++ b/arch/arm/boot/dts/r8a7794.dtsi
+@@ -383,6 +383,17 @@
+ 		status = "disabled";
  	};
  
- 	chosen {
--		bootargs = "ignore_loglevel";
-+		bootargs = "ignore_loglevel rw root=/dev/nfs ip=dhcp";
- 		stdout-path = &scif2;
- 	};
- 
-@@ -41,6 +41,16 @@
- 		renesas,groups = "scif2_data";
- 		renesas,function = "scif2";
- 	};
-+
-+	ether_pins: ether {
-+		renesas,groups = "eth_link", "eth_mdio", "eth_rmii";
-+		renesas,function = "eth";
++	mmcif0: mmc at ee200000 {
++		compatible = "renesas,mmcif-r8a7794", "renesas,sh-mmcif";
++		reg = <0 0xee200000 0 0x80>;
++		interrupts = <0 169 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp3_clks R8A7794_CLK_MMCIF0>;
++		dmas = <&dmac0 0xd1>, <&dmac0 0xd2>;
++		dma-names = "tx", "rx";
++		reg-io-width = <4>;
++		status = "disabled";
 +	};
 +
-+	phy1_pins: phy1 {
-+		renesas,groups = "intc_irq8";
-+		renesas,function = "intc";
-+	};
- };
- 
- &scif2 {
-@@ -49,3 +59,19 @@
- 
- 	status = "okay";
- };
-+
-+&ether {
-+	pinctrl-0 = <&ether_pins &phy1_pins>;
-+	pinctrl-names = "default";
-+
-+	phy-handle = <&phy1>;
-+	renesas,ether-link-active-low;
-+	status = "okay";
-+
-+	phy1: ethernet-phy at 1 {
-+		reg = <1>;
-+		interrupt-parent = <&irqc0>;
-+		interrupts = <8 IRQ_TYPE_LEVEL_LOW>;
-+		micrel,led-mode = <1>;
-+	};
-+};
+ 	sdhi0: sd at ee100000 {
+ 		compatible = "renesas,sdhi-r8a7794";
+ 		reg = <0 0xee100000 0 0x200>;
 -- 
 2.1.4
