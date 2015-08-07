@@ -1,115 +1,46 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 7 Aug 2015 09:11:28 +0530
-Subject: [PATCH v4 1/6] cpufreq: make scaling_boost_freqs sysfs attr
- available when boost is enabled
-In-Reply-To: <1438868514-8814-2-git-send-email-b.zolnierkie@samsung.com>
+Date: Fri, 7 Aug 2015 09:20:18 +0530
+Subject: [PATCH v4 0/6] cpufreq: use generic cpufreq drivers for
+ Exynos4x12 platform
+In-Reply-To: <015301d0d0a3$1396c900$3ac45b00$@kernel.org>
 References: <1438868514-8814-1-git-send-email-b.zolnierkie@samsung.com>
- <1438868514-8814-2-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <20150807034128.GE6325@linux>
+ <015301d0d0a3$1396c900$3ac45b00$@kernel.org>
+Message-ID: <20150807035018.GF6325@linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Cc'ing Rafael again. Guys please don't miss him for any PM related
+stuff or use get_maintainers ..
 
-I would suggest you sending such patches as reply to the earlier
-threads only, instead of a new chain. This will save your time.
+Cc'ing Arnd/Olof as well to discuss the merge stuff..
 
-For example, you will need to resend other patches unnecessarily if I
-NAK this patch :)
+On 07-08-15, 08:53, Kukjin Kim wrote:
+> > Depends on:
+> > - next-20150806 branch of linux-next kernel tree
+> > - "[PATCH V3 00/16] OPP: Add code to support operating-points-v2 bindings"
+> >   (http://www.spinics.net/lists/arm-kernel/msg435408.html)
+> > 
+> BTW, hmm...how can we see this series in v4.3?...to be honest, I don't think it
+> can be done in v4.3 because of dependencies with PM / OPP series
 
-On 06-08-15, 15:41, Bartlomiej Zolnierkiewicz wrote:
-> Add cpufreq_boost_enabled_generic_attr table and use it in
-> cpufreq-dt driver instead of cpufreq_generic_attr one when
-> boost support is enabled.  As a result scaling_boost_freqs
-> sysfs attribute is available when cpufreq-dt driver is
-> used and boost support is enabled.
-> 
-> Cc: Viresh Kumar <viresh.kumar@linaro.org>
-> Cc: Thomas Abraham <thomas.ab@samsung.com>
-> Cc: Javier Martinez Canillas <javier@osg.samsung.com>
-> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> ---
->  drivers/cpufreq/cpufreq-dt.c | 3 +++
->  drivers/cpufreq/freq_table.c | 7 +++++++
->  include/linux/cpufreq.h      | 1 +
->  3 files changed, 11 insertions(+)
-> 
-> diff --git a/drivers/cpufreq/cpufreq-dt.c b/drivers/cpufreq/cpufreq-dt.c
-> index b9259ab..7b091c0 100644
-> --- a/drivers/cpufreq/cpufreq-dt.c
-> +++ b/drivers/cpufreq/cpufreq-dt.c
-> @@ -182,6 +182,8 @@ try_again:
->  	return ret;
->  }
->  
-> +static struct cpufreq_driver dt_cpufreq_driver;
-> +
->  static int cpufreq_init(struct cpufreq_policy *policy)
->  {
->  	struct cpufreq_frequency_table *freq_table;
-> @@ -336,6 +338,7 @@ static int cpufreq_init(struct cpufreq_policy *policy)
->  		ret = cpufreq_enable_boost_support();
->  		if (ret)
->  			goto out_free_cpufreq_table;
-> +		dt_cpufreq_driver.attr = cpufreq_boost_enabled_generic_attr;
->  	}
->  
->  	policy->cpuinfo.transition_latency = transition_latency;
-> diff --git a/drivers/cpufreq/freq_table.c b/drivers/cpufreq/freq_table.c
-> index a8f1daf..5a00a09 100644
-> --- a/drivers/cpufreq/freq_table.c
-> +++ b/drivers/cpufreq/freq_table.c
-> @@ -300,6 +300,13 @@ struct freq_attr *cpufreq_generic_attr[] = {
->  };
->  EXPORT_SYMBOL_GPL(cpufreq_generic_attr);
->  
-> +struct freq_attr *cpufreq_boost_enabled_generic_attr[] = {
-> +	&cpufreq_freq_attr_scaling_available_freqs,
-> +	&cpufreq_freq_attr_scaling_boost_freqs,
-> +	NULL,
-> +};
-> +EXPORT_SYMBOL_GPL(cpufreq_boost_enabled_generic_attr);
+That is merged by Rafael Yesterday. That is manageable 
 
-This isn't scalable. We can't create a new generic structure every time
-a entry comes in. Rather we should leave the generic attr for
-cpufreq-dt and do something like this in the cpufreq-dt driver (And
-that patch should rather go via cpufreq tree and not ARM SoC)..
+> and previous
+> exynos CPU OPP series in each cross trees...maybe that's why you created based
+> on linux-next...any idea?
 
-diff --git a/drivers/cpufreq/cpufreq-dt.c b/drivers/cpufreq/cpufreq-dt.c
-index a5b6a854661f..e229258ad791 100644
---- a/drivers/cpufreq/cpufreq-dt.c
-+++ b/drivers/cpufreq/cpufreq-dt.c
-@@ -36,6 +36,12 @@ struct private_data {
- 	unsigned int voltage_tolerance; /* in percentage */
- };
- 
-+static struct freq_attr *cpufreq_dt_attr[] = {
-+	&cpufreq_freq_attr_scaling_available_freqs,
-+	NULL,	/* Extra space for boost-attr if required */
-+	NULL,
-+};
-+
- static int set_target(struct cpufreq_policy *policy, unsigned int index)
- {
- 	struct dev_pm_opp *opp;
-@@ -337,6 +343,7 @@ static int cpufreq_init(struct cpufreq_policy *policy)
- 		ret = cpufreq_enable_boost_support();
- 		if (ret)
- 			goto out_free_cpufreq_table;
-+		cpufreq_dt_attr[1] = &cpufreq_freq_attr_scaling_boost_freqs;
- 	}
- 
- 	policy->cpuinfo.transition_latency = transition_latency;
-@@ -412,7 +419,7 @@ static struct cpufreq_driver dt_cpufreq_driver = {
- 	.exit = cpufreq_exit,
- 	.ready = cpufreq_ready,
- 	.name = "cpufreq-dt",
--	.attr = cpufreq_generic_attr,
-+	.attr = cpufreq_dt_attr,
- };
- 
- static int dt_cpufreq_probe(struct platform_device *pdev)
+So there is no build dependency with OPP patches I hope, as its all
+about using the bindings defined by them. And so you don't need to
+depend on that.
+
+You might have to rebase on the ARM tree to manage your conflicts. In
+this case you can rebase directly on ARM SoC branch which has your
+patches (rebase directly over the last patch instead of the whole
+branch) and make sure Olof knows about this and he doesn't update
+(i.e. rebase) his branch, which he might not anyway.
+
+The whole idea is to keep a single sha-id for a commit. So you can
+rebase over the published material present in ARM-SoC ..
 
 -- 
 viresh
