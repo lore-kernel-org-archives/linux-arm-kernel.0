@@ -1,40 +1,41 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  7 Aug 2015 11:11:26 +0900
-Subject: [PATCH 02/10] ARM: shmobile: r8a7791: Add JPU device node.
+Date: Fri,  7 Aug 2015 11:11:27 +0900
+Subject: [PATCH 03/10] ARM: shmobile: r8a7794: add PFC DT support
 In-Reply-To: <cover.1438911334.git.horms+renesas@verge.net.au>
 References: <cover.1438911334.git.horms+renesas@verge.net.au>
-Message-ID: <0caa36603300dd4ff4841227cf372e91e940c8bd.1438911334.git.horms+renesas@verge.net.au>
+Message-ID: <fd1683c18c372d51aeeeb25efa8b451f922c9c52.1438911334.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mikhail Ulyanov <mikhail.ulyanov@cogentembedded.com>
+From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-This patch contains device tree node definition for JPEG codec peripheral
-found in the Renesas R-Car r8a7791 SoC.
+Define the generic R8A7794 part of the PFC device node.
 
-Signed-off-by: Mikhail Ulyanov <mikhail.ulyanov@cogentembedded.com>
+Based on original patch by Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>.
+
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Acked-by: by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7791.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm/boot/dts/r8a7794.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index d37339bd7cdb..1cb6c2d07933 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -898,6 +898,13 @@
- 		status = "disabled";
+diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
+index 8824dbd5dbb4..51cc2b975c3f 100644
+--- a/arch/arm/boot/dts/r8a7794.dtsi
++++ b/arch/arm/boot/dts/r8a7794.dtsi
+@@ -108,6 +108,12 @@
+ 		clocks = <&mstp4_clks R8A7794_CLK_IRQC>;
  	};
  
-+	jpu: jpeg-codec at fe980000 {
-+		compatible = "renesas,jpu-r8a7791";
-+		reg = <0 0xfe980000 0 0x10300>;
-+		interrupts = <0 272 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp1_clks R8A7791_CLK_JPU>;
++	pfc: pin-controller at e6060000 {
++		compatible = "renesas,pfc-r8a7794";
++		reg = <0 0xe6060000 0 0x11c>;
++		#gpio-range-cells = <3>;
 +	};
 +
- 	clocks {
- 		#address-cells = <2>;
- 		#size-cells = <2>;
+ 	dmac0: dma-controller at e6700000 {
+ 		compatible = "renesas,rcar-dmac";
+ 		reg = <0 0xe6700000 0 0x20000>;
 -- 
 2.1.4
