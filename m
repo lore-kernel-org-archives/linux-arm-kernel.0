@@ -1,70 +1,40 @@
-From: aisheng.dong@freescale.com (Dong Aisheng)
-Date: Fri, 7 Aug 2015 15:50:51 +0800
-Subject: [PATCH v4 6/6] mmc: sdhci-esdhc-imx: set back the
- burst_length_enable bit to 1
-In-Reply-To: <1438771122-8601-7-git-send-email-haibo.chen@freescale.com>
-References: <1438771122-8601-1-git-send-email-haibo.chen@freescale.com>
- <1438771122-8601-7-git-send-email-haibo.chen@freescale.com>
-Message-ID: <20150807075050.GC6935@shlinux1.ap.freescale.net>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Fri, 07 Aug 2015 09:59:22 +0200
+Subject: [PATCH 16/31] net/cavium/liquidio: use kmemdup rather than duplicating
+ its implementation
+In-Reply-To: <1438934377-4922-1-git-send-email-a.hajda@samsung.com>
+References: <1438934377-4922-1-git-send-email-a.hajda@samsung.com>
+Message-ID: <1438934377-4922-17-git-send-email-a.hajda@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 05, 2015 at 06:38:42PM +0800, Haibo Chen wrote:
-> Currently we find that if a usdhc is choosed to boot system, then ROM
-> code will set the burst length enable bit of this usdhc as 0.
-> 
-> This will make performance drop a lot if this usdhc's burst length is
-> configed. So this patch set back the burst_length_enable bit as 1,
-> which is the default value, and means burst length is enabled for INCR.
-> 
+The patch was generated using fixed coccinelle semantic patch
+scripts/coccinelle/api/memdup.cocci [1].
 
-This patch should be put before patch 5 to avoid function break, right?
-[PATCH v4 5/6] mmc: sdhci-esdhc-imx: change default watermark level and burst length
+[1]: http://permalink.gmane.org/gmane.linux.kernel/2014320
 
-Other than that, this patch looks good to me.
+Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
+---
+ drivers/net/ethernet/cavium/liquidio/octeon_device.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-Regards
-Dong Aisheng
-
-> Signed-off-by: Haibo Chen <haibo.chen@freescale.com>
-> ---
->  drivers/mmc/host/sdhci-esdhc-imx.c | 16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
-> 
-> diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-> index 97aa944..3334762 100644
-> --- a/drivers/mmc/host/sdhci-esdhc-imx.c
-> +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-> @@ -32,6 +32,7 @@
->  #include "sdhci-esdhc.h"
->  
->  #define	ESDHC_CTRL_D3CD			0x08
-> +#define ESDHC_BURST_LEN_EN_INCR		(1 << 27)
->  /* VENDOR SPEC register */
->  #define ESDHC_VENDOR_SPEC		0xc0
->  #define  ESDHC_VENDOR_SPEC_SDIO_QUIRK	(1 << 1)
-> @@ -1165,6 +1166,21 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
->  		host->quirks2 |= SDHCI_QUIRK2_PRESET_VALUE_BROKEN;
->  		host->mmc->caps |= MMC_CAP_1_8V_DDR;
->  
-> +		/*
-> +		 * ROM code will change the bit burst_length_enable setting
-> +		 * to zero if this usdhc is choosed to boot system. Change
-> +		 * it back here, otherwise it will impact the performance a
-> +		 * lot. This bit is used to enable/disable the burst length
-> +		 * for the external AHB2AXI bridge, it's usefully especially
-> +		 * for INCR transfer because without burst length indicator,
-> +		 * the AHB2AXI bridge does not know the burst length in
-> +		 * advance. And without burst length indicator, AHB INCR
-> +		 * transfer can only be converted to singles on the AXI side.
-> +		 */
-> +		writel(readl(host->ioaddr + SDHCI_HOST_CONTROL)
-> +			| ESDHC_BURST_LEN_EN_INCR,
-> +			host->ioaddr + SDHCI_HOST_CONTROL);
-> +
->  		if (!(imx_data->socdata->flags & ESDHC_FLAG_HS200))
->  			host->quirks2 |= SDHCI_QUIRK2_BROKEN_HS200;
->  
-> -- 
-> 1.9.1
-> 
+diff --git a/drivers/net/ethernet/cavium/liquidio/octeon_device.c b/drivers/net/ethernet/cavium/liquidio/octeon_device.c
+index f67641a..8e23e3f 100644
+--- a/drivers/net/ethernet/cavium/liquidio/octeon_device.c
++++ b/drivers/net/ethernet/cavium/liquidio/octeon_device.c
+@@ -602,12 +602,10 @@ int octeon_download_firmware(struct octeon_device *oct, const u8 *data,
+ 	snprintf(oct->fw_info.liquidio_firmware_version, 32, "LIQUIDIO: %s",
+ 		 h->version);
+ 
+-	buffer = kmalloc(size, GFP_KERNEL);
++	buffer = kmemdup(data, size, GFP_KERNEL);
+ 	if (!buffer)
+ 		return -ENOMEM;
+ 
+-	memcpy(buffer, data, size);
+-
+ 	p = buffer + sizeof(struct octeon_firmware_file_header);
+ 
+ 	/* load all images */
+-- 
+1.9.1
