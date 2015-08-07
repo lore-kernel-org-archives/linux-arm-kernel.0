@@ -1,145 +1,119 @@
-From: tomasz.nowicki@linaro.org (Tomasz Nowicki)
-Date: Fri, 07 Aug 2015 12:03:24 +0200
-Subject: [PATCH v4 09/10] PCI: ACPI: Bind GIC MSI frame to PCI host bridge
-In-Reply-To: <1438164539-29256-10-git-send-email-hanjun.guo@linaro.org>
-References: <1438164539-29256-1-git-send-email-hanjun.guo@linaro.org>
- <1438164539-29256-10-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <55C4826C.80600@linaro.org>
+From: Haibo.Chen@freescale.com (Chen Bough)
+Date: Fri, 7 Aug 2015 10:04:56 +0000
+Subject: [PATCH v4 2/6] mmc: sdhci-esdhc-imx: add tuning-step seting
+ support
+In-Reply-To: <20150807074019.GB6935@shlinux1.ap.freescale.net>
+References: <1438771122-8601-1-git-send-email-haibo.chen@freescale.com>
+ <1438771122-8601-3-git-send-email-haibo.chen@freescale.com>
+ <20150807074019.GB6935@shlinux1.ap.freescale.net>
+Message-ID: <BY1PR03MB138864BA52567E75F56808329A730@BY1PR03MB1388.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29.07.2015 12:08, Hanjun Guo wrote:
-> From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
->
-> This patch introduces pci_host_bridge_acpi_msi_domain(), which queries
-> a GIC MSI irq-domain token and use it to retrieve an irq_domain with
-> DOMAIN_BUS_PCI_MSI bus type, and bind it to PCI host-bridge.
->
-> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> ---
->   drivers/pci/pci-acpi.c   | 18 ++++++++++++++++++
->   drivers/pci/probe.c      |  3 +++
->   include/linux/pci-acpi.h |  4 ++++
->   3 files changed, 25 insertions(+)
->
-> diff --git a/drivers/pci/pci-acpi.c b/drivers/pci/pci-acpi.c
-> index 314a625..5f11653 100644
-> --- a/drivers/pci/pci-acpi.c
-> +++ b/drivers/pci/pci-acpi.c
-> @@ -9,6 +9,7 @@
->
->   #include <linux/delay.h>
->   #include <linux/init.h>
-> +#include <linux/irqdomain.h>
->   #include <linux/pci.h>
->   #include <linux/pci_hotplug.h>
->   #include <linux/module.h>
-> @@ -16,6 +17,7 @@
->   #include <linux/pci-acpi.h>
->   #include <linux/pm_runtime.h>
->   #include <linux/pm_qos.h>
-> +#include <acpi/acpi_gic.h>
->   #include "pci.h"
->
->   /*
-> @@ -681,6 +683,22 @@ static bool pci_acpi_bus_match(struct device *dev)
->   	return dev_is_pci(dev);
->   }
->
-> +#ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
-> +struct irq_domain *pci_host_bridge_acpi_msi_domain(struct pci_bus *bus)
-> +{
-> +	struct irq_domain *d = NULL;
-> +	void *token = acpi_gic_get_msi_token(&bus->dev);
-> +
-> +	if (token)
-> +		d = irq_find_matching_host(token, DOMAIN_BUS_PCI_MSI);
-> +
-> +	if (!d)
-> +		pr_debug("Fail to find domain for MSI\n");
-> +
-> +	return d;
-> +}
-> +#endif /*CONFIG_GENERIC_MSI_IRQ_DOMAIN*/
-> +
->   static struct acpi_bus_type acpi_pci_bus = {
->   	.name = "PCI",
->   	.match = pci_acpi_bus_match,
-> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-> index a7afeac..8c1204c 100644
-> --- a/drivers/pci/probe.c
-> +++ b/drivers/pci/probe.c
-> @@ -12,6 +12,7 @@
->   #include <linux/module.h>
->   #include <linux/cpumask.h>
->   #include <linux/pci-aspm.h>
-> +#include <linux/pci-acpi.h>
->   #include <asm-generic/pci-bridge.h>
->   #include "pci.h"
->
-> @@ -670,6 +671,8 @@ static struct irq_domain *pci_host_bridge_msi_domain(struct pci_bus *bus)
->   	 * should be called from here.
->   	 */
->   	d = pci_host_bridge_of_msi_domain(bus);
-> +	if (!d)
-> +		d = pci_host_bridge_acpi_msi_domain(bus);
-
-Please use acpi_disabled here.
-
-BTW. This is another place where we need to know our firmware - DT vs 
-ACPI. I know we can use acpi_disabled but I think more about generic 
-solution. Since we already have:
-struct fwnode_handle	*fwnode;
-we can create macro which identify h/w description style, something like:
-
-#define FWNODE_TYPE(dev)	dev_fwnode(dev)->type
-
-and then:
-
-switch (FWNODE_TYPE(&bus->dev)) {
-case FWNODE_OF:
-...
-case FWNODE_ACPI:
-...
-case FWNODE_XXX:
-...
-}
-
-Root bus is special case since it has no frimware type but we could 
-factor out pci_set_bus_of_node(). For platform devices we have all we 
-need. Just thinking aloud, let me know your thoughts.
-
-Regards,
-Tomasz
 
 
+> -----Original Message-----
+> From: Dong Aisheng [mailto:aisheng.dong at freescale.com]
+> Sent: Friday, August 07, 2015 3:40 PM
+> To: Chen Haibo-B51421
+> Cc: robh+dt at kernel.org; pawel.moll at arm.com; mark.rutland at arm.com;
+> ijc+devicetree at hellion.org.uk; galak at codeaurora.org; shawnguo at kernel.org;
+> kernel at pengutronix.de; linux at arm.linux.org.uk; ulf.hansson at linaro.org;
+> johan.derycke at barco.com; mkl at pengutronix.de; Estevam Fabio-R49496; Dong
+> Aisheng-B29396; devicetree at vger.kernel.org; linux-kernel at vger.kernel.org;
+> linux-arm-kernel at lists.infradead.org; linux-mmc at vger.kernel.org
+> Subject: Re: [PATCH v4 2/6] mmc: sdhci-esdhc-imx: add tuning-step seting
+> support
+> 
+> On Wed, Aug 05, 2015 at 06:38:38PM +0800, Haibo Chen wrote:
+> > tuning-step is the delay cell steps in tuning procedure. The default
+> > value of tuning-step is 1. Some boards or cards need another value to
+> > pass the tuning procedure. For example, imx7d-sdb board need the
+> > tuning-step value as 2, otherwise it can't pass the tuning procedure.
+> >
+> > So this patch add the tuning-step setting in driver, so that user can
+> > set the tuning-step value in dts.
+> >
+> > Signed-off-by: Haibo Chen <haibo.chen@freescale.com>
+> > ---
+> >  drivers/mmc/host/sdhci-esdhc-imx.c          | 9 +++++++++
+> >  include/linux/platform_data/mmc-esdhc-imx.h | 1 +
+> >  2 files changed, 10 insertions(+)
+> >
+> > diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c
+> > b/drivers/mmc/host/sdhci-esdhc-imx.c
+> > index 48f009c..803d24f 100644
+> > --- a/drivers/mmc/host/sdhci-esdhc-imx.c
+> > +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+> > @@ -75,6 +75,7 @@
+> >  #define ESDHC_STD_TUNING_EN		(1 << 24)
+> >  /* NOTE: the minimum valid tuning start tap for mx6sl is 1 */
+> >  #define ESDHC_TUNING_START_TAP		0x1
+> > +#define ESDHC_TUNING_STEP_SHIFT		16
+> >
+> >  /* pinctrl state */
+> >  #define ESDHC_PINCTRL_STATE_100MHZ	"state_100mhz"
+> > @@ -474,6 +475,7 @@ static void esdhc_writew_le(struct sdhci_host *host,
+> u16 val, int reg)
+> >  		} else if (imx_data->socdata->flags & ESDHC_FLAG_STD_TUNING)
+> {
+> >  			u32 v = readl(host->ioaddr + SDHCI_ACMD12_ERR);
+> >  			u32 m = readl(host->ioaddr + ESDHC_MIX_CTRL);
+> > +			u32 tuning_ctrl;
+> >  			if (val & SDHCI_CTRL_TUNED_CLK) {
+> >  				v |= ESDHC_MIX_CTRL_SMPCLK_SEL;
+> >  			} else {
+> > @@ -484,6 +486,11 @@ static void esdhc_writew_le(struct sdhci_host
+> *host, u16 val, int reg)
+> >  			if (val & SDHCI_CTRL_EXEC_TUNING) {
+> >  				v |= ESDHC_MIX_CTRL_EXE_TUNE;
+> >  				m |= ESDHC_MIX_CTRL_FBCLK_SEL;
+> > +				tuning_ctrl = readl(host->ioaddr +
+> ESDHC_TUNING_CTRL);
+> > +				tuning_ctrl |= ESDHC_STD_TUNING_EN |
+> ESDHC_TUNING_START_TAP;
+> > +				if (imx_data->boarddata.tuning_step)
+> > +					tuning_ctrl |= imx_data-
+> >boarddata.tuning_step << ESDHC_TUNING_STEP_SHIFT;
+> > +					writel(tuning_ctrl, host->ioaddr +
+> ESDHC_TUNING_CTRL);
+> 
+> Is there a code indent issue here?
+> Otherwise, the patch looks good to me.
+> 
+> Regards
+> Dong Aisheng
 
+[haibo] I check this, the code indent is okay.
 
-
->
->   	return d;
->   }
-> diff --git a/include/linux/pci-acpi.h b/include/linux/pci-acpi.h
-> index a965efa..766d045 100644
-> --- a/include/linux/pci-acpi.h
-> +++ b/include/linux/pci-acpi.h
-> @@ -77,6 +77,8 @@ static inline void acpiphp_remove_slots(struct pci_bus *bus) { }
->   static inline void acpiphp_check_host_bridge(struct acpi_device *adev) { }
->   #endif
->
-> +struct irq_domain *pci_host_bridge_acpi_msi_domain(struct pci_bus *bus);
-> +
->   extern const u8 pci_acpi_dsm_uuid[];
->   #define DEVICE_LABEL_DSM	0x07
->   #define RESET_DELAY_DSM		0x08
-> @@ -85,6 +87,8 @@ extern const u8 pci_acpi_dsm_uuid[];
->   #else	/* CONFIG_ACPI */
->   static inline void acpi_pci_add_bus(struct pci_bus *bus) { }
->   static inline void acpi_pci_remove_bus(struct pci_bus *bus) { }
-> +static inline struct irq_domain *
-> +pci_host_bridge_acpi_msi_domain(struct pci_bus *bus) { return NULL; }
->   #endif	/* CONFIG_ACPI */
->
->   #ifdef CONFIG_ACPI_APEI
->
+> 
+> >  			} else {
+> >  				v &= ~ESDHC_MIX_CTRL_EXE_TUNE;
+> >  			}
+> > @@ -964,6 +971,8 @@ sdhci_esdhc_imx_probe_dt(struct platform_device
+> *pdev,
+> >  	if (gpio_is_valid(boarddata->wp_gpio))
+> >  		boarddata->wp_type = ESDHC_WP_GPIO;
+> >
+> > +	of_property_read_u32(np, "fsl,tuning-step",
+> > +&boarddata->tuning_step);
+> > +
+> >  	if (of_find_property(np, "no-1-8-v", NULL))
+> >  		boarddata->support_vsel = false;
+> >  	else
+> > diff --git a/include/linux/platform_data/mmc-esdhc-imx.h
+> > b/include/linux/platform_data/mmc-esdhc-imx.h
+> > index e1571ef..95ccab3 100644
+> > --- a/include/linux/platform_data/mmc-esdhc-imx.h
+> > +++ b/include/linux/platform_data/mmc-esdhc-imx.h
+> > @@ -45,5 +45,6 @@ struct esdhc_platform_data {
+> >  	int max_bus_width;
+> >  	bool support_vsel;
+> >  	unsigned int delay_line;
+> > +	unsigned int tuning_step;       /* The delay cell steps in tuning
+> procedure */
+> >  };
+> >  #endif /* __ASM_ARCH_IMX_ESDHC_H */
+> > --
+> > 1.9.1
+> >
