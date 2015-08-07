@@ -1,69 +1,76 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  7 Aug 2015 11:11:34 +0900
-Subject: [PATCH 10/10] ARM: shmobile: sh73a0 dtsi: Add missing "gpio-ranges"
- to gpio node
-In-Reply-To: <cover.1438911334.git.horms+renesas@verge.net.au>
-References: <cover.1438911334.git.horms+renesas@verge.net.au>
-Message-ID: <94bdc48d55ca10f90b4a625f0e443197e0013557.1438911334.git.horms+renesas@verge.net.au>
+Date: Fri,  7 Aug 2015 11:12:03 +0900
+Subject: [GIT PULL] Renesas ARM Based SoC CPG MSTP Clock Domain Updates for
+ v4.3
+Message-ID: <cover.1438911559.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-If a GPIO driver uses gpiochip_add_pin_range() (which is usually the
-case for GPIO/PFC combos), the GPIO hogging mechanism configured from DT
-doesn't work:
+Please consider these Renesas ARM based SoC CPG MSTP clock domain updates
+for v4.3.
 
-    requesting hog GPIO led1-high (chip sh73a0_pfc, offset 20) failed
+This pull request is based on "Third Round of Renesas ARM Based SoC DT
+Updates for v4.3", tagged as renesas-dt3-for-v4.3, which I have also sent a
+pull-request for.
 
-The actual error code is -517 == -EPROBE_DEFER.
+The reason for that base is that the DT changes in this series update nodes
+added in that tag.
 
-The problem is that PFC+GPIO registration is handled in multiple steps:
-  1. pinctrl_register(),
-  2. gpiochip_add(),
-  3. gpiochip_add_pin_range().
+This series begins with driver changes and follows up with DT changes.
+The latter depend on the former.
 
-Configuration of the hogs is handled in gpiochip_add():
 
-    gpiochip_add
-        of_gpiochip_add
-            of_gpiochip_scan_hogs
-                gpiod_hog
-                    gpiochip_request_own_desc
-                        __gpiod_request
-                            chip->request
-                                pinctrl_request_gpio
-                                    pinctrl_get_device_gpio_range
+The following changes since commit 94bdc48d55ca10f90b4a625f0e443197e0013557:
 
-However, at this point the GPIO controller hasn't been added to
-pinctrldev_list yet, so the range can't be found, and the operation fails
-with -EPROBE_DEFER.
+  ARM: shmobile: sh73a0 dtsi: Add missing "gpio-ranges" to gpio node (2015-08-05 06:39:28 +0900)
 
-To fix this, add a "gpio-ranges" property to the gpio device node, so
-the ranges are added by of_gpiochip_add_pin_range(), which is called by
-of_gpiochip_add() before the call to of_gpiochip_scan_hogs().
+are available in the git repository at:
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/sh73a0.dtsi | 3 +++
- 1 file changed, 3 insertions(+)
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-cpg-mstp-clock-domain-for-v4.3
 
-diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
-index 11e17c5f26e2..ff7c8f298f30 100644
---- a/arch/arm/boot/dts/sh73a0.dtsi
-+++ b/arch/arm/boot/dts/sh73a0.dtsi
-@@ -392,6 +392,9 @@
- 		      <0xe605801c 0x1c>;
- 		gpio-controller;
- 		#gpio-cells = <2>;
-+		gpio-ranges =
-+			<&pfc 0 0 119>, <&pfc 128 128 37>, <&pfc 192 192 91>,
-+			<&pfc 288 288 22>;
- 		interrupts-extended =
- 			<&irqpin0 0 0>, <&irqpin0 1 0>, <&irqpin0 2 0>, <&irqpin0 3 0>,
- 			<&irqpin0 4 0>, <&irqpin0 5 0>, <&irqpin0 6 0>, <&irqpin0 7 0>,
--- 
-2.1.4
+for you to fetch changes up to 2daa8a5a8c0994893c2ca456303f0bf53e881cb9:
+
+  ARM: shmobile: r8a7794 dtsi: Add CPG/MSTP Clock Domain (2015-08-05 06:42:51 +0900)
+
+----------------------------------------------------------------
+Renesas ARM Based SoC CPG MSTP Clock Domain Updates for v4.3
+
+* Add Clock Domain support to the Clock Pulse Generator
+  (CPG) Module Stop (MSTP) Clocks driver using the generic PM Domain.
+
+----------------------------------------------------------------
+Geert Uytterhoeven (12):
+      clk: shmobile: Add CPG/MSTP Clock Domain support
+      clk: shmobile: r8a7778: Add CPG/MSTP Clock Domain support
+      clk: shmobile: r8a7779: Add CPG/MSTP Clock Domain support
+      clk: shmobile: rcar-gen2: Add CPG/MSTP Clock Domain support
+      clk: shmobile: rz: Add CPG/MSTP Clock Domain support
+      ARM: shmobile: r7s72100 dtsi: Add CPG/MSTP Clock Domain
+      ARM: shmobile: r8a7778 dtsi: Add CPG/MSTP Clock Domain
+      ARM: shmobile: r8a7779 dtsi: Add CPG/MSTP Clock Domain
+      ARM: shmobile: r8a7790 dtsi: Add CPG/MSTP Clock Domain
+      ARM: shmobile: r8a7791 dtsi: Add CPG/MSTP Clock Domain
+      ARM: shmobile: r8a7793 dtsi: Add CPG/MSTP Clock Domain
+      ARM: shmobile: r8a7794 dtsi: Add CPG/MSTP Clock Domain
+
+ .../bindings/clock/renesas,r8a7778-cpg-clocks.txt  | 29 ++++++-
+ .../bindings/clock/renesas,r8a7779-cpg-clocks.txt  | 30 +++++++-
+ .../clock/renesas,rcar-gen2-cpg-clocks.txt         | 26 ++++++-
+ .../bindings/clock/renesas,rz-cpg-clocks.txt       | 29 ++++++-
+ arch/arm/boot/dts/r7s72100.dtsi                    | 19 +++++
+ arch/arm/boot/dts/r8a7778.dtsi                     | 22 ++++++
+ arch/arm/boot/dts/r8a7779.dtsi                     | 23 ++++++
+ arch/arm/boot/dts/r8a7790.dtsi                     | 86 ++++++++++++++++++---
+ arch/arm/boot/dts/r8a7791.dtsi                     | 88 ++++++++++++++++++++--
+ arch/arm/boot/dts/r8a7793.dtsi                     |  7 ++
+ arch/arm/boot/dts/r8a7794.dtsi                     | 29 +++++++
+ arch/arm/mach-shmobile/Kconfig                     |  2 +
+ drivers/clk/shmobile/clk-mstp.c                    | 87 +++++++++++++++++++++
+ drivers/clk/shmobile/clk-r8a7778.c                 |  2 +
+ drivers/clk/shmobile/clk-r8a7779.c                 |  2 +
+ drivers/clk/shmobile/clk-rcar-gen2.c               |  2 +
+ drivers/clk/shmobile/clk-rz.c                      |  3 +
+ include/linux/clk/shmobile.h                       | 12 +++
+ 18 files changed, 470 insertions(+), 28 deletions(-)
