@@ -1,223 +1,104 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Fri, 07 Aug 2015 14:36:40 +0200
-Subject: [PATCH 1/2] KVM: arm: rename pause into power_off
-In-Reply-To: <20150718090913.GN14024@cbox>
-References: <1436186996-22528-1-git-send-email-eric.auger@linaro.org>
- <1436186996-22528-2-git-send-email-eric.auger@linaro.org>
- <20150718090913.GN14024@cbox>
-Message-ID: <55C4A658.3060302@linaro.org>
+From: tomasz.nowicki@linaro.org (Tomasz Nowicki)
+Date: Fri, 07 Aug 2015 14:42:20 +0200
+Subject: [PATCH 2/2] net, thunder, bgx: Add support for ACPI binding.
+In-Reply-To: <20150807115622.GS4914@rric.localhost>
+References: <1438907590-29649-1-git-send-email-ddaney.cavm@gmail.com>
+ <1438907590-29649-3-git-send-email-ddaney.cavm@gmail.com>
+ <55C467A0.4020601@linaro.org> <20150807104320.GQ1820@rric.localhost>
+ <55C48DF9.70406@linaro.org> <20150807115622.GS4914@rric.localhost>
+Message-ID: <55C4A7AC.1080902@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
-On 07/18/2015 11:09 AM, Christoffer Dall wrote:
-> On Mon, Jul 06, 2015 at 02:49:55PM +0200, Eric Auger wrote:
->> The kvm_vcpu_arch pause field is renamed into power_off to prepare
->> for the introduction of a new pause field.
+On 07.08.2015 13:56, Robert Richter wrote:
+> On 07.08.15 12:52:41, Tomasz Nowicki wrote:
+>> On 07.08.2015 12:43, Robert Richter wrote:
+>>> On 07.08.15 10:09:04, Tomasz Nowicki wrote:
+>>>> On 07.08.2015 02:33, David Daney wrote:
+>>>
+>>> ...
+>>>
+>>>>> +#else
+>>>>> +
+>>>>> +static int bgx_init_acpi_phy(struct bgx *bgx)
+>>>>> +{
+>>>>> +	return -ENODEV;
+>>>>> +}
+>>>>> +
+>>>>> +#endif /* CONFIG_ACPI */
+>>>>> +
+>>>>>   #if IS_ENABLED(CONFIG_OF_MDIO)
+>>>>>
+>>>>>   static int bgx_init_of_phy(struct bgx *bgx)
+>>>>> @@ -882,7 +1010,12 @@ static int bgx_init_of_phy(struct bgx *bgx)
+>>>>>
+>>>>>   static int bgx_init_phy(struct bgx *bgx)
+>>>>>   {
+>>>>> -	return bgx_init_of_phy(bgx);
+>>>>> +	int err = bgx_init_of_phy(bgx);
+>>>>> +
+>>>>> +	if (err != -ENODEV)
+>>>>> +		return err;
+>>>>> +
+>>>>> +	return bgx_init_acpi_phy(bgx);
+>>>>>   }
+>>>>>
+>>>>
+>>>> If kernel can work with DT and ACPI (both compiled in), it should take only
+>>>> one path instead of probing DT and ACPI sequentially. How about:
+>>>>
+>>>> @@ -902,10 +925,9 @@ static int bgx_probe(struct pci_dev *pdev, const struct
+>>>> pci_device_id *ent)
+>>>>   	bgx_vnic[bgx->bgx_id] = bgx;
+>>>>   	bgx_get_qlm_mode(bgx);
+>>>>
+>>>> -	snprintf(bgx_sel, 5, "bgx%d", bgx->bgx_id);
+>>>> -	np = of_find_node_by_name(NULL, bgx_sel);
+>>>> -	if (np)
+>>>> -		bgx_init_of(bgx, np);
+>>>> +	err = acpi_disabled ? bgx_init_of_phy(bgx) : bgx_init_acpi_phy(bgx);
+>>>> +	if (err)
+>>>> +		goto err_enable;
+>>>>
+>>>>   	bgx_init_hw(bgx);
+>>>
+>>> I would not pollute bgx_probe() with acpi and dt specifics, and instead
+>>> keep bgx_init_phy(). The typical design pattern for this is:
+>>>
+>>> static int bgx_init_phy(struct bgx *bgx)
+>>> {
+>>> #ifdef CONFIG_ACPI
+>>>          if (!acpi_disabled)
+>>>                  return bgx_init_acpi_phy(bgx);
+>>> #endif
+>>>          return bgx_init_of_phy(bgx);
+>>> }
+>>>
+>>> This adds acpi runtime detection (acpi=no), does not call dt code in
+>>> case of acpi, and saves the #else for bgx_init_acpi_phy().
+>>>
 >>
->> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+>> I am fine with keeping it in bgx_init_phy(), however we can drop there
+>> #ifdefs since both of bgx_init_{acpi,of}_phy calls have empty stub for !ACPI
+>> and !OF case. Like that:
 >>
->> v4 -> v5:
->> - fix compilation issue on arm64 (add power_off field in kvm_host.h)
->> ---
->>  arch/arm/include/asm/kvm_host.h   |  4 ++--
->>  arch/arm/kvm/arm.c                | 10 +++++-----
->>  arch/arm/kvm/psci.c               | 10 +++++-----
->>  arch/arm64/include/asm/kvm_host.h |  4 ++--
->>  4 files changed, 14 insertions(+), 14 deletions(-)
+>> static int bgx_init_phy(struct bgx *bgx)
+>> {
 >>
->> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
->> index e896d2c..304004d 100644
->> --- a/arch/arm/include/asm/kvm_host.h
->> +++ b/arch/arm/include/asm/kvm_host.h
->> @@ -129,8 +129,8 @@ struct kvm_vcpu_arch {
->>  	 * here.
->>  	 */
->>  
->> -	/* Don't run the guest on this vcpu */
->> -	bool pause;
->> +	/* vcpu power-off state */
->> +	bool power_off;
->>  
->>  	/* IO related fields */
->>  	struct kvm_decode mmio_decode;
->> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
->> index bcdf799..7537e68 100644
->> --- a/arch/arm/kvm/arm.c
->> +++ b/arch/arm/kvm/arm.c
->> @@ -475,7 +475,7 @@ static void vcpu_pause(struct kvm_vcpu *vcpu)
->>  {
->>  	wait_queue_head_t *wq = kvm_arch_vcpu_wq(vcpu);
->>  
->> -	wait_event_interruptible(*wq, !vcpu->arch.pause);
->> +	wait_event_interruptible(*wq, !vcpu->arch.power_off);
-> 
-> would there be any benefit to simply calling kvm_vcpu_block() instead of
-> vcpu_pause, and rewrite kvm_arch_vcpu_runnable to:
-Wouldn't it somehow change the known behavior or kvm_vcpu_block which is
-expected/used to exit on IRQ/FIQ (WFI). Here it would exit when
-power_off changes to false (or maybe you meant pause below in the new
-context?).
-> 
-> int kvm_arch_vcpu_runnable(struct kvm_vcpu *v)
-> {
-> ?       return !vcpu->arch.power_off &&
-> 		(!!v->arch.irq_lines || kvm_vgic_vcpu_pending_irq(v));
-> }
-> 
-> Not sure really, certainly the runnable function does not become more
-> readable.
-To me the usage of kvm_vcpu_block looks more complex than this code and
-I would prefer keeping that version if you don't mind.
-> 
->>  }
->>  
->>  static int kvm_vcpu_initialized(struct kvm_vcpu *vcpu)
->> @@ -525,7 +525,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
->>  
->>  		update_vttbr(vcpu->kvm);
->>  
->> -		if (vcpu->arch.pause)
->> +		if (vcpu->arch.power_off)
->>  			vcpu_pause(vcpu);
-> 
-> looking back over this code, how does this actually guarantee that we
-> don't run a powered-off cpu?
-> 
-> vcpu_pause() just does a wait_event_interruptible(), so if we get
-> scheduled again, we'll just proceed running. 
-actually it also checks the !vcpu->arch.power_off condition, right?
- Is there any case where we
-> could get scheduled without signal_pending() being true and therefore
-> inadvertedly run the vcpu?
-kvm_arm_halt_guest can happen at any time, including after the execution
-of above vcpu_pause(vcpu) call. This is the reason why I added the
-second check below, once we entered the critical section and just before
-running the vcpu.
+>>          if (!acpi_disabled)
+>>                  return bgx_init_acpi_phy(bgx);
+>> 	else
+>>          	return bgx_init_of_phy(bgx);
+>> }
+>
+> As said, keeping it in #ifdefs makes the empty stub function for !acpi
+> obsolete, which makes the code smaller and better readable. This style
+> is common practice in the kernel. Apart from that, the 'else' should
+> be dropped as it is useless.
+>
 
-With regard to renamed power_off boolean my understanding is:
+I would't say the code is better readable (bgx_init_of_phy has still two 
+stubs) but this is just cosmetic, my point was to use run time detection 
+using acpi_disabled.
 
-power_off is set
-- on kvm_arch_vcpu_ioctl_vcpu_init/KVM_ARM_VCPU_POWER_OFF
-- on PSCI calls from guests through traps from HVC instructions
-in that case I don't think this can happen
-
-- on KVM_SET_MP_STATE ioctl: I think in that case, what you describe can
-happen.
-
-Do you share the same understanding?
-
-Best Regards
-
-Eric
-
-> 
-> if so, we should change the line below like this:
-> 
-> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> index bc738d2..98f31e6 100644
-> --- a/arch/arm/kvm/arm.c
-> +++ b/arch/arm/kvm/arm.c
-> @@ -542,7 +542,8 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  			run->exit_reason = KVM_EXIT_INTR;
->  		}
->  
-> -		if (ret <= 0 || need_new_vmid_gen(vcpu->kvm)) {
-> +		if (ret <= 0 || need_new_vmid_gen(vcpu->kvm) ||
-> +		    vcpu->arch.power_off) {
->  			local_irq_enable();
->  			preempt_enable();
->  			kvm_timer_sync_hwstate(vcpu);
-> 
-> 
-> Sorry for polluting your patch with these questions, I'm otherwise fine
-> with the rename.
-> 
-> Thanks,
-> -Christoffer
-> 
->>  
->>  		/*
->> @@ -766,12 +766,12 @@ static int kvm_arch_vcpu_ioctl_vcpu_init(struct kvm_vcpu *vcpu,
->>  	vcpu_reset_hcr(vcpu);
->>  
->>  	/*
->> -	 * Handle the "start in power-off" case by marking the VCPU as paused.
->> +	 * Handle the "start in power-off" case.
->>  	 */
->>  	if (test_bit(KVM_ARM_VCPU_POWER_OFF, vcpu->arch.features))
->> -		vcpu->arch.pause = true;
->> +		vcpu->arch.power_off = true;
->>  	else
->> -		vcpu->arch.pause = false;
->> +		vcpu->arch.power_off = false;
->>  
->>  	return 0;
->>  }
->> diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
->> index 4b94b51..134971a 100644
->> --- a/arch/arm/kvm/psci.c
->> +++ b/arch/arm/kvm/psci.c
->> @@ -63,7 +63,7 @@ static unsigned long kvm_psci_vcpu_suspend(struct kvm_vcpu *vcpu)
->>  
->>  static void kvm_psci_vcpu_off(struct kvm_vcpu *vcpu)
->>  {
->> -	vcpu->arch.pause = true;
->> +	vcpu->arch.power_off = true;
->>  }
->>  
->>  static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
->> @@ -87,7 +87,7 @@ static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
->>  	 */
->>  	if (!vcpu)
->>  		return PSCI_RET_INVALID_PARAMS;
->> -	if (!vcpu->arch.pause) {
->> +	if (!vcpu->arch.power_off) {
->>  		if (kvm_psci_version(source_vcpu) != KVM_ARM_PSCI_0_1)
->>  			return PSCI_RET_ALREADY_ON;
->>  		else
->> @@ -115,7 +115,7 @@ static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
->>  	 * the general puspose registers are undefined upon CPU_ON.
->>  	 */
->>  	*vcpu_reg(vcpu, 0) = context_id;
->> -	vcpu->arch.pause = false;
->> +	vcpu->arch.power_off = false;
->>  	smp_mb();		/* Make sure the above is visible */
->>  
->>  	wq = kvm_arch_vcpu_wq(vcpu);
->> @@ -152,7 +152,7 @@ static unsigned long kvm_psci_vcpu_affinity_info(struct kvm_vcpu *vcpu)
->>  	kvm_for_each_vcpu(i, tmp, kvm) {
->>  		mpidr = kvm_vcpu_get_mpidr_aff(tmp);
->>  		if (((mpidr & target_affinity_mask) == target_affinity) &&
->> -		    !tmp->arch.pause) {
->> +		    !tmp->arch.power_off) {
->>  			return PSCI_0_2_AFFINITY_LEVEL_ON;
->>  		}
->>  	}
->> @@ -175,7 +175,7 @@ static void kvm_prepare_system_event(struct kvm_vcpu *vcpu, u32 type)
->>  	 * re-initialized.
->>  	 */
->>  	kvm_for_each_vcpu(i, tmp, vcpu->kvm) {
->> -		tmp->arch.pause = true;
->> +		tmp->arch.power_off = true;
->>  		kvm_vcpu_kick(tmp);
->>  	}
->>  
->> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
->> index 2709db2..009da6b 100644
->> --- a/arch/arm64/include/asm/kvm_host.h
->> +++ b/arch/arm64/include/asm/kvm_host.h
->> @@ -122,8 +122,8 @@ struct kvm_vcpu_arch {
->>  	 * here.
->>  	 */
->>  
->> -	/* Don't run the guest */
->> -	bool pause;
->> +	/* vcpu power-off state */
->> +	bool power_off;
->>  
->>  	/* IO related fields */
->>  	struct kvm_decode mmio_decode;
->> -- 
->> 1.9.1
->>
+Tomasz
