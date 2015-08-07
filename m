@@ -1,25 +1,45 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 7 Aug 2015 17:57:01 +0100
-Subject: [PATCH 2/5] ACPI / ARM64: remove usage of
- BAD_MADT_ENTRY/BAD_MADT_GICC_ENTRY
-In-Reply-To: <1438894770-31163-3-git-send-email-al.stone@linaro.org>
-References: <1438894770-31163-1-git-send-email-al.stone@linaro.org>
- <1438894770-31163-3-git-send-email-al.stone@linaro.org>
-Message-ID: <20150807165701.GI19308@e104818-lin.cambridge.arm.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Fri, 7 Aug 2015 20:06:31 +0300
+Subject: [PATCH v3 01/18] platform: delay OF device-driver matches until
+ late_initcall
+In-Reply-To: <CAAObsKBapFqzr+4YEXJfcJWMd+tkaBqYbGiFTntHStAP=+P-_Q@mail.gmail.com>
+References: <1438870315-18689-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1438870315-18689-2-git-send-email-tomeu.vizoso@collabora.com>
+ <CAL_Jsq+GLMZe-f6qEi=7i1YrrWc6k99RpGkOyCd5KkYDiyt0QA@mail.gmail.com>
+ <CAAObsKBapFqzr+4YEXJfcJWMd+tkaBqYbGiFTntHStAP=+P-_Q@mail.gmail.com>
+Message-ID: <55C4E597.1010701@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 06, 2015 at 02:59:27PM -0600, Al Stone wrote:
-> Now that we have introduced the bad_madt_entry() function, and that
-> function is being invoked in acpi_table_parse_madt() for us, there
-> is no longer any need to use the BAD_MADT_ENTRY macro, or in the case
-> of arm64, the BAD_MADT_GICC_ENTRY, too.
+On 08/07/2015 10:11 AM, Tomeu Vizoso wrote:
+> On 6 August 2015 at 22:19, Rob Herring <robherring2@gmail.com> wrote:
+>> On Thu, Aug 6, 2015 at 9:11 AM, Tomeu Vizoso <tomeu.vizoso@collabora.com> wrote:
+>>> Delay matches of platform devices with OF nodes until late_initcall,
+>>> when we are sure that all built-in drivers have been registered already.
+>>> This is needed to prevent deferred probes because of some drivers not
+>>> having registered yet.
+>>>
+>>> The reason why only platform devices are delayed is that some other
+>>> devices are expected to be probed earlier than late_initcall, for
+>>> example, the system PNP driver needs to probe its devices in
+>>> fs_initcall.
+>>>
+>>> Additionally, only platform devices with OF nodes are delayed because
+>>> some machines may depend on oter platform devices being registered at
+>>> specific times.
+>>
+>> How do we know that these probes occur before the unused clocks and
+>> regulators are turned off? Just getting lucky (as is deferred probe)?
+>> Can we do this one level earlier so we have a level left to do things
+>> after probe.
 > 
-> Signed-off-by: Al Stone <al.stone@linaro.org>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Those are already late_initcall_sync so I guess we're fine.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+I wouldn't be so sure :(
+FYI:
+http://git.ti.com/ti-linux-kernel/ti-linux-kernel/commit/763d643bbfc0f445c6685c541fcae3c370e4314a
+
+
+-- 
+regards,
+-grygorii
