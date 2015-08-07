@@ -1,63 +1,55 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Fri, 7 Aug 2015 10:52:34 +0200
-Subject: [PATCH v5 2/3] arm64: Add IOMMU dma_ops
-In-Reply-To: <8a5abd0a9929aae160ccb74d7a8d9c3698f61910.1438362603.git.robin.murphy@arm.com>
-References: <cover.1438362603.git.robin.murphy@arm.com>
- <8a5abd0a9929aae160ccb74d7a8d9c3698f61910.1438362603.git.robin.murphy@arm.com>
-Message-ID: <20150807085233.GV14980@8bytes.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 07 Aug 2015 09:52:32 +0100
+Subject: [PATCH TRIVIAL] Enable GICv2m on ARM virt machine
+In-Reply-To: <00f501d0ce9c$4d57bcc0$e8073640$@samsung.com>
+References: <00f501d0ce9c$4d57bcc0$e8073640$@samsung.com>
+Message-ID: <55C471D0.8050400@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 31, 2015 at 06:18:28PM +0100, Robin Murphy wrote:
-> +/*
-> + * TODO: Right now __iommu_setup_dma_ops() gets called too early to do
-> + * everything it needs to - the device isn't yet fully created, and the
-> + * IOMMU driver hasn't seen it yet, so we need this delayed attachment
-> + * dance. Once IOMMU probe ordering is sorted to move the
-> + * arch_setup_dma_ops() call later, all the notifier bits below become
-> + * unnecessary, and will go away.
-> + */
-> +struct iommu_dma_notifier_data {
-> +	struct list_head list;
-> +	struct device *dev;
-> +	struct iommu_domain *dma_domain;
-> +};
-> +static LIST_HEAD(iommu_dma_masters);
-> +static DEFINE_MUTEX(iommu_dma_notifier_lock);
+Hi Pavel,
 
-Ugh, thats incredibly ugly. Why can't you do the setup work then the
-iommu driver sees the device? Just call the dma-api setup functions
-there (like the x86 iommu drivers do it too) and be done without any
-notifiers.
+On 04/08/15 10:59, Pavel Fedin wrote:
+> qemu implementation of "virt" includes GICv2m. This commit allows to use
+> it also on ARM32 architecture.
+> 
+> Signed-off-by: Pavel Fedin <p.fedin@samsung.com>
+> ---
+>  arch/arm/Kconfig            | 1 +
+>  arch/arm/include/asm/Kbuild | 1 +
+>  2 files changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 45df48b..1091025 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -815,6 +815,7 @@ config ARCH_VIRT
+>  	bool "Dummy Virtual Machine" if ARCH_MULTI_V7
+>  	select ARM_AMBA
+>  	select ARM_GIC
+> +	select ARM_GIC_V2M if PCI_MSI
+>  	select ARM_PSCI
+>  	select HAVE_ARM_ARCH_TIMER
+>  
+> diff --git a/arch/arm/include/asm/Kbuild b/arch/arm/include/asm/Kbuild
+> index 3c4596d..01806f5 100644
+> --- a/arch/arm/include/asm/Kbuild
+> +++ b/arch/arm/include/asm/Kbuild
+> @@ -14,6 +14,7 @@ generic-y += local.h
+>  generic-y += local64.h
+>  generic-y += mcs_spinlock.h
+>  generic-y += msgbuf.h
+> +generic-y += msi.h
+>  generic-y += param.h
+>  generic-y += parport.h
+>  generic-y += poll.h
+> 
 
-> +static void __iommu_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
-> +				  const struct iommu_ops *ops)
-> +{
-> +	struct iommu_domain *domain;
-> +	int err;
-> +
-> +	if (!ops)
-> +		return;
-> +	/*
-> +	 * In a perfect world, everything happened in the right order up to
-> +	 * here, and the IOMMU core has already attached the device to an
-> +	 * appropriate default domain for us to set up...
-> +	 */
-> +	domain = iommu_get_domain_for_dev(dev);
-> +	if (!domain) {
-> +		/*
-> +		 * Urgh. Reliable default domains for platform devices can't
-> +		 * happen anyway without some sensible way of handling
-> +		 * non-trivial groups. So until then, HORRIBLE HACKS!
-> +		 */
+You may want to add a comment about the dependency chain that requires
+the generic msi.h.
 
-I don't get this, what is preventing to rely on default domains here?
+Thanks,
 
-> +		domain = ops->domain_alloc(IOMMU_DOMAIN_DMA);
-
-The IOMMU core should already tried to allocate an IOMMU_DOMAIN_DMA type
-domain. No need to try this again here.
-
-
-
-	Joerg
+	M.
+-- 
+Jazz is not dead. It just smells funny...
