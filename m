@@ -1,67 +1,215 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 7 Aug 2015 20:15:02 +0530
-Subject: [PATCH 00/11] omap_hsmmc: voltage switching and tuning
-In-Reply-To: <20150806064821.GO16878@atomide.com>
-References: <1438242394-25599-1-git-send-email-kishon@ti.com>
- <20150805104355.GE16878@atomide.com> <55C22524.5050304@ti.com>
- <20150806064821.GO16878@atomide.com>
-Message-ID: <55C4C46E.9080200@ti.com>
+From: gg@slimlogic.co.uk (Graeme Gregory)
+Date: Fri, 7 Aug 2015 15:54:14 +0100
+Subject: [PATCH 2/2] net, thunder, bgx: Add support for ACPI binding.
+In-Reply-To: <1438907590-29649-3-git-send-email-ddaney.cavm@gmail.com>
+References: <1438907590-29649-1-git-send-email-ddaney.cavm@gmail.com>
+ <1438907590-29649-3-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <20150807145414.GA5468@xora-haswell.xora.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Aug 06, 2015 at 05:33:10PM -0700, David Daney wrote:
+> From: David Daney <david.daney@cavium.com>
+> 
+> Find out which PHYs belong to which BGX instance in the ACPI way.
+> 
+> Set the MAC address of the device as provided by ACPI tables. This is
+> similar to the implementation for devicetree in
+> of_get_mac_address(). The table is searched for the device property
+> entries "mac-address", "local-mac-address" and "address" in that
+> order. The address is provided in a u64 variable and must contain a
+> valid 6 bytes-len mac addr.
+> 
+> Based on code from: Narinder Dhillon <ndhillon@cavium.com>
+>                     Tomasz Nowicki <tomasz.nowicki@linaro.org>
+>                     Robert Richter <rrichter@cavium.com>
+> 
+> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+> Signed-off-by: Robert Richter <rrichter@cavium.com>
+> Signed-off-by: David Daney <david.daney@cavium.com>
+> ---
+>  drivers/net/ethernet/cavium/thunder/thunder_bgx.c | 137 +++++++++++++++++++++-
+>  1 file changed, 135 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
+> index 615b2af..2056583 100644
+> --- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
+> +++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
+> @@ -6,6 +6,7 @@
+>   * as published by the Free Software Foundation.
+>   */
+>  
+> +#include <linux/acpi.h>
+>  #include <linux/module.h>
+>  #include <linux/interrupt.h>
+>  #include <linux/pci.h>
+> @@ -26,7 +27,7 @@
+>  struct lmac {
+>  	struct bgx		*bgx;
+>  	int			dmac;
+> -	unsigned char		mac[ETH_ALEN];
+> +	u8			mac[ETH_ALEN];
+>  	bool			link_up;
+>  	int			lmacid; /* ID within BGX */
+>  	int			lmacid_bd; /* ID on board */
+> @@ -835,6 +836,133 @@ static void bgx_get_qlm_mode(struct bgx *bgx)
+>  	}
+>  }
+>  
+> +#ifdef CONFIG_ACPI
+> +
+> +static int bgx_match_phy_id(struct device *dev, void *data)
+> +{
+> +	struct phy_device *phydev = to_phy_device(dev);
+> +	u32 *phy_id = data;
+> +
+> +	if (phydev->addr == *phy_id)
+> +		return 1;
+> +
+> +	return 0;
+> +}
+> +
+> +static const char * const addr_propnames[] = {
+> +	"mac-address",
+> +	"local-mac-address",
+> +	"address",
+> +};
+> +
+> +static int acpi_get_mac_address(struct acpi_device *adev, u8 *dst)
+> +{
+> +	const union acpi_object *prop;
+> +	u64 mac_val;
+> +	u8 mac[ETH_ALEN];
+> +	int i, j;
+> +	int ret;
+> +
+> +	for (i = 0; i < ARRAY_SIZE(addr_propnames); i++) {
+> +		ret = acpi_dev_get_property(adev, addr_propnames[i],
+> +					    ACPI_TYPE_INTEGER, &prop);
 
-On Thursday 06 August 2015 12:18 PM, Tony Lindgren wrote:
-> * Kishon Vijay Abraham I <kishon@ti.com> [150805 08:03]:
->> Hi,
->>
->> On Wednesday 05 August 2015 04:13 PM, Tony Lindgren wrote:
->>> * Kishon Vijay Abraham I <kishon@ti.com> [150730 00:49]:
->>>> Patch series implements voltage switching and tuning for omap_hsmmc
->>>> driver.
->>>>
->>>> Did basic read/write test in J6, J6 Eco, Beagle-x15, AM437x EVM,
->>>> Beaglebone black, OMAP5 uEVM and OMAP4 PANDA.
->>>
->>> Your tests are missing omap3?
->>
->> I don't have one at my disposal :-( I'll try to find one and add omap3 tests.
-> 
-> Great :) Beagle xm is a good one to test the USB PHY stuff on
-> and also MMC. Having USB cable connected or EHCI loaded blocks the PM
-> though, so NFSroot is not very usable for testing on it.
+Shouldn't this be trying to use device_property_read_* API and making
+the DT/ACPI path the same where possible?
 
-I found a beagle xm. So I should be able to get back to this early next week.
+Graeme
 
-Thanks
-Kishon
+> +		if (ret)
+> +			continue;
+> +
+> +		mac_val = prop->integer.value;
+> +
+> +		if (mac_val & (~0ULL << 48))
+> +			continue;	/* more than 6 bytes */
+> +
+> +		for (j = 0; j < ARRAY_SIZE(mac); j++)
+> +			mac[j] = (u8)(mac_val >> (8 * j));
+> +		if (!is_valid_ether_addr(mac))
+> +			continue;
+> +
+> +		memcpy(dst, mac, ETH_ALEN);
+> +
+> +		return 0;
+> +	}
+> +
+> +	return ret ? ret : -EINVAL;
+> +}
+> +
+> +static acpi_status bgx_acpi_register_phy(acpi_handle handle,
+> +					 u32 lvl, void *context, void **rv)
+> +{
+> +	struct acpi_reference_args args;
+> +	const union acpi_object *prop;
+> +	struct bgx *bgx = context;
+> +	struct acpi_device *adev;
+> +	struct device *phy_dev;
+> +	u32 phy_id;
+> +
+> +	if (acpi_bus_get_device(handle, &adev))
+> +		goto out;
+> +
+> +	SET_NETDEV_DEV(&bgx->lmac[bgx->lmac_count].netdev, &bgx->pdev->dev);
+> +
+> +	acpi_get_mac_address(adev, bgx->lmac[bgx->lmac_count].mac);
+> +
+> +	bgx->lmac[bgx->lmac_count].lmacid = bgx->lmac_count;
+> +
+> +	if (acpi_dev_get_property_reference(adev, "phy-handle", 0, &args))
+> +		goto out;
+> +
+> +	if (acpi_dev_get_property(args.adev, "phy-channel", ACPI_TYPE_INTEGER, &prop))
+> +		goto out;
+> +
+> +	phy_id = prop->integer.value;
+> +
+> +	phy_dev = bus_find_device(&mdio_bus_type, NULL, (void *)&phy_id,
+> +				  bgx_match_phy_id);
+> +	if (!phy_dev)
+> +		goto out;
+> +
+> +	bgx->lmac[bgx->lmac_count].phydev = to_phy_device(phy_dev);
+> +out:
+> +	bgx->lmac_count++;
+> +	return AE_OK;
+> +}
+> +
+> +static acpi_status bgx_acpi_match_id(acpi_handle handle, u32 lvl,
+> +				     void *context, void **ret_val)
+> +{
+> +	struct acpi_buffer string = { ACPI_ALLOCATE_BUFFER, NULL };
+> +	struct bgx *bgx = context;
+> +	char bgx_sel[5];
+> +
+> +	snprintf(bgx_sel, 5, "BGX%d", bgx->bgx_id);
+> +	if (ACPI_FAILURE(acpi_get_name(handle, ACPI_SINGLE_NAME, &string))) {
+> +		pr_warn("Invalid link device\n");
+> +		return AE_OK;
+> +	}
+> +
+> +	if (strncmp(string.pointer, bgx_sel, 4))
+> +		return AE_OK;
+> +
+> +	acpi_walk_namespace(ACPI_TYPE_DEVICE, handle, 1,
+> +			    bgx_acpi_register_phy, NULL, bgx, NULL);
+> +
+> +	kfree(string.pointer);
+> +	return AE_CTRL_TERMINATE;
+> +}
+> +
+> +static int bgx_init_acpi_phy(struct bgx *bgx)
+> +{
+> +	acpi_get_devices(NULL, bgx_acpi_match_id, bgx, (void **)NULL);
+> +	return 0;
+> +}
+> +
+> +#else
+> +
+> +static int bgx_init_acpi_phy(struct bgx *bgx)
+> +{
+> +	return -ENODEV;
+> +}
+> +
+> +#endif /* CONFIG_ACPI */
+> +
+>  #if IS_ENABLED(CONFIG_OF_MDIO)
+>  
+>  static int bgx_init_of_phy(struct bgx *bgx)
+> @@ -882,7 +1010,12 @@ static int bgx_init_of_phy(struct bgx *bgx)
+>  
+>  static int bgx_init_phy(struct bgx *bgx)
+>  {
+> -	return bgx_init_of_phy(bgx);
+> +	int err = bgx_init_of_phy(bgx);
+> +
+> +	if (err != -ENODEV)
+> +		return err;
+> +
+> +	return bgx_init_acpi_phy(bgx);
+>  }
+>  
+>  static int bgx_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
+> -- 
+> 1.9.1
 > 
-> If you want to test PM over NFSroot, boards with the smsc911x known
-> to work with PM  are at least omap3-evm-37xx.dts and
-> logicpd-torpedo-37xx-devkit.dts.  Since you tinker with the USB PHYs,
-> torpedo has MUSB working the same way as the beagle boards, EVM I
-> think can be modified that way but by default has diffent PHY.
-> 
-> Also overo tobi boards work with PM but only for retntion idle and
-> not off idle, and map3-sbc-t3517.dts probably can be made to work
-> with PM but I have mine as a gateway and have not been able to test
-> with it.
-> 
-> Probably also zoom3 boards with later processor boards can be made
-> to work, the LDP has early omap34xx variants and can't be made to
-> work reliably.
-> 
-> I don't have omap3-lilly, but I'd assume that can also be made
-> to work with PM if not already working.
-> 
->>> I suggest you add some omap3 tests in general as otherwise you are
->>> only testing a subset of the driver features and completely missing
->>> things like rutnime PM and save and restore for the deeper idle
->>> states.
->>
->> yeah, I'll do those tests and re-post the series.
-> 
-> Thanks!
-> 
-> Tony
-> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
