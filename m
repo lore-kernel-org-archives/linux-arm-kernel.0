@@ -1,121 +1,43 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri,  7 Aug 2015 18:27:34 +0200
-Subject: [PATCH 3/4] drm/panel: Add Samsung prefix to panel drivers
-In-Reply-To: <1438964855-16989-1-git-send-email-thierry.reding@gmail.com>
-References: <1438964855-16989-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <1438964855-16989-3-git-send-email-thierry.reding@gmail.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Fri, 7 Aug 2015 09:30:06 -0700
+Subject: [PATCH v9 0/9] Add simple NVMEM Framework via regmap.
+In-Reply-To: <55C4DA42.909@linaro.org>
+References: <1437995567-11203-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <7hwpx7vzyo.fsf@deeprootsystems.com> <55C4DA42.909@linaro.org>
+Message-ID: <CAMAWPa_=1oTziNz-oorXV70AZ2S3JbVu4rhK_nX_=wYwjr2a3g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thierry Reding <treding@nvidia.com>
+On Fri, Aug 7, 2015 at 9:18 AM, Srinivas Kandagatla
+<srinivas.kandagatla@linaro.org> wrote:
+> Thanks Kevin,
+>
+> On 07/08/15 17:13, Kevin Hilman wrote:
+>>
+>> Srinivas Kandagatla <srinivas.kandagatla@linaro.org> writes:
+>>
+>>> This patchset adds a new simple NVMEM framework to kernel, and it is
+>>> tested
+>>> with various drivers like "QCOM thermal sensors", "QCOM cpr driver",
+>>> "begal bone cape manager" and few more on the way.
+>>>
+>>> Can you please consider this as 4.3 material, AFAIK there are more than 3
+>>> drivers
+>>> depending on this framework which are wating since last 2 merge windows.
+>>>
+>>> Should these patches go via ARM-SOC tree or via Greg's tree?
+>>
+>>
+>> With Greg's ack, we can take this through the arm-soc tree (unless Greg
+>> wants to queue it, which is fine also.)
+>>
+>
+> Greg already merged these patches yesterday on to
+> git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/char-misc.git
+> in the char-misc-next branch.
 
-The likelihood of getting a large number of panel drivers from different
-vendors is quite high. Add a prefix to the two existing Samsung panel
-drivers to set a guideline for future patch submissions. Using vendor
-prefixes consistently should allow a cleaner organization of the tree.
+Ah, great.  I missed that (still catching up on post-vacation mail backlog.)
 
-Signed-off-by: Thierry Reding <treding@nvidia.com>
----
- arch/arm/configs/exynos_defconfig                                 | 2 +-
- arch/arm/configs/multi_v7_defconfig                               | 2 +-
- drivers/gpu/drm/panel/Kconfig                                     | 8 ++++----
- drivers/gpu/drm/panel/Makefile                                    | 4 ++--
- drivers/gpu/drm/panel/{panel-ld9040.c => panel-samsung-ld9040.c}  | 2 +-
- .../gpu/drm/panel/{panel-s6e8aa0.c => panel-samsung-s6e8aa0.c}    | 2 +-
- 6 files changed, 10 insertions(+), 10 deletions(-)
- rename drivers/gpu/drm/panel/{panel-ld9040.c => panel-samsung-ld9040.c} (99%)
- rename drivers/gpu/drm/panel/{panel-s6e8aa0.c => panel-samsung-s6e8aa0.c} (99%)
+Thanks,
 
-diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-index 099438e19f05..354124c3ed2c 100644
---- a/arch/arm/configs/exynos_defconfig
-+++ b/arch/arm/configs/exynos_defconfig
-@@ -132,7 +132,7 @@ CONFIG_DRM_EXYNOS_FIMD=y
- CONFIG_DRM_EXYNOS_DSI=y
- CONFIG_DRM_EXYNOS_HDMI=y
- CONFIG_DRM_PANEL_SIMPLE=y
--CONFIG_DRM_PANEL_S6E8AA0=y
-+CONFIG_DRM_PANEL_SAMSUNG_S6E8AA0=y
- CONFIG_FB_SIMPLE=y
- CONFIG_EXYNOS_VIDEO=y
- CONFIG_EXYNOS_MIPI_DSI=y
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 29be77726ec8..6ba9608798ab 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -446,7 +446,7 @@ CONFIG_DRM_EXYNOS_FIMD=y
- CONFIG_DRM_EXYNOS_HDMI=y
- CONFIG_DRM_RCAR_DU=m
- CONFIG_DRM_TEGRA=y
--CONFIG_DRM_PANEL_S6E8AA0=m
-+CONFIG_DRM_PANEL_SAMSUNG_S6E8AA0=m
- CONFIG_DRM_PANEL_SIMPLE=y
- CONFIG_FB_ARMCLCD=y
- CONFIG_FB_WM8505=y
-diff --git a/drivers/gpu/drm/panel/Kconfig b/drivers/gpu/drm/panel/Kconfig
-index 6d64c7bb908b..5be25d9282e3 100644
---- a/drivers/gpu/drm/panel/Kconfig
-+++ b/drivers/gpu/drm/panel/Kconfig
-@@ -18,13 +18,13 @@ config DRM_PANEL_SIMPLE
- 	  that it can be automatically turned off when the panel goes into a
- 	  low power state.
- 
--config DRM_PANEL_LD9040
--	tristate "LD9040 RGB/SPI panel"
-+config DRM_PANEL_SAMSUNG_LD9040
-+	tristate "Samsung LD9040 RGB/SPI panel"
- 	depends on OF && SPI
- 	select VIDEOMODE_HELPERS
- 
--config DRM_PANEL_S6E8AA0
--	tristate "S6E8AA0 DSI video mode panel"
-+config DRM_PANEL_SAMSUNG_S6E8AA0
-+	tristate "Samsung S6E8AA0 DSI video mode panel"
- 	depends on OF
- 	select DRM_MIPI_DSI
- 	select VIDEOMODE_HELPERS
-diff --git a/drivers/gpu/drm/panel/Makefile b/drivers/gpu/drm/panel/Makefile
-index 4b2a0430804b..8026ce5d18b5 100644
---- a/drivers/gpu/drm/panel/Makefile
-+++ b/drivers/gpu/drm/panel/Makefile
-@@ -1,4 +1,4 @@
- obj-$(CONFIG_DRM_PANEL_SIMPLE) += panel-simple.o
--obj-$(CONFIG_DRM_PANEL_LD9040) += panel-ld9040.o
--obj-$(CONFIG_DRM_PANEL_S6E8AA0) += panel-s6e8aa0.o
-+obj-$(CONFIG_DRM_PANEL_SAMSUNG_LD9040) += panel-samsung-ld9040.o
-+obj-$(CONFIG_DRM_PANEL_SAMSUNG_S6E8AA0) += panel-samsung-s6e8aa0.o
- obj-$(CONFIG_DRM_PANEL_SHARP_LQ101R1SX01) += panel-sharp-lq101r1sx01.o
-diff --git a/drivers/gpu/drm/panel/panel-ld9040.c b/drivers/gpu/drm/panel/panel-samsung-ld9040.c
-similarity index 99%
-rename from drivers/gpu/drm/panel/panel-ld9040.c
-rename to drivers/gpu/drm/panel/panel-samsung-ld9040.c
-index bba3501c5821..fcb827003a8c 100644
---- a/drivers/gpu/drm/panel/panel-ld9040.c
-+++ b/drivers/gpu/drm/panel/panel-samsung-ld9040.c
-@@ -378,7 +378,7 @@ static struct spi_driver ld9040_driver = {
- 	.probe = ld9040_probe,
- 	.remove = ld9040_remove,
- 	.driver = {
--		.name = "ld9040",
-+		.name = "panel-samsung-ld9040",
- 		.owner = THIS_MODULE,
- 		.of_match_table = ld9040_of_match,
- 	},
-diff --git a/drivers/gpu/drm/panel/panel-s6e8aa0.c b/drivers/gpu/drm/panel/panel-samsung-s6e8aa0.c
-similarity index 99%
-rename from drivers/gpu/drm/panel/panel-s6e8aa0.c
-rename to drivers/gpu/drm/panel/panel-samsung-s6e8aa0.c
-index 9e79bc43b047..6b11e75ff645 100644
---- a/drivers/gpu/drm/panel/panel-s6e8aa0.c
-+++ b/drivers/gpu/drm/panel/panel-samsung-s6e8aa0.c
-@@ -1052,7 +1052,7 @@ static struct mipi_dsi_driver s6e8aa0_driver = {
- 	.probe = s6e8aa0_probe,
- 	.remove = s6e8aa0_remove,
- 	.driver = {
--		.name = "panel_s6e8aa0",
-+		.name = "panel-samsung-s6e8aa0",
- 		.of_match_table = s6e8aa0_of_match,
- 	},
- };
--- 
-2.4.5
+Kevin
