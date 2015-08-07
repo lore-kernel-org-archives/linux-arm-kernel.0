@@ -1,91 +1,102 @@
-From: tomasz.nowicki@linaro.org (Tomasz Nowicki)
-Date: Fri, 07 Aug 2015 12:52:41 +0200
-Subject: [PATCH 2/2] net, thunder, bgx: Add support for ACPI binding.
-In-Reply-To: <20150807104320.GQ1820@rric.localhost>
-References: <1438907590-29649-1-git-send-email-ddaney.cavm@gmail.com>
- <1438907590-29649-3-git-send-email-ddaney.cavm@gmail.com>
- <55C467A0.4020601@linaro.org> <20150807104320.GQ1820@rric.localhost>
-Message-ID: <55C48DF9.70406@linaro.org>
+From: ykk@rock-chips.com (Yakir Yang)
+Date: Fri,  7 Aug 2015 05:51:49 -0500
+Subject: [PATCH v2 7/8] drm: bridge: analogix_dp: try force hpd after plug in
+ lookup failed
+In-Reply-To: <1438943674-18191-1-git-send-email-ykk@rock-chips.com>
+References: <1438943674-18191-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <1438944709-19091-1-git-send-email-ykk@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07.08.2015 12:43, Robert Richter wrote:
-> On 07.08.15 10:09:04, Tomasz Nowicki wrote:
->> On 07.08.2015 02:33, David Daney wrote:
->
-> ...
->
->>> +#else
->>> +
->>> +static int bgx_init_acpi_phy(struct bgx *bgx)
->>> +{
->>> +	return -ENODEV;
->>> +}
->>> +
->>> +#endif /* CONFIG_ACPI */
->>> +
->>>   #if IS_ENABLED(CONFIG_OF_MDIO)
->>>
->>>   static int bgx_init_of_phy(struct bgx *bgx)
->>> @@ -882,7 +1010,12 @@ static int bgx_init_of_phy(struct bgx *bgx)
->>>
->>>   static int bgx_init_phy(struct bgx *bgx)
->>>   {
->>> -	return bgx_init_of_phy(bgx);
->>> +	int err = bgx_init_of_phy(bgx);
->>> +
->>> +	if (err != -ENODEV)
->>> +		return err;
->>> +
->>> +	return bgx_init_acpi_phy(bgx);
->>>   }
->>>
->>
->> If kernel can work with DT and ACPI (both compiled in), it should take only
->> one path instead of probing DT and ACPI sequentially. How about:
->>
->> @@ -902,10 +925,9 @@ static int bgx_probe(struct pci_dev *pdev, const struct
->> pci_device_id *ent)
->>   	bgx_vnic[bgx->bgx_id] = bgx;
->>   	bgx_get_qlm_mode(bgx);
->>
->> -	snprintf(bgx_sel, 5, "bgx%d", bgx->bgx_id);
->> -	np = of_find_node_by_name(NULL, bgx_sel);
->> -	if (np)
->> -		bgx_init_of(bgx, np);
->> +	err = acpi_disabled ? bgx_init_of_phy(bgx) : bgx_init_acpi_phy(bgx);
->> +	if (err)
->> +		goto err_enable;
->>
->>   	bgx_init_hw(bgx);
->
-> I would not pollute bgx_probe() with acpi and dt specifics, and instead
-> keep bgx_init_phy(). The typical design pattern for this is:
->
-> static int bgx_init_phy(struct bgx *bgx)
-> {
-> #ifdef CONFIG_ACPI
->          if (!acpi_disabled)
->                  return bgx_init_acpi_phy(bgx);
-> #endif
->          return bgx_init_of_phy(bgx);
-> }
->
-> This adds acpi runtime detection (acpi=no), does not call dt code in
-> case of acpi, and saves the #else for bgx_init_acpi_phy().
->
+Some edp screen do not have hpd signal, so we can't just return
+failed when hpd plug in detect failed.
 
-I am fine with keeping it in bgx_init_phy(), however we can drop there 
-#ifdefs since both of bgx_init_{acpi,of}_phy calls have empty stub for 
-!ACPI and !OF case. Like that:
+Besides TRM indicate that if HPD_STATUS(RO) is 0, AUX CH will not
+work, so we need to give a force hpd action to set HPD_STATUS manually.
 
-static int bgx_init_phy(struct bgx *bgx)
-{
+Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+---
+Changes in v2: None
 
-         if (!acpi_disabled)
-                 return bgx_init_acpi_phy(bgx);
-	else
-         	return bgx_init_of_phy(bgx);
-}
+ drivers/gpu/drm/bridge/analogix_dp_core.c | 28 +++++++++++++++++++++++-----
+ drivers/gpu/drm/bridge/analogix_dp_core.h |  1 +
+ drivers/gpu/drm/bridge/analogix_dp_reg.c  |  9 +++++++++
+ 3 files changed, 33 insertions(+), 5 deletions(-)
 
-Tomasz
+diff --git a/drivers/gpu/drm/bridge/analogix_dp_core.c b/drivers/gpu/drm/bridge/analogix_dp_core.c
+index 44be01d..efd810c 100644
+--- a/drivers/gpu/drm/bridge/analogix_dp_core.c
++++ b/drivers/gpu/drm/bridge/analogix_dp_core.c
+@@ -66,15 +66,33 @@ static int analogix_dp_detect_hpd(struct analogix_dp_device *dp)
+ {
+ 	int timeout_loop = 0;
+ 
+-	while (analogix_dp_get_plug_in_status(dp) != 0) {
++	while (timeout_loop < DP_TIMEOUT_LOOP_COUNT) {
++		if (analogix_dp_get_plug_in_status(dp) == 0)
++			return 0;
++
+ 		timeout_loop++;
+-		if (DP_TIMEOUT_LOOP_COUNT < timeout_loop) {
+-			dev_err(dp->dev, "failed to get hpd plug status\n");
+-			return -ETIMEDOUT;
+-		}
+ 		usleep_range(10, 11);
+ 	}
+ 
++	/*
++	 * Some edp screen do not have hpd signal, so we can't just
++	 * return failed when hpd plug in detect failed.
++	 *
++	 * Besides TRM indicate that if HPD_STATUS(RO) is 0, AUX CH
++	 * will not work, so we need to give a force hpd action to
++	 * set HPD_STATUS manually.
++	 */
++	dev_dbg(dp->dev, "failed to get hpd plug status, try to force hpd\n");
++
++	analogix_dp_force_hpd(dp);
++
++	if (analogix_dp_get_plug_in_status(dp) != 0) {
++		dev_err(dp->dev, "failed to get hpd plug in status\n");
++		return -ETIMEDOUT;
++	}
++
++	dev_dbg(dp->dev, "success to get plug in status after force hpd\n");
++
+ 	return 0;
+ }
+ 
+diff --git a/drivers/gpu/drm/bridge/analogix_dp_core.h b/drivers/gpu/drm/bridge/analogix_dp_core.h
+index 713c57f..53f3973 100644
+--- a/drivers/gpu/drm/bridge/analogix_dp_core.h
++++ b/drivers/gpu/drm/bridge/analogix_dp_core.h
+@@ -182,6 +182,7 @@ void analogix_dp_set_analog_power_down(struct analogix_dp_device *dp,
+ 				       bool enable);
+ void analogix_dp_init_analog_func(struct analogix_dp_device *dp);
+ void analogix_dp_init_hpd(struct analogix_dp_device *dp);
++void analogix_dp_force_hpd(struct analogix_dp_device *dp);
+ enum dp_irq_type analogix_dp_get_irq_type(struct analogix_dp_device *dp);
+ void analogix_dp_clear_hotplug_interrupts(struct analogix_dp_device *dp);
+ void analogix_dp_reset_aux(struct analogix_dp_device *dp);
+diff --git a/drivers/gpu/drm/bridge/analogix_dp_reg.c b/drivers/gpu/drm/bridge/analogix_dp_reg.c
+index a0fc1fb..bf7cee1 100644
+--- a/drivers/gpu/drm/bridge/analogix_dp_reg.c
++++ b/drivers/gpu/drm/bridge/analogix_dp_reg.c
+@@ -365,6 +365,15 @@ void analogix_dp_init_hpd(struct analogix_dp_device *dp)
+ 	writel(reg, dp->reg_base + ANALOGIX_DP_SYS_CTL_3);
+ }
+ 
++void analogix_dp_force_hpd(struct analogix_dp_device *dp)
++{
++	u32 reg;
++
++	reg = readl(dp->reg_base + ANALOGIX_DP_SYS_CTL_3);
++	reg = (F_HPD | HPD_CTRL);
++	writel(reg, dp->reg_base + ANALOGIX_DP_SYS_CTL_3);
++}
++
+ enum dp_irq_type analogix_dp_get_irq_type(struct analogix_dp_device *dp)
+ {
+ 	u32 reg;
+-- 
+1.9.1
