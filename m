@@ -1,181 +1,101 @@
 From: julien.grall@citrix.com (Julien Grall)
-Date: Fri, 7 Aug 2015 17:46:46 +0100
-Subject: [PATCH v3 07/20] block/xen-blkfront: Store a page rather a pfn in the
- grant structure
-In-Reply-To: <1438966019-19322-1-git-send-email-julien.grall@citrix.com>
-References: <1438966019-19322-1-git-send-email-julien.grall@citrix.com>
-Message-ID: <1438966019-19322-8-git-send-email-julien.grall@citrix.com>
+Date: Fri, 7 Aug 2015 17:46:39 +0100
+Subject: [PATCH v3 00/20] xen/arm64: Add support for 64KB page
+Message-ID: <1438966019-19322-1-git-send-email-julien.grall@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All the usage of the field pfn are done using the same idiom:
+Hi all,
 
-pfn_to_page(grant->pfn)
+ARM64 Linux is supporting both 4KB and 64KB page granularity. Although, Xen
+hypercall interface and PV protocol are always based on 4KB page granularity.
 
-This will  return always the same page. Store directly the page in the
-grant to clean up the code.
+Any attempt to boot a Linux guest with 64KB pages enabled will result to a
+guest crash.
 
-Signed-off-by: Julien Grall <julien.grall@citrix.com>
-Acked-by: Roger Pau Monn? <roger.pau@citrix.com>
-Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+This series is a first attempt to allow those Linux running with the current
+hypercall interface and PV protocol.
 
----
-Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
-Cc: David Vrabel <david.vrabel@citrix.com>
+This solution has been chosen because we want to run Linux 64KB in released
+Xen ARM version or/and platform using an old version of Linux DOM0.
 
-    Changes in v3:
-        - Use the correct indentation in get_grant. The current
-        indentation (i.e without this patch) was wrong because it was
-        using space rather than tabulation.
-        - Add Roger's acked and Stefano's reviewed
-        - s/mfn/gfn based on the new naming
+There is room for improvement, such as support of 64KB grant, modification
+of PV protocol to support different page size... They will be explored in a
+separate patch series later.
 
-    Changes in v2:
-        - Patch added
----
- drivers/block/xen-blkfront.c | 39 +++++++++++++++++++--------------------
- 1 file changed, 19 insertions(+), 20 deletions(-)
+TODO list:
+    - Convert swiotlb to 64KB
+    - Convert xenfb to 64KB
+    - Check if backend in QEMU works with DOM0 64KB
+    - It may be possible to move some common define between
+    netback/netfront and blkfront/blkback in an header
 
-diff --git a/drivers/block/xen-blkfront.c b/drivers/block/xen-blkfront.c
-index b235689..e431e82 100644
---- a/drivers/block/xen-blkfront.c
-+++ b/drivers/block/xen-blkfront.c
-@@ -68,7 +68,7 @@ enum blkif_state {
- 
- struct grant {
- 	grant_ref_t gref;
--	unsigned long pfn;
-+	struct page *page;
- 	struct list_head node;
- };
- 
-@@ -221,7 +221,7 @@ static int fill_grant_buffer(struct blkfront_info *info, int num)
- 				kfree(gnt_list_entry);
- 				goto out_of_memory;
- 			}
--			gnt_list_entry->pfn = page_to_pfn(granted_page);
-+			gnt_list_entry->page = granted_page;
- 		}
- 
- 		gnt_list_entry->gref = GRANT_INVALID_REF;
-@@ -236,7 +236,7 @@ out_of_memory:
- 	                         &info->grants, node) {
- 		list_del(&gnt_list_entry->node);
- 		if (info->feature_persistent)
--			__free_page(pfn_to_page(gnt_list_entry->pfn));
-+			__free_page(gnt_list_entry->page);
- 		kfree(gnt_list_entry);
- 		i--;
- 	}
-@@ -245,8 +245,8 @@ out_of_memory:
- }
- 
- static struct grant *get_grant(grant_ref_t *gref_head,
--                               unsigned long pfn,
--                               struct blkfront_info *info)
-+			       struct page *page,
-+			       struct blkfront_info *info)
- {
- 	struct grant *gnt_list_entry;
- 	unsigned long buffer_gfn;
-@@ -265,10 +265,10 @@ static struct grant *get_grant(grant_ref_t *gref_head,
- 	gnt_list_entry->gref = gnttab_claim_grant_reference(gref_head);
- 	BUG_ON(gnt_list_entry->gref == -ENOSPC);
- 	if (!info->feature_persistent) {
--		BUG_ON(!pfn);
--		gnt_list_entry->pfn = pfn;
-+		BUG_ON(!page);
-+		gnt_list_entry->page = page;
- 	}
--	buffer_gfn = pfn_to_gfn(gnt_list_entry->pfn);
-+	buffer_gfn = xen_page_to_gfn(gnt_list_entry->page);
- 	gnttab_grant_foreign_access_ref(gnt_list_entry->gref,
- 	                                info->xbdev->otherend_id,
- 	                                buffer_gfn, 0);
-@@ -524,7 +524,7 @@ static int blkif_queue_rw_req(struct request *req)
- 
- 		if ((ring_req->operation == BLKIF_OP_INDIRECT) &&
- 		    (i % SEGS_PER_INDIRECT_FRAME == 0)) {
--			unsigned long uninitialized_var(pfn);
-+			struct page *uninitialized_var(page);
- 
- 			if (segments)
- 				kunmap_atomic(segments);
-@@ -541,15 +541,15 @@ static int blkif_queue_rw_req(struct request *req)
- 				indirect_page = list_first_entry(&info->indirect_pages,
- 								 struct page, lru);
- 				list_del(&indirect_page->lru);
--				pfn = page_to_pfn(indirect_page);
-+				page = indirect_page;
- 			}
--			gnt_list_entry = get_grant(&gref_head, pfn, info);
-+			gnt_list_entry = get_grant(&gref_head, page, info);
- 			info->shadow[id].indirect_grants[n] = gnt_list_entry;
--			segments = kmap_atomic(pfn_to_page(gnt_list_entry->pfn));
-+			segments = kmap_atomic(gnt_list_entry->page);
- 			ring_req->u.indirect.indirect_grefs[n] = gnt_list_entry->gref;
- 		}
- 
--		gnt_list_entry = get_grant(&gref_head, page_to_pfn(sg_page(sg)), info);
-+		gnt_list_entry = get_grant(&gref_head, sg_page(sg), info);
- 		ref = gnt_list_entry->gref;
- 
- 		info->shadow[id].grants_used[i] = gnt_list_entry;
-@@ -560,7 +560,7 @@ static int blkif_queue_rw_req(struct request *req)
- 
- 			BUG_ON(sg->offset + sg->length > PAGE_SIZE);
- 
--			shared_data = kmap_atomic(pfn_to_page(gnt_list_entry->pfn));
-+			shared_data = kmap_atomic(gnt_list_entry->page);
- 			bvec_data = kmap_atomic(sg_page(sg));
- 
- 			/*
-@@ -1001,7 +1001,7 @@ static void blkif_free(struct blkfront_info *info, int suspend)
- 				info->persistent_gnts_c--;
- 			}
- 			if (info->feature_persistent)
--				__free_page(pfn_to_page(persistent_gnt->pfn));
-+				__free_page(persistent_gnt->page);
- 			kfree(persistent_gnt);
- 		}
- 	}
-@@ -1036,7 +1036,7 @@ static void blkif_free(struct blkfront_info *info, int suspend)
- 			persistent_gnt = info->shadow[i].grants_used[j];
- 			gnttab_end_foreign_access(persistent_gnt->gref, 0, 0UL);
- 			if (info->feature_persistent)
--				__free_page(pfn_to_page(persistent_gnt->pfn));
-+				__free_page(persistent_gnt->page);
- 			kfree(persistent_gnt);
- 		}
- 
-@@ -1050,7 +1050,7 @@ static void blkif_free(struct blkfront_info *info, int suspend)
- 		for (j = 0; j < INDIRECT_GREFS(segs); j++) {
- 			persistent_gnt = info->shadow[i].indirect_grants[j];
- 			gnttab_end_foreign_access(persistent_gnt->gref, 0, 0UL);
--			__free_page(pfn_to_page(persistent_gnt->pfn));
-+			__free_page(persistent_gnt->page);
- 			kfree(persistent_gnt);
- 		}
- 
-@@ -1101,8 +1101,7 @@ static void blkif_completion(struct blk_shadow *s, struct blkfront_info *info,
- 	if (bret->operation == BLKIF_OP_READ && info->feature_persistent) {
- 		for_each_sg(s->sg, sg, nseg, i) {
- 			BUG_ON(sg->offset + sg->length > PAGE_SIZE);
--			shared_data = kmap_atomic(
--				pfn_to_page(s->grants_used[i]->pfn));
-+			shared_data = kmap_atomic(s->grants_used[i]->page);
- 			bvec_data = kmap_atomic(sg_page(sg));
- 			memcpy(bvec_data   + sg->offset,
- 			       shared_data + sg->offset,
-@@ -1153,7 +1152,7 @@ static void blkif_completion(struct blk_shadow *s, struct blkfront_info *info,
- 				 * Add the used indirect page back to the list of
- 				 * available pages for indirect grefs.
- 				 */
--				indirect_page = pfn_to_page(s->indirect_grants[i]->pfn);
-+				indirect_page = s->indirect_grants[i]->page;
- 				list_add(&indirect_page->lru, &info->indirect_pages);
- 				s->indirect_grants[i]->gref = GRANT_INVALID_REF;
- 				list_add_tail(&s->indirect_grants[i]->node, &info->grants);
+All patches has been built tested for ARM32, ARM64, x86. But I haven't tested
+to run it on x86 as I don't have a box with Xen x86 running. I would be
+happy if someone give a try and see possible regression for x86.
+
+A branch based on the latest linux/master can be found here:
+
+git://xenbits.xen.org/people/julieng/linux-arm.git branch xen-64k-v3
+
+Comments, suggestions are welcomed.
+
+Sincerely yours,
+
+Cc: david.vrabel at citrix.com
+Cc: konrad.wilk at oracle.com
+Cc: boris.ostrovsky at oracle.com
+Cc: wei.liu2 at citrix.com
+Cc: roger.pau at citrix.com
+
+Julien Grall (20):
+  net/xen-netback: xenvif_gop_frag_copy: move GSO check out of the loop
+  arm/xen: Drop pte_mfn and mfn_pte
+  xen: Add Xen specific page definition
+  xen/grant: Introduce helpers to split a page into grant
+  xen/grant: Add helper gnttab_page_grant_foreign_access_ref_one
+  block/xen-blkfront: Split blkif_queue_request in 2
+  block/xen-blkfront: Store a page rather a pfn in the grant structure
+  block/xen-blkfront: split get_grant in 2
+  xen/biomerge: Don't allow biovec to be merge when Linux is not using
+    4KB page
+  xen/xenbus: Use Xen page definition
+  tty/hvc: xen: Use xen page definition
+  xen/balloon: Don't rely on the page granularity is the same for Xen
+    and Linux
+  xen/events: fifo: Make it running on 64KB granularity
+  xen/grant-table: Make it running on 64KB granularity
+  block/xen-blkfront: Make it running on 64KB page granularity
+  block/xen-blkback: Make it running on 64KB page granularity
+  net/xen-netfront: Make it running on 64KB page granularity
+  net/xen-netback: Make it running on 64KB page granularity
+  xen/privcmd: Add support for Linux 64KB page granularity
+  arm/xen: Add support for 64KB page granularity
+
+ arch/arm/include/asm/xen/page.h     |  18 +-
+ arch/arm/xen/enlighten.c            |   6 +-
+ arch/arm/xen/p2m.c                  |   6 +-
+ arch/x86/include/asm/xen/page.h     |   2 +-
+ drivers/block/xen-blkback/blkback.c |   5 +-
+ drivers/block/xen-blkback/common.h  |  17 +-
+ drivers/block/xen-blkback/xenbus.c  |   9 +-
+ drivers/block/xen-blkfront.c        | 552 +++++++++++++++++++++++-------------
+ drivers/net/xen-netback/common.h    |  15 +-
+ drivers/net/xen-netback/netback.c   | 163 +++++++----
+ drivers/net/xen-netfront.c          | 122 +++++---
+ drivers/tty/hvc/hvc_xen.c           |   4 +-
+ drivers/xen/balloon.c               |  47 ++-
+ drivers/xen/biomerge.c              |   8 +
+ drivers/xen/events/events_base.c    |   2 +-
+ drivers/xen/events/events_fifo.c    |   2 +-
+ drivers/xen/grant-table.c           |  32 ++-
+ drivers/xen/privcmd.c               |   8 +-
+ drivers/xen/xenbus/xenbus_client.c  |   6 +-
+ drivers/xen/xenbus/xenbus_probe.c   |   3 +-
+ drivers/xen/xlate_mmu.c             | 124 +++++---
+ include/xen/grant_table.h           |  51 ++++
+ include/xen/page.h                  |  27 +-
+ 23 files changed, 844 insertions(+), 385 deletions(-)
+
 -- 
 2.1.4
