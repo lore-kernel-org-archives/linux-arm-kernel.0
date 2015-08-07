@@ -1,74 +1,73 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  7 Aug 2015 11:11:31 +0900
-Subject: [PATCH 07/10] ARM: shmobile: silk: add eMMC DT support
+Date: Fri,  7 Aug 2015 11:11:32 +0900
+Subject: [PATCH 08/10] ARM: shmobile: r8a73a4 dtsi: Add missing "gpio-ranges"
+ to gpio node
 In-Reply-To: <cover.1438911334.git.horms+renesas@verge.net.au>
 References: <cover.1438911334.git.horms+renesas@verge.net.au>
-Message-ID: <054531e7a5cb195140bead068b51cc6147c5c8bf.1438911334.git.horms+renesas@verge.net.au>
+Message-ID: <17ccec50cc40bef00b26d506d483e928804cb20e.1438911334.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Define the SILK board dependent part of the MMCIF device node (the board has
-eMMC chip) along with the  necessary voltage regulator (note that the Vcc/Vccq
-regulator is dummy -- it's required by the MMCIF driver but doesn't actually
-exist on the board).
+If a GPIO driver uses gpiochip_add_pin_range() (which is usually the
+case for GPIO/PFC combos), the GPIO hogging mechanism configured from DT
+doesn't work:
 
-Based on the original patch by Vladimir Barinov
-<vladimir.barinov@cogentembedded.com>.
+    requesting hog GPIO led1-high (chip r8a73a4_pfc, offset 28) failed
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+The actual error code is -517 == -EPROBE_DEFER.
+
+The problem is that PFC+GPIO registration is handled in multiple steps:
+  1. pinctrl_register(),
+  2. gpiochip_add(),
+  3. gpiochip_add_pin_range().
+
+Configuration of the hogs is handled in gpiochip_add():
+
+    gpiochip_add
+        of_gpiochip_add
+            of_gpiochip_scan_hogs
+                gpiod_hog
+                    gpiochip_request_own_desc
+                        __gpiod_request
+                            chip->request
+                                pinctrl_request_gpio
+                                    pinctrl_get_device_gpio_range
+
+However, at this point the GPIO controller hasn't been added to
+pinctrldev_list yet, so the range can't be found, and the operation fails
+with -EPROBE_DEFER.
+
+To fix this, add a "gpio-ranges" property to the gpio device node, so
+the ranges are added by of_gpiochip_add_pin_range(), which is called by
+of_gpiochip_add() before the call to of_gpiochip_scan_hogs().
+
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7794-silk.dts | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+ arch/arm/boot/dts/r8a73a4.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7794-silk.dts b/arch/arm/boot/dts/r8a7794-silk.dts
-index 79bc64b94456..d4dd5a30ccdf 100644
---- a/arch/arm/boot/dts/r8a7794-silk.dts
-+++ b/arch/arm/boot/dts/r8a7794-silk.dts
-@@ -30,6 +30,15 @@
- 		device_type = "memory";
- 		reg = <0 0x40000000 0 0x40000000>;
- 	};
-+
-+	d3_3v: regulator at 0 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "D3.3V";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-boot-on;
-+		regulator-always-on;
-+	};
- };
- 
- &extal_clk {
-@@ -51,6 +60,11 @@
- 		renesas,groups = "intc_irq8";
- 		renesas,function = "intc";
- 	};
-+
-+	mmcif0_pins: mmcif0 {
-+		renesas,groups = "mmc_data8", "mmc_ctrl";
-+		renesas,function = "mmc";
-+	};
- };
- 
- &scif2 {
-@@ -75,3 +89,14 @@
- 		micrel,led-mode = <1>;
- 	};
- };
-+
-+&mmcif0 {
-+	pinctrl-0 = <&mmcif0_pins>;
-+	pinctrl-names = "default";
-+
-+	vmmc-supply = <&d3_3v>;
-+	vqmmc-supply = <&d3_3v>;
-+	bus-width = <8>;
-+	non-removable;
-+	status = "okay";
-+};
+diff --git a/arch/arm/boot/dts/r8a73a4.dtsi b/arch/arm/boot/dts/r8a73a4.dtsi
+index 5090d1a8f652..cb4f7b2798fe 100644
+--- a/arch/arm/boot/dts/r8a73a4.dtsi
++++ b/arch/arm/boot/dts/r8a73a4.dtsi
+@@ -207,6 +207,13 @@
+ 		reg = <0 0xe6050000 0 0x9000>;
+ 		gpio-controller;
+ 		#gpio-cells = <2>;
++		gpio-ranges =
++			<&pfc 0 0 31>, <&pfc 32 32 9>,
++			<&pfc 64 64 22>, <&pfc 96 96 31>,
++			<&pfc 128 128 7>, <&pfc 160 160 19>,
++			<&pfc 192 192 31>, <&pfc 224 224 27>,
++			<&pfc 256 256 28>, <&pfc 288 288 21>,
++			<&pfc 320 320 10>;
+ 		interrupts-extended =
+ 			<&irqc0  0 0>, <&irqc0  1 0>, <&irqc0  2 0>, <&irqc0  3 0>,
+ 			<&irqc0  4 0>, <&irqc0  5 0>, <&irqc0  6 0>, <&irqc0  7 0>,
 -- 
 2.1.4
