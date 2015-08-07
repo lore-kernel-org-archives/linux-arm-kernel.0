@@ -1,95 +1,70 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 7 Aug 2015 10:41:15 +0100
-Subject: Fw: drivers/xen/pci.c:31:25: fatal error: asm/pci_x86.h: No such
- file or directory
-In-Reply-To: <55C39ABC.5020101@oracle.com>
-References: <20150806170426.GM1820@rric.localhost>
- <55C39ABC.5020101@oracle.com>
-Message-ID: <alpine.DEB.2.02.1508071021040.11337@kaball.uk.xensource.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Fri, 07 Aug 2015 10:45:22 +0100
+Subject: [PATCH v4 1/6] ARM: shmobile: r8a7740 dtsi: Add L2
+ cache-controller node
+In-Reply-To: <CAMuHMdVAOba0ofmoy8OH2DdY1m3XaD8iOXvXBE035=C4yK58VQ@mail.gmail.com>
+References: <1438765090-823-1-git-send-email-geert+renesas@glider.be>	<1438765090-823-2-git-send-email-geert+renesas@glider.be>	<55C1D894.8070302@arm.com>	<CAMuHMdXdEV+41mH338bDbazzqOErDLQkBUAj2+uVX4Wupn1ABQ@mail.gmail.com>	<55C1EC3C.9000407@arm.com>
+ <CAMuHMdVAOba0ofmoy8OH2DdY1m3XaD8iOXvXBE035=C4yK58VQ@mail.gmail.com>
+Message-ID: <55C47E32.6070400@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 6 Aug 2015, Boris Ostrovsky wrote:
-> On 08/06/2015 01:04 PM, Robert Richter wrote:
-> > Boris,
-> > 
-> > we are working on acpi pci support for arm64. For this we are enabling
-> > PCI_MMCONFIG on arm64 which breaks compiling drivers/xen/pci.c.
-> > 
-> > Looking into it there is x86 code in generic driver code introduced
-> > with:
-> > 
-> >   8deb3eb1461e xen/mcfg: Call PHYSDEVOP_pci_mmcfg_reserved for MCFG areas.
-> > 
-> > This implements:
-> > 
-> > diff --git a/drivers/xen/pci.c b/drivers/xen/pci.c
-> > index 18fff88254eb..d15f6e80479f 100644
-> > --- a/drivers/xen/pci.c
-> > +++ b/drivers/xen/pci.c
-> > @@ -26,6 +26,7 @@
-> >   #include <asm/xen/hypervisor.h>
-> >   #include <asm/xen/hypercall.h>
-> >   #include "../pci/pci.h"
-> > +#include <asm/pci_x86.h>
-> >     static bool __read_mostly pci_seg_supported = true;
-> >   @@ -192,3 +193,49 @@ static int __init register_xen_pci_notifier(void)
-> >   }
-> >     arch_initcall(register_xen_pci_notifier);
-> > +
-> > +#ifdef CONFIG_PCI_MMCONFIG
-> > +static int __init xen_mcfg_late(void)
-> > +{
-> > +       struct pci_mmcfg_region *cfg;
-> > +       int rc;
-> > +
-> > +       if (!xen_initial_domain())
-> > +               return 0;
-> > +
-> > +       if ((pci_probe & PCI_PROBE_MMCONF) == 0)
-> > +               return 0;
-> > [...]
-> > 
-> > There are no defines for pci_probe and PCI_PROBE_MMCONF other than for
-> > the x86 architecture.
-> > 
-> > I see several ways to fix that:
-> > 
-> >   * moving code to arch/x86/pci/xen.c,
-> 
-> If this routine is not going to be used by ARM I think this would be the way
-> to go. Stefano --- will this be needed by ARM?
-
-Yes, I think it is most probable that this code will be needed on ARM,
-even though we are still at the design doc stage for Xen and ACPI on ARM
-at the moment.
-
-Besides I think you should be able to compile this function on arm64
-just fine. The hypercall should build without issues. If the problem is
-just this one check, we should be able to rework it somehow.
-
-Is there something equivalent to pci_probe on arm? If not, we could just
-ifdef the check for x86.
 
 
-> > 
-> >   * make code dependent on arch X86,
-> > 
-> >   * make 'if (pci_probe & PCI_PROBE_MMCONF) ...' an arch function to be
-> >     implemented by archs,
-> 
-> Otherwise I'd go with this.
+On 06/08/15 17:21, Geert Uytterhoeven wrote:
+> Hi Sudeep,
+>
+> On Wed, Aug 5, 2015 at 12:58 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>> On 05/08/15 11:44, Geert Uytterhoeven wrote:
+>>> On Wed, Aug 5, 2015 at 11:34 AM, Sudeep Holla <sudeep.holla@arm.com>
+>>> wrote:
 
-Or this of course
+[..]
+
+>>>>
+>>>> Any particular reason whey you need all this cache-* properties ? Is
+>>>
+>>> To describe the cache as good as possible.
+>>
+>> Why if you can probe it ? IMO DT is mostly useful to describe things
+>> that can't be probed/discovered using hardware.
+>>
+>>>> something broken on these SoCs ? We should be able to get most of these
+>>>> information from the SoC(reading some registers). It's good to avoid
+>>>> passing them via DT if they can be discovered from hardware.
+>>>
+>>> So we have all these documented properties in
+>>> Documentation/devicetree/bindings/arm/l2cc.txt, but they're not meant to
+>>> be used?
+>>
+>> No I didn't mean that, I just wanted to know if they can't be probed due
+>> to some hardware issue. It would avoid issues with wrong DTs especially
+>> if they are not so easy to upgrade.
+>
+> I think it works just fine without them.
+>
+
+Yes, in general if you specify a value in DT that can be probed, its
+usually to override the probed value(useful if there is some h/w errata)...
+
+> Should I drop all cache-* properties marked optional in
+> Documentation/devicetree/bindings/arm/l2cc.txt?
+> That would be cache-size, cache-sets, cache-block-size, and cache-line-size.
+>
+
+... however if you incorrect values by mistake, then it's problematic
+even if h/w provides correct value.
 
 
-> -boris
-> 
-> > 
-> >   * reworking the code by removing the check (not sure if that could be
-> >     done).
-> > 
-> > I don't think PCI_XEN is enabled yet for arm64, so we just disalbe it
-> > for !X86 or move it to arch/x86. I suggest the latter. Is there any
-> > preference you have?
-> 
+> What about the L1 cache? I know Linux uses none of the d-cache-*
+> and i-cache-* properties.
+>
+
+Same there, IIRC PPC use them, but on ARM I think so far the need has
+not arise.
+
+Just to re-iterate myself, I am not against adding them, but it's not
+really needed. I just wanted to know if there was any h/w issue.
+
+Regards,
+Sudeep
