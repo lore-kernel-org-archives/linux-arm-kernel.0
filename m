@@ -1,211 +1,91 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Fri,  7 Aug 2015 05:49:24 -0500
-Subject: [PATCH v2 6/8] drm: bridge: analogix_dp: add some rk3288 special
- registers setting
-In-Reply-To: <1438943674-18191-1-git-send-email-ykk@rock-chips.com>
-References: <1438943674-18191-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <1438944564-19010-1-git-send-email-ykk@rock-chips.com>
+From: tomasz.nowicki@linaro.org (Tomasz Nowicki)
+Date: Fri, 07 Aug 2015 12:52:41 +0200
+Subject: [PATCH 2/2] net, thunder, bgx: Add support for ACPI binding.
+In-Reply-To: <20150807104320.GQ1820@rric.localhost>
+References: <1438907590-29649-1-git-send-email-ddaney.cavm@gmail.com>
+ <1438907590-29649-3-git-send-email-ddaney.cavm@gmail.com>
+ <55C467A0.4020601@linaro.org> <20150807104320.GQ1820@rric.localhost>
+Message-ID: <55C48DF9.70406@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-RK3288 need some special registers setting, we can separate
-them out by the dev_type of plat_data.
+On 07.08.2015 12:43, Robert Richter wrote:
+> On 07.08.15 10:09:04, Tomasz Nowicki wrote:
+>> On 07.08.2015 02:33, David Daney wrote:
+>
+> ...
+>
+>>> +#else
+>>> +
+>>> +static int bgx_init_acpi_phy(struct bgx *bgx)
+>>> +{
+>>> +	return -ENODEV;
+>>> +}
+>>> +
+>>> +#endif /* CONFIG_ACPI */
+>>> +
+>>>   #if IS_ENABLED(CONFIG_OF_MDIO)
+>>>
+>>>   static int bgx_init_of_phy(struct bgx *bgx)
+>>> @@ -882,7 +1010,12 @@ static int bgx_init_of_phy(struct bgx *bgx)
+>>>
+>>>   static int bgx_init_phy(struct bgx *bgx)
+>>>   {
+>>> -	return bgx_init_of_phy(bgx);
+>>> +	int err = bgx_init_of_phy(bgx);
+>>> +
+>>> +	if (err != -ENODEV)
+>>> +		return err;
+>>> +
+>>> +	return bgx_init_acpi_phy(bgx);
+>>>   }
+>>>
+>>
+>> If kernel can work with DT and ACPI (both compiled in), it should take only
+>> one path instead of probing DT and ACPI sequentially. How about:
+>>
+>> @@ -902,10 +925,9 @@ static int bgx_probe(struct pci_dev *pdev, const struct
+>> pci_device_id *ent)
+>>   	bgx_vnic[bgx->bgx_id] = bgx;
+>>   	bgx_get_qlm_mode(bgx);
+>>
+>> -	snprintf(bgx_sel, 5, "bgx%d", bgx->bgx_id);
+>> -	np = of_find_node_by_name(NULL, bgx_sel);
+>> -	if (np)
+>> -		bgx_init_of(bgx, np);
+>> +	err = acpi_disabled ? bgx_init_of_phy(bgx) : bgx_init_acpi_phy(bgx);
+>> +	if (err)
+>> +		goto err_enable;
+>>
+>>   	bgx_init_hw(bgx);
+>
+> I would not pollute bgx_probe() with acpi and dt specifics, and instead
+> keep bgx_init_phy(). The typical design pattern for this is:
+>
+> static int bgx_init_phy(struct bgx *bgx)
+> {
+> #ifdef CONFIG_ACPI
+>          if (!acpi_disabled)
+>                  return bgx_init_acpi_phy(bgx);
+> #endif
+>          return bgx_init_of_phy(bgx);
+> }
+>
+> This adds acpi runtime detection (acpi=no), does not call dt code in
+> case of acpi, and saves the #else for bgx_init_acpi_phy().
+>
 
-Signed-off-by: Yakir Yang <ykk@rock-chips.com>
----
-Changes in v2:
-- Fix compile failed dut to phy_pd_addr variable misspell error
+I am fine with keeping it in bgx_init_phy(), however we can drop there 
+#ifdefs since both of bgx_init_{acpi,of}_phy calls have empty stub for 
+!ACPI and !OF case. Like that:
 
- drivers/gpu/drm/bridge/analogix_dp_reg.c | 76 ++++++++++++++++++++------------
- drivers/gpu/drm/bridge/analogix_dp_reg.h | 12 +++++
- 2 files changed, 60 insertions(+), 28 deletions(-)
+static int bgx_init_phy(struct bgx *bgx)
+{
 
-diff --git a/drivers/gpu/drm/bridge/analogix_dp_reg.c b/drivers/gpu/drm/bridge/analogix_dp_reg.c
-index cc5cdbf..a0fc1fb 100644
---- a/drivers/gpu/drm/bridge/analogix_dp_reg.c
-+++ b/drivers/gpu/drm/bridge/analogix_dp_reg.c
-@@ -15,6 +15,8 @@
- #include <linux/delay.h>
- #include <linux/gpio.h>
- 
-+#include <drm/bridge/analogix_dp.h>
-+
- #include "analogix_dp_core.h"
- #include "analogix_dp_reg.h"
- 
-@@ -72,6 +74,14 @@ void analogix_dp_init_analog_param(struct analogix_dp_device *dp)
- 	reg = SEL_24M | TX_DVDD_BIT_1_0625V;
- 	writel(reg, dp->reg_base + ANALOGIX_DP_ANALOG_CTL_2);
- 
-+	if (dp->plat_data && (dp->plat_data->dev_type == RK3288_DP)) {
-+		writel(REF_CLK_24M, dp->reg_base + ANALOGIX_DP_PLL_REG_1);
-+		writel(0x95, dp->reg_base + ANALOGIX_DP_PLL_REG_2);
-+		writel(0x40, dp->reg_base + ANALOGIX_DP_PLL_REG_3);
-+		writel(0x58, dp->reg_base + ANALOGIX_DP_PLL_REG_4);
-+		writel(0x22, dp->reg_base + ANALOGIX_DP_PLL_REG_5);
-+	}
-+
- 	reg = DRIVE_DVDD_BIT_1_0625V | VCO_BIT_600_MICRO;
- 	writel(reg, dp->reg_base + ANALOGIX_DP_ANALOG_CTL_3);
- 
-@@ -206,81 +216,85 @@ void analogix_dp_set_analog_power_down(struct analogix_dp_device *dp,
- 				       bool enable)
- {
- 	u32 reg;
-+	u32 phy_pd_addr = ANALOGIX_DP_PHY_PD;
-+
-+	if (dp->plat_data && (dp->plat_data->dev_type == RK3288_DP))
-+		phy_pd_addr = ANALOGIX_DP_PD;
- 
- 	switch (block) {
- 	case AUX_BLOCK:
- 		if (enable) {
--			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			reg = readl(dp->reg_base + phy_pd_addr);
- 			reg |= AUX_PD;
--			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			writel(reg, dp->reg_base + phy_pd_addr);
- 		} else {
--			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			reg = readl(dp->reg_base + phy_pd_addr);
- 			reg &= ~AUX_PD;
--			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			writel(reg, dp->reg_base + phy_pd_addr);
- 		}
- 		break;
- 	case CH0_BLOCK:
- 		if (enable) {
--			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			reg = readl(dp->reg_base + phy_pd_addr);
- 			reg |= CH0_PD;
--			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			writel(reg, dp->reg_base + phy_pd_addr);
- 		} else {
--			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			reg = readl(dp->reg_base + phy_pd_addr);
- 			reg &= ~CH0_PD;
--			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			writel(reg, dp->reg_base + phy_pd_addr);
- 		}
- 		break;
- 	case CH1_BLOCK:
- 		if (enable) {
--			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			reg = readl(dp->reg_base + phy_pd_addr);
- 			reg |= CH1_PD;
--			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			writel(reg, dp->reg_base + phy_pd_addr);
- 		} else {
--			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			reg = readl(dp->reg_base + phy_pd_addr);
- 			reg &= ~CH1_PD;
--			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			writel(reg, dp->reg_base + phy_pd_addr);
- 		}
- 		break;
- 	case CH2_BLOCK:
- 		if (enable) {
--			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			reg = readl(dp->reg_base + phy_pd_addr);
- 			reg |= CH2_PD;
--			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			writel(reg, dp->reg_base + phy_pd_addr);
- 		} else {
--			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			reg = readl(dp->reg_base + phy_pd_addr);
- 			reg &= ~CH2_PD;
--			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			writel(reg, dp->reg_base + phy_pd_addr);
- 		}
- 		break;
- 	case CH3_BLOCK:
- 		if (enable) {
--			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			reg = readl(dp->reg_base + phy_pd_addr);
- 			reg |= CH3_PD;
--			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			writel(reg, dp->reg_base + phy_pd_addr);
- 		} else {
--			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			reg = readl(dp->reg_base + phy_pd_addr);
- 			reg &= ~CH3_PD;
--			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			writel(reg, dp->reg_base + phy_pd_addr);
- 		}
- 		break;
- 	case ANALOG_TOTAL:
- 		if (enable) {
--			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			reg = readl(dp->reg_base + phy_pd_addr);
- 			reg |= DP_PHY_PD;
--			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			writel(reg, dp->reg_base + phy_pd_addr);
- 		} else {
--			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			reg = readl(dp->reg_base + phy_pd_addr);
- 			reg &= ~DP_PHY_PD;
--			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			writel(reg, dp->reg_base + phy_pd_addr);
- 		}
- 		break;
- 	case POWER_ALL:
- 		if (enable) {
- 			reg = DP_PHY_PD | AUX_PD | CH3_PD | CH2_PD |
- 				CH1_PD | CH0_PD;
--			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			writel(reg, dp->reg_base + phy_pd_addr);
- 		} else {
--			writel(0x00, dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			writel(0x00, dp->reg_base + phy_pd_addr);
- 		}
- 		break;
- 	default:
-@@ -399,8 +413,14 @@ void analogix_dp_init_aux(struct analogix_dp_device *dp)
- 	analogix_dp_reset_aux(dp);
- 
- 	/* Disable AUX transaction H/W retry */
--	reg = AUX_BIT_PERIOD_EXPECTED_DELAY(3) | AUX_HW_RETRY_COUNT_SEL(0) |
--	      AUX_HW_RETRY_INTERVAL_600_MICROSECONDS;
-+	if (dp->plat_data && (dp->plat_data->dev_type == RK3288_DP))
-+		reg = AUX_BIT_PERIOD_EXPECTED_DELAY(0) |
-+		      AUX_HW_RETRY_COUNT_SEL(3) |
-+		      AUX_HW_RETRY_INTERVAL_600_MICROSECONDS;
-+	else
-+		reg = AUX_BIT_PERIOD_EXPECTED_DELAY(3) |
-+		      AUX_HW_RETRY_COUNT_SEL(0) |
-+		      AUX_HW_RETRY_INTERVAL_600_MICROSECONDS;
- 	writel(reg, dp->reg_base + ANALOGIX_DP_AUX_HW_RETRY_CTL);
- 
- 	/* Receive AUX Channel DEFER commands equal to DEFFER_COUNT*64 */
-diff --git a/drivers/gpu/drm/bridge/analogix_dp_reg.h b/drivers/gpu/drm/bridge/analogix_dp_reg.h
-index bed226f..e38af21 100644
---- a/drivers/gpu/drm/bridge/analogix_dp_reg.h
-+++ b/drivers/gpu/drm/bridge/analogix_dp_reg.h
-@@ -22,6 +22,14 @@
- #define ANALOGIX_DP_VIDEO_CTL_8			0x3C
- #define ANALOGIX_DP_VIDEO_CTL_10			0x44
- 
-+#define ANALOGIX_DP_PLL_REG_1			0xfc
-+#define ANALOGIX_DP_PLL_REG_2			0x9e4
-+#define ANALOGIX_DP_PLL_REG_3			0x9e8
-+#define ANALOGIX_DP_PLL_REG_4			0x9ec
-+#define ANALOGIX_DP_PLL_REG_5			0xa00
-+
-+#define ANALOGIX_DP_PD                          0x12c
-+
- #define ANALOGIX_DP_LANE_MAP			0x35C
- 
- #define ANALOGIX_DP_ANALOG_CTL_1			0x370
-@@ -154,6 +162,10 @@
- #define VSYNC_POLARITY_CFG			(0x1 << 1)
- #define HSYNC_POLARITY_CFG			(0x1 << 0)
- 
-+/* ANALOGIX_DP_PLL_REG_1 */
-+#define REF_CLK_24M				(0x1 << 1)
-+#define REF_CLK_27M				(0x0 << 1)
-+
- /* ANALOGIX_DP_LANE_MAP */
- #define LANE3_MAP_LOGIC_LANE_0			(0x0 << 6)
- #define LANE3_MAP_LOGIC_LANE_1			(0x1 << 6)
--- 
-1.9.1
+         if (!acpi_disabled)
+                 return bgx_init_acpi_phy(bgx);
+	else
+         	return bgx_init_of_phy(bgx);
+}
+
+Tomasz
