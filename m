@@ -1,55 +1,50 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 07 Aug 2015 18:01:39 +0200
-Subject: [GIT PULL] ARM: mvebu: dt changes for v4.3 #3
-Message-ID: <55C4D663.4050508@free-electrons.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Fri,  7 Aug 2015 18:08:29 +0200
+Subject: [PATCH v2 0/4] KVM: arm/arm64: guest synchronous halt/resume
+Message-ID: <1438963713-10460-1-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This series introduces the capability to synchronously exit the guest
+and prevent it from being re-entered. This modality will be used by
+IRQ forwarding series when changing the state of the IRQ.
 
-Here is the third  pull request for dt for mvebu for v4.3
+Former pause flag used when starting the vcpu in KVM_ARM_VCPU_POWER_OFF
+state, in PSCI calls and in KVM_SET_MP_STATE ioctl is renamed into
+power_off. A new pause flag is introduced. Both now are checked in
+kvm_arch_vcpu_runnable and in the VCPU_RUN critical section, before
+entering the vcpu.
 
-Gregory
+Best Regards
 
-he following changes since commit dc57844a736f10bf3799d63d7c0d0efc29b1ad7d:
+Eric
 
-  ARM: dts: orion5x: add buffalo linkstation ls-wtgl (2015-07-25 16:19:20 +0200)
+History:
 
-are available in the git repository at:
+v1 -> v2:
+- check pause, power_off and in kvm_arch_vcpu_runnable
+- check power_off in vcpu_run critcal section before guest entry
+- correct compil issue in first patch reported by Andrew
+- rename vcpu_pause into vcpu_sleep
 
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt-4.3-3
+RFC -> PATCH v1:
+- originally part of [RFC 00/17] ARM IRQ forward control based on IRQ
+  bypass manager (https://lkml.org/lkml/2015/7/2/268) and isolated in
+  this series.
+- added __maybe_unused following Marc's advice
 
-for you to fetch changes up to 15979aeeb548e020b6107214f0405be894891a57:
 
-  ARM: dts: Convert Linkstation Mini to Device Tree (2015-08-06 18:51:29 +0200)
+Eric Auger (4):
+  KVM: arm/arm64: rename pause into power_off
+  KVM: arm/arm64: check power_off in kvm_arch_vcpu_runnable
+  KVM: arm/arm64: check power_off in critical section before VCPU run
+  KVM: arm/arm64: implement kvm_arm_[halt,resume]_guest
 
-----------------------------------------------------------------
-mvebu dt changes for v4.3 (part #3)
+ arch/arm/include/asm/kvm_host.h   |  5 +++-
+ arch/arm/kvm/arm.c                | 53 ++++++++++++++++++++++++++++++---------
+ arch/arm/kvm/psci.c               | 10 ++++----
+ arch/arm64/include/asm/kvm_host.h |  3 +++
+ 4 files changed, 53 insertions(+), 18 deletions(-)
 
-- device tree part of the Dove PMU series
-- converting a new orion5x based platform to dt: Linkstation Mini
-
-----------------------------------------------------------------
-Benjamin Cama (1):
-      ARM: dts: Convert Linkstation Mini to Device Tree
-
-Russell King (4):
-      ARM: dt: Add PMU node, making PMU child devices childs of this node
-      ARM: dt: dove: wire up RTC interrupt
-      ARM: dt: dove: add video decoder power domain description
-      ARM: dt: dove: add GPU power domain description
-
- arch/arm/boot/dts/Makefile           |   1 +
- arch/arm/boot/dts/dove.dtsi          | 604 ++++++++++++++++++-----------------
- arch/arm/boot/dts/orion5x-lswsgl.dts | 276 ++++++++++++++++
- arch/arm/mach-orion5x/Kconfig        |   6 +-
- arch/arm/mach-orion5x/Makefile       |   1 -
- arch/arm/mach-orion5x/lsmini-setup.c | 280 ----------------
- 6 files changed, 598 insertions(+), 570 deletions(-)
- create mode 100644 arch/arm/boot/dts/orion5x-lswsgl.dts
- delete mode 100644 arch/arm/mach-orion5x/lsmini-setup.c
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.9.1
