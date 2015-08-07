@@ -1,122 +1,137 @@
-From: henryc.chen@mediatek.com (Henry Chen)
-Date: Fri, 7 Aug 2015 15:25:59 +0800
-Subject: [PATCH v2] mfd: mt6397: Implement wake handler and suspend/resume for
- mt6397-core.c
-Message-ID: <1438932359-8476-1-git-send-email-henryc.chen@mediatek.com>
+From: hramrach@gmail.com (Michal Suchanek)
+Date: Fri, 7 Aug 2015 09:38:48 +0200
+Subject: [RFC PATCH 1/5] spi: introduce flag for memory mapped read
+In-Reply-To: <20150806213340.GK7576@n2100.arm.linux.org.uk>
+References: <20150805115013.GJ20873@sirena.org.uk>
+ <CAOMqctQXwcHyiWBwtugSDSE_k65qrNfrwnhjQMDJkLoJMmGzUw@mail.gmail.com>
+ <20150805124412.GN20873@sirena.org.uk>
+ <CAOMqctS9Y5FxpUCCJew6+cnjH5iTvbzkH3g-8yrXs4OuS2pSGA@mail.gmail.com>
+ <20150806090202.GO20873@sirena.org.uk>
+ <CAOMqctQZRZ4zG_yYy=CeX3DX4NVNWN1COP4Q-2YvMun9xYOA7g@mail.gmail.com>
+ <20150806102225.GI7576@n2100.arm.linux.org.uk> <55C35233.2000105@ti.com>
+ <20150806135129.GJ7576@n2100.arm.linux.org.uk>
+ <CAMuHMdWWDwZ=ziGQXFCnOX8pErXpsEi533J73_Hh=sEqq4hR6Q@mail.gmail.com>
+ <20150806213340.GK7576@n2100.arm.linux.org.uk>
+Message-ID: <CAOMqctRBW230fA4AEhK7MyqkZY==6ENNNHE-LVm7-mHKA_VzRw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implement .irq_set_wake() to get who is wakeup source and setup on suspend/reumse. Enbale
-mt6393_irq as wake up source properly to pinctrl by enable_irq_wake()/enable_irq_wake().
+On 6 August 2015 at 23:33, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Thu, Aug 06, 2015 at 06:14:00PM +0200, Geert Uytterhoeven wrote:
+>> On Thu, Aug 6, 2015 at 3:51 PM, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>> > On Thu, Aug 06, 2015 at 05:55:23PM +0530, Vignesh R wrote:
+>> >> On the whole following are my requirements:
+>> >> 1. to be able to communicate with non -flash SPI devices via config port
+>> >> ( this functionality is supported by current driver, I dont want to
+>> >> break it). Or pump any spi_message on to SPI bus directly.
+>> >> 2. take advantage of memory mapped port in order to increase read
+>> >> throughput( and use dma in future) when the slave is a m25p80 type flash.
+>> >> 3. handle m25p80 as well as other slave on multiple chipselects.
+>> >>
+>> >> I just need to know whether the user that requested the transfer is
+>> >> m25p80 driver. If yes, ti-qspi driver can take advantage of memory
+>> >> mapped interface, else just use config port to access SPI bus directly.
+>> >
+>> > The problem with this approach is that it's an abomination.  It's adding
+>> > a SPI-user specific hack which is detected by a specific driver.  That's
+>> > really not sane - what happens when we have lots of these kinds of "I'm
+>> > an X SPI-user" with drivers detecting that?  It's not maintainable in the
+>> > long term.
+>> >
+>> > Yes, your requirements _today_ seem simple and easy, but you're only
+>> > thinking about today, not tomorrow when you've moved on and someone else
+>> > has to maintain the mess left behind (or delete it from mainline because
+>> > they're sick of dealing with a hack.)
+>> >
+>> >> The spi_message that is received in transfer_one_message() is too
+>> >> generic to imply the slave device that is on the other side of the wire.
+>> >> IMO, the read command does not imply that the slave is m25p80 flash
+>> >> (besides the read opcodes vary across vendors of m25p80 and across modes).
+>> >
+>> > I can see both sides of the argument.
+>> >
+>> > Mark is saying: if the SPI driver detects that the message to be transmitted
+>> > is a read command followed by the appropriate number of dummy bytes, and
+>> > then the data being read _and_ it's using quad-mode access, and the hardware
+>> > generates _exactly_ that in hardware using the memory mapped mode, there is
+>> > no reason _not_ to use the hardware to achieve that SPI transaction.  The
+>> > bus activity will be identical to what happens when the SPI controller is
+>> > used manually to achieve that bus sequence.
+>> >
+>> > You're saying: but the documentation says you can't use it for anything
+>> > except m25p80.  If you look at 24.5.4.1.2, it tells you what the SFI
+>> > generates on the bus, which is:
+>> >
+>> > 1. CS active
+>> > 2. Read command byte sent
+>> > 3. 1-4 address bytes sent
+>> > 4. 0-3 dummy bytes sent
+>> > 5. data bytes read from bus
+>> > 6. CS inactive
+>> >
+>> > So, Mark's point is "if we can detect a transaction which fits _that_
+>> > bus activity, there's no reason not to use this acceleration for the
+>> > transaction."
+>> >
+>> > What you're failing to counter with is: we don't have enough information
+>> > in the SPI driver to know how many dummy bytes there are between the
+>> > address bytes and the data read from the bus.
+>>
+>> Irrespective of the dummy bytes.
+>> What if the spi device is not a FLASH ROM, but some other device,
+>> which receives a data packet that accidentally looks like an m25p80 READ
+>> command?
+>
+> Well, for the most part it looks like it should still work, but there
+> could be a gotcha, but first, let's get rid of a myth there.
+>
+> The QSPI is _not_ specific to the M25P80.  The manual says nothing
+> about being specific to that device.  What it says is that it's for
+> SPI NOR memory.  It will work with bus widths of 1, 2 or 4 data lines,
+> so it probably works with non-M25P80 SPI NOR devices too - and the fact
+> that the read and write commands are completely programmable suggests
+> that using it with SPI NOR devices which do not use the M25P80 read
+> command value is intended.
+>
+...
+>
+> That much is good, but now is the problem - how does the SFI know that
+> we're going to require to read 32 bytes?  I think the answer to that
+> is that it doesn't know, so it probably just reads the number of bytes
+> which the access on the SoC bus is asking for, which makes it
+> indeterminant from a software point of view to control how many bytes
+> will be read without provoking another "send 0x01, next address, dummy
+> byte" sequence.
+>
+> So, I'm now on the side of not parsing commands in the SPI driver, and
+> back on the idea that this needs to be handled in some other manner
+> which doesn't involve polluting the SPI core with flag-hacks.
 
-Signed-off-by: Henry Chen <henryc.chen@mediatek.com>
----
-Chandes since v1:
-Used enable_irq_wake()/disable_irq_wake to handle irq wakeup source.
+OK, so we can agree that using this hardware acceleration for any kind
+of transfer indiscriminately is not a very good idea.
 
- drivers/mfd/mt6397-core.c       | 50 +++++++++++++++++++++++++++++++++++++++++
- include/linux/mfd/mt6397/core.h |  1 +
- 2 files changed, 51 insertions(+)
+Now since the description is clearer it's obvious that ti-qspi cannot
+work fully mmapped as fsl-qspi does because the setup has to be done
+over normal spi access and using non-m25p80 devices on the same bus is
+a requirement.
 
-diff --git a/drivers/mfd/mt6397-core.c b/drivers/mfd/mt6397-core.c
-index 03929a6..49daf1a 100644
---- a/drivers/mfd/mt6397-core.c
-+++ b/drivers/mfd/mt6397-core.c
-@@ -93,12 +93,31 @@ static void mt6397_irq_enable(struct irq_data *data)
- 	mt6397->irq_masks_cur[reg] |= BIT(shift);
- }
- 
-+#ifdef CONFIG_PM_SLEEP
-+static int mt6397_irq_set_wake(struct irq_data *irq_data, unsigned int on)
-+{
-+	struct mt6397_chip *mt6397 = irq_data_get_irq_chip_data(irq_data);
-+	int shift = irq_data->hwirq & 0xf;
-+	int reg = irq_data->hwirq >> 4;
-+
-+	if (on)
-+		mt6397->wake_mask[reg] |= BIT(shift);
-+	else
-+		mt6397->wake_mask[reg] &= ~BIT(shift);
-+
-+	return 0;
-+}
-+#else
-+#define mt6397_irq_set_wake NULL
-+#endif
-+
- static struct irq_chip mt6397_irq_chip = {
- 	.name = "mt6397-irq",
- 	.irq_bus_lock = mt6397_irq_lock,
- 	.irq_bus_sync_unlock = mt6397_irq_sync_unlock,
- 	.irq_enable = mt6397_irq_enable,
- 	.irq_disable = mt6397_irq_disable,
-+	.irq_set_wake = mt6397_irq_set_wake,
- };
- 
- static void mt6397_irq_handle_reg(struct mt6397_chip *mt6397, int reg,
-@@ -142,6 +161,7 @@ static int mt6397_irq_domain_map(struct irq_domain *d, unsigned int irq,
- 	irq_set_chip_data(irq, mt6397);
- 	irq_set_chip_and_handler(irq, &mt6397_irq_chip, handle_level_irq);
- 	irq_set_nested_thread(irq, 1);
-+
- #ifdef CONFIG_ARM
- 	set_irq_flags(irq, IRQF_VALID);
- #else
-@@ -183,6 +203,35 @@ static int mt6397_irq_init(struct mt6397_chip *mt6397)
- 	return 0;
- }
- 
-+#ifdef CONFIG_PM_SLEEP
-+static int mt6397_irq_suspend(struct device *dev)
-+{
-+	struct mt6397_chip *chip = dev_get_drvdata(dev);
-+
-+	regmap_write(chip->regmap, MT6397_INT_CON0, chip->wake_mask[0]);
-+	regmap_write(chip->regmap, MT6397_INT_CON1, chip->wake_mask[1]);
-+
-+	enable_irq_wake(chip->irq);
-+
-+	return 0;
-+}
-+
-+static int mt6397_irq_resume(struct device *dev)
-+{
-+	struct mt6397_chip *chip = dev_get_drvdata(dev);
-+
-+	regmap_write(chip->regmap, MT6397_INT_CON0, chip->irq_masks_cur[0]);
-+	regmap_write(chip->regmap, MT6397_INT_CON1, chip->irq_masks_cur[1]);
-+
-+	disable_irq_wake(chip->irq);
-+
-+	return 0;
-+}
-+#endif
-+
-+static SIMPLE_DEV_PM_OPS(mt6397_pm_ops, mt6397_irq_suspend,
-+			mt6397_irq_resume);
-+
- static int mt6397_probe(struct platform_device *pdev)
- {
- 	int ret;
-@@ -237,6 +286,7 @@ static struct platform_driver mt6397_driver = {
- 	.driver = {
- 		.name = "mt6397",
- 		.of_match_table = of_match_ptr(mt6397_of_match),
-+		.pm = &mt6397_pm_ops,
- 	},
- };
- 
-diff --git a/include/linux/mfd/mt6397/core.h b/include/linux/mfd/mt6397/core.h
-index cf5265b..45b8e8a 100644
---- a/include/linux/mfd/mt6397/core.h
-+++ b/include/linux/mfd/mt6397/core.h
-@@ -57,6 +57,7 @@ struct mt6397_chip {
- 	int irq;
- 	struct irq_domain *irq_domain;
- 	struct mutex irqlock;
-+	u16 wake_mask[2];
- 	u16 irq_masks_cur[2];
- 	u16 irq_masks_cache[2];
- };
--- 
-1.8.1.1.dirty
+The place where it is known if a transfer can use the mmap access is m25p80.c
+
+So my suggestion is
+
+ - add a new method for spi master that gets the read opcode, dummy
+length, address, address length, buffer, buffer length and performs
+read from the flash memory in a hardware-specific way
+
+- add a check in m25p80.c that the master supports this feature and if
+so use it (eg check that the method is non-null)
+
+Presumably if some new SPI controllers with similar feature are
+supported in the future they can use the same inteface because you
+pass on everything the m25p80 read knows.
+
+Thanks
+
+Michal
