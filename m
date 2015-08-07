@@ -1,55 +1,32 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Fri, 7 Aug 2015 21:18:10 +0800
-Subject: [RFC PATCH 2/8] drm: exynos/dp: convert to drm bridge mode
-In-Reply-To: <20150807112535.GK17734@phenom.ffwll.local>
-References: <1438868947-22132-1-git-send-email-ykk@rock-chips.com>
- <1438870041-23130-1-git-send-email-ykk@rock-chips.com>
- <000001d0d052$f44fa3a0$dceeeae0$@com> <55C36F49.6020207@rock-chips.com>
- <20150807112535.GK17734@phenom.ffwll.local>
-Message-ID: <55C4B012.3010600@rock-chips.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri,  7 Aug 2015 15:34:44 +0200
+Subject: [PATCH 0/2] ARM: Wire up userfaultfd and mlock2 syscalls
+Message-ID: <1438954486-28286-1-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel,
+From: Thierry Reding <treding@nvidia.com>
 
-? 2015/8/7 19:25, Daniel Vetter ??:
-> On Thu, Aug 06, 2015 at 10:29:29PM +0800, Yakir Yang wrote:
->> Hi Jingoo,
->>
->> ? 2015/8/6 22:19, Jingoo Han ??:
->>> On Thursday, August 06, 2015 11:07 PM, Yakir Yang wrote:
->>>> In order to move exynos dp code to bridge directory,
->>>> we need to convert driver drm bridge mode first. As
->>>> dp driver already have a ptn3460 bridge, so we need
->>>> to move ptn bridge to the next bridge of dp bridge.
->>>>
->>>> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
->>>> ---
->>>>   drivers/gpu/drm/exynos/exynos_dp_core.c | 196 ++++++++++++++++++++------------
->>>>   drivers/gpu/drm/exynos/exynos_dp_core.h |   2 +
->>>>   2 files changed, 126 insertions(+), 72 deletions(-)
->>>>
->>>> diff --git a/drivers/gpu/drm/exynos/exynos_dp_core.c b/drivers/gpu/drm/exynos/exynos_dp_core.c
->>>> index a8097a4..aa99e23 100644
->>>> --- a/drivers/gpu/drm/exynos/exynos_dp_core.c
->>>> +++ b/drivers/gpu/drm/exynos/exynos_dp_core.c
->>>> @@ -3,6 +3,7 @@
->>>>    *
->>>>    * Copyright (C) 2012 Samsung Electronics Co., Ltd.
->>>>    * Author: Jingoo Han <jg1.han@samsung.com>
->>>> + *         Yakir Yang <ykk@rock-chips.com>
->>> Please don't add this.
->>> You just fixed some parts of this code. I don't find the reason
->>> why you have to be added to author for this file.
->>> If you want the title for an author, please send the patch
->>> for a new IP, instead of modifying the exiting codes.
->> Okay, thanks for your remind ;)
-> tbh the author lines are completely irrelevant, git blame/log is the
-> authoritative source for that. Copyright is a bit a different matter
-> entirely, but in general we seem to be not too good at updating.
-Thanks for your good explain  ;)
+These are two fairly trivial patches to wire up the userfaultfd and
+mlock2 syscalls on 32-bit ARM. I've verified that these work by running
+the userfaultfd and mlock2-tests tests from tools/testing/selftests/vm/
+and they give good results. Note that mlock2-tests doesn't work without
+additional fixups in linux-next needed to remove VM flags clashes.
 
-- Yakir
-> Really if that's all you have to comment and no substantial technical
-> concerns or questions then just can such a bikeshed mail.
-> -Daniel
+I suppose this would have to wait until both of the above syscalls have
+actually been merged, but I figured I'd post them anyway since I already
+did the work and verified that they work.
+
+Thierry
+
+Thierry Reding (2):
+  ARM: Wire up userfaultfd syscall
+  ARM: Wire up mlock2 syscall
+
+ arch/arm/include/asm/unistd.h      | 2 +-
+ arch/arm/include/uapi/asm/unistd.h | 2 ++
+ arch/arm/kernel/calls.S            | 2 ++
+ 3 files changed, 5 insertions(+), 1 deletion(-)
+
+-- 
+2.4.5
