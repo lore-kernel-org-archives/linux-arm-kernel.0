@@ -1,68 +1,92 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Fri, 07 Aug 2015 13:36:38 +0200
-Subject: [PATCH v4 1/2] clk: rockchip: add pclk_pd_pmu to the list of
- rk3288 critical clocks
-In-Reply-To: <55C47D59.8080403@rock-chips.com>
-References: <1438939872-2116-1-git-send-email-hl@rock-chips.com>
- <55C47D59.8080403@rock-chips.com>
-Message-ID: <2226681.uyCeUEdNHm@diego>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 7 Aug 2015 17:07:39 +0530
+Subject: [PATCH v4 1/6] cpufreq: make scaling_boost_freqs sysfs attr
+ available when boost is enabled
+In-Reply-To: <1594902.Dv5JKhve0y@amdc1976>
+References: <1438868514-8814-1-git-send-email-b.zolnierkie@samsung.com>
+ <5184469.cOpIkgzX4h@amdc1976> <20150807104156.GE6939@linux>
+ <1594902.Dv5JKhve0y@amdc1976>
+Message-ID: <20150807113739.GF6939@linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 7. August 2015, 17:41:45 schrieb hl:
-> Hi Heiko,
+On 07-08-15, 13:12, Bartlomiej Zolnierkiewicz wrote:
+> >From 993ebb6fc632ec7b61654c9610c90ff4dca4be34 Mon Sep 17 00:00:00 2001
+> From: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> Date: Fri, 7 Aug 2015 13:07:51 +0200
+> Subject: [PATCH] cpufreq-dt: make scaling_boost_freqs sysfs attr available
+>  when boost is enabled
 > 
-> > pclk_pd_pmu needs to keep running and with the upcoming gpio clock
-> > handling this is not always the case anymore. So add it to the list
-> > of critical clocks for now.
-> > 
-> > From: Heiko Stuebner <heiko@sntech.de>
-> > Signed-off-by: Lin Huang <hl@rock-chips.com>
+> Make scaling_boost_freqs sysfs attribute is available when
+> cpufreq-dt driver is used and boost support is enabled.
 > 
->      is it the right way?  if it still can not meet the requirement,
-> please let me know.
-
-nearly, but not quite ;-)
-
-You can take a look at my minnie patch [0] for inspiration.
-
-
-Also please make sure to include linus.walleij at linaro.org also in this
-first mail. This clock patch is a prequisite for the pinctrl change so
-we would like Linus Walleij to merge both into his pinctrl tree.
-
-Ideally both times in the "To" and not the "Cc" recipients, as To vs. Cc
-is often used to distinguish whom you want to apply the patch.
-
-
-Heiko
-
-
-[0] http://lists.infradead.org/pipermail/linux-rockchip/2015-August/003608.html
-
-
-
-
+> Cc: Thomas Abraham <thomas.ab@samsung.com>
+> Cc: Javier Martinez Canillas <javier@osg.samsung.com>
+> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Suggested-by: Viresh Kumar <viresh.kumar@linaro.org>
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> ---
+>  drivers/cpufreq/cpufreq-dt.c | 11 ++++++++++-
+>  include/linux/cpufreq.h      |  1 +
+>  2 files changed, 11 insertions(+), 1 deletion(-)
 > 
-> > ---
-> > Changes in v4:
-> > - Add From: Heiko Stuebner <heiko@sntech.de>
-> > 
-> >   drivers/clk/rockchip/clk-rk3288.c | 1 +
-> >   1 file changed, 1 insertion(+)
-> > 
-> > diff --git a/drivers/clk/rockchip/clk-rk3288.c
-> > b/drivers/clk/rockchip/clk-rk3288.c index 0df5bae..9040878 100644
-> > --- a/drivers/clk/rockchip/clk-rk3288.c
-> > +++ b/drivers/clk/rockchip/clk-rk3288.c
-> > @@ -780,6 +780,7 @@ static const char *const rk3288_critical_clocks[]
-> > __initconst = {> 
-> >   	"aclk_cpu",
-> >   	"aclk_peri",
-> >   	"hclk_peri",
-> > 
-> > +	"pclk_pd_pmu",
-> > 
-> >   };
-> >   
-> >   #ifdef CONFIG_PM_SLEEP
+> diff --git a/drivers/cpufreq/cpufreq-dt.c b/drivers/cpufreq/cpufreq-dt.c
+> index b9259ab..c6a3b98 100644
+> --- a/drivers/cpufreq/cpufreq-dt.c
+> +++ b/drivers/cpufreq/cpufreq-dt.c
+> @@ -36,6 +36,12 @@ struct private_data {
+>  	unsigned int voltage_tolerance; /* in percentage */
+>  };
+>  
+> +static struct freq_attr *cpufreq_dt_attr[] = {
+> +	&cpufreq_freq_attr_scaling_available_freqs,
+> +	NULL,   /* Extra space for boost-attr if required */
+> +	NULL,
+> +};
+> +
+>  static int set_target(struct cpufreq_policy *policy, unsigned int index)
+>  {
+>  	struct dev_pm_opp *opp;
+> @@ -182,6 +188,8 @@ try_again:
+>  	return ret;
+>  }
+>  
+> +static struct cpufreq_driver dt_cpufreq_driver;
+> +
+>  static int cpufreq_init(struct cpufreq_policy *policy)
+>  {
+>  	struct cpufreq_frequency_table *freq_table;
+> @@ -336,6 +344,7 @@ static int cpufreq_init(struct cpufreq_policy *policy)
+>  		ret = cpufreq_enable_boost_support();
+>  		if (ret)
+>  			goto out_free_cpufreq_table;
+> +		cpufreq_dt_attr[1] = &cpufreq_freq_attr_scaling_boost_freqs;
+>  	}
+>  
+>  	policy->cpuinfo.transition_latency = transition_latency;
+> @@ -411,7 +420,7 @@ static struct cpufreq_driver dt_cpufreq_driver = {
+>  	.exit = cpufreq_exit,
+>  	.ready = cpufreq_ready,
+>  	.name = "cpufreq-dt",
+> -	.attr = cpufreq_generic_attr,
+> +	.attr = cpufreq_dt_attr,
+>  };
+>  
+>  static int dt_cpufreq_probe(struct platform_device *pdev)
+> diff --git a/include/linux/cpufreq.h b/include/linux/cpufreq.h
+> index 95f0186..657542d 100644
+> --- a/include/linux/cpufreq.h
+> +++ b/include/linux/cpufreq.h
+> @@ -609,6 +609,7 @@ struct cpufreq_frequency_table *cpufreq_frequency_get_table(unsigned int cpu);
+>  
+>  /* the following are really really optional */
+>  extern struct freq_attr cpufreq_freq_attr_scaling_available_freqs;
+> +extern struct freq_attr cpufreq_freq_attr_scaling_boost_freqs;
+>  extern struct freq_attr *cpufreq_generic_attr[];
+>  int cpufreq_table_validate_and_show(struct cpufreq_policy *policy,
+>  				      struct cpufreq_frequency_table *table);
+
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+
+-- 
+viresh
