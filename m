@@ -1,41 +1,51 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 7 Aug 2015 10:48:26 +0530
-Subject: [PATCH v4 0/6] cpufreq: use generic cpufreq drivers for
- Exynos4x12 platform
-In-Reply-To: <55C43971.5010504@samsung.com>
-References: <1438868514-8814-1-git-send-email-b.zolnierkie@samsung.com>
- <015301d0d0a3$1396c900$3ac45b00$@kernel.org>
- <20150807035018.GF6325@linux> <20150807035156.GG6325@linux>
- <55C43085.8090506@samsung.com> <20150807043037.GH6325@linux>
- <55C43971.5010504@samsung.com>
-Message-ID: <20150807051826.GJ6325@linux>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu,  6 Aug 2015 22:19:03 -0700
+Subject: [PATCH 1/1] ARM: OMAP2+: Fix power domain operations regression
+ caused by 81xx
+Message-ID: <1438924743-30025-1-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07-08-15, 13:52, Krzysztof Kozlowski wrote:
-> Thanks for explanation. As fair as I understand, Bartlomiej wanted to
-> merge this in a way which would avoid loosing the boost mode. Kukjin
-> prepared topic branches for previous cpu-freq/clk stuff so maybe
-> everything could go through PM?
+I managed to mess up omap3 power domain operations with commit
+7c80a3f89c51 ("ARM: OMAP2+: Add custom prwdm_operations for 81xx
+to support dm814x"), by default we should keep on using the
+omap3_pwrdm_operations, only 81xx needs custom handling.
 
-We aren't loosing anything at all. There can be two cases here:
+This causes omap3 PM to break so we won't hit off mode any longer
+causing idle power consumption go up from less than 10mW to over
+50 mW.
 
-1. Patch 1/6 and 6/6 make it to 4.3 (with suggested changes) via PM tree:
-- All will work fine in this case, no issues at all..
+Fixs: 7c80a3f89c51 ("ARM: OMAP2+: Add custom prwdm_operations for
+81xx to support dm814x")
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/mach-omap2/powerdomains3xxx_data.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-2. They don't make it:
-- Even in this case, nothing will break. Users can just enable a
-  config option and that's all..
-
-So, no need to divert things into another tree this late.
-
-Over that, Rafael will not be around for 2 weeks now (Plumbers and
-other stuff) ..
-
-So, just target the cpufreq core changes via PM tree.. rest is just
-fine.
-
-I hope that makes sense :)
-
+--- a/arch/arm/mach-omap2/powerdomains3xxx_data.c
++++ b/arch/arm/mach-omap2/powerdomains3xxx_data.c
+@@ -580,7 +580,9 @@ void __init omap3xxx_powerdomains_init(void)
+ 	if (!cpu_is_omap34xx() && !cpu_is_ti81xx())
+ 		return;
+ 
+-	pwrdm_register_platform_funcs(&ti81xx_pwrdm_operations);
++	/* Only 81xx needs custom pwrdm_operations */
++	if (!cpu_is_ti81xx())
++		pwrdm_register_platform_funcs(&omap3_pwrdm_operations);;
+ 
+ 	rev = omap_rev();
+ 
+@@ -588,9 +590,11 @@ void __init omap3xxx_powerdomains_init(void)
+ 		pwrdm_register_pwrdms(powerdomains_am35x);
+ 	} else if (rev == TI8148_REV_ES1_0 || rev == TI8148_REV_ES2_0 ||
+ 		   rev == TI8148_REV_ES2_1) {
++		pwrdm_register_platform_funcs(&ti81xx_pwrdm_operations);
+ 		pwrdm_register_pwrdms(powerdomains_ti814x);
+ 	} else if (rev == TI8168_REV_ES1_0 || rev == TI8168_REV_ES1_1
+ 			|| rev == TI8168_REV_ES2_0 || rev == TI8168_REV_ES2_1) {
++		pwrdm_register_platform_funcs(&ti81xx_pwrdm_operations);
+ 		pwrdm_register_pwrdms(powerdomains_ti816x);
+ 	} else {
+ 		pwrdm_register_pwrdms(powerdomains_omap3430_common);
 -- 
-viresh
+2.1.4
