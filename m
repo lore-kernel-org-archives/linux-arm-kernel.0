@@ -1,45 +1,33 @@
-From: fainelli@broadcom.com (Florian Fainelli)
-Date: Fri, 7 Aug 2015 10:20:08 -0700
-Subject: [GIT PULL] Broadcom SoC changes for 4.3 (part 2)
-In-Reply-To: <1438796683-18581-3-git-send-email-f.fainelli@gmail.com>
-References: <1438796683-18581-1-git-send-email-f.fainelli@gmail.com>
- <1438796683-18581-3-git-send-email-f.fainelli@gmail.com>
-Message-ID: <55C4E8C8.7030503@broadcom.com>
+From: agross@codeaurora.org (Andy Gross)
+Date: Fri, 7 Aug 2015 12:30:31 -0500
+Subject: next-20150807 build: 2 failures 51 warnings (next-20150807)
+In-Reply-To: <20150807122344.GT20873@sirena.org.uk>
+References: <E1ZNgYS-0000SE-QL@optimist> <20150807122344.GT20873@sirena.org.uk>
+Message-ID: <20150807173031.GA25070@qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Kevin, Olof,
+On Fri, Aug 07, 2015 at 01:23:44PM +0100, Mark Brown wrote:
+> On Fri, Aug 07, 2015 at 01:15:20PM +0100, Build bot for Mark Brown wrote:
+> 
+> Today's linux-next fails to build an arm64 allmodconfig with:
+> 
+> > 	arm64-allmodconfig
+> > ../drivers/firmware/qcom_scm-32.c:27:28: fatal error: asm/outercache.h: No such file or directory
+> 
+> This header file only exists on ARM, either the driver shouldn't be
+> built for ARMv8, we need a dummy header for ARMv8 or we need to use the
+> header conditionally in the driver.
 
-Can you drop this pull request, or if you already merged it, there will
-be a second one for a single patch coming in shortly. Thank you!
+Right.  We're right in the middle of pulling together SCM for 64 bit.  I think
+for now, perhaps I should just send in a stubbed out placeholder for ARMV8 SCM
+and then fill it in once we get that patch set reworked (previously sent by
+Kumar Gala).
 
-On 05/08/15 10:44, Florian Fainelli wrote:
-> The following changes since commit 39aa437e18cac7acae55481ed73feea0de497399:
-> 
->   Merge branch 'queue/irq/arm' of git://git.kernel.org/pub/scm/linux/kernel/git/tip/tip into next/cleanup (2015-08-05 17:24:11 +0200)
-> 
-> are available in the git repository at:
-> 
->   http://github.com/broadcom/stblinux tags/arm-soc/for-4.3/soc-part2
-> 
-> for you to fetch changes up to 661e59d30168331e5e1c7386d23ea8fd14965270:
-> 
->   ARM: BCM: Enable ARM erratum 798181 for BRCMSTB (2015-08-05 10:30:59 -0700)
-> 
-> ----------------------------------------------------------------
-> This pull request contains the following changes:
-> 
-> - Gregory updates the BRCMSTB Kconfig to select the ARM erratum 798181 which
->   affects the chips covered by this platform
-> 
-> ----------------------------------------------------------------
-> Gregory Fong (1):
->       ARM: BCM: Enable ARM erratum 798181 for BRCMSTB
-> 
->  arch/arm/mach-bcm/Kconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-
+I'll add that to my branch today and it should resolve our next builds.  I'll
+send it to arm/soc in a fixes pull request.
 
 -- 
-Florian
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
