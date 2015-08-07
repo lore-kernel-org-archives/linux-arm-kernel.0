@@ -1,69 +1,59 @@
 From: julien.grall@citrix.com (Julien Grall)
-Date: Fri, 7 Aug 2015 17:34:34 +0100
-Subject: [PATCH v3 1/9] arm/xen: Remove helpers which are PV specific
+Date: Fri, 7 Aug 2015 17:34:36 +0100
+Subject: [PATCH v3 3/9] arm/xen: implement correctly pfn_to_mfn
 In-Reply-To: <1438965282-19103-1-git-send-email-julien.grall@citrix.com>
 References: <1438965282-19103-1-git-send-email-julien.grall@citrix.com>
-Message-ID: <1438965282-19103-2-git-send-email-julien.grall@citrix.com>
+Message-ID: <1438965282-19103-4-git-send-email-julien.grall@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM guests are always HVM. The current implementation is assuming a 1:1
-mapping which is only true for DOM0 and may not be at all in the future.
+After the commit introducing convertion between DMA and guest addresses,
+all the callers of pfn_to_mfn are expecting to get a GFN (Guest Frame
+Number). On ARM, all the guests are auto-translated so the GFN is equal
+to the Linux PFN (Pseudo-physical Frame Number).
 
-Furthermore, all the helpers but arbitrary_virt_to_machine are used in
-x86 specific code (or only compiled for).
+The current implementation may return an MFN if the caller is passing a
+PFN associated to a mapped foreign grant. In pratice, I haven't seen
+the problem on running guest but we should fix it for the sake of
+correctness.
 
-The helper arbitrary_virt_to_machine is only used in PV specific code.
-Therefore we should never call the function.
+Correct the implementation by always returning the pfn passed in parameter.
 
-Add a BUG() in this helper and drop all the others.
+A follow-up patch will take care to rename pfn_to_mfn to a suitable
+name.
 
 Signed-off-by: Julien Grall <julien.grall@citrix.com>
-Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 
 ---
 Cc: Russell King <linux@arm.linux.org.uk>
 Cc: linux-arm-kernel at lists.infradead.org
 
-    Changes in v2:
-        - Typoes
-        - Add Stefano's acked-by
+    Changes in v3:
+        - Typoes in the commit message
+        - Add Stefano's reviewed-by
 ---
- arch/arm/include/asm/xen/page.h | 16 ++--------------
- 1 file changed, 2 insertions(+), 14 deletions(-)
+ arch/arm/include/asm/xen/page.h | 8 --------
+ 1 file changed, 8 deletions(-)
 
 diff --git a/arch/arm/include/asm/xen/page.h b/arch/arm/include/asm/xen/page.h
-index 1bee8ca..98b1084 100644
+index 5f76a9e..911d62b 100644
 --- a/arch/arm/include/asm/xen/page.h
 +++ b/arch/arm/include/asm/xen/page.h
-@@ -54,26 +54,14 @@ static inline unsigned long mfn_to_pfn(unsigned long mfn)
+@@ -36,14 +36,6 @@ extern struct rb_root phys_to_mach;
  
- #define mfn_to_local_pfn(mfn) mfn_to_pfn(mfn)
- 
--static inline xmaddr_t phys_to_machine(xpaddr_t phys)
--{
--	unsigned offset = phys.paddr & ~PAGE_MASK;
--	return XMADDR(PFN_PHYS(pfn_to_mfn(PFN_DOWN(phys.paddr))) | offset);
--}
--
--static inline xpaddr_t machine_to_phys(xmaddr_t machine)
--{
--	unsigned offset = machine.maddr & ~PAGE_MASK;
--	return XPADDR(PFN_PHYS(mfn_to_pfn(PFN_DOWN(machine.maddr))) | offset);
--}
- /* VIRT <-> MACHINE conversion */
--#define virt_to_machine(v)	(phys_to_machine(XPADDR(__pa(v))))
- #define virt_to_mfn(v)		(pfn_to_mfn(virt_to_pfn(v)))
- #define mfn_to_virt(m)		(__va(mfn_to_pfn(m) << PAGE_SHIFT))
- 
-+/* Only used in PV code. But ARM guests are always HVM. */
- static inline xmaddr_t arbitrary_virt_to_machine(void *vaddr)
+ static inline unsigned long pfn_to_mfn(unsigned long pfn)
  {
--	/* TODO: assuming it is mapped in the kernel 1:1 */
--	return virt_to_machine(vaddr);
-+	BUG();
+-	unsigned long mfn;
+-
+-	if (phys_to_mach.rb_node != NULL) {
+-		mfn = __pfn_to_mfn(pfn);
+-		if (mfn != INVALID_P2M_ENTRY)
+-			return mfn;
+-	}
+-
+ 	return pfn;
  }
  
- /* TODO: this shouldn't be here but it is because the frontend drivers
 -- 
 2.1.4
