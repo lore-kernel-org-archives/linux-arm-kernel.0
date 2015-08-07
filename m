@@ -1,37 +1,51 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Fri,  7 Aug 2015 05:54:04 -0500
-Subject: [PATCH v2 8/8] drm: bridge/analogix_dp: expand the delay time for hpd
- detect
-In-Reply-To: <1438943674-18191-1-git-send-email-ykk@rock-chips.com>
-References: <1438943674-18191-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <1438944844-19243-1-git-send-email-ykk@rock-chips.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri,  7 Aug 2015 12:57:20 +0200
+Subject: [PATCH] ARM: at91: dt: sama5d2: use slow clock where necessary
+Message-ID: <1438945040-11800-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some edp screen with no hpd signal would need some delay time
-to ensure that screen would be ready for work, so we can expand
-the delay time in hpd detect function, it works prefectly on my
-rk3288 sdk board.
+The watchdog, the reset controller, the RTC, the shutdown controller, the
+timer counters and the LCD PWM need the slow clock, add it to the currently
+defined nodes.
 
-Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
-Changes in v2: None
+ arch/arm/boot/dts/sama5d2.dtsi | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
 
- drivers/gpu/drm/bridge/analogix_dp_core.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/gpu/drm/bridge/analogix_dp_core.c b/drivers/gpu/drm/bridge/analogix_dp_core.c
-index efd810c..3ba10fa2 100644
---- a/drivers/gpu/drm/bridge/analogix_dp_core.c
-+++ b/drivers/gpu/drm/bridge/analogix_dp_core.c
-@@ -71,7 +71,7 @@ static int analogix_dp_detect_hpd(struct analogix_dp_device *dp)
- 			return 0;
+diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
+index f39258fa3815..034cd48ae28b 100644
+--- a/arch/arm/boot/dts/sama5d2.dtsi
++++ b/arch/arm/boot/dts/sama5d2.dtsi
+@@ -764,16 +764,16 @@
+ 				compatible = "atmel,at91sam9x5-tcb";
+ 				reg = <0xf800c000 0x100>;
+ 				interrupts = <35 IRQ_TYPE_LEVEL_HIGH 0>;
+-				clocks = <&tcb0_clk>;
+-				clock-names = "t0_clk";
++				clocks = <&tcb0_clk>, <&clk32k>;
++				clock-names = "t0_clk", "slow_clk";
+ 			};
  
- 		timeout_loop++;
--		usleep_range(10, 11);
-+		usleep_range(100, 110);
- 	}
+ 			tcb1: timer at f8010000 {
+ 				compatible = "atmel,at91sam9x5-tcb";
+ 				reg = <0xf8010000 0x100>;
+ 				interrupts = <36 IRQ_TYPE_LEVEL_HIGH 0>;
+-				clocks = <&tcb1_clk>;
+-				clock-names = "t0_clk";
++				clocks = <&tcb1_clk>, <&clk32k>;
++				clock-names = "t0_clk", "slow_clk";
+ 			};
  
- 	/*
+ 			uart0: serial at f801c000 {
+@@ -857,6 +857,7 @@
+ 				compatible = "atmel,at91rm9200-rtc";
+ 				reg = <0xf80480b0 0x30>;
+ 				interrupts = <74 IRQ_TYPE_LEVEL_HIGH 7>;
++				clocks = <&clk32k>;
+ 			};
+ 
+ 			spi1: spi at fc000000 {
 -- 
-1.9.1
+2.1.4
