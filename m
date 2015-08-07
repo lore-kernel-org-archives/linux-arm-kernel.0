@@ -1,39 +1,26 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Fri, 7 Aug 2015 13:19:13 +0100
-Subject: [PATCH v3 02/18] of/platform: add of_platform_probe
-In-Reply-To: <1438870315-18689-3-git-send-email-tomeu.vizoso@collabora.com>
-References: <1438870315-18689-1-git-send-email-tomeu.vizoso@collabora.com>
- <1438870315-18689-3-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <20150807121913.GS20873@sirena.org.uk>
+Date: Fri, 7 Aug 2015 13:23:44 +0100
+Subject: next-20150807 build: 2 failures 51 warnings (next-20150807)
+In-Reply-To: <E1ZNgYS-0000SE-QL@optimist>
+References: <E1ZNgYS-0000SE-QL@optimist>
+Message-ID: <20150807122344.GT20873@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 06, 2015 at 04:11:39PM +0200, Tomeu Vizoso wrote:
+On Fri, Aug 07, 2015 at 01:15:20PM +0100, Build bot for Mark Brown wrote:
 
-> Walks the OF tree up and finds the closest ancestor that has a platform
-> device associated with it, probing it if isn't bound to a driver yet.
+Today's linux-next fails to build an arm64 allmodconfig with:
 
-> The above should ensure that the dependency represented by the passed OF
-> node is available, because probing a platform device should cause its
-> descendants to be probed as well.
+> 	arm64-allmodconfig
+> ../drivers/firmware/qcom_scm-32.c:27:28: fatal error: asm/outercache.h: No such file or directory
 
-This sounds like it's going to break in the case where we have MFDs that
-represent their functions in DT (not a pattern I'm a fan of but it's a
-thing people do).  We'll walk back to the platform device for the MFD
-function, try to probe it and then give up.  Perhaps that's good enough
-anyway but it's not clear to me why we don't just try every parent we
-find?
-
-I'm also not a fan of the fact that the interface here is explicitly
-saying that we want to probe a platform device, that's an implementation
-detail that callers shouldn't need to know about.  From the point of
-view of the callers what they're trying to do is kick any dependencies
-into being instantiated, the fact that we currently try to accomplish it
-with platform devices isn't something they care about.
+This header file only exists on ARM, either the driver shouldn't be
+built for ARMv8, we need a dummy header for ARMv8 or we need to use the
+header conditionally in the driver.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 473 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150807/90403c12/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150807/4e390095/attachment.sig>
