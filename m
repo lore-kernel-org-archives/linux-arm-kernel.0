@@ -1,10 +1,10 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  7 Aug 2015 11:11:32 +0900
-Subject: [PATCH 08/10] ARM: shmobile: r8a73a4 dtsi: Add missing "gpio-ranges"
+Date: Fri,  7 Aug 2015 11:11:33 +0900
+Subject: [PATCH 09/10] ARM: shmobile: r8a7740 dtsi: Add missing "gpio-ranges"
  to gpio node
 In-Reply-To: <cover.1438911334.git.horms+renesas@verge.net.au>
 References: <cover.1438911334.git.horms+renesas@verge.net.au>
-Message-ID: <17ccec50cc40bef00b26d506d483e928804cb20e.1438911334.git.horms+renesas@verge.net.au>
+Message-ID: <09d1c7b4babd3ef9bfc0a148931e5e5702db5e1b.1438911334.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,7 +14,7 @@ If a GPIO driver uses gpiochip_add_pin_range() (which is usually the
 case for GPIO/PFC combos), the GPIO hogging mechanism configured from DT
 doesn't work:
 
-    requesting hog GPIO led1-high (chip r8a73a4_pfc, offset 28) failed
+    requesting hog GPIO lcd0 (chip r8a7740_pfc, offset 176) failed
 
 The actual error code is -517 == -EPROBE_DEFER.
 
@@ -40,7 +40,7 @@ pinctrldev_list yet, so the range can't be found, and the operation fails
 with -EPROBE_DEFER.
 
 To fix this, add a "gpio-ranges" property to the gpio device node, so
-the ranges are added by of_gpiochip_add_pin_range(), which is called by
+the range is added by of_gpiochip_add_pin_range(), which is called by
 of_gpiochip_add() before the call to of_gpiochip_scan_hogs().
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
@@ -48,26 +48,20 @@ Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a73a4.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm/boot/dts/r8a7740.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/r8a73a4.dtsi b/arch/arm/boot/dts/r8a73a4.dtsi
-index 5090d1a8f652..cb4f7b2798fe 100644
---- a/arch/arm/boot/dts/r8a73a4.dtsi
-+++ b/arch/arm/boot/dts/r8a73a4.dtsi
-@@ -207,6 +207,13 @@
- 		reg = <0 0xe6050000 0 0x9000>;
+diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
+index d84714468cce..e14cb1438216 100644
+--- a/arch/arm/boot/dts/r8a7740.dtsi
++++ b/arch/arm/boot/dts/r8a7740.dtsi
+@@ -291,6 +291,7 @@
+ 		      <0xe605800c 0x20>;
  		gpio-controller;
  		#gpio-cells = <2>;
-+		gpio-ranges =
-+			<&pfc 0 0 31>, <&pfc 32 32 9>,
-+			<&pfc 64 64 22>, <&pfc 96 96 31>,
-+			<&pfc 128 128 7>, <&pfc 160 160 19>,
-+			<&pfc 192 192 31>, <&pfc 224 224 27>,
-+			<&pfc 256 256 28>, <&pfc 288 288 21>,
-+			<&pfc 320 320 10>;
++		gpio-ranges = <&pfc 0 0 212>;
  		interrupts-extended =
- 			<&irqc0  0 0>, <&irqc0  1 0>, <&irqc0  2 0>, <&irqc0  3 0>,
- 			<&irqc0  4 0>, <&irqc0  5 0>, <&irqc0  6 0>, <&irqc0  7 0>,
+ 			<&irqpin0 0 0>, <&irqpin0 1 0>, <&irqpin0 2 0>, <&irqpin0 3 0>,
+ 			<&irqpin0 4 0>, <&irqpin0 5 0>, <&irqpin0 6 0>, <&irqpin0 7 0>,
 -- 
 2.1.4
