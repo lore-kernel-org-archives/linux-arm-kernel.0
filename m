@@ -1,44 +1,95 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Fri, 7 Aug 2015 23:34:24 +0200
-Subject: [RFC PATCH v4 7/9] arm: lpc18xx_defconfig: remove
- CONFIG_MMC_DW_IDMAC
-In-Reply-To: <1438843590-24101-1-git-send-email-shawn.lin@rock-chips.com>
-References: <1438843469-23807-1-git-send-email-shawn.lin@rock-chips.com>
- <1438843590-24101-1-git-send-email-shawn.lin@rock-chips.com>
-Message-ID: <CAGhQ9VxkFk19HGtToUm8bOU62Z8S0_dMqciUiNfJry-Jb5YF=Q@mail.gmail.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Sat, 08 Aug 2015 00:21:04 +0200
+Subject: [PATCH v4 1/6] cpufreq: make scaling_boost_freqs sysfs attr
+ available when boost is enabled
+In-Reply-To: <20150807113739.GF6939@linux>
+References: <1438868514-8814-1-git-send-email-b.zolnierkie@samsung.com>
+ <1594902.Dv5JKhve0y@amdc1976> <20150807113739.GF6939@linux>
+Message-ID: <11605783.uxKCOKbq1D@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 August 2015 at 08:46, Shawn Lin <shawn.lin@rock-chips.com> wrote:
-> DesignWare MMC Controller's transfer mode should be decided
-> at runtime instead of compile-time. So we remove this config
-> option and read dw_mmc's register to select DMA master.
->
-> Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
+On Friday, August 07, 2015 05:07:39 PM Viresh Kumar wrote:
+> On 07-08-15, 13:12, Bartlomiej Zolnierkiewicz wrote:
+> > >From 993ebb6fc632ec7b61654c9610c90ff4dca4be34 Mon Sep 17 00:00:00 2001
+> > From: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> > Date: Fri, 7 Aug 2015 13:07:51 +0200
+> > Subject: [PATCH] cpufreq-dt: make scaling_boost_freqs sysfs attr available
+> >  when boost is enabled
+> > 
+> > Make scaling_boost_freqs sysfs attribute is available when
+> > cpufreq-dt driver is used and boost support is enabled.
+> > 
+> > Cc: Thomas Abraham <thomas.ab@samsung.com>
+> > Cc: Javier Martinez Canillas <javier@osg.samsung.com>
+> > Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> > Suggested-by: Viresh Kumar <viresh.kumar@linaro.org>
+> > Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> > ---
+> >  drivers/cpufreq/cpufreq-dt.c | 11 ++++++++++-
+> >  include/linux/cpufreq.h      |  1 +
+> >  2 files changed, 11 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/cpufreq/cpufreq-dt.c b/drivers/cpufreq/cpufreq-dt.c
+> > index b9259ab..c6a3b98 100644
+> > --- a/drivers/cpufreq/cpufreq-dt.c
+> > +++ b/drivers/cpufreq/cpufreq-dt.c
+> > @@ -36,6 +36,12 @@ struct private_data {
+> >  	unsigned int voltage_tolerance; /* in percentage */
+> >  };
+> >  
+> > +static struct freq_attr *cpufreq_dt_attr[] = {
+> > +	&cpufreq_freq_attr_scaling_available_freqs,
+> > +	NULL,   /* Extra space for boost-attr if required */
+> > +	NULL,
+> > +};
+> > +
+> >  static int set_target(struct cpufreq_policy *policy, unsigned int index)
+> >  {
+> >  	struct dev_pm_opp *opp;
+> > @@ -182,6 +188,8 @@ try_again:
+> >  	return ret;
+> >  }
+> >  
+> > +static struct cpufreq_driver dt_cpufreq_driver;
+> > +
+> >  static int cpufreq_init(struct cpufreq_policy *policy)
+> >  {
+> >  	struct cpufreq_frequency_table *freq_table;
+> > @@ -336,6 +344,7 @@ static int cpufreq_init(struct cpufreq_policy *policy)
+> >  		ret = cpufreq_enable_boost_support();
+> >  		if (ret)
+> >  			goto out_free_cpufreq_table;
+> > +		cpufreq_dt_attr[1] = &cpufreq_freq_attr_scaling_boost_freqs;
+> >  	}
+> >  
+> >  	policy->cpuinfo.transition_latency = transition_latency;
+> > @@ -411,7 +420,7 @@ static struct cpufreq_driver dt_cpufreq_driver = {
+> >  	.exit = cpufreq_exit,
+> >  	.ready = cpufreq_ready,
+> >  	.name = "cpufreq-dt",
+> > -	.attr = cpufreq_generic_attr,
+> > +	.attr = cpufreq_dt_attr,
+> >  };
+> >  
+> >  static int dt_cpufreq_probe(struct platform_device *pdev)
+> > diff --git a/include/linux/cpufreq.h b/include/linux/cpufreq.h
+> > index 95f0186..657542d 100644
+> > --- a/include/linux/cpufreq.h
+> > +++ b/include/linux/cpufreq.h
+> > @@ -609,6 +609,7 @@ struct cpufreq_frequency_table *cpufreq_frequency_get_table(unsigned int cpu);
+> >  
+> >  /* the following are really really optional */
+> >  extern struct freq_attr cpufreq_freq_attr_scaling_available_freqs;
+> > +extern struct freq_attr cpufreq_freq_attr_scaling_boost_freqs;
+> >  extern struct freq_attr *cpufreq_generic_attr[];
+> >  int cpufreq_table_validate_and_show(struct cpufreq_policy *policy,
+> >  				      struct cpufreq_frequency_table *table);
+> 
+> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-Acked-by: Joachim Eastwood <manabian@gmail.com>
+And what exactly am I supposed to do with this?
 
->  arch/arm/configs/lpc18xx_defconfig | 1 -
->  1 file changed, 1 deletion(-)
->
-> diff --git a/arch/arm/configs/lpc18xx_defconfig b/arch/arm/configs/lpc18xx_defconfig
-> index 1c47f86..b7e8cda 100644
-> --- a/arch/arm/configs/lpc18xx_defconfig
-> +++ b/arch/arm/configs/lpc18xx_defconfig
-> @@ -119,7 +119,6 @@ CONFIG_USB_EHCI_HCD=y
->  CONFIG_USB_EHCI_ROOT_HUB_TT=y
->  CONFIG_MMC=y
->  CONFIG_MMC_DW=y
-> -CONFIG_MMC_DW_IDMAC=y
->  CONFIG_NEW_LEDS=y
->  CONFIG_LEDS_CLASS=y
->  CONFIG_LEDS_PCA9532=y
-> --
-> 2.3.7
->
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+Have a robot that will pick up all patches ACKed by you magically or what?
+
+Rafael
