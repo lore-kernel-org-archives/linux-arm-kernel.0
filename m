@@ -1,72 +1,60 @@
 From: julien.grall@citrix.com (Julien Grall)
-Date: Fri, 7 Aug 2015 17:46:44 +0100
-Subject: [PATCH v3 05/20] xen/grant: Add helper
- gnttab_page_grant_foreign_access_ref_one
+Date: Fri, 7 Aug 2015 17:46:40 +0100
+Subject: [PATCH v3 01/20] net/xen-netback: xenvif_gop_frag_copy: move GSO
+ check out of the loop
 In-Reply-To: <1438966019-19322-1-git-send-email-julien.grall@citrix.com>
 References: <1438966019-19322-1-git-send-email-julien.grall@citrix.com>
-Message-ID: <1438966019-19322-6-git-send-email-julien.grall@citrix.com>
+Message-ID: <1438966019-19322-2-git-send-email-julien.grall@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Many PV drivers contain the idiom:
+The skb doesn't change within the function. Therefore it's only
+necessary to check if we need GSO once at the beginning.
 
-pfn = page_to_gfn(...) /* Or similar */
-gnttab_grant_foreign_access_ref
-
-Replace it by a new helper. Note that when Linux is using a different
-page granularity than Xen, the helper only gives access to the first 4KB
-grant.
-
-This is useful where drivers are allocating a full Linux page for each
-grant.
-
-Also include xen/interface/grant_table.h rather than xen/grant_table.h in
-asm/page.h for x86 to fix a compilation issue [1]. Only the former is
-useful in order to get the structure definition.
-
-[1] Interdependency between asm/page.h and xen/grant_table.h which result
-to page_mfn not being defined when necessary.
-
-Signed-off-by: Julien Grall <julien.grall@linaro.org>
-Reviewed-by: David Vrabel <david.vrabel@citrix.com>
-Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Signed-off-by: Julien Grall <julien.grall@citrix.com>
 
 ---
-Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
-
-    Changes in v3:
-        - Rename gnttab_page_grant_foreign_access_ref into
-        gnttab_page_grant_foreign_access_ref_one
-        - Fix typo in the commit message
-        - s/mfn/gfn based on the new naming
-        - Add David and Stefano's reviewed-by
+Cc: Ian Campbell <ian.campbell@citrix.com>
+Cc: Wei Liu <wei.liu2@citrix.com>
+Cc: netdev at vger.kernel.org
 
     Changes in v2:
         - Patch added
 ---
- include/xen/grant_table.h | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ drivers/net/xen-netback/netback.c | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
 
-diff --git a/include/xen/grant_table.h b/include/xen/grant_table.h
-index 2a8ebe8..1c1ddd9 100644
---- a/include/xen/grant_table.h
-+++ b/include/xen/grant_table.h
-@@ -131,6 +131,15 @@ void gnttab_cancel_free_callback(struct gnttab_free_callback *callback);
- void gnttab_grant_foreign_access_ref(grant_ref_t ref, domid_t domid,
- 				     unsigned long frame, int readonly);
+diff --git a/drivers/net/xen-netback/netback.c b/drivers/net/xen-netback/netback.c
+index 8293374..66f1780 100644
+--- a/drivers/net/xen-netback/netback.c
++++ b/drivers/net/xen-netback/netback.c
+@@ -277,6 +277,13 @@ static void xenvif_gop_frag_copy(struct xenvif_queue *queue, struct sk_buff *skb
+ 	unsigned long bytes;
+ 	int gso_type = XEN_NETIF_GSO_TYPE_NONE;
  
-+/* Give access to the first 4K of the page */
-+static inline void gnttab_page_grant_foreign_access_ref_one(
-+	grant_ref_t ref, domid_t domid,
-+	struct page *page, int readonly)
-+{
-+	gnttab_grant_foreign_access_ref(ref, domid, xen_page_to_gfn(page),
-+					readonly);
-+}
++	if (skb_is_gso(skb)) {
++		if (skb_shinfo(skb)->gso_type & SKB_GSO_TCPV4)
++			gso_type = XEN_NETIF_GSO_TYPE_TCPV4;
++		else if (skb_shinfo(skb)->gso_type & SKB_GSO_TCPV6)
++			gso_type = XEN_NETIF_GSO_TYPE_TCPV6;
++	}
 +
- void gnttab_grant_foreign_transfer_ref(grant_ref_t, domid_t domid,
- 				       unsigned long pfn);
+ 	/* Data must not cross a page boundary. */
+ 	BUG_ON(size + offset > PAGE_SIZE<<compound_order(page));
+ 
+@@ -336,13 +343,6 @@ static void xenvif_gop_frag_copy(struct xenvif_queue *queue, struct sk_buff *skb
+ 		}
+ 
+ 		/* Leave a gap for the GSO descriptor. */
+-		if (skb_is_gso(skb)) {
+-			if (skb_shinfo(skb)->gso_type & SKB_GSO_TCPV4)
+-				gso_type = XEN_NETIF_GSO_TYPE_TCPV4;
+-			else if (skb_shinfo(skb)->gso_type & SKB_GSO_TCPV6)
+-				gso_type = XEN_NETIF_GSO_TYPE_TCPV6;
+-		}
+-
+ 		if (*head && ((1 << gso_type) & queue->vif->gso_mask))
+ 			queue->rx.req_cons++;
  
 -- 
 2.1.4
