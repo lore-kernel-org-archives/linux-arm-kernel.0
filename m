@@ -1,60 +1,42 @@
 From: julien.grall@citrix.com (Julien Grall)
-Date: Fri, 7 Aug 2015 17:46:40 +0100
-Subject: [PATCH v3 01/20] net/xen-netback: xenvif_gop_frag_copy: move GSO
- check out of the loop
+Date: Fri, 7 Aug 2015 17:46:41 +0100
+Subject: [PATCH v3 02/20] arm/xen: Drop pte_mfn and mfn_pte
 In-Reply-To: <1438966019-19322-1-git-send-email-julien.grall@citrix.com>
 References: <1438966019-19322-1-git-send-email-julien.grall@citrix.com>
-Message-ID: <1438966019-19322-2-git-send-email-julien.grall@citrix.com>
+Message-ID: <1438966019-19322-3-git-send-email-julien.grall@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The skb doesn't change within the function. Therefore it's only
-necessary to check if we need GSO once at the beginning.
+They are not used in common code expect in one place in balloon.c which is
+only compiled when Linux is using PV MMU. It's not the case on ARM.
+
+Rather than worrying how to handle the 64KB case, drop them.
 
 Signed-off-by: Julien Grall <julien.grall@citrix.com>
 
 ---
-Cc: Ian Campbell <ian.campbell@citrix.com>
-Cc: Wei Liu <wei.liu2@citrix.com>
-Cc: netdev at vger.kernel.org
+Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Russell King <linux@arm.linux.org.uk>
 
-    Changes in v2:
+    Changes in v3:
         - Patch added
 ---
- drivers/net/xen-netback/netback.c | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+ arch/arm/include/asm/xen/page.h | 3 ---
+ 1 file changed, 3 deletions(-)
 
-diff --git a/drivers/net/xen-netback/netback.c b/drivers/net/xen-netback/netback.c
-index 8293374..66f1780 100644
---- a/drivers/net/xen-netback/netback.c
-+++ b/drivers/net/xen-netback/netback.c
-@@ -277,6 +277,13 @@ static void xenvif_gop_frag_copy(struct xenvif_queue *queue, struct sk_buff *skb
- 	unsigned long bytes;
- 	int gso_type = XEN_NETIF_GSO_TYPE_NONE;
+diff --git a/arch/arm/include/asm/xen/page.h b/arch/arm/include/asm/xen/page.h
+index 1279563..98c9fc3 100644
+--- a/arch/arm/include/asm/xen/page.h
++++ b/arch/arm/include/asm/xen/page.h
+@@ -13,9 +13,6 @@
  
-+	if (skb_is_gso(skb)) {
-+		if (skb_shinfo(skb)->gso_type & SKB_GSO_TCPV4)
-+			gso_type = XEN_NETIF_GSO_TYPE_TCPV4;
-+		else if (skb_shinfo(skb)->gso_type & SKB_GSO_TCPV6)
-+			gso_type = XEN_NETIF_GSO_TYPE_TCPV6;
-+	}
-+
- 	/* Data must not cross a page boundary. */
- 	BUG_ON(size + offset > PAGE_SIZE<<compound_order(page));
+ #define phys_to_machine_mapping_valid(pfn) (1)
  
-@@ -336,13 +343,6 @@ static void xenvif_gop_frag_copy(struct xenvif_queue *queue, struct sk_buff *skb
- 		}
- 
- 		/* Leave a gap for the GSO descriptor. */
--		if (skb_is_gso(skb)) {
--			if (skb_shinfo(skb)->gso_type & SKB_GSO_TCPV4)
--				gso_type = XEN_NETIF_GSO_TYPE_TCPV4;
--			else if (skb_shinfo(skb)->gso_type & SKB_GSO_TCPV6)
--				gso_type = XEN_NETIF_GSO_TYPE_TCPV6;
--		}
+-#define pte_mfn	    pte_pfn
+-#define mfn_pte	    pfn_pte
 -
- 		if (*head && ((1 << gso_type) & queue->vif->gso_mask))
- 			queue->rx.req_cons++;
- 
+ /* Xen machine address */
+ typedef struct xmaddr {
+ 	phys_addr_t maddr;
 -- 
 2.1.4
