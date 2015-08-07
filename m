@@ -1,37 +1,58 @@
-From: wangzhou1@hisilicon.com (Zhou Wang)
-Date: Fri, 7 Aug 2015 14:09:22 +0800
-Subject: [PATCH v6 6/6] MAINTAINERS: Add pcie-hisi maintainer
-In-Reply-To: <1438848559-232109-7-git-send-email-wangzhou1@hisilicon.com>
-References: <1438848559-232109-1-git-send-email-wangzhou1@hisilicon.com>
- <1438848559-232109-7-git-send-email-wangzhou1@hisilicon.com>
-Message-ID: <55C44B92.7010707@hisilicon.com>
+From: b20788@freescale.com (Anson Huang)
+Date: Fri, 7 Aug 2015 22:28:33 +0800
+Subject: [PATCH] ARM: dts: imx6ul: add pm_power_off support
+Message-ID: <1438957713-27661-1-git-send-email-b20788@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+cc jingoohan1 at gmail.com]
+i.MX6UL can be powered off by programming SNVS.
 
-On 2015/8/6 16:09, Zhou Wang wrote:
-> Signed-off-by: Zhou Wang <wangzhou1@hisilicon.com>
-> ---
->  MAINTAINERS | 7 +++++++
->  1 file changed, 7 insertions(+)
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 8133cef..7cd8e47 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -7854,6 +7854,13 @@ S:	Maintained
->  F:	Documentation/devicetree/bindings/pci/xgene-pci-msi.txt
->  F:	drivers/pci/host/pci-xgene-msi.c
->  
-> +PCIE DRIVER FOR HISILICON
-> +M:	Zhou Wang <wangzhou1@hisilicon.com>
-> +L:	linux-pci at vger.kernel.org
-> +S:	Maintained
-> +F:	Documentation/devicetree/bindings/pci/hisilicon-pcie.txt
-> +F:	drivers/pci/host/pcie-hisi.c
-> +
->  PCMCIA SUBSYSTEM
->  P:	Linux PCMCIA Team
->  L:	linux-pcmcia at lists.infradead.org
-> 
+When long press ON/OFF button(5 seconds),
+PMIC_ON_REQ pin will be set to low and external
+PMIC will be powered off.
+
+And system can be powered on by long press ON/OFF
+button again.
+
+Signed-off-by: Anson Huang <b20788@freescale.com>
+---
+ arch/arm/boot/dts/imx6ul-14x14-evk.dts | 4 ++++
+ arch/arm/boot/dts/imx6ul.dtsi          | 8 ++++++++
+ 2 files changed, 12 insertions(+)
+
+diff --git a/arch/arm/boot/dts/imx6ul-14x14-evk.dts b/arch/arm/boot/dts/imx6ul-14x14-evk.dts
+index ee2243b..c27f3c4 100644
+--- a/arch/arm/boot/dts/imx6ul-14x14-evk.dts
++++ b/arch/arm/boot/dts/imx6ul-14x14-evk.dts
+@@ -58,6 +58,10 @@
+ 	};
+ };
+ 
++&snvs_poweroff {
++	status = "okay";
++};
++
+ &uart1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_uart1>;
+diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
+index 514ae43..446913e 100644
+--- a/arch/arm/boot/dts/imx6ul.dtsi
++++ b/arch/arm/boot/dts/imx6ul.dtsi
+@@ -404,6 +404,14 @@
+ 					interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>, <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
+ 				};
+ 
++				snvs_poweroff: snvs-poweroff {
++					compatible = "syscon-poweroff";
++					regmap = <&snvs>;
++					offset = <0x38>;
++					mask = <0x60>;
++					status = "disabled";
++				};
++
+ 				snvs_pwrkey: snvs-powerkey {
+ 					compatible = "fsl,sec-v4.0-pwrkey";
+ 					regmap = <&snvs>;
+-- 
+1.9.1
