@@ -1,68 +1,177 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Fri, 7 Aug 2015 09:40:41 -0700
-Subject: [PATCH 2/2] net, thunder, bgx: Add support for ACPI binding.
-In-Reply-To: <55C4A7AC.1080902@linaro.org>
-References: <1438907590-29649-1-git-send-email-ddaney.cavm@gmail.com>
- <1438907590-29649-3-git-send-email-ddaney.cavm@gmail.com>
- <55C467A0.4020601@linaro.org> <20150807104320.GQ1820@rric.localhost>
- <55C48DF9.70406@linaro.org> <20150807115622.GS4914@rric.localhost>
- <55C4A7AC.1080902@linaro.org>
-Message-ID: <55C4DF89.9060502@caviumnetworks.com>
+From: julien.grall@citrix.com (Julien Grall)
+Date: Fri, 7 Aug 2015 17:46:47 +0100
+Subject: [PATCH v3 08/20] block/xen-blkfront: split get_grant in 2
+In-Reply-To: <1438966019-19322-1-git-send-email-julien.grall@citrix.com>
+References: <1438966019-19322-1-git-send-email-julien.grall@citrix.com>
+Message-ID: <1438966019-19322-9-git-send-email-julien.grall@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/07/2015 05:42 AM, Tomasz Nowicki wrote:
-> On 07.08.2015 13:56, Robert Richter wrote:
->> On 07.08.15 12:52:41, Tomasz Nowicki wrote:
-[...]
+Prepare the code to support 64KB page granularity. The first
+implementation will use a full Linux page per indirect and persistent
+grant. When non-persistent grant is used, each page of a bio request
+may be split in multiple grant.
 
->>>>
->>>> I would not pollute bgx_probe() with acpi and dt specifics, and instead
->>>> keep bgx_init_phy(). The typical design pattern for this is:
->>>>
->>>> static int bgx_init_phy(struct bgx *bgx)
->>>> {
->>>> #ifdef CONFIG_ACPI
->>>>          if (!acpi_disabled)
->>>>                  return bgx_init_acpi_phy(bgx);
->>>> #endif
->>>>          return bgx_init_of_phy(bgx);
->>>> }
->>>>
->>>> This adds acpi runtime detection (acpi=no), does not call dt code in
->>>> case of acpi, and saves the #else for bgx_init_acpi_phy().
->>>>
->>>
->>> I am fine with keeping it in bgx_init_phy(), however we can drop there
->>> #ifdefs since both of bgx_init_{acpi,of}_phy calls have empty stub
->>> for !ACPI
->>> and !OF case. Like that:
->>>
->>> static int bgx_init_phy(struct bgx *bgx)
->>> {
->>>
->>>          if (!acpi_disabled)
->>>                  return bgx_init_acpi_phy(bgx);
->>>     else
->>>              return bgx_init_of_phy(bgx);
->>> }
->>
->> As said, keeping it in #ifdefs makes the empty stub function for !acpi
->> obsolete, which makes the code smaller and better readable. This style
->> is common practice in the kernel. Apart from that, the 'else' should
->> be dropped as it is useless.
->>
->
-> I would't say the code is better readable (bgx_init_of_phy has still two
-> stubs) but this is just cosmetic, my point was to use run time detection
-> using acpi_disabled.
->
+Furthermore, the field page of the grant structure is only used to copy
+data from persistent grant or indirect grant. Avoid to set it for other
+use case as it will have no meaning given the page will be split in
+multiple grant.
 
-Thanks Tomasz and Robert for the input.  Because of this, it seems that 
-another version of the patch will be necessary.  In the interests of 
-code clarity and asthetics, we will go with the code without the 
-#ifdefs, and rely on the compiler to optimize away any dead code.
+Provide 2 functions, to setup indirect grant, the other for bio page.
 
-David Daney
+Signed-off-by: Julien Grall <julien.grall@citrix.com>
 
-> Tomasz
+---
+Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+Cc: Roger Pau Monn? <roger.pau@citrix.com>
+Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
+Cc: David Vrabel <david.vrabel@citrix.com>
+
+    Changes in v3:
+        - Fix errors reported by checkpatch.pl
+        - gnttab_page_grant_foreign_access_ref has been renamed to
+        gnttab_page_grant_foreign_access_ref_one
+        - Fix compilation by using get_indirect_grant rather than
+        get_grant (the changes was in a later patch...).
+        - Make grant_foreign_access static inline
+        - s/mfn/gfn/ based on the new naming
+
+    Changes in v2:
+        - Patch added
+---
+ drivers/block/xen-blkfront.c | 88 +++++++++++++++++++++++++++++---------------
+ 1 file changed, 59 insertions(+), 29 deletions(-)
+
+diff --git a/drivers/block/xen-blkfront.c b/drivers/block/xen-blkfront.c
+index e431e82..52105e7 100644
+--- a/drivers/block/xen-blkfront.c
++++ b/drivers/block/xen-blkfront.c
+@@ -244,34 +244,77 @@ out_of_memory:
+ 	return -ENOMEM;
+ }
+ 
+-static struct grant *get_grant(grant_ref_t *gref_head,
+-			       struct page *page,
+-			       struct blkfront_info *info)
++static struct grant *get_free_grant(struct blkfront_info *info)
+ {
+ 	struct grant *gnt_list_entry;
+-	unsigned long buffer_gfn;
+ 
+ 	BUG_ON(list_empty(&info->grants));
+ 	gnt_list_entry = list_first_entry(&info->grants, struct grant,
+-	                                  node);
++					  node);
+ 	list_del(&gnt_list_entry->node);
+ 
+-	if (gnt_list_entry->gref != GRANT_INVALID_REF) {
++	if (gnt_list_entry->gref != GRANT_INVALID_REF)
+ 		info->persistent_gnts_c--;
++
++	return gnt_list_entry;
++}
++
++static inline void grant_foreign_access(const struct grant *gnt_list_entry,
++					const struct blkfront_info *info)
++{
++	gnttab_page_grant_foreign_access_ref_one(gnt_list_entry->gref,
++						 info->xbdev->otherend_id,
++						 gnt_list_entry->page,
++						 0);
++}
++
++static struct grant *get_grant(grant_ref_t *gref_head,
++			       unsigned long gfn,
++			       struct blkfront_info *info)
++{
++	struct grant *gnt_list_entry = get_free_grant(info);
++
++	if (gnt_list_entry->gref != GRANT_INVALID_REF)
+ 		return gnt_list_entry;
++
++	/* Assign a gref to this page */
++	gnt_list_entry->gref = gnttab_claim_grant_reference(gref_head);
++	BUG_ON(gnt_list_entry->gref == -ENOSPC);
++	if (info->feature_persistent)
++		grant_foreign_access(gnt_list_entry, info);
++	else {
++		/* Grant access to the GFN passed by the caller */
++		gnttab_grant_foreign_access_ref(gnt_list_entry->gref,
++						info->xbdev->otherend_id,
++						gfn, 0);
+ 	}
+ 
++	return gnt_list_entry;
++}
++
++static struct grant *get_indirect_grant(grant_ref_t *gref_head,
++					struct blkfront_info *info)
++{
++	struct grant *gnt_list_entry = get_free_grant(info);
++
++	if (gnt_list_entry->gref != GRANT_INVALID_REF)
++		return gnt_list_entry;
++
+ 	/* Assign a gref to this page */
+ 	gnt_list_entry->gref = gnttab_claim_grant_reference(gref_head);
+ 	BUG_ON(gnt_list_entry->gref == -ENOSPC);
+ 	if (!info->feature_persistent) {
+-		BUG_ON(!page);
+-		gnt_list_entry->page = page;
++		struct page *indirect_page;
++
++		/* Fetch a pre-allocated page to use for indirect grefs */
++		BUG_ON(list_empty(&info->indirect_pages));
++		indirect_page = list_first_entry(&info->indirect_pages,
++						 struct page, lru);
++		list_del(&indirect_page->lru);
++		gnt_list_entry->page = indirect_page;
+ 	}
+-	buffer_gfn = xen_page_to_gfn(gnt_list_entry->page);
+-	gnttab_grant_foreign_access_ref(gnt_list_entry->gref,
+-	                                info->xbdev->otherend_id,
+-	                                buffer_gfn, 0);
++	grant_foreign_access(gnt_list_entry, info);
++
+ 	return gnt_list_entry;
+ }
+ 
+@@ -524,32 +567,19 @@ static int blkif_queue_rw_req(struct request *req)
+ 
+ 		if ((ring_req->operation == BLKIF_OP_INDIRECT) &&
+ 		    (i % SEGS_PER_INDIRECT_FRAME == 0)) {
+-			struct page *uninitialized_var(page);
+-
+ 			if (segments)
+ 				kunmap_atomic(segments);
+ 
+ 			n = i / SEGS_PER_INDIRECT_FRAME;
+-			if (!info->feature_persistent) {
+-				struct page *indirect_page;
+-
+-				/*
+-				 * Fetch a pre-allocated page to use for
+-				 * indirect grefs
+-				 */
+-				BUG_ON(list_empty(&info->indirect_pages));
+-				indirect_page = list_first_entry(&info->indirect_pages,
+-								 struct page, lru);
+-				list_del(&indirect_page->lru);
+-				page = indirect_page;
+-			}
+-			gnt_list_entry = get_grant(&gref_head, page, info);
++			gnt_list_entry = get_indirect_grant(&gref_head, info);
+ 			info->shadow[id].indirect_grants[n] = gnt_list_entry;
+ 			segments = kmap_atomic(gnt_list_entry->page);
+ 			ring_req->u.indirect.indirect_grefs[n] = gnt_list_entry->gref;
+ 		}
+ 
+-		gnt_list_entry = get_grant(&gref_head, sg_page(sg), info);
++		gnt_list_entry = get_grant(&gref_head,
++					   xen_page_to_gfn(sg_page(sg)),
++					   info);
+ 		ref = gnt_list_entry->gref;
+ 
+ 		info->shadow[id].grants_used[i] = gnt_list_entry;
+-- 
+2.1.4
