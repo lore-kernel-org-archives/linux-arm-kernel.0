@@ -1,134 +1,86 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Sat, 8 Aug 2015 07:37:55 +0800
-Subject: [RFC PATCH v4 1/9] mmc: dw_mmc: Add external dma interface support
-In-Reply-To: <CAGhQ9VxUYvgGD=K3J3cQ0CNpCC-RfGE9cxhBHnTeAU2CmWkiKA@mail.gmail.com>
-References: <1438843469-23807-1-git-send-email-shawn.lin@rock-chips.com>
- <1438843491-23853-1-git-send-email-shawn.lin@rock-chips.com>
- <CAGhQ9VxUYvgGD=K3J3cQ0CNpCC-RfGE9cxhBHnTeAU2CmWkiKA@mail.gmail.com>
-Message-ID: <55C54153.2070709@rock-chips.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Fri, 07 Aug 2015 16:45:36 -0700
+Subject: [PATCH 5/9] ARM: common: Introduce PM domains for CPUs/clusters
+In-Reply-To: <CAL_JsqK67=DTtjZwwnonObLDjLbahkREfm0RvyXVV95bhR-d4Q@mail.gmail.com>
+ (Rob Herring's message of "Wed, 5 Aug 2015 22:14:51 -0500")
+References: <1438731339-58317-1-git-send-email-lina.iyer@linaro.org>
+ <1438731339-58317-6-git-send-email-lina.iyer@linaro.org>
+ <CAL_JsqK67=DTtjZwwnonObLDjLbahkREfm0RvyXVV95bhR-d4Q@mail.gmail.com>
+Message-ID: <7hd1yyvf1b.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2015/8/8 5:32, Joachim Eastwood ??:
-> Hi Shawn,
->
-> On 6 August 2015 at 08:44, Shawn Lin <shawn.lin@rock-chips.com> wrote:
->> DesignWare MMC Controller can supports two types of DMA
->> mode: external dma and internal dma. We get a RK312x platform
->> integrated dw_mmc and ARM pl330 dma controller. This patch add
->> edmac ops to support these platforms. I've tested it on RK312x
->> platform with edmac mode and RK3288 platform with idmac mode.
->>
->> Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
->
->> @@ -2256,26 +2373,30 @@ static irqreturn_t dw_mci_interrupt(int irq, void *dev_id)
->>
->>          }
->>
->> -#ifdef CONFIG_MMC_DW_IDMAC
->> -       /* Handle DMA interrupts */
->> -       if (host->dma_64bit_address == 1) {
->> -               pending = mci_readl(host, IDSTS64);
->> -               if (pending & (SDMMC_IDMAC_INT_TI | SDMMC_IDMAC_INT_RI)) {
->> -                       mci_writel(host, IDSTS64, SDMMC_IDMAC_INT_TI |
->> -                                                       SDMMC_IDMAC_INT_RI);
->> -                       mci_writel(host, IDSTS64, SDMMC_IDMAC_INT_NI);
->> -                       host->dma_ops->complete(host);
->> -               }
->> -       } else {
->> -               pending = mci_readl(host, IDSTS);
->> -               if (pending & (SDMMC_IDMAC_INT_TI | SDMMC_IDMAC_INT_RI)) {
->> -                       mci_writel(host, IDSTS, SDMMC_IDMAC_INT_TI |
->> -                                                       SDMMC_IDMAC_INT_RI);
->> -                       mci_writel(host, IDSTS, SDMMC_IDMAC_INT_NI);
->> -                       host->dma_ops->complete(host);
->> +       if (host->use_dma == TRANS_MODE_IDMAC) {
->
-> Doing:
-> if (host->use_dma != TRANS_MODE_IDMAC)
->      return IRQ_HANDLED;
->
+Rob Herring <robherring2@gmail.com> writes:
 
-Okay.
+> On Tue, Aug 4, 2015 at 6:35 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
+>> Define and add Generic PM domains (genpd) for ARM CPU clusters. Many
+>> new
 
-> Could save you the extra level of identation you add below.
->
->> +               /* Handle DMA interrupts */
->> +               if (host->dma_64bit_address == 1) {
->> +                       pending = mci_readl(host, IDSTS64);
->> +                       if (pending & (SDMMC_IDMAC_INT_TI |
->> +                                      SDMMC_IDMAC_INT_RI)) {
->> +                               mci_writel(host, IDSTS64,
->> +                                          SDMMC_IDMAC_INT_TI |
->> +                                          SDMMC_IDMAC_INT_RI);
->> +                               mci_writel(host, IDSTS64, SDMMC_IDMAC_INT_NI);
->> +                               host->dma_ops->complete((void *)host);
->> +                       }
->> +               } else {
->> +                       pending = mci_readl(host, IDSTS);
->> +                       if (pending & (SDMMC_IDMAC_INT_TI |
->> +                                      SDMMC_IDMAC_INT_RI)) {
->> +                               mci_writel(host, IDSTS,
->> +                                          SDMMC_IDMAC_INT_TI |
->> +                                          SDMMC_IDMAC_INT_RI);
->> +                               mci_writel(host, IDSTS, SDMMC_IDMAC_INT_NI);
->> +                               host->dma_ops->complete((void *)host);
->> +                       }
->>                  }
->>          }
->> -#endif
+@Lina: I know you inherited this from some proof-of-concept code frome me, so
+I'm partially to blame, but...
+
+There's really nothing ARM specific about this driver.  
+
+>> SoCs group CPUs as clusters. Clusters share common resources like GIC,
+>> power rail, caches, VFP, Coresight etc. When all CPUs in the cluster are
+>> idle, these shared resources may also be put in their idle state.
 >>
->>          return IRQ_HANDLED;
->>   }
+>> The idle time between the last CPU entering idle and a CPU resuming
+>> execution is an opportunity for these shared resources to be powered
+>> down. Generic PM domain provides a framework for defining such power
+>> domains and attach devices to the domain. When the devices in the domain
+>> are idle at runtime, the domain would also be suspended and resumed
+>> before the first of the devices resume execution.
+>>
+>> We define a generic PM domain for each cluster and attach CPU devices in
+>> the cluster to that PM domain. The DT definitions for the SoC describe
+>> this relationship. Genpd callbacks for power_on and power_off can then
+>> be used to power up/down the shared resources for the domain.
 >
+> [...]
 >
->> @@ -2437,6 +2567,21 @@ static void dw_mci_cleanup_slot(struct dw_mci_slot *slot, unsigned int id)
->>   static void dw_mci_init_dma(struct dw_mci *host)
->>   {
->>          int addr_config;
->> +       int trans_mode;
->> +       struct device *dev = host->dev;
->> +       struct device_node *np = dev->of_node;
+>> +ARM CPU Power domains
 >> +
->> +       /* Check tansfer mode */
->> +       trans_mode = (mci_readl(host, HCON) >> 16) & 0x3;
->
-> I think it would be nice if you could add some defines for 16 and 0x03
-> or add a macro like SDMMC_GET_FCNT() that is in dw_mmc.h.
->
-
-yes, it's better to avoid magic number for register operation to make
-others understand w/o checking databook for details. And might more than 
-one (e.g "Check ADDR_CONFIG bit in HCON to find IDMAC address bus 
-width") should be modified.
-
-Although one patch only do one thing, I will drop by to make it in v5.
-
->> +       if (trans_mode == 0) {
->> +               trans_mode = TRANS_MODE_IDMAC;
->> +       } else if (trans_mode == 1 || trans_mode == 2) {
->> +               trans_mode = TRANS_MODE_EDMAC;
->> +       } else {
->> +               trans_mode = TRANS_MODE_PIO;
->> +               goto no_dma;
->> +       }
+>> +The device tree allows describing of CPU power domains in a SoC. In ARM SoC,
+>> +CPUs may be grouped as clusters. A cluster may have CPUs, GIC, Coresight,
+>> +caches, VFP and power controller and other peripheral hardware. Generally,
+>> +when the CPUs in the cluster are idle/suspended, the shared resources may also
+>> +be suspended and resumed before any of the CPUs resume execution.
 >> +
->>          /* Check ADDR_CONFIG bit in HCON to find IDMAC address bus width */
->>          addr_config = (mci_readl(host, HCON) >> 27) & 0x01;
+>> +CPUs are the defined as the PM domain consumers and there is a PM domain
+>> +provider for the CPUs. Bindings for generic PM domains (genpd) is described in
+>> +[1].
+>> +
+>> +The ARM CPU PM domain follows the same binding convention as any generic PM
+>> +domain. Additional binding properties are -
+>> +
+>> +- compatible:
+>> +       Usage: required
+>> +       Value type: <string>
+>> +       Definition: Must also have
+>> +                       "arm,pd"
+>> +               inorder to initialize the genpd provider as ARM CPU PM domain.
 >
-> I'll try to get this patch tested on my lpc18xx platform soon.
-> btw, the HCON reg on lpc18xx reads as 0x00e42cc1 (address 0x40004070).
+> A compatible string should represent a particular h/w block. If it is
+> generic, it should represent some sort of standard programming
+> interface (e.g, AHCI, EHCI, etc.). This doesn't seem to be either and
+> is rather just a mapping of what "driver" you want to use.
 >
+> I would expect that identifying a cpu's or cluster's power domain
+> would be done by a phandle between the cpu/cluster node and power
+> domain node. 
 
-yes, HCON[17:16] is 2b'00 means your lpc18xx use IDMAC.
+That's correct, the CPU nodes (and other nodes in the cluster like GIC,
+Coresight, etc.) would have phandles to the cluster power domain node.
 
->
-> regard,
-> Joachim Eastwood
->
->
->
+But this series is meant to create the driver & binding for those cluster
+power domain(s), so the question is how exactly describe it.
 
+What we're trying to get to is binding to describe a powerdomain of a
+generic CPU cluster, but of course the actual programming interface for
+powering down the cluster will be platform specific.  In earlier RFC
+versions, Lina had proposed ways for platforms to register some
+low-level hooks with this generic driver for the platform-specific bits,
+but if you have some other suggests, we'd be all ears.
 
--- 
-Shawn Lin
+Kevin
