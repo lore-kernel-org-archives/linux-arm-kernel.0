@@ -1,33 +1,51 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri,  7 Aug 2015 15:56:47 +0200
-Subject: [PATCH] drivers: psci: Allow PSCI node to be disabled
-Message-ID: <1438955807-18574-1-git-send-email-thierry.reding@gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 7 Aug 2015 08:58:30 -0500
+Subject: [PATCH v3 06/18] regulator: core: Probe regulators on demand
+In-Reply-To: <20150807120906.GR20873@sirena.org.uk>
+References: <1438870315-18689-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1438870315-18689-7-git-send-email-tomeu.vizoso@collabora.com>
+ <20150807120906.GR20873@sirena.org.uk>
+Message-ID: <CAL_JsqJf-ZeAhJjkd-6sPH12xL3FX9pOyTBMYHsvS8PnOkAXDQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thierry Reding <treding@nvidia.com>
+On Fri, Aug 7, 2015 at 7:09 AM, Mark Brown <broonie@kernel.org> wrote:
+> On Thu, Aug 06, 2015 at 04:11:43PM +0200, Tomeu Vizoso wrote:
+>
+>> When looking up a regulator through its OF node, probe it if it hasn't
+>> already.
+>>
+>> The goal is to reduce deferred probes to a minimum, as it makes it very
+>> cumbersome to find out why a device failed to probe, and can introduce
+>> very big delays in when a critical device is probed.
+>
+> Still the same problem as we had before with this stuff, why is this DT
+> only?
 
-Allow disabling PSCI support (mostly for testing purposes) by setting
-the status property to "disabled". This makes the node behave in much
-the same way as proper device nodes.
+The last version was more generic, but it was obvious that doing that
+was pointless with current code structure. You have a call sequence
+like either:
 
-Signed-off-by: Thierry Reding <treding@nvidia.com>
----
- drivers/firmware/psci.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+generic get -> DT specific get -> generic poke  -> DT specific poke
 
-diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
-index a6956007dd38..59e66ac2c3b6 100644
---- a/drivers/firmware/psci.c
-+++ b/drivers/firmware/psci.c
-@@ -351,7 +351,7 @@ int __init psci_dt_init(void)
- 
- 	np = of_find_matching_node_and_match(NULL, psci_of_match, &matched_np);
- 
--	if (!np)
-+	if (!np || !of_device_is_available(np))
- 		return -ENODEV;
- 
- 	init_fn = (psci_initcall_t)matched_np->data;
--- 
-2.4.5
+or
+
+generic get -> DT specific get -> DT specific poke
+
+v2 did the former and this version does the latter. However, for some
+reason with regulators this is not all contained within
+of_get_regulator.
+
+>
+>>  #include <linux/regulator/consumer.h>
+>> @@ -1336,6 +1337,7 @@ static struct regulator_dev *regulator_dev_lookup(struct device *dev,
+>>       if (dev && dev->of_node) {
+>>               node = of_get_regulator(dev, supply);
+>>               if (node) {
+>> +                     of_platform_probe(node);
+>
+> And why the assumption that this is a platform device?
+
+Agreed on this point.
+
+Rob
