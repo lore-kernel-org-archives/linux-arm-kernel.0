@@ -1,17 +1,19 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 7 Aug 2015 18:51:27 +0100
+Date: Fri, 7 Aug 2015 18:53:53 +0100
 Subject: [PATCH 2/2] net, thunder, bgx: Add support for ACPI binding.
 In-Reply-To: <55C4ECC6.7050908@caviumnetworks.com>
 References: <1438907590-29649-1-git-send-email-ddaney.cavm@gmail.com>
  <1438907590-29649-3-git-send-email-ddaney.cavm@gmail.com>
  <20150807140106.GE7646@leverpostej>
  <55C4ECC6.7050908@caviumnetworks.com>
-Message-ID: <20150807175127.GB12013@leverpostej>
+Message-ID: <20150807175353.GA31122@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 [Correcting the devicetree list address, which I typo'd in my original
 reply]
+
+[resending to _really_ correct the address, apologies for the spam]
 
 > >> +static const char * const addr_propnames[] = {
 > >> +	"mac-address",
