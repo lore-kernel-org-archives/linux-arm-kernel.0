@@ -1,113 +1,55 @@
-From: jbe@pengutronix.de (Juergen Borleis)
-Date: Fri,  7 Aug 2015 12:47:04 +0200
-Subject: [PATCH v4 2/2] serial: mxs-auart: keep the AUART unit in reset state
- when not in use
-In-Reply-To: <1438944424-9053-1-git-send-email-jbe@pengutronix.de>
-References: <1438944424-9053-1-git-send-email-jbe@pengutronix.de>
-Message-ID: <1438944424-9053-2-git-send-email-jbe@pengutronix.de>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 7 Aug 2015 11:48:03 +0100
+Subject: [PATCH v4 09/10] PCI: ACPI: Bind GIC MSI frame to PCI host bridge
+In-Reply-To: <55C4826C.80600@linaro.org>
+References: <1438164539-29256-1-git-send-email-hanjun.guo@linaro.org>
+ <1438164539-29256-10-git-send-email-hanjun.guo@linaro.org>
+ <55C4826C.80600@linaro.org>
+Message-ID: <20150807104803.GO20873@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Whenever the UART device driver gets closed from userland, the driver
-disables the UART unit and then stops the clocks to save power.
+On Fri, Aug 07, 2015 at 12:03:24PM +0200, Tomasz Nowicki wrote:
 
-The bit which disabled the UART unit is described as:
+> >@@ -670,6 +671,8 @@ static struct irq_domain *pci_host_bridge_msi_domain(struct pci_bus *bus)
+> >  	 * should be called from here.
+> >  	 */
+> >  	d = pci_host_bridge_of_msi_domain(bus);
+> >+	if (!d)
+> >+		d = pci_host_bridge_acpi_msi_domain(bus);
+> 
+> Please use acpi_disabled here.
 
-?"UART Enable. If this bit is set to 1, the UART is enabled. Data
-  transmission and reception occurs for the UART signals. When the
-  UART is disabled in the middle of transmission or reception, it
-  completes the current character before stopping."
+> BTW. This is another place where we need to know our firmware - DT vs ACPI.
+> I know we can use acpi_disabled but I think more about generic solution.
+> Since we already have:
+> struct fwnode_handle	*fwnode;
+> we can create macro which identify h/w description style, something like:
 
-The important part is the "it completes the current character". Whenever
-a reception is ongoing when the UART gets disabled (including the clock
-off) the statemachine freezes and "remembers" this state on the next
-open() when re-enabling the unit's clock.
+> #define FWNODE_TYPE(dev)	dev_fwnode(dev)->type
 
-In this case we end up receiving an additional bogus character
-immediately.
+> and then:
 
-The solution in this change is to switch the AUART unit into its reset
-state on close() and only release it from its reset state on the next
-open().
+> switch (FWNODE_TYPE(&bus->dev)) {
+> case FWNODE_OF:
+> ...
+> case FWNODE_ACPI:
+> ...
+> case FWNODE_XXX:
+> ...
+> }
 
-Note: when the unit is also used as system console it is always 'in use',
-so we cannot reset it on close().
+> Root bus is special case since it has no frimware type but we could factor
+> out pci_set_bus_of_node(). For platform devices we have all we need. Just
+> thinking aloud, let me know your thoughts.
 
-Signed-off-by: Juergen Borleis <jbe@pengutronix.de>
----
- drivers/tty/serial/mxs-auart.c | 46 +++++++++++++++++++++++++++++++++++-------
- 1 file changed, 39 insertions(+), 7 deletions(-)
-
-diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
-index 7dc87a9..8d1cd15 100644
---- a/drivers/tty/serial/mxs-auart.c
-+++ b/drivers/tty/serial/mxs-auart.c
-@@ -858,6 +858,30 @@ static void mxs_auart_reset_deassert(struct uart_port *u)
- 	writel(AUART_CTRL0_CLKGATE, u->membase + AUART_CTRL0_CLR);
- }
- 
-+static void mxs_auart_reset_assert(struct uart_port *u)
-+{
-+	int i;
-+	u32 reg;
-+
-+	reg = readl(u->membase + AUART_CTRL0);
-+	/* if already in reset state, keep it untouched */
-+	if (reg & AUART_CTRL0_SFTRST)
-+		return;
-+
-+	writel(AUART_CTRL0_CLKGATE, u->membase + AUART_CTRL0_CLR);
-+	writel(AUART_CTRL0_SFTRST, u->membase + AUART_CTRL0_SET);
-+
-+	for (i = 0; i < 1000; i++) {
-+		reg = readl(u->membase + AUART_CTRL0);
-+		/* reset is finished when the clock is gated */
-+		if (reg & AUART_CTRL0_CLKGATE)
-+			return;
-+		udelay(10);
-+	}
-+
-+	dev_err(u->dev, "Failed to reset the unit.");
-+}
-+
- static int mxs_auart_startup(struct uart_port *u)
- {
- 	int ret;
-@@ -867,7 +891,13 @@ static int mxs_auart_startup(struct uart_port *u)
- 	if (ret)
- 		return ret;
- 
--	writel(AUART_CTRL0_CLKGATE, u->membase + AUART_CTRL0_CLR);
-+	if (uart_console(u)) {
-+		writel(AUART_CTRL0_CLKGATE, u->membase + AUART_CTRL0_CLR);
-+	} else {
-+		/* reset the unit to a well known state */
-+		mxs_auart_reset_assert(u);
-+		mxs_auart_reset_deassert(u);
-+	}
- 
- 	writel(AUART_CTRL2_UARTEN, u->membase + AUART_CTRL2_SET);
- 
-@@ -899,12 +929,14 @@ static void mxs_auart_shutdown(struct uart_port *u)
- 	if (auart_dma_enabled(s))
- 		mxs_auart_dma_exit(s);
- 
--	writel(AUART_CTRL2_UARTEN, u->membase + AUART_CTRL2_CLR);
--
--	writel(AUART_INTR_RXIEN | AUART_INTR_RTIEN | AUART_INTR_CTSMIEN,
--			u->membase + AUART_INTR_CLR);
--
--	writel(AUART_CTRL0_CLKGATE, u->membase + AUART_CTRL0_SET);
-+	if (uart_console(u)) {
-+		writel(AUART_CTRL2_UARTEN, u->membase + AUART_CTRL2_CLR);
-+		writel(AUART_INTR_RXIEN | AUART_INTR_RTIEN | AUART_INTR_CTSMIEN,
-+				u->membase + AUART_INTR_CLR);
-+		writel(AUART_CTRL0_CLKGATE, u->membase + AUART_CTRL0_SET);
-+	} else {
-+		mxs_auart_reset_assert(u);
-+	}
- 
- 	clk_disable_unprepare(s->clk);
- }
--- 
-2.4.6
+Not knowing the particular detail here but can we not go a step further
+than that and have a fwnode_disabled() for this which does appropriate
+things for both ACPI and DT?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150807/f5c2fece/attachment.sig>
