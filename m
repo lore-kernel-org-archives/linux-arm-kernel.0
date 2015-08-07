@@ -1,45 +1,74 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  7 Aug 2015 11:11:30 +0900
-Subject: [PATCH 06/10] ARM: shmobile: r8a7794: add MMCIF DT support
+Date: Fri,  7 Aug 2015 11:11:31 +0900
+Subject: [PATCH 07/10] ARM: shmobile: silk: add eMMC DT support
 In-Reply-To: <cover.1438911334.git.horms+renesas@verge.net.au>
 References: <cover.1438911334.git.horms+renesas@verge.net.au>
-Message-ID: <6cdf6ba19c8b9a386ef882206b29d97a49271317.1438911334.git.horms+renesas@verge.net.au>
+Message-ID: <054531e7a5cb195140bead068b51cc6147c5c8bf.1438911334.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Define the generic R8A7794 part of the MMCIF0 device node.
+Define the SILK board dependent part of the MMCIF device node (the board has
+eMMC chip) along with the  necessary voltage regulator (note that the Vcc/Vccq
+regulator is dummy -- it's required by the MMCIF driver but doesn't actually
+exist on the board).
 
-Based on the orginal patch by Shinobu Uehara <shinobu.uehara.xc@renesas.com>.
+Based on the original patch by Vladimir Barinov
+<vladimir.barinov@cogentembedded.com>.
 
 Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7794.dtsi | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ arch/arm/boot/dts/r8a7794-silk.dts | 25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
-index 51cc2b975c3f..43acf185ecc4 100644
---- a/arch/arm/boot/dts/r8a7794.dtsi
-+++ b/arch/arm/boot/dts/r8a7794.dtsi
-@@ -383,6 +383,17 @@
- 		status = "disabled";
+diff --git a/arch/arm/boot/dts/r8a7794-silk.dts b/arch/arm/boot/dts/r8a7794-silk.dts
+index 79bc64b94456..d4dd5a30ccdf 100644
+--- a/arch/arm/boot/dts/r8a7794-silk.dts
++++ b/arch/arm/boot/dts/r8a7794-silk.dts
+@@ -30,6 +30,15 @@
+ 		device_type = "memory";
+ 		reg = <0 0x40000000 0 0x40000000>;
  	};
- 
-+	mmcif0: mmc at ee200000 {
-+		compatible = "renesas,mmcif-r8a7794", "renesas,sh-mmcif";
-+		reg = <0 0xee200000 0 0x80>;
-+		interrupts = <0 169 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp3_clks R8A7794_CLK_MMCIF0>;
-+		dmas = <&dmac0 0xd1>, <&dmac0 0xd2>;
-+		dma-names = "tx", "rx";
-+		reg-io-width = <4>;
-+		status = "disabled";
-+	};
 +
- 	sdhi0: sd at ee100000 {
- 		compatible = "renesas,sdhi-r8a7794";
- 		reg = <0 0xee100000 0 0x200>;
++	d3_3v: regulator at 0 {
++		compatible = "regulator-fixed";
++		regulator-name = "D3.3V";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-boot-on;
++		regulator-always-on;
++	};
+ };
+ 
+ &extal_clk {
+@@ -51,6 +60,11 @@
+ 		renesas,groups = "intc_irq8";
+ 		renesas,function = "intc";
+ 	};
++
++	mmcif0_pins: mmcif0 {
++		renesas,groups = "mmc_data8", "mmc_ctrl";
++		renesas,function = "mmc";
++	};
+ };
+ 
+ &scif2 {
+@@ -75,3 +89,14 @@
+ 		micrel,led-mode = <1>;
+ 	};
+ };
++
++&mmcif0 {
++	pinctrl-0 = <&mmcif0_pins>;
++	pinctrl-names = "default";
++
++	vmmc-supply = <&d3_3v>;
++	vqmmc-supply = <&d3_3v>;
++	bus-width = <8>;
++	non-removable;
++	status = "okay";
++};
 -- 
 2.1.4
