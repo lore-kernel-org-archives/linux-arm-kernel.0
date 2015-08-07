@@ -1,111 +1,51 @@
-From: lftan@altera.com (Ley Foon Tan)
-Date: Fri, 7 Aug 2015 15:43:01 +0800
-Subject: [PATCH v3 4/5] Documentation: dt-bindings: pci: altera pcie device
- tree binding
-In-Reply-To: <1438933382-2936-1-git-send-email-lftan@altera.com>
-References: <1438933382-2936-1-git-send-email-lftan@altera.com>
-Message-ID: <1438933382-2936-5-git-send-email-lftan@altera.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Fri, 07 Aug 2015 09:46:37 +0200
+Subject: [PATCH 2/3] nvmem: imx-ocotp: Add i.MX6 OCOTP driver
+In-Reply-To: <55C3B74F.5010501@linaro.org>
+References: <1438693342-605-1-git-send-email-p.zabel@pengutronix.de>
+ <1438693342-605-2-git-send-email-p.zabel@pengutronix.de>
+ <55C38941.9090709@linaro.org> <1438878490.3223.10.camel@pengutronix.de>
+ <55C3B74F.5010501@linaro.org>
+Message-ID: <1438933597.3638.5.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the bindings for Altera PCIe host controller driver and
-Altera PCIe MSI driver.
+Am Donnerstag, den 06.08.2015, 20:36 +0100 schrieb Srinivas Kandagatla:
+> Hi Philipp,
+> 
+> Could you add Greg KH in the CC, for next merge window, we can request 
+> Greg to take this driver via his tree.
+> 
+> Once the comments are fixed you can add my
+> 
+> Acked-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> 
+> On 06/08/15 17:28, Philipp Zabel wrote:
+> > Hi Srinivas,
+> >
+> > Am Donnerstag, den 06.08.2015, 17:20 +0100 schrieb Srinivas Kandagatla:
+> >> Few Nits..
+> >>
+> >> On 04/08/15 14:02, Philipp Zabel wrote:
+> >>> +#include <linux/clk.h>
+> >> May be you can drop this?
+> >
+> > Yes, that's a left-over and can be removed.
+> >
+> >> BTW, who is taking care of the gated peripheral clock controlled for
+> >> this driver?
+> >
+> > Nobody. I had initially copied the code that actually senses the fuses,
+> > but since this happens during power-on reset anyway (all values are
+> > stored in shadow registers), I didn't see the point and dropped it for
+> > now.
+> > The shadow registers are clocked directly by the ungated ipg_root clock.
+> 
+> So, are you planning to drop the clocks property from the bindings too?
 
-Signed-off-by: Ley Foon Tan <lftan@altera.com>
----
- .../devicetree/bindings/pci/altera-pcie-msi.txt    | 27 ++++++++++++
- .../devicetree/bindings/pci/altera-pcie.txt        | 49 ++++++++++++++++++++++
- 2 files changed, 76 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pci/altera-pcie-msi.txt
- create mode 100644 Documentation/devicetree/bindings/pci/altera-pcie.txt
+The gated clock input exists and is needed for the full functionality of
+the device (writing and re-sensing fuses). It should be in the device
+tree even if the linux driver doesn't implement writing.
 
-diff --git a/Documentation/devicetree/bindings/pci/altera-pcie-msi.txt b/Documentation/devicetree/bindings/pci/altera-pcie-msi.txt
-new file mode 100644
-index 0000000..7f330c9
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pci/altera-pcie-msi.txt
-@@ -0,0 +1,27 @@
-+* Altera PCIe MSI controller
-+
-+Required properties:
-+- compatible:	should contain "altr,msi-1.0"
-+- reg:		specifies the physical base address of the controller and
-+		the length of the memory mapped region.
-+- reg-names:	Must include the following entries:
-+		"csr": CSR registers
-+		"vector_slave": vectors region
-+-interrupts:	specifies the interrupt source of the parent interrupt
-+		controller. The format of the interrupt specifier depends on the
-+		parent interrupt controller.
-+- num-vectors:	Number of vectors, range 1 to 32.
-+- msi-controller:	indicates that this is MSI controller node
-+
-+
-+Example
-+msi0: msi at 0xFF200000 {
-+	compatible = "altr,msi-1.0";
-+	reg = <0xFF200000 0x00000010
-+		0xFF200010 0x00000080>;
-+	reg-names = "csr", "vector_slave";
-+	interrupt-parent = <&hps_0_arm_gic_0>;
-+	interrupts = <0 42 4>;
-+	msi-controller = <1>;
-+	num-vectors = <32>;
-+};
-diff --git a/Documentation/devicetree/bindings/pci/altera-pcie.txt b/Documentation/devicetree/bindings/pci/altera-pcie.txt
-new file mode 100644
-index 0000000..729193d
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pci/altera-pcie.txt
-@@ -0,0 +1,49 @@
-+* Altera PCIe controller
-+
-+Required properties:
-+- compatible :	should contain "altr,pcie-root-port-1.0"
-+- reg:		A list of physical base address and length for TXS and CRA.
-+- reg-names:	Must include the following entries:
-+		"Txs": TXS region
-+		"Cra": Control register access region
-+-interrupts:	specifies the interrupt source of the parent interrupt controller.
-+		The format of the interrupt specifier depends on the parent interrupt
-+		controller.
-+- device_type:	must be "pci"
-+- #address-cells:	set to <3>
-+- #size-cells:	set to <2>
-+- #interrupt-cells:	set to <1>
-+- ranges:		Describes the translation of addresses for root ports and standard
-+		PCI regions.
-+- interrupt-map-mask and interrupt-map: standard PCI properties
-+	to define the mapping of the PCIe interface to interrupt
-+	numbers.
-+
-+Optional properties:
-+- msi-parent:	Link to the hardware entity that serves as the MSI controller for this PCIe
-+		controller.
-+- bus-range:	PCI bus numbers covered
-+
-+Example
-+	pcie_0: pcie at 0xc00000000 {
-+		compatible = "altr,pcie-root-port-1.0";
-+		reg = <0xc0000000 0x20000000>,
-+			<0xff220000 0x00004000>;
-+		reg-names = "Txs", "Cra";
-+		interrupt-parent = <&hps_0_arm_gic_0>;
-+		interrupts = <0 40 4>;
-+		interrupt-controller;
-+		#interrupt-cells = <1>;
-+		bus-range = <0x0 0xFF>;
-+		device_type = "pci";
-+		msi-parent = <&msi_to_gic_gen_0>;
-+		#address-cells = <3>;
-+		#size-cells = <2>;
-+		interrupt-map-mask = <0 0 0 7>;
-+		interrupt-map = <0 0 0 1 &pcie_0 1>,
-+			            <0 0 0 2 &pcie_0 2>,
-+			            <0 0 0 3 &pcie_0 3>,
-+			            <0 0 0 4 &pcie_0 4>;
-+		ranges = <0x82000000 0x00000000 0x00000000 0xc0000000 0x00000000 0x10000000
-+			    0x82000000 0x00000000 0x10000000 0xd0000000 0x00000000 0x10000000>;
-+	};
--- 
-1.8.2.1
+regards
+Philipp
