@@ -1,55 +1,63 @@
-From: scott.shu@mediatek.com (Scott Shu)
-Date: Fri, 7 Aug 2015 09:59:45 +0800
-Subject: [PATCH v3 5/8] ARM: mediatek: add smp bringup code for MT6580
-In-Reply-To: <20150806061918.GK18700@pengutronix.de>
-References: <1438696464-59858-1-git-send-email-scott.shu@mediatek.com>
- <1438696464-59858-6-git-send-email-scott.shu@mediatek.com>
- <1801910.hz53dYUgta@ubix> <20150806061918.GK18700@pengutronix.de>
-Message-ID: <1438912785.1900.33.camel@mtkswgap22>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri,  7 Aug 2015 11:11:31 +0900
+Subject: [GIT PULL] Third Round of Renesas ARM Based SoC DT Updates for v4.3
+Message-ID: <cover.1438911334.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2015-08-06 at 08:19 +0200, Sascha Hauer wrote:
-> On Wed, Aug 05, 2015 at 06:47:03PM +0200, Matthias Brugger wrote:
-> > On Tuesday, August 04, 2015 09:54:21 PM Scott Shu wrote:
-> > > Add support for cpu enable-method "mediatek,mt6580-smp" for booting
-> > > secondary CPUs on MT6580.
-> > > 
-> > > Signed-off-by: Scott Shu <scott.shu@mediatek.com>
-> > > ---
-> > >  arch/arm/mach-mediatek/platsmp.c |  137
-> > > ++++++++++++++++++++++++++++++++++++++ 1 file changed, 137 insertions(+)
-> > > +
-> > > +static void __init mt6580_smp_prepare_cpus(unsigned int max_cpus)
-> > > +{
-> > > +	static void __iomem *infracfg_ao_base;
-> > > +
-> > > +	infracfg_ao_base = ioremap(MT6580_INFRACFG_AO, 0x1000);
-> > > +	if (!infracfg_ao_base) {
-> > > +		pr_err("%s: Unable to map I/O memory\n", __func__);
-> > > +		return;
-> > > +	}
-> > > +
-> > > +	/* Enable bootrom power down mode */
-> > > +	writel_relaxed(readl(infracfg_ao_base + 0x804) | SW_ROM_PD,
-> > > +		       infracfg_ao_base + 0x804);
-> > 
-> > Please use a define for the offset.
-> > I prefer to not cascade reads and writes but to use a temporary variable. But 
-> > if this is fine with the kernel coding style (I doubt, but I'm not sure) then 
-> > this is fine.
-> 
-> For what it's worth I also prefer
-> 
-> 	val = readl(infracfg_ao_base + 0x804);
-> 	val |= SW_ROM_PD:
-> 	writel_relaxed(val, infracfg_ao_base + 0x804);
-> 
-> I find this better readable. I don't think though that there's common
-> agreement that this style is better.
-> 
-> Sascha
-> 
-Fixed in next version. Thanks.
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Scott
+Please consider these third round of Renesas ARM based SoC DT updates for v4.3.
+
+This pull request is based on the previous round of
+such requests, tagged as renesas-dt2-for-v4.3,
+which I have already sent a pull-request for.
+
+
+The following changes since commit 7fd6e11dca09b21efbe2b9db4eff08c8f4a16125:
+
+  ARM: shmobile: r8a7791: Add Audio MIX support on DTSI (2015-07-22 09:36:49 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt3-for-v4.3
+
+for you to fetch changes up to 94bdc48d55ca10f90b4a625f0e443197e0013557:
+
+  ARM: shmobile: sh73a0 dtsi: Add missing "gpio-ranges" to gpio node (2015-08-05 06:39:28 +0900)
+
+----------------------------------------------------------------
+Third Round of Renesas ARM Based SoC DT Updates for v4.3
+
+* Add JPU support: r8a7791 and r8a7790 SoCs
+* Add MMCIF and PFC support: r8a7794 SoC
+* Add initial support for r8a7794/silk
+* Add missing "gpio-ranges" to gpio nodes: sh73a0, r8a7740 and r8a73a4 SoCs
+
+----------------------------------------------------------------
+Geert Uytterhoeven (3):
+      ARM: shmobile: r8a73a4 dtsi: Add missing "gpio-ranges" to gpio node
+      ARM: shmobile: r8a7740 dtsi: Add missing "gpio-ranges" to gpio node
+      ARM: shmobile: sh73a0 dtsi: Add missing "gpio-ranges" to gpio node
+
+Mikhail Ulyanov (2):
+      ARM: shmobile: r8a7790: Add JPU device node.
+      ARM: shmobile: r8a7791: Add JPU device node.
+
+Sergei Shtylyov (5):
+      ARM: shmobile: r8a7794: add PFC DT support
+      ARM: shmobile: silk: initial device tree
+      ARM: shmobile: silk: add Ether DT support
+      ARM: shmobile: r8a7794: add MMCIF DT support
+      ARM: shmobile: silk: add eMMC DT support
+
+ arch/arm/boot/dts/Makefile         |   1 +
+ arch/arm/boot/dts/r8a73a4.dtsi     |   7 +++
+ arch/arm/boot/dts/r8a7740.dtsi     |   1 +
+ arch/arm/boot/dts/r8a7790.dtsi     |   7 +++
+ arch/arm/boot/dts/r8a7791.dtsi     |   7 +++
+ arch/arm/boot/dts/r8a7794-silk.dts | 102 +++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/r8a7794.dtsi     |  17 +++++++
+ arch/arm/boot/dts/sh73a0.dtsi      |   3 ++
+ 8 files changed, 145 insertions(+)
+ create mode 100644 arch/arm/boot/dts/r8a7794-silk.dts
