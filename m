@@ -1,59 +1,38 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Fri, 07 Aug 2015 10:41:48 +0100
-Subject: [PATCH v1 7/7] ARM: dts: ifc6410: add inforce LVDS panel support
-In-Reply-To: <55B957B4.40501@codeaurora.org>
-References: <1438087956-17307-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1438088076-17606-1-git-send-email-srinivas.kandagatla@linaro.org>
- <55B957B4.40501@codeaurora.org>
-Message-ID: <55C47D5C.8060905@linaro.org>
+From: hl@rock-chips.com (hl)
+Date: Fri, 07 Aug 2015 17:41:45 +0800
+Subject: [PATCH v4 1/2] clk: rockchip: add pclk_pd_pmu to the list of
+ rk3288 critical clocks
+In-Reply-To: <1438939872-2116-1-git-send-email-hl@rock-chips.com>
+References: <1438939872-2116-1-git-send-email-hl@rock-chips.com>
+Message-ID: <55C47D59.8080403@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 29/07/15 23:46, Stephen Boyd wrote:
-> On 07/28/2015 05:54 AM, Srinivas Kandagatla wrote:
->> +
->> +        panel_3p3v: panel_3p3v {
->> +            compatible = "regulator-fixed";
->> +            pinctrl-0 = <&disp_en_gpios>;
->> +            pinctrl-names = "default";
->> +            regulator-min-microvolt = <3300000>;
->> +            regulator-max-microvolt = <3300000>;
->> +            regulator-name = "panel_en_3p3v";
->> +            regulator-type = "voltage";
->> +            startup-delay-us = <0>;
->> +            gpio = <&pm8921_gpio 36 GPIO_ACTIVE_HIGH>;
->> +            enable-active-high;
->> +            regulator-boot-on;
->> +        };
+Hi Heiko,
+> pclk_pd_pmu needs to keep running and with the upcoming gpio clock
+> handling this is not always the case anymore. So add it to the list
+> of critical clocks for now.
 >
-> We should put gpio regulators into their own container in the root of
-> the tree. Similar to what was done for 8960 gpio regulators.
-I agree, Will do this in next version.
+> From: Heiko Stuebner <heiko@sntech.de>
+> Signed-off-by: Lin Huang <hl@rock-chips.com>
+     is it the right way?  if it still can not meet the requirement, 
+please let me know.
+> ---
+> Changes in v4:
+> - Add From: Heiko Stuebner <heiko@sntech.de>
 >
->> +
->> +        backlight: backlight{
->> +            pinctrl-0 = <&pwm_bl_gpios>;
->> +            pinctrl-names = "default";
->> +            compatible = "gpio-backlight";
->> +            gpios = <&pm8921_gpio 26 GPIO_ACTIVE_HIGH>;
->> +            default-on;
->> +        };
->> +
->> +        panel: auo,b101xtn01 {
->> +            status = "okay";
->> +            compatible = "auo,b101xtn01";
->> +
->> +            ddc-i2c-bus = <&i2c3>;
->> +            backlight = <&backlight>;
->> +            power-supply = <&panel_3p3v>;
->>           };
+>   drivers/clk/rockchip/clk-rk3288.c | 1 +
+>   1 file changed, 1 insertion(+)
 >
-> These two nodes shouldn't be under the SoC node. They don't have
-> registers so they should be at the root of the tree. And we don't need
-> to put labels twice on nodes. If we're modifying things in board
-> specific dtsi files it should be fine to leave the label off if the
-> label is in the SoC dtsi file.
-Yep, will fix it in next version.
->
+> diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
+> index 0df5bae..9040878 100644
+> --- a/drivers/clk/rockchip/clk-rk3288.c
+> +++ b/drivers/clk/rockchip/clk-rk3288.c
+> @@ -780,6 +780,7 @@ static const char *const rk3288_critical_clocks[] __initconst = {
+>   	"aclk_cpu",
+>   	"aclk_peri",
+>   	"hclk_peri",
+> +	"pclk_pd_pmu",
+>   };
+>   
+>   #ifdef CONFIG_PM_SLEEP
