@@ -1,41 +1,96 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  7 Aug 2015 11:11:27 +0900
-Subject: [PATCH 03/10] ARM: shmobile: r8a7794: add PFC DT support
+Date: Fri,  7 Aug 2015 11:11:28 +0900
+Subject: [PATCH 04/10] ARM: shmobile: silk: initial device tree
 In-Reply-To: <cover.1438911334.git.horms+renesas@verge.net.au>
 References: <cover.1438911334.git.horms+renesas@verge.net.au>
-Message-ID: <fd1683c18c372d51aeeeb25efa8b451f922c9c52.1438911334.git.horms+renesas@verge.net.au>
+Message-ID: <a42fc57a9e9d1dbb1d8cc0c3ccf2d7ea1a939559.1438911334.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Define the generic R8A7794 part of the PFC device node.
+Add the initial device  tree for the R8A7794 SoC based SILK low cost board.
+SCIF2 serial port support is included, so that the serial console can work.
 
-Based on original patch by Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>.
+Based on the original patch by Vladimir Barinov
+<vladimir.barinov@cogentembedded.com>.
 
 Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Acked-by: by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7794.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/boot/dts/Makefile         |  1 +
+ arch/arm/boot/dts/r8a7794-silk.dts | 51 ++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 52 insertions(+)
+ create mode 100644 arch/arm/boot/dts/r8a7794-silk.dts
 
-diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
-index 8824dbd5dbb4..51cc2b975c3f 100644
---- a/arch/arm/boot/dts/r8a7794.dtsi
-+++ b/arch/arm/boot/dts/r8a7794.dtsi
-@@ -108,6 +108,12 @@
- 		clocks = <&mstp4_clks R8A7794_CLK_IRQC>;
- 	};
- 
-+	pfc: pin-controller at e6060000 {
-+		compatible = "renesas,pfc-r8a7794";
-+		reg = <0 0xe6060000 0 0x11c>;
-+		#gpio-range-cells = <3>;
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 679d7cc2f57c..c6e0befabada 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -518,6 +518,7 @@ dtb-$(CONFIG_ARCH_SHMOBILE_MULTI) += \
+ 	r8a7791-koelsch.dtb \
+ 	r8a7793-gose.dtb \
+ 	r8a7794-alt.dtb \
++	r8a7794-silk.dtb \
+ 	sh73a0-kzm9g.dtb
+ dtb-$(CONFIG_ARCH_SOCFPGA) += \
+ 	socfpga_arria5_socdk.dtb \
+diff --git a/arch/arm/boot/dts/r8a7794-silk.dts b/arch/arm/boot/dts/r8a7794-silk.dts
+new file mode 100644
+index 000000000000..f3da95b1dedd
+--- /dev/null
++++ b/arch/arm/boot/dts/r8a7794-silk.dts
+@@ -0,0 +1,51 @@
++/*
++ * Device Tree Source for the SILK board
++ *
++ * Copyright (C) 2014 Renesas Electronics Corporation
++ * Copyright (C) 2014-2015 Renesas Solutions Corp.
++ * Copyright (C) 2014-2015 Cogent Embedded, Inc.
++ *
++ * This file is licensed under the terms of the GNU General Public License
++ * version 2.  This program is licensed "as is" without any warranty of any
++ * kind, whether express or implied.
++ */
++
++/dts-v1/;
++#include "r8a7794.dtsi"
++
++/ {
++	model = "SILK";
++	compatible = "renesas,silk", "renesas,r8a7794";
++
++	aliases {
++		serial0 = &scif2;
 +	};
 +
- 	dmac0: dma-controller at e6700000 {
- 		compatible = "renesas,rcar-dmac";
- 		reg = <0 0xe6700000 0 0x20000>;
++	chosen {
++		bootargs = "ignore_loglevel";
++		stdout-path = &scif2;
++	};
++
++	memory at 40000000 {
++		device_type = "memory";
++		reg = <0 0x40000000 0 0x40000000>;
++	};
++};
++
++&extal_clk {
++	clock-frequency = <20000000>;
++};
++
++&pfc {
++	scif2_pins: serial2 {
++		renesas,groups = "scif2_data";
++		renesas,function = "scif2";
++	};
++};
++
++&scif2 {
++	pinctrl-0 = <&scif2_pins>;
++	pinctrl-names = "default";
++
++	status = "okay";
++};
 -- 
 2.1.4
