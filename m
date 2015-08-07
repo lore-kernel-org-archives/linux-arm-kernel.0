@@ -1,101 +1,171 @@
 From: julien.grall@citrix.com (Julien Grall)
-Date: Fri, 7 Aug 2015 17:46:39 +0100
-Subject: [PATCH v3 00/20] xen/arm64: Add support for 64KB page
-Message-ID: <1438966019-19322-1-git-send-email-julien.grall@citrix.com>
+Date: Fri, 7 Aug 2015 17:46:43 +0100
+Subject: [PATCH v3 04/20] xen/grant: Introduce helpers to split a page into
+ grant
+In-Reply-To: <1438966019-19322-1-git-send-email-julien.grall@citrix.com>
+References: <1438966019-19322-1-git-send-email-julien.grall@citrix.com>
+Message-ID: <1438966019-19322-5-git-send-email-julien.grall@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Currently, a grant is always based on the Xen page granularity (i.e
+4KB). When Linux is using a different page granularity, a single page
+will be split between multiple grants.
 
-ARM64 Linux is supporting both 4KB and 64KB page granularity. Although, Xen
-hypercall interface and PV protocol are always based on 4KB page granularity.
+The new helpers will be in charge to split the Linux page into grants and
+call a function given by the caller on each grant.
 
-Any attempt to boot a Linux guest with 64KB pages enabled will result to a
-guest crash.
+Also provide an helper to count the number of grants within a given
+contiguous region.
 
-This series is a first attempt to allow those Linux running with the current
-hypercall interface and PV protocol.
+Note that the x86/include/asm/xen/page.h is now including
+xen/interface/grant_table.h rather than xen/grant_table.h. It's
+necessary because xen/grant_table.h depends on asm/xen/page.h and will
+break the compilation. Furthermore, only definition in
+interface/grant_table.h was required.
 
-This solution has been chosen because we want to run Linux 64KB in released
-Xen ARM version or/and platform using an old version of Linux DOM0.
+Signed-off-by: Julien Grall <julien.grall@citrix.com>
 
-There is room for improvement, such as support of 64KB grant, modification
-of PV protocol to support different page size... They will be explored in a
-separate patch series later.
+---
+Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
+Cc: David Vrabel <david.vrabel@citrix.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Ingo Molnar <mingo@redhat.com>
+Cc: "H. Peter Anvin" <hpa@zytor.com>
+Cc: x86 at kernel.org
 
-TODO list:
-    - Convert swiotlb to 64KB
-    - Convert xenfb to 64KB
-    - Check if backend in QEMU works with DOM0 64KB
-    - It may be possible to move some common define between
-    netback/netfront and blkfront/blkback in an header
+    Changes in v3:
+        - Fix error reported by checkpatch.pl
+        - Typoes
+        - s/pfn/xen_pfn/ in gnttab_foreach_grant
+        - Drop the possibility to use less data. The complexity is moved
+        in netback which is the only user
+        - Rename gnttab_foreach_grant into gnttab_foreach_grant_in_range
+        - s/offset/start/ in gnttab_count_grant and update the
+        description of the parameter
+        - s/mfn/gfn base on the new terminologies
+        - Add EXPORT_SYMBOL_GPL for gnttab_foreach_grant_in_range
+        - Use xen_offset_in_page and XEN_PFN_DOWN whenever it's possible
+        - Fix compilation on x86.
 
-All patches has been built tested for ARM32, ARM64, x86. But I haven't tested
-to run it on x86 as I don't have a box with Xen x86 running. I would be
-happy if someone give a try and see possible regression for x86.
+    Changes in v2:
+        - Patch added
+---
+ arch/x86/include/asm/xen/page.h |  2 +-
+ drivers/xen/grant-table.c       | 26 +++++++++++++++++++++++++
+ include/xen/grant_table.h       | 42 +++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 69 insertions(+), 1 deletion(-)
 
-A branch based on the latest linux/master can be found here:
-
-git://xenbits.xen.org/people/julieng/linux-arm.git branch xen-64k-v3
-
-Comments, suggestions are welcomed.
-
-Sincerely yours,
-
-Cc: david.vrabel at citrix.com
-Cc: konrad.wilk at oracle.com
-Cc: boris.ostrovsky at oracle.com
-Cc: wei.liu2 at citrix.com
-Cc: roger.pau at citrix.com
-
-Julien Grall (20):
-  net/xen-netback: xenvif_gop_frag_copy: move GSO check out of the loop
-  arm/xen: Drop pte_mfn and mfn_pte
-  xen: Add Xen specific page definition
-  xen/grant: Introduce helpers to split a page into grant
-  xen/grant: Add helper gnttab_page_grant_foreign_access_ref_one
-  block/xen-blkfront: Split blkif_queue_request in 2
-  block/xen-blkfront: Store a page rather a pfn in the grant structure
-  block/xen-blkfront: split get_grant in 2
-  xen/biomerge: Don't allow biovec to be merge when Linux is not using
-    4KB page
-  xen/xenbus: Use Xen page definition
-  tty/hvc: xen: Use xen page definition
-  xen/balloon: Don't rely on the page granularity is the same for Xen
-    and Linux
-  xen/events: fifo: Make it running on 64KB granularity
-  xen/grant-table: Make it running on 64KB granularity
-  block/xen-blkfront: Make it running on 64KB page granularity
-  block/xen-blkback: Make it running on 64KB page granularity
-  net/xen-netfront: Make it running on 64KB page granularity
-  net/xen-netback: Make it running on 64KB page granularity
-  xen/privcmd: Add support for Linux 64KB page granularity
-  arm/xen: Add support for 64KB page granularity
-
- arch/arm/include/asm/xen/page.h     |  18 +-
- arch/arm/xen/enlighten.c            |   6 +-
- arch/arm/xen/p2m.c                  |   6 +-
- arch/x86/include/asm/xen/page.h     |   2 +-
- drivers/block/xen-blkback/blkback.c |   5 +-
- drivers/block/xen-blkback/common.h  |  17 +-
- drivers/block/xen-blkback/xenbus.c  |   9 +-
- drivers/block/xen-blkfront.c        | 552 +++++++++++++++++++++++-------------
- drivers/net/xen-netback/common.h    |  15 +-
- drivers/net/xen-netback/netback.c   | 163 +++++++----
- drivers/net/xen-netfront.c          | 122 +++++---
- drivers/tty/hvc/hvc_xen.c           |   4 +-
- drivers/xen/balloon.c               |  47 ++-
- drivers/xen/biomerge.c              |   8 +
- drivers/xen/events/events_base.c    |   2 +-
- drivers/xen/events/events_fifo.c    |   2 +-
- drivers/xen/grant-table.c           |  32 ++-
- drivers/xen/privcmd.c               |   8 +-
- drivers/xen/xenbus/xenbus_client.c  |   6 +-
- drivers/xen/xenbus/xenbus_probe.c   |   3 +-
- drivers/xen/xlate_mmu.c             | 124 +++++---
- include/xen/grant_table.h           |  51 ++++
- include/xen/page.h                  |  27 +-
- 23 files changed, 844 insertions(+), 385 deletions(-)
-
+diff --git a/arch/x86/include/asm/xen/page.h b/arch/x86/include/asm/xen/page.h
+index 0b762f6..501479e 100644
+--- a/arch/x86/include/asm/xen/page.h
++++ b/arch/x86/include/asm/xen/page.h
+@@ -12,7 +12,7 @@
+ #include <asm/pgtable.h>
+ 
+ #include <xen/interface/xen.h>
+-#include <xen/grant_table.h>
++#include <xen/interface/grant_table.h>
+ #include <xen/features.h>
+ 
+ /* Xen machine address */
+diff --git a/drivers/xen/grant-table.c b/drivers/xen/grant-table.c
+index 62f591f..94ae0fd 100644
+--- a/drivers/xen/grant-table.c
++++ b/drivers/xen/grant-table.c
+@@ -776,6 +776,32 @@ void gnttab_batch_copy(struct gnttab_copy *batch, unsigned count)
+ }
+ EXPORT_SYMBOL_GPL(gnttab_batch_copy);
+ 
++void gnttab_foreach_grant_in_range(struct page *page,
++				   unsigned int offset,
++				   unsigned int len,
++				   xen_grant_fn_t fn,
++				   void *data)
++{
++	unsigned int goffset;
++	unsigned int glen;
++	unsigned long xen_pfn;
++
++	len = min_t(unsigned int, PAGE_SIZE - offset, len);
++	goffset = xen_offset_in_page(offset);
++
++	xen_pfn = xen_page_to_pfn(page) + XEN_PFN_DOWN(offset);
++
++	while (len) {
++		glen = min_t(unsigned int, XEN_PAGE_SIZE - goffset, len);
++		fn(pfn_to_gfn(xen_pfn), goffset, glen, data);
++
++		goffset = 0;
++		xen_pfn++;
++		len -= glen;
++	}
++}
++EXPORT_SYMBOL_GPL(gnttab_foreach_grant_in_range);
++
+ int gnttab_map_refs(struct gnttab_map_grant_ref *map_ops,
+ 		    struct gnttab_map_grant_ref *kmap_ops,
+ 		    struct page **pages, unsigned int count)
+diff --git a/include/xen/grant_table.h b/include/xen/grant_table.h
+index 4478f4b..2a8ebe8 100644
+--- a/include/xen/grant_table.h
++++ b/include/xen/grant_table.h
+@@ -45,8 +45,10 @@
+ #include <asm/xen/hypervisor.h>
+ 
+ #include <xen/features.h>
++#include <xen/page.h>
+ #include <linux/mm_types.h>
+ #include <linux/page-flags.h>
++#include <linux/kernel.h>
+ 
+ #define GNTTAB_RESERVED_XENSTORE 1
+ 
+@@ -224,4 +226,44 @@ static inline struct xen_page_foreign *xen_page_foreign(struct page *page)
+ #endif
+ }
+ 
++/* Split Linux page in chunk of the size of the grant and call fn
++ *
++ * Parameters of fn:
++ *	gfn: guest frame number
++ *	offset: offset in the grant
++ *	len: length of the data in the grant.
++ *	data: internal information
++ */
++typedef void (*xen_grant_fn_t)(unsigned long gfn, unsigned int offset,
++			       unsigned int len, void *data);
++
++void gnttab_foreach_grant_in_range(struct page *page,
++				   unsigned int offset,
++				   unsigned int len,
++				   xen_grant_fn_t fn,
++				   void *data);
++
++/* Helper to get to call fn only on the first "grant chunk" */
++static inline void gnttab_one_grant(struct page *page, unsigned int offset,
++				    unsigned len, xen_grant_fn_t fn,
++				    void *data)
++{
++	/* The first request is limited to the size of one grant */
++	len = min_t(unsigned int, XEN_PAGE_SIZE - (offset & ~XEN_PAGE_MASK),
++		    len);
++
++	gnttab_foreach_grant_in_range(page, offset, len, fn, data);
++}
++
++/* Get the number of grant in a specified region
++ *
++ * start: Offset from the beginning of the first page
++ * len: total length of data (can cross multiple page)
++ */
++static inline unsigned int gnttab_count_grant(unsigned int start,
++					      unsigned int len)
++{
++	return XEN_PFN_UP(xen_offset_in_page(start) + len);
++}
++
+ #endif /* __ASM_GNTTAB_H__ */
 -- 
 2.1.4
