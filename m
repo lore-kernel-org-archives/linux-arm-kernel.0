@@ -1,45 +1,59 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Fri, 7 Aug 2015 20:06:31 +0300
-Subject: [PATCH v3 01/18] platform: delay OF device-driver matches until
- late_initcall
-In-Reply-To: <CAAObsKBapFqzr+4YEXJfcJWMd+tkaBqYbGiFTntHStAP=+P-_Q@mail.gmail.com>
-References: <1438870315-18689-1-git-send-email-tomeu.vizoso@collabora.com>
- <1438870315-18689-2-git-send-email-tomeu.vizoso@collabora.com>
- <CAL_Jsq+GLMZe-f6qEi=7i1YrrWc6k99RpGkOyCd5KkYDiyt0QA@mail.gmail.com>
- <CAAObsKBapFqzr+4YEXJfcJWMd+tkaBqYbGiFTntHStAP=+P-_Q@mail.gmail.com>
-Message-ID: <55C4E597.1010701@ti.com>
+From: julien.grall@citrix.com (Julien Grall)
+Date: Fri, 7 Aug 2015 18:11:02 +0100
+Subject: [Xen-devel] [PATCH v3 00/20] xen/arm64: Add support for 64KB page
+In-Reply-To: <1438966019-19322-1-git-send-email-julien.grall@citrix.com>
+References: <1438966019-19322-1-git-send-email-julien.grall@citrix.com>
+Message-ID: <55C4E6A6.3010808@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/07/2015 10:11 AM, Tomeu Vizoso wrote:
-> On 6 August 2015 at 22:19, Rob Herring <robherring2@gmail.com> wrote:
->> On Thu, Aug 6, 2015 at 9:11 AM, Tomeu Vizoso <tomeu.vizoso@collabora.com> wrote:
->>> Delay matches of platform devices with OF nodes until late_initcall,
->>> when we are sure that all built-in drivers have been registered already.
->>> This is needed to prevent deferred probes because of some drivers not
->>> having registered yet.
->>>
->>> The reason why only platform devices are delayed is that some other
->>> devices are expected to be probed earlier than late_initcall, for
->>> example, the system PNP driver needs to probe its devices in
->>> fs_initcall.
->>>
->>> Additionally, only platform devices with OF nodes are delayed because
->>> some machines may depend on oter platform devices being registered at
->>> specific times.
->>
->> How do we know that these probes occur before the unused clocks and
->> regulators are turned off? Just getting lucky (as is deferred probe)?
->> Can we do this one level earlier so we have a level left to do things
->> after probe.
+On 07/08/15 17:46, Julien Grall wrote:
+> Hi all,
 > 
-> Those are already late_initcall_sync so I guess we're fine.
+> ARM64 Linux is supporting both 4KB and 64KB page granularity. Although, Xen
+> hypercall interface and PV protocol are always based on 4KB page granularity.
+> 
+> Any attempt to boot a Linux guest with 64KB pages enabled will result to a
+> guest crash.
+> 
+> This series is a first attempt to allow those Linux running with the current
+> hypercall interface and PV protocol.
+> 
+> This solution has been chosen because we want to run Linux 64KB in released
+> Xen ARM version or/and platform using an old version of Linux DOM0.
+> 
+> There is room for improvement, such as support of 64KB grant, modification
+> of PV protocol to support different page size... They will be explored in a
+> separate patch series later.
+> 
+> TODO list:
+>     - Convert swiotlb to 64KB
+>     - Convert xenfb to 64KB
+>     - Check if backend in QEMU works with DOM0 64KB
+>     - It may be possible to move some common define between
+>     netback/netfront and blkfront/blkback in an header
+> 
+> All patches has been built tested for ARM32, ARM64, x86. But I haven't tested
+> to run it on x86 as I don't have a box with Xen x86 running. I would be
+> happy if someone give a try and see possible regression for x86.
+> 
+> A branch based on the latest linux/master can be found here:
 
-I wouldn't be so sure :(
-FYI:
-http://git.ti.com/ti-linux-kernel/ti-linux-kernel/commit/763d643bbfc0f445c6685c541fcae3c370e4314a
+Sorry, I forgot to update this bits in the cover letter.
+
+It's based on xentip for-linus-4.3 and depends on "Use correctly the Xen
+memory terminologies". The v3 has been sent few minutes ago [1]
+
+
+> 
+> git://xenbits.xen.org/people/julieng/linux-arm.git branch xen-64k-v3
+> 
+> Comments, suggestions are welcomed.
+> 
+> Sincerely yours,
+
+[1] http://lists.xen.org/archives/html/xen-devel/2015-08/msg00619.html
 
 
 -- 
-regards,
--grygorii
+Julien Grall
