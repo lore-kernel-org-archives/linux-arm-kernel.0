@@ -1,44 +1,62 @@
 From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
-Date: Fri,  7 Aug 2015 13:44:10 +0200
-Subject: [PATCH v3 0/4] Add SPDIF support for rockchip
-Message-ID: <1438947854-3743-1-git-send-email-sjoerd.simons@collabora.co.uk>
+Date: Fri,  7 Aug 2015 13:44:14 +0200
+Subject: [PATCH v3 4/4] ARM: dts: rockchip: Add SPDIF optical out on Radxa Rock
+In-Reply-To: <1438947854-3743-1-git-send-email-sjoerd.simons@collabora.co.uk>
+References: <1438947854-3743-1-git-send-email-sjoerd.simons@collabora.co.uk>
+Message-ID: <1438947854-3743-5-git-send-email-sjoerd.simons@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds support for the Rockchip SPDIF transceiver as present
-on RK3066, RK3188 and RK3288 boards and enables it on a Radxa rock pro.
-Tested on a Radxa Rock Pro board.
+This enables the SPDIF optical audio output on the Radxa Rock
+
+Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+
+---
 
 Changes in v3:
-- Fix typos in commit message
 - Resent patches to a more complete list of maintainers.
 
-Changes in v2:
-- Remove platform: module alias as it was unused
-- Call MODULE_DEVICE_TABLE(of, ) right after the of match table
-- use rk_spdif as a prefix consistenly throughout the driver
-- Check return code of regmap_update and bubble it up
-- Sort the spdif node properties
-- Drop the 0x prefix from the node name
-- Rename the spdif@ node to sound@
+Changes in v2: None
 
-Sjoerd Simons (4):
-  ASoC: dt-bindings: add rockchip tranceiver bindings
-  ASoC: rockchip: Add rockchip SPDIF transceiver driver
-  ARM: dts: rockchip: Add SPDIF transceiver for RK3188
-  ARM: dts: rockchip: Add SPDIF optical out on Radxa Rock
+ arch/arm/boot/dts/rk3188-radxarock.dts | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
- .../devicetree/bindings/sound/rockchip-spdif.txt   |  41 +++
- arch/arm/boot/dts/rk3188-radxarock.dts             |  19 +
- arch/arm/boot/dts/rk3188.dtsi                      |  22 ++
- sound/soc/rockchip/Kconfig                         |   8 +
- sound/soc/rockchip/Makefile                        |   2 +
- sound/soc/rockchip/rockchip_spdif.c                | 381 +++++++++++++++++++++
- sound/soc/rockchip/rockchip_spdif.h                |  63 ++++
- 7 files changed, 536 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/sound/rockchip-spdif.txt
- create mode 100644 sound/soc/rockchip/rockchip_spdif.c
- create mode 100644 sound/soc/rockchip/rockchip_spdif.h
-
+diff --git a/arch/arm/boot/dts/rk3188-radxarock.dts b/arch/arm/boot/dts/rk3188-radxarock.dts
+index 4bb014d..dea020c 100644
+--- a/arch/arm/boot/dts/rk3188-radxarock.dts
++++ b/arch/arm/boot/dts/rk3188-radxarock.dts
+@@ -90,6 +90,21 @@
+ 		};
+ 	};
+ 
++	sound {
++		compatible = "simple-audio-card";
++		simple-audio-card,name = "SPDIF";
++
++		simple-audio-card,dai-link at 1 {  /* S/PDIF - S/PDIF */
++			cpu { sound-dai = <&spdif>; };
++			codec { sound-dai = <&spdif_out>; };
++		};
++	};
++
++	spdif_out: spdif-out {
++		compatible = "linux,spdif-dit";
++		#sound-dai-cells = <0>;
++	};
++
+ 	ir_recv: gpio-ir-receiver {
+ 		compatible = "gpio-ir-receiver";
+ 		gpios = <&gpio0 10 1>;
+@@ -343,6 +358,10 @@
+ 	};
+ };
+ 
++&spdif {
++	status = "okay";
++};
++
+ &uart0 {
+ 	status = "okay";
+ };
 -- 
 2.5.0
