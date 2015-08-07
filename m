@@ -1,131 +1,34 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Fri,  7 Aug 2015 18:08:33 +0200
-Subject: [PATCH v2 4/4] KVM: arm/arm64: implement kvm_arm_[halt,resume]_guest
-In-Reply-To: <1438963713-10460-1-git-send-email-eric.auger@linaro.org>
-References: <1438963713-10460-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1438963713-10460-5-git-send-email-eric.auger@linaro.org>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 7 Aug 2015 18:10:55 +0200
+Subject: [PATCH 0/8] misc: remove boundary checks from bin attr users
+In-Reply-To: <1437945502-27944-1-git-send-email-vz@mleia.com>
+References: <1437945502-27944-1-git-send-email-vz@mleia.com>
+Message-ID: <20150807161055.GD25357@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We introduce kvm_arm_halt_guest and resume functions. They
-will be used for IRQ forward state change.
+Vladimir,
 
-Halt is synchronous and prevents the guest from being re-entered.
-We use the same mechanism put in place for PSCI former pause,
-now renamed power_off. A new flag is introduced in arch vcpu state,
-pause, only meant to be used by those functions.
+On Mon, Jul 27, 2015 at 12:18:22AM +0300, Vladimir Zapolskiy wrote:
+> This change removes a number of redundant checks on bin attribute
+> client's side, the same checks are done by sysfs_kf_bin_read() or
+> sysfs_kf_bin_write() caller from fs/sysfs/file.c.
+> 
+> Note, drivers/misc/pch_phub.c and drivers/misc/c2port/core.c may be
+> updated in a similar way, however this task is not done due to more
+> complicated read()/write() callbacks.
 
-Signed-off-by: Eric Auger <eric.auger@linaro.org>
+Can you resend the patches which touch i2c drivers with me on cc? I'd
+like to take care of them.
 
----
-v1 -> v2:
-- check pause in kvm_arch_vcpu_runnable
-- we cannot use kvm_vcpu_block since this latter would exit on
-  IRQ/FIQ and this is not what we want
----
- arch/arm/include/asm/kvm_host.h   |  3 +++
- arch/arm/kvm/arm.c                | 35 +++++++++++++++++++++++++++++++----
- arch/arm64/include/asm/kvm_host.h |  3 +++
- 3 files changed, 37 insertions(+), 4 deletions(-)
+Thanks,
 
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index 304004d..dac85f6 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -132,6 +132,9 @@ struct kvm_vcpu_arch {
- 	/* vcpu power-off state */
- 	bool power_off;
- 
-+	 /* Exit and don't run the guest (internal implementation need) */
-+	bool pause;
-+
- 	/* IO related fields */
- 	struct kvm_decode mmio_decode;
- 
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index cc404a8..0529b38 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -348,7 +348,7 @@ int kvm_arch_vcpu_ioctl_set_mpstate(struct kvm_vcpu *vcpu,
- int kvm_arch_vcpu_runnable(struct kvm_vcpu *v)
- {
- 	return ((!!v->arch.irq_lines || kvm_vgic_vcpu_pending_irq(v))
--		&& !v->arch.power_off);
-+		&& !v->arch.power_off && !v->arch.pause);
- }
- 
- /* Just ensure a guest exit from a particular CPU */
-@@ -474,11 +474,38 @@ bool kvm_arch_intc_initialized(struct kvm *kvm)
- 	return vgic_initialized(kvm);
- }
- 
-+static void kvm_arm_halt_guest(struct kvm *kvm) __maybe_unused;
-+static void kvm_arm_resume_guest(struct kvm *kvm) __maybe_unused;
-+
-+static void kvm_arm_halt_guest(struct kvm *kvm)
-+{
-+	int i;
-+	struct kvm_vcpu *vcpu;
-+
-+	kvm_for_each_vcpu(i, vcpu, kvm)
-+		vcpu->arch.pause = true;
-+	force_vm_exit(cpu_all_mask);
-+}
-+
-+static void kvm_arm_resume_guest(struct kvm *kvm)
-+{
-+	int i;
-+	struct kvm_vcpu *vcpu;
-+
-+	kvm_for_each_vcpu(i, vcpu, kvm) {
-+		wait_queue_head_t *wq = kvm_arch_vcpu_wq(vcpu);
-+
-+		vcpu->arch.pause = false;
-+		wake_up_interruptible(wq);
-+	}
-+}
-+
- static void vcpu_sleep(struct kvm_vcpu *vcpu)
- {
- 	wait_queue_head_t *wq = kvm_arch_vcpu_wq(vcpu);
- 
--	wait_event_interruptible(*wq, !vcpu->arch.power_off);
-+	wait_event_interruptible(*wq, ((!vcpu->arch.power_off) &&
-+				       (!vcpu->arch.pause)));
- }
- 
- static int kvm_vcpu_initialized(struct kvm_vcpu *vcpu)
-@@ -528,7 +555,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 
- 		update_vttbr(vcpu->kvm);
- 
--		if (vcpu->arch.power_off)
-+		if (vcpu->arch.power_off || vcpu->arch.pause)
- 			vcpu_sleep(vcpu);
- 
- 		/*
-@@ -556,7 +583,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 		}
- 
- 		if (ret <= 0 || need_new_vmid_gen(vcpu->kvm) ||
--			vcpu->arch.power_off) {
-+			vcpu->arch.power_off || vcpu->arch.pause) {
- 			local_irq_enable();
- 			kvm_vgic_sync_hwstate(vcpu);
- 			preempt_enable();
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 009da6b..69e3785 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -125,6 +125,9 @@ struct kvm_vcpu_arch {
- 	/* vcpu power-off state */
- 	bool power_off;
- 
-+	/* Don't run the guest */
-+	bool pause;
-+
- 	/* IO related fields */
- 	struct kvm_decode mmio_decode;
- 
--- 
-1.9.1
+   Wolfram
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150807/fe9bc9a6/attachment.sig>
