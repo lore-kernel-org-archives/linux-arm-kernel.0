@@ -1,63 +1,40 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  7 Aug 2015 11:11:31 +0900
-Subject: [GIT PULL] Third Round of Renesas ARM Based SoC DT Updates for v4.3
-Message-ID: <cover.1438911334.git.horms+renesas@verge.net.au>
+Date: Fri,  7 Aug 2015 11:11:25 +0900
+Subject: [PATCH 01/10] ARM: shmobile: r8a7790: Add JPU device node.
+In-Reply-To: <cover.1438911334.git.horms+renesas@verge.net.au>
+References: <cover.1438911334.git.horms+renesas@verge.net.au>
+Message-ID: <fb847575f8f5a9580c26bdc3e08fe49639144619.1438911334.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Mikhail Ulyanov <mikhail.ulyanov@cogentembedded.com>
 
-Please consider these third round of Renesas ARM based SoC DT updates for v4.3.
+This patch contains device tree node definition for JPEG codec peripheral
+found in the Renesas R-Car r8a7790 SoC.
 
-This pull request is based on the previous round of
-such requests, tagged as renesas-dt2-for-v4.3,
-which I have already sent a pull-request for.
+Signed-off-by: Mikhail Ulyanov <mikhail.ulyanov@cogentembedded.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/boot/dts/r8a7790.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-
-The following changes since commit 7fd6e11dca09b21efbe2b9db4eff08c8f4a16125:
-
-  ARM: shmobile: r8a7791: Add Audio MIX support on DTSI (2015-07-22 09:36:49 +0900)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt3-for-v4.3
-
-for you to fetch changes up to 94bdc48d55ca10f90b4a625f0e443197e0013557:
-
-  ARM: shmobile: sh73a0 dtsi: Add missing "gpio-ranges" to gpio node (2015-08-05 06:39:28 +0900)
-
-----------------------------------------------------------------
-Third Round of Renesas ARM Based SoC DT Updates for v4.3
-
-* Add JPU support: r8a7791 and r8a7790 SoCs
-* Add MMCIF and PFC support: r8a7794 SoC
-* Add initial support for r8a7794/silk
-* Add missing "gpio-ranges" to gpio nodes: sh73a0, r8a7740 and r8a73a4 SoCs
-
-----------------------------------------------------------------
-Geert Uytterhoeven (3):
-      ARM: shmobile: r8a73a4 dtsi: Add missing "gpio-ranges" to gpio node
-      ARM: shmobile: r8a7740 dtsi: Add missing "gpio-ranges" to gpio node
-      ARM: shmobile: sh73a0 dtsi: Add missing "gpio-ranges" to gpio node
-
-Mikhail Ulyanov (2):
-      ARM: shmobile: r8a7790: Add JPU device node.
-      ARM: shmobile: r8a7791: Add JPU device node.
-
-Sergei Shtylyov (5):
-      ARM: shmobile: r8a7794: add PFC DT support
-      ARM: shmobile: silk: initial device tree
-      ARM: shmobile: silk: add Ether DT support
-      ARM: shmobile: r8a7794: add MMCIF DT support
-      ARM: shmobile: silk: add eMMC DT support
-
- arch/arm/boot/dts/Makefile         |   1 +
- arch/arm/boot/dts/r8a73a4.dtsi     |   7 +++
- arch/arm/boot/dts/r8a7740.dtsi     |   1 +
- arch/arm/boot/dts/r8a7790.dtsi     |   7 +++
- arch/arm/boot/dts/r8a7791.dtsi     |   7 +++
- arch/arm/boot/dts/r8a7794-silk.dts | 102 +++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/r8a7794.dtsi     |  17 +++++++
- arch/arm/boot/dts/sh73a0.dtsi      |   3 ++
- 8 files changed, 145 insertions(+)
- create mode 100644 arch/arm/boot/dts/r8a7794-silk.dts
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index f1cdccc0a8c8..5b2952d5c700 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -872,6 +872,13 @@
+ 		status = "disabled";
+ 	};
+ 
++	jpu: jpeg-codec at fe980000 {
++		compatible = "renesas,jpu-r8a7790";
++		reg = <0 0xfe980000 0 0x10300>;
++		interrupts = <0 272 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp1_clks R8A7790_CLK_JPU>;
++	};
++
+ 	clocks {
+ 		#address-cells = <2>;
+ 		#size-cells = <2>;
+-- 
+2.1.4
