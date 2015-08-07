@@ -1,118 +1,161 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Fri, 07 Aug 2015 13:12:56 +0200
-Subject: [PATCH v4 1/6] cpufreq: make scaling_boost_freqs sysfs attr
- available when boost is enabled
-In-Reply-To: <20150807104156.GE6939@linux>
-References: <1438868514-8814-1-git-send-email-b.zolnierkie@samsung.com>
- <5184469.cOpIkgzX4h@amdc1976> <20150807104156.GE6939@linux>
-Message-ID: <1594902.Dv5JKhve0y@amdc1976>
+From: chunfeng.yun@mediatek.com (chunfeng yun)
+Date: Fri, 7 Aug 2015 19:17:19 +0800
+Subject: [PATCH v4 2/5] dt-bindings: Add a binding for Mediatek xHCI
+ host controller
+In-Reply-To: <20150731134556.GC25118@leverpostej>
+References: <1438347836-29060-1-git-send-email-chunfeng.yun@mediatek.com>
+ <1438347836-29060-3-git-send-email-chunfeng.yun@mediatek.com>
+ <20150731134556.GC25118@leverpostej>
+Message-ID: <1438946239.26208.23.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, August 07, 2015 04:11:56 PM Viresh Kumar wrote:
-> On 07-08-15, 12:34, Bartlomiej Zolnierkiewicz wrote:
-> > > I would suggest you sending such patches as reply to the earlier
-> > > threads only, instead of a new chain. This will save your time.
+hi,
+
+On Fri, 2015-07-31 at 14:45 +0100, Mark Rutland wrote:
+> Hi,
+> 
+> Sorry for my late reply to a prior version of this series, but I still
+> have concerns with some of the properties.
+> 
+> I'll repeat those below.
+> 
+> On Fri, Jul 31, 2015 at 02:03:53PM +0100, Chunfeng Yun wrote:
+> > add a DT binding documentation of xHCI host controller for the
+> > MT8173 SoC from Mediatek.
 > > 
-> > Please explain it more.  This patch needs to be first for cpufreq-dt
-> > switch to be complete.  scaling_boost_freqs is available currently
-> > for exynos-cpufreq users when boost is enabled and ideally we would
-> > like it to be available immediately after the switch to cpufreq-dt.
+> > Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+> > ---
+> >  .../devicetree/bindings/usb/mt8173-xhci.txt        | 51 ++++++++++++++++++++++
+> >  1 file changed, 51 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/usb/mt8173-xhci.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/usb/mt8173-xhci.txt b/Documentation/devicetree/bindings/usb/mt8173-xhci.txt
+> > new file mode 100644
+> > index 0000000..364be5a
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/usb/mt8173-xhci.txt
+> > @@ -0,0 +1,51 @@
+> > +MT65XX xhci
+> > +
+> > +The device node for Mediatek SOC usb3.0 host controller
+> > +
+> > +Required properties:
+> > + - compatible : Supports "mediatek,mt8173-xhci"
 > 
-> I wasn't talking about the ordering of the patches here, but when to
-> send patches.
+> s/Supports/should contain/
 > 
-> So, you now sent these patches again, but what you could have done
-> is: only send the first patch in reply to the earlier thread. And ask
-> if it looks fine. If yes, resend the whole series properly or keep
-> fixing there only..
+done
+> > + - reg : Specifies physical base address and size of the registers,
+> > +	the first one for MAC, the second for IPPC
+> > + - interrupts : Interrupt mode, number and trigger mode
 > 
-> That makes things really fast. You don't have to resend the series and
-> people wouldn't stay away from it. I stayed away from this series to
-> find enough available time to see your 6 patches. Had it been just a
-> reply, I would have replied immediately like now.
+> Just specify what this logically corresponds to; the format of the
+> interrupts proeprty depends on the interrupt controller.
 > 
-> Look at how updated versions in the same mail chain in case of OPP
-> series..
+done
+> > + - power-domains : To enable usb's mtcmos
+> 
+> Please describe what this contains. I assume you exped a single power
+> domain to be described, covering the whole xHCI controller?
+> 
+> > + - vusb33-supply : Regulator of usb avdd3.3v
+> > + - clocks : Must support all clocks that xhci needs
+> 
+> - clocks: a list of phandle + clock-specifier pairs, one for each entry
+>   in clock-names.
+> 
+> > + - clock-names : Should be "sys_mac" for sys and mac clocks, and
+> > +	"wakeup_deb_p0", "wakeup_deb_p1" for wakeup debounce control
+> > +	clocks
+> 
+> This would be better as a list, e.g.
+> 
+> - clock-names: should contain:
+>   * "sys_mac" <description here if necessary>
+>   * "wakeup_deb_p0" <description here if necessary>
+>   * "wakeup_deb_p1" <description here if necessary>
+> 
+done
+> Is sys_mac a single clock input line? Or is it jsut the case that a
+> single line feeds two inputs currently? if the latter they should be
+> separate entries.
+> 
+It is a single clock for usb MAC, already rename it
 
-Please find updated patch below.  It can be moved just before
-patch #6 and all patches in the series would still apply fine.
+> > + - phys : List of PHY specifiers (used by generic PHY framework).
+> 
+> The bracketed part should go. The bidnigns should know nothing of Linux
+> internals.
+> 
+remove it
+> > + - phy-names : Must be "usb-phy0", "usb-phy1",.., "usb-phyN", based on
+> > +	the number of PHYs as specified in @phys property.
+> 
+> This is useless.
+> 
+> You either don't need names, and can acquire the phys by index, or you
+> need names which correspond to those on the data sheet for the xHCI
+> controller.
+> 
+Ok, re-write the phy driver, and here also make use of the new format.
 
----------------------8<-------------------
+> > + - mediatek,usb-wakeup : To access usb wakeup control register
+> 
+> Please describe what this points to (I guess it's a syscon)/
+> 
+> > + - mediatek,wakeup-src : 1: Ip sleep wakeup mode; 2: line state wakeup
+> > +	mode; others means don't enable wakeup source of usb
+> 
+> This sounds like a runtime decision.
+> 
+No, the driver do not know whether to enable wakeup function or not and
+also don't know enable which one, except tell it. 
+And it will set different registers of @mediatek,usb-wakeup to enable
+the selected wakeup mode when system enter suspend.
 
->From 993ebb6fc632ec7b61654c9610c90ff4dca4be34 Mon Sep 17 00:00:00 2001
-From: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-Date: Fri, 7 Aug 2015 13:07:51 +0200
-Subject: [PATCH] cpufreq-dt: make scaling_boost_freqs sysfs attr available
- when boost is enabled
+> _why_ do you think this needs to be in the DT?
+> 
+> > + - mediatek,u2port-num : The number should not greater than the number
+> > +	of phys
+> 
+> This is useless. Either this is implied by the entries in the phys
+> property, or it should be a runtime decision.
+> 
+Yes, it can be calculated from @phys, already remove it.
 
-Make scaling_boost_freqs sysfs attribute is available when
-cpufreq-dt driver is used and boost support is enabled.
-
-Cc: Thomas Abraham <thomas.ab@samsung.com>
-Cc: Javier Martinez Canillas <javier@osg.samsung.com>
-Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Suggested-by: Viresh Kumar <viresh.kumar@linaro.org>
-Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
----
- drivers/cpufreq/cpufreq-dt.c | 11 ++++++++++-
- include/linux/cpufreq.h      |  1 +
- 2 files changed, 11 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/cpufreq/cpufreq-dt.c b/drivers/cpufreq/cpufreq-dt.c
-index b9259ab..c6a3b98 100644
---- a/drivers/cpufreq/cpufreq-dt.c
-+++ b/drivers/cpufreq/cpufreq-dt.c
-@@ -36,6 +36,12 @@ struct private_data {
- 	unsigned int voltage_tolerance; /* in percentage */
- };
+Thanks a lot for your suggestion
  
-+static struct freq_attr *cpufreq_dt_attr[] = {
-+	&cpufreq_freq_attr_scaling_available_freqs,
-+	NULL,   /* Extra space for boost-attr if required */
-+	NULL,
-+};
-+
- static int set_target(struct cpufreq_policy *policy, unsigned int index)
- {
- 	struct dev_pm_opp *opp;
-@@ -182,6 +188,8 @@ try_again:
- 	return ret;
- }
- 
-+static struct cpufreq_driver dt_cpufreq_driver;
-+
- static int cpufreq_init(struct cpufreq_policy *policy)
- {
- 	struct cpufreq_frequency_table *freq_table;
-@@ -336,6 +344,7 @@ static int cpufreq_init(struct cpufreq_policy *policy)
- 		ret = cpufreq_enable_boost_support();
- 		if (ret)
- 			goto out_free_cpufreq_table;
-+		cpufreq_dt_attr[1] = &cpufreq_freq_attr_scaling_boost_freqs;
- 	}
- 
- 	policy->cpuinfo.transition_latency = transition_latency;
-@@ -411,7 +420,7 @@ static struct cpufreq_driver dt_cpufreq_driver = {
- 	.exit = cpufreq_exit,
- 	.ready = cpufreq_ready,
- 	.name = "cpufreq-dt",
--	.attr = cpufreq_generic_attr,
-+	.attr = cpufreq_dt_attr,
- };
- 
- static int dt_cpufreq_probe(struct platform_device *pdev)
-diff --git a/include/linux/cpufreq.h b/include/linux/cpufreq.h
-index 95f0186..657542d 100644
---- a/include/linux/cpufreq.h
-+++ b/include/linux/cpufreq.h
-@@ -609,6 +609,7 @@ struct cpufreq_frequency_table *cpufreq_frequency_get_table(unsigned int cpu);
- 
- /* the following are really really optional */
- extern struct freq_attr cpufreq_freq_attr_scaling_available_freqs;
-+extern struct freq_attr cpufreq_freq_attr_scaling_boost_freqs;
- extern struct freq_attr *cpufreq_generic_attr[];
- int cpufreq_table_validate_and_show(struct cpufreq_policy *policy,
- 				      struct cpufreq_frequency_table *table);
--- 
-1.9.1
+> Thanks,
+> Mark.
+> 
+> > +
+> > +Optional properties:
+> > + - vbus-supply : Reference to the VBUS regulator;
+> > +
+> > +Example:
+> > +usb: usb at 11270000 {
+> > +	compatible = "mediatek,mt8173-xhci";
+> > +	reg = <0 0x11270000 0 0x4000>,
+> > +	      <0 0x11280000 0 0x0800>;
+> > +	interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_LOW>;
+> > +	power-domains = <&scpsys MT8173_POWER_DOMAIN_USB>;
+> > +	clocks = <&topckgen CLK_TOP_USB30_SEL>,
+> > +		 <&pericfg CLK_PERI_USB0>,
+> > +		 <&pericfg CLK_PERI_USB1>;
+> > +	clock-names = "sys_mac",
+> > +		      "wakeup_deb_p0",
+> > +		      "wakeup_deb_p1";
+> > +	phys = <&u3phy 0>, <&u3phy 1>;
+> > +	phy-names = "usb-phy0", "usb-phy1";
+> > +	vusb33-supply = <&mt6397_vusb_reg>;
+> > +	vbus-supply = <&usb_p1_vbus>;
+> > +	usb3-lpm-capable;
+> > +	mediatek,usb-wakeup = <&pericfg>;
+> > +	mediatek,wakeup-src = <1>;
+> > +	mediatek,u2port-num = <2>;
+> > +	status = "okay";
+> > +};
+> > -- 
+> > 1.8.1.1.dirty
+> > 
