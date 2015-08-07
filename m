@@ -1,19 +1,18 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  7 Aug 2015 11:12:03 +0900
-Subject: [PATCH 04/12] clk: shmobile: rcar-gen2: Add CPG/MSTP Clock Domain
- support
+Date: Fri,  7 Aug 2015 11:12:04 +0900
+Subject: [PATCH 05/12] clk: shmobile: rz: Add CPG/MSTP Clock Domain support
 In-Reply-To: <cover.1438911559.git.horms+renesas@verge.net.au>
 References: <cover.1438911559.git.horms+renesas@verge.net.au>
-Message-ID: <713290fcd73b31d0517c5c6ec505b612e93d1662.1438911559.git.horms+renesas@verge.net.au>
+Message-ID: <aeea676370b28723183580985bbce54cebadddf7.1438911559.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Add Clock Domain support to the R-Car Gen2 Clock Pulse Generator (CPG)
-driver using the generic PM Domain.  This allows to power-manage the
-module clocks of SoC devices that are part of the CPG/MSTP Clock Domain
-using Runtime PM, or for system suspend/resume.
+Add Clock Domain support to the RZ Clock Pulse Generator (CPG) driver
+using the generic PM Domain.  This allows to power-manage the module
+clocks of SoC devices that are part of the CPG/MSTP Clock Domain using
+Runtime PM, or for system suspend/resume.
 
 SoC devices that are part of the CPG/MSTP Clock Domain and can be
 power-managed through an MSTP clock should be tagged in DT with a proper
@@ -24,27 +23,28 @@ Acked-by: Stephen Boyd <sboyd@codeaurora.org>
 Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- .../clock/renesas,rcar-gen2-cpg-clocks.txt         | 26 ++++++++++++++++++++--
- drivers/clk/shmobile/clk-rcar-gen2.c               |  2 ++
- 2 files changed, 26 insertions(+), 2 deletions(-)
+ .../bindings/clock/renesas,rz-cpg-clocks.txt       | 29 ++++++++++++++++++++--
+ arch/arm/mach-shmobile/Kconfig                     |  1 +
+ drivers/clk/shmobile/clk-rz.c                      |  3 +++
+ 3 files changed, 31 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/clock/renesas,rcar-gen2-cpg-clocks.txt b/Documentation/devicetree/bindings/clock/renesas,rcar-gen2-cpg-clocks.txt
-index 56f111bd3e45..2a9a8edc8f35 100644
---- a/Documentation/devicetree/bindings/clock/renesas,rcar-gen2-cpg-clocks.txt
-+++ b/Documentation/devicetree/bindings/clock/renesas,rcar-gen2-cpg-clocks.txt
+diff --git a/Documentation/devicetree/bindings/clock/renesas,rz-cpg-clocks.txt b/Documentation/devicetree/bindings/clock/renesas,rz-cpg-clocks.txt
+index b0f7ddb8cdb1..bb51a33a1fbf 100644
+--- a/Documentation/devicetree/bindings/clock/renesas,rz-cpg-clocks.txt
++++ b/Documentation/devicetree/bindings/clock/renesas,rz-cpg-clocks.txt
 @@ -2,6 +2,8 @@
  
- The CPG generates core clocks for the R-Car Gen2 SoCs. It includes three PLLs
- and several fixed ratio dividers.
+ The CPG generates core clocks for the RZ SoCs. It includes the PLL, variable
+ CPU and GPU clocks, and several fixed ratio dividers.
 +The CPG also provides a Clock Domain for SoC devices, in combination with the
 +CPG Module Stop (MSTP) Clocks.
  
  Required Properties:
  
-@@ -20,10 +22,18 @@ Required Properties:
-   - clock-output-names: The names of the clocks. Supported clocks are "main",
-     "pll0", "pll1", "pll3", "lb", "qspi", "sdh", "sd0", "sd1", "z", "rcan", and
-     "adsp"
+@@ -14,10 +16,18 @@ Required Properties:
+   - #clock-cells: Must be 1
+   - clock-output-names: The names of the clocks. Supported clocks are "pll",
+     "i", and "g"
 +  - #power-domain-cells: Must be 0
  
 +SoC devices that are part of the CPG/MSTP Clock Domain and can be power-managed
@@ -60,37 +60,59 @@ index 56f111bd3e45..2a9a8edc8f35 100644
 +
 +  - CPG device node:
  
- 	cpg_clocks: cpg_clocks at e6150000 {
- 		compatible = "renesas,r8a7790-cpg-clocks",
-@@ -34,4 +44,16 @@ Example
- 		clock-output-names = "main", "pll0, "pll1", "pll3",
- 				     "lb", "qspi", "sdh", "sd0", "sd1", "z",
- 				     "rcan", "adsp";
+ 	cpg_clocks: cpg_clocks at fcfe0000 {
+ 		#clock-cells = <1>;
+@@ -26,4 +36,19 @@ Example
+ 		reg = <0xfcfe0000 0x18>;
+ 		clocks = <&extal_clk>, <&usb_x1_clk>;
+ 		clock-output-names = "pll", "i", "g";
 +		#power-domain-cells = <0>;
 +	};
 +
 +
 +  - CPG/MSTP Clock Domain member device node:
 +
-+	thermal at e61f0000 {
-+		compatible = "renesas,thermal-r8a7790", "renesas,rcar-thermal";
-+		reg = <0 0xe61f0000 0 0x14>, <0 0xe61f0100 0 0x38>;
-+		interrupts = <0 69 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp5_clks R8A7790_CLK_THERMAL>;
++	mtu2: timer at fcff0000 {
++		compatible = "renesas,mtu2-r7s72100", "renesas,mtu2";
++		reg = <0xfcff0000 0x400>;
++		interrupts = <0 107 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-names = "tgi0a";
++		clocks = <&mstp3_clks R7S72100_CLK_MTU2>;
++		clock-names = "fck";
 +		power-domains = <&cpg_clocks>;
++		status = "disabled";
  	};
-diff --git a/drivers/clk/shmobile/clk-rcar-gen2.c b/drivers/clk/shmobile/clk-rcar-gen2.c
-index acfb6d7dbd6b..f2c457f494eb 100644
---- a/drivers/clk/shmobile/clk-rcar-gen2.c
-+++ b/drivers/clk/shmobile/clk-rcar-gen2.c
-@@ -415,6 +415,8 @@ static void __init rcar_gen2_cpg_clocks_init(struct device_node *np)
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index e14fa5e87475..34eac88a9889 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -51,6 +51,7 @@ config ARCH_EMEV2
+ 
+ config ARCH_R7S72100
+ 	bool "RZ/A1H (R7S72100)"
++	select PM_GENERIC_DOMAINS if PM
+ 	select SYS_SUPPORTS_SH_MTU2
+ 
+ config ARCH_R8A73A4
+diff --git a/drivers/clk/shmobile/clk-rz.c b/drivers/clk/shmobile/clk-rz.c
+index 7e68e8630962..9766e3cb595f 100644
+--- a/drivers/clk/shmobile/clk-rz.c
++++ b/drivers/clk/shmobile/clk-rz.c
+@@ -10,6 +10,7 @@
+  */
+ 
+ #include <linux/clk-provider.h>
++#include <linux/clk/shmobile.h>
+ #include <linux/init.h>
+ #include <linux/kernel.h>
+ #include <linux/of.h>
+@@ -99,5 +100,7 @@ static void __init rz_cpg_clocks_init(struct device_node *np)
  	}
  
  	of_clk_add_provider(np, of_clk_src_onecell_get, &cpg->data);
 +
 +	cpg_mstp_add_clk_domain(np);
  }
- CLK_OF_DECLARE(rcar_gen2_cpg_clks, "renesas,rcar-gen2-cpg-clocks",
- 	       rcar_gen2_cpg_clocks_init);
+ CLK_OF_DECLARE(rz_cpg_clks, "renesas,rz-cpg-clocks", rz_cpg_clocks_init);
 -- 
 2.1.4
