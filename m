@@ -1,11 +1,10 @@
 From: wangzhou1@hisilicon.com (Zhou Wang)
-Date: Fri, 7 Aug 2015 14:04:48 +0800
-Subject: [PATCH v6 1/6] PCI: designware: move calculation of bus addresses
- to DRA7xx
-In-Reply-To: <1438848559-232109-2-git-send-email-wangzhou1@hisilicon.com>
+Date: Fri, 7 Aug 2015 14:06:42 +0800
+Subject: [PATCH v6 2/6] ARM/PCI: remove align_resource in pci_sys_data
+In-Reply-To: <1438848559-232109-3-git-send-email-wangzhou1@hisilicon.com>
 References: <1438848559-232109-1-git-send-email-wangzhou1@hisilicon.com>
- <1438848559-232109-2-git-send-email-wangzhou1@hisilicon.com>
-Message-ID: <55C44A80.20308@hisilicon.com>
+ <1438848559-232109-3-git-send-email-wangzhou1@hisilicon.com>
+Message-ID: <55C44AF2.8040807@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,101 +13,81 @@ List-Id: linux-arm-kernel.lists.infradead.org
 On 2015/8/6 16:09, Zhou Wang wrote:
 > From: gabriele paoloni <gabriele.paoloni@huawei.com>
 > 
-> Commit f4c55c5a3f7f "PCI: designware: Program ATU with untranslated
-> address" added the calculation of PCI BUS addresses in designware,
-> storing them in new fields added in "struct pcie_port". This
-> calculation is done for every designware user even if is only
-> applicable to DRA7xx.
-> This patch moves the calculation of the bus addresses to the DRA7xx
-> driver and is needed to allow the rework of designware to use
-> the new DT parsing API.
+> This patch is needed in order to unify the PCIe designware framework for ARM and
+> ARM64 architectures. In the PCIe designware unification process we are calling
+> pci_create_root_bus() passing a "sysdata" parameter that is the same for both
+> ARM and ARM64 and is of type "struct pcie_port*". In the ARM case this will
+> cause a problem with the function pcibios_align_resource(); in fact this will
+> cast "dev->sysdata" to "struct pci_sys_data*", whereas designware had passed a
+> "struct pcie_port*" pointer.
+> 
+> This patch solves the issue by removing "align_resource" from "pci_sys_data"
+> struct and defining a static global function pointer in "bios32.c"
 > 
 > Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
-> Signed-off-by: Zhou Wang <wangzhou1@hisilicon.com>
 > ---
->  drivers/pci/host/pci-dra7xx.c      | 13 +++++++++++++
->  drivers/pci/host/pcie-designware.c | 15 ++++-----------
->  2 files changed, 17 insertions(+), 11 deletions(-)
+>  arch/arm/include/asm/mach/pci.h |  5 -----
+>  arch/arm/kernel/bios32.c        | 12 ++++++++----
+>  2 files changed, 8 insertions(+), 9 deletions(-)
 > 
-> diff --git a/drivers/pci/host/pci-dra7xx.c b/drivers/pci/host/pci-dra7xx.c
-> index 80db09e..18ae7ff 100644
-> --- a/drivers/pci/host/pci-dra7xx.c
-> +++ b/drivers/pci/host/pci-dra7xx.c
-> @@ -61,6 +61,7 @@
+> diff --git a/arch/arm/include/asm/mach/pci.h b/arch/arm/include/asm/mach/pci.h
+> index 28b9bb3..8a4e4de 100644
+> --- a/arch/arm/include/asm/mach/pci.h
+> +++ b/arch/arm/include/asm/mach/pci.h
+> @@ -58,11 +58,6 @@ struct pci_sys_data {
+>  					/* IRQ mapping				*/
+>  	int		(*map_irq)(const struct pci_dev *, u8, u8);
+>  					/* Resource alignement requirements	*/
+> -	resource_size_t (*align_resource)(struct pci_dev *dev,
+> -					  const struct resource *res,
+> -					  resource_size_t start,
+> -					  resource_size_t size,
+> -					  resource_size_t align);
+>  	void		*private_data;	/* platform controller private data	*/
+>  };
 >  
->  #define	PCIECTRL_DRA7XX_CONF_PHY_CS			0x010C
->  #define	LINK_UP						BIT(16)
-> +#define	CPU_TO_BUS_ADDR					0x0FFFFFFF
+> diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+> index fcbbbb1..4cdc64d 100644
+> --- a/arch/arm/kernel/bios32.c
+> +++ b/arch/arm/kernel/bios32.c
+> @@ -17,6 +17,11 @@
+>  #include <asm/mach/pci.h>
 >  
->  struct dra7xx_pcie {
->  	void __iomem		*base;
-> @@ -139,6 +140,18 @@ static void dra7xx_pcie_enable_interrupts(struct pcie_port *pp)
->  static void dra7xx_pcie_host_init(struct pcie_port *pp)
+>  static int debug_pci;
+> +static resource_size_t (*align_resource)(struct pci_dev *dev,
+> +		  const struct resource *res,
+> +		  resource_size_t start,
+> +		  resource_size_t size,
+> +		  resource_size_t align) = NULL;
+>  
+>  #ifdef CONFIG_PCI_MSI
+>  struct msi_controller *pcibios_msi_controller(struct pci_dev *dev)
+> @@ -468,7 +473,7 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
+>  		sys->busnr   = busnr;
+>  		sys->swizzle = hw->swizzle;
+>  		sys->map_irq = hw->map_irq;
+> -		sys->align_resource = hw->align_resource;
+> +		align_resource = hw->align_resource;
+>  		INIT_LIST_HEAD(&sys->resources);
+>  
+>  		if (hw->private_data)
+> @@ -589,7 +594,6 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
+>  				resource_size_t size, resource_size_t align)
 >  {
->  	dw_pcie_setup_rc(pp);
-> +
-> +	if (pp->io_mod_base)
-> +		pp->io_mod_base &= CPU_TO_BUS_ADDR;
-> +
-> +	if (pp->mem_mod_base)
-> +		pp->mem_mod_base &= CPU_TO_BUS_ADDR;
-> +
-> +	if (pp->cfg0_mod_base) {
-> +		pp->cfg0_mod_base &= CPU_TO_BUS_ADDR;
-> +		pp->cfg1_mod_base &= CPU_TO_BUS_ADDR;
-> +	}
-> +
->  	dra7xx_pcie_establish_link(pp);
->  	if (IS_ENABLED(CONFIG_PCI_MSI))
->  		dw_pcie_msi_init(pp);
-> diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
-> index 69486be..c5d407c 100644
-> --- a/drivers/pci/host/pcie-designware.c
-> +++ b/drivers/pci/host/pcie-designware.c
-> @@ -366,14 +366,10 @@ int dw_pcie_host_init(struct pcie_port *pp)
->  	struct of_pci_range range;
->  	struct of_pci_range_parser parser;
->  	struct resource *cfg_res;
-> -	u32 val, na, ns;
-> +	u32 val, ns;
->  	const __be32 *addrp;
->  	int i, index, ret;
+>  	struct pci_dev *dev = data;
+> -	struct pci_sys_data *sys = dev->sysdata;
+>  	resource_size_t start = res->start;
 >  
-> -	/* Find the address cell size and the number of cells in order to get
-> -	 * the untranslated address.
-> -	 */
-> -	of_property_read_u32(np, "#address-cells", &na);
->  	ns = of_n_size_cells(np);
+>  	if (res->flags & IORESOURCE_IO && start & 0x300)
+> @@ -597,8 +601,8 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
 >  
->  	cfg_res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "config");
-> @@ -416,8 +412,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
->  			pp->io_base = range.cpu_addr;
+>  	start = (start + align - 1) & ~(align - 1);
 >  
->  			/* Find the untranslated IO space address */
-> -			pp->io_mod_base = of_read_number(parser.range -
-> -							 parser.np + na, ns);
-> +			pp->io_mod_base = range.cpu_addr;
->  		}
->  		if (restype == IORESOURCE_MEM) {
->  			of_pci_range_to_resource(&range, np, &pp->mem);
-> @@ -426,8 +421,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
->  			pp->mem_bus_addr = range.pci_addr;
+> -	if (sys->align_resource)
+> -		return sys->align_resource(dev, res, start, size, align);
+> +	if (align_resource)
+> +		return align_resource(dev, res, start, size, align);
 >  
->  			/* Find the untranslated MEM space address */
-> -			pp->mem_mod_base = of_read_number(parser.range -
-> -							  parser.np + na, ns);
-> +			pp->mem_mod_base = range.cpu_addr;
->  		}
->  		if (restype == 0) {
->  			of_pci_range_to_resource(&range, np, &pp->cfg);
-> @@ -437,8 +431,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
->  			pp->cfg1_base = pp->cfg.start + pp->cfg0_size;
->  
->  			/* Find the untranslated configuration space address */
-> -			pp->cfg0_mod_base = of_read_number(parser.range -
-> -							   parser.np + na, ns);
-> +			pp->cfg0_mod_base = range.cpu_addr;
->  			pp->cfg1_mod_base = pp->cfg0_mod_base +
->  					    pp->cfg0_size;
->  		}
+>  	return start;
+>  }
 > 
