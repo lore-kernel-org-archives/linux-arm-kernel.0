@@ -1,53 +1,57 @@
-From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Fri, 7 Aug 2015 18:50:18 +0800
-Subject: [PATCH v3 0/5] Add SMP bringup support for mt65xx socs
-In-Reply-To: <20150805223115.GD7557@n2100.arm.linux.org.uk>
-References: <1436851111-2369-1-git-send-email-yingjoe.chen@mediatek.com>
- <4831607.pyCH8elj8i@ubix> <20150805223115.GD7557@n2100.arm.linux.org.uk>
-Message-ID: <1438944618.14580.5.camel@mtksdaap41>
+From: p.fedin@samsung.com (Pavel Fedin)
+Date: Fri, 07 Aug 2015 13:50:45 +0300
+Subject: [PATCH v2 TRIVIAL] Enable GICv2m on ARM virt machine
+Message-ID: <00fa01d0d0fe$ea19e2e0$be4da8a0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-08-05 at 23:31 +0100, Russell King - ARM Linux wrote:
-> On Wed, Aug 05, 2015 at 08:44:11PM +0200, Matthias Brugger wrote:
-> > On Tuesday, July 14, 2015 01:18:26 PM Yingjoe Chen wrote:
-> > > This series add SMP brinup support for MediaTek SoCs. This is based
-> > > on v4.2-rc1 and Matthias' next branch (for dts parts).
-<...>
+qemu implementation of "virt" includes GICv2m. This commit allows to use
+it also on ARM32 architecture.
 
-> > Applied to v4.2-next/soc-2 and v4.2-next/dts-2 
-> 
-> I've just NAK'd one of the patches in this set; I don't tend to even see
-> mediatek patches normally, as they all head into my junk mailfolder
-> because mediatek's mail server setup is truely abysmal (it has broken
-> reverse DNS - the DNS positively says that the mail server is not a
-> legit owner of the name it claims to be.)
+msi.h is added because it is required by linux/msi.h
+if CONFIG_GENERIC_MSI_IRQ_DOMAIN is defined. It gets enabled by the
+following KConfig dependency chain:
+ARM_GIC_V2M => PCI_MSI_IRQ_DOMAIN => GENERIC_MSI_IRQ_DOMAIN
 
-Hi Russell,
+Signed-off-by: Pavel Fedin <p.fedin@samsung.com>
+---
+v1 => v2:
+Added verbose explanation in commit message
+---
+ arch/arm/Kconfig            | 1 +
+ arch/arm/include/asm/Kbuild | 1 +
+ 2 files changed, 2 insertions(+)
 
-Hope you see this.
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 45df48b..1091025 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -815,6 +815,7 @@ config ARCH_VIRT
+ 	bool "Dummy Virtual Machine" if ARCH_MULTI_V7
+ 	select ARM_AMBA
+ 	select ARM_GIC
++	select ARM_GIC_V2M if PCI_MSI
+ 	select ARM_PSCI
+ 	select HAVE_ARM_ARCH_TIMER
+ 
+diff --git a/arch/arm/include/asm/Kbuild b/arch/arm/include/asm/Kbuild
+index 3c4596d..01806f5 100644
+--- a/arch/arm/include/asm/Kbuild
++++ b/arch/arm/include/asm/Kbuild
+@@ -14,6 +14,7 @@ generic-y += local.h
+ generic-y += local64.h
+ generic-y += mcs_spinlock.h
+ generic-y += msgbuf.h
++generic-y += msi.h
+ generic-y += param.h
+ generic-y += parport.h
+ generic-y += poll.h
+-- 
+1.9.5.msysgit.0
 
-Thanks for your review. I already pass this information to our IT, hope
-they can resolve this soon.
 
 
-> The problem is that this patch series uses memblock_reserve() way after
-> the memory has been transitioned out of memblock's control, so actually
-> this has no effect.
-> 
-> I've seen a number of patches doing this.  I'm not sure what's soo friggin
-> hard for people to understand: memblock is about the EARLY stages of
-> getting the system up and running.  Once the memory has been handed
-> over to the kernel's memory management, memblock MUST NOT BE USED to
-> reserve memory.
-> 
-> There is one place, and one place only in the ARM kernel where
-> memblock_reserve() is possible, and that's in the ->reserve machine
-> callback.  NOWHERE ELSE is permissible.
-
-
-It seems we can write memory-reserve node in device tree to do this as
-well. Do you prefer us to reserve memblock in reserve callback or using
-device tree?
-
-Joe.C
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel at lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
