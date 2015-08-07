@@ -1,44 +1,125 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Fri, 07 Aug 2015 11:30:27 -0400
-Subject: [PATCH v4 2/2] serial: mxs-auart: keep the AUART unit in reset
- state when not in use
-In-Reply-To: <1438944424-9053-2-git-send-email-jbe@pengutronix.de>
-References: <1438944424-9053-1-git-send-email-jbe@pengutronix.de>
- <1438944424-9053-2-git-send-email-jbe@pengutronix.de>
-Message-ID: <55C4CF13.90206@hurleysoftware.com>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Fri, 7 Aug 2015 17:44:01 +0200
+Subject: [PATCH 2/2] DT: pwm: Add NXP LPC18xx PWM/SCT binding documentation
+In-Reply-To: <CAAEAJfBjr2wxn-x1RiEj+ezoHA0aWNqCFfpYLM3RzhTrnHDyWw@mail.gmail.com>
+References: <1437972345-16444-1-git-send-email-ariel@vanguardiasur.com.ar>
+ <1437972345-16444-3-git-send-email-ariel@vanguardiasur.com.ar>
+ <CAGhQ9Vyy+oUAWm0q2+NV0D9RVf5qyED8Tn54-cGzbDc-EZR4yw@mail.gmail.com>
+ <CAAEAJfApE8=cAue-bc5xPD_XAtV8qzur12C4okF-uLJ-__reBA@mail.gmail.com>
+ <CAGhQ9VwudkK=bo5Qk79O7fmdEEm1KEWxUhLO14ucCJ+FbhqQqw@mail.gmail.com>
+ <CAAEAJfA22JA0AWB1FCiDVYEy5BqasDror_Ejpd=b3s14BWpORw@mail.gmail.com>
+ <CAGhQ9VyCNrH_J6rP+L+6OkV-PCgemOzhznuFRg07YxPpLX_nig@mail.gmail.com>
+ <CAAEAJfBjr2wxn-x1RiEj+ezoHA0aWNqCFfpYLM3RzhTrnHDyWw@mail.gmail.com>
+Message-ID: <CAGhQ9VyGYro=PZgj7cu+vP3QCZapL8cxYX-Zxp4+ZS9AtxznFw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/07/2015 06:47 AM, Juergen Borleis wrote:
-> Whenever the UART device driver gets closed from userland, the driver
-> disables the UART unit and then stops the clocks to save power.
-> 
-> The bit which disabled the UART unit is described as:
-> 
->  "UART Enable. If this bit is set to 1, the UART is enabled. Data
->   transmission and reception occurs for the UART signals. When the
->   UART is disabled in the middle of transmission or reception, it
->   completes the current character before stopping."
-> 
-> The important part is the "it completes the current character". Whenever
-> a reception is ongoing when the UART gets disabled (including the clock
-> off) the statemachine freezes and "remembers" this state on the next
-> open() when re-enabling the unit's clock.
-> 
-> In this case we end up receiving an additional bogus character
-> immediately.
-> 
-> The solution in this change is to switch the AUART unit into its reset
-> state on close() and only release it from its reset state on the next
-> open().
-> 
-> Note: when the unit is also used as system console it is always 'in use',
-> so we cannot reset it on close().
+On 31 July 2015 at 20:09, Ezequiel Garcia <ezequiel@vanguardiasur.com.ar> wrote:
+> Joachim,
+>
+> On 30 July 2015 at 20:30, Joachim  Eastwood <manabian@gmail.com> wrote:
+>> On 29 July 2015 at 15:47, Ezequiel Garcia <ezequiel@vanguardiasur.com.ar> wrote:
+>>> +devicetree guys
+>>>
+>>> On 28 July 2015 at 20:22, Joachim  Eastwood <manabian@gmail.com> wrote:
+>>>> On 29 July 2015 at 00:45, Ezequiel Garcia <ezequiel@vanguardiasur.com.ar> wrote:
+>>>>> On 28 July 2015 at 19:37, Joachim  Eastwood <manabian@gmail.com> wrote:
+>>>>>> On 27 July 2015 at 06:45, Ariel D'Alessandro <ariel@vanguardiasur.com.ar> wrote:
+>>>>>>> Add the devicetree binding document for NXP LPC18xx PWM/SCT.
+>>>>>>>
+>>>>>>> Signed-off-by: Ariel D'Alessandro <ariel@vanguardiasur.com.ar>
+>>>>>>> ---
+>>>>>>>  .../devicetree/bindings/pwm/lpc1850-pwm.txt          | 20 ++++++++++++++++++++
+>>>>>>>  1 file changed, 20 insertions(+)
+>>>>>>>  create mode 100644 Documentation/devicetree/bindings/pwm/lpc1850-pwm.txt
+>>>>>>>
+>>>>>>> diff --git a/Documentation/devicetree/bindings/pwm/lpc1850-pwm.txt b/Documentation/devicetree/bindings/pwm/lpc1850-pwm.txt
+>>>>>>> new file mode 100644
+>>>>>>> index 0000000..3055429
+>>>>>>> --- /dev/null
+>>>>>>> +++ b/Documentation/devicetree/bindings/pwm/lpc1850-pwm.txt
+>>>>>>> @@ -0,0 +1,20 @@
+>>>>>>> +* NXP LPC18xx Pulse Width Modulator driver
+>>>>>>> +
+>>>>>>> +Required properties:
+>>>>>>> +  - compatible: Should be "nxp,lpc1850-pwm"
+>>>>>>> +  - reg: Should contain physical base address and length of pwm registers.
+>>>>>>> +  - clocks: Must contain an entry for each entry in clock-names.
+>>>>>>> +    See ../clock/clock-bindings.txt for details.
+>>>>>>> +  - clock-names: Must include the following entries.
+>>>>>>> +    - pwm: PWM operating clock.
+>>>>>>> +  - #pwm-cells: Should be 3. See pwm.txt in this directory for the description
+>>>>>>> +    of the cells format.
+>>>>>>> +
+>>>>>>> +Example:
+>>>>>>> +  pwm: pwm at 40000000 {
+>>>>>>> +    compatible = "nxp,lpc1850-pwm";
+>>>>>>
+>>>>>> I would prefer "nxp,lpc1850-sct" for a couple of reasons. SCT is the
+>>>>>> name of hardware block as described in the user manual and while PWM
+>>>>>> is the most obvious usage for this block on Linux, the hardware is not
+>>>>>> limited to just doing that. So as a bit of future proofing if someone
+>>>>>> wants to use this block for more than PWM I would prefer SCT.
+>>>>>>
+>>>>>
+>>>>> Shouldn't we use something like "nxp,lpc1850-sct-pwm"?
+>>>>>
+>>>>> Sounds like the word PWM should be in the compatible as it describes
+>>>>> not only the device, but the device used in a certain way.
+>>>>>
+>>>>> Otherwise, how would we use "nxp,lpc1850-sct" to distinguish a PWM from
+>>>>> e.g. a clocksource/clockevents (we can also use SCT for that)?
+>>>>
+>>>> I not sure how to best handle dt bindings with such flexible hardware blocks.
+>>>>
+>>>> But are you suggestion to have multiple drivers for the same hw block?
+>>>> ie.: "nxp,lpc1850-sct-pwm" for PWM and for example
+>>>> "nxp,lpc1850-sct-clocksource" for clocksource and then use/enable one
+>>>> or the other.
+>>>>
+>>>
+>>> Yup, I'm suggesting just that. If the hardware is capable, I can't see
+>>> why we can't have different drivers for it.
+>>
+>> Well, I think it would be nice if we could have one driver per hw
+>> block. But then you need a way to select whether you want to use the
+>> counter in the SCT block for PWM or, for example, clocksource. Sort of
+>> mode selection I guess.
+>>
+>> But then again if someone has some very custom and application
+>> specific usage for the SCT block that maybe better served by a
+>> standalone driver anyway.
+>>
+>
+> Technically speaking, I believe we can use "nxp,lpc1850-sct" to expose
+> both a PWM interface and a clocksource in a single driver. Not too
+> clean, though.
 
-The code is still a bit ackward but looks functional, so
+Well, I don't think that is unclean way of doing it. But it's up to
+the different subsystem maintainers if they want users outside their
+normal directory as we would, for example, end of with a clocksource
+under the pwm dir.
 
-Reviewed-by: Peter Hurley <peter@hurleysoftware.com>
+> Alternatively, we should be able to have a multifunction device (MFD) to mux
+> the SCT resources to be consumed by different kind of drivers.
+
+That is an other way of doing it.
+
+But you would still need to a way to chose between either PWM or
+clocksource since the SCT has a limited number of counters. (SCT can
+be configured to have either two 16-bit timers or one 32-bit)
+
+> Given there's no counter API to feed SCT, and given we use the other
+> timer hw block to feed clocksource and clockevents for the LPC18/43xx,
+> I think currently the simplest choice is to have "nxp,lpc1850-sct-pwm"
+> describing this PWM SCT driver.
+>
+> If we later want to change completely the PWM SCT driver, we can do
+> that without any bindings change.
+
+Agreed. Let's keep it simple now and deal with it again if another
+user for the SCT block turns up.
 
 
-PS - This mxs driver has the same problem as the i.MX driver.
-     The irq request and hardware init should be done in startup().
+regards,
+Joachim Eastwood
