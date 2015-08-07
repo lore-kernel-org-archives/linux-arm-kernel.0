@@ -1,218 +1,237 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri,  7 Aug 2015 11:48:21 +0200
-Subject: [PATCH v2 2/2] nvmem: imx-ocotp: Add i.MX6 OCOTP driver
-In-Reply-To: <1438940901-5779-1-git-send-email-p.zabel@pengutronix.de>
-References: <1438940901-5779-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <1438940901-5779-3-git-send-email-p.zabel@pengutronix.de>
+From: Haibo.Chen@freescale.com (Chen Bough)
+Date: Fri, 7 Aug 2015 09:53:01 +0000
+Subject: [PATCH v4 1/6] mmc: sdhci-esdhc-imx: add imx7d support and
+ support HS400
+In-Reply-To: <20150807073854.GA6935@shlinux1.ap.freescale.net>
+References: <1438771122-8601-1-git-send-email-haibo.chen@freescale.com>
+ <1438771122-8601-2-git-send-email-haibo.chen@freescale.com>
+ <20150807073854.GA6935@shlinux1.ap.freescale.net>
+Message-ID: <BY1PR03MB138813618D918A609ED1D7ED9A730@BY1PR03MB1388.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This driver handles the i.MX On-Chip OTP Controller found in
-i.MX6Q/D, i.MX6S/DL, i.MX6SL, and i.MX6SX SoCs. Currently it
-just returns the values stored in the shadow registers.
 
-Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-Acked-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
----
-Changes since v1:
- - Dropped unneeded clk.h include
- - Fixed MODULE_LICENSE
----
- drivers/nvmem/Kconfig     |  11 ++++
- drivers/nvmem/Makefile    |   2 +
- drivers/nvmem/imx-ocotp.c | 154 ++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 167 insertions(+)
- create mode 100644 drivers/nvmem/imx-ocotp.c
 
-diff --git a/drivers/nvmem/Kconfig b/drivers/nvmem/Kconfig
-index 8db2978..0b33014 100644
---- a/drivers/nvmem/Kconfig
-+++ b/drivers/nvmem/Kconfig
-@@ -36,4 +36,15 @@ config NVMEM_SUNXI_SID
- 	  This driver can also be built as a module. If so, the module
- 	  will be called nvmem_sunxi_sid.
- 
-+config NVMEM_IMX_OCOTP
-+	tristate "i.MX6 On-Chip OTP Controller support"
-+	depends on SOC_IMX6
-+	help
-+	  This is a driver for the On-Chip OTP Controller (OCOTP) available on
-+	  i.MX6 SoCs, providing access to 4 Kbits of one-time programmable
-+	  eFuses.
-+
-+	  This driver can also be built as a module. If so, the module
-+	  will be called nvmem-imx-ocotp.
-+
- endif
-diff --git a/drivers/nvmem/Makefile b/drivers/nvmem/Makefile
-index 4328b93..b512d77 100644
---- a/drivers/nvmem/Makefile
-+++ b/drivers/nvmem/Makefile
-@@ -10,3 +10,5 @@ obj-$(CONFIG_QCOM_QFPROM)	+= nvmem_qfprom.o
- nvmem_qfprom-y			:= qfprom.o
- obj-$(CONFIG_NVMEM_SUNXI_SID)	+= nvmem_sunxi_sid.o
- nvmem_sunxi_sid-y		:= sunxi_sid.o
-+obj-$(CONFIG_NVMEM_IMX_OCOTP)	+= nvmem-imx-ocotp.o
-+nvmem-imx-ocotp-y		:= imx-ocotp.o
-diff --git a/drivers/nvmem/imx-ocotp.c b/drivers/nvmem/imx-ocotp.c
-new file mode 100644
-index 0000000..b7971d4
---- /dev/null
-+++ b/drivers/nvmem/imx-ocotp.c
-@@ -0,0 +1,154 @@
-+/*
-+ * i.MX6 OCOTP fusebox driver
-+ *
-+ * Copyright (c) 2015 Pengutronix, Philipp Zabel <p.zabel@pengutronix.de>
-+ *
-+ * Based on the barebox ocotp driver,
-+ * Copyright (c) 2010 Baruch Siach <baruch@tkos.co.il>,
-+ *	Orex Computed Radiography
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2
-+ * as published by the Free Software Foundation.
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+#include <linux/device.h>
-+#include <linux/io.h>
-+#include <linux/module.h>
-+#include <linux/nvmem-provider.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/platform_device.h>
-+#include <linux/regmap.h>
-+#include <linux/slab.h>
-+
-+struct ocotp_priv {
-+	struct device *dev;
-+	void __iomem *base;
-+	unsigned int nregs;
-+};
-+
-+static int imx_ocotp_read(void *context, const void *reg, size_t reg_size,
-+			  void *val, size_t val_size)
-+{
-+	struct ocotp_priv *priv = context;
-+	unsigned int offset = *(u32 *)reg;
-+	unsigned int count;
-+	int i;
-+	u32 index;
-+
-+	index = offset >> 2;
-+	count = val_size >> 2;
-+
-+	if (count > (priv->nregs - index))
-+		count = priv->nregs - index;
-+
-+	for (i = index; i < (index + count); i++) {
-+		*(u32 *)val = readl(priv->base + 0x400 + i * 0x10);
-+		val += 4;
-+	}
-+
-+	return (i - index) * 4;
-+}
-+
-+static int imx_ocotp_write(void *context, const void *data, size_t count)
-+{
-+	/* Not implemented */
-+	return 0;
-+}
-+
-+static struct regmap_bus imx_ocotp_bus = {
-+	.read = imx_ocotp_read,
-+	.write = imx_ocotp_write,
-+	.reg_format_endian_default = REGMAP_ENDIAN_NATIVE,
-+	.val_format_endian_default = REGMAP_ENDIAN_NATIVE,
-+};
-+
-+static bool imx_ocotp_writeable_reg(struct device *dev, unsigned int reg)
-+{
-+	return false;
-+}
-+
-+static struct regmap_config imx_ocotp_regmap_config = {
-+	.reg_bits = 32,
-+	.val_bits = 32,
-+	.reg_stride = 4,
-+	.writeable_reg = imx_ocotp_writeable_reg,
-+	.name = "imx-ocotp",
-+};
-+
-+static struct nvmem_config imx_ocotp_nvmem_config = {
-+	.name = "imx-ocotp",
-+	.read_only = true,
-+	.owner = THIS_MODULE,
-+};
-+
-+static const struct of_device_id imx_ocotp_dt_ids[] = {
-+	{ .compatible = "fsl,imx6q-ocotp",  (void *)128 },
-+	{ .compatible = "fsl,imx6sl-ocotp", (void *)32 },
-+	{ .compatible = "fsl,imx6sx-ocotp", (void *)128 },
-+	{ },
-+};
-+MODULE_DEVICE_TABLE(of, imx_ocotp_dt_ids);
-+
-+static int imx_ocotp_probe(struct platform_device *pdev)
-+{
-+	const struct of_device_id *of_id;
-+	struct device *dev = &pdev->dev;
-+	struct resource *res;
-+	struct regmap *regmap;
-+	struct ocotp_priv *priv;
-+	struct nvmem_device *nvmem;
-+
-+	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
-+	if (!priv)
-+		return -ENOMEM;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	priv->base = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(priv->base))
-+		return PTR_ERR(priv->base);
-+
-+	of_id = of_match_device(imx_ocotp_dt_ids, dev);
-+	priv->nregs = (unsigned int)of_id->data;
-+	imx_ocotp_regmap_config.max_register = 4 * priv->nregs - 4;
-+
-+	regmap = devm_regmap_init(dev, &imx_ocotp_bus, priv,
-+				  &imx_ocotp_regmap_config);
-+	if (IS_ERR(regmap)) {
-+		dev_err(dev, "regmap init failed\n");
-+		return PTR_ERR(regmap);
-+	}
-+	imx_ocotp_nvmem_config.dev = dev;
-+	nvmem = nvmem_register(&imx_ocotp_nvmem_config);
-+	if (IS_ERR(nvmem))
-+		return PTR_ERR(nvmem);
-+
-+	platform_set_drvdata(pdev, nvmem);
-+
-+	return 0;
-+}
-+
-+static int imx_ocotp_remove(struct platform_device *pdev)
-+{
-+	struct nvmem_device *nvmem = platform_get_drvdata(pdev);
-+
-+	return nvmem_unregister(nvmem);
-+}
-+
-+static struct platform_driver imx_ocotp_driver = {
-+	.probe	= imx_ocotp_probe,
-+	.remove	= imx_ocotp_remove,
-+	.driver = {
-+		.name	= "imx_ocotp",
-+		.of_match_table = imx_ocotp_dt_ids,
-+	},
-+};
-+module_platform_driver(imx_ocotp_driver);
-+
-+MODULE_AUTHOR("Philipp Zabel <p.zabel@pengutronix.de>");
-+MODULE_DESCRIPTION("i.MX6 OCOTP fuse box driver");
-+MODULE_LICENSE("GPL v2");
--- 
-2.4.6
+> -----Original Message-----
+> From: Dong Aisheng [mailto:aisheng.dong at freescale.com]
+> Sent: Friday, August 07, 2015 3:39 PM
+> To: Chen Haibo-B51421
+> Cc: robh+dt at kernel.org; pawel.moll at arm.com; mark.rutland at arm.com;
+> ijc+devicetree at hellion.org.uk; galak at codeaurora.org; shawnguo at kernel.org;
+> kernel at pengutronix.de; linux at arm.linux.org.uk; ulf.hansson at linaro.org;
+> johan.derycke at barco.com; mkl at pengutronix.de; Estevam Fabio-R49496; Dong
+> Aisheng-B29396; devicetree at vger.kernel.org; linux-kernel at vger.kernel.org;
+> linux-arm-kernel at lists.infradead.org; linux-mmc at vger.kernel.org
+> Subject: Re: [PATCH v4 1/6] mmc: sdhci-esdhc-imx: add imx7d support and
+> support HS400
+> 
+> On Wed, Aug 05, 2015 at 06:38:37PM +0800, Haibo Chen wrote:
+> > The imx7d usdhc is derived from imx6sx, the difference is that imx7d
+> > support HS400.
+> >
+> > So introduce a new compatible string for imx7d and add HS400 support
+> > for imx7d usdhc.
+> >
+> > Signed-off-by: Haibo Chen <haibo.chen@freescale.com>
+> > ---
+> >  drivers/mmc/host/sdhci-esdhc-imx.c | 81
+> > ++++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 81 insertions(+)
+> >
+> > diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c
+> > b/drivers/mmc/host/sdhci-esdhc-imx.c
+> > index c6b9f64..48f009c 100644
+> > --- a/drivers/mmc/host/sdhci-esdhc-imx.c
+> > +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+> > @@ -44,6 +44,7 @@
+> >  #define  ESDHC_MIX_CTRL_EXE_TUNE	(1 << 22)
+> >  #define  ESDHC_MIX_CTRL_SMPCLK_SEL	(1 << 23)
+> >  #define  ESDHC_MIX_CTRL_FBCLK_SEL	(1 << 25)
+> > +#define  ESDHC_MIX_CTRL_HS400_EN	(1 << 26)
+> >  /* Bits 3 and 6 are not SDHCI standard definitions */
+> >  #define  ESDHC_MIX_CTRL_SDHCI_MASK	0xb7
+> >  /* Tuning bits */
+> > @@ -60,6 +61,16 @@
+> >  #define  ESDHC_TUNE_CTRL_MIN		0
+> >  #define  ESDHC_TUNE_CTRL_MAX		((1 << 7) - 1)
+> >
+> > +/* strobe dll register */
+> > +#define ESDHC_STROBE_DLL_CTRL		0x70
+> > +#define ESDHC_STROBE_DLL_CTRL_ENABLE	(1 << 0)
+> > +#define ESDHC_STROBE_DLL_CTRL_RESET	(1 << 1)
+> > +#define ESDHC_STROBE_DLL_CTRL_SLV_DLY_TARGET_SHIFT	3
+> > +
+> > +#define ESDHC_STROBE_DLL_STATUS		0x74
+> > +#define ESDHC_STROBE_DLL_STS_REF_LOCK	(1 << 1)
+> > +#define ESDHC_STROBE_DLL_STS_SLV_LOCK	0x1
+> > +
+> >  #define ESDHC_TUNING_CTRL		0xcc
+> >  #define ESDHC_STD_TUNING_EN		(1 << 24)
+> >  /* NOTE: the minimum valid tuning start tap for mx6sl is 1 */ @@
+> > -120,6 +131,11 @@
+> >  #define ESDHC_FLAG_ERR004536		BIT(7)
+> >  /* The IP supports HS200 mode */
+> >  #define ESDHC_FLAG_HS200		BIT(8)
+> > +/* The IP supports HS400 mode */
+> > +#define ESDHC_FLAG_HS400		BIT(9)
+> > +
+> > +/* A higher clock ferquency than this rate requires strobell dll
+> control */
+> > +#define ESDHC_STROBE_DLL_CLK_FREQ	100000000
+> >
+> >  struct esdhc_soc_data {
+> >  	u32 flags;
+> > @@ -156,6 +172,12 @@ static struct esdhc_soc_data usdhc_imx6sx_data = {
+> >  			| ESDHC_FLAG_HAVE_CAP1 | ESDHC_FLAG_HS200,  };
+> >
+> > +static struct esdhc_soc_data usdhc_imx7d_data = {
+> > +	.flags = ESDHC_FLAG_USDHC | ESDHC_FLAG_STD_TUNING
+> > +			| ESDHC_FLAG_HAVE_CAP1 | ESDHC_FLAG_HS200
+> > +			| ESDHC_FLAG_HS400,
+> > +};
+> > +
+> >  struct pltfm_imx_data {
+> >  	u32 scratchpad;
+> >  	struct pinctrl *pinctrl;
+> > @@ -199,6 +221,7 @@ static const struct of_device_id imx_esdhc_dt_ids[]
+> = {
+> >  	{ .compatible = "fsl,imx6sx-usdhc", .data = &usdhc_imx6sx_data, },
+> >  	{ .compatible = "fsl,imx6sl-usdhc", .data = &usdhc_imx6sl_data, },
+> >  	{ .compatible = "fsl,imx6q-usdhc", .data = &usdhc_imx6q_data, },
+> > +	{ .compatible = "fsl,imx7d-usdhc", .data = &usdhc_imx7d_data, },
+> >  	{ /* sentinel */ }
+> >  };
+> >  MODULE_DEVICE_TABLE(of, imx_esdhc_dt_ids); @@ -274,6 +297,9 @@ static
+> > u32 esdhc_readl_le(struct sdhci_host *host, int reg)
+> >  				val = SDHCI_SUPPORT_DDR50 | SDHCI_SUPPORT_SDR104
+> >  					| SDHCI_SUPPORT_SDR50
+> >  					| SDHCI_USE_SDR50_TUNING;
+> > +
+> > +			if (imx_data->socdata->flags & ESDHC_FLAG_HS400)
+> > +				val |= SDHCI_SUPPORT_HS400;
+> >  		}
+> >  	}
+> >
+> > @@ -774,6 +800,7 @@ static int esdhc_change_pinstate(struct sdhci_host
+> *host,
+> >  		break;
+> >  	case MMC_TIMING_UHS_SDR104:
+> >  	case MMC_TIMING_MMC_HS200:
+> > +	case MMC_TIMING_MMC_HS400:
+> >  		pinctrl = imx_data->pins_200mhz;
+> >  		break;
+> >  	default:
+> > @@ -784,6 +811,44 @@ static int esdhc_change_pinstate(struct sdhci_host
+> *host,
+> >  	return pinctrl_select_state(imx_data->pinctrl, pinctrl);  }
+> >
+> > +/*
+> > + * For HS400 eMMC, there is a data_strobe line, this signal is
+> > +generated
+> > + * by the device and used for data output and CRC status response
+> > +output
+> > + * in HS400 mode. The frequency of this signal follows the frequency
+> > +of
+> > + * CLK generated by host. Host receive the data which is aligned to
+> > +the
+> > + * edge of data_strobe line. Due to the time delay between CLK line
+> > +and
+> > + * data_strobe line, if the delay time is larger than one clock
+> > +cycle,
+> > + * then CLK and data_strobe line will misaligned, read error shows up.
+> > + * So when the CLK is higher than 100MHz, each clock cycle is short
+> > +enough,
+> > + * host should config the delay target.
+> > + */
+> > +static void esdhc_set_strobe_dll(struct sdhci_host *host) {
+> > +	u32 v;
+> > +
+> > +	if (host->mmc->actual_clock > ESDHC_STROBE_DLL_CLK_FREQ) {
+> > +		/* force a reset on strobe dll */
+> > +		writel(ESDHC_STROBE_DLL_CTRL_RESET,
+> > +			host->ioaddr + ESDHC_STROBE_DLL_CTRL);
+> > +		/*
+> > +		 * enable strobe dll ctrl and adjust the delay target
+> > +		 * for the uSDHC loopback read clock
+> > +		 */
+> > +		v = ESDHC_STROBE_DLL_CTRL_ENABLE |
+> > +			(7 << ESDHC_STROBE_DLL_CTRL_SLV_DLY_TARGET_SHIFT);
+> > +		writel(v, host->ioaddr + ESDHC_STROBE_DLL_CTRL);
+> > +		/* wait 1us to make sure strobe dll status register stable */
+> > +		udelay(1);
+> > +		v = readl(host->ioaddr + ESDHC_STROBE_DLL_STATUS);
+> > +		if (!(v & ESDHC_STROBE_DLL_STS_REF_LOCK))
+> > +			dev_warn(mmc_dev(host->mmc),
+> > +				"warning! HS400 strobe DLL status REF not
+> lock!\n");
+> > +		if (!(v & ESDHC_STROBE_DLL_STS_SLV_LOCK))
+> > +			dev_warn(mmc_dev(host->mmc),
+> > +				"warning! HS400 strobe DLL status SLV not
+> lock!\n");
+> > +	}
+> > +}
+> > +
+> >  static void esdhc_set_uhs_signaling(struct sdhci_host *host, unsigned
+> > timing)  {
+> >  	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host); @@ -795,7
+> > +860,13 @@ static void esdhc_set_uhs_signaling(struct sdhci_host *host,
+> unsigned timing)
+> >  	case MMC_TIMING_UHS_SDR25:
+> >  	case MMC_TIMING_UHS_SDR50:
+> >  	case MMC_TIMING_UHS_SDR104:
+> > +		break;
+> >  	case MMC_TIMING_MMC_HS200:
+> > +		/* disable ddr mode and disable HS400 mode */
+> > +		writel(readl(host->ioaddr + ESDHC_MIX_CTRL) &
+> > +			~(ESDHC_MIX_CTRL_DDREN | ESDHC_MIX_CTRL_HS400_EN),
+> > +			host->ioaddr + ESDHC_MIX_CTRL);
+> > +		imx_data->is_ddr = 0;
+> 
+> Can you please explain why need above code?
+> Any issues if not do it?
+> 
+> Regards
+> Dong Aisheng
+
+[haibo] currently, mmc core code use mmc_retune before every request, 
+and in mmc_retune, for eMMC, if the chip is in HS400 mode, firstly,
+the code use mmc_hs400_to_hs200() to change the emmc chip work in
+HS200 mode, and execute the tuning, and then use mmc_hs200_to_hs400()
+to make the emmc chip work back in HS400 mode.
+
+Without the above code, when change to hs200 mode from hs400 mode, our
+host still enable ddr mode and enable hs400 mode, which is wrong.
+So add the code here. 
+
+> 
+> >  		break;
+> >  	case MMC_TIMING_UHS_DDR50:
+> >  	case MMC_TIMING_MMC_DDR52:
+> > @@ -813,6 +884,13 @@ static void esdhc_set_uhs_signaling(struct
+> sdhci_host *host, unsigned timing)
+> >  			writel(v, host->ioaddr + ESDHC_DLL_CTRL);
+> >  		}
+> >  		break;
+> > +	case MMC_TIMING_MMC_HS400:
+> > +		writel(readl(host->ioaddr + ESDHC_MIX_CTRL) |
+> > +				ESDHC_MIX_CTRL_DDREN | ESDHC_MIX_CTRL_HS400_EN,
+> > +				host->ioaddr + ESDHC_MIX_CTRL);
+> > +		imx_data->is_ddr = 1;
+> > +		esdhc_set_strobe_dll(host);
+> > +		break;
+> >  	}
+> >
+> >  	esdhc_change_pinstate(host, timing); @@ -1100,6 +1178,9 @@ static
+> > int sdhci_esdhc_imx_probe(struct platform_device *pdev)
+> >  	if (imx_data->socdata->flags & ESDHC_FLAG_ERR004536)
+> >  		host->quirks |= SDHCI_QUIRK_BROKEN_ADMA;
+> >
+> > +	if (imx_data->socdata->flags & ESDHC_FLAG_HS400)
+> > +		host->quirks2 |= SDHCI_QUIRK2_CAPS_BIT63_FOR_HS400;
+> > +
+> >  	if (of_id)
+> >  		err = sdhci_esdhc_imx_probe_dt(pdev, host, imx_data);
+> >  	else
+> > --
+> > 1.9.1
+> >
