@@ -1,8 +1,8 @@
 From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Fri, 07 Aug 2015 13:56:04 +0200
-Subject: [PATCH v2] cpufreq-dt: make scaling_boost_freqs sysfs attr available
+Date: Fri, 07 Aug 2015 13:59:16 +0200
+Subject: [PATCH v3] cpufreq-dt: make scaling_boost_freqs sysfs attr available
  when boost is enabled
-Message-ID: <3835403.gWyHpfh1Gz@amdc1976>
+Message-ID: <2130756.euuUs9t9I5@amdc1976>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,9 +13,13 @@ Cc: Thomas Abraham <thomas.ab@samsung.com>
 Cc: Javier Martinez Canillas <javier@osg.samsung.com>
 Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 Suggested-by: Viresh Kumar <viresh.kumar@linaro.org>
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 ---
 v2: Removed leftover prototype.
+v3: added missing Acked-by
+Sorry for two resends, this is not my day..
+Rafael, please apply for v4.3.
 
  drivers/cpufreq/cpufreq-dt.c | 9 ++++++++-
  include/linux/cpufreq.h      | 1 +
