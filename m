@@ -1,290 +1,76 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Fri,  7 Aug 2015 05:40:38 -0500
-Subject: [PATCH v2 2/8] drm: exynos/dp: convert to drm bridge mode
-In-Reply-To: <1438943674-18191-1-git-send-email-ykk@rock-chips.com>
-References: <1438943674-18191-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <1438944039-18690-1-git-send-email-ykk@rock-chips.com>
+From: robert.richter@caviumnetworks.com (Robert Richter)
+Date: Fri, 7 Aug 2015 12:43:20 +0200
+Subject: [PATCH 2/2] net, thunder, bgx: Add support for ACPI binding.
+In-Reply-To: <55C467A0.4020601@linaro.org>
+References: <1438907590-29649-1-git-send-email-ddaney.cavm@gmail.com>
+ <1438907590-29649-3-git-send-email-ddaney.cavm@gmail.com>
+ <55C467A0.4020601@linaro.org>
+Message-ID: <20150807104320.GQ1820@rric.localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to move exynos dp code to bridge directory,
-we need to convert driver drm bridge mode first. As
-dp driver already have a ptn3460 bridge, so we need
-to move ptn bridge to the next bridge of dp bridge.
+On 07.08.15 10:09:04, Tomasz Nowicki wrote:
+> On 07.08.2015 02:33, David Daney wrote:
 
-Signed-off-by: Yakir Yang <ykk@rock-chips.com>
----
-Changes in v2:
-- Take Jingoo Han suggest, cause I jsut improve parts
-  of the code, so just remove my name from author list.
+...
 
- drivers/gpu/drm/exynos/exynos_dp_core.c | 194 ++++++++++++++++++++------------
- drivers/gpu/drm/exynos/exynos_dp_core.h |   1 +
- 2 files changed, 123 insertions(+), 72 deletions(-)
+> >+#else
+> >+
+> >+static int bgx_init_acpi_phy(struct bgx *bgx)
+> >+{
+> >+	return -ENODEV;
+> >+}
+> >+
+> >+#endif /* CONFIG_ACPI */
+> >+
+> >  #if IS_ENABLED(CONFIG_OF_MDIO)
+> >
+> >  static int bgx_init_of_phy(struct bgx *bgx)
+> >@@ -882,7 +1010,12 @@ static int bgx_init_of_phy(struct bgx *bgx)
+> >
+> >  static int bgx_init_phy(struct bgx *bgx)
+> >  {
+> >-	return bgx_init_of_phy(bgx);
+> >+	int err = bgx_init_of_phy(bgx);
+> >+
+> >+	if (err != -ENODEV)
+> >+		return err;
+> >+
+> >+	return bgx_init_acpi_phy(bgx);
+> >  }
+> >
+> 
+> If kernel can work with DT and ACPI (both compiled in), it should take only
+> one path instead of probing DT and ACPI sequentially. How about:
+> 
+> @@ -902,10 +925,9 @@ static int bgx_probe(struct pci_dev *pdev, const struct
+> pci_device_id *ent)
+>  	bgx_vnic[bgx->bgx_id] = bgx;
+>  	bgx_get_qlm_mode(bgx);
+> 
+> -	snprintf(bgx_sel, 5, "bgx%d", bgx->bgx_id);
+> -	np = of_find_node_by_name(NULL, bgx_sel);
+> -	if (np)
+> -		bgx_init_of(bgx, np);
+> +	err = acpi_disabled ? bgx_init_of_phy(bgx) : bgx_init_acpi_phy(bgx);
+> +	if (err)
+> +		goto err_enable;
+> 
+>  	bgx_init_hw(bgx);
 
-diff --git a/drivers/gpu/drm/exynos/exynos_dp_core.c b/drivers/gpu/drm/exynos/exynos_dp_core.c
-index 562f4a8..2b87406 100644
---- a/drivers/gpu/drm/exynos/exynos_dp_core.c
-+++ b/drivers/gpu/drm/exynos/exynos_dp_core.c
-@@ -997,59 +997,6 @@ static struct drm_connector_helper_funcs exynos_dp_connector_helper_funcs = {
- 	.best_encoder = exynos_dp_best_encoder,
- };
- 
--/* returns the number of bridges attached */
--static int exynos_drm_attach_lcd_bridge(struct exynos_dp_device *dp,
--					struct drm_encoder *encoder)
--{
--	int ret;
--
--	encoder->bridge = dp->bridge;
--	dp->bridge->encoder = encoder;
--	ret = drm_bridge_attach(encoder->dev, dp->bridge);
--	if (ret) {
--		DRM_ERROR("Failed to attach bridge to drm\n");
--		return ret;
--	}
--
--	return 0;
--}
--
--static int exynos_dp_create_connector(struct exynos_drm_display *display,
--				      struct drm_encoder *encoder)
--{
--	struct exynos_dp_device *dp = display_to_dp(display);
--	struct drm_connector *connector = &dp->connector;
--	int ret;
--
--	dp->encoder = encoder;
--
--	/* Pre-empt DP connector creation if there's a bridge */
--	if (dp->bridge) {
--		ret = exynos_drm_attach_lcd_bridge(dp, encoder);
--		if (!ret)
--			return 0;
--	}
--
--	connector->polled = DRM_CONNECTOR_POLL_HPD;
--
--	ret = drm_connector_init(dp->drm_dev, connector,
--				 &exynos_dp_connector_funcs,
--				 DRM_MODE_CONNECTOR_eDP);
--	if (ret) {
--		DRM_ERROR("Failed to initialize connector with drm\n");
--		return ret;
--	}
--
--	drm_connector_helper_add(connector, &exynos_dp_connector_helper_funcs);
--	drm_connector_register(connector);
--	drm_mode_connector_attach_encoder(connector, encoder);
--
--	if (dp->panel)
--		ret = drm_panel_attach(dp->panel, &dp->connector);
--
--	return ret;
--}
--
- static void exynos_dp_phy_init(struct exynos_dp_device *dp)
- {
- 	if (dp->phy)
-@@ -1114,23 +1061,126 @@ static void exynos_dp_poweroff(struct exynos_dp_device *dp)
- 	}
- }
- 
--static void exynos_dp_dpms(struct exynos_drm_display *display, int mode)
-+/* returns the number of bridges attached */
-+static int exynos_drm_attach_lcd_bridge(struct exynos_dp_device *dp,
-+		struct drm_encoder *encoder)
-+{
-+	int ret;
-+
-+	dp->bridge->next = dp->ptn_bridge;
-+	dp->bridge->encoder = encoder;
-+	ret = drm_bridge_attach(encoder->dev, dp->bridge);
-+	if (ret) {
-+		DRM_ERROR("Failed to attach ptn bridge to drm\n");
-+		return ret;
-+	}
-+
-+	return 0;
-+}
-+
-+static int exynos_dp_bridge_attach(struct drm_bridge *bridge)
-+{
-+
-+	struct exynos_dp_device *dp = bridge->driver_private;
-+	struct drm_encoder *encoder = dp->encoder;
-+	struct drm_connector *connector = &dp->connector;
-+	int ret;
-+
-+	if (!bridge->encoder) {
-+		DRM_ERROR("Parent encoder object not found");
-+		return -ENODEV;
-+	}
-+
-+	encoder->bridge = bridge;
-+
-+	/* Pre-empt DP connector creation if there's a bridge */
-+	if (dp->ptn_bridge) {
-+		ret = exynos_drm_attach_lcd_bridge(dp, encoder);
-+		if (ret)
-+			return -ENODEV;
-+	}
-+
-+	connector->polled = DRM_CONNECTOR_POLL_HPD;
-+
-+	ret = drm_connector_init(dp->drm_dev, connector,
-+			&exynos_dp_connector_funcs, DRM_MODE_CONNECTOR_eDP);
-+	if (ret) {
-+		DRM_ERROR("Failed to initialize connector with drm\n");
-+		return ret;
-+	}
-+
-+	drm_connector_helper_add(connector, &exynos_dp_connector_helper_funcs);
-+	drm_connector_register(connector);
-+	drm_mode_connector_attach_encoder(connector, encoder);
-+
-+	if (dp->panel)
-+		ret = drm_panel_attach(dp->panel, &dp->connector);
-+
-+	return ret;
-+}
-+
-+static void exynos_dp_bridge_nop(struct drm_bridge *bridge)
-+{
-+	/* do nothing */
-+}
-+
-+static void exynos_dp_bridge_enable(struct drm_bridge *bridge)
-+{
-+	struct exynos_dp_device *dp = bridge->driver_private;
-+
-+	exynos_dp_poweron(dp);
-+	dp->dpms_mode = DRM_MODE_DPMS_ON;
-+}
-+
-+static void exynos_dp_bridge_disable(struct drm_bridge *bridge)
-+{
-+	struct exynos_dp_device *dp = bridge->driver_private;
-+
-+	exynos_dp_poweroff(dp);
-+	dp->dpms_mode = DRM_MODE_DPMS_OFF;
-+}
-+
-+static const struct drm_bridge_funcs exynos_dp_bridge_funcs = {
-+	.enable = exynos_dp_bridge_enable,
-+	.disable = exynos_dp_bridge_disable,
-+	.pre_enable = exynos_dp_bridge_nop,
-+	.post_disable = exynos_dp_bridge_nop,
-+	.attach = exynos_dp_bridge_attach,
-+};
-+
-+static int exynos_dp_create_connector(struct exynos_drm_display *display,
-+				struct drm_encoder *encoder)
- {
- 	struct exynos_dp_device *dp = display_to_dp(display);
-+	struct drm_device *drm_dev = dp->drm_dev;
-+	struct drm_bridge *bridge;
-+	int ret;
- 
--	switch (mode) {
--	case DRM_MODE_DPMS_ON:
--		exynos_dp_poweron(dp);
--		break;
--	case DRM_MODE_DPMS_STANDBY:
--	case DRM_MODE_DPMS_SUSPEND:
--	case DRM_MODE_DPMS_OFF:
--		exynos_dp_poweroff(dp);
--		break;
--	default:
--		break;
-+	bridge = devm_kzalloc(drm_dev->dev, sizeof(*bridge), GFP_KERNEL);
-+	if (!bridge) {
-+		DRM_ERROR("failed to allocate for drm bridge\n");
-+		return -ENOMEM;
- 	}
--	dp->dpms_mode = mode;
-+
-+	dp->bridge = bridge;
-+	dp->encoder = encoder;
-+
-+	bridge->driver_private = dp;
-+	bridge->encoder = dp->encoder;
-+	bridge->funcs = &exynos_dp_bridge_funcs;
-+
-+	ret = drm_bridge_attach(drm_dev, bridge);
-+	if (ret) {
-+		DRM_ERROR("failed to attach drm bridge\n");
-+		return -EINVAL;
-+	}
-+
-+	return 0;
-+}
-+
-+static void exynos_dp_dpms(struct exynos_drm_display *display, int mode)
-+{
-+	/* do nothing */
- }
- 
- static struct exynos_drm_display_ops exynos_dp_display_ops = {
-@@ -1242,7 +1292,7 @@ static int exynos_dp_bind(struct device *dev, struct device *master, void *data)
- 		}
- 	}
- 
--	if (!dp->panel && !dp->bridge) {
-+	if (!dp->panel && !dp->ptn_bridge) {
- 		ret = exynos_dp_dt_parse_panel(dp);
- 		if (ret)
- 			return ret;
-@@ -1315,7 +1365,7 @@ static void exynos_dp_unbind(struct device *dev, struct device *master,
- {
- 	struct exynos_dp_device *dp = dev_get_drvdata(dev);
- 
--	exynos_dp_dpms(&dp->display, DRM_MODE_DPMS_OFF);
-+	exynos_dp_bridge_disable(dp->bridge);
- }
- 
- static const struct component_ops exynos_dp_ops = {
-@@ -1350,9 +1400,9 @@ static int exynos_dp_probe(struct platform_device *pdev)
- 	if (endpoint) {
- 		bridge_node = of_graph_get_remote_port_parent(endpoint);
- 		if (bridge_node) {
--			dp->bridge = of_drm_find_bridge(bridge_node);
-+			dp->ptn_bridge = of_drm_find_bridge(bridge_node);
- 			of_node_put(bridge_node);
--			if (!dp->bridge)
-+			if (!dp->ptn_bridge)
- 				return -EPROBE_DEFER;
- 		} else {
- 			return -EPROBE_DEFER;
-@@ -1374,7 +1424,7 @@ static int exynos_dp_suspend(struct device *dev)
- {
- 	struct exynos_dp_device *dp = dev_get_drvdata(dev);
- 
--	exynos_dp_dpms(&dp->display, DRM_MODE_DPMS_OFF);
-+	exynos_dp_bridge_disable(dp->bridge);
- 	return 0;
- }
- 
-@@ -1382,7 +1432,7 @@ static int exynos_dp_resume(struct device *dev)
- {
- 	struct exynos_dp_device *dp = dev_get_drvdata(dev);
- 
--	exynos_dp_dpms(&dp->display, DRM_MODE_DPMS_ON);
-+	exynos_dp_bridge_enable(dp->bridge);
- 	return 0;
- }
- #endif
-diff --git a/drivers/gpu/drm/exynos/exynos_dp_core.h b/drivers/gpu/drm/exynos/exynos_dp_core.h
-index c321ad5..29bd56e 100644
---- a/drivers/gpu/drm/exynos/exynos_dp_core.h
-+++ b/drivers/gpu/drm/exynos/exynos_dp_core.h
-@@ -154,6 +154,7 @@ struct exynos_dp_device {
- 	struct drm_encoder	*encoder;
- 	struct drm_panel	*panel;
- 	struct drm_bridge	*bridge;
-+	struct drm_bridge	*ptn_bridge;
- 	struct clk		*clock;
- 	unsigned int		irq;
- 	void __iomem		*reg_base;
--- 
-1.9.1
+I would not pollute bgx_probe() with acpi and dt specifics, and instead
+keep bgx_init_phy(). The typical design pattern for this is:
+
+static int bgx_init_phy(struct bgx *bgx)
+{
+#ifdef CONFIG_ACPI
+        if (!acpi_disabled)
+                return bgx_init_acpi_phy(bgx);
+#endif
+        return bgx_init_of_phy(bgx);
+}
+
+This adds acpi runtime detection (acpi=no), does not call dt code in
+case of acpi, and saves the #else for bgx_init_acpi_phy().
+
+-Robert
