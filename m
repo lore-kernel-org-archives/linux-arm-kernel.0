@@ -1,119 +1,69 @@
-From: Haibo.Chen@freescale.com (Chen Bough)
-Date: Fri, 7 Aug 2015 10:04:56 +0000
-Subject: [PATCH v4 2/6] mmc: sdhci-esdhc-imx: add tuning-step seting
- support
-In-Reply-To: <20150807074019.GB6935@shlinux1.ap.freescale.net>
-References: <1438771122-8601-1-git-send-email-haibo.chen@freescale.com>
- <1438771122-8601-3-git-send-email-haibo.chen@freescale.com>
- <20150807074019.GB6935@shlinux1.ap.freescale.net>
-Message-ID: <BY1PR03MB138864BA52567E75F56808329A730@BY1PR03MB1388.namprd03.prod.outlook.com>
+From: b18965@freescale.com (Alison Wang)
+Date: Fri, 7 Aug 2015 18:01:59 +0800
+Subject: [PATCH] ARM: ls1021a: add platform notifier for dma-coherent
+ requirement
+Message-ID: <1438941719-38350-1-git-send-email-b18965@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch adds platform notifier for dma-coherent requirement.
+Structure arm_coherent_dma_ops is used instead of arm_dma_ops.
 
+Signed-off-by: Alison Wang <alison.wang@freescale.com>
+---
+ arch/arm/mach-imx/mach-ls1021a.c | 30 ++++++++++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
 
-> -----Original Message-----
-> From: Dong Aisheng [mailto:aisheng.dong at freescale.com]
-> Sent: Friday, August 07, 2015 3:40 PM
-> To: Chen Haibo-B51421
-> Cc: robh+dt at kernel.org; pawel.moll at arm.com; mark.rutland at arm.com;
-> ijc+devicetree at hellion.org.uk; galak at codeaurora.org; shawnguo at kernel.org;
-> kernel at pengutronix.de; linux at arm.linux.org.uk; ulf.hansson at linaro.org;
-> johan.derycke at barco.com; mkl at pengutronix.de; Estevam Fabio-R49496; Dong
-> Aisheng-B29396; devicetree at vger.kernel.org; linux-kernel at vger.kernel.org;
-> linux-arm-kernel at lists.infradead.org; linux-mmc at vger.kernel.org
-> Subject: Re: [PATCH v4 2/6] mmc: sdhci-esdhc-imx: add tuning-step seting
-> support
-> 
-> On Wed, Aug 05, 2015 at 06:38:38PM +0800, Haibo Chen wrote:
-> > tuning-step is the delay cell steps in tuning procedure. The default
-> > value of tuning-step is 1. Some boards or cards need another value to
-> > pass the tuning procedure. For example, imx7d-sdb board need the
-> > tuning-step value as 2, otherwise it can't pass the tuning procedure.
-> >
-> > So this patch add the tuning-step setting in driver, so that user can
-> > set the tuning-step value in dts.
-> >
-> > Signed-off-by: Haibo Chen <haibo.chen@freescale.com>
-> > ---
-> >  drivers/mmc/host/sdhci-esdhc-imx.c          | 9 +++++++++
-> >  include/linux/platform_data/mmc-esdhc-imx.h | 1 +
-> >  2 files changed, 10 insertions(+)
-> >
-> > diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c
-> > b/drivers/mmc/host/sdhci-esdhc-imx.c
-> > index 48f009c..803d24f 100644
-> > --- a/drivers/mmc/host/sdhci-esdhc-imx.c
-> > +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-> > @@ -75,6 +75,7 @@
-> >  #define ESDHC_STD_TUNING_EN		(1 << 24)
-> >  /* NOTE: the minimum valid tuning start tap for mx6sl is 1 */
-> >  #define ESDHC_TUNING_START_TAP		0x1
-> > +#define ESDHC_TUNING_STEP_SHIFT		16
-> >
-> >  /* pinctrl state */
-> >  #define ESDHC_PINCTRL_STATE_100MHZ	"state_100mhz"
-> > @@ -474,6 +475,7 @@ static void esdhc_writew_le(struct sdhci_host *host,
-> u16 val, int reg)
-> >  		} else if (imx_data->socdata->flags & ESDHC_FLAG_STD_TUNING)
-> {
-> >  			u32 v = readl(host->ioaddr + SDHCI_ACMD12_ERR);
-> >  			u32 m = readl(host->ioaddr + ESDHC_MIX_CTRL);
-> > +			u32 tuning_ctrl;
-> >  			if (val & SDHCI_CTRL_TUNED_CLK) {
-> >  				v |= ESDHC_MIX_CTRL_SMPCLK_SEL;
-> >  			} else {
-> > @@ -484,6 +486,11 @@ static void esdhc_writew_le(struct sdhci_host
-> *host, u16 val, int reg)
-> >  			if (val & SDHCI_CTRL_EXEC_TUNING) {
-> >  				v |= ESDHC_MIX_CTRL_EXE_TUNE;
-> >  				m |= ESDHC_MIX_CTRL_FBCLK_SEL;
-> > +				tuning_ctrl = readl(host->ioaddr +
-> ESDHC_TUNING_CTRL);
-> > +				tuning_ctrl |= ESDHC_STD_TUNING_EN |
-> ESDHC_TUNING_START_TAP;
-> > +				if (imx_data->boarddata.tuning_step)
-> > +					tuning_ctrl |= imx_data-
-> >boarddata.tuning_step << ESDHC_TUNING_STEP_SHIFT;
-> > +					writel(tuning_ctrl, host->ioaddr +
-> ESDHC_TUNING_CTRL);
-> 
-> Is there a code indent issue here?
-> Otherwise, the patch looks good to me.
-> 
-> Regards
-> Dong Aisheng
-
-[haibo] I check this, the code indent is okay.
-
-> 
-> >  			} else {
-> >  				v &= ~ESDHC_MIX_CTRL_EXE_TUNE;
-> >  			}
-> > @@ -964,6 +971,8 @@ sdhci_esdhc_imx_probe_dt(struct platform_device
-> *pdev,
-> >  	if (gpio_is_valid(boarddata->wp_gpio))
-> >  		boarddata->wp_type = ESDHC_WP_GPIO;
-> >
-> > +	of_property_read_u32(np, "fsl,tuning-step",
-> > +&boarddata->tuning_step);
-> > +
-> >  	if (of_find_property(np, "no-1-8-v", NULL))
-> >  		boarddata->support_vsel = false;
-> >  	else
-> > diff --git a/include/linux/platform_data/mmc-esdhc-imx.h
-> > b/include/linux/platform_data/mmc-esdhc-imx.h
-> > index e1571ef..95ccab3 100644
-> > --- a/include/linux/platform_data/mmc-esdhc-imx.h
-> > +++ b/include/linux/platform_data/mmc-esdhc-imx.h
-> > @@ -45,5 +45,6 @@ struct esdhc_platform_data {
-> >  	int max_bus_width;
-> >  	bool support_vsel;
-> >  	unsigned int delay_line;
-> > +	unsigned int tuning_step;       /* The delay cell steps in tuning
-> procedure */
-> >  };
-> >  #endif /* __ASM_ARCH_IMX_ESDHC_H */
-> > --
-> > 1.9.1
-> >
+diff --git a/arch/arm/mach-imx/mach-ls1021a.c b/arch/arm/mach-imx/mach-ls1021a.c
+index b89c858..6bfc71b 100644
+--- a/arch/arm/mach-imx/mach-ls1021a.c
++++ b/arch/arm/mach-imx/mach-ls1021a.c
+@@ -7,10 +7,39 @@
+  * (at your option) any later version.
+  */
+ 
++#include <linux/dma-mapping.h>
++#include <linux/of_platform.h>
+ #include <asm/mach/arch.h>
+ 
+ #include "common.h"
+ 
++static int ls1021a_platform_notifier(struct notifier_block *nb,
++				  unsigned long event, void *__dev)
++{
++	struct device *dev = __dev;
++
++	if (event != BUS_NOTIFY_ADD_DEVICE)
++		return NOTIFY_DONE;
++
++	if (of_device_is_compatible(dev->of_node, "fsl,etsec2"))
++		set_dma_ops(dev, &arm_coherent_dma_ops);
++	else if (of_property_read_bool(dev->of_node, "dma-coherent"))
++		set_dma_ops(dev, &arm_coherent_dma_ops);
++
++	return NOTIFY_OK;
++}
++
++static struct notifier_block ls1021a_platform_nb = {
++	.notifier_call = ls1021a_platform_notifier,
++};
++
++static void __init ls1021a_init_machine(void)
++{
++	bus_register_notifier(&platform_bus_type, &ls1021a_platform_nb);
++
++	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
++}
++
+ static const char * const ls1021a_dt_compat[] __initconst = {
+ 	"fsl,ls1021a",
+ 	NULL,
+@@ -18,5 +47,6 @@ static const char * const ls1021a_dt_compat[] __initconst = {
+ 
+ DT_MACHINE_START(LS1021A, "Freescale LS1021A")
+ 	.smp		= smp_ops(ls1021a_smp_ops),
++	.init_machine   = ls1021a_init_machine,
+ 	.dt_compat	= ls1021a_dt_compat,
+ MACHINE_END
+-- 
+2.1.0.27.g96db324
