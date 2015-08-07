@@ -1,111 +1,42 @@
-From: alex.williamson@redhat.com (Alex Williamson)
-Date: Fri, 07 Aug 2015 14:09:14 -0600
-Subject: [PATCH v4 4/5] KVM: introduce kvm_arch functions for IRQ bypass
-In-Reply-To: <1438622444-25444-5-git-send-email-eric.auger@linaro.org>
-References: <1438622444-25444-1-git-send-email-eric.auger@linaro.org>
- <1438622444-25444-5-git-send-email-eric.auger@linaro.org>
-Message-ID: <1438978154.4023.262.camel@redhat.com>
+From: petr.cvek@tul.cz (Petr Cvek)
+Date: Fri, 07 Aug 2015 22:20:41 +0200
+Subject: [BUG, RFC] MTD Execute in Place on ARM breaks build
+Message-ID: <55C51319.2010901@tul.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-08-03 at 19:20 +0200, Eric Auger wrote:
-> This patch introduces
-> - kvm_arch_irq_bypass_add_producer
-> - kvm_arch_irq_bypass_del_producer
-> - kvm_arch_irq_bypass_stop
-> - kvm_arch_irq_bypass_start
-> 
-> They make possible to specialize the KVM IRQ bypass consumer in
-> case CONFIG_KVM_HAVE_IRQ_BYPASS is set.
-> 
-> Signed-off-by: Eric Auger <eric.auger@linaro.org>
-> Signed-off-by: Feng Wu <feng.wu@intel.com>
-> 
-> ---
-> 
-> v2 -> v3 (Feng Wu):
-> - use 'kvm_arch_irq_bypass_start' instead of 'kvm_arch_irq_bypass_resume'
-> - Remove 'kvm_arch_irq_bypass_update', which is not needed to be
->   a irqbypass callback per Alex's comments.
-> - Make kvm_arch_irq_bypass_add_producer return 'int'
-> 
-> v1 -> v2:
-> - use CONFIG_KVM_HAVE_IRQ_BYPASS instead CONFIG_IRQ_BYPASS_MANAGER
-> - rename all functions according to Paolo's proposal
-> - add kvm_arch_irq_bypass_update according to Feng's need
-> ---
->  include/linux/kvm_host.h | 33 +++++++++++++++++++++++++++++++++
->  virt/kvm/Kconfig         |  3 +++
->  2 files changed, 36 insertions(+)
-> 
-> diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
-> index 05e99b8..84b5feb 100644
-> --- a/include/linux/kvm_host.h
-> +++ b/include/linux/kvm_host.h
-> @@ -24,6 +24,7 @@
->  #include <linux/err.h>
->  #include <linux/irqflags.h>
->  #include <linux/context_tracking.h>
-> +#include <linux/irqbypass.h>
->  #include <asm/signal.h>
->  
->  #include <linux/kvm.h>
-> @@ -1151,5 +1152,37 @@ static inline void kvm_vcpu_set_dy_eligible(struct kvm_vcpu *vcpu, bool val)
->  {
->  }
->  #endif /* CONFIG_HAVE_KVM_CPU_RELAX_INTERCEPT */
-> +
-> +#ifdef CONFIG_HAVE_KVM_IRQ_BYPASS
-> +
-> +int kvm_arch_irq_bypass_add_producer(struct irq_bypass_consumer *,
-> +			   struct irq_bypass_producer *);
-> +void kvm_arch_irq_bypass_del_producer(struct irq_bypass_consumer *,
-> +			   struct irq_bypass_producer *);
-> +void kvm_arch_irq_bypass_stop(struct irq_bypass_consumer *);
-> +void kvm_arch_irq_bypass_start(struct irq_bypass_consumer *);
-> +
-> +#else
+Hello,
 
-Do we really need static inline stubs?  When would they get used?  How
-would they work since we call them via function pointers?
+Configuration:
 
-> +
-> +static inline int kvm_arch_irq_bypass_add_producer(
-> +			struct irq_bypass_consumer *cons,
-> +			struct irq_bypass_producer *prod)
-> +{
-> +	return -1;
+	CONFIG_MTD_XIP=y
 
-No reason not to stick with standard errno values, is there?  -EINVAL
-Thanks,
+on PXA2xx architecture causes request of undefined macros from 
 
-Alex
+	drivers/mtd/chipscfi_cmdset_0001.c
 
-> +}
-> +static inline void kvm_arch_irq_bypass_del_producer(
-> +			struct irq_bypass_consumer *cons,
-> +			struct irq_bypass_producer *prod)
-> +{
-> +}
-> +static inline void kvm_arch_irq_bypass_stop(
-> +			struct irq_bypass_consumer *cons)
-> +{
-> +}
-> +static inline void kvm_arch_irq_bypass_start(
-> +			struct irq_bypass_consumer *cons)
-> +{
-> +}
-> +#endif /* CONFIG_HAVE_KVM_IRQ_BYPASS */
->  #endif
->  
-> diff --git a/virt/kvm/Kconfig b/virt/kvm/Kconfig
-> index e2c876d..9f8014d 100644
-> --- a/virt/kvm/Kconfig
-> +++ b/virt/kvm/Kconfig
-> @@ -47,3 +47,6 @@ config KVM_GENERIC_DIRTYLOG_READ_PROTECT
->  config KVM_COMPAT
->         def_bool y
->         depends on COMPAT && !S390
-> +
-> +config HAVE_KVM_IRQ_BYPASS
-> +       bool
+These macros (using ICIP and ICMR) are defined here:
+
+	http://lxr.free-electrons.com/source/arch/arm/mach-pxa/include/mach/mtd-xip.h#L20
+
+register definitions for ICIP and ICMR were removed by commit:
+	
+	5d284e353eb11ab2e8b1c5671ba06489b0bd1e0c
+
+Similar is for macros with OSCR (lines 23 and 24), which have different type.
+Re-adding ICIP and ICMR definition and explicit type conversion will fix the build
+and the kernel boots, but I'm not yet able to test XIP functionality (too many different
+bugs to flash over windows mobile image).
+
+My temporal fix (ugly):
+
+#define ICIP __REG(0x40D00000)  /* Interrupt Controller IRQ Pending Register */
+#define ICMR __REG(0x40D00004)  /* Interrupt Controller Mask Register */
+...
+#define xip_currtime()		((unsigned long) OSCR)
+#define xip_elapsed_since(x)	(signed)((((unsigned long) OSCR) - (x)) / 4)
+
+
+P.S. Same macros are used on omap1 and sa1100 too.
+
+Petr Cvek
