@@ -1,34 +1,66 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 7 Aug 2015 17:09:50 +0530
-Subject: [PATCH v4 0/6] cpufreq: use generic cpufreq drivers for
- Exynos4x12 platform
-In-Reply-To: <2061119.GBaoSb4YSL@amdc1976>
-References: <1438868514-8814-1-git-send-email-b.zolnierkie@samsung.com>
- <55C43971.5010504@samsung.com> <20150807051826.GJ6325@linux>
- <2061119.GBaoSb4YSL@amdc1976>
-Message-ID: <20150807113950.GG6939@linux>
+From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
+Date: Fri,  7 Aug 2015 13:44:13 +0200
+Subject: [PATCH v3 3/4] ARM: dts: rockchip: Add SPDIF transceiver for RK3188
+In-Reply-To: <1438947854-3743-1-git-send-email-sjoerd.simons@collabora.co.uk>
+References: <1438947854-3743-1-git-send-email-sjoerd.simons@collabora.co.uk>
+Message-ID: <1438947854-3743-4-git-send-email-sjoerd.simons@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07-08-15, 13:31, Bartlomiej Zolnierkiewicz wrote:
-> Users don't need to enable the config option to get boost
-> functionality working.  It is only needed to get scaling_boost_freqs
-> sysfs attribute visible (which lists available boost freqs) when
-> using cpufreq-dt driver.  Also the config option in question is not
-> user visible.
+Add the SPDIF transceiver controller and pin for RK3188
 
-By users I meant the people who will prepare the build images for the
-release. They can just enable the config option :)
+Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
 
-> The worst thing that happens if these 2 PM patches don't make it
-> in time is that there will be no scaling_boost_freqs available
-> when using cpufreq-dt driver.  Which is not very important from
-> Exynos4x12 POV as it only supports single boost freq currently.
+---
 
-Right. So, now that your patch is Acked, send 1/6 and 6/6 separately
-to pm-list and Rafael can get them merged himself..
+Changes in v3: None
+Changes in v2:
+- Sort the spdif node properties
+- Drop the 0x prefix from the node name
+- Rename the spdif@ node to sound@
 
-I hope, your 6/6 patch will change a bit now ?
+ arch/arm/boot/dts/rk3188.dtsi | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
 
+diff --git a/arch/arm/boot/dts/rk3188.dtsi b/arch/arm/boot/dts/rk3188.dtsi
+index 0f23aed..abdb5bc 100644
+--- a/arch/arm/boot/dts/rk3188.dtsi
++++ b/arch/arm/boot/dts/rk3188.dtsi
+@@ -121,6 +121,22 @@
+ 		status = "disabled";
+ 	};
+ 
++	spdif: sound at 1011e000 {
++		compatible = "rockchip,rk3188-spdif", "rockchip,rk3066-spdif";
++		reg = <0x1011e000 0x2000>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		#sound-dai-cells = <0>;
++		clock-names = "spdif_hclk", "spdif_clk";
++		clocks = <&cru HCLK_SPDIF>, <&cru SCLK_SPDIF>;
++		dmas = <&dmac1_s 8>;
++		dma-names = "tx";
++		interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&spdif_tx>;
++		status = "disabled";
++	};
++
+ 	cru: clock-controller at 20000000 {
+ 		compatible = "rockchip,rk3188-cru";
+ 		reg = <0x20000000 0x1000>;
+@@ -462,6 +478,12 @@
+ 						<RK_GPIO1 21 RK_FUNC_1 &pcfg_pull_none>;
+ 			};
+ 		};
++
++		spdif {
++			spdif_tx: spdif-tx {
++				rockchip,pins = <RK_GPIO1 14 RK_FUNC_1 &pcfg_pull_none>;
++			};
++		};
+ 	};
+ };
+ 
 -- 
-viresh
+2.5.0
