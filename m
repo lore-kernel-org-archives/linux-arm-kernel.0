@@ -1,150 +1,93 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 07 Aug 2015 09:29:23 +0100
-Subject: [PATCH v3 09/11] KVM: arm/arm64: vgic: Prevent userspace injection
- of a mapped interrupt
-In-Reply-To: <55C458D4.9030500@linaro.org>
-References: <1437753309-17989-1-git-send-email-marc.zyngier@arm.com>
- <1437753309-17989-10-git-send-email-marc.zyngier@arm.com>
- <55C0E690.1090808@linaro.org> <55C0EBF5.2060708@arm.com>
- <55C1BBF9.2060004@linaro.org> <55C1DAE9.1050609@arm.com>
- <20150805105345.GA4657@cbox> <55C1F7CF.5070904@linaro.org>
- <20150805134754.GB4657@cbox> <55C38EF5.1080502@arm.com>
- <55C458D4.9030500@linaro.org>
-Message-ID: <55C46C63.2050906@arm.com>
+From: vigneshr@ti.com (Vignesh R)
+Date: Fri, 7 Aug 2015 14:05:10 +0530
+Subject: [RFC PATCH 1/5] spi: introduce flag for memory mapped read
+In-Reply-To: <CAOMqctRBW230fA4AEhK7MyqkZY==6ENNNHE-LVm7-mHKA_VzRw@mail.gmail.com>
+References: <20150805115013.GJ20873@sirena.org.uk>
+ <CAOMqctQXwcHyiWBwtugSDSE_k65qrNfrwnhjQMDJkLoJMmGzUw@mail.gmail.com>
+ <20150805124412.GN20873@sirena.org.uk>
+ <CAOMqctS9Y5FxpUCCJew6+cnjH5iTvbzkH3g-8yrXs4OuS2pSGA@mail.gmail.com>
+ <20150806090202.GO20873@sirena.org.uk>
+ <CAOMqctQZRZ4zG_yYy=CeX3DX4NVNWN1COP4Q-2YvMun9xYOA7g@mail.gmail.com>
+ <20150806102225.GI7576@n2100.arm.linux.org.uk> <55C35233.2000105@ti.com>
+ <20150806135129.GJ7576@n2100.arm.linux.org.uk>
+ <CAMuHMdWWDwZ=ziGQXFCnOX8pErXpsEi533J73_Hh=sEqq4hR6Q@mail.gmail.com>
+ <20150806213340.GK7576@n2100.arm.linux.org.uk>
+ <CAOMqctRBW230fA4AEhK7MyqkZY==6ENNNHE-LVm7-mHKA_VzRw@mail.gmail.com>
+Message-ID: <55C46DBE.7060809@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/08/15 08:05, Eric Auger wrote:
-> Hi Marc,
-> On 08/06/2015 06:44 PM, Marc Zyngier wrote:
->> On 05/08/15 14:47, Christoffer Dall wrote:
->>> On Wed, Aug 05, 2015 at 01:47:27PM +0200, Eric Auger wrote:
->>>> On 08/05/2015 12:53 PM, Christoffer Dall wrote:
->>>>> On Wed, Aug 05, 2015 at 10:44:09AM +0100, Marc Zyngier wrote:
->>>>>> On 05/08/15 08:32, Eric Auger wrote:
->>>>>>> Hi Marc,
->>>>>>> On 08/04/2015 06:44 PM, Marc Zyngier wrote:
->>>>>>>> On 04/08/15 17:21, Eric Auger wrote:
->>>>>>>>> Hi Marc,
->>>>>>>>> On 07/24/2015 05:55 PM, Marc Zyngier wrote:
->>>>>>>>>> Virtual interrupts mapped to a HW interrupt should only be triggered
->>>>>>>>>> from inside the kernel. Otherwise, you could end up confusing the
->>>>>>>>>> kernel (and the GIC's) state machine.
->>>>>>>>>>
->>>>>>>>>> Rearrange the injection path so that kvm_vgic_inject_irq is
->>>>>>>>>> used for non-mapped interrupts, and kvm_vgic_inject_mapped_irq is
->>>>>>>>>> used for mapped interrupts. The latter should only be called from
->>>>>>>>>> inside the kernel (timer, VFIO).
->>>>>>>>> nit: I would replace VFIO by irqfd.
->>>>>>>>> VFIO just triggers the eventfd/irqfd. This is KVM/irqfd that injects the
->>>>>>>>> virtual irq upon the irqfd signaling and he irqfd adaptation/ARM
->>>>>>>>> currently is implemented in vgic.c
->>>>>>>>
->>>>>>>> Ah, thanks for reminding me of the right terminology, I tend to think of
->>>>>>>> it as one big bag of nasty tricks... ;-)
->>>>>>>>
->>>>>>>> I'll update the commit message.
->>>>>>>>
->>>>>>>>>>
->>>>>>>>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>>>>>>>>> ---
->>>>>>>>>>  include/kvm/arm_vgic.h |  2 +
->>>>>>>>>>  virt/kvm/arm/vgic.c    | 99 ++++++++++++++++++++++++++++++++++----------------
->>>>>>>>>>  2 files changed, 70 insertions(+), 31 deletions(-)
->>>>>>>>>>
->>>>>>>>>> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
->>>>>>>>>> index 7306b4b..f6bfd79 100644
->>>>>>>>>> --- a/include/kvm/arm_vgic.h
->>>>>>>>>> +++ b/include/kvm/arm_vgic.h
->>>>>>>>>> @@ -351,6 +351,8 @@ void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu);
->>>>>>>>>>  void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu);
->>>>>>>>>>  int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int irq_num,
->>>>>>>>>>  			bool level);
->>>>>>>>>> +int kvm_vgic_inject_mapped_irq(struct kvm *kvm, int cpuid,
->>>>>>>>>> +			       struct irq_phys_map *map, bool level);
->>>>>>>>>>  void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg);
->>>>>>>>>>  int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
->>>>>>>>>>  int kvm_vgic_vcpu_active_irq(struct kvm_vcpu *vcpu);
->>>>>>>>>> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
->>>>>>>>>> index 3f7b690..e40ef70 100644
->>>>>>>>>> --- a/virt/kvm/arm/vgic.c
->>>>>>>>>> +++ b/virt/kvm/arm/vgic.c
->>>>>>>>>> @@ -1533,7 +1533,8 @@ static int vgic_validate_injection(struct kvm_vcpu *vcpu, int irq, int level)
->>>>>>>>>>  }
->>>>>>>>>>  
->>>>>>>>>>  static int vgic_update_irq_pending(struct kvm *kvm, int cpuid,
->>>>>>>>>> -				  unsigned int irq_num, bool level)
->>>>>>>>>> +				   struct irq_phys_map *map,
->>>>>>>>>> +				   unsigned int irq_num, bool level)
->>>>>>>>>>  {
->>>>>>>>> In vgic_update_irq_pending, I needed to modify the following line and
->>>>>>>>> add the "&& !map".
->>>>>>>>>
->>>>>>>>>         if (!vgic_validate_injection(vcpu, irq_num, level) && !map) {
->>>>>>>>>
->>>>>>>>> Without that, the level being not properly modeled for level sensitive
->>>>>>>>> forwarded IRQs, the 2d injection fails.
->>>>>>>>
->>>>>>>> Ah! Is that because we never see the line being reset to zero, and the
->>>>>>>> VGIC still sees the line as pending at the distributor level?
->>>>>>> yes indeed
->>>>>>
->>>>>> Then it is a bigger problem we need to solve, and your solution just
->>>>>> papers over the issue.
->>>>>>
->>>>>> The main problem is that irqfd is essentially an edge-triggered
->>>>>> signalling. Fire and forget. Given that we're dealing with a level
->>>>>> triggered interrupt, we end up with the interrupt still marked as
->>>>>> pending (nobody took the signal down).
->>>> this does not really relate to irqfd: irqfd also comes with the concept
->>>> of resamplefd. in case the IRQ is not forwarded, this is the
->>>> irqfd_resampler_ack function that toggles the IRQ down (eventfd.c). Its
->>>> execution is triggered in vgic_process_maintenance. With forwarding the
->>>> EOI is not trappable anymore so this disappears.
->>>>
->>>>
->>>>>> The usual way to get out of that mess in is to evaluate the state of the
->>>>>> level on EOI. But we can't trap on EOI for a HW interrupt.
->>>>>>
->>>>>> So it raises the question: should we instead consider the HW pending
->>>>>> state instead of the software one for mapped interrupts? It is
->>>>>> expensive, but it feels more correct.
->>>>>>
->>>>> I thought we already covered this at LCA.  For mapped interrupts
->>>>> (forwarded) we should never consider the software pending state, because
->>>>> that state is managed by the hardware.  Or am I confusing concepts here?
->>>>
->>>> Yes we discussed we should bypass most of the SW states.
->>>>
->>>> in my previous integration I proposed a patch "KVM: arm: vgic: fix state
->>>> machine for forwarded IRQ". What's wrong with the below approach?
->>>>
->>>>
->>>>     Fix multiple injection of level sensitive forwarded IRQs.
->>>>     With current code, the second injection fails since the
->>>>     state bitmaps are not reset (process_maintenance is not
->>>>     called anymore).
->>>>
->>>>     New implementation follows those principles:
->>>>     - A forwarded IRQ only can be sampled when it is pending
->>>>     - when queueing the IRQ (programming the LR), the pending state
->>>>       is removed as for edge sensitive IRQs
->>>>     - an injection of a forwarded IRQ is considered always valid since
->>>>       coming from the HW and level always is 1.
->>>>
->>> I don't see anything wrong, and I thought this was what we discussed.
->>
->> I think I just lost track of what we've discussed at LCA. Ignore me.
->>
->> I'll repost the updated first 10 patches tomorrow. Eric, are you willing
->> to take custody of patch 11 as part of one of your series?
-> Yes no problem I can take this over if you prefer. I can easily test it.
-> May I put it in the irq forwarding series?
 
-That would be its natural location.
 
-Thanks,
+On 08/07/2015 01:08 PM, Michal Suchanek wrote:
 
-	M.
+> Now since the description is clearer it's obvious that ti-qspi cannot
+> work fully mmapped as fsl-qspi does because the setup has to be done
+> over normal spi access and using non-m25p80 devices on the same bus is
+> a requirement.
+> 
+> The place where it is known if a transfer can use the mmap access is m25p80.c
+> 
+> So my suggestion is
+> 
+>  - add a new method for spi master that gets the read opcode, dummy
+> length, address, address length, buffer, buffer length and performs
+> read from the flash memory in a hardware-specific way
+> 
+> - add a check in m25p80.c that the master supports this feature and if
+> so use it (eg check that the method is non-null)
+> 
+> Presumably if some new SPI controllers with similar feature are
+> supported in the future they can use the same inteface because you
+> pass on everything the m25p80 read knows.
+> 
+
+Ok... Do you mean something like this?
+
+I will take m25p80 as example but can be expanded for any flash.
+
+In include/linux/mtd.h:
+	struct spi_mtd_config_info {
+		struct spi_device 	*spi;
+	        u32                     page_size;
+	        u8                      addr_width;
+       		u8                      erase_opcode;
+	        u8                      read_opcode;
+        	u8                      read_dummy;
+	        u8                      program_opcode;
+        	enum read_mode          flash_read;
+
+	} /* subset of struct spi_nor */
+
+
+In m25p80.c:
+
+	static int m25p80_read(struct spi_nor *nor, loff_t from,
+				size_t len, size_t *retlen,
+				u_char *buf)
+	{
+		struct spi_mtd_config_info info;
+		struct spi_device *spi;
+		
+		if (spi->master->spi_mtd_mmap_read) {
+		  /* Populate spi_mtd_config_info */
+		  spi->master->spi_mtd_mmap_read(&info, from, len,
+						 retlen, buf);
+		}
+		else {
+		/* no mtd specific acceleration supported try normal
+		 * SPI way of communicating with flash
+		 * continue with current code
+		 * set up spi_message and call spi_sync()
+		 */
+	}
+
+      }
+
+In spi-ti-qspi.c:
+Implement spi_mtd_mmap_read while holding master->bus_lock mutex.
+
+
 -- 
-Jazz is not dead. It just smells funny...
+Regards
+Vignesh
