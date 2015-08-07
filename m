@@ -1,102 +1,108 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 7 Aug 2015 17:45:44 +0200
-Subject: [GIT PULL] at91: dt for 4.3 #2
-Message-ID: <20150807154544.GA18934@piout.net>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri,  7 Aug 2015 16:45:36 +0100
+Subject: [PATCH v4 00/11] arm/arm64: KVM: Active interrupt state switching for
+ shared devices
+Message-ID: <1438962347-17541-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+>From day 1, our timer code has been using a terrible hack: whenever
+the guest is scheduled with a timer interrupt pending (i.e. the HW
+timer has expired), we restore the timer state with the MASK bit set,
+in order to avoid the physical interrupt to fire again. And again. And
+again...
 
-Arnd, Olof, Kevin,
+This is absolutely silly, for at least two reasons:
 
-This is the second batch of DT changes for 4.3.
-It is mainly some preparation to support properly getting the slow clock
-from each driver so that the dtsis are ready when the driver change
-lands in each subsystem.
+- This relies on the device (the timer) having a mask bit that we can
+  play with. Not all devices are built like this.
 
-It also adds support for the lcd controller on at91sam9x5 and
-at91sam9n12. The driver changes have been submitted but didn't yet land
-in the drm and mfd subsystem however, I don't expect any issue getting
-those in.
+- This expects some behaviour of the guest that only works because the
+  both the kernel timer code and the KVM counterpart have been written
+  by the same idiot (the idiot being me).
 
-Thanks, best regards,
+The One True Way is to set the GIC active bit when injecting the
+interrupt, and to context-switch across the world switch. This is what
+this series implements.
 
-The following changes since commit 22b5a0f7bc07ac4b4e4aab9a7f8cf2521819c1c4:
+We introduce a relatively simple infrastructure enabling the mapping
+of a virtual interrupt with its physical counterpart:
 
-  ARM: at91/dt: add minimal sama5d2 Xplained board (2015-07-30 18:44:44 +0200)
+- Whenever an virtual interrupt is injected, we look it up in an
+  rbtree. If we have a match, the interrupt is injected with the HW
+  bit set in the LR, together with the physical interrupt.
 
-are available in the git repository at:
+- Across the world switch, we save/restore the active state for these
+  interrupts using the irqchip_state API.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-dt2
+- On guest EOI, the HW interrupt is automagically deactivated by the
+  GIC, allowing the interrupt to be resampled.
 
-for you to fetch changes up to 761c5867ef031fae244d030bc17c93f5a3df106f:
+The timer code is slightly modified to set the active state at the
+same time as the injection.
 
-  ARM: at91/dt: sama5d2: use slow clock where necessary (2015-08-07 17:33:54 +0200)
+The last patch also allows non-shared devices to have their interrupt
+deactivated the same way (in this case we do not context-switch the
+active state). This is the first step in the long overdue direction of
+the mythical IRQ forwarding thing... This last patch is not a
+candidate for merging, but is included for completeness, and to allow
+Eric to base his own code on this stuff.
 
-----------------------------------------------------------------
-Second batch of DT changes for 4.3:
-- Add the slow clock to the nodes that will use it
-- Add hlcd to the at91sam9x5 and at91sam9n12
-- Add touchscreen and touch button support to the at91sam9x5ek
+This series is based on v4.2-rc2 + the current queue for 4.3, and has
+been tested on Juno, Cubietruck (GICv2) and the FVP Base model (GICv3
+host, both GICv2 and GICv3 guests). I'd appreciate any form of
+testing, specially in the context of guest migration (there is
+obviously some interesting stuff there...).
 
-----------------------------------------------------------------
-Alexandre Belloni (15):
-      Documentation: dt: atmel-at91: add clocks to system timer, rstc and shdwc
-      Documentation: watchdog: at91sam9_wdt: add clocks property
-      Documentation: dt: rtc: at91rm9200: add clocks property
-      ARM: at91/dt: at91rm9200: use slow clock where necessary
-      ARM: at91/dt: at91sam9260: use slow clock where necessary
-      ARM: at91/dt: at91sam9261: use slow clock where necessary
-      ARM: at91/dt: at91sam9263: use slow clock where necessary
-      ARM: at91/dt: at91sam9g45: use slow clock where necessary
-      ARM: at91/dt: at91sam9n12: use slow clock where necessary
-      ARM: at91/dt: at91sam9rl: use slow clock where necessary
-      ARM: at91/dt: at91sam9x5: use slow clock where necessary
-      ARM: at91/dt: sama5d3: use slow clock where necessary
-      ARM: at91/dt: sama5d4: use slow clock where necessary
-      ARM: at91/dt: at91sam9x5dm: add support for the touschscreen
-      ARM: at91/dt: sama5d2: use slow clock where necessary
+The code is otherwise available at
+git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm64/active-timer-next
 
-Bo Shen (1):
-      ARM: at91/dt: add drm support for at91sam9n12ek
+* From v3:
+  - Fixed RCU thinko
+  - Some more documentation
+  - Added RBs from Christoffer
 
-Boris Brezillon (5):
-      Documentation: dt: atmel-at91: add slow clock to tcb
-      ARM: at91/dt: define hlcdc node in at91sam9x5_lcd.dtsi
-      ARM: at91/dt: include lcd dtsi in at91sam9x5 dtsis
-      ARM: at91/dt: add at91sam9x5-ek Display Module dtsi
-      ARM: at91/dt: enable lcd support for at91sam9x5 SoCs
+* From v2:
+  - Many comments added
+  - Fixed potential race between unmap and destroy
+  - Removed the requirement for a GFP_ATOMIC allocations in map
+  - New function names for the exported functions (map, unmap, get, set, init)
+  - New patch preventing the injection of a HW mapped interrupt, and
+    offer a new injection API
 
-Nicolas Ferre (1):
-      ARM: at91/dt: at91sam9x5dm: add QT1070 touch button controller
+* From v1:
+  - Rebased on top of current mainline
+  - Fixed non-shared handling of forwarded interrupts
+  - Fixed memory leaks on VM exit
+  - Used RCU lists instead of an RB tree
 
- .../devicetree/bindings/arm/atmel-at91.txt         |  13 +-
- .../bindings/rtc/atmel,at91rm9200-rtc.txt          |   2 +
- .../devicetree/bindings/watchdog/atmel-wdt.txt     |   2 +
- arch/arm/boot/dts/at91rm9200.dtsi                  |  10 +-
- arch/arm/boot/dts/at91sam9260.dtsi                 |  11 +-
- arch/arm/boot/dts/at91sam9261.dtsi                 |   7 +-
- arch/arm/boot/dts/at91sam9263.dtsi                 |   7 +-
- arch/arm/boot/dts/at91sam9g15.dtsi                 |   1 +
- arch/arm/boot/dts/at91sam9g15ek.dts                |  25 ++++
- arch/arm/boot/dts/at91sam9g35.dtsi                 |   1 +
- arch/arm/boot/dts/at91sam9g35ek.dts                |  21 ++++
- arch/arm/boot/dts/at91sam9g45.dtsi                 |  12 +-
- arch/arm/boot/dts/at91sam9n12.dtsi                 |  83 +++++++++++-
- arch/arm/boot/dts/at91sam9n12ek.dts                |  61 +++++++++
- arch/arm/boot/dts/at91sam9rl.dtsi                  |   8 +-
- arch/arm/boot/dts/at91sam9x35.dtsi                 |   1 +
- arch/arm/boot/dts/at91sam9x35ek.dts                |  20 +++
- arch/arm/boot/dts/at91sam9x5.dtsi                  |  12 +-
- arch/arm/boot/dts/at91sam9x5_lcd.dtsi              | 139 +++++++++++++++++++++
- arch/arm/boot/dts/at91sam9x5dm.dtsi                | 101 +++++++++++++++
- arch/arm/boot/dts/sama5d2.dtsi                     |   9 +-
- arch/arm/boot/dts/sama5d3.dtsi                     |   8 +-
- arch/arm/boot/dts/sama5d3_tcb1.dtsi                |   4 +-
- arch/arm/boot/dts/sama5d4.dtsi                     |  12 +-
- 24 files changed, 528 insertions(+), 42 deletions(-)
- create mode 100644 arch/arm/boot/dts/at91sam9x5dm.dtsi
+Marc Zyngier (11):
+  arm/arm64: KVM: Fix ordering of timer/GIC on guest entry
+  arm/arm64: KVM: Move vgic handling to a non-preemptible section
+  KVM: arm/arm64: vgic: Convert struct vgic_lr to use bitfields
+  KVM: arm/arm64: vgic: Allow HW irq to be encoded in LR
+  KVM: arm/arm64: vgic: Relax vgic_can_sample_irq for edge IRQs
+  KVM: arm/arm64: vgic: Allow dynamic mapping of physical/virtual
+    interrupts
+  KVM: arm/arm64: vgic: Allow HW interrupts to be queued to a guest
+  KVM: arm/arm64: vgic: Add vgic_{get,set}_phys_irq_active
+  KVM: arm/arm64: vgic: Prevent userspace injection of a mapped
+    interrupt
+  KVM: arm/arm64: timer: Allow the timer to control the active state
+  KVM: arm/arm64: vgic: Allow HW interrupts for non-shared devices
+
+ arch/arm/kvm/arm.c                 |  21 +-
+ arch/arm/kvm/reset.c               |   4 +-
+ arch/arm64/kvm/reset.c             |   4 +-
+ include/kvm/arm_arch_timer.h       |   7 +-
+ include/kvm/arm_vgic.h             |  41 +++-
+ include/linux/irqchip/arm-gic-v3.h |   3 +
+ include/linux/irqchip/arm-gic.h    |   3 +-
+ virt/kvm/arm/arch_timer.c          |  30 ++-
+ virt/kvm/arm/vgic-v2.c             |  16 +-
+ virt/kvm/arm/vgic-v3.c             |  21 +-
+ virt/kvm/arm/vgic.c                | 472 ++++++++++++++++++++++++++++++++++---
+ 11 files changed, 557 insertions(+), 65 deletions(-)
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+2.1.4
