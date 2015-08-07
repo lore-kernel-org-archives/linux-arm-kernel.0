@@ -1,45 +1,34 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 7 Aug 2015 18:27:54 +0200
-Subject: [GIT PULL] at91: defconfig for 4.3 #2
-Message-ID: <20150807162754.GA20169@piout.net>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri,  7 Aug 2015 18:27:32 +0200
+Subject: [PATCH 1/4] ARM: exynos: Remove PTN3460 dependency
+Message-ID: <1438964855-16989-1-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof, Kevin,
+From: Thierry Reding <treding@nvidia.com>
 
-A little defconfig update. That will probably be all for this cycle.
+Now that the PTN3460 driver has been rewritten as a proper I2C driver
+and there is infrastructure to hook up the bridge with a DRM device, it
+is no longer necessary to have this dependency to ensure the correct
+build mode.
 
-Thanks, bye,
+Signed-off-by: Thierry Reding <treding@nvidia.com>
+---
+ drivers/gpu/drm/exynos/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-
-The following changes since commit eff7f41572a645bf14a96a6f844be4f1c88cd9dd:
-
-  ARM: at91: at91_dt_defconfig: enable ISI and ov2640 support (2015-07-30 14:17:31 +0200)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-defconfig2
-
-for you to fetch changes up to ea7bf603fd494391acc1f42acbfc34260b965c44:
-
-  ARM: at91/defconfig: at91_dt: remove ARM_AT91_ETHER (2015-08-07 12:07:50 +0200)
-
-----------------------------------------------------------------
-Second batch of defconfig update for 4.3:
-- enable the HLCDC driver for at91sam9
-- remove an obsolete config option
-
-----------------------------------------------------------------
-Alexandre Belloni (1):
-      ARM: at91/defconfig: at91_dt: remove ARM_AT91_ETHER
-
-Josh Wu (1):
-      ARM: at91/defconfig: at91_dt: enable DRM hlcdc support
-
- arch/arm/configs/at91_dt_defconfig | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
-
+diff --git a/drivers/gpu/drm/exynos/Kconfig b/drivers/gpu/drm/exynos/Kconfig
+index 43003c4ad80b..df0b61a60501 100644
+--- a/drivers/gpu/drm/exynos/Kconfig
++++ b/drivers/gpu/drm/exynos/Kconfig
+@@ -56,7 +56,7 @@ config DRM_EXYNOS_DSI
+ 
+ config DRM_EXYNOS_DP
+ 	bool "EXYNOS DRM DP driver support"
+-	depends on DRM_EXYNOS && (DRM_EXYNOS_FIMD || DRM_EXYNOS7_DECON) && (DRM_PTN3460=n || DRM_PTN3460=y || DRM_PTN3460=DRM_EXYNOS)
++	depends on DRM_EXYNOS && (DRM_EXYNOS_FIMD || DRM_EXYNOS7_DECON)
+ 	default DRM_EXYNOS
+ 	select DRM_PANEL
+ 	help
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+2.4.5
