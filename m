@@ -1,10 +1,10 @@
 From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Fri, 07 Aug 2015 09:59:22 +0200
-Subject: [PATCH 16/31] net/cavium/liquidio: use kmemdup rather than duplicating
- its implementation
+Date: Fri, 07 Aug 2015 09:59:07 +0200
+Subject: [PATCH 01/31] arch/arm/mach-lpc32xx: use kmemdup rather than
+ duplicating its implementation
 In-Reply-To: <1438934377-4922-1-git-send-email-a.hajda@samsung.com>
 References: <1438934377-4922-1-git-send-email-a.hajda@samsung.com>
-Message-ID: <1438934377-4922-17-git-send-email-a.hajda@samsung.com>
+Message-ID: <1438934377-4922-2-git-send-email-a.hajda@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,26 +15,33 @@ scripts/coccinelle/api/memdup.cocci [1].
 
 Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
 ---
- drivers/net/ethernet/cavium/liquidio/octeon_device.c | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+ arch/arm/mach-lpc32xx/pm.c | 7 ++-----
+ 1 file changed, 2 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/net/ethernet/cavium/liquidio/octeon_device.c b/drivers/net/ethernet/cavium/liquidio/octeon_device.c
-index f67641a..8e23e3f 100644
---- a/drivers/net/ethernet/cavium/liquidio/octeon_device.c
-+++ b/drivers/net/ethernet/cavium/liquidio/octeon_device.c
-@@ -602,12 +602,10 @@ int octeon_download_firmware(struct octeon_device *oct, const u8 *data,
- 	snprintf(oct->fw_info.liquidio_firmware_version, 32, "LIQUIDIO: %s",
- 		 h->version);
+diff --git a/arch/arm/mach-lpc32xx/pm.c b/arch/arm/mach-lpc32xx/pm.c
+index 207e812..dd3a432 100644
+--- a/arch/arm/mach-lpc32xx/pm.c
++++ b/arch/arm/mach-lpc32xx/pm.c
+@@ -87,7 +87,8 @@ static int lpc32xx_pm_enter(suspend_state_t state)
+ 	void *iram_swap_area;
  
--	buffer = kmalloc(size, GFP_KERNEL);
-+	buffer = kmemdup(data, size, GFP_KERNEL);
- 	if (!buffer)
+ 	/* Allocate some space for temporary IRAM storage */
+-	iram_swap_area = kmalloc(lpc32xx_sys_suspend_sz, GFP_KERNEL);
++	iram_swap_area = kmemdup((void *)TEMP_IRAM_AREA,
++				 lpc32xx_sys_suspend_sz, GFP_KERNEL);
+ 	if (!iram_swap_area) {
+ 		printk(KERN_ERR
+ 		       "PM Suspend: cannot allocate memory to save portion "
+@@ -95,10 +96,6 @@ static int lpc32xx_pm_enter(suspend_state_t state)
  		return -ENOMEM;
+ 	}
  
--	memcpy(buffer, data, size);
+-	/* Backup a small area of IRAM used for the suspend code */
+-	memcpy(iram_swap_area, (void *) TEMP_IRAM_AREA,
+-		lpc32xx_sys_suspend_sz);
 -
- 	p = buffer + sizeof(struct octeon_firmware_file_header);
- 
- 	/* load all images */
+ 	/*
+ 	 * Copy code to suspend system into IRAM. The suspend code
+ 	 * needs to run from IRAM as DRAM may no longer be available
 -- 
 1.9.1
