@@ -1,28 +1,19 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 7 Aug 2015 10:01:16 +0530
-Subject: [PATCH v4 6/6] cpufreq: remove no longer needed
- CPU_FREQ_BOOST_SW config option
-In-Reply-To: <1438868514-8814-7-git-send-email-b.zolnierkie@samsung.com>
-References: <1438868514-8814-1-git-send-email-b.zolnierkie@samsung.com>
- <1438868514-8814-7-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <20150807043116.GI6325@linux>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 06 Aug 2015 21:40:14 -0700
+Subject: [PATCH] ARM: brcmstb: select ARCH_DMA_ADDR_T_64BIT for LPAE
+In-Reply-To: <1438914158-12439-1-git-send-email-gregory.0xf0@gmail.com>
+References: <1438914158-12439-1-git-send-email-gregory.0xf0@gmail.com>
+Message-ID: <55C436AE.6070704@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06-08-15, 15:41, Bartlomiej Zolnierkiewicz wrote:
-> Remove no longer needed CPU_FREQ_BOOST_SW config option.
+Le 08/06/15 19:22, Gregory Fong a ?crit :
+> Broadcom STB (BRCMSTB) has some 64-bit capable DMA and therefore needs
+> dma_addr_t to be a 64-bit size.  One user is the Broadcom SATA3 AHCI
+> controller driver.
 > 
-> Cc: Viresh Kumar <viresh.kumar@linaro.org>
-> Cc: Thomas Abraham <thomas.ab@samsung.com>
-> Cc: Javier Martinez Canillas <javier@osg.samsung.com>
-> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> ---
->  drivers/cpufreq/Kconfig      | 4 ----
->  drivers/cpufreq/freq_table.c | 3 ---
->  2 files changed, 7 deletions(-)
+> Signed-off-by: Gregory Fong <gregory.0xf0@gmail.com>
 
-This must be applied only after fixing 1/6.
-
+Applied to soc/next, thanks Gregory!
 -- 
-viresh
+Florian
