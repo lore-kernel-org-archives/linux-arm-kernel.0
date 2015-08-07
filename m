@@ -1,31 +1,97 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Fri, 7 Aug 2015 10:55:17 +0200
-Subject: [PATCH v5 3/3] arm64: Hook up IOMMU dma_ops
-In-Reply-To: <caecbce93dd4870995a000bebc8f58d1ca7e551e.1438362603.git.robin.murphy@arm.com>
-References: <cover.1438362603.git.robin.murphy@arm.com>
- <caecbce93dd4870995a000bebc8f58d1ca7e551e.1438362603.git.robin.murphy@arm.com>
-Message-ID: <20150807085516.GW14980@8bytes.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 07 Aug 2015 10:04:22 +0100
+Subject: [PATCH 2/5] ACPI / ARM64: remove usage of
+ BAD_MADT_ENTRY/BAD_MADT_GICC_ENTRY
+In-Reply-To: <1438894770-31163-3-git-send-email-al.stone@linaro.org>
+References: <1438894770-31163-1-git-send-email-al.stone@linaro.org>
+ <1438894770-31163-3-git-send-email-al.stone@linaro.org>
+Message-ID: <55C47496.5070902@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 31, 2015 at 06:18:29PM +0100, Robin Murphy wrote:
-> +void arch_teardown_dma_ops(struct device *dev)
-> +{
-> +	struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
-> +
-> +	if (domain) {
-> +		iommu_detach_device(domain, dev);
-> +		if (domain->type & __IOMMU_DOMAIN_ARM64_IOVA)
-> +			iommu_put_dma_cookie(domain);
-> +		if (domain->type & __IOMMU_DOMAIN_ARM64)
-> +			iommu_domain_free(domain);
-> +		dev->archdata.dma_ops = NULL;
-> +	}
-> +}
+Hi Al,
 
-When is this called? In case a device gets removed the IOMMU core and
-driver should take care of destroying the domain, at least when its a
-default-domain. This is part of the iommu-group handling.
+On 06/08/15 21:59, Al Stone wrote:
+> Now that we have introduced the bad_madt_entry() function, and that
+> function is being invoked in acpi_table_parse_madt() for us, there
+> is no longer any need to use the BAD_MADT_ENTRY macro, or in the case
+> of arm64, the BAD_MADT_GICC_ENTRY, too.
+> 
+> Signed-off-by: Al Stone <al.stone@linaro.org>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm64/include/asm/acpi.h | 8 --------
+>  arch/arm64/kernel/smp.c       | 2 --
+>  drivers/irqchip/irq-gic.c     | 6 ------
+>  3 files changed, 16 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+> index 406485e..39248d3 100644
+> --- a/arch/arm64/include/asm/acpi.h
+> +++ b/arch/arm64/include/asm/acpi.h
+> @@ -19,14 +19,6 @@
+>  #include <asm/psci.h>
+>  #include <asm/smp_plat.h>
+>  
+> -/* Macros for consistency checks of the GICC subtable of MADT */
+> -#define ACPI_MADT_GICC_LENGTH	\
+> -	(acpi_gbl_FADT.header.revision < 6 ? 76 : 80)
+> -
+> -#define BAD_MADT_GICC_ENTRY(entry, end)						\
+> -	(!(entry) || (unsigned long)(entry) + sizeof(*(entry)) > (end) ||	\
+> -	 (entry)->header.length != ACPI_MADT_GICC_LENGTH)
+> -
+>  /* Basic configuration for ACPI */
+>  #ifdef	CONFIG_ACPI
+>  /* ACPI table mapping after acpi_gbl_permanent_mmap is set */
+> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+> index 50fb469..acd3b27 100644
+> --- a/arch/arm64/kernel/smp.c
+> +++ b/arch/arm64/kernel/smp.c
+> @@ -438,8 +438,6 @@ acpi_parse_gic_cpu_interface(struct acpi_subtable_header *header,
+>  	struct acpi_madt_generic_interrupt *processor;
+>  
+>  	processor = (struct acpi_madt_generic_interrupt *)header;
+> -	if (BAD_MADT_GICC_ENTRY(processor, end))
+> -		return -EINVAL;
+>  
+>  	acpi_table_print_madt_entry(header);
+>  
+> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+> index 4dd8826..2735611 100644
+> --- a/drivers/irqchip/irq-gic.c
+> +++ b/drivers/irqchip/irq-gic.c
+> @@ -1055,9 +1055,6 @@ gic_acpi_parse_madt_cpu(struct acpi_subtable_header *header,
+>  
+>  	processor = (struct acpi_madt_generic_interrupt *)header;
+>  
+> -	if (BAD_MADT_GICC_ENTRY(processor, end))
+> -		return -EINVAL;
+> -
+>  	/*
+>  	 * There is no support for non-banked GICv1/2 register in ACPI spec.
+>  	 * All CPU interface addresses have to be the same.
+> @@ -1079,9 +1076,6 @@ gic_acpi_parse_madt_distributor(struct acpi_subtable_header *header,
+>  
+>  	dist = (struct acpi_madt_generic_distributor *)header;
+>  
+> -	if (BAD_MADT_ENTRY(dist, end))
+> -		return -EINVAL;
+> -
+>  	dist_phy_base = dist->base_address;
+>  	return 0;
+>  }
+> 
 
+Thanks a lot for doing this - the proliferation of this macro has been
+driving me insane.
 
-	Joerg
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
