@@ -1,148 +1,41 @@
-From: julien.grall@citrix.com (Julien Grall)
-Date: Fri, 7 Aug 2015 17:46:55 +0100
-Subject: [PATCH v3 16/20] block/xen-blkback: Make it running on 64KB page
- granularity
-In-Reply-To: <1438966019-19322-1-git-send-email-julien.grall@citrix.com>
-References: <1438966019-19322-1-git-send-email-julien.grall@citrix.com>
-Message-ID: <1438966019-19322-17-git-send-email-julien.grall@citrix.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 7 Aug 2015 14:16:12 -0300
+Subject: could not get clock /usdhc1_pwrseq:ext_clock(0)
+Message-ID: <CAOMZO5BFSBjLNDuEVrdANU9Og1tttawp=a3vLCKFBJok95=r0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PV block protocol is using 4KB page granularity. The goal of this
-patch is to allow a Linux using 64KB page granularity behaving as a
-block backend on a non-modified Xen.
+Hi,
 
-It's only necessary to adapt the ring size and the number of request per
-indirect frames. The rest of the code is relying on the grant table
-code.
+When booting linux-next 20150807 on a imx6q-cuboxi I see the following
+error coming from __of_clk_get_by_name():
 
-Note that the grant table code is allocating a Linux page per grant
-which will result to waste 6OKB for every grant when Linux is using 64KB
-page granularity. This could be improved by sharing the page between
-multiple grants.
+[    1.674167] ERROR: could not get clock /usdhc1_pwrseq:ext_clock(0)
 
-Signed-off-by: Julien Grall <julien.grall@citrix.com>
----
+The ext_clock clock is passed in the imx6qdl-microsom.dtsi:
 
-Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-Cc: "Roger Pau Monn?" <roger.pau@citrix.com>
-Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
-Cc: David Vrabel <david.vrabel@citrix.com>
+    usdhc1_pwrseq: usdhc1_pwrseq {
+        compatible = "mmc-pwrseq-simple";
+        reset-gpios = <&gpio5 26 GPIO_ACTIVE_LOW>,
+                  <&gpio6 0 GPIO_ACTIVE_LOW>;
+        clocks = <&clk_sdio>;
+        clock-names = "ext_clock";
+    };
 
-Improvement such as support of 64KB grant is not taken into
-consideration in this patch because we have the requirement to run a
-Linux using 64KB pages on a non-modified Xen.
+, where:
 
-This has been tested only with a loop device. I plan to test passing
-hard drive partition but I didn't yet convert the swiotlb code.
+    clk_sdio: sdio-clock{
+        compatible = "gpio-gate-clock";
+        #clock-cells = <0>;
+        pinctrl-names = "default";
+        pinctrl-0 = <&pinctrl_microsom_brcm_osc>;
+        enable-gpios = <&gpio5 5 GPIO_ACTIVE_HIGH>;
+    };
 
-    Changes in v3:
-        - Use DIV_ROUND_UP in INDIRECT_PAGES to avoid a line over 80
-        characters
----
- drivers/block/xen-blkback/blkback.c |  5 +++--
- drivers/block/xen-blkback/common.h  | 17 +++++++++++++----
- drivers/block/xen-blkback/xenbus.c  |  9 ++++++---
- 3 files changed, 22 insertions(+), 9 deletions(-)
+This used to work earlier, but I haven't bisected it yet.
 
-diff --git a/drivers/block/xen-blkback/blkback.c b/drivers/block/xen-blkback/blkback.c
-index ced9677..d5cce8c 100644
---- a/drivers/block/xen-blkback/blkback.c
-+++ b/drivers/block/xen-blkback/blkback.c
-@@ -961,7 +961,7 @@ static int xen_blkbk_parse_indirect(struct blkif_request *req,
- 		seg[n].nsec = segments[i].last_sect -
- 			segments[i].first_sect + 1;
- 		seg[n].offset = (segments[i].first_sect << 9);
--		if ((segments[i].last_sect >= (PAGE_SIZE >> 9)) ||
-+		if ((segments[i].last_sect >= (XEN_PAGE_SIZE >> 9)) ||
- 		    (segments[i].last_sect < segments[i].first_sect)) {
- 			rc = -EINVAL;
- 			goto unmap;
-@@ -1210,6 +1210,7 @@ static int dispatch_rw_block_io(struct xen_blkif *blkif,
- 
- 	req_operation = req->operation == BLKIF_OP_INDIRECT ?
- 			req->u.indirect.indirect_op : req->operation;
-+
- 	if ((req->operation == BLKIF_OP_INDIRECT) &&
- 	    (req_operation != BLKIF_OP_READ) &&
- 	    (req_operation != BLKIF_OP_WRITE)) {
-@@ -1268,7 +1269,7 @@ static int dispatch_rw_block_io(struct xen_blkif *blkif,
- 			seg[i].nsec = req->u.rw.seg[i].last_sect -
- 				req->u.rw.seg[i].first_sect + 1;
- 			seg[i].offset = (req->u.rw.seg[i].first_sect << 9);
--			if ((req->u.rw.seg[i].last_sect >= (PAGE_SIZE >> 9)) ||
-+			if ((req->u.rw.seg[i].last_sect >= (XEN_PAGE_SIZE >> 9)) ||
- 			    (req->u.rw.seg[i].last_sect <
- 			     req->u.rw.seg[i].first_sect))
- 				goto fail_response;
-diff --git a/drivers/block/xen-blkback/common.h b/drivers/block/xen-blkback/common.h
-index 45a044a..68e87a0 100644
---- a/drivers/block/xen-blkback/common.h
-+++ b/drivers/block/xen-blkback/common.h
-@@ -39,6 +39,7 @@
- #include <asm/pgalloc.h>
- #include <asm/hypervisor.h>
- #include <xen/grant_table.h>
-+#include <xen/page.h>
- #include <xen/xenbus.h>
- #include <xen/interface/io/ring.h>
- #include <xen/interface/io/blkif.h>
-@@ -51,12 +52,20 @@ extern unsigned int xen_blkif_max_ring_order;
-  */
- #define MAX_INDIRECT_SEGMENTS 256
- 
--#define SEGS_PER_INDIRECT_FRAME \
--	(PAGE_SIZE/sizeof(struct blkif_request_segment))
-+/*
-+ * Xen use 4K pages. The guest may use different page size (4K or 64K)
-+ * Number of Xen pages per segment
-+ */
-+#define XEN_PAGES_PER_SEGMENT   (PAGE_SIZE / XEN_PAGE_SIZE)
-+
-+#define XEN_PAGES_PER_INDIRECT_FRAME \
-+	(XEN_PAGE_SIZE/sizeof(struct blkif_request_segment))
-+#define SEGS_PER_INDIRECT_FRAME	\
-+	(XEN_PAGES_PER_INDIRECT_FRAME / XEN_PAGES_PER_SEGMENT)
-+
- #define MAX_INDIRECT_PAGES \
- 	((MAX_INDIRECT_SEGMENTS + SEGS_PER_INDIRECT_FRAME - 1)/SEGS_PER_INDIRECT_FRAME)
--#define INDIRECT_PAGES(_segs) \
--	((_segs + SEGS_PER_INDIRECT_FRAME - 1)/SEGS_PER_INDIRECT_FRAME)
-+#define INDIRECT_PAGES(_segs) DIV_ROUND_UP(_segs, XEN_PAGES_PER_INDIRECT_FRAME)
- 
- /* Not a real protocol.  Used to generate ring structs which contain
-  * the elements common to all protocols only.  This way we get a
-diff --git a/drivers/block/xen-blkback/xenbus.c b/drivers/block/xen-blkback/xenbus.c
-index deb3f00..edd27e4 100644
---- a/drivers/block/xen-blkback/xenbus.c
-+++ b/drivers/block/xen-blkback/xenbus.c
-@@ -176,21 +176,24 @@ static int xen_blkif_map(struct xen_blkif *blkif, grant_ref_t *gref,
- 	{
- 		struct blkif_sring *sring;
- 		sring = (struct blkif_sring *)blkif->blk_ring;
--		BACK_RING_INIT(&blkif->blk_rings.native, sring, PAGE_SIZE * nr_grefs);
-+		BACK_RING_INIT(&blkif->blk_rings.native, sring,
-+			       XEN_PAGE_SIZE * nr_grefs);
- 		break;
- 	}
- 	case BLKIF_PROTOCOL_X86_32:
- 	{
- 		struct blkif_x86_32_sring *sring_x86_32;
- 		sring_x86_32 = (struct blkif_x86_32_sring *)blkif->blk_ring;
--		BACK_RING_INIT(&blkif->blk_rings.x86_32, sring_x86_32, PAGE_SIZE * nr_grefs);
-+		BACK_RING_INIT(&blkif->blk_rings.x86_32, sring_x86_32,
-+			       XEN_PAGE_SIZE * nr_grefs);
- 		break;
- 	}
- 	case BLKIF_PROTOCOL_X86_64:
- 	{
- 		struct blkif_x86_64_sring *sring_x86_64;
- 		sring_x86_64 = (struct blkif_x86_64_sring *)blkif->blk_ring;
--		BACK_RING_INIT(&blkif->blk_rings.x86_64, sring_x86_64, PAGE_SIZE * nr_grefs);
-+		BACK_RING_INIT(&blkif->blk_rings.x86_64, sring_x86_64,
-+			       XEN_PAGE_SIZE * nr_grefs);
- 		break;
- 	}
- 	default:
--- 
-2.1.4
+Does anyone have an idea as to why __of_clk_get_by_name() fail in this case?
+
+Thanks,
+
+Fabio Estevam
