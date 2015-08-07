@@ -1,98 +1,71 @@
-From: robert.richter@caviumnetworks.com (Robert Richter)
-Date: Fri, 7 Aug 2015 13:56:22 +0200
-Subject: [PATCH 2/2] net, thunder, bgx: Add support for ACPI binding.
-In-Reply-To: <55C48DF9.70406@linaro.org>
-References: <1438907590-29649-1-git-send-email-ddaney.cavm@gmail.com>
- <1438907590-29649-3-git-send-email-ddaney.cavm@gmail.com>
- <55C467A0.4020601@linaro.org>
- <20150807104320.GQ1820@rric.localhost> <55C48DF9.70406@linaro.org>
-Message-ID: <20150807115622.GS4914@rric.localhost>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Fri, 07 Aug 2015 13:56:04 +0200
+Subject: [PATCH v2] cpufreq-dt: make scaling_boost_freqs sysfs attr available
+ when boost is enabled
+Message-ID: <3835403.gWyHpfh1Gz@amdc1976>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07.08.15 12:52:41, Tomasz Nowicki wrote:
-> On 07.08.2015 12:43, Robert Richter wrote:
-> >On 07.08.15 10:09:04, Tomasz Nowicki wrote:
-> >>On 07.08.2015 02:33, David Daney wrote:
-> >
-> >...
-> >
-> >>>+#else
-> >>>+
-> >>>+static int bgx_init_acpi_phy(struct bgx *bgx)
-> >>>+{
-> >>>+	return -ENODEV;
-> >>>+}
-> >>>+
-> >>>+#endif /* CONFIG_ACPI */
-> >>>+
-> >>>  #if IS_ENABLED(CONFIG_OF_MDIO)
-> >>>
-> >>>  static int bgx_init_of_phy(struct bgx *bgx)
-> >>>@@ -882,7 +1010,12 @@ static int bgx_init_of_phy(struct bgx *bgx)
-> >>>
-> >>>  static int bgx_init_phy(struct bgx *bgx)
-> >>>  {
-> >>>-	return bgx_init_of_phy(bgx);
-> >>>+	int err = bgx_init_of_phy(bgx);
-> >>>+
-> >>>+	if (err != -ENODEV)
-> >>>+		return err;
-> >>>+
-> >>>+	return bgx_init_acpi_phy(bgx);
-> >>>  }
-> >>>
-> >>
-> >>If kernel can work with DT and ACPI (both compiled in), it should take only
-> >>one path instead of probing DT and ACPI sequentially. How about:
-> >>
-> >>@@ -902,10 +925,9 @@ static int bgx_probe(struct pci_dev *pdev, const struct
-> >>pci_device_id *ent)
-> >>  	bgx_vnic[bgx->bgx_id] = bgx;
-> >>  	bgx_get_qlm_mode(bgx);
-> >>
-> >>-	snprintf(bgx_sel, 5, "bgx%d", bgx->bgx_id);
-> >>-	np = of_find_node_by_name(NULL, bgx_sel);
-> >>-	if (np)
-> >>-		bgx_init_of(bgx, np);
-> >>+	err = acpi_disabled ? bgx_init_of_phy(bgx) : bgx_init_acpi_phy(bgx);
-> >>+	if (err)
-> >>+		goto err_enable;
-> >>
-> >>  	bgx_init_hw(bgx);
-> >
-> >I would not pollute bgx_probe() with acpi and dt specifics, and instead
-> >keep bgx_init_phy(). The typical design pattern for this is:
-> >
-> >static int bgx_init_phy(struct bgx *bgx)
-> >{
-> >#ifdef CONFIG_ACPI
-> >         if (!acpi_disabled)
-> >                 return bgx_init_acpi_phy(bgx);
-> >#endif
-> >         return bgx_init_of_phy(bgx);
-> >}
-> >
-> >This adds acpi runtime detection (acpi=no), does not call dt code in
-> >case of acpi, and saves the #else for bgx_init_acpi_phy().
-> >
-> 
-> I am fine with keeping it in bgx_init_phy(), however we can drop there
-> #ifdefs since both of bgx_init_{acpi,of}_phy calls have empty stub for !ACPI
-> and !OF case. Like that:
-> 
-> static int bgx_init_phy(struct bgx *bgx)
-> {
-> 
->         if (!acpi_disabled)
->                 return bgx_init_acpi_phy(bgx);
-> 	else
->         	return bgx_init_of_phy(bgx);
-> }
+Make scaling_boost_freqs sysfs attribute is available when
+cpufreq-dt driver is used and boost support is enabled.
 
-As said, keeping it in #ifdefs makes the empty stub function for !acpi
-obsolete, which makes the code smaller and better readable. This style
-is common practice in the kernel. Apart from that, the 'else' should
-be dropped as it is useless.
+Cc: Thomas Abraham <thomas.ab@samsung.com>
+Cc: Javier Martinez Canillas <javier@osg.samsung.com>
+Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Suggested-by: Viresh Kumar <viresh.kumar@linaro.org>
+Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+---
+v2: Removed leftover prototype.
 
--Robert
+ drivers/cpufreq/cpufreq-dt.c | 9 ++++++++-
+ include/linux/cpufreq.h      | 1 +
+ 2 files changed, 9 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/cpufreq/cpufreq-dt.c b/drivers/cpufreq/cpufreq-dt.c
+index b9259ab..c3583cd 100644
+--- a/drivers/cpufreq/cpufreq-dt.c
++++ b/drivers/cpufreq/cpufreq-dt.c
+@@ -36,6 +36,12 @@ struct private_data {
+ 	unsigned int voltage_tolerance; /* in percentage */
+ };
+ 
++static struct freq_attr *cpufreq_dt_attr[] = {
++	&cpufreq_freq_attr_scaling_available_freqs,
++	NULL,   /* Extra space for boost-attr if required */
++	NULL,
++};
++
+ static int set_target(struct cpufreq_policy *policy, unsigned int index)
+ {
+ 	struct dev_pm_opp *opp;
+@@ -336,6 +342,7 @@ static int cpufreq_init(struct cpufreq_policy *policy)
+ 		ret = cpufreq_enable_boost_support();
+ 		if (ret)
+ 			goto out_free_cpufreq_table;
++		cpufreq_dt_attr[1] = &cpufreq_freq_attr_scaling_boost_freqs;
+ 	}
+ 
+ 	policy->cpuinfo.transition_latency = transition_latency;
+@@ -411,7 +418,7 @@ static struct cpufreq_driver dt_cpufreq_driver = {
+ 	.exit = cpufreq_exit,
+ 	.ready = cpufreq_ready,
+ 	.name = "cpufreq-dt",
+-	.attr = cpufreq_generic_attr,
++	.attr = cpufreq_dt_attr,
+ };
+ 
+ static int dt_cpufreq_probe(struct platform_device *pdev)
+diff --git a/include/linux/cpufreq.h b/include/linux/cpufreq.h
+index 95f0186..657542d 100644
+--- a/include/linux/cpufreq.h
++++ b/include/linux/cpufreq.h
+@@ -609,6 +609,7 @@ struct cpufreq_frequency_table *cpufreq_frequency_get_table(unsigned int cpu);
+ 
+ /* the following are really really optional */
+ extern struct freq_attr cpufreq_freq_attr_scaling_available_freqs;
++extern struct freq_attr cpufreq_freq_attr_scaling_boost_freqs;
+ extern struct freq_attr *cpufreq_generic_attr[];
+ int cpufreq_table_validate_and_show(struct cpufreq_policy *policy,
+ 				      struct cpufreq_frequency_table *table);
+-- 
+1.9.1
