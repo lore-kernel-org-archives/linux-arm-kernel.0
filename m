@@ -1,11 +1,11 @@
 From: wangzhou1@hisilicon.com (Zhou Wang)
-Date: Fri, 7 Aug 2015 14:03:57 +0800
+Date: Fri, 7 Aug 2015 14:04:48 +0800
 Subject: [PATCH v6 1/6] PCI: designware: move calculation of bus addresses
  to DRA7xx
 In-Reply-To: <1438848559-232109-2-git-send-email-wangzhou1@hisilicon.com>
 References: <1438848559-232109-1-git-send-email-wangzhou1@hisilicon.com>
  <1438848559-232109-2-git-send-email-wangzhou1@hisilicon.com>
-Message-ID: <55C44A4D.8070300@hisilicon.com>
+Message-ID: <55C44A80.20308@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
