@@ -1,26 +1,28 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 7 Aug 2015 10:00:37 +0530
-Subject: [PATCH v4 0/6] cpufreq: use generic cpufreq drivers for
- Exynos4x12 platform
-In-Reply-To: <55C43085.8090506@samsung.com>
+Date: Fri, 7 Aug 2015 10:01:16 +0530
+Subject: [PATCH v4 6/6] cpufreq: remove no longer needed
+ CPU_FREQ_BOOST_SW config option
+In-Reply-To: <1438868514-8814-7-git-send-email-b.zolnierkie@samsung.com>
 References: <1438868514-8814-1-git-send-email-b.zolnierkie@samsung.com>
- <015301d0d0a3$1396c900$3ac45b00$@kernel.org>
- <20150807035018.GF6325@linux> <20150807035156.GG6325@linux>
- <55C43085.8090506@samsung.com>
-Message-ID: <20150807043037.GH6325@linux>
+ <1438868514-8814-7-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <20150807043116.GI6325@linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07-08-15, 13:13, Krzysztof Kozlowski wrote:
-> Still patches 1/6 and 6/6 need your acks. Is the patch 1/6 a
-> prerequisite for others? It does not look like a prerequisite... but it
-> was put at the beginning of the patchset.
+On 06-08-15, 15:41, Bartlomiej Zolnierkiewicz wrote:
+> Remove no longer needed CPU_FREQ_BOOST_SW config option.
+> 
+> Cc: Viresh Kumar <viresh.kumar@linaro.org>
+> Cc: Thomas Abraham <thomas.ab@samsung.com>
+> Cc: Javier Martinez Canillas <javier@osg.samsung.com>
+> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> ---
+>  drivers/cpufreq/Kconfig      | 4 ----
+>  drivers/cpufreq/freq_table.c | 3 ---
+>  2 files changed, 7 deletions(-)
 
-Patch 1/6 is required to get boost working, that's all.. Not sure how
-important is that. Anyway, that will work without 1/6 as well, all you
-need to do is enable CONFIG_CPU_FREQ_BOOST_SW in you .config.
-
-Anyway, it should go via pm tree and can be sent separately.
+This must be applied only after fixing 1/6.
 
 -- 
 viresh
