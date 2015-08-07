@@ -1,86 +1,48 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Fri, 07 Aug 2015 16:45:36 -0700
-Subject: [PATCH 5/9] ARM: common: Introduce PM domains for CPUs/clusters
-In-Reply-To: <CAL_JsqK67=DTtjZwwnonObLDjLbahkREfm0RvyXVV95bhR-d4Q@mail.gmail.com>
- (Rob Herring's message of "Wed, 5 Aug 2015 22:14:51 -0500")
-References: <1438731339-58317-1-git-send-email-lina.iyer@linaro.org>
- <1438731339-58317-6-git-send-email-lina.iyer@linaro.org>
- <CAL_JsqK67=DTtjZwwnonObLDjLbahkREfm0RvyXVV95bhR-d4Q@mail.gmail.com>
-Message-ID: <7hd1yyvf1b.fsf@deeprootsystems.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 7 Aug 2015 16:52:31 -0700
+Subject: [PATCH v7 01/13] clk: qcom: Add support for GDSCs
+In-Reply-To: <55C19FA4.4070402@codeaurora.org>
+References: <1438076046-4706-1-git-send-email-rnayak@codeaurora.org>
+ <1438076046-4706-2-git-send-email-rnayak@codeaurora.org>
+ <20150803192427.GA7096@codeaurora.org>
+ <55C19FA4.4070402@codeaurora.org>
+Message-ID: <20150807235230.GE16477@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rob Herring <robherring2@gmail.com> writes:
+On 08/05, Rajendra Nayak wrote:
+> 
+> 
+> On 08/04/2015 12:54 AM, Stephen Boyd wrote:
+> >On 07/28, Rajendra Nayak wrote:
+> >>+
+> >>+#define PWR_ON_MASK		BIT(31)
+> >>+#define EN_REST_WAIT_MASK	GENMASK(23, 20)
+> >>+#define EN_FEW_WAIT_MASK	GENMASK(19, 16)
+> >>+#define CLK_DIS_WAIT_MASK	GENMASK(15, 12)
+> >
+> >This trips up some static checker...
+> >
+> >drivers/clk/qcom/gdsc.c:234:53: warning: cast truncates bits from
+> >constant value (fffffffffff006 becomes fffff006)
+> >
+> >So I think we can use GENMASK_ULL here instead.
+> 
+> Sure. btw, what static checker is this? I did not see it with sparse.
 
-> On Tue, Aug 4, 2015 at 6:35 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
->> Define and add Generic PM domains (genpd) for ARM CPU clusters. Many
->> new
+Pretty sure this was with sparse. Which now has me concerned that
+my sparse is old!
 
-@Lina: I know you inherited this from some proof-of-concept code frome me, so
-I'm partially to blame, but...
+$ sparse --version
+v0.5.0-47-g0f71312959ed
 
-There's really nothing ARM specific about this driver.  
+But I updated to
 
->> SoCs group CPUs as clusters. Clusters share common resources like GIC,
->> power rail, caches, VFP, Coresight etc. When all CPUs in the cluster are
->> idle, these shared resources may also be put in their idle state.
->>
->> The idle time between the last CPU entering idle and a CPU resuming
->> execution is an opportunity for these shared resources to be powered
->> down. Generic PM domain provides a framework for defining such power
->> domains and attach devices to the domain. When the devices in the domain
->> are idle at runtime, the domain would also be suspended and resumed
->> before the first of the devices resume execution.
->>
->> We define a generic PM domain for each cluster and attach CPU devices in
->> the cluster to that PM domain. The DT definitions for the SoC describe
->> this relationship. Genpd callbacks for power_on and power_off can then
->> be used to power up/down the shared resources for the domain.
->
-> [...]
->
->> +ARM CPU Power domains
->> +
->> +The device tree allows describing of CPU power domains in a SoC. In ARM SoC,
->> +CPUs may be grouped as clusters. A cluster may have CPUs, GIC, Coresight,
->> +caches, VFP and power controller and other peripheral hardware. Generally,
->> +when the CPUs in the cluster are idle/suspended, the shared resources may also
->> +be suspended and resumed before any of the CPUs resume execution.
->> +
->> +CPUs are the defined as the PM domain consumers and there is a PM domain
->> +provider for the CPUs. Bindings for generic PM domains (genpd) is described in
->> +[1].
->> +
->> +The ARM CPU PM domain follows the same binding convention as any generic PM
->> +domain. Additional binding properties are -
->> +
->> +- compatible:
->> +       Usage: required
->> +       Value type: <string>
->> +       Definition: Must also have
->> +                       "arm,pd"
->> +               inorder to initialize the genpd provider as ARM CPU PM domain.
->
-> A compatible string should represent a particular h/w block. If it is
-> generic, it should represent some sort of standard programming
-> interface (e.g, AHCI, EHCI, etc.). This doesn't seem to be either and
-> is rather just a mapping of what "driver" you want to use.
->
-> I would expect that identifying a cpu's or cluster's power domain
-> would be done by a phandle between the cpu/cluster node and power
-> domain node. 
+$ sparse --version
+v0.5.0-51-ga53cea28f0db
 
-That's correct, the CPU nodes (and other nodes in the cluster like GIC,
-Coresight, etc.) would have phandles to the cluster power domain node.
+And I still see it.
 
-But this series is meant to create the driver & binding for those cluster
-power domain(s), so the question is how exactly describe it.
-
-What we're trying to get to is binding to describe a powerdomain of a
-generic CPU cluster, but of course the actual programming interface for
-powering down the cluster will be platform specific.  In earlier RFC
-versions, Lina had proposed ways for platforms to register some
-low-level hooks with this generic driver for the platform-specific bits,
-but if you have some other suggests, we'd be all ears.
-
-Kevin
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
