@@ -1,50 +1,34 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Fri,  7 Aug 2015 18:08:29 +0200
-Subject: [PATCH v2 0/4] KVM: arm/arm64: guest synchronous halt/resume
-Message-ID: <1438963713-10460-1-git-send-email-eric.auger@linaro.org>
+Date: Fri,  7 Aug 2015 18:08:31 +0200
+Subject: [PATCH v2 2/4] KVM: arm/arm64: check power_off in
+ kvm_arch_vcpu_runnable
+In-Reply-To: <1438963713-10460-1-git-send-email-eric.auger@linaro.org>
+References: <1438963713-10460-1-git-send-email-eric.auger@linaro.org>
+Message-ID: <1438963713-10460-3-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series introduces the capability to synchronously exit the guest
-and prevent it from being re-entered. This modality will be used by
-IRQ forwarding series when changing the state of the IRQ.
+kvm_arch_vcpu_runnable now also checks whether the power_off
+flag is set.
 
-Former pause flag used when starting the vcpu in KVM_ARM_VCPU_POWER_OFF
-state, in PSCI calls and in KVM_SET_MP_STATE ioctl is renamed into
-power_off. A new pause flag is introduced. Both now are checked in
-kvm_arch_vcpu_runnable and in the VCPU_RUN critical section, before
-entering the vcpu.
+Signed-off-by: Eric Auger <eric.auger@linaro.org>
+---
+ arch/arm/kvm/arm.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-Best Regards
-
-Eric
-
-History:
-
-v1 -> v2:
-- check pause, power_off and in kvm_arch_vcpu_runnable
-- check power_off in vcpu_run critcal section before guest entry
-- correct compil issue in first patch reported by Andrew
-- rename vcpu_pause into vcpu_sleep
-
-RFC -> PATCH v1:
-- originally part of [RFC 00/17] ARM IRQ forward control based on IRQ
-  bypass manager (https://lkml.org/lkml/2015/7/2/268) and isolated in
-  this series.
-- added __maybe_unused following Marc's advice
-
-
-Eric Auger (4):
-  KVM: arm/arm64: rename pause into power_off
-  KVM: arm/arm64: check power_off in kvm_arch_vcpu_runnable
-  KVM: arm/arm64: check power_off in critical section before VCPU run
-  KVM: arm/arm64: implement kvm_arm_[halt,resume]_guest
-
- arch/arm/include/asm/kvm_host.h   |  5 +++-
- arch/arm/kvm/arm.c                | 53 ++++++++++++++++++++++++++++++---------
- arch/arm/kvm/psci.c               | 10 ++++----
- arch/arm64/include/asm/kvm_host.h |  3 +++
- 4 files changed, 53 insertions(+), 18 deletions(-)
-
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index 3ac6b4c..4f50be3 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -347,7 +347,8 @@ int kvm_arch_vcpu_ioctl_set_mpstate(struct kvm_vcpu *vcpu,
+  */
+ int kvm_arch_vcpu_runnable(struct kvm_vcpu *v)
+ {
+-	return !!v->arch.irq_lines || kvm_vgic_vcpu_pending_irq(v);
++	return ((!!v->arch.irq_lines || kvm_vgic_vcpu_pending_irq(v))
++		&& !v->arch.power_off);
+ }
+ 
+ /* Just ensure a guest exit from a particular CPU */
 -- 
 1.9.1
