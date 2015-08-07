@@ -1,99 +1,76 @@
 From: julien.grall@citrix.com (Julien Grall)
-Date: Fri, 7 Aug 2015 17:46:53 +0100
-Subject: [PATCH v3 14/20] xen/grant-table: Make it running on 64KB granularity
+Date: Fri, 7 Aug 2015 17:46:52 +0100
+Subject: [PATCH v3 13/20] xen/events: fifo: Make it running on 64KB granularity
 In-Reply-To: <1438966019-19322-1-git-send-email-julien.grall@citrix.com>
 References: <1438966019-19322-1-git-send-email-julien.grall@citrix.com>
-Message-ID: <1438966019-19322-15-git-send-email-julien.grall@citrix.com>
+Message-ID: <1438966019-19322-14-git-send-email-julien.grall@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Xen interface is using 4KB page granularity. This means that each
-grant is 4KB.
+Only use the first 4KB of the page to store the events channel info. It
+means that we will waste 60KB every time we allocate page for:
+     * control block: a page is allocating per CPU
+     * event array: a page is allocating everytime we need to expand it
 
-The current implementation allocates a Linux page per grant. On Linux
-using 64KB page granularity, only the first 4KB of the page will be
-used.
+I think we can reduce the memory waste for the 2 areas by:
 
-We could decrease the memory wasted by sharing the page with multiple
-grant. It will require some care with the {Set,Clear}ForeignPage macro.
+    * control block: sharing between multiple vCPUs. Although it will
+    require some bookkeeping in order to not free the page when the CPU
+    goes offline and the other CPUs sharing the page still there
 
-Note that no changes has been made in the x86 code because both Linux
-and Xen will only use 4KB page granularity.
+    * event array: always extend the array event by 64K (i.e 16 4K
+    chunk). That would require more care when we fail to expand the
+    event channel.
 
 Signed-off-by: Julien Grall <julien.grall@citrix.com>
 Reviewed-by: David Vrabel <david.vrabel@citrix.com>
-Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Reviewed-by: Stefano Stabellini <stefano.stabellini@citrix.com>
 
 ---
-Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-Cc: Russell King <linux@arm.linux.org.uk>
 Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
 Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
 
+    Note I haven't updated the suggestion to reduce the memory waste
+    after David's email [1]. I can do it if necessary.
+
     Changes in v3:
-        - Add Stefano's reviewed-by
+        - Add David and Stefano's reviewed-by
 
-    Changes in v2
-        - Add David's reviewed-by
+    [1] http://lists.xen.org/archives/html/xen-devel/2015-07/msg04596.html
 ---
- arch/arm/xen/p2m.c        | 6 +++---
- drivers/xen/grant-table.c | 6 +++---
- 2 files changed, 6 insertions(+), 6 deletions(-)
+ drivers/xen/events/events_base.c | 2 +-
+ drivers/xen/events/events_fifo.c | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/xen/p2m.c b/arch/arm/xen/p2m.c
-index 887596c..0ed01f2 100644
---- a/arch/arm/xen/p2m.c
-+++ b/arch/arm/xen/p2m.c
-@@ -93,8 +93,8 @@ int set_foreign_p2m_mapping(struct gnttab_map_grant_ref *map_ops,
- 	for (i = 0; i < count; i++) {
- 		if (map_ops[i].status)
- 			continue;
--		set_phys_to_machine(map_ops[i].host_addr >> PAGE_SHIFT,
--				    map_ops[i].dev_bus_addr >> PAGE_SHIFT);
-+		set_phys_to_machine(map_ops[i].host_addr >> XEN_PAGE_SHIFT,
-+				    map_ops[i].dev_bus_addr >> XEN_PAGE_SHIFT);
- 	}
+diff --git a/drivers/xen/events/events_base.c b/drivers/xen/events/events_base.c
+index c49bb7a..00dd923 100644
+--- a/drivers/xen/events/events_base.c
++++ b/drivers/xen/events/events_base.c
+@@ -40,11 +40,11 @@
+ #include <asm/idle.h>
+ #include <asm/io_apic.h>
+ #include <asm/xen/pci.h>
+-#include <xen/page.h>
+ #endif
+ #include <asm/sync_bitops.h>
+ #include <asm/xen/hypercall.h>
+ #include <asm/xen/hypervisor.h>
++#include <xen/page.h>
  
- 	return 0;
-@@ -108,7 +108,7 @@ int clear_foreign_p2m_mapping(struct gnttab_unmap_grant_ref *unmap_ops,
- 	int i;
+ #include <xen/xen.h>
+ #include <xen/hvm.h>
+diff --git a/drivers/xen/events/events_fifo.c b/drivers/xen/events/events_fifo.c
+index 1d4baf5..e3e9e3d 100644
+--- a/drivers/xen/events/events_fifo.c
++++ b/drivers/xen/events/events_fifo.c
+@@ -54,7 +54,7 @@
  
- 	for (i = 0; i < count; i++) {
--		set_phys_to_machine(unmap_ops[i].host_addr >> PAGE_SHIFT,
-+		set_phys_to_machine(unmap_ops[i].host_addr >> XEN_PAGE_SHIFT,
- 				    INVALID_P2M_ENTRY);
- 	}
+ #include "events_internal.h"
  
-diff --git a/drivers/xen/grant-table.c b/drivers/xen/grant-table.c
-index 94ae0fd..253d4db 100644
---- a/drivers/xen/grant-table.c
-+++ b/drivers/xen/grant-table.c
-@@ -642,7 +642,7 @@ int gnttab_setup_auto_xlat_frames(phys_addr_t addr)
- 	if (xen_auto_xlat_grant_frames.count)
- 		return -EINVAL;
+-#define EVENT_WORDS_PER_PAGE (PAGE_SIZE / sizeof(event_word_t))
++#define EVENT_WORDS_PER_PAGE (XEN_PAGE_SIZE / sizeof(event_word_t))
+ #define MAX_EVENT_ARRAY_PAGES (EVTCHN_FIFO_NR_CHANNELS / EVENT_WORDS_PER_PAGE)
  
--	vaddr = xen_remap(addr, PAGE_SIZE * max_nr_gframes);
-+	vaddr = xen_remap(addr, XEN_PAGE_SIZE * max_nr_gframes);
- 	if (vaddr == NULL) {
- 		pr_warn("Failed to ioremap gnttab share frames (addr=%pa)!\n",
- 			&addr);
-@@ -654,7 +654,7 @@ int gnttab_setup_auto_xlat_frames(phys_addr_t addr)
- 		return -ENOMEM;
- 	}
- 	for (i = 0; i < max_nr_gframes; i++)
--		pfn[i] = PFN_DOWN(addr) + i;
-+		pfn[i] = XEN_PFN_DOWN(addr) + i;
- 
- 	xen_auto_xlat_grant_frames.vaddr = vaddr;
- 	xen_auto_xlat_grant_frames.pfn = pfn;
-@@ -1004,7 +1004,7 @@ static void gnttab_request_version(void)
- {
- 	/* Only version 1 is used, which will always be available. */
- 	grant_table_version = 1;
--	grefs_per_grant_frame = PAGE_SIZE / sizeof(struct grant_entry_v1);
-+	grefs_per_grant_frame = XEN_PAGE_SIZE / sizeof(struct grant_entry_v1);
- 	gnttab_interface = &gnttab_v1_ops;
- 
- 	pr_info("Grant tables using version %d layout\n", grant_table_version);
+ struct evtchn_fifo_queue {
 -- 
 2.1.4
