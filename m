@@ -1,69 +1,41 @@
-From: dtor@chromium.org (Dmitry Torokhov)
-Date: Fri, 7 Aug 2015 14:00:52 -0700
-Subject: [PATCH] thermal: rockhip: fix setting thermal shutdown polarity
-Message-ID: <20150807210052.GA34032@dtor-ws>
+From: dianders@chromium.org (Doug Anderson)
+Date: Fri, 7 Aug 2015 14:31:02 -0700
+Subject: [PATCH v2 1/2] ARM: dts: rockchip: reserve unusable memory region
+ on rk3288
+In-Reply-To: <1763907.pckMEaRNPs@diego>
+References: <1763907.pckMEaRNPs@diego>
+Message-ID: <CAD=FV=Vo0tQO-KdCLbcJF-yYEgwGbjEx3qvvnv7jgAKcVA4p+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When requested thermal shutdown signal polarity is low we need to make
-sure that the bit representing high level of signal is reset, and not
-set all other bits in that register.
+Heiko,
 
-Also rename TSADCV2_INT_PD_CLEAR to TSADCV2_INT_PD_CLEAR_MASK to better
-reflect its nature.
+On Thu, Aug 6, 2015 at 10:33 AM, Heiko St?bner <heiko@sntech.de> wrote:
+> The all current Rockchip SoCs supporting 4GB of ram have problems accessing
+> the memory region 0xfe000000~0xff000000. This also seems to includes the
+> rk3368 arm64 soc.
+>
+> All current code handling dma memory oddities I could find, seem to involve
+> soc-specific code (zone-dma or so) while this issue is shared between arm32
+> and arm64 socs from Rockchip, which would need to have this described in
+> the soc devicetree on both socs.
+>
+> Limiting the dma-zone alone also does not solve the issue and as the
+> dma-masks need to be a power-of-two in the kernel, the next lower dma-mask
+> brings memory usable for dma down to 2GB.
+>
+> So as a stop-gap block off the affected region to prevent its use by
+> devices with 4GB of memory, like some recent Chromebooks.
+>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+> changes since v1:
+> - expand reasons for the reserved memory
+>
+>  arch/arm/boot/dts/rk3288.dtsi | 20 ++++++++++++++++++++
+>  1 file changed, 20 insertions(+)
 
-Signed-off-by: Dmitry Torokhov <dtor@chromium.org>
----
- drivers/thermal/rockchip_thermal.c | 10 ++++------
- 1 file changed, 4 insertions(+), 6 deletions(-)
+As discussed earlier, I'm now convinced that this is an appropriate
+stopgap.  ...and the description looks good to me.
 
-diff --git a/drivers/thermal/rockchip_thermal.c b/drivers/thermal/rockchip_thermal.c
-index 93ee307..4d5b7d4 100644
---- a/drivers/thermal/rockchip_thermal.c
-+++ b/drivers/thermal/rockchip_thermal.c
-@@ -106,16 +106,14 @@ struct rockchip_thermal_data {
- #define TSADCV2_AUTO_PERIOD_HT			0x6c
- 
- #define TSADCV2_AUTO_EN				BIT(0)
--#define TSADCV2_AUTO_DISABLE			~BIT(0)
- #define TSADCV2_AUTO_SRC_EN(chn)		BIT(4 + (chn))
- #define TSADCV2_AUTO_TSHUT_POLARITY_HIGH	BIT(8)
--#define TSADCV2_AUTO_TSHUT_POLARITY_LOW		~BIT(8)
- 
- #define TSADCV2_INT_SRC_EN(chn)			BIT(chn)
- #define TSADCV2_SHUT_2GPIO_SRC_EN(chn)		BIT(4 + (chn))
- #define TSADCV2_SHUT_2CRU_SRC_EN(chn)		BIT(8 + (chn))
- 
--#define TSADCV2_INT_PD_CLEAR			~BIT(8)
-+#define TSADCV2_INT_PD_CLEAR_MASK		~BIT(8)
- 
- #define TSADCV2_DATA_MASK			0xfff
- #define TSADCV2_HIGHT_INT_DEBOUNCE_COUNT	4
-@@ -244,10 +242,10 @@ static void rk_tsadcv2_initialize(void __iomem *regs,
- 				  enum tshut_polarity tshut_polarity)
- {
- 	if (tshut_polarity == TSHUT_HIGH_ACTIVE)
--		writel_relaxed(0 | (TSADCV2_AUTO_TSHUT_POLARITY_HIGH),
-+		writel_relaxed(0U | TSADCV2_AUTO_TSHUT_POLARITY_HIGH,
- 			       regs + TSADCV2_AUTO_CON);
- 	else
--		writel_relaxed(0 | (TSADCV2_AUTO_TSHUT_POLARITY_LOW),
-+		writel_relaxed(0U & ~TSADCV2_AUTO_TSHUT_POLARITY_HIGH,
- 			       regs + TSADCV2_AUTO_CON);
- 
- 	writel_relaxed(TSADCV2_AUTO_PERIOD_TIME, regs + TSADCV2_AUTO_PERIOD);
-@@ -264,7 +262,7 @@ static void rk_tsadcv2_irq_ack(void __iomem *regs)
- 	u32 val;
- 
- 	val = readl_relaxed(regs + TSADCV2_INT_PD);
--	writel_relaxed(val & TSADCV2_INT_PD_CLEAR, regs + TSADCV2_INT_PD);
-+	writel_relaxed(val & TSADCV2_INT_PD_CLEAR_MASK, regs + TSADCV2_INT_PD);
- }
- 
- static void rk_tsadcv2_control(void __iomem *regs, bool enable)
--- 
-2.5.0.rc2.392.g76e840b
-
-
--- 
-Dmitry
+Reviewed-by: Douglas Anderson <dianders@chromium.org>
