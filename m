@@ -1,136 +1,85 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Fri, 07 Aug 2015 12:34:23 +0200
-Subject: [PATCH v4 1/6] cpufreq: make scaling_boost_freqs sysfs attr
- available when boost is enabled
-In-Reply-To: <20150807034128.GE6325@linux>
-References: <1438868514-8814-1-git-send-email-b.zolnierkie@samsung.com>
- <1438868514-8814-2-git-send-email-b.zolnierkie@samsung.com>
- <20150807034128.GE6325@linux>
-Message-ID: <5184469.cOpIkgzX4h@amdc1976>
+From: ykk@rock-chips.com (Yakir Yang)
+Date: Fri,  7 Aug 2015 05:34:34 -0500
+Subject: [PATCH v2 0/8] Add Analogix Core Display Port Driver
+Message-ID: <1438943674-18191-1-git-send-email-ykk@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi all,
+   The Samsung Exynos eDP controller and Rockchip RK3288 eDP controller
+share the same IP, so a lot of parts can be re-used. I split the common
+code into bridge directory, then rk3288 and exynos only need to keep
+some platform code. Cause I can't find the exact IP name of exynos dp
+controller, so I decide to name dp core driver with "analogix" which I
+find in rk3288 eDP TRM ;)
 
-Hi,
+Beyond that, there are three light registers setting differents bewteen
+exynos and rk3288.
+1. RK3288 have five special pll resigters which not indicata in exynos
+   dp controller.
+2. The address of DP_PHY_PD(dp phy power manager register) are different
+   between rk3288 and exynos.
+3. Rk3288 and exynos have different setting with AUX_HW_RETRY_CTL(dp debug
+   register).
 
-On Friday, August 07, 2015 09:11:28 AM Viresh Kumar wrote:
-> Hi,
-> 
-> I would suggest you sending such patches as reply to the earlier
-> threads only, instead of a new chain. This will save your time.
+My series patches can be divider into two parts: One for spliting the
+analogix_dp code from exynos dp driver. Another are trying to add rk3288
+platform special code.
 
-Please explain it more.  This patch needs to be first for cpufreq-dt
-switch to be complete.  scaling_boost_freqs is available currently
-for exynos-cpufreq users when boost is enabled and ideally we would
-like it to be available immediately after the switch to cpufreq-dt.
+Thanks,
+- Yakir
 
-> For example, you will need to resend other patches unnecessarily if I
-> NAK this patch :)
-> 
-> On 06-08-15, 15:41, Bartlomiej Zolnierkiewicz wrote:
-> > Add cpufreq_boost_enabled_generic_attr table and use it in
-> > cpufreq-dt driver instead of cpufreq_generic_attr one when
-> > boost support is enabled.  As a result scaling_boost_freqs
-> > sysfs attribute is available when cpufreq-dt driver is
-> > used and boost support is enabled.
-> > 
-> > Cc: Viresh Kumar <viresh.kumar@linaro.org>
-> > Cc: Thomas Abraham <thomas.ab@samsung.com>
-> > Cc: Javier Martinez Canillas <javier@osg.samsung.com>
-> > Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> > Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> > ---
-> >  drivers/cpufreq/cpufreq-dt.c | 3 +++
-> >  drivers/cpufreq/freq_table.c | 7 +++++++
-> >  include/linux/cpufreq.h      | 1 +
-> >  3 files changed, 11 insertions(+)
-> > 
-> > diff --git a/drivers/cpufreq/cpufreq-dt.c b/drivers/cpufreq/cpufreq-dt.c
-> > index b9259ab..7b091c0 100644
-> > --- a/drivers/cpufreq/cpufreq-dt.c
-> > +++ b/drivers/cpufreq/cpufreq-dt.c
-> > @@ -182,6 +182,8 @@ try_again:
-> >  	return ret;
-> >  }
-> >  
-> > +static struct cpufreq_driver dt_cpufreq_driver;
-> > +
-> >  static int cpufreq_init(struct cpufreq_policy *policy)
-> >  {
-> >  	struct cpufreq_frequency_table *freq_table;
-> > @@ -336,6 +338,7 @@ static int cpufreq_init(struct cpufreq_policy *policy)
-> >  		ret = cpufreq_enable_boost_support();
-> >  		if (ret)
-> >  			goto out_free_cpufreq_table;
-> > +		dt_cpufreq_driver.attr = cpufreq_boost_enabled_generic_attr;
-> >  	}
-> >  
-> >  	policy->cpuinfo.transition_latency = transition_latency;
-> > diff --git a/drivers/cpufreq/freq_table.c b/drivers/cpufreq/freq_table.c
-> > index a8f1daf..5a00a09 100644
-> > --- a/drivers/cpufreq/freq_table.c
-> > +++ b/drivers/cpufreq/freq_table.c
-> > @@ -300,6 +300,13 @@ struct freq_attr *cpufreq_generic_attr[] = {
-> >  };
-> >  EXPORT_SYMBOL_GPL(cpufreq_generic_attr);
-> >  
-> > +struct freq_attr *cpufreq_boost_enabled_generic_attr[] = {
-> > +	&cpufreq_freq_attr_scaling_available_freqs,
-> > +	&cpufreq_freq_attr_scaling_boost_freqs,
-> > +	NULL,
-> > +};
-> > +EXPORT_SYMBOL_GPL(cpufreq_boost_enabled_generic_attr);
-> 
-> This isn't scalable. We can't create a new generic structure every time
-> a entry comes in. Rather we should leave the generic attr for
+Changes in v2:
+- Take Joe Preches advise, improved commit message more readable, and
+  avoid using some uncommon style like bellow:
+  -  retval = exynos_dp_read_bytes_from_i2c(...
+				...)
+  +  retval =
+  +  exynos_dp_read_bytes_from_i2c(......);
+- Take Jingoo Han suggest, cause I jsut improve parts
+  of the code, so just remove my name from author list.
+- Take Jingoo Han suggest, remove new copyright
+- Fix compiled failed dut to analogix_dp_device misspell
+- Add GNU license v2 declared and samsung copyright
+- Fix compile failed dut to phy_pd_addr variable misspell error
 
-boost entry is rather generic one so I imagine that other cpufreq
-drivers that add support for boost would also like to use it.
+Yakir Yang (8):
+  drm: exynos/dp: fix code style
+  drm: exynos/dp: convert to drm bridge mode
+  drm: bridge: analogix_dp: split exynos dp driver to bridge dir
+  drm: rockchip/dp: add rockchip platform dp driver
+  drm: bridge/analogix_dp: add platform device type support
+  drm: bridge: analogix_dp: add some rk3288 special registers setting
+  drm: bridge: analogix_dp: try force hpd after plug in lookup failed
+  drm: bridge/analogix_dp: expand the delay time for hpd detect
 
-Anyway since there are no such drivers currently I agree that
-making a new generic structure may be premature and I will re-do
-this patch according to your request.
+ drivers/gpu/drm/bridge/Kconfig                     |    5 +
+ drivers/gpu/drm/bridge/Makefile                    |    1 +
+ drivers/gpu/drm/bridge/analogix_dp_core.c          | 1397 +++++++++++++++++++
+ drivers/gpu/drm/bridge/analogix_dp_core.h          |  286 ++++
+ drivers/gpu/drm/bridge/analogix_dp_reg.c           | 1294 ++++++++++++++++++
+ .../exynos_dp_reg.h => bridge/analogix_dp_reg.h}   |  270 ++--
+ drivers/gpu/drm/exynos/Kconfig                     |    5 +-
+ drivers/gpu/drm/exynos/Makefile                    |    2 +-
+ drivers/gpu/drm/exynos/analogix_dp-exynos.c        |  238 ++++
+ drivers/gpu/drm/exynos/exynos_dp_core.c            | 1416 --------------------
+ drivers/gpu/drm/exynos/exynos_dp_core.h            |  282 ----
+ drivers/gpu/drm/exynos/exynos_dp_reg.c             | 1263 -----------------
+ drivers/gpu/drm/rockchip/Kconfig                   |   10 +
+ drivers/gpu/drm/rockchip/Makefile                  |    1 +
+ drivers/gpu/drm/rockchip/analogix_dp-rockchip.c    |  420 ++++++
+ include/drm/bridge/analogix_dp.h                   |   38 +
+ 16 files changed, 3835 insertions(+), 3093 deletions(-)
+ create mode 100644 drivers/gpu/drm/bridge/analogix_dp_core.c
+ create mode 100644 drivers/gpu/drm/bridge/analogix_dp_core.h
+ create mode 100644 drivers/gpu/drm/bridge/analogix_dp_reg.c
+ rename drivers/gpu/drm/{exynos/exynos_dp_reg.h => bridge/analogix_dp_reg.h} (62%)
+ create mode 100644 drivers/gpu/drm/exynos/analogix_dp-exynos.c
+ delete mode 100644 drivers/gpu/drm/exynos/exynos_dp_core.c
+ delete mode 100644 drivers/gpu/drm/exynos/exynos_dp_core.h
+ delete mode 100644 drivers/gpu/drm/exynos/exynos_dp_reg.c
+ create mode 100644 drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+ create mode 100644 include/drm/bridge/analogix_dp.h
 
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
-
-> cpufreq-dt and do something like this in the cpufreq-dt driver (And
-> that patch should rather go via cpufreq tree and not ARM SoC)..
-> 
-> diff --git a/drivers/cpufreq/cpufreq-dt.c b/drivers/cpufreq/cpufreq-dt.c
-> index a5b6a854661f..e229258ad791 100644
-> --- a/drivers/cpufreq/cpufreq-dt.c
-> +++ b/drivers/cpufreq/cpufreq-dt.c
-> @@ -36,6 +36,12 @@ struct private_data {
->  	unsigned int voltage_tolerance; /* in percentage */
->  };
->  
-> +static struct freq_attr *cpufreq_dt_attr[] = {
-> +	&cpufreq_freq_attr_scaling_available_freqs,
-> +	NULL,	/* Extra space for boost-attr if required */
-> +	NULL,
-> +};
-> +
->  static int set_target(struct cpufreq_policy *policy, unsigned int index)
->  {
->  	struct dev_pm_opp *opp;
-> @@ -337,6 +343,7 @@ static int cpufreq_init(struct cpufreq_policy *policy)
->  		ret = cpufreq_enable_boost_support();
->  		if (ret)
->  			goto out_free_cpufreq_table;
-> +		cpufreq_dt_attr[1] = &cpufreq_freq_attr_scaling_boost_freqs;
->  	}
->  
->  	policy->cpuinfo.transition_latency = transition_latency;
-> @@ -412,7 +419,7 @@ static struct cpufreq_driver dt_cpufreq_driver = {
->  	.exit = cpufreq_exit,
->  	.ready = cpufreq_ready,
->  	.name = "cpufreq-dt",
-> -	.attr = cpufreq_generic_attr,
-> +	.attr = cpufreq_dt_attr,
->  };
->  
->  static int dt_cpufreq_probe(struct platform_device *pdev)
+-- 
+1.9.1
