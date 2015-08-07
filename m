@@ -1,47 +1,41 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 7 Aug 2015 16:52:31 -0700
-Subject: [PATCH v7 01/13] clk: qcom: Add support for GDSCs
-In-Reply-To: <55C19FA4.4070402@codeaurora.org>
-References: <1438076046-4706-1-git-send-email-rnayak@codeaurora.org>
- <1438076046-4706-2-git-send-email-rnayak@codeaurora.org>
- <20150803192427.GA7096@codeaurora.org>
- <55C19FA4.4070402@codeaurora.org>
-Message-ID: <20150807235230.GE16477@codeaurora.org>
+Date: Fri, 7 Aug 2015 16:59:49 -0700
+Subject: [PATCH 1/3] clk: berlin: add cpuclk
+In-Reply-To: <1438259752-16320-2-git-send-email-antoine.tenart@free-electrons.com>
+References: <1438259752-16320-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1438259752-16320-2-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <20150807235949.GB9678@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/05, Rajendra Nayak wrote:
+On 07/30, Antoine Tenart wrote:
+> Add cpuclk in the Berlin BG2Q clock driver. This clk has a divider
+> fixed to 1.
 > 
+> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+> ---
+
+I didn't get anything besides 1/3, but this looks ok. If you
+don't want us to take this through clk-tree, feel to take my ack
+
+Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+
+>  drivers/clk/berlin/bg2q.c            | 14 +++++++-------
+>  include/dt-bindings/clock/berlin2q.h |  3 ++-
+>  2 files changed, 9 insertions(+), 8 deletions(-)
 > 
-> On 08/04/2015 12:54 AM, Stephen Boyd wrote:
-> >On 07/28, Rajendra Nayak wrote:
-> >>+
-> >>+#define PWR_ON_MASK		BIT(31)
-> >>+#define EN_REST_WAIT_MASK	GENMASK(23, 20)
-> >>+#define EN_FEW_WAIT_MASK	GENMASK(19, 16)
-> >>+#define CLK_DIS_WAIT_MASK	GENMASK(15, 12)
-> >
-> >This trips up some static checker...
-> >
-> >drivers/clk/qcom/gdsc.c:234:53: warning: cast truncates bits from
-> >constant value (fffffffffff006 becomes fffff006)
-> >
-> >So I think we can use GENMASK_ULL here instead.
-> 
-> Sure. btw, what static checker is this? I did not see it with sparse.
+> diff --git a/drivers/clk/berlin/bg2q.c b/drivers/clk/berlin/bg2q.c
+> index 221f40c2b850..72d2f3500db8 100644
+> --- a/drivers/clk/berlin/bg2q.c
+> +++ b/drivers/clk/berlin/bg2q.c
+> @@ -45,7 +45,7 @@
+>  #define REG_SDIO0XIN_CLKCTL	0x0158
+>  #define REG_SDIO1XIN_CLKCTL	0x015c
+>  
+> -#define	MAX_CLKS 27
+> +#define	MAX_CLKS 28
 
-Pretty sure this was with sparse. Which now has me concerned that
-my sparse is old!
-
-$ sparse --version
-v0.5.0-47-g0f71312959ed
-
-But I updated to
-
-$ sparse --version
-v0.5.0-51-ga53cea28f0db
-
-And I still see it.
+Maybe you should move this into the dt-bindings.h file.
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
