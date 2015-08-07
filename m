@@ -1,62 +1,149 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri,  7 Aug 2015 16:45:37 +0100
-Subject: [PATCH v4 01/11] arm/arm64: KVM: Fix ordering of timer/GIC on guest
- entry
+Date: Fri,  7 Aug 2015 16:45:40 +0100
+Subject: [PATCH v4 04/11] KVM: arm/arm64: vgic: Allow HW irq to be encoded in
+ LR
 In-Reply-To: <1438962347-17541-1-git-send-email-marc.zyngier@arm.com>
 References: <1438962347-17541-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1438962347-17541-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1438962347-17541-5-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we now inject the timer interrupt when we're about to enter
-the guest, it makes a lot more sense to make sure this happens
-before the vgic code queues the pending interrupts.
+Now that struct vgic_lr supports the LR_HW bit and carries a hwirq
+field, we can encode that information into the list registers.
 
-Otherwise, we get the interrupt on the following exit, which is
-not great for latency (and leads to all kind of bizarre issues
-when using with active interrupts at the HW level).
+This patch provides implementations for both GICv2 and GICv3.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
 Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/kvm/arm.c | 7 +++----
- 1 file changed, 3 insertions(+), 4 deletions(-)
+ include/linux/irqchip/arm-gic-v3.h |  3 +++
+ include/linux/irqchip/arm-gic.h    |  3 ++-
+ virt/kvm/arm/vgic-v2.c             | 16 +++++++++++++++-
+ virt/kvm/arm/vgic-v3.c             | 21 ++++++++++++++++++---
+ 4 files changed, 38 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 9ce5cf0..1141d21 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -523,8 +523,8 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 		if (vcpu->arch.pause)
- 			vcpu_pause(vcpu);
+diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+index ffbc034..cf637d6 100644
+--- a/include/linux/irqchip/arm-gic-v3.h
++++ b/include/linux/irqchip/arm-gic-v3.h
+@@ -268,9 +268,12 @@
  
--		kvm_vgic_flush_hwstate(vcpu);
- 		kvm_timer_flush_hwstate(vcpu);
-+		kvm_vgic_flush_hwstate(vcpu);
+ #define ICH_LR_EOI			(1UL << 41)
+ #define ICH_LR_GROUP			(1UL << 60)
++#define ICH_LR_HW			(1UL << 61)
+ #define ICH_LR_STATE			(3UL << 62)
+ #define ICH_LR_PENDING_BIT		(1UL << 62)
+ #define ICH_LR_ACTIVE_BIT		(1UL << 63)
++#define ICH_LR_PHYS_ID_SHIFT		32
++#define ICH_LR_PHYS_ID_MASK		(0x3ffUL << ICH_LR_PHYS_ID_SHIFT)
  
- 		preempt_disable();
- 		local_irq_disable();
-@@ -540,8 +540,8 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 		if (ret <= 0 || need_new_vmid_gen(vcpu->kvm)) {
- 			local_irq_enable();
- 			preempt_enable();
--			kvm_timer_sync_hwstate(vcpu);
- 			kvm_vgic_sync_hwstate(vcpu);
-+			kvm_timer_sync_hwstate(vcpu);
- 			continue;
- 		}
+ #define ICH_MISR_EOI			(1 << 0)
+ #define ICH_MISR_U			(1 << 1)
+diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
+index 9de976b..ca88dad 100644
+--- a/include/linux/irqchip/arm-gic.h
++++ b/include/linux/irqchip/arm-gic.h
+@@ -71,11 +71,12 @@
  
-@@ -587,9 +587,8 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 		trace_kvm_exit(kvm_vcpu_trap_get_class(vcpu), *vcpu_pc(vcpu));
- 		preempt_enable();
+ #define GICH_LR_VIRTUALID		(0x3ff << 0)
+ #define GICH_LR_PHYSID_CPUID_SHIFT	(10)
+-#define GICH_LR_PHYSID_CPUID		(7 << GICH_LR_PHYSID_CPUID_SHIFT)
++#define GICH_LR_PHYSID_CPUID		(0x3ff << GICH_LR_PHYSID_CPUID_SHIFT)
+ #define GICH_LR_STATE			(3 << 28)
+ #define GICH_LR_PENDING_BIT		(1 << 28)
+ #define GICH_LR_ACTIVE_BIT		(1 << 29)
+ #define GICH_LR_EOI			(1 << 19)
++#define GICH_LR_HW			(1 << 31)
  
--
--		kvm_timer_sync_hwstate(vcpu);
- 		kvm_vgic_sync_hwstate(vcpu);
-+		kvm_timer_sync_hwstate(vcpu);
+ #define GICH_VMCR_CTRL_SHIFT		0
+ #define GICH_VMCR_CTRL_MASK		(0x21f << GICH_VMCR_CTRL_SHIFT)
+diff --git a/virt/kvm/arm/vgic-v2.c b/virt/kvm/arm/vgic-v2.c
+index f9b9c7c..8d7b04d 100644
+--- a/virt/kvm/arm/vgic-v2.c
++++ b/virt/kvm/arm/vgic-v2.c
+@@ -48,6 +48,10 @@ static struct vgic_lr vgic_v2_get_lr(const struct kvm_vcpu *vcpu, int lr)
+ 		lr_desc.state |= LR_STATE_ACTIVE;
+ 	if (val & GICH_LR_EOI)
+ 		lr_desc.state |= LR_EOI_INT;
++	if (val & GICH_LR_HW) {
++		lr_desc.state |= LR_HW;
++		lr_desc.hwirq = (val & GICH_LR_PHYSID_CPUID) >> GICH_LR_PHYSID_CPUID_SHIFT;
++	}
  
- 		ret = handle_exit(vcpu, run, ret);
- 	}
+ 	return lr_desc;
+ }
+@@ -55,7 +59,9 @@ static struct vgic_lr vgic_v2_get_lr(const struct kvm_vcpu *vcpu, int lr)
+ static void vgic_v2_set_lr(struct kvm_vcpu *vcpu, int lr,
+ 			   struct vgic_lr lr_desc)
+ {
+-	u32 lr_val = (lr_desc.source << GICH_LR_PHYSID_CPUID_SHIFT) | lr_desc.irq;
++	u32 lr_val;
++
++	lr_val = lr_desc.irq;
+ 
+ 	if (lr_desc.state & LR_STATE_PENDING)
+ 		lr_val |= GICH_LR_PENDING_BIT;
+@@ -64,6 +70,14 @@ static void vgic_v2_set_lr(struct kvm_vcpu *vcpu, int lr,
+ 	if (lr_desc.state & LR_EOI_INT)
+ 		lr_val |= GICH_LR_EOI;
+ 
++	if (lr_desc.state & LR_HW) {
++		lr_val |= GICH_LR_HW;
++		lr_val |= (u32)lr_desc.hwirq << GICH_LR_PHYSID_CPUID_SHIFT;
++	}
++
++	if (lr_desc.irq < VGIC_NR_SGIS)
++		lr_val |= (lr_desc.source << GICH_LR_PHYSID_CPUID_SHIFT);
++
+ 	vcpu->arch.vgic_cpu.vgic_v2.vgic_lr[lr] = lr_val;
+ }
+ 
+diff --git a/virt/kvm/arm/vgic-v3.c b/virt/kvm/arm/vgic-v3.c
+index dff0602..afbf925 100644
+--- a/virt/kvm/arm/vgic-v3.c
++++ b/virt/kvm/arm/vgic-v3.c
+@@ -67,6 +67,10 @@ static struct vgic_lr vgic_v3_get_lr(const struct kvm_vcpu *vcpu, int lr)
+ 		lr_desc.state |= LR_STATE_ACTIVE;
+ 	if (val & ICH_LR_EOI)
+ 		lr_desc.state |= LR_EOI_INT;
++	if (val & ICH_LR_HW) {
++		lr_desc.state |= LR_HW;
++		lr_desc.hwirq = (val >> ICH_LR_PHYS_ID_SHIFT) & GENMASK(9, 0);
++	}
+ 
+ 	return lr_desc;
+ }
+@@ -84,10 +88,17 @@ static void vgic_v3_set_lr(struct kvm_vcpu *vcpu, int lr,
+ 	 * Eventually we want to make this configurable, so we may revisit
+ 	 * this in the future.
+ 	 */
+-	if (vcpu->kvm->arch.vgic.vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3)
++	switch (vcpu->kvm->arch.vgic.vgic_model) {
++	case KVM_DEV_TYPE_ARM_VGIC_V3:
+ 		lr_val |= ICH_LR_GROUP;
+-	else
+-		lr_val |= (u32)lr_desc.source << GICH_LR_PHYSID_CPUID_SHIFT;
++		break;
++	case  KVM_DEV_TYPE_ARM_VGIC_V2:
++		if (lr_desc.irq < VGIC_NR_SGIS)
++			lr_val |= (u32)lr_desc.source << GICH_LR_PHYSID_CPUID_SHIFT;
++		break;
++	default:
++		BUG();
++	}
+ 
+ 	if (lr_desc.state & LR_STATE_PENDING)
+ 		lr_val |= ICH_LR_PENDING_BIT;
+@@ -95,6 +106,10 @@ static void vgic_v3_set_lr(struct kvm_vcpu *vcpu, int lr,
+ 		lr_val |= ICH_LR_ACTIVE_BIT;
+ 	if (lr_desc.state & LR_EOI_INT)
+ 		lr_val |= ICH_LR_EOI;
++	if (lr_desc.state & LR_HW) {
++		lr_val |= ICH_LR_HW;
++		lr_val |= ((u64)lr_desc.hwirq) << ICH_LR_PHYS_ID_SHIFT;
++	}
+ 
+ 	vcpu->arch.vgic_cpu.vgic_v3.vgic_lr[LR_INDEX(lr)] = lr_val;
+ }
 -- 
 2.1.4
