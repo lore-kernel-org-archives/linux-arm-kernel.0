@@ -1,55 +1,53 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 7 Aug 2015 11:48:03 +0100
-Subject: [PATCH v4 09/10] PCI: ACPI: Bind GIC MSI frame to PCI host bridge
-In-Reply-To: <55C4826C.80600@linaro.org>
-References: <1438164539-29256-1-git-send-email-hanjun.guo@linaro.org>
- <1438164539-29256-10-git-send-email-hanjun.guo@linaro.org>
- <55C4826C.80600@linaro.org>
-Message-ID: <20150807104803.GO20873@sirena.org.uk>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Fri, 7 Aug 2015 18:50:18 +0800
+Subject: [PATCH v3 0/5] Add SMP bringup support for mt65xx socs
+In-Reply-To: <20150805223115.GD7557@n2100.arm.linux.org.uk>
+References: <1436851111-2369-1-git-send-email-yingjoe.chen@mediatek.com>
+ <4831607.pyCH8elj8i@ubix> <20150805223115.GD7557@n2100.arm.linux.org.uk>
+Message-ID: <1438944618.14580.5.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 07, 2015 at 12:03:24PM +0200, Tomasz Nowicki wrote:
+On Wed, 2015-08-05 at 23:31 +0100, Russell King - ARM Linux wrote:
+> On Wed, Aug 05, 2015 at 08:44:11PM +0200, Matthias Brugger wrote:
+> > On Tuesday, July 14, 2015 01:18:26 PM Yingjoe Chen wrote:
+> > > This series add SMP brinup support for MediaTek SoCs. This is based
+> > > on v4.2-rc1 and Matthias' next branch (for dts parts).
+<...>
 
-> >@@ -670,6 +671,8 @@ static struct irq_domain *pci_host_bridge_msi_domain(struct pci_bus *bus)
-> >  	 * should be called from here.
-> >  	 */
-> >  	d = pci_host_bridge_of_msi_domain(bus);
-> >+	if (!d)
-> >+		d = pci_host_bridge_acpi_msi_domain(bus);
+> > Applied to v4.2-next/soc-2 and v4.2-next/dts-2 
 > 
-> Please use acpi_disabled here.
+> I've just NAK'd one of the patches in this set; I don't tend to even see
+> mediatek patches normally, as they all head into my junk mailfolder
+> because mediatek's mail server setup is truely abysmal (it has broken
+> reverse DNS - the DNS positively says that the mail server is not a
+> legit owner of the name it claims to be.)
 
-> BTW. This is another place where we need to know our firmware - DT vs ACPI.
-> I know we can use acpi_disabled but I think more about generic solution.
-> Since we already have:
-> struct fwnode_handle	*fwnode;
-> we can create macro which identify h/w description style, something like:
+Hi Russell,
 
-> #define FWNODE_TYPE(dev)	dev_fwnode(dev)->type
+Hope you see this.
 
-> and then:
+Thanks for your review. I already pass this information to our IT, hope
+they can resolve this soon.
 
-> switch (FWNODE_TYPE(&bus->dev)) {
-> case FWNODE_OF:
-> ...
-> case FWNODE_ACPI:
-> ...
-> case FWNODE_XXX:
-> ...
-> }
 
-> Root bus is special case since it has no frimware type but we could factor
-> out pci_set_bus_of_node(). For platform devices we have all we need. Just
-> thinking aloud, let me know your thoughts.
+> The problem is that this patch series uses memblock_reserve() way after
+> the memory has been transitioned out of memblock's control, so actually
+> this has no effect.
+> 
+> I've seen a number of patches doing this.  I'm not sure what's soo friggin
+> hard for people to understand: memblock is about the EARLY stages of
+> getting the system up and running.  Once the memory has been handed
+> over to the kernel's memory management, memblock MUST NOT BE USED to
+> reserve memory.
+> 
+> There is one place, and one place only in the ARM kernel where
+> memblock_reserve() is possible, and that's in the ->reserve machine
+> callback.  NOWHERE ELSE is permissible.
 
-Not knowing the particular detail here but can we not go a step further
-than that and have a fwnode_disabled() for this which does appropriate
-things for both ACPI and DT?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150807/f5c2fece/attachment.sig>
+
+It seems we can write memory-reserve node in device tree to do this as
+well. Do you prefer us to reserve memblock in reserve callback or using
+device tree?
+
+Joe.C
