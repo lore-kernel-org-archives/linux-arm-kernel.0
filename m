@@ -1,74 +1,48 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Fri, 7 Aug 2015 15:13:13 -0700
-Subject: [PATCH v2 2/2] ARM: dts: rockchip: add veyron-minnie board
-In-Reply-To: <CAD=FV=XVxxDzXkz7DuX47d=3MENzGkHrBYYDzH_KCKDpyORYYA@mail.gmail.com>
-References: <1763907.pckMEaRNPs@diego> <3051758.nWNxbUbTXs@diego>
- <CAD=FV=XVxxDzXkz7DuX47d=3MENzGkHrBYYDzH_KCKDpyORYYA@mail.gmail.com>
-Message-ID: <CAKdAkRTVbGeDY2J_T1N1x1yQaq7vCnO71TVmQGAZAkMaQsz2qw@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sat, 8 Aug 2015 00:10:52 +0200
+Subject: Armadaxp GPIO interrupts
+In-Reply-To: <CAG1O52VTqkiGbQ2Et98WyL_vqAhcx6VXxPmHMpLnSJx5wCLe-w@mail.gmail.com>
+References: <20150804153439.GA28673@lunn.ch>
+ <CAG1O52W2Gy_6_DfewtUqoK_J+Y=KwVGyygNaPu2xyPM_ZkLfcQ@mail.gmail.com>
+ <CAG1O52VQPpeGkA8bqYbPMTiT9Mua1yHi3H3osqJsHqm-RRKzow@mail.gmail.com>
+ <20150805162155.GE32760@lunn.ch>
+ <CAG1O52WPFfm+XGk01iUVWLu=-Dm7bcDVmhv3P8iQDH+HHjsLUA@mail.gmail.com>
+ <20150806132926.GB19896@lunn.ch>
+ <CAG1O52XUyPkgTTRKftujZBNK1=n6GBdWgBg_kq6SsC5XMaeU3w@mail.gmail.com>
+ <20150806171312.GI13421@lunn.ch>
+ <CAG1O52XO+5F11ELZ+7txWXTYPwmhQP5sVvcjdCiM_T1+ptfp=w@mail.gmail.com>
+ <CAG1O52VTqkiGbQ2Et98WyL_vqAhcx6VXxPmHMpLnSJx5wCLe-w@mail.gmail.com>
+Message-ID: <20150807221052.GJ26884@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 7, 2015 at 3:06 PM, Doug Anderson <dianders@chromium.org> wrote:
-> Heiko,
->
-> On Thu, Aug 6, 2015 at 10:37 AM, Heiko St?bner <heiko@sntech.de> wrote:
->> +&i2c3 {
->> +       status = "okay";
->> +
->> +       /*
->> +        * Touchscreen pin control is shared between Atmel and Elan devices,
->> +        * so we have to pull it up to the bus level.
->> +        */
->> +       pinctrl-names = "default";
->> +       pinctrl-0 = <&i2c3_xfer &touch_int &touch_rst>;
->> +
->> +       clock-frequency = <400000>;
->> +       i2c-scl-falling-time-ns = <50>;
->> +       i2c-scl-rising-time-ns = <300>;
->> +
->> +       touchscreen at 10 {
->> +               compatible = "elan,ekth3500";
->> +               reg = <0x10>;
->> +               interrupt-parent = <&gpio2>;
->> +               interrupts = <14 IRQ_TYPE_EDGE_FALLING>;
->> +               reset-gpios = <&gpio2 15 GPIO_ACTIVE_LOW>;
->> +               vcc33-supply = <&vcc33_touch>;
->> +               vccio-supply = <&vcc33_touch>;
->> +       };
->> +
->> +       touchscreen at 4a {
->> +               compatible = "atmel,atmel_mxt_ts";
->> +               reg = <0x4a>;
->> +               atmel,reset-gpios = <&gpio2 15 GPIO_ACTIVE_LOW>;
->> +               avdd-supply = <&vcc5v_touch>;
->> +               interrupt-parent = <&gpio2>;
->> +               interrupts = <14 IRQ_TYPE_EDGE_FALLING>;
->> +               vdd-supply = <&vcc33_touch>;
->
-> Technically I don't think most of these properties exist upstream, but
-> Dmitry (now CCed) might know more.
->
-> ...actually similar for elan.  At least I don't see 'reset-gpios', nor
-> 'vcc33-supply' and 'vccio-supply' in the bindings when I checkout
-> linuxnext...
->
+On Sat, Aug 08, 2015 at 02:24:04AM +0530, raghu MG wrote:
+> Hi Andrew,
+> I added these entries into armada-xp-gp.dtb
+>  gpio_rtm {
+>                 compatible = "gpio-rtm";
+>                 #address-cells = <1>;
+>                 #size-cells = <0>;
+>                 pinctrl-0 = <&keys_pin>;
+>                 pinctrl-names = "default";
+> 
+>                  rtm at 57 {
+>                         label = "RTM JACKINOUT";
+>                         gpios = <&gpio1 26 GPIO_ACTIVE_LOW>; /* GPIO 57 */
+>                 };
+>         };
+> 
+> So I understand the leaf nodes are specific purpose of
+> GPIOs(input:keyboard,mouse,touchpad etc).
+> 1)For the board I am working needs different implementation for GPIO
+> 57 unlike input devices drivers driving GPIOs.
+> 2)To implement the functionality I need to write driver specific to my
+> board which will implement event specific to requirements.
+> I hope I am going right here, can you name a simple driver(kernel
+> source) where it would make my driver development easy.
 
-I just merged the Elan regulator/gpio support, it will show up in the next next.
+Given the name "RTM JACKINOUT", how about
 
-> Oh, and also locally our tree has hacks in it to handle the fact that
-> both atmel and elan will try to grab the same reset GPIO.  I'm nearly
-> certain that Dmitry said that the current hacks we have wouldn't be
-> appropriate for upstream.  I had some proposals for better solutions,
-> but they were slightly more controversial.  In any case, I think all
-> shipping devices ended up using one or the other of these two
-> touchscreens (I forget which), so you could probably simplify and just
-> pick one of them.  If old prototype devices don't work upstream it
-> wouldn't be the end of the world.
+sound/soc/soc-jack.c
 
-I think if you pick Elan for this board it will cover majority (all?)
-devices that actually shipped.
-
-Thanks.
-
--- 
-Dmitry
+	Andrew
