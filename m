@@ -1,122 +1,223 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Fri, 7 Aug 2015 16:06:51 +0800
-Subject: [PATCH v6 7/9] clk: mediatek: Add subsystem clocks of MT8173
-In-Reply-To: <CAGS+omBDaP1b-zNJ7SaX89Mt5jhZEp_kDh7Pytsax0d=V++MEA@mail.gmail.com>
-References: <1438676218-11310-1-git-send-email-jamesjj.liao@mediatek.com>
- <1438676218-11310-8-git-send-email-jamesjj.liao@mediatek.com>
- <20150805064605.GZ18700@pengutronix.de> <1438849431.27884.9.camel@mtksdaap41>
- <20150806085354.GN18700@pengutronix.de> <1438851644.27884.21.camel@mtksdaap41>
- <CAGS+omAAYZyZJ4+eSdu2jmwThvHg1YpVoehui_cqNp4A5fURWg@mail.gmail.com>
- <20150806102059.GQ18700@pengutronix.de> <1438914018.29334.6.camel@mtksdaap41>
- <CAGS+omBDaP1b-zNJ7SaX89Mt5jhZEp_kDh7Pytsax0d=V++MEA@mail.gmail.com>
-Message-ID: <CAGS+omAizzehDjUx+r0JZRNo75W56zKiDq8kz6PUT9f2fdE7=w@mail.gmail.com>
+From: tomasz.nowicki@linaro.org (Tomasz Nowicki)
+Date: Fri, 07 Aug 2015 10:09:04 +0200
+Subject: [PATCH 2/2] net, thunder, bgx: Add support for ACPI binding.
+In-Reply-To: <1438907590-29649-3-git-send-email-ddaney.cavm@gmail.com>
+References: <1438907590-29649-1-git-send-email-ddaney.cavm@gmail.com>
+ <1438907590-29649-3-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <55C467A0.4020601@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 7, 2015 at 4:05 PM, Daniel Kurtz <djkurtz@chromium.org> wrote:
-> On Fri, Aug 7, 2015 at 10:20 AM, James Liao <jamesjj.liao@mediatek.com> wrote:
->> Hi Sascha,
->>
->> On Thu, 2015-08-06 at 12:20 +0200, Sascha Hauer wrote:
->>> On Thu, Aug 06, 2015 at 05:13:21PM +0800, Daniel Kurtz wrote:
->>> > On Thu, Aug 6, 2015 at 5:00 PM, James Liao <jamesjj.liao@mediatek.com> wrote:
->>> > > Hi Sascha,
->>> > >
->>> > > On Thu, 2015-08-06 at 10:53 +0200, Sascha Hauer wrote:
->>> > >> On Thu, Aug 06, 2015 at 04:23:51PM +0800, James Liao wrote:
->>> > >> > On Wed, 2015-08-05 at 08:46 +0200, Sascha Hauer wrote:
->>> > >> > > On Tue, Aug 04, 2015 at 04:16:56PM +0800, James Liao wrote:
->>> > >> > > >  static const struct mtk_fixed_clk fixed_clks[] __initconst = {
->>> > >> > > >         FIXED_CLK(CLK_TOP_CLKPH_MCK_O, "clkph_mck_o", "clk26m", 400 * MHZ),
->>> > >> > > >         FIXED_CLK(CLK_TOP_USB_SYSPLL_125M, "usb_syspll_125m", "clk26m", 125 * MHZ),
->>> > >> > > > +       FIXED_CLK(CLK_TOP_DSI0_DIG, "dsi0_dig", "clk26m", 130 * MHZ),
->>> > >> > > > +       FIXED_CLK(CLK_TOP_DSI1_DIG, "dsi1_dig", "clk26m", 130 * MHZ),
->>> > >> > > > +       FIXED_CLK(CLK_TOP_LVDS_PXL, "lvds_pxl", "lvdspll", 148.5 * MHZ),
->>> > >> > > > +       FIXED_CLK(CLK_TOP_LVDS_CTS, "lvds_cts", "lvdspll", 51.975 * MHZ),
->>> > >> > >
->>> > >> > > I would expect 51975 * KHZ here to avoid fractional numbers. Probably
->>> > >> > > gcc calculates that during compile time so this will work as expected,
->>> > >> > > still I'm not sure this is good style to use fractional numbers here.
->>> > >> >
->>> > >> > As I know all constants will be calculated in compile time, so there
->>> > >> > should be no difference between 51.975 * MHZ and 51975 * KHz.
->>> > >> >
->>> > >> > > Anyway, on my system lvdspll is running at 150MHz. Are you sure there is
->>> > >> > > a clock derived from this running at 148.5MHz? Is it really correct to
->>> > >> > > use a fixed clock here or should it rather be lvdspll directly?
->>> > >> >
->>> > >> > Here is the clock hierarchy between lvdspll and lvds_pxl:
->>> > >> >
->>> > >> >             --------       AD_VPLL_DPIX_CK  --------   lvds_pxl  -----
->>> > >> >            |        |--------------------->|        |---------->|
->>> > >> >            |        |                      | cksys  |           |
->>> > >> > LVDSPLL -->| LVDSTX |                      | buffer |           | MMSYS
->>> > >> >            |        | AD_LVDSTX_CLKDIG_CTS | test   |  lvds_cts |
->>> > >> >            |        |--------------------->|        |---------->|
->>> > >> >             --------                        --------             -----
->>> > >> >
->>> > >> > Some clocks and blocks are not modeled into CCF. But we prefer to enable
->>> > >> > lvdspll before enabling lvds_pxl. So I modeled lvds_pxl (and lvds_cts)
->>> > >> > as a fixed-rate clock with a source from lvdspll.
->>> > >> >
->>> > >> > The frequency of these fixed-rate clocks (such as 148.5 MHz) are typical
->>> > >> > rate. In fact, we don't care about the actual rate of these clocks. We
->>> > >> > just care about the enable / disable sequence of them.
->>> > >>
->>> > >> Please either use the real rate or 0 (along with a explaining why). Using
->>> > >> a frequency with four to five significant digits makes me think that the
->>> > >> actual rate is very important.
->>> > >
->>> > > Oops, your suggestion is much different from Daniel's.
->>> > >
->>> > > Daniel, could you help to comment about how we model these clocks?
->>> >
->>> > First of all, for clocks where the rate doesn't matter, it doesn't
->>> > matters to what rate we set the clock.
->>> >
->>> > As for the color of our shed, "the designer says these are the typical
->>> > rates" sounds good enough to me for a "real rate", so I prefer using
->>> > the rates in James' patch.
->>> >
->>> > If not sure what Sascha's concern is, but if he insists on 0, I'm fine
->>> > with that too.
->>>
->>> I only find it confusing. I'd expect either the correct rate or an
->>> obviously dummy rate. Whatever we choose a comment explaining the
->>> background would really help here. Otherwise we won't know later
->>> whether this 148.5 MHz rate was introduced because a) The consumers
->>> depend on this rate being reported, b) It really is the correct rate or
->>> c) we don't care about the rate.
->>
->> So the proper setting should be:
->>
->> clk_name,          parent,    rate
->> -------------------------------------
->> "clkph_mck_o",     "clk26m",  0
->> "usb_syspll_125m", "clk26m",  125 * MHZ
->> "dsi0_dig",        "clk26m",  0
->> "dsi1_dig",        "clk26m",  0
->> "lvds_pxl",        "lvdspll", 0
->> "lvds_cts",        "lvdspll", 0
->>
->> usb_syspll_125m will keep in 125 MHz event in different products.Others
->> may be changed by DRAM or display settings.
->>
->> Daniel, do you think it's OK to model these clocks like above?
+On 07.08.2015 02:33, David Daney wrote:
+> From: David Daney <david.daney@cavium.com>
 >
-> Yes, I am fine with this.
-
-Oh, but Sascha's main point is that, whatever we choose to do, please
-document it to make it clear why we are setting these clocks to the
-value we choose.
-
--Dan
-
+> Find out which PHYs belong to which BGX instance in the ACPI way.
 >
->>
->>
->> Best regards,
->>
->> James
->>
->>
+> Set the MAC address of the device as provided by ACPI tables. This is
+> similar to the implementation for devicetree in
+> of_get_mac_address(). The table is searched for the device property
+> entries "mac-address", "local-mac-address" and "address" in that
+> order. The address is provided in a u64 variable and must contain a
+> valid 6 bytes-len mac addr.
+>
+> Based on code from: Narinder Dhillon <ndhillon@cavium.com>
+>                      Tomasz Nowicki <tomasz.nowicki@linaro.org>
+>                      Robert Richter <rrichter@cavium.com>
+>
+> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+> Signed-off-by: Robert Richter <rrichter@cavium.com>
+> Signed-off-by: David Daney <david.daney@cavium.com>
+> ---
+>   drivers/net/ethernet/cavium/thunder/thunder_bgx.c | 137 +++++++++++++++++++++-
+>   1 file changed, 135 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
+> index 615b2af..2056583 100644
+> --- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
+> +++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
+> @@ -6,6 +6,7 @@
+>    * as published by the Free Software Foundation.
+>    */
+>
+> +#include <linux/acpi.h>
+>   #include <linux/module.h>
+>   #include <linux/interrupt.h>
+>   #include <linux/pci.h>
+> @@ -26,7 +27,7 @@
+>   struct lmac {
+>   	struct bgx		*bgx;
+>   	int			dmac;
+> -	unsigned char		mac[ETH_ALEN];
+> +	u8			mac[ETH_ALEN];
+>   	bool			link_up;
+>   	int			lmacid; /* ID within BGX */
+>   	int			lmacid_bd; /* ID on board */
+> @@ -835,6 +836,133 @@ static void bgx_get_qlm_mode(struct bgx *bgx)
+>   	}
+>   }
+>
+> +#ifdef CONFIG_ACPI
+> +
+> +static int bgx_match_phy_id(struct device *dev, void *data)
+> +{
+> +	struct phy_device *phydev = to_phy_device(dev);
+> +	u32 *phy_id = data;
+> +
+> +	if (phydev->addr == *phy_id)
+> +		return 1;
+> +
+> +	return 0;
+> +}
+> +
+> +static const char * const addr_propnames[] = {
+> +	"mac-address",
+> +	"local-mac-address",
+> +	"address",
+> +};
+> +
+> +static int acpi_get_mac_address(struct acpi_device *adev, u8 *dst)
+> +{
+> +	const union acpi_object *prop;
+> +	u64 mac_val;
+> +	u8 mac[ETH_ALEN];
+> +	int i, j;
+> +	int ret;
+> +
+> +	for (i = 0; i < ARRAY_SIZE(addr_propnames); i++) {
+> +		ret = acpi_dev_get_property(adev, addr_propnames[i],
+> +					    ACPI_TYPE_INTEGER, &prop);
+> +		if (ret)
+> +			continue;
+> +
+> +		mac_val = prop->integer.value;
+> +
+> +		if (mac_val & (~0ULL << 48))
+> +			continue;	/* more than 6 bytes */
+> +
+> +		for (j = 0; j < ARRAY_SIZE(mac); j++)
+> +			mac[j] = (u8)(mac_val >> (8 * j));
+> +		if (!is_valid_ether_addr(mac))
+> +			continue;
+> +
+> +		memcpy(dst, mac, ETH_ALEN);
+> +
+> +		return 0;
+> +	}
+> +
+> +	return ret ? ret : -EINVAL;
+> +}
+> +
+> +static acpi_status bgx_acpi_register_phy(acpi_handle handle,
+> +					 u32 lvl, void *context, void **rv)
+> +{
+> +	struct acpi_reference_args args;
+> +	const union acpi_object *prop;
+> +	struct bgx *bgx = context;
+> +	struct acpi_device *adev;
+> +	struct device *phy_dev;
+> +	u32 phy_id;
+> +
+> +	if (acpi_bus_get_device(handle, &adev))
+> +		goto out;
+> +
+> +	SET_NETDEV_DEV(&bgx->lmac[bgx->lmac_count].netdev, &bgx->pdev->dev);
+> +
+> +	acpi_get_mac_address(adev, bgx->lmac[bgx->lmac_count].mac);
+> +
+> +	bgx->lmac[bgx->lmac_count].lmacid = bgx->lmac_count;
+> +
+> +	if (acpi_dev_get_property_reference(adev, "phy-handle", 0, &args))
+> +		goto out;
+> +
+> +	if (acpi_dev_get_property(args.adev, "phy-channel", ACPI_TYPE_INTEGER, &prop))
+> +		goto out;
+> +
+> +	phy_id = prop->integer.value;
+> +
+> +	phy_dev = bus_find_device(&mdio_bus_type, NULL, (void *)&phy_id,
+> +				  bgx_match_phy_id);
+> +	if (!phy_dev)
+> +		goto out;
+> +
+> +	bgx->lmac[bgx->lmac_count].phydev = to_phy_device(phy_dev);
+> +out:
+> +	bgx->lmac_count++;
+> +	return AE_OK;
+> +}
+> +
+> +static acpi_status bgx_acpi_match_id(acpi_handle handle, u32 lvl,
+> +				     void *context, void **ret_val)
+> +{
+> +	struct acpi_buffer string = { ACPI_ALLOCATE_BUFFER, NULL };
+> +	struct bgx *bgx = context;
+> +	char bgx_sel[5];
+> +
+> +	snprintf(bgx_sel, 5, "BGX%d", bgx->bgx_id);
+> +	if (ACPI_FAILURE(acpi_get_name(handle, ACPI_SINGLE_NAME, &string))) {
+> +		pr_warn("Invalid link device\n");
+> +		return AE_OK;
+> +	}
+> +
+> +	if (strncmp(string.pointer, bgx_sel, 4))
+> +		return AE_OK;
+> +
+> +	acpi_walk_namespace(ACPI_TYPE_DEVICE, handle, 1,
+> +			    bgx_acpi_register_phy, NULL, bgx, NULL);
+> +
+> +	kfree(string.pointer);
+> +	return AE_CTRL_TERMINATE;
+> +}
+> +
+> +static int bgx_init_acpi_phy(struct bgx *bgx)
+> +{
+> +	acpi_get_devices(NULL, bgx_acpi_match_id, bgx, (void **)NULL);
+> +	return 0;
+> +}
+> +
+> +#else
+> +
+> +static int bgx_init_acpi_phy(struct bgx *bgx)
+> +{
+> +	return -ENODEV;
+> +}
+> +
+> +#endif /* CONFIG_ACPI */
+> +
+>   #if IS_ENABLED(CONFIG_OF_MDIO)
+>
+>   static int bgx_init_of_phy(struct bgx *bgx)
+> @@ -882,7 +1010,12 @@ static int bgx_init_of_phy(struct bgx *bgx)
+>
+>   static int bgx_init_phy(struct bgx *bgx)
+>   {
+> -	return bgx_init_of_phy(bgx);
+> +	int err = bgx_init_of_phy(bgx);
+> +
+> +	if (err != -ENODEV)
+> +		return err;
+> +
+> +	return bgx_init_acpi_phy(bgx);
+>   }
+>
+
+If kernel can work with DT and ACPI (both compiled in), it should take 
+only one path instead of probing DT and ACPI sequentially. How about:
+
+@@ -902,10 +925,9 @@ static int bgx_probe(struct pci_dev *pdev, const 
+struct pci_device_id *ent)
+  	bgx_vnic[bgx->bgx_id] = bgx;
+  	bgx_get_qlm_mode(bgx);
+
+-	snprintf(bgx_sel, 5, "bgx%d", bgx->bgx_id);
+-	np = of_find_node_by_name(NULL, bgx_sel);
+-	if (np)
+-		bgx_init_of(bgx, np);
++	err = acpi_disabled ? bgx_init_of_phy(bgx) : bgx_init_acpi_phy(bgx);
++	if (err)
++		goto err_enable;
+
+  	bgx_init_hw(bgx);
+
+
+Regards,
+Tomasz
