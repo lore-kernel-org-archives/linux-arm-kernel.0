@@ -1,106 +1,43 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat, 8 Aug 2015 17:35:36 +0200
-Subject: [linux-sunxi] [PATCH v2] ARM: dts: sunxi: Add regulators for
- LeMaker BananaPi
-In-Reply-To: <1438532305-5884-1-git-send-email-public_timo.s@silentcreek.de>
-References: <1438532305-5884-1-git-send-email-public_timo.s@silentcreek.de>
-Message-ID: <55C621C8.7040302@redhat.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 8 Aug 2015 16:35:41 +0100
+Subject: [PATCH v5 4/6] drm: bridge/dw_hdmi-i2s-audio: add audio driver
+In-Reply-To: <1434731295-11060-1-git-send-email-ykk@rock-chips.com>
+References: <1434730417-10629-1-git-send-email-ykk@rock-chips.com>
+ <1434731295-11060-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <20150808153540.GL7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sat, Jun 20, 2015 at 12:28:15AM +0800, Yakir Yang wrote:
+> Add ALSA based HDMI I2S audio driver for dw_hdmi. Sound card
+> driver could connect to this codec through the codec dai name
+> "dw-hdmi-i2s-audio".
 
-On 02-08-15 18:18, Timo Sigurdsson wrote:
-> sun7i-a20-bananapi.dts doesn't contain regulator nodes for the AXP209 PMU
-> driver, so add them to allow for voltage-scaling with cpufreq-dt.
->
-> Signed-off-by: Timo Sigurdsson <public_timo.s@silentcreek.de>
+I'm applying this patch to my tree with some changes.  I haven't seen
+anyone ack it, nor review it any further.  I'm hoping someone can ack
+this patch with the following changes below - I'll be posting it as
+part of my dw-hdmi devel updates later today.
 
-Thanks for doing this, looks good to me:
+> +	ret = request_irq(dw->data.irq, snd_dw_hdmi_irq, IRQF_SHARED,
+> +			  "dw-dw-audio", dw);
 
-Acked-by: Hans de Goede <hdegoede@redhat.com>
+			  DRIVER_NAME, dw);
 
-Regards,
+> +MODULE_AUTHOR("Yakir Yang <ykk@rock-chips.com>");
+> +MODULE_DESCRIPTION("DW dw Audio ASoC Interface");
 
-Hans
+Fixing this to be "Synopsis DesignWare HDMI I2S ASoC interface".
 
+> +MODULE_LICENSE("GPL v2");
+> +MODULE_ALIAS(PLATFORM_MODULE_PREFIX DRIVER_NAME);
 
-p.s.
+Replacing PLATFORM_MODULE_PREFIX with the "platform:" string.
 
-I've replaced my own patch with this one in my sunxi-wip branch.
+> +	if (hdmi_readb(hdmi, HDMI_CONFIG1_ID) & HDMI_CONFIG1_AHB) {
+>  		pdevinfo.name = "dw-hdmi-ahb-audio";
 
+Fixing this to be "dw-hdmi-i2s-audio".
 
-> ---
-> Changes since v1 (RFC):
->
-> - Dropped the changes to the cpufreq operating points and renamed the patch
-> accordingly
-> - Limited the CPU voltage range so it doesn't exceed the SOC specifications
-> ---
->   arch/arm/boot/dts/sun7i-a20-bananapi.dts | 35 ++++++++++++++++++++++++++++----
->   1 file changed, 31 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/sun7i-a20-bananapi.dts b/arch/arm/boot/dts/sun7i-a20-bananapi.dts
-> index 9f7b472..74382f3 100644
-> --- a/arch/arm/boot/dts/sun7i-a20-bananapi.dts
-> +++ b/arch/arm/boot/dts/sun7i-a20-bananapi.dts
-> @@ -92,6 +92,10 @@
->   	status = "okay";
->   };
->
-> +&cpu0 {
-> +	cpu-supply = <&reg_dcdc2>;
-> +};
-> +
->   &ehci0 {
->   	status = "okay";
->   };
-> @@ -119,13 +123,9 @@
->   	status = "okay";
->
->   	axp209: pmic at 34 {
-> -		compatible = "x-powers,axp209";
->   		reg = <0x34>;
->   		interrupt-parent = <&nmi_intc>;
->   		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-> -
-> -		interrupt-controller;
-> -		#interrupt-cells = <1>;
->   	};
->   };
->
-> @@ -182,6 +182,33 @@
->   	};
->   };
->
-> +#include "axp209.dtsi"
-> +
-> +&reg_dcdc2 {
-> +	regulator-always-on;
-> +	regulator-min-microvolt = <1000000>;
-> +	regulator-max-microvolt = <1400000>;
-> +	regulator-name = "vdd-cpu";
-> +};
-> +
-> +&reg_dcdc3 {
-> +	regulator-always-on;
-> +	regulator-min-microvolt = <1000000>;
-> +	regulator-max-microvolt = <1400000>;
-> +	regulator-name = "vdd-int-dll";
-> +};
-> +
-> +&reg_ldo1 {
-> +	regulator-name = "vdd-rtc";
-> +};
-> +
-> +&reg_ldo2 {
-> +	regulator-always-on;
-> +	regulator-min-microvolt = <3000000>;
-> +	regulator-max-microvolt = <3000000>;
-> +	regulator-name = "avcc";
-> +};
-> +
->   &reg_usb1_vbus {
->   	status = "okay";
->   };
->
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
