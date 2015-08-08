@@ -1,67 +1,120 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 08 Aug 2015 13:42:50 +0200
-Subject: [BUG, RFC] MTD Execute in Place on ARM breaks build
-In-Reply-To: <55C51319.2010901@tul.cz>
-References: <55C51319.2010901@tul.cz>
-Message-ID: <1564596.BEQS8u7XSM@wuerfel>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Sat, 8 Aug 2015 20:56:47 +0900
+Subject: [PATCH] ARM: refactor bitops functions with BIT_MASK() and
+ BIT_WORD()
+In-Reply-To: <1437461324-7284-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1437461324-7284-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <CAK7LNAQpU_S-dUZ+z9eXsJP7gVMYitHa40JpLHNevN5479oU8Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 07 August 2015 22:20:41 Petr Cvek wrote:
-> Hello,
-> 
-> Configuration:
-> 
-> 	CONFIG_MTD_XIP=y
-> 
-> on PXA2xx architecture causes request of undefined macros from 
-> 
-> 	drivers/mtd/chipscfi_cmdset_0001.c
-> 
-> These macros (using ICIP and ICMR) are defined here:
-> 
-> 	http://lxr.free-electrons.com/source/arch/arm/mach-pxa/include/mach/mtd-xip.h#L20
-> 
-> register definitions for ICIP and ICMR were removed by commit:
-> 	
-> 	5d284e353eb11ab2e8b1c5671ba06489b0bd1e0c
-> 
-> Similar is for macros with OSCR (lines 23 and 24), which have different type.
-> Re-adding ICIP and ICMR definition and explicit type conversion will fix the build
-> and the kernel boots, but I'm not yet able to test XIP functionality (too many different
-> bugs to flash over windows mobile image).
+Hi.
+
+No comment?
+
+If nobody has objection to this patch,
+I will post it to the patch tracking system.
+
+
+
+
+2015-07-21 15:48 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
+> Use BIT_MASK() and BIT_WORD() rather than hard-coding the size
+> of the "long" type.
 >
-> My temporal fix (ugly):
-> 
-> #define ICIP __REG(0x40D00000)  /* Interrupt Controller IRQ Pending Register */
-> #define ICMR __REG(0x40D00004)  /* Interrupt Controller Mask Register */
-> ...
-> #define xip_currtime()		((unsigned long) OSCR)
-> #define xip_elapsed_since(x)	(signed)((((unsigned long) OSCR) - (x)) / 4)
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> ---
+>
+>  arch/arm/include/asm/bitops.h | 24 ++++++++++++------------
+>  1 file changed, 12 insertions(+), 12 deletions(-)
+>
+> diff --git a/arch/arm/include/asm/bitops.h b/arch/arm/include/asm/bitops.h
+> index 5638099..e943e6c 100644
+> --- a/arch/arm/include/asm/bitops.h
+> +++ b/arch/arm/include/asm/bitops.h
+> @@ -35,9 +35,9 @@
+>  static inline void ____atomic_set_bit(unsigned int bit, volatile unsigned long *p)
+>  {
+>         unsigned long flags;
+> -       unsigned long mask = 1UL << (bit & 31);
+> +       unsigned long mask = BIT_MASK(bit);
+>
+> -       p += bit >> 5;
+> +       p += BIT_WORD(bit);
+>
+>         raw_local_irq_save(flags);
+>         *p |= mask;
+> @@ -47,9 +47,9 @@ static inline void ____atomic_set_bit(unsigned int bit, volatile unsigned long *
+>  static inline void ____atomic_clear_bit(unsigned int bit, volatile unsigned long *p)
+>  {
+>         unsigned long flags;
+> -       unsigned long mask = 1UL << (bit & 31);
+> +       unsigned long mask = BIT_MASK(bit);
+>
+> -       p += bit >> 5;
+> +       p += BIT_WORD(bit);
+>
+>         raw_local_irq_save(flags);
+>         *p &= ~mask;
+> @@ -59,9 +59,9 @@ static inline void ____atomic_clear_bit(unsigned int bit, volatile unsigned long
+>  static inline void ____atomic_change_bit(unsigned int bit, volatile unsigned long *p)
+>  {
+>         unsigned long flags;
+> -       unsigned long mask = 1UL << (bit & 31);
+> +       unsigned long mask = BIT_MASK(bit);
+>
+> -       p += bit >> 5;
+> +       p += BIT_WORD(bit);
+>
+>         raw_local_irq_save(flags);
+>         *p ^= mask;
+> @@ -73,9 +73,9 @@ ____atomic_test_and_set_bit(unsigned int bit, volatile unsigned long *p)
+>  {
+>         unsigned long flags;
+>         unsigned int res;
+> -       unsigned long mask = 1UL << (bit & 31);
+> +       unsigned long mask = BIT_MASK(bit);
+>
+> -       p += bit >> 5;
+> +       p += BIT_WORD(bit);
+>
+>         raw_local_irq_save(flags);
+>         res = *p;
+> @@ -90,9 +90,9 @@ ____atomic_test_and_clear_bit(unsigned int bit, volatile unsigned long *p)
+>  {
+>         unsigned long flags;
+>         unsigned int res;
+> -       unsigned long mask = 1UL << (bit & 31);
+> +       unsigned long mask = BIT_MASK(bit);
+>
+> -       p += bit >> 5;
+> +       p += BIT_WORD(bit);
+>
+>         raw_local_irq_save(flags);
+>         res = *p;
+> @@ -107,9 +107,9 @@ ____atomic_test_and_change_bit(unsigned int bit, volatile unsigned long *p)
+>  {
+>         unsigned long flags;
+>         unsigned int res;
+> -       unsigned long mask = 1UL << (bit & 31);
+> +       unsigned long mask = BIT_MASK(bit);
+>
+> -       p += bit >> 5;
+> +       p += BIT_WORD(bit);
+>
+>         raw_local_irq_save(flags);
+>         res = *p;
+> --
+> 1.9.1
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
 
-Macros that do implicit pointer dereferences are discouraged, a better way to
-write them is
 
-	#define xip_currtime()	readl_relaxed(OSCR)
-
-with the OSCR definition from arch/arm/mach-pxa/include/mach/regs-ost.h.
-
-> P.S. Same macros are used on omap1 and sa1100 too.
-
-There is a (slow) effort to move both omap1 and pxa into ARCH_MULTIPLATFORM
-in the long run, and at that point we have to come up with something
-better. The easiest way out would be to replace the functions with
-function pointers that can be set by platform specific code.
-
-A cleaner approach might be to replace xip_currtime() with
-ktime_get_ns(), and find some other generic interface to replace
-xip_irqpending. That would let us eliminate the mach/mtd-xip.h
-header entirely and make mtd-xip portablel to a lot of other
-platforms.
-
-For a real multiplatform kernel, you'd also need to replace the
-#ifdef CONFIG_MTD_XIP instances with a runtime conditional, but that
-is less urgent for real world use cases.
-
-	Arnd
+-- 
+Best Regards
+Masahiro Yamada
