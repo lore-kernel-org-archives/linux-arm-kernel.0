@@ -1,85 +1,57 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Fri, 7 Aug 2015 18:29:05 -0700
-Subject: [PATCH v4 2/2] usb: Add support for ACPI identification to
- xhci-platform
-In-Reply-To: <5e302acb5b03c9bf61ecfb9b5b37e8b3b520bed9.1438994178.git.dhdang@apm.com>
-References: <CADaLNDkeOP+gBw0qdSDha551w+w+q4ry9-EevDw5giyiQGdnqA@mail.gmail.com>
- <5e302acb5b03c9bf61ecfb9b5b37e8b3b520bed9.1438994178.git.dhdang@apm.com>
-Message-ID: <20150808012905.GA10407@kroah.com>
+From: nathan_lynch@mentor.com (Nathan Lynch)
+Date: Fri, 7 Aug 2015 21:03:22 -0500
+Subject: [PATCH 1/2] ARM: VDSO: fix coarse clock monotonicity regression
+In-Reply-To: <1438999403-5770-1-git-send-email-nathan_lynch@mentor.com>
+References: <1438999403-5770-1-git-send-email-nathan_lynch@mentor.com>
+Message-ID: <1438999403-5770-2-git-send-email-nathan_lynch@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 07, 2015 at 06:03:36PM -0700, Duc Dang wrote:
-> Provide the methods to let ACPI identify the need to use
-> xhci-platform. Change the Kconfig files so the
-> xhci-plat.o file is selectable during kernel config.
-> 
-> This has been tested on an ARM64 machine with platform XHCI, an
-> x86_64 machine with XHCI, and an x86_64 machine without XHCI.
-> There were no regressions or error messages on the machines
-> without platform XHCI.
-> 
-> [dhdang: regenerate the patch over 4.2-rc5]
-> Signed-off-by: Mark Langsdorf <mlangsdo@redhat.com>
-> Signed-off-by: Duc Dang <dhdang@apm.com>
-> 
-> ---
-> Changes from v3:
-> 	Regenerate the patch over 4.2-rc5
-> 	No code change
-> 
-> Changes from v2
-> 	Replaced tristate with a boolean as the driver doesn't
-> 		compile as a module
-> 	Correct --help-- to ---help---
-> 
-> Changes from v1
-> 	Renamed from "add support for APM X-Gene to xhci-platform"
-> 	Removed changes to arm64/Kconfig
-> 	Made CONFIG_USB_XHCI_PLATFORM a user selectable config option
-> 
->  drivers/usb/host/Kconfig     |  7 ++++++-
->  drivers/usb/host/xhci-plat.c | 11 +++++++++++
->  2 files changed, 17 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-> index 8afc3c1..96231ee 100644
-> --- a/drivers/usb/host/Kconfig
-> +++ b/drivers/usb/host/Kconfig
-> @@ -32,7 +32,12 @@ config USB_XHCI_PCI
->         default y
->  
->  config USB_XHCI_PLATFORM
-> -	tristate
-> +	tristate "xHCI platform driver support"
-> +	---help---
-> +	  Say 'Y' to enable the support for the xHCI host controller
-> +	  as a platform device. Many ARM SoCs provide USB this way.
-> +
-> +	  If unsure, say 'Y'.
->  
->  config USB_XHCI_MVEBU
->  	tristate "xHCI support for Marvell Armada 375/38x"
-> diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
-> index 5d03f8b..14b40d2 100644
-> --- a/drivers/usb/host/xhci-plat.c
-> +++ b/drivers/usb/host/xhci-plat.c
-> @@ -19,6 +19,7 @@
->  #include <linux/usb/phy.h>
->  #include <linux/slab.h>
->  #include <linux/usb/xhci_pdriver.h>
-> +#include <linux/acpi.h>
->  
->  #include "xhci.h"
->  #include "xhci-mvebu.h"
-> @@ -262,6 +263,15 @@ static const struct of_device_id usb_xhci_of_match[] = {
->  MODULE_DEVICE_TABLE(of, usb_xhci_of_match);
->  #endif
->  
-> +#ifdef CONFIG_ACPI
+Since 906c55579a63 ("timekeeping: Copy the shadow-timekeeper over the
+real timekeeper last") it has become possible on ARM to:
 
-You shoudn't need this #ifdef, right?
+- Obtain a CLOCK_MONOTONIC_COARSE or CLOCK_REALTIME_COARSE timestamp
+  via syscall.
+- Subsequently obtain a timestamp for the same clock ID via VDSO which
+  predates the first timestamp (by one jiffy).
 
-thanks,
+This is because ARM's update_vsyscall is deriving the coarse time
+using the __current_kernel_time interface, when it should really be
+using the timekeeper object provided to it by the timekeeping core.
+It happened to work before only because __current_kernel_time would
+access the same timekeeper object which had been passed to
+update_vsyscall.  This is no longer the case.
 
-greg k-h
+Signed-off-by: Nathan Lynch <nathan_lynch@mentor.com>
+---
+ arch/arm/kernel/vdso.c | 7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/kernel/vdso.c b/arch/arm/kernel/vdso.c
+index efe17dd9b921..c8b243c1aef8 100644
+--- a/arch/arm/kernel/vdso.c
++++ b/arch/arm/kernel/vdso.c
+@@ -296,7 +296,6 @@ static bool tk_is_cntvct(const struct timekeeper *tk)
+  */
+ void update_vsyscall(struct timekeeper *tk)
+ {
+-	struct timespec xtime_coarse;
+ 	struct timespec64 *wtm = &tk->wall_to_monotonic;
+ 
+ 	if (!cntvct_ok) {
+@@ -308,10 +307,10 @@ void update_vsyscall(struct timekeeper *tk)
+ 
+ 	vdso_write_begin(vdso_data);
+ 
+-	xtime_coarse = __current_kernel_time();
+ 	vdso_data->tk_is_cntvct			= tk_is_cntvct(tk);
+-	vdso_data->xtime_coarse_sec		= xtime_coarse.tv_sec;
+-	vdso_data->xtime_coarse_nsec		= xtime_coarse.tv_nsec;
++	vdso_data->xtime_coarse_sec		= tk->xtime_sec;
++	vdso_data->xtime_coarse_nsec		= tk->tkr_mono.xtime_nsec >>
++							tk->tkr_mono.shift;
+ 	vdso_data->wtm_clock_sec		= wtm->tv_sec;
+ 	vdso_data->wtm_clock_nsec		= wtm->tv_nsec;
+ 
+-- 
+2.1.0
