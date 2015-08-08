@@ -1,7 +1,7 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sun, 09 Aug 2015 01:06:40 +0300
-Subject: [PATCH v2 0/2] Add R8A7794 GPIO DT support
-Message-ID: <1458933.B2H9sbD3e6@wasted.cogentembedded.com>
+Date: Sun, 09 Aug 2015 01:06:55 +0300
+Subject: [PATCH v3 0/2] Add R8A7794 GPIO DT support
+Message-ID: <2265315.MpjeDzrVz2@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
