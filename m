@@ -1,62 +1,80 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 8 Aug 2015 18:53:13 +0100
-Subject: [PATCH v4] ARM: early fixmap support for earlycon
-In-Reply-To: <00498073e34373292dd053cdb700ff25@agner.ch>
-References: <1434491507-6208-1-git-send-email-stefan@agner.ch>
- <00498073e34373292dd053cdb700ff25@agner.ch>
-Message-ID: <20150808175313.GO7557@n2100.arm.linux.org.uk>
+From: petr.cvek@tul.cz (Petr Cvek)
+Date: Sat, 08 Aug 2015 20:20:20 +0200
+Subject: [PATCH v1, TRIVIAL] Fix pxafb nonstd field documentation and add
+ errata info
+Message-ID: <55C64864.6070405@tul.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 30, 2015 at 11:02:38PM +0200, Stefan Agner wrote:
-> On 2015-06-16 23:51, Stefan Agner wrote:
-> >  static void __init devicemaps_init(const struct machine_desc *mdesc)
-> >  {
-> > @@ -1231,7 +1272,10 @@ static void __init devicemaps_init(const struct
-> > machine_desc *mdesc)
-> >  
-> >  	early_trap_init(vectors);
-> >  
-> > -	for (addr = VMALLOC_START; addr; addr += PMD_SIZE)
-> > +	/*
-> > +	 * Clear page table except top pmd used by early fixmaps
-> > +	 */
-> > +	for (addr = VMALLOC_START; addr < (FIXADDR_TOP & PMD_MASK); addr += PMD_SIZE)
-> >  		pmd_clear(pmd_off_k(addr));
-> >  
-> 
-> Hi Russel,
-> 
-> Checked this again, v4 does the right thing:
-> FIXADDR_TOP (0xffeff000) & PMD_MASK (0xffe00000) gives us the address of
-> the top PMD (0xFFE00000). We don't clear that since that is taken care
-> of by early fixmap support (early_fixmap_shutdown). v3 used
-> FIXADDR_START, which also left out the second to top PMD. The 3MiB of
-> fixmap spawns two PMD's however only the top PMD is handled by early
-> fixmap. Hence this was wrong in v3, but is fixed in v4.
-> 
-> Can you reconsider this patch?
+Fix pxafb nonstd field documentation and add warning comment to Kconfig
+and pxafb.c (errata: YUV420 hangs LCD).
 
-I applied the patch which was in the patch system, and Olof's builder
-reported failures:
+Signed-off-by: Petr Cvek <petr.cvek@tul.cz>
+---
+ Documentation/fb/pxafb.txt  | 8 ++++----
+ drivers/video/fbdev/Kconfig | 5 +++++
+ drivers/video/fbdev/pxafb.c | 4 ++++
+ 3 files changed, 13 insertions(+), 4 deletions(-)
 
-        arm.allnoconfig:
-:(.init.text+0x7a0): undefined reference to `early_fixmap_init'
-
-        arm.efm32_defconfig:
-arch/arm/kernel/setup.c:958: undefined reference to `early_fixmap_init'
-
-        arm.lpc18xx_defconfig:
-arch/arm/include/asm/fixmap.h:25:29: error: 'L_PTE_YOUNG' undeclared (first use in this function)
-arch/arm/include/asm/fixmap.h:25:43: error: 'L_PTE_PRESENT' undeclared (first use in this function)
-arch/arm/include/asm/fixmap.h:25:59: error: 'L_PTE_XN' undeclared (first use in this function)
-arch/arm/include/asm/fixmap.h:25:70: error: 'L_PTE_DIRTY' undeclared (first use in this function)
-arch/arm/include/asm/fixmap.h:30:47: error: 'L_PTE_MT_DEV_SHARED' undeclared (first use in this function)
-arch/arm/include/asm/fixmap.h:30:69: error: 'L_PTE_SHARED' undeclared (first use in this function)
-
-So I'm going to drop it from my tree.  Please resubmit a fixed version,
-thanks.
-
+diff --git a/Documentation/fb/pxafb.txt b/Documentation/fb/pxafb.txt
+index d143a0a..dbbf5eb 100644
+--- a/Documentation/fb/pxafb.txt
++++ b/Documentation/fb/pxafb.txt
+@@ -123,12 +123,12 @@ Overlay Support for PXA27x and later LCD controllers
+      framebuffer framework, application has to take care of the offsets
+      and lengths of each component within the framebuffer.
+ 
+-  4. var->nonstd is used to pass starting (x, y) position and color format,
++  4. var->nonstd is used to pass starting (y, x) position and color format,
+      the detailed bit fields are shown below:
+ 
+     31                23  20         10          0
+      +-----------------+---+----------+----------+
+-     |  ... unused ... |FOR|   XPOS   |   YPOS   |
++     |  ... unused ... |FOR|   YPOS   |   XPOS   | (as in OVLxC2 register)
+      +-----------------+---+----------+----------+
+ 
+      FOR  - color format, as defined by OVERLAY_FORMAT_* in pxafb.h
+@@ -136,7 +136,7 @@ Overlay Support for PXA27x and later LCD controllers
+ 	    1 - YUV444 PACKED
+ 	    2 - YUV444 PLANAR
+ 	    3 - YUV422 PLANAR
+-	    4 - YUR420 PLANAR
++	    4 - YUV420 PLANAR
+ 
+-     XPOS - starting horizontal position
+      YPOS - starting vertical position
++     XPOS - starting horizontal position
+diff --git a/drivers/video/fbdev/Kconfig b/drivers/video/fbdev/Kconfig
+index 2d98de5..8f485ec 100644
+--- a/drivers/video/fbdev/Kconfig
++++ b/drivers/video/fbdev/Kconfig
+@@ -1893,6 +1893,11 @@ config FB_PXA_OVERLAY
+ 	bool "Support PXA27x/PXA3xx Overlay(s) as framebuffer"
+ 	default n
+ 	depends on FB_PXA && (PXA27x || PXA3xx)
++	---help---
++	  Using the overlay 2 and YUV420 mode on a PXA27x C0 chip revision will
++	  hang the LCD until the next SoC restart (errata E24).
++
++	  If unsure, say N or check /proc/cpuinfo for "CPU revision : 4".
+ 
+ config FB_PXA_SMARTPANEL
+ 	bool "PXA Smartpanel LCD support"
+diff --git a/drivers/video/fbdev/pxafb.c b/drivers/video/fbdev/pxafb.c
+index 7245611..e573699 100644
+--- a/drivers/video/fbdev/pxafb.c
++++ b/drivers/video/fbdev/pxafb.c
+@@ -30,6 +30,10 @@
+  *
+  *   Copyright (C) 2006-2008 Marvell International Ltd.
+  *   All Rights Reserved
++ *
++ * NOTICE
++ * According to PXA27x errata E24 an enable of the overlay 2 in YUV420 mode
++ * on C0 chip revision will hang the LCD until the next SoC reset.
+  */
+ 
+ #include <linux/module.h>
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+1.7.12.1
