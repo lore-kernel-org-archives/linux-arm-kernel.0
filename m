@@ -1,69 +1,55 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sat, 8 Aug 2015 10:20:58 +0200
-Subject: [RFC] arm64: defconfig: enable 48-bit VA by default
-In-Reply-To: <BY2PR0301MB07436AC9C8D023DC7C67DE3D87730@BY2PR0301MB0743.namprd03.prod.outlook.com>
-References: <CY1PR0301MB07488D6DC5F0B171D6B290E187830@CY1PR0301MB0748.namprd03.prod.outlook.com>
- <55B0E1AD.60409@arm.com>
- <BY2PR0301MB0743CBCFC5476E39A5D1EC0B878C0@BY2PR0301MB0743.namprd03.prod.outlook.com>
- <CAKv+Gu9LHBd7wM6P4H0X5WigzDETtpr2++_Ebo=adg5QtTOW2w@mail.gmail.com>
- <BY2PR0301MB074300C5F31701D9211827F0878C0@BY2PR0301MB0743.namprd03.prod.outlook.com>
- <20150730101358.GA30796@e104818-lin.cambridge.arm.com>
- <CY1PR0301MB074850E27D5D298D1B8495D2878B0@CY1PR0301MB0748.namprd03.prod.outlook.com>
- <20150730161210.GE407@e104818-lin.cambridge.arm.com>
- <CY1PR0301MB0748FA3A10AFA9BFC1AB0A39878B0@CY1PR0301MB0748.namprd03.prod.outlook.com>
- <CAKv+Gu-Wbv3J9-2KbXrz_3W_=VXChrD+REo1-q1Ns_=RUM1BFw@mail.gmail.com>
- <BY2PR0301MB07436AC9C8D023DC7C67DE3D87730@BY2PR0301MB0743.namprd03.prod.outlook.com>
-Message-ID: <CAKv+Gu-SH7MjkrgevfcUurPc7iQm+11cntfEo84opkqQoN2YPQ@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 8 Aug 2015 10:22:52 +0100
+Subject: [PATCH v5 1/2] usb: make xhci platform driver use 64 bit or 32
+ bit DMA
+In-Reply-To: <74fe0b014334a5ac1db90dec46bdbf6c30c07895.1439002338.git.dhdang@apm.com>
+References: <CADaLNDkU14GCPZE_zNt_9kMSsUdywyNp1QCiWpokXQgbfRS0qw@mail.gmail.com>
+ <74fe0b014334a5ac1db90dec46bdbf6c30c07895.1439002338.git.dhdang@apm.com>
+Message-ID: <20150808092252.GJ7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 aug. 2015, at 21:01, Stuart Yoder <stuart.yoder@freescale.com> wrote:
+On Fri, Aug 07, 2015 at 08:18:48PM -0700, Duc Dang wrote:
+> diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
+> index 890ad9d..5d03f8b 100644
+> --- a/drivers/usb/host/xhci-plat.c
+> +++ b/drivers/usb/host/xhci-plat.c
+> @@ -93,14 +93,14 @@ static int xhci_plat_probe(struct platform_device *pdev)
+>  	if (irq < 0)
+>  		return -ENODEV;
+>  
+> -	/* Initialize dma_mask and coherent_dma_mask to 32-bits */
+> -	ret = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
+> -	if (ret)
+> -		return ret;
+> -	if (!pdev->dev.dma_mask)
+> -		pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
+> -	else
+> -		dma_set_mask(&pdev->dev, DMA_BIT_MASK(32));
+> +	/* Try setting the coherent_dma_mask to 64 bits, then try 32 bits */
+> +	ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64));
+> +	if (ret) {
+> +		ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
+> +		if (ret)
+> +			return ret;
+> +	}
 
->> Whether defconfig supports your platform optimally has nothing to do
->> with that. Of course, we should deal with the unexpected memory layout
->> gracefully, which is why Mark Rutland and myself proposed patches to
->> fix the panic you reported. But in a development context, I think it
->> is perfectly acceptable to simply load the kernel at 0x80_8000_0000,
->> and be able to run defconfig fine while losing just 2 GB of your 16 GB
->> at the low end.
->
-> I've done this experiment-- loading/running the kernel at 0x80_8000_0000
-> and losing the lower 2GB of memory.  And in fact I can see the kernel
-> ignoring the low memory:
->
->   [    0.000000] Ignoring memory block 0x80000000 - 0x100000000
->
+Note that dma_set_mask_and_coherent() and the original code are not
+equivalent because of this:
 
-Yes that looks correct
+	if (!pdev->dev.dma_mask)
+		pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
 
-> However, this only works with 48-bit VA enabled.  With 39-bit VA
-> enabled the kernel crashes before the early console is working
-> and I see nothing.
->
+If we know that pdev->dev.dma_mask will always be initialised at this
+point, then the above change is fine.  If not, it's introducing a
+regression - dma_set_mask_and_coherent() will fail if pdev->dev.dma_mask
+is NULL (depending on the architectures implementation of dma_set_mask()).
 
-That may well be a kernel bug: the changes to allow 39-bit VA kernels
-to execute on systems whose memory is outside the 39-bit VA range was
-developed and tested on AMD Seattle only, which has its RAM at
-0x80_0000_0000. But it is hard to be sure, of course, with no output
-at all ...
-
-> Does the linear mapping we've been talking about just need to cover
-> all of _RAM_, or does it need to cover all of I/O as well in
-> the same mapping.
->
-> In our case we have various SoC I/O devices, like the UART
-> in the space below 4 GB... at 0x0100_0000.
->
-
-The linear mapping only covers system RAM, so that should not matter at all.
-
-> Before debugging further I want to check whether this should
-> work in theory.  I had the impression that the issue was
-> discontiguous RAM regions, and I/O was a separate issue.
-
-Yes, it should work in theory. The linear region starts at the base of
-the kernel Image, and extends all the way up to the end of DRAM (14 GB
-in your case, IIRC)
+Prefixing the above change with the two lines I mention above would
+ensure equivalent behaviour.  Even if we do want to get rid of this,
+I'd advise to do it as a separate patch after this change, which can
+be independently reverted if there's problems with its removal.
 
 -- 
-Ard.
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
