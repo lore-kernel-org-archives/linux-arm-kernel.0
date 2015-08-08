@@ -1,41 +1,161 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat,  8 Aug 2015 17:38:54 +0200
-Subject: [PATCH] ARM: dts: sun4i: Enable i2c1 and i2c2 on the Chuwi V7-CW0825
- tablet
-Message-ID: <1439048334-14704-1-git-send-email-hdegoede@redhat.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Sun,  9 Aug 2015 00:53:31 +0900
+Subject: [PATCH v2] ARM: add boot image dependencies to not generate invalid
+ images
+Message-ID: <1439049211-4181-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-i2c1 has a freescale mma7660 accelerometer connected to it at addr 0x4c,
-i2c2 has a ft5x touchscreen connected to it at addr 0x38.
+U-Boot is often used to boot the kernel on ARM boards, but uImage
+is not built by "make all", so we are often inclined to do
+"make all uImage" to generate DTBs, modules and uImage in a single
+command, but we should notice a pitfall behind it.  In fact,
+"make all uImage" could generate an invalid uImage if it is run with
+the parallel option (-j).
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+You can reproduce this problem with the following procedure:
+
+[1] First, build "all" and "uImage" separately.
+    You will get a valid uImage
+
+  $ git clean -f -x -d
+  $ export CROSS_COMPILE=<your-tools-prefix>
+  $ make -s -j8 ARCH=arm multi_v7_defconfig
+  $ make -s -j8 ARCH=arm all
+  $ make -j8 ARCH=arm UIMAGE_LOADADDR=0x80208000 uImage
+    CHK     include/config/kernel.release
+    CHK     include/generated/uapi/linux/version.h
+    CHK     include/generated/utsrelease.h
+  make[1]: `include/generated/mach-types.h' is up to date.
+    CHK     include/generated/timeconst.h
+    CHK     include/generated/bounds.h
+    CHK     include/generated/asm-offsets.h
+    CALL    scripts/checksyscalls.sh
+    CHK     include/generated/compile.h
+    Kernel: arch/arm/boot/Image is ready
+    Kernel: arch/arm/boot/zImage is ready
+    UIMAGE  arch/arm/boot/uImage
+  Image Name:   Linux-4.2.0-rc5-00156-gdd2384a-d
+  Created:      Sat Aug  8 23:21:35 2015
+  Image Type:   ARM Linux Kernel Image (uncompressed)
+  Data Size:    6138648 Bytes = 5994.77 kB = 5.85 MB
+  Load Address: 80208000
+  Entry Point:  80208000
+    Image arch/arm/boot/uImage is ready
+  $ ls -l arch/arm/boot/*Image
+  -rwxrwxr-x 1 masahiro masahiro 13766656 Aug  8 23:20 arch/arm/boot/Image
+  -rw-rw-r-- 1 masahiro masahiro  6138712 Aug  8 23:21 arch/arm/boot/uImage
+  -rwxrwxr-x 1 masahiro masahiro  6138648 Aug  8 23:20 arch/arm/boot/zImage
+
+[2] Update some source file(s)
+
+  $ touch init/main.c
+
+[3] Then, re-build "all" and "uImage" simultaneously.
+    You will get an invalid uImage at random.
+
+  $ make -j8 ARCH=arm UIMAGE_LOADADDR=0x80208000 all uImage
+    CHK     include/config/kernel.release
+    CHK     include/generated/uapi/linux/version.h
+    CHK     include/generated/utsrelease.h
+  make[1]: `include/generated/mach-types.h' is up to date.
+    CHK     include/generated/timeconst.h
+    CHK     include/generated/bounds.h
+    CHK     include/generated/asm-offsets.h
+    CALL    scripts/checksyscalls.sh
+    CC      init/main.o
+    CHK     include/generated/compile.h
+    LD      init/built-in.o
+    LINK    vmlinux
+    LD      vmlinux.o
+    MODPOST vmlinux.o
+    GEN     .version
+    CHK     include/generated/compile.h
+    UPD     include/generated/compile.h
+    CC      init/version.o
+    LD      init/built-in.o
+    KSYM    .tmp_kallsyms1.o
+    KSYM    .tmp_kallsyms2.o
+    LD      vmlinux
+    SORTEX  vmlinux
+    SYSMAP  System.map
+    OBJCOPY arch/arm/boot/Image
+    Building modules, stage 2.
+    Kernel: arch/arm/boot/Image is ready
+    GZIP    arch/arm/boot/compressed/piggy.gzip
+    AS      arch/arm/boot/compressed/piggy.gzip.o
+    Kernel: arch/arm/boot/Image is ready
+    LD      arch/arm/boot/compressed/vmlinux
+    GZIP    arch/arm/boot/compressed/piggy.gzip
+    OBJCOPY arch/arm/boot/zImage
+    Kernel: arch/arm/boot/zImage is ready
+    UIMAGE  arch/arm/boot/uImage
+  Image Name:   Linux-4.2.0-rc5-00156-gdd2384a-d
+  Created:      Sat Aug  8 23:23:14 2015
+  Image Type:   ARM Linux Kernel Image (uncompressed)
+  Data Size:    26472 Bytes = 25.85 kB = 0.03 MB
+  Load Address: 80208000
+  Entry Point:  80208000
+    Image arch/arm/boot/uImage is ready
+    MODPOST 192 modules
+    AS      arch/arm/boot/compressed/piggy.gzip.o
+    LD      arch/arm/boot/compressed/vmlinux
+    OBJCOPY arch/arm/boot/zImage
+    Kernel: arch/arm/boot/zImage is ready
+  $ ls -l arch/arm/boot/*Image
+  -rwxrwxr-x 1 masahiro masahiro 13766656 Aug  8 23:23 arch/arm/boot/Image
+  -rw-rw-r-- 1 masahiro masahiro    26536 Aug  8 23:23 arch/arm/boot/uImage
+  -rwxrwxr-x 1 masahiro masahiro  6138648 Aug  8 23:23 arch/arm/boot/zImage
+
+Please notice the uImage is extremely small when this issue is
+encountered.  Besides, "Kernel: arch/arm/boot/zImage is ready" is
+displayed twice, before and after the uImage log.
+
+The root cause of this is the race condition between zImage and
+uImage.  Actually, uImage depends on zImage, but the dependency
+between the two is only described in arch/arm/boot/Makefile.
+Because arch/arm/boot/Makefile is not included from the top-level
+Makefile, it cannot know the dependency between zImage and uImage.
+
+Consequently, when we run make with the parallel option, Kbuild
+updates vmlinux first, and then two different threads descends into
+the arch/arm/boot/Makefile almost at the same time, one for updating
+zImage and the other for uImage.  While one thread is re-generating
+zImage, the other also tries to update zImage before creating uImage
+on top of that.  zImage is overwritten by the slower thread and then
+uImage is created based on the half-written zImage.
+
+This is the reason why "Kernel: arch/arm/boot/zImage is ready" is
+displayed twice, and a broken uImage is created.
+
+The same problem could happen on bootpImage.
+
+This commit adds dependencies among Image, zImage, uImage, and
+bootpImage to arch/arm/Makefile, which is included from the
+top-level Makefile.
+
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 ---
- arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts b/arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts
-index 1430568..5366089 100644
---- a/arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts
-@@ -78,6 +78,18 @@
- 	};
- };
+Changes in v2:
+  - Add more detailed build log and explanation.
+
+ arch/arm/Makefile | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index 07ab3d2..7451b44 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -312,6 +312,9 @@ INSTALL_TARGETS	= zinstall uinstall install
  
-+&i2c1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c1_pins_a>;
-+	status = "okay";
-+};
+ PHONY += bzImage $(BOOT_TARGETS) $(INSTALL_TARGETS)
+ 
++bootpImage uImage: zImage
++zImage: Image
 +
-+&i2c2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c2_pins_a>;
-+	status = "okay";
-+};
-+
- &lradc {
- 	vref-supply = <&reg_vcc3v0>;
- 	status = "okay";
+ $(BOOT_TARGETS): vmlinux
+ 	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $(boot)/$@
+ 
 -- 
-2.4.3
+1.9.1
