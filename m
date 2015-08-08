@@ -1,161 +1,87 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Sun,  9 Aug 2015 00:53:31 +0900
-Subject: [PATCH v2] ARM: add boot image dependencies to not generate invalid
- images
-Message-ID: <1439049211-4181-1-git-send-email-yamada.masahiro@socionext.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sat,  8 Aug 2015 17:58:41 +0200
+Subject: [PATCH v4 2/2] mfd: axp20x: Add a cell for the usb power_supply part
+ of the axp20x PMICs
+In-Reply-To: <1439049521-30766-1-git-send-email-hdegoede@redhat.com>
+References: <1439049521-30766-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <1439049521-30766-2-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-U-Boot is often used to boot the kernel on ARM boards, but uImage
-is not built by "make all", so we are often inclined to do
-"make all uImage" to generate DTBs, modules and uImage in a single
-command, but we should notice a pitfall behind it.  In fact,
-"make all uImage" could generate an invalid uImage if it is run with
-the parallel option (-j).
+Add a cell for the usb power_supply part of the axp20x PMICs.
 
-You can reproduce this problem with the following procedure:
+Note that this cell is only for the usb power_supply part and not the
+ac-power / battery-charger / rtc-backup-bat-charger bits.
 
-[1] First, build "all" and "uImage" separately.
-    You will get a valid uImage
+Depending on the board each of those must be enabled / disabled separately
+in devicetree as most boards do not use all 4. So in dt each one needs its
+own child-node of the axp20x node. Another reason for using separate child
+nodes for each is so that other devicetree nodes can have a power-supply
+property with a phandle referencing a node representing a single
+power-supply.
 
-  $ git clean -f -x -d
-  $ export CROSS_COMPILE=<your-tools-prefix>
-  $ make -s -j8 ARCH=arm multi_v7_defconfig
-  $ make -s -j8 ARCH=arm all
-  $ make -j8 ARCH=arm UIMAGE_LOADADDR=0x80208000 uImage
-    CHK     include/config/kernel.release
-    CHK     include/generated/uapi/linux/version.h
-    CHK     include/generated/utsrelease.h
-  make[1]: `include/generated/mach-types.h' is up to date.
-    CHK     include/generated/timeconst.h
-    CHK     include/generated/bounds.h
-    CHK     include/generated/asm-offsets.h
-    CALL    scripts/checksyscalls.sh
-    CHK     include/generated/compile.h
-    Kernel: arch/arm/boot/Image is ready
-    Kernel: arch/arm/boot/zImage is ready
-    UIMAGE  arch/arm/boot/uImage
-  Image Name:   Linux-4.2.0-rc5-00156-gdd2384a-d
-  Created:      Sat Aug  8 23:21:35 2015
-  Image Type:   ARM Linux Kernel Image (uncompressed)
-  Data Size:    6138648 Bytes = 5994.77 kB = 5.85 MB
-  Load Address: 80208000
-  Entry Point:  80208000
-    Image arch/arm/boot/uImage is ready
-  $ ls -l arch/arm/boot/*Image
-  -rwxrwxr-x 1 masahiro masahiro 13766656 Aug  8 23:20 arch/arm/boot/Image
-  -rw-rw-r-- 1 masahiro masahiro  6138712 Aug  8 23:21 arch/arm/boot/uImage
-  -rwxrwxr-x 1 masahiro masahiro  6138648 Aug  8 23:20 arch/arm/boot/zImage
+The decision to use a separate devicetree node for each is reflected on
+the kernel side by each getting its own mfd-cell / platform_device and
+platform-driver.
 
-[2] Update some source file(s)
+Note this commit also makes some whitespace changes to the intialization
+of existing cells in axp20x_cells, these are pure whitespace changes,
+functionally nothing changes.
 
-  $ touch init/main.c
-
-[3] Then, re-build "all" and "uImage" simultaneously.
-    You will get an invalid uImage at random.
-
-  $ make -j8 ARCH=arm UIMAGE_LOADADDR=0x80208000 all uImage
-    CHK     include/config/kernel.release
-    CHK     include/generated/uapi/linux/version.h
-    CHK     include/generated/utsrelease.h
-  make[1]: `include/generated/mach-types.h' is up to date.
-    CHK     include/generated/timeconst.h
-    CHK     include/generated/bounds.h
-    CHK     include/generated/asm-offsets.h
-    CALL    scripts/checksyscalls.sh
-    CC      init/main.o
-    CHK     include/generated/compile.h
-    LD      init/built-in.o
-    LINK    vmlinux
-    LD      vmlinux.o
-    MODPOST vmlinux.o
-    GEN     .version
-    CHK     include/generated/compile.h
-    UPD     include/generated/compile.h
-    CC      init/version.o
-    LD      init/built-in.o
-    KSYM    .tmp_kallsyms1.o
-    KSYM    .tmp_kallsyms2.o
-    LD      vmlinux
-    SORTEX  vmlinux
-    SYSMAP  System.map
-    OBJCOPY arch/arm/boot/Image
-    Building modules, stage 2.
-    Kernel: arch/arm/boot/Image is ready
-    GZIP    arch/arm/boot/compressed/piggy.gzip
-    AS      arch/arm/boot/compressed/piggy.gzip.o
-    Kernel: arch/arm/boot/Image is ready
-    LD      arch/arm/boot/compressed/vmlinux
-    GZIP    arch/arm/boot/compressed/piggy.gzip
-    OBJCOPY arch/arm/boot/zImage
-    Kernel: arch/arm/boot/zImage is ready
-    UIMAGE  arch/arm/boot/uImage
-  Image Name:   Linux-4.2.0-rc5-00156-gdd2384a-d
-  Created:      Sat Aug  8 23:23:14 2015
-  Image Type:   ARM Linux Kernel Image (uncompressed)
-  Data Size:    26472 Bytes = 25.85 kB = 0.03 MB
-  Load Address: 80208000
-  Entry Point:  80208000
-    Image arch/arm/boot/uImage is ready
-    MODPOST 192 modules
-    AS      arch/arm/boot/compressed/piggy.gzip.o
-    LD      arch/arm/boot/compressed/vmlinux
-    OBJCOPY arch/arm/boot/zImage
-    Kernel: arch/arm/boot/zImage is ready
-  $ ls -l arch/arm/boot/*Image
-  -rwxrwxr-x 1 masahiro masahiro 13766656 Aug  8 23:23 arch/arm/boot/Image
-  -rw-rw-r-- 1 masahiro masahiro    26536 Aug  8 23:23 arch/arm/boot/uImage
-  -rwxrwxr-x 1 masahiro masahiro  6138648 Aug  8 23:23 arch/arm/boot/zImage
-
-Please notice the uImage is extremely small when this issue is
-encountered.  Besides, "Kernel: arch/arm/boot/zImage is ready" is
-displayed twice, before and after the uImage log.
-
-The root cause of this is the race condition between zImage and
-uImage.  Actually, uImage depends on zImage, but the dependency
-between the two is only described in arch/arm/boot/Makefile.
-Because arch/arm/boot/Makefile is not included from the top-level
-Makefile, it cannot know the dependency between zImage and uImage.
-
-Consequently, when we run make with the parallel option, Kbuild
-updates vmlinux first, and then two different threads descends into
-the arch/arm/boot/Makefile almost at the same time, one for updating
-zImage and the other for uImage.  While one thread is re-generating
-zImage, the other also tries to update zImage before creating uImage
-on top of that.  zImage is overwritten by the slower thread and then
-uImage is created based on the half-written zImage.
-
-This is the reason why "Kernel: arch/arm/boot/zImage is ready" is
-displayed twice, and a broken uImage is created.
-
-The same problem could happen on bootpImage.
-
-This commit adds dependencies among Image, zImage, uImage, and
-bootpImage to arch/arm/Makefile, which is included from the
-top-level Makefile.
-
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+Cc: Bruno Pr?mont <bonbons@linux-vserver.org>
+Signed-off-by: Bruno Pr?mont <bonbons@linux-vserver.org>
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Acked-by: Lee Jones <lee.jones@linaro.org>
 ---
-
 Changes in v2:
-  - Add more detailed build log and explanation.
+-Use DEFINE_RES_IRQ_NAMED
+-Change indentation of axp20x_cells initializers to avoid line wrapping
+Changes in v3:
+-Improve commit message
+-Add Bruno's S-o-b
+---
+ drivers/mfd/axp20x.c | 20 ++++++++++++++++----
+ 1 file changed, 16 insertions(+), 4 deletions(-)
 
- arch/arm/Makefile | 3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 07ab3d2..7451b44 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -312,6 +312,9 @@ INSTALL_TARGETS	= zinstall uinstall install
+diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+index d9f2f96..3f576b7 100644
+--- a/drivers/mfd/axp20x.c
++++ b/drivers/mfd/axp20x.c
+@@ -140,6 +140,13 @@ static struct resource axp20x_pek_resources[] = {
+ 	},
+ };
  
- PHONY += bzImage $(BOOT_TARGETS) $(INSTALL_TARGETS)
- 
-+bootpImage uImage: zImage
-+zImage: Image
++static struct resource axp20x_usb_power_supply_resources[] = {
++	DEFINE_RES_IRQ_NAMED(AXP20X_IRQ_VBUS_PLUGIN, "VBUS_PLUGIN"),
++	DEFINE_RES_IRQ_NAMED(AXP20X_IRQ_VBUS_REMOVAL, "VBUS_REMOVAL"),
++	DEFINE_RES_IRQ_NAMED(AXP20X_IRQ_VBUS_VALID, "VBUS_VALID"),
++	DEFINE_RES_IRQ_NAMED(AXP20X_IRQ_VBUS_NOT_VALID, "VBUS_NOT_VALID"),
++};
 +
- $(BOOT_TARGETS): vmlinux
- 	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $(boot)/$@
+ static struct resource axp22x_pek_resources[] = {
+ 	{
+ 		.name   = "PEK_DBR",
+@@ -432,11 +439,16 @@ static const struct regmap_irq_chip axp288_regmap_irq_chip = {
+ 
+ static struct mfd_cell axp20x_cells[] = {
+ 	{
+-		.name			= "axp20x-pek",
+-		.num_resources		= ARRAY_SIZE(axp20x_pek_resources),
+-		.resources		= axp20x_pek_resources,
++		.name		= "axp20x-pek",
++		.num_resources	= ARRAY_SIZE(axp20x_pek_resources),
++		.resources	= axp20x_pek_resources,
+ 	}, {
+-		.name			= "axp20x-regulator",
++		.name		= "axp20x-regulator",
++	}, {
++		.name		= "axp20x-usb-power-supply",
++		.of_compatible	= "x-powers,axp202-usb-power-supply",
++		.num_resources	= ARRAY_SIZE(axp20x_usb_power_supply_resources),
++		.resources	= axp20x_usb_power_supply_resources,
+ 	},
+ };
  
 -- 
-1.9.1
+2.4.3
