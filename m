@@ -1,80 +1,34 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat,  8 Aug 2015 17:58:40 +0200
-Subject: [PATCH v4 1/2] mfd: axp20x: Add missing registers,
- and mark more registers volatile
-Message-ID: <1439049521-30766-1-git-send-email-hdegoede@redhat.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 8 Aug 2015 17:02:51 +0100
+Subject: [PATCH 00/12] dw-hdmi development
+Message-ID: <20150808160251.GM7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bruno Pr?mont <bonbons@linux-vserver.org>
+This sub-series is a mixture of development:
 
-Add an extra set of registers which is necessary tu support the PMICs
-battery charger function, and mark registers which contain status bits,
-gpio status, and adc readings as volatile.
+* Removing the incorrect pixel repetition configuration code
+* Preventing pixel-doubled modes from being used
+* Adding interlaced video support
+* Implementing the sink_is_hdmi/sink_has_audio flags I suggested a few
+  months ago
+* Only enabling audio support if the sink indicates it has audio
+* Avoiding double-enabling the HDMI interface
+* Fixing the mis-leading name of "dw_hdmi_phy_enable_power"
+* Adding connector mode forcing (important if your monitor bounces
+  RXSENSE and HPD signals while in low-power mode.)
+* Improving the HDMI enable/disabling on sink status
 
-Cc: Bruno Pr?mont <bonbons@linux-vserver.org>
-Signed-off-by: Bruno Pr?mont <bonbons@linux-vserver.org>
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-Acked-by: Lee Jones <lee.jones@linaro.org>
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
-Changes in v2:
--Add a AXP20X_OCV_MAX define
-Changes in v3:
--Add Bruno's S-o-b
-Changes in v4:
--Consistently use AXP20X_OCV_MAX everywhere
----
- drivers/mfd/axp20x.c       | 8 +++++++-
- include/linux/mfd/axp20x.h | 6 ++++++
- 2 files changed, 13 insertions(+), 1 deletion(-)
+For review (and testing if people feel like it).  Acks/tested-bys etc
+welcome.  It applies on top of my drm-dwhdmi-devel branch, which is
+waiting for David Airlie to pull (see pull request on dri-devel, 15th
+July.)
 
-diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
-index b369cfc..d9f2f96 100644
---- a/drivers/mfd/axp20x.c
-+++ b/drivers/mfd/axp20x.c
-@@ -61,10 +61,16 @@ static const struct regmap_access_table axp152_volatile_table = {
- static const struct regmap_range axp20x_writeable_ranges[] = {
- 	regmap_reg_range(AXP20X_DATACACHE(0), AXP20X_IRQ5_STATE),
- 	regmap_reg_range(AXP20X_DCDC_MODE, AXP20X_FG_RES),
-+	regmap_reg_range(AXP20X_RDC_H, AXP20X_OCV(AXP20X_OCV_MAX)),
- };
- 
- static const struct regmap_range axp20x_volatile_ranges[] = {
-+	regmap_reg_range(AXP20X_PWR_INPUT_STATUS, AXP20X_USB_OTG_STATUS),
-+	regmap_reg_range(AXP20X_CHRG_CTRL1, AXP20X_CHRG_CTRL2),
- 	regmap_reg_range(AXP20X_IRQ1_EN, AXP20X_IRQ5_STATE),
-+	regmap_reg_range(AXP20X_ACIN_V_ADC_H, AXP20X_IPSOUT_V_HIGH_L),
-+	regmap_reg_range(AXP20X_GPIO20_SS, AXP20X_GPIO3_CTRL),
-+	regmap_reg_range(AXP20X_FG_RES, AXP20X_RDC_L),
- };
- 
- static const struct regmap_access_table axp20x_writeable_table = {
-@@ -195,7 +201,7 @@ static const struct regmap_config axp20x_regmap_config = {
- 	.val_bits	= 8,
- 	.wr_table	= &axp20x_writeable_table,
- 	.volatile_table	= &axp20x_volatile_table,
--	.max_register	= AXP20X_FG_RES,
-+	.max_register	= AXP20X_OCV(AXP20X_OCV_MAX),
- 	.cache_type	= REGCACHE_RBTREE,
- };
- 
-diff --git a/include/linux/mfd/axp20x.h b/include/linux/mfd/axp20x.h
-index 52203d5..cc8ad1e 100644
---- a/include/linux/mfd/axp20x.h
-+++ b/include/linux/mfd/axp20x.h
-@@ -190,6 +190,12 @@ enum {
- #define AXP20X_CC_CTRL			0xb8
- #define AXP20X_FG_RES			0xb9
- 
-+/* OCV */
-+#define AXP20X_RDC_H			0xba
-+#define AXP20X_RDC_L			0xbb
-+#define AXP20X_OCV(m)			(0xc0 + (m))
-+#define AXP20X_OCV_MAX			0xf
-+
- /* AXP22X specific registers */
- #define AXP22X_BATLOW_THRES1		0xe6
- 
+ drivers/gpu/drm/bridge/dw_hdmi.c | 275 ++++++++++++++++++++++++++++++---------
+ drivers/gpu/ipu-v3/ipu-dc.c      |  18 ++-
+ drivers/gpu/ipu-v3/ipu-di.c      | 129 +++++++++---------
+ 3 files changed, 291 insertions(+), 131 deletions(-)
+
 -- 
-2.4.3
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
