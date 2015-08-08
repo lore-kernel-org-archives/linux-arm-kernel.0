@@ -1,69 +1,63 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Fri, 07 Aug 2015 17:55:09 -0700
-Subject: [GIT PULL] Xilinx Zynq changes for v4.3
-In-Reply-To: <20150805085344.GH6390@localhost>
-References: <55BB31E8.7040806@monstr.eu> <20150805085344.GH6390@localhost>
-Message-ID: <20150808005509.2416.8174@quantum>
+From: dhdang@apm.com (Duc Dang)
+Date: Fri,  7 Aug 2015 18:03:35 -0700
+Subject: [PATCH v4 1/2] usb: make xhci platform driver use 64 bit or 32 bit DMA
+In-Reply-To: <CADaLNDkeOP+gBw0qdSDha551w+w+q4ry9-EevDw5giyiQGdnqA@mail.gmail.com>
+References: <CADaLNDkeOP+gBw0qdSDha551w+w+q4ry9-EevDw5giyiQGdnqA@mail.gmail.com>
+Message-ID: <07fb19170aa7c027f44af634aac7e7918daac7cd.1438994178.git.dhdang@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Olof Johansson (2015-08-05 01:53:44)
-> Hi,
-> 
-> On Fri, Jul 31, 2015 at 10:29:28AM +0200, Michal Simek wrote:
-> > Hi,
-> > 
-> > please pull these SoC changes to your tree.
-> > 
-> > Thanks,
-> > Michal
-> > 
-> > The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
-> > 
-> >   Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
-> > 
-> > are available in the git repository at:
-> > 
-> >   https://github.com/Xilinx/linux-xlnx.git tags/zynq-soc-for-4.3
-> > 
-> > for you to fetch changes up to e4a9288942392965bd5cfad93d9996b83c0dc4a6:
-> > 
-> >   ARM: zynq: reserve space for jump target in secondary trampoline
-> > (2015-07-31 10:24:41 +0200)
-> 
-> Merged, however:
-> 
-> > Arun Chandran (1):
-> >       ARM: zynq: Fix earlyprintk in big endian mode
-> > 
-> > Masahiro Yamada (1):
-> >       clk: zynq: remove redundant $(CONFIG_ARCH_ZYNQ) in Makefile
-> 
-> This should have gone through the clk tree. Seems small and simple enough that
-> I'll take it, but please send patches through appropriate maintainers.
-> 
-> (Adding Mike and Stephen on cc so they know about it).
+The xhci platform driver needs to work on systems that
+either only support 64-bit DMA or only support 32-bit DMA. 
+Attempt to set a coherent dma mask for 64-bit DMA, and 
+attempt again with 32-bit DMA if that fails.
 
-Olof,
+[dhdang: regenerate the patch over 4.2-rc5]
+Signed-off-by: Mark Langsdorf <mlangsdo@redhat.com>
+Tested-by: Mark Salter <msalter@redhat.com>
+Signed-off-by: Duc Dang <dhdang@apm.com>
 
-Thanks for the heads up.
+---
+Changes from v3:
+	Re-generate the patch over 4.2-rc5
+	No code change.
 
-Michal,
+Changes from v2:
+	None
 
-No reason that patch couldn't have gone through the clk tree. It was
-posted on July 27th, which wasn't that long ago. Please feel free to
-ping Stephen or I on #linux-clk if you think one of your clk patches has
-slipped through the cracks.
+Changes from v1:
+        Consolidated to use dma_set_mask_and_coherent
+        Got rid of the check against sizeof(dma_addr_t)
 
-Regards,
-Mike
+ drivers/usb/host/xhci-plat.c | 16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
 
-> 
-> 
-> -Olof
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
+index 890ad9d..5d03f8b 100644
+--- a/drivers/usb/host/xhci-plat.c
++++ b/drivers/usb/host/xhci-plat.c
+@@ -93,14 +93,14 @@ static int xhci_plat_probe(struct platform_device *pdev)
+ 	if (irq < 0)
+ 		return -ENODEV;
+ 
+-	/* Initialize dma_mask and coherent_dma_mask to 32-bits */
+-	ret = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
+-	if (ret)
+-		return ret;
+-	if (!pdev->dev.dma_mask)
+-		pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
+-	else
+-		dma_set_mask(&pdev->dev, DMA_BIT_MASK(32));
++	/* Try setting the coherent_dma_mask to 64 bits, then try 32 bits */
++	ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64));
++	if (ret) {
++		ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
++		if (ret)
++			return ret;
++	}
++
+ 
+ 	hcd = usb_create_hcd(driver, &pdev->dev, dev_name(&pdev->dev));
+ 	if (!hcd)
+-- 
+1.9.1
