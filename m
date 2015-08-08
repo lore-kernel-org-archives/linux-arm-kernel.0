@@ -1,55 +1,30 @@
 From: nathan_lynch@mentor.com (Nathan Lynch)
-Date: Fri, 7 Aug 2015 21:03:23 -0500
-Subject: [PATCH 2/2] arm64: VDSO: fix coarse clock monotonicity regression
-In-Reply-To: <1438999403-5770-1-git-send-email-nathan_lynch@mentor.com>
-References: <1438999403-5770-1-git-send-email-nathan_lynch@mentor.com>
-Message-ID: <1438999403-5770-3-git-send-email-nathan_lynch@mentor.com>
+Date: Fri, 7 Aug 2015 21:03:21 -0500
+Subject: [PATCH 0/2] fix vdso coarse clock monotonicity regressions
+Message-ID: <1438999403-5770-1-git-send-email-nathan_lynch@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since 906c55579a63 ("timekeeping: Copy the shadow-timekeeper over the
-real timekeeper last") it has become possible on arm64 to:
+Commit 906c55579a63 ("timekeeping: Copy the shadow-timekeeper over the
+real timekeeper last") made it so the user can observe the coarse
+clocks going backwards on arm and arm64, if they're really looking for
+it.
 
-- Obtain a CLOCK_MONOTONIC_COARSE or CLOCK_REALTIME_COARSE timestamp
-  via syscall.
-- Subsequently obtain a timestamp for the same clock ID via VDSO which
-  predates the first timestamp (by one jiffy).
+Technically these are fixing regressions versus 4.1, but I won't be
+bothered if they don't make 4.2 final at this late stage, since only
+the (seldom-used?) coarse clocks are affected.
 
-This is because arm64's update_vsyscall is deriving the coarse time
-using the __current_kernel_time interface, when it should really be
-using the timekeeper object provided to it by the timekeeping core.
-It happened to work before only because __current_kernel_time would
-access the same timekeeper object which had been passed to
-update_vsyscall.  This is no longer the case.
+I'd like to collect review/acks for these now and make sure they at
+least make it into 4.3-rc1 (and -stable after that).
 
-Signed-off-by: Nathan Lynch <nathan_lynch@mentor.com>
----
+
+Nathan Lynch (2):
+  ARM: VDSO: fix coarse clock monotonicity regression
+  arm64: VDSO: fix coarse clock monotonicity regression
+
+ arch/arm/kernel/vdso.c   | 7 +++----
  arch/arm64/kernel/vdso.c | 7 +++----
- 1 file changed, 3 insertions(+), 4 deletions(-)
+ 2 files changed, 6 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm64/kernel/vdso.c b/arch/arm64/kernel/vdso.c
-index ec37ab3f524f..97bc68f4c689 100644
---- a/arch/arm64/kernel/vdso.c
-+++ b/arch/arm64/kernel/vdso.c
-@@ -199,16 +199,15 @@ int arch_setup_additional_pages(struct linux_binprm *bprm,
-  */
- void update_vsyscall(struct timekeeper *tk)
- {
--	struct timespec xtime_coarse;
- 	u32 use_syscall = strcmp(tk->tkr_mono.clock->name, "arch_sys_counter");
- 
- 	++vdso_data->tb_seq_count;
- 	smp_wmb();
- 
--	xtime_coarse = __current_kernel_time();
- 	vdso_data->use_syscall			= use_syscall;
--	vdso_data->xtime_coarse_sec		= xtime_coarse.tv_sec;
--	vdso_data->xtime_coarse_nsec		= xtime_coarse.tv_nsec;
-+	vdso_data->xtime_coarse_sec		= tk->xtime_sec;
-+	vdso_data->xtime_coarse_nsec		= tk->tkr_mono.xtime_nsec >>
-+							tk->tkr_mono.shift;
- 	vdso_data->wtm_clock_sec		= tk->wall_to_monotonic.tv_sec;
- 	vdso_data->wtm_clock_nsec		= tk->wall_to_monotonic.tv_nsec;
- 
 -- 
 2.1.0
