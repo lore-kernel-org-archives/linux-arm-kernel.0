@@ -1,98 +1,122 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Sat, 08 Aug 2015 17:10:11 +0100
-Subject: [PATCH 2/9] drm: bridge/dw_hdmi-ahb-audio: parse ELD from HDMI driver
-In-Reply-To: <20150808160936.GN7557@n2100.arm.linux.org.uk>
-References: <20150808160936.GN7557@n2100.arm.linux.org.uk>
-Message-ID: <E1ZO6hH-0003N1-IM@rmk-PC.arm.linux.org.uk>
+From: dhdang@apm.com (Duc Dang)
+Date: Sat, 8 Aug 2015 09:45:33 -0700
+Subject: [PATCH v4 2/2] usb: Add support for ACPI identification to
+ xhci-platform
+In-Reply-To: <20150808153710.GA11851@kroah.com>
+References: <CADaLNDkeOP+gBw0qdSDha551w+w+q4ry9-EevDw5giyiQGdnqA@mail.gmail.com>
+ <5e302acb5b03c9bf61ecfb9b5b37e8b3b520bed9.1438994178.git.dhdang@apm.com>
+ <20150808012905.GA10407@kroah.com>
+ <CABxcv=nAxKqt06js1epALu8Y_61bZ+XeRwy_N=oQUTeRVCh6-w@mail.gmail.com>
+ <20150808153710.GA11851@kroah.com>
+Message-ID: <CADaLND=nvwjUO41FXZds7YQMbyDFmKGwnuaj_ThdY_s1cNzLJw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Parse the ELD (EDID like data) stored from the HDMI driver to restrict
-the sample rates and channels which are available to ALSA.  This causes
-the ALSA device to reflect the capabilities of the overall audio path,
-not just what is supported at the HDMI source interface level.
+On Sat, Aug 8, 2015 at 8:37 AM, Greg KH <gregkh@linuxfoundation.org> wrote:
+> On Sat, Aug 08, 2015 at 07:43:40AM +0200, Javier Martinez Canillas wrote:
+>> Hello Greg,
+>>
+>> On Sat, Aug 8, 2015 at 3:29 AM, Greg KH <gregkh@linuxfoundation.org> wrote:
+>> > On Fri, Aug 07, 2015 at 06:03:36PM -0700, Duc Dang wrote:
+>> >> Provide the methods to let ACPI identify the need to use
+>> >> xhci-platform. Change the Kconfig files so the
+>> >> xhci-plat.o file is selectable during kernel config.
+>> >>
+>> >> This has been tested on an ARM64 machine with platform XHCI, an
+>> >> x86_64 machine with XHCI, and an x86_64 machine without XHCI.
+>> >> There were no regressions or error messages on the machines
+>> >> without platform XHCI.
+>> >>
+>> >> [dhdang: regenerate the patch over 4.2-rc5]
+>> >> Signed-off-by: Mark Langsdorf <mlangsdo@redhat.com>
+>> >> Signed-off-by: Duc Dang <dhdang@apm.com>
+>> >>
+>> >> ---
+>> >> Changes from v3:
+>> >>       Regenerate the patch over 4.2-rc5
+>> >>       No code change
+>> >>
+>> >> Changes from v2
+>> >>       Replaced tristate with a boolean as the driver doesn't
+>> >>               compile as a module
+>> >>       Correct --help-- to ---help---
+>> >>
+>> >> Changes from v1
+>> >>       Renamed from "add support for APM X-Gene to xhci-platform"
+>> >>       Removed changes to arm64/Kconfig
+>> >>       Made CONFIG_USB_XHCI_PLATFORM a user selectable config option
+>> >>
+>> >>  drivers/usb/host/Kconfig     |  7 ++++++-
+>> >>  drivers/usb/host/xhci-plat.c | 11 +++++++++++
+>> >>  2 files changed, 17 insertions(+), 1 deletion(-)
+>> >>
+>> >> diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
+>> >> index 8afc3c1..96231ee 100644
+>> >> --- a/drivers/usb/host/Kconfig
+>> >> +++ b/drivers/usb/host/Kconfig
+>> >> @@ -32,7 +32,12 @@ config USB_XHCI_PCI
+>> >>         default y
+>> >>
+>> >>  config USB_XHCI_PLATFORM
+>> >> -     tristate
+>> >> +     tristate "xHCI platform driver support"
+>> >> +     ---help---
+>> >> +       Say 'Y' to enable the support for the xHCI host controller
+>> >> +       as a platform device. Many ARM SoCs provide USB this way.
+>> >> +
+>> >> +       If unsure, say 'Y'.
+>> >>
+>> >>  config USB_XHCI_MVEBU
+>> >>       tristate "xHCI support for Marvell Armada 375/38x"
+>> >> diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
+>> >> index 5d03f8b..14b40d2 100644
+>> >> --- a/drivers/usb/host/xhci-plat.c
+>> >> +++ b/drivers/usb/host/xhci-plat.c
+>> >> @@ -19,6 +19,7 @@
+>> >>  #include <linux/usb/phy.h>
+>> >>  #include <linux/slab.h>
+>> >>  #include <linux/usb/xhci_pdriver.h>
+>> >> +#include <linux/acpi.h>
+>> >>
+>> >>  #include "xhci.h"
+>> >>  #include "xhci-mvebu.h"
+>> >> @@ -262,6 +263,15 @@ static const struct of_device_id usb_xhci_of_match[] = {
+>> >>  MODULE_DEVICE_TABLE(of, usb_xhci_of_match);
+>> >>  #endif
+>> >>
+>> >> +#ifdef CONFIG_ACPI
+>> >
+>> > You shoudn't need this #ifdef, right?
+>> >
+>>
+>> Why it is not needed?
+>
+> Why is it needed?
+>
+>> The driver does .acpi_match_table = ACPI_PTR(usb_xhci_acpi_match) and
+>> ACPI_PTR() is NULL if CONFIG_ACPI is not enabled. Which can happen
+>> AFAIU since the driver also supports OF. So without the #ifdef guards,
+>> .acpi_match_table = NULL and the struct acpi_device_id
+>> usb_xhci_acpi_match[] will be built but not used.
+>
+> Which is just fine, right?
+>
+>> Or am I missing something?
+>
+> Don't put #ifdef in .c files if at all possible is the kernel style
+> rules.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- drivers/gpu/drm/bridge/Kconfig             | 1 +
- drivers/gpu/drm/bridge/dw_hdmi-ahb-audio.c | 6 ++++++
- drivers/gpu/drm/bridge/dw_hdmi-audio.h     | 1 +
- drivers/gpu/drm/bridge/dw_hdmi.c           | 3 +++
- 4 files changed, 11 insertions(+)
+I tested booting with both device tree and ACPI with the new code that
+has #ifdef CONFIG_ACPI removed and USB works fine with my X-Gene Arm64
+platform.
 
-diff --git a/drivers/gpu/drm/bridge/Kconfig b/drivers/gpu/drm/bridge/Kconfig
-index 56ed35fe0734..204861bfb867 100644
---- a/drivers/gpu/drm/bridge/Kconfig
-+++ b/drivers/gpu/drm/bridge/Kconfig
-@@ -7,6 +7,7 @@ config DRM_DW_HDMI_AHB_AUDIO
- 	tristate "Synopsis Designware AHB Audio interface"
- 	depends on DRM_DW_HDMI && SND
- 	select SND_PCM
-+	select SND_PCM_ELD
- 	select SND_PCM_IEC958
- 	help
- 	  Support the AHB Audio interface which is part of the Synopsis
-diff --git a/drivers/gpu/drm/bridge/dw_hdmi-ahb-audio.c b/drivers/gpu/drm/bridge/dw_hdmi-ahb-audio.c
-index 22bbbc5c2393..125b81306254 100644
---- a/drivers/gpu/drm/bridge/dw_hdmi-ahb-audio.c
-+++ b/drivers/gpu/drm/bridge/dw_hdmi-ahb-audio.c
-@@ -12,11 +12,13 @@
- #include <linux/module.h>
- #include <linux/platform_device.h>
- #include <drm/bridge/dw_hdmi.h>
-+#include <drm/drm_edid.h>
- 
- #include <sound/asoundef.h>
- #include <sound/core.h>
- #include <sound/initval.h>
- #include <sound/pcm.h>
-+#include <sound/pcm_drm_eld.h>
- #include <sound/pcm_iec958.h>
- 
- #include "dw_hdmi-audio.h"
-@@ -284,6 +286,10 @@ static int dw_hdmi_open(struct snd_pcm_substream *substream)
- 
- 	runtime->hw = dw_hdmi_hw;
- 
-+	ret = snd_pcm_hw_constraint_eld(runtime, dw->data.eld);
-+	if (ret < 0)
-+		return ret;
-+
- 	ret = snd_pcm_limit_hw_rates(runtime);
- 	if (ret < 0)
- 		return ret;
-diff --git a/drivers/gpu/drm/bridge/dw_hdmi-audio.h b/drivers/gpu/drm/bridge/dw_hdmi-audio.h
-index 1e840118d90a..91f631beecc7 100644
---- a/drivers/gpu/drm/bridge/dw_hdmi-audio.h
-+++ b/drivers/gpu/drm/bridge/dw_hdmi-audio.h
-@@ -8,6 +8,7 @@ struct dw_hdmi_audio_data {
- 	void __iomem *base;
- 	int irq;
- 	struct dw_hdmi *hdmi;
-+	u8 *eld;
- };
- 
- #endif
-diff --git a/drivers/gpu/drm/bridge/dw_hdmi.c b/drivers/gpu/drm/bridge/dw_hdmi.c
-index b65464789fbd..a8b243278774 100644
---- a/drivers/gpu/drm/bridge/dw_hdmi.c
-+++ b/drivers/gpu/drm/bridge/dw_hdmi.c
-@@ -1533,6 +1533,8 @@ static int dw_hdmi_connector_get_modes(struct drm_connector *connector)
- 		hdmi->sink_has_audio = drm_detect_monitor_audio(edid);
- 		drm_mode_connector_update_edid_property(connector, edid);
- 		ret = drm_add_edid_modes(connector, edid);
-+		/* Store the ELD */
-+		drm_edid_to_eld(connector, edid);
- 		kfree(edid);
- 	} else {
- 		dev_dbg(hdmi->dev, "failed to get edid\n");
-@@ -1873,6 +1875,7 @@ int dw_hdmi_bind(struct device *dev, struct device *master,
- 		audio.base = hdmi->regs;
- 		audio.irq = irq;
- 		audio.hdmi = hdmi;
-+		audio.eld = hdmi->connector.eld;
- 
- 		pdevinfo.name = "dw-hdmi-ahb-audio";
- 		pdevinfo.data = &audio;
+>
+> thanks,
+>
+> greg k-h
+
+
+
 -- 
-2.1.0
+Regards,
+Duc Dang.
