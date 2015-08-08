@@ -1,55 +1,129 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 8 Aug 2015 10:22:52 +0100
-Subject: [PATCH v5 1/2] usb: make xhci platform driver use 64 bit or 32
- bit DMA
-In-Reply-To: <74fe0b014334a5ac1db90dec46bdbf6c30c07895.1439002338.git.dhdang@apm.com>
-References: <CADaLNDkU14GCPZE_zNt_9kMSsUdywyNp1QCiWpokXQgbfRS0qw@mail.gmail.com>
- <74fe0b014334a5ac1db90dec46bdbf6c30c07895.1439002338.git.dhdang@apm.com>
-Message-ID: <20150808092252.GJ7557@n2100.arm.linux.org.uk>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Sat,  8 Aug 2015 12:11:11 +0200
+Subject: [PATCH] ARM: at91: debug: use DEBUG_UART_PHYS
+Message-ID: <1439028671-22131-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 07, 2015 at 08:18:48PM -0700, Duc Dang wrote:
-> diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
-> index 890ad9d..5d03f8b 100644
-> --- a/drivers/usb/host/xhci-plat.c
-> +++ b/drivers/usb/host/xhci-plat.c
-> @@ -93,14 +93,14 @@ static int xhci_plat_probe(struct platform_device *pdev)
->  	if (irq < 0)
->  		return -ENODEV;
->  
-> -	/* Initialize dma_mask and coherent_dma_mask to 32-bits */
-> -	ret = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
-> -	if (ret)
-> -		return ret;
-> -	if (!pdev->dev.dma_mask)
-> -		pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
-> -	else
-> -		dma_set_mask(&pdev->dev, DMA_BIT_MASK(32));
-> +	/* Try setting the coherent_dma_mask to 64 bits, then try 32 bits */
-> +	ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64));
-> +	if (ret) {
-> +		ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
-> +		if (ret)
-> +			return ret;
-> +	}
+Instead of having to add a new configuration option each time support for
+new SoC is added, use CONFIG_DEBUG_UART_PHYS. For now,
+CONFIG_DEBUG_UART_VIRT is automatically computed.
 
-Note that dma_set_mask_and_coherent() and the original code are not
-equivalent because of this:
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ arch/arm/Kconfig.debug        | 41 ++++++++++++++++-------------------------
+ arch/arm/include/debug/at91.S | 18 ++++--------------
+ 2 files changed, 20 insertions(+), 39 deletions(-)
 
-	if (!pdev->dev.dma_mask)
-		pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
-
-If we know that pdev->dev.dma_mask will always be initialised at this
-point, then the above change is fine.  If not, it's introducing a
-regression - dma_set_mask_and_coherent() will fail if pdev->dev.dma_mask
-is NULL (depending on the architectures implementation of dma_set_mask()).
-
-Prefixing the above change with the two lines I mention above would
-ensure equivalent behaviour.  Even if we do want to get rid of this,
-I'd advise to do it as a separate patch after this change, which can
-be independently reverted if there's problems with its removal.
-
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 946c8c0fa1fb..3ba23d0f5c55 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -123,29 +123,23 @@ choice
+ 		    0x80020000      | 0xf0020000     | UART8
+ 		    0x80024000      | 0xf0024000     | UART9
+ 
+-	config AT91_DEBUG_LL_DBGU0
+-		bool "Kernel low-level debugging on rm9200, 9260/9g20, 9261/9g10, 9rl, 9x5, 9n12"
+-		select DEBUG_AT91_UART
++	config DEBUG_AT91_UART
++		bool "Kernel low-level debugging on Atmel SoCs"
+ 		depends on ARCH_AT91
+-		depends on SOC_AT91RM9200 || SOC_AT91SAM9
++		help
++		  Say Y here if you want the debug print routines to direct
++		  their output to the serial port on atmel devices.
+ 
+-	config AT91_DEBUG_LL_DBGU1
+-		bool "Kernel low-level debugging on 9263, 9g45 and sama5d3"
+-		select DEBUG_AT91_UART
+-		depends on ARCH_AT91
+-		depends on SOC_AT91SAM9 || SOC_SAMA5
++		  SOC                  DEBUG_UART_PHYS   DEBUG_UART_VIRT  PORT
++		  rm9200, 9260/9g20,   0xfffff200        0xfefff200       DBGU
++		  9261/9g10, 9rl
++		  9263, 9g45, sama5d3  0xffffee00        0xfeffee00       DBGU
++		  sama5d4              0xfc00c000        0xfb00c000       USART3
++		  sama5d4              0xfc069000        0xfb069000       DBGU
++		  sama5d2              0xf8020000        0xf7020000       UART1
+ 
+-	config AT91_DEBUG_LL_DBGU2
+-		bool "Kernel low-level debugging on sama5d4"
+-		select DEBUG_AT91_UART
+-		depends on ARCH_AT91
+-		depends on SOC_SAMA5
+-
+-	config AT91_DEBUG_LL_DBGU3
+-		bool "Kernel low-level debugging on sama5d2"
+-		select DEBUG_AT91_UART
+-		depends on ARCH_AT91
+-		depends on SOC_SAMA5
++		  Please adjust DEBUG_UART_PHYS configuration options based on
++		  your needs.
+ 
+ 	config DEBUG_BCM2835
+ 		bool "Kernel low-level debugging on BCM2835 PL011 UART"
+@@ -1242,10 +1236,6 @@ choice
+ 
+ endchoice
+ 
+-config DEBUG_AT91_UART
+-	bool
+-	depends on ARCH_AT91
+-
+ config DEBUG_EXYNOS_UART
+ 	bool
+ 
+@@ -1476,7 +1466,8 @@ config DEBUG_UART_PHYS
+ 		DEBUG_RMOBILE_SCIFA0 || DEBUG_RMOBILE_SCIFA1 || \
+ 		DEBUG_RMOBILE_SCIFA4 || DEBUG_S3C24XX_UART || \
+ 		DEBUG_UART_BCM63XX || DEBUG_ASM9260_UART || \
+-		DEBUG_SIRFSOC_UART || DEBUG_DIGICOLOR_UA0
++		DEBUG_SIRFSOC_UART || DEBUG_DIGICOLOR_UA0 || \
++		DEBUG_AT91_UART
+ 
+ config DEBUG_UART_VIRT
+ 	hex "Virtual base address of debug UART"
+diff --git a/arch/arm/include/debug/at91.S b/arch/arm/include/debug/at91.S
+index 2556a8801c8c..43243be94cfc 100644
+--- a/arch/arm/include/debug/at91.S
++++ b/arch/arm/include/debug/at91.S
+@@ -9,32 +9,22 @@
+  *
+ */
+ 
+-#if defined(CONFIG_AT91_DEBUG_LL_DBGU0)
+-#define AT91_DBGU 0xfffff200 /* AT91_BASE_DBGU0 */
+-#elif defined(CONFIG_AT91_DEBUG_LL_DBGU1)
+-#define AT91_DBGU 0xffffee00 /* AT91_BASE_DBGU1 */
+-#elif defined(CONFIG_AT91_DEBUG_LL_DBGU2)
+-/* On sama5d4, use USART3 as low level serial console */
+-#define AT91_DBGU 0xfc00c000 /* SAMA5D4_BASE_USART3 */
+-#else
+-/* On sama5d2, use UART1 as low level serial console */
+-#define AT91_DBGU 0xf8020000
+-#endif
+-
+ #ifdef CONFIG_MMU
+ #define AT91_IO_P2V(x) ((x) - 0x01000000)
+ #else
+ #define AT91_IO_P2V(x) (x)
+ #endif
+ 
++#define CONFIG_DEBUG_UART_VIRT AT91_IO_P2V(CONFIG_DEBUG_UART_PHYS)
++
+ #define AT91_DBGU_SR		(0x14)	/* Status Register */
+ #define AT91_DBGU_THR		(0x1c)	/* Transmitter Holding Register */
+ #define AT91_DBGU_TXRDY		(1 << 1)	/* Transmitter Ready */
+ #define AT91_DBGU_TXEMPTY	(1 << 9)	/* Transmitter Empty */
+ 
+ 	.macro	addruart, rp, rv, tmp
+-	ldr	\rp, =AT91_DBGU				@ System peripherals (phys address)
+-	ldr	\rv, =AT91_IO_P2V(AT91_DBGU)		@ System peripherals (virt address)
++	ldr	\rp, =CONFIG_DEBUG_UART_PHYS		@ System peripherals (phys address)
++	ldr	\rv, =CONFIG_DEBUG_UART_VIRT		@ System peripherals (virt address)
+ 	.endm
+ 
+ 	.macro	senduart,rd,rx
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+2.1.4
