@@ -1,19 +1,21 @@
-From: wei.liu2@citrix.com (Wei Liu)
-Date: Sat, 8 Aug 2015 14:59:04 +0100
-Subject: [PATCH v3 01/20] net/xen-netback: xenvif_gop_frag_copy: move GSO
- check out of the loop
-In-Reply-To: <1438966019-19322-2-git-send-email-julien.grall@citrix.com>
-References: <1438966019-19322-1-git-send-email-julien.grall@citrix.com>
- <1438966019-19322-2-git-send-email-julien.grall@citrix.com>
-Message-ID: <20150808135904.GA14214@zion.uk.xensource.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Sat, 8 Aug 2015 19:29:36 +0530
+Subject: [PATCH v4 0/6] cpufreq: use generic cpufreq drivers for
+ Exynos4x12 platform
+In-Reply-To: <55C5AF4E.3010500@samsung.com>
+References: <1438868514-8814-1-git-send-email-b.zolnierkie@samsung.com>
+ <2359635.Hxe4cb8zKm@amdc1976> <20150807115627.GH6939@linux>
+ <1525406.7aXvVQzEDd@vostro.rjw.lan> <20150808020740.GM6939@linux>
+ <55C5AF4E.3010500@samsung.com>
+Message-ID: <20150808135936.GQ6939@linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 07, 2015 at 05:46:40PM +0100, Julien Grall wrote:
-> The skb doesn't change within the function. Therefore it's only
-> necessary to check if we need GSO once at the beginning.
-> 
-> Signed-off-by: Julien Grall <julien.grall@citrix.com>
-> 
+On 08-08-15, 16:27, Krzysztof Kozlowski wrote:
+> Can you apply the 2-5 of this series to v4.3? It's getting late but
+> maybe they still could go?
 
-Acked-by: Wei Liu <wei.liu2@citrix.com>
+FWIW, 1/6 (updated version) is already applied by Rafael.
+
+-- 
+viresh
