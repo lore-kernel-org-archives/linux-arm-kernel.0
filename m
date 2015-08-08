@@ -1,35 +1,40 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Sat, 8 Aug 2015 18:49:06 +0200
-Subject: [PATCH 0/8] misc: remove boundary checks from bin attr users
-In-Reply-To: <55C5FB6A.5010300@mleia.com>
-References: <1437945502-27944-1-git-send-email-vz@mleia.com>
- <20150807161055.GD25357@katana> <55C4D9B2.3000708@mleia.com>
- <20150807223456.GA1527@katana> <55C5FB6A.5010300@mleia.com>
-Message-ID: <20150808164906.GA1528@katana>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sat, 08 Aug 2015 18:56:34 +0200
+Subject: [BUG, RFC] Different bitfields in documentation and driver
+In-Reply-To: <55C503A7.6020304@tul.cz> (Petr Cvek's message of "Fri, 07 Aug
+ 2015 21:14:47 +0200")
+References: <55C503A7.6020304@tul.cz>
+Message-ID: <87zj21k9bx.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 08, 2015 at 03:51:54PM +0300, Vladimir Zapolskiy wrote:
-> Hi Wolfram,
-> 
-> On 08.08.2015 01:34, Wolfram Sang wrote:
-> > 
-> >> if we're talking about this particular series, you should have them in
-> >> your mailbox, since you have them applied in wsa/i2c/for-next:
-> > 
-> > Those are already in linus tree. I mean all drivers which use struct
-> > i2c_driver. Or do you prefer they go via Greg? I am fine with both.
-> > 
-> 
-> I think you may find most of the changes applied by Greg into
-> misc/char-misc-next branch.
+Petr Cvek <petr.cvek@tul.cz> writes:
 
-Great, thanks for the heads up!
+> Hello,
+> It seems that PXA2xx framebuffer has switched bitfields in nonstd definition (when using overlay).
+>
+> This:
+>
+> 	http://lxr.free-electrons.com/source/drivers/video/fbdev/pxafb.h#L80
+>
+> versus this:
+>
+> 	http://lxr.free-electrons.com/source/Documentation/fb/pxafb.txt#L128
+>
+> Should be this changed in documentation or in driver? I was able to find only
+> one use (in form of little outdated mplayer patch) and it fills both bitfields
+> with zero (so potential change in driver will not break it).
+I'd rather go for documentation. Not only the driver's way looks more pretty to
+me, but it also guarantees compatibility from the kernel side.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150808/e80cfbcb/attachment.sig>
+> P.S. Lack of overlay2's use is probably caused by errata "E24: LCD: Enabling
+> Overlay 2 for YUV420 hangs LCD controller.", which is not workarounded in this
+> driver. It should be mentioned in documentation and/or code, because the only
+> way to start the LCD again is a full PXA SoC reset.
+Ok, do you know if this this true for all pxa variants and steppings or is this
+for only a subset of them ?
+
+Cheers.
+
+-- 
+Robert
