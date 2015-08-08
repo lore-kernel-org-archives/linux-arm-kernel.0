@@ -1,37 +1,69 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Sat,  8 Aug 2015 12:50:44 -0700
-Subject: [GIT PULL] Broadcom SoC changes for 4.3 (part 2, try2)
-In-Reply-To: <55C4E8C8.7030503@broadcom.com>
-References: <55C4E8C8.7030503@broadcom.com>
-Message-ID: <1439063444-12466-1-git-send-email-f.fainelli@gmail.com>
+From: dhdang@apm.com (Duc Dang)
+Date: Sat, 8 Aug 2015 13:31:02 -0700
+Subject: [PATCH v5 1/2] usb: make xhci platform driver use 64 bit or 32
+ bit DMA
+In-Reply-To: <20150808092252.GJ7557@n2100.arm.linux.org.uk>
+References: <CADaLNDkU14GCPZE_zNt_9kMSsUdywyNp1QCiWpokXQgbfRS0qw@mail.gmail.com>
+ <74fe0b014334a5ac1db90dec46bdbf6c30c07895.1439002338.git.dhdang@apm.com>
+ <20150808092252.GJ7557@n2100.arm.linux.org.uk>
+Message-ID: <CADaLNDn4SvW3hvi7H0c_z2xgVSgRHLOK06xMyTYJd+ddFqc7Nw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 39aa437e18cac7acae55481ed73feea0de497399:
+On Sat, Aug 8, 2015 at 2:22 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, Aug 07, 2015 at 08:18:48PM -0700, Duc Dang wrote:
+>> diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
+>> index 890ad9d..5d03f8b 100644
+>> --- a/drivers/usb/host/xhci-plat.c
+>> +++ b/drivers/usb/host/xhci-plat.c
+>> @@ -93,14 +93,14 @@ static int xhci_plat_probe(struct platform_device *pdev)
+>>       if (irq < 0)
+>>               return -ENODEV;
+>>
+>> -     /* Initialize dma_mask and coherent_dma_mask to 32-bits */
+>> -     ret = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
+>> -     if (ret)
+>> -             return ret;
+>> -     if (!pdev->dev.dma_mask)
+>> -             pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
+>> -     else
+>> -             dma_set_mask(&pdev->dev, DMA_BIT_MASK(32));
+>> +     /* Try setting the coherent_dma_mask to 64 bits, then try 32 bits */
+>> +     ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64));
+>> +     if (ret) {
+>> +             ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
+>> +             if (ret)
+>> +                     return ret;
+>> +     }
+>
+> Note that dma_set_mask_and_coherent() and the original code are not
+> equivalent because of this:
+>
+>         if (!pdev->dev.dma_mask)
+>                 pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
+>
+> If we know that pdev->dev.dma_mask will always be initialised at this
+> point, then the above change is fine.  If not, it's introducing a
+> regression - dma_set_mask_and_coherent() will fail if pdev->dev.dma_mask
+> is NULL (depending on the architectures implementation of dma_set_mask()).
+>
+> Prefixing the above change with the two lines I mention above would
+> ensure equivalent behaviour.  Even if we do want to get rid of this,
+> I'd advise to do it as a separate patch after this change, which can
+> be independently reverted if there's problems with its removal.
+>
+Hi Russell,
 
-  Merge branch 'queue/irq/arm' of git://git.kernel.org/pub/scm/linux/kernel/git/tip/tip into next/cleanup (2015-08-05 17:24:11 +0200)
+I will add the 2 lines you mentioned back to next version of the
+patch. It is safer to do it that way as I do not see
+pdev->dev.dma_mask gets initialized before the call
+dma_set_mask_and_coherent  inside this xhci_plat.c file.
 
-are available in the git repository at:
+> --
+> FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+> according to speedtest.net.
 
-  http://github.com/broadcom/stblinux tags/arm-soc/for-4.3/soc-part2
-
-for you to fetch changes up to cf1140515b3b94ef5aa06a085e94ddd814a8cd78:
-
-  ARM: brcmstb: select ARCH_DMA_ADDR_T_64BIT for LPAE (2015-08-06 21:38:13 -0700)
-
-----------------------------------------------------------------
-This pull request contains two changes for brcmstb SoCs from Gregory:
-
-- Update the BRCMSTB Kconfig to select the ARM erratum 798181 which
-  affects the chips covered by this platform
-
-- Update the BRCMST Kconfig to select 64-bits DMA address types when LPAE
-  is enabled
-
-----------------------------------------------------------------
-Gregory Fong (2):
-      ARM: BCM: Enable ARM erratum 798181 for BRCMSTB
-      ARM: brcmstb: select ARCH_DMA_ADDR_T_64BIT for LPAE
-
- arch/arm/mach-bcm/Kconfig | 2 ++
- 1 file changed, 2 insertions(+)
+-- 
+Regards,
+Duc Dang.
