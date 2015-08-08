@@ -1,36 +1,29 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Sat, 08 Aug 2015 15:54:43 +0900
-Subject: [PATCH 3/4] drm/panel: Add Samsung prefix to panel drivers
-In-Reply-To: <1438964855-16989-3-git-send-email-thierry.reding@gmail.com>
-References: <1438964855-16989-1-git-send-email-thierry.reding@gmail.com>
- <1438964855-16989-3-git-send-email-thierry.reding@gmail.com>
-Message-ID: <55C5A7B3.2010701@samsung.com>
+Date: Sat, 08 Aug 2015 16:27:10 +0900
+Subject: [PATCH v4 0/6] cpufreq: use generic cpufreq drivers for Exynos4x12
+ platform
+In-Reply-To: <20150808020740.GM6939@linux>
+References: <1438868514-8814-1-git-send-email-b.zolnierkie@samsung.com>
+ <2359635.Hxe4cb8zKm@amdc1976> <20150807115627.GH6939@linux>
+ <1525406.7aXvVQzEDd@vostro.rjw.lan> <20150808020740.GM6939@linux>
+Message-ID: <55C5AF4E.3010500@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-W dniu 08.08.2015 o 01:27, Thierry Reding pisze:
-> From: Thierry Reding <treding@nvidia.com>
+W dniu 08.08.2015 o 11:07, Viresh Kumar pisze:
+> On 08-08-15, 00:24, Rafael J. Wysocki wrote:
+>> OK, so please let me know which patches you want me to pick up.
+>>
+>> Ideally, I'd prefer them to be resent in a separate series with ACKs and all
+>> with a cover letter clearly stating whose tree they are being targeted at.
 > 
-> The likelihood of getting a large number of panel drivers from different
-> vendors is quite high. Add a prefix to the two existing Samsung panel
-> drivers to set a guideline for future patch submissions. Using vendor
-> prefixes consistently should allow a cleaner organization of the tree.
-> 
-> Signed-off-by: Thierry Reding <treding@nvidia.com>
-> ---
->  arch/arm/configs/exynos_defconfig                                 | 2 +-
->  arch/arm/configs/multi_v7_defconfig                               | 2 +-
+> He already sent it separately, let me send a confirmatory mail in
+> reply to that.
 
-Acked-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Dear Kukjin,
+
+Can you apply the 2-5 of this series to v4.3? It's getting late but
+maybe they still could go?
 
 Best regards,
 Krzysztof
-
-
->  drivers/gpu/drm/panel/Kconfig                                     | 8 ++++----
->  drivers/gpu/drm/panel/Makefile                                    | 4 ++--
->  drivers/gpu/drm/panel/{panel-ld9040.c => panel-samsung-ld9040.c}  | 2 +-
->  .../gpu/drm/panel/{panel-s6e8aa0.c => panel-samsung-s6e8aa0.c}    | 2 +-
->  6 files changed, 10 insertions(+), 10 deletions(-)
->  rename drivers/gpu/drm/panel/{panel-ld9040.c => panel-samsung-ld9040.c} (99%)
->  rename drivers/gpu/drm/panel/{panel-s6e8aa0.c => panel-samsung-s6e8aa0.c} (99%)
