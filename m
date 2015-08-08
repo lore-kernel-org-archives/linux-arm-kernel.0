@@ -1,120 +1,42 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Sat, 8 Aug 2015 20:56:47 +0900
-Subject: [PATCH] ARM: refactor bitops functions with BIT_MASK() and
- BIT_WORD()
-In-Reply-To: <1437461324-7284-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1437461324-7284-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <CAK7LNAQpU_S-dUZ+z9eXsJP7gVMYitHa40JpLHNevN5479oU8Q@mail.gmail.com>
+Date: Sat,  8 Aug 2015 21:11:39 +0900
+Subject: [PATCH] ARM: Feroceon: use of_iomap() to map register base
+Message-ID: <1439035899-1783-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi.
+The sequence of of_address_to_resource() and ioremap() can be
+replaced with of_iomap().
 
-No comment?
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
 
-If nobody has objection to this patch,
-I will post it to the patch tracking system.
+ arch/arm/mm/cache-feroceon-l2.c | 6 +-----
+ 1 file changed, 1 insertion(+), 5 deletions(-)
 
-
-
-
-2015-07-21 15:48 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
-> Use BIT_MASK() and BIT_WORD() rather than hard-coding the size
-> of the "long" type.
->
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> ---
->
->  arch/arm/include/asm/bitops.h | 24 ++++++++++++------------
->  1 file changed, 12 insertions(+), 12 deletions(-)
->
-> diff --git a/arch/arm/include/asm/bitops.h b/arch/arm/include/asm/bitops.h
-> index 5638099..e943e6c 100644
-> --- a/arch/arm/include/asm/bitops.h
-> +++ b/arch/arm/include/asm/bitops.h
-> @@ -35,9 +35,9 @@
->  static inline void ____atomic_set_bit(unsigned int bit, volatile unsigned long *p)
->  {
->         unsigned long flags;
-> -       unsigned long mask = 1UL << (bit & 31);
-> +       unsigned long mask = BIT_MASK(bit);
->
-> -       p += bit >> 5;
-> +       p += BIT_WORD(bit);
->
->         raw_local_irq_save(flags);
->         *p |= mask;
-> @@ -47,9 +47,9 @@ static inline void ____atomic_set_bit(unsigned int bit, volatile unsigned long *
->  static inline void ____atomic_clear_bit(unsigned int bit, volatile unsigned long *p)
->  {
->         unsigned long flags;
-> -       unsigned long mask = 1UL << (bit & 31);
-> +       unsigned long mask = BIT_MASK(bit);
->
-> -       p += bit >> 5;
-> +       p += BIT_WORD(bit);
->
->         raw_local_irq_save(flags);
->         *p &= ~mask;
-> @@ -59,9 +59,9 @@ static inline void ____atomic_clear_bit(unsigned int bit, volatile unsigned long
->  static inline void ____atomic_change_bit(unsigned int bit, volatile unsigned long *p)
->  {
->         unsigned long flags;
-> -       unsigned long mask = 1UL << (bit & 31);
-> +       unsigned long mask = BIT_MASK(bit);
->
-> -       p += bit >> 5;
-> +       p += BIT_WORD(bit);
->
->         raw_local_irq_save(flags);
->         *p ^= mask;
-> @@ -73,9 +73,9 @@ ____atomic_test_and_set_bit(unsigned int bit, volatile unsigned long *p)
->  {
->         unsigned long flags;
->         unsigned int res;
-> -       unsigned long mask = 1UL << (bit & 31);
-> +       unsigned long mask = BIT_MASK(bit);
->
-> -       p += bit >> 5;
-> +       p += BIT_WORD(bit);
->
->         raw_local_irq_save(flags);
->         res = *p;
-> @@ -90,9 +90,9 @@ ____atomic_test_and_clear_bit(unsigned int bit, volatile unsigned long *p)
->  {
->         unsigned long flags;
->         unsigned int res;
-> -       unsigned long mask = 1UL << (bit & 31);
-> +       unsigned long mask = BIT_MASK(bit);
->
-> -       p += bit >> 5;
-> +       p += BIT_WORD(bit);
->
->         raw_local_irq_save(flags);
->         res = *p;
-> @@ -107,9 +107,9 @@ ____atomic_test_and_change_bit(unsigned int bit, volatile unsigned long *p)
->  {
->         unsigned long flags;
->         unsigned int res;
-> -       unsigned long mask = 1UL << (bit & 31);
-> +       unsigned long mask = BIT_MASK(bit);
->
-> -       p += bit >> 5;
-> +       p += BIT_WORD(bit);
->
->         raw_local_irq_save(flags);
->         res = *p;
-> --
-> 1.9.1
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
-
-
+diff --git a/arch/arm/mm/cache-feroceon-l2.c b/arch/arm/mm/cache-feroceon-l2.c
+index 097181e..5c1b7a7 100644
+--- a/arch/arm/mm/cache-feroceon-l2.c
++++ b/arch/arm/mm/cache-feroceon-l2.c
+@@ -368,7 +368,6 @@ int __init feroceon_of_init(void)
+ 	struct device_node *node;
+ 	void __iomem *base;
+ 	bool l2_wt_override = false;
+-	struct resource res;
+ 
+ #if defined(CONFIG_CACHE_FEROCEON_L2_WRITETHROUGH)
+ 	l2_wt_override = true;
+@@ -376,10 +375,7 @@ int __init feroceon_of_init(void)
+ 
+ 	node = of_find_matching_node(NULL, feroceon_ids);
+ 	if (node && of_device_is_compatible(node, "marvell,kirkwood-cache")) {
+-		if (of_address_to_resource(node, 0, &res))
+-			return -ENODEV;
+-
+-		base = ioremap(res.start, resource_size(&res));
++		base = of_iomap(node, 0);
+ 		if (!base)
+ 			return -ENOMEM;
+ 
 -- 
-Best Regards
-Masahiro Yamada
+1.9.1
