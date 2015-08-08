@@ -1,66 +1,109 @@
-From: dhdang@apm.com (Duc Dang)
-Date: Fri,  7 Aug 2015 20:18:48 -0700
-Subject: [PATCH v5 1/2] usb: make xhci platform driver use 64 bit or 32 bit DMA
-In-Reply-To: <CADaLNDkU14GCPZE_zNt_9kMSsUdywyNp1QCiWpokXQgbfRS0qw@mail.gmail.com>
-References: <CADaLNDkU14GCPZE_zNt_9kMSsUdywyNp1QCiWpokXQgbfRS0qw@mail.gmail.com>
-Message-ID: <74fe0b014334a5ac1db90dec46bdbf6c30c07895.1439002338.git.dhdang@apm.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sat, 8 Aug 2015 13:28:39 +0800
+Subject: ARM: dts: sunxi: Regulators at common board layouts
+In-Reply-To: <55B9F245.2000300@whiteboxes.ch>
+References: <55B9F245.2000300@whiteboxes.ch>
+Message-ID: <CAGb2v64PgX9aiBBYRXcBjchzqfEovFXdDMkHhooPnGF9AAfL+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The xhci platform driver needs to work on systems that
-either only support 64-bit DMA or only support 32-bit DMA.
-Attempt to set a coherent dma mask for 64-bit DMA, and
-attempt again with 32-bit DMA if that fails.
+Hi,
 
-[dhdang: Regenerate the patch over 4.2-rc5]
-Signed-off-by: Mark Langsdorf <mlangsdo@redhat.com>
-Tested-by: Mark Salter <msalter@redhat.com>
-Signed-off-by: Duc Dang <dhdang@apm.com>
+On Thu, Jul 30, 2015 at 5:45 PM, Mikhail Yakshin <greycat@whiteboxes.ch> wrote:
+> Hi,
+>
+> I've been analyzing various boards based on Allwinner A20 CPU and
+> X-Powers AXP209 PMU (to make a proper configuration for our board,
+> Whitebox Labs Watermelon).
+>
+> There are some things very common and some things pretty different on
+> various boards.
+>
+> Namely, there's agreement on that DCDC2 and DCDC3 and used for CPU
+> voltages (VDD-CPU and (VDD-SYS=VDD-INT)+VDD-DLL respectively) on all
+> boards I've analyzed (Olimex boards, Cubieboard / Cubietruck, BananaPi,
+> PCDuino, Watermelon, etc) and probably it should be kept this way.
+>
+> However, what puzzles me the most so far is LDO1 regulator. According to
+> [AXP209 datasheet, p. 13, p. 23][1] and all the boards I've
+> investigated, it's used exclusively for powering VDD-RTC input of A20
+> CPU that supports internal CPU's RTC. LDO1 gets very special status in
+> AXP209 - basically, it's as close to "always on" (even on backup
+> battery) as possible the purpose of timekeeping.
+>
+> According to the same spec, LDO1 allows 2 distinct voltage choices: 1.3V
+> and 3.3V. However, according to the [A20 datasheet][2], VDD-RTC (pin K8)
+> has absolute minimum and maximum voltage ratings of 3.0V. I'm not sure
+> how is it supposed to work together, given that X-Powers AXP209 and
+> Allwinner A20 is basically produced by different branches the same
+> company and are meant to be totally compatible.
 
----
-Changes from v4:
-	None
+Get an updated datasheet. Mine (v1.5 20150510) recommends VDD-RTC to
+be 1.2 V ~ 1.4 V, and nominally at 1.3 V.
 
-Changes from v3:
-        Re-generate the patch over 4.2-rc5
-        No code change.
+Also, my AXP209 datasheet (v1.0 Chinese) says LDO1SET grounded means
+LDO1 is set to 1.3 V.
 
-Changes from v2:
-        None
+> What's even more weird, is that all configurations I've encountered so
+> far (i.e. FEX configurations for 3.4 sunxi kernel and DTS for modern
+> mainline kernels) use hard locked 1.3V setting for LDO1. For example,
+> kernel 3.4:
+>
+> /sys/devices/platform/sunxi-i2c.0/i2c-0/0-0034/axp20-regulator.21/regulator/regulator.1/
+> name    axp20_ldo1
+> microvolts      1300000
+> min_microvolts  1300000
+> max_microvolts  1300000
+>
+> and similar construction in mainline DTSes:
+>
+>     vdd_rtc: ldo1 {
+>             regulator-min-microvolt = <1300000>;
+>             regulator-max-microvolt = <1300000>;
+>             regulator-always-on;
+>     };
+>
+> or in axp209.dtsi:
+>
+>     reg_ldo1: ldo1 {
+>             /* LDO1 is a fixed output regulator */
+>             regulator-always-on;
+>             regulator-min-microvolt = <1300000>;
+>             regulator-max-microvolt = <1300000>;
+>             regulator-name = "ldo1";
+>     };
+>
+> If we'll take a look at default power-on setup for AXP209 in the
+> datasheet (page 24), we'll see that it's determined by LDO1SET pin. If
+> it's connected to GND, then LDO1 will start with 1.3V, if it's connected
+> to VINT, then it would be 3.3V.
+>
+> I've analyzed all the schematics I found in public:
+>
+> * Older Olimex schematics (Lime rev C, Lime rev D, Lime2 rev B) state
+> that LDO1 line is "3V3/30mA". LDO1SET is grounded.
+> * Newer Olimex schematics (Lime2 rev C) call that "1V3/30mA". LDO1SET is
+> grounded.
+> * All Bananapi and Cubieboard schematics look very similar and seem to
+> be originating from the same source (reference Allwinner design?) and do
+> not hint any voltages. LDO1SET is grounded.
+>
+> Can someone explain to me how does it work / supposed to work?
 
-Changes from v1:
-        Consolidated to use dma_set_mask_and_coherent
-        Got rid of the check against sizeof(dma_addr_t)
+See above.
 
- drivers/usb/host/xhci-plat.c | 16 ++++++++--------
- 1 file changed, 8 insertions(+), 8 deletions(-)
+ChenYu
 
-diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
-index 890ad9d..5d03f8b 100644
---- a/drivers/usb/host/xhci-plat.c
-+++ b/drivers/usb/host/xhci-plat.c
-@@ -93,14 +93,14 @@ static int xhci_plat_probe(struct platform_device *pdev)
- 	if (irq < 0)
- 		return -ENODEV;
- 
--	/* Initialize dma_mask and coherent_dma_mask to 32-bits */
--	ret = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
--	if (ret)
--		return ret;
--	if (!pdev->dev.dma_mask)
--		pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
--	else
--		dma_set_mask(&pdev->dev, DMA_BIT_MASK(32));
-+	/* Try setting the coherent_dma_mask to 64 bits, then try 32 bits */
-+	ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64));
-+	if (ret) {
-+		ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
-+		if (ret)
-+			return ret;
-+	}
-+
- 
- 	hcd = usb_create_hcd(driver, &pdev->dev, dev_name(&pdev->dev));
- 	if (!hcd)
--- 
-1.9.1
+> [1]: http://linux-sunxi.org/images/8/89/AXP209_Datasheet_v1.0en.pdf
+> [2]:
+> https://github.com/OLIMEX/OLINUXINO/raw/master/HARDWARE/A20-PDFs/A20%20Datasheet%20v1.0%2020130227.pdf
+>
+> --
+> WBR, Mikhail Yakshin
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
