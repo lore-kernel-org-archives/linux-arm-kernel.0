@@ -1,109 +1,41 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Sat, 8 Aug 2015 08:37:10 -0700
-Subject: [PATCH v4 2/2] usb: Add support for ACPI identification to
- xhci-platform
-In-Reply-To: <CABxcv=nAxKqt06js1epALu8Y_61bZ+XeRwy_N=oQUTeRVCh6-w@mail.gmail.com>
-References: <CADaLNDkeOP+gBw0qdSDha551w+w+q4ry9-EevDw5giyiQGdnqA@mail.gmail.com>
- <5e302acb5b03c9bf61ecfb9b5b37e8b3b520bed9.1438994178.git.dhdang@apm.com>
- <20150808012905.GA10407@kroah.com>
- <CABxcv=nAxKqt06js1epALu8Y_61bZ+XeRwy_N=oQUTeRVCh6-w@mail.gmail.com>
-Message-ID: <20150808153710.GA11851@kroah.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sat,  8 Aug 2015 17:38:54 +0200
+Subject: [PATCH] ARM: dts: sun4i: Enable i2c1 and i2c2 on the Chuwi V7-CW0825
+ tablet
+Message-ID: <1439048334-14704-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 08, 2015 at 07:43:40AM +0200, Javier Martinez Canillas wrote:
-> Hello Greg,
-> 
-> On Sat, Aug 8, 2015 at 3:29 AM, Greg KH <gregkh@linuxfoundation.org> wrote:
-> > On Fri, Aug 07, 2015 at 06:03:36PM -0700, Duc Dang wrote:
-> >> Provide the methods to let ACPI identify the need to use
-> >> xhci-platform. Change the Kconfig files so the
-> >> xhci-plat.o file is selectable during kernel config.
-> >>
-> >> This has been tested on an ARM64 machine with platform XHCI, an
-> >> x86_64 machine with XHCI, and an x86_64 machine without XHCI.
-> >> There were no regressions or error messages on the machines
-> >> without platform XHCI.
-> >>
-> >> [dhdang: regenerate the patch over 4.2-rc5]
-> >> Signed-off-by: Mark Langsdorf <mlangsdo@redhat.com>
-> >> Signed-off-by: Duc Dang <dhdang@apm.com>
-> >>
-> >> ---
-> >> Changes from v3:
-> >>       Regenerate the patch over 4.2-rc5
-> >>       No code change
-> >>
-> >> Changes from v2
-> >>       Replaced tristate with a boolean as the driver doesn't
-> >>               compile as a module
-> >>       Correct --help-- to ---help---
-> >>
-> >> Changes from v1
-> >>       Renamed from "add support for APM X-Gene to xhci-platform"
-> >>       Removed changes to arm64/Kconfig
-> >>       Made CONFIG_USB_XHCI_PLATFORM a user selectable config option
-> >>
-> >>  drivers/usb/host/Kconfig     |  7 ++++++-
-> >>  drivers/usb/host/xhci-plat.c | 11 +++++++++++
-> >>  2 files changed, 17 insertions(+), 1 deletion(-)
-> >>
-> >> diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-> >> index 8afc3c1..96231ee 100644
-> >> --- a/drivers/usb/host/Kconfig
-> >> +++ b/drivers/usb/host/Kconfig
-> >> @@ -32,7 +32,12 @@ config USB_XHCI_PCI
-> >>         default y
-> >>
-> >>  config USB_XHCI_PLATFORM
-> >> -     tristate
-> >> +     tristate "xHCI platform driver support"
-> >> +     ---help---
-> >> +       Say 'Y' to enable the support for the xHCI host controller
-> >> +       as a platform device. Many ARM SoCs provide USB this way.
-> >> +
-> >> +       If unsure, say 'Y'.
-> >>
-> >>  config USB_XHCI_MVEBU
-> >>       tristate "xHCI support for Marvell Armada 375/38x"
-> >> diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
-> >> index 5d03f8b..14b40d2 100644
-> >> --- a/drivers/usb/host/xhci-plat.c
-> >> +++ b/drivers/usb/host/xhci-plat.c
-> >> @@ -19,6 +19,7 @@
-> >>  #include <linux/usb/phy.h>
-> >>  #include <linux/slab.h>
-> >>  #include <linux/usb/xhci_pdriver.h>
-> >> +#include <linux/acpi.h>
-> >>
-> >>  #include "xhci.h"
-> >>  #include "xhci-mvebu.h"
-> >> @@ -262,6 +263,15 @@ static const struct of_device_id usb_xhci_of_match[] = {
-> >>  MODULE_DEVICE_TABLE(of, usb_xhci_of_match);
-> >>  #endif
-> >>
-> >> +#ifdef CONFIG_ACPI
-> >
-> > You shoudn't need this #ifdef, right?
-> >
-> 
-> Why it is not needed?
+i2c1 has a freescale mma7660 accelerometer connected to it at addr 0x4c,
+i2c2 has a ft5x touchscreen connected to it at addr 0x38.
 
-Why is it needed?
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-> The driver does .acpi_match_table = ACPI_PTR(usb_xhci_acpi_match) and
-> ACPI_PTR() is NULL if CONFIG_ACPI is not enabled. Which can happen
-> AFAIU since the driver also supports OF. So without the #ifdef guards,
-> .acpi_match_table = NULL and the struct acpi_device_id
-> usb_xhci_acpi_match[] will be built but not used.
-
-Which is just fine, right?
-
-> Or am I missing something?
-
-Don't put #ifdef in .c files if at all possible is the kernel style
-rules.
-
-thanks,
-
-greg k-h
+diff --git a/arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts b/arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts
+index 1430568..5366089 100644
+--- a/arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts
++++ b/arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts
+@@ -78,6 +78,18 @@
+ 	};
+ };
+ 
++&i2c1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c1_pins_a>;
++	status = "okay";
++};
++
++&i2c2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c2_pins_a>;
++	status = "okay";
++};
++
+ &lradc {
+ 	vref-supply = <&reg_vcc3v0>;
+ 	status = "okay";
+-- 
+2.4.3
