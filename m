@@ -1,103 +1,121 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Sat, 08 Aug 2015 17:03:45 +0100
-Subject: [PATCH 05/12] drm: bridge/dw_hdmi: add support for interlaced video
- modes
+Date: Sat, 08 Aug 2015 17:03:50 +0100
+Subject: [PATCH 06/12] drm: bridge/dw_hdmi: clean up HDMI vs DVI mode handling
 In-Reply-To: <20150808160251.GM7557@n2100.arm.linux.org.uk>
 References: <20150808160251.GM7557@n2100.arm.linux.org.uk>
-Message-ID: <E1ZO6b3-0002qv-BK@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1ZO6b8-0002r1-Gr@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for interlaced video modes to the dw_hdmi bridge.  This
-mainly involves halving the vertical parameters to be programmed into
-the bridge registers, and setting the interlace_allowed connector flag.
+The FSL kernel detects the HDMI vendor id, and uses this to set
+hdmi->edid_cfg.hdmi_cap, which is then used to set mdvi appropriately,
+rather than detecting whether we are outputting a CEA mode.  Update
+the dw_hdmi code to use this logic, but lets eliminate the mdvi
+variable, prefering the more verbose "hdmi->sink_is_hdmi" instead.
 
-This brings working 1080i support.  However, 480i and 576i fail to
-work due to the lack of proper pixel repetition support, which is not
-trivial to add due to the tabular PLL parameterisation.  Hence, we
-filter out these modes in our mode_valid() method.
+Use the generic drm_detect_hdmi_monitor() to detect a HDMI sink.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/gpu/drm/bridge/dw_hdmi.c | 26 +++++++++++++++++++++-----
- 1 file changed, 21 insertions(+), 5 deletions(-)
+ drivers/gpu/drm/bridge/dw_hdmi.c | 26 ++++++++++++--------------
+ 1 file changed, 12 insertions(+), 14 deletions(-)
 
 diff --git a/drivers/gpu/drm/bridge/dw_hdmi.c b/drivers/gpu/drm/bridge/dw_hdmi.c
-index 8edf4c31f55c..2e211b8331ed 100644
+index 2e211b8331ed..7f764716f3c4 100644
 --- a/drivers/gpu/drm/bridge/dw_hdmi.c
 +++ b/drivers/gpu/drm/bridge/dw_hdmi.c
-@@ -1060,6 +1060,7 @@ static void hdmi_av_composer(struct dw_hdmi *hdmi,
- 	u8 inv_val;
- 	struct hdmi_vmode *vmode = &hdmi->hdmi_data.video_mode;
- 	int hblank, vblank, h_de_hs, v_de_vs, hsync_len, vsync_len;
-+	unsigned int vdisplay;
+@@ -82,7 +82,6 @@ static const u16 csc_coeff_rgb_in_eitu709[3][4] = {
+ };
  
- 	vmode->mpixelclock = mode->clock * 1000;
+ struct hdmi_vmode {
+-	bool mdvi;
+ 	bool mdataenablepolarity;
  
-@@ -1099,13 +1100,29 @@ static void hdmi_av_composer(struct dw_hdmi *hdmi,
+ 	unsigned int mpixelclock;
+@@ -123,6 +122,7 @@ struct dw_hdmi {
+ 
+ 	struct i2c_adapter *ddc;
+ 	void __iomem *regs;
++	bool sink_is_hdmi;
+ 
+ 	spinlock_t audio_lock;
+ 	struct mutex audio_mutex;
+@@ -913,11 +913,10 @@ static int hdmi_phy_configure(struct dw_hdmi *hdmi, unsigned char prep,
+ static int dw_hdmi_phy_init(struct dw_hdmi *hdmi)
+ {
+ 	int i, ret;
+-	bool cscon = false;
++	bool cscon;
+ 
+ 	/*check csc whether needed activated in HDMI mode */
+-	cscon = (is_color_space_conversion(hdmi) &&
+-			!hdmi->hdmi_data.video_mode.mdvi);
++	cscon = hdmi->sink_is_hdmi && is_color_space_conversion(hdmi);
+ 
+ 	/* HDMI Phy spec says to do the phy initialization sequence twice */
+ 	for (i = 0; i < 2; i++) {
+@@ -1094,9 +1093,9 @@ static void hdmi_av_composer(struct dw_hdmi *hdmi,
+ 		HDMI_FC_INVIDCONF_IN_I_P_INTERLACED :
+ 		HDMI_FC_INVIDCONF_IN_I_P_PROGRESSIVE;
+ 
+-	inv_val |= (vmode->mdvi ?
+-		HDMI_FC_INVIDCONF_DVI_MODEZ_DVI_MODE :
+-		HDMI_FC_INVIDCONF_DVI_MODEZ_HDMI_MODE);
++	inv_val |= hdmi->sink_is_hdmi ?
++		HDMI_FC_INVIDCONF_DVI_MODEZ_HDMI_MODE :
++		HDMI_FC_INVIDCONF_DVI_MODEZ_DVI_MODE;
  
  	hdmi_writeb(hdmi, inv_val, HDMI_FC_INVIDCONF);
  
-+	vdisplay = mode->vdisplay;
-+	vblank = mode->vtotal - mode->vdisplay;
-+	v_de_vs = mode->vsync_start - mode->vdisplay;
-+	vsync_len = mode->vsync_end - mode->vsync_start;
-+
-+	/*
-+	 * When we're setting an interlaced mode, we need
-+	 * to adjust the vertical timing to suit.
-+	 */
-+	if (mode->flags & DRM_MODE_FLAG_INTERLACE) {
-+		vdisplay /= 2;
-+		vblank /= 2;
-+		v_de_vs /= 2;
-+		vsync_len /= 2;
-+	}
-+
- 	/* Set up horizontal active pixel width */
- 	hdmi_writeb(hdmi, mode->hdisplay >> 8, HDMI_FC_INHACTV1);
- 	hdmi_writeb(hdmi, mode->hdisplay, HDMI_FC_INHACTV0);
+@@ -1236,10 +1235,8 @@ static int dw_hdmi_setup(struct dw_hdmi *hdmi, struct drm_display_mode *mode)
  
- 	/* Set up vertical active lines */
--	hdmi_writeb(hdmi, mode->vdisplay >> 8, HDMI_FC_INVACTV1);
--	hdmi_writeb(hdmi, mode->vdisplay, HDMI_FC_INVACTV0);
-+	hdmi_writeb(hdmi, vdisplay >> 8, HDMI_FC_INVACTV1);
-+	hdmi_writeb(hdmi, vdisplay, HDMI_FC_INVACTV0);
+ 	if (!hdmi->vic) {
+ 		dev_dbg(hdmi->dev, "Non-CEA mode used in HDMI\n");
+-		hdmi->hdmi_data.video_mode.mdvi = true;
+ 	} else {
+ 		dev_dbg(hdmi->dev, "CEA mode used vic=%d\n", hdmi->vic);
+-		hdmi->hdmi_data.video_mode.mdvi = false;
+ 	}
  
- 	/* Set up horizontal blanking pixel region width */
- 	hblank = mode->htotal - mode->hdisplay;
-@@ -1113,7 +1130,6 @@ static void hdmi_av_composer(struct dw_hdmi *hdmi,
- 	hdmi_writeb(hdmi, hblank, HDMI_FC_INHBLANK0);
+ 	if ((hdmi->vic == 6) || (hdmi->vic == 7) ||
+@@ -1275,10 +1272,8 @@ static int dw_hdmi_setup(struct dw_hdmi *hdmi, struct drm_display_mode *mode)
+ 	dw_hdmi_enable_video_path(hdmi);
  
- 	/* Set up vertical blanking pixel region width */
--	vblank = mode->vtotal - mode->vdisplay;
- 	hdmi_writeb(hdmi, vblank, HDMI_FC_INVBLANK);
+ 	/* not for DVI mode */
+-	if (hdmi->hdmi_data.video_mode.mdvi) {
+-		dev_dbg(hdmi->dev, "%s DVI mode\n", __func__);
+-	} else {
+-		dev_dbg(hdmi->dev, "%s CEA mode\n", __func__);
++	if (hdmi->sink_is_hdmi) {
++		dev_dbg(hdmi->dev, "%s HDMI mode\n", __func__);
  
- 	/* Set up HSYNC active edge delay width (in pixel clks) */
-@@ -1122,7 +1138,6 @@ static void hdmi_av_composer(struct dw_hdmi *hdmi,
- 	hdmi_writeb(hdmi, h_de_hs, HDMI_FC_HSYNCINDELAY0);
+ 		/* HDMI Initialization Step E - Configure audio */
+ 		hdmi_clk_regenerator_update_pixel_clock(hdmi);
+@@ -1286,6 +1281,8 @@ static int dw_hdmi_setup(struct dw_hdmi *hdmi, struct drm_display_mode *mode)
  
- 	/* Set up VSYNC active edge delay (in lines) */
--	v_de_vs = mode->vsync_start - mode->vdisplay;
- 	hdmi_writeb(hdmi, v_de_vs, HDMI_FC_VSYNCINDELAY);
+ 		/* HDMI Initialization Step F - Configure AVI InfoFrame */
+ 		hdmi_config_AVI(hdmi, mode);
++	} else {
++		dev_dbg(hdmi->dev, "%s DVI mode\n", __func__);
+ 	}
  
- 	/* Set up HSYNC active pulse width (in pixel clks) */
-@@ -1131,7 +1146,6 @@ static void hdmi_av_composer(struct dw_hdmi *hdmi,
- 	hdmi_writeb(hdmi, hsync_len, HDMI_FC_HSYNCINWIDTH0);
+ 	hdmi_video_packetize(hdmi);
+@@ -1294,7 +1291,7 @@ static int dw_hdmi_setup(struct dw_hdmi *hdmi, struct drm_display_mode *mode)
+ 	hdmi_tx_hdcp_config(hdmi);
  
- 	/* Set up VSYNC active edge delay (in lines) */
--	vsync_len = mode->vsync_end - mode->vsync_start;
- 	hdmi_writeb(hdmi, vsync_len, HDMI_FC_VSYNCINWIDTH);
- }
+ 	dw_hdmi_clear_overflow(hdmi);
+-	if (hdmi->cable_plugin && !hdmi->hdmi_data.video_mode.mdvi)
++	if (hdmi->cable_plugin && hdmi->sink_is_hdmi)
+ 		hdmi_enable_overflow_interrupts(hdmi);
  
-@@ -1593,6 +1607,8 @@ int dw_hdmi_bind(struct device *dev, struct device *master,
- 	if (!hdmi)
- 		return -ENOMEM;
+ 	return 0;
+@@ -1444,6 +1441,7 @@ static int dw_hdmi_connector_get_modes(struct drm_connector *connector)
+ 		dev_dbg(hdmi->dev, "got edid: width[%d] x height[%d]\n",
+ 			edid->width_cm, edid->height_cm);
  
-+	hdmi->connector.interlace_allowed = 1;
-+
- 	hdmi->plat_data = plat_data;
- 	hdmi->dev = dev;
- 	hdmi->dev_type = plat_data->dev_type;
++		hdmi->sink_is_hdmi = drm_detect_hdmi_monitor(edid);
+ 		drm_mode_connector_update_edid_property(connector, edid);
+ 		ret = drm_add_edid_modes(connector, edid);
+ 		kfree(edid);
 -- 
 2.1.0
