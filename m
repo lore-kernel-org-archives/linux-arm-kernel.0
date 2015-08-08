@@ -1,94 +1,69 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Sat, 8 Aug 2015 02:32:42 +0200
-Subject: [PATCH 2/2] net, thunder, bgx: Add support for ACPI binding.
-In-Reply-To: <55C4F597.50103@caviumnetworks.com>
-References: <1438907590-29649-1-git-send-email-ddaney.cavm@gmail.com>
- <1438907590-29649-3-git-send-email-ddaney.cavm@gmail.com>
- <20150807145414.GA5468@xora-haswell.xora.org.uk>
- <55C4F597.50103@caviumnetworks.com>
-Message-ID: <CAJZ5v0hG8xUX9k7QD+vTR90_V+Rrvv3LqxLF966YCRk192zrzQ@mail.gmail.com>
+From: mturquette@baylibre.com (Michael Turquette)
+Date: Fri, 07 Aug 2015 17:55:09 -0700
+Subject: [GIT PULL] Xilinx Zynq changes for v4.3
+In-Reply-To: <20150805085344.GH6390@localhost>
+References: <55BB31E8.7040806@monstr.eu> <20150805085344.GH6390@localhost>
+Message-ID: <20150808005509.2416.8174@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+Quoting Olof Johansson (2015-08-05 01:53:44)
+> Hi,
+> 
+> On Fri, Jul 31, 2015 at 10:29:28AM +0200, Michal Simek wrote:
+> > Hi,
+> > 
+> > please pull these SoC changes to your tree.
+> > 
+> > Thanks,
+> > Michal
+> > 
+> > The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
+> > 
+> >   Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
+> > 
+> > are available in the git repository at:
+> > 
+> >   https://github.com/Xilinx/linux-xlnx.git tags/zynq-soc-for-4.3
+> > 
+> > for you to fetch changes up to e4a9288942392965bd5cfad93d9996b83c0dc4a6:
+> > 
+> >   ARM: zynq: reserve space for jump target in secondary trampoline
+> > (2015-07-31 10:24:41 +0200)
+> 
+> Merged, however:
+> 
+> > Arun Chandran (1):
+> >       ARM: zynq: Fix earlyprintk in big endian mode
+> > 
+> > Masahiro Yamada (1):
+> >       clk: zynq: remove redundant $(CONFIG_ARCH_ZYNQ) in Makefile
+> 
+> This should have gone through the clk tree. Seems small and simple enough that
+> I'll take it, but please send patches through appropriate maintainers.
+> 
+> (Adding Mike and Stephen on cc so they know about it).
 
-On Fri, Aug 7, 2015 at 8:14 PM, David Daney <ddaney@caviumnetworks.com> wrote:
-> On 08/07/2015 07:54 AM, Graeme Gregory wrote:
->>
->> On Thu, Aug 06, 2015 at 05:33:10PM -0700, David Daney wrote:
->>>
->>> From: David Daney <david.daney@cavium.com>
->>>
->>> Find out which PHYs belong to which BGX instance in the ACPI way.
->>>
->>> Set the MAC address of the device as provided by ACPI tables. This is
->>> similar to the implementation for devicetree in
->>> of_get_mac_address(). The table is searched for the device property
->>> entries "mac-address", "local-mac-address" and "address" in that
->>> order. The address is provided in a u64 variable and must contain a
->>> valid 6 bytes-len mac addr.
->>>
->>> Based on code from: Narinder Dhillon <ndhillon@cavium.com>
->>>                      Tomasz Nowicki <tomasz.nowicki@linaro.org>
->>>                      Robert Richter <rrichter@cavium.com>
->>>
->>> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
->>> Signed-off-by: Robert Richter <rrichter@cavium.com>
->>> Signed-off-by: David Daney <david.daney@cavium.com>
->>> ---
->>>   drivers/net/ethernet/cavium/thunder/thunder_bgx.c | 137
->>> +++++++++++++++++++++-
->>>   1 file changed, 135 insertions(+), 2 deletions(-)
->>>
->>> diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
->>> b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
->>> index 615b2af..2056583 100644
->>> --- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
->>> +++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
->
-> [...]
->>>
->>> +
->>> +static int acpi_get_mac_address(struct acpi_device *adev, u8 *dst)
->>> +{
->>> +       const union acpi_object *prop;
->>> +       u64 mac_val;
->>> +       u8 mac[ETH_ALEN];
->>> +       int i, j;
->>> +       int ret;
->>> +
->>> +       for (i = 0; i < ARRAY_SIZE(addr_propnames); i++) {
->>> +               ret = acpi_dev_get_property(adev, addr_propnames[i],
->>> +                                           ACPI_TYPE_INTEGER, &prop);
->>
->>
->> Shouldn't this be trying to use device_property_read_* API and making
->> the DT/ACPI path the same where possible?
->>
->
-> Ideally, something like you suggest would be possible.  However, there are a
-> couple of problems trying to do it in the kernel as it exists today:
->
-> 1) There is no 'struct device *' here, so device_property_read_* is not
-> applicable.
->
-> 2) There is no standard ACPI binding for MAC addresses, so it is impossible
-> to create a hypothetical fw_get_mac_address(), which would be analogous to
-> of_get_mac_address().
->
-> Other e-mail threads have suggested that the path to an elegant solution is
-> to inter-mix a bunch of calls to acpi_dev_get_property*() and
-> fwnode_property_read*() as to use these more generic fwnode_property_read*()
-> functions whereever possible.  I rejected this approach as it seems cleaner
-> to me to consistently use a single set of APIs.
+Olof,
 
-Actually, that wasn't my intention.
+Thanks for the heads up.
 
-I wanted to say that once you'd got an ACPI device pointer (struct
-acpi_device), you could easly convert it to a struct fwnode_handle
-pointer and operate that going forward when accessing properties.
-That at least would help with the properties that do not differ
-between DT and ACPI.
+Michal,
 
-Thanks,
-Rafael
+No reason that patch couldn't have gone through the clk tree. It was
+posted on July 27th, which wasn't that long ago. Please feel free to
+ping Stephen or I on #linux-clk if you think one of your clk patches has
+slipped through the cracks.
+
+Regards,
+Mike
+
+> 
+> 
+> -Olof
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
