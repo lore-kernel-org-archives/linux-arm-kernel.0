@@ -1,34 +1,49 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 8 Aug 2015 17:02:51 +0100
-Subject: [PATCH 00/12] dw-hdmi development
-Message-ID: <20150808160251.GM7557@n2100.arm.linux.org.uk>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Sat, 08 Aug 2015 17:03:24 +0100
+Subject: [PATCH 01/12] drm: bridge/dw_hdmi: remove pixel repetition setting
+ for all VICs
+In-Reply-To: <20150808160251.GM7557@n2100.arm.linux.org.uk>
+References: <20150808160251.GM7557@n2100.arm.linux.org.uk>
+Message-ID: <E1ZO6ai-0002qN-Nn@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This sub-series is a mixture of development:
+dw_hdmi sets a pixel repetition factor of 1 for VICs 10-15, 25-30 and
+35-38.  However, DRM uses their native resolutions in its timing
+information.  For example, VIC 14 can be 1440x480 with no repetition,
+or 720x480 with one pixel repetition.  As DRM uses 1440 pixels per line
+for this video mode, we need no pixel repetition.
 
-* Removing the incorrect pixel repetition configuration code
-* Preventing pixel-doubled modes from being used
-* Adding interlaced video support
-* Implementing the sink_is_hdmi/sink_has_audio flags I suggested a few
-  months ago
-* Only enabling audio support if the sink indicates it has audio
-* Avoiding double-enabling the HDMI interface
-* Fixing the mis-leading name of "dw_hdmi_phy_enable_power"
-* Adding connector mode forcing (important if your monitor bounces
-  RXSENSE and HPD signals while in low-power mode.)
-* Improving the HDMI enable/disabling on sink status
+In any case, pixel repetition appears broken in dw_hdmi.
 
-For review (and testing if people feel like it).  Acks/tested-bys etc
-welcome.  It applies on top of my drm-dwhdmi-devel branch, which is
-waiting for David Airlie to pull (see pull request on dri-devel, 15th
-July.)
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ drivers/gpu/drm/bridge/dw_hdmi.c | 13 +------------
+ 1 file changed, 1 insertion(+), 12 deletions(-)
 
- drivers/gpu/drm/bridge/dw_hdmi.c | 275 ++++++++++++++++++++++++++++++---------
- drivers/gpu/ipu-v3/ipu-dc.c      |  18 ++-
- drivers/gpu/ipu-v3/ipu-di.c      | 129 +++++++++---------
- 3 files changed, 291 insertions(+), 131 deletions(-)
-
+diff --git a/drivers/gpu/drm/bridge/dw_hdmi.c b/drivers/gpu/drm/bridge/dw_hdmi.c
+index f070ee07b8c9..1c0ee3476138 100644
+--- a/drivers/gpu/drm/bridge/dw_hdmi.c
++++ b/drivers/gpu/drm/bridge/dw_hdmi.c
+@@ -1236,18 +1236,7 @@ static int dw_hdmi_setup(struct dw_hdmi *hdmi, struct drm_display_mode *mode)
+ 	else
+ 		hdmi->hdmi_data.colorimetry = HDMI_COLORIMETRY_ITU_709;
+ 
+-	if ((hdmi->vic == 10) || (hdmi->vic == 11) ||
+-	    (hdmi->vic == 12) || (hdmi->vic == 13) ||
+-	    (hdmi->vic == 14) || (hdmi->vic == 15) ||
+-	    (hdmi->vic == 25) || (hdmi->vic == 26) ||
+-	    (hdmi->vic == 27) || (hdmi->vic == 28) ||
+-	    (hdmi->vic == 29) || (hdmi->vic == 30) ||
+-	    (hdmi->vic == 35) || (hdmi->vic == 36) ||
+-	    (hdmi->vic == 37) || (hdmi->vic == 38))
+-		hdmi->hdmi_data.video_mode.mpixelrepetitionoutput = 1;
+-	else
+-		hdmi->hdmi_data.video_mode.mpixelrepetitionoutput = 0;
+-
++	hdmi->hdmi_data.video_mode.mpixelrepetitionoutput = 0;
+ 	hdmi->hdmi_data.video_mode.mpixelrepetitioninput = 0;
+ 
+ 	/* TODO: Get input format from IPU (via FB driver interface) */
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+2.1.0
