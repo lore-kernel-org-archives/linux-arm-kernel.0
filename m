@@ -1,122 +1,35 @@
-From: dhdang@apm.com (Duc Dang)
-Date: Sat, 8 Aug 2015 09:45:33 -0700
-Subject: [PATCH v4 2/2] usb: Add support for ACPI identification to
- xhci-platform
-In-Reply-To: <20150808153710.GA11851@kroah.com>
-References: <CADaLNDkeOP+gBw0qdSDha551w+w+q4ry9-EevDw5giyiQGdnqA@mail.gmail.com>
- <5e302acb5b03c9bf61ecfb9b5b37e8b3b520bed9.1438994178.git.dhdang@apm.com>
- <20150808012905.GA10407@kroah.com>
- <CABxcv=nAxKqt06js1epALu8Y_61bZ+XeRwy_N=oQUTeRVCh6-w@mail.gmail.com>
- <20150808153710.GA11851@kroah.com>
-Message-ID: <CADaLND=nvwjUO41FXZds7YQMbyDFmKGwnuaj_ThdY_s1cNzLJw@mail.gmail.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Sat, 8 Aug 2015 18:49:06 +0200
+Subject: [PATCH 0/8] misc: remove boundary checks from bin attr users
+In-Reply-To: <55C5FB6A.5010300@mleia.com>
+References: <1437945502-27944-1-git-send-email-vz@mleia.com>
+ <20150807161055.GD25357@katana> <55C4D9B2.3000708@mleia.com>
+ <20150807223456.GA1527@katana> <55C5FB6A.5010300@mleia.com>
+Message-ID: <20150808164906.GA1528@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 8, 2015 at 8:37 AM, Greg KH <gregkh@linuxfoundation.org> wrote:
-> On Sat, Aug 08, 2015 at 07:43:40AM +0200, Javier Martinez Canillas wrote:
->> Hello Greg,
->>
->> On Sat, Aug 8, 2015 at 3:29 AM, Greg KH <gregkh@linuxfoundation.org> wrote:
->> > On Fri, Aug 07, 2015 at 06:03:36PM -0700, Duc Dang wrote:
->> >> Provide the methods to let ACPI identify the need to use
->> >> xhci-platform. Change the Kconfig files so the
->> >> xhci-plat.o file is selectable during kernel config.
->> >>
->> >> This has been tested on an ARM64 machine with platform XHCI, an
->> >> x86_64 machine with XHCI, and an x86_64 machine without XHCI.
->> >> There were no regressions or error messages on the machines
->> >> without platform XHCI.
->> >>
->> >> [dhdang: regenerate the patch over 4.2-rc5]
->> >> Signed-off-by: Mark Langsdorf <mlangsdo@redhat.com>
->> >> Signed-off-by: Duc Dang <dhdang@apm.com>
->> >>
->> >> ---
->> >> Changes from v3:
->> >>       Regenerate the patch over 4.2-rc5
->> >>       No code change
->> >>
->> >> Changes from v2
->> >>       Replaced tristate with a boolean as the driver doesn't
->> >>               compile as a module
->> >>       Correct --help-- to ---help---
->> >>
->> >> Changes from v1
->> >>       Renamed from "add support for APM X-Gene to xhci-platform"
->> >>       Removed changes to arm64/Kconfig
->> >>       Made CONFIG_USB_XHCI_PLATFORM a user selectable config option
->> >>
->> >>  drivers/usb/host/Kconfig     |  7 ++++++-
->> >>  drivers/usb/host/xhci-plat.c | 11 +++++++++++
->> >>  2 files changed, 17 insertions(+), 1 deletion(-)
->> >>
->> >> diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
->> >> index 8afc3c1..96231ee 100644
->> >> --- a/drivers/usb/host/Kconfig
->> >> +++ b/drivers/usb/host/Kconfig
->> >> @@ -32,7 +32,12 @@ config USB_XHCI_PCI
->> >>         default y
->> >>
->> >>  config USB_XHCI_PLATFORM
->> >> -     tristate
->> >> +     tristate "xHCI platform driver support"
->> >> +     ---help---
->> >> +       Say 'Y' to enable the support for the xHCI host controller
->> >> +       as a platform device. Many ARM SoCs provide USB this way.
->> >> +
->> >> +       If unsure, say 'Y'.
->> >>
->> >>  config USB_XHCI_MVEBU
->> >>       tristate "xHCI support for Marvell Armada 375/38x"
->> >> diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
->> >> index 5d03f8b..14b40d2 100644
->> >> --- a/drivers/usb/host/xhci-plat.c
->> >> +++ b/drivers/usb/host/xhci-plat.c
->> >> @@ -19,6 +19,7 @@
->> >>  #include <linux/usb/phy.h>
->> >>  #include <linux/slab.h>
->> >>  #include <linux/usb/xhci_pdriver.h>
->> >> +#include <linux/acpi.h>
->> >>
->> >>  #include "xhci.h"
->> >>  #include "xhci-mvebu.h"
->> >> @@ -262,6 +263,15 @@ static const struct of_device_id usb_xhci_of_match[] = {
->> >>  MODULE_DEVICE_TABLE(of, usb_xhci_of_match);
->> >>  #endif
->> >>
->> >> +#ifdef CONFIG_ACPI
->> >
->> > You shoudn't need this #ifdef, right?
->> >
->>
->> Why it is not needed?
->
-> Why is it needed?
->
->> The driver does .acpi_match_table = ACPI_PTR(usb_xhci_acpi_match) and
->> ACPI_PTR() is NULL if CONFIG_ACPI is not enabled. Which can happen
->> AFAIU since the driver also supports OF. So without the #ifdef guards,
->> .acpi_match_table = NULL and the struct acpi_device_id
->> usb_xhci_acpi_match[] will be built but not used.
->
-> Which is just fine, right?
->
->> Or am I missing something?
->
-> Don't put #ifdef in .c files if at all possible is the kernel style
-> rules.
+On Sat, Aug 08, 2015 at 03:51:54PM +0300, Vladimir Zapolskiy wrote:
+> Hi Wolfram,
+> 
+> On 08.08.2015 01:34, Wolfram Sang wrote:
+> > 
+> >> if we're talking about this particular series, you should have them in
+> >> your mailbox, since you have them applied in wsa/i2c/for-next:
+> > 
+> > Those are already in linus tree. I mean all drivers which use struct
+> > i2c_driver. Or do you prefer they go via Greg? I am fine with both.
+> > 
+> 
+> I think you may find most of the changes applied by Greg into
+> misc/char-misc-next branch.
 
-I tested booting with both device tree and ACPI with the new code that
-has #ifdef CONFIG_ACPI removed and USB works fine with my X-Gene Arm64
-platform.
+Great, thanks for the heads up!
 
->
-> thanks,
->
-> greg k-h
-
-
-
--- 
-Regards,
-Duc Dang.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150808/e80cfbcb/attachment.sig>
