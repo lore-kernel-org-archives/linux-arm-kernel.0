@@ -1,114 +1,32 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Sat, 08 Aug 2015 17:04:11 +0100
-Subject: [PATCH 10/12] drm: bridge/dw_hdmi: fix phy enable/disable handling
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 8 Aug 2015 17:09:36 +0100
+Subject: [PATCH 0/9] dw-hdmi audio support
 In-Reply-To: <20150808160251.GM7557@n2100.arm.linux.org.uk>
 References: <20150808160251.GM7557@n2100.arm.linux.org.uk>
-Message-ID: <E1ZO6bT-0002vk-3d@rmk-PC.arm.linux.org.uk>
+Message-ID: <20150808160936.GN7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The dw_hdmi enable/disable handling is particularly weak in several
-regards:
-* The hotplug interrupt could call hdmi_poweron() or hdmi_poweroff()
-  while DRM is setting a mode, which could race with a mode being set.
-* Hotplug will always re-enable the phy whenever it detects an active
-  hotplug signal, even if DRM has disabled the output.
+Following on from the previous sub-series, this sub-series adds audio
+support to dw-hdmi.
 
-Resolve all of these by introducing a mutex to prevent races, and a
-state-tracking bool so we know whether DRM wishes the output to be
-enabled.  We choose to use our own mutex rather than ->struct_mutex
-so that we can still process interrupts in a timely fashion.
+The two different variants are now in this patch: AHB audio support
+found on iMX6 platforms, and I2S support found on Rockchip patches.
+Thanks to Yakir Yang for contributing the I2S support.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- drivers/gpu/drm/bridge/dw_hdmi.c | 29 ++++++++++++++++++++++-------
- 1 file changed, 22 insertions(+), 7 deletions(-)
+I suspect that there is still some discussion to be had on this
+series, though I would like to see it moving forward so that we can
+get something merged.
 
-diff --git a/drivers/gpu/drm/bridge/dw_hdmi.c b/drivers/gpu/drm/bridge/dw_hdmi.c
-index 7b8a4e942a71..0ee188930d26 100644
---- a/drivers/gpu/drm/bridge/dw_hdmi.c
-+++ b/drivers/gpu/drm/bridge/dw_hdmi.c
-@@ -125,6 +125,9 @@ struct dw_hdmi {
- 	bool sink_is_hdmi;
- 	bool sink_has_audio;
- 
-+	struct mutex mutex;		/* for state below and previous_mode */
-+	bool disabled;			/* DRM has disabled our bridge */
-+
- 	spinlock_t audio_lock;
- 	struct mutex audio_mutex;
- 	unsigned int sample_rate;
-@@ -1389,8 +1392,12 @@ static void dw_hdmi_bridge_mode_set(struct drm_bridge *bridge,
- {
- 	struct dw_hdmi *hdmi = bridge->driver_private;
- 
-+	mutex_lock(&hdmi->mutex);
-+
- 	/* Store the display mode for plugin/DKMS poweron events */
- 	memcpy(&hdmi->previous_mode, mode, sizeof(hdmi->previous_mode));
-+
-+	mutex_unlock(&hdmi->mutex);
- }
- 
- static bool dw_hdmi_bridge_mode_fixup(struct drm_bridge *bridge,
-@@ -1404,14 +1411,20 @@ static void dw_hdmi_bridge_disable(struct drm_bridge *bridge)
- {
- 	struct dw_hdmi *hdmi = bridge->driver_private;
- 
-+	mutex_lock(&hdmi->mutex);
-+	hdmi->disabled = true;
- 	dw_hdmi_poweroff(hdmi);
-+	mutex_unlock(&hdmi->mutex);
- }
- 
- static void dw_hdmi_bridge_enable(struct drm_bridge *bridge)
- {
- 	struct dw_hdmi *hdmi = bridge->driver_private;
- 
-+	mutex_lock(&hdmi->mutex);
- 	dw_hdmi_poweron(hdmi);
-+	hdmi->disabled = false;
-+	mutex_unlock(&hdmi->mutex);
- }
- 
- static void dw_hdmi_bridge_nop(struct drm_bridge *bridge)
-@@ -1534,20 +1547,20 @@ static irqreturn_t dw_hdmi_irq(int irq, void *dev_id)
- 	phy_int_pol = hdmi_readb(hdmi, HDMI_PHY_POL0);
- 
- 	if (intr_stat & HDMI_IH_PHY_STAT0_HPD) {
-+		hdmi_modb(hdmi, ~phy_int_pol, HDMI_PHY_HPD, HDMI_PHY_POL0);
-+		mutex_lock(&hdmi->mutex);
- 		if (phy_int_pol & HDMI_PHY_HPD) {
- 			dev_dbg(hdmi->dev, "EVENT=plugin\n");
- 
--			hdmi_modb(hdmi, 0, HDMI_PHY_HPD, HDMI_PHY_POL0);
--
--			dw_hdmi_poweron(hdmi);
-+			if (!hdmi->disabled)
-+				dw_hdmi_poweron(hdmi);
- 		} else {
- 			dev_dbg(hdmi->dev, "EVENT=plugout\n");
- 
--			hdmi_modb(hdmi, HDMI_PHY_HPD, HDMI_PHY_HPD,
--				  HDMI_PHY_POL0);
--
--			dw_hdmi_poweroff(hdmi);
-+			if (!hdmi->disabled)
-+				dw_hdmi_poweroff(hdmi);
- 		}
-+		mutex_unlock(&hdmi->mutex);
- 		drm_helper_hpd_irq_event(hdmi->bridge->dev);
- 	}
- 
-@@ -1617,7 +1630,9 @@ int dw_hdmi_bind(struct device *dev, struct device *master,
- 	hdmi->sample_rate = 48000;
- 	hdmi->ratio = 100;
- 	hdmi->encoder = encoder;
-+	hdmi->disabled = true;
- 
-+	mutex_init(&hdmi->mutex);
- 	mutex_init(&hdmi->audio_mutex);
- 	spin_lock_init(&hdmi->audio_lock);
- 
+ drivers/gpu/drm/bridge/Kconfig             |  20 +
+ drivers/gpu/drm/bridge/Makefile            |   2 +
+ drivers/gpu/drm/bridge/dw_hdmi-ahb-audio.c | 635 +++++++++++++++++++++++++++++
+ drivers/gpu/drm/bridge/dw_hdmi-audio.h     |  14 +
+ drivers/gpu/drm/bridge/dw_hdmi-i2s-audio.c | 398 ++++++++++++++++++
+ drivers/gpu/drm/bridge/dw_hdmi.c           | 202 ++++-----
+ drivers/gpu/drm/bridge/dw_hdmi.h           |   6 +
+ 7 files changed, 1155 insertions(+), 122 deletions(-)
+
 -- 
-2.1.0
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
