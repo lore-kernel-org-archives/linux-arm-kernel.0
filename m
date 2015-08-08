@@ -1,42 +1,44 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Sat,  8 Aug 2015 21:11:39 +0900
-Subject: [PATCH] ARM: Feroceon: use of_iomap() to map register base
-Message-ID: <1439035899-1783-1-git-send-email-yamada.masahiro@socionext.com>
+Date: Sat,  8 Aug 2015 21:13:44 +0900
+Subject: [PATCH] ARM: UniPhier: drop v7_invalidate_l1 call at secondary entry
+Message-ID: <1439036024-1933-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The sequence of of_address_to_resource() and ioremap() can be
-replaced with of_iomap().
+This is unnecessary since commit 02b4e2756e01 ("ARM: v7 setup
+function should invalidate L1 cache").
 
 Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 ---
 
- arch/arm/mm/cache-feroceon-l2.c | 6 +-----
- 1 file changed, 1 insertion(+), 5 deletions(-)
+ arch/arm/mach-uniphier/platsmp.c | 8 +-------
+ 1 file changed, 1 insertion(+), 7 deletions(-)
 
-diff --git a/arch/arm/mm/cache-feroceon-l2.c b/arch/arm/mm/cache-feroceon-l2.c
-index 097181e..5c1b7a7 100644
---- a/arch/arm/mm/cache-feroceon-l2.c
-+++ b/arch/arm/mm/cache-feroceon-l2.c
-@@ -368,7 +368,6 @@ int __init feroceon_of_init(void)
- 	struct device_node *node;
- 	void __iomem *base;
- 	bool l2_wt_override = false;
--	struct resource res;
+diff --git a/arch/arm/mach-uniphier/platsmp.c b/arch/arm/mach-uniphier/platsmp.c
+index 5943e1c..4b784f7 100644
+--- a/arch/arm/mach-uniphier/platsmp.c
++++ b/arch/arm/mach-uniphier/platsmp.c
+@@ -60,12 +60,6 @@ err:
+ 	sbcm_regmap = NULL;
+ }
  
- #if defined(CONFIG_CACHE_FEROCEON_L2_WRITETHROUGH)
- 	l2_wt_override = true;
-@@ -376,10 +375,7 @@ int __init feroceon_of_init(void)
- 
- 	node = of_find_matching_node(NULL, feroceon_ids);
- 	if (node && of_device_is_compatible(node, "marvell,kirkwood-cache")) {
--		if (of_address_to_resource(node, 0, &res))
--			return -ENODEV;
+-static void __naked uniphier_secondary_startup(void)
+-{
+-	asm("bl		v7_invalidate_l1\n"
+-	    "b		secondary_startup\n");
+-};
 -
--		base = ioremap(res.start, resource_size(&res));
-+		base = of_iomap(node, 0);
- 		if (!base)
- 			return -ENOMEM;
+ static int uniphier_boot_secondary(unsigned int cpu,
+ 				   struct task_struct *idle)
+ {
+@@ -75,7 +69,7 @@ static int uniphier_boot_secondary(unsigned int cpu,
+ 		return -ENODEV;
+ 
+ 	ret = regmap_write(sbcm_regmap, 0x1208,
+-			   virt_to_phys(uniphier_secondary_startup));
++			   virt_to_phys(secondary_startup));
+ 	if (!ret)
+ 		asm("sev"); /* wake up secondary CPU */
  
 -- 
 1.9.1
