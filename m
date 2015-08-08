@@ -1,35 +1,42 @@
-From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Sat, 08 Aug 2015 15:51:54 +0300
-Subject: [PATCH 0/8] misc: remove boundary checks from bin attr users
-In-Reply-To: <20150807223456.GA1527@katana>
-References: <1437945502-27944-1-git-send-email-vz@mleia.com>
- <20150807161055.GD25357@katana> <55C4D9B2.3000708@mleia.com>
- <20150807223456.GA1527@katana>
-Message-ID: <55C5FB6A.5010300@mleia.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 8 Aug 2015 14:47:09 +0100
+Subject: [BUG, RFC] MTD Execute in Place on ARM breaks build
+In-Reply-To: <1564596.BEQS8u7XSM@wuerfel>
+References: <55C51319.2010901@tul.cz>
+ <1564596.BEQS8u7XSM@wuerfel>
+Message-ID: <20150808134708.GK7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolfram,
+On Sat, Aug 08, 2015 at 01:42:50PM +0200, Arnd Bergmann wrote:
+> A cleaner approach might be to replace xip_currtime() with
+> ktime_get_ns(), and find some other generic interface to replace
+> xip_irqpending.
 
-On 08.08.2015 01:34, Wolfram Sang wrote:
-> 
->> if we're talking about this particular series, you should have them in
->> your mailbox, since you have them applied in wsa/i2c/for-next:
-> 
-> Those are already in linus tree. I mean all drivers which use struct
-> i2c_driver. Or do you prefer they go via Greg? I am fine with both.
-> 
+Definitely not.
 
-I think you may find most of the changes applied by Greg into
-misc/char-misc-next branch.
+The issue here is that the kernel sits in flash.  When we want to write
+to flash, we need to switch the flash into a mode where the data
+contained in the flash becomes unreadable - reading from it results in
+status bytes being returned.  Status bytes are not executable.
 
-The only change from the series, which is not found in
-misc/char-misc-next or i2c/for-next is related to at25 driver (IC is
-sitting on SPI):
+To get around that problem, we have a small amount of code in RAM which
+does the flash erasing and/or programming.  This code, however, needs
+to have access to the interrupt controller and timer.
 
-  https://lkml.org/lkml/2015/7/26/101
+Calling generic functions that would be part of the paged-out kernel
+image is just not possible; doing so will immediately crash the kernel
+and break what's being achieved here.  You'd need to mark these functions
+and any functions that they then call (including spinlocks, probably
+the entire lockdep infrastructure, etc) with __xipram.  I don't think
+that's feasible.
 
-Change 8/8 for sunxi is outdated due to accepted NVMEM framework.
+In any case, I don't think XIP multiplatform makes any sense what so
+ever.  Needless to say, it _could_ be made to work, but you're likely
+need some complexity, and given that it has very few users, I don't
+think there's much to be gained from putting that work in.  We've even
+talked a few times about removing XIP support altogether.
 
-With best wishes,
-Vladimir
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
