@@ -1,30 +1,27 @@
-From: nathan_lynch@mentor.com (Nathan Lynch)
-Date: Fri, 7 Aug 2015 21:03:21 -0500
-Subject: [PATCH 0/2] fix vdso coarse clock monotonicity regressions
-Message-ID: <1438999403-5770-1-git-send-email-nathan_lynch@mentor.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Sat, 8 Aug 2015 07:36:42 +0530
+Subject: [PATCH v4 1/6] cpufreq: make scaling_boost_freqs sysfs attr
+ available when boost is enabled
+In-Reply-To: <11605783.uxKCOKbq1D@vostro.rjw.lan>
+References: <1438868514-8814-1-git-send-email-b.zolnierkie@samsung.com>
+ <1594902.Dv5JKhve0y@amdc1976> <20150807113739.GF6939@linux>
+ <11605783.uxKCOKbq1D@vostro.rjw.lan>
+Message-ID: <20150808020642.GL6939@linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 906c55579a63 ("timekeeping: Copy the shadow-timekeeper over the
-real timekeeper last") made it so the user can observe the coarse
-clocks going backwards on arm and arm64, if they're really looking for
-it.
+On 08-08-15, 00:21, Rafael J. Wysocki wrote:
+> > Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+> 
+> And what exactly am I supposed to do with this?
+> 
+> Have a robot that will pick up all patches ACKed by you magically or what?
 
-Technically these are fixing regressions versus 4.1, but I won't be
-bothered if they don't make 4.2 final at this late stage, since only
-the (seldom-used?) coarse clocks are affected.
+:)
 
-I'd like to collect review/acks for these now and make sure they at
-least make it into 4.3-rc1 (and -stable after that).
-
-
-Nathan Lynch (2):
-  ARM: VDSO: fix coarse clock monotonicity regression
-  arm64: VDSO: fix coarse clock monotonicity regression
-
- arch/arm/kernel/vdso.c   | 7 +++----
- arch/arm64/kernel/vdso.c | 7 +++----
- 2 files changed, 6 insertions(+), 8 deletions(-)
+That's why I have asked Bartlomiej specifically to send it separately
+to the pm list as a cpufreq patch. I wasn't expecting you to apply
+right from here.
 
 -- 
-2.1.0
+viresh
