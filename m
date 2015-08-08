@@ -1,144 +1,167 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Sat, 08 Aug 2015 17:10:42 +0100
-Subject: [PATCH 8/9] drm: bridge/dw_hdmi: replace CTS calculation for the ACR
+Date: Sat, 08 Aug 2015 17:10:37 +0100
+Subject: [PATCH 7/9] drm: bridge/dw_hdmi: remove ratio support from ACR code
 In-Reply-To: <20150808160936.GN7557@n2100.arm.linux.org.uk>
 References: <20150808160936.GN7557@n2100.arm.linux.org.uk>
-Message-ID: <E1ZO6hm-0003Ni-E0@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1ZO6hh-0003Nc-A7@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Given the TDMS clock, audio sample rate, and the N parameter, we can
-calculate the CTS value for the audio clock regenerator (ACR) using the
-following calculation given in the HDMI specification:
-
-	CTS = ftdms * N / (128 * fs)
-
-The specification says that the CTS value is an average value, which is
-true if the source hardware measures it.  Where source hardware needs it
-to be programmed, it is particularly difficult to alternate it between
-two values correctly to ensure that we achieve a correct "average"
-fractional value at the sink.
-
-Also, there's the problem that our "ftdms" is not a fully accurate
-value; it is rounded to a kHz value.  This introduces an unnecessary
-(and harmless) fractional value into the above equation for combinations
-like 148.5MHz/1.001 for 44100Hz - we still calculate the correct CTS
-value.
+We never set the ratio for CTS/N calculation for the audio clock
+regenerator (ACR) to anything but 100, so this adds pointless
+complexity.  Should we support pixel repetition, we should update the
+CTS/N calculation code to use those parameters or the actual TMDS clock
+rate instead of a ratio.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/gpu/drm/bridge/dw_hdmi.c | 92 +++++++---------------------------------
- 1 file changed, 16 insertions(+), 76 deletions(-)
+ drivers/gpu/drm/bridge/dw_hdmi.c | 44 ++++++++++++++++------------------------
+ 1 file changed, 18 insertions(+), 26 deletions(-)
 
 diff --git a/drivers/gpu/drm/bridge/dw_hdmi.c b/drivers/gpu/drm/bridge/dw_hdmi.c
-index 60487bff48e3..a4f9aecf1862 100644
+index 5576cd7d7abb..60487bff48e3 100644
 --- a/drivers/gpu/drm/bridge/dw_hdmi.c
 +++ b/drivers/gpu/drm/bridge/dw_hdmi.c
-@@ -272,89 +272,29 @@ static unsigned int hdmi_compute_n(unsigned int freq, unsigned long pixel_clk)
+@@ -140,7 +140,6 @@ struct dw_hdmi {
+ 	unsigned int audio_cts;
+ 	unsigned int audio_n;
+ 	bool audio_enable;
+-	int ratio;
+ 
+ 	void (*write)(struct dw_hdmi *hdmi, u8 val, int offset);
+ 	u8 (*read)(struct dw_hdmi *hdmi, int offset);
+@@ -217,8 +216,7 @@ static void hdmi_set_cts_n(struct dw_hdmi *hdmi, unsigned int cts,
+ 	hdmi_writeb(hdmi, n & 0xff, HDMI_AUD_N1);
+ }
+ 
+-static unsigned int hdmi_compute_n(unsigned int freq, unsigned long pixel_clk,
+-				   unsigned int ratio)
++static unsigned int hdmi_compute_n(unsigned int freq, unsigned long pixel_clk)
+ {
+ 	unsigned int n = (128 * freq) / 1000;
+ 	unsigned int mult = 1;
+@@ -231,9 +229,9 @@ static unsigned int hdmi_compute_n(unsigned int freq, unsigned long pixel_clk,
+ 	switch (freq) {
+ 	case 32000:
+ 		if (pixel_clk == 25175000)
+-			n = (ratio == 150) ? 9152 : 4576;
++			n = 4576;
+ 		else if (pixel_clk == 27027000)
+-			n = (ratio == 150) ? 8192 : 4096;
++			n = 4096;
+ 		else if (pixel_clk == 74176000 || pixel_clk == 148352000)
+ 			n = 11648;
+ 		else
+@@ -247,7 +245,7 @@ static unsigned int hdmi_compute_n(unsigned int freq, unsigned long pixel_clk,
+ 		else if (pixel_clk == 74176000)
+ 			n = 17836;
+ 		else if (pixel_clk == 148352000)
+-			n = (ratio == 150) ? 17836 : 8918;
++			n = 8918;
+ 		else
+ 			n = 6272;
+ 		n *= mult;
+@@ -255,13 +253,13 @@ static unsigned int hdmi_compute_n(unsigned int freq, unsigned long pixel_clk,
+ 
+ 	case 48000:
+ 		if (pixel_clk == 25175000)
+-			n = (ratio == 150) ? 9152 : 6864;
++			n = 6864;
+ 		else if (pixel_clk == 27027000)
+-			n = (ratio == 150) ? 8192 : 6144;
++			n = 6144;
+ 		else if (pixel_clk == 74176000)
+ 			n = 11648;
+ 		else if (pixel_clk == 148352000)
+-			n = (ratio == 150) ? 11648 : 5824;
++			n = 5824;
+ 		else
+ 			n = 6144;
+ 		n *= mult;
+@@ -274,13 +272,11 @@ static unsigned int hdmi_compute_n(unsigned int freq, unsigned long pixel_clk,
  	return n;
  }
  
--static unsigned int hdmi_compute_cts(unsigned int freq, unsigned long pixel_clk)
--{
--	unsigned int cts = 0;
--
--	pr_debug("%s: freq: %d pixel_clk: %ld\n", __func__, freq, pixel_clk);
--
--	switch (freq) {
--	case 32000:
--		if (pixel_clk == 297000000) {
--			cts = 222750;
--			break;
--		}
--	case 48000:
--	case 96000:
--	case 192000:
--		switch (pixel_clk) {
--		case 25200000:
--		case 27000000:
--		case 54000000:
--		case 74250000:
--		case 148500000:
--			cts = pixel_clk / 1000;
--			break;
--		case 297000000:
--			cts = 247500;
--			break;
--		/*
--		 * All other TMDS clocks are not supported by
--		 * DWC_hdmi_tx. The TMDS clocks divided or
--		 * multiplied by 1,001 coefficients are not
--		 * supported.
--		 */
--		default:
--			break;
--		}
--		break;
--	case 44100:
--	case 88200:
--	case 176400:
--		switch (pixel_clk) {
--		case 25200000:
--			cts = 28000;
--			break;
--		case 27000000:
--			cts = 30000;
--			break;
--		case 54000000:
--			cts = 60000;
--			break;
--		case 74250000:
--			cts = 82500;
--			break;
--		case 148500000:
--			cts = 165000;
--			break;
--		case 297000000:
--			cts = 247500;
--			break;
--		default:
--			break;
--		}
--		break;
--	default:
--		break;
--	}
--	return cts;
--}
--
- static void hdmi_set_clk_regenerator(struct dw_hdmi *hdmi,
- 	unsigned long pixel_clk, unsigned int sample_rate)
+-static unsigned int hdmi_compute_cts(unsigned int freq, unsigned long pixel_clk,
+-				     unsigned int ratio)
++static unsigned int hdmi_compute_cts(unsigned int freq, unsigned long pixel_clk)
  {
-+	unsigned long ftdms = pixel_clk;
+ 	unsigned int cts = 0;
+ 
+-	pr_debug("%s: freq: %d pixel_clk: %ld ratio: %d\n", __func__, freq,
+-		 pixel_clk, ratio);
++	pr_debug("%s: freq: %d pixel_clk: %ld\n", __func__, freq, pixel_clk);
+ 
+ 	switch (freq) {
+ 	case 32000:
+@@ -341,26 +337,24 @@ static unsigned int hdmi_compute_cts(unsigned int freq, unsigned long pixel_clk,
+ 	default:
+ 		break;
+ 	}
+-	if (ratio == 100)
+-		return cts;
+-	return (cts * ratio) / 100;
++	return cts;
+ }
+ 
+ static void hdmi_set_clk_regenerator(struct dw_hdmi *hdmi,
+-	unsigned long pixel_clk, unsigned int sample_rate, unsigned int ratio)
++	unsigned long pixel_clk, unsigned int sample_rate)
+ {
  	unsigned int n, cts;
-+	u64 tmp;
  
- 	n = hdmi_compute_n(sample_rate, pixel_clk);
--	cts = hdmi_compute_cts(sample_rate, pixel_clk);
--	if (!cts) {
--		dev_err(hdmi->dev,
--			"%s: pixel clock/sample rate not supported: %luMHz / %ukHz\n",
--			__func__, pixel_clk, sample_rate);
--	}
+-	n = hdmi_compute_n(sample_rate, pixel_clk, ratio);
+-	cts = hdmi_compute_cts(sample_rate, pixel_clk, ratio);
++	n = hdmi_compute_n(sample_rate, pixel_clk);
++	cts = hdmi_compute_cts(sample_rate, pixel_clk);
+ 	if (!cts) {
+ 		dev_err(hdmi->dev,
+ 			"%s: pixel clock/sample rate not supported: %luMHz / %ukHz\n",
+ 			__func__, pixel_clk, sample_rate);
+ 	}
  
--	dev_dbg(hdmi->dev, "%s: samplerate=%ukHz pixelclk=%luMHz N=%d cts=%d\n",
--		__func__, sample_rate, pixel_clk, n, cts);
-+	/*
-+	 * Compute the CTS value from the N value.  Note that CTS and N
-+	 * can be up to 20 bits in total, so we need 64-bit math.  Also
-+	 * note that our TDMS clock is not fully accurate; it is accurate
-+	 * to kHz.  This can introduce an unnecessary remainder in the
-+	 * calculation below, so we don't try to warn about that.
-+	 */
-+	tmp = (u64)ftdms * n;
-+	do_div(tmp, 128 * sample_rate);
-+	cts = tmp;
-+
-+	dev_dbg(hdmi->dev, "%s: fs=%uHz ftdms=%lu.%03luMHz N=%d cts=%d\n",
-+		__func__, sample_rate, ftdms / 1000000, (ftdms / 1000) % 1000,
-+		n, cts);
+-	dev_dbg(hdmi->dev, "%s: samplerate=%ukHz ratio=%d pixelclk=%luMHz N=%d cts=%d\n",
+-		__func__, sample_rate, ratio, pixel_clk, n, cts);
++	dev_dbg(hdmi->dev, "%s: samplerate=%ukHz pixelclk=%luMHz N=%d cts=%d\n",
++		__func__, sample_rate, pixel_clk, n, cts);
  
  	spin_lock_irq(&hdmi->audio_lock);
  	hdmi->audio_n = n;
+@@ -372,8 +366,7 @@ static void hdmi_set_clk_regenerator(struct dw_hdmi *hdmi,
+ static void hdmi_init_clk_regenerator(struct dw_hdmi *hdmi)
+ {
+ 	mutex_lock(&hdmi->audio_mutex);
+-	hdmi_set_clk_regenerator(hdmi, 74250000, hdmi->sample_rate,
+-				 hdmi->ratio);
++	hdmi_set_clk_regenerator(hdmi, 74250000, hdmi->sample_rate);
+ 	mutex_unlock(&hdmi->audio_mutex);
+ }
+ 
+@@ -381,7 +374,7 @@ static void hdmi_clk_regenerator_update_pixel_clock(struct dw_hdmi *hdmi)
+ {
+ 	mutex_lock(&hdmi->audio_mutex);
+ 	hdmi_set_clk_regenerator(hdmi, hdmi->hdmi_data.video_mode.mpixelclock,
+-				 hdmi->sample_rate, hdmi->ratio);
++				 hdmi->sample_rate);
+ 	mutex_unlock(&hdmi->audio_mutex);
+ }
+ 
+@@ -390,7 +383,7 @@ void dw_hdmi_set_sample_rate(struct dw_hdmi *hdmi, unsigned int rate)
+ 	mutex_lock(&hdmi->audio_mutex);
+ 	hdmi->sample_rate = rate;
+ 	hdmi_set_clk_regenerator(hdmi, hdmi->hdmi_data.video_mode.mpixelclock,
+-				 hdmi->sample_rate, hdmi->ratio);
++				 hdmi->sample_rate);
+ 	mutex_unlock(&hdmi->audio_mutex);
+ }
+ EXPORT_SYMBOL_GPL(dw_hdmi_set_sample_rate);
+@@ -1746,7 +1739,6 @@ int dw_hdmi_bind(struct device *dev, struct device *master,
+ 	hdmi->dev = dev;
+ 	hdmi->dev_type = plat_data->dev_type;
+ 	hdmi->sample_rate = 48000;
+-	hdmi->ratio = 100;
+ 	hdmi->encoder = encoder;
+ 	hdmi->disabled = true;
+ 	hdmi->rxsense = true;
 -- 
 2.1.0
