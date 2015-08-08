@@ -1,279 +1,200 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 8 Aug 2015 15:29:47 +0100
-Subject: [PATCH v2] iio: adc: vf610: Add IIO buffer support for Vybrid ADC
-In-Reply-To: <1bb1f290da601bbda41875a92ba6e983b423d7b0.1438775572.git.maitysanchayan@gmail.com>
-References: <cover.1438775572.git.maitysanchayan@gmail.com>
- <1bb1f290da601bbda41875a92ba6e983b423d7b0.1438775572.git.maitysanchayan@gmail.com>
-Message-ID: <55C6125B.1060103@kernel.org>
+From: wei.liu2@citrix.com (Wei Liu)
+Date: Sat, 8 Aug 2015 15:55:34 +0100
+Subject: [PATCH v3 18/20] net/xen-netback: Make it running on 64KB page
+ granularity
+In-Reply-To: <1438966019-19322-19-git-send-email-julien.grall@citrix.com>
+References: <1438966019-19322-1-git-send-email-julien.grall@citrix.com>
+ <1438966019-19322-19-git-send-email-julien.grall@citrix.com>
+Message-ID: <20150808145534.GB14214@zion.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/08/15 13:10, Sanchayan Maity wrote:
-> This patch adds support for IIO buffer to the Vybrid ADC driver.
-> IIO triggered buffer infrastructure along with iio sysfs trigger
-> is used to leverage continuous sampling support provided by the
-> ADC block.
-Looking good.  Just a couple more bits and pieces inline from me.
-One or two of which aren't corrected from Peter's review of v1.
-
-I will want Fugang Dong's ack / review tag on the final version
-before applying it however.  This driver is some distance form my
-area of expertise!
-
-Jonathan
+On Fri, Aug 07, 2015 at 05:46:57PM +0100, Julien Grall wrote:
+> The PV network protocol is using 4KB page granularity. The goal of this
+> patch is to allow a Linux using 64KB page granularity working as a
+> network backend on a non-modified Xen.
 > 
-> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+> It's only necessary to adapt the ring size and break skb data in small
+> chunk of 4KB. The rest of the code is relying on the grant table code.
+> 
+> Signed-off-by: Julien Grall <julien.grall@citrix.com>
+> 
 > ---
->  drivers/iio/adc/Kconfig     |   4 ++
->  drivers/iio/adc/vf610_adc.c | 107 +++++++++++++++++++++++++++++++++++++++++---
->  2 files changed, 105 insertions(+), 6 deletions(-)
+> Cc: Ian Campbell <ian.campbell@citrix.com>
+> Cc: Wei Liu <wei.liu2@citrix.com>
+> Cc: netdev at vger.kernel.org
 > 
-> diff --git a/drivers/iio/adc/Kconfig b/drivers/iio/adc/Kconfig
-> index 7c55658..4661241 100644
-> --- a/drivers/iio/adc/Kconfig
-> +++ b/drivers/iio/adc/Kconfig
-> @@ -337,6 +337,10 @@ config TWL6030_GPADC
->  config VF610_ADC
->  	tristate "Freescale vf610 ADC driver"
->  	depends on OF
-> +	select IIO_BUFFER
-> +	select IIO_TRIGGER
-> +	select IIO_SYSFS_TRIGGER
-Unless I missed something there is no dependency on this particular
-trigger (it just happens to be the one you've been testing with I guess).
-Could be driven from a hardware trigger belonging to another device for
-example.
-
-> +	select IIO_TRIGGERED_BUFFER
->  	help
->  	  Say yes here to support for Vybrid board analog-to-digital converter.
->  	  Since the IP is used for i.MX6SLX, the driver also support i.MX6SLX.
-> diff --git a/drivers/iio/adc/vf610_adc.c b/drivers/iio/adc/vf610_adc.c
-> index 23b8fb9..97cb2ed 100644
-> --- a/drivers/iio/adc/vf610_adc.c
-> +++ b/drivers/iio/adc/vf610_adc.c
-> @@ -34,8 +34,11 @@
->  #include <linux/err.h>
+[...]
+> +#define XEN_NETIF_TX_RING_SIZE __CONST_RING_SIZE(xen_netif_tx, XEN_PAGE_SIZE)
+> +#define XEN_NETIF_RX_RING_SIZE __CONST_RING_SIZE(xen_netif_rx, XEN_PAGE_SIZE)
 >  
->  #include <linux/iio/iio.h>
-> +#include <linux/iio/buffer.h>
->  #include <linux/iio/sysfs.h>
-> -#include <linux/iio/driver.h>
-> +#include <linux/iio/trigger.h>
-> +#include <linux/iio/trigger_consumer.h>
-> +#include <linux/iio/triggered_buffer.h>
+>  struct xenvif_rx_meta {
+>  	int id;
+> @@ -80,16 +81,18 @@ struct xenvif_rx_meta {
+>  /* Discriminate from any valid pending_idx value. */
+>  #define INVALID_PENDING_IDX 0xFFFF
 >  
->  /* This will be the driver name the kernel reports */
->  #define DRIVER_NAME "vf610-adc"
-> @@ -170,6 +173,7 @@ struct vf610_adc {
->  	u32 sample_freq_avail[5];
+> -#define MAX_BUFFER_OFFSET PAGE_SIZE
+> +#define MAX_BUFFER_OFFSET XEN_PAGE_SIZE
 >  
->  	struct completion completion;
-> +	u16 buffer[2];
-Note the requirements on the buffer provided to
-iio_push_to_buffers_with_timestamp
-Needs to be u16 buffer[8] to allow for the aligned 64bit (4 word) timestamp.
-
-Peter pointed this out in his follow up email and you said you'd implement
-it.. Guessing this got lost somewhere.
-
-
->  };
+>  #define MAX_PENDING_REQS XEN_NETIF_TX_RING_SIZE
 >  
->  static const u32 vf610_hw_avgs[] = { 1, 4, 8, 16, 32 };
-> @@ -505,12 +509,22 @@ static const struct iio_chan_spec_ext_info vf610_ext_info[] = {
->  	.info_mask_shared_by_type = BIT(IIO_CHAN_INFO_SCALE) |	\
->  				BIT(IIO_CHAN_INFO_SAMP_FREQ),	\
->  	.ext_info = vf610_ext_info,				\
-> +	.address = (_idx),				\
-> +	.scan_index = (_idx),			\
-> +	.scan_type.sign = 'u',			\
-> +	.scan_type.realbits = 12,		\
-> +	.scan_type.storagebits = 16,	\
+> +#define MAX_XEN_SKB_FRAGS (65536 / XEN_PAGE_SIZE + 1)
+> +
+
+It might be clearer if you add a comment saying the maximum number of
+frags is derived from the page size of the grant page, which happens to
+be XEN_PAGE_SIZE at the moment. 
+
+In the future we need to figure out the page size of grant page in a
+dynamic way. We shall cross the bridge when we get there.
+
+>  /* It's possible for an skb to have a maximal number of frags
+>   * but still be less than MAX_BUFFER_OFFSET in size. Thus the
+> - * worst-case number of copy operations is MAX_SKB_FRAGS per
+> + * worst-case number of copy operations is MAX_XEN_SKB_FRAGS per
+>   * ring slot.
+>   */
+> -#define MAX_GRANT_COPY_OPS (MAX_SKB_FRAGS * XEN_NETIF_RX_RING_SIZE)
+> +#define MAX_GRANT_COPY_OPS (MAX_XEN_SKB_FRAGS * XEN_NETIF_RX_RING_SIZE)
+>  
+>  #define NETBACK_INVALID_HANDLE -1
+>  
+> @@ -203,7 +206,7 @@ struct xenvif_queue { /* Per-queue data for xenvif */
+>  /* Maximum number of Rx slots a to-guest packet may use, including the
+>   * slot needed for GSO meta-data.
+>   */
+> -#define XEN_NETBK_RX_SLOTS_MAX (MAX_SKB_FRAGS + 1)
+> +#define XEN_NETBK_RX_SLOTS_MAX ((MAX_XEN_SKB_FRAGS + 1))
+>  
+>  enum state_bit_shift {
+>  	/* This bit marks that the vif is connected */
+> diff --git a/drivers/net/xen-netback/netback.c b/drivers/net/xen-netback/netback.c
+> index 66f1780..c32a9f2 100644
+> --- a/drivers/net/xen-netback/netback.c
+> +++ b/drivers/net/xen-netback/netback.c
+> @@ -263,6 +263,80 @@ static struct xenvif_rx_meta *get_next_rx_buffer(struct xenvif_queue *queue,
+>  	return meta;
 >  }
 >  
->  #define VF610_ADC_TEMPERATURE_CHAN(_idx, _chan_type) {	\
->  	.type = (_chan_type),	\
->  	.channel = (_idx),		\
->  	.info_mask_separate = BIT(IIO_CHAN_INFO_PROCESSED),	\
-> +	.address = (_idx),						\
-> +	.scan_index = (_idx),					\
-.scan_type = {
-	   .sign = 'u',
-	   etc.
-
-Peter picked up on this..
-
-> +	.scan_type.sign = 'u',					\
-> +	.scan_type.realbits = 12,				\
-> +	.scan_type.storagebits = 16,			\
->  }
->  
->  static const struct iio_chan_spec vf610_adc_iio_channels[] = {
-> @@ -531,6 +545,7 @@ static const struct iio_chan_spec vf610_adc_iio_channels[] = {
->  	VF610_ADC_CHAN(14, IIO_VOLTAGE),
->  	VF610_ADC_CHAN(15, IIO_VOLTAGE),
->  	VF610_ADC_TEMPERATURE_CHAN(26, IIO_TEMP),
-> +	IIO_CHAN_SOFT_TIMESTAMP(32),
-It's bit extreme throwing it out at scan_index 32.  Is there a reason
-to think that migh be neccesary?  Mind you, why is the temperature
-channel down at 26?  Are we dealing with a set of reserved real channels
-inbetween?
->  	/* sentinel */
->  };
->  
-> @@ -559,13 +574,20 @@ static int vf610_adc_read_data(struct vf610_adc *info)
->  
->  static irqreturn_t vf610_adc_isr(int irq, void *dev_id)
+[...]
+>   * Set up the grant operations for this fragment. If it's a flipping
+>   * interface, we also set up the unmap request from here.
+> @@ -272,83 +346,52 @@ static void xenvif_gop_frag_copy(struct xenvif_queue *queue, struct sk_buff *skb
+>  				 struct page *page, unsigned long size,
+>  				 unsigned long offset, int *head)
 >  {
-> -	struct vf610_adc *info = (struct vf610_adc *)dev_id;
-> +	struct iio_dev *indio_dev = (struct iio_dev *)dev_id;
-> +	struct vf610_adc *info = iio_priv(indio_dev);
->  	int coco;
+> -	struct gnttab_copy *copy_gop;
+> -	struct xenvif_rx_meta *meta;
+> +	struct gop_frag_copy info = {
+> +		.queue = queue,
+> +		.npo = npo,
+> +		.head = *head,
+> +		.gso_type = XEN_NETIF_GSO_TYPE_NONE,
+> +	};
+>  	unsigned long bytes;
+> -	int gso_type = XEN_NETIF_GSO_TYPE_NONE;
 >  
->  	coco = readl(info->regs + VF610_REG_ADC_HS);
->  	if (coco & VF610_ADC_HS_COCO0) {
->  		info->value = vf610_adc_read_data(info);
-
-I'd be tempted to make the non buffered path also use
-info->bufffer[0] and drop info->value entirely.
-A more invasive patch, but a cleaner resulting code (slightly!)
-> -		complete(&info->completion);
-> +		if (iio_buffer_enabled(indio_dev)) {
-> +			info->buffer[0] = info->value;
-> +			iio_push_to_buffers_with_timestamp(indio_dev,
-> +					info->buffer, iio_get_time_ns());
-> +			iio_trigger_notify_done(indio_dev->trig);
-> +		} else
-> +			complete(&info->completion);
+>  	if (skb_is_gso(skb)) {
+>  		if (skb_shinfo(skb)->gso_type & SKB_GSO_TCPV4)
+> -			gso_type = XEN_NETIF_GSO_TYPE_TCPV4;
+> +			info.gso_type = XEN_NETIF_GSO_TYPE_TCPV4;
+>  		else if (skb_shinfo(skb)->gso_type & SKB_GSO_TCPV6)
+> -			gso_type = XEN_NETIF_GSO_TYPE_TCPV6;
+> +			info.gso_type = XEN_NETIF_GSO_TYPE_TCPV6;
 >  	}
 >  
->  	return IRQ_HANDLED;
-> @@ -612,6 +634,9 @@ static int vf610_read_raw(struct iio_dev *indio_dev,
->  	switch (mask) {
->  	case IIO_CHAN_INFO_RAW:
->  	case IIO_CHAN_INFO_PROCESSED:
-
-To avoid possible races this check should be done under the mlock.
-> +		if (iio_buffer_enabled(indio_dev))
-> +			return -EBUSY;
-> +
->  		mutex_lock(&indio_dev->mlock);
->  		reinit_completion(&info->completion);
+>  	/* Data must not cross a page boundary. */
+>  	BUG_ON(size + offset > PAGE_SIZE<<compound_order(page));
 >  
-> @@ -694,6 +719,68 @@ static int vf610_write_raw(struct iio_dev *indio_dev,
->  	return -EINVAL;
+> -	meta = npo->meta + npo->meta_prod - 1;
+> +	info.meta = npo->meta + npo->meta_prod - 1;
+>  
+>  	/* Skip unused frames from start of page */
+>  	page += offset >> PAGE_SHIFT;
+>  	offset &= ~PAGE_MASK;
+>  
+>  	while (size > 0) {
+> -		struct xen_page_foreign *foreign;
+> -
+>  		BUG_ON(offset >= PAGE_SIZE);
+> -		BUG_ON(npo->copy_off > MAX_BUFFER_OFFSET);
+> -
+> -		if (npo->copy_off == MAX_BUFFER_OFFSET)
+> -			meta = get_next_rx_buffer(queue, npo);
+>  
+>  		bytes = PAGE_SIZE - offset;
+>  		if (bytes > size)
+>  			bytes = size;
+>  
+> -		if (npo->copy_off + bytes > MAX_BUFFER_OFFSET)
+> -			bytes = MAX_BUFFER_OFFSET - npo->copy_off;
+> -
+> -		copy_gop = npo->copy + npo->copy_prod++;
+> -		copy_gop->flags = GNTCOPY_dest_gref;
+> -		copy_gop->len = bytes;
+> -
+> -		foreign = xen_page_foreign(page);
+> -		if (foreign) {
+> -			copy_gop->source.domid = foreign->domid;
+> -			copy_gop->source.u.ref = foreign->gref;
+> -			copy_gop->flags |= GNTCOPY_source_gref;
+> -		} else {
+> -			copy_gop->source.domid = DOMID_SELF;
+> -			copy_gop->source.u.gmfn =
+> -				virt_to_gfn(page_address(page));
+> -		}
+> -		copy_gop->source.offset = offset;
+> -
+> -		copy_gop->dest.domid = queue->vif->domid;
+> -		copy_gop->dest.offset = npo->copy_off;
+> -		copy_gop->dest.u.ref = npo->copy_gref;
+> -
+> -		npo->copy_off += bytes;
+> -		meta->size += bytes;
+> -
+> -		offset += bytes;
+> +		info.page = page;
+> +		gnttab_foreach_grant_in_range(page, offset, bytes,
+> +					      xenvif_gop_frag_copy_grant,
+> +					      &info);
+
+Looks like I need to at least wait until the API is settle before giving
+my ack.
+
+>  		size -= bytes;
+> +		offset = 0;
+
+This looks wrong. Should be offset += bytes.
+
+>  
+> -		/* Next frame */
+> -		if (offset == PAGE_SIZE && size) {
+> +		/* Next page */
+> +		if (size) {
+>  			BUG_ON(!PageCompound(page));
+>  			page++;
+> -			offset = 0;
+
+And this should not be deleted, I think.
+
+What is the reason for changing offset calculation? I think there is
+still compound page when using 64K page.
+
+>  		}
+> -
+> -		/* Leave a gap for the GSO descriptor. */
+> -		if (*head && ((1 << gso_type) & queue->vif->gso_mask))
+> -			queue->rx.req_cons++;
+> -
+> -		*head = 0; /* There must be something in this buffer now. */
+> -
+>  	}
+> +
+> +	*head = info.head;
 >  }
 >  
-> +static int vf610_adc_buffer_postenable(struct iio_dev *indio_dev)
-> +{
-> +	struct vf610_adc *info = iio_priv(indio_dev);
-> +	unsigned int channel;
-> +	int ret;
-> +	int val;
-> +
-> +	ret = iio_triggered_buffer_postenable(indio_dev);
-> +	if (ret)
-> +		return ret;
-> +
-> +	val = readl(info->regs + VF610_REG_ADC_GC);
-> +	val |= VF610_ADC_ADCON;
-> +	writel(val, info->regs + VF610_REG_ADC_GC);
-> +
-> +	channel = find_first_bit(indio_dev->active_scan_mask,
-> +						indio_dev->masklength);
-> +
-> +	val = VF610_ADC_ADCHC(channel);
-> +	val |= VF610_ADC_AIEN;
-> +
-> +	writel(val, info->regs + VF610_REG_ADC_HC0);
-> +
-> +	return 0;
-> +}
-> +
-> +static int vf610_adc_buffer_postdisable(struct iio_dev *indio_dev)
-> +{
-> +	struct vf610_adc *info = iio_priv(indio_dev);
-> +	unsigned int hc_cfg = 0;
-> +	int val;
-> +
-> +	val = readl(info->regs + VF610_REG_ADC_GC);
-> +	val &= ~VF610_ADC_ADCON;
-> +	writel(val, info->regs + VF610_REG_ADC_GC);
-> +
-> +	hc_cfg |= VF610_ADC_CONV_DISABLE;
-> +	hc_cfg &= ~VF610_ADC_AIEN;
-> +
-> +	writel(hc_cfg, info->regs + VF610_REG_ADC_HC0);
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct iio_buffer_setup_ops iio_triggered_buffer_setup_ops = {
-> +	.postenable = &vf610_adc_buffer_postenable,
-> +	.predisable = &iio_triggered_buffer_predisable,
-> +	.postdisable = &vf610_adc_buffer_postdisable,
-> +	.validate_scan_mask = &iio_validate_scan_mask_onehot,
-> +};
-> +
-> +static int vf610_adc_buffer_init(struct iio_dev *indio_dev)
-> +{
-> +	return iio_triggered_buffer_setup(indio_dev, &iio_pollfunc_store_time,
-> +		NULL, &iio_triggered_buffer_setup_ops);
-> +}
-> +
-> +static void vf610_adc_buffer_remove(struct iio_dev *indio_dev)
-> +{
-> +	iio_triggered_buffer_cleanup(indio_dev);
-> +}
-These to wrappers seem a little superflous. I'd have just put the code
-inline, but it's obviously a matter of personal taste and I don't care
-that much!
 
-> +
->  static int vf610_adc_reg_access(struct iio_dev *indio_dev,
->  			unsigned reg, unsigned writeval,
->  			unsigned *readval)
-> @@ -753,7 +840,7 @@ static int vf610_adc_probe(struct platform_device *pdev)
->  
->  	ret = devm_request_irq(info->dev, irq,
->  				vf610_adc_isr, 0,
-> -				dev_name(&pdev->dev), info);
-> +				dev_name(&pdev->dev), indio_dev);
->  	if (ret < 0) {
->  		dev_err(&pdev->dev, "failed requesting irq, irq = %d\n", irq);
->  		return ret;
-> @@ -806,15 +893,22 @@ static int vf610_adc_probe(struct platform_device *pdev)
->  	vf610_adc_cfg_init(info);
->  	vf610_adc_hw_init(info);
->  
-> +	ret = vf610_adc_buffer_init(indio_dev);
-> +	if (ret < 0) {
-> +		dev_err(&pdev->dev, "Couldn't initialise the buffer\n");
-> +		goto error_iio_device_register;
-> +	}
-> +
->  	ret = iio_device_register(indio_dev);
->  	if (ret) {
->  		dev_err(&pdev->dev, "Couldn't register the device.\n");
-> -		goto error_iio_device_register;
-> +		goto error_adc_buffer_init;
->  	}
->  
->  	return 0;
->  
-> -
-> +error_adc_buffer_init:
-> +	vf610_adc_buffer_remove(indio_dev);
->  error_iio_device_register:
->  	clk_disable_unprepare(info->clk);
->  error_adc_clk_enable:
-> @@ -829,6 +923,7 @@ static int vf610_adc_remove(struct platform_device *pdev)
->  	struct vf610_adc *info = iio_priv(indio_dev);
->  
->  	iio_device_unregister(indio_dev);
-> +	vf610_adc_buffer_remove(indio_dev);
->  	regulator_disable(info->vref);
->  	clk_disable_unprepare(info->clk);
->  
-> 
+The reset looks OK.
+
+Wei.
