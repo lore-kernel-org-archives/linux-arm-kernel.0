@@ -1,40 +1,30 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 8 Aug 2015 20:34:12 +0100
-Subject: [BUG, RFC] MTD Execute in Place on ARM breaks build
-In-Reply-To: <55C64FE6.40007@tul.cz>
-References: <55C51319.2010901@tul.cz> <1564596.BEQS8u7XSM@wuerfel>
- <20150808134708.GK7557@n2100.arm.linux.org.uk>
- <55C64FE6.40007@tul.cz>
-Message-ID: <20150808193412.GP7557@n2100.arm.linux.org.uk>
+From: oliver@schinagl.nl (Olliver Schinagl)
+Date: Sat,  8 Aug 2015 21:41:51 +0200
+Subject: [PATCH v6] ARM: sun4i: spi: Allow transfers larger than FIFO size
+Message-ID: <1439062912-4405-1-git-send-email-oliver@schinagl.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 08, 2015 at 08:52:22PM +0200, Petr Cvek wrote:
-> How often are these chips erased/written? If it is only for system
-> image update, it could be done with special code (something like
-> BIOS flashing).
+Alexandru sent this patch over a year and a half ago, and I believe several
+tree's have been carrying it since. We've been using this patch on an
+Olimex OLinuxIno Lime1 and Lime2 using the mmc-spi driver to access SD cards
+without problems. So bumping this and adding my
 
-I have no idea what the use case is for this.  Nicolas did all the
-development work while working for Montavista...  It's entirely
-possible that people use jffs2 or some other writable filesystem.
+Tested-by: Olliver Schinagl <oliver@schinagl.nl>
 
-> Anyway, is my patch proposal for build fixing OK?
+Changes from v5as warned by checkpatch. No functional changes.
+ * Added some newlines to make checkpatch happy. No functional changes.
 
-I don't think so - it effectively hides the broken nature of it,
-which really isn't what kernel maintanence is about.  If something
-is wrong, either it needs to be fixed properly, or it needs to stay
-as a reportable bug so it reminds people that it needs to be fixed.
-Papering over a bug with something that doesn't work isn't a way
-forward.
+Changes from v4:
+ * use min3() instead of two if statements in sun4i_spi_fill_fifo()
+ * fix trivial whitespace issue in if statement in sun4i_spi_handler()
+ * use consistent style in assigning 'reg' in the added functions.
 
-Arnd suggested getting around some of the issue with:
+Alexandru Gagniuc (1):
+  ARM: sun4i: spi: Allow transfers larger than FIFO size
 
-	#define xip_currtime()  readl_relaxed(OSCR)
-
-which would be a step in the right direction - that should issue
-correct code on PXA to read the OSCR register from the __xipram
-marked code.
+ drivers/spi/spi-sun4i.c | 76 +++++++++++++++++++++++++++++++++++++++++++------
+ 1 file changed, 67 insertions(+), 9 deletions(-)
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+2.1.4
