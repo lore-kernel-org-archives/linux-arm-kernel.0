@@ -1,76 +1,66 @@
 From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Sun, 9 Aug 2015 15:03:14 +0200
-Subject: [PATCH v3 01/18] platform: delay OF device-driver matches until
- late_initcall
-In-Reply-To: <55C4E597.1010701@ti.com>
-References: <1438870315-18689-1-git-send-email-tomeu.vizoso@collabora.com>
- <1438870315-18689-2-git-send-email-tomeu.vizoso@collabora.com>
- <CAL_Jsq+GLMZe-f6qEi=7i1YrrWc6k99RpGkOyCd5KkYDiyt0QA@mail.gmail.com>
- <CAAObsKBapFqzr+4YEXJfcJWMd+tkaBqYbGiFTntHStAP=+P-_Q@mail.gmail.com>
- <55C4E597.1010701@ti.com>
-Message-ID: <CAAObsKDJsuhuQfLbxq27Mtm1T_Auz7Gohp8PDyK7rNNDyaGhcg@mail.gmail.com>
+Date: Sun, 9 Aug 2015 15:37:36 +0200
+Subject: [PATCH v2 13/22] i2c: core: Probe i2c master devices on demand
+In-Reply-To: <20150809123430.GB1521@katana>
+References: <1438089593-7696-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1438089593-7696-14-git-send-email-tomeu.vizoso@collabora.com>
+ <20150809123430.GB1521@katana>
+Message-ID: <CAAObsKBUxtdT7gsO9mh__E5kFamp9yPUAetxJJ=ftV4Bu_b2HA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 August 2015 at 19:06, Grygorii Strashko <grygorii.strashko@ti.com> wrote:
-> On 08/07/2015 10:11 AM, Tomeu Vizoso wrote:
->> On 6 August 2015 at 22:19, Rob Herring <robherring2@gmail.com> wrote:
->>> On Thu, Aug 6, 2015 at 9:11 AM, Tomeu Vizoso <tomeu.vizoso@collabora.com> wrote:
->>>> Delay matches of platform devices with OF nodes until late_initcall,
->>>> when we are sure that all built-in drivers have been registered already.
->>>> This is needed to prevent deferred probes because of some drivers not
->>>> having registered yet.
->>>>
->>>> The reason why only platform devices are delayed is that some other
->>>> devices are expected to be probed earlier than late_initcall, for
->>>> example, the system PNP driver needs to probe its devices in
->>>> fs_initcall.
->>>>
->>>> Additionally, only platform devices with OF nodes are delayed because
->>>> some machines may depend on oter platform devices being registered at
->>>> specific times.
->>>
->>> How do we know that these probes occur before the unused clocks and
->>> regulators are turned off? Just getting lucky (as is deferred probe)?
->>> Can we do this one level earlier so we have a level left to do things
->>> after probe.
+On 9 August 2015 at 14:34, Wolfram Sang <wsa@the-dreams.de> wrote:
+> On Tue, Jul 28, 2015 at 03:19:44PM +0200, Tomeu Vizoso wrote:
+>> When looking up an i2c master through its firmware node, probe it if it
+>> hasn't already.
 >>
->> Those are already late_initcall_sync so I guess we're fine.
+>> The goal is to reduce deferred probes to a minimum, as it makes it very
+>> cumbersome to find out why a device failed to probe, and can introduce
+>> very big delays in when a critical device is probed.
+>>
+>> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
 >
-> I wouldn't be so sure :(
-> FYI:
-> http://git.ti.com/ti-linux-kernel/ti-linux-kernel/commit/763d643bbfc0f445c6685c541fcae3c370e4314a
+> What is the status of this series?
 
-If I understand the situation correctly, this is one more instance of
-starting to do some work at some point and hoping that something else
-that started before has already finished happening. If that's the
-case, how does this series make that worst?
+See here for a summary:
 
-During this development I have found many hacks intended to put some
-order, even if not enough care was taken to make sure that the order
-was guaranteed. In general I would recommend for moving code into
-proper drivers and have them to defer the probe of their devices if
-some dependency isn't fulfilled at that moment.
+http://lkml.kernel.org/g/1438870315-18689-1-git-send-email-tomeu.vizoso at collabora.com
 
-Once that's done and we have a safe and reliable boot, we can avoid
-those deferred probes by fulfilling the dependency on-demand as this
-series shows.
+> The boot time reduction sounds great.
 
-There was some recent thread about how the disabling of unused clocks
-and regulators isn't really safe because after late_initcall_sync more
-drivers can be registered from modules. Furthermore, there's async
-device probes.
+Note that this should not reduce total boot time substantially, as the
+time wasted due to superfluous probe deferrals is really small when
+compared to the time spent in delays due to hardware constraints. If
+you want to reduce total boot time, async probing may be helpful in
+some scenarios.
 
 Regards,
 
 Tomeu
 
+>> ---
+>>
+>> Changes in v2: None
+>>
+>>  drivers/i2c/i2c-core.c | 2 ++
+>>  1 file changed, 2 insertions(+)
+>>
+>> diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
+>> index e6d4935161e4..5520b413e3db 100644
+>> --- a/drivers/i2c/i2c-core.c
+>> +++ b/drivers/i2c/i2c-core.c
+>> @@ -1353,6 +1353,8 @@ struct i2c_adapter *of_find_i2c_adapter_by_node(struct device_node *node)
+>>  {
+>>       struct device *dev;
+>>
+>> +     fwnode_ensure_device(&node->fwnode);
 >
-> --
-> regards,
-> -grygorii
+> TBH, the function name doesn't tell me a lot. It ensures what?
 >
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>> +
+>>       dev = bus_find_device(&i2c_bus_type, NULL, node,
+>>                                        of_dev_node_match);
+>>       if (!dev)
+>> --
+>> 2.4.3
+>>
