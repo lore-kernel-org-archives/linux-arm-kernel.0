@@ -1,131 +1,200 @@
 From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
-Date: Sun, 9 Aug 2015 15:02:45 +0700
-Subject: [PATCH v4 09/10] PCI: ACPI: Bind GIC MSI frame to PCI host bridge
-In-Reply-To: <55C0C685.4000400@arm.com>
+Date: Sun, 9 Aug 2015 15:04:31 +0700
+Subject: [PATCH v4 10/10] irqchip / gicv2m: Introducing gicv2m_acpi_init()
+In-Reply-To: <55C0CAC4.3010202@arm.com>
 References: <1438164539-29256-1-git-send-email-hanjun.guo@linaro.org>
- <1438164539-29256-10-git-send-email-hanjun.guo@linaro.org>
- <55C0C685.4000400@arm.com>
-Message-ID: <55C70925.2000306@amd.com>
+ <1438164539-29256-11-git-send-email-hanjun.guo@linaro.org>
+ <55C0CAC4.3010202@arm.com>
+Message-ID: <55C7098F.5010303@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Marc,
 
-On 8/4/15 21:04, Marc Zyngier wrote:
+On 8/4/15 21:23, Marc Zyngier wrote:
 > On 29/07/15 11:08, Hanjun Guo wrote:
 >> From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 >>
->> This patch introduces pci_host_bridge_acpi_msi_domain(), which queries
->> a GIC MSI irq-domain token and use it to retrieve an irq_domain with
->> DOMAIN_BUS_PCI_MSI bus type, and bind it to PCI host-bridge.
+>> This patch introduces gicv2m_acpi_init(), which uses information
+>> in MADT GIC MSI frames structure to initialize GICv2m driver.
+>> It also refactors gicv2m_init_one() to handle both DT and ACPI
+>> initialization path.
 >>
 >> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 >> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 >> ---
->>   drivers/pci/pci-acpi.c   | 18 ++++++++++++++++++
->>   drivers/pci/probe.c      |  3 +++
->>   include/linux/pci-acpi.h |  4 ++++
->>   3 files changed, 25 insertions(+)
+>>   drivers/irqchip/irq-gic-v2m.c   | 111 +++++++++++++++++++++++++++++++---------
+>>   drivers/irqchip/irq-gic.c       |   3 ++
+>>   include/linux/irqchip/arm-gic.h |   7 +++
+>>   3 files changed, 98 insertions(+), 23 deletions(-)
 >>
->> diff --git a/drivers/pci/pci-acpi.c b/drivers/pci/pci-acpi.c
->> index 314a625..5f11653 100644
->> --- a/drivers/pci/pci-acpi.c
->> +++ b/drivers/pci/pci-acpi.c
->> @@ -9,6 +9,7 @@
+>> diff --git a/drivers/irqchip/irq-gic-v2m.c b/drivers/irqchip/irq-gic-v2m.c
+>> index d0fcbf8..c491a08 100644
+>> --- a/drivers/irqchip/irq-gic-v2m.c
+>> +++ b/drivers/irqchip/irq-gic-v2m.c
+>> @@ -15,6 +15,7 @@
 >>
->>   #include <linux/delay.h>
->>   #include <linux/init.h>
->> +#include <linux/irqdomain.h>
->>   #include <linux/pci.h>
->>   #include <linux/pci_hotplug.h>
->>   #include <linux/module.h>
->> @@ -16,6 +17,7 @@
->>   #include <linux/pci-acpi.h>
->>   #include <linux/pm_runtime.h>
->>   #include <linux/pm_qos.h>
->> +#include <acpi/acpi_gic.h>
->>   #include "pci.h"
+>>   #define pr_fmt(fmt) "GICv2m: " fmt
 >>
->>   /*
->> @@ -681,6 +683,22 @@ static bool pci_acpi_bus_match(struct device *dev)
->>   	return dev_is_pci(dev);
+>> +#include <linux/acpi.h>
+>>   #include <linux/irq.h>
+>>   #include <linux/irqdomain.h>
+>>   #include <linux/kernel.h>
+>> @@ -211,6 +212,10 @@ static bool is_msi_spi_valid(u32 base, u32 num)
+>>   	return true;
 >>   }
 >>
->> +#ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
->> +struct irq_domain *pci_host_bridge_acpi_msi_domain(struct pci_bus *bus)
+>> +char gicv2m_domain_name[] = "GICV2M";
+>> +char gicv2m_pci_msi_domain_name[] = "GICV2M-PCI-MSI";
+>> +char gicv2m_plat_msi_domain_name[] = "GICV2M-PLAT-MSI";
+>> +
+>
+> Can't these be static? Why do we need them?
+
+Of course, this is not needed. I figured it was useful when I was 
+debugging the irq domain hierarchy stuff. I'll remove it then.
+
+[...]
+>> @@ -329,15 +330,79 @@ int __init gicv2m_of_init(struct device_node *node, struct irq_domain *parent)
+>>
+>>   	for (child = of_find_matching_node(node, gicv2m_device_id); child;
+>>   	     child = of_find_matching_node(child, gicv2m_device_id)) {
+>> +		u32 spi_start = 0, nr_spis = 0;
+>> +		struct resource res;
+>> +
+>>   		if (!of_find_property(child, "msi-controller", NULL))
+>>   			continue;
+>>
+>> -		ret = gicv2m_init_one(child, parent);
+>> +		ret = of_address_to_resource(child, 0, &res);
+>> +		if (ret) {
+>> +			pr_err("Failed to allocate v2m resource.\n");
+>> +			break;
+>> +		}
+>> +
+>> +		if (!of_property_read_u32(child, "arm,msi-base-spi", &spi_start) &&
+>> +		    !of_property_read_u32(child, "arm,msi-num-spis", &nr_spis))
+>> +			pr_info("Overriding V2M MSI_TYPER (base:%u, num:%u)\n",
+>> +				spi_start, nr_spis);
+>> +
+>> +		ret = gicv2m_init_one(parent, &spi_start, &nr_spis, &res,
+>
+> If these spi_start and nr_spis pointers passed to gicv2m_init_one are
+> only for the benefit of printing the message below, just move the
+> message inside the function...
+>
+
+Ok.
+
+>> +				      child);
+>>   		if (ret) {
+>>   			of_node_put(node);
+>>   			break;
+>>   		}
+>> +
+>> +		pr_info("Node %s: range[%#lx:%#lx], SPI[%d:%d]\n", child->name,
+>> +			(unsigned long)res.start, (unsigned long)res.end,
+>> +			spi_start, (spi_start + nr_spis));
+>>   	}
+>>
+>>   	return ret;
+>>   }
+>> +
+>> +#ifdef CONFIG_ACPI
+>> +int __init gicv2m_acpi_init(struct acpi_table_header *table,
+>> +			    struct irq_domain *parent)
 >> +{
->> +	struct irq_domain *d = NULL;
->> +	void *token = acpi_gic_get_msi_token(&bus->dev);
+>> +	int i, ret;
+>> +
+>> +	ret = acpi_gic_msi_init(table);
+>> +	if (ret)
+>> +		return ret;
+>> +
+>> +	for (i = 0; i < acpi_gic_get_num_msi_frame(); i++) {
+>> +		struct resource res;
+>> +		u32 spi_start = 0, nr_spis = 0;
+>> +		struct acpi_madt_generic_msi_frame *m;
+>> +
+>> +		ret = acpi_gic_get_msi_frame(i, &m);
+>> +		if (ret)
+>> +			return ret;
+>> +
 >
-> Do you see why I positively *hate* having hardware details in generic
-> layers? They propagate everywhere...
->
+> All of that should be moved here. And we don't need to build an
+> intermediate representation. Just build the v2m_data structures as you go.
+
+I'll rework the ACPI MADT parsing, and move it into this file, and get 
+rid of the structure.
+
+>> +		res.start = m->base_address;
+>> +		res.end = m->base_address + 0x1000;
 >> +
->> +	if (token)
->> +		d = irq_find_matching_host(token, DOMAIN_BUS_PCI_MSI);
+>> +		if (m->flags & ACPI_MADT_OVERRIDE_SPI_VALUES) {
+>> +			spi_start = m->spi_base;
+>> +			nr_spis = m->spi_count;
 >> +
->> +	if (!d)
->> +		pr_debug("Fail to find domain for MSI\n");
+>> +			pr_info("ACPI overriding V2M MSI_TYPER (base:%u, num:%u)\n",
+>> +				spi_start, nr_spis);
+>> +		}
 >> +
->> +	return d;
+>> +		ret = gicv2m_init_one(parent, &spi_start, &nr_spis, &res,
+>> +				      (void *)(m->base_address));
+>> +		if (ret)
+>> +			break;
+>> +
+>> +		pr_info("MSI frame ID %u: range[%#lx:%#lx], SPI[%d:%d]\n",
+>> +			m->msi_frame_id,
+>> +			(unsigned long)res.start, (unsigned long)res.end,
+>> +			spi_start, (spi_start + nr_spis));
+>> +	}
+>> +	return ret;
 >> +}
->> +#endif /*CONFIG_GENERIC_MSI_IRQ_DOMAIN*/
 >> +
->>   static struct acpi_bus_type acpi_pci_bus = {
->>   	.name = "PCI",
->>   	.match = pci_acpi_bus_match,
->> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
->> index a7afeac..8c1204c 100644
->> --- a/drivers/pci/probe.c
->> +++ b/drivers/pci/probe.c
->> @@ -12,6 +12,7 @@
->>   #include <linux/module.h>
->>   #include <linux/cpumask.h>
->>   #include <linux/pci-aspm.h>
->> +#include <linux/pci-acpi.h>
->>   #include <asm-generic/pci-bridge.h>
->>   #include "pci.h"
->>
->> @@ -670,6 +671,8 @@ static struct irq_domain *pci_host_bridge_msi_domain(struct pci_bus *bus)
->>   	 * should be called from here.
+>> +#endif /* CONFIG_ACPI */
+>> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+>> index bec6b00..531ebbc 100644
+>> --- a/drivers/irqchip/irq-gic.c
+>> +++ b/drivers/irqchip/irq-gic.c
+>> @@ -1159,6 +1159,9 @@ gic_v2_acpi_init(struct acpi_table_header *table)
 >>   	 */
->>   	d = pci_host_bridge_of_msi_domain(bus);
->> +	if (!d)
->> +		d = pci_host_bridge_acpi_msi_domain(bus);
+>>   	gic_init_bases(0, -1, dist_base, cpu_base, 0, (void *)ACPI_IRQ_MODEL_GIC);
 >>
->>   	return d;
->>   }
->> diff --git a/include/linux/pci-acpi.h b/include/linux/pci-acpi.h
->> index a965efa..766d045 100644
->> --- a/include/linux/pci-acpi.h
->> +++ b/include/linux/pci-acpi.h
->> @@ -77,6 +77,8 @@ static inline void acpiphp_remove_slots(struct pci_bus *bus) { }
->>   static inline void acpiphp_check_host_bridge(struct acpi_device *adev) { }
->>   #endif
->>
->> +struct irq_domain *pci_host_bridge_acpi_msi_domain(struct pci_bus *bus);
+>> +	if (IS_ENABLED(CONFIG_ARM_GIC_V2M))
+>> +		gicv2m_acpi_init(table, gic_data[0].domain);
 >> +
->>   extern const u8 pci_acpi_dsm_uuid[];
->>   #define DEVICE_LABEL_DSM	0x07
->>   #define RESET_DELAY_DSM		0x08
->> @@ -85,6 +87,8 @@ extern const u8 pci_acpi_dsm_uuid[];
->>   #else	/* CONFIG_ACPI */
->>   static inline void acpi_pci_add_bus(struct pci_bus *bus) { }
->>   static inline void acpi_pci_remove_bus(struct pci_bus *bus) { }
->> +static inline struct irq_domain *
->> +pci_host_bridge_acpi_msi_domain(struct pci_bus *bus) { return NULL; }
->>   #endif	/* CONFIG_ACPI */
+>>   	acpi_set_irq_model(ACPI_IRQ_MODEL_GIC, ACPI_IRQ_MODEL_GIC,
+>>   			   gic_acpi_gsi_desc_populate);
+>>   	return 0;
+>> diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
+>> index 97799b7..27d8196 100644
+>> --- a/include/linux/irqchip/arm-gic.h
+>> +++ b/include/linux/irqchip/arm-gic.h
+>> @@ -109,6 +109,13 @@ static inline void gic_init(unsigned int nr, int start,
 >>
->>   #ifdef CONFIG_ACPI_APEI
+>>   int gicv2m_of_init(struct device_node *node, struct irq_domain *parent);
+>>
+>> +#ifdef CONFIG_ACPI
+>> +struct acpi_table_header;
+>> +
+>> +int gicv2m_acpi_init(struct acpi_table_header *table,
+>> +		     struct irq_domain *parent);
+>> +#endif
+>> +
+>>   void gic_send_sgi(unsigned int cpu_id, unsigned int irq);
+>>   int gic_get_cpu_id(unsigned int cpu);
+>>   void gic_migrate_target(unsigned int new_cpu_id);
 >>
 >
-> Once you solve the HW abstraction issue, this will be OK.
->
-> Thanks,
->
-> 	M.
->
+> This needs rework to do the parsing of the tables in this driver. Just
+> expose the domain_token through a function that you register with the
+> ACPI layer.
 
-Ok. Thanks,
+Ok. I'll investigate and rework this to only expose the domain_token.
 
+Basically, I would need a way to pass down a device from ACPI layer into 
+irqchips (e.g. GICv2m and GICv3-ITS), so that it can verify the device 
+with the MSI domains and return the appropriate domain token (or some 
+sort of domain reference).
+
+Thanks,
 Suravee
