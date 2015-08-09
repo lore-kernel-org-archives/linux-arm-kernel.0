@@ -1,35 +1,34 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sun, 9 Aug 2015 17:19:16 +0200
-Subject: [PATCH v9 0/9] Add simple NVMEM Framework via regmap.
-In-Reply-To: <1438693367.3793.29.camel@pengutronix.de>
-References: <1437995567-11203-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1438693367.3793.29.camel@pengutronix.de>
-Message-ID: <20150809151916.GF14271@lunn.ch>
+From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
+Date: Sun, 09 Aug 2015 22:23:30 +0530
+Subject: [PATCH-v5 5/5] i2c: pxa: Add ILCR (tLow & tHigh) configuration
+ support
+In-Reply-To: <87bnegk632.fsf@belgarion.home>
+References: <1437482466-16126-1-git-send-email-vaibhav.hiremath@linaro.org>	<1437482466-16126-6-git-send-email-vaibhav.hiremath@linaro.org>	<55C1CE8E.9000601@linaro.org>
+ <87bnegk632.fsf@belgarion.home>
+Message-ID: <55C7858A.5080308@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Srinivas
 
-The AT24 eeprom driver contains the comment:
 
-        /*                                                                                               
-         * Export the EEPROM bytes through sysfs, since that's convenient.                               
-         * By default, only root should see the data (maybe passwords etc)                               
-         */
+On Sunday 09 August 2015 05:48 PM, Robert Jarzmik wrote:
+> Vaibhav Hiremath <vaibhav.hiremath@linaro.org> writes:
+>
+>> Robert,
+>>
+>> It would be helpful if you can test this patch-series and confirm that
+>> it now fixes the NULL pointer deference issue.
+> Tested, it works on pxa27x in master mode, in non-DT mode.
+>
+> For all non-DT patches, you can add my :
+> Tested-by: Robert Jarzmik <robert.jarzmik@free.fr>
+>
 
-and as you would expect from this:
+Thanks Robert,
 
-# ls -l ./devices/platform/soc/soc:aips-bus at 40000000/40066000.i2c/i2c-0/0-0050/eeprom
--rw------- 1 root root 512 Aug  9 10:16 ./devices/platform/soc/soc:aips-bus at 40000000/40066000.i2c/i2c-0/0-0050/eeprom
+Wolfram,
+Request you to please take a look at this series.
+We can have discussion on DT properties as well.
 
-The AT25 and the MAX6875 driver are the same.
-
-However nvmem has different defaults:
-
-# ls -l ./devices/platform/soc/soc:aips-bus at 40000000/40066000.i2c/i2c-0/0-0050/0-00500/nvmem
--rw-r--r-- 1 root root 0 Aug  9 10:16 ./devices/platform/soc/soc:aips-bus at 40000000/40066000.i2c/i2c-0/0-0050/0-00500/nvmem
-
-Has this been considered and discussed?
-
-Thanks
-    Andrew
+Thanks,
+Vaibhav
