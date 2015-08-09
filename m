@@ -1,110 +1,131 @@
 From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
-Date: Sun, 9 Aug 2015 15:02:33 +0700
-Subject: [PATCH v4 08/10] ACPI: GIC: Add ACPI helper functions to query
- irq-domain tokens for for GIC MSI and ITS
-In-Reply-To: <55C0C5DD.6090607@arm.com>
+Date: Sun, 9 Aug 2015 15:02:45 +0700
+Subject: [PATCH v4 09/10] PCI: ACPI: Bind GIC MSI frame to PCI host bridge
+In-Reply-To: <55C0C685.4000400@arm.com>
 References: <1438164539-29256-1-git-send-email-hanjun.guo@linaro.org>
- <1438164539-29256-9-git-send-email-hanjun.guo@linaro.org>
- <55C0C5DD.6090607@arm.com>
-Message-ID: <55C70919.2050805@amd.com>
+ <1438164539-29256-10-git-send-email-hanjun.guo@linaro.org>
+ <55C0C685.4000400@arm.com>
+Message-ID: <55C70925.2000306@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Marc,
 
-Sorry for late reply. Please see my comments below.
-
-On 8/4/15 21:02, Marc Zyngier wrote:
+On 8/4/15 21:04, Marc Zyngier wrote:
 > On 29/07/15 11:08, Hanjun Guo wrote:
 >> From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 >>
->> This patch introduces acpi_gic_get_msi_token(), which returns irq-domain
->> token that can be used to look up MSI doamin of a device.
->> In both GIC MSI and ITS cases, the base_address specified in the GIC MSI
->> or GIC ITS structure is used as a token for MSI domain.
->>
->> In addition, this patch also provides low-level helper functions to parse
->> and query GIC MSI structure and GIC ITS from MADT. Once parsed, it keeps
->> a copy of the structure for use in subsequent queries to avoid having
->> to map and parse MADT multiple times.
+>> This patch introduces pci_host_bridge_acpi_msi_domain(), which queries
+>> a GIC MSI irq-domain token and use it to retrieve an irq_domain with
+>> DOMAIN_BUS_PCI_MSI bus type, and bind it to PCI host-bridge.
 >>
 >> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 >> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 >> ---
->>   drivers/acpi/Makefile   |   1 +
->>   drivers/acpi/acpi_gic.c | 234 ++++++++++++++++++++++++++++++++++++++++++++++++
->>   include/acpi/acpi_gic.h |  23 +++++
->>   include/linux/acpi.h    |   1 +
->>   4 files changed, 259 insertions(+)
->>   create mode 100644 drivers/acpi/acpi_gic.c
->>   create mode 100644 include/acpi/acpi_gic.h
+>>   drivers/pci/pci-acpi.c   | 18 ++++++++++++++++++
+>>   drivers/pci/probe.c      |  3 +++
+>>   include/linux/pci-acpi.h |  4 ++++
+>>   3 files changed, 25 insertions(+)
 >>
->> diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
->> index 8321430..def54b9 100644
->> --- a/drivers/acpi/Makefile
->> +++ b/drivers/acpi/Makefile
->> @@ -54,6 +54,7 @@ acpi-$(CONFIG_ACPI_NUMA)	+= numa.o
->>   acpi-$(CONFIG_ACPI_PROCFS_POWER) += cm_sbs.o
->>   acpi-y				+= acpi_lpat.o
->>   acpi-$(CONFIG_ACPI_GENERIC_GSI) += gsi.o
->> +acpi-$(CONFIG_ARM_GIC_ACPI)	+= acpi_gic.o
+>> diff --git a/drivers/pci/pci-acpi.c b/drivers/pci/pci-acpi.c
+>> index 314a625..5f11653 100644
+>> --- a/drivers/pci/pci-acpi.c
+>> +++ b/drivers/pci/pci-acpi.c
+>> @@ -9,6 +9,7 @@
 >>
->>   # These are (potentially) separate modules
->>
->> diff --git a/drivers/acpi/acpi_gic.c b/drivers/acpi/acpi_gic.c
->> new file mode 100644
->> index 0000000..11ee4eb
->> --- /dev/null
->> +++ b/drivers/acpi/acpi_gic.c
->
-> I think this is starting badly. If this is GIC specific, it lives in
-> drivers/irqchip. Nothing in drivers/acpi should be interrupt-controller
-> specific at all. If there are things you need to expose through the ACPI
-> layer, add some indirections.
-
-OK, originally, I intended for this to be an intermediate layer b/w ACPI 
-and irqchip, but I guess that's still not what you are looking for. I'll 
-rework this again.
-
-[....]
->> +
->> +#endif /*__ACPI_GIC_H__*/
->> diff --git a/include/linux/acpi.h b/include/linux/acpi.h
->> index 04dd0bb..5d58b61 100644
->> --- a/include/linux/acpi.h
->> +++ b/include/linux/acpi.h
->> @@ -44,6 +44,7 @@
->>
->>   #include <acpi/acpi_bus.h>
->>   #include <acpi/acpi_drivers.h>
+>>   #include <linux/delay.h>
+>>   #include <linux/init.h>
+>> +#include <linux/irqdomain.h>
+>>   #include <linux/pci.h>
+>>   #include <linux/pci_hotplug.h>
+>>   #include <linux/module.h>
+>> @@ -16,6 +17,7 @@
+>>   #include <linux/pci-acpi.h>
+>>   #include <linux/pm_runtime.h>
+>>   #include <linux/pm_qos.h>
 >> +#include <acpi/acpi_gic.h>
+>>   #include "pci.h"
+>>
+>>   /*
+>> @@ -681,6 +683,22 @@ static bool pci_acpi_bus_match(struct device *dev)
+>>   	return dev_is_pci(dev);
+>>   }
+>>
+>> +#ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
+>> +struct irq_domain *pci_host_bridge_acpi_msi_domain(struct pci_bus *bus)
+>> +{
+>> +	struct irq_domain *d = NULL;
+>> +	void *token = acpi_gic_get_msi_token(&bus->dev);
 >
-> Ah! No.
+> Do you see why I positively *hate* having hardware details in generic
+> layers? They propagate everywhere...
 >
->>   #include <acpi/acpi_numa.h>
->>   #include <acpi/acpi_io.h>
->>   #include <asm/acpi.h>
+>> +
+>> +	if (token)
+>> +		d = irq_find_matching_host(token, DOMAIN_BUS_PCI_MSI);
+>> +
+>> +	if (!d)
+>> +		pr_debug("Fail to find domain for MSI\n");
+>> +
+>> +	return d;
+>> +}
+>> +#endif /*CONFIG_GENERIC_MSI_IRQ_DOMAIN*/
+>> +
+>>   static struct acpi_bus_type acpi_pci_bus = {
+>>   	.name = "PCI",
+>>   	.match = pci_acpi_bus_match,
+>> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+>> index a7afeac..8c1204c 100644
+>> --- a/drivers/pci/probe.c
+>> +++ b/drivers/pci/probe.c
+>> @@ -12,6 +12,7 @@
+>>   #include <linux/module.h>
+>>   #include <linux/cpumask.h>
+>>   #include <linux/pci-aspm.h>
+>> +#include <linux/pci-acpi.h>
+>>   #include <asm-generic/pci-bridge.h>
+>>   #include "pci.h"
+>>
+>> @@ -670,6 +671,8 @@ static struct irq_domain *pci_host_bridge_msi_domain(struct pci_bus *bus)
+>>   	 * should be called from here.
+>>   	 */
+>>   	d = pci_host_bridge_of_msi_domain(bus);
+>> +	if (!d)
+>> +		d = pci_host_bridge_acpi_msi_domain(bus);
+>>
+>>   	return d;
+>>   }
+>> diff --git a/include/linux/pci-acpi.h b/include/linux/pci-acpi.h
+>> index a965efa..766d045 100644
+>> --- a/include/linux/pci-acpi.h
+>> +++ b/include/linux/pci-acpi.h
+>> @@ -77,6 +77,8 @@ static inline void acpiphp_remove_slots(struct pci_bus *bus) { }
+>>   static inline void acpiphp_check_host_bridge(struct acpi_device *adev) { }
+>>   #endif
+>>
+>> +struct irq_domain *pci_host_bridge_acpi_msi_domain(struct pci_bus *bus);
+>> +
+>>   extern const u8 pci_acpi_dsm_uuid[];
+>>   #define DEVICE_LABEL_DSM	0x07
+>>   #define RESET_DELAY_DSM		0x08
+>> @@ -85,6 +87,8 @@ extern const u8 pci_acpi_dsm_uuid[];
+>>   #else	/* CONFIG_ACPI */
+>>   static inline void acpi_pci_add_bus(struct pci_bus *bus) { }
+>>   static inline void acpi_pci_remove_bus(struct pci_bus *bus) { }
+>> +static inline struct irq_domain *
+>> +pci_host_bridge_acpi_msi_domain(struct pci_bus *bus) { return NULL; }
+>>   #endif	/* CONFIG_ACPI */
+>>
+>>   #ifdef CONFIG_ACPI_APEI
 >>
 >
-> Right. Very little of what is above belongs to the ACPI layer. What
-> would belong here is a generic acpi_get_msi_domain_token(dev) that would
-> call into a controller-specific function to parse the various tables and
-> find out which GICv2m frame (or which ITS) is serving the given device.
-> This would include parsing of the IORT structures if they are available.
-
-The problem here is we would need to figure out the hook into *a 
-controller-specific function* from a generic layer (ACPI in this case).
-
-> For GICv2m, it should be simplistic: just return the domain_token of the
-> v2m widget. For the ITS, it is slightly more complex, and there should
-> be some specific backend for that. There is no ACPI support for the ITS
-> yet, so that shouldn't be your concern at this point in time.
+> Once you solve the HW abstraction issue, this will be OK.
 >
-> Overall, drivers/acpi should be hardware agnostic (or at least aim for
-> it), just like drivers/of is.
+> Thanks,
+>
+> 	M.
+>
 
-I think I understand how you don't like the current approach. Lemme try 
-a different approach and send out another revision.
+Ok. Thanks,
 
-Thanks,
 Suravee
