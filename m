@@ -1,51 +1,67 @@
-From: aneesh.kumar@linux.vnet.ibm.com (Aneesh Kumar K.V)
-Date: Mon, 10 Aug 2015 11:31:12 +0530
-Subject: [PATCH v4 2/7] mm: kasan: introduce generic
- kasan_populate_zero_shadow()
-In-Reply-To: <1437756119-12817-3-git-send-email-a.ryabinin@samsung.com>
-References: <1437756119-12817-1-git-send-email-a.ryabinin@samsung.com>
- <1437756119-12817-3-git-send-email-a.ryabinin@samsung.com>
-Message-ID: <87mvxzptqv.fsf@linux.vnet.ibm.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 10 Aug 2015 11:42:29 +0530
+Subject: [PATCH V1 Resend 07/11] drivers: rtc: Drop (un)likely before
+ IS_ERR(_OR_NULL)
+In-Reply-To: <cover.1439187003.git.viresh.kumar@linaro.org>
+References: <cover.1439187003.git.viresh.kumar@linaro.org>
+Message-ID: <2ea7e46d3a63b1229889b1e8f0a9976725578189.1439187003.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andrey Ryabinin <a.ryabinin@samsung.com> writes:
+IS_ERR(_OR_NULL) already contain an 'unlikely' compiler flag and there
+is no need to do that again from its callers. Drop it.
 
-> Introduce generic kasan_populate_zero_shadow(start, end).
-> This function maps kasan_zero_page to the [start, end] addresses.
->
-> In follow on patches it will be used for ARMv8 (and maybe other
-> architectures) and will replace x86_64 specific populate_zero_shadow().
->
-> Signed-off-by: Andrey Ryabinin <a.ryabinin@samsung.com>
+gemini driver was using likely() for a failure case while the rtc driver
+is getting registered. That looks wrong and it should really be
+unlikely. But because we are killing all the unlikely() flags, lets kill
+that too.
 
-This assume that we can have shared pgtable_t in generic code ? Is that
-true for generic code ? Even if it is we may want to allow some arch to
-override this ? On ppc64, we store the hardware hash page table slot
-number in pte_t, Hence we won't be able to share pgtable_t. 
+Acked-by: Hans Ulli Kroll <ulli.kroll@googlemail.com> (gemini)
+Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+---
+ drivers/rtc/interface.c  | 2 +-
+ drivers/rtc/rtc-bfin.c   | 2 +-
+ drivers/rtc/rtc-gemini.c | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
 
-
-
-> ---
->  arch/x86/mm/kasan_init_64.c |  14 ----
->  include/linux/kasan.h       |   8 +++
->  mm/kasan/Makefile           |   2 +-
->  mm/kasan/kasan_init.c       | 151 ++++++++++++++++++++++++++++++++++++++++++++
->  4 files changed, 160 insertions(+), 15 deletions(-)
->  create mode 100644 mm/kasan/kasan_init.c
->
-> diff --git a/arch/x86/mm/kasan_init_64.c b/arch/x86/mm/kasan_init_64.c
-> index e1840f3..812086c 100644
-> --- a/arch/x86/mm/kasan_init_64.c
-> +++ b/arch/x86/mm/kasan_init_64.c
-> @@ -12,20 +12,6 @@
->  extern pgd_t early_level4_pgt[PTRS_PER_PGD];
->  extern struct range pfn_mapped[E820_X_MAX];
->  
-> -static pud_t kasan_zero_pud[PTRS_PER_PUD] __page_aligned_bss;
-> -static pmd_t kasan_zero_pmd[PTRS_PER_PMD] __page_aligned_bss;
-> -static pte_t kasan_zero_pte[PTRS_PER_PTE] __page_aligned_bss;
-> -
-> -/*
-
--aneesh
+diff --git a/drivers/rtc/interface.c b/drivers/rtc/interface.c
+index 11b639067312..5836751b8203 100644
+--- a/drivers/rtc/interface.c
++++ b/drivers/rtc/interface.c
+@@ -564,7 +564,7 @@ enum hrtimer_restart rtc_pie_update_irq(struct hrtimer *timer)
+ void rtc_update_irq(struct rtc_device *rtc,
+ 		unsigned long num, unsigned long events)
+ {
+-	if (unlikely(IS_ERR_OR_NULL(rtc)))
++	if (IS_ERR_OR_NULL(rtc))
+ 		return;
+ 
+ 	pm_stay_awake(rtc->dev.parent);
+diff --git a/drivers/rtc/rtc-bfin.c b/drivers/rtc/rtc-bfin.c
+index 3d44b11721ea..535a5f9338d0 100644
+--- a/drivers/rtc/rtc-bfin.c
++++ b/drivers/rtc/rtc-bfin.c
+@@ -361,7 +361,7 @@ static int bfin_rtc_probe(struct platform_device *pdev)
+ 	/* Register our RTC with the RTC framework */
+ 	rtc->rtc_dev = devm_rtc_device_register(dev, pdev->name, &bfin_rtc_ops,
+ 						THIS_MODULE);
+-	if (unlikely(IS_ERR(rtc->rtc_dev)))
++	if (IS_ERR(rtc->rtc_dev))
+ 		return PTR_ERR(rtc->rtc_dev);
+ 
+ 	/* Grab the IRQ and init the hardware */
+diff --git a/drivers/rtc/rtc-gemini.c b/drivers/rtc/rtc-gemini.c
+index 35f4486738fc..2fed93e1114a 100644
+--- a/drivers/rtc/rtc-gemini.c
++++ b/drivers/rtc/rtc-gemini.c
+@@ -148,7 +148,7 @@ static int gemini_rtc_probe(struct platform_device *pdev)
+ 
+ 	rtc->rtc_dev = rtc_device_register(pdev->name, dev,
+ 					   &gemini_rtc_ops, THIS_MODULE);
+-	if (likely(IS_ERR(rtc->rtc_dev)))
++	if (IS_ERR(rtc->rtc_dev))
+ 		return PTR_ERR(rtc->rtc_dev);
+ 
+ 	return 0;
+-- 
+2.4.0
