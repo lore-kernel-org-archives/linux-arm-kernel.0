@@ -1,57 +1,57 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 10 Aug 2015 16:44:54 +0200
-Subject: [PATCH] can: at91: move at91_can_data to at91_can.c
-Message-ID: <1439217894-15230-1-git-send-email-alexandre.belloni@free-electrons.com>
+Date: Mon, 10 Aug 2015 16:46:19 +0200
+Subject: [PATCH] usb: gadget: at91_udc: move at91_udc_data in at91_udc.h
+Message-ID: <1439217979-15642-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-struct at91_can_data is now only used inside the driver, move it to
-its c file.
+struct at91_udc_data is now only used inside the driver, move it to its
+include.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- drivers/net/can/at91_can.c          | 5 ++++-
- include/linux/platform_data/atmel.h | 5 -----
- 2 files changed, 4 insertions(+), 6 deletions(-)
+ drivers/usb/gadget/udc/at91_udc.h   | 8 ++++++++
+ include/linux/platform_data/atmel.h | 9 ---------
+ 2 files changed, 8 insertions(+), 9 deletions(-)
 
-diff --git a/drivers/net/can/at91_can.c b/drivers/net/can/at91_can.c
-index 945c0955a967..83ddf4f46f0d 100644
---- a/drivers/net/can/at91_can.c
-+++ b/drivers/net/can/at91_can.c
-@@ -33,7 +33,6 @@
- #include <linux/spinlock.h>
- #include <linux/string.h>
- #include <linux/types.h>
--#include <linux/platform_data/atmel.h>
- 
- #include <linux/can/dev.h>
- #include <linux/can/error.h>
-@@ -136,6 +135,10 @@ struct at91_devtype_data {
- 	enum at91_devtype type;
+diff --git a/drivers/usb/gadget/udc/at91_udc.h b/drivers/usb/gadget/udc/at91_udc.h
+index 2679c8b217cc..0a433e6b346b 100644
+--- a/drivers/usb/gadget/udc/at91_udc.h
++++ b/drivers/usb/gadget/udc/at91_udc.h
+@@ -112,6 +112,14 @@ struct at91_udc_caps {
+ 	void (*pullup)(struct at91_udc *udc, int is_on);
  };
  
-+struct at91_can_data {
-+	void (*transceiver_switch)(int on);
++struct at91_udc_data {
++	int	vbus_pin;		/* high == host powering us */
++	u8	vbus_active_low;	/* vbus polarity */
++	u8	vbus_polled;		/* Use polling, not interrupt */
++	int	pullup_pin;		/* active == D+ pulled up */
++	u8	pullup_active_low;	/* true == pullup_pin is active low */
 +};
 +
- struct at91_priv {
- 	struct can_priv can;		/* must be the first member! */
- 	struct napi_struct napi;
+ /*
+  * driver is non-SMP, and just blocks IRQs whenever it needs
+  * access protection for chip registers or driver state
 diff --git a/include/linux/platform_data/atmel.h b/include/linux/platform_data/atmel.h
-index 4b452c6a2f7b..b99d85f56a7d 100644
+index 4b452c6a2f7b..2d67e466c51b 100644
 --- a/include/linux/platform_data/atmel.h
 +++ b/include/linux/platform_data/atmel.h
-@@ -86,11 +86,6 @@ struct atmel_uart_data {
- 	struct serial_rs485	rs485;		/* rs485 settings */
- };
+@@ -25,15 +25,6 @@
+  */
+ #define ATMEL_MAX_UART	7
  
--/* CAN */
--struct at91_can_data {
--	void (*transceiver_switch)(int on);
+- /* USB Device */
+-struct at91_udc_data {
+-	int	vbus_pin;		/* high == host powering us */
+-	u8	vbus_active_low;	/* vbus polarity */
+-	u8	vbus_polled;		/* Use polling, not interrupt */
+-	int	pullup_pin;		/* active == D+ pulled up */
+-	u8	pullup_active_low;	/* true == pullup_pin is active low */
 -};
 -
- /* FIXME: this needs a better location, but gets stuff building again */
- extern int at91_suspend_entering_slow_clock(void);
- 
+  /* Compact Flash */
+ struct at91_cf_data {
+ 	int	irq_pin;		/* I/O IRQ */
 -- 
 2.1.4
