@@ -1,43 +1,33 @@
-From: aph@redhat.com (Andrew Haley)
-Date: Mon, 10 Aug 2015 19:19:03 +0100
-Subject: [RFC PATCH 01/10] arm64: feature registers: Documentation
-In-Reply-To: <55C8E12E.6030305@arm.com>
-References: <1437731037-25795-1-git-send-email-suzuki.poulose@arm.com>
- <1437731037-25795-2-git-send-email-suzuki.poulose@arm.com>
- <20150810160636.GB15394@e104818-lin.cambridge.arm.com>
- <55C8E12E.6030305@arm.com>
-Message-ID: <55C8EB17.7090708@redhat.com>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Mon, 10 Aug 2015 20:42:16 +0200
+Subject: [PATCH 5/5] drivers/tty: make serial 8250_lpc18xx.c explicitly
+ non-modular
+In-Reply-To: <1439081497-14986-6-git-send-email-paul.gortmaker@windriver.com>
+References: <1439081497-14986-1-git-send-email-paul.gortmaker@windriver.com>
+ <1439081497-14986-6-git-send-email-paul.gortmaker@windriver.com>
+Message-ID: <CAGhQ9Vxjymt4z32s3x2B8b6ypgn3Bzh1ncbqxqidfPyM2k87jw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/10/2015 06:36 PM, Suzuki K. Poulose wrote:
-> On 10/08/15 17:06, Catalin Marinas wrote:
->> Hi Suzuki,
->>
->> On Fri, Jul 24, 2015 at 10:43:47AM +0100, Suzuki K. Poulose wrote:
->>> From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
->>>
->>> Documentation of the infrastructure
->>>
->>> Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
->>
->> The implementation looks fine but I think the main discussion will be
->> around the goal of this feature and the ABI that it introduces. So I'll
->> just write my thoughts on this patch (I could as well have replied to
->> the cover letter).
->>
->> Another question: who's going to use this feature? I know people asked
->> in private but I'd like to have some public statements.
-> 
-> Right, I am hoping that folks from glibc / JIT / GCC will respond to
-> this thread.
+Hi Paul,
 
-We certainly need it for OpenJDK.  We need to know the manufacturer,
-part number, revision id, etc.  We already have workarounds in
-OpenJDK for various bugs, and we also can generate better code if we
-know the exact part.
+On 9 August 2015 at 02:51, Paul Gortmaker <paul.gortmaker@windriver.com> wrote:
+> The Kconfig currently controlling compilation of this code is:
+>
+> 8250/Kconfig:config SERIAL_8250_LPC18XX
+> 8250/Kconfig:        bool "NXP LPC18xx/43xx serial port support"
+>
+> ...meaning that it currently is not being built as a module by anyone.
+>
+> Lets remove the modular code that is essentially orphaned, so that
+> when reading the driver there is no doubt it is builtin-only.
 
-I note that the REVIDR is not in this patch.  That seems odd, because
-it can be used to identify minor revisions.
+The bool in KConfig is more or less a copy-paste mistake on my side. I
+really meant for this driver to be buildable as module and it builds
+just fine with 'm'.
 
-Andrew.
+Want me send a patch changing it to tristate or will you handle it?
+
+
+regards,
+Joachim Eastwood
