@@ -1,32 +1,65 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 11 Aug 2015 08:20:58 +0900
-Subject: [PATCH v3 2/2] ARM: shmobile: r8a7794: add GPIO DT support
-In-Reply-To: <CAMuHMdVj4_h8LX=XuWSyhGpSZ2BPxuWe_oJQYTRPFfYbuidm4g@mail.gmail.com>
-References: <2265315.MpjeDzrVz2@wasted.cogentembedded.com>
- <10288801.ZnYt2TD47O@wasted.cogentembedded.com>
- <CAMuHMdVj4_h8LX=XuWSyhGpSZ2BPxuWe_oJQYTRPFfYbuidm4g@mail.gmail.com>
-Message-ID: <20150810232054.GA9484@verge.net.au>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Tue, 11 Aug 2015 00:23:12 +0100
+Subject: earlycon issues in -next with amba-pl011 updates
+Message-ID: <20150810232312.GB10728@bivouac.eciton.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 10, 2015 at 03:23:54PM +0200, Geert Uytterhoeven wrote:
-> Hi Sergei,
-> 
-> On Sun, Aug 9, 2015 at 12:09 AM, Sergei Shtylyov
-> <sergei.shtylyov@cogentembedded.com> wrote:
-> > Describe GPIO[0-6] controllers in the R8A7794 device tree.
-> >
-> > Based on original patch by Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>.
-> >
-> > Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> > Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> >
-> > ---
-> > Changes in version 3:
-> > - added "power-domains" property to the GPIO device nodes.
-> 
-> Thanks, unwithdrawing my ack ;-)
-> 
-> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Hi all,
 
-Thanks, I have queued these up for v4.4.
+The kernelci.org bot picked up a complete boot failure (no output past
+UEFI stub) with next-20150806 and Tyler bisected it down to somewhere
+in
+8cd90e5 uart: pl011: Add support to ZTE ZX296702 uart
+09dcc7d uart: pl011: Improve LCRH register access decision
+2c096a9 uart: pl011: Introduce register look up table
+7b753f3 uart: pl011: Introduce register accessor
+
+The issue only appears with earlycon on command line, for pl011
+consoles.
+
+Some investigation shows that the cause lies with
+commit 7b753f318d14 ("uart: pl011: Introduce register accessor")
+and
+commit 2c096a9eedc6 ("uart: pl011: Introduce register look up table")
+
+Specifically, the changes to pl011_putc() are incorrect:
+The new pl011_ accessors take a (struct uart_amba_port *) input, but
+pl011_putc() directly uses the incoming (struct uart_port *) for this.
+
+Apart from ending up with an unintended/incorrect UART base address,
+the introduction of the lookup table for register offsets also means
+the accessors try to dereference (struct uart_amba_port *)->reg_lut.
+
+The below is a hack that shows/resolves the issue, but some
+refactoring of the original patches might be in order.
+
+/
+    Leif
+
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index 2af09ab..452dbba 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -2348,13 +2348,14 @@ static struct console amba_console = {
+ 
+ static void pl011_putc(struct uart_port *port, int c)
+ {
+-	struct uart_amba_port *uap =
+-	    container_of(port, struct uart_amba_port, port);
++	struct uart_amba_port uap;
++	uap.port = *port;
++	uap.reg_lut = arm_reg;
+ 
+-	while (pl011_readw(uap, REG_FR) & UART01x_FR_TXFF)
++	while (pl011_readw(&uap, REG_FR) & UART01x_FR_TXFF)
+ 		;
+-	pl011_writeb(uap, c, REG_DR);
+-	while (pl011_readw(uap, REG_FR) & uap->fr_busy)
++	pl011_writeb(&uap, c, REG_DR);
++	while (pl011_readw(&uap, REG_FR) & UART01x_FR_BUSY)
+ 		;
+ }
+ 
+-- 
+2.1.4
