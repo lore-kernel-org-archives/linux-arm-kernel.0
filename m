@@ -1,58 +1,80 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 11 Aug 2015 00:59:24 +0300
-Subject: [PATCH v2 1/2] ARM: shmobile: r8a7794: add QSPI DT support
+Date: Tue, 11 Aug 2015 01:00:35 +0300
+Subject: [PATCH v2 2/2] ARM: shmobile: silk: add QSPI DT support
 In-Reply-To: <4187771.Fb49GBKgyg@wasted.cogentembedded.com>
 References: <4187771.Fb49GBKgyg@wasted.cogentembedded.com>
-Message-ID: <1540672.y3DTbtssP8@wasted.cogentembedded.com>
+Message-ID: <7036752.0LCvRcbC9K@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the generic R8A7794 part of the QSPI device node.
+Define the SILK board dependent part of the QSPI device node.
+Add device nodes  for Spansion  S25FL512S SPI flash and MTD partitions on it.
 
-Based on original patch by Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>.
+Based on the original patch by Vladimir Barinov
+<vladimir.barinov@cogentembedded.com>.
 
 Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
 ---
 Changes in version 2:
-- moved the "power-domains" property after the DMA properties.
+- added fallback value to the SPI flash's "compatible" property;
+- grouped all SPI-related properties together in the SPI flash node.
 
- arch/arm/boot/dts/r8a7794.dtsi |   18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+ arch/arm/boot/dts/r8a7794-silk.dts |   40 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 40 insertions(+)
 
-Index: renesas/arch/arm/boot/dts/r8a7794.dtsi
+Index: renesas/arch/arm/boot/dts/r8a7794-silk.dts
 ===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7794.dtsi
-+++ renesas/arch/arm/boot/dts/r8a7794.dtsi
-@@ -19,6 +19,10 @@
- 	#address-cells = <2>;
- 	#size-cells = <2>;
- 
-+	aliases {
-+		spi0 = &qspi;
-+	};
-+
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-@@ -537,6 +541,20 @@
- 		status = "disabled";
+--- renesas.orig/arch/arm/boot/dts/r8a7794-silk.dts
++++ renesas/arch/arm/boot/dts/r8a7794-silk.dts
+@@ -65,6 +65,11 @@
+ 		renesas,groups = "mmc_data8", "mmc_ctrl";
+ 		renesas,function = "mmc";
  	};
- 
-+	qspi: spi at e6b10000 {
-+		compatible = "renesas,qspi-r8a7794", "renesas,qspi";
-+		reg = <0 0xe6b10000 0 0x2c>;
-+		interrupts = <0 184 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp9_clks R8A7794_CLK_QSPI_MOD>;
-+		dmas = <&dmac0 0x17>, <&dmac0 0x18>;
-+		dma-names = "tx", "rx";
-+		power-domains = <&cpg_clocks>;
-+		num-cs = <1>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		status = "disabled";
-+	};
 +
- 	clocks {
- 		#address-cells = <2>;
- 		#size-cells = <2>;
++	qspi_pins: spi0 {
++		renesas,groups = "qspi_ctrl", "qspi_data4";
++		renesas,function = "qspi";
++	};
+ };
+ 
+ &scif2 {
+@@ -100,3 +105,38 @@
+ 	non-removable;
+ 	status = "okay";
+ };
++
++&qspi {
++	pinctrl-0 = <&qspi_pins>;
++	pinctrl-names = "default";
++
++	status = "okay";
++
++	flash at 0 {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "spansion,s25fl512s", "jedec,spi-nor";
++		reg = <0>;
++		spi-max-frequency = <30000000>;
++		spi-tx-bus-width = <4>;
++		spi-rx-bus-width = <4>;
++		spi-cpol;
++		spi-cpha;
++		m25p,fast-read;
++
++		partition at 0 {
++			label = "loader";
++			reg = <0x00000000 0x00040000>;
++			read-only;
++		};
++		partition at 40000 {
++			label = "user";
++			reg = <0x00040000 0x00400000>;
++			read-only;
++		};
++		partition at 440000 {
++			label = "flash";
++			reg = <0x00440000 0x03bc0000>;
++		};
++	};
++};
