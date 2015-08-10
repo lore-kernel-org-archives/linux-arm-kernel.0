@@ -1,45 +1,53 @@
 From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Mon, 10 Aug 2015 12:28:17 +0530
-Subject: [PATCH v2 2/6] mailbox: dt-bindings: Add shared [driver <=>
- device tree] defines
-In-Reply-To: <1437990272-23111-3-git-send-email-lee.jones@linaro.org>
-References: <1437990272-23111-1-git-send-email-lee.jones@linaro.org>
- <1437990272-23111-3-git-send-email-lee.jones@linaro.org>
-Message-ID: <CABb+yY2asjH-c+VJXvG+RK0=2p=P4Y21pznNP0riaKMWLxYZog@mail.gmail.com>
+Date: Mon, 10 Aug 2015 12:32:05 +0530
+Subject: [RFC PATCH 0/3] mailbox: hisilicon: add mailbox driver
+In-Reply-To: <20150805231743.GB6880@leoy-linaro>
+References: <1438564390-28111-1-git-send-email-leo.yan@linaro.org>
+ <CABb+yY0-RQ80q92EBsuBoYpjxW5zR=nXr+j3zCXw3wKkCf33OQ@mail.gmail.com>
+ <20150805231743.GB6880@leoy-linaro>
+Message-ID: <CABb+yY1HTGNi4gZABNhXjpA57DPZx-tv=6+m4JLyx4wPHfovyA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 27, 2015 at 3:14 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> This header is currently only used for defines pertaining to data
-> direction i.e. Rx, Tx or Loopback.
+On Thu, Aug 6, 2015 at 4:47 AM, Leo Yan <leo.yan@linaro.org> wrote:
+> Hi Jassi,
 >
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  include/dt-bindings/mailbox/mailbox.h | 14 ++++++++++++++
->  1 file changed, 14 insertions(+)
->  create mode 100644 include/dt-bindings/mailbox/mailbox.h
+> Thanks for review.
 >
-> diff --git a/include/dt-bindings/mailbox/mailbox.h b/include/dt-bindings/mailbox/mailbox.h
-> new file mode 100644
-> index 0000000..82e929a
-> --- /dev/null
-> +++ b/include/dt-bindings/mailbox/mailbox.h
-> @@ -0,0 +1,14 @@
-> +/*
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#ifndef __MAILBOX_CONTROLLER_DT_BINDINGS_H
-> +#define __MAILBOX_CONTROLLER_DT_BINDINGS_H
-> +
-> +#define MBOX_TX                0x1
-> +#define MBOX_RX                0x2
-> +#define MBOX_LOOPBACK  (MBOX_RX | MBOX_TX)
-> +
-Not sure I understand 'loopback'.  Does it mean h/w has some
-'loopback' mode for testing purposes? Or it simply means the
-controller can send as well as receive messages?
+> On Wed, Aug 05, 2015 at 04:22:01PM +0530, Jassi Brar wrote:
+>> On Mon, Aug 3, 2015 at 6:43 AM, Leo Yan <leo.yan@linaro.org> wrote:
+>
+> [...]
+>
+>> > For easily extending for Hisilicon series SoCs (SoCs may have difference
+>> > for register's definition with each other), so firstly implement common
+>> > mailbox driver; this common mailbox driver provides three mainly
+>> > functionality:
+>> >
+>> >  - help register channels into framework;
+>> >  - hook low level callback functions for register's operations;
+>> >  - Enhance rx channel's message queue, which is based on the code in
+>> >    drivers/mailbox/omap-mailbox.c.
+>> >
+>> Not cool.
+>>  Please don't reinvent the wheel by having platform specific
+>> implementation of the mailbox api. Which vendor doesn't plan to roll
+>> out new SoCs, and hence variations of mailbox controllers?  The OMAP
+>> stack predates the common api, and was actually supposed to be
+>> converted over eventually. Please implement just the
+>> drivers/mailbox/hi6220-mailbox.c (preferably by the name of the
+>> mailbox controller, if any)
+>
+> Understood. Here i have one question, the rx channel's message queue is
+> looks like a common mechanism and can be added into framework file
+> mailbox.c, then Soc driver file can _ONLY_ focus on register level's
+> operations. If so, the common driver in this patch also is unnecessary.
+>
+Yes, that's what I say, no 'common' driver for a platform.
 
-Thanks.
+> Do you suggest to use upper method to rework patches? Or just think
+> it's okay to implement rx channel's message queue in hi6220-mailbox.c?
+>
+The code in drivers/mailbox/ should only manage the controller
+(registers and interrupts). Everything else (queues, shmem etc) should
+be in platform specific client driver(s).
