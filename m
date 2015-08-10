@@ -1,79 +1,32 @@
-From: dhdang@apm.com (Duc Dang)
-Date: Mon, 10 Aug 2015 12:07:13 -0700
-Subject: X-Gene: Unhandled fault: synchronous external abort in
- pci_generic_config_read32
-In-Reply-To: <CAErSpo7aDYKwy4MC6ZPf7hNd4MPE-LARiOVKutFfDFFkHY7qjQ@mail.gmail.com>
-References: <20150724224258.GA23990@google.com>
- <CADaLNDmYZ=8XQt82W_H74QaOiX3UwkVxkE1_EWRgzhkG1boebw@mail.gmail.com>
- <CAErSpo549xfAnx62quCqGHh3DNay5Lfb6EhEG+4EXooEuueQFQ@mail.gmail.com>
- <CADaLNDn95H=g73DKWRsrB4SuWcf+-8mkepbwb_DC-sFsVkrk6g@mail.gmail.com>
- <20150728212944.GA12958@google.com>
- <CADaLNDkOLiyPmVC3VwpnbrfAKFmNwSVJKdChjQFdQqs7XP-Ddg@mail.gmail.com>
- <20150729012255.GA18606@google.com> <20150729155509.GA31170@google.com>
- <CADaLNDk=+J_yOer1ferSCNb_xAC42ULtP2FyCLmYMwa+Gj=vfA@mail.gmail.com>
- <CAErSpo4VFh7rv81sCAG-eCXVyZh4ub8Trh-ntZhyfy7BzqTr5g@mail.gmail.com>
- <CADaLNDkUQHzGACfFmYDeJWnaNrKmJUDx4Rby60OWr4FzOjx3rA@mail.gmail.com>
- <CAErSpo7aDYKwy4MC6ZPf7hNd4MPE-LARiOVKutFfDFFkHY7qjQ@mail.gmail.com>
-Message-ID: <CADaLNDmnnZOoB1fxO=rQQa-eqT=B9G24rUrN_GzwAkFoC3Acbw@mail.gmail.com>
+From: rabin@rab.in (Rabin Vincent)
+Date: Mon, 10 Aug 2015 21:31:16 +0200
+Subject: Problem with ftrace uprobes on ARM
+In-Reply-To: <55C8E417.7080607@techfak.uni-bielefeld.de>
+References: <55C8E417.7080607@techfak.uni-bielefeld.de>
+Message-ID: <20150810193116.GA2895@debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 10, 2015 at 10:42 AM, Bjorn Helgaas <bhelgaas@google.com> wrote:
-> On Mon, Aug 10, 2015 at 12:16 PM, Duc Dang <dhdang@apm.com> wrote:
->> On Monday, August 10, 2015, Bjorn Helgaas <bhelgaas@google.com> wrote:
->>>
->>> On Fri, Jul 31, 2015 at 12:00 PM, Duc Dang <dhdang@apm.com> wrote:
->>> > On Wed, Jul 29, 2015 at 8:55 AM, Bjorn Helgaas <bhelgaas@google.com>
->>> > wrote:
->>> >> On Tue, Jul 28, 2015 at 08:22:55PM -0500, Bjorn Helgaas wrote:
->>> >>> On Tue, Jul 28, 2015 at 02:50:39PM -0700, Duc Dang wrote:
->>> >>
->>> >>> > Do you have another PCIe card to try on the same reboot test on this
->>> >>> > board?
->>> >>>
->>> >>> I've seen this on at least two Mellanox cards.  I'm running similar
->>> >>> tests
->>> >>> on a different type of card now.
->>> >>
->>> >> FWIW, reboot tests on two machines with Mellanox cards failed, while
->>> >> the
->>> >> same test on a machine with a different proprietary card succeeded.
->>> >
->>> > Thanks, Bjorn.
->>> >
->>> > I don't have the same Mellanox card as yours, but I will also run
->>> > similar reboot test to see if I hit the same issue with my card.
->>>
->>> Any more hints on this?  Nothing has changed on my end, so of course
->>> I'm still seeing this, always on machines with Mellanox, and never on
->>> other machines.  Could this be a hardware issue like a signal
->>> integrity or margin issue?  I don't know where to go from here because
->>> I'm not a hardware person, and I don't know anything to do in
->>> software.
->>
->>
->> Hi Bjorn,
->>
->> I tried to run similar reboot tests on 2 different Mellanox cards (Connect-X
->> family, one card has 2 10G interfaces, the other one has 1 port that
->> supports InfiniBand) with U-Boot 1.15.12 and linux 4.2-rc5 and I did not see
->> the crash that you encounterred.
->>
->> Did you check if your Mellanox cards have latest firmware? I did see some
->> link issues on my Mellanox cards with its old firmware before.
->
-> Good idea; I'll check that, too.  Also, I just learned that these
-> cards on installed with an extender card because of some space issues,
-> so we're going to test again without the extender.
+On Mon, Aug 10, 2015 at 07:49:11PM +0200, Christian Ascheberg wrote:
+> # objdump -t benchmark | grep "calc_sum"
+> 00008574 g     F .text    00000020              calc_sum
+> 
+> # echo 'p /home/root/benchmark:0x8574' >
+> /sys/kernel/debug/tracing/uprobe_events
+> 
+> # echo 1 >
+> /sys/kernel/debug/tracing/events/uprobes/p_benchmark_0x8574/enable
+> -sh: echo: write error: Invalid argument
 
-Hi Bjorn,
+The offset of the instruction in the file should be used, not the virtual
+address.  For example, in the following example ls_main() is at 0x0009aec0 but
+to set the breakpoint one actually has to use 0x92ec0:
 
-Are other cards that passed your test installed directly to the
-on-board PCIe slot?
-If yes, then this is a good data point and it will be useful to test
-the case where
-your Mellanox cards are directly installed into the on-board PCIe slot.
+$ arm-none-linux-gnueabi-nm busybox_unstripped | grep ls_main
+0009aec0 T ls_main
 
--- 
-Regards,
-Duc Dang.
+$ arm-none-linux-gnueabi-objdump -F -d busybox_unstripped | grep '<ls_main>'
+0009aec0 <ls_main> (File Offset: 0x92ec0):
+
+By the way, I hope "benchmark" does not use Thumb instructions, because
+uprobes on those aren't supported.  See arch_uprobe_analyze_insn().
