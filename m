@@ -1,164 +1,79 @@
-From: alexander.stein@systec-electronic.com (Alexander Stein)
-Date: Mon, 10 Aug 2015 14:45:06 +0200
-Subject: [RFC] i.MX25/35/SDHCI: switch off DMA usage
-In-Reply-To: <20150422073258.GB25437@shlinux1.ap.freescale.net>
-References: <201503271152.04348.jbe@pengutronix.de>
- <201504141142.00237.jbe@pengutronix.de>
- <20150422073258.GB25437@shlinux1.ap.freescale.net>
-Message-ID: <4555081.2nUx7FPr1R@ws-stein>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 10 Aug 2015 13:50:39 +0100
+Subject: Disabling caches with MMU enabled
+Message-ID: <20150810125039.GT7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+There is an erratum for Cortex-A15 which contains this paragraph:
 
-On Wednesday 22 April 2015 15:33:00, Dong Aisheng wrote:
-> > On Friday 27 March 2015 12:44:03 Dong Aisheng wrote:
-> > > On Fri, Mar 27, 2015 at 11:52:04AM +0100, Juergen Borleis wrote:
-> > > > DMA and the required overhead on very small data blocks seems an
-> > > > expensive operation. Due to erratum ENGCM07207 for i.MX25 and i.MX35 SoCs
-> > > > the support for multiblock transfers is disabled which results into a
-> > > > huge amount of single 512 byte sector transfers and interrupts. This
-> > > > slows down the transmission speed to below 500 kiB/s (even at 50 MHz SD
-> > > > card clock). Using PIO instead of DMA to avoid ENGCM07207 happens and
-> > > > re-enabling multiblock transfers again improve the transmission
-> > > > capability up to about 2.5 MiB/s.
-> > > >
-> > > > I'm still not sure if ENGCM07207 is related to DMA only and can not
-> > > > happen when PIO is used instead. Someone out there with experience
-> > > > regarding this topic?
-> > >
-> > > The errata does not state it's related to DMA only.
-> > > http://cache.freescale.com/files/dsp/doc/errata/IMX35CE.pdf
-> > > I could double check with our IC guys to confirm it.
-> > 
-> > Gentle ping.
-> > 
-> 
-> Hi Juergen,
-> 
-> Got the info from our IC guy.
-> PIO mode is not related to AHB access, so AHB hang is not exist.
-> But, he supposes the incorrect state machine of IP after sending CMD12 should
-> also exist on PIO mode. We may still needs reset the controller after sending
-> CMD12.(Reset before sending CMD12 should also work)
-> 
-> BTW the errata already indicates a workaround for AHB hang:
-> "To abort data transfers on the AHB, software can reset the eSDHC by
-> writing 1 to SYSCTL[24] (RSTA)."
-> 
-> So the issue could be avoided by reset controller.
-> 
-> And the current SDHCI driver already does reset if any error(cmd or data)
-> happens, and current MMC core seems only sending stop command when meets error.
-> (not sending stop during normal transfer).
-> So it looks to me the issue may already be workarounded and can not
-> be reproduced.
-> 
-> I'm not sure if anyone really meets the issue.
-> 
-> By googling the original post of this patch, it seems the patch
-> owner also did not reproduce this issue.
-> See:
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2010-October/029818.html
-> 
-> I would suggest someone who has the MX35/MX25 boards, to run the test again by
-> manually triggering a data error.(e.g: shorting data line to ground during
-> transfer). Then to see if the controller can still work well.
-> 
-> If can not reproduce, then we can remove this errata and back to DMA mode.
+ 2) Do not issue write-back cacheable stores at any time when the cache
+ is disabled (SCTLR.C=0) and the MMU is enabled (SCTLR.M=1). Because it
+ is implementation defined whether cacheable stores update the cache when
+ the cache is disabled it is not expected that any portable code will
+ execute cacheable stores when the cache is disabled.
 
-I did some timing tests on my imx35 based board by removing the SDHCI_QUIRK_NO_MULTIBLOCK. Patches are inlined below.
+The interesting part is the second sentence, which implies that having the
+MMU enabled with writeback mappings, but with the C bit clear is not an
+expected use case.  Moreover, it reinforces the ARM ARM statment that a
+disabled cache may still be searched, and updated with written data.
 
-Current v4.2-rc6:
-# time dd if=/dev/mmcblk0 of=/dev/null bs=1M count=100
-100+0 records in
-100+0 records out
-real    3m 8.40s
-user    0m 0.02s
-sys     0m 3.67s
+However, the v7_exit_coherency_flush() function creates exactly this
+scenario by clearing the C bit:
 
-Current v4.2-rc6 + patch1:
-# time dd if=/dev/mmcblk0 of=/dev/null bs=1M count=100
-100+0 records in
-100+0 records out
-real    0m 5.90s
-user    0m 0.02s
-sys     0m 1.43s
+#define v7_exit_coherency_flush(level) \
+        asm volatile( \
+        ".arch  armv7-a \n\t" \
+        "stmfd  sp!, {fp, ip} \n\t" \
+        "mrc    p15, 0, r0, c1, c0, 0   @ get SCTLR \n\t" \
+        "bic    r0, r0, #"__stringify(CR_C)" \n\t" \
+        "mcr    p15, 0, r0, c1, c0, 0   @ set SCTLR \n\t" \
+        "isb    \n\t" \
 
-So apparently using multiblock transfers increases the performance considerably. I tried your suggestion to short a data line (DAT0 in my case) to GND. The transfers fail with data CRC errors. So far as expected. But after releasing short DAT0 to GND the data CRC errors remain. I can only get the transfers back to work when unplugging/pluggin the card or reboot the system. But this behavior is also the case when using SDHCI_QUIRK_NO_MULTIBLOCK, aka. the current state. I have no explanation for that. Sample error message is:
-> [  297.671266] mmcblk0: error -84 transferring data, sector 506, nr 6, cmd response 0x900, card status 0x0
-So card state 0x900 is fine. I also get the same when doing
-# cat /sys/kernel/debug/mmc0/mmc0\:1234/status
-00000900
+However, v7_exit_coherency_flush() is careful to disable caching, flush
+the cache and then disable coherency.  Whether that's sufficient for all
+cases is open to question - and where we need this CA15 errata implemented,
+it implies that even this sequence is not permissible to use there.
 
-So I cannot say anything if using multiblock transfers has any negative effect. Up to now it has the same behavior regarding data crc errors as running without multiblock.
+tegra_disable_clean_inv_dcache() is an assembly version of something
+similar to the above, and has the same concerns as the above.
 
-While at it I was curious why ADMA was disabled at all. So I did another test _with_ multiblock transfer and ADMA.
+Implementations which copy the ARM Ltd platforms CPU hotplug hack also
+do this, but in a much more dirty way.  We really need people to stop
+copying the ARM Ltd CPU hotplug hack - I'd go as far as saying that
+arm-soc must stop merging code which introduces these, or (as I've
+already said) which try to turn the ARM CPU hotplug hack into some
+generic facility for platforms to make use of:
 
-Current v4.2-rc6 + patch2:
-# time dd if=/dev/mmcblk0 of=/dev/null bs=1M count=100
-100+0 records in
-100+0 records out
-real    0m 5.28s
-user    0m 0.00s
-sys     0m 1.26s
+static inline void cpu_enter_lowpower(void)
+{
+        "       mrc     p15, 0, %0, c1, c0, 1\n"
+        "       bic     %0, %0, %3\n"
+        "       mcr     p15, 0, %0, c1, c0, 1\n"
+...
+          : "=&r" (v)
+          : "r" (0), "Ir" (CR_C), "Ir" (0x40)
+}
 
-Everything seems ok so far. Why has ADMA been disabled at all? Checking git history this quirk was added with the initial commit 95f25efe0ce22e28d61722d655d2ef582f5f7520 (mmc: sdhci-pltfm: add -pltfm driver for imx35/51).
+The exynos implementation of v7_exit_coherency() is another instance.
 
-Any comments regarding multiblock and (not so) broken ADMA?
+arch/arm/mach-shmobile/platsmp-apmu.c:cpu_enter_lowpower_a15() definitely
+looks like it's a problem, because we are talking about Cortex-A15 there,
+and the sequence is just turning off the C bit, but then reverting back
+to C code to then call the cache flushing.  This is definitely unsafe.
 
-Best regard,
-Alexander
+I think all places which clear the C bit need to be re-reviewed and at
+least some of them fixed, or converted to use a macro such as the
+v7_exit_coherency_flush macro - and they should get a notice placed
+on them to discourage copy-n-pasting it.
 
-patch1:
-8<----------------------------------------------------------------------------------
-diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-index c6b9f64..bc82abe 100644
---- a/drivers/mmc/host/sdhci-esdhc-imx.c
-+++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-@@ -1065,8 +1065,7 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
- 
-        if (imx_data->socdata->flags & ESDHC_FLAG_ENGCM07207)
-                /* Fix errata ENGcm07207 present on i.MX25 and i.MX35 */
--               host->quirks |= SDHCI_QUIRK_NO_MULTIBLOCK
--                       | SDHCI_QUIRK_BROKEN_ADMA;
-+               host->quirks |= SDHCI_QUIRK_BROKEN_ADMA;
- 
-        /*
-         * The imx6q ROM code will change the default watermark level setting
-8<----------------------------------------------------------------------------------
+Incidentally, armada_370_xp_pmsu_idle_enter() should be fixed not to use
+hard-coded constants in the assembly.  Use the "Ir" asm() constraint and
+pass CR_C in.
 
-patch2:
-8<----------------------------------------------------------------------------------
-diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-index c6b9f64..74d552c 100644
---- a/drivers/mmc/host/sdhci-esdhc-imx.c
-+++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-@@ -130,7 +130,7 @@ static struct esdhc_soc_data esdhc_imx25_data = {
- };
- 
- static struct esdhc_soc_data esdhc_imx35_data = {
--       .flags = ESDHC_FLAG_ENGCM07207,
-+       .flags = 0,
- };
- 
- static struct esdhc_soc_data esdhc_imx51_data = {
-8<----------------------------------------------------------------------------------
+Basically, grep for '\<CR_C\>' (quotes and backslashes required for
+grep...)
+
 -- 
-Dipl.-Inf. Alexander Stein
-SYS TEC electronic GmbH
-alexander.stein@systec-electronic.com
-
-Legal and Commercial Address:
-Am Windrad 2
-08468 Heinsdorfergrund
-Germany
-
-Office: +49 (0) 3765 38600-0
-Fax:    +49 (0) 3765 38600-4100
- 
-Managing Directors:
-	Director Technology/CEO: Dipl.-Phys. Siegmar Schmidt;
-	Director Commercial Affairs/COO: Dipl. Ing. (FH) Armin von Collrepp
-Commercial Registry:
-	Amtsgericht Chemnitz, HRB 28082; USt.-Id Nr. DE150534010
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
