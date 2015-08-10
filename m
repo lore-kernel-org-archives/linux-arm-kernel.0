@@ -1,376 +1,130 @@
-From: romain.perier@gmail.com (Romain Perier)
-Date: Mon, 10 Aug 2015 19:44:45 +0200
-Subject: [PATCH] soc/rockchip: add handler for usb-uart functionality
-In-Reply-To: <1574322.mYky5df1dK@diego>
-References: <1574322.mYky5df1dK@diego>
-Message-ID: <CABgxDoKVk=gdPET5E7y+JPwe5S2RsWQMDC6xWBBw=waeG+vNhg@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 10 Aug 2015 19:48:48 +0200
+Subject: [RFC PATCH 01/10] arm64: feature registers: Documentation
+In-Reply-To: <55C8E12E.6030305@arm.com>
+References: <1437731037-25795-1-git-send-email-suzuki.poulose@arm.com>
+ <1437731037-25795-2-git-send-email-suzuki.poulose@arm.com>
+ <20150810160636.GB15394@e104818-lin.cambridge.arm.com>
+ <55C8E12E.6030305@arm.com>
+Message-ID: <CAKv+Gu-9GTzjqyT=NeBKjcaL7q-uFMToqPpprkyD-faG0J3mkQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-07-08 21:00 GMT+02:00 Heiko St?bner <heiko@sntech.de>:
-> Most newer Rockchip SoCs provide the possibility to use a usb-phy
-> as passthrough for the debug uart (uart2), making it possible to
-> get console output without needing to open the device.
->
-> This patch adds an early_initcall to enable this functionality
-> conditionally via the commandline and also disables the corresponding
-> usb controller in the devicetree.
->
-> Currently only data for the rk3288 is provided, but at least the
-> rk3188 and arm64 rk3368 also provide this functionality and will be
-> enabled later.
->
-> On a spliced usb cable the signals are tx on white wire(D+) and
-> rx on green wire(D-).
->
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> ---
-> changes from the version in chromium-review:
-> - enable siddq (probably saves a little power to power down plls)
-> - cosmetics to make checkpatch happy
->
-> Yunzhi Li already gave a Code-Review+1 in the chromium gerrit
-> but I'd guess a public Reviewed-by would be better ;-)
+On 10 August 2015 at 19:36, Suzuki K. Poulose <Suzuki.Poulose@arm.com> wrote:
+> On 10/08/15 17:06, Catalin Marinas wrote:
+>>
+>> Hi Suzuki,
+>>
+>> On Fri, Jul 24, 2015 at 10:43:47AM +0100, Suzuki K. Poulose wrote:
+>>>
+>>> From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
+>>>
+>>> Documentation of the infrastructure
+>>>
+>>> Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
+>>
+>>
+>> The implementation looks fine but I think the main discussion will be
+>> around the goal of this feature and the ABI that it introduces. So I'll
+>> just write my thoughts on this patch (I could as well have replied to
+>> the cover letter).
+>>
+>> Another question: who's going to use this feature? I know people asked
+>> in private but I'd like to have some public statements.
 >
 >
->  Documentation/kernel-parameters.txt      |   6 +
->  drivers/soc/Kconfig                      |   1 +
->  drivers/soc/Makefile                     |   1 +
->  drivers/soc/rockchip/Kconfig             |  13 ++
->  drivers/soc/rockchip/Makefile            |   1 +
->  drivers/soc/rockchip/rockchip_usb_uart.c | 226 +++++++++++++++++++++++++++++++
->  6 files changed, 248 insertions(+)
->  create mode 100644 drivers/soc/rockchip/Kconfig
->  create mode 100644 drivers/soc/rockchip/Makefile
->  create mode 100644 drivers/soc/rockchip/rockchip_usb_uart.c
+> Right, I am hoping that folks from glibc / JIT / GCC will respond to
+> this thread.
 >
-> diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
-> index 1d6f045..156911b 100644
-> --- a/Documentation/kernel-parameters.txt
-> +++ b/Documentation/kernel-parameters.txt
-> @@ -3339,6 +3339,12 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
+>>
+> ...
 >
->         ro              [KNL] Mount root device read-only on boot
+>>> + a) Any change to the HWCAPs requires an update to userspace (e.g libc)
+>>> +    to detect the new changes, which can take a long time to appear in
+>>> +    distributions. Exposing the registers allows applications to get the
+>>> +    information without requiring other userspace components to be
+>>> updated.
+>>
+>>
+>> How does it help if you have a new CPUID field or even a new value in an
+>> existing field? Doesn't userspace need to be changed anyway to make use
+>> of the new feature? I don't think that's a valid argument.
+>>
 >
-> +       rockchip.usb_uart
-> +                       Enable the uart passthrough on the designated usb port
-> +                       on Rockchip SoCs. When active, the signals of the
-> +                       debug-uart get routed to the D+ and D- pins of the usb
-> +                       port and the regular usb controller gets disabled.
-> +
->         root=           [KNL] Root filesystem
->                         See name_to_dev_t comment in init/do_mounts.c.
+> Yes, the userspace would need an update to work with the new CPUID field. I
+> understand.
+> It is just that, "in the enterprise world" updates to the system libraries
+> provided by
+> the distribution might take a bit longer to provide the changes than a
+> software vendor.
+> I agree thats not a common case.
 >
-> diff --git a/drivers/soc/Kconfig b/drivers/soc/Kconfig
-> index 96ddecb..ecb1a6c 100644
-> --- a/drivers/soc/Kconfig
-> +++ b/drivers/soc/Kconfig
-> @@ -2,6 +2,7 @@ menu "SOC (System On Chip) specific Drivers"
 >
->  source "drivers/soc/mediatek/Kconfig"
->  source "drivers/soc/qcom/Kconfig"
-> +source "drivers/soc/rockchip/Kconfig"
->  source "drivers/soc/sunxi/Kconfig"
->  source "drivers/soc/ti/Kconfig"
->  source "drivers/soc/versatile/Kconfig"
-> diff --git a/drivers/soc/Makefile b/drivers/soc/Makefile
-> index 7dc7c0d..6c0b677 100644
-> --- a/drivers/soc/Makefile
-> +++ b/drivers/soc/Makefile
-> @@ -4,6 +4,7 @@
+>>> + b) Access to HWCAPs is sometimes restricted (e.g prior to libc, or when
+>>> ld is
+>>> +    initialised at startup time).
+>>
+>>
+>> That's useful indeed.
 >
->  obj-$(CONFIG_ARCH_MEDIATEK)    += mediatek/
->  obj-$(CONFIG_ARCH_QCOM)                += qcom/
-> +obj-$(CONFIG_ARCH_ROCKCHIP)    += rockchip/
->  obj-$(CONFIG_ARCH_SUNXI)       += sunxi/
->  obj-$(CONFIG_ARCH_TEGRA)       += tegra/
->  obj-$(CONFIG_SOC_TI)           += ti/
-> diff --git a/drivers/soc/rockchip/Kconfig b/drivers/soc/rockchip/Kconfig
-> new file mode 100644
-> index 0000000..24d4e05
-> --- /dev/null
-> +++ b/drivers/soc/rockchip/Kconfig
-> @@ -0,0 +1,13 @@
-> +#
-> +# Rockchip Soc drivers
-> +#
-> +config ROCKCHIP_USB_UART
-> +       bool "Rockchip usb-uart override"
-> +       depends on ARCH_ROCKCHIP
-> +       select MFD_SYSCON
-> +       help
-> +         Say y here to enable usb-uart functionality. Newer Rockchip SoCs
-> +         provide means to repurpose one usb phy as uart2 output, making it
-> +         possible to get debug output without needing to open a device.
-> +         To enable this function on boot, add a rockchip.usb_uart option
-> +         to the kernel commandline.
-> diff --git a/drivers/soc/rockchip/Makefile b/drivers/soc/rockchip/Makefile
-> new file mode 100644
-> index 0000000..b5dd6f8
-> --- /dev/null
-> +++ b/drivers/soc/rockchip/Makefile
-> @@ -0,0 +1 @@
-> +obj-$(CONFIG_ROCKCHIP_USB_UART)                +=      rockchip_usb_uart.o
-> diff --git a/drivers/soc/rockchip/rockchip_usb_uart.c b/drivers/soc/rockchip/rockchip_usb_uart.c
-> new file mode 100644
-> index 0000000..8e96d46
-> --- /dev/null
-> +++ b/drivers/soc/rockchip/rockchip_usb_uart.c
-> @@ -0,0 +1,226 @@
-> +/*
-> + * Copyright (c) 2015 Heiko Stuebner <heiko@sntech.de>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/init.h>
-> +#include <linux/errno.h>
-> +#include <linux/mfd/syscon.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_platform.h>
-> +#include <linux/regmap.h>
-> +#include <linux/slab.h>
-> +
-> +#define HIWORD_UPDATE(val, mask) \
-> +               ((val) | (mask) << 16)
-> +
-> +struct rockchip_uart_data {
-> +       const char *grf_compatible;
-> +       const char *usb_compatible;
-> +       phys_addr_t usb_phys_addr;
-> +       int (*init_uart)(const struct rockchip_uart_data *data,
-> +                        struct regmap *grf);
-> +};
-> +
-> +static int enable_usb_uart;
-> +
-> +#define RK3288_UOC0_CON0                               0x320
-> +#define RK3288_UOC0_CON0_COMMON_ON_N                   BIT(0)
-> +#define RK3288_UOC0_CON0_DISABLE                       BIT(4)
-> +#define RK3288_UOC0_CON0_SIDDQ                         BIT(13)
-> +
-> +#define RK3288_UOC0_CON2                               0x328
-> +#define RK3288_UOC0_CON2_SOFT_CON_SEL                  BIT(2)
-> +
-> +#define RK3288_UOC0_CON3                               0x32c
-> +#define RK3288_UOC0_CON3_UTMI_SUSPENDN                 BIT(0)
-> +#define RK3288_UOC0_CON3_UTMI_OPMODE_NODRIVING         (1 << 1)
-> +#define RK3288_UOC0_CON3_UTMI_OPMODE_MASK              (3 << 1)
-> +#define RK3288_UOC0_CON3_UTMI_XCVRSEELCT_FSTRANSC      (1 << 3)
-> +#define RK3288_UOC0_CON3_UTMI_XCVRSEELCT_MASK          (3 << 3)
-> +#define RK3288_UOC0_CON3_UTMI_TERMSEL_FULLSPEED                BIT(5)
-> +#define RK3288_UOC0_CON3_BYPASSDMEN                    BIT(6)
-> +#define RK3288_UOC0_CON3_BYPASSSEL                     BIT(7)
+>
+> OK
+>
+>>
+>>> + c) HWCAPs cannot represent non-boolean information effectively. The
+>>> +    architecture defines a canonical format for representing features
+>>> +    in the ID registers; this is well defined and is capable of
+>>> +    representing all valid architecture variations. Exposing the ID
+>>> +    registers avoids having to come up with HWCAP representations
+>>> +    and parsing code.
+>>
+>>
+>> So far we've managed to cope with the boolean state of HWCAP, at least
+>> for information relevant to user space. One thing it doesn't cover is
+>> MIDR_EL1.
+>>
+>> But the question here is whether we continue to add HWCAP bits even when
+>> we exposed the CPUID registers to user. IMO, we should continue to add
+>> the HWCAP bits matching new CPUID features for a few reasons:
+>
+>
+> I don't have a strong opinion against it.
+>
+>>
+>> 1. It's the current interface that we have and the bits can be checked
+>>     in standard C code without having to issue arm64-specific instructions
+>>
+>
+> I agree. May be we could provide library interface for this in the future ?
+>
+>> 2. We still need features listed in /proc/cpuinfo, at least for humans
+>>     reading this file or scripts that can't issue mrs instructions
+>>
+>
+> Agreed, we still need to provide the features in /proc/cpuinfo. We could do
+> this without HWCAP if we decide not to update the list.
+>
+>> And to debunk some of the counter arguments:
+>>
+>> a) Running out of HWCAP bits - I really doubt this, we can always
+>>     introduce 64 more via a new elf_hwcapX
+>
 
-I was wondering why these values are "hardcoded" directly, but as you
-said, support for other SoCs will be enabled later.
-Keep things simple as beginning is okay for me.
+Note that ELF_HWCAP is also wired into ifunc resolution of GNU
+indirect functions, which looks like a useful feature although it
+isn't used that widely yet.
 
-> +
-> +/*
-> + * Enable the bypass of uart2 data through the otg usb phy.
-> + * Original description in the TRM.
-> + * 1. Disable the OTG block by setting OTGDISABLE0 to 1?b1.
-> + * 2. Disable the pull-up resistance on the D+ line by setting
-> + *    OPMODE0[1:0] to 2?b01.
-> + * 3. To ensure that the XO, Bias, and PLL blocks are powered down in Suspend
-> + *    mode, set COMMONONN to 1?b1.
-> + * 4. Place the USB PHY in Suspend mode by setting SUSPENDM0 to 1?b0.
-> + * 5. Set BYPASSSEL0 to 1?b1.
-> + * 6. To transmit data, controls BYPASSDMEN0, and BYPASSDMDATA0.
-> + * To receive data, monitor FSVPLUS0.
-> + *
-> + * The actual code in the vendor kernel does some things differently.
-> + */
-> +static int __init rk3288_init_usb_uart(const struct rockchip_uart_data *data,
-> +                                      struct regmap *grf)
-> +{
-> +       u32 val;
-> +       int ret;
-> +
-> +       /*
-> +        * COMMON_ON and DISABLE settings are described in the TRM,
-> +        * but were not present in the original code.
-> +        * Also disable the analog phy components to save power.
-> +        */
-> +       val = HIWORD_UPDATE(RK3288_UOC0_CON0_COMMON_ON_N
-> +                               | RK3288_UOC0_CON0_DISABLE
-> +                               | RK3288_UOC0_CON0_SIDDQ,
-> +                           RK3288_UOC0_CON0_COMMON_ON_N
-> +                               | RK3288_UOC0_CON0_DISABLE
-> +                               | RK3288_UOC0_CON0_SIDDQ);
-> +       ret = regmap_write(grf, RK3288_UOC0_CON0, val);
-> +       if (ret)
-> +               return ret;
-> +
-> +       val = HIWORD_UPDATE(RK3288_UOC0_CON2_SOFT_CON_SEL,
-> +                           RK3288_UOC0_CON2_SOFT_CON_SEL);
-> +       ret = regmap_write(grf, RK3288_UOC0_CON2, val);
-> +       if (ret)
-> +               return ret;
-> +
-> +       val = HIWORD_UPDATE(RK3288_UOC0_CON3_UTMI_OPMODE_NODRIVING
-> +                               | RK3288_UOC0_CON3_UTMI_XCVRSEELCT_FSTRANSC
-> +                               | RK3288_UOC0_CON3_UTMI_TERMSEL_FULLSPEED,
-> +                           RK3288_UOC0_CON3_UTMI_SUSPENDN
-> +                               | RK3288_UOC0_CON3_UTMI_OPMODE_MASK
-> +                               | RK3288_UOC0_CON3_UTMI_XCVRSEELCT_MASK
-> +                               | RK3288_UOC0_CON3_UTMI_TERMSEL_FULLSPEED);
-> +       ret = regmap_write(grf, RK3288_UOC0_CON3, val);
-> +       if (ret)
-> +               return ret;
-> +
-> +       val = HIWORD_UPDATE(RK3288_UOC0_CON3_BYPASSSEL
-> +                               | RK3288_UOC0_CON3_BYPASSDMEN,
-> +                           RK3288_UOC0_CON3_BYPASSSEL
-> +                               | RK3288_UOC0_CON3_BYPASSDMEN);
-> +       ret = regmap_write(grf, RK3288_UOC0_CON3, val);
-> +       if (ret)
-> +               return ret;
-> +
-> +       return 0;
-> +}
-> +
-> +static const struct rockchip_uart_data rk3288_uart_data __initconst = {
-> +       .grf_compatible = "rockchip,rk3288-grf",
-> +       .usb_compatible = "rockchip,rk3288-usb",
-> +       .usb_phys_addr = 0xff580000,
-> +       .init_uart = rk3288_init_usb_uart,
-> +};
-> +
-> +static const struct of_device_id rockchip_usb_uart_ids[] __initconst = {
-> +       { .compatible = "rockchip,rk3288", .data = &rk3288_uart_data },
-> +       { }
-> +};
-> +
-> +/*
-> + * Find the usb controller using the shared usb-uart-phy in the dts and
-> + * disable it.
-> + */
-> +static int __init
-> +rockchip_disable_usb_controller(const struct rockchip_uart_data *data)
-> +{
-> +       struct device_node *np;
-> +
-> +       for_each_compatible_node(np, NULL, data->usb_compatible) {
-> +               struct property *new_status;
-> +               struct resource res;
-> +               int ret;
-> +
-> +               ret = of_address_to_resource(np, 0, &res);
-> +               if (ret) {
-> +                       pr_err("%s: could not get address of usb controller %s\n",
-> +                              __func__, np->full_name);
-> +                       continue;
-> +               }
-> +
-> +               /* not the controller we're looking for */
-> +               if (res.start != data->usb_phys_addr)
-> +                       continue;
-> +
-> +               pr_debug("%s: disabling usb controller %s\n",
-> +                        __func__, np->full_name);
-> +
-> +               new_status = kzalloc(sizeof(*new_status), GFP_KERNEL);
-> +               if (!new_status)
-> +                       return -ENOMEM;
-> +
-> +               new_status->name = kstrdup("status", GFP_KERNEL);
-> +               new_status->length = sizeof("disabled");
-> +               new_status->value = kstrdup("disabled", GFP_KERNEL);
+The ifunc prototype for aarch64 has only one 'long' parameter, and I
+don't know if it is possible to extend that without having a bit in
+HWCAPn to indicate that HWCAPn+1 is valid. Also, the ifunc resolvers
+are restricted in the sense that they cannot use shared libraries or
+code that uses constructors (AFAIR) so it may require a special static
+library to call this CPU feature interface from such a resolver if
+features are not covered by HWCAP bits.
 
-I understand completly why you need to pass an property allocated
-dynamically, however, is it absolutly required to allocate "name" and
-"value" dynamically too ? I mean, you could assign const literal
-strings directly *BUT* it strongly depends on how properties are freed
-by the devicetree subsystem.
+So treating HWCAP bits as an endless supply may not be the wisest
+approach here. Also, I think some alignment with the libc folks is
+indeed in order.
 
-> +
-> +               return of_update_property(np, new_status);
-> +       }
-> +
-> +       return 0;
-> +}
-> +
-> +static const struct of_device_id __init *rockchip_usb_uart_data_lookup(void)
-> +{
-> +       struct device_node *root;
-> +       const struct of_device_id *id;
-> +
-> +       root = of_find_node_by_path("/");
-> +       if (!root)
-> +               return NULL;
-> +
-> +       id = of_match_node(rockchip_usb_uart_ids, root);
-> +       of_node_put(root);
-> +
-> +       return id;
-> +}
-> +
-> +static int __init rockchip_init_usb_uart(void)
-> +{
-> +       const struct of_device_id *match;
-> +       const struct rockchip_uart_data *data;
-> +       struct regmap *grf;
-> +       int ret;
-> +
-> +       if (!enable_usb_uart)
-> +               return 0;
-> +
-> +       match = rockchip_usb_uart_data_lookup();
-> +       if (!match)
-> +               return -ENOTSUPP;
-> +
-> +       pr_debug("%s: using settings for %s\n", __func__, match->compatible);
-> +       data = match->data;
-> +
-> +       grf = syscon_regmap_lookup_by_compatible(data->grf_compatible);
-> +       if (IS_ERR(grf)) {
-> +               pr_err("%s: could not find GRF syscon\n", __func__);
-> +               return PTR_ERR(grf);
-> +       }
-> +
-> +       ret = data->init_uart(data, grf);
-> +       if (ret) {
-> +               pr_err("%s: could not init usb_uart\n", __func__);
-> +               return ret;
-> +       }
-> +
-> +       return rockchip_disable_usb_controller(data);
-> +}
-> +early_initcall(rockchip_init_usb_uart);
-> +
-> +static int __init rockchip_usb_uart(char *buf)
-> +{
-> +       enable_usb_uart = true;
-> +       return 0;
-> +}
-> +early_param("rockchip.usb_uart", rockchip_usb_uart);
-> --
-> 2.1.4
->
->
->
-> _______________________________________________
-> Linux-rockchip mailing list
-> Linux-rockchip at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-rockchip
-
-
-I agree with Arnd, it would be better to lose nothing. Some users
-might have rk3288-based tv box (assuming that the dts is opened...) or
-broken uart... yes you can do low levels tasks on a development board,
-but that's not a real solution for me. Each device should be
-independent, imho.
-
-Regards,
-Romain
+-- 
+Ard.
