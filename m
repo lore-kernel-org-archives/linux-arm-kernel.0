@@ -1,81 +1,101 @@
-From: dhdang@apm.com (Duc Dang)
-Date: Mon, 10 Aug 2015 15:28:43 -0700
-Subject: [PATCH v5 9/9] PCI: xgene: Use pci_scan_root_bus_msi()
-In-Reply-To: <20150810220413.GA13982@google.com>
-References: <20150804214234.9189.42548.stgit@bhelgaas-glaptop2.roam.corp.google.com>
- <20150804215457.9189.27595.stgit@bhelgaas-glaptop2.roam.corp.google.com>
- <55C37C92.1020509@arm.com> <20150810220413.GA13982@google.com>
-Message-ID: <CADaLNDmAzFhqWcR4mD3+Oi=eTu6zaSeNzZrc186_3Va2QaXw2g@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 11 Aug 2015 01:44:03 +0300
+Subject: [PATCH v2] ARM: shmobile: silk: add SDHI1 DT support
+In-Reply-To: <10037494.4LD4T2QGPX@wasted.cogentembedded.com>
+References: <10037494.4LD4T2QGPX@wasted.cogentembedded.com>
+Message-ID: <2757472.iuyUyRzJ3z@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 10, 2015 at 3:04 PM, Bjorn Helgaas <bhelgaas@google.com> wrote:
-> Hi Marc,
->
-> On Thu, Aug 06, 2015 at 04:26:10PM +0100, Marc Zyngier wrote:
->> On 04/08/15 22:54, Bjorn Helgaas wrote:
->> > Previously there was no way to specify the MSI controller when creating a
->> > new PCI root bus, so we had to create the bus, set its MSI controller, then
->> > scan the bus.  With the new pci_scan_root_bus_msi() interface, we can
->> > specify the MSI controller up front and get rid of that intermediate step.
->> >
->> > Look up the MSI controller first, then use pci_scan_root_bus_msi() to
->> > create and scan the root PCI bus.
->>
->> I'm wondering about these XGene patches.
->>
->> With the code that is queued for v4.3 in tip/irq/core, the X-Gene MSI
->> driver doesn't export a struct msi_controller anymore, and entirely
->> relies on IRQ domains to identify to be matched with the actual PCI driver.
->>
->> Do you intend this as a cleanup until everything lands in mainline? At
->> that point, we'd be able to remove all traces of struct msi_controller
->> from this driver.
->
-> I haven't been following the IRQ domain stuff or tip/irq/core, so I
-> really don't know how this relates to that.  I took a look, and I see
-> 8d63bc7beaee ("PCI/MSI: pci-xgene-msi: Get rid of struct
-> msi_controller"), which removes an msi_controller pointer from
-> pci-xgene-msi.c, but I don't see any pci-xgene.c changes in
-> tip/irq/core.
->
-> Are you saying that xgene_pcie_msi_enable() will go away eventually?
-> And the OF "msi-parent" lookup will go away, or at least be moved
-> elsewhere?  We currently have:
->
->   xgene_pcie_probe_bridge(...)
->   {
->     ...
->     bus = pci_create_root_bus(...);
->     xgene_pcie_msi_enable(...);
->     pci_scan_child_bus(bus);
->     ...
->   }
->
-> I'd like to get rid of that arch-specific MSI enable stuff because
-> then we can use a higher level interface, e.g., pci_scan_root_bus(),
-> and make the X-Gene code slightly simpler.
->
->> Alternatively, we could ask tglx to add an extra patch to the existing
->> queue in order to clean up pci-xgene.c (nuking the whole
->> xgene_pcie_msi_enable function).
->
-> Ah, I guess you *are* saying that xgene_pcie_msi_enable() will go away
-> eventually.  I don't know how to do that, but apparently you do, so
-> I'll just drop these X-Gene-related patches for now.
+Define the SILK board dependent part of the SDHI1 (connected to micro-SD slot)
+device nodes along with the necessary voltage regulators.
 
-Hi Bjorn,
+Based on the original patch by Vladimir Barinov
+<vladimir.barinov@cogentembedded.com>.
 
-I tested PCIe MSI with Marc's patch on X-Gene platform and it was working fine.
-xgene_pcie_msi_enable will go away. I will post clean up patch to
-remove these msi_controller traces
-for X-Gene.
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
->
-> Bjorn
+---
+This patch is against 'renesas-devel-20150810-v4.2-rc6' tag of Simon Horman's
+'renesas.git' repo plus the R8A7794/SILK QSPI patches just re-posted. It needs
+the R8A7794 GPIO patches in order to compile.
 
+Changes in version 2:
+- removed not working SDHI0 stuff, renamed the patch;
+- replaced SDHI1's "wp-gpios" property with "disable-wp".
 
+ arch/arm/boot/dts/r8a7794-silk.dts |   40 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 40 insertions(+)
 
--- 
-Regards,
-Duc Dang.
+Index: renesas/arch/arm/boot/dts/r8a7794-silk.dts
+===================================================================
+--- renesas.orig/arch/arm/boot/dts/r8a7794-silk.dts
++++ renesas/arch/arm/boot/dts/r8a7794-silk.dts
+@@ -12,6 +12,7 @@
+ 
+ /dts-v1/;
+ #include "r8a7794.dtsi"
++#include <dt-bindings/gpio/gpio.h>
+ 
+ / {
+ 	model = "SILK";
+@@ -39,6 +40,29 @@
+ 		regulator-boot-on;
+ 		regulator-always-on;
+ 	};
++	vcc_sdhi1: regulator at 3 {
++		compatible = "regulator-fixed";
++
++		regulator-name = "SDHI1 Vcc";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++
++		gpio = <&gpio4 26 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
++
++	vccq_sdhi1: regulator at 4 {
++		compatible = "regulator-gpio";
++
++		regulator-name = "SDHI1 VccQ";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <3300000>;
++
++		gpios = <&gpio4 29 GPIO_ACTIVE_HIGH>;
++		gpios-states = <1>;
++		states = <3300000 1
++			  1800000 0>;
++	};
+ };
+ 
+ &extal_clk {
+@@ -66,6 +90,11 @@
+ 		renesas,function = "mmc";
+ 	};
+ 
++	sdhi1_pins: sd1 {
++		renesas,groups = "sdhi1_data4", "sdhi1_ctrl";
++		renesas,function = "sdhi1";
++	};
++
+ 	qspi_pins: spi0 {
+ 		renesas,groups = "qspi_ctrl", "qspi_data4";
+ 		renesas,function = "qspi";
+@@ -106,6 +135,17 @@
+ 	status = "okay";
+ };
+ 
++&sdhi1 {
++	pinctrl-0 = <&sdhi1_pins>;
++	pinctrl-names = "default";
++
++	vmmc-supply = <&vcc_sdhi1>;
++	vqmmc-supply = <&vccq_sdhi1>;
++	cd-gpios = <&gpio6 14 GPIO_ACTIVE_LOW>;
++	disable-wp;
++	status = "okay";
++};
++
+ &qspi {
+ 	pinctrl-0 = <&qspi_pins>;
+ 	pinctrl-names = "default";
