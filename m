@@ -1,43 +1,76 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Mon, 10 Aug 2015 11:18:23 -0500
-Subject: X-Gene: Unhandled fault: synchronous external abort in
- pci_generic_config_read32
-In-Reply-To: <CADaLNDk=+J_yOer1ferSCNb_xAC42ULtP2FyCLmYMwa+Gj=vfA@mail.gmail.com>
-References: <20150724224258.GA23990@google.com>
- <CADaLNDmYZ=8XQt82W_H74QaOiX3UwkVxkE1_EWRgzhkG1boebw@mail.gmail.com>
- <CAErSpo549xfAnx62quCqGHh3DNay5Lfb6EhEG+4EXooEuueQFQ@mail.gmail.com>
- <CADaLNDn95H=g73DKWRsrB4SuWcf+-8mkepbwb_DC-sFsVkrk6g@mail.gmail.com>
- <20150728212944.GA12958@google.com>
- <CADaLNDkOLiyPmVC3VwpnbrfAKFmNwSVJKdChjQFdQqs7XP-Ddg@mail.gmail.com>
- <20150729012255.GA18606@google.com> <20150729155509.GA31170@google.com>
- <CADaLNDk=+J_yOer1ferSCNb_xAC42ULtP2FyCLmYMwa+Gj=vfA@mail.gmail.com>
-Message-ID: <CAErSpo4VFh7rv81sCAG-eCXVyZh4ub8Trh-ntZhyfy7BzqTr5g@mail.gmail.com>
+From: ykk@rock-chips.com (Yakir Yang)
+Date: Tue, 11 Aug 2015 00:26:21 +0800
+Subject: [PATCH 9/9] drm: bridge/dw_hdmi-i2s-audio: add audio driver
+In-Reply-To: <20150810154848.GV7557@n2100.arm.linux.org.uk>
+References: <20150808160936.GN7557@n2100.arm.linux.org.uk>
+ <E1ZO6hr-0003No-RB@rmk-PC.arm.linux.org.uk>
+ <20150810154848.GV7557@n2100.arm.linux.org.uk>
+Message-ID: <55C8D0AD.3040001@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 31, 2015 at 12:00 PM, Duc Dang <dhdang@apm.com> wrote:
-> On Wed, Jul 29, 2015 at 8:55 AM, Bjorn Helgaas <bhelgaas@google.com> wrote:
->> On Tue, Jul 28, 2015 at 08:22:55PM -0500, Bjorn Helgaas wrote:
->>> On Tue, Jul 28, 2015 at 02:50:39PM -0700, Duc Dang wrote:
->>
->>> > Do you have another PCIe card to try on the same reboot test on this board?
->>>
->>> I've seen this on at least two Mellanox cards.  I'm running similar tests
->>> on a different type of card now.
->>
->> FWIW, reboot tests on two machines with Mellanox cards failed, while the
->> same test on a machine with a different proprietary card succeeded.
->
-> Thanks, Bjorn.
->
-> I don't have the same Mellanox card as yours, but I will also run
-> similar reboot test to see if I hit the same issue with my card.
+Hi Russell,
 
-Any more hints on this?  Nothing has changed on my end, so of course
-I'm still seeing this, always on machines with Mellanox, and never on
-other machines.  Could this be a hardware issue like a signal
-integrity or margin issue?  I don't know where to go from here because
-I'm not a hardware person, and I don't know anything to do in
-software.
+? 2015/8/10 23:48, Russell King - ARM Linux ??:
+> On Sat, Aug 08, 2015 at 05:10:47PM +0100, Russell King wrote:
+>> From: Yakir Yang <ykk@rock-chips.com>
+>>
+>> Add ALSA based HDMI I2S audio driver for dw_hdmi. Sound card
+>> driver could connect to this codec through the codec dai name
+>> "dw-hdmi-i2s-audio".
+>>
+>> [Fixed IRQ name, MODULE_DESCRIPTION, MODULE_ALIAS in
+>>   dw-hdmi-i2s-audio.c, and platform device name in dw-hdmi.c --rmk]
+>>
+>> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+>> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> I'm dropping this patch after all as it no longer builds against modern
+> kernels due to the reference to the removed snd_soc_jack_new().  Its
+> replacement is at card level, and I don't think it's a simple case of
+> replacing it here.
 
-Bjorn
+Hmm... I would rather to fix it in my side, and then I could rebase on 
+your series, is it okay ?
+
+- Yakir
+
+>> +static int snd_dw_hdmi_audio_probe(struct snd_soc_codec *codec)
+>> +{
+>> +	struct snd_dw_hdmi *dw = snd_soc_codec_get_drvdata(codec);
+>> +	int ret;
+>> +
+>> +	ret = snd_soc_jack_new(codec, "dw Jack", SND_JACK_LINEOUT,
+>> +			       &dw->jack);
+> ...
+>> +static const struct snd_soc_codec_driver dw_hdmi_audio = {
+>> +	.probe = snd_dw_hdmi_audio_probe,
+>> +	.dapm_widgets = snd_dw_hdmi_audio_widgets,
+>> +	.num_dapm_widgets = ARRAY_SIZE(snd_dw_hdmi_audio_widgets),
+>> +	.dapm_routes = snd_dw_hdmi_audio_routes,
+>> +	.num_dapm_routes = ARRAY_SIZE(snd_dw_hdmi_audio_routes),
+>> +};
+>> +
+>> +static int dw_hdmi_audio_probe(struct platform_device *pdev)
+>> +{
+>> +	struct dw_hdmi_audio_data *data = pdev->dev.platform_data;
+>> +	struct snd_dw_hdmi *dw;
+>> +	int ret;
+>> +
+>> +	dw = devm_kzalloc(&pdev->dev, sizeof(*dw), GFP_KERNEL);
+>> +	if (!dw)
+>> +		return -ENOMEM;
+>> +
+>> +	dw->data = *data;
+>> +	dw->dev = &pdev->dev;
+>> +	dw->is_jack_ready = false;
+>> +	platform_set_drvdata(pdev, dw);
+>> +
+>> +	ret = request_irq(dw->data.irq, snd_dw_hdmi_irq, IRQF_SHARED,
+>> +			  DRIVER_NAME, dw);
+>> +	if (ret) {
+>> +		dev_err(&pdev->dev, "request irq failed (%d)\n", ret);
+>> +		return -EINVAL;
+>> +	}
+>> +
+>> +	ret = snd_soc_register_codec(&pdev->dev, &dw_hdmi_audio,
+>> +				     &dw_hdmi_audio_dai, 1);
