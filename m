@@ -1,33 +1,46 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Mon, 10 Aug 2015 20:42:16 +0200
-Subject: [PATCH 5/5] drivers/tty: make serial 8250_lpc18xx.c explicitly
- non-modular
-In-Reply-To: <1439081497-14986-6-git-send-email-paul.gortmaker@windriver.com>
-References: <1439081497-14986-1-git-send-email-paul.gortmaker@windriver.com>
- <1439081497-14986-6-git-send-email-paul.gortmaker@windriver.com>
-Message-ID: <CAGhQ9Vxjymt4z32s3x2B8b6ypgn3Bzh1ncbqxqidfPyM2k87jw@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 10 Aug 2015 20:52:03 +0200
+Subject: [PATCH 2/2] ARM: shmobile: silk: add QSPI DT support
+In-Reply-To: <55C8EAF0.7060600@cogentembedded.com>
+References: <1898263.zrOs5SAUTS@wasted.cogentembedded.com>
+ <1768974.jEFIAaInqd@wasted.cogentembedded.com>
+ <CAMuHMdXQJ4Hju477Ys0ujXCNdUjWOa6AuKGzLPc3YFJc_eLz+g@mail.gmail.com>
+ <55C8EAF0.7060600@cogentembedded.com>
+Message-ID: <CAMuHMdVAjsDJ+fFJnG4WAydCgvW=iRDcyXp9R6xBfn3EHU-tbQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+Hi Sergei,
 
-On 9 August 2015 at 02:51, Paul Gortmaker <paul.gortmaker@windriver.com> wrote:
-> The Kconfig currently controlling compilation of this code is:
+On Mon, Aug 10, 2015 at 8:18 PM, Sergei Shtylyov
+<sergei.shtylyov@cogentembedded.com> wrote:
+> On 08/10/2015 05:38 PM, Geert Uytterhoeven wrote:
+>>> +&qspi {
+>>> +       pinctrl-0 = <&qspi_pins>;
+>>> +       pinctrl-names = "default";
+>>> +
+>>> +       status = "okay";
+>>> +
+>>> +       flash at 0 {
+>>> +               #address-cells = <1>;
+>>> +               #size-cells = <1>;
+>>> +               compatible = "spansion,s25fl512s";
 >
-> 8250/Kconfig:config SERIAL_8250_LPC18XX
-> 8250/Kconfig:        bool "NXP LPC18xx/43xx serial port support"
+>> Please add the "jedec,spi-nor" fallback.
 >
-> ...meaning that it currently is not being built as a module by anyone.
->
-> Lets remove the modular code that is essentially orphaned, so that
-> when reading the driver there is no doubt it is builtin-only.
+>    Hm, spi-nor.c alone can't control this device, it's rather m25p80.c
+> that's the real driver. So if a fallback needs to be added indeed it should
+> be "st,m25p80" I think...
 
-The bool in KConfig is more or less a copy-paste mistake on my side. I
-really meant for this driver to be buildable as module and it builds
-just fine with 'm'.
+Please have a look at Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt.
 
-Want me send a patch changing it to tristate or will you handle it?
+Gr{oetje,eeting}s,
 
+                        Geert
 
-regards,
-Joachim Eastwood
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
