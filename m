@@ -1,54 +1,67 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Mon, 10 Aug 2015 15:57:59 +0100
-Subject: [PATCH v8 4/4] nvmem: Add DT binding documentation for Vybrid
- OCOTP driver
-In-Reply-To: <3149879671b1b1b0b6fc1fbe62e9f49333deb8ed.1439214648.git.maitysanchayan@gmail.com>
-References: <cover.1439214648.git.maitysanchayan@gmail.com>
- <3149879671b1b1b0b6fc1fbe62e9f49333deb8ed.1439214648.git.maitysanchayan@gmail.com>
-Message-ID: <55C8BBF7.30308@linaro.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 10 Aug 2015 15:58:04 +0100
+Subject: [PATCH 2/2] arm64: VDSO: fix coarse clock monotonicity regression
+In-Reply-To: <20150810092252.GB1604@arm.com>
+References: <1438999403-5770-1-git-send-email-nathan_lynch@mentor.com>
+ <1438999403-5770-3-git-send-email-nathan_lynch@mentor.com>
+ <20150810092252.GB1604@arm.com>
+Message-ID: <20150810145804.GA15394@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Aug 10, 2015 at 10:22:53AM +0100, Will Deacon wrote:
+> On Sat, Aug 08, 2015 at 03:03:23AM +0100, Nathan Lynch wrote:
+> > Since 906c55579a63 ("timekeeping: Copy the shadow-timekeeper over the
+> > real timekeeper last") it has become possible on arm64 to:
+> > 
+> > - Obtain a CLOCK_MONOTONIC_COARSE or CLOCK_REALTIME_COARSE timestamp
+> >   via syscall.
+> > - Subsequently obtain a timestamp for the same clock ID via VDSO which
+> >   predates the first timestamp (by one jiffy).
+> > 
+> > This is because arm64's update_vsyscall is deriving the coarse time
+> > using the __current_kernel_time interface, when it should really be
+> > using the timekeeper object provided to it by the timekeeping core.
+> > It happened to work before only because __current_kernel_time would
+> > access the same timekeeper object which had been passed to
+> > update_vsyscall.  This is no longer the case.
+> > 
+> > Signed-off-by: Nathan Lynch <nathan_lynch@mentor.com>
+> > ---
+> >  arch/arm64/kernel/vdso.c | 7 +++----
+> >  1 file changed, 3 insertions(+), 4 deletions(-)
+> > 
+> > diff --git a/arch/arm64/kernel/vdso.c b/arch/arm64/kernel/vdso.c
+> > index ec37ab3f524f..97bc68f4c689 100644
+> > --- a/arch/arm64/kernel/vdso.c
+> > +++ b/arch/arm64/kernel/vdso.c
+> > @@ -199,16 +199,15 @@ int arch_setup_additional_pages(struct linux_binprm *bprm,
+> >   */
+> >  void update_vsyscall(struct timekeeper *tk)
+> >  {
+> > -	struct timespec xtime_coarse;
+> >  	u32 use_syscall = strcmp(tk->tkr_mono.clock->name, "arch_sys_counter");
+> >  
+> >  	++vdso_data->tb_seq_count;
+> >  	smp_wmb();
+> >  
+> > -	xtime_coarse = __current_kernel_time();
+> >  	vdso_data->use_syscall			= use_syscall;
+> > -	vdso_data->xtime_coarse_sec		= xtime_coarse.tv_sec;
+> > -	vdso_data->xtime_coarse_nsec		= xtime_coarse.tv_nsec;
+> > +	vdso_data->xtime_coarse_sec		= tk->xtime_sec;
+> > +	vdso_data->xtime_coarse_nsec		= tk->tkr_mono.xtime_nsec >>
+> > +							tk->tkr_mono.shift;
+> >  	vdso_data->wtm_clock_sec		= tk->wall_to_monotonic.tv_sec;
+> >  	vdso_data->wtm_clock_nsec		= tk->wall_to_monotonic.tv_nsec;
+> 
+> Looks good,
+> 
+>   Acked-by: Will Deacon <will.deacon@arm.com>
+> 
+> There's probably still time for Catalin to pick this up for 4.2.
 
+Applied, I'll send a pull request today/tomorrow. Thanks.
 
-On 10/08/15 15:11, Sanchayan Maity wrote:
-> Add the devicetree bindings for the Freescale Vybrid On-Chip
-> OTP driver.
->
-> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
-> ---
->   .../devicetree/bindings/nvmem/vf610-ocotp.txt       | 21 +++++++++++++++++++++
->   1 file changed, 21 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/nvmem/vf610-ocotp.txt
->
-
-Acked-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-
-> diff --git a/Documentation/devicetree/bindings/nvmem/vf610-ocotp.txt b/Documentation/devicetree/bindings/nvmem/vf610-ocotp.txt
-> new file mode 100644
-> index 0000000..b29f65f
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/nvmem/vf610-ocotp.txt
-> @@ -0,0 +1,21 @@
-> +On-Chip OTP Memory for Freescale Vybrid
-> +
-> +Required Properties:
-> +  compatible:
-> +  - "fsl,vf610-ocotp" for VF5xx/VF6xx
-> +  #address-cells : Should be 1
-> +  #size-cells : Should be 1
-> +  reg : Address and length of OTP controller and fuse map registers
-> +  clocks : ipg clock we associate with the OCOTP peripheral
-> +  clock-names : Must contain "ocotp" as matching entry
-> +
-> +Example for Vybrid VF5xx/VF6xx:
-> +
-> +	ocotp: ocotp at 400a5000 {
-> +		compatible = "fsl,vf610-ocotp";
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		reg = <0x400a5000 0xCF0>;
-> +		clocks = <&clks VF610_CLK_OCOTP>;
-> +		clock-names = "ocotp";
-> +	};
->
+-- 
+Catalin
