@@ -1,37 +1,57 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 10 Aug 2015 16:41:45 +0200
-Subject: [PATCH] ARM: at91: remove useless includes in platform_data/atmel.h
-Message-ID: <1439217705-13960-1-git-send-email-alexandre.belloni@free-electrons.com>
+Date: Mon, 10 Aug 2015 16:44:54 +0200
+Subject: [PATCH] can: at91: move at91_can_data to at91_can.c
+Message-ID: <1439217894-15230-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-include/linux/platform_data/atmel.h has a lot of useless includes, remove
-them.
+struct at91_can_data is now only used inside the driver, move it to
+its c file.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- include/linux/platform_data/atmel.h | 8 --------
- 1 file changed, 8 deletions(-)
+ drivers/net/can/at91_can.c          | 5 ++++-
+ include/linux/platform_data/atmel.h | 5 -----
+ 2 files changed, 4 insertions(+), 6 deletions(-)
 
+diff --git a/drivers/net/can/at91_can.c b/drivers/net/can/at91_can.c
+index 945c0955a967..83ddf4f46f0d 100644
+--- a/drivers/net/can/at91_can.c
++++ b/drivers/net/can/at91_can.c
+@@ -33,7 +33,6 @@
+ #include <linux/spinlock.h>
+ #include <linux/string.h>
+ #include <linux/types.h>
+-#include <linux/platform_data/atmel.h>
+ 
+ #include <linux/can/dev.h>
+ #include <linux/can/error.h>
+@@ -136,6 +135,10 @@ struct at91_devtype_data {
+ 	enum at91_devtype type;
+ };
+ 
++struct at91_can_data {
++	void (*transceiver_switch)(int on);
++};
++
+ struct at91_priv {
+ 	struct can_priv can;		/* must be the first member! */
+ 	struct napi_struct napi;
 diff --git a/include/linux/platform_data/atmel.h b/include/linux/platform_data/atmel.h
-index 527a85c61924..4d67a5e82c83 100644
+index 4b452c6a2f7b..b99d85f56a7d 100644
 --- a/include/linux/platform_data/atmel.h
 +++ b/include/linux/platform_data/atmel.h
-@@ -9,15 +9,7 @@
+@@ -86,11 +86,6 @@ struct atmel_uart_data {
+ 	struct serial_rs485	rs485;		/* rs485 settings */
+ };
  
- #include <linux/mtd/nand.h>
- #include <linux/mtd/partitions.h>
--#include <linux/device.h>
--#include <linux/i2c.h>
--#include <linux/leds.h>
--#include <linux/spi/spi.h>
--#include <linux/usb/atmel_usba_udc.h>
--#include <linux/atmel-mci.h>
--#include <sound/atmel-ac97c.h>
- #include <linux/serial.h>
--#include <linux/platform_data/macb.h>
+-/* CAN */
+-struct at91_can_data {
+-	void (*transceiver_switch)(int on);
+-};
+-
+ /* FIXME: this needs a better location, but gets stuff building again */
+ extern int at91_suspend_entering_slow_clock(void);
  
- /*
-  * at91: 6 USARTs and one DBGU port (SAM9260)
 -- 
 2.1.4
