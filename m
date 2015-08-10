@@ -1,38 +1,55 @@
-From: jaz@semihalf.com (Grzegorz Jaszczyk)
-Date: Mon, 10 Aug 2015 11:51:54 +0200
-Subject: [PATCH] ARM: mvebu: update mvebu_v7_defconfig for Armada 38x USB3.0
-Message-ID: <1439200314-26850-1-git-send-email-jaz@semihalf.com>
+From: jamesjj.liao@mediatek.com (James Liao)
+Date: Mon, 10 Aug 2015 17:50:21 +0800
+Subject: [PATCH v7 2/9] clk: mediatek: Remove unused code from MT8173.
+In-Reply-To: <1439200228-318-1-git-send-email-jamesjj.liao@mediatek.com>
+References: <1439200228-318-1-git-send-email-jamesjj.liao@mediatek.com>
+Message-ID: <1439200228-318-3-git-send-email-jamesjj.liao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-	This patch enables the fixed voltage regulator and the gpio PCA953X
-	drivers in mvebu_v7_defconfig, as they are used for enabling the USB3.0
-	phy on some of the Armada's 38x boards.
+Remove unused header files from MT8173, and remove unused
+keywords from function declaration.
 
-Signed-off-by: Grzegorz Jaszczyk <jaz@semihalf.com>
-Cc: <stable@vger.kernel.org>
+Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
 ---
- arch/arm/configs/mvebu_v7_defconfig | 3 +++
- 1 file changed, 3 insertions(+)
+ drivers/clk/mediatek/clk-mt8173.c | 2 --
+ drivers/clk/mediatek/clk-mtk.h    | 4 ++--
+ 2 files changed, 2 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/configs/mvebu_v7_defconfig b/arch/arm/configs/mvebu_v7_defconfig
-index cacc9f4..1b8ecf4 100644
---- a/arch/arm/configs/mvebu_v7_defconfig
-+++ b/arch/arm/configs/mvebu_v7_defconfig
-@@ -83,11 +83,14 @@ CONFIG_I2C_MV64XXX=y
- CONFIG_SPI=y
- CONFIG_SPI_ORION=y
- CONFIG_GPIO_SYSFS=y
-+CONFIG_GPIO_PCA953X=y
- CONFIG_SENSORS_GPIO_FAN=y
- CONFIG_THERMAL=y
- CONFIG_ARMADA_THERMAL=y
- CONFIG_WATCHDOG=y
- CONFIG_ORION_WATCHDOG=y
-+CONFIG_REGULATOR=y
-+CONFIG_REGULATOR_FIXED_VOLTAGE=y
- CONFIG_SOUND=y
- CONFIG_SND=y
- CONFIG_SND_SOC=y
+diff --git a/drivers/clk/mediatek/clk-mt8173.c b/drivers/clk/mediatek/clk-mt8173.c
+index 80871e2..13aa432 100644
+--- a/drivers/clk/mediatek/clk-mt8173.c
++++ b/drivers/clk/mediatek/clk-mt8173.c
+@@ -14,8 +14,6 @@
+ 
+ #include <linux/of.h>
+ #include <linux/of_address.h>
+-#include <linux/slab.h>
+-#include <linux/mfd/syscon.h>
+ 
+ #include "clk-mtk.h"
+ #include "clk-gate.h"
+diff --git a/drivers/clk/mediatek/clk-mtk.h b/drivers/clk/mediatek/clk-mtk.h
+index 9dda9d8..740fe5e 100644
+--- a/drivers/clk/mediatek/clk-mtk.h
++++ b/drivers/clk/mediatek/clk-mtk.h
+@@ -41,7 +41,7 @@ struct mtk_fixed_factor {
+ 		.div = _div,				\
+ 	}
+ 
+-extern void mtk_clk_register_factors(const struct mtk_fixed_factor *clks,
++void mtk_clk_register_factors(const struct mtk_fixed_factor *clks,
+ 		int num, struct clk_onecell_data *clk_data);
+ 
+ struct mtk_composite {
+@@ -152,7 +152,7 @@ struct mtk_pll_data {
+ 	int pcw_shift;
+ };
+ 
+-void __init mtk_clk_register_plls(struct device_node *node,
++void mtk_clk_register_plls(struct device_node *node,
+ 		const struct mtk_pll_data *plls, int num_plls,
+ 		struct clk_onecell_data *clk_data);
+ 
 -- 
-1.8.3.1
+1.8.1.1.dirty
