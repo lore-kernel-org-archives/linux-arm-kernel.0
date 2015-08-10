@@ -1,67 +1,31 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 10 Aug 2015 15:58:04 +0100
-Subject: [PATCH 2/2] arm64: VDSO: fix coarse clock monotonicity regression
-In-Reply-To: <20150810092252.GB1604@arm.com>
-References: <1438999403-5770-1-git-send-email-nathan_lynch@mentor.com>
- <1438999403-5770-3-git-send-email-nathan_lynch@mentor.com>
- <20150810092252.GB1604@arm.com>
-Message-ID: <20150810145804.GA15394@e104818-lin.cambridge.arm.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 10 Aug 2015 23:35:42 +0800
+Subject: [GIT PULL] ARM: imx: fixes for 4.2, 3rd round
+Message-ID: <20150810153542.GA10035@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 10, 2015 at 10:22:53AM +0100, Will Deacon wrote:
-> On Sat, Aug 08, 2015 at 03:03:23AM +0100, Nathan Lynch wrote:
-> > Since 906c55579a63 ("timekeeping: Copy the shadow-timekeeper over the
-> > real timekeeper last") it has become possible on arm64 to:
-> > 
-> > - Obtain a CLOCK_MONOTONIC_COARSE or CLOCK_REALTIME_COARSE timestamp
-> >   via syscall.
-> > - Subsequently obtain a timestamp for the same clock ID via VDSO which
-> >   predates the first timestamp (by one jiffy).
-> > 
-> > This is because arm64's update_vsyscall is deriving the coarse time
-> > using the __current_kernel_time interface, when it should really be
-> > using the timekeeper object provided to it by the timekeeping core.
-> > It happened to work before only because __current_kernel_time would
-> > access the same timekeeper object which had been passed to
-> > update_vsyscall.  This is no longer the case.
-> > 
-> > Signed-off-by: Nathan Lynch <nathan_lynch@mentor.com>
-> > ---
-> >  arch/arm64/kernel/vdso.c | 7 +++----
-> >  1 file changed, 3 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/arch/arm64/kernel/vdso.c b/arch/arm64/kernel/vdso.c
-> > index ec37ab3f524f..97bc68f4c689 100644
-> > --- a/arch/arm64/kernel/vdso.c
-> > +++ b/arch/arm64/kernel/vdso.c
-> > @@ -199,16 +199,15 @@ int arch_setup_additional_pages(struct linux_binprm *bprm,
-> >   */
-> >  void update_vsyscall(struct timekeeper *tk)
-> >  {
-> > -	struct timespec xtime_coarse;
-> >  	u32 use_syscall = strcmp(tk->tkr_mono.clock->name, "arch_sys_counter");
-> >  
-> >  	++vdso_data->tb_seq_count;
-> >  	smp_wmb();
-> >  
-> > -	xtime_coarse = __current_kernel_time();
-> >  	vdso_data->use_syscall			= use_syscall;
-> > -	vdso_data->xtime_coarse_sec		= xtime_coarse.tv_sec;
-> > -	vdso_data->xtime_coarse_nsec		= xtime_coarse.tv_nsec;
-> > +	vdso_data->xtime_coarse_sec		= tk->xtime_sec;
-> > +	vdso_data->xtime_coarse_nsec		= tk->tkr_mono.xtime_nsec >>
-> > +							tk->tkr_mono.shift;
-> >  	vdso_data->wtm_clock_sec		= tk->wall_to_monotonic.tv_sec;
-> >  	vdso_data->wtm_clock_nsec		= tk->wall_to_monotonic.tv_nsec;
-> 
-> Looks good,
-> 
->   Acked-by: Will Deacon <will.deacon@arm.com>
-> 
-> There's probably still time for Catalin to pick this up for 4.2.
+The following changes since commit e053f96b1a00022b4e2c7ceb7ac0229646626507:
 
-Applied, I'll send a pull request today/tomorrow. Thanks.
+  ARM: dts: i.MX35: Fix can support. (2015-07-25 11:35:08 +0800)
 
--- 
-Catalin
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-fixes-4.2-3
+
+for you to fetch changes up to 1a9fa190956f45c1e58c4d8bfa5ac051691ea590:
+
+  ARM: imx6: correct i.MX6 PCIe interrupt routing (2015-08-06 16:30:18 +0800)
+
+----------------------------------------------------------------
+The i.MX fixes for 4.2, 3rd round:
+ - Fix i.MX6 PCIe interrupt routing which gets missed from stacked IRQ
+   domain conversion.  The PCIe wakeup support is currently broken
+   because of this.
+
+----------------------------------------------------------------
+Lucas Stach (1):
+      ARM: imx6: correct i.MX6 PCIe interrupt routing
+
+ arch/arm/boot/dts/imx6qdl.dtsi | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
