@@ -1,62 +1,34 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Mon, 10 Aug 2015 16:52:44 +0800
-Subject: [RFC PATCH 0/3] mailbox: hisilicon: add mailbox driver
-In-Reply-To: <CABb+yY1HTGNi4gZABNhXjpA57DPZx-tv=6+m4JLyx4wPHfovyA@mail.gmail.com>
-References: <1438564390-28111-1-git-send-email-leo.yan@linaro.org>
- <CABb+yY0-RQ80q92EBsuBoYpjxW5zR=nXr+j3zCXw3wKkCf33OQ@mail.gmail.com>
- <20150805231743.GB6880@leoy-linaro>
- <CABb+yY1HTGNi4gZABNhXjpA57DPZx-tv=6+m4JLyx4wPHfovyA@mail.gmail.com>
-Message-ID: <20150810085244.GA13147@leoy-linaro>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 10 Aug 2015 11:01:48 +0200
+Subject: [PATCH] ARM/EP93xx/timer: Migrate to new 'set-state' interface
+In-Reply-To: <744dca162a7626694770a9f51457566a33c3e08f.1438852023.git.viresh.kumar@linaro.org>
+References: <744dca162a7626694770a9f51457566a33c3e08f.1438852023.git.viresh.kumar@linaro.org>
+Message-ID: <CACRpkdZknzqgH+-F0MZgZywtoOL1hhbg=7w1RSC5aZohXtDB3A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jassi,
+On Thu, Aug 6, 2015 at 11:11 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
 
-On Mon, Aug 10, 2015 at 12:32:05PM +0530, Jassi Brar wrote:
-> On Thu, Aug 6, 2015 at 4:47 AM, Leo Yan <leo.yan@linaro.org> wrote:
-> > Hi Jassi,
-> >
-> > Thanks for review.
-> >
-> > On Wed, Aug 05, 2015 at 04:22:01PM +0530, Jassi Brar wrote:
-> >> On Mon, Aug 3, 2015 at 6:43 AM, Leo Yan <leo.yan@linaro.org> wrote:
-> >
-> > [...]
-> >
-> >> > For easily extending for Hisilicon series SoCs (SoCs may have difference
-> >> > for register's definition with each other), so firstly implement common
-> >> > mailbox driver; this common mailbox driver provides three mainly
-> >> > functionality:
-> >> >
-> >> >  - help register channels into framework;
-> >> >  - hook low level callback functions for register's operations;
-> >> >  - Enhance rx channel's message queue, which is based on the code in
-> >> >    drivers/mailbox/omap-mailbox.c.
-> >> >
-> >> Not cool.
-> >>  Please don't reinvent the wheel by having platform specific
-> >> implementation of the mailbox api. Which vendor doesn't plan to roll
-> >> out new SoCs, and hence variations of mailbox controllers?  The OMAP
-> >> stack predates the common api, and was actually supposed to be
-> >> converted over eventually. Please implement just the
-> >> drivers/mailbox/hi6220-mailbox.c (preferably by the name of the
-> >> mailbox controller, if any)
-> >
-> > Understood. Here i have one question, the rx channel's message queue is
-> > looks like a common mechanism and can be added into framework file
-> > mailbox.c, then Soc driver file can _ONLY_ focus on register level's
-> > operations. If so, the common driver in this patch also is unnecessary.
-> >
-> Yes, that's what I say, no 'common' driver for a platform.
-> 
-> > Do you suggest to use upper method to rework patches? Or just think
-> > it's okay to implement rx channel's message queue in hi6220-mailbox.c?
-> >
-> The code in drivers/mailbox/ should only manage the controller
-> (registers and interrupts). Everything else (queues, shmem etc) should
-> be in platform specific client driver(s).
+> Migrate EP93xx driver to the new 'set-state' interface provided by
+> clockevents core, the earlier 'set-mode' interface is marked obsolete
+> now.
+>
+> This also enables us to implement callbacks for new states of clockevent
+> devices, for example: ONESHOT_STOPPED.
+>
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> ---
+> Linus,
+>
+> All other clockevent drivers are migrated to the new interface and yours
+> was left as it adapted generic clockevents framework just now.
+>
+> Probably Olof can apply it directly to ARM SoC tree..
 
-Thanks for suggestion, will send new version patches for reviewing.
+Sure, but does it work right off or does Olof have to
+pull a branch from your tree in for it to work? In that
+case I suggest you take this in the -rc phase. Anyways:
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-Thanks,
-Leo Yan
+Yours,
+Linus Walleij
