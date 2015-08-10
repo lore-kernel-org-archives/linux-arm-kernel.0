@@ -1,7 +1,7 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 10 Aug 2015 16:26:48 +0200
-Subject: [PATCH] mmc: atmel-mci: remove useless include
-Message-ID: <1439216808-11826-1-git-send-email-alexandre.belloni@free-electrons.com>
+Date: Mon, 10 Aug 2015 16:28:07 +0200
+Subject: [PATCH] spi: atmel: remove useless include
+Message-ID: <1439216887-11985-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -10,20 +10,20 @@ include.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- drivers/mmc/host/atmel-mci.c | 1 -
+ drivers/spi/spi-atmel.c | 1 -
  1 file changed, 1 deletion(-)
 
-diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
-index 9a39e0b7e583..bf62e429f7fc 100644
---- a/drivers/mmc/host/atmel-mci.c
-+++ b/drivers/mmc/host/atmel-mci.c
-@@ -29,7 +29,6 @@
+diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
+index c9eca347787d..bf9ed380bb1c 100644
+--- a/drivers/spi/spi-atmel.c
++++ b/drivers/spi/spi-atmel.c
+@@ -19,7 +19,6 @@
+ #include <linux/interrupt.h>
+ #include <linux/spi/spi.h>
  #include <linux/slab.h>
- #include <linux/stat.h>
- #include <linux/types.h>
 -#include <linux/platform_data/atmel.h>
- #include <linux/platform_data/mmc-atmel-mci.h>
+ #include <linux/platform_data/dma-atmel.h>
+ #include <linux/of.h>
  
- #include <linux/mmc/host.h>
 -- 
 2.1.4
