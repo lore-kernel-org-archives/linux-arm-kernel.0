@@ -1,31 +1,35 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 10 Aug 2015 11:29:58 +0200
-Subject: [PATCH 1/6] gpiolib-of: Rename gpio_hog functions to be generic
-In-Reply-To: <1438680203-13432-2-git-send-email-mpa@pengutronix.de>
-References: <1438680203-13432-1-git-send-email-mpa@pengutronix.de>
- <1438680203-13432-2-git-send-email-mpa@pengutronix.de>
-Message-ID: <CACRpkdYpeoo2scKzNuSYbWfWLTBodXJEX3KyRzoRQPuoaeqzKw@mail.gmail.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Mon, 10 Aug 2015 12:33:34 +0300
+Subject: [PATCH] ARM/fb: ep93xx: switch framebuffer to use modedb only
+In-Reply-To: <1437744688-29915-1-git-send-email-linus.walleij@linaro.org>
+References: <1437744688-29915-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <55C86FEE.6090502@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 4, 2015 at 11:23 AM, Markus Pargmann <mpa@pengutronix.de> wrote:
 
-> The gpio hogging functions are currently only used for gpio-hogging. But
-> these functions are widely generic ones which parse gpio device nodes in
-> the DT.
->
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-(...)
->  /**
-> - * of_get_gpio_hog() - Get a GPIO hog descriptor, names and flags for GPIO API
-> + * of_parse_gpio() - Get a GPIO hog descriptor, names and flags for GPIO API
 
-It's not a good name, too generic. It could easily be assued this is
-for something
-wider.
+On 24/07/15 16:31, Linus Walleij wrote:
+> All the EP93xx boards exclusively use modedb to look up video
+> modes from the command line. Root out the parametrization of
+> custom video modes from the platform data and board files
+> and simplify the driver.
+> 
+> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+> Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> J-C/Tomi: please ACK this if you're OK with it so I can take
+> it through the ARM SoC tree.
 
-of_parse_own_gpio() or something, indicating that this pertains to the
-chip itself and not to outside users, would be better.
+Acked-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
 
-Yours,
-Linus Walleij
+ Tomi
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150810/340ad3f3/attachment.sig>
