@@ -1,154 +1,184 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 10 Aug 2015 11:52:07 +0200
-Subject: [PATCH 50/74] clockevents/drivers/tcb_clksrc: Migrate to new
+Date: Mon, 10 Aug 2015 11:52:08 +0200
+Subject: [PATCH 51/74] clockevents/drivers/exynos_mct: Migrate to new
  'set-state' interface
 In-Reply-To: <1439200352-26767-1-git-send-email-daniel.lezcano@linaro.org>
 References: <55C87382.4070309@linaro.org>
  <1439200352-26767-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1439200352-26767-50-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1439200352-26767-51-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Viresh Kumar <viresh.kumar@linaro.org>
 
-Migrate tcb_clksrc driver to the new 'set-state' interface provided by
+Migrate exynos_mct driver to the new 'set-state' interface provided by
 clockevents core, the earlier 'set-mode' interface is marked obsolete
 now.
 
 This also enables us to implement callbacks for new states of clockevent
 devices, for example: ONESHOT_STOPPED.
 
-Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- drivers/clocksource/tcb_clksrc.c | 93 ++++++++++++++++++++++------------------
- 1 file changed, 51 insertions(+), 42 deletions(-)
+ drivers/clocksource/exynos_mct.c | 85 +++++++++++++++++++---------------------
+ 1 file changed, 40 insertions(+), 45 deletions(-)
 
-diff --git a/drivers/clocksource/tcb_clksrc.c b/drivers/clocksource/tcb_clksrc.c
-index 8bdbc45..d28d2fe 100644
---- a/drivers/clocksource/tcb_clksrc.c
-+++ b/drivers/clocksource/tcb_clksrc.c
-@@ -91,55 +91,62 @@ static struct tc_clkevt_device *to_tc_clkevt(struct clock_event_device *clkevt)
-  */
- static u32 timer_clock;
+diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
+index 4d2330a..029f96a 100644
+--- a/drivers/clocksource/exynos_mct.c
++++ b/drivers/clocksource/exynos_mct.c
+@@ -257,15 +257,14 @@ static void exynos4_mct_comp0_stop(void)
+ 	exynos4_mct_write(0, EXYNOS4_MCT_G_INT_ENB);
+ }
  
--static void tc_mode(enum clock_event_mode m, struct clock_event_device *d)
-+static int tc_shutdown(struct clock_event_device *d)
+-static void exynos4_mct_comp0_start(enum clock_event_mode mode,
+-				    unsigned long cycles)
++static void exynos4_mct_comp0_start(bool periodic, unsigned long cycles)
  {
- 	struct tc_clkevt_device *tcd = to_tc_clkevt(d);
- 	void __iomem		*regs = tcd->regs;
+ 	unsigned int tcon;
+ 	cycle_t comp_cycle;
  
--	if (tcd->clkevt.mode == CLOCK_EVT_MODE_PERIODIC
--			|| tcd->clkevt.mode == CLOCK_EVT_MODE_ONESHOT) {
--		__raw_writel(0xff, regs + ATMEL_TC_REG(2, IDR));
--		__raw_writel(ATMEL_TC_CLKDIS, regs + ATMEL_TC_REG(2, CCR));
--		clk_disable(tcd->clk);
--	}
-+	__raw_writel(0xff, regs + ATMEL_TC_REG(2, IDR));
-+	__raw_writel(ATMEL_TC_CLKDIS, regs + ATMEL_TC_REG(2, CCR));
-+	clk_disable(tcd->clk);
+ 	tcon = readl_relaxed(reg_base + EXYNOS4_MCT_G_TCON);
  
--	switch (m) {
+-	if (mode == CLOCK_EVT_MODE_PERIODIC) {
++	if (periodic) {
+ 		tcon |= MCT_G_TCON_COMP0_AUTO_INC;
+ 		exynos4_mct_write(cycles, EXYNOS4_MCT_G_COMP0_ADD_INCR);
+ 	}
+@@ -283,38 +282,38 @@ static void exynos4_mct_comp0_start(enum clock_event_mode mode,
+ static int exynos4_comp_set_next_event(unsigned long cycles,
+ 				       struct clock_event_device *evt)
+ {
+-	exynos4_mct_comp0_start(evt->mode, cycles);
++	exynos4_mct_comp0_start(false, cycles);
+ 
+ 	return 0;
+ }
+ 
+-static void exynos4_comp_set_mode(enum clock_event_mode mode,
+-				  struct clock_event_device *evt)
++static int mct_set_state_shutdown(struct clock_event_device *evt)
+ {
+-	unsigned long cycles_per_jiffy;
+ 	exynos4_mct_comp0_stop();
 +	return 0;
 +}
  
--	/* By not making the gentime core emulate periodic mode on top
--	 * of oneshot, we get lower overhead and improved accuracy.
--	 */
+-	switch (mode) {
 -	case CLOCK_EVT_MODE_PERIODIC:
--		clk_enable(tcd->clk);
-+static int tc_set_oneshot(struct clock_event_device *d)
-+{
-+	struct tc_clkevt_device *tcd = to_tc_clkevt(d);
-+	void __iomem		*regs = tcd->regs;
- 
--		/* slow clock, count up to RC, then irq and restart */
--		__raw_writel(timer_clock
--				| ATMEL_TC_WAVE | ATMEL_TC_WAVESEL_UP_AUTO,
--				regs + ATMEL_TC_REG(2, CMR));
--		__raw_writel((32768 + HZ/2) / HZ, tcaddr + ATMEL_TC_REG(2, RC));
-+	if (clockevent_state_oneshot(d) || clockevent_state_periodic(d))
-+		tc_shutdown(d);
- 
--		/* Enable clock and interrupts on RC compare */
--		__raw_writel(ATMEL_TC_CPCS, regs + ATMEL_TC_REG(2, IER));
-+	clk_enable(tcd->clk);
- 
--		/* go go gadget! */
--		__raw_writel(ATMEL_TC_CLKEN | ATMEL_TC_SWTRG,
--				regs + ATMEL_TC_REG(2, CCR));
+-		cycles_per_jiffy =
+-			(((unsigned long long) NSEC_PER_SEC / HZ * evt->mult) >> evt->shift);
+-		exynos4_mct_comp0_start(mode, cycles_per_jiffy);
 -		break;
-+	/* slow clock, count up to RC, then irq and stop */
-+	__raw_writel(timer_clock | ATMEL_TC_CPCSTOP | ATMEL_TC_WAVE |
-+		     ATMEL_TC_WAVESEL_UP_AUTO, regs + ATMEL_TC_REG(2, CMR));
-+	__raw_writel(ATMEL_TC_CPCS, regs + ATMEL_TC_REG(2, IER));
++static int mct_set_state_periodic(struct clock_event_device *evt)
++{
++	unsigned long cycles_per_jiffy;
  
 -	case CLOCK_EVT_MODE_ONESHOT:
--		clk_enable(tcd->clk);
-+	/* set_next_event() configures and starts the timer */
-+	return 0;
-+}
- 
--		/* slow clock, count up to RC, then irq and stop */
--		__raw_writel(timer_clock | ATMEL_TC_CPCSTOP
--				| ATMEL_TC_WAVE | ATMEL_TC_WAVESEL_UP_AUTO,
--				regs + ATMEL_TC_REG(2, CMR));
--		__raw_writel(ATMEL_TC_CPCS, regs + ATMEL_TC_REG(2, IER));
-+static int tc_set_periodic(struct clock_event_device *d)
-+{
-+	struct tc_clkevt_device *tcd = to_tc_clkevt(d);
-+	void __iomem		*regs = tcd->regs;
- 
--		/* set_next_event() configures and starts the timer */
--		break;
-+	if (clockevent_state_oneshot(d) || clockevent_state_periodic(d))
-+		tc_shutdown(d);
- 
--	default:
+-	case CLOCK_EVT_MODE_UNUSED:
+-	case CLOCK_EVT_MODE_SHUTDOWN:
+-	case CLOCK_EVT_MODE_RESUME:
 -		break;
 -	}
-+	/* By not making the gentime core emulate periodic mode on top
-+	 * of oneshot, we get lower overhead and improved accuracy.
-+	 */
-+	clk_enable(tcd->clk);
-+
-+	/* slow clock, count up to RC, then irq and restart */
-+	__raw_writel(timer_clock | ATMEL_TC_WAVE | ATMEL_TC_WAVESEL_UP_AUTO,
-+		     regs + ATMEL_TC_REG(2, CMR));
-+	__raw_writel((32768 + HZ / 2) / HZ, tcaddr + ATMEL_TC_REG(2, RC));
-+
-+	/* Enable clock and interrupts on RC compare */
-+	__raw_writel(ATMEL_TC_CPCS, regs + ATMEL_TC_REG(2, IER));
-+
-+	/* go go gadget! */
-+	__raw_writel(ATMEL_TC_CLKEN | ATMEL_TC_SWTRG, regs +
-+		     ATMEL_TC_REG(2, CCR));
++	cycles_per_jiffy = (((unsigned long long)NSEC_PER_SEC / HZ * evt->mult)
++			    >> evt->shift);
++	exynos4_mct_comp0_stop();
++	exynos4_mct_comp0_start(true, cycles_per_jiffy);
 +	return 0;
  }
  
- static int tc_next_event(unsigned long delta, struct clock_event_device *d)
-@@ -154,13 +161,15 @@ static int tc_next_event(unsigned long delta, struct clock_event_device *d)
- 
- static struct tc_clkevt_device clkevt = {
- 	.clkevt	= {
--		.name		= "tc_clkevt",
--		.features	= CLOCK_EVT_FEAT_PERIODIC
--					| CLOCK_EVT_FEAT_ONESHOT,
-+		.name			= "tc_clkevt",
-+		.features		= CLOCK_EVT_FEAT_PERIODIC |
-+					  CLOCK_EVT_FEAT_ONESHOT,
- 		/* Should be lower than at91rm9200's system timer */
--		.rating		= 125,
--		.set_next_event	= tc_next_event,
--		.set_mode	= tc_mode,
-+		.rating			= 125,
-+		.set_next_event		= tc_next_event,
-+		.set_state_shutdown	= tc_shutdown,
-+		.set_state_periodic	= tc_set_periodic,
-+		.set_state_oneshot	= tc_set_oneshot,
- 	},
+ static struct clock_event_device mct_comp_device = {
+-	.name		= "mct-comp",
+-	.features       = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
+-	.rating		= 250,
+-	.set_next_event	= exynos4_comp_set_next_event,
+-	.set_mode	= exynos4_comp_set_mode,
++	.name			= "mct-comp",
++	.features		= CLOCK_EVT_FEAT_PERIODIC |
++				  CLOCK_EVT_FEAT_ONESHOT,
++	.rating			= 250,
++	.set_next_event		= exynos4_comp_set_next_event,
++	.set_state_periodic	= mct_set_state_periodic,
++	.set_state_shutdown	= mct_set_state_shutdown,
++	.set_state_oneshot	= mct_set_state_shutdown,
++	.tick_resume		= mct_set_state_shutdown,
  };
  
+ static irqreturn_t exynos4_mct_comp_isr(int irq, void *dev_id)
+@@ -390,39 +389,32 @@ static int exynos4_tick_set_next_event(unsigned long cycles,
+ 	return 0;
+ }
+ 
+-static inline void exynos4_tick_set_mode(enum clock_event_mode mode,
+-					 struct clock_event_device *evt)
++static int set_state_shutdown(struct clock_event_device *evt)
++{
++	exynos4_mct_tick_stop(this_cpu_ptr(&percpu_mct_tick));
++	return 0;
++}
++
++static int set_state_periodic(struct clock_event_device *evt)
+ {
+ 	struct mct_clock_event_device *mevt = this_cpu_ptr(&percpu_mct_tick);
+ 	unsigned long cycles_per_jiffy;
+ 
++	cycles_per_jiffy = (((unsigned long long)NSEC_PER_SEC / HZ * evt->mult)
++			    >> evt->shift);
+ 	exynos4_mct_tick_stop(mevt);
+-
+-	switch (mode) {
+-	case CLOCK_EVT_MODE_PERIODIC:
+-		cycles_per_jiffy =
+-			(((unsigned long long) NSEC_PER_SEC / HZ * evt->mult) >> evt->shift);
+-		exynos4_mct_tick_start(cycles_per_jiffy, mevt);
+-		break;
+-
+-	case CLOCK_EVT_MODE_ONESHOT:
+-	case CLOCK_EVT_MODE_UNUSED:
+-	case CLOCK_EVT_MODE_SHUTDOWN:
+-	case CLOCK_EVT_MODE_RESUME:
+-		break;
+-	}
++	exynos4_mct_tick_start(cycles_per_jiffy, mevt);
++	return 0;
+ }
+ 
+ static void exynos4_mct_tick_clear(struct mct_clock_event_device *mevt)
+ {
+-	struct clock_event_device *evt = &mevt->evt;
+-
+ 	/*
+ 	 * This is for supporting oneshot mode.
+ 	 * Mct would generate interrupt periodically
+ 	 * without explicit stopping.
+ 	 */
+-	if (evt->mode != CLOCK_EVT_MODE_PERIODIC)
++	if (!clockevent_state_periodic(&mevt->evt))
+ 		exynos4_mct_tick_stop(mevt);
+ 
+ 	/* Clear the MCT tick interrupt */
+@@ -453,7 +445,10 @@ static int exynos4_local_timer_setup(struct mct_clock_event_device *mevt)
+ 	evt->name = mevt->name;
+ 	evt->cpumask = cpumask_of(cpu);
+ 	evt->set_next_event = exynos4_tick_set_next_event;
+-	evt->set_mode = exynos4_tick_set_mode;
++	evt->set_state_periodic = set_state_periodic;
++	evt->set_state_shutdown = set_state_shutdown;
++	evt->set_state_oneshot = set_state_shutdown;
++	evt->tick_resume = set_state_shutdown;
+ 	evt->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT;
+ 	evt->rating = 450;
+ 
+@@ -479,7 +474,7 @@ static void exynos4_local_timer_stop(struct mct_clock_event_device *mevt)
+ {
+ 	struct clock_event_device *evt = &mevt->evt;
+ 
+-	evt->set_mode(CLOCK_EVT_MODE_UNUSED, evt);
++	evt->set_state_shutdown(evt);
+ 	if (mct_int_type == MCT_INT_SPI) {
+ 		if (evt->irq != -1)
+ 			disable_irq_nosync(evt->irq);
 -- 
 1.9.1
