@@ -1,71 +1,72 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 10 Aug 2015 16:48:16 +0100
-Subject: [PATCH v2] ARM: VDSO: fix coarse clock monotonicity regression
-In-Reply-To: <1439221592-31875-1-git-send-email-nathan_lynch@mentor.com>
-References: <1438999403-5770-1-git-send-email-nathan_lynch@mentor.com>
- <1439221592-31875-1-git-send-email-nathan_lynch@mentor.com>
-Message-ID: <20150810154815.GH1604@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 10 Aug 2015 16:48:48 +0100
+Subject: [PATCH 9/9] drm: bridge/dw_hdmi-i2s-audio: add audio driver
+In-Reply-To: <E1ZO6hr-0003No-RB@rmk-PC.arm.linux.org.uk>
+References: <20150808160936.GN7557@n2100.arm.linux.org.uk>
+ <E1ZO6hr-0003No-RB@rmk-PC.arm.linux.org.uk>
+Message-ID: <20150810154848.GV7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 10, 2015 at 04:46:32PM +0100, Nathan Lynch wrote:
-> Since 906c55579a63 ("timekeeping: Copy the shadow-timekeeper over the
-> real timekeeper last") it has become possible on ARM to:
+On Sat, Aug 08, 2015 at 05:10:47PM +0100, Russell King wrote:
+> From: Yakir Yang <ykk@rock-chips.com>
 > 
-> - Obtain a CLOCK_MONOTONIC_COARSE or CLOCK_REALTIME_COARSE timestamp
->   via syscall.
-> - Subsequently obtain a timestamp for the same clock ID via VDSO which
->   predates the first timestamp (by one jiffy).
+> Add ALSA based HDMI I2S audio driver for dw_hdmi. Sound card
+> driver could connect to this codec through the codec dai name
+> "dw-hdmi-i2s-audio".
 > 
-> This is because ARM's update_vsyscall is deriving the coarse time
-> using the __current_kernel_time interface, when it should really be
-> using the timekeeper object provided to it by the timekeeping core.
-> It happened to work before only because __current_kernel_time would
-> access the same timekeeper object which had been passed to
-> update_vsyscall.  This is no longer the case.
+> [Fixed IRQ name, MODULE_DESCRIPTION, MODULE_ALIAS in
+>  dw-hdmi-i2s-audio.c, and platform device name in dw-hdmi.c --rmk]
 > 
-> Signed-off-by: Nathan Lynch <nathan_lynch@mentor.com>
-> ---
-> 
-> Changes since v1:
-> - Add u32 cast to nsec calculation.
+> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+I'm dropping this patch after all as it no longer builds against modern
+kernels due to the reference to the removed snd_soc_jack_new().  Its
+replacement is at card level, and I don't think it's a simple case of
+replacing it here.
 
-Probably best sticking it into Russell's patch system with a Cc stable
-in case it doesn't make it for 4.2.
+> +static int snd_dw_hdmi_audio_probe(struct snd_soc_codec *codec)
+> +{
+> +	struct snd_dw_hdmi *dw = snd_soc_codec_get_drvdata(codec);
+> +	int ret;
+> +
+> +	ret = snd_soc_jack_new(codec, "dw Jack", SND_JACK_LINEOUT,
+> +			       &dw->jack);
+...
+> +static const struct snd_soc_codec_driver dw_hdmi_audio = {
+> +	.probe = snd_dw_hdmi_audio_probe,
+> +	.dapm_widgets = snd_dw_hdmi_audio_widgets,
+> +	.num_dapm_widgets = ARRAY_SIZE(snd_dw_hdmi_audio_widgets),
+> +	.dapm_routes = snd_dw_hdmi_audio_routes,
+> +	.num_dapm_routes = ARRAY_SIZE(snd_dw_hdmi_audio_routes),
+> +};
+> +
+> +static int dw_hdmi_audio_probe(struct platform_device *pdev)
+> +{
+> +	struct dw_hdmi_audio_data *data = pdev->dev.platform_data;
+> +	struct snd_dw_hdmi *dw;
+> +	int ret;
+> +
+> +	dw = devm_kzalloc(&pdev->dev, sizeof(*dw), GFP_KERNEL);
+> +	if (!dw)
+> +		return -ENOMEM;
+> +
+> +	dw->data = *data;
+> +	dw->dev = &pdev->dev;
+> +	dw->is_jack_ready = false;
+> +	platform_set_drvdata(pdev, dw);
+> +
+> +	ret = request_irq(dw->data.irq, snd_dw_hdmi_irq, IRQF_SHARED,
+> +			  DRIVER_NAME, dw);
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "request irq failed (%d)\n", ret);
+> +		return -EINVAL;
+> +	}
+> +
+> +	ret = snd_soc_register_codec(&pdev->dev, &dw_hdmi_audio,
+> +				     &dw_hdmi_audio_dai, 1);
 
-Will
-
->  arch/arm/kernel/vdso.c | 7 +++----
->  1 file changed, 3 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/vdso.c b/arch/arm/kernel/vdso.c
-> index efe17dd9b921..54a5aeab988d 100644
-> --- a/arch/arm/kernel/vdso.c
-> +++ b/arch/arm/kernel/vdso.c
-> @@ -296,7 +296,6 @@ static bool tk_is_cntvct(const struct timekeeper *tk)
->   */
->  void update_vsyscall(struct timekeeper *tk)
->  {
-> -	struct timespec xtime_coarse;
->  	struct timespec64 *wtm = &tk->wall_to_monotonic;
->  
->  	if (!cntvct_ok) {
-> @@ -308,10 +307,10 @@ void update_vsyscall(struct timekeeper *tk)
->  
->  	vdso_write_begin(vdso_data);
->  
-> -	xtime_coarse = __current_kernel_time();
->  	vdso_data->tk_is_cntvct			= tk_is_cntvct(tk);
-> -	vdso_data->xtime_coarse_sec		= xtime_coarse.tv_sec;
-> -	vdso_data->xtime_coarse_nsec		= xtime_coarse.tv_nsec;
-> +	vdso_data->xtime_coarse_sec		= tk->xtime_sec;
-> +	vdso_data->xtime_coarse_nsec		= (u32)(tk->tkr_mono.xtime_nsec >>
-> +							tk->tkr_mono.shift);
->  	vdso_data->wtm_clock_sec		= wtm->tv_sec;
->  	vdso_data->wtm_clock_nsec		= wtm->tv_nsec;
->  
-> -- 
-> 2.1.0
-> 
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
