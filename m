@@ -1,7 +1,7 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 10 Aug 2015 16:28:07 +0200
-Subject: [PATCH] spi: atmel: remove useless include
-Message-ID: <1439216887-11985-1-git-send-email-alexandre.belloni@free-electrons.com>
+Date: Mon, 10 Aug 2015 16:29:33 +0200
+Subject: [PATCH] usb: gadget: atmel: remove useless include
+Message-ID: <1439216973-12150-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -10,20 +10,20 @@ include.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- drivers/spi/spi-atmel.c | 1 -
+ drivers/usb/gadget/udc/atmel_usba_udc.c | 1 -
  1 file changed, 1 deletion(-)
 
-diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
-index c9eca347787d..bf9ed380bb1c 100644
---- a/drivers/spi/spi-atmel.c
-+++ b/drivers/spi/spi-atmel.c
-@@ -19,7 +19,6 @@
- #include <linux/interrupt.h>
- #include <linux/spi/spi.h>
- #include <linux/slab.h>
+diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
+index 4095cce05e6a..548192f77dcb 100644
+--- a/drivers/usb/gadget/udc/atmel_usba_udc.c
++++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
+@@ -22,7 +22,6 @@
+ #include <linux/usb/gadget.h>
+ #include <linux/usb/atmel_usba_udc.h>
+ #include <linux/delay.h>
 -#include <linux/platform_data/atmel.h>
- #include <linux/platform_data/dma-atmel.h>
  #include <linux/of.h>
+ #include <linux/of_gpio.h>
  
 -- 
 2.1.4
