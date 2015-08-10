@@ -1,85 +1,43 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Mon, 10 Aug 2015 13:24:38 +0200 (CEST)
-Subject: [PATCH v9 0/9] Add simple NVMEM Framework via regmap.
-In-Reply-To: <55C87EEF.6020609@linaro.org>
-References: <1437995567-11203-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1438693367.3793.29.camel@pengutronix.de> <20150809151916.GF14271@lunn.ch>
- <55C87EEF.6020609@linaro.org>
-Message-ID: <997560650.82109.1439205878609.JavaMail.open-xchange@oxbsltgw00.schlund.de>
+From: julien.grall@citrix.com (Julien Grall)
+Date: Mon, 10 Aug 2015 12:24:20 +0100
+Subject: [Xen-devel] [PATCH v3 09/20] xen/biomerge: Don't allow biovec
+ to be merge when Linux is not using 4KB page
+In-Reply-To: <alpine.DEB.2.02.1508101149070.11337@kaball.uk.xensource.com>
+References: <1438966019-19322-1-git-send-email-julien.grall@citrix.com>
+ <1438966019-19322-10-git-send-email-julien.grall@citrix.com>
+ <alpine.DEB.2.02.1508101149070.11337@kaball.uk.xensource.com>
+Message-ID: <55C889E4.8050307@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Srinivas,
-hi Andrew,
+Hi Stefano,
 
-[add Sanchayan and Philipp]
+On 10/08/15 11:50, Stefano Stabellini wrote:
+> On Fri, 7 Aug 2015, Julien Grall wrote:
+>> On ARM all dma-capable devices on a same platform may not be protected
+>> by an IOMMU. The DMA requests have to use the BFN (i.e MFN on ARM) in
+>> order to use correctly the device.
+>>
+>> While the DOM0 memory is allocated in a 1:1 fashion (PFN == MFN), grant
+>> mapping will screw this contiguous mapping.
+>>
+>> When Linux is using 64KB page granularitary, the page may be split
+>> accross multiple non-contiguous MFN (Xen is using 4KB page
+>> granularity). Therefore a DMA request will likely fail.
+>>
+>> Checking that a 64KB page is using contiguous MFN is tedious. For
+>> now, always says that biovec are not mergeable.
+>>
+>> Signed-off-by: Julien Grall <julien.grall@citrix.com>
+> 
+> Please fix the grammar in the subject line.
 
-> Srinivas Kandagatla <srinivas.kandagatla@linaro.org> hat am 10. August 2015 um
-> 12:37 geschrieben:
->
->
-> Hi Andrew,
->
-> On 09/08/15 16:19, Andrew Lunn wrote:
-> > Hi Srinivas
-> >
-> > The AT24 eeprom driver contains the comment:
-> >
-> > /*
-> > * Export the EEPROM bytes through sysfs, since that's convenient.
-> > * By default, only root should see the data (maybe passwords etc)
-> > */
-> >
-> > and as you would expect from this:
-> >
-> > # ls -l
-> > ./devices/platform/soc/soc:aips-bus at 40000000/40066000.i2c/i2c-0/0-0050/eeprom
-> > -rw------- 1 root root 512 Aug 9 10:16
-> > ./devices/platform/soc/soc:aips-bus at 40000000/40066000.i2c/i2c-0/0-0050/eeprom
-> >
-> > The AT25 and the MAX6875 driver are the same.
-> >
-> > However nvmem has different defaults:
-> >
-> > # ls -l
-> > ./devices/platform/soc/soc:aips-bus at 40000000/40066000.i2c/i2c-0/0-0050/0-00500/nvmem
-> > -rw-r--r-- 1 root root 0 Aug 9 10:16
-> > ./devices/platform/soc/soc:aips-bus at 40000000/40066000.i2c/i2c-0/0-0050/0-00500/nvmem
-> >
-> Yes, nvmem by default sets the read permission for everyone S_IRUGO.
-> Which was the most common use case.
+If I made a mistake it's unlikely that I will find myself which one I made.
 
-i can only speak for mxs-ocotp, but root-only access is sufficient.
+Anyway, I guess you mean to replace merge by merged? I don't see any
+other in the subject.
 
->
-> > Has this been considered and discussed?
-> Thanks for bringing this up, No, we did not discuss this explicitly, but
-> it should not be an issue to accommodate this. Provider still have
-> flexibility to configure such things.
+Regards,
 
-IMHO it would better the default settings of the framework would be compatible
-and same restrictive as the eeprom drivers.
-
-In case a provider needs more privileges, it should be his job.
-
->
-> As a first patchset we wanted to keep the framework simple and add
-> features as we move on.
-
-That's true, but it's an ABI too. So changing default settings soon is better.
-
-Regards
-Stefan
-
->
-> Thanks,
-> srini
-> >
-> > Thanks
-> > Andrew
-> >
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+Julien Grall
