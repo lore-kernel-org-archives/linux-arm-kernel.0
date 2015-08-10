@@ -1,79 +1,108 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 10 Aug 2015 13:50:39 +0100
-Subject: Disabling caches with MMU enabled
-Message-ID: <20150810125039.GT7557@n2100.arm.linux.org.uk>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Mon, 10 Aug 2015 13:52:22 +0100
+Subject: [PATCH v3 20/20] arm/xen: Add support for 64KB page
+ granularity
+In-Reply-To: <1438966019-19322-21-git-send-email-julien.grall@citrix.com>
+References: <1438966019-19322-1-git-send-email-julien.grall@citrix.com>
+ <1438966019-19322-21-git-send-email-julien.grall@citrix.com>
+Message-ID: <alpine.DEB.2.02.1508101351410.11337@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is an erratum for Cortex-A15 which contains this paragraph:
+On Fri, 7 Aug 2015, Julien Grall wrote:
+> The hypercall interface is always using 4KB page granularity. This is
+> requiring to use xen page definition macro when we deal with hypercall.
+> 
+> Note that pfn_to_gfn is working with a Xen pfn (i.e 4KB). We may want to
+> rename pfn_gfn to make this explicit.
+> 
+> We also allocate a 64KB page for the shared page even though only the
+> first 4KB is used. I don't think this is really important for now as it
+> helps to have the pointer 4KB aligned (XENMEM_add_to_physmap is taking a
+> Xen PFN).
+> 
+> Signed-off-by: Julien Grall <julien.grall@citrix.com>
 
- 2) Do not issue write-back cacheable stores at any time when the cache
- is disabled (SCTLR.C=0) and the MMU is enabled (SCTLR.M=1). Because it
- is implementation defined whether cacheable stores update the cache when
- the cache is disabled it is not expected that any portable code will
- execute cacheable stores when the cache is disabled.
+Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 
-The interesting part is the second sentence, which implies that having the
-MMU enabled with writeback mappings, but with the C bit clear is not an
-expected use case.  Moreover, it reinforces the ARM ARM statment that a
-disabled cache may still be searched, and updated with written data.
 
-However, the v7_exit_coherency_flush() function creates exactly this
-scenario by clearing the C bit:
-
-#define v7_exit_coherency_flush(level) \
-        asm volatile( \
-        ".arch  armv7-a \n\t" \
-        "stmfd  sp!, {fp, ip} \n\t" \
-        "mrc    p15, 0, r0, c1, c0, 0   @ get SCTLR \n\t" \
-        "bic    r0, r0, #"__stringify(CR_C)" \n\t" \
-        "mcr    p15, 0, r0, c1, c0, 0   @ set SCTLR \n\t" \
-        "isb    \n\t" \
-
-However, v7_exit_coherency_flush() is careful to disable caching, flush
-the cache and then disable coherency.  Whether that's sufficient for all
-cases is open to question - and where we need this CA15 errata implemented,
-it implies that even this sequence is not permissible to use there.
-
-tegra_disable_clean_inv_dcache() is an assembly version of something
-similar to the above, and has the same concerns as the above.
-
-Implementations which copy the ARM Ltd platforms CPU hotplug hack also
-do this, but in a much more dirty way.  We really need people to stop
-copying the ARM Ltd CPU hotplug hack - I'd go as far as saying that
-arm-soc must stop merging code which introduces these, or (as I've
-already said) which try to turn the ARM CPU hotplug hack into some
-generic facility for platforms to make use of:
-
-static inline void cpu_enter_lowpower(void)
-{
-        "       mrc     p15, 0, %0, c1, c0, 1\n"
-        "       bic     %0, %0, %3\n"
-        "       mcr     p15, 0, %0, c1, c0, 1\n"
-...
-          : "=&r" (v)
-          : "r" (0), "Ir" (CR_C), "Ir" (0x40)
-}
-
-The exynos implementation of v7_exit_coherency() is another instance.
-
-arch/arm/mach-shmobile/platsmp-apmu.c:cpu_enter_lowpower_a15() definitely
-looks like it's a problem, because we are talking about Cortex-A15 there,
-and the sequence is just turning off the C bit, but then reverting back
-to C code to then call the cache flushing.  This is definitely unsafe.
-
-I think all places which clear the C bit need to be re-reviewed and at
-least some of them fixed, or converted to use a macro such as the
-v7_exit_coherency_flush macro - and they should get a notice placed
-on them to discourage copy-n-pasting it.
-
-Incidentally, armada_370_xp_pmsu_idle_enter() should be fixed not to use
-hard-coded constants in the assembly.  Use the "Ir" asm() constraint and
-pass CR_C in.
-
-Basically, grep for '\<CR_C\>' (quotes and backslashes required for
-grep...)
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+> ---
+> Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> 
+> Stefano, I've dropped your reviewed-by given I've updated the doc and do
+> changes to avoid usage of XEN_PAGE_SHIFT
+> 
+>     Changes in v3:
+>         - s/MFN/GFN/ base on the new naming
+>         - Use virt_to_gfn to avoid use XEN_PAGE_SHIFT
+>         - Drop Stefano's reviewed-by
+>         - Add some docs in arch/arm/asm/xen/page.h
+> 
+>     Changes in v2
+>         - Add Stefano's reviewed-by
+> ---
+>  arch/arm/include/asm/xen/page.h | 15 +++++++++++++--
+>  arch/arm/xen/enlighten.c        |  6 +++---
+>  2 files changed, 16 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/xen/page.h b/arch/arm/include/asm/xen/page.h
+> index 98c9fc3..e3d94cf 100644
+> --- a/arch/arm/include/asm/xen/page.h
+> +++ b/arch/arm/include/asm/xen/page.h
+> @@ -28,6 +28,17 @@ typedef struct xpaddr {
+>  
+>  #define INVALID_P2M_ENTRY      (~0UL)
+>  
+> +/*
+> + * The pseudo-physical frame (pfn) used in all the helpers is always based
+> + * on Xen page granularity (i.e 4KB).
+> + *
+> + * A Linux page may be split across multiple non-contiguous Xen page so we
+> + * have to keep track with frame based on 4KB page granularity.
+> + *
+> + * PV drivers should never make a direct usage of those helpers (particularly
+> + * pfn_to_gfn and gfn_to_pfn).
+> + */
+> +
+>  unsigned long __pfn_to_mfn(unsigned long pfn);
+>  extern struct rb_root phys_to_mach;
+>  
+> @@ -64,8 +75,8 @@ static inline unsigned long bfn_to_pfn(unsigned long bfn)
+>  #define bfn_to_local_pfn(bfn)	bfn_to_pfn(bfn)
+>  
+>  /* VIRT <-> GUEST conversion */
+> -#define virt_to_gfn(v)		(pfn_to_gfn(virt_to_pfn(v)))
+> -#define gfn_to_virt(m)		(__va(gfn_to_pfn(m) << PAGE_SHIFT))
+> +#define virt_to_gfn(v)		(pfn_to_gfn(virt_to_phys(v) >> XEN_PAGE_SHIFT))
+> +#define gfn_to_virt(m)		(__va(gfn_to_pfn(m) << XEN_PAGE_SHIFT))
+>  
+>  /* Only used in PV code. But ARM guests are always HVM. */
+>  static inline xmaddr_t arbitrary_virt_to_machine(void *vaddr)
+> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+> index eeeab07..50b4769 100644
+> --- a/arch/arm/xen/enlighten.c
+> +++ b/arch/arm/xen/enlighten.c
+> @@ -89,8 +89,8 @@ static void xen_percpu_init(void)
+>  	pr_info("Xen: initializing cpu%d\n", cpu);
+>  	vcpup = per_cpu_ptr(xen_vcpu_info, cpu);
+>  
+> -	info.mfn = __pa(vcpup) >> PAGE_SHIFT;
+> -	info.offset = offset_in_page(vcpup);
+> +	info.mfn = virt_to_gfn(vcpup);
+> +	info.offset = xen_offset_in_page(vcpup);
+>  
+>  	err = HYPERVISOR_vcpu_op(VCPUOP_register_vcpu_info, cpu, &info);
+>  	BUG_ON(err);
+> @@ -213,7 +213,7 @@ static int __init xen_guest_init(void)
+>  	xatp.domid = DOMID_SELF;
+>  	xatp.idx = 0;
+>  	xatp.space = XENMAPSPACE_shared_info;
+> -	xatp.gpfn = __pa(shared_info_page) >> PAGE_SHIFT;
+> +	xatp.gpfn = virt_to_gfn(shared_info_page);
+>  	if (HYPERVISOR_memory_op(XENMEM_add_to_physmap, &xatp))
+>  		BUG();
+>  
+> -- 
+> 2.1.4
+> 
