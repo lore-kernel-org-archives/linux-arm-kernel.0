@@ -1,73 +1,155 @@
 From: zhichao.huang@linaro.org (Zhichao Huang)
-Date: Mon, 10 Aug 2015 21:26:03 +0800
-Subject: [PATCH v4 11/15] KVM: arm: add a function to keep track of host use
- of the debug registers
+Date: Mon, 10 Aug 2015 21:26:05 +0800
+Subject: [PATCH v4 13/15] KVM: arm: keep track of guest use of the debug
+ registers
 In-Reply-To: <1439213167-8988-1-git-send-email-zhichao.huang@linaro.org>
 References: <1439213167-8988-1-git-send-email-zhichao.huang@linaro.org>
-Message-ID: <1439213167-8988-12-git-send-email-zhichao.huang@linaro.org>
+Message-ID: <1439213167-8988-14-git-send-email-zhichao.huang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we're about to implement a lazy world switch for debug registers,
-we add a function reading the break/watch control variables directly to
-indicate whether the host has enabled any break/watch points or not.
+We trap debug register accesses from guest all the time, and read the
+BCR/WCR to indicate whether the guest has enabled any break/watch points
+or not.
 
 Signed-off-by: Zhichao Huang <zhichao.huang@linaro.org>
 ---
- arch/arm/include/asm/hw_breakpoint.h |  5 +++++
- arch/arm/kernel/hw_breakpoint.c      | 21 +++++++++++++++++++++
- 2 files changed, 26 insertions(+)
+ arch/arm/include/asm/kvm_asm.h |  2 ++
+ arch/arm/kvm/coproc.c          | 75 +++++++++++++++++++++++++++++++++++++++---
+ 2 files changed, 72 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/include/asm/hw_breakpoint.h b/arch/arm/include/asm/hw_breakpoint.h
-index f2f4c61..6f375c5 100644
---- a/arch/arm/include/asm/hw_breakpoint.h
-+++ b/arch/arm/include/asm/hw_breakpoint.h
-@@ -66,9 +66,14 @@ int arch_install_hw_breakpoint(struct perf_event *bp);
- void arch_uninstall_hw_breakpoint(struct perf_event *bp);
- void hw_breakpoint_pmu_read(struct perf_event *bp);
- int hw_breakpoint_slots(int type);
-+bool hw_breakpoint_enabled(void);
+diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
+index 5b1c3eb..e9e1f0a 100644
+--- a/arch/arm/include/asm/kvm_asm.h
++++ b/arch/arm/include/asm/kvm_asm.h
+@@ -65,7 +65,9 @@
+ #define NR_CP14_REGS	66	/* Number of regs (incl. invalid) */
  
- #else
- static inline void clear_ptrace_hw_breakpoint(struct task_struct *tsk) {}
-+static inline bool hw_breakpoint_enabled(void)
-+{
-+	return false;
-+}
+ #define KVM_ARM_DEBUG_HOST_INUSE_SHIFT	0
++#define KVM_ARM_DEBUG_GUEST_INUSE_SHIFT	1
+ #define KVM_ARM_DEBUG_HOST_INUSE	(1 << KVM_ARM_DEBUG_HOST_INUSE_SHIFT)
++#define KVM_ARM_DEBUG_GUEST_INUSE	(1 << KVM_ARM_DEBUG_GUEST_INUSE_SHIFT)
  
- #endif	/* CONFIG_HAVE_HW_BREAKPOINT */
- #endif  /* __ASSEMBLY */
-diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
-index dc7d0a9..f56788f 100644
---- a/arch/arm/kernel/hw_breakpoint.c
-+++ b/arch/arm/kernel/hw_breakpoint.c
-@@ -227,6 +227,27 @@ static int get_num_brps(void)
- 	return core_has_mismatch_brps() ? brps - 1 : brps;
+ #define ARM_EXCEPTION_RESET	  0
+ #define ARM_EXCEPTION_UNDEFINED   1
+diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
+index b37afd6..d9dcd28b 100644
+--- a/arch/arm/kvm/coproc.c
++++ b/arch/arm/kvm/coproc.c
+@@ -220,7 +220,22 @@ bool access_vm_reg(struct kvm_vcpu *vcpu,
+ 	return true;
  }
  
-+/* Indicate whether the host has enabled any break/watch points or not. */
-+bool hw_breakpoint_enabled(void)
+-static bool trap_debug32(struct kvm_vcpu *vcpu,
++/* Indicate whether the guest has enabled any break/watch points or not. */
++static bool guest_debug_in_use(struct kvm_vcpu *vcpu)
 +{
-+	struct perf_event **slots;
-+	int i;
++	unsigned int i;
 +
-+	slots = this_cpu_ptr(bp_on_reg);
-+	for (i = 0; i < core_num_brps; i++) {
-+		if (slots[i])
++	for (i = 0; i < ARM_MAX_BRP; i++)
++		if (vcpu->arch.cp14[cp14_DBGBCR0 + i] & 0x1)
 +			return true;
-+	}
-+
-+	slots = this_cpu_ptr(wp_on_reg);
-+	for (i = 0; i < core_num_wrps; i++) {
-+		if (slots[i])
++	for (i = 0; i < ARM_MAX_WRP; i++)
++		if (vcpu->arch.cp14[cp14_DBGWCR0 + i] & 0x1)
 +			return true;
-+	}
 +
 +	return false;
 +}
 +
- /*
-  * In order to access the breakpoint/watchpoint control registers,
-  * we must be running in debug monitor mode. Unfortunately, we can
++static bool __trap_debug32(struct kvm_vcpu *vcpu,
+ 			const struct coproc_params *p,
+ 			const struct coproc_reg *r)
+ {
+@@ -232,6 +247,56 @@ static bool trap_debug32(struct kvm_vcpu *vcpu,
+ 	return true;
+ }
+ 
++/*
++ * We want to avoid world-switching all the DBG registers all the
++ * time:
++ *
++ * When we are about to run a guest, we have the following cases:
++ *
++ * 1) Neither the host nor the guest has configured any [WB]points
++ * 2) Only the host has configured any [WB]points
++ * 3) Only the guest has configured any [WB]points
++ * 4) Both the host and the guest have configured any [WB]points
++ *
++ * - In case (1), KVM should enable trapping and swtich the register
++ *   state on guest accesses.
++ * - In cases (2), (3), and (4) we must switch the register state on each
++ *   entry/exit.
++ *
++ * For ARMv7, if the CONFIG_HAVE_HW_BREAKPOINT is set, ARM_DSCR_MDBGEN
++ * is always set(ARM64 use it to indicate that debug registers are actively
++ * in use).
++ *
++ * - We add a function reading the break/watch control variables directly to
++ *   indicate whether the host has enabled any break/watch points or not.
++ *   We only call the function upon guest entry, after preempt_disable() and
++ *   local_irq_disable(), so there is no race for it.
++ *
++ * - We trap debug register accesses from guest all the time, and read the
++ *   BCR/WCR to indicate whether the guest has enabled any break/watch points
++ *   or not.
++ *
++ * For this, we can keep track of the host/guest use of debug registers,
++ * and skip the save/restore dance when neither the host nor the guest has
++ * configured any [WB]points.
++ */
++static bool trap_debug32(struct kvm_vcpu *vcpu,
++			const struct coproc_params *p,
++			const struct coproc_reg *r)
++{
++	__trap_debug32(vcpu, p, r);
++
++	if (p->is_write) {
++		if ((vcpu->arch.cp14[r->reg] & 0x1) ||
++		    guest_debug_in_use(vcpu))
++			vcpu->arch.debug_flags |= KVM_ARM_DEBUG_GUEST_INUSE;
++		else
++			vcpu->arch.debug_flags &= ~KVM_ARM_DEBUG_GUEST_INUSE;
++	}
++
++	return true;
++}
++
+ /* DBGIDR (RO) Debug ID */
+ static bool trap_dbgidr(struct kvm_vcpu *vcpu,
+ 			const struct coproc_params *p,
+@@ -419,13 +484,13 @@ static const struct coproc_reg cp15_regs[] = {
+ #define DBG_BCR_BVR_WCR_WVR(n)					\
+ 	/* DBGBVRn */						\
+ 	{ CRn( 0), CRm((n)), Op1( 0), Op2( 4), is32,		\
+-	  trap_debug32,	reset_val, (cp14_DBGBVR0 + (n)), 0 },	\
++	  __trap_debug32, reset_val, (cp14_DBGBVR0 + (n)), 0 },	\
+ 	/* DBGBCRn */						\
+ 	{ CRn( 0), CRm((n)), Op1( 0), Op2( 5), is32,		\
+ 	  trap_debug32,	reset_val, (cp14_DBGBCR0 + (n)), 0 },	\
+ 	/* DBGWVRn */						\
+ 	{ CRn( 0), CRm((n)), Op1( 0), Op2( 6), is32,		\
+-	  trap_debug32,	reset_val, (cp14_DBGWVR0 + (n)), 0 },	\
++	  __trap_debug32, reset_val, (cp14_DBGWVR0 + (n)), 0 },	\
+ 	/* DBGWCRn */						\
+ 	{ CRn( 0), CRm((n)), Op1( 0), Op2( 7), is32,		\
+ 	  trap_debug32,	reset_val, (cp14_DBGWCR0 + (n)), 0 }
+@@ -462,7 +527,7 @@ static const struct coproc_reg cp14_regs[] = {
+ 	/* DBGDSAR (64bit) */
+ 	{ CRn( 0), CRm( 2), Op1( 0), Op2( 0), is64, trap_raz_wi },
+ 	/* DBGDSCRext */
+-	{ CRn( 0), CRm( 2), Op1( 0), Op2( 2), is32, trap_debug32,
++	{ CRn( 0), CRm( 2), Op1( 0), Op2( 2), is32, __trap_debug32,
+ 				reset_val, cp14_DBGDSCRext, 0 },
+ 	DBG_BCR_BVR_WCR_WVR(2),
+ 	/* DBGDTRTXext */
+@@ -474,7 +539,7 @@ static const struct coproc_reg cp14_regs[] = {
+ 	DBG_BCR_BVR_WCR_WVR(5),
+ 	DBG_BCR_BVR_WCR_WVR(6),
+ 	/* DBGVCR */
+-	{ CRn( 0), CRm( 7), Op1( 0), Op2( 0), is32, trap_debug32 },
++	{ CRn( 0), CRm( 7), Op1( 0), Op2( 0), is32, __trap_debug32 },
+ 	DBG_BCR_BVR_WCR_WVR(7),
+ 	DBG_BCR_BVR_WCR_WVR(8),
+ 	DBG_BCR_BVR_WCR_WVR(9),
 -- 
 1.7.12.4
