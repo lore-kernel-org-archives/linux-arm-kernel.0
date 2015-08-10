@@ -1,43 +1,136 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 10 Aug 2015 15:47:51 +0200
-Subject: [PATCH] ARM: mvebu: Use a CR_C constant instead of a hard-coded one
-Message-ID: <1439214471-25902-1-git-send-email-gregory.clement@free-electrons.com>
+From: maitysanchayan@gmail.com (Sanchayan Maity)
+Date: Mon, 10 Aug 2015 19:41:28 +0530
+Subject: [PATCH v8 0/4] Implement OCOTP driver for Vybrid using NVMEM
+Message-ID: <cover.1439214648.git.maitysanchayan@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix the armada_370_xp_pmsu_idle_enter() function to use a CR_C
-constant instead of a hard-coded constant in the assembly part.
-This clean-up was suggested by Russell King.
+Hello,
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
-Hi,
+This patchset is based on top of v9 of Srinivas's NVMEM framework patches.
+Tested using v9 NVMEM patches which got merged after applying them on
+shawn's tree for-next branch along with Stefan's NAND driver patchset.
 
-this clean-up is not for 4.2 neither for 4.3 (the rc6 had just been
-released), but for 4.4. I send it now to not forget it.
+Sample output on Colibri VF50
 
-Gregory
+root at colibri-vf:/sys/bus/nvmem/devices/ocotp0# hexdump nvmem
+0000000 0000 0000 0000 0000 0000 0000 0000 0000
+*
+0000410 72a6 df64 0000 0000 0000 0000 0000 0000
+0000420 11d4 2c14 0000 0000 0000 0000 0000 0000
+0000430 0000 0000 0000 0000 0000 0000 0000 0000
+*
+0000450 0280 0000 0000 0000 0000 0000 0000 0000
+0000460 0000 0000 0000 0000 0000 0000 0000 0000
+*
+0000880 8f01 0000 0000 0000 0000 0000 0000 0000
+0000890 0000 0000 0000 0000 0000 0000 0000 0000
+*
+00008c0 0000 1000 0000 0000 0000 0000 0000 0000
+00008d0 3202 0800 0000 0000 0000 0000 0000 0000
+00008e0 0000 e100 0000 0000 0000 0000 0000 0000
+00008f0 0000 0000 0000 0000 0000 0000 0000 0000
+*
+0000c80 bada bada 0000 0000 0000 0000 0000 0000
+*
+0000cc0 0000 0000 0000 0000 0000 0000 0000 0000
+*
+0000cf0
 
- arch/arm/mach-mvebu/pmsu.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+The driver has changed quite a bit from the first version
+relying on of_platform_populate in mach file, to using
+SoC driver under drivers/soc and finally to NVMEM.
 
-diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
-index 4f4e22206ae5..8efb83cea83d 100644
---- a/arch/arm/mach-mvebu/pmsu.c
-+++ b/arch/arm/mach-mvebu/pmsu.c
-@@ -296,11 +296,11 @@ int armada_370_xp_pmsu_idle_enter(unsigned long deepidle)
- 	/* Test the CR_C bit and set it if it was cleared */
- 	asm volatile(
- 	"mrc	p15, 0, r0, c1, c0, 0 \n\t"
--	"tst	r0, #(1 << 2) \n\t"
-+	"tst	r0, %0 \n\t"
- 	"orreq	r0, r0, #(1 << 2) \n\t"
- 	"mcreq	p15, 0, r0, c1, c0, 0 \n\t"
- 	"isb	"
--	: : : "r0");
-+	: : "Ir" (CR_C) : "r0");
- 
- 	pr_debug("Failed to suspend the system\n");
- 
+Feedback and comments most welcome.
+
+Version 7 patches can be found here
+https://lkml.org/lkml/2015/8/6/440
+
+Version 6 RFC patches can be found here
+http://lkml.iu.edu/hypermail/linux/kernel/1506.2/05123.html
+
+Version 5 of the patchset can be found here
+http://lkml.iu.edu/hypermail/linux/kernel/1506.0/03787.html
+
+Version 4 of the patchset can be found here
+https://lkml.org/lkml/2015/5/26/199
+
+Version 3 of the patchset can be found here
+http://www.spinics.net/lists/arm-kernel/msg420847.html
+
+Version 2 of the patchset can be found here
+http://www.spinics.net/lists/devicetree/msg80654.html
+
+Version 1 of the patchset can be found here
+http://www.spinics.net/lists/devicetree/msg80257.html
+
+The RFC version can be found here
+https://lkml.org/lkml/2015/5/11/13
+
+Changes since v7:
+1. Add COMPILE_TEST to Kconfig
+2. Use GENMASK and BIT macros where applicable
+3. Fix a code alignment issue
+4. Get the max_register value for regmap config using
+resource_size()
+5. Also add copyright info as the driver logic is based off
+on ocotp code in barebox
+6. Add missing info related to clock in DT binding doc
+
+Changes since v6:
+1. Use the v9 of NVMEM framework patchset
+2. Add a few comments
+3. Initialise buffer address not part of the fuse map to 0
+instead of only handling buffer locations with valid fuse
+addresses.
+
+Changes since v5:
+Use NVMEM framework by Srinivas and Maxime
+
+Changes since v4:
+1. Use devm_* family of functions and use a struct to get rid of
+global variables (suggested by Joachim Eastwood)
+2. Make Kconfig govern the compilation with tristate, instead of
+earlier bool. Paul Bolle raised a valid point that perhaps this
+should have been built in with the bool, however I had not taken
+into consideration generic distro kernels and it makes sense to
+have this tristated. (comments from Paul Bolle and Andreas Farber)
+
+Changes since v3:
+Instead of using the syscon_regmap_lookup_by_compatible function
+use a phandle in the device tree along with offsets specified in
+this phandle node and then read the offset along with the device
+node in the driver for reading from the required region.
+
+Changes since v2:
+Implement the SoC bus code as a driver in drivers/soc
+by registering with fsl,mscm-cpucfg as per Arnd's feedback
+
+Changes since v1:
+Sort the headers in alphabetical order
+
+Changes since RFC:
+Use a DT entry for the ROM area while specifying it as syscon.
+
+Thanks & Regards,
+Sanchayan Maity.
+
+Sanchayan Maity (4):
+  clk: clk-vf610: Add clock for Vybrid OCOTP controller
+  ARM: dts: vfxxx: Add OCOTP node
+  drivers: nvmem: Add Vybrid OCOTP support
+  nvmem: Add DT binding documentation for Vybrid OCOTP driver
+
+ .../devicetree/bindings/nvmem/vf610-ocotp.txt      |  21 ++
+ arch/arm/boot/dts/vfxxx.dtsi                       |   9 +
+ drivers/clk/imx/clk-vf610.c                        |   1 +
+ drivers/nvmem/Kconfig                              |  10 +
+ drivers/nvmem/Makefile                             |   2 +
+ drivers/nvmem/vf610-ocotp.c                        | 301 +++++++++++++++++++++
+ include/dt-bindings/clock/vf610-clock.h            |   3 +-
+ 7 files changed, 346 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/nvmem/vf610-ocotp.txt
+ create mode 100644 drivers/nvmem/vf610-ocotp.c
+
 -- 
-2.1.0
+2.5.0
