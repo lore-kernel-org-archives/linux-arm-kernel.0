@@ -1,78 +1,77 @@
-From: zhichao.huang@linaro.org (Zhichao Huang)
-Date: Mon, 10 Aug 2015 21:26:06 +0800
-Subject: [PATCH v4 14/15] KVM: arm: implement lazy world switch for debug
- registers
-In-Reply-To: <1439213167-8988-1-git-send-email-zhichao.huang@linaro.org>
-References: <1439213167-8988-1-git-send-email-zhichao.huang@linaro.org>
-Message-ID: <1439213167-8988-15-git-send-email-zhichao.huang@linaro.org>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Mon, 10 Aug 2015 15:31:02 +0200
+Subject: [PATCH v5 0/5] KVM: irqfd consumer based on IRQ bypass manager
+Message-ID: <1439213467-13668-1-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Avoid world-switching all the debug registers when neither the host
-nor the guest has configured any [WB]points.
+This series transforms irqfd into an IRQ bypass consumer and
+introduce the infrastructure shared by Intel posted-interrupts
+and ARM forwarded IRQ series.
 
-Signed-off-by: Zhichao Huang <zhichao.huang@linaro.org>
----
- arch/arm/kvm/interrupts_head.S | 23 +++++++++++++++++++++--
- 1 file changed, 21 insertions(+), 2 deletions(-)
+The bypass manager gets compiled for x86 and arm/arm64 when
+KVM is used. A new kvm_irqfd.h header is created to externalize
+some irqfd declarations going to be used by architecture specific
+code. A new CONFIG_HAVE_KVM_IRQ_BYPASS option is introduced
+to enable architecture specific IRQ manager hooks.
 
-diff --git a/arch/arm/kvm/interrupts_head.S b/arch/arm/kvm/interrupts_head.S
-index b9e7410..7ad0adf 100644
---- a/arch/arm/kvm/interrupts_head.S
-+++ b/arch/arm/kvm/interrupts_head.S
-@@ -332,6 +332,21 @@ vcpu	.req	r0		@ vcpu pointer always in r0
- 	sub	r12, r2, r12		@ How many WPs to skip
- .endm
- 
-+/* If VCPU_DEBUG_FLAGS is not set, it means that neither the host
-+ * nor the guest has configured any [WB]points.
-+ *
-+ * We avoid world-switching all the debug registers in that case.
-+ *
-+ * Assume vcpu pointer in vcpu reg
-+ *
-+ * clobbers r2
-+ */
-+.macro skip_debug_state target
-+	ldr	r2, [vcpu, #VCPU_DEBUG_FLAGS]
-+	cmp	r2, #0
-+	beq	\target
-+.endm
-+
- /* Reads cp14 registers from hardware.
-  * Writes cp14 registers in-order to the CP14 struct pointed to by r10
-  *
-@@ -340,12 +355,14 @@ vcpu	.req	r0		@ vcpu pointer always in r0
-  * Clobbers r2-r12
-  */
- .macro save_debug_state
-+	skip_debug_state 9999f
-+
- 	read_hw_dbg_num
- 	cp14_read_and_str r10, 4, cp14_DBGBVR0, r11
- 	cp14_read_and_str r10, 5, cp14_DBGBCR0, r11
- 	cp14_read_and_str r10, 6, cp14_DBGWVR0, r12
- 	cp14_read_and_str r10, 7, cp14_DBGWCR0, r12
--
-+9999:
- 	/* DBGDSCR reg */
- 	mrc	p14, 0, r2, c0, c1, 0
- 	str	r2, [r10, #CP14_OFFSET(cp14_DBGDSCRext)]
-@@ -359,12 +376,14 @@ vcpu	.req	r0		@ vcpu pointer always in r0
-  * Clobbers r2-r12
-  */
- .macro restore_debug_state
-+	skip_debug_state 9999f
-+
- 	read_hw_dbg_num
- 	cp14_ldr_and_write r10, 4, cp14_DBGBVR0, r11
- 	cp14_ldr_and_write r10, 5, cp14_DBGBCR0, r11
- 	cp14_ldr_and_write r10, 6, cp14_DBGWVR0, r12
- 	cp14_ldr_and_write r10, 7, cp14_DBGWCR0, r12
--
-+9999:
- 	/* DBGDSCR reg */
- 	ldr	r2, [r10, #CP14_OFFSET(cp14_DBGDSCRext)]
- 	mcr	p14, 0, r2, c0, c2, 2
+the series depends on the IRQ bypass manager:
+- [PATCH v4] virt: IRQ bypass manager (https://lkml.org/lkml/2015/8/6/526)
+
+can be found at:
+https://git.linaro.org/people/eric.auger/linux.git/shortlog/refs/heads/v4.2-rc6-irq-forward-v3
+
+Best Regards
+
+Eric
+
+History:
+
+v4 -> v5:
+- remove kvm_arch static inline stubs
+- add pr_info on registration failure
+
+v3 -> v4:
+- fix compilation for arm/arm64
+- rearrange signoffs/history on some patch files
+
+v2 -> v3 (Feng Wu):
+- rebase on IRQ bypass manager [PATCH v2] virt: IRQ bypass manager:
+  https://lkml.org/lkml/2015/7/16/810
+- Correct some minor errors and typo
+- Add something needed for posted-interrupts
+
+v1 -> v2:
+- isolate the bypass manager and irqfd consumer in this series
+- take into account Paolo's comments and use container_of strategy and
+  remove additional fields introduced in v1.
+- create kvm_irqfd.h
+- add unregistration in irqfd_shutdown
+
+v1: originally part of [RFC 00/17] ARM IRQ forward control based on IRQ
+    bypass manager (https://lkml.org/lkml/2015/7/2/268)
+
+Eric Auger (4):
+  KVM: arm/arm64: select IRQ_BYPASS_MANAGER
+  KVM: create kvm_irqfd.h
+  KVM: introduce kvm_arch functions for IRQ bypass
+  KVM: eventfd: add irq bypass consumer management
+
+Feng Wu (1):
+  KVM: x86: select IRQ_BYPASS_MANAGER
+
+ arch/arm/kvm/Kconfig      |   2 +
+ arch/arm/kvm/Makefile     |   1 +
+ arch/arm64/kvm/Kconfig    |   2 +
+ arch/arm64/kvm/Makefile   |   1 +
+ arch/x86/kvm/Kconfig      |   2 +
+ arch/x86/kvm/Makefile     |   3 ++
+ include/linux/kvm_host.h  |  10 +++++
+ include/linux/kvm_irqfd.h |  71 ++++++++++++++++++++++++++++++
+ virt/kvm/Kconfig          |   3 ++
+ virt/kvm/eventfd.c        | 110 ++++++++++++++++------------------------------
+ 10 files changed, 133 insertions(+), 72 deletions(-)
+ create mode 100644 include/linux/kvm_irqfd.h
+
 -- 
-1.7.12.4
+1.9.1
