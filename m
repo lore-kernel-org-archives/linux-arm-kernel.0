@@ -1,115 +1,236 @@
 From: zhichao.huang@linaro.org (Zhichao Huang)
-Date: Mon, 10 Aug 2015 21:26:04 +0800
-Subject: [PATCH v4 12/15] KVM: arm: keep track of host use of the debug
- registers
+Date: Mon, 10 Aug 2015 21:26:02 +0800
+Subject: [PATCH v4 10/15] KVM: arm: implement world switch for debug registers
 In-Reply-To: <1439213167-8988-1-git-send-email-zhichao.huang@linaro.org>
 References: <1439213167-8988-1-git-send-email-zhichao.huang@linaro.org>
-Message-ID: <1439213167-8988-13-git-send-email-zhichao.huang@linaro.org>
+Message-ID: <1439213167-8988-11-git-send-email-zhichao.huang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Every guest entry, we need to keep track of host use of the debug
-registers.
-
-We only call the function upon guest entry, after preempt_disable()
-and local_irq_disable(), so there is no race for it.
+Implement switching of the debug registers. While the number
+of registers is massive, CPUs usually don't implement them all
+(A15 has 6 breakpoints and 4 watchpoints, which gives us a total
+of 22 registers "only").
 
 Signed-off-by: Zhichao Huang <zhichao.huang@linaro.org>
 ---
- arch/arm/include/asm/kvm_asm.h    | 3 +++
- arch/arm/include/asm/kvm_host.h   | 4 ++++
- arch/arm/kernel/asm-offsets.c     | 1 +
- arch/arm/kvm/arm.c                | 2 ++
- arch/arm/kvm/coproc.c             | 8 ++++++++
- arch/arm64/include/asm/kvm_host.h | 1 +
- 6 files changed, 19 insertions(+)
+ arch/arm/kvm/interrupts_head.S | 170 ++++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 159 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
-index 7443a3a..5b1c3eb 100644
---- a/arch/arm/include/asm/kvm_asm.h
-+++ b/arch/arm/include/asm/kvm_asm.h
-@@ -64,6 +64,9 @@
- #define cp14_DBGDSCRext	65	/* Debug Status and Control external */
- #define NR_CP14_REGS	66	/* Number of regs (incl. invalid) */
+diff --git a/arch/arm/kvm/interrupts_head.S b/arch/arm/kvm/interrupts_head.S
+index 7ac5e51..b9e7410 100644
+--- a/arch/arm/kvm/interrupts_head.S
++++ b/arch/arm/kvm/interrupts_head.S
+@@ -5,6 +5,7 @@
+ #define VCPU_USR_SP		(VCPU_USR_REG(13))
+ #define VCPU_USR_LR		(VCPU_USR_REG(14))
+ #define CP15_OFFSET(_cp15_reg_idx) (VCPU_CP15 + (_cp15_reg_idx * 4))
++#define CP14_OFFSET(_cp14_reg_idx) ((_cp14_reg_idx) * 4)
  
-+#define KVM_ARM_DEBUG_HOST_INUSE_SHIFT	0
-+#define KVM_ARM_DEBUG_HOST_INUSE	(1 << KVM_ARM_DEBUG_HOST_INUSE_SHIFT)
+ /*
+  * Many of these macros need to access the VCPU structure, which is always
+@@ -239,6 +240,136 @@ vcpu	.req	r0		@ vcpu pointer always in r0
+ 	save_guest_regs_mode irq, #VCPU_IRQ_REGS
+ .endm
+ 
++/* Assume r10/r11/r12 are in use, clobbers r2-r3 */
++.macro cp14_read_and_str base Op2 cp14_reg0 skip_num
++	adr	r3, 1f
++	add	r3, r3, \skip_num, lsl #3
++	bx	r3
++1:
++	mrc	p14, 0, r2, c0, c15, \Op2
++	str     r2, [\base, #CP14_OFFSET(\cp14_reg0+15)]
++	mrc	p14, 0, r2, c0, c14, \Op2
++	str     r2, [\base, #CP14_OFFSET(\cp14_reg0+14)]
++	mrc	p14, 0, r2, c0, c13, \Op2
++	str     r2, [\base, #CP14_OFFSET(\cp14_reg0+13)]
++	mrc	p14, 0, r2, c0, c12, \Op2
++	str     r2, [\base, #CP14_OFFSET(\cp14_reg0+12)]
++	mrc	p14, 0, r2, c0, c11, \Op2
++	str     r2, [\base, #CP14_OFFSET(\cp14_reg0+11)]
++	mrc	p14, 0, r2, c0, c10, \Op2
++	str     r2, [\base, #CP14_OFFSET(\cp14_reg0+10)]
++	mrc	p14, 0, r2, c0, c9, \Op2
++	str     r2, [\base, #CP14_OFFSET(\cp14_reg0+9)]
++	mrc	p14, 0, r2, c0, c8, \Op2
++	str     r2, [\base, #CP14_OFFSET(\cp14_reg0+8)]
++	mrc	p14, 0, r2, c0, c7, \Op2
++	str     r2, [\base, #CP14_OFFSET(\cp14_reg0+7)]
++	mrc	p14, 0, r2, c0, c6, \Op2
++	str     r2, [\base, #CP14_OFFSET(\cp14_reg0+6)]
++	mrc	p14, 0, r2, c0, c5, \Op2
++	str     r2, [\base, #CP14_OFFSET(\cp14_reg0+5)]
++	mrc	p14, 0, r2, c0, c4, \Op2
++	str     r2, [\base, #CP14_OFFSET(\cp14_reg0+4)]
++	mrc	p14, 0, r2, c0, c3, \Op2
++	str     r2, [\base, #CP14_OFFSET(\cp14_reg0+3)]
++	mrc	p14, 0, r2, c0, c2, \Op2
++	str     r2, [\base, #CP14_OFFSET(\cp14_reg0+2)]
++	mrc	p14, 0, r2, c0, c1, \Op2
++	str     r2, [\base, #CP14_OFFSET(\cp14_reg0+1)]
++	mrc	p14, 0, r2, c0, c0, \Op2
++	str     r2, [\base, #CP14_OFFSET(\cp14_reg0)]
++.endm
 +
- #define ARM_EXCEPTION_RESET	  0
- #define ARM_EXCEPTION_UNDEFINED   1
- #define ARM_EXCEPTION_SOFTWARE    2
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index fc461ac..7338f34 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -131,6 +131,9 @@ struct kvm_vcpu_arch {
- 	/* System control coprocessor (cp14) */
- 	u32 cp14[NR_CP14_REGS];
- 
-+	/* Debug State */
-+	u32 debug_flags;
++/* Assume r11/r12 are in use, clobbers r2-r3 */
++.macro cp14_ldr_and_write base Op2 cp14_reg0 skip_num
++	adr	r3, 1f
++	add	r3, r3, \skip_num, lsl #3
++	bx	r3
++1:
++	ldr     r2, [\base, #CP14_OFFSET(\cp14_reg0+15)]
++	mcr	p14, 0, r2, c0, c15, \Op2
++	ldr     r2, [\base, #CP14_OFFSET(\cp14_reg0+14)]
++	mcr	p14, 0, r2, c0, c14, \Op2
++	ldr     r2, [\base, #CP14_OFFSET(\cp14_reg0+13)]
++	mcr	p14, 0, r2, c0, c13, \Op2
++	ldr     r2, [\base, #CP14_OFFSET(\cp14_reg0+12)]
++	mcr	p14, 0, r2, c0, c12, \Op2
++	ldr     r2, [\base, #CP14_OFFSET(\cp14_reg0+11)]
++	mcr	p14, 0, r2, c0, c11, \Op2
++	ldr     r2, [\base, #CP14_OFFSET(\cp14_reg0+10)]
++	mcr	p14, 0, r2, c0, c10, \Op2
++	ldr     r2, [\base, #CP14_OFFSET(\cp14_reg0+9)]
++	mcr	p14, 0, r2, c0, c9, \Op2
++	ldr     r2, [\base, #CP14_OFFSET(\cp14_reg0+8)]
++	mcr	p14, 0, r2, c0, c8, \Op2
++	ldr     r2, [\base, #CP14_OFFSET(\cp14_reg0+7)]
++	mcr	p14, 0, r2, c0, c7, \Op2
++	ldr     r2, [\base, #CP14_OFFSET(\cp14_reg0+6)]
++	mcr	p14, 0, r2, c0, c6, \Op2
++	ldr     r2, [\base, #CP14_OFFSET(\cp14_reg0+5)]
++	mcr	p14, 0, r2, c0, c5, \Op2
++	ldr     r2, [\base, #CP14_OFFSET(\cp14_reg0+4)]
++	mcr	p14, 0, r2, c0, c4, \Op2
++	ldr     r2, [\base, #CP14_OFFSET(\cp14_reg0+3)]
++	mcr	p14, 0, r2, c0, c3, \Op2
++	ldr     r2, [\base, #CP14_OFFSET(\cp14_reg0+2)]
++	mcr	p14, 0, r2, c0, c2, \Op2
++	ldr     r2, [\base, #CP14_OFFSET(\cp14_reg0+1)]
++	mcr	p14, 0, r2, c0, c1, \Op2
++	ldr     r2, [\base, #CP14_OFFSET(\cp14_reg0)]
++	mcr	p14, 0, r2, c0, c0, \Op2
++.endm
 +
- 	/*
- 	 * Anything that is not used directly from assembly code goes
- 	 * here.
-@@ -237,5 +240,6 @@ static inline void kvm_arch_hardware_unsetup(void) {}
- static inline void kvm_arch_sync_events(struct kvm *kvm) {}
- static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
- static inline void kvm_arch_sched_in(struct kvm_vcpu *vcpu, int cpu) {}
-+void kvm_arm_setup_debug(struct kvm_vcpu *vcpu);
- 
- #endif /* __ARM_KVM_HOST_H__ */
-diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
-index cee4254..7750597 100644
---- a/arch/arm/kernel/asm-offsets.c
-+++ b/arch/arm/kernel/asm-offsets.c
-@@ -178,6 +178,7 @@ int main(void)
-   DEFINE(VCPU_HOST_CONTEXT,	offsetof(struct kvm_vcpu, arch.host_cpu_context));
-   DEFINE(VCPU_VFP_HOST,		offsetof(struct kvm_cpu_context, vfp));
-   DEFINE(VCPU_CP14_HOST,	offsetof(struct kvm_cpu_context, cp14));
-+  DEFINE(VCPU_DEBUG_FLAGS,	offsetof(struct kvm_vcpu, arch.debug_flags));
-   DEFINE(VCPU_REGS,		offsetof(struct kvm_vcpu, arch.regs));
-   DEFINE(VCPU_USR_REGS,		offsetof(struct kvm_vcpu, arch.regs.usr_regs));
-   DEFINE(VCPU_SVC_REGS,		offsetof(struct kvm_vcpu, arch.regs.svc_regs));
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index bc738d2..0129346 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -550,6 +550,8 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 			continue;
- 		}
- 
-+		kvm_arm_setup_debug(vcpu);
++/* Get extract number of BRPs and WRPs. Saved in r11/r12 */
++.macro read_hw_dbg_num
++	mrc	p14, 0, r2, c0, c0, 0
++	ubfx	r11, r2, #24, #4
++	add	r11, r11, #1		@ Extract BRPs
++	ubfx	r12, r2, #28, #4
++	add	r12, r12, #1		@ Extract WRPs
++	mov	r2, #16
++	sub	r11, r2, r11		@ How many BPs to skip
++	sub	r12, r2, r12		@ How many WPs to skip
++.endm
 +
- 		/**************************************************************
- 		 * Enter the guest
- 		 */
-diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
-index d15b250..b37afd6 100644
---- a/arch/arm/kvm/coproc.c
-+++ b/arch/arm/kvm/coproc.c
-@@ -1516,3 +1516,11 @@ void kvm_reset_coprocs(struct kvm_vcpu *vcpu)
- 		if (vcpu->arch.cp15[num] == 0x42424242)
- 			panic("Didn't reset vcpu->arch.cp15[%zi]", num);
- }
++/* Reads cp14 registers from hardware.
++ * Writes cp14 registers in-order to the CP14 struct pointed to by r10
++ *
++ * Assumes vcpu pointer in vcpu reg
++ *
++ * Clobbers r2-r12
++ */
++.macro save_debug_state
++	read_hw_dbg_num
++	cp14_read_and_str r10, 4, cp14_DBGBVR0, r11
++	cp14_read_and_str r10, 5, cp14_DBGBCR0, r11
++	cp14_read_and_str r10, 6, cp14_DBGWVR0, r12
++	cp14_read_and_str r10, 7, cp14_DBGWCR0, r12
 +
-+void kvm_arm_setup_debug(struct kvm_vcpu *vcpu)
-+{
-+	if (hw_breakpoint_enabled())
-+		vcpu->arch.debug_flags |= KVM_ARM_DEBUG_HOST_INUSE;
-+	else
-+		vcpu->arch.debug_flags &= ~KVM_ARM_DEBUG_HOST_INUSE;
-+}
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 2709db2..84fa4f0 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -226,5 +226,6 @@ static inline void kvm_arch_hardware_unsetup(void) {}
- static inline void kvm_arch_sync_events(struct kvm *kvm) {}
- static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
- static inline void kvm_arch_sched_in(struct kvm_vcpu *vcpu, int cpu) {}
-+static inline void kvm_arm_setup_debug(struct kvm_vcpu *vcpu) {}
++	/* DBGDSCR reg */
++	mrc	p14, 0, r2, c0, c1, 0
++	str	r2, [r10, #CP14_OFFSET(cp14_DBGDSCRext)]
++.endm
++
++/* Reads cp14 registers in-order from the CP14 struct pointed to by r10
++ * Writes cp14 registers to hardware.
++ *
++ * Assumes vcpu pointer in vcpu reg
++ *
++ * Clobbers r2-r12
++ */
++.macro restore_debug_state
++	read_hw_dbg_num
++	cp14_ldr_and_write r10, 4, cp14_DBGBVR0, r11
++	cp14_ldr_and_write r10, 5, cp14_DBGBCR0, r11
++	cp14_ldr_and_write r10, 6, cp14_DBGWVR0, r12
++	cp14_ldr_and_write r10, 7, cp14_DBGWCR0, r12
++
++	/* DBGDSCR reg */
++	ldr	r2, [r10, #CP14_OFFSET(cp14_DBGDSCRext)]
++	mcr	p14, 0, r2, c0, c2, 2
++.endm
++
+ /* Reads cp14/cp15 registers from hardware and stores them in memory
+  * @store_to_vcpu: If 0, registers are written in-order to the stack,
+  * 		   otherwise to the VCPU struct pointed to by vcpup
+@@ -248,11 +379,17 @@ vcpu	.req	r0		@ vcpu pointer always in r0
+  * Clobbers r2 - r12
+  */
+ .macro read_coproc_state store_to_vcpu
+-	.if \store_to_vcpu == 0
+-	mrc	p14, 0, r2, c0, c1, 0	@ DBGDSCR
+-	push	{r2}
++	.if \store_to_vcpu == 1
++	add	r10, vcpu, #VCPU_CP14
++	.else
++	add	r10, vcpu, #VCPU_HOST_CONTEXT
++	ldr	r10, [r10]
++	add	r10, r10, #VCPU_CP14_HOST
+ 	.endif
  
- #endif /* __ARM64_KVM_HOST_H__ */
++	/* Assumes r10 pointer in cp14 regs  */
++	bl __save_debug_state
++
+ 	mrc	p15, 0, r2, c1, c0, 0	@ SCTLR
+ 	mrc	p15, 0, r3, c1, c0, 2	@ CPACR
+ 	mrc	p15, 0, r4, c2, c0, 2	@ TTBCR
+@@ -331,6 +468,17 @@ vcpu	.req	r0		@ vcpu pointer always in r0
+  * Assumes vcpu pointer in vcpu reg
+  */
+ .macro write_coproc_state read_from_vcpu
++	.if \read_from_vcpu == 1
++	add	r10, vcpu, #VCPU_CP14
++	.else
++	add	r10, vcpu, #VCPU_HOST_CONTEXT
++	ldr	r10, [r10]
++	add	r10, r10, #VCPU_CP14_HOST
++	.endif
++
++	/* Assumes r10 pointer in cp14 regs  */
++	bl __restore_debug_state
++
+ 	.if \read_from_vcpu == 0
+ 	pop	{r2,r4-r7}
+ 	.else
+@@ -399,14 +547,6 @@ vcpu	.req	r0		@ vcpu pointer always in r0
+ 	mcr	p15, 0, r10, c10, c2, 0	@ PRRR
+ 	mcr	p15, 0, r11, c10, c2, 1	@ NMRR
+ 	mcr	p15, 2, r12, c0, c0, 0	@ CSSELR
+-
+-	.if \read_from_vcpu == 0
+-	pop	{r2}
+-	.else
+-	mov	r2, #0
+-	.endif
+-
+-	mcr	p14, 0, r2, c0, c2, 2	@ DBGDSCR
+ .endm
+ 
+ /*
+@@ -657,3 +797,11 @@ ARM_BE8(rev	r6, r6  )
+ .macro load_vcpu
+ 	mrc	p15, 4, vcpu, c13, c0, 2	@ HTPIDR
+ .endm
++
++__save_debug_state:
++	save_debug_state
++	bx	lr
++
++__restore_debug_state:
++	restore_debug_state
++	bx	lr
 -- 
 1.7.12.4
