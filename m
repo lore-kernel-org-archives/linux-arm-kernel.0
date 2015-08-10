@@ -1,53 +1,73 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Mon, 10 Aug 2015 12:32:05 +0530
-Subject: [RFC PATCH 0/3] mailbox: hisilicon: add mailbox driver
-In-Reply-To: <20150805231743.GB6880@leoy-linaro>
-References: <1438564390-28111-1-git-send-email-leo.yan@linaro.org>
- <CABb+yY0-RQ80q92EBsuBoYpjxW5zR=nXr+j3zCXw3wKkCf33OQ@mail.gmail.com>
- <20150805231743.GB6880@leoy-linaro>
-Message-ID: <CABb+yY1HTGNi4gZABNhXjpA57DPZx-tv=6+m4JLyx4wPHfovyA@mail.gmail.com>
+From: dhdang@apm.com (Duc Dang)
+Date: Mon, 10 Aug 2015 00:37:21 -0700
+Subject: [PATCH v6 1/2] usb: make xhci platform driver use 64 bit or 32 bit DMA
+In-Reply-To: <20150808092252.GJ7557@n2100.arm.linux.org.uk>
+References: <20150808092252.GJ7557@n2100.arm.linux.org.uk>
+Message-ID: <eb7cf78f9c43ee61a5ad1f51a1bd53bd7524e05f.1439190829.git.dhdang@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 6, 2015 at 4:47 AM, Leo Yan <leo.yan@linaro.org> wrote:
-> Hi Jassi,
->
-> Thanks for review.
->
-> On Wed, Aug 05, 2015 at 04:22:01PM +0530, Jassi Brar wrote:
->> On Mon, Aug 3, 2015 at 6:43 AM, Leo Yan <leo.yan@linaro.org> wrote:
->
-> [...]
->
->> > For easily extending for Hisilicon series SoCs (SoCs may have difference
->> > for register's definition with each other), so firstly implement common
->> > mailbox driver; this common mailbox driver provides three mainly
->> > functionality:
->> >
->> >  - help register channels into framework;
->> >  - hook low level callback functions for register's operations;
->> >  - Enhance rx channel's message queue, which is based on the code in
->> >    drivers/mailbox/omap-mailbox.c.
->> >
->> Not cool.
->>  Please don't reinvent the wheel by having platform specific
->> implementation of the mailbox api. Which vendor doesn't plan to roll
->> out new SoCs, and hence variations of mailbox controllers?  The OMAP
->> stack predates the common api, and was actually supposed to be
->> converted over eventually. Please implement just the
->> drivers/mailbox/hi6220-mailbox.c (preferably by the name of the
->> mailbox controller, if any)
->
-> Understood. Here i have one question, the rx channel's message queue is
-> looks like a common mechanism and can be added into framework file
-> mailbox.c, then Soc driver file can _ONLY_ focus on register level's
-> operations. If so, the common driver in this patch also is unnecessary.
->
-Yes, that's what I say, no 'common' driver for a platform.
+The xhci platform driver needs to work on systems that
+either only support 64-bit DMA or only support 32-bit DMA.
+Attempt to set a coherent dma mask for 64-bit DMA, and
+attempt again with 32-bit DMA if that fails.
 
-> Do you suggest to use upper method to rework patches? Or just think
-> it's okay to implement rx channel's message queue in hi6220-mailbox.c?
->
-The code in drivers/mailbox/ should only manage the controller
-(registers and interrupts). Everything else (queues, shmem etc) should
-be in platform specific client driver(s).
+[dhdang: regenerate the patch over 4.2-rc5 and address new comments]
+Signed-off-by: Mark Langsdorf <mlangsdo@redhat.com>
+Tested-by: Mark Salter <msalter@redhat.com>
+Signed-off-by: Duc Dang <dhdang@apm.com>
+
+---
+Changes from v5:
+	-Change comment
+	-Assign dma_mask to coherent_dma_mask if dma_mask is NULL
+	to make sure dma_set_mask_and_coherent does not	fail prematurely.
+
+Changes from v4:
+        -None
+
+Changes from v3:
+        -Re-generate the patch over 4.2-rc5
+        -No code change.
+
+Changes from v2:
+        -None
+
+Changes from v1:
+        -Consolidated to use dma_set_mask_and_coherent
+        -Got rid of the check against sizeof(dma_addr_t)
+
+ drivers/usb/host/xhci-plat.c | 16 ++++++++++------
+ 1 file changed, 10 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
+index 890ad9d..5d1b84b 100644
+--- a/drivers/usb/host/xhci-plat.c
++++ b/drivers/usb/host/xhci-plat.c
+@@ -93,14 +93,18 @@ static int xhci_plat_probe(struct platform_device *pdev)
+ 	if (irq < 0)
+ 		return -ENODEV;
+ 
+-	/* Initialize dma_mask and coherent_dma_mask to 32-bits */
+-	ret = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
+-	if (ret)
+-		return ret;
++	/*
++	 * Try setting dma_mask and coherent_dma_mask to 64 bits,
++	 * then try 32 bits
++	 */
+ 	if (!pdev->dev.dma_mask)
+ 		pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
+-	else
+-		dma_set_mask(&pdev->dev, DMA_BIT_MASK(32));
++	ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64));
++	if (ret) {
++		ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
++		if (ret)
++			return ret;
++	}
+ 
+ 	hcd = usb_create_hcd(driver, &pdev->dev, dev_name(&pdev->dev));
+ 	if (!hcd)
+-- 
+1.9.1
