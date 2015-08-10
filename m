@@ -1,92 +1,47 @@
-From: wei.liu2@citrix.com (Wei Liu)
-Date: Mon, 10 Aug 2015 12:39:07 +0100
-Subject: [PATCH v3 18/20] net/xen-netback: Make it running on 64KB page
- granularity
-In-Reply-To: <55C8759C.3010507@citrix.com>
-References: <1438966019-19322-1-git-send-email-julien.grall@citrix.com>
- <1438966019-19322-19-git-send-email-julien.grall@citrix.com>
- <20150808145534.GB14214@zion.uk.xensource.com> <55C8759C.3010507@citrix.com>
-Message-ID: <20150810113907.GH8857@zion.uk.xensource.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 10 Aug 2015 12:42:24 +0100
+Subject: [PATCH] mfd: mt6397: Implement wake handler and suspend/resume
+ for mt6397-core.c
+In-Reply-To: <1438268846-22451-1-git-send-email-henryc.chen@mediatek.com>
+References: <1438268846-22451-1-git-send-email-henryc.chen@mediatek.com>
+Message-ID: <20150810114224.GD3249@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 10, 2015 at 10:57:48AM +0100, Julien Grall wrote:
+No need to mention the filename in the subject line.  You already
+mentioned which driver is effected by the change.
+
+> Register mt6393_irq as wake up source to pinctrl by flag "IRQF_NO_SUSPEND".
+> Implement .irq_set_wake() function of pmic to keep who is wakeup source,
+> and enable irq on .suspend()and restore irq on .resume().
+> 
+> Signed-off-by: Henry Chen <henryc.chen@mediatek.com>
+> ---
+>  drivers/mfd/mt6397-core.c       | 49 ++++++++++++++++++++++++++++++++++++++++-
+>  include/linux/mfd/mt6397/core.h |  1 +
+>  2 files changed, 49 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/mfd/mt6397-core.c b/drivers/mfd/mt6397-core.c
+> index 03929a6..aebdee5 100644
+> --- a/drivers/mfd/mt6397-core.c
+> +++ b/drivers/mfd/mt6397-core.c
+
 [...]
-> 
-> >>+		info.page = page;
-> >>+		gnttab_foreach_grant_in_range(page, offset, bytes,
-> >>+					      xenvif_gop_frag_copy_grant,
-> >>+					      &info);
-> >
-> >Looks like I need to at least wait until the API is settle before giving
-> >my ack.
-> >
-> >>  		size -= bytes;
-> >>+		offset = 0;
-> >
-> >This looks wrong. Should be offset += bytes.
-> 
-> With the new implementation of the loop, each iteration will be on a
-> different page.
-> So only the first page has an offset different than zero.
-> 
-> >
-> >>
-> >>-		/* Next frame */
-> >>-		if (offset == PAGE_SIZE && size) {
-> >>+		/* Next page */
-> >>+		if (size) {
-> >>  			BUG_ON(!PageCompound(page));
-> >>  			page++;
-> >>-			offset = 0;
-> >
-> >And this should not be deleted, I think.
-> >
-> >What is the reason for changing offset calculation? I think there is
-> >still compound page when using 64K page.
-> 
-> The compound pages are still working ... gnttab_foreach_grant_in_range is
-> called once per page. So the offset can be reset to 0 every time. No need to
-> add code which would make the result less clear.
-> 
-> We only need to know if the size is not 0 to get the next page.
-> 
-> The patch may not be clear enough to see it's working so I've copied the
-> result loop below:
-> 
->         while (size > 0) {
->                 BUG_ON(offset >= PAGE_SIZE);
-> 
->                 bytes = PAGE_SIZE - offset;
->                 if (bytes > size)
->                         bytes = size;
-> 
->                 info.page = page;
->                 gnttab_foreach_grant_in_range(page, offset, bytes,
->                                              xenvif_gop_frag_copy_grant,
->                                               &info);
->                 size -= bytes;
->                 offset = 0;
-> 
->                 /* Next page */
->                 if (size) {
->                         BUG_ON(!PageCompound(page));
->                         page++;
->                 }
->         }
-> 
 
-Right. That doesn't mean the original code was wrong or anything. But I
-don't want to bikeshed about this.
+> @@ -142,6 +161,7 @@ static int mt6397_irq_domain_map(struct irq_domain *d, unsigned int irq,
+>  	irq_set_chip_data(irq, mt6397);
+>  	irq_set_chip_and_handler(irq, &mt6397_irq_chip, handle_level_irq);
+>  	irq_set_nested_thread(irq, 1);
+> +
 
-Please add a comment saying that offset is always 0 starting from second
-iteration because the gnttab_foreach_grant_in_range makes sure we handle
-one page in one go.
+Remainder of the patch looks okay, but this irrelevant change, which
+has nothing to do with the remainder of the patch will cause issues if
+I attempt to apply it.  Please remove and re-submit.
 
-Wei.
+[...]
 
-
-> Regards,
-> 
-> -- 
-> Julien Grall
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
