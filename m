@@ -1,106 +1,84 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 10 Aug 2015 11:51:19 +0200
-Subject: [PATCH 02/74] clockevents/drivers/arm_global_timer: Migrate to new
- 'set-state' interface
+Date: Mon, 10 Aug 2015 11:51:25 +0200
+Subject: [PATCH 08/74] clockevents/drivers/exynos_mct: Remove unneeded
+ container_of()
 In-Reply-To: <1439200352-26767-1-git-send-email-daniel.lezcano@linaro.org>
 References: <55C87382.4070309@linaro.org>
  <1439200352-26767-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1439200352-26767-2-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1439200352-26767-8-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Viresh Kumar <viresh.kumar@linaro.org>
+From: Alexey Klimov <klimov.linux@gmail.com>
 
-Migrate arm_global_timer driver to the new 'set-state' interface
-provided by the clockevents core, the earlier 'set-mode' interface is
-marked obsolete now.
+Patch removes unneeded container_of() macro in exynos4_local_timer_setup().
+Instead let's pass mevt pointer to setup and stop functions from
+exynos4_mct_cpu_notify() and let them get evt pointer.
 
-This also enables us to implement callbacks for new states of clockevent
-devices, for example: ONESHOT_STOPPED.
+Tested on odroid-xu3.
 
-Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
-Acked-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-Cc: Srinivas Kandagatla <srinivas.kandagatla@gmail.com>
-Cc: Maxime Coquelin <maxime.coquelin@st.com>
-Cc: Patrice Chotard <patrice.chotard@st.com>
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+Signed-off-by: Alexey Klimov <klimov.linux@gmail.com>
+Acked-by: Stephen Boyd <sboyd@codeaurora.org>
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 ---
- drivers/clocksource/arm_global_timer.c | 37 ++++++++++++++++------------------
- 1 file changed, 17 insertions(+), 20 deletions(-)
+ drivers/clocksource/exynos_mct.c | 16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/clocksource/arm_global_timer.c b/drivers/clocksource/arm_global_timer.c
-index e683377..29ea50a 100644
---- a/drivers/clocksource/arm_global_timer.c
-+++ b/drivers/clocksource/arm_global_timer.c
-@@ -107,26 +107,21 @@ static void gt_compare_set(unsigned long delta, int periodic)
- 	writel(ctrl, gt_base + GT_CONTROL);
+diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
+index 9064ff7..4d2330a 100644
+--- a/drivers/clocksource/exynos_mct.c
++++ b/drivers/clocksource/exynos_mct.c
+@@ -442,13 +442,11 @@ static irqreturn_t exynos4_mct_tick_isr(int irq, void *dev_id)
+ 	return IRQ_HANDLED;
  }
  
--static void gt_clockevent_set_mode(enum clock_event_mode mode,
--				   struct clock_event_device *clk)
-+static int gt_clockevent_shutdown(struct clock_event_device *evt)
+-static int exynos4_local_timer_setup(struct clock_event_device *evt)
++static int exynos4_local_timer_setup(struct mct_clock_event_device *mevt)
  {
- 	unsigned long ctrl;
+-	struct mct_clock_event_device *mevt;
++	struct clock_event_device *evt = &mevt->evt;
+ 	unsigned int cpu = smp_processor_id();
  
--	switch (mode) {
--	case CLOCK_EVT_MODE_PERIODIC:
--		gt_compare_set(DIV_ROUND_CLOSEST(gt_clk_rate, HZ), 1);
--		break;
--	case CLOCK_EVT_MODE_ONESHOT:
--	case CLOCK_EVT_MODE_UNUSED:
--	case CLOCK_EVT_MODE_SHUTDOWN:
--		ctrl = readl(gt_base + GT_CONTROL);
--		ctrl &= ~(GT_CONTROL_COMP_ENABLE |
--				GT_CONTROL_IRQ_ENABLE | GT_CONTROL_AUTO_INC);
--		writel(ctrl, gt_base + GT_CONTROL);
--		break;
--	default:
--		break;
--	}
-+	ctrl = readl(gt_base + GT_CONTROL);
-+	ctrl &= ~(GT_CONTROL_COMP_ENABLE | GT_CONTROL_IRQ_ENABLE |
-+		  GT_CONTROL_AUTO_INC);
-+	writel(ctrl, gt_base + GT_CONTROL);
-+	return 0;
-+}
+-	mevt = container_of(evt, struct mct_clock_event_device, evt);
+-
+ 	mevt->base = EXYNOS4_MCT_L_BASE(cpu);
+ 	snprintf(mevt->name, sizeof(mevt->name), "mct_tick%d", cpu);
+ 
+@@ -477,8 +475,10 @@ static int exynos4_local_timer_setup(struct clock_event_device *evt)
+ 	return 0;
+ }
+ 
+-static void exynos4_local_timer_stop(struct clock_event_device *evt)
++static void exynos4_local_timer_stop(struct mct_clock_event_device *mevt)
+ {
++	struct clock_event_device *evt = &mevt->evt;
 +
-+static int gt_clockevent_set_periodic(struct clock_event_device *evt)
-+{
-+	gt_compare_set(DIV_ROUND_CLOSEST(gt_clk_rate, HZ), 1);
-+	return 0;
- }
+ 	evt->set_mode(CLOCK_EVT_MODE_UNUSED, evt);
+ 	if (mct_int_type == MCT_INT_SPI) {
+ 		if (evt->irq != -1)
+@@ -500,11 +500,11 @@ static int exynos4_mct_cpu_notify(struct notifier_block *self,
+ 	switch (action & ~CPU_TASKS_FROZEN) {
+ 	case CPU_STARTING:
+ 		mevt = this_cpu_ptr(&percpu_mct_tick);
+-		exynos4_local_timer_setup(&mevt->evt);
++		exynos4_local_timer_setup(mevt);
+ 		break;
+ 	case CPU_DYING:
+ 		mevt = this_cpu_ptr(&percpu_mct_tick);
+-		exynos4_local_timer_stop(&mevt->evt);
++		exynos4_local_timer_stop(mevt);
+ 		break;
+ 	}
  
- static int gt_clockevent_set_next_event(unsigned long evt,
-@@ -155,7 +150,7 @@ static irqreturn_t gt_clockevent_interrupt(int irq, void *dev_id)
- 	 *	the Global Timer flag _after_ having incremented
- 	 *	the Comparator register	value to a higher value.
- 	 */
--	if (evt->mode == CLOCK_EVT_MODE_ONESHOT)
-+	if (clockevent_state_oneshot(evt))
- 		gt_compare_set(ULONG_MAX, 0);
+@@ -570,7 +570,7 @@ static void __init exynos4_timer_resources(struct device_node *np, void __iomem
+ 		goto out_irq;
  
- 	writel_relaxed(GT_INT_STATUS_EVENT_FLAG, gt_base + GT_INT_STATUS);
-@@ -171,7 +166,9 @@ static int gt_clockevents_init(struct clock_event_device *clk)
- 	clk->name = "arm_global_timer";
- 	clk->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT |
- 		CLOCK_EVT_FEAT_PERCPU;
--	clk->set_mode = gt_clockevent_set_mode;
-+	clk->set_state_shutdown = gt_clockevent_shutdown;
-+	clk->set_state_periodic = gt_clockevent_set_periodic;
-+	clk->set_state_oneshot = gt_clockevent_shutdown;
- 	clk->set_next_event = gt_clockevent_set_next_event;
- 	clk->cpumask = cpumask_of(cpu);
- 	clk->rating = 300;
-@@ -184,7 +181,7 @@ static int gt_clockevents_init(struct clock_event_device *clk)
+ 	/* Immediately configure the timer on the boot CPU */
+-	exynos4_local_timer_setup(&mevt->evt);
++	exynos4_local_timer_setup(mevt);
+ 	return;
  
- static void gt_clockevents_stop(struct clock_event_device *clk)
- {
--	gt_clockevent_set_mode(CLOCK_EVT_MODE_UNUSED, clk);
-+	gt_clockevent_shutdown(clk);
- 	disable_percpu_irq(clk->irq);
- }
- 
+ out_irq:
 -- 
 1.9.1
