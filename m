@@ -1,39 +1,48 @@
 From: maitysanchayan@gmail.com (Sanchayan Maity)
-Date: Mon, 10 Aug 2015 19:41:30 +0530
-Subject: [PATCH v8 2/4] ARM: dts: vfxxx: Add OCOTP node
+Date: Mon, 10 Aug 2015 19:41:32 +0530
+Subject: [PATCH v8 4/4] nvmem: Add DT binding documentation for Vybrid OCOTP
+ driver
 In-Reply-To: <cover.1439214648.git.maitysanchayan@gmail.com>
 References: <cover.1439214648.git.maitysanchayan@gmail.com>
-Message-ID: <0ce479474fde4e8e652b144b025f3ecc42786ec7.1439214648.git.maitysanchayan@gmail.com>
+Message-ID: <3149879671b1b1b0b6fc1fbe62e9f49333deb8ed.1439214648.git.maitysanchayan@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device tree node for the On-Chip One Time Programmable
-controller (OCOTP) on the Vybrid platform.
+Add the devicetree bindings for the Freescale Vybrid On-Chip
+OTP driver.
 
 Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
 ---
- arch/arm/boot/dts/vfxxx.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ .../devicetree/bindings/nvmem/vf610-ocotp.txt       | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/nvmem/vf610-ocotp.txt
 
-diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
-index 39173bb..8577211 100644
---- a/arch/arm/boot/dts/vfxxx.dtsi
-+++ b/arch/arm/boot/dts/vfxxx.dtsi
-@@ -419,6 +419,15 @@
- 				status = "disabled";
- 			};
- 
-+			ocotp: ocotp at 400a5000 {
-+				compatible = "fsl,vf610-ocotp";
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				reg = <0x400a5000 0xCF0>;
-+				clocks = <&clks VF610_CLK_OCOTP>;
-+				clock-names = "ocotp";
-+			};
+diff --git a/Documentation/devicetree/bindings/nvmem/vf610-ocotp.txt b/Documentation/devicetree/bindings/nvmem/vf610-ocotp.txt
+new file mode 100644
+index 0000000..b29f65f
+--- /dev/null
++++ b/Documentation/devicetree/bindings/nvmem/vf610-ocotp.txt
+@@ -0,0 +1,21 @@
++On-Chip OTP Memory for Freescale Vybrid
 +
- 			snvs0: snvs at 400a7000 {
- 			    compatible = "fsl,sec-v4.0-mon", "syscon", "simple-mfd";
- 				reg = <0x400a7000 0x2000>;
++Required Properties:
++  compatible:
++  - "fsl,vf610-ocotp" for VF5xx/VF6xx
++  #address-cells : Should be 1
++  #size-cells : Should be 1
++  reg : Address and length of OTP controller and fuse map registers
++  clocks : ipg clock we associate with the OCOTP peripheral
++  clock-names : Must contain "ocotp" as matching entry
++
++Example for Vybrid VF5xx/VF6xx:
++
++	ocotp: ocotp at 400a5000 {
++		compatible = "fsl,vf610-ocotp";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		reg = <0x400a5000 0xCF0>;
++		clocks = <&clks VF610_CLK_OCOTP>;
++		clock-names = "ocotp";
++	};
 -- 
 2.5.0
