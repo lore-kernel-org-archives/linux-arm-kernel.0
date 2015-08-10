@@ -1,55 +1,36 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Mon, 10 Aug 2015 15:31:03 +0200
-Subject: [PATCH v5 1/5] KVM: x86: select IRQ_BYPASS_MANAGER
-In-Reply-To: <1439213467-13668-1-git-send-email-eric.auger@linaro.org>
-References: <1439213467-13668-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1439213467-13668-2-git-send-email-eric.auger@linaro.org>
+From: julien.grall@citrix.com (Julien Grall)
+Date: Mon, 10 Aug 2015 14:36:10 +0100
+Subject: [PATCH v3 12/20] xen/balloon: Don't rely on the page granularity
+ is the same for Xen and Linux
+In-Reply-To: <alpine.DEB.2.02.1508101352370.11337@kaball.uk.xensource.com>
+References: <1438966019-19322-1-git-send-email-julien.grall@citrix.com>
+ <1438966019-19322-13-git-send-email-julien.grall@citrix.com>
+ <alpine.DEB.2.02.1508101207071.11337@kaball.uk.xensource.com>
+ <55C88B77.8030700@citrix.com>
+ <alpine.DEB.2.02.1508101352370.11337@kaball.uk.xensource.com>
+Message-ID: <55C8A8CA.7070409@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Feng Wu <feng.wu@intel.com>
+On 10/08/15 13:55, Stefano Stabellini wrote:
+>> If your only concern is the size of the array, we could decrease the
+>> number of frames by batch. Or allocation the variable once a boot time.
+> 
+> Yes, that is my only concern. Allocating only nr_pages new struct page*
+> would be good enough I guess.
 
-Select IRQ_BYPASS_MANAGER for x86 when CONFIG_KVM is set
+That would be even worst. We shouldn't allocate the array at every call,
+but at boot time.
 
-Signed-off-by: Feng Wu <feng.wu@intel.com>
----
- arch/x86/kvm/Kconfig  | 2 ++
- arch/x86/kvm/Makefile | 3 +++
- 2 files changed, 5 insertions(+)
+Note that frame_list is already a static variable use 64KB when 64KB
+page is used. I guess this will be unlikely to remove that much frame in
+a single batch. But I will keep this optimization for later.
 
-diff --git a/arch/x86/kvm/Kconfig b/arch/x86/kvm/Kconfig
-index d8a1d56..c951d44 100644
---- a/arch/x86/kvm/Kconfig
-+++ b/arch/x86/kvm/Kconfig
-@@ -3,6 +3,7 @@
- #
- 
- source "virt/kvm/Kconfig"
-+source "virt/lib/Kconfig"
- 
- menuconfig VIRTUALIZATION
- 	bool "Virtualization"
-@@ -28,6 +29,7 @@ config KVM
- 	select ANON_INODES
- 	select HAVE_KVM_IRQCHIP
- 	select HAVE_KVM_IRQFD
-+	select IRQ_BYPASS_MANAGER
- 	select HAVE_KVM_IRQ_ROUTING
- 	select HAVE_KVM_EVENTFD
- 	select KVM_APIC_ARCHITECTURE
-diff --git a/arch/x86/kvm/Makefile b/arch/x86/kvm/Makefile
-index 67d215c..05cc2d7 100644
---- a/arch/x86/kvm/Makefile
-+++ b/arch/x86/kvm/Makefile
-@@ -6,6 +6,9 @@ CFLAGS_svm.o := -I.
- CFLAGS_vmx.o := -I.
- 
- KVM := ../../../virt/kvm
-+LIB := ../../../virt/lib
-+
-+obj-$(CONFIG_IRQ_BYPASS_MANAGER)	+= $(LIB)/
- 
- kvm-y			+= $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o \
- 				$(KVM)/eventfd.o $(KVM)/irqchip.o $(KVM)/vfio.o
+Anyway, I'm wondering if we could re-use the lru field to link the page
+when allocate them and retrieve in the second loop in order to avoid the
+pages array.
+
+Regards,
+
 -- 
-1.9.1
+Julien Grall
