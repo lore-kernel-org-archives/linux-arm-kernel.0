@@ -1,80 +1,115 @@
 From: zhichao.huang@linaro.org (Zhichao Huang)
-Date: Mon, 10 Aug 2015 21:26:01 +0800
-Subject: [PATCH v4 09/15] KVM: arm: redefine kvm_cpu_context_t to save the
- host cp14 states
+Date: Mon, 10 Aug 2015 21:26:04 +0800
+Subject: [PATCH v4 12/15] KVM: arm: keep track of host use of the debug
+ registers
 In-Reply-To: <1439213167-8988-1-git-send-email-zhichao.huang@linaro.org>
 References: <1439213167-8988-1-git-send-email-zhichao.huang@linaro.org>
-Message-ID: <1439213167-8988-10-git-send-email-zhichao.huang@linaro.org>
+Message-ID: <1439213167-8988-13-git-send-email-zhichao.huang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Redefine kvm_cpu_context_t as a new struct that include the cp14 states,
-which we used to save the host cp14 states.
+Every guest entry, we need to keep track of host use of the debug
+registers.
+
+We only call the function upon guest entry, after preempt_disable()
+and local_irq_disable(), so there is no race for it.
 
 Signed-off-by: Zhichao Huang <zhichao.huang@linaro.org>
 ---
- arch/arm/include/asm/kvm_host.h | 6 +++++-
- arch/arm/kernel/asm-offsets.c   | 4 +++-
- arch/arm/kvm/interrupts.S       | 6 ++++--
- 3 files changed, 12 insertions(+), 4 deletions(-)
+ arch/arm/include/asm/kvm_asm.h    | 3 +++
+ arch/arm/include/asm/kvm_host.h   | 4 ++++
+ arch/arm/kernel/asm-offsets.c     | 1 +
+ arch/arm/kvm/arm.c                | 2 ++
+ arch/arm/kvm/coproc.c             | 8 ++++++++
+ arch/arm64/include/asm/kvm_host.h | 1 +
+ 6 files changed, 19 insertions(+)
 
+diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
+index 7443a3a..5b1c3eb 100644
+--- a/arch/arm/include/asm/kvm_asm.h
++++ b/arch/arm/include/asm/kvm_asm.h
+@@ -64,6 +64,9 @@
+ #define cp14_DBGDSCRext	65	/* Debug Status and Control external */
+ #define NR_CP14_REGS	66	/* Number of regs (incl. invalid) */
+ 
++#define KVM_ARM_DEBUG_HOST_INUSE_SHIFT	0
++#define KVM_ARM_DEBUG_HOST_INUSE	(1 << KVM_ARM_DEBUG_HOST_INUSE_SHIFT)
++
+ #define ARM_EXCEPTION_RESET	  0
+ #define ARM_EXCEPTION_UNDEFINED   1
+ #define ARM_EXCEPTION_SOFTWARE    2
 diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index 63ac005..fc461ac 100644
+index fc461ac..7338f34 100644
 --- a/arch/arm/include/asm/kvm_host.h
 +++ b/arch/arm/include/asm/kvm_host.h
-@@ -91,7 +91,11 @@ struct kvm_vcpu_fault_info {
- 	u32 hyp_pc;		/* PC when exception was taken from Hyp mode */
- };
+@@ -131,6 +131,9 @@ struct kvm_vcpu_arch {
+ 	/* System control coprocessor (cp14) */
+ 	u32 cp14[NR_CP14_REGS];
  
--typedef struct vfp_hard_struct kvm_cpu_context_t;
-+struct kvm_cpu_context {
-+	struct vfp_hard_struct vfp;
-+	u32 cp14[NR_CP14_REGS];
-+};
-+typedef struct kvm_cpu_context kvm_cpu_context_t;
++	/* Debug State */
++	u32 debug_flags;
++
+ 	/*
+ 	 * Anything that is not used directly from assembly code goes
+ 	 * here.
+@@ -237,5 +240,6 @@ static inline void kvm_arch_hardware_unsetup(void) {}
+ static inline void kvm_arch_sync_events(struct kvm *kvm) {}
+ static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
+ static inline void kvm_arch_sched_in(struct kvm_vcpu *vcpu, int cpu) {}
++void kvm_arm_setup_debug(struct kvm_vcpu *vcpu);
  
- struct kvm_vcpu_arch {
- 	struct kvm_regs regs;
+ #endif /* __ARM_KVM_HOST_H__ */
 diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
-index 9158de0..cee4254 100644
+index cee4254..7750597 100644
 --- a/arch/arm/kernel/asm-offsets.c
 +++ b/arch/arm/kernel/asm-offsets.c
-@@ -175,7 +175,9 @@ int main(void)
-   DEFINE(VCPU_CP14,		offsetof(struct kvm_vcpu, arch.cp14));
-   DEFINE(VCPU_CP15,		offsetof(struct kvm_vcpu, arch.cp15));
-   DEFINE(VCPU_VFP_GUEST,	offsetof(struct kvm_vcpu, arch.vfp_guest));
--  DEFINE(VCPU_VFP_HOST,		offsetof(struct kvm_vcpu, arch.host_cpu_context));
-+  DEFINE(VCPU_HOST_CONTEXT,	offsetof(struct kvm_vcpu, arch.host_cpu_context));
-+  DEFINE(VCPU_VFP_HOST,		offsetof(struct kvm_cpu_context, vfp));
-+  DEFINE(VCPU_CP14_HOST,	offsetof(struct kvm_cpu_context, cp14));
+@@ -178,6 +178,7 @@ int main(void)
+   DEFINE(VCPU_HOST_CONTEXT,	offsetof(struct kvm_vcpu, arch.host_cpu_context));
+   DEFINE(VCPU_VFP_HOST,		offsetof(struct kvm_cpu_context, vfp));
+   DEFINE(VCPU_CP14_HOST,	offsetof(struct kvm_cpu_context, cp14));
++  DEFINE(VCPU_DEBUG_FLAGS,	offsetof(struct kvm_vcpu, arch.debug_flags));
    DEFINE(VCPU_REGS,		offsetof(struct kvm_vcpu, arch.regs));
    DEFINE(VCPU_USR_REGS,		offsetof(struct kvm_vcpu, arch.regs.usr_regs));
    DEFINE(VCPU_SVC_REGS,		offsetof(struct kvm_vcpu, arch.regs.svc_regs));
-diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
-index 48333ff..d4ff22e 100644
---- a/arch/arm/kvm/interrupts.S
-+++ b/arch/arm/kvm/interrupts.S
-@@ -176,8 +176,9 @@ __kvm_vcpu_return:
- 	@ Switch VFP/NEON hardware state to the host's
- 	add	r7, vcpu, #VCPU_VFP_GUEST
- 	store_vfp_state r7
--	add	r7, vcpu, #VCPU_VFP_HOST
-+	add	r7, vcpu, #VCPU_HOST_CONTEXT
- 	ldr	r7, [r7]
-+	add	r7, r7, #VCPU_VFP_HOST
- 	restore_vfp_state r7
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index bc738d2..0129346 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -550,6 +550,8 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 			continue;
+ 		}
  
- after_vfp_restore:
-@@ -484,8 +485,9 @@ switch_to_guest_vfp:
- 	set_hcptr vmtrap, (HCPTR_TCP(10) | HCPTR_TCP(11))
++		kvm_arm_setup_debug(vcpu);
++
+ 		/**************************************************************
+ 		 * Enter the guest
+ 		 */
+diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
+index d15b250..b37afd6 100644
+--- a/arch/arm/kvm/coproc.c
++++ b/arch/arm/kvm/coproc.c
+@@ -1516,3 +1516,11 @@ void kvm_reset_coprocs(struct kvm_vcpu *vcpu)
+ 		if (vcpu->arch.cp15[num] == 0x42424242)
+ 			panic("Didn't reset vcpu->arch.cp15[%zi]", num);
+ }
++
++void kvm_arm_setup_debug(struct kvm_vcpu *vcpu)
++{
++	if (hw_breakpoint_enabled())
++		vcpu->arch.debug_flags |= KVM_ARM_DEBUG_HOST_INUSE;
++	else
++		vcpu->arch.debug_flags &= ~KVM_ARM_DEBUG_HOST_INUSE;
++}
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 2709db2..84fa4f0 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -226,5 +226,6 @@ static inline void kvm_arch_hardware_unsetup(void) {}
+ static inline void kvm_arch_sync_events(struct kvm *kvm) {}
+ static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
+ static inline void kvm_arch_sched_in(struct kvm_vcpu *vcpu, int cpu) {}
++static inline void kvm_arm_setup_debug(struct kvm_vcpu *vcpu) {}
  
- 	@ Switch VFP/NEON hardware state to the guest's
--	add	r7, r0, #VCPU_VFP_HOST
-+	add	r7, r0, #VCPU_HOST_CONTEXT
- 	ldr	r7, [r7]
-+	add	r7, r7, #VCPU_VFP_HOST
- 	store_vfp_state r7
- 	add	r7, r0, #VCPU_VFP_GUEST
- 	restore_vfp_state r7
+ #endif /* __ARM64_KVM_HOST_H__ */
 -- 
 1.7.12.4
