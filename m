@@ -1,239 +1,102 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Mon, 10 Aug 2015 15:21:03 +0200
-Subject: [PATCH v3 09/10] KVM: arm/arm64: vgic: forwarding control
-In-Reply-To: <1439212864-12954-1-git-send-email-eric.auger@linaro.org>
-References: <1439212864-12954-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1439212864-12954-10-git-send-email-eric.auger@linaro.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 10 Aug 2015 14:22:47 +0100
+Subject: [PATCH v4 2/2] dt: power: st: Provide bindings for ST's OPPs
+In-Reply-To: <20150803034642.GV899@linux>
+References: <1438010430-5802-1-git-send-email-lee.jones@linaro.org>
+ <1438010430-5802-2-git-send-email-lee.jones@linaro.org>
+ <20150728022936.GB1229@linux>
+ <20150728225510.GB3159@codeaurora.org> <20150729081403.GH2284@x1>
+ <20150729221526.GE3159@codeaurora.org> <20150730084634.GD9319@x1>
+ <CAL_JsqKQLQ15qSt95zBZykzzPhcUrtZzhk29a76n+r_3719AiA@mail.gmail.com>
+ <20150731163715.GV3159@codeaurora.org> <20150803034642.GV899@linux>
+Message-ID: <20150810132247.GH3249@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implements kvm_vgic_[set|unset]_forward.
+On Mon, 03 Aug 2015, Viresh Kumar wrote:
 
-Handle low-level VGIC programming: physical IRQ/guest IRQ mapping,
-list register cleanup, VGIC state machine. Also interacts with
-the irqchip.
+> On 31-07-15, 09:37, Stephen Boyd wrote:
+> > For qcom platforms, the frequency is almost always constant.
+> > There may be some tables where we have a couple higher
+> > frequencies than others because the speed bin is different.
+> > Otherwise the voltage/current is changing based on the silicon
+> > characteristics. So the biggest duplication is the frequency
+> > property.
+> > 
+> > As far as I know there isn't any algorithm to generate the
+> > voltage values. It's all hand tuned tables based on the silicon
+> > characterization, so we're left to store these tables in DT and
+> > pick the right one at runtime. With regards to the table
+> > explosion, on qcom platforms we haven't worried that we have ~40
+> > tables, but I'm not opposed to expressing it in a smaller set of
+> > nodes, tables, etc. if that's what's desired.
+> > 
+> > Do we need vendor specific properties for that though? Or do we
+> > need some sort of extended frequency/voltage properties that are
+> > arrays of values that we can index into based on some silicon
+> > characteristics? I like the name based approach because it's
+> > simple. Use this OPP table because it's called
+> > x-y-z-characteristics and be done. Cramming the tables into less
+> > lines may save us some typing and dtb space, but I'm not sure
+> > what else it does.
+> 
+> What about something like this:
+> 
+> diff --git a/Documentation/devicetree/bindings/opp/opp.txt b/Documentation/devicetree/bindings/opp/opp.txt
+> index 0cb44dc21f97..bad7a8299b9c 100644
+> --- a/Documentation/devicetree/bindings/opp/opp.txt
+> +++ b/Documentation/devicetree/bindings/opp/opp.txt
+> @@ -74,6 +74,8 @@ This describes the OPPs belonging to a device. This node can have following
+>    reference an OPP.
+>  
+>  Optional properties:
+> +- opp-cuts: One or more strings, describing the versions of hardware the OPPs
+> +  can support.
 
-Signed-off-by: Eric Auger <eric.auger@linaro.org>
+This isn't very generic.
 
----
+I'm guessing some vendors my have quite a few ways to differentiate
+between board versions/revisions/cuts etc.
 
-v2 -> v3:
-- on unforward, we do not compute & output the active state anymore.
-  This means if the unforward happens while the physical IRQ is
-  active, we will not VFIO mask the IRQ while deactiving it. If a
-  new physical IRQ hits, the corresponding virtual IRQ might not
-  be injected (hence lost) due to VGIC state machine.
+How about another array where a vendor can choose to identify a piece
+of hardware however they see fit.
 
-bypass rfc v2:
-- use irq_set_vcpu_affinity API
-- use irq_set_irqchip_state instead of chip->irq_eoi
+Example 1 (simple version):
 
-bypass rfc:
-- rename kvm_arch_{set|unset}_forward into
-  kvm_vgic_{set|unset}_forward. Remove __KVM_HAVE_ARCH_HALT_GUEST.
-  The function is bound to be called by ARM code only.
+/* Version 1 */
+opp-version = <1>;
 
-v4 -> v5:
-- fix arm64 compilation issues, ie. also defines
-  __KVM_HAVE_ARCH_HALT_GUEST for arm64
+Example 2 (using the kernel's versioning):
 
-v3 -> v4:
-- code originally located in kvm_vfio_arm.c
-- kvm_arch_vfio_{set|unset}_forward renamed into
-  kvm_arch_{set|unset}_forward
-- split into 2 functions (set/unset) since unset does not fail anymore
-- unset can be invoked at whatever time. Extra care is taken to handle
-  transition in VGIC state machine, LR cleanup, ...
+/* 2.6.32-rc1 */
+opp-version = <2 6 32 1>;
 
-v2 -> v3:
-- renaming of kvm_arch_set_fwd_state into kvm_arch_vfio_set_forward
-- takes a bool arg instead of kvm_fwd_irq_action enum
-- removal of KVM_VFIO_IRQ_CLEANUP
-- platform device check now happens here
-- more precise errors returned
-- irq_eoi handled externally to this patch (VGIC)
-- correct enable_irq bug done twice
-- reword the commit message
-- correct check of platform_bus_type
-- use raw_spin_lock_irqsave and check the validity of the handler
----
- include/kvm/arm_vgic.h |   6 ++
- virt/kvm/arm/vgic.c    | 149 +++++++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 155 insertions(+)
+Example 3 (using ST's versioning):
 
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index 7ef9ce0..409ac0f 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -363,6 +363,12 @@ int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, struct irq_phys_map *map);
- bool kvm_vgic_get_phys_irq_active(struct irq_phys_map *map);
- void kvm_vgic_set_phys_irq_active(struct irq_phys_map *map, bool active);
- 
-+int kvm_vgic_set_forward(struct kvm *kvm,
-+			 unsigned int host_irq, unsigned int guest_irq);
-+
-+void kvm_vgic_unset_forward(struct kvm *kvm,
-+			    unsigned int host_irq, unsigned int guest_irq);
-+
- #define irqchip_in_kernel(k)	(!!((k)->arch.vgic.in_kernel))
- #define vgic_initialized(k)	(!!((k)->arch.vgic.nr_cpus))
- #define vgic_ready(k)		((k)->arch.vgic.ready)
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 03a85b3..b15999a 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -2551,3 +2551,152 @@ int kvm_set_msi(struct kvm_kernel_irq_routing_entry *e,
- {
- 	return 0;
- }
-+
-+/**
-+ * kvm_vgic_set_forward - Set IRQ forwarding
-+ *
-+ * @kvm: handle to the VM
-+ * @host_irq: physical IRQ number
-+ * @guest_irq: virtual IRQ number
-+ *
-+ * This function is supposed to be called only if the IRQ
-+ * is not in progress: ie. not active at GIC level and not
-+ * currently under injection in the guest. The physical IRQ must
-+ * also be disabled and the guest must have been exited and
-+ * prevented from being re-entered.
-+ */
-+int kvm_vgic_set_forward(struct kvm *kvm,
-+			 unsigned int host_irq,
-+			 unsigned int guest_irq)
-+{
-+	struct irq_phys_map *map = NULL;
-+	struct kvm_vcpu *vcpu = kvm_get_vcpu(kvm, 0);
-+	int spi_id = guest_irq + VGIC_NR_PRIVATE_IRQS;
-+
-+	kvm_debug("%s host_irq=%d guest_irq=%d\n",
-+		__func__, host_irq, guest_irq);
-+
-+	if (!vcpu)
-+		return 0;
-+
-+	irq_set_vcpu_affinity(host_irq, vcpu);
-+	/*
-+	 * next physical IRQ will be be handled as forwarded
-+	 * by the host (priority drop only)
-+	 */
-+
-+	map = kvm_vgic_map_phys_irq(vcpu, spi_id, host_irq, false);
-+	/*
-+	 * next guest_irq injection will be considered as
-+	 * forwarded and next flush will program LR
-+	 * without maintenance IRQ but with HW bit set
-+	 */
-+	return !map;
-+}
-+
-+/**
-+ * kvm_vgic_unset_forward - Unset IRQ forwarding
-+ *
-+ * @kvm: handle to the VM
-+ * @host_irq: physical IRQ number
-+ * @guest_irq: virtual IRQ number
-+ *
-+ * This function must be called when the host_irq is disabled
-+ * and guest has been exited and prevented from being re-entered.
-+ *
-+ */
-+void kvm_vgic_unset_forward(struct kvm *kvm,
-+			    unsigned int host_irq,
-+			    unsigned int guest_irq)
-+{
-+	struct kvm_vcpu *vcpu = kvm_get_vcpu(kvm, 0);
-+	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-+	struct vgic_dist *dist = &kvm->arch.vgic;
-+	int ret, lr;
-+	struct vgic_lr vlr;
-+	int spi_id = guest_irq + VGIC_NR_PRIVATE_IRQS;
-+	bool queued = false, needs_deactivate = true;
-+	struct irq_phys_map *map;
-+	bool active;
-+
-+	kvm_debug("%s host_irq=%d guest_irq=%d\n",
-+		__func__, host_irq, guest_irq);
-+
-+	spin_lock(&dist->lock);
-+
-+	irq_get_irqchip_state(host_irq, IRQCHIP_STATE_ACTIVE, &active);
-+
-+	if (!vcpu)
-+		goto out;
-+
-+	map = vgic_irq_map_search(vcpu, spi_id);
-+	BUG_ON(!map);
-+	ret = kvm_vgic_unmap_phys_irq(vcpu, map);
-+	BUG_ON(ret);
-+	/*
-+	 * subsequent update_irq_pending or flush will handle this
-+	 * irq as not forwarded
-+	 */
-+	if (likely(!(active))) {
-+		/*
-+		 * the IRQ was not active. let's simply prepare the states
-+		 * for subsequent non forwarded injection.
-+		 */
-+		vgic_dist_irq_clear_level(vcpu, spi_id);
-+		vgic_dist_irq_clear_pending(vcpu, spi_id);
-+		vgic_irq_clear_queued(vcpu, spi_id);
-+		needs_deactivate = false;
-+		goto out;
-+	}
-+
-+	/* is there any list register with valid state? */
-+	lr = vgic_cpu->vgic_irq_lr_map[spi_id];
-+	if (lr != LR_EMPTY) {
-+		vlr = vgic_get_lr(vcpu, lr);
-+		if (vlr.state & LR_STATE_MASK)
-+			queued = true;
-+	}
-+
-+	if (!queued) {
-+		vgic_irq_clear_queued(vcpu, spi_id);
-+		if (vgic_dist_irq_is_pending(vcpu, spi_id)) {
-+			/*
-+			 * IRQ is injected but not yet queued. LR will be
-+			 * written with EOI_INT and process_maintenance will
-+			 * reset the states: queued, level(resampler). Pending
-+			 * will be reset on flush.
-+			 */
-+			vgic_dist_irq_set_level(vcpu, spi_id);
-+		} else {
-+			/*
-+			 * We are somewhere before the update_irq_pending.
-+			 * we can't be sure the virtual IRQ will ever be
-+			 * injected (due to previous disable_irq).
-+			 * Let's simply clear the level which was not correctly
-+			 * modelled in forwarded state.
-+			 */
-+			vgic_dist_irq_clear_level(vcpu, spi_id);
-+		}
-+		goto out;
-+	}
-+
-+	/*
-+	 * the virtual IRQ is queued and a valid LR exists, let's patch it so
-+	 * that when EOI happens a maintenance IRQ gets triggered
-+	 */
-+	vlr.state |= LR_EOI_INT;
-+	vgic_set_lr(vcpu, lr, vlr);
-+
-+	vgic_dist_irq_set_level(vcpu, spi_id);
-+	vgic_dist_irq_set_pending(vcpu, spi_id);
-+	vgic_irq_set_queued(vcpu, spi_id);
-+	 /* The maintenance IRQ will reset all states above */
-+
-+out:
-+	irq_set_irqchip_state(host_irq, IRQCHIP_STATE_ACTIVE, false);
-+	irq_set_vcpu_affinity(host_irq, NULL);
-+	/* next occurrence will be deactivated by the host */
-+
-+	spin_unlock(&dist->lock);
-+}
-+
+/* Major 2, Minor 0, Cut 2, All substrates */
+opp-version = <2 0 2 0xff>;
+
+Qcom (or anyone else wanting to use names to identify their revisions)
+can continue to use their node name method, as it doesn't break any
+convention.
+
+>  - opp-shared: Indicates that device nodes using this OPP Table Node's phandle
+>    switch their DVFS state together, i.e. they share clock/voltage/current lines.
+>    Missing property means devices have independent clock/voltage/current lines,
+> @@ -100,6 +102,9 @@ properties.
+>    Entries for multiple regulators must be present in the same order as
+>    regulators are specified in device's DT node.
+>  
+> +  If used with 'opp-cuts', then the number of entries present here must match
+> +  the number of strings present in 'opp-cuts'.
+> +
+>  - opp-microamp: The maximum current drawn by the device in microamperes
+>    considering system specific parameters (such as transients, process, aging,
+>    maximum operating temperature range etc.) as necessary. This may be used to
+> 
+
 -- 
-1.9.1
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
