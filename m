@@ -1,83 +1,113 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 10 Aug 2015 11:52:00 +0200
-Subject: [PATCH 43/74] clockevents/drivers/prima2: Migrate to new 'set-state'
- interface
+Date: Mon, 10 Aug 2015 11:51:59 +0200
+Subject: [PATCH 42/74] clockevents/drivers/keystone: Migrate to new
+ 'set-state' interface
 In-Reply-To: <1439200352-26767-1-git-send-email-daniel.lezcano@linaro.org>
 References: <55C87382.4070309@linaro.org>
  <1439200352-26767-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1439200352-26767-43-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1439200352-26767-42-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Viresh Kumar <viresh.kumar@linaro.org>
 
-Migrate prima2 driver to the new 'set-state' interface provided by
+Migrate keystone driver to the new 'set-state' interface provided by
 clockevents core, the earlier 'set-mode' interface is marked obsolete
 now.
 
 This also enables us to implement callbacks for new states of clockevent
 devices, for example: ONESHOT_STOPPED.
 
-Cc: Barry Song <baohua@kernel.org>
+Also pass the mode-mask to keystone_timer_config() instead of the mode
+as mode macro's aren't valid anymore.
+
+Cc: Santosh Shilimkar <ssantosh@kernel.org>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- drivers/clocksource/timer-prima2.c | 34 +++++++++++++++-------------------
- 1 file changed, 15 insertions(+), 19 deletions(-)
+ drivers/clocksource/timer-keystone.c | 44 +++++++++++++-----------------------
+ 1 file changed, 16 insertions(+), 28 deletions(-)
 
-diff --git a/drivers/clocksource/timer-prima2.c b/drivers/clocksource/timer-prima2.c
-index ce18d57..78de982 100644
---- a/drivers/clocksource/timer-prima2.c
-+++ b/drivers/clocksource/timer-prima2.c
-@@ -104,26 +104,21 @@ static int sirfsoc_timer_set_next_event(unsigned long delta,
- 	return next - now > delta ? -ETIME : 0;
+diff --git a/drivers/clocksource/timer-keystone.c b/drivers/clocksource/timer-keystone.c
+index 0250354..edacf39 100644
+--- a/drivers/clocksource/timer-keystone.c
++++ b/drivers/clocksource/timer-keystone.c
+@@ -72,10 +72,10 @@ static inline void keystone_timer_barrier(void)
+ 
+ /**
+  * keystone_timer_config: configures timer to work in oneshot/periodic modes.
+- * @ mode: mode to configure
++ * @ mask: mask of the mode to configure
+  * @ period: cycles number to configure for
+  */
+-static int keystone_timer_config(u64 period, enum clock_event_mode mode)
++static int keystone_timer_config(u64 period, int mask)
+ {
+ 	u32 tcr;
+ 	u32 off;
+@@ -84,16 +84,7 @@ static int keystone_timer_config(u64 period, enum clock_event_mode mode)
+ 	off = tcr & ~(TCR_ENAMODE_MASK);
+ 
+ 	/* set enable mode */
+-	switch (mode) {
+-	case CLOCK_EVT_MODE_ONESHOT:
+-		tcr |= TCR_ENAMODE_ONESHOT_MASK;
+-		break;
+-	case CLOCK_EVT_MODE_PERIODIC:
+-		tcr |= TCR_ENAMODE_PERIODIC_MASK;
+-		break;
+-	default:
+-		return -1;
+-	}
++	tcr |= mask;
+ 
+ 	/* disable timer */
+ 	keystone_timer_writel(off, TCR);
+@@ -138,24 +129,19 @@ static irqreturn_t keystone_timer_interrupt(int irq, void *dev_id)
+ static int keystone_set_next_event(unsigned long cycles,
+ 				  struct clock_event_device *evt)
+ {
+-	return keystone_timer_config(cycles, evt->mode);
++	return keystone_timer_config(cycles, TCR_ENAMODE_ONESHOT_MASK);
  }
  
--static void sirfsoc_timer_set_mode(enum clock_event_mode mode,
--	struct clock_event_device *ce)
-+static int sirfsoc_timer_shutdown(struct clock_event_device *evt)
+-static void keystone_set_mode(enum clock_event_mode mode,
+-			     struct clock_event_device *evt)
++static int keystone_shutdown(struct clock_event_device *evt)
  {
- 	u32 val = readl_relaxed(sirfsoc_timer_base + SIRFSOC_TIMER_INT_EN);
 -	switch (mode) {
 -	case CLOCK_EVT_MODE_PERIODIC:
--		WARN_ON(1);
--		break;
--	case CLOCK_EVT_MODE_ONESHOT:
--		writel_relaxed(val | BIT(0),
--			sirfsoc_timer_base + SIRFSOC_TIMER_INT_EN);
--		break;
--	case CLOCK_EVT_MODE_SHUTDOWN:
--		writel_relaxed(val & ~BIT(0),
--			sirfsoc_timer_base + SIRFSOC_TIMER_INT_EN);
+-		keystone_timer_config(timer.hz_period, CLOCK_EVT_MODE_PERIODIC);
 -		break;
 -	case CLOCK_EVT_MODE_UNUSED:
--	case CLOCK_EVT_MODE_RESUME:
+-	case CLOCK_EVT_MODE_SHUTDOWN:
+-	case CLOCK_EVT_MODE_ONESHOT:
+-		keystone_timer_disable();
+-		break;
+-	default:
 -		break;
 -	}
-+
-+	writel_relaxed(val & ~BIT(0),
-+		       sirfsoc_timer_base + SIRFSOC_TIMER_INT_EN);
++	keystone_timer_disable();
 +	return 0;
 +}
 +
-+static int sirfsoc_timer_set_oneshot(struct clock_event_device *evt)
++static int keystone_set_periodic(struct clock_event_device *evt)
 +{
-+	u32 val = readl_relaxed(sirfsoc_timer_base + SIRFSOC_TIMER_INT_EN);
-+
-+	writel_relaxed(val | BIT(0), sirfsoc_timer_base + SIRFSOC_TIMER_INT_EN);
++	keystone_timer_config(timer.hz_period, TCR_ENAMODE_PERIODIC_MASK);
 +	return 0;
  }
  
- static void sirfsoc_clocksource_suspend(struct clocksource *cs)
-@@ -157,7 +152,8 @@ static struct clock_event_device sirfsoc_clockevent = {
- 	.name = "sirfsoc_clockevent",
- 	.rating = 200,
- 	.features = CLOCK_EVT_FEAT_ONESHOT,
--	.set_mode = sirfsoc_timer_set_mode,
-+	.set_state_shutdown = sirfsoc_timer_shutdown,
-+	.set_state_oneshot = sirfsoc_timer_set_oneshot,
- 	.set_next_event = sirfsoc_timer_set_next_event,
- };
- 
+ static void __init keystone_timer_init(struct device_node *np)
+@@ -222,7 +208,9 @@ static void __init keystone_timer_init(struct device_node *np)
+ 	/* setup clockevent */
+ 	event_dev->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT;
+ 	event_dev->set_next_event = keystone_set_next_event;
+-	event_dev->set_mode = keystone_set_mode;
++	event_dev->set_state_shutdown = keystone_shutdown;
++	event_dev->set_state_periodic = keystone_set_periodic;
++	event_dev->set_state_oneshot = keystone_shutdown;
+ 	event_dev->cpumask = cpu_all_mask;
+ 	event_dev->owner = THIS_MODULE;
+ 	event_dev->name = TIMER_NAME;
 -- 
 1.9.1
