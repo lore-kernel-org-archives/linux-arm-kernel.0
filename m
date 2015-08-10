@@ -1,60 +1,73 @@
-From: ryabinin.a.a@gmail.com (Andrey Ryabinin)
-Date: Mon, 10 Aug 2015 15:00:05 +0300
-Subject: [PATCH v4 2/7] mm: kasan: introduce generic
- kasan_populate_zero_shadow()
-In-Reply-To: <87mvxzptqv.fsf@linux.vnet.ibm.com>
-References: <1437756119-12817-1-git-send-email-a.ryabinin@samsung.com>
- <1437756119-12817-3-git-send-email-a.ryabinin@samsung.com>
- <87mvxzptqv.fsf@linux.vnet.ibm.com>
-Message-ID: <CAPAsAGwsA138f=oNaqJ4qT6Ow9VyoSqAkwZSa_pCDJVsA-JuAg@mail.gmail.com>
+From: julien.grall@citrix.com (Julien Grall)
+Date: Mon, 10 Aug 2015 13:00:40 +0100
+Subject: [PATCH v3 18/20] net/xen-netback: Make it running on 64KB page
+ granularity
+In-Reply-To: <20150810113907.GH8857@zion.uk.xensource.com>
+References: <1438966019-19322-1-git-send-email-julien.grall@citrix.com>
+ <1438966019-19322-19-git-send-email-julien.grall@citrix.com>
+ <20150808145534.GB14214@zion.uk.xensource.com> <55C8759C.3010507@citrix.com>
+ <20150810113907.GH8857@zion.uk.xensource.com>
+Message-ID: <55C89268.2030102@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-08-10 9:01 GMT+03:00 Aneesh Kumar K.V <aneesh.kumar@linux.vnet.ibm.com>:
-> Andrey Ryabinin <a.ryabinin@samsung.com> writes:
->
->> Introduce generic kasan_populate_zero_shadow(start, end).
->> This function maps kasan_zero_page to the [start, end] addresses.
+On 10/08/15 12:39, Wei Liu wrote:
+> On Mon, Aug 10, 2015 at 10:57:48AM +0100, Julien Grall wrote:
+>>         while (size > 0) {
+>>                 BUG_ON(offset >= PAGE_SIZE);
 >>
->> In follow on patches it will be used for ARMv8 (and maybe other
->> architectures) and will replace x86_64 specific populate_zero_shadow().
+>>                 bytes = PAGE_SIZE - offset;
+>>                 if (bytes > size)
+>>                         bytes = size;
 >>
->> Signed-off-by: Andrey Ryabinin <a.ryabinin@samsung.com>
->
-> This assume that we can have shared pgtable_t in generic code ? Is that
-> true for generic code ? Even if it is we may want to allow some arch to
-> override this ? On ppc64, we store the hardware hash page table slot
-> number in pte_t, Hence we won't be able to share pgtable_t.
->
+>>                 info.page = page;
+>>                 gnttab_foreach_grant_in_range(page, offset, bytes,
+>>                                              xenvif_gop_frag_copy_grant,
+>>                                               &info);
+>>                 size -= bytes;
+>>                 offset = 0;
+>>
+>>                 /* Next page */
+>>                 if (size) {
+>>                         BUG_ON(!PageCompound(page));
+>>                         page++;
+>>                 }
+>>         }
+>>
+> 
+> Right. That doesn't mean the original code was wrong or anything. But I
+> don't want to bikeshed about this.
 
-So, ppc64 could define some config which will disable compilation of
-mm/kasan/kasan_init.c.
-However, it might be a bad idea to use such never defined config symbol now.
-So I think this could be done later, in "KASAN for powerpc" series.
+I never said the original code was wrong... The original code was
+allowing the possibility to copy less data than the length contained in
+page.
 
->
->
->> ---
->>  arch/x86/mm/kasan_init_64.c |  14 ----
->>  include/linux/kasan.h       |   8 +++
->>  mm/kasan/Makefile           |   2 +-
->>  mm/kasan/kasan_init.c       | 151 ++++++++++++++++++++++++++++++++++++++++++++
->>  4 files changed, 160 insertions(+), 15 deletions(-)
->>  create mode 100644 mm/kasan/kasan_init.c
->>
->> diff --git a/arch/x86/mm/kasan_init_64.c b/arch/x86/mm/kasan_init_64.c
->> index e1840f3..812086c 100644
->> --- a/arch/x86/mm/kasan_init_64.c
->> +++ b/arch/x86/mm/kasan_init_64.c
->> @@ -12,20 +12,6 @@
->>  extern pgd_t early_level4_pgt[PTRS_PER_PGD];
->>  extern struct range pfn_mapped[E820_X_MAX];
->>
->> -static pud_t kasan_zero_pud[PTRS_PER_PUD] __page_aligned_bss;
->> -static pmd_t kasan_zero_pmd[PTRS_PER_PMD] __page_aligned_bss;
->> -static pte_t kasan_zero_pte[PTRS_PER_PTE] __page_aligned_bss;
->> -
->> -/*
->
-> -aneesh
->
+In the new version, it has been pushed with the callback
+xenvif_gop_frag_copy_grant.
+
+> Please add a comment saying that offset is always 0 starting from second
+> iteration because the gnttab_foreach_grant_in_range makes sure we handle
+> one page in one go.
+
+I think this is superfluous. To be honest, the comment should have been
+on the original version and not in the new one. The construction of the
+loop was far from obvious that we copied less data.
+
+In this new version, the reason is not because of
+gnttab_foreach_grant_in_range is always a page but how the loop has been
+constructed.
+
+If you look how bytes has been defined, it will always contain
+
+min(PAGE_SIZE - offset, size)
+
+So for the first page, this will be PAGE_SIZE - offset. A the end of the
+loop we reset the offset 0, indeed we copy all the data of the first
+page. For the second page and onwards this will always be PAGE_SIZE
+except for the last one where we took size.
+
+
+Regards,
+
+-- 
+Julien Grall
