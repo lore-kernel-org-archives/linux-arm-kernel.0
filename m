@@ -1,53 +1,45 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Mon, 10 Aug 2015 10:18:01 +0100
-Subject: [PATCH v7 4/4] nvmem: Add DT binding documentation for Vybrid
- OCOTP driver
-In-Reply-To: <3713643bb44c39c2126edca2916e1c1aa43eabf8.1438874125.git.maitysanchayan@gmail.com>
-References: <cover.1438874125.git.maitysanchayan@gmail.com>
- <3713643bb44c39c2126edca2916e1c1aa43eabf8.1438874125.git.maitysanchayan@gmail.com>
-Message-ID: <55C86C49.6080708@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 10 Aug 2015 11:20:00 +0200
+Subject: [PATCH 3/9] gpio: Allow hogged gpios to be requested
+In-Reply-To: <20150728091753.GJ28535@localhost>
+References: <1437125570-28623-1-git-send-email-mpa@pengutronix.de>
+ <1437125570-28623-4-git-send-email-mpa@pengutronix.de>
+ <20150717202702.GK7013@pengutronix.de>
+ <20150719140142.GV26287@pengutronix.de>
+ <20150728091753.GJ28535@localhost>
+Message-ID: <CACRpkdbHwCNttDCEUyYq_5REh1PDuR__XDeLD0mR6NqfO6h_HA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Jul 28, 2015 at 11:17 AM, Johan Hovold <johan@kernel.org> wrote:
+> On Sun, Jul 19, 2015 at 04:01:42PM +0200, Markus Pargmann wrote:
 
-
-On 06/08/15 16:27, Sanchayan Maity wrote:
-> Add the devicetree bindings for the Freescale Vybrid On-Chip
-> OTP driver.
+>> > I don't like this patch. IMHO hogging is a "use" of a GPIO that should
+>> > prevent it being requested.
+>>
+>> I disagree with you here. The original patch stated in its description
+>> that it was designed to initialize GPIOs. In my understanding this does
+>> not necessarily mean that a hogged GPIO has to be blocked forever.
 >
-> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
-> ---
->   .../devicetree/bindings/nvmem/vf610-ocotp.txt        | 20 ++++++++++++++++++++
->   1 file changed, 20 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/nvmem/vf610-ocotp.txt
+> IIRC, this use case was discussed but was rejected by Linus when hogs
+> were added:
 >
-> diff --git a/Documentation/devicetree/bindings/nvmem/vf610-ocotp.txt b/Documentation/devicetree/bindings/nvmem/vf610-ocotp.txt
-> new file mode 100644
-> index 0000000..5556810
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/nvmem/vf610-ocotp.txt
-> @@ -0,0 +1,20 @@
-> +On-Chip OTP Memory for Freescale Vybrid
-> +
-> +Required Properties:
-> +  compatible:
-> +  - "fsl,vf610-ocotp" for VF5xx/VF6xx
-> +  #address-cells : Should be 1
-> +  #size-cells : Should be 1
-> +  reg : Address and length of OTP controller registers
-
-Is there a reason to not add clocks property in to the bindings?
-
-> +
-> +Example for Vybrid VF5xx/VF6xx:
-> +
-> +	ocotp: ocotp at 400a5000 {
-> +		compatible = "fsl,vf610-ocotp";
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		reg = <0x400a5000 0xD00>;
-> +		clocks = <&clks VF610_CLK_OCOTP>;
-> +		clock-names = "ocotp";
-> +	};
-> +
+>         https://lkml.kernel.org/r/CACRpkdZcNcPBYQM438CZJx1gYst9BFBSTj-3Qv2aPGF9pdWa5g at mail.gmail.com
 >
+> Linus?
+
+Yeah that is true. But maybe I softened up a bit.
+
+Basically I want to avoid having two very similar mechanisms.
+
+But that is maybe more of a question of how the code is
+arranged and named than what it is called. It would be nicer
+if this was referring to initial values rather than hogging,
+the mechanism inside the kernel could be the same.
+
+But then there is the path where something that is initially
+a hog is turned into a userspace GPIO. Then it is essentially
+not a hog anymore, so this property is not static.
+
+Yours,
+Linus Walleij
