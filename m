@@ -1,209 +1,152 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 10 Aug 2015 11:52:03 +0200
-Subject: [PATCH 46/74] clockevents/drivers/u300: Migrate to new 'set-state'
- interface
+Date: Mon, 10 Aug 2015 11:52:07 +0200
+Subject: [PATCH 50/74] clockevents/drivers/tcb_clksrc: Migrate to new
+ 'set-state' interface
 In-Reply-To: <1439200352-26767-1-git-send-email-daniel.lezcano@linaro.org>
 References: <55C87382.4070309@linaro.org>
  <1439200352-26767-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1439200352-26767-46-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1439200352-26767-50-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Viresh Kumar <viresh.kumar@linaro.org>
 
-Migrate u300 driver to the new 'set-state' interface provided by
+Migrate tcb_clksrc driver to the new 'set-state' interface provided by
 clockevents core, the earlier 'set-mode' interface is marked obsolete
 now.
 
 This also enables us to implement callbacks for new states of clockevent
 devices, for example: ONESHOT_STOPPED.
 
-Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/clocksource/timer-u300.c | 155 +++++++++++++++++++--------------------
- 1 file changed, 77 insertions(+), 78 deletions(-)
+ drivers/clocksource/tcb_clksrc.c | 93 ++++++++++++++++++++++------------------
+ 1 file changed, 51 insertions(+), 42 deletions(-)
 
-diff --git a/drivers/clocksource/timer-u300.c b/drivers/clocksource/timer-u300.c
-index 5dcf756..1744b24 100644
---- a/drivers/clocksource/timer-u300.c
-+++ b/drivers/clocksource/timer-u300.c
-@@ -187,85 +187,82 @@ struct u300_clockevent_data {
- 	unsigned ticks_per_jiffy;
- };
- 
-+static int u300_shutdown(struct clock_event_device *evt)
-+{
-+	/* Disable interrupts on GP1 */
-+	writel(U300_TIMER_APP_GPT1IE_IRQ_DISABLE,
-+	       u300_timer_base + U300_TIMER_APP_GPT1IE);
-+	/* Disable GP1 */
-+	writel(U300_TIMER_APP_DGPT1_TIMER_DISABLE,
-+	       u300_timer_base + U300_TIMER_APP_DGPT1);
-+	return 0;
-+}
-+
- /*
-- * The u300_set_mode() function is always called first, if we
-- * have oneshot timer active, the oneshot scheduling function
-+ * If we have oneshot timer active, the oneshot scheduling function
-  * u300_set_next_event() is called immediately after.
+diff --git a/drivers/clocksource/tcb_clksrc.c b/drivers/clocksource/tcb_clksrc.c
+index 8bdbc45..d28d2fe 100644
+--- a/drivers/clocksource/tcb_clksrc.c
++++ b/drivers/clocksource/tcb_clksrc.c
+@@ -91,55 +91,62 @@ static struct tc_clkevt_device *to_tc_clkevt(struct clock_event_device *clkevt)
   */
--static void u300_set_mode(enum clock_event_mode mode,
--			  struct clock_event_device *evt)
-+static int u300_set_oneshot(struct clock_event_device *evt)
-+{
-+	/* Just return; here? */
-+	/*
-+	 * The actual event will be programmed by the next event hook,
-+	 * so we just set a dummy value somewhere at the end of the
-+	 * universe here.
-+	 */
-+	/* Disable interrupts on GPT1 */
-+	writel(U300_TIMER_APP_GPT1IE_IRQ_DISABLE,
-+	       u300_timer_base + U300_TIMER_APP_GPT1IE);
-+	/* Disable GP1 while we're reprogramming it. */
-+	writel(U300_TIMER_APP_DGPT1_TIMER_DISABLE,
-+	       u300_timer_base + U300_TIMER_APP_DGPT1);
-+	/*
-+	 * Expire far in the future, u300_set_next_event() will be
-+	 * called soon...
-+	 */
-+	writel(0xFFFFFFFF, u300_timer_base + U300_TIMER_APP_GPT1TC);
-+	/* We run one shot per tick here! */
-+	writel(U300_TIMER_APP_SGPT1M_MODE_ONE_SHOT,
-+	       u300_timer_base + U300_TIMER_APP_SGPT1M);
-+	/* Enable interrupts for this timer */
-+	writel(U300_TIMER_APP_GPT1IE_IRQ_ENABLE,
-+	       u300_timer_base + U300_TIMER_APP_GPT1IE);
-+	/* Enable timer */
-+	writel(U300_TIMER_APP_EGPT1_TIMER_ENABLE,
-+	       u300_timer_base + U300_TIMER_APP_EGPT1);
+ static u32 timer_clock;
+ 
+-static void tc_mode(enum clock_event_mode m, struct clock_event_device *d)
++static int tc_shutdown(struct clock_event_device *d)
+ {
+ 	struct tc_clkevt_device *tcd = to_tc_clkevt(d);
+ 	void __iomem		*regs = tcd->regs;
+ 
+-	if (tcd->clkevt.mode == CLOCK_EVT_MODE_PERIODIC
+-			|| tcd->clkevt.mode == CLOCK_EVT_MODE_ONESHOT) {
+-		__raw_writel(0xff, regs + ATMEL_TC_REG(2, IDR));
+-		__raw_writel(ATMEL_TC_CLKDIS, regs + ATMEL_TC_REG(2, CCR));
+-		clk_disable(tcd->clk);
+-	}
++	__raw_writel(0xff, regs + ATMEL_TC_REG(2, IDR));
++	__raw_writel(ATMEL_TC_CLKDIS, regs + ATMEL_TC_REG(2, CCR));
++	clk_disable(tcd->clk);
+ 
+-	switch (m) {
 +	return 0;
 +}
-+
-+static int u300_set_periodic(struct clock_event_device *evt)
- {
- 	struct u300_clockevent_data *cevdata =
- 		container_of(evt, struct u300_clockevent_data, cevd);
  
--	switch (mode) {
+-	/* By not making the gentime core emulate periodic mode on top
+-	 * of oneshot, we get lower overhead and improved accuracy.
+-	 */
 -	case CLOCK_EVT_MODE_PERIODIC:
--		/* Disable interrupts on GPT1 */
--		writel(U300_TIMER_APP_GPT1IE_IRQ_DISABLE,
--		       u300_timer_base + U300_TIMER_APP_GPT1IE);
--		/* Disable GP1 while we're reprogramming it. */
--		writel(U300_TIMER_APP_DGPT1_TIMER_DISABLE,
--		       u300_timer_base + U300_TIMER_APP_DGPT1);
--		/*
--		 * Set the periodic mode to a certain number of ticks per
--		 * jiffy.
--		 */
--		writel(cevdata->ticks_per_jiffy,
--		       u300_timer_base + U300_TIMER_APP_GPT1TC);
--		/*
--		 * Set continuous mode, so the timer keeps triggering
--		 * interrupts.
--		 */
--		writel(U300_TIMER_APP_SGPT1M_MODE_CONTINUOUS,
--		       u300_timer_base + U300_TIMER_APP_SGPT1M);
--		/* Enable timer interrupts */
--		writel(U300_TIMER_APP_GPT1IE_IRQ_ENABLE,
--		       u300_timer_base + U300_TIMER_APP_GPT1IE);
--		/* Then enable the OS timer again */
--		writel(U300_TIMER_APP_EGPT1_TIMER_ENABLE,
--		       u300_timer_base + U300_TIMER_APP_EGPT1);
+-		clk_enable(tcd->clk);
++static int tc_set_oneshot(struct clock_event_device *d)
++{
++	struct tc_clkevt_device *tcd = to_tc_clkevt(d);
++	void __iomem		*regs = tcd->regs;
+ 
+-		/* slow clock, count up to RC, then irq and restart */
+-		__raw_writel(timer_clock
+-				| ATMEL_TC_WAVE | ATMEL_TC_WAVESEL_UP_AUTO,
+-				regs + ATMEL_TC_REG(2, CMR));
+-		__raw_writel((32768 + HZ/2) / HZ, tcaddr + ATMEL_TC_REG(2, RC));
++	if (clockevent_state_oneshot(d) || clockevent_state_periodic(d))
++		tc_shutdown(d);
+ 
+-		/* Enable clock and interrupts on RC compare */
+-		__raw_writel(ATMEL_TC_CPCS, regs + ATMEL_TC_REG(2, IER));
++	clk_enable(tcd->clk);
+ 
+-		/* go go gadget! */
+-		__raw_writel(ATMEL_TC_CLKEN | ATMEL_TC_SWTRG,
+-				regs + ATMEL_TC_REG(2, CCR));
 -		break;
++	/* slow clock, count up to RC, then irq and stop */
++	__raw_writel(timer_clock | ATMEL_TC_CPCSTOP | ATMEL_TC_WAVE |
++		     ATMEL_TC_WAVESEL_UP_AUTO, regs + ATMEL_TC_REG(2, CMR));
++	__raw_writel(ATMEL_TC_CPCS, regs + ATMEL_TC_REG(2, IER));
+ 
 -	case CLOCK_EVT_MODE_ONESHOT:
--		/* Just break; here? */
--		/*
--		 * The actual event will be programmed by the next event hook,
--		 * so we just set a dummy value somewhere at the end of the
--		 * universe here.
--		 */
--		/* Disable interrupts on GPT1 */
--		writel(U300_TIMER_APP_GPT1IE_IRQ_DISABLE,
--		       u300_timer_base + U300_TIMER_APP_GPT1IE);
--		/* Disable GP1 while we're reprogramming it. */
--		writel(U300_TIMER_APP_DGPT1_TIMER_DISABLE,
--		       u300_timer_base + U300_TIMER_APP_DGPT1);
--		/*
--		 * Expire far in the future, u300_set_next_event() will be
--		 * called soon...
--		 */
--		writel(0xFFFFFFFF, u300_timer_base + U300_TIMER_APP_GPT1TC);
--		/* We run one shot per tick here! */
--		writel(U300_TIMER_APP_SGPT1M_MODE_ONE_SHOT,
--		       u300_timer_base + U300_TIMER_APP_SGPT1M);
--		/* Enable interrupts for this timer */
--		writel(U300_TIMER_APP_GPT1IE_IRQ_ENABLE,
--		       u300_timer_base + U300_TIMER_APP_GPT1IE);
--		/* Enable timer */
--		writel(U300_TIMER_APP_EGPT1_TIMER_ENABLE,
--		       u300_timer_base + U300_TIMER_APP_EGPT1);
+-		clk_enable(tcd->clk);
++	/* set_next_event() configures and starts the timer */
++	return 0;
++}
+ 
+-		/* slow clock, count up to RC, then irq and stop */
+-		__raw_writel(timer_clock | ATMEL_TC_CPCSTOP
+-				| ATMEL_TC_WAVE | ATMEL_TC_WAVESEL_UP_AUTO,
+-				regs + ATMEL_TC_REG(2, CMR));
+-		__raw_writel(ATMEL_TC_CPCS, regs + ATMEL_TC_REG(2, IER));
++static int tc_set_periodic(struct clock_event_device *d)
++{
++	struct tc_clkevt_device *tcd = to_tc_clkevt(d);
++	void __iomem		*regs = tcd->regs;
+ 
+-		/* set_next_event() configures and starts the timer */
 -		break;
--	case CLOCK_EVT_MODE_UNUSED:
--	case CLOCK_EVT_MODE_SHUTDOWN:
--		/* Disable interrupts on GP1 */
--		writel(U300_TIMER_APP_GPT1IE_IRQ_DISABLE,
--		       u300_timer_base + U300_TIMER_APP_GPT1IE);
--		/* Disable GP1 */
--		writel(U300_TIMER_APP_DGPT1_TIMER_DISABLE,
--		       u300_timer_base + U300_TIMER_APP_DGPT1);
--		break;
--	case CLOCK_EVT_MODE_RESUME:
--		/* Ignore this call */
++	if (clockevent_state_oneshot(d) || clockevent_state_periodic(d))
++		tc_shutdown(d);
+ 
+-	default:
 -		break;
 -	}
-+	/* Disable interrupts on GPT1 */
-+	writel(U300_TIMER_APP_GPT1IE_IRQ_DISABLE,
-+	       u300_timer_base + U300_TIMER_APP_GPT1IE);
-+	/* Disable GP1 while we're reprogramming it. */
-+	writel(U300_TIMER_APP_DGPT1_TIMER_DISABLE,
-+	       u300_timer_base + U300_TIMER_APP_DGPT1);
-+	/*
-+	 * Set the periodic mode to a certain number of ticks per
-+	 * jiffy.
++	/* By not making the gentime core emulate periodic mode on top
++	 * of oneshot, we get lower overhead and improved accuracy.
 +	 */
-+	writel(cevdata->ticks_per_jiffy,
-+	       u300_timer_base + U300_TIMER_APP_GPT1TC);
-+	/*
-+	 * Set continuous mode, so the timer keeps triggering
-+	 * interrupts.
-+	 */
-+	writel(U300_TIMER_APP_SGPT1M_MODE_CONTINUOUS,
-+	       u300_timer_base + U300_TIMER_APP_SGPT1M);
-+	/* Enable timer interrupts */
-+	writel(U300_TIMER_APP_GPT1IE_IRQ_ENABLE,
-+	       u300_timer_base + U300_TIMER_APP_GPT1IE);
-+	/* Then enable the OS timer again */
-+	writel(U300_TIMER_APP_EGPT1_TIMER_ENABLE,
-+	       u300_timer_base + U300_TIMER_APP_EGPT1);
++	clk_enable(tcd->clk);
++
++	/* slow clock, count up to RC, then irq and restart */
++	__raw_writel(timer_clock | ATMEL_TC_WAVE | ATMEL_TC_WAVESEL_UP_AUTO,
++		     regs + ATMEL_TC_REG(2, CMR));
++	__raw_writel((32768 + HZ / 2) / HZ, tcaddr + ATMEL_TC_REG(2, RC));
++
++	/* Enable clock and interrupts on RC compare */
++	__raw_writel(ATMEL_TC_CPCS, regs + ATMEL_TC_REG(2, IER));
++
++	/* go go gadget! */
++	__raw_writel(ATMEL_TC_CLKEN | ATMEL_TC_SWTRG, regs +
++		     ATMEL_TC_REG(2, CCR));
 +	return 0;
  }
  
- /*
-@@ -309,13 +306,15 @@ static int u300_set_next_event(unsigned long cycles,
- static struct u300_clockevent_data u300_clockevent_data = {
- 	/* Use general purpose timer 1 as clock event */
- 	.cevd = {
--		.name		= "GPT1",
-+		.name			= "GPT1",
- 		/* Reasonably fast and accurate clock event */
--		.rating		= 300,
--		.features	= CLOCK_EVT_FEAT_PERIODIC |
--			CLOCK_EVT_FEAT_ONESHOT,
--		.set_next_event	= u300_set_next_event,
--		.set_mode	= u300_set_mode,
-+		.rating			= 300,
+ static int tc_next_event(unsigned long delta, struct clock_event_device *d)
+@@ -154,13 +161,15 @@ static int tc_next_event(unsigned long delta, struct clock_event_device *d)
+ 
+ static struct tc_clkevt_device clkevt = {
+ 	.clkevt	= {
+-		.name		= "tc_clkevt",
+-		.features	= CLOCK_EVT_FEAT_PERIODIC
+-					| CLOCK_EVT_FEAT_ONESHOT,
++		.name			= "tc_clkevt",
 +		.features		= CLOCK_EVT_FEAT_PERIODIC |
 +					  CLOCK_EVT_FEAT_ONESHOT,
-+		.set_next_event		= u300_set_next_event,
-+		.set_state_shutdown	= u300_shutdown,
-+		.set_state_periodic	= u300_set_periodic,
-+		.set_state_oneshot	= u300_set_oneshot,
+ 		/* Should be lower than at91rm9200's system timer */
+-		.rating		= 125,
+-		.set_next_event	= tc_next_event,
+-		.set_mode	= tc_mode,
++		.rating			= 125,
++		.set_next_event		= tc_next_event,
++		.set_state_shutdown	= tc_shutdown,
++		.set_state_periodic	= tc_set_periodic,
++		.set_state_oneshot	= tc_set_oneshot,
  	},
  };
  
