@@ -1,238 +1,104 @@
-From: oliver@schinagl.nl (Olliver Schinagl)
-Date: Mon, 10 Aug 2015 10:43:37 +0200
-Subject: [linux-sunxi] [PATCH] ARM: dts: sunxi: enable otg port on the
- sun7i-a20-olinuxino-lime2
-In-Reply-To: <55C7DCA1.2090204@gmail.com>
-References: <1439146968-9039-1-git-send-email-oliver@schinagl.nl>
- <1439146968-9039-2-git-send-email-oliver@schinagl.nl>
- <55C7DCA1.2090204@gmail.com>
-Message-ID: <55C86439.4000005@schinagl.nl>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Mon, 10 Aug 2015 10:44:14 +0200
+Subject: [PATCH v4 5/5] KVM: eventfd: add irq bypass consumer management
+In-Reply-To: <1438978155.4023.263.camel@redhat.com>
+References: <1438622444-25444-1-git-send-email-eric.auger@linaro.org>	
+ <1438622444-25444-6-git-send-email-eric.auger@linaro.org>
+ <1438978155.4023.263.camel@redhat.com>
+Message-ID: <55C8645E.6060505@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Yeah I just noticed as well that for some reason i've sent a merged patch :(
-
-I all ready fixed it locally this morning and will re-send the patches. 
-I wonder what I did though ..
-
-Sorry again,
-
-Olliver
-
-On 10-08-15 01:05, Iain Paton wrote:
-> NAK. This does much more than enabling the otg port.
->
-> Neither wholesale re-writing the regulator node or hooking up the
-> dcdc2 regulator to the operating points definition is required in order
-> to enable the otg port.
->
-> At the very least you need to split your patches and describe them
-> properly rather than trying to get additional changes that are likely
-> to cause further discussion through unnoticed using a misleading
-> subject.
->
-> Rgds,
-> Iain
->   
-> On 09/08/15 20:02, Olliver Schinagl wrote:
->> From: Olliver Schinagl <o.schinagl@ultimaker.com>
+Hi Alex,
+On 08/07/2015 10:09 PM, Alex Williamson wrote:
+> On Mon, 2015-08-03 at 19:20 +0200, Eric Auger wrote:
+>> This patch adds the registration/unregistration of an
+>> irq_bypass_consumer on irqfd assignment/deassignment.
 >>
->> This patch enables the musb-otg USB controller on the Lime2. The Lime2
->> differs from the Lime1 series in pins used for usb0 power.
+>> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+>> Signed-off-by: Feng Wu <feng.wu@intel.com>
 >>
->> Tested on a OlinuXino Lime2-4GB.
->>
->> Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
 >> ---
->>   arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts | 131 ++++++++++++++----------
->>   1 file changed, 75 insertions(+), 56 deletions(-)
 >>
->> diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
->> index 22cd052..efd9ebb 100644
->> --- a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
->> +++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
->> @@ -71,14 +71,6 @@
->>   			default-state = "on";
->>   		};
->>   	};
->> -
->> -	reg_axp_ipsout: axp_ipsout {
->> -		compatible = "regulator-fixed";
->> -		regulator-name = "axp-ipsout";
->> -		regulator-min-microvolt = <5000000>;
->> -		regulator-max-microvolt = <5000000>;
->> -		regulator-always-on;
->> -	};
->>   };
->>   
->>   &ahci {
->> @@ -86,6 +78,10 @@
->>   	status = "okay";
->>   };
->>   
->> +&cpu0 {
->> +	cpu-supply = <&reg_dcdc2>;
->> +};
->> +
->>   &ehci0 {
->>   	status = "okay";
->>   };
->> @@ -112,57 +108,9 @@
->>   	status = "okay";
->>   
->>   	axp209: pmic at 34 {
->> -		compatible = "x-powers,axp209";
->>   		reg = <0x34>;
->>   		interrupt-parent = <&nmi_intc>;
->>   		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
->> -
->> -		interrupt-controller;
->> -		#interrupt-cells = <1>;
->> -
->> -		acin-supply = <&reg_axp_ipsout>;
->> -		vin2-supply = <&reg_axp_ipsout>;
->> -		vin3-supply = <&reg_axp_ipsout>;
->> -		ldo24in-supply = <&reg_axp_ipsout>;
->> -		ldo3in-supply = <&reg_axp_ipsout>;
->> -
->> -		regulators {
->> -			vdd_rtc: ldo1 {
->> -				regulator-min-microvolt = <1300000>;
->> -				regulator-max-microvolt = <1300000>;
->> -				regulator-always-on;
->> -			};
->> -
->> -			avcc: ldo2 {
->> -				regulator-min-microvolt = <1800000>;
->> -				regulator-max-microvolt = <3300000>;
->> -				regulator-always-on;
->> -			};
->> -
->> -			vcc_csi0: ldo3 {
->> -				regulator-min-microvolt = <700000>;
->> -				regulator-max-microvolt = <3500000>;
->> -				regulator-always-on;
->> -			};
->> -
->> -			vcc_csi1: ldo4 {
->> -				regulator-min-microvolt = <1250000>;
->> -				regulator-max-microvolt = <3300000>;
->> -				regulator-always-on;
->> -			};
->> -
->> -			vdd_cpu: dcdc2 {
->> -				regulator-min-microvolt = <700000>;
->> -				regulator-max-microvolt = <2275000>;
->> -				regulator-always-on;
->> -			};
->> -
->> -			vdd_int: dcdc3 {
->> -				regulator-min-microvolt = <700000>;
->> -				regulator-max-microvolt = <3500000>;
->> -				regulator-always-on;
->> -			};
->> -		};
->>   	};
->>   };
->>   
->> @@ -196,6 +144,10 @@
->>   	status = "okay";
->>   };
->>   
->> +&otg_sram {
->> +	status = "okay";
->> +};
->> +
->>   &pio {
->>   	ahci_pwr_pin_olinuxinolime: ahci_pwr_pin at 1 {
->>   		allwinner,pins = "PC3";
->> @@ -210,6 +162,27 @@
->>   		allwinner,drive = <SUN4I_PINCTRL_20_MA>;
->>   		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
->>   	};
->> +
->> +	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
->> +		allwinner,pins = "PH4";
->> +		allwinner,function = "gpio_in";
->> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
->> +		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
->> +	};
->> +
->> +	usb0_vbus_detect_pin: usb0_vbus_detect_pin at 0 {
->> +		allwinner,pins = "PH5";
->> +		allwinner,function = "gpio_in";
->> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
->> +		allwinner,pull = <SUN4I_PINCTRL_PULL_DOWN>;
->> +	};
->> +
->> +	usb0_vbus_pin_lime2: usb0_vbus_pin at 0 {
->> +		allwinner,pins = "PC17";
->> +		allwinner,function = "gpio_out";
->> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
->> +		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
->> +	};
->>   };
->>   
->>   &reg_ahci_5v {
->> @@ -218,6 +191,42 @@
->>   	status = "okay";
->>   };
->>   
->> +#include "axp209.dtsi"
->> +
->> +&reg_dcdc2 {
->> +	regulator-always-on;
->> +	regulator-min-microvolt = <1000000>;
->> +	regulator-max-microvolt = <1450000>;
->> +	regulator-name = "vdd-cpu";
->> +};
->> +
->> +&reg_dcdc3 {
->> +	regulator-always-on;
->> +	regulator-min-microvolt = <1000000>;
->> +	regulator-max-microvolt = <1400000>;
->> +	regulator-name = "vdd-int-dll";
->> +};
->> +
->> +&reg_ldo1 {
->> +	regulator-always-on;
->> +	regulator-min-microvolt = <1300000>;
->> +	regulator-max-microvolt = <1300000>;
->> +	regulator-name = "vdd-rtc";
->> +};
->> +
->> +&reg_ldo2 {
->> +	regulator-always-on;
->> +	regulator-min-microvolt = <3000000>;
->> +	regulator-max-microvolt = <3000000>;
->> +	regulator-name = "avcc";
->> +};
->> +
->> +&reg_usb0_vbus {
->> +	pinctrl-0 = <&usb0_vbus_pin_lime2>;
->> +	gpio = <&pio 2 17 GPIO_ACTIVE_HIGH>;
->> +	status = "okay";
->> +};
->> +
->>   &reg_usb1_vbus {
->>   	status = "okay";
->>   };
->> @@ -232,7 +241,17 @@
->>   	status = "okay";
->>   };
->>   
->> +&usb_otg {
->> +	dr_mode = "otg";
->> +	status = "okay";
->> +};
->> +
->>   &usbphy {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&usb0_id_detect_pin>, <&usb0_vbus_detect_pin>;
->> +	usb0_id_det-gpio = <&pio 7 4 GPIO_ACTIVE_HIGH>; /* PH4 */
->> +	usb0_vbus_det-gpio = <&pio 7 5 GPIO_ACTIVE_HIGH>; /* PH5 */
->> +	usb0_vbus-supply = <&reg_usb0_vbus>;
->>   	usb1_vbus-supply = <&reg_usb1_vbus>;
->>   	usb2_vbus-supply = <&reg_usb2_vbus>;
->>   	status = "okay";
+>> v2 -> v3 (Feng Wu):
+>> - Use kvm_arch_irq_bypass_start
+>> - Remove kvm_arch_irq_bypass_update
+>> - Add member 'struct irq_bypass_producer *producer' in
+>>   'struct kvm_kernel_irqfd', it is needed by posted interrupt.
+>> - Remove 'irq_bypass_unregister_consumer' in kvm_irqfd_deassign()
 >>
+>> v1 -> v2:
+>> - populate of kvm and gsi removed
+>> - unregister the consumer on irqfd_shutdown
+>> ---
+>>  include/linux/kvm_irqfd.h |  2 ++
+>>  virt/kvm/eventfd.c        | 10 ++++++++++
+>>  2 files changed, 12 insertions(+)
+>>
+>> diff --git a/include/linux/kvm_irqfd.h b/include/linux/kvm_irqfd.h
+>> index f926b39..0c1de05 100644
+>> --- a/include/linux/kvm_irqfd.h
+>> +++ b/include/linux/kvm_irqfd.h
+>> @@ -64,6 +64,8 @@ struct kvm_kernel_irqfd {
+>>  	struct list_head list;
+>>  	poll_table pt;
+>>  	struct work_struct shutdown;
+>> +	struct irq_bypass_consumer consumer;
+>> +	struct irq_bypass_producer *producer;
+>>  };
+>>  
+>>  #endif /* __LINUX_KVM_IRQFD_H */
+>> diff --git a/virt/kvm/eventfd.c b/virt/kvm/eventfd.c
+>> index 647ffb8..08855de 100644
+>> --- a/virt/kvm/eventfd.c
+>> +++ b/virt/kvm/eventfd.c
+>> @@ -35,6 +35,7 @@
+>>  #include <linux/srcu.h>
+>>  #include <linux/slab.h>
+>>  #include <linux/seqlock.h>
+>> +#include <linux/irqbypass.h>
+>>  #include <trace/events/kvm.h>
+>>  
+>>  #include <kvm/iodev.h>
+>> @@ -140,6 +141,7 @@ irqfd_shutdown(struct work_struct *work)
+>>  	/*
+>>  	 * It is now safe to release the object's resources
+>>  	 */
+>> +	irq_bypass_unregister_consumer(&irqfd->consumer);
+>>  	eventfd_ctx_put(irqfd->eventfd);
+>>  	kfree(irqfd);
+>>  }
+>> @@ -380,6 +382,14 @@ kvm_irqfd_assign(struct kvm *kvm, struct kvm_irqfd *args)
+>>  	 */
+>>  	fdput(f);
+>>  
+>> +	irqfd->consumer.token = (void *)irqfd->eventfd;
+>> +	irqfd->consumer.add_producer = kvm_arch_irq_bypass_add_producer;
+>> +	irqfd->consumer.del_producer = kvm_arch_irq_bypass_del_producer;
+>> +	irqfd->consumer.stop = kvm_arch_irq_bypass_stop;
+>> +	irqfd->consumer.start = kvm_arch_irq_bypass_start;
+>> +	ret = irq_bypass_register_consumer(&irqfd->consumer);
+>> +	WARN_ON(ret);
+> 
+> This seems like a lazy way to handle this error.  What is the stack
+> trace from this WARN_ON going to tell us that we didn't already know?
+> If we get the WARN_ON, it's probably means that an incompatible producer
+> registered the token first.  It means we can't do bypass, but it doesn't
+> tell us anything about whether bypass is or is not enabled.  Wouldn't a
+> pr_info/debug() suffice for that?  Thanks,
+
+Sure I will output some more relevant traces.
+
+Thanks
+
+Eric
+> 
+> Alex
+> 
+>> +
+>>  	return 0;
+>>  
+>>  fail:
+> 
+> 
+> 
