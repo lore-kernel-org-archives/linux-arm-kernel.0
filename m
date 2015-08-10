@@ -1,120 +1,85 @@
-From: lftan.linux@gmail.com (Ley Foon Tan)
-Date: Mon, 10 Aug 2015 19:03:57 +0800
-Subject: [PATCH v3 4/5] Documentation: dt-bindings: pci: altera pcie
- device tree binding
-In-Reply-To: <1438933382-2936-5-git-send-email-lftan@altera.com>
-References: <1438933382-2936-1-git-send-email-lftan@altera.com>
- <1438933382-2936-5-git-send-email-lftan@altera.com>
-Message-ID: <CAFiDJ58b62Q7CnoU1+h2dSf7xBPAhjaY5kaeeOrxRVRZ84WJxw@mail.gmail.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Mon, 10 Aug 2015 13:13:26 +0200
+Subject: [GIT PULL] Xilinx Zynq changes for v4.3
+In-Reply-To: <20150808005509.2416.8174@quantum>
+References: <55BB31E8.7040806@monstr.eu> <20150805085344.GH6390@localhost>
+ <20150808005509.2416.8174@quantum>
+Message-ID: <55C88756.1090309@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 7, 2015 at 3:43 PM, Ley Foon Tan <lftan@altera.com> wrote:
-> This patch adds the bindings for Altera PCIe host controller driver and
-> Altera PCIe MSI driver.
->
-> Signed-off-by: Ley Foon Tan <lftan@altera.com>
-> ---
->  .../devicetree/bindings/pci/altera-pcie-msi.txt    | 27 ++++++++++++
->  .../devicetree/bindings/pci/altera-pcie.txt        | 49 ++++++++++++++++++++++
->  2 files changed, 76 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pci/altera-pcie-msi.txt
->  create mode 100644 Documentation/devicetree/bindings/pci/altera-pcie.txt
->
-> diff --git a/Documentation/devicetree/bindings/pci/altera-pcie-msi.txt b/Documentation/devicetree/bindings/pci/altera-pcie-msi.txt
-> new file mode 100644
-> index 0000000..7f330c9
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pci/altera-pcie-msi.txt
-> @@ -0,0 +1,27 @@
-> +* Altera PCIe MSI controller
-> +
-> +Required properties:
-> +- compatible:  should contain "altr,msi-1.0"
-> +- reg:         specifies the physical base address of the controller and
-> +               the length of the memory mapped region.
-> +- reg-names:   Must include the following entries:
-> +               "csr": CSR registers
-> +               "vector_slave": vectors region
-> +-interrupts:   specifies the interrupt source of the parent interrupt
-> +               controller. The format of the interrupt specifier depends on the
-> +               parent interrupt controller.
-> +- num-vectors: Number of vectors, range 1 to 32.
-> +- msi-controller:      indicates that this is MSI controller node
-> +
-> +
-> +Example
-> +msi0: msi at 0xFF200000 {
-> +       compatible = "altr,msi-1.0";
-> +       reg = <0xFF200000 0x00000010
-> +               0xFF200010 0x00000080>;
-> +       reg-names = "csr", "vector_slave";
-> +       interrupt-parent = <&hps_0_arm_gic_0>;
-> +       interrupts = <0 42 4>;
-> +       msi-controller = <1>;
-> +       num-vectors = <32>;
-> +};
-> diff --git a/Documentation/devicetree/bindings/pci/altera-pcie.txt b/Documentation/devicetree/bindings/pci/altera-pcie.txt
-> new file mode 100644
-> index 0000000..729193d
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pci/altera-pcie.txt
-> @@ -0,0 +1,49 @@
-> +* Altera PCIe controller
-> +
-> +Required properties:
-> +- compatible : should contain "altr,pcie-root-port-1.0"
-> +- reg:         A list of physical base address and length for TXS and CRA.
-> +- reg-names:   Must include the following entries:
-> +               "Txs": TXS region
-> +               "Cra": Control register access region
-> +-interrupts:   specifies the interrupt source of the parent interrupt controller.
-> +               The format of the interrupt specifier depends on the parent interrupt
-> +               controller.
-> +- device_type: must be "pci"
-> +- #address-cells:      set to <3>
-> +- #size-cells: set to <2>
-> +- #interrupt-cells:    set to <1>
-> +- ranges:              Describes the translation of addresses for root ports and standard
-> +               PCI regions.
-> +- interrupt-map-mask and interrupt-map: standard PCI properties
-> +       to define the mapping of the PCIe interface to interrupt
-> +       numbers.
-> +
-> +Optional properties:
-> +- msi-parent:  Link to the hardware entity that serves as the MSI controller for this PCIe
-> +               controller.
-> +- bus-range:   PCI bus numbers covered
-> +
-> +Example
-> +       pcie_0: pcie at 0xc00000000 {
-> +               compatible = "altr,pcie-root-port-1.0";
-> +               reg = <0xc0000000 0x20000000>,
-> +                       <0xff220000 0x00004000>;
-> +               reg-names = "Txs", "Cra";
-> +               interrupt-parent = <&hps_0_arm_gic_0>;
-> +               interrupts = <0 40 4>;
-> +               interrupt-controller;
-> +               #interrupt-cells = <1>;
-> +               bus-range = <0x0 0xFF>;
-> +               device_type = "pci";
-> +               msi-parent = <&msi_to_gic_gen_0>;
-> +               #address-cells = <3>;
-> +               #size-cells = <2>;
-> +               interrupt-map-mask = <0 0 0 7>;
-> +               interrupt-map = <0 0 0 1 &pcie_0 1>,
-> +                                   <0 0 0 2 &pcie_0 2>,
-> +                                   <0 0 0 3 &pcie_0 3>,
-> +                                   <0 0 0 4 &pcie_0 4>;
-> +               ranges = <0x82000000 0x00000000 0x00000000 0xc0000000 0x00000000 0x10000000
-> +                           0x82000000 0x00000000 0x10000000 0xd0000000 0x00000000 0x10000000>;
-> +       };
-> --
+Hi,
 
-Added DT maintainers to CC list. Please help to review if anything
-need to be changed.
+On 08/08/2015 02:55 AM, Michael Turquette wrote:
+> Quoting Olof Johansson (2015-08-05 01:53:44)
+>> Hi,
+>>
+>> On Fri, Jul 31, 2015 at 10:29:28AM +0200, Michal Simek wrote:
+>>> Hi,
+>>>
+>>> please pull these SoC changes to your tree.
+>>>
+>>> Thanks,
+>>> Michal
+>>>
+>>> The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
+>>>
+>>>   Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
+>>>
+>>> are available in the git repository at:
+>>>
+>>>   https://github.com/Xilinx/linux-xlnx.git tags/zynq-soc-for-4.3
+>>>
+>>> for you to fetch changes up to e4a9288942392965bd5cfad93d9996b83c0dc4a6:
+>>>
+>>>   ARM: zynq: reserve space for jump target in secondary trampoline
+>>> (2015-07-31 10:24:41 +0200)
+>>
+>> Merged, however:
+>>
+>>> Arun Chandran (1):
+>>>       ARM: zynq: Fix earlyprintk in big endian mode
+>>>
+>>> Masahiro Yamada (1):
+>>>       clk: zynq: remove redundant $(CONFIG_ARCH_ZYNQ) in Makefile
+>>
+>> This should have gone through the clk tree. Seems small and simple enough that
+>> I'll take it, but please send patches through appropriate maintainers.
+>>
+>> (Adding Mike and Stephen on cc so they know about it).
+> 
+> Olof,
+> 
+> Thanks for the heads up.
+> 
+> Michal,
+> 
+> No reason that patch couldn't have gone through the clk tree. It was
+> posted on July 27th, which wasn't that long ago. Please feel free to
+> ping Stephen or I on #linux-clk if you think one of your clk patches has
+> slipped through the cracks.
 
-Thanks.
+I took it because it was pretty simple and there was no reaction from
+you. Thanks for sending link to IRC. I wasn't aware that there is any
+clk specific IRC.
+Next time I will make sure that patches will go in the right direction.
 
-Regards
-Ley Foon
+Thanks,
+Michal
+
+
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150810/b36e9016/attachment.sig>
