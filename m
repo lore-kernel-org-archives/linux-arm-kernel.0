@@ -1,35 +1,41 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Mon, 10 Aug 2015 10:27:18 +0900
-Subject: [PATCH v4 0/6] cpufreq: use generic cpufreq drivers for Exynos4x12
- platform
-In-Reply-To: <55C5AF4E.3010500@samsung.com>
-References: <1438868514-8814-1-git-send-email-b.zolnierkie@samsung.com>
- <2359635.Hxe4cb8zKm@amdc1976> <20150807115627.GH6939@linux>
- <1525406.7aXvVQzEDd@vostro.rjw.lan> <20150808020740.GM6939@linux>
- <55C5AF4E.3010500@samsung.com>
-Message-ID: <03ee01d0d30b$b279c490$176d4db0$@kernel.org>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 10 Aug 2015 10:52:10 +0900
+Subject: [GIT PULL] Samsung mach fixes for 4.2
+Message-ID: <1439171530-971-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Krzysztof Kozlowski wrote:
-> 
-> W dniu 08.08.2015 o 11:07, Viresh Kumar pisze:
-> > On 08-08-15, 00:24, Rafael J. Wysocki wrote:
-> >> OK, so please let me know which patches you want me to pick up.
-> >>
-> >> Ideally, I'd prefer them to be resent in a separate series with ACKs and all
-> >> with a cover letter clearly stating whose tree they are being targeted at.
-> >
-> > He already sent it separately, let me send a confirmatory mail in
-> > reply to that.
-> 
-> Dear Kukjin,
-> 
-> Can you apply the 2-5 of this series to v4.3? It's getting late but
-> maybe they still could go?
-> 
-Once my previous pull-request landed into arm-soc, I'll try to send out this
-series 2-5 for v4.3.
+Dear Kukjin,
 
-Thanks,
-Kukjin
+Please find latest two fixes for v4.2 cycle. You can find more detailed
+description with the tag.
+
+Best regards,
+Krzysztof
+
+
+The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
+
+  Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
+
+are available in the git repository at:
+
+  https://github.com/krzk/linux.git tags/samsung-mach-fixes-4.2
+
+for you to fetch changes up to 3e9f798784b30293012682021d5a0352f78658b8:
+
+  ARM: EXYNOS: fix double of_node_put() on error path (2015-07-31 10:12:17 +0900)
+
+----------------------------------------------------------------
+Two fixes for bugs in Exynos power domain error exit path:
+1. kfree() of read-only memory (name of power domain returned
+   by kstrdup_const()),
+2. Doubled of_node_put() leading to invalid ref count for OF node.
+
+----------------------------------------------------------------
+Vladimir Zapolskiy (2):
+      ARM: EXYNOS: Fix potentian kfree() of ro memory
+      ARM: EXYNOS: fix double of_node_put() on error path
+
+ arch/arm/mach-exynos/pm_domains.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
