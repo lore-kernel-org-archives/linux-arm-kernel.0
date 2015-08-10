@@ -1,119 +1,109 @@
-From: henryc.chen@mediatek.com (Henry Chen)
-Date: Mon, 10 Aug 2015 21:10:45 +0800
-Subject: [PATCH v3] mfd: mt6397: Implement wake handler and suspend/resume to
- handle wake up event.
-Message-ID: <1439212245-18935-1-git-send-email-henryc.chen@mediatek.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Mon, 10 Aug 2015 15:20:55 +0200
+Subject: [PATCH v3 01/10] VFIO: platform: registration of a dummy IRQ bypass
+ producer
+In-Reply-To: <1439212864-12954-1-git-send-email-eric.auger@linaro.org>
+References: <1439212864-12954-1-git-send-email-eric.auger@linaro.org>
+Message-ID: <1439212864-12954-2-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implement .irq_set_wake() to get who is wakeup source and setup on suspend/reumse. Enable
-mt6393_irq as wake up source properly to pinctrl by enable_irq_wake()/enable_irq_wake().
+Register a dummy producer with void callbacks
 
-Reviewed-by: Lee Jones <lee.jones@linaro.org>
-Signed-off-by: Henry Chen <henryc.chen@mediatek.com>
+Signed-off-by: Eric Auger <eric.auger@linaro.org>
+
 ---
-Changes since v2:
-Remove the filename of title.
-Remove irrelevant change.
 
-Chandes since v1:
-Used enable_irq_wake()/disable_irq_wake to handle irq wakeup source.
+v2 -> v3:
+- rename vfio_platform_irq_bypass_resume into *_start
+---
+ drivers/vfio/platform/vfio_platform_irq.c     | 32 +++++++++++++++++++++++++++
+ drivers/vfio/platform/vfio_platform_private.h |  2 ++
+ 2 files changed, 34 insertions(+)
 
- drivers/mfd/mt6397-core.c       | 49 +++++++++++++++++++++++++++++++++++++++++
- include/linux/mfd/mt6397/core.h |  1 +
- 2 files changed, 50 insertions(+)
-
-diff --git a/drivers/mfd/mt6397-core.c b/drivers/mfd/mt6397-core.c
-index 03929a6..e7d5a67 100644
---- a/drivers/mfd/mt6397-core.c
-+++ b/drivers/mfd/mt6397-core.c
-@@ -93,12 +93,31 @@ static void mt6397_irq_enable(struct irq_data *data)
- 	mt6397->irq_masks_cur[reg] |= BIT(shift);
+diff --git a/drivers/vfio/platform/vfio_platform_irq.c b/drivers/vfio/platform/vfio_platform_irq.c
+index 88bba57..b5cb8c7 100644
+--- a/drivers/vfio/platform/vfio_platform_irq.c
++++ b/drivers/vfio/platform/vfio_platform_irq.c
+@@ -20,6 +20,7 @@
+ #include <linux/types.h>
+ #include <linux/vfio.h>
+ #include <linux/irq.h>
++#include <linux/irqbypass.h>
+ 
+ #include "vfio_platform_private.h"
+ 
+@@ -177,6 +178,27 @@ static irqreturn_t vfio_irq_handler(int irq, void *dev_id)
+ 	return IRQ_HANDLED;
  }
  
-+#ifdef CONFIG_PM_SLEEP
-+static int mt6397_irq_set_wake(struct irq_data *irq_data, unsigned int on)
++static void vfio_platform_irq_bypass_stop(struct irq_bypass_producer *prod)
 +{
-+	struct mt6397_chip *mt6397 = irq_data_get_irq_chip_data(irq_data);
-+	int shift = irq_data->hwirq & 0xf;
-+	int reg = irq_data->hwirq >> 4;
-+
-+	if (on)
-+		mt6397->wake_mask[reg] |= BIT(shift);
-+	else
-+		mt6397->wake_mask[reg] &= ~BIT(shift);
-+
-+	return 0;
 +}
-+#else
-+#define mt6397_irq_set_wake NULL
-+#endif
 +
- static struct irq_chip mt6397_irq_chip = {
- 	.name = "mt6397-irq",
- 	.irq_bus_lock = mt6397_irq_lock,
- 	.irq_bus_sync_unlock = mt6397_irq_sync_unlock,
- 	.irq_enable = mt6397_irq_enable,
- 	.irq_disable = mt6397_irq_disable,
-+	.irq_set_wake = mt6397_irq_set_wake,
- };
- 
- static void mt6397_irq_handle_reg(struct mt6397_chip *mt6397, int reg,
-@@ -183,6 +202,35 @@ static int mt6397_irq_init(struct mt6397_chip *mt6397)
- 	return 0;
- }
- 
-+#ifdef CONFIG_PM_SLEEP
-+static int mt6397_irq_suspend(struct device *dev)
++static void vfio_platform_irq_bypass_start(struct irq_bypass_producer *prod)
 +{
-+	struct mt6397_chip *chip = dev_get_drvdata(dev);
++}
 +
-+	regmap_write(chip->regmap, MT6397_INT_CON0, chip->wake_mask[0]);
-+	regmap_write(chip->regmap, MT6397_INT_CON1, chip->wake_mask[1]);
-+
-+	enable_irq_wake(chip->irq);
-+
++static int vfio_platform_irq_bypass_add_consumer(
++			struct irq_bypass_producer *prod,
++			struct irq_bypass_consumer *cons)
++{
 +	return 0;
 +}
 +
-+static int mt6397_irq_resume(struct device *dev)
++static void vfio_platform_irq_bypass_del_consumer(
++			struct irq_bypass_producer *prod,
++			struct irq_bypass_consumer *cons)
 +{
-+	struct mt6397_chip *chip = dev_get_drvdata(dev);
-+
-+	regmap_write(chip->regmap, MT6397_INT_CON0, chip->irq_masks_cur[0]);
-+	regmap_write(chip->regmap, MT6397_INT_CON1, chip->irq_masks_cur[1]);
-+
-+	disable_irq_wake(chip->irq);
-+
-+	return 0;
 +}
-+#endif
 +
-+static SIMPLE_DEV_PM_OPS(mt6397_pm_ops, mt6397_irq_suspend,
-+			mt6397_irq_resume);
-+
- static int mt6397_probe(struct platform_device *pdev)
+ static int vfio_set_trigger(struct vfio_platform_device *vdev, int index,
+ 			    int fd, irq_handler_t handler)
  {
- 	int ret;
-@@ -237,6 +285,7 @@ static struct platform_driver mt6397_driver = {
- 	.driver = {
- 		.name = "mt6397",
- 		.of_match_table = of_match_ptr(mt6397_of_match),
-+		.pm = &mt6397_pm_ops,
- 	},
+@@ -186,6 +208,7 @@ static int vfio_set_trigger(struct vfio_platform_device *vdev, int index,
+ 
+ 	if (irq->trigger) {
+ 		free_irq(irq->hwirq, irq);
++		irq_bypass_unregister_producer(&irq->producer);
+ 		kfree(irq->name);
+ 		eventfd_ctx_put(irq->trigger);
+ 		irq->trigger = NULL;
+@@ -216,6 +239,15 @@ static int vfio_set_trigger(struct vfio_platform_device *vdev, int index,
+ 		return ret;
+ 	}
+ 
++	irq->producer.token = (void *)trigger;
++	irq->producer.irq = irq->hwirq;
++	irq->producer.add_consumer = vfio_platform_irq_bypass_add_consumer;
++	irq->producer.del_consumer = vfio_platform_irq_bypass_del_consumer;
++	irq->producer.stop = vfio_platform_irq_bypass_stop;
++	irq->producer.start = vfio_platform_irq_bypass_start;
++	ret = irq_bypass_register_producer(&irq->producer);
++	WARN_ON(ret);
++
+ 	if (!irq->masked)
+ 		enable_irq(irq->hwirq);
+ 
+diff --git a/drivers/vfio/platform/vfio_platform_private.h b/drivers/vfio/platform/vfio_platform_private.h
+index 1c9b3d5..1d2d4d6 100644
+--- a/drivers/vfio/platform/vfio_platform_private.h
++++ b/drivers/vfio/platform/vfio_platform_private.h
+@@ -17,6 +17,7 @@
+ 
+ #include <linux/types.h>
+ #include <linux/interrupt.h>
++#include <linux/irqbypass.h>
+ 
+ #define VFIO_PLATFORM_OFFSET_SHIFT   40
+ #define VFIO_PLATFORM_OFFSET_MASK (((u64)(1) << VFIO_PLATFORM_OFFSET_SHIFT) - 1)
+@@ -37,6 +38,7 @@ struct vfio_platform_irq {
+ 	spinlock_t		lock;
+ 	struct virqfd		*unmask;
+ 	struct virqfd		*mask;
++	struct irq_bypass_producer producer;
  };
  
-diff --git a/include/linux/mfd/mt6397/core.h b/include/linux/mfd/mt6397/core.h
-index cf5265b..45b8e8a 100644
---- a/include/linux/mfd/mt6397/core.h
-+++ b/include/linux/mfd/mt6397/core.h
-@@ -57,6 +57,7 @@ struct mt6397_chip {
- 	int irq;
- 	struct irq_domain *irq_domain;
- 	struct mutex irqlock;
-+	u16 wake_mask[2];
- 	u16 irq_masks_cur[2];
- 	u16 irq_masks_cache[2];
- };
+ struct vfio_platform_region {
 -- 
-1.8.1.1.dirty
+1.9.1
