@@ -1,66 +1,68 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 10 Aug 2015 16:35:32 +0200
-Subject: [PATCH 1/2] ARM: shmobile: r8a7794: add QSPI DT support
-In-Reply-To: <5339616.vfIYf6AeR8@wasted.cogentembedded.com>
+Date: Mon, 10 Aug 2015 16:38:46 +0200
+Subject: [PATCH 2/2] ARM: shmobile: silk: add QSPI DT support
+In-Reply-To: <1768974.jEFIAaInqd@wasted.cogentembedded.com>
 References: <1898263.zrOs5SAUTS@wasted.cogentembedded.com>
- <5339616.vfIYf6AeR8@wasted.cogentembedded.com>
-Message-ID: <CAMuHMdX3F4ecR=BjgUrrEA3P4xpu-Yt_r3qM6SgUdFrYm7h1Rw@mail.gmail.com>
+ <1768974.jEFIAaInqd@wasted.cogentembedded.com>
+Message-ID: <CAMuHMdXQJ4Hju477Ys0ujXCNdUjWOa6AuKGzLPc3YFJc_eLz+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 9, 2015 at 12:26 AM, Sergei Shtylyov
+Hi Sergei,
+
+On Sun, Aug 9, 2015 at 12:27 AM, Sergei Shtylyov
 <sergei.shtylyov@cogentembedded.com> wrote:
-> Define the generic R8A7794 part of the QSPI device node.
+> Define the SILK board dependent part of the QSPI device node.
+> Add device nodes  for Spansion  S25FL512S SPI flash and MTD partitions on it.
 >
-> Based on original patch by Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>.
+> Based on the original patch by Vladimir Barinov
+> <vladimir.barinov@cogentembedded.com>.
 >
 > Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> --- renesas.orig/arch/arm/boot/dts/r8a7794-silk.dts
+> +++ renesas/arch/arm/boot/dts/r8a7794-silk.dts
 
- arch/arm/boot/dts/r8a7794.dtsi |   18 ++++++++++++++++++
->  1 file changed, 18 insertions(+)
->
-> Index: renesas/arch/arm/boot/dts/r8a7794.dtsi
-> ===================================================================
-> --- renesas.orig/arch/arm/boot/dts/r8a7794.dtsi
-> +++ renesas/arch/arm/boot/dts/r8a7794.dtsi
-> @@ -19,6 +19,10 @@
->         #address-cells = <2>;
->         #size-cells = <2>;
->
-> +       aliases {
-> +               spi0 = &qspi;
-> +       };
+> +&qspi {
+> +       pinctrl-0 = <&qspi_pins>;
+> +       pinctrl-names = "default";
 > +
->         cpus {
->                 #address-cells = <1>;
->                 #size-cells = <0>;
-> @@ -537,6 +541,20 @@
->                 status = "disabled";
->         };
->
-> +       qspi: spi at e6b10000 {
-> +               compatible = "renesas,qspi-r8a7794", "renesas,qspi";
-> +               reg = <0 0xe6b10000 0 0x2c>;
-> +               interrupts = <0 184 IRQ_TYPE_LEVEL_HIGH>;
-> +               clocks = <&mstp9_clks R8A7794_CLK_QSPI_MOD>;
-> +               power-domains = <&cpg_clocks>;
-
-For consistency with the other nodes, I'd add "power-domains" below the
-DMA-related properties.
-
-> +               dmas = <&dmac0 0x17>, <&dmac0 0x18>;
-> +               dma-names = "tx", "rx";
-> +               num-cs = <1>;
+> +       status = "okay";
+> +
+> +       flash at 0 {
 > +               #address-cells = <1>;
-> +               #size-cells = <0>;
-> +               status = "disabled";
-> +       };
-> +
->         clocks {
->                 #address-cells = <2>;
->                 #size-cells = <2>;
+> +               #size-cells = <1>;
+> +               compatible = "spansion,s25fl512s";
+
+Please add the "jedec,spi-nor" fallback.
+
+> +               reg = <0>;
+> +               spi-max-frequency = <30000000>;
+> +               spi-tx-bus-width = <4>;
+> +               spi-rx-bus-width = <4>;
+> +               m25p,fast-read;
+
+Please keep all "spi-*" properties together.
+
+> +               spi-cpol;
+> +               spi-cpha;
+
+> +               partition at 0 {
+> +                       label = "loader";
+> +                       reg = <0x00000000 0x00040000>;
+> +                       read-only;
+> +               };
+> +               partition at 40000 {
+> +                       label = "user";
+> +                       reg = <0x00040000 0x00400000>;
+> +                       read-only;
+> +               };
+> +               partition at 440000 {
+> +                       label = "flash";
+> +                       reg = <0x00440000 0x03bc0000>;
+> +               };
+
+The above part I cannot verify, so I have to trust you.
 
 Gr{oetje,eeting}s,
 
