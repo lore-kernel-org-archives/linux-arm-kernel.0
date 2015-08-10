@@ -1,169 +1,44 @@
 From: jamesjj.liao@mediatek.com (James Liao)
-Date: Mon, 10 Aug 2015 17:50:25 +0800
-Subject: [PATCH v7 6/9] dt-bindings: ARM: Mediatek: Document devicetree
- bindings for clock controllers
+Date: Mon, 10 Aug 2015 17:50:20 +0800
+Subject: [PATCH v7 1/9] clk: mediatek: Removed unused dpi_ck clock from MT8173
 In-Reply-To: <1439200228-318-1-git-send-email-jamesjj.liao@mediatek.com>
 References: <1439200228-318-1-git-send-email-jamesjj.liao@mediatek.com>
-Message-ID: <1439200228-318-7-git-send-email-jamesjj.liao@mediatek.com>
+Message-ID: <1439200228-318-2-git-send-email-jamesjj.liao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the binding documentation for the mmsys, imgsys, vdecsys,
-vencsys and vencltsys controllers found on Mediatek SoCs.
+The dpi_ck clock can be removed because it not actually used
+in topckgen and subsystems.
 
 Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
 ---
- .../bindings/arm/mediatek/mediatek,imgsys.txt      | 22 ++++++++++++++++++++++
- .../bindings/arm/mediatek/mediatek,mmsys.txt       | 22 ++++++++++++++++++++++
- .../bindings/arm/mediatek/mediatek,vdecsys.txt     | 22 ++++++++++++++++++++++
- .../bindings/arm/mediatek/mediatek,vencltsys.txt   | 22 ++++++++++++++++++++++
- .../bindings/arm/mediatek/mediatek,vencsys.txt     | 22 ++++++++++++++++++++++
- 5 files changed, 110 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,imgsys.txt
- create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt
- create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,vdecsys.txt
- create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,vencltsys.txt
- create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,vencsys.txt
+ drivers/clk/mediatek/clk-mt8173.c      | 1 -
+ include/dt-bindings/clock/mt8173-clk.h | 1 -
+ 2 files changed, 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,imgsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,imgsys.txt
-new file mode 100644
-index 0000000..b1f2ce1
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,imgsys.txt
-@@ -0,0 +1,22 @@
-+Mediatek imgsys controller
-+============================
-+
-+The Mediatek imgsys controller provides various clocks to the system.
-+
-+Required Properties:
-+
-+- compatible: Should be:
-+	- "mediatek,mt8173-imgsys", "syscon"
-+- #clock-cells: Must be 1
-+
-+The imgsys controller uses the common clk binding from
-+Documentation/devicetree/bindings/clock/clock-bindings.txt
-+The available clocks are defined in dt-bindings/clock/mt*-clk.h.
-+
-+Example:
-+
-+imgsys: clock-controller at 15000000 {
-+	compatible = "mediatek,mt8173-imgsys", "syscon";
-+	reg = <0 0x15000000 0 0x1000>;
-+	#clock-cells = <1>;
-+};
-diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt
-new file mode 100644
-index 0000000..4385946
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt
-@@ -0,0 +1,22 @@
-+Mediatek mmsys controller
-+============================
-+
-+The Mediatek mmsys controller provides various clocks to the system.
-+
-+Required Properties:
-+
-+- compatible: Should be:
-+	- "mediatek,mt8173-mmsys", "syscon"
-+- #clock-cells: Must be 1
-+
-+The mmsys controller uses the common clk binding from
-+Documentation/devicetree/bindings/clock/clock-bindings.txt
-+The available clocks are defined in dt-bindings/clock/mt*-clk.h.
-+
-+Example:
-+
-+mmsys: clock-controller at 14000000 {
-+	compatible = "mediatek,mt8173-mmsys", "syscon";
-+	reg = <0 0x14000000 0 0x1000>;
-+	#clock-cells = <1>;
-+};
-diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,vdecsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,vdecsys.txt
-new file mode 100644
-index 0000000..1faacf1
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,vdecsys.txt
-@@ -0,0 +1,22 @@
-+Mediatek vdecsys controller
-+============================
-+
-+The Mediatek vdecsys controller provides various clocks to the system.
-+
-+Required Properties:
-+
-+- compatible: Should be:
-+	- "mediatek,mt8173-vdecsys", "syscon"
-+- #clock-cells: Must be 1
-+
-+The vdecsys controller uses the common clk binding from
-+Documentation/devicetree/bindings/clock/clock-bindings.txt
-+The available clocks are defined in dt-bindings/clock/mt*-clk.h.
-+
-+Example:
-+
-+vdecsys: clock-controller at 16000000 {
-+	compatible = "mediatek,mt8173-vdecsys", "syscon";
-+	reg = <0 0x16000000 0 0x1000>;
-+	#clock-cells = <1>;
-+};
-diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,vencltsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,vencltsys.txt
-new file mode 100644
-index 0000000..3cc299f
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,vencltsys.txt
-@@ -0,0 +1,22 @@
-+Mediatek vencltsys controller
-+============================
-+
-+The Mediatek vencltsys controller provides various clocks to the system.
-+
-+Required Properties:
-+
-+- compatible: Should be:
-+	- "mediatek,mt8173-vencltsys", "syscon"
-+- #clock-cells: Must be 1
-+
-+The vencltsys controller uses the common clk binding from
-+Documentation/devicetree/bindings/clock/clock-bindings.txt
-+The available clocks are defined in dt-bindings/clock/mt*-clk.h.
-+
-+Example:
-+
-+vencltsys: clock-controller at 19000000 {
-+	compatible = "mediatek,mt8173-vencltsys", "syscon";
-+	reg = <0 0x19000000 0 0x1000>;
-+	#clock-cells = <1>;
-+};
-diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,vencsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,vencsys.txt
-new file mode 100644
-index 0000000..5bb2866
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,vencsys.txt
-@@ -0,0 +1,22 @@
-+Mediatek vencsys controller
-+============================
-+
-+The Mediatek vencsys controller provides various clocks to the system.
-+
-+Required Properties:
-+
-+- compatible: Should be:
-+	- "mediatek,mt8173-vencsys", "syscon"
-+- #clock-cells: Must be 1
-+
-+The vencsys controller uses the common clk binding from
-+Documentation/devicetree/bindings/clock/clock-bindings.txt
-+The available clocks are defined in dt-bindings/clock/mt*-clk.h.
-+
-+Example:
-+
-+vencsys: clock-controller at 18000000 {
-+	compatible = "mediatek,mt8173-vencsys", "syscon";
-+	reg = <0 0x18000000 0 0x1000>;
-+	#clock-cells = <1>;
-+};
+diff --git a/drivers/clk/mediatek/clk-mt8173.c b/drivers/clk/mediatek/clk-mt8173.c
+index 8b6523d..80871e2 100644
+--- a/drivers/clk/mediatek/clk-mt8173.c
++++ b/drivers/clk/mediatek/clk-mt8173.c
+@@ -26,7 +26,6 @@ static DEFINE_SPINLOCK(mt8173_clk_lock);
+ 
+ static const struct mtk_fixed_factor root_clk_alias[] __initconst = {
+ 	FACTOR(CLK_TOP_CLKPH_MCK_O, "clkph_mck_o", "clk_null", 1, 1),
+-	FACTOR(CLK_TOP_DPI, "dpi_ck", "clk_null", 1, 1),
+ 	FACTOR(CLK_TOP_USB_SYSPLL_125M, "usb_syspll_125m", "clk_null", 1, 1),
+ 	FACTOR(CLK_TOP_HDMITX_DIG_CTS, "hdmitx_dig_cts", "clk_null", 1, 1),
+ };
+diff --git a/include/dt-bindings/clock/mt8173-clk.h b/include/dt-bindings/clock/mt8173-clk.h
+index 4ad76ed..7230c38 100644
+--- a/include/dt-bindings/clock/mt8173-clk.h
++++ b/include/dt-bindings/clock/mt8173-clk.h
+@@ -18,7 +18,6 @@
+ /* TOPCKGEN */
+ 
+ #define CLK_TOP_CLKPH_MCK_O		1
+-#define CLK_TOP_DPI			2
+ #define CLK_TOP_USB_SYSPLL_125M		3
+ #define CLK_TOP_HDMITX_DIG_CTS		4
+ #define CLK_TOP_ARMCA7PLL_754M		5
 -- 
 1.8.1.1.dirty
