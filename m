@@ -1,60 +1,195 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 10 Aug 2015 13:00:56 +0200
-Subject: [PATCH] ARM: mvebu: update mvebu_v7_defconfig for Armada 38x
- USB3.0
-In-Reply-To: <1439200314-26850-1-git-send-email-jaz@semihalf.com>
-References: <1439200314-26850-1-git-send-email-jaz@semihalf.com>
-Message-ID: <55C88468.2000400@free-electrons.com>
+From: lftan@altera.com (Ley Foon Tan)
+Date: Mon, 10 Aug 2015 19:02:08 +0800
+Subject: [PATCH v3 2/5] pci:host: Add Altera PCIe host controller driver
+In-Reply-To: <55C4C1E2.7080205@arm.com>
+References: <1438933382-2936-1-git-send-email-lftan@altera.com>
+ <1438933382-2936-3-git-send-email-lftan@altera.com>
+ <55C4C1E2.7080205@arm.com>
+Message-ID: <CAFiDJ5-3MTjMQDgXH4Om_-S8d0MTLPeg2V7pQQhzPCow0E9jeQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grzegorz,
+On Fri, Aug 7, 2015 at 10:34 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On 07/08/15 08:42, Ley Foon Tan wrote:
+>> This patch adds the Altera PCIe host controller driver.
+>>
+>> Signed-off-by: Ley Foon Tan <lftan@altera.com>
+>> ---
+>>  drivers/pci/host/Kconfig       |   7 +
+>>  drivers/pci/host/Makefile      |   1 +
+>>  drivers/pci/host/pcie-altera.c | 532 +++++++++++++++++++++++++++++++++++++++++
+>>  3 files changed, 540 insertions(+)
+>>  create mode 100644 drivers/pci/host/pcie-altera.c
 
-On 10/08/2015 11:51, Grzegorz Jaszczyk wrote:
-> 	This patch enables the fixed voltage regulator and the gpio PCA953X
-> 	drivers in mvebu_v7_defconfig, as they are used for enabling the USB3.0
-> 	phy on some of the Armada's 38x boards.
-> 
+<snip>
 
-The same patch had already been merged in arm-soc and should be part of
-4.3: See: "ARM: mvebu: update mvebu_v7_defconfig with features needed
-for Armada 388 GP".
-http://thread.gmane.org/gmane.linux.ports.arm.kernel/421082/focus=425086
+>> +static int tlp_read_packet(struct altera_pcie *pcie, u32 *value)
+>> +{
+>> +       u8 loop;
+>> +       struct tlp_rp_regpair_t tlp_rp_regdata;
+>> +
+>> +       for (loop = TLP_LOOP; loop > 0; loop--) {
+>
+> I'd prefer to see the more common idiom:
+>
+>         for (loop = 0; loop < TLP_LOOP; loop++) {
+Okay, will change this.
 
-Thanks,
+>> +               tlp_read_rx(pcie, &tlp_rp_regdata);
+>> +               if (tlp_rp_regdata.ctrl & RP_RXCPL_EOP) {
+>> +                       if (value)
+>> +                               *value = tlp_rp_regdata.reg0;
+>> +                       return PCIBIOS_SUCCESSFUL;
+>> +               }
+>
+> Don't you need some form of relaxation here? A delay of some sort?
+> Repeatedly polling the HW is usually not helping it to recover...
+Yes, will add udelay here.
 
-Gregory
+<snip>
 
-> Signed-off-by: Grzegorz Jaszczyk <jaz@semihalf.com>
-> Cc: <stable@vger.kernel.org>
-> ---
->  arch/arm/configs/mvebu_v7_defconfig | 3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/arch/arm/configs/mvebu_v7_defconfig b/arch/arm/configs/mvebu_v7_defconfig
-> index cacc9f4..1b8ecf4 100644
-> --- a/arch/arm/configs/mvebu_v7_defconfig
-> +++ b/arch/arm/configs/mvebu_v7_defconfig
-> @@ -83,11 +83,14 @@ CONFIG_I2C_MV64XXX=y
->  CONFIG_SPI=y
->  CONFIG_SPI_ORION=y
->  CONFIG_GPIO_SYSFS=y
-> +CONFIG_GPIO_PCA953X=y
->  CONFIG_SENSORS_GPIO_FAN=y
->  CONFIG_THERMAL=y
->  CONFIG_ARMADA_THERMAL=y
->  CONFIG_WATCHDOG=y
->  CONFIG_ORION_WATCHDOG=y
-> +CONFIG_REGULATOR=y
-> +CONFIG_REGULATOR_FIXED_VOLTAGE=y
->  CONFIG_SOUND=y
->  CONFIG_SND=y
->  CONFIG_SND_SOC=y
-> 
+>> +static int altera_pcie_init_irq_domain(struct altera_pcie *pcie)
+>> +{
+>> +       struct device *dev = &pcie->pdev->dev;
+>> +       struct device_node *node = dev->of_node;
+>> +
+>> +       /* Setup INTx */
+>> +       pcie->irq_domain = irq_domain_add_linear(node, INTX_NUM,
+>> +                                       &intx_domain_ops, pcie);
+>> +       if (!pcie->irq_domain) {
+>> +               dev_err(dev, "Failed to get a INTx IRQ domain\n");
+>> +               return PTR_ERR(pcie->irq_domain);
+>
+> Err, no. irq_domain_add returns NULL on error, so PTR_ERR(NULL) is still
+> going to be zero.
+
+Change to return -ENOMEM.
+
+>
+>> +       }
+>> +
+>> +       return 0;
+>> +}
+>> +
+>> +static int altera_pcie_parse_dt(struct altera_pcie *pcie)
+>> +{
+>> +       struct resource *cra;
+>> +       struct platform_device *pdev = pcie->pdev;
+>> +
+>> +       cra = platform_get_resource_byname(pdev, IORESOURCE_MEM, "Cra");
+>
+> Probably worth checking that this hasn't failed.
+Noted. Will add error checking.
+>
+>> +       pcie->cra_base = devm_ioremap_resource(&pdev->dev, cra);
+>> +       if (IS_ERR(pcie->cra_base)) {
+>> +               dev_err(&pdev->dev, "get Cra resource failed\n");
+>> +               return PTR_ERR(pcie->cra_base);
+>> +       }
+>> +
+>> +       /* setup IRQ */
+>> +       pcie->irq = platform_get_irq(pdev, 0);
+>> +       if (pcie->irq <= 0) {
+>> +               dev_err(&pdev->dev, "failed to get IRQ: %d\n", pcie->irq);
+>> +               return -EINVAL;
+>> +       }
+>> +
+>> +       irq_set_chained_handler_and_data(pcie->irq, altera_pcie_isr, pcie);
+>> +
+>> +       return 0;
+>> +}
+>> +
+>> +static int altera_pcie_probe(struct platform_device *pdev)
+>> +{
+>> +       struct altera_pcie *pcie;
+>> +       struct pci_bus *bus;
+>> +       int ret;
+>> +
+>> +       pcie = devm_kzalloc(&pdev->dev, sizeof(*pcie), GFP_KERNEL);
+>> +       if (!pcie)
+>> +               return -ENOMEM;
+>> +
+>> +       pcie->pdev = pdev;
+>> +
+>> +       ret = altera_pcie_parse_dt(pcie);
+>> +       if (ret) {
+>> +               dev_err(&pdev->dev, "Parsing DT failed\n");
+>> +               return ret;
+>> +       }
+>> +
+>> +       INIT_LIST_HEAD(&pcie->resources);
+>> +
+>> +       ret = altera_pcie_parse_request_of_pci_ranges(pcie);
+>> +       if (ret) {
+>> +               dev_err(&pdev->dev, "Failed add resources\n");
+>> +               return ret;
+>> +       }
+>> +
+>> +       ret = altera_pcie_init_irq_domain(pcie);
+>> +       if (ret) {
+>> +               dev_err(&pdev->dev, "Failed creating IRQ Domain\n");
+>> +               return ret;
+>> +       }
+>> +
+>> +       pcie->root_bus_nr = 0;
+>> +
+>> +       /* clear all interrupts */
+>> +       cra_writel(pcie, P2A_INT_STS_ALL, P2A_INT_STATUS);
+>> +       /* enable all interrupts */
+>> +       cra_writel(pcie, P2A_INT_ENA_ALL, P2A_INT_ENABLE);
+>> +
+>> +       bus = pci_scan_root_bus(&pdev->dev, pcie->root_bus_nr, &altera_pcie_ops,
+>> +                               pcie, &pcie->resources);
+>> +       if (!bus)
+>> +               return -ENOMEM;
+>> +
+>> +       pci_fixup_irqs(pci_common_swizzle, of_irq_parse_and_map_pci);
+>> +       pci_assign_unassigned_bus_resources(bus);
+>> +       pci_bus_add_devices(bus);
+>> +
+>> +       platform_set_drvdata(pdev, pcie);
+>> +       return ret;
+>> +}
+>> +
+>> +static int __exit altera_pcie_remove(struct platform_device *pdev)
+>> +{
+>> +       struct altera_pcie *pcie = platform_get_drvdata(pdev);
+>> +
+>> +       altera_pcie_free_irq_domain(pcie);
+>> +       platform_set_drvdata(pdev, NULL);
+>> +       return 0;
+>> +}
+>> +
+>> +static const struct of_device_id altera_pcie_of_match[] = {
+>> +       { .compatible = "altr,pcie-root-port-1.0", },
+>> +       {},
+>> +};
+>> +MODULE_DEVICE_TABLE(of, altera_pcie_of_match);
+>> +
+>> +static struct platform_driver altera_pcie_driver = {
+>> +       .probe          = altera_pcie_probe,
+>> +       .remove         = altera_pcie_remove,
+>> +       .driver = {
+>> +               .name   = "altera-pcie",
+>> +               .of_match_table = altera_pcie_of_match,
+>> +       },
+>> +};
+>> +
+>> +module_platform_driver(altera_pcie_driver);
+>> +
+>> +MODULE_AUTHOR("Ley Foon Tan <lftan@altera.com>");
+>> +MODULE_DESCRIPTION("Altera PCIe host controller driver");
+>> +MODULE_LICENSE("GPL v2");
+>> --
+>> 1.8.2.1
+>>
+>
+> This is starting to look better. You should get someone to review the DT
+> parts though.
+I have CC-ed DT maintainers. Hope someone can help to review.
 
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Thanks for reviewing.
+
+Regards
+Ley Foon
