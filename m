@@ -1,53 +1,55 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Mon, 10 Aug 2015 15:20:58 +0200
-Subject: [PATCH v3 04/10] VFIO: platform: add vfio_platform_set_automasked
-In-Reply-To: <1439212864-12954-1-git-send-email-eric.auger@linaro.org>
-References: <1439212864-12954-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1439212864-12954-5-git-send-email-eric.auger@linaro.org>
+Date: Mon, 10 Aug 2015 15:31:03 +0200
+Subject: [PATCH v5 1/5] KVM: x86: select IRQ_BYPASS_MANAGER
+In-Reply-To: <1439213467-13668-1-git-send-email-eric.auger@linaro.org>
+References: <1439213467-13668-1-git-send-email-eric.auger@linaro.org>
+Message-ID: <1439213467-13668-2-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This function makes possible to change the automasked mode.
+From: Feng Wu <feng.wu@intel.com>
 
-Signed-off-by: Eric Auger <eric.auger@linaro.org>
+Select IRQ_BYPASS_MANAGER for x86 when CONFIG_KVM is set
 
+Signed-off-by: Feng Wu <feng.wu@intel.com>
 ---
+ arch/x86/kvm/Kconfig  | 2 ++
+ arch/x86/kvm/Makefile | 3 +++
+ 2 files changed, 5 insertions(+)
 
-v1 -> v2:
-- set forwarded flag
----
- drivers/vfio/platform/vfio_platform_irq.c | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
-
-diff --git a/drivers/vfio/platform/vfio_platform_irq.c b/drivers/vfio/platform/vfio_platform_irq.c
-index b31b1f0..a285384 100644
---- a/drivers/vfio/platform/vfio_platform_irq.c
-+++ b/drivers/vfio/platform/vfio_platform_irq.c
-@@ -186,6 +186,25 @@ static irqreturn_t vfio_handler(int irq, void *dev_id)
- 	return ret;
- }
+diff --git a/arch/x86/kvm/Kconfig b/arch/x86/kvm/Kconfig
+index d8a1d56..c951d44 100644
+--- a/arch/x86/kvm/Kconfig
++++ b/arch/x86/kvm/Kconfig
+@@ -3,6 +3,7 @@
+ #
  
-+static int vfio_platform_set_automasked(struct vfio_platform_irq *irq,
-+					   bool automasked)
-+{
-+	unsigned long flags;
+ source "virt/kvm/Kconfig"
++source "virt/lib/Kconfig"
+ 
+ menuconfig VIRTUALIZATION
+ 	bool "Virtualization"
+@@ -28,6 +29,7 @@ config KVM
+ 	select ANON_INODES
+ 	select HAVE_KVM_IRQCHIP
+ 	select HAVE_KVM_IRQFD
++	select IRQ_BYPASS_MANAGER
+ 	select HAVE_KVM_IRQ_ROUTING
+ 	select HAVE_KVM_EVENTFD
+ 	select KVM_APIC_ARCHITECTURE
+diff --git a/arch/x86/kvm/Makefile b/arch/x86/kvm/Makefile
+index 67d215c..05cc2d7 100644
+--- a/arch/x86/kvm/Makefile
++++ b/arch/x86/kvm/Makefile
+@@ -6,6 +6,9 @@ CFLAGS_svm.o := -I.
+ CFLAGS_vmx.o := -I.
+ 
+ KVM := ../../../virt/kvm
++LIB := ../../../virt/lib
 +
-+	spin_lock_irqsave(&irq->lock, flags);
-+	if (automasked) {
-+		irq->forwarded = true;
-+		irq->flags |= VFIO_IRQ_INFO_AUTOMASKED;
-+		irq->handler = vfio_automasked_irq_handler;
-+	} else {
-+		irq->forwarded = false;
-+		irq->flags &= ~VFIO_IRQ_INFO_AUTOMASKED;
-+		irq->handler = vfio_irq_handler;
-+	}
-+	spin_unlock_irqrestore(&irq->lock, flags);
-+	return 0;
-+}
-+
- static void vfio_platform_irq_bypass_stop(struct irq_bypass_producer *prod)
- {
- }
++obj-$(CONFIG_IRQ_BYPASS_MANAGER)	+= $(LIB)/
+ 
+ kvm-y			+= $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o \
+ 				$(KVM)/eventfd.o $(KVM)/irqchip.o $(KVM)/vfio.o
 -- 
 1.9.1
