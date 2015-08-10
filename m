@@ -1,24 +1,47 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 10 Aug 2015 12:02:13 +0200
-Subject: [PATCH 6/6] gpiolib: Add gpio name information to
- /sys/kernel/debug/gpio
-In-Reply-To: <1438680203-13432-7-git-send-email-mpa@pengutronix.de>
-References: <1438680203-13432-1-git-send-email-mpa@pengutronix.de>
- <1438680203-13432-7-git-send-email-mpa@pengutronix.de>
-Message-ID: <CACRpkdajd5B6qUa6mi_0m53eMtLenoAWUCnmq-mOC+EhXfzpTA@mail.gmail.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Mon, 10 Aug 2015 11:10:17 +0100
+Subject: [PATCH v3 02/20] arm/xen: Drop pte_mfn and mfn_pte
+In-Reply-To: <1438966019-19322-3-git-send-email-julien.grall@citrix.com>
+References: <1438966019-19322-1-git-send-email-julien.grall@citrix.com>
+ <1438966019-19322-3-git-send-email-julien.grall@citrix.com>
+Message-ID: <alpine.DEB.2.02.1508101110080.11337@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 4, 2015 at 11:23 AM, Markus Pargmann <mpa@pengutronix.de> wrote:
+On Fri, 7 Aug 2015, Julien Grall wrote:
+> They are not used in common code expect in one place in balloon.c which is
+> only compiled when Linux is using PV MMU. It's not the case on ARM.
+> 
+> Rather than worrying how to handle the 64KB case, drop them.
+> 
+> Signed-off-by: Julien Grall <julien.grall@citrix.com>
 
-> Add some information about gpio names to the debugfs gpio file. name and
-> label of a GPIO are then displayed next to each other. This way it is
-> easy to see what the real name of GPIO is and what the driver requested
-> it for.
->
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 
-This patch looks correct in the context.
 
-Yours,
-Linus Walleij
+> Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> Russell King <linux@arm.linux.org.uk>
+> 
+>     Changes in v3:
+>         - Patch added
+> ---
+>  arch/arm/include/asm/xen/page.h | 3 ---
+>  1 file changed, 3 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/xen/page.h b/arch/arm/include/asm/xen/page.h
+> index 1279563..98c9fc3 100644
+> --- a/arch/arm/include/asm/xen/page.h
+> +++ b/arch/arm/include/asm/xen/page.h
+> @@ -13,9 +13,6 @@
+>  
+>  #define phys_to_machine_mapping_valid(pfn) (1)
+>  
+> -#define pte_mfn	    pte_pfn
+> -#define mfn_pte	    pfn_pte
+> -
+>  /* Xen machine address */
+>  typedef struct xmaddr {
+>  	phys_addr_t maddr;
+> -- 
+> 2.1.4
+> 
