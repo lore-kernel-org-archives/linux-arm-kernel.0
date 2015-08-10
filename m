@@ -1,139 +1,238 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Mon, 10 Aug 2015 10:43:00 +0200
-Subject: [PATCH v4 4/5] KVM: introduce kvm_arch functions for IRQ bypass
-In-Reply-To: <1438978154.4023.262.camel@redhat.com>
-References: <1438622444-25444-1-git-send-email-eric.auger@linaro.org>	
- <1438622444-25444-5-git-send-email-eric.auger@linaro.org>
- <1438978154.4023.262.camel@redhat.com>
-Message-ID: <55C86414.5070203@linaro.org>
+From: oliver@schinagl.nl (Olliver Schinagl)
+Date: Mon, 10 Aug 2015 10:43:37 +0200
+Subject: [linux-sunxi] [PATCH] ARM: dts: sunxi: enable otg port on the
+ sun7i-a20-olinuxino-lime2
+In-Reply-To: <55C7DCA1.2090204@gmail.com>
+References: <1439146968-9039-1-git-send-email-oliver@schinagl.nl>
+ <1439146968-9039-2-git-send-email-oliver@schinagl.nl>
+ <55C7DCA1.2090204@gmail.com>
+Message-ID: <55C86439.4000005@schinagl.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/07/2015 10:09 PM, Alex Williamson wrote:
-> On Mon, 2015-08-03 at 19:20 +0200, Eric Auger wrote:
->> This patch introduces
->> - kvm_arch_irq_bypass_add_producer
->> - kvm_arch_irq_bypass_del_producer
->> - kvm_arch_irq_bypass_stop
->> - kvm_arch_irq_bypass_start
+Yeah I just noticed as well that for some reason i've sent a merged patch :(
+
+I all ready fixed it locally this morning and will re-send the patches. 
+I wonder what I did though ..
+
+Sorry again,
+
+Olliver
+
+On 10-08-15 01:05, Iain Paton wrote:
+> NAK. This does much more than enabling the otg port.
+>
+> Neither wholesale re-writing the regulator node or hooking up the
+> dcdc2 regulator to the operating points definition is required in order
+> to enable the otg port.
+>
+> At the very least you need to split your patches and describe them
+> properly rather than trying to get additional changes that are likely
+> to cause further discussion through unnoticed using a misleading
+> subject.
+>
+> Rgds,
+> Iain
+>   
+> On 09/08/15 20:02, Olliver Schinagl wrote:
+>> From: Olliver Schinagl <o.schinagl@ultimaker.com>
 >>
->> They make possible to specialize the KVM IRQ bypass consumer in
->> case CONFIG_KVM_HAVE_IRQ_BYPASS is set.
+>> This patch enables the musb-otg USB controller on the Lime2. The Lime2
+>> differs from the Lime1 series in pins used for usb0 power.
 >>
->> Signed-off-by: Eric Auger <eric.auger@linaro.org>
->> Signed-off-by: Feng Wu <feng.wu@intel.com>
+>> Tested on a OlinuXino Lime2-4GB.
 >>
+>> Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
 >> ---
+>>   arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts | 131 ++++++++++++++----------
+>>   1 file changed, 75 insertions(+), 56 deletions(-)
 >>
->> v2 -> v3 (Feng Wu):
->> - use 'kvm_arch_irq_bypass_start' instead of 'kvm_arch_irq_bypass_resume'
->> - Remove 'kvm_arch_irq_bypass_update', which is not needed to be
->>   a irqbypass callback per Alex's comments.
->> - Make kvm_arch_irq_bypass_add_producer return 'int'
+>> diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
+>> index 22cd052..efd9ebb 100644
+>> --- a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
+>> +++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
+>> @@ -71,14 +71,6 @@
+>>   			default-state = "on";
+>>   		};
+>>   	};
+>> -
+>> -	reg_axp_ipsout: axp_ipsout {
+>> -		compatible = "regulator-fixed";
+>> -		regulator-name = "axp-ipsout";
+>> -		regulator-min-microvolt = <5000000>;
+>> -		regulator-max-microvolt = <5000000>;
+>> -		regulator-always-on;
+>> -	};
+>>   };
+>>   
+>>   &ahci {
+>> @@ -86,6 +78,10 @@
+>>   	status = "okay";
+>>   };
+>>   
+>> +&cpu0 {
+>> +	cpu-supply = <&reg_dcdc2>;
+>> +};
+>> +
+>>   &ehci0 {
+>>   	status = "okay";
+>>   };
+>> @@ -112,57 +108,9 @@
+>>   	status = "okay";
+>>   
+>>   	axp209: pmic at 34 {
+>> -		compatible = "x-powers,axp209";
+>>   		reg = <0x34>;
+>>   		interrupt-parent = <&nmi_intc>;
+>>   		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
+>> -
+>> -		interrupt-controller;
+>> -		#interrupt-cells = <1>;
+>> -
+>> -		acin-supply = <&reg_axp_ipsout>;
+>> -		vin2-supply = <&reg_axp_ipsout>;
+>> -		vin3-supply = <&reg_axp_ipsout>;
+>> -		ldo24in-supply = <&reg_axp_ipsout>;
+>> -		ldo3in-supply = <&reg_axp_ipsout>;
+>> -
+>> -		regulators {
+>> -			vdd_rtc: ldo1 {
+>> -				regulator-min-microvolt = <1300000>;
+>> -				regulator-max-microvolt = <1300000>;
+>> -				regulator-always-on;
+>> -			};
+>> -
+>> -			avcc: ldo2 {
+>> -				regulator-min-microvolt = <1800000>;
+>> -				regulator-max-microvolt = <3300000>;
+>> -				regulator-always-on;
+>> -			};
+>> -
+>> -			vcc_csi0: ldo3 {
+>> -				regulator-min-microvolt = <700000>;
+>> -				regulator-max-microvolt = <3500000>;
+>> -				regulator-always-on;
+>> -			};
+>> -
+>> -			vcc_csi1: ldo4 {
+>> -				regulator-min-microvolt = <1250000>;
+>> -				regulator-max-microvolt = <3300000>;
+>> -				regulator-always-on;
+>> -			};
+>> -
+>> -			vdd_cpu: dcdc2 {
+>> -				regulator-min-microvolt = <700000>;
+>> -				regulator-max-microvolt = <2275000>;
+>> -				regulator-always-on;
+>> -			};
+>> -
+>> -			vdd_int: dcdc3 {
+>> -				regulator-min-microvolt = <700000>;
+>> -				regulator-max-microvolt = <3500000>;
+>> -				regulator-always-on;
+>> -			};
+>> -		};
+>>   	};
+>>   };
+>>   
+>> @@ -196,6 +144,10 @@
+>>   	status = "okay";
+>>   };
+>>   
+>> +&otg_sram {
+>> +	status = "okay";
+>> +};
+>> +
+>>   &pio {
+>>   	ahci_pwr_pin_olinuxinolime: ahci_pwr_pin at 1 {
+>>   		allwinner,pins = "PC3";
+>> @@ -210,6 +162,27 @@
+>>   		allwinner,drive = <SUN4I_PINCTRL_20_MA>;
+>>   		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+>>   	};
+>> +
+>> +	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
+>> +		allwinner,pins = "PH4";
+>> +		allwinner,function = "gpio_in";
+>> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+>> +		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+>> +	};
+>> +
+>> +	usb0_vbus_detect_pin: usb0_vbus_detect_pin at 0 {
+>> +		allwinner,pins = "PH5";
+>> +		allwinner,function = "gpio_in";
+>> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+>> +		allwinner,pull = <SUN4I_PINCTRL_PULL_DOWN>;
+>> +	};
+>> +
+>> +	usb0_vbus_pin_lime2: usb0_vbus_pin at 0 {
+>> +		allwinner,pins = "PC17";
+>> +		allwinner,function = "gpio_out";
+>> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+>> +		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+>> +	};
+>>   };
+>>   
+>>   &reg_ahci_5v {
+>> @@ -218,6 +191,42 @@
+>>   	status = "okay";
+>>   };
+>>   
+>> +#include "axp209.dtsi"
+>> +
+>> +&reg_dcdc2 {
+>> +	regulator-always-on;
+>> +	regulator-min-microvolt = <1000000>;
+>> +	regulator-max-microvolt = <1450000>;
+>> +	regulator-name = "vdd-cpu";
+>> +};
+>> +
+>> +&reg_dcdc3 {
+>> +	regulator-always-on;
+>> +	regulator-min-microvolt = <1000000>;
+>> +	regulator-max-microvolt = <1400000>;
+>> +	regulator-name = "vdd-int-dll";
+>> +};
+>> +
+>> +&reg_ldo1 {
+>> +	regulator-always-on;
+>> +	regulator-min-microvolt = <1300000>;
+>> +	regulator-max-microvolt = <1300000>;
+>> +	regulator-name = "vdd-rtc";
+>> +};
+>> +
+>> +&reg_ldo2 {
+>> +	regulator-always-on;
+>> +	regulator-min-microvolt = <3000000>;
+>> +	regulator-max-microvolt = <3000000>;
+>> +	regulator-name = "avcc";
+>> +};
+>> +
+>> +&reg_usb0_vbus {
+>> +	pinctrl-0 = <&usb0_vbus_pin_lime2>;
+>> +	gpio = <&pio 2 17 GPIO_ACTIVE_HIGH>;
+>> +	status = "okay";
+>> +};
+>> +
+>>   &reg_usb1_vbus {
+>>   	status = "okay";
+>>   };
+>> @@ -232,7 +241,17 @@
+>>   	status = "okay";
+>>   };
+>>   
+>> +&usb_otg {
+>> +	dr_mode = "otg";
+>> +	status = "okay";
+>> +};
+>> +
+>>   &usbphy {
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&usb0_id_detect_pin>, <&usb0_vbus_detect_pin>;
+>> +	usb0_id_det-gpio = <&pio 7 4 GPIO_ACTIVE_HIGH>; /* PH4 */
+>> +	usb0_vbus_det-gpio = <&pio 7 5 GPIO_ACTIVE_HIGH>; /* PH5 */
+>> +	usb0_vbus-supply = <&reg_usb0_vbus>;
+>>   	usb1_vbus-supply = <&reg_usb1_vbus>;
+>>   	usb2_vbus-supply = <&reg_usb2_vbus>;
+>>   	status = "okay";
 >>
->> v1 -> v2:
->> - use CONFIG_KVM_HAVE_IRQ_BYPASS instead CONFIG_IRQ_BYPASS_MANAGER
->> - rename all functions according to Paolo's proposal
->> - add kvm_arch_irq_bypass_update according to Feng's need
->> ---
->>  include/linux/kvm_host.h | 33 +++++++++++++++++++++++++++++++++
->>  virt/kvm/Kconfig         |  3 +++
->>  2 files changed, 36 insertions(+)
->>
->> diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
->> index 05e99b8..84b5feb 100644
->> --- a/include/linux/kvm_host.h
->> +++ b/include/linux/kvm_host.h
->> @@ -24,6 +24,7 @@
->>  #include <linux/err.h>
->>  #include <linux/irqflags.h>
->>  #include <linux/context_tracking.h>
->> +#include <linux/irqbypass.h>
->>  #include <asm/signal.h>
->>  
->>  #include <linux/kvm.h>
->> @@ -1151,5 +1152,37 @@ static inline void kvm_vcpu_set_dy_eligible(struct kvm_vcpu *vcpu, bool val)
->>  {
->>  }
->>  #endif /* CONFIG_HAVE_KVM_CPU_RELAX_INTERCEPT */
->> +
->> +#ifdef CONFIG_HAVE_KVM_IRQ_BYPASS
->> +
->> +int kvm_arch_irq_bypass_add_producer(struct irq_bypass_consumer *,
->> +			   struct irq_bypass_producer *);
->> +void kvm_arch_irq_bypass_del_producer(struct irq_bypass_consumer *,
->> +			   struct irq_bypass_producer *);
->> +void kvm_arch_irq_bypass_stop(struct irq_bypass_consumer *);
->> +void kvm_arch_irq_bypass_start(struct irq_bypass_consumer *);
->> +
->> +#else
-> 
-> Do we really need static inline stubs?  When would they get used?
-This addresses the case where another arch would use an irq bypass
-producer (such as vfio platform driver ) and irqfd without
-implementing/needing forwarding/posting stuff.
-
-I see 2 solutions: either we have those stubs or in eventfd.c we guard
-	irq_bypass_unregister_consumer(&irqfd->consumer);
-and
-	ret = irq_bypass_register_consumer(&irqfd->consumer);
-by
-
-#ifdef CONFIG_HAVE_KVM_IRQ_BYPASS
-#endif
-
-This latter solution maybe is better.
-
-  How
-> would they work since we call them via function pointers?
-Just tested that without the ARM forwarding implementation of kvm_arch
-functions and that runs fine.
-> 
->> +
->> +static inline int kvm_arch_irq_bypass_add_producer(
->> +			struct irq_bypass_consumer *cons,
->> +			struct irq_bypass_producer *prod)
->> +{
->> +	return -1;
-> 
-> No reason not to stick with standard errno values, is there?  -EINVAL
-> Thanks,
-sure
-
-Thanks
-
-Eric
-> 
-> Alex
-> 
->> +}
->> +static inline void kvm_arch_irq_bypass_del_producer(
->> +			struct irq_bypass_consumer *cons,
->> +			struct irq_bypass_producer *prod)
->> +{
->> +}
->> +static inline void kvm_arch_irq_bypass_stop(
->> +			struct irq_bypass_consumer *cons)
->> +{
->> +}
->> +static inline void kvm_arch_irq_bypass_start(
->> +			struct irq_bypass_consumer *cons)
->> +{
->> +}
->> +#endif /* CONFIG_HAVE_KVM_IRQ_BYPASS */
->>  #endif
->>  
->> diff --git a/virt/kvm/Kconfig b/virt/kvm/Kconfig
->> index e2c876d..9f8014d 100644
->> --- a/virt/kvm/Kconfig
->> +++ b/virt/kvm/Kconfig
->> @@ -47,3 +47,6 @@ config KVM_GENERIC_DIRTYLOG_READ_PROTECT
->>  config KVM_COMPAT
->>         def_bool y
->>         depends on COMPAT && !S390
->> +
->> +config HAVE_KVM_IRQ_BYPASS
->> +       bool
-> 
-> 
-> 
