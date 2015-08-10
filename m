@@ -1,34 +1,51 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 10 Aug 2015 11:25:15 +0100
-Subject: [PATCH v3 01/18] platform: delay OF device-driver matches until
- late_initcall
-In-Reply-To: <CAAObsKDJsuhuQfLbxq27Mtm1T_Auz7Gohp8PDyK7rNNDyaGhcg@mail.gmail.com>
-References: <1438870315-18689-1-git-send-email-tomeu.vizoso@collabora.com>
- <1438870315-18689-2-git-send-email-tomeu.vizoso@collabora.com>
- <CAL_Jsq+GLMZe-f6qEi=7i1YrrWc6k99RpGkOyCd5KkYDiyt0QA@mail.gmail.com>
- <CAAObsKBapFqzr+4YEXJfcJWMd+tkaBqYbGiFTntHStAP=+P-_Q@mail.gmail.com>
- <55C4E597.1010701@ti.com>
- <CAAObsKDJsuhuQfLbxq27Mtm1T_Auz7Gohp8PDyK7rNNDyaGhcg@mail.gmail.com>
-Message-ID: <20150810102515.GA1965@sirena.org.uk>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Mon, 10 Aug 2015 11:37:35 +0100
+Subject: [PATCH v9 0/9] Add simple NVMEM Framework via regmap.
+In-Reply-To: <20150809151916.GF14271@lunn.ch>
+References: <1437995567-11203-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1438693367.3793.29.camel@pengutronix.de> <20150809151916.GF14271@lunn.ch>
+Message-ID: <55C87EEF.6020609@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 09, 2015 at 03:03:14PM +0200, Tomeu Vizoso wrote:
+Hi Andrew,
 
-> There was some recent thread about how the disabling of unused clocks
-> and regulators isn't really safe because after late_initcall_sync more
-> drivers can be registered from modules. Furthermore, there's async
-> device probes.
+On 09/08/15 16:19, Andrew Lunn wrote:
+> Hi Srinivas
+>
+> The AT24 eeprom driver contains the comment:
+>
+>          /*
+>           * Export the EEPROM bytes through sysfs, since that's convenient.
+>           * By default, only root should see the data (maybe passwords etc)
+>           */
+>
+> and as you would expect from this:
+>
+> # ls -l ./devices/platform/soc/soc:aips-bus at 40000000/40066000.i2c/i2c-0/0-0050/eeprom
+> -rw------- 1 root root 512 Aug  9 10:16 ./devices/platform/soc/soc:aips-bus at 40000000/40066000.i2c/i2c-0/0-0050/eeprom
+>
+> The AT25 and the MAX6875 driver are the same.
+>
+> However nvmem has different defaults:
+>
+> # ls -l ./devices/platform/soc/soc:aips-bus at 40000000/40066000.i2c/i2c-0/0-0050/0-00500/nvmem
+> -rw-r--r-- 1 root root 0 Aug  9 10:16 ./devices/platform/soc/soc:aips-bus at 40000000/40066000.i2c/i2c-0/0-0050/0-00500/nvmem
+>
+Yes, nvmem by default sets the read permission for everyone S_IRUGO. 
+Which was the most common use case.
 
-What recent thread and why would that be unsafe?  Any driver using a
-clock or regulator ought to be making sure that the clock or regulator
-is enabled before it tries to use it.  The worst that should happen is
-that something gets the power bounced during boot which isn't the end of
-the world.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150810/5a6b2746/attachment.sig>
+> Has this been considered and discussed?
+Thanks for bringing this up, No, we did not discuss this explicitly, but 
+it should not be an issue to accommodate this. Provider still have 
+flexibility to configure such things.
+
+As a first patchset we wanted to keep the framework simple and add 
+features as we move on.
+
+Thanks,
+srini
+>
+> Thanks
+>      Andrew
+>
