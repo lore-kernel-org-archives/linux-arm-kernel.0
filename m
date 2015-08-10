@@ -1,113 +1,96 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 10 Aug 2015 11:51:59 +0200
-Subject: [PATCH 42/74] clockevents/drivers/keystone: Migrate to new
- 'set-state' interface
+Date: Mon, 10 Aug 2015 11:52:02 +0200
+Subject: [PATCH 45/74] clockevents/drivers/sun5i: Migrate to new 'set-state'
+ interface
 In-Reply-To: <1439200352-26767-1-git-send-email-daniel.lezcano@linaro.org>
 References: <55C87382.4070309@linaro.org>
  <1439200352-26767-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1439200352-26767-42-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1439200352-26767-45-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Viresh Kumar <viresh.kumar@linaro.org>
 
-Migrate keystone driver to the new 'set-state' interface provided by
+Migrate sun5i driver to the new 'set-state' interface provided by
 clockevents core, the earlier 'set-mode' interface is marked obsolete
 now.
 
 This also enables us to implement callbacks for new states of clockevent
 devices, for example: ONESHOT_STOPPED.
 
-Also pass the mode-mask to keystone_timer_config() instead of the mode
-as mode macro's aren't valid anymore.
-
-Cc: Santosh Shilimkar <ssantosh@kernel.org>
+Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/clocksource/timer-keystone.c | 44 +++++++++++++-----------------------
- 1 file changed, 16 insertions(+), 28 deletions(-)
+ drivers/clocksource/timer-sun5i.c | 45 ++++++++++++++++++++++-----------------
+ 1 file changed, 26 insertions(+), 19 deletions(-)
 
-diff --git a/drivers/clocksource/timer-keystone.c b/drivers/clocksource/timer-keystone.c
-index 0250354..edacf39 100644
---- a/drivers/clocksource/timer-keystone.c
-+++ b/drivers/clocksource/timer-keystone.c
-@@ -72,10 +72,10 @@ static inline void keystone_timer_barrier(void)
- 
- /**
-  * keystone_timer_config: configures timer to work in oneshot/periodic modes.
-- * @ mode: mode to configure
-+ * @ mask: mask of the mode to configure
-  * @ period: cycles number to configure for
-  */
--static int keystone_timer_config(u64 period, enum clock_event_mode mode)
-+static int keystone_timer_config(u64 period, int mask)
- {
- 	u32 tcr;
- 	u32 off;
-@@ -84,16 +84,7 @@ static int keystone_timer_config(u64 period, enum clock_event_mode mode)
- 	off = tcr & ~(TCR_ENAMODE_MASK);
- 
- 	/* set enable mode */
--	switch (mode) {
--	case CLOCK_EVT_MODE_ONESHOT:
--		tcr |= TCR_ENAMODE_ONESHOT_MASK;
--		break;
--	case CLOCK_EVT_MODE_PERIODIC:
--		tcr |= TCR_ENAMODE_PERIODIC_MASK;
--		break;
--	default:
--		return -1;
--	}
-+	tcr |= mask;
- 
- 	/* disable timer */
- 	keystone_timer_writel(off, TCR);
-@@ -138,24 +129,19 @@ static irqreturn_t keystone_timer_interrupt(int irq, void *dev_id)
- static int keystone_set_next_event(unsigned long cycles,
- 				  struct clock_event_device *evt)
- {
--	return keystone_timer_config(cycles, evt->mode);
-+	return keystone_timer_config(cycles, TCR_ENAMODE_ONESHOT_MASK);
+diff --git a/drivers/clocksource/timer-sun5i.c b/drivers/clocksource/timer-sun5i.c
+index 0ffb4ea..bca9573 100644
+--- a/drivers/clocksource/timer-sun5i.c
++++ b/drivers/clocksource/timer-sun5i.c
+@@ -103,27 +103,31 @@ static void sun5i_clkevt_time_start(struct sun5i_timer_clkevt *ce, u8 timer, boo
+ 	       ce->timer.base + TIMER_CTL_REG(timer));
  }
  
--static void keystone_set_mode(enum clock_event_mode mode,
--			     struct clock_event_device *evt)
-+static int keystone_shutdown(struct clock_event_device *evt)
+-static void sun5i_clkevt_mode(enum clock_event_mode mode,
+-			      struct clock_event_device *clkevt)
++static int sun5i_clkevt_shutdown(struct clock_event_device *clkevt)
  {
+ 	struct sun5i_timer_clkevt *ce = to_sun5i_timer_clkevt(clkevt);
+ 
 -	switch (mode) {
 -	case CLOCK_EVT_MODE_PERIODIC:
--		keystone_timer_config(timer.hz_period, CLOCK_EVT_MODE_PERIODIC);
+-		sun5i_clkevt_time_stop(ce, 0);
+-		sun5i_clkevt_time_setup(ce, 0, ce->timer.ticks_per_jiffy);
+-		sun5i_clkevt_time_start(ce, 0, true);
+-		break;
+-	case CLOCK_EVT_MODE_ONESHOT:
+-		sun5i_clkevt_time_stop(ce, 0);
+-		sun5i_clkevt_time_start(ce, 0, false);
 -		break;
 -	case CLOCK_EVT_MODE_UNUSED:
 -	case CLOCK_EVT_MODE_SHUTDOWN:
--	case CLOCK_EVT_MODE_ONESHOT:
--		keystone_timer_disable();
--		break;
 -	default:
+-		sun5i_clkevt_time_stop(ce, 0);
 -		break;
 -	}
-+	keystone_timer_disable();
++	sun5i_clkevt_time_stop(ce, 0);
 +	return 0;
 +}
 +
-+static int keystone_set_periodic(struct clock_event_device *evt)
++static int sun5i_clkevt_set_oneshot(struct clock_event_device *clkevt)
 +{
-+	keystone_timer_config(timer.hz_period, TCR_ENAMODE_PERIODIC_MASK);
++	struct sun5i_timer_clkevt *ce = to_sun5i_timer_clkevt(clkevt);
++
++	sun5i_clkevt_time_stop(ce, 0);
++	sun5i_clkevt_time_start(ce, 0, false);
++	return 0;
++}
++
++static int sun5i_clkevt_set_periodic(struct clock_event_device *clkevt)
++{
++	struct sun5i_timer_clkevt *ce = to_sun5i_timer_clkevt(clkevt);
++
++	sun5i_clkevt_time_stop(ce, 0);
++	sun5i_clkevt_time_setup(ce, 0, ce->timer.ticks_per_jiffy);
++	sun5i_clkevt_time_start(ce, 0, true);
 +	return 0;
  }
  
- static void __init keystone_timer_init(struct device_node *np)
-@@ -222,7 +208,9 @@ static void __init keystone_timer_init(struct device_node *np)
- 	/* setup clockevent */
- 	event_dev->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT;
- 	event_dev->set_next_event = keystone_set_next_event;
--	event_dev->set_mode = keystone_set_mode;
-+	event_dev->set_state_shutdown = keystone_shutdown;
-+	event_dev->set_state_periodic = keystone_set_periodic;
-+	event_dev->set_state_oneshot = keystone_shutdown;
- 	event_dev->cpumask = cpu_all_mask;
- 	event_dev->owner = THIS_MODULE;
- 	event_dev->name = TIMER_NAME;
+ static int sun5i_clkevt_next_event(unsigned long evt,
+@@ -286,7 +290,10 @@ static int __init sun5i_setup_clockevent(struct device_node *node, void __iomem
+ 	ce->clkevt.name = node->name;
+ 	ce->clkevt.features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT;
+ 	ce->clkevt.set_next_event = sun5i_clkevt_next_event;
+-	ce->clkevt.set_mode = sun5i_clkevt_mode;
++	ce->clkevt.set_state_shutdown = sun5i_clkevt_shutdown;
++	ce->clkevt.set_state_periodic = sun5i_clkevt_set_periodic;
++	ce->clkevt.set_state_oneshot = sun5i_clkevt_set_oneshot;
++	ce->clkevt.tick_resume = sun5i_clkevt_shutdown;
+ 	ce->clkevt.rating = 340;
+ 	ce->clkevt.irq = irq;
+ 	ce->clkevt.cpumask = cpu_possible_mask;
 -- 
 1.9.1
