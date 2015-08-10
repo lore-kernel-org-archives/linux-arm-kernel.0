@@ -1,86 +1,18 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 10 Aug 2015 10:40:08 +0100
-Subject: [PATCH 2/3] [v4] ARM64: TTY: hvc_dcc: Add support for ARM64 dcc
-In-Reply-To: <1438992995-22610-2-git-send-email-timur@codeaurora.org>
-References: <1438992995-22610-1-git-send-email-timur@codeaurora.org>
- <1438992995-22610-2-git-send-email-timur@codeaurora.org>
-Message-ID: <20150810094008.GD1604@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 10 Aug 2015 11:40:27 +0200
+Subject: [PATCH 4/6] gpiolib-sysfs: Add gpio name parsing for sysfs export
+In-Reply-To: <1438680203-13432-5-git-send-email-mpa@pengutronix.de>
+References: <1438680203-13432-1-git-send-email-mpa@pengutronix.de>
+ <1438680203-13432-5-git-send-email-mpa@pengutronix.de>
+Message-ID: <CACRpkdaomx0JHnO2+sg-UZ+gZbX8fTs3c26Wcq=-GP4zFp-TGQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 08, 2015 at 01:16:34AM +0100, Timur Tabi wrote:
-> From: Abhimanyu Kapur <abhimany@codeaurora.org>
-> 
-> Add support for debug communications channel based
-> hvc console for arm64 cpus.
-> 
-> Signed-off-by: Abhimanyu Kapur <abhimany@codeaurora.org>
-> Signed-off-by: Timur Tabi <timur@codeaurora.org>
-> ---
->  arch/arm64/include/asm/dcc.h | 52 ++++++++++++++++++++++++++++++++++++++++++++
->  drivers/tty/hvc/Kconfig      |  2 +-
->  2 files changed, 53 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm64/include/asm/dcc.h
-> 
-> diff --git a/arch/arm64/include/asm/dcc.h b/arch/arm64/include/asm/dcc.h
-> new file mode 100644
-> index 0000000..fcb8d7d
-> --- /dev/null
-> +++ b/arch/arm64/include/asm/dcc.h
-> @@ -0,0 +1,52 @@
-> +/* Copyright (c) 2014-2015 The Linux Foundation. All rights reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 and
-> + * only version 2 as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * A call to __dcc_getchar() or __dcc_putchar() is typically followed by
-> + * a call to __dcc_getstatus().  We want to make sure that the CPU does
-> + * not speculative read the DCC status before executing the read or write
-> + * instruction.  That's what the ISBs are for.
-> + *
-> + * The 'volatile' ensures that the compiler does not cache the status bits,
-> + * and instead reads the DCC register every time.
-> + */
-> +#ifndef __ASM_DCC_H
-> +#define __ASM_DCC_H
-> +
-> +#include <asm/barrier.h>
-> +
-> +static inline u32 __dcc_getstatus(void)
-> +{
-> +	u32 ret;
-> +
-> +	asm volatile("mrs %0, mdccsr_el0" : "=r" (ret));
-> +
-> +	return ret;
-> +}
-> +
-> +static inline char __dcc_getchar(void)
-> +{
-> +	char c;
-> +
-> +	asm volatile("mrs %0, dbgdtrrx_el0" : "=r" (c));
-> +	isb();
-> +
-> +	return c;
-> +}
-> +
-> +static inline void __dcc_putchar(char c)
-> +{
-> +	asm volatile("msr dbgdtrtx_el0, %0"
-> +			: /* No output register */
-> +			: "r" (c));
-> +	isb();
+On Tue, Aug 4, 2015 at 11:23 AM, Markus Pargmann <mpa@pengutronix.de> wrote:
 
-I think we should be masking out the upper bits of c before the msr
-(the compiler probably expects a uxtb).
+> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 
-Other than that, this looks ok.
+Needs a bigger commit message, but looks correct in this context.
 
-Will
+Yours,
+Linus Walleij
