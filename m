@@ -1,74 +1,194 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 10 Aug 2015 16:23:10 +0200
-Subject: [PATCH 2/4] USB: host: ohci-at91: depend on OF
+Date: Mon, 10 Aug 2015 16:23:11 +0200
+Subject: [PATCH 3/4] USB: host: ohci-at91: merge ohci_at91_of_init in
+ ohci_hcd_at91_drv_probe
 In-Reply-To: <1439216592-11381-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1439216592-11381-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1439216592-11381-3-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1439216592-11381-4-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make the driver depend on CONFIG_OF and remove the now useless #ifdef
-
-Also, fix the Kconfig indentation.
+As device tree support is now mandatory, merge ohci_at91_of_init() in
+ohci_hcd_at91_drv_probe().
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- drivers/usb/host/Kconfig     | 8 ++++----
- drivers/usb/host/ohci-at91.c | 9 +--------
- 2 files changed, 5 insertions(+), 12 deletions(-)
+ drivers/usb/host/ohci-at91.c | 145 +++++++++++++++++++------------------------
+ 1 file changed, 63 insertions(+), 82 deletions(-)
 
-diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-index 8afc3c1efdab..7ef56faf09bb 100644
---- a/drivers/usb/host/Kconfig
-+++ b/drivers/usb/host/Kconfig
-@@ -441,10 +441,10 @@ config USB_OHCI_HCD_PXA27X
- 	  PXA27x/PXA3xx chips.
- 
- config USB_OHCI_HCD_AT91
--        tristate "Support for Atmel on-chip OHCI USB controller"
--        depends on USB_OHCI_HCD && ARCH_AT91
--        default y
--        ---help---
-+	tristate "Support for Atmel on-chip OHCI USB controller"
-+	depends on USB_OHCI_HCD && ARCH_AT91 && OF
-+	default y
-+	---help---
-           Enables support for the on-chip OHCI controller on
-           Atmel chips.
- 
 diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
-index 72dc4f9e2a0f..8e17d5ba26c6 100644
+index 8e17d5ba26c6..cdd91c551c7b 100644
 --- a/drivers/usb/host/ohci-at91.c
 +++ b/drivers/usb/host/ohci-at91.c
-@@ -442,7 +442,6 @@ static irqreturn_t ohci_hcd_at91_overcurrent_irq(int irq, void *data)
- 	return IRQ_HANDLED;
- }
+@@ -449,16 +449,17 @@ static const struct of_device_id at91_ohci_dt_ids[] = {
  
--#ifdef CONFIG_OF
- static const struct of_device_id at91_ohci_dt_ids[] = {
- 	{ .compatible = "atmel,at91rm9200-ohci" },
- 	{ /* sentinel */ }
-@@ -492,12 +491,6 @@ static int ohci_at91_of_init(struct platform_device *pdev)
+ MODULE_DEVICE_TABLE(of, at91_ohci_dt_ids);
  
- 	return 0;
- }
--#else
 -static int ohci_at91_of_init(struct platform_device *pdev)
--{
++/*-------------------------------------------------------------------------*/
++
++static int ohci_hcd_at91_drv_probe(struct platform_device *pdev)
+ {
+ 	struct device_node *np = pdev->dev.of_node;
+-	int i, gpio, ret;
+-	enum of_gpio_flags flags;
+ 	struct at91_usbh_data	*pdata;
+-	u32 ports;
+-
+-	if (!np)
+-		return 0;
++	int			i;
++	int			gpio;
++	int			ret;
++	enum of_gpio_flags	flags;
++	u32			ports;
+ 
+ 	/* Right now device-tree probed devices don't get dma_mask set.
+ 	 * Since shared usb code relies on it, set it here for now.
+@@ -489,89 +490,69 @@ static int ohci_at91_of_init(struct platform_device *pdev)
+ 
+ 	pdev->dev.platform_data = pdata;
+ 
 -	return 0;
 -}
--#endif
+-
+-/*-------------------------------------------------------------------------*/
+-
+-static int ohci_hcd_at91_drv_probe(struct platform_device *pdev)
+-{
+-	struct at91_usbh_data	*pdata;
+-	int			i;
+-	int			gpio;
+-	int			ret;
+-
+-	ret = ohci_at91_of_init(pdev);
+-	if (ret)
+-		return ret;
++	at91_for_each_port(i) {
++		/*
++		 * do not configure PIO if not in relation with
++		 * real USB port on board
++		 */
++		if (i >= pdata->ports) {
++			pdata->vbus_pin[i] = -EINVAL;
++			pdata->overcurrent_pin[i] = -EINVAL;
++			break;
++		}
  
- /*-------------------------------------------------------------------------*/
+-	pdata = dev_get_platdata(&pdev->dev);
++		if (!gpio_is_valid(pdata->vbus_pin[i]))
++			continue;
++		gpio = pdata->vbus_pin[i];
  
-@@ -684,7 +677,7 @@ static struct platform_driver ohci_hcd_at91_driver = {
- 	.driver		= {
- 		.name	= "at91_ohci",
- 		.pm	= &ohci_hcd_at91_pm_ops,
--		.of_match_table	= of_match_ptr(at91_ohci_dt_ids),
-+		.of_match_table	= at91_ohci_dt_ids,
- 	},
- };
+-	if (pdata) {
+-		at91_for_each_port(i) {
+-			/*
+-			 * do not configure PIO if not in relation with
+-			 * real USB port on board
+-			 */
+-			if (i >= pdata->ports) {
+-				pdata->vbus_pin[i] = -EINVAL;
+-				pdata->overcurrent_pin[i] = -EINVAL;
+-				break;
+-			}
++		ret = gpio_request(gpio, "ohci_vbus");
++		if (ret) {
++			dev_err(&pdev->dev,
++				"can't request vbus gpio %d\n", gpio);
++			continue;
++		}
++		ret = gpio_direction_output(gpio,
++					!pdata->vbus_pin_active_low[i]);
++		if (ret) {
++			dev_err(&pdev->dev,
++				"can't put vbus gpio %d as output %d\n",
++				gpio, !pdata->vbus_pin_active_low[i]);
++			gpio_free(gpio);
++			continue;
++		}
+ 
+-			if (!gpio_is_valid(pdata->vbus_pin[i]))
+-				continue;
+-			gpio = pdata->vbus_pin[i];
++		ohci_at91_usb_set_power(pdata, i, 1);
++	}
+ 
+-			ret = gpio_request(gpio, "ohci_vbus");
+-			if (ret) {
+-				dev_err(&pdev->dev,
+-					"can't request vbus gpio %d\n", gpio);
+-				continue;
+-			}
+-			ret = gpio_direction_output(gpio,
+-						!pdata->vbus_pin_active_low[i]);
+-			if (ret) {
+-				dev_err(&pdev->dev,
+-					"can't put vbus gpio %d as output %d\n",
+-					gpio, !pdata->vbus_pin_active_low[i]);
+-				gpio_free(gpio);
+-				continue;
+-			}
++	at91_for_each_port(i) {
++		if (!gpio_is_valid(pdata->overcurrent_pin[i]))
++			continue;
++		gpio = pdata->overcurrent_pin[i];
+ 
+-			ohci_at91_usb_set_power(pdata, i, 1);
++		ret = gpio_request(gpio, "ohci_overcurrent");
++		if (ret) {
++			dev_err(&pdev->dev,
++				"can't request overcurrent gpio %d\n",
++				gpio);
++			continue;
+ 		}
+ 
+-		at91_for_each_port(i) {
+-			if (!gpio_is_valid(pdata->overcurrent_pin[i]))
+-				continue;
+-			gpio = pdata->overcurrent_pin[i];
+-
+-			ret = gpio_request(gpio, "ohci_overcurrent");
+-			if (ret) {
+-				dev_err(&pdev->dev,
+-					"can't request overcurrent gpio %d\n",
+-					gpio);
+-				continue;
+-			}
+-
+-			ret = gpio_direction_input(gpio);
+-			if (ret) {
+-				dev_err(&pdev->dev,
+-					"can't configure overcurrent gpio %d as input\n",
+-					gpio);
+-				gpio_free(gpio);
+-				continue;
+-			}
++		ret = gpio_direction_input(gpio);
++		if (ret) {
++			dev_err(&pdev->dev,
++				"can't configure overcurrent gpio %d as input\n",
++				gpio);
++			gpio_free(gpio);
++			continue;
++		}
+ 
+-			ret = request_irq(gpio_to_irq(gpio),
+-					  ohci_hcd_at91_overcurrent_irq,
+-					  IRQF_SHARED, "ohci_overcurrent", pdev);
+-			if (ret) {
+-				gpio_free(gpio);
+-				dev_err(&pdev->dev,
+-					"can't get gpio IRQ for overcurrent\n");
+-			}
++		ret = request_irq(gpio_to_irq(gpio),
++				  ohci_hcd_at91_overcurrent_irq,
++				  IRQF_SHARED, "ohci_overcurrent", pdev);
++		if (ret) {
++			gpio_free(gpio);
++			dev_err(&pdev->dev,
++				"can't get gpio IRQ for overcurrent\n");
+ 		}
+ 	}
  
 -- 
 2.1.4
