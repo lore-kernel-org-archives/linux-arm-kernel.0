@@ -1,94 +1,100 @@
 From: zhichao.huang@linaro.org (Zhichao Huang)
-Date: Mon, 10 Aug 2015 21:26:00 +0800
-Subject: [PATCH v4 08/15] KVM: arm: add a trace event for cp14 traps
+Date: Mon, 10 Aug 2015 21:25:55 +0800
+Subject: [PATCH v4 03/15] KVM: arm: enable to use the ARM_DSCR_MDBGEN macro
+ from KVM assembly code
 In-Reply-To: <1439213167-8988-1-git-send-email-zhichao.huang@linaro.org>
 References: <1439213167-8988-1-git-send-email-zhichao.huang@linaro.org>
-Message-ID: <1439213167-8988-9-git-send-email-zhichao.huang@linaro.org>
+Message-ID: <1439213167-8988-4-git-send-email-zhichao.huang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are too many cp15 traps, so we don't reuse the cp15 trace event
-but add a new trace event to trace the access of debug registers.
+Add #ifndef __ASSEMBLY__ in hw_breakpoint.h, in order to use
+the ARM_DSCR_MDBGEN macro from KVM assembly code.
 
 Signed-off-by: Zhichao Huang <zhichao.huang@linaro.org>
+Reviewed-by: Alex Bennee <alex.bennee@linaro.org>
 Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/kvm/coproc.c | 14 ++++++++++++++
- arch/arm/kvm/trace.h  | 30 ++++++++++++++++++++++++++++++
- 2 files changed, 44 insertions(+)
+ arch/arm/include/asm/hw_breakpoint.h | 54 +++++++++++++++++++-----------------
+ 1 file changed, 29 insertions(+), 25 deletions(-)
 
-diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
-index 2164f4e..d15b250 100644
---- a/arch/arm/kvm/coproc.c
-+++ b/arch/arm/kvm/coproc.c
-@@ -643,6 +643,13 @@ int kvm_handle_cp_64(struct kvm_vcpu *vcpu,
- 	params.Rt2 = (kvm_vcpu_get_hsr(vcpu) >> 10) & 0xf;
- 	params.CRm = 0;
+diff --git a/arch/arm/include/asm/hw_breakpoint.h b/arch/arm/include/asm/hw_breakpoint.h
+index 8e427c7..f2f4c61 100644
+--- a/arch/arm/include/asm/hw_breakpoint.h
++++ b/arch/arm/include/asm/hw_breakpoint.h
+@@ -3,6 +3,8 @@
  
-+	if (global == cp14_regs)
-+		trace_kvm_emulate_cp14_imp(params.Op1, params.Rt1, params.CRn,
-+			params.CRm, params.Op2, params.is_write);
-+	else
-+		trace_kvm_emulate_cp15_imp(params.Op1, params.Rt1, params.CRn,
-+			params.CRm, params.Op2, params.is_write);
-+
- 	if (!emulate_cp(vcpu, &params, target_specific, nr_specific))
- 		return 1;
- 	if (!emulate_cp(vcpu, &params, global, nr_global))
-@@ -680,6 +687,13 @@ int kvm_handle_cp_32(struct kvm_vcpu *vcpu,
- 	params.Op2 = (kvm_vcpu_get_hsr(vcpu) >> 17) & 0x7;
- 	params.Rt2 = 0;
+ #ifdef __KERNEL__
  
-+	if (global == cp14_regs)
-+		trace_kvm_emulate_cp14_imp(params.Op1, params.Rt1, params.CRn,
-+			params.CRm, params.Op2, params.is_write);
-+	else
-+		trace_kvm_emulate_cp15_imp(params.Op1, params.Rt1, params.CRn,
-+			params.CRm, params.Op2, params.is_write);
++#ifndef __ASSEMBLY__
 +
- 	if (!emulate_cp(vcpu, &params, target_specific, nr_specific))
- 		return 1;
- 	if (!emulate_cp(vcpu, &params, global, nr_global))
-diff --git a/arch/arm/kvm/trace.h b/arch/arm/kvm/trace.h
-index 0ec3539..988da03 100644
---- a/arch/arm/kvm/trace.h
-+++ b/arch/arm/kvm/trace.h
-@@ -159,6 +159,36 @@ TRACE_EVENT(kvm_emulate_cp15_imp,
- 			__entry->CRm, __entry->Op2)
- );
+ struct task_struct;
  
-+/* Architecturally implementation defined CP14 register access */
-+TRACE_EVENT(kvm_emulate_cp14_imp,
-+	TP_PROTO(unsigned long Op1, unsigned long Rt1, unsigned long CRn,
-+		 unsigned long CRm, unsigned long Op2, bool is_write),
-+	TP_ARGS(Op1, Rt1, CRn, CRm, Op2, is_write),
+ #ifdef CONFIG_HAVE_HW_BREAKPOINT
+@@ -44,6 +46,33 @@ static inline void decode_ctrl_reg(u32 reg,
+ 	ctrl->mismatch	= reg & 0x1;
+ }
+ 
++struct notifier_block;
++struct perf_event;
++struct pmu;
 +
-+	TP_STRUCT__entry(
-+		__field(	unsigned int,	Op1		)
-+		__field(	unsigned int,	Rt1		)
-+		__field(	unsigned int,	CRn		)
-+		__field(	unsigned int,	CRm		)
-+		__field(	unsigned int,	Op2		)
-+		__field(	bool,		is_write	)
-+	),
++extern struct pmu perf_ops_bp;
++extern int arch_bp_generic_fields(struct arch_hw_breakpoint_ctrl ctrl,
++				  int *gen_len, int *gen_type);
++extern int arch_check_bp_in_kernelspace(struct perf_event *bp);
++extern int arch_validate_hwbkpt_settings(struct perf_event *bp);
++extern int hw_breakpoint_exceptions_notify(struct notifier_block *unused,
++					   unsigned long val, void *data);
 +
-+	TP_fast_assign(
-+		__entry->is_write		= is_write;
-+		__entry->Op1			= Op1;
-+		__entry->Rt1			= Rt1;
-+		__entry->CRn			= CRn;
-+		__entry->CRm			= CRm;
-+		__entry->Op2			= Op2;
-+	),
++extern u8 arch_get_debug_arch(void);
++extern u8 arch_get_max_wp_len(void);
++extern void clear_ptrace_hw_breakpoint(struct task_struct *tsk);
 +
-+	TP_printk("Implementation defined CP14: %s\tp14, %u, r%u, c%u, c%u, %u",
-+			(__entry->is_write) ? "mcr" : "mrc",
-+			__entry->Op1, __entry->Rt1, __entry->CRn,
-+			__entry->CRm, __entry->Op2)
-+);
++int arch_install_hw_breakpoint(struct perf_event *bp);
++void arch_uninstall_hw_breakpoint(struct perf_event *bp);
++void hw_breakpoint_pmu_read(struct perf_event *bp);
++int hw_breakpoint_slots(int type);
 +
- TRACE_EVENT(kvm_wfx,
- 	TP_PROTO(unsigned long vcpu_pc, bool is_wfe),
- 	TP_ARGS(vcpu_pc, is_wfe),
++#else
++static inline void clear_ptrace_hw_breakpoint(struct task_struct *tsk) {}
++
++#endif	/* CONFIG_HAVE_HW_BREAKPOINT */
++#endif  /* __ASSEMBLY */
++
+ /* Debug architecture numbers. */
+ #define ARM_DEBUG_ARCH_RESERVED	0	/* In case of ptrace ABI updates. */
+ #define ARM_DEBUG_ARCH_V6	1
+@@ -110,30 +139,5 @@ static inline void decode_ctrl_reg(u32 reg,
+ 	asm volatile("mcr p14, 0, %0, " #N "," #M ", " #OP2 : : "r" (VAL));\
+ } while (0)
+ 
+-struct notifier_block;
+-struct perf_event;
+-struct pmu;
+-
+-extern struct pmu perf_ops_bp;
+-extern int arch_bp_generic_fields(struct arch_hw_breakpoint_ctrl ctrl,
+-				  int *gen_len, int *gen_type);
+-extern int arch_check_bp_in_kernelspace(struct perf_event *bp);
+-extern int arch_validate_hwbkpt_settings(struct perf_event *bp);
+-extern int hw_breakpoint_exceptions_notify(struct notifier_block *unused,
+-					   unsigned long val, void *data);
+-
+-extern u8 arch_get_debug_arch(void);
+-extern u8 arch_get_max_wp_len(void);
+-extern void clear_ptrace_hw_breakpoint(struct task_struct *tsk);
+-
+-int arch_install_hw_breakpoint(struct perf_event *bp);
+-void arch_uninstall_hw_breakpoint(struct perf_event *bp);
+-void hw_breakpoint_pmu_read(struct perf_event *bp);
+-int hw_breakpoint_slots(int type);
+-
+-#else
+-static inline void clear_ptrace_hw_breakpoint(struct task_struct *tsk) {}
+-
+-#endif	/* CONFIG_HAVE_HW_BREAKPOINT */
+ #endif	/* __KERNEL__ */
+ #endif	/* _ARM_HW_BREAKPOINT_H */
 -- 
 1.7.12.4
