@@ -1,97 +1,82 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Mon, 10 Aug 2015 15:20:57 +0200
-Subject: [PATCH v3 03/10] VFIO: platform: single handler using function pointer
+Date: Mon, 10 Aug 2015 15:21:00 +0200
+Subject: [PATCH v3 06/10] VFIO: platform: add irq bypass producer management
 In-Reply-To: <1439212864-12954-1-git-send-email-eric.auger@linaro.org>
 References: <1439212864-12954-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1439212864-12954-4-git-send-email-eric.auger@linaro.org>
+Message-ID: <1439212864-12954-7-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A single handler now is registered whatever the use case: automasked
-or not. A function pointer is set according to the wished behavior
-and the handler calls this function.
-
-The irq lock is taken/released in the root handler. eventfd_signal can
-be called in regions not allowed to sleep.
+This patch populates the IRQ bypass callacks:
+- stop/start producer simply consist in disabling/enabling the host irq
+- add/del consumer: basically set the automasked flag to false/true
 
 Signed-off-by: Eric Auger <eric.auger@linaro.org>
 
 ---
+v2 -> v3:
+- vfio_platform_irq_bypass_add_consumer now returns an error in case
+  the IRQ is recognized as active
+- active boolean not set anymore
+- do not VFIO mask the IRQ anymore on unforward
 
-v4: creation
+v1 -> v2:
+- device handle caching in vfio_platform_device is introduced in a
+  separate patch
+- use container_of
 ---
- drivers/vfio/platform/vfio_platform_irq.c     | 21 +++++++++++++++------
- drivers/vfio/platform/vfio_platform_private.h |  1 +
- 2 files changed, 16 insertions(+), 6 deletions(-)
+ drivers/vfio/platform/vfio_platform_irq.c | 23 ++++++++++++++++++++++-
+ 1 file changed, 22 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/vfio/platform/vfio_platform_irq.c b/drivers/vfio/platform/vfio_platform_irq.c
-index 40f057a..b31b1f0 100644
+index efaee58..400a188 100644
 --- a/drivers/vfio/platform/vfio_platform_irq.c
 +++ b/drivers/vfio/platform/vfio_platform_irq.c
-@@ -148,11 +148,8 @@ static int vfio_platform_set_irq_unmask(struct vfio_platform_device *vdev,
- static irqreturn_t vfio_automasked_irq_handler(int irq, void *dev_id)
- {
- 	struct vfio_platform_irq *irq_ctx = dev_id;
--	unsigned long flags;
- 	int ret = IRQ_NONE;
+@@ -224,23 +224,44 @@ static int vfio_platform_is_active(struct vfio_platform_irq *irq)
  
--	spin_lock_irqsave(&irq_ctx->lock, flags);
--
- 	if (!irq_ctx->masked) {
- 		ret = IRQ_HANDLED;
- 
-@@ -161,8 +158,6 @@ static irqreturn_t vfio_automasked_irq_handler(int irq, void *dev_id)
- 		irq_ctx->masked = true;
- 	}
- 
--	spin_unlock_irqrestore(&irq_ctx->lock, flags);
--
- 	if (ret == IRQ_HANDLED)
- 		eventfd_signal(irq_ctx->trigger, 1);
- 
-@@ -178,6 +173,19 @@ static irqreturn_t vfio_irq_handler(int irq, void *dev_id)
- 	return IRQ_HANDLED;
- }
- 
-+static irqreturn_t vfio_handler(int irq, void *dev_id)
-+{
-+	struct vfio_platform_irq *irq_ctx = dev_id;
-+	unsigned long flags;
-+	irqreturn_t ret;
-+
-+	spin_lock_irqsave(&irq_ctx->lock, flags);
-+	ret = irq_ctx->handler(irq, dev_id);
-+	spin_unlock_irqrestore(&irq_ctx->lock, flags);
-+
-+	return ret;
-+}
-+
  static void vfio_platform_irq_bypass_stop(struct irq_bypass_producer *prod)
  {
++	disable_irq(prod->irq);
  }
-@@ -229,9 +237,10 @@ static int vfio_set_trigger(struct vfio_platform_device *vdev, int index,
- 	}
  
- 	irq->trigger = trigger;
-+	irq->handler = handler;
+ static void vfio_platform_irq_bypass_start(struct irq_bypass_producer *prod)
+ {
++	enable_irq(prod->irq);
+ }
  
- 	irq_set_status_flags(irq->hwirq, IRQ_NOAUTOEN);
--	ret = request_irq(irq->hwirq, handler, 0, irq->name, irq);
-+	ret = request_irq(irq->hwirq, vfio_handler, 0, irq->name, irq);
- 	if (ret) {
- 		kfree(irq->name);
- 		eventfd_ctx_put(trigger);
-diff --git a/drivers/vfio/platform/vfio_platform_private.h b/drivers/vfio/platform/vfio_platform_private.h
-index 8b4f814..f848a6b 100644
---- a/drivers/vfio/platform/vfio_platform_private.h
-+++ b/drivers/vfio/platform/vfio_platform_private.h
-@@ -40,6 +40,7 @@ struct vfio_platform_irq {
- 	struct virqfd		*mask;
- 	struct irq_bypass_producer producer;
- 	bool			forwarded;
-+	irqreturn_t (*handler)(int irq, void *dev_id);
- };
+ static int vfio_platform_irq_bypass_add_consumer(
+ 			struct irq_bypass_producer *prod,
+ 			struct irq_bypass_consumer *cons)
+ {
+-	return 0;
++	struct vfio_platform_irq *irq =
++		container_of(prod, struct vfio_platform_irq, producer);
++
++	/*
++	 * if the IRQ is active at irqchip level or VFIO (auto)masked
++	 * this means the host IRQ is already under injection in the
++	 * guest and this not safe to change the forwarding state at
++	 * that stage.
++	 * It is not possible to differentiate user-space masking
++	 * from auto-masking, leading to possible false detection of
++	 * active state.
++	 */
++	if (vfio_platform_is_active(irq))
++		return -EAGAIN;
++
++	return vfio_platform_set_automasked(irq, false);
+ }
  
- struct vfio_platform_region {
+ static void vfio_platform_irq_bypass_del_consumer(
+ 			struct irq_bypass_producer *prod,
+ 			struct irq_bypass_consumer *cons)
+ {
++	struct vfio_platform_irq *irq =
++		container_of(prod, struct vfio_platform_irq, producer);
++
++	vfio_platform_set_automasked(irq, true);
+ }
+ 
+ static int vfio_set_trigger(struct vfio_platform_device *vdev, int index,
 -- 
 1.9.1
