@@ -1,53 +1,60 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Mon, 10 Aug 2015 13:59:13 +0200
-Subject: [GIT PULL] STi DT changes for v4.3, round 1
-In-Reply-To: <20150727122459.GB14224@localhost>
-References: <55AFD16C.7020006@st.com> <20150727122459.GB14224@localhost>
-Message-ID: <55C89211.8010600@st.com>
+From: ryabinin.a.a@gmail.com (Andrey Ryabinin)
+Date: Mon, 10 Aug 2015 15:00:05 +0300
+Subject: [PATCH v4 2/7] mm: kasan: introduce generic
+ kasan_populate_zero_shadow()
+In-Reply-To: <87mvxzptqv.fsf@linux.vnet.ibm.com>
+References: <1437756119-12817-1-git-send-email-a.ryabinin@samsung.com>
+ <1437756119-12817-3-git-send-email-a.ryabinin@samsung.com>
+ <87mvxzptqv.fsf@linux.vnet.ibm.com>
+Message-ID: <CAPAsAGwsA138f=oNaqJ4qT6Ow9VyoSqAkwZSa_pCDJVsA-JuAg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+2015-08-10 9:01 GMT+03:00 Aneesh Kumar K.V <aneesh.kumar@linux.vnet.ibm.com>:
+> Andrey Ryabinin <a.ryabinin@samsung.com> writes:
+>
+>> Introduce generic kasan_populate_zero_shadow(start, end).
+>> This function maps kasan_zero_page to the [start, end] addresses.
+>>
+>> In follow on patches it will be used for ARMv8 (and maybe other
+>> architectures) and will replace x86_64 specific populate_zero_shadow().
+>>
+>> Signed-off-by: Andrey Ryabinin <a.ryabinin@samsung.com>
+>
+> This assume that we can have shared pgtable_t in generic code ? Is that
+> true for generic code ? Even if it is we may want to allow some arch to
+> override this ? On ppc64, we store the hardware hash page table slot
+> number in pte_t, Hence we won't be able to share pgtable_t.
+>
 
-On 07/27/2015 02:24 PM, Olof Johansson wrote:
-> On Wed, Jul 22, 2015 at 07:22:52PM +0200, Maxime Coquelin wrote:
->> Hi Olof, Arnd and Kevin,
->>
->> Please consider this first round of STi DT updates for v4.3:
->>
->> The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
->>
->>    Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
->>
->> are available in the git repository at:
->>
->>    https://git.kernel.org/pub/scm/linux/kernel/git/mcoquelin/sti.git
->> tags/sti-dt-for-v4.3-1
->>
->> for you to fetch changes up to 794445095791aa4f92dfd802f08b541167d63ecc:
->>
->>    ARM: DT: STiH410: Add bdisp dt nodes (2015-07-22 15:05:31 +0200)
-> Thanks, merged, however:
->
->> Peter Griffin (11):
->>        ARM: STi: DT: Add STiH407 family tsin0 pinctrl configuration
->>        ARM: STi: DT: Add STiH407 family tsin1 pinctrl configuration
->>        ARM: STi: DT: Add STiH407 family tsin2 pinctrl configuration
->>        ARM: STi: DT: Add STiH407 family tsin3 pinctrl configuration
->>        ARM: STi: DT: Add STiH407 family tsin4 pinctrl configuration
->>        ARM: STi: DT: Add STiH407 family tsin5 pinctrl configuration
->>        ARM: STi: DT: Add STiH407 family tsout0 pinctrl configuration
->>        ARM: STi: DT: Add STiH407 family tsout1 pinctrl configuration
->>        ARM: STi: DT: Add STiH407 family mtsin0 pinctrl configuration
->>        ARM: STi: DT: STiH407: Add cpu-release-addr dt property.
->>        ARM: STi: DT: STiH418: Add cpu-release-addr dt property.
-> The patch splitting here is a bit excessive. I think squashing these down
-> into one to add STiH407 pinctrl configurations would have been just fine.
->
-> Anyway, not a big deal.
->
->
-Ok, I will avoid that next time.
+So, ppc64 could define some config which will disable compilation of
+mm/kasan/kasan_init.c.
+However, it might be a bad idea to use such never defined config symbol now.
+So I think this could be done later, in "KASAN for powerpc" series.
 
-Thanks!
-Maxime
+>
+>
+>> ---
+>>  arch/x86/mm/kasan_init_64.c |  14 ----
+>>  include/linux/kasan.h       |   8 +++
+>>  mm/kasan/Makefile           |   2 +-
+>>  mm/kasan/kasan_init.c       | 151 ++++++++++++++++++++++++++++++++++++++++++++
+>>  4 files changed, 160 insertions(+), 15 deletions(-)
+>>  create mode 100644 mm/kasan/kasan_init.c
+>>
+>> diff --git a/arch/x86/mm/kasan_init_64.c b/arch/x86/mm/kasan_init_64.c
+>> index e1840f3..812086c 100644
+>> --- a/arch/x86/mm/kasan_init_64.c
+>> +++ b/arch/x86/mm/kasan_init_64.c
+>> @@ -12,20 +12,6 @@
+>>  extern pgd_t early_level4_pgt[PTRS_PER_PGD];
+>>  extern struct range pfn_mapped[E820_X_MAX];
+>>
+>> -static pud_t kasan_zero_pud[PTRS_PER_PUD] __page_aligned_bss;
+>> -static pmd_t kasan_zero_pmd[PTRS_PER_PMD] __page_aligned_bss;
+>> -static pte_t kasan_zero_pte[PTRS_PER_PTE] __page_aligned_bss;
+>> -
+>> -/*
+>
+> -aneesh
+>
