@@ -1,46 +1,44 @@
-From: dinh.linux@gmail.com (dinh.linux at gmail.com)
-Date: Sun,  9 Aug 2015 22:15:56 -0500
-Subject: [GIT PULL] SoCFPGA DTS updates for v4.3, part 2
-Message-ID: <1439176556-30367-1-git-send-email-dinh.linux@gmail.com>
+From: ssantosh@kernel.org (Santosh Shilimkar)
+Date: Sun,  9 Aug 2015 20:26:40 -0700
+Subject: [GIT PULL] ARM: Couple of Keystone MDIO DTS fixes for 4.2-rc6+
+Message-ID: <1439177200-32434-1-git-send-email-ssantosh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Kevin, and Olof:
+ARM-SoC folks,
 
-This is a 2nd pull-request for v4.3. Please consider pulling in this patches.
+Please pull below couple of late fixes for 4.2-rc6+. I know its late
+with rc6 already out but if possible please consider. 
 
-Thanks,
-Dinh
+The following changes since commit f7644cbfcdf03528f0f450f3940c4985b2291f49:
 
-
-The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
-
-  Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
+  Linux 4.2-rc6 (2015-08-09 15:54:30 -0400)
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git socfpga_dts_for_v4.3_part_2
+  git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone-dts-late-fixes
 
-for you to fetch changes up to 6855e5b7090330add9521d8947017875d5f4f88e:
+for you to fetch changes up to 6a024079862443b3ec9455931e9219cd5912656d:
 
-  ARM: socfpga: dts: Add resets for EMACs on Arria10 (2015-08-09 21:58:58 -0500)
-
-----------------------------------------------------------------
-SoCFPGA DTS updates for v4.3, take 2
-- Add DTS property "altr,modrst-offset" for reset driver to
-  use
-- Add updated reset defines for the reset driver
-- Add reset property for EMACs on Arria10
+  ARM: dts: keystone: Fix the mdio bindings by moving it to soc specific file (2015-08-09 20:06:27 -0700)
 
 ----------------------------------------------------------------
-Dinh Nguyen (3):
-      dt-bindings: Add reset manager offsets for Arria10
-      ARM: socfpga: dts: add "altr,modrst-offset" property
-      ARM: socfpga: dts: Add resets for EMACs on Arria10
+ARM: Couple of Keysyone MDIO DTS fixes for 4.2-rc6+
 
- .../devicetree/bindings/reset/socfpga-reset.txt    |   2 +
- arch/arm/boot/dts/socfpga.dtsi                     |   1 +
- arch/arm/boot/dts/socfpga_arria10.dtsi             |   6 ++
- include/dt-bindings/reset/altr,rst-mgr-a10.h       | 110 +++++++++++++++++++++
- 4 files changed, 119 insertions(+)
- create mode 100644 include/dt-bindings/reset/altr,rst-mgr-a10.h
+These are necessary to get the NIC card working on all Keystone
+EVMs. Couple of boards are nroken without these two fixes.
+
+----------------------------------------------------------------
+Murali Karicheri (2):
+      ARM: dts: keystone: fix the clock node for mdio
+      ARM: dts: keystone: Fix the mdio bindings by moving it to soc specific file
+
+ arch/arm/boot/dts/k2e.dtsi      | 15 +++++++++++----
+ arch/arm/boot/dts/k2hk.dtsi     | 11 +++++++++++
+ arch/arm/boot/dts/k2l.dtsi      | 16 +++++++++++-----
+ arch/arm/boot/dts/keystone.dtsi | 11 -----------
+ 4 files changed, 33 insertions(+), 20 deletions(-)
+
+
+Regards,
+Santosh
