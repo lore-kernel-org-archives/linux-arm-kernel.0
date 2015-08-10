@@ -1,97 +1,61 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Mon, 10 Aug 2015 09:36:24 -0600
-Subject: [PATCH 6/9] ARM: domain: Add platform handlers for CPU PM domains
-In-Reply-To: <CAL_JsqJ_AK6M5WmyFrGVLtpGg=MdAafxX=1873Je_uB_sQkpiA@mail.gmail.com>
-References: <1438731339-58317-1-git-send-email-lina.iyer@linaro.org>
- <1438731339-58317-7-git-send-email-lina.iyer@linaro.org>
- <CAL_JsqKWekSGiFbZz6++3ibAzY_8Y6+0nOBQinFVw4cBk6JvEw@mail.gmail.com>
- <20150805192341.GB52339@linaro.org>
- <CAL_JsqJ_AK6M5WmyFrGVLtpGg=MdAafxX=1873Je_uB_sQkpiA@mail.gmail.com>
-Message-ID: <20150810153624.GD52339@linaro.org>
+From: nathan_lynch@mentor.com (Nathan Lynch)
+Date: Mon, 10 Aug 2015 10:46:32 -0500
+Subject: [PATCH v2] ARM: VDSO: fix coarse clock monotonicity regression
+In-Reply-To: <1438999403-5770-1-git-send-email-nathan_lynch@mentor.com>
+References: <1438999403-5770-1-git-send-email-nathan_lynch@mentor.com>
+Message-ID: <1439221592-31875-1-git-send-email-nathan_lynch@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 05 2015 at 21:01 -0600, Rob Herring wrote:
->On Wed, Aug 5, 2015 at 2:23 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
->> On Wed, Aug 05 2015 at 08:45 -0600, Rob Herring wrote:
->>>
->>> On Tue, Aug 4, 2015 at 6:35 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
->>>>
->>>> In addition to the common power up/down actions of CPU PM domain core,
->>>> platforms may have additional configuration before the CPU domain can be
->>>> powered off or considered active. Allow platform drivers to register
->>>> handlers for CPU PM domains.
->>>>
->>>> Platform drivers may register their callbacks against a compatible
->>>> string defined by their PM domain provider device node in the DT. At
->>>> domain init, the platform driver can initialize the platform specific
->>>> genpd attributes. The init callback would need to return successfully,
->>>> for the platform power_on/off handlers to be registered with the CPU PM
->>>> domain.
->>>>
->>>> The code uses __init section to reduce memory needed for platform
->>>> handlers and therefore can be freed after the driver is initialized, a
->>>> desirable outcome for single kernel image.
->>>
->>>
->>> [...]
->>>
->>>> diff --git a/arch/arm/include/asm/arm-pd.h
->>>> b/arch/arm/include/asm/arm-pd.h
->>>> new file mode 100644
->>>> index 0000000..fc44abf
->>
->>
->> [...]
->>
->>>> +#define ARM_PD_METHOD_OF_DECLARE(_name, _handle, _ops) \
->>>> +       static const struct of_arm_pd_method
->>>> __arm_pd_method_of_table_##_name \
->>>> +       __used __section(__arm_pd_method_of_table)              \
->>>> +       = { .handle = _handle, .ops = _ops }
->>>
->>>
->>> AFAICT, you are not using this in this series. You should add it when
->>> you have a user.
->>>
->>> Ideally, we keep some amount of uniformity across various *_OF_DECLARE
->>> which is why we have OF_DECLARE_1 and OF_DECLARE_2. This makes all the
->>> sections just arrays of struct of_device_id. Not all users follow
->>> this, but most do. So instead of putting the ops in here, platforms
->>> can provide a function callback which can then set the ops. Then you
->>> also don't need the .init() ops function as the callback function can
->>> do any initialization too.
->>>
->> I looked through these and I can switch over to _OF_DECLARE() without any
->> issues, but using OF_DECLARE_1 or OF_DECLARE_2 is pretty limiting.
->
->Well yes, but then we only want to use it for things that will never
->use the driver model.
->
->> If I could set up my own function type for the .data member, then its a
->> lot more easier on the code. Like this -
->>
->> typedef int (*arm_pd_init)(struct device_node *dn, struct
->>                 generic_pm_domain *genpd, struct of_arm_pd_ops *ops);
->
->You alloc the genpd struct just before calling init. You can just as
->easily have the platform specific code call an allocation function and
->a function to set the ops functions. This is more inline with how a
->driver would work when registering with a subsystem.
->
-OK. That would mean I have a way of mapping the device_node to the
-of_arm_pd_ops, which I currently dont. Was trying to avoid a list. But,
-I was able to use list and use OF_DECLARE_1. The platform driver, shall
-call up separate API to register the ops or ge the Genpd and modify it.
+Since 906c55579a63 ("timekeeping: Copy the shadow-timekeeper over the
+real timekeeper last") it has become possible on ARM to:
 
-Will submit it in the next spin, following the discussion on arm,pd.
+- Obtain a CLOCK_MONOTONIC_COARSE or CLOCK_REALTIME_COARSE timestamp
+  via syscall.
+- Subsequently obtain a timestamp for the same clock ID via VDSO which
+  predates the first timestamp (by one jiffy).
 
-Thanks,
-Lina
+This is because ARM's update_vsyscall is deriving the coarse time
+using the __current_kernel_time interface, when it should really be
+using the timekeeper object provided to it by the timekeeping core.
+It happened to work before only because __current_kernel_time would
+access the same timekeeper object which had been passed to
+update_vsyscall.  This is no longer the case.
 
+Signed-off-by: Nathan Lynch <nathan_lynch@mentor.com>
+---
 
->I also don't
->think "arm,pd" is a good compatible string to be matching on. I'll
->comment on that more in patch 5.
->
->Rob
+Changes since v1:
+- Add u32 cast to nsec calculation.
+
+ arch/arm/kernel/vdso.c | 7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/kernel/vdso.c b/arch/arm/kernel/vdso.c
+index efe17dd9b921..54a5aeab988d 100644
+--- a/arch/arm/kernel/vdso.c
++++ b/arch/arm/kernel/vdso.c
+@@ -296,7 +296,6 @@ static bool tk_is_cntvct(const struct timekeeper *tk)
+  */
+ void update_vsyscall(struct timekeeper *tk)
+ {
+-	struct timespec xtime_coarse;
+ 	struct timespec64 *wtm = &tk->wall_to_monotonic;
+ 
+ 	if (!cntvct_ok) {
+@@ -308,10 +307,10 @@ void update_vsyscall(struct timekeeper *tk)
+ 
+ 	vdso_write_begin(vdso_data);
+ 
+-	xtime_coarse = __current_kernel_time();
+ 	vdso_data->tk_is_cntvct			= tk_is_cntvct(tk);
+-	vdso_data->xtime_coarse_sec		= xtime_coarse.tv_sec;
+-	vdso_data->xtime_coarse_nsec		= xtime_coarse.tv_nsec;
++	vdso_data->xtime_coarse_sec		= tk->xtime_sec;
++	vdso_data->xtime_coarse_nsec		= (u32)(tk->tkr_mono.xtime_nsec >>
++							tk->tkr_mono.shift);
+ 	vdso_data->wtm_clock_sec		= wtm->tv_sec;
+ 	vdso_data->wtm_clock_nsec		= wtm->tv_nsec;
+ 
+-- 
+2.1.0
