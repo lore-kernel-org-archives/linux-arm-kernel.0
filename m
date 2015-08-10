@@ -1,67 +1,77 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 10 Aug 2015 11:42:29 +0530
-Subject: [PATCH V1 Resend 07/11] drivers: rtc: Drop (un)likely before
- IS_ERR(_OR_NULL)
-In-Reply-To: <cover.1439187003.git.viresh.kumar@linaro.org>
-References: <cover.1439187003.git.viresh.kumar@linaro.org>
-Message-ID: <2ea7e46d3a63b1229889b1e8f0a9976725578189.1439187003.git.viresh.kumar@linaro.org>
+From: wxt@rock-chips.com (Caesar Wang)
+Date: Mon, 10 Aug 2015 14:34:57 +0800
+Subject: [PATCH] thermal: rockhip: fix setting thermal shutdown polarity
+In-Reply-To: <20150807210052.GA34032@dtor-ws>
+References: <20150807210052.GA34032@dtor-ws>
+Message-ID: <55C84611.10904@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-IS_ERR(_OR_NULL) already contain an 'unlikely' compiler flag and there
-is no need to do that again from its callers. Drop it.
+Dear Dmitry,
 
-gemini driver was using likely() for a failure case while the rtc driver
-is getting registered. That looks wrong and it should really be
-unlikely. But because we are killing all the unlikely() flags, lets kill
-that too.
+Thanks to work for it.
 
-Acked-by: Hans Ulli Kroll <ulli.kroll@googlemail.com> (gemini)
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
----
- drivers/rtc/interface.c  | 2 +-
- drivers/rtc/rtc-bfin.c   | 2 +-
- drivers/rtc/rtc-gemini.c | 2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+? 2015?08?08? 05:00, Dmitry Torokhov ??:
+> When requested thermal shutdown signal polarity is low we need to make
+> sure that the bit representing high level of signal is reset, and not
+> set all other bits in that register.
+>
+> Also rename TSADCV2_INT_PD_CLEAR to TSADCV2_INT_PD_CLEAR_MASK to better
+> reflect its nature.
+>
+> Signed-off-by: Dmitry Torokhov <dtor@chromium.org>
 
-diff --git a/drivers/rtc/interface.c b/drivers/rtc/interface.c
-index 11b639067312..5836751b8203 100644
---- a/drivers/rtc/interface.c
-+++ b/drivers/rtc/interface.c
-@@ -564,7 +564,7 @@ enum hrtimer_restart rtc_pie_update_irq(struct hrtimer *timer)
- void rtc_update_irq(struct rtc_device *rtc,
- 		unsigned long num, unsigned long events)
- {
--	if (unlikely(IS_ERR_OR_NULL(rtc)))
-+	if (IS_ERR_OR_NULL(rtc))
- 		return;
- 
- 	pm_stay_awake(rtc->dev.parent);
-diff --git a/drivers/rtc/rtc-bfin.c b/drivers/rtc/rtc-bfin.c
-index 3d44b11721ea..535a5f9338d0 100644
---- a/drivers/rtc/rtc-bfin.c
-+++ b/drivers/rtc/rtc-bfin.c
-@@ -361,7 +361,7 @@ static int bfin_rtc_probe(struct platform_device *pdev)
- 	/* Register our RTC with the RTC framework */
- 	rtc->rtc_dev = devm_rtc_device_register(dev, pdev->name, &bfin_rtc_ops,
- 						THIS_MODULE);
--	if (unlikely(IS_ERR(rtc->rtc_dev)))
-+	if (IS_ERR(rtc->rtc_dev))
- 		return PTR_ERR(rtc->rtc_dev);
- 
- 	/* Grab the IRQ and init the hardware */
-diff --git a/drivers/rtc/rtc-gemini.c b/drivers/rtc/rtc-gemini.c
-index 35f4486738fc..2fed93e1114a 100644
---- a/drivers/rtc/rtc-gemini.c
-+++ b/drivers/rtc/rtc-gemini.c
-@@ -148,7 +148,7 @@ static int gemini_rtc_probe(struct platform_device *pdev)
- 
- 	rtc->rtc_dev = rtc_device_register(pdev->name, dev,
- 					   &gemini_rtc_ops, THIS_MODULE);
--	if (likely(IS_ERR(rtc->rtc_dev)))
-+	if (IS_ERR(rtc->rtc_dev))
- 		return PTR_ERR(rtc->rtc_dev);
- 
- 	return 0;
--- 
-2.4.0
+  Acked-by: Caesar Wang <wxt@rock-chips.com>
+
+--
+Thanks,
+Caesar
+
+> ---
+>   drivers/thermal/rockchip_thermal.c | 10 ++++------
+>   1 file changed, 4 insertions(+), 6 deletions(-)
+>
+> diff --git a/drivers/thermal/rockchip_thermal.c b/drivers/thermal/rockchip_thermal.c
+> index 93ee307..4d5b7d4 100644
+> --- a/drivers/thermal/rockchip_thermal.c
+> +++ b/drivers/thermal/rockchip_thermal.c
+> @@ -106,16 +106,14 @@ struct rockchip_thermal_data {
+>   #define TSADCV2_AUTO_PERIOD_HT			0x6c
+>   
+>   #define TSADCV2_AUTO_EN				BIT(0)
+> -#define TSADCV2_AUTO_DISABLE			~BIT(0)
+>   #define TSADCV2_AUTO_SRC_EN(chn)		BIT(4 + (chn))
+>   #define TSADCV2_AUTO_TSHUT_POLARITY_HIGH	BIT(8)
+> -#define TSADCV2_AUTO_TSHUT_POLARITY_LOW		~BIT(8)
+>   
+>   #define TSADCV2_INT_SRC_EN(chn)			BIT(chn)
+>   #define TSADCV2_SHUT_2GPIO_SRC_EN(chn)		BIT(4 + (chn))
+>   #define TSADCV2_SHUT_2CRU_SRC_EN(chn)		BIT(8 + (chn))
+>   
+> -#define TSADCV2_INT_PD_CLEAR			~BIT(8)
+> +#define TSADCV2_INT_PD_CLEAR_MASK		~BIT(8)
+>   
+>   #define TSADCV2_DATA_MASK			0xfff
+>   #define TSADCV2_HIGHT_INT_DEBOUNCE_COUNT	4
+> @@ -244,10 +242,10 @@ static void rk_tsadcv2_initialize(void __iomem *regs,
+>   				  enum tshut_polarity tshut_polarity)
+>   {
+>   	if (tshut_polarity == TSHUT_HIGH_ACTIVE)
+> -		writel_relaxed(0 | (TSADCV2_AUTO_TSHUT_POLARITY_HIGH),
+> +		writel_relaxed(0U | TSADCV2_AUTO_TSHUT_POLARITY_HIGH,
+>   			       regs + TSADCV2_AUTO_CON);
+>   	else
+> -		writel_relaxed(0 | (TSADCV2_AUTO_TSHUT_POLARITY_LOW),
+> +		writel_relaxed(0U & ~TSADCV2_AUTO_TSHUT_POLARITY_HIGH,
+>   			       regs + TSADCV2_AUTO_CON);
+>   
+>   	writel_relaxed(TSADCV2_AUTO_PERIOD_TIME, regs + TSADCV2_AUTO_PERIOD);
+> @@ -264,7 +262,7 @@ static void rk_tsadcv2_irq_ack(void __iomem *regs)
+>   	u32 val;
+>   
+>   	val = readl_relaxed(regs + TSADCV2_INT_PD);
+> -	writel_relaxed(val & TSADCV2_INT_PD_CLEAR, regs + TSADCV2_INT_PD);
+> +	writel_relaxed(val & TSADCV2_INT_PD_CLEAR_MASK, regs + TSADCV2_INT_PD);
+>   }
+>   
+>   static void rk_tsadcv2_control(void __iomem *regs, bool enable)
