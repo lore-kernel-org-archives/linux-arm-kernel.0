@@ -1,57 +1,35 @@
 From: kgene@kernel.org (Kukjin Kim)
-Date: Mon, 10 Aug 2015 09:41:04 +0900
-Subject: [GIT PULL 1/5] Samsung non-critical-fixes for v4.3
-In-Reply-To: <55C06995.2030600@kernel.org>
-References: <55C06995.2030600@kernel.org>
-Message-ID: <03ce01d0d305$3ceaea70$b6c0bf50$@kernel.org>
+Date: Mon, 10 Aug 2015 10:27:18 +0900
+Subject: [PATCH v4 0/6] cpufreq: use generic cpufreq drivers for Exynos4x12
+ platform
+In-Reply-To: <55C5AF4E.3010500@samsung.com>
+References: <1438868514-8814-1-git-send-email-b.zolnierkie@samsung.com>
+ <2359635.Hxe4cb8zKm@amdc1976> <20150807115627.GH6939@linux>
+ <1525406.7aXvVQzEDd@vostro.rjw.lan> <20150808020740.GM6939@linux>
+ <55C5AF4E.3010500@samsung.com>
+Message-ID: <03ee01d0d30b$b279c490$176d4db0$@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kukjin Kim wrote:
+Krzysztof Kozlowski wrote:
 > 
-> Hi Arnd, Olof, Kevin,
+> W dniu 08.08.2015 o 11:07, Viresh Kumar pisze:
+> > On 08-08-15, 00:24, Rafael J. Wysocki wrote:
+> >> OK, so please let me know which patches you want me to pick up.
+> >>
+> >> Ideally, I'd prefer them to be resent in a separate series with ACKs and all
+> >> with a cover letter clearly stating whose tree they are being targeted at.
+> >
+> > He already sent it separately, let me send a confirmatory mail in
+> > reply to that.
 > 
-> Here is Samsung non-critical-fixes for v4.3.
-> Please pull.
+> Dear Kukjin,
 > 
-> Thanks,
-> Kukjin
+> Can you apply the 2-5 of this series to v4.3? It's getting late but
+> maybe they still could go?
 > 
-Hi arm-soc maintainers,
-
-Is there any problem on this series?
-If not, please pull ;-)
+Once my previous pull-request landed into arm-soc, I'll try to send out this
+series 2-5 for v4.3.
 
 Thanks,
 Kukjin
-
-> The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
-> 
->   Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> tags/samsung-non-critical-1
-> 
-> for you to fetch changes up to 2cc6b813579415c4f627b08a043079bdc5b87a33:
-> 
->   ARM: EXYNOS: Use IOMEM_ERR_PTR when function returns iomem (2015-07-21
-> 13:19:06 +0900)
-> 
-> ----------------------------------------------------------------
-> Samsung non-critical fixes for v4.3
-> 
-> - fix sparse warning for returning iomem
-> - fix clock-frequency of display timing0 for exynos3250-rinato
-> 
-> ----------------------------------------------------------------
-> Hyungwon Hwang (1):
->       ARM: dts: fix clock-frequency of display timing0 for exynos3250-rinato
-> 
-> Krzysztof Kozlowski (1):
->       ARM: EXYNOS: Use IOMEM_ERR_PTR when function returns iomem
-> 
->  arch/arm/boot/dts/exynos3250-rinato.dts | 2 +-
->  arch/arm/mach-exynos/platsmp.c          | 2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
