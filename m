@@ -1,227 +1,57 @@
-From: ipaton0@gmail.com (Iain Paton)
-Date: Mon, 10 Aug 2015 00:05:05 +0100
-Subject: [linux-sunxi] [PATCH] ARM: dts: sunxi: enable otg port on the
- sun7i-a20-olinuxino-lime2
-In-Reply-To: <1439146968-9039-2-git-send-email-oliver@schinagl.nl>
-References: <1439146968-9039-1-git-send-email-oliver@schinagl.nl>
- <1439146968-9039-2-git-send-email-oliver@schinagl.nl>
-Message-ID: <55C7DCA1.2090204@gmail.com>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Mon, 10 Aug 2015 09:41:04 +0900
+Subject: [GIT PULL 1/5] Samsung non-critical-fixes for v4.3
+In-Reply-To: <55C06995.2030600@kernel.org>
+References: <55C06995.2030600@kernel.org>
+Message-ID: <03ce01d0d305$3ceaea70$b6c0bf50$@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-NAK. This does much more than enabling the otg port.
+Kukjin Kim wrote:
+> 
+> Hi Arnd, Olof, Kevin,
+> 
+> Here is Samsung non-critical-fixes for v4.3.
+> Please pull.
+> 
+> Thanks,
+> Kukjin
+> 
+Hi arm-soc maintainers,
 
-Neither wholesale re-writing the regulator node or hooking up the 
-dcdc2 regulator to the operating points definition is required in order 
-to enable the otg port.  
+Is there any problem on this series?
+If not, please pull ;-)
 
-At the very least you need to split your patches and describe them 
-properly rather than trying to get additional changes that are likely 
-to cause further discussion through unnoticed using a misleading 
-subject.
+Thanks,
+Kukjin
 
-Rgds,
-Iain
- 
-On 09/08/15 20:02, Olliver Schinagl wrote:
-> From: Olliver Schinagl <o.schinagl@ultimaker.com>
+> The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
 > 
-> This patch enables the musb-otg USB controller on the Lime2. The Lime2
-> differs from the Lime1 series in pins used for usb0 power.
+>   Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
 > 
-> Tested on a OlinuXino Lime2-4GB.
+> are available in the git repository at:
 > 
-> Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
-> ---
->  arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts | 131 ++++++++++++++----------
->  1 file changed, 75 insertions(+), 56 deletions(-)
+>   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> tags/samsung-non-critical-1
 > 
-> diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
-> index 22cd052..efd9ebb 100644
-> --- a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
-> +++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
-> @@ -71,14 +71,6 @@
->  			default-state = "on";
->  		};
->  	};
-> -
-> -	reg_axp_ipsout: axp_ipsout {
-> -		compatible = "regulator-fixed";
-> -		regulator-name = "axp-ipsout";
-> -		regulator-min-microvolt = <5000000>;
-> -		regulator-max-microvolt = <5000000>;
-> -		regulator-always-on;
-> -	};
->  };
->  
->  &ahci {
-> @@ -86,6 +78,10 @@
->  	status = "okay";
->  };
->  
-> +&cpu0 {
-> +	cpu-supply = <&reg_dcdc2>;
-> +};
-> +
->  &ehci0 {
->  	status = "okay";
->  };
-> @@ -112,57 +108,9 @@
->  	status = "okay";
->  
->  	axp209: pmic at 34 {
-> -		compatible = "x-powers,axp209";
->  		reg = <0x34>;
->  		interrupt-parent = <&nmi_intc>;
->  		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-> -
-> -		interrupt-controller;
-> -		#interrupt-cells = <1>;
-> -
-> -		acin-supply = <&reg_axp_ipsout>;
-> -		vin2-supply = <&reg_axp_ipsout>;
-> -		vin3-supply = <&reg_axp_ipsout>;
-> -		ldo24in-supply = <&reg_axp_ipsout>;
-> -		ldo3in-supply = <&reg_axp_ipsout>;
-> -
-> -		regulators {
-> -			vdd_rtc: ldo1 {
-> -				regulator-min-microvolt = <1300000>;
-> -				regulator-max-microvolt = <1300000>;
-> -				regulator-always-on;
-> -			};
-> -
-> -			avcc: ldo2 {
-> -				regulator-min-microvolt = <1800000>;
-> -				regulator-max-microvolt = <3300000>;
-> -				regulator-always-on;
-> -			};
-> -
-> -			vcc_csi0: ldo3 {
-> -				regulator-min-microvolt = <700000>;
-> -				regulator-max-microvolt = <3500000>;
-> -				regulator-always-on;
-> -			};
-> -
-> -			vcc_csi1: ldo4 {
-> -				regulator-min-microvolt = <1250000>;
-> -				regulator-max-microvolt = <3300000>;
-> -				regulator-always-on;
-> -			};
-> -
-> -			vdd_cpu: dcdc2 {
-> -				regulator-min-microvolt = <700000>;
-> -				regulator-max-microvolt = <2275000>;
-> -				regulator-always-on;
-> -			};
-> -
-> -			vdd_int: dcdc3 {
-> -				regulator-min-microvolt = <700000>;
-> -				regulator-max-microvolt = <3500000>;
-> -				regulator-always-on;
-> -			};
-> -		};
->  	};
->  };
->  
-> @@ -196,6 +144,10 @@
->  	status = "okay";
->  };
->  
-> +&otg_sram {
-> +	status = "okay";
-> +};
-> +
->  &pio {
->  	ahci_pwr_pin_olinuxinolime: ahci_pwr_pin at 1 {
->  		allwinner,pins = "PC3";
-> @@ -210,6 +162,27 @@
->  		allwinner,drive = <SUN4I_PINCTRL_20_MA>;
->  		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
->  	};
-> +
-> +	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
-> +		allwinner,pins = "PH4";
-> +		allwinner,function = "gpio_in";
-> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-> +		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
-> +	};
-> +
-> +	usb0_vbus_detect_pin: usb0_vbus_detect_pin at 0 {
-> +		allwinner,pins = "PH5";
-> +		allwinner,function = "gpio_in";
-> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-> +		allwinner,pull = <SUN4I_PINCTRL_PULL_DOWN>;
-> +	};
-> +
-> +	usb0_vbus_pin_lime2: usb0_vbus_pin at 0 {
-> +		allwinner,pins = "PC17";
-> +		allwinner,function = "gpio_out";
-> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-> +		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-> +	};
->  };
->  
->  &reg_ahci_5v {
-> @@ -218,6 +191,42 @@
->  	status = "okay";
->  };
->  
-> +#include "axp209.dtsi"
-> +
-> +&reg_dcdc2 {
-> +	regulator-always-on;
-> +	regulator-min-microvolt = <1000000>;
-> +	regulator-max-microvolt = <1450000>;
-> +	regulator-name = "vdd-cpu";
-> +};
-> +
-> +&reg_dcdc3 {
-> +	regulator-always-on;
-> +	regulator-min-microvolt = <1000000>;
-> +	regulator-max-microvolt = <1400000>;
-> +	regulator-name = "vdd-int-dll";
-> +};
-> +
-> +&reg_ldo1 {
-> +	regulator-always-on;
-> +	regulator-min-microvolt = <1300000>;
-> +	regulator-max-microvolt = <1300000>;
-> +	regulator-name = "vdd-rtc";
-> +};
-> +
-> +&reg_ldo2 {
-> +	regulator-always-on;
-> +	regulator-min-microvolt = <3000000>;
-> +	regulator-max-microvolt = <3000000>;
-> +	regulator-name = "avcc";
-> +};
-> +
-> +&reg_usb0_vbus {
-> +	pinctrl-0 = <&usb0_vbus_pin_lime2>;
-> +	gpio = <&pio 2 17 GPIO_ACTIVE_HIGH>;
-> +	status = "okay";
-> +};
-> +
->  &reg_usb1_vbus {
->  	status = "okay";
->  };
-> @@ -232,7 +241,17 @@
->  	status = "okay";
->  };
->  
-> +&usb_otg {
-> +	dr_mode = "otg";
-> +	status = "okay";
-> +};
-> +
->  &usbphy {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&usb0_id_detect_pin>, <&usb0_vbus_detect_pin>;
-> +	usb0_id_det-gpio = <&pio 7 4 GPIO_ACTIVE_HIGH>; /* PH4 */
-> +	usb0_vbus_det-gpio = <&pio 7 5 GPIO_ACTIVE_HIGH>; /* PH5 */
-> +	usb0_vbus-supply = <&reg_usb0_vbus>;
->  	usb1_vbus-supply = <&reg_usb1_vbus>;
->  	usb2_vbus-supply = <&reg_usb2_vbus>;
->  	status = "okay";
+> for you to fetch changes up to 2cc6b813579415c4f627b08a043079bdc5b87a33:
 > 
+>   ARM: EXYNOS: Use IOMEM_ERR_PTR when function returns iomem (2015-07-21
+> 13:19:06 +0900)
+> 
+> ----------------------------------------------------------------
+> Samsung non-critical fixes for v4.3
+> 
+> - fix sparse warning for returning iomem
+> - fix clock-frequency of display timing0 for exynos3250-rinato
+> 
+> ----------------------------------------------------------------
+> Hyungwon Hwang (1):
+>       ARM: dts: fix clock-frequency of display timing0 for exynos3250-rinato
+> 
+> Krzysztof Kozlowski (1):
+>       ARM: EXYNOS: Use IOMEM_ERR_PTR when function returns iomem
+> 
+>  arch/arm/boot/dts/exynos3250-rinato.dts | 2 +-
+>  arch/arm/mach-exynos/platsmp.c          | 2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
