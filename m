@@ -1,83 +1,134 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Tue, 11 Aug 2015 11:49:51 +0200
-Subject: [PATCH v5 2/3] arm64: Add IOMMU dma_ops
-In-Reply-To: <55C4CE7C.7050205@arm.com>
-References: <cover.1438362603.git.robin.murphy@arm.com>
- <8a5abd0a9929aae160ccb74d7a8d9c3698f61910.1438362603.git.robin.murphy@arm.com>
- <20150807085233.GV14980@8bytes.org> <55C4CE7C.7050205@arm.com>
-Message-ID: <20150811094951.GD14980@8bytes.org>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 11 Aug 2015 11:58:47 +0200
+Subject: [PATCH] spi: orion: On a38x,
+ implement "50MHZ SPI AC timing" Erratum No. FE-9144572
+Message-ID: <1439287127-3782-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 07, 2015 at 04:27:56PM +0100, Robin Murphy wrote:
-> As per the comments, the issue here lies in the order in which the
-> OF/driver core code currently calls things for platform devices: as
-> it stands we can't attach the device to a domain in
-> arch_setup_dma_ops() because it doesn't have a group, and we can't
-> even add it to a group ourselves because it isn't fully created and
-> doesn't exist in sysfs yet. The only reason arch/arm is currently
-> getting away without this workaround is that the few IOMMU drivers
-> there hooked up to the generic infrastructure don't actually mind
-> that they get an attach_device from arch_setup_dma_ops() before
-> they've even seen an add_device (largely because they don't care
-> about groups).
+From: Nadav Haklai <nadavh@marvell.com>
 
-Hmm, what about just registering the iommu-driver in arch_setup_dma_ops
-with bus_set_iommu and not care about devices? The code will iterate
-over the devices already on the bus and tries to attach them to the
-iommu driver. But as you said, the devices are not yet on the bus, so
-when a device is later added by the OF/driver core code you can do
-everything needed for the device in the add_device call-back.
+Description:
+On Armada 38x, the device SPI interface supports frequencies of up to
+50 MHz. However, due to this erratum, when the device core clock is
+250 MHz and the SPI interfaces is configured for 50MHz SPI clock and
+CPOL=CPHA=1, there might occur data corruption on reads from the SPI
+device.
 
-This might include initializing the hardware iommu needed for the
-device and setting its per-device dma_ops.
+Workaround:
+Work in one of the following configurations:
+1. Set CPOL=CPHA=0 in "SPI Interface Configuration Register".
+2. Set TMISO_SAMPLE value to 0x2 in "SPI Timing Parameters 1 Register"
+before setting the interface.
 
-> Laurent's probe-deferral series largely solves these problems in the
-> right place - adding identical boilerplate code to every IOMMU
-> driver to do something they shouldn't have to know about (and don't
-> necessarily have all the right information for) is exactly what we
-> don't want to do. As discussed over on another thread, I'm planning
-> to pick that series up and polish it off after this, but my top
-> priority is getting the basic dma_ops functionality into arm64 that
-> people need right now. I will be only too happy when I can submit
-> the patch removing this notifier workaround ;)
+[gregory.clement at free-electrons.com}: port to v4.2-rc, use
+is_errata_50mhz_ac instead of using a new ARMADA_380_SPI spi type.
 
-I've experienced it often that someone promises me to fix things later,
-but that it doesn't happen then, so please understand that I am pretty
-cautious about adding such hacks ;)
+Signed-off-by: Nadav Haklai <nadavh@marvell.com>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ drivers/spi/spi-orion.c | 54 ++++++++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 53 insertions(+), 1 deletion(-)
 
-> No driver other than the AMD IOMMU has any support yet. Support for
-> IOMMU_DOMAIN_DMA can easily be added to existing drivers based on
-> patch 1 of this series, but more generally it's not entirely clear
-> how default domains are going to work beyond x86. On systems like
-> Juno or Seattle with different sets of masters behind different
-> IOMMU instances (with limited domain contexts each), the most
-> sensible approach would be to have a single default domain per IOMMU
-> (spanning domains across instances would need some hideous
-> synchronisation logic for some implementations), but the current
-> domain_alloc interface gives us no way to do that. On something like
-> RK3288 with two different types of IOMMU on the platform "bus", it
-> breaks down even further as there's no way to guarantee that
-> iommu_domain_alloc() even gives you a domain from the right *driver*
-> (hence bypassing it by going through ops directly here).
-
-Default domain allocation comes down to how the bus organizes its
-iommu-groups. For every group (at least in its current design) a default
-domain is allocated. An a group is typically only behind a single iommu
-instance.
-
-> Only for PCI devices, via iommu_group_get_for_pci_dev(). The code
-> here, however, only runs for platform devices - ops will be always
-> null for a PCI device since of_iommu_configure() will have bailed
-> out (see the silly warning removed by my patch you picked up the
-> other day). Once iommu_group_get_for_dev() supports platform
-> devices, this too can go away. In the meantime if someone adds PCI
-> support to of_iommu_configure() and IOMMU_DOMAIN_DMA support to
-> their IOMMU driver, then we'll get a domain back from
-> iommu_get_domain_for_dev() and just use that.
-
-What is the plan for getting an iommu-groups implementation for the
-platform bus?
-
-
-	Joerg
+diff --git a/drivers/spi/spi-orion.c b/drivers/spi/spi-orion.c
+index 8cad107a5b3f..a87cfd4ba17b 100644
+--- a/drivers/spi/spi-orion.c
++++ b/drivers/spi/spi-orion.c
+@@ -41,6 +41,11 @@
+ #define ORION_SPI_DATA_OUT_REG		0x08
+ #define ORION_SPI_DATA_IN_REG		0x0c
+ #define ORION_SPI_INT_CAUSE_REG		0x10
++#define ORION_SPI_TIMING_PARAMS_REG	0x18
++
++#define ORION_SPI_TMISO_SAMPLE_MASK	(0x3 << 6)
++#define ORION_SPI_TMISO_SAMPLE_1	(1 << 6)
++#define ORION_SPI_TMISO_SAMPLE_2	(2 << 6)
+ 
+ #define ORION_SPI_MODE_CPOL		(1 << 11)
+ #define ORION_SPI_MODE_CPHA		(1 << 12)
+@@ -70,6 +75,7 @@ struct orion_spi_dev {
+ 	unsigned int		min_divisor;
+ 	unsigned int		max_divisor;
+ 	u32			prescale_mask;
++	bool			is_errata_50mhz_ac;
+ };
+ 
+ struct orion_spi {
+@@ -195,6 +201,41 @@ orion_spi_mode_set(struct spi_device *spi)
+ 	writel(reg, spi_reg(orion_spi, ORION_SPI_IF_CONFIG_REG));
+ }
+ 
++static void
++orion_spi_50mhz_ac_timing_erratum(struct spi_device *spi, unsigned int speed)
++{
++	u32 reg;
++	struct orion_spi *orion_spi;
++
++	orion_spi = spi_master_get_devdata(spi->master);
++
++	/*
++	 * Erratum description: (Erratum NO. FE-9144572) The device
++	 * SPI interface supports frequencies of up to 50 MHz.
++	 * However, due to this erratum, when the device core clock is
++	 * 250 MHz and the SPI interfaces is configured for 50MHz SPI
++	 * clock and CPOL=CPHA=1 there might occur data corruption on
++	 * reads from the SPI device.
++	 * Erratum Workaround:
++	 * Work in one of the following configurations:
++	 * 1. Set CPOL=CPHA=0 in "SPI Interface Configuration
++	 * Register".
++	 * 2. Set TMISO_SAMPLE value to 0x2 in "SPI Timing Parameters 1
++	 * Register" before setting the interface.
++	 */
++	reg = readl(spi_reg(orion_spi, ORION_SPI_TIMING_PARAMS_REG));
++	reg &= ~ORION_SPI_TMISO_SAMPLE_MASK;
++
++	if (clk_get_rate(orion_spi->clk) == 250000000 &&
++			speed == 50000000 && spi->mode & SPI_CPOL &&
++			spi->mode & SPI_CPHA)
++		reg |= ORION_SPI_TMISO_SAMPLE_2;
++	else
++		reg |= ORION_SPI_TMISO_SAMPLE_1; /* This is the default value */
++
++	writel(reg, spi_reg(orion_spi, ORION_SPI_TIMING_PARAMS_REG));
++}
++
+ /*
+  * called only when no transfer is active on the bus
+  */
+@@ -216,6 +257,9 @@ orion_spi_setup_transfer(struct spi_device *spi, struct spi_transfer *t)
+ 
+ 	orion_spi_mode_set(spi);
+ 
++	if (orion_spi->devdata->is_errata_50mhz_ac)
++		orion_spi_50mhz_ac_timing_erratum(spi, speed);
++
+ 	rc = orion_spi_baudrate_set(spi, speed);
+ 	if (rc)
+ 		return rc;
+@@ -413,6 +457,14 @@ static const struct orion_spi_dev armada_375_spi_dev_data = {
+ 	.prescale_mask = ARMADA_SPI_CLK_PRESCALE_MASK,
+ };
+ 
++static const struct orion_spi_dev armada_380_spi_dev_data = {
++	.typ = ARMADA_SPI,
++	.max_hz = 50000000,
++	.max_divisor = 1920,
++	.prescale_mask = ARMADA_SPI_CLK_PRESCALE_MASK,
++	.is_errata_50mhz_ac = true,
++};
++
+ static const struct of_device_id orion_spi_of_match_table[] = {
+ 	{
+ 		.compatible = "marvell,orion-spi",
+@@ -428,7 +480,7 @@ static const struct of_device_id orion_spi_of_match_table[] = {
+ 	},
+ 	{
+ 		.compatible = "marvell,armada-380-spi",
+-		.data = &armada_xp_spi_dev_data,
++		.data = &armada_380_spi_dev_data,
+ 	},
+ 	{
+ 		.compatible = "marvell,armada-390-spi",
+-- 
+2.1.0
