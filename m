@@ -1,34 +1,60 @@
-From: aph@redhat.com (Andrew Haley)
-Date: Tue, 11 Aug 2015 09:58:00 +0100
-Subject: [RFC PATCH 01/10] arm64: feature registers: Documentation
-In-Reply-To: <55C9B51D.1060601@arm.com>
-References: <1437731037-25795-1-git-send-email-suzuki.poulose@arm.com>
- <1437731037-25795-2-git-send-email-suzuki.poulose@arm.com>
- <20150810160636.GB15394@e104818-lin.cambridge.arm.com>
- <55C8E12E.6030305@arm.com> <55C8EB17.7090708@redhat.com>
- <55C9B51D.1060601@arm.com>
-Message-ID: <55C9B918.90807@redhat.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 11 Aug 2015 16:59:21 +0800
+Subject: [GIT PULL] i.MX clock updates for 4.2
+Message-ID: <20150811085921.GB10035@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/08/15 09:41, Suzuki K. Poulose wrote:
-> The REVIDR has to be used in conjunction with the MIDR to make real sense.
+Hi Michael, Stephen,
 
-Sure, of course.
+The i.MX clock drivers were moved into drivers/clk/imx folder since
+v4.2-rc1, so I would like to send i.MX clock changes through clock tree
+from this cycle.  Here is my first pull request to you guys.  I'm using
+signed tags, same as how I work with arm-soc folks.  Let me know if
+there is any problem with it.
 
-> We cannot guarantee that the REVIDR that we read (would) belong to the CPU
-> where MIDR would have been read (unless the process is pinned) and hence the
-> user may not be able to make any use of the information.
+Also, please keep it stable, because I need to pull it into other
+branch as dependency which I will send via arm-soc tree.
 
-Well, yes, nothing is perfect.  The situation we're in now, for example,
-is that if we see Cortex A57 we have to assume Cortex A53 and include
-workarounds.  People might mix and match processors.  So it goes.
+Thanks,
+Shawn
 
-> Steve has a patch [1]
-> to expose the MIDR,REVIDR info via sysfs.
-> 
-> [1] https://lkml.org/lkml/2015/7/24/420
+The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
 
-OK.  As long as I can get at it I'm happy.
+  Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
 
-Andrew.
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-clk-4.3
+
+for you to fetch changes up to 3713e3f5e9274bbe52e94716bde303071364c1ed:
+
+  clk: imx35: define two clocks for rtc (2015-08-05 20:01:21 +0800)
+
+----------------------------------------------------------------
+The i.MX clock updates for 4.3:
+ - Provide a better IPU clock initial settings on imx6dl for getting
+   HDMI and LVDS at the same time.
+ - Add clock driver support for i.MX6UL SoC
+ - Add a second clock for RTC device on i.MX31 and i.MX35
+
+----------------------------------------------------------------
+Fabio Estevam (1):
+      clk: imx: clk-imx6q: Provide initial IPU clock settings for mx6dl
+
+Frank Li (1):
+      clk: imx: add imx6ul clk tree support
+
+Philippe Reynes (2):
+      clk: imx31: add a second rtc clock
+      clk: imx35: define two clocks for rtc
+
+ drivers/clk/imx/Makefile                 |   1 +
+ drivers/clk/imx/clk-imx31.c              |   3 +-
+ drivers/clk/imx/clk-imx35.c              |   6 +-
+ drivers/clk/imx/clk-imx6q.c              |   4 +
+ drivers/clk/imx/clk-imx6ul.c             | 432 +++++++++++++++++++++++++++++++
+ include/dt-bindings/clock/imx6ul-clock.h | 240 +++++++++++++++++
+ 6 files changed, 684 insertions(+), 2 deletions(-)
+ create mode 100644 drivers/clk/imx/clk-imx6ul.c
+ create mode 100644 include/dt-bindings/clock/imx6ul-clock.h
