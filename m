@@ -1,39 +1,67 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 11 Aug 2015 10:03:42 +0100
-Subject: [RESEND][PATCH 3/4] ARM: davinci: Set proper SPI prescale limit
- value
-In-Reply-To: <55C99D0D.9050605@ti.com>
-References: <1437568344-18889-1-git-send-email-fcooper@ti.com>
- <1437568344-18889-4-git-send-email-fcooper@ti.com>
- <55B22681.3060000@ti.com> <55C9380D.1060802@ti.com>
- <55C99D0D.9050605@ti.com>
-Message-ID: <20150811090342.GG10748@sirena.org.uk>
+From: maitysanchayan@gmail.com (Sanchayan Maity)
+Date: Tue, 11 Aug 2015 14:35:00 +0530
+Subject: [PATCH v3] Add continuous sampling with IIO buffers for Vybrid
+Message-ID: <cover.1439283162.git.maitysanchayan@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 11, 2015 at 12:28:21PM +0530, Sekhar Nori wrote:
-> On Tuesday 11 August 2015 05:17 AM, Franklin S Cooper Jr. wrote:
+Hello,
 
-> > ping. Patches 1 and 2 have already been pulled into Mark's spi tree and are currently in in linux-next.
+This patch adds support for continuous sampling provided by the
+ADC block on Vybrid by leveraging the IIO triggered buffers
+infrastructure.
 
-> Mark, can you apply this patch to your tree as well? Thats the preferred
-> route for me.
+The patch has been tested on Colibri VF50 and VF61 on shawn's
+tree for-next branch with the patches [1] and [2] applied.
 
-> If thats not an option for you, can you confirm that the topic/davinci
-> branch of your spi tree is an immutable commit I can base my pull
-> request to ARM-SoC on?
+The below script was used for testing.
 
-Why would there be any interdependency between the the two trees, that
-would be very unusual?  Adding a new value to DT doesn't need the kernel
-to understand it and the driver should be compatible with existing DTs.
-If there *is* some dependency that suggests the driver update has
-problems...
+#!/bin/sh
+echo 0 > /sys/bus/iio/devices/iio:device0/scan_elements/in_voltage8_en
+echo 0 > /sys/bus/iio/devices/iio:device0/scan_elements/in_voltage9_en
+echo 1 > /sys/bus/iio/devices/iio:device0/scan_elements/in_temp_en
+echo 1 > /sys/bus/iio/devices/iio:device0/scan_elements/in_timestamp_en
+echo 0 > /sys/bus/iio/devices/iio_sysfs_trigger/add_trigger
+/home/root/generic_buffer -n 4003b000.adc -t sysfstrig0 -l 512 -c 10
+echo 0 > /sys/bus/iio/devices/iio:device0/scan_elements/in_timestamp_en
+echo 0 > /sys/bus/iio/devices/iio:device0/scan_elements/in_temp_en
+echo 0 > /sys/bus/iio/devices/iio:device0/scan_elements/in_voltage8_en
+echo 0 > /sys/bus/iio/devices/iio:device0/scan_elements/in_voltage9_en
 
-In any case I don't have a copy of the patch any more.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150811/7da1cd5e/attachment.sig>
+Feedback and comments are most welcome.
+
+Changes since v2:
+1. Fix the wrong buffer size for statically allocated buffer
+2. Drop the use of .address field from the iio_chan_spec
+3. Use iio_buffer_enabled call inside the lock
+4. Drop wrapper function around iio_trigered_* function calls
+5. Drop Kconfig select of sysfs trigger
+6. Drop Kconfig select IIO_TRIGGER as it is already selected by
+IIO_TRIGGERED_BUFFER
+
+Changes since v1:
+1. Use a fixed size buffer instead of kmalloc allocated during update
+scan mode
+2. Remove a write to read only register ADC_HS (COCO bit)
+
+Version 2 patch can be found here
+http://www.gossamer-threads.com/lists/linux/kernel/2235178
+
+Version 1 patch can be found here
+http://www.spinics.net/lists/linux-iio/msg20053.html
+
+[1]. https://lkml.org/lkml/2015/5/27/350
+[2]. https://lkml.org/lkml/2015/7/14/395
+
+Thanks & Regards,
+Sanchayan Maity.
+
+Sanchayan Maity (1):
+  iio: adc: vf610: Add IIO buffer support for Vybrid ADC
+
+ drivers/iio/adc/Kconfig     |   2 +
+ drivers/iio/adc/vf610_adc.c | 102 +++++++++++++++++++++++++++++++++++++++++---
+ 2 files changed, 97 insertions(+), 7 deletions(-)
+
+-- 
+2.5.0
