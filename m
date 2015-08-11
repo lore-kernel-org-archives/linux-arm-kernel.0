@@ -1,31 +1,33 @@
-From: hongzhou.yang@mediatek.com (Hongzhou Yang)
-Date: Mon, 10 Aug 2015 18:51:50 -0700
-Subject: [PATCH] pinctrl: mediatek: Implement pictrl irq wake handler
-In-Reply-To: <CACRpkdZ1RjjSh5J=K724CpbXDXwdHJSdXOTLS8fSOO-34zn=9A@mail.gmail.com>
-References: <1438162601-448-1-git-send-email-maoguang.meng@mediatek.com>
- <CACRpkdZ1RjjSh5J=K724CpbXDXwdHJSdXOTLS8fSOO-34zn=9A@mail.gmail.com>
-Message-ID: <1439257910.38706.1.camel@mussux00.eus.mediatek.inc>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 11 Aug 2015 11:15:54 +0900
+Subject: [PATCH] ARM: exynos_defconfig: Enable cpufreq-dt driver
+Message-ID: <1439259354-32055-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-08-10 at 14:43 +0200, Linus Walleij wrote:
-> On Wed, Jul 29, 2015 at 11:36 AM,  <maoguang.meng@mediatek.com> wrote:
-> 
-> > From: Maoguang Meng <maoguang.meng@mediatek.com>
-> >
-> > This patch implement irq_set_wake for suspend resume.
-> >
-> > Signed-off-by: Maoguang Meng <maoguang.meng@mediatek.com>
-> 
-> Hongzhou/Yingjoe: are you OK with this patch? Can I have your ACKs?
-> 
-> Yours,
-> Linus Walleij
+With the latest patches the cpufreq-dt can be used on multiple
+Exynos SoCs: 3250, 4210, 4212, 4412 and 5250.
 
-Hi Linus,
+Enable it along with default ondemand governor to conserve the energy,
+reduce temperature while maintaining acceptable performance.
 
-Yes, you can. Thank you.
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+---
+ arch/arm/configs/exynos_defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Acked-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
-
-Hongzhou
+diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+index 67965cedeb69..2263cd94cb93 100644
+--- a/arch/arm/configs/exynos_defconfig
++++ b/arch/arm/configs/exynos_defconfig
+@@ -27,6 +27,8 @@ CONFIG_ARM_APPENDED_DTB=y
+ CONFIG_ARM_ATAG_DTB_COMPAT=y
+ CONFIG_CMDLINE="root=/dev/ram0 rw ramdisk=8192 initrd=0x41000000,8M console=ttySAC1,115200 init=/linuxrc mem=256M"
+ CONFIG_CPU_FREQ=y
++CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
++CONFIG_CPUFREQ_DT=y
+ CONFIG_CPU_IDLE=y
+ CONFIG_ARM_EXYNOS_CPUIDLE=y
+ CONFIG_VFP=y
+-- 
+1.9.1
