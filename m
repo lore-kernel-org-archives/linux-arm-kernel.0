@@ -1,36 +1,74 @@
-From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
-Date: Tue, 11 Aug 2015 16:37:46 +0100
-Subject: [RFC PATCH 01/10] arm64: feature registers: Documentation
-In-Reply-To: <20150811142301.GE23307@e104818-lin.cambridge.arm.com>
-References: <1437731037-25795-1-git-send-email-suzuki.poulose@arm.com>
- <1437731037-25795-2-git-send-email-suzuki.poulose@arm.com>
- <20150810160636.GB15394@e104818-lin.cambridge.arm.com>
- <55C8E12E.6030305@arm.com>
- <CAKv+Gu-9GTzjqyT=NeBKjcaL7q-uFMToqPpprkyD-faG0J3mkQ@mail.gmail.com>
- <20150811142301.GE23307@e104818-lin.cambridge.arm.com>
-Message-ID: <55CA16CA.8060609@arm.com>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Tue, 11 Aug 2015 17:39:47 +0200
+Subject: [PATCH v4 5/6] iommu/mediatek: Add mt8173 IOMMU driver
+In-Reply-To: <1438597279-2937-6-git-send-email-yong.wu@mediatek.com>
+References: <1438597279-2937-1-git-send-email-yong.wu@mediatek.com>
+ <1438597279-2937-6-git-send-email-yong.wu@mediatek.com>
+Message-ID: <20150811153947.GF14980@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/08/15 15:23, Catalin Marinas wrote:
-> On Mon, Aug 10, 2015 at 07:48:48PM +0200, Ard Biesheuvel wrote:
->>> On 10/08/15 17:06, Catalin Marinas wrote:
->>>> And to debunk some of the counter arguments:
->>>>
->>>> a) Running out of HWCAP bits - I really doubt this, we can always
->>>>      introduce 64 more via a new elf_hwcapX
->>
->> Note that ELF_HWCAP is also wired into ifunc resolution of GNU
->> indirect functions, which looks like a useful feature although it
->> isn't used that widely yet.
->
-> I forgot to mention, we also need an HWCAP_CPUID with these patches when
-> we expose the MRS interface. The ifunc resolver could use MRS when
-> available. But I would still keep adding HWCAP bits for new features,
-> even if we risk running out of the 64-bit we have now.
->
+On Mon, Aug 03, 2015 at 06:21:18PM +0800, Yong Wu wrote:
+> +/*
+> + * There is only one iommu domain called the m4u domain that
+> + * all Multimedia modules share.
+> + */
+> +static struct mtk_iommu_domain	*m4udom;
 
-Sure, I will add the HWCAP_CPUID in the next version of the series.
+What is the reason you only implement one domain? Can't the IOMMU
+isolate different devices from each other?
 
-Thanks
-Suzuki
+
+> +static struct iommu_domain *mtk_iommu_domain_alloc(unsigned type)
+> +{
+> +	struct mtk_iommu_domain *priv;
+> +
+> +	if (type != IOMMU_DOMAIN_UNMANAGED && type != IOMMU_DOMAIN_DMA)
+> +		return NULL;
+> +
+> +	if (m4udom)/* The m4u domain exist. */
+> +		return &m4udom->domain;
+
+This is not going to work. If you always return the same domain the
+iommu core might re-initialize domain state (and overwrite changed
+state). At the moment this is only the domain-type which will change
+every time this function is called, but there might be more.
+
+> +static int mtk_iommu_add_device(struct device *dev)
+> +{
+> +	struct iommu_group *group;
+> +	int ret;
+> +
+> +	if (!dev->archdata.iommu) /* Not a iommu client device */
+> +		return -ENODEV;
+> +
+> +	group = iommu_group_get(dev);
+> +	if (!group) {
+> +		group = iommu_group_alloc();
+> +		if (IS_ERR(group)) {
+> +			dev_err(dev, "Failed to allocate IOMMU group\n");
+> +			return PTR_ERR(group);
+> +		}
+> +	}
+> +
+> +	ret = iommu_group_add_device(group, dev);
+> +	if (ret) {
+> +		dev_err(dev, "Failed to add IOMMU group\n");
+> +		goto err_group_put;
+> +	}
+> +
+> +	ret = iommu_attach_group(&m4udom->domain, group);
+> +	if (ret)
+> +		dev_err(dev, "Failed to attach IOMMU group\n");
+> +
+> +err_group_put:
+> +	iommu_group_put(group);
+> +	return ret;
+> +}
+
+Putting every device into its own group indicates that the IOMMU can
+isolate between single devices on the bus, which makes it even more
+questionable that you only allow one domain for the whole driver.
+
+
+	Joerg
