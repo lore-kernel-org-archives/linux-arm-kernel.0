@@ -1,43 +1,43 @@
 From: haibo.chen@freescale.com (Haibo Chen)
-Date: Tue, 11 Aug 2015 19:38:28 +0800
-Subject: [PATCH v6 3/6] mmc: sdhci-esdhc-imx: add imx7d support in bingding doc
+Date: Tue, 11 Aug 2015 19:38:29 +0800
+Subject: [PATCH v6 4/6] ARM: dts: imx7d-sdb: add eMMC5.0 support
 In-Reply-To: <1439293111-21077-1-git-send-email-haibo.chen@freescale.com>
 References: <1439293111-21077-1-git-send-email-haibo.chen@freescale.com>
-Message-ID: <1439293111-21077-4-git-send-email-haibo.chen@freescale.com>
+Message-ID: <1439293111-21077-5-git-send-email-haibo.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a required property "fsl,imx7d-usdhc" in binding doc.
-Add an optional property "fsl,tuning-step" in binding doc.
+imx7d-sdb board has a eMMC5.0 on usdhc3. This eMMC support HS400.
+This patch add usdhc3 support for HS400
 
 Signed-off-by: Haibo Chen <haibo.chen@freescale.com>
 ---
- Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/boot/dts/imx7d-sdb.dts | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt b/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt
-index 211e778..dca56d6 100644
---- a/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt
-+++ b/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt
-@@ -15,6 +15,7 @@ Required properties:
- 	       "fsl,imx6q-usdhc"
- 	       "fsl,imx6sl-usdhc"
- 	       "fsl,imx6sx-usdhc"
-+	       "fsl,imx7d-usdhc"
+diff --git a/arch/arm/boot/dts/imx7d-sdb.dts b/arch/arm/boot/dts/imx7d-sdb.dts
+index fdd1d7c..8059458 100644
+--- a/arch/arm/boot/dts/imx7d-sdb.dts
++++ b/arch/arm/boot/dts/imx7d-sdb.dts
+@@ -241,6 +241,19 @@
+ 	status = "okay";
+ };
  
- Optional properties:
- - fsl,wp-controller : Indicate to use controller internal write protection
-@@ -27,6 +28,11 @@ Optional properties:
-   transparent level shifters on the outputs of the controller. Two cells are
-   required, first cell specifies minimum slot voltage (mV), second cell
-   specifies maximum slot voltage (mV). Several ranges could be specified.
-+- fsl,tuning-step: Specify the increasing delay cell steps in tuning procedure.
-+  The uSDHC use one delay cell as default increasing step to do tuning process.
-+  This property allows user to change the tuning step to more than one delay
-+  cells which is useful for some special boards or cards when the default
-+  tuning step can't find the proper delay window within limited tuning retries.
- 
- Examples:
- 
++&usdhc3 {
++	pinctrl-names = "default", "state_100mhz", "state_200mhz";
++	pinctrl-0 = <&pinctrl_usdhc3>;
++	pinctrl-1 = <&pinctrl_usdhc3_100mhz>;
++	pinctrl-2 = <&pinctrl_usdhc3_200mhz>;
++	assigned-clocks = <&clks IMX7D_USDHC3_ROOT_CLK>;
++	assigned-clock-rates = <400000000>;
++	bus-width = <8>;
++	fsl,tuning-step = <2>;
++	non-removable;
++	status = "okay";
++};
++
+ &iomuxc {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_hog>;
 -- 
 1.9.1
