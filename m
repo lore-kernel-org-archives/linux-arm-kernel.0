@@ -1,30 +1,46 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 11 Aug 2015 15:06:55 +0200
-Subject: [PATCH 0/3] Device Tree updates of UniPhier SoCs for Linux 4.3
-In-Reply-To: <1438687264-26538-1-git-send-email-yamada.masahiro@socionext.com>
+Date: Tue, 11 Aug 2015 15:07:39 +0200
+Subject: [PATCH 3/3] ARM: dts: UniPhier: add ProXstream2 and PH1-LD6b
+ SoC/board support
+In-Reply-To: <1438687264-26538-4-git-send-email-yamada.masahiro@socionext.com>
 References: <1438687264-26538-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <20150811130655.GC30181@localhost>
+ <1438687264-26538-4-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <20150811130739.GD30181@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 04, 2015 at 08:21:01PM +0900, Masahiro Yamada wrote:
-> Hi Olof and Arnd,
-> 
-> 
-> Here are a little more updates for device trees for UniPhier SoCs.
-> 
-> Please consider applying this series to your ARM-SOC tree.
-> 
-> Thanks!
-> 
-> 
-> 
-> Masahiro Yamada (3):
->   ARM: dts: UniPhier: add I2C controller device nodes
->   ARM: dts: UniPhier: add PH1-Pro5 SoC support
->   ARM: dts: UniPhier: add ProXstream2 and PH1-LD6b SoC/board support
+Hi,
 
-Thanks, applied all 3 to next/dt with minor tweaks to the subject line.
+On Tue, Aug 04, 2015 at 08:21:04PM +0900, Masahiro Yamada wrote:
+> Initial version of DTSI for ProXstream2 and PH1-LD6b and DTS for
+> PH1-LD6b reference board.
+> 
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> ---
+> 
+>  arch/arm/boot/dts/Makefile                  |   3 +-
+>  arch/arm/boot/dts/uniphier-ph1-ld6b-ref.dts | 105 +++++++++++
+>  arch/arm/boot/dts/uniphier-ph1-ld6b.dtsi    |  67 +++++++
+>  arch/arm/boot/dts/uniphier-proxstream2.dtsi | 273 ++++++++++++++++++++++++++++
+>  4 files changed, 447 insertions(+), 1 deletion(-)
+>  create mode 100644 arch/arm/boot/dts/uniphier-ph1-ld6b-ref.dts
+>  create mode 100644 arch/arm/boot/dts/uniphier-ph1-ld6b.dtsi
+>  create mode 100644 arch/arm/boot/dts/uniphier-proxstream2.dtsi
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 246473a..6eb3f2f 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -645,7 +645,8 @@ dtb-$(CONFIG_ARCH_UNIPHIER) += \
+>  	uniphier-ph1-sld3-ref.dtb \
+>  	uniphier-ph1-ld4-ref.dtb \
+>  	uniphier-ph1-pro4-ref.dtb \
+> -	uniphier-ph1-sld8-ref.dtb
+> +	uniphier-ph1-sld8-ref.dtb \
+> +	uniphier-ph1-ld6b-ref.dtb
+
+Please always add entries here sorted, don't just append. I've fixed it
+up for you this time.
 
 
 -Olof
