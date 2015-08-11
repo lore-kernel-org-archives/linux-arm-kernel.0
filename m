@@ -1,54 +1,58 @@
 From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Tue, 11 Aug 2015 13:30:15 +0000
-Subject: [PATCH V5 0/3] nvmem: add ocotp support for i.MX23 and i.MX28
-Message-ID: <1439299818-8495-1-git-send-email-stefan.wahren@i2se.com>
+Date: Tue, 11 Aug 2015 13:30:18 +0000
+Subject: [PATCH V5 3/3] ARM: mxs: enable ocotp for i.MX23 and i.MX28
+In-Reply-To: <1439299818-8495-1-git-send-email-stefan.wahren@i2se.com>
+References: <1439299818-8495-1-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <1439299818-8495-4-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series brings read-only support for the On-Chip OTP cells
-in the i.MX23 and i.MX28 processor.
+This patch enables On Chip OTP support for i.MX23 and i.MX28 SoCs,
+but keeps the old compatible string.
 
-changes in V5:
-- rebase to char-misc-next
-- add nvmem prefix to module name
-- set status in dtsi files
+Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+---
+ arch/arm/boot/dts/imx23.dtsi |    7 +++++--
+ arch/arm/boot/dts/imx28.dtsi |    7 +++++--
+ 2 files changed, 10 insertions(+), 4 deletions(-)
 
-changes in V4:
-- rename fsl_ocotp.c to mxs-ocotp.c
-- adapt driver to use NVMEM framework V7
-- take care of hbus clock
-- increase too small timeout
-- implement a wait function
-- use defines from stmp_device.h
-- remove owner init
-- more code cleanup
-
-changes in V3:
-- drop write support
-- take care of i.MX23 which has less registers
-- drop unnecessary header file
-- move static variables into driver data
-- add devicetree probing
-- fix missing bank closing in error case
-- use kobj from platform device for sysfs
-- add SYSFS to Kconfig
-- add binding file
-- code cleanup
-
-Stefan Wahren (3):
-  DT: nvmem: add binding for mxs-ocotp
-  nvmem: add driver for ocotp in i.MX23 and i.MX28
-  ARM: mxs: enable ocotp for i.MX23 and i.MX28
-
- .../devicetree/bindings/nvmem/mxs-ocotp.txt        |   24 ++
- arch/arm/boot/dts/imx23.dtsi                       |    7 +-
- arch/arm/boot/dts/imx28.dtsi                       |    7 +-
- drivers/nvmem/Kconfig                              |   11 +
- drivers/nvmem/Makefile                             |    2 +
- drivers/nvmem/mxs-ocotp.c                          |  252 ++++++++++++++++++++
- 6 files changed, 299 insertions(+), 4 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/nvmem/mxs-ocotp.txt
- create mode 100644 drivers/nvmem/mxs-ocotp.c
-
+diff --git a/arch/arm/boot/dts/imx23.dtsi b/arch/arm/boot/dts/imx23.dtsi
+index b995333..0541563 100644
+--- a/arch/arm/boot/dts/imx23.dtsi
++++ b/arch/arm/boot/dts/imx23.dtsi
+@@ -383,9 +383,12 @@
+ 			};
+ 
+ 			ocotp at 8002c000 {
+-				compatible = "fsl,ocotp";
++				compatible = "fsl,imx23-ocotp", "fsl,ocotp";
++				#address-cells = <1>;
++				#size-cells = <1>;
+ 				reg = <0x8002c000 0x2000>;
+-				status = "disabled";
++				clocks = <&clks 15>;
++				status = "okay";
+ 			};
+ 
+ 			axi-ahb at 8002e000 {
+diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+index 4e073e8..648d790 100644
+--- a/arch/arm/boot/dts/imx28.dtsi
++++ b/arch/arm/boot/dts/imx28.dtsi
+@@ -936,9 +936,12 @@
+ 			};
+ 
+ 			ocotp: ocotp at 8002c000 {
+-				compatible = "fsl,ocotp";
++				compatible = "fsl,imx28-ocotp", "fsl,ocotp";
++				#address-cells = <1>;
++				#size-cells = <1>;
+ 				reg = <0x8002c000 0x2000>;
+-				status = "disabled";
++				clocks = <&clks 25>;
++				status = "okay";
+ 			};
+ 
+ 			axi-ahb at 8002e000 {
 -- 
 1.7.9.5
