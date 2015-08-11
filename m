@@ -1,36 +1,30 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 11 Aug 2015 15:02:38 +0200
-Subject: [GIT PULL 3/5] Samsung DT updates for v4.3
-In-Reply-To: <55C069C2.7040208@kernel.org>
-References: <55C069C2.7040208@kernel.org>
-Message-ID: <20150811130238.GB30181@localhost>
+Date: Tue, 11 Aug 2015 15:06:55 +0200
+Subject: [PATCH 0/3] Device Tree updates of UniPhier SoCs for Linux 4.3
+In-Reply-To: <1438687264-26538-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1438687264-26538-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <20150811130655.GC30181@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 04, 2015 at 04:29:06PM +0900, Kukjin Kim wrote:
-> Hi,
-> 
-> Please pull Samsung DT updates for v4.3.
-> 
-> Thanks,
-> Kukjin
+On Tue, Aug 04, 2015 at 08:21:01PM +0900, Masahiro Yamada wrote:
+> Hi Olof and Arnd,
 > 
 > 
-> The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
+> Here are a little more updates for device trees for UniPhier SoCs.
 > 
->   Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
+> Please consider applying this series to your ARM-SOC tree.
 > 
-> are available in the git repository at:
+> Thanks!
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> tags/samsung-dt-1
 > 
-> for you to fetch changes up to 5e080b078fa1f929d9aa5586985d5e7c0739d207:
 > 
->   ARM: dts: Extend exynos5420-pinctrl nodes using labels instead of
-> paths (2015-07-21 13:01:23 +0900)
+> Masahiro Yamada (3):
+>   ARM: dts: UniPhier: add I2C controller device nodes
+>   ARM: dts: UniPhier: add PH1-Pro5 SoC support
+>   ARM: dts: UniPhier: add ProXstream2 and PH1-LD6b SoC/board support
 
-Merged, thanks.
+Thanks, applied all 3 to next/dt with minor tweaks to the subject line.
 
 
 -Olof
