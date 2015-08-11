@@ -1,34 +1,88 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 11 Aug 2015 09:21:05 +0100
-Subject: [GIT PULL v2] Renesas ARM Based SoC Marzen Board Removal for v4.3
-In-Reply-To: <20150807012847.GF1145@verge.net.au>
-References: <cover.1438581659.git.horms+renesas@verge.net.au>
- <20150806081000.GA16520@localhost>
- <20150807012847.GF1145@verge.net.au>
-Message-ID: <20150811082105.GX7557@n2100.arm.linux.org.uk>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Tue, 11 Aug 2015 09:26:02 +0100
+Subject: [PATCH 0/9] qcom: Add support for TSENS driver
+In-Reply-To: <1436348838-22671-1-git-send-email-rnayak@codeaurora.org>
+References: <1436348838-22671-1-git-send-email-rnayak@codeaurora.org>
+Message-ID: <55C9B19A.9040901@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 07, 2015 at 10:28:47AM +0900, Simon Horman wrote:
-> diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
-> index 8d1e0b6ac2a2..476de30798d7 100644
-> --- a/arch/arm/mach-shmobile/Makefile
-> +++ b/arch/arm/mach-shmobile/Makefile
-> @@ -53,6 +53,7 @@ obj-$(CONFIG_ARCH_RCAR_GEN2)	+= pm-rcar-gen2.o
->  ifndef CONFIG_ARCH_SHMOBILE_MULTI
->  obj-$(CONFIG_MACH_BOCKW)	+= board-bockw.o
->  obj-$(CONFIG_MACH_BOCKW_REFERENCE)	+= board-bockw-reference.o
-> +endif
->  
->  # Framework support
->  obj-$(CONFIG_SMP)		+= $(smp-y)
+Hi Rajendra,
 
-What's happening to get this fixed?
+On 08/07/15 10:47, Rajendra Nayak wrote:
+> Changes since RFC:
+> * Added support for 8916 and 8084
+> * Based off the latest nvmem framework patches [1]
+> * Minor review fixes for comments mostly from Lina
+>
+> ** I have also added irq support using the hardware
+> trip point support series [2]. Will post that
+> out seperately.
+>
+> This is an attempt to have a single TSENS driver for
+> the different versions of the TSENS IP that exist, on
+> different qcom msm/apq SoCs'
+> Support is added for msm8916, msm8960 and msm8974 families.
+> Based on top of the latest nvmem framework patches [2]
+>
+> A lot of the work is based of original code from Stephen Boyd
+> and Siddartha Mohanadoss. I have also picked some of what
+> Narendran Rajan did in his attempt to upstream the support
+> for 8960 family. I could not keep the original authorship on
+> any of the patches because I ended up moving the code around
+> quite a bit in an effort to have a single driver for the
+> various devices. I would be glad to change the authorship
+> for any of the patches if needed.
+>
+> [1] https://lkml.org/lkml/2015/6/22/609
+> [2] https://lkml.org/lkml/2015/5/20/472
+>
+> Rajendra Nayak (8):
+>    thermal: qcom: tsens: Add a skeletal TSENS drivers
+>    thermal: qcom: tsens-8916: Add support for 8916 family of SoCs
+>    thermal: qcom: tsens-8974: Add support for 8974 family of SoCs
+>    thermal: qcom: tsens-8960: Add support for 8960 family of SoCs
+>    arm: dts: msm8974: Add thermal zones, tsens and eeprom nodes
+>    arm: dts: apq8064: Add thermal zones, tsens and eeprom nodes
+>    arm: dts: apq8084: Add thermal zones, tsens and eeprom nodes
+>    arm64: dts: msm8916: Add thermal zones, tsens and eeprom nodes
+>
+> Srinivas Kandagatla (1):
+>    clk: qcom: gcc-msm8960: add child devices support.
+>
+>   .../devicetree/bindings/thermal/qcom-tsens.txt     |  37 +++
+>   arch/arm/boot/dts/qcom-apq8064.dtsi                | 108 ++++++++
+>   arch/arm/boot/dts/qcom-apq8084.dtsi                | 105 ++++++++
+>   arch/arm/boot/dts/qcom-msm8974.dtsi                | 105 ++++++++
+>   arch/arm64/boot/dts/qcom/msm8916.dtsi              |  66 +++++
+>   drivers/clk/qcom/gcc-msm8960.c                     |   4 +-
+>   drivers/thermal/Kconfig                            |   5 +
+>   drivers/thermal/Makefile                           |   1 +
+>   drivers/thermal/qcom/Kconfig                       |  10 +
+>   drivers/thermal/qcom/Makefile                      |   2 +
+>   drivers/thermal/qcom/tsens-8916.c                  | 107 ++++++++
+>   drivers/thermal/qcom/tsens-8960.c                  | 291 +++++++++++++++++++++
+>   drivers/thermal/qcom/tsens-8974.c                  | 239 +++++++++++++++++
+>   drivers/thermal/qcom/tsens-common.c                | 128 +++++++++
+>   drivers/thermal/qcom/tsens.c                       | 209 +++++++++++++++
+>   drivers/thermal/qcom/tsens.h                       |  69 +++++
+>   16 files changed, 1485 insertions(+), 1 deletion(-)
+>   create mode 100644 Documentation/devicetree/bindings/thermal/qcom-tsens.txt
+>   create mode 100644 drivers/thermal/qcom/Kconfig
+>   create mode 100644 drivers/thermal/qcom/Makefile
+>   create mode 100644 drivers/thermal/qcom/tsens-8916.c
+>   create mode 100644 drivers/thermal/qcom/tsens-8960.c
+>   create mode 100644 drivers/thermal/qcom/tsens-8974.c
+>   create mode 100644 drivers/thermal/qcom/tsens-common.c
+>   create mode 100644 drivers/thermal/qcom/tsens.c
+>   create mode 100644 drivers/thermal/qcom/tsens.h
+>
 
-arch/arm/mach-shmobile/Makefile:59: *** missing 'endif'.  Stop.
-Makefile:949: recipe for target 'arch/arm/mach-shmobile' failed
-make[1]: *** [arch/arm/mach-shmobile] Error 2
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Tested-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+
+NVMEM framework in now available in linux-next.
+
+Do you think we can get this in v4.3?
+
+--srini
