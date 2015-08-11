@@ -1,96 +1,80 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Tue, 11 Aug 2015 12:43:25 +0800
-Subject: [PATCH v7 0/9] Fixes and new clocks support for Mediatek MT8173
-In-Reply-To: <1439200228-318-1-git-send-email-jamesjj.liao@mediatek.com>
-References: <1439200228-318-1-git-send-email-jamesjj.liao@mediatek.com>
-Message-ID: <CAGS+omCya_0djzoVGhJchmaTtzo2z+JdnJHDjLipNMsZKV=MLQ@mail.gmail.com>
+From: hongzhou.yang@mediatek.com (Hongzhou Yang)
+Date: Mon, 10 Aug 2015 21:49:31 -0700
+Subject: [PATCH] pinctrl: mediatek: Fix multiple registeration issue.
+Message-ID: <1439268571-10895-1-git-send-email-hongzhou.yang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi James,
+Use dynamic allocation to fix multiple registeration issue.
 
-On Mon, Aug 10, 2015 at 5:50 PM, James Liao <jamesjj.liao@mediatek.com> wrote:
-> This patchset is based on 4.2-rc2 and [1], and contains minor fixes and
-> subsystem clocks support for Mediatek MT8173.
->
-> The previous reviews can be found in [2].
->
-> changes since v6:
-> - Use DUMMY_RATE (0) instead of typical rate for clocks that we don't care
->   and not controlled in CCF.
+--------------8<--------------------
+Since our common driver need support main chip and PMU
+at the same time, that means it will register two
+pinctrl device, and the pinctrl_desc structure should
+be used two times.
 
-For the whole series:
-Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
+But pinctrl_desc use global static definition, then
+the latest registered pinctrl device will overwrite
+the old one's, all members in pinctrl_desc will set to
+the new one's, such as name, pins and pins numbers, etc.
+This is a bug. Changing to use devm_kzalloc to fix it.
 
->
-> changes since v5:
-> - Rebase to 4.2-rc2.
-> - Patch "Fix enabling of critical clocks" had been included in 4.2-rc2,
->   so it need not be included in this patchset.
->
-> changes since v4:
-> - Add a separated patch to remove unused dpi_ck.
-> - Add separated patches to fix clk/mediatek in release 4.2-rc1.
-> - Add __init* for initialization data and functions.
-> - Rename dummy_clk with oscillator in DT.
-> - Remove mtk_clk_register_apmixed_ex(), call mtk_clk_register_ref2usb_tx()
->   directly to register USB clock.
->
-> changes since v3:
-> - Remove clk_null dependency from root clocks.
-> - Use fixed-rate clocks with typical rate to replace clk_null.
-> - Separate ref2usb_tx implementation to clk-apmixed.c
-> - Use clock-controller as the name of clock providers.
->
-> changes since v2:
-> - Rebase to 4.2-rc1.
-> - Add device tree nodes for subsystem clocks.
-> - Fine tune comments of patches.
-> - Add __init, __initconst and const to init data and functions.
-> - Removed unused code from init functions of subsystem clocks.
->
-> changes since v1:
-> - Add CA7PLL and CA15PLL as critical clocks.
-> - Use the same register descriptor for imgsys, vensys and vencltsys.
-> - Generalize apmixedsys special clocks registration.
->
-> [1] https://patchwork.kernel.org/patch/6446341/
-> [2] https://lkml.org/lkml/2015/8/4/111
->
-> James Liao (9):
->   clk: mediatek: Removed unused dpi_ck clock from MT8173
->   clk: mediatek: Remove unused code from MT8173.
->   clk: mediatek: Add __initdata and __init for data and functions
->   clk: mediatek: Add fixed clocks support for Mediatek SoC.
->   clk: mediatek: Fix rate and dependency of MT8173 clocks
->   dt-bindings: ARM: Mediatek: Document devicetree bindings for clock
->     controllers
->   clk: mediatek: Add subsystem clocks of MT8173
->   clk: mediatek: Add USB clock support in MT8173 APMIXEDSYS
->   arm64: dts: mt8173: Add subsystem clock controller device nodes
->
->  .../bindings/arm/mediatek/mediatek,imgsys.txt      |  22 ++
->  .../bindings/arm/mediatek/mediatek,mmsys.txt       |  22 ++
->  .../bindings/arm/mediatek/mediatek,vdecsys.txt     |  22 ++
->  .../bindings/arm/mediatek/mediatek,vencltsys.txt   |  22 ++
->  .../bindings/arm/mediatek/mediatek,vencsys.txt     |  22 ++
->  arch/arm64/boot/dts/mediatek/mt8173.dtsi           |  37 +++
->  drivers/clk/mediatek/Makefile                      |   2 +-
->  drivers/clk/mediatek/clk-apmixed.c                 | 107 +++++++
->  drivers/clk/mediatek/clk-gate.c                    |   2 +-
->  drivers/clk/mediatek/clk-mt8173.c                  | 342 ++++++++++++++++++++-
->  drivers/clk/mediatek/clk-mtk.c                     |  36 ++-
->  drivers/clk/mediatek/clk-mtk.h                     |  24 +-
->  drivers/clk/mediatek/clk-pll.c                     |   7 +-
->  include/dt-bindings/clock/mt8173-clk.h             | 101 +++++-
->  14 files changed, 735 insertions(+), 33 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,imgsys.txt
->  create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt
->  create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,vdecsys.txt
->  create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,vencltsys.txt
->  create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,vencsys.txt
->  create mode 100644 drivers/clk/mediatek/clk-apmixed.c
->
-> --
-> 1.8.1.1.dirty
->
+Cc: stable at vger.kernel.org # v4.1+
+Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
+---
+ drivers/pinctrl/mediatek/pinctrl-mtk-common.c |   27 +++++++++++++++----------
+ 1 file changed, 16 insertions(+), 11 deletions(-)
+
+diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+index ad1ea16..2bba504 100644
+--- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
++++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+@@ -1202,17 +1202,12 @@ static int mtk_pctrl_build_state(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-static struct pinctrl_desc mtk_pctrl_desc = {
+-	.confops	= &mtk_pconf_ops,
+-	.pctlops	= &mtk_pctrl_ops,
+-	.pmxops		= &mtk_pmx_ops,
+-};
+-
+ int mtk_pctrl_init(struct platform_device *pdev,
+ 		const struct mtk_pinctrl_devdata *data,
+ 		struct regmap *regmap)
+ {
+ 	struct pinctrl_pin_desc *pins;
++	struct pinctrl_desc *mtk_pctrl_desc;
+ 	struct mtk_pinctrl *pctl;
+ 	struct device_node *np = pdev->dev.of_node, *node;
+ 	struct property *prop;
+@@ -1265,12 +1260,22 @@ int mtk_pctrl_init(struct platform_device *pdev,
+ 
+ 	for (i = 0; i < pctl->devdata->npins; i++)
+ 		pins[i] = pctl->devdata->pins[i].pin;
+-	mtk_pctrl_desc.name = dev_name(&pdev->dev);
+-	mtk_pctrl_desc.owner = THIS_MODULE;
+-	mtk_pctrl_desc.pins = pins;
+-	mtk_pctrl_desc.npins = pctl->devdata->npins;
++
++	mtk_pctrl_desc = devm_kzalloc(&pdev->dev, sizeof(*mtk_pctrl_desc),
++				GFP_KERNEL);
++	if (!mtk_pctrl_desc)
++		return -ENOMEM;
++
++	mtk_pctrl_desc->name = dev_name(&pdev->dev);
++	mtk_pctrl_desc->owner = THIS_MODULE;
++	mtk_pctrl_desc->pins = pins;
++	mtk_pctrl_desc->npins = pctl->devdata->npins;
++	mtk_pctrl_desc->confops = &mtk_pconf_ops;
++	mtk_pctrl_desc->pctlops = &mtk_pctrl_ops;
++	mtk_pctrl_desc->pmxops = &mtk_pmx_ops;
+ 	pctl->dev = &pdev->dev;
+-	pctl->pctl_dev = pinctrl_register(&mtk_pctrl_desc, &pdev->dev, pctl);
++
++	pctl->pctl_dev = pinctrl_register(mtk_pctrl_desc, &pdev->dev, pctl);
+ 	if (IS_ERR(pctl->pctl_dev)) {
+ 		dev_err(&pdev->dev, "couldn't register pinctrl driver\n");
+ 		return PTR_ERR(pctl->pctl_dev);
+-- 
+1.7.9.5
