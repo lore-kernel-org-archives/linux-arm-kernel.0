@@ -1,52 +1,62 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Tue, 11 Aug 2015 11:45:18 +0200
-Subject: [PATCH 4/6] irqchip: GIC: Use chip_data instead of handler_data
- for cascaded interrupts
-In-Reply-To: <1436447951-22357-5-git-send-email-marc.zyngier@arm.com>
-References: <1436447951-22357-1-git-send-email-marc.zyngier@arm.com>
- <1436447951-22357-5-git-send-email-marc.zyngier@arm.com>
-Message-ID: <55C9C42E.8070602@linaro.org>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue, 11 Aug 2015 10:47:11 +0100
+Subject: [PATCH REPOST #2] serial/amba-pl011: Disable interrupts around TX
+ softirq
+Message-ID: <1439286431-7602-1-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
-On 07/09/2015 03:19 PM, Marc Zyngier wrote:
-> When used as a primary interrupt controller, the GIC driver uses
-> irq_data->chip_data to extract controller-specific information.
-> 
-> When used as a secondary interrupt controller, it uses handler_data
-> instead. As this difference is relatively pointless and only creates
-> confusion, change the secondary path to match what the rest of the
-> driver does.
-not really related to this series' topic, is it?
+pl011_tx_softirq() currently uses spin_{,un}lock(), which are not
+sufficient to inhibit pl011_int() from being triggered by a local
+IRQ and trying to re-take the same lock.  This can lead to
+deadlocks.
 
-Eric
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  drivers/irqchip/irq-gic.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-> index e264675..3c7f3a4 100644
-> --- a/drivers/irqchip/irq-gic.c
-> +++ b/drivers/irqchip/irq-gic.c
-> @@ -298,7 +298,7 @@ static void __exception_irq_entry gic_handle_irq(struct pt_regs *regs)
->  
->  static void gic_handle_cascade_irq(unsigned int irq, struct irq_desc *desc)
->  {
-> -	struct gic_chip_data *chip_data = irq_get_handler_data(irq);
-> +	struct gic_chip_data *chip_data = irq_get_chip_data(irq);
->  	struct irq_chip *chip = irq_get_chip(irq);
->  	unsigned int cascade_irq, gic_irq;
->  	unsigned long status;
-> @@ -341,7 +341,7 @@ void __init gic_cascade_irq(unsigned int gic_nr, unsigned int irq)
->  {
->  	if (gic_nr >= MAX_GIC_NR)
->  		BUG();
-> -	if (irq_set_handler_data(irq, &gic_data[gic_nr]) != 0)
-> +	if (irq_set_chip_data(irq, &gic_data[gic_nr]) != 0)
->  		BUG();
->  	irq_set_chained_handler(irq, gic_handle_cascade_irq);
->  }
-> 
+This patch uses the _irq() locking variants instead to ensure that
+pl011_int() handling for a given port is deferred until any
+pl011_tx_softirq() work for that port is complete.
+
+
+Notes for stable:
+
+This patch fixes an issue that is fixed by the following upstream
+commit, which is a more substantial rewrite of the affected code,
+fixing multiple, mostly more minor issues:
+
+        1e84d22322ceed4767db1e5342c830dd60c8210f
+        serial/amba-pl011: Refactor and simplify TX FIFO handling
+
+The upstream patch was rejected for stable on the reasonable grounds
+that it was too big and complex a patch.  The original buggy code was
+merged in v4.1, and the rewrite was merged in v4.2, leaving only v4.1
+affected.
+
+
+This patch replaces the 1e84d22, for 4.1.x only.
+
+Fixes: 734745caeb9f serial/amba-pl011: Activate TX IRQ passively
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+Tested-by: Robin Murphy <robin.murphy@arm.com>
+Tested-by: Stefan Wahren <stefan.wahren@i2se.com>
+Cc: stable <stable@vger.kernel.org> # 4.1.x
+---
+ drivers/tty/serial/amba-pl011.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index 763eb20..0cc622a 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -1360,9 +1360,9 @@ static void pl011_tx_softirq(struct work_struct *work)
+ 	struct uart_amba_port *uap =
+ 		container_of(dwork, struct uart_amba_port, tx_softirq_work);
+ 
+-	spin_lock(&uap->port.lock);
++	spin_lock_irq(&uap->port.lock);
+ 	while (pl011_tx_chars(uap)) ;
+-	spin_unlock(&uap->port.lock);
++	spin_unlock_irq(&uap->port.lock);
+ }
+ 
+ static void pl011_tx_irq_seen(struct uart_amba_port *uap)
+-- 
+1.7.10.4
