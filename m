@@ -1,30 +1,44 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Tue, 11 Aug 2015 17:36:14 -0500
-Subject: [PATCH v4 00/10] ACPI GIC Self-probing, GICv2m and GICv3 support
-In-Reply-To: <20150811232523.60d192d2@arm.com>
-References: <1438164539-29256-1-git-send-email-hanjun.guo@linaro.org>	<55CA70D5.6040300@codeaurora.org>
- <20150811232523.60d192d2@arm.com>
-Message-ID: <55CA78DE.1000306@codeaurora.org>
+From: mchehab@osg.samsung.com (Mauro Carvalho Chehab)
+Date: Tue, 11 Aug 2015 19:39:04 -0300
+Subject: [PATCH 1/3] [media] c8sectpfe: fix pinctrl dependencies
+Message-ID: <53cc7c9043f0a68a66e53623b114c86051a7250c.1439332733.git.mchehab@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/11/2015 05:25 PM, Marc Zyngier wrote:
-> My branch, as far as I can tell by looking at my own git tree, is based
-> on v4.2-rc2. As for "the LEG kernel", I have no idea what that is. I
-> only work on this thing called "the Linux kernel". You may have heard
-> of it!;-)
+compiling on some archs fail with:
 
-Then what is this:
+drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c:540:8: error: implicit declaration of function ?pinctrl_select_state? [-Werror=implicit-function-declaration]
+  ret = pinctrl_select_state(fei->pinctrl, tsin->pstate);
 
-git://git.linaro.org/leg/acpi/acpi.git
-                      ^^^
+That's due the need of including pinctrl.h header and because
+CONFIG_PINCTRL needs to be true.
 
-This is your tree, isn't it?  Hanjun said, "Patches are on top of Marc's 
-branch irq/gsi-irq-domain-v2, and available at: 
-git://git.linaro.org/leg/acpi/acpi.git gsi-irqdomain".
+Signed-off-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
 
-
+diff --git a/drivers/media/platform/sti/c8sectpfe/Kconfig b/drivers/media/platform/sti/c8sectpfe/Kconfig
+index a7227d2ab6cc..1b1110d7374f 100644
+--- a/drivers/media/platform/sti/c8sectpfe/Kconfig
++++ b/drivers/media/platform/sti/c8sectpfe/Kconfig
+@@ -1,6 +1,7 @@
+ config DVB_C8SECTPFE
+ 	tristate "STMicroelectronics C8SECTPFE DVB support"
+-	depends on DVB_CORE && I2C && (ARCH_STI || ARCH_MULTIPLATFORM || COMPILE_TEST)
++	depends on PINCTRL && DVB_CORE && I2C
++	depends on ARCH_STI || ARCH_MULTIPLATFORM || COMPILE_TEST
+ 	select LIBELF_32
+ 	select FW_LOADER
+ 	select FW_LOADER_USER_HELPER_FALLBACK
+diff --git a/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c b/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c
+index 955d8daf055f..1586a1e6836d 100644
+--- a/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c
++++ b/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c
+@@ -33,6 +33,7 @@
+ #include <linux/time.h>
+ #include <linux/version.h>
+ #include <linux/wait.h>
++#include <linux/pinctrl/pinctrl.h>
+ 
+ #include "c8sectpfe-core.h"
+ #include "c8sectpfe-common.h"
 -- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+2.4.3
