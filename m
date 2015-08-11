@@ -1,111 +1,48 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 11 Aug 2015 15:33:38 +0100
-Subject: [PATCH] ARM: OMAP: irqdomain_hierarchy: fix arm gic irq type
- configuration
-In-Reply-To: <55C9E78D.7040404@ti.com>
-References: <1439285147-20027-1-git-send-email-grygorii.strashko@ti.com>
- <20150811122456.1efe1656@arm.com> <55C9E78D.7040404@ti.com>
-Message-ID: <20150811153338.7e67e6ba@arm.com>
+From: dann.frazier@canonical.com (Dann Frazier)
+Date: Tue, 11 Aug 2015 08:36:57 -0600
+Subject: [PATCH v2 0/3] edac: Add L3/SoC support to the APM X-Gene SoC
+ EDAC driver
+In-Reply-To: <CAPw-ZT=9Eq0yc7tzqJAdCvsQTgRkMmGzNOSXgawBTY0gAijr4Q@mail.gmail.com>
+References: <1437808063-17592-1-git-send-email-lho@apm.com>
+ <CALdTtnv7P5d0Y6wyKe1SOqXedNhQxMsFZY=m-rxK3zouLcFv-Q@mail.gmail.com>
+ <CAPw-ZT=9Eq0yc7tzqJAdCvsQTgRkMmGzNOSXgawBTY0gAijr4Q@mail.gmail.com>
+Message-ID: <CALdTtnsfQ1GsZqCN470hdvsJtr_Fi5BU2L1xfAo4cqb=S9yfqA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 11 Aug 2015 13:16:13 +0100
-Grygorii Strashko <grygorii.strashko@ti.com> wrote:
+On Mon, Aug 10, 2015 at 2:15 PM, Loc Ho <lho@apm.com> wrote:
+> Hi Dann,
+>
+>>> v2:
+>>> * Update binding documentation accordingly
+>>> * Change all single bit defines to BIT(x)
+>>> * Add support for L3 version 1 and 2 HW's
+>>> * Change to use debug file system for error injection
+>>> * In L3/SoC instance add function, allocate EDAC context after all
+>>>   initalization successed
+>>> * Support raw or detail info for SoC EDAC error reporting
+>>>
+>>> v1:
+>>> * Add L3/SoC support to the APM X-Gene SoC EDAC driver
+>>
+>> Loc,
+>>   I tested 4.2-rc5 on a Mustang board with one DIMM, and it hangs (RCU
+>> stall) in xgene_edac_mc_irq_ctl() on modprobe. Same board with 2 DIMMs
+>> boots fine. (U-boot 1.15.12).
+>
+> I just removed one of the two 16GB DIMM... with 4.2.0-rc1 and some
+> code clean up in EDAC driver, it boots just fine... I don't believe
+> the code clean up would affect it. Do you have the dump log?
+>
+> [root at dhcp-10-76-213-247 ~]# uname -a
+> Linux dhcp-10-76-213-247 4.2.0-rc1+ #33 SMP PREEMPT Mon Aug 10
+> 13:23:03 MDT 2015 aarch64 GNU/Linux
 
-> On 08/11/2015 02:24 PM, Marc Zyngier wrote:
-> > On Tue, 11 Aug 2015 10:25:47 +0100
-> > Grygorii Strashko <grygorii.strashko@ti.com> wrote:
-> >
-> > Hi Grygorii,
-> >
-> >> It's observed that ARM GIC IRQ triggering type is not configured
-> >> properly when IRQ is routed through IRQ domains hierarchy and
-> >> system started using DT. As result, system will start using default
-> >> ARM GIC configuration, ignore DT IRQ type configuration,
-> >> and value of desc->irq_data.state_use_accessors = 0.
-> >>
-> >> In case of TI OMAP the following IRQ hierarchy is defined:
-> >> ARM GIC <- OMAP wakeupgen <- TI CBAR
-> >>
-> >> Failed call chain:
-> >>   irq_create_of_mapping
-> >>   irq_set_irq_type
-> >>   __irq_set_trigger
-> >>   if (!chip || !chip->irq_set_type) {
-> >>      return 0; <- return here
-> >>   }
-> >>   CBAR has no .irq_set_type() defined and, so, IRQ triggering
-> >>   configuration will not be propagated to parent IRQ domain.
-> >>
-> >> Hence, fix it by introducing irq_chip_set_type_parent(), in the
-> >> same manner as irq_chip_set_wake_parent(), and use it for IRQ
-> >> triggering type propagation to the parent IRQ domain in
-> >> irq-crossbar and omap-wakeupgen.
-> >>
-> >> / # cat /proc/interrupts -- before
-> >> 230:          0          0      CBAR  30 Edge    -00000000  48051000.gpio
-> >> 263:          0          0      CBAR 116 Edge    -00000000  48053000.gpio
-> >> 296:        246          0      CBAR  67 Edge    -00000000  OMAP UART0
-> >> 311:        341          0      CBAR  51 Edge    -00000000  48070000.i2c
-> >> 312:          3          0      CBAR  52 Edge    -00000000  48072000.i2c
-> >> 313:          0          0      CBAR  56 Edge    -00000000  48060000.i2c
-> >> 314:        255          0      CBAR  78 Edge    -00000000  mmc0
-> >> 315:         40          0      CBAR  81 Edge    -00000000  mmc1
-> >> 316:         13          0      CBAR  91 Edge    -00000000  mmc2
-> >> 320:          0          0      CBAR  49 Edge    -00000000  4a140000.sata
-> >> 324:          0          0      CBAR   1 Edge    -00000000  48078000.elm
-> >> 325:          0          0      CBAR  15 Edge    -00000000  gpmc
-> >> 333:          0          0      CBAR 335 Edge    -00000000  48484000.ethernet
-> >> 334:          0          0      CBAR 336 Edge    -00000000  48484000.ethernet
-> >> 415:          0          0   pcf857x   2 Edge    -00000000  btnUser1
-> >> 416:          0          0   pcf857x   3 Edge    -00000000  btnUser2
-> >> 445:          0          0   pinctrl 992 Edge    -00010000  4806a000.seria
-> >>
-> >> / # cat /proc/interrupts -- after
-> >> 230:          0          0      CBAR  30 Level   -00002004  48051000.gpio
-> >> 263:          0          0      CBAR 116 Level   -00002004  48053000.gpio
-> >> 296:        567          0      CBAR  67 Level   -00002004  OMAP UART0
-> >> 311:        363          0      CBAR  51 Level   -00002004  48070000.i2c
-> >> 312:          3          0      CBAR  52 Level   -00002004  48072000.i2c
-> >> 313:          0          0      CBAR  56 Level   -00002004  48060000.i2c
-> >> 314:        197          0      CBAR  78 Level   -00002004  mmc0
-> >> 315:         40          0      CBAR  81 Level   -00002004  mmc1
-> >> 316:         13          0      CBAR  91 Level   -00002004  mmc2
-> >> 320:          0          0      CBAR  49 Level   -00002004  4a140000.sata
-> >> 324:          0          0      CBAR   1 Level   -00002004  48078000.elm
-> >> 325:          0          0      CBAR  15 Level   -00002004  gpmc
-> >> 333:          0          0      CBAR 335 Level   -00002004  48484000.ethernet
-> >> 334:          0          0      CBAR 336 Level   -00002004  48484000.ethernet
-> >> 415:          0          0   pcf857x   2 Edge    -00000000  btnUser1
-> >> 416:          4          2   pcf857x   3 Edge    -00000000  btnUser2
-> >> 445:          0          0   pinctrl 992 Edge    -00010000  4806a000.serial
-> >>
-> >> Fixes: 783d31863fb8 ('irqchip: crossbar: Convert dra7 crossbar to stacked domains')
-> >> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-> >> ---
-> >> Hi All,
-> >>
-> >> I can split patch if required and overall solution acceptable.
-> >
-> > This looks good to me. Please repost it after splitting it in two
-> > patches.
-> 
-> just to clarify - Do you want to see two or three patches?
-> 
-> 2) or 3) arch/arm/mach-omap2/omap-wakeupgen.c |  1 +
-> 2) drivers/irqchip/irq-crossbar.c       |  1 +
-> 1) include/linux/irq.h                  |  1 +
-> 1) kernel/irq/chip.c                    | 16 ++++++++++++++++
+Sure:
+  http://paste.ubuntu.com/12055821/
+I've reproduced this on two machines. In both cases, we removed the
+DIMM furthest from the CPU (in case that matters).
 
-Ah, I forgot wakeupgen lived in the omap-specific directory.
+ -dann
 
-Please cut it in 3 then (generic implementation, crossbar and
-wakeupgen).
-
-Thanks,
-
-	M.
-
-
--- 
-Jazz is not dead. It just smells funny.
+> -Loc
