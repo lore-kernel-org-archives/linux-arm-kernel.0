@@ -1,36 +1,22 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 11 Aug 2015 15:32:17 +0200
-Subject: [GIT PULL] Third Round of Renesas ARM Based SoC DT Updates for
- v4.3
-In-Reply-To: <cover.1438911334.git.horms+renesas@verge.net.au>
-References: <cover.1438911334.git.horms+renesas@verge.net.au>
-Message-ID: <20150811133217.GO30181@localhost>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 11 Aug 2015 19:37:47 +0530
+Subject: [PATCH] ARM/EP93xx/timer: Migrate to new 'set-state' interface
+In-Reply-To: <20150811131924.GJ30181@localhost>
+References: <744dca162a7626694770a9f51457566a33c3e08f.1438852023.git.viresh.kumar@linaro.org>
+ <CACRpkdZknzqgH+-F0MZgZywtoOL1hhbg=7w1RSC5aZohXtDB3A@mail.gmail.com>
+ <20150810090334.GB5766@linux> <20150811131924.GJ30181@localhost>
+Message-ID: <20150811140747.GI5509@linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 07, 2015 at 11:11:31AM +0900, Simon Horman wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
-> 
-> Please consider these third round of Renesas ARM based SoC DT updates for v4.3.
-> 
-> This pull request is based on the previous round of
-> such requests, tagged as renesas-dt2-for-v4.3,
-> which I have already sent a pull-request for.
+On 11-08-15, 15:19, Olof Johansson wrote:
+> Latest? We don't base our tree on the latest -- instead we try to keep
+> back on -rc2/3 if we can. Right now our tree is on -rc2.
 > 
 > 
-> The following changes since commit 7fd6e11dca09b21efbe2b9db4eff08c8f4a16125:
-> 
->   ARM: shmobile: r8a7791: Add Audio MIX support on DTSI (2015-07-22 09:36:49 +0900)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt3-for-v4.3
-> 
-> for you to fetch changes up to 94bdc48d55ca10f90b4a625f0e443197e0013557:
-> 
->   ARM: shmobile: sh73a0 dtsi: Add missing "gpio-ranges" to gpio node (2015-08-05 06:39:28 +0900)
+> Please confirm that this is still OK to merge with that as base. Thanks.
 
-Merged, thanks.
+Yeah, rc2 should be fine.
 
-
--Olof
+-- 
+viresh
