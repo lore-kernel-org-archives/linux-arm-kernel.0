@@ -1,34 +1,55 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Tue, 11 Aug 2015 18:33:44 -0500
-Subject: [PATCH v4 00/10] ACPI GIC Self-probing, GICv2m and GICv3 support
-In-Reply-To: <20150811234801.51108784@arm.com>
-References: <1438164539-29256-1-git-send-email-hanjun.guo@linaro.org>	<55CA70D5.6040300@codeaurora.org>	<20150811232523.60d192d2@arm.com>	<55CA78DE.1000306@codeaurora.org>
- <20150811234801.51108784@arm.com>
-Message-ID: <55CA8658.80202@codeaurora.org>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Wed, 12 Aug 2015 09:48:34 +1000
+Subject: linux-next: manual merge of the arm-soc tree with the arm tree
+Message-ID: <20150812094834.0b0b2af1@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/11/2015 05:48 PM, Marc Zyngier wrote:
-> I don't see any contradiction here. Hanjun picked the patches from my
-> own branch in my own tree, put his own patches on top, and pushed that
-> out on an branch called gsi-irqdomain that is definitely based on
-> 4.2-rc2. I have no idea where your 3.9-rc7 comes from.
+Hi all,
 
-Ok, so that's not your kernel, but the LEG kernel instead.
+Today's linux-next merge of the arm-soc tree got a conflict in:
 
-The top commits show this:
+  arch/arm/kernel/psci.c
 
-Follows: tracking-mainline-llct-20130415.0, 
-tracking-mainline-llct-20130417.0, v3.9-rc7
+between commit:
 
-Also,
-	$ git tag | grep v4
+  be120397e770 ("ARM: migrate to common PSCI client code")
 
-shows no v4.x tags.
+from the arm tree and commit:
 
-Anyway, I don't want to make a big deal about this.
+  19c233b79d1a ("ARM: appropriate __init annotation for const data")
+
+from the arm-soc tree.
+
+I fixed it up (the former removed the file, so I did that, then added
+the following patch) and can carry the fix as necessary (no action
+is required).
+
+From: Stephen Rothwell <sfr@canb.auug.org.au>
+Date: Wed, 12 Aug 2015 09:39:15 +1000
+Subject: [PATCH] ARM: fix for PSCI code movement
+
+Signed-off-by: Stephen Rothwell <sfr@canb.auug.org.au>
+---
+ drivers/firmware/psci.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
+index a6956007dd38..42700f09a8c5 100644
+--- a/drivers/firmware/psci.c
++++ b/drivers/firmware/psci.c
+@@ -337,7 +337,7 @@ out_put_node:
+ 	return err;
+ }
+ 
+-static const struct of_device_id psci_of_match[] __initconst = {
++static const struct of_device_id const psci_of_match[] __initconst = {
+ 	{ .compatible = "arm,psci",	.data = psci_0_1_init},
+ 	{ .compatible = "arm,psci-0.2",	.data = psci_0_2_init},
+ 	{},
+-- 
+2.5.0
 
 -- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
