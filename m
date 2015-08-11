@@ -1,21 +1,19 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 10 Aug 2015 23:59:37 -0700
-Subject: [PATCH v8 04/13] clk: qcom: gdsc: Add support for ON only state
-In-Reply-To: <1438857474-20262-5-git-send-email-rnayak@codeaurora.org>
+Date: Mon, 10 Aug 2015 23:59:48 -0700
+Subject: [PATCH v8 06/13] clk: qcom: gdsc: Add GDSCs in msm8974 GCC
+In-Reply-To: <1438857474-20262-7-git-send-email-rnayak@codeaurora.org>
 References: <1438857474-20262-1-git-send-email-rnayak@codeaurora.org>
- <1438857474-20262-5-git-send-email-rnayak@codeaurora.org>
-Message-ID: <20150811065937.GF2839@codeaurora.org>
+ <1438857474-20262-7-git-send-email-rnayak@codeaurora.org>
+Message-ID: <20150811065948.GH2839@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 08/06, Rajendra Nayak wrote:
-> Certain devices can have GDSCs' which support ON as the only state.
-> They can't be power collapsed to either hit RET or OFF.
-> The clients drivers for these GDSCs' however would expect the state
-> of the core to be reset following a GDSC disable and re-enable.
-> To do this assert/deassert reset lines every time the client
-> driver would request the GDSC to be powered on/off instead.
+> From: Stephen Boyd <sboyd@codeaurora.org>
 > 
+> There's just one GDSC as part of the msm8974 GCC block.
+> 
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 > Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
 > ---
 
