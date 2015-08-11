@@ -1,76 +1,62 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 11 Aug 2015 12:49:18 +0100
-Subject: [PATCH v3 1/4] mfd: max77686: Don't suggest in binding to use a
- deprecated property
-In-Reply-To: <1438252327-28427-2-git-send-email-javier@osg.samsung.com>
-References: <1438252327-28427-1-git-send-email-javier@osg.samsung.com>
- <1438252327-28427-2-git-send-email-javier@osg.samsung.com>
-Message-ID: <20150811114918.GD18282@x1>
+Date: Tue, 11 Aug 2015 12:54:25 +0100
+Subject: [PATCH v4 2/2] dt: power: st: Provide bindings for ST's OPPs
+In-Reply-To: <20150811100941.GG5509@linux>
+References: <20150729081403.GH2284@x1> <20150729221526.GE3159@codeaurora.org>
+ <20150730084634.GD9319@x1>
+ <CAL_JsqKQLQ15qSt95zBZykzzPhcUrtZzhk29a76n+r_3719AiA@mail.gmail.com>
+ <20150731163715.GV3159@codeaurora.org> <20150803034642.GV899@linux>
+ <20150810132247.GH3249@x1> <20150811080023.GB5509@linux>
+ <20150811093039.GA18282@x1> <20150811100941.GG5509@linux>
+Message-ID: <20150811115425.GE18282@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 30 Jul 2015, Javier Martinez Canillas wrote:
+On Tue, 11 Aug 2015, Viresh Kumar wrote:
+> On 11-08-15, 10:30, Lee Jones wrote:
+> > On Tue, 11 Aug 2015, Viresh Kumar wrote:
+> > 
+> > > On 10-08-15, 14:22, Lee Jones wrote:
+> > > > >  Optional properties:
+> > > > > +- opp-cuts: One or more strings, describing the versions of hardware the OPPs
+> > > > > +  can support.
+> > > > 
+> > > > This isn't very generic.
+> > > > 
+> > > > I'm guessing some vendors my have quite a few ways to differentiate
+> > > > between board versions/revisions/cuts etc.
+> > > > 
+> > > > How about another array where a vendor can choose to identify a piece
+> > > > of hardware however they see fit.
+> > > > 
+> > > > Example 1 (simple version):
+> > > > 
+> > > > /* Version 1 */
+> > > > opp-version = <1>;
+> > > > 
+> > > > Example 2 (using the kernel's versioning):
+> > > > 
+> > > > /* 2.6.32-rc1 */
+> > > > opp-version = <2 6 32 1>;
+> > > > 
+> > > > Example 3 (using ST's versioning):
+> > > > 
+> > > > /* Major 2, Minor 0, Cut 2, All substrates */
+> > > > opp-version = <2 0 2 0xff>;
+> > > 
+> > > But how will we parse this with generic code ?
+> > 
+> > Why would you want to?
+> 
+> So that individual platforms don't need to reinvent the wheel ?
 
-> The regulator-compatible property from the regulator DT binding was
-> deprecated. But the max77686 DT binding doc still suggest to use it
-> instead of the regulator node name's which is the correct approach.
-> 
-> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> 
-> ---
-> 
-> Changes in v3: None
-> Changes in v2:
-> - Add Krzysztof Kozlowski Reviewed-by tag in patch #1.
-> 
->  Documentation/devicetree/bindings/mfd/max77686.txt | 11 ++++-------
->  1 file changed, 4 insertions(+), 7 deletions(-)
+The framework does not need to parse this information.  It is used
+solely by the platform driver, whose job it is to decide which OPPs
+are appropriate for the running platform.
 
-Acked-by: Lee Jones <lee.jones@linaro.org>
-
-> diff --git a/Documentation/devicetree/bindings/mfd/max77686.txt b/Documentation/devicetree/bindings/mfd/max77686.txt
-> index 163bd81a4607..8221102d3fc2 100644
-> --- a/Documentation/devicetree/bindings/mfd/max77686.txt
-> +++ b/Documentation/devicetree/bindings/mfd/max77686.txt
-> @@ -26,7 +26,7 @@ Optional node:
->  	};
->  	refer Documentation/devicetree/bindings/regulator/regulator.txt
->  
-> -  The regulator-compatible property of regulator should initialized with string
-> +  The regulator node's name should be initialized with a string
->  to get matched with their hardware counterparts as follow:
->  
->  	-LDOn 	:	for LDOs, where n can lie in range 1 to 26.
-> @@ -55,16 +55,14 @@ Example:
->  		reg = <0x09>;
->  
->  		voltage-regulators {
-> -			ldo11_reg {
-> -				regulator-compatible = "LDO11";
-> +			ldo11_reg: LDO11 {
->  				regulator-name = "vdd_ldo11";
->  				regulator-min-microvolt = <1900000>;
->  				regulator-max-microvolt = <1900000>;
->  				regulator-always-on;
->  			};
->  
-> -			buck1_reg {
-> -				regulator-compatible = "BUCK1";
-> +			buck1_reg: BUCK1 {
->  				regulator-name = "vdd_mif";
->  				regulator-min-microvolt = <950000>;
->  				regulator-max-microvolt = <1300000>;
-> @@ -72,8 +70,7 @@ Example:
->  				regulator-boot-on;
->  			};
->  
-> -			buck9_reg {
-> -				regulator-compatible = "BUCK9";
-> +			buck9_reg: BUCK9 {
->  				regulator-name = "CAM_ISP_CORE_1.2V";
->  				regulator-min-microvolt = <1000000>;
->  				regulator-max-microvolt = <1200000>;
+Back to my question; how would you like arbitrary version information,
+which means different things to different vendors to be used in
+shared/generic/framework code?
 
 -- 
 Lee Jones
