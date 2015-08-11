@@ -1,48 +1,93 @@
-From: haibo.chen@freescale.com (Haibo Chen)
-Date: Tue, 11 Aug 2015 19:38:31 +0800
-Subject: [PATCH v6 6/6] mmc: sdhci-esdhc-imx: change default watermark level
- and burst length
-In-Reply-To: <1439293111-21077-1-git-send-email-haibo.chen@freescale.com>
-References: <1439293111-21077-1-git-send-email-haibo.chen@freescale.com>
-Message-ID: <1439293111-21077-7-git-send-email-haibo.chen@freescale.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 11 Aug 2015 12:47:36 +0100
+Subject: [PATCH v3 3/4] mfd: Add DT binding for Maxim MAX77802 IC
+In-Reply-To: <1438252327-28427-4-git-send-email-javier@osg.samsung.com>
+References: <1438252327-28427-1-git-send-email-javier@osg.samsung.com>
+ <1438252327-28427-4-git-send-email-javier@osg.samsung.com>
+Message-ID: <20150811114736.GB18282@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-By default, for all imx SoC types, the watermark level is 16, and the
-burst length is 8. But if the SDIO/SD/MMC I/O speed is fast enough,
-this default watermark level and burst length will be the performance
-bottleneck.
+On Thu, 30 Jul 2015, Javier Martinez Canillas wrote:
 
-For example, i.MX7D support eMMC HS400 mode, this mode can run in 8 bit,
-200MHZ DDR mode. So the I/O speed improve a lot compare to SD3.0.
-The default burst length is 8, if we don't change this value, in
-HS400 mode, when we do eMMC read operation, we can find that the
-clock signal will stop for a period of time. This means the speed
-of data moving on AHB bus is slower than I/O speed. So we should
-improve the speed of data moving on AHB bus.
+> The MAX77802 is a chip that contains regulators, 2 32kHz clocks,
+> a RTC and an I2C interface to program the individual components.
+> 
+> The are already DT bindings for the regulators and clocks and
+> these reference to a bindings/mfd/max77802.txt file, that didn't
+> exist, for the details about the PMIC.
+> 
+> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> 
+> ---
+> 
+> Changes in v3:
+> - Add Krzysztof Kozlowski Reviewed-by tag to patch #3.
+> - Capitalise all acronyms. Suggested by Lee Jones.
+> - Use relative path to refer other bindings. Suggested by Lee Jones.
+> - Use IRQ_TYPE_NONE instead of 0 in example. Suggested by Lee Jones.
+> 
+> Changes in v2:
+> - Use the correct "maxim,max77802" compatible string.
+>   Suggested by Krzysztof Kozlowski
+> - Use a pmic generic node name for the max77802 node example.
+>   Suggested by Sergei Shtylyov.
+> 
+>  Documentation/devicetree/bindings/mfd/max77802.txt | 26 ++++++++++++++++++++++
+>  1 file changed, 26 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/max77802.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/mfd/max77802.txt b/Documentation/devicetree/bindings/mfd/max77802.txt
+> new file mode 100644
+> index 000000000000..911ec5fcaefd
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mfd/max77802.txt
+> @@ -0,0 +1,26 @@
+> +Maxim MAX77802 multi-function device
+> +
+> +The Maxim MAX77802 is a Power Management IC (PMIC) that contains 10 high
+> +efficiency Buck regulators, 32 Low-DropOut (LDO) regulators used to power
+> +up application processors and peripherals, a 2-channel 32kHz clock outputs,
+> +a Real-Time-Clock (RTC) and a I2C interface to program the individual
+> +regulators, clocks outputs and the RTC.
+> +
+> +Binding for the built-in 32k clock generator block is defined separately
+> +in the ../clk/maxim,max77802.txt file and binding for the regulators
+> +is defined in the ../regulator/max77802.txt file.
 
-This patch set the default burst length as 16, and set the default
-watermark level as 64. The test result is the clock signal has
-no stop during the eMMC HS400 operation.
+  "Bindings for the built-in 32k clock generator block and
+   regulators are defined in ../clk/maxim,max77802.txt and
+   ../regulator/max77802.txt respectively."
 
-Signed-off-by: Haibo Chen <haibo.chen@freescale.com>
----
- drivers/mmc/host/sdhci-esdhc-imx.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+> +Required properties:
+> +- compatible : Must be "maxim,max77802";
 
-diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-index ac8ec01..886d230 100644
---- a/drivers/mmc/host/sdhci-esdhc-imx.c
-+++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-@@ -1160,7 +1160,8 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
- 	 * to something insane.  Change it back here.
- 	 */
- 	if (esdhc_is_usdhc(imx_data)) {
--		writel(0x08100810, host->ioaddr + ESDHC_WTMK_LVL);
-+		writel(0x10401040, host->ioaddr + ESDHC_WTMK_LVL);
-+
- 		host->quirks2 |= SDHCI_QUIRK2_PRESET_VALUE_BROKEN;
- 		host->mmc->caps |= MMC_CAP_1_8V_DDR;
- 
+';' ?
+
+> +- reg : Specifies the I2C slave address of PMIC block.
+> +- interrupts : This I2C device has an IRQ line connected to the main SoC.
+> +- interrupt-parent : The parent interrupt controller.
+
+I always find this easier on the eye when you:
+
+Required properties:
+- compatible		: Must be "maxim,max77802"
+- reg			: Specifies the I2C slave address of PMIC block.
+- interrupts		: This I2C device has an IRQ line connected to the main SoC.
+- interrupt-parent	: The parent interrupt controller.
+
+> +Example:
+> +
+> +	max77802: pmic at 09 {
+> +		compatible = "maxim,max77802";
+> +		interrupt-parent = <&intc>;
+> +		interrupts = <26 IRQ_TYPE_NONE>;
+> +		reg = <0x09>;
+> +	};
+
 -- 
-1.9.1
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
