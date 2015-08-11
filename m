@@ -1,45 +1,43 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Tue, 11 Aug 2015 07:54:31 +0200
-Subject: [PATCH] ARM: exynos_defconfig: Enable cpufreq-dt driver
-In-Reply-To: <1439259354-32055-1-git-send-email-k.kozlowski@samsung.com>
-References: <1439259354-32055-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <55C98E17.9040303@osg.samsung.com>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Tue, 11 Aug 2015 02:05:44 -0400
+Subject: [PATCH 5/5] drivers/tty: make serial 8250_lpc18xx.c explicitly
+ non-modular
+In-Reply-To: <CAGhQ9Vxjymt4z32s3x2B8b6ypgn3Bzh1ncbqxqidfPyM2k87jw@mail.gmail.com>
+References: <1439081497-14986-1-git-send-email-paul.gortmaker@windriver.com>
+ <1439081497-14986-6-git-send-email-paul.gortmaker@windriver.com>
+ <CAGhQ9Vxjymt4z32s3x2B8b6ypgn3Bzh1ncbqxqidfPyM2k87jw@mail.gmail.com>
+Message-ID: <20150811060544.GJ9751@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+[Re: [PATCH 5/5] drivers/tty: make serial 8250_lpc18xx.c explicitly non-modular] On 10/08/2015 (Mon 20:42) Joachim Eastwood wrote:
 
-On 08/11/2015 04:15 AM, Krzysztof Kozlowski wrote:
-> With the latest patches the cpufreq-dt can be used on multiple
-> Exynos SoCs: 3250, 4210, 4212, 4412 and 5250.
+> Hi Paul,
 > 
-> Enable it along with default ondemand governor to conserve the energy,
-> reduce temperature while maintaining acceptable performance.
+> On 9 August 2015 at 02:51, Paul Gortmaker <paul.gortmaker@windriver.com> wrote:
+> > The Kconfig currently controlling compilation of this code is:
+> >
+> > 8250/Kconfig:config SERIAL_8250_LPC18XX
+> > 8250/Kconfig:        bool "NXP LPC18xx/43xx serial port support"
+> >
+> > ...meaning that it currently is not being built as a module by anyone.
+> >
+> > Lets remove the modular code that is essentially orphaned, so that
+> > when reading the driver there is no doubt it is builtin-only.
 > 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> ---
->  arch/arm/configs/exynos_defconfig | 2 ++
->  1 file changed, 2 insertions(+)
+> The bool in KConfig is more or less a copy-paste mistake on my side. I
+> really meant for this driver to be buildable as module and it builds
+> just fine with 'm'.
 > 
-> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-> index 67965cedeb69..2263cd94cb93 100644
-> --- a/arch/arm/configs/exynos_defconfig
-> +++ b/arch/arm/configs/exynos_defconfig
-> @@ -27,6 +27,8 @@ CONFIG_ARM_APPENDED_DTB=y
->  CONFIG_ARM_ATAG_DTB_COMPAT=y
->  CONFIG_CMDLINE="root=/dev/ram0 rw ramdisk=8192 initrd=0x41000000,8M console=ttySAC1,115200 init=/linuxrc mem=256M"
->  CONFIG_CPU_FREQ=y
-> +CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
-> +CONFIG_CPUFREQ_DT=y
->  CONFIG_CPU_IDLE=y
->  CONFIG_ARM_EXYNOS_CPUIDLE=y
->  CONFIG_VFP=y
-> 
+> Want me send a patch changing it to tristate or will you handle it?
 
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+I will do a v2 in the next day or so with collected ACKs and this patch
+replaced, unless Greg jumps in and indicates he'd like something
+different.
 
-Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+Paul.
+--
+
+> 
+> 
+> regards, Joachim Eastwood
