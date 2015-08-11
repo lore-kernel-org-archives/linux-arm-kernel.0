@@ -1,34 +1,61 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Tue, 11 Aug 2015 08:42:47 +0000
-Subject: [PATCH 2/2] mmc: sirf: fix the capbility to support DDR50
-Message-ID: <1439282567-6362-1-git-send-email-21cnbao@gmail.com>
+From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
+Date: Tue, 11 Aug 2015 09:41:01 +0100
+Subject: [RFC PATCH 01/10] arm64: feature registers: Documentation
+In-Reply-To: <55C8EB17.7090708@redhat.com>
+References: <1437731037-25795-1-git-send-email-suzuki.poulose@arm.com>
+ <1437731037-25795-2-git-send-email-suzuki.poulose@arm.com>
+ <20150810160636.GB15394@e104818-lin.cambridge.arm.com>
+ <55C8E12E.6030305@arm.com> <55C8EB17.7090708@redhat.com>
+Message-ID: <55C9B51D.1060601@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Weijun Yang <york.yang@csr.com>
+On 10/08/15 19:19, Andrew Haley wrote:
+> On 08/10/2015 06:36 PM, Suzuki K. Poulose wrote:
+>> On 10/08/15 17:06, Catalin Marinas wrote:
+>>> Hi Suzuki,
+>>>
+>>> On Fri, Jul 24, 2015 at 10:43:47AM +0100, Suzuki K. Poulose wrote:
+>>>> From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
+>>>>
+>>>> Documentation of the infrastructure
+>>>>
+>>>> Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
+>>>
+>>> The implementation looks fine but I think the main discussion will be
+>>> around the goal of this feature and the ABI that it introduces. So I'll
+>>> just write my thoughts on this patch (I could as well have replied to
+>>> the cover letter).
+>>>
+>>> Another question: who's going to use this feature? I know people asked
+>>> in private but I'd like to have some public statements.
+>>
+>> Right, I am hoping that folks from glibc / JIT / GCC will respond to
+>> this thread.
+>
+> We certainly need it for OpenJDK.  We need to know the manufacturer,
+> part number, revision id, etc.  We already have workarounds in
+> OpenJDK for various bugs, and we also can generate better code if we
+> know the exact part.
 
-According to hardware spec, validate DDR50 mode
-for SDXC.
+OK.
 
-Signed-off-by: Weijun Yang <york.yang@csr.com>
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
----
- drivers/mmc/host/sdhci-sirf.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+>
+> I note that the REVIDR is not in this patch.  That seems odd, because
+> it can be used to identify minor revisions.
 
-diff --git a/drivers/mmc/host/sdhci-sirf.c b/drivers/mmc/host/sdhci-sirf.c
-index 0110bae..03efcfc 100644
---- a/drivers/mmc/host/sdhci-sirf.c
-+++ b/drivers/mmc/host/sdhci-sirf.c
-@@ -50,7 +50,8 @@ static u32 sdhci_sirf_readl_le(struct sdhci_host *host, int reg)
- 	if (unlikely((reg == SDHCI_CAPABILITIES_1) &&
- 			(host->mmc->caps & MMC_CAP_UHS_SDR50))) {
- 		/* fake CAP_1 register */
--		val = SDHCI_SUPPORT_SDR50 | SDHCI_USE_SDR50_TUNING;
-+		val = SDHCI_SUPPORT_DDR50 |
-+			SDHCI_SUPPORT_SDR50 | SDHCI_USE_SDR50_TUNING;
- 	}
- 
- 	if (unlikely(reg == SDHCI_SLOT_INT_STATUS)) {
--- 
-1.9.1
+The REVIDR has to be used in conjunction with the MIDR to make real sense.
+We cannot guarantee that the REVIDR that we read (would) belong to the CPU
+where MIDR would have been read (unless the process is pinned) and hence the
+user may not be able to make any use of the information. Steve has a patch [1]
+to expose the MIDR,REVIDR info via sysfs.
+
+[1] https://lkml.org/lkml/2015/7/24/420
+
+Thanks
+Suzuki
+
+>
+> Andrew.
+>
+>
