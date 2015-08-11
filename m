@@ -1,72 +1,99 @@
-From: dev@lynxeye.de (Lucas Stach)
-Date: Tue, 11 Aug 2015 21:38:38 +0200
-Subject: [PATCH] arm: rpi: Device tree modifications for U-Boot
-In-Reply-To: <55CA3113.1010601@wwwdotorg.org>
-References: <1439303153-12171-1-git-send-email-sjg@chromium.org>
- <1439312701.2451.3.camel@lynxeye.de> <55CA3113.1010601@wwwdotorg.org>
-Message-ID: <1439321918.2214.6.camel@lynxeye.de>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 11 Aug 2015 15:41:52 -0400 (EDT)
+Subject: arm kernel oops in highmem.c with 4.2
+In-Reply-To: <20150811181008.GA7557@n2100.arm.linux.org.uk>
+References: <CALeDE9Ox3=sh3AXQ0NUG6BBfU5i5YrMY=LDpcTHQWqz2=60F2g@mail.gmail.com>
+ <20150805100701.GV7557@n2100.arm.linux.org.uk>
+ <CALeDE9PXF=gQCaBCiHpHy2nXOooQOmsCQvSgOv+wQw3mta=P6A@mail.gmail.com>
+ <20150805112713.GY7557@n2100.arm.linux.org.uk>
+ <1439315290.3153.11.camel@redhat.com>
+ <20150811181008.GA7557@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.20.1508111501130.1515@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, den 11.08.2015, 11:29 -0600 schrieb Stephen Warren:
-> On 08/11/2015 11:05 AM, Lucas Stach wrote:
-> > Hi Simon,
-> >
-> > why did you send this to the Tegra ML?
-> 
-> At my request, so that the DT changes could be reviewed by the kernel DT 
-> reviewers and added to the copy of the DT files in the kernel source 
-> tree if approved.
-> 
-This doesn't really answer the question why it was sent to the Tegra
-list if it is an RPi change, but that's just a side note.
+On Tue, 11 Aug 2015, Russell King - ARM Linux wrote:
 
-> My assertion is that DT content should be independent of SW stack. Or 
-> put another way, all SW stacks should use the same DT content. As such, 
-> if these properties are needed by U-Boot, and contained in the copy of 
-> the DT files in the U-Boot source tree, they should also be present in 
-> the copy of the DT files in the kernel source tree, so the two do not 
-> become out of sync.
+> On Tue, Aug 11, 2015 at 01:48:10PM -0400, Mark Salter wrote:
+> > On Wed, 2015-08-05 at 12:27 +0100, Russell King - ARM Linux wrote:
+> > > It helps if I look at 4.2 rather than an older kernel :)
+> > > 
+> > > However, I've checked that I have DEBUG_HIGHMEM enabled, which I do, and
+> > > I'm unable to reproduce this here.  My kernels are built with gcc 4.7.4.
+> > > 
+> > > What it looks like from your oops is that the address which was passed
+> > > in was 0xffedf000, but the address we calculated via the following for
+> > > the current index was 0xfff00000:
+> > > 
+> > > type = kmap_atomic_idx();
+> > > idx = type + KM_TYPE_NR * smp_processor_id();
+> > > __fix_to_virt(idx)
+> > > 
+> > > Doing a bit of maths... the address 0xffedf000 corresponds to a fixmap
+> > > index of... (0xffeff000 - 0xffedf000) >> 12 = 32.  KM_TYPE_NR is 16 on
+> > > ARM, so the mapping was created by CPU 2, and type was zero.
+> > > 
+> > > On unmap, 0xfff00000 gives... (0xffeff000 - 0xfff00000) >> 12 = -1.
+> > > That suggests we're on CPU 0, and type is -1 - in other words, there
+> > > are no atomically mapped mappings on CPU 0.
+> > > 
+> > > Since kmap_atomic() disables preemption and page faults, how did your
+> > > kernel migrate this thread from CPU 2 to CPU 0... and I can't see how
+> > > that happened.
+> > > 
+> > 
+> > The fedora kernel is using PREEMPT_VOLUNTARY with !PREEMPT and
+> > !PREEMPT_CPOUNT. So preempt_disable() is a nop. I added some code
+> > to catch the kernel scheduling between kmap_atomic() and
+> > kunmap_atomic() and got this straightaway:
 > 
-I agree with that overall goal to have a common DT base between
-different software stacks. After all I lobbied for keeping the Tegra
-pinctrl setting in the DT even though Linux doesn't use them any more.
+> Looking at the backtrace, and grepping for __copy_to_user_memcpy, it
+> seems to imply that you're using the uaccess-with-memcpy code.
+> 
+> This code is relatively unmaintained, and probably mostly unused by
+> people today, so I doubt it gets much in the way of testing - and
+> you've certainly found a bug in there.
+> 
+>         /* the mmap semaphore is taken only if not in an atomic context */
+>         atomic = in_atomic();
+> 
+>         if (!atomic)
+>                 down_read(&current->mm->mmap_sem);
+> 
+> is not sufficient to tell whether we can take the semaphore.
+> 
+> We _could_ replace the above with:
+> 
+> 	int ret;
+> 
+> 	ret = down_read_trylock(&current->mm->mmap_sem);
+> 	if (!ret) {
+> 		__copy_to_user_std(to, from, n);
+> 		return;
+> 	}
+> 
+> but that's just a guess.  I'm not a big fan of this code, and given
+> that it probably doesn't get much use, we may be better off deleting
+> it so it doesn't sit around rotting...  Code like this really needs
+> regular testing.
 
-For my question below I honestly want an answer as to why U-Boot needs
-those DT changes and why it can't work with the current DT contents.
-It's really just the same question we also have to answer for each and
-every DT addition that we do for Linux.
+I'd agree.  But first I'd like to know why the fedora kernel is using 
+CONFIG_UACCESS_WITH_MEMCPY?  If it's just because it sounded cool then 
+that's a bad reason.
 
-Regards,
-Lucas
+That code was created to work around inneficiency in the Orion CPU core 
+that didn't coalesce writes from STRT instructions, and by using plain 
+STR and/or STM the actual throughput was more than doubled.  This was 
+fixed in later cores. However Orion users (if they still exist) might 
+like the added performance. I don't have Orion-based targets anymore 
+(they took the way of the recycling facility a while ago).
 
-> > Am Dienstag, den 11.08.2015, 08:25 -0600 schrieb Simon Glass:
-> >> This updates the device tree from the kernel version to something suitable
-> >> for U-Boot:
-> >>
-> >> - Add stdout-path alias for console
-> >> - Mark the /soc node to be available pre-relocation so that the early
-> >> serial console works (we need the 'ranges' property to be available)
-> 
-> >> diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
-> >> index 301c73f..bd6bff6 100644
-> >> --- a/arch/arm/boot/dts/bcm2835.dtsi
-> >> +++ b/arch/arm/boot/dts/bcm2835.dtsi
-> >> @@ -8,6 +8,7 @@
-> >>
-> >>   	chosen {
-> >>   		bootargs = "earlyprintk console=ttyAMA0";
-> >> +		stdout-path = &uart;
-> >>   	};
-> >>
-> >>   	soc {
-> >> @@ -16,6 +17,7 @@
-> >>   		#size-cells = <1>;
-> >>   		ranges = <0x7e000000 0x20000000 0x02000000>;
-> >>   		dma-ranges = <0x40000000 0x00000000 0x20000000>;
-> >> +		u-boot,dm-pre-reloc;
-> >
-> > Why do you need this and why should upstream carry your favourite
-> > bootloaders configuration? This is in no way hardware description.
-> 
-> 
+To be sure you really need it, you may try something like:
+
+	dd if=/dev/zero of=/dev/null bs=4k
+
+and compare the reported speed with and without 
+CONFIG_UACCESS_WITH_MEMCPY.
+
+
+Nicolas
