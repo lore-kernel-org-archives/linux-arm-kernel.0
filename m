@@ -1,91 +1,45 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 11 Aug 2015 16:48:32 +0100
-Subject: [PATCH] iommu/io-pgtable-arm: Unmap and free table when overwriting
- with block
-Message-ID: <1439308112-29758-1-git-send-email-will.deacon@arm.com>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Tue, 11 Aug 2015 23:54:02 +0800
+Subject: [PATCH 0/5] add GPT timer support for mt8173
+In-Reply-To: <1436779969-18610-1-git-send-email-yingjoe.chen@mediatek.com>
+References: <1436779969-18610-1-git-send-email-yingjoe.chen@mediatek.com>
+Message-ID: <CAGS+omAeYhXDpBueG-F_gYBccqeaejN9k5bRKC78aDLfvHfnBA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When installing a block mapping, we unconditionally overwrite a non-leaf
-PTE if we find one. However, this can cause a problem if the following
-sequence of events occur:
+On Mon, Jul 13, 2015 at 5:32 PM, Yingjoe Chen <yingjoe.chen@mediatek.com> wrote:
+> This series add GPT timer support for mt8173. This is based on v4.2-rc1
+> and Matthias' next branch (for dts parts).
+>
+> The first 2 patches comes from 'Add SMP bringup support for mt65xx socs'
+> series [1]. I decide to move these 2 patches to this series, since it
+> is more relevent here. They are changed based on Matthias' and Daniel's
+> comments.
+>
+> [1] http://lists.infradead.org/pipermail/linux-mediatek/2015-May/000714.html
+>
+> Daniel Kurtz (1):
+>   arm64: dts: mt8173: add timer node
+>
+> Yingjoe Chen (4):
+>   clocksource: mediatek: do not enable GPT_CLK_EVT when setup
+>   clocksource: mediatek: Use GPT as sched clock source
+>   arm64: mediatek: enable MTK_TIMER
+>   clk: mediatek: add 13mhz clock for MT8173
 
-  (1) iommu_map called for a 4k (i.e. PAGE_SIZE) mapping at some address
-      - We initialise the page table all the way down to a leaf entry
-      - No TLB maintenance is required, because we're going from invalid
-        to valid.
+Was this mediatek clocksource patch set get forgotten again?
+All 5 patches have have been reviewed, and I think the ones that need
+it have been Ack'ed by Matthias and/or Stephen.
+What is the plan for merging them?
 
-  (2) iommu_unmap is called on the mapping installed in (1)
-      - We walk the page table to the final (leaf) entry and zero it
-      - We only changed a valid leaf entry, so we invalidate leaf-only
+Thanks,
+-Dan
 
-  (3) iommu_map is called on the same address as (1), but this time for
-      a 2MB (i.e. BLOCK_SIZE) mapping)
-      - We walk the page table down to the penultimate level, where we
-        find a table entry
-      - We overwrite the table entry with a block mapping and return
-        without any TLB maintenance and without freeing the memory used
-        by the now-orphaned table.
-
-This last step can lead to a walk-cache caching the overwritten table
-entry, causing unexpected faults when the new mapping is accessed by a
-device. One way to fix this would be to collapse the page table when
-freeing the last page at a given level, but this would require expensive
-iteration on every map call. Instead, this patch detects the case when
-we are overwriting a table entry and explicitly unmaps the table first,
-which takes care of both freeing and TLB invalidation.
-
-Cc: <stable@vger.kernel.org>
-Reported-by: Brian Starkey <brian.starkey@arm.com>
-Tested-by: Brian Starkey <brian.starkey@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
-
-Joerg, could you queue this up for 4.3 please? It's a fix, but it's late
-in the day for 4.2 and doesn't backport cleanly. Merging it with the Cc
-stable tag is probably the easiest thing to do, then I can fix up the
-conflicts as they arise.
-
- drivers/iommu/io-pgtable-arm.c | 17 ++++++++++++++++-
- 1 file changed, 16 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
-index e4bc2b23ab96..73c07482f487 100644
---- a/drivers/iommu/io-pgtable-arm.c
-+++ b/drivers/iommu/io-pgtable-arm.c
-@@ -263,6 +263,10 @@ static void __arm_lpae_set_pte(arm_lpae_iopte *ptep, arm_lpae_iopte pte,
- 					   sizeof(pte), DMA_TO_DEVICE);
- }
- 
-+static int __arm_lpae_unmap(struct arm_lpae_io_pgtable *data,
-+			    unsigned long iova, size_t size, int lvl,
-+			    arm_lpae_iopte *ptep);
-+
- static int arm_lpae_init_pte(struct arm_lpae_io_pgtable *data,
- 			     unsigned long iova, phys_addr_t paddr,
- 			     arm_lpae_iopte prot, int lvl,
-@@ -271,10 +275,21 @@ static int arm_lpae_init_pte(struct arm_lpae_io_pgtable *data,
- 	arm_lpae_iopte pte = prot;
- 	struct io_pgtable_cfg *cfg = &data->iop.cfg;
- 
--	/* We require an unmap first */
- 	if (iopte_leaf(*ptep, lvl)) {
-+		/* We require an unmap first */
- 		WARN_ON(!selftest_running);
- 		return -EEXIST;
-+	} else if (iopte_type(*ptep, lvl) == ARM_LPAE_PTE_TYPE_TABLE) {
-+		/*
-+		 * We need to unmap and free the old table before
-+		 * overwriting it with a block entry.
-+		 */
-+		arm_lpae_iopte *tblp;
-+		size_t sz = ARM_LPAE_BLOCK_SIZE(lvl, data);
-+
-+		tblp = ptep - ARM_LPAE_LVL_IDX(iova, lvl, data);
-+		if (WARN_ON(__arm_lpae_unmap(data, iova, sz, lvl, tblp) != sz))
-+			return -EINVAL;
- 	}
- 
- 	if (cfg->quirks & IO_PGTABLE_QUIRK_ARM_NS)
--- 
-2.1.4
+>
+>  arch/arm64/Kconfig                       |  1 +
+>  arch/arm64/boot/dts/mediatek/mt8173.dtsi |  9 +++++++++
+>  drivers/clk/mediatek/clk-mt8173.c        |  5 +++++
+>  drivers/clocksource/mtk_timer.c          | 26 ++++++++++++++++++++------
+>  include/dt-bindings/clock/mt8173-clk.h   |  3 ++-
+>  5 files changed, 37 insertions(+), 7 deletions(-)
+>
