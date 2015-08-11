@@ -1,35 +1,56 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 11 Aug 2015 13:32:55 +0800
-Subject: [PATCH 1/3] crypto: sunxi-ss: Document optional reset control bindings
+Date: Tue, 11 Aug 2015 13:32:57 +0800
+Subject: [PATCH 3/3] ARM: dts: sun6i: Add security system crypto engine clock
+ and device nodes
 In-Reply-To: <1439271177-26523-1-git-send-email-wens@csie.org>
 References: <1439271177-26523-1-git-send-email-wens@csie.org>
-Message-ID: <1439271177-26523-2-git-send-email-wens@csie.org>
+Message-ID: <1439271177-26523-4-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Later Allwinner SoCs split out the reset controls for individual modules
-out of the clock gate controls. The "Security System" crypto engine is
-no different.
+A31/A31s have the same "Security System" crypto engine as A10/A20,
+but with a separate reset control.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- Documentation/devicetree/bindings/crypto/sun4i-ss.txt | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/boot/dts/sun6i-a31.dtsi | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/crypto/sun4i-ss.txt b/Documentation/devicetree/bindings/crypto/sun4i-ss.txt
-index 1e02d177fea6..5d38e9b7033f 100644
---- a/Documentation/devicetree/bindings/crypto/sun4i-ss.txt
-+++ b/Documentation/devicetree/bindings/crypto/sun4i-ss.txt
-@@ -9,6 +9,10 @@ Required properties:
- 	* "ahb" : AHB gating clock
- 	* "mod" : SS controller clock
+diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+index 39953e76bbfc..7afb80f07dad 100644
+--- a/arch/arm/boot/dts/sun6i-a31.dtsi
++++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+@@ -346,6 +346,14 @@
+ 					     "mmc3_sample";
+ 		};
  
-+Optional properties:
-+ - resets : phandle + reset specifier pair
-+ - reset-names : must contain "ahb"
++		ss_clk: clk at 01c2009c {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-a10-mod0-clk";
++			reg = <0x01c2009c 0x4>;
++			clocks = <&osc24M>, <&pll6 0>;
++			clock-output-names = "ss";
++		};
 +
- Example:
- 	crypto: crypto-engine at 01c15000 {
- 		compatible = "allwinner,sun4i-a10-crypto";
+ 		spi0_clk: clk at 01c200a0 {
+ 			#clock-cells = <0>;
+ 			compatible = "allwinner,sun4i-a10-mod0-clk";
+@@ -882,6 +890,16 @@
+ 			#size-cells = <0>;
+ 		};
+ 
++		crypto: crypto-engine at 01c15000 {
++			compatible = "allwinner,sun4i-a10-crypto";
++			reg = <0x01c15000 0x1000>;
++			interrupts = <GIC_SPI 80 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ahb1_gates 5>, <&ss_clk>;
++			clock-names = "ahb", "mod";
++			resets = <&ahb1_rst 5>;
++			reset-names = "ahb";
++		};
++
+ 		timer at 01c60000 {
+ 			compatible = "allwinner,sun6i-a31-hstimer",
+ 				     "allwinner,sun7i-a20-hstimer";
 -- 
 2.5.0
