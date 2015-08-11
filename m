@@ -1,46 +1,92 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Tue, 11 Aug 2015 12:03:44 +0100
-Subject: [PATCH RFC 3/3] nvmem: add permission flags in nvmem_config
-In-Reply-To: <1439290931-18232-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1439290931-18232-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1439291024-18375-1-git-send-email-srinivas.kandagatla@linaro.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 11 Aug 2015 12:24:56 +0100
+Subject: [PATCH] ARM: OMAP: irqdomain_hierarchy: fix arm gic irq type
+ configuration
+In-Reply-To: <1439285147-20027-1-git-send-email-grygorii.strashko@ti.com>
+References: <1439285147-20027-1-git-send-email-grygorii.strashko@ti.com>
+Message-ID: <20150811122456.1efe1656@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds perm variable to nvmem_config structure which will allow
-providers to specify the permissions required for the sysfs binary file.
-This permission is applied on top of root-only access permissions set by
-the core.
+On Tue, 11 Aug 2015 10:25:47 +0100
+Grygorii Strashko <grygorii.strashko@ti.com> wrote:
 
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
----
- drivers/nvmem/core.c           | 1 +
- include/linux/nvmem-provider.h | 1 +
- 2 files changed, 2 insertions(+)
+Hi Grygorii,
 
-diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
-index 414ed23..7481387 100644
---- a/drivers/nvmem/core.c
-+++ b/drivers/nvmem/core.c
-@@ -312,6 +312,7 @@ struct nvmem_device *nvmem_register(const struct nvmem_config *config)
- 			   config->read_only;
- 	nvmem->bin = bin_attr_template;
- 	nvmem->bin.attr.mode = nvmem->read_only ? : (S_IRUSR | S_IWUSR);
-+	nvmem->bin.attr.mode |= config->perm;
- 	nvmem->bin.size = nvmem->size;
- 	device_initialize(&nvmem->dev);
- 
-diff --git a/include/linux/nvmem-provider.h b/include/linux/nvmem-provider.h
-index 0b68caf..de9a61f 100644
---- a/include/linux/nvmem-provider.h
-+++ b/include/linux/nvmem-provider.h
-@@ -23,6 +23,7 @@ struct nvmem_config {
- 	const struct nvmem_cell_info	*cells;
- 	int			ncells;
- 	bool			read_only;
-+	u16			perm; /* visibility in sysfs */
- };
- 
- #if IS_ENABLED(CONFIG_NVMEM)
+> It's observed that ARM GIC IRQ triggering type is not configured
+> properly when IRQ is routed through IRQ domains hierarchy and
+> system started using DT. As result, system will start using default
+> ARM GIC configuration, ignore DT IRQ type configuration,
+> and value of desc->irq_data.state_use_accessors = 0.
+> 
+> In case of TI OMAP the following IRQ hierarchy is defined:
+> ARM GIC <- OMAP wakeupgen <- TI CBAR
+> 
+> Failed call chain:
+>  irq_create_of_mapping
+>  irq_set_irq_type
+>  __irq_set_trigger
+>  if (!chip || !chip->irq_set_type) {
+>     return 0; <- return here
+>  }
+>  CBAR has no .irq_set_type() defined and, so, IRQ triggering
+>  configuration will not be propagated to parent IRQ domain.
+> 
+> Hence, fix it by introducing irq_chip_set_type_parent(), in the
+> same manner as irq_chip_set_wake_parent(), and use it for IRQ 
+> triggering type propagation to the parent IRQ domain in
+> irq-crossbar and omap-wakeupgen.
+> 
+> / # cat /proc/interrupts -- before
+> 230:          0          0      CBAR  30 Edge    -00000000  48051000.gpio
+> 263:          0          0      CBAR 116 Edge    -00000000  48053000.gpio
+> 296:        246          0      CBAR  67 Edge    -00000000  OMAP UART0
+> 311:        341          0      CBAR  51 Edge    -00000000  48070000.i2c
+> 312:          3          0      CBAR  52 Edge    -00000000  48072000.i2c
+> 313:          0          0      CBAR  56 Edge    -00000000  48060000.i2c
+> 314:        255          0      CBAR  78 Edge    -00000000  mmc0
+> 315:         40          0      CBAR  81 Edge    -00000000  mmc1
+> 316:         13          0      CBAR  91 Edge    -00000000  mmc2
+> 320:          0          0      CBAR  49 Edge    -00000000  4a140000.sata
+> 324:          0          0      CBAR   1 Edge    -00000000  48078000.elm
+> 325:          0          0      CBAR  15 Edge    -00000000  gpmc
+> 333:          0          0      CBAR 335 Edge    -00000000  48484000.ethernet
+> 334:          0          0      CBAR 336 Edge    -00000000  48484000.ethernet
+> 415:          0          0   pcf857x   2 Edge    -00000000  btnUser1
+> 416:          0          0   pcf857x   3 Edge    -00000000  btnUser2
+> 445:          0          0   pinctrl 992 Edge    -00010000  4806a000.seria
+> 
+> / # cat /proc/interrupts -- after
+> 230:          0          0      CBAR  30 Level   -00002004  48051000.gpio
+> 263:          0          0      CBAR 116 Level   -00002004  48053000.gpio
+> 296:        567          0      CBAR  67 Level   -00002004  OMAP UART0
+> 311:        363          0      CBAR  51 Level   -00002004  48070000.i2c
+> 312:          3          0      CBAR  52 Level   -00002004  48072000.i2c
+> 313:          0          0      CBAR  56 Level   -00002004  48060000.i2c
+> 314:        197          0      CBAR  78 Level   -00002004  mmc0
+> 315:         40          0      CBAR  81 Level   -00002004  mmc1
+> 316:         13          0      CBAR  91 Level   -00002004  mmc2
+> 320:          0          0      CBAR  49 Level   -00002004  4a140000.sata
+> 324:          0          0      CBAR   1 Level   -00002004  48078000.elm
+> 325:          0          0      CBAR  15 Level   -00002004  gpmc
+> 333:          0          0      CBAR 335 Level   -00002004  48484000.ethernet
+> 334:          0          0      CBAR 336 Level   -00002004  48484000.ethernet
+> 415:          0          0   pcf857x   2 Edge    -00000000  btnUser1
+> 416:          4          2   pcf857x   3 Edge    -00000000  btnUser2
+> 445:          0          0   pinctrl 992 Edge    -00010000  4806a000.serial
+> 
+> Fixes: 783d31863fb8 ('irqchip: crossbar: Convert dra7 crossbar to stacked domains')
+> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+> ---
+> Hi All,
+> 
+> I can split patch if required and overall solution acceptable.
+
+This looks good to me. Please repost it after splitting it in two
+patches.
+
+Thanks,
+
+	M.
 -- 
-1.9.1
+Jazz is not dead. It just smells funny.
