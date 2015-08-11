@@ -1,89 +1,79 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 11 Aug 2015 11:12:46 +0200
-Subject: [PATCH v3 1/5] power/reset: at91-reset: remove useless
- at91_reset_platform_probe()
+Date: Tue, 11 Aug 2015 11:12:47 +0200
+Subject: [PATCH v3 2/5] power/reset: at91-reset: allow compiling as a module
 In-Reply-To: <1439284370-13803-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1439284370-13803-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1439284370-13803-2-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1439284370-13803-3-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since all the at91 platforms are now DT only, at91_reset_platform_probe()
-is now useless, remove it.
+It was not possible to compile at91-reset as a module. Implement .remove()
+to allow it. Also switch to module_platform_driver_probe() as it is not
+hotpluggable.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- drivers/power/reset/at91-reset.c | 47 +++-------------------------------------
- 1 file changed, 3 insertions(+), 44 deletions(-)
+ drivers/power/reset/Kconfig      |  2 +-
+ drivers/power/reset/at91-reset.c | 17 ++++++++++++++---
+ 2 files changed, 15 insertions(+), 4 deletions(-)
 
+diff --git a/drivers/power/reset/Kconfig b/drivers/power/reset/Kconfig
+index 17d93a73c513..e41da4a80a05 100644
+--- a/drivers/power/reset/Kconfig
++++ b/drivers/power/reset/Kconfig
+@@ -23,7 +23,7 @@ config POWER_RESET_AT91_POWEROFF
+ 	  SoCs
+ 
+ config POWER_RESET_AT91_RESET
+-	bool "Atmel AT91 reset driver"
++	tristate "Atmel AT91 reset driver"
+ 	depends on ARCH_AT91
+ 	default SOC_AT91SAM9 || SOC_SAMA5
+ 	help
 diff --git a/drivers/power/reset/at91-reset.c b/drivers/power/reset/at91-reset.c
-index 36dc52fb2ec8..3225c8590ed0 100644
+index 3225c8590ed0..120f3dec9574 100644
 --- a/drivers/power/reset/at91-reset.c
 +++ b/drivers/power/reset/at91-reset.c
-@@ -169,11 +169,11 @@ static struct notifier_block at91_restart_nb = {
+@@ -169,7 +169,7 @@ static struct notifier_block at91_restart_nb = {
  	.priority = 192,
  };
  
--static int at91_reset_of_probe(struct platform_device *pdev)
-+static int at91_reset_probe(struct platform_device *pdev)
+-static int at91_reset_probe(struct platform_device *pdev)
++static int __init at91_reset_probe(struct platform_device *pdev)
  {
  	const struct of_device_id *match;
  	struct device_node *np;
--	int idx = 0;
-+	int ret, idx = 0;
+@@ -202,6 +202,13 @@ static int at91_reset_probe(struct platform_device *pdev)
+ 	return 0;
+ }
  
- 	at91_rstc_base = of_iomap(pdev->dev.of_node, 0);
- 	if (!at91_rstc_base) {
-@@ -192,49 +192,8 @@ static int at91_reset_of_probe(struct platform_device *pdev)
++static int __exit at91_reset_remove(struct platform_device *pdev)
++{
++	unregister_restart_handler(&at91_restart_nb);
++
++	return 0;
++}
++
+ static const struct platform_device_id at91_reset_plat_match[] = {
+ 	{ "at91-sam9260-reset", (unsigned long)at91sam9260_restart },
+ 	{ "at91-sam9g45-reset", (unsigned long)at91sam9g45_restart },
+@@ -209,11 +216,15 @@ static const struct platform_device_id at91_reset_plat_match[] = {
+ };
  
- 	match = of_match_node(at91_reset_of_match, pdev->dev.of_node);
- 	at91_restart_nb.notifier_call = match->data;
--	return register_restart_handler(&at91_restart_nb);
--}
--
--static int at91_reset_platform_probe(struct platform_device *pdev)
--{
--	const struct platform_device_id *match;
--	struct resource *res;
--	int idx = 0;
--
--	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	at91_rstc_base = devm_ioremap_resource(&pdev->dev, res);
--	if (IS_ERR(at91_rstc_base)) {
--		dev_err(&pdev->dev, "Could not map reset controller address\n");
--		return PTR_ERR(at91_rstc_base);
--	}
--
--	for (idx = 0; idx < 2; idx++) {
--		res = platform_get_resource(pdev, IORESOURCE_MEM, idx + 1 );
--		at91_ramc_base[idx] = devm_ioremap(&pdev->dev, res->start,
--						   resource_size(res));
--		if (!at91_ramc_base[idx]) {
--			dev_err(&pdev->dev, "Could not map ram controller address\n");
--			return -ENOMEM;
--		}
--	}
--
--	match = platform_get_device_id(pdev);
--	at91_restart_nb.notifier_call =
--		(int (*)(struct notifier_block *,
--			 unsigned long, void *)) match->driver_data;
--
--	return register_restart_handler(&at91_restart_nb);
--}
--
--static int at91_reset_probe(struct platform_device *pdev)
--{
--	int ret;
--
--	if (pdev->dev.of_node)
--		ret = at91_reset_of_probe(pdev);
--	else
--		ret = at91_reset_platform_probe(pdev);
- 
-+	ret = register_restart_handler(&at91_restart_nb);
- 	if (ret)
- 		return ret;
- 
+ static struct platform_driver at91_reset_driver = {
+-	.probe = at91_reset_probe,
++	.remove = __exit_p(at91_reset_remove),
+ 	.driver = {
+ 		.name = "at91-reset",
+ 		.of_match_table = at91_reset_of_match,
+ 	},
+ 	.id_table = at91_reset_plat_match,
+ };
+-module_platform_driver(at91_reset_driver);
++module_platform_driver_probe(at91_reset_driver, at91_reset_probe);
++
++MODULE_AUTHOR("Atmel Corporation");
++MODULE_DESCRIPTION("Reset driver for Atmel SoCs");
++MODULE_LICENSE("GPL v2");
 -- 
 2.1.4
