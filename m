@@ -1,105 +1,72 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Tue, 11 Aug 2015 17:25:21 +0200
-Subject: [PATCH v3 3/4] mfd: Add DT binding for Maxim MAX77802 IC
-In-Reply-To: <20150811114736.GB18282@x1>
-References: <1438252327-28427-1-git-send-email-javier@osg.samsung.com>
- <1438252327-28427-4-git-send-email-javier@osg.samsung.com>
- <20150811114736.GB18282@x1>
-Message-ID: <55CA13E1.9090403@osg.samsung.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 11 Aug 2015 17:27:24 +0200
+Subject: [PATCH v3 4/4] misc: atmel_tclib: get and use slow clock
+In-Reply-To: <55C9FB5D.7030607@linaro.org>
+References: <1439285884-16051-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1439285884-16051-5-git-send-email-alexandre.belloni@free-electrons.com>
+ <55C9FB5D.7030607@linaro.org>
+Message-ID: <20150811152724.GR3411@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Lee,
+On 11/08/2015 at 15:40:45 +0200, Daniel Lezcano wrote :
+> On 08/11/2015 11:38 AM, Alexandre Belloni wrote:
+> >From: Boris Brezillon <boris.brezillon@free-electrons.com>
+> >
+> >Commit dca1a4b5ff6e ("clk: at91: keep slow clk enabled to prevent system
+> >hang") added a workaround for the slow clock as it is not properly handled
+> >by its users.
+> >
+> >Get and use the slow clock as it is necessary for the timer counters.
+> >
+> >Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> >Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> >Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> >---
+> >Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> >Cc: Thomas Gleixner <tglx@linutronix.de>
+> >Cc: Thierry Reding <thierry.reding@gmail.com>
+> >Cc: linux-pwm at vger.kernel.org
+> >
+> >  drivers/clocksource/tcb_clksrc.c |  8 ++++++++
+> >  drivers/misc/atmel_tclib.c       |  4 ++++
+> >  drivers/pwm/pwm-atmel-tcb.c      | 23 ++++++++++++++++-------
+> >  include/linux/atmel_tc.h         |  1 +
+> >  4 files changed, 29 insertions(+), 7 deletions(-)
+> >
+> >diff --git a/drivers/clocksource/tcb_clksrc.c b/drivers/clocksource/tcb_clksrc.c
+> >index b9b7277173c2..969ba03633b0 100644
+> >--- a/drivers/clocksource/tcb_clksrc.c
+> >+++ b/drivers/clocksource/tcb_clksrc.c
+> >@@ -188,6 +188,13 @@ static int __init setup_clkevents(struct atmel_tc *tc, int clk32k_divisor_idx)
+> >  	ret = clk_prepare_enable(t2_clk);
+> >  	if (ret)
+> >  		return ret;
+> >+
+> >+	ret = clk_prepare_enable(tc->slow_clk);
+> >+	if (ret) {
+> >+		clk_disable_unprepare(t2_clk);
+> >+		return ret;
+> >+	}
+> >+
+> >  	clk_disable(t2_clk);
+> 
+> Do you need t2_clk to be enabled in order to enable tc->slow_clk ?
 
-On 08/11/2015 01:47 PM, Lee Jones wrote:
-> On Thu, 30 Jul 2015, Javier Martinez Canillas wrote:
-> 
->> The MAX77802 is a chip that contains regulators, 2 32kHz clocks,
->> a RTC and an I2C interface to program the individual components.
->>
->> The are already DT bindings for the regulators and clocks and
->> these reference to a bindings/mfd/max77802.txt file, that didn't
->> exist, for the details about the PMIC.
->>
->> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
->> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->>
->> ---
->>
->> Changes in v3:
->> - Add Krzysztof Kozlowski Reviewed-by tag to patch #3.
->> - Capitalise all acronyms. Suggested by Lee Jones.
->> - Use relative path to refer other bindings. Suggested by Lee Jones.
->> - Use IRQ_TYPE_NONE instead of 0 in example. Suggested by Lee Jones.
->>
->> Changes in v2:
->> - Use the correct "maxim,max77802" compatible string.
->>   Suggested by Krzysztof Kozlowski
->> - Use a pmic generic node name for the max77802 node example.
->>   Suggested by Sergei Shtylyov.
->>
->>  Documentation/devicetree/bindings/mfd/max77802.txt | 26 ++++++++++++++++++++++
->>  1 file changed, 26 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/mfd/max77802.txt
->>
->> diff --git a/Documentation/devicetree/bindings/mfd/max77802.txt b/Documentation/devicetree/bindings/mfd/max77802.txt
->> new file mode 100644
->> index 000000000000..911ec5fcaefd
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/mfd/max77802.txt
->> @@ -0,0 +1,26 @@
->> +Maxim MAX77802 multi-function device
->> +
->> +The Maxim MAX77802 is a Power Management IC (PMIC) that contains 10 high
->> +efficiency Buck regulators, 32 Low-DropOut (LDO) regulators used to power
->> +up application processors and peripherals, a 2-channel 32kHz clock outputs,
->> +a Real-Time-Clock (RTC) and a I2C interface to program the individual
->> +regulators, clocks outputs and the RTC.
->> +
->> +Binding for the built-in 32k clock generator block is defined separately
->> +in the ../clk/maxim,max77802.txt file and binding for the regulators
->> +is defined in the ../regulator/max77802.txt file.
-> 
->   "Bindings for the built-in 32k clock generator block and
->    regulators are defined in ../clk/maxim,max77802.txt and
->    ../regulator/max77802.txt respectively."
-> 
->> +Required properties:
->> +- compatible : Must be "maxim,max77802";
-> 
-> ';' ?
->
+No, I'll move clk_prepare_enable for tc->slow_clk before t2_clk.
 
-err... I've no idea how that ended there. It seems I didn't completely
-context switch from coding :-)
- 
->> +- reg : Specifies the I2C slave address of PMIC block.
->> +- interrupts : This I2C device has an IRQ line connected to the main SoC.
->> +- interrupt-parent : The parent interrupt controller.
+> >+
+> >+err_free_tc:
+> >+	atmel_tc_free(tc);
+> >+
+> >+	return err;
 > 
-> I always find this easier on the eye when you:
->
-> Required properties:
-> - compatible		: Must be "maxim,max77802"
-> - reg			: Specifies the I2C slave address of PMIC block.
-> - interrupts		: This I2C device has an IRQ line connected to the main SoC.
-> - interrupt-parent	: The parent interrupt controller.
->
-
-Ok, I'll wait for Mark's feedback and repost with your suggestions. Thanks!
-
->> +Example:
->> +
->> +	max77802: pmic at 09 {
->> +		compatible = "maxim,max77802";
->> +		interrupt-parent = <&intc>;
->> +		interrupts = <26 IRQ_TYPE_NONE>;
->> +		reg = <0x09>;
->> +	};
+> What about clk_unprepare_disable(tc->slow_clk) ?
 > 
 
-Best regards,
+Indeed, I trusted Boris a bit too much ;)
+
 -- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
