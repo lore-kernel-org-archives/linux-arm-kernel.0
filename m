@@ -1,30 +1,67 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 11 Aug 2015 23:16:31 +0300
-Subject: [PATCH v2 1/2] ARM: shmobile: r8a7794: add QSPI DT support
-In-Reply-To: <CAMuHMdVG3R3ThQWPM-tDHTcJZfFB+j3cFhdBNoH4=ZN7ENrXRg@mail.gmail.com>
-References: <4187771.Fb49GBKgyg@wasted.cogentembedded.com>
- <1540672.y3DTbtssP8@wasted.cogentembedded.com>
- <CAMuHMdVG3R3ThQWPM-tDHTcJZfFB+j3cFhdBNoH4=ZN7ENrXRg@mail.gmail.com>
-Message-ID: <55CA581F.60407@cogentembedded.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 11 Aug 2015 16:20:05 -0400 (EDT)
+Subject: arm kernel oops in highmem.c with 4.2
+In-Reply-To: <20150811195638.GC7557@n2100.arm.linux.org.uk>
+References: <CALeDE9Ox3=sh3AXQ0NUG6BBfU5i5YrMY=LDpcTHQWqz2=60F2g@mail.gmail.com>
+ <20150805100701.GV7557@n2100.arm.linux.org.uk>
+ <CALeDE9PXF=gQCaBCiHpHy2nXOooQOmsCQvSgOv+wQw3mta=P6A@mail.gmail.com>
+ <20150805112713.GY7557@n2100.arm.linux.org.uk>
+ <1439315290.3153.11.camel@redhat.com>
+ <20150811181008.GA7557@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.20.1508111501130.1515@knanqh.ubzr>
+ <20150811195638.GC7557@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.20.1508111558210.1515@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Tue, 11 Aug 2015, Russell King - ARM Linux wrote:
 
-On 08/11/2015 09:58 AM, Geert Uytterhoeven wrote:
+> On Tue, Aug 11, 2015 at 03:41:52PM -0400, Nicolas Pitre wrote:
+> > I'd agree.  But first I'd like to know why the fedora kernel is using 
+> > CONFIG_UACCESS_WITH_MEMCPY?  If it's just because it sounded cool then 
+> > that's a bad reason.
+> > 
+> > That code was created to work around inneficiency in the Orion CPU core 
+> > that didn't coalesce writes from STRT instructions, and by using plain 
+> > STR and/or STM the actual throughput was more than doubled.  This was 
+> > fixed in later cores. However Orion users (if they still exist) might 
+> > like the added performance. I don't have Orion-based targets anymore 
+> > (they took the way of the recycling facility a while ago).
+> 
+> Irrespective of that, what has been found is that the implementation is
+> unsafe - it is taking a semaphore when page faults are disabled.  In
+> other words, notwithstanding the above, it's buggy no matter if it's
+> an Orion CPU core, or highmem, or what.  Any place in the kernel which
+> uses pagefault_disable() and then calls into this code will be buggy.
+> 
+> It needs fixing or removing.
 
->> Define the generic R8A7794 part of the QSPI device node.
->>
->> Based on original patch by Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>.
->>
->> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->
-> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Absolutely. I'm not disputing that. I'm only asking so we can wisely 
+choose between fixing or removing.  Personally I'd be inclined towards 
+the later, unless the following is sufficient to fix it:
 
-    Sorry, forgot to add your ACK when re-posting. Thank you!
+diff --git a/arch/arm/lib/uaccess_with_memcpy.c b/arch/arm/lib/uaccess_with_memcpy.c
+index 3e58d71001..4b39af2dfd 100644
+--- a/arch/arm/lib/uaccess_with_memcpy.c
++++ b/arch/arm/lib/uaccess_with_memcpy.c
+@@ -96,7 +96,7 @@ __copy_to_user_memcpy(void __user *to, const void *from, unsigned long n)
+ 	}
+ 
+ 	/* the mmap semaphore is taken only if not in an atomic context */
+-	atomic = in_atomic();
++	atomic = faulthandler_disabled();
+ 
+ 	if (!atomic)
+ 		down_read(&current->mm->mmap_sem);
 
-> Gr{oetje,eeting}s,
->
->                          Geert
+> Even if it is fixed, making it _depend_ on CPU_FEROCEON sounds like a
+> good idea if non-orion stuff isn't supposed to be enabling it.  Or
+> something like that.
 
-MBR, Sergei
+It is not clear to me exactly which cores are affected.  That's why the 
+Kconfig entry was left open to all, in case it could benefit others.
+In theory it shouldn't be harmful to anyone notwithstanding the caveat
+mentioned in the help text.
+
+
+Nicolas
