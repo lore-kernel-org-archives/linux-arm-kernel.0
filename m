@@ -1,43 +1,27 @@
-From: lho@apm.com (Loc Ho)
-Date: Tue, 11 Aug 2015 14:47:57 -0600
-Subject: [PATCH v3 4/4] arm64: Add L3/SoC DT subnodes to the APM X-Gene SoC
- EDAC node
-In-Reply-To: <1439326077-25507-4-git-send-email-lho@apm.com>
-References: <1439326077-25507-1-git-send-email-lho@apm.com>
- <1439326077-25507-2-git-send-email-lho@apm.com>
- <1439326077-25507-3-git-send-email-lho@apm.com>
- <1439326077-25507-4-git-send-email-lho@apm.com>
-Message-ID: <1439326077-25507-5-git-send-email-lho@apm.com>
+From: davem@davemloft.net (David Miller)
+Date: Tue, 11 Aug 2015 13:49:11 -0700 (PDT)
+Subject: [PATCH v2 0/2] net: thunder: Add ACPI support.
+In-Reply-To: <55CA5567.9010002@caviumnetworks.com>
+References: <1439254717-2875-1-git-send-email-ddaney.cavm@gmail.com>
+ <20150811.114908.1384923604512568161.davem@davemloft.net>
+ <55CA5567.9010002@caviumnetworks.com>
+Message-ID: <20150811.134911.568429332024299359.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds L3/SoC DT subnodes to the APM X-Gene SoC EDAC node.
+From: David Daney <ddaney@caviumnetworks.com>
+Date: Tue, 11 Aug 2015 13:04:55 -0700
 
-Signed-off-by: Loc Ho <lho@apm.com>
----
- arch/arm64/boot/dts/apm/apm-storm.dtsi |   10 ++++++++++
- 1 files changed, 10 insertions(+), 0 deletions(-)
+> You seem to be recommending precedence for OF.  It should be
+> consistent across all drivers/sub-systems, so do you really think
+> that OF before ACPI is the way to go?
 
-diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-index 58093ed..8ab6b0e 100644
---- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
-+++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-@@ -477,6 +477,16 @@
- 				reg = <0x0 0x7c600000 0x0 0x200000>;
- 				pmd-controller = <3>;
- 			};
-+
-+			edacl3 at 7e600000 {
-+				compatible = "apm,xgene-edac-l3";
-+				reg = <0x0 0x7e600000 0x0 0x1000>;
-+			};
-+
-+			edacsoc at 7e930000 {
-+				compatible = "apm,xgene-edac-soc-v1";
-+				reg = <0x0 0x7e930000 0x0 0x1000>;
-+			};
- 		};
- 
- 		pcie0: pcie at 1f2b0000 {
--- 
-1.7.1
+I just think it's more hackish to test acpi_disabled than to
+simply see if the matching OF node even exists.
+
+If ACPI is enabled, no OF node will be found.
+
+It could just be my preference for such things.
+
+I really wish it just fell out from the probing method, but
+we're using PCI for that.
