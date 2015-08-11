@@ -1,101 +1,34 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Tue, 11 Aug 2015 16:26:49 -0700
-Subject: [PATCH 20/20] clk: at91: Revert "keep slow clk enabled to prevent
- system hang"
-In-Reply-To: <1438215726-27452-21-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1438215726-27452-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1438215726-27452-21-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <20150811232649.31346.37488@quantum>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Tue, 11 Aug 2015 18:33:44 -0500
+Subject: [PATCH v4 00/10] ACPI GIC Self-probing, GICv2m and GICv3 support
+In-Reply-To: <20150811234801.51108784@arm.com>
+References: <1438164539-29256-1-git-send-email-hanjun.guo@linaro.org>	<55CA70D5.6040300@codeaurora.org>	<20150811232523.60d192d2@arm.com>	<55CA78DE.1000306@codeaurora.org>
+ <20150811234801.51108784@arm.com>
+Message-ID: <55CA8658.80202@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Alexandre Belloni (2015-07-29 17:22:06)
-> Commit dca1a4b5ff6e ("clk: at91: keep slow clk enabled to prevent system
-> hang") added a workaround for the slow clock as it is not properly handled
-> by its users.
-> 
-> Now that the slow clock is taken properly by the drivers, this workaround
-> is not necessary anymore, revert it.
-> 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> ---
-> Cc: Michael Turquette <mturquette@baylibre.com>
-> Cc: Stephen Boyd <sboyd@codeaurora.org>
-> Cc: linux-clk at vger.kernel.org
->  drivers/clk/at91/clk-slow.c | 27 ---------------------------
->  1 file changed, 27 deletions(-)
-> 
-> diff --git a/drivers/clk/at91/clk-slow.c b/drivers/clk/at91/clk-slow.c
-> index 98a84a865fe1..2c59d6a64dd5 100644
-> --- a/drivers/clk/at91/clk-slow.c
-> +++ b/drivers/clk/at91/clk-slow.c
-> @@ -70,7 +70,6 @@ struct clk_sam9x5_slow {
->  
->  #define to_clk_sam9x5_slow(hw) container_of(hw, struct clk_sam9x5_slow, hw)
->  
-> -static struct clk *slow_clk;
->  
+On 08/11/2015 05:48 PM, Marc Zyngier wrote:
+> I don't see any contradiction here. Hanjun picked the patches from my
+> own branch in my own tree, put his own patches on top, and pushed that
+> out on an branch called gsi-irqdomain that is definitely based on
+> 4.2-rc2. I have no idea where your 3.9-rc7 comes from.
 
-Might want to remove one extra line of white space?
+Ok, so that's not your kernel, but the LEG kernel instead.
 
->  static int clk_slow_osc_prepare(struct clk_hw *hw)
->  {
-> @@ -358,8 +357,6 @@ at91_clk_register_sam9x5_slow(void __iomem *sckcr,
->         clk = clk_register(NULL, &slowck->hw);
->         if (IS_ERR(clk))
->                 kfree(slowck);
-> -       else
-> -               slow_clk = clk;
->  
->         return clk;
->  }
-> @@ -436,8 +433,6 @@ at91_clk_register_sam9260_slow(struct at91_pmc *pmc,
->         clk = clk_register(NULL, &slowck->hw);
->         if (IS_ERR(clk))
->                 kfree(slowck);
-> -       else
-> -               slow_clk = clk;
->  
->         return clk;
->  }
-> @@ -470,25 +465,3 @@ void __init of_at91sam9260_clk_slow_setup(struct device_node *np,
->  
->         of_clk_add_provider(np, of_clk_src_simple_get, clk);
->  }
-> -
-> -/*
-> - * FIXME: All slow clk users are not properly claiming it (get + prepare +
-> - * enable) before using it.
-> - * If all users properly claiming this clock decide that they don't need it
-> - * anymore (or are removed), it is disabled while faulty users are still
-> - * requiring it, and the system hangs.
-> - * Prevent this clock from being disabled until all users are properly
-> - * requesting it.
-> - * Once this is done we should remove this function and the slow_clk variable.
-> - */
-> -static int __init of_at91_clk_slow_retain(void)
-> -{
-> -       if (!slow_clk)
-> -               return 0;
-> -
-> -       __clk_get(slow_clk);
-> -       clk_prepare_enable(slow_clk);
-> -
-> -       return 0;
-> -}
-> -arch_initcall(of_at91_clk_slow_retain);
+The top commits show this:
 
-This is a cool series. Thanks. Feel free to add my Ack, or we can take
-this through clk-next once the other patches are applied.
+Follows: tracking-mainline-llct-20130415.0, 
+tracking-mainline-llct-20130417.0, v3.9-rc7
 
-Regards,
-Mike
+Also,
+	$ git tag | grep v4
 
-> -- 
-> 2.1.4
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+shows no v4.x tags.
+
+Anyway, I don't want to make a big deal about this.
+
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
