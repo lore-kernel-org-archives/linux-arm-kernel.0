@@ -1,42 +1,39 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 11 Aug 2015 20:56:38 +0100
-Subject: arm kernel oops in highmem.c with 4.2
-In-Reply-To: <alpine.LFD.2.20.1508111501130.1515@knanqh.ubzr>
-References: <CALeDE9Ox3=sh3AXQ0NUG6BBfU5i5YrMY=LDpcTHQWqz2=60F2g@mail.gmail.com>
- <20150805100701.GV7557@n2100.arm.linux.org.uk>
- <CALeDE9PXF=gQCaBCiHpHy2nXOooQOmsCQvSgOv+wQw3mta=P6A@mail.gmail.com>
- <20150805112713.GY7557@n2100.arm.linux.org.uk>
- <1439315290.3153.11.camel@redhat.com>
- <20150811181008.GA7557@n2100.arm.linux.org.uk>
- <alpine.LFD.2.20.1508111501130.1515@knanqh.ubzr>
-Message-ID: <20150811195638.GC7557@n2100.arm.linux.org.uk>
+From: ddaney@caviumnetworks.com (David Daney)
+Date: Tue, 11 Aug 2015 13:04:55 -0700
+Subject: [PATCH v2 0/2] net: thunder: Add ACPI support.
+In-Reply-To: <20150811.114908.1384923604512568161.davem@davemloft.net>
+References: <1439254717-2875-1-git-send-email-ddaney.cavm@gmail.com>
+ <20150811.114908.1384923604512568161.davem@davemloft.net>
+Message-ID: <55CA5567.9010002@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 11, 2015 at 03:41:52PM -0400, Nicolas Pitre wrote:
-> I'd agree.  But first I'd like to know why the fedora kernel is using 
-> CONFIG_UACCESS_WITH_MEMCPY?  If it's just because it sounded cool then 
-> that's a bad reason.
-> 
-> That code was created to work around inneficiency in the Orion CPU core 
-> that didn't coalesce writes from STRT instructions, and by using plain 
-> STR and/or STM the actual throughput was more than doubled.  This was 
-> fixed in later cores. However Orion users (if they still exist) might 
-> like the added performance. I don't have Orion-based targets anymore 
-> (they took the way of the recycling facility a while ago).
+On 08/11/2015 11:49 AM, David Miller wrote:
+> From: David Daney <ddaney.cavm@gmail.com>
+> Date: Mon, 10 Aug 2015 17:58:35 -0700
+>
+>> Change from v1:  Drop PHY binding part, use fwnode_property* APIs.
+>>
+>> The first patch (1/2) rearranges the existing code a little with no
+>> functional change to get ready for the second.  The second (2/2) does
+>> the actual work of adding support to extract the needed information
+>> from the ACPI tables.
+>
+> Series applied.
 
-Irrespective of that, what has been found is that the implementation is
-unsafe - it is taking a semaphore when page faults are disabled.  In
-other words, notwithstanding the above, it's buggy no matter if it's
-an Orion CPU core, or highmem, or what.  Any place in the kernel which
-uses pagefault_disable() and then calls into this code will be buggy.
+Thank you very much.
 
-It needs fixing or removing.
+>
+> In the future it might be better structured to try and get the OF
+> node, and if that fails then try and use the ACPI method to obtain
+> these values.
 
-Even if it is fixed, making it _depend_ on CPU_FEROCEON sounds like a
-good idea if non-orion stuff isn't supposed to be enabling it.  Or
-something like that.
+Our current approach, as you can see in the patch, is the opposite.  If 
+ACPI is being used, prefer that over the OF device tree.
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+You seem to be recommending precedence for OF.  It should be consistent 
+across all drivers/sub-systems, so do you really think that OF before 
+ACPI is the way to go?
+
+Thanks,
+David Daney
