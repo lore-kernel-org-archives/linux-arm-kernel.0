@@ -1,72 +1,94 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Tue, 11 Aug 2015 16:56:33 +0200
-Subject: [PATCH v4 4/6] memory: mediatek: Add SMI driver
-In-Reply-To: <1438597279-2937-5-git-send-email-yong.wu@mediatek.com>
-References: <1438597279-2937-1-git-send-email-yong.wu@mediatek.com>
- <1438597279-2937-5-git-send-email-yong.wu@mediatek.com>
-Message-ID: <20150811145633.GE14980@8bytes.org>
+From: jungseoklee85@gmail.com (Jungseok Lee)
+Date: Tue, 11 Aug 2015 23:57:56 +0900
+Subject: [RFC v2 4/4] arm64: ftrace: add a stack frame for exception
+ handler
+In-Reply-To: <1438674249-3447-5-git-send-email-takahiro.akashi@linaro.org>
+References: <1438674249-3447-1-git-send-email-takahiro.akashi@linaro.org>
+ <1438674249-3447-5-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <6399AE18-786B-41C2-B1C7-428567D9CF47@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 03, 2015 at 06:21:17PM +0800, Yong Wu wrote:
-> +static int mtk_smi_common_get(struct device *smidev)
-> +{
-> +	struct mtk_smi_common *smipriv = dev_get_drvdata(smidev);
-> +	int ret;
+On Aug 4, 2015, at 4:44 PM, AKASHI Takahiro wrote:
+
+Hi Akashi,
+
+> On arm64, an exception handler use the same stack as in non-exception
+> contexts, but doesn't create a stack frame for elx_xx entry, only updating
+> sp register. This behavior results in save_stace_trace() missing a function
+> that is the one when an exception happens.
+> 
+> This patch creates a stack frame for this case, and puts an additional
+> entry for the function  in a stack trace list.
+> 
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> ---
+> arch/arm64/kernel/entry.S      |    4 ++++
+> arch/arm64/kernel/stacktrace.c |   17 +++++++++++++++++
+> 2 files changed, 21 insertions(+)
+> 
+> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+> index f860bfd..aacb6c6 100644
+> --- a/arch/arm64/kernel/entry.S
+> +++ b/arch/arm64/kernel/entry.S
+> @@ -107,6 +107,8 @@
+> 	str	x21, [sp, #S_SYSCALLNO]
+> 	.endif
+> 
+> +	/* create a stack frame for stack tracer */
+> +	mov	x29, sp
+> 	/*
+> 	 * Registers that may be useful after this macro is invoked:
+> 	 *
+> @@ -737,3 +739,5 @@ ENTRY(sys_rt_sigreturn_wrapper)
+> 	mov	x0, sp
+> 	b	sys_rt_sigreturn
+> ENDPROC(sys_rt_sigreturn_wrapper)
 > +
-> +	ret = pm_runtime_get_sync(smidev);
-> +	if (ret < 0)
-> +		return ret;
+> +ENTRY(end_of_vectors)
+> diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
+> index d1790eb..22ce7c9 100644
+> --- a/arch/arm64/kernel/stacktrace.c
+> +++ b/arch/arm64/kernel/stacktrace.c
+> @@ -25,6 +25,10 @@
+> #include <asm/stacktrace.h>
+> 
+> #define S_FRAME_SIZE sizeof(struct pt_regs) /* asm-offsets.h */
+> +#define S_FP offsetof(struct pt_regs, regs[29])
+> +#define S_LR offsetof(struct pt_regs, regs[30])
 > +
-> +	ret = clk_prepare_enable(smipriv->clk_apb);
-> +	if (ret) {
-> +		dev_err(smidev, "Failed to enable the apb clock\n");
-> +		goto err_put_pm;
+> +extern unsigned int *vectors, *end_of_vectors;
+> 
+> /*
+>  * AArch64 PCS assigns the frame pointer to x29.
+> @@ -50,6 +54,19 @@ int notrace unwind_frame(struct stackframe *frame)
+> 	if (fp < low || fp > high - 0x18 || fp & 0xf)
+> 		return -EINVAL;
+> 
+> +	if ((frame->pc >= (unsigned long)&vectors) &&
+> +			(frame->pc < (unsigned long)&end_of_vectors)) {
+> +		/*
+> +		 * Expection handler does not use a normal format of
+> +		 * stack frame, but allocates struct pt_regs.
+> +		 */
+> +		frame->sp = frame->sp + S_FRAME_SIZE;
+> +		frame->fp = *(unsigned long *)(fp + S_FP);
+> +		frame->pc = *(unsigned long *)(fp + S_LR);
+
+Not frame->pc = *(unsigned long *)(fp + S_PC)? Don't we need to look up elr_el1
+since this is an exception?
+
+> +
+> +		return 0;
 > +	}
-> +	ret = clk_prepare_enable(smipriv->clk_smi);
-> +	if (ret) {
-> +		dev_err(smidev, "Failed to enable the smi clock\n");
-> +		goto err_disable_apb;
-> +	}
-> +	return ret;
 > +
-> +err_disable_apb:
-> +	clk_disable_unprepare(smipriv->clk_apb);
-> +err_put_pm:
-> +	pm_runtime_put(smidev);
-> +	return ret;
-> +}
+> 	frame->sp = fp + 0x10;
 
-[...]
+I'm just curious about this constant, 0x10. Do you have an idea on this value?
+As reviewing objdump of vmlinux, it looks needed to analyze the first store-pair
+instruction of each function.
 
-> +int mtk_smi_larb_get(struct device *larbdev)
-> +{
-> +	struct mtk_smi_larb *larbpriv = dev_get_drvdata(larbdev);
-> +	struct mtk_larb_mmu *mmucfg = larbdev->archdata.iommu;
-> +	int ret;
-> +
-> +	ret = mtk_smi_common_get(larbpriv->smi);
-> +	if (ret)
-> +		return ret;
-> +
-> +	ret = pm_runtime_get_sync(larbdev);
-> +	if (ret < 0)
-> +		goto err_put_smicommon;
-> +
-> +	ret = clk_prepare_enable(larbpriv->clk_apb);
-> +	if (ret) {
-> +		dev_err(larbdev, "Failed to enable the apb clock\n");
-> +		goto err_put_pm;
-> +	}
-> +
-> +	ret = clk_prepare_enable(larbpriv->clk_smi);
-> +	if (ret) {
-> +		dev_err(larbdev, "Failed to enable the smi clock\n");
-> +		goto err_disable_apb;
-> +	}
+Please correct me if I'm wrong.
 
-The clock enablement looks similar to the function above, maybe move it
-to a helper function?
-
-
-	Joerg
+Best Regards
+Jungseok Lee
