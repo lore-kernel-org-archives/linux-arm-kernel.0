@@ -1,43 +1,67 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Tue, 11 Aug 2015 02:05:44 -0400
-Subject: [PATCH 5/5] drivers/tty: make serial 8250_lpc18xx.c explicitly
- non-modular
-In-Reply-To: <CAGhQ9Vxjymt4z32s3x2B8b6ypgn3Bzh1ncbqxqidfPyM2k87jw@mail.gmail.com>
-References: <1439081497-14986-1-git-send-email-paul.gortmaker@windriver.com>
- <1439081497-14986-6-git-send-email-paul.gortmaker@windriver.com>
- <CAGhQ9Vxjymt4z32s3x2B8b6ypgn3Bzh1ncbqxqidfPyM2k87jw@mail.gmail.com>
-Message-ID: <20150811060544.GJ9751@windriver.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 10 Aug 2015 23:52:24 -0700
+Subject: [PATCH v8 11/13] clk: qcom: gdsc: Use PM clocks to control gdsc
+ clocks
+In-Reply-To: <1438857474-20262-12-git-send-email-rnayak@codeaurora.org>
+References: <1438857474-20262-1-git-send-email-rnayak@codeaurora.org>
+ <1438857474-20262-12-git-send-email-rnayak@codeaurora.org>
+Message-ID: <20150811065224.GA2839@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Re: [PATCH 5/5] drivers/tty: make serial 8250_lpc18xx.c explicitly non-modular] On 10/08/2015 (Mon 20:42) Joachim Eastwood wrote:
+On 08/06, Rajendra Nayak wrote:
+> +
+> +static int gdsc_attach(struct generic_pm_domain *domain, struct device *dev)
+> +{
+> +	int ret, i = 0, j = 0;
+> +	struct gdsc *sc = domain_to_gdsc(domain);
+> +	struct of_phandle_args clkspec;
+> +	struct device_node *np = dev->of_node;
+> +
+> +	if (!sc->clock_count)
+> +		return 0;
+> +
+> +	ret = pm_clk_create(dev);
+> +	if (ret) {
+> +		dev_dbg(dev, "pm_clk_create failed %d\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	sc->clks = devm_kcalloc(dev, sc->clock_count, sizeof(sc->clks),
+> +				       GFP_KERNEL);
+> +	if (!sc->clks)
+> +		return -ENOMEM;
+> +
+> +	while (!of_parse_phandle_with_args(np, "clocks", "#clock-cells", i,
+> +					   &clkspec)) {
+> +		if (match(clkspec.args[0], sc->clocks, sc->clock_count)) {
 
-> Hi Paul,
-> 
-> On 9 August 2015 at 02:51, Paul Gortmaker <paul.gortmaker@windriver.com> wrote:
-> > The Kconfig currently controlling compilation of this code is:
-> >
-> > 8250/Kconfig:config SERIAL_8250_LPC18XX
-> > 8250/Kconfig:        bool "NXP LPC18xx/43xx serial port support"
-> >
-> > ...meaning that it currently is not being built as a module by anyone.
-> >
-> > Lets remove the modular code that is essentially orphaned, so that
-> > when reading the driver there is no doubt it is builtin-only.
-> 
-> The bool in KConfig is more or less a copy-paste mistake on my side. I
-> really meant for this driver to be buildable as module and it builds
-> just fine with 'm'.
-> 
-> Want me send a patch changing it to tristate or will you handle it?
+I'm lost. I was hoping we could just make up a clkspec on the
+stack and pass it over to of_clk_get_from_provider() without
+having to go through the np of the client device. The point being
+to avoid forcing this code from knowing about the consumer
+binding or connection name choice for each device. Instead, it
+assumes that it's a #clock-cells=<1> binding and gets the clocks
+by passing the 1 cell data without calling
+of_parse_phandle_with_args().
 
-I will do a v2 in the next day or so with collected ACKs and this patch
-replaced, unless Greg jumps in and indicates he'd like something
-different.
+Now, one downside of that approach is that it's DT centric (also
+of_clk_get_from_provider() is not an exported symbol yet). So I'm
+really starting to lean towards exposing __clk_create_clk() (or
+some better named "provider" function) that will allow clk
+providers to turn their clk_hw structure into a struct clk
+pointer. That avoids the DT centric design, and avoids binding
+the provider to the connection ids too.
 
-Paul.
---
+> +			sc->clks[j] = of_clk_get_from_provider(&clkspec);
+> +			pm_clk_add_clk(dev, sc->clks[j]);
+> +			j++;
+> +		}
+> +		i++;
+> +	}
+> +	return 0;
+> +};
 
-> 
-> 
-> regards, Joachim Eastwood
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
