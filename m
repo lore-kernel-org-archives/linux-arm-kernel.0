@@ -1,80 +1,95 @@
-From: hongzhou.yang@mediatek.com (Hongzhou Yang)
-Date: Mon, 10 Aug 2015 21:49:31 -0700
-Subject: [PATCH] pinctrl: mediatek: Fix multiple registeration issue.
-Message-ID: <1439268571-10895-1-git-send-email-hongzhou.yang@mediatek.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 11 Aug 2015 12:49:54 +0800
+Subject: [PATCH v2 5/7] ARM: sun8i: Add clock indices
+In-Reply-To: <CAGb2v64nvA1K=Ya7_99-2G1LtFjcuj+qQbO1GJaqsL+yPF+Xdw@mail.gmail.com>
+References: <1438364782-3968-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1438364782-3968-6-git-send-email-maxime.ripard@free-electrons.com>
+ <CAGb2v64nvA1K=Ya7_99-2G1LtFjcuj+qQbO1GJaqsL+yPF+Xdw@mail.gmail.com>
+Message-ID: <CAGb2v64-=1Byzo-h=7Pq=HK9Xx01KaTKT89Nx6jVWUc_kqthyg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use dynamic allocation to fix multiple registeration issue.
+On Sat, Aug 8, 2015 at 12:21 AM, Chen-Yu Tsai <wens@csie.org> wrote:
+> On Sat, Aug 1, 2015 at 1:46 AM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+>> The A23 and A33 gates have a non continuous set of clock IDs that are
+>> valid. Add the clock-indices property to the DT to express this.
+>>
+>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>> ---
+>>  arch/arm/boot/dts/sun8i-a23-a33.dtsi | 15 +++++++++++++++
+>>  1 file changed, 15 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/sun8i-a23-a33.dtsi b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
+>> index 7abd0ae3143d..c318c770b6c1 100644
+>> --- a/arch/arm/boot/dts/sun8i-a23-a33.dtsi
+>> +++ b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
+>> @@ -180,6 +180,15 @@
+>>                         compatible = "allwinner,sun8i-a23-ahb1-gates-clk";
+>>                         reg = <0x01c20060 0x8>;
+>>                         clocks = <&ahb1>;
+>> +                       clock-indices = <1>, <6>,
+>
+> Turns out the A33 (and I assume the same with the A23) has
+> an ahb1 clock gate for the Security System at clock-index <5>.
 
---------------8<--------------------
-Since our common driver need support main chip and PMU
-at the same time, that means it will register two
-pinctrl device, and the pinctrl_desc structure should
-be used two times.
+Looks like the A23 does not have this one, nor the SS mod clock.
 
-But pinctrl_desc use global static definition, then
-the latest registered pinctrl device will overwrite
-the old one's, all members in pinctrl_desc will set to
-the new one's, such as name, pins and pins numbers, etc.
-This is a bug. Changing to use devm_kzalloc to fix it.
+> This is found in the updated A33 user manual.
+>
+>> +                                       <8>, <9>, <10>,
+>> +                                       <13>, <14>,
+>> +                                       <19>, <20>,
+>> +                                       <21>, <24>, <26>,
+>> +                                       <29>, <32>, <36>,
+>> +                                       <40>, <44>, <46>,
+>> +                                       <52>, <54>,
+>
+> <53> is ahb1 clock gate for msgbox, again found in A33 manual.
 
-Cc: stable at vger.kernel.org # v4.1+
-Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
----
- drivers/pinctrl/mediatek/pinctrl-mtk-common.c |   27 +++++++++++++++----------
- 1 file changed, 16 insertions(+), 11 deletions(-)
+A23 has this one. Found in Allwinner kernel sources.
 
-diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-index ad1ea16..2bba504 100644
---- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-+++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-@@ -1202,17 +1202,12 @@ static int mtk_pctrl_build_state(struct platform_device *pdev)
- 	return 0;
- }
- 
--static struct pinctrl_desc mtk_pctrl_desc = {
--	.confops	= &mtk_pconf_ops,
--	.pctlops	= &mtk_pctrl_ops,
--	.pmxops		= &mtk_pmx_ops,
--};
--
- int mtk_pctrl_init(struct platform_device *pdev,
- 		const struct mtk_pinctrl_devdata *data,
- 		struct regmap *regmap)
- {
- 	struct pinctrl_pin_desc *pins;
-+	struct pinctrl_desc *mtk_pctrl_desc;
- 	struct mtk_pinctrl *pctl;
- 	struct device_node *np = pdev->dev.of_node, *node;
- 	struct property *prop;
-@@ -1265,12 +1260,22 @@ int mtk_pctrl_init(struct platform_device *pdev,
- 
- 	for (i = 0; i < pctl->devdata->npins; i++)
- 		pins[i] = pctl->devdata->pins[i].pin;
--	mtk_pctrl_desc.name = dev_name(&pdev->dev);
--	mtk_pctrl_desc.owner = THIS_MODULE;
--	mtk_pctrl_desc.pins = pins;
--	mtk_pctrl_desc.npins = pctl->devdata->npins;
-+
-+	mtk_pctrl_desc = devm_kzalloc(&pdev->dev, sizeof(*mtk_pctrl_desc),
-+				GFP_KERNEL);
-+	if (!mtk_pctrl_desc)
-+		return -ENOMEM;
-+
-+	mtk_pctrl_desc->name = dev_name(&pdev->dev);
-+	mtk_pctrl_desc->owner = THIS_MODULE;
-+	mtk_pctrl_desc->pins = pins;
-+	mtk_pctrl_desc->npins = pctl->devdata->npins;
-+	mtk_pctrl_desc->confops = &mtk_pconf_ops;
-+	mtk_pctrl_desc->pctlops = &mtk_pctrl_ops;
-+	mtk_pctrl_desc->pmxops = &mtk_pmx_ops;
- 	pctl->dev = &pdev->dev;
--	pctl->pctl_dev = pinctrl_register(&mtk_pctrl_desc, &pdev->dev, pctl);
-+
-+	pctl->pctl_dev = pinctrl_register(mtk_pctrl_desc, &pdev->dev, pctl);
- 	if (IS_ERR(pctl->pctl_dev)) {
- 		dev_err(&pdev->dev, "couldn't register pinctrl driver\n");
- 		return PTR_ERR(pctl->pctl_dev);
--- 
-1.7.9.5
+>> +                                       <57>;
+>
+> <58> is ahb1 clock gate for SAT, which seems to be part of the
+> display pipeline.
+
+This one is A33 only.
+
+I guess we should do a separate compatible for A33 AHB1 clock gates.
+
+ChenYu
+
+>>                         clock-output-names = "ahb1_mipidsi", "ahb1_dma",
+>>                                         "ahb1_mmc0", "ahb1_mmc1", "ahb1_mmc2",
+>>                                         "ahb1_nand", "ahb1_sdram",
+>> @@ -196,6 +205,8 @@
+>>                         compatible = "allwinner,sun8i-a23-apb1-gates-clk";
+>>                         reg = <0x01c20068 0x4>;
+>>                         clocks = <&apb1>;
+>> +                       clock-indices = <0>, <5>,
+>> +                                       <12>, <13>;
+>>                         clock-output-names = "apb1_codec", "apb1_pio",
+>>                                         "apb1_daudio0", "apb1_daudio1";
+>>                 };
+>> @@ -213,6 +224,10 @@
+>>                         compatible = "allwinner,sun8i-a23-apb2-gates-clk";
+>>                         reg = <0x01c2006c 0x4>;
+>>                         clocks = <&apb2>;
+>> +                       clock-indices = <0>, <1>,
+>> +                                       <2>, <16>,
+>> +                                       <17>, <18>,
+>> +                                       <19>, <20>;
+>>                         clock-output-names = "apb2_i2c0", "apb2_i2c1",
+>>                                         "apb2_i2c2", "apb2_uart0",
+>>                                         "apb2_uart1", "apb2_uart2",
+>> --
+>> 2.4.6
+>>
+>
+> Not sure if you want to add the clocks I mentioned together
+> in this patch, or do a separate patch.
+>
+> The rest look good.
+>
+> ChenYu
