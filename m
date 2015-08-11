@@ -1,65 +1,42 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 11 Aug 2015 12:54:25 +0100
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 11 Aug 2015 17:31:24 +0530
 Subject: [PATCH v4 2/2] dt: power: st: Provide bindings for ST's OPPs
-In-Reply-To: <20150811100941.GG5509@linux>
-References: <20150729081403.GH2284@x1> <20150729221526.GE3159@codeaurora.org>
- <20150730084634.GD9319@x1>
+In-Reply-To: <20150811115425.GE18282@x1>
+References: <20150729221526.GE3159@codeaurora.org> <20150730084634.GD9319@x1>
  <CAL_JsqKQLQ15qSt95zBZykzzPhcUrtZzhk29a76n+r_3719AiA@mail.gmail.com>
  <20150731163715.GV3159@codeaurora.org> <20150803034642.GV899@linux>
  <20150810132247.GH3249@x1> <20150811080023.GB5509@linux>
  <20150811093039.GA18282@x1> <20150811100941.GG5509@linux>
-Message-ID: <20150811115425.GE18282@x1>
+ <20150811115425.GE18282@x1>
+Message-ID: <20150811120124.GH5509@linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 11 Aug 2015, Viresh Kumar wrote:
-> On 11-08-15, 10:30, Lee Jones wrote:
-> > On Tue, 11 Aug 2015, Viresh Kumar wrote:
-> > 
-> > > On 10-08-15, 14:22, Lee Jones wrote:
-> > > > >  Optional properties:
-> > > > > +- opp-cuts: One or more strings, describing the versions of hardware the OPPs
-> > > > > +  can support.
-> > > > 
-> > > > This isn't very generic.
-> > > > 
-> > > > I'm guessing some vendors my have quite a few ways to differentiate
-> > > > between board versions/revisions/cuts etc.
-> > > > 
-> > > > How about another array where a vendor can choose to identify a piece
-> > > > of hardware however they see fit.
-> > > > 
-> > > > Example 1 (simple version):
-> > > > 
-> > > > /* Version 1 */
-> > > > opp-version = <1>;
-> > > > 
-> > > > Example 2 (using the kernel's versioning):
-> > > > 
-> > > > /* 2.6.32-rc1 */
-> > > > opp-version = <2 6 32 1>;
-> > > > 
-> > > > Example 3 (using ST's versioning):
-> > > > 
-> > > > /* Major 2, Minor 0, Cut 2, All substrates */
-> > > > opp-version = <2 0 2 0xff>;
-> > > 
-> > > But how will we parse this with generic code ?
-> > 
-> > Why would you want to?
-> 
-> So that individual platforms don't need to reinvent the wheel ?
+On 11-08-15, 12:54, Lee Jones wrote:
+> The framework does not need to parse this information.  It is used
+> solely by the platform driver, whose job it is to decide which OPPs
+> are appropriate for the running platform.
 
-The framework does not need to parse this information.  It is used
-solely by the platform driver, whose job it is to decide which OPPs
-are appropriate for the running platform.
+The OPP layer needs to parse OPP nodes in DT. But for doing that it
+needs to know which OPPs to pick from the table as, in cases like
+yours or qcom, not all OPPs might be available.
 
-Back to my question; how would you like arbitrary version information,
-which means different things to different vendors to be used in
-shared/generic/framework code?
+One of the ways to do that is:
+- the platform reads its efuses (or whatever) and encodes the
+  information into a string.
+- This string should match with the strings present (somewhere) in the
+  OPP table. That location can be like what I proposed few mails back.
+- Then the *generic* OPP code can parse only those OPP nodes which
+  match with that string.
+
+This way, we can avoid pushing the platform code to parse OPP tables.
+
+> Back to my question; how would you like arbitrary version information,
+> which means different things to different vendors to be used in
+> shared/generic/framework code?
+
+Exactly like I wrote above. The platform just needs to give a string
+that should match with the OPPs ..
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+viresh
