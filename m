@@ -1,55 +1,24 @@
-From: lho@apm.com (Loc Ho)
-Date: Tue, 11 Aug 2015 11:43:24 -0700
-Subject: [PATCH v2 0/3] edac: Add L3/SoC support to the APM X-Gene SoC
- EDAC driver
-In-Reply-To: <CALdTtnsfQ1GsZqCN470hdvsJtr_Fi5BU2L1xfAo4cqb=S9yfqA@mail.gmail.com>
-References: <1437808063-17592-1-git-send-email-lho@apm.com>
- <CALdTtnv7P5d0Y6wyKe1SOqXedNhQxMsFZY=m-rxK3zouLcFv-Q@mail.gmail.com>
- <CAPw-ZT=9Eq0yc7tzqJAdCvsQTgRkMmGzNOSXgawBTY0gAijr4Q@mail.gmail.com>
- <CALdTtnsfQ1GsZqCN470hdvsJtr_Fi5BU2L1xfAo4cqb=S9yfqA@mail.gmail.com>
-Message-ID: <CAPw-ZTkMR3Kx=dhaZ0BZWMUU027f4X7STTSZV6JA0ne0W3-JPQ@mail.gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Tue, 11 Aug 2015 11:49:08 -0700 (PDT)
+Subject: [PATCH v2 0/2] net: thunder: Add ACPI support.
+In-Reply-To: <1439254717-2875-1-git-send-email-ddaney.cavm@gmail.com>
+References: <1439254717-2875-1-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <20150811.114908.1384923604512568161.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dann,
+From: David Daney <ddaney.cavm@gmail.com>
+Date: Mon, 10 Aug 2015 17:58:35 -0700
 
-On Tue, Aug 11, 2015 at 7:36 AM, Dann Frazier
-<dann.frazier@canonical.com> wrote:
-> On Mon, Aug 10, 2015 at 2:15 PM, Loc Ho <lho@apm.com> wrote:
->> Hi Dann,
->>
->>>> v2:
->>>> * Update binding documentation accordingly
->>>> * Change all single bit defines to BIT(x)
->>>> * Add support for L3 version 1 and 2 HW's
->>>> * Change to use debug file system for error injection
->>>> * In L3/SoC instance add function, allocate EDAC context after all
->>>>   initalization successed
->>>> * Support raw or detail info for SoC EDAC error reporting
->>>>
->>>> v1:
->>>> * Add L3/SoC support to the APM X-Gene SoC EDAC driver
->>>
->>> Loc,
->>>   I tested 4.2-rc5 on a Mustang board with one DIMM, and it hangs (RCU
->>> stall) in xgene_edac_mc_irq_ctl() on modprobe. Same board with 2 DIMMs
->>> boots fine. (U-boot 1.15.12).
->>
->> I just removed one of the two 16GB DIMM... with 4.2.0-rc1 and some
->> code clean up in EDAC driver, it boots just fine... I don't believe
->> the code clean up would affect it. Do you have the dump log?
->>
->> [root at dhcp-10-76-213-247 ~]# uname -a
->> Linux dhcp-10-76-213-247 4.2.0-rc1+ #33 SMP PREEMPT Mon Aug 10
->> 13:23:03 MDT 2015 aarch64 GNU/Linux
->
-> Sure:
->   http://paste.ubuntu.com/12055821/
-> I've reproduced this on two machines. In both cases, we removed the
-> DIMM furthest from the CPU (in case that matters).
+> Change from v1:  Drop PHY binding part, use fwnode_property* APIs.
+> 
+> The first patch (1/2) rearranges the existing code a little with no
+> functional change to get ready for the second.  The second (2/2) does
+> the actual work of adding support to extract the needed information
+> from the ACPI tables.
 
-This is an un-supported configuration. In the latest FW, the FW will
-flag this and won't boot. Please remove the DIMM closest to the CPU.
-FYI... I will be posting another version soon.
+Series applied.
 
--Loc
+In the future it might be better structured to try and get the OF
+node, and if that fails then try and use the ACPI method to obtain
+these values.
