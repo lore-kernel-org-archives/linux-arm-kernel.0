@@ -1,87 +1,181 @@
-From: mturquette@linaro.org (Michael Turquette)
-Date: Tue, 11 Aug 2015 11:25:35 -0700
-Subject: [RFC PATCH 0/8] clk: qoriq: Move chip-specific knowledge into
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 11 Aug 2015 20:31:31 +0200
+Subject: [rtc-linux] [PATCH v2 2/2] drivers: rtc: add xilinx zynqmp rtc
  driver
-In-Reply-To: <1434682158-7243-1-git-send-email-scottwood@freescale.com>
-References: <1434682158-7243-1-git-send-email-scottwood@freescale.com>
-Message-ID: <20150811182535.31346.52965@quantum>
+In-Reply-To: <1438336757-23404-2-git-send-email-suneel.garapati@xilinx.com>
+References: <1438336757-23404-1-git-send-email-suneel.garapati@xilinx.com>
+ <1438336757-23404-2-git-send-email-suneel.garapati@xilinx.com>
+Message-ID: <20150811183131.GW3411@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Scott,
+Hi,
 
-Quoting Scott Wood (2015-06-18 19:49:10)
-> The existing device tree bindings are error-prone and inflexible. 
-> Correct the mistake by moving the knowledge into the driver, which
-> has more flexibility in describing the quirks of each chip.  This leaves
-> the device tree to its proper role of identifying a programming interface
-> rather than describing its individual registers.
+Please run checkpatch --strict and fix the issues.
 
-Sorry for not responding to this one sooner. Fell through the cracks.
+On 31/07/2015 at 15:29:17 +0530, Suneel Garapati wrote :
+> +#include <linux/init.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/io.h>
+> +#include <linux/delay.h>
+> +#include <linux/rtc.h>
+> +
 
-All of the changes to drives/clk/clk-qoriq.c look great to me. I assume
-you need to keep all of these patches together and want to the take
-through the freescale tree? If so feel free to add,
+The includes hav to be sorted alphabetically.
 
-Acked-by: Michael Turquette <mturquette@baylibre.com>
+> +static int xlnx_rtc_set_time(struct device *dev, struct rtc_time *tm)
+> +{
+> +	struct xlnx_rtc_dev *xrtcdev = dev_get_drvdata(dev);
+> +	unsigned long new_time;
+> +
+> +	rtc_tm_to_time(tm, &new_time);
 
-Regards,
-Mike
+You should use rtc_tm_to_time64() and rtc_time64_to_tm() throughout the
+file.
 
-> 
-> For more detail, see the commit message of patch 4.
-> 
-> Scott Wood (8):
->   ARM: dts: ls1021a: Fix clockgen node
->   cpufreq: qoriq: Don't look at clock implementation details
->   powerpc/fsl: Move fsl_guts.h out of arch/powerpc
->   clk: qoriq: Move chip-specific knowledge into driver
->   clk: qoriq: Redirect legacy clock nodes to new clocks
->   cpufreq: qoriq: Remove frequency masking and minimum
->   clk: qoriq: Expose OF clocks directly from the clockgen node
->   powerpc/fsl: Use new clockgen binding
-> 
->  .../devicetree/bindings/clock/qoriq-clock.txt      |   57 +-
->  arch/arm/boot/dts/ls1021a.dtsi                     |    3 +
->  arch/powerpc/boot/dts/fsl/b4420si-pre.dtsi         |    4 +-
->  arch/powerpc/boot/dts/fsl/b4860si-pre.dtsi         |    8 +-
->  arch/powerpc/boot/dts/fsl/b4si-post.dtsi           |   15 -
->  arch/powerpc/boot/dts/fsl/p2041si-post.dtsi        |   18 -
->  arch/powerpc/boot/dts/fsl/p2041si-pre.dtsi         |    8 +-
->  arch/powerpc/boot/dts/fsl/p3041si-post.dtsi        |   18 -
->  arch/powerpc/boot/dts/fsl/p3041si-pre.dtsi         |    8 +-
->  arch/powerpc/boot/dts/fsl/p4080si-post.dtsi        |   70 --
->  arch/powerpc/boot/dts/fsl/p4080si-pre.dtsi         |   16 +-
->  arch/powerpc/boot/dts/fsl/p5020si-pre.dtsi         |    4 +-
->  arch/powerpc/boot/dts/fsl/p5040si-post.dtsi        |   18 -
->  arch/powerpc/boot/dts/fsl/p5040si-pre.dtsi         |    8 +-
->  arch/powerpc/boot/dts/fsl/qoriq-clockgen1.dtsi     |   50 +-
->  arch/powerpc/boot/dts/fsl/qoriq-clockgen2.dtsi     |   33 +-
->  arch/powerpc/boot/dts/fsl/t1023si-post.dtsi        |   16 -
->  arch/powerpc/boot/dts/fsl/t102xsi-pre.dtsi         |    4 +-
->  arch/powerpc/boot/dts/fsl/t1040si-post.dtsi        |   44 -
->  arch/powerpc/boot/dts/fsl/t104xsi-pre.dtsi         |    8 +-
->  arch/powerpc/boot/dts/fsl/t2081si-post.dtsi        |   22 -
->  arch/powerpc/boot/dts/fsl/t208xsi-pre.dtsi         |    8 +-
->  arch/powerpc/boot/dts/fsl/t4240si-post.dtsi        |   61 -
->  arch/powerpc/boot/dts/fsl/t4240si-pre.dtsi         |   24 +-
->  arch/powerpc/platforms/85xx/mpc85xx_mds.c          |    2 +-
->  arch/powerpc/platforms/85xx/mpc85xx_rdb.c          |    2 +-
->  arch/powerpc/platforms/85xx/p1022_ds.c             |    2 +-
->  arch/powerpc/platforms/85xx/p1022_rdk.c            |    2 +-
->  arch/powerpc/platforms/85xx/smp.c                  |    2 +-
->  arch/powerpc/platforms/85xx/twr_p102x.c            |    2 +-
->  arch/powerpc/platforms/86xx/mpc8610_hpcd.c         |    2 +-
->  drivers/clk/clk-qoriq.c                            | 1191 ++++++++++++++++----
->  drivers/cpufreq/qoriq-cpufreq.c                    |  139 +--
->  drivers/iommu/fsl_pamu.c                           |    2 +-
->  .../asm/fsl_guts.h => include/linux/fsl/guts.h     |    6 +-
->  sound/soc/fsl/mpc8610_hpcd.c                       |    2 +-
->  sound/soc/fsl/p1022_ds.c                           |    2 +-
->  sound/soc/fsl/p1022_rdk.c                          |    2 +-
->  38 files changed, 1107 insertions(+), 776 deletions(-)
->  rename arch/powerpc/include/asm/fsl_guts.h => include/linux/fsl/guts.h (98%)
-> 
-> -- 
-> 2.1.4
-> 
+> +	writel(new_time, xrtcdev->reg_base + RTC_SET_TM_WR);
+> +
+
+Is that a 32bits register? If yes, you probably want to return an error
+if the year is 2106 or after.
+
+> +	return 0;
+> +}
+> +
+
+[...]
+
+> +static int xlnx_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alrm)
+> +{
+> +	struct xlnx_rtc_dev *xrtcdev = dev_get_drvdata(dev);
+> +	unsigned long alarm_time;
+> +
+
+Same comment, you probably want to error out if the time overflows a
+32bits register.
+
+> +	rtc_tm_to_time(&alrm->time, &alarm_time);
+> +
+> +	writel((u32) alarm_time, (xrtcdev->reg_base + RTC_ALRM));
+> +
+> +	xlnx_rtc_alarm_irq_enable(dev, alrm->enabled);
+> +
+> +	return 0;
+> +}
+> +
+> +static void xlnx_init_rtc(struct xlnx_rtc_dev *xrtcdev, u32 calibval)
+> +{
+> +	/*
+> +	 * Based on crystal freq of 33.330 KHz
+> +	 * set the secounds counter and enable, set fractions counter
+typo --------------^
+
+> +	 * to default value suggested as per design spec
+> +	 * to correct RTC delay in frequency over period of time.
+> +	 */
+> +	calibval &= RTC_CALIB_MASK;
+> +	writel(calibval, (xrtcdev->reg_base + RTC_CALIB_WR));
+> +}
+> +
+> +static const struct rtc_class_ops xlnx_rtc_ops = {
+> +	.set_time	  = xlnx_rtc_set_time,
+> +	.read_time	  = xlnx_rtc_read_time,
+> +	.read_alarm	  = xlnx_rtc_read_alarm,
+> +	.set_alarm	  = xlnx_rtc_set_alarm,
+> +	.alarm_irq_enable = xlnx_rtc_alarm_irq_enable,
+> +};
+> +
+> +static irqreturn_t xlnx_rtc_interrupt(int irq, void *id)
+> +{
+> +	struct xlnx_rtc_dev *xrtcdev = (struct xlnx_rtc_dev *) id;
+> +	unsigned int status;
+> +
+> +	status = readl(xrtcdev->reg_base + RTC_INT_STS);
+> +	/* Check if interrupt asserted */
+> +	if (!(status & (RTC_INT_SEC | RTC_INT_ALRM)))
+> +		return IRQ_NONE;
+> +
+> +	/* Clear interrupt */
+> +	writel(status, xrtcdev->reg_base + RTC_INT_STS);
+> +
+> +	if (status & RTC_INT_SEC)
+> +		rtc_update_irq(xrtcdev->rtc, 1, RTC_IRQF | RTC_UF);
+> +	if (status & RTC_INT_ALRM)
+> +		rtc_update_irq(xrtcdev->rtc, 1, RTC_IRQF | RTC_AF);
+> +	if (status & RTC_INT_ALRM)
+> +		printk("alarm interrupt\n");
+
+I guess this is a debug message that you forgot to remove.
+
+> +static int xlnx_rtc_probe(struct platform_device *pdev)
+> +{
+> +	struct xlnx_rtc_dev *xrtcdev;
+> +	struct resource *res;
+> +	int ret;
+> +	unsigned int calibvalue;
+> +
+> +	xrtcdev = devm_kzalloc(&pdev->dev, sizeof(*xrtcdev), GFP_KERNEL);
+> +	if (!xrtcdev)
+> +		return -ENOMEM;
+> +
+> +	platform_set_drvdata(pdev, xrtcdev);
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +
+> +	xrtcdev->reg_base = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(xrtcdev->reg_base))
+> +		return PTR_ERR(xrtcdev->reg_base);
+> +
+> +	xrtcdev->alarm_irq = platform_get_irq_byname(pdev, "alarm");
+> +	if (xrtcdev->alarm_irq < 0) {
+> +		dev_err(&pdev->dev, "no irq resource\n");
+> +		return xrtcdev->alarm_irq;
+> +	}
+> +	ret = devm_request_irq(&pdev->dev, xrtcdev->alarm_irq,
+> +				xlnx_rtc_interrupt, 0,
+> +				dev_name(&pdev->dev), xrtcdev);
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "request irq failed\n");
+> +		return ret;
+> +	}
+> +
+> +	xrtcdev->sec_irq = platform_get_irq_byname(pdev, "sec");
+> +	if (xrtcdev->sec_irq < 0) {
+> +		dev_err(&pdev->dev, "no irq resource\n");
+> +		return xrtcdev->sec_irq;
+> +	}
+> +	ret = devm_request_irq(&pdev->dev, xrtcdev->sec_irq,
+> +				xlnx_rtc_interrupt, 0,
+> +				dev_name(&pdev->dev), xrtcdev);
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "request irq failed\n");
+> +		return ret;
+> +	}
+> +
+> +	ret = of_property_read_u32(pdev->dev.of_node, "calibration",
+> +					&calibvalue);
+> +	if (ret)
+> +		calibvalue = RTC_CALIB_DEF;
+> +
+> +	xlnx_init_rtc(xrtcdev, calibvalue);
+> +
+> +	device_init_wakeup(&pdev->dev, 1);
+> +
+> +	xrtcdev->rtc = devm_rtc_device_register(&pdev->dev, pdev->name,
+> +					 &xlnx_rtc_ops, THIS_MODULE);
+> +	if (IS_ERR(xrtcdev->rtc)) {
+> +		return PTR_ERR(xrtcdev->rtc);
+> +	}
+> +
+> +	return 0;
+
+You should use PTR_ERR_OR_ZERO here.
+
+Thanks,
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
