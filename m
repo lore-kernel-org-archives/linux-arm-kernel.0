@@ -1,51 +1,91 @@
-From: sjg@chromium.org (Simon Glass)
-Date: Tue, 11 Aug 2015 08:25:53 -0600
-Subject: [PATCH] arm: rpi: Device tree modifications for U-Boot
-Message-ID: <1439303153-12171-1-git-send-email-sjg@chromium.org>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 11 Aug 2015 19:58:12 +0530
+Subject: [PATCH v4 2/2] dt: power: st: Provide bindings for ST's OPPs
+In-Reply-To: <20150811132756.GG18282@x1>
+References: <CAL_JsqKQLQ15qSt95zBZykzzPhcUrtZzhk29a76n+r_3719AiA@mail.gmail.com>
+ <20150731163715.GV3159@codeaurora.org> <20150803034642.GV899@linux>
+ <20150810132247.GH3249@x1> <20150811080023.GB5509@linux>
+ <20150811093039.GA18282@x1> <20150811100941.GG5509@linux>
+ <20150811115425.GE18282@x1> <20150811120124.GH5509@linux>
+ <20150811132756.GG18282@x1>
+Message-ID: <20150811142812.GJ5509@linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This updates the device tree from the kernel version to something suitable
-for U-Boot:
+On 11-08-15, 14:27, Lee Jones wrote:
+> Okay, so what you're saying is that you've already made the decision
+> to create a separate node for every OPP permutation,
 
-- Add stdout-path alias for console
-- Mark the /soc node to be available pre-relocation so that the early
-serial console works (we need the 'ranges' property to be available)
+Absolutely not.
 
-Signed-off-by: Simon Glass <sjg@chromium.org>
----
+> despite the fact
+> that I've told you this could lead to more nodes than anyone would
+> care to successfully write or maintain?
 
- arch/arm/boot/dts/bcm2835.dtsi | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+I have enough fear of yours and then I have to see you in another
+month as well. I wouldn't dare to disobey your command SIR :)
 
-diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
-index 301c73f..bd6bff6 100644
---- a/arch/arm/boot/dts/bcm2835.dtsi
-+++ b/arch/arm/boot/dts/bcm2835.dtsi
-@@ -8,6 +8,7 @@
- 
- 	chosen {
- 		bootargs = "earlyprintk console=ttyAMA0";
-+		stdout-path = &uart;
- 	};
- 
- 	soc {
-@@ -16,6 +17,7 @@
- 		#size-cells = <1>;
- 		ranges = <0x7e000000 0x20000000 0x02000000>;
- 		dma-ranges = <0x40000000 0x00000000 0x20000000>;
-+		u-boot,dm-pre-reloc;
- 
- 		timer at 7e003000 {
- 			compatible = "brcm,bcm2835-system-timer";
-@@ -92,7 +94,7 @@
- 			#interrupt-cells = <2>;
- 		};
- 
--		uart at 7e201000 {
-+		uart: uart at 7e201000 {
- 			compatible = "brcm,bcm2835-pl011", "arm,pl011", "arm,primecell";
- 			reg = <0x7e201000 0x1000>;
- 			interrupts = <2 25>;
+> Perhaps an example might help explain the issue.
+> 
+> Using the current driver, we need to place the following in DT and the
+> driver does the rest:
+> 
+> opp-list {
+> 	opp1 {
+> 		opp-hz = <1500000000>;
+> 		st,avs = <1200 1200 1200 1200 1170 1140 1100 1070>;
+> 		st,substrate = <0xff>;
+> 		st,cuts = <0xff>;
+> 	};
+> 	opp0 {
+> 		opp-hz = <1200000000>;
+> 		st,avs = <1110 1150 1100 1080 1040 1020 980 930>;
+> 		st,substrate = <0xff>;
+> 		st,cuts = <0x2>;
+> 	};
+> };
+
+Nothing is fixed as of now but this is what I am thinking of:
+
+	cpu0_opp_table: opp_table0 {
+		compatible = "operating-points-v2";
+                opp-cuts = "10", "3c", "f0";
+		supply-names = "vcc0", "vcc1", "vcc2";
+		opp-shared;
+
+		opp00 {
+			opp-hz = /bits/ 64 <1000000000>;
+			clock-latency-ns = <300000>;
+			opp-microvolt-10 = <970000>;
+			opp-microvolt-3c = <950000>;
+			opp-microvolt-f0 = <930000>;
+		};
+
+		/* OR */
+
+		opp00 {
+			opp-hz = /bits/ 64 <1000000000>;
+			clock-latency-ns = <300000>;
+                        opp-microvolt = <970000>, <950000>, <930000>;
+		};
+        };
+
+And then the platform code needs to tell OPP layer:
+"Use OPPs for cut f0 for device X", and OPP layer will store that
+somewhere.
+
+And then it will only initialize OPPs after matching this string with
+the values.
+
+Out of the earlier two options, I may prefer the first one. As we will
+be soon adding support for multiple regulators, and a single regulator
+can have min/max/target values.. So, a single list will become too
+long.
+
+But, something like this should be generic enough to capture most of
+the cases.
+
+@Stephen/Rob ??
+
 -- 
-2.5.0.rc2.392.g76e840b
+viresh
