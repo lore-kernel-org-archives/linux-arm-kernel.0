@@ -1,137 +1,96 @@
-From: t.remmet@phytec.de (Teresa Remmet)
-Date: Tue, 11 Aug 2015 12:04:16 +0200
-Subject: [PATCH] ARM: dts: am335x-phycore-som: Move NAND partition table
- into board files
-In-Reply-To: <1438938599-11252-1-git-send-email-matthias.klein@optimeas.de>
-References: <1438938599-11252-1-git-send-email-matthias.klein@optimeas.de>
-Message-ID: <1439287456.3733.18.camel@lws-tremmet.phytec.de>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Tue, 11 Aug 2015 11:07:21 +0100
+Subject: earlycon issues in -next with amba-pl011 updates
+In-Reply-To: <55C94247.8020701@hurleysoftware.com>
+References: <20150810232312.GB10728@bivouac.eciton.net>
+ <55C94247.8020701@hurleysoftware.com>
+Message-ID: <20150811100721.GE10728@bivouac.eciton.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Matthias,
+Hi Peter,
 
-Am Freitag, den 07.08.2015, 11:09 +0200 schrieb Matthias Klein:
-> Partitions which are defined in the som file can not be deleted in the
-> board file.
+On Mon, Aug 10, 2015 at 08:31:03PM -0400, Peter Hurley wrote:
+> > The issue only appears with earlycon on command line, for pl011
+> > consoles.
+> > 
+> > Some investigation shows that the cause lies with
+> > commit 7b753f318d14 ("uart: pl011: Introduce register accessor")
+> > and
+> > commit 2c096a9eedc6 ("uart: pl011: Introduce register look up table")
+> > 
+> > Specifically, the changes to pl011_putc() are incorrect:
+> > The new pl011_ accessors take a (struct uart_amba_port *) input, but
+> > pl011_putc() directly uses the incoming (struct uart_port *) for this.
+> > 
+> > Apart from ending up with an unintended/incorrect UART base address,
+> > the introduction of the lookup table for register offsets also means
+> > the accessors try to dereference (struct uart_amba_port *)->reg_lut.
 > 
-> Signed-off-by: Matthias Klein <matthias.klein@optimeas.de>
+> 
+> Thanks for the bug report and bisect, and apologies for the breakage;
+> I should have caught that on review.
+
+I wouldn't have found it if I didn't have the boot failure to track
+down, and I'm _not_ going to tell you how long I spent doing that.
+ 
+> Would you please test the patch below and see if that resolves the
+> problem for you?
+
+Yeah, that's a more straightforward fix.
+
+> PS - _NOT_ even compile-tested, sorry.
+> 
+> --- >% ---
+> Subject: [PATCH] serial: pl011: Fix earlycon register LUT breakage
+> 
+> Commit 7b753f318d14 ("uart: pl011: Introduce register accessor")
+> mistakenly used the register LUT i/o accessors for the pl011
+> earlycon. Since the port has not been probed at earlycon time,
+> the struct uart_amba_port (and register LUTs) are uninitialized.
+> 
+> Use direct register addressing for pl011 earlycon; other h/w supported
+> by the amba-pl011 driver should declare an alternate earlycon.
+> 
+> Cc: Jun Nie <jun.nie@linaro.org>
+> Signed-off-by: Peter Hurley <peter@hurleysoftware.com>
 > ---
->  arch/arm/boot/dts/am335x-phycore-som.dtsi | 37 -------------------------
->  arch/arm/boot/dts/am335x-wega.dtsi        | 45 +++++++++++++++++++++++++++++++
->  2 files changed, 45 insertions(+), 37 deletions(-)
+>  drivers/tty/serial/amba-pl011.c | 9 +++------
+>  1 file changed, 3 insertions(+), 6 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/am335x-phycore-som.dtsi b/arch/arm/boot/dts/am335x-phycore-som.dtsi
-> index 4d28fc3..8f12bd54 100644
-> --- a/arch/arm/boot/dts/am335x-phycore-som.dtsi
-> +++ b/arch/arm/boot/dts/am335x-phycore-som.dtsi
-> @@ -189,43 +189,6 @@
+> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+> index 2af09ab..fd54991 100644
+> --- a/drivers/tty/serial/amba-pl011.c
+> +++ b/drivers/tty/serial/amba-pl011.c
+> @@ -2348,13 +2348,10 @@ static struct console amba_console = {
 >  
->  		#address-cells = <1>;
->  		#size-cells = <1>;
+>  static void pl011_putc(struct uart_port *port, int c)
+>  {
+> -	struct uart_amba_port *uap =
+> -	    container_of(port, struct uart_amba_port, port);
 > -
-> -		partition at 0 {
-> -			label = "xload";
-> -			reg = <0x0 0x20000>;
-> -		};
-> -		partition at 1 {
-> -			label = "xload_backup1";
-> -			reg = <0x20000 0x20000>;
-> -		};
-> -		partition at 2 {
-> -			label = "xload_backup2";
-> -			reg = <0x40000 0x20000>;
-> -		};
-> -		partition at 3 {
-> -			label = "xload_backup3";
-> -			reg = <0x60000 0x20000>;
-> -		};
-> -		partition at 4 {
-> -			label = "barebox";
-> -			reg = <0x80000 0x80000>;
-> -		};
-> -		partition at 5 {
-> -			label = "bareboxenv";
-> -			reg = <0x100000 0x40000>;
-> -		};
-> -		partition at 6 {
-> -			label = "oftree";
-> -			reg = <0x140000 0x40000>;
-> -		};
-> -		partition at 7 {
-> -			label = "kernel";
-> -			reg = <0x180000 0x800000>;
-> -		};
-> -		partition at 8 {
-> -			label = "root";
-> -			reg = <0x980000 0x0>;
-> -		};
->  	};
->  };
+> -	while (pl011_readw(uap, REG_FR) & UART01x_FR_TXFF)
+> +	while (readl(port->membase + UART01x_FR) & UART01x_FR_TXFF)
+>  		;
+> -	pl011_writeb(uap, c, REG_DR);
+> -	while (pl011_readw(uap, REG_FR) & uap->fr_busy)
+> +	writeb(c, port->membase + UART01x_DR);
+> +	while (readl(port->membase + UART01x_FR) & UART01x_FR_BUSY)
+>  		;
+>  }
 >  
-> diff --git a/arch/arm/boot/dts/am335x-wega.dtsi b/arch/arm/boot/dts/am335x-wega.dtsi
-> index 5e541bd..945a41d 100644
-> --- a/arch/arm/boot/dts/am335x-wega.dtsi
-> +++ b/arch/arm/boot/dts/am335x-wega.dtsi
-> @@ -149,3 +149,48 @@
->  &usb1_phy {
->  	status = "okay";
->  };
+> -- 
+> 2.5.0
 
-I don't think that moving the nand partition to the carrier board dtsi is correct.
-The nand partition does not have anything to do with the carrier board in first place.
-So they should rather be moved to the am335x-wega-rdk.dts which does describe the 
-board in a whole. 
-If you do this, you should remove the spi partitions from the SoM dtsi also.
+It works, but builds with:
+drivers/tty/serial/amba-pl011.c:329:13: warning: ?pl011_writeb?
+defined but not used [-Wunused-function]
+ static void pl011_writeb(struct uart_amba_port *uap, u8 val, int
+ index)
+             ^
+I was dithering about whether having _relaxed accessors in post boot
+code and plain ones in earlycon was an issue, but I guess it doesn't
+matter much.
 
-And it is generally possible to delete nodes from a device tree with /delete-node/ &my_node; 
-But I have actually not tested this when overwriting partitions. Neither know if this whould
-be a sane solution.
-
-Regards
-Teresa
-
-> +
-> +&nandflash {
-> +	partition at 0 {
-> +		label = "xload";
-> +		reg = <0x0 0x20000>;
-> +	};
-> +
-> +	partition at 1 {
-> +		label = "xload_backup1";
-> +		reg = <0x20000 0x20000>;
-> +	};
-> +
-> +	partition at 2 {
-> +		label = "xload_backup2";
-> +		reg = <0x40000 0x20000>;
-> +	};
-> +
-> +	partition at 3 {
-> +		label = "xload_backup3";
-> +		reg = <0x60000 0x20000>;
-> +	};
-> +
-> +	partition at 4 {
-> +		label = "barebox";
-> +		reg = <0x80000 0x80000>;
-> +	};
-> +
-> +	partition at 5 {
-> +		label = "bareboxenv";
-> +		reg = <0x100000 0x40000>;
-> +	};
-> +
-> +	partition at 6 {
-> +		label = "oftree";
-> +		reg = <0x140000 0x40000>;
-> +	};
-> +	partition at 7 {
-> +		label = "kernel";
-> +		reg = <0x180000 0x800000>;
-> +	};
-> +	partition at 8 {
-> +		label = "root";
-> +		reg = <0x980000 0x0>;
-> +	};
-> +};
+/
+    Leif
