@@ -1,46 +1,60 @@
-From: dave.long@linaro.org (David Long)
-Date: Tue, 11 Aug 2015 13:03:46 -0400
-Subject: [PATCH v8 0/7] arm64: Add kernel probes (kprobes) support
-In-Reply-To: <20150811165645.GA29880@arm.com>
-References: <1439254364-15362-1-git-send-email-dave.long@linaro.org>
- <20150811165645.GA29880@arm.com>
-Message-ID: <55CA2AF2.6040202@linaro.org>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 11 Aug 2015 19:03:35 +0200
+Subject: [PATCH] ARM: mm: fix support for HW coherent systems in PL310 cache
+Message-ID: <1439312615-6160-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/11/15 12:56, Will Deacon wrote:
-> Hi David,
->
-> On Tue, Aug 11, 2015 at 01:52:37AM +0100, David Long wrote:
->> From: "David A. Long" <dave.long@linaro.org>
->>
->> This patchset is heavily based on Sandeepa Prabhu's ARM v8 kprobes patches,
->> first seen in October 2013. This version attempts to address concerns raised by
->> reviewers and also fixes problems discovered during testing.
->>
->> This patchset adds support for kernel probes(kprobes), jump probes(jprobes)
->> and return probes(kretprobes) support for ARM64.
->>
->> The kprobes mechanism makes use of software breakpoint and single stepping
->> support available in the ARM v8 kernel.
->>
->> This patch depends on:
->> 	[PATCH 1/2] Move the pt_regs_offset struct definition from arch to common include file
->> 	[PATCH 2/2] Consolidate redundant register/stack access code
->
-> Are these two queued somewhere? This series doesn't even build without
-> them.
->
-> Will
->
+From: Nadav Haklai <nadavh@marvell.com>
 
-I posted the last revision of that on July 27.  I don't know if they're 
-"queued" somewhere.  They do affect multiple architectures so I'm not 
-certain where they would get queued. They also live in a branch in my 
-own Linaro repo.
+When a PL310 cache is used in a system that provides hardware
+coherency, the entire outer cache operations are useless, and can be
+skipped.  Moreover, on some systems, it is harmful as it causes
+deadlocks between the Marvell coherency mechanism, the Marvell PCIe
+controller and the Cortex-A9.
 
-Was there a better way for me to deal with this dependency?  I was 
-reluctant to make this into one patch set as the other patch really does 
-stand alone as a useful fix.
+This commit extends a previous commit:
+98ea2dba65932ffc456b6d7b11b8a0624e2f7b95 which added the io-coherent
+support for the PL310 cache by also disabling the outer cache flush
+range operation.
 
--dl
+In the current kernel implementation, the outer cache flush range
+operation is triggered by the dma_alloc function.
+This operation can be take place during runtime and in some
+circumstances may lead to the PCIe/PL310 deadlock on Armada 375/38x
+SoCs.
+
+Signed-off-by: Nadav Haklai <nadavh@marvell.com>
+Reviewed-by: Ofer Heifetz <oferh@marvell.com>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ arch/arm/mm/cache-l2x0.c | 7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index 71b3d3309024..5c3148675597 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -1266,9 +1266,9 @@ static const struct l2c_init_data of_l2c310_data __initconst = {
+ };
+ 
+ /*
+- * This is a variant of the of_l2c310_data with .sync set to
+- * NULL. Outer sync operations are not needed when the system is I/O
+- * coherent, and potentially harmful in certain situations (PCIe/PL310
++ * This is a variant of the of_l2c310_data with .sync and .flush_range set to
++ * NULL. Outer sync and flush range operations are not needed when the system
++ * is I/O coherent, and potentially harmful in certain situations (PCIe/PL310
+  * deadlock on Armada 375/38x due to hardware I/O coherency). The
+  * other operations are kept because they are infrequent (therefore do
+  * not cause the deadlock in practice) and needed for secondary CPU
+@@ -1287,7 +1287,6 @@ static const struct l2c_init_data of_l2c310_coherent_data __initconst = {
+ 	.outer_cache = {
+ 		.inv_range   = l2c210_inv_range,
+ 		.clean_range = l2c210_clean_range,
+-		.flush_range = l2c210_flush_range,
+ 		.flush_all   = l2c210_flush_all,
+ 		.disable     = l2c310_disable,
+ 		.resume      = l2c310_resume,
+-- 
+2.1.0
