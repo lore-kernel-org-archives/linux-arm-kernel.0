@@ -1,25 +1,33 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 11 Aug 2015 15:16:53 +0200
-Subject: [GIT PULL] Broadcom Device Tree changes for 4.3 (part 2)
-In-Reply-To: <1438796683-18581-1-git-send-email-f.fainelli@gmail.com>
-References: <1438796683-18581-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <20150811131653.GH30181@localhost>
+Date: Tue, 11 Aug 2015 15:17:56 +0200
+Subject: [GIT PULL] Broadcom SoC changes for 4.3 (part 2, try2)
+In-Reply-To: <1439063444-12466-1-git-send-email-f.fainelli@gmail.com>
+References: <55C4E8C8.7030503@broadcom.com>
+ <1439063444-12466-1-git-send-email-f.fainelli@gmail.com>
+Message-ID: <20150811131756.GI30181@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Wed, Aug 05, 2015 at 10:44:41AM -0700, Florian Fainelli wrote:
-> The following changes since commit ee224e175e9d837b3d572e863ac96109b58707ac:
+
+On Sat, Aug 08, 2015 at 12:50:44PM -0700, Florian Fainelli wrote:
+> The following changes since commit 39aa437e18cac7acae55481ed73feea0de497399:
 > 
->   Merge tag 'mvebu-dt-4.3-2' of git://git.infradead.org/linux-mvebu into next/dt (2015-08-05 11:10:30 +0200)
+>   Merge branch 'queue/irq/arm' of git://git.kernel.org/pub/scm/linux/kernel/git/tip/tip into next/cleanup (2015-08-05 17:24:11 +0200)
+> 
+> are available in the git repository at:
+> 
+>   http://github.com/broadcom/stblinux tags/arm-soc/for-4.3/soc-part2
+> 
+> for you to fetch changes up to cf1140515b3b94ef5aa06a085e94ddd814a8cd78:
+> 
+>   ARM: brcmstb: select ARCH_DMA_ADDR_T_64BIT for LPAE (2015-08-06 21:38:13 -0700)
 
-This isn't quite right. Please don't base your branches on top of our
-next/* branches. Instead they should be based on a plain -rc from upstream
-or, if needed, preceding versions of your own branches.
+Same thing here, please don't base your branch on top of our next/*. I've also
+cherry-picked these patches over, so no need to respin this time.
 
-In this case I've just taken the three patches and applied them directly, so
-no need to respin the branch this time.
 
+Thanks,
 
 -Olof
