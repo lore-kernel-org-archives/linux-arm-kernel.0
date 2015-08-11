@@ -1,32 +1,46 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Tue, 11 Aug 2015 12:03:36 +0100
-Subject: [PATCH RFC 2/3] nvmem: set the size for the nvmem binary file.
+Date: Tue, 11 Aug 2015 12:03:44 +0100
+Subject: [PATCH RFC 3/3] nvmem: add permission flags in nvmem_config
 In-Reply-To: <1439290931-18232-1-git-send-email-srinivas.kandagatla@linaro.org>
 References: <1439290931-18232-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1439291016-18333-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1439291024-18375-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch sets the actual size of binary file to the nvmem size.
-Previously this was not possible as the core was using the static global
-data structures for attributes.
+This patch adds perm variable to nvmem_config structure which will allow
+providers to specify the permissions required for the sysfs binary file.
+This permission is applied on top of root-only access permissions set by
+the core.
 
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 ---
- drivers/nvmem/core.c | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/nvmem/core.c           | 1 +
+ include/linux/nvmem-provider.h | 1 +
+ 2 files changed, 2 insertions(+)
 
 diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
-index 103f6aa..414ed23 100644
+index 414ed23..7481387 100644
 --- a/drivers/nvmem/core.c
 +++ b/drivers/nvmem/core.c
 @@ -312,6 +312,7 @@ struct nvmem_device *nvmem_register(const struct nvmem_config *config)
  			   config->read_only;
  	nvmem->bin = bin_attr_template;
  	nvmem->bin.attr.mode = nvmem->read_only ? : (S_IRUSR | S_IWUSR);
-+	nvmem->bin.size = nvmem->size;
++	nvmem->bin.attr.mode |= config->perm;
+ 	nvmem->bin.size = nvmem->size;
  	device_initialize(&nvmem->dev);
  
- 	dev_dbg(&nvmem->dev, "Registering nvmem device %s\n", config->name);
+diff --git a/include/linux/nvmem-provider.h b/include/linux/nvmem-provider.h
+index 0b68caf..de9a61f 100644
+--- a/include/linux/nvmem-provider.h
++++ b/include/linux/nvmem-provider.h
+@@ -23,6 +23,7 @@ struct nvmem_config {
+ 	const struct nvmem_cell_info	*cells;
+ 	int			ncells;
+ 	bool			read_only;
++	u16			perm; /* visibility in sysfs */
+ };
+ 
+ #if IS_ENABLED(CONFIG_NVMEM)
 -- 
 1.9.1
