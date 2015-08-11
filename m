@@ -1,60 +1,39 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 11 Aug 2015 16:59:21 +0800
-Subject: [GIT PULL] i.MX clock updates for 4.2
-Message-ID: <20150811085921.GB10035@tiger>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 11 Aug 2015 10:03:42 +0100
+Subject: [RESEND][PATCH 3/4] ARM: davinci: Set proper SPI prescale limit
+ value
+In-Reply-To: <55C99D0D.9050605@ti.com>
+References: <1437568344-18889-1-git-send-email-fcooper@ti.com>
+ <1437568344-18889-4-git-send-email-fcooper@ti.com>
+ <55B22681.3060000@ti.com> <55C9380D.1060802@ti.com>
+ <55C99D0D.9050605@ti.com>
+Message-ID: <20150811090342.GG10748@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Michael, Stephen,
+On Tue, Aug 11, 2015 at 12:28:21PM +0530, Sekhar Nori wrote:
+> On Tuesday 11 August 2015 05:17 AM, Franklin S Cooper Jr. wrote:
 
-The i.MX clock drivers were moved into drivers/clk/imx folder since
-v4.2-rc1, so I would like to send i.MX clock changes through clock tree
-from this cycle.  Here is my first pull request to you guys.  I'm using
-signed tags, same as how I work with arm-soc folks.  Let me know if
-there is any problem with it.
+> > ping. Patches 1 and 2 have already been pulled into Mark's spi tree and are currently in in linux-next.
 
-Also, please keep it stable, because I need to pull it into other
-branch as dependency which I will send via arm-soc tree.
+> Mark, can you apply this patch to your tree as well? Thats the preferred
+> route for me.
 
-Thanks,
-Shawn
+> If thats not an option for you, can you confirm that the topic/davinci
+> branch of your spi tree is an immutable commit I can base my pull
+> request to ARM-SoC on?
 
-The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
+Why would there be any interdependency between the the two trees, that
+would be very unusual?  Adding a new value to DT doesn't need the kernel
+to understand it and the driver should be compatible with existing DTs.
+If there *is* some dependency that suggests the driver update has
+problems...
 
-  Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-clk-4.3
-
-for you to fetch changes up to 3713e3f5e9274bbe52e94716bde303071364c1ed:
-
-  clk: imx35: define two clocks for rtc (2015-08-05 20:01:21 +0800)
-
-----------------------------------------------------------------
-The i.MX clock updates for 4.3:
- - Provide a better IPU clock initial settings on imx6dl for getting
-   HDMI and LVDS at the same time.
- - Add clock driver support for i.MX6UL SoC
- - Add a second clock for RTC device on i.MX31 and i.MX35
-
-----------------------------------------------------------------
-Fabio Estevam (1):
-      clk: imx: clk-imx6q: Provide initial IPU clock settings for mx6dl
-
-Frank Li (1):
-      clk: imx: add imx6ul clk tree support
-
-Philippe Reynes (2):
-      clk: imx31: add a second rtc clock
-      clk: imx35: define two clocks for rtc
-
- drivers/clk/imx/Makefile                 |   1 +
- drivers/clk/imx/clk-imx31.c              |   3 +-
- drivers/clk/imx/clk-imx35.c              |   6 +-
- drivers/clk/imx/clk-imx6q.c              |   4 +
- drivers/clk/imx/clk-imx6ul.c             | 432 +++++++++++++++++++++++++++++++
- include/dt-bindings/clock/imx6ul-clock.h | 240 +++++++++++++++++
- 6 files changed, 684 insertions(+), 2 deletions(-)
- create mode 100644 drivers/clk/imx/clk-imx6ul.c
- create mode 100644 include/dt-bindings/clock/imx6ul-clock.h
+In any case I don't have a copy of the patch any more.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150811/7da1cd5e/attachment.sig>
