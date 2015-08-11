@@ -1,46 +1,45 @@
 From: ryabinin.a.a@gmail.com (Andrey Ryabinin)
-Date: Tue, 11 Aug 2015 05:18:14 +0300
-Subject: [PATCH v5 1/6] x86/kasan: define KASAN_SHADOW_OFFSET per architecture
+Date: Tue, 11 Aug 2015 05:18:17 +0300
+Subject: [PATCH v5 4/6] arm64: move PGD_SIZE definition to pgalloc.h
 In-Reply-To: <1439259499-13913-1-git-send-email-ryabinin.a.a@gmail.com>
 References: <1439259499-13913-1-git-send-email-ryabinin.a.a@gmail.com>
-Message-ID: <1439259499-13913-2-git-send-email-ryabinin.a.a@gmail.com>
+Message-ID: <1439259499-13913-5-git-send-email-ryabinin.a.a@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Current definition of  KASAN_SHADOW_OFFSET in include/linux/kasan.h
-will not work for upcomming arm64, so move it to the arch header.
+This will be used by KASAN latter.
 
 Signed-off-by: Andrey Ryabinin <ryabinin.a.a@gmail.com>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/x86/include/asm/kasan.h | 3 +++
- include/linux/kasan.h        | 1 -
- 2 files changed, 3 insertions(+), 1 deletion(-)
+ arch/arm64/include/asm/pgalloc.h | 1 +
+ arch/arm64/mm/pgd.c              | 2 --
+ 2 files changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/arch/x86/include/asm/kasan.h b/arch/x86/include/asm/kasan.h
-index 74a2a8d..1410b56 100644
---- a/arch/x86/include/asm/kasan.h
-+++ b/arch/x86/include/asm/kasan.h
-@@ -1,6 +1,9 @@
- #ifndef _ASM_X86_KASAN_H
- #define _ASM_X86_KASAN_H
+diff --git a/arch/arm64/include/asm/pgalloc.h b/arch/arm64/include/asm/pgalloc.h
+index 7642056..c150539 100644
+--- a/arch/arm64/include/asm/pgalloc.h
++++ b/arch/arm64/include/asm/pgalloc.h
+@@ -27,6 +27,7 @@
+ #define check_pgt_cache()		do { } while (0)
  
-+#include <linux/const.h>
-+#define KASAN_SHADOW_OFFSET _AC(CONFIG_KASAN_SHADOW_OFFSET, UL)
-+
- /*
-  * Compiler uses shadow offset assuming that addresses start
-  * from 0. Kernel addresses don't start from 0, so shadow
-diff --git a/include/linux/kasan.h b/include/linux/kasan.h
-index 5486d77..6fb1c7d 100644
---- a/include/linux/kasan.h
-+++ b/include/linux/kasan.h
-@@ -10,7 +10,6 @@ struct vm_struct;
- #ifdef CONFIG_KASAN
+ #define PGALLOC_GFP	(GFP_KERNEL | __GFP_NOTRACK | __GFP_REPEAT | __GFP_ZERO)
++#define PGD_SIZE	(PTRS_PER_PGD * sizeof(pgd_t))
  
- #define KASAN_SHADOW_SCALE_SHIFT 3
--#define KASAN_SHADOW_OFFSET _AC(CONFIG_KASAN_SHADOW_OFFSET, UL)
+ #if CONFIG_PGTABLE_LEVELS > 2
  
- #include <asm/kasan.h>
- #include <linux/sched.h>
+diff --git a/arch/arm64/mm/pgd.c b/arch/arm64/mm/pgd.c
+index 71ca104..cb3ba1b 100644
+--- a/arch/arm64/mm/pgd.c
++++ b/arch/arm64/mm/pgd.c
+@@ -28,8 +28,6 @@
+ 
+ #include "mm.h"
+ 
+-#define PGD_SIZE	(PTRS_PER_PGD * sizeof(pgd_t))
+-
+ static struct kmem_cache *pgd_cache;
+ 
+ pgd_t *pgd_alloc(struct mm_struct *mm)
 -- 
 2.4.6
