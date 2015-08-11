@@ -1,131 +1,122 @@
-From: hansverk@cisco.com (Hans Verkuil)
-Date: Tue, 11 Aug 2015 15:32:46 +0200
-Subject: [PATCH RFC v2 09/16] media: use media_graph_obj for link endpoints
-In-Reply-To: <20150811102201.5abaf64d@recife.lan>
-References: <cover.1439292977.git.mchehab@osg.samsung.com>	<6d02794028ea4f7ad33e3ba0e07e0c690e2feee2.1439292977.git.mchehab@osg.samsung.com>	<55C9E9AE.5020602@cisco.com>
- <20150811102201.5abaf64d@recife.lan>
-Message-ID: <55C9F97E.7070601@cisco.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 11 Aug 2015 15:40:45 +0200
+Subject: [PATCH v3 4/4] misc: atmel_tclib: get and use slow clock
+In-Reply-To: <1439285884-16051-5-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1439285884-16051-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1439285884-16051-5-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <55C9FB5D.7030607@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>> diff --git a/include/media/media-entity.h b/include/media/media-entity.h
->>> index 403019035424..f6e2136480f1 100644
->>> --- a/include/media/media-entity.h
->>> +++ b/include/media/media-entity.h
->>> @@ -43,6 +43,17 @@ enum media_graph_type {
->>>  	MEDIA_GRAPH_LINK,
->>>  };
->>>  
->>> +/**
->>> + * enum media_graph_link_dir - direction of a link
->>> + *
->>> + * @MEDIA_LINK_DIR_BIDIRECTIONAL	Link is bidirectional
->>> + * @MEDIA_LINK_DIR_PAD_0_TO_1		Link is unidirectional,
->>> + *					from port 0 (source) to port 1 (sink)
->>> + */
->>> +enum media_graph_link_dir {
->>> +	MEDIA_LINK_DIR_BIDIRECTIONAL,
->>> +	MEDIA_LINK_DIR_PORT0_TO_PORT1,
->>> +};
->>
->> 1) the comment and the actual enum are out-of-sync
-> 
-> Ah, yes. I was in doubt about using PAD or PORT here. I ended by using
-> port at the links, as the endpoints can either be an interface/entity
-> or a pad. So, I decided to use port.
+On 08/11/2015 11:38 AM, Alexandre Belloni wrote:
+> From: Boris Brezillon <boris.brezillon@free-electrons.com>
+>
+> Commit dca1a4b5ff6e ("clk: at91: keep slow clk enabled to prevent system
+> hang") added a workaround for the slow clock as it is not properly handled
+> by its users.
+>
+> Get and use the slow clock as it is necessary for the timer counters.
+>
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> ---
+> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Thierry Reding <thierry.reding@gmail.com>
+> Cc: linux-pwm at vger.kernel.org
+>
+>   drivers/clocksource/tcb_clksrc.c |  8 ++++++++
+>   drivers/misc/atmel_tclib.c       |  4 ++++
+>   drivers/pwm/pwm-atmel-tcb.c      | 23 ++++++++++++++++-------
+>   include/linux/atmel_tc.h         |  1 +
+>   4 files changed, 29 insertions(+), 7 deletions(-)
+>
+> diff --git a/drivers/clocksource/tcb_clksrc.c b/drivers/clocksource/tcb_clksrc.c
+> index b9b7277173c2..969ba03633b0 100644
+> --- a/drivers/clocksource/tcb_clksrc.c
+> +++ b/drivers/clocksource/tcb_clksrc.c
+> @@ -188,6 +188,13 @@ static int __init setup_clkevents(struct atmel_tc *tc, int clk32k_divisor_idx)
+>   	ret = clk_prepare_enable(t2_clk);
+>   	if (ret)
+>   		return ret;
+> +
+> +	ret = clk_prepare_enable(tc->slow_clk);
+> +	if (ret) {
+> +		clk_disable_unprepare(t2_clk);
+> +		return ret;
+> +	}
+> +
+>   	clk_disable(t2_clk);
 
-It's either bi-directional (between interface and entity) or directional
-(between two pads), so I think PAD is better here. We don't use the term
-port anywhere else in the MC, so I think it is a bit confusing to
-introduce a new name here.
+Do you need t2_clk to be enabled in order to enable tc->slow_clk ?
 
-> 
->> 2) why not just make a 'BIRECTIONAL' link flag instead of inventing
->>    a new enum? Adding yet another field seems overkill to me. Have a
->>    'BIDIRECTIONAL' flag seems perfectly OK to me (and useful for the
->>    application as well).
-> 
-> Yeah, we can use flags, instead. I decided to use an enum here just
-> to make it clearer about the two possible options.
-> 
-> I was actually considering to rename media_link source/sink to
-> port0/port1, as using "source"/"sink" names on a bidirection link
-> doesn't make sense. I'm still in doubt about such rename, though,
-> as it would make harder to inspect the graph traversal routines.
+>   	clkevt.regs = tc->regs;
+> @@ -200,6 +207,7 @@ static int __init setup_clkevents(struct atmel_tc *tc, int clk32k_divisor_idx)
+>   	ret = request_irq(irq, ch2_irq, IRQF_TIMER, "tc_clkevt", &clkevt);
+>   	if (ret) {
+>   		clk_unprepare(t2_clk);
+> +		clk_disable_unprepare(tc->slow_clk);
+>   		return ret;
+>   	}
+>
+> diff --git a/drivers/misc/atmel_tclib.c b/drivers/misc/atmel_tclib.c
+> index 0ca05c3ec8d6..ac24a4bd63f7 100644
+> --- a/drivers/misc/atmel_tclib.c
+> +++ b/drivers/misc/atmel_tclib.c
 
-Right. I really wouldn't rename it. As suggested below using an
-anonymous union would allow you to create proper names.
+[ ... ]
 
-> Also, I want to force all places that create a link to choose
-> between either BIRECTIONAL or PORT0_TO_PORT1, as this makes easier
-> to review if the code is doing the right thing when inspecting it.
+> @@ -387,9 +387,9 @@ static int atmel_tcb_pwm_probe(struct platform_device *pdev)
+>
+>   	tcbpwm = devm_kzalloc(&pdev->dev, sizeof(*tcbpwm), GFP_KERNEL);
+>   	if (tcbpwm == NULL) {
+> -		atmel_tc_free(tc);
+> +		err = -ENOMEM;
+>   		dev_err(&pdev->dev, "failed to allocate memory\n");
+> -		return -ENOMEM;
+> +		goto err_free_tc;
+>   	}
+>
+>   	tcbpwm->chip.dev = &pdev->dev;
+> @@ -400,17 +400,24 @@ static int atmel_tcb_pwm_probe(struct platform_device *pdev)
+>   	tcbpwm->chip.npwm = NPWM;
+>   	tcbpwm->tc = tc;
+>
+> +	err = clk_prepare_enable(tc->slow_clk);
+> +	if (err)
+> +		goto err_free_tc;
+> +
+>   	spin_lock_init(&tcbpwm->lock);
+>
+>   	err = pwmchip_add(&tcbpwm->chip);
+> -	if (err < 0) {
+> -		atmel_tc_free(tc);
+> -		return err;
+> -	}
+> +	if (err < 0)
+> +		goto err_free_tc;
+>
+>   	platform_set_drvdata(pdev, tcbpwm);
+>
+>   	return 0;
+> +
+> +err_free_tc:
+> +	atmel_tc_free(tc);
+> +
+> +	return err;
 
-By creating two different functions? I think that would be very useful.
-E.g. make_pad_link() and make_intf_to_ent_link() or something like
-that. That would also hide the link direction. I still prefer a flag,
-though :-) That's mostly personal preference, though.
+What about clk_unprepare_disable(tc->slow_clk) ?
 
-> 
-> In summary, I would prefer to keep this internally as a separate
->  enum, at least for now. We can latter simplify it and use a flag
-> for that (or maybe two flags?).
-> 
->>
->>>  
->>>  /* Structs to represent the objects that belong to a media graph */
->>>  
->>> @@ -72,9 +83,9 @@ struct media_pipeline {
->>>  
->>>  struct media_link {
->>>  	struct list_head list;
->>> -	struct media_graph_obj			graph_obj;
->>> -	struct media_pad *source;	/* Source pad */
->>> -	struct media_pad *sink;		/* Sink pad  */
->>> +	struct media_graph_obj		graph_obj;
->>> +	enum media_graph_link_dir	dir;
->>> +	struct media_graph_obj		*source, *sink;
->>
->> I'm not too keen about all the gobj_to_foo(obj) macros that this requires. It
->> is rather ugly code.
->>
->> What about this:
->>
->> 	union {
->> 		struct media_graph_obj *source;
->> 		struct media_pad *source_pad;
->> 		struct media_interface *source_intf;
->> 	};
->> 	union {
->> 		struct media_graph_obj *sink;
->> 		struct media_pad *sink_pad;
->> 		struct media_entity *sink_ent;
->> 	};
->>
->> Now the code can just use ->source_pad etc.
-> 
-> good idea. Will do that on a version 3. I think that, in this case, the
-> best is to write a note that the first element at pad/entity/interface
-> should be the graph_obj.
-> 
-> I would actually call port0_intf and port1_ent on the above structs,
-> as it makes no sense to call sink/source for interface->entity links.
+>   }
+>
 
-How about this:
+[ ... ]
 
- 	union {
- 		struct media_graph_obj *port0;
- 		struct media_interface *port0_intf;	// perhaps just intf or interface?
- 		struct media_pad *source;
- 	};
- 	union {
- 		struct media_graph_obj *port1;
- 		struct media_entity *port1_ent;	// perhaps just ent or entity?
- 		struct media_pad *sink;
- 	};
 
-This has the advantage that the source/sink pads are still called source and
-sink and you don't have to rename the existing code.
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-Regards,
-
-	Hans
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
