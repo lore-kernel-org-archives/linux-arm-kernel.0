@@ -1,39 +1,36 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 11 Aug 2015 15:31:27 +0200
-Subject: [GIT PULL] Nomadik improvements and cleanups for v4.3
-In-Reply-To: <CACRpkdbN6ZDhH56PSUmPD5_uYJhk_o+mCqAvi5GVEtys=AftNg@mail.gmail.com>
-References: <CACRpkdbN6ZDhH56PSUmPD5_uYJhk_o+mCqAvi5GVEtys=AftNg@mail.gmail.com>
-Message-ID: <20150811133127.GN30181@localhost>
+Date: Tue, 11 Aug 2015 15:38:43 +0200
+Subject: [GIT PULL] Renesas ARM Based SoC CPG MSTP Clock Domain Updates
+ for v4.3
+In-Reply-To: <cover.1438911559.git.horms+renesas@verge.net.au>
+References: <cover.1438911559.git.horms+renesas@verge.net.au>
+Message-ID: <20150811133843.GP30181@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Fri, Aug 07, 2015 at 11:12:03AM +0900, Simon Horman wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
+> 
+> Please consider these Renesas ARM based SoC CPG MSTP clock domain updates
+> for v4.3.
+> 
+> This pull request is based on "Third Round of Renesas ARM Based SoC DT
+> Updates for v4.3", tagged as renesas-dt3-for-v4.3, which I have also sent a
+> pull-request for.
+> 
+> The reason for that base is that the DT changes in this series update nodes
+> added in that tag.
+> 
+> This series begins with driver changes and follows up with DT changes.
+> The latter depend on the former.
 
-On Thu, Aug 06, 2015 at 04:50:13PM +0200, Linus Walleij wrote:
-> Hi ARM SoC folks,
-> 
-> these are a four patches of Nomadik cleanups and improvements
-> targeted for v4.2.
-> 
-> Since there is a cross-dependency between the board files and the
-> device tree files I just kept them all on the same branch. Also it seems
-> a bit overzealous to split patches for this small platform.
-> 
-> Please pull it in as cleanup/development for v4.3.
-> 
-> Yours,
-> Linus Walleij
-> 
-> The following changes since commit 74d33293e467df61de1b1d8b2fbe29e550dec33b:
-> 
->   Linux 4.2-rc5 (2015-08-02 18:34:55 -0700)
+I see the acked-by tags on the clk patches, but it took some searching to find
+the ack email from Stephen.
 
-This is 3 -rcs newer than we have our tree based on to date (-rc2).
+Can you please make our homework a bit easier when providing that in
+the future?
 
-I don't see any conflict with -rc2 though, so I've cherry-picked these over
-instead of merging the branch.
+Thanks,
 
-
-Thanks!
 
 -Olof
