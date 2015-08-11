@@ -1,62 +1,83 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 11 Aug 2015 10:47:11 +0100
-Subject: [PATCH REPOST #2] serial/amba-pl011: Disable interrupts around TX
- softirq
-Message-ID: <1439286431-7602-1-git-send-email-Dave.Martin@arm.com>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Tue, 11 Aug 2015 11:49:51 +0200
+Subject: [PATCH v5 2/3] arm64: Add IOMMU dma_ops
+In-Reply-To: <55C4CE7C.7050205@arm.com>
+References: <cover.1438362603.git.robin.murphy@arm.com>
+ <8a5abd0a9929aae160ccb74d7a8d9c3698f61910.1438362603.git.robin.murphy@arm.com>
+ <20150807085233.GV14980@8bytes.org> <55C4CE7C.7050205@arm.com>
+Message-ID: <20150811094951.GD14980@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pl011_tx_softirq() currently uses spin_{,un}lock(), which are not
-sufficient to inhibit pl011_int() from being triggered by a local
-IRQ and trying to re-take the same lock.  This can lead to
-deadlocks.
+On Fri, Aug 07, 2015 at 04:27:56PM +0100, Robin Murphy wrote:
+> As per the comments, the issue here lies in the order in which the
+> OF/driver core code currently calls things for platform devices: as
+> it stands we can't attach the device to a domain in
+> arch_setup_dma_ops() because it doesn't have a group, and we can't
+> even add it to a group ourselves because it isn't fully created and
+> doesn't exist in sysfs yet. The only reason arch/arm is currently
+> getting away without this workaround is that the few IOMMU drivers
+> there hooked up to the generic infrastructure don't actually mind
+> that they get an attach_device from arch_setup_dma_ops() before
+> they've even seen an add_device (largely because they don't care
+> about groups).
 
-This patch uses the _irq() locking variants instead to ensure that
-pl011_int() handling for a given port is deferred until any
-pl011_tx_softirq() work for that port is complete.
+Hmm, what about just registering the iommu-driver in arch_setup_dma_ops
+with bus_set_iommu and not care about devices? The code will iterate
+over the devices already on the bus and tries to attach them to the
+iommu driver. But as you said, the devices are not yet on the bus, so
+when a device is later added by the OF/driver core code you can do
+everything needed for the device in the add_device call-back.
+
+This might include initializing the hardware iommu needed for the
+device and setting its per-device dma_ops.
+
+> Laurent's probe-deferral series largely solves these problems in the
+> right place - adding identical boilerplate code to every IOMMU
+> driver to do something they shouldn't have to know about (and don't
+> necessarily have all the right information for) is exactly what we
+> don't want to do. As discussed over on another thread, I'm planning
+> to pick that series up and polish it off after this, but my top
+> priority is getting the basic dma_ops functionality into arm64 that
+> people need right now. I will be only too happy when I can submit
+> the patch removing this notifier workaround ;)
+
+I've experienced it often that someone promises me to fix things later,
+but that it doesn't happen then, so please understand that I am pretty
+cautious about adding such hacks ;)
+
+> No driver other than the AMD IOMMU has any support yet. Support for
+> IOMMU_DOMAIN_DMA can easily be added to existing drivers based on
+> patch 1 of this series, but more generally it's not entirely clear
+> how default domains are going to work beyond x86. On systems like
+> Juno or Seattle with different sets of masters behind different
+> IOMMU instances (with limited domain contexts each), the most
+> sensible approach would be to have a single default domain per IOMMU
+> (spanning domains across instances would need some hideous
+> synchronisation logic for some implementations), but the current
+> domain_alloc interface gives us no way to do that. On something like
+> RK3288 with two different types of IOMMU on the platform "bus", it
+> breaks down even further as there's no way to guarantee that
+> iommu_domain_alloc() even gives you a domain from the right *driver*
+> (hence bypassing it by going through ops directly here).
+
+Default domain allocation comes down to how the bus organizes its
+iommu-groups. For every group (at least in its current design) a default
+domain is allocated. An a group is typically only behind a single iommu
+instance.
+
+> Only for PCI devices, via iommu_group_get_for_pci_dev(). The code
+> here, however, only runs for platform devices - ops will be always
+> null for a PCI device since of_iommu_configure() will have bailed
+> out (see the silly warning removed by my patch you picked up the
+> other day). Once iommu_group_get_for_dev() supports platform
+> devices, this too can go away. In the meantime if someone adds PCI
+> support to of_iommu_configure() and IOMMU_DOMAIN_DMA support to
+> their IOMMU driver, then we'll get a domain back from
+> iommu_get_domain_for_dev() and just use that.
+
+What is the plan for getting an iommu-groups implementation for the
+platform bus?
 
 
-Notes for stable:
-
-This patch fixes an issue that is fixed by the following upstream
-commit, which is a more substantial rewrite of the affected code,
-fixing multiple, mostly more minor issues:
-
-        1e84d22322ceed4767db1e5342c830dd60c8210f
-        serial/amba-pl011: Refactor and simplify TX FIFO handling
-
-The upstream patch was rejected for stable on the reasonable grounds
-that it was too big and complex a patch.  The original buggy code was
-merged in v4.1, and the rewrite was merged in v4.2, leaving only v4.1
-affected.
-
-
-This patch replaces the 1e84d22, for 4.1.x only.
-
-Fixes: 734745caeb9f serial/amba-pl011: Activate TX IRQ passively
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-Tested-by: Robin Murphy <robin.murphy@arm.com>
-Tested-by: Stefan Wahren <stefan.wahren@i2se.com>
-Cc: stable <stable@vger.kernel.org> # 4.1.x
----
- drivers/tty/serial/amba-pl011.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-index 763eb20..0cc622a 100644
---- a/drivers/tty/serial/amba-pl011.c
-+++ b/drivers/tty/serial/amba-pl011.c
-@@ -1360,9 +1360,9 @@ static void pl011_tx_softirq(struct work_struct *work)
- 	struct uart_amba_port *uap =
- 		container_of(dwork, struct uart_amba_port, tx_softirq_work);
- 
--	spin_lock(&uap->port.lock);
-+	spin_lock_irq(&uap->port.lock);
- 	while (pl011_tx_chars(uap)) ;
--	spin_unlock(&uap->port.lock);
-+	spin_unlock_irq(&uap->port.lock);
- }
- 
- static void pl011_tx_irq_seen(struct uart_amba_port *uap)
--- 
-1.7.10.4
+	Joerg
