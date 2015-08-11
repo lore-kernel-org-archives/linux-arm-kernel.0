@@ -1,47 +1,47 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Tue, 11 Aug 2015 16:51:36 +0900
-Subject: [PATCH] ARM: exynos_defconfig: Enable cpufreq-dt driver
-In-Reply-To: <55C98E17.9040303@osg.samsung.com>
-References: <1439259354-32055-1-git-send-email-k.kozlowski@samsung.com>
- <55C98E17.9040303@osg.samsung.com>
-Message-ID: <057e01d0d40a$8c3a3210$a4ae9630$@kernel.org>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 11 Aug 2015 13:30:23 +0530
+Subject: [PATCH v4 2/2] dt: power: st: Provide bindings for ST's OPPs
+In-Reply-To: <20150810132247.GH3249@x1>
+References: <1438010430-5802-2-git-send-email-lee.jones@linaro.org>
+ <20150728022936.GB1229@linux>
+ <20150728225510.GB3159@codeaurora.org> <20150729081403.GH2284@x1>
+ <20150729221526.GE3159@codeaurora.org> <20150730084634.GD9319@x1>
+ <CAL_JsqKQLQ15qSt95zBZykzzPhcUrtZzhk29a76n+r_3719AiA@mail.gmail.com>
+ <20150731163715.GV3159@codeaurora.org> <20150803034642.GV899@linux>
+ <20150810132247.GH3249@x1>
+Message-ID: <20150811080023.GB5509@linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Javier Martinez Canillas wrote:
+On 10-08-15, 14:22, Lee Jones wrote:
+> >  Optional properties:
+> > +- opp-cuts: One or more strings, describing the versions of hardware the OPPs
+> > +  can support.
 > 
-> Hello Krzysztof,
+> This isn't very generic.
 > 
-> On 08/11/2015 04:15 AM, Krzysztof Kozlowski wrote:
-> > With the latest patches the cpufreq-dt can be used on multiple
-> > Exynos SoCs: 3250, 4210, 4212, 4412 and 5250.
-> >
-> > Enable it along with default ondemand governor to conserve the energy,
-> > reduce temperature while maintaining acceptable performance.
-> >
-> > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> > ---
-> >  arch/arm/configs/exynos_defconfig | 2 ++
-> >  1 file changed, 2 insertions(+)
-> >
-> > diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-> > index 67965cedeb69..2263cd94cb93 100644
-> > --- a/arch/arm/configs/exynos_defconfig
-> > +++ b/arch/arm/configs/exynos_defconfig
-> > @@ -27,6 +27,8 @@ CONFIG_ARM_APPENDED_DTB=y
-> >  CONFIG_ARM_ATAG_DTB_COMPAT=y
-> >  CONFIG_CMDLINE="root=/dev/ram0 rw ramdisk=8192 initrd=0x41000000,8M console=ttySAC1,115200
-> init=/linuxrc mem=256M"
-> >  CONFIG_CPU_FREQ=y
-> > +CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
-> > +CONFIG_CPUFREQ_DT=y
-> >  CONFIG_CPU_IDLE=y
-> >  CONFIG_ARM_EXYNOS_CPUIDLE=y
-> >  CONFIG_VFP=y
-> >
+> I'm guessing some vendors my have quite a few ways to differentiate
+> between board versions/revisions/cuts etc.
 > 
-> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> How about another array where a vendor can choose to identify a piece
+> of hardware however they see fit.
 > 
-Thanks, applied.
+> Example 1 (simple version):
+> 
+> /* Version 1 */
+> opp-version = <1>;
+> 
+> Example 2 (using the kernel's versioning):
+> 
+> /* 2.6.32-rc1 */
+> opp-version = <2 6 32 1>;
+> 
+> Example 3 (using ST's versioning):
+> 
+> /* Major 2, Minor 0, Cut 2, All substrates */
+> opp-version = <2 0 2 0xff>;
 
-- Kukjin
+But how will we parse this with generic code ?
+
+-- 
+viresh
