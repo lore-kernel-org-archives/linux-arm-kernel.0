@@ -1,45 +1,23 @@
-From: mturquette@linaro.org (Michael Turquette)
-Date: Tue, 11 Aug 2015 14:19:46 -0700
-Subject: [PATCH v4 5/8] clk: bcm2835: Drop the fixed sys_pclk.
-In-Reply-To: <1437420787-32137-6-git-send-email-eric@anholt.net>
-References: <1437420787-32137-1-git-send-email-eric@anholt.net>
- <1437420787-32137-6-git-send-email-eric@anholt.net>
-Message-ID: <20150811211946.31346.8021@quantum>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 11 Aug 2015 23:20:01 +0200
+Subject: [rtc-linux] Re: [PATCH v2 1/2] devicetree: bindings: rtc: add
+ bindings for xilinx zynqmp rtc
+In-Reply-To: <EE0C027E1B1062419E7D6F61B9CF3AF65EDC2845@XAP-PVEXMBX01.xlnx.xilinx.com>
+References: <1438336757-23404-1-git-send-email-suneel.garapati@xilinx.com>
+ <7f57f610-7eea-434c-b7b8-3fb15cea18c0@googlegroups.com>
+ <20150811183209.GX3411@piout.net>
+ <EE0C027E1B1062419E7D6F61B9CF3AF65EDC2845@XAP-PVEXMBX01.xlnx.xilinx.com>
+Message-ID: <20150811212001.GY3411@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Eric Anholt (2015-07-20 12:33:04)
-> Nothing uses it, and I can't find any evidence that anything ever has.
-> Its role is now filled by the core clock in the firmware driver.
-> 
-> Signed-off-by: Eric Anholt <eric@anholt.net>
-> Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+On 11/08/2015 at 19:29:54 +0000, Suneel Garapati wrote :
+> For unknown reason, Alessandro zummo is shown by get_maintainer.pl.
 
-Applied to clk-next.
+Because he is the original RTC subsystem maintainer. Are you working on
+an older kernel and my name doesn't appear?
 
-Regards,
-Mike
-
-> ---
->  drivers/clk/clk-bcm2835.c | 5 -----
->  1 file changed, 5 deletions(-)
-> 
-> diff --git a/drivers/clk/clk-bcm2835.c b/drivers/clk/clk-bcm2835.c
-> index 6b950ca..dd295e4 100644
-> --- a/drivers/clk/clk-bcm2835.c
-> +++ b/drivers/clk/clk-bcm2835.c
-> @@ -32,11 +32,6 @@ void __init bcm2835_init_clocks(void)
->         struct clk *clk;
->         int ret;
->  
-> -       clk = clk_register_fixed_rate(NULL, "sys_pclk", NULL, CLK_IS_ROOT,
-> -                                       250000000);
-> -       if (IS_ERR(clk))
-> -               pr_err("sys_pclk not registered\n");
-> -
->         clk = clk_register_fixed_rate(NULL, "apb_pclk", NULL, CLK_IS_ROOT,
->                                         126000000);
->         if (IS_ERR(clk))
-> -- 
-> 2.1.4
-> 
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
