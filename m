@@ -1,44 +1,66 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 12 Aug 2015 00:42:31 +0800
-Subject: [GIT PULL 3/3] ARM: imx: defconfig updates for 4.3
-In-Reply-To: <1439311351-5268-1-git-send-email-shawnguo@kernel.org>
-References: <1439311351-5268-1-git-send-email-shawnguo@kernel.org>
-Message-ID: <1439311351-5268-3-git-send-email-shawnguo@kernel.org>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 12 Aug 2015 00:48:50 +0800
+Subject: [linux-sunxi] [PATCH] pinctrl: sun4i: add spdif to pin
+ description.
+In-Reply-To: <1439309965-9530-1-git-send-email-codekipper@gmail.com>
+References: <1439309965-9530-1-git-send-email-codekipper@gmail.com>
+Message-ID: <CAGb2v64Ptt5NgeicsYtiR8At+K4aDd3Lb3U4kijQ5UM+UafSrA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
+On Wed, Aug 12, 2015 at 12:19 AM,  <codekipper@gmail.com> wrote:
+> From: Marcus Cooper <codekipper@gmail.com>
+>
+> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+> ---
+>  drivers/pinctrl/sunxi/pinctrl-sun4i-a10.c | 9 ++++++---
+>  1 file changed, 6 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/pinctrl/sunxi/pinctrl-sun4i-a10.c b/drivers/pinctrl/sunxi/pinctrl-sun4i-a10.c
+> index 7376a97..daf7dec 100644
+> --- a/drivers/pinctrl/sunxi/pinctrl-sun4i-a10.c
+> +++ b/drivers/pinctrl/sunxi/pinctrl-sun4i-a10.c
+> @@ -135,7 +135,8 @@ static const struct sunxi_desc_pin sun4i_a10_pins[] = {
+>         SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 3),
+>                   SUNXI_FUNCTION(0x0, "gpio_in"),
+>                   SUNXI_FUNCTION(0x1, "gpio_out"),
+> -                 SUNXI_FUNCTION(0x2, "ir0")),          /* TX */
+> +                 SUNXI_FUNCTION(0x2, "ir0"),           /* TX */
+> +                 SUNXI_FUNCTION(0x4, "spdif")),        /* MCLK */
+>         SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 4),
+>                   SUNXI_FUNCTION(0x0, "gpio_in"),
+>                   SUNXI_FUNCTION(0x1, "gpio_out"),
+> @@ -176,11 +177,13 @@ static const struct sunxi_desc_pin sun4i_a10_pins[] = {
+>                   SUNXI_FUNCTION(0x0, "gpio_in"),
+>                   SUNXI_FUNCTION(0x1, "gpio_out"),
+>                   SUNXI_FUNCTION(0x2, "i2s"),           /* DI */
+> -                 SUNXI_FUNCTION(0x3, "ac97")),         /* DI */
+> +                 SUNXI_FUNCTION(0x3, "ac97"),          /* DI */
+> +                 SUNXI_FUNCTION(0x4, "spdif")),        /* DI */
+>         SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 13),
+>                   SUNXI_FUNCTION(0x0, "gpio_in"),
+>                   SUNXI_FUNCTION(0x1, "gpio_out"),
+> -                 SUNXI_FUNCTION(0x2, "spi2")),         /* CS1 */
+> +                 SUNXI_FUNCTION(0x2, "spi2"),          /* CS1 */
+> +                 SUNXI_FUNCTION(0x4, "spdif")),        /* DO */
 
-  Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
+The datasheet and manual list them as NC or Reserved. Maybe mention how you knew
+they were available?
 
-are available in the git repository at:
+Given that the S/PDIF block is not documented either, you should do
+the same for the
+actual driver, like mention Allwinner kernel sources.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-defconfig-4.3
 
-for you to fetch changes up to 9559b3a38b26ab8410aeb822cf0596ea0b4adde4:
+ChenYu
 
-  ARM: imx_v6_v7_defconfig: Select CONFIG_IKCONFIG_PROC (2015-07-27 22:33:50 +0800)
-
-----------------------------------------------------------------
-The i.MX defconfig updates for 4.3:
- - Enable i.MX6UL SoC build
- - Enable powerkey and syscon poweroff support
- - Build in multi-channel audio support, including i.MX ASRC and CS42xx8
-   codec drivers.
- - Enable kexec build, HCIUART_H4 and IKCONFIG_PROC support.
-
-----------------------------------------------------------------
-Fabio Estevam (3):
-      ARM: imx_v6_v7_defconfig: Enable kexec support
-      ARM: imx_v6_v7_defconfig: Select HCIUART_H4
-      ARM: imx_v6_v7_defconfig: Select CONFIG_IKCONFIG_PROC
-
-Frank Li (2):
-      ARM: imx_v6_v7_defconfig: enable powerkey and syscon power off
-      ARM: imx: imx_v6_v7_defconfig enable imx6ul support
-
-Shengjiu Wang (1):
-      ARM: imx_v6_v7_defconfig: build in audio driver
-
- arch/arm/configs/imx_v6_v7_defconfig | 31 ++++++++++++++++++-------------
- 1 file changed, 18 insertions(+), 13 deletions(-)
+>         SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 14),
+>                   SUNXI_FUNCTION(0x0, "gpio_in"),
+>                   SUNXI_FUNCTION(0x1, "gpio_out"),
+> --
+> 2.5.0
+>
+> --
+> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/d/optout.
