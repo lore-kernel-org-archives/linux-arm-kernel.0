@@ -1,67 +1,161 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 11 Aug 2015 16:20:05 -0400 (EDT)
-Subject: arm kernel oops in highmem.c with 4.2
-In-Reply-To: <20150811195638.GC7557@n2100.arm.linux.org.uk>
-References: <CALeDE9Ox3=sh3AXQ0NUG6BBfU5i5YrMY=LDpcTHQWqz2=60F2g@mail.gmail.com>
- <20150805100701.GV7557@n2100.arm.linux.org.uk>
- <CALeDE9PXF=gQCaBCiHpHy2nXOooQOmsCQvSgOv+wQw3mta=P6A@mail.gmail.com>
- <20150805112713.GY7557@n2100.arm.linux.org.uk>
- <1439315290.3153.11.camel@redhat.com>
- <20150811181008.GA7557@n2100.arm.linux.org.uk>
- <alpine.LFD.2.20.1508111501130.1515@knanqh.ubzr>
- <20150811195638.GC7557@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.20.1508111558210.1515@knanqh.ubzr>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Tue, 11 Aug 2015 15:20:27 -0500
+Subject: [PATCH v3] PCI: kill off set_irq_flags usage
+In-Reply-To: <1438030523-15853-9-git-send-email-robh@kernel.org>
+References: <1438030523-15853-1-git-send-email-robh@kernel.org>
+ <1438030523-15853-9-git-send-email-robh@kernel.org>
+Message-ID: <20150811202027.GG13982@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 11 Aug 2015, Russell King - ARM Linux wrote:
-
-> On Tue, Aug 11, 2015 at 03:41:52PM -0400, Nicolas Pitre wrote:
-> > I'd agree.  But first I'd like to know why the fedora kernel is using 
-> > CONFIG_UACCESS_WITH_MEMCPY?  If it's just because it sounded cool then 
-> > that's a bad reason.
-> > 
-> > That code was created to work around inneficiency in the Orion CPU core 
-> > that didn't coalesce writes from STRT instructions, and by using plain 
-> > STR and/or STM the actual throughput was more than doubled.  This was 
-> > fixed in later cores. However Orion users (if they still exist) might 
-> > like the added performance. I don't have Orion-based targets anymore 
-> > (they took the way of the recycling facility a while ago).
+On Mon, Jul 27, 2015 at 03:55:21PM -0500, Rob Herring wrote:
+> set_irq_flags is ARM specific with custom flags which have genirq
+> equivalents. Convert drivers to use the genirq interfaces directly, so we
+> can kill off set_irq_flags. The translation of flags is as follows:
 > 
-> Irrespective of that, what has been found is that the implementation is
-> unsafe - it is taking a semaphore when page faults are disabled.  In
-> other words, notwithstanding the above, it's buggy no matter if it's
-> an Orion CPU core, or highmem, or what.  Any place in the kernel which
-> uses pagefault_disable() and then calls into this code will be buggy.
+> IRQF_VALID -> !IRQ_NOREQUEST
+> IRQF_PROBE -> !IRQ_NOPROBE
+> IRQF_NOAUTOEN -> IRQ_NOAUTOEN
 > 
-> It needs fixing or removing.
+> For IRQs managed by an irqdomain, the irqdomain core code handles clearing
+> and setting IRQ_NOREQUEST already, so there is no need to do this in
+> .map() functions and we can simply remove the set_irq_flags calls. Some
+> users also modify IRQ_NOPROBE and this has been maintained although it
+> is not clear that is really needed. There appears to be a great deal of
+> blind copy and paste of this code.
+> 
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> Cc: Kishon Vijay Abraham I <kishon@ti.com>
+> Acked-by: Bjorn Helgaas <bhelgaas@google.com>
+> Cc: Murali Karicheri <m-karicheri2@ti.com>
+> Cc: Thierry Reding <thierry.reding@gmail.com>
+> Cc: Stephen Warren <swarren@wwwdotorg.org>
+> Cc: Alexandre Courbot <gnurou@gmail.com>
+> Cc: Jingoo Han <jingoohan1@gmail.com>
+> Cc: Pratyush Anand <pratyush.anand@gmail.com>
+> Cc: Simon Horman <horms@verge.net.au>
+> Cc: Michal Simek <michal.simek@xilinx.com>
+> Cc: "S?ren Brinkmann" <soren.brinkmann@xilinx.com>
+> Cc: linux-omap at vger.kernel.org
+> Cc: linux-pci at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-tegra at vger.kernel.org
+> Cc: linux-sh at vger.kernel.org
+> ---
+> Thomas asked that this be merged thru subsystem trees instead of arm-soc,
+> so please apply this to your tree.
 
-Absolutely. I'm not disputing that. I'm only asking so we can wisely 
-choose between fixing or removing.  Personally I'd be inclined towards 
-the later, unless the following is sufficient to fix it:
+Applied with Jingoo's ack to pci/irq for v4.3, thanks!
 
-diff --git a/arch/arm/lib/uaccess_with_memcpy.c b/arch/arm/lib/uaccess_with_memcpy.c
-index 3e58d71001..4b39af2dfd 100644
---- a/arch/arm/lib/uaccess_with_memcpy.c
-+++ b/arch/arm/lib/uaccess_with_memcpy.c
-@@ -96,7 +96,7 @@ __copy_to_user_memcpy(void __user *to, const void *from, unsigned long n)
- 	}
- 
- 	/* the mmap semaphore is taken only if not in an atomic context */
--	atomic = in_atomic();
-+	atomic = faulthandler_disabled();
- 
- 	if (!atomic)
- 		down_read(&current->mm->mmap_sem);
-
-> Even if it is fixed, making it _depend_ on CPU_FEROCEON sounds like a
-> good idea if non-orion stuff isn't supposed to be enabling it.  Or
-> something like that.
-
-It is not clear to me exactly which cores are affected.  That's why the 
-Kconfig entry was left open to all, in case it could benefit others.
-In theory it shouldn't be harmful to anyone notwithstanding the caveat
-mentioned in the help text.
-
-
-Nicolas
+>  drivers/pci/host/pci-dra7xx.c      | 1 -
+>  drivers/pci/host/pci-keystone-dw.c | 2 --
+>  drivers/pci/host/pci-tegra.c       | 1 -
+>  drivers/pci/host/pci-xgene-msi.c   | 1 -
+>  drivers/pci/host/pcie-designware.c | 1 -
+>  drivers/pci/host/pcie-rcar.c       | 1 -
+>  drivers/pci/host/pcie-xilinx.c     | 2 --
+>  7 files changed, 9 deletions(-)
+> 
+> diff --git a/drivers/pci/host/pci-dra7xx.c b/drivers/pci/host/pci-dra7xx.c
+> index 80db09e..1a0d124 100644
+> --- a/drivers/pci/host/pci-dra7xx.c
+> +++ b/drivers/pci/host/pci-dra7xx.c
+> @@ -155,7 +155,6 @@ static int dra7xx_pcie_intx_map(struct irq_domain *domain, unsigned int irq,
+>  {
+>  	irq_set_chip_and_handler(irq, &dummy_irq_chip, handle_simple_irq);
+>  	irq_set_chip_data(irq, domain->host_data);
+> -	set_irq_flags(irq, IRQF_VALID);
+> 
+>  	return 0;
+>  }
+> diff --git a/drivers/pci/host/pci-keystone-dw.c b/drivers/pci/host/pci-keystone-dw.c
+> index f34892e..f1d0749 100644
+> --- a/drivers/pci/host/pci-keystone-dw.c
+> +++ b/drivers/pci/host/pci-keystone-dw.c
+> @@ -196,7 +196,6 @@ static int ks_dw_pcie_msi_map(struct irq_domain *domain, unsigned int irq,
+>  	irq_set_chip_and_handler(irq, &ks_dw_pcie_msi_irq_chip,
+>  				 handle_level_irq);
+>  	irq_set_chip_data(irq, domain->host_data);
+> -	set_irq_flags(irq, IRQF_VALID);
+> 
+>  	return 0;
+>  }
+> @@ -277,7 +276,6 @@ static int ks_dw_pcie_init_legacy_irq_map(struct irq_domain *d,
+>  	irq_set_chip_and_handler(irq, &ks_dw_pcie_legacy_irq_chip,
+>  				 handle_level_irq);
+>  	irq_set_chip_data(irq, d->host_data);
+> -	set_irq_flags(irq, IRQF_VALID);
+> 
+>  	return 0;
+>  }
+> diff --git a/drivers/pci/host/pci-tegra.c b/drivers/pci/host/pci-tegra.c
+> index 10c0571..81df0c1 100644
+> --- a/drivers/pci/host/pci-tegra.c
+> +++ b/drivers/pci/host/pci-tegra.c
+> @@ -1248,7 +1248,6 @@ static int tegra_msi_map(struct irq_domain *domain, unsigned int irq,
+>  {
+>  	irq_set_chip_and_handler(irq, &tegra_msi_irq_chip, handle_simple_irq);
+>  	irq_set_chip_data(irq, domain->host_data);
+> -	set_irq_flags(irq, IRQF_VALID);
+> 
+>  	tegra_cpuidle_pcie_irqs_in_use();
+> 
+> diff --git a/drivers/pci/host/pci-xgene-msi.c b/drivers/pci/host/pci-xgene-msi.c
+> index 2d31d4d..8e559d1 100644
+> --- a/drivers/pci/host/pci-xgene-msi.c
+> +++ b/drivers/pci/host/pci-xgene-msi.c
+> @@ -223,7 +223,6 @@ static int xgene_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
+>  	irq_domain_set_info(domain, virq, msi_irq,
+>  			    &xgene_msi_bottom_irq_chip, domain->host_data,
+>  			    handle_simple_irq, NULL, NULL);
+> -	set_irq_flags(virq, IRQF_VALID);
+> 
+>  	return 0;
+>  }
+> diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
+> index 69486be..5c6b562 100644
+> --- a/drivers/pci/host/pcie-designware.c
+> +++ b/drivers/pci/host/pcie-designware.c
+> @@ -350,7 +350,6 @@ static int dw_pcie_msi_map(struct irq_domain *domain, unsigned int irq,
+>  {
+>  	irq_set_chip_and_handler(irq, &dw_msi_irq_chip, handle_simple_irq);
+>  	irq_set_chip_data(irq, domain->host_data);
+> -	set_irq_flags(irq, IRQF_VALID);
+> 
+>  	return 0;
+>  }
+> diff --git a/drivers/pci/host/pcie-rcar.c b/drivers/pci/host/pcie-rcar.c
+> index c086210..7678fe0 100644
+> --- a/drivers/pci/host/pcie-rcar.c
+> +++ b/drivers/pci/host/pcie-rcar.c
+> @@ -664,7 +664,6 @@ static int rcar_msi_map(struct irq_domain *domain, unsigned int irq,
+>  {
+>  	irq_set_chip_and_handler(irq, &rcar_msi_irq_chip, handle_simple_irq);
+>  	irq_set_chip_data(irq, domain->host_data);
+> -	set_irq_flags(irq, IRQF_VALID);
+> 
+>  	return 0;
+>  }
+> diff --git a/drivers/pci/host/pcie-xilinx.c b/drivers/pci/host/pcie-xilinx.c
+> index f1a06a0..72015119 100644
+> --- a/drivers/pci/host/pcie-xilinx.c
+> +++ b/drivers/pci/host/pcie-xilinx.c
+> @@ -338,7 +338,6 @@ static int xilinx_pcie_msi_map(struct irq_domain *domain, unsigned int irq,
+>  {
+>  	irq_set_chip_and_handler(irq, &xilinx_msi_irq_chip, handle_simple_irq);
+>  	irq_set_chip_data(irq, domain->host_data);
+> -	set_irq_flags(irq, IRQF_VALID);
+> 
+>  	return 0;
+>  }
+> @@ -377,7 +376,6 @@ static int xilinx_pcie_intx_map(struct irq_domain *domain, unsigned int irq,
+>  {
+>  	irq_set_chip_and_handler(irq, &dummy_irq_chip, handle_simple_irq);
+>  	irq_set_chip_data(irq, domain->host_data);
+> -	set_irq_flags(irq, IRQF_VALID);
+> 
+>  	return 0;
+>  }
+> --
+> 2.1.0
+> 
