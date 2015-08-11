@@ -1,32 +1,31 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 11 Aug 2015 17:56:45 +0100
-Subject: [PATCH v8 0/7] arm64: Add kernel probes (kprobes) support
-In-Reply-To: <1439254364-15362-1-git-send-email-dave.long@linaro.org>
-References: <1439254364-15362-1-git-send-email-dave.long@linaro.org>
-Message-ID: <20150811165645.GA29880@arm.com>
+Date: Tue, 11 Aug 2015 18:03:22 +0100
+Subject: [RFC v2 1/4] ftrace: allow arch-specific check_stack()
+In-Reply-To: <1438674249-3447-2-git-send-email-takahiro.akashi@linaro.org>
+References: <1438674249-3447-1-git-send-email-takahiro.akashi@linaro.org>
+ <1438674249-3447-2-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <20150811170321.GB29880@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+On Tue, Aug 04, 2015 at 08:44:06AM +0100, AKASHI Takahiro wrote:
+> A stack frame pointer may be used in a different way depending on
+> cpu architecture. Thus it is not always appropriate to slurp the stack
+> contents, as currently done in check_stack(), in order to calcurate
+> a stack index (height) at a given function call. At least not on arm64.
+> 
+> This patch extract potentially arch-specific code from check_stack()
+> and puts it into a new arch_check_stack(), which is declared as weak.
+> So we will be able to add arch-specific and most efficient way of
+> stack traversing Later.
+> 
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 
-On Tue, Aug 11, 2015 at 01:52:37AM +0100, David Long wrote:
-> From: "David A. Long" <dave.long@linaro.org>
-> 
-> This patchset is heavily based on Sandeepa Prabhu's ARM v8 kprobes patches,
-> first seen in October 2013. This version attempts to address concerns raised by
-> reviewers and also fixes problems discovered during testing.
-> 
-> This patchset adds support for kernel probes(kprobes), jump probes(jprobes)
-> and return probes(kretprobes) support for ARM64.
-> 
-> The kprobes mechanism makes use of software breakpoint and single stepping
-> support available in the ARM v8 kernel.
-> 
-> This patch depends on:
-> 	[PATCH 1/2] Move the pt_regs_offset struct definition from arch to common include file
-> 	[PATCH 2/2] Consolidate redundant register/stack access code
-
-Are these two queued somewhere? This series doesn't even build without
-them.
+If arm64 is the only architecture behaving differently, then I'm happy
+to reconsider the fix to unwind_frame that we merged in e306dfd06fcb
+("ARM64: unwind: Fix PC calculation"). I'd have thought any architecture
+with a branch-and-link instruction would potentially have the same issue,
+so we could just be fixing things in the wrong place if ftrace works
+everywhere else.
 
 Will
