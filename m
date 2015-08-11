@@ -1,17 +1,16 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 11 Aug 2015 15:00:51 +0200
-Subject: [GIT PULL 2/5] Samsung cleanup for v4.3
-In-Reply-To: <55C069AF.5050300@kernel.org>
-References: <55C069AF.5050300@kernel.org>
-Message-ID: <20150811130051.GA30181@localhost>
+Date: Tue, 11 Aug 2015 15:02:38 +0200
+Subject: [GIT PULL 3/5] Samsung DT updates for v4.3
+In-Reply-To: <55C069C2.7040208@kernel.org>
+References: <55C069C2.7040208@kernel.org>
+Message-ID: <20150811130238.GB30181@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 04, 2015 at 04:28:47PM +0900, Kukjin Kim wrote:
+On Tue, Aug 04, 2015 at 04:29:06PM +0900, Kukjin Kim wrote:
 > Hi,
 > 
-> Please pull Samsung cleanup for v4.3.
-> Note I'm going to cleanup non-used definitions based on this soon.
+> Please pull Samsung DT updates for v4.3.
 > 
 > Thanks,
 > Kukjin
@@ -24,12 +23,12 @@ On Tue, Aug 04, 2015 at 04:28:47PM +0900, Kukjin Kim wrote:
 > are available in the git repository at:
 > 
 >   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> tags/samsung-cleanup
+> tags/samsung-dt-1
 > 
-> for you to fetch changes up to d306d08f07183fe1504257101b25b5b33d77bae9:
+> for you to fetch changes up to 5e080b078fa1f929d9aa5586985d5e7c0739d207:
 > 
->   ARM: SAMSUNG: remove keypad-core header in plat-samsung (2015-07-30
-> 02:02:06 +0900)
+>   ARM: dts: Extend exynos5420-pinctrl nodes using labels instead of
+> paths (2015-07-21 13:01:23 +0900)
 
 Merged, thanks.
 
