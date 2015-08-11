@@ -1,108 +1,150 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 11 Aug 2015 11:38:02 +0200
-Subject: [PATCH v3 2/4] clocksource: atmel-st: get and use slow clock
+Date: Tue, 11 Aug 2015 11:38:04 +0200
+Subject: [PATCH v3 4/4] misc: atmel_tclib: get and use slow clock
 In-Reply-To: <1439285884-16051-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1439285884-16051-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1439285884-16051-3-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1439285884-16051-5-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current slow clock rate is hardcoded. Properly get the slow clock
-and use its rate.
+From: Boris Brezillon <boris.brezillon@free-electrons.com>
 
+Commit dca1a4b5ff6e ("clk: at91: keep slow clk enabled to prevent system
+hang") added a workaround for the slow clock as it is not properly handled
+by its users.
+
+Get and use the slow clock as it is necessary for the timer counters.
+
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 ---
 Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
 Cc: Thomas Gleixner <tglx@linutronix.de>
- drivers/clocksource/timer-atmel-st.c | 31 ++++++++++++++++++++++---------
- 1 file changed, 22 insertions(+), 9 deletions(-)
+Cc: Thierry Reding <thierry.reding@gmail.com>
+Cc: linux-pwm at vger.kernel.org
 
-diff --git a/drivers/clocksource/timer-atmel-st.c b/drivers/clocksource/timer-atmel-st.c
-index 1692e17e096b..51dcbae0a654 100644
---- a/drivers/clocksource/timer-atmel-st.c
-+++ b/drivers/clocksource/timer-atmel-st.c
-@@ -22,6 +22,7 @@
- #include <linux/kernel.h>
- #include <linux/interrupt.h>
- #include <linux/irq.h>
-+#include <linux/clk.h>
- #include <linux/clockchips.h>
- #include <linux/export.h>
- #include <linux/mfd/syscon.h>
-@@ -33,9 +34,7 @@ static unsigned long last_crtr;
- static u32 irqmask;
- static struct clock_event_device clkevt;
- static struct regmap *regmap_st;
--
--#define AT91_SLOW_CLOCK		32768
--#define RM9200_TIMER_LATCH	((AT91_SLOW_CLOCK + HZ/2) / HZ)
-+static int timer_latch;
- 
- /*
-  * The ST_CRTR is updated asynchronously to the master clock ... but
-@@ -82,8 +81,8 @@ static irqreturn_t at91rm9200_timer_interrupt(int irq, void *dev_id)
- 	if (sr & AT91_ST_PITS) {
- 		u32	crtr = read_CRTR();
- 
--		while (((crtr - last_crtr) & AT91_ST_CRTV) >= RM9200_TIMER_LATCH) {
--			last_crtr += RM9200_TIMER_LATCH;
-+		while (((crtr - last_crtr) & AT91_ST_CRTV) >= timer_latch) {
-+			last_crtr += timer_latch;
- 			clkevt.event_handler(&clkevt);
- 		}
- 		return IRQ_HANDLED;
-@@ -120,7 +119,7 @@ clkevt32k_mode(enum clock_event_mode mode, struct clock_event_device *dev)
- 	case CLOCK_EVT_MODE_PERIODIC:
- 		/* PIT for periodic irqs; fixed rate of 1/HZ */
- 		irqmask = AT91_ST_PITS;
--		regmap_write(regmap_st, AT91_ST_PIMR, RM9200_TIMER_LATCH);
-+		regmap_write(regmap_st, AT91_ST_PIMR, timer_latch);
- 		break;
- 	case CLOCK_EVT_MODE_ONESHOT:
- 		/* ALM for oneshot irqs, set by next_event()
-@@ -182,7 +181,8 @@ static struct clock_event_device clkevt = {
-  */
- static void __init atmel_st_timer_init(struct device_node *node)
- {
--	unsigned int val;
-+	struct clk *sclk;
-+	unsigned int sclk_rate, val;
- 	int irq, ret;
- 
- 	regmap_st = syscon_node_to_regmap(node);
-@@ -206,6 +206,19 @@ static void __init atmel_st_timer_init(struct device_node *node)
+ drivers/clocksource/tcb_clksrc.c |  8 ++++++++
+ drivers/misc/atmel_tclib.c       |  4 ++++
+ drivers/pwm/pwm-atmel-tcb.c      | 23 ++++++++++++++++-------
+ include/linux/atmel_tc.h         |  1 +
+ 4 files changed, 29 insertions(+), 7 deletions(-)
+
+diff --git a/drivers/clocksource/tcb_clksrc.c b/drivers/clocksource/tcb_clksrc.c
+index b9b7277173c2..969ba03633b0 100644
+--- a/drivers/clocksource/tcb_clksrc.c
++++ b/drivers/clocksource/tcb_clksrc.c
+@@ -188,6 +188,13 @@ static int __init setup_clkevents(struct atmel_tc *tc, int clk32k_divisor_idx)
+ 	ret = clk_prepare_enable(t2_clk);
  	if (ret)
- 		panic(pr_fmt("Unable to setup IRQ\n"));
- 
-+	sclk = of_clk_get(node, 0);
-+	if (IS_ERR(sclk))
-+		panic(pr_fmt("Unable to get slow clock\n"));
+ 		return ret;
 +
-+	clk_prepare_enable(sclk);
-+	if (ret)
-+		panic(pr_fmt("Could not enable slow clock\n"));
++	ret = clk_prepare_enable(tc->slow_clk);
++	if (ret) {
++		clk_disable_unprepare(t2_clk);
++		return ret;
++	}
 +
-+	sclk_rate = clk_get_rate(sclk);
-+	if (!sclk_rate)
-+		panic(pr_fmt("Invalid slow clock rate\n"));
-+	timer_latch = (sclk_rate + HZ / 2) / HZ;
+ 	clk_disable(t2_clk);
+ 
+ 	clkevt.regs = tc->regs;
+@@ -200,6 +207,7 @@ static int __init setup_clkevents(struct atmel_tc *tc, int clk32k_divisor_idx)
+ 	ret = request_irq(irq, ch2_irq, IRQF_TIMER, "tc_clkevt", &clkevt);
+ 	if (ret) {
+ 		clk_unprepare(t2_clk);
++		clk_disable_unprepare(tc->slow_clk);
+ 		return ret;
+ 	}
+ 
+diff --git a/drivers/misc/atmel_tclib.c b/drivers/misc/atmel_tclib.c
+index 0ca05c3ec8d6..ac24a4bd63f7 100644
+--- a/drivers/misc/atmel_tclib.c
++++ b/drivers/misc/atmel_tclib.c
+@@ -125,6 +125,10 @@ static int __init tc_probe(struct platform_device *pdev)
+ 	if (IS_ERR(clk))
+ 		return PTR_ERR(clk);
+ 
++	tc->slow_clk = devm_clk_get(&pdev->dev, "slow_clk");
++	if (IS_ERR(tc->slow_clk))
++		return PTR_ERR(tc->slow_clk);
 +
- 	/* The 32KiHz "Slow Clock" (tick every 30517.58 nanoseconds) is used
- 	 * directly for the clocksource and all clockevents, after adjusting
- 	 * its prescaler from the 1 Hz default.
-@@ -214,11 +227,11 @@ static void __init atmel_st_timer_init(struct device_node *node)
+ 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	tc->regs = devm_ioremap_resource(&pdev->dev, r);
+ 	if (IS_ERR(tc->regs))
+diff --git a/drivers/pwm/pwm-atmel-tcb.c b/drivers/pwm/pwm-atmel-tcb.c
+index d14e0677c92d..070a32a35295 100644
+--- a/drivers/pwm/pwm-atmel-tcb.c
++++ b/drivers/pwm/pwm-atmel-tcb.c
+@@ -305,7 +305,7 @@ static int atmel_tcb_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+ 	 */
+ 	if (i == 5) {
+ 		i = slowclk;
+-		rate = 32768;
++		rate = clk_get_rate(tc->slow_clk);
+ 		min = div_u64(NSEC_PER_SEC, rate);
+ 		max = min << tc->tcb_config->counter_width;
  
- 	/* Setup timer clockevent, with minimum of two ticks (important!!) */
- 	clkevt.cpumask = cpumask_of(0);
--	clockevents_config_and_register(&clkevt, AT91_SLOW_CLOCK,
-+	clockevents_config_and_register(&clkevt, sclk_rate,
- 					2, AT91_ST_ALMV);
+@@ -387,9 +387,9 @@ static int atmel_tcb_pwm_probe(struct platform_device *pdev)
  
- 	/* register clocksource */
--	clocksource_register_hz(&clk32k, AT91_SLOW_CLOCK);
-+	clocksource_register_hz(&clk32k, sclk_rate);
+ 	tcbpwm = devm_kzalloc(&pdev->dev, sizeof(*tcbpwm), GFP_KERNEL);
+ 	if (tcbpwm == NULL) {
+-		atmel_tc_free(tc);
++		err = -ENOMEM;
+ 		dev_err(&pdev->dev, "failed to allocate memory\n");
+-		return -ENOMEM;
++		goto err_free_tc;
+ 	}
+ 
+ 	tcbpwm->chip.dev = &pdev->dev;
+@@ -400,17 +400,24 @@ static int atmel_tcb_pwm_probe(struct platform_device *pdev)
+ 	tcbpwm->chip.npwm = NPWM;
+ 	tcbpwm->tc = tc;
+ 
++	err = clk_prepare_enable(tc->slow_clk);
++	if (err)
++		goto err_free_tc;
++
+ 	spin_lock_init(&tcbpwm->lock);
+ 
+ 	err = pwmchip_add(&tcbpwm->chip);
+-	if (err < 0) {
+-		atmel_tc_free(tc);
+-		return err;
+-	}
++	if (err < 0)
++		goto err_free_tc;
+ 
+ 	platform_set_drvdata(pdev, tcbpwm);
+ 
+ 	return 0;
++
++err_free_tc:
++	atmel_tc_free(tc);
++
++	return err;
  }
- CLOCKSOURCE_OF_DECLARE(atmel_st_timer, "atmel,at91rm9200-st",
- 		       atmel_st_timer_init);
+ 
+ static int atmel_tcb_pwm_remove(struct platform_device *pdev)
+@@ -418,6 +425,8 @@ static int atmel_tcb_pwm_remove(struct platform_device *pdev)
+ 	struct atmel_tcb_pwm_chip *tcbpwm = platform_get_drvdata(pdev);
+ 	int err;
+ 
++	clk_disable_unprepare(tcbpwm->tc->slow_clk);
++
+ 	err = pwmchip_remove(&tcbpwm->chip);
+ 	if (err < 0)
+ 		return err;
+diff --git a/include/linux/atmel_tc.h b/include/linux/atmel_tc.h
+index b87c1c7c242a..468fdfa643f0 100644
+--- a/include/linux/atmel_tc.h
++++ b/include/linux/atmel_tc.h
+@@ -67,6 +67,7 @@ struct atmel_tc {
+ 	const struct atmel_tcb_config *tcb_config;
+ 	int			irq[3];
+ 	struct clk		*clk[3];
++	struct clk		*slow_clk;
+ 	struct list_head	node;
+ 	bool			allocated;
+ };
 -- 
 2.1.4
