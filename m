@@ -1,37 +1,30 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 11 Aug 2015 15:34:09 -0700
-Subject: [PATCH v3 0/2] clk: improve handling of orphan clocks
-In-Reply-To: <20150730100908.GI2564@lukather>
-References: <1429735986-18592-1-git-send-email-heiko@sntech.de>
- <554BD33D.7050907@codeaurora.org> <20150508100247.GQ11057@lukather>
- <4099394.C7vEjTFs8V@diego> <20150730100908.GI2564@lukather>
-Message-ID: <20150811223409.GN2839@codeaurora.org>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Tue, 11 Aug 2015 17:36:14 -0500
+Subject: [PATCH v4 00/10] ACPI GIC Self-probing, GICv2m and GICv3 support
+In-Reply-To: <20150811232523.60d192d2@arm.com>
+References: <1438164539-29256-1-git-send-email-hanjun.guo@linaro.org>	<55CA70D5.6040300@codeaurora.org>
+ <20150811232523.60d192d2@arm.com>
+Message-ID: <55CA78DE.1000306@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/30, Maxime Ripard wrote:
-> On Mon, Jul 27, 2015 at 10:57:33AM +0200, Heiko St?bner wrote:
-> > 
-> > did this lead anywhere meanwhile.
-> > 
-> > Last I remember the change to orphan handling made sunxi fail, but
-> > I'm still hoping to get this usable at some point :-)
-> 
-> To be honest, I don't know what the current status is. I haven't get
-> any news since that mail.
-> 
-> I started to move a significant portion of our clocks to
-> CLK_OF_DECLARE, but not all of them are (which probably make the
-> situation worse for the time being).
-> 
+On 08/11/2015 05:25 PM, Marc Zyngier wrote:
+> My branch, as far as I can tell by looking at my own git tree, is based
+> on v4.2-rc2. As for "the LEG kernel", I have no idea what that is. I
+> only work on this thing called "the Linux kernel". You may have heard
+> of it!;-)
 
-Sorry, I think we're still waiting for the critical clocks stuff
-to settle down so that Sunxi can use that instead of calling
-clk_prepare_enable() in init code. For now, I've put the first
-patch of the two into clk-next so that we can have proper orphan
-tracking. Hopefully we resolve critical clocks soon so that we
-can merge the defer part.
+Then what is this:
+
+git://git.linaro.org/leg/acpi/acpi.git
+                      ^^^
+
+This is your tree, isn't it?  Hanjun said, "Patches are on top of Marc's 
+branch irq/gsi-irq-domain-v2, and available at: 
+git://git.linaro.org/leg/acpi/acpi.git gsi-irqdomain".
+
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
