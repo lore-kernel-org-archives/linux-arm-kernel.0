@@ -1,79 +1,28 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 11 Aug 2015 11:12:49 +0200
-Subject: [PATCH v3 4/5] power/reset: at91-poweroff: allow compiling as a module
-In-Reply-To: <1439284370-13803-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1439284370-13803-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1439284370-13803-5-git-send-email-alexandre.belloni@free-electrons.com>
+Date: Tue, 11 Aug 2015 11:12:45 +0200
+Subject: [PATCH v3 0/5] power/reset: at91: cleanups and slow clock
+Message-ID: <1439284370-13803-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It was not possible to compile at91-poweroff as a module. Implement
-.remove() to allow it. Also switch to module_platform_driver_probe() as it
-is not hotpluggable.
+Hi,
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- drivers/power/reset/Kconfig         |  2 +-
- drivers/power/reset/at91-poweroff.c | 18 +++++++++++++++---
- 2 files changed, 16 insertions(+), 4 deletions(-)
+As discussed this series is now removing non DT initialization, allowing to
+compile the drivers as modules and finally adding slow clock support to the
+drivers.
 
-diff --git a/drivers/power/reset/Kconfig b/drivers/power/reset/Kconfig
-index e41da4a80a05..b3c6191d1847 100644
---- a/drivers/power/reset/Kconfig
-+++ b/drivers/power/reset/Kconfig
-@@ -15,7 +15,7 @@ config POWER_RESET_AS3722
- 	  This driver supports turning off board via a ams AS3722 power-off.
- 
- config POWER_RESET_AT91_POWEROFF
--	bool "Atmel AT91 poweroff driver"
-+	tristate "Atmel AT91 poweroff driver"
- 	depends on ARCH_AT91
- 	default SOC_AT91SAM9 || SOC_SAMA5
- 	help
-diff --git a/drivers/power/reset/at91-poweroff.c b/drivers/power/reset/at91-poweroff.c
-index 9847cfb7e23d..3e698d916c4f 100644
---- a/drivers/power/reset/at91-poweroff.c
-+++ b/drivers/power/reset/at91-poweroff.c
-@@ -119,7 +119,7 @@ static void at91_poweroff_dt_set_wakeup_mode(struct platform_device *pdev)
- 	writel(wakeup_mode | mode, at91_shdwc_base + AT91_SHDW_MR);
- }
- 
--static int at91_poweroff_probe(struct platform_device *pdev)
-+static int __init at91_poweroff_probe(struct platform_device *pdev)
- {
- 	struct resource *res;
- 
-@@ -140,6 +140,14 @@ static int at91_poweroff_probe(struct platform_device *pdev)
- 	return 0;
- }
- 
-+static int __exit at91_poweroff_remove(struct platform_device *pdev)
-+{
-+	if (pm_power_off == at91_poweroff)
-+		pm_power_off = NULL;
-+
-+	return 0;
-+}
-+
- static const struct of_device_id at91_poweroff_of_match[] = {
- 	{ .compatible = "atmel,at91sam9260-shdwc", },
- 	{ .compatible = "atmel,at91sam9rl-shdwc", },
-@@ -148,10 +156,14 @@ static const struct of_device_id at91_poweroff_of_match[] = {
- };
- 
- static struct platform_driver at91_poweroff_driver = {
--	.probe = at91_poweroff_probe,
-+	.remove = __exit_p(at91_poweroff_remove),
- 	.driver = {
- 		.name = "at91-poweroff",
- 		.of_match_table = at91_poweroff_of_match,
- 	},
- };
--module_platform_driver(at91_poweroff_driver);
-+module_platform_driver_probe(at91_poweroff_driver, at91_poweroff_probe);
-+
-+MODULE_AUTHOR("Atmel Corporation");
-+MODULE_DESCRIPTION("Shutdown driver for Atmel SoCs");
-+MODULE_LICENSE("GPL v2");
+
+Alexandre Belloni (5):
+  power/reset: at91-reset: remove useless at91_reset_platform_probe()
+  power/reset: at91-reset: allow compiling as a module
+  power/reset: at91-reset: get and use slow clock
+  power/reset: at91-poweroff: allow compiling as a module
+  power/reset: at91-poweroff: get and use slow clock
+
+ drivers/power/reset/Kconfig         |  4 +--
+ drivers/power/reset/at91-poweroff.c | 33 ++++++++++++++++--
+ drivers/power/reset/at91-reset.c    | 67 ++++++++++++++-----------------------
+ 3 files changed, 58 insertions(+), 46 deletions(-)
+
 -- 
 2.1.4
