@@ -1,41 +1,32 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 11 Aug 2015 15:49:02 -0700
-Subject: [PATCH 5/9] clk: qcom: gcc-msm8960: add child devices support.
-In-Reply-To: <1436348838-22671-6-git-send-email-rnayak@codeaurora.org>
-References: <1436348838-22671-1-git-send-email-rnayak@codeaurora.org>
- <1436348838-22671-6-git-send-email-rnayak@codeaurora.org>
-Message-ID: <20150811224902.GO2839@codeaurora.org>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 11 Aug 2015 15:52:36 -0700
+Subject: [PATCH v5 1/2] clk: rockchip: add pclk_pd_pmu to the list of
+ rk3288 critical clocks
+In-Reply-To: <1439287924-6988-1-git-send-email-hl@rock-chips.com>
+References: <1439287924-6988-1-git-send-email-hl@rock-chips.com>
+Message-ID: <CAD=FV=Wm1NMqoGvCZ4pimB2d9gQEF9PJCCCdqdEBDa5Q=bHcCw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/08, Rajendra Nayak wrote:
-> diff --git a/drivers/clk/qcom/gcc-msm8960.c b/drivers/clk/qcom/gcc-msm8960.c
-> index eb6a4f9..2c80d03 100644
-> --- a/drivers/clk/qcom/gcc-msm8960.c
-> +++ b/drivers/clk/qcom/gcc-msm8960.c
-> @@ -15,6 +15,7 @@
->  #include <linux/bitops.h>
->  #include <linux/err.h>
->  #include <linux/platform_device.h>
-> +#include <linux/of_platform.h>
->  #include <linux/module.h>
->  #include <linux/of.h>
->  #include <linux/of_device.h>
-> @@ -3520,7 +3521,8 @@ static int gcc_msm8960_probe(struct platform_device *pdev)
->  	if (IS_ERR(clk))
->  		return PTR_ERR(clk);
->  
-> -	return qcom_cc_probe(pdev, match->data);
-> +	qcom_cc_probe(pdev, match->data);
-> +	return of_platform_populate(pdev->dev.of_node, NULL, NULL, &pdev->dev);
+Hi,
 
-We just lost the error code from qcom_cc_probe()...
+On Tue, Aug 11, 2015 at 3:12 AM, Lin Huang <hl@rock-chips.com> wrote:
+> From: Heiko Stuebner <heiko@sntech.de>
+>
+> pclk_pd_pmu needs to keep running and with the upcoming gpio clock
+> handling this is not always the case anymore. So add it to the list
+> of critical clocks for now.
+>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> Signed-off-by: Lin Huang <hl@rock-chips.com>
+> ---
+> Changes in v5:
+> - Add From: Heiko Stuebner <heiko@sntech.de>
+> - Add Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+>
+>  drivers/clk/rockchip/clk-rk3288.c | 1 +
+>  1 file changed, 1 insertion(+)
 
-Also, I don't like having a subnode in DT. Why can't we use the
-same node as the GCC node and create a virtual child device here
-for tsens? We can assign the same of_node that this platform
-device has so that DT keeps working correctly.
+You forgot to carry forward my reviewed by:
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Reviewed-by: Douglas Anderson <dianders@chromium.org>
