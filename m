@@ -1,31 +1,40 @@
-From: davem@davemloft.net (David Miller)
-Date: Tue, 11 Aug 2015 13:50:19 -0700 (PDT)
-Subject: [PATCH v2 0/2] net: thunder: Add ACPI support.
-In-Reply-To: <20150811201237.GW4914@rric.localhost>
-References: <20150811.114908.1384923604512568161.davem@davemloft.net>
- <55CA5567.9010002@caviumnetworks.com>
- <20150811201237.GW4914@rric.localhost>
-Message-ID: <20150811.135019.576312282566025940.davem@davemloft.net>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Tue, 11 Aug 2015 16:02:10 -0500
+Subject: [PATCH 0/2] pci: am57xx-evm: Fix PCIe card enumeration issue
+In-Reply-To: <1438090750-11604-1-git-send-email-kishon@ti.com>
+References: <1438090750-11604-1-git-send-email-kishon@ti.com>
+Message-ID: <20150811210210.GK13982@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Robert Richter <robert.richter@caviumnetworks.com>
-Date: Tue, 11 Aug 2015 22:12:37 +0200
-
-> On 11.08.15 13:04:55, David Daney wrote:
->> >In the future it might be better structured to try and get the OF
->> >node, and if that fails then try and use the ACPI method to obtain
->> >these values.
->> 
->> Our current approach, as you can see in the patch, is the opposite.  If ACPI
->> is being used, prefer that over the OF device tree.
->> 
->> You seem to be recommending precedence for OF.  It should be consistent
->> across all drivers/sub-systems, so do you really think that OF before ACPI
->> is the way to go?
+On Tue, Jul 28, 2015 at 07:09:08PM +0530, Kishon Vijay Abraham I wrote:
+> This series fixes PCIe card enumeration issue in am57xx-evm.
 > 
-> If ACPI is enabled then no OF function may be called at all.
+> In the case of am57xx-evm, the PERST# line is connected to a gpio line
+> and this has to be driven low in order to perform a fundamental reset
+> of the card. If the gpio line is driven high, there is no way the card
+> can come out of reset.
+> 
+> Add support in the pcie-dra7xx driver to make gpio drive PERST# line.
+> 
+> The PERST# line can be used to perform reset not during the power on
+> sequence too (warm reset) but we are not adding support for this as the
+> PCIe express base sepcification doesn't explain how to perform warm
+> reset
+> 
+> "In some cases, it may be possible for the Fundamental Reset mechanism
+> to be triggered by hardware without the removal and re-application of
+> power to the component. This is called a warm reset. This document does
+> not specify a means for generating a warm reset."
+> 
+> Kishon Vijay Abraham I (2):
+>   pci: host: pci-dra7xx: Add support to make gpio drive PERST# line
+>   ARM: dts: am57xx-evm: Add 'gpios' property with gpio2_8
+> 
+>  Documentation/devicetree/bindings/pci/ti-pci.txt |    3 +++
+>  arch/arm/boot/dts/am57xx-beagle-x15.dts          |    5 +++++
+>  arch/arm/boot/dts/dra7.dtsi                      |    2 +-
+>  drivers/pci/host/pci-dra7xx.c                    |   24 ++++++++++++++++++++--
+>  4 files changed, 31 insertions(+), 3 deletions(-)
 
-That makes no sense to me at all.
-
-If ACPI is enabled, the OF routines should return no nodes etc.
+Applied with Tony's ack (for patch 2) to pci/host-dra7xx for v4.3, thanks!
