@@ -1,79 +1,50 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 11 Aug 2015 19:05:27 +0200
-Subject: [PATCH] ARM: mm: fix support for HW coherent systems in PL310
- cache
-In-Reply-To: <1439312615-6160-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1439312615-6160-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <55CA2B57.2080600@free-electrons.com>
+From: dev@lynxeye.de (Lucas Stach)
+Date: Tue, 11 Aug 2015 19:05:01 +0200
+Subject: [PATCH] arm: rpi: Device tree modifications for U-Boot
+In-Reply-To: <1439303153-12171-1-git-send-email-sjg@chromium.org>
+References: <1439303153-12171-1-git-send-email-sjg@chromium.org>
+Message-ID: <1439312701.2451.3.camel@lynxeye.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Hi Simon,
 
-please ignore this one it is the wrong version.
+why did you send this to the Tegra ML?
 
-Sorry for the noise
-
-Gregory
-
-
-On 11/08/2015 19:03, Gregory CLEMENT wrote:
-> From: Nadav Haklai <nadavh@marvell.com>
+Am Dienstag, den 11.08.2015, 08:25 -0600 schrieb Simon Glass:
+> This updates the device tree from the kernel version to something suitable
+> for U-Boot:
 > 
-> When a PL310 cache is used in a system that provides hardware
-> coherency, the entire outer cache operations are useless, and can be
-> skipped.  Moreover, on some systems, it is harmful as it causes
-> deadlocks between the Marvell coherency mechanism, the Marvell PCIe
-> controller and the Cortex-A9.
+> - Add stdout-path alias for console
+> - Mark the /soc node to be available pre-relocation so that the early
+> serial console works (we need the 'ranges' property to be available)
 > 
-> This commit extends a previous commit:
-> 98ea2dba65932ffc456b6d7b11b8a0624e2f7b95 which added the io-coherent
-> support for the PL310 cache by also disabling the outer cache flush
-> range operation.
-> 
-> In the current kernel implementation, the outer cache flush range
-> operation is triggered by the dma_alloc function.
-> This operation can be take place during runtime and in some
-> circumstances may lead to the PCIe/PL310 deadlock on Armada 375/38x
-> SoCs.
-> 
-> Signed-off-by: Nadav Haklai <nadavh@marvell.com>
-> Reviewed-by: Ofer Heifetz <oferh@marvell.com>
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Signed-off-by: Simon Glass <sjg@chromium.org>
 > ---
->  arch/arm/mm/cache-l2x0.c | 7 +++----
->  1 file changed, 3 insertions(+), 4 deletions(-)
 > 
-> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-> index 71b3d3309024..5c3148675597 100644
-> --- a/arch/arm/mm/cache-l2x0.c
-> +++ b/arch/arm/mm/cache-l2x0.c
-> @@ -1266,9 +1266,9 @@ static const struct l2c_init_data of_l2c310_data __initconst = {
->  };
+>  arch/arm/boot/dts/bcm2835.dtsi | 4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
+> index 301c73f..bd6bff6 100644
+> --- a/arch/arm/boot/dts/bcm2835.dtsi
+> +++ b/arch/arm/boot/dts/bcm2835.dtsi
+> @@ -8,6 +8,7 @@
 >  
->  /*
-> - * This is a variant of the of_l2c310_data with .sync set to
-> - * NULL. Outer sync operations are not needed when the system is I/O
-> - * coherent, and potentially harmful in certain situations (PCIe/PL310
-> + * This is a variant of the of_l2c310_data with .sync and .flush_range set to
-> + * NULL. Outer sync and flush range operations are not needed when the system
-> + * is I/O coherent, and potentially harmful in certain situations (PCIe/PL310
->   * deadlock on Armada 375/38x due to hardware I/O coherency). The
->   * other operations are kept because they are infrequent (therefore do
->   * not cause the deadlock in practice) and needed for secondary CPU
-> @@ -1287,7 +1287,6 @@ static const struct l2c_init_data of_l2c310_coherent_data __initconst = {
->  	.outer_cache = {
->  		.inv_range   = l2c210_inv_range,
->  		.clean_range = l2c210_clean_range,
-> -		.flush_range = l2c210_flush_range,
->  		.flush_all   = l2c210_flush_all,
->  		.disable     = l2c310_disable,
->  		.resume      = l2c310_resume,
-> 
+>  	chosen {
+>  		bootargs = "earlyprintk console=ttyAMA0";
+> +		stdout-path = &uart;
+>  	};
+>  
+>  	soc {
+> @@ -16,6 +17,7 @@
+>  		#size-cells = <1>;
+>  		ranges = <0x7e000000 0x20000000 0x02000000>;
+>  		dma-ranges = <0x40000000 0x00000000 0x20000000>;
+> +		u-boot,dm-pre-reloc;
 
+Why do you need this and why should upstream carry your favourite
+bootloaders configuration? This is in no way hardware description.
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Regards,
+Lucas
