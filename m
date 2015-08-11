@@ -1,64 +1,41 @@
-From: shengjiu.wang@freescale.com (Shengjiu Wang)
-Date: Tue, 11 Aug 2015 17:26:54 +0800
-Subject: [PATCH V1 3/3] ARM: imx6sx: Add SPDIF_GCLK clock in clock tree
-In-Reply-To: <cover.1439284957.git.shengjiu.wang@freescale.com>
-References: <cover.1439284957.git.shengjiu.wang@freescale.com>
-Message-ID: <d1ffad5bac99d16c3b8377a2cc9370e35efcc7e7.1439284957.git.shengjiu.wang@freescale.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 11 Aug 2015 10:28:10 +0100
+Subject: [RESEND][PATCH 3/4] ARM: davinci: Set proper SPI prescale limit
+ value
+In-Reply-To: <55C9BF51.5080401@ti.com>
+References: <1437568344-18889-1-git-send-email-fcooper@ti.com>
+ <1437568344-18889-4-git-send-email-fcooper@ti.com>
+ <55B22681.3060000@ti.com> <55C9380D.1060802@ti.com>
+ <55C99D0D.9050605@ti.com> <20150811090342.GG10748@sirena.org.uk>
+ <55C9BF51.5080401@ti.com>
+Message-ID: <20150811092810.GK10748@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As spdif driver will register SPDIF clock to regmap, regmap will do
-clk_prepare in init function, so SPDIF clock is prepared in probe, then its
-root clock (pll clock) is prepared also, which cause the arm can't enter
-low power mode.
-Add SPDIF_GCLK in clock tree which share same gate bits with SPDIF clock.
-Its root clock is ipg clock, and register it to regmap, then the issue can
-be fixed.
+On Tue, Aug 11, 2015 at 02:54:33PM +0530, Sekhar Nori wrote:
+> On Tuesday 11 August 2015 02:33 PM, Mark Brown wrote:
 
-Signed-off-by: Shengjiu Wang <shengjiu.wang@freescale.com>
----
- arch/arm/boot/dts/imx6sx.dtsi            | 2 +-
- drivers/clk/imx/clk-imx6sx.c             | 1 +
- include/dt-bindings/clock/imx6sx-clock.h | 3 ++-
- 3 files changed, 4 insertions(+), 2 deletions(-)
+> > Why would there be any interdependency between the the two trees, that
+> > would be very unusual?  Adding a new value to DT doesn't need the kernel
+> > to understand it and the driver should be compatible with existing DTs.
+> > If there *is* some dependency that suggests the driver update has
+> > problems...
 
-diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
-index e391d63..af9c28e 100644
---- a/arch/arm/boot/dts/imx6sx.dtsi
-+++ b/arch/arm/boot/dts/imx6sx.dtsi
-@@ -211,7 +211,7 @@
- 					dmas = <&sdma 14 18 0>,
- 					       <&sdma 15 18 0>;
- 					dma-names = "rx", "tx";
--					clocks = <&clks IMX6SX_CLK_SPDIF>,
-+					clocks = <&clks IMX6SX_CLK_SPDIF_GCLK>,
- 						 <&clks IMX6SX_CLK_OSC>,
- 						 <&clks IMX6SX_CLK_SPDIF>,
- 						 <&clks 0>, <&clks 0>, <&clks 0>,
-diff --git a/drivers/clk/imx/clk-imx6sx.c b/drivers/clk/imx/clk-imx6sx.c
-index 5b95c2c..f2bc511 100644
---- a/drivers/clk/imx/clk-imx6sx.c
-+++ b/drivers/clk/imx/clk-imx6sx.c
-@@ -454,6 +454,7 @@ static void __init imx6sx_clocks_init(struct device_node *ccm_node)
- 	clks[IMX6SX_CLK_SPBA]         = imx_clk_gate2("spba",          "ipg",               base + 0x7c, 12);
- 	clks[IMX6SX_CLK_AUDIO]        = imx_clk_gate2_shared("audio",  "audio_podf",        base + 0x7c, 14, &share_count_audio);
- 	clks[IMX6SX_CLK_SPDIF]        = imx_clk_gate2_shared("spdif",  "spdif_podf",        base + 0x7c, 14, &share_count_audio);
-+	clks[IMX6SX_CLK_SPDIF_GCLK]   = imx_clk_gate2_shared("spdif_gclk",    "ipg",        base + 0x7c, 14, &share_count_audio);
- 	clks[IMX6SX_CLK_SSI1_IPG]     = imx_clk_gate2_shared("ssi1_ipg",      "ipg",        base + 0x7c, 18, &share_count_ssi1);
- 	clks[IMX6SX_CLK_SSI2_IPG]     = imx_clk_gate2_shared("ssi2_ipg",      "ipg",        base + 0x7c, 20, &share_count_ssi2);
- 	clks[IMX6SX_CLK_SSI3_IPG]     = imx_clk_gate2_shared("ssi3_ipg",      "ipg",        base + 0x7c, 22, &share_count_ssi3);
-diff --git a/include/dt-bindings/clock/imx6sx-clock.h b/include/dt-bindings/clock/imx6sx-clock.h
-index 9957091..36f0324 100644
---- a/include/dt-bindings/clock/imx6sx-clock.h
-+++ b/include/dt-bindings/clock/imx6sx-clock.h
-@@ -274,6 +274,7 @@
- #define IMX6SX_PLL5_BYPASS		261
- #define IMX6SX_PLL6_BYPASS		262
- #define IMX6SX_PLL7_BYPASS		263
--#define IMX6SX_CLK_CLK_END		264
-+#define IMX6SX_CLK_SPDIF_GCLK		264
-+#define IMX6SX_CLK_CLK_END		265
- 
- #endif /* __DT_BINDINGS_CLOCK_IMX6SX_H */
--- 
-1.9.1
+> The dependency is because of platform data. Patch 2/4 adds a new
+> platform data member 'prescaler_limit' which this patch populates for
+> DaVinci devices using legacy booting.
+
+Ugh, you still have legacy platforms :(
+
+> > In any case I don't have a copy of the patch any more.
+
+> I can resend this patch to you with my ack included.
+
+I guess.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150811/b31df503/attachment.sig>
