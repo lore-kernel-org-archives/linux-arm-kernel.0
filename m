@@ -1,34 +1,52 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 11 Aug 2015 10:45:13 +0100
-Subject: [PATCH v3] ARM: appropriate __init annotation for const data
-In-Reply-To: <alpine.LFD.2.20.1507271750160.1806@knanqh.ubzr>
-References: <alpine.LFD.2.20.1507271750160.1806@knanqh.ubzr>
-Message-ID: <20150811094512.GY7557@n2100.arm.linux.org.uk>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Tue, 11 Aug 2015 11:45:18 +0200
+Subject: [PATCH 4/6] irqchip: GIC: Use chip_data instead of handler_data
+ for cascaded interrupts
+In-Reply-To: <1436447951-22357-5-git-send-email-marc.zyngier@arm.com>
+References: <1436447951-22357-1-git-send-email-marc.zyngier@arm.com>
+ <1436447951-22357-5-git-send-email-marc.zyngier@arm.com>
+Message-ID: <55C9C42E.8070602@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 27, 2015 at 06:27:52PM -0400, Nicolas Pitre wrote:
-> Init data marked const should be annotated with __initconst for
-> correctness and not __initdata.  In some cases the array gathering
-> references to that data has to be marked const as well. This fixes
-> LTO builds that otherwise fail with section mismatch errors.
+Hi Marc,
+On 07/09/2015 03:19 PM, Marc Zyngier wrote:
+> When used as a primary interrupt controller, the GIC driver uses
+> irq_data->chip_data to extract controller-specific information.
 > 
-> Signed-off-by: Nicolas Pitre <nico@linaro.org>
+> When used as a secondary interrupt controller, it uses handler_data
+> instead. As this difference is relatively pointless and only creates
+> confusion, change the secondary path to match what the rest of the
+> driver does.
+not really related to this series' topic, is it?
 
-Can we please get a little smarter at splitting up changes between core
-ARM code and SoC ARM code please.
-
-This now causes a delete/modify conflict between my tree and arm-soc,
-because I'm now carrying ARMs patches which move arch/arm/kernel/psci.c
-to drivers/firmware.
-
-Right now, my resolution for that conflict is to just delete the old
-file, I'm not even checking to see whether the new one needs this
-change applied.  If it does, please submit a change on top of my
-tree.
-
-Thanks.
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Eric
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  drivers/irqchip/irq-gic.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+> index e264675..3c7f3a4 100644
+> --- a/drivers/irqchip/irq-gic.c
+> +++ b/drivers/irqchip/irq-gic.c
+> @@ -298,7 +298,7 @@ static void __exception_irq_entry gic_handle_irq(struct pt_regs *regs)
+>  
+>  static void gic_handle_cascade_irq(unsigned int irq, struct irq_desc *desc)
+>  {
+> -	struct gic_chip_data *chip_data = irq_get_handler_data(irq);
+> +	struct gic_chip_data *chip_data = irq_get_chip_data(irq);
+>  	struct irq_chip *chip = irq_get_chip(irq);
+>  	unsigned int cascade_irq, gic_irq;
+>  	unsigned long status;
+> @@ -341,7 +341,7 @@ void __init gic_cascade_irq(unsigned int gic_nr, unsigned int irq)
+>  {
+>  	if (gic_nr >= MAX_GIC_NR)
+>  		BUG();
+> -	if (irq_set_handler_data(irq, &gic_data[gic_nr]) != 0)
+> +	if (irq_set_chip_data(irq, &gic_data[gic_nr]) != 0)
+>  		BUG();
+>  	irq_set_chained_handler(irq, gic_handle_cascade_irq);
+>  }
+> 
