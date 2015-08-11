@@ -1,79 +1,87 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 11 Aug 2015 19:10:09 +0100
-Subject: arm kernel oops in highmem.c with 4.2
-In-Reply-To: <1439315290.3153.11.camel@redhat.com>
-References: <CALeDE9Ox3=sh3AXQ0NUG6BBfU5i5YrMY=LDpcTHQWqz2=60F2g@mail.gmail.com>
- <20150805100701.GV7557@n2100.arm.linux.org.uk>
- <CALeDE9PXF=gQCaBCiHpHy2nXOooQOmsCQvSgOv+wQw3mta=P6A@mail.gmail.com>
- <20150805112713.GY7557@n2100.arm.linux.org.uk>
- <1439315290.3153.11.camel@redhat.com>
-Message-ID: <20150811181008.GA7557@n2100.arm.linux.org.uk>
+From: mturquette@linaro.org (Michael Turquette)
+Date: Tue, 11 Aug 2015 11:25:35 -0700
+Subject: [RFC PATCH 0/8] clk: qoriq: Move chip-specific knowledge into
+ driver
+In-Reply-To: <1434682158-7243-1-git-send-email-scottwood@freescale.com>
+References: <1434682158-7243-1-git-send-email-scottwood@freescale.com>
+Message-ID: <20150811182535.31346.52965@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 11, 2015 at 01:48:10PM -0400, Mark Salter wrote:
-> On Wed, 2015-08-05 at 12:27 +0100, Russell King - ARM Linux wrote:
-> > It helps if I look at 4.2 rather than an older kernel :)
-> > 
-> > However, I've checked that I have DEBUG_HIGHMEM enabled, which I do, and
-> > I'm unable to reproduce this here.  My kernels are built with gcc 4.7.4.
-> > 
-> > What it looks like from your oops is that the address which was passed
-> > in was 0xffedf000, but the address we calculated via the following for
-> > the current index was 0xfff00000:
-> > 
-> > type = kmap_atomic_idx();
-> > idx = type + KM_TYPE_NR * smp_processor_id();
-> > __fix_to_virt(idx)
-> > 
-> > Doing a bit of maths... the address 0xffedf000 corresponds to a fixmap
-> > index of... (0xffeff000 - 0xffedf000) >> 12 = 32.  KM_TYPE_NR is 16 on
-> > ARM, so the mapping was created by CPU 2, and type was zero.
-> > 
-> > On unmap, 0xfff00000 gives... (0xffeff000 - 0xfff00000) >> 12 = -1.
-> > That suggests we're on CPU 0, and type is -1 - in other words, there
-> > are no atomically mapped mappings on CPU 0.
-> > 
-> > Since kmap_atomic() disables preemption and page faults, how did your
-> > kernel migrate this thread from CPU 2 to CPU 0... and I can't see how
-> > that happened.
-> > 
+Hi Scott,
+
+Quoting Scott Wood (2015-06-18 19:49:10)
+> The existing device tree bindings are error-prone and inflexible. 
+> Correct the mistake by moving the knowledge into the driver, which
+> has more flexibility in describing the quirks of each chip.  This leaves
+> the device tree to its proper role of identifying a programming interface
+> rather than describing its individual registers.
+
+Sorry for not responding to this one sooner. Fell through the cracks.
+
+All of the changes to drives/clk/clk-qoriq.c look great to me. I assume
+you need to keep all of these patches together and want to the take
+through the freescale tree? If so feel free to add,
+
+Acked-by: Michael Turquette <mturquette@baylibre.com>
+
+Regards,
+Mike
+
 > 
-> The fedora kernel is using PREEMPT_VOLUNTARY with !PREEMPT and
-> !PREEMPT_CPOUNT. So preempt_disable() is a nop. I added some code
-> to catch the kernel scheduling between kmap_atomic() and
-> kunmap_atomic() and got this straightaway:
-
-Looking at the backtrace, and grepping for __copy_to_user_memcpy, it
-seems to imply that you're using the uaccess-with-memcpy code.
-
-This code is relatively unmaintained, and probably mostly unused by
-people today, so I doubt it gets much in the way of testing - and
-you've certainly found a bug in there.
-
-        /* the mmap semaphore is taken only if not in an atomic context */
-        atomic = in_atomic();
-
-        if (!atomic)
-                down_read(&current->mm->mmap_sem);
-
-is not sufficient to tell whether we can take the semaphore.
-
-We _could_ replace the above with:
-
-	int ret;
-
-	ret = down_read_trylock(&current->mm->mmap_sem);
-	if (!ret) {
-		__copy_to_user_std(to, from, n);
-		return;
-	}
-
-but that's just a guess.  I'm not a big fan of this code, and given
-that it probably doesn't get much use, we may be better off deleting
-it so it doesn't sit around rotting...  Code like this really needs
-regular testing.
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+> For more detail, see the commit message of patch 4.
+> 
+> Scott Wood (8):
+>   ARM: dts: ls1021a: Fix clockgen node
+>   cpufreq: qoriq: Don't look at clock implementation details
+>   powerpc/fsl: Move fsl_guts.h out of arch/powerpc
+>   clk: qoriq: Move chip-specific knowledge into driver
+>   clk: qoriq: Redirect legacy clock nodes to new clocks
+>   cpufreq: qoriq: Remove frequency masking and minimum
+>   clk: qoriq: Expose OF clocks directly from the clockgen node
+>   powerpc/fsl: Use new clockgen binding
+> 
+>  .../devicetree/bindings/clock/qoriq-clock.txt      |   57 +-
+>  arch/arm/boot/dts/ls1021a.dtsi                     |    3 +
+>  arch/powerpc/boot/dts/fsl/b4420si-pre.dtsi         |    4 +-
+>  arch/powerpc/boot/dts/fsl/b4860si-pre.dtsi         |    8 +-
+>  arch/powerpc/boot/dts/fsl/b4si-post.dtsi           |   15 -
+>  arch/powerpc/boot/dts/fsl/p2041si-post.dtsi        |   18 -
+>  arch/powerpc/boot/dts/fsl/p2041si-pre.dtsi         |    8 +-
+>  arch/powerpc/boot/dts/fsl/p3041si-post.dtsi        |   18 -
+>  arch/powerpc/boot/dts/fsl/p3041si-pre.dtsi         |    8 +-
+>  arch/powerpc/boot/dts/fsl/p4080si-post.dtsi        |   70 --
+>  arch/powerpc/boot/dts/fsl/p4080si-pre.dtsi         |   16 +-
+>  arch/powerpc/boot/dts/fsl/p5020si-pre.dtsi         |    4 +-
+>  arch/powerpc/boot/dts/fsl/p5040si-post.dtsi        |   18 -
+>  arch/powerpc/boot/dts/fsl/p5040si-pre.dtsi         |    8 +-
+>  arch/powerpc/boot/dts/fsl/qoriq-clockgen1.dtsi     |   50 +-
+>  arch/powerpc/boot/dts/fsl/qoriq-clockgen2.dtsi     |   33 +-
+>  arch/powerpc/boot/dts/fsl/t1023si-post.dtsi        |   16 -
+>  arch/powerpc/boot/dts/fsl/t102xsi-pre.dtsi         |    4 +-
+>  arch/powerpc/boot/dts/fsl/t1040si-post.dtsi        |   44 -
+>  arch/powerpc/boot/dts/fsl/t104xsi-pre.dtsi         |    8 +-
+>  arch/powerpc/boot/dts/fsl/t2081si-post.dtsi        |   22 -
+>  arch/powerpc/boot/dts/fsl/t208xsi-pre.dtsi         |    8 +-
+>  arch/powerpc/boot/dts/fsl/t4240si-post.dtsi        |   61 -
+>  arch/powerpc/boot/dts/fsl/t4240si-pre.dtsi         |   24 +-
+>  arch/powerpc/platforms/85xx/mpc85xx_mds.c          |    2 +-
+>  arch/powerpc/platforms/85xx/mpc85xx_rdb.c          |    2 +-
+>  arch/powerpc/platforms/85xx/p1022_ds.c             |    2 +-
+>  arch/powerpc/platforms/85xx/p1022_rdk.c            |    2 +-
+>  arch/powerpc/platforms/85xx/smp.c                  |    2 +-
+>  arch/powerpc/platforms/85xx/twr_p102x.c            |    2 +-
+>  arch/powerpc/platforms/86xx/mpc8610_hpcd.c         |    2 +-
+>  drivers/clk/clk-qoriq.c                            | 1191 ++++++++++++++++----
+>  drivers/cpufreq/qoriq-cpufreq.c                    |  139 +--
+>  drivers/iommu/fsl_pamu.c                           |    2 +-
+>  .../asm/fsl_guts.h => include/linux/fsl/guts.h     |    6 +-
+>  sound/soc/fsl/mpc8610_hpcd.c                       |    2 +-
+>  sound/soc/fsl/p1022_ds.c                           |    2 +-
+>  sound/soc/fsl/p1022_rdk.c                          |    2 +-
+>  38 files changed, 1107 insertions(+), 776 deletions(-)
+>  rename arch/powerpc/include/asm/fsl_guts.h => include/linux/fsl/guts.h (98%)
+> 
+> -- 
+> 2.1.4
+> 
