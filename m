@@ -1,25 +1,30 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 10 Aug 2015 23:53:35 -0700
-Subject: [PATCH v8 10/13] arm: dts: qcom: Add #power-domain-cells property
-In-Reply-To: <1438857474-20262-11-git-send-email-rnayak@codeaurora.org>
-References: <1438857474-20262-1-git-send-email-rnayak@codeaurora.org>
- <1438857474-20262-11-git-send-email-rnayak@codeaurora.org>
-Message-ID: <20150811065335.GB2839@codeaurora.org>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 11 Aug 2015 08:58:15 +0200
+Subject: [PATCH v2 1/2] ARM: shmobile: r8a7794: add QSPI DT support
+In-Reply-To: <1540672.y3DTbtssP8@wasted.cogentembedded.com>
+References: <4187771.Fb49GBKgyg@wasted.cogentembedded.com>
+ <1540672.y3DTbtssP8@wasted.cogentembedded.com>
+Message-ID: <CAMuHMdVG3R3ThQWPM-tDHTcJZfFB+j3cFhdBNoH4=ZN7ENrXRg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/06, Rajendra Nayak wrote:
-> msm8974 has gcc and mmcc nodes, and apq8084 has a gcc node which
-> implement gdsc powerdomains. Add the #power-domain-cells property
-> to them.
-> 
-> Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
-> ---
+On Mon, Aug 10, 2015 at 11:59 PM, Sergei Shtylyov
+<sergei.shtylyov@cogentembedded.com> wrote:
+> Define the generic R8A7794 part of the QSPI device node.
+>
+> Based on original patch by Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>.
+>
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-This needs to go through  Andy's tree and arm-soc. Also, I don't
-see an update for the binding anywhere. Please update the binding
-too.
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
