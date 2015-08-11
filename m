@@ -1,92 +1,28 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 11 Aug 2015 12:24:56 +0100
-Subject: [PATCH] ARM: OMAP: irqdomain_hierarchy: fix arm gic irq type
- configuration
-In-Reply-To: <1439285147-20027-1-git-send-email-grygorii.strashko@ti.com>
-References: <1439285147-20027-1-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <20150811122456.1efe1656@arm.com>
+From: haibo.chen@freescale.com (Haibo Chen)
+Date: Tue, 11 Aug 2015 19:38:25 +0800
+Subject: [PATCH v6 0/6] mmc: imx: a few fixes and new feature
+Message-ID: <1439293111-21077-1-git-send-email-haibo.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 11 Aug 2015 10:25:47 +0100
-Grygorii Strashko <grygorii.strashko@ti.com> wrote:
+Changes for v6:
+-remove duplicate code in esdhc_set_uhs_signaling().
+-fix a typo for patch-2.
+-make commit log of patch-3 more specific.
 
-Hi Grygorii,
+Haibo Chen (6):
+  mmc: sdhci-esdhc-imx: add imx7d support and support HS400
+  mmc: sdhci-esdhc-imx: add tuning-step setting support
+  mmc: sdhci-esdhc-imx: add imx7d support in bingding doc
+  ARM: dts: imx7d-sdb: add eMMC5.0 support
+  mmc: sdhci-esdhc-imx: set back the burst_length_enable bit to 1
+  mmc: sdhci-esdhc-imx: change default watermark level and burst length
 
-> It's observed that ARM GIC IRQ triggering type is not configured
-> properly when IRQ is routed through IRQ domains hierarchy and
-> system started using DT. As result, system will start using default
-> ARM GIC configuration, ignore DT IRQ type configuration,
-> and value of desc->irq_data.state_use_accessors = 0.
-> 
-> In case of TI OMAP the following IRQ hierarchy is defined:
-> ARM GIC <- OMAP wakeupgen <- TI CBAR
-> 
-> Failed call chain:
->  irq_create_of_mapping
->  irq_set_irq_type
->  __irq_set_trigger
->  if (!chip || !chip->irq_set_type) {
->     return 0; <- return here
->  }
->  CBAR has no .irq_set_type() defined and, so, IRQ triggering
->  configuration will not be propagated to parent IRQ domain.
-> 
-> Hence, fix it by introducing irq_chip_set_type_parent(), in the
-> same manner as irq_chip_set_wake_parent(), and use it for IRQ 
-> triggering type propagation to the parent IRQ domain in
-> irq-crossbar and omap-wakeupgen.
-> 
-> / # cat /proc/interrupts -- before
-> 230:          0          0      CBAR  30 Edge    -00000000  48051000.gpio
-> 263:          0          0      CBAR 116 Edge    -00000000  48053000.gpio
-> 296:        246          0      CBAR  67 Edge    -00000000  OMAP UART0
-> 311:        341          0      CBAR  51 Edge    -00000000  48070000.i2c
-> 312:          3          0      CBAR  52 Edge    -00000000  48072000.i2c
-> 313:          0          0      CBAR  56 Edge    -00000000  48060000.i2c
-> 314:        255          0      CBAR  78 Edge    -00000000  mmc0
-> 315:         40          0      CBAR  81 Edge    -00000000  mmc1
-> 316:         13          0      CBAR  91 Edge    -00000000  mmc2
-> 320:          0          0      CBAR  49 Edge    -00000000  4a140000.sata
-> 324:          0          0      CBAR   1 Edge    -00000000  48078000.elm
-> 325:          0          0      CBAR  15 Edge    -00000000  gpmc
-> 333:          0          0      CBAR 335 Edge    -00000000  48484000.ethernet
-> 334:          0          0      CBAR 336 Edge    -00000000  48484000.ethernet
-> 415:          0          0   pcf857x   2 Edge    -00000000  btnUser1
-> 416:          0          0   pcf857x   3 Edge    -00000000  btnUser2
-> 445:          0          0   pinctrl 992 Edge    -00010000  4806a000.seria
-> 
-> / # cat /proc/interrupts -- after
-> 230:          0          0      CBAR  30 Level   -00002004  48051000.gpio
-> 263:          0          0      CBAR 116 Level   -00002004  48053000.gpio
-> 296:        567          0      CBAR  67 Level   -00002004  OMAP UART0
-> 311:        363          0      CBAR  51 Level   -00002004  48070000.i2c
-> 312:          3          0      CBAR  52 Level   -00002004  48072000.i2c
-> 313:          0          0      CBAR  56 Level   -00002004  48060000.i2c
-> 314:        197          0      CBAR  78 Level   -00002004  mmc0
-> 315:         40          0      CBAR  81 Level   -00002004  mmc1
-> 316:         13          0      CBAR  91 Level   -00002004  mmc2
-> 320:          0          0      CBAR  49 Level   -00002004  4a140000.sata
-> 324:          0          0      CBAR   1 Level   -00002004  48078000.elm
-> 325:          0          0      CBAR  15 Level   -00002004  gpmc
-> 333:          0          0      CBAR 335 Level   -00002004  48484000.ethernet
-> 334:          0          0      CBAR 336 Level   -00002004  48484000.ethernet
-> 415:          0          0   pcf857x   2 Edge    -00000000  btnUser1
-> 416:          4          2   pcf857x   3 Edge    -00000000  btnUser2
-> 445:          0          0   pinctrl 992 Edge    -00010000  4806a000.serial
-> 
-> Fixes: 783d31863fb8 ('irqchip: crossbar: Convert dra7 crossbar to stacked domains')
-> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-> ---
-> Hi All,
-> 
-> I can split patch if required and overall solution acceptable.
+ .../devicetree/bindings/mmc/fsl-imx-esdhc.txt      |   6 ++
+ arch/arm/boot/dts/imx7d-sdb.dts                    |  13 +++
+ drivers/mmc/host/sdhci-esdhc-imx.c                 | 114 ++++++++++++++++++++-
+ include/linux/platform_data/mmc-esdhc-imx.h        |   1 +
+ 4 files changed, 130 insertions(+), 4 deletions(-)
 
-This looks good to me. Please repost it after splitting it in two
-patches.
-
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny.
+1.9.1
