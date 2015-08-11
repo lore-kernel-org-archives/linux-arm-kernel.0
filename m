@@ -1,53 +1,37 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 11 Aug 2015 10:30:39 +0100
-Subject: [PATCH v4 2/2] dt: power: st: Provide bindings for ST's OPPs
-In-Reply-To: <20150811080023.GB5509@linux>
-References: <20150728022936.GB1229@linux>
- <20150728225510.GB3159@codeaurora.org> <20150729081403.GH2284@x1>
- <20150729221526.GE3159@codeaurora.org> <20150730084634.GD9319@x1>
- <CAL_JsqKQLQ15qSt95zBZykzzPhcUrtZzhk29a76n+r_3719AiA@mail.gmail.com>
- <20150731163715.GV3159@codeaurora.org> <20150803034642.GV899@linux>
- <20150810132247.GH3249@x1> <20150811080023.GB5509@linux>
-Message-ID: <20150811093039.GA18282@x1>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Tue, 11 Aug 2015 11:37:42 +0200
+Subject: [PATCH v5 1/3] iommu: Implement common IOMMU ops for DMA mapping
+In-Reply-To: <55C4B4DF.4040608@arm.com>
+References: <cover.1438362603.git.robin.murphy@arm.com>
+ <6ce6b501501f611297ae0eae31e07b0d2060eaae.1438362603.git.robin.murphy@arm.com>
+ <20150807084228.GU14980@8bytes.org> <55C4B4DF.4040608@arm.com>
+Message-ID: <20150811093742.GC14980@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 11 Aug 2015, Viresh Kumar wrote:
+On Fri, Aug 07, 2015 at 02:38:39PM +0100, Robin Murphy wrote:
+> Indeed, DMA_DEBUG will check that a driver is making DMA API calls
+> to the arch code in the right way; this is a different check, to
+> catch things like the arch code passing the wrong domain into this
+> layer, or someone else having messed directly with the domain via
+> the IOMMU API. If the iommu_unmap doesn't match the IOVA region we
+> looked up, that means the IOMMU page tables have somehow become
+> inconsistent with the IOVA allocator, so we are in an unrecoverable
+> situation where we can no longer be sure what devices have access
+> to. That's bad.
 
-> On 10-08-15, 14:22, Lee Jones wrote:
-> > >  Optional properties:
-> > > +- opp-cuts: One or more strings, describing the versions of hardware the OPPs
-> > > +  can support.
-> > 
-> > This isn't very generic.
-> > 
-> > I'm guessing some vendors my have quite a few ways to differentiate
-> > between board versions/revisions/cuts etc.
-> > 
-> > How about another array where a vendor can choose to identify a piece
-> > of hardware however they see fit.
-> > 
-> > Example 1 (simple version):
-> > 
-> > /* Version 1 */
-> > opp-version = <1>;
-> > 
-> > Example 2 (using the kernel's versioning):
-> > 
-> > /* 2.6.32-rc1 */
-> > opp-version = <2 6 32 1>;
-> > 
-> > Example 3 (using ST's versioning):
-> > 
-> > /* Major 2, Minor 0, Cut 2, All substrates */
-> > opp-version = <2 0 2 0xff>;
-> 
-> But how will we parse this with generic code ?
+Sure, but the BUG_ON would also trigger on things like a double-free,
+which is bad to handle as a BUG_ON. A WARN_ON for this is sufficient.
 
-Why would you want to?
+> AFAIK, yes (this is just a slight tidyup of the existing code that
+> 32-bit Exynos/Tegra/Rockchip/etc. devices are already using) - the
+> display guys want increasingly massive contiguous allocations for
+> framebuffers, layers, etc., so having IOMMU magic deal with that
+> saves CMA for non-IOMMU devices that really need it.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Makes sense, I thougt about something similar for x86 too to avoid the
+high-order allocations we currently do. I guess the buffer will later be
+mapped into the vmalloc space for the CPU?
+
+
+	Joerg
