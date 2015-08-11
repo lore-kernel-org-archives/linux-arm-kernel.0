@@ -1,30 +1,63 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Tue, 11 Aug 2015 10:28:05 +0200
-Subject: [PATCH 5/5] ARM: at91/defconfig: sama5: add PIO4 controller support
-In-Reply-To: <1439281685-3020-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1439281685-3020-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <1439281685-3020-6-git-send-email-ludovic.desroches@atmel.com>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Tue, 11 Aug 2015 16:32:38 +0800
+Subject: [PATCH v2 1/2] i2c: mediatek: Reset DMA engine in hardware init
+ function
+In-Reply-To: <1438845731-17805-2-git-send-email-eddie.huang@mediatek.com>
+References: <1438845731-17805-1-git-send-email-eddie.huang@mediatek.com>
+ <1438845731-17805-2-git-send-email-eddie.huang@mediatek.com>
+Message-ID: <CAGS+omAXRz5obq3si1tOdT5JSLB6m8XcdaN2VGpaLbuqMyqVGw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SAMA5D2 chip family has a new PIO controller.
+On Thu, Aug 6, 2015 at 3:22 PM, Eddie Huang <eddie.huang@mediatek.com> wrote:
+> Reset DMA in hardware init function to avoid unknown hardware state
+> before do any I2C operation.
+>
+> Signed-off-by: Liguo Zhang <liguo.zhang@mediatek.com>
+> Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
----
- arch/arm/mach-at91/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
 
-diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-index 89a755b..9e4067c 100644
---- a/arch/arm/mach-at91/Kconfig
-+++ b/arch/arm/mach-at91/Kconfig
-@@ -5,6 +5,7 @@ menuconfig ARCH_AT91
- 	select COMMON_CLK_AT91
- 	select PINCTRL
- 	select PINCTRL_AT91
-+	select PINCTRL_AT91PIO4
- 	select SOC_BUS
- 
- if ARCH_AT91
--- 
-2.5.0
+> ---
+>  drivers/i2c/busses/i2c-mt65xx.c |    6 ++++++
+>  1 file changed, 6 insertions(+)
+>
+> diff --git a/drivers/i2c/busses/i2c-mt65xx.c b/drivers/i2c/busses/i2c-mt65xx.c
+> index 9920eef..e28ad4c 100644
+> --- a/drivers/i2c/busses/i2c-mt65xx.c
+> +++ b/drivers/i2c/busses/i2c-mt65xx.c
+> @@ -59,6 +59,7 @@
+>  #define I2C_DMA_START_EN               0x0001
+>  #define I2C_DMA_INT_FLAG_NONE          0x0000
+>  #define I2C_DMA_CLR_FLAG               0x0000
+> +#define I2C_DMA_HARD_RST               0x0002
+>
+>  #define I2C_DEFAULT_SPEED              100000  /* hz */
+>  #define MAX_FS_MODE_SPEED              400000
+> @@ -81,6 +82,7 @@ enum DMA_REGS_OFFSET {
+>         OFFSET_INT_FLAG = 0x0,
+>         OFFSET_INT_EN = 0x04,
+>         OFFSET_EN = 0x08,
+> +       OFFSET_RST = 0x0c,
+>         OFFSET_CON = 0x18,
+>         OFFSET_TX_MEM_ADDR = 0x1c,
+>         OFFSET_RX_MEM_ADDR = 0x20,
+> @@ -262,6 +264,10 @@ static void mtk_i2c_init_hw(struct mtk_i2c *i2c)
+>                       I2C_CONTROL_CLK_EXT_EN | I2C_CONTROL_DMA_EN;
+>         writew(control_reg, i2c->base + OFFSET_CONTROL);
+>         writew(I2C_DELAY_LEN, i2c->base + OFFSET_DELAY_LEN);
+> +
+> +       writel(I2C_DMA_HARD_RST, i2c->pdmabase + OFFSET_RST);
+> +       udelay(50);
+> +       writel(I2C_DMA_CLR_FLAG, i2c->pdmabase + OFFSET_RST);
+>  }
+>
+>  /*
+> --
+> 1.7.9.5
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
