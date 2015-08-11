@@ -1,36 +1,43 @@
 From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Tue, 11 Aug 2015 10:28:03 +0200
-Subject: [PATCH 3/5] MAINTAINERS: Add an entry for pinctrl-at91-pio4
+Date: Tue, 11 Aug 2015 10:28:04 +0200
+Subject: [PATCH 4/5] ARM: at91/dt: sama5d2: add pio controller node
 In-Reply-To: <1439281685-3020-1-git-send-email-ludovic.desroches@atmel.com>
 References: <1439281685-3020-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <1439281685-3020-4-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <1439281685-3020-5-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add an entry for the Atmel PIO4 controller driver.
+Add pio4 controller node to enable pinmux and gpio.
 
 Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 ---
- MAINTAINERS | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm/boot/dts/sama5d2.dtsi | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 8b37fdf..62c243a 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -8041,6 +8041,13 @@ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
- F:	drivers/pinctrl/pinctrl-at91.*
- 
-+PIN CONTROLLER - ATMEL AT91 PIO4
-+M:	Ludovic Desroches <ludovic.desroches@atmel.com>
-+L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-+L:	linux-gpio at vger.kernel.org
-+S:	Supported
-+F:	drivers/pinctrl/pinctrl-at91-pio4.*
+diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
+index f39258f..55df0ae 100644
+--- a/arch/arm/boot/dts/sama5d2.dtsi
++++ b/arch/arm/boot/dts/sama5d2.dtsi
+@@ -920,6 +920,20 @@
+ 				clocks = <&twi1_clk>;
+ 				status = "disabled";
+ 			};
 +
- PIN CONTROLLER - INTEL
- M:	Mika Westerberg <mika.westerberg@linux.intel.com>
- M:	Heikki Krogerus <heikki.krogerus@linux.intel.com>
++			pioA: pinctrl at fc038000 {
++				compatible = "atmel,sama5d2-pinctrl";
++				reg = <0xfc038000 0x600>;
++				interrupts = <18 IRQ_TYPE_LEVEL_HIGH 7>,
++					     <68 IRQ_TYPE_LEVEL_HIGH 7>,
++					     <69 IRQ_TYPE_LEVEL_HIGH 7>,
++					     <70 IRQ_TYPE_LEVEL_HIGH 7>;
++				interrupt-controller;
++				#interrupt-cells = <2>;
++				gpio-controller;
++				#gpio-cells = <2>;
++				clocks = <&pioA_clk>;
++			};
+ 		};
+ 	};
+ };
 -- 
 2.5.0
