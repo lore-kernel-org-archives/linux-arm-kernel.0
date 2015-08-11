@@ -1,93 +1,37 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 11 Aug 2015 11:38:01 +0200
-Subject: [PATCH v3 1/4] watchdog: at91sam9: get and use slow clock
+Date: Tue, 11 Aug 2015 11:38:03 +0200
+Subject: [PATCH v3 3/4] clocksource: tcb_clksrc: fix setup_clkevents error path
 In-Reply-To: <1439285884-16051-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1439285884-16051-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1439285884-16051-2-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1439285884-16051-4-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit dca1a4b5ff6e ("clk: at91: keep slow clk enabled to prevent system
-hang") added a workaround for the slow clock as it is not properly handled
-by its users.
+From: Boris Brezillon <boris.brezillon@free-electrons.com>
 
-Get and use the slow clock as it is necessary for the at91sam9 watchdog.
+t2_clk is already disabled before request_irq(), it must not be disabled
+again.
 
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Reviewed-by: Guenter Roeck <linux@roeck-us.net>
 ---
-Cc: Wim Van Sebroeck <wim@iguana.be>
-Cc: linux-watchdog at vger.kernel.org
- drivers/watchdog/at91sam9_wdt.c | 22 ++++++++++++++++++++--
- 1 file changed, 20 insertions(+), 2 deletions(-)
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+ drivers/clocksource/tcb_clksrc.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/watchdog/at91sam9_wdt.c b/drivers/watchdog/at91sam9_wdt.c
-index e4698f7c5f93..7e6acaf3ece4 100644
---- a/drivers/watchdog/at91sam9_wdt.c
-+++ b/drivers/watchdog/at91sam9_wdt.c
-@@ -17,6 +17,7 @@
+diff --git a/drivers/clocksource/tcb_clksrc.c b/drivers/clocksource/tcb_clksrc.c
+index 8bdbc45c6dad..b9b7277173c2 100644
+--- a/drivers/clocksource/tcb_clksrc.c
++++ b/drivers/clocksource/tcb_clksrc.c
+@@ -199,7 +199,7 @@ static int __init setup_clkevents(struct atmel_tc *tc, int clk32k_divisor_idx)
  
- #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
- 
-+#include <linux/clk.h>
- #include <linux/errno.h>
- #include <linux/init.h>
- #include <linux/interrupt.h>
-@@ -90,6 +91,7 @@ struct at91wdt {
- 	unsigned long heartbeat;	/* WDT heartbeat in jiffies */
- 	bool nowayout;
- 	unsigned int irq;
-+	struct clk *sclk;
- };
- 
- /* ......................................................................... */
-@@ -352,15 +354,25 @@ static int __init at91wdt_probe(struct platform_device *pdev)
- 	if (IS_ERR(wdt->base))
- 		return PTR_ERR(wdt->base);
- 
-+	wdt->sclk = devm_clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(wdt->sclk))
-+		return PTR_ERR(wdt->sclk);
-+
-+	err = clk_prepare_enable(wdt->sclk);
-+	if (err) {
-+		dev_err(&pdev->dev, "Could not enable slow clock\n");
-+		return err;
-+	}
-+
- 	if (pdev->dev.of_node) {
- 		err = of_at91wdt_init(pdev->dev.of_node, wdt);
- 		if (err)
--			return err;
-+			goto err_clk;
+ 	ret = request_irq(irq, ch2_irq, IRQF_TIMER, "tc_clkevt", &clkevt);
+ 	if (ret) {
+-		clk_disable_unprepare(t2_clk);
++		clk_unprepare(t2_clk);
+ 		return ret;
  	}
  
- 	err = at91_wdt_init(pdev, wdt);
- 	if (err)
--		return err;
-+		goto err_clk;
- 
- 	platform_set_drvdata(pdev, wdt);
- 
-@@ -368,6 +380,11 @@ static int __init at91wdt_probe(struct platform_device *pdev)
- 		wdt->wdd.timeout, wdt->nowayout);
- 
- 	return 0;
-+
-+err_clk:
-+	clk_disable_unprepare(wdt->sclk);
-+
-+	return err;
- }
- 
- static int __exit at91wdt_remove(struct platform_device *pdev)
-@@ -377,6 +394,7 @@ static int __exit at91wdt_remove(struct platform_device *pdev)
- 
- 	pr_warn("I quit now, hardware will probably reboot!\n");
- 	del_timer(&wdt->timer);
-+	clk_disable_unprepare(wdt->sclk);
- 
- 	return 0;
- }
 -- 
 2.1.4
