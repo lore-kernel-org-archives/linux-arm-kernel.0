@@ -1,51 +1,52 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 11 Aug 2015 13:00:06 +0900
-Subject: [PATCH v4] dtb: Create a common home for cross-architecture dtsi
- files.
-In-Reply-To: <1438617993-1012-1-git-send-email-ian.campbell@citrix.com>
-References: <1438617993-1012-1-git-send-email-ian.campbell@citrix.com>
-Message-ID: <CAK7LNARyEbnOWTis0Nx9zwTcwH_s3GZKg2XYG3+zLnf=FhhctA@mail.gmail.com>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Tue, 11 Aug 2015 12:28:41 +0800
+Subject: [PATCH v2 2/2] watchdog: add wdt shutdown callback to disable wdt
+ if enabled
+In-Reply-To: <1488521.5eJqASov2O@ubix>
+References: <1437630551-39650-1-git-send-email-eddie.huang@mediatek.com>
+ <1437630551-39650-3-git-send-email-eddie.huang@mediatek.com>
+ <1488521.5eJqASov2O@ubix>
+Message-ID: <CAGS+omD1UYSTfJ4-vZSE_BYuvGcTvpbC7T4ukaV10xuQxkCChg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+Hi Guenter, Matthias,
 
-2015-08-04 1:06 GMT+09:00 Ian Campbell <ian.campbell@citrix.com>:
-> Commit 9ccd608070b6 ("arm64: dts: add device tree for ARM SMM-A53x2 on
-> LogicTile Express 20MG") added a new dts file to arch/arm64 which
-> included "../../../../arm/boot/dts/vexpress-v2m-rs1.dtsi", i.e. a
-> .dtsi supplied by arch/arm.
+On Fri, Jul 24, 2015 at 1:37 AM, Matthias Brugger
+<matthias.bgg@gmail.com> wrote:
+> On Thursday, July 23, 2015 01:49:11 PM Eddie Huang wrote:
+>> From: Greta Zhang <greta.zhang@mediatek.com>
+>>
+>> Without .shutdown(), watchdog might reset the system during power off.
+>> For example, if watchdog's timeout is set to 30s, then it is reset to
+>> zero by mtk_wdt_ping(). During power off, no app will ping watchdog,
+>> but watchdog is still running and may trigger reset.
+>>
+>> Signed-off-by: Greta Zhang <greta.zhang@mediatek.com>
+>> Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
+>> ---
+>>  drivers/watchdog/mtk_wdt.c | 9 +++++++++
+>>  1 file changed, 9 insertions(+)
 >
-> Unfortunately this causes some issues for the split device tree
-> repository[0], since things get moved around there. In that context
-> the new .dts ends up at src/arm64/arm/vexpress-v2f-1xv7-ca53x2.dts
-> while the include is at src/arm/vexpress-v2m-rs1.dtsi.
->
-> The sharing of the .dtsi is legitimate since the baseboard is the same
-> for various vexpress systems whatever processor they use.
->
-> Rather than using ../../ tricks to pickup .dtsi files from another
-> arch this patch creates a new directory kernel/dts as a home for such
-> cross-arch .dtsi files and arranges for it to be in the include path
-> for both dtc and cpp. The dtsi file itself is moved into a vendor
-> subdir in this case "arm" (the vendor, not the ARCH=).
+> Acked-by: Matthias Brugger <matthias.bgg@gmail.com>
 
+is the plan to land these two patches via Guenter's watchdog tree [0]?
+[0] git://www.linux-watchdog.org/linux-watchdog.git
 
-Question:
-If this patch is applied, which directory will be created in
-device-tree-rebasing?
-src/kernel/, src/common/, or something else?
-Either will do, of course.
+In fact, though, I don't see any new patches in that repository.
+The only branches I see are:
+  remotes/wdog/master                                      b953c0d Linux 4.1
+  remotes/wdog/winbond-superio                             dc89871
+Sample Winbond Super-I/O MFD device consisting out of a lowel-level
+driver that does the detection and creates the platform-data and a
+watchdog driver.
 
+Am I looking in the wrong place?
 
-Another nit:
-I just noticed a period at the end of the commit subject.
-Re-post would not be needed only for such a minor thing,
-but please try best to remember to drop it when this patch is applied.
+-Dan
 
-
-
-
--- 
-Best Regards
-Masahiro Yamada
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
