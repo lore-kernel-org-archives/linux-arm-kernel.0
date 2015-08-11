@@ -1,84 +1,53 @@
 From: jszhang@marvell.com (Jisheng Zhang)
-Date: Tue, 11 Aug 2015 10:44:06 +0800
-Subject: [PATCH 2/3] ARM: berlin: register cpufreq-dt for the BG2Q
-In-Reply-To: <55C90814.3050505@gmail.com>
-References: <1438259752-16320-1-git-send-email-antoine.tenart@free-electrons.com>
- <1438259752-16320-3-git-send-email-antoine.tenart@free-electrons.com>
- <20150731141602.28b28f21@xhacker>	<55C90814.3050505@gmail.com>
-Message-ID: <20150811104406.77e0a264@xhacker>
+Date: Tue, 11 Aug 2015 10:46:50 +0800
+Subject: [PATCH v2 4/5] ARM: berlin: add a PWM node on the BG2
+In-Reply-To: <55C900D0.9060606@gmail.com>
+References: <1438248201-29222-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1438248201-29222-5-git-send-email-antoine.tenart@free-electrons.com>
+ <55C900D0.9060606@gmail.com>
+Message-ID: <20150811104650.0e19ba41@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Dear Sebastian,
 
-On Mon, 10 Aug 2015 22:22:44 +0200
+On Mon, 10 Aug 2015 21:51:44 +0200
 Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
 
-> On 31.07.2015 08:16, Jisheng Zhang wrote:
-> > On Thu, 30 Jul 2015 14:35:51 +0200
-> > Antoine Tenart <antoine.tenart@free-electrons.com> wrote:
+> On 30.07.2015 11:23, Antoine Tenart wrote:
+> > This patch adds a PWM node in the Berlin BG2 device tree, using the
+> > newly added Berlin PWM driver.
 > >
-> >> The BG2Q SoC uses cpufreq-dt for cpufreq. Register a platform device for
-> >> this.
-> >>
-> >> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-> >> ---
-> [...]
-> >> diff --git a/arch/arm/mach-berlin/berlin.c b/arch/arm/mach-berlin/berlin.c
-> >> index ac181c6797ee..0de906374994 100644
-> >> --- a/arch/arm/mach-berlin/berlin.c
-> >> +++ b/arch/arm/mach-berlin/berlin.c
-> >> @@ -15,9 +15,21 @@
-> [...]
-> >> +static void __init berlin_init_late(void)
-> >> +{
-> >> +	if (of_find_matching_node(NULL, berlin2q_match))
-> >> +		platform_device_register_simple("cpufreq-dt", -1, NULL, 0);
+> > Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+> > ---
+> >   arch/arm/boot/dts/berlin2.dtsi | 6 ++++++
+> >   1 file changed, 6 insertions(+)
 > >
-> > I'm not sure is it acceptable to always register cpufreq-dt platform device.
-> > In cpufreq-dt driver, the probe will exit if there's no cpuclk node.
+> > diff --git a/arch/arm/boot/dts/berlin2.dtsi b/arch/arm/boot/dts/berlin2.dtsi
+> > index ef811de09908..e17bd5faed27 100644
+> > --- a/arch/arm/boot/dts/berlin2.dtsi
+> > +++ b/arch/arm/boot/dts/berlin2.dtsi
+> > @@ -512,5 +512,11 @@
+> >   				interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
+> >   			};
+> >   		};
+> > +
+> > +		pwm: pwm at f20000 {
+> > +			compatible = "marvell,berlin-pwm";
+> > +			reg = <0xf20000 0x40>;
+> > +			#pwm-cells = <3>;
+> > +		};
 > 
-> Jisheng,
+> I only checked berlin2.dtsi:
+> The top most line with <GIC_SPI 15 ...> belongs to a sub-node of
+> apb at fc0000 - which means that the pwm node isn't sorted in by
+> address. Please sort the nodes by address in all three DT patches.
 > 
-> registering the _device_ without checking for any requirements of
-> the _driver_ is usual practice. It it the driver's job to check
-> all of them and report an error or warning. So, I am fine with
-> adding the device unconditionally.
-> 
-> Using the .init_late() callback seems reasonable - but can you
-> evaluate if we can have cpufreq-dt also for BG2/BG2CD? I'd also
-> accept a single, default operating-point.
+> BTW, is there any IRQ from the PWM IP routed to any intc upstream?
+> A quick look into some BSP code does not reveal any hints maybe
+> one of the Marvell guys can comment on it.
 
-hmm, if so, we can enable cpufreq-dt for BG2/BG2CD. In fact, there's no any
-problem if we don't touch the voltage, only changing the cpufreq should not
-introduce stable issues.
+There's no interrupt for the PWM in all berlin SoCs ;)
 
-> 
-> BTW, there is one true point about Jisheng's comment: try to order
-> your patches logically correct to avoid unnecessary warnings, i.e.
-> 
-> 1/3 add cpuclk
-> 2/3 add cpufreq-dt properties
-> 3/3 register cpufreq-dt device
-> 
-> If you consider a git-bisect run, you can land in between any of the
-> three patches but they are always in the above order - so ordering is
-> important.
-> 
-> Sebastian
-> 
-> >> +}
-> >> +
-> >>   static const char * const berlin_dt_compat[] = {
-> >>   	"marvell,berlin",
-> >>   	NULL,
-> >> @@ -25,6 +37,7 @@ static const char * const berlin_dt_compat[] = {
-> >>
-> >>   DT_MACHINE_START(BERLIN_DT, "Marvell Berlin")
-> >>   	.dt_compat	= berlin_dt_compat,
-> >> +	.init_late	= berlin_init_late,
-> >>   	/*
-> >>   	 * with DT probing for L2CCs, berlin_init_machine can be removed.
-> >>   	 * Note: 88DE3005 (Armada 1500-mini) uses pl310 l2cc
-> >
-> 
+Thanks,
+Jisheng
