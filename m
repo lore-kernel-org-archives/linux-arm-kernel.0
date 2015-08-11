@@ -1,33 +1,42 @@
-From: ryabinin.a.a@gmail.com (Andrey Ryabinin)
-Date: Tue, 11 Aug 2015 19:30:42 +0300
-Subject: [PATCH v5 2/6] x86/kasan, mm: introduce generic
- kasan_populate_zero_shadow()
-In-Reply-To: <20150811154117.GH23307@e104818-lin.cambridge.arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 11 Aug 2015 17:37:10 +0100
+Subject: [PATCH v5 5/6] arm64: add KASAN support
+In-Reply-To: <1439259499-13913-6-git-send-email-ryabinin.a.a@gmail.com>
 References: <1439259499-13913-1-git-send-email-ryabinin.a.a@gmail.com>
- <1439259499-13913-3-git-send-email-ryabinin.a.a@gmail.com>
- <20150811154117.GH23307@e104818-lin.cambridge.arm.com>
-Message-ID: <55CA2332.7040206@gmail.com>
+ <1439259499-13913-6-git-send-email-ryabinin.a.a@gmail.com>
+Message-ID: <20150811163709.GI23307@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 08/11/2015 06:41 PM, Catalin Marinas wrote:
-> On Tue, Aug 11, 2015 at 05:18:15AM +0300, Andrey Ryabinin wrote:
->> --- /dev/null
->> +++ b/mm/kasan/kasan_init.c
-> [...]
->> +#if CONFIG_PGTABLE_LEVELS > 3
->> +pud_t kasan_zero_pud[PTRS_PER_PUD] __page_aligned_bss;
->> +#endif
->> +#if CONFIG_PGTABLE_LEVELS > 2
->> +pmd_t kasan_zero_pmd[PTRS_PER_PMD] __page_aligned_bss;
->> +#endif
->> +pte_t kasan_zero_pte[PTRS_PER_PTE] __page_aligned_bss;
+On Tue, Aug 11, 2015 at 05:18:18AM +0300, Andrey Ryabinin wrote:
+> This patch adds arch specific code for kernel address sanitizer
+> (see Documentation/kasan.txt).
 > 
-> Is there any problem if you don't add the #ifs here? Wouldn't the linker
-> remove them if they are not used?
+> 1/8 of kernel addresses reserved for shadow memory. There was no
+> big enough hole for this, so virtual addresses for shadow were
+> stolen from vmalloc area.
 > 
+> At early boot stage the whole shadow region populated with just
+> one physical page (kasan_zero_page). Later, this page reused
+> as readonly zero shadow for some memory that KASan currently
+> don't track (vmalloc).
+> After mapping the physical memory, pages for shadow memory are
+> allocated and mapped.
+> 
+> Functions like memset/memmove/memcpy do a lot of memory accesses.
+> If bad pointer passed to one of these function it is important
+> to catch this. Compiler's instrumentation cannot do this since
+> these functions are written in assembly.
+> KASan replaces memory functions with manually instrumented variants.
+> Original functions declared as weak symbols so strong definitions
+> in mm/kasan/kasan.c could replace them. Original functions have aliases
+> with '__' prefix in name, so we could call non-instrumented variant
+> if needed.
+> Some files built without kasan instrumentation (e.g. mm/slub.c).
+> Original mem* function replaced (via #define) with prefixed variants
+> to disable memory access checks for such files.
+> 
+> Signed-off-by: Andrey Ryabinin <ryabinin.a.a@gmail.com>
+> Tested-by: Linus Walleij <linus.walleij@linaro.org>
 
-AFAIK such optimization is possible if we build with -fdata-sections flag and
-use --gc-sections flag in linker, but we don't do this.
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
