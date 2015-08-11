@@ -1,91 +1,34 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 11 Aug 2015 19:58:12 +0530
-Subject: [PATCH v4 2/2] dt: power: st: Provide bindings for ST's OPPs
-In-Reply-To: <20150811132756.GG18282@x1>
-References: <CAL_JsqKQLQ15qSt95zBZykzzPhcUrtZzhk29a76n+r_3719AiA@mail.gmail.com>
- <20150731163715.GV3159@codeaurora.org> <20150803034642.GV899@linux>
- <20150810132247.GH3249@x1> <20150811080023.GB5509@linux>
- <20150811093039.GA18282@x1> <20150811100941.GG5509@linux>
- <20150811115425.GE18282@x1> <20150811120124.GH5509@linux>
- <20150811132756.GG18282@x1>
-Message-ID: <20150811142812.GJ5509@linux>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Tue, 11 Aug 2015 15:32:33 +0100
+Subject: [PATCH] ARM: make highpte an expert option
+Message-ID: <E1ZPAbR-00005g-Op@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11-08-15, 14:27, Lee Jones wrote:
-> Okay, so what you're saying is that you've already made the decision
-> to create a separate node for every OPP permutation,
+When highmem is enabled, there's little reason not to also enable
+highpte support as well.  Rather than leaving this to chance, make
+it an expert option, and default it to be enabled if highmem is
+enabled.
 
-Absolutely not.
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/Kconfig | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-> despite the fact
-> that I've told you this could lead to more nodes than anyone would
-> care to successfully write or maintain?
-
-I have enough fear of yours and then I have to see you in another
-month as well. I wouldn't dare to disobey your command SIR :)
-
-> Perhaps an example might help explain the issue.
-> 
-> Using the current driver, we need to place the following in DT and the
-> driver does the rest:
-> 
-> opp-list {
-> 	opp1 {
-> 		opp-hz = <1500000000>;
-> 		st,avs = <1200 1200 1200 1200 1170 1140 1100 1070>;
-> 		st,substrate = <0xff>;
-> 		st,cuts = <0xff>;
-> 	};
-> 	opp0 {
-> 		opp-hz = <1200000000>;
-> 		st,avs = <1110 1150 1100 1080 1040 1020 980 930>;
-> 		st,substrate = <0xff>;
-> 		st,cuts = <0x2>;
-> 	};
-> };
-
-Nothing is fixed as of now but this is what I am thinking of:
-
-	cpu0_opp_table: opp_table0 {
-		compatible = "operating-points-v2";
-                opp-cuts = "10", "3c", "f0";
-		supply-names = "vcc0", "vcc1", "vcc2";
-		opp-shared;
-
-		opp00 {
-			opp-hz = /bits/ 64 <1000000000>;
-			clock-latency-ns = <300000>;
-			opp-microvolt-10 = <970000>;
-			opp-microvolt-3c = <950000>;
-			opp-microvolt-f0 = <930000>;
-		};
-
-		/* OR */
-
-		opp00 {
-			opp-hz = /bits/ 64 <1000000000>;
-			clock-latency-ns = <300000>;
-                        opp-microvolt = <970000>, <950000>, <930000>;
-		};
-        };
-
-And then the platform code needs to tell OPP layer:
-"Use OPPs for cut f0 for device X", and OPP layer will store that
-somewhere.
-
-And then it will only initialize OPPs after matching this string with
-the values.
-
-Out of the earlier two options, I may prefer the first one. As we will
-be soon adding support for multiple regulators, and a single regulator
-can have min/max/target values.. So, a single list will become too
-long.
-
-But, something like this should be generic enough to capture most of
-the cases.
-
-@Stephen/Rob ??
-
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index adf2412ba4d4..f418885d9c3d 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1708,8 +1708,9 @@ config HIGHMEM
+ 	  If unsure, say n.
+ 
+ config HIGHPTE
+-	bool "Allocate 2nd-level pagetables from highmem"
++	bool "Allocate 2nd-level pagetables from highmem" if EXPERT
+ 	depends on HIGHMEM
++	default y
+ 	help
+ 	  The VM uses one page of physical memory for each page table.
+ 	  For systems with a lot of processes, this can use a lot of
 -- 
-viresh
+2.1.0
