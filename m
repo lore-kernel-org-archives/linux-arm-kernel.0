@@ -1,99 +1,51 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Tue, 11 Aug 2015 12:46:24 +0900
-Subject: [PATCH 4/4] ARM: dts: Add MSHC2 dt node for Exynos3250 SoC
-In-Reply-To: <1439264784-30322-1-git-send-email-cw00.choi@samsung.com>
-References: <1439264784-30322-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1439264784-30322-5-git-send-email-cw00.choi@samsung.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Tue, 11 Aug 2015 13:00:06 +0900
+Subject: [PATCH v4] dtb: Create a common home for cross-architecture dtsi
+ files.
+In-Reply-To: <1438617993-1012-1-git-send-email-ian.campbell@citrix.com>
+References: <1438617993-1012-1-git-send-email-ian.campbell@citrix.com>
+Message-ID: <CAK7LNARyEbnOWTis0Nx9zwTcwH_s3GZKg2XYG3+zLnf=FhhctA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add the MSHC2 (Mobile Storage Host Controller) devicetree node for
-Exynos3250 SoC.
+Hi
 
-Cc: Kukjin Kim <kgene@kernel.org>
-Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
----
- arch/arm/boot/dts/exynos3250-pinctrl.dtsi | 35 +++++++++++++++++++++++++++++++
- arch/arm/boot/dts/exynos3250.dtsi         | 13 ++++++++++++
- 2 files changed, 48 insertions(+)
+2015-08-04 1:06 GMT+09:00 Ian Campbell <ian.campbell@citrix.com>:
+> Commit 9ccd608070b6 ("arm64: dts: add device tree for ARM SMM-A53x2 on
+> LogicTile Express 20MG") added a new dts file to arch/arm64 which
+> included "../../../../arm/boot/dts/vexpress-v2m-rs1.dtsi", i.e. a
+> .dtsi supplied by arch/arm.
+>
+> Unfortunately this causes some issues for the split device tree
+> repository[0], since things get moved around there. In that context
+> the new .dts ends up at src/arm64/arm/vexpress-v2f-1xv7-ca53x2.dts
+> while the include is at src/arm/vexpress-v2m-rs1.dtsi.
+>
+> The sharing of the .dtsi is legitimate since the baseboard is the same
+> for various vexpress systems whatever processor they use.
+>
+> Rather than using ../../ tricks to pickup .dtsi files from another
+> arch this patch creates a new directory kernel/dts as a home for such
+> cross-arch .dtsi files and arranges for it to be in the include path
+> for both dtc and cpp. The dtsi file itself is moved into a vendor
+> subdir in this case "arm" (the vendor, not the ARCH=).
 
-diff --git a/arch/arm/boot/dts/exynos3250-pinctrl.dtsi b/arch/arm/boot/dts/exynos3250-pinctrl.dtsi
-index eac1d21c10d4..78b995fed6c7 100644
---- a/arch/arm/boot/dts/exynos3250-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/exynos3250-pinctrl.dtsi
-@@ -452,6 +452,41 @@
- 		samsung,pin-drv = <3>;
- 	};
- 
-+	sd2_clk: sd2-clk {
-+		samsung,pins = "gpk2-0";
-+		samsung,pin-function = <2>;
-+		samsung,pin-pud = <0>;
-+		samsung,pin-drv = <3>;
-+	};
-+
-+	sd2_cmd: sd2-cmd {
-+		samsung,pins = "gpk2-1";
-+		samsung,pin-function = <2>;
-+		samsung,pin-pud = <0>;
-+		samsung,pin-drv = <3>;
-+	};
-+
-+	sd2_cd: sd2-cd {
-+		samsung,pins = "gpk2-2";
-+		samsung,pin-function = <2>;
-+		samsung,pin-pud = <3>;
-+		samsung,pin-drv = <3>;
-+	};
-+
-+	sd2_bus1: sd2-bus-width1 {
-+		samsung,pins = "gpk2-3";
-+		samsung,pin-function = <2>;
-+		samsung,pin-pud = <3>;
-+		samsung,pin-drv = <3>;
-+	};
-+
-+	sd2_bus4: sd2-bus-width4 {
-+		samsung,pins = "gpk2-4", "gpk2-5", "gpk2-6";
-+		samsung,pin-function = <2>;
-+		samsung,pin-pud = <3>;
-+		samsung,pin-drv = <3>;
-+	};
-+
- 	cam_port_b_io: cam-port-b-io {
- 		samsung,pins = "gpm0-0", "gpm0-1", "gpm0-2", "gpm0-3",
- 				"gpm0-4", "gpm0-5", "gpm0-6", "gpm0-7",
-diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
-index 02f3250766c9..5a91eaa26565 100644
---- a/arch/arm/boot/dts/exynos3250.dtsi
-+++ b/arch/arm/boot/dts/exynos3250.dtsi
-@@ -30,6 +30,7 @@
- 		pinctrl1 = &pinctrl_1;
- 		mshc0 = &mshc_0;
- 		mshc1 = &mshc_1;
-+		mshc2 = &mshc_2;
- 		spi0 = &spi_0;
- 		spi1 = &spi_1;
- 		i2c0 = &i2c_0;
-@@ -341,6 +342,18 @@
- 			status = "disabled";
- 		};
- 
-+		mshc_2: mshc at 12530000 {
-+			compatible = "samsung,exynos5250-dw-mshc";
-+			reg = <0x12530000 0x1000>;
-+			interrupts = <0 144 0>;
-+			clocks = <&cmu CLK_SDMMC2>, <&cmu CLK_SCLK_MMC2>;
-+			clock-names = "biu", "ciu";
-+			fifo-depth = <0x80>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
- 		exynos_usbphy: exynos-usbphy at 125B0000 {
- 			compatible = "samsung,exynos3250-usb2-phy";
- 			reg = <0x125B0000 0x100>;
+
+Question:
+If this patch is applied, which directory will be created in
+device-tree-rebasing?
+src/kernel/, src/common/, or something else?
+Either will do, of course.
+
+
+Another nit:
+I just noticed a period at the end of the commit subject.
+Re-post would not be needed only for such a minor thing,
+but please try best to remember to drop it when this patch is applied.
+
+
+
+
 -- 
-1.8.5.5
+Best Regards
+Masahiro Yamada
