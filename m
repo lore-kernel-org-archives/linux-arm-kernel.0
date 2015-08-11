@@ -1,58 +1,131 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 11 Aug 2015 14:31:34 +0100
-Subject: [PATCH v5 1/3] iommu: Implement common IOMMU ops for DMA mapping
-In-Reply-To: <20150811093742.GC14980@8bytes.org>
-References: <cover.1438362603.git.robin.murphy@arm.com>
- <6ce6b501501f611297ae0eae31e07b0d2060eaae.1438362603.git.robin.murphy@arm.com>
- <20150807084228.GU14980@8bytes.org> <55C4B4DF.4040608@arm.com>
- <20150811093742.GC14980@8bytes.org>
-Message-ID: <55C9F936.8080201@arm.com>
+From: hansverk@cisco.com (Hans Verkuil)
+Date: Tue, 11 Aug 2015 15:32:46 +0200
+Subject: [PATCH RFC v2 09/16] media: use media_graph_obj for link endpoints
+In-Reply-To: <20150811102201.5abaf64d@recife.lan>
+References: <cover.1439292977.git.mchehab@osg.samsung.com>	<6d02794028ea4f7ad33e3ba0e07e0c690e2feee2.1439292977.git.mchehab@osg.samsung.com>	<55C9E9AE.5020602@cisco.com>
+ <20150811102201.5abaf64d@recife.lan>
+Message-ID: <55C9F97E.7070601@cisco.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joerg,
+>>> diff --git a/include/media/media-entity.h b/include/media/media-entity.h
+>>> index 403019035424..f6e2136480f1 100644
+>>> --- a/include/media/media-entity.h
+>>> +++ b/include/media/media-entity.h
+>>> @@ -43,6 +43,17 @@ enum media_graph_type {
+>>>  	MEDIA_GRAPH_LINK,
+>>>  };
+>>>  
+>>> +/**
+>>> + * enum media_graph_link_dir - direction of a link
+>>> + *
+>>> + * @MEDIA_LINK_DIR_BIDIRECTIONAL	Link is bidirectional
+>>> + * @MEDIA_LINK_DIR_PAD_0_TO_1		Link is unidirectional,
+>>> + *					from port 0 (source) to port 1 (sink)
+>>> + */
+>>> +enum media_graph_link_dir {
+>>> +	MEDIA_LINK_DIR_BIDIRECTIONAL,
+>>> +	MEDIA_LINK_DIR_PORT0_TO_PORT1,
+>>> +};
+>>
+>> 1) the comment and the actual enum are out-of-sync
+> 
+> Ah, yes. I was in doubt about using PAD or PORT here. I ended by using
+> port at the links, as the endpoints can either be an interface/entity
+> or a pad. So, I decided to use port.
 
-On 11/08/15 10:37, Joerg Roedel wrote:
-> On Fri, Aug 07, 2015 at 02:38:39PM +0100, Robin Murphy wrote:
->> Indeed, DMA_DEBUG will check that a driver is making DMA API calls
->> to the arch code in the right way; this is a different check, to
->> catch things like the arch code passing the wrong domain into this
->> layer, or someone else having messed directly with the domain via
->> the IOMMU API. If the iommu_unmap doesn't match the IOVA region we
->> looked up, that means the IOMMU page tables have somehow become
->> inconsistent with the IOVA allocator, so we are in an unrecoverable
->> situation where we can no longer be sure what devices have access
->> to. That's bad.
->
-> Sure, but the BUG_ON would also trigger on things like a double-free,
-> which is bad to handle as a BUG_ON. A WARN_ON for this is sufficient.
+It's either bi-directional (between interface and entity) or directional
+(between two pads), so I think PAD is better here. We don't use the term
+port anywhere else in the MC, so I think it is a bit confusing to
+introduce a new name here.
 
-Oh dear, it gets even better than that; in the case of a simple 
-double-unmap where the IOVA is already free, we wouldn't even get as far 
-as that check because we'd die calling iova_size(NULL). How on Earth did 
-I get to v5 without spotting that? :(
+> 
+>> 2) why not just make a 'BIRECTIONAL' link flag instead of inventing
+>>    a new enum? Adding yet another field seems overkill to me. Have a
+>>    'BIDIRECTIONAL' flag seems perfectly OK to me (and useful for the
+>>    application as well).
+> 
+> Yeah, we can use flags, instead. I decided to use an enum here just
+> to make it clearer about the two possible options.
+> 
+> I was actually considering to rename media_link source/sink to
+> port0/port1, as using "source"/"sink" names on a bidirection link
+> doesn't make sense. I'm still in doubt about such rename, though,
+> as it would make harder to inspect the graph traversal routines.
 
-Anyway, on reflection I think you're probably right; I've clearly been 
-working on this for long enough to start falling into the "my thing is 
-obviously more important than all the other things" trap.
+Right. I really wouldn't rename it. As suggested below using an
+anonymous union would allow you to create proper names.
 
->> AFAIK, yes (this is just a slight tidyup of the existing code that
->> 32-bit Exynos/Tegra/Rockchip/etc. devices are already using) - the
->> display guys want increasingly massive contiguous allocations for
->> framebuffers, layers, etc., so having IOMMU magic deal with that
->> saves CMA for non-IOMMU devices that really need it.
->
-> Makes sense, I thougt about something similar for x86 too to avoid the
-> high-order allocations we currently do. I guess the buffer will later be
-> mapped into the vmalloc space for the CPU?
+> Also, I want to force all places that create a link to choose
+> between either BIRECTIONAL or PORT0_TO_PORT1, as this makes easier
+> to review if the code is doing the right thing when inspecting it.
 
-Indeed - for non-coherent devices we have to remap all allocations 
-(IOMMU or not) anyway in order to get a non-cacheable CPU mapping of the 
-buffer, so having non-contiguous pages is no bother; for coherent 
-devices we can just do the same thing but keep the vmalloc mapping 
-cacheable. There's also the DMA_ATTR_NO_KERNEL_MAPPING case (e.g. GPU 
-just wants a big buffer to render into and read back out again) where we 
-wouldn't need a CPU address at all, although on arm64 vmalloc space is 
-cheap enough that we've no plans to implement that at the moment.
+By creating two different functions? I think that would be very useful.
+E.g. make_pad_link() and make_intf_to_ent_link() or something like
+that. That would also hide the link direction. I still prefer a flag,
+though :-) That's mostly personal preference, though.
 
-Robin.
+> 
+> In summary, I would prefer to keep this internally as a separate
+>  enum, at least for now. We can latter simplify it and use a flag
+> for that (or maybe two flags?).
+> 
+>>
+>>>  
+>>>  /* Structs to represent the objects that belong to a media graph */
+>>>  
+>>> @@ -72,9 +83,9 @@ struct media_pipeline {
+>>>  
+>>>  struct media_link {
+>>>  	struct list_head list;
+>>> -	struct media_graph_obj			graph_obj;
+>>> -	struct media_pad *source;	/* Source pad */
+>>> -	struct media_pad *sink;		/* Sink pad  */
+>>> +	struct media_graph_obj		graph_obj;
+>>> +	enum media_graph_link_dir	dir;
+>>> +	struct media_graph_obj		*source, *sink;
+>>
+>> I'm not too keen about all the gobj_to_foo(obj) macros that this requires. It
+>> is rather ugly code.
+>>
+>> What about this:
+>>
+>> 	union {
+>> 		struct media_graph_obj *source;
+>> 		struct media_pad *source_pad;
+>> 		struct media_interface *source_intf;
+>> 	};
+>> 	union {
+>> 		struct media_graph_obj *sink;
+>> 		struct media_pad *sink_pad;
+>> 		struct media_entity *sink_ent;
+>> 	};
+>>
+>> Now the code can just use ->source_pad etc.
+> 
+> good idea. Will do that on a version 3. I think that, in this case, the
+> best is to write a note that the first element at pad/entity/interface
+> should be the graph_obj.
+> 
+> I would actually call port0_intf and port1_ent on the above structs,
+> as it makes no sense to call sink/source for interface->entity links.
+
+How about this:
+
+ 	union {
+ 		struct media_graph_obj *port0;
+ 		struct media_interface *port0_intf;	// perhaps just intf or interface?
+ 		struct media_pad *source;
+ 	};
+ 	union {
+ 		struct media_graph_obj *port1;
+ 		struct media_entity *port1_ent;	// perhaps just ent or entity?
+ 		struct media_pad *sink;
+ 	};
+
+This has the advantage that the source/sink pads are still called source and
+sink and you don't have to rename the existing code.
+
+Regards,
+
+	Hans
