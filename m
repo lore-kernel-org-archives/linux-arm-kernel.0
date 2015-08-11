@@ -1,29 +1,90 @@
-From: fcooper@ti.com (Franklin S Cooper Jr.)
-Date: Mon, 10 Aug 2015 18:47:25 -0500
-Subject: [RESEND][PATCH 3/4] ARM: davinci: Set proper SPI prescale limit
- value
-In-Reply-To: <55B22681.3060000@ti.com>
-References: <1437568344-18889-1-git-send-email-fcooper@ti.com>
- <1437568344-18889-4-git-send-email-fcooper@ti.com> <55B22681.3060000@ti.com>
-Message-ID: <55C9380D.1060802@ti.com>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Mon, 10 Aug 2015 20:31:03 -0400
+Subject: earlycon issues in -next with amba-pl011 updates
+In-Reply-To: <20150810232312.GB10728@bivouac.eciton.net>
+References: <20150810232312.GB10728@bivouac.eciton.net>
+Message-ID: <55C94247.8020701@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Leif,
+
+On 08/10/2015 07:23 PM, Leif Lindholm wrote:
+> Hi all,
+> 
+> The kernelci.org bot picked up a complete boot failure (no output past
+> UEFI stub) with next-20150806 and Tyler bisected it down to somewhere
+> in
+> 8cd90e5 uart: pl011: Add support to ZTE ZX296702 uart
+> 09dcc7d uart: pl011: Improve LCRH register access decision
+> 2c096a9 uart: pl011: Introduce register look up table
+> 7b753f3 uart: pl011: Introduce register accessor
+> 
+> The issue only appears with earlycon on command line, for pl011
+> consoles.
+> 
+> Some investigation shows that the cause lies with
+> commit 7b753f318d14 ("uart: pl011: Introduce register accessor")
+> and
+> commit 2c096a9eedc6 ("uart: pl011: Introduce register look up table")
+> 
+> Specifically, the changes to pl011_putc() are incorrect:
+> The new pl011_ accessors take a (struct uart_amba_port *) input, but
+> pl011_putc() directly uses the incoming (struct uart_port *) for this.
+> 
+> Apart from ending up with an unintended/incorrect UART base address,
+> the introduction of the lookup table for register offsets also means
+> the accessors try to dereference (struct uart_amba_port *)->reg_lut.
 
 
-On 07/24/2015 06:50 AM, Sekhar Nori wrote:
-> On Wednesday 22 July 2015 06:02 PM, Franklin S Cooper Jr wrote:
->> SPI Davinci driver has been updated to allow SOCs to specify their minimum
->> prescale value. Update the various SOCs board files that use this driver with
->> their proper prescaler limit.
->>
->> Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
-> Acked-by: Sekhar Nori <nsekhar@ti.com>
->
-> in case Mark is okay to take it through his tree. It does not clash with
-> anything else I have for mach-davinci.
->
-> Thanks,
-> Sekhar
->
-ping. Patches 1 and 2 have already been pulled into Mark's spi tree and are currently in in linux-next.
+Thanks for the bug report and bisect, and apologies for the breakage;
+I should have caught that on review.
+
+Would you please test the patch below and see if that resolves the
+problem for you?
+
+Regards,
+Peter Hurley
+
+PS - _NOT_ even compile-tested, sorry.
+
+--- >% ---
+Subject: [PATCH] serial: pl011: Fix earlycon register LUT breakage
+
+Commit 7b753f318d14 ("uart: pl011: Introduce register accessor")
+mistakenly used the register LUT i/o accessors for the pl011
+earlycon. Since the port has not been probed at earlycon time,
+the struct uart_amba_port (and register LUTs) are uninitialized.
+
+Use direct register addressing for pl011 earlycon; other h/w supported
+by the amba-pl011 driver should declare an alternate earlycon.
+
+Cc: Jun Nie <jun.nie@linaro.org>
+Signed-off-by: Peter Hurley <peter@hurleysoftware.com>
+---
+ drivers/tty/serial/amba-pl011.c | 9 +++------
+ 1 file changed, 3 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index 2af09ab..fd54991 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -2348,13 +2348,10 @@ static struct console amba_console = {
+ 
+ static void pl011_putc(struct uart_port *port, int c)
+ {
+-	struct uart_amba_port *uap =
+-	    container_of(port, struct uart_amba_port, port);
+-
+-	while (pl011_readw(uap, REG_FR) & UART01x_FR_TXFF)
++	while (readl(port->membase + UART01x_FR) & UART01x_FR_TXFF)
+ 		;
+-	pl011_writeb(uap, c, REG_DR);
+-	while (pl011_readw(uap, REG_FR) & uap->fr_busy)
++	writeb(c, port->membase + UART01x_DR);
++	while (readl(port->membase + UART01x_FR) & UART01x_FR_BUSY)
+ 		;
+ }
+ 
+-- 
+2.5.0
