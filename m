@@ -1,26 +1,36 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 11 Aug 2015 15:24:17 +0200
-Subject: [GIT PULL] omap dts changes for v4.3 merge window, part 3
-In-Reply-To: <20150806104516.GF4215@atomide.com>
-References: <20150806104516.GF4215@atomide.com>
-Message-ID: <20150811132417.GM30181@localhost>
+Date: Tue, 11 Aug 2015 15:32:17 +0200
+Subject: [GIT PULL] Third Round of Renesas ARM Based SoC DT Updates for
+ v4.3
+In-Reply-To: <cover.1438911334.git.horms+renesas@verge.net.au>
+References: <cover.1438911334.git.horms+renesas@verge.net.au>
+Message-ID: <20150811133217.GO30181@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 06, 2015 at 03:45:16AM -0700, Tony Lindgren wrote:
-> The following changes since commit f5887fe5d14181aef0653ab04f60988252d42461:
+On Fri, Aug 07, 2015 at 11:11:31AM +0900, Simon Horman wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
 > 
->   ARM: OMAP2+: Add custom abort handler for t410 (2015-07-23 22:33:19 -0700)
+> Please consider these third round of Renesas ARM based SoC DT updates for v4.3.
+> 
+> This pull request is based on the previous round of
+> such requests, tagged as renesas-dt2-for-v4.3,
+> which I have already sent a pull-request for.
+> 
+> 
+> The following changes since commit 7fd6e11dca09b21efbe2b9db4eff08c8f4a16125:
+> 
+>   ARM: shmobile: r8a7791: Add Audio MIX support on DTSI (2015-07-22 09:36:49 +0900)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.3/dt-pt3
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt3-for-v4.3
 > 
-> for you to fetch changes up to ed05637c30e6d13e5793aab64d6a6e57e30228af:
+> for you to fetch changes up to 94bdc48d55ca10f90b4a625f0e443197e0013557:
 > 
->   ARM: dts: omap3-devkit8000: Add ADS7846 Touchscreen support (2015-08-06 02:43:09 -0700)
+>   ARM: shmobile: sh73a0 dtsi: Add missing "gpio-ranges" to gpio node (2015-08-05 06:39:28 +0900)
 
-Thanks, merged.
+Merged, thanks.
 
 
 -Olof
