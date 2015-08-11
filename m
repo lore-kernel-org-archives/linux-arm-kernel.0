@@ -1,29 +1,72 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Tue, 11 Aug 2015 16:55:21 +0200
-Subject: [PATCH v2 2/2] i2c: mediatek: Fixup i2c ack error interrupt
- handling
-In-Reply-To: <1438845731-17805-3-git-send-email-eddie.huang@mediatek.com>
-References: <1438845731-17805-1-git-send-email-eddie.huang@mediatek.com>
- <1438845731-17805-3-git-send-email-eddie.huang@mediatek.com>
-Message-ID: <20150811145521.GB1525@katana>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Tue, 11 Aug 2015 16:56:33 +0200
+Subject: [PATCH v4 4/6] memory: mediatek: Add SMI driver
+In-Reply-To: <1438597279-2937-5-git-send-email-yong.wu@mediatek.com>
+References: <1438597279-2937-1-git-send-email-yong.wu@mediatek.com>
+ <1438597279-2937-5-git-send-email-yong.wu@mediatek.com>
+Message-ID: <20150811145633.GE14980@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 06, 2015 at 03:22:11PM +0800, Eddie Huang wrote:
-> When occur i2c ack error, i2c controller generate two interrupts,
-> first is the ack error interrupt, then the complete interrupt.
-> i2c interrupt handler should keep the two interrupt value, and only
-> call complete() for the complete interrupt.
-> 
-> Signed-off-by: Liguo Zhang <liguo.zhang@mediatek.com>
-> Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
+On Mon, Aug 03, 2015 at 06:21:17PM +0800, Yong Wu wrote:
+> +static int mtk_smi_common_get(struct device *smidev)
+> +{
+> +	struct mtk_smi_common *smipriv = dev_get_drvdata(smidev);
+> +	int ret;
+> +
+> +	ret = pm_runtime_get_sync(smidev);
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	ret = clk_prepare_enable(smipriv->clk_apb);
+> +	if (ret) {
+> +		dev_err(smidev, "Failed to enable the apb clock\n");
+> +		goto err_put_pm;
+> +	}
+> +	ret = clk_prepare_enable(smipriv->clk_smi);
+> +	if (ret) {
+> +		dev_err(smidev, "Failed to enable the smi clock\n");
+> +		goto err_disable_apb;
+> +	}
+> +	return ret;
+> +
+> +err_disable_apb:
+> +	clk_disable_unprepare(smipriv->clk_apb);
+> +err_put_pm:
+> +	pm_runtime_put(smidev);
+> +	return ret;
+> +}
 
-Applied to for-next, thanks!
+[...]
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150811/05b4bbc5/attachment.sig>
+> +int mtk_smi_larb_get(struct device *larbdev)
+> +{
+> +	struct mtk_smi_larb *larbpriv = dev_get_drvdata(larbdev);
+> +	struct mtk_larb_mmu *mmucfg = larbdev->archdata.iommu;
+> +	int ret;
+> +
+> +	ret = mtk_smi_common_get(larbpriv->smi);
+> +	if (ret)
+> +		return ret;
+> +
+> +	ret = pm_runtime_get_sync(larbdev);
+> +	if (ret < 0)
+> +		goto err_put_smicommon;
+> +
+> +	ret = clk_prepare_enable(larbpriv->clk_apb);
+> +	if (ret) {
+> +		dev_err(larbdev, "Failed to enable the apb clock\n");
+> +		goto err_put_pm;
+> +	}
+> +
+> +	ret = clk_prepare_enable(larbpriv->clk_smi);
+> +	if (ret) {
+> +		dev_err(larbdev, "Failed to enable the smi clock\n");
+> +		goto err_disable_apb;
+> +	}
+
+The clock enablement looks similar to the function above, maybe move it
+to a helper function?
+
+
+	Joerg
