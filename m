@@ -1,96 +1,51 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 11 Aug 2015 15:18:11 +0100
-Subject: [PATCH v4 2/2] mfd: axp20x: Add a cell for the usb power_supply
- part of the axp20x PMICs
-In-Reply-To: <1439049521-30766-2-git-send-email-hdegoede@redhat.com>
-References: <1439049521-30766-1-git-send-email-hdegoede@redhat.com>
- <1439049521-30766-2-git-send-email-hdegoede@redhat.com>
-Message-ID: <20150811141811.GM18282@x1>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 11 Aug 2015 15:23:01 +0100
+Subject: [RFC PATCH 01/10] arm64: feature registers: Documentation
+In-Reply-To: <CAKv+Gu-9GTzjqyT=NeBKjcaL7q-uFMToqPpprkyD-faG0J3mkQ@mail.gmail.com>
+References: <1437731037-25795-1-git-send-email-suzuki.poulose@arm.com>
+ <1437731037-25795-2-git-send-email-suzuki.poulose@arm.com>
+ <20150810160636.GB15394@e104818-lin.cambridge.arm.com>
+ <55C8E12E.6030305@arm.com>
+ <CAKv+Gu-9GTzjqyT=NeBKjcaL7q-uFMToqPpprkyD-faG0J3mkQ@mail.gmail.com>
+Message-ID: <20150811142301.GE23307@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 08 Aug 2015, Hans de Goede wrote:
+On Mon, Aug 10, 2015 at 07:48:48PM +0200, Ard Biesheuvel wrote:
+> > On 10/08/15 17:06, Catalin Marinas wrote:
+> >> And to debunk some of the counter arguments:
+> >>
+> >> a) Running out of HWCAP bits - I really doubt this, we can always
+> >>     introduce 64 more via a new elf_hwcapX
+> 
+> Note that ELF_HWCAP is also wired into ifunc resolution of GNU
+> indirect functions, which looks like a useful feature although it
+> isn't used that widely yet.
 
-> Add a cell for the usb power_supply part of the axp20x PMICs.
-> 
-> Note that this cell is only for the usb power_supply part and not the
-> ac-power / battery-charger / rtc-backup-bat-charger bits.
-> 
-> Depending on the board each of those must be enabled / disabled separately
-> in devicetree as most boards do not use all 4. So in dt each one needs its
-> own child-node of the axp20x node. Another reason for using separate child
-> nodes for each is so that other devicetree nodes can have a power-supply
-> property with a phandle referencing a node representing a single
-> power-supply.
-> 
-> The decision to use a separate devicetree node for each is reflected on
-> the kernel side by each getting its own mfd-cell / platform_device and
-> platform-driver.
-> 
-> Note this commit also makes some whitespace changes to the intialization
-> of existing cells in axp20x_cells, these are pure whitespace changes,
-> functionally nothing changes.
-> 
-> Cc: Bruno Pr?mont <bonbons@linux-vserver.org>
-> Signed-off-by: Bruno Pr?mont <bonbons@linux-vserver.org>
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Acked-by: Lee Jones <lee.jones@linaro.org>
-> ---
-> Changes in v2:
-> -Use DEFINE_RES_IRQ_NAMED
-> -Change indentation of axp20x_cells initializers to avoid line wrapping
-> Changes in v3:
-> -Improve commit message
-> -Add Bruno's S-o-b
-> ---
->  drivers/mfd/axp20x.c | 20 ++++++++++++++++----
->  1 file changed, 16 insertions(+), 4 deletions(-)
+I forgot to mention, we also need an HWCAP_CPUID with these patches when
+we expose the MRS interface. The ifunc resolver could use MRS when
+available. But I would still keep adding HWCAP bits for new features,
+even if we risk running out of the 64-bit we have now.
 
-Applied, thanks.
+> The ifunc prototype for aarch64 has only one 'long' parameter, and I
+> don't know if it is possible to extend that without having a bit in
+> HWCAPn to indicate that HWCAPn+1 is valid. Also, the ifunc resolvers
+> are restricted in the sense that they cannot use shared libraries or
+> code that uses constructors (AFAIR) so it may require a special static
+> library to call this CPU feature interface from such a resolver if
+> features are not covered by HWCAP bits.
 
-> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
-> index d9f2f96..3f576b7 100644
-> --- a/drivers/mfd/axp20x.c
-> +++ b/drivers/mfd/axp20x.c
-> @@ -140,6 +140,13 @@ static struct resource axp20x_pek_resources[] = {
->  	},
->  };
->  
-> +static struct resource axp20x_usb_power_supply_resources[] = {
-> +	DEFINE_RES_IRQ_NAMED(AXP20X_IRQ_VBUS_PLUGIN, "VBUS_PLUGIN"),
-> +	DEFINE_RES_IRQ_NAMED(AXP20X_IRQ_VBUS_REMOVAL, "VBUS_REMOVAL"),
-> +	DEFINE_RES_IRQ_NAMED(AXP20X_IRQ_VBUS_VALID, "VBUS_VALID"),
-> +	DEFINE_RES_IRQ_NAMED(AXP20X_IRQ_VBUS_NOT_VALID, "VBUS_NOT_VALID"),
-> +};
-> +
->  static struct resource axp22x_pek_resources[] = {
->  	{
->  		.name   = "PEK_DBR",
-> @@ -432,11 +439,16 @@ static const struct regmap_irq_chip axp288_regmap_irq_chip = {
->  
->  static struct mfd_cell axp20x_cells[] = {
->  	{
-> -		.name			= "axp20x-pek",
-> -		.num_resources		= ARRAY_SIZE(axp20x_pek_resources),
-> -		.resources		= axp20x_pek_resources,
-> +		.name		= "axp20x-pek",
-> +		.num_resources	= ARRAY_SIZE(axp20x_pek_resources),
-> +		.resources	= axp20x_pek_resources,
->  	}, {
-> -		.name			= "axp20x-regulator",
-> +		.name		= "axp20x-regulator",
-> +	}, {
-> +		.name		= "axp20x-usb-power-supply",
-> +		.of_compatible	= "x-powers,axp202-usb-power-supply",
-> +		.num_resources	= ARRAY_SIZE(axp20x_usb_power_supply_resources),
-> +		.resources	= axp20x_usb_power_supply_resources,
->  	},
->  };
->  
+Or we could get some compiler intrinsics that generate the instruction
+inline, just to avoid explicit asm.
+
+> So treating HWCAP bits as an endless supply may not be the wisest
+> approach here.
+
+Probably not for ifunc, otherwise I don't think it hurts.
+
+> Also, I think some alignment with the libc folks is indeed in order.
+
+I agree (not sure how they feel about cross-posting though).
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Catalin
