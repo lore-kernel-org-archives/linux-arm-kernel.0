@@ -1,47 +1,47 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 11 Aug 2015 13:40:43 +0100
-Subject: earlycon issues in -next with amba-pl011 updates
-In-Reply-To: <55C94247.8020701@hurleysoftware.com>
-References: <20150810232312.GB10728@bivouac.eciton.net>
- <55C94247.8020701@hurleysoftware.com>
-Message-ID: <20150811124043.GZ7557@n2100.arm.linux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 11 Aug 2015 14:53:30 +0200
+Subject: [PATCH 0/2] drivers: PL061: Add platform driver probing support
+In-Reply-To: <20150807022141.GD25067@kroah.com>
+References: <1438585198-8764-1-git-send-email-zhaoshenglong@huawei.com>
+ <20150803075848.GH7557@n2100.arm.linux.org.uk>
+ <55BF33AD.5040502@huawei.com>
+ <20150803094923.GI7557@n2100.arm.linux.org.uk>
+ <20150803162623.GB30867@kroah.com>
+ <20150803190935.GL7557@n2100.arm.linux.org.uk>
+ <20150807022141.GD25067@kroah.com>
+Message-ID: <CACRpkdYd_oWsx23h4-Hjk8rqcgnuMqd47SEg+4ubtR08jgQY9g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 10, 2015 at 08:31:03PM -0400, Peter Hurley wrote:
-> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-> index 2af09ab..fd54991 100644
-> --- a/drivers/tty/serial/amba-pl011.c
-> +++ b/drivers/tty/serial/amba-pl011.c
-> @@ -2348,13 +2348,10 @@ static struct console amba_console = {
->  
->  static void pl011_putc(struct uart_port *port, int c)
->  {
-> -	struct uart_amba_port *uap =
-> -	    container_of(port, struct uart_amba_port, port);
-> -
-> -	while (pl011_readw(uap, REG_FR) & UART01x_FR_TXFF)
-> +	while (readl(port->membase + UART01x_FR) & UART01x_FR_TXFF)
->  		;
-> -	pl011_writeb(uap, c, REG_DR);
-> -	while (pl011_readw(uap, REG_FR) & uap->fr_busy)
-> +	writeb(c, port->membase + UART01x_DR);
-> +	while (readl(port->membase + UART01x_FR) & UART01x_FR_BUSY)
->  		;
+On Fri, Aug 7, 2015 at 4:21 AM, Greg Kroah-Hartman
+<gregkh@linuxfoundation.org> wrote:
+> On Mon, Aug 03, 2015 at 08:09:35PM +0100, Russell King - ARM Linux wrote:
 
-These loops are wrong.  Kernel coding style is that loops like this
-will use cpu_relax() in them, just like the driver used to.  This
-was introduced by:
+>> Right now, there seems to be a move to convert _all_ AMBA device drivers
+>> to become dual-drivers: an amba bus driver and a platform driver.  Is
+>> that something you really want to see, irrespective of ACPI issues?
+>
+> Ick, no, I don't think that's wise at all.  Why not just make the needed
+> resources availble to _all_ bus drivers, then it doesn't matter if it's
+> AMBA, or ACPI, or USB, or anything else?
 
-commit 0d3c673e7881e691991b2a4745bd4f149603baa2
-Author: Rob Herring <robh@kernel.org>
-Date:   Fri Apr 18 17:19:57 2014 -0500
+Amen to that.
 
-    tty/serial: pl011: add generic earlycon support
+> I thought that is what some recent patches did to the acpi/of core, but
+> maybe I was mistaken.
 
-Also, the above readl()s should be readl_relaxed(), we don't need
-barriered reads or to hit the L2 cache on those reads in the above code.
+I think you're referring to the initiative to provide query functions that will
+work the same on device trees and ACPI devices, that is to get a key/value
+from a certain struct device * no matter if it came from a DT or ACPI.
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+This is about how the core hardware description spawns devices. While
+DT will (correctly) spawn AMBA devices, the ACPI code apparently
+doesn't. But it should. of_amba_device_create() even shows exactly
+how to do it.
+
+What I fear is that ACPI actually has no way to tell whether a device is
+an AMBA device but rather thinks the whole world consists of
+platform_devices, and then *THAT* needs to be fixed.
+
+Yours,
+Linus Walleij
