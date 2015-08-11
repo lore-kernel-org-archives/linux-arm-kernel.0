@@ -1,88 +1,33 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Tue, 11 Aug 2015 09:26:02 +0100
-Subject: [PATCH 0/9] qcom: Add support for TSENS driver
-In-Reply-To: <1436348838-22671-1-git-send-email-rnayak@codeaurora.org>
-References: <1436348838-22671-1-git-send-email-rnayak@codeaurora.org>
-Message-ID: <55C9B19A.9040901@linaro.org>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Tue, 11 Aug 2015 10:28:00 +0200
+Subject: [PATCH 0/5] New Atmel PIO4 pinctrl/gpio driver
+Message-ID: <1439281685-3020-1-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rajendra,
+Hi,
 
-On 08/07/15 10:47, Rajendra Nayak wrote:
-> Changes since RFC:
-> * Added support for 8916 and 8084
-> * Based off the latest nvmem framework patches [1]
-> * Minor review fixes for comments mostly from Lina
->
-> ** I have also added irq support using the hardware
-> trip point support series [2]. Will post that
-> out seperately.
->
-> This is an attempt to have a single TSENS driver for
-> the different versions of the TSENS IP that exist, on
-> different qcom msm/apq SoCs'
-> Support is added for msm8916, msm8960 and msm8974 families.
-> Based on top of the latest nvmem framework patches [2]
->
-> A lot of the work is based of original code from Stephen Boyd
-> and Siddartha Mohanadoss. I have also picked some of what
-> Narendran Rajan did in his attempt to upstream the support
-> for 8960 family. I could not keep the original authorship on
-> any of the patches because I ended up moving the code around
-> quite a bit in an effort to have a single driver for the
-> various devices. I would be glad to change the authorship
-> for any of the patches if needed.
->
-> [1] https://lkml.org/lkml/2015/6/22/609
-> [2] https://lkml.org/lkml/2015/5/20/472
->
-> Rajendra Nayak (8):
->    thermal: qcom: tsens: Add a skeletal TSENS drivers
->    thermal: qcom: tsens-8916: Add support for 8916 family of SoCs
->    thermal: qcom: tsens-8974: Add support for 8974 family of SoCs
->    thermal: qcom: tsens-8960: Add support for 8960 family of SoCs
->    arm: dts: msm8974: Add thermal zones, tsens and eeprom nodes
->    arm: dts: apq8064: Add thermal zones, tsens and eeprom nodes
->    arm: dts: apq8084: Add thermal zones, tsens and eeprom nodes
->    arm64: dts: msm8916: Add thermal zones, tsens and eeprom nodes
->
-> Srinivas Kandagatla (1):
->    clk: qcom: gcc-msm8960: add child devices support.
->
->   .../devicetree/bindings/thermal/qcom-tsens.txt     |  37 +++
->   arch/arm/boot/dts/qcom-apq8064.dtsi                | 108 ++++++++
->   arch/arm/boot/dts/qcom-apq8084.dtsi                | 105 ++++++++
->   arch/arm/boot/dts/qcom-msm8974.dtsi                | 105 ++++++++
->   arch/arm64/boot/dts/qcom/msm8916.dtsi              |  66 +++++
->   drivers/clk/qcom/gcc-msm8960.c                     |   4 +-
->   drivers/thermal/Kconfig                            |   5 +
->   drivers/thermal/Makefile                           |   1 +
->   drivers/thermal/qcom/Kconfig                       |  10 +
->   drivers/thermal/qcom/Makefile                      |   2 +
->   drivers/thermal/qcom/tsens-8916.c                  | 107 ++++++++
->   drivers/thermal/qcom/tsens-8960.c                  | 291 +++++++++++++++++++++
->   drivers/thermal/qcom/tsens-8974.c                  | 239 +++++++++++++++++
->   drivers/thermal/qcom/tsens-common.c                | 128 +++++++++
->   drivers/thermal/qcom/tsens.c                       | 209 +++++++++++++++
->   drivers/thermal/qcom/tsens.h                       |  69 +++++
->   16 files changed, 1485 insertions(+), 1 deletion(-)
->   create mode 100644 Documentation/devicetree/bindings/thermal/qcom-tsens.txt
->   create mode 100644 drivers/thermal/qcom/Kconfig
->   create mode 100644 drivers/thermal/qcom/Makefile
->   create mode 100644 drivers/thermal/qcom/tsens-8916.c
->   create mode 100644 drivers/thermal/qcom/tsens-8960.c
->   create mode 100644 drivers/thermal/qcom/tsens-8974.c
->   create mode 100644 drivers/thermal/qcom/tsens-common.c
->   create mode 100644 drivers/thermal/qcom/tsens.c
->   create mode 100644 drivers/thermal/qcom/tsens.h
->
+The Atmel PIO4 controller has been introduced with SAMA5D2 chip family. This
+drivers manages both pinmux/pinconf and gpio stuff. It is inspired by Mediatek
+pinctrl driver.
 
+Ludovic Desroches (5):
+  pinctrl: introduce driver for Atmel PIO4 controller
+  pinctrl: dt-binding: Add DT binding documentation for Atmel PIO4
+  MAINTAINERS: Add an entry for pinctrl-at91-pio4
+  ARM: at91/dt: sama5d2: add pio controller node
+  ARM: at91/defconfig: sama5: add PIO4 controller support
 
-Tested-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+ .../bindings/pinctrl/atmel,at91-pio4-pinctrl.txt   |   90 ++
+ MAINTAINERS                                        |    7 +
+ arch/arm/boot/dts/sama5d2.dtsi                     |   14 +
+ arch/arm/mach-at91/Kconfig                         |    1 +
+ drivers/pinctrl/Kconfig                            |   13 +
+ drivers/pinctrl/Makefile                           |    1 +
+ drivers/pinctrl/pinctrl-at91-pio4.c                | 1063 ++++++++++++++++++++
+ 7 files changed, 1189 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/atmel,at91-pio4-pinctrl.txt
+ create mode 100644 drivers/pinctrl/pinctrl-at91-pio4.c
 
-NVMEM framework in now available in linux-next.
-
-Do you think we can get this in v4.3?
-
---srini
+-- 
+2.5.0
