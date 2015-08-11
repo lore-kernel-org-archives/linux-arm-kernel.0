@@ -1,74 +1,70 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Tue, 11 Aug 2015 17:39:47 +0200
-Subject: [PATCH v4 5/6] iommu/mediatek: Add mt8173 IOMMU driver
-In-Reply-To: <1438597279-2937-6-git-send-email-yong.wu@mediatek.com>
-References: <1438597279-2937-1-git-send-email-yong.wu@mediatek.com>
- <1438597279-2937-6-git-send-email-yong.wu@mediatek.com>
-Message-ID: <20150811153947.GF14980@8bytes.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 11 Aug 2015 16:41:18 +0100
+Subject: [PATCH v5 2/6] x86/kasan, mm: introduce generic
+ kasan_populate_zero_shadow()
+In-Reply-To: <1439259499-13913-3-git-send-email-ryabinin.a.a@gmail.com>
+References: <1439259499-13913-1-git-send-email-ryabinin.a.a@gmail.com>
+ <1439259499-13913-3-git-send-email-ryabinin.a.a@gmail.com>
+Message-ID: <20150811154117.GH23307@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 03, 2015 at 06:21:18PM +0800, Yong Wu wrote:
-> +/*
-> + * There is only one iommu domain called the m4u domain that
-> + * all Multimedia modules share.
-> + */
-> +static struct mtk_iommu_domain	*m4udom;
+On Tue, Aug 11, 2015 at 05:18:15AM +0300, Andrey Ryabinin wrote:
+> --- /dev/null
+> +++ b/mm/kasan/kasan_init.c
+[...]
+> +#if CONFIG_PGTABLE_LEVELS > 3
+> +pud_t kasan_zero_pud[PTRS_PER_PUD] __page_aligned_bss;
+> +#endif
+> +#if CONFIG_PGTABLE_LEVELS > 2
+> +pmd_t kasan_zero_pmd[PTRS_PER_PMD] __page_aligned_bss;
+> +#endif
+> +pte_t kasan_zero_pte[PTRS_PER_PTE] __page_aligned_bss;
 
-What is the reason you only implement one domain? Can't the IOMMU
-isolate different devices from each other?
+Is there any problem if you don't add the #ifs here? Wouldn't the linker
+remove them if they are not used?
 
+Original hunk copied here for easy comparison:
 
-> +static struct iommu_domain *mtk_iommu_domain_alloc(unsigned type)
+> -static int __init zero_pte_populate(pmd_t *pmd, unsigned long addr,
+> -				unsigned long end)
+> -{
+> -	pte_t *pte = pte_offset_kernel(pmd, addr);
+> -
+> -	while (addr + PAGE_SIZE <= end) {
+> -		WARN_ON(!pte_none(*pte));
+> -		set_pte(pte, __pte(__pa_nodebug(kasan_zero_page)
+> -					| __PAGE_KERNEL_RO));
+> -		addr += PAGE_SIZE;
+> -		pte = pte_offset_kernel(pmd, addr);
+> -	}
+> -	return 0;
+> -}
+[...]
+> +static void __init zero_pte_populate(pmd_t *pmd, unsigned long addr,
+> +				unsigned long end)
 > +{
-> +	struct mtk_iommu_domain *priv;
+> +	pte_t *pte = pte_offset_kernel(pmd, addr);
+> +	pte_t zero_pte;
 > +
-> +	if (type != IOMMU_DOMAIN_UNMANAGED && type != IOMMU_DOMAIN_DMA)
-> +		return NULL;
+> +	zero_pte = pfn_pte(PFN_DOWN(__pa(kasan_zero_page)), PAGE_KERNEL);
+> +	zero_pte = pte_wrprotect(zero_pte);
 > +
-> +	if (m4udom)/* The m4u domain exist. */
-> +		return &m4udom->domain;
-
-This is not going to work. If you always return the same domain the
-iommu core might re-initialize domain state (and overwrite changed
-state). At the moment this is only the domain-type which will change
-every time this function is called, but there might be more.
-
-> +static int mtk_iommu_add_device(struct device *dev)
-> +{
-> +	struct iommu_group *group;
-> +	int ret;
-> +
-> +	if (!dev->archdata.iommu) /* Not a iommu client device */
-> +		return -ENODEV;
-> +
-> +	group = iommu_group_get(dev);
-> +	if (!group) {
-> +		group = iommu_group_alloc();
-> +		if (IS_ERR(group)) {
-> +			dev_err(dev, "Failed to allocate IOMMU group\n");
-> +			return PTR_ERR(group);
-> +		}
+> +	while (addr + PAGE_SIZE <= end) {
+> +		set_pte_at(&init_mm, addr, pte, zero_pte);
+> +		addr += PAGE_SIZE;
+> +		pte = pte_offset_kernel(pmd, addr);
 > +	}
-> +
-> +	ret = iommu_group_add_device(group, dev);
-> +	if (ret) {
-> +		dev_err(dev, "Failed to add IOMMU group\n");
-> +		goto err_group_put;
-> +	}
-> +
-> +	ret = iommu_attach_group(&m4udom->domain, group);
-> +	if (ret)
-> +		dev_err(dev, "Failed to attach IOMMU group\n");
-> +
-> +err_group_put:
-> +	iommu_group_put(group);
-> +	return ret;
 > +}
 
-Putting every device into its own group indicates that the IOMMU can
-isolate between single devices on the bus, which makes it even more
-questionable that you only allow one domain for the whole driver.
+I think there are some differences with the original x86 code. The first
+one is the use of __pa_nodebug, does it cause any problems if
+CONFIG_DEBUG_VIRTUAL is enabled?
 
+The second is the use of a read-only attribute when mapping
+kasan_zero_page on x86. Can it cope with a writable mapping?
 
-	Joerg
+If there are no issues, it should be documented in the commit log.
+
+-- 
+Catalin
