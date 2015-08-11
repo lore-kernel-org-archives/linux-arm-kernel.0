@@ -1,484 +1,122 @@
-From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
-Date: Tue, 11 Aug 2015 10:48:47 -0500
-Subject: [PATCHv2] arm64: dts: Add base stratix 10 dtsi
-Message-ID: <1439308127-7412-1-git-send-email-dinguyen@opensource.altera.com>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Tue, 11 Aug 2015 09:58:19 -0600
+Subject: [PATCH 5/9] ARM: common: Introduce PM domains for CPUs/clusters
+In-Reply-To: <CAMuHMdWRoUOBvz7MEGgF1oHz95D-GhaYG1yHr_kGe5NUQ0EnrQ@mail.gmail.com>
+References: <1438731339-58317-1-git-send-email-lina.iyer@linaro.org>
+ <1438731339-58317-6-git-send-email-lina.iyer@linaro.org>
+ <CAL_JsqK67=DTtjZwwnonObLDjLbahkREfm0RvyXVV95bhR-d4Q@mail.gmail.com>
+ <7hd1yyvf1b.fsf@deeprootsystems.com>
+ <CAMuHMdWRoUOBvz7MEGgF1oHz95D-GhaYG1yHr_kGe5NUQ0EnrQ@mail.gmail.com>
+Message-ID: <20150811155819.GH52339@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dinh Nguyen <dinguyen@opensource.altera.com>
+On Tue, Aug 11 2015 at 07:07 -0600, Geert Uytterhoeven wrote:
+>On Sat, Aug 8, 2015 at 1:45 AM, Kevin Hilman <khilman@kernel.org> wrote:
+>> Rob Herring <robherring2@gmail.com> writes:
+>>> On Tue, Aug 4, 2015 at 6:35 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
+>>>> +ARM CPU Power domains
+>>>> +
+>>>> +The device tree allows describing of CPU power domains in a SoC. In ARM SoC,
+>>>> +CPUs may be grouped as clusters. A cluster may have CPUs, GIC, Coresight,
+>>>> +caches, VFP and power controller and other peripheral hardware. Generally,
+>>>> +when the CPUs in the cluster are idle/suspended, the shared resources may also
+>>>> +be suspended and resumed before any of the CPUs resume execution.
+>>>> +
+>>>> +CPUs are the defined as the PM domain consumers and there is a PM domain
+>>>> +provider for the CPUs. Bindings for generic PM domains (genpd) is described in
+>>>> +[1].
+>>>> +
+>>>> +The ARM CPU PM domain follows the same binding convention as any generic PM
+>>>> +domain. Additional binding properties are -
+>>>> +
+>>>> +- compatible:
+>>>> +       Usage: required
+>>>> +       Value type: <string>
+>>>> +       Definition: Must also have
+>>>> +                       "arm,pd"
+>>>> +               inorder to initialize the genpd provider as ARM CPU PM domain.
+>>>
+>>> A compatible string should represent a particular h/w block. If it is
+>>> generic, it should represent some sort of standard programming
+>>> interface (e.g, AHCI, EHCI, etc.). This doesn't seem to be either and
+>>> is rather just a mapping of what "driver" you want to use.
+>>>
+>>> I would expect that identifying a cpu's or cluster's power domain
+>>> would be done by a phandle between the cpu/cluster node and power
+>>> domain node.
+>>
+>> That's correct, the CPU nodes (and other nodes in the cluster like GIC,
+>> Coresight, etc.) would have phandles to the cluster power domain node.
+>
+>Indeed.
+>
+>> But this series is meant to create the driver & binding for those cluster
+>> power domain(s), so the question is how exactly describe it.
+>
+>I don't think I can add an "arm,pd" compatible property to e.g. a2sl
+>(for CA15-CPUx) and a3sm (for CA15-SCU) in arch/arm/boot/dts/r8a73a4.dtsi,
+>as these are just subdomains in a power domain hierarchy, all driven by a
+>single hardware block.
+>
+>I can call e.g. a special registration method, or set up some ops pointer,
+>for the a2sl and a3sm subdomains from within the "renesas,sysc-rmobile"
+>driver.
+>
+I was hoping the macro would help in such a case. But since your domain
+cannot be defined as arm,pd (could you explain why, I seem to missing
+the obvious) would it help if I export a function like that the
+renesas,sysc-rmobile driver could call and setup the CPU PM domain?
+There is catch to it though.
 
-Add the base DTS for Altera's SoCFPGA Stratix 10 platform.
+The problem is -
 
-Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
----
-v2: use interrupt-affinity for pmu node
----
- arch/arm64/Kconfig                                 |   5 +
- arch/arm64/boot/dts/Makefile                       |   1 +
- arch/arm64/boot/dts/altera/Makefile                |   5 +
- arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi  | 358 +++++++++++++++++++++
- .../boot/dts/altera/socfpga_stratix10_socdk.dts    |  38 +++
- arch/arm64/configs/defconfig                       |   1 +
- 6 files changed, 408 insertions(+)
- create mode 100644 arch/arm64/boot/dts/altera/Makefile
- create mode 100644 arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
- create mode 100644 arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts
+To be generic and not have every driver write code to do this generic
+functionality, the common code would want to instantiate the
+arm_pm_domain and therefore the embedded genpd. A pointer instead of
+actual object, would mean maintaining a list and iterating through it,
+everytime the domain is suspended/resumed. With an object, I could just
+do container_of and get the arm_pd. But, we also want to give the
+platform an option to define certain aspects of the CPU's generic PM
+domain like the flags, genpd callbacks etc, before the genpd is
+registered with the framework.
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 318175f..0f8ab2b 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -207,6 +207,11 @@ config ARCH_SEATTLE
- 	help
- 	  This enables support for AMD Seattle SOC Family
- 
-+config ARCH_STRATIX10
-+	bool "Altera's Stratix 10 SoCFPGA Family"
-+	help
-+	  This enables support for Altera's Stratix 10 SoCFPGA Family
-+
- config ARCH_TEGRA
- 	bool "NVIDIA Tegra SoC Family"
- 	select ARCH_HAS_RESET_CONTROLLER
-diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
-index 38913be..7fb421a 100644
---- a/arch/arm64/boot/dts/Makefile
-+++ b/arch/arm64/boot/dts/Makefile
-@@ -1,3 +1,4 @@
-+dts-dirs += altera
- dts-dirs += amd
- dts-dirs += apm
- dts-dirs += arm
-diff --git a/arch/arm64/boot/dts/altera/Makefile b/arch/arm64/boot/dts/altera/Makefile
-new file mode 100644
-index 0000000..d7a6416
---- /dev/null
-+++ b/arch/arm64/boot/dts/altera/Makefile
-@@ -0,0 +1,5 @@
-+dtb-$(CONFIG_ARCH_STRATIX10) += socfpga_stratix10_socdk.dtb
-+
-+always		:= $(dtb-y)
-+subdir-y	:= $(dts-dirs)
-+clean-files	:= *.dtb
-diff --git a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
-new file mode 100644
-index 0000000..d67de22
---- /dev/null
-+++ b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
-@@ -0,0 +1,358 @@
-+/*
-+ * Copyright Altera Corporation (C) 2015. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along with
-+ * this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+/dts-v1/;
-+
-+/ {
-+	compatible = "altr,socfpga-stratix10";
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu0: cpu at 0 {
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			device_type = "cpu";
-+			enable-method = "psci";
-+			reg = <0x0>;
-+		};
-+
-+		cpu1: cpu at 1 {
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			device_type = "cpu";
-+			enable-method = "psci";
-+			reg = <0x1>;
-+		};
-+
-+		cpu2: cpu at 2 {
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			device_type = "cpu";
-+			enable-method = "psci";
-+			reg = <0x2>;
-+		};
-+
-+		cpu3: cpu at 3 {
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			device_type = "cpu";
-+			enable-method = "psci";
-+			reg = <0x3>;
-+		};
-+	};
-+
-+	pmu {
-+		compatible = "arm,armv8-pmuv3";
-+		interrupts = <0 120 8>,
-+			     <0 121 8>,
-+			     <0 122 8>,
-+			     <0 123 8>;
-+		interrupt-affinity = <&cpu0>,
-+				     <&cpu1>,
-+				     <&cpu2>,
-+				     <&cpu3>;
-+	};
-+
-+	psci {
-+		compatible = "arm,psci-0.2";
-+		method = "smc";
-+	};
-+
-+	intc: intc at ffff8000 {
-+		compatible = "arm,gic-400", "arm,cortex-a15-gic";
-+		#interrupt-cells = <3>;
-+		interrupt-controller;
-+		reg = <0x0 0xffff9000 0x1000>,
-+		      <0x0 0xffffa000 0x2000>,
-+		      <0x0 0xffffc000 0x1000>,
-+		      <0x0 0xffffd000 0x1000>;
-+	};
-+
-+	soc {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "simple-bus";
-+		device_type = "soc";
-+		interrupt-parent = <&intc>;
-+		ranges;
-+
-+		clkmgr at ffd1000 {
-+			compatible = "altr,clk-mgr";
-+			reg = <0xffd10000 0x1000>;
-+		};
-+
-+		gmac0: ethernet at ff800000 {
-+			compatible = "altr,socfpga-stmmac", "snps,dwmac-3.74a", "snps,dwmac";
-+			reg = <0xff800000 0x2000>;
-+			interrupts = <0 90 4>;
-+			interrupt-names = "macirq";
-+			mac-address = [00 00 00 00 00 00];
-+			status = "disabled";
-+		};
-+
-+		gmac1: ethernet at ff802000 {
-+			compatible = "altr,socfpga-stmmac", "snps,dwmac-3.74a", "snps,dwmac";
-+			reg = <0xff802000 0x2000>;
-+			interrupts = <0 91 4>;
-+			interrupt-names = "macirq";
-+			mac-address = [00 00 00 00 00 00];
-+			status = "disabled";
-+		};
-+
-+		gmac2: ethernet at ff804000 {
-+			compatible = "altr,socfpga-stmmac", "snps,dwmac-3.74a", "snps,dwmac";
-+			reg = <0xff804000 0x2000>;
-+			interrupts = <0 92 4>;
-+			interrupt-names = "macirq";
-+			mac-address = [00 00 00 00 00 00];
-+			status = "disabled";
-+		};
-+
-+		gpio0: gpio at ffc03200 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "snps,dw-apb-gpio";
-+			reg = <0xffc03200 0x100>;
-+			status = "disabled";
-+
-+			porta: gpio-controller at 0 {
-+				compatible = "snps,dw-apb-gpio-port";
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+				snps,nr-gpios = <24>;
-+				reg = <0>;
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
-+				interrupts = <0 110 4>;
-+			};
-+		};
-+
-+		gpio1: gpio at ffc03300 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "snps,dw-apb-gpio";
-+			reg = <0xffc03300 0x100>;
-+			status = "disabled";
-+
-+			portb: gpio-controller at 0 {
-+				compatible = "snps,dw-apb-gpio-port";
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+				snps,nr-gpios = <24>;
-+				reg = <0>;
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
-+				interrupts = <0 110 4>;
-+			};
-+		};
-+
-+		i2c0: i2c at ffc02800 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "snps,designware-i2c";
-+			reg = <0xffc02800 0x100>;
-+			interrupts = <0 103 4>;
-+			status = "disabled";
-+		};
-+
-+		i2c1: i2c at ffc02900 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "snps,designware-i2c";
-+			reg = <0xffc02900 0x100>;
-+			interrupts = <0 104 4>;
-+			status = "disabled";
-+		};
-+
-+		i2c2: i2c at ffc02a00 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "snps,designware-i2c";
-+			reg = <0xffc02a00 0x100>;
-+			interrupts = <0 105 4>;
-+			status = "disabled";
-+		};
-+
-+		i2c3: i2c at ffc02b00 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "snps,designware-i2c";
-+			reg = <0xffc02b00 0x100>;
-+			interrupts = <0 106 4>;
-+			status = "disabled";
-+		};
-+
-+		i2c4: i2c at ffc02c00 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "snps,designware-i2c";
-+			reg = <0xffc02c00 0x100>;
-+			interrupts = <0 107 4>;
-+			status = "disabled";
-+		};
-+
-+		mmc: dwmmc0 at ff808000 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "altr,socfpga-dw-mshc";
-+			reg = <0xff808000 0x1000>;
-+			interrupts = <0 96 4>;
-+			fifo-depth = <0x400>;
-+			status = "disabled";
-+		};
-+
-+		ocram: sram at ffe00000 {
-+			compatible = "mmio-sram";
-+			reg = <0xffe00000 0x100000>;
-+		};
-+
-+		rst: rstmgr at ffd11000 {
-+			#reset-cells = <1>;
-+			compatible = "altr,rst-mgr";
-+			reg = <0xffd11000 0x1000>;
-+		};
-+
-+		spi0: spi at ffda4000 {
-+			compatible = "snps,dw-apb-ssi";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0xffda4000 0x1000>;
-+			interrupts = <0 101 4>;
-+			num-chipselect = <4>;
-+			bus-num = <0>;
-+			status = "disabled";
-+		};
-+
-+		spi1: spi at ffda5000 {
-+			compatible = "snps,dw-apb-ssi";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0xffda5000 0x1000>;
-+			interrupts = <0 102 4>;
-+			num-chipselect = <4>;
-+			bus-num = <0>;
-+			status = "disabled";
-+		};
-+
-+		sysmgr: sysmgr at ffd12000 {
-+			compatible = "altr,sys-mgr", "syscon";
-+			reg = <0xffd12000 0x1000>;
-+		};
-+
-+		/* Local timer */
-+		timer {
-+			compatible = "arm,armv8-timer";
-+			interrupts = <1 13 0xf01>,
-+				     <1 14 0xf01>,
-+				     <1 11 0xf01>,
-+				     <1 10 0xf01>;
-+		};
-+
-+		timer0: timer0 at ffc03000 {
-+			compatible = "snps,dw-apb-timer";
-+			interrupts = <0 113 4>;
-+			reg = <0xffc03000 0x100>;
-+		};
-+
-+		timer1: timer1 at ffc03100 {
-+			compatible = "snps,dw-apb-timer";
-+			interrupts = <0 114 4>;
-+			reg = <0xffc03100 0x100>;
-+		};
-+
-+		timer2: timer2 at ffd00000 {
-+			compatible = "snps,dw-apb-timer";
-+			interrupts = <0 115 4>;
-+			reg = <0xffd00000 0x100>;
-+		};
-+
-+		timer3: timer3 at ffd00100 {
-+			compatible = "snps,dw-apb-timer";
-+			interrupts = <0 116 4>;
-+			reg = <0xffd00100 0x100>;
-+		};
-+
-+		uart0: serial0 at ffc02000 {
-+			compatible = "snps,dw-apb-uart";
-+			reg = <0xffc02000 0x100>;
-+			interrupts = <0 108 4>;
-+			reg-shift = <2>;
-+			reg-io-width = <4>;
-+			status = "disabled";
-+		};
-+
-+		uart1: serial1 at ffc02100 {
-+			compatible = "snps,dw-apb-uart";
-+			reg = <0xffc02100 0x100>;
-+			interrupts = <0 109 4>;
-+			reg-shift = <2>;
-+			reg-io-width = <4>;
-+			status = "disabled";
-+		};
-+
-+		usbphy0: usbphy at 0 {
-+			#phy-cells = <0>;
-+			compatible = "usb-nop-xceiv";
-+			status = "okay";
-+		};
-+
-+		usb0: usb at ffb00000 {
-+			compatible = "snps,dwc2";
-+			reg = <0xffb00000 0x40000>;
-+			interrupts = <0 93 4>;
-+			phys = <&usbphy0>;
-+			phy-names = "usb2-phy";
-+			status = "disabled";
-+		};
-+
-+		usb1: usb at ffb40000 {
-+			compatible = "snps,dwc2";
-+			reg = <0xffb40000 0x40000>;
-+			interrupts = <0 94 4>;
-+			phys = <&usbphy0>;
-+			phy-names = "usb2-phy";
-+			status = "disabled";
-+		};
-+
-+		watchdog0: watchdog at ffd00200 {
-+			compatible = "snps,dw-wdt";
-+			reg = <0xffd00200 0x100>;
-+			interrupts = <0 117 4>;
-+			status = "disabled";
-+		};
-+
-+		watchdog1: watchdog at ffd00300 {
-+			compatible = "snps,dw-wdt";
-+			reg = <0xffd00300 0x100>;
-+			interrupts = <0 118 4>;
-+			status = "disabled";
-+		};
-+
-+		watchdog2: watchdog at ffd00400 {
-+			compatible = "snps,dw-wdt";
-+			reg = <0xffd00400 0x100>;
-+			interrupts = <0 125 4>;
-+			status = "disabled";
-+		};
-+
-+		watchdog3: watchdog at ffd00500 {
-+			compatible = "snps,dw-wdt";
-+			reg = <0xffd00500 0x100>;
-+			interrupts = <0 126 4>;
-+			status = "disabled";
-+		};
-+	};
-+};
-diff --git a/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts b/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts
-new file mode 100644
-index 0000000..8b162ef
---- /dev/null
-+++ b/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts
-@@ -0,0 +1,38 @@
-+/*
-+ * Copyright Altera Corporation (C) 2015. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along with
-+ * this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+/include/ "socfpga_stratix10.dtsi"
-+
-+/ {
-+	model = "SoCFPGA Stratix 10 SoCDK";
-+
-+	aliases {
-+		serial0 = &uart0;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x0 0x40000000>;
-+	};
-+};
-+
-+&uart0 {
-+	status = "okay";
-+};
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 4e17e7e..ad3b636 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -36,6 +36,7 @@ CONFIG_ARCH_FSL_LS2085A=y
- CONFIG_ARCH_HISI=y
- CONFIG_ARCH_MEDIATEK=y
- CONFIG_ARCH_SEATTLE=y
-+CONFIG_ARCH_STRATIX10=y
- CONFIG_ARCH_TEGRA=y
- CONFIG_ARCH_TEGRA_132_SOC=y
- CONFIG_ARCH_QCOM=y
--- 
-2.4.5
+Would such a function work for you? What does everyone think about the
+@template?
+
+struct generic_pm_domain *of_arm_cpu_domain(struct device_node *dn,
+                struct of_arm_pd_ops *ops, struct generic_pm_domain *template)
+{
+        struct arm_pm_domain *pd;
+
+        if (!of_device_is_available(dn))
+                return NULL;
+
+	/* This creates the memory for pd and setup basic stuff */
+        pd = setup_arm_pd(dn);
+
+	/* copy the platform's template genpd over to the pd's genpd */
+        memcpy(&pd.genpd, template, sizeof(*template));
+
+	/* 
+	 * Now set up the additional ops and flags and register with
+	 * genpd framework
+	 */
+        register_arm_pd(dn, pd);
+
+	/* 
+	 * Returning the genpd back to the platform so it can be added
+	 * as subdomains to other domains etc.
+	 */
+        return &pd.genpd;
+}
+EXPORT_SYMBOL(of_arm_cpu_domain);
+
+The catch is that platform drivers have to provide a template for the
+genpd. The @template would never be registered, but would just be used
+to create the common code's genpd.
+
+Any other ideas?
+
+Thanks,
+Lina
