@@ -1,42 +1,41 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 11 Aug 2015 23:48:01 +0100
-Subject: [PATCH v4 00/10] ACPI GIC Self-probing, GICv2m and GICv3 support
-In-Reply-To: <55CA78DE.1000306@codeaurora.org>
-References: <1438164539-29256-1-git-send-email-hanjun.guo@linaro.org>
- <55CA70D5.6040300@codeaurora.org> <20150811232523.60d192d2@arm.com>
- <55CA78DE.1000306@codeaurora.org>
-Message-ID: <20150811234801.51108784@arm.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 11 Aug 2015 15:49:02 -0700
+Subject: [PATCH 5/9] clk: qcom: gcc-msm8960: add child devices support.
+In-Reply-To: <1436348838-22671-6-git-send-email-rnayak@codeaurora.org>
+References: <1436348838-22671-1-git-send-email-rnayak@codeaurora.org>
+ <1436348838-22671-6-git-send-email-rnayak@codeaurora.org>
+Message-ID: <20150811224902.GO2839@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 11 Aug 2015 23:36:14 +0100
-Timur Tabi <timur@codeaurora.org> wrote:
+On 07/08, Rajendra Nayak wrote:
+> diff --git a/drivers/clk/qcom/gcc-msm8960.c b/drivers/clk/qcom/gcc-msm8960.c
+> index eb6a4f9..2c80d03 100644
+> --- a/drivers/clk/qcom/gcc-msm8960.c
+> +++ b/drivers/clk/qcom/gcc-msm8960.c
+> @@ -15,6 +15,7 @@
+>  #include <linux/bitops.h>
+>  #include <linux/err.h>
+>  #include <linux/platform_device.h>
+> +#include <linux/of_platform.h>
+>  #include <linux/module.h>
+>  #include <linux/of.h>
+>  #include <linux/of_device.h>
+> @@ -3520,7 +3521,8 @@ static int gcc_msm8960_probe(struct platform_device *pdev)
+>  	if (IS_ERR(clk))
+>  		return PTR_ERR(clk);
+>  
+> -	return qcom_cc_probe(pdev, match->data);
+> +	qcom_cc_probe(pdev, match->data);
+> +	return of_platform_populate(pdev->dev.of_node, NULL, NULL, &pdev->dev);
 
-> On 08/11/2015 05:25 PM, Marc Zyngier wrote:
-> > My branch, as far as I can tell by looking at my own git tree, is based
-> > on v4.2-rc2. As for "the LEG kernel", I have no idea what that is. I
-> > only work on this thing called "the Linux kernel". You may have heard
-> > of it!;-)
-> 
-> Then what is this:
-> 
-> git://git.linaro.org/leg/acpi/acpi.git
->                       ^^^
-> 
-> This is your tree, isn't it?  
+We just lost the error code from qcom_cc_probe()...
 
-My tree would have "maz" in it, and would rather be hosted on
-kernel.org.
+Also, I don't like having a subnode in DT. Why can't we use the
+same node as the GCC node and create a virtual child device here
+for tsens? We can assign the same of_node that this platform
+device has so that DT keeps working correctly.
 
-> Hanjun said, "Patches are on top of Marc's 
-> branch irq/gsi-irq-domain-v2, and available at: 
-> git://git.linaro.org/leg/acpi/acpi.git gsi-irqdomain".
-
-I don't see any contradiction here. Hanjun picked the patches from my
-own branch in my own tree, put his own patches on top, and pushed that
-out on an branch called gsi-irqdomain that is definitely based on
-4.2-rc2. I have no idea where your 3.9-rc7 comes from.
-
-	M.
 -- 
-Jazz is not dead. It just smells funny.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
