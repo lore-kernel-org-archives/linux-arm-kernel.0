@@ -1,54 +1,175 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 11 Aug 2015 11:29:55 -0600
-Subject: [PATCH] arm: rpi: Device tree modifications for U-Boot
-In-Reply-To: <1439312701.2451.3.camel@lynxeye.de>
-References: <1439303153-12171-1-git-send-email-sjg@chromium.org>
- <1439312701.2451.3.camel@lynxeye.de>
-Message-ID: <55CA3113.1010601@wwwdotorg.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 11 Aug 2015 18:31:21 +0100
+Subject: [PATCH v8 1/7] arm64: Add HAVE_REGS_AND_STACK_ACCESS_API feature
+In-Reply-To: <1439254364-15362-2-git-send-email-dave.long@linaro.org>
+References: <1439254364-15362-1-git-send-email-dave.long@linaro.org>
+ <1439254364-15362-2-git-send-email-dave.long@linaro.org>
+Message-ID: <20150811173121.GC29880@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/11/2015 11:05 AM, Lucas Stach wrote:
-> Hi Simon,
->
-> why did you send this to the Tegra ML?
+Hi David,
 
-At my request, so that the DT changes could be reviewed by the kernel DT 
-reviewers and added to the copy of the DT files in the kernel source 
-tree if approved.
+On Tue, Aug 11, 2015 at 01:52:38AM +0100, David Long wrote:
+> From: "David A. Long" <dave.long@linaro.org>
+> 
+> Add HAVE_REGS_AND_STACK_ACCESS_API feature for arm64.
+> 
+> Signed-off-by: David A. Long <dave.long@linaro.org>
+> ---
+>  arch/arm64/Kconfig              |  1 +
+>  arch/arm64/include/asm/ptrace.h | 25 +++++++++++++
+>  arch/arm64/kernel/ptrace.c      | 77 +++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 103 insertions(+)
+> 
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 318175f..ef5d726 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -70,6 +70,7 @@ config ARM64
+>  	select HAVE_PERF_EVENTS
+>  	select HAVE_PERF_REGS
+>  	select HAVE_PERF_USER_STACK_DUMP
+> +	select HAVE_REGS_AND_STACK_ACCESS_API
+>  	select HAVE_RCU_TABLE_FREE
+>  	select HAVE_SYSCALL_TRACEPOINTS
+>  	select IRQ_DOMAIN
+> diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
+> index d6dd9fd..8f440e9 100644
+> --- a/arch/arm64/include/asm/ptrace.h
+> +++ b/arch/arm64/include/asm/ptrace.h
+> @@ -118,6 +118,8 @@ struct pt_regs {
+>  	u64 syscallno;
+>  };
+>  
+> +#define MAX_REG_OFFSET (sizeof(struct user_pt_regs) - sizeof(u64))
 
-My assertion is that DT content should be independent of SW stack. Or 
-put another way, all SW stacks should use the same DT content. As such, 
-if these properties are needed by U-Boot, and contained in the copy of 
-the DT files in the U-Boot source tree, they should also be present in 
-the copy of the DT files in the kernel source tree, so the two do not 
-become out of sync.
+Can you not use offset_of(struct user_pt_regs, pstate) here?
 
-> Am Dienstag, den 11.08.2015, 08:25 -0600 schrieb Simon Glass:
->> This updates the device tree from the kernel version to something suitable
->> for U-Boot:
->>
->> - Add stdout-path alias for console
->> - Mark the /soc node to be available pre-relocation so that the early
->> serial console works (we need the 'ranges' property to be available)
+> +
+>  #define arch_has_single_step()	(1)
+>  
+>  #ifdef CONFIG_COMPAT
+> @@ -146,6 +148,29 @@ struct pt_regs {
+>  #define user_stack_pointer(regs) \
+>  	(!compat_user_mode(regs) ? (regs)->sp : (regs)->compat_sp)
+>  
+> +/**
+> + * regs_get_register() - get register value from its offset
+> + * @regs:	   pt_regs from which register value is gotten
+> + * @offset:    offset number of the register.
+> + *
+> + * regs_get_register returns the value of a register whose offset from @regs.
+> + * The @offset is the offset of the register in struct pt_regs.
+> + * If @offset is bigger than MAX_REG_OFFSET, this returns 0.
+> + */
+> +static inline u64 regs_get_register(struct pt_regs *regs,
+> +					      unsigned int offset)
+> +{
+> +	if (unlikely(offset > MAX_REG_OFFSET))
+> +		return 0;
+> +	return *(u64 *)((u64)regs + offset);
+> +}
 
->> diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
->> index 301c73f..bd6bff6 100644
->> --- a/arch/arm/boot/dts/bcm2835.dtsi
->> +++ b/arch/arm/boot/dts/bcm2835.dtsi
->> @@ -8,6 +8,7 @@
->>
->>   	chosen {
->>   		bootargs = "earlyprintk console=ttyAMA0";
->> +		stdout-path = &uart;
->>   	};
->>
->>   	soc {
->> @@ -16,6 +17,7 @@
->>   		#size-cells = <1>;
->>   		ranges = <0x7e000000 0x20000000 0x02000000>;
->>   		dma-ranges = <0x40000000 0x00000000 0x20000000>;
->> +		u-boot,dm-pre-reloc;
->
-> Why do you need this and why should upstream carry your favourite
-> bootloaders configuration? This is in no way hardware description.
+Is this guaranteed only to be called on kernel-mode regs, or do we need
+to deal with compat tasks too?
+
+> +
+> +/* Valid only for Kernel mode traps. */
+> +static inline unsigned long kernel_stack_pointer(struct pt_regs *regs)
+> +{
+> +	return regs->sp;
+> +}
+> +
+>  static inline unsigned long regs_return_value(struct pt_regs *regs)
+>  {
+>  	return regs->regs[0];
+> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
+> index d882b83..f6199a5 100644
+> --- a/arch/arm64/kernel/ptrace.c
+> +++ b/arch/arm64/kernel/ptrace.c
+> @@ -48,6 +48,83 @@
+>  #define CREATE_TRACE_POINTS
+>  #include <trace/events/syscalls.h>
+>  
+> +#define ARM_pstate	pstate
+> +#define ARM_pc		pc
+> +#define ARM_sp		sp
+> +#define ARM_x30		regs[30]
+> +#define ARM_x29		regs[29]
+> +#define ARM_x28		regs[28]
+> +#define ARM_x27		regs[27]
+> +#define ARM_x26		regs[26]
+> +#define ARM_x25		regs[25]
+> +#define ARM_x24		regs[24]
+> +#define ARM_x23		regs[23]
+> +#define ARM_x22		regs[22]
+> +#define ARM_x21		regs[21]
+> +#define ARM_x20		regs[20]
+> +#define ARM_x19		regs[19]
+> +#define ARM_x18		regs[18]
+> +#define ARM_x17		regs[17]
+> +#define ARM_x16		regs[16]
+> +#define ARM_x15		regs[15]
+> +#define ARM_x14		regs[14]
+> +#define ARM_x13		regs[13]
+> +#define ARM_x12		regs[12]
+> +#define ARM_x11		regs[11]
+> +#define ARM_x10		regs[10]
+> +#define ARM_x9		regs[9]
+> +#define ARM_x8		regs[8]
+> +#define ARM_x7		regs[7]
+> +#define ARM_x6		regs[6]
+> +#define ARM_x5		regs[5]
+> +#define ARM_x4		regs[4]
+> +#define ARM_x3		regs[3]
+> +#define ARM_x2		regs[2]
+> +#define ARM_x1		regs[1]
+> +#define ARM_x0		regs[0]
+
+I've said it before, but I really don't like these macros. I'd rather
+rework the following REG_OFFSET_NAME to be GPR_OFFSET_NAME which could
+prefix the "x" in the name field.
+
+> +
+> +#define REG_OFFSET_NAME(r) \
+> +	{.name = #r, .offset = offsetof(struct pt_regs, ARM_##r)}
+> +#define REG_OFFSET_END {.name = NULL, .offset = 0}
+> +
+> +const struct pt_regs_offset regs_offset_table[] = {
+> +	REG_OFFSET_NAME(x0),
+> +	REG_OFFSET_NAME(x1),
+> +	REG_OFFSET_NAME(x2),
+> +	REG_OFFSET_NAME(x3),
+> +	REG_OFFSET_NAME(x4),
+> +	REG_OFFSET_NAME(x5),
+> +	REG_OFFSET_NAME(x6),
+> +	REG_OFFSET_NAME(x7),
+> +	REG_OFFSET_NAME(x8),
+> +	REG_OFFSET_NAME(x9),
+> +	REG_OFFSET_NAME(x10),
+> +	REG_OFFSET_NAME(x11),
+> +	REG_OFFSET_NAME(x12),
+> +	REG_OFFSET_NAME(x13),
+> +	REG_OFFSET_NAME(x14),
+> +	REG_OFFSET_NAME(x15),
+> +	REG_OFFSET_NAME(x16),
+> +	REG_OFFSET_NAME(x17),
+> +	REG_OFFSET_NAME(x18),
+> +	REG_OFFSET_NAME(x19),
+> +	REG_OFFSET_NAME(x20),
+> +	REG_OFFSET_NAME(x21),
+> +	REG_OFFSET_NAME(x22),
+> +	REG_OFFSET_NAME(x23),
+> +	REG_OFFSET_NAME(x24),
+> +	REG_OFFSET_NAME(x25),
+> +	REG_OFFSET_NAME(x26),
+> +	REG_OFFSET_NAME(x27),
+> +	REG_OFFSET_NAME(x28),
+> +	REG_OFFSET_NAME(x29),
+> +	REG_OFFSET_NAME(x30),
+
+Does this interact badly with perf tools, which expect to pass "lr" for
+x30? (see tools/perf/arch/arm64/include/perf_regs.h).
+
+Will
