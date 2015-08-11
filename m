@@ -1,52 +1,49 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Tue, 11 Aug 2015 15:50:47 +0800
-Subject: [PATCH] pinctrl: mediatek: Implement pictrl irq wake handler
-In-Reply-To: <1439257910.38706.1.camel@mussux00.eus.mediatek.inc>
-References: <1438162601-448-1-git-send-email-maoguang.meng@mediatek.com>
- <CACRpkdZ1RjjSh5J=K724CpbXDXwdHJSdXOTLS8fSOO-34zn=9A@mail.gmail.com>
- <1439257910.38706.1.camel@mussux00.eus.mediatek.inc>
-Message-ID: <CAGS+omA+yhcSSMPq_Pvc+v9UjwLz8wJNKr9ezcuxnYHAUwNXfQ@mail.gmail.com>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Tue, 11 Aug 2015 16:51:10 +0900
+Subject: [PATCH v4 0/6] cpufreq: use generic cpufreq drivers for Exynos4x12
+ platform
+In-Reply-To: <55C95BD6.7010200@samsung.com>
+References: <1438868514-8814-1-git-send-email-b.zolnierkie@samsung.com>
+ <2359635.Hxe4cb8zKm@amdc1976> <20150807115627.GH6939@linux>
+ <1525406.7aXvVQzEDd@vostro.rjw.lan> <20150808020740.GM6939@linux>
+ <55C5AF4E.3010500@samsung.com> <03ee01d0d30b$b279c490$176d4db0$@kernel.org>
+ <55C95BD6.7010200@samsung.com>
+Message-ID: <057401d0d40a$7cd241a0$7676c4e0$@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 11, 2015 at 9:51 AM, Hongzhou Yang
-<hongzhou.yang@mediatek.com> wrote:
-> On Mon, 2015-08-10 at 14:43 +0200, Linus Walleij wrote:
->> On Wed, Jul 29, 2015 at 11:36 AM,  <maoguang.meng@mediatek.com> wrote:
->>
->> > From: Maoguang Meng <maoguang.meng@mediatek.com>
->> >
->> > This patch implement irq_set_wake for suspend resume.
->> >
->> > Signed-off-by: Maoguang Meng <maoguang.meng@mediatek.com>
->>
->> Hongzhou/Yingjoe: are you OK with this patch? Can I have your ACKs?
->>
->> Yours,
->> Linus Walleij
->
-> Hi Linus,
->
-> Yes, you can. Thank you.
->
-> Acked-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
+Krzysztof Kozlowski wrote:
+> 
+> On 10.08.2015 10:27, Kukjin Kim wrote:
+> > Krzysztof Kozlowski wrote:
+> >>
+> >> W dniu 08.08.2015 o 11:07, Viresh Kumar pisze:
+> >>> On 08-08-15, 00:24, Rafael J. Wysocki wrote:
+> >>>> OK, so please let me know which patches you want me to pick up.
+> >>>>
+> >>>> Ideally, I'd prefer them to be resent in a separate series with ACKs and all
+> >>>> with a cover letter clearly stating whose tree they are being targeted at.
+> >>>
+> >>> He already sent it separately, let me send a confirmatory mail in
+> >>> reply to that.
+> >>
+> >> Dear Kukjin,
+> >>
+> >> Can you apply the 2-5 of this series to v4.3? It's getting late but
+> >> maybe they still could go?
+> >>
+> > Once my previous pull-request landed into arm-soc, I'll try to send out this
+> > series 2-5 for v4.3.
+> 
+> Additionally (better late than never):
 
-NAK.
+Sure ;-)
 
-maoguang removes almost all of this patch in what I think is v2 of
-this same patch:
-https://patchwork.kernel.org/patch/6967441/
+> Patches 2-5 tested on Trats2 board (Exynos4412)
+> 
+> Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> 
+Applied with Krzysztof's 'Tested-by'.
 
-maoguang, please squash the two version of this patch together, and
-upload a separate, correct patch.
-
--Dan
-
->
-> Hongzhou
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+Thanks,
+Kukjin
