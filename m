@@ -1,89 +1,158 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 12 Aug 2015 00:42:29 +0800
-Subject: [GIT PULL 1/3] ARM: imx: soc updates for 4.3
-Message-ID: <1439311351-5268-1-git-send-email-shawnguo@kernel.org>
+Date: Wed, 12 Aug 2015 00:42:30 +0800
+Subject: [GIT PULL 2/3] ARM: imx: device tree changes for 4.3
+In-Reply-To: <1439311351-5268-1-git-send-email-shawnguo@kernel.org>
+References: <1439311351-5268-1-git-send-email-shawnguo@kernel.org>
+Message-ID: <1439311351-5268-2-git-send-email-shawnguo@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi arm-soc maintainers,
 
-This is the i.MX SoC changes for 4.3.  There are some input and rtc
-changes, because they are applied as a series.  Subsystem maintainers
-have ACKed these changes, so it should be fine to send them via arm-soc
-tree.
+This is the i.MX device tree updates for 4.3.  To resolve the dependency
+between imx6ul clock driver and DTS files on those clock ID definitions,
+the i.MX clock changes are pulled into the branch.  But since i.MX clock
+drivers are now in drivers/clk/imx/ folder, I sent the clock changes to
+Mike and Stephen.  I've already asked them to keep my clock branch
+stable/non-reabasable.  So it should be safe pull this DT change set
+into arm-soc.
 
 Shawn
 
-The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
+The following changes since commit 787b4271a6a0c09775241770782b22762f40bd6e:
 
-  Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
+  clk: imx: add imx6ul clk tree support (2015-07-14 15:02:13 +0800)
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-soc-4.3
+  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-dt-4.3
 
-for you to fetch changes up to 8a0fa1843638c5078e6606114ed8bdf9ea56fab1:
+for you to fetch changes up to 360325755336893869c419013ec0e33757432cbb:
 
-  rtc: snvs: select option REGMAP_MMIO (2015-08-11 23:04:47 +0800)
-
-----------------------------------------------------------------
-The i.MX SoC changes for 4.3:
- - Add i.MX6 Ultralite SoC support, which is the newest addition to
-   i.MX6 family.  It integrates a single Cortex-A7 core and a power
-   management module that reduces the complexity of external power
-   supply and simplifies power sequencing.
- - Change SNVS RTC driver to use syscon interface for register access,
-   and add SNVS power key driver support.
- - Add a second clock for mxc rtc driver, and support device tree probe
-   for the driver.
- - Add FEC MAC reference clock and phy fixup initialization for i.MX6UL
-   platform.
+  ARM: dts: imx6ul: add snvs power key support (2015-08-11 23:15:27 +0800)
 
 ----------------------------------------------------------------
-Anson Huang (1):
-      ARM: imx: add low-level debug support for i.mx6ul
+The i.MX device tree updates for 4.3:
+ - Add audio and eTSEC device support and update dspi node for LS1021A.
+ - Add initial i.MX6UL and imx6ul-14x14-evk board support, and enable
+   a bunch of device support for i.MX6UL, including RTC, power key, USB,
+   QSPI, and dual FEC.
+ - Enable HDMI and LVDS dual display support for a few imx6qdl boards.
+ - Support of imx6sl-warp board rev1.12, the version which will be
+   publicly available for the customers.
+ - A few i.MX7D device additions, watchdog, cortex-a7 coresight
+   components, RTC, power key, power off.
+ - Some Vybrid updates: add device support for I2C, QSPI, eSDHC etc.,
+   update ADC node, and define stdout-path property.
+ - A few random updates for i.MX27 and i.MX53 devices.
 
-Frank Li (4):
-      ARM: imx: add i.mx6ul msl support
-      rtc: snvs: use syscon to access register
-      Document: dt: fsl: snvs: change support syscon
-      Document: devicetree: input: imx: i.mx snvs power device tree bindings
+----------------------------------------------------------------
+Alison Wang (1):
+      ARM: dts: ls1021a: Add dts nodes for audio on LS1021A
+
+Anson Huang (4):
+      ARM: dts: imx6sx: correct property name for wakeup source
+      ARM: dts: imx6ul: enable GPC as extended interrupt controller
+      ARM: dts: imx6ul: add RTC support
+      ARM: dts: imx6ul: add snvs power key support
+
+Claudiu Manoil (2):
+      ARM: dts: ls1021a: Add the eTSEC controller nodes
+      ARM: dts: ls1021a: Enable the eTSEC ports on QDS and TWR
+
+Cory Tusar (4):
+      ARM: dts: vf610: Extend I2C support to all available buses.
+      ARM: dts: vf610: Add missing QuadSPI register mapping and names.
+      ARM: dts: vfxxx: Include support for qspi1 functionality.
+      ARM: dts: vfxxx: Include support for esdhc0 functionality.
+
+Fabio Estevam (7):
+      ARM: dts: imx6sl-warp: Add the SD2_RESET pin
+      ARM: dts: imx6qdl-sabreauto: Add HDMI support
+      ARM: dts: imx6qdl-sabresd: Allow HDMI and LVDS to work simultaneously
+      ARM: dts: imx6sl-warp: Add changes for rev1.12
+      ARM: dts: imx6qdl-sabrelite: Allow HDMI and LVDS to work simultaneously
+      ARM: dts: imx6qdl-nitrogen6x: Allow HDMI and LVDS to work simultaneously
+      ARM: dts: imx6qdl-sabreauto: Allow HDMI and LVDS to work simultaneously
+
+Frank Li (11):
+      ARM: dts: imx7d: add watch dog support
+      ARM: dts: imx6sx: enable snvs power key
+      ARM: dts: imx7d: add cortex-a7 coresight component
+      Document: dt: binding: imx: update document for imx6ul support
+      ARM: dts: add i.mx6ul pin function include file
+      ARM: dts: imx: add imx6ul and imx6ul evk board support
+      ARM: dts: imx: update snvs to use syscon access register
+      ARM: dts: imx6ul: add usb host and function support
+      ARM: dts: imx6ul: fix low case define in imx6ul-pinfunc.h
+      ARM: dts: imx6ul: add qspi support
+      ARM: dts: imx7d: enable snvs rtc, onoffkey and power off
 
 Fugang Duan (2):
-      ARM: imx6ul: add fec bits to GPR syscon definition
-      ARM: imx6ul: add fec MAC refrence clock and phy fixup init
+      ARM: dts: imx: add fec1 and fec2 nodes for SOC i.MX6UL
+      ARM: dts: imx6ul-14x14-evk: add fec1 and fec2 support
 
-Philippe Reynes (3):
-      rtc: mxc: use a second rtc clock
-      dt-binding: document the binding for mxc rtc
-      rtc: mxc: add support of device tree
+Haikun Wang (1):
+      ARM: dts: ls1021a: Update 'dspi' device node compatible string
 
-Robin Gong (1):
-      input: keyboard: imx: add snvs power key driver
+Lucas Stach (1):
+      ARM: dts: imx53-qsb: select open-drain mode for i2c1 pads
 
-Shawn Guo (2):
-      input: snvs_pwrkey: use "wakeup-source" as deivce tree property name
-      rtc: snvs: select option REGMAP_MMIO
+Peter Chen (1):
+      ARM: imx6qdl-sabreauto.dtsi: enable USB support
 
- .../devicetree/bindings/crypto/fsl-sec4.txt        |  91 +++++++--
- .../devicetree/bindings/input/snvs-pwrkey.txt      |   1 +
- Documentation/devicetree/bindings/rtc/rtc-mxc.txt  |  26 +++
- arch/arm/Kconfig.debug                             |   9 +
- arch/arm/include/debug/imx-uart.h                  |  13 ++
- arch/arm/mach-imx/Kconfig                          |   8 +
- arch/arm/mach-imx/Makefile                         |   1 +
- arch/arm/mach-imx/cpu.c                            |   3 +
- arch/arm/mach-imx/mach-imx6ul.c                    |  86 ++++++++
- arch/arm/mach-imx/mxc.h                            |   6 +
- drivers/input/keyboard/Kconfig                     |  11 +
- drivers/input/keyboard/Makefile                    |   1 +
- drivers/input/keyboard/snvs_pwrkey.c               | 227 +++++++++++++++++++++
- drivers/rtc/Kconfig                                |   1 +
- drivers/rtc/rtc-mxc.c                              |  60 ++++--
- drivers/rtc/rtc-snvs.c                             | 132 ++++++------
- include/linux/mfd/syscon/imx6q-iomuxc-gpr.h        |   8 +
- 17 files changed, 592 insertions(+), 92 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/input/snvs-pwrkey.txt
- create mode 100644 Documentation/devicetree/bindings/rtc/rtc-mxc.txt
- create mode 100644 arch/arm/mach-imx/mach-imx6ul.c
- create mode 100644 drivers/input/keyboard/snvs_pwrkey.c
+Peter Seiderer (2):
+      ARM: dts: nitrogen6x: add CAN support
+      ARM: dts: sabrelite: add CAN support
+
+Philippe Reynes (1):
+      ARM: dts: imx27: add support of internal rtc
+
+Sanchayan Maity (1):
+      ARM: dts: vfxxx: Add io-channel-cells property for ADC node
+
+Shengjiu Wang (1):
+      ARM: dts: imx6qdl-sabreauto: Add audio support
+
+Stefan Agner (2):
+      ARM: dts: vf-colibri: define stdout-path property
+      ARM: dts: add property for maximum ADC clock frequencies
+
+Tim Harvey (1):
+      ARM: dts: ventana: add UHS-I support for Ventana boards
+
+ .../devicetree/bindings/clock/imx6ul-clock.txt     |  13 +
+ .../bindings/pinctrl/fsl,imx6ul-pinctrl.txt        |  36 +
+ arch/arm/boot/dts/Makefile                         |   2 +
+ arch/arm/boot/dts/imx27.dtsi                       |   9 +
+ arch/arm/boot/dts/imx53-qsb-common.dtsi            |   5 +-
+ arch/arm/boot/dts/imx53-qsrb.dts                   |  14 +-
+ arch/arm/boot/dts/imx6qdl-gw51xx.dtsi              |   1 -
+ arch/arm/boot/dts/imx6qdl-gw52xx.dtsi              |  35 +-
+ arch/arm/boot/dts/imx6qdl-gw53xx.dtsi              |  35 +-
+ arch/arm/boot/dts/imx6qdl-gw54xx.dtsi              |  34 +-
+ arch/arm/boot/dts/imx6qdl-gw551x.dtsi              |   1 -
+ arch/arm/boot/dts/imx6qdl-gw552x.dtsi              |   1 -
+ arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi          |  39 +
+ arch/arm/boot/dts/imx6qdl-sabreauto.dtsi           | 137 +++
+ arch/arm/boot/dts/imx6qdl-sabrelite.dtsi           |  39 +
+ arch/arm/boot/dts/imx6qdl-sabresd.dtsi             |   7 +
+ arch/arm/boot/dts/imx6qdl.dtsi                     |  52 +-
+ arch/arm/boot/dts/imx6sl-warp.dts                  |  32 +-
+ arch/arm/boot/dts/imx6sl.dtsi                      |  21 +-
+ arch/arm/boot/dts/imx6sx.dtsi                      |  28 +-
+ arch/arm/boot/dts/imx6ul-14x14-evk.dts             | 343 ++++++++
+ arch/arm/boot/dts/imx6ul-pinfunc.h                 | 938 +++++++++++++++++++++
+ arch/arm/boot/dts/imx6ul.dtsi                      | 707 ++++++++++++++++
+ arch/arm/boot/dts/imx7d.dtsi                       | 260 +++++-
+ arch/arm/boot/dts/ls1021a-qds.dts                  |  89 ++
+ arch/arm/boot/dts/ls1021a-twr.dts                  |  81 ++
+ arch/arm/boot/dts/ls1021a.dtsi                     | 106 ++-
+ arch/arm/boot/dts/vf-colibri-eval-v3.dtsi          |   2 +-
+ arch/arm/boot/dts/vfxxx.dtsi                       |  85 +-
+ 29 files changed, 3062 insertions(+), 90 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/imx6ul-clock.txt
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/fsl,imx6ul-pinctrl.txt
+ create mode 100644 arch/arm/boot/dts/imx6ul-14x14-evk.dts
+ create mode 100644 arch/arm/boot/dts/imx6ul-pinfunc.h
+ create mode 100644 arch/arm/boot/dts/imx6ul.dtsi
