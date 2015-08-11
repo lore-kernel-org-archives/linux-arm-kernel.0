@@ -1,49 +1,47 @@
 From: kgene@kernel.org (Kukjin Kim)
-Date: Tue, 11 Aug 2015 16:51:10 +0900
-Subject: [PATCH v4 0/6] cpufreq: use generic cpufreq drivers for Exynos4x12
- platform
-In-Reply-To: <55C95BD6.7010200@samsung.com>
-References: <1438868514-8814-1-git-send-email-b.zolnierkie@samsung.com>
- <2359635.Hxe4cb8zKm@amdc1976> <20150807115627.GH6939@linux>
- <1525406.7aXvVQzEDd@vostro.rjw.lan> <20150808020740.GM6939@linux>
- <55C5AF4E.3010500@samsung.com> <03ee01d0d30b$b279c490$176d4db0$@kernel.org>
- <55C95BD6.7010200@samsung.com>
-Message-ID: <057401d0d40a$7cd241a0$7676c4e0$@kernel.org>
+Date: Tue, 11 Aug 2015 16:51:36 +0900
+Subject: [PATCH] ARM: exynos_defconfig: Enable cpufreq-dt driver
+In-Reply-To: <55C98E17.9040303@osg.samsung.com>
+References: <1439259354-32055-1-git-send-email-k.kozlowski@samsung.com>
+ <55C98E17.9040303@osg.samsung.com>
+Message-ID: <057e01d0d40a$8c3a3210$a4ae9630$@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Krzysztof Kozlowski wrote:
+Javier Martinez Canillas wrote:
 > 
-> On 10.08.2015 10:27, Kukjin Kim wrote:
-> > Krzysztof Kozlowski wrote:
-> >>
-> >> W dniu 08.08.2015 o 11:07, Viresh Kumar pisze:
-> >>> On 08-08-15, 00:24, Rafael J. Wysocki wrote:
-> >>>> OK, so please let me know which patches you want me to pick up.
-> >>>>
-> >>>> Ideally, I'd prefer them to be resent in a separate series with ACKs and all
-> >>>> with a cover letter clearly stating whose tree they are being targeted at.
-> >>>
-> >>> He already sent it separately, let me send a confirmatory mail in
-> >>> reply to that.
-> >>
-> >> Dear Kukjin,
-> >>
-> >> Can you apply the 2-5 of this series to v4.3? It's getting late but
-> >> maybe they still could go?
-> >>
-> > Once my previous pull-request landed into arm-soc, I'll try to send out this
-> > series 2-5 for v4.3.
+> Hello Krzysztof,
 > 
-> Additionally (better late than never):
+> On 08/11/2015 04:15 AM, Krzysztof Kozlowski wrote:
+> > With the latest patches the cpufreq-dt can be used on multiple
+> > Exynos SoCs: 3250, 4210, 4212, 4412 and 5250.
+> >
+> > Enable it along with default ondemand governor to conserve the energy,
+> > reduce temperature while maintaining acceptable performance.
+> >
+> > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> > ---
+> >  arch/arm/configs/exynos_defconfig | 2 ++
+> >  1 file changed, 2 insertions(+)
+> >
+> > diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+> > index 67965cedeb69..2263cd94cb93 100644
+> > --- a/arch/arm/configs/exynos_defconfig
+> > +++ b/arch/arm/configs/exynos_defconfig
+> > @@ -27,6 +27,8 @@ CONFIG_ARM_APPENDED_DTB=y
+> >  CONFIG_ARM_ATAG_DTB_COMPAT=y
+> >  CONFIG_CMDLINE="root=/dev/ram0 rw ramdisk=8192 initrd=0x41000000,8M console=ttySAC1,115200
+> init=/linuxrc mem=256M"
+> >  CONFIG_CPU_FREQ=y
+> > +CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
+> > +CONFIG_CPUFREQ_DT=y
+> >  CONFIG_CPU_IDLE=y
+> >  CONFIG_ARM_EXYNOS_CPUIDLE=y
+> >  CONFIG_VFP=y
+> >
+> 
+> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> 
+Thanks, applied.
 
-Sure ;-)
-
-> Patches 2-5 tested on Trats2 board (Exynos4412)
-> 
-> Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> 
-Applied with Krzysztof's 'Tested-by'.
-
-Thanks,
-Kukjin
+- Kukjin
