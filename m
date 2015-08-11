@@ -1,39 +1,41 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 11 Aug 2015 17:12:21 +0200
-Subject: [PATCH] pinctrl: nomadik: reflect current input value
-Message-ID: <1439305941-29948-1-git-send-email-linus.walleij@linaro.org>
+From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
+Date: Tue, 11 Aug 2015 17:12:44 +0200
+Subject: [PATCH] enable HQVDP for stih410 platform
+Message-ID: <1439305964-15641-1-git-send-email-benjamin.gaignard@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Let us see the current value on the input line in debugfs.
+From: Vincent Abriou <vincent.abriou@st.com>
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Add HQVDP in stih410 devicetree to enable it.
+HQVDP bindings have been describe in
+Documentation/devicetree/bindings/gpu/st,stih4xx.txt file.
+
+Signed-off-by: Vincent Abriou <vincent.abriou@st.com>
 ---
- drivers/pinctrl/nomadik/pinctrl-nomadik.c | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm/boot/dts/stih410.dtsi | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/drivers/pinctrl/nomadik/pinctrl-nomadik.c b/drivers/pinctrl/nomadik/pinctrl-nomadik.c
-index 809d88445db5..ad43ea8fd67e 100644
---- a/drivers/pinctrl/nomadik/pinctrl-nomadik.c
-+++ b/drivers/pinctrl/nomadik/pinctrl-nomadik.c
-@@ -1012,6 +1012,7 @@ static void nmk_gpio_dbg_show_one(struct seq_file *s,
- 		int irq = gpio_to_irq(gpio);
- 		struct irq_desc	*desc = irq_to_desc(irq);
- 		int pullidx = 0;
-+		int val;
+diff --git a/arch/arm/boot/dts/stih410.dtsi b/arch/arm/boot/dts/stih410.dtsi
+index 6620bba..33cc933 100644
+--- a/arch/arm/boot/dts/stih410.dtsi
++++ b/arch/arm/boot/dts/stih410.dtsi
+@@ -163,6 +163,16 @@
+ 				st,vtg = <&vtg_main>, <&vtg_aux>;
+ 			};
  
- 		if (pull)
- 			pullidx = data_out ? 1 : 2;
-@@ -1021,6 +1022,10 @@ static void nmk_gpio_dbg_show_one(struct seq_file *s,
- 			   label ?: "(none)",
- 			   pulls[pullidx],
- 			   (mode < 0) ? "unknown" : modes[mode]);
++			sti-hqvdp at 9c000000 {
++				compatible = "st,stih407-hqvdp";
++				reg = <0x9C00000 0x100000>;
++				clock-names = "hqvdp", "pix_main";
++				clocks = <&clk_s_c0_flexgen CLK_MAIN_DISP>, <&clk_s_d2_flexgen CLK_PIX_MAIN_DISP>;
++				reset-names = "hqvdp";
++				resets = <&softreset STIH407_HDQVDP_SOFTRESET>;
++				st,vtg = <&vtg_main>;
++			};
 +
-+		val = nmk_gpio_get_input(chip, offset);
-+		seq_printf(s, " VAL %d", val);
-+
- 		/*
- 		 * This races with request_irq(), set_irq_type(),
- 		 * and set_irq_wake() ... but those are "rare".
+ 			sti-tvout at 8d08000 {
+ 				compatible = "st,stih407-tvout";
+ 				reg = <0x8d08000 0x1000>;
 -- 
-2.4.3
+1.9.1
