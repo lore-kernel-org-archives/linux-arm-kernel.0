@@ -1,48 +1,55 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 11 Aug 2015 11:34:25 -0700
-Subject: [GIT PULL] i.MX clock updates for 4.2
-In-Reply-To: <20150811174657.2416.1270@quantum>
-References: <20150811085921.GB10035@tiger> <20150811174657.2416.1270@quantum>
-Message-ID: <20150811183425.GL2839@codeaurora.org>
+From: lho@apm.com (Loc Ho)
+Date: Tue, 11 Aug 2015 11:43:24 -0700
+Subject: [PATCH v2 0/3] edac: Add L3/SoC support to the APM X-Gene SoC
+ EDAC driver
+In-Reply-To: <CALdTtnsfQ1GsZqCN470hdvsJtr_Fi5BU2L1xfAo4cqb=S9yfqA@mail.gmail.com>
+References: <1437808063-17592-1-git-send-email-lho@apm.com>
+ <CALdTtnv7P5d0Y6wyKe1SOqXedNhQxMsFZY=m-rxK3zouLcFv-Q@mail.gmail.com>
+ <CAPw-ZT=9Eq0yc7tzqJAdCvsQTgRkMmGzNOSXgawBTY0gAijr4Q@mail.gmail.com>
+ <CALdTtnsfQ1GsZqCN470hdvsJtr_Fi5BU2L1xfAo4cqb=S9yfqA@mail.gmail.com>
+Message-ID: <CAPw-ZTkMR3Kx=dhaZ0BZWMUU027f4X7STTSZV6JA0ne0W3-JPQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/11, Michael Turquette wrote:
-> > 
-> > Also, please keep it stable, because I need to pull it into other
-> > branch as dependency which I will send via arm-soc tree.
-> 
-> Will do.
-> 
-> Also, the clock driver was not Cc'd to linux-clk mailing list nor did it
-> Cc myself or Stephen. I've taken a quick look at it and it seems fine,
-> but please post clk patches to the linux-clk mailing list in the future.
-> 
+Hi Dann,
 
-Yes. We would have found this unused include too. I'll apply this
-after we merge it into clk-next.
+On Tue, Aug 11, 2015 at 7:36 AM, Dann Frazier
+<dann.frazier@canonical.com> wrote:
+> On Mon, Aug 10, 2015 at 2:15 PM, Loc Ho <lho@apm.com> wrote:
+>> Hi Dann,
+>>
+>>>> v2:
+>>>> * Update binding documentation accordingly
+>>>> * Change all single bit defines to BIT(x)
+>>>> * Add support for L3 version 1 and 2 HW's
+>>>> * Change to use debug file system for error injection
+>>>> * In L3/SoC instance add function, allocate EDAC context after all
+>>>>   initalization successed
+>>>> * Support raw or detail info for SoC EDAC error reporting
+>>>>
+>>>> v1:
+>>>> * Add L3/SoC support to the APM X-Gene SoC EDAC driver
+>>>
+>>> Loc,
+>>>   I tested 4.2-rc5 on a Mustang board with one DIMM, and it hangs (RCU
+>>> stall) in xgene_edac_mc_irq_ctl() on modprobe. Same board with 2 DIMMs
+>>> boots fine. (U-boot 1.15.12).
+>>
+>> I just removed one of the two 16GB DIMM... with 4.2.0-rc1 and some
+>> code clean up in EDAC driver, it boots just fine... I don't believe
+>> the code clean up would affect it. Do you have the dump log?
+>>
+>> [root at dhcp-10-76-213-247 ~]# uname -a
+>> Linux dhcp-10-76-213-247 4.2.0-rc1+ #33 SMP PREEMPT Mon Aug 10
+>> 13:23:03 MDT 2015 aarch64 GNU/Linux
+>
+> Sure:
+>   http://paste.ubuntu.com/12055821/
+> I've reproduced this on two machines. In both cases, we removed the
+> DIMM furthest from the CPU (in case that matters).
 
-----8<----
-From: Stephen Boyd <sboyd@codeaurora.org>
-Subject: [PATCH] clk: imx: Remove unused clkdev.h include
+This is an un-supported configuration. In the latest FW, the FW will
+flag this and won't boot. Please remove the DIMM closest to the CPU.
+FYI... I will be posting another version soon.
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- drivers/clk/imx/clk-imx6ul.c | 1 -
- 1 file changed, 1 deletion(-)
-
-diff --git a/drivers/clk/imx/clk-imx6ul.c b/drivers/clk/imx/clk-imx6ul.c
-index aaa36650695f..c498f558e942 100644
---- a/drivers/clk/imx/clk-imx6ul.c
-+++ b/drivers/clk/imx/clk-imx6ul.c
-@@ -11,7 +11,6 @@
- 
- #include <dt-bindings/clock/imx6ul-clock.h>
- #include <linux/clk.h>
--#include <linux/clkdev.h>
- #include <linux/err.h>
- #include <linux/init.h>
- #include <linux/io.h>
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+-Loc
