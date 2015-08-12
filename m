@@ -1,74 +1,46 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Wed, 12 Aug 2015 12:12:19 +0200
-Subject: [PATCH v3 1/4] edac: Add an function to retrieve the EDAC
- debugfs node
-In-Reply-To: <1439326077-25507-2-git-send-email-lho@apm.com>
-References: <1439326077-25507-1-git-send-email-lho@apm.com>
- <1439326077-25507-2-git-send-email-lho@apm.com>
-Message-ID: <20150812101219.GC14011@nazgul.tnic>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Wed, 12 Aug 2015 12:12:36 +0200
+Subject: [PATCH 11/20] regmap: _regmap_raw_read: Add handling of busses
+ without bus->read()
+In-Reply-To: <1439374365-20623-1-git-send-email-mpa@pengutronix.de>
+References: <1439374365-20623-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <1439374365-20623-12-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 11, 2015 at 02:47:54PM -0600, Loc Ho wrote:
-> This patch adds an function to retrieve the EDAC debugfs node. This allows
-> EDAC driver to create debugfs node under the EDAC debugfs node.
-> 
-> Signed-off-by: Loc Ho <lho@apm.com>
-> ---
->  drivers/edac/edac_core.h     |    1 +
->  drivers/edac/edac_mc_sysfs.c |   10 ++++++++++
->  2 files changed, 11 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/edac/edac_core.h b/drivers/edac/edac_core.h
-> index ad42587..6771e64 100644
-> --- a/drivers/edac/edac_core.h
-> +++ b/drivers/edac/edac_core.h
-> @@ -511,5 +511,6 @@ extern void edac_pci_remove_sysfs(struct edac_pci_ctl_info *pci);
->   * edac misc APIs
->   */
->  extern char *edac_op_state_to_string(int op_state);
-> +extern struct dentry *edac_get_debugfs(void);
->  
->  #endif				/* _EDAC_CORE_H_ */
-> diff --git a/drivers/edac/edac_mc_sysfs.c b/drivers/edac/edac_mc_sysfs.c
-> index 33df7d9..b76afe0 100644
-> --- a/drivers/edac/edac_mc_sysfs.c
-> +++ b/drivers/edac/edac_mc_sysfs.c
-> @@ -959,6 +959,16 @@ nomem:
->  	debugfs_remove(mci->debugfs);
->  	return -ENOMEM;
->  }
-> +
-> +struct dentry *edac_get_debugfs(void)
-> +{
-> +	return edac_debugfs;
-> +}
+Handle easy reads by using bus->reg_read(). Return with an error value
+if a read is requested that can not be handled with reg_read().
 
-EXPORT_SYMBOL_GPL() if it is going to be used by modules.
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+---
+ drivers/base/regmap/regmap.c | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-> +#else
-> +struct dentry *edac_get_debugfs(void)
-
-static inline struct ...
-
-> +{
-> +	return NULL;
-> +}
->  #endif
->  
->  /*
-> -- 
-> 1.7.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-edac" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-
+diff --git a/drivers/base/regmap/regmap.c b/drivers/base/regmap/regmap.c
+index 87f15fb60bc5..3b663350c573 100644
+--- a/drivers/base/regmap/regmap.c
++++ b/drivers/base/regmap/regmap.c
+@@ -2071,6 +2071,21 @@ static int _regmap_raw_read(struct regmap *map, unsigned int reg, void *val,
+ 
+ 	WARN_ON(!map->bus);
+ 
++	/*
++	 * There are busses that do not have a read function as it is optional.
++	 * Use their reg_read function instead if the requested number of bytes
++	 * is correct.
++	 */
++	if (!map->bus->read) {
++		/*
++		 * bus_reg_read() does not support reading values that are not
++		 * exactly the size of format.val_bytes
++		 */
++		if (val_len != map->format.val_bytes)
++			return -EINVAL;
++		return _regmap_bus_reg_read(map, reg, val);
++	}
++
+ 	range = _regmap_range_lookup(map, reg);
+ 	if (range) {
+ 		ret = _regmap_select_page(map, &reg, range,
 -- 
-Regards/Gruss,
-    Boris.
-
-ECO tip #101: Trim your mails when you reply.
---
+2.4.6
