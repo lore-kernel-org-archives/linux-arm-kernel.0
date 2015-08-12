@@ -1,58 +1,28 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Wed, 12 Aug 2015 14:51:19 +0200
-Subject: [PATCH 13/20] regmap: regmap max_raw_io getter function
-In-Reply-To: <20150812115136.GA10748@sirena.org.uk>
+Date: Wed, 12 Aug 2015 14:52:02 +0200
+Subject: [PATCH 15/20] regmap-i2c: Add smbus i2c block support
+In-Reply-To: <20150812115936.GC10748@sirena.org.uk>
 References: <1439374365-20623-1-git-send-email-mpa@pengutronix.de>
- <1439374365-20623-14-git-send-email-mpa@pengutronix.de>
- <20150812115136.GA10748@sirena.org.uk>
-Message-ID: <20150812125119.GJ19600@pengutronix.de>
+ <1439374365-20623-16-git-send-email-mpa@pengutronix.de>
+ <20150812115936.GC10748@sirena.org.uk>
+Message-ID: <20150812125202.GK19600@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 12, 2015 at 12:51:36PM +0100, Mark Brown wrote:
-> On Wed, Aug 12, 2015 at 12:12:38PM +0200, Markus Pargmann wrote:
-> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+On Wed, Aug 12, 2015 at 12:59:37PM +0100, Mark Brown wrote:
+> On Wed, Aug 12, 2015 at 12:12:40PM +0200, Markus Pargmann wrote:
 > 
-> Your changelog doesn't mention why anything would reasonably want to use
-> this and...
-
-Right, this is used later in the driver code of bmc150 to find out how
-much we can read from the sensor in one run.
-
+> > +	if (count < 1 || count >= I2C_SMBUS_BLOCK_MAX)
+> > +		return -EINVAL;
 > 
-> > +size_t regmap_get_raw_io_max(struct regmap *map)
-> > +{
-> > +	return map->max_raw_io;
-> > +}
-> > +EXPORT_SYMBOL_GPL(regmap_get_raw_io_max);
-> > +
-> > +/**
-> > + * regmap_get_raw_read_max - Get the maximum size we can read
-> > + *
-> > + * @map: Map to check.
-> > + */
-> 
-> ...it is adding two functions which don't seem very symmetrically named.
+> Elsewhere you added returns of -E2BIG if the transfer was too big, why
+> not do that here as well?
 
-Oh, this is half of my previous version where raw_read_max and
-raw_write_max where separate. Will fix it along with your comment that
-these should be different values for read and write.
+Sounds good to use E2BIG here as well.
 
-Thanks,
+Best Regards,
 
 Markus
-
-> 
-> > @@ -441,6 +441,8 @@ int regmap_get_max_register(struct regmap *map);
-> >  int regmap_get_reg_stride(struct regmap *map);
-> >  int regmap_async_complete(struct regmap *map);
-> >  bool regmap_can_raw_write(struct regmap *map);
-> > +size_t regmap_get_raw_write_max(struct regmap *map);
-> > +size_t regmap_get_raw_io_max(struct regmap *map);
-> 
-> Do we want stubs here?
-
-
 
 -- 
 Pengutronix e.K.                           |                             |
@@ -65,4 +35,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150812/9654dff2/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150812/0c10fb64/attachment.sig>
