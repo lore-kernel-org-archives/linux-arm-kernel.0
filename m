@@ -1,40 +1,29 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 11 Aug 2015 17:02:29 -0700
-Subject: [PATCH 5/7] clk: atlas7: fix the clock tree for bluetooth stuff
-In-Reply-To: <CAGsJ_4y=TC1LXC1CPB=c1bfY7ZR0ktMD+hVuUZWxXXpyRR9zEw@mail.gmail.com>
-References: <1438064845-17894-1-git-send-email-21cnbao@gmail.com>
- <1438064845-17894-6-git-send-email-21cnbao@gmail.com>
- <55B7FD22.10609@codeaurora.org>
- <CAGsJ_4wg1+5KrwTJRzE-iaSTvgvgFrM6cDyUTL16gx6Hk+tdPw@mail.gmail.com>
- <55C2BBED.4050608@codeaurora.org>
- <CAGsJ_4y=TC1LXC1CPB=c1bfY7ZR0ktMD+hVuUZWxXXpyRR9zEw@mail.gmail.com>
-Message-ID: <20150812000229.GB26614@codeaurora.org>
+Date: Tue, 11 Aug 2015 17:27:02 -0700
+Subject: [PATCH 1/7 v2] clk: atlas7: add lost pwm unit clks
+In-Reply-To: <1438699532-13860-2-git-send-email-21cnbao@gmail.com>
+References: <1438699532-13860-1-git-send-email-21cnbao@gmail.com>
+ <1438699532-13860-2-git-send-email-21cnbao@gmail.com>
+Message-ID: <20150812002702.GC26614@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/10, Barry Song wrote:
-> 2015-08-06 9:44 GMT+08:00 Stephen Boyd <sboyd@codeaurora.org>:
-> >
-> > This actually points out a big problem we have right now in Linux, which is
-> > the lack of proper power management for the type of bus topology you see in
-> > embedded systems. Some of the genpd work going on may also be another
-> > solution to this problem, where we could group multiple devices into generic
-> > power domains that know to turn on 2 or 3 of the clocks. For example, the
-> > DMAC, USP, and UART device could all be in the APB power domain so that the
-> > a7ca_io_clk is enabled whenever one of those devices is active. And there
-> > could be another power domain for the NOC that encompasses all devices that
-> > are sitting on that NOC.
-> >
-> 
-> Stephen, this should be a possible option, i will talk with HW guys to
-> figure out the relationship of power domain, and check whether we
-> handle this issue by the power domain solution.
-> 
-> btw, would you apply other patches in this series at first? we can
-> hold on this one to find a final solution.
-> 
+On 08/04, Barry Song wrote:
+> diff --git a/drivers/clk/sirf/clk-atlas7.c b/drivers/clk/sirf/clk-atlas7.c
+> index db8ab69..a92e7ea 100644
+> --- a/drivers/clk/sirf/clk-atlas7.c
+> +++ b/drivers/clk/sirf/clk-atlas7.c
+> @@ -1174,6 +1174,10 @@ static struct atlas7_unit_init_data unit_list[] __initdata = {
+>  	{ 135, "thbtm_io", "btm_io", 0, SIRFSOC_CLKC_LEAF_CLK_EN8_SET, 7, &leaf8_gate_lock },
+>  	{ 136, "btslow", "xinw_fixdiv_btslow", 0, SIRFSOC_CLKC_ROOT_CLK_EN1_SET, 25, &root1_gate_lock },
+>  	{ 137, "a7ca_btslow", "btslow", 0, SIRFSOC_CLKC_LEAF_CLK_EN8_SET, 0, &leaf8_gate_lock },
+> +	{ 138 , "pwm_io", "io_mux", 0, SIRFSOC_CLKC_LEAF_CLK_EN0_SET, 0, &leaf0_gate_lock },
+> +	{ 139 , "pwm_xin", "xin", 0, SIRFSOC_CLKC_LEAF_CLK_EN0_SET, 1, &leaf0_gate_lock },
+> +	{ 140 , "pwm_xinw", "xinw", 0, SIRFSOC_CLKC_LEAF_CLK_EN0_SET, 2, &leaf0_gate_lock },
+> +	{ 141 , "thcgum_sys", "sys_mux", 0, SIRFSOC_CLKC_LEAF_CLK_EN0_SET, 3, &leaf0_gate_lock },
 
-Yes. I'll apply the rest to clk-next.
+The extra space made checkpatch complain. I silenced it and
+applied to clk-next.
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
