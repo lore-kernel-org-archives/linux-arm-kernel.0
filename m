@@ -1,79 +1,53 @@
-From: jungseoklee85@gmail.com (Jungseok Lee)
-Date: Thu, 13 Aug 2015 00:18:49 +0900
-Subject: [PATCH] arm64: Add __exception_irq_entry definition for function
- graph
-In-Reply-To: <20150812150232.GI23540@arm.com>
-References: <1439388979-1518-1-git-send-email-jungseoklee85@gmail.com>
- <20150812150232.GI23540@arm.com>
-Message-ID: <9C0002C4-EEC5-415F-A0BC-2284E662D308@gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 12 Aug 2015 16:23:38 +0100
+Subject: [PATCH v2 0/2] net: thunder: Add ACPI support.
+In-Reply-To: <55CA5567.9010002@caviumnetworks.com>
+References: <1439254717-2875-1-git-send-email-ddaney.cavm@gmail.com>
+ <20150811.114908.1384923604512568161.davem@davemloft.net>
+ <55CA5567.9010002@caviumnetworks.com>
+Message-ID: <20150812152337.GB5393@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Aug 13, 2015, at 12:02 AM, Will Deacon wrote:
-
-Hi Will,
-
-> On Wed, Aug 12, 2015 at 03:16:19PM +0100, Jungseok Lee wrote:
->> The gic_handle_irq() is defined with __exception_irq_entry attribute.
->> A single remaining work is to add its definition as ARM did. Below
->> shows how function graph data is changed with these hunks.
+On Tue, Aug 11, 2015 at 01:04:55PM -0700, David Daney wrote:
+> On 08/11/2015 11:49 AM, David Miller wrote:
+> >From: David Daney <ddaney.cavm@gmail.com>
+> >Date: Mon, 10 Aug 2015 17:58:35 -0700
+> >
+> >>Change from v1:  Drop PHY binding part, use fwnode_property* APIs.
+> >>
+> >>The first patch (1/2) rearranges the existing code a little with no
+> >>functional change to get ready for the second.  The second (2/2) does
+> >>the actual work of adding support to extract the needed information
+> >>from the ACPI tables.
+> >
+> >Series applied.
 > 
-> [...]
+> Thank you very much.
 > 
->> diff --git a/arch/arm64/include/asm/traps.h b/arch/arm64/include/asm/traps.h
->> index 232e4ba..0cc2f29 100644
->> --- a/arch/arm64/include/asm/traps.h
->> +++ b/arch/arm64/include/asm/traps.h
->> @@ -34,13 +34,32 @@ struct undef_hook {
->> void register_undef_hook(struct undef_hook *hook);
->> void unregister_undef_hook(struct undef_hook *hook);
->> 
->> +#ifdef CONFIG_FUNCTION_GRAPH_TRACER
->> +static inline int __in_irqentry_text(unsigned long ptr)
->> +{
->> +	extern char __irqentry_text_start[];
->> +	extern char __irqentry_text_end[];
->> +
->> +	return ptr >= (unsigned long)&__irqentry_text_start &&
->> +	       ptr < (unsigned long)&__irqentry_text_end;
->> +}
->> +#else
->> +static inline int __in_irqentry_text(unsigned long ptr)
->> +{
->> +	return 0;
->> +}
->> +#endif
->> +
->> static inline int in_exception_text(unsigned long ptr)
->> {
->> 	extern char __exception_text_start[];
->> 	extern char __exception_text_end[];
->> +	int in;
->> +
->> +	in = ptr >= (unsigned long)&__exception_text_start &&
->> +	     ptr < (unsigned long)&__exception_text_end;
->> 
->> -	return ptr >= (unsigned long)&__exception_text_start &&
->> -	       ptr < (unsigned long)&__exception_text_end;
->> +	return in ? : __in_irqentry_text(ptr);
->> }
+> >In the future it might be better structured to try and get the OF
+> >node, and if that fails then try and use the ACPI method to obtain
+> >these values.
 > 
-> On arm64, this function is only called from dump_backtrace, so I'm
-> struggling to see why this change makes any difference to the ftrace
-> output.
+> Our current approach, as you can see in the patch, is the opposite.  If ACPI
+> is being used, prefer that over the OF device tree.
 > 
-> What am I missing?
+> You seem to be recommending precedence for OF.  It should be consistent
+> across all drivers/sub-systems, so do you really think that OF before ACPI
+> is the way to go?
 
-As you mentioned, the above hunk does not change the ftrace behavior.
+On arm64 (unless you use a vendor kernel), DT takes precedence over ACPI
+if both arm provided to the kernel (and it's a fair assumption given
+that ACPI on ARM is still in the early days). You could also force ACPI
+with acpi=force on the kernel cmd line and the arch code will not
+unflatten the DT even if it is provided, therefore is_of_node(fwnode)
+returning false.
 
-The first diff directly affects the first condition check in print_graph_irq
-function in kernel/trace/trace_functions_graph.c. The code snippet is as follows.
+I haven't looked at your driver in detail but something like AMD's
+xgbe_probe() uses a single function for both DT and ACPI with
+device_property_read_*() functions getting the information from the
+correct place in either case. The ACPI vs DT precedence is handled by
+the arch boot code, we never mix the two and confuse the drivers.
 
-if (addr < (unsigned long)__irqentry_text_start ||
-	addr >= (unsigned long)__irqentry_text_end)
-	return;
-
-I hope it would be helpful.
-
-Best Regards
-Jungseok Lee
+-- 
+Catalin
