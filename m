@@ -1,67 +1,84 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 12 Aug 2015 15:59:43 +0530
-Subject: [PATCH V1 Resend 06/10] drivers: rtc: Drop (un)likely before
- IS_ERR(_OR_NULL)
-In-Reply-To: <cover.1439375087.git.viresh.kumar@linaro.org>
-References: <cover.1439375087.git.viresh.kumar@linaro.org>
-Message-ID: <1a92f2e1af5309ece9736f79f312e90486a98825.1439375087.git.viresh.kumar@linaro.org>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Wed, 12 Aug 2015 12:12:25 +0200
+Subject: [PATCH 00/20] Regmap max_raw_io and bmc150 SPI support
+Message-ID: <1439374365-20623-1-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-IS_ERR(_OR_NULL) already contain an 'unlikely' compiler flag and there
-is no need to do that again from its callers. Drop it.
+Hi,
 
-gemini driver was using likely() for a failure case while the rtc driver
-is getting registered. That looks wrong and it should really be
-unlikely. But because we are killing all the unlikely() flags, lets kill
-that too.
+this series was created to add SPI support to the bmc150 accelerometer driver.
+To not add any regressions, I had to add some infrastructure that allows to use
+regmap with busses that do limit the size of transfers (block smbus). I hope
+this is sufficient to not break anything.
 
-Acked-by: Hans Ulli Kroll <ulli.kroll@googlemail.com> (gemini)
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
----
- drivers/rtc/interface.c  | 2 +-
- drivers/rtc/rtc-bfin.c   | 2 +-
- drivers/rtc/rtc-gemini.c | 2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+The series has several different parts for regmap and the iio driver:
 
-diff --git a/drivers/rtc/interface.c b/drivers/rtc/interface.c
-index 11b639067312..5836751b8203 100644
---- a/drivers/rtc/interface.c
-+++ b/drivers/rtc/interface.c
-@@ -564,7 +564,7 @@ enum hrtimer_restart rtc_pie_update_irq(struct hrtimer *timer)
- void rtc_update_irq(struct rtc_device *rtc,
- 		unsigned long num, unsigned long events)
- {
--	if (unlikely(IS_ERR_OR_NULL(rtc)))
-+	if (IS_ERR_OR_NULL(rtc))
- 		return;
- 
- 	pm_stay_awake(rtc->dev.parent);
-diff --git a/drivers/rtc/rtc-bfin.c b/drivers/rtc/rtc-bfin.c
-index 3d44b11721ea..535a5f9338d0 100644
---- a/drivers/rtc/rtc-bfin.c
-+++ b/drivers/rtc/rtc-bfin.c
-@@ -361,7 +361,7 @@ static int bfin_rtc_probe(struct platform_device *pdev)
- 	/* Register our RTC with the RTC framework */
- 	rtc->rtc_dev = devm_rtc_device_register(dev, pdev->name, &bfin_rtc_ops,
- 						THIS_MODULE);
--	if (unlikely(IS_ERR(rtc->rtc_dev)))
-+	if (IS_ERR(rtc->rtc_dev))
- 		return PTR_ERR(rtc->rtc_dev);
- 
- 	/* Grab the IRQ and init the hardware */
-diff --git a/drivers/rtc/rtc-gemini.c b/drivers/rtc/rtc-gemini.c
-index 35f4486738fc..2fed93e1114a 100644
---- a/drivers/rtc/rtc-gemini.c
-+++ b/drivers/rtc/rtc-gemini.c
-@@ -148,7 +148,7 @@ static int gemini_rtc_probe(struct platform_device *pdev)
- 
- 	rtc->rtc_dev = rtc_device_register(pdev->name, dev,
- 					   &gemini_rtc_ops, THIS_MODULE);
--	if (likely(IS_ERR(rtc->rtc_dev)))
-+	if (IS_ERR(rtc->rtc_dev))
- 		return PTR_ERR(rtc->rtc_dev);
- 
- 	return 0;
+Patches 1-4 fix some minor things in the regmap core code.
+
+Patches 5-11 fix some issues with regmap busses that do not have an
+implementation of read() or write(). Currently a lot of the regmap API
+functions simply fail for those busses.
+
+Patches 12-14 introduce 'max_raw_io' for busses which defines the max number of
+bytes that may be send or received by this bus. This includes handling in
+regmap_bulk_read/write and reporting an error for raw_read/writes that are
+above this limit (E2BIG).
+
+Patch 15 makes use of max_raw_io by adding smbus i2c block bus driver. This
+patch is created to avoid regressions in the bmc150 driver.
+
+Patches 16-20 move bmc150 to use regmap and add SPI support.
+
+
+As I don't have a bmc150 connected via smbus I am not able to test Patch 14 and
+the resulting I2C part of the bmc150 driver. It would be great if someone with
+the hardware could test it. Also it would be great to have some test coverage
+for all other regmap setups.
+
+Best Regards,
+
+Markus
+
+
+
+Markus Pargmann (20):
+  regmap: Add missing comments about struct regmap_bus
+  regmap: Remove regmap_bulk_write 64bit support
+  regmap: Fix integertypes for register address and value
+  regmap: Do not skip format initialization
+  regmap: Restructure writes in _regmap_raw_write()
+  regmap: Fix regmap_bulk_write for bus writes
+  regmap: Without bus read() or write(), force use_single_rw
+  regmap: Fix regmap_can_raw_write check
+  regmap: _regmap_raw_write fix for busses without write()
+  regmap: _regmap_raw_multi_reg_write: Add reg_write() support
+  regmap: _regmap_raw_read: Add handling of busses without bus->read()
+  regmap: Introduce max_raw_io for regmap_bulk_read/write
+  regmap: regmap max_raw_io getter function
+  regmap: Add raw_write/read checks for max_raw_write/read sizes
+  regmap-i2c: Add smbus i2c block support
+  iio: bmc150: Fix irq checks
+  iio: bmc150: Use i2c regmap
+  iio: bcm150: Remove i2c_client from private data
+  iio: bmc150: Split the driver into core and i2c
+  iio: bmc150: Add SPI driver
+
+ drivers/base/regmap/internal.h                     |   3 +
+ drivers/base/regmap/regmap-i2c.c                   |  46 +++
+ drivers/base/regmap/regmap.c                       | 221 ++++++++---
+ drivers/iio/accel/Kconfig                          |  32 +-
+ drivers/iio/accel/Makefile                         |   4 +-
+ .../accel/{bmc150-accel.c => bmc150-accel-core.c}  | 404 ++++++++-------------
+ drivers/iio/accel/bmc150-accel-i2c.c               | 101 ++++++
+ drivers/iio/accel/bmc150-accel-spi.c               |  86 +++++
+ drivers/iio/accel/bmc150-accel.h                   |  21 ++
+ include/linux/regmap.h                             |   8 +-
+ 10 files changed, 622 insertions(+), 304 deletions(-)
+ rename drivers/iio/accel/{bmc150-accel.c => bmc150-accel-core.c} (82%)
+ create mode 100644 drivers/iio/accel/bmc150-accel-i2c.c
+ create mode 100644 drivers/iio/accel/bmc150-accel-spi.c
+ create mode 100644 drivers/iio/accel/bmc150-accel.h
+
 -- 
-2.4.0
+2.4.6
