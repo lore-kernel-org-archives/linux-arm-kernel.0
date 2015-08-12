@@ -1,29 +1,38 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 12 Aug 2015 15:21:40 +0100
-Subject: [PATCH 0/6] irqchip: GICv2/v3: Add support for irq_vcpu_affinity
-In-Reply-To: <55C9C939.2020408@linaro.org>
-References: <1436447951-22357-1-git-send-email-marc.zyngier@arm.com>
- <55C9C939.2020408@linaro.org>
-Message-ID: <55CB5674.2080209@arm.com>
+From: mike.looijmans@topic.nl (Mike Looijmans)
+Date: Wed, 12 Aug 2015 16:22:12 +0200
+Subject: [PATCH] pinctrl-zynq.c: Fix typos in smc0_nand_grp and smc0_nor_grp
+Message-ID: <1439389332-9373-1-git-send-email-mike.looijmans@topic.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/08/15 11:06, Eric Auger wrote:
-> Hi Marc,
-> 
-> The series works fine with KVM platform device passthrough use case
-> (Calxeda Midway, GICv2, SPI assignment with VFIO). My integration branch
-> can be found at
-> https://git.linaro.org/people/eric.auger/linux.git/shortlog/refs/heads/v4.2-rc6-irq-forward-v3
-> if useful.
-> 
-> Tested-by: Eric Auger <eric.auger@linaro.org>
+Group names should be smc0_nand_grp and smc0_nor_grp, otherwise you'll
+get errors like this if you try to pinmux them via the devicetree:
+zynq-pinctrl 700.pinctrl: invalid group "smc0_nand_grp" for function "smc0_nand"
 
-Many thanks for trying it (and for the review). I'll post an updated
-version soon.
+Probably a typo while creating these tables.
 
-Thanks,
+Signed-off-by: Mike Looijmans <mike.looijmans@topic.nl>
+Acked-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
+---
+ drivers/pinctrl/pinctrl-zynq.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-	M.
+diff --git a/drivers/pinctrl/pinctrl-zynq.c b/drivers/pinctrl/pinctrl-zynq.c
+index 7ce23b6..5aafea8 100644
+--- a/drivers/pinctrl/pinctrl-zynq.c
++++ b/drivers/pinctrl/pinctrl-zynq.c
+@@ -706,10 +706,10 @@ static const char * const sdio1_wp_groups[] = {"gpio0_0_grp",
+ 		"gpio0_39_grp", "gpio0_41_grp", "gpio0_43_grp",
+ 		"gpio0_45_grp", "gpio0_47_grp", "gpio0_49_grp",
+ 		"gpio0_51_grp", "gpio0_53_grp", "sdio1_emio_wp_grp"};
+-static const char * const smc0_nor_groups[] = {"smc0_nor"};
++static const char * const smc0_nor_groups[] = {"smc0_nor_grp"};
+ static const char * const smc0_nor_cs1_groups[] = {"smc0_nor_cs1_grp"};
+ static const char * const smc0_nor_addr25_groups[] = {"smc0_nor_addr25_grp"};
+-static const char * const smc0_nand_groups[] = {"smc0_nand"};
++static const char * const smc0_nand_groups[] = {"smc0_nand_grp"};
+ static const char * const can0_groups[] = {"can0_0_grp", "can0_1_grp",
+ 		"can0_2_grp", "can0_3_grp", "can0_4_grp", "can0_5_grp",
+ 		"can0_6_grp", "can0_7_grp", "can0_8_grp", "can0_9_grp",
 -- 
-Jazz is not dead. It just smells funny...
+1.9.1
