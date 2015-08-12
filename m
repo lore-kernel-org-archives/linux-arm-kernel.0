@@ -1,48 +1,150 @@
-From: horia.geanta@freescale.com (=?UTF-8?q?Horia=20Geant=C4=83?=)
-Date: Wed, 12 Aug 2015 17:12:39 +0300
-Subject: [PATCH v2] arm64: add ioread64be and iowrite64be macros
-In-Reply-To: <20150812134526.GD23540@arm.com>
-References: <20150812134526.GD23540@arm.com>
-Message-ID: <1439388759-4299-1-git-send-email-horia.geanta@freescale.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 12 Aug 2015 14:15:17 +0000 (UTC)
+Subject: OMAP baseline test results for v4.2-rc6
+Message-ID: <alpine.DEB.2.02.1508121337410.7154@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This will allow device drivers to consistently use io{read,write}XXbe
-macros in all cases.
 
-Signed-off-by: Alex Porosanu <alexandru.porosanu@freescale.com>
-Signed-off-by: Horia Geant? <horia.geanta@freescale.com>
----
+Here are some basic OMAP test results for Linux v4.2-rc6.
+Logs and other details at:
 
-I am planning to use the macros in a subsequent patch that revamps
-the I/O accessors in drivers/crypto/caam/regs.h
+    http://www.pwsan.com/omap/testlogs/test_v4.2-rc6/20150810114017/
 
-Let me know if you prefer having this change submitted as part of a
-patchset (bundled with the caller/user of the macros).
 
- arch/arm64/include/asm/io.h | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+Test summary
+------------
 
-diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
-index 44be1e03ed65..9b6e408cfa51 100644
---- a/arch/arm64/include/asm/io.h
-+++ b/arch/arm64/include/asm/io.h
-@@ -174,13 +174,15 @@ extern void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size);
- #define iounmap				__iounmap
- 
- /*
-- * io{read,write}{16,32}be() macros
-+ * io{read,write}{16,32,64}be() macros
-  */
- #define ioread16be(p)		({ __u16 __v = be16_to_cpu((__force __be16)__raw_readw(p)); __iormb(); __v; })
- #define ioread32be(p)		({ __u32 __v = be32_to_cpu((__force __be32)__raw_readl(p)); __iormb(); __v; })
-+#define ioread64be(p)		({ __u64 __v = be64_to_cpu((__force __be64)__raw_readq(p)); __iormb(); __v; })
- 
- #define iowrite16be(v,p)	({ __iowmb(); __raw_writew((__force __u16)cpu_to_be16(v), p); })
- #define iowrite32be(v,p)	({ __iowmb(); __raw_writel((__force __u32)cpu_to_be32(v), p); })
-+#define iowrite64be(v,p)	({ __iowmb(); __raw_writeq((__force __u64)cpu_to_be64(v), p); })
- 
- /*
-  * Convert a physical pointer to a virtual kernel pointer for /dev/mem
--- 
-2.4.4
+Build: uImage:
+    Pass ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
+		  omap1_defconfig_5912osk_only
+
+Build: uImage+dtb:
+    Pass (13/13): omap2plus_defconfig_am33xx_only/am335x-bone,
+		  omap2plus_defconfig/omap4-panda,
+		  omap2plus_defconfig/omap4-panda-es,
+		  omap2plus_defconfig/omap4-var-stk-om44,
+		  omap2plus_defconfig/omap3-evm-37xx,
+		  omap2plus_defconfig_n800_only_a/omap2420-n800,
+		  omap2plus_defconfig/omap2430-sdp,
+		  omap2plus_defconfig/am3517-evm,
+		  omap2plus_defconfig/omap3-beagle,
+		  omap2plus_defconfig/omap3-beagle-xm,
+		  omap2plus_defconfig/omap3-sbc-t3517,
+		  omap2plus_defconfig/omap5-uevm,
+		  omap2plus_defconfig/omap5-sbc-t54
+
+Build: zImage:
+    Pass (17/17): omap2plus_defconfig, omap2plus_defconfig_am33xx_only,
+		  omap2plus_defconfig_n800_only_a,
+		  omap2plus_defconfig_n800_multi_omap2xxx,
+		  omap2plus_defconfig_2430sdp_only,
+		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
+		  omap2plus_defconfig_omap2_4_only,
+		  omap2plus_defconfig_omap3_4_only,
+		  omap2plus_defconfig_omap5_only,
+		  omap2plus_defconfig_dra7xx_only,
+		  omap2plus_defconfig_am43xx_only,
+		  rmk_omap3430_ldp_oldconfig,
+		  rmk_omap3430_ldp_allnoconfig,
+		  rmk_omap4430_sdp_oldconfig,
+		  rmk_omap4430_sdp_allnoconfig, multi_v7_defconfig
+
+Build warnings from toolchain: uImage:
+    (none)
+
+Build warnings from toolchain: uImage+dtb:
+    (none)
+
+Build warnings from toolchain: zImage:
+    FAIL (10/17): omap2plus_defconfig, omap2plus_defconfig_am33xx_only,
+		  omap2plus_defconfig_2430sdp_only,
+		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
+		  omap2plus_defconfig_omap2_4_only,
+		  omap2plus_defconfig_omap3_4_only,
+		  omap2plus_defconfig_omap5_only,
+		  omap2plus_defconfig_dra7xx_only,
+		  omap2plus_defconfig_am43xx_only
+
+Boot to userspace:
+    FAIL ( 1/17): 2430sdp
+    skip ( 3/17): 5912osk, 3517evm, 5430es2sbct54
+    Pass (13/17): am335xbonelt, am335xbone, 4430es2panda, 4460pandaes,
+		  4460varsomom, 37xxevm, 3530es3beagle, 3530es31beagle,
+		  3730beaglexm, 3730es12beaglexm, cmt3517, 5430es2uevm,
+		  2420n800
+
+Kernel warnings during boot to userspace:
+    FAIL ( 2/17): 4430es2panda, cmt3517
+
+PM: chip retention via suspend:
+    FAIL ( 6/11): am335xbonelt, 4430es2panda, 4460varsomom, 37xxevm,
+		  2430sdp, 5430es2uevm
+    Pass ( 5/11): 4460pandaes, 3530es3beagle, 3530es31beagle,
+		  3730beaglexm, 3730es12beaglexm
+
+PM: chip retention via dynamic idle:
+    FAIL ( 6/11): am335xbonelt, 4430es2panda, 4460varsomom, 37xxevm,
+		  2430sdp, 5430es2uevm
+    Pass ( 5/11): 4460pandaes, 3530es3beagle, 3530es31beagle,
+		  3730beaglexm, 3730es12beaglexm
+
+PM: chip off (except CORE, due to errata) via suspend:
+    Pass ( 1/ 1): 3730beaglexm
+
+PM: chip off (except CORE, due to errata) via dynamic idle:
+    Pass ( 1/ 1): 3730beaglexm
+
+PM: chip off via suspend:
+    FAIL ( 1/ 4): 37xxevm
+    Pass ( 3/ 4): 3530es3beagle, 3530es31beagle, 3730es12beaglexm
+
+PM: chip off via dynamic idle:
+    FAIL ( 1/ 4): 37xxevm
+    Pass ( 3/ 4): 3530es3beagle, 3530es31beagle, 3730es12beaglexm
+
+Kernel warnings during PM test:
+    FAIL ( 1/17): 4430es2panda
+
+Obsolete Kconfig symbols:
+    FAIL ( 1/20): multi_v7_defconfig
+
+
+vmlinux object size
+(delta in bytes from test_v4.2-rc5 (74d33293e467df61de1b1d8b2fbe29e550dec33b)):
+   text     data      bss    total  kernel
+   +251        0        0     +251  omap1_defconfig
+   +251        0        0     +251  omap1_defconfig_1510innovator_only
+   +251        0        0     +251  omap1_defconfig_5912osk_only
+   +540        0        0     +540  multi_v7_defconfig
+  +4443        0        0    +4443  omap2plus_defconfig
+   +127        0        0     +127  omap2plus_defconfig_2430sdp_only
+   +347        0        0     +347  omap2plus_defconfig_am33xx_only
+   +347        0        0     +347  omap2plus_defconfig_am43xx_only
+   +347        0        0     +347  omap2plus_defconfig_cpupm
+   +347        0        0     +347  omap2plus_defconfig_dra7xx_only
+   +415        0        0     +415  omap2plus_defconfig_n800_multi_omap2xxx
+   +435        0        0     +435  omap2plus_defconfig_n800_only_a
+   +347        0        0     +347  omap2plus_defconfig_no_pm
+   +347        0        0     +347  omap2plus_defconfig_omap2_4_only
+   +415        0        0     +415  omap2plus_defconfig_omap3_4_only
+   +411        0        0     +411  omap2plus_defconfig_omap5_only
+   +116      +20      -16     +120  rmk_omap3430_ldp_allnoconfig
+   +339        0        0     +339  rmk_omap3430_ldp_oldconfig
+   +100      +20      -16     +104  rmk_omap4430_sdp_allnoconfig
+   +419        0        0     +419  rmk_omap4430_sdp_oldconfig
+
+Boot-time memory difference
+(delta in bytes from test_v4.2-rc5 (74d33293e467df61de1b1d8b2fbe29e550dec33b))
+  avail  rsrvd   high  freed  board          kconfig
+    -8k     8k      .      .  2430sdp        omap2plus_defconfig
+    -8k     8k      .     4k  3530es31beagle omap2plus_defconfig
+    -8k     8k      .     4k  3530es3beagle  omap2plus_defconfig
+    -8k     8k      .     4k  3730beaglexm   omap2plus_defconfig
+    -8k     8k      .     4k  3730es12beaglexmomap2plus_defconfig
+    -8k     8k      .     4k  37xxevm        omap2plus_defconfig
+    -8k     8k      .     4k  4430es2panda   omap2plus_defconfig
+    -8k     8k      .     4k  4460pandaes    omap2plus_defconfig
+    -4k     4k      .     4k  4460varsomom   omap2plus_defconfig
+    -8k     8k      .     4k  5430es2uevm    omap2plus_defconfig
+    -8k     8k      .     4k  am335xbonelt   omap2plus_defconfig
