@@ -1,97 +1,79 @@
-From: alex.williamson@redhat.com (Alex Williamson)
-Date: Wed, 12 Aug 2015 13:05:07 -0600
-Subject: [PATCH v5 5/5] KVM: eventfd: add irq bypass consumer management
-In-Reply-To: <1439213467-13668-6-git-send-email-eric.auger@linaro.org>
-References: <1439213467-13668-1-git-send-email-eric.auger@linaro.org>
- <1439213467-13668-6-git-send-email-eric.auger@linaro.org>
-Message-ID: <1439406307.4023.532.camel@redhat.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 12 Aug 2015 12:11:57 -0700
+Subject: [PATCH 3/5] iommu/msm: Add support for generic master bindings
+In-Reply-To: <1439390869-6347-4-git-send-email-sricharan@codeaurora.org>
+References: <1439390869-6347-1-git-send-email-sricharan@codeaurora.org>
+ <1439390869-6347-4-git-send-email-sricharan@codeaurora.org>
+Message-ID: <55CB9A7D.7080206@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-08-10 at 15:31 +0200, Eric Auger wrote:
-> This patch adds the registration/unregistration of an
-> irq_bypass_consumer on irqfd assignment/deassignment.
-> 
-> Signed-off-by: Eric Auger <eric.auger@linaro.org>
-> Signed-off-by: Feng Wu <feng.wu@intel.com>
-> 
-> ---
-> 
-> v4 -> v5:
-> - due to removal of static inline stubs, add
->   #ifdef CONFIG_HAVE_KVM_IRQ_BYPASS
->   around consumer registration/unregistration
-> - add pr_info when registration fails
-> 
-> v2 -> v3 (Feng Wu):
-> - Use kvm_arch_irq_bypass_start
-> - Remove kvm_arch_irq_bypass_update
-> - Add member 'struct irq_bypass_producer *producer' in
->   'struct kvm_kernel_irqfd', it is needed by posted interrupt.
-> - Remove 'irq_bypass_unregister_consumer' in kvm_irqfd_deassign()
-> 
-> v1 -> v2:
-> - populate of kvm and gsi removed
-> - unregister the consumer on irqfd_shutdown
-> ---
->  include/linux/kvm_irqfd.h |  2 ++
->  virt/kvm/eventfd.c        | 15 +++++++++++++++
->  2 files changed, 17 insertions(+)
-> 
-> diff --git a/include/linux/kvm_irqfd.h b/include/linux/kvm_irqfd.h
-> index f926b39..0c1de05 100644
-> --- a/include/linux/kvm_irqfd.h
-> +++ b/include/linux/kvm_irqfd.h
-> @@ -64,6 +64,8 @@ struct kvm_kernel_irqfd {
->  	struct list_head list;
->  	poll_table pt;
->  	struct work_struct shutdown;
-> +	struct irq_bypass_consumer consumer;
-> +	struct irq_bypass_producer *producer;
->  };
->  
->  #endif /* __LINUX_KVM_IRQFD_H */
-> diff --git a/virt/kvm/eventfd.c b/virt/kvm/eventfd.c
-> index 647ffb8..d7a230f 100644
-> --- a/virt/kvm/eventfd.c
-> +++ b/virt/kvm/eventfd.c
-> @@ -35,6 +35,7 @@
->  #include <linux/srcu.h>
->  #include <linux/slab.h>
->  #include <linux/seqlock.h>
-> +#include <linux/irqbypass.h>
->  #include <trace/events/kvm.h>
->  
->  #include <kvm/iodev.h>
-> @@ -140,6 +141,9 @@ irqfd_shutdown(struct work_struct *work)
->  	/*
->  	 * It is now safe to release the object's resources
->  	 */
-> +#ifdef CONFIG_HAVE_KVM_IRQ_BYPASS
-> +	irq_bypass_unregister_consumer(&irqfd->consumer);
-> +#endif
->  	eventfd_ctx_put(irqfd->eventfd);
->  	kfree(irqfd);
->  }
-> @@ -379,6 +383,17 @@ kvm_irqfd_assign(struct kvm *kvm, struct kvm_irqfd *args)
->  	 * we might race against the POLLHUP
->  	 */
->  	fdput(f);
-> +#ifdef CONFIG_HAVE_KVM_IRQ_BYPASS
-> +	irqfd->consumer.token = (void *)irqfd->eventfd;
-> +	irqfd->consumer.add_producer = kvm_arch_irq_bypass_add_producer;
-> +	irqfd->consumer.del_producer = kvm_arch_irq_bypass_del_producer;
-> +	irqfd->consumer.stop = kvm_arch_irq_bypass_stop;
-> +	irqfd->consumer.start = kvm_arch_irq_bypass_start;
-> +	ret = irq_bypass_register_consumer(&irqfd->consumer);
-> +	if (ret)
-> +		pr_info("irq bypass consumer (token %p) registration fails: %d\n",
-> +				irqfd->consumer.token, ret);
-> +#endif
+On 08/12/2015 07:47 AM, Sricharan R wrote:
+> @@ -702,6 +703,44 @@ static void print_ctx_regs(void __iomem *base, int ctx)
+>   	       GET_PRRR(base, ctx), GET_NMRR(base, ctx));
+>   }
+>   
+> +static void insert_iommu_master(struct device *dev,
+> +				struct msm_iommu_dev *iommu,
+> +				struct of_phandle_args *spec)
+> +{
+> +	struct msm_iommu_ctx_dev *master;
+> +	int sid;
+> +
+> +	master = kzalloc(sizeof(*master), GFP_KERNEL);
 
-Does this series compile on its own?  Aren't all these arch function
-unresolved?
+This is called with irqs disabled, but it's not GFP_ATOMIC. Please test 
+with DEBUG_ATOMIC_SLEEP=y.
 
->  
->  	return 0;
->  
+> +	master->of_node = dev->of_node;
+> +	list_add(&master->list, &iommu->ctx_list);
+> +
+> +	for (sid = 0; sid < spec->args_count; sid++)
+> +		master->mids[sid] = spec->args[sid];
+> +
+> +	master->num_mids = spec->args_count;
+> +}
+> +
+> +static int qcom_iommu_of_xlate(struct device *dev,
+> +			       struct of_phandle_args *spec)
+> +{
+> +	struct msm_iommu_dev *iommu;
+> +	unsigned long flags;
+> +
+> +	spin_lock_irqsave(&msm_iommu_lock, flags);
+> +	list_for_each_entry(iommu, &qcom_iommu_devices, dev_node) {
+> +		if (iommu->dev->of_node == spec->np)
+> +			break;
+> +	}
+
+The braces are unnecessary here.
+
+> +
+> +	if (!iommu || (iommu->dev->of_node != spec->np))
+
+Please remove extraneous parentheses.
+
+> +		return -ENODEV;
+> +
+> +	insert_iommu_master(dev, iommu, spec);
+> +	spin_unlock_irqrestore(&msm_iommu_lock, flags);
+> +
+> +	return 0;
+> +}
+> +
+>   irqreturn_t msm_iommu_fault_handler(int irq, void *dev_id)
+>   {
+>   	struct msm_iommu_dev *iommu = dev_id;
+> @@ -737,7 +776,7 @@ fail:
+>   	return 0;
+>   }
+>   
+> -static const struct iommu_ops msm_iommu_ops = {
+> +static struct iommu_ops msm_iommu_ops = {
+
+Is there a reason why we can't make of_iommu_set_ops() take a const ops 
+pointer?
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
