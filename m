@@ -1,87 +1,126 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Wed, 12 Aug 2015 15:46:06 +0530
-Subject: [PATCH v2 2/6] mailbox: dt-bindings: Add shared [driver <=>
- device tree] defines
-In-Reply-To: <20150812085309.GB18282@x1>
-References: <1437990272-23111-1-git-send-email-lee.jones@linaro.org>
- <1437990272-23111-3-git-send-email-lee.jones@linaro.org>
- <CABb+yY2asjH-c+VJXvG+RK0=2p=P4Y21pznNP0riaKMWLxYZog@mail.gmail.com>
- <20150810082445.GA3249@x1>
- <CABb+yY3jUKXXJys32bHY1u+dbdsix71Xq_H1Lrkkt27vZzmf7w@mail.gmail.com>
- <20150812085309.GB18282@x1>
-Message-ID: <CABb+yY3LdX1Lk7jfPbdXr4Zw=zKGJ=TsRRhB5a4CeYHOsjb90A@mail.gmail.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Wed, 12 Aug 2015 12:18:43 +0200
+Subject: [linux-sunxi] [PATCH] pinctrl: sun4i: add spdif to pin
+ description.
+In-Reply-To: <CAGb2v64A+T1aE622uvW6nCmJACWrtLVaLRfoLgh=CppGDrEX2A@mail.gmail.com>
+References: <1439309965-9530-1-git-send-email-codekipper@gmail.com>
+ <CAGb2v64Ptt5NgeicsYtiR8At+K4aDd3Lb3U4kijQ5UM+UafSrA@mail.gmail.com>
+ <CAEKpxBmS6YJMjREc3gmeSQOzBXFKw=Sb-xPK57oUn6BtmASErg@mail.gmail.com>
+ <55CB051D.3090109@redhat.com>
+ <CAEKpxB=UQYEnwXYAzMZA4noR9Xg8wnSjD+H0bNO5GV3dtZQtTg@mail.gmail.com>
+ <CAGb2v64A+T1aE622uvW6nCmJACWrtLVaLRfoLgh=CppGDrEX2A@mail.gmail.com>
+Message-ID: <55CB1D83.2050106@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 12, 2015 at 2:23 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> On Mon, 10 Aug 2015, Jassi Brar wrote:
->
->> On Mon, Aug 10, 2015 at 1:54 PM, Lee Jones <lee.jones@linaro.org> wrote:
->> > On Mon, 10 Aug 2015, Jassi Brar wrote:
->> >> On Mon, Jul 27, 2015 at 3:14 PM, Lee Jones <lee.jones@linaro.org> wrote:
->> >> > This header is currently only used for defines pertaining to data
->> >> > direction i.e. Rx, Tx or Loopback.
->> >> >
->> >> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
->> >> > ---
->> >> >  include/dt-bindings/mailbox/mailbox.h | 14 ++++++++++++++
->> >> >  1 file changed, 14 insertions(+)
->> >> >  create mode 100644 include/dt-bindings/mailbox/mailbox.h
->> >> >
->> >> > diff --git a/include/dt-bindings/mailbox/mailbox.h b/include/dt-bindings/mailbox/mailbox.h
->> >> > new file mode 100644
->> >> > index 0000000..82e929a
->> >> > --- /dev/null
->> >> > +++ b/include/dt-bindings/mailbox/mailbox.h
->> >> > @@ -0,0 +1,14 @@
->> >> > +/*
->> >> > + * This program is free software; you can redistribute it and/or modify
->> >> > + * it under the terms of the GNU General Public License version 2 as
->> >> > + * published by the Free Software Foundation.
->> >> > + */
->> >> > +
->> >> > +#ifndef __MAILBOX_CONTROLLER_DT_BINDINGS_H
->> >> > +#define __MAILBOX_CONTROLLER_DT_BINDINGS_H
->> >> > +
->> >> > +#define MBOX_TX                0x1
->> >> > +#define MBOX_RX                0x2
->> >> > +#define MBOX_LOOPBACK  (MBOX_RX | MBOX_TX)
->> >> > +
->> >> Not sure I understand 'loopback'.  Does it mean h/w has some
->> >> 'loopback' mode for testing purposes? Or it simply means the
->> >> controller can send as well as receive messages?
->> >
->> > 'loopback' allows firmware to conduct some early function tests.
->> > However, channels are simplex, so we provide protection against
->> > multiple allocation of single channel.  By allocating a LOOPBACK
->> > channel we over-ride this protection and allow a single channel to be
->> > allocated twice, once for Rx and the other for Tx.
->> >
->> So basically hardware is half-duplex, not simplex. I think maybe you
->> should simply allow for RX and TX always. It should work. Just
->> handover any received data before send_data (reflecting the h/w
->> limitation). That way you don't need any such special flag.
->
-> Unfortunately no, that's not correct.  Only Mailbox 0 is half-duplex.
-> The others are simplex (Rx only).
->
-Assuming that is indeed the case (though code and comments suggest
-otherwise), it is still not a matter of choice for clients to 'make' a
-channel RX or TX or RXTX. That is the property/constraint of the
-controller and the controller driver should simply check for channel
-ID to be zero in send_data() and return error if its non-zero.
+Hi,
 
->  Ideally I'd like to keep the
-> LOOPBACK flag, as it's easier to figure out if what someone is
-> attempting to do is actually valid.
+On 12-08-15 11:18, Chen-Yu Tsai wrote:
+> On Wed, Aug 12, 2015 at 5:13 PM, Code Kipper <codekipper@gmail.com> wrote:
+>> On 12 August 2015 at 10:34, Hans de Goede <hdegoede@redhat.com> wrote:
+>>>
+>>> Hi,
+>>>
+>>>
+>>> On 12-08-15 07:31, Code Kipper wrote:
+>>>>
+>>>> On 11 August 2015 at 18:48, Chen-Yu Tsai <wens@csie.org> wrote:
+>>>>
+>>>>> On Wed, Aug 12, 2015 at 12:19 AM,  <codekipper@gmail.com> wrote:
+>>>>>>
+>>>>>> From: Marcus Cooper <codekipper@gmail.com>
+>>>>>>
+>>>>>> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+>>>>>> ---
+>>>>>>    drivers/pinctrl/sunxi/pinctrl-sun4i-a10.c | 9 ++++++---
+>>>>>>    1 file changed, 6 insertions(+), 3 deletions(-)
+>>>>>>
+>>>>>> diff --git a/drivers/pinctrl/sunxi/pinctrl-sun4i-a10.c
+>>>>>
+>>>>> b/drivers/pinctrl/sunxi/pinctrl-sun4i-a10.c
+>>>>>>
+>>>>>> index 7376a97..daf7dec 100644
+>>>>>> --- a/drivers/pinctrl/sunxi/pinctrl-sun4i-a10.c
+>>>>>> +++ b/drivers/pinctrl/sunxi/pinctrl-sun4i-a10.c
+>>>>>> @@ -135,7 +135,8 @@ static const struct sunxi_desc_pin sun4i_a10_pins[]
+>>>>>
+>>>>> = {
+>>>>>>
+>>>>>>           SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 3),
+>>>>>>                     SUNXI_FUNCTION(0x0, "gpio_in"),
+>>>>>>                     SUNXI_FUNCTION(0x1, "gpio_out"),
+>>>>>> -                 SUNXI_FUNCTION(0x2, "ir0")),          /* TX */
+>>>>>> +                 SUNXI_FUNCTION(0x2, "ir0"),           /* TX */
+>>>>>> +                 SUNXI_FUNCTION(0x4, "spdif")),        /* MCLK */
+>>>>>>           SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 4),
+>>>>>>                     SUNXI_FUNCTION(0x0, "gpio_in"),
+>>>>>>                     SUNXI_FUNCTION(0x1, "gpio_out"),
+>>>>>> @@ -176,11 +177,13 @@ static const struct sunxi_desc_pin
+>>>>>
+>>>>> sun4i_a10_pins[] = {
+>>>>>>
+>>>>>>                     SUNXI_FUNCTION(0x0, "gpio_in"),
+>>>>>>                     SUNXI_FUNCTION(0x1, "gpio_out"),
+>>>>>>                     SUNXI_FUNCTION(0x2, "i2s"),           /* DI */
+>>>>>> -                 SUNXI_FUNCTION(0x3, "ac97")),         /* DI */
+>>>>>> +                 SUNXI_FUNCTION(0x3, "ac97"),          /* DI */
+>>>>>> +                 SUNXI_FUNCTION(0x4, "spdif")),        /* DI */
+>>>>>>           SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 13),
+>>>>>>                     SUNXI_FUNCTION(0x0, "gpio_in"),
+>>>>>>                     SUNXI_FUNCTION(0x1, "gpio_out"),
+>>>>>> -                 SUNXI_FUNCTION(0x2, "spi2")),         /* CS1 */
+>>>>>> +                 SUNXI_FUNCTION(0x2, "spi2"),          /* CS1 */
+>>>>>> +                 SUNXI_FUNCTION(0x4, "spdif")),        /* DO */
+>>>>>
+>>>>>
+>>>>> The datasheet and manual list them as NC or Reserved. Maybe mention how
+>>>>> you knew
+>>>>> they were available?
+>>>>>
+>>>> Not sure if this deserves to be in the commit message but I can
+>>>> definitely
+>>>> put together a covering letter with links etc.
+>>>
+>>>
+>>> I dear to say it belongs right there in the source code, use a multi-line
+>>> comment above the SUNXI_FUNCTION(0x4, "spdif")) to explain where the mux
+>>> info comes from. someday sooner or later someone is going to compare the
+>>> kernel mux table to the datasheet and think "huh, that is not right",
+>>> that person will be saved an immense amount of time by simply having a
+>>> comment there.
+>>
+>> Good point I was thinking something along the lines of this
+>> /*
+>>   * The SPDIF block is not referenced at all in the A10 user
+>>   * manual. However it is described in the code leaked and the
+>>   * pin descriptions are declared in the A20 user manual which
+>>   * is pin compatible with this device.
+>>   */
+>> Thing is do I add this above every spdif pin, the first change(MCLK) or the
+>> pin most likely to be used(SPDIF DO)?
 >
-I am not for such paranoia. Provider drivers is not the place to check
-for valid user data.
-The controller driver should simply reject send_data() request on any
-mailbox > 0 while the consumer driver should scream for attention
-because that's where the problem is.
+> I'd say put it before the first pin, and then reference it (like
+> "undocumented, see the comment for pin P??? above", for the rest.
 
-Please note, what I suggest will only make the code simpler while not
-breaking anything.
+Ack / +1 exactly what I was thinking :)
 
-Thanks.
+Regards,
+
+Hans
+
+
+>
+> ChenYu
+>
+>> Thanks,
+>> CK
+>>>
+>>>
+>>> And do NOT say that this will not happen, because I've already done
+>>> such a comparison once in the past.
+>>>
+>>> Regards,
+>>>
+>>> Hans
+>>
+>>
