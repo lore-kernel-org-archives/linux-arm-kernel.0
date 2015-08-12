@@ -1,66 +1,64 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 12 Aug 2015 13:34:06 +0100
-Subject: [PATCH 09/20] regmap: _regmap_raw_write fix for busses without
- write()
-In-Reply-To: <20150812122011.GE19600@pengutronix.de>
-References: <1439374365-20623-1-git-send-email-mpa@pengutronix.de>
- <1439374365-20623-10-git-send-email-mpa@pengutronix.de>
- <20150812112035.GX10748@sirena.org.uk>
- <20150812122011.GE19600@pengutronix.de>
-Message-ID: <20150812123406.GG10748@sirena.org.uk>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Wed, 12 Aug 2015 14:35:30 +0200
+Subject: [linux-sunxi] [PATCH 3/3] mmc: sunxi: use controller automatic
+ clock gating.
+In-Reply-To: <c33b221f9b622e3bad9d855a7ad1887b82827244.1439381423.git.hramrach@gmail.com>
+References: <cover.1439381423.git.hramrach@gmail.com>
+ <c33b221f9b622e3bad9d855a7ad1887b82827244.1439381423.git.hramrach@gmail.com>
+Message-ID: <55CB3D92.6040403@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 12, 2015 at 02:20:11PM +0200, Markus Pargmann wrote:
-> On Wed, Aug 12, 2015 at 12:20:35PM +0100, Mark Brown wrote:
-> > On Wed, Aug 12, 2015 at 12:12:34PM +0200, Markus Pargmann wrote:
-> > 
-> > > @@ -1229,6 +1229,11 @@ int _regmap_raw_write(struct regmap *map, unsigned int reg,
-> > >  		}
-> > >  	}
-> > >  
-> > > +	if (!map->bus->write && val_len == map->format.val_bytes) {
-> > > +		ret = _regmap_bus_reg_write(map, reg, *(unsigned int *)val);
-> > > +		return ret;
-> > > +	}
+Hi,
 
-> > This is broken - you can't use a raw value as a register value.  The
+On 12-08-15 14:23, Michal Suchanek wrote:
+> When core does not set the MMC_QUIRK_BROKEN_CLK_GATING flag enable
+> automatic hardware controlled clock gating on the mmc interface.
+>
+> Signed-off-by: Michal Suchanek <hramrach@gmail.com>
 
-> I am not sure what you mean here?
+In general this looks good, but I wonder how intensively this has
+been tested ? Also given the long latencies when using manual
+clock on/off support, have you done any testing to check what
+sort of latencies this adds, e.g. Both with and without
+the patch, dump all the filesystem caches:
 
-> The register value given to _regmap_raw_write is the real register
-> value, not formatted differenty. This is given directly towards
-> bus->reg_write() which should handle the rest.
+echo 3 > /proc/sys/vm/drop_caches
 
-I mean the value for the register, not the register address.
+And then do:
 
-> At least that's how I understood the code. For example regmap_read()
-> directly calls _regmap_read() which in turn calls directly
-> bus->reg_read() without any formating.
+time cat /some/small/file/on/the/sdcard
 
-You're adding this code to regmap_raw_write() which takes raw register
-values for the device, not unsigned integers.
+Do this at least 3 time both with and without the patch, and see
+if there are any noticable differences ?
 
-> > endianness of the device may not be the same as the endianness of the
-> > system and you can't cast a value to unsigned int, the value may be of
-> > any size.
+Regards,
 
-> Yes right. On the other hand if bus->read() and bus->write() was not set
-> in the init method (before this patch series) no formatting functions at
-> all were assigned. So it was always ignored for bus->reg_read() and
-> bus->reg_write()?!
+Hans
 
-I'm not sure what the "it" you're talking about here is, sorry.  There
-are unsupported features in the API especially for cases that don't make
-a huge amount of sense, the error handling isn't always complete.  It
-sounds like you might be trying to support one of these nonsensical
-cases - it's not obvious what raw I/O on a device where we don't know
-the raw format of the device should mean or how anything could sensibly
-use that.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150812/e2d08482/attachment.sig>
+
+
+> ---
+>   drivers/mmc/host/sunxi-mmc.c | 7 ++++++-
+>   1 file changed, 6 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+> index f808a02..443cab5 100644
+> --- a/drivers/mmc/host/sunxi-mmc.c
+> +++ b/drivers/mmc/host/sunxi-mmc.c
+> @@ -601,8 +601,13 @@ static int sunxi_mmc_oclk_onoff(struct sunxi_mmc_host *host, u32 oclk_en)
+>   	rval = mmc_readl(host, REG_CLKCR);
+>   	rval &= ~(SDXC_CARD_CLOCK_ON | SDXC_LOW_POWER_ON);
+>
+> -	if (oclk_en)
+> +	if (oclk_en) {
+>   		rval |= SDXC_CARD_CLOCK_ON;
+> +		if (!host->mmc->card ||
+> +		     !(host->mmc->card->quirks & MMC_QUIRK_BROKEN_CLK_GATING))
+> +
+> +			rval |= SDXC_LOW_POWER_ON;
+> +	}
+>
+>   	start = jiffies;
+>   	end = start + msecs_to_jiffies(750);
+>
