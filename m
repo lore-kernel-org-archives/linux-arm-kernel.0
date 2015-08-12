@@ -1,36 +1,24 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 12 Aug 2015 10:26 +0200
-Subject: [PATCH v3 0/2] clk: improve handling of orphan clocks
-In-Reply-To: <20150811223409.GN2839@codeaurora.org>
-References: <1429735986-18592-1-git-send-email-heiko@sntech.de>
- <20150730100908.GI2564@lukather> <20150811223409.GN2839@codeaurora.org>
-Message-ID: <3547940.Og2cC25c4G@diego>
+From: chaotian.jing@mediatek.com (Chaotian Jing)
+Date: Wed, 12 Aug 2015 16:24:01 +0800
+Subject: [PATCH 0/4] msdc: Add tuning support of Mediatek MMC host
+Message-ID: <1439367845-5891-1-git-send-email-chaotian.jing@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 11. August 2015, 15:34:09 schrieb Stephen Boyd:
-> On 07/30, Maxime Ripard wrote:
-> > On Mon, Jul 27, 2015 at 10:57:33AM +0200, Heiko St?bner wrote:
-> > > did this lead anywhere meanwhile.
-> > > 
-> > > Last I remember the change to orphan handling made sunxi fail, but
-> > > I'm still hoping to get this usable at some point :-)
-> > 
-> > To be honest, I don't know what the current status is. I haven't get
-> > any news since that mail.
-> > 
-> > I started to move a significant portion of our clocks to
-> > CLK_OF_DECLARE, but not all of them are (which probably make the
-> > situation worse for the time being).
-> 
-> Sorry, I think we're still waiting for the critical clocks stuff
-> to settle down so that Sunxi can use that instead of calling
-> clk_prepare_enable() in init code. For now, I've put the first
-> patch of the two into clk-next so that we can have proper orphan
-> tracking. Hopefully we resolve critical clocks soon so that we
-> can merge the defer part.
+This series add tuning support for EMMC/SD transfer.
+The tuning thread was start when CMD/DAT crc error deteted,
+for some SD card, tune DAT crc error may occur data timeout,
+in this case, try to reset card to recover.
+With tuning support, can support SDR104/HS200/HS400 modes
 
-great :-)
+Chaotian Jing (4):
+  mmc: mediatek: Add online-tuning support of EMMC/SD
+  mmc: mediatek: Add HS400 support
+  arm64: dts: mediatek: Support SD/EMMC SDR104/HS200/HS400
+  mmc: dt-bindings:  Add 400Mhz clock source
 
-For the defer-part you came up with a better solution than mine anyway, if I 
-remember correctly.
+ Documentation/devicetree/bindings/mmc/mtk-sd.txt |  10 +-
+ arch/arm64/boot/dts/mediatek/mt8173-evb.dts      |  10 +-
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi         |   5 +-
+ drivers/mmc/host/mtk-sd.c                        | 256 ++++++++++++++++++++---
+ 4 files changed, 248 insertions(+), 33 deletions(-)
