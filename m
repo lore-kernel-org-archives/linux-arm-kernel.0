@@ -1,30 +1,142 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 12 Aug 2015 10:37:02 +0100
-Subject: [PATCH v5 2/6] x86/kasan, mm: introduce generic
- kasan_populate_zero_shadow()
-In-Reply-To: <CAPAsAGwDNpRBLAvyCSpR9ZO9tAmHx-XYjVDZPECeQkU0WOw5jg@mail.gmail.com>
-References: <1439259499-13913-1-git-send-email-ryabinin.a.a@gmail.com>
- <1439259499-13913-3-git-send-email-ryabinin.a.a@gmail.com>
- <20150811154117.GH23307@e104818-lin.cambridge.arm.com>
- <55CA21E8.2060704@gmail.com>
- <20150811164010.GJ23307@e104818-lin.cambridge.arm.com>
- <CAPAsAGwDNpRBLAvyCSpR9ZO9tAmHx-XYjVDZPECeQkU0WOw5jg@mail.gmail.com>
-Message-ID: <20150812093701.GH22485@arm.com>
+From: mhocko@kernel.org (Michal Hocko)
+Date: Wed, 12 Aug 2015 11:45:58 +0200
+Subject: [PATCH v7 2/6] mm: mlock: Add new mlock system call
+In-Reply-To: <1439097776-27695-3-git-send-email-emunson@akamai.com>
+References: <1439097776-27695-1-git-send-email-emunson@akamai.com>
+ <1439097776-27695-3-git-send-email-emunson@akamai.com>
+Message-ID: <20150812094558.GD14940@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 12, 2015 at 10:30:37AM +0100, Andrey Ryabinin wrote:
-> 2015-08-11 19:40 GMT+03:00 Catalin Marinas <catalin.marinas@arm.com>:
-> >
-> > Not sure how you plan to merge it though since there are x86
-> > dependencies. I could send the whole series via tip or the mm tree (and
-> > I guess it's pretty late for 4.3).
+On Sun 09-08-15 01:22:52, Eric B Munson wrote:
+> With the refactored mlock code, introduce a new system call for mlock.
+> The new call will allow the user to specify what lock states are being
+> added.  mlock2 is trivial at the moment, but a follow on patch will add
+> a new mlock state making it useful.
+
+Looks good to me
+
+Acked-by: Michal Hocko <mhocko@suse.com>
+
+> Signed-off-by: Eric B Munson <emunson@akamai.com>
+> Acked-by: Vlastimil Babka <vbabka@suse.cz>
+> Cc: Michal Hocko <mhocko@suse.cz>
+> Cc: Vlastimil Babka <vbabka@suse.cz>
+> Cc: Heiko Carstens <heiko.carstens@de.ibm.com>
+> Cc: Geert Uytterhoeven <geert@linux-m68k.org>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Stephen Rothwell <sfr@canb.auug.org.au>
+> Cc: Guenter Roeck <linux@roeck-us.net>
+> Cc: Andrea Arcangeli <aarcange@redhat.com>
+> Cc: linux-alpha at vger.kernel.org
+> Cc: linux-kernel at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: adi-buildroot-devel at lists.sourceforge.net
+> Cc: linux-cris-kernel at axis.com
+> Cc: linux-ia64 at vger.kernel.org
+> Cc: linux-m68k at lists.linux-m68k.org
+> Cc: linux-am33-list at redhat.com
+> Cc: linux-parisc at vger.kernel.org
+> Cc: linuxppc-dev at lists.ozlabs.org
+> Cc: linux-s390 at vger.kernel.org
+> Cc: linux-sh at vger.kernel.org
+> Cc: sparclinux at vger.kernel.org
+> Cc: linux-xtensa at linux-xtensa.org
+> Cc: linux-api at vger.kernel.org
+> Cc: linux-arch at vger.kernel.org
+> Cc: linux-mm at kvack.org
+> ---
+>  arch/x86/entry/syscalls/syscall_32.tbl | 1 +
+>  arch/x86/entry/syscalls/syscall_64.tbl | 1 +
+>  include/linux/syscalls.h               | 2 ++
+>  include/uapi/asm-generic/unistd.h      | 4 +++-
+>  kernel/sys_ni.c                        | 1 +
+>  mm/mlock.c                             | 8 ++++++++
+>  6 files changed, 16 insertions(+), 1 deletion(-)
 > 
-> Via mm tree, I guess.
-> If this is too late for 4.3, then I'll update changelog and send v6
-> after 4.3-rc1 release.
+> diff --git a/arch/x86/entry/syscalls/syscall_32.tbl b/arch/x86/entry/syscalls/syscall_32.tbl
+> index ef8187f..8e06da6 100644
+> --- a/arch/x86/entry/syscalls/syscall_32.tbl
+> +++ b/arch/x86/entry/syscalls/syscall_32.tbl
+> @@ -365,3 +365,4 @@
+>  356	i386	memfd_create		sys_memfd_create
+>  357	i386	bpf			sys_bpf
+>  358	i386	execveat		sys_execveat			stub32_execveat
+> +360	i386	mlock2			sys_mlock2
+> diff --git a/arch/x86/entry/syscalls/syscall_64.tbl b/arch/x86/entry/syscalls/syscall_64.tbl
+> index 9ef32d5..67601e7 100644
+> --- a/arch/x86/entry/syscalls/syscall_64.tbl
+> +++ b/arch/x86/entry/syscalls/syscall_64.tbl
+> @@ -329,6 +329,7 @@
+>  320	common	kexec_file_load		sys_kexec_file_load
+>  321	common	bpf			sys_bpf
+>  322	64	execveat		stub_execveat
+> +324	common	mlock2			sys_mlock2
+>  
+>  #
+>  # x32-specific system call numbers start at 512 to avoid cache impact
+> diff --git a/include/linux/syscalls.h b/include/linux/syscalls.h
+> index b45c45b..56a3d59 100644
+> --- a/include/linux/syscalls.h
+> +++ b/include/linux/syscalls.h
+> @@ -884,4 +884,6 @@ asmlinkage long sys_execveat(int dfd, const char __user *filename,
+>  			const char __user *const __user *argv,
+>  			const char __user *const __user *envp, int flags);
+>  
+> +asmlinkage long sys_mlock2(unsigned long start, size_t len, int flags);
+> +
+>  #endif
+> diff --git a/include/uapi/asm-generic/unistd.h b/include/uapi/asm-generic/unistd.h
+> index e016bd9..14a6013 100644
+> --- a/include/uapi/asm-generic/unistd.h
+> +++ b/include/uapi/asm-generic/unistd.h
+> @@ -709,9 +709,11 @@ __SYSCALL(__NR_memfd_create, sys_memfd_create)
+>  __SYSCALL(__NR_bpf, sys_bpf)
+>  #define __NR_execveat 281
+>  __SC_COMP(__NR_execveat, sys_execveat, compat_sys_execveat)
+> +#define __NR_mlock2 282
+> +__SYSCALL(__NR_mlock2, sys_mlock2)
+>  
+>  #undef __NR_syscalls
+> -#define __NR_syscalls 282
+> +#define __NR_syscalls 283
+>  
+>  /*
+>   * All syscalls below here should go away really,
+> diff --git a/kernel/sys_ni.c b/kernel/sys_ni.c
+> index 7995ef5..4818b71 100644
+> --- a/kernel/sys_ni.c
+> +++ b/kernel/sys_ni.c
+> @@ -193,6 +193,7 @@ cond_syscall(sys_mlock);
+>  cond_syscall(sys_munlock);
+>  cond_syscall(sys_mlockall);
+>  cond_syscall(sys_munlockall);
+> +cond_syscall(sys_mlock2);
+>  cond_syscall(sys_mincore);
+>  cond_syscall(sys_madvise);
+>  cond_syscall(sys_mremap);
+> diff --git a/mm/mlock.c b/mm/mlock.c
+> index 5692ee5..3094f27 100644
+> --- a/mm/mlock.c
+> +++ b/mm/mlock.c
+> @@ -643,6 +643,14 @@ SYSCALL_DEFINE2(mlock, unsigned long, start, size_t, len)
+>  	return do_mlock(start, len, VM_LOCKED);
+>  }
+>  
+> +SYSCALL_DEFINE3(mlock2, unsigned long, start, size_t, len, int, flags)
+> +{
+> +	if (flags)
+> +		return -EINVAL;
+> +
+> +	return do_mlock(start, len, VM_LOCKED);
+> +}
+> +
+>  SYSCALL_DEFINE2(munlock, unsigned long, start, size_t, len)
+>  {
+>  	int ret;
+> -- 
+> 1.9.1
 
-That's probably the best bet, as I suspect we'll get some non-trivial
-conflicts with the arm64 tree at this stage.
-
-Will
+-- 
+Michal Hocko
+SUSE Labs
