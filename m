@@ -1,42 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 12 Aug 2015 08:21:29 +0100
-Subject: 3.18: lockdep problems in cpufreq
-In-Reply-To: <20150812051659.GI32049@linux>
-References: <20141214213655.GA11285@n2100.arm.linux.org.uk>
- <CAKohponhkk9BK6-7ScHeZa4R43iooWQFV8YoPLv6LjO40GNq=A@mail.gmail.com>
- <20150518185645.GA28053@n2100.arm.linux.org.uk>
- <2574268.XBqpdL2VLI@vostro.rjw.lan>
- <20150811170357.GA24529@n2100.arm.linux.org.uk>
- <20150812051659.GI32049@linux>
-Message-ID: <20150812072129.GD7557@n2100.arm.linux.org.uk>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 12 Aug 2015 08:21:38 +0100
+Subject: [PATCH v4 00/10] ACPI GIC Self-probing, GICv2m and GICv3 support
+In-Reply-To: <55CA8658.80202@codeaurora.org>
+References: <1438164539-29256-1-git-send-email-hanjun.guo@linaro.org>
+ <55CA70D5.6040300@codeaurora.org> <20150811232523.60d192d2@arm.com>
+ <55CA78DE.1000306@codeaurora.org> <20150811234801.51108784@arm.com>
+ <55CA8658.80202@codeaurora.org>
+Message-ID: <20150812082138.6a80c71d@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 12, 2015 at 10:46:59AM +0530, Viresh Kumar wrote:
-> On 11-08-15, 18:03, Russell King - ARM Linux wrote:
-> > On Tue, May 19, 2015 at 12:05:55AM +0200, Rafael J. Wysocki wrote:
-> > > On Monday, May 18, 2015 07:56:45 PM Russell King - ARM Linux wrote:
-> > > > On Tue, Dec 16, 2014 at 09:11:53AM +0530, Viresh Kumar wrote:
-> > > > > On 16 December 2014 at 04:39, Russell King - ARM Linux
-> > > > > <linux@arm.linux.org.uk> wrote:
-> > > > > > Well, here's a patch which I'm running on top of 3.18 at the moment,
-> > > > > > which is basically what I described in my email, and I'm running with it
-> > > > > > and it is without any lockdep complaint.
-> > > > > 
-> > > > > We need two separate patches now, one for 3.18 and other one for 3.19-rc.
-> > > > > 3.19 has see lots of changes in this particular file and so we need to
-> > > > > change few things here.
+On Wed, 12 Aug 2015 00:33:44 +0100
+Timur Tabi <timur@codeaurora.org> wrote:
+
+> On 08/11/2015 05:48 PM, Marc Zyngier wrote:
+> > I don't see any contradiction here. Hanjun picked the patches from my
+> > own branch in my own tree, put his own patches on top, and pushed that
+> > out on an branch called gsi-irqdomain that is definitely based on
+> > 4.2-rc2. I have no idea where your 3.9-rc7 comes from.
 > 
-> Was the patch for latest kernel ever circulated ? Probably that's why
-> Eduardo never got back to it.
+> Ok, so that's not your kernel, but the LEG kernel instead.
+> 
+> The top commits show this:
+> 
+> Follows: tracking-mainline-llct-20130415.0, 
+> tracking-mainline-llct-20130417.0, v3.9-rc7
+> 
+> Also,
+> 	$ git tag | grep v4
+> 
+> shows no v4.x tags.
+> 
+> Anyway, I don't want to make a big deal about this.
 
-Maybe not - I often lose track of which patches are in what state -
-tracking the state of 250+ patches over many months and in some cases
-_years_ is not easy.
+I just cloned this repository, and none of the branches I received have
+this as their top commit. I can only guess that you're looking at
+something else.
 
-That's still no reason for Eduardo to _completely_ ignore this thread,
-especially when Rafael explicitly tried to get comment from Eduardo.
+Thanks,
 
+	M.
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Jazz is not dead. It just smells funny.
