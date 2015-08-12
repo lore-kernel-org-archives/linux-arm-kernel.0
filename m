@@ -1,153 +1,30 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 12 Aug 2015 16:03:21 -0700
-Subject: [PATCH 3/9] PM / Domains: Support IRQ safe PM domains
-In-Reply-To: <1438731339-58317-4-git-send-email-lina.iyer@linaro.org>
-References: <1438731339-58317-1-git-send-email-lina.iyer@linaro.org>
- <1438731339-58317-4-git-send-email-lina.iyer@linaro.org>
-Message-ID: <20150812230321.GN26614@codeaurora.org>
+From: stefan@agner.ch (Stefan Agner)
+Date: Thu, 13 Aug 2015 01:03:51 +0200
+Subject: [PATCH v5] ARM: early fixmap support for earlycon
+In-Reply-To: <1439309753-30864-1-git-send-email-stefan@agner.ch>
+References: <1439309753-30864-1-git-send-email-stefan@agner.ch>
+Message-ID: <be21734a76bbc844d3035b3bf3a1ad6c@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/04, Lina Iyer wrote:
-> diff --git a/Documentation/power/devices.txt b/Documentation/power/devices.txt
-> index 8ba6625..6d8318c 100644
-> --- a/Documentation/power/devices.txt
-> +++ b/Documentation/power/devices.txt
-> @@ -607,7 +607,16 @@ individually.  Instead, a set of devices sharing a power resource can be put
->  into a low-power state together at the same time by turning off the shared
->  power resource.  Of course, they also need to be put into the full-power state
->  together, by turning the shared power resource on.  A set of devices with this
-> -property is often referred to as a power domain.
-> +property is often referred to as a power domain. A power domain may also be
-> +nested inside another power domain.
-> +
-> +Devices, by default, operate in process context and if a device can operate in
-> +IRQ safe context, has to be explicitly set as IRQ safe. Power domains by
-> +default, operate in process context but could have devices that are IRQ safe.
-> +Such power domains cannot be powered on/off during runtime PM. On the other
-> +hand, an IRQ safe PM domain that can be powered on/off and suspend or resumed
+On 2015-08-11 18:15, Stefan Agner wrote:
+<snip>
+> Hi Russel,
+> 
+> All three compile issues were related to MMU/!MMU differences. The solution
+> is rather simple: This patch now only configures FIX_EARLYCON_MEM if the
+> MMU is available. This makes sense since on !MMU platform we can use ioremap
+> very early...
+> 
+> --
+> Stefan
+> 
+> Changes since v4:
+> - Add MMU dependency for FIX_EARLYCON_MEM
+> - Call early_fixmap_init conditionally, only if FIX_EARLYCON_MEM is set
+<snip>
 
-s/suspend/suspended/?
+Submitted to the patch tracker as 8415/1.
 
-> +in an atomic context, may contain IRQ safe devices. Such domains may only
-> +contain IRQ safe devices or IRQ safe sub-domains.
->  
->  Support for power domains is provided through the pm_domain field of struct
->  device.  This field is a pointer to an object of type struct dev_pm_domain,
-> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-> index ef8d19f..221feb0 100644
-> --- a/drivers/base/power/domain.c
-> +++ b/drivers/base/power/domain.c
-> @@ -53,6 +53,74 @@
->  static LIST_HEAD(gpd_list);
->  static DEFINE_MUTEX(gpd_list_lock);
->  
-> +static inline int genpd_lock_noirq(struct generic_pm_domain *genpd,
-> +					unsigned int subclass)
-> +	__acquires(&genpd->slock)
-> +{
-> +	unsigned long flags;
-> +
-> +	if (subclass > 0)
-> +		spin_lock_irqsave_nested(&genpd->slock, flags, subclass);
-> +	else
-> +		spin_lock_irqsave(&genpd->slock, flags);
-> +
-> +	genpd->lock_flags = flags;
-> +	return 0;
-
-Why return anything at all?
-
-> +}
-> +
-> +static inline void genpd_unlock_noirq(struct generic_pm_domain *genpd)
-> +	__releases(&genpd->slock)
-> +{
-> +	spin_unlock_irqrestore(&genpd->slock, genpd->lock_flags);
-> +}
-> +
-> +static inline int genpd_lock_irq(struct generic_pm_domain *genpd,
-> +					unsigned int subclass)
-> +	__acquires(&genpd->mlock)
-> +{
-> +	if (subclass > 0)
-> +		mutex_lock_nested(&genpd->mlock, subclass);
-> +	else
-> +		mutex_lock(&genpd->mlock);
-> +	return 0;
-
-Same here.
-
-> +}
-> +
-> +static inline int genpd_lock_interruptible_irq(struct generic_pm_domain *genpd)
-> +	__acquires(&genpd->mlock)
-> +{
-> +	return mutex_lock_interruptible(&genpd->mlock);
-> +}
-> +
-> +static inline void genpd_unlock_irq(struct generic_pm_domain *genpd)
-> +	__releases(&genpd->mlock)
-> +{
-> +	mutex_unlock(&genpd->mlock);
-> +}
-> +
-> +static inline int genpd_lock(struct generic_pm_domain *genpd)
-> +{
-> +	return genpd->irq_safe ? genpd_lock_noirq(genpd, 0)
-> +			: genpd_lock_irq(genpd, 0);
-> +}
-> +
-> +static inline int genpd_lock_nested(struct generic_pm_domain *genpd)
-> +{
-> +	return genpd->irq_safe ? genpd_lock_noirq(genpd, SINGLE_DEPTH_NESTING)
-> +			: genpd_lock_irq(genpd, SINGLE_DEPTH_NESTING);
-> +}
-
-And for all these functions. The return is always 0.
-
-> +
-> +static inline int genpd_lock_interruptible(struct generic_pm_domain *genpd)
-> +{
-> +	return genpd->irq_safe ? genpd_lock_noirq(genpd, 0)
-> +			: genpd_lock_interruptible_irq(genpd);
-> +}
-
-I guess this is the only one that matters.
-
-> +
-> +static inline void genpd_unlock(struct generic_pm_domain *genpd)
-> +{
-> +	return genpd->irq_safe ? genpd_unlock_noirq(genpd)
-> +			: genpd_unlock_irq(genpd);
-> +}
-
-And this one again always returns 0?
-
-> +
->  static struct generic_pm_domain *pm_genpd_lookup_name(const char *domain_name)
->  {
->  	struct generic_pm_domain *genpd = NULL, *gpd;
-> @@ -535,15 +611,18 @@ static int pm_genpd_runtime_resume(struct device *dev)
->  	if (IS_ERR(genpd))
->  		return -EINVAL;
->  
-> -	/* If power.irq_safe, the PM domain is never powered off. */
-> -	if (dev->power.irq_safe) {
-> +	/*
-> +	 * As we dont power off a non IRQ safe domain, which holds
-> +	 * an IRQ safe device, we dont need to restore power to it.
-> +	 */
-> +	if (dev->power.irq_safe && !genpd->irq_safe) {
-
-This same statement where we check dev for irq_safe and genpd for
-!irq_safe has happened three times now. Maybe it should be some
-sort of helper function?
-
-if (irq_safe_device_in_no_sleep_domain(dev, genpd))
-
-or something?
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+--
+Stefan
