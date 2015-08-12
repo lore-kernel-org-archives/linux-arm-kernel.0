@@ -1,34 +1,34 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 12 Aug 2015 10:26:52 +0900
-Subject: [PATCH v2] ARM: shmobile: silk: add SDHI1 DT support
-In-Reply-To: <2757472.iuyUyRzJ3z@wasted.cogentembedded.com>
-References: <10037494.4LD4T2QGPX@wasted.cogentembedded.com>
- <2757472.iuyUyRzJ3z@wasted.cogentembedded.com>
-Message-ID: <20150812012652.GH15957@verge.net.au>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Wed, 12 Aug 2015 09:32:40 +0800
+Subject: [PATCH v2 2/2] i2c: mediatek: Fixup i2c ack error interrupt
+ handling
+In-Reply-To: <20150811145521.GB1525@katana>
+References: <1438845731-17805-1-git-send-email-eddie.huang@mediatek.com>
+ <1438845731-17805-3-git-send-email-eddie.huang@mediatek.com>
+ <20150811145521.GB1525@katana>
+Message-ID: <CAGS+omBrDWd7hwn=0qYBLK=6L-hORwrKQ9ecL4k3wSSGEPZ64g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+Hi Wolfram,
 
-On Tue, Aug 11, 2015 at 01:44:03AM +0300, Sergei Shtylyov wrote:
-> Define the SILK board dependent part of the SDHI1 (connected to micro-SD slot)
-> device nodes along with the necessary voltage regulators.
-> 
-> Based on the original patch by Vladimir Barinov
-> <vladimir.barinov@cogentembedded.com>.
-> 
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> 
-> ---
-> This patch is against 'renesas-devel-20150810-v4.2-rc6' tag of Simon Horman's
-> 'renesas.git' repo plus the R8A7794/SILK QSPI patches just re-posted. It needs
-> the R8A7794 GPIO patches in order to compile.
-> 
-> Changes in version 2:
-> - removed not working SDHI0 stuff, renamed the patch;
-> - replaced SDHI1's "wp-gpios" property with "disable-wp".
+On Tue, Aug 11, 2015 at 10:55 PM, Wolfram Sang <wsa@the-dreams.de> wrote:
+> On Thu, Aug 06, 2015 at 03:22:11PM +0800, Eddie Huang wrote:
+>> When occur i2c ack error, i2c controller generate two interrupts,
+>> first is the ack error interrupt, then the complete interrupt.
+>> i2c interrupt handler should keep the two interrupt value, and only
+>> call complete() for the complete interrupt.
+>>
+>> Signed-off-by: Liguo Zhang <liguo.zhang@mediatek.com>
+>> Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
+>
+> Applied to for-next, thanks!
 
-I am wondering if you could explain the motivation for the "disable-wp"
-update and weather it is appropriate for other r8a779* dts files.
+I don't see them in [0].
+[0] https://git.kernel.org/cgit/linux/kernel/git/wsa/linux.git/log/?h=i2c/for-next
 
-Thanks.
+Am I not looking in the right place?
+Or, did I not wait long enough?
+
+Thanks!
+-Dan
