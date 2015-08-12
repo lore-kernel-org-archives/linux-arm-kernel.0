@@ -1,34 +1,83 @@
-From: horia.geanta@freescale.com (=?UTF-8?Q?Horia_Geant=c4=83?=)
-Date: Wed, 12 Aug 2015 16:20:41 +0300
-Subject: [PATCH v3] ARM: configs: Add Freescale LS1021A defconfig
-In-Reply-To: <1438941784-38403-1-git-send-email-b18965@freescale.com>
-References: <1438941784-38403-1-git-send-email-b18965@freescale.com>
-Message-ID: <55CB4829.40204@freescale.com>
+From: sjg@chromium.org (Simon Glass)
+Date: Wed, 12 Aug 2015 07:21:32 -0600
+Subject: [PATCH] arm: rpi: Device tree modifications for U-Boot
+In-Reply-To: <1439312701.2451.3.camel@lynxeye.de>
+References: <1439303153-12171-1-git-send-email-sjg@chromium.org>
+ <1439312701.2451.3.camel@lynxeye.de>
+Message-ID: <CAPnjgZ3ztXnkxZJvitiXiKMzq5+x46hbv0PW4HcF7yGgsXUV+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/7/2015 1:03 PM, Alison Wang wrote:
-> Add Freescale LS1021A initial defconfig file.
-> The LS1021A SoC is a dual-core Cortex-A7 based processor.
-> 
-> LS1021A has some special configure options against common V7 SOCs,
-> such as CONFIG_THUMB2_KERNEL, CONFIG_VMSPLIT_2G, CONFIG_VFP...
-> 
-> Enable I2C, LPUART, eDMA, WDT, GIANFAR, Sound, DSPI at default.
-> 
-> Signed-off-by: Haikun Wang <haikun.wang@freescale.com>
-> Signed-off-by: Alison Wang <alison.wang@freescale.com>
-> ---
-> Changes since v2:
-> - Enable PSCI, as PSCI is enabled in u-boot.
-> Changes since v1:
-> - Enable GIANFAR, Sound and DSPI.
+Hi Lucas,
 
-Looks like CONFIG_ARCH_DMA_ADDR_T_64BIT=y is missing.
-For e.g. CAAM (crypto engine) is a DMA device able to use 40-bit bus
-addresses.
-Note that ARCH_DMA_ADDR_T_64BIT does not depend / is not selected by
-ARM_LPAE.
+On 11 August 2015 at 11:05, Lucas Stach <dev@lynxeye.de> wrote:
+> Hi Simon,
+>
+> why did you send this to the Tegra ML?
+>
+> Am Dienstag, den 11.08.2015, 08:25 -0600 schrieb Simon Glass:
+>> This updates the device tree from the kernel version to something suitable
+>> for U-Boot:
+>>
+>> - Add stdout-path alias for console
+>> - Mark the /soc node to be available pre-relocation so that the early
+>> serial console works (we need the 'ranges' property to be available)
+>>
+>> Signed-off-by: Simon Glass <sjg@chromium.org>
+>> ---
+>>
+>>  arch/arm/boot/dts/bcm2835.dtsi | 4 +++-
+>>  1 file changed, 3 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
+>> index 301c73f..bd6bff6 100644
+>> --- a/arch/arm/boot/dts/bcm2835.dtsi
+>> +++ b/arch/arm/boot/dts/bcm2835.dtsi
+>> @@ -8,6 +8,7 @@
+>>
+>>       chosen {
+>>               bootargs = "earlyprintk console=ttyAMA0";
+>> +             stdout-path = &uart;
+>>       };
+>>
+>>       soc {
+>> @@ -16,6 +17,7 @@
+>>               #size-cells = <1>;
+>>               ranges = <0x7e000000 0x20000000 0x02000000>;
+>>               dma-ranges = <0x40000000 0x00000000 0x20000000>;
+>> +             u-boot,dm-pre-reloc;
+>
+> Why do you need this and why should upstream carry your favourite
+> bootloaders configuration? This is in no way hardware description.
 
-Thanks,
-Horia
+I'm not sure how much you know about U-Boot, so let me know if you
+need more info.
+
+U-Boot normally starts up by setting up its serial UART and displaying
+a banner message. At this stage typically only a few devices are
+initialised (e.g. maybe just the UART). It then relocates itself to
+the top of memory and starts up all the devices. It throws away any
+previous devices that it set up before relocation and starts again.
+
+U-Boot uses a thing called driver model (dm) which handles driver
+binding and probing. Driver model has the device tree and would
+normally scan through it and create devices for everything it finds.
+
+Before relocation we don't need every device. Also the CPU is often
+running slowly, perhaps without the cache enabled. SDRAM may not be
+available yet so space is short. We want to avoid starting up things
+that will not be used.
+
+So this property indicates that the device is needed before relocation
+and should be set up by driver model. We need it to avoid a very slow
+and memory-hungry startup.
+
+As to why upstream should accept it, my understanding of upstream is
+that people can send patches to it and in fact are encouraged to do
+so, to avoid misunderstandings and duplication. The device tree files
+are stored in Linux so any binding or source file changes should end
+up there. Otherwise the files tend to diverge and we end up with
+multiple bindings and multiple versions of the same source file.
+
+Regards,
+Simon
