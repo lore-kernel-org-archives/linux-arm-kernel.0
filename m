@@ -1,80 +1,45 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 12 Aug 2015 08:44:39 +0100
-Subject: [PATCH v2 1/2] soc/fsl: add freescale dir for SOC specific drivers
-In-Reply-To: <1439358807-9024-1-git-send-email-dongsheng.wang@freescale.com>
-References: <1439358807-9024-1-git-send-email-dongsheng.wang@freescale.com>
-Message-ID: <20150812074439.GF7557@n2100.arm.linux.org.uk>
+Date: Wed, 12 Aug 2015 08:49:25 +0100
+Subject: 3.18: lockdep problems in cpufreq
+In-Reply-To: <20150812073530.GA16445@linux>
+References: <20141214213655.GA11285@n2100.arm.linux.org.uk>
+ <CAKohponhkk9BK6-7ScHeZa4R43iooWQFV8YoPLv6LjO40GNq=A@mail.gmail.com>
+ <20150518185645.GA28053@n2100.arm.linux.org.uk>
+ <2574268.XBqpdL2VLI@vostro.rjw.lan>
+ <20150811170357.GA24529@n2100.arm.linux.org.uk>
+ <20150812051659.GI32049@linux>
+ <20150812072129.GD7557@n2100.arm.linux.org.uk>
+ <20150812073530.GA16445@linux>
+Message-ID: <20150812074925.GG7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 12, 2015 at 01:53:26PM +0800, Dongsheng Wang wrote:
-> diff --git a/drivers/soc/fsl/Kconfig b/drivers/soc/fsl/Kconfig
-> new file mode 100644
-> index 0000000..863d1ef
-> --- /dev/null
-> +++ b/drivers/soc/fsl/Kconfig
-> @@ -0,0 +1,18 @@
-> +#
-> +# Freescale SOC drivers
-> +#
-> +menuconfig FSL_SOC_DRIVERS
-> +	bool "Freescale Soc Drivers"
-> +	default n
+On Wed, Aug 12, 2015 at 01:05:30PM +0530, Viresh Kumar wrote:
+> On 12-08-15, 08:21, Russell King - ARM Linux wrote:
+> > Maybe not - I often lose track of which patches are in what state -
+> > tracking the state of 250+ patches over many months and in some cases
+> > _years_ is not easy.
+> 
+> I agree..
+> 
+> > That's still no reason for Eduardo to _completely_ ignore this thread,
+> > especially when Rafael explicitly tried to get comment from Eduardo.
+> 
+> Oh, no. I am not trying to be anybody's advocate here. I was just
+> highlighting the point here, that I remembered.
+> 
+> Even I was quite busy then and couldn't get back to it.
+> 
+> Lets fix this now. I believe you have a patch for this based on latest
+> kernel? Mind pasting that here for quick review?
 
-No need for default n.
+I don't think it's changed much since the original, but I've posted
+what's in linux-next as of today, and it doesn't conflict with anything.
+So there's no excuse about getting it merged.
 
-> diff --git a/drivers/soc/fsl/Kconfig.arm b/drivers/soc/fsl/Kconfig.arm
-> new file mode 100644
-> index 0000000..8c90b82
-> --- /dev/null
-> +++ b/drivers/soc/fsl/Kconfig.arm
-> @@ -0,0 +1,16 @@
-> +#
-> +# Freescale ARM SOC Drivers
-> +#
-> +
-> +config	LS1_SOC_DRIVERS
-> +	bool "LS1021A Soc Drivers"
-> +	depends on SOC_LS1021A
-> +	default n
-
-Ditto.
-
-> +	help
-> +	Say y here to enable Freescale LS1021A Soc Device Drivers support.
-> +	The Soc Drivers provides the device driver that is a specific block
-> +	or feature on LS1021A platform.
-
-Help text should be indented by two spaces as per almost every other
-help text.
-
-> +
-> +if LS1_SOC_DRIVERS
-> +	source "drivers/soc/fsl/ls1/Kconfig"
-> +endif
-> diff --git a/drivers/soc/fsl/Makefile b/drivers/soc/fsl/Makefile
-> new file mode 100644
-> index 0000000..b4215dd
-> --- /dev/null
-> +++ b/drivers/soc/fsl/Makefile
-> @@ -0,0 +1,6 @@
-> +#
-> +# Makefile for Freescale Soc specific device drivers.
-> +#
-> +
-> +obj-$(CONFIG_LS1_SOC_DRIVERS) += ls1/
-> +
-> diff --git a/drivers/soc/fsl/ls1/Kconfig b/drivers/soc/fsl/ls1/Kconfig
-> new file mode 100644
-> index 0000000..7556f44
-> --- /dev/null
-> +++ b/drivers/soc/fsl/ls1/Kconfig
-> @@ -0,0 +1,3 @@
-> +#
-> +# LS-1 Soc drivers
-> +#
-
-Doesn't this directory need a Makefile as well?
+The problem will be back-porting it to stable kernels, because I think
+it's had to be updated at least a couple of times.  I don't have the old
+versions anymore, so I'm just going to say "not my problem" - sorry.
 
 -- 
 FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
