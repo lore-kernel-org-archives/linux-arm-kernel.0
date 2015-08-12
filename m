@@ -1,39 +1,39 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 12 Aug 2015 14:41:16 +0100
-Subject: [PATCH v5 2/6] x86/kasan, mm: introduce generic
- kasan_populate_zero_shadow()
-In-Reply-To: <CAPAsAGwnhnqJCh=sc97-=qrYHNQnDSjVR-xGertoMiNWHDbhrw@mail.gmail.com>
-References: <1439259499-13913-1-git-send-email-ryabinin.a.a@gmail.com>
- <1439259499-13913-3-git-send-email-ryabinin.a.a@gmail.com>
- <20150811154117.GH23307@e104818-lin.cambridge.arm.com>
- <55CA21E8.2060704@gmail.com>
- <20150811164010.GJ23307@e104818-lin.cambridge.arm.com>
- <CAPAsAGwDNpRBLAvyCSpR9ZO9tAmHx-XYjVDZPECeQkU0WOw5jg@mail.gmail.com>
- <20150812093701.GH22485@arm.com>
- <CAPAsAGwnhnqJCh=sc97-=qrYHNQnDSjVR-xGertoMiNWHDbhrw@mail.gmail.com>
-Message-ID: <20150812134116.GB23540@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 12 Aug 2015 14:41:42 +0100
+Subject: [PATCH 4/6] irqchip: GIC: Use chip_data instead of handler_data
+ for cascaded interrupts
+In-Reply-To: <55C9C42E.8070602@linaro.org>
+References: <1436447951-22357-1-git-send-email-marc.zyngier@arm.com>
+ <1436447951-22357-5-git-send-email-marc.zyngier@arm.com>
+ <55C9C42E.8070602@linaro.org>
+Message-ID: <55CB4D16.9070608@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 12, 2015 at 01:19:03PM +0100, Andrey Ryabinin wrote:
-> 2015-08-12 12:37 GMT+03:00 Will Deacon <will.deacon@arm.com>:
-> > On Wed, Aug 12, 2015 at 10:30:37AM +0100, Andrey Ryabinin wrote:
-> >> 2015-08-11 19:40 GMT+03:00 Catalin Marinas <catalin.marinas@arm.com>:
-> >> >
-> >> > Not sure how you plan to merge it though since there are x86
-> >> > dependencies. I could send the whole series via tip or the mm tree (and
-> >> > I guess it's pretty late for 4.3).
-> >>
-> >> Via mm tree, I guess.
-> >> If this is too late for 4.3, then I'll update changelog and send v6
-> >> after 4.3-rc1 release.
-> >
-> > That's probably the best bet, as I suspect we'll get some non-trivial
-> > conflicts with the arm64 tree at this stage.
-> >
-> Or, if x86 maintainers are agree to take first 2 patches in 4.3,
-> the rest of the series could go into arm64 tree later.
+On 11/08/15 10:45, Eric Auger wrote:
+> Hi Marc,
+> On 07/09/2015 03:19 PM, Marc Zyngier wrote:
+>> When used as a primary interrupt controller, the GIC driver uses
+>> irq_data->chip_data to extract controller-specific information.
+>>
+>> When used as a secondary interrupt controller, it uses handler_data
+>> instead. As this difference is relatively pointless and only creates
+>> confusion, change the secondary path to match what the rest of the
+>> driver does.
+> not really related to this series' topic, is it?
 
-Yup, that would be even better for us!
+It is. Or was. We use the handler_data field to hold the vcpu
+information, but that's also used by the chained interrupt handler to
+find out which secondary it is.
 
-Will
+But this patch is wrong anyway, as it entirely breaks secondary GICs (I
+found out when I merged this with a patch from Jon Hunter fixing some
+other related stuff). Took me hours to get an EB up and running!
+
+I have a working version now, which makes this patch irrelevant.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
