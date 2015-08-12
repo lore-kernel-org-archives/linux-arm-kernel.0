@@ -1,37 +1,32 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 12 Aug 2015 11:54:43 +0100
-Subject: [PATCH 05/20] regmap: Restructure writes in _regmap_raw_write()
-In-Reply-To: <1439374365-20623-6-git-send-email-mpa@pengutronix.de>
-References: <1439374365-20623-1-git-send-email-mpa@pengutronix.de>
- <1439374365-20623-6-git-send-email-mpa@pengutronix.de>
-Message-ID: <20150812105443.GT10748@sirena.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 12 Aug 2015 03:56:42 -0700
+Subject: [PATCH] ARM: OMAP3: clock: remove un-used core dpll re-program
+ code
+In-Reply-To: <20150812072535.GQ4215@atomide.com>
+References: <1437034091-18306-1-git-send-email-t-kristo@ti.com>
+ <20150812072535.GQ4215@atomide.com>
+Message-ID: <20150812105642.GW4215@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 12, 2015 at 12:12:30PM +0200, Markus Pargmann wrote:
-> Currently we try to write the data without copying directly using
-> bus->write() or bus->gather_write() if it exists. If one of the previous
-> tries to write reported -ENOTSUPP or none of them were usable, we copy
-> the data into a buffer and use bus->write().
+* Tony Lindgren <tony@atomide.com> [150812 00:29]:
+> * Tero Kristo <t-kristo@ti.com> [150716 01:10]:
+> > Remove the OMAP3 core DPLL re-program code, and the associated SRAM
+> > code that does the low-level programming of the DPLL divider, idling
+> > of the SDRAM etc.
+> > 
+> > This code was never fully implemented in the kernel; things missing
+> > were driver side handling of core clock changes (they need to account
+> > for their functional clock rate being changed on-the-fly), and the whole
+> > framework required for handling this. Thus, there is not much point
+> > to keep carrying the low-level support code either.
 > 
-> However it does not make sense to try bus->write() a second time with a
-> copied buffer if it didn't work the first time.
-> 
-> This patch restructures this if/else block to make it clear that this is
-> not intended for the case where bus->write() returns -ENOTSUPP.
+> OK I'm applying this into omap-for-v4.3/soc. If we ever need the code
+> it will be in the git history.
 
-I'm not entirely convinced that this is an improvement.  The main effect
-that I'm seeing is an increase in the indentation level and there are
-potential issues with the write operation being unable to work with some
-kinds of memory (like restrictions about dmaing from stack or unalinged
-memory for example) which mean that copying into a newly allocated
-buffer may actually help.  I don't think we detect any such restrictions
-at the minute but the defensiveness is nice and I'd really hope that the
-failed write case isn't any kind of fast path.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150812/ffeed222/attachment.sig>
+Actually I'll wait on this one and apply it later on as it currently
+adds merge conflicts into Linux next.
+
+Regards,
+
+Tony
