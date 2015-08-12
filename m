@@ -1,17 +1,15 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Wed, 12 Aug 2015 17:46:40 +0900
+Date: Wed, 12 Aug 2015 17:48:22 +0900
 Subject: [GIT PULL] Renesas ARM Based SoC CPG MSTP Clock Domain Updates
  for v4.3
-In-Reply-To: <20150811134249.GQ30181@localhost>
+In-Reply-To: <20150811133843.GP30181@localhost>
 References: <cover.1438911559.git.horms+renesas@verge.net.au>
- <20150811134249.GQ30181@localhost>
-Message-ID: <20150812084638.GA16058@verge.net.au>
+ <20150811133843.GP30181@localhost>
+Message-ID: <20150812084822.GB16058@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
-
-On Tue, Aug 11, 2015 at 03:42:49PM +0200, Olof Johansson wrote:
+On Tue, Aug 11, 2015 at 03:38:43PM +0200, Olof Johansson wrote:
 > On Fri, Aug 07, 2015 at 11:12:03AM +0900, Simon Horman wrote:
 > > Hi Olof, Hi Kevin, Hi Arnd,
 > > 
@@ -27,41 +25,14 @@ On Tue, Aug 11, 2015 at 03:42:49PM +0200, Olof Johansson wrote:
 > > 
 > > This series begins with driver changes and follows up with DT changes.
 > > The latter depend on the former.
-> > 
-> > 
-> > The following changes since commit 94bdc48d55ca10f90b4a625f0e443197e0013557:
-> > 
-> >   ARM: shmobile: sh73a0 dtsi: Add missing "gpio-ranges" to gpio node (2015-08-05 06:39:28 +0900)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-cpg-mstp-clock-domain-for-v4.3
-> > 
-> > for you to fetch changes up to 2daa8a5a8c0994893c2ca456303f0bf53e881cb9:
-> > 
-> >   ARM: shmobile: r8a7794 dtsi: Add CPG/MSTP Clock Domain (2015-08-05 06:42:51 +0900)
 > 
-> We normally prefer to see drivers separately from DT. If you've looked at how
-> we organize arm-soc, you've maybe seen that we have a separate topic for
-> next/driver and one for next/dt. In other words, we try to keep them apart
-> where it makes sense.
+> I see the acked-by tags on the clk patches, but it took some searching to find
+> the ack email from Stephen.
 > 
-> In this case, that would mean having the clk changes in a drivers branch, and
-> include that in this dt4 branch.
-> 
-> If you want a reminder for when you might have looked at the branch sorting
-> wrong: If you're naming the branch after a feature instead of the type of
-> patches in it (when you send it to us), then chances are that we would ideally
-> like to see the contents sorted differently -- at least in the cases where they
-> cross the category boundaries that we organize our tree in.
-> 
-> So, while it's not a huge deal I think it makes sense to revisit this
-> and do that sorting for consistency's sake. Can I please ask that you
-> respin this pull request with that in mind? I'd cherry-pick them apart
-> but I know you tend to base branches on each other so that might mess
-> you up and I don't want to do that.
+> Can you please make our homework a bit easier when providing that in
+> the future?
 
-Thanks for the detailed feedback.
+Sure, I hadn't realised that you liked to track down Acks to that extent.
 
-I have split the pull-request and reposted as you suggest above.
-And I'll try to keep your 'reminder' in mind in future.
+As practice for myself I've included some notes in the repost of the
+patches in question.  Please let me know if you need something different.
