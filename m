@@ -1,50 +1,63 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Wed, 12 Aug 2015 12:12:29 +0200
-Subject: [PATCH 04/20] regmap: Do not skip format initialization
+Date: Wed, 12 Aug 2015 12:12:38 +0200
+Subject: [PATCH 13/20] regmap: regmap max_raw_io getter function
 In-Reply-To: <1439374365-20623-1-git-send-email-mpa@pengutronix.de>
 References: <1439374365-20623-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1439374365-20623-5-git-send-email-mpa@pengutronix.de>
+Message-ID: <1439374365-20623-14-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is not obvious why format initialization is skipped here. format
-functions are used for example in regmap_bulk_read even if bus is not
-set. So they are used even if skipped here which leads to null pointer
-errors.
-
-This patch adds format initialization for !bus and !bus->read/write.
-
 Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 ---
- drivers/base/regmap/regmap.c | 4 ----
- 1 file changed, 4 deletions(-)
+ drivers/base/regmap/regmap.c | 22 ++++++++++++++++++++++
+ include/linux/regmap.h       |  2 ++
+ 2 files changed, 24 insertions(+)
 
 diff --git a/drivers/base/regmap/regmap.c b/drivers/base/regmap/regmap.c
-index 4fe5f63edb54..86e94be3c749 100644
+index 6ad4ca849055..8c2be516a100 100644
 --- a/drivers/base/regmap/regmap.c
 +++ b/drivers/base/regmap/regmap.c
-@@ -607,13 +607,11 @@ struct regmap *regmap_init(struct device *dev,
- 		map->reg_write = config->reg_write;
+@@ -1393,6 +1393,28 @@ bool regmap_can_raw_write(struct regmap *map)
+ }
+ EXPORT_SYMBOL_GPL(regmap_can_raw_write);
  
- 		map->defer_caching = false;
--		goto skip_format_initialization;
- 	} else if (!bus->read || !bus->write) {
- 		map->reg_read = _regmap_bus_reg_read;
- 		map->reg_write = _regmap_bus_reg_write;
++/**
++ * regmap_get_raw_io_max - Get the maximum size we can read/write
++ *
++ * @map: Map to check.
++ */
++size_t regmap_get_raw_io_max(struct regmap *map)
++{
++	return map->max_raw_io;
++}
++EXPORT_SYMBOL_GPL(regmap_get_raw_io_max);
++
++/**
++ * regmap_get_raw_read_max - Get the maximum size we can read
++ *
++ * @map: Map to check.
++ */
++size_t regmap_get_raw_read_max(struct regmap *map)
++{
++	return map->max_raw_io;
++}
++EXPORT_SYMBOL_GPL(regmap_get_raw_read_max);
++
+ static int _regmap_bus_formatted_write(void *context, unsigned int reg,
+ 				       unsigned int val)
+ {
+diff --git a/include/linux/regmap.h b/include/linux/regmap.h
+index 2cb62d141761..b236f884f642 100644
+--- a/include/linux/regmap.h
++++ b/include/linux/regmap.h
+@@ -441,6 +441,8 @@ int regmap_get_max_register(struct regmap *map);
+ int regmap_get_reg_stride(struct regmap *map);
+ int regmap_async_complete(struct regmap *map);
+ bool regmap_can_raw_write(struct regmap *map);
++size_t regmap_get_raw_write_max(struct regmap *map);
++size_t regmap_get_raw_io_max(struct regmap *map);
  
- 		map->defer_caching = false;
--		goto skip_format_initialization;
- 	} else {
- 		map->reg_read  = _regmap_bus_read;
- 	}
-@@ -784,8 +782,6 @@ struct regmap *regmap_init(struct device *dev,
- 		map->reg_write = _regmap_bus_raw_write;
- 	}
- 
--skip_format_initialization:
--
- 	map->range_tree = RB_ROOT;
- 	for (i = 0; i < config->num_ranges; i++) {
- 		const struct regmap_range_cfg *range_cfg = &config->ranges[i];
+ int regcache_sync(struct regmap *map);
+ int regcache_sync_region(struct regmap *map, unsigned int min,
 -- 
 2.4.6
