@@ -1,44 +1,27 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 12 Aug 2015 08:21:38 +0100
-Subject: [PATCH v4 00/10] ACPI GIC Self-probing, GICv2m and GICv3 support
-In-Reply-To: <55CA8658.80202@codeaurora.org>
-References: <1438164539-29256-1-git-send-email-hanjun.guo@linaro.org>
- <55CA70D5.6040300@codeaurora.org> <20150811232523.60d192d2@arm.com>
- <55CA78DE.1000306@codeaurora.org> <20150811234801.51108784@arm.com>
- <55CA8658.80202@codeaurora.org>
-Message-ID: <20150812082138.6a80c71d@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 12 Aug 2015 00:25:36 -0700
+Subject: [PATCH] ARM: OMAP3: clock: remove un-used core dpll re-program
+ code
+In-Reply-To: <1437034091-18306-1-git-send-email-t-kristo@ti.com>
+References: <1437034091-18306-1-git-send-email-t-kristo@ti.com>
+Message-ID: <20150812072535.GQ4215@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 12 Aug 2015 00:33:44 +0100
-Timur Tabi <timur@codeaurora.org> wrote:
+* Tero Kristo <t-kristo@ti.com> [150716 01:10]:
+> Remove the OMAP3 core DPLL re-program code, and the associated SRAM
+> code that does the low-level programming of the DPLL divider, idling
+> of the SDRAM etc.
+> 
+> This code was never fully implemented in the kernel; things missing
+> were driver side handling of core clock changes (they need to account
+> for their functional clock rate being changed on-the-fly), and the whole
+> framework required for handling this. Thus, there is not much point
+> to keep carrying the low-level support code either.
 
-> On 08/11/2015 05:48 PM, Marc Zyngier wrote:
-> > I don't see any contradiction here. Hanjun picked the patches from my
-> > own branch in my own tree, put his own patches on top, and pushed that
-> > out on an branch called gsi-irqdomain that is definitely based on
-> > 4.2-rc2. I have no idea where your 3.9-rc7 comes from.
-> 
-> Ok, so that's not your kernel, but the LEG kernel instead.
-> 
-> The top commits show this:
-> 
-> Follows: tracking-mainline-llct-20130415.0, 
-> tracking-mainline-llct-20130417.0, v3.9-rc7
-> 
-> Also,
-> 	$ git tag | grep v4
-> 
-> shows no v4.x tags.
-> 
-> Anyway, I don't want to make a big deal about this.
+OK I'm applying this into omap-for-v4.3/soc. If we ever need the code
+it will be in the git history.
 
-I just cloned this repository, and none of the branches I received have
-this as their top commit. I can only guess that you're looking at
-something else.
+Regards,
 
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny.
+Tony
