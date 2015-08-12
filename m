@@ -1,109 +1,96 @@
-From: Dongsheng.Wang@freescale.com (Wang Dongsheng)
-Date: Wed, 12 Aug 2015 08:10:12 +0000
-Subject: [PATCH v2 1/2] soc/fsl: add freescale dir for SOC specific drivers
-In-Reply-To: <20150812080354.GH7557@n2100.arm.linux.org.uk>
-References: <1439358807-9024-1-git-send-email-dongsheng.wang@freescale.com>
- <20150812074439.GF7557@n2100.arm.linux.org.uk>
- <SN1PR0301MB1616C942574FB3261B811DB19D7E0@SN1PR0301MB1616.namprd03.prod.outlook.com>
- <20150812080354.GH7557@n2100.arm.linux.org.uk>
-Message-ID: <SN1PR0301MB16166F525E73A892C673F2C19D7E0@SN1PR0301MB1616.namprd03.prod.outlook.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 12 Aug 2015 13:41:43 +0530
+Subject: [PATCH] thermal: cpu_cooling: fix lockdep problems in cpu_cooling
+In-Reply-To: <E1ZPQfV-0005nb-DN@rmk-PC.arm.linux.org.uk>
+References: <20150812073530.GA16445@linux>
+ <E1ZPQfV-0005nb-DN@rmk-PC.arm.linux.org.uk>
+Message-ID: <20150812081142.GB16445@linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 12-08-15, 08:41, Russell King wrote:
+> diff --git a/drivers/thermal/cpu_cooling.c b/drivers/thermal/cpu_cooling.c
+>  /**
+> @@ -221,7 +224,7 @@ static int cpufreq_thermal_notifier(struct notifier_block *nb,
+>  	switch (event) {
+>  
+>  	case CPUFREQ_ADJUST:
+> -		mutex_lock(&cooling_cpufreq_lock);
+> +		mutex_lock(&cooling_list_lock);
 
+There is one more place where the list's locking needs update:
+cpufreq_cooling_get_level().
 
-> -----Original Message-----
-> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
-> Sent: Wednesday, August 12, 2015 4:04 PM
-> To: Wang Dongsheng-B40534
-> Cc: shawn.guo at linaro.org; Wang Huan-B18965; linus.walleij at linaro.org; linux-
-> kernel at vger.kernel.org; sandeep_n at ti.com; hdegoede at redhat.com; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [PATCH v2 1/2] soc/fsl: add freescale dir for SOC specific drivers
-> 
-> On Wed, Aug 12, 2015 at 08:01:32AM +0000, Wang Dongsheng wrote:
-> > Hi Russell,
-> >
-> > Thanks for your review. :)
-> >
-> > > -----Original Message-----
-> > > From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
-> > > Sent: Wednesday, August 12, 2015 3:45 PM
-> > > To: Wang Dongsheng-B40534
-> > > Cc: shawn.guo at linaro.org; Wang Huan-B18965;
-> > > linus.walleij at linaro.org; linux- kernel at vger.kernel.org;
-> > > sandeep_n at ti.com; hdegoede at redhat.com; linux-arm-
-> > > kernel at lists.infradead.org
-> > > Subject: Re: [PATCH v2 1/2] soc/fsl: add freescale dir for SOC
-> > > specific drivers
-> > >
-> > > On Wed, Aug 12, 2015 at 01:53:26PM +0800, Dongsheng Wang wrote:
-> > > > diff --git a/drivers/soc/fsl/Kconfig b/drivers/soc/fsl/Kconfig new
-> > > > file mode 100644 index 0000000..863d1ef
-> > > > --- /dev/null
-> > > > +++ b/drivers/soc/fsl/Kconfig
-> > > > @@ -0,0 +1,18 @@
-> > > > +#
-> > > > +# Freescale SOC drivers
-> > > > +#
-> > > > +menuconfig FSL_SOC_DRIVERS
-> > > > +	bool "Freescale Soc Drivers"
-> > > > +	default n
-> > >
-> > > No need for default n.
-> >
-> > Thanks. Fix it in next version.
-> >
-> > > > +	help
-> > > > +	Say y here to enable Freescale LS1021A Soc Device Drivers support.
-> > > > +	The Soc Drivers provides the device driver that is a specific block
-> > > > +	or feature on LS1021A platform.
-> > >
-> > > Help text should be indented by two spaces as per almost every other help
-> text.
-> > >
-> >
-> > Thanks. My mistake...
-> >
-> > > > +
-> > > > +if LS1_SOC_DRIVERS
-> > > > +	source "drivers/soc/fsl/ls1/Kconfig"
-> > > > +endif
-> > > > diff --git a/drivers/soc/fsl/Makefile b/drivers/soc/fsl/Makefile
-> > > > new file mode 100644 index 0000000..b4215dd
-> > > > --- /dev/null
-> > > > +++ b/drivers/soc/fsl/Makefile
-> > > > @@ -0,0 +1,6 @@
-> > > > +#
-> > > > +# Makefile for Freescale Soc specific device drivers.
-> > > > +#
-> > > > +
-> > > > +obj-$(CONFIG_LS1_SOC_DRIVERS) += ls1/
-> > > > +
-> > > > diff --git a/drivers/soc/fsl/ls1/Kconfig
-> > > > b/drivers/soc/fsl/ls1/Kconfig new file mode 100644 index
-> > > > 0000000..7556f44
-> > > > --- /dev/null
-> > > > +++ b/drivers/soc/fsl/ls1/Kconfig
-> > > > @@ -0,0 +1,3 @@
-> > > > +#
-> > > > +# LS-1 Soc drivers
-> > > > +#
-> > >
-> > > Doesn't this directory need a Makefile as well?
-> > >
-> >
-> > 2/2 patch add a config option and Makefile for this.
-> 
-> If _just_ this patch is merged, it creates a build problem as
-> CONFIG_LS1_SOC_DRIVERS can be enabled, which will cause the kbuild to decend
-> into drivers/soc/fsl/ls1, where it will stop due to the missing build error.
-> 
-> Please fix this by adding at least an empty Makefile to this directory.
-> Do not rely on patch 2 being merged to "fix" this.
-> 
+>  		list_for_each_entry(cpufreq_dev, &cpufreq_dev_list, node) {
+>  			if (!cpumask_test_cpu(policy->cpu,
+>  					      &cpufreq_dev->allowed_cpus))
+> @@ -233,7 +236,7 @@ static int cpufreq_thermal_notifier(struct notifier_block *nb,
+>  				cpufreq_verify_within_limits(policy, 0,
+>  							     max_freq);
+>  		}
+> -		mutex_unlock(&cooling_cpufreq_lock);
+> +		mutex_unlock(&cooling_list_lock);
+>  		break;
+>  	default:
+>  		return NOTIFY_DONE;
+> @@ -865,12 +868,15 @@ __cpufreq_cooling_register(struct device_node *np,
+>  	cpufreq_dev->cool_dev = cool_dev;
+>  
+>  	mutex_lock(&cooling_cpufreq_lock);
+> +	mutex_lock(&cooling_list_lock);
 
-Um..Yes, miss it. Fix it in next version. :)
+Why is the list lock taken from within the existing lock here? and ...
 
-Regards,
--Dongsheng
+> +	list_add(&cpufreq_dev->node, &cpufreq_dev_list);
+> +	mutex_unlock(&cooling_list_lock);
+>  
+>  	/* Register the notifier for first cpufreq cooling device */
+> -	if (list_empty(&cpufreq_dev_list))
+> +	if (cpufreq_dev_count == 0)
+>  		cpufreq_register_notifier(&thermal_cpufreq_notifier_block,
+>  					  CPUFREQ_POLICY_NOTIFIER);
+> -	list_add(&cpufreq_dev->node, &cpufreq_dev_list);
+> +	cpufreq_dev_count++;
+
+Maybe:
+        if (!cpufreq_dev_count++)
+                cpufreq_register_notifier();
+
+>  
+>  	mutex_unlock(&cooling_cpufreq_lock);
+>  
+> @@ -1014,14 +1020,18 @@ void cpufreq_cooling_unregister(struct thermal_cooling_device *cdev)
+>  
+>  	cpufreq_dev = cdev->devdata;
+>  	mutex_lock(&cooling_cpufreq_lock);
+> -	list_del(&cpufreq_dev->node);
+> +	cpufreq_dev_count--;
+>  
+>  	/* Unregister the notifier for the last cpufreq cooling device */
+> -	if (list_empty(&cpufreq_dev_list))
+> +	if (cpufreq_dev_count == 0)
+
+Maybe:
+        if (!--cpufreq_dev_count)
+                cpufreq_register_notifier();
+
+>  		cpufreq_unregister_notifier(&thermal_cpufreq_notifier_block,
+>  					    CPUFREQ_POLICY_NOTIFIER);
+>  	mutex_unlock(&cooling_cpufreq_lock);
+>  
+> +	mutex_lock(&cooling_list_lock);
+
+... The same list lock is not taken from within the earlier critical
+section?
+
+> +	list_del(&cpufreq_dev->node);
+> +	mutex_unlock(&cooling_list_lock);
+> +
+>  	thermal_cooling_device_unregister(cpufreq_dev->cool_dev);
+>  	release_idr(&cpufreq_idr, cpufreq_dev->id);
+>  	kfree(cpufreq_dev->time_in_idle_timestamp);
+> -- 
+> 2.1.0
+
+-- 
+viresh
