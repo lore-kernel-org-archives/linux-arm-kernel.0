@@ -1,35 +1,239 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 12 Aug 2015 13:05:30 +0530
-Subject: 3.18: lockdep problems in cpufreq
-In-Reply-To: <20150812072129.GD7557@n2100.arm.linux.org.uk>
-References: <20141214213655.GA11285@n2100.arm.linux.org.uk>
- <CAKohponhkk9BK6-7ScHeZa4R43iooWQFV8YoPLv6LjO40GNq=A@mail.gmail.com>
- <20150518185645.GA28053@n2100.arm.linux.org.uk>
- <2574268.XBqpdL2VLI@vostro.rjw.lan>
- <20150811170357.GA24529@n2100.arm.linux.org.uk>
- <20150812051659.GI32049@linux>
- <20150812072129.GD7557@n2100.arm.linux.org.uk>
-Message-ID: <20150812073530.GA16445@linux>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Wed, 12 Aug 2015 08:41:49 +0100
+Subject: [PATCH] thermal: cpu_cooling: fix lockdep problems in cpu_cooling
+In-Reply-To: <20150812073530.GA16445@linux>
+References: <20150812073530.GA16445@linux>
+Message-ID: <E1ZPQfV-0005nb-DN@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12-08-15, 08:21, Russell King - ARM Linux wrote:
-> Maybe not - I often lose track of which patches are in what state -
-> tracking the state of 250+ patches over many months and in some cases
-> _years_ is not easy.
+A recent change to the cpu_cooling code introduced a AB-BA deadlock
+scenario between the cpufreq_policy_notifier_list rwsem and the
+cooling_cpufreq_lock.  This is caused by cooling_cpufreq_lock being held
+before the registration/removal of the notifier block (an operation
+which takes the rwsem), and the notifier code itself which takes the
+locks in the reverse order:
 
-I agree..
+======================================================
+[ INFO: possible circular locking dependency detected ]
+3.18.0+ #1453 Not tainted
+-------------------------------------------------------
+rc.local/770 is trying to acquire lock:
+ (cooling_cpufreq_lock){+.+.+.}, at: [<c04abfc4>] cpufreq_thermal_notifier+0x34/0xfc
 
-> That's still no reason for Eduardo to _completely_ ignore this thread,
-> especially when Rafael explicitly tried to get comment from Eduardo.
+but task is already holding lock:
+ ((cpufreq_policy_notifier_list).rwsem){++++.+}, at: [<c0042f04>]  __blocking_notifier_call_chain+0x34/0x68
 
-Oh, no. I am not trying to be anybody's advocate here. I was just
-highlighting the point here, that I remembered.
+which lock already depends on the new lock.
 
-Even I was quite busy then and couldn't get back to it.
+the existing dependency chain (in reverse order) is:
 
-Lets fix this now. I believe you have a patch for this based on latest
-kernel? Mind pasting that here for quick review?
+-> #1 ((cpufreq_policy_notifier_list).rwsem){++++.+}:
+       [<c06bc3b0>] down_write+0x44/0x9c
+       [<c0043444>] blocking_notifier_chain_register+0x28/0xd8
+       [<c04ad610>] cpufreq_register_notifier+0x68/0x90
+       [<c04abe4c>] __cpufreq_cooling_register.part.1+0x120/0x180
+       [<c04abf44>] __cpufreq_cooling_register+0x98/0xa4
+       [<c04abf8c>] cpufreq_cooling_register+0x18/0x1c
+       [<bf0046f8>] imx_thermal_probe+0x1c0/0x470 [imx_thermal]
+       [<c037cef8>] platform_drv_probe+0x50/0xac
+       [<c037b710>] driver_probe_device+0x114/0x234
+       [<c037b8cc>] __driver_attach+0x9c/0xa0
+       [<c0379d68>] bus_for_each_dev+0x5c/0x90
+       [<c037b204>] driver_attach+0x24/0x28
+       [<c037ae7c>] bus_add_driver+0xe0/0x1d8
+       [<c037c0cc>] driver_register+0x80/0xfc
+       [<c037cd80>] __platform_driver_register+0x50/0x64
+       [<bf007018>] 0xbf007018
+       [<c0008a5c>] do_one_initcall+0x88/0x1d8
+       [<c0095da4>] load_module+0x1768/0x1ef8
+       [<c0096614>] SyS_init_module+0xe0/0xf4
+       [<c000ec00>] ret_fast_syscall+0x0/0x48
 
+-> #0 (cooling_cpufreq_lock){+.+.+.}:
+       [<c00619f8>] lock_acquire+0xb0/0x124
+       [<c06ba3b4>] mutex_lock_nested+0x5c/0x3d8
+       [<c04abfc4>] cpufreq_thermal_notifier+0x34/0xfc
+       [<c0042bf4>] notifier_call_chain+0x4c/0x8c
+       [<c0042f20>] __blocking_notifier_call_chain+0x50/0x68
+       [<c0042f58>] blocking_notifier_call_chain+0x20/0x28
+       [<c04ae62c>] cpufreq_set_policy+0x7c/0x1d0
+       [<c04af3cc>] store_scaling_governor+0x74/0x9c
+       [<c04ad418>] store+0x90/0xc0
+       [<c0175384>] sysfs_kf_write+0x54/0x58
+       [<c01746b4>] kernfs_fop_write+0xdc/0x190
+       [<c010dcc0>] vfs_write+0xac/0x1b4
+       [<c010dfec>] SyS_write+0x44/0x90
+       [<c000ec00>] ret_fast_syscall+0x0/0x48
+
+other info that might help us debug this:
+
+ Possible unsafe locking scenario:
+
+       CPU0                    CPU1
+       ----                    ----
+  lock((cpufreq_policy_notifier_list).rwsem);
+                               lock(cooling_cpufreq_lock);
+                               lock((cpufreq_policy_notifier_list).rwsem);
+  lock(cooling_cpufreq_lock);
+
+ *** DEADLOCK ***
+
+7 locks held by rc.local/770:
+ #0:  (sb_writers#6){.+.+.+}, at: [<c010dda0>] vfs_write+0x18c/0x1b4
+ #1:  (&of->mutex){+.+.+.}, at: [<c0174678>] kernfs_fop_write+0xa0/0x190
+ #2:  (s_active#52){.+.+.+}, at: [<c0174680>] kernfs_fop_write+0xa8/0x190
+ #3:  (cpu_hotplug.lock){++++++}, at: [<c0026a60>] get_online_cpus+0x34/0x90
+ #4:  (cpufreq_rwsem){.+.+.+}, at: [<c04ad3e0>] store+0x58/0xc0
+ #5:  (&policy->rwsem){+.+.+.}, at: [<c04ad3f8>] store+0x70/0xc0
+ #6:  ((cpufreq_policy_notifier_list).rwsem){++++.+}, at: [<c0042f04>] __blocking_notifier_call_chain+0x34/0x68
+
+stack backtrace:
+CPU: 0 PID: 770 Comm: rc.local Not tainted 3.18.0+ #1453
+Hardware name: Freescale i.MX6 Quad/DualLite (Device Tree)
+Backtrace:
+[<c00121c8>] (dump_backtrace) from [<c0012360>] (show_stack+0x18/0x1c)
+ r6:c0b85a80 r5:c0b75630 r4:00000000 r3:00000000
+[<c0012348>] (show_stack) from [<c06b6c48>] (dump_stack+0x7c/0x98)
+[<c06b6bcc>] (dump_stack) from [<c06b42a4>] (print_circular_bug+0x28c/0x2d8)
+ r4:c0b85a80 r3:d0071d40
+[<c06b4018>] (print_circular_bug) from [<c00613b0>] (__lock_acquire+0x1acc/0x1bb0)
+ r10:c0b50660 r8:c09e6d80 r7:d0071d40 r6:c11d0f0c r5:00000007 r4:d0072240
+[<c005f8e4>] (__lock_acquire) from [<c00619f8>] (lock_acquire+0xb0/0x124)
+ r10:00000000 r9:c04abfc4 r8:00000000 r7:00000000 r6:00000000 r5:c0a06f0c
+ r4:00000000
+[<c0061948>] (lock_acquire) from [<c06ba3b4>] (mutex_lock_nested+0x5c/0x3d8)
+ r10:ec853800 r9:c0a06ed4 r8:d0071d40 r7:c0a06ed4 r6:c11d0f0c r5:00000000
+ r4:c04abfc4
+[<c06ba358>] (mutex_lock_nested) from [<c04abfc4>] (cpufreq_thermal_notifier+0x34/0xfc)
+ r10:ec853800 r9:ec85380c r8:d00d7d3c r7:c0a06ed4 r6:d00d7d3c r5:00000000
+ r4:fffffffe
+[<c04abf90>] (cpufreq_thermal_notifier) from [<c0042bf4>] (notifier_call_chain+0x4c/0x8c)
+ r7:00000000 r6:00000000 r5:00000000 r4:fffffffe
+[<c0042ba8>] (notifier_call_chain) from [<c0042f20>] (__blocking_notifier_call_chain+0x50/0x68)
+ r8:c0a072a4 r7:00000000 r6:d00d7d3c r5:ffffffff r4:c0a06fc8 r3:ffffffff
+[<c0042ed0>] (__blocking_notifier_call_chain) from [<c0042f58>] (blocking_notifier_call_chain+0x20/0x28)
+ r7:ec98b540 r6:c13ebc80 r5:ed76e600 r4:d00d7d3c
+[<c0042f38>] (blocking_notifier_call_chain) from [<c04ae62c>] (cpufreq_set_policy+0x7c/0x1d0)
+[<c04ae5b0>] (cpufreq_set_policy) from [<c04af3cc>] (store_scaling_governor+0x74/0x9c)
+ r7:ec98b540 r6:0000000c r5:ec98b540 r4:ed76e600
+[<c04af358>] (store_scaling_governor) from [<c04ad418>] (store+0x90/0xc0)
+ r6:0000000c r5:ed76e6d4 r4:ed76e600
+[<c04ad388>] (store) from [<c0175384>] (sysfs_kf_write+0x54/0x58)
+ r8:0000000c r7:d00d7f78 r6:ec98b540 r5:0000000c r4:ec853800 r3:0000000c
+[<c0175330>] (sysfs_kf_write) from [<c01746b4>] (kernfs_fop_write+0xdc/0x190)
+ r6:ec98b540 r5:00000000 r4:00000000 r3:c0175330
+[<c01745d8>] (kernfs_fop_write) from [<c010dcc0>] (vfs_write+0xac/0x1b4)
+ r10:0162aa70 r9:d00d6000 r8:0000000c r7:d00d7f78 r6:0162aa70 r5:0000000c
+ r4:eccde500
+[<c010dc14>] (vfs_write) from [<c010dfec>] (SyS_write+0x44/0x90)
+ r10:0162aa70 r8:0000000c r7:eccde500 r6:eccde500 r5:00000000 r4:00000000
+[<c010dfa8>] (SyS_write) from [<c000ec00>] (ret_fast_syscall+0x0/0x48)
+ r10:00000000 r8:c000edc4 r7:00000004 r6:000216cc r5:0000000c r4:0162aa70
+
+Solve this by moving to finer grained locking - use one mutex to protect
+the cpufreq_dev_list as a whole, and a separate lock to ensure correct
+ordering of cpufreq notifier registration and removal.
+
+I considered taking the cooling_list_lock within cooling_cpufreq_lock to
+protect the registration sequence as a whole, but that adds a dependency
+between these two locks which is best avoided (lest someone tries to
+take those two new locks in the reverse order.)  In any case, it's safer
+to have an empty cpufreq_dev_list than to have unnecessary dependencies
+between locks.
+
+Fixes: 2dcd851fe4b4 ("thermal: cpu_cooling: Update always cpufreq policy with
+Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+
+For some reason, despite Rafael saying that this should go in, despite it
+having been reviewed, Eduardo appears to be ignoring basic fixes to code
+under his control.  Having waited more than a reasonable amount of time,
+it is now time to take some action against this blockage.  Hence, I'm
+putting this into linux-next in the hope that it'll conflict and elicit
+a response for this important bug fix.
+
+Relevant message IDs:
+20141214213655.GA11285 at n2100.arm.linux.org.uk
+7573578.UE8ufgjWuX at vostro.rjw.lan
+20141215230922.GL11285 at n2100.arm.linux.org.uk
+CAKohponhkk9BK6-7ScHeZa4R43iooWQFV8YoPLv6LjO40GNq=A at mail.gmail.com
+20150518185645.GA28053 at n2100.arm.linux.org.uk
+2574268.XBqpdL2VLI at vostro.rjw.lan
+---
+ drivers/thermal/cpu_cooling.c | 22 ++++++++++++++++------
+ 1 file changed, 16 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/thermal/cpu_cooling.c b/drivers/thermal/cpu_cooling.c
+index 6509c61b9648..d1fd02eec58d 100644
+--- a/drivers/thermal/cpu_cooling.c
++++ b/drivers/thermal/cpu_cooling.c
+@@ -107,6 +107,9 @@ struct cpufreq_cooling_device {
+ static DEFINE_IDR(cpufreq_idr);
+ static DEFINE_MUTEX(cooling_cpufreq_lock);
+ 
++static unsigned int cpufreq_dev_count;
++
++static DEFINE_MUTEX(cooling_list_lock);
+ static LIST_HEAD(cpufreq_dev_list);
+ 
+ /**
+@@ -221,7 +224,7 @@ static int cpufreq_thermal_notifier(struct notifier_block *nb,
+ 	switch (event) {
+ 
+ 	case CPUFREQ_ADJUST:
+-		mutex_lock(&cooling_cpufreq_lock);
++		mutex_lock(&cooling_list_lock);
+ 		list_for_each_entry(cpufreq_dev, &cpufreq_dev_list, node) {
+ 			if (!cpumask_test_cpu(policy->cpu,
+ 					      &cpufreq_dev->allowed_cpus))
+@@ -233,7 +236,7 @@ static int cpufreq_thermal_notifier(struct notifier_block *nb,
+ 				cpufreq_verify_within_limits(policy, 0,
+ 							     max_freq);
+ 		}
+-		mutex_unlock(&cooling_cpufreq_lock);
++		mutex_unlock(&cooling_list_lock);
+ 		break;
+ 	default:
+ 		return NOTIFY_DONE;
+@@ -865,12 +868,15 @@ __cpufreq_cooling_register(struct device_node *np,
+ 	cpufreq_dev->cool_dev = cool_dev;
+ 
+ 	mutex_lock(&cooling_cpufreq_lock);
++	mutex_lock(&cooling_list_lock);
++	list_add(&cpufreq_dev->node, &cpufreq_dev_list);
++	mutex_unlock(&cooling_list_lock);
+ 
+ 	/* Register the notifier for first cpufreq cooling device */
+-	if (list_empty(&cpufreq_dev_list))
++	if (cpufreq_dev_count == 0)
+ 		cpufreq_register_notifier(&thermal_cpufreq_notifier_block,
+ 					  CPUFREQ_POLICY_NOTIFIER);
+-	list_add(&cpufreq_dev->node, &cpufreq_dev_list);
++	cpufreq_dev_count++;
+ 
+ 	mutex_unlock(&cooling_cpufreq_lock);
+ 
+@@ -1014,14 +1020,18 @@ void cpufreq_cooling_unregister(struct thermal_cooling_device *cdev)
+ 
+ 	cpufreq_dev = cdev->devdata;
+ 	mutex_lock(&cooling_cpufreq_lock);
+-	list_del(&cpufreq_dev->node);
++	cpufreq_dev_count--;
+ 
+ 	/* Unregister the notifier for the last cpufreq cooling device */
+-	if (list_empty(&cpufreq_dev_list))
++	if (cpufreq_dev_count == 0)
+ 		cpufreq_unregister_notifier(&thermal_cpufreq_notifier_block,
+ 					    CPUFREQ_POLICY_NOTIFIER);
+ 	mutex_unlock(&cooling_cpufreq_lock);
+ 
++	mutex_lock(&cooling_list_lock);
++	list_del(&cpufreq_dev->node);
++	mutex_unlock(&cooling_list_lock);
++
+ 	thermal_cooling_device_unregister(cpufreq_dev->cool_dev);
+ 	release_idr(&cpufreq_idr, cpufreq_dev->id);
+ 	kfree(cpufreq_dev->time_in_idle_timestamp);
 -- 
-viresh
+2.1.0
