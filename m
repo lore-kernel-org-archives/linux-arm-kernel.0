@@ -1,123 +1,127 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 12 Aug 2015 13:42:57 +0530
-Subject: 3.18: lockdep problems in cpufreq
-In-Reply-To: <20150812074925.GG7557@n2100.arm.linux.org.uk>
-References: <20141214213655.GA11285@n2100.arm.linux.org.uk>
- <CAKohponhkk9BK6-7ScHeZa4R43iooWQFV8YoPLv6LjO40GNq=A@mail.gmail.com>
- <20150518185645.GA28053@n2100.arm.linux.org.uk>
- <2574268.XBqpdL2VLI@vostro.rjw.lan>
- <20150811170357.GA24529@n2100.arm.linux.org.uk>
- <20150812051659.GI32049@linux>
- <20150812072129.GD7557@n2100.arm.linux.org.uk>
- <20150812073530.GA16445@linux>
- <20150812074925.GG7557@n2100.arm.linux.org.uk>
-Message-ID: <20150812081257.GC16445@linux>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 12 Aug 2015 10:14:25 +0200
+Subject: [PATCH] ARM: l2c: fix support for HW coherent systems in PL310
+ cache
+In-Reply-To: <20150811172620.GK23307@e104818-lin.cambridge.arm.com>
+References: <1439312743-6237-1-git-send-email-gregory.clement@free-electrons.com>
+ <20150811172620.GK23307@e104818-lin.cambridge.arm.com>
+Message-ID: <55CB0061.2010602@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12-08-15, 08:49, Russell King - ARM Linux wrote:
-> The problem will be back-porting it to stable kernels, because I think
-> it's had to be updated at least a couple of times.  I don't have the old
-> versions anymore, so I'm just going to say "not my problem" - sorry.
+Hi Catalin,
 
-Your old 3.18 version :)
+On 11/08/2015 19:26, Catalin Marinas wrote:
+> On Tue, Aug 11, 2015 at 07:05:43PM +0200, Gregory CLEMENT wrote:
+>> From: Nadav Haklai <nadavh@marvell.com>
+>>
+>> When a PL310 cache is used in a system that provides hardware
+>> coherency, the entire outer cache operations are useless, and can be
+>> skipped.  Moreover, on some systems, it is harmful as it causes
+>> deadlocks between the Marvell coherency mechanism, the Marvell PCIe
+>> controller and the Cortex-A9.
+>>
+>> This commit extends a previous commit:
+>> 98ea2dba65932ffc456b6d7b11b8a0624e2f7b95 which added the io-coherent
+>> support for the PL310 cache by also disabling the outer cache flush
+>> range operation.
+>>
+>> In the current kernel implementation, the outer cache flush range
+>> operation is triggered by the dma_alloc function.
+>> This operation can be take place during runtime and in some
+>> circumstances may lead to the PCIe/PL310 deadlock on Armada 375/38x
+>> SoCs.
+> 
+> While this may work around the issue for your specific SoC, I think a
+> better fix is in DMA alloc code to avoid flushing caches for coherent
+> devices. This would be the __dma_clear_buffer() implementation which
+> isn't aware of whether the device is coherent or not.
 
-8<===
-From: Russell King <rmk+kernel@arm.linux.org.uk>
-thermal: cpu_cooling: fix lockdep problems in cpu_cooling
+Indeed, the other use of the outer cache flush range is done pretty
+early in the boot and should not be a problem.
 
-A recent change to the cpu_cooling code introduced a AB-BA deadlock
-scenario between the cpufreq_policy_notifier_list rwsem and the
-cooling_cpufreq_lock.  This is caused by cooling_cpufreq_lock being held
-before the registration/removal of the notifier block (an operation
-which takes the rwsem), and the notifier code itself which takes the
-locks in the reverse order.
+What do you think of the following patch?
 
-Solve this by moving to finer grained locking - use one mutex to protect
-the cpufreq_dev_list as a whole, and a separate lock to ensure correct
-ordering of cpufreq notifier registration and removal.
+I am not totally happy with it because I added a variable to a struct
+dedicated for the outer cache functions. But using a function at the
+l2cc driver level would be too much. At the opposite we could directly
+set a boolean from the l2cc driver. From my point of view it would
+violate the layer but I might be wrong.
 
-I considered taking the cooling_list_lock within cooling_cpufreq_lock to
-protect the registration sequence as a whole, but that adds a dependency
-between these two locks which is best avoided (lest someone tries to
-take those two new locks in the reverse order.)  In any case, it's safer
-to have an empty cpufreq_dev_list than to have unnecessary dependencies
-between locks.
 
-Fixes: 2dcd851fe4b4 ("thermal: cpu_cooling: Update always cpufreq policy with thermal constraints")
-Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
+Thanks,
 
- drivers/thermal/cpu_cooling.c | 16 ++++++++++++----
- 1 file changed, 12 insertions(+), 4 deletions(-)
+Gregory
 
-diff --git a/drivers/thermal/cpu_cooling.c b/drivers/thermal/cpu_cooling.c
-index ad09e51ffae4..9e42c6f30785 100644
---- a/drivers/thermal/cpu_cooling.c
-+++ b/drivers/thermal/cpu_cooling.c
-@@ -57,6 +57,7 @@ static DEFINE_MUTEX(cooling_cpufreq_lock);
- 
- static unsigned int cpufreq_dev_count;
- 
-+static DEFINE_MUTEX(cooling_list_lock);
- static LIST_HEAD(cpufreq_dev_list);
- 
- /**
-@@ -317,7 +318,7 @@ static int cpufreq_thermal_notifier(struct notifier_block *nb,
- 	if (event != CPUFREQ_ADJUST)
- 		return 0;
- 
--	mutex_lock(&cooling_cpufreq_lock);
-+	mutex_lock(&cooling_list_lock);
- 	list_for_each_entry(cpufreq_dev, &cpufreq_dev_list, node) {
- 		if (!cpumask_test_cpu(policy->cpu,
- 					&cpufreq_dev->allowed_cpus))
-@@ -333,7 +334,7 @@ static int cpufreq_thermal_notifier(struct notifier_block *nb,
- 		if (policy->max != max_freq)
- 			cpufreq_verify_within_limits(policy, 0, max_freq);
- 	}
--	mutex_unlock(&cooling_cpufreq_lock);
-+	mutex_unlock(&cooling_list_lock);
- 
- 	return 0;
+
+
+ arch/arm/include/asm/outercache.h | 9 +++++++++
+ arch/arm/mm/cache-l2x0.c          | 1 +
+ arch/arm/mm/dma-mapping.c         | 6 ++++--
+ 3 files changed, 14 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/include/asm/outercache.h b/arch/arm/include/asm/outercache.h
+index 563b92fc2f41..7f7bbfcf1d32 100644
+--- a/arch/arm/include/asm/outercache.h
++++ b/arch/arm/include/asm/outercache.h
+@@ -35,6 +35,7 @@ struct outer_cache_fns {
+ 	void (*sync)(void);
+ #endif
+ 	void (*resume)(void);
++	bool is_coherent;
+
+ 	/* This is an ARM L2C thing */
+ 	void (*write_sec)(unsigned long, unsigned);
+@@ -56,6 +57,14 @@ static inline void outer_inv_range(phys_addr_t start, phys_addr_t end)
  }
-@@ -482,6 +483,11 @@ __cpufreq_cooling_register(struct device_node *np,
+
+ /**
++ * outer_is_coherent - tell if the outer cache is io coherent
++ */
++static inline bool outer_is_coherent(void)
++{
++	return outer_cache.is_coherent;
++}
++
++/**
+  * outer_clean_range - clean dirty outer cache lines
+  * @start: starting physical address, inclusive
+  * @end: end physical address, exclusive
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index 71b3d3309024..0071e276adc0 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -1291,6 +1291,7 @@ static const struct l2c_init_data of_l2c310_coherent_data __initconst = {
+ 		.flush_all   = l2c210_flush_all,
+ 		.disable     = l2c310_disable,
+ 		.resume      = l2c310_resume,
++		.is_coherent = true,
+ 	},
+ };
+
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index 1ced8a0f7a52..4d87df2c16f9 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -241,12 +241,14 @@ static void __dma_clear_buffer(struct page *page, size_t size)
+ 			page++;
+ 			size -= PAGE_SIZE;
+ 		}
+-		outer_flush_range(base, end);
++		if (!outer_is_coherent())
++			outer_flush_range(base, end);
+ 	} else {
+ 		void *ptr = page_address(page);
+ 		memset(ptr, 0, size);
+ 		dmac_flush_range(ptr, ptr + size);
+-		outer_flush_range(__pa(ptr), __pa(ptr) + size);
++		if (!outer_is_coherent())
++			outer_flush_range(__pa(ptr), __pa(ptr) + size);
  	}
- 	cpufreq_dev->cool_dev = cool_dev;
- 	cpufreq_dev->cpufreq_state = 0;
-+
-+	mutex_lock(&cooling_list_lock);
-+	list_add(&cpufreq_dev->node, &cpufreq_dev_list);
-+	mutex_unlock(&cooling_list_lock);
-+
- 	mutex_lock(&cooling_cpufreq_lock);
- 
- 	/* Register the notifier for first cpufreq cooling device */
-@@ -489,7 +495,6 @@ __cpufreq_cooling_register(struct device_node *np,
- 		cpufreq_register_notifier(&thermal_cpufreq_notifier_block,
- 					  CPUFREQ_POLICY_NOTIFIER);
- 	cpufreq_dev_count++;
--	list_add(&cpufreq_dev->node, &cpufreq_dev_list);
- 
- 	mutex_unlock(&cooling_cpufreq_lock);
- 
-@@ -553,7 +558,6 @@ void cpufreq_cooling_unregister(struct thermal_cooling_device *cdev)
- 
- 	cpufreq_dev = cdev->devdata;
- 	mutex_lock(&cooling_cpufreq_lock);
--	list_del(&cpufreq_dev->node);
- 	cpufreq_dev_count--;
- 
- 	/* Unregister the notifier for the last cpufreq cooling device */
-@@ -562,6 +566,10 @@ void cpufreq_cooling_unregister(struct thermal_cooling_device *cdev)
- 					    CPUFREQ_POLICY_NOTIFIER);
- 	mutex_unlock(&cooling_cpufreq_lock);
- 
-+	mutex_lock(&cooling_list_lock);
-+	list_del(&cpufreq_dev->node);
-+	mutex_unlock(&cooling_list_lock);
-+
- 	thermal_cooling_device_unregister(cpufreq_dev->cool_dev);
- 	release_idr(&cpufreq_idr, cpufreq_dev->id);
- 	kfree(cpufreq_dev);
+ }
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
