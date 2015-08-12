@@ -1,64 +1,30 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 12 Aug 2015 14:35:30 +0200
-Subject: [linux-sunxi] [PATCH 3/3] mmc: sunxi: use controller automatic
- clock gating.
-In-Reply-To: <c33b221f9b622e3bad9d855a7ad1887b82827244.1439381423.git.hramrach@gmail.com>
-References: <cover.1439381423.git.hramrach@gmail.com>
- <c33b221f9b622e3bad9d855a7ad1887b82827244.1439381423.git.hramrach@gmail.com>
-Message-ID: <55CB3D92.6040403@redhat.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 12 Aug 2015 13:35:37 +0100
+Subject: [PATCH 02/20] regmap: Remove regmap_bulk_write 64bit support
+In-Reply-To: <20150812122856.GF19600@pengutronix.de>
+References: <1439374365-20623-1-git-send-email-mpa@pengutronix.de>
+ <1439374365-20623-3-git-send-email-mpa@pengutronix.de>
+ <20150812102550.GQ10748@sirena.org.uk>
+ <20150812104436.GA19600@pengutronix.de>
+ <20150812105758.GU10748@sirena.org.uk>
+ <20150812122856.GF19600@pengutronix.de>
+Message-ID: <20150812123537.GH10748@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Aug 12, 2015 at 02:28:56PM +0200, Markus Pargmann wrote:
 
-On 12-08-15 14:23, Michal Suchanek wrote:
-> When core does not set the MMC_QUIRK_BROKEN_CLK_GATING flag enable
-> automatic hardware controlled clock gating on the mmc interface.
->
-> Signed-off-by: Michal Suchanek <hramrach@gmail.com>
+> Ok, would work for me as well although sizeof is not a preprocessor
+> macro so I would probably leave it as it is. The whole regmap framework
+> just didn't seem to support 64bit so I thought this was just not
+> working.
 
-In general this looks good, but I wonder how intensively this has
-been tested ? Also given the long latencies when using manual
-clock on/off support, have you done any testing to check what
-sort of latencies this adds, e.g. Both with and without
-the patch, dump all the filesystem caches:
-
-echo 3 > /proc/sys/vm/drop_caches
-
-And then do:
-
-time cat /some/small/file/on/the/sdcard
-
-Do this at least 3 time both with and without the patch, and see
-if there are any noticable differences ?
-
-Regards,
-
-Hans
-
-
-
-> ---
->   drivers/mmc/host/sunxi-mmc.c | 7 ++++++-
->   1 file changed, 6 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-> index f808a02..443cab5 100644
-> --- a/drivers/mmc/host/sunxi-mmc.c
-> +++ b/drivers/mmc/host/sunxi-mmc.c
-> @@ -601,8 +601,13 @@ static int sunxi_mmc_oclk_onoff(struct sunxi_mmc_host *host, u32 oclk_en)
->   	rval = mmc_readl(host, REG_CLKCR);
->   	rval &= ~(SDXC_CARD_CLOCK_ON | SDXC_LOW_POWER_ON);
->
-> -	if (oclk_en)
-> +	if (oclk_en) {
->   		rval |= SDXC_CARD_CLOCK_ON;
-> +		if (!host->mmc->card ||
-> +		     !(host->mmc->card->quirks & MMC_QUIRK_BROKEN_CLK_GATING))
-> +
-> +			rval |= SDXC_LOW_POWER_ON;
-> +	}
->
->   	start = jiffies;
->   	end = start + msecs_to_jiffies(750);
->
+I'd expect the framework to cope with things when ints are 64 bit.  We
+don't try to support anything else, though.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150812/0cdbdd89/attachment.sig>
