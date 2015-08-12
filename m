@@ -1,36 +1,74 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 12 Aug 2015 10:56:38 +0100
-Subject: [PATCH v4 06/11] KVM: arm/arm64: vgic: Allow dynamic mapping of
- physical/virtual interrupts
-In-Reply-To: <20150811074221.GC5007@lvm>
-References: <1438962347-17541-1-git-send-email-marc.zyngier@arm.com>
- <1438962347-17541-7-git-send-email-marc.zyngier@arm.com>
- <20150811074221.GC5007@lvm>
-Message-ID: <20150812105638.67de9423@arm.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Wed, 12 Aug 2015 12:12:19 +0200
+Subject: [PATCH v3 1/4] edac: Add an function to retrieve the EDAC
+ debugfs node
+In-Reply-To: <1439326077-25507-2-git-send-email-lho@apm.com>
+References: <1439326077-25507-1-git-send-email-lho@apm.com>
+ <1439326077-25507-2-git-send-email-lho@apm.com>
+Message-ID: <20150812101219.GC14011@nazgul.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 11 Aug 2015 08:42:37 +0100
-Christoffer Dall <christoffer.dall@linaro.org> wrote:
-
-> On Fri, Aug 07, 2015 at 04:45:42PM +0100, Marc Zyngier wrote:
-> > In order to be able to feed physical interrupts to a guest, we need
-> > to be able to establish the virtual-physical mapping between the two
-> > worlds.
-> > 
-> > The mappings are kept in a set of RCU lists, indexed by virtual interrupts.
-> > 
-> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+On Tue, Aug 11, 2015 at 02:47:54PM -0600, Loc Ho wrote:
+> This patch adds an function to retrieve the EDAC debugfs node. This allows
+> EDAC driver to create debugfs node under the EDAC debugfs node.
 > 
-> Thanks for addressing all my concerns:
+> Signed-off-by: Loc Ho <lho@apm.com>
+> ---
+>  drivers/edac/edac_core.h     |    1 +
+>  drivers/edac/edac_mc_sysfs.c |   10 ++++++++++
+>  2 files changed, 11 insertions(+), 0 deletions(-)
 > 
-> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+> diff --git a/drivers/edac/edac_core.h b/drivers/edac/edac_core.h
+> index ad42587..6771e64 100644
+> --- a/drivers/edac/edac_core.h
+> +++ b/drivers/edac/edac_core.h
+> @@ -511,5 +511,6 @@ extern void edac_pci_remove_sysfs(struct edac_pci_ctl_info *pci);
+>   * edac misc APIs
+>   */
+>  extern char *edac_op_state_to_string(int op_state);
+> +extern struct dentry *edac_get_debugfs(void);
+>  
+>  #endif				/* _EDAC_CORE_H_ */
+> diff --git a/drivers/edac/edac_mc_sysfs.c b/drivers/edac/edac_mc_sysfs.c
+> index 33df7d9..b76afe0 100644
+> --- a/drivers/edac/edac_mc_sysfs.c
+> +++ b/drivers/edac/edac_mc_sysfs.c
+> @@ -959,6 +959,16 @@ nomem:
+>  	debugfs_remove(mci->debugfs);
+>  	return -ENOMEM;
+>  }
+> +
+> +struct dentry *edac_get_debugfs(void)
+> +{
+> +	return edac_debugfs;
+> +}
 
-Thanks a lot for all the reviewing, much appreciated.
+EXPORT_SYMBOL_GPL() if it is going to be used by modules.
 
-Unless someone has an objection, I'm going put this series (minus
-the last patch) into -next so it gets a bit more exposure.
+> +#else
+> +struct dentry *edac_get_debugfs(void)
 
-	M.
+static inline struct ...
+
+> +{
+> +	return NULL;
+> +}
+>  #endif
+>  
+>  /*
+> -- 
+> 1.7.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-edac" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+
 -- 
-Jazz is not dead. It just smells funny.
+Regards/Gruss,
+    Boris.
+
+ECO tip #101: Trim your mails when you reply.
+--
