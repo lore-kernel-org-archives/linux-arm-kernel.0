@@ -1,24 +1,22 @@
-From: p.fedin@samsung.com (Pavel Fedin)
-Date: Wed, 12 Aug 2015 10:11:29 +0300
-Subject: [PATCH v4 1/3] PCI: generic: remove dependency on hw_pci
-In-Reply-To: <20150804234956.GF17327@google.com>
-References: <1438721620-15493-1-git-send-email-jchandra@broadcom.com>
- <20150804234956.GF17327@google.com>
-Message-ID: <007501d0d4ce$1d2dd9c0$57898d40$@samsung.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 12 Aug 2015 00:14:24 -0700
+Subject: [RFC/PATCH-v4.2-rc6 4/5] arm: omap2: timer: simplify
+ omap4_local_timer_init()
+In-Reply-To: <1439242911-715-5-git-send-email-balbi@ti.com>
+References: <1439242911-715-1-git-send-email-balbi@ti.com>
+ <1439242911-715-5-git-send-email-balbi@ti.com>
+Message-ID: <20150812071424.GO4215@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Hello!
+* Felipe Balbi <balbi@ti.com> [150810 14:44]:
+> all users of omap4_local_timer_init() are already
+> DT-only, so we can remove the check for having
+> DTB or not.
+> 
+> While at that, fix a typo in comment.
 
-> I dropped the acks and tested-by because of that change, but I'll happily
-> add them back if Lorenzo and Pavel confirm.  
+We already have d1dabab2841d ("ARM: OMAP2+: Clean up
+omap4_local_timer_init") in Linux next reviewed-by you :)
 
- Confirm.
- Tested-by: Pavel Fedin <p.fedin@samsung.com>
-
- I also added MSI support. Can i post it as patch on top of your branch?
-
-Kind regards,
-Pavel Fedin
-Expert Engineer
-Samsung Electronics Research center Russia
+Tony
