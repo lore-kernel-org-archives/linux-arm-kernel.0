@@ -1,44 +1,60 @@
 From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Wed, 12 Aug 2015 20:46:02 +0300
-Subject: [PATCH v2 6/6] irqchip: crossbar: fix irq masking at suspend
+Date: Wed, 12 Aug 2015 20:45:58 +0300
+Subject: [PATCH v2 2/6] genirq: fix irqchip_set_wake_parent if
+ IRQCHIP_SKIP_SET_WAKE
 In-Reply-To: <1439401562-28874-1-git-send-email-grygorii.strashko@ti.com>
 References: <1439401562-28874-1-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <1439401562-28874-7-git-send-email-grygorii.strashko@ti.com>
+Message-ID: <1439401562-28874-3-git-send-email-grygorii.strashko@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All ARM GIC IRQs have to masked during suspend if they are not
-wakeup source. Now this is not happen, since switching to
-use IRQ domain hierarchy, because suspend_device_irq() only checks flags
-in the last IRQ chip in hierarchy for IRQCHIP_MASK_ON_SUSPEND
-bit set. And in the case of TI OMAP DRA7 the last IRQ chip is TI Crossbar
-which do not have this flag set.
+The irqchip_set_wake_parent should not fail if IRQ chip
+specifies IRQCHIP_SKIP_SET_WAKE. Otherwise, IRQ wakeup
+configuration can't be propagated properly through IRQ
+domains hierarchy.
 
-In case of TI OMAP DRA7 the following IRQ hierarchy is defined:
-  ARM GIC <- OMAP wakeupgen <- TI CBAR
-ARM GIC - IRQCHIP_MASK_ON_SUSPEND=n
-OMAP wakeupgen - IRQCHIP_MASK_ON_SUSPEND=y
-TI CBAR - IRQCHIP_MASK_ON_SUSPEND=n
+In case of TI OMAP DRA7 the issue reproduced with following
+configuration:
+ARM GIC<-OMAP wakeupgen<-TI CBAR<-GPIO<-GPIO pcf857x<-gpio_key
 
-Hence, fix by adding IRQCHIP_MASK_ON_SUSPEND for
-TI Crossbar IRQ chip.
+gpio_key is wakeup source
 
+Failure is reproduced during suspend/resume to RAM:
+suspend:
+ - gpio_keys_suspend
+   enable_irq_wake
+     + pcf857x_irq_set_wake
+       + omap_gpio_wake_enable
+         + TI CBAR irq_chip_set_wake_parent
+           + OMAP wakeupgen has no .irq_set_wake()
+           and -ENOSYS will be returned
+
+resume:
+ - gpio_keys_resume
+   + disable_irq_wake
+     + irq_set_irq_wake
+       + WARN(1, "Unbalanced IRQ %d wake disable\n", irq);
+
+Fixes: 08b55e2a9208 ('genirq: Add irqchip_set_wake_parent')
 Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
 ---
- drivers/irqchip/irq-crossbar.c | 1 +
- 1 file changed, 1 insertion(+)
+ kernel/irq/chip.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/drivers/irqchip/irq-crossbar.c b/drivers/irqchip/irq-crossbar.c
-index 3ba58e7..f5a72cc 100644
---- a/drivers/irqchip/irq-crossbar.c
-+++ b/drivers/irqchip/irq-crossbar.c
-@@ -70,6 +70,7 @@ static struct irq_chip crossbar_chip = {
- 	.irq_retrigger		= irq_chip_retrigger_hierarchy,
- 	.irq_set_wake		= irq_chip_set_wake_parent,
- 	.irq_set_type		= irq_chip_set_type_parent,
-+	.flags			= IRQCHIP_MASK_ON_SUSPEND,
- #ifdef CONFIG_SMP
- 	.irq_set_affinity	= irq_chip_set_affinity_parent,
- #endif
+diff --git a/kernel/irq/chip.c b/kernel/irq/chip.c
+index 6de638b..bdb1b9d 100644
+--- a/kernel/irq/chip.c
++++ b/kernel/irq/chip.c
+@@ -1024,6 +1024,10 @@ int irq_chip_set_vcpu_affinity_parent(struct irq_data *data, void *vcpu_info)
+ int irq_chip_set_wake_parent(struct irq_data *data, unsigned int on)
+ {
+ 	data = data->parent_data;
++
++	if (irq_data_get_irq_chip(data)->flags & IRQCHIP_SKIP_SET_WAKE)
++		return 0;
++
+ 	if (data->chip->irq_set_wake)
+ 		return data->chip->irq_set_wake(data, on);
+ 
 -- 
 2.5.0
