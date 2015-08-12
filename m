@@ -1,118 +1,68 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 12 Aug 2015 17:15:19 +0900
-Subject: [PATCH 5/5] clk: shmobile: rz: Add CPG/MSTP Clock Domain support
-In-Reply-To: <cover.1439365731.git.horms+renesas@verge.net.au>
-References: <cover.1439365731.git.horms+renesas@verge.net.au>
-Message-ID: <f04b486d34ac6bab2aaa3988ee098b2bad3950de.1439365731.git.horms+renesas@verge.net.au>
+Date: Wed, 12 Aug 2015 17:15:25 +0900
+Subject: [GIT PULL] Fourth Round of Renesas ARM Based SoC DT Updates for v4.3
+Message-ID: <cover.1439366241.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Add Clock Domain support to the RZ Clock Pulse Generator (CPG) driver
-using the generic PM Domain.  This allows to power-manage the module
-clocks of SoC devices that are part of the CPG/MSTP Clock Domain using
-Runtime PM, or for system suspend/resume.
+Please consider these fourth round of Renesas ARM based SoC DT updates for v4.3.
 
-SoC devices that are part of the CPG/MSTP Clock Domain and can be
-power-managed through an MSTP clock should be tagged in DT with a proper
-"power-domains" property.
+As requested by Olof, this is a repost of patches broken out of a now
+defunct pull-request, "Renesas ARM Based SoC CPG MSTP Clock Domain Updates
+for v4.3".  The motivation being to have driver changes in a separate
+branch to DT changes.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Acked-by: Stephen Boyd <sboyd@codeaurora.org>
-Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- .../bindings/clock/renesas,rz-cpg-clocks.txt       | 29 ++++++++++++++++++++--
- arch/arm/mach-shmobile/Kconfig                     |  1 +
- drivers/clk/shmobile/clk-rz.c                      |  3 +++
- 3 files changed, 31 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/clock/renesas,rz-cpg-clocks.txt b/Documentation/devicetree/bindings/clock/renesas,rz-cpg-clocks.txt
-index b0f7ddb8cdb1..bb51a33a1fbf 100644
---- a/Documentation/devicetree/bindings/clock/renesas,rz-cpg-clocks.txt
-+++ b/Documentation/devicetree/bindings/clock/renesas,rz-cpg-clocks.txt
-@@ -2,6 +2,8 @@
- 
- The CPG generates core clocks for the RZ SoCs. It includes the PLL, variable
- CPU and GPU clocks, and several fixed ratio dividers.
-+The CPG also provides a Clock Domain for SoC devices, in combination with the
-+CPG Module Stop (MSTP) Clocks.
- 
- Required Properties:
- 
-@@ -14,10 +16,18 @@ Required Properties:
-   - #clock-cells: Must be 1
-   - clock-output-names: The names of the clocks. Supported clocks are "pll",
-     "i", and "g"
-+  - #power-domain-cells: Must be 0
- 
-+SoC devices that are part of the CPG/MSTP Clock Domain and can be power-managed
-+through an MSTP clock should refer to the CPG device node in their
-+"power-domains" property, as documented by the generic PM domain bindings in
-+Documentation/devicetree/bindings/power/power_domain.txt.
- 
--Example
---------
-+
-+Examples
-+--------
-+
-+  - CPG device node:
- 
- 	cpg_clocks: cpg_clocks at fcfe0000 {
- 		#clock-cells = <1>;
-@@ -26,4 +36,19 @@ Example
- 		reg = <0xfcfe0000 0x18>;
- 		clocks = <&extal_clk>, <&usb_x1_clk>;
- 		clock-output-names = "pll", "i", "g";
-+		#power-domain-cells = <0>;
-+	};
-+
-+
-+  - CPG/MSTP Clock Domain member device node:
-+
-+	mtu2: timer at fcff0000 {
-+		compatible = "renesas,mtu2-r7s72100", "renesas,mtu2";
-+		reg = <0xfcff0000 0x400>;
-+		interrupts = <0 107 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-names = "tgi0a";
-+		clocks = <&mstp3_clks R7S72100_CLK_MTU2>;
-+		clock-names = "fck";
-+		power-domains = <&cpg_clocks>;
-+		status = "disabled";
- 	};
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index e14fa5e87475..34eac88a9889 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -51,6 +51,7 @@ config ARCH_EMEV2
- 
- config ARCH_R7S72100
- 	bool "RZ/A1H (R7S72100)"
-+	select PM_GENERIC_DOMAINS if PM
- 	select SYS_SUPPORTS_SH_MTU2
- 
- config ARCH_R8A73A4
-diff --git a/drivers/clk/shmobile/clk-rz.c b/drivers/clk/shmobile/clk-rz.c
-index 7e68e8630962..9766e3cb595f 100644
---- a/drivers/clk/shmobile/clk-rz.c
-+++ b/drivers/clk/shmobile/clk-rz.c
-@@ -10,6 +10,7 @@
-  */
- 
- #include <linux/clk-provider.h>
-+#include <linux/clk/shmobile.h>
- #include <linux/init.h>
- #include <linux/kernel.h>
- #include <linux/of.h>
-@@ -99,5 +100,7 @@ static void __init rz_cpg_clocks_init(struct device_node *np)
- 	}
- 
- 	of_clk_add_provider(np, of_clk_src_onecell_get, &cpg->data);
-+
-+	cpg_mstp_add_clk_domain(np);
- }
- CLK_OF_DECLARE(rz_cpg_clks, "renesas,rz-cpg-clocks", rz_cpg_clocks_init);
--- 
-2.1.4
+This pull request is based on a merge of:
+
+* "Renesas ARM Based SoC CPG/MSTP Clock Driver Updates for v4.3",
+  tagged as renesas-clk-for-v4.3, which I have also sent a pull request for.
+
+  The patches in this pull request depend on driver changes in
+  renesas-clk-for-v4.3.
+
+* "Third Round of Renesas ARM Based SoC DT Updates for v4.3",
+  tagged as renesas-dt3-for-v4.3, which you have already merged.
+
+  The patches in this pull request update nodes added by patches
+  present in renesas-dt3-for-v4.3.
+
+
+The following changes since commit 3f3f0ea0afe031ca20e48a212f4faa00f9920450:
+
+  Merge branch 'clk-for-v4.3' into dt-for-v4.3 (2015-08-12 11:15:19 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt4-for-v4.3
+
+for you to fetch changes up to 60c0745a80be075bbd4e0925e4b740b3e588a445:
+
+  ARM: shmobile: r8a7794 dtsi: Add CPG/MSTP Clock Domain (2015-08-12 11:15:28 +0900)
+
+----------------------------------------------------------------
+Fourth Round of Renesas ARM Based SoC DT Updates for v4.3
+
+* Enable Clock Domain support of the Clock Pulse Generator (CPG)
+  Module Stop (MSTP) Clocks driver.
+
+----------------------------------------------------------------
+Geert Uytterhoeven (7):
+      ARM: shmobile: r7s72100 dtsi: Add CPG/MSTP Clock Domain
+      ARM: shmobile: r8a7778 dtsi: Add CPG/MSTP Clock Domain
+      ARM: shmobile: r8a7779 dtsi: Add CPG/MSTP Clock Domain
+      ARM: shmobile: r8a7790 dtsi: Add CPG/MSTP Clock Domain
+      ARM: shmobile: r8a7791 dtsi: Add CPG/MSTP Clock Domain
+      ARM: shmobile: r8a7793 dtsi: Add CPG/MSTP Clock Domain
+      ARM: shmobile: r8a7794 dtsi: Add CPG/MSTP Clock Domain
+
+ arch/arm/boot/dts/r7s72100.dtsi | 19 +++++++++
+ arch/arm/boot/dts/r8a7778.dtsi  | 22 +++++++++++
+ arch/arm/boot/dts/r8a7779.dtsi  | 23 +++++++++++
+ arch/arm/boot/dts/r8a7790.dtsi  | 86 +++++++++++++++++++++++++++++++++++-----
+ arch/arm/boot/dts/r8a7791.dtsi  | 88 +++++++++++++++++++++++++++++++++++++----
+ arch/arm/boot/dts/r8a7793.dtsi  |  7 ++++
+ arch/arm/boot/dts/r8a7794.dtsi  | 29 ++++++++++++++
+ 7 files changed, 257 insertions(+), 17 deletions(-)
