@@ -1,50 +1,45 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 12 Aug 2015 10:15:51 +0100
-Subject: [PATCH v4 1/3] PCI: generic: remove dependency on hw_pci
-In-Reply-To: <20150804234956.GF17327@google.com>
-References: <1438721620-15493-1-git-send-email-jchandra@broadcom.com>
- <20150804234956.GF17327@google.com>
-Message-ID: <20150812091551.GA23483@red-moon>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 12 Aug 2015 14:48:03 +0530
+Subject: [PATCH] thermal: cpu_cooling: fix lockdep problems in cpu_cooling
+In-Reply-To: <20150812090811.GI7557@n2100.arm.linux.org.uk>
+References: <20150812073530.GA16445@linux>
+ <E1ZPQfV-0005nb-DN@rmk-PC.arm.linux.org.uk>
+ <20150812081142.GB16445@linux>
+ <20150812090811.GI7557@n2100.arm.linux.org.uk>
+Message-ID: <20150812091803.GG16445@linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 05, 2015 at 12:49:56AM +0100, Bjorn Helgaas wrote:
-> On Wed, Aug 05, 2015 at 02:23:38AM +0530, Jayachandran C wrote:
-> > The current code in pci-host-generic.c uses pci_common_init_dev()
-> > from arm architecture to do some part of the PCI setup, and this
-> > prevents it from being used with arm64 architecture.
-> > 
-> > The part of pci_common_init_dev() that is really needed by
-> > pci-host-generic.c is very limited and can be done in the same
-> > file without using hw_pci API of ARM. The ARM platform requires
-> > a pci_sys_data as sysdata for the PCI bus, this can be handled by
-> > setting up gen_pci to have a pci_sys_data variable as the first
-> > element.
-> > 
-> > Signed-off-by: Jayachandran C <jchandra@broadcom.com>
-> > Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > Tested-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > Tested-by: Pavel Fedin <p.fedin@samsung.com>
+On 12-08-15, 10:08, Russell King - ARM Linux wrote:
+> Possibly, had the code previously been like that.  See:
 > 
-> I applied all three of these to my pci/enumeration branch for v4.3.
+> commit 2479bb6443d6a793f896219a34bfab0cc410f0b4
+> Author: Viresh Kumar <viresh.kumar@linaro.org>
+> Date:   Thu Dec 4 09:42:04 2014 +0530
 > 
-> I made a few changes, the most important being to call
-> pcie_bus_configure_settings() before pci_bus_add_devices(), because drivers
-> may claim devices in pci_bus_add_devices(), and the PCI core shouldn't
-> touch devices after drivers claim them.
-> 
-> I dropped the acks and tested-by because of that change, but I'll happily
-> add them back if Lorenzo and Pavel confirm.  The patches are here if you
-> want to review/test them:
-> 
-> https://git.kernel.org/cgit/linux/kernel/git/helgaas/pci.git/log/?h=pci/enumeration
-> 
+> which post-dates this patch, and removes this "style" in favour of using
+> the broken list mechanism.
 
-I am happy with your changes so you can certainly add my acked-by/tested-by
-tags back, with thanks.
+Just to make sure I understand it properly, do you want to say that I
+added 2479bb6 patch after you reported this problem & your patch?
 
-Thank you !
-Lorenzo
+If yes, then I don't see how my patch came after yours. Mine was
+written on 4/Dec/2014 and committed on 8/Dec/2014 and you first
+reported the problem on 14/Dec/2014.
 
-> I'm sure the other patches on that branch will need some tweaks, too, so I
-> don't have any problem with updating these.
+> Frankly... you don't have a leg to stand on
+
+I can accept that :)
+
+> because _you_ knew about this problem, and you saw my patch.  So removing
+> something that my patch to fix a serious bug relied upon...
+
+I don't think I removed that stuff after your patch.
+
+> You know what?  At this point, I'm just not going to bother.  You fix
+> this lockdep problem, I'm obviously useless at kernel stuff.
+
+Okay, leave it on me. I will re-circulate your patch.
+
+-- 
+viresh
