@@ -1,39 +1,46 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 12 Aug 2015 14:41:42 +0100
-Subject: [PATCH 4/6] irqchip: GIC: Use chip_data instead of handler_data
- for cascaded interrupts
-In-Reply-To: <55C9C42E.8070602@linaro.org>
-References: <1436447951-22357-1-git-send-email-marc.zyngier@arm.com>
- <1436447951-22357-5-git-send-email-marc.zyngier@arm.com>
- <55C9C42E.8070602@linaro.org>
-Message-ID: <55CB4D16.9070608@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 12 Aug 2015 14:45:26 +0100
+Subject: [PATCH] arm64: add ioread64be and iowrite64be macros
+In-Reply-To: <1439382275-21678-1-git-send-email-horia.geanta@freescale.com>
+References: <1439382275-21678-1-git-send-email-horia.geanta@freescale.com>
+Message-ID: <20150812134526.GD23540@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/08/15 10:45, Eric Auger wrote:
-> Hi Marc,
-> On 07/09/2015 03:19 PM, Marc Zyngier wrote:
->> When used as a primary interrupt controller, the GIC driver uses
->> irq_data->chip_data to extract controller-specific information.
->>
->> When used as a secondary interrupt controller, it uses handler_data
->> instead. As this difference is relatively pointless and only creates
->> confusion, change the secondary path to match what the rest of the
->> driver does.
-> not really related to this series' topic, is it?
+On Wed, Aug 12, 2015 at 01:24:35PM +0100, Horia Geant? wrote:
 
-It is. Or was. We use the handler_data field to hold the vcpu
-information, but that's also used by the chained interrupt handler to
-find out which secondary it is.
+Please add a commit message here, preferably explaining why you appear
+to be adding a macro that doesn't have any callers in mainline linux.
 
-But this patch is wrong anyway, as it entirely breaks secondary GICs (I
-found out when I merged this with a patch from Jon Hunter fixing some
-other related stuff). Took me hours to get an EB up and running!
+Will
 
-I have a working version now, which makes this patch irrelevant.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> Signed-off-by: Alex Porosanu <alexandru.porosanu@freescale.com>
+> Signed-off-by: Horia Geant? <horia.geanta@freescale.com>
+> ---
+>  arch/arm64/include/asm/io.h | 4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
+> index 44be1e03ed65..9b6e408cfa51 100644
+> --- a/arch/arm64/include/asm/io.h
+> +++ b/arch/arm64/include/asm/io.h
+> @@ -174,13 +174,15 @@ extern void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size);
+>  #define iounmap				__iounmap
+>  
+>  /*
+> - * io{read,write}{16,32}be() macros
+> + * io{read,write}{16,32,64}be() macros
+>   */
+>  #define ioread16be(p)		({ __u16 __v = be16_to_cpu((__force __be16)__raw_readw(p)); __iormb(); __v; })
+>  #define ioread32be(p)		({ __u32 __v = be32_to_cpu((__force __be32)__raw_readl(p)); __iormb(); __v; })
+> +#define ioread64be(p)		({ __u64 __v = be64_to_cpu((__force __be64)__raw_readq(p)); __iormb(); __v; })
+>  
+>  #define iowrite16be(v,p)	({ __iowmb(); __raw_writew((__force __u16)cpu_to_be16(v), p); })
+>  #define iowrite32be(v,p)	({ __iowmb(); __raw_writel((__force __u32)cpu_to_be32(v), p); })
+> +#define iowrite64be(v,p)	({ __iowmb(); __raw_writeq((__force __u64)cpu_to_be64(v), p); })
+>  
+>  /*
+>   * Convert a physical pointer to a virtual kernel pointer for /dev/mem
+> -- 
+> 2.4.4
+> 
