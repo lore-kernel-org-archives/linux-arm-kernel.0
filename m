@@ -1,65 +1,33 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Wed, 12 Aug 2015 08:36:04 -0700
-Subject: [PATCH v2 0/2] net: thunder: Add ACPI support.
-In-Reply-To: <20150812152337.GB5393@e104818-lin.cambridge.arm.com>
-References: <1439254717-2875-1-git-send-email-ddaney.cavm@gmail.com>
- <20150811.114908.1384923604512568161.davem@davemloft.net>
- <55CA5567.9010002@caviumnetworks.com>
- <20150812152337.GB5393@e104818-lin.cambridge.arm.com>
-Message-ID: <55CB67E4.8030001@caviumnetworks.com>
+From: pratyush.anand@gmail.com (Pratyush Anand)
+Date: Wed, 12 Aug 2015 21:10:20 +0530
+Subject: [PATCH v6 1/6] PCI: designware: move calculation of bus addresses
+ to DRA7xx
+In-Reply-To: <55C44A80.20308@hisilicon.com>
+References: <1438848559-232109-1-git-send-email-wangzhou1@hisilicon.com>
+ <1438848559-232109-2-git-send-email-wangzhou1@hisilicon.com>
+ <55C44A80.20308@hisilicon.com>
+Message-ID: <CAHM4w1muj4+OBcsDQ9ePjV77t+iPh7TYY8h5MF66GjD=2ktRew@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/12/2015 08:23 AM, Catalin Marinas wrote:
-> On Tue, Aug 11, 2015 at 01:04:55PM -0700, David Daney wrote:
->> On 08/11/2015 11:49 AM, David Miller wrote:
->>> From: David Daney <ddaney.cavm@gmail.com>
->>> Date: Mon, 10 Aug 2015 17:58:35 -0700
->>>
->>>> Change from v1:  Drop PHY binding part, use fwnode_property* APIs.
->>>>
->>>> The first patch (1/2) rearranges the existing code a little with no
->>>> functional change to get ready for the second.  The second (2/2) does
->>>> the actual work of adding support to extract the needed information
->>> >from the ACPI tables.
->>>
->>> Series applied.
->>
->> Thank you very much.
->>
->>> In the future it might be better structured to try and get the OF
->>> node, and if that fails then try and use the ACPI method to obtain
->>> these values.
->>
->> Our current approach, as you can see in the patch, is the opposite.  If ACPI
->> is being used, prefer that over the OF device tree.
->>
->> You seem to be recommending precedence for OF.  It should be consistent
->> across all drivers/sub-systems, so do you really think that OF before ACPI
->> is the way to go?
+On Fri, Aug 7, 2015 at 11:34 AM, Zhou Wang <wangzhou1@hisilicon.com> wrote:
+> [+cc jingoohan1 at gmail.com]
 >
-> On arm64 (unless you use a vendor kernel), DT takes precedence over ACPI
-> if both arm provided to the kernel (and it's a fair assumption given
-> that ACPI on ARM is still in the early days). You could also force ACPI
-> with acpi=force on the kernel cmd line and the arch code will not
-> unflatten the DT even if it is provided, therefore is_of_node(fwnode)
-> returning false.
->
-> I haven't looked at your driver in detail but something like AMD's
-> xgbe_probe() uses a single function for both DT and ACPI with
-> device_property_read_*() functions getting the information from the
-> correct place in either case. The ACPI vs DT precedence is handled by
-> the arch boot code, we never mix the two and confuse the drivers.
->
+> On 2015/8/6 16:09, Zhou Wang wrote:
+>> From: gabriele paoloni <gabriele.paoloni@huawei.com>
+>>
+>> Commit f4c55c5a3f7f "PCI: designware: Program ATU with untranslated
+>> address" added the calculation of PCI BUS addresses in designware,
+>> storing them in new fields added in "struct pcie_port". This
+>> calculation is done for every designware user even if is only
+>> applicable to DRA7xx.
+>> This patch moves the calculation of the bus addresses to the DRA7xx
+>> driver and is needed to allow the rework of designware to use
+>> the new DT parsing API.
+>>
+>> Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
+>> Signed-off-by: Zhou Wang <wangzhou1@hisilicon.com>
 
-My long term plan is to create something like 
-firmware_get_mac_address(), that would encapsulate  of_get_mac_address() 
-and the ACPI equivalent.
 
-Same for firmware_phy_find_device().
-
-These would function as you suggest, but lacking this infrastructure, we 
-implemented this patch set instead.
-
-Thanks,
-David Daney
+Looks fine to me
+Acked-by: Pratyush Anand <pratyush.anand@gmail.com>
