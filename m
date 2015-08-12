@@ -1,40 +1,40 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 12 Aug 2015 13:42:56 +0200
-Subject: [PATCH V1 Resend 06/10] drivers: rtc: Drop (un)likely before
- IS_ERR(_OR_NULL)
-In-Reply-To: <20150812104625.GB20238@linux>
-References: <cover.1439375087.git.viresh.kumar@linaro.org>
- <1a92f2e1af5309ece9736f79f312e90486a98825.1439375087.git.viresh.kumar@linaro.org>
- <20150812104133.GE3411@piout.net> <20150812104625.GB20238@linux>
-Message-ID: <20150812114256.GF3411@piout.net>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 12 Aug 2015 13:45:43 +0200
+Subject: [PATCH v4 06/11] KVM: arm/arm64: vgic: Allow dynamic mapping of
+ physical/virtual interrupts
+In-Reply-To: <20150812105638.67de9423@arm.com>
+References: <1438962347-17541-1-git-send-email-marc.zyngier@arm.com>
+ <1438962347-17541-7-git-send-email-marc.zyngier@arm.com>
+ <20150811074221.GC5007@lvm> <20150812105638.67de9423@arm.com>
+Message-ID: <20150812114543.GA15085@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/08/2015 at 16:16:25 +0530, Viresh Kumar wrote :
-> On 12-08-15, 12:41, Alexandre Belloni wrote:
-> > Hi Viresh,
+On Wed, Aug 12, 2015 at 10:56:38AM +0100, Marc Zyngier wrote:
+> On Tue, 11 Aug 2015 08:42:37 +0100
+> Christoffer Dall <christoffer.dall@linaro.org> wrote:
+> 
+> > On Fri, Aug 07, 2015 at 04:45:42PM +0100, Marc Zyngier wrote:
+> > > In order to be able to feed physical interrupts to a guest, we need
+> > > to be able to establish the virtual-physical mapping between the two
+> > > worlds.
+> > > 
+> > > The mappings are kept in a set of RCU lists, indexed by virtual interrupts.
+> > > 
+> > > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > > 
-> > Why are you resending?
+> > Thanks for addressing all my concerns:
+> > 
+> > Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 > 
-> I never got a reply from Andrew Morton on V1, so resent it again. And
-> today Andrew asked me to take this via trivial tree.
+> Thanks a lot for all the reviewing, much appreciated.
 > 
-> So the resent.
-> 
-> I need to find a sane way to get few more people to the cover-letter.
-> The problem is that I am generating the cc-list with get_maintainers,
-> and if I combine that list for all the patches, it becomes huge. And
-> really can't send the cover-letter to those people then. Few lists may
-> block it as well, due to high number of cc'd people.
-> 
-> I am telling this because, the cover-letter did contain the reason for
-> resend.
+> Unless someone has an objection, I'm going put this series (minus
+> the last patch) into -next so it gets a bit more exposure.
 > 
 
-The fact is that I sent you a mail yesterday stating that I applied that
-particular patch.
+Sounds good to me, when I'm back from this paper writing business
+tomorrow/friday, I'll give it a spin and test the UEFI reboot issue with
+it as well.
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+-Christoffer
