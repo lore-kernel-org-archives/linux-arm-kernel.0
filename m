@@ -1,46 +1,81 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 12 Aug 2015 08:49:25 +0100
-Subject: 3.18: lockdep problems in cpufreq
-In-Reply-To: <20150812073530.GA16445@linux>
-References: <20141214213655.GA11285@n2100.arm.linux.org.uk>
- <CAKohponhkk9BK6-7ScHeZa4R43iooWQFV8YoPLv6LjO40GNq=A@mail.gmail.com>
- <20150518185645.GA28053@n2100.arm.linux.org.uk>
- <2574268.XBqpdL2VLI@vostro.rjw.lan>
- <20150811170357.GA24529@n2100.arm.linux.org.uk>
- <20150812051659.GI32049@linux>
- <20150812072129.GD7557@n2100.arm.linux.org.uk>
- <20150812073530.GA16445@linux>
-Message-ID: <20150812074925.GG7557@n2100.arm.linux.org.uk>
+From: Dongsheng.Wang@freescale.com (Wang Dongsheng)
+Date: Wed, 12 Aug 2015 08:01:32 +0000
+Subject: [PATCH v2 1/2] soc/fsl: add freescale dir for SOC specific drivers
+In-Reply-To: <20150812074439.GF7557@n2100.arm.linux.org.uk>
+References: <1439358807-9024-1-git-send-email-dongsheng.wang@freescale.com>
+ <20150812074439.GF7557@n2100.arm.linux.org.uk>
+Message-ID: <SN1PR0301MB1616C942574FB3261B811DB19D7E0@SN1PR0301MB1616.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 12, 2015 at 01:05:30PM +0530, Viresh Kumar wrote:
-> On 12-08-15, 08:21, Russell King - ARM Linux wrote:
-> > Maybe not - I often lose track of which patches are in what state -
-> > tracking the state of 250+ patches over many months and in some cases
-> > _years_ is not easy.
-> 
-> I agree..
-> 
-> > That's still no reason for Eduardo to _completely_ ignore this thread,
-> > especially when Rafael explicitly tried to get comment from Eduardo.
-> 
-> Oh, no. I am not trying to be anybody's advocate here. I was just
-> highlighting the point here, that I remembered.
-> 
-> Even I was quite busy then and couldn't get back to it.
-> 
-> Lets fix this now. I believe you have a patch for this based on latest
-> kernel? Mind pasting that here for quick review?
+Hi Russell,
 
-I don't think it's changed much since the original, but I've posted
-what's in linux-next as of today, and it doesn't conflict with anything.
-So there's no excuse about getting it merged.
+Thanks for your review. :)
 
-The problem will be back-porting it to stable kernels, because I think
-it's had to be updated at least a couple of times.  I don't have the old
-versions anymore, so I'm just going to say "not my problem" - sorry.
+> -----Original Message-----
+> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
+> Sent: Wednesday, August 12, 2015 3:45 PM
+> To: Wang Dongsheng-B40534
+> Cc: shawn.guo at linaro.org; Wang Huan-B18965; linus.walleij at linaro.org; linux-
+> kernel at vger.kernel.org; sandeep_n at ti.com; hdegoede at redhat.com; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [PATCH v2 1/2] soc/fsl: add freescale dir for SOC specific drivers
+> 
+> On Wed, Aug 12, 2015 at 01:53:26PM +0800, Dongsheng Wang wrote:
+> > diff --git a/drivers/soc/fsl/Kconfig b/drivers/soc/fsl/Kconfig new
+> > file mode 100644 index 0000000..863d1ef
+> > --- /dev/null
+> > +++ b/drivers/soc/fsl/Kconfig
+> > @@ -0,0 +1,18 @@
+> > +#
+> > +# Freescale SOC drivers
+> > +#
+> > +menuconfig FSL_SOC_DRIVERS
+> > +	bool "Freescale Soc Drivers"
+> > +	default n
+> 
+> No need for default n.
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Thanks. Fix it in next version.
+
+> > +	help
+> > +	Say y here to enable Freescale LS1021A Soc Device Drivers support.
+> > +	The Soc Drivers provides the device driver that is a specific block
+> > +	or feature on LS1021A platform.
+> 
+> Help text should be indented by two spaces as per almost every other help text.
+> 
+
+Thanks. My mistake...
+
+> > +
+> > +if LS1_SOC_DRIVERS
+> > +	source "drivers/soc/fsl/ls1/Kconfig"
+> > +endif
+> > diff --git a/drivers/soc/fsl/Makefile b/drivers/soc/fsl/Makefile new
+> > file mode 100644 index 0000000..b4215dd
+> > --- /dev/null
+> > +++ b/drivers/soc/fsl/Makefile
+> > @@ -0,0 +1,6 @@
+> > +#
+> > +# Makefile for Freescale Soc specific device drivers.
+> > +#
+> > +
+> > +obj-$(CONFIG_LS1_SOC_DRIVERS) += ls1/
+> > +
+> > diff --git a/drivers/soc/fsl/ls1/Kconfig b/drivers/soc/fsl/ls1/Kconfig
+> > new file mode 100644 index 0000000..7556f44
+> > --- /dev/null
+> > +++ b/drivers/soc/fsl/ls1/Kconfig
+> > @@ -0,0 +1,3 @@
+> > +#
+> > +# LS-1 Soc drivers
+> > +#
+> 
+> Doesn't this directory need a Makefile as well?
+> 
+
+2/2 patch add a config option and Makefile for this.
+
+Regards,
+-Dongsheng
