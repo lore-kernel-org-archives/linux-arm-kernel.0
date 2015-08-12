@@ -1,51 +1,112 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Wed, 12 Aug 2015 11:45:13 -0700
-Subject: [GIT PULL] RPi SOC changes for v4.3
-Message-ID: <87oaic8hxi.fsf@eliezer.anholt.net>
+From: alex.williamson@redhat.com (Alex Williamson)
+Date: Wed, 12 Aug 2015 12:56:10 -0600
+Subject: [PATCH v3 01/10] VFIO: platform: registration of a dummy IRQ
+ bypass producer
+In-Reply-To: <1439212864-12954-2-git-send-email-eric.auger@linaro.org>
+References: <1439212864-12954-1-git-send-email-eric.auger@linaro.org>
+ <1439212864-12954-2-git-send-email-eric.auger@linaro.org>
+Message-ID: <1439405770.4023.526.camel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Following Lee's forwarding of the DT changes for the firmware driver for
-4.3, here's the associated driver for the brcm arm-soc tree.
+On Mon, 2015-08-10 at 15:20 +0200, Eric Auger wrote:
+> Register a dummy producer with void callbacks
+> 
+> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+> 
+> ---
+> 
+> v2 -> v3:
+> - rename vfio_platform_irq_bypass_resume into *_start
+> ---
+>  drivers/vfio/platform/vfio_platform_irq.c     | 32 +++++++++++++++++++++++++++
+>  drivers/vfio/platform/vfio_platform_private.h |  2 ++
+>  2 files changed, 34 insertions(+)
+> 
+> diff --git a/drivers/vfio/platform/vfio_platform_irq.c b/drivers/vfio/platform/vfio_platform_irq.c
+> index 88bba57..b5cb8c7 100644
+> --- a/drivers/vfio/platform/vfio_platform_irq.c
+> +++ b/drivers/vfio/platform/vfio_platform_irq.c
+> @@ -20,6 +20,7 @@
+>  #include <linux/types.h>
+>  #include <linux/vfio.h>
+>  #include <linux/irq.h>
+> +#include <linux/irqbypass.h>
+>  
+>  #include "vfio_platform_private.h"
+>  
+> @@ -177,6 +178,27 @@ static irqreturn_t vfio_irq_handler(int irq, void *dev_id)
+>  	return IRQ_HANDLED;
+>  }
+>  
+> +static void vfio_platform_irq_bypass_stop(struct irq_bypass_producer *prod)
+> +{
+> +}
+> +
+> +static void vfio_platform_irq_bypass_start(struct irq_bypass_producer *prod)
+> +{
+> +}
+> +
+> +static int vfio_platform_irq_bypass_add_consumer(
+> +			struct irq_bypass_producer *prod,
+> +			struct irq_bypass_consumer *cons)
+> +{
+> +	return 0;
+> +}
+> +
+> +static void vfio_platform_irq_bypass_del_consumer(
+> +			struct irq_bypass_producer *prod,
+> +			struct irq_bypass_consumer *cons)
+> +{
+> +}
+> +
+>  static int vfio_set_trigger(struct vfio_platform_device *vdev, int index,
+>  			    int fd, irq_handler_t handler)
+>  {
+> @@ -186,6 +208,7 @@ static int vfio_set_trigger(struct vfio_platform_device *vdev, int index,
+>  
+>  	if (irq->trigger) {
+>  		free_irq(irq->hwirq, irq);
+> +		irq_bypass_unregister_producer(&irq->producer);
+>  		kfree(irq->name);
+>  		eventfd_ctx_put(irq->trigger);
+>  		irq->trigger = NULL;
+> @@ -216,6 +239,15 @@ static int vfio_set_trigger(struct vfio_platform_device *vdev, int index,
+>  		return ret;
+>  	}
+>  
+> +	irq->producer.token = (void *)trigger;
+> +	irq->producer.irq = irq->hwirq;
+> +	irq->producer.add_consumer = vfio_platform_irq_bypass_add_consumer;
+> +	irq->producer.del_consumer = vfio_platform_irq_bypass_del_consumer;
+> +	irq->producer.stop = vfio_platform_irq_bypass_stop;
+> +	irq->producer.start = vfio_platform_irq_bypass_start;
+> +	ret = irq_bypass_register_producer(&irq->producer);
+> +	WARN_ON(ret);
 
-I think this is the first time RPi changes have been forwarded through
-Florian.  It was suggested by Florian when I was discussing RPi
-upstreaming with him and Arnd.  I think it makes sense, since general
--next trees for Broadcom are maintained there, and he's willing to
-accept pull requests at any point.
+For what purpose?
 
-The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
-
-  Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
-
-are available in the git repository at:
-
-  http://github.com/anholt/linux tags/rpi-soc-for-4.3-v1
-
-for you to fetch changes up to d39ae82e65dc538295eea0384ed1ad8752dabbae:
-
-  ARM: bcm2835: Add the Raspberry Pi firmware driver (2015-08-11 11:27:13 -0700)
-
-----------------------------------------------------------------
-This pull request contains the Raspberry Pi firmware driver, for
-communicating with the VPU which has exclusive control of some of the
-peripherals.
-
-----------------------------------------------------------------
-Eric Anholt (1):
-      ARM: bcm2835: Add the Raspberry Pi firmware driver
-
- drivers/firmware/Kconfig                   |   7 +
- drivers/firmware/Makefile                  |   1 +
- drivers/firmware/raspberrypi.c             | 260 +++++++++++++++++++++++++++++
- include/soc/bcm2835/raspberrypi-firmware.h | 115 +++++++++++++
- 4 files changed, 383 insertions(+)
- create mode 100644 drivers/firmware/raspberrypi.c
- create mode 100644 include/soc/bcm2835/raspberrypi-firmware.h
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150812/b876ccd9/attachment.sig>
+> +
+>  	if (!irq->masked)
+>  		enable_irq(irq->hwirq);
+>  
+> diff --git a/drivers/vfio/platform/vfio_platform_private.h b/drivers/vfio/platform/vfio_platform_private.h
+> index 1c9b3d5..1d2d4d6 100644
+> --- a/drivers/vfio/platform/vfio_platform_private.h
+> +++ b/drivers/vfio/platform/vfio_platform_private.h
+> @@ -17,6 +17,7 @@
+>  
+>  #include <linux/types.h>
+>  #include <linux/interrupt.h>
+> +#include <linux/irqbypass.h>
+>  
+>  #define VFIO_PLATFORM_OFFSET_SHIFT   40
+>  #define VFIO_PLATFORM_OFFSET_MASK (((u64)(1) << VFIO_PLATFORM_OFFSET_SHIFT) - 1)
+> @@ -37,6 +38,7 @@ struct vfio_platform_irq {
+>  	spinlock_t		lock;
+>  	struct virqfd		*unmask;
+>  	struct virqfd		*mask;
+> +	struct irq_bypass_producer producer;
+>  };
+>  
+>  struct vfio_platform_region {
