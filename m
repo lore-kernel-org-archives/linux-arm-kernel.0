@@ -1,64 +1,35 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 12 Aug 2015 16:49:10 +0200
-Subject: [linux-sunxi] [PATCH v3 1/3] mmc: sunxi: fix timeout in
- sunxi_mmc_oclk_onoff
-In-Reply-To: <bdcb7ce26f359b7fedbd8559eb275c324bfb52bb.1439386047.git.hramrach@gmail.com>
-References: <cover.1439381423.git.hramrach@gmail.com>
- <7f9c6f99b31702c02436ef3356b3ebffa4754260.1439381423.git.hramrach@gmail.com>
- <bdcb7ce26f359b7fedbd8559eb275c324bfb52bb.1439386047.git.hramrach@gmail.com>
-Message-ID: <55CB5CE6.1000303@redhat.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 12 Aug 2015 09:52:16 -0500
+Subject: [RFC/PATCH-v4.2-rc6 2/5] arm: boot: dts: am4372: add ARM timers
+ and SCU nodes
+In-Reply-To: <20150812072816.GR4215@atomide.com>
+References: <1439242911-715-1-git-send-email-balbi@ti.com>
+ <1439242911-715-3-git-send-email-balbi@ti.com>
+ <20150812072816.GR4215@atomide.com>
+Message-ID: <20150812145216.GB13884@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Aug 12, 2015 at 12:28:16AM -0700, Tony Lindgren wrote:
+> * Felipe Balbi <balbi@ti.com> [150810 14:44]:
+> > AM437x devices sport SCU, TWD and Global timers,
+> > let's add them to DTS so they have a chance to
+> > probe and be used by Linux.
+> 
+> Is this one safe to apply already without the Kconfig change?
+> 
+> Or will it cause multi_v7_defconfig with the timers selected
+> to not boot properly?
 
-On 08/12/2015 03:29 PM, Michal Suchanek wrote:
-> The 250ms timeout is too short.
->
-> On my system enabling the oclk takes under 50ms and disabling slightly
-> over 100ms when idle. Under load disabling the clock can take over
-> 350ms.
->
-> This does not make mmc clock gating look like good option to have on
-> sunxi but the system should not crash with mmc clock gating enabled
-> nonetheless.
->
-> This patch sets the timeout to 750ms.
->
-> Signed-off-by: Michal Suchanek <hramrach@gmail.com>
->
-> ---
-> v3
->   - remove debug message
+I'd have to try :-) But it should be safe, just the timers won't be
+chosen for anything :-)
 
-Thanks, this one looks good to me:
-
-Acked-by: Hans de Goede <hdegoede@redhat.com>
-
-Ulf, can you apply this one please?
-
-Thanks & Regards,
-
-Hans
-
-
-> v2
->   - fix formatting
-> ---
->   drivers/mmc/host/sunxi-mmc.c | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-> index 4d3e1ff..a7b7a67 100644
-> --- a/drivers/mmc/host/sunxi-mmc.c
-> +++ b/drivers/mmc/host/sunxi-mmc.c
-> @@ -595,7 +595,7 @@ static irqreturn_t sunxi_mmc_handle_manual_stop(int irq, void *dev_id)
->
->   static int sunxi_mmc_oclk_onoff(struct sunxi_mmc_host *host, u32 oclk_en)
->   {
-> -	unsigned long expire = jiffies + msecs_to_jiffies(250);
-> +	unsigned long expire = jiffies + msecs_to_jiffies(750);
->   	u32 rval;
->
->   	rval = mmc_readl(host, REG_CLKCR);
->
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150812/adb93b17/attachment.sig>
