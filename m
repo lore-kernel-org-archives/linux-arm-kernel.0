@@ -1,90 +1,48 @@
-From: alex.williamson@redhat.com (Alex Williamson)
-Date: Wed, 12 Aug 2015 12:56:52 -0600
-Subject: [PATCH v3 06/10] VFIO: platform: add irq bypass producer
- management
-In-Reply-To: <1439212864-12954-7-git-send-email-eric.auger@linaro.org>
-References: <1439212864-12954-1-git-send-email-eric.auger@linaro.org>
- <1439212864-12954-7-git-send-email-eric.auger@linaro.org>
-Message-ID: <1439405812.4023.530.camel@redhat.com>
+From: mturquette@baylibre.com (Michael Turquette)
+Date: Wed, 12 Aug 2015 12:00:14 -0700
+Subject: [PATCH v4 2/8] clk: Add a Raspberry Pi-specific clock driver.
+In-Reply-To: <87wpx04c4q.fsf@eliezer.anholt.net>
+References: <1437420787-32137-1-git-send-email-eric@anholt.net>
+ <1437420787-32137-3-git-send-email-eric@anholt.net>
+ <20150811211733.31346.11122@quantum> <87wpx04c4q.fsf@eliezer.anholt.net>
+Message-ID: <20150812190014.31346.89987@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-08-10 at 15:21 +0200, Eric Auger wrote:
-> This patch populates the IRQ bypass callacks:
-> - stop/start producer simply consist in disabling/enabling the host irq
-> - add/del consumer: basically set the automasked flag to false/true
+Quoting Eric Anholt (2015-08-12 11:04:05)
+> Michael Turquette <mturquette@linaro.org> writes:
 > 
-> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+> > Hi Eric,
+> >
+> > Quoting Eric Anholt (2015-07-20 12:33:01)
+> >> +void __init rpi_firmware_init_clock_provider(struct device_node *node)
+> >> +{
+> >> +       /* We delay construction of our struct clks until get time,
+> >> +        * because we need to be able to return -EPROBE_DEFER if the
+> >> +        * firmware driver isn't up yet.  clk core doesn't support
+> >> +        * re-probing on -EPROBE_DEFER, but callers of clk_get can.
+> >> +        */
+> >> +       of_clk_add_provider(node, rpi_firmware_delayed_get_clk, node);
+> >> +}
+> >> +
+> >> +CLK_OF_DECLARE(rpi_firmware_clocks, "raspberrypi,bcm2835-firmware-clocks",
+> >> +              rpi_firmware_init_clock_provider);
+> >
+> > Do you require CLK_OF_DECLARE here? Could this be a platform driver
+> > instead?
 > 
-> ---
-> v2 -> v3:
-> - vfio_platform_irq_bypass_add_consumer now returns an error in case
->   the IRQ is recognized as active
-> - active boolean not set anymore
-> - do not VFIO mask the IRQ anymore on unforward
-> 
-> v1 -> v2:
-> - device handle caching in vfio_platform_device is introduced in a
->   separate patch
-> - use container_of
-> ---
->  drivers/vfio/platform/vfio_platform_irq.c | 23 ++++++++++++++++++++++-
->  1 file changed, 22 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/vfio/platform/vfio_platform_irq.c b/drivers/vfio/platform/vfio_platform_irq.c
-> index efaee58..400a188 100644
-> --- a/drivers/vfio/platform/vfio_platform_irq.c
-> +++ b/drivers/vfio/platform/vfio_platform_irq.c
-> @@ -224,23 +224,44 @@ static int vfio_platform_is_active(struct vfio_platform_irq *irq)
->  
->  static void vfio_platform_irq_bypass_stop(struct irq_bypass_producer *prod)
->  {
-> +	disable_irq(prod->irq);
->  }
->  
->  static void vfio_platform_irq_bypass_start(struct irq_bypass_producer *prod)
->  {
-> +	enable_irq(prod->irq);
->  }
->  
->  static int vfio_platform_irq_bypass_add_consumer(
->  			struct irq_bypass_producer *prod,
->  			struct irq_bypass_consumer *cons)
->  {
-> -	return 0;
-> +	struct vfio_platform_irq *irq =
-> +		container_of(prod, struct vfio_platform_irq, producer);
-> +
-> +	/*
-> +	 * if the IRQ is active at irqchip level or VFIO (auto)masked
-> +	 * this means the host IRQ is already under injection in the
-> +	 * guest and this not safe to change the forwarding state at
-> +	 * that stage.
-> +	 * It is not possible to differentiate user-space masking
-> +	 * from auto-masking, leading to possible false detection of
-> +	 * active state.
-> +	 */
-> +	if (vfio_platform_is_active(irq))
-> +		return -EAGAIN;
+> I'm not actually sure.  The common pattern seemed to be using
+> CLK_OF_DECLARE (130 files using it versus declaring a struct
+> platform_driver), and it seems to avoid a whole lot of boilerplate.
+> What would the advantage be?
 
-Here's an example of why we don't want WARN_ON if a registration fails,
-this is effectively random.  When and how is a re-try going to happen?
+Correctly using the Linux driver model, having a nice struct device and
+things like supsend and resume handlers, etc.
 
-> +
-> +	return vfio_platform_set_automasked(irq, false);
+There is a lot of CLK_OF_DECLARE going on in drivers/clk, but I am
+hoping we can fix that. The main reason for CLK_OF_DECLARE is when you
+need to register clocks very early (e.g. timers). This is often not the
+case.
 
-set_forwarded just seems so much more logical here.
-
->  }
->  
->  static void vfio_platform_irq_bypass_del_consumer(
->  			struct irq_bypass_producer *prod,
->  			struct irq_bypass_consumer *cons)
->  {
-> +	struct vfio_platform_irq *irq =
-> +		container_of(prod, struct vfio_platform_irq, producer);
-> +
-> +	vfio_platform_set_automasked(irq, true);
->  }
->  
->  static int vfio_set_trigger(struct vfio_platform_device *vdev, int index,
+Regards,
+Mike
