@@ -1,24 +1,18 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 12 Aug 2015 00:28:16 -0700
-Subject: [RFC/PATCH-v4.2-rc6 2/5] arm: boot: dts: am4372: add ARM timers
- and SCU nodes
-In-Reply-To: <1439242911-715-3-git-send-email-balbi@ti.com>
-References: <1439242911-715-1-git-send-email-balbi@ti.com>
- <1439242911-715-3-git-send-email-balbi@ti.com>
-Message-ID: <20150812072816.GR4215@atomide.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 12 Aug 2015 08:35:15 +0100
+Subject: My boot farm
+Message-ID: <20150812073515.GE7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Felipe Balbi <balbi@ti.com> [150810 14:44]:
-> AM437x devices sport SCU, TWD and Global timers,
-> let's add them to DTS so they have a chance to
-> probe and be used by Linux.
+... will be offline for a while as, on the face of it, the Digi TS16
+rack (terminal server) internal power supply seems to have died.  I'll
+investigate further on Friday, but in the mean time, I'm taking the
+boot tests completely offline until it's resolved.
 
-Is this one safe to apply already without the Kconfig change?
+As such, I'll be less inclined to merge new code as it'll get less
+testing before being pushed out.
 
-Or will it cause multi_v7_defconfig with the timers selected
-to not boot properly?
-
-Regards,
-
-Tony
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
