@@ -1,40 +1,43 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Wed, 12 Aug 2015 10:56:58 -0700
-Subject: [PATCH v4 1/8] clk: bcm2835: Add binding docs for the Raspberry
- Pi clock provider
-In-Reply-To: <20150811211840.31346.28666@quantum>
+Date: Wed, 12 Aug 2015 11:04:05 -0700
+Subject: [PATCH v4 2/8] clk: Add a Raspberry Pi-specific clock driver.
+In-Reply-To: <20150811211733.31346.11122@quantum>
 References: <1437420787-32137-1-git-send-email-eric@anholt.net>
- <1437420787-32137-2-git-send-email-eric@anholt.net>
- <20150811211840.31346.28666@quantum>
-Message-ID: <87zj1w4cgl.fsf@eliezer.anholt.net>
+ <1437420787-32137-3-git-send-email-eric@anholt.net>
+ <20150811211733.31346.11122@quantum>
+Message-ID: <87wpx04c4q.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Michael Turquette <mturquette@linaro.org> writes:
 
-> Quoting Eric Anholt (2015-07-20 12:33:00)
->> The hardware clocks are not controllable by the ARM, so we have to
->> make requests to the firmware to do so from the VPU side.  This will
->> let us replace fixed clocks in our DT with actual clock control (and
->> correct frequency information).
->> 
->> Signed-off-by: Eric Anholt <eric@anholt.net>
->> Acked-by: Stephen Warren <swarren@wwwdotorg.org>
->> Acked-by: Lee Jones <lee@kernel.org>
+> Hi Eric,
 >
-> Looks good to me. Do you want the clk patches to go through the clk tree
-> or do you want them all together? For this patch feel free to add:
+> Quoting Eric Anholt (2015-07-20 12:33:01)
+>> +void __init rpi_firmware_init_clock_provider(struct device_node *node)
+>> +{
+>> +       /* We delay construction of our struct clks until get time,
+>> +        * because we need to be able to return -EPROBE_DEFER if the
+>> +        * firmware driver isn't up yet.  clk core doesn't support
+>> +        * re-probing on -EPROBE_DEFER, but callers of clk_get can.
+>> +        */
+>> +       of_clk_add_provider(node, rpi_firmware_delayed_get_clk, node);
+>> +}
+>> +
+>> +CLK_OF_DECLARE(rpi_firmware_clocks, "raspberrypi,bcm2835-firmware-clocks",
+>> +              rpi_firmware_init_clock_provider);
 >
-> Acked-by: Michael Turquette <mturquette@baylibre.com>
+> Do you require CLK_OF_DECLARE here? Could this be a platform driver
+> instead?
 
-It would be nice to do them all together in the arm-soc tree, since the
-later DT changes require that the clock driver be present.  (And, since
-this is a dependency of the RPi2 work, it would let us stack that on
-top, too).
+I'm not actually sure.  The common pattern seemed to be using
+CLK_OF_DECLARE (130 files using it versus declaring a struct
+platform_driver), and it seems to avoid a whole lot of boilerplate.
+What would the advantage be?
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 818 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150812/0d1a7c0d/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150812/82521ee8/attachment.sig>
