@@ -1,40 +1,62 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Wed, 12 Aug 2015 09:49:54 +0800
-Subject: [PATCH v4 0/4] clk: hisilicon: support stub clock
-In-Reply-To: <20150812003817.GI26614@codeaurora.org>
-References: <1438673249-6051-1-git-send-email-leo.yan@linaro.org>
- <20150812003817.GI26614@codeaurora.org>
-Message-ID: <20150812014954.GA6215@leoy-linaro>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 11 Aug 2015 22:18:26 -0400 (EDT)
+Subject: arm kernel oops in highmem.c with 4.2
+In-Reply-To: <1439327845.3153.17.camel@redhat.com>
+References: <CALeDE9Ox3=sh3AXQ0NUG6BBfU5i5YrMY=LDpcTHQWqz2=60F2g@mail.gmail.com>
+ <20150805100701.GV7557@n2100.arm.linux.org.uk>
+ <CALeDE9PXF=gQCaBCiHpHy2nXOooQOmsCQvSgOv+wQw3mta=P6A@mail.gmail.com>
+ <20150805112713.GY7557@n2100.arm.linux.org.uk>
+ <1439315290.3153.11.camel@redhat.com>
+ <20150811181008.GA7557@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.20.1508111501130.1515@knanqh.ubzr>
+ <20150811195638.GC7557@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.20.1508111558210.1515@knanqh.ubzr>
+ <1439327845.3153.17.camel@redhat.com>
+Message-ID: <alpine.LFD.2.20.1508112116320.1515@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+On Tue, 11 Aug 2015, Mark Salter wrote:
 
-On Tue, Aug 11, 2015 at 05:38:17PM -0700, Stephen Boyd wrote:
-> On 08/04, Leo Yan wrote:
-> > This series adds support for hisilicon stub clock driver. On hi6220,
-> > the bootloader needs load the firmware image and set info for OPPs;
-> > after run into kernel, the stub clock driver is used to communicate
-> > w/t firmware for cpu dynamic frequency scaling.
+> On Tue, 2015-08-11 at 16:20 -0400, Nicolas Pitre wrote:
+> > On Tue, 11 Aug 2015, Russell King - ARM Linux wrote:
 > > 
-> > In patch series v1/v2, the stub clock driver simply writes request in
-> > sram and send ipc to firmware; For patch series v3, the firmware has
-> > been upgraded to use mailbox, so stub clock driver will call standard
-> > mailbox APIs to request mailbox channel and send message to firmware.
+> > > It needs fixing or removing.
 > > 
-> > Patch 4 adds stub clock node into dts and it references mailbox with
-> > phandle, so patch 4 will depend on mailbox driver's patch series [1].
-> > These patches have been tested on 96board hikey and is used by cpufreq
-> > driver.
+> > Absolutely. I'm not disputing that. I'm only asking so we can wisely 
+> > choose between fixing or removing.  Personally I'd be inclined towards 
+> > the later, unless the following is sufficient to fix it:
+> > 
+> > diff --git a/arch/arm/lib/uaccess_with_memcpy.c 
+> > b/arch/arm/lib/uaccess_with_memcpy.c
+> > index 3e58d71001..4b39af2dfd 100644
+> > --- a/arch/arm/lib/uaccess_with_memcpy.c
+> > +++ b/arch/arm/lib/uaccess_with_memcpy.c
+> > @@ -96,7 +96,7 @@ __copy_to_user_memcpy(void __user *to, const void 
+> > *from, unsigned long n)
+> >  	}
+> >  
+> >  	/* the mmap semaphore is taken only if not in an atomic context 
+> > */
+> > -	atomic = in_atomic();
+> > +	atomic = faulthandler_disabled();
+> >  
+> >  	if (!atomic)
+> >  		down_read(&current->mm->mmap_sem);
 > 
-> The To: list is everyone, so I'm not sure who is supposed to
-> apply these patches. I'd like to take patches 1, 2, and 3 through
-> the clk tree though.
+> Yeah, that fixes the problem I was seeing.
 
-Thanks, you could take first three patches. For patch 4, i will
-re-send it after mailbox driver's patches have been merged.
+Good!  Then I'll add it to RMK's patch system.  May I add a tested-by 
+tag with your name?
 
-Wei Xu, is this okay for you?
+> This was on a calxeda highbank.
 
-Thanks,
-Leo Yan
+Any idea why this option was set?
+
+> With CONFIG_UACCESS_WITH_MEMCPY, the dd copy test reported 1.8GB/s
+> Without CONFIG_UACCESS_WITH_MEMCPY, 2.1GB/s
+
+Therefore this is of no benefit to you.
+
+
+Nicolas
