@@ -1,47 +1,39 @@
-From: knaack.h@gmx.de (Hartmut Knaack)
-Date: Wed, 12 Aug 2015 22:12:22 +0200
-Subject: [PATCH 01/20] regmap: Add missing comments about struct regmap_bus
-In-Reply-To: <1439374365-20623-2-git-send-email-mpa@pengutronix.de>
-References: <1439374365-20623-1-git-send-email-mpa@pengutronix.de>
- <1439374365-20623-2-git-send-email-mpa@pengutronix.de>
-Message-ID: <55CBA8A6.7020404@gmx.de>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Wed, 12 Aug 2015 13:13:15 -0700
+Subject: [PATCH 4/9] kernel/cpu_pm: fix cpu_cluster_pm_exit comment
+In-Reply-To: <1438731339-58317-5-git-send-email-lina.iyer@linaro.org> (Lina
+ Iyer's message of "Tue, 4 Aug 2015 17:35:34 -0600")
+References: <1438731339-58317-1-git-send-email-lina.iyer@linaro.org>
+ <1438731339-58317-5-git-send-email-lina.iyer@linaro.org>
+Message-ID: <7htws4mfj8.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Markus Pargmann schrieb am 12.08.2015 um 12:12:
-> There are some fields of this struct undocumented or old. This patch
-> updates the missing comments.
-> 
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+Lina Iyer <lina.iyer@linaro.org> writes:
+
+> cpu_cluster_pm_exit() must be sent after cpu_cluster_pm_enter() has been
+> sent for the cluster and before any cpu_pm_exit() notifications are sent
+> for any CPU.
+>
+> Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+
+Acked-by: Kevin Hilman <khilman@linaro.org>
+
 > ---
->  include/linux/regmap.h | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
-> 
-> diff --git a/include/linux/regmap.h b/include/linux/regmap.h
-> index 59c55ea0f0b5..6ff83c9ddb45 100644
-> --- a/include/linux/regmap.h
-> +++ b/include/linux/regmap.h
-> @@ -296,8 +296,11 @@ typedef void (*regmap_hw_free_context)(void *context);
->   *                if not implemented  on a given device.
->   * @async_write: Write operation which completes asynchronously, optional and
->   *               must serialise with respect to non-async I/O.
-> + * @reg_write: Write operation for a register. Writes value to register.
->   * @read: Read operation.  Data is returned in the buffer used to transmit
->   *         data.
-> + * @reg_read: Read operation for a register. Reads a value from a register.
-> + * @free_conetext: Free context.
-
-Typo: free_context
-
->   * @async_alloc: Allocate a regmap_async() structure.
->   * @read_flag_mask: Mask to be set in the top byte of the register when doing
->   *                  a read.
-> @@ -307,7 +310,6 @@ typedef void (*regmap_hw_free_context)(void *context);
->   * @val_format_endian_default: Default endianness for formatted register
->   *     values. Used when the regmap_config specifies DEFAULT. If this is
->   *     DEFAULT, BIG is assumed.
-> - * @async_size: Size of struct used for async work.
->   */
->  struct regmap_bus {
->  	bool fast_io;
-> 
+>  kernel/cpu_pm.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/kernel/cpu_pm.c b/kernel/cpu_pm.c
+> index 9656a3c..009cc9a 100644
+> --- a/kernel/cpu_pm.c
+> +++ b/kernel/cpu_pm.c
+> @@ -180,7 +180,7 @@ EXPORT_SYMBOL_GPL(cpu_cluster_pm_enter);
+>   * low power state that may have caused some blocks in the same power domain
+>   * to reset.
+>   *
+> - * Must be called after cpu_pm_exit has been called on all cpus in the power
+> + * Must be called after cpu_cluster_pm_enter has been called for the power
+>   * domain, and before cpu_pm_exit has been called on any cpu in the power
+>   * domain. Notified drivers can include VFP co-processor, interrupt controller
+>   * and its PM extensions, local CPU timers context save/restore which
