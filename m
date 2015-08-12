@@ -1,179 +1,74 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 12 Aug 2015 14:31:47 +0100
-Subject: [PATCH 2/6] irqchip: GIC: Convert to EOImode == 1
-In-Reply-To: <55C9BD24.10708@linaro.org>
-References: <1436447951-22357-1-git-send-email-marc.zyngier@arm.com>
- <1436447951-22357-3-git-send-email-marc.zyngier@arm.com>
- <55C9BD24.10708@linaro.org>
-Message-ID: <55CB4AC3.6040400@arm.com>
+From: msalter@redhat.com (Mark Salter)
+Date: Wed, 12 Aug 2015 09:33:56 -0400
+Subject: arm kernel oops in highmem.c with 4.2
+In-Reply-To: <alpine.LFD.2.20.1508112116320.1515@knanqh.ubzr>
+References: <CALeDE9Ox3=sh3AXQ0NUG6BBfU5i5YrMY=LDpcTHQWqz2=60F2g@mail.gmail.com>
+ <20150805100701.GV7557@n2100.arm.linux.org.uk>
+ <CALeDE9PXF=gQCaBCiHpHy2nXOooQOmsCQvSgOv+wQw3mta=P6A@mail.gmail.com>
+ <20150805112713.GY7557@n2100.arm.linux.org.uk>
+ <1439315290.3153.11.camel@redhat.com>
+ <20150811181008.GA7557@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.20.1508111501130.1515@knanqh.ubzr>
+ <20150811195638.GC7557@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.20.1508111558210.1515@knanqh.ubzr>
+ <1439327845.3153.17.camel@redhat.com>
+ <alpine.LFD.2.20.1508112116320.1515@knanqh.ubzr>
+Message-ID: <1439386436.3153.23.camel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
+On Tue, 2015-08-11 at 22:18 -0400, Nicolas Pitre wrote:
+> On Tue, 11 Aug 2015, Mark Salter wrote:
+> 
+> > On Tue, 2015-08-11 at 16:20 -0400, Nicolas Pitre wrote:
+> > > On Tue, 11 Aug 2015, Russell King - ARM Linux wrote:
+> > > 
+> > > > It needs fixing or removing.
+> > > 
+> > > Absolutely. I'm not disputing that. I'm only asking so we can wisely 
+> > > choose between fixing or removing.  Personally I'd be inclined 
+> > > towards 
+> > > the later, unless the following is sufficient to fix it:
+> > > 
+> > > diff --git a/arch/arm/lib/uaccess_with_memcpy.c 
+> > > b/arch/arm/lib/uaccess_with_memcpy.c
+> > > index 3e58d71001..4b39af2dfd 100644
+> > > --- a/arch/arm/lib/uaccess_with_memcpy.c
+> > > +++ b/arch/arm/lib/uaccess_with_memcpy.c
+> > > @@ -96,7 +96,7 @@ __copy_to_user_memcpy(void __user *to, const void 
+> > > *from, unsigned long n)
+> > >  	}
+> > >  
+> > >  	/* the mmap semaphore is taken only if not in an atomic 
+> > > context 
+> > > */
+> > > -	atomic = in_atomic();
+> > > +	atomic = faulthandler_disabled();
+> > >  
+> > >  	if (!atomic)
+> > >  		down_read(&current->mm->mmap_sem);
+> > 
+> > Yeah, that fixes the problem I was seeing.
+> 
+> Good!  Then I'll add it to RMK's patch system.  May I add a tested-by 
+> tag with your name?
 
-On 11/08/15 10:15, Eric Auger wrote:
-> Hi Marc,
-> On 07/09/2015 03:19 PM, Marc Zyngier wrote:
->> So far, GICv2 has been used in with EOImode == 0. The effect of this
->> mode is to perform the priority drop and the deactivation of the
->> interrupt at the same time.
->>
->> While this works perfectly for Linux (we only have a single priority),
->> it causes issues when an interrupt is forwarded to a guest, and when
->> we want the guest to perform the EOI itself.
->>
->> For this case, the GIC architecture provides EOImode == 1, where:
->> - A write to the EOI register drops the priority of the interrupt and leaves
->> it active. Other interrupts at the same priority level can now be taken,
->> but the active interrupt cannot be taken again
->> - A write to the DIR marks the interrupt as inactive, meaning it can
->> now be taken again.
->>
->> We only enable this feature when booted in HYP mode and that
->> the device-tree reporte
-> reported
->  a suitable CPU interface. Observable behaviour
->> should remain unchanged.
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  drivers/irqchip/irq-gic.c       | 32 +++++++++++++++++++++++++++++---
->>  include/linux/irqchip/arm-gic.h |  4 ++++
->>  2 files changed, 33 insertions(+), 3 deletions(-)
->>
->> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
->> index 8d7e1c8..e264675 100644
->> --- a/drivers/irqchip/irq-gic.c
->> +++ b/drivers/irqchip/irq-gic.c
->> @@ -46,6 +46,7 @@
->>  #include <asm/irq.h>
->>  #include <asm/exception.h>
->>  #include <asm/smp_plat.h>
->> +#include <asm/virt.h>
->>  
->>  #include "irq-gic-common.h"
->>  #include "irqchip.h"
->> @@ -82,6 +83,8 @@ static DEFINE_RAW_SPINLOCK(irq_controller_lock);
->>  #define NR_GIC_CPU_IF 8
->>  static u8 gic_cpu_map[NR_GIC_CPU_IF] __read_mostly;
->>  
->> +static struct static_key supports_deactivate = STATIC_KEY_INIT_TRUE;
->> +
->>  #ifndef MAX_GIC_NR
->>  #define MAX_GIC_NR	1
->>  #endif
->> @@ -164,7 +167,10 @@ static void gic_unmask_irq(struct irq_data *d)
->>  
->>  static void gic_eoi_irq(struct irq_data *d)
->>  {
->> -	writel_relaxed(gic_irq(d), gic_cpu_base(d) + GIC_CPU_EOI);
->> +	if (static_key_true(&supports_deactivate))
->> +		writel_relaxed(gic_irq(d), gic_cpu_base(d) + GIC_CPU_DEACTIVATE);
->> +	else
->> +		writel_relaxed(gic_irq(d), gic_cpu_base(d) + GIC_CPU_EOI);
->>  }
->>  
->>  static int gic_irq_set_irqchip_state(struct irq_data *d,
->> @@ -272,11 +278,15 @@ static void __exception_irq_entry gic_handle_irq(struct pt_regs *regs)
->>  		irqnr = irqstat & GICC_IAR_INT_ID_MASK;
->>  
->>  		if (likely(irqnr > 15 && irqnr < 1021)) {
-> shouldn't we have < 1020?
+Yes
 
-Looks like you have unearthed a very long standing (though not fatal)
-bug - I can trace it back to 2005 and the inclusion of the Realview
-support (see include/asm-arm/arch-realview/entry-macro.S in 8ad68bbf for
-the details).
+> 
+> > This was on a calxeda highbank.
+> 
+> Any idea why this option was set?
 
-It may be that the original GIC didn't make number 1020 a special one,
-though the earliest spec I have access to (GICv1) is already making 1020
-a reserved interrupt number. And looking@the pre-existing code
-(arch/arm/common/gic.c), 1020 seems to already be considered an invalid
-number.
+None. It seems to have been there in the original fedora config
+for v7 kernels. But nothing in the config turns on CPU_FEROCEON
+so there is no real need for it.
 
-CC-ing Catalin, as he was the one who introduced it... ;-) Unless he
-says otherwise, I'll cook a patch for that.
-
->> +			if (static_key_true(&supports_deactivate))
->> +				writel_relaxed(irqstat, cpu_base + GIC_CPU_EOI);
->>  			handle_domain_irq(gic->domain, irqnr, regs);
-> why don't we handle the returned value of handle_domain_irq as we do in
-> GICv3?
-
-Because I wrote the GICv3 code with my paranoia hat on... This really
-should never fail.
-
->>  			continue;
->>  		}
->>  		if (irqnr < 16) {
->>  			writel_relaxed(irqstat, cpu_base + GIC_CPU_EOI);
->> +			if (static_key_true(&supports_deactivate))
->> +				writel_relaxed(irqstat, cpu_base + GIC_CPU_DEACTIVATE);
->>  #ifdef CONFIG_SMP
->>  			handle_IPI(irqnr, regs);
->>  #endif
->> @@ -358,7 +368,11 @@ static u8 gic_get_cpumask(struct gic_chip_data *gic)
->>  static void gic_cpu_if_up(void)
->>  {
->>  	void __iomem *cpu_base = gic_data_cpu_base(&gic_data[0]);
->> -	u32 bypass = 0;
->> +	u32 bypass;
->> +	u32 mode = 0;
->> +
->> +	if (static_key_true(&supports_deactivate))
->> +		mode = GIC_CPU_CTRL_EOImodeNS;
->>  
->>  	/*
->>  	* Preserve bypass disable bits to be written back later
->> @@ -366,7 +380,7 @@ static void gic_cpu_if_up(void)
->>  	bypass = readl(cpu_base + GIC_CPU_CTRL);
->>  	bypass &= GICC_DIS_BYPASS_MASK;
->>  
->> -	writel_relaxed(bypass | GICC_ENABLE, cpu_base + GIC_CPU_CTRL);
->> +	writel_relaxed(bypass | mode | GICC_ENABLE, cpu_base + GIC_CPU_CTRL);
->>  }
->>  
->>  
->> @@ -986,6 +1000,9 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
->>  		register_cpu_notifier(&gic_cpu_notifier);
->>  #endif
->>  		set_handle_irq(gic_handle_irq);
->> +		pr_info ("GIC: Using EOImode == %d\n",
->> +			 static_key_true(&supports_deactivate));
->> +
->>  	}
->>  
->>  	gic_dist_init(gic);
->> @@ -1001,6 +1018,7 @@ gic_of_init(struct device_node *node, struct device_node *parent)
->>  {
->>  	void __iomem *cpu_base;
->>  	void __iomem *dist_base;
->> +	struct resource cpu_res;
->>  	u32 percpu_offset;
->>  	int irq;
->>  
->> @@ -1013,6 +1031,11 @@ gic_of_init(struct device_node *node, struct device_node *parent)
->>  	cpu_base = of_iomap(node, 1);
->>  	WARN(!cpu_base, "unable to map gic cpu registers\n");
->>  
->> +	of_address_to_resource(node, 1, &cpu_res);
->> +	if (!gic_cnt &&
->> +	    (!is_hyp_mode_available() || resource_size(&cpu_res) < SZ_8K))
-> I don't understand why we check this size?
-> in GICv1 EOIMode necessarily is 0, right? is it related?
-
-This is indeed related. For a GIC to support EOIMode==1, you need to
-have access to the DIR register, which has the good idea of being
-located on a separate 4k page, making the size of the CPU interface 8k
-in total. Anything smaller means you don't have a DIR register.
-
-It is worth noticing that most of the DTS files containing a reference
-to GICv2 are wrong, and are only exposing a 4k CPU interface. These
-platforms won't be able to use this feature until they are fixed.
-Basically anything with an A7/A15/A53/A57/X-Gene.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> 
+> > With CONFIG_UACCESS_WITH_MEMCPY, the dd copy test reported 1.8GB/s
+> > Without CONFIG_UACCESS_WITH_MEMCPY, 2.1GB/s
+> 
+> Therefore this is of no benefit to you.
+> 
+> 
+> Nicolas
