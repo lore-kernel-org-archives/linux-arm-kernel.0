@@ -1,130 +1,79 @@
-From: jungseoklee85@gmail.com (Jungseok Lee)
-Date: Wed, 12 Aug 2015 14:16:19 +0000
-Subject: [PATCH] arm64: Add __exception_irq_entry definition for function graph
-Message-ID: <1439388979-1518-1-git-send-email-jungseoklee85@gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 12 Aug 2015 15:20:07 +0100
+Subject: [PATCH 5/6] irqchip: GICv3: Don't deactivate interrupts forwarded
+ to a guest
+In-Reply-To: <55C9C860.4020107@linaro.org>
+References: <1436447951-22357-1-git-send-email-marc.zyngier@arm.com>
+ <1436447951-22357-6-git-send-email-marc.zyngier@arm.com>
+ <55C9C860.4020107@linaro.org>
+Message-ID: <55CB5617.1030901@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The gic_handle_irq() is defined with __exception_irq_entry attribute.
-A single remaining work is to add its definition as ARM did. Below
-shows how function graph data is changed with these hunks.
+On 11/08/15 11:03, Eric Auger wrote:
+> On 07/09/2015 03:19 PM, Marc Zyngier wrote:
+>> Commit 0a4377de3056 ("genirq: Introduce irq_set_vcpu_affinity() to
+>> target an interrupt to a VCPU") added just what we needed at the
+>> lowest level to allow an interrupt to be deactivated by a guest.
+>>
+>> When such a request reaches the GIC, it knows it doesn't need to
+>> perform the deactivation anymore, and can safely leave the guest
+>> do its magic. This of course requires additional support in both
+>> VFIO and KVM.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  drivers/irqchip/irq-gic-v3.c | 29 +++++++++++++++++++++++++++--
+>>  1 file changed, 27 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+>> index e02592b..a1ca9e6 100644
+>> --- a/drivers/irqchip/irq-gic-v3.c
+>> +++ b/drivers/irqchip/irq-gic-v3.c
+>> @@ -70,6 +70,11 @@ static inline int gic_irq_in_rdist(struct irq_data *d)
+>>  	return gic_irq(d) < 32;
+>>  }
+>>  
+>> +static inline bool forwarded_irq(struct irq_data *d)
+>> +{
+>> +	return d->handler_data != NULL;
+>> +}
+>> +
+>>  static inline void __iomem *gic_dist_base(struct irq_data *d)
+>>  {
+>>  	if (gic_irq_in_rdist(d))	/* SGI+PPI -> SGI_base for this CPU */
+>> @@ -231,6 +236,12 @@ static void gic_poke_irq(struct irq_data *d, u32 offset)
+>>  static void gic_mask_irq(struct irq_data *d)
+>>  {
+>>  	gic_poke_irq(d, GICD_ICENABLER);
+>> +	/*
+>> +	 * When masking a forwarded interrupt, make sure it is
+>> +	 * deactivated as well.
+> To me it is not straightforward to understand why a forwarded IRQ would
+> need to be DIR'ed when masked. This is needed because of the disable_irq
+> optimisation, I would add a related comment.
+> 
 
-A prologue of an interrupt handler is drawn as follows.
+The lazy disable_irq is just an optimization.
 
-- current status
+The real reason is that if we mask an interrupt on the host, it is
+because we don't want the guest to process it at all. There is three cases:
 
- 0)   0.208 us    |  cpuidle_not_available();
- 0)               |  default_idle_call() {
- 0)               |    arch_cpu_idle() {
- 0)               |      __handle_domain_irq() {
- 0)               |        irq_enter() {
- 0)   0.313 us    |          rcu_irq_enter();
- 0)   0.261 us    |          __local_bh_disable_ip();
+1) The interrupt was inactive: no problem
+2) The interrupt was active, but not presented to the guest yet: no
+problem either. The interrupt will be taken again on unmask.
+3) The interrupt was active and presented to the guest: we might get a
+double deactivate, which shouldn't be a big deal (but mostly should not
+occur at all).
 
-- with this change
+Would something like this make sense?
 
- 0)   0.625 us    |  cpuidle_not_available();
- 0)               |  default_idle_call() {
- 0)               |    arch_cpu_idle() {
- 0)   ==========> |
- 0)               |      gic_handle_irq() {
- 0)               |        __handle_domain_irq() {
- 0)               |          irq_enter() {
- 0)   0.885 us    |            rcu_irq_enter();
- 0)   0.781 us    |            __local_bh_disable_ip();
+On a related note, I wonder if we need to mark the interrupt pending if
+it is configured as edge. Otherwise, we could loose an interrupt in case
+2 (mask, deactivate, unmask, oh look nothing triggers). Thoughts?
 
-An epilogue of an interrupt handler is recorded as follows.
+Thanks,
 
-- current status
-
- 0)   0.261 us    |          idle_cpu();
- 0)               |          rcu_irq_exit() {
- 0)   0.521 us    |            rcu_eqs_enter_common.isra.46();
- 0)   2.552 us    |          }
- 0) ! 322.448 us  |        }
- 0) ! 583.437 us  |      }
- 0) # 1656.041 us |    }
- 0) # 1658.073 us |  }
-
-- with this change
-
- 0)   0.677 us    |            idle_cpu();
- 0)               |            rcu_irq_exit() {
- 0)   1.770 us    |              rcu_eqs_enter_common.isra.46();
- 0)   7.968 us    |            }
- 0) # 1803.541 us |          }
- 0) # 2626.667 us |        }
- 0) # 2632.969 us |      }
- 0)   <========== |
- 0) # 14425.00 us |    }
- 0) # 14430.98 us |  }
-
-Cc: AKASHI Takahiro <takahiro.akashi@linaro.org>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Rabin Vincent <rabin@rab.in>
-Cc: Steven Rostedt <rostedt@goodmis.org>
-Signed-off-by: Jungseok Lee <jungseoklee85@gmail.com>
----
- arch/arm64/include/asm/exception.h |  6 +++++
- arch/arm64/include/asm/traps.h     | 23 ++++++++++++++++--
- 2 files changed, 27 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm64/include/asm/exception.h b/arch/arm64/include/asm/exception.h
-index 0303705..6cb7e1a 100644
---- a/arch/arm64/include/asm/exception.h
-+++ b/arch/arm64/include/asm/exception.h
-@@ -18,7 +18,13 @@
- #ifndef __ASM_EXCEPTION_H
- #define __ASM_EXCEPTION_H
- 
-+#include <linux/ftrace.h>
-+
- #define __exception	__attribute__((section(".exception.text")))
-+#ifdef CONFIG_FUNCTION_GRAPH_TRACER
-+#define __exception_irq_entry	__irq_entry
-+#else
- #define __exception_irq_entry	__exception
-+#endif
- 
- #endif	/* __ASM_EXCEPTION_H */
-diff --git a/arch/arm64/include/asm/traps.h b/arch/arm64/include/asm/traps.h
-index 232e4ba..0cc2f29 100644
---- a/arch/arm64/include/asm/traps.h
-+++ b/arch/arm64/include/asm/traps.h
-@@ -34,13 +34,32 @@ struct undef_hook {
- void register_undef_hook(struct undef_hook *hook);
- void unregister_undef_hook(struct undef_hook *hook);
- 
-+#ifdef CONFIG_FUNCTION_GRAPH_TRACER
-+static inline int __in_irqentry_text(unsigned long ptr)
-+{
-+	extern char __irqentry_text_start[];
-+	extern char __irqentry_text_end[];
-+
-+	return ptr >= (unsigned long)&__irqentry_text_start &&
-+	       ptr < (unsigned long)&__irqentry_text_end;
-+}
-+#else
-+static inline int __in_irqentry_text(unsigned long ptr)
-+{
-+	return 0;
-+}
-+#endif
-+
- static inline int in_exception_text(unsigned long ptr)
- {
- 	extern char __exception_text_start[];
- 	extern char __exception_text_end[];
-+	int in;
-+
-+	in = ptr >= (unsigned long)&__exception_text_start &&
-+	     ptr < (unsigned long)&__exception_text_end;
- 
--	return ptr >= (unsigned long)&__exception_text_start &&
--	       ptr < (unsigned long)&__exception_text_end;
-+	return in ? : __in_irqentry_text(ptr);
- }
- 
- #endif
+	M.
 -- 
-1.9.1
+Jazz is not dead. It just smells funny...
