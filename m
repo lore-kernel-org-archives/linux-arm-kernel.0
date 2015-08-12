@@ -1,97 +1,144 @@
-From: katsuki.uwatoko@toshiba.co.jp (katsuki.uwatoko at toshiba.co.jp)
-Date: Wed, 12 Aug 2015 00:56:25 +0000
-Subject: PROBLEM: XFS on ARM corruption 'Structure needs cleaning'
-In-Reply-To: <20150612225209.GA20262@dastard>
-References: <5579B804.9050707@skylable.com>
- <20150612122108.GB60661@bfoster.bfoster> <557AD4D4.3010901@skylable.com>
- <20150612225209.GA20262@dastard>
-Message-ID: <C6D0D499B56584katsuki.uwatoko@toshiba.co.jp>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 11 Aug 2015 20:07:50 -0500
+Subject: [PATCH] ARM: config: Switch PXA27x platforms to use PXA RTC driver
+In-Reply-To: <1437757375-9113-1-git-send-email-robh@kernel.org>
+References: <1437757375-9113-1-git-send-email-robh@kernel.org>
+Message-ID: <CAL_JsqKxUjg+zPJ=_Wvd+zTh7UuT=dkECEh=Hy7QdZsqn4B+8w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 13 Jun 2015 08:52:09 +1000, Dave Chinner wrote:
+On Fri, Jul 24, 2015 at 12:02 PM, Rob Herring <robh@kernel.org> wrote:
+> With the SA1100 and PXA RTC drivers be mutually exclusive and no
+> longer sharing hardware, PXA27x/PXA3xx platforms must use the PXA RTC
+> driver as the SA1100 platform device is no longer registered.
+>
+> This change should be almost transparent to userspace. Former users of
+> pxa-rtc should be aware that 2 RTCs will be available on their kernels,
+> rtc0 being sa1100-rtc and rtc1 being pxa-rtc. Any userspace relying on
+> the fact that rtc0 was pxa-rtc should be fixed.
+>
+> As a consequence:
+>  - the first reboot after the switch will have the wrong time,
+>  - on dual boot platform where the other OS programs some logic into the
+>    sa1100 rtc IP, a lack of fix in userspace, ie. a kernel changing
+>    sa1100-rtc thinking it is pxa-rtc could have dire consequence, such
+>    as wiping the other OS data partition.
+>
+> (Thanks to Robert Jarmik for help on the above commit text.)
+>
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> Cc: Robert Jarzmik <robert.jarzmik@free.fr>
+> Cc: Daniel Mack <daniel@zonque.org>
+> Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
+> Cc: Sergey Lapin <slapin@ossfans.org>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Mike Rapoport <mike@compulab.co.il>
+> Cc: Philipp Zabel <philipp.zabel@gmail.com>
+> ---
+> PXA Maintainers,
+>
+> This is dependent on my SA1100 RTC cleanup series[1]. Please comment on
+> this patch and that series. The full series is available from a git
+> branch here[2]. I've rebased it to 4.2-rc3, but otherwise there is no
+> change from v4.
 
-> Yup, that's looking like a toolchain bug. Thread about arm directory
-> read corruption:
+Any comments on this? If not, I plan to send Alexandre a pull request
+for this series this week.
 
-I think that this is not a toolchain bug, this is related to 
-Subject: [PATCH v2 1/1] ARM : missing corrupted reg in __do_div_asm
-http://www.spinics.net/lists/arm-kernel/msg426684.html
+Rob
 
---
-
-The problematic line in xfs is: 
-irecs->br_startblock = XFS_DADDR_TO_FSB(mp, mappedbno)
-in xfs_dabuf_map()/fs/xfs/xfs_da_btree.c.
-
-The expansion of it is: 
-
-  ld = mappedbno >> mp->m_blkbb_log;
-  do_div(ld, mp->m_sb.sb_agblocks);
-  startblock = ld << mp->m_sb.sb_agblklog;
-  ld = mappedbno >> mp->m_blkbb_log;
-  startblock |= do_div(ld, mp->m_sb.sb_agblocks);
-  irecs->br_startblock = startblock;
-
-The assembler of these are:
-
-:
-	bl	__do_div64
-	ldr	r1, [sp, #44]
-	subs	r3, r7, #32
-	orr	r1, r1, r2, lsr r5
-	add	r5, sp, #80
-	str	r5, [sp, #64]
-	ldr	r5, [sp, #60]
-	movpl	r1, r2, asl r3
-	mov	r2, r2, asl r7
-	str	r2, [sp, #40]
-	str	r1, [sp, #44]
-	mov	r1, r9
-	str	r5, [sp, #96]
-	mov	r7, #0
-	ldr	r2, [sp, #96]
-	mov	r5, #1
-	ldr	fp, [sp, #64]
-	str	r7, [sp, #84]
-	mov	r9, r2, asr #31
-	str	r7, [sp, #104]
-	bl	__do_div64
-:
-
-by GCC 4.7.2 with -O2 option.
-
-Because a result of do_div is stored in the 1st arg (r0),
-r0, which is "ld" in the C,  must be reloaded after the 1st call of do_div, before the 2nd call of do_div.
-But it is not reloaded in the above assembler.
-The problem is macro __do_div_asm, as the patch describes.
-
-I confirmed that the patch fixed this problem.
-
-	mov	r1, sl
-	str	r2, [sp, #56]
-	mov	r0, fp
-	bl	__do_div64
-	ldr	ip, [sp, #36]
-	rsb	r6, r5, #32
-	subs	r3, r5, #32
-	ldr	r1, [sp, #56]
-	orr	ip, ip, r2, lsr r6
-	str	r7, [sp, #96]
-	mov	r6, #1
-	str	r8, [sp, #80]
-	mov	r0, ip
-	str	r1, [sp, #52]
-	movpl	r0, r2, asl r3
-	mov	r2, r2, asl r5
-	str	r0, [sp, #36]
-	mov	r1, sl
-	str	r2, [sp, #32]
-	mov	r0, fp
-	bl	__do_div64
-
-by GCC 4.7.2 with -O2 option and the patch.
-
-Thank you,
--- 
-UWATOKO
+>
+> Rob
+>
+> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-June/349262.html
+> [2] git://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git marvell/rtc
+>
+>  arch/arm/configs/cm_x2xx_defconfig  | 2 +-
+>  arch/arm/configs/em_x270_defconfig  | 2 +-
+>  arch/arm/configs/magician_defconfig | 2 +-
+>  arch/arm/configs/palmz72_defconfig  | 2 +-
+>  arch/arm/configs/pcm027_defconfig   | 2 +-
+>  arch/arm/configs/trizeps4_defconfig | 2 +-
+>  6 files changed, 6 insertions(+), 6 deletions(-)
+>
+> diff --git a/arch/arm/configs/cm_x2xx_defconfig b/arch/arm/configs/cm_x2xx_defconfig
+> index dc01c04..3b32d5f 100644
+> --- a/arch/arm/configs/cm_x2xx_defconfig
+> +++ b/arch/arm/configs/cm_x2xx_defconfig
+> @@ -157,7 +157,7 @@ CONFIG_LEDS_TRIGGERS=y
+>  CONFIG_LEDS_TRIGGER_HEARTBEAT=y
+>  CONFIG_RTC_CLASS=y
+>  CONFIG_RTC_DRV_V3020=y
+> -CONFIG_RTC_DRV_SA1100=y
+> +CONFIG_RTC_DRV_PXA=y
+>  CONFIG_EXT2_FS=y
+>  CONFIG_EXT3_FS=y
+>  CONFIG_INOTIFY=y
+> diff --git a/arch/arm/configs/em_x270_defconfig b/arch/arm/configs/em_x270_defconfig
+> index 4560c9c..8e10df7 100644
+> --- a/arch/arm/configs/em_x270_defconfig
+> +++ b/arch/arm/configs/em_x270_defconfig
+> @@ -157,7 +157,7 @@ CONFIG_LEDS_TRIGGERS=y
+>  CONFIG_LEDS_TRIGGER_HEARTBEAT=y
+>  CONFIG_RTC_CLASS=y
+>  CONFIG_RTC_DRV_V3020=y
+> -CONFIG_RTC_DRV_SA1100=y
+> +CONFIG_RTC_DRV_PXA=y
+>  CONFIG_EXT2_FS=y
+>  CONFIG_EXT3_FS=y
+>  CONFIG_INOTIFY=y
+> diff --git a/arch/arm/configs/magician_defconfig b/arch/arm/configs/magician_defconfig
+> index 557dd29..a5b4920 100644
+> --- a/arch/arm/configs/magician_defconfig
+> +++ b/arch/arm/configs/magician_defconfig
+> @@ -150,7 +150,7 @@ CONFIG_LEDS_TRIGGERS=y
+>  CONFIG_LEDS_TRIGGER_BACKLIGHT=y
+>  CONFIG_RTC_CLASS=y
+>  CONFIG_RTC_DEBUG=y
+> -CONFIG_RTC_DRV_SA1100=y
+> +CONFIG_RTC_DRV_PXA=y
+>  CONFIG_EXT2_FS=y
+>  CONFIG_INOTIFY=y
+>  CONFIG_MSDOS_FS=m
+> diff --git a/arch/arm/configs/palmz72_defconfig b/arch/arm/configs/palmz72_defconfig
+> index 4baa83c..83c135e 100644
+> --- a/arch/arm/configs/palmz72_defconfig
+> +++ b/arch/arm/configs/palmz72_defconfig
+> @@ -67,7 +67,7 @@ CONFIG_MMC=y
+>  CONFIG_MMC_DEBUG=y
+>  CONFIG_MMC_PXA=y
+>  CONFIG_RTC_CLASS=y
+> -CONFIG_RTC_DRV_SA1100=y
+> +CONFIG_RTC_DRV_PXA=y
+>  CONFIG_EXT2_FS=y
+>  CONFIG_EXT3_FS=y
+>  # CONFIG_DNOTIFY is not set
+> diff --git a/arch/arm/configs/pcm027_defconfig b/arch/arm/configs/pcm027_defconfig
+> index 0a847d0..b5624e3 100644
+> --- a/arch/arm/configs/pcm027_defconfig
+> +++ b/arch/arm/configs/pcm027_defconfig
+> @@ -82,7 +82,7 @@ CONFIG_MMC=y
+>  CONFIG_MMC_PXA=y
+>  CONFIG_RTC_CLASS=y
+>  CONFIG_RTC_DRV_PCF8563=m
+> -CONFIG_RTC_DRV_SA1100=m
+> +CONFIG_RTC_DRV_PXA=m
+>  CONFIG_EXT2_FS=m
+>  CONFIG_EXT3_FS=m
+>  # CONFIG_DNOTIFY is not set
+> diff --git a/arch/arm/configs/trizeps4_defconfig b/arch/arm/configs/trizeps4_defconfig
+> index 932ee4e..4bc8700 100644
+> --- a/arch/arm/configs/trizeps4_defconfig
+> +++ b/arch/arm/configs/trizeps4_defconfig
+> @@ -177,7 +177,7 @@ CONFIG_NEW_LEDS=y
+>  CONFIG_RTC_CLASS=y
+>  # CONFIG_RTC_HCTOSYS is not set
+>  CONFIG_RTC_DRV_PCF8583=m
+> -CONFIG_RTC_DRV_SA1100=y
+> +CONFIG_RTC_DRV_PXA=y
+>  CONFIG_EXT2_FS=y
+>  CONFIG_EXT2_FS_XATTR=y
+>  CONFIG_EXT2_FS_POSIX_ACL=y
+> --
+> 2.1.0
+>
