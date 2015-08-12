@@ -1,38 +1,69 @@
-From: mike.looijmans@topic.nl (Mike Looijmans)
-Date: Wed, 12 Aug 2015 16:22:12 +0200
-Subject: [PATCH] pinctrl-zynq.c: Fix typos in smc0_nand_grp and smc0_nor_grp
-Message-ID: <1439389332-9373-1-git-send-email-mike.looijmans@topic.nl>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Wed, 12 Aug 2015 16:28:59 +0200
+Subject: [PATCH 3/6] irqchip: GICv3: Skip LPI deactivation
+In-Reply-To: <55CB4B82.9060601@arm.com>
+References: <1436447951-22357-1-git-send-email-marc.zyngier@arm.com>
+ <1436447951-22357-4-git-send-email-marc.zyngier@arm.com>
+ <55C9C39A.3060208@linaro.org> <55CB4B82.9060601@arm.com>
+Message-ID: <55CB582B.50007@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Group names should be smc0_nand_grp and smc0_nor_grp, otherwise you'll
-get errors like this if you try to pinmux them via the devicetree:
-zynq-pinctrl 700.pinctrl: invalid group "smc0_nand_grp" for function "smc0_nand"
+On 08/12/2015 03:34 PM, Marc Zyngier wrote:
+> On 11/08/15 10:42, Eric Auger wrote:
+>> On 07/09/2015 03:19 PM, Marc Zyngier wrote:
+>>> Contrary to other GICv3 interrupts, LPIs do not have an active state
+>>> by virtue of being edge-triggered only (they only have a pending state).
+>>>
+>>> Given this, there is no point trying to deactivate them, and we can
+>>> skip the ICC_DIR_EL1 entierely.
+>>>
+>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>> ---
+>>>  drivers/irqchip/irq-gic-v3.c | 8 ++++++--
+>>>  1 file changed, 6 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+>>> index 49768fc..e02592b 100644
+>>> --- a/drivers/irqchip/irq-gic-v3.c
+>>> +++ b/drivers/irqchip/irq-gic-v3.c
+>>> @@ -295,10 +295,14 @@ static int gic_irq_get_irqchip_state(struct irq_data *d,
+>>>  
+>>>  static void gic_eoi_irq(struct irq_data *d)
+>>>  {
+>>> -	if (static_key_true(&supports_deactivate))
+>>> +	if (static_key_true(&supports_deactivate)) {
+>>> +		/* No need to deactivate an LPI */
+>>> +		if (gic_irq(d) >= 8192)
+>> In case of EOIMode == 0, we do not call EOI. I can't understand whether
+>> it is an issue.
+> 
+> What do you mean? We definitely perform an EOI in both EOImodes...
+> 
+>> In 4.8.3 Properties of LPI, in 2d note it is written:
+>>
+>> "SW must issue a write to EOI to clear the active priorities register,
+>> hence the CPU interface still requires an active state for LPIs, even
+>> through this is not necessary within the redistributor"
+>>
+>> Eric
+>>> +			return;
+>>>  		gic_write_dir(gic_irq(d));
+>>> -	else
+>>> +	} else {
+>>>  		gic_write_eoir(gic_irq(d));
+> 
+> ... right here.
+> 
+> Of am I missing something completely obvious?
+yes sorry please forget this. I think I meant EOImode == 1 instead and
+anyway the EOI is done in gic_handle_irq.
 
-Probably a typo while creating these tables.
+Apologies
 
-Signed-off-by: Mike Looijmans <mike.looijmans@topic.nl>
-Acked-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
----
- drivers/pinctrl/pinctrl-zynq.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/pinctrl/pinctrl-zynq.c b/drivers/pinctrl/pinctrl-zynq.c
-index 7ce23b6..5aafea8 100644
---- a/drivers/pinctrl/pinctrl-zynq.c
-+++ b/drivers/pinctrl/pinctrl-zynq.c
-@@ -706,10 +706,10 @@ static const char * const sdio1_wp_groups[] = {"gpio0_0_grp",
- 		"gpio0_39_grp", "gpio0_41_grp", "gpio0_43_grp",
- 		"gpio0_45_grp", "gpio0_47_grp", "gpio0_49_grp",
- 		"gpio0_51_grp", "gpio0_53_grp", "sdio1_emio_wp_grp"};
--static const char * const smc0_nor_groups[] = {"smc0_nor"};
-+static const char * const smc0_nor_groups[] = {"smc0_nor_grp"};
- static const char * const smc0_nor_cs1_groups[] = {"smc0_nor_cs1_grp"};
- static const char * const smc0_nor_addr25_groups[] = {"smc0_nor_addr25_grp"};
--static const char * const smc0_nand_groups[] = {"smc0_nand"};
-+static const char * const smc0_nand_groups[] = {"smc0_nand_grp"};
- static const char * const can0_groups[] = {"can0_0_grp", "can0_1_grp",
- 		"can0_2_grp", "can0_3_grp", "can0_4_grp", "can0_5_grp",
- 		"can0_6_grp", "can0_7_grp", "can0_8_grp", "can0_9_grp",
--- 
-1.9.1
+Eric
+> 
+> Thanks,
+> 
+> 	M.
+> 
