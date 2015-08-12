@@ -1,34 +1,59 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Wed, 12 Aug 2015 09:32:40 +0800
-Subject: [PATCH v2 2/2] i2c: mediatek: Fixup i2c ack error interrupt
- handling
-In-Reply-To: <20150811145521.GB1525@katana>
-References: <1438845731-17805-1-git-send-email-eddie.huang@mediatek.com>
- <1438845731-17805-3-git-send-email-eddie.huang@mediatek.com>
- <20150811145521.GB1525@katana>
-Message-ID: <CAGS+omBrDWd7hwn=0qYBLK=6L-hORwrKQ9ecL4k3wSSGEPZ64g@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 11 Aug 2015 18:36:50 -0700
+Subject: [PATCH 1/2] ARM: dts: vexpress: Use assigned-clock-parents for sp810
+Message-ID: <1439343411-29168-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolfram,
+The sp810 clk driver is calling the clk consumer APIs from
+clk_prepare ops to change the parent to a 1 MHz fixed rate clock
+for each of the clocks that the driver provides. Use
+assigned-clock-parents for this instead of doing it in the driver
+to avoid using the consumer API in provider code. This also
+allows us to remove the usage of clk provider APIs that take a
+struct clk as an argument from the sp810 driver.
 
-On Tue, Aug 11, 2015 at 10:55 PM, Wolfram Sang <wsa@the-dreams.de> wrote:
-> On Thu, Aug 06, 2015 at 03:22:11PM +0800, Eddie Huang wrote:
->> When occur i2c ack error, i2c controller generate two interrupts,
->> first is the ack error interrupt, then the complete interrupt.
->> i2c interrupt handler should keep the two interrupt value, and only
->> call complete() for the complete interrupt.
->>
->> Signed-off-by: Liguo Zhang <liguo.zhang@mediatek.com>
->> Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
->
-> Applied to for-next, thanks!
+Cc: Pawel Moll <pawel.moll@arm.com>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Tested-by: Sudeep Holla <sudeep.holla@arm.com>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
 
-I don't see them in [0].
-[0] https://git.kernel.org/cgit/linux/kernel/git/wsa/linux.git/log/?h=i2c/for-next
+This came out of a larger series to change this binding[1]. This
+patch can go through arm-soc independently though, so please apply.
 
-Am I not looking in the right place?
-Or, did I not wait long enough?
+[1] http://lkml.kernel.org/r/1438386285-5070-1-git-send-email-sboyd at codeaurora.org
 
-Thanks!
--Dan
+ arch/arm/boot/dts/vexpress-v2m-rs1.dtsi | 2 ++
+ arch/arm/boot/dts/vexpress-v2m.dtsi     | 2 ++
+ 2 files changed, 4 insertions(+)
+
+diff --git a/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi b/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
+index 2efb2058ba49..21b02874bea3 100644
+--- a/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
++++ b/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
+@@ -101,6 +101,8 @@
+ 				clock-names = "refclk", "timclk", "apb_pclk";
+ 				#clock-cells = <1>;
+ 				clock-output-names = "timerclken0", "timerclken1", "timerclken2", "timerclken3";
++				assigned-clocks = <&v2m_sysctl 0>, <&v2m_sysctl 1>, <&v2m_sysctl 3>, <&v2m_sysctl 3>;
++				assigned-clock-parents = <&v2m_refclk1mhz>, <&v2m_refclk1mhz>, <&v2m_refclk1mhz>, <&v2m_refclk1mhz>;
+ 			};
+ 
+ 			/* PCI-E I2C bus */
+diff --git a/arch/arm/boot/dts/vexpress-v2m.dtsi b/arch/arm/boot/dts/vexpress-v2m.dtsi
+index cb3090f919a7..e712c0af149b 100644
+--- a/arch/arm/boot/dts/vexpress-v2m.dtsi
++++ b/arch/arm/boot/dts/vexpress-v2m.dtsi
+@@ -100,6 +100,8 @@
+ 				clock-names = "refclk", "timclk", "apb_pclk";
+ 				#clock-cells = <1>;
+ 				clock-output-names = "timerclken0", "timerclken1", "timerclken2", "timerclken3";
++				assigned-clocks = <&v2m_sysctl 0>, <&v2m_sysctl 1>, <&v2m_sysctl 3>, <&v2m_sysctl 3>;
++				assigned-clock-parents = <&v2m_refclk1mhz>, <&v2m_refclk1mhz>, <&v2m_refclk1mhz>, <&v2m_refclk1mhz>;
+ 			};
+ 
+ 			/* PCI-E I2C bus */
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
