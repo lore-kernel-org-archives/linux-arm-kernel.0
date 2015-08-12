@@ -1,54 +1,42 @@
 From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Wed, 12 Aug 2015 16:51:30 -0500
-Subject: [PATCH 3/3] Add ACPI bindings for the EHCI platform driver.
+Date: Wed, 12 Aug 2015 16:51:28 -0500
+Subject: [PATCH 1/3] Honor ACPI _CCA attribute setting
 In-Reply-To: <1439416290-21228-1-git-send-email-jeremy.linton@arm.com>
 References: <1439416290-21228-1-git-send-email-jeremy.linton@arm.com>
-Message-ID: <1439416290-21228-4-git-send-email-jeremy.linton@arm.com>
+Message-ID: <1439416290-21228-2-git-send-email-jeremy.linton@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This enables USB on the ARM juno board when booted with
-an ACPI kernel. The PNP id comes from the PNP/ACPI registry
-and describes a EHCI controller without debug.
+ACPI configurations can now mark devices as noncoherent,
+support that choice.
 
 Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
 ---
- drivers/usb/host/ehci-platform.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ include/acpi/acpi_bus.h | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/usb/host/ehci-platform.c b/drivers/usb/host/ehci-platform.c
-index 82e396f..1807baa 100644
---- a/drivers/usb/host/ehci-platform.c
-+++ b/drivers/usb/host/ehci-platform.c
-@@ -27,6 +27,7 @@
- #include <linux/io.h>
- #include <linux/module.h>
- #include <linux/of.h>
-+#include <linux/acpi.h>
- #include <linux/phy/phy.h>
- #include <linux/platform_device.h>
- #include <linux/reset.h>
-@@ -382,6 +383,13 @@ static const struct of_device_id vt8500_ehci_ids[] = {
- };
- MODULE_DEVICE_TABLE(of, vt8500_ehci_ids);
- 
-+static const struct acpi_device_id ehci_acpi_match[] = {
-+	{ "PNP0D20", 0 },
-+	{ }
-+};
-+MODULE_DEVICE_TABLE(acpi, ehci_acpi_match);
-+
-+
- static const struct platform_device_id ehci_platform_table[] = {
- 	{ "ehci-platform", 0 },
- 	{ }
-@@ -400,6 +408,7 @@ static struct platform_driver ehci_platform_driver = {
- 		.name	= "ehci-platform",
- 		.pm	= &ehci_platform_pm_ops,
- 		.of_match_table = vt8500_ehci_ids,
-+		.acpi_match_table = ACPI_PTR(ehci_acpi_match),
- 	}
- };
- 
+diff --git a/include/acpi/acpi_bus.h b/include/acpi/acpi_bus.h
+index 83061ca..7ecb8e4 100644
+--- a/include/acpi/acpi_bus.h
++++ b/include/acpi/acpi_bus.h
+@@ -399,7 +399,7 @@ static inline bool acpi_check_dma(struct acpi_device *adev, bool *coherent)
+ 	 * case 1. Do not support and disable DMA.
+ 	 * case 2. Support but rely on arch-specific cache maintenance for
+ 	 *         non-coherence DMA operations.
+-	 * Currently, we implement case 1 above.
++	 * Currently, we implement case 2 above.
+ 	 *
+ 	 * For the case when _CCA is missing (i.e. cca_seen=0) and
+ 	 * platform specifies ACPI_CCA_REQUIRED, we do not support DMA,
+@@ -407,7 +407,8 @@ static inline bool acpi_check_dma(struct acpi_device *adev, bool *coherent)
+ 	 *
+ 	 * See acpi_init_coherency() for more info.
+ 	 */
+-	if (adev->flags.coherent_dma) {
++	if (adev->flags.coherent_dma ||
++	    (adev->flags.cca_seen && IS_ENABLED(CONFIG_ARM64))) {
+ 		ret = true;
+ 		if (coherent)
+ 			*coherent = adev->flags.coherent_dma;
 -- 
 2.4.3
