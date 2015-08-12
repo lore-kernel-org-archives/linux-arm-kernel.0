@@ -1,85 +1,119 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Wed, 12 Aug 2015 14:26:34 +0200
-Subject: [PATCH v2 04/15] KVM: arm/arm64: extend arch CAP checks to allow
- per-VM capabilities
-In-Reply-To: <1436538111-4294-5-git-send-email-andre.przywara@arm.com>
-References: <1436538111-4294-1-git-send-email-andre.przywara@arm.com>
- <1436538111-4294-5-git-send-email-andre.przywara@arm.com>
-Message-ID: <55CB3B7A.3070300@linaro.org>
+From: yong.wu@mediatek.com (Yong Wu)
+Date: Wed, 12 Aug 2015 20:28:08 +0800
+Subject: [PATCH v4 5/6] iommu/mediatek: Add mt8173 IOMMU driver
+In-Reply-To: <20150811153947.GF14980@8bytes.org>
+References: <1438597279-2937-1-git-send-email-yong.wu@mediatek.com>
+ <1438597279-2937-6-git-send-email-yong.wu@mediatek.com>
+ <20150811153947.GF14980@8bytes.org>
+Message-ID: <1439382488.7382.23.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reviewed-by: Eric Auger <eric.auger@linaro.org>
-
-Best Regards
-
-Eric
-
-On 07/10/2015 04:21 PM, Andre Przywara wrote:
-> KVM capabilities can be a per-VM property, though ARM/ARM64 currently
-> does not pass on the VM pointer to the architecture specific
-> capability handlers.
-> Add a "struct kvm*" parameter to those function to later allow proper
-> per-VM capability reporting.
+On Tue, 2015-08-11 at 17:39 +0200, Joerg Roedel wrote:
+> On Mon, Aug 03, 2015 at 06:21:18PM +0800, Yong Wu wrote:
+> > +/*
+> > + * There is only one iommu domain called the m4u domain that
+> > + * all Multimedia modules share.
+> > + */
+> > +static struct mtk_iommu_domain	*m4udom;
 > 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
->  arch/arm/include/asm/kvm_host.h   | 2 +-
->  arch/arm/kvm/arm.c                | 2 +-
->  arch/arm64/include/asm/kvm_host.h | 2 +-
->  arch/arm64/kvm/reset.c            | 2 +-
->  4 files changed, 4 insertions(+), 4 deletions(-)
+> What is the reason you only implement one domain? Can't the IOMMU
+> isolate different devices from each other?
+Hi Joerg,
+
+  Thanks for your review.
+  From your comment, you may care that we use only one domain.
+
+  Our HW is called m4u(MultiMedia Memory Management Unit) which
+help all the multimedia hardware access the dram, include display,video
+decode,video encode,camera,mdp,etc. And the m4u has only one pagetable.
+(Actually there is two pagetables in m4u, one is the normal pagetable,
+the other is security pagetable. Currently We don't implement the
+security one, so there is only one pagetable here.)
+That is to say all the multimedia devices are in the m4u domain and
+share the m4u?s pagetable.
+
+So We have only one domain here..
+
+> > +static struct iommu_domain *mtk_iommu_domain_alloc(unsigned type)
+> > +{
+> > +	struct mtk_iommu_domain *priv;
+> > +
+> > +	if (type != IOMMU_DOMAIN_UNMANAGED && type != IOMMU_DOMAIN_DMA)
+> > +		return NULL;
+> > +
+> > +	if (m4udom)/* The m4u domain exist. */
+> > +		return &m4udom->domain;
 > 
-> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-> index e896d2c..56cac05 100644
-> --- a/arch/arm/include/asm/kvm_host.h
-> +++ b/arch/arm/include/asm/kvm_host.h
-> @@ -213,7 +213,7 @@ static inline void __cpu_init_hyp_mode(phys_addr_t boot_pgd_ptr,
->  	kvm_call_hyp((void*)hyp_stack_ptr, vector_ptr, pgd_ptr);
->  }
->  
-> -static inline int kvm_arch_dev_ioctl_check_extension(long ext)
-> +static inline int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
->  {
->  	return 0;
->  }
-> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> index bc738d2..7c65353 100644
-> --- a/arch/arm/kvm/arm.c
-> +++ b/arch/arm/kvm/arm.c
-> @@ -196,7 +196,7 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
->  		r = KVM_MAX_VCPUS;
->  		break;
->  	default:
-> -		r = kvm_arch_dev_ioctl_check_extension(ext);
-> +		r = kvm_arch_dev_ioctl_check_extension(kvm, ext);
->  		break;
->  	}
->  	return r;
-> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> index 2709db2..8d78a72 100644
-> --- a/arch/arm64/include/asm/kvm_host.h
-> +++ b/arch/arm64/include/asm/kvm_host.h
-> @@ -47,7 +47,7 @@
->  
->  int __attribute_const__ kvm_target_cpu(void);
->  int kvm_reset_vcpu(struct kvm_vcpu *vcpu);
-> -int kvm_arch_dev_ioctl_check_extension(long ext);
-> +int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext);
->  
->  struct kvm_arch {
->  	/* The VMID generation used for the virt. memory system */
-> diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
-> index 0b43265..866502b 100644
-> --- a/arch/arm64/kvm/reset.c
-> +++ b/arch/arm64/kvm/reset.c
-> @@ -56,7 +56,7 @@ static bool cpu_has_32bit_el1(void)
->  	return !!(pfr0 & 0x20);
->  }
->  
-> -int kvm_arch_dev_ioctl_check_extension(long ext)
-> +int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
->  {
->  	int r;
->  
+> This is not going to work. If you always return the same domain the
+> iommu core might re-initialize domain state (and overwrite changed
+> state). At the moment this is only the domain-type which will change
+> every time this function is called, but there might be more.
+
+In our v3[1],  I didn't return the same domain, Then I have to trick in
+attach_device like below:
+//============
+static int mtk_iommu_attach_device(struct iommu_domain *domain,
+                                  struct device *dev)
+{
+        struct device *imudev = xxxx;
+        /*
+         * Reserve one iommu domain as the m4u domain which
+         * all Multimedia modules share and free the others.
+         */
+        if (!imudev->archdata.iommu)
+               imudev->archdata.iommu = priv;
+        else if (imudev->archdata.iommu != priv)
+               iommu_domain_free(domain);
+        xxxx
+}
+//==============
+In this version, I used a global variable to record the m4u domain then
+I can delete these code and make it simple.
+
+Then how should I do in our case? .
+If we can't return the same domain here, We have to add some code like
+above in the attach_device.
+
+[1]:http://lists.linuxfoundation.org/pipermail/iommu/2015-July/013631.html
+ 
+> 
+> > +static int mtk_iommu_add_device(struct device *dev)
+> > +{
+> > +	struct iommu_group *group;
+> > +	int ret;
+> > +
+> > +	if (!dev->archdata.iommu) /* Not a iommu client device */
+> > +		return -ENODEV;
+> > +
+> > +	group = iommu_group_get(dev);
+> > +	if (!group) {
+> > +		group = iommu_group_alloc();
+> > +		if (IS_ERR(group)) {
+> > +			dev_err(dev, "Failed to allocate IOMMU group\n");
+> > +			return PTR_ERR(group);
+> > +		}
+> > +	}
+> > +
+> > +	ret = iommu_group_add_device(group, dev);
+> > +	if (ret) {
+> > +		dev_err(dev, "Failed to add IOMMU group\n");
+> > +		goto err_group_put;
+> > +	}
+> > +
+> > +	ret = iommu_attach_group(&m4udom->domain, group);
+> > +	if (ret)
+> > +		dev_err(dev, "Failed to attach IOMMU group\n");
+> > +
+> > +err_group_put:
+> > +	iommu_group_put(group);
+> > +	return ret;
+> > +}
+> 
+> Putting every device into its own group indicates that the IOMMU can
+> isolate between single devices on the bus, which makes it even more
+> questionable that you only allow one domain for the whole driver.
+> 
+> 
+> 	Joerg
 > 
