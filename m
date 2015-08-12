@@ -1,51 +1,63 @@
-From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Wed, 12 Aug 2015 13:18:55 -0700
-Subject: [PATCH 5/9] clk: qcom: gcc-msm8960: add child devices support.
-In-Reply-To: <20150811224902.GO2839@codeaurora.org>
-References: <1436348838-22671-1-git-send-email-rnayak@codeaurora.org>
- <1436348838-22671-6-git-send-email-rnayak@codeaurora.org>
- <20150811224902.GO2839@codeaurora.org>
-Message-ID: <20150812201855.GF13472@usrtlx11787.corpusers.net>
+From: john.stultz@linaro.org (John Stultz)
+Date: Wed, 12 Aug 2015 13:00:53 -0700
+Subject: [PATCH 2/2] arm64: VDSO: fix coarse clock monotonicity regression
+In-Reply-To: <1438999403-5770-3-git-send-email-nathan_lynch@mentor.com>
+References: <1438999403-5770-1-git-send-email-nathan_lynch@mentor.com>
+ <1438999403-5770-3-git-send-email-nathan_lynch@mentor.com>
+Message-ID: <CALAqxLVt43ntH04FJCTXujhtNQ8KAOcTSfyZ5TnKs=R7m2grNA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 11 Aug 15:49 PDT 2015, Stephen Boyd wrote:
+On Fri, Aug 7, 2015 at 7:03 PM, Nathan Lynch <nathan_lynch@mentor.com> wrote:
+> Since 906c55579a63 ("timekeeping: Copy the shadow-timekeeper over the
+> real timekeeper last") it has become possible on arm64 to:
+>
+> - Obtain a CLOCK_MONOTONIC_COARSE or CLOCK_REALTIME_COARSE timestamp
+>   via syscall.
+> - Subsequently obtain a timestamp for the same clock ID via VDSO which
+>   predates the first timestamp (by one jiffy).
+>
+> This is because arm64's update_vsyscall is deriving the coarse time
+> using the __current_kernel_time interface, when it should really be
+> using the timekeeper object provided to it by the timekeeping core.
+> It happened to work before only because __current_kernel_time would
+> access the same timekeeper object which had been passed to
+> update_vsyscall.  This is no longer the case.
+>
+> Signed-off-by: Nathan Lynch <nathan_lynch@mentor.com>
+> ---
+>  arch/arm64/kernel/vdso.c | 7 +++----
+>  1 file changed, 3 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/arm64/kernel/vdso.c b/arch/arm64/kernel/vdso.c
+> index ec37ab3f524f..97bc68f4c689 100644
+> --- a/arch/arm64/kernel/vdso.c
+> +++ b/arch/arm64/kernel/vdso.c
+> @@ -199,16 +199,15 @@ int arch_setup_additional_pages(struct linux_binprm *bprm,
+>   */
+>  void update_vsyscall(struct timekeeper *tk)
+>  {
+> -       struct timespec xtime_coarse;
+>         u32 use_syscall = strcmp(tk->tkr_mono.clock->name, "arch_sys_counter");
+>
+>         ++vdso_data->tb_seq_count;
+>         smp_wmb();
+>
+> -       xtime_coarse = __current_kernel_time();
+>         vdso_data->use_syscall                  = use_syscall;
+> -       vdso_data->xtime_coarse_sec             = xtime_coarse.tv_sec;
+> -       vdso_data->xtime_coarse_nsec            = xtime_coarse.tv_nsec;
+> +       vdso_data->xtime_coarse_sec             = tk->xtime_sec;
+> +       vdso_data->xtime_coarse_nsec            = tk->tkr_mono.xtime_nsec >>
+> +                                                       tk->tkr_mono.shift;
+>         vdso_data->wtm_clock_sec                = tk->wall_to_monotonic.tv_sec;
+>         vdso_data->wtm_clock_nsec               = tk->wall_to_monotonic.tv_nsec;
+>
 
-> On 07/08, Rajendra Nayak wrote:
-> > diff --git a/drivers/clk/qcom/gcc-msm8960.c b/drivers/clk/qcom/gcc-msm8960.c
-> > index eb6a4f9..2c80d03 100644
-> > --- a/drivers/clk/qcom/gcc-msm8960.c
-> > +++ b/drivers/clk/qcom/gcc-msm8960.c
-> > @@ -15,6 +15,7 @@
-> >  #include <linux/bitops.h>
-> >  #include <linux/err.h>
-> >  #include <linux/platform_device.h>
-> > +#include <linux/of_platform.h>
-> >  #include <linux/module.h>
-> >  #include <linux/of.h>
-> >  #include <linux/of_device.h>
-> > @@ -3520,7 +3521,8 @@ static int gcc_msm8960_probe(struct platform_device *pdev)
-> >  	if (IS_ERR(clk))
-> >  		return PTR_ERR(clk);
-> >  
-> > -	return qcom_cc_probe(pdev, match->data);
-> > +	qcom_cc_probe(pdev, match->data);
-> > +	return of_platform_populate(pdev->dev.of_node, NULL, NULL, &pdev->dev);
-> 
-> We just lost the error code from qcom_cc_probe()...
-> 
-> Also, I don't like having a subnode in DT. Why can't we use the
-> same node as the GCC node and create a virtual child device here
-> for tsens? We can assign the same of_node that this platform
-> device has so that DT keeps working correctly.
-> 
+(Sorry for the slow response, I've been out on vacation).
 
-Can't we make the gcc driver support being a child of a simple-mfd by
-having it attempting to acquire the regmap of the parent and falling
-back to creating its own mmio regmap?
+If its worth anything now:
+Acked-by: John Stultz <john.stultz@linaro.org>
 
-That way we don't need to make tsense a child of the clock device and
-we're still backwards compatible.
-
-Regards,
-Bjorn
+thanks
+-john
