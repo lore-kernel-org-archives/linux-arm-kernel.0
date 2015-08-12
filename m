@@ -1,33 +1,56 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Wed, 12 Aug 2015 12:12:33 +0200
-Subject: [PATCH 08/20] regmap: Fix regmap_can_raw_write check
+Date: Wed, 12 Aug 2015 12:12:34 +0200
+Subject: [PATCH 09/20] regmap: _regmap_raw_write fix for busses without write()
 In-Reply-To: <1439374365-20623-1-git-send-email-mpa@pengutronix.de>
 References: <1439374365-20623-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1439374365-20623-9-git-send-email-mpa@pengutronix.de>
+Message-ID: <1439374365-20623-10-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This function is missing a check if map->bus->write is implemented. If
-it is not implemented arbitrary raw writes are not possible.
+Some busses don't have a write() function defined. However we can use
+reg_write() in special cases.
+
+This patch adds support for reg_write() and throws errors if it was
+unsuccessful.
 
 Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 ---
- drivers/base/regmap/regmap.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ drivers/base/regmap/regmap.c | 9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/base/regmap/regmap.c b/drivers/base/regmap/regmap.c
-index 35ad3783da70..510dab052a95 100644
+index 510dab052a95..78eb96288a68 100644
 --- a/drivers/base/regmap/regmap.c
 +++ b/drivers/base/regmap/regmap.c
-@@ -1382,7 +1382,8 @@ int _regmap_raw_write(struct regmap *map, unsigned int reg,
-  */
- bool regmap_can_raw_write(struct regmap *map)
- {
--	return map->bus && map->format.format_val && map->format.format_reg;
-+	return map->bus && map->bus->write && map->format.format_val &&
-+		map->format.format_reg;
- }
- EXPORT_SYMBOL_GPL(regmap_can_raw_write);
+@@ -1229,6 +1229,11 @@ int _regmap_raw_write(struct regmap *map, unsigned int reg,
+ 		}
+ 	}
  
++	if (!map->bus->write && val_len == map->format.val_bytes) {
++		ret = _regmap_bus_reg_write(map, reg, *(unsigned int *)val);
++		return ret;
++	}
++
+ 	range = _regmap_range_lookup(map, reg);
+ 	if (range) {
+ 		int val_num = val_len / map->format.val_bytes;
+@@ -1340,7 +1345,7 @@ int _regmap_raw_write(struct regmap *map, unsigned int reg,
+ 	 * send the work_buf directly, otherwise try to do a gather
+ 	 * write.
+ 	 */
+-	if (val == work_val) {
++	if (val == work_val && map->bus->write) {
+ 		ret = map->bus->write(map->bus_context, map->work_buf,
+ 				      map->format.reg_bytes +
+ 				      map->format.pad_bytes +
+@@ -1354,7 +1359,7 @@ int _regmap_raw_write(struct regmap *map, unsigned int reg,
+ 						     val, val_len);
+ 
+ 		/* If that didn't work fall back on linearising by hand. */
+-		if (ret == -ENOTSUPP) {
++		if (ret == -ENOTSUPP && map->bus->write) {
+ 			len = map->format.reg_bytes + map->format.pad_bytes +
+ 				val_len;
+ 			buf = kzalloc(len, GFP_KERNEL);
 -- 
 2.4.6
