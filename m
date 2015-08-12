@@ -1,88 +1,36 @@
-From: michal.suchanek@ruk.cuni.cz (michal.suchanek at ruk.cuni.cz)
-Date: 12 Aug 2015 12:23:10 -0000
-Subject: [PATCH resend 1/3] mmc: sunxi: fix timeout in sunxi_mmc_oclk_onoff
-In-Reply-To: <cover.1439381423.git.hramrach@gmail.com>
-References: <cover.1439381423.git.hramrach@gmail.com>
-Message-ID: <7f9c6f99b31702c02436ef3356b3ebffa4754260.1439381423.git.hramrach@gmail.com>
+From: horia.geanta@freescale.com (=?UTF-8?q?Horia=20Geant=C4=83?=)
+Date: Wed, 12 Aug 2015 15:24:35 +0300
+Subject: [PATCH] arm64: add ioread64be and iowrite64be macros
+Message-ID: <1439382275-21678-1-git-send-email-horia.geanta@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The 250ms timeout is too short.
-
-On my system enabling the oclk takes under 50ms and disabling slightly
-over 100ms when idle. Under load disabling the clock can take over
-350ms.
-
-This does not make mmc clock gating look like good option to have on
-sunxi but the system should not crash with mmc clock gating enabled
-nonetheless.
-
-This patch sets the timeout to 750ms and adds debug prints which show
-how long enabling/disabling the clock took so more data can be collected
-from other systems.
-
-Signed-off-by: Michal Suchanek <hramrach@gmail.com>
-
---
-
- - fix formatting
+Signed-off-by: Alex Porosanu <alexandru.porosanu@freescale.com>
+Signed-off-by: Horia Geant? <horia.geanta@freescale.com>
 ---
- drivers/mmc/host/sunxi-mmc.c | 22 +++++++++++++++++++---
- 1 file changed, 19 insertions(+), 3 deletions(-)
+ arch/arm64/include/asm/io.h | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-index 4d3e1ff..f808a02 100644
---- a/drivers/mmc/host/sunxi-mmc.c
-+++ b/drivers/mmc/host/sunxi-mmc.c
-@@ -595,7 +595,7 @@ static irqreturn_t sunxi_mmc_handle_manual_stop(int irq, void *dev_id)
+diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
+index 44be1e03ed65..9b6e408cfa51 100644
+--- a/arch/arm64/include/asm/io.h
++++ b/arch/arm64/include/asm/io.h
+@@ -174,13 +174,15 @@ extern void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size);
+ #define iounmap				__iounmap
  
- static int sunxi_mmc_oclk_onoff(struct sunxi_mmc_host *host, u32 oclk_en)
- {
--	unsigned long expire = jiffies + msecs_to_jiffies(250);
-+	unsigned long start, end;
- 	u32 rval;
+ /*
+- * io{read,write}{16,32}be() macros
++ * io{read,write}{16,32,64}be() macros
+  */
+ #define ioread16be(p)		({ __u16 __v = be16_to_cpu((__force __be16)__raw_readw(p)); __iormb(); __v; })
+ #define ioread32be(p)		({ __u32 __v = be32_to_cpu((__force __be32)__raw_readl(p)); __iormb(); __v; })
++#define ioread64be(p)		({ __u64 __v = be64_to_cpu((__force __be64)__raw_readq(p)); __iormb(); __v; })
  
- 	rval = mmc_readl(host, REG_CLKCR);
-@@ -604,6 +604,8 @@ static int sunxi_mmc_oclk_onoff(struct sunxi_mmc_host *host, u32 oclk_en)
- 	if (oclk_en)
- 		rval |= SDXC_CARD_CLOCK_ON;
+ #define iowrite16be(v,p)	({ __iowmb(); __raw_writew((__force __u16)cpu_to_be16(v), p); })
+ #define iowrite32be(v,p)	({ __iowmb(); __raw_writel((__force __u32)cpu_to_be32(v), p); })
++#define iowrite64be(v,p)	({ __iowmb(); __raw_writeq((__force __u64)cpu_to_be64(v), p); })
  
-+	start = jiffies;
-+	end = start + msecs_to_jiffies(750);
- 	mmc_writel(host, REG_CLKCR, rval);
- 
- 	rval = SDXC_START | SDXC_UPCLK_ONLY | SDXC_WAIT_PRE_OVER;
-@@ -611,15 +613,29 @@ static int sunxi_mmc_oclk_onoff(struct sunxi_mmc_host *host, u32 oclk_en)
- 
- 	do {
- 		rval = mmc_readl(host, REG_CMDR);
--	} while (time_before(jiffies, expire) && (rval & SDXC_START));
-+	} while (time_before(jiffies, end) && (rval & SDXC_START));
-+	end = jiffies;
- 
- 	/* clear irq status bits set by the command */
- 	mmc_writel(host, REG_RINTR,
- 		   mmc_readl(host, REG_RINTR) & ~SDXC_SDIO_INTERRUPT);
- 
- 	if (rval & SDXC_START) {
--		dev_err(mmc_dev(host->mmc), "fatal err update clk timeout\n");
-+		dev_err(mmc_dev(host->mmc),
-+			"fatal err update oclk timeout. Could not %s in %ims.\n",
-+			oclk_en ? "enable" : "disable",
-+			jiffies_to_msecs(end - start));
- 		return -EIO;
-+	} else {
-+		int msecs = jiffies_to_msecs(end - start);
-+		const char *ing = oclk_en ? "enabling" : "disabling";
-+
-+		if ((msecs > 150) || (oclk_en && (msecs > 50)))
-+			dev_warn(mmc_dev(host->mmc),
-+				 "%s oclk took %ims", ing, msecs);
-+		else
-+			dev_dbg(mmc_dev(host->mmc),
-+				 "%s oclk took %ims", ing, msecs);
- 	}
- 
- 	return 0;
+ /*
+  * Convert a physical pointer to a virtual kernel pointer for /dev/mem
 -- 
-2.1.4
+2.4.4
