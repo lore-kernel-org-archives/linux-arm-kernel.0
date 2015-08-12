@@ -1,72 +1,37 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Wed, 12 Aug 2015 12:51:21 +0200
-Subject: [PATCH v3 3/4] edac: Add L3/SoC EDAC support to the APM X-Gene
- SoC EDAC driver
-In-Reply-To: <1439326077-25507-4-git-send-email-lho@apm.com>
-References: <1439326077-25507-1-git-send-email-lho@apm.com>
- <1439326077-25507-2-git-send-email-lho@apm.com>
- <1439326077-25507-3-git-send-email-lho@apm.com>
- <1439326077-25507-4-git-send-email-lho@apm.com>
-Message-ID: <20150812105121.GE14011@nazgul.tnic>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 12 Aug 2015 11:54:43 +0100
+Subject: [PATCH 05/20] regmap: Restructure writes in _regmap_raw_write()
+In-Reply-To: <1439374365-20623-6-git-send-email-mpa@pengutronix.de>
+References: <1439374365-20623-1-git-send-email-mpa@pengutronix.de>
+ <1439374365-20623-6-git-send-email-mpa@pengutronix.de>
+Message-ID: <20150812105443.GT10748@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 11, 2015 at 02:47:56PM -0600, Loc Ho wrote:
-> This patch adds EDAC support for the L3 and SoC components.
+On Wed, Aug 12, 2015 at 12:12:30PM +0200, Markus Pargmann wrote:
+> Currently we try to write the data without copying directly using
+> bus->write() or bus->gather_write() if it exists. If one of the previous
+> tries to write reported -ENOTSUPP or none of them were usable, we copy
+> the data into a buffer and use bus->write().
 > 
-> Signed-off-by: Loc Ho <lho@apm.com>
-> ---
->  drivers/edac/xgene_edac.c |  827 ++++++++++++++++++++++++++++++++++++++++++++-
->  1 files changed, 815 insertions(+), 12 deletions(-)
+> However it does not make sense to try bus->write() a second time with a
+> copied buffer if it didn't work the first time.
 > 
-> diff --git a/drivers/edac/xgene_edac.c b/drivers/edac/xgene_edac.c
-> index ba06904..d5e33bf 100644
-> --- a/drivers/edac/xgene_edac.c
-> +++ b/drivers/edac/xgene_edac.c
-> @@ -66,6 +66,8 @@ struct xgene_edac {
->  
->  	struct list_head	mcus;
->  	struct list_head	pmds;
-> +	struct list_head	l3s;
-> +	struct list_head	socs;
->  
->  	struct mutex		mc_lock;
->  	int			mc_active_mask;
-> @@ -877,8 +879,8 @@ static const struct file_operations xgene_edac_pmd_debug_inject_fops[] = {
->  	{ }
->  };
->  
-> -static void xgene_edac_pmd_create_debugfs_nodes(
-> -	struct edac_device_ctl_info *edac_dev)
-> +static void
-> +xgene_edac_pmd_create_debugfs_nodes(struct edac_device_ctl_info *edac_dev)
->  {
->  	struct xgene_edac_pmd_ctx *ctx = edac_dev->pvt_info;
->  	struct dentry *edac_debugfs;
-> @@ -887,10 +889,6 @@ static void xgene_edac_pmd_create_debugfs_nodes(
->  	if (!IS_ENABLED(CONFIG_EDAC_DEBUG))
->  		return;
->  
-> -	/*
-> -	 * Todo: Switch to common EDAC debug file system for edac device
-> -	 *       when available.
-> -	 */
->  	if (!ctx->edac->dfs) {
->  		ctx->edac->dfs = debugfs_create_dir(edac_dev->dev->kobj.name,
->  						    NULL);
+> This patch restructures this if/else block to make it clear that this is
+> not intended for the case where bus->write() returns -ENOTSUPP.
 
-Why is this removing only the comment and not the debugfs_create_dir()
-and the rest of the gunk?
-
-xgene_edac_l3_create_debugfs_nodes() does call debugfs_create_dir()
-creating a top-level edac debugfs node too. Why?
-
-Please go through the previous comments I had and make sure you've
-incorporated them all. I'm not wasting time reviewing half-baked stuff.
-
--- 
-Regards/Gruss,
-    Boris.
-
-ECO tip #101: Trim your mails when you reply.
---
+I'm not entirely convinced that this is an improvement.  The main effect
+that I'm seeing is an increase in the indentation level and there are
+potential issues with the write operation being unable to work with some
+kinds of memory (like restrictions about dmaing from stack or unalinged
+memory for example) which mean that copying into a newly allocated
+buffer may actually help.  I don't think we detect any such restrictions
+at the minute but the defensiveness is nice and I'd really hope that the
+failed write case isn't any kind of fast path.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150812/ffeed222/attachment.sig>
