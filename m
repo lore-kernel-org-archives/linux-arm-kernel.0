@@ -1,50 +1,29 @@
-From: moritz.fischer@ettus.com (Moritz Fischer)
-Date: Wed, 12 Aug 2015 09:27:40 -0700
-Subject: [PATCH] pinctrl-zynq.c: Fix typos in smc0_nand_grp and
- smc0_nor_grp
-In-Reply-To: <1439389332-9373-1-git-send-email-mike.looijmans@topic.nl>
-References: <1439389332-9373-1-git-send-email-mike.looijmans@topic.nl>
-Message-ID: <CAAtXAHdbHoqMQP0wHpHiUbD6d6W8WcDaB=5VR2D5Nh29Seue9A@mail.gmail.com>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Wed, 12 Aug 2015 18:33:28 +0200
+Subject: [PATCH v4] iio: adc: xilinx-xadc: Push interrupts into hardirq
+ context
+In-Reply-To: <55CB6391.7060502@metafoo.de>
+References: <55C07160.5040907@metafoo.de>
+ <1439334049-28671-1-git-send-email-xander.huff@ni.com>
+ <55CB6391.7060502@metafoo.de>
+Message-ID: <55CB7558.3090608@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Acked-by: Moritz Fischer <moritz.fischer@ettus.com>
+On 08/12/2015 05:17 PM, Lars-Peter Clausen wrote:
+> On 08/12/2015 01:00 AM, Xander Huff wrote:
+>> Unfortunately, this breaks PREEMPT_RT builds, where a spinlock can sleep,
+>> and is thus not able to be acquired from a hardirq handler. This patch gets
+>> rid of the threaded handler and pushes all interrupt handling into the
+>> hardirq context, and uses request_irq().
+>>
+>> To validate that this change has no impact on RT performance, here are
+>> cyclictest values with no processes running:
+> 
+> Looks good, thanks.
+> 
+> Acked-by: Lars-Peter Clausen <lars@metafoo.de>
 
-On Wed, Aug 12, 2015 at 7:22 AM, Mike Looijmans <mike.looijmans@topic.nl> wrote:
-> Group names should be smc0_nand_grp and smc0_nor_grp, otherwise you'll
-> get errors like this if you try to pinmux them via the devicetree:
-> zynq-pinctrl 700.pinctrl: invalid group "smc0_nand_grp" for function "smc0_nand"
->
-> Probably a typo while creating these tables.
->
-> Signed-off-by: Mike Looijmans <mike.looijmans@topic.nl>
-> Acked-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
-> ---
->  drivers/pinctrl/pinctrl-zynq.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/pinctrl/pinctrl-zynq.c b/drivers/pinctrl/pinctrl-zynq.c
-> index 7ce23b6..5aafea8 100644
-> --- a/drivers/pinctrl/pinctrl-zynq.c
-> +++ b/drivers/pinctrl/pinctrl-zynq.c
-> @@ -706,10 +706,10 @@ static const char * const sdio1_wp_groups[] = {"gpio0_0_grp",
->                 "gpio0_39_grp", "gpio0_41_grp", "gpio0_43_grp",
->                 "gpio0_45_grp", "gpio0_47_grp", "gpio0_49_grp",
->                 "gpio0_51_grp", "gpio0_53_grp", "sdio1_emio_wp_grp"};
-> -static const char * const smc0_nor_groups[] = {"smc0_nor"};
-> +static const char * const smc0_nor_groups[] = {"smc0_nor_grp"};
->  static const char * const smc0_nor_cs1_groups[] = {"smc0_nor_cs1_grp"};
->  static const char * const smc0_nor_addr25_groups[] = {"smc0_nor_addr25_grp"};
-> -static const char * const smc0_nand_groups[] = {"smc0_nand"};
-> +static const char * const smc0_nand_groups[] = {"smc0_nand_grp"};
->  static const char * const can0_groups[] = {"can0_0_grp", "can0_1_grp",
->                 "can0_2_grp", "can0_3_grp", "can0_4_grp", "can0_5_grp",
->                 "can0_6_grp", "can0_7_grp", "can0_8_grp", "can0_9_grp",
-> --
-> 1.9.1
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Yes, I'm fine with the rework, too.
+
+Sebastian
