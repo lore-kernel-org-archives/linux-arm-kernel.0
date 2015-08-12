@@ -1,40 +1,45 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Wed, 12 Aug 2015 12:49:31 +0100
-Subject: [PATCH 12/20] regmap: Introduce max_raw_io for
- regmap_bulk_read/write
-In-Reply-To: <1439374365-20623-13-git-send-email-mpa@pengutronix.de>
+Date: Wed, 12 Aug 2015 12:51:36 +0100
+Subject: [PATCH 13/20] regmap: regmap max_raw_io getter function
+In-Reply-To: <1439374365-20623-14-git-send-email-mpa@pengutronix.de>
 References: <1439374365-20623-1-git-send-email-mpa@pengutronix.de>
- <1439374365-20623-13-git-send-email-mpa@pengutronix.de>
-Message-ID: <20150812114931.GZ10748@sirena.org.uk>
+ <1439374365-20623-14-git-send-email-mpa@pengutronix.de>
+Message-ID: <20150812115136.GA10748@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 12, 2015 at 12:12:37PM +0200, Markus Pargmann wrote:
+On Wed, Aug 12, 2015 at 12:12:38PM +0200, Markus Pargmann wrote:
+> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 
-> +	/* if set, raw reads/writes are limited to this size */
-> +	size_t max_raw_io;
+Your changelog doesn't mention why anything would reasonably want to use
+this and...
+
+> +size_t regmap_get_raw_io_max(struct regmap *map)
+> +{
+> +	return map->max_raw_io;
+> +}
+> +EXPORT_SYMBOL_GPL(regmap_get_raw_io_max);
 > +
+> +/**
+> + * regmap_get_raw_read_max - Get the maximum size we can read
+> + *
+> + * @map: Map to check.
+> + */
 
-Do this separately for read and write, there's doubtless going to be
-something that has asymmetry.
+...it is adding two functions which don't seem very symmetrically named.
 
-> +		if (!map->use_single_rw) {
-> +			write_count = total_bytes / map->max_raw_io;
-> +			write_bytes = map->max_raw_io;
+> @@ -441,6 +441,8 @@ int regmap_get_max_register(struct regmap *map);
+>  int regmap_get_reg_stride(struct regmap *map);
+>  int regmap_async_complete(struct regmap *map);
+>  bool regmap_can_raw_write(struct regmap *map);
+> +size_t regmap_get_raw_write_max(struct regmap *map);
+> +size_t regmap_get_raw_io_max(struct regmap *map);
 
-We may not be able to fit a whole number of values into whatever the
-constraint that the bus has is and partial values don't seem like a good
-idea.
-
-> +			reg_stride *= write_bytes / val_bytes;
-> +		}
-
-This is very confusing, regmap already has a concept of stride and this
-isn't the same thing.
+Do we want stubs here?
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 473 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150812/c337ed3f/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150812/0fc84067/attachment.sig>
