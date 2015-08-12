@@ -1,637 +1,274 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 12 Aug 2015 17:15:25 +0900
-Subject: [PATCH 5/7] ARM: shmobile: r8a7791 dtsi: Add CPG/MSTP Clock Domain
-In-Reply-To: <cover.1439366241.git.horms+renesas@verge.net.au>
-References: <cover.1439366241.git.horms+renesas@verge.net.au>
-Message-ID: <797a0626e08ca4af539cd4888ebbc8c5aacc993d.1439366241.git.horms+renesas@verge.net.au>
+From: chaotian.jing@mediatek.com (Chaotian Jing)
+Date: Wed, 12 Aug 2015 16:24:03 +0800
+Subject: [PATCH 2/4] mmc: mediatek: Add HS400 support
+In-Reply-To: <1439367845-5891-1-git-send-email-chaotian.jing@mediatek.com>
+References: <1439367845-5891-1-git-send-email-chaotian.jing@mediatek.com>
+Message-ID: <1439367845-5891-3-git-send-email-chaotian.jing@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+Support HS400 mode in driver
 
-Add an appropriate "#power-domain-cells" property to the cpg_clocks
-device node, to create the CPG/MSTP Clock Domain.
-
-Add "power-domains" properties to all device nodes for devices that are
-part of the CPG/MSTP Clock Domain and can be power-managed through an
-MSTP clock.  This applies to most on-SoC devices, which have a
-one-to-one mapping from SoC device to DT device node.  Notable
-exceptions are the "display" and "sound" nodes, which represent multiple
-SoC devices, each having their own MSTP clocks.
-
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
 ---
- arch/arm/boot/dts/r8a7791.dtsi | 88 ++++++++++++++++++++++++++++++++++++++----
- 1 file changed, 80 insertions(+), 8 deletions(-)
+ drivers/mmc/host/mtk-sd.c | 108 ++++++++++++++++++++++++++++++++++++----------
+ 1 file changed, 86 insertions(+), 22 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index 1cb6c2d07933..831525dd39a6 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -91,6 +91,7 @@
- 		#interrupt-cells = <2>;
- 		interrupt-controller;
- 		clocks = <&mstp9_clks R8A7791_CLK_GPIO0>;
-+		power-domains = <&cpg_clocks>;
- 	};
+diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
+index eb44fe1..457d919 100644
+--- a/drivers/mmc/host/mtk-sd.c
++++ b/drivers/mmc/host/mtk-sd.c
+@@ -72,6 +72,8 @@
+ #define MSDC_PATCH_BIT   0xb0
+ #define MSDC_PATCH_BIT1  0xb4
+ #define MSDC_PAD_TUNE    0xec
++#define PAD_DS_TUNE      0x188
++#define EMMC50_CFG0      0x208
  
- 	gpio1: gpio at e6051000 {
-@@ -103,6 +104,7 @@
- 		#interrupt-cells = <2>;
- 		interrupt-controller;
- 		clocks = <&mstp9_clks R8A7791_CLK_GPIO1>;
-+		power-domains = <&cpg_clocks>;
- 	};
+ /*--------------------------------------------------------------------------*/
+ /* Register Mask                                                            */
+@@ -205,6 +207,14 @@
+ #define MSDC_PATCH_BIT_SPCPUSH    (0x1 << 29)	/* RW */
+ #define MSDC_PATCH_BIT_DECRCTMO   (0x1 << 30)	/* RW */
  
- 	gpio2: gpio at e6052000 {
-@@ -115,6 +117,7 @@
- 		#interrupt-cells = <2>;
- 		interrupt-controller;
- 		clocks = <&mstp9_clks R8A7791_CLK_GPIO2>;
-+		power-domains = <&cpg_clocks>;
- 	};
++#define PAD_DS_TUNE_DLY1	  (0x1f << 2)
++#define PAD_DS_TUNE_DLY2	  (0x1f << 7)
++#define PAD_DS_TUNE_DLY3	  (0x1f << 12)
++
++#define EMMC50_CFG_PADCMD_LATCHCK (0x1 << 0)
++#define EMMC50_CFG_CRCSTS_EDGE    (0x1 << 3)
++#define EMMC50_CFG_CFCSTS_SEL     (0x1 << 4)
++
+ #define REQ_CMD_EIO  (0x1 << 0)
+ #define REQ_CMD_TMO  (0x1 << 1)
+ #define REQ_DAT_ERR  (0x1 << 2)
+@@ -266,6 +276,8 @@ struct msdc_save_para {
+ 	u32 pad_tune;
+ 	u32 patch_bit0;
+ 	u32 patch_bit1;
++	u32 pad_ds_tune;
++	u32 emmc50_cfg0;
+ };
  
- 	gpio3: gpio at e6053000 {
-@@ -127,6 +130,7 @@
- 		#interrupt-cells = <2>;
- 		interrupt-controller;
- 		clocks = <&mstp9_clks R8A7791_CLK_GPIO3>;
-+		power-domains = <&cpg_clocks>;
- 	};
+ struct msdc_host {
+@@ -295,14 +307,17 @@ struct msdc_host {
+ 	struct work_struct repeat_req;
+ 	struct mmc_request *repeat_mrq;
+ 	u32 tune_cmd_counter;
++	u32 tune_hs400_rw_counter;
+ 	int irq;		/* host interrupt */
  
- 	gpio4: gpio at e6054000 {
-@@ -139,6 +143,7 @@
- 		#interrupt-cells = <2>;
- 		interrupt-controller;
- 		clocks = <&mstp9_clks R8A7791_CLK_GPIO4>;
-+		power-domains = <&cpg_clocks>;
- 	};
+ 	struct clk *src_clk;	/* msdc source clock */
++	struct clk *src_clk_parent; /* src_clk's parent */
++	struct clk *hs400_src;	/* 400Mhz source clock */
+ 	struct clk *h_clk;      /* msdc h_clk */
+ 	u32 mclk;		/* mmc subsystem clock frequency */
+ 	u32 src_clk_freq;	/* source clock frequency */
+ 	u32 sclk;		/* SD/MS bus clock frequency */
+-	bool ddr;
++	unsigned char timing;
+ 	bool vqmmc_enabled;
+ 	struct msdc_save_para save_para; /* used when gate HCLK */
+ };
+@@ -493,7 +508,7 @@ static void msdc_ungate_clock(struct msdc_host *host)
+ 		cpu_relax();
+ }
  
- 	gpio5: gpio at e6055000 {
-@@ -151,6 +156,7 @@
- 		#interrupt-cells = <2>;
- 		interrupt-controller;
- 		clocks = <&mstp9_clks R8A7791_CLK_GPIO5>;
-+		power-domains = <&cpg_clocks>;
- 	};
+-static void msdc_set_mclk(struct msdc_host *host, int ddr, u32 hz)
++static void msdc_set_mclk(struct msdc_host *host, unsigned char timing, u32 hz)
+ {
+ 	u32 mode;
+ 	u32 flags;
+@@ -509,8 +524,13 @@ static void msdc_set_mclk(struct msdc_host *host, int ddr, u32 hz)
  
- 	gpio6: gpio at e6055400 {
-@@ -163,6 +169,7 @@
- 		#interrupt-cells = <2>;
- 		interrupt-controller;
- 		clocks = <&mstp9_clks R8A7791_CLK_GPIO6>;
-+		power-domains = <&cpg_clocks>;
- 	};
+ 	flags = readl(host->base + MSDC_INTEN);
+ 	sdr_clr_bits(host->base + MSDC_INTEN, flags);
+-	if (ddr) { /* may need to modify later */
+-		mode = 0x2; /* ddr mode and use divisor */
++	if (timing == MMC_TIMING_UHS_DDR50 ||
++	    timing == MMC_TIMING_MMC_DDR52 ||
++	    timing == MMC_TIMING_MMC_HS400) { /* may need to modify later */
++		if (timing == MMC_TIMING_MMC_HS400)
++			mode = 0x3;
++		else
++			mode = 0x2; /* ddr mode and use divisor */
+ 		if (hz >= (host->src_clk_freq >> 2)) {
+ 			div = 0; /* mean div = 1/4 */
+ 			sclk = host->src_clk_freq >> 2; /* sclk = clk / 4 */
+@@ -540,12 +560,12 @@ static void msdc_set_mclk(struct msdc_host *host, int ddr, u32 hz)
+ 		cpu_relax();
+ 	host->sclk = sclk;
+ 	host->mclk = hz;
+-	host->ddr = ddr;
++	host->timing = timing;
+ 	/* need because clk changed. */
+ 	msdc_set_timeout(host, host->timeout_ns, host->timeout_clks);
+ 	sdr_set_bits(host->base + MSDC_INTEN, flags);
  
- 	gpio7: gpio at e6055800 {
-@@ -175,6 +182,7 @@
- 		#interrupt-cells = <2>;
- 		interrupt-controller;
- 		clocks = <&mstp9_clks R8A7791_CLK_GPIO7>;
-+		power-domains = <&cpg_clocks>;
- 	};
+-	dev_dbg(host->dev, "sclk: %d, ddr: %d\n", host->sclk, ddr);
++	dev_dbg(host->dev, "sclk: %d, timing: %d\n", host->sclk, timing);
+ }
  
- 	thermal at e61f0000 {
-@@ -182,6 +190,7 @@
- 		reg = <0 0xe61f0000 0 0x14>, <0 0xe61f0100 0 0x38>;
- 		interrupts = <0 69 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp5_clks R8A7791_CLK_THERMAL>;
-+		power-domains = <&cpg_clocks>;
- 	};
+ static inline u32 msdc_cmd_find_resp(struct msdc_host *host,
+@@ -710,6 +730,7 @@ static void msdc_request_done(struct msdc_host *host, struct mmc_request *mrq)
+ 		}
+ 	}
+ 	host->tune_cmd_counter = 0;
++	host->tune_hs400_rw_counter = 0;
+ 	mmc_request_done(host->mmc, mrq);
  
- 	timer {
-@@ -199,6 +208,7 @@
- 			     <0 143 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp1_clks R8A7791_CLK_CMT0>;
- 		clock-names = "fck";
-+		power-domains = <&cpg_clocks>;
+ 	pm_runtime_mark_last_busy(host->dev);
+@@ -1132,6 +1153,7 @@ static void msdc_init_hw(struct msdc_host *host)
+ 	writel(0x403c0046, host->base + MSDC_PATCH_BIT);
+ 	sdr_set_field(host->base + MSDC_PATCH_BIT, MSDC_CKGEN_MSDC_DLY_SEL, 1);
+ 	writel(0xffff0089, host->base + MSDC_PATCH_BIT1);
++	sdr_set_bits(host->base + EMMC50_CFG0, EMMC50_CFG_CFCSTS_SEL);
+ 	/* Configure to enable SDIO mode.
+ 	 * it's must otherwise sdio cmd5 failed
+ 	 */
+@@ -1163,11 +1185,14 @@ static void msdc_init_gpd_bd(struct msdc_host *host, struct msdc_dma *dma)
+ 	struct mt_bdma_desc *bd = dma->bd;
+ 	int i;
  
- 		renesas,channels-mask = <0x60>;
+-	memset(gpd, 0, sizeof(struct mt_gpdma_desc));
++	memset(gpd, 0, sizeof(struct mt_gpdma_desc) * 2);
  
-@@ -218,6 +228,7 @@
- 			     <0 127 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp3_clks R8A7791_CLK_CMT1>;
- 		clock-names = "fck";
-+		power-domains = <&cpg_clocks>;
+ 	gpd->gpd_info = GPDMA_DESC_BDP; /* hwo, cs, bd pointer */
+ 	gpd->ptr = (u32)dma->bd_addr; /* physical address */
+-
++	/* gpd->next is must set for desc DMA
++	 * That's why must alloc 2 gpd structure.
++	 */
++	gpd->next = (u32)dma->gpd_addr + sizeof(struct mt_gpdma_desc);
+ 	memset(bd, 0, sizeof(struct mt_bdma_desc) * MAX_BD_NUM);
+ 	for (i = 0; i < (MAX_BD_NUM - 1); i++)
+ 		bd[i].next = (u32)dma->bd_addr + sizeof(*bd) * (i + 1);
+@@ -1177,14 +1202,9 @@ static void msdc_ops_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ {
+ 	struct msdc_host *host = mmc_priv(mmc);
+ 	int ret;
+-	u32 ddr = 0;
  
- 		renesas,channels-mask = <0xff>;
+ 	pm_runtime_get_sync(host->dev);
  
-@@ -240,6 +251,7 @@
- 			     <0 16 IRQ_TYPE_LEVEL_HIGH>,
- 			     <0 17 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp4_clks R8A7791_CLK_IRQC>;
-+		power-domains = <&cpg_clocks>;
- 	};
+-	if (ios->timing == MMC_TIMING_UHS_DDR50 ||
+-	    ios->timing == MMC_TIMING_MMC_DDR52)
+-		ddr = 1;
+-
+ 	msdc_set_buswidth(host, ios->bus_width);
  
- 	dmac0: dma-controller at e6700000 {
-@@ -268,6 +280,7 @@
- 				"ch12", "ch13", "ch14";
- 		clocks = <&mstp2_clks R8A7791_CLK_SYS_DMAC0>;
- 		clock-names = "fck";
-+		power-domains = <&cpg_clocks>;
- 		#dma-cells = <1>;
- 		dma-channels = <15>;
- 	};
-@@ -298,6 +311,7 @@
- 				"ch12", "ch13", "ch14";
- 		clocks = <&mstp2_clks R8A7791_CLK_SYS_DMAC1>;
- 		clock-names = "fck";
-+		power-domains = <&cpg_clocks>;
- 		#dma-cells = <1>;
- 		dma-channels = <15>;
- 	};
-@@ -326,6 +340,7 @@
- 				"ch12";
- 		clocks = <&mstp5_clks R8A7791_CLK_AUDIO_DMAC0>;
- 		clock-names = "fck";
-+		power-domains = <&cpg_clocks>;
- 		#dma-cells = <1>;
- 		dma-channels = <13>;
- 	};
-@@ -354,6 +369,7 @@
- 				"ch12";
- 		clocks = <&mstp5_clks R8A7791_CLK_AUDIO_DMAC1>;
- 		clock-names = "fck";
-+		power-domains = <&cpg_clocks>;
- 		#dma-cells = <1>;
- 		dma-channels = <13>;
- 	};
-@@ -365,6 +381,7 @@
- 			      0 109 IRQ_TYPE_LEVEL_HIGH>;
- 		interrupt-names = "ch0", "ch1";
- 		clocks = <&mstp3_clks R8A7791_CLK_USBDMAC0>;
-+		power-domains = <&cpg_clocks>;
- 		#dma-cells = <1>;
- 		dma-channels = <2>;
- 	};
-@@ -376,6 +393,7 @@
- 			      0 110 IRQ_TYPE_LEVEL_HIGH>;
- 		interrupt-names = "ch0", "ch1";
- 		clocks = <&mstp3_clks R8A7791_CLK_USBDMAC1>;
-+		power-domains = <&cpg_clocks>;
- 		#dma-cells = <1>;
- 		dma-channels = <2>;
- 	};
-@@ -388,6 +406,7 @@
- 		reg = <0 0xe6508000 0 0x40>;
- 		interrupts = <0 287 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp9_clks R8A7791_CLK_I2C0>;
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 	};
+ 	/* Suspend/Resume will do power off/on */
+@@ -1222,8 +1242,8 @@ static void msdc_ops_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ 		break;
+ 	}
  
-@@ -398,6 +417,7 @@
- 		reg = <0 0xe6518000 0 0x40>;
- 		interrupts = <0 288 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp9_clks R8A7791_CLK_I2C1>;
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 	};
+-	if (host->mclk != ios->clock || host->ddr != ddr)
+-		msdc_set_mclk(host, ddr, ios->clock);
++	if (host->mclk != ios->clock || host->timing != ios->timing)
++		msdc_set_mclk(host, ios->timing, ios->clock);
  
-@@ -408,6 +428,7 @@
- 		reg = <0 0xe6530000 0 0x40>;
- 		interrupts = <0 286 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp9_clks R8A7791_CLK_I2C2>;
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 	};
+ end:
+ 	pm_runtime_mark_last_busy(host->dev);
+@@ -1290,7 +1310,6 @@ static void msdc_tune_request(struct msdc_host *host)
+ {
+ 	u32 orig_rsmpl, orig_cksel;
+ 	u32 cur_rsmpl, cur_cksel = 0;
+-	u32 ddr, clkmode;
+ 	struct mmc_ios ios = host->mmc->ios;
  
-@@ -418,6 +439,7 @@
- 		reg = <0 0xe6540000 0 0x40>;
- 		interrupts = <0 290 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp9_clks R8A7791_CLK_I2C3>;
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 	};
+ 	sdr_get_field(host->base + MSDC_IOCON, MSDC_IOCON_RSPL, &orig_rsmpl);
+@@ -1318,9 +1337,38 @@ static void msdc_tune_request(struct msdc_host *host)
+ 		sdr_set_field(host->base + MSDC_IOCON, MSDC_IOCON_RSPL, 0);
+ 		sdr_set_field(host->base + MSDC_PATCH_BIT,
+ 			      MSDC_CKGEN_MSDC_DLY_SEL, 0);
+-		sdr_get_field(host->base + MSDC_CFG, MSDC_CFG_CKMOD, &clkmode);
+-		ddr = (clkmode == 2) ? 1 : 0;
+-		msdc_set_mclk(host, ddr, host->mclk / 2);
++		msdc_set_mclk(host, host->timing, host->mclk / 2);
++	}
++}
++
++static void emmc_hs400_tune_rw(struct msdc_host *host)
++{
++	int cur_ds_dly1, cur_ds_dly3, orig_ds_dly1, orig_ds_dly3;
++
++	sdr_get_field(host->base + PAD_DS_TUNE, PAD_DS_TUNE_DLY1, &orig_ds_dly1);
++	sdr_get_field(host->base + PAD_DS_TUNE, PAD_DS_TUNE_DLY3, &orig_ds_dly3);
++
++	cur_ds_dly1 = orig_ds_dly1 - 1;
++	cur_ds_dly3 = orig_ds_dly3;
++	if (cur_ds_dly1 < 0) {
++		cur_ds_dly1 = 31;
++		cur_ds_dly3 = orig_ds_dly3 + 1;
++		if (cur_ds_dly3 >= 32)
++			cur_ds_dly3 = 0;
++	}
++
++	if (++host->tune_hs400_rw_counter >= 32 * 32) {
++		dev_warn(host->dev, "HS400 tune fail at %dhz\n", host->mclk);
++		host->tune_hs400_rw_counter = 0;
++		msdc_set_mclk(host, host->timing, host->mclk / 2);
++	} else {
++		sdr_set_field(host->base + PAD_DS_TUNE, PAD_DS_TUNE_DLY1, cur_ds_dly1);
++		if (cur_ds_dly3 != orig_ds_dly3) {
++			sdr_set_field(host->base + PAD_DS_TUNE, PAD_DS_TUNE_DLY3,
++				      cur_ds_dly3);
++		}
++		dev_dbg(host->dev, "cur_ds_dly1<0x%x>, cur_ds_dly3<0x%x>\n",
++				cur_ds_dly1, cur_ds_dly3);
+ 	}
+ }
  
-@@ -428,6 +450,7 @@
- 		reg = <0 0xe6520000 0 0x40>;
- 		interrupts = <0 19 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp9_clks R8A7791_CLK_I2C4>;
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 	};
+@@ -1336,10 +1384,15 @@ static void msdc_repeat_request(struct work_struct *work)
+ 	spin_unlock_irqrestore(&host->lock, flags);
+ 	msdc_send_stop(host);
+ 	msdc_wait_card_not_busy(host);
+-	if (mrq->data && mrq->data->error == -ETIMEDOUT)
++	if (mrq->data && mrq->data->error == -ETIMEDOUT) {
+ 		mmc_hw_reset(host->mmc);
+-	else
+-		msdc_tune_request(host);
++	} else {
++		if (mrq->data && mrq->data->error == -EILSEQ &&
++		    host->timing == MMC_TIMING_MMC_HS400)
++			emmc_hs400_tune_rw(host);
++		else
++			msdc_tune_request(host);
++	}
+ 	msdc_reset_mrq(mrq);
+ 	msdc_ops_request(host->mmc, mrq);
+ }
+@@ -1389,6 +1442,13 @@ static int msdc_drv_probe(struct platform_device *pdev)
+ 	if (IS_ERR(host->src_clk)) {
+ 		ret = PTR_ERR(host->src_clk);
+ 		goto host_free;
++	} else {
++		host->src_clk_parent = clk_get_parent(host->src_clk);
++		host->hs400_src = devm_clk_get(&pdev->dev, "400Mhz_clk");
++		if (IS_ERR(host->hs400_src))
++			dev_dbg(&pdev->dev, "Cannot find 400Mhz_clk at dts!\n");
++		else if (clk_set_parent(host->src_clk_parent, host->hs400_src) < 0)
++				dev_err(host->dev, "Failed to set 400Mhz source clock!\n");
+ 	}
  
-@@ -439,6 +462,7 @@
- 		reg = <0 0xe6528000 0 0x40>;
- 		interrupts = <0 20 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp9_clks R8A7791_CLK_I2C5>;
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 	};
+ 	host->h_clk = devm_clk_get(&pdev->dev, "hclk");
+@@ -1541,6 +1601,8 @@ static void msdc_save_reg(struct msdc_host *host)
+ 	host->save_para.pad_tune = readl(host->base + MSDC_PAD_TUNE);
+ 	host->save_para.patch_bit0 = readl(host->base + MSDC_PATCH_BIT);
+ 	host->save_para.patch_bit1 = readl(host->base + MSDC_PATCH_BIT1);
++	host->save_para.pad_ds_tune = readl(host->base + PAD_DS_TUNE);
++	host->save_para.emmc50_cfg0 = readl(host->base + EMMC50_CFG0);
+ }
  
-@@ -452,6 +476,7 @@
- 		clocks = <&mstp9_clks R8A7791_CLK_IICDVFS>;
- 		dmas = <&dmac0 0x77>, <&dmac0 0x78>;
- 		dma-names = "tx", "rx";
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 	};
+ static void msdc_restore_reg(struct msdc_host *host)
+@@ -1551,6 +1613,8 @@ static void msdc_restore_reg(struct msdc_host *host)
+ 	writel(host->save_para.pad_tune, host->base + MSDC_PAD_TUNE);
+ 	writel(host->save_para.patch_bit0, host->base + MSDC_PATCH_BIT);
+ 	writel(host->save_para.patch_bit1, host->base + MSDC_PATCH_BIT1);
++	writel(host->save_para.pad_ds_tune, host->base + PAD_DS_TUNE);
++	writel(host->save_para.emmc50_cfg0, host->base + EMMC50_CFG0);
+ }
  
-@@ -464,6 +489,7 @@
- 		clocks = <&mstp3_clks R8A7791_CLK_IIC0>;
- 		dmas = <&dmac0 0x61>, <&dmac0 0x62>;
- 		dma-names = "tx", "rx";
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 	};
- 
-@@ -476,6 +502,7 @@
- 		clocks = <&mstp3_clks R8A7791_CLK_IIC1>;
- 		dmas = <&dmac0 0x65>, <&dmac0 0x66>;
- 		dma-names = "tx", "rx";
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 	};
- 
-@@ -492,6 +519,7 @@
- 		clocks = <&mstp3_clks R8A7791_CLK_MMCIF0>;
- 		dmas = <&dmac0 0xd1>, <&dmac0 0xd2>;
- 		dma-names = "tx", "rx";
-+		power-domains = <&cpg_clocks>;
- 		reg-io-width = <4>;
- 		status = "disabled";
- 		max-frequency = <97500000>;
-@@ -504,6 +532,7 @@
- 		clocks = <&mstp3_clks R8A7791_CLK_SDHI0>;
- 		dmas = <&dmac1 0xcd>, <&dmac1 0xce>;
- 		dma-names = "tx", "rx";
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 	};
- 
-@@ -514,6 +543,7 @@
- 		clocks = <&mstp3_clks R8A7791_CLK_SDHI1>;
- 		dmas = <&dmac1 0xc1>, <&dmac1 0xc2>;
- 		dma-names = "tx", "rx";
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 	};
- 
-@@ -524,6 +554,7 @@
- 		clocks = <&mstp3_clks R8A7791_CLK_SDHI2>;
- 		dmas = <&dmac1 0xd3>, <&dmac1 0xd4>;
- 		dma-names = "tx", "rx";
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 	};
- 
-@@ -535,6 +566,7 @@
- 		clock-names = "sci_ick";
- 		dmas = <&dmac0 0x21>, <&dmac0 0x22>;
- 		dma-names = "tx", "rx";
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 	};
- 
-@@ -546,6 +578,7 @@
- 		clock-names = "sci_ick";
- 		dmas = <&dmac0 0x25>, <&dmac0 0x26>;
- 		dma-names = "tx", "rx";
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 	};
- 
-@@ -557,6 +590,7 @@
- 		clock-names = "sci_ick";
- 		dmas = <&dmac0 0x27>, <&dmac0 0x28>;
- 		dma-names = "tx", "rx";
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 	};
- 
-@@ -568,6 +602,7 @@
- 		clock-names = "sci_ick";
- 		dmas = <&dmac0 0x1b>, <&dmac0 0x1c>;
- 		dma-names = "tx", "rx";
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 	};
- 
-@@ -579,6 +614,7 @@
- 		clock-names = "sci_ick";
- 		dmas = <&dmac0 0x1f>, <&dmac0 0x20>;
- 		dma-names = "tx", "rx";
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 	};
- 
-@@ -590,6 +626,7 @@
- 		clock-names = "sci_ick";
- 		dmas = <&dmac0 0x23>, <&dmac0 0x24>;
- 		dma-names = "tx", "rx";
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 	};
- 
-@@ -601,6 +638,7 @@
- 		clock-names = "sci_ick";
- 		dmas = <&dmac0 0x3d>, <&dmac0 0x3e>;
- 		dma-names = "tx", "rx";
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 	};
- 
-@@ -612,6 +650,7 @@
- 		clock-names = "sci_ick";
- 		dmas = <&dmac0 0x19>, <&dmac0 0x1a>;
- 		dma-names = "tx", "rx";
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 	};
- 
-@@ -623,6 +662,7 @@
- 		clock-names = "sci_ick";
- 		dmas = <&dmac0 0x1d>, <&dmac0 0x1e>;
- 		dma-names = "tx", "rx";
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 	};
- 
-@@ -634,6 +674,7 @@
- 		clock-names = "sci_ick";
- 		dmas = <&dmac0 0x29>, <&dmac0 0x2a>;
- 		dma-names = "tx", "rx";
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 	};
- 
-@@ -645,6 +686,7 @@
- 		clock-names = "sci_ick";
- 		dmas = <&dmac0 0x2d>, <&dmac0 0x2e>;
- 		dma-names = "tx", "rx";
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 	};
- 
-@@ -656,6 +698,7 @@
- 		clock-names = "sci_ick";
- 		dmas = <&dmac0 0x2b>, <&dmac0 0x2c>;
- 		dma-names = "tx", "rx";
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 	};
- 
-@@ -667,6 +710,7 @@
- 		clock-names = "sci_ick";
- 		dmas = <&dmac0 0x2f>, <&dmac0 0x30>;
- 		dma-names = "tx", "rx";
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 	};
- 
-@@ -678,6 +722,7 @@
- 		clock-names = "sci_ick";
- 		dmas = <&dmac0 0xfb>, <&dmac0 0xfc>;
- 		dma-names = "tx", "rx";
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 	};
- 
-@@ -689,6 +734,7 @@
- 		clock-names = "sci_ick";
- 		dmas = <&dmac0 0xfd>, <&dmac0 0xfe>;
- 		dma-names = "tx", "rx";
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 	};
- 
-@@ -700,6 +746,7 @@
- 		clock-names = "sci_ick";
- 		dmas = <&dmac0 0x39>, <&dmac0 0x3a>;
- 		dma-names = "tx", "rx";
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 	};
- 
-@@ -711,6 +758,7 @@
- 		clock-names = "sci_ick";
- 		dmas = <&dmac0 0x4d>, <&dmac0 0x4e>;
- 		dma-names = "tx", "rx";
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 	};
- 
-@@ -722,6 +770,7 @@
- 		clock-names = "sci_ick";
- 		dmas = <&dmac0 0x3b>, <&dmac0 0x3c>;
- 		dma-names = "tx", "rx";
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 	};
- 
-@@ -730,6 +779,7 @@
- 		reg = <0 0xee700000 0 0x400>;
- 		interrupts = <0 162 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp8_clks R8A7791_CLK_ETHER>;
-+		power-domains = <&cpg_clocks>;
- 		phy-mode = "rmii";
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-@@ -741,6 +791,7 @@
- 		reg = <0 0xee300000 0 0x2000>;
- 		interrupts = <0 105 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp8_clks R8A7791_CLK_SATA0>;
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 	};
- 
-@@ -749,6 +800,7 @@
- 		reg = <0 0xee500000 0 0x2000>;
- 		interrupts = <0 106 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp8_clks R8A7791_CLK_SATA1>;
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 	};
- 
-@@ -757,12 +809,13 @@
- 		reg = <0 0xe6590000 0 0x100>;
- 		interrupts = <0 107 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp7_clks R8A7791_CLK_HSUSB>;
--		renesas,buswait = <4>;
--		phys = <&usb0 1>;
--		phy-names = "usb";
- 		dmas = <&usb_dmac0 0>, <&usb_dmac0 1>,
- 		       <&usb_dmac1 0>, <&usb_dmac1 1>;
- 		dma-names = "ch0", "ch1", "ch2", "ch3";
-+		power-domains = <&cpg_clocks>;
-+		renesas,buswait = <4>;
-+		phys = <&usb0 1>;
-+		phy-names = "usb";
- 		status = "disabled";
- 	};
- 
-@@ -773,6 +826,7 @@
- 		#size-cells = <0>;
- 		clocks = <&mstp7_clks R8A7791_CLK_HSUSB>;
- 		clock-names = "usbhs";
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 
- 		usb0: usb-channel at 0 {
-@@ -787,25 +841,28 @@
- 
- 	vin0: video at e6ef0000 {
- 		compatible = "renesas,vin-r8a7791";
--		clocks = <&mstp8_clks R8A7791_CLK_VIN0>;
- 		reg = <0 0xe6ef0000 0 0x1000>;
- 		interrupts = <0 188 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp8_clks R8A7791_CLK_VIN0>;
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 	};
- 
- 	vin1: video at e6ef1000 {
- 		compatible = "renesas,vin-r8a7791";
--		clocks = <&mstp8_clks R8A7791_CLK_VIN1>;
- 		reg = <0 0xe6ef1000 0 0x1000>;
- 		interrupts = <0 189 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp8_clks R8A7791_CLK_VIN1>;
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 	};
- 
- 	vin2: video at e6ef2000 {
- 		compatible = "renesas,vin-r8a7791";
--		clocks = <&mstp8_clks R8A7791_CLK_VIN2>;
- 		reg = <0 0xe6ef2000 0 0x1000>;
- 		interrupts = <0 190 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp8_clks R8A7791_CLK_VIN2>;
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 	};
- 
-@@ -814,6 +871,7 @@
- 		reg = <0 0xfe928000 0 0x8000>;
- 		interrupts = <0 267 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp1_clks R8A7791_CLK_VSP1_S>;
-+		power-domains = <&cpg_clocks>;
- 
- 		renesas,has-lut;
- 		renesas,has-sru;
-@@ -827,6 +885,7 @@
- 		reg = <0 0xfe930000 0 0x8000>;
- 		interrupts = <0 246 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp1_clks R8A7791_CLK_VSP1_DU0>;
-+		power-domains = <&cpg_clocks>;
- 
- 		renesas,has-lif;
- 		renesas,has-lut;
-@@ -840,6 +899,7 @@
- 		reg = <0 0xfe938000 0 0x8000>;
- 		interrupts = <0 247 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp1_clks R8A7791_CLK_VSP1_DU1>;
-+		power-domains = <&cpg_clocks>;
- 
- 		renesas,has-lif;
- 		renesas,has-lut;
-@@ -885,6 +945,7 @@
- 		clocks = <&mstp9_clks R8A7791_CLK_RCAN0>,
- 			 <&cpg_clocks R8A7791_CLK_RCAN>, <&can_clk>;
- 		clock-names = "clkp1", "clkp2", "can_clk";
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 	};
- 
-@@ -895,6 +956,7 @@
- 		clocks = <&mstp9_clks R8A7791_CLK_RCAN1>,
- 			 <&cpg_clocks R8A7791_CLK_RCAN>, <&can_clk>;
- 		clock-names = "clkp1", "clkp2", "can_clk";
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 	};
- 
-@@ -903,6 +965,7 @@
- 		reg = <0 0xfe980000 0 0x10300>;
- 		interrupts = <0 272 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp1_clks R8A7791_CLK_JPU>;
-+		power-domains = <&cpg_clocks>;
- 	};
- 
- 	clocks {
-@@ -979,6 +1042,7 @@
- 			clock-output-names = "main", "pll0", "pll1", "pll3",
- 					     "lb", "qspi", "sdh", "sd0", "z",
- 					     "rcan", "adsp";
-+			#power-domain-cells = <0>;
- 		};
- 
- 		/* Variable factor clocks */
-@@ -1361,6 +1425,7 @@
- 		clocks = <&mstp9_clks R8A7791_CLK_QSPI_MOD>;
- 		dmas = <&dmac0 0x17>, <&dmac0 0x18>;
- 		dma-names = "tx", "rx";
-+		power-domains = <&cpg_clocks>;
- 		num-cs = <1>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-@@ -1374,6 +1439,7 @@
- 		clocks = <&mstp0_clks R8A7791_CLK_MSIOF0>;
- 		dmas = <&dmac0 0x51>, <&dmac0 0x52>;
- 		dma-names = "tx", "rx";
-+		power-domains = <&cpg_clocks>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 		status = "disabled";
-@@ -1386,6 +1452,7 @@
- 		clocks = <&mstp2_clks R8A7791_CLK_MSIOF1>;
- 		dmas = <&dmac0 0x55>, <&dmac0 0x56>;
- 		dma-names = "tx", "rx";
-+		power-domains = <&cpg_clocks>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 		status = "disabled";
-@@ -1398,6 +1465,7 @@
- 		clocks = <&mstp2_clks R8A7791_CLK_MSIOF2>;
- 		dmas = <&dmac0 0x41>, <&dmac0 0x42>;
- 		dma-names = "tx", "rx";
-+		power-domains = <&cpg_clocks>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 		status = "disabled";
-@@ -1408,6 +1476,7 @@
- 		reg = <0 0xee000000 0 0xc00>;
- 		interrupts = <0 101 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp3_clks R8A7791_CLK_SSUSB>;
-+		power-domains = <&cpg_clocks>;
- 		phys = <&usb2 1>;
- 		phy-names = "usb";
- 		status = "disabled";
-@@ -1416,10 +1485,11 @@
- 	pci0: pci at ee090000 {
- 		compatible = "renesas,pci-r8a7791";
- 		device_type = "pci";
--		clocks = <&mstp7_clks R8A7791_CLK_EHCI>;
- 		reg = <0 0xee090000 0 0xc00>,
- 		      <0 0xee080000 0 0x1100>;
- 		interrupts = <0 108 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp7_clks R8A7791_CLK_EHCI>;
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 
- 		bus-range = <0 0>;
-@@ -1450,10 +1520,11 @@
- 	pci1: pci at ee0d0000 {
- 		compatible = "renesas,pci-r8a7791";
- 		device_type = "pci";
--		clocks = <&mstp7_clks R8A7791_CLK_EHCI>;
- 		reg = <0 0xee0d0000 0 0xc00>,
- 		      <0 0xee0c0000 0 0x1100>;
- 		interrupts = <0 113 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp7_clks R8A7791_CLK_EHCI>;
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 
- 		bus-range = <1 1>;
-@@ -1503,6 +1574,7 @@
- 		interrupt-map = <0 0 0 0 &gic 0 116 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp3_clks R8A7791_CLK_PCIEC>, <&pcie_bus_clk>;
- 		clock-names = "pcie", "pcie_bus";
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 	};
- 
+ static int msdc_runtime_suspend(struct device *dev)
 -- 
-2.1.4
+1.8.1.1.dirty
