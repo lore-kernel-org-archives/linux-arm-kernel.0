@@ -1,82 +1,48 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 12 Aug 2015 15:47:38 +0100
-Subject: [PATCH v8 5/7] arm64: Add trampoline code for kretprobes
-In-Reply-To: <1439254364-15362-6-git-send-email-dave.long@linaro.org>
-References: <1439254364-15362-1-git-send-email-dave.long@linaro.org>
- <1439254364-15362-6-git-send-email-dave.long@linaro.org>
-Message-ID: <20150812144738.GG23540@arm.com>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Wed, 12 Aug 2015 20:17:44 +0530
+Subject: [PATCH 0/5] iommu/msm: Add DT adaptation and generic bindings support
+Message-ID: <1439390869-6347-1-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+The msm_iommu.c driver currently works based on platform data. A single master
+device can be connected to more than one iommu and multiple contexts in each
+of the iommu. This association between master and iommus was represented
+from platform data using parent/child devices. The master drivers were
+responsible for attaching all of the iommus/context to a domain. Now the
+platform data support is removed and DT support is added. The master/iommus
+are added through generic iommu bindings.
 
-On Tue, Aug 11, 2015 at 01:52:42AM +0100, David Long wrote:
-> From: William Cohen <wcohen@redhat.com>
-> 
-> The trampoline code is used by kretprobes to capture a return from a probed
-> function.  This is done by saving the registers, calling the handler, and
-> restoring the registers.  The code then returns to the original saved caller
-> return address.  It is necessary to do this directly instead of using a
-> software breakpoint because the code used in processing that breakpoint
-> could itself be kprobe'd and cause a problematic reentry into the debug
-> exception handler.
-> 
-> Signed-off-by: William Cohen <wcohen@redhat.com>
-> Signed-off-by: David A. Long <dave.long@linaro.org>
+This is essentially rework of the patch posted earlier by
+Rob Clark <robdclark@gmail.com>. This series folds the changes
+in to the existing driver with the addition of generic bindings.
 
-[...]
+        http://www.spinics.net/lists/linux-arm-msm/msg10077.html
 
-> diff --git a/arch/arm64/kernel/kprobes_trampoline.S b/arch/arm64/kernel/kprobes_trampoline.S
-> new file mode 100644
-> index 0000000..dd0172b
-> --- /dev/null
-> +++ b/arch/arm64/kernel/kprobes_trampoline.S
-> @@ -0,0 +1,61 @@
-> +/*
-> + * trampoline entry and return code for kretprobes.
-> + */
-> +
-> +#include <linux/linkage.h>
-> +#include <generated/asm-offsets.h>
-> +
-> +	.text
-> +
-> +ENTRY(kretprobe_trampoline)
-> +
-> +	sub sp, sp, #S_FRAME_SIZE
-> +
-> +	stp x0, x1, [sp, #S_X0]
-> +	stp x2, x3, [sp, #S_X2]
-> +	stp x4, x5, [sp, #S_X4]
-> +	stp x6, x7, [sp, #S_X6]
-> +	stp x8, x9, [sp, #S_X8]
-> +	stp x10, x11, [sp, #S_X10]
-> +	stp x12, x13, [sp, #S_X12]
-> +	stp x14, x15, [sp, #S_X14]
-> +	stp x16, x17, [sp, #S_X16]
-> +	stp x18, x19, [sp, #S_X18]
-> +	stp x20, x21, [sp, #S_X20]
-> +	stp x22, x23, [sp, #S_X22]
-> +	stp x24, x25, [sp, #S_X24]
-> +	stp x26, x27, [sp, #S_X26]
-> +	stp x28, x29, [sp, #S_X28]
-> +	str x30, [sp, #S_LR]
-> +	mrs x0, nzcv
-> +	str x0, [sp, #S_PSTATE]
+This series is based on the IOMMU probe deferral series from
+Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
-I'm slightly wary of this, as it means user_mode(regs) will return true
-for the pt_regs passed into the handler. Do we need to force the mode?
-What about things like the I bit?
+        https://lkml.org/lkml/2015/5/14/786
 
-Similarly, why don't you save the stack pointer?
+Tested this series on ifc6410 board.
 
-> +
-> +	mov x0, sp
-> +	bl trampoline_probe_handler
-> +	/* Replace trampoline address in lr with actual
-> +	   orig_ret_addr return address. */
-> +	str x0, [sp, #S_LR]
+Sricharan R (5):
+  iommu/msm: Add DT adaptation
+  iommu/msm: Move the contents from msm_iommu_dev.c to msm_iommu.c
+  iommu/msm: Add support for generic master bindings
+  iommu/msm: Set cacheability attributes without tex remap
+  iommu/msm: Remove driver BROKEN
 
-Why can't the trampoline_probe_handler update the pt_regs directly?
+ .../devicetree/bindings/iommu/msm,iommu-v0.txt     |  59 +++
+ drivers/iommu/Kconfig                              |   1 -
+ drivers/iommu/Makefile                             |   2 +-
+ drivers/iommu/msm_iommu.c                          | 508 ++++++++++++++-------
+ drivers/iommu/msm_iommu.h                          |  73 ++-
+ drivers/iommu/msm_iommu_dev.c                      | 392 ----------------
+ drivers/iommu/msm_iommu_hw-8xxx.h                  |  10 +-
+ 7 files changed, 432 insertions(+), 613 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/iommu/msm,iommu-v0.txt
+ delete mode 100644 drivers/iommu/msm_iommu_dev.c
 
-Will
+-- 
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
