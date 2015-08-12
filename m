@@ -1,28 +1,19 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 12 Aug 2015 14:49:14 +0530
-Subject: 3.18: lockdep problems in cpufreq
-In-Reply-To: <20150812090857.GJ7557@n2100.arm.linux.org.uk>
-References: <CAKohponhkk9BK6-7ScHeZa4R43iooWQFV8YoPLv6LjO40GNq=A@mail.gmail.com>
- <20150518185645.GA28053@n2100.arm.linux.org.uk>
- <2574268.XBqpdL2VLI@vostro.rjw.lan>
- <20150811170357.GA24529@n2100.arm.linux.org.uk>
- <20150812051659.GI32049@linux>
- <20150812072129.GD7557@n2100.arm.linux.org.uk>
- <20150812073530.GA16445@linux>
- <20150812074925.GG7557@n2100.arm.linux.org.uk>
- <20150812081257.GC16445@linux>
- <20150812090857.GJ7557@n2100.arm.linux.org.uk>
-Message-ID: <20150812091914.GH16445@linux>
+From: caschebe@techfak.uni-bielefeld.de (Christian Ascheberg)
+Date: Wed, 12 Aug 2015 11:27:35 +0200
+Subject: Problem with ftrace uprobes on ARM
+In-Reply-To: <20150810193116.GA2895@debian>
+References: <55C8E417.7080607@techfak.uni-bielefeld.de>
+ <20150810193116.GA2895@debian>
+Message-ID: <55CB1187.6030301@techfak.uni-bielefeld.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12-08-15, 10:08, Russell King - ARM Linux wrote:
-> And now generate versions for all the stable kernels inbetween.  Now
-> your problem.  I'm sick of this.
+Thanks, your answer was really helpful. I did not know that Thumb 
+instructions were not supported, which solved my initial problem when 
+using Perf as well.
 
-Haha.. There wouldn't be many. 3.19 got large number of changes (from
-me) and so we required a newer version. But after that should be
-somewhat stable.
+Is there any documentation regarding limitations of perf/ftrace support 
+on ARM (compared to x86)?
 
--- 
-viresh
+For example, I also noticed that 'perf help' lists 'trace' command, but 
+running 'perf trace' says 'is not a perf-command'.
