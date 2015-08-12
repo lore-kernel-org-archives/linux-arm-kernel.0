@@ -1,46 +1,63 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Wed, 12 Aug 2015 15:08:38 +0200
-Subject: [PATCH 02/20] regmap: Remove regmap_bulk_write 64bit support
-In-Reply-To: <20150812123537.GH10748@sirena.org.uk>
-References: <1439374365-20623-1-git-send-email-mpa@pengutronix.de>
- <1439374365-20623-3-git-send-email-mpa@pengutronix.de>
- <20150812102550.GQ10748@sirena.org.uk>
- <20150812104436.GA19600@pengutronix.de>
- <20150812105758.GU10748@sirena.org.uk>
- <20150812122856.GF19600@pengutronix.de>
- <20150812123537.GH10748@sirena.org.uk>
-Message-ID: <20150812130838.GN19600@pengutronix.de>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Wed, 12 Aug 2015 22:14:18 +0900
+Subject: [PATCH 3/3] ARM: dts: UniPhier: add ProXstream2 and PH1-LD6b
+ SoC/board support
+In-Reply-To: <20150811130739.GD30181@localhost>
+References: <1438687264-26538-1-git-send-email-yamada.masahiro@socionext.com>
+ <1438687264-26538-4-git-send-email-yamada.masahiro@socionext.com>
+ <20150811130739.GD30181@localhost>
+Message-ID: <CAK7LNAQ+6tQ9Ci6LKsAB7kLj0o60Hizo2gOokDH9qW=FnO0gEA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 12, 2015 at 01:35:37PM +0100, Mark Brown wrote:
-> On Wed, Aug 12, 2015 at 02:28:56PM +0200, Markus Pargmann wrote:
-> 
-> > Ok, would work for me as well although sizeof is not a preprocessor
-> > macro so I would probably leave it as it is. The whole regmap framework
-> > just didn't seem to support 64bit so I thought this was just not
-> > working.
-> 
-> I'd expect the framework to cope with things when ints are 64 bit.  We
-> don't try to support anything else, though.
+Hi Olof,
 
-For all non-busses it probably will. All the format functions are not
-working for 64bit at the moment. But that's something different, also I
-didn't see a bus device with 64bit yet.
 
-Best Regards,
+2015-08-11 22:07 GMT+09:00 Olof Johansson <olof@lixom.net>:
+> Hi,
+>
+> On Tue, Aug 04, 2015 at 08:21:04PM +0900, Masahiro Yamada wrote:
+>> Initial version of DTSI for ProXstream2 and PH1-LD6b and DTS for
+>> PH1-LD6b reference board.
+>>
+>> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+>> ---
+>>
+>>  arch/arm/boot/dts/Makefile                  |   3 +-
+>>  arch/arm/boot/dts/uniphier-ph1-ld6b-ref.dts | 105 +++++++++++
+>>  arch/arm/boot/dts/uniphier-ph1-ld6b.dtsi    |  67 +++++++
+>>  arch/arm/boot/dts/uniphier-proxstream2.dtsi | 273 ++++++++++++++++++++++++++++
+>>  4 files changed, 447 insertions(+), 1 deletion(-)
+>>  create mode 100644 arch/arm/boot/dts/uniphier-ph1-ld6b-ref.dts
+>>  create mode 100644 arch/arm/boot/dts/uniphier-ph1-ld6b.dtsi
+>>  create mode 100644 arch/arm/boot/dts/uniphier-proxstream2.dtsi
+>>
+>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+>> index 246473a..6eb3f2f 100644
+>> --- a/arch/arm/boot/dts/Makefile
+>> +++ b/arch/arm/boot/dts/Makefile
+>> @@ -645,7 +645,8 @@ dtb-$(CONFIG_ARCH_UNIPHIER) += \
+>>       uniphier-ph1-sld3-ref.dtb \
+>>       uniphier-ph1-ld4-ref.dtb \
+>>       uniphier-ph1-pro4-ref.dtb \
+>> -     uniphier-ph1-sld8-ref.dtb
+>> +     uniphier-ph1-sld8-ref.dtb \
+>> +     uniphier-ph1-ld6b-ref.dtb
+>
+> Please always add entries here sorted, don't just append. I've fixed it
+> up for you this time.
+>
+>
 
-Markus
+Please do not do that (without my ack).
+
+It was already sorted from old SoC to new SoC.
+
+Sorting chronologically (in other words, in the order of chip ID)
+makes more sense than sorting alphabetically.
+
+
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150812/f8619d20/attachment.sig>
+Best Regards
+Masahiro Yamada
