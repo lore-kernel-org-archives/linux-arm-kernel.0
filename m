@@ -1,85 +1,110 @@
-From: hongzhou.yang@mediatek.com (Hongzhou Yang)
-Date: Wed, 12 Aug 2015 12:19:59 -0700
-Subject: [PATCH] pinctrl: mediatek: Fix multiple registeration issue.
-In-Reply-To: <CAGS+omAE2AXpwnYtvetcjvP_6jUbE2HDuPfKfy=aLook2M-8LQ@mail.gmail.com>
-References: <1439268571-10895-1-git-send-email-hongzhou.yang@mediatek.com>
- <CAGS+omAE2AXpwnYtvetcjvP_6jUbE2HDuPfKfy=aLook2M-8LQ@mail.gmail.com>
-Message-ID: <1439407199.38706.3.camel@mussux00.eus.mediatek.inc>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Wed, 12 Aug 2015 12:47:37 -0700
+Subject: [PATCH 1/9] PM / Domains: Allocate memory outside domain locks
+In-Reply-To: <1438731339-58317-2-git-send-email-lina.iyer@linaro.org> (Lina
+ Iyer's message of "Tue, 4 Aug 2015 17:35:31 -0600")
+References: <1438731339-58317-1-git-send-email-lina.iyer@linaro.org>
+ <1438731339-58317-2-git-send-email-lina.iyer@linaro.org>
+Message-ID: <7hoaicnvae.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2015-08-11 at 15:45 +0800, Daniel Kurtz wrote:
-> On Tue, Aug 11, 2015 at 12:49 PM, Hongzhou Yang
-> <hongzhou.yang@mediatek.com> wrote:
-> > Use dynamic allocation to fix multiple registeration issue.
-> 
-> s/registeration/registration   - here and in the patch subject.
-> 
-> >
-> > --------------8<--------------------
-> 
-> I don't think this is required.
-> 
-> > Since our common driver need support main chip and PMU
-> > at the same time, that means it will register two
-> > pinctrl device, and the pinctrl_desc structure should
-> > be used two times.
-> >
-> > But pinctrl_desc use global static definition, then
-> > the latest registered pinctrl device will overwrite
-> > the old one's, all members in pinctrl_desc will set to
-> > the new one's, such as name, pins and pins numbers, etc.
-> > This is a bug. Changing to use devm_kzalloc to fix it.
-> >
-> > Cc: stable at vger.kernel.org # v4.1+
-> > Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
-> > ---
-> >  drivers/pinctrl/mediatek/pinctrl-mtk-common.c |   27 +++++++++++++++----------
-> >  1 file changed, 16 insertions(+), 11 deletions(-)
-> >
-> > diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-> > index ad1ea16..2bba504 100644
-> > --- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-> > +++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-> > @@ -1202,17 +1202,12 @@ static int mtk_pctrl_build_state(struct platform_device *pdev)
-> >         return 0;
-> >  }
-> >
-> > -static struct pinctrl_desc mtk_pctrl_desc = {
-> > -       .confops        = &mtk_pconf_ops,
-> > -       .pctlops        = &mtk_pctrl_ops,
-> > -       .pmxops         = &mtk_pmx_ops,
-> > -};
-> > -
-> >  int mtk_pctrl_init(struct platform_device *pdev,
-> >                 const struct mtk_pinctrl_devdata *data,
-> >                 struct regmap *regmap)
-> >  {
-> >         struct pinctrl_pin_desc *pins;
-> > +       struct pinctrl_desc *mtk_pctrl_desc;
-> >         struct mtk_pinctrl *pctl;
-> >         struct device_node *np = pdev->dev.of_node, *node;
-> >         struct property *prop;
-> > @@ -1265,12 +1260,22 @@ int mtk_pctrl_init(struct platform_device *pdev,
-> >
-> >         for (i = 0; i < pctl->devdata->npins; i++)
-> >                 pins[i] = pctl->devdata->pins[i].pin;
-> > -       mtk_pctrl_desc.name = dev_name(&pdev->dev);
-> > -       mtk_pctrl_desc.owner = THIS_MODULE;
-> > -       mtk_pctrl_desc.pins = pins;
-> > -       mtk_pctrl_desc.npins = pctl->devdata->npins;
-> > +
-> > +       mtk_pctrl_desc = devm_kzalloc(&pdev->dev, sizeof(*mtk_pctrl_desc),
-> > +                               GFP_KERNEL);
-> > +       if (!mtk_pctrl_desc)
-> > +               return -ENOMEM;
-> 
-> Just embed a struct pinctrl_desc in your struct mtk_pinctrl.
-> 
-> Best Regards,
-> -Dan
+Lina Iyer <lina.iyer@linaro.org> writes:
 
-Ok, I will send another patch to fix them, thank you.
+> In preparation for supporting IRQ-safe domains, allocate domain data
+> outside the domain locks. These functions are not called in an atomic
+> context, so we can always allocate memory using GFP_KERNEL. By
+> allocating memory before the locks, we can safely lock the domain using
+> spinlocks instead of mutexes.
+>
+> Cc: Ulf Hansson <ulf.hansson@linaro.org>
+> Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
+> Cc: Kevin Hilman <khilman@linaro.org>
+> Cc: Geert Uytterhoeven <geert@linux-m68k.org>
+> Cc: Krzysztof Koz?owski <k.kozlowski@samsung.com>
+> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
 
-Yours,
-Hongzhou
+Reviewed-by: Kevin Hilman <khilman@linaro.org>
+
+> ---
+>  drivers/base/power/domain.c | 30 +++++++++++++++---------------
+>  1 file changed, 15 insertions(+), 15 deletions(-)
+>
+> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+> index 7666a1c..5fd1306 100644
+> --- a/drivers/base/power/domain.c
+> +++ b/drivers/base/power/domain.c
+> @@ -1382,13 +1382,17 @@ int pm_genpd_remove_device(struct generic_pm_domain *genpd,
+>  int pm_genpd_add_subdomain(struct generic_pm_domain *genpd,
+>  			   struct generic_pm_domain *subdomain)
+>  {
+> -	struct gpd_link *link;
+> +	struct gpd_link *link, *itr;
+>  	int ret = 0;
+>  
+>  	if (IS_ERR_OR_NULL(genpd) || IS_ERR_OR_NULL(subdomain)
+>  	    || genpd == subdomain)
+>  		return -EINVAL;
+>  
+> +	link = kzalloc(sizeof(*link), GFP_KERNEL);
+> +	if (!link)
+> +		return -ENOMEM;
+> +
+>  	mutex_lock(&genpd->lock);
+>  	mutex_lock_nested(&subdomain->lock, SINGLE_DEPTH_NESTING);
+>  
+> @@ -1398,18 +1402,13 @@ int pm_genpd_add_subdomain(struct generic_pm_domain *genpd,
+>  		goto out;
+>  	}
+>  
+> -	list_for_each_entry(link, &genpd->master_links, master_node) {
+> -		if (link->slave == subdomain && link->master == genpd) {
+> +	list_for_each_entry(itr, &genpd->master_links, master_node) {
+> +		if (itr->slave == subdomain && itr->master == genpd) {
+>  			ret = -EINVAL;
+>  			goto out;
+>  		}
+>  	}
+>  
+> -	link = kzalloc(sizeof(*link), GFP_KERNEL);
+> -	if (!link) {
+> -		ret = -ENOMEM;
+> -		goto out;
+> -	}
+>  	link->master = genpd;
+>  	list_add_tail(&link->master_node, &genpd->master_links);
+>  	link->slave = subdomain;
+> @@ -1420,7 +1419,8 @@ int pm_genpd_add_subdomain(struct generic_pm_domain *genpd,
+>   out:
+>  	mutex_unlock(&subdomain->lock);
+>  	mutex_unlock(&genpd->lock);
+> -
+> +	if (ret)
+> +		kfree(link);
+>  	return ret;
+>  }
+>  
+> @@ -1511,17 +1511,17 @@ int pm_genpd_attach_cpuidle(struct generic_pm_domain *genpd, int state)
+>  	if (IS_ERR_OR_NULL(genpd) || state < 0)
+>  		return -EINVAL;
+>  
+> +	cpuidle_data = kzalloc(sizeof(*cpuidle_data), GFP_KERNEL);
+> +	if (!cpuidle_data)
+> +		return -ENOMEM;
+> +
+>  	mutex_lock(&genpd->lock);
+>  
+>  	if (genpd->cpuidle_data) {
+>  		ret = -EEXIST;
+> -		goto out;
+> -	}
+> -	cpuidle_data = kzalloc(sizeof(*cpuidle_data), GFP_KERNEL);
+> -	if (!cpuidle_data) {
+> -		ret = -ENOMEM;
+> -		goto out;
+> +		goto err_drv;
+>  	}
+> +
+>  	cpuidle_drv = cpuidle_driver_ref();
+>  	if (!cpuidle_drv) {
+>  		ret = -ENODEV;
