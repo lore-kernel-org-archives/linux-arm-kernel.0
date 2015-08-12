@@ -1,171 +1,52 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 12 Aug 2015 15:29:45 +0100
-Subject: [PATCH v8 4/7] arm64: kprobes instruction simulation support
-In-Reply-To: <1439254364-15362-5-git-send-email-dave.long@linaro.org>
-References: <1439254364-15362-1-git-send-email-dave.long@linaro.org>
- <1439254364-15362-5-git-send-email-dave.long@linaro.org>
-Message-ID: <20150812142945.GF23540@arm.com>
+From: jogo@openwrt.org (Jonas Gorski)
+Date: Wed, 12 Aug 2015 16:45:25 +0200
+Subject: [PATCH] spi: Mediatek: fix endian warnings
+In-Reply-To: <1439289789-29026-1-git-send-email-leilk.liu@mediatek.com>
+References: <1439289789-29026-1-git-send-email-leilk.liu@mediatek.com>
+Message-ID: <CAOiHx=mrDhxkMd5WVTpayyyxXHUDRTELubErynN3qd-v5qpCfw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+Hi,
 
-On Tue, Aug 11, 2015 at 01:52:41AM +0100, David Long wrote:
-> From: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
-> 
-> Kprobes needs simulation of instructions that cannot be stepped
-> from different memory location, e.g.: those instructions
-> that uses PC-relative addressing. In simulation, the behaviour
-> of the instruction is implemented using a copy of pt_regs.
-> 
-> Following instruction catagories are simulated:
->  - All branching instructions(conditional, register, and immediate)
->  - Literal access instructions(load-literal, adr/adrp)
-> 
-> Conditional execution is limited to branching instructions in
-> ARM v8. If conditions at PSTATE do not match the condition fields
-> of opcode, the instruction is effectively NOP. Kprobes considers
-> this case as 'miss'.
-> 
-> Thanks to Will Cohen for assorted suggested changes.
-> 
-> Signed-off-by: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
-> Signed-off-by: William Cohen <wcohen@redhat.com>
-> Signed-off-by: David A. Long <dave.long@linaro.org>
+On Tue, Aug 11, 2015 at 12:43 PM, Leilk Liu <leilk.liu@mediatek.com> wrote:
+> This patch fixes endian warnings detected by sparse:
+> - sparse: incorrect type in argument 1 (different base types)
+>           expected unsigned int [unsigned] val
+>           got restricted __le32 [usertype] <noident>
+> - sparse: incorrect type in argument 1 (different base types)
+>           expected unsigned int [unsigned] val
+>           got restricted __le32 [usertype] <noident>
 
-[...]
+This doesn't "fix" the warning, it only hides the warning and leaves
+the actual issue unfixed.
 
-> diff --git a/arch/arm64/kernel/probes-condn-check.c b/arch/arm64/kernel/probes-condn-check.c
-> new file mode 100644
-> index 0000000..e68aa0c
-> --- /dev/null
-> +++ b/arch/arm64/kernel/probes-condn-check.c
-> @@ -0,0 +1,122 @@
-> +/*
-> + * arch/arm64/kernel/probes-condn-check.c
-> + *
-> + * Copyright (C) 2013 Linaro Limited
-> + *
-> + * Copied from: arch/arm/kernel/kprobes-common.c
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-> + * General Public License for more details.
-> + *
-> + * Description:
-> + *
-> + *  AArch64 and AArch32 shares same conditional(CNZV) flags encoding.
-> + *  This file implements conditional check helpers compatible with
-> + *  both AArch64 and AArch32 modes. Uprobes on v8 can handle both 32-bit
-> + *  & 64-bit user-space instructions, so we abstract the common functions
-> + *  in this file. While AArch64 and AArch32 specific instruction handling
-> + *  are implemented in separate files, this file contains common bits.
-> + */
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <asm/probes.h>
-> +
-> +static unsigned long __kprobes __check_eq(unsigned long pstate)
-> +{
-> +       return pstate & PSR_Z_BIT;
-> +}
-> +
-> +static unsigned long __kprobes __check_ne(unsigned long pstate)
-> +{
-> +       return (~pstate) & PSR_Z_BIT;
-> +}
-> +
-> +static unsigned long __kprobes __check_cs(unsigned long pstate)
-> +{
-> +       return pstate & PSR_C_BIT;
-> +}
-> +
-> +static unsigned long __kprobes __check_cc(unsigned long pstate)
-> +{
-> +       return (~pstate) & PSR_C_BIT;
-> +}
-> +
-> +static unsigned long __kprobes __check_mi(unsigned long pstate)
-> +{
-> +       return pstate & PSR_N_BIT;
-> +}
-> +
-> +static unsigned long __kprobes __check_pl(unsigned long pstate)
-> +{
-> +       return (~pstate) & PSR_N_BIT;
-> +}
-> +
-> +static unsigned long __kprobes __check_vs(unsigned long pstate)
-> +{
-> +       return pstate & PSR_V_BIT;
-> +}
-> +
-> +static unsigned long __kprobes __check_vc(unsigned long pstate)
-> +{
-> +       return (~pstate) & PSR_V_BIT;
-> +}
-> +
-> +static unsigned long __kprobes __check_hi(unsigned long pstate)
-> +{
-> +       pstate &= ~(pstate >> 1);       /* PSR_C_BIT &= ~PSR_Z_BIT */
-> +       return pstate & PSR_C_BIT;
-> +}
-> +
-> +static unsigned long __kprobes __check_ls(unsigned long pstate)
-> +{
-> +       pstate &= ~(pstate >> 1);       /* PSR_C_BIT &= ~PSR_Z_BIT */
-> +       return (~pstate) & PSR_C_BIT;
-> +}
-> +
-> +static unsigned long __kprobes __check_ge(unsigned long pstate)
-> +{
-> +       pstate ^= (pstate << 3);        /* PSR_N_BIT ^= PSR_V_BIT */
-> +       return (~pstate) & PSR_N_BIT;
-> +}
-> +
-> +static unsigned long __kprobes __check_lt(unsigned long pstate)
-> +{
-> +       pstate ^= (pstate << 3);        /* PSR_N_BIT ^= PSR_V_BIT */
-> +       return pstate & PSR_N_BIT;
-> +}
-> +
-> +static unsigned long __kprobes __check_gt(unsigned long pstate)
-> +{
-> +       /*PSR_N_BIT ^= PSR_V_BIT */
-> +       unsigned long temp = pstate ^ (pstate << 3);
-> +
-> +       temp |= (pstate << 1);  /*PSR_N_BIT |= PSR_Z_BIT */
-> +       return (~temp) & PSR_N_BIT;
-> +}
-> +
-> +static unsigned long __kprobes __check_le(unsigned long pstate)
-> +{
-> +       /*PSR_N_BIT ^= PSR_V_BIT */
-> +       unsigned long temp = pstate ^ (pstate << 3);
-> +
-> +       temp |= (pstate << 1);  /*PSR_N_BIT |= PSR_Z_BIT */
-> +       return temp & PSR_N_BIT;
-> +}
-> +
-> +static unsigned long __kprobes __check_al(unsigned long pstate)
-> +{
-> +       return true;
-> +}
-> +
-> +kprobes_pstate_check_t * const kprobe_condition_checks[16] = {
-> +       &__check_eq, &__check_ne, &__check_cs, &__check_cc,
-> +       &__check_mi, &__check_pl, &__check_vs, &__check_vc,
-> +       &__check_hi, &__check_ls, &__check_ge, &__check_lt,
-> +       &__check_gt, &__check_le, &__check_al, &__check_al
-> +};
+>
+> Signed-off-by: Leilk Liu <leilk.liu@mediatek.com>
+> ---
+>  drivers/spi/spi-mt65xx.c | 6 ++++--
+>  1 file changed, 4 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/spi/spi-mt65xx.c b/drivers/spi/spi-mt65xx.c
+> index 4676b01..ae645fa 100644
+> --- a/drivers/spi/spi-mt65xx.c
+> +++ b/drivers/spi/spi-mt65xx.c
+> @@ -359,9 +359,11 @@ static void mtk_spi_setup_dma_addr(struct spi_master *master,
+>         struct mtk_spi *mdata = spi_master_get_devdata(master);
+>
+>         if (mdata->tx_sgl)
+> -               writel(cpu_to_le32(xfer->tx_dma), mdata->base + SPI_TX_SRC_REG);
+> +               writel((__force u32)cpu_to_le32(xfer->tx_dma),
+> +                      mdata->base + SPI_TX_SRC_REG);
+>         if (mdata->rx_sgl)
+> -               writel(cpu_to_le32(xfer->rx_dma), mdata->base + SPI_RX_DST_REG);
+> +               writel((__force u32)cpu_to_le32(xfer->rx_dma),
+> +                      mdata->base + SPI_RX_DST_REG);
 
-I *much* prefer this to our current inclusion / compilation of opcode.[ch]
-from arch/arm/. Do you think you could put this somewhere like insn.h and
-move armv8_deprecated.c over to using it?
+The issue here is that writel already does a cpu_to_le32 conversion,
+so the extra cpu_to_le32 calls are actually bogus and need to be
+removed. Else it will do a double conversion on big endian systems,
+resulting in the data being written in big endian.
 
-Will
+
+Jonas
