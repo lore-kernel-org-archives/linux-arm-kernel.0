@@ -1,73 +1,94 @@
-From: hramrach@gmail.com (Michal Suchanek)
-Date: Wed, 12 Aug 2015 15:04:22 +0200
-Subject: [linux-sunxi] Re: [PATCH resend 1/3] mmc: sunxi: fix timeout in
- sunxi_mmc_oclk_onoff
-In-Reply-To: <55CB3ED4.9000201@schinagl.nl>
-References: <cover.1439381423.git.hramrach@gmail.com>
- <7f9c6f99b31702c02436ef3356b3ebffa4754260.1439381423.git.hramrach@gmail.com>
- <55CB3CD7.2050200@redhat.com> <55CB3ED4.9000201@schinagl.nl>
-Message-ID: <CAOMqctRo8Kp6e33qVqVLNYt9pMmMAuoUHTwmqoBLGSpdQ_vu9Q@mail.gmail.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Wed, 12 Aug 2015 15:05:18 +0200
+Subject: [PATCH 09/20] regmap: _regmap_raw_write fix for busses without
+ write()
+In-Reply-To: <20150812123406.GG10748@sirena.org.uk>
+References: <1439374365-20623-1-git-send-email-mpa@pengutronix.de>
+ <1439374365-20623-10-git-send-email-mpa@pengutronix.de>
+ <20150812112035.GX10748@sirena.org.uk>
+ <20150812122011.GE19600@pengutronix.de>
+ <20150812123406.GG10748@sirena.org.uk>
+Message-ID: <20150812130518.GM19600@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 August 2015 at 14:40, Olliver Schinagl <oliver+list@schinagl.nl> wrote:
+On Wed, Aug 12, 2015 at 01:34:06PM +0100, Mark Brown wrote:
+> On Wed, Aug 12, 2015 at 02:20:11PM +0200, Markus Pargmann wrote:
+> > On Wed, Aug 12, 2015 at 12:20:35PM +0100, Mark Brown wrote:
+> > > On Wed, Aug 12, 2015 at 12:12:34PM +0200, Markus Pargmann wrote:
+> > > 
+> > > > @@ -1229,6 +1229,11 @@ int _regmap_raw_write(struct regmap *map, unsigned int reg,
+> > > >  		}
+> > > >  	}
+> > > >  
+> > > > +	if (!map->bus->write && val_len == map->format.val_bytes) {
+> > > > +		ret = _regmap_bus_reg_write(map, reg, *(unsigned int *)val);
+> > > > +		return ret;
+> > > > +	}
+> 
+> > > This is broken - you can't use a raw value as a register value.  The
+> 
+> > I am not sure what you mean here?
+> 
+> > The register value given to _regmap_raw_write is the real register
+> > value, not formatted differenty. This is given directly towards
+> > bus->reg_write() which should handle the rest.
+> 
+> I mean the value for the register, not the register address.
+> 
+> > At least that's how I understood the code. For example regmap_read()
+> > directly calls _regmap_read() which in turn calls directly
+> > bus->reg_read() without any formating.
+> 
+> You're adding this code to regmap_raw_write() which takes raw register
+> values for the device, not unsigned integers.
 
->
-> On 12-08-15 14:32, Hans de Goede wrote:
->>
->> Hi,
->>
->> On 12-08-15 14:23, michal.suchanek at ruk.cuni.cz wrote:
->>>
->>> The 250ms timeout is too short.
->>>
->>> On my system enabling the oclk takes under 50ms and disabling slightly
->>> over 100ms when idle. Under load disabling the clock can take over
->>> 350ms.
->>>
->>> This does not make mmc clock gating look like good option to have on
->>> sunxi but the system should not crash with mmc clock gating enabled
->>> nonetheless.
->>>
->>> This patch sets the timeout to 750ms and adds debug prints which show
->>> how long enabling/disabling the clock took so more data can be collected
->>> from other systems.
->>>
->>> Signed-off-by: Michal Suchanek <hramrach@gmail.com>
->>
->>
->> This is a big patch for just changing a timeout, most of this is in
->> extra verbosity which IMHO has little value, in the error path w
->> know we will have waited aprox 750 ms, so printing the waiting
->> time there is not worth all the extra code.
->>
->> As for adding the warning I'm even less of a big fan of that,
->> if we need higher timeouts, we need higher timeouts, spamming the
->> kernel logs with that we are actually hitting the higher timeouts
->> is not productive IMHO.
->>
->> Can you please resend this as a one-liner just changing the timeout ?
->>
+Ah yes, I see.
 
-If we expect the timeout to be short and it isn't that means something is wrong.
+> 
+> > > endianness of the device may not be the same as the endianness of the
+> > > system and you can't cast a value to unsigned int, the value may be of
+> > > any size.
+> 
+> > Yes right. On the other hand if bus->read() and bus->write() was not set
+> > in the init method (before this patch series) no formatting functions at
+> > all were assigned. So it was always ignored for bus->reg_read() and
+> > bus->reg_write()?!
+> 
+> I'm not sure what the "it" you're talking about here is, sorry.  There
+> are unsupported features in the API especially for cases that don't make
+> a huge amount of sense, the error handling isn't always complete.  It
+> sounds like you might be trying to support one of these nonsensical
+> cases - it's not obvious what raw I/O on a device where we don't know
+> the raw format of the device should mean or how anything could sensibly
+> use that.
 
-The user is probably experiencing degraded performance in that case so
-it's good to have a diagnostic for it IMHO.
+The bus and the regmap user are separate. So as a regmap user, I am not
+able to know if the bus the device is connected to actually supports raw
+reads/writes. At least it should not fail with a null pointer when using
+these functions anyway so yes error handling is missing a bit here.
 
-Yes, printing of the timeout in the error case does not have that much
-value but since it's calculated anyway I just pasted it there.
+Also the real use of this function is regmap_bulk_write() which always
+uses _regmap_raw_write() regardless of a missing bus->write() function.
+So regmap_bulk_write will fail for those as well and this should be
+supported.
 
-> While I can't speak for Michal obviously,
->
-> I left the debugging bit (in my v2 that i sent 2 minutes ago) as both you
-> and Hans where content with it back then and both acked it.
->
-> Michal, feel free to send the v3 without the debug info, unless you want me
-> to do it ;)
->
+But it is probably better to handle this in regmap_bulk_write() and
+add a simple check for bus->write() here.
 
-I don't really care either way so long as the boards do not crash.
+Best Regards,
 
-Thanks
+Markus
 
-Michal
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150812/a9d32853/attachment.sig>
