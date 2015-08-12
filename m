@@ -1,45 +1,51 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 12 Aug 2015 12:20:35 +0100
-Subject: [PATCH 09/20] regmap: _regmap_raw_write fix for busses without
- write()
-In-Reply-To: <1439374365-20623-10-git-send-email-mpa@pengutronix.de>
-References: <1439374365-20623-1-git-send-email-mpa@pengutronix.de>
- <1439374365-20623-10-git-send-email-mpa@pengutronix.de>
-Message-ID: <20150812112035.GX10748@sirena.org.uk>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 12 Aug 2015 12:24:28 +0100
+Subject: [PATCH v5 6/9] PCI: Drop references acquired by of_parse_phandle()
+In-Reply-To: <20150804215435.9189.94410.stgit@bhelgaas-glaptop2.roam.corp.google.com>
+References: <20150804214234.9189.42548.stgit@bhelgaas-glaptop2.roam.corp.google.com>
+ <20150804215435.9189.94410.stgit@bhelgaas-glaptop2.roam.corp.google.com>
+Message-ID: <20150812112428.GC5674@e107981-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 12, 2015 at 12:12:34PM +0200, Markus Pargmann wrote:
+On Tue, Aug 04, 2015 at 10:54:35PM +0100, Bjorn Helgaas wrote:
+> of_parse_phandle() returns a device_node pointer with the refcount
+> incremented.  We should dispose of this reference when we're finished.
+> 
+> Drop the reference acquired by of_parse_phandle().
+> 
+> Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+> ---
+>  drivers/pci/host/pci-mvebu.c |    1 +
+>  drivers/pci/host/pci-xgene.c |    1 +
+>  2 files changed, 2 insertions(+)
 
-> @@ -1229,6 +1229,11 @@ int _regmap_raw_write(struct regmap *map, unsigned int reg,
->  		}
->  	}
+It looks fine to me:
+
+Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+
+> diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+> index 70aa095..67ec5e1 100644
+> --- a/drivers/pci/host/pci-mvebu.c
+> +++ b/drivers/pci/host/pci-mvebu.c
+> @@ -879,6 +879,7 @@ static void mvebu_pcie_msi_enable(struct mvebu_pcie *pcie)
+>  		return;
 >  
-> +	if (!map->bus->write && val_len == map->format.val_bytes) {
-> +		ret = _regmap_bus_reg_write(map, reg, *(unsigned int *)val);
-> +		return ret;
-> +	}
-
-This is broken - you can't use a raw value as a register value.  The
-endianness of the device may not be the same as the endianness of the
-system and you can't cast a value to unsigned int, the value may be of
-any size.
-
-> @@ -1340,7 +1345,7 @@ int _regmap_raw_write(struct regmap *map, unsigned int reg,
->  	 * send the work_buf directly, otherwise try to do a gather
->  	 * write.
->  	 */
-> -	if (val == work_val) {
-> +	if (val == work_val && map->bus->write) {
->  		ret = map->bus->write(map->bus_context, map->work_buf,
->  				      map->format.reg_bytes +
->  				      map->format.pad_bytes +
-
-This appears to be another case of merging an unrelated change :(
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150812/42cd50dd/attachment.sig>
+>  	pcie->msi = of_pci_find_msi_chip_by_node(msi_node);
+> +	of_node_put(msi_node);
+>  
+>  	if (pcie->msi)
+>  		pcie->msi->dev = &pcie->pdev->dev;
+> diff --git a/drivers/pci/host/pci-xgene.c b/drivers/pci/host/pci-xgene.c
+> index a9dfb70..4c2fb1f 100644
+> --- a/drivers/pci/host/pci-xgene.c
+> +++ b/drivers/pci/host/pci-xgene.c
+> @@ -514,6 +514,7 @@ static int xgene_pcie_msi_enable(struct pci_bus *bus)
+>  	if (!bus->msi)
+>  		return -ENODEV;
+>  
+> +	of_node_put(msi_node);
+>  	bus->msi->dev = &bus->dev;
+>  	return 0;
+>  }
+> 
