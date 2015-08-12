@@ -1,42 +1,27 @@
 From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Wed, 12 Aug 2015 16:51:28 -0500
-Subject: [PATCH 1/3] Honor ACPI _CCA attribute setting
-In-Reply-To: <1439416290-21228-1-git-send-email-jeremy.linton@arm.com>
-References: <1439416290-21228-1-git-send-email-jeremy.linton@arm.com>
-Message-ID: <1439416290-21228-2-git-send-email-jeremy.linton@arm.com>
+Date: Wed, 12 Aug 2015 16:51:27 -0500
+Subject: [PATCH 0/3] Enable EHCI-platform driver for use with ACPI
+Message-ID: <1439416290-21228-1-git-send-email-jeremy.linton@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ACPI configurations can now mark devices as noncoherent,
-support that choice.
+This patch set enables the USB on the ARM Juno development platform
+when using an ACPI kernel. This patch is in two primary parts. First
+It tweaks the code in acpi_check_dma() to support the recently added
+CCA attribute which describes a device which is not cache coherent.
 
-Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
----
- include/acpi/acpi_bus.h | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+It then adds an error message if the device cannot be configured with
+the current DMA settings, finally it adds the ACPI PNP id to the
+acpi_match_table entry.
 
-diff --git a/include/acpi/acpi_bus.h b/include/acpi/acpi_bus.h
-index 83061ca..7ecb8e4 100644
---- a/include/acpi/acpi_bus.h
-+++ b/include/acpi/acpi_bus.h
-@@ -399,7 +399,7 @@ static inline bool acpi_check_dma(struct acpi_device *adev, bool *coherent)
- 	 * case 1. Do not support and disable DMA.
- 	 * case 2. Support but rely on arch-specific cache maintenance for
- 	 *         non-coherence DMA operations.
--	 * Currently, we implement case 1 above.
-+	 * Currently, we implement case 2 above.
- 	 *
- 	 * For the case when _CCA is missing (i.e. cca_seen=0) and
- 	 * platform specifies ACPI_CCA_REQUIRED, we do not support DMA,
-@@ -407,7 +407,8 @@ static inline bool acpi_check_dma(struct acpi_device *adev, bool *coherent)
- 	 *
- 	 * See acpi_init_coherency() for more info.
- 	 */
--	if (adev->flags.coherent_dma) {
-+	if (adev->flags.coherent_dma ||
-+	    (adev->flags.cca_seen && IS_ENABLED(CONFIG_ARM64))) {
- 		ret = true;
- 		if (coherent)
- 			*coherent = adev->flags.coherent_dma;
+Jeremy Linton (3):
+  Honor ACPI _CCA attribute setting
+  Display a DMA error message
+  Add ACPI bindings for the EHCI platform driver.
+
+ drivers/usb/host/ehci-platform.c | 13 ++++++++++++-
+ include/acpi/acpi_bus.h          |  5 +++--
+ 2 files changed, 15 insertions(+), 3 deletions(-)
+
 -- 
 2.4.3
