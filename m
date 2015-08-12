@@ -1,28 +1,28 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 12 Aug 2015 22:05:43 +0100
-Subject: My boot farm
-In-Reply-To: <20150812073515.GE7557@n2100.arm.linux.org.uk>
-References: <20150812073515.GE7557@n2100.arm.linux.org.uk>
-Message-ID: <20150812210543.GL7557@n2100.arm.linux.org.uk>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Wed, 12 Aug 2015 17:08:18 -0400 (EDT)
+Subject: [PATCH 0/4] USB: host: ohci-at91: cleanups
+In-Reply-To: <1439216592-11381-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <Pine.LNX.4.44L0.1508121708030.1582-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 12, 2015 at 08:35:15AM +0100, Russell King - ARM Linux wrote:
-> ... will be offline for a while as, on the face of it, the Digi TS16
-> rack (terminal server) internal power supply seems to have died.  I'll
-> investigate further on Friday, but in the mean time, I'm taking the
-> boot tests completely offline until it's resolved.
+On Mon, 10 Aug 2015, Alexandre Belloni wrote:
 
-It turns out that I had more time today than I expected to look at it.
-What's died in it is the open-frame switch-mode PSU, ITS UO01511120,
-which supplies 12V 1.3A to the main board - which looks to be due to
-a manufacturing error in component placement.
+> Hi,
+> 
+> Here are a few cleanups for ohci-at91. This is the fallout of AT91 now being DT
+> only.
+> 
+> Alexandre Belloni (4):
+>   USB: host: ohci-at91: move at91_usbh_data definition in c file
+>   USB: host: ohci-at91: depend on OF
+>   USB: host: ohci-at91: merge ohci_at91_of_init in
+>     ohci_hcd_at91_drv_probe
+>   USB: host: ohci-at91: merge loops in ohci_hcd_at91_drv_probe
+> 
+>  drivers/usb/host/Kconfig            |   8 +-
+>  drivers/usb/host/ohci-at91.c        | 179 ++++++++++++++++--------------------
+>  include/linux/platform_data/atmel.h |  12 ---
+>  3 files changed, 85 insertions(+), 114 deletions(-)
 
-In the mean time, I've jury-rigged an alternative 12V power source for
-the main board in the terminal server, so the boot farm should be back
-up and running tonight, provided all the RJ45's found their correct
-holes. :)
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Acked-by: Alan Stern <stern@rowland.harvard.edu>
