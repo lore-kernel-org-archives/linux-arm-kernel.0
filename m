@@ -1,37 +1,69 @@
 From: hramrach@gmail.com (Michal Suchanek)
-Date: Wed, 12 Aug 2015 14:10:23 +0200
-Subject: [PATCH 0/3] misc MMC fixes
-Message-ID: <cover.1439381423.git.hramrach@gmail.com>
+Date: 12 Aug 2015 12:23:10 -0000
+Subject: [PATCH 2/3] mmc: dw_mmc: simplify the SDMMC_CLKEN_LOW_PWR logic
+In-Reply-To: <cover.1439381423.git.hramrach@gmail.com>
+References: <cover.1439381423.git.hramrach@gmail.com>
+Message-ID: <3d03bfe2c18789eefa038018467c9c63c94ae4a2.1439381423.git.hramrach@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+The driver has open-coded test for SDIO cards. Use the mmc core provided
+MMC_QUIRK_BROKEN_CLK_GATING flag instead.
 
-The first sunxi patch from this series was rejected on the basis that this clock
-gating functionality is obsolete and should be eventually removed.
+As a bonus this may enable clock gating on SDIO cards that are known to
+work with it.
 
-However, the function still exists in the current code and until removed it
-should be corrected to work properly. Turning off the clock may be used for
-something other than the clock gating feature, too.
+Signed-off-by: Michal Suchanek <hramrach@gmail.com>
+---
+ drivers/mmc/host/dw_mmc.c | 33 +++++++++++++++------------------
+ 1 file changed, 15 insertions(+), 18 deletions(-)
 
-The next sunxi patch is for automatic clock gating on the controller which
-should replace the in-kernel mmc clock gating we have now.
-
-I looked at dw_mmc for how this is supposed to work and it turns out it's not
-exactly clean there either.
-
-Thanks
-
-Michal
-
-Michal Suchanek (3):
-  mmc: sunxi: fix timeout in sunxi_mmc_oclk_onoff
-  mmc: dw_mmc: simplify the SDMMC_CLKEN_LOW_PWR logic
-  mmc: sunxi: use controller automatic clock gating.
-
- drivers/mmc/host/dw_mmc.c    | 33 +++++++++++++++------------------
- drivers/mmc/host/sunxi-mmc.c | 29 +++++++++++++++++++++++++----
- 2 files changed, 40 insertions(+), 22 deletions(-)
-
+diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+index 40e9d8e..3bc9fd7 100644
+--- a/drivers/mmc/host/dw_mmc.c
++++ b/drivers/mmc/host/dw_mmc.c
+@@ -1335,27 +1335,24 @@ static void dw_mci_init_card(struct mmc_host *mmc, struct mmc_card *card)
+ 	 * description of the CLKENA register we should disable low power mode
+ 	 * for SDIO cards if we need SDIO interrupts to work.
+ 	 */
+-	if (mmc->caps & MMC_CAP_SDIO_IRQ) {
+-		const u32 clken_low_pwr = SDMMC_CLKEN_LOW_PWR << slot->id;
+-		u32 clk_en_a_old;
+-		u32 clk_en_a;
++	const u32 clken_low_pwr = SDMMC_CLKEN_LOW_PWR << slot->id;
++	u32 clk_en_a_old;
++	u32 clk_en_a;
+ 
+-		clk_en_a_old = mci_readl(host, CLKENA);
++	clk_en_a_old = mci_readl(host, CLKENA);
+ 
+-		if (card->type == MMC_TYPE_SDIO ||
+-		    card->type == MMC_TYPE_SD_COMBO) {
+-			set_bit(DW_MMC_CARD_NO_LOW_PWR, &slot->flags);
+-			clk_en_a = clk_en_a_old & ~clken_low_pwr;
+-		} else {
+-			clear_bit(DW_MMC_CARD_NO_LOW_PWR, &slot->flags);
+-			clk_en_a = clk_en_a_old | clken_low_pwr;
+-		}
++	if (card->quirks & MMC_QUIRK_BROKEN_CLK_GATING) {
++		set_bit(DW_MMC_CARD_NO_LOW_PWR, &slot->flags);
++		clk_en_a = clk_en_a_old & ~clken_low_pwr;
++	} else {
++		clear_bit(DW_MMC_CARD_NO_LOW_PWR, &slot->flags);
++		clk_en_a = clk_en_a_old | clken_low_pwr;
++	}
+ 
+-		if (clk_en_a != clk_en_a_old) {
+-			mci_writel(host, CLKENA, clk_en_a);
+-			mci_send_cmd(slot, SDMMC_CMD_UPD_CLK |
+-				     SDMMC_CMD_PRV_DAT_WAIT, 0);
+-		}
++	if (clk_en_a != clk_en_a_old) {
++		mci_writel(host, CLKENA, clk_en_a);
++		mci_send_cmd(slot, SDMMC_CMD_UPD_CLK |
++				SDMMC_CMD_PRV_DAT_WAIT, 0);
+ 	}
+ }
+ 
 -- 
 2.1.4
