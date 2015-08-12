@@ -1,53 +1,76 @@
-From: hramrach@gmail.com (Michal Suchanek)
-Date: Wed, 12 Aug 2015 14:53:42 +0200
-Subject: [linux-sunxi] [PATCH 3/3] mmc: sunxi: use controller automatic
- clock gating.
-In-Reply-To: <55CB3D92.6040403@redhat.com>
-References: <cover.1439381423.git.hramrach@gmail.com>
- <c33b221f9b622e3bad9d855a7ad1887b82827244.1439381423.git.hramrach@gmail.com>
- <55CB3D92.6040403@redhat.com>
-Message-ID: <CAOMqctSVN5y+Hs0_+aaZ=Gu_kr6_-1WONO585Y1bUEg79WJoAw@mail.gmail.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Wed, 12 Aug 2015 15:02:51 +0200
+Subject: [PATCH v2 05/15] KVM: arm/arm64: make GIC frame address
+ initialization model specific
+In-Reply-To: <1436538111-4294-6-git-send-email-andre.przywara@arm.com>
+References: <1436538111-4294-1-git-send-email-andre.przywara@arm.com>
+ <1436538111-4294-6-git-send-email-andre.przywara@arm.com>
+Message-ID: <55CB43FB.4070400@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 August 2015 at 14:35, Hans de Goede <hdegoede@redhat.com> wrote:
-> Hi,
->
-> On 12-08-15 14:23, Michal Suchanek wrote:
->>
->> When core does not set the MMC_QUIRK_BROKEN_CLK_GATING flag enable
->> automatic hardware controlled clock gating on the mmc interface.
->>
->> Signed-off-by: Michal Suchanek <hramrach@gmail.com>
->
->
-> In general this looks good, but I wonder how intensively this has
-> been tested ?
+On 07/10/2015 04:21 PM, Andre Przywara wrote:
+> Currently we initialize all the possible GIC frame addresses in one
+> function, without looking at the specific GIC model we instantiate
+> for the guest.
+> As this gets confusing when adding another VGIC model later, lets
+> move these initializations into the respective model's init 
+nit: tobe more precise the init emulation function (not the
+vgic_v2/v3_init_model model's init function). pfouh?! ;-)
+functions.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+>  virt/kvm/arm/vgic-v2-emul.c | 3 +++
+>  virt/kvm/arm/vgic-v3-emul.c | 3 +++
+>  virt/kvm/arm/vgic.c         | 3 ---
+>  3 files changed, 6 insertions(+), 3 deletions(-)
+> 
+> diff --git a/virt/kvm/arm/vgic-v2-emul.c b/virt/kvm/arm/vgic-v2-emul.c
+> index 1390797..8faa28c 100644
+> --- a/virt/kvm/arm/vgic-v2-emul.c
+> +++ b/virt/kvm/arm/vgic-v2-emul.c
+> @@ -567,6 +567,9 @@ void vgic_v2_init_emulation(struct kvm *kvm)
+>  	dist->vm_ops.init_model = vgic_v2_init_model;
+>  	dist->vm_ops.map_resources = vgic_v2_map_resources;
+>  
+> +	dist->vgic_cpu_base = VGIC_ADDR_UNDEF;
+> +	dist->vgic_dist_base = VGIC_ADDR_UNDEF;
+Looks strange to see the common dist_base here. Why don't you leave it
+in common part, kvm_vgic_create; all the more so you left
+kvm->arch.vgic.vctrl_base = vgic->vctrl_base in kvm_vgic_create.
 
-Unlike the wrong timeout it does not cause the boards to crash frequently ;-)
-
-It would be nice if somebody actively using some board atm tested this.
-
-> Also given the long latencies when using manual
-> clock on/off support, have you done any testing to check what
-
-I suspect the long latency is due to the controller flushing data to
-the card or something like that since it happens only under load.
-
-> sort of latencies this adds, e.g. Both with and without
-> the patch, dump all the filesystem caches:
->
-> echo 3 > /proc/sys/vm/drop_caches
->
-> And then do:
->
-> time cat /some/small/file/on/the/sdcard
->
-> Do this at least 3 time both with and without the patch, and see
-> if there are any noticable differences ?
-
-Yes, it would be good idea to test.
-
-Thanks
-
-Michal
+Eric
+> +
+>  	kvm->arch.max_vcpus = VGIC_V2_MAX_CPUS;
+>  }
+>  
+> diff --git a/virt/kvm/arm/vgic-v3-emul.c b/virt/kvm/arm/vgic-v3-emul.c
+> index d2eeb20..1f42348 100644
+> --- a/virt/kvm/arm/vgic-v3-emul.c
+> +++ b/virt/kvm/arm/vgic-v3-emul.c
+> @@ -885,6 +885,9 @@ void vgic_v3_init_emulation(struct kvm *kvm)
+>  	dist->vm_ops.destroy_model = vgic_v3_destroy_model;
+>  	dist->vm_ops.map_resources = vgic_v3_map_resources;
+>  
+> +	dist->vgic_dist_base = VGIC_ADDR_UNDEF;
+> +	dist->vgic_redist_base = VGIC_ADDR_UNDEF;
+> +
+>  	kvm->arch.max_vcpus = KVM_MAX_VCPUS;
+>  }
+>  
+> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+> index cc8f5ed..59f1801 100644
+> --- a/virt/kvm/arm/vgic.c
+> +++ b/virt/kvm/arm/vgic.c
+> @@ -1830,9 +1830,6 @@ int kvm_vgic_create(struct kvm *kvm, u32 type)
+>  	kvm->arch.vgic.in_kernel = true;
+>  	kvm->arch.vgic.vgic_model = type;
+>  	kvm->arch.vgic.vctrl_base = vgic->vctrl_base;
+> -	kvm->arch.vgic.vgic_dist_base = VGIC_ADDR_UNDEF;
+> -	kvm->arch.vgic.vgic_cpu_base = VGIC_ADDR_UNDEF;
+> -	kvm->arch.vgic.vgic_redist_base = VGIC_ADDR_UNDEF;
+>  
+>  out_unlock:
+>  	for (; vcpu_lock_idx >= 0; vcpu_lock_idx--) {
+> 
