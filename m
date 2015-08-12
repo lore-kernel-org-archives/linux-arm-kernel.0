@@ -1,26 +1,31 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 11 Aug 2015 17:30:54 -0700
-Subject: [PATCH 7/7] clk: atlas7: fix pll missed divide NR in fraction mode
-In-Reply-To: <1438699532-13860-8-git-send-email-21cnbao@gmail.com>
-References: <1438699532-13860-1-git-send-email-21cnbao@gmail.com>
- <1438699532-13860-8-git-send-email-21cnbao@gmail.com>
-Message-ID: <20150812002805.GH26614@codeaurora.org>
+Date: Tue, 11 Aug 2015 17:38:17 -0700
+Subject: [PATCH v4 0/4] clk: hisilicon: support stub clock
+In-Reply-To: <1438673249-6051-1-git-send-email-leo.yan@linaro.org>
+References: <1438673249-6051-1-git-send-email-leo.yan@linaro.org>
+Message-ID: <20150812003817.GI26614@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/04, Barry Song wrote:
-> From: Guo Zeng <guo.zeng@csr.com>
+On 08/04, Leo Yan wrote:
+> This series adds support for hisilicon stub clock driver. On hi6220,
+> the bootloader needs load the firmware image and set info for OPPs;
+> after run into kernel, the stub clock driver is used to communicate
+> w/t firmware for cpu dynamic frequency scaling.
 > 
-> PLL VCO frequency is given by Fvco = Fref * 2 * NF / NR
-> in integer-N mode, or by Fvco = Fref * SSN / NR in Spread
-> Spectrum (fractional-N) mode. Thus fix the missing part
-> of NR
+> In patch series v1/v2, the stub clock driver simply writes request in
+> sram and send ipc to firmware; For patch series v3, the firmware has
+> been upgraded to use mailbox, so stub clock driver will call standard
+> mailbox APIs to request mailbox channel and send message to firmware.
 > 
-> Signed-off-by: Guo Zeng <guo.zeng@csr.com>
-> Signed-off-by: Barry Song <Baohua.Song@csr.com>
-> ---
+> Patch 4 adds stub clock node into dts and it references mailbox with
+> phandle, so patch 4 will depend on mailbox driver's patch series [1].
+> These patches have been tested on 96board hikey and is used by cpufreq
+> driver.
 
-Applied to clk-next
+The To: list is everyone, so I'm not sure who is supposed to
+apply these patches. I'd like to take patches 1, 2, and 3 through
+the clk tree though.
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
