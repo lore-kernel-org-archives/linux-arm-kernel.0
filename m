@@ -1,134 +1,67 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 12 Aug 2015 11:26:25 +0100
-Subject: [PATCH v4 2/2] mfd: axp20x: Add a cell for the usb power_supply
- part of the axp20x PMICs
-In-Reply-To: <55CB1DDF.7000201@redhat.com>
-References: <1439049521-30766-1-git-send-email-hdegoede@redhat.com>
- <1439049521-30766-2-git-send-email-hdegoede@redhat.com>
- <20150811141811.GM18282@x1> <55CB05AD.1030707@redhat.com>
- <20150812092900.GC18282@x1> <55CB1DDF.7000201@redhat.com>
-Message-ID: <20150812102625.GE18282@x1>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 12 Aug 2015 15:59:43 +0530
+Subject: [PATCH V1 Resend 06/10] drivers: rtc: Drop (un)likely before
+ IS_ERR(_OR_NULL)
+In-Reply-To: <cover.1439375087.git.viresh.kumar@linaro.org>
+References: <cover.1439375087.git.viresh.kumar@linaro.org>
+Message-ID: <1a92f2e1af5309ece9736f79f312e90486a98825.1439375087.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 12 Aug 2015, Hans de Goede wrote:
+IS_ERR(_OR_NULL) already contain an 'unlikely' compiler flag and there
+is no need to do that again from its callers. Drop it.
 
-> Hi,
-> 
-> On 12-08-15 11:29, Lee Jones wrote:
-> >On Wed, 12 Aug 2015, Hans de Goede wrote:
-> >
-> >>Hi,
-> >>
-> >>On 11-08-15 16:18, Lee Jones wrote:
-> >>>On Sat, 08 Aug 2015, Hans de Goede wrote:
-> >>>
-> >>>>Add a cell for the usb power_supply part of the axp20x PMICs.
-> >>>>
-> >>>>Note that this cell is only for the usb power_supply part and not the
-> >>>>ac-power / battery-charger / rtc-backup-bat-charger bits.
-> >>>>
-> >>>>Depending on the board each of those must be enabled / disabled separately
-> >>>>in devicetree as most boards do not use all 4. So in dt each one needs its
-> >>>>own child-node of the axp20x node. Another reason for using separate child
-> >>>>nodes for each is so that other devicetree nodes can have a power-supply
-> >>>>property with a phandle referencing a node representing a single
-> >>>>power-supply.
-> >>>>
-> >>>>The decision to use a separate devicetree node for each is reflected on
-> >>>>the kernel side by each getting its own mfd-cell / platform_device and
-> >>>>platform-driver.
-> >>>>
-> >>>>Note this commit also makes some whitespace changes to the intialization
-> >>>>of existing cells in axp20x_cells, these are pure whitespace changes,
-> >>>>functionally nothing changes.
-> >>>>
-> >>>>Cc: Bruno Pr?mont <bonbons@linux-vserver.org>
-> >>>>Signed-off-by: Bruno Pr?mont <bonbons@linux-vserver.org>
-> >>>>Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> >>>>Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> >>>>Acked-by: Lee Jones <lee.jones@linaro.org>
-> >>>>---
-> >>>>Changes in v2:
-> >>>>-Use DEFINE_RES_IRQ_NAMED
-> >>>>-Change indentation of axp20x_cells initializers to avoid line wrapping
-> >>>>Changes in v3:
-> >>>>-Improve commit message
-> >>>>-Add Bruno's S-o-b
-> >>>>---
-> >>>>  drivers/mfd/axp20x.c | 20 ++++++++++++++++----
-> >>>>  1 file changed, 16 insertions(+), 4 deletions(-)
-> >>>
-> >>>Applied, thanks.
-> >>
-> >>Great, but I'm not seeing this in:
-> >>
-> >>https://git.kernel.org/cgit/linux/kernel/git/lee/mfd.git/log/?h=for-mfd-next
-> >
-> >Well it does usually take me a day or two push my local branch out,
-> >however in this case I had actually dropped a ball somewhere.  I've
-> >been through my backlog of 'applied' patches and these two are the
-> >only ones I failed to pick.  I have now, re-picked, re-applied and
-> >pushed the branch out.  Let me know if something is still not right.
-> 
-> Looks good now, thanks.
+gemini driver was using likely() for a failure case while the rtc driver
+is getting registered. That looks wrong and it should really be
+unlikely. But because we are killing all the unlikely() flags, lets kill
+that too.
 
-You're welcome.
+Acked-by: Hans Ulli Kroll <ulli.kroll@googlemail.com> (gemini)
+Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+---
+ drivers/rtc/interface.c  | 2 +-
+ drivers/rtc/rtc-bfin.c   | 2 +-
+ drivers/rtc/rtc-gemini.c | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
 
-> >Sorry for the inconvenience.
-> 
-> No problem, thanks for all the great work you are doing on maintaining
-> the mfd subsys.
-
-Thanks. :)
-
-I should print and frame this, to look at when I think about not doing
-it anymore.
-
-> >>>>diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
-> >>>>index d9f2f96..3f576b7 100644
-> >>>>--- a/drivers/mfd/axp20x.c
-> >>>>+++ b/drivers/mfd/axp20x.c
-> >>>>@@ -140,6 +140,13 @@ static struct resource axp20x_pek_resources[] = {
-> >>>>  	},
-> >>>>  };
-> >>>>
-> >>>>+static struct resource axp20x_usb_power_supply_resources[] = {
-> >>>>+	DEFINE_RES_IRQ_NAMED(AXP20X_IRQ_VBUS_PLUGIN, "VBUS_PLUGIN"),
-> >>>>+	DEFINE_RES_IRQ_NAMED(AXP20X_IRQ_VBUS_REMOVAL, "VBUS_REMOVAL"),
-> >>>>+	DEFINE_RES_IRQ_NAMED(AXP20X_IRQ_VBUS_VALID, "VBUS_VALID"),
-> >>>>+	DEFINE_RES_IRQ_NAMED(AXP20X_IRQ_VBUS_NOT_VALID, "VBUS_NOT_VALID"),
-> >>>>+};
-> >>>>+
-> >>>>  static struct resource axp22x_pek_resources[] = {
-> >>>>  	{
-> >>>>  		.name   = "PEK_DBR",
-> >>>>@@ -432,11 +439,16 @@ static const struct regmap_irq_chip axp288_regmap_irq_chip = {
-> >>>>
-> >>>>  static struct mfd_cell axp20x_cells[] = {
-> >>>>  	{
-> >>>>-		.name			= "axp20x-pek",
-> >>>>-		.num_resources		= ARRAY_SIZE(axp20x_pek_resources),
-> >>>>-		.resources		= axp20x_pek_resources,
-> >>>>+		.name		= "axp20x-pek",
-> >>>>+		.num_resources	= ARRAY_SIZE(axp20x_pek_resources),
-> >>>>+		.resources	= axp20x_pek_resources,
-> >>>>  	}, {
-> >>>>-		.name			= "axp20x-regulator",
-> >>>>+		.name		= "axp20x-regulator",
-> >>>>+	}, {
-> >>>>+		.name		= "axp20x-usb-power-supply",
-> >>>>+		.of_compatible	= "x-powers,axp202-usb-power-supply",
-> >>>>+		.num_resources	= ARRAY_SIZE(axp20x_usb_power_supply_resources),
-> >>>>+		.resources	= axp20x_usb_power_supply_resources,
-> >>>>  	},
-> >>>>  };
-> >>>>
-> >>>
-> >
-
+diff --git a/drivers/rtc/interface.c b/drivers/rtc/interface.c
+index 11b639067312..5836751b8203 100644
+--- a/drivers/rtc/interface.c
++++ b/drivers/rtc/interface.c
+@@ -564,7 +564,7 @@ enum hrtimer_restart rtc_pie_update_irq(struct hrtimer *timer)
+ void rtc_update_irq(struct rtc_device *rtc,
+ 		unsigned long num, unsigned long events)
+ {
+-	if (unlikely(IS_ERR_OR_NULL(rtc)))
++	if (IS_ERR_OR_NULL(rtc))
+ 		return;
+ 
+ 	pm_stay_awake(rtc->dev.parent);
+diff --git a/drivers/rtc/rtc-bfin.c b/drivers/rtc/rtc-bfin.c
+index 3d44b11721ea..535a5f9338d0 100644
+--- a/drivers/rtc/rtc-bfin.c
++++ b/drivers/rtc/rtc-bfin.c
+@@ -361,7 +361,7 @@ static int bfin_rtc_probe(struct platform_device *pdev)
+ 	/* Register our RTC with the RTC framework */
+ 	rtc->rtc_dev = devm_rtc_device_register(dev, pdev->name, &bfin_rtc_ops,
+ 						THIS_MODULE);
+-	if (unlikely(IS_ERR(rtc->rtc_dev)))
++	if (IS_ERR(rtc->rtc_dev))
+ 		return PTR_ERR(rtc->rtc_dev);
+ 
+ 	/* Grab the IRQ and init the hardware */
+diff --git a/drivers/rtc/rtc-gemini.c b/drivers/rtc/rtc-gemini.c
+index 35f4486738fc..2fed93e1114a 100644
+--- a/drivers/rtc/rtc-gemini.c
++++ b/drivers/rtc/rtc-gemini.c
+@@ -148,7 +148,7 @@ static int gemini_rtc_probe(struct platform_device *pdev)
+ 
+ 	rtc->rtc_dev = rtc_device_register(pdev->name, dev,
+ 					   &gemini_rtc_ops, THIS_MODULE);
+-	if (likely(IS_ERR(rtc->rtc_dev)))
++	if (IS_ERR(rtc->rtc_dev))
+ 		return PTR_ERR(rtc->rtc_dev);
+ 
+ 	return 0;
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+2.4.0
