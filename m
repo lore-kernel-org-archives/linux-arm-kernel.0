@@ -1,36 +1,81 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Wed, 12 Aug 2015 12:12:28 +0200
-Subject: [PATCH 03/20] regmap: Fix integertypes for register address and value
+Date: Wed, 12 Aug 2015 12:12:40 +0200
+Subject: [PATCH 15/20] regmap-i2c: Add smbus i2c block support
 In-Reply-To: <1439374365-20623-1-git-send-email-mpa@pengutronix.de>
 References: <1439374365-20623-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1439374365-20623-4-git-send-email-mpa@pengutronix.de>
+Message-ID: <1439374365-20623-16-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These values are defined as unsigned int in the struct and are assigned
-to int values.
-
-This patch fixes the type to be unsigned int instead.
+This allows to read/write up to 32 bytes of data and is to be prefered
+if supported before the register read/write smbus support.
 
 Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 ---
- drivers/base/regmap/regmap.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/base/regmap/regmap-i2c.c | 46 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 46 insertions(+)
 
-diff --git a/drivers/base/regmap/regmap.c b/drivers/base/regmap/regmap.c
-index 64a106af174f..4fe5f63edb54 100644
---- a/drivers/base/regmap/regmap.c
-+++ b/drivers/base/regmap/regmap.c
-@@ -1763,8 +1763,8 @@ static int _regmap_raw_multi_reg_write(struct regmap *map,
- 	u8 = buf;
+diff --git a/drivers/base/regmap/regmap-i2c.c b/drivers/base/regmap/regmap-i2c.c
+index 4b76e33110a2..2de6eb4e6ec3 100644
+--- a/drivers/base/regmap/regmap-i2c.c
++++ b/drivers/base/regmap/regmap-i2c.c
+@@ -209,11 +209,57 @@ static struct regmap_bus regmap_i2c = {
+ 	.val_format_endian_default = REGMAP_ENDIAN_BIG,
+ };
  
- 	for (i = 0; i < num_regs; i++) {
--		int reg = regs[i].reg;
--		int val = regs[i].def;
-+		unsigned int reg = regs[i].reg;
-+		unsigned int val = regs[i].def;
- 		trace_regmap_hw_write_start(map, reg, 1);
- 		map->format.format_reg(u8, reg, map->reg_shift);
- 		u8 += reg_bytes + pad_bytes;
++static int regmap_i2c_smbus_i2c_write(void *context, const void *data,
++				      size_t count)
++{
++	struct device *dev = context;
++	struct i2c_client *i2c = to_i2c_client(dev);
++
++	if (count < 1 || count >= I2C_SMBUS_BLOCK_MAX)
++		return -EINVAL;
++
++	--count;
++	return i2c_smbus_write_i2c_block_data(i2c, ((u8 *)data)[0], count,
++					      ((u8 *)data + 1));
++}
++
++static int regmap_i2c_smbus_i2c_read(void *context, const void *reg,
++				     size_t reg_size, void *val,
++				     size_t val_size)
++{
++	struct device *dev = context;
++	struct i2c_client *i2c = to_i2c_client(dev);
++	int ret;
++
++	if (reg_size != 1)
++		return -EINVAL;
++	if (val_size < 1 || val_size >= I2C_SMBUS_BLOCK_MAX)
++		return -EINVAL;
++
++	ret = i2c_smbus_read_i2c_block_data(i2c, ((u8 *)reg)[0], val_size, val);
++	if (ret == val_size)
++		return 0;
++	else if (ret < 0)
++		return ret;
++	else
++		return -EIO;
++}
++
++static struct regmap_bus regmap_i2c_smbus_i2c_block = {
++	.write = regmap_i2c_smbus_i2c_write,
++	.read = regmap_i2c_smbus_i2c_read,
++	.max_raw_io = I2C_SMBUS_BLOCK_MAX,
++};
++
+ static const struct regmap_bus *regmap_get_i2c_bus(struct i2c_client *i2c,
+ 					const struct regmap_config *config)
+ {
+ 	if (i2c_check_functionality(i2c->adapter, I2C_FUNC_I2C))
+ 		return &regmap_i2c;
++	else if (config->reg_bits == 8 &&
++		 i2c_check_functionality(i2c->adapter,
++					 I2C_FUNC_SMBUS_I2C_BLOCK))
++		return &regmap_i2c_smbus_i2c_block;
+ 	else if (config->val_bits == 16 && config->reg_bits == 8 &&
+ 		 i2c_check_functionality(i2c->adapter,
+ 					 I2C_FUNC_SMBUS_WORD_DATA))
 -- 
 2.4.6
