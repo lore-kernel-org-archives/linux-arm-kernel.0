@@ -1,45 +1,77 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 12 Aug 2015 12:51:36 +0100
-Subject: [PATCH 13/20] regmap: regmap max_raw_io getter function
-In-Reply-To: <1439374365-20623-14-git-send-email-mpa@pengutronix.de>
-References: <1439374365-20623-1-git-send-email-mpa@pengutronix.de>
- <1439374365-20623-14-git-send-email-mpa@pengutronix.de>
-Message-ID: <20150812115136.GA10748@sirena.org.uk>
+From: oliver+list@schinagl.nl (Olliver Schinagl)
+Date: Wed, 12 Aug 2015 13:55:59 +0200
+Subject: [linux-sunxi] MMC clock gating broken on a20
+In-Reply-To: <55CB3095.9050509@schinagl.nl>
+References: <CAOMqctRhQHv1idY0ci6uzDxnv5oj7dbHtc4CTfo75ipXkXd1gw@mail.gmail.com>
+ <55CB3095.9050509@schinagl.nl>
+Message-ID: <55CB344F.6050608@schinagl.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 12, 2015 at 12:12:38PM +0200, Markus Pargmann wrote:
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+Actually, I've reverted hans's
 
-Your changelog doesn't mention why anything would reasonably want to use
-this and...
+mmc: sunxi: Don't start commands while the card is busy
 
-> +size_t regmap_get_raw_io_max(struct regmap *map)
-> +{
-> +	return map->max_raw_io;
-> +}
-> +EXPORT_SYMBOL_GPL(regmap_get_raw_io_max);
-> +
-> +/**
-> + * regmap_get_raw_read_max - Get the maximum size we can read
-> + *
-> + * @map: Map to check.
-> + */
+and that makes it disapear as well. So it looks like that patch triggers 
+the aggressiveness more?
 
-...it is adding two functions which don't seem very symmetrically named.
+I'll apply your patch and undo the revert to see if that fixes the root 
+issue.
 
-> @@ -441,6 +441,8 @@ int regmap_get_max_register(struct regmap *map);
->  int regmap_get_reg_stride(struct regmap *map);
->  int regmap_async_complete(struct regmap *map);
->  bool regmap_can_raw_write(struct regmap *map);
-> +size_t regmap_get_raw_write_max(struct regmap *map);
-> +size_t regmap_get_raw_io_max(struct regmap *map);
+Olliver
 
-Do we want stubs here?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150812/0fc84067/attachment.sig>
+On 12-08-15 13:40, Olliver Schinagl wrote:
+> Hey all,
+>
+> I'm noticing the exact same thing using hans's sunxi-wip from a few 
+> days ago.
+>
+> I did see a patch from you about this very issue I belive
+> mmc: sunxi: fix timeout in sunxi_mmc_oclk_onoff
+>
+> but can't find it in any of the repo's. Has it been merged yet and did 
+> that actually solve the problem eventually?
+>
+>
+> On 24-05-15 14:37, Michal Suchanek wrote:
+>> Hello,
+>>
+>> I tried to update the kernel on my cubieboards to something recent and
+>> while the a10 cubieboard works fine the a20 one won't boot.
+>>
+>> Looking at the console I found that the culprit is mmc clock so I
+>> disabled mmc clock gating and the board works.
+>>
+>> I went as far back as 3.19 and the issue is pretty much the same. The
+>> difference is that with linus master the clock gating seems more
+>> aggressive so the board does not even boot whereas with 3.19 it
+>> crashes shortly after booting fully.
+>>
+>> Anyone has some idea why the clock would fail re-enabling after gated?
+>>
+>> Supposedly the clock was already set up by the kernel when probing 
+>> the mmc.
+>>
+>> Thanks
+>>
+>> Michal
+>>
+>> root at sunxi-a20:~# sunxi-mmc 1c0f000.mmc: fatal err update clk timeout
+>> mmcblk0: error -5 requesting status
+>> blk_update_request: I/O error, dev mmcblk0, sector 2048
+>> Buffer I/O error on dev mmcblk0p1, logical block 0, lost async page 
+>> write
+>> blk_update_request: I/O error, dev mmcblk0, sector 2056
+>> Buffer I/O error on dev mmcblk0p1, logical block 1, lost async page 
+>> write
+>> mmcblk0: error -5 sending status command, retrying
+>> mmcblk0: error -5 sending status command, retrying
+>> mmcblk0: error -5 sending status command, aborting
+>> blk_update_request: I/O error, dev mmcblk0, sector 6776
+>> Buffer I/O error on dev mmcblk0p1, logical block 591, lost async page 
+>> write
+>> mmcblk0: error -5 sending status command, retrying
+>> mmcblk0: error -5 sending status command, retrying
+>> mmcblk0: error -5 sending status command, aborting
+>>
+>
