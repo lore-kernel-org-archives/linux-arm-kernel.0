@@ -1,68 +1,184 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 12 Aug 2015 17:15:25 +0900
-Subject: [GIT PULL] Fourth Round of Renesas ARM Based SoC DT Updates for v4.3
-Message-ID: <cover.1439366241.git.horms+renesas@verge.net.au>
+Date: Wed, 12 Aug 2015 17:15:21 +0900
+Subject: [PATCH 1/7] ARM: shmobile: r7s72100 dtsi: Add CPG/MSTP Clock Domain
+In-Reply-To: <cover.1439366241.git.horms+renesas@verge.net.au>
+References: <cover.1439366241.git.horms+renesas@verge.net.au>
+Message-ID: <cbe1f83818c6e2c05fca5045fcc4807177988d61.1439366241.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Please consider these fourth round of Renesas ARM based SoC DT updates for v4.3.
+Add an appropriate "#power-domain-cells" property to the cpg_clocks
+device node, to create the CPG/MSTP Clock Domain.
 
-As requested by Olof, this is a repost of patches broken out of a now
-defunct pull-request, "Renesas ARM Based SoC CPG MSTP Clock Domain Updates
-for v4.3".  The motivation being to have driver changes in a separate
-branch to DT changes.
+Add "power-domains" properties to all device nodes for devices that are
+part of the CPG/MSTP Clock Domain and can be power-managed through an
+MSTP clock.  This applies to most on-SoC devices, which have a
+one-to-one mapping from SoC device to DT device node.
 
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/boot/dts/r7s72100.dtsi | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-This pull request is based on a merge of:
-
-* "Renesas ARM Based SoC CPG/MSTP Clock Driver Updates for v4.3",
-  tagged as renesas-clk-for-v4.3, which I have also sent a pull request for.
-
-  The patches in this pull request depend on driver changes in
-  renesas-clk-for-v4.3.
-
-* "Third Round of Renesas ARM Based SoC DT Updates for v4.3",
-  tagged as renesas-dt3-for-v4.3, which you have already merged.
-
-  The patches in this pull request update nodes added by patches
-  present in renesas-dt3-for-v4.3.
-
-
-The following changes since commit 3f3f0ea0afe031ca20e48a212f4faa00f9920450:
-
-  Merge branch 'clk-for-v4.3' into dt-for-v4.3 (2015-08-12 11:15:19 +0900)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt4-for-v4.3
-
-for you to fetch changes up to 60c0745a80be075bbd4e0925e4b740b3e588a445:
-
-  ARM: shmobile: r8a7794 dtsi: Add CPG/MSTP Clock Domain (2015-08-12 11:15:28 +0900)
-
-----------------------------------------------------------------
-Fourth Round of Renesas ARM Based SoC DT Updates for v4.3
-
-* Enable Clock Domain support of the Clock Pulse Generator (CPG)
-  Module Stop (MSTP) Clocks driver.
-
-----------------------------------------------------------------
-Geert Uytterhoeven (7):
-      ARM: shmobile: r7s72100 dtsi: Add CPG/MSTP Clock Domain
-      ARM: shmobile: r8a7778 dtsi: Add CPG/MSTP Clock Domain
-      ARM: shmobile: r8a7779 dtsi: Add CPG/MSTP Clock Domain
-      ARM: shmobile: r8a7790 dtsi: Add CPG/MSTP Clock Domain
-      ARM: shmobile: r8a7791 dtsi: Add CPG/MSTP Clock Domain
-      ARM: shmobile: r8a7793 dtsi: Add CPG/MSTP Clock Domain
-      ARM: shmobile: r8a7794 dtsi: Add CPG/MSTP Clock Domain
-
- arch/arm/boot/dts/r7s72100.dtsi | 19 +++++++++
- arch/arm/boot/dts/r8a7778.dtsi  | 22 +++++++++++
- arch/arm/boot/dts/r8a7779.dtsi  | 23 +++++++++++
- arch/arm/boot/dts/r8a7790.dtsi  | 86 +++++++++++++++++++++++++++++++++++-----
- arch/arm/boot/dts/r8a7791.dtsi  | 88 +++++++++++++++++++++++++++++++++++++----
- arch/arm/boot/dts/r8a7793.dtsi  |  7 ++++
- arch/arm/boot/dts/r8a7794.dtsi  | 29 ++++++++++++++
- 7 files changed, 257 insertions(+), 17 deletions(-)
+diff --git a/arch/arm/boot/dts/r7s72100.dtsi b/arch/arm/boot/dts/r7s72100.dtsi
+index 277e73c110e5..060c32cbd669 100644
+--- a/arch/arm/boot/dts/r7s72100.dtsi
++++ b/arch/arm/boot/dts/r7s72100.dtsi
+@@ -86,6 +86,7 @@
+ 			reg = <0xfcfe0000 0x18>;
+ 			clocks = <&extal_clk>, <&usb_x1_clk>;
+ 			clock-output-names = "pll", "i", "g";
++			#power-domain-cells = <0>;
+ 		};
+ 
+ 		/* MSTP clocks */
+@@ -157,6 +158,7 @@
+ 			     <0 189 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp4_clks R7S72100_CLK_SCIF0>;
+ 		clock-names = "sci_ick";
++		power-domains = <&cpg_clocks>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -169,6 +171,7 @@
+ 			     <0 193 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp4_clks R7S72100_CLK_SCIF1>;
+ 		clock-names = "sci_ick";
++		power-domains = <&cpg_clocks>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -181,6 +184,7 @@
+ 			     <0 197 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp4_clks R7S72100_CLK_SCIF2>;
+ 		clock-names = "sci_ick";
++		power-domains = <&cpg_clocks>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -193,6 +197,7 @@
+ 			     <0 201 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp4_clks R7S72100_CLK_SCIF3>;
+ 		clock-names = "sci_ick";
++		power-domains = <&cpg_clocks>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -205,6 +210,7 @@
+ 			     <0 205 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp4_clks R7S72100_CLK_SCIF4>;
+ 		clock-names = "sci_ick";
++		power-domains = <&cpg_clocks>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -217,6 +223,7 @@
+ 			     <0 209 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp4_clks R7S72100_CLK_SCIF5>;
+ 		clock-names = "sci_ick";
++		power-domains = <&cpg_clocks>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -229,6 +236,7 @@
+ 			     <0 213 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp4_clks R7S72100_CLK_SCIF6>;
+ 		clock-names = "sci_ick";
++		power-domains = <&cpg_clocks>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -241,6 +249,7 @@
+ 			     <0 217 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp4_clks R7S72100_CLK_SCIF7>;
+ 		clock-names = "sci_ick";
++		power-domains = <&cpg_clocks>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -252,6 +261,7 @@
+ 			     <0 240 IRQ_TYPE_LEVEL_HIGH>;
+ 		interrupt-names = "error", "rx", "tx";
+ 		clocks = <&mstp10_clks R7S72100_CLK_SPI0>;
++		power-domains = <&cpg_clocks>;
+ 		num-cs = <1>;
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+@@ -266,6 +276,7 @@
+ 			     <0 243 IRQ_TYPE_LEVEL_HIGH>;
+ 		interrupt-names = "error", "rx", "tx";
+ 		clocks = <&mstp10_clks R7S72100_CLK_SPI1>;
++		power-domains = <&cpg_clocks>;
+ 		num-cs = <1>;
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+@@ -280,6 +291,7 @@
+ 			     <0 246 IRQ_TYPE_LEVEL_HIGH>;
+ 		interrupt-names = "error", "rx", "tx";
+ 		clocks = <&mstp10_clks R7S72100_CLK_SPI2>;
++		power-domains = <&cpg_clocks>;
+ 		num-cs = <1>;
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+@@ -294,6 +306,7 @@
+ 			     <0 249 IRQ_TYPE_LEVEL_HIGH>;
+ 		interrupt-names = "error", "rx", "tx";
+ 		clocks = <&mstp10_clks R7S72100_CLK_SPI3>;
++		power-domains = <&cpg_clocks>;
+ 		num-cs = <1>;
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+@@ -308,6 +321,7 @@
+ 			     <0 252 IRQ_TYPE_LEVEL_HIGH>;
+ 		interrupt-names = "error", "rx", "tx";
+ 		clocks = <&mstp10_clks R7S72100_CLK_SPI4>;
++		power-domains = <&cpg_clocks>;
+ 		num-cs = <1>;
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+@@ -338,6 +352,7 @@
+ 			     <0 164 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp9_clks R7S72100_CLK_I2C0>;
+ 		clock-frequency = <100000>;
++		power-domains = <&cpg_clocks>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -356,6 +371,7 @@
+ 			     <0 172 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp9_clks R7S72100_CLK_I2C1>;
+ 		clock-frequency = <100000>;
++		power-domains = <&cpg_clocks>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -374,6 +390,7 @@
+ 			     <0 180 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp9_clks R7S72100_CLK_I2C2>;
+ 		clock-frequency = <100000>;
++		power-domains = <&cpg_clocks>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -392,6 +409,7 @@
+ 			     <0 188 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp9_clks R7S72100_CLK_I2C3>;
+ 		clock-frequency = <100000>;
++		power-domains = <&cpg_clocks>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -402,6 +420,7 @@
+ 		interrupt-names = "tgi0a";
+ 		clocks = <&mstp3_clks R7S72100_CLK_MTU2>;
+ 		clock-names = "fck";
++		power-domains = <&cpg_clocks>;
+ 		status = "disabled";
+ 	};
+ };
+-- 
+2.1.4
