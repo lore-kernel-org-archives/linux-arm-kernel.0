@@ -1,28 +1,36 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Wed, 12 Aug 2015 17:08:18 -0400 (EDT)
-Subject: [PATCH 0/4] USB: host: ohci-at91: cleanups
-In-Reply-To: <1439216592-11381-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <Pine.LNX.4.44L0.1508121708030.1582-100000@iolanthe.rowland.org>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Wed, 12 Aug 2015 16:51:29 -0500
+Subject: [PATCH 2/3] Display a DMA error message
+In-Reply-To: <1439416290-21228-1-git-send-email-jeremy.linton@arm.com>
+References: <1439416290-21228-1-git-send-email-jeremy.linton@arm.com>
+Message-ID: <1439416290-21228-3-git-send-email-jeremy.linton@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 10 Aug 2015, Alexandre Belloni wrote:
+If the ehci driver fails to configure the dma settings then display
+a dev error instead of simply failing. This is triggered in an
+ACPI world if the user fails to set the _CCA on the device.
 
-> Hi,
-> 
-> Here are a few cleanups for ohci-at91. This is the fallout of AT91 now being DT
-> only.
-> 
-> Alexandre Belloni (4):
->   USB: host: ohci-at91: move at91_usbh_data definition in c file
->   USB: host: ohci-at91: depend on OF
->   USB: host: ohci-at91: merge ohci_at91_of_init in
->     ohci_hcd_at91_drv_probe
->   USB: host: ohci-at91: merge loops in ohci_hcd_at91_drv_probe
-> 
->  drivers/usb/host/Kconfig            |   8 +-
->  drivers/usb/host/ohci-at91.c        | 179 ++++++++++++++++--------------------
->  include/linux/platform_data/atmel.h |  12 ---
->  3 files changed, 85 insertions(+), 114 deletions(-)
+Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+---
+ drivers/usb/host/ehci-platform.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
+diff --git a/drivers/usb/host/ehci-platform.c b/drivers/usb/host/ehci-platform.c
+index 2593def..82e396f 100644
+--- a/drivers/usb/host/ehci-platform.c
++++ b/drivers/usb/host/ehci-platform.c
+@@ -162,8 +162,10 @@ static int ehci_platform_probe(struct platform_device *dev)
+ 
+ 	err = dma_coerce_mask_and_coherent(&dev->dev,
+ 		pdata->dma_mask_64 ? DMA_BIT_MASK(64) : DMA_BIT_MASK(32));
+-	if (err)
++	if (err) {
++		dev_err(&dev->dev, "Error: DMA setup failed\n");
+ 		return err;
++	}
+ 
+ 	irq = platform_get_irq(dev, 0);
+ 	if (irq < 0) {
+-- 
+2.4.3
