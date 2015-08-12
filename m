@@ -1,7 +1,9 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 11 Aug 2015 18:36:50 -0700
-Subject: [PATCH 1/2] ARM: dts: vexpress: Use assigned-clock-parents for sp810
-Message-ID: <1439343411-29168-1-git-send-email-sboyd@codeaurora.org>
+Date: Tue, 11 Aug 2015 18:36:51 -0700
+Subject: [PATCH 2/2] ARM64: dts: vexpress: Use assigned-clock-parents for sp810
+In-Reply-To: <1439343411-29168-1-git-send-email-sboyd@codeaurora.org>
+References: <1439343411-29168-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1439343411-29168-2-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -24,15 +26,28 @@ patch can go through arm-soc independently though, so please apply.
 
 [1] http://lkml.kernel.org/r/1438386285-5070-1-git-send-email-sboyd at codeaurora.org
 
- arch/arm/boot/dts/vexpress-v2m-rs1.dtsi | 2 ++
- arch/arm/boot/dts/vexpress-v2m.dtsi     | 2 ++
+ arch/arm64/boot/dts/arm/juno-motherboard.dtsi    | 2 ++
+ arch/arm64/boot/dts/arm/rtsm_ve-motherboard.dtsi | 2 ++
  2 files changed, 4 insertions(+)
 
-diff --git a/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi b/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
-index 2efb2058ba49..21b02874bea3 100644
---- a/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
-+++ b/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
-@@ -101,6 +101,8 @@
+diff --git a/arch/arm64/boot/dts/arm/juno-motherboard.dtsi b/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
+index 021e0f40f419..637e046f0e36 100644
+--- a/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
++++ b/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
+@@ -136,6 +136,8 @@
+ 					clock-names = "refclk", "timclk", "apb_pclk";
+ 					#clock-cells = <1>;
+ 					clock-output-names = "timerclken0", "timerclken1", "timerclken2", "timerclken3";
++					assigned-clocks = <&v2m_sysctl 0>, <&v2m_sysctl 1>, <&v2m_sysctl 3>, <&v2m_sysctl 3>;
++					assigned-clock-parents = <&v2m_refclk1mhz>, <&v2m_refclk1mhz>, <&v2m_refclk1mhz>, <&v2m_refclk1mhz>;
+ 				};
+ 
+ 				apbregs at 010000 {
+diff --git a/arch/arm64/boot/dts/arm/rtsm_ve-motherboard.dtsi b/arch/arm64/boot/dts/arm/rtsm_ve-motherboard.dtsi
+index c46cbb29f3c6..88a7583ed7a7 100644
+--- a/arch/arm64/boot/dts/arm/rtsm_ve-motherboard.dtsi
++++ b/arch/arm64/boot/dts/arm/rtsm_ve-motherboard.dtsi
+@@ -74,6 +74,8 @@
  				clock-names = "refclk", "timclk", "apb_pclk";
  				#clock-cells = <1>;
  				clock-output-names = "timerclken0", "timerclken1", "timerclken2", "timerclken3";
@@ -40,20 +55,7 @@ index 2efb2058ba49..21b02874bea3 100644
 +				assigned-clock-parents = <&v2m_refclk1mhz>, <&v2m_refclk1mhz>, <&v2m_refclk1mhz>, <&v2m_refclk1mhz>;
  			};
  
- 			/* PCI-E I2C bus */
-diff --git a/arch/arm/boot/dts/vexpress-v2m.dtsi b/arch/arm/boot/dts/vexpress-v2m.dtsi
-index cb3090f919a7..e712c0af149b 100644
---- a/arch/arm/boot/dts/vexpress-v2m.dtsi
-+++ b/arch/arm/boot/dts/vexpress-v2m.dtsi
-@@ -100,6 +100,8 @@
- 				clock-names = "refclk", "timclk", "apb_pclk";
- 				#clock-cells = <1>;
- 				clock-output-names = "timerclken0", "timerclken1", "timerclken2", "timerclken3";
-+				assigned-clocks = <&v2m_sysctl 0>, <&v2m_sysctl 1>, <&v2m_sysctl 3>, <&v2m_sysctl 3>;
-+				assigned-clock-parents = <&v2m_refclk1mhz>, <&v2m_refclk1mhz>, <&v2m_refclk1mhz>, <&v2m_refclk1mhz>;
- 			};
- 
- 			/* PCI-E I2C bus */
+ 			aaci at 040000 {
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 a Linux Foundation Collaborative Project
