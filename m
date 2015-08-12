@@ -1,29 +1,79 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 12 Aug 2015 11:37:36 +0100
-Subject: [PATCH 00/20] Regmap max_raw_io and bmc150 SPI support
-In-Reply-To: <1439374365-20623-1-git-send-email-mpa@pengutronix.de>
-References: <1439374365-20623-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <20150812103736.GR10748@sirena.org.uk>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 12 Aug 2015 12:41:33 +0200
+Subject: [PATCH V1 Resend 06/10] drivers: rtc: Drop (un)likely before
+ IS_ERR(_OR_NULL)
+In-Reply-To: <1a92f2e1af5309ece9736f79f312e90486a98825.1439375087.git.viresh.kumar@linaro.org>
+References: <cover.1439375087.git.viresh.kumar@linaro.org>
+ <1a92f2e1af5309ece9736f79f312e90486a98825.1439375087.git.viresh.kumar@linaro.org>
+Message-ID: <20150812104133.GE3411@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 12, 2015 at 12:12:25PM +0200, Markus Pargmann wrote:
-> Hi,
-> 
-> this series was created to add SPI support to the bmc150 accelerometer driver.
-> To not add any regressions, I had to add some infrastructure that allows to use
-> regmap with busses that do limit the size of transfers (block smbus). I hope
-> this is sufficient to not break anything.
+Hi Viresh,
 
-This is a really big series but looking at at least the initial patches
-there's a lot of unrelated cleanups mixed in with it.  Please don't do
-this, send things like cleanups separately so that your series is
-focused on the relevant topic.  This makes things much easier to work
-with.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150812/8f2eb69e/attachment.sig>
+Why are you resending?
+
+On 12/08/2015 at 15:59:43 +0530, Viresh Kumar wrote :
+> IS_ERR(_OR_NULL) already contain an 'unlikely' compiler flag and there
+> is no need to do that again from its callers. Drop it.
+> 
+> gemini driver was using likely() for a failure case while the rtc driver
+> is getting registered. That looks wrong and it should really be
+> unlikely. But because we are killing all the unlikely() flags, lets kill
+> that too.
+> 
+> Acked-by: Hans Ulli Kroll <ulli.kroll@googlemail.com> (gemini)
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> ---
+>  drivers/rtc/interface.c  | 2 +-
+>  drivers/rtc/rtc-bfin.c   | 2 +-
+>  drivers/rtc/rtc-gemini.c | 2 +-
+>  3 files changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/rtc/interface.c b/drivers/rtc/interface.c
+> index 11b639067312..5836751b8203 100644
+> --- a/drivers/rtc/interface.c
+> +++ b/drivers/rtc/interface.c
+> @@ -564,7 +564,7 @@ enum hrtimer_restart rtc_pie_update_irq(struct hrtimer *timer)
+>  void rtc_update_irq(struct rtc_device *rtc,
+>  		unsigned long num, unsigned long events)
+>  {
+> -	if (unlikely(IS_ERR_OR_NULL(rtc)))
+> +	if (IS_ERR_OR_NULL(rtc))
+>  		return;
+>  
+>  	pm_stay_awake(rtc->dev.parent);
+> diff --git a/drivers/rtc/rtc-bfin.c b/drivers/rtc/rtc-bfin.c
+> index 3d44b11721ea..535a5f9338d0 100644
+> --- a/drivers/rtc/rtc-bfin.c
+> +++ b/drivers/rtc/rtc-bfin.c
+> @@ -361,7 +361,7 @@ static int bfin_rtc_probe(struct platform_device *pdev)
+>  	/* Register our RTC with the RTC framework */
+>  	rtc->rtc_dev = devm_rtc_device_register(dev, pdev->name, &bfin_rtc_ops,
+>  						THIS_MODULE);
+> -	if (unlikely(IS_ERR(rtc->rtc_dev)))
+> +	if (IS_ERR(rtc->rtc_dev))
+>  		return PTR_ERR(rtc->rtc_dev);
+>  
+>  	/* Grab the IRQ and init the hardware */
+> diff --git a/drivers/rtc/rtc-gemini.c b/drivers/rtc/rtc-gemini.c
+> index 35f4486738fc..2fed93e1114a 100644
+> --- a/drivers/rtc/rtc-gemini.c
+> +++ b/drivers/rtc/rtc-gemini.c
+> @@ -148,7 +148,7 @@ static int gemini_rtc_probe(struct platform_device *pdev)
+>  
+>  	rtc->rtc_dev = rtc_device_register(pdev->name, dev,
+>  					   &gemini_rtc_ops, THIS_MODULE);
+> -	if (likely(IS_ERR(rtc->rtc_dev)))
+> +	if (IS_ERR(rtc->rtc_dev))
+>  		return PTR_ERR(rtc->rtc_dev);
+>  
+>  	return 0;
+> -- 
+> 2.4.0
+> 
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
