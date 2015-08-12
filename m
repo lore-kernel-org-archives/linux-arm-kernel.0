@@ -1,35 +1,76 @@
-From: ryabinin.a.a@gmail.com (Andrey Ryabinin)
-Date: Wed, 12 Aug 2015 15:19:03 +0300
-Subject: [PATCH v5 2/6] x86/kasan,
- mm: introduce generic kasan_populate_zero_shadow()
-In-Reply-To: <20150812093701.GH22485@arm.com>
-References: <1439259499-13913-1-git-send-email-ryabinin.a.a@gmail.com>
- <1439259499-13913-3-git-send-email-ryabinin.a.a@gmail.com>
- <20150811154117.GH23307@e104818-lin.cambridge.arm.com>
- <55CA21E8.2060704@gmail.com>
- <20150811164010.GJ23307@e104818-lin.cambridge.arm.com>
- <CAPAsAGwDNpRBLAvyCSpR9ZO9tAmHx-XYjVDZPECeQkU0WOw5jg@mail.gmail.com>
- <20150812093701.GH22485@arm.com>
-Message-ID: <CAPAsAGwnhnqJCh=sc97-=qrYHNQnDSjVR-xGertoMiNWHDbhrw@mail.gmail.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Wed, 12 Aug 2015 14:20:11 +0200
+Subject: [PATCH 09/20] regmap: _regmap_raw_write fix for busses without
+ write()
+In-Reply-To: <20150812112035.GX10748@sirena.org.uk>
+References: <1439374365-20623-1-git-send-email-mpa@pengutronix.de>
+ <1439374365-20623-10-git-send-email-mpa@pengutronix.de>
+ <20150812112035.GX10748@sirena.org.uk>
+Message-ID: <20150812122011.GE19600@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-08-12 12:37 GMT+03:00 Will Deacon <will.deacon@arm.com>:
-> On Wed, Aug 12, 2015 at 10:30:37AM +0100, Andrey Ryabinin wrote:
->> 2015-08-11 19:40 GMT+03:00 Catalin Marinas <catalin.marinas@arm.com>:
->> >
->> > Not sure how you plan to merge it though since there are x86
->> > dependencies. I could send the whole series via tip or the mm tree (and
->> > I guess it's pretty late for 4.3).
->>
->> Via mm tree, I guess.
->> If this is too late for 4.3, then I'll update changelog and send v6
->> after 4.3-rc1 release.
->
-> That's probably the best bet, as I suspect we'll get some non-trivial
-> conflicts with the arm64 tree at this stage.
->
-> Will
+On Wed, Aug 12, 2015 at 12:20:35PM +0100, Mark Brown wrote:
+> On Wed, Aug 12, 2015 at 12:12:34PM +0200, Markus Pargmann wrote:
+> 
+> > @@ -1229,6 +1229,11 @@ int _regmap_raw_write(struct regmap *map, unsigned int reg,
+> >  		}
+> >  	}
+> >  
+> > +	if (!map->bus->write && val_len == map->format.val_bytes) {
+> > +		ret = _regmap_bus_reg_write(map, reg, *(unsigned int *)val);
+> > +		return ret;
+> > +	}
+> 
+> This is broken - you can't use a raw value as a register value.  The
 
-Or, if x86 maintainers are agree to take first 2 patches in 4.3,
-the rest of the series could go into arm64 tree later.
+I am not sure what you mean here?
+
+The register value given to _regmap_raw_write is the real register
+value, not formatted differenty. This is given directly towards
+bus->reg_write() which should handle the rest.
+
+At least that's how I understood the code. For example regmap_read()
+directly calls _regmap_read() which in turn calls directly
+bus->reg_read() without any formating.
+
+> endianness of the device may not be the same as the endianness of the
+> system and you can't cast a value to unsigned int, the value may be of
+> any size.
+
+Yes right. On the other hand if bus->read() and bus->write() was not set
+in the init method (before this patch series) no formatting functions at
+all were assigned. So it was always ignored for bus->reg_read() and
+bus->reg_write()?!
+
+> 
+> > @@ -1340,7 +1345,7 @@ int _regmap_raw_write(struct regmap *map, unsigned int reg,
+> >  	 * send the work_buf directly, otherwise try to do a gather
+> >  	 * write.
+> >  	 */
+> > -	if (val == work_val) {
+> > +	if (val == work_val && map->bus->write) {
+> >  		ret = map->bus->write(map->bus_context, map->work_buf,
+> >  				      map->format.reg_bytes +
+> >  				      map->format.pad_bytes +
+> 
+> This appears to be another case of merging an unrelated change :(
+
+Yes, will fix.
+
+Thanks,
+
+Markus
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150812/ac1570c7/attachment-0001.sig>
