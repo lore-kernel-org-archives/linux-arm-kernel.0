@@ -1,61 +1,109 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Wed, 12 Aug 2015 07:45:36 +0200
-Subject: [PATCH] ARM: config: Switch PXA27x platforms to use PXA RTC driver
-In-Reply-To: <CAL_JsqKxUjg+zPJ=_Wvd+zTh7UuT=dkECEh=Hy7QdZsqn4B+8w@mail.gmail.com>
- (Rob Herring's message of "Tue, 11 Aug 2015 20:07:50 -0500")
-References: <1437757375-9113-1-git-send-email-robh@kernel.org>
- <CAL_JsqKxUjg+zPJ=_Wvd+zTh7UuT=dkECEh=Hy7QdZsqn4B+8w@mail.gmail.com>
-Message-ID: <8737zpjbzz.fsf@belgarion.home>
+From: dongsheng.wang@freescale.com (Dongsheng Wang)
+Date: Wed, 12 Aug 2015 13:53:26 +0800
+Subject: [PATCH v2 1/2] soc/fsl: add freescale dir for SOC specific drivers
+Message-ID: <1439358807-9024-1-git-send-email-dongsheng.wang@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rob Herring <robh@kernel.org> writes:
+From: Wang Dongsheng <dongsheng.wang@freescale.com>
 
-> On Fri, Jul 24, 2015 at 12:02 PM, Rob Herring <robh@kernel.org> wrote:
->> With the SA1100 and PXA RTC drivers be mutually exclusive and no
->> longer sharing hardware, PXA27x/PXA3xx platforms must use the PXA RTC
->> driver as the SA1100 platform device is no longer registered.
->>
->> This change should be almost transparent to userspace. Former users of
->> pxa-rtc should be aware that 2 RTCs will be available on their kernels,
->> rtc0 being sa1100-rtc and rtc1 being pxa-rtc. Any userspace relying on
->> the fact that rtc0 was pxa-rtc should be fixed.
->>
->> As a consequence:
->>  - the first reboot after the switch will have the wrong time,
->>  - on dual boot platform where the other OS programs some logic into the
->>    sa1100 rtc IP, a lack of fix in userspace, ie. a kernel changing
->>    sa1100-rtc thinking it is pxa-rtc could have dire consequence, such
->>    as wiping the other OS data partition.
->>
->> (Thanks to Robert Jarmik for help on the above commit text.)
->>
->> Signed-off-by: Rob Herring <robh@kernel.org>
->> Cc: Robert Jarzmik <robert.jarzmik@free.fr>
->> Cc: Daniel Mack <daniel@zonque.org>
->> Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
->> Cc: Sergey Lapin <slapin@ossfans.org>
->> Cc: Russell King <linux@arm.linux.org.uk>
->> Cc: Mike Rapoport <mike@compulab.co.il>
->> Cc: Philipp Zabel <philipp.zabel@gmail.com>
->> ---
->> PXA Maintainers,
->>
->> This is dependent on my SA1100 RTC cleanup series[1]. Please comment on
->> this patch and that series. The full series is available from a git
->> branch here[2]. I've rebased it to 4.2-rc3, but otherwise there is no
->> change from v4.
->
-> Any comments on this? If not, I plan to send Alexandre a pull request
-> for this series this week.
-Hi Rob,
+Some Freescale device drivers need to move to soc/, because these
+drivers are specific drivers. Before the soc/ to be created, the
+drivers had been there arch/ or drivers/misc/, but now soc/ dir
+is a better choice.
 
-I think you waited long enough, nobody can tell now they were not aware of the
-situation. Please go ahead and request pull.
+Signed-off-by: Wang Dongsheng <dongsheng.wang@freescale.com>
+---
+*V2*
+Rebase for last kernel. Resend this patch, this patch is one year ago.
+Sorry I haven't had the time to push this patch before.
 
-Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
-
-Cheers.
-
---
-Robert
+diff --git a/drivers/soc/Kconfig b/drivers/soc/Kconfig
+index 96ddecb..b5c5179 100644
+--- a/drivers/soc/Kconfig
++++ b/drivers/soc/Kconfig
+@@ -5,5 +5,6 @@ source "drivers/soc/qcom/Kconfig"
+ source "drivers/soc/sunxi/Kconfig"
+ source "drivers/soc/ti/Kconfig"
+ source "drivers/soc/versatile/Kconfig"
++source "drivers/soc/fsl/Kconfig"
+ 
+ endmenu
+diff --git a/drivers/soc/Makefile b/drivers/soc/Makefile
+index 7dc7c0d..1caf1d6 100644
+--- a/drivers/soc/Makefile
++++ b/drivers/soc/Makefile
+@@ -8,3 +8,4 @@ obj-$(CONFIG_ARCH_SUNXI)	+= sunxi/
+ obj-$(CONFIG_ARCH_TEGRA)	+= tegra/
+ obj-$(CONFIG_SOC_TI)		+= ti/
+ obj-$(CONFIG_PLAT_VERSATILE)	+= versatile/
++obj-$(CONFIG_FSL_SOC_DRIVERS)	+= fsl/
+diff --git a/drivers/soc/fsl/Kconfig b/drivers/soc/fsl/Kconfig
+new file mode 100644
+index 0000000..863d1ef
+--- /dev/null
++++ b/drivers/soc/fsl/Kconfig
+@@ -0,0 +1,18 @@
++#
++# Freescale SOC drivers
++#
++menuconfig FSL_SOC_DRIVERS
++	bool "Freescale Soc Drivers"
++	default n
++	help
++	  Say y here to enable Freescale Soc Device Drivers support.
++	  The Soc Drivers provides the device driver that is a specific
++	  block or feature on Freescale platform.
++
++if FSL_SOC_DRIVERS
++
++if ARM
++source "drivers/soc/fsl/Kconfig.arm"
++endif
++
++endif
+diff --git a/drivers/soc/fsl/Kconfig.arm b/drivers/soc/fsl/Kconfig.arm
+new file mode 100644
+index 0000000..8c90b82
+--- /dev/null
++++ b/drivers/soc/fsl/Kconfig.arm
+@@ -0,0 +1,16 @@
++#
++# Freescale ARM SOC Drivers
++#
++
++config	LS1_SOC_DRIVERS
++	bool "LS1021A Soc Drivers"
++	depends on SOC_LS1021A
++	default n
++	help
++	Say y here to enable Freescale LS1021A Soc Device Drivers support.
++	The Soc Drivers provides the device driver that is a specific block
++	or feature on LS1021A platform.
++
++if LS1_SOC_DRIVERS
++	source "drivers/soc/fsl/ls1/Kconfig"
++endif
+diff --git a/drivers/soc/fsl/Makefile b/drivers/soc/fsl/Makefile
+new file mode 100644
+index 0000000..b4215dd
+--- /dev/null
++++ b/drivers/soc/fsl/Makefile
+@@ -0,0 +1,6 @@
++#
++# Makefile for Freescale Soc specific device drivers.
++#
++
++obj-$(CONFIG_LS1_SOC_DRIVERS) += ls1/
++
+diff --git a/drivers/soc/fsl/ls1/Kconfig b/drivers/soc/fsl/ls1/Kconfig
+new file mode 100644
+index 0000000..7556f44
+--- /dev/null
++++ b/drivers/soc/fsl/ls1/Kconfig
+@@ -0,0 +1,3 @@
++#
++# LS-1 Soc drivers
++#
+-- 
+2.1.0.27.g96db324
