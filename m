@@ -1,85 +1,255 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Wed, 12 Aug 2015 22:20:57 +0800
-Subject: [PATCH] regmap: Add function check before called format_val
-In-Reply-To: <1437458845.30329.51.camel@mtksdaap41>
-References: <1437396110-5192-1-git-send-email-henryc.chen@mediatek.com>
- <20150720150254.GC11162@sirena.org.uk> <1437458845.30329.51.camel@mtksdaap41>
-Message-ID: <CAGS+omDa+FhKD2u_VwBG3cWvN+ZiHneqFVz=mtdYuPsiQu4JEQ@mail.gmail.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Wed, 12 Aug 2015 16:21:16 +0200
+Subject: [PATCH v3 1/5] pwm: add the Berlin pwm controller driver
+In-Reply-To: <1439387497-6863-2-git-send-email-antoine.tenart@free-electrons.com>
+References: <1439387497-6863-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1439387497-6863-2-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <55CB565C.8050906@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Henry & Mark,
-
-On Tue, Jul 21, 2015 at 2:07 PM, Henry Chen <HenryC.Chen@mediatek.com> wrote:
-> On Mon, 2015-07-20 at 16:02 +0100, Mark Brown wrote:
->> On Mon, Jul 20, 2015 at 08:41:50PM +0800, Henry Chen wrote:
->> > The regmap_format will not be initialize since regmap_bus is not assgined
->> > on regmap_init(). It should has a function check before using
->> > format_val() to avoid null function called on regmap_bulk_read().
->>
->> > -                   map->format.format_val(val + (i * val_bytes), ival, 0);
->> > +                   if (map->format.format_val)
->> > +                           map->format.format_val(val + (i * val_bytes), ival, 0);
->> > +                   else
->> > +                           memcpy(val + (i * val_bytes), &ival, val_bytes);
->>
->> Your changelog doesn't explan why we are in this code path in the first
->> place without a format_val() and why a memcpy() is an appropriate
->> replacement.  It should, it's not clear to me that this is a good fix
->> but I don't feel I fully understand the problem.
+On 08/12/2015 03:51 PM, Antoine Tenart wrote:
+> Add a PWM controller driver for the Marvell Berlin SoCs. This PWM
+> controller has 4 channels.
 >
-> Sorry for being unclear for issue, the call flow as following,
+> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+
+Antoine,
+
+nice rework, but...
+
+[...]
+> diff --git a/drivers/pwm/pwm-berlin.c b/drivers/pwm/pwm-berlin.c
+> new file mode 100644
+> index 000000000000..f89e25ea5c6d
+> --- /dev/null
+> +++ b/drivers/pwm/pwm-berlin.c
+> @@ -0,0 +1,227 @@
+[...]
+> +#define BERLIN_PWM_ENABLE		BIT(0)
+> +#define BERLIN_PWM_DISABLE		0x0
+
+I'd drop BERLIN_PWM_DISABLE and use reg & ~BERLIN_PWM_ENABLE below.
+Even if there are no more writable bits in that register, IMHO it
+is good practice to affect as little bits as possible.
+
+[...]
+> +/* prescaler table: {1, 4, 8, 16, 64, 256, 1024, 4096} */
+> +static const u32 prescaler_diff_table[] = {
+> +	1, 4, 2, 2, 4, 4, 4, 4,
+> +};
+> +
+> +static int berlin_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+> +			     int duty_ns, int period_ns)
+> +{
+> +	struct berlin_pwm_chip *berlin_chip = to_berlin_pwm_chip(chip);
+> +	int ret, prescale = 0;
+> +	u32 val, duty, period;
+> +	u64 cycles;
+> +
+> +	cycles = clk_get_rate(berlin_chip->clk);
+> +	cycles *= period_ns;
+> +	do_div(cycles, NSEC_PER_SEC);
+> +
+> +	while (cycles > BERLIN_PWM_MAX_TCNT)
+> +		do_div(cycles, prescaler_diff_table[++prescale]);
+> +
+> +	if (cycles > BERLIN_PWM_MAX_TCNT)
+> +		return -EINVAL;
+
+Does my idea actually work? Did you test it with some different
+pwm frequencies?
+
+> +	period = cycles;
+> +	cycles *= duty_ns;
+> +	do_div(cycles, period_ns);
+> +	duty = cycles;
+> +
+> +	ret = clk_prepare_enable(berlin_chip->clk);
+> +	if (ret)
+> +		return ret;
+
+Hmm. I understand that this may be required as the pwm framework
+calls .pwm_config before .pwm_enable, but...
+
+> +
+> +	spin_lock(&berlin_chip->lock);
+> +
+> +	val = berlin_pwm_readl(berlin_chip, pwm->hwpwm, BERLIN_PWM_CONTROL);
+> +	val &= ~BERLIN_PWM_PRESCALE_MASK;
+> +	val |= prescale;
+> +	berlin_pwm_writel(val, berlin_chip, pwm->hwpwm, BERLIN_PWM_CONTROL);
+> +
+> +	berlin_pwm_writel(duty, berlin_chip, pwm->hwpwm, BERLIN_PWM_DUTY);
+> +	berlin_pwm_writel(period, berlin_chip, pwm->hwpwm, BERLIN_PWM_TCNT);
+> +
+> +	spin_unlock(&berlin_chip->lock);
+> +
+> +	clk_disable_unprepare(berlin_chip->clk);
+
+Are you sure that register contents are retained after disabling the
+clock? I understand that cfg_clk is the _ip_ input clock and pwm gets
+derived from it.
+
+Actually, since cfg_clk seems to be an important, internal SoC clock
+I'd say to clk_prepare_enable() in _probe() before reading any
+registers and clk_disable_unprepare() on _remove() (see below).
+
+Internal low-frequency clocks don't consume that much power that it
+is worth the pain ;)
+
+> +	return 0;
+> +}
+> +
+> +static int berlin_pwm_set_polarity(struct pwm_chip *chip,
+> +				   struct pwm_device *pwm,
+> +				   enum pwm_polarity polarity)
+> +{
+> +	struct berlin_pwm_chip *berlin_chip = to_berlin_pwm_chip(chip);
+> +	int ret;
+> +	u32 val;
+> +
+> +	ret = clk_prepare_enable(berlin_chip->clk);
+> +	if (ret)
+> +		return ret;
+
+These would become unnecessary then.
+
+> +	spin_lock(&berlin_chip->lock);
+> +
+> +	val = berlin_pwm_readl(berlin_chip, pwm->hwpwm, BERLIN_PWM_CONTROL);
+> +
+> +	if (polarity == PWM_POLARITY_NORMAL)
+> +		val &= ~BERLIN_PWM_INVERT_POLARITY;
+> +	else
+> +		val |= BERLIN_PWM_INVERT_POLARITY;
+> +
+> +	berlin_pwm_writel(val, berlin_chip, pwm->hwpwm, BERLIN_PWM_CONTROL);
+> +
+> +	spin_unlock(&berlin_chip->lock);
+> +
+> +	clk_disable_unprepare(berlin_chip->clk);
+
+ditto.
+
+> +	return 0;
+> +}
+> +
+> +static int berlin_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
+> +{
+> +	struct berlin_pwm_chip *berlin_chip = to_berlin_pwm_chip(chip);
+> +	int ret;
+> +
+> +	ret = clk_prepare_enable(berlin_chip->clk);
+> +	if (ret)
+> +		return ret;
+
+ditto.
+
+> +	spin_lock(&berlin_chip->lock);
+> +	berlin_pwm_writel(BERLIN_PWM_ENABLE, berlin_chip, pwm->hwpwm, BERLIN_PWM_EN);
+> +	spin_unlock(&berlin_chip->lock);
+> +
+> +	return 0;
+> +}
+> +
+> +static void berlin_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
+> +{
+> +	struct berlin_pwm_chip *berlin_chip = to_berlin_pwm_chip(chip);
+> +
+> +	spin_lock(&berlin_chip->lock);
+> +	berlin_pwm_writel(BERLIN_PWM_DISABLE, berlin_chip, pwm->hwpwm, BERLIN_PWM_EN);
+> +	spin_unlock(&berlin_chip->lock);
+> +
+> +	clk_disable_unprepare(berlin_chip->clk);
+
+ditto.
+
+> +}
+> +
+> +static const struct pwm_ops berlin_pwm_ops = {
+> +	.config = berlin_pwm_config,
+> +	.set_polarity = berlin_pwm_set_polarity,
+> +	.enable = berlin_pwm_enable,
+> +	.disable = berlin_pwm_disable,
+> +	.owner = THIS_MODULE,
+> +};
+> +
+> +static const struct of_device_id berlin_pwm_match[] = {
+> +	{ .compatible = "marvell,berlin-pwm" },
+> +	{ },
+> +};
+> +MODULE_DEVICE_TABLE(of, berlin_pwm_match);
+> +
+> +static int berlin_pwm_probe(struct platform_device *pdev)
+> +{
+> +	struct berlin_pwm_chip *pwm;
+> +	struct resource *res;
+> +	int ret;
+> +
+> +	pwm = devm_kzalloc(&pdev->dev, sizeof(*pwm), GFP_KERNEL);
+> +	if (!pwm)
+> +		return -ENOMEM;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	pwm->base = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(pwm->base))
+> +		return PTR_ERR(pwm->base);
+> +
+> +	pwm->clk = devm_clk_get(&pdev->dev, NULL);
+> +	if (IS_ERR(pwm->clk))
+> +		return PTR_ERR(pwm->clk);
+> +
+> +	pwm->chip.dev = &pdev->dev;
+> +	pwm->chip.ops = &berlin_pwm_ops;
+> +	pwm->chip.base = -1;
+> +	pwm->chip.npwm = 4;
+> +	pwm->chip.can_sleep = true;
+> +	pwm->chip.of_xlate = of_pwm_xlate_with_flags;
+> +	pwm->chip.of_pwm_n_cells = 3;
+> +
+> +	spin_lock_init(&pwm->lock);
+
+add clk_prepare_enable() before adding the pwmchip...
+
+> +	ret = pwmchip_add(&pwm->chip);
+> +	if (ret < 0) {
+> +		dev_err(&pdev->dev, "Failed to add PWM chip: %d\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	platform_set_drvdata(pdev, pwm);
+> +
+> +	return 0;
+> +}
+> +
+> +static int berlin_pwm_remove(struct platform_device *pdev)
+> +{
+> +	struct berlin_pwm_chip *pwm = platform_get_drvdata(pdev);
+> +
+> +	return pwmchip_remove(&pwm->chip);
+
+... and clk_disable_unprepare after removing it.
+
+Besides the comments, for Berlin you get my
+
+Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+
+Thanks!
+
+> +}
+> +
+> +static struct platform_driver berlin_pwm_driver = {
+> +	.probe	= berlin_pwm_probe,
+> +	.remove	= berlin_pwm_remove,
+> +	.driver	= {
+> +		.name	= "berlin-pwm",
+> +		.of_match_table = berlin_pwm_match,
+> +	},
+> +};
+> +module_platform_driver(berlin_pwm_driver);
+> +
+> +MODULE_AUTHOR("Antoine Tenart <antoine.tenart@free-electrons.com>");
+> +MODULE_DESCRIPTION("Marvell Berlin PWM driver");
+> +MODULE_LICENSE("GPL v2");
 >
-> First, in drivers/mfd/mtk_pmic_wrap.c which registered regmap without
-> rebmap_bus.
-> devm_regmap_init(wrp->dev, NULL, wrp, &pwrap_regmap_config);
->
-> It call to regmap_init() and go to "skip_format_initialization" because
-> regmap_bus didn't assign by driver.
->
-> if (!bus) {
->         map->reg_read  = config->reg_read;
->         map->reg_write = config->reg_write;
->
->         map->defer_caching = false;
->         goto skip_format_initialization;"
->
-> Then in driver rtc-mt6397.c, it used regmap_bulk_read() to get the time
-> of PMIC, and hit the null function of format_val(), because the
-> regmap_bus was null.
->
-> It skipped the initialization of format_val() because bus == null, but
-> called the format_val() at regmap_bulk_read() if bus == null.
->
-> Maybe it was not the good fix for this, but should be a problem need to
-> be reported, or should I need to give the regmap_bus on mtk_pmic_wrap.c?
-
-I ran into this bug when testing Matthias' v4.2-next/for-next branch
-on mt8173.  It now crashes on boot.
-
-Since I didn't see it elsewhere in this discussion, I'll point out
-that the "regression" here was introduced by commit [0], which added
-the call to map->format.format_val from regmap_bulk_read() when
-map->bus == NULL.
-
-[0] commit 15b8d2c41fe5839582029f65c5f7004db451cc2b
-  Author: Arun Chandran <achandran@mvista.com>
-  regmap: Fix regmap_bulk_read in BE mode
-
-Perhaps the easiest work around to unbreak v4.2 is, as Henry mentions,
-for mtk_pmic_wrap to define its own regmap_bus, with .read() &
-.write() handlers.  This way they will inherit the default built-in
-format_val() from the regmap core.
-
-Making mtk_pmic-wrap into a regmap_bus makes a bit of sense
-architecturally, too, since it is essentially just a bus for accessing
-the registers of an off-chip PMIC.  The CPU sees a platform bus, but
-the registers of the remote PMIC are accessed over a dedicated SPI
-bus.
-
-WDYT?
-
-Henry, can you try to implement this?
-
-Thanks,
--Dan
