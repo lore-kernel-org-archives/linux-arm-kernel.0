@@ -1,24 +1,23 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Wed, 12 Aug 2015 14:52:02 +0200
-Subject: [PATCH 15/20] regmap-i2c: Add smbus i2c block support
-In-Reply-To: <20150812115936.GC10748@sirena.org.uk>
+Date: Wed, 12 Aug 2015 14:52:56 +0200
+Subject: [PATCH 17/20] iio: bmc150: Use i2c regmap
+In-Reply-To: <20150812120146.GD10748@sirena.org.uk>
 References: <1439374365-20623-1-git-send-email-mpa@pengutronix.de>
- <1439374365-20623-16-git-send-email-mpa@pengutronix.de>
- <20150812115936.GC10748@sirena.org.uk>
-Message-ID: <20150812125202.GK19600@pengutronix.de>
+ <1439374365-20623-18-git-send-email-mpa@pengutronix.de>
+ <20150812120146.GD10748@sirena.org.uk>
+Message-ID: <20150812125256.GL19600@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 12, 2015 at 12:59:37PM +0100, Mark Brown wrote:
-> On Wed, Aug 12, 2015 at 12:12:40PM +0200, Markus Pargmann wrote:
+On Wed, Aug 12, 2015 at 01:01:46PM +0100, Mark Brown wrote:
+> On Wed, Aug 12, 2015 at 12:12:42PM +0200, Markus Pargmann wrote:
 > 
-> > +	if (count < 1 || count >= I2C_SMBUS_BLOCK_MAX)
-> > +		return -EINVAL;
+> > +	select REGMAP
+> > +	select REGMAP_I2C
 > 
-> Elsewhere you added returns of -E2BIG if the transfer was too big, why
-> not do that here as well?
+> You don't need to select regmap, only REGMAP_I2C.
 
-Sounds good to use E2BIG here as well.
+Ok, thanks, will fix.
 
 Best Regards,
 
@@ -35,4 +34,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150812/0c10fb64/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150812/02310db8/attachment.sig>
