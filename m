@@ -1,28 +1,29 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 12 Aug 2015 09:52:16 -0500
-Subject: [RFC/PATCH-v4.2-rc6 2/5] arm: boot: dts: am4372: add ARM timers
- and SCU nodes
-In-Reply-To: <20150812072816.GR4215@atomide.com>
+Date: Wed, 12 Aug 2015 09:53:28 -0500
+Subject: [RFC/PATCH-v4.2-rc6 4/5] arm: omap2: timer: simplify
+ omap4_local_timer_init()
+In-Reply-To: <20150812071424.GO4215@atomide.com>
 References: <1439242911-715-1-git-send-email-balbi@ti.com>
- <1439242911-715-3-git-send-email-balbi@ti.com>
- <20150812072816.GR4215@atomide.com>
-Message-ID: <20150812145216.GB13884@saruman.tx.rr.com>
+ <1439242911-715-5-git-send-email-balbi@ti.com>
+ <20150812071424.GO4215@atomide.com>
+Message-ID: <20150812145328.GC13884@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 12, 2015 at 12:28:16AM -0700, Tony Lindgren wrote:
+On Wed, Aug 12, 2015 at 12:14:24AM -0700, Tony Lindgren wrote:
 > * Felipe Balbi <balbi@ti.com> [150810 14:44]:
-> > AM437x devices sport SCU, TWD and Global timers,
-> > let's add them to DTS so they have a chance to
-> > probe and be used by Linux.
+> > all users of omap4_local_timer_init() are already
+> > DT-only, so we can remove the check for having
+> > DTB or not.
+> > 
+> > While at that, fix a typo in comment.
 > 
-> Is this one safe to apply already without the Kconfig change?
-> 
-> Or will it cause multi_v7_defconfig with the timers selected
-> to not boot properly?
+> We already have d1dabab2841d ("ARM: OMAP2+: Clean up
+> omap4_local_timer_init") in Linux next reviewed-by you :)
 
-I'd have to try :-) But it should be safe, just the timers won't be
-chosen for anything :-)
+hehe, I had forgotten about that sorry. I'll rebase this on today's
+next and resend the series. I'll also test $subject without the other
+patches.
 
 -- 
 balbi
@@ -32,4 +33,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150812/adb93b17/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150812/68c7e75a/attachment.sig>
