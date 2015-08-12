@@ -1,44 +1,79 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Wed, 12 Aug 2015 17:17:37 +0200
-Subject: [PATCH v4] iio: adc: xilinx-xadc: Push interrupts into hardirq
- context
-In-Reply-To: <1439334049-28671-1-git-send-email-xander.huff@ni.com>
-References: <55C07160.5040907@metafoo.de>
- <1439334049-28671-1-git-send-email-xander.huff@ni.com>
-Message-ID: <55CB6391.7060502@metafoo.de>
+From: jungseoklee85@gmail.com (Jungseok Lee)
+Date: Thu, 13 Aug 2015 00:18:49 +0900
+Subject: [PATCH] arm64: Add __exception_irq_entry definition for function
+ graph
+In-Reply-To: <20150812150232.GI23540@arm.com>
+References: <1439388979-1518-1-git-send-email-jungseoklee85@gmail.com>
+ <20150812150232.GI23540@arm.com>
+Message-ID: <9C0002C4-EEC5-415F-A0BC-2284E662D308@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/12/2015 01:00 AM, Xander Huff wrote:
-> The driver currently registers a pair of irq handlers using
-> request_threaded_irq(), however the synchronization mechanism between the
-> hardirq and the threadedirq handler is a regular spinlock.
-> 
-> Unfortunately, this breaks PREEMPT_RT builds, where a spinlock can sleep,
-> and is thus not able to be acquired from a hardirq handler. This patch gets
-> rid of the threaded handler and pushes all interrupt handling into the
-> hardirq context, and uses request_irq().
-> 
-> To validate that this change has no impact on RT performance, here are
-> cyclictest values with no processes running:
-> 
-> $ sudo cyclictest -S -m -p 98
-> # /dev/cpu_dma_latency set to 0us
-> policy: fifo: loadavg: 0.00 0.01 0.05 1/174 2539
-> T: 0 ( 1405) P:98 I:1000 C:167010520 Min: 9 Act: 12 Avg: 12 Max: 75
-> T: 1 ( 1862) P:98 I:1500 C:111340339 Min: 9 Act: 12 Avg: 12 Max: 73
-> 
-> Then, all xadc raw handles were accessed in a continuous loop via
-> /sys/bus/iio/devices/iio:device0:
-> 
-> $ sudo cyclictest -S -m -p 98
-> # /dev/cpu_dma_latency set to 0us
-> policy: fifo: loadavg: 7.84 7.70 7.63 3/182 4260
-> T: 0 ( 2559) P:98 I:1000 C:241557018 Min: 11 Act: 18 Avg: 21 Max: 74
-> T: 1 ( 2560) P:98 I:1500 C:161038006 Min: 10 Act: 21 Avg: 20 Max: 73
-> 
-> Signed-off-by: Xander Huff <xander.huff@ni.com>
+On Aug 13, 2015, at 12:02 AM, Will Deacon wrote:
 
-Looks good, thanks.
+Hi Will,
 
-Acked-by: Lars-Peter Clausen <lars@metafoo.de>
+> On Wed, Aug 12, 2015 at 03:16:19PM +0100, Jungseok Lee wrote:
+>> The gic_handle_irq() is defined with __exception_irq_entry attribute.
+>> A single remaining work is to add its definition as ARM did. Below
+>> shows how function graph data is changed with these hunks.
+> 
+> [...]
+> 
+>> diff --git a/arch/arm64/include/asm/traps.h b/arch/arm64/include/asm/traps.h
+>> index 232e4ba..0cc2f29 100644
+>> --- a/arch/arm64/include/asm/traps.h
+>> +++ b/arch/arm64/include/asm/traps.h
+>> @@ -34,13 +34,32 @@ struct undef_hook {
+>> void register_undef_hook(struct undef_hook *hook);
+>> void unregister_undef_hook(struct undef_hook *hook);
+>> 
+>> +#ifdef CONFIG_FUNCTION_GRAPH_TRACER
+>> +static inline int __in_irqentry_text(unsigned long ptr)
+>> +{
+>> +	extern char __irqentry_text_start[];
+>> +	extern char __irqentry_text_end[];
+>> +
+>> +	return ptr >= (unsigned long)&__irqentry_text_start &&
+>> +	       ptr < (unsigned long)&__irqentry_text_end;
+>> +}
+>> +#else
+>> +static inline int __in_irqentry_text(unsigned long ptr)
+>> +{
+>> +	return 0;
+>> +}
+>> +#endif
+>> +
+>> static inline int in_exception_text(unsigned long ptr)
+>> {
+>> 	extern char __exception_text_start[];
+>> 	extern char __exception_text_end[];
+>> +	int in;
+>> +
+>> +	in = ptr >= (unsigned long)&__exception_text_start &&
+>> +	     ptr < (unsigned long)&__exception_text_end;
+>> 
+>> -	return ptr >= (unsigned long)&__exception_text_start &&
+>> -	       ptr < (unsigned long)&__exception_text_end;
+>> +	return in ? : __in_irqentry_text(ptr);
+>> }
+> 
+> On arm64, this function is only called from dump_backtrace, so I'm
+> struggling to see why this change makes any difference to the ftrace
+> output.
+> 
+> What am I missing?
+
+As you mentioned, the above hunk does not change the ftrace behavior.
+
+The first diff directly affects the first condition check in print_graph_irq
+function in kernel/trace/trace_functions_graph.c. The code snippet is as follows.
+
+if (addr < (unsigned long)__irqentry_text_start ||
+	addr >= (unsigned long)__irqentry_text_end)
+	return;
+
+I hope it would be helpful.
+
+Best Regards
+Jungseok Lee
