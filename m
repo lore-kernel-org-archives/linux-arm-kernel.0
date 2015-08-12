@@ -1,32 +1,29 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 12 Aug 2015 03:56:42 -0700
-Subject: [PATCH] ARM: OMAP3: clock: remove un-used core dpll re-program
- code
-In-Reply-To: <20150812072535.GQ4215@atomide.com>
-References: <1437034091-18306-1-git-send-email-t-kristo@ti.com>
- <20150812072535.GQ4215@atomide.com>
-Message-ID: <20150812105642.GW4215@atomide.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 12 Aug 2015 11:57:58 +0100
+Subject: [PATCH 02/20] regmap: Remove regmap_bulk_write 64bit support
+In-Reply-To: <20150812104436.GA19600@pengutronix.de>
+References: <1439374365-20623-1-git-send-email-mpa@pengutronix.de>
+ <1439374365-20623-3-git-send-email-mpa@pengutronix.de>
+ <20150812102550.GQ10748@sirena.org.uk>
+ <20150812104436.GA19600@pengutronix.de>
+Message-ID: <20150812105758.GU10748@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [150812 00:29]:
-> * Tero Kristo <t-kristo@ti.com> [150716 01:10]:
-> > Remove the OMAP3 core DPLL re-program code, and the associated SRAM
-> > code that does the low-level programming of the DPLL divider, idling
-> > of the SDRAM etc.
-> > 
-> > This code was never fully implemented in the kernel; things missing
-> > were driver side handling of core clock changes (they need to account
-> > for their functional clock rate being changed on-the-fly), and the whole
-> > framework required for handling this. Thus, there is not much point
-> > to keep carrying the low-level support code either.
-> 
-> OK I'm applying this into omap-for-v4.3/soc. If we ever need the code
-> it will be in the git history.
+On Wed, Aug 12, 2015 at 12:44:36PM +0200, Markus Pargmann wrote:
 
-Actually I'll wait on this one and apply it later on as it currently
-adds merge conflicts into Linux next.
+> I wasn't aware that any 64 bit architecture actually has unsigned ints
+> that are 64 bit in size. So wouldn't at least on x86_64 this would lead
+> to a compiler warning as unsigned int is 4 byte and u64 8 bytes?
 
-Regards,
-
-Tony
+Nobody complained about warnings yet.  The compiler probably shouldn't
+be complaining given the casts, they're supposed to be an "I know what
+I'm doing" thing.  If you want to change something here it's changing
+the test to be based on sizeof(unsigned int).
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150812/a6280ed6/attachment.sig>
