@@ -1,36 +1,85 @@
-From: horia.geanta@freescale.com (=?UTF-8?q?Horia=20Geant=C4=83?=)
-Date: Wed, 12 Aug 2015 15:24:35 +0300
-Subject: [PATCH] arm64: add ioread64be and iowrite64be macros
-Message-ID: <1439382275-21678-1-git-send-email-horia.geanta@freescale.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Wed, 12 Aug 2015 14:26:34 +0200
+Subject: [PATCH v2 04/15] KVM: arm/arm64: extend arch CAP checks to allow
+ per-VM capabilities
+In-Reply-To: <1436538111-4294-5-git-send-email-andre.przywara@arm.com>
+References: <1436538111-4294-1-git-send-email-andre.przywara@arm.com>
+ <1436538111-4294-5-git-send-email-andre.przywara@arm.com>
+Message-ID: <55CB3B7A.3070300@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Alex Porosanu <alexandru.porosanu@freescale.com>
-Signed-off-by: Horia Geant? <horia.geanta@freescale.com>
----
- arch/arm64/include/asm/io.h | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+Reviewed-by: Eric Auger <eric.auger@linaro.org>
 
-diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
-index 44be1e03ed65..9b6e408cfa51 100644
---- a/arch/arm64/include/asm/io.h
-+++ b/arch/arm64/include/asm/io.h
-@@ -174,13 +174,15 @@ extern void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size);
- #define iounmap				__iounmap
- 
- /*
-- * io{read,write}{16,32}be() macros
-+ * io{read,write}{16,32,64}be() macros
-  */
- #define ioread16be(p)		({ __u16 __v = be16_to_cpu((__force __be16)__raw_readw(p)); __iormb(); __v; })
- #define ioread32be(p)		({ __u32 __v = be32_to_cpu((__force __be32)__raw_readl(p)); __iormb(); __v; })
-+#define ioread64be(p)		({ __u64 __v = be64_to_cpu((__force __be64)__raw_readq(p)); __iormb(); __v; })
- 
- #define iowrite16be(v,p)	({ __iowmb(); __raw_writew((__force __u16)cpu_to_be16(v), p); })
- #define iowrite32be(v,p)	({ __iowmb(); __raw_writel((__force __u32)cpu_to_be32(v), p); })
-+#define iowrite64be(v,p)	({ __iowmb(); __raw_writeq((__force __u64)cpu_to_be64(v), p); })
- 
- /*
-  * Convert a physical pointer to a virtual kernel pointer for /dev/mem
--- 
-2.4.4
+Best Regards
+
+Eric
+
+On 07/10/2015 04:21 PM, Andre Przywara wrote:
+> KVM capabilities can be a per-VM property, though ARM/ARM64 currently
+> does not pass on the VM pointer to the architecture specific
+> capability handlers.
+> Add a "struct kvm*" parameter to those function to later allow proper
+> per-VM capability reporting.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+>  arch/arm/include/asm/kvm_host.h   | 2 +-
+>  arch/arm/kvm/arm.c                | 2 +-
+>  arch/arm64/include/asm/kvm_host.h | 2 +-
+>  arch/arm64/kvm/reset.c            | 2 +-
+>  4 files changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+> index e896d2c..56cac05 100644
+> --- a/arch/arm/include/asm/kvm_host.h
+> +++ b/arch/arm/include/asm/kvm_host.h
+> @@ -213,7 +213,7 @@ static inline void __cpu_init_hyp_mode(phys_addr_t boot_pgd_ptr,
+>  	kvm_call_hyp((void*)hyp_stack_ptr, vector_ptr, pgd_ptr);
+>  }
+>  
+> -static inline int kvm_arch_dev_ioctl_check_extension(long ext)
+> +static inline int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
+>  {
+>  	return 0;
+>  }
+> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> index bc738d2..7c65353 100644
+> --- a/arch/arm/kvm/arm.c
+> +++ b/arch/arm/kvm/arm.c
+> @@ -196,7 +196,7 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
+>  		r = KVM_MAX_VCPUS;
+>  		break;
+>  	default:
+> -		r = kvm_arch_dev_ioctl_check_extension(ext);
+> +		r = kvm_arch_dev_ioctl_check_extension(kvm, ext);
+>  		break;
+>  	}
+>  	return r;
+> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> index 2709db2..8d78a72 100644
+> --- a/arch/arm64/include/asm/kvm_host.h
+> +++ b/arch/arm64/include/asm/kvm_host.h
+> @@ -47,7 +47,7 @@
+>  
+>  int __attribute_const__ kvm_target_cpu(void);
+>  int kvm_reset_vcpu(struct kvm_vcpu *vcpu);
+> -int kvm_arch_dev_ioctl_check_extension(long ext);
+> +int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext);
+>  
+>  struct kvm_arch {
+>  	/* The VMID generation used for the virt. memory system */
+> diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+> index 0b43265..866502b 100644
+> --- a/arch/arm64/kvm/reset.c
+> +++ b/arch/arm64/kvm/reset.c
+> @@ -56,7 +56,7 @@ static bool cpu_has_32bit_el1(void)
+>  	return !!(pfr0 & 0x20);
+>  }
+>  
+> -int kvm_arch_dev_ioctl_check_extension(long ext)
+> +int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
+>  {
+>  	int r;
+>  
+> 
