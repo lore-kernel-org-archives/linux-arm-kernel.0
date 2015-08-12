@@ -1,74 +1,63 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Wed, 12 Aug 2015 09:33:56 -0400
-Subject: arm kernel oops in highmem.c with 4.2
-In-Reply-To: <alpine.LFD.2.20.1508112116320.1515@knanqh.ubzr>
-References: <CALeDE9Ox3=sh3AXQ0NUG6BBfU5i5YrMY=LDpcTHQWqz2=60F2g@mail.gmail.com>
- <20150805100701.GV7557@n2100.arm.linux.org.uk>
- <CALeDE9PXF=gQCaBCiHpHy2nXOooQOmsCQvSgOv+wQw3mta=P6A@mail.gmail.com>
- <20150805112713.GY7557@n2100.arm.linux.org.uk>
- <1439315290.3153.11.camel@redhat.com>
- <20150811181008.GA7557@n2100.arm.linux.org.uk>
- <alpine.LFD.2.20.1508111501130.1515@knanqh.ubzr>
- <20150811195638.GC7557@n2100.arm.linux.org.uk>
- <alpine.LFD.2.20.1508111558210.1515@knanqh.ubzr>
- <1439327845.3153.17.camel@redhat.com>
- <alpine.LFD.2.20.1508112116320.1515@knanqh.ubzr>
-Message-ID: <1439386436.3153.23.camel@redhat.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 12 Aug 2015 14:34:58 +0100
+Subject: [PATCH 3/6] irqchip: GICv3: Skip LPI deactivation
+In-Reply-To: <55C9C39A.3060208@linaro.org>
+References: <1436447951-22357-1-git-send-email-marc.zyngier@arm.com>
+ <1436447951-22357-4-git-send-email-marc.zyngier@arm.com>
+ <55C9C39A.3060208@linaro.org>
+Message-ID: <55CB4B82.9060601@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2015-08-11 at 22:18 -0400, Nicolas Pitre wrote:
-> On Tue, 11 Aug 2015, Mark Salter wrote:
-> 
-> > On Tue, 2015-08-11 at 16:20 -0400, Nicolas Pitre wrote:
-> > > On Tue, 11 Aug 2015, Russell King - ARM Linux wrote:
-> > > 
-> > > > It needs fixing or removing.
-> > > 
-> > > Absolutely. I'm not disputing that. I'm only asking so we can wisely 
-> > > choose between fixing or removing.  Personally I'd be inclined 
-> > > towards 
-> > > the later, unless the following is sufficient to fix it:
-> > > 
-> > > diff --git a/arch/arm/lib/uaccess_with_memcpy.c 
-> > > b/arch/arm/lib/uaccess_with_memcpy.c
-> > > index 3e58d71001..4b39af2dfd 100644
-> > > --- a/arch/arm/lib/uaccess_with_memcpy.c
-> > > +++ b/arch/arm/lib/uaccess_with_memcpy.c
-> > > @@ -96,7 +96,7 @@ __copy_to_user_memcpy(void __user *to, const void 
-> > > *from, unsigned long n)
-> > >  	}
-> > >  
-> > >  	/* the mmap semaphore is taken only if not in an atomic 
-> > > context 
-> > > */
-> > > -	atomic = in_atomic();
-> > > +	atomic = faulthandler_disabled();
-> > >  
-> > >  	if (!atomic)
-> > >  		down_read(&current->mm->mmap_sem);
-> > 
-> > Yeah, that fixes the problem I was seeing.
-> 
-> Good!  Then I'll add it to RMK's patch system.  May I add a tested-by 
-> tag with your name?
+On 11/08/15 10:42, Eric Auger wrote:
+> On 07/09/2015 03:19 PM, Marc Zyngier wrote:
+>> Contrary to other GICv3 interrupts, LPIs do not have an active state
+>> by virtue of being edge-triggered only (they only have a pending state).
+>>
+>> Given this, there is no point trying to deactivate them, and we can
+>> skip the ICC_DIR_EL1 entierely.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  drivers/irqchip/irq-gic-v3.c | 8 ++++++--
+>>  1 file changed, 6 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+>> index 49768fc..e02592b 100644
+>> --- a/drivers/irqchip/irq-gic-v3.c
+>> +++ b/drivers/irqchip/irq-gic-v3.c
+>> @@ -295,10 +295,14 @@ static int gic_irq_get_irqchip_state(struct irq_data *d,
+>>  
+>>  static void gic_eoi_irq(struct irq_data *d)
+>>  {
+>> -	if (static_key_true(&supports_deactivate))
+>> +	if (static_key_true(&supports_deactivate)) {
+>> +		/* No need to deactivate an LPI */
+>> +		if (gic_irq(d) >= 8192)
+> In case of EOIMode == 0, we do not call EOI. I can't understand whether
+> it is an issue.
 
-Yes
+What do you mean? We definitely perform an EOI in both EOImodes...
 
+> In 4.8.3 Properties of LPI, in 2d note it is written:
 > 
-> > This was on a calxeda highbank.
+> "SW must issue a write to EOI to clear the active priorities register,
+> hence the CPU interface still requires an active state for LPIs, even
+> through this is not necessary within the redistributor"
 > 
-> Any idea why this option was set?
+> Eric
+>> +			return;
+>>  		gic_write_dir(gic_irq(d));
+>> -	else
+>> +	} else {
+>>  		gic_write_eoir(gic_irq(d));
 
-None. It seems to have been there in the original fedora config
-for v7 kernels. But nothing in the config turns on CPU_FEROCEON
-so there is no real need for it.
+... right here.
 
-> 
-> > With CONFIG_UACCESS_WITH_MEMCPY, the dd copy test reported 1.8GB/s
-> > Without CONFIG_UACCESS_WITH_MEMCPY, 2.1GB/s
-> 
-> Therefore this is of no benefit to you.
-> 
-> 
-> Nicolas
+Of am I missing something completely obvious?
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
