@@ -1,115 +1,23 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 12 Aug 2015 10:29:00 +0100
-Subject: [PATCH v4 2/2] mfd: axp20x: Add a cell for the usb power_supply
- part of the axp20x PMICs
-In-Reply-To: <55CB05AD.1030707@redhat.com>
-References: <1439049521-30766-1-git-send-email-hdegoede@redhat.com>
- <1439049521-30766-2-git-send-email-hdegoede@redhat.com>
- <20150811141811.GM18282@x1> <55CB05AD.1030707@redhat.com>
-Message-ID: <20150812092900.GC18282@x1>
+From: ryabinin.a.a@gmail.com (Andrey Ryabinin)
+Date: Wed, 12 Aug 2015 12:30:37 +0300
+Subject: [PATCH v5 2/6] x86/kasan,
+ mm: introduce generic kasan_populate_zero_shadow()
+In-Reply-To: <20150811164010.GJ23307@e104818-lin.cambridge.arm.com>
+References: <1439259499-13913-1-git-send-email-ryabinin.a.a@gmail.com>
+ <1439259499-13913-3-git-send-email-ryabinin.a.a@gmail.com>
+ <20150811154117.GH23307@e104818-lin.cambridge.arm.com>
+ <55CA21E8.2060704@gmail.com>
+ <20150811164010.GJ23307@e104818-lin.cambridge.arm.com>
+Message-ID: <CAPAsAGwDNpRBLAvyCSpR9ZO9tAmHx-XYjVDZPECeQkU0WOw5jg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 12 Aug 2015, Hans de Goede wrote:
+2015-08-11 19:40 GMT+03:00 Catalin Marinas <catalin.marinas@arm.com>:
+>
+> Not sure how you plan to merge it though since there are x86
+> dependencies. I could send the whole series via tip or the mm tree (and
+> I guess it's pretty late for 4.3).
 
-> Hi,
-> 
-> On 11-08-15 16:18, Lee Jones wrote:
-> >On Sat, 08 Aug 2015, Hans de Goede wrote:
-> >
-> >>Add a cell for the usb power_supply part of the axp20x PMICs.
-> >>
-> >>Note that this cell is only for the usb power_supply part and not the
-> >>ac-power / battery-charger / rtc-backup-bat-charger bits.
-> >>
-> >>Depending on the board each of those must be enabled / disabled separately
-> >>in devicetree as most boards do not use all 4. So in dt each one needs its
-> >>own child-node of the axp20x node. Another reason for using separate child
-> >>nodes for each is so that other devicetree nodes can have a power-supply
-> >>property with a phandle referencing a node representing a single
-> >>power-supply.
-> >>
-> >>The decision to use a separate devicetree node for each is reflected on
-> >>the kernel side by each getting its own mfd-cell / platform_device and
-> >>platform-driver.
-> >>
-> >>Note this commit also makes some whitespace changes to the intialization
-> >>of existing cells in axp20x_cells, these are pure whitespace changes,
-> >>functionally nothing changes.
-> >>
-> >>Cc: Bruno Pr?mont <bonbons@linux-vserver.org>
-> >>Signed-off-by: Bruno Pr?mont <bonbons@linux-vserver.org>
-> >>Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> >>Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> >>Acked-by: Lee Jones <lee.jones@linaro.org>
-> >>---
-> >>Changes in v2:
-> >>-Use DEFINE_RES_IRQ_NAMED
-> >>-Change indentation of axp20x_cells initializers to avoid line wrapping
-> >>Changes in v3:
-> >>-Improve commit message
-> >>-Add Bruno's S-o-b
-> >>---
-> >>  drivers/mfd/axp20x.c | 20 ++++++++++++++++----
-> >>  1 file changed, 16 insertions(+), 4 deletions(-)
-> >
-> >Applied, thanks.
-> 
-> Great, but I'm not seeing this in:
-> 
-> https://git.kernel.org/cgit/linux/kernel/git/lee/mfd.git/log/?h=for-mfd-next
-
-Well it does usually take me a day or two push my local branch out,
-however in this case I had actually dropped a ball somewhere.  I've
-been through my backlog of 'applied' patches and these two are the
-only ones I failed to pick.  I have now, re-picked, re-applied and
-pushed the branch out.  Let me know if something is still not right.
-
-Sorry for the inconvenience.
-
-> >>diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
-> >>index d9f2f96..3f576b7 100644
-> >>--- a/drivers/mfd/axp20x.c
-> >>+++ b/drivers/mfd/axp20x.c
-> >>@@ -140,6 +140,13 @@ static struct resource axp20x_pek_resources[] = {
-> >>  	},
-> >>  };
-> >>
-> >>+static struct resource axp20x_usb_power_supply_resources[] = {
-> >>+	DEFINE_RES_IRQ_NAMED(AXP20X_IRQ_VBUS_PLUGIN, "VBUS_PLUGIN"),
-> >>+	DEFINE_RES_IRQ_NAMED(AXP20X_IRQ_VBUS_REMOVAL, "VBUS_REMOVAL"),
-> >>+	DEFINE_RES_IRQ_NAMED(AXP20X_IRQ_VBUS_VALID, "VBUS_VALID"),
-> >>+	DEFINE_RES_IRQ_NAMED(AXP20X_IRQ_VBUS_NOT_VALID, "VBUS_NOT_VALID"),
-> >>+};
-> >>+
-> >>  static struct resource axp22x_pek_resources[] = {
-> >>  	{
-> >>  		.name   = "PEK_DBR",
-> >>@@ -432,11 +439,16 @@ static const struct regmap_irq_chip axp288_regmap_irq_chip = {
-> >>
-> >>  static struct mfd_cell axp20x_cells[] = {
-> >>  	{
-> >>-		.name			= "axp20x-pek",
-> >>-		.num_resources		= ARRAY_SIZE(axp20x_pek_resources),
-> >>-		.resources		= axp20x_pek_resources,
-> >>+		.name		= "axp20x-pek",
-> >>+		.num_resources	= ARRAY_SIZE(axp20x_pek_resources),
-> >>+		.resources	= axp20x_pek_resources,
-> >>  	}, {
-> >>-		.name			= "axp20x-regulator",
-> >>+		.name		= "axp20x-regulator",
-> >>+	}, {
-> >>+		.name		= "axp20x-usb-power-supply",
-> >>+		.of_compatible	= "x-powers,axp202-usb-power-supply",
-> >>+		.num_resources	= ARRAY_SIZE(axp20x_usb_power_supply_resources),
-> >>+		.resources	= axp20x_usb_power_supply_resources,
-> >>  	},
-> >>  };
-> >>
-> >
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Via mm tree, I guess.
+If this is too late for 4.3, then I'll update changelog and send v6
+after 4.3-rc1 release.
