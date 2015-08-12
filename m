@@ -1,60 +1,31 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Wed, 12 Aug 2015 22:21:53 +0000
-Subject: [PATCH V6 0/3] nvmem: add ocotp support for i.MX23 and i.MX28
-Message-ID: <1439418116-1833-1-git-send-email-stefan.wahren@i2se.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Wed, 12 Aug 2015 17:35:04 -0500
+Subject: [Linaro-acpi] [PATCH 1/5] ACPI: add in a bad_madt_entry()
+ function to eventually replace the macro
+In-Reply-To: <1438894770-31163-2-git-send-email-al.stone@linaro.org>
+References: <1438894770-31163-1-git-send-email-al.stone@linaro.org>
+ <1438894770-31163-2-git-send-email-al.stone@linaro.org>
+Message-ID: <CAOZdJXVZomskfpvEjmDUiptW3SndJWvfKyzd9SwJp3dh7h3pig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series brings read-only support for the On-Chip OTP cells
-in the i.MX23 and i.MX28 processor.
+On Thu, Aug 6, 2015 at 3:59 PM, Al Stone <al.stone@linaro.org> wrote:
+> +       while (ms->num_types != 0) {
+> +               if (ms->major_version == major &&
+> +                   ms->minor_version == minor &&
+> +                   ms->madt_version == madt->header.revision)
+> +                       break;
+> +               ms++;
+> +       }
+> +       if (!ms) {
 
-changes in V6:
-- add COMPILE_TEST to dependancy
-- remove unnecessary headers
-- enable clock during read operation
-- fix module license
+Shouldn't this be
 
-changes in V5:
-- rebase to char-misc-next
-- add nvmem prefix to module name
-- set status in dtsi files
+  if (!ms->num_types) {
 
-changes in V4:
-- rename fsl_ocotp.c to mxs-ocotp.c
-- adapt driver to use NVMEM framework V7
-- take care of hbus clock
-- increase too small timeout
-- implement a wait function
-- use defines from stmp_device.h
-- remove owner init
-- more code cleanup
-
-changes in V3:
-- drop write support
-- take care of i.MX23 which has less registers
-- drop unnecessary header file
-- move static variables into driver data
-- add devicetree probing
-- fix missing bank closing in error case
-- use kobj from platform device for sysfs
-- add SYSFS to Kconfig
-- add binding file
-- code cleanup
-
-Stefan Wahren (3):
-  DT: nvmem: add binding for mxs-ocotp
-  nvmem: add driver for ocotp in i.MX23 and i.MX28
-  ARM: mxs: enable ocotp for i.MX23 and i.MX28
-
- .../devicetree/bindings/nvmem/mxs-ocotp.txt        |   25 ++
- arch/arm/boot/dts/imx23.dtsi                       |    7 +-
- arch/arm/boot/dts/imx28.dtsi                       |    7 +-
- drivers/nvmem/Kconfig                              |   11 +
- drivers/nvmem/Makefile                             |    2 +
- drivers/nvmem/mxs-ocotp.c                          |  257 ++++++++++++++++++++
- 6 files changed, 305 insertions(+), 4 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/nvmem/mxs-ocotp.txt
- create mode 100644 drivers/nvmem/mxs-ocotp.c
+instead?
 
 -- 
-1.7.9.5
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
