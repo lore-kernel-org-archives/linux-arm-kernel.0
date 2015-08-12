@@ -1,31 +1,38 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Wed, 12 Aug 2015 17:35:04 -0500
-Subject: [Linaro-acpi] [PATCH 1/5] ACPI: add in a bad_madt_entry()
- function to eventually replace the macro
-In-Reply-To: <1438894770-31163-2-git-send-email-al.stone@linaro.org>
-References: <1438894770-31163-1-git-send-email-al.stone@linaro.org>
- <1438894770-31163-2-git-send-email-al.stone@linaro.org>
-Message-ID: <CAOZdJXVZomskfpvEjmDUiptW3SndJWvfKyzd9SwJp3dh7h3pig@mail.gmail.com>
+From: torvalds@linux-foundation.org (Linus Torvalds)
+Date: Wed, 12 Aug 2015 15:36:14 -0700
+Subject: enabling libgcc for 64-bit divisions, was Re: PROBLEM: XFS on ARM
+ corruption 'Structure needs cleaning'
+In-Reply-To: <55CBC6C6.3090306@kernel.org>
+References: <5579B804.9050707@skylable.com>
+ <20150612122108.GB60661@bfoster.bfoster>
+ <557AD4D4.3010901@skylable.com> <20150612225209.GA20262@dastard>
+ <C6D0D499B56584katsuki.uwatoko@toshiba.co.jp>
+ <20150812062445.GA4520@infradead.org>
+ <CA+55aFxcoXkaa1syBVxwb9-bn3rfyFam9fcNY438bkhHjHq+Vw@mail.gmail.com>
+ <55CBC6C6.3090306@kernel.org>
+Message-ID: <CA+55aFx3-8LRR9aFDM-CrunSEFrSs+z_=iAZ6n-+wgNRzJ4NQQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 6, 2015 at 3:59 PM, Al Stone <al.stone@linaro.org> wrote:
-> +       while (ms->num_types != 0) {
-> +               if (ms->major_version == major &&
-> +                   ms->minor_version == minor &&
-> +                   ms->madt_version == madt->header.revision)
-> +                       break;
-> +               ms++;
-> +       }
-> +       if (!ms) {
+On Wed, Aug 12, 2015 at 3:20 PM, Andy Lutomirski <luto@kernel.org> wrote:
+>
+> Does your objection still apply if we supplied our own implementations of a
+> handful of libgcc helpers?
 
-Shouldn't this be
+We already do that.
 
-  if (!ms->num_types) {
+Several architectures actually implement _udivdi3.
 
-instead?
+However, do_div() is actually the much simpler/better interface.
 
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+I don't think we have a single case in the kernel where we really want
+the full 64/64 division, and the 64/32->64 case really is
+fundamentally simpler.
+
+This whole "do_div is so complicated" thing is just BS.
+
+The thing that triggered Christoph to ask was a bug in the
+implementation of that *simpler*  interface. What makes you think that
+making people implement _udivdi3 would magically avoid all such bugs?
+
+                Linus
