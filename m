@@ -1,73 +1,124 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 12 Aug 2015 17:53:24 +0100
-Subject: [PATCH] arm64: Add __exception_irq_entry definition for function
- graph
-In-Reply-To: <9C0002C4-EEC5-415F-A0BC-2284E662D308@gmail.com>
-References: <1439388979-1518-1-git-send-email-jungseoklee85@gmail.com>
- <20150812150232.GI23540@arm.com>
- <9C0002C4-EEC5-415F-A0BC-2284E662D308@gmail.com>
-Message-ID: <20150812165324.GK23540@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 12 Aug 2015 17:57:11 +0100
+Subject: [PATCH] ARM: l2c: fix support for HW coherent systems in PL310
+ cache
+In-Reply-To: <55CB0061.2010602@free-electrons.com>
+References: <1439312743-6237-1-git-send-email-gregory.clement@free-electrons.com>
+ <20150811172620.GK23307@e104818-lin.cambridge.arm.com>
+ <55CB0061.2010602@free-electrons.com>
+Message-ID: <20150812165711.GF5393@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 12, 2015 at 04:18:49PM +0100, Jungseok Lee wrote:
-> On Aug 13, 2015, at 12:02 AM, Will Deacon wrote:
-> > On Wed, Aug 12, 2015 at 03:16:19PM +0100, Jungseok Lee wrote:
-> >> diff --git a/arch/arm64/include/asm/traps.h b/arch/arm64/include/asm/traps.h
-> >> index 232e4ba..0cc2f29 100644
-> >> --- a/arch/arm64/include/asm/traps.h
-> >> +++ b/arch/arm64/include/asm/traps.h
-> >> @@ -34,13 +34,32 @@ struct undef_hook {
-> >> void register_undef_hook(struct undef_hook *hook);
-> >> void unregister_undef_hook(struct undef_hook *hook);
-> >> 
-> >> +#ifdef CONFIG_FUNCTION_GRAPH_TRACER
-> >> +static inline int __in_irqentry_text(unsigned long ptr)
-> >> +{
-> >> +	extern char __irqentry_text_start[];
-> >> +	extern char __irqentry_text_end[];
-> >> +
-> >> +	return ptr >= (unsigned long)&__irqentry_text_start &&
-> >> +	       ptr < (unsigned long)&__irqentry_text_end;
-> >> +}
-> >> +#else
-> >> +static inline int __in_irqentry_text(unsigned long ptr)
-> >> +{
-> >> +	return 0;
-> >> +}
-> >> +#endif
-> >> +
-> >> static inline int in_exception_text(unsigned long ptr)
-> >> {
-> >> 	extern char __exception_text_start[];
-> >> 	extern char __exception_text_end[];
-> >> +	int in;
-> >> +
-> >> +	in = ptr >= (unsigned long)&__exception_text_start &&
-> >> +	     ptr < (unsigned long)&__exception_text_end;
-> >> 
-> >> -	return ptr >= (unsigned long)&__exception_text_start &&
-> >> -	       ptr < (unsigned long)&__exception_text_end;
-> >> +	return in ? : __in_irqentry_text(ptr);
-> >> }
+On Wed, Aug 12, 2015 at 10:14:25AM +0200, Gregory CLEMENT wrote:
+> On 11/08/2015 19:26, Catalin Marinas wrote:
+> > On Tue, Aug 11, 2015 at 07:05:43PM +0200, Gregory CLEMENT wrote:
+> >> From: Nadav Haklai <nadavh@marvell.com>
+> >>
+> >> When a PL310 cache is used in a system that provides hardware
+> >> coherency, the entire outer cache operations are useless, and can be
+> >> skipped.  Moreover, on some systems, it is harmful as it causes
+> >> deadlocks between the Marvell coherency mechanism, the Marvell PCIe
+> >> controller and the Cortex-A9.
+> >>
+> >> This commit extends a previous commit:
+> >> 98ea2dba65932ffc456b6d7b11b8a0624e2f7b95 which added the io-coherent
+> >> support for the PL310 cache by also disabling the outer cache flush
+> >> range operation.
+> >>
+> >> In the current kernel implementation, the outer cache flush range
+> >> operation is triggered by the dma_alloc function.
+> >> This operation can be take place during runtime and in some
+> >> circumstances may lead to the PCIe/PL310 deadlock on Armada 375/38x
+> >> SoCs.
 > > 
-> > On arm64, this function is only called from dump_backtrace, so I'm
-> > struggling to see why this change makes any difference to the ftrace
-> > output.
-> > 
-> > What am I missing?
+> > While this may work around the issue for your specific SoC, I think a
+> > better fix is in DMA alloc code to avoid flushing caches for coherent
+> > devices. This would be the __dma_clear_buffer() implementation which
+> > isn't aware of whether the device is coherent or not.
 > 
-> As you mentioned, the above hunk does not change the ftrace behavior.
+> Indeed, the other use of the outer cache flush range is done pretty
+> early in the boot and should not be a problem.
 > 
-> The first diff directly affects the first condition check in print_graph_irq
-> function in kernel/trace/trace_functions_graph.c. The code snippet is as follows.
+> What do you think of the following patch?
+[...]
+>  arch/arm/include/asm/outercache.h | 9 +++++++++
+>  arch/arm/mm/cache-l2x0.c          | 1 +
+>  arch/arm/mm/dma-mapping.c         | 6 ++++--
+>  3 files changed, 14 insertions(+), 2 deletions(-)
 > 
-> if (addr < (unsigned long)__irqentry_text_start ||
-> 	addr >= (unsigned long)__irqentry_text_end)
-> 	return;
+> diff --git a/arch/arm/include/asm/outercache.h b/arch/arm/include/asm/outercache.h
+> index 563b92fc2f41..7f7bbfcf1d32 100644
+> --- a/arch/arm/include/asm/outercache.h
+> +++ b/arch/arm/include/asm/outercache.h
+> @@ -35,6 +35,7 @@ struct outer_cache_fns {
+>  	void (*sync)(void);
+>  #endif
+>  	void (*resume)(void);
+> +	bool is_coherent;
 > 
-> I hope it would be helpful.
+>  	/* This is an ARM L2C thing */
+>  	void (*write_sec)(unsigned long, unsigned);
+> @@ -56,6 +57,14 @@ static inline void outer_inv_range(phys_addr_t start, phys_addr_t end)
+>  }
+> 
+>  /**
+> + * outer_is_coherent - tell if the outer cache is io coherent
+> + */
+> +static inline bool outer_is_coherent(void)
+> +{
+> +	return outer_cache.is_coherent;
+> +}
+> +
+> +/**
+>   * outer_clean_range - clean dirty outer cache lines
+>   * @start: starting physical address, inclusive
+>   * @end: end physical address, exclusive
+> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+> index 71b3d3309024..0071e276adc0 100644
+> --- a/arch/arm/mm/cache-l2x0.c
+> +++ b/arch/arm/mm/cache-l2x0.c
+> @@ -1291,6 +1291,7 @@ static const struct l2c_init_data of_l2c310_coherent_data __initconst = {
+>  		.flush_all   = l2c210_flush_all,
+>  		.disable     = l2c310_disable,
+>  		.resume      = l2c310_resume,
+> +		.is_coherent = true,
+>  	},
+>  };
 
-Gotcha, thanks for the explanation.
+I don't really think we need these. If you need to check a device, we
+already have is_device_dma_coherent(). Just pass bool argument to
+__dma_clear_buffer() and fix the calling places. The __dma_alloc()
+function also takes a "bool coherent" but in this case
+__alloc_simple_buffer() is only ever used on coherent devices, so you
+may not even need to check is_device_dma_coherent() (however, there are
+some patches to add CMA support for coherent devices, I don't know
+whether they are queued yet).
 
-Will
+> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> index 1ced8a0f7a52..4d87df2c16f9 100644
+> --- a/arch/arm/mm/dma-mapping.c
+> +++ b/arch/arm/mm/dma-mapping.c
+> @@ -241,12 +241,14 @@ static void __dma_clear_buffer(struct page *page, size_t size)
+>  			page++;
+>  			size -= PAGE_SIZE;
+>  		}
+> -		outer_flush_range(base, end);
+> +		if (!outer_is_coherent())
+> +			outer_flush_range(base, end);
+>  	} else {
+>  		void *ptr = page_address(page);
+>  		memset(ptr, 0, size);
+>  		dmac_flush_range(ptr, ptr + size);
+> -		outer_flush_range(__pa(ptr), __pa(ptr) + size);
+> +		if (!outer_is_coherent())
+> +			outer_flush_range(__pa(ptr), __pa(ptr) + size);
+>  	}
+>  }
+
+This would make sense if we have a device which is outer coherent but
+inner non-coherent, though I doubt this is the case you are trying to
+fix.
+
+-- 
+Catalin
