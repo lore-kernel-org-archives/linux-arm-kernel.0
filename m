@@ -1,60 +1,64 @@
 From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Wed, 12 Aug 2015 20:45:58 +0300
-Subject: [PATCH v2 2/6] genirq: fix irqchip_set_wake_parent if
- IRQCHIP_SKIP_SET_WAKE
+Date: Wed, 12 Aug 2015 20:45:59 +0300
+Subject: [PATCH v2 3/6] genirq: introduce irq_chip_set_type_parent() helper
 In-Reply-To: <1439401562-28874-1-git-send-email-grygorii.strashko@ti.com>
 References: <1439401562-28874-1-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <1439401562-28874-3-git-send-email-grygorii.strashko@ti.com>
+Message-ID: <1439401562-28874-4-git-send-email-grygorii.strashko@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The irqchip_set_wake_parent should not fail if IRQ chip
-specifies IRQCHIP_SKIP_SET_WAKE. Otherwise, IRQ wakeup
-configuration can't be propagated properly through IRQ
-domains hierarchy.
+It's expected to use this helper when the current
+domain doesn't implement .irq_set_type(),  but expect
+the parent to do so.
 
-In case of TI OMAP DRA7 the issue reproduced with following
-configuration:
-ARM GIC<-OMAP wakeupgen<-TI CBAR<-GPIO<-GPIO pcf857x<-gpio_key
-
-gpio_key is wakeup source
-
-Failure is reproduced during suspend/resume to RAM:
-suspend:
- - gpio_keys_suspend
-   enable_irq_wake
-     + pcf857x_irq_set_wake
-       + omap_gpio_wake_enable
-         + TI CBAR irq_chip_set_wake_parent
-           + OMAP wakeupgen has no .irq_set_wake()
-           and -ENOSYS will be returned
-
-resume:
- - gpio_keys_resume
-   + disable_irq_wake
-     + irq_set_irq_wake
-       + WARN(1, "Unbalanced IRQ %d wake disable\n", irq);
-
-Fixes: 08b55e2a9208 ('genirq: Add irqchip_set_wake_parent')
 Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
 ---
- kernel/irq/chip.c | 4 ++++
- 1 file changed, 4 insertions(+)
+ include/linux/irq.h |  1 +
+ kernel/irq/chip.c   | 20 ++++++++++++++++++++
+ 2 files changed, 21 insertions(+)
 
+diff --git a/include/linux/irq.h b/include/linux/irq.h
+index 92188b0..51744bc 100644
+--- a/include/linux/irq.h
++++ b/include/linux/irq.h
+@@ -484,6 +484,7 @@ extern int irq_chip_set_affinity_parent(struct irq_data *data,
+ extern int irq_chip_set_wake_parent(struct irq_data *data, unsigned int on);
+ extern int irq_chip_set_vcpu_affinity_parent(struct irq_data *data,
+ 					     void *vcpu_info);
++extern int irq_chip_set_type_parent(struct irq_data *data, unsigned int type);
+ #endif
+ 
+ /* Handling of unhandled and spurious interrupts: */
 diff --git a/kernel/irq/chip.c b/kernel/irq/chip.c
-index 6de638b..bdb1b9d 100644
+index bdb1b9d..b48938b 100644
 --- a/kernel/irq/chip.c
 +++ b/kernel/irq/chip.c
-@@ -1024,6 +1024,10 @@ int irq_chip_set_vcpu_affinity_parent(struct irq_data *data, void *vcpu_info)
- int irq_chip_set_wake_parent(struct irq_data *data, unsigned int on)
- {
- 	data = data->parent_data;
+@@ -985,6 +985,26 @@ int irq_chip_set_affinity_parent(struct irq_data *data,
+ }
+ 
+ /**
++ * irq_chip_set_type_parent - Set IRQ type on the parent interrupt
++ * @data:	Pointer to interrupt specific data
++ * @type:	IRQ_TYPE_{LEVEL,EDGE}_* value - see include/linux/irq.h
++ *
++ * Conditional, as the underlying parent chip might not implement it.
++ */
++int irq_chip_set_type_parent(struct irq_data *data, unsigned int type)
++{
++	data = data->parent_data;
 +
 +	if (irq_data_get_irq_chip(data)->flags & IRQCHIP_SKIP_SET_WAKE)
 +		return 0;
 +
- 	if (data->chip->irq_set_wake)
- 		return data->chip->irq_set_wake(data, on);
- 
++	if (data->chip->irq_set_type)
++		return data->chip->irq_set_type(data, type);
++
++	return -ENOSYS;
++}
++
++/**
+  * irq_chip_retrigger_hierarchy - Retrigger an interrupt in hardware
+  * @data:	Pointer to interrupt specific data
+  *
 -- 
 2.5.0
