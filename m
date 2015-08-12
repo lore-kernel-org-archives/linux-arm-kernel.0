@@ -1,32 +1,37 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 12 Aug 2015 16:38:41 +0530
-Subject: [PATCH v4 2/2] dt: power: st: Provide bindings for ST's OPPs
-In-Reply-To: <20150811151736.GO18282@x1>
-References: <20150803034642.GV899@linux> <20150810132247.GH3249@x1>
- <20150811080023.GB5509@linux> <20150811093039.GA18282@x1>
- <20150811100941.GG5509@linux> <20150811115425.GE18282@x1>
- <20150811120124.GH5509@linux> <20150811132756.GG18282@x1>
- <20150811142812.GJ5509@linux> <20150811151736.GO18282@x1>
-Message-ID: <20150812110841.GC20238@linux>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 12 Aug 2015 12:10:31 +0100
+Subject: [PATCH 06/20] regmap: Fix regmap_bulk_write for bus writes
+In-Reply-To: <1439374365-20623-7-git-send-email-mpa@pengutronix.de>
+References: <1439374365-20623-1-git-send-email-mpa@pengutronix.de>
+ <1439374365-20623-7-git-send-email-mpa@pengutronix.de>
+Message-ID: <20150812111031.GV10748@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11-08-15, 16:17, Lee Jones wrote:
-> This would work if we only had a single variable to contend with, but
-> what I showed you in my previous example is that we have 3 variables
-> to consider; cut (version), pcode and substrate.
-> 
-> Using the two (simple) examples I provided, how would your suggestion
-> look in our case?
+On Wed, Aug 12, 2015 at 12:12:31PM +0200, Markus Pargmann wrote:
 
-So the solution I gave is for picking the microvolt based on pcode.
-The other two (cut, substrate) aren't about picking microvolt, but if
-the OPP is available or not. Right?
+> Cc: Stephen Boyd <sboyd@codeaurora.org>
 
-If these terms are generic enough, then we can add something similar
-to what you have added..
+I'm not sure why you're putting this in these commit messages...
 
-@Stephen ?
+>  	if (!map->bus || map->use_single_rw) {
+> +		if (val_bytes != 1 && val_bytes != 2 && val_bytes != 4)
+> +			return -EINVAL;
+> +
 
--- 
-viresh
+switch statement please.  This also looks like a separate change to the
+handling of single writes.
+
+> +	} else if (map->use_single_rw) {
+> +		/*
+
+How are we ever going to fall into this else case?  The first check has
+an || map->use_single_rw it so if this is true then the first check will
+be too so we'd never end up in this else case.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150812/6c5fa1df/attachment.sig>
