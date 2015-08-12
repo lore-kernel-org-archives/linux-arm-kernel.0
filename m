@@ -1,104 +1,54 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Wed, 12 Aug 2015 14:57:03 +0530
-Subject: [RFC PATCH 1/5] spi: introduce flag for memory mapped read
-In-Reply-To: <CAOMqctScUybdoZPgqH185qzDxB=TyutDMARextHx0XwC7L3Xmw@mail.gmail.com>
-References: <20150805115013.GJ20873@sirena.org.uk>
- <CAOMqctQXwcHyiWBwtugSDSE_k65qrNfrwnhjQMDJkLoJMmGzUw@mail.gmail.com>
- <20150805124412.GN20873@sirena.org.uk>
- <CAOMqctS9Y5FxpUCCJew6+cnjH5iTvbzkH3g-8yrXs4OuS2pSGA@mail.gmail.com>
- <20150806090202.GO20873@sirena.org.uk>
- <CAOMqctQZRZ4zG_yYy=CeX3DX4NVNWN1COP4Q-2YvMun9xYOA7g@mail.gmail.com>
- <20150806102225.GI7576@n2100.arm.linux.org.uk> <55C35233.2000105@ti.com>
- <20150806135129.GJ7576@n2100.arm.linux.org.uk>
- <CAMuHMdWWDwZ=ziGQXFCnOX8pErXpsEi533J73_Hh=sEqq4hR6Q@mail.gmail.com>
- <20150806213340.GK7576@n2100.arm.linux.org.uk> <55C46B84.3010304@sperl.org>
- <CAOMqctScUybdoZPgqH185qzDxB=TyutDMARextHx0XwC7L3Xmw@mail.gmail.com>
-Message-ID: <55CB1167.7010804@ti.com>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Wed, 12 Aug 2015 10:20:13 +0100
+Subject: [PATCH v4 0/4] clk: hisilicon: support stub clock
+In-Reply-To: <20150812014954.GA6215@leoy-linaro>
+References: <1438673249-6051-1-git-send-email-leo.yan@linaro.org>
+ <20150812003817.GI26614@codeaurora.org> <20150812014954.GA6215@leoy-linaro>
+Message-ID: <55CB0FCD.7050303@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 08/07/2015 03:46 PM, Michal Suchanek wrote:
-[snip]
-> On 7 August 2015 at 10:35, Vignesh R <vigneshr@ti.com> wrote:
->>
->>
->> On 08/07/2015 01:08 PM, Michal Suchanek wrote:
->>
->>> Now since the description is clearer it's obvious that ti-qspi cannot
->>> work fully mmapped as fsl-qspi does because the setup has to be done
->>> over normal spi access and using non-m25p80 devices on the same bus is
->>> a requirement.
->>>
->>> The place where it is known if a transfer can use the mmap access is m25p80.c
->>>
->>> So my suggestion is
->>>
->>>  - add a new method for spi master that gets the read opcode, dummy
->>> length, address, address length, buffer, buffer length and performs
->>> read from the flash memory in a hardware-specific way
->>>
->>> - add a check in m25p80.c that the master supports this feature and if
->>> so use it (eg check that the method is non-null)
->>>
->>> Presumably if some new SPI controllers with similar feature are
->>> supported in the future they can use the same inteface because you
->>> pass on everything the m25p80 read knows.
->>>
->>
->> Ok... Do you mean something like this?
->>
->> I will take m25p80 as example but can be expanded for any flash.
->>
->> In include/linux/mtd.h:
->>         struct spi_mtd_config_info {
->>                 struct spi_device       *spi;
->>                 u32                     page_size;
->>                 u8                      addr_width;
->>                 u8                      erase_opcode;
->>                 u8                      read_opcode;
->>                 u8                      read_dummy;
->>                 u8                      program_opcode;
->>                 enum read_mode          flash_read;
->>
->>         } /* subset of struct spi_nor */
->>
+On 8/12/2015 2:49 AM, Leo Yan wrote:
+> Hi Stephen,
 > 
-> I would just pass these as separate arguments to the function but whatver.
+> On Tue, Aug 11, 2015 at 05:38:17PM -0700, Stephen Boyd wrote:
+>> On 08/04, Leo Yan wrote:
+>>> This series adds support for hisilicon stub clock driver. On hi6220,
+>>> the bootloader needs load the firmware image and set info for OPPs;
+>>> after run into kernel, the stub clock driver is used to communicate
+>>> w/t firmware for cpu dynamic frequency scaling.
+>>>
+>>> In patch series v1/v2, the stub clock driver simply writes request in
+>>> sram and send ipc to firmware; For patch series v3, the firmware has
+>>> been upgraded to use mailbox, so stub clock driver will call standard
+>>> mailbox APIs to request mailbox channel and send message to firmware.
+>>>
+>>> Patch 4 adds stub clock node into dts and it references mailbox with
+>>> phandle, so patch 4 will depend on mailbox driver's patch series [1].
+>>> These patches have been tested on 96board hikey and is used by cpufreq
+>>> driver.
+>>
+>> The To: list is everyone, so I'm not sure who is supposed to
+>> apply these patches. I'd like to take patches 1, 2, and 3 through
+>> the clk tree though.
 > 
->> In m25p80.c:
->>
->>         static int m25p80_read(struct spi_nor *nor, loff_t from,
->>                                 size_t len, size_t *retlen,
->>                                 u_char *buf)
->>         {
->>                 struct spi_mtd_config_info info;
->>                 struct spi_device *spi;
->>
->>                 if (spi->master->spi_mtd_mmap_read) {
->>                   /* Populate spi_mtd_config_info */
->>                   spi->master->spi_mtd_mmap_read(&info, from, len,
->>                                                  retlen, buf);
->>                 }
->>                 else {
->>                 /* no mtd specific acceleration supported try normal
->>                  * SPI way of communicating with flash
->>                  * continue with current code
->>                  * set up spi_message and call spi_sync()
->>                  */
->>         }
->>
->>       }
->>
->> In spi-ti-qspi.c:
->> Implement spi_mtd_mmap_read while holding master->bus_lock mutex.
->>
-> 
+> Thanks, you could take first three patches. For patch 4, i will
+> re-send it after mailbox driver's patches have been merged.
 
-I will re-submit patches based on the above idea, if there are no
-further comments..
+Hi Leo,
 
--- 
-Thanks
-Vignesh
+> Wei Xu, is this okay for you?
+
+OK :)
+
+Best Regards,
+Wei
+
+> 
+> Thanks,
+> Leo Yan
+> 
+> .
+> 
