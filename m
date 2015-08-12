@@ -1,83 +1,89 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Wed, 12 Aug 2015 10:39:09 +0800
-Subject: [PATCH 5/7] clk: atlas7: fix the clock tree for bluetooth stuff
-In-Reply-To: <20150812000229.GB26614@codeaurora.org>
-References: <1438064845-17894-1-git-send-email-21cnbao@gmail.com>
- <1438064845-17894-6-git-send-email-21cnbao@gmail.com>
- <55B7FD22.10609@codeaurora.org>
- <CAGsJ_4wg1+5KrwTJRzE-iaSTvgvgFrM6cDyUTL16gx6Hk+tdPw@mail.gmail.com>
- <55C2BBED.4050608@codeaurora.org>
- <CAGsJ_4y=TC1LXC1CPB=c1bfY7ZR0ktMD+hVuUZWxXXpyRR9zEw@mail.gmail.com>
- <20150812000229.GB26614@codeaurora.org>
-Message-ID: <CAGsJ_4x3L=p1tR7bg=d8WwLe_2ojZgCw4aiuN5quM7YtP150tg@mail.gmail.com>
+From: david@fromorbit.com (Dave Chinner)
+Date: Wed, 12 Aug 2015 13:14:07 +1000
+Subject: PROBLEM: XFS on ARM corruption 'Structure needs cleaning'
+In-Reply-To: <C6D0D499B56584katsuki.uwatoko@toshiba.co.jp>
+References: <5579B804.9050707@skylable.com>
+ <20150612122108.GB60661@bfoster.bfoster>
+ <557AD4D4.3010901@skylable.com> <20150612225209.GA20262@dastard>
+ <C6D0D499B56584katsuki.uwatoko@toshiba.co.jp>
+Message-ID: <20150812031407.GB20596@dastard>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-08-12 8:02 GMT+08:00 Stephen Boyd <sboyd@codeaurora.org>:
-> On 08/10, Barry Song wrote:
->> 2015-08-06 9:44 GMT+08:00 Stephen Boyd <sboyd@codeaurora.org>:
->> >
->> > This actually points out a big problem we have right now in Linux, which is
->> > the lack of proper power management for the type of bus topology you see in
->> > embedded systems. Some of the genpd work going on may also be another
->> > solution to this problem, where we could group multiple devices into generic
->> > power domains that know to turn on 2 or 3 of the clocks. For example, the
->> > DMAC, USP, and UART device could all be in the APB power domain so that the
->> > a7ca_io_clk is enabled whenever one of those devices is active. And there
->> > could be another power domain for the NOC that encompasses all devices that
->> > are sitting on that NOC.
->> >
->>
->> Stephen, this should be a possible option, i will talk with HW guys to
->> figure out the relationship of power domain, and check whether we
->> handle this issue by the power domain solution.
->>
->> btw, would you apply other patches in this series at first? we can
->> hold on this one to find a final solution.
->>
->
-> Yes. I'll apply the rest to clk-next.
+On Wed, Aug 12, 2015 at 12:56:25AM +0000, katsuki.uwatoko at toshiba.co.jp wrote:
+> On Sat, 13 Jun 2015 08:52:09 +1000, Dave Chinner wrote:
+> 
+> > Yup, that's looking like a toolchain bug. Thread about arm directory
+> > read corruption:
+> 
+> I think that this is not a toolchain bug, this is related to 
+> Subject: [PATCH v2 1/1] ARM : missing corrupted reg in __do_div_asm
+> http://www.spinics.net/lists/arm-kernel/msg426684.html
 
-Stephen, thanks a lot. i think more about the power domain solution.
-we can re-look at the attached diagram(btm.png) again.
+Interesting! Very good work finding that bug, Katsuki-san. 
 
-usp3 requires btm_io_clk and uart6_io_clk;
-uart6_io requires btm_io_clk and dmac4_io_clk;
-dmac4_io requires btm_io_clk and a7ca_io_clk;
-a7ca_io requires btm_io_clk and btm_noc_clk;
+FWIW, I suspect this fix will need to go back into stable kernels,
+too.
 
-if we put these things in a power domain, it seems we can enable these
-clocks together or disable them together. but it seems we can't
-describe the dependency how.
+> --
+> 
+> The problematic line in xfs is: 
+> irecs->br_startblock = XFS_DADDR_TO_FSB(mp, mappedbno)
+> in xfs_dabuf_map()/fs/xfs/xfs_da_btree.c.
+> 
+> The expansion of it is: 
+> 
+>   ld = mappedbno >> mp->m_blkbb_log;
+>   do_div(ld, mp->m_sb.sb_agblocks);
+>   startblock = ld << mp->m_sb.sb_agblklog;
+>   ld = mappedbno >> mp->m_blkbb_log;
+>   startblock |= do_div(ld, mp->m_sb.sb_agblocks);
+>   irecs->br_startblock = startblock;
+> 
+> The assembler of these are:
+> 
+> :
+> 	bl	__do_div64
+> 	ldr	r1, [sp, #44]
+> 	subs	r3, r7, #32
+> 	orr	r1, r1, r2, lsr r5
+> 	add	r5, sp, #80
+> 	str	r5, [sp, #64]
+> 	ldr	r5, [sp, #60]
+> 	movpl	r1, r2, asl r3
+> 	mov	r2, r2, asl r7
+> 	str	r2, [sp, #40]
+> 	str	r1, [sp, #44]
+> 	mov	r1, r9
+> 	str	r5, [sp, #96]
+> 	mov	r7, #0
+> 	ldr	r2, [sp, #96]
+> 	mov	r5, #1
+> 	ldr	fp, [sp, #64]
+> 	str	r7, [sp, #84]
+> 	mov	r9, r2, asr #31
+> 	str	r7, [sp, #104]
+> 	bl	__do_div64
+> :
+> 
+> by GCC 4.7.2 with -O2 option.
 
-for example, if someone wants to use usp3, it means all clocks should
-be enabled.
-but if someone only wants to use a7ca_io, it means only btm_io_clk and
-btm_noc_clk should be enabled, others should be disabled.
-and if someone wants to use dmac4_io, then btm_io_clk , btm_noc_clk
-and a7ca_io_clk should be enabled, others should be disabled.
+To close the loop, what code do the other versions GCC produce for
+this macro?  Evidence so far says that the result depends on the
+compiler version, so I would like to have confirmation that other
+versions of the compiler generate working code.  There are other
+XFS_DADDR_TO_FSB() calls in the XFS code, too - do they demonstrate
+the same problem, maybe with different compiler versions?
 
-it is difficult to find any power domain things can really resolve the
-right dependency of the clock except that we can do such a power
-domain as diagram pd.png. but the problem is this is the powerdomain
-design in the real hardware.
+Basically I'm asking what is the scope of the problem you've found?
+i.e. when was the bug introduced, what compilers expose it, etc
+so that when ARM users report XFS corruptions we have some idea of
+whether their kernel/compiler combination might have caused the
+issue they are seeing...
 
-it turns out the current patch really resolves all problems except
-that it is not a right description to clock tree. but it does build a
-good dependency map for the relationship of the clocks.
+Cheers,
 
--barry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: btm.PNG
-Type: image/png
-Size: 5993 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150812/0795135e/attachment.png>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: pd.png
-Type: image/png
-Size: 4527 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150812/0795135e/attachment-0001.png>
+Dave.
+-- 
+Dave Chinner
+david at fromorbit.com
