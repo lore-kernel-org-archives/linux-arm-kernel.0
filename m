@@ -1,41 +1,40 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Wed, 12 Aug 2015 12:41:31 +0100
-Subject: [PATCH v8 3/4] drivers: nvmem: Add Vybrid OCOTP support
-In-Reply-To: <20150812113203.GA15470@Sanchayan-Arch.toradex.int>
-References: <cover.1439214648.git.maitysanchayan@gmail.com>
- <29b527f1897b24a310a3f3acee61c721d3399503.1439214648.git.maitysanchayan@gmail.com>
- <55CB22F3.2000702@linaro.org>
- <20150812113203.GA15470@Sanchayan-Arch.toradex.int>
-Message-ID: <55CB30EB.3050006@linaro.org>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 12 Aug 2015 13:42:56 +0200
+Subject: [PATCH V1 Resend 06/10] drivers: rtc: Drop (un)likely before
+ IS_ERR(_OR_NULL)
+In-Reply-To: <20150812104625.GB20238@linux>
+References: <cover.1439375087.git.viresh.kumar@linaro.org>
+ <1a92f2e1af5309ece9736f79f312e90486a98825.1439375087.git.viresh.kumar@linaro.org>
+ <20150812104133.GE3411@piout.net> <20150812104625.GB20238@linux>
+Message-ID: <20150812114256.GF3411@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 12/08/2015 at 16:16:25 +0530, Viresh Kumar wrote :
+> On 12-08-15, 12:41, Alexandre Belloni wrote:
+> > Hi Viresh,
+> > 
+> > Why are you resending?
+> 
+> I never got a reply from Andrew Morton on V1, so resent it again. And
+> today Andrew asked me to take this via trivial tree.
+> 
+> So the resent.
+> 
+> I need to find a sane way to get few more people to the cover-letter.
+> The problem is that I am generating the cc-list with get_maintainers,
+> and if I combine that list for all the patches, it becomes huge. And
+> really can't send the cover-letter to those people then. Few lists may
+> block it as well, due to high number of cc'd people.
+> 
+> I am telling this because, the cover-letter did contain the reason for
+> resend.
+> 
 
+The fact is that I sent you a mail yesterday stating that I applied that
+particular patch.
 
-On 12/08/15 12:32, maitysanchayan at gmail.com wrote:
-> Hello,
->
-> On 15-08-12 11:41:55, Srinivas Kandagatla wrote:
->> >Hi Sanchayan,
->> >
->> >Please run checkpatch before you send the patch next time.
->> >Look at Documentation/SubmittingPatches for more details.
->> >
->> >WARNING: line over 80 characters
->> >#225: FILE: drivers/nvmem/vf610-ocotp.c:174:
->> >+			ret = vf610_ocotp_wait_busy(ocotp->base + OCOTP_CTRL_REG);
->> >
->> >WARNING: line over 80 characters
->> >#237: FILE: drivers/nvmem/vf610-ocotp.c:186:
->> >+			ret = vf610_ocotp_wait_busy(ocotp->base + OCOTP_CTRL_REG);
->> >
->> >WARNING: line over 80 characters
->> >#244: FILE: drivers/nvmem/vf610-ocotp.c:193:
->> >+				writel(OCOTP_CTRL_ERROR, ocotp->base + OCOTP_CTRL_CLR);
->> >
-> I had. However splitting these lines seemed odd. Will split and fix.
->
-Just get the base to a local variable, which should make it look neat 
-and this will avoid de-referencing the octop in the all the time in loop.
-
---srini
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
