@@ -1,56 +1,30 @@
-From: codekipper@gmail.com (codekipper at gmail.com)
-Date: Wed, 12 Aug 2015 19:27:48 +0200
-Subject: [PATCH v2] pinctrl: sun4i: add spdif to pin description.
-In-Reply-To: <1439400468-1563-1-git-send-email-codekipper@gmail.com>
-References: <1439400468-1563-1-git-send-email-codekipper@gmail.com>
-Message-ID: <1439400468-1563-2-git-send-email-codekipper@gmail.com>
+From: rabin@rab.in (Rabin Vincent)
+Date: Wed, 12 Aug 2015 19:33:07 +0200
+Subject: Problem with ftrace uprobes on ARM
+In-Reply-To: <55CB1187.6030301@techfak.uni-bielefeld.de>
+References: <55C8E417.7080607@techfak.uni-bielefeld.de>
+ <20150810193116.GA2895@debian>
+ <55CB1187.6030301@techfak.uni-bielefeld.de>
+Message-ID: <20150812173307.GA19814@debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marcus Cooper <codekipper@gmail.com>
+On Wed, Aug 12, 2015 at 11:27:35AM +0200, Christian Ascheberg wrote:
+> Is there any documentation regarding limitations of perf/ftrace support on
+> ARM (compared to x86)?
 
-Signed-off-by: Marcus Cooper <codekipper@gmail.com>
----
- drivers/pinctrl/sunxi/pinctrl-sun4i-a10.c | 17 ++++++++++++++---
- 1 file changed, 14 insertions(+), 3 deletions(-)
+There's Documentation/features/ which lists the status of architecture
+support for various kernel options.  I don't know of any other
+documentation.
 
-diff --git a/drivers/pinctrl/sunxi/pinctrl-sun4i-a10.c b/drivers/pinctrl/sunxi/pinctrl-sun4i-a10.c
-index 7376a97..862a096 100644
---- a/drivers/pinctrl/sunxi/pinctrl-sun4i-a10.c
-+++ b/drivers/pinctrl/sunxi/pinctrl-sun4i-a10.c
-@@ -135,7 +135,14 @@ static const struct sunxi_desc_pin sun4i_a10_pins[] = {
- 	SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 3),
- 		  SUNXI_FUNCTION(0x0, "gpio_in"),
- 		  SUNXI_FUNCTION(0x1, "gpio_out"),
--		  SUNXI_FUNCTION(0x2, "ir0")),		/* TX */
-+		  SUNXI_FUNCTION(0x2, "ir0"),		/* TX */
-+		/*
-+		 * The SPDIF block is not referenced at all in the A10 user
-+		 * manual. However it is described in the code leaked and the
-+		 * pin descriptions are declared in the A20 user manual which
-+		 * is pin compatible with this device.
-+		 */
-+		  SUNXI_FUNCTION(0x4, "spdif")),        /* SPDIF MCLK */
- 	SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 4),
- 		  SUNXI_FUNCTION(0x0, "gpio_in"),
- 		  SUNXI_FUNCTION(0x1, "gpio_out"),
-@@ -176,11 +183,15 @@ static const struct sunxi_desc_pin sun4i_a10_pins[] = {
- 		  SUNXI_FUNCTION(0x0, "gpio_in"),
- 		  SUNXI_FUNCTION(0x1, "gpio_out"),
- 		  SUNXI_FUNCTION(0x2, "i2s"),		/* DI */
--		  SUNXI_FUNCTION(0x3, "ac97")),		/* DI */
-+		  SUNXI_FUNCTION(0x3, "ac97"),		/* DI */
-+		/* Undocumented mux function - See SPDIF MCLK above */
-+		  SUNXI_FUNCTION(0x4, "spdif")),        /* SPDIF IN */
- 	SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 13),
- 		  SUNXI_FUNCTION(0x0, "gpio_in"),
- 		  SUNXI_FUNCTION(0x1, "gpio_out"),
--		  SUNXI_FUNCTION(0x2, "spi2")),		/* CS1 */
-+		  SUNXI_FUNCTION(0x2, "spi2"),		/* CS1 */
-+		/* Undocumented mux function - See SPDIF MCLK above */
-+		  SUNXI_FUNCTION(0x4, "spdif")),        /* SPDIF OUT */
- 	SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 14),
- 		  SUNXI_FUNCTION(0x0, "gpio_in"),
- 		  SUNXI_FUNCTION(0x1, "gpio_out"),
--- 
-2.5.0
+> For example, I also noticed that 'perf help' lists 'trace' command, but
+> running 'perf trace' says 'is not a perf-command'.
+
+That doesn't have anything to do with something missing in ARM afaics.
+It's probably because your perf wasn't built with libaudit.  Information
+is printed about this when you build perf.  The fact that 'perf help'
+lists unavailable commands is probably a bug.
+
+ ~/dev/linux/tools/perf$ make
+   BUILD:   Doing 'make -j8' parallel build
+ config/Makefile:366: No libaudit.h found, disables 'trace' tool, please install audit-libs-devel or libaudit-dev
