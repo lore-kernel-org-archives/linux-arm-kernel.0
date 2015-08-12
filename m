@@ -1,270 +1,125 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 12 Aug 2015 11:23:28 +0100
-Subject: [PATCH v2 5/6] mailbox: Add generic mechanism for testing
- Mailbox Controllers
-In-Reply-To: <CABb+yY20nQbiEEZeRvWTMUsJ2qgwRn8CrWvnFDSB-b1dgVaAuw@mail.gmail.com>
-References: <1437990272-23111-1-git-send-email-lee.jones@linaro.org>
- <1437990272-23111-6-git-send-email-lee.jones@linaro.org>
- <CABb+yY20nQbiEEZeRvWTMUsJ2qgwRn8CrWvnFDSB-b1dgVaAuw@mail.gmail.com>
-Message-ID: <20150812102328.GD18282@x1>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Wed, 12 Aug 2015 12:20:15 +0200
+Subject: [PATCH v4 2/2] mfd: axp20x: Add a cell for the usb power_supply
+ part of the axp20x PMICs
+In-Reply-To: <20150812092900.GC18282@x1>
+References: <1439049521-30766-1-git-send-email-hdegoede@redhat.com>
+ <1439049521-30766-2-git-send-email-hdegoede@redhat.com>
+ <20150811141811.GM18282@x1> <55CB05AD.1030707@redhat.com>
+ <20150812092900.GC18282@x1>
+Message-ID: <55CB1DDF.7000201@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 10 Aug 2015, Jassi Brar wrote:
+Hi,
 
-> On Mon, Jul 27, 2015 at 3:14 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> > This particular Client implementation uses shared memory in order
-> > to pass messages between Mailbox users; however, it can be easily
-> > hacked to support any type of Controller.
-> >
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > ---
-> >  drivers/mailbox/Kconfig        |   7 ++
-> >  drivers/mailbox/Makefile       |   2 +
-> >  drivers/mailbox/mailbox-test.c | 210 +++++++++++++++++++++++++++++++++++++++++
-> >  3 files changed, 219 insertions(+)
-> >  create mode 100644 drivers/mailbox/mailbox-test.c
-> >
-> > diff --git a/drivers/mailbox/Kconfig b/drivers/mailbox/Kconfig
-> > index 2cc4c39..7720bde 100644
-> > --- a/drivers/mailbox/Kconfig
-> > +++ b/drivers/mailbox/Kconfig
-> > @@ -77,4 +77,11 @@ config STI_MBOX
-> >           Mailbox implementation for STMicroelectonics family chips with
-> >           hardware for interprocessor communication.
-> >
-> > +config MAILBOX_TEST
-> > +       tristate "Mailbox Test Client"
-> > +       depends on OF
-> > +       help
-> > +         Test client to help with testing new Controller driver
-> > +         implementations.
-> > +
-> >  endif
-> > diff --git a/drivers/mailbox/Makefile b/drivers/mailbox/Makefile
-> > index 7cb4766..92435ef 100644
-> > --- a/drivers/mailbox/Makefile
-> > +++ b/drivers/mailbox/Makefile
-> > @@ -2,6 +2,8 @@
-> >
-> >  obj-$(CONFIG_MAILBOX)          += mailbox.o
-> >
-> > +obj-$(CONFIG_MAILBOX_TEST)     += mailbox-test.o
-> > +
-> >  obj-$(CONFIG_ARM_MHU)  += arm_mhu.o
-> >
-> >  obj-$(CONFIG_PL320_MBOX)       += pl320-ipc.o
-> > diff --git a/drivers/mailbox/mailbox-test.c b/drivers/mailbox/mailbox-test.c
-> > new file mode 100644
-> > index 0000000..10bfe3a
-> > --- /dev/null
-> > +++ b/drivers/mailbox/mailbox-test.c
-> > @@ -0,0 +1,210 @@
-> > +/*
-> > + * Copyright (C) 2015 ST Microelectronics
-> > + *
-> > + * Author: Lee Jones <lee.jones@linaro.org>
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License as published by
-> > + * the Free Software Foundation; either version 2 of the License, or
-> > + * (at your option) any later version.
-> > + */
-> > +
-> > +#include <linux/debugfs.h>
-> > +#include <linux/err.h>
-> > +#include <linux/kernel.h>
-> > +#include <linux/mailbox_client.h>
-> > +#include <linux/module.h>
-> > +#include <linux/of.h>
-> > +#include <linux/platform_device.h>
-> > +#include <linux/slab.h>
-> > +#include <linux/uaccess.h>
-> > +
-> > +#define MBOX_MAX_MSG_LEN 128
-> > +
-> > +static struct dentry *root_debugfs_dir;
-> > +
-> > +struct mbox_test_device {
-> > +       struct device           *dev;
-> > +       struct mbox_chan        *tx_channel;
-> > +       struct mbox_chan        *rx_channel;
-> > +       void __iomem            *mmio;
-> > +
-> > +};
-> > +
-> > +static ssize_t mbox_test_write(struct file *filp,
-> > +                              const char __user *userbuf,
-> > +                              size_t count, loff_t *ppos)
-> > +{
-> > +       struct mbox_test_device *tdev = filp->private_data;
-> > +       char *message;
-> > +       int ret;
-> > +
-> > +       if (count > MBOX_MAX_MSG_LEN) {
-> > +               dev_err(tdev->dev,
-> > +                       "Message length %d greater than max allowed %d\n",
-> > +                       count, MBOX_MAX_MSG_LEN);
-> > +               return -EINVAL;
-> > +       }
-> > +
-> > +       message = kzalloc(count, GFP_KERNEL);
-> > +       if (!message)
-> > +               return -ENOMEM;
-> > +
-> > +       ret = copy_from_user(message, userbuf, count);
-> > +       if (ret)
-> > +               return -EFAULT;
-> > +
-> > +       print_hex_dump(KERN_ERR, "Client: Sending: ", DUMP_PREFIX_ADDRESS,
-> > +                      16, 1, message, 16, true);
-> > +
-> > +       ret = mbox_send_message(tdev->tx_channel, message);
-> > +       if (ret < 0)
-> > +               dev_err(tdev->dev, "Failed to send message via mailbox\n");
-> > +
-> > +       kfree(message);
-> > +
-> > +       return ret < 0 ? ret : count;
-> > +}
-> > +
-> > +static const struct file_operations mbox_test_ops = {
-> > +       .write  = mbox_test_write,
-> > +       .open   = simple_open,
-> > +       .llseek = generic_file_llseek,
-> > +};
-> > +
-> > +static int mbox_test_add_debugfs(struct platform_device *pdev,
-> > +                                struct mbox_test_device *tdev)
-> > +{
-> > +       if (!debugfs_initialized())
-> > +               return 0;
-> > +
-> > +       root_debugfs_dir = debugfs_create_dir("mailbox", NULL);
-> > +       if (!root_debugfs_dir) {
-> > +               dev_err(&pdev->dev, "Failed to create Mailbox debugfs\n");
-> > +               return -EINVAL;
-> > +       }
-> > +
-> > +       debugfs_create_file("send-message", 0200, root_debugfs_dir,
-> > +                           tdev, &mbox_test_ops);
-> > +
-> > +       return 0;
-> > +}
-> > +
-> > +static void mbox_test_receive_message(struct mbox_client *client, void *message)
-> > +{
-> > +       struct mbox_test_device *tdev = dev_get_drvdata(client->dev);
-> > +
-> > +       if (!tdev->mmio) {
-> > +               dev_info(tdev->dev, "Client: Recived something [read mmio]\n");
-> > +               return;
-> > +       }
-> > +
-> > +       print_hex_dump(KERN_ERR, "Client: from co-proc: ", DUMP_PREFIX_ADDRESS,
-> > +                      16, 1, tdev->mmio, MBOX_MAX_MSG_LEN, true);
-> > +}
-> > +
-> > +static void mbox_test_prepare_message(struct mbox_client *client, void *message)
-> > +{
-> > +       struct mbox_test_device *tdev = dev_get_drvdata(client->dev);
-> > +
-> > +       if (tdev->mmio)
-> > +               memcpy(tdev->mmio, message, MBOX_MAX_MSG_LEN);
-> >
-> This is unlikely to work. Those platforms that need to send a 2 part
-> message, they do :
-> (a) Signal/Command/Target code via some controller register (via
-> mbox_send_message).
-> (b) Setup the payload in Shared-Memory (via tx_prepare).
-> 
-> This test driver assumes both are the same. I think you have to
-> declare something like
+On 12-08-15 11:29, Lee Jones wrote:
+> On Wed, 12 Aug 2015, Hans de Goede wrote:
+>
+>> Hi,
+>>
+>> On 11-08-15 16:18, Lee Jones wrote:
+>>> On Sat, 08 Aug 2015, Hans de Goede wrote:
+>>>
+>>>> Add a cell for the usb power_supply part of the axp20x PMICs.
+>>>>
+>>>> Note that this cell is only for the usb power_supply part and not the
+>>>> ac-power / battery-charger / rtc-backup-bat-charger bits.
+>>>>
+>>>> Depending on the board each of those must be enabled / disabled separately
+>>>> in devicetree as most boards do not use all 4. So in dt each one needs its
+>>>> own child-node of the axp20x node. Another reason for using separate child
+>>>> nodes for each is so that other devicetree nodes can have a power-supply
+>>>> property with a phandle referencing a node representing a single
+>>>> power-supply.
+>>>>
+>>>> The decision to use a separate devicetree node for each is reflected on
+>>>> the kernel side by each getting its own mfd-cell / platform_device and
+>>>> platform-driver.
+>>>>
+>>>> Note this commit also makes some whitespace changes to the intialization
+>>>> of existing cells in axp20x_cells, these are pure whitespace changes,
+>>>> functionally nothing changes.
+>>>>
+>>>> Cc: Bruno Pr?mont <bonbons@linux-vserver.org>
+>>>> Signed-off-by: Bruno Pr?mont <bonbons@linux-vserver.org>
+>>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>>>> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>>>> Acked-by: Lee Jones <lee.jones@linaro.org>
+>>>> ---
+>>>> Changes in v2:
+>>>> -Use DEFINE_RES_IRQ_NAMED
+>>>> -Change indentation of axp20x_cells initializers to avoid line wrapping
+>>>> Changes in v3:
+>>>> -Improve commit message
+>>>> -Add Bruno's S-o-b
+>>>> ---
+>>>>   drivers/mfd/axp20x.c | 20 ++++++++++++++++----
+>>>>   1 file changed, 16 insertions(+), 4 deletions(-)
+>>>
+>>> Applied, thanks.
+>>
+>> Great, but I'm not seeing this in:
+>>
+>> https://git.kernel.org/cgit/linux/kernel/git/lee/mfd.git/log/?h=for-mfd-next
+>
+> Well it does usually take me a day or two push my local branch out,
+> however in this case I had actually dropped a ball somewhere.  I've
+> been through my backlog of 'applied' patches and these two are the
+> only ones I failed to pick.  I have now, re-picked, re-applied and
+> pushed the branch out.  Let me know if something is still not right.
 
-This driver assumes that the framework will call client->tx_prepare()
-first, which satisfies (b).  It then assumes controller->send_data()
-will be invoked, which will send the platform specific
-signal/command/target code, which then satisfies (a).
+Looks good now, thanks.
 
-In what way does it assume they are the same?
+> Sorry for the inconvenience.
 
-> struct mbox_test_message { /* same for TX and RX */
->           unsigned sig_len;
->           void *signal;               /* rx/tx via mailbox api */
->           unsigned pl_len;
->           void *payload;           /* rx/tx via shared-memory */
-> };
+No problem, thanks for all the great work you are doing on maintaining
+the mfd subsys.
 
-How do you think this should be set and use these?
+Regards,
 
-> > +
-> > +static void mbox_test_message_sent(struct mbox_client *client,
-> > +                                  void *message, int r)
-> > +{
-> > +       if (r)
-> > +               dev_warn(client->dev,
-> > +                        "Client: Message could not be sent: %d\n", r);
-> > +       else
-> > +               dev_info(client->dev,
-> > +                        "Client: Message sent\n");
-> > +}
-> > +
-> > +static struct mbox_chan *
-> > +mbox_test_request_channel(struct platform_device *pdev, const char *name)
-> > +{
-> > +       struct mbox_client *client;
-> > +
-> > +       client = devm_kzalloc(&pdev->dev, sizeof(*client), GFP_KERNEL);
-> > +       if (!client)
-> > +               return ERR_PTR(-ENOMEM);
-> > +
-> > +       client->dev             = &pdev->dev;
-> > +       client->rx_callback     = mbox_test_receive_message;
-> > +       client->tx_prepare      = mbox_test_prepare_message;
-> > +       client->tx_done         = mbox_test_message_sent;
-> > +       client->tx_block        = true;
-> > +       client->knows_txdone    = false;
-> > +       client->tx_tout         = 500;
-> > +
-> > +       return mbox_request_channel_byname(client, name);
-> > +}
-> > +
-> > +static int mbox_test_probe(struct platform_device *pdev)
-> > +{
-> > +       struct mbox_test_device *tdev;
-> > +       struct resource *res;
-> > +       int ret;
-> > +
-> > +       tdev = devm_kzalloc(&pdev->dev, sizeof(*tdev), GFP_KERNEL);
-> > +       if (!tdev)
-> > +               return -ENOMEM;
-> > +
-> > +       /* It's okay for MMIO to be NULL */
-> > +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> > +       tdev->mmio = devm_ioremap_resource(&pdev->dev, res);
-> > +       if (IS_ERR(tdev->mmio))
-> > +               tdev->mmio = NULL;
-> > +
-> > +       tdev->tx_channel = mbox_test_request_channel(pdev, "tx");
-> > +       if (IS_ERR(tdev->tx_channel))
-> > +               return PTR_ERR(tdev->tx_channel);
-> > +
-> > +       tdev->rx_channel = mbox_test_request_channel(pdev, "rx");
-> > +       if (IS_ERR(tdev->rx_channel))
-> > +               return PTR_ERR(tdev->rx_channel);
-> > +
-> Should it really fail on TX or RX only clients?
+Hans
 
-Good question.  Probably not, but I guess we'd need a flag for that.
 
-> It takes write from userspace but shouldn't it also provide data
-> received to the userspace?
-
-Currently we only print the returning message.  If you want me to put
-it in a userspace file too, that's not an issue.
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+>
+>>>> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+>>>> index d9f2f96..3f576b7 100644
+>>>> --- a/drivers/mfd/axp20x.c
+>>>> +++ b/drivers/mfd/axp20x.c
+>>>> @@ -140,6 +140,13 @@ static struct resource axp20x_pek_resources[] = {
+>>>>   	},
+>>>>   };
+>>>>
+>>>> +static struct resource axp20x_usb_power_supply_resources[] = {
+>>>> +	DEFINE_RES_IRQ_NAMED(AXP20X_IRQ_VBUS_PLUGIN, "VBUS_PLUGIN"),
+>>>> +	DEFINE_RES_IRQ_NAMED(AXP20X_IRQ_VBUS_REMOVAL, "VBUS_REMOVAL"),
+>>>> +	DEFINE_RES_IRQ_NAMED(AXP20X_IRQ_VBUS_VALID, "VBUS_VALID"),
+>>>> +	DEFINE_RES_IRQ_NAMED(AXP20X_IRQ_VBUS_NOT_VALID, "VBUS_NOT_VALID"),
+>>>> +};
+>>>> +
+>>>>   static struct resource axp22x_pek_resources[] = {
+>>>>   	{
+>>>>   		.name   = "PEK_DBR",
+>>>> @@ -432,11 +439,16 @@ static const struct regmap_irq_chip axp288_regmap_irq_chip = {
+>>>>
+>>>>   static struct mfd_cell axp20x_cells[] = {
+>>>>   	{
+>>>> -		.name			= "axp20x-pek",
+>>>> -		.num_resources		= ARRAY_SIZE(axp20x_pek_resources),
+>>>> -		.resources		= axp20x_pek_resources,
+>>>> +		.name		= "axp20x-pek",
+>>>> +		.num_resources	= ARRAY_SIZE(axp20x_pek_resources),
+>>>> +		.resources	= axp20x_pek_resources,
+>>>>   	}, {
+>>>> -		.name			= "axp20x-regulator",
+>>>> +		.name		= "axp20x-regulator",
+>>>> +	}, {
+>>>> +		.name		= "axp20x-usb-power-supply",
+>>>> +		.of_compatible	= "x-powers,axp202-usb-power-supply",
+>>>> +		.num_resources	= ARRAY_SIZE(axp20x_usb_power_supply_resources),
+>>>> +		.resources	= axp20x_usb_power_supply_resources,
+>>>>   	},
+>>>>   };
+>>>>
+>>>
+>
