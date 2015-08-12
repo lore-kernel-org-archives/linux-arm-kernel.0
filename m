@@ -1,150 +1,130 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 12 Aug 2015 14:15:17 +0000 (UTC)
-Subject: OMAP baseline test results for v4.2-rc6
-Message-ID: <alpine.DEB.2.02.1508121337410.7154@utopia.booyaka.com>
+From: jungseoklee85@gmail.com (Jungseok Lee)
+Date: Wed, 12 Aug 2015 14:16:19 +0000
+Subject: [PATCH] arm64: Add __exception_irq_entry definition for function graph
+Message-ID: <1439388979-1518-1-git-send-email-jungseoklee85@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The gic_handle_irq() is defined with __exception_irq_entry attribute.
+A single remaining work is to add its definition as ARM did. Below
+shows how function graph data is changed with these hunks.
 
-Here are some basic OMAP test results for Linux v4.2-rc6.
-Logs and other details at:
+A prologue of an interrupt handler is drawn as follows.
 
-    http://www.pwsan.com/omap/testlogs/test_v4.2-rc6/20150810114017/
+- current status
 
+ 0)   0.208 us    |  cpuidle_not_available();
+ 0)               |  default_idle_call() {
+ 0)               |    arch_cpu_idle() {
+ 0)               |      __handle_domain_irq() {
+ 0)               |        irq_enter() {
+ 0)   0.313 us    |          rcu_irq_enter();
+ 0)   0.261 us    |          __local_bh_disable_ip();
 
-Test summary
-------------
+- with this change
 
-Build: uImage:
-    Pass ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
-		  omap1_defconfig_5912osk_only
+ 0)   0.625 us    |  cpuidle_not_available();
+ 0)               |  default_idle_call() {
+ 0)               |    arch_cpu_idle() {
+ 0)   ==========> |
+ 0)               |      gic_handle_irq() {
+ 0)               |        __handle_domain_irq() {
+ 0)               |          irq_enter() {
+ 0)   0.885 us    |            rcu_irq_enter();
+ 0)   0.781 us    |            __local_bh_disable_ip();
 
-Build: uImage+dtb:
-    Pass (13/13): omap2plus_defconfig_am33xx_only/am335x-bone,
-		  omap2plus_defconfig/omap4-panda,
-		  omap2plus_defconfig/omap4-panda-es,
-		  omap2plus_defconfig/omap4-var-stk-om44,
-		  omap2plus_defconfig/omap3-evm-37xx,
-		  omap2plus_defconfig_n800_only_a/omap2420-n800,
-		  omap2plus_defconfig/omap2430-sdp,
-		  omap2plus_defconfig/am3517-evm,
-		  omap2plus_defconfig/omap3-beagle,
-		  omap2plus_defconfig/omap3-beagle-xm,
-		  omap2plus_defconfig/omap3-sbc-t3517,
-		  omap2plus_defconfig/omap5-uevm,
-		  omap2plus_defconfig/omap5-sbc-t54
+An epilogue of an interrupt handler is recorded as follows.
 
-Build: zImage:
-    Pass (17/17): omap2plus_defconfig, omap2plus_defconfig_am33xx_only,
-		  omap2plus_defconfig_n800_only_a,
-		  omap2plus_defconfig_n800_multi_omap2xxx,
-		  omap2plus_defconfig_2430sdp_only,
-		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
-		  omap2plus_defconfig_omap2_4_only,
-		  omap2plus_defconfig_omap3_4_only,
-		  omap2plus_defconfig_omap5_only,
-		  omap2plus_defconfig_dra7xx_only,
-		  omap2plus_defconfig_am43xx_only,
-		  rmk_omap3430_ldp_oldconfig,
-		  rmk_omap3430_ldp_allnoconfig,
-		  rmk_omap4430_sdp_oldconfig,
-		  rmk_omap4430_sdp_allnoconfig, multi_v7_defconfig
+- current status
 
-Build warnings from toolchain: uImage:
-    (none)
+ 0)   0.261 us    |          idle_cpu();
+ 0)               |          rcu_irq_exit() {
+ 0)   0.521 us    |            rcu_eqs_enter_common.isra.46();
+ 0)   2.552 us    |          }
+ 0) ! 322.448 us  |        }
+ 0) ! 583.437 us  |      }
+ 0) # 1656.041 us |    }
+ 0) # 1658.073 us |  }
 
-Build warnings from toolchain: uImage+dtb:
-    (none)
+- with this change
 
-Build warnings from toolchain: zImage:
-    FAIL (10/17): omap2plus_defconfig, omap2plus_defconfig_am33xx_only,
-		  omap2plus_defconfig_2430sdp_only,
-		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
-		  omap2plus_defconfig_omap2_4_only,
-		  omap2plus_defconfig_omap3_4_only,
-		  omap2plus_defconfig_omap5_only,
-		  omap2plus_defconfig_dra7xx_only,
-		  omap2plus_defconfig_am43xx_only
+ 0)   0.677 us    |            idle_cpu();
+ 0)               |            rcu_irq_exit() {
+ 0)   1.770 us    |              rcu_eqs_enter_common.isra.46();
+ 0)   7.968 us    |            }
+ 0) # 1803.541 us |          }
+ 0) # 2626.667 us |        }
+ 0) # 2632.969 us |      }
+ 0)   <========== |
+ 0) # 14425.00 us |    }
+ 0) # 14430.98 us |  }
 
-Boot to userspace:
-    FAIL ( 1/17): 2430sdp
-    skip ( 3/17): 5912osk, 3517evm, 5430es2sbct54
-    Pass (13/17): am335xbonelt, am335xbone, 4430es2panda, 4460pandaes,
-		  4460varsomom, 37xxevm, 3530es3beagle, 3530es31beagle,
-		  3730beaglexm, 3730es12beaglexm, cmt3517, 5430es2uevm,
-		  2420n800
+Cc: AKASHI Takahiro <takahiro.akashi@linaro.org>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Rabin Vincent <rabin@rab.in>
+Cc: Steven Rostedt <rostedt@goodmis.org>
+Signed-off-by: Jungseok Lee <jungseoklee85@gmail.com>
+---
+ arch/arm64/include/asm/exception.h |  6 +++++
+ arch/arm64/include/asm/traps.h     | 23 ++++++++++++++++--
+ 2 files changed, 27 insertions(+), 2 deletions(-)
 
-Kernel warnings during boot to userspace:
-    FAIL ( 2/17): 4430es2panda, cmt3517
-
-PM: chip retention via suspend:
-    FAIL ( 6/11): am335xbonelt, 4430es2panda, 4460varsomom, 37xxevm,
-		  2430sdp, 5430es2uevm
-    Pass ( 5/11): 4460pandaes, 3530es3beagle, 3530es31beagle,
-		  3730beaglexm, 3730es12beaglexm
-
-PM: chip retention via dynamic idle:
-    FAIL ( 6/11): am335xbonelt, 4430es2panda, 4460varsomom, 37xxevm,
-		  2430sdp, 5430es2uevm
-    Pass ( 5/11): 4460pandaes, 3530es3beagle, 3530es31beagle,
-		  3730beaglexm, 3730es12beaglexm
-
-PM: chip off (except CORE, due to errata) via suspend:
-    Pass ( 1/ 1): 3730beaglexm
-
-PM: chip off (except CORE, due to errata) via dynamic idle:
-    Pass ( 1/ 1): 3730beaglexm
-
-PM: chip off via suspend:
-    FAIL ( 1/ 4): 37xxevm
-    Pass ( 3/ 4): 3530es3beagle, 3530es31beagle, 3730es12beaglexm
-
-PM: chip off via dynamic idle:
-    FAIL ( 1/ 4): 37xxevm
-    Pass ( 3/ 4): 3530es3beagle, 3530es31beagle, 3730es12beaglexm
-
-Kernel warnings during PM test:
-    FAIL ( 1/17): 4430es2panda
-
-Obsolete Kconfig symbols:
-    FAIL ( 1/20): multi_v7_defconfig
-
-
-vmlinux object size
-(delta in bytes from test_v4.2-rc5 (74d33293e467df61de1b1d8b2fbe29e550dec33b)):
-   text     data      bss    total  kernel
-   +251        0        0     +251  omap1_defconfig
-   +251        0        0     +251  omap1_defconfig_1510innovator_only
-   +251        0        0     +251  omap1_defconfig_5912osk_only
-   +540        0        0     +540  multi_v7_defconfig
-  +4443        0        0    +4443  omap2plus_defconfig
-   +127        0        0     +127  omap2plus_defconfig_2430sdp_only
-   +347        0        0     +347  omap2plus_defconfig_am33xx_only
-   +347        0        0     +347  omap2plus_defconfig_am43xx_only
-   +347        0        0     +347  omap2plus_defconfig_cpupm
-   +347        0        0     +347  omap2plus_defconfig_dra7xx_only
-   +415        0        0     +415  omap2plus_defconfig_n800_multi_omap2xxx
-   +435        0        0     +435  omap2plus_defconfig_n800_only_a
-   +347        0        0     +347  omap2plus_defconfig_no_pm
-   +347        0        0     +347  omap2plus_defconfig_omap2_4_only
-   +415        0        0     +415  omap2plus_defconfig_omap3_4_only
-   +411        0        0     +411  omap2plus_defconfig_omap5_only
-   +116      +20      -16     +120  rmk_omap3430_ldp_allnoconfig
-   +339        0        0     +339  rmk_omap3430_ldp_oldconfig
-   +100      +20      -16     +104  rmk_omap4430_sdp_allnoconfig
-   +419        0        0     +419  rmk_omap4430_sdp_oldconfig
-
-Boot-time memory difference
-(delta in bytes from test_v4.2-rc5 (74d33293e467df61de1b1d8b2fbe29e550dec33b))
-  avail  rsrvd   high  freed  board          kconfig
-    -8k     8k      .      .  2430sdp        omap2plus_defconfig
-    -8k     8k      .     4k  3530es31beagle omap2plus_defconfig
-    -8k     8k      .     4k  3530es3beagle  omap2plus_defconfig
-    -8k     8k      .     4k  3730beaglexm   omap2plus_defconfig
-    -8k     8k      .     4k  3730es12beaglexmomap2plus_defconfig
-    -8k     8k      .     4k  37xxevm        omap2plus_defconfig
-    -8k     8k      .     4k  4430es2panda   omap2plus_defconfig
-    -8k     8k      .     4k  4460pandaes    omap2plus_defconfig
-    -4k     4k      .     4k  4460varsomom   omap2plus_defconfig
-    -8k     8k      .     4k  5430es2uevm    omap2plus_defconfig
-    -8k     8k      .     4k  am335xbonelt   omap2plus_defconfig
+diff --git a/arch/arm64/include/asm/exception.h b/arch/arm64/include/asm/exception.h
+index 0303705..6cb7e1a 100644
+--- a/arch/arm64/include/asm/exception.h
++++ b/arch/arm64/include/asm/exception.h
+@@ -18,7 +18,13 @@
+ #ifndef __ASM_EXCEPTION_H
+ #define __ASM_EXCEPTION_H
+ 
++#include <linux/ftrace.h>
++
+ #define __exception	__attribute__((section(".exception.text")))
++#ifdef CONFIG_FUNCTION_GRAPH_TRACER
++#define __exception_irq_entry	__irq_entry
++#else
+ #define __exception_irq_entry	__exception
++#endif
+ 
+ #endif	/* __ASM_EXCEPTION_H */
+diff --git a/arch/arm64/include/asm/traps.h b/arch/arm64/include/asm/traps.h
+index 232e4ba..0cc2f29 100644
+--- a/arch/arm64/include/asm/traps.h
++++ b/arch/arm64/include/asm/traps.h
+@@ -34,13 +34,32 @@ struct undef_hook {
+ void register_undef_hook(struct undef_hook *hook);
+ void unregister_undef_hook(struct undef_hook *hook);
+ 
++#ifdef CONFIG_FUNCTION_GRAPH_TRACER
++static inline int __in_irqentry_text(unsigned long ptr)
++{
++	extern char __irqentry_text_start[];
++	extern char __irqentry_text_end[];
++
++	return ptr >= (unsigned long)&__irqentry_text_start &&
++	       ptr < (unsigned long)&__irqentry_text_end;
++}
++#else
++static inline int __in_irqentry_text(unsigned long ptr)
++{
++	return 0;
++}
++#endif
++
+ static inline int in_exception_text(unsigned long ptr)
+ {
+ 	extern char __exception_text_start[];
+ 	extern char __exception_text_end[];
++	int in;
++
++	in = ptr >= (unsigned long)&__exception_text_start &&
++	     ptr < (unsigned long)&__exception_text_end;
+ 
+-	return ptr >= (unsigned long)&__exception_text_start &&
+-	       ptr < (unsigned long)&__exception_text_end;
++	return in ? : __in_irqentry_text(ptr);
+ }
+ 
+ #endif
+-- 
+1.9.1
