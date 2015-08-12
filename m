@@ -1,39 +1,37 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 12 Aug 2015 14:22:00 +0200
-Subject: [PATCH v3 4/4] power: Add an axp20x-usb-power driver
-In-Reply-To: <20150724151020.GH27569@earth>
-References: <1435316357-26606-1-git-send-email-hdegoede@redhat.com>
- <1435316357-26606-4-git-send-email-hdegoede@redhat.com>
- <20150724151020.GH27569@earth>
-Message-ID: <55CB3A68.5080001@redhat.com>
+From: hramrach@gmail.com (Michal Suchanek)
+Date: Wed, 12 Aug 2015 14:10:23 +0200
+Subject: [PATCH 0/3] misc MMC fixes
+Message-ID: <cover.1439381423.git.hramrach@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sebastian,
+Hello,
 
-On 24-07-15 17:10, Sebastian Reichel wrote:
-> Hi,
->
-> On Fri, Jun 26, 2015 at 12:59:17PM +0200, Hans de Goede wrote:
->> This adds a driver for the usb power_supply bits of the axp20x PMICs.
->>
->> I initially started writing my own driver, before coming aware of
->> Bruno Pr?mont's excellent earlier RFC with a driver for this.
->>
->> My driver was lacking CURRENT_MAX and VOLTAGE_MIN support Bruno's
->> drvier has, so I've copied the code for those from his driver.
->>
->> Note that the AC-power-supply and battery charger bits will need separate
->> drivers. Each one needs its own devictree child-node so that other
->> devicetree nodes can reference the right power-supply, and thus each one
->> will get its own mfd-cell / platform_device and platform-driver.
->
-> Once the other comments have been taken care of, the driver looks ok
-> to me.
+The first sunxi patch from this series was rejected on the basis that this clock
+gating functionality is obsolete and should be eventually removed.
 
-I send out a v4 taking care of the other comments a while back, any
-news on this? Anything I need todo from my side to get things moving?
+However, the function still exists in the current code and until removed it
+should be corrected to work properly. Turning off the clock may be used for
+something other than the clock gating feature, too.
 
-Thanks & Regards,
+The next sunxi patch is for automatic clock gating on the controller which
+should replace the in-kernel mmc clock gating we have now.
 
-Hans
+I looked at dw_mmc for how this is supposed to work and it turns out it's not
+exactly clean there either.
+
+Thanks
+
+Michal
+
+Michal Suchanek (3):
+  mmc: sunxi: fix timeout in sunxi_mmc_oclk_onoff
+  mmc: dw_mmc: simplify the SDMMC_CLKEN_LOW_PWR logic
+  mmc: sunxi: use controller automatic clock gating.
+
+ drivers/mmc/host/dw_mmc.c    | 33 +++++++++++++++------------------
+ drivers/mmc/host/sunxi-mmc.c | 29 +++++++++++++++++++++++++----
+ 2 files changed, 40 insertions(+), 22 deletions(-)
+
+-- 
+2.1.4
