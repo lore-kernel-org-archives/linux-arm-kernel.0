@@ -1,20 +1,73 @@
-From: HartleyS@visionengravers.com (Hartley Sweeten)
-Date: Wed, 12 Aug 2015 16:39:46 +0000
-Subject: [PATCH] ARM/EP93xx/timer: Migrate to new 'set-state' interface
-In-Reply-To: <744dca162a7626694770a9f51457566a33c3e08f.1438852023.git.viresh.kumar@linaro.org>
-References: <744dca162a7626694770a9f51457566a33c3e08f.1438852023.git.viresh.kumar@linaro.org>
-Message-ID: <BN3PR0101MB10579524DEE61E49B8725469D07E0@BN3PR0101MB1057.prod.exchangelabs.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 12 Aug 2015 17:53:24 +0100
+Subject: [PATCH] arm64: Add __exception_irq_entry definition for function
+ graph
+In-Reply-To: <9C0002C4-EEC5-415F-A0BC-2284E662D308@gmail.com>
+References: <1439388979-1518-1-git-send-email-jungseoklee85@gmail.com>
+ <20150812150232.GI23540@arm.com>
+ <9C0002C4-EEC5-415F-A0BC-2284E662D308@gmail.com>
+Message-ID: <20150812165324.GK23540@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, August 06, 2015 2:11 AM, Viresh Kumar wrote:
-> Migrate EP93xx driver to the new 'set-state' interface provided by
-> clockevents core, the earlier 'set-mode' interface is marked obsolete
-> now.
->
-> This also enables us to implement callbacks for new states of clockevent
-> devices, for example: ONESHOT_STOPPED.
->
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+On Wed, Aug 12, 2015 at 04:18:49PM +0100, Jungseok Lee wrote:
+> On Aug 13, 2015, at 12:02 AM, Will Deacon wrote:
+> > On Wed, Aug 12, 2015 at 03:16:19PM +0100, Jungseok Lee wrote:
+> >> diff --git a/arch/arm64/include/asm/traps.h b/arch/arm64/include/asm/traps.h
+> >> index 232e4ba..0cc2f29 100644
+> >> --- a/arch/arm64/include/asm/traps.h
+> >> +++ b/arch/arm64/include/asm/traps.h
+> >> @@ -34,13 +34,32 @@ struct undef_hook {
+> >> void register_undef_hook(struct undef_hook *hook);
+> >> void unregister_undef_hook(struct undef_hook *hook);
+> >> 
+> >> +#ifdef CONFIG_FUNCTION_GRAPH_TRACER
+> >> +static inline int __in_irqentry_text(unsigned long ptr)
+> >> +{
+> >> +	extern char __irqentry_text_start[];
+> >> +	extern char __irqentry_text_end[];
+> >> +
+> >> +	return ptr >= (unsigned long)&__irqentry_text_start &&
+> >> +	       ptr < (unsigned long)&__irqentry_text_end;
+> >> +}
+> >> +#else
+> >> +static inline int __in_irqentry_text(unsigned long ptr)
+> >> +{
+> >> +	return 0;
+> >> +}
+> >> +#endif
+> >> +
+> >> static inline int in_exception_text(unsigned long ptr)
+> >> {
+> >> 	extern char __exception_text_start[];
+> >> 	extern char __exception_text_end[];
+> >> +	int in;
+> >> +
+> >> +	in = ptr >= (unsigned long)&__exception_text_start &&
+> >> +	     ptr < (unsigned long)&__exception_text_end;
+> >> 
+> >> -	return ptr >= (unsigned long)&__exception_text_start &&
+> >> -	       ptr < (unsigned long)&__exception_text_end;
+> >> +	return in ? : __in_irqentry_text(ptr);
+> >> }
+> > 
+> > On arm64, this function is only called from dump_backtrace, so I'm
+> > struggling to see why this change makes any difference to the ftrace
+> > output.
+> > 
+> > What am I missing?
+> 
+> As you mentioned, the above hunk does not change the ftrace behavior.
+> 
+> The first diff directly affects the first condition check in print_graph_irq
+> function in kernel/trace/trace_functions_graph.c. The code snippet is as follows.
+> 
+> if (addr < (unsigned long)__irqentry_text_start ||
+> 	addr >= (unsigned long)__irqentry_text_end)
+> 	return;
+> 
+> I hope it would be helpful.
 
-Reviewed-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+Gotcha, thanks for the explanation.
+
+Will
