@@ -1,40 +1,33 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 12 Aug 2015 12:27:07 +0100
-Subject: [PATCH 11/20] regmap: _regmap_raw_read: Add handling of busses
- without bus->read()
-In-Reply-To: <1439374365-20623-12-git-send-email-mpa@pengutronix.de>
-References: <1439374365-20623-1-git-send-email-mpa@pengutronix.de>
- <1439374365-20623-12-git-send-email-mpa@pengutronix.de>
-Message-ID: <20150812112707.GY10748@sirena.org.uk>
+From: aballier@gentoo.org (Alexis Ballier)
+Date: Wed, 12 Aug 2015 13:27:51 +0200
+Subject: [PATCH] ARM: dts: exynos4412-odroidu3: Enable SPI1.
+Message-ID: <1439378871-28117-1-git-send-email-aballier@gentoo.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 12, 2015 at 12:12:36PM +0200, Markus Pargmann wrote:
+SPI1 is available on IO Port #2 (as depicted on their website) in
+PCB Revision 0.5 of Hardkernel Odroid U3 board.
+The shield connects a 256KiB spi-nor flash on that bus.
 
-> +	/*
-> +	 * There are busses that do not have a read function as it is optional.
-> +	 * Use their reg_read function instead if the requested number of bytes
-> +	 * is correct.
-> +	 */
-> +	if (!map->bus->read) {
-> +		/*
-> +		 * bus_reg_read() does not support reading values that are not
-> +		 * exactly the size of format.val_bytes
-> +		 */
-> +		if (val_len != map->format.val_bytes)
-> +			return -EINVAL;
-> +		return _regmap_bus_reg_read(map, reg, val);
-> +	}
+Signed-off-by: Alexis Ballier <aballier@gentoo.org>
+---
+ arch/arm/boot/dts/exynos4412-odroidu3.dts | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-No, this makes no sense - if the device doesn't have a read operation
-then it doesn't support a raw data stream and hence can't support raw
-access sensibly.  Callers that want to access a lot of registers at once
-without knowing what the wire format for the device is should be using
-the bulk or multi interfaces.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150812/10f82529/attachment.sig>
+diff --git a/arch/arm/boot/dts/exynos4412-odroidu3.dts b/arch/arm/boot/dts/exynos4412-odroidu3.dts
+index 44684e5..37698e4 100644
+--- a/arch/arm/boot/dts/exynos4412-odroidu3.dts
++++ b/arch/arm/boot/dts/exynos4412-odroidu3.dts
+@@ -61,3 +61,10 @@
+ 		"Speakers", "SPKL",
+ 		"Speakers", "SPKR";
+ };
++
++&spi_1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&spi1_bus>;
++	cs-gpios = <&gpb 5 0>;
++	status = "okay";
++};
+-- 
+2.5.0
