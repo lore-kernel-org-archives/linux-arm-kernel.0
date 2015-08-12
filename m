@@ -1,31 +1,62 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 12 Aug 2015 15:01:21 +0000 (UTC)
-Subject: [PATCH] [ARM][TEGRA] Fix AHB base address on tegra20, tegra30
- and tegra114
-In-Reply-To: <1439042292-19912-1-git-send-email-kwizart@gmail.com>
-References: <1439042292-19912-1-git-send-email-kwizart@gmail.com>
-Message-ID: <alpine.DEB.2.02.1508121500300.7154@utopia.booyaka.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 12 Aug 2015 16:02:32 +0100
+Subject: [PATCH] arm64: Add __exception_irq_entry definition for function
+ graph
+In-Reply-To: <1439388979-1518-1-git-send-email-jungseoklee85@gmail.com>
+References: <1439388979-1518-1-git-send-email-jungseoklee85@gmail.com>
+Message-ID: <20150812150232.GI23540@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 8 Aug 2015, Nicolas Chauvet wrote:
+On Wed, Aug 12, 2015 at 03:16:19PM +0100, Jungseok Lee wrote:
+> The gic_handle_irq() is defined with __exception_irq_entry attribute.
+> A single remaining work is to add its definition as ARM did. Below
+> shows how function graph data is changed with these hunks.
 
-> Current base address is wrong by 0x04 bytes for AHB bus device as shown in dmesg:
->  tegra-ahb 6000c004.ahb: incorrect AHB base address in DT data - enabling workaround
-> 
-> To correct old dtbs,  the commit ce7a10b0ff3db63 checks for the low bit
-> of the base address and removes theses 0x04 bytes at runtime.
-> 
-> This patch fix the original dts, so upstream version doesn't need
-> the workaround of the base address.
-> 
-> As both addresses are valid, this patch doesn't break compatibility
-> 
-> Tested on tegra20-paz00 (aka ac100)
-> 
-> Signed-off-by: Nicolas Chauvet <kwizart@gmail.com>
+[...]
 
-Reviewed-by: Paul Walmsley <paul@pwsan.com>
+> diff --git a/arch/arm64/include/asm/traps.h b/arch/arm64/include/asm/traps.h
+> index 232e4ba..0cc2f29 100644
+> --- a/arch/arm64/include/asm/traps.h
+> +++ b/arch/arm64/include/asm/traps.h
+> @@ -34,13 +34,32 @@ struct undef_hook {
+>  void register_undef_hook(struct undef_hook *hook);
+>  void unregister_undef_hook(struct undef_hook *hook);
+>  
+> +#ifdef CONFIG_FUNCTION_GRAPH_TRACER
+> +static inline int __in_irqentry_text(unsigned long ptr)
+> +{
+> +	extern char __irqentry_text_start[];
+> +	extern char __irqentry_text_end[];
+> +
+> +	return ptr >= (unsigned long)&__irqentry_text_start &&
+> +	       ptr < (unsigned long)&__irqentry_text_end;
+> +}
+> +#else
+> +static inline int __in_irqentry_text(unsigned long ptr)
+> +{
+> +	return 0;
+> +}
+> +#endif
+> +
+>  static inline int in_exception_text(unsigned long ptr)
+>  {
+>  	extern char __exception_text_start[];
+>  	extern char __exception_text_end[];
+> +	int in;
+> +
+> +	in = ptr >= (unsigned long)&__exception_text_start &&
+> +	     ptr < (unsigned long)&__exception_text_end;
+>  
+> -	return ptr >= (unsigned long)&__exception_text_start &&
+> -	       ptr < (unsigned long)&__exception_text_end;
+> +	return in ? : __in_irqentry_text(ptr);
+>  }
 
+On arm64, this function is only called from dump_backtrace, so I'm
+struggling to see why this change makes any difference to the ftrace
+output.
 
-- Paul
+What am I missing?
+
+Will
