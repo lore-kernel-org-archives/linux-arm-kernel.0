@@ -1,28 +1,42 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 12 Aug 2015 00:15:27 -0700
-Subject: [RFC/PATCH-v4.2-rc6 1/5] Revert "ARM: 7655/1: smp_twd: make
- twd_local_timer_of_register() no-op for nosmp"
-In-Reply-To: <1439242911-715-2-git-send-email-balbi@ti.com>
-References: <1439242911-715-1-git-send-email-balbi@ti.com>
- <1439242911-715-2-git-send-email-balbi@ti.com>
-Message-ID: <20150812071527.GP4215@atomide.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 12 Aug 2015 08:21:29 +0100
+Subject: 3.18: lockdep problems in cpufreq
+In-Reply-To: <20150812051659.GI32049@linux>
+References: <20141214213655.GA11285@n2100.arm.linux.org.uk>
+ <CAKohponhkk9BK6-7ScHeZa4R43iooWQFV8YoPLv6LjO40GNq=A@mail.gmail.com>
+ <20150518185645.GA28053@n2100.arm.linux.org.uk>
+ <2574268.XBqpdL2VLI@vostro.rjw.lan>
+ <20150811170357.GA24529@n2100.arm.linux.org.uk>
+ <20150812051659.GI32049@linux>
+Message-ID: <20150812072129.GD7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Felipe Balbi <balbi@ti.com> [150810 14:45]:
-> This reverts commit 904464b91eca8c665acea033489225af02eeb75a.
+On Wed, Aug 12, 2015 at 10:46:59AM +0530, Viresh Kumar wrote:
+> On 11-08-15, 18:03, Russell King - ARM Linux wrote:
+> > On Tue, May 19, 2015 at 12:05:55AM +0200, Rafael J. Wysocki wrote:
+> > > On Monday, May 18, 2015 07:56:45 PM Russell King - ARM Linux wrote:
+> > > > On Tue, Dec 16, 2014 at 09:11:53AM +0530, Viresh Kumar wrote:
+> > > > > On 16 December 2014 at 04:39, Russell King - ARM Linux
+> > > > > <linux@arm.linux.org.uk> wrote:
+> > > > > > Well, here's a patch which I'm running on top of 3.18 at the moment,
+> > > > > > which is basically what I described in my email, and I'm running with it
+> > > > > > and it is without any lockdep complaint.
+> > > > > 
+> > > > > We need two separate patches now, one for 3.18 and other one for 3.19-rc.
+> > > > > 3.19 has see lots of changes in this particular file and so we need to
+> > > > > change few things here.
 > 
-> The problem pointed out by commit 904464b91eca ("ARM: 7655/1:
-> smp_twd: make twd_local_timer_of_register() no-op for nosmp")
-> doesn't exist anymore.
-> 
-> We can safely boot with nosmp and the warning won't show up.
-> 
-> The other side benefit of this patch is that TWD has a chance
-> to probe on single-core A9 systems such as AM437x which sport
-> TWD.
+> Was the patch for latest kernel ever circulated ? Probably that's why
+> Eduardo never got back to it.
 
-Can you please upload this into Russell's patch tracking system
-if no comments? Please also feel free to add:
+Maybe not - I often lose track of which patches are in what state -
+tracking the state of 250+ patches over many months and in some cases
+_years_ is not easy.
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+That's still no reason for Eduardo to _completely_ ignore this thread,
+especially when Rafael explicitly tried to get comment from Eduardo.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
