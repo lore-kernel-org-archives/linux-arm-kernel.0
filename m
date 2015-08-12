@@ -1,39 +1,43 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Wed, 12 Aug 2015 12:12:27 +0200
-Subject: [PATCH 02/20] regmap: Remove regmap_bulk_write 64bit support
+Date: Wed, 12 Aug 2015 12:12:26 +0200
+Subject: [PATCH 01/20] regmap: Add missing comments about struct regmap_bus
 In-Reply-To: <1439374365-20623-1-git-send-email-mpa@pengutronix.de>
 References: <1439374365-20623-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1439374365-20623-3-git-send-email-mpa@pengutronix.de>
+Message-ID: <1439374365-20623-2-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Regmap does not support 64bit. The ival that is used to write the 64bit
-data to, is unsigned int and can't hold 64bit. _regmap_write also just
-supports unsigend int.
+There are some fields of this struct undocumented or old. This patch
+updates the missing comments.
 
-This patch removes the 64bit case as it may lead to compile warnings.
-
-Cc: Stephen Boyd <sboyd@codeaurora.org>
 Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 ---
- drivers/base/regmap/regmap.c | 5 -----
- 1 file changed, 5 deletions(-)
+ include/linux/regmap.h | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/base/regmap/regmap.c b/drivers/base/regmap/regmap.c
-index 7111d04f2621..64a106af174f 100644
---- a/drivers/base/regmap/regmap.c
-+++ b/drivers/base/regmap/regmap.c
-@@ -1694,11 +1694,6 @@ int regmap_bulk_write(struct regmap *map, unsigned int reg, const void *val,
- 			case 4:
- 				ival = *(u32 *)(val + (i * val_bytes));
- 				break;
--#ifdef CONFIG_64BIT
--			case 8:
--				ival = *(u64 *)(val + (i * val_bytes));
--				break;
--#endif
- 			default:
- 				ret = -EINVAL;
- 				goto out;
+diff --git a/include/linux/regmap.h b/include/linux/regmap.h
+index 59c55ea0f0b5..6ff83c9ddb45 100644
+--- a/include/linux/regmap.h
++++ b/include/linux/regmap.h
+@@ -296,8 +296,11 @@ typedef void (*regmap_hw_free_context)(void *context);
+  *                if not implemented  on a given device.
+  * @async_write: Write operation which completes asynchronously, optional and
+  *               must serialise with respect to non-async I/O.
++ * @reg_write: Write operation for a register. Writes value to register.
+  * @read: Read operation.  Data is returned in the buffer used to transmit
+  *         data.
++ * @reg_read: Read operation for a register. Reads a value from a register.
++ * @free_conetext: Free context.
+  * @async_alloc: Allocate a regmap_async() structure.
+  * @read_flag_mask: Mask to be set in the top byte of the register when doing
+  *                  a read.
+@@ -307,7 +310,6 @@ typedef void (*regmap_hw_free_context)(void *context);
+  * @val_format_endian_default: Default endianness for formatted register
+  *     values. Used when the regmap_config specifies DEFAULT. If this is
+  *     DEFAULT, BIG is assumed.
+- * @async_size: Size of struct used for async work.
+  */
+ struct regmap_bus {
+ 	bool fast_io;
 -- 
 2.4.6
