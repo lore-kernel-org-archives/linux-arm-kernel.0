@@ -1,72 +1,81 @@
-From: horia.geanta@freescale.com (=?UTF-8?q?Horia=20Geant=C4=83?=)
-Date: Wed, 12 Aug 2015 10:42:41 +0300
-Subject: [PATCH] ARM: dts: ls1021a: add crypto node
-Message-ID: <1439365361-24129-1-git-send-email-horia.geanta@freescale.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 12 Aug 2015 08:44:39 +0100
+Subject: [PATCH v2 1/2] soc/fsl: add freescale dir for SOC specific drivers
+In-Reply-To: <1439358807-9024-1-git-send-email-dongsheng.wang@freescale.com>
+References: <1439358807-9024-1-git-send-email-dongsheng.wang@freescale.com>
+Message-ID: <20150812074439.GF7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Horia Geant? <horia.geanta@freescale.com>
----
- arch/arm/boot/dts/ls1021a.dtsi | 40 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 40 insertions(+)
+On Wed, Aug 12, 2015 at 01:53:26PM +0800, Dongsheng Wang wrote:
+> diff --git a/drivers/soc/fsl/Kconfig b/drivers/soc/fsl/Kconfig
+> new file mode 100644
+> index 0000000..863d1ef
+> --- /dev/null
+> +++ b/drivers/soc/fsl/Kconfig
+> @@ -0,0 +1,18 @@
+> +#
+> +# Freescale SOC drivers
+> +#
+> +menuconfig FSL_SOC_DRIVERS
+> +	bool "Freescale Soc Drivers"
+> +	default n
 
-diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
-index 973a496207fc..5bd64a4df4d3 100644
---- a/arch/arm/boot/dts/ls1021a.dtsi
-+++ b/arch/arm/boot/dts/ls1021a.dtsi
-@@ -63,6 +63,7 @@
- 		serial4 = &lpuart4;
- 		serial5 = &lpuart5;
- 		sysclk = &sysclk;
-+		crypto = &crypto;
- 	};
- 
- 	cpus {
-@@ -148,6 +149,45 @@
- 			big-endian;
- 		};
- 
-+		crypto: crypto at 1700000 {
-+			compatible = "fsl,sec-v5.0", "fsl,sec-v4.0";
-+			fsl,sec-era = <7>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			reg		 = <0x0 0x1700000 0x0 0x100000>;
-+			ranges		 = <0x0 0x0 0x1700000 0x100000>;
-+			interrupts	 = <GIC_SPI 107 IRQ_TYPE_LEVEL_HIGH>;
-+
-+			sec_jr0: jr at 10000 {
-+				compatible = "fsl,sec-v5.0-job-ring",
-+				     "fsl,sec-v4.0-job-ring";
-+				reg = <0x10000 0x10000>;
-+				interrupts = <GIC_SPI 103 IRQ_TYPE_LEVEL_HIGH>;
-+			};
-+
-+			sec_jr1: jr at 20000 {
-+				compatible = "fsl,sec-v5.0-job-ring",
-+				     "fsl,sec-v4.0-job-ring";
-+				reg = <0x20000 0x10000>;
-+				interrupts = <GIC_SPI 104 IRQ_TYPE_LEVEL_HIGH>;
-+			};
-+
-+			sec_jr2: jr at 30000 {
-+				compatible = "fsl,sec-v5.0-job-ring",
-+				     "fsl,sec-v4.0-job-ring";
-+				reg = <0x30000 0x10000>;
-+				interrupts = <GIC_SPI 105 IRQ_TYPE_LEVEL_HIGH>;
-+			};
-+
-+			sec_jr3: jr at 40000 {
-+				compatible = "fsl,sec-v5.0-job-ring",
-+				     "fsl,sec-v4.0-job-ring";
-+				reg = <0x40000 0x10000>;
-+				interrupts = <GIC_SPI 106 IRQ_TYPE_LEVEL_HIGH>;
-+			};
-+
-+		};
-+
- 		clockgen: clocking at 1ee1000 {
- 			#address-cells = <1>;
- 			#size-cells = <1>;
+No need for default n.
+
+> diff --git a/drivers/soc/fsl/Kconfig.arm b/drivers/soc/fsl/Kconfig.arm
+> new file mode 100644
+> index 0000000..8c90b82
+> --- /dev/null
+> +++ b/drivers/soc/fsl/Kconfig.arm
+> @@ -0,0 +1,16 @@
+> +#
+> +# Freescale ARM SOC Drivers
+> +#
+> +
+> +config	LS1_SOC_DRIVERS
+> +	bool "LS1021A Soc Drivers"
+> +	depends on SOC_LS1021A
+> +	default n
+
+Ditto.
+
+> +	help
+> +	Say y here to enable Freescale LS1021A Soc Device Drivers support.
+> +	The Soc Drivers provides the device driver that is a specific block
+> +	or feature on LS1021A platform.
+
+Help text should be indented by two spaces as per almost every other
+help text.
+
+> +
+> +if LS1_SOC_DRIVERS
+> +	source "drivers/soc/fsl/ls1/Kconfig"
+> +endif
+> diff --git a/drivers/soc/fsl/Makefile b/drivers/soc/fsl/Makefile
+> new file mode 100644
+> index 0000000..b4215dd
+> --- /dev/null
+> +++ b/drivers/soc/fsl/Makefile
+> @@ -0,0 +1,6 @@
+> +#
+> +# Makefile for Freescale Soc specific device drivers.
+> +#
+> +
+> +obj-$(CONFIG_LS1_SOC_DRIVERS) += ls1/
+> +
+> diff --git a/drivers/soc/fsl/ls1/Kconfig b/drivers/soc/fsl/ls1/Kconfig
+> new file mode 100644
+> index 0000000..7556f44
+> --- /dev/null
+> +++ b/drivers/soc/fsl/ls1/Kconfig
+> @@ -0,0 +1,3 @@
+> +#
+> +# LS-1 Soc drivers
+> +#
+
+Doesn't this directory need a Makefile as well?
+
 -- 
-2.4.4
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
