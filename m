@@ -1,65 +1,41 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 11 Aug 2015 19:53:27 -0400 (EDT)
-Subject: linux-next: manual merge of the arm-soc tree with the arm tree
-In-Reply-To: <20150812094834.0b0b2af1@canb.auug.org.au>
-References: <20150812094834.0b0b2af1@canb.auug.org.au>
-Message-ID: <alpine.LFD.2.20.1508111952260.1515@knanqh.ubzr>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 11 Aug 2015 17:02:29 -0700
+Subject: [PATCH 5/7] clk: atlas7: fix the clock tree for bluetooth stuff
+In-Reply-To: <CAGsJ_4y=TC1LXC1CPB=c1bfY7ZR0ktMD+hVuUZWxXXpyRR9zEw@mail.gmail.com>
+References: <1438064845-17894-1-git-send-email-21cnbao@gmail.com>
+ <1438064845-17894-6-git-send-email-21cnbao@gmail.com>
+ <55B7FD22.10609@codeaurora.org>
+ <CAGsJ_4wg1+5KrwTJRzE-iaSTvgvgFrM6cDyUTL16gx6Hk+tdPw@mail.gmail.com>
+ <55C2BBED.4050608@codeaurora.org>
+ <CAGsJ_4y=TC1LXC1CPB=c1bfY7ZR0ktMD+hVuUZWxXXpyRR9zEw@mail.gmail.com>
+Message-ID: <20150812000229.GB26614@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 12 Aug 2015, Stephen Rothwell wrote:
+On 08/10, Barry Song wrote:
+> 2015-08-06 9:44 GMT+08:00 Stephen Boyd <sboyd@codeaurora.org>:
+> >
+> > This actually points out a big problem we have right now in Linux, which is
+> > the lack of proper power management for the type of bus topology you see in
+> > embedded systems. Some of the genpd work going on may also be another
+> > solution to this problem, where we could group multiple devices into generic
+> > power domains that know to turn on 2 or 3 of the clocks. For example, the
+> > DMAC, USP, and UART device could all be in the APB power domain so that the
+> > a7ca_io_clk is enabled whenever one of those devices is active. And there
+> > could be another power domain for the NOC that encompasses all devices that
+> > are sitting on that NOC.
+> >
+> 
+> Stephen, this should be a possible option, i will talk with HW guys to
+> figure out the relationship of power domain, and check whether we
+> handle this issue by the power domain solution.
+> 
+> btw, would you apply other patches in this series at first? we can
+> hold on this one to find a final solution.
+> 
 
-> Hi all,
-> 
-> Today's linux-next merge of the arm-soc tree got a conflict in:
-> 
->   arch/arm/kernel/psci.c
-> 
-> between commit:
-> 
->   be120397e770 ("ARM: migrate to common PSCI client code")
-> 
-> from the arm tree and commit:
-> 
->   19c233b79d1a ("ARM: appropriate __init annotation for const data")
-> 
-> from the arm-soc tree.
-> 
-> I fixed it up (the former removed the file, so I did that, then added
-> the following patch) and can carry the fix as necessary (no action
-> is required).
+Yes. I'll apply the rest to clk-next.
 
-The fix is correct, thanks.
-
-
-> 
-> From: Stephen Rothwell <sfr@canb.auug.org.au>
-> Date: Wed, 12 Aug 2015 09:39:15 +1000
-> Subject: [PATCH] ARM: fix for PSCI code movement
-> 
-> Signed-off-by: Stephen Rothwell <sfr@canb.auug.org.au>
-> ---
->  drivers/firmware/psci.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
-> index a6956007dd38..42700f09a8c5 100644
-> --- a/drivers/firmware/psci.c
-> +++ b/drivers/firmware/psci.c
-> @@ -337,7 +337,7 @@ out_put_node:
->  	return err;
->  }
->  
-> -static const struct of_device_id psci_of_match[] __initconst = {
-> +static const struct of_device_id const psci_of_match[] __initconst = {
->  	{ .compatible = "arm,psci",	.data = psci_0_1_init},
->  	{ .compatible = "arm,psci-0.2",	.data = psci_0_2_init},
->  	{},
-> -- 
-> 2.5.0
-> 
-> -- 
-> Cheers,
-> Stephen Rothwell                    sfr at canb.auug.org.au
-> 
-> 
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
