@@ -1,27 +1,78 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 12 Aug 2015 13:39:23 +0100
-Subject: [PATCH 10/20] regmap: _regmap_raw_multi_reg_write: Add
- reg_write() support
-In-Reply-To: <1439374365-20623-11-git-send-email-mpa@pengutronix.de>
-References: <1439374365-20623-1-git-send-email-mpa@pengutronix.de>
- <1439374365-20623-11-git-send-email-mpa@pengutronix.de>
-Message-ID: <20150812123923.GI10748@sirena.org.uk>
+From: yong.wu@mediatek.com (Yong Wu)
+Date: Wed, 12 Aug 2015 20:39:34 +0800
+Subject: [PATCH v4 4/6] memory: mediatek: Add SMI driver
+In-Reply-To: <20150811145633.GE14980@8bytes.org>
+References: <1438597279-2937-1-git-send-email-yong.wu@mediatek.com>
+ <1438597279-2937-5-git-send-email-yong.wu@mediatek.com>
+ <20150811145633.GE14980@8bytes.org>
+Message-ID: <1439383174.7382.24.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 12, 2015 at 12:12:35PM +0200, Markus Pargmann wrote:
-> Define a fallback for busses which do not define a write() function.
-> Instead we write one register at a time using reg_write().
+On Tue, 2015-08-11 at 16:56 +0200, Joerg Roedel wrote:
+> On Mon, Aug 03, 2015 at 06:21:17PM +0800, Yong Wu wrote:
+> > +static int mtk_smi_common_get(struct device *smidev)
+> > +{
+> > +	struct mtk_smi_common *smipriv = dev_get_drvdata(smidev);
+> > +	int ret;
+> > +
+> > +	ret = pm_runtime_get_sync(smidev);
+> > +	if (ret < 0)
+> > +		return ret;
+> > +
+> > +	ret = clk_prepare_enable(smipriv->clk_apb);
+> > +	if (ret) {
+> > +		dev_err(smidev, "Failed to enable the apb clock\n");
+> > +		goto err_put_pm;
+> > +	}
+> > +	ret = clk_prepare_enable(smipriv->clk_smi);
+> > +	if (ret) {
+> > +		dev_err(smidev, "Failed to enable the smi clock\n");
+> > +		goto err_disable_apb;
+> > +	}
+> > +	return ret;
+> > +
+> > +err_disable_apb:
+> > +	clk_disable_unprepare(smipriv->clk_apb);
+> > +err_put_pm:
+> > +	pm_runtime_put(smidev);
+> > +	return ret;
+> > +}
 > 
-> Without this patch, _regmap_raw_multi_reg_write would break as it tries
-> to call bus->write() without checking if it exists before.
+> [...]
+> 
+> > +int mtk_smi_larb_get(struct device *larbdev)
+> > +{
+> > +	struct mtk_smi_larb *larbpriv = dev_get_drvdata(larbdev);
+> > +	struct mtk_larb_mmu *mmucfg = larbdev->archdata.iommu;
+> > +	int ret;
+> > +
+> > +	ret = mtk_smi_common_get(larbpriv->smi);
+> > +	if (ret)
+> > +		return ret;
+> > +
+> > +	ret = pm_runtime_get_sync(larbdev);
+> > +	if (ret < 0)
+> > +		goto err_put_smicommon;
+> > +
+> > +	ret = clk_prepare_enable(larbpriv->clk_apb);
+> > +	if (ret) {
+> > +		dev_err(larbdev, "Failed to enable the apb clock\n");
+> > +		goto err_put_pm;
+> > +	}
+> > +
+> > +	ret = clk_prepare_enable(larbpriv->clk_smi);
+> > +	if (ret) {
+> > +		dev_err(larbdev, "Failed to enable the smi clock\n");
+> > +		goto err_disable_apb;
+> > +	}
+> 
+> The clock enablement looks similar to the function above, maybe move it
+> to a helper function?
 
-Why are we trying to use multi write APIs in the first place if we can't
-do raw I/O?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150812/59a4ff51/attachment.sig>
+Thanks. I will improve it in next version.
+
+> 
+> 
+> 	Joerg
+> 
