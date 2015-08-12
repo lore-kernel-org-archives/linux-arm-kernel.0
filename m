@@ -1,36 +1,24 @@
-From: hch@infradead.org (Christoph Hellwig)
-Date: Tue, 11 Aug 2015 23:24:45 -0700
-Subject: enabling libgcc for 64-bit divisions, was Re: PROBLEM: XFS on ARM
- corruption 'Structure needs cleaning'
-In-Reply-To: <C6D0D499B56584katsuki.uwatoko@toshiba.co.jp>
-References: <5579B804.9050707@skylable.com>
- <20150612122108.GB60661@bfoster.bfoster>
- <557AD4D4.3010901@skylable.com> <20150612225209.GA20262@dastard>
- <C6D0D499B56584katsuki.uwatoko@toshiba.co.jp>
-Message-ID: <20150812062445.GA4520@infradead.org>
+From: p.fedin@samsung.com (Pavel Fedin)
+Date: Wed, 12 Aug 2015 10:11:29 +0300
+Subject: [PATCH v4 1/3] PCI: generic: remove dependency on hw_pci
+In-Reply-To: <20150804234956.GF17327@google.com>
+References: <1438721620-15493-1-git-send-email-jchandra@broadcom.com>
+ <20150804234956.GF17327@google.com>
+Message-ID: <007501d0d4ce$1d2dd9c0$57898d40$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 12, 2015 at 12:56:25AM +0000, katsuki.uwatoko at toshiba.co.jp wrote:
-> On Sat, 13 Jun 2015 08:52:09 +1000, Dave Chinner wrote:
-> 
-> > Yup, that's looking like a toolchain bug. Thread about arm directory
-> > read corruption:
-> 
-> I think that this is not a toolchain bug, this is related to 
-> Subject: [PATCH v2 1/1] ARM : missing corrupted reg in __do_div_asm
-> http://www.spinics.net/lists/arm-kernel/msg426684.html
+ Hello!
 
-Maybe it's time to rely on gcc to handle 64 bit divisions now?
+> I dropped the acks and tested-by because of that change, but I'll happily
+> add them back if Lorenzo and Pavel confirm.  
 
-I've been pretty annoyed at the amount of 32-bit architecture build
-failures due to the lack of support for native 64-bit divisions, and
-the ugly do_div hackery to work around it.
+ Confirm.
+ Tested-by: Pavel Fedin <p.fedin@samsung.com>
 
-We're living in a world where we are using a lot of 64-bit CPUs and
-people optimize for them, so it might be a good time to start relying
-on the compiler to get these right on older CPUs.
+ I also added MSI support. Can i post it as patch on top of your branch?
 
-How bad is gcc's code for 64-bit divisions on arm and x86 these days?
-Is there still a good case for offloading work the compiler should be
-doing on the programmer?
+Kind regards,
+Pavel Fedin
+Expert Engineer
+Samsung Electronics Research center Russia
