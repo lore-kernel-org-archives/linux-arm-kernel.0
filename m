@@ -1,62 +1,75 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 13 Aug 2015 11:26:32 +0200
-Subject: [PATCH v2] ARM: shmobile: kzm9g dts: Use adxl345-specific
- compatible property
-In-Reply-To: <20150813000537.GD5221@verge.net.au>
-References: <1436180132-26190-1-git-send-email-geert+renesas@glider.be>
- <15966074.zDS67FO48r@avalon> <20150707002621.GD13326@verge.net.au>
- <9389528.5qtaECVqX7@avalon> <20150708005148.GA28100@verge.net.au>
- <20150813000537.GD5221@verge.net.au>
-Message-ID: <CAMuHMdV0fqjJSjmYqP0uFa0x5ydc1iztu4za1Ufu7OMdhC29Ug@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 13 Aug 2015 10:26:30 +0100
+Subject: [PATCH v2 1/6] genirq: fix irq_chip_retrigger_hierarchy
+In-Reply-To: <1439401562-28874-2-git-send-email-grygorii.strashko@ti.com>
+References: <1439401562-28874-1-git-send-email-grygorii.strashko@ti.com>
+ <1439401562-28874-2-git-send-email-grygorii.strashko@ti.com>
+Message-ID: <55CC62C6.20304@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+[adding Jiang to the cc list]
 
-On Thu, Aug 13, 2015 at 2:05 AM, Simon Horman <horms@verge.net.au> wrote:
-> On Wed, Jul 08, 2015 at 09:51:49AM +0900, Simon Horman wrote:
->> On Tue, Jul 07, 2015 at 09:56:29AM +0300, Laurent Pinchart wrote:
->> > On Tuesday 07 July 2015 09:26:21 Simon Horman wrote:
->> > > On Mon, Jul 06, 2015 at 04:29:33PM +0300, Laurent Pinchart wrote:
->> > > > On Monday 06 July 2015 12:55:32 Geert Uytterhoeven wrote:
->> > > > > Replace the deprecated generic "adi,adxl34x" compatible value by the
->> > > > > adxl345-specific "adi,adxl345" value, cfr. commit e465bf6fc55d5ce2 ("DT:
->> > > > > i2c: Deprecate adi,adxl34x compatible string").
->> > > > >
->> > > > > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
->> > > >
->> > > > Acked-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
->> > > >
->> > > > > ---
->> > > > > Depends on commit 3a38958d2477b718 ("Input: adxl34x - add OF match
->> > > > > support"), which is in v4.2-rc1.
->> > > > >
->> > > > > This is v2 of "ARM: shmobile: kzm9g dts: Add adxl345-specific compatible
->> > > > > property".
->> > >
->> > > It appears to me that this will cause a regression when booting old kernels
->> > > with new dts blobs. For that reason think we should consider v1
->> > > of this change coupled with a schedule to remove use of the deprecated
->> > > compat string.
->> >
->> > That's the forward compatibility that Geert mentioned, is that really an
->> > issue, especially on this board ?
->>
->> I think it would be best to provide backwards compatibility unless there
->> is a compelling reason not to.
->
-> I would like to revisit this discussion with a view to getting some version
-> of this patch queued up (yes I know I pushed back on it earlier in this thread).
+On 12/08/15 18:45, Grygorii Strashko wrote:
+> Now irq_chip_retrigger_hierarchy() returns -ENOSYS if it
+> was not able to find at least one .irq_retrigger() callback
+> implemented in IRQ domain hierarchy. As result, IRQ
+> re-triggering is not working now on ARM (TI OMAP) where
+> ARM GIC is not implemented this callback.
+> The .irq_retrigger() is optional (see check_irq_resend())
+> and there are no reasons to fail if it was not found, hence
+> lets return 0 in this case.
+> 
+> In case of TI OMAP DRA7 the following IRQ hierarchy is defined:
+> ARM GIC <- OMAP wakeupgen <- TI CBAR
+> 
+> Failure is reproduced during resume from suspend to RAM:
+> - wakeup by IRQx
+> - suspend_enter
+>   + arch_suspend_enable_irqs
+>     + handle_fasteoi_irq
+>       + irq_may_run
+>         + irq_pm_check_wakeup
+>           + irq_disable(IRQx)
+>   + dpm_resume_noirq()
+>     + resume_device_irqs
+>       + resume_irqs
+>         + resume_irq
+>           + __enable_irq <== IRQx is not re-triggered
+> 
+> Fixes: 85f08c17de26 ('genirq: Introduce helper functions...')
+> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+> ---
+>  kernel/irq/chip.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/kernel/irq/chip.c b/kernel/irq/chip.c
+> index 27f4332..6de638b 100644
+> --- a/kernel/irq/chip.c
+> +++ b/kernel/irq/chip.c
+> @@ -997,7 +997,7 @@ int irq_chip_retrigger_hierarchy(struct irq_data *data)
+>  		if (data->chip && data->chip->irq_retrigger)
+>  			return data->chip->irq_retrigger(data);
+>  
+> -	return -ENOSYS;
+> +	return 0;
+>  }
+>  
+>  /**
+> 
 
-I'm fine with applying v1.
+I think this makes sense. Not having an irq_retrigger or having an
+irq_retrigger that returns zero are the same thing.
 
-Gr{oetje,eeting}s,
+Actually, we don't even distinguish between a retrigger that
+successfully poked the HW, and a retrigger that returned an error. Both
+are considered to not to require a SW retrigger... maybe we should fix
+that too. Jiang, Thomas?
 
-                        Geert
+Anyway, for this patch:
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+	M.
+-- 
+Jazz is not dead. It just smells funny...
