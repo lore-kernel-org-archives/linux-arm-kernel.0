@@ -1,385 +1,476 @@
-From: ryabinin.a.a@gmail.com (Andrey Ryabinin)
-Date: Thu, 13 Aug 2015 08:37:24 +0300
-Subject: [PATCH v6 2/2] x86/kasan,
- mm: introduce generic kasan_populate_zero_shadow()
-In-Reply-To: <1439444244-26057-1-git-send-email-ryabinin.a.a@gmail.com>
-References: <1439444244-26057-1-git-send-email-ryabinin.a.a@gmail.com>
-Message-ID: <1439444244-26057-3-git-send-email-ryabinin.a.a@gmail.com>
+From: leilk.liu@mediatek.com (lei liu)
+Date: Thu, 13 Aug 2015 14:29:24 +0800
+Subject: [v5,2/3] spi: mediatek: Add spi bus for Mediatek MT8173
+In-Reply-To: <CANMq1KBNz7u0XHQBwmJjLbXyT0twxnfFJ7Hn1Cp8HmnKdOdduw@mail.gmail.com>
+References: <1438931991-17044-3-git-send-email-leilk.liu@mediatek.com>
+ <CANMq1KBNz7u0XHQBwmJjLbXyT0twxnfFJ7Hn1Cp8HmnKdOdduw@mail.gmail.com>
+Message-ID: <1439447364.21454.44.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce generic kasan_populate_zero_shadow(shadow_start, shadow_end).
-This function maps kasan_zero_page to the [shadow_start, shadow_end]
-addresses.
+Hi,
 
-This replaces x86_64 specific populate_zero_shadow() and will
-be used for ARM64 in follow on patches.
+> > +#include <linux/clk.h>
+> > +#include <linux/device.h>
+> > +#include <linux/err.h>
+> > +#include <linux/interrupt.h>
+> 
+> Since you are using readl/writel, please import linux/io.h as well (it
+> is implicitly imported by spi/spi.h, but better be safe...)
+> 
+OK, I'll fix it.
 
-The main changes from original version are:
- * Use p?d_populate*() instead of set_p?d()
- * Use memblock allocator directly instead of vmemmap_alloc_block()
- * __pa() instead of __pa_nodebug(). __pa() causes troubles
-   iff we use it before kasan_early_init(). kasan_populate_zero_shadow()
-   will be used later, so we ok with __pa() here.
+> > +#include <linux/ioport.h>
+> > +#include <linux/module.h>
+> > +#include <linux/of.h>
 
-Signed-off-by: Andrey Ryabinin <ryabinin.a.a@gmail.com>
----
- arch/x86/mm/kasan_init_64.c | 123 ++---------------------------------
- include/linux/kasan.h       |   9 +++
- mm/kasan/Makefile           |   2 +-
- mm/kasan/kasan_init.c       | 152 ++++++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 167 insertions(+), 119 deletions(-)
- create mode 100644 mm/kasan/kasan_init.c
+> > +
+> > +#define SPI_CMD_ACT_OFFSET                0
+> > +#define SPI_CMD_RESUME_OFFSET             1
+> > +#define SPI_CMD_CPHA_OFFSET               8
+> > +#define SPI_CMD_CPOL_OFFSET               9
+> > +#define SPI_CMD_TXMSBF_OFFSET             12
+> > +#define SPI_CMD_RXMSBF_OFFSET             13
+> > +#define SPI_CMD_RX_ENDIAN_OFFSET          14
+> > +#define SPI_CMD_TX_ENDIAN_OFFSET          15
+> 
+> It feels error-prone that you are defining these offsets here, then
+> redefining the bits just below.
+> 
+> Looking at the code, I think it's better if you remove these
+> SPI_CMD_*_OFFSET defines, and only use the BIT(x) defines below.
+> 
+OK, I will remove those defines.
 
-diff --git a/arch/x86/mm/kasan_init_64.c b/arch/x86/mm/kasan_init_64.c
-index e1840f3..9ce5da2 100644
---- a/arch/x86/mm/kasan_init_64.c
-+++ b/arch/x86/mm/kasan_init_64.c
-@@ -12,20 +12,6 @@
- extern pgd_t early_level4_pgt[PTRS_PER_PGD];
- extern struct range pfn_mapped[E820_X_MAX];
- 
--static pud_t kasan_zero_pud[PTRS_PER_PUD] __page_aligned_bss;
--static pmd_t kasan_zero_pmd[PTRS_PER_PMD] __page_aligned_bss;
--static pte_t kasan_zero_pte[PTRS_PER_PTE] __page_aligned_bss;
--
--/*
-- * This page used as early shadow. We don't use empty_zero_page
-- * at early stages, stack instrumentation could write some garbage
-- * to this page.
-- * Latter we reuse it as zero shadow for large ranges of memory
-- * that allowed to access, but not instrumented by kasan
-- * (vmalloc/vmemmap ...).
-- */
--static unsigned char kasan_zero_page[PAGE_SIZE] __page_aligned_bss;
--
- static int __init map_range(struct range *range)
- {
- 	unsigned long start;
-@@ -62,106 +48,6 @@ static void __init kasan_map_early_shadow(pgd_t *pgd)
- 	}
- }
- 
--static int __init zero_pte_populate(pmd_t *pmd, unsigned long addr,
--				unsigned long end)
--{
--	pte_t *pte = pte_offset_kernel(pmd, addr);
--
--	while (addr + PAGE_SIZE <= end) {
--		WARN_ON(!pte_none(*pte));
--		set_pte(pte, __pte(__pa_nodebug(kasan_zero_page)
--					| __PAGE_KERNEL_RO));
--		addr += PAGE_SIZE;
--		pte = pte_offset_kernel(pmd, addr);
--	}
--	return 0;
--}
--
--static int __init zero_pmd_populate(pud_t *pud, unsigned long addr,
--				unsigned long end)
--{
--	int ret = 0;
--	pmd_t *pmd = pmd_offset(pud, addr);
--
--	while (IS_ALIGNED(addr, PMD_SIZE) && addr + PMD_SIZE <= end) {
--		WARN_ON(!pmd_none(*pmd));
--		set_pmd(pmd, __pmd(__pa_nodebug(kasan_zero_pte)
--					| _KERNPG_TABLE));
--		addr += PMD_SIZE;
--		pmd = pmd_offset(pud, addr);
--	}
--	if (addr < end) {
--		if (pmd_none(*pmd)) {
--			void *p = vmemmap_alloc_block(PAGE_SIZE, NUMA_NO_NODE);
--			if (!p)
--				return -ENOMEM;
--			set_pmd(pmd, __pmd(__pa_nodebug(p) | _KERNPG_TABLE));
--		}
--		ret = zero_pte_populate(pmd, addr, end);
--	}
--	return ret;
--}
--
--
--static int __init zero_pud_populate(pgd_t *pgd, unsigned long addr,
--				unsigned long end)
--{
--	int ret = 0;
--	pud_t *pud = pud_offset(pgd, addr);
--
--	while (IS_ALIGNED(addr, PUD_SIZE) && addr + PUD_SIZE <= end) {
--		WARN_ON(!pud_none(*pud));
--		set_pud(pud, __pud(__pa_nodebug(kasan_zero_pmd)
--					| _KERNPG_TABLE));
--		addr += PUD_SIZE;
--		pud = pud_offset(pgd, addr);
--	}
--
--	if (addr < end) {
--		if (pud_none(*pud)) {
--			void *p = vmemmap_alloc_block(PAGE_SIZE, NUMA_NO_NODE);
--			if (!p)
--				return -ENOMEM;
--			set_pud(pud, __pud(__pa_nodebug(p) | _KERNPG_TABLE));
--		}
--		ret = zero_pmd_populate(pud, addr, end);
--	}
--	return ret;
--}
--
--static int __init zero_pgd_populate(unsigned long addr, unsigned long end)
--{
--	int ret = 0;
--	pgd_t *pgd = pgd_offset_k(addr);
--
--	while (IS_ALIGNED(addr, PGDIR_SIZE) && addr + PGDIR_SIZE <= end) {
--		WARN_ON(!pgd_none(*pgd));
--		set_pgd(pgd, __pgd(__pa_nodebug(kasan_zero_pud)
--					| _KERNPG_TABLE));
--		addr += PGDIR_SIZE;
--		pgd = pgd_offset_k(addr);
--	}
--
--	if (addr < end) {
--		if (pgd_none(*pgd)) {
--			void *p = vmemmap_alloc_block(PAGE_SIZE, NUMA_NO_NODE);
--			if (!p)
--				return -ENOMEM;
--			set_pgd(pgd, __pgd(__pa_nodebug(p) | _KERNPG_TABLE));
--		}
--		ret = zero_pud_populate(pgd, addr, end);
--	}
--	return ret;
--}
--
--
--static void __init populate_zero_shadow(const void *start, const void *end)
--{
--	if (zero_pgd_populate((unsigned long)start, (unsigned long)end))
--		panic("kasan: unable to map zero shadow!");
--}
--
--
- #ifdef CONFIG_KASAN_INLINE
- static int kasan_die_handler(struct notifier_block *self,
- 			     unsigned long val,
-@@ -213,7 +99,7 @@ void __init kasan_init(void)
- 
- 	clear_pgds(KASAN_SHADOW_START, KASAN_SHADOW_END);
- 
--	populate_zero_shadow((void *)KASAN_SHADOW_START,
-+	kasan_populate_zero_shadow((void *)KASAN_SHADOW_START,
- 			kasan_mem_to_shadow((void *)PAGE_OFFSET));
- 
- 	for (i = 0; i < E820_X_MAX; i++) {
-@@ -223,14 +109,15 @@ void __init kasan_init(void)
- 		if (map_range(&pfn_mapped[i]))
- 			panic("kasan: unable to allocate shadow!");
- 	}
--	populate_zero_shadow(kasan_mem_to_shadow((void *)PAGE_OFFSET + MAXMEM),
--			kasan_mem_to_shadow((void *)__START_KERNEL_map));
-+	kasan_populate_zero_shadow(
-+		kasan_mem_to_shadow((void *)PAGE_OFFSET + MAXMEM),
-+		kasan_mem_to_shadow((void *)__START_KERNEL_map));
- 
- 	vmemmap_populate((unsigned long)kasan_mem_to_shadow(_stext),
- 			(unsigned long)kasan_mem_to_shadow(_end),
- 			NUMA_NO_NODE);
- 
--	populate_zero_shadow(kasan_mem_to_shadow((void *)MODULES_END),
-+	kasan_populate_zero_shadow(kasan_mem_to_shadow((void *)MODULES_END),
- 			(void *)KASAN_SHADOW_END);
- 
- 	memset(kasan_zero_page, 0, PAGE_SIZE);
-diff --git a/include/linux/kasan.h b/include/linux/kasan.h
-index 6fb1c7d..4b9f85c 100644
---- a/include/linux/kasan.h
-+++ b/include/linux/kasan.h
-@@ -12,8 +12,17 @@ struct vm_struct;
- #define KASAN_SHADOW_SCALE_SHIFT 3
- 
- #include <asm/kasan.h>
-+#include <asm/pgtable.h>
- #include <linux/sched.h>
- 
-+extern unsigned char kasan_zero_page[PAGE_SIZE];
-+extern pte_t kasan_zero_pte[PTRS_PER_PTE];
-+extern pmd_t kasan_zero_pmd[PTRS_PER_PMD];
-+extern pud_t kasan_zero_pud[PTRS_PER_PUD];
-+
-+void kasan_populate_zero_shadow(const void *shadow_start,
-+				const void *shadow_end);
-+
- static inline void *kasan_mem_to_shadow(const void *addr)
- {
- 	return (void *)((unsigned long)addr >> KASAN_SHADOW_SCALE_SHIFT)
-diff --git a/mm/kasan/Makefile b/mm/kasan/Makefile
-index bd837b8..6471014 100644
---- a/mm/kasan/Makefile
-+++ b/mm/kasan/Makefile
-@@ -5,4 +5,4 @@ CFLAGS_REMOVE_kasan.o = -pg
- # see: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=63533
- CFLAGS_kasan.o := $(call cc-option, -fno-conserve-stack -fno-stack-protector)
- 
--obj-y := kasan.o report.o
-+obj-y := kasan.o report.o kasan_init.o
-diff --git a/mm/kasan/kasan_init.c b/mm/kasan/kasan_init.c
-new file mode 100644
-index 0000000..3f9a41c
---- /dev/null
-+++ b/mm/kasan/kasan_init.c
-@@ -0,0 +1,152 @@
-+/*
-+ * This file contains some kasan initialization code.
-+ *
-+ * Copyright (c) 2015 Samsung Electronics Co., Ltd.
-+ * Author: Andrey Ryabinin <ryabinin.a.a@gmail.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ */
-+
-+#include <linux/bootmem.h>
-+#include <linux/init.h>
-+#include <linux/kasan.h>
-+#include <linux/kernel.h>
-+#include <linux/memblock.h>
-+#include <linux/pfn.h>
-+
-+#include <asm/page.h>
-+#include <asm/pgalloc.h>
-+
-+/*
-+ * This page serves two purposes:
-+ *   - It used as early shadow memory. The entire shadow region populated
-+ *     with this page, before we will be able to setup normal shadow memory.
-+ *   - Latter it reused it as zero shadow to cover large ranges of memory
-+ *     that allowed to access, but not handled by kasan (vmalloc/vmemmap ...).
-+ */
-+unsigned char kasan_zero_page[PAGE_SIZE] __page_aligned_bss;
-+
-+#if CONFIG_PGTABLE_LEVELS > 3
-+pud_t kasan_zero_pud[PTRS_PER_PUD] __page_aligned_bss;
-+#endif
-+#if CONFIG_PGTABLE_LEVELS > 2
-+pmd_t kasan_zero_pmd[PTRS_PER_PMD] __page_aligned_bss;
-+#endif
-+pte_t kasan_zero_pte[PTRS_PER_PTE] __page_aligned_bss;
-+
-+static __init void *early_alloc(size_t size, int node)
-+{
-+	return memblock_virt_alloc_try_nid(size, size, __pa(MAX_DMA_ADDRESS),
-+					BOOTMEM_ALLOC_ACCESSIBLE, node);
-+}
-+
-+static void __init zero_pte_populate(pmd_t *pmd, unsigned long addr,
-+				unsigned long end)
-+{
-+	pte_t *pte = pte_offset_kernel(pmd, addr);
-+	pte_t zero_pte;
-+
-+	zero_pte = pfn_pte(PFN_DOWN(__pa(kasan_zero_page)), PAGE_KERNEL);
-+	zero_pte = pte_wrprotect(zero_pte);
-+
-+	while (addr + PAGE_SIZE <= end) {
-+		set_pte_at(&init_mm, addr, pte, zero_pte);
-+		addr += PAGE_SIZE;
-+		pte = pte_offset_kernel(pmd, addr);
-+	}
-+}
-+
-+static void __init zero_pmd_populate(pud_t *pud, unsigned long addr,
-+				unsigned long end)
-+{
-+	pmd_t *pmd = pmd_offset(pud, addr);
-+	unsigned long next;
-+
-+	do {
-+		next = pmd_addr_end(addr, end);
-+
-+		if (IS_ALIGNED(addr, PMD_SIZE) && end - addr >= PMD_SIZE) {
-+			pmd_populate_kernel(&init_mm, pmd, kasan_zero_pte);
-+			continue;
-+		}
-+
-+		if (pmd_none(*pmd)) {
-+			pmd_populate_kernel(&init_mm, pmd,
-+					early_alloc(PAGE_SIZE, NUMA_NO_NODE));
-+		}
-+		zero_pte_populate(pmd, addr, next);
-+	} while (pmd++, addr = next, addr != end);
-+}
-+
-+static void __init zero_pud_populate(pgd_t *pgd, unsigned long addr,
-+				unsigned long end)
-+{
-+	pud_t *pud = pud_offset(pgd, addr);
-+	unsigned long next;
-+
-+	do {
-+		next = pud_addr_end(addr, end);
-+		if (IS_ALIGNED(addr, PUD_SIZE) && end - addr >= PUD_SIZE) {
-+			pmd_t *pmd;
-+
-+			pud_populate(&init_mm, pud, kasan_zero_pmd);
-+			pmd = pmd_offset(pud, addr);
-+			pmd_populate_kernel(&init_mm, pmd, kasan_zero_pte);
-+			continue;
-+		}
-+
-+		if (pud_none(*pud)) {
-+			pud_populate(&init_mm, pud,
-+				early_alloc(PAGE_SIZE, NUMA_NO_NODE));
-+		}
-+		zero_pmd_populate(pud, addr, next);
-+	} while (pud++, addr = next, addr != end);
-+}
-+
-+/**
-+ * kasan_populate_zero_shadow - populate shadow memory region with
-+ *                               kasan_zero_page
-+ * @shadow_start - start of the memory range to populate
-+ * @shadow_end   - end of the memory range to populate
-+ */
-+void __init kasan_populate_zero_shadow(const void *shadow_start,
-+				const void *shadow_end)
-+{
-+	unsigned long addr = (unsigned long)shadow_start;
-+	unsigned long end = (unsigned long)shadow_end;
-+	pgd_t *pgd = pgd_offset_k(addr);
-+	unsigned long next;
-+
-+	do {
-+		next = pgd_addr_end(addr, end);
-+
-+		if (IS_ALIGNED(addr, PGDIR_SIZE) && end - addr >= PGDIR_SIZE) {
-+			pud_t *pud;
-+			pmd_t *pmd;
-+
-+			/*
-+			 * kasan_zero_pud should be populated with pmds
-+			 * at this moment.
-+			 * [pud,pmd]_populate*() below needed only for
-+			 * 3,2 - level page tables where we don't have
-+			 * puds,pmds, so pgd_populate(), pud_populate()
-+			 * is noops.
-+			 */
-+			pgd_populate(&init_mm, pgd, kasan_zero_pud);
-+			pud = pud_offset(pgd, addr);
-+			pud_populate(&init_mm, pud, kasan_zero_pmd);
-+			pmd = pmd_offset(pud, addr);
-+			pmd_populate_kernel(&init_mm, pmd, kasan_zero_pte);
-+			continue;
-+		}
-+
-+		if (pgd_none(*pgd)) {
-+			pgd_populate(&init_mm, pgd,
-+				early_alloc(PAGE_SIZE, NUMA_NO_NODE));
-+		}
-+		zero_pud_populate(pgd, addr, next);
-+	} while (pgd++, addr = next, addr != end);
-+}
--- 
-2.4.6
+> > +#define SPI_CMD_RST                  BIT(2)
+> > +#define SPI_CMD_PAUSE_EN             BIT(4)
+> > +#define SPI_CMD_DEASSERT             BIT(5)
+> > +#define SPI_CMD_CPHA                 BIT(8)
+> > +#define SPI_CMD_CPOL                 BIT(9)
+> > +#define SPI_CMD_RX_DMA               BIT(10)
+> > +#define SPI_CMD_TX_DMA               BIT(11)
+> > +#define SPI_CMD_TXMSBF               BIT(12)
+> > +#define SPI_CMD_RXMSBF               BIT(13)
+> > +#define SPI_CMD_RX_ENDIAN            BIT(14)
+> > +#define SPI_CMD_TX_ENDIAN            BIT(15)
+> > +#define SPI_CMD_FINISH_IE            BIT(16)
+> > +#define SPI_CMD_PAUSE_IE             BIT(17)
+> > +
+
+> > +
+> > +struct mtk_spi_compatible {
+> > +       u32 need_pad_sel;
+> > +       u32 must_tx;
+> 
+> Since the quirks are true/false, define these as bool, and remove
+> MTK_SPI_QUIRK_PAD_SELECT/MTK_SPI_QUIRK_MUST_TX. Move the comment here
+> too.
+> 
+OK. I will fix it.
+
+> > +};
+> > +
+
+> > +static const struct mtk_spi_compatible mt6589_compat = {
+> > +       .need_pad_sel = 0,
+> > +       .must_tx = 0,
+> > +};
+> > +
+> > +static const struct mtk_spi_compatible mt8135_compat = {
+> > +       .need_pad_sel = 0,
+> > +       .must_tx = 0,
+> > +};
+> 
+> You don't need to set these explicitly to 0/false.
+> 
+OK, I will fix it.
+
+> > +
+> > +static const struct mtk_spi_compatible mt8173_compat = {
+> > +       .need_pad_sel = MTK_SPI_QUIRK_PAD_SELECT,
+> > +       .must_tx = MTK_SPI_QUIRK_MUST_TX,
+> 
+> Then you can set those as "true".
+> 
+OK, I will fix it.
+
+> > +};
+> > +
+> > +/*
+> > + * A piece of default chip info unless the platform
+> > + * supplies it.
+> > + */
+> > +static const struct mtk_chip_config mtk_default_chip_info = {
+> > +       .rx_mlsb = 1,
+> > +       .tx_mlsb = 1,
+> > +       .tx_endian = 0,
+> > +       .rx_endian = 0,
+> > +};
+> > +
+
+> > +
+> > +       trans = list_first_entry(&msg->transfers, struct spi_transfer,
+> > +                                transfer_list);
+> > +       if (trans->cs_change == 0) {
+> 
+> !trans->cs_change
+> 
+OK, I  will fix it.
+
+> > +               mdata->state = MTK_SPI_IDLE;
+> > +               mtk_spi_reset(mdata);
+> > +       }
+> > +
+> > +       return ret;
+> > +}
+> > +
+> > +static int mtk_spi_unprepare_hardware(struct spi_master *master)
+> > +{
+> > +       struct mtk_spi *mdata = spi_master_get_devdata(master);
+> > +
+> > +       clk_disable_unprepare(mdata->spi_clk);
+> > +
+> > +       return 0;
+> > +}
+> 
+> In this case, prepare_hardware/unprepare_hardware is redundant with
+> pm_runtime (apart from the cs_change check, possibly).
+> 
+> If PM_RUNTIME is disabled, leave the clock enabled all the time, if
+> not enable/disable in pm_runtime functions (as you already do)
+> 
+> See https://git.kernel.org/cgit/linux/kernel/git/broonie/spi.git/commit/?id=db91841b58f9ad0ecbb81ed0fa496c3a1b67fd63
+> "spi/omap100k: Convert to runtime PM" for an example (it's one of the
+> last driver that used prepare/unprepare calls, and got converted to
+> pm_runtime)
+> 
+OK, I'll fix it.
+
+> > +static int mtk_spi_prepare_message(struct spi_master *master,
+> > +                                  struct spi_message *msg)
+> > +{
+> > +       u32 reg_val;
+> > +       u8 cpha, cpol;
+> > +       struct mtk_chip_config *chip_config;
+> > +       struct spi_device *spi = msg->spi;
+> > +       struct mtk_spi *mdata = spi_master_get_devdata(master);
+> > +
+> > +       cpha = spi->mode & SPI_CPHA ? 1 : 0;
+> > +       cpol = spi->mode & SPI_CPOL ? 1 : 0;
+> > +
+> > +       reg_val = readl(mdata->base + SPI_CMD_REG);
+> > +       reg_val &= ~(SPI_CMD_CPHA | SPI_CMD_CPOL);
+> > +       reg_val |= (cpha << SPI_CMD_CPHA_OFFSET);
+> > +       reg_val |= (cpol << SPI_CMD_CPOL_OFFSET);
+> 
+> This can actually be simplified a bit by using
+> SPI_CMD_CPHA/SPI_CMD_CPOL instead.
+> 
+OK, I will fix it.
+
+> > +       writel(reg_val, mdata->base + SPI_CMD_REG);
+> > +
+
+> > +
+> > +static void mtk_spi_prepare_transfer(struct spi_master *master,
+> > +                                    struct spi_transfer *xfer)
+> > +{
+> > +       u32 spi_clk_hz, div, high_time, low_time, holdtime,
+> > +           setuptime, cs_idletime, reg_val = 0;
+> > +       struct mtk_spi *mdata = spi_master_get_devdata(master);
+> > +
+> > +       spi_clk_hz = clk_get_rate(mdata->spi_clk);
+> > +       if (xfer->speed_hz < spi_clk_hz / 2)
+> > +               div = DIV_ROUND_UP(spi_clk_hz, xfer->speed_hz);
+> > +       else
+> > +               div = 1;
+> > +
+> > +       high_time = (div + 1) / 2;
+> > +       low_time = (div + 1) / 2;
+> > +       holdtime = (div + 1) / 2 * 2;
+> > +       setuptime = (div + 1) / 2 * 2;
+> > +       cs_idletime = (div + 1) / 2 * 2;
+> 
+> Why setting variables with the exact same value? Can you do with just 2?
+> 
+OK, I'll fix it.
+
+> > +       reg_val |= (((high_time - 1) & 0xff) << SPI_CFG0_SCK_HIGH_OFFSET);
+> > +       reg_val |= (((low_time - 1) & 0xff) << SPI_CFG0_SCK_LOW_OFFSET);
+> > +       reg_val |= (((holdtime - 1) & 0xff) << SPI_CFG0_CS_HOLD_OFFSET);
+> > +       reg_val |= (((setuptime - 1) & 0xff) << SPI_CFG0_CS_SETUP_OFFSET);
+> 
+> Not sure of the details, but can you guarantee this will never
+> overflow? I.e. can div be larger than 256?
+> 
+If xfer->speed_hz is too small, maybe div may be larger than 256, but
+0xff will mask div here, so I think it doesn't matter.
+
+
+> > +       writel(reg_val, mdata->base + SPI_CFG0_REG);
+> > +
+> > +       reg_val = readl(mdata->base + SPI_CFG1_REG);
+> > +       reg_val &= ~SPI_CFG1_CS_IDLE_MASK;
+> > +       reg_val |= (((cs_idletime - 1) & 0xff) << SPI_CFG1_CS_IDLE_OFFSET);
+> > +       writel(reg_val, mdata->base + SPI_CFG1_REG);
+> > +}
+> > +
+> > +static void mtk_spi_setup_packet(struct spi_master *master)
+> > +{
+> > +       u32 packet_size, packet_loop, reg_val;
+> > +       struct mtk_spi *mdata = spi_master_get_devdata(master);
+> > +
+> > +       packet_size = min_t(unsigned, mdata->xfer_len, MTK_SPI_PACKET_SIZE);
+> 
+> u32 instead of unsigned.
+OK, I will fix it.
+
+> 
+> > +       packet_loop = mdata->xfer_len / packet_size;
+> > +
+> > +       reg_val = readl(mdata->base + SPI_CFG1_REG);
+> > +       reg_val &= ~(SPI_CFG1_PACKET_LENGTH_MASK + SPI_CFG1_PACKET_LOOP_MASK);
+> 
+> Use |, not +.
+OK, I will fix it.
+
+> 
+> > +       reg_val |= (packet_size - 1) << SPI_CFG1_PACKET_LENGTH_OFFSET;
+> > +       reg_val |= (packet_loop - 1) << SPI_CFG1_PACKET_LOOP_OFFSET;
+> 
+> Can packet_loop be >256?
+> 
+packet_loop can never be >256. If packet_loop=256, the xfer_len will be
+256*1024 bytes. It's not possible because packet_loop is from
+mdata->xfer_len / packet_size, mdata->xfer_len is from sg_dma_len(). 
+
+> > +       writel(reg_val, mdata->base + SPI_CFG1_REG);
+> > +}
+> > +
+> > +static void mtk_spi_enable_transfer(struct spi_master *master)
+> > +{
+> > +       int cmd;
+> 
+> u32
+> 
+OK. I will fix it.
+
+> > +       struct mtk_spi *mdata = spi_master_get_devdata(master);
+> > +
+> > +       cmd = readl(mdata->base + SPI_CMD_REG);
+> > +       if (mdata->state == MTK_SPI_IDLE)
+> > +               cmd |= 1 << SPI_CMD_ACT_OFFSET;
+> > +       else
+> > +               cmd |= 1 << SPI_CMD_RESUME_OFFSET;
+> > +       writel(cmd, mdata->base + SPI_CMD_REG);
+> > +}
+> > +
+> > +static int mtk_spi_get_mult_delta(int xfer_len)
+> 
+> xfer_len is a u32, so should be mult_delta.
+> 
+OK, I'll fix it.
+
+> > +{
+> > +       int mult_delta;
+> > +
+> > +       if (xfer_len > MTK_SPI_PACKET_SIZE)
+> > +               mult_delta = xfer_len % MTK_SPI_PACKET_SIZE;
+> > +       else
+> > +               mult_delta = 0;
+> > +
+> > +       return mult_delta;
+> > +}
+> > +
+> > +static void mtk_spi_update_mdata_len(struct spi_master *master)
+> > +{
+> > +       int mult_delta;
+> > +       struct mtk_spi *mdata = spi_master_get_devdata(master);
+> > +
+> > +       if (mdata->tx_sgl_len && mdata->rx_sgl_len) {
+> > +               if (mdata->tx_sgl_len > mdata->rx_sgl_len) {
+> > +                       mult_delta = mtk_spi_get_mult_delta(mdata->rx_sgl_len);
+> > +                       mdata->xfer_len = mdata->rx_sgl_len - mult_delta;
+> > +                       mdata->rx_sgl_len = mult_delta;
+> > +                       mdata->tx_sgl_len -= mdata->xfer_len;
+> > +               } else {
+> > +                       mult_delta = mtk_spi_get_mult_delta(mdata->tx_sgl_len);
+> > +                       mdata->xfer_len = mdata->tx_sgl_len - mult_delta;
+> > +                       mdata->tx_sgl_len = mult_delta;
+> > +                       mdata->rx_sgl_len -= mdata->xfer_len;
+> > +               }
+> > +       } else if (mdata->tx_sgl_len) {
+> > +               mult_delta = mtk_spi_get_mult_delta(mdata->tx_sgl_len);
+> > +               mdata->xfer_len = mdata->tx_sgl_len - mult_delta;
+> > +               mdata->tx_sgl_len = mult_delta;
+> > +       } else if (mdata->rx_sgl_len) {
+> > +               mult_delta = mtk_spi_get_mult_delta(mdata->rx_sgl_len);
+> > +               mdata->xfer_len = mdata->rx_sgl_len - mult_delta;
+> > +               mdata->rx_sgl_len = mult_delta;
+> > +       }
+> > +}
+> > +
+> > +static void mtk_spi_setup_dma_addr(struct spi_master *master,
+> > +                                  struct spi_transfer *xfer)
+> > +{
+> > +       struct mtk_spi *mdata = spi_master_get_devdata(master);
+> > +
+> > +       if (mdata->tx_sgl)
+> > +               writel(cpu_to_le32(xfer->tx_dma), mdata->base + SPI_TX_SRC_REG);
+> > +       if (mdata->rx_sgl)
+> > +               writel(cpu_to_le32(xfer->rx_dma), mdata->base + SPI_RX_DST_REG);
+> > +}
+> > +
+> > +static int mtk_spi_fifo_transfer(struct spi_master *master,
+> > +                                struct spi_device *spi,
+> > +                                struct spi_transfer *xfer)
+> > +{
+> > +       int cnt, i;
+> > +       struct mtk_spi *mdata = spi_master_get_devdata(master);
+> > +
+> > +       mdata->cur_transfer = xfer;
+> > +       mdata->xfer_len = xfer->len;
+> > +       mtk_spi_prepare_transfer(master, xfer);
+> > +       mtk_spi_setup_packet(master);
+> > +
+> > +       if (xfer->len % 4)
+> > +               cnt = xfer->len / 4 + 1;
+> > +       else
+> > +               cnt = xfer->len / 4;
+> > +
+> > +       for (i = 0; i < cnt; i++)
+> > +               writel(*((u32 *)xfer->tx_buf + i),
+> 
+> This will access past the end of tx_buf if len%4 > 0.
+
+SPI_TX_DATA_REG requires write 4 bytes once. If len%4 > 0, this just
+reads more data from dram(xfer->tx_buf) to register, and that spi hw
+only tranfer length according to xfer->len, so I think it doesn't
+matter.
+
+> > +                      mdata->base + SPI_TX_DATA_REG);
+> > +
+> > +       mtk_spi_enable_transfer(master);
+> > +
+> > +       return 1;
+> > +}
+> > +
+> > +static int mtk_spi_dma_transfer(struct spi_master *master,
+> > +                               struct spi_device *spi,
+> > +                               struct spi_transfer *xfer)
+> > +{
+> > +       int cmd;
+> > +       struct mtk_spi *mdata = spi_master_get_devdata(master);
+> > +
+> > +       mdata->tx_sgl = NULL;
+> > +       mdata->rx_sgl = NULL;
+> > +       mdata->tx_sgl_len = 0;
+> > +       mdata->rx_sgl_len = 0;
+> > +       mdata->cur_transfer = xfer;
+> > +
+> > +       mtk_spi_prepare_transfer(master, xfer);
+> > +
+> > +       cmd = readl(mdata->base + SPI_CMD_REG);
+> > +       if (xfer->tx_buf)
+> > +               cmd |= SPI_CMD_TX_DMA;
+> > +       if (xfer->rx_buf)
+> > +               cmd |= SPI_CMD_RX_DMA;
+> > +       writel(cmd, mdata->base + SPI_CMD_REG);
+> > +
+> > +       if (xfer->tx_buf)
+> > +               mdata->tx_sgl = xfer->tx_sg.sgl;
+> > +       if (xfer->rx_buf)
+> > +               mdata->rx_sgl = xfer->rx_sg.sgl;
+> > +
+> > +       if (mdata->tx_sgl) {
+> > +               xfer->tx_dma = sg_dma_address(mdata->tx_sgl);
+> > +               mdata->tx_sgl_len = sg_dma_len(mdata->tx_sgl);
+> > +       }
+> > +       if (mdata->rx_sgl) {
+> > +               xfer->rx_dma = sg_dma_address(mdata->rx_sgl);
+> > +               mdata->rx_sgl_len = sg_dma_len(mdata->rx_sgl);
+> > +       }
+> > +
+> > +       mtk_spi_update_mdata_len(master);
+> > +       mtk_spi_setup_packet(master);
+> > +       mtk_spi_setup_dma_addr(master, xfer);
+> > +       mtk_spi_enable_transfer(master);
+> > +
+> > +       return 1;
+> > +}
+> > +
+> > +static int mtk_spi_transfer_one(struct spi_master *master,
+> > +                               struct spi_device *spi,
+> > +                               struct spi_transfer *xfer)
+> > +{
+> > +       if (master->can_dma(master, spi, xfer))
+> > +               return mtk_spi_dma_transfer(master, spi, xfer);
+> > +       else
+> > +               return mtk_spi_fifo_transfer(master, spi, xfer);
+> > +}
+> > +
+> > +static bool mtk_spi_can_dma(struct spi_master *master,
+> > +                           struct spi_device *spi,
+> > +                           struct spi_transfer *xfer)
+> > +{
+> > +       return xfer->len > MTK_SPI_MAX_FIFO_SIZE;
+> > +}
+> > +
+> > +static irqreturn_t mtk_spi_interrupt(int irq, void *dev_id)
+> > +{
+> > +       u32 cmd, reg_val, i;
+> > +       struct spi_master *master = dev_id;
+> > +       struct mtk_spi *mdata = spi_master_get_devdata(master);
+> > +       struct spi_transfer *trans = mdata->cur_transfer;
+> > +
+> > +       reg_val = readl(mdata->base + SPI_STATUS0_REG);
+> > +       if (reg_val & 0x2)
+> 
+> define 0x2?
+
+OK. I will fix it.
+
+> > +               mdata->state = MTK_SPI_PAUSED;
+> > +       else
+> > +               mdata->state = MTK_SPI_IDLE;
+> > +
+> > +       if (!master->can_dma(master, master->cur_msg->spi, trans)) {
+> > +               /* xfer len is not N*4 bytes every time in a transfer,
+> > +                * but SPI_RX_DATA_REG must reads 4 bytes once,
+> > +                * so rx buffer byte by byte.
+> > +                */
+> > +               if (trans->rx_buf) {
+> > +                       for (i = 0; i < mdata->xfer_len; i++) {
+> > +                               if (i % 4 == 0)
+> > +                                       reg_val =
+> > +                                       readl(mdata->base + SPI_RX_DATA_REG);
+> 
+> Strange indentation. Might be better to put readl on the same line,
+> and SPI_RX_DATA_REG on the next one.
+
+OK. I will fix it.
+
+> > +                               *((u8 *)(trans->rx_buf + i)) =
+> > +                                       (reg_val >> ((i % 4) * 8)) & 0xff;
+> 
+> This feels a bit awkward... Also, & 0xff is not needed.
+> 
+OK, I will fix it.
+
+> > +
+> > +static int mtk_spi_probe(struct platform_device *pdev)
+> > +{
+> > +       struct spi_master *master;
+> > +       struct mtk_spi *mdata;
+> > +       const struct of_device_id *of_id;
+> > +       struct resource *res;
+> > +       int     irq, ret;
+> 
+> Space, not tab, between int and irq.
+> 
+OK. I will fix it.
+
+> > +
+> > +       master = spi_alloc_master(&pdev->dev, sizeof(*mdata));
+> > +       if (!master) {
+> > +               dev_err(&pdev->dev, "failed to alloc spi master\n");
