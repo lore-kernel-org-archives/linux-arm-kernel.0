@@ -1,27 +1,52 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Thu, 13 Aug 2015 09:28:35 -0700
-Subject: enabling libgcc for 64-bit divisions, was Re: PROBLEM: XFS on ARM
- corruption 'Structure needs cl
-In-Reply-To: <20150813061109.29409.qmail@ns.horizon.com>
-References: <20150813061109.29409.qmail@ns.horizon.com>
-Message-ID: <CA+55aFwgaq3KkeXGQWxmVHsNVwJUWK3WssJ5_ADpQG4zTXjWPQ@mail.gmail.com>
+From: abrestic@chromium.org (Andrew Bresticker)
+Date: Thu, 13 Aug 2015 09:40:07 -0700
+Subject: [PATCH 2/2] clk: Convert __clk_get_name(hw->clk) to
+ clk_hw_get_name(hw)
+In-Reply-To: <1439421161-17868-2-git-send-email-sboyd@codeaurora.org>
+References: <1439421161-17868-1-git-send-email-sboyd@codeaurora.org>
+ <1439421161-17868-2-git-send-email-sboyd@codeaurora.org>
+Message-ID: <CAL1qeaE-UJD3CBx=6feF=Hu4=gu5AtQiWwQAZmbg+6qYLhOy2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 12, 2015 at 11:11 PM, George Spelvin <linux@horizon.com> wrote:
+On Wed, Aug 12, 2015 at 4:12 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> Use the provider based method to get a clock's name so that we
+> can get rid of the clk member in struct clk_hw one day. Mostly
+> converted with the following coccinelle script.
 >
-> Agreed.  But some x86 code I'm working on now, I have a *lot* of
-> asm("divl") calls because even do_div isn't great for 64/32->32 division.
+> @@
+> struct clk_hw *E;
+> @@
+>
+> -__clk_get_name(E->clk)
+> +clk_hw_get_name(E)
+>
+> Cc: Heiko Stuebner <heiko@sntech.de>
+> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> Cc: Tomasz Figa <tomasz.figa@gmail.com>
+> Cc: Peter De Schrijver <pdeschrijver@nvidia.com>
+> Cc: Prashant Gaikwad <pgaikwad@nvidia.com>
+> Cc: Stephen Warren <swarren@wwwdotorg.org>
+> Cc: Thierry Reding <thierry.reding@gmail.com>
+> Cc: Alexandre Courbot <gnurou@gmail.com>
+> Cc: Tero Kristo <t-kristo@ti.com>
+> Cc: Ulf Hansson <ulf.hansson@linaro.org>
+> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> Cc: Andrew Bresticker <abrestic@chromium.org>
+> Cc: Ezequiel Garcia <ezequiel.garcia@imgtec.com>
+> Cc: Ralf Baechle <ralf@linux-mips.org>
+> Cc: Kevin Cernekee <cernekee@chromium.org>
+> Cc: Geert Uytterhoeven <geert+renesas@glider.be>
+> Cc: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-rockchip at lists.infradead.org
+> Cc: linux-samsung-soc at vger.kernel.org
+> Cc: linux-tegra at vger.kernel.org
+> Cc: linux-omap at vger.kernel.org
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 
-Yeah.
+>  drivers/clk/pistachio/clk-pll.c      |  4 ++--
 
-I'm not convinced that "64/32->32" is all that generic, though.  If
-the dividend in 64-bit, there's no fundamental type-based guarantee
-that things will fit.
+For Pistachio,
 
-So your case is rather special, and depends (intimately) on knowing
-the actual ranges and how they interact.
-
-That's not a generic situation like "do_div()".
-
-                  Linus
+Acked-by: Andrew Bresticker <abrestic@chromium.org>
