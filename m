@@ -1,36 +1,40 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 13 Aug 2015 12:02:51 +0200
-Subject: [GIT PULL] ARM: mvebu: soc changes for v4.3 #2
-In-Reply-To: <55C4D665.8060702@free-electrons.com>
-References: <55C4D665.8060702@free-electrons.com>
-Message-ID: <20150813100251.GM30160@localhost>
+Date: Thu, 13 Aug 2015 12:09:38 +0200
+Subject: [GIT PULL] at91: defconfig for 4.3 #2
+In-Reply-To: <20150807162754.GA20169@piout.net>
+References: <20150807162754.GA20169@piout.net>
+Message-ID: <20150813100938.GN30160@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Fri, Aug 07, 2015 at 06:01:41PM +0200, Gregory CLEMENT wrote:
-> Hi,
+On Fri, Aug 07, 2015 at 06:27:54PM +0200, Alexandre Belloni wrote:
+> Arnd, Olof, Kevin,
 > 
-> Here is the second pull request for soc for mvebu for v4.3
+> A little defconfig update. That will probably be all for this cycle.
 > 
-> Gregory
+> Thanks, bye,
 > 
-> The following changes since commit 482d638f98cc626bf01d4c9f6d6d35fc77d630c8:
 > 
->   ARM: mvebu: Warn about the wake-up sources not taken into account in suspend (2015-07-28 11:40:47 +0200)
+> The following changes since commit eff7f41572a645bf14a96a6f844be4f1c88cd9dd:
+> 
+>   ARM: at91: at91_dt_defconfig: enable ISI and ov2640 support (2015-07-30 14:17:31 +0200)
 > 
 > are available in the git repository at:
 > 
->   git://git.infradead.org/linux-mvebu.git tags/mvebu-soc-4.3-2
+>   git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-defconfig2
 > 
-> for you to fetch changes up to 44e259ac909f3b41786cf732a44b5cf8444e098a:
+> for you to fetch changes up to ea7bf603fd494391acc1f42acbfc34260b965c44:
 > 
->   ARM: dove: create a proper PMU driver for power domains, PMU IRQs and resets (2015-08-05 18:36:49 +0200)
+>   ARM: at91/defconfig: at91_dt: remove ARM_AT91_ETHER (2015-08-07 12:07:50 +0200)
 
-I've merged this into next/drivers (which now has a dependency on next/soc
-since your branch was based on previous soc contents, but that's OK).
+Nicolas had sent me one patch which you've also included here but it's not in
+the pull request ("enable ISI and ov2640 support"). That caused a conflict
+here, so to avoid having the patch in the tree twice I instead also directly
+applied your patches from this branch instead of merging.
 
-Thanks,
+Sorry about that, it started due to Nicolas sending the discrete patch to us.
+So it seems like we'll apply at91 defconfig updates directly this release, in
+case there are any more. No big deal I hope. :)
+
 
 -Olof
