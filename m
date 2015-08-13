@@ -1,37 +1,23 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 13 Aug 2015 10:30:56 +0100
-Subject: [PATCH v2 6/6] irqchip: crossbar: fix irq masking at suspend
-In-Reply-To: <1439401562-28874-7-git-send-email-grygorii.strashko@ti.com>
-References: <1439401562-28874-1-git-send-email-grygorii.strashko@ti.com>
- <1439401562-28874-7-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <55CC63D0.8030707@arm.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 13 Aug 2015 11:18:48 +0200
+Subject: [GIT PULL 5/5] Samsung driver updates for v4.3
+In-Reply-To: <55C06A0A.6040407@kernel.org>
+References: <55C06A0A.6040407@kernel.org>
+Message-ID: <20150813091848.GB30160@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Aug 04, 2015 at 04:30:18PM +0900, Kukjin Kim wrote:
+> Hi,
+> 
+> This branch is including to support generic cpufreq driver in
+> mach-exynos dir. for exynos3250 and exynos5250 even the tag name is
+> driver. Because it is depending on clk and cpufreq changes which acked
+> by regarding maintainers, Mike and Viresh.
+> 
+> Please pull and if any problems, please kindly let me know.
+
+This now needs to be respun too, apparantly, since it includes dt2.
 
 
-On 12/08/15 18:46, Grygorii Strashko wrote:
-> All ARM GIC IRQs have to masked during suspend if they are not
-> wakeup source. Now this is not happen, since switching to
-> use IRQ domain hierarchy, because suspend_device_irq() only checks flags
-> in the last IRQ chip in hierarchy for IRQCHIP_MASK_ON_SUSPEND
-> bit set. And in the case of TI OMAP DRA7 the last IRQ chip is TI Crossbar
-> which do not have this flag set.
->
-> In case of TI OMAP DRA7 the following IRQ hierarchy is defined:
->    ARM GIC <- OMAP wakeupgen <- TI CBAR
-> ARM GIC - IRQCHIP_MASK_ON_SUSPEND=n
-
-May be this won't affect your platform or this patch but even GIC marks
-IRQCHIP_MASK_ON_SUSPEND=y now since GIC doesn't provide any facility to
-configure the wakeup source and keeps all the interrupt source enabled.
-
-We have this flag enabled now as it's always safer to mask all the non
-wakeup interrupts are masked at the chip level when suspending.
-
-Also the beginning of the commit message contradicts when you also say
-in the following statement IRQCHIP_MASK_ON_SUSPEND=n. So you may need to
-update the log.
-
-Regards,
-Sudeep
+-Olof
