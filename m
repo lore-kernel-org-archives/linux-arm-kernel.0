@@ -1,104 +1,295 @@
-From: sricharan@codeaurora.org (Sricharan)
-Date: Thu, 13 Aug 2015 13:39:15 +0530
-Subject: [PATCH 3/5] iommu/msm: Add support for generic master bindings
-In-Reply-To: <55CB9A7D.7080206@codeaurora.org>
-References: <1439390869-6347-1-git-send-email-sricharan@codeaurora.org>
- <1439390869-6347-4-git-send-email-sricharan@codeaurora.org>
- <55CB9A7D.7080206@codeaurora.org>
-Message-ID: <000801d0d59f$5d017f80$17047e80$@codeaurora.org>
+From: j.anaszewski@samsung.com (Jacek Anaszewski)
+Date: Thu, 13 Aug 2015 10:10:00 +0200
+Subject: [PATCH v1 RFC] This patch repairs HTC Magician machine (PXA27x)
+ support
+In-Reply-To: <55CBCDED.8010409@tul.cz>
+References: <55CBCDED.8010409@tul.cz>
+Message-ID: <55CC50D8.5000706@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+Hi Petr,
 
-> -----Original Message-----
-> From: Stephen Boyd [mailto:sboyd at codeaurora.org]
-> Sent: Thursday, August 13, 2015 12:42 AM
-> To: Sricharan R
-> Cc: linux-arm-kernel at lists.infradead.org;
-iommu at lists.linux-foundation.org;
-> devicetree at vger.kernel.org; linux-arm-msm at vger.kernel.org;
-> robin.murphy at arm.com; robdclark at gmail.com; joro at 8bytes.org;
-> srinivas.kandagatla at linaro.org; laurent.pinchart at ideasonboard.com;
-> Will.Deacon at arm.com; stepanm at codeaurora.org; treding at nvidia.com
-> Subject: Re: [PATCH 3/5] iommu/msm: Add support for generic master
-> bindings
-> 
-> On 08/12/2015 07:47 AM, Sricharan R wrote:
-> > @@ -702,6 +703,44 @@ static void print_ctx_regs(void __iomem *base,
-> int ctx)
-> >   	       GET_PRRR(base, ctx), GET_NMRR(base, ctx));
-> >   }
-> >
-> > +static void insert_iommu_master(struct device *dev,
-> > +				struct msm_iommu_dev *iommu,
-> > +				struct of_phandle_args *spec)
-> > +{
-> > +	struct msm_iommu_ctx_dev *master;
-> > +	int sid;
-> > +
-> > +	master = kzalloc(sizeof(*master), GFP_KERNEL);
-> 
-> This is called with irqs disabled, but it's not GFP_ATOMIC. Please test
-with
-> DEBUG_ATOMIC_SLEEP=y.
+This is review only of the LED subsystem related part of this patch,.
 
-    Ok. I will have to adjust the locking here. It should be granular only
-for the list manipulation.
-> 
-> > +	master->of_node = dev->of_node;
-> > +	list_add(&master->list, &iommu->ctx_list);
-> > +
-> > +	for (sid = 0; sid < spec->args_count; sid++)
-> > +		master->mids[sid] = spec->args[sid];
-> > +
-> > +	master->num_mids = spec->args_count; }
-> > +
-> > +static int qcom_iommu_of_xlate(struct device *dev,
-> > +			       struct of_phandle_args *spec) {
-> > +	struct msm_iommu_dev *iommu;
-> > +	unsigned long flags;
-> > +
-> > +	spin_lock_irqsave(&msm_iommu_lock, flags);
-> > +	list_for_each_entry(iommu, &qcom_iommu_devices, dev_node) {
-> > +		if (iommu->dev->of_node == spec->np)
-> > +			break;
-> > +	}
-> 
-> The braces are unnecessary here.
- Ok, will remove this.
-> 
-> > +
-> > +	if (!iommu || (iommu->dev->of_node != spec->np))
-> 
-> Please remove extraneous parentheses.
-> 
- Ok.
+On 08/13/2015 12:51 AM, Petr Cvek wrote:
+> Fixing original code: Problems to successful boot due to the bad LCD
+> power sequence (wrongly configured GPIO).
+>
+> Add/fix platform data and helper function for various hardware
+> (touchscreen, audio, USB device, ...).
+>
+> Add new discovered GPIOs and fix names by GPIO context.
+>
+> Add new LEDs driver.
+>
+> Signed-off-by: Petr Cvek <petr.cvek@tul.cz>
+> ---
+>   arch/arm/mach-pxa/Kconfig                 |    1 +
+>   arch/arm/mach-pxa/include/mach/magician.h |   21 +-
+>   arch/arm/mach-pxa/magician.c              | 1148 +++++++++++++++++++++++------
+>   drivers/leds/Kconfig                      |    9 +
+>   drivers/leds/Makefile                     |    1 +
+>   drivers/leds/leds-pasic3.c                |  192 +++++
+>   drivers/mfd/htc-pasic3.c                  |  115 ++-
+>   include/linux/mfd/htc-pasic3.h            |   69 +-
+>   8 files changed, 1293 insertions(+), 263 deletions(-)
+>   create mode 100644 drivers/leds/leds-pasic3.c
+>
 
-> > +		return -ENODEV;
-> > +
-> > +	insert_iommu_master(dev, iommu, spec);
-> > +	spin_unlock_irqrestore(&msm_iommu_lock, flags);
-> > +
-> > +	return 0;
-> > +}
-> > +
-> >   irqreturn_t msm_iommu_fault_handler(int irq, void *dev_id)
-> >   {
-> >   	struct msm_iommu_dev *iommu = dev_id; @@ -737,7 +776,7 @@
-> fail:
-> >   	return 0;
-> >   }
-> >
-> > -static const struct iommu_ops msm_iommu_ops = {
-> > +static struct iommu_ops msm_iommu_ops = {
-> 
-> Is there a reason why we can't make of_iommu_set_ops() take a const ops
-> pointer?
-> 
-  Hmm right. of_iommu_set_ops is the one that needs change. I will add a
-separate
-  patch to correct that.
+[...]
 
-Regards,
- Sricharan
+> diff --git a/drivers/leds/Kconfig b/drivers/leds/Kconfig
+> index 9ad35f7..516ba65 100644
+> --- a/drivers/leds/Kconfig
+> +++ b/drivers/leds/Kconfig
+> @@ -586,6 +586,15 @@ config LEDS_PM8941_WLED
+>   	  This option enables support for the 'White' LED block
+>   	  on Qualcomm PM8941 PMICs.
+>
+> +config LEDS_PASIC3
+> +	tristate "LED support for the HTC Magician/Alpine PASIC3"
+> +	depends on LEDS_CLASS
+> +	depends on HTC_PASIC3
+> +	select REGMAP
+> +	help
+> +	  This option enables support for the PASIC3 chip (different chip
+> +	  than Compaq ASIC3).
+> +
+>   comment "LED Triggers"
+>   source "drivers/leds/trigger/Kconfig"
+>
+> diff --git a/drivers/leds/Makefile b/drivers/leds/Makefile
+> index 8d6a24a..b1c659c 100644
+> --- a/drivers/leds/Makefile
+> +++ b/drivers/leds/Makefile
+> @@ -65,6 +65,7 @@ obj-$(CONFIG_LEDS_VERSATILE)		+= leds-versatile.o
+>   obj-$(CONFIG_LEDS_MENF21BMC)		+= leds-menf21bmc.o
+>   obj-$(CONFIG_LEDS_PM8941_WLED)		+= leds-pm8941-wled.o
+>   obj-$(CONFIG_LEDS_KTD2692)		+= leds-ktd2692.o
+> +obj-$(CONFIG_LEDS_PASIC3)		+= leds-pasic3.o
+>
+>   # LED SPI Drivers
+>   obj-$(CONFIG_LEDS_DAC124S085)		+= leds-dac124s085.o
+> diff --git a/drivers/leds/leds-pasic3.c b/drivers/leds/leds-pasic3.c
+> new file mode 100644
+> index 0000000..ecb0557
+> --- /dev/null
+> +++ b/drivers/leds/leds-pasic3.c
+> @@ -0,0 +1,192 @@
+> +/*
+> + * AIC3 (or PASIC3) LED driver for HTC Magician/Alpine/.. (not Compaq ASIC3)
+> + *
+> + * Copyright (c) 2015 Petr Cvek <petr.cvek@tul.cz>
+> + *
+> + * Based on leds-asic3.c driver
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/leds.h>
+> +#include <linux/slab.h>
+> +
+
+This empty line is not required.
+
+> +#include <linux/mfd/htc-pasic3.h>
+> +#include <linux/mfd/core.h>
+> +#include <linux/module.h>
+
+Please keep alphabetical order across all includes.
+
+> +/*
+> + * 1 tick is around 62-63 ms, blinking settings (on+off):
+> + *	Min: 1+1 ticks ~125ms
+> + *	Max: 127+127 ticks ~15?875ms
+> + * Sometimes takes time to change after write (counter overflow?)
+> + */
+> +
+> +#define MS_TO_CLK(ms)	DIV_ROUND_CLOSEST(((ms)*1024), 64000)
+> +#define CLK_TO_MS(clk)	(((clk)*64000)/1024)
+> +#define MAX_CLK		254		/* 127 + 127 (2x 7 bit reg) */
+> +#define MAX_MS		CLK_TO_MS(MAX_CLK)
+> +
+> +static void brightness_set(struct led_classdev *cdev,
+> +	enum led_brightness value)
+> +{
+> +	struct platform_device *pdev = to_platform_device(cdev->dev->parent);
+> +	const struct mfd_cell *cell = mfd_get_cell(pdev);
+> +	struct pasic3_led *led;
+> +	struct device *dev;
+> +	u8 val;
+> +
+> +	if (!cell->platform_data) {
+> +		pr_err("No platform data\n");
+> +		return;
+> +	}
+> +
+> +	led = cell->platform_data;
+> +	dev = pdev->dev.parent;
+> +
+> +	if (value == LED_OFF) {
+> +		val = pasic3_read_register(dev, PASIC3_CH_CONTROL);
+> +		pasic3_write_register(dev, PASIC3_CH_CONTROL,
+> +			val & ~(led->bit_blink_en | led->bit_force_on));
+> +
+> +		val = pasic3_read_register(dev, PASIC3_MASK_A);
+> +		pasic3_write_register(dev, PASIC3_MASK_A, val & ~led->bit_mask);
+
+I think that you need spin_lock protection as setting brightness
+is not an atomic operation here. Moreover pasic3_write_register
+calls __raw_writeb twice, without spin_lock protection. This function
+is used also in drivers/mfd/htc-pasic3.c - shouldn't it be fixed?
+
+> +	} else {
+> +		val = pasic3_read_register(dev, PASIC3_CH_CONTROL);
+> +		pasic3_write_register(dev, PASIC3_CH_CONTROL,
+> +			val | led->bit_force_on);
+> +	}
+> +}
+> +
+> +static int blink_set(struct led_classdev *cdev,
+> +	unsigned long *delay_on,
+> +	unsigned long *delay_off)
+> +{
+> +	struct platform_device *pdev = to_platform_device(cdev->dev->parent);
+> +	const struct mfd_cell *cell = mfd_get_cell(pdev);
+> +	struct device *dev;
+> +	struct pasic3_led *led;
+> +	u32 on, off;
+> +	u8 val;
+> +
+> +	if (!cell->platform_data) {
+> +		pr_err("No platform data\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	if (*delay_on > MAX_MS || *delay_off > MAX_MS)
+> +		return -EINVAL;
+> +
+> +	if (*delay_on == 0 && *delay_off == 0) {
+> +		/* If both are zero then a sensible default should be chosen */
+> +		on = MS_TO_CLK(500);
+> +		off = MS_TO_CLK(500);
+> +	} else {
+> +		on = MS_TO_CLK(*delay_on);
+> +		off = MS_TO_CLK(*delay_off);
+> +		if ((on + off) > MAX_CLK)
+> +			return -EINVAL;
+> +		/* Minimal value must be 1 */
+> +		on = on ? on : 1;
+> +		off = off ? off : 1;
+> +	}
+> +
+> +	led = cell->platform_data;
+> +	dev = pdev->dev.parent;
+> +
+> +	pasic3_write_register(dev, led->reg_delay_on, on);
+> +	pasic3_write_register(dev, led->reg_delay_off, off);
+> +
+> +	val = pasic3_read_register(dev, PASIC3_CH_CONTROL);
+> +	pasic3_write_register(dev, PASIC3_CH_CONTROL, val | led->bit_blink_en);
+
+Ditto.
+
+> +	*delay_on = CLK_TO_MS(on);
+> +	*delay_off = CLK_TO_MS(off);
+> +
+> +	return 0;
+> +}
+> +
+> +static int pasic3_led_probe(struct platform_device *pdev)
+> +{
+> +	struct pasic3_led *led = dev_get_platdata(&pdev->dev);
+> +	int ret;
+> +
+> +	ret = mfd_cell_enable(pdev);
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	led->cdev.flags = LED_CORE_SUSPENDRESUME;
+> +	led->cdev.brightness_set = brightness_set;
+> +	led->cdev.blink_set = blink_set;
+
+You need to set also led->cdev.name. What is the name of your
+LED in the sysfs now?
+
+> +	ret = led_classdev_register(&pdev->dev, &led->cdev);
+> +	if (ret < 0)
+> +		goto out;
+
+Please use devm_led_classdev_register.
+
+> +	return 0;
+> +
+> +out:
+> +	(void) mfd_cell_disable(pdev);
+> +	return ret;
+> +}
+> +
+> +static int pasic3_led_remove(struct platform_device *pdev)
+> +{
+> +	struct pasic3_led *led = dev_get_platdata(&pdev->dev);
+> +
+> +	led_classdev_unregister(&led->cdev);
+> +
+> +	return mfd_cell_disable(pdev);
+> +}
+> +
+> +#ifdef CONFIG_PM_SLEEP
+> +static int pasic3_led_suspend(struct device *dev)
+> +{
+> +	struct platform_device *pdev = to_platform_device(dev);
+> +	const struct mfd_cell *cell = mfd_get_cell(pdev);
+> +	int ret;
+> +
+> +	ret = 0;
+> +	if (cell->suspend)
+> +		ret = (*cell->suspend)(pdev);
+> +
+> +	return ret;
+> +}
+> +
+> +static int pasic3_led_resume(struct device *dev)
+> +{
+> +	struct platform_device *pdev = to_platform_device(dev);
+> +	const struct mfd_cell *cell = mfd_get_cell(pdev);
+> +	int ret;
+> +
+> +	ret = 0;
+> +	if (cell->resume)
+> +		ret = (*cell->resume)(pdev);
+> +
+> +	return ret;
+> +}
+> +#endif
+> +
+> +static SIMPLE_DEV_PM_OPS(pasic3_led_pm_ops, pasic3_led_suspend,
+> +	pasic3_led_resume);
+> +
+> +static struct platform_driver pasic3_led_driver = {
+> +	.probe		= pasic3_led_probe,
+> +	.remove		= pasic3_led_remove,
+> +	.driver		= {
+> +		.name	= "leds-pasic3",
+> +		.pm	= &pasic3_led_pm_ops,
+> +	},
+> +};
+> +
+> +module_platform_driver(pasic3_led_driver);
+> +
+> +MODULE_AUTHOR("Petr Cvek <petr.cvek@tul.cz>");
+> +MODULE_DESCRIPTION("HTC Magician PASIC3 LED driver");
+> +MODULE_LICENSE("GPL");
+> +MODULE_ALIAS("platform:leds-pasic3");
+
+[...]
+
+-- 
+Best Regards,
+Jacek Anaszewski
