@@ -1,33 +1,45 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 13 Aug 2015 16:18:41 +0200
-Subject: [PATCH] soc: tegra: remove redundant $(CONFIG_ARCH_TEGRA) in
- Makefile
-In-Reply-To: <1438322301-24584-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1438322301-24584-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <20150813141840.GB26559@ulmo>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Thu, 13 Aug 2015 09:24:23 -0500
+Subject: [PATCH 1/2] Add a matching set of device_ functions for
+ determining mac/phy
+In-Reply-To: <55CC8613.1040709@arm.com>
+References: <1439417187-21411-1-git-send-email-jeremy.linton@arm.com>
+ <1439417187-21411-2-git-send-email-jeremy.linton@arm.com>
+ <55CC8613.1040709@arm.com>
+Message-ID: <55CCA897.5080108@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 31, 2015 at 02:58:21PM +0900, Masahiro Yamada wrote:
-> Kbuild descends into drivers/soc/tegra/ only when CONFIG_ARCH_TEGRA
-> is enabled. (see drivers/soc/Makefile)
-> 
-> $(CONFIG_ARCH_TEGRA) in drivers/soc/tegra/Makefile always evaluates
-> to 'y'.
-> 
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> ---
-> 
->  drivers/soc/tegra/Makefile | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
+Hello Robin,
 
-Applied, thanks.
+On 08/13/2015 06:57 AM, Robin Murphy wrote:
+>> +static void *device_get_mac_addr(struct device *dev,
+>> +				 const char *name, char *addr,
+>> +				 int alen)
+>> +{
+>> +	int ret = device_property_read_u8_array(dev, name, addr, alen);
+>> +
+>> +	if (ret == 0 && is_valid_ether_addr(addr))
+>> +		return addr;
+>> +	return NULL;
+>> +}
+>
+> Not sure I understand the logic here - "return the same thing we were
+> given if we updated it, or null if we didn't". It's only indicating
+> success/failure (the caller can perfectly well cast its own buffer to a
+> void * if it needs to), so why wouldn't you just return a normal int
+> error code?
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150813/7536bad6/attachment.sig>
+
+	No particular reason, other than initially I was trying to keep the 
+function as similar as possible to the one in of_net. AKA copy paste 
+job. I can convert the return types, but I was trying for a simple 
+function rename. That way the users of the of version could be converted 
+with relative ease, and the drivers which invented their own version of 
+these functions could be changed to use this instead. Of course, that 
+plan took a blow, when I added the addr/alen parameters.
+
+	Same thing applies for the other function.
+
+
+	
