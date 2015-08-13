@@ -1,30 +1,46 @@
 From: ryabinin.a.a@gmail.com (Andrey Ryabinin)
-Date: Thu, 13 Aug 2015 08:37:22 +0300
-Subject: [PATCH 0/2] x86/KASAN updates for 4.3
-Message-ID: <1439444244-26057-1-git-send-email-ryabinin.a.a@gmail.com>
+Date: Thu, 13 Aug 2015 08:37:23 +0300
+Subject: [PATCH v6 1/2] x86/kasan: define KASAN_SHADOW_OFFSET per architecture
+In-Reply-To: <1439444244-26057-1-git-send-email-ryabinin.a.a@gmail.com>
+References: <1439444244-26057-1-git-send-email-ryabinin.a.a@gmail.com>
+Message-ID: <1439444244-26057-2-git-send-email-ryabinin.a.a@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These 2 patches taken from v5 'KASAN for arm64' series.
-The only change is updated changelog in second patch.
+Current definition of  KASAN_SHADOW_OFFSET in include/linux/kasan.h
+will not work for upcomming arm64, so move it to the arch header.
 
-I hope this is not too late to queue these for 4.3,
-as this allow us to merge arm64/KASAN patches in v4.4
-through arm64 tree.
+Signed-off-by: Andrey Ryabinin <ryabinin.a.a@gmail.com>
+---
+ arch/x86/include/asm/kasan.h | 3 +++
+ include/linux/kasan.h        | 1 -
+ 2 files changed, 3 insertions(+), 1 deletion(-)
 
-
-
-Andrey Ryabinin (2):
-  x86/kasan: define KASAN_SHADOW_OFFSET per architecture
-  x86/kasan, mm: introduce generic kasan_populate_zero_shadow()
-
- arch/x86/include/asm/kasan.h |   3 +
- arch/x86/mm/kasan_init_64.c  | 123 ++--------------------------------
- include/linux/kasan.h        |  10 ++-
- mm/kasan/Makefile            |   2 +-
- mm/kasan/kasan_init.c        | 152 +++++++++++++++++++++++++++++++++++++++++++
- 5 files changed, 170 insertions(+), 120 deletions(-)
- create mode 100644 mm/kasan/kasan_init.c
-
+diff --git a/arch/x86/include/asm/kasan.h b/arch/x86/include/asm/kasan.h
+index 74a2a8d..1410b56 100644
+--- a/arch/x86/include/asm/kasan.h
++++ b/arch/x86/include/asm/kasan.h
+@@ -1,6 +1,9 @@
+ #ifndef _ASM_X86_KASAN_H
+ #define _ASM_X86_KASAN_H
+ 
++#include <linux/const.h>
++#define KASAN_SHADOW_OFFSET _AC(CONFIG_KASAN_SHADOW_OFFSET, UL)
++
+ /*
+  * Compiler uses shadow offset assuming that addresses start
+  * from 0. Kernel addresses don't start from 0, so shadow
+diff --git a/include/linux/kasan.h b/include/linux/kasan.h
+index 5486d77..6fb1c7d 100644
+--- a/include/linux/kasan.h
++++ b/include/linux/kasan.h
+@@ -10,7 +10,6 @@ struct vm_struct;
+ #ifdef CONFIG_KASAN
+ 
+ #define KASAN_SHADOW_SCALE_SHIFT 3
+-#define KASAN_SHADOW_OFFSET _AC(CONFIG_KASAN_SHADOW_OFFSET, UL)
+ 
+ #include <asm/kasan.h>
+ #include <linux/sched.h>
 -- 
 2.4.6
