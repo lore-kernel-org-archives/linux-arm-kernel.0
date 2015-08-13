@@ -1,91 +1,27 @@
-From: b08248@gmail.com (Stuart Yoder)
-Date: Thu, 13 Aug 2015 11:23:11 -0500
-Subject: [PATCH v3 1/2] Documentation: DT: FTM: add FTM0 be used as alarm
- timer
-In-Reply-To: <1439352061-14656-1-git-send-email-dongsheng.wang@freescale.com>
-References: <1439352061-14656-1-git-send-email-dongsheng.wang@freescale.com>
-Message-ID: <CALRxmdDGgYh+_cOPB43gyuZwu_zo+wE0qHh8nWJTjiQN__hZ3w@mail.gmail.com>
+From: torvalds@linux-foundation.org (Linus Torvalds)
+Date: Thu, 13 Aug 2015 09:28:35 -0700
+Subject: enabling libgcc for 64-bit divisions, was Re: PROBLEM: XFS on ARM
+ corruption 'Structure needs cl
+In-Reply-To: <20150813061109.29409.qmail@ns.horizon.com>
+References: <20150813061109.29409.qmail@ns.horizon.com>
+Message-ID: <CA+55aFwgaq3KkeXGQWxmVHsNVwJUWK3WssJ5_ADpQG4zTXjWPQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 11, 2015 at 11:01 PM, Dongsheng Wang
-<dongsheng.wang@freescale.com> wrote:
-> From: Wang Dongsheng <dongsheng.wang@freescale.com>
+On Wed, Aug 12, 2015 at 11:11 PM, George Spelvin <linux@horizon.com> wrote:
 >
-> In freescale layerscape platform there is only FTM0 can be used as
-> alarm timer to wake up system. So add FTM0 description for devicetree
-> document.
+> Agreed.  But some x86 code I'm working on now, I have a *lot* of
+> asm("divl") calls because even do_div isn't great for 64/32->32 division.
 
-Suggestion:
+Yeah.
 
-In the Freescale Layerscape platform a flextimer module can be used
-as an alarm timer to wake up the system.  Define a binding for this
-alarm.
+I'm not convinced that "64/32->32" is all that generic, though.  If
+the dividend in 64-bit, there's no fundamental type-based guarantee
+that things will fit.
 
-> Signed-off-by: Wang Dongsheng <dongsheng.wang@freescale.com>
-> ---
-> V3:
-> Include this patch in V3.
->
-> diff --git a/Documentation/devicetree/bindings/timer/fsl,ftm-timer.txt b/Documentation/devicetree/bindings/timer/fsl,ftm-timer.txt
-> index aa8c402..380a0b3d 100644
-> --- a/Documentation/devicetree/bindings/timer/fsl,ftm-timer.txt
-> +++ b/Documentation/devicetree/bindings/timer/fsl,ftm-timer.txt
-> @@ -1,5 +1,7 @@
->  Freescale FlexTimer Module (FTM) Timer
->
-> +* Default FTM Timer
-> +
->  Required properties:
->
->  - compatible : should be "fsl,ftm-timer"
-> @@ -29,3 +31,26 @@ ftm: ftm at 400b8000 {
->                 <&clks VF610_CLK_FTM3_EXT_FIX_EN>;
->         big-endian;
->  };
-> +
-> +* FTM Alarm Timer
-> +  The default FTM device contains eight FlexTimer modules. FlexTimer1 is in
-> +  on-domain(power is not switched off in deep sleep mode). Other seven FlexTimer
-> +  modules(flextimer2/3/4/5/6/7/8) are in off-domain (power is switched off in
-> +  deep sleep mode).
+So your case is rather special, and depends (intimately) on knowing
+the actual ranges and how they interact.
 
-Suggestion:
+That's not a generic situation like "do_div()".
 
-  This binding describes a Flextimer (FTM) instance that can be used as an alarm
-  to wake up a system in deep sleep.  The flextimer module with alarm
-  support is in a power domain that remains awake when the SoC is in
-  deep sleep mode.
-
-(don't use flextimer1 in the binding...for all you know in the next SoC it
-will be flextimer7 that has this capability)
-
-> +Required properties:
-> +
-> +- compatible : should be "fsl,ftm-alarm".
-> +- reg : should contain base address and length of FTM timer 0 register.
-
-  "should contain the address and size of the FTM alarm module registers"
-
-(don't use the number 0)
-
-> +- interrupts : Should contain FTM 0 interrupt.
-
-   "describes the FTM alarm interrupt"
-
-> +- big-endian: One boolean property, the big endian mode will be in use if it is
-> +  present, or the little endian mode will be in use for all the device registers.
-> +
-> +Example:
-> +ftm0: ftm0 at 29d0000 {
-> +       compatible = "fsl,ftm-alarm";
-> +       reg = <0x0 0x29d0000 0x0 0x10000>;
-> +       interrupts = <GIC_SPI 118 IRQ_TYPE_LEVEL_HIGH>;
-> +       big-endian;
-> +       status = "disabled";
-> +};
-
-Drop the number 0 from the names in your example.
-
-Thanks,
-Stuart
+                  Linus
