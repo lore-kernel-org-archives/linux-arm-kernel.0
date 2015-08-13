@@ -1,108 +1,25 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Thu, 13 Aug 2015 11:19:21 +0200
-Subject: [PATCH v5 5/5] KVM: eventfd: add irq bypass consumer management
-In-Reply-To: <1439406307.4023.532.camel@redhat.com>
-References: <1439213467-13668-1-git-send-email-eric.auger@linaro.org>	
- <1439213467-13668-6-git-send-email-eric.auger@linaro.org>
- <1439406307.4023.532.camel@redhat.com>
-Message-ID: <55CC6119.10001@linaro.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 13 Aug 2015 10:19:53 +0100
+Subject: [PATCH] spi: Mediatek: fix endian warnings
+In-Reply-To: <1439431919.21454.13.camel@mhfsdcap03>
+References: <1439289789-29026-1-git-send-email-leilk.liu@mediatek.com>
+ <CAOiHx=mrDhxkMd5WVTpayyyxXHUDRTELubErynN3qd-v5qpCfw@mail.gmail.com>
+ <1439431919.21454.13.camel@mhfsdcap03>
+Message-ID: <20150813091953.GM10748@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alex,
-On 08/12/2015 09:05 PM, Alex Williamson wrote:
-> On Mon, 2015-08-10 at 15:31 +0200, Eric Auger wrote:
->> This patch adds the registration/unregistration of an
->> irq_bypass_consumer on irqfd assignment/deassignment.
->>
->> Signed-off-by: Eric Auger <eric.auger@linaro.org>
->> Signed-off-by: Feng Wu <feng.wu@intel.com>
->>
->> ---
->>
->> v4 -> v5:
->> - due to removal of static inline stubs, add
->>   #ifdef CONFIG_HAVE_KVM_IRQ_BYPASS
->>   around consumer registration/unregistration
->> - add pr_info when registration fails
->>
->> v2 -> v3 (Feng Wu):
->> - Use kvm_arch_irq_bypass_start
->> - Remove kvm_arch_irq_bypass_update
->> - Add member 'struct irq_bypass_producer *producer' in
->>   'struct kvm_kernel_irqfd', it is needed by posted interrupt.
->> - Remove 'irq_bypass_unregister_consumer' in kvm_irqfd_deassign()
->>
->> v1 -> v2:
->> - populate of kvm and gsi removed
->> - unregister the consumer on irqfd_shutdown
->> ---
->>  include/linux/kvm_irqfd.h |  2 ++
->>  virt/kvm/eventfd.c        | 15 +++++++++++++++
->>  2 files changed, 17 insertions(+)
->>
->> diff --git a/include/linux/kvm_irqfd.h b/include/linux/kvm_irqfd.h
->> index f926b39..0c1de05 100644
->> --- a/include/linux/kvm_irqfd.h
->> +++ b/include/linux/kvm_irqfd.h
->> @@ -64,6 +64,8 @@ struct kvm_kernel_irqfd {
->>  	struct list_head list;
->>  	poll_table pt;
->>  	struct work_struct shutdown;
->> +	struct irq_bypass_consumer consumer;
->> +	struct irq_bypass_producer *producer;
->>  };
->>  
->>  #endif /* __LINUX_KVM_IRQFD_H */
->> diff --git a/virt/kvm/eventfd.c b/virt/kvm/eventfd.c
->> index 647ffb8..d7a230f 100644
->> --- a/virt/kvm/eventfd.c
->> +++ b/virt/kvm/eventfd.c
->> @@ -35,6 +35,7 @@
->>  #include <linux/srcu.h>
->>  #include <linux/slab.h>
->>  #include <linux/seqlock.h>
->> +#include <linux/irqbypass.h>
->>  #include <trace/events/kvm.h>
->>  
->>  #include <kvm/iodev.h>
->> @@ -140,6 +141,9 @@ irqfd_shutdown(struct work_struct *work)
->>  	/*
->>  	 * It is now safe to release the object's resources
->>  	 */
->> +#ifdef CONFIG_HAVE_KVM_IRQ_BYPASS
->> +	irq_bypass_unregister_consumer(&irqfd->consumer);
->> +#endif
->>  	eventfd_ctx_put(irqfd->eventfd);
->>  	kfree(irqfd);
->>  }
->> @@ -379,6 +383,17 @@ kvm_irqfd_assign(struct kvm *kvm, struct kvm_irqfd *args)
->>  	 * we might race against the POLLHUP
->>  	 */
->>  	fdput(f);
->> +#ifdef CONFIG_HAVE_KVM_IRQ_BYPASS
->> +	irqfd->consumer.token = (void *)irqfd->eventfd;
->> +	irqfd->consumer.add_producer = kvm_arch_irq_bypass_add_producer;
->> +	irqfd->consumer.del_producer = kvm_arch_irq_bypass_del_producer;
->> +	irqfd->consumer.stop = kvm_arch_irq_bypass_stop;
->> +	irqfd->consumer.start = kvm_arch_irq_bypass_start;
->> +	ret = irq_bypass_register_consumer(&irqfd->consumer);
->> +	if (ret)
->> +		pr_info("irq bypass consumer (token %p) registration fails: %d\n",
->> +				irqfd->consumer.token, ret);
->> +#endif
-> 
-> Does this series compile on its own?  Aren't all these arch function
-> unresolved?
-yes it does since by default CONFIG_HAVE_KVM_IRQ_BYPASS is not defined
+On Thu, Aug 13, 2015 at 10:11:59AM +0800, lei liu wrote:
 
-Best Regards
+>  This patch is applied, should I append a new patch or you rollback it?
+> Thanks.
 
-Eric
-> 
->>  
->>  	return 0;
->>  
-> 
-> 
-> 
+Please send an incremental patch on top of what's applied and don't top
+post.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150813/834457b6/attachment.sig>
