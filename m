@@ -1,34 +1,26 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 13 Aug 2015 12:24:34 +0200
-Subject: [GIT PULL] ARM: Couple of Keystone MDIO DTS fixes for 4.2-rc6+
-In-Reply-To: <1439177200-32434-1-git-send-email-ssantosh@kernel.org>
-References: <1439177200-32434-1-git-send-email-ssantosh@kernel.org>
-Message-ID: <20150813102434.GV30160@localhost>
+Date: Thu, 13 Aug 2015 12:25:11 +0200
+Subject: [GIT PULL] ARM: imx: fixes for 4.2, 3rd round
+In-Reply-To: <20150810153542.GA10035@tiger>
+References: <20150810153542.GA10035@tiger>
+Message-ID: <20150813102511.GW30160@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 09, 2015 at 08:26:40PM -0700, Santosh Shilimkar wrote:
-> ARM-SoC folks,
+On Mon, Aug 10, 2015 at 11:35:42PM +0800, Shawn Guo wrote:
+> The following changes since commit e053f96b1a00022b4e2c7ceb7ac0229646626507:
 > 
-> Please pull below couple of late fixes for 4.2-rc6+. I know its late
-> with rc6 already out but if possible please consider. 
-> 
-> The following changes since commit f7644cbfcdf03528f0f450f3940c4985b2291f49:
-> 
->   Linux 4.2-rc6 (2015-08-09 15:54:30 -0400)
+>   ARM: dts: i.MX35: Fix can support. (2015-07-25 11:35:08 +0800)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone-dts-late-fixes
+>   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-fixes-4.2-3
 > 
-> for you to fetch changes up to 6a024079862443b3ec9455931e9219cd5912656d:
+> for you to fetch changes up to 1a9fa190956f45c1e58c4d8bfa5ac051691ea590:
 > 
->   ARM: dts: keystone: Fix the mdio bindings by moving it to soc specific file (2015-08-09 20:06:27 -0700)
+>   ARM: imx6: correct i.MX6 PCIe interrupt routing (2015-08-06 16:30:18 +0800)
 
-Hi,
-
-Our fixes branch is still at -rc2. Would you mind respinning with an older
-base unless there are conflicts?
+Merged, thanks.
 
 
 -Olof
