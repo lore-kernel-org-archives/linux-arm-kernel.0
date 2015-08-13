@@ -1,62 +1,163 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Thu, 13 Aug 2015 15:07:20 +0200
-Subject: [PATCH v2] gpio: Allow hogged gpios to be requested
-In-Reply-To: <CACRpkdZAjWf3Echvz6Z2hTOF8Bqs=OqLKUTYc04r9vzFo727jg@mail.gmail.com>
-References: <1438680424-698-1-git-send-email-mpa@pengutronix.de>
- <CACRpkdZAjWf3Echvz6Z2hTOF8Bqs=OqLKUTYc04r9vzFo727jg@mail.gmail.com>
-Message-ID: <20150813130720.GV19600@pengutronix.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 13 Aug 2015 14:07:36 +0100
+Subject: [PATCH v2 5/6] mailbox: Add generic mechanism for testing
+ Mailbox Controllers
+In-Reply-To: <CABb+yY2OH16mgOwi=yH_eEHQN2Ck2x5xtVk-p-8Un9gGmcACdw@mail.gmail.com>
+References: <20150812102328.GD18282@x1>
+ <CABb+yY0A74Vy3-KOvj0URU_4zb2FAC7Yp3gmEwnFaBrD0mzt0w@mail.gmail.com>
+ <20150813091914.GB8782@x1>
+ <CABb+yY0cgbtM68-E_Xqgh5O6GRLXESYTLa5WcAwUBoVL3ufrxA@mail.gmail.com>
+ <20150813102335.GC8782@x1>
+ <CABb+yY3z7p97eOhncQ2i+g6yoYGfDgSN9BDPKmiDaVLa3oPocA@mail.gmail.com>
+ <20150813110008.GD8782@x1>
+ <CABb+yY34i=VUnswUE21vgeQYAGOS=7uwvdnTAFFgYkTV0CFk=w@mail.gmail.com>
+ <20150813114005.GF8782@x1>
+ <CABb+yY2OH16mgOwi=yH_eEHQN2Ck2x5xtVk-p-8Un9gGmcACdw@mail.gmail.com>
+Message-ID: <20150813130736.GG8782@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, 13 Aug 2015, Jassi Brar wrote:
 
-On Mon, Aug 10, 2015 at 11:26:49AM +0200, Linus Walleij wrote:
-> On Tue, Aug 4, 2015 at 11:27 AM, Markus Pargmann <mpa@pengutronix.de> wrote:
-> 
-> > It can be useful to claim hogged gpios later, for example from
-> > userspace. This allows to set defaults for GPIOs using the hogging
-> > mechanism and override the setup later from userspace or a kernel driver.
+> On Thu, Aug 13, 2015 at 5:10 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> > On Thu, 13 Aug 2015, Jassi Brar wrote:
 > >
-> > This patch adds a check for hogged gpios to allow requesting them. If
-> > the gpio is not hogged but marked as requested, it still fails with
-> > -EBUSY.
+> >> On Thu, Aug 13, 2015 at 4:30 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> >> > On Thu, 13 Aug 2015, Jassi Brar wrote:
+> >> >
+> >> >> On Thu, Aug 13, 2015 at 3:53 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> >> >> > On Thu, 13 Aug 2015, Jassi Brar wrote:
+> >> >> >
+> >> >> >> On Thu, Aug 13, 2015 at 2:49 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> >> >> >> > On Thu, 13 Aug 2015, Jassi Brar wrote:
+> >> >> >>
+> >> >> >> >> >> > +
+> >> >> >> >> >> > +static void mbox_test_prepare_message(struct mbox_client *client, void *message)
+> >> >> >> >> >> > +{
+> >> >> >> >> >> > +       struct mbox_test_device *tdev = dev_get_drvdata(client->dev);
+> >> >> >> >> >> > +
+> >> >> >> >> >> > +       if (tdev->mmio)
+> >> >> >> >> >> > +               memcpy(tdev->mmio, message, MBOX_MAX_MSG_LEN);
+> >> >> >> >> >> >
+> >> >> >> >> >> This is unlikely to work. Those platforms that need to send a 2 part
+> >> >> >> >> >> message, they do :
+> >> >> >> >> >> (a) Signal/Command/Target code via some controller register (via
+> >> >> >> >> >> mbox_send_message).
+> >> >> >> >> >> (b) Setup the payload in Shared-Memory (via tx_prepare).
+> >> >> >> >> >>
+> >> >> >> >> >> This test driver assumes both are the same. I think you have to
+> >> >> >> >> >> declare something like
+> >> >> >> >> >
+> >> >> >> >> > This driver assumes that the framework will call client->tx_prepare()
+> >> >> >> >> > first, which satisfies (b).  It then assumes controller->send_data()
+> >> >> >> >> > will be invoked, which will send the platform specific
+> >> >> >> >> > signal/command/target code, which then satisfies (a).
+> >> >> >> >> >
+> >> >> >> >> Yeah, but what would be that code? Who provides that?
+> >> >> >> >>
+> >> >> >> >> > In what way does it assume they are the same?
+> >> >> >> >> >
+> >> >> >> >> notice the 'message' pointer in
+> >> >> >> >> mbox_send_message(tdev->tx_channel, message);
+> >> >> >> >>     and
+> >> >> >> >> memcpy(tdev->mmio, message, MBOX_MAX_MSG_LEN);
+> >> >> >> >>
+> >> >> >> >> >> struct mbox_test_message { /* same for TX and RX */
+> >> >> >> >> >>           unsigned sig_len;
+> >> >> >> >> >>           void *signal;               /* rx/tx via mailbox api */
+> >> >> >> >> >>           unsigned pl_len;
+> >> >> >> >> >>           void *payload;           /* rx/tx via shared-memory */
+> >> >> >> >> >> };
+> >> >> >> >> >
+> >> >> >> >> > How do you think this should be set and use these?
+> >> >> >> >> >
+> >> >> >> >> The userspace would want to specify the command code (32bits or not)
+> >> >> >> >> that would be passed via the fifo/register of the controller. So we
+> >> >> >> >> need signal[]
+> >> >> >> >>
+> >> >> >> >> The data to be passed via share-memory could be provided by userspace
+> >> >> >> >> via the payload[] array.
+> >> >> >> >
+> >> >> >> > Okay, so would the solution be two userspace files 'signal' and
+> >> >> >> > 'message', so in the case of a client specified signal we can write it
+> >> >> >> > into there first.
+> >> >> >> >
+> >> >> >> > echo 255  > signal
+> >> >> >> > echo test > message
+> >> >> >> >
+> >> >> >> > ... or in the case where no signal is required, or the controller
+> >> >> >> > driver taking care of it, we just don't write anything to signal?
+> >> >> >> >
+> >> >> >> file_operations.write() should parse signal and message, coming from
+> >> >> >> userspace, into a local structure before routing them via
+> >> >> >> mbox_send_message and tx_prepare respectively.
+> >> >> >
+> >> >> > Okay.  So before I code this up we should agree on syntax.
+> >> >> >
+> >> >> > How would you like to represent the break between signal and message?
+> >> >> > Obviously ' ' would be a bad idea, as some clients may want to send
+> >> >> > messages with white space contained.  How about '\t' or '\n'?
+> >> >> >
+> >> >> Yeah, I am not a fan of markers and flags either.
+> >> >>
+> >> >> Maybe we should share with userspace
+> >> >>   struct mbox_test_message { /* same for TX and RX */
+> >> >>            unsigned sig_len;
+> >> >>            void __user *signal;        /* rx/tx via mailbox api */
+> >> >>            unsigned pl_len;
+> >> >>            void __user *payload;    /* rx/tx via shared-memory */
+> >> >>   };
+> >> >>
+> >> >> First copy_from_user the structure of length sizof(struct
+> >> >> mbox_test_message) and then copy_from_user length sig_len and pl_len
+> >> >> from signal[] and payload[] respectively (usually ioctls would carry
+> >> >> such data).
+> >> >
+> >> > Simplicity and ease of use should be the goals here.  Testers should
+> >> > not have to write applications to use this driver.  Can we come up
+> >> > with a simple/effective method that uses SYSFS/DEBUGFS please?
+> >> >
+> >> > The easiest way I can think of which avoids markers/separators AND the
+> >> > requirement for users to have to write applications is to have two
+> >> > files, 'signal' and 'message' as mentioned before.  Once both are
+> >> > populated I can get this driver to draft the message appropriately and
+> >> > fire it off.
+> >> >
+> >> And then write to more files for RX data? ... which should also be in
+> >> the form of 'signal' and 'message'.
+> >>
+> >> BTW like for spi there is a stock application in
+> >> Documentation/spi/spidev_test.c we could do the same?
 > >
-> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> 
-> To me it feels like a new DT property "gpio-inital-value" or so
-> need to be defined in addition to the hogging bindings, and that
-> one just sets the GPIO up without setting the FLAG_IS_HOGGED.
-> 
-> The mechanism needs to be available to non-DT as well
-> of course, but it could be a first usecase.
-> 
-> So instead of:
-> 
-> line_b {
->            gpio-initval;
->            gpios = <6 0>;
->            output-low;
-> };
-> 
-> Note: no line-name. And it shouldn't be allowed: we don't
-> know who will use this in the end.
+> > Coming from personal experience, testing drivers with (even stock)
+> > applications is much more painful that simply writing/reading
+> > (cat/echo) to a file in SYSFS/DEBUGFS.  Particularly if people are
+> > using initramfs or thelike.  If it is possible to use SYSFS/DEBUGFS,
+> > which it is in this case, then I believe that's the route we could go
+> > down.
+> >
+> Well, where could sysfs/debugfs not be used? :)  Anyways I am ok if
+> prefer debugfs.
 
-Sounds good to me. If everyone is okay with this I could go ahead and
-implement something like this.
+You know what I mean; CPIO et. al.
 
-Best Regards,
+> > In answer to your question; we only need those two files.  The reply
+> > can be placed back into 'message' and can be read from there.
+> >
+> Testing shouldn't be restricted to 'send command and receive reply'.
+> What if Linux only listens to broadcasts from the remote? Who knows
+> someone might want to (ab)use this test client to implement userspace
+> handler of remote commands?
+> So please see RX to be independent of TX.
 
-Markus
+Sure.
+
+Now just agree with me that mbox_request_chan() should fail on request
+of a known bad configuration request and I can code all this up and
+re-submit. :D
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150813/73758fb7/attachment.sig>
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
