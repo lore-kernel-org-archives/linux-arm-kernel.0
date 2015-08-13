@@ -1,25 +1,62 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 13 Aug 2015 10:19:53 +0100
-Subject: [PATCH] spi: Mediatek: fix endian warnings
-In-Reply-To: <1439431919.21454.13.camel@mhfsdcap03>
-References: <1439289789-29026-1-git-send-email-leilk.liu@mediatek.com>
- <CAOiHx=mrDhxkMd5WVTpayyyxXHUDRTELubErynN3qd-v5qpCfw@mail.gmail.com>
- <1439431919.21454.13.camel@mhfsdcap03>
-Message-ID: <20150813091953.GM10748@sirena.org.uk>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 13 Aug 2015 11:26:32 +0200
+Subject: [PATCH v2] ARM: shmobile: kzm9g dts: Use adxl345-specific
+ compatible property
+In-Reply-To: <20150813000537.GD5221@verge.net.au>
+References: <1436180132-26190-1-git-send-email-geert+renesas@glider.be>
+ <15966074.zDS67FO48r@avalon> <20150707002621.GD13326@verge.net.au>
+ <9389528.5qtaECVqX7@avalon> <20150708005148.GA28100@verge.net.au>
+ <20150813000537.GD5221@verge.net.au>
+Message-ID: <CAMuHMdV0fqjJSjmYqP0uFa0x5ydc1iztu4za1Ufu7OMdhC29Ug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 13, 2015 at 10:11:59AM +0800, lei liu wrote:
+Hi Simon,
 
->  This patch is applied, should I append a new patch or you rollback it?
-> Thanks.
+On Thu, Aug 13, 2015 at 2:05 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Wed, Jul 08, 2015 at 09:51:49AM +0900, Simon Horman wrote:
+>> On Tue, Jul 07, 2015 at 09:56:29AM +0300, Laurent Pinchart wrote:
+>> > On Tuesday 07 July 2015 09:26:21 Simon Horman wrote:
+>> > > On Mon, Jul 06, 2015 at 04:29:33PM +0300, Laurent Pinchart wrote:
+>> > > > On Monday 06 July 2015 12:55:32 Geert Uytterhoeven wrote:
+>> > > > > Replace the deprecated generic "adi,adxl34x" compatible value by the
+>> > > > > adxl345-specific "adi,adxl345" value, cfr. commit e465bf6fc55d5ce2 ("DT:
+>> > > > > i2c: Deprecate adi,adxl34x compatible string").
+>> > > > >
+>> > > > > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>> > > >
+>> > > > Acked-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+>> > > >
+>> > > > > ---
+>> > > > > Depends on commit 3a38958d2477b718 ("Input: adxl34x - add OF match
+>> > > > > support"), which is in v4.2-rc1.
+>> > > > >
+>> > > > > This is v2 of "ARM: shmobile: kzm9g dts: Add adxl345-specific compatible
+>> > > > > property".
+>> > >
+>> > > It appears to me that this will cause a regression when booting old kernels
+>> > > with new dts blobs. For that reason think we should consider v1
+>> > > of this change coupled with a schedule to remove use of the deprecated
+>> > > compat string.
+>> >
+>> > That's the forward compatibility that Geert mentioned, is that really an
+>> > issue, especially on this board ?
+>>
+>> I think it would be best to provide backwards compatibility unless there
+>> is a compelling reason not to.
+>
+> I would like to revisit this discussion with a view to getting some version
+> of this patch queued up (yes I know I pushed back on it earlier in this thread).
 
-Please send an incremental patch on top of what's applied and don't top
-post.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150813/834457b6/attachment.sig>
+I'm fine with applying v1.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
