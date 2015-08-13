@@ -1,63 +1,48 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 13 Aug 2015 10:41:09 +0200
-Subject: [PATCH 2/2] clk: Convert __clk_get_name(hw->clk) to
- clk_hw_get_name(hw)
-In-Reply-To: <1439421161-17868-2-git-send-email-sboyd@codeaurora.org>
-References: <1439421161-17868-1-git-send-email-sboyd@codeaurora.org>
- <1439421161-17868-2-git-send-email-sboyd@codeaurora.org>
-Message-ID: <CAMuHMdXo4ChAfbi5h0okyw18LNM5iv-rfx_AO9e_u7QAB8Vx9A@mail.gmail.com>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Thu, 13 Aug 2015 10:41:50 +0200
+Subject: [PATCH v3 1/4] edac: Add an function to retrieve the EDAC
+ debugfs node
+In-Reply-To: <20150813081537.GB20004@nazgul.tnic>
+References: <1439326077-25507-1-git-send-email-lho@apm.com>
+ <1439326077-25507-2-git-send-email-lho@apm.com>
+ <20150812101219.GC14011@nazgul.tnic>
+ <20150812104954.GD14011@nazgul.tnic>
+ <CAPw-ZT=AFtyLt4CNGBzLZcdPr-ekJpQxKA4Y_AiDzqKfhF1-=w@mail.gmail.com>
+ <CAPw-ZTkfAxqG6HQHU3WomrqRwXa+jyTWCg=ns1HKC323ds1yug@mail.gmail.com>
+ <20150813081537.GB20004@nazgul.tnic>
+Message-ID: <20150813104150.2c084a8c@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 13, 2015 at 1:12 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> Use the provider based method to get a clock's name so that we
-> can get rid of the clk member in struct clk_hw one day. Mostly
-> converted with the following coccinelle script.
->
-> @@
-> struct clk_hw *E;
-> @@
->
-> -__clk_get_name(E->clk)
-> +clk_hw_get_name(E)
->
-> Cc: Heiko Stuebner <heiko@sntech.de>
-> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> Cc: Tomasz Figa <tomasz.figa@gmail.com>
-> Cc: Peter De Schrijver <pdeschrijver@nvidia.com>
-> Cc: Prashant Gaikwad <pgaikwad@nvidia.com>
-> Cc: Stephen Warren <swarren@wwwdotorg.org>
-> Cc: Thierry Reding <thierry.reding@gmail.com>
-> Cc: Alexandre Courbot <gnurou@gmail.com>
-> Cc: Tero Kristo <t-kristo@ti.com>
-> Cc: Ulf Hansson <ulf.hansson@linaro.org>
-> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> Cc: Andrew Bresticker <abrestic@chromium.org>
-> Cc: Ezequiel Garcia <ezequiel.garcia@imgtec.com>
-> Cc: Ralf Baechle <ralf@linux-mips.org>
-> Cc: Kevin Cernekee <cernekee@chromium.org>
-> Cc: Geert Uytterhoeven <geert+renesas@glider.be>
-> Cc: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-rockchip at lists.infradead.org
-> Cc: linux-samsung-soc at vger.kernel.org
-> Cc: linux-tegra at vger.kernel.org
-> Cc: linux-omap at vger.kernel.org
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+Hi,
 
->  drivers/clk/shmobile/clk-div6.c      |  2 +-
+> On Wed, Aug 12, 2015 at 09:30:58PM -0700, Loc Ho wrote:
+> > Okay... The 'inline' helps with the compiler warning. If I move all to
+> > header file with 'static inline' and wrapper around CONFIG_EDAC_DEBUG,
+> > don't I need to export and declare the variable 'edac_debugfs'? Are
+> > you okay with export this variable?
+> 
+> You need to make edac_debugfs extern in the header and define it in
+> edac_mc_sysfs.c.
+> 
+> But that's ok because edac_core.h will be included only by EDAC drivers
+> and they're supposed to see edac_debugfs anyway...
+> 
+What's the point in having an accessor function that returns a driver
+internal variable when this variable is exported anyway?
+This will only further inconsistencies because half of the users will
+use the variable directly and the other half will use the accessor
+function.
 
-For the shmobile part:
 
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Lothar Wa?mann
+-- 
+___________________________________________________________
 
-Gr{oetje,eeting}s,
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
