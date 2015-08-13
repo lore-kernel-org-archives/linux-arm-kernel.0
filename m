@@ -1,26 +1,32 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 13 Aug 2015 14:27:55 +0200
-Subject: [GIT PULL] omap gpmc null pointer fix against v4.2-rc6
-In-Reply-To: <20150813082022.GL10928@atomide.com>
-References: <20150813082022.GL10928@atomide.com>
-Message-ID: <20150813122755.GB23581@localhost>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 13 Aug 2015 14:29:47 +0200
+Subject: [PATCH v2 0/6] ARM: shmobile: Move gpio ranges from C code to DT
+In-Reply-To: <20150805005540.GB20726@verge.net.au>
+References: <1438696519-13727-1-git-send-email-geert+renesas@glider.be>
+ <20150805005540.GB20726@verge.net.au>
+Message-ID: <CACRpkdY7P86+SxMr5-HnhrN5fC-N1U135jiGAJGTV=xx47VW5g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 13, 2015 at 01:20:22AM -0700, Tony Lindgren wrote:
-> The following changes since commit cd4556733b30cc363adc7b1cea3bffa7e2dd0c7c:
-> 
->   ARM: dts: dra7: Fix broken pbias device creation (2015-08-05 03:04:07 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.2/fixes-rc6
-> 
-> for you to fetch changes up to e984a1791ac6a7c944911207e8a9c344763f0003:
-> 
->   memory: omap-gpmc: Don't try to save uninitialized GPMC context (2015-08-12 01:43:49 -0700)
+On Wed, Aug 5, 2015 at 2:55 AM, Simon Horman <horms@verge.net.au> wrote:
 
-Thanks, merged.
+> Where possible I prefer not to apply non-DTS/DTSI patches on top of
+> DTS/DTSI patches, I believe this is in keeping with how the ARM SoC
+> maintainers like things handled.  With this in mind I have done the following:
+>
+> 1. Queued up the DTSI patches (patches 1 - 3) for v4.3 in my dt branch.
+>    I intend for this to turn up in next soon.
+> 2. Queued up for pinctrl patches (patches 4 - 6) for v4.4 in a pinctrl patch.
+>    I intend for these to be present in the renesas devel branch but
+>    not in next until after the release of v4.3-rc1. I would also be
+>    happy to drop them and let Linus Walleij take these patches for v4.4,
+>    assuming patches 1 - 3 are accepted for v4.3.
 
+OK.
 
--Olof
+Will the world explode if I try to queue the pinctrl patches 4-6 in my
+tree now for v4.3? Then I prefer to defer to v4.4. Else I can merge
+it in parallel?
+
+Yours,
+Linus Walleij
