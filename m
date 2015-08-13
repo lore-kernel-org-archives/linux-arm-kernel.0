@@ -1,125 +1,71 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Thu, 13 Aug 2015 16:40:42 +0530
-Subject: [PATCH v2 5/6] mailbox: Add generic mechanism for testing Mailbox
- Controllers
-In-Reply-To: <20150813110008.GD8782@x1>
-References: <1437990272-23111-1-git-send-email-lee.jones@linaro.org>
- <1437990272-23111-6-git-send-email-lee.jones@linaro.org>
- <CABb+yY20nQbiEEZeRvWTMUsJ2qgwRn8CrWvnFDSB-b1dgVaAuw@mail.gmail.com>
- <20150812102328.GD18282@x1>
- <CABb+yY0A74Vy3-KOvj0URU_4zb2FAC7Yp3gmEwnFaBrD0mzt0w@mail.gmail.com>
- <20150813091914.GB8782@x1>
- <CABb+yY0cgbtM68-E_Xqgh5O6GRLXESYTLa5WcAwUBoVL3ufrxA@mail.gmail.com>
- <20150813102335.GC8782@x1>
- <CABb+yY3z7p97eOhncQ2i+g6yoYGfDgSN9BDPKmiDaVLa3oPocA@mail.gmail.com>
- <20150813110008.GD8782@x1>
-Message-ID: <CABb+yY34i=VUnswUE21vgeQYAGOS=7uwvdnTAFFgYkTV0CFk=w@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 13 Aug 2015 13:11:01 +0200
+Subject: [PATCH v4 2/4] gpio: brcmstb: Add interrupt and wakeup source
+ support
+In-Reply-To: <1438391865-7862-3-git-send-email-gregory.0xf0@gmail.com>
+References: <1438391865-7862-1-git-send-email-gregory.0xf0@gmail.com>
+ <1438391865-7862-3-git-send-email-gregory.0xf0@gmail.com>
+Message-ID: <CACRpkdaz3k_N1qS5M_jmprPz8fHXeLtTke_YT8i2gaehmme+OQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 13, 2015 at 4:30 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> On Thu, 13 Aug 2015, Jassi Brar wrote:
->
->> On Thu, Aug 13, 2015 at 3:53 PM, Lee Jones <lee.jones@linaro.org> wrote:
->> > On Thu, 13 Aug 2015, Jassi Brar wrote:
->> >
->> >> On Thu, Aug 13, 2015 at 2:49 PM, Lee Jones <lee.jones@linaro.org> wrote:
->> >> > On Thu, 13 Aug 2015, Jassi Brar wrote:
->> >>
->> >> >> >> > +
->> >> >> >> > +static void mbox_test_prepare_message(struct mbox_client *client, void *message)
->> >> >> >> > +{
->> >> >> >> > +       struct mbox_test_device *tdev = dev_get_drvdata(client->dev);
->> >> >> >> > +
->> >> >> >> > +       if (tdev->mmio)
->> >> >> >> > +               memcpy(tdev->mmio, message, MBOX_MAX_MSG_LEN);
->> >> >> >> >
->> >> >> >> This is unlikely to work. Those platforms that need to send a 2 part
->> >> >> >> message, they do :
->> >> >> >> (a) Signal/Command/Target code via some controller register (via
->> >> >> >> mbox_send_message).
->> >> >> >> (b) Setup the payload in Shared-Memory (via tx_prepare).
->> >> >> >>
->> >> >> >> This test driver assumes both are the same. I think you have to
->> >> >> >> declare something like
->> >> >> >
->> >> >> > This driver assumes that the framework will call client->tx_prepare()
->> >> >> > first, which satisfies (b).  It then assumes controller->send_data()
->> >> >> > will be invoked, which will send the platform specific
->> >> >> > signal/command/target code, which then satisfies (a).
->> >> >> >
->> >> >> Yeah, but what would be that code? Who provides that?
->> >> >>
->> >> >> > In what way does it assume they are the same?
->> >> >> >
->> >> >> notice the 'message' pointer in
->> >> >> mbox_send_message(tdev->tx_channel, message);
->> >> >>     and
->> >> >> memcpy(tdev->mmio, message, MBOX_MAX_MSG_LEN);
->> >> >>
->> >> >> >> struct mbox_test_message { /* same for TX and RX */
->> >> >> >>           unsigned sig_len;
->> >> >> >>           void *signal;               /* rx/tx via mailbox api */
->> >> >> >>           unsigned pl_len;
->> >> >> >>           void *payload;           /* rx/tx via shared-memory */
->> >> >> >> };
->> >> >> >
->> >> >> > How do you think this should be set and use these?
->> >> >> >
->> >> >> The userspace would want to specify the command code (32bits or not)
->> >> >> that would be passed via the fifo/register of the controller. So we
->> >> >> need signal[]
->> >> >>
->> >> >> The data to be passed via share-memory could be provided by userspace
->> >> >> via the payload[] array.
->> >> >
->> >> > Okay, so would the solution be two userspace files 'signal' and
->> >> > 'message', so in the case of a client specified signal we can write it
->> >> > into there first.
->> >> >
->> >> > echo 255  > signal
->> >> > echo test > message
->> >> >
->> >> > ... or in the case where no signal is required, or the controller
->> >> > driver taking care of it, we just don't write anything to signal?
->> >> >
->> >> file_operations.write() should parse signal and message, coming from
->> >> userspace, into a local structure before routing them via
->> >> mbox_send_message and tx_prepare respectively.
->> >
->> > Okay.  So before I code this up we should agree on syntax.
->> >
->> > How would you like to represent the break between signal and message?
->> > Obviously ' ' would be a bad idea, as some clients may want to send
->> > messages with white space contained.  How about '\t' or '\n'?
->> >
->> Yeah, I am not a fan of markers and flags either.
->>
->> Maybe we should share with userspace
->>   struct mbox_test_message { /* same for TX and RX */
->>            unsigned sig_len;
->>            void __user *signal;        /* rx/tx via mailbox api */
->>            unsigned pl_len;
->>            void __user *payload;    /* rx/tx via shared-memory */
->>   };
->>
->> First copy_from_user the structure of length sizof(struct
->> mbox_test_message) and then copy_from_user length sig_len and pl_len
->> from signal[] and payload[] respectively (usually ioctls would carry
->> such data).
->
-> Simplicity and ease of use should be the goals here.  Testers should
-> not have to write applications to use this driver.  Can we come up
-> with a simple/effective method that uses SYSFS/DEBUGFS please?
->
-> The easiest way I can think of which avoids markers/separators AND the
-> requirement for users to have to write applications is to have two
-> files, 'signal' and 'message' as mentioned before.  Once both are
-> populated I can get this driver to draft the message appropriately and
-> fire it off.
->
-And then write to more files for RX data? ... which should also be in
-the form of 'signal' and 'message'.
+On Sat, Aug 1, 2015 at 3:17 AM, Gregory Fong <gregory.0xf0@gmail.com> wrote:
 
-BTW like for spi there is a stock application in
-Documentation/spi/spidev_test.c we could do the same?
+> Uses the gpiolib irqchip helpers.  For this to work, the irq setup
+> function is called once per bank instead of once per device.  Note
+> that all known uses of this block have a BCM7120 L2 interrupt
+> controller as a parent.  Supports interrupts for all GPIOs.
+>
+> In the IRQ handler, we check for raised IRQs for invalid GPIOs and
+> warn (ratelimited) if they're encountered.
+>
+> Also, several drivers (e.g. gpio-keys) allow for GPIOs to be
+> configured as wakeup sources, and this GPIO controller supports that
+> through a separate interrupt path.
+>
+> The de-facto standard DT property "wakeup-source" is checked, since
+> that indicates whether the GPIO controller hardware can wake.  Uses
+> the IRQCHIP_MASK_ON_SUSPEND irq_chip flag because UPG GIO doesn't have
+> any of its own wakeup source configuration.
+>
+> Aside regarding gpiolib irqchip helpers: It wasn't obvious (to me)
+> that you can have multiple chained irqchips and associated IRQ domains
+> for a single parent IRQ, and as long as the xlate function is written
+> correctly, a GPIO IRQ request end up checking the correct domain and
+> will get associated with the correct IRQ.  What helps make this clear
+> is to read
+>   drivers/gpio/gpiolib-of.c:
+>    - of_gpiochip_find_and_xlate()
+>    - of_get_named_gpiod_flags()
+>   drivers/gpio/gpiolib.c:
+>    - gpiochip_find()
+>
+> Signed-off-by: Gregory Fong <gregory.0xf0@gmail.com>
+> ---
+> v4:
+> - when checking parent_irq, use <= 0 or > 0 since 0 is NO_IRQ.
+
+Patch applied, but:
+
+
+> +       if (of_property_read_bool(np, "interrupt-controller")) {
+> +               priv->parent_irq = platform_get_irq(pdev, 0);
+> +               if (priv->parent_irq <= 0) {
+> +                       dev_err(dev, "Couldn't get IRQ");
+> +                       return -ENOENT;
+> +               }
+> +       } else {
+> +               priv->parent_irq = -ENOENT;
+> +       }
+> +
+>         if (brcmstb_gpio_sanity_check_banks(dev, np, res))
+>                 return -EINVAL;
+
+This patch does not apply cleanly because the version in my
+tree has INIT_LIST_HEAD(&priv->bank_list);
+before the sanity check.
+
+I applied it manually, but check that things are working right.
+
+Yours,
+Linus Walleij
