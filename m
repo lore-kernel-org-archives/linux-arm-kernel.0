@@ -1,216 +1,84 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 13 Aug 2015 11:30:08 +0100
-Subject: [PATCH 2/2] Convert smsc911x to use ACPI as well as DT
-In-Reply-To: <20150813093838.GC5468@xora-haswell.xora.org.uk>
-References: <1439417187-21411-1-git-send-email-jeremy.linton@arm.com>
- <1439417187-21411-3-git-send-email-jeremy.linton@arm.com>
- <20150813082759.GB5468@xora-haswell.xora.org.uk>
- <20150813090117.GA13833@red-moon>
- <20150813093838.GC5468@xora-haswell.xora.org.uk>
-Message-ID: <20150813103008.GA13356@red-moon>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Thu, 13 Aug 2015 13:31:04 +0300
+Subject: [PATCH v2 2/6] genirq: fix irqchip_set_wake_parent if
+ IRQCHIP_SKIP_SET_WAKE
+In-Reply-To: <55CC6AFF.8060400@arm.com>
+References: <1439401562-28874-1-git-send-email-grygorii.strashko@ti.com>
+ <1439401562-28874-3-git-send-email-grygorii.strashko@ti.com>
+ <55CC6AFF.8060400@arm.com>
+Message-ID: <55CC71E8.80604@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 13, 2015 at 10:38:38AM +0100, Graeme Gregory wrote:
-> On Thu, Aug 13, 2015 at 10:01:17AM +0100, Lorenzo Pieralisi wrote:
-> > On Thu, Aug 13, 2015 at 09:27:59AM +0100, Graeme Gregory wrote:
-> > > On Wed, Aug 12, 2015 at 05:06:27PM -0500, Jeremy Linton wrote:
-> > > > Add ACPI bindings for the smsc911x driver. Convert the DT specific calls
-> > > > to nonspecific device* calls, This allows the driver to work
-> > > > with both ACPI and DT configurations. Ethernet should now work when using
-> > > > ACPI on ARM Juno.
-> > 
-> > Last sentence does not belong in the commit log.
-> > 
-> > > > 
-> > > > Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
-> > > 
-> > > The code looks fine to me.
-> > > 
-> > > Currently the compulsary DT properties seem to match the "approved" ACPI
-> > > NIC properties from here
-> > > 
-> > > http://www.uefi.org/sites/default/files/resources/nic-request-v2.pdf
-> > 
-> > What about _DSD device specific properties (eg "smsc,save-mac-address") ?
-> > Are we taking 1:1 translation between DT and ACPI for granted ?
-> > 
-> > I thought some process must be put in place to define the corresponding
-> > bindings in ACPI before starting this mechanical translation or maybe
-> > I missed something, I would like to understand.
-> > 
-> > How does the device specific _DSD definitions work in ACPI world ? Where
-> > are they published ? How will we translate those to DT bindings if there
-> > is need ?
-> > 
-> 
-> This I do not know as that discussion is still ongoing. But those
-> options are currently marked as optional so driver should not fail if
-> they are not present in ACPI.
+On 08/13/2015 01:01 PM, Marc Zyngier wrote:
+> On 12/08/15 18:45, Grygorii Strashko wrote:
+>> The irqchip_set_wake_parent should not fail if IRQ chip
+>> specifies IRQCHIP_SKIP_SET_WAKE. Otherwise, IRQ wakeup
+>> configuration can't be propagated properly through IRQ
+>> domains hierarchy.
+>>
+>> In case of TI OMAP DRA7 the issue reproduced with following
+>> configuration:
+>> ARM GIC<-OMAP wakeupgen<-TI CBAR<-GPIO<-GPIO pcf857x<-gpio_key
+>>
+>> gpio_key is wakeup source
+>>
+>> Failure is reproduced during suspend/resume to RAM:
+>> suspend:
+>>   - gpio_keys_suspend
+>>     enable_irq_wake
+>>       + pcf857x_irq_set_wake
+>>         + omap_gpio_wake_enable
+>>           + TI CBAR irq_chip_set_wake_parent
+>>             + OMAP wakeupgen has no .irq_set_wake()
+>
+> Most importantly, wakeupgen has IRQCHIP_SKIP_SET_WAKE set.
+>
+>>             and -ENOSYS will be returned
+>>
+>> resume:
+>>   - gpio_keys_resume
+>>     + disable_irq_wake
+>>       + irq_set_irq_wake
+>>         + WARN(1, "Unbalanced IRQ %d wake disable\n", irq);
+>>
+>> Fixes: 08b55e2a9208 ('genirq: Add irqchip_set_wake_parent')
+>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+>> ---
+>>   kernel/irq/chip.c | 4 ++++
+>>   1 file changed, 4 insertions(+)
+>>
+>> diff --git a/kernel/irq/chip.c b/kernel/irq/chip.c
+>> index 6de638b..bdb1b9d 100644
+>> --- a/kernel/irq/chip.c
+>> +++ b/kernel/irq/chip.c
+>> @@ -1024,6 +1024,10 @@ int irq_chip_set_vcpu_affinity_parent(struct irq_data *data, void *vcpu_info)
+>>   int irq_chip_set_wake_parent(struct irq_data *data, unsigned int on)
+>>   {
+>>   	data = data->parent_data;
+>> +
+>> +	if (irq_data_get_irq_chip(data)->flags & IRQCHIP_SKIP_SET_WAKE)
+>> +		return 0;
+>> +
+>>   	if (data->chip->irq_set_wake)
+>>   		return data->chip->irq_set_wake(data, on);
+>>
+>>
+>
+> We have a more general issue with chip flags, and how they combine
+> within a stack of irqchips.
 
-Well yes, but if they are present this patch uses them when booting
-with ACPI and that's what I am arguing about, because they are
-undocumented.
+Indeed. Problem looks similar to IRQCHIP_MASK_ON_SUSPEND flag usage.
 
-This discussion should be brought to completion, the _DSD usage and
-bindings sharing between DT and ACPI well defined before we can
-enable drivers to rely on properties that in ACPI world have no
-binding definition at all, if we go by this route we might end
-up having drivers reusing DT properties that have no reason whatsoever
-to exist in ACPI world.
+>
+> What if you remove the irq_chip_set_wake_parent from the crossbar
+> driver, and instead set IRQCHIP_SKIP_SET_WAKE?
 
-So, to make this clear, the _DSD usage must be documented and there
-has to be a way to define the related bindings in ACPI world so that
-driver code can be reviewed accordingly.
+I've thought about this and it should work for me.
+One question - what if crossbar will be not the last one in
+IRQ domains hierarchy?
 
-Lorenzo
 
-> Graeme
-> 
-> > Lorenzo
-> > 
-> > > Reviewed-by: Graeme Gregory <graeme.gregory@linaro.org>
-> > > 
-> > > Thanks
-> > > 
-> > > > ---
-> > > >  drivers/net/ethernet/smsc/smsc911x.c | 48 +++++++++++++++++-------------------
-> > > >  1 file changed, 22 insertions(+), 26 deletions(-)
-> > > > 
-> > > > diff --git a/drivers/net/ethernet/smsc/smsc911x.c b/drivers/net/ethernet/smsc/smsc911x.c
-> > > > index 959aeea..0f21aa3 100644
-> > > > --- a/drivers/net/ethernet/smsc/smsc911x.c
-> > > > +++ b/drivers/net/ethernet/smsc/smsc911x.c
-> > > > @@ -59,7 +59,9 @@
-> > > >  #include <linux/of_device.h>
-> > > >  #include <linux/of_gpio.h>
-> > > >  #include <linux/of_net.h>
-> > > > +#include <linux/acpi.h>
-> > > >  #include <linux/pm_runtime.h>
-> > > > +#include <linux/property.h>
-> > > >  
-> > > >  #include "smsc911x.h"
-> > > >  
-> > > > @@ -2362,59 +2364,46 @@ static const struct smsc911x_ops shifted_smsc911x_ops = {
-> > > >  	.tx_writefifo = smsc911x_tx_writefifo_shift,
-> > > >  };
-> > > >  
-> > > > -#ifdef CONFIG_OF
-> > > > -static int smsc911x_probe_config_dt(struct smsc911x_platform_config *config,
-> > > > -				    struct device_node *np)
-> > > > +static int smsc911x_probe_config(struct smsc911x_platform_config *config,
-> > > > +				 struct device *dev)
-> > > >  {
-> > > > -	const char *mac;
-> > > >  	u32 width = 0;
-> > > >  
-> > > > -	if (!np)
-> > > > +	if (!dev)
-> > > >  		return -ENODEV;
-> > > >  
-> > > > -	config->phy_interface = of_get_phy_mode(np);
-> > > > +	config->phy_interface = device_get_phy_mode(dev);
-> > > >  
-> > > > -	mac = of_get_mac_address(np);
-> > > > -	if (mac)
-> > > > -		memcpy(config->mac, mac, ETH_ALEN);
-> > > > +	device_get_mac_address(dev, config->mac, ETH_ALEN);
-> > > >  
-> > > > -	of_property_read_u32(np, "reg-shift", &config->shift);
-> > > > +	device_property_read_u32(dev, "reg-shift", &config->shift);
-> > > >  
-> > > > -	of_property_read_u32(np, "reg-io-width", &width);
-> > > > +	device_property_read_u32(dev, "reg-io-width", &width);
-> > > >  	if (width == 4)
-> > > >  		config->flags |= SMSC911X_USE_32BIT;
-> > > >  	else
-> > > >  		config->flags |= SMSC911X_USE_16BIT;
-> > > >  
-> > > > -	if (of_get_property(np, "smsc,irq-active-high", NULL))
-> > > > +	if (device_property_present(dev, "smsc,irq-active-high"))
-> > > >  		config->irq_polarity = SMSC911X_IRQ_POLARITY_ACTIVE_HIGH;
-> > > >  
-> > > > -	if (of_get_property(np, "smsc,irq-push-pull", NULL))
-> > > > +	if (device_property_present(dev, "smsc,irq-push-pull"))
-> > > >  		config->irq_type = SMSC911X_IRQ_TYPE_PUSH_PULL;
-> > > >  
-> > > > -	if (of_get_property(np, "smsc,force-internal-phy", NULL))
-> > > > +	if (device_property_present(dev, "smsc,force-internal-phy"))
-> > > >  		config->flags |= SMSC911X_FORCE_INTERNAL_PHY;
-> > > >  
-> > > > -	if (of_get_property(np, "smsc,force-external-phy", NULL))
-> > > > +	if (device_property_present(dev, "smsc,force-external-phy"))
-> > > >  		config->flags |= SMSC911X_FORCE_EXTERNAL_PHY;
-> > > >  
-> > > > -	if (of_get_property(np, "smsc,save-mac-address", NULL))
-> > > > +	if (device_property_present(dev, "smsc,save-mac-address"))
-> > > >  		config->flags |= SMSC911X_SAVE_MAC_ADDRESS;
-> > > >  
-> > > >  	return 0;
-> > > >  }
-> > > > -#else
-> > > > -static inline int smsc911x_probe_config_dt(
-> > > > -				struct smsc911x_platform_config *config,
-> > > > -				struct device_node *np)
-> > > > -{
-> > > > -	return -ENODEV;
-> > > > -}
-> > > > -#endif /* CONFIG_OF */
-> > > >  
-> > > >  static int smsc911x_drv_probe(struct platform_device *pdev)
-> > > >  {
-> > > > -	struct device_node *np = pdev->dev.of_node;
-> > > >  	struct net_device *dev;
-> > > >  	struct smsc911x_data *pdata;
-> > > >  	struct smsc911x_platform_config *config = dev_get_platdata(&pdev->dev);
-> > > > @@ -2478,7 +2467,7 @@ static int smsc911x_drv_probe(struct platform_device *pdev)
-> > > >  		goto out_disable_resources;
-> > > >  	}
-> > > >  
-> > > > -	retval = smsc911x_probe_config_dt(&pdata->config, np);
-> > > > +	retval = smsc911x_probe_config(&pdata->config, &pdev->dev);
-> > > >  	if (retval && config) {
-> > > >  		/* copy config parameters across to pdata */
-> > > >  		memcpy(&pdata->config, config, sizeof(pdata->config));
-> > > > @@ -2654,6 +2643,12 @@ static const struct of_device_id smsc911x_dt_ids[] = {
-> > > >  MODULE_DEVICE_TABLE(of, smsc911x_dt_ids);
-> > > >  #endif
-> > > >  
-> > > > +static const struct acpi_device_id smsc911x_acpi_match[] = {
-> > > > +	{ "ARMH9118", 0 },
-> > > > +	{ }
-> > > > +};
-> > > > +MODULE_DEVICE_TABLE(acpi, smsc911x_acpi_match);
-> > > > +
-> > > >  static struct platform_driver smsc911x_driver = {
-> > > >  	.probe = smsc911x_drv_probe,
-> > > >  	.remove = smsc911x_drv_remove,
-> > > > @@ -2661,6 +2656,7 @@ static struct platform_driver smsc911x_driver = {
-> > > >  		.name	= SMSC_CHIPNAME,
-> > > >  		.pm	= SMSC911X_PM_OPS,
-> > > >  		.of_match_table = of_match_ptr(smsc911x_dt_ids),
-> > > > +		.acpi_match_table = ACPI_PTR(smsc911x_acpi_match),
-> > > >  	},
-> > > >  };
-> > > >  
-> > > > -- 
-> > > > 2.4.3
-> > > > 
-> > > > 
-> > > > 
-> > > > _______________________________________________
-> > > > linux-arm-kernel mailing list
-> > > > linux-arm-kernel at lists.infradead.org
-> > > > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> > > 
-> > > _______________________________________________
-> > > linux-arm-kernel mailing list
-> > > linux-arm-kernel at lists.infradead.org
-> > > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> > > 
-> > 
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+-- 
+regards,
+-grygorii
