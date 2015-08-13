@@ -1,49 +1,50 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Thu, 13 Aug 2015 15:14:03 +0200
-Subject: [PATCH 1/6] gpiolib-of: Rename gpio_hog functions to be generic
-In-Reply-To: <CACRpkdYpeoo2scKzNuSYbWfWLTBodXJEX3KyRzoRQPuoaeqzKw@mail.gmail.com>
-References: <1438680203-13432-1-git-send-email-mpa@pengutronix.de>
- <1438680203-13432-2-git-send-email-mpa@pengutronix.de>
- <CACRpkdYpeoo2scKzNuSYbWfWLTBodXJEX3KyRzoRQPuoaeqzKw@mail.gmail.com>
-Message-ID: <20150813131403.GW19600@pengutronix.de>
+From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
+Date: Thu, 13 Aug 2015 20:16:30 +0700
+Subject: [PATCH v4 1/3] PCI: generic: remove dependency on hw_pci
+In-Reply-To: <20150805092318.GB6092@arm.com>
+References: <1438721620-15493-1-git-send-email-jchandra@broadcom.com>
+ <20150804234956.GF17327@google.com> <20150805092318.GB6092@arm.com>
+Message-ID: <55CC98AE.5010604@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 10, 2015 at 11:29:58AM +0200, Linus Walleij wrote:
-> On Tue, Aug 4, 2015 at 11:23 AM, Markus Pargmann <mpa@pengutronix.de> wrote:
-> 
-> > The gpio hogging functions are currently only used for gpio-hogging. But
-> > these functions are widely generic ones which parse gpio device nodes in
-> > the DT.
-> >
-> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> (...)
-> >  /**
-> > - * of_get_gpio_hog() - Get a GPIO hog descriptor, names and flags for GPIO API
-> > + * of_parse_gpio() - Get a GPIO hog descriptor, names and flags for GPIO API
-> 
-> It's not a good name, too generic. It could easily be assued this is
-> for something
-> wider.
-> 
-> of_parse_own_gpio() or something, indicating that this pertains to the
-> chip itself and not to outside users, would be better.
+Hi Bjorn,
 
-Yes, changed to of_parse_own_gpio() for next version.
+On 8/5/15 16:23, Will Deacon wrote:
+> On Wed, Aug 05, 2015 at 12:49:56AM +0100, Bjorn Helgaas wrote:
+>> >On Wed, Aug 05, 2015 at 02:23:38AM +0530, Jayachandran C wrote:
+>>> > >The current code in pci-host-generic.c uses pci_common_init_dev()
+>>> > >from arm architecture to do some part of the PCI setup, and this
+>>> > >prevents it from being used with arm64 architecture.
+>>> > >
+>>> > >The part of pci_common_init_dev() that is really needed by
+>>> > >pci-host-generic.c is very limited and can be done in the same
+>>> > >file without using hw_pci API of ARM. The ARM platform requires
+>>> > >a pci_sys_data as sysdata for the PCI bus, this can be handled by
+>>> > >setting up gen_pci to have a pci_sys_data variable as the first
+>>> > >element.
+>>> > >
+>>> > >Signed-off-by: Jayachandran C<jchandra@broadcom.com>
+>>> > >Acked-by: Lorenzo Pieralisi<lorenzo.pieralisi@arm.com>
+>>> > >Tested-by: Lorenzo Pieralisi<lorenzo.pieralisi@arm.com>
+>>> > >Tested-by: Pavel Fedin<p.fedin@samsung.com>
+>> >
+>> >I applied all three of these to my pci/enumeration branch for v4.3.
+>> >
+>> >I made a few changes, the most important being to call
+>> >pcie_bus_configure_settings() before pci_bus_add_devices(), because drivers
+>> >may claim devices in pci_bus_add_devices(), and the PCI core shouldn't
+>> >touch devices after drivers claim them.
+>> >
+>> >I dropped the acks and tested-by because of that change, but I'll happily
+>> >add them back if Lorenzo and Pavel confirm.  The patches are here if you
+>> >want to review/test them:
+>> >
+>> >https://git.kernel.org/cgit/linux/kernel/git/helgaas/pci.git/log/?h=pci/enumeration
+>> >
+>> >I'm sure the other patches on that branch will need some tweaks, too, so I
+>> >don't have any problem with updating these.
 
-Best Regards,
+I have also tested on AMD Seattle (w/ non-PROBE_ONLY mode).
 
-Markus
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150813/06c025d3/attachment.sig>
+Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
