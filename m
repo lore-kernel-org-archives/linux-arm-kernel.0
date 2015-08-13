@@ -1,65 +1,43 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 14 Aug 2015 00:31:09 +0300
-Subject: [PATCH v2] ARM: shmobile: kzm9g dts: Use adxl345-specific
- compatible property
-In-Reply-To: <CAMuHMdV0fqjJSjmYqP0uFa0x5ydc1iztu4za1Ufu7OMdhC29Ug@mail.gmail.com>
-References: <1436180132-26190-1-git-send-email-geert+renesas@glider.be>
- <20150813000537.GD5221@verge.net.au>
- <CAMuHMdV0fqjJSjmYqP0uFa0x5ydc1iztu4za1Ufu7OMdhC29Ug@mail.gmail.com>
-Message-ID: <10744920.2768uXkYtL@avalon>
+From: mathieu@codeaurora.org (Mathieu Olivari)
+Date: Thu, 13 Aug 2015 14:33:38 -0700
+Subject: [PATCH 1/3] ARM: qcom: add SFPB nodes to IPQ806x dts
+In-Reply-To: <1439501620-24073-1-git-send-email-mathieu@codeaurora.org>
+References: <1439501620-24073-1-git-send-email-mathieu@codeaurora.org>
+Message-ID: <1439501620-24073-2-git-send-email-mathieu@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 13 August 2015 11:26:32 Geert Uytterhoeven wrote:
-> On Thu, Aug 13, 2015 at 2:05 AM, Simon Horman <horms@verge.net.au> wrote:
-> > On Wed, Jul 08, 2015 at 09:51:49AM +0900, Simon Horman wrote:
-> >> On Tue, Jul 07, 2015 at 09:56:29AM +0300, Laurent Pinchart wrote:
-> >>> On Tuesday 07 July 2015 09:26:21 Simon Horman wrote:
-> >>>> On Mon, Jul 06, 2015 at 04:29:33PM +0300, Laurent Pinchart wrote:
-> >>>>> On Monday 06 July 2015 12:55:32 Geert Uytterhoeven wrote:
-> >>>>>> Replace the deprecated generic "adi,adxl34x" compatible value by
-> >>>>>> the adxl345-specific "adi,adxl345" value, cfr. commit
-> >>>>>> e465bf6fc55d5ce2 ("DT:
-> >>>>>> i2c: Deprecate adi,adxl34x compatible string").
-> >>>>>> 
-> >>>>>> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> >>>>> 
-> >>>>> Acked-by: Laurent Pinchart
-> >>>>> <laurent.pinchart+renesas@ideasonboard.com>
-> >>>>> 
-> >>>>>> ---
-> >>>>>> Depends on commit 3a38958d2477b718 ("Input: adxl34x - add OF
-> >>>>>> match support"), which is in v4.2-rc1.
-> >>>>>> 
-> >>>>>> This is v2 of "ARM: shmobile: kzm9g dts: Add adxl345-specific
-> >>>>>> compatible property".
-> >>>> 
-> >>>> It appears to me that this will cause a regression when booting old
-> >>>> kernels with new dts blobs. For that reason think we should consider
-> >>>> v1 of this change coupled with a schedule to remove use of the
-> >>>> deprecated compat string.
-> >>> 
-> >>> That's the forward compatibility that Geert mentioned, is that really
-> >>> an issue, especially on this board ?
-> >> 
-> >> I think it would be best to provide backwards compatibility unless there
-> >> is a compelling reason not to.
-> > 
-> > I would like to revisit this discussion with a view to getting some
-> > version of this patch queued up (yes I know I pushed back on it earlier in
-> > this thread).
->
-> I'm fine with applying v1.
+Add one new node to the ipq806x.dtsi file to declare & register the
+hardware spinlock devices. This mechanism is required to be used by
+other drivers such as SMEM.
 
-And I'm quite unsurprisingly not, as I've asked for a v2.
+Signed-off-by: Mathieu Olivari <mathieu@codeaurora.org>
+---
+ arch/arm/boot/dts/qcom-ipq8064.dtsi | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-The "adi,adxl34x" compatible string is deprecated. That means we still support 
-it in the driver for device trees that haven't been updated, but it shouldn't 
-be used forward by new device trees. That's why the device tree sources 
-contained in the kernel shouldn't use it, especially given that they often 
-serve as references for device trees shipped out of tree.
-
+diff --git a/arch/arm/boot/dts/qcom-ipq8064.dtsi b/arch/arm/boot/dts/qcom-ipq8064.dtsi
+index 9f727d8..ea7b959 100644
+--- a/arch/arm/boot/dts/qcom-ipq8064.dtsi
++++ b/arch/arm/boot/dts/qcom-ipq8064.dtsi
+@@ -67,6 +67,18 @@
+ 			clock-frequency = <32768>;
+ 			#clock-cells = <0>;
+ 		};
++
++		sfpb_mutex_block: syscon at 01200600 {
++			compatible = "syscon";
++			reg = <0x01200600 0x100>;
++		};
++
++		sfpb_mutex: sfpb-mutex {
++			compatible = "qcom,sfpb-mutex";
++			syscon = <&sfpb_mutex_block 4 4>;
++
++			#hwlock-cells = <1>;
++		};
+ 	};
+ 
+ 	soc: soc {
 -- 
-Regards,
-
-Laurent Pinchart
+2.1.4
