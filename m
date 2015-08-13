@@ -1,62 +1,42 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Thu, 13 Aug 2015 20:01:08 +0200
-Subject: [PATCH v1 RFC] This patch repairs HTC Magician machine (PXA27x)
- support
-In-Reply-To: <55CBCDED.8010409@tul.cz> (Petr Cvek's message of "Thu, 13 Aug
- 2015 00:51:25 +0200")
-References: <55CBCDED.8010409@tul.cz>
-Message-ID: <87y4hfhxuj.fsf@belgarion.home>
+From: linux@horizon.com (George Spelvin)
+Date: 13 Aug 2015 14:18:41 -0400
+Subject: enabling libgcc for 64-bit divisions,
+ was Re: PROBLEM: XFS on ARM corruption 'Structure needs cl
+In-Reply-To: <CA+55aFwgaq3KkeXGQWxmVHsNVwJUWK3WssJ5_ADpQG4zTXjWPQ@mail.gmail.com>
+Message-ID: <20150813181841.10342.qmail@ns.horizon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Petr Cvek <petr.cvek@tul.cz> writes:
+> I'm not convinced that "64/32->32" is all that generic, though.  If
+> the dividend in 64-bit, there's no fundamental type-based guarantee
+> that things will fit.
 
-> Fixing original code: Problems to successful boot due to the bad LCD
-> power sequence (wrongly configured GPIO).
->
-> Add/fix platform data and helper function for various hardware
-> (touchscreen, audio, USB device, ...).
->
-> Add new discovered GPIOs and fix names by GPIO context.
->
-> Add new LEDs driver.
->
-> Signed-off-by: Petr Cvek <petr.cvek@tul.cz>
-Hi Petr,
+I agree that it's impossible to decide based on the types, but having
+that knowledge is extremely common.  Which is why it would be nice
+to have a way for the programmer to communicate that knowledge.
 
-Just as Lee, I want the serie to be split per-subsystem.
+> So your case is rather special, and depends (intimately) on knowing
+> the actual ranges and how they interact.
 
-For the mach-pxa part, I need you to split the patch into several chunks to
-review.
-At least please split :
- - a first patch for cleanup (identation and whitespaces)
- - a second patch for cleanup (comments changes, debug messages)
- - a serie of fix patches
-   - one for the power sequence
-   - one for GPIO fixes
- - a serie of evolution patches
-   - new gpio_keys
-   - new backlight stuff
-   - one per new device declared
-   - new flash stuff
-   - etc ...
+Actually, it's the most common case.  Going through "git grep -w do_div",
+by far the *majority* of all calls to do_div immediately convert the
+result to 32 bits (or unsigned long), with no overflow checking.
 
-Please keep in mind that in order to pick the patches, I need to split them in 3
-groups :
- - cleanups
- - fixes
- - evolutions / new stuff
-Moreover I want to be able to revert one functionality (for example new power
-sequence) without reverting the whole serie.
+Partially that's because I'm cointing static code frequency and there
+are a ridiculous number of different PLL drivers, but still.
 
-You probably know that the pxa patches need the subject prefix to be "ARM: pxa:
-magician: " in your case. Other subsystem maintainers have similar requirements
-I believe.
+On x86, the case that msword >= divsor causes a divide exception
+(divide ba generalization of divide by zero), so it's tempting
+to do the same sort of "assume no trap and fix up in the handler"
+trick as <asm/uaccess.h>.
 
-When that's done, I'll begin the review, and Philipp will probably too as he is
-the maintainer.
 
-Cheers.
+There are only 854 references to do_div in the kernel, so
+doing a sweep over all of them is quite practical.
 
---
-Robert
+One function that would cover a significant number of use cases
+(but not all, damn it) would be
+
+rem = do_mul_div(x, mul,_div)
+
+Which returns x * mul / div, with a 64-bit intermediate.
