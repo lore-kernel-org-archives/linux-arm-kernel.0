@@ -1,35 +1,107 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu, 13 Aug 2015 10:09:41 -0500
-Subject: [PATCH 0/3] ARM: multi_v7_defconfig: Enable more OMAP family
- platforms
-In-Reply-To: <20150811103751.GK4215@atomide.com>
-References: <1428614121-3374-1-git-send-email-nm@ti.com>
- <20150805102234.GZ16878@atomide.com>
- <7hfv3uwvdw.fsf@deeprootsystems.com>
- <20150811103751.GK4215@atomide.com>
-Message-ID: <CAGo_u6q+U_Yi7Oq2pAFr4hs28_-G6dFbiHJQg3s3aEj0vG1asg@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 13 Aug 2015 16:11:15 +0100
+Subject: [PATCH v2 3/5] irqchip, gicv3: Workaround for Cavium ThunderX
+ erratum 23154
+In-Reply-To: <1439477277-6157-4-git-send-email-rric@kernel.org>
+References: <1439477277-6157-1-git-send-email-rric@kernel.org>
+ <1439477277-6157-4-git-send-email-rric@kernel.org>
+Message-ID: <55CCB393.1040909@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 11, 2015 at 5:37 AM, Tony Lindgren <tony@atomide.com> wrote:
->
-> * Kevin Hilman <khilman@kernel.org> [150807 16:10]:
-> > Tony Lindgren <tony@atomide.com> writes:
-> >
-> > > Ping, looks like these are still pending. Probably should be
-> > > applied directly by the arm-soc maintainers.
-> >
-> > If these should go through arm-soc, please resend to:arm at kernel.org so
-> > they make it into our queue of stuff to be reviewed/applied.
->
-> OK thanks, up to Nihshant to resend.
->
+On 13/08/15 15:47, Robert Richter wrote:
+> From: Robert Richter <rrichter@cavium.com>
+> 
+> This patch implements Cavium ThunderX erratum 23154.
+> 
+> The gicv3 of ThunderX requires a modified version for reading the IAR
+> status to ensure data synchronization. Since this is in the fast-path
+> and called with each interrupt, runtime patching is used using jump
+> label patching for smallest overhead (no-op). This is the same
+> technique as used for tracepoints.
+> 
+> v2:
+>  * implement code in a single asm() to keep instruction sequence
+>  * added comment to the code that explains the erratum
+>  * apply workaround also if running as guest, thus check MIDR
+> 
+> Signed-off-by: Robert Richter <rrichter@cavium.com>
+> ---
+>  drivers/irqchip/irq-gic-v3.c | 45 +++++++++++++++++++++++++++++++++++++++++++-
+>  1 file changed, 44 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+> index 1a91902be0b1..2f80a11621a0 100644
+> --- a/drivers/irqchip/irq-gic-v3.c
+> +++ b/drivers/irqchip/irq-gic-v3.c
+> @@ -107,7 +107,7 @@ static void gic_redist_wait_for_rwp(void)
+>  }
+>  
+>  /* Low level accessors */
+> -static u64 __maybe_unused gic_read_iar(void)
+> +static u64 gic_read_iar_common(void)
+>  {
+>  	u64 irqstat;
+>  
+> @@ -115,6 +115,38 @@ static u64 __maybe_unused gic_read_iar(void)
+>  	return irqstat;
+>  }
+>  
+> +/*
+> + * Cavium ThunderX erratum 23154
+> + *
+> + * The gicv3 of ThunderX requires a modified version for reading the
+> + * IAR status to ensure data synchronization (access to icc_iar1_el1
+> + * is not sync'ed before and after).
+> + */
+> +static u64 gic_read_iar_cavium_thunderx(void)
+> +{
+> +	u64 irqstat;
+> +
+> +	asm volatile(
+> +		"nop;nop;nop;nop\n\t"
+> +		"nop;nop;nop;nop\n\t"
+> +		"mrs_s %0, " __stringify(ICC_IAR1_EL1) "\n\t"
+> +		"nop;nop;nop;nop"
+> +		: "=r" (irqstat));
+> +	mb();
+> +
+> +	return irqstat;
+> +}
+> +
+> +struct static_key is_cavium_thunderx = STATIC_KEY_INIT_FALSE;
+> +
+> +static u64 __maybe_unused gic_read_iar(void)
+> +{
+> +	if (static_key_false(&is_cavium_thunderx))
+> +		return gic_read_iar_common();
+> +	else
+> +		return gic_read_iar_cavium_thunderx();
+> +}
+> +
+>  static void __maybe_unused gic_write_pmr(u64 val)
+>  {
+>  	asm volatile("msr_s " __stringify(ICC_PMR_EL1) ", %0" : : "r" (val));
+> @@ -766,8 +798,19 @@ static const struct irq_domain_ops gic_irq_domain_ops = {
+>  	.free = gic_irq_domain_free,
+>  };
+>  
+> +static void gicv3_enable_cavium_thunderx(void *data)
+> +{
+> +	static_key_slow_inc(&is_cavium_thunderx);
+> +}
+> +
+>  static const struct gic_capabilities gicv3_errata[] = {
+>  	{
+> +		.desc		= "GIC: Cavium erratum 23154",
+> +		.iidr		= 0xa100034c,	/* ThunderX pass 1.x */
+> +		.iidr_mask	= 0xffff0fff,
+> +		.init		= gicv3_enable_cavium_thunderx,
+> +	},
 
-Sorry about the slow response - i will have to do this at a later
-point(probably based off 4.3-rc1). tied up with a few other internal
-stuff atm :(
+I'm even more puzzled. You're working around a CPU bug based on the ITS
+ID registers? Or have you swapped the detection methods for the two errata?
 
+	M.
 -- 
----
-Regards,
-Nishanth Menon
+Jazz is not dead. It just smells funny...
