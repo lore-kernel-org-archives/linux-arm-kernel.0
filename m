@@ -1,49 +1,80 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 13 Aug 2015 11:30:21 +0200
-Subject: [GIT PULL] Renesas ARM Based SoC CPG MSTP Clock Domain Updates
- for v4.3
-In-Reply-To: <20150812084822.GB16058@verge.net.au>
-References: <cover.1438911559.git.horms+renesas@verge.net.au>
- <20150811133843.GP30181@localhost>
- <20150812084822.GB16058@verge.net.au>
-Message-ID: <20150813093021.GG30160@localhost>
+Date: Thu, 13 Aug 2015 11:09:39 +0200
+Subject: [PATCH 3/3] ARM: dts: UniPhier: add ProXstream2 and PH1-LD6b
+ SoC/board support
+In-Reply-To: <CAK7LNAQ+6tQ9Ci6LKsAB7kLj0o60Hizo2gOokDH9qW=FnO0gEA@mail.gmail.com>
+References: <1438687264-26538-1-git-send-email-yamada.masahiro@socionext.com>
+ <1438687264-26538-4-git-send-email-yamada.masahiro@socionext.com>
+ <20150811130739.GD30181@localhost>
+ <CAK7LNAQ+6tQ9Ci6LKsAB7kLj0o60Hizo2gOokDH9qW=FnO0gEA@mail.gmail.com>
+Message-ID: <CAOesGMhhSKr6Nn7YEjoB9V_5-yhwzn_fKZ7FSU3U-2XYT5mJrQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 12, 2015 at 05:48:22PM +0900, Simon Horman wrote:
-> On Tue, Aug 11, 2015 at 03:38:43PM +0200, Olof Johansson wrote:
-> > On Fri, Aug 07, 2015 at 11:12:03AM +0900, Simon Horman wrote:
-> > > Hi Olof, Hi Kevin, Hi Arnd,
-> > > 
-> > > Please consider these Renesas ARM based SoC CPG MSTP clock domain updates
-> > > for v4.3.
-> > > 
-> > > This pull request is based on "Third Round of Renesas ARM Based SoC DT
-> > > Updates for v4.3", tagged as renesas-dt3-for-v4.3, which I have also sent a
-> > > pull-request for.
-> > > 
-> > > The reason for that base is that the DT changes in this series update nodes
-> > > added in that tag.
-> > > 
-> > > This series begins with driver changes and follows up with DT changes.
-> > > The latter depend on the former.
-> > 
-> > I see the acked-by tags on the clk patches, but it took some searching to find
-> > the ack email from Stephen.
-> > 
-> > Can you please make our homework a bit easier when providing that in
-> > the future?
-> 
-> Sure, I hadn't realised that you liked to track down Acks to that extent.
-> 
-> As practice for myself I've included some notes in the repost of the
-> patches in question.  Please let me know if you need something different.
+On Wed, Aug 12, 2015 at 3:14 PM, Masahiro Yamada
+<yamada.masahiro@socionext.com> wrote:
+> Hi Olof,
+>
+>
+> 2015-08-11 22:07 GMT+09:00 Olof Johansson <olof@lixom.net>:
+>> Hi,
+>>
+>> On Tue, Aug 04, 2015 at 08:21:04PM +0900, Masahiro Yamada wrote:
+>>> Initial version of DTSI for ProXstream2 and PH1-LD6b and DTS for
+>>> PH1-LD6b reference board.
+>>>
+>>> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+>>> ---
+>>>
+>>>  arch/arm/boot/dts/Makefile                  |   3 +-
+>>>  arch/arm/boot/dts/uniphier-ph1-ld6b-ref.dts | 105 +++++++++++
+>>>  arch/arm/boot/dts/uniphier-ph1-ld6b.dtsi    |  67 +++++++
+>>>  arch/arm/boot/dts/uniphier-proxstream2.dtsi | 273 ++++++++++++++++++++++++++++
+>>>  4 files changed, 447 insertions(+), 1 deletion(-)
+>>>  create mode 100644 arch/arm/boot/dts/uniphier-ph1-ld6b-ref.dts
+>>>  create mode 100644 arch/arm/boot/dts/uniphier-ph1-ld6b.dtsi
+>>>  create mode 100644 arch/arm/boot/dts/uniphier-proxstream2.dtsi
+>>>
+>>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+>>> index 246473a..6eb3f2f 100644
+>>> --- a/arch/arm/boot/dts/Makefile
+>>> +++ b/arch/arm/boot/dts/Makefile
+>>> @@ -645,7 +645,8 @@ dtb-$(CONFIG_ARCH_UNIPHIER) += \
+>>>       uniphier-ph1-sld3-ref.dtb \
+>>>       uniphier-ph1-ld4-ref.dtb \
+>>>       uniphier-ph1-pro4-ref.dtb \
+>>> -     uniphier-ph1-sld8-ref.dtb
+>>> +     uniphier-ph1-sld8-ref.dtb \
+>>> +     uniphier-ph1-ld6b-ref.dtb
+>>
+>> Please always add entries here sorted, don't just append. I've fixed it
+>> up for you this time.
+>>
+>>
+>
+> Please do not do that (without my ack).
 
-It's one of those things that we check in on every now and then, just to make
-sure that there weren't comments from the other maintainer that were missed.
+I'm not going to go get your ack for something as trivial as this. We
+do make sure subplatform maintainers are in the loop and get to review
+code that touches their platform, but in this case this was a shared
+makefile and there were no functional changes.
 
-We're more likely to do it on pull requests that didn't have the other
-maintainer on Cc, FWIW. :)
+> It was already sorted from old SoC to new SoC.
+>
+> Sorting chronologically (in other words, in the order of chip ID)
+> makes more sense than sorting alphabetically.
+
+No, it doesn't. All entries in these files should be sorted
+alphabetically. Sometimes we miss out on it, but it's the goal.
+
+If you sort chronologically it's impossible for anyone but people
+intimately familiar with UniPhier's product history to add any new
+entries in the right location. Also, since it's likely that newer
+chips will be introduced over time, new entries are likely to just be
+appends instead of inserted at more varied locations in the files.
+
+Append-only additions are more likely to have add/add conflicts, which
+is why we're preferring alphabetical sort order in the first place.
 
 
 -Olof
