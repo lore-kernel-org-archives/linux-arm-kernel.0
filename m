@@ -1,102 +1,117 @@
-From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Wed, 12 Aug 2015 21:14:02 -0700
-Subject: [PATCH 5/9] clk: qcom: gcc-msm8960: add child devices support.
-In-Reply-To: <55CBC14B.8000509@codeaurora.org>
-References: <1436348838-22671-1-git-send-email-rnayak@codeaurora.org>
- <1436348838-22671-6-git-send-email-rnayak@codeaurora.org>
- <20150811224902.GO2839@codeaurora.org>
- <20150812201855.GF13472@usrtlx11787.corpusers.net>
- <55CBC14B.8000509@codeaurora.org>
-Message-ID: <20150813041402.GI13472@usrtlx11787.corpusers.net>
+From: dave.long@linaro.org (David Long)
+Date: Thu, 13 Aug 2015 00:23:03 -0400
+Subject: [PATCH v8 2/7] arm64: Add more test functions to insn.c
+In-Reply-To: <20150811180012.GE29880@arm.com>
+References: <1439254364-15362-1-git-send-email-dave.long@linaro.org>
+ <1439254364-15362-3-git-send-email-dave.long@linaro.org>
+ <20150811180012.GE29880@arm.com>
+Message-ID: <55CC1BA7.7040200@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 12 Aug 14:57 PDT 2015, Stephen Boyd wrote:
+On 08/11/15 14:00, Will Deacon wrote:
+> On Tue, Aug 11, 2015 at 01:52:39AM +0100, David Long wrote:
+>> From: "David A. Long" <dave.long@linaro.org>
+>>
+>> Certain instructions are hard to execute correctly out-of-line (as in
+>> kprobes).  Test functions are added to insn.[hc] to identify these.  The
+>> instructions include any that use PC-relative addressing, change the PC,
+>> or change interrupt masking. For efficiency and simplicity test
+>> functions are also added for small collections of related instructions.
+>>
+>> Signed-off-by: David A. Long <dave.long@linaro.org>
+>> ---
+>>   arch/arm64/include/asm/insn.h | 18 ++++++++++++++++++
+>>   arch/arm64/kernel/insn.c      | 28 ++++++++++++++++++++++++++++
+>>   2 files changed, 46 insertions(+)
+>>
+>> diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
+>> index 30e50eb..66bfb21 100644
+>> --- a/arch/arm64/include/asm/insn.h
+>> +++ b/arch/arm64/include/asm/insn.h
+>> @@ -223,8 +223,13 @@ static __always_inline bool aarch64_insn_is_##abbr(u32 code) \
+>>   static __always_inline u32 aarch64_insn_get_##abbr##_value(void) \
+>>   { return (val); }
+>>
+>> +__AARCH64_INSN_FUNCS(adr_adrp,	0x1F000000, 0x10000000)
+>> +__AARCH64_INSN_FUNCS(prfm_lit,	0xFF000000, 0xD8000000)
+>>   __AARCH64_INSN_FUNCS(str_reg,	0x3FE0EC00, 0x38206800)
+>>   __AARCH64_INSN_FUNCS(ldr_reg,	0x3FE0EC00, 0x38606800)
+>> +__AARCH64_INSN_FUNCS(ldr_lit,	0xBF000000, 0x18000000)
+>> +__AARCH64_INSN_FUNCS(ldrsw_lit,	0xFF000000, 0x98000000)
+>> +__AARCH64_INSN_FUNCS(exclusive,	0x3F000000, 0x08000000)
+>
+> Hmm, so this class also pulls in load-acquire and store-release, which
+> we *should* be able to single-step, no? Maybe it's worth splitting this
+> category up (or at least changing aarch64_insn_is_exclusive to be more
+> permissive).
 
-> On 08/12/2015 01:18 PM, Bjorn Andersson wrote:
-> > On Tue 11 Aug 15:49 PDT 2015, Stephen Boyd wrote:
-> >
-> >> On 07/08, Rajendra Nayak wrote:
-> >>> diff --git a/drivers/clk/qcom/gcc-msm8960.c b/drivers/clk/qcom/gcc-msm8960.c
-> >>> index eb6a4f9..2c80d03 100644
-> >>> --- a/drivers/clk/qcom/gcc-msm8960.c
-> >>> +++ b/drivers/clk/qcom/gcc-msm8960.c
-> >>> @@ -15,6 +15,7 @@
-> >>>   #include <linux/bitops.h>
-> >>>   #include <linux/err.h>
-> >>>   #include <linux/platform_device.h>
-> >>> +#include <linux/of_platform.h>
-> >>>   #include <linux/module.h>
-> >>>   #include <linux/of.h>
-> >>>   #include <linux/of_device.h>
-> >>> @@ -3520,7 +3521,8 @@ static int gcc_msm8960_probe(struct platform_device *pdev)
-> >>>   	if (IS_ERR(clk))
-> >>>   		return PTR_ERR(clk);
-> >>>   
-> >>> -	return qcom_cc_probe(pdev, match->data);
-> >>> +	qcom_cc_probe(pdev, match->data);
-> >>> +	return of_platform_populate(pdev->dev.of_node, NULL, NULL, &pdev->dev);
-> >> We just lost the error code from qcom_cc_probe()...
-> >>
-> >> Also, I don't like having a subnode in DT. Why can't we use the
-> >> same node as the GCC node and create a virtual child device here
-> >> for tsens? We can assign the same of_node that this platform
-> >> device has so that DT keeps working correctly.
-> >>
-> > Can't we make the gcc driver support being a child of a simple-mfd by
-> > having it attempting to acquire the regmap of the parent and falling
-> > back to creating its own mmio regmap?
-> 
-> So we would need to make a new device and driver for the simple-mfd 
-> parent?
+I was not confident that this was the case. After reading the relevant 
+parts of the v8 ARM yet again I think I see your point.
 
-No that part is already in mainline, so my idea was that we add an early
-return in qcom_cc_map() like:
+>
+>>   __AARCH64_INSN_FUNCS(stp_post,	0x7FC00000, 0x28800000)
+>>   __AARCH64_INSN_FUNCS(ldp_post,	0x7FC00000, 0x28C00000)
+>>   __AARCH64_INSN_FUNCS(stp_pre,	0x7FC00000, 0x29800000)
+>> @@ -264,19 +269,29 @@ __AARCH64_INSN_FUNCS(ands,	0x7F200000, 0x6A000000)
+>>   __AARCH64_INSN_FUNCS(bics,	0x7F200000, 0x6A200000)
+>>   __AARCH64_INSN_FUNCS(b,		0xFC000000, 0x14000000)
+>>   __AARCH64_INSN_FUNCS(bl,	0xFC000000, 0x94000000)
+>> +__AARCH64_INSN_FUNCS(b_bl,	0x7C000000, 0x14000000)
+>
+> Why do we need this when we already have checks for b and bl?
 
-	 struct device *dev = &pdev->dev;
-+        struct regmap *map;
-+
-+        map = syscon_node_to_regmap(dev->parent->of_node);
-+        if (!IS_ERR(map))
-+                return map;
+I was trying to avoid doing multiple checks for different variants of 
+similar instructions.
 
-And then just update the dts to:
+>
+>> +__AARCH64_INSN_FUNCS(cb,	0x7E000000, 0x34000000)
+>
+> Likewise for cbz and cbnz...
+>
+>>   __AARCH64_INSN_FUNCS(cbz,	0x7F000000, 0x34000000)
+>>   __AARCH64_INSN_FUNCS(cbnz,	0x7F000000, 0x35000000)
+>> +__AARCH64_INSN_FUNCS(tb,	0x7E000000, 0x36000000)
+>
+> ... there's a pattern here!
+>
 
-	gcc {
-		compatible = "syscon", "simple-mfd";
-		reg = <0x00900000 0x4000>;
+^^
 
-		gcc: clock-controller {
-			compatible = "qcom,gcc-apq8064";
-			#clock-cells = <1>;
-			#reset-cells = <1>;
-		};
-	};
+>>   __AARCH64_INSN_FUNCS(tbz,	0x7F000000, 0x36000000)
+>>   __AARCH64_INSN_FUNCS(tbnz,	0x7F000000, 0x37000000)
+>> +__AARCH64_INSN_FUNCS(b_bl_cb_tb, 0x5C000000, 0x14000000)
+>
+> I must be missing something :)
 
-But as I implemented this I realized that the syscon_node_to_regmap()
-does not register the regmap as a devres of the parent, and as such it's
-not caught by the regmap lookup in devm_clk_register_regmap().
+^^
 
-So either one would need to make the syscon throw the regmap into devres
-or make it possible to pass a regmap to devm_clk_register_regmap() for
-this to work.
+>
+>>   __AARCH64_INSN_FUNCS(bcond,	0xFF000010, 0x54000000)
+>>   __AARCH64_INSN_FUNCS(svc,	0xFFE0001F, 0xD4000001)
+>>   __AARCH64_INSN_FUNCS(hvc,	0xFFE0001F, 0xD4000002)
+>>   __AARCH64_INSN_FUNCS(smc,	0xFFE0001F, 0xD4000003)
+>>   __AARCH64_INSN_FUNCS(brk,	0xFFE0001F, 0xD4200000)
+>> +__AARCH64_INSN_FUNCS(exception,	0xFF000000, 0xD4000000)
+>>   __AARCH64_INSN_FUNCS(hint,	0xFFFFF01F, 0xD503201F)
+>>   __AARCH64_INSN_FUNCS(br,	0xFFFFFC1F, 0xD61F0000)
+>>   __AARCH64_INSN_FUNCS(blr,	0xFFFFFC1F, 0xD63F0000)
+>> +__AARCH64_INSN_FUNCS(br_blr,	0xFFDFFC1F, 0xD61F0000)
+>>   __AARCH64_INSN_FUNCS(ret,	0xFFFFFC1F, 0xD65F0000)
+>> +__AARCH64_INSN_FUNCS(msr_imm,	0xFFF8F01F, 0xD500401F)
+>> +__AARCH64_INSN_FUNCS(msr_reg,	0xFFF00000, 0xD5100000)
+>> +__AARCH64_INSN_FUNCS(set_clr_daif, 0xFFFFF0DF, 0xD50340DF)
+>> +__AARCH64_INSN_FUNCS(rd_wr_daif, 0xFFDFFFE0, 0xD51B4220)
+>
+> I think I'd rather have separate decoders to decode the register field
+> of an mrs/msr instruction than overload each encoding here.
+>
+> Anyway, on the whole this looks pretty good, I'd just prefer not to build
+> compound instruction checks at the encoding level (even though it looks
+> like you did a good job on the values).
+>
 
-> I'm confused about what you're suggesting and what benefit it 
-> has versus creating a child of the clock controller device.
+OK, easy enough to just add to the if statements where these are getting 
+used.  May be getting a little bloated looking there though.
 
-The benefit would simply be that we're using the already existing
-mechanism for handling multiple platform_drivers sharing a hw block.
-
-> 
-> Here's the patch I'm suggesting. The device name is probably wrong, but 
-> you get the idea.
-
-Looks very much like my take on it as well, I do however have concerns
-that suddenly the node called "clock-controller" will have to come with
-tsens related properties.
-
-Are all the tsens-in-gcc blocks the same? Or do you intend to of_match
-on the gcc compatible in the tsens driver?
-
-Regards,
-Bjorn
+-dl
