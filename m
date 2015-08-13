@@ -1,45 +1,48 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Thu, 13 Aug 2015 09:24:23 -0500
-Subject: [PATCH 1/2] Add a matching set of device_ functions for
- determining mac/phy
-In-Reply-To: <55CC8613.1040709@arm.com>
-References: <1439417187-21411-1-git-send-email-jeremy.linton@arm.com>
- <1439417187-21411-2-git-send-email-jeremy.linton@arm.com>
- <55CC8613.1040709@arm.com>
-Message-ID: <55CCA897.5080108@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 13 Aug 2015 15:24:44 +0100
+Subject: [GIT PULL] ARM64: juno: SCPI and dependent drivers for v4.3
+In-Reply-To: <20150813124026.GD23581@localhost>
+References: <55C1E3FB.5090309@arm.com>
+ <20150813124026.GD23581@localhost>
+Message-ID: <20150813142444.GA4602@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Robin,
+On Thu, Aug 13, 2015 at 02:40:26PM +0200, Olof Johansson wrote:
+> On Wed, Aug 05, 2015 at 11:22:51AM +0100, Sudeep Holla wrote:
+> > Here is the first pull request for SCPI, clock and cpufreq support on
+> > ARM64 Juno development platform for v4.3
+> 
+> I'd like to hear from Catalin and Will on why ARM is doing this. Catalin
+> and Will are pushing back very hard at vendors who don't use PSCI for
+> CPU power management, and then they have coworkers that are looking to
+> merge this directly into the kernel.
 
-On 08/13/2015 06:57 AM, Robin Murphy wrote:
->> +static void *device_get_mac_addr(struct device *dev,
->> +				 const char *name, char *addr,
->> +				 int alen)
->> +{
->> +	int ret = device_property_read_u8_array(dev, name, addr, alen);
->> +
->> +	if (ret == 0 && is_valid_ether_addr(addr))
->> +		return addr;
->> +	return NULL;
->> +}
->
-> Not sure I understand the logic here - "return the same thing we were
-> given if we updated it, or null if we didn't". It's only indicating
-> success/failure (the caller can perfectly well cast its own buffer to a
-> void * if it needs to), so why wouldn't you just return a normal int
-> error code?
+Actually, the arm64 CPU power management story is pretty much handled by
+Lorenzo and Sudeep in my team, so I trust their judgement ;). But I
+agree with you that a better explanation on the reasons behind this is
+needed, otherwise we risk confusing messages. I'll try to summarise it
+below but Sudeep can reply with more details.
 
+PSCI only covers CPU boot/cpuidle and platform suspend. It does not have
+any provisions for DVFS and I'm not sure this could be easily
+standardised (or whether we could find enough supporters to get it
+adopted).
 
-	No particular reason, other than initially I was trying to keep the 
-function as similar as possible to the one in of_net. AKA copy paste 
-job. I can convert the return types, but I was trying for a simple 
-function rename. That way the users of the of version could be converted 
-with relative ease, and the drivers which invented their own version of 
-these functions could be changed to use this instead. Of course, that 
-plan took a blow, when I added the addr/alen parameters.
+SCPI is a (standard) interface to a coprocessor handling clocks etc. to
+be used with cpufreq. This patchset adds support for cpufreq/dvs which
+is not handled by PSCI. So, just to clarify the acronyms:
 
-	Same thing applies for the other function.
+SCPI - System Control and Power Interface - it's a protocol for
+communicating with a System Control Processor (e.g. Cortex-M3) via
+mailboxes. It is used in Linux for DVFS but this is *not* a secure/EL3
+firmware interface (a.k.a. SMC calls). It indeed a firmware interface
+but the firmware runs on a separate coprocessor and not on the CPU itself.
 
+PSCI - Power State Coordination Interface - it is a secure firmware
+interface for coordinating the CPU power states (idle, not DVFS). The
+firmware may use an SCPI communication channel (e.g. deeper sleep states
+where clock changes are needed).
 
-	
+-- 
+Catalin
