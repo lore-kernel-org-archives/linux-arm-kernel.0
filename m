@@ -1,36 +1,25 @@
 From: bp@alien8.de (Borislav Petkov)
-Date: Thu, 13 Aug 2015 05:36:40 +0200
-Subject: [PATCH v3 3/4] edac: Add L3/SoC EDAC support to the APM X-Gene
- SoC EDAC driver
-In-Reply-To: <CAPw-ZTkRytHUsUsDmTkfzzTYbcZnmTVRMkzNzg_9ZpdQH76rZw@mail.gmail.com>
+Date: Thu, 13 Aug 2015 05:38:37 +0200
+Subject: [PATCH v3 1/4] edac: Add an function to retrieve the EDAC
+ debugfs node
+In-Reply-To: <CAPw-ZT=AFtyLt4CNGBzLZcdPr-ekJpQxKA4Y_AiDzqKfhF1-=w@mail.gmail.com>
 References: <1439326077-25507-1-git-send-email-lho@apm.com>
  <1439326077-25507-2-git-send-email-lho@apm.com>
- <1439326077-25507-3-git-send-email-lho@apm.com>
- <1439326077-25507-4-git-send-email-lho@apm.com>
- <20150812105121.GE14011@nazgul.tnic>
- <CAPw-ZTkRytHUsUsDmTkfzzTYbcZnmTVRMkzNzg_9ZpdQH76rZw@mail.gmail.com>
-Message-ID: <20150813033640.GB14432@nazgul.tnic>
+ <20150812101219.GC14011@nazgul.tnic>
+ <20150812104954.GD14011@nazgul.tnic>
+ <CAPw-ZT=AFtyLt4CNGBzLZcdPr-ekJpQxKA4Y_AiDzqKfhF1-=w@mail.gmail.com>
+Message-ID: <20150813033837.GC14432@nazgul.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 12, 2015 at 10:50:52AM -0700, Loc Ho wrote:
-> I intentional left this code as is so that the driver will still works
-> with older version of the EDAC code.
+On Wed, Aug 12, 2015 at 10:23:11AM -0700, Loc Ho wrote:
+> I can't move it completely to the header and make it static. It will
+> generate a lot of compiler warning as it isn't used by other modules.
 
-Huh, what? I don't think this is how upstream development works.
+Come again?
 
-> I had already reversed the logic for the L3 and SoC. Are you asking
-> for the MC/PMD (earlier posting)? The MC/PMD routine isn't that big.
-> Functions in general fit in an screen of 80 column?
-
-Only for the ones where it becomes clumsy and flipping it would make the
-code more readable. I'm not a hard 80 cols follower anyway.
-
-> So, is there something that I am missing?
-
-I hope you're not. But seeing the custom debugfs stuff left in the new
-submission without any comment as to *why* you've left it, made me think
-you didn't incorporate all feedback.
+I'm talking about static inline functions in headers. Grep the kernel
+sources for examples.
 
 -- 
 Regards/Gruss,
