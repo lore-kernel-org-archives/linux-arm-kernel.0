@@ -1,42 +1,61 @@
-From: gg@slimlogic.co.uk (Graeme Gregory)
-Date: Thu, 13 Aug 2015 10:44:59 +0100
-Subject: [PATCH 0/3] Enable EHCI-platform driver for use with ACPI
-In-Reply-To: <1439416290-21228-1-git-send-email-jeremy.linton@arm.com>
-References: <1439416290-21228-1-git-send-email-jeremy.linton@arm.com>
-Message-ID: <20150813094459.GD5468@xora-haswell.xora.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 13 Aug 2015 02:50:48 -0700
+Subject: [PATCH v2 5/6] ARM: OMAP: wakeupgen: fix arm gic irq type
+ configuration
+In-Reply-To: <1439401562-28874-6-git-send-email-grygorii.strashko@ti.com>
+References: <1439401562-28874-1-git-send-email-grygorii.strashko@ti.com>
+ <1439401562-28874-6-git-send-email-grygorii.strashko@ti.com>
+Message-ID: <20150813095048.GA4215@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 12, 2015 at 04:51:27PM -0500, Jeremy Linton wrote:
-> This patch set enables the USB on the ARM Juno development platform
-> when using an ACPI kernel. This patch is in two primary parts. First
-> It tweaks the code in acpi_check_dma() to support the recently added
-> CCA attribute which describes a device which is not cache coherent.
+* Grygorii Strashko <grygorii.strashko@ti.com> [150812 10:49]:
+> It's observed that ARM GIC IRQ triggering type is not configured
+> properly when IRQ is routed through IRQ domain hierarchy and
+> system started using DT. As result, system will start using default
+> ARM GIC configuration, ignore DT IRQ triggering configuration,
+> and value of desc->irq_data.state_use_accessors = 0.
 > 
-> It then adds an error message if the device cannot be configured with
-> the current DMA settings, finally it adds the ACPI PNP id to the
-> acpi_match_table entry.
+> In case of TI OMAP DRA7 the following IRQ hierarchy is defined:
+> ARM GIC <- OMAP wakeupgen <- TI CBAR
 > 
+> Failed call chain:
+>      irq_create_of_mapping
+>      irq_set_irq_type
+>      __irq_set_trigger
+>      if (!chip || !chip->irq_set_type) {
+>         return 0; <- return here
+>      }
+> OMAP wakeupgen has no .irq_set_type() defined and, so, IRQ triggering
+> configuration will not be propagated to parent IRQ domain.
+> 
+> Hence, fix it by using irq_chip_set_type_parent() for
+> propagation IRQ triggering type to parent IRQ domains.
+> 
+> Fixes: 7136d457f365 ('ARM: omap: convert wakeupgen to stacked domains')
+> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
 
-Patch 1 I am unsure of (I just don't know enough about DMA), but for the other
-two it looks fine to me.
+Makse sense to merge this along with the irqchip changes once those
+are ready, so feel free to add to this one:
 
-Reviewed-by: Graeme Gregory <graeme.gregory@linaro.org>
+Acked-by: Tony Lindgren <tony@atomide.com>
 
-> Jeremy Linton (3):
->   Honor ACPI _CCA attribute setting
->   Display a DMA error message
->   Add ACPI bindings for the EHCI platform driver.
+> ---
+>  arch/arm/mach-omap2/omap-wakeupgen.c | 1 +
+>  1 file changed, 1 insertion(+)
 > 
->  drivers/usb/host/ehci-platform.c | 13 ++++++++++++-
->  include/acpi/acpi_bus.h          |  5 +++--
->  2 files changed, 15 insertions(+), 3 deletions(-)
-> 
+> diff --git a/arch/arm/mach-omap2/omap-wakeupgen.c b/arch/arm/mach-omap2/omap-wakeupgen.c
+> index 8e52621..e1d2e99 100644
+> --- a/arch/arm/mach-omap2/omap-wakeupgen.c
+> +++ b/arch/arm/mach-omap2/omap-wakeupgen.c
+> @@ -392,6 +392,7 @@ static struct irq_chip wakeupgen_chip = {
+>  	.irq_mask		= wakeupgen_mask,
+>  	.irq_unmask		= wakeupgen_unmask,
+>  	.irq_retrigger		= irq_chip_retrigger_hierarchy,
+> +	.irq_set_type		= irq_chip_set_type_parent,
+>  	.flags			= IRQCHIP_SKIP_SET_WAKE | IRQCHIP_MASK_ON_SUSPEND,
+>  #ifdef CONFIG_SMP
+>  	.irq_set_affinity	= irq_chip_set_affinity_parent,
 > -- 
-> 2.4.3
+> 2.5.0
 > 
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
