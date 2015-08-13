@@ -1,103 +1,63 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 13 Aug 2015 10:35:16 +0200
-Subject: [PATCH v2 1/5] clocksource: mediatek: do not enable GPT_CLK_EVT
- when setup
-In-Reply-To: <1437552878-3684-1-git-send-email-yingjoe.chen@mediatek.com>
-References: <CAGS+omD8k_Cfxv3bYyjmjtLbiavo-WmJPn0Z-CBhN_nnv65Tag@mail.gmail.com>
- <1437552878-3684-1-git-send-email-yingjoe.chen@mediatek.com>
-Message-ID: <55CC56C4.8080201@linaro.org>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 13 Aug 2015 10:41:09 +0200
+Subject: [PATCH 2/2] clk: Convert __clk_get_name(hw->clk) to
+ clk_hw_get_name(hw)
+In-Reply-To: <1439421161-17868-2-git-send-email-sboyd@codeaurora.org>
+References: <1439421161-17868-1-git-send-email-sboyd@codeaurora.org>
+ <1439421161-17868-2-git-send-email-sboyd@codeaurora.org>
+Message-ID: <CAMuHMdXo4ChAfbi5h0okyw18LNM5iv-rfx_AO9e_u7QAB8Vx9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/22/2015 10:14 AM, Yingjoe Chen wrote:
-> Spurious mtk timer interrupt is noticed at boot and cause kernel
-> crash. It seems if GPT is enabled, it will latch irq status even
-> when its IRQ is disabled. When irq is enabled afterward, we see
-> spurious interrupt.
-> Change init flow to only enable GPT_CLK_SRC at mtk_timer_init.
+On Thu, Aug 13, 2015 at 1:12 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> Use the provider based method to get a clock's name so that we
+> can get rid of the clk member in struct clk_hw one day. Mostly
+> converted with the following coccinelle script.
 >
-> Acked-by: Matthias Brugger <matthias.bgg@gmail.com>
-> Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
-> Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
-> ---
+> @@
+> struct clk_hw *E;
+> @@
 >
-> Update to my patch [1], added __init as Daniel suggest. This is the
-> only patch that need to change in that series, so I only sent this one.
+> -__clk_get_name(E->clk)
+> +clk_hw_get_name(E)
 >
-> http://lists.infradead.org/pipermail/linux-mediatek/2015-July/001545.html
->
->   drivers/clocksource/mtk_timer.c | 16 ++++++++++------
->   1 file changed, 10 insertions(+), 6 deletions(-)
->
-> diff --git a/drivers/clocksource/mtk_timer.c b/drivers/clocksource/mtk_timer.c
-> index 68ab423..2ba5b66 100644
-> --- a/drivers/clocksource/mtk_timer.c
-> +++ b/drivers/clocksource/mtk_timer.c
-> @@ -156,9 +156,11 @@ static void mtk_timer_global_reset(struct mtk_clock_event_device *evt)
->   	writel(0x3f, evt->gpt_base + GPT_IRQ_ACK_REG);
->   }
->
-> -static void
-> -mtk_timer_setup(struct mtk_clock_event_device *evt, u8 timer, u8 option)
-> +static void __init mtk_timer_setup(struct mtk_clock_event_device *evt,
-> +				   u8 timer, u8 option, bool enable)
->   {
-> +	u32 val;
-> +
->   	writel(TIMER_CTRL_CLEAR | TIMER_CTRL_DISABLE,
->   		evt->gpt_base + TIMER_CTRL_REG(timer));
->
-> @@ -167,8 +169,10 @@ mtk_timer_setup(struct mtk_clock_event_device *evt, u8 timer, u8 option)
->
->   	writel(0x0, evt->gpt_base + TIMER_CMP_REG(timer));
->
-> -	writel(TIMER_CTRL_OP(option) | TIMER_CTRL_ENABLE,
-> -			evt->gpt_base + TIMER_CTRL_REG(timer));
-> +	val = TIMER_CTRL_OP(option);
-> +	if (enable)
-> +		val |= TIMER_CTRL_ENABLE;
-> +	writel(val, evt->gpt_base + TIMER_CTRL_REG(timer));
+> Cc: Heiko Stuebner <heiko@sntech.de>
+> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> Cc: Tomasz Figa <tomasz.figa@gmail.com>
+> Cc: Peter De Schrijver <pdeschrijver@nvidia.com>
+> Cc: Prashant Gaikwad <pgaikwad@nvidia.com>
+> Cc: Stephen Warren <swarren@wwwdotorg.org>
+> Cc: Thierry Reding <thierry.reding@gmail.com>
+> Cc: Alexandre Courbot <gnurou@gmail.com>
+> Cc: Tero Kristo <t-kristo@ti.com>
+> Cc: Ulf Hansson <ulf.hansson@linaro.org>
+> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> Cc: Andrew Bresticker <abrestic@chromium.org>
+> Cc: Ezequiel Garcia <ezequiel.garcia@imgtec.com>
+> Cc: Ralf Baechle <ralf@linux-mips.org>
+> Cc: Kevin Cernekee <cernekee@chromium.org>
+> Cc: Geert Uytterhoeven <geert+renesas@glider.be>
+> Cc: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-rockchip at lists.infradead.org
+> Cc: linux-samsung-soc at vger.kernel.org
+> Cc: linux-tegra at vger.kernel.org
+> Cc: linux-omap at vger.kernel.org
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 
-Instead of the 'enable' new option, I prefer a test with 'timer' with a 
-comment:
+>  drivers/clk/shmobile/clk-div6.c      |  2 +-
 
-	/*
-	 * the timer hw is broken in that way ... bla bla, so we only
-	 * enable the clocksource ...
-	 */
-	if (timer == GPT_CLK_SRC)
-		val |= TIMER_CTRL_ENABLE;
+For the shmobile part:
 
-That said, can you have a look at commit 1096be08 ?
-"clockevents: sun5i: Fix setup_irq init sequence"
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-first and check if moving the interrupt request after the 
-clockevents_config_and_register could fix your issue.
+Gr{oetje,eeting}s,
 
->   }
->
->   static void mtk_timer_enable_irq(struct mtk_clock_event_device *evt, u8 timer)
-> @@ -235,12 +239,12 @@ static void __init mtk_timer_init(struct device_node *node)
->   	evt->ticks_per_jiffy = DIV_ROUND_UP(rate, HZ);
->
->   	/* Configure clock source */
-> -	mtk_timer_setup(evt, GPT_CLK_SRC, TIMER_CTRL_OP_FREERUN);
-> +	mtk_timer_setup(evt, GPT_CLK_SRC, TIMER_CTRL_OP_FREERUN, true);
->   	clocksource_mmio_init(evt->gpt_base + TIMER_CNT_REG(GPT_CLK_SRC),
->   			node->name, rate, 300, 32, clocksource_mmio_readl_up);
->
->   	/* Configure clock event */
-> -	mtk_timer_setup(evt, GPT_CLK_EVT, TIMER_CTRL_OP_REPEAT);
-> +	mtk_timer_setup(evt, GPT_CLK_EVT, TIMER_CTRL_OP_REPEAT, false);
->   	clockevents_config_and_register(&evt->dev, rate, 0x3,
->   					0xffffffff);
+                        Geert
 
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
