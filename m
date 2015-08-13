@@ -1,145 +1,41 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Thu, 13 Aug 2015 17:46:07 +0200
-Subject: [PATCH v2 10/15] KVM: arm64: add data structures to model ITS
- interrupt translation
-In-Reply-To: <1436538111-4294-11-git-send-email-andre.przywara@arm.com>
-References: <1436538111-4294-1-git-send-email-andre.przywara@arm.com>
- <1436538111-4294-11-git-send-email-andre.przywara@arm.com>
-Message-ID: <55CCBBBF.1080407@linaro.org>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 13 Aug 2015 10:47:36 -0500
+Subject: [PATCH-next 1/4] Revert "ARM: 7655/1: smp_twd: make
+ twd_local_timer_of_register() no-op for nosmp"
+In-Reply-To: <20150813153707.GF7576@n2100.arm.linux.org.uk>
+References: <1439409416-32673-1-git-send-email-balbi@ti.com>
+ <1439409416-32673-2-git-send-email-balbi@ti.com>
+ <20150813153707.GF7576@n2100.arm.linux.org.uk>
+Message-ID: <20150813154736.GI27560@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Aug 13, 2015 at 04:37:07PM +0100, Russell King - ARM Linux wrote:
+> On Wed, Aug 12, 2015 at 02:56:53PM -0500, Felipe Balbi wrote:
+> > This reverts commit 904464b91eca8c665acea033489225af02eeb75a.
+> > 
+> > The problem pointed out by commit 904464b91eca ("ARM: 7655/1:
+> > smp_twd: make twd_local_timer_of_register() no-op for nosmp")
+> > doesn't exist anymore.
+> > 
+> > We can safely boot with nosmp and the warning won't show up.
+> > 
+> > The other side benefit of this patch is that TWD has a chance
+> > to probe on single-core A9 systems such as AM437x which sport
+> > TWD.
+> 
+> I don't remember all the details from Feb 2013 on why we made that
+> change.  If this is proven safe, then I guess it's okay.
 
-On 07/10/2015 04:21 PM, Andre Przywara wrote:
-> The GICv3 Interrupt Translation Service (ITS) uses tables in memory
-> to allow a sophisticated interrupt routing. It features device tables,
-> an interrupt table per device and a table connecting "collections" to
-> actual CPUs (aka. redistributors in the GICv3 lingo).
-> Since the interrupt numbers for the LPIs are allocated quite sparsely
-> and the range can be quite huge (8192 LPIs being the minimum), using
-> bitmaps or arrays for storing information is a waste of memory.
-> We use linked lists instead, which we iterate linearily. This works
-> very well with the actual number of LPIs/MSIs in the guest being
-> quite low. Should the number of LPIs exceed the number where iterating
-> through lists seems acceptable, we can later revisit this and use more
-> efficient data structures.
-> 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
->  include/kvm/arm_vgic.h  |  3 +++
->  virt/kvm/arm/its-emul.c | 48 ++++++++++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 51 insertions(+)
-> 
-> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-> index b432055..1648668 100644
-> --- a/include/kvm/arm_vgic.h
-> +++ b/include/kvm/arm_vgic.h
-> @@ -25,6 +25,7 @@
->  #include <linux/spinlock.h>
->  #include <linux/types.h>
->  #include <kvm/iodev.h>
-> +#include <linux/list.h>
->  
->  #define VGIC_NR_IRQS_LEGACY	256
->  #define VGIC_NR_SGIS		16
-> @@ -162,6 +163,8 @@ struct vgic_its {
->  	u64			cbaser;
->  	int			creadr;
->  	int			cwriter;
-> +	struct list_head	device_list;
-> +	struct list_head	collection_list;
->  };
->  
->  struct vgic_dist {
-> diff --git a/virt/kvm/arm/its-emul.c b/virt/kvm/arm/its-emul.c
-> index b498f06..7f217fa 100644
-> --- a/virt/kvm/arm/its-emul.c
-> +++ b/virt/kvm/arm/its-emul.c
-> @@ -21,6 +21,7 @@
->  #include <linux/kvm.h>
->  #include <linux/kvm_host.h>
->  #include <linux/interrupt.h>
-> +#include <linux/list.h>
->  
->  #include <linux/irqchip/arm-gic-v3.h>
->  #include <kvm/arm_vgic.h>
-> @@ -32,6 +33,25 @@
->  #include "vgic.h"
->  #include "its-emul.h"
->  
-> +struct its_device {
-> +	struct list_head dev_list;
-> +	struct list_head itt;
-> +	u32 device_id;
-> +};
-> +
-> +struct its_collection {
-> +	struct list_head coll_list;
-> +	u32 collection_id;
-> +	u32 target_addr;
-> +};
-> +
-> +struct its_itte {
-> +	struct list_head itte_list;
-> +	struct its_collection *collection;
-> +	u32 lpi;
-> +	u32 event_id;
-> +};
-> +
->  #define BASER_BASE_ADDRESS(x) ((x) & 0xfffffffff000ULL)
->  
->  /* The distributor lock is held by the VGIC MMIO handler. */
-> @@ -311,6 +331,9 @@ int vits_init(struct kvm *kvm)
->  
->  	spin_lock_init(&its->lock);
->  
-> +	INIT_LIST_HEAD(&its->device_list);
-> +	INIT_LIST_HEAD(&its->collection_list);
-> +
->  	its->enabled = false;
->  
->  	return -ENXIO;
-> @@ -320,11 +343,36 @@ void vits_destroy(struct kvm *kvm)
->  {
->  	struct vgic_dist *dist = &kvm->arch.vgic;
->  	struct vgic_its *its = &dist->its;
-> +	struct its_device *dev;
-> +	struct its_itte *itte;
-> +	struct list_head *dev_cur, *dev_temp;
-> +	struct list_head *cur, *temp;
->  
->  	if (!vgic_has_its(kvm))
->  		return;
->  
-> +	if (!its->device_list.next)
-Why not using list_empty? But I think I would simply remove this since
-the empty case if handle below...
-> +		return;
-> +
-> +	spin_lock(&its->lock);
-> +	list_for_each_safe(dev_cur, dev_temp, &its->device_list) {
-> +		dev = container_of(dev_cur, struct its_device, dev_list);
-isn't the usage of list_for_each_entry_safe more synthetic here?
-> +		list_for_each_safe(cur, temp, &dev->itt) {
-> +			itte = (container_of(cur, struct its_itte, itte_list));
-same
+Do you want me to upload to your patch system and, perhaps, keep in
+linux-next for v4.4 merge window ? (too late for v4.3 I guess).
 
-Eric
-> +			list_del(cur);
-> +			kfree(itte);
-> +		}
-> +		list_del(dev_cur);
-> +		kfree(dev);
-> +	}
-> +
-> +	list_for_each_safe(cur, temp, &its->collection_list) {
-> +		list_del(cur);
-> +		kfree(container_of(cur, struct its_collection, coll_list));
-> +	}
-> +
->  	kfree(dist->pendbaser);
->  
->  	its->enabled = false;
-> +	spin_unlock(&its->lock);
->  }
-> 
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150813/67ef08f1/attachment-0001.sig>
