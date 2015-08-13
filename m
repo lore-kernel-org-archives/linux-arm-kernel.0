@@ -1,54 +1,104 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 13 Aug 2015 11:33:21 +0100
-Subject: [PATCH v2 2/6] genirq: fix irqchip_set_wake_parent if
- IRQCHIP_SKIP_SET_WAKE
-In-Reply-To: <55CC68A0.40101@ti.com>
-References: <1439401562-28874-1-git-send-email-grygorii.strashko@ti.com>
- <1439401562-28874-3-git-send-email-grygorii.strashko@ti.com>
- <55CC5B2F.7060503@arm.com> <55CC68A0.40101@ti.com>
-Message-ID: <55CC7271.5040202@arm.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Thu, 13 Aug 2015 16:11:38 +0530
+Subject: [PATCH v2 5/6] mailbox: Add generic mechanism for testing Mailbox
+ Controllers
+In-Reply-To: <20150813102335.GC8782@x1>
+References: <1437990272-23111-1-git-send-email-lee.jones@linaro.org>
+ <1437990272-23111-6-git-send-email-lee.jones@linaro.org>
+ <CABb+yY20nQbiEEZeRvWTMUsJ2qgwRn8CrWvnFDSB-b1dgVaAuw@mail.gmail.com>
+ <20150812102328.GD18282@x1>
+ <CABb+yY0A74Vy3-KOvj0URU_4zb2FAC7Yp3gmEwnFaBrD0mzt0w@mail.gmail.com>
+ <20150813091914.GB8782@x1>
+ <CABb+yY0cgbtM68-E_Xqgh5O6GRLXESYTLa5WcAwUBoVL3ufrxA@mail.gmail.com>
+ <20150813102335.GC8782@x1>
+Message-ID: <CABb+yY3z7p97eOhncQ2i+g6yoYGfDgSN9BDPKmiDaVLa3oPocA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 13/08/15 10:51, Grygorii Strashko wrote:
-> On 08/13/2015 11:54 AM, Sudeep Holla wrote:
->>
->>
->> On 12/08/15 18:45, Grygorii Strashko wrote:
-
-[...]
-
->>> diff --git a/kernel/irq/chip.c b/kernel/irq/chip.c
->>> index 6de638b..bdb1b9d 100644
->>> --- a/kernel/irq/chip.c
->>> +++ b/kernel/irq/chip.c
->>> @@ -1024,6 +1024,10 @@ int irq_chip_set_vcpu_affinity_parent(struct
->>> irq_data *data, void *vcpu_info)
->>>    int irq_chip_set_wake_parent(struct irq_data *data, unsigned int on)
->>>    {
->>>        data = data->parent_data;
->>> +
->>> +    if (irq_data_get_irq_chip(data)->flags & IRQCHIP_SKIP_SET_WAKE)
->>> +        return 0;
->>> +
->>
->> [Nit] I think the irq core can access data->chip directly. Either way,
->> it's better to be consistent, the statement following doesn't use helper
->> function.
+On Thu, Aug 13, 2015 at 3:53 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> On Thu, 13 Aug 2015, Jassi Brar wrote:
 >
-> thanks. I'll change it to:
-> 	if (data->chip->flags & IRQCHIP_SKIP_SET_WAKE)
-> 		return 0;
->
+>> On Thu, Aug 13, 2015 at 2:49 PM, Lee Jones <lee.jones@linaro.org> wrote:
+>> > On Thu, 13 Aug 2015, Jassi Brar wrote:
 >>
->> Otherwise looks good to me.
+>> >> >> > +
+>> >> >> > +static void mbox_test_prepare_message(struct mbox_client *client, void *message)
+>> >> >> > +{
+>> >> >> > +       struct mbox_test_device *tdev = dev_get_drvdata(client->dev);
+>> >> >> > +
+>> >> >> > +       if (tdev->mmio)
+>> >> >> > +               memcpy(tdev->mmio, message, MBOX_MAX_MSG_LEN);
+>> >> >> >
+>> >> >> This is unlikely to work. Those platforms that need to send a 2 part
+>> >> >> message, they do :
+>> >> >> (a) Signal/Command/Target code via some controller register (via
+>> >> >> mbox_send_message).
+>> >> >> (b) Setup the payload in Shared-Memory (via tx_prepare).
+>> >> >>
+>> >> >> This test driver assumes both are the same. I think you have to
+>> >> >> declare something like
+>> >> >
+>> >> > This driver assumes that the framework will call client->tx_prepare()
+>> >> > first, which satisfies (b).  It then assumes controller->send_data()
+>> >> > will be invoked, which will send the platform specific
+>> >> > signal/command/target code, which then satisfies (a).
+>> >> >
+>> >> Yeah, but what would be that code? Who provides that?
+>> >>
+>> >> > In what way does it assume they are the same?
+>> >> >
+>> >> notice the 'message' pointer in
+>> >> mbox_send_message(tdev->tx_channel, message);
+>> >>     and
+>> >> memcpy(tdev->mmio, message, MBOX_MAX_MSG_LEN);
+>> >>
+>> >> >> struct mbox_test_message { /* same for TX and RX */
+>> >> >>           unsigned sig_len;
+>> >> >>           void *signal;               /* rx/tx via mailbox api */
+>> >> >>           unsigned pl_len;
+>> >> >>           void *payload;           /* rx/tx via shared-memory */
+>> >> >> };
+>> >> >
+>> >> > How do you think this should be set and use these?
+>> >> >
+>> >> The userspace would want to specify the command code (32bits or not)
+>> >> that would be passed via the fifo/register of the controller. So we
+>> >> need signal[]
+>> >>
+>> >> The data to be passed via share-memory could be provided by userspace
+>> >> via the payload[] array.
+>> >
+>> > Okay, so would the solution be two userspace files 'signal' and
+>> > 'message', so in the case of a client specified signal we can write it
+>> > into there first.
+>> >
+>> > echo 255  > signal
+>> > echo test > message
+>> >
+>> > ... or in the case where no signal is required, or the controller
+>> > driver taking care of it, we just don't write anything to signal?
+>> >
+>> file_operations.write() should parse signal and message, coming from
+>> userspace, into a local structure before routing them via
+>> mbox_send_message and tx_prepare respectively.
 >
-> Does it means that I can add your Reviewed-by: with above change?
+> Okay.  So before I code this up we should agree on syntax.
 >
+> How would you like to represent the break between signal and message?
+> Obviously ' ' would be a bad idea, as some clients may want to send
+> messages with white space contained.  How about '\t' or '\n'?
+>
+Yeah, I am not a fan of markers and flags either.
 
-Yes you can.
+Maybe we should share with userspace
+  struct mbox_test_message { /* same for TX and RX */
+           unsigned sig_len;
+           void __user *signal;        /* rx/tx via mailbox api */
+           unsigned pl_len;
+           void __user *payload;    /* rx/tx via shared-memory */
+  };
 
-Regards,
-Sudeep
+First copy_from_user the structure of length sizof(struct
+mbox_test_message) and then copy_from_user length sig_len and pl_len
+from signal[] and payload[] respectively (usually ioctls would carry
+such data).
