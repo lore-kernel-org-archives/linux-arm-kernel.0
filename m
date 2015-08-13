@@ -1,104 +1,47 @@
 From: rric@kernel.org (Robert Richter)
-Date: Thu, 13 Aug 2015 16:47:55 +0200
-Subject: [PATCH v2 3/5] irqchip,
- gicv3: Workaround for Cavium ThunderX erratum 23154
-In-Reply-To: <1439477277-6157-1-git-send-email-rric@kernel.org>
-References: <1439477277-6157-1-git-send-email-rric@kernel.org>
-Message-ID: <1439477277-6157-4-git-send-email-rric@kernel.org>
+Date: Thu, 13 Aug 2015 16:47:52 +0200
+Subject: [PATCH v2 0/5] irqchip,
+ gicv3: Updates and Cavium ThunderX errata workarounds
+Message-ID: <1439477277-6157-1-git-send-email-rric@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Robert Richter <rrichter@cavium.com>
 
-This patch implements Cavium ThunderX erratum 23154.
+This patch series adds gicv3 updates and workarounds for HW errata in
+Cavium's ThunderX GICV3.
 
-The gicv3 of ThunderX requires a modified version for reading the IAR
-status to ensure data synchronization. Since this is in the fast-path
-and called with each interrupt, runtime patching is used using jump
-label patching for smallest overhead (no-op). This is the same
-technique as used for tracepoints.
+The first one is an unchanged resubmission of a gicv3 series I sent a
+while ago.
 
-v2:
- * implement code in a single asm() to keep instruction sequence
- * added comment to the code that explains the erratum
- * apply workaround also if running as guest, thus check MIDR
+The next patches implement the workarounds for ThunderX's gicv3. Patch
+#2 adds generic code to parse the hw revision provided by an IIDR or
+MIDR register value and runs specific code if hw matches. This is used
+to implement the actual errata fixes in patch #3 (gicv3) and #5
+(gicv3-its). Patch #4 prerequisit for patch #5.
 
-Signed-off-by: Robert Richter <rrichter@cavium.com>
----
- drivers/irqchip/irq-gic-v3.c | 45 +++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 44 insertions(+), 1 deletion(-)
+All current review comments addressed so far with V2.
 
-diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-index 1a91902be0b1..2f80a11621a0 100644
---- a/drivers/irqchip/irq-gic-v3.c
-+++ b/drivers/irqchip/irq-gic-v3.c
-@@ -107,7 +107,7 @@ static void gic_redist_wait_for_rwp(void)
- }
- 
- /* Low level accessors */
--static u64 __maybe_unused gic_read_iar(void)
-+static u64 gic_read_iar_common(void)
- {
- 	u64 irqstat;
- 
-@@ -115,6 +115,38 @@ static u64 __maybe_unused gic_read_iar(void)
- 	return irqstat;
- }
- 
-+/*
-+ * Cavium ThunderX erratum 23154
-+ *
-+ * The gicv3 of ThunderX requires a modified version for reading the
-+ * IAR status to ensure data synchronization (access to icc_iar1_el1
-+ * is not sync'ed before and after).
-+ */
-+static u64 gic_read_iar_cavium_thunderx(void)
-+{
-+	u64 irqstat;
-+
-+	asm volatile(
-+		"nop;nop;nop;nop\n\t"
-+		"nop;nop;nop;nop\n\t"
-+		"mrs_s %0, " __stringify(ICC_IAR1_EL1) "\n\t"
-+		"nop;nop;nop;nop"
-+		: "=r" (irqstat));
-+	mb();
-+
-+	return irqstat;
-+}
-+
-+struct static_key is_cavium_thunderx = STATIC_KEY_INIT_FALSE;
-+
-+static u64 __maybe_unused gic_read_iar(void)
-+{
-+	if (static_key_false(&is_cavium_thunderx))
-+		return gic_read_iar_common();
-+	else
-+		return gic_read_iar_cavium_thunderx();
-+}
-+
- static void __maybe_unused gic_write_pmr(u64 val)
- {
- 	asm volatile("msr_s " __stringify(ICC_PMR_EL1) ", %0" : : "r" (val));
-@@ -766,8 +798,19 @@ static const struct irq_domain_ops gic_irq_domain_ops = {
- 	.free = gic_irq_domain_free,
- };
- 
-+static void gicv3_enable_cavium_thunderx(void *data)
-+{
-+	static_key_slow_inc(&is_cavium_thunderx);
-+}
-+
- static const struct gic_capabilities gicv3_errata[] = {
- 	{
-+		.desc		= "GIC: Cavium erratum 23154",
-+		.iidr		= 0xa100034c,	/* ThunderX pass 1.x */
-+		.iidr_mask	= 0xffff0fff,
-+		.init		= gicv3_enable_cavium_thunderx,
-+	},
-+	{
- 	}
- };
- 
+V2:
+ * Workaround for 23154:
+   * implement code in a single asm() to keep instruction sequence
+   * added comment to the code that explains the erratum
+   * apply workaround also if running as guest, thus check MIDR
+ * adding MIDR check
+
+Robert Richter (5):
+  arm64: gicv3: its: Add range check for number of allocated pages
+  irqchip, gicv3: Add HW revision detection and configuration
+  irqchip, gicv3: Workaround for Cavium ThunderX erratum 23154
+  irqchip, gicv3-its: Read typer register outside the loop
+  irqchip, gicv3-its: Workaround for Cavium ThunderX errata 22375, 24313
+
+ drivers/irqchip/irq-gic-common.c   | 13 ++++++++
+ drivers/irqchip/irq-gic-common.h   | 11 +++++++
+ drivers/irqchip/irq-gic-v3-its.c   | 66 ++++++++++++++++++++++++++++++++++----
+ drivers/irqchip/irq-gic-v3.c       | 59 +++++++++++++++++++++++++++++++++-
+ include/linux/irqchip/arm-gic-v3.h |  1 +
+ 5 files changed, 143 insertions(+), 7 deletions(-)
+
 -- 
 2.1.1
