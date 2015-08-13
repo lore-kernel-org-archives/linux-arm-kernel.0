@@ -1,69 +1,182 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 13 Aug 2015 10:58:44 +0200
-Subject: [linux-sunxi] [PATCH v2] pinctrl: sun4i: add spdif to pin
- description.
-In-Reply-To: <1439400468-1563-2-git-send-email-codekipper@gmail.com>
-References: <1439400468-1563-1-git-send-email-codekipper@gmail.com>
- <1439400468-1563-2-git-send-email-codekipper@gmail.com>
-Message-ID: <55CC5C44.5060507@redhat.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 13 Aug 2015 10:01:17 +0100
+Subject: [PATCH 2/2] Convert smsc911x to use ACPI as well as DT
+In-Reply-To: <20150813082759.GB5468@xora-haswell.xora.org.uk>
+References: <1439417187-21411-1-git-send-email-jeremy.linton@arm.com>
+ <1439417187-21411-3-git-send-email-jeremy.linton@arm.com>
+ <20150813082759.GB5468@xora-haswell.xora.org.uk>
+Message-ID: <20150813090117.GA13833@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Aug 13, 2015 at 09:27:59AM +0100, Graeme Gregory wrote:
+> On Wed, Aug 12, 2015 at 05:06:27PM -0500, Jeremy Linton wrote:
+> > Add ACPI bindings for the smsc911x driver. Convert the DT specific calls
+> > to nonspecific device* calls, This allows the driver to work
+> > with both ACPI and DT configurations. Ethernet should now work when using
+> > ACPI on ARM Juno.
 
-On 12-08-15 19:27, codekipper at gmail.com wrote:
-> From: Marcus Cooper <codekipper@gmail.com>
->
-> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+Last sentence does not belong in the commit log.
 
-LGTM:
+> > 
+> > Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+> 
+> The code looks fine to me.
+> 
+> Currently the compulsary DT properties seem to match the "approved" ACPI
+> NIC properties from here
+> 
+> http://www.uefi.org/sites/default/files/resources/nic-request-v2.pdf
 
-Reviewed-by: Hans de Goede <hdegoede@redhat.com>
+What about _DSD device specific properties (eg "smsc,save-mac-address") ?
+Are we taking 1:1 translation between DT and ACPI for granted ?
 
-Regards,
+I thought some process must be put in place to define the corresponding
+bindings in ACPI before starting this mechanical translation or maybe
+I missed something, I would like to understand.
 
-Hans
+How does the device specific _DSD definitions work in ACPI world ? Where
+are they published ? How will we translate those to DT bindings if there
+is need ?
 
-> ---
->   drivers/pinctrl/sunxi/pinctrl-sun4i-a10.c | 17 ++++++++++++++---
->   1 file changed, 14 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/pinctrl/sunxi/pinctrl-sun4i-a10.c b/drivers/pinctrl/sunxi/pinctrl-sun4i-a10.c
-> index 7376a97..862a096 100644
-> --- a/drivers/pinctrl/sunxi/pinctrl-sun4i-a10.c
-> +++ b/drivers/pinctrl/sunxi/pinctrl-sun4i-a10.c
-> @@ -135,7 +135,14 @@ static const struct sunxi_desc_pin sun4i_a10_pins[] = {
->   	SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 3),
->   		  SUNXI_FUNCTION(0x0, "gpio_in"),
->   		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> -		  SUNXI_FUNCTION(0x2, "ir0")),		/* TX */
-> +		  SUNXI_FUNCTION(0x2, "ir0"),		/* TX */
-> +		/*
-> +		 * The SPDIF block is not referenced at all in the A10 user
-> +		 * manual. However it is described in the code leaked and the
-> +		 * pin descriptions are declared in the A20 user manual which
-> +		 * is pin compatible with this device.
-> +		 */
-> +		  SUNXI_FUNCTION(0x4, "spdif")),        /* SPDIF MCLK */
->   	SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 4),
->   		  SUNXI_FUNCTION(0x0, "gpio_in"),
->   		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> @@ -176,11 +183,15 @@ static const struct sunxi_desc_pin sun4i_a10_pins[] = {
->   		  SUNXI_FUNCTION(0x0, "gpio_in"),
->   		  SUNXI_FUNCTION(0x1, "gpio_out"),
->   		  SUNXI_FUNCTION(0x2, "i2s"),		/* DI */
-> -		  SUNXI_FUNCTION(0x3, "ac97")),		/* DI */
-> +		  SUNXI_FUNCTION(0x3, "ac97"),		/* DI */
-> +		/* Undocumented mux function - See SPDIF MCLK above */
-> +		  SUNXI_FUNCTION(0x4, "spdif")),        /* SPDIF IN */
->   	SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 13),
->   		  SUNXI_FUNCTION(0x0, "gpio_in"),
->   		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> -		  SUNXI_FUNCTION(0x2, "spi2")),		/* CS1 */
-> +		  SUNXI_FUNCTION(0x2, "spi2"),		/* CS1 */
-> +		/* Undocumented mux function - See SPDIF MCLK above */
-> +		  SUNXI_FUNCTION(0x4, "spdif")),        /* SPDIF OUT */
->   	SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 14),
->   		  SUNXI_FUNCTION(0x0, "gpio_in"),
->   		  SUNXI_FUNCTION(0x1, "gpio_out"),
->
+Lorenzo
+
+> Reviewed-by: Graeme Gregory <graeme.gregory@linaro.org>
+> 
+> Thanks
+> 
+> > ---
+> >  drivers/net/ethernet/smsc/smsc911x.c | 48 +++++++++++++++++-------------------
+> >  1 file changed, 22 insertions(+), 26 deletions(-)
+> > 
+> > diff --git a/drivers/net/ethernet/smsc/smsc911x.c b/drivers/net/ethernet/smsc/smsc911x.c
+> > index 959aeea..0f21aa3 100644
+> > --- a/drivers/net/ethernet/smsc/smsc911x.c
+> > +++ b/drivers/net/ethernet/smsc/smsc911x.c
+> > @@ -59,7 +59,9 @@
+> >  #include <linux/of_device.h>
+> >  #include <linux/of_gpio.h>
+> >  #include <linux/of_net.h>
+> > +#include <linux/acpi.h>
+> >  #include <linux/pm_runtime.h>
+> > +#include <linux/property.h>
+> >  
+> >  #include "smsc911x.h"
+> >  
+> > @@ -2362,59 +2364,46 @@ static const struct smsc911x_ops shifted_smsc911x_ops = {
+> >  	.tx_writefifo = smsc911x_tx_writefifo_shift,
+> >  };
+> >  
+> > -#ifdef CONFIG_OF
+> > -static int smsc911x_probe_config_dt(struct smsc911x_platform_config *config,
+> > -				    struct device_node *np)
+> > +static int smsc911x_probe_config(struct smsc911x_platform_config *config,
+> > +				 struct device *dev)
+> >  {
+> > -	const char *mac;
+> >  	u32 width = 0;
+> >  
+> > -	if (!np)
+> > +	if (!dev)
+> >  		return -ENODEV;
+> >  
+> > -	config->phy_interface = of_get_phy_mode(np);
+> > +	config->phy_interface = device_get_phy_mode(dev);
+> >  
+> > -	mac = of_get_mac_address(np);
+> > -	if (mac)
+> > -		memcpy(config->mac, mac, ETH_ALEN);
+> > +	device_get_mac_address(dev, config->mac, ETH_ALEN);
+> >  
+> > -	of_property_read_u32(np, "reg-shift", &config->shift);
+> > +	device_property_read_u32(dev, "reg-shift", &config->shift);
+> >  
+> > -	of_property_read_u32(np, "reg-io-width", &width);
+> > +	device_property_read_u32(dev, "reg-io-width", &width);
+> >  	if (width == 4)
+> >  		config->flags |= SMSC911X_USE_32BIT;
+> >  	else
+> >  		config->flags |= SMSC911X_USE_16BIT;
+> >  
+> > -	if (of_get_property(np, "smsc,irq-active-high", NULL))
+> > +	if (device_property_present(dev, "smsc,irq-active-high"))
+> >  		config->irq_polarity = SMSC911X_IRQ_POLARITY_ACTIVE_HIGH;
+> >  
+> > -	if (of_get_property(np, "smsc,irq-push-pull", NULL))
+> > +	if (device_property_present(dev, "smsc,irq-push-pull"))
+> >  		config->irq_type = SMSC911X_IRQ_TYPE_PUSH_PULL;
+> >  
+> > -	if (of_get_property(np, "smsc,force-internal-phy", NULL))
+> > +	if (device_property_present(dev, "smsc,force-internal-phy"))
+> >  		config->flags |= SMSC911X_FORCE_INTERNAL_PHY;
+> >  
+> > -	if (of_get_property(np, "smsc,force-external-phy", NULL))
+> > +	if (device_property_present(dev, "smsc,force-external-phy"))
+> >  		config->flags |= SMSC911X_FORCE_EXTERNAL_PHY;
+> >  
+> > -	if (of_get_property(np, "smsc,save-mac-address", NULL))
+> > +	if (device_property_present(dev, "smsc,save-mac-address"))
+> >  		config->flags |= SMSC911X_SAVE_MAC_ADDRESS;
+> >  
+> >  	return 0;
+> >  }
+> > -#else
+> > -static inline int smsc911x_probe_config_dt(
+> > -				struct smsc911x_platform_config *config,
+> > -				struct device_node *np)
+> > -{
+> > -	return -ENODEV;
+> > -}
+> > -#endif /* CONFIG_OF */
+> >  
+> >  static int smsc911x_drv_probe(struct platform_device *pdev)
+> >  {
+> > -	struct device_node *np = pdev->dev.of_node;
+> >  	struct net_device *dev;
+> >  	struct smsc911x_data *pdata;
+> >  	struct smsc911x_platform_config *config = dev_get_platdata(&pdev->dev);
+> > @@ -2478,7 +2467,7 @@ static int smsc911x_drv_probe(struct platform_device *pdev)
+> >  		goto out_disable_resources;
+> >  	}
+> >  
+> > -	retval = smsc911x_probe_config_dt(&pdata->config, np);
+> > +	retval = smsc911x_probe_config(&pdata->config, &pdev->dev);
+> >  	if (retval && config) {
+> >  		/* copy config parameters across to pdata */
+> >  		memcpy(&pdata->config, config, sizeof(pdata->config));
+> > @@ -2654,6 +2643,12 @@ static const struct of_device_id smsc911x_dt_ids[] = {
+> >  MODULE_DEVICE_TABLE(of, smsc911x_dt_ids);
+> >  #endif
+> >  
+> > +static const struct acpi_device_id smsc911x_acpi_match[] = {
+> > +	{ "ARMH9118", 0 },
+> > +	{ }
+> > +};
+> > +MODULE_DEVICE_TABLE(acpi, smsc911x_acpi_match);
+> > +
+> >  static struct platform_driver smsc911x_driver = {
+> >  	.probe = smsc911x_drv_probe,
+> >  	.remove = smsc911x_drv_remove,
+> > @@ -2661,6 +2656,7 @@ static struct platform_driver smsc911x_driver = {
+> >  		.name	= SMSC_CHIPNAME,
+> >  		.pm	= SMSC911X_PM_OPS,
+> >  		.of_match_table = of_match_ptr(smsc911x_dt_ids),
+> > +		.acpi_match_table = ACPI_PTR(smsc911x_acpi_match),
+> >  	},
+> >  };
+> >  
+> > -- 
+> > 2.4.3
+> > 
+> > 
+> > 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
