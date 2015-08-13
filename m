@@ -1,82 +1,103 @@
-From: gg@slimlogic.co.uk (Graeme Gregory)
-Date: Thu, 13 Aug 2015 13:25:13 +0100
-Subject: [PATCH 1/2] drivers: PL061: add support for platform driver
- probing
-In-Reply-To: <CACRpkdYmeXvXCrJPxCJCDfCG_=MmopmyAe5mgCPoB_S02ERTLg@mail.gmail.com>
-References: <1438585198-8764-1-git-send-email-zhaoshenglong@huawei.com>
- <1438585198-8764-2-git-send-email-zhaoshenglong@huawei.com>
- <CACRpkdY6ZfB-gnnr49He+BYELy4fhiV0g5jkEHhyVsJOc_SBFw@mail.gmail.com>
- <1438614811.2338188.346456017.5D258EC5@webmail.messagingengine.com>
- <CACRpkdYmeXvXCrJPxCJCDfCG_=MmopmyAe5mgCPoB_S02ERTLg@mail.gmail.com>
-Message-ID: <1439468713.1661643.355247625.1CF96E47@webmail.messagingengine.com>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Thu, 13 Aug 2015 13:28:28 +0100
+Subject: [PATCH 12/14] arm64: Check for selected granule support
+In-Reply-To: <1439465645-22584-13-git-send-email-suzuki.poulose@arm.com>
+References: <1439465645-22584-1-git-send-email-suzuki.poulose@arm.com>
+ <1439465645-22584-13-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <CAPvkgC3=S1BxdzZM4uUOmyXLjii48SMpCof6i6HdNeTG_fydfg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 13 August 2015 at 12:34, Suzuki K. Poulose <suzuki.poulose@arm.com> wrote:
+> From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
+>
+> Ensure that the selected page size is supported by the
+> CPU(s).
+>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
+> ---
+>  arch/arm64/include/asm/sysreg.h |    6 ++++++
+>  arch/arm64/kernel/head.S        |   24 +++++++++++++++++++++++-
+>  2 files changed, 29 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+> index a7f3d4b..e01d323 100644
+> --- a/arch/arm64/include/asm/sysreg.h
+> +++ b/arch/arm64/include/asm/sysreg.h
+> @@ -87,4 +87,10 @@ static inline void config_sctlr_el1(u32 clear, u32 set)
+>  }
+>  #endif
+>
+> +#define ID_AA64MMFR0_TGran4_SHIFT      28
+> +#define ID_AA64MMFR0_TGran64_SHIFT     24
+> +
+> +#define ID_AA64MMFR0_TGran4_ENABLED    0x0
+> +#define ID_AA64MMFR0_TGran64_ENABLED   0x0
+> +
+>  #endif /* __ASM_SYSREG_H */
+> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+> index 01b8e58..0cb04db 100644
+> --- a/arch/arm64/kernel/head.S
+> +++ b/arch/arm64/kernel/head.S
+> @@ -31,10 +31,11 @@
+>  #include <asm/cputype.h>
+>  #include <asm/kernel-pgtable.h>
+>  #include <asm/memory.h>
+> -#include <asm/thread_info.h>
+>  #include <asm/pgtable-hwdef.h>
+>  #include <asm/pgtable.h>
+>  #include <asm/page.h>
+> +#include <asm/sysreg.h>
+> +#include <asm/thread_info.h>
+>  #include <asm/virt.h>
+>
+>  #define __PHYS_OFFSET  (KERNEL_START - TEXT_OFFSET)
+> @@ -606,9 +607,25 @@ ENDPROC(__secondary_switched)
+>   *  x27 = *virtual* address to jump to upon completion
+>   *
+>   * other registers depend on the function called upon completion
+> + * Checks if the selected granule size is supported by the CPU.
+>   */
+> +#if    defined(CONFIG_ARM64_64K_PAGES)
+> +
+> +#define ID_AA64MMFR0_TGran_SHIFT       ID_AA64MMFR0_TGran64_SHIFT
+> +#define ID_AA64MMFR0_TGran_ENABLED     ID_AA64MMFR0_TGran64_ENABLED
+> +
+> +#else
+> +
+> +#define ID_AA64MMFR0_TGran_SHIFT       ID_AA64MMFR0_TGran4_SHIFT
+> +#define ID_AA64MMFR0_TGran_ENABLED     ID_AA64MMFR0_TGran4_ENABLED
+> +
+> +#endif
+>         .section        ".idmap.text", "ax"
+>  __enable_mmu:
+> +       mrs     x1, ID_AA64MMFR0_EL1
+> +       ubfx    x2, x1, #ID_AA64MMFR0_TGran_SHIFT, 4
+> +       cmp     x2, #ID_AA64MMFR0_TGran_ENABLED
+> +       b.ne    __no_granule_support
+>         ldr     x5, =vectors
+>         msr     vbar_el1, x5
+>         msr     ttbr0_el1, x25                  // load TTBR0
+> @@ -626,3 +643,8 @@ __enable_mmu:
+>         isb
+>         br      x27
+>  ENDPROC(__enable_mmu)
+> +
+> +__no_granule_support:
+> +       wfe
+> +       b __no_granule_support
+> +ENDPROC(__no_granule_support)
+> --
+> 1.7.9.5
+>
 
+Hi Suzuki,
+Is is possible to tell the user that the kernel has failed to boot due
+to the kernel granule being unsupported?
 
-On Thu, 13 Aug 2015, at 01:14 PM, Linus Walleij wrote:
-> On Mon, Aug 3, 2015 at 5:13 PM, Graeme Gregory <gg@slimlogic.co.uk>
-> wrote:
-> > On Mon, 3 Aug 2015, at 01:40 PM, Linus Walleij wrote:
-> >> On Mon, Aug 3, 2015 at 8:59 AM, Shannon Zhao <zhaoshenglong@huawei.com>
-> >> wrote:
-> >>
-> >> > From: Shannon Zhao <shannon.zhao@linaro.org>
-> >> >
-> >> > Since PL061 currently only supports AMBA driver, to support using GPIO
-> >> > PL061 by DT or ACPI, it needs to add support for platform driver.
-> >> > A DT binding is provided with this patch, ACPI support is added in a
-> >> > separate one.
-> >> >
-> >> > Signed-off-by: Shannon Zhao <zhaoshenglong@huawei.com>
-> >> > Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> >>
-> >> I already stated in 0/2 what the problem is with this, and it's obviously
-> >> adding
-> >> a huge codechunk, very similar to the AMBA probe path.
-> >>
-> >> We need to investigate if ACPI can just spawn AMBA/PrimeCell type devices
-> >> instead.
-> >
-> > AMBA DT support is a hideous hack, we had kind of hoped to avoid doing
-> > that in ACPI.
-> 
-> Define what you mean with "hideous hack".
-> 
-drivers/of/platform.c search for #ifdef CONFIG_ARM_AMBA
-
-> I think it is elegant. It combines the DT aspect of telling where the
-> device is with the Plug-and-play aspect of reading the 0xB105F00D
-> magic in the PrimeCells very nicely. With an optional override
-> mechanism. It's nice.
-> 
-> The runtime PM stuff and pclk handling that Russell and also Ulf
-> has worked on is very helpful and takes out a lot of codelines
-> in a lot of drivers. Also very nice.
-> 
-I have no objection to AMBA devices that are children of an AMBA bus
-object. Its the hack above that is nasty!  It is also un-scalable as it
-sets the precedent that the platform.c in both DT and ACPI should learn
-about all the different types of device probing.
-
-> > If you notice ARM already updated pl011 driver to support platform
-> > device type probing this seems to be the way to go.
-> 
-> Just because there is a precedent does not mean it is good.
-> 
-> Continuing with this adds 100+ lines of hairy initialization to
-> every AMBA driver.
-> 
-> What needs to happen is stop this and make ACPI spawn
-> AMBA devices for PrimeCells, and move the serial port over
-> to that.
-> 
-> A compromise may be to have something that probes a list
-> of these platform devices in drivers/acpi/ and spawn a
-> corresponding AMBA device for it. It will still save codelines in
-> all other subsystems and lower maintenance for the
-> subsystem maintainers.
-> 
-I am currently working on exactly what you describe above.
-
-Graeme
+Cheers,
+--
+Steve
