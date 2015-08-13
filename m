@@ -1,112 +1,52 @@
 From: kgene@kernel.org (Kukjin Kim)
-Date: Fri, 14 Aug 2015 03:42:31 +0900
-Subject: [GIT PULL v2 0/5] Samsung updates for v4.3
-Message-ID: <55CCE517.2070003@kernel.org>
+Date: Fri, 14 Aug 2015 03:48:37 +0900
+Subject: [GIT PULL v2 1/5] Samsung clk driver updates for v4.3
+In-Reply-To: <55CCE517.2070003@kernel.org>
+References: <55CCE517.2070003@kernel.org>
+Message-ID: <55CCE685.40501@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Arnd, Olof, Kevin
+The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
 
-Here is re-spin of pull request for Samsung stuff for v4.3 as per Olof's
-suggestion.
+  Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
 
-Most of this pull-requests are to switch to support generic cpufreq
-driver for exynos3250, 4210, 4412 and 5250 and several exynos dt updates.
+are available in the git repository at:
 
-Note as I commented in each tag, each pull-request(signed tag) has a
-dependency with each other, so please keep the ordering in this time.
+  git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+tags/samsung-clk-driver
 
-1) tags/samsung-clk-driver
-2) tags/samsung-late-dt
-3) tags/samsung-soc
-4) tags/samsung-late-cpufreq-driver
-5) tags/samsung-defconfig-new
+for you to fetch changes up to cd6aceef028afc3fa216e3e7bc94cc31632cad43:
 
-If any problems, please kindly let me know.
+  clk: exynos4x12: add cpu clock configuration data and instantiate cpu
+clock (2015-08-14 02:00:43 +0900)
 
-Thanks,
-Kukjin
+----------------------------------------------------------------
+Samsung clk driver updates for v4.3
 
-Alexis Ballier (1):
-      ARM: dts: enable SPI1 for exynos4412-odroidu3
+- add cpu clock configuration data and instantiate cpu clock
+  for exynos3250, 4210, 4412 and 5250 SoCs to support Samsung
+  specific cpu-clock type
 
-Anand Moon (1):
-      ARM: exynos_defconfig: Enable CONFIG_SND_SOC_ODROIDX2 for Odroid-XU3
+* Note this branch has been provided to clk tree as a topic branch
 
-Bartlomiej Zolnierkiewicz (5):
-      cpufreq: exynos: remove exynos5250 specific cpufreq driver support
+----------------------------------------------------------------
+Bartlomiej Zolnierkiewicz (1):
       clk: exynos4x12: add cpu clock configuration data and instantiate
 cpu clock
-      cpufreq: exynos: remove Exynos4x12 specific cpufreq driver support
-      ARM: dts: add CPU OPP and regulator supply property for exynos4x12
-      ARM: EXYNOS: switch to using generic cpufreq driver for exynos4x12
 
-Chanho Park (1):
-      ARM: dts: add exynos5422-cpus.dtsi to correct cpu order
-
-Chanwoo Choi (4):
+Chanwoo Choi (1):
       clk: exynos3250: Add cpu clock configuration data and instaniate
 cpu clock
-      ARM: EXYNOS: Add exynos3250 compatible to use generic cpufreq driver
-      ARM: dts: Add CPU OPP and regulator supply property for exynos3250
-      ARM: dts: Add CPU cooling binding for exynos3250 boards
 
-Javier Martinez Canillas (4):
-      ARM: multi_v7_defconfig: Remove old Samsung USB PHY configs
-      ARM: multi_v7_defconfig: Enable NTC Thermistors support
-      ARM: exynos_defconfig: Enable NTC Thermistors support
-      ARM: multi_v7_defconfig: Enable max77802 regulator
-
-Jonas Rabenstein (1):
-      cpufreq: exynos: Remove unselectable rule for arm-exynos-cpufreq.o
-
-Krzysztof Kozlowski (1):
-      ARM: exynos_defconfig: Enable cpufreq-dt driver
-
-Marek Szyprowski (1):
-      ARM: dts: add iommu property to JPEG device for exynos4
-
-Michal Suchanek (1):
-      ARM: dts: Add SPI CS on exynos5250-snow
-
-Thomas Abraham (3):
+Thomas Abraham (1):
       clk: exynos5250: add cpu clock configuration data and instantiate
 cpu clock
-      ARM: EXYNOS: switch to using generic cpufreq driver for exynos5250
-      ARM: dts: add CPU OPP and regulator supply property for exynos5250
 
- arch/arm/boot/dts/exynos3250-monk.dts              |  19 ++
- arch/arm/boot/dts/exynos3250-rinato.dts            |  19 ++
- arch/arm/boot/dts/exynos3250.dtsi                  |  16 ++
- arch/arm/boot/dts/exynos4.dtsi                     |   1 +
- arch/arm/boot/dts/exynos4212.dtsi                  |  81 +++++++
- arch/arm/boot/dts/exynos4412-odroid-common.dtsi    |   4 +
- arch/arm/boot/dts/exynos4412-odroidu3.dts          |   8 +
- arch/arm/boot/dts/exynos4412-origen.dts            |   4 +
- arch/arm/boot/dts/exynos4412-trats2.dts            |   4 +
- arch/arm/boot/dts/exynos4412.dtsi                  |  83 ++++++++
- arch/arm/boot/dts/exynos5250-arndale.dts           |   4 +
- arch/arm/boot/dts/exynos5250-smdk5250.dts          |   4 +
- arch/arm/boot/dts/exynos5250-snow.dts              |   5 +
- arch/arm/boot/dts/exynos5250-spring.dts            |   4 +
- arch/arm/boot/dts/exynos5250.dtsi                  |  22 ++
- arch/arm/boot/dts/exynos5422-cpus.dtsi             |  81 +++++++
- arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi |   1 +
- arch/arm/configs/exynos_defconfig                  |   5 +
- arch/arm/configs/multi_v7_defconfig                |   5 +-
- arch/arm/mach-exynos/Kconfig                       |   2 +
- arch/arm/mach-exynos/exynos.c                      |   4 +
- drivers/clk/samsung/clk-exynos3250.c               |  32 ++-
- drivers/clk/samsung/clk-exynos4.c                  |  50 +++++
- drivers/clk/samsung/clk-exynos5250.c               |  31 +++
- drivers/cpufreq/Kconfig.arm                        |  49 -----
- drivers/cpufreq/Makefile                           |   4 -
- drivers/cpufreq/exynos-cpufreq.c                   | 237
----------------------
- drivers/cpufreq/exynos-cpufreq.h                   |  89 --------
- drivers/cpufreq/exynos4x12-cpufreq.c               | 236
---------------------
- drivers/cpufreq/exynos5250-cpufreq.c               | 210 ------------------
- include/dt-bindings/clock/exynos3250.h             |   1 +
- include/dt-bindings/clock/exynos5250.h             |   1 +
- 32 files changed, 487 insertions(+), 829 deletions(-)
+ drivers/clk/samsung/clk-exynos3250.c   | 32 ++++++++++++++++++++--
+ drivers/clk/samsung/clk-exynos4.c      | 50
+++++++++++++++++++++++++++++++++++
+ drivers/clk/samsung/clk-exynos5250.c   | 31 +++++++++++++++++++++
+ include/dt-bindings/clock/exynos3250.h |  1 +
+ include/dt-bindings/clock/exynos5250.h |  1 +
+ 5 files changed, 113 insertions(+), 2 deletions(-)
