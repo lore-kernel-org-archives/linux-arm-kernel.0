@@ -1,35 +1,49 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Thu, 13 Aug 2015 10:15:37 +0200
-Subject: [PATCH v3 1/4] edac: Add an function to retrieve the EDAC
- debugfs node
-In-Reply-To: <CAPw-ZTkfAxqG6HQHU3WomrqRwXa+jyTWCg=ns1HKC323ds1yug@mail.gmail.com>
-References: <1439326077-25507-1-git-send-email-lho@apm.com>
- <1439326077-25507-2-git-send-email-lho@apm.com>
- <20150812101219.GC14011@nazgul.tnic>
- <20150812104954.GD14011@nazgul.tnic>
- <CAPw-ZT=AFtyLt4CNGBzLZcdPr-ekJpQxKA4Y_AiDzqKfhF1-=w@mail.gmail.com>
- <CAPw-ZTkfAxqG6HQHU3WomrqRwXa+jyTWCg=ns1HKC323ds1yug@mail.gmail.com>
-Message-ID: <20150813081537.GB20004@nazgul.tnic>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Thu, 13 Aug 2015 10:16:41 +0200
+Subject: [PATCH 0/2] x86/KASAN updates for 4.3
+In-Reply-To: <20150813065040.GA17983@gmail.com>
+References: <1439444244-26057-1-git-send-email-ryabinin.a.a@gmail.com>
+ <20150813065040.GA17983@gmail.com>
+Message-ID: <20150813081641.GA14402@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 12, 2015 at 09:30:58PM -0700, Loc Ho wrote:
-> Okay... The 'inline' helps with the compiler warning. If I move all to
-> header file with 'static inline' and wrapper around CONFIG_EDAC_DEBUG,
-> don't I need to export and declare the variable 'edac_debugfs'? Are
-> you okay with export this variable?
 
-You need to make edac_debugfs extern in the header and define it in
-edac_mc_sysfs.c.
+* Ingo Molnar <mingo@kernel.org> wrote:
 
-But that's ok because edac_core.h will be included only by EDAC drivers
-and they're supposed to see edac_debugfs anyway...
+> 
+> * Andrey Ryabinin <ryabinin.a.a@gmail.com> wrote:
+> 
+> > These 2 patches taken from v5 'KASAN for arm64' series.
+> > The only change is updated changelog in second patch.
+> > 
+> > I hope this is not too late to queue these for 4.3,
+> > as this allow us to merge arm64/KASAN patches in v4.4
+> > through arm64 tree.
+> > 
+> > Andrey Ryabinin (2):
+> >   x86/kasan: define KASAN_SHADOW_OFFSET per architecture
+> >   x86/kasan, mm: introduce generic kasan_populate_zero_shadow()
+> > 
+> >  arch/x86/include/asm/kasan.h |   3 +
+> >  arch/x86/mm/kasan_init_64.c  | 123 ++--------------------------------
+> >  include/linux/kasan.h        |  10 ++-
+> >  mm/kasan/Makefile            |   2 +-
+> >  mm/kasan/kasan_init.c        | 152 +++++++++++++++++++++++++++++++++++++++++++
+> >  5 files changed, 170 insertions(+), 120 deletions(-)
+> >  create mode 100644 mm/kasan/kasan_init.c
+> 
+> It's absolutely too late in the -rc cycle for v4.3!
 
-Thanks.
+Stupid me, I have read 'v4.2' ...
 
--- 
-Regards/Gruss,
-    Boris.
+So yes, it's still good for v4.3, the development window is still open.
 
-ECO tip #101: Trim your mails when you reply.
---
+The rest still stands:
+
+> I can create a stable topic tree for it, tip:mm/kasan or so, which arm64 could 
+> pull and base its own ARM specific work on, if that's OK with everyone.
+
+Thanks,
+
+	Ingo
