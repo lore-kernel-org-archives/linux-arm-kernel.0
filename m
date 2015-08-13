@@ -1,46 +1,73 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Thu, 13 Aug 2015 10:52:01 +0200
-Subject: [PATCH v3 1/4] edac: Add an function to retrieve the EDAC
- debugfs node
-In-Reply-To: <20150813104150.2c084a8c@ipc1.ka-ro>
-References: <1439326077-25507-1-git-send-email-lho@apm.com>
- <1439326077-25507-2-git-send-email-lho@apm.com>
- <20150812101219.GC14011@nazgul.tnic>
- <20150812104954.GD14011@nazgul.tnic>
- <CAPw-ZT=AFtyLt4CNGBzLZcdPr-ekJpQxKA4Y_AiDzqKfhF1-=w@mail.gmail.com>
- <CAPw-ZTkfAxqG6HQHU3WomrqRwXa+jyTWCg=ns1HKC323ds1yug@mail.gmail.com>
- <20150813081537.GB20004@nazgul.tnic>
- <20150813104150.2c084a8c@ipc1.ka-ro>
-Message-ID: <20150813085201.GC20004@nazgul.tnic>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 13 Aug 2015 09:54:07 +0100
+Subject: [PATCH v2 2/6] genirq: fix irqchip_set_wake_parent if
+ IRQCHIP_SKIP_SET_WAKE
+In-Reply-To: <1439401562-28874-3-git-send-email-grygorii.strashko@ti.com>
+References: <1439401562-28874-1-git-send-email-grygorii.strashko@ti.com>
+ <1439401562-28874-3-git-send-email-grygorii.strashko@ti.com>
+Message-ID: <55CC5B2F.7060503@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 13, 2015 at 10:41:50AM +0200, Lothar Wa?mann wrote:
-> What's the point in having an accessor function that returns a driver
-> internal variable when this variable is exported anyway?
 
-Not driver-internal but EDAC-core internal.
 
-> This will only further inconsistencies because half of the users will
-> use the variable directly and the other half will use the accessor
-> function.
+On 12/08/15 18:45, Grygorii Strashko wrote:
+> The irqchip_set_wake_parent should not fail if IRQ chip
+> specifies IRQCHIP_SKIP_SET_WAKE. Otherwise, IRQ wakeup
+> configuration can't be propagated properly through IRQ
+> domains hierarchy.
+>
+> In case of TI OMAP DRA7 the issue reproduced with following
+> configuration:
+> ARM GIC<-OMAP wakeupgen<-TI CBAR<-GPIO<-GPIO pcf857x<-gpio_key
+>
+> gpio_key is wakeup source
+>
+> Failure is reproduced during suspend/resume to RAM:
+> suspend:
+>   - gpio_keys_suspend
+>     enable_irq_wake
+>       + pcf857x_irq_set_wake
+>         + omap_gpio_wake_enable
+>           + TI CBAR irq_chip_set_wake_parent
+>             + OMAP wakeupgen has no .irq_set_wake()
+>             and -ENOSYS will be returned
+>
+> resume:
+>   - gpio_keys_resume
+>     + disable_irq_wake
+>       + irq_set_irq_wake
+>         + WARN(1, "Unbalanced IRQ %d wake disable\n", irq);
+>
+> Fixes: 08b55e2a9208 ('genirq: Add irqchip_set_wake_parent')
+> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+> ---
+>   kernel/irq/chip.c | 4 ++++
+>   1 file changed, 4 insertions(+)
+>
+> diff --git a/kernel/irq/chip.c b/kernel/irq/chip.c
+> index 6de638b..bdb1b9d 100644
+> --- a/kernel/irq/chip.c
+> +++ b/kernel/irq/chip.c
+> @@ -1024,6 +1024,10 @@ int irq_chip_set_vcpu_affinity_parent(struct irq_data *data, void *vcpu_info)
+>   int irq_chip_set_wake_parent(struct irq_data *data, unsigned int on)
+>   {
+>   	data = data->parent_data;
+> +
+> +	if (irq_data_get_irq_chip(data)->flags & IRQCHIP_SKIP_SET_WAKE)
+> +		return 0;
+> +
 
-The idea is that it is not visible outside of EDAC. The EDAC drivers
-themselves should see it. And yes, I admit that the accessors are maybe
-redundant then since EDAC drivers can use edac_debugfs ptr directly.
+[Nit] I think the irq core can access data->chip directly. Either way,
+it's better to be consistent, the statement following doesn't use helper
+function.
 
-Hmm, and that's ok too because my other concern about future refactoring
-is taken care of too because as long as all users of edac_debugfs are
-confined to drivers/edac/, changing stuff there is easy.
+Otherwise looks good to me.
 
-Ok, I'm convinced, Loc, feel free to drop the accessors in your next
-version.
+Regards,
+Sudeep
 
-Thanks.
-
--- 
-Regards/Gruss,
-    Boris.
-
-ECO tip #101: Trim your mails when you reply.
---
+>   	if (data->chip->irq_set_wake)
+>   		return data->chip->irq_set_wake(data, on);
+>
+>
