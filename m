@@ -1,43 +1,34 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 13 Aug 2015 16:54:47 +0200
-Subject: [PATCH v3] ARM: tegra: cpuidle: implement
- cpuidle_state.enter_freeze()
-In-Reply-To: <1432046953-12945-1-git-send-email-tomeu.vizoso@collabora.com>
-References: <1432046953-12945-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <20150813145446.GD26559@ulmo>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 13 Aug 2015 10:01:14 -0500
+Subject: [PATCH-next 2/4] arm: boot: dts: am4372: add ARM timers and SCU
+ nodes
+In-Reply-To: <20150813083215.GY4215@atomide.com>
+References: <1439409416-32673-1-git-send-email-balbi@ti.com>
+ <1439409416-32673-3-git-send-email-balbi@ti.com>
+ <20150813083215.GY4215@atomide.com>
+Message-ID: <20150813150114.GH27560@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 19, 2015 at 04:49:12PM +0200, Tomeu Vizoso wrote:
-> This callback is expected to do the same as enter() but it has to
-> guarantee that interrupts aren't enabled at any point in its execution,
-> as the tick is frozen.
+On Thu, Aug 13, 2015 at 01:32:15AM -0700, Tony Lindgren wrote:
+> * Felipe Balbi <balbi@ti.com> [150812 13:00]:
+> > AM437x devices sport SCU, TWD and Global timers,
+> > let's add them to DTS so they have a chance to
+> > probe and be used by Linux.
 > 
-> It will be called when the system goes to suspend-to-idle and will
-> reduce power usage because CPUs won't be awaken for unnecessary IRQs.
-> 
-> By setting the CPUIDLE_FLAG_TIMER_STOP flag, we can reuse the same code
-> for both the enter() and enter_freeze() callbacks.
-> 
-> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-> Cc: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-> 
-> ---
-> 
-> v3:	* Set CPUIDLE_FLAG_TIMER_STOP to simplify things as suggested by
-> 	Lorenzo Pieralisi
-> v2:	* Disable FIQs also when suspending-to-idle
-> ---
->  arch/arm/mach-tegra/cpuidle-tegra114.c | 13 +++++++++----
->  1 file changed, 9 insertions(+), 4 deletions(-)
+> Applying this one into omap-for-v4.3/dt-v2. Not sure
+> if it will get merged as we're getting close to the
+> merge window. The rest we can patch once Russell has
+> reverted the bogus SMP dependency.
 
-Applied, thanks.
+I'm just waiting for Russell's "it's okay to post on patch system".
 
-Thierry
+-- 
+balbi
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150813/06f41e28/attachment.sig>
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150813/a9e68a66/attachment-0001.sig>
