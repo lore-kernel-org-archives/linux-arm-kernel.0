@@ -1,55 +1,46 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 13 Aug 2015 10:56:31 +0200
-Subject: [PATCH 2/2] clk: Convert __clk_get_name(hw->clk) to
- clk_hw_get_name(hw)
-In-Reply-To: <1439421161-17868-2-git-send-email-sboyd@codeaurora.org>
-References: <1439421161-17868-1-git-send-email-sboyd@codeaurora.org>
- <1439421161-17868-2-git-send-email-sboyd@codeaurora.org>
-Message-ID: <55CC5BBF.9060600@gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 13 Aug 2015 10:57:38 +0200
+Subject: [PATCH 2/9] PM / Domains: Remove dev->driver check for runtime PM
+In-Reply-To: <7hfv3onv5c.fsf@deeprootsystems.com>
+References: <1438731339-58317-1-git-send-email-lina.iyer@linaro.org>
+ <1438731339-58317-3-git-send-email-lina.iyer@linaro.org>
+ <7hfv3onv5c.fsf@deeprootsystems.com>
+Message-ID: <CAMuHMdVeffa-jgXuSjDQBKTrhgW-d87OKzs1iXX+4y-9U_AJbg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/13/2015 01:12 AM, Stephen Boyd wrote:
-> Use the provider based method to get a clock's name so that we
-> can get rid of the clk member in struct clk_hw one day. Mostly
-> converted with the following coccinelle script.
+Hi Kevin,
+
+On Wed, Aug 12, 2015 at 9:50 PM, Kevin Hilman <khilman@kernel.org> wrote:
+> Lina Iyer <lina.iyer@linaro.org> writes:
 >
-> @@
-> struct clk_hw *E;
-> @@
+>> Remove check for driver of a device, for runtime PM. Device may be
+>> suspended without an explicit driver. This check seems to be vestigial
+>> and incorrect in the current context.
 >
-> -__clk_get_name(E->clk)
-> +clk_hw_get_name(E)
-[...]
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
->   drivers/clk/berlin/berlin2-pll.c     |  4 ++--
-
-For Berlin,
-
-Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-
-Thanks!
-
-[...]
-> diff --git a/drivers/clk/berlin/berlin2-pll.c b/drivers/clk/berlin/berlin2-pll.c
-> index f4b8d324b083..1c2294d3ba85 100644
-> --- a/drivers/clk/berlin/berlin2-pll.c
-> +++ b/drivers/clk/berlin/berlin2-pll.c
-> @@ -61,7 +61,7 @@ berlin2_pll_recalc_rate(struct clk_hw *hw, unsigned long parent_rate)
->   	fbdiv = (val >> map->fbdiv_shift) & FBDIV_MASK;
->   	rfdiv = (val >> map->rfdiv_shift) & RFDIV_MASK;
->   	if (rfdiv == 0) {
-> -		pr_warn("%s has zero rfdiv\n", __clk_get_name(hw->clk));
-> +		pr_warn("%s has zero rfdiv\n", clk_hw_get_name(hw));
->   		rfdiv = 1;
->   	}
+> This one should probably have been RFC.
 >
-> @@ -70,7 +70,7 @@ berlin2_pll_recalc_rate(struct clk_hw *hw, unsigned long parent_rate)
->   	vcodiv = map->vcodiv[vcodivsel];
->   	if (vcodiv == 0) {
->   		pr_warn("%s has zero vcodiv (index %d)\n",
-> -			__clk_get_name(hw->clk), vcodivsel);
-> +			clk_hw_get_name(hw), vcodivsel);
->   		vcodiv = 1;
->   	}
+> For a little more context here, this was uncovered when experimenting
+> with using runtime PM for CPU devices which don't have a dev->driver.
+>
+> This check might have made sense before PM domains, but with PM domains,
+> it's entirely possible to have a simple device without a driver and the
+> PM domain handles all the necesary PM, so I think this check
+> could/should be removed.
+>
+> Thoughts?
+
+Simple devices without a driver aren't handled automatically.
+At minimum, the driver should call pm_runtime_enable(), cfr.
+drivers/bus/simple-pm-bus.c.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
