@@ -1,115 +1,61 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Thu, 13 Aug 2015 14:12:48 -0600
-Subject: [PATCH v2 1/2] ARM: common: Introduce PM domains for CPUs/clusters
-In-Reply-To: <CAL_JsqLcSs79bnj4ELN0uiwJ6gxt46PghxvuGQ7prkq-4gLKhg@mail.gmail.com>
-References: <CAL_JsqLhHy5gO=usm1HLf8h6iz_5FguCDo-Qz2Km+XEwaCODUA@mail.gmail.com>
- <1439406024-41893-1-git-send-email-lina.iyer@linaro.org>
- <CAL_JsqLcSs79bnj4ELN0uiwJ6gxt46PghxvuGQ7prkq-4gLKhg@mail.gmail.com>
-Message-ID: <20150813201248.GB84868@linaro.org>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Thu, 13 Aug 2015 22:43:11 +0200
+Subject: [PATCH 1/2] clk: add lpc18xx creg clk driver
+In-Reply-To: <20150811204127.31346.16729@quantum>
+References: <1436651307-24098-1-git-send-email-manabian@gmail.com>
+ <1436651307-24098-2-git-send-email-manabian@gmail.com>
+ <20150811204127.31346.16729@quantum>
+Message-ID: <CAGhQ9VwZaM_iWTkQYVTuTiyb6gCG2y6s8WFVySCHt7YHE1qbcA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 13 2015 at 11:29 -0600, Rob Herring wrote:
->On Wed, Aug 12, 2015 at 2:00 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
->> Define and add Generic PM domains (genpd) for CPU clusters. Many new
->> SoCs group CPUs as clusters. Clusters share common resources like GIC,
->> power rail, caches, VFP, Coresight etc. When all CPUs in the cluster are
->> idle, these shared resources may also be put in their idle state.
->>
->> The idle time between the last CPU entering idle and a CPU resuming
->> execution is an opportunity for these shared resources to be powered
->> down. Generic PM domain provides a framework for defining such power
->> domains and attach devices to the domain. When the devices in the domain
->> are idle at runtime, the domain would also be suspended and resumed
->> before the first of the devices resume execution.
->>
->> We define a generic PM domain for each cluster and attach CPU devices in
->> the cluster to that PM domain. The DT definitions for the SoC describe
->> this relationship. Genpd callbacks for power_on and power_off can then
->> be used to power up/down the shared resources for the domain.
->>
->> Cc: Stephen Boyd <sboyd@codeaurora.org>
->> Cc: Kevin Hilman <khilman@linaro.org>
->> Cc: Ulf Hansson <ulf.hansson@linaro.org>
->> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->> Signed-off-by: Kevin Hilman <khilman@linaro.org>
->> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
->> ---
->> Changes since v1:
->>
->> - Function name changes and split out common code
->> - Use cpu,pd for now. Removed references to ARM. Open to recommendations.
->> - Still located in arch/arm/common/. May move to a more appropriate location.
->> - Platform drivers can directly call of_init_cpu_domain() without using
->>   compatibles.
->> - Now maintains a list of CPU PM domains.
+On 11 August 2015 at 22:41, Michael Turquette <mturquette@baylibre.com> wrote:
+> Hi Joachim,
 >
->[...]
->
->> +static int __init of_pm_domain_attach_cpus(void)
+> Quoting Joachim Eastwood (2015-07-11 14:48:26)
+>> +static void __init lpc18xx_creg_clk_init(struct device_node *np)
 >> +{
->> +       int cpuid, ret;
+>> +       const char *clk_32khz_parent;
+>> +       struct regmap *syscon;
 >> +
->> +       /* Find any CPU nodes with a phandle to this power domain */
->> +       for_each_possible_cpu(cpuid) {
->> +               struct device *cpu_dev;
->> +               struct of_phandle_args pd_args;
+>> +       syscon = syscon_node_to_regmap(np->parent);
+>> +       if (IS_ERR(syscon)) {
+>> +               pr_err("%s: syscon lookup failed\n", __func__);
+>> +               return;
+>> +       }
 >> +
->> +               cpu_dev = get_cpu_device(cpuid);
->> +               if (!cpu_dev) {
->> +                       pr_warn("%s: Unable to get device for CPU%d\n",
->> +                                       __func__, cpuid);
->> +                       return -ENODEV;
->> +               }
+>> +       clk_32khz_parent = of_clk_get_parent_name(np, 0);
 >> +
->> +               /*
->> +                * We are only interested in CPUs that can be attached to
->> +                * PM domains that are cpu,pd compatible.
->> +                */
+>> +       clk_creg[CREG_CLK_32KHZ] =
+>> +               clk_register_creg_clk(&clk_creg_clocks[CREG_CLK_32KHZ],
+>> +                                     &clk_32khz_parent, syscon);
+>> +
+>> +       clk_creg[CREG_CLK_1KHZ] =
+>> +               clk_register_creg_clk(&clk_creg_clocks[CREG_CLK_1KHZ],
+>> +                                     &clk_creg_clocks[CREG_CLK_32KHZ].name,
+>> +                                     syscon);
+>> +
+>> +       of_clk_add_provider(np, of_clk_src_onecell_get, &clk_base_data);
+>> +}
+>> +CLK_OF_DECLARE(lpc18xx_creg_clk, "nxp,lpc1850-creg-clk", lpc18xx_creg_clk_init);
 >
->Under what conditions would the power domain for a cpu not be cpu,pd compatible?
->
-Mostly never. But I dont want to assume and attach a CPU to its domain
-that I am not concerned with.
+> I'll ask the same question that Stephen asked in your CCU/CGU driver
+> series: is it necessary to use CLK_OF_DECLARE here or can you use the
+> platform device model?
 
->Why can't the driver handling the power domain register with gen_pd
->and the cpu_pd as the driver is going to be aware of which domains are
->for cpus.
-They could and like Renesas they would. They could have an intricate
-hierarchy of domains that they may want to deal with in their platform
-drivers. Platforms could define the CPU devices as IRQ-safe and attach
-it to their domains. Ensure the reference count of the online and
-running CPUs are correct and they are good to go. They also would attach
-the CPU devices to the domain and everything would work as they would
-here. Its just repeated code across platforms that we are trying to
-avoid.
+The 32 kHz clock from the CREG block is a clock parent to the CGU
+block so it's possible that it will required early. This is all
+depends on how the boot loader initially configures the CGU.
 
->While there could be h/w such that all power domains within
->a chip have a nice uniform programming model, I'd guess that is the
->exception, not the rule. First, chips I have worked on were not that
->way. CPU related and peripheral related domains are handled quite
->differently. 
->
-Agreed. These are very SoC specific components and would require
-platform specific programming. But most SoCs, would need to do many
-other things like suspending debuggers, reducing clocks, GIC save and
-restore, cluster state determination etc that are only getting more
-generalized. We have generalized ARM CPU idle, I see this as the
-platform for the next set of power saving in an SoC.
+Currently in the DTS for lpc18xx cgu it has:
+clocks = <&xtal>, <&xtal32>, <...>;
+xtal32 is just a temporary placeholder until the CREG clock is in place.
 
->Second, often the actions on the CPU power domains don't
->take effect until a WFI, so you end up with a different programming
->sequence.
->
-How so? The last core going down (in this case, when the domain is
-suspended the last core is the last device that does a _put() on the
-domain) would determine and perform the power domain's programming
-sequence, in the context of the last CPU. A sequence that would only be
-effected in hardware when the the CPU executes WFI. I dont see why it
-would be any different than how it is today.
 
-Thanks,
-Lina
+Note that while it's possible to use the 32k clock together with PLL0
+to generate the main CPU bus clock I doubt it will be common
+configuration. It is however fully possible to do.
+
+
+regards,
+Joachim Eastwood
