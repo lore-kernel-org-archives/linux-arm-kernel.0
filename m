@@ -1,101 +1,91 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Thu, 13 Aug 2015 10:22:05 -0600
-Subject: [PATCH 5/9] ARM: common: Introduce PM domains for CPUs/clusters
-In-Reply-To: <20150813155245.GD13833@red-moon>
-References: <1438731339-58317-1-git-send-email-lina.iyer@linaro.org>
- <1438731339-58317-6-git-send-email-lina.iyer@linaro.org>
- <CAL_JsqK67=DTtjZwwnonObLDjLbahkREfm0RvyXVV95bhR-d4Q@mail.gmail.com>
- <20150813150154.GB13356@red-moon>
- <20150813154503.GO52339@linaro.org>
- <20150813155245.GD13833@red-moon>
-Message-ID: <20150813162205.GQ52339@linaro.org>
+From: b08248@gmail.com (Stuart Yoder)
+Date: Thu, 13 Aug 2015 11:23:11 -0500
+Subject: [PATCH v3 1/2] Documentation: DT: FTM: add FTM0 be used as alarm
+ timer
+In-Reply-To: <1439352061-14656-1-git-send-email-dongsheng.wang@freescale.com>
+References: <1439352061-14656-1-git-send-email-dongsheng.wang@freescale.com>
+Message-ID: <CALRxmdDGgYh+_cOPB43gyuZwu_zo+wE0qHh8nWJTjiQN__hZ3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 13 2015 at 09:52 -0600, Lorenzo Pieralisi wrote:
->On Thu, Aug 13, 2015 at 04:45:03PM +0100, Lina Iyer wrote:
->> On Thu, Aug 13 2015 at 09:01 -0600, Lorenzo Pieralisi wrote:
->> >On Thu, Aug 06, 2015 at 04:14:51AM +0100, Rob Herring wrote:
->> >> On Tue, Aug 4, 2015 at 6:35 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
->> >> > Define and add Generic PM domains (genpd) for ARM CPU clusters. Many new
->> >> > SoCs group CPUs as clusters. Clusters share common resources like GIC,
->> >> > power rail, caches, VFP, Coresight etc. When all CPUs in the cluster are
->> >> > idle, these shared resources may also be put in their idle state.
->> >> >
->> >> > The idle time between the last CPU entering idle and a CPU resuming
->> >> > execution is an opportunity for these shared resources to be powered
->> >> > down. Generic PM domain provides a framework for defining such power
->> >> > domains and attach devices to the domain. When the devices in the domain
->> >> > are idle at runtime, the domain would also be suspended and resumed
->> >> > before the first of the devices resume execution.
->> >> >
->> >> > We define a generic PM domain for each cluster and attach CPU devices in
->> >> > the cluster to that PM domain. The DT definitions for the SoC describe
->> >> > this relationship. Genpd callbacks for power_on and power_off can then
->> >> > be used to power up/down the shared resources for the domain.
->> >>
->> >> [...]
->> >>
->> >> > +ARM CPU Power domains
->> >> > +
->> >> > +The device tree allows describing of CPU power domains in a SoC. In ARM SoC,
->> >> > +CPUs may be grouped as clusters. A cluster may have CPUs, GIC, Coresight,
->> >> > +caches, VFP and power controller and other peripheral hardware. Generally,
->> >> > +when the CPUs in the cluster are idle/suspended, the shared resources may also
->> >> > +be suspended and resumed before any of the CPUs resume execution.
->> >> > +
->> >> > +CPUs are the defined as the PM domain consumers and there is a PM domain
->> >> > +provider for the CPUs. Bindings for generic PM domains (genpd) is described in
->> >> > +[1].
->> >> > +
->> >> > +The ARM CPU PM domain follows the same binding convention as any generic PM
->> >> > +domain. Additional binding properties are -
->> >> > +
->> >> > +- compatible:
->> >> > +       Usage: required
->> >> > +       Value type: <string>
->> >> > +       Definition: Must also have
->> >> > +                       "arm,pd"
->> >> > +               inorder to initialize the genpd provider as ARM CPU PM domain.
->> >>
->> >> A compatible string should represent a particular h/w block. If it is
->> >> generic, it should represent some sort of standard programming
->> >> interface (e.g, AHCI, EHCI, etc.). This doesn't seem to be either and
->> >> is rather just a mapping of what "driver" you want to use.
->> >>
->> >> I would expect that identifying a cpu's or cluster's power domain
->> >> would be done by a phandle between the cpu/cluster node and power
->> >> domain node. But I've not really looked at the power domain bindings
->> >> so who knows.
->> >
->> >I would expect the same, meaning that a cpu node, like any other device
->> >node would have a phandle pointing at the respective HW power domain.
->> >
->> CPUs have phandles to their domains. That is how the relationship
->> between the domain provider (power-controller) and the consumer (CPU) is
->> established.
->>
->> >I do not really understand why we want a "generic" CPU power domain, what
->> >purpose does it serve ? Creating a collection of cpu devices that we
->> >can call "cluster" ?
->> >
->> Nope, not for calling a cluster, a cluster :)
->>
->> This compatible is used to define a generic behavior of the CPU domain
->> controller (in addition to the platform specific behavior of the domain
->> power controller). The kernel activities for such power controller are
->> generally the same which otherwise would be repeated across platforms.
+On Tue, Aug 11, 2015 at 11:01 PM, Dongsheng Wang
+<dongsheng.wang@freescale.com> wrote:
+> From: Wang Dongsheng <dongsheng.wang@freescale.com>
 >
->What activities ? CPU PM notifiers ?
->
-Yes, for now. May be someday we can get rid of these notifiers and
-directly invoke subsystems from these callbacks directly. Kevin proposed
-this idea. With little exploration that I have done, I dont have a good
-way to do that yet.
+> In freescale layerscape platform there is only FTM0 can be used as
+> alarm timer to wake up system. So add FTM0 description for devicetree
+> document.
 
-I am imagining here (only imagining at this time) that I could tie this
-with last man down for cluster idle state determination and call into
-cpuidle-PSCI to help compose the composite state id.
+Suggestion:
+
+In the Freescale Layerscape platform a flextimer module can be used
+as an alarm timer to wake up the system.  Define a binding for this
+alarm.
+
+> Signed-off-by: Wang Dongsheng <dongsheng.wang@freescale.com>
+> ---
+> V3:
+> Include this patch in V3.
+>
+> diff --git a/Documentation/devicetree/bindings/timer/fsl,ftm-timer.txt b/Documentation/devicetree/bindings/timer/fsl,ftm-timer.txt
+> index aa8c402..380a0b3d 100644
+> --- a/Documentation/devicetree/bindings/timer/fsl,ftm-timer.txt
+> +++ b/Documentation/devicetree/bindings/timer/fsl,ftm-timer.txt
+> @@ -1,5 +1,7 @@
+>  Freescale FlexTimer Module (FTM) Timer
+>
+> +* Default FTM Timer
+> +
+>  Required properties:
+>
+>  - compatible : should be "fsl,ftm-timer"
+> @@ -29,3 +31,26 @@ ftm: ftm at 400b8000 {
+>                 <&clks VF610_CLK_FTM3_EXT_FIX_EN>;
+>         big-endian;
+>  };
+> +
+> +* FTM Alarm Timer
+> +  The default FTM device contains eight FlexTimer modules. FlexTimer1 is in
+> +  on-domain(power is not switched off in deep sleep mode). Other seven FlexTimer
+> +  modules(flextimer2/3/4/5/6/7/8) are in off-domain (power is switched off in
+> +  deep sleep mode).
+
+Suggestion:
+
+  This binding describes a Flextimer (FTM) instance that can be used as an alarm
+  to wake up a system in deep sleep.  The flextimer module with alarm
+  support is in a power domain that remains awake when the SoC is in
+  deep sleep mode.
+
+(don't use flextimer1 in the binding...for all you know in the next SoC it
+will be flextimer7 that has this capability)
+
+> +Required properties:
+> +
+> +- compatible : should be "fsl,ftm-alarm".
+> +- reg : should contain base address and length of FTM timer 0 register.
+
+  "should contain the address and size of the FTM alarm module registers"
+
+(don't use the number 0)
+
+> +- interrupts : Should contain FTM 0 interrupt.
+
+   "describes the FTM alarm interrupt"
+
+> +- big-endian: One boolean property, the big endian mode will be in use if it is
+> +  present, or the little endian mode will be in use for all the device registers.
+> +
+> +Example:
+> +ftm0: ftm0 at 29d0000 {
+> +       compatible = "fsl,ftm-alarm";
+> +       reg = <0x0 0x29d0000 0x0 0x10000>;
+> +       interrupts = <GIC_SPI 118 IRQ_TYPE_LEVEL_HIGH>;
+> +       big-endian;
+> +       status = "disabled";
+> +};
+
+Drop the number 0 from the names in your example.
 
 Thanks,
-Lina
+Stuart
