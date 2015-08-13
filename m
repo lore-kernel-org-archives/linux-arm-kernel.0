@@ -1,50 +1,77 @@
-From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
-Date: Thu, 13 Aug 2015 20:16:30 +0700
-Subject: [PATCH v4 1/3] PCI: generic: remove dependency on hw_pci
-In-Reply-To: <20150805092318.GB6092@arm.com>
-References: <1438721620-15493-1-git-send-email-jchandra@broadcom.com>
- <20150804234956.GF17327@google.com> <20150805092318.GB6092@arm.com>
-Message-ID: <55CC98AE.5010604@amd.com>
+From: maitysanchayan@gmail.com (maitysanchayan at gmail.com)
+Date: Thu, 13 Aug 2015 18:47:20 +0530
+Subject: [PATCH v3 0/3] Add support for touchscreen on Colibri VF50
+In-Reply-To: <cover.1438763030.git.maitysanchayan@gmail.com>
+References: <cover.1438763030.git.maitysanchayan@gmail.com>
+Message-ID: <20150813131720.GA2925@Sanchayan-Arch.toradex.int>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+Hello,
 
-On 8/5/15 16:23, Will Deacon wrote:
-> On Wed, Aug 05, 2015 at 12:49:56AM +0100, Bjorn Helgaas wrote:
->> >On Wed, Aug 05, 2015 at 02:23:38AM +0530, Jayachandran C wrote:
->>> > >The current code in pci-host-generic.c uses pci_common_init_dev()
->>> > >from arm architecture to do some part of the PCI setup, and this
->>> > >prevents it from being used with arm64 architecture.
->>> > >
->>> > >The part of pci_common_init_dev() that is really needed by
->>> > >pci-host-generic.c is very limited and can be done in the same
->>> > >file without using hw_pci API of ARM. The ARM platform requires
->>> > >a pci_sys_data as sysdata for the PCI bus, this can be handled by
->>> > >setting up gen_pci to have a pci_sys_data variable as the first
->>> > >element.
->>> > >
->>> > >Signed-off-by: Jayachandran C<jchandra@broadcom.com>
->>> > >Acked-by: Lorenzo Pieralisi<lorenzo.pieralisi@arm.com>
->>> > >Tested-by: Lorenzo Pieralisi<lorenzo.pieralisi@arm.com>
->>> > >Tested-by: Pavel Fedin<p.fedin@samsung.com>
->> >
->> >I applied all three of these to my pci/enumeration branch for v4.3.
->> >
->> >I made a few changes, the most important being to call
->> >pcie_bus_configure_settings() before pci_bus_add_devices(), because drivers
->> >may claim devices in pci_bus_add_devices(), and the PCI core shouldn't
->> >touch devices after drivers claim them.
->> >
->> >I dropped the acks and tested-by because of that change, but I'll happily
->> >add them back if Lorenzo and Pavel confirm.  The patches are here if you
->> >want to review/test them:
->> >
->> >https://git.kernel.org/cgit/linux/kernel/git/helgaas/pci.git/log/?h=pci/enumeration
->> >
->> >I'm sure the other patches on that branch will need some tweaks, too, so I
->> >don't have any problem with updating these.
+Ping?
 
-I have also tested on AMD Seattle (w/ non-PROBE_ONLY mode).
+- Sanchayan.
 
-Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+On 15-08-05 14:25:48, Sanchayan Maity wrote:
+> Hello,
+> 
+> The patchset adds support for 4 wire touchscreen on Toradex Colibri
+> VF50 modules. Patches are tested on top of shawn's for-next branch.
+> 
+> Changes since v2:
+> 1. Fix pin multiplexing for pins in idle state. Configuration of the
+> pen detect pull up viz. PTA19__GPIO_9 resulted in generation of pen
+> irq's on a continuous basis.
+> 2. Fix pinmux of the ADC pins as per the recommended pinmux in TRM.
+> 3. Use a threaded irq handler instead of a irq handler plus workqueue
+> approach.
+> 4. Use a low level trigger with oneshot flag specifier instead of the
+> previous falling edge triggered irq's. This coupled with the fix in
+> point 1 fixes the previous continuous spurious irq generation bug.
+> 5. Change/fix the TS measurement logic to account for the fact that
+> iio_channel_read_raw might actually return an error. To be more
+> specific use break instead of continue and take care to close the
+> FET's in case of channel read error.
+> 6. Drop the first patch "Add io-channel-cells property for ADC node"
+> as it has already been applied.
+> 7. Move the iio channel get call again at the start. Having it in
+> the end resulted in crashes sometimes when iio was not probed and
+> the ts device got probed and opened earlier.
+> 
+> Changes since v1:
+> 1. Fix/drop comments
+> 2. Use an inline function for multiple gpiod_get calls in probe
+> 3. Remove the pull up in the pinmux specified in DT for touchctrl_gpios
+> 4. Add the io-channel-cells property before status property.
+> 5. Add GPIOLIB as dependency in the Kconfig file
+> 
+> Version 2 of the patchset can be found here
+> https://www.mail-archive.com/linux-input at vger.kernel.org/msg18090.html
+> 
+> Version 1 of the patchset can be found here
+> https://lkml.org/lkml/2015/6/30/103
+> 
+> Thank you very much for the feedback till now.
+> 
+> Regards,
+> Sanchayan.
+> 
+> Sanchayan Maity (3):
+>   ARM: dts: vf500-colibri: Add device tree node for touchscreen support
+>   input: Add DT binding documentation for Colibri VF50 touchscreen
+>   touchscreen: colibri-vf50-ts: Add touchscreen support for Colibri VF50
+> 
+>  .../bindings/input/touchscreen/colibri-vf50-ts.txt |  32 ++
+>  arch/arm/boot/dts/vf500-colibri-eval-v3.dts        |   4 +
+>  arch/arm/boot/dts/vf500-colibri.dtsi               |  45 +++
+>  drivers/input/touchscreen/Kconfig                  |  12 +
+>  drivers/input/touchscreen/Makefile                 |   1 +
+>  drivers/input/touchscreen/colibri-vf50-ts.c        | 404 +++++++++++++++++++++
+>  6 files changed, 498 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/input/touchscreen/colibri-vf50-ts.txt
+>  create mode 100644 drivers/input/touchscreen/colibri-vf50-ts.c
+> 
+> -- 
+> 2.5.0
+> 
