@@ -1,49 +1,39 @@
-From: sricharan@codeaurora.org (Sricharan)
-Date: Thu, 13 Aug 2015 12:07:59 +0530
-Subject: [PATCH 4/5] iommu/msm: Set cacheability attributes without tex
- remap
-In-Reply-To: <20150812145346.GH23540@arm.com>
-References: <1439390869-6347-1-git-send-email-sricharan@codeaurora.org>
- <1439390869-6347-5-git-send-email-sricharan@codeaurora.org>
- <20150812145346.GH23540@arm.com>
-Message-ID: <000201d0d592$9ce1a740$d6a4f5c0$@codeaurora.org>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Thu, 13 Aug 2015 08:50:41 +0200
+Subject: [PATCH 0/2] x86/KASAN updates for 4.3
+In-Reply-To: <1439444244-26057-1-git-send-email-ryabinin.a.a@gmail.com>
+References: <1439444244-26057-1-git-send-email-ryabinin.a.a@gmail.com>
+Message-ID: <20150813065040.GA17983@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
 
-> -----Original Message-----
-> From: linux-arm-kernel [mailto:linux-arm-kernel-
-> bounces at lists.infradead.org] On Behalf Of Will Deacon
-> Sent: Wednesday, August 12, 2015 8:24 PM
-> To: Sricharan R
-> Cc: devicetree at vger.kernel.org; linux-arm-msm at vger.kernel.org;
-> joro at 8bytes.org; robdclark at gmail.com; iommu at lists.linux-foundation.org;
-> srinivas.kandagatla at linaro.org; laurent.pinchart at ideasonboard.com;
-> treding at nvidia.com; Robin Murphy; linux-arm-kernel at lists.infradead.org;
-> stepanm at codeaurora.org
-> Subject: Re: [PATCH 4/5] iommu/msm: Set cacheability attributes without
-tex
-> remap
-> 
-> On Wed, Aug 12, 2015 at 03:47:48PM +0100, Sricharan R wrote:
-> > The cacheablity attributes are set when IOMMU_CACHE property is true.
-> > So cachebility is set as either noncached (normal) or cached (normal
-> > WBWA) directly and avoid setting using tex remap.
-> 
-> Does this IOMMU support the ARMv7 short descriptor format? If so, would it
-> work with Yong's patch here:
-> 
->   http://lists.infradead.org/pipermail/linux-arm-kernel/2015-
-> August/361615.html
-> 
-> I've not gotten around to reviewing the latest version yet, but having
-other
-> IOMMUs consolidate on one set of page table code would be a good thing.
+* Andrey Ryabinin <ryabinin.a.a@gmail.com> wrote:
 
-     Yes, this is ARMv7 short descriptor complaint. I will rebase the next
-one the
-     above. That should reduce more code in this driver. Thanks.
+> These 2 patches taken from v5 'KASAN for arm64' series.
+> The only change is updated changelog in second patch.
+> 
+> I hope this is not too late to queue these for 4.3,
+> as this allow us to merge arm64/KASAN patches in v4.4
+> through arm64 tree.
+> 
+> Andrey Ryabinin (2):
+>   x86/kasan: define KASAN_SHADOW_OFFSET per architecture
+>   x86/kasan, mm: introduce generic kasan_populate_zero_shadow()
+> 
+>  arch/x86/include/asm/kasan.h |   3 +
+>  arch/x86/mm/kasan_init_64.c  | 123 ++--------------------------------
+>  include/linux/kasan.h        |  10 ++-
+>  mm/kasan/Makefile            |   2 +-
+>  mm/kasan/kasan_init.c        | 152 +++++++++++++++++++++++++++++++++++++++++++
+>  5 files changed, 170 insertions(+), 120 deletions(-)
+>  create mode 100644 mm/kasan/kasan_init.c
 
-Regards,
-  Sricharan
+It's absolutely too late in the -rc cycle for v4.3!
+
+I can create a stable topic tree for it, tip:mm/kasan or so, which arm64 could 
+pull and base its own ARM specific work on, if that's OK with everyone.
+
+Thanks,
+
+	Ingo
