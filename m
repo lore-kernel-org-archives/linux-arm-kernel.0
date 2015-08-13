@@ -1,102 +1,59 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 13 Aug 2015 18:26:52 +0100
-Subject: [PATCH 5/9] ARM: common: Introduce PM domains for CPUs/clusters
-In-Reply-To: <20150813154503.GO52339@linaro.org>
-References: <1438731339-58317-1-git-send-email-lina.iyer@linaro.org>
- <1438731339-58317-6-git-send-email-lina.iyer@linaro.org>
- <CAL_JsqK67=DTtjZwwnonObLDjLbahkREfm0RvyXVV95bhR-d4Q@mail.gmail.com>
- <20150813150154.GB13356@red-moon> <20150813154503.GO52339@linaro.org>
-Message-ID: <55CCD35C.4000901@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 13 Aug 2015 18:29:47 +0100
+Subject: [PATCH 12/14] arm64: Check for selected granule support
+In-Reply-To: <55CCAD73.7080702@arm.com>
+References: <1439465645-22584-1-git-send-email-suzuki.poulose@arm.com>
+ <1439465645-22584-13-git-send-email-suzuki.poulose@arm.com>
+ <CAPvkgC3=S1BxdzZM4uUOmyXLjii48SMpCof6i6HdNeTG_fydfg@mail.gmail.com>
+ <55CCAD73.7080702@arm.com>
+Message-ID: <20150813172946.GD4602@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Aug 13, 2015 at 03:45:07PM +0100, Suzuki K. Poulose wrote:
+> On 13/08/15 13:28, Steve Capper wrote:
+> >On 13 August 2015 at 12:34, Suzuki K. Poulose <suzuki.poulose@arm.com> wrote:
+> >>  __enable_mmu:
+> >>+       mrs     x1, ID_AA64MMFR0_EL1
+> >>+       ubfx    x2, x1, #ID_AA64MMFR0_TGran_SHIFT, 4
+> >>+       cmp     x2, #ID_AA64MMFR0_TGran_ENABLED
+> >>+       b.ne    __no_granule_support
+> >>         ldr     x5, =vectors
+> >>         msr     vbar_el1, x5
+> >>         msr     ttbr0_el1, x25                  // load TTBR0
+> >>@@ -626,3 +643,8 @@ __enable_mmu:
+> >>         isb
+> >>         br      x27
+> >>  ENDPROC(__enable_mmu)
+> >>+
+> >>+__no_granule_support:
+> >>+       wfe
+> >>+       b __no_granule_support
+> >>+ENDPROC(__no_granule_support)
+> >>--
+> >>1.7.9.5
+> >>
+> >
+> >Is is possible to tell the user that the kernel has failed to boot due
+> >to the kernel granule being unsupported?
+> 
+> We don't have anything up at this time. The "looping address" is actually a clue
+> to the (expert) user. Not sure we can do something, until we get something like DEBUG_LL(?)
 
+No.
 
-On 13/08/15 16:45, Lina Iyer wrote:
-> On Thu, Aug 13 2015 at 09:01 -0600, Lorenzo Pieralisi wrote:
->> On Thu, Aug 06, 2015 at 04:14:51AM +0100, Rob Herring wrote:
->>> On Tue, Aug 4, 2015 at 6:35 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
+> Or we should let it continue and end in a panic(?). The current situation can boot a
+> multi-cluster system with boot cluster having the Tgran support(which doesn't make a
+> strong use case though). I will try out some options and get back to you.
 
-[..]
+If the boot CPU does not support 16KB pages, in general there isn't much
+we can do since the console printing is done after we enabled the MMU.
+Even mapping the UART address requires fixmap support and the PAGE_SIZE
+is hard-coded in the kernel image. The DT is also mapped at run-time.
 
->>>
->>>> +ARM CPU Power domains
->>>> +
->>>> +The device tree allows describing of CPU power domains in a SoC. In ARM SoC,
->>>> +CPUs may be grouped as clusters. A cluster may have CPUs, GIC, Coresight,
->>>> +caches, VFP and power controller and other peripheral hardware. Generally,
->>>> +when the CPUs in the cluster are idle/suspended, the shared resources may also
->>>> +be suspended and resumed before any of the CPUs resume execution.
->>>> +
->>>> +CPUs are the defined as the PM domain consumers and there is a PM domain
->>>> +provider for the CPUs. Bindings for generic PM domains (genpd) is described in
->>>> +[1].
->>>> +
->>>> +The ARM CPU PM domain follows the same binding convention as any generic PM
->>>> +domain. Additional binding properties are -
->>>> +
->>>> +- compatible:
->>>> +       Usage: required
->>>> +       Value type: <string>
->>>> +       Definition: Must also have
->>>> +                       "arm,pd"
->>>> +               inorder to initialize the genpd provider as ARM CPU PM domain.
->>>
->>> A compatible string should represent a particular h/w block. If it is
->>> generic, it should represent some sort of standard programming
->>> interface (e.g, AHCI, EHCI, etc.). This doesn't seem to be either and
->>> is rather just a mapping of what "driver" you want to use.
->>>
->>> I would expect that identifying a cpu's or cluster's power domain
->>> would be done by a phandle between the cpu/cluster node and power
->>> domain node. But I've not really looked at the power domain bindings
->>> so who knows.
->>
->> I would expect the same, meaning that a cpu node, like any other device
->> node would have a phandle pointing at the respective HW power domain.
->>
-> CPUs have phandles to their domains. That is how the relationship
-> between the domain provider (power-controller) and the consumer (CPU) is
-> established.
->
->> I do not really understand why we want a "generic" CPU power domain, what
->> purpose does it serve ? Creating a collection of cpu devices that we
->> can call "cluster" ?
->>
-> Nope, not for calling a cluster, a cluster :)
->
-> This compatible is used to define a generic behavior of the CPU domain
-> controller (in addition to the platform specific behavior of the domain
-> power controller). The kernel activities for such power controller are
-> generally the same which otherwise would be repeated across platforms.
+While in theory it's possible to fall back to a 4KB page size just
+enough to load the DT and figure out the early console, I suggest we
+just live with the "looping address" clue.
 
-Having gone through this series and the one using it[1], the only common
-activity is just cluster pm notifiers. Other than that it's just
-creating indirection for now. The scenario might change in future, but
-for now it seems unnecessary.
-
-Also if you look at the shmobile power controller driver, it covers all
-the devices including CPUs unlike QCOM power controller which handles
-only CPU. Yes we can skip CPU genpd creation there only for CPU, IMO
-creating the power domains should be part of power controller driver.
-
-You can add helper functions for all the ARM specific code that can be
-reused by multiple power controller drivers handling CPU/Cluster power
-domain.
-
-> An analogy to this would be the "arm,idle-state" that defines the DT
-> node as something that also depicts a generic cpuidle C state.
->
-
-I tend to disagree. In idle-states, the nodes define that generic
-properties and they can be parsed in a generic way. That's not the case
-here. Each power controller binding differs.
-
-Yes the generic compatible might be useful to identify that this power
-domain handles CPU/Cluster, but there will be more power controller
-specific things compared to generic code.
-
-Regards,
-Sudeep
-
-[1] http://www.spinics.net/lists/arm-kernel/msg437304.html
+-- 
+Catalin
