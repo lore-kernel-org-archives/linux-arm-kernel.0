@@ -1,55 +1,49 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 13 Aug 2015 15:08:18 +0200
-Subject: [GIT PULL] qcom SoC changes for 4.3 *CORRECTED*
-In-Reply-To: <1438379275-6314-1-git-send-email-agross@codeaurora.org>
-References: <1438379275-6314-1-git-send-email-agross@codeaurora.org>
-Message-ID: <20150813130818.GE23581@localhost>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Thu, 13 Aug 2015 15:14:03 +0200
+Subject: [PATCH 1/6] gpiolib-of: Rename gpio_hog functions to be generic
+In-Reply-To: <CACRpkdYpeoo2scKzNuSYbWfWLTBodXJEX3KyRzoRQPuoaeqzKw@mail.gmail.com>
+References: <1438680203-13432-1-git-send-email-mpa@pengutronix.de>
+ <1438680203-13432-2-git-send-email-mpa@pengutronix.de>
+ <CACRpkdYpeoo2scKzNuSYbWfWLTBodXJEX3KyRzoRQPuoaeqzKw@mail.gmail.com>
+Message-ID: <20150813131403.GW19600@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 31, 2015 at 04:47:55PM -0500, Andy Gross wrote:
-> The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
+On Mon, Aug 10, 2015 at 11:29:58AM +0200, Linus Walleij wrote:
+> On Tue, Aug 4, 2015 at 11:23 AM, Markus Pargmann <mpa@pengutronix.de> wrote:
 > 
->   Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
+> > The gpio hogging functions are currently only used for gpio-hogging. But
+> > these functions are widely generic ones which parse gpio device nodes in
+> > the DT.
+> >
+> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> (...)
+> >  /**
+> > - * of_get_gpio_hog() - Get a GPIO hog descriptor, names and flags for GPIO API
+> > + * of_parse_gpio() - Get a GPIO hog descriptor, names and flags for GPIO API
 > 
-> are available in the git repository at:
+> It's not a good name, too generic. It could easily be assued this is
+> for something
+> wider.
 > 
->   git://codeaurora.org/quic/kernel/agross-msm.git tags/qcom-soc-for-4.3
-> 
-> for you to fetch changes up to ba68227e610cec8e0bef7da7e04af3f479d9797d:
-> 
->   devicetree: soc: Add Qualcomm SMD based RPM DT binding (2015-07-29 14:13:48 -0500)
-> 
-> ----------------------------------------------------------------
-> Qualcomm ARM Based SoC Updates for 4.3
-> 
-> * Add SMEM driver
-> * Add SMD driver
-> * Add RPM over SMD driver
-> * Select QCOM_SCM by default
-> 
-> ----------------------------------------------------------------
-> Bjorn Andersson (5):
->       soc: qcom: Add Shared Memory Manager driver
->       soc: qcom: Add device tree binding for Shared Memory Device
->       soc: qcom: Add Shared Memory Driver
->       soc: qcom: Driver for the Qualcomm RPM over SMD
->       devicetree: soc: Add Qualcomm SMD based RPM DT binding
-> 
-> Lina Iyer (1):
->       drivers: qcom: Select QCOM_SCM unconditionally for QCOM_PM
+> of_parse_own_gpio() or something, indicating that this pertains to the
+> chip itself and not to outside users, would be better.
 
-Ok, after looking through it, I've decided to merge this branch.
+Yes, changed to of_parse_own_gpio() for next version.
 
-I'm still concerned that we are picking up similar functionality without
-any shared implementation for a lot of platforms right now. At some
-point we'll have to say that enough is enough and someone will have to
-clean it up.
+Best Regards,
 
-In the past, Linaro has done some of that work since several members have been
-affected. I don't know if this is the right time to kick something off though,
-or if we should let a few more implementations surface such that there is
-a better set of needed use cases to base a common framework on.
+Markus
 
-
--Olof
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150813/06c025d3/attachment.sig>
