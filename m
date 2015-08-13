@@ -1,27 +1,34 @@
 From: kgene@kernel.org (Kukjin Kim)
-Date: Thu, 13 Aug 2015 19:12:24 +0900
-Subject: [GIT PULL 5/5] Samsung driver updates for v4.3
-In-Reply-To: <20150813091848.GB30160@localhost>
-References: <55C06A0A.6040407@kernel.org> <20150813091848.GB30160@localhost>
-Message-ID: <007601d0d5b0$8c6eb3d0$a54c1b70$@kernel.org>
+Date: Thu, 13 Aug 2015 19:13:59 +0900
+Subject: [GIT PULL 2nd 3/4] Samsung driver 2nd updates for v4.3
+In-Reply-To: <20150813092144.GD30160@localhost>
+References: <55CBE10B.2030103@kernel.org> <20150813092144.GD30160@localhost>
+Message-ID: <007a01d0d5b0$c53d6580$4fb83080$@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Olof Johansson wrote:
 > 
-> On Tue, Aug 04, 2015 at 04:30:18PM +0900, Kukjin Kim wrote:
+> On Thu, Aug 13, 2015 at 09:12:59AM +0900, Kukjin Kim wrote:
 > > Hi,
 > >
-> > This branch is including to support generic cpufreq driver in
-> > mach-exynos dir. for exynos3250 and exynos5250 even the tag name is
-> > driver. Because it is depending on clk and cpufreq changes which acked
-> > by regarding maintainers, Mike and Viresh.
+> > I've created the signed tag based on previous tags/samsung-driver so you
+> > can see several merge in there. To support cpufreq-dt driver requires
+> > clk/cpufreq/exynos changes together and clk/cpufreq maintainers are
+> > aware of this changes. And we can remove exynos cpufreq driver at last.
 > >
-> > Please pull and if any problems, please kindly let me know.
+> > Note this drivers update is including previous dependencies and if
+> > you're OK, please pull.
 > 
-> This now needs to be respun too, apparantly, since it includes dt2.
+> Again, this needs to be revisited.
 > 
-Sure, I'll.
+YES.
 
-Thanks
+> Please try to keep the dependency only driver->dt if you can,
+> and we can merge drivers before DT this release cycle. If you do
+> driver->dt->driver->dt like here then things get messy.
+> 
+It looks better. OK.
+
+Thanks,
 Kukjin
