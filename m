@@ -1,51 +1,47 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Thu, 13 Aug 2015 08:08:22 +0800
-Subject: [RFC PATCH v4 3/9] mips: pistachio_defconfig: remove
- CONFIG_MMC_DW_IDMAC
-In-Reply-To: <20150812220500.GD11636@linux-mips.org>
-References: <1438843469-23807-1-git-send-email-shawn.lin@rock-chips.com>
- <1438843515-23935-1-git-send-email-shawn.lin@rock-chips.com>
- <20150812220500.GD11636@linux-mips.org>
-Message-ID: <55CBDFF6.9090900@rock-chips.com>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Thu, 13 Aug 2015 09:11:55 +0900
+Subject: [GIT PULL 2nd 1/4] Samsung defconfig updates for v4.3
+Message-ID: <55CBE0CB.1060708@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2015/8/13 6:05, Ralf Baechle ??:
-> On Thu, Aug 06, 2015 at 02:45:15PM +0800, Shawn Lin wrote:
->
->> DesignWare MMC Controller's transfer mode should be decided
->> at runtime instead of compile-time. So we remove this config
->> option and read dw_mmc's register to select DMA master.
->>
->> Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
->> ---
->>
->> Changes in v4: None
->> Changes in v3: None
->> Changes in v2: None
->>
->>   arch/mips/configs/pistachio_defconfig | 1 -
->
-> Acked-by: Ralf Baechle <ralf@linux-mips.org>
->
-> Please feel free to merge this patch with the remainder
-> of the series.
->
+The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
 
-Thanks, Ralf. :)
+  Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
 
-v5 is coming which will be rebased on 
-"https://github.com/jh80chung/dw-mmc.git tags/dw-mmc-for-ulf-v4.2" for 
-the next merge window
-that make Jeahoon do it easier. Also define new macro for reading
-HCON register suggested by Joachim.
+are available in the git repository at:
 
+  git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+tags/samsung-defconfig-1
 
->    Ralf
->
->
->
+for you to fetch changes up to c3e71f4b5f580b43e0eb3be18059c8844d8713e7:
 
+  ARM: multi_v7_defconfig: Enable max77802 regulator (2015-08-12
+08:15:02 +0900)
 
--- 
-Shawn Lin
+----------------------------------------------------------------
+Samsung defconfig updates for v4.3
+
+- for exynos_defconfig
+  : enable SND_SOC_ODROIDX2 and SND_SIMPLE_CARD for
+    Odroid-XU3 to use max98090 audio codec
+  : enalbe SENSORS_NTC_THERMISTOR for Peach boards
+
+- for multi_v7_defconfig:
+  : remove SAMSUNG_USB2PHY and SAMSUNG_USB3PHY are not used now
+  : enable SENSORS_NTC_THERMISTOR and EXYNOS_ADC for Peach boards
+  : enable REGULATOR_MAX77802 for Peach boards
+
+----------------------------------------------------------------
+Anand Moon (1):
+      ARM: exynos_defconfig: Enable CONFIG_SND_SOC_ODROIDX2 for Odroid-XU3
+
+Javier Martinez Canillas (4):
+      ARM: multi_v7_defconfig: Remove old Samsung USB PHY configs
+      ARM: multi_v7_defconfig: Enable NTC Thermistors support
+      ARM: exynos_defconfig: Enable NTC Thermistors support
+      ARM: multi_v7_defconfig: Enable max77802 regulator
+
+ arch/arm/configs/exynos_defconfig   | 3 +++
+ arch/arm/configs/multi_v7_defconfig | 5 +++--
+ 2 files changed, 6 insertions(+), 2 deletions(-)
