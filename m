@@ -1,76 +1,45 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 13 Aug 2015 11:01:35 +0100
-Subject: [PATCH v2 2/6] genirq: fix irqchip_set_wake_parent if
- IRQCHIP_SKIP_SET_WAKE
-In-Reply-To: <1439401562-28874-3-git-send-email-grygorii.strashko@ti.com>
-References: <1439401562-28874-1-git-send-email-grygorii.strashko@ti.com>
- <1439401562-28874-3-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <55CC6AFF.8060400@arm.com>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Thu, 13 Aug 2015 19:02:57 +0900
+Subject: [GIT PULL 4/5] Samsung 2nd DT updates for v4.3
+In-Reply-To: <20150813091814.GA30160@localhost>
+References: <55C069D5.1050409@kernel.org> <20150813091814.GA30160@localhost>
+Message-ID: <004101d0d5af$3c688420$b5398c60$@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/08/15 18:45, Grygorii Strashko wrote:
-> The irqchip_set_wake_parent should not fail if IRQ chip
-> specifies IRQCHIP_SKIP_SET_WAKE. Otherwise, IRQ wakeup
-> configuration can't be propagated properly through IRQ
-> domains hierarchy.
+Olof Johansson wrote:
 > 
-> In case of TI OMAP DRA7 the issue reproduced with following
-> configuration:
-> ARM GIC<-OMAP wakeupgen<-TI CBAR<-GPIO<-GPIO pcf857x<-gpio_key
+> On Tue, Aug 04, 2015 at 04:29:25PM +0900, Kukjin Kim wrote:
+> > Hi Arnd, Olof, Kevin
+> >
+> > This 2nd DT update branch is based tags/samsung-dt-1 +
+> > v4.3-topic/clk-samsung branch because of dependency to support generic
+> > cpufreq driver. Please pull.
+> >
+> > Thanks,
+> > Kukjin
+> >
+> >
+> > The following changes since commit e4a39d904c3c3e4855287b7325306289ff044b06:
+> >
+> >   Merge branch 'v4.3-topic/clk-samsung' into v4.3-next/dt-samsung-2
+> > (2015-07-24 12:54:00 +0900)
+> >
+> > are available in the git repository at:
+> >
+> >
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> > tags/samsung-dt-2
 > 
-> gpio_key is wakeup source
+> "clk: exynos5250: add cpu clock configuration data and instantiate cpu
+> clock" is applied twice, once to your own branch, and once merged in
+> from Mike's branch. That doesn't look right.
 > 
-> Failure is reproduced during suspend/resume to RAM:
-> suspend:
->  - gpio_keys_suspend
->    enable_irq_wake
->      + pcf857x_irq_set_wake
->        + omap_gpio_wake_enable
->          + TI CBAR irq_chip_set_wake_parent
->            + OMAP wakeupgen has no .irq_set_wake()
+Oops, it's my fault. Sorry for that.
 
-Most importantly, wakeupgen has IRQCHIP_SKIP_SET_WAKE set.
-
->            and -ENOSYS will be returned
+> Can you please respin? Thanks.
 > 
-> resume:
->  - gpio_keys_resume
->    + disable_irq_wake
->      + irq_set_irq_wake
->        + WARN(1, "Unbalanced IRQ %d wake disable\n", irq);
-> 
-> Fixes: 08b55e2a9208 ('genirq: Add irqchip_set_wake_parent')
-> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-> ---
->  kernel/irq/chip.c | 4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/kernel/irq/chip.c b/kernel/irq/chip.c
-> index 6de638b..bdb1b9d 100644
-> --- a/kernel/irq/chip.c
-> +++ b/kernel/irq/chip.c
-> @@ -1024,6 +1024,10 @@ int irq_chip_set_vcpu_affinity_parent(struct irq_data *data, void *vcpu_info)
->  int irq_chip_set_wake_parent(struct irq_data *data, unsigned int on)
->  {
->  	data = data->parent_data;
-> +
-> +	if (irq_data_get_irq_chip(data)->flags & IRQCHIP_SKIP_SET_WAKE)
-> +		return 0;
-> +
->  	if (data->chip->irq_set_wake)
->  		return data->chip->irq_set_wake(data, on);
->  
-> 
-
-We have a more general issue with chip flags, and how they combine
-within a stack of irqchips.
-
-What if you remove the irq_chip_set_wake_parent from the crossbar
-driver, and instead set IRQCHIP_SKIP_SET_WAKE?
+Sure, I'll tonight in my time.
 
 Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Kukjin
