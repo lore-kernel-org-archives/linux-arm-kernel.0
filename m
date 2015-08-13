@@ -1,88 +1,145 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Thu, 13 Aug 2015 09:45:03 -0600
-Subject: [PATCH 5/9] ARM: common: Introduce PM domains for CPUs/clusters
-In-Reply-To: <20150813150154.GB13356@red-moon>
-References: <1438731339-58317-1-git-send-email-lina.iyer@linaro.org>
- <1438731339-58317-6-git-send-email-lina.iyer@linaro.org>
- <CAL_JsqK67=DTtjZwwnonObLDjLbahkREfm0RvyXVV95bhR-d4Q@mail.gmail.com>
- <20150813150154.GB13356@red-moon>
-Message-ID: <20150813154503.GO52339@linaro.org>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Thu, 13 Aug 2015 17:46:07 +0200
+Subject: [PATCH v2 10/15] KVM: arm64: add data structures to model ITS
+ interrupt translation
+In-Reply-To: <1436538111-4294-11-git-send-email-andre.przywara@arm.com>
+References: <1436538111-4294-1-git-send-email-andre.przywara@arm.com>
+ <1436538111-4294-11-git-send-email-andre.przywara@arm.com>
+Message-ID: <55CCBBBF.1080407@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 13 2015 at 09:01 -0600, Lorenzo Pieralisi wrote:
->On Thu, Aug 06, 2015 at 04:14:51AM +0100, Rob Herring wrote:
->> On Tue, Aug 4, 2015 at 6:35 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
->> > Define and add Generic PM domains (genpd) for ARM CPU clusters. Many new
->> > SoCs group CPUs as clusters. Clusters share common resources like GIC,
->> > power rail, caches, VFP, Coresight etc. When all CPUs in the cluster are
->> > idle, these shared resources may also be put in their idle state.
->> >
->> > The idle time between the last CPU entering idle and a CPU resuming
->> > execution is an opportunity for these shared resources to be powered
->> > down. Generic PM domain provides a framework for defining such power
->> > domains and attach devices to the domain. When the devices in the domain
->> > are idle at runtime, the domain would also be suspended and resumed
->> > before the first of the devices resume execution.
->> >
->> > We define a generic PM domain for each cluster and attach CPU devices in
->> > the cluster to that PM domain. The DT definitions for the SoC describe
->> > this relationship. Genpd callbacks for power_on and power_off can then
->> > be used to power up/down the shared resources for the domain.
->>
->> [...]
->>
->> > +ARM CPU Power domains
->> > +
->> > +The device tree allows describing of CPU power domains in a SoC. In ARM SoC,
->> > +CPUs may be grouped as clusters. A cluster may have CPUs, GIC, Coresight,
->> > +caches, VFP and power controller and other peripheral hardware. Generally,
->> > +when the CPUs in the cluster are idle/suspended, the shared resources may also
->> > +be suspended and resumed before any of the CPUs resume execution.
->> > +
->> > +CPUs are the defined as the PM domain consumers and there is a PM domain
->> > +provider for the CPUs. Bindings for generic PM domains (genpd) is described in
->> > +[1].
->> > +
->> > +The ARM CPU PM domain follows the same binding convention as any generic PM
->> > +domain. Additional binding properties are -
->> > +
->> > +- compatible:
->> > +       Usage: required
->> > +       Value type: <string>
->> > +       Definition: Must also have
->> > +                       "arm,pd"
->> > +               inorder to initialize the genpd provider as ARM CPU PM domain.
->>
->> A compatible string should represent a particular h/w block. If it is
->> generic, it should represent some sort of standard programming
->> interface (e.g, AHCI, EHCI, etc.). This doesn't seem to be either and
->> is rather just a mapping of what "driver" you want to use.
->>
->> I would expect that identifying a cpu's or cluster's power domain
->> would be done by a phandle between the cpu/cluster node and power
->> domain node. But I've not really looked at the power domain bindings
->> so who knows.
->
->I would expect the same, meaning that a cpu node, like any other device
->node would have a phandle pointing at the respective HW power domain.
->
-CPUs have phandles to their domains. That is how the relationship
-between the domain provider (power-controller) and the consumer (CPU) is
-established.
 
->I do not really understand why we want a "generic" CPU power domain, what
->purpose does it serve ? Creating a collection of cpu devices that we
->can call "cluster" ?
->
-Nope, not for calling a cluster, a cluster :)
+On 07/10/2015 04:21 PM, Andre Przywara wrote:
+> The GICv3 Interrupt Translation Service (ITS) uses tables in memory
+> to allow a sophisticated interrupt routing. It features device tables,
+> an interrupt table per device and a table connecting "collections" to
+> actual CPUs (aka. redistributors in the GICv3 lingo).
+> Since the interrupt numbers for the LPIs are allocated quite sparsely
+> and the range can be quite huge (8192 LPIs being the minimum), using
+> bitmaps or arrays for storing information is a waste of memory.
+> We use linked lists instead, which we iterate linearily. This works
+> very well with the actual number of LPIs/MSIs in the guest being
+> quite low. Should the number of LPIs exceed the number where iterating
+> through lists seems acceptable, we can later revisit this and use more
+> efficient data structures.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+>  include/kvm/arm_vgic.h  |  3 +++
+>  virt/kvm/arm/its-emul.c | 48 ++++++++++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 51 insertions(+)
+> 
+> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+> index b432055..1648668 100644
+> --- a/include/kvm/arm_vgic.h
+> +++ b/include/kvm/arm_vgic.h
+> @@ -25,6 +25,7 @@
+>  #include <linux/spinlock.h>
+>  #include <linux/types.h>
+>  #include <kvm/iodev.h>
+> +#include <linux/list.h>
+>  
+>  #define VGIC_NR_IRQS_LEGACY	256
+>  #define VGIC_NR_SGIS		16
+> @@ -162,6 +163,8 @@ struct vgic_its {
+>  	u64			cbaser;
+>  	int			creadr;
+>  	int			cwriter;
+> +	struct list_head	device_list;
+> +	struct list_head	collection_list;
+>  };
+>  
+>  struct vgic_dist {
+> diff --git a/virt/kvm/arm/its-emul.c b/virt/kvm/arm/its-emul.c
+> index b498f06..7f217fa 100644
+> --- a/virt/kvm/arm/its-emul.c
+> +++ b/virt/kvm/arm/its-emul.c
+> @@ -21,6 +21,7 @@
+>  #include <linux/kvm.h>
+>  #include <linux/kvm_host.h>
+>  #include <linux/interrupt.h>
+> +#include <linux/list.h>
+>  
+>  #include <linux/irqchip/arm-gic-v3.h>
+>  #include <kvm/arm_vgic.h>
+> @@ -32,6 +33,25 @@
+>  #include "vgic.h"
+>  #include "its-emul.h"
+>  
+> +struct its_device {
+> +	struct list_head dev_list;
+> +	struct list_head itt;
+> +	u32 device_id;
+> +};
+> +
+> +struct its_collection {
+> +	struct list_head coll_list;
+> +	u32 collection_id;
+> +	u32 target_addr;
+> +};
+> +
+> +struct its_itte {
+> +	struct list_head itte_list;
+> +	struct its_collection *collection;
+> +	u32 lpi;
+> +	u32 event_id;
+> +};
+> +
+>  #define BASER_BASE_ADDRESS(x) ((x) & 0xfffffffff000ULL)
+>  
+>  /* The distributor lock is held by the VGIC MMIO handler. */
+> @@ -311,6 +331,9 @@ int vits_init(struct kvm *kvm)
+>  
+>  	spin_lock_init(&its->lock);
+>  
+> +	INIT_LIST_HEAD(&its->device_list);
+> +	INIT_LIST_HEAD(&its->collection_list);
+> +
+>  	its->enabled = false;
+>  
+>  	return -ENXIO;
+> @@ -320,11 +343,36 @@ void vits_destroy(struct kvm *kvm)
+>  {
+>  	struct vgic_dist *dist = &kvm->arch.vgic;
+>  	struct vgic_its *its = &dist->its;
+> +	struct its_device *dev;
+> +	struct its_itte *itte;
+> +	struct list_head *dev_cur, *dev_temp;
+> +	struct list_head *cur, *temp;
+>  
+>  	if (!vgic_has_its(kvm))
+>  		return;
+>  
+> +	if (!its->device_list.next)
+Why not using list_empty? But I think I would simply remove this since
+the empty case if handle below...
+> +		return;
+> +
+> +	spin_lock(&its->lock);
+> +	list_for_each_safe(dev_cur, dev_temp, &its->device_list) {
+> +		dev = container_of(dev_cur, struct its_device, dev_list);
+isn't the usage of list_for_each_entry_safe more synthetic here?
+> +		list_for_each_safe(cur, temp, &dev->itt) {
+> +			itte = (container_of(cur, struct its_itte, itte_list));
+same
 
-This compatible is used to define a generic behavior of the CPU domain
-controller (in addition to the platform specific behavior of the domain
-power controller). The kernel activities for such power controller are
-generally the same which otherwise would be repeated across platforms.
-An analogy to this would be the "arm,idle-state" that defines the DT
-node as something that also depicts a generic cpuidle C state.
-
-Thanks,
-Lina
+Eric
+> +			list_del(cur);
+> +			kfree(itte);
+> +		}
+> +		list_del(dev_cur);
+> +		kfree(dev);
+> +	}
+> +
+> +	list_for_each_safe(cur, temp, &its->collection_list) {
+> +		list_del(cur);
+> +		kfree(container_of(cur, struct its_collection, coll_list));
+> +	}
+> +
+>  	kfree(dist->pendbaser);
+>  
+>  	its->enabled = false;
+> +	spin_unlock(&its->lock);
+>  }
+> 
