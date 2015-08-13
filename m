@@ -1,84 +1,48 @@
-From: aisheng.dong@freescale.com (Dong Aisheng)
-Date: Thu, 13 Aug 2015 18:17:03 +0800
-Subject: [PATCH V3 0/5] clk: support clocks which requires parent clock
- on during operation
-In-Reply-To: <20150804094556.GE24870@shlinux1.ap.freescale.net>
-References: <1438089585-30103-1-git-send-email-aisheng.dong@freescale.com>
- <20150728143824.GB16916@shlinux1.ap.freescale.net>
- <20150804094556.GE24870@shlinux1.ap.freescale.net>
-Message-ID: <20150813101702.GB19166@shlinux1.ap.freescale.net>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Thu, 13 Aug 2015 11:18:10 +0100
+Subject: [RFC PATCH v4 6/9] arm: hisi_defconfig: remove CONFIG_MMC_DW_IDMAC
+In-Reply-To: <1438843553-24058-1-git-send-email-shawn.lin@rock-chips.com>
+References: <1438843469-23807-1-git-send-email-shawn.lin@rock-chips.com>
+ <1438843553-24058-1-git-send-email-shawn.lin@rock-chips.com>
+Message-ID: <55CC6EE2.4070308@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 04, 2015 at 05:45:57PM +0800, Dong Aisheng wrote:
-> On Tue, Jul 28, 2015 at 10:38:25PM +0800, Dong Aisheng wrote:
-> > On Tue, Jul 28, 2015 at 09:19:40PM +0800, Dong Aisheng wrote:
-> > > This patch series adds support in clock framework for clocks which operations
-> > > requires its parent clock is on.
-> > > 
-> > > Such clock type is initially met on Freescale i.MX7D platform that all clocks
-> > > operations, including enable/disable, rate change and re-parent, requires its
-> > > parent clock on. No sure if any other SoC has the similar clock type.
-> > > 
-> > > Current clock core can not support such type of clock well.
-> > > 
-> > > This patch introduce a new flag CLK_SET_PARENT_ON to handle this special case
-> > > in clock core that enable its parent clock firstly for each operation and disable
-> > > it later after operation complete.
-> > > 
-> > > The most special case is for set_parent() operation which requires both parent,
-> > > old one and new one, to be enabled at the same time during the operation.
-> > > 
-> > > The patch series is based on for-next branch of Michael's git:
-> > > git://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git
-> > > 
-> > > Change Log:
-> > > v2->v3:
-> > >  * rebased version, no other changes.
-> > > 
-> > > v1->v2:
-> > >  Mainly addressed Stephen Boyd's comments
-> > >  * remove dupliciated code with __clk_set_parent_after
-> > >  * introduce more clk_core_x APIs for core easily use
-> > >  * move clk_disable_unused code position
-> > >  * use clk_core_x API to make code more clean and easily read
-> > > 
-> > > Dong Aisheng (5):
-> > >   clk: remove duplicated code with __clk_set_parent_after
-> > >   clk: introduce clk_core_enable_lock and clk_core_disable_lock
-> > >     functions
-> > >   clk: move clk_disable_unused after clk_core_disable_unprepare function
-> > >   clk: core: add CLK_OPS_PARENT_ON flags to support clocks require
-> > >     parent on
-> > >   clk: core: add CLK_OPS_PARENT_ON flags to support clocks require
-> > >     parent on
-> > > 
-> > >  drivers/clk/clk.c            | 338 +++++++++++++++++++++++++------------------
-> > >  include/linux/clk-provider.h |   5 +
-> > >  2 files changed, 200 insertions(+), 143 deletions(-)
-> > > 
-> > 
-> > Sorry, forgot to update Mike's new email address.
-> > Updated.
-> > 
+
+
+On 8/6/2015 7:45 AM, Shawn Lin wrote:
+> DesignWare MMC Controller's transfer mode should be decided
+> at runtime instead of compile-time. So we remove this config
+> option and read dw_mmc's register to select DMA master.
 > 
-> Ping...
+> Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
+
+Acked-by: Wei Xu <xuwei5@hisilicon.com>
+
+> ---
+> 
+> Changes in v4: None
+> Changes in v3: None
+> Changes in v2: None
+> 
+>  arch/arm/configs/hisi_defconfig | 1 -
+>  1 file changed, 1 deletion(-)
+> 
+> diff --git a/arch/arm/configs/hisi_defconfig b/arch/arm/configs/hisi_defconfig
+> index 5997dbc..b2e340b 100644
+> --- a/arch/arm/configs/hisi_defconfig
+> +++ b/arch/arm/configs/hisi_defconfig
+> @@ -69,7 +69,6 @@ CONFIG_NOP_USB_XCEIV=y
+>  CONFIG_MMC=y
+>  CONFIG_RTC_CLASS=y
+>  CONFIG_MMC_DW=y
+> -CONFIG_MMC_DW_IDMAC=y
+>  CONFIG_MMC_DW_PLTFM=y
+>  CONFIG_RTC_DRV_PL031=y
+>  CONFIG_DMADEVICES=y
 > 
 
-Hi Mike,
+Thanks!
 
-It's been quite a long time.
-Can you help pick this?
-
-Regards
-Dong Aisheng
-
-> Regards
-> Dong Aisheng
-> 
-> > Regards
-> > Dong Aisheng
-> > 
-> > > -- 
-> > > 1.9.1
-> > > 
+Best Regards,
+Wei
