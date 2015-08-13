@@ -1,30 +1,29 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Wed, 12 Aug 2015 19:00:04 -0700
-Subject: [PATCH v2 1/2] mtd: spi-nor: add driver for NXP SPI Flash
- Interface (SPIFI)
-In-Reply-To: <CAGhQ9VzU+J1ZT45e-yZ+BAmyZvLUm1cyXE2T__O_4gGjtHrX-w@mail.gmail.com>
-References: <1433106362-6032-1-git-send-email-manabian@gmail.com>
- <1433106362-6032-2-git-send-email-manabian@gmail.com>
- <5570692E.2050603@vanguardiasur.com.ar>
- <CAGhQ9VzU+J1ZT45e-yZ+BAmyZvLUm1cyXE2T__O_4gGjtHrX-w@mail.gmail.com>
-Message-ID: <20150813020004.GA108786@google.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 13 Aug 2015 11:03:32 +0900
+Subject: [PATCH] drm/exynos: Staticize local function in exynos_drm_gem.c
+Message-ID: <1439431412-20023-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 04, 2015 at 05:58:07PM +0200, Joachim Eastwood wrote:
-> On 4 June 2015 at 17:05, Ezequiel Garcia <ezequiel@vanguardiasur.com.ar> wrote:
-> > I think the "auto-detect" quirk is really needed, or you are will
-> > otherwise fail to probe with the generic "jedec,spi-nor" compatible
-> > string.
-[...]
-> Note that this code was copied from fsl-quadspi so I assume it has the
-> same problem.
+The exynos_drm_gem_mmap_buffer() is not used outside so make it static.
 
-Yes, fsl-quadspi gets this a bit wrong, I think. But spi_nor_scan()
-didn't have a notion of "NULL means autodetect" when it was first
-written. The framework is still evolving a bit.
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+---
+ drivers/gpu/drm/exynos/exynos_drm_gem.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-I have a simple patch for fsl-quadspi to fix this up now, but I don't
-have the HW. Maybe I'll send with a RFT.
-
-Brian
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_gem.c b/drivers/gpu/drm/exynos/exynos_drm_gem.c
+index 0d5b9698d384..d9f6de012235 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_gem.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_gem.c
+@@ -318,7 +318,7 @@ void exynos_drm_gem_put_dma_addr(struct drm_device *dev,
+ 	drm_gem_object_unreference_unlocked(obj);
+ }
+ 
+-int exynos_drm_gem_mmap_buffer(struct exynos_drm_gem_obj *exynos_gem_obj,
++static int exynos_drm_gem_mmap_buffer(struct exynos_drm_gem_obj *exynos_gem_obj,
+ 				      struct vm_area_struct *vma)
+ {
+ 	struct drm_device *drm_dev = exynos_gem_obj->base.dev;
+-- 
+1.9.1
