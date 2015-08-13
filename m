@@ -1,78 +1,81 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Fri, 14 Aug 2015 09:22:37 +1000
-Subject: [GIT PULL] at91: defconfig for 4.3 #2
-In-Reply-To: <20150813122643.GA23581@localhost>
-References: <20150807162754.GA20169@piout.net>
- <20150813100938.GN30160@localhost>
- <20150813112118.GA22269@piout.net>
- <20150813122643.GA23581@localhost>
-Message-ID: <20150814092237.3551c03e@canb.auug.org.au>
+From: gregory.0xf0@gmail.com (Gregory Fong)
+Date: Thu, 13 Aug 2015 16:49:57 -0700
+Subject: [PATCH v4 2/4] gpio: brcmstb: Add interrupt and wakeup source
+ support
+In-Reply-To: <CACRpkdaz3k_N1qS5M_jmprPz8fHXeLtTke_YT8i2gaehmme+OQ@mail.gmail.com>
+References: <1438391865-7862-1-git-send-email-gregory.0xf0@gmail.com>
+ <1438391865-7862-3-git-send-email-gregory.0xf0@gmail.com>
+ <CACRpkdaz3k_N1qS5M_jmprPz8fHXeLtTke_YT8i2gaehmme+OQ@mail.gmail.com>
+Message-ID: <CADtm3G7NQqDKwGujZUA9CUJ15+e8fLg0Kupbn2CMc0MeK9DbMw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
-
-On Thu, 13 Aug 2015 14:26:43 +0200 Olof Johansson <olof@lixom.net> wrote:
+On Thu, Aug 13, 2015 at 4:11 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Sat, Aug 1, 2015 at 3:17 AM, Gregory Fong <gregory.0xf0@gmail.com> wrote:
 >
-> On Thu, Aug 13, 2015 at 01:21:18PM +0200, Alexandre Belloni wrote:
-> > On 13/08/2015 at 12:09:38 +0200, Olof Johansson wrote :
-> > > On Fri, Aug 07, 2015 at 06:27:54PM +0200, Alexandre Belloni wrote:
-> > > > 
-> > > > A little defconfig update. That will probably be all for this cycle.
-> > > > 
-> > > > Thanks, bye,
-> > > > 
-> > > > 
-> > > > The following changes since commit eff7f41572a645bf14a96a6f844be4f1c88cd9dd:
-> > > > 
-> > > >   ARM: at91: at91_dt_defconfig: enable ISI and ov2640 support (2015-07-30 14:17:31 +0200)
-> > > > 
-> > > > are available in the git repository at:
-> > > > 
-> > > >   git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-defconfig2
-> > > > 
-> > > > for you to fetch changes up to ea7bf603fd494391acc1f42acbfc34260b965c44:
-> > > > 
-> > > >   ARM: at91/defconfig: at91_dt: remove ARM_AT91_ETHER (2015-08-07 12:07:50 +0200)
-> > > 
-> > > Nicolas had sent me one patch which you've also included here but it's not in
-> > > the pull request ("enable ISI and ov2640 support"). That caused a conflict
-> > > here, so to avoid having the patch in the tree twice I instead also directly
-> > > applied your patches from this branch instead of merging.
-> > > 
-> > > Sorry about that, it started due to Nicolas sending the discrete patch to us.
-> > > So it seems like we'll apply at91 defconfig updates directly this release, in
-> > > case there are any more. No big deal I hope. :)
-> > 
-> > That's not a big deal and there will most probably be all for that cycle
-> > anyway.
-> > 
-> > However, I'm wondering how I should have done. From the PR, if you get
-> > eff7f41572a645bf14a96a6f844be4f1c88cd9dd..tags/at91-ab-defconfig2, it
-> > correctly excludes "enable ISI and ov2640 support" so I was thinking it
-> > was fine.
-> > Be cause the first patch was taken as a patch, should I have prepared a
-> > branch without it?
-> 
-> Yeah, you could have applied the other two if there were no conflicts. If there
-> were conflicts then it gets complicated, and the best answer would probably
-> have been to continue applying directly as patches.
-> 
-> This is the drawback of us sometimes applying patches directly -- when we do,
-> we no longer put them on a branch of their own that you can use as base. We
-> used to once upon a time but it is quite a bit of overhead for us and the
-> upside was pretty limited.
+>> Uses the gpiolib irqchip helpers.  For this to work, the irq setup
+>> function is called once per bank instead of once per device.  Note
+>> that all known uses of this block have a BCM7120 L2 interrupt
+>> controller as a parent.  Supports interrupts for all GPIOs.
+>>
+>> In the IRQ handler, we check for raised IRQs for invalid GPIOs and
+>> warn (ratelimited) if they're encountered.
+>>
+>> Also, several drivers (e.g. gpio-keys) allow for GPIOs to be
+>> configured as wakeup sources, and this GPIO controller supports that
+>> through a separate interrupt path.
+>>
+>> The de-facto standard DT property "wakeup-source" is checked, since
+>> that indicates whether the GPIO controller hardware can wake.  Uses
+>> the IRQCHIP_MASK_ON_SUSPEND irq_chip flag because UPG GIO doesn't have
+>> any of its own wakeup source configuration.
+>>
+>> Aside regarding gpiolib irqchip helpers: It wasn't obvious (to me)
+>> that you can have multiple chained irqchips and associated IRQ domains
+>> for a single parent IRQ, and as long as the xlate function is written
+>> correctly, a GPIO IRQ request end up checking the correct domain and
+>> will get associated with the correct IRQ.  What helps make this clear
+>> is to read
+>>   drivers/gpio/gpiolib-of.c:
+>>    - of_gpiochip_find_and_xlate()
+>>    - of_get_named_gpiod_flags()
+>>   drivers/gpio/gpiolib.c:
+>>    - gpiochip_find()
+>>
+>> Signed-off-by: Gregory Fong <gregory.0xf0@gmail.com>
+>> ---
+>> v4:
+>> - when checking parent_irq, use <= 0 or > 0 since 0 is NO_IRQ.
+>
+> Patch applied, but:
+>
+>
+>> +       if (of_property_read_bool(np, "interrupt-controller")) {
+>> +               priv->parent_irq = platform_get_irq(pdev, 0);
+>> +               if (priv->parent_irq <= 0) {
+>> +                       dev_err(dev, "Couldn't get IRQ");
+>> +                       return -ENOENT;
+>> +               }
+>> +       } else {
+>> +               priv->parent_irq = -ENOENT;
+>> +       }
+>> +
+>>         if (brcmstb_gpio_sanity_check_banks(dev, np, res))
+>>                 return -EINVAL;
+>
+> This patch does not apply cleanly because the version in my
+> tree has INIT_LIST_HEAD(&priv->bank_list);
+> before the sanity check.
+>
+> I applied it manually, but check that things are working right.
 
-The only thing now is that since the at91 tree is in linux-next as well
-as the arm-soc tree, those patches appear twice there and there is a
-conflict (easy to fix, but a pain).  The solution here is to update the
-at91 tree to be somewhere in the arm-soc tree (probably just reset to
-the point where the two trees match in patches but not commits).  This
-has the downside that the at91 tree will be rebased which will affect
-any development work that is based on that.
+Your tree seems to be missing
 
-If there was just one patch in common, it maybe have been better to
-just merge the at91 tree and fix the conflict in the merge.
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
+commit 2252607d327d5219a6331b50e6ec266d56402be0
+Author: Gregory Fong <gregory.0xf0@gmail.com>
+Date:   Wed Jun 17 18:00:40 2015 -0700
+
+    gpio: brcmstb: fix null ptr dereference in driver remove
+
+which you had pulled in and sent for 4.2-rc1.  It should apply cleanly
+on top of that.
