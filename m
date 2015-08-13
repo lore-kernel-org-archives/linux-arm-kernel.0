@@ -1,80 +1,196 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 13 Aug 2015 11:09:39 +0200
-Subject: [PATCH 3/3] ARM: dts: UniPhier: add ProXstream2 and PH1-LD6b
- SoC/board support
-In-Reply-To: <CAK7LNAQ+6tQ9Ci6LKsAB7kLj0o60Hizo2gOokDH9qW=FnO0gEA@mail.gmail.com>
-References: <1438687264-26538-1-git-send-email-yamada.masahiro@socionext.com>
- <1438687264-26538-4-git-send-email-yamada.masahiro@socionext.com>
- <20150811130739.GD30181@localhost>
- <CAK7LNAQ+6tQ9Ci6LKsAB7kLj0o60Hizo2gOokDH9qW=FnO0gEA@mail.gmail.com>
-Message-ID: <CAOesGMhhSKr6Nn7YEjoB9V_5-yhwzn_fKZ7FSU3U-2XYT5mJrQ@mail.gmail.com>
+From: gg@slimlogic.co.uk (Graeme Gregory)
+Date: Thu, 13 Aug 2015 10:38:38 +0100
+Subject: [PATCH 2/2] Convert smsc911x to use ACPI as well as DT
+In-Reply-To: <20150813090117.GA13833@red-moon>
+References: <1439417187-21411-1-git-send-email-jeremy.linton@arm.com>
+ <1439417187-21411-3-git-send-email-jeremy.linton@arm.com>
+ <20150813082759.GB5468@xora-haswell.xora.org.uk>
+ <20150813090117.GA13833@red-moon>
+Message-ID: <20150813093838.GC5468@xora-haswell.xora.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 12, 2015 at 3:14 PM, Masahiro Yamada
-<yamada.masahiro@socionext.com> wrote:
-> Hi Olof,
->
->
-> 2015-08-11 22:07 GMT+09:00 Olof Johansson <olof@lixom.net>:
->> Hi,
->>
->> On Tue, Aug 04, 2015 at 08:21:04PM +0900, Masahiro Yamada wrote:
->>> Initial version of DTSI for ProXstream2 and PH1-LD6b and DTS for
->>> PH1-LD6b reference board.
->>>
->>> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
->>> ---
->>>
->>>  arch/arm/boot/dts/Makefile                  |   3 +-
->>>  arch/arm/boot/dts/uniphier-ph1-ld6b-ref.dts | 105 +++++++++++
->>>  arch/arm/boot/dts/uniphier-ph1-ld6b.dtsi    |  67 +++++++
->>>  arch/arm/boot/dts/uniphier-proxstream2.dtsi | 273 ++++++++++++++++++++++++++++
->>>  4 files changed, 447 insertions(+), 1 deletion(-)
->>>  create mode 100644 arch/arm/boot/dts/uniphier-ph1-ld6b-ref.dts
->>>  create mode 100644 arch/arm/boot/dts/uniphier-ph1-ld6b.dtsi
->>>  create mode 100644 arch/arm/boot/dts/uniphier-proxstream2.dtsi
->>>
->>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->>> index 246473a..6eb3f2f 100644
->>> --- a/arch/arm/boot/dts/Makefile
->>> +++ b/arch/arm/boot/dts/Makefile
->>> @@ -645,7 +645,8 @@ dtb-$(CONFIG_ARCH_UNIPHIER) += \
->>>       uniphier-ph1-sld3-ref.dtb \
->>>       uniphier-ph1-ld4-ref.dtb \
->>>       uniphier-ph1-pro4-ref.dtb \
->>> -     uniphier-ph1-sld8-ref.dtb
->>> +     uniphier-ph1-sld8-ref.dtb \
->>> +     uniphier-ph1-ld6b-ref.dtb
->>
->> Please always add entries here sorted, don't just append. I've fixed it
->> up for you this time.
->>
->>
->
-> Please do not do that (without my ack).
+On Thu, Aug 13, 2015 at 10:01:17AM +0100, Lorenzo Pieralisi wrote:
+> On Thu, Aug 13, 2015 at 09:27:59AM +0100, Graeme Gregory wrote:
+> > On Wed, Aug 12, 2015 at 05:06:27PM -0500, Jeremy Linton wrote:
+> > > Add ACPI bindings for the smsc911x driver. Convert the DT specific calls
+> > > to nonspecific device* calls, This allows the driver to work
+> > > with both ACPI and DT configurations. Ethernet should now work when using
+> > > ACPI on ARM Juno.
+> 
+> Last sentence does not belong in the commit log.
+> 
+> > > 
+> > > Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+> > 
+> > The code looks fine to me.
+> > 
+> > Currently the compulsary DT properties seem to match the "approved" ACPI
+> > NIC properties from here
+> > 
+> > http://www.uefi.org/sites/default/files/resources/nic-request-v2.pdf
+> 
+> What about _DSD device specific properties (eg "smsc,save-mac-address") ?
+> Are we taking 1:1 translation between DT and ACPI for granted ?
+> 
+> I thought some process must be put in place to define the corresponding
+> bindings in ACPI before starting this mechanical translation or maybe
+> I missed something, I would like to understand.
+> 
+> How does the device specific _DSD definitions work in ACPI world ? Where
+> are they published ? How will we translate those to DT bindings if there
+> is need ?
+> 
 
-I'm not going to go get your ack for something as trivial as this. We
-do make sure subplatform maintainers are in the loop and get to review
-code that touches their platform, but in this case this was a shared
-makefile and there were no functional changes.
+This I do not know as that discussion is still ongoing. But those
+options are currently marked as optional so driver should not fail if
+they are not present in ACPI.
 
-> It was already sorted from old SoC to new SoC.
->
-> Sorting chronologically (in other words, in the order of chip ID)
-> makes more sense than sorting alphabetically.
+Graeme
 
-No, it doesn't. All entries in these files should be sorted
-alphabetically. Sometimes we miss out on it, but it's the goal.
-
-If you sort chronologically it's impossible for anyone but people
-intimately familiar with UniPhier's product history to add any new
-entries in the right location. Also, since it's likely that newer
-chips will be introduced over time, new entries are likely to just be
-appends instead of inserted at more varied locations in the files.
-
-Append-only additions are more likely to have add/add conflicts, which
-is why we're preferring alphabetical sort order in the first place.
-
-
--Olof
+> Lorenzo
+> 
+> > Reviewed-by: Graeme Gregory <graeme.gregory@linaro.org>
+> > 
+> > Thanks
+> > 
+> > > ---
+> > >  drivers/net/ethernet/smsc/smsc911x.c | 48 +++++++++++++++++-------------------
+> > >  1 file changed, 22 insertions(+), 26 deletions(-)
+> > > 
+> > > diff --git a/drivers/net/ethernet/smsc/smsc911x.c b/drivers/net/ethernet/smsc/smsc911x.c
+> > > index 959aeea..0f21aa3 100644
+> > > --- a/drivers/net/ethernet/smsc/smsc911x.c
+> > > +++ b/drivers/net/ethernet/smsc/smsc911x.c
+> > > @@ -59,7 +59,9 @@
+> > >  #include <linux/of_device.h>
+> > >  #include <linux/of_gpio.h>
+> > >  #include <linux/of_net.h>
+> > > +#include <linux/acpi.h>
+> > >  #include <linux/pm_runtime.h>
+> > > +#include <linux/property.h>
+> > >  
+> > >  #include "smsc911x.h"
+> > >  
+> > > @@ -2362,59 +2364,46 @@ static const struct smsc911x_ops shifted_smsc911x_ops = {
+> > >  	.tx_writefifo = smsc911x_tx_writefifo_shift,
+> > >  };
+> > >  
+> > > -#ifdef CONFIG_OF
+> > > -static int smsc911x_probe_config_dt(struct smsc911x_platform_config *config,
+> > > -				    struct device_node *np)
+> > > +static int smsc911x_probe_config(struct smsc911x_platform_config *config,
+> > > +				 struct device *dev)
+> > >  {
+> > > -	const char *mac;
+> > >  	u32 width = 0;
+> > >  
+> > > -	if (!np)
+> > > +	if (!dev)
+> > >  		return -ENODEV;
+> > >  
+> > > -	config->phy_interface = of_get_phy_mode(np);
+> > > +	config->phy_interface = device_get_phy_mode(dev);
+> > >  
+> > > -	mac = of_get_mac_address(np);
+> > > -	if (mac)
+> > > -		memcpy(config->mac, mac, ETH_ALEN);
+> > > +	device_get_mac_address(dev, config->mac, ETH_ALEN);
+> > >  
+> > > -	of_property_read_u32(np, "reg-shift", &config->shift);
+> > > +	device_property_read_u32(dev, "reg-shift", &config->shift);
+> > >  
+> > > -	of_property_read_u32(np, "reg-io-width", &width);
+> > > +	device_property_read_u32(dev, "reg-io-width", &width);
+> > >  	if (width == 4)
+> > >  		config->flags |= SMSC911X_USE_32BIT;
+> > >  	else
+> > >  		config->flags |= SMSC911X_USE_16BIT;
+> > >  
+> > > -	if (of_get_property(np, "smsc,irq-active-high", NULL))
+> > > +	if (device_property_present(dev, "smsc,irq-active-high"))
+> > >  		config->irq_polarity = SMSC911X_IRQ_POLARITY_ACTIVE_HIGH;
+> > >  
+> > > -	if (of_get_property(np, "smsc,irq-push-pull", NULL))
+> > > +	if (device_property_present(dev, "smsc,irq-push-pull"))
+> > >  		config->irq_type = SMSC911X_IRQ_TYPE_PUSH_PULL;
+> > >  
+> > > -	if (of_get_property(np, "smsc,force-internal-phy", NULL))
+> > > +	if (device_property_present(dev, "smsc,force-internal-phy"))
+> > >  		config->flags |= SMSC911X_FORCE_INTERNAL_PHY;
+> > >  
+> > > -	if (of_get_property(np, "smsc,force-external-phy", NULL))
+> > > +	if (device_property_present(dev, "smsc,force-external-phy"))
+> > >  		config->flags |= SMSC911X_FORCE_EXTERNAL_PHY;
+> > >  
+> > > -	if (of_get_property(np, "smsc,save-mac-address", NULL))
+> > > +	if (device_property_present(dev, "smsc,save-mac-address"))
+> > >  		config->flags |= SMSC911X_SAVE_MAC_ADDRESS;
+> > >  
+> > >  	return 0;
+> > >  }
+> > > -#else
+> > > -static inline int smsc911x_probe_config_dt(
+> > > -				struct smsc911x_platform_config *config,
+> > > -				struct device_node *np)
+> > > -{
+> > > -	return -ENODEV;
+> > > -}
+> > > -#endif /* CONFIG_OF */
+> > >  
+> > >  static int smsc911x_drv_probe(struct platform_device *pdev)
+> > >  {
+> > > -	struct device_node *np = pdev->dev.of_node;
+> > >  	struct net_device *dev;
+> > >  	struct smsc911x_data *pdata;
+> > >  	struct smsc911x_platform_config *config = dev_get_platdata(&pdev->dev);
+> > > @@ -2478,7 +2467,7 @@ static int smsc911x_drv_probe(struct platform_device *pdev)
+> > >  		goto out_disable_resources;
+> > >  	}
+> > >  
+> > > -	retval = smsc911x_probe_config_dt(&pdata->config, np);
+> > > +	retval = smsc911x_probe_config(&pdata->config, &pdev->dev);
+> > >  	if (retval && config) {
+> > >  		/* copy config parameters across to pdata */
+> > >  		memcpy(&pdata->config, config, sizeof(pdata->config));
+> > > @@ -2654,6 +2643,12 @@ static const struct of_device_id smsc911x_dt_ids[] = {
+> > >  MODULE_DEVICE_TABLE(of, smsc911x_dt_ids);
+> > >  #endif
+> > >  
+> > > +static const struct acpi_device_id smsc911x_acpi_match[] = {
+> > > +	{ "ARMH9118", 0 },
+> > > +	{ }
+> > > +};
+> > > +MODULE_DEVICE_TABLE(acpi, smsc911x_acpi_match);
+> > > +
+> > >  static struct platform_driver smsc911x_driver = {
+> > >  	.probe = smsc911x_drv_probe,
+> > >  	.remove = smsc911x_drv_remove,
+> > > @@ -2661,6 +2656,7 @@ static struct platform_driver smsc911x_driver = {
+> > >  		.name	= SMSC_CHIPNAME,
+> > >  		.pm	= SMSC911X_PM_OPS,
+> > >  		.of_match_table = of_match_ptr(smsc911x_dt_ids),
+> > > +		.acpi_match_table = ACPI_PTR(smsc911x_acpi_match),
+> > >  	},
+> > >  };
+> > >  
+> > > -- 
+> > > 2.4.3
+> > > 
+> > > 
+> > > 
+> > > _______________________________________________
+> > > linux-arm-kernel mailing list
+> > > linux-arm-kernel at lists.infradead.org
+> > > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> > 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> > 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
