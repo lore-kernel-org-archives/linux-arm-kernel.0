@@ -1,41 +1,62 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Thu, 13 Aug 2015 19:02:17 +0800
-Subject: [PATCH 2/3] Display a DMA error message
-In-Reply-To: <1439416290-21228-3-git-send-email-jeremy.linton@arm.com>
-References: <1439416290-21228-1-git-send-email-jeremy.linton@arm.com>
- <1439416290-21228-3-git-send-email-jeremy.linton@arm.com>
-Message-ID: <55CC7939.7020800@huawei.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 13 Aug 2015 12:04:29 +0100
+Subject: [PATCH v2 6/6] irqchip: crossbar: fix irq masking at suspend
+In-Reply-To: <55CC6EB8.3050906@ti.com>
+References: <1439401562-28874-1-git-send-email-grygorii.strashko@ti.com>
+ <1439401562-28874-7-git-send-email-grygorii.strashko@ti.com>
+ <55CC63D0.8030707@arm.com> <55CC6EB8.3050906@ti.com>
+Message-ID: <55CC79BD.4030001@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/8/13 5:51, Jeremy Linton wrote:
-> If the ehci driver fails to configure the dma settings then display
-> a dev error instead of simply failing. This is triggered in an
-> ACPI world if the user fails to set the _CCA on the device.
->
-> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
-> ---
->  drivers/usb/host/ehci-platform.c | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/usb/host/ehci-platform.c b/drivers/usb/host/ehci-platform.c
-> index 2593def..82e396f 100644
-> --- a/drivers/usb/host/ehci-platform.c
-> +++ b/drivers/usb/host/ehci-platform.c
-> @@ -162,8 +162,10 @@ static int ehci_platform_probe(struct platform_device *dev)
->  
->  	err = dma_coerce_mask_and_coherent(&dev->dev,
->  		pdata->dma_mask_64 ? DMA_BIT_MASK(64) : DMA_BIT_MASK(32));
-> -	if (err)
-> +	if (err) {
-> +		dev_err(&dev->dev, "Error: DMA setup failed\n");
->  		return err;
-> +	}
->  
->  	irq = platform_get_irq(dev, 0);
->  	if (irq < 0) {
 
-Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
 
-Thanks
-Hanjun
+On 13/08/15 11:17, Grygorii Strashko wrote:
+> On 08/13/2015 12:30 PM, Sudeep Holla wrote:
+>>
+>>
+>> On 12/08/15 18:46, Grygorii Strashko wrote:
+>>> All ARM GIC IRQs have to masked during suspend if they are not
+>>> wakeup source. Now this is not happen, since switching to
+>>> use IRQ domain hierarchy, because suspend_device_irq() only checks flags
+>>> in the last IRQ chip in hierarchy for IRQCHIP_MASK_ON_SUSPEND
+>>> bit set. And in the case of TI OMAP DRA7 the last IRQ chip is TI Crossbar
+>>> which do not have this flag set.
+>>>
+>>> In case of TI OMAP DRA7 the following IRQ hierarchy is defined:
+>>>     ARM GIC <- OMAP wakeupgen <- TI CBAR
+>>> ARM GIC - IRQCHIP_MASK_ON_SUSPEND=n
+>>
+>> May be this won't affect your platform or this patch but even GIC marks
+>> IRQCHIP_MASK_ON_SUSPEND=y now since GIC doesn't provide any facility to
+>> configure the wakeup source and keeps all the interrupt source enabled.
+>
+> That's true for next, bur not true for 4.2-rc6 or 4.1 :(
+>
+
+True, I just wanted to ensure there is no assumption.
+
+[...]
+>>
+>> Also the beginning of the commit message contradicts when you also say
+>> in the following statement IRQCHIP_MASK_ON_SUSPEND=n. So you may need to
+>> update the log.
+>
+> I'll try to reword. What I've tried to mention that IRQs masking on
+> suspend is default expected behavior and that how it was before
+> switching to IRQ domain hierarchy.
+>
+> "All ARM GIC IRQs have to masked during suspend if they are not
+>   wakeup source - this is expected behavior and that's how it was before
+>   switching to IRQ domain hierarchy. ..."
+> ok?
+>
+
+My mistake I referred the code after it was converted to use stack
+domains. So I missed to understand that you were using gic_arch_extn
+flags before to override GIC flags as gic_set_irqchip_flags was not
+used when I removed it. Sorry for the noise, you can retain the commit
+log as is.
+
+Regards,
+Sudeep
