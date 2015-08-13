@@ -1,158 +1,100 @@
-From: gg@slimlogic.co.uk (Graeme Gregory)
-Date: Thu, 13 Aug 2015 09:27:59 +0100
-Subject: [PATCH 2/2] Convert smsc911x to use ACPI as well as DT
-In-Reply-To: <1439417187-21411-3-git-send-email-jeremy.linton@arm.com>
-References: <1439417187-21411-1-git-send-email-jeremy.linton@arm.com>
- <1439417187-21411-3-git-send-email-jeremy.linton@arm.com>
-Message-ID: <20150813082759.GB5468@xora-haswell.xora.org.uk>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 13 Aug 2015 09:28:44 +0100
+Subject: [PATCH v2 2/4] irqchip: GICv3: Don't deactivate interrupts forwarded
+ to a guest
+In-Reply-To: <1439454526-1185-1-git-send-email-marc.zyngier@arm.com>
+References: <1439454526-1185-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1439454526-1185-3-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 12, 2015 at 05:06:27PM -0500, Jeremy Linton wrote:
-> Add ACPI bindings for the smsc911x driver. Convert the DT specific calls
-> to nonspecific device* calls, This allows the driver to work
-> with both ACPI and DT configurations. Ethernet should now work when using
-> ACPI on ARM Juno.
-> 
-> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+Commit 0a4377de3056 ("genirq: Introduce irq_set_vcpu_affinity() to
+target an interrupt to a VCPU") added just what we needed at the
+lowest level to allow an interrupt to be deactivated by a guest.
 
-The code looks fine to me.
+When such a request reaches the GIC, it knows it doesn't need to
+perform the deactivation anymore, and can safely leave the guest
+do its magic. This of course requires additional support in both
+VFIO and KVM.
 
-Currently the compulsary DT properties seem to match the "approved" ACPI
-NIC properties from here
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ drivers/irqchip/irq-gic-v3.c | 35 +++++++++++++++++++++++++++++++++--
+ 1 file changed, 33 insertions(+), 2 deletions(-)
 
-http://www.uefi.org/sites/default/files/resources/nic-request-v2.pdf
-
-Reviewed-by: Graeme Gregory <graeme.gregory@linaro.org>
-
-Thanks
-
-> ---
->  drivers/net/ethernet/smsc/smsc911x.c | 48 +++++++++++++++++-------------------
->  1 file changed, 22 insertions(+), 26 deletions(-)
-> 
-> diff --git a/drivers/net/ethernet/smsc/smsc911x.c b/drivers/net/ethernet/smsc/smsc911x.c
-> index 959aeea..0f21aa3 100644
-> --- a/drivers/net/ethernet/smsc/smsc911x.c
-> +++ b/drivers/net/ethernet/smsc/smsc911x.c
-> @@ -59,7 +59,9 @@
->  #include <linux/of_device.h>
->  #include <linux/of_gpio.h>
->  #include <linux/of_net.h>
-> +#include <linux/acpi.h>
->  #include <linux/pm_runtime.h>
-> +#include <linux/property.h>
->  
->  #include "smsc911x.h"
->  
-> @@ -2362,59 +2364,46 @@ static const struct smsc911x_ops shifted_smsc911x_ops = {
->  	.tx_writefifo = smsc911x_tx_writefifo_shift,
->  };
->  
-> -#ifdef CONFIG_OF
-> -static int smsc911x_probe_config_dt(struct smsc911x_platform_config *config,
-> -				    struct device_node *np)
-> +static int smsc911x_probe_config(struct smsc911x_platform_config *config,
-> +				 struct device *dev)
->  {
-> -	const char *mac;
->  	u32 width = 0;
->  
-> -	if (!np)
-> +	if (!dev)
->  		return -ENODEV;
->  
-> -	config->phy_interface = of_get_phy_mode(np);
-> +	config->phy_interface = device_get_phy_mode(dev);
->  
-> -	mac = of_get_mac_address(np);
-> -	if (mac)
-> -		memcpy(config->mac, mac, ETH_ALEN);
-> +	device_get_mac_address(dev, config->mac, ETH_ALEN);
->  
-> -	of_property_read_u32(np, "reg-shift", &config->shift);
-> +	device_property_read_u32(dev, "reg-shift", &config->shift);
->  
-> -	of_property_read_u32(np, "reg-io-width", &width);
-> +	device_property_read_u32(dev, "reg-io-width", &width);
->  	if (width == 4)
->  		config->flags |= SMSC911X_USE_32BIT;
->  	else
->  		config->flags |= SMSC911X_USE_16BIT;
->  
-> -	if (of_get_property(np, "smsc,irq-active-high", NULL))
-> +	if (device_property_present(dev, "smsc,irq-active-high"))
->  		config->irq_polarity = SMSC911X_IRQ_POLARITY_ACTIVE_HIGH;
->  
-> -	if (of_get_property(np, "smsc,irq-push-pull", NULL))
-> +	if (device_property_present(dev, "smsc,irq-push-pull"))
->  		config->irq_type = SMSC911X_IRQ_TYPE_PUSH_PULL;
->  
-> -	if (of_get_property(np, "smsc,force-internal-phy", NULL))
-> +	if (device_property_present(dev, "smsc,force-internal-phy"))
->  		config->flags |= SMSC911X_FORCE_INTERNAL_PHY;
->  
-> -	if (of_get_property(np, "smsc,force-external-phy", NULL))
-> +	if (device_property_present(dev, "smsc,force-external-phy"))
->  		config->flags |= SMSC911X_FORCE_EXTERNAL_PHY;
->  
-> -	if (of_get_property(np, "smsc,save-mac-address", NULL))
-> +	if (device_property_present(dev, "smsc,save-mac-address"))
->  		config->flags |= SMSC911X_SAVE_MAC_ADDRESS;
->  
->  	return 0;
->  }
-> -#else
-> -static inline int smsc911x_probe_config_dt(
-> -				struct smsc911x_platform_config *config,
-> -				struct device_node *np)
-> -{
-> -	return -ENODEV;
-> -}
-> -#endif /* CONFIG_OF */
->  
->  static int smsc911x_drv_probe(struct platform_device *pdev)
->  {
-> -	struct device_node *np = pdev->dev.of_node;
->  	struct net_device *dev;
->  	struct smsc911x_data *pdata;
->  	struct smsc911x_platform_config *config = dev_get_platdata(&pdev->dev);
-> @@ -2478,7 +2467,7 @@ static int smsc911x_drv_probe(struct platform_device *pdev)
->  		goto out_disable_resources;
->  	}
->  
-> -	retval = smsc911x_probe_config_dt(&pdata->config, np);
-> +	retval = smsc911x_probe_config(&pdata->config, &pdev->dev);
->  	if (retval && config) {
->  		/* copy config parameters across to pdata */
->  		memcpy(&pdata->config, config, sizeof(pdata->config));
-> @@ -2654,6 +2643,12 @@ static const struct of_device_id smsc911x_dt_ids[] = {
->  MODULE_DEVICE_TABLE(of, smsc911x_dt_ids);
->  #endif
->  
-> +static const struct acpi_device_id smsc911x_acpi_match[] = {
-> +	{ "ARMH9118", 0 },
-> +	{ }
-> +};
-> +MODULE_DEVICE_TABLE(acpi, smsc911x_acpi_match);
-> +
->  static struct platform_driver smsc911x_driver = {
->  	.probe = smsc911x_drv_probe,
->  	.remove = smsc911x_drv_remove,
-> @@ -2661,6 +2656,7 @@ static struct platform_driver smsc911x_driver = {
->  		.name	= SMSC_CHIPNAME,
->  		.pm	= SMSC911X_PM_OPS,
->  		.of_match_table = of_match_ptr(smsc911x_dt_ids),
-> +		.acpi_match_table = ACPI_PTR(smsc911x_acpi_match),
->  	},
->  };
->  
-> -- 
-> 2.4.3
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+index 61190fb..01c6329 100644
+--- a/drivers/irqchip/irq-gic-v3.c
++++ b/drivers/irqchip/irq-gic-v3.c
+@@ -70,6 +70,11 @@ static inline int gic_irq_in_rdist(struct irq_data *d)
+ 	return gic_irq(d) < 32;
+ }
+ 
++static inline bool forwarded_irq(struct irq_data *d)
++{
++	return d->handler_data != NULL;
++}
++
+ static inline void __iomem *gic_dist_base(struct irq_data *d)
+ {
+ 	if (gic_irq_in_rdist(d))	/* SGI+PPI -> SGI_base for this CPU */
+@@ -231,6 +236,18 @@ static void gic_poke_irq(struct irq_data *d, u32 offset)
+ static void gic_mask_irq(struct irq_data *d)
+ {
+ 	gic_poke_irq(d, GICD_ICENABLER);
++	/*
++	 * When masking a forwarded interrupt, make sure it is
++	 * deactivated as well.
++	 *
++	 * This ensures that an interrupt that is getting
++	 * disabled/masked will not get "stuck", because there is
++	 * noone to deactivate it (guest is being terminated).
++	 */
++	if (static_key_true(&supports_deactivate)) {
++		if (forwarded_irq(d))
++			gic_poke_irq(d, GICD_ICACTIVER);
++	}
+ }
+ 
+ static void gic_unmask_irq(struct irq_data *d)
+@@ -296,8 +313,11 @@ static int gic_irq_get_irqchip_state(struct irq_data *d,
+ static void gic_eoi_irq(struct irq_data *d)
+ {
+ 	if (static_key_true(&supports_deactivate)) {
+-		/* No need to deactivate an LPI */
+-		if (gic_irq(d) >= 8192)
++		/*
++		 * No need to deactivate an LPI, or an interrupt that
++		 * is is getting forwarded to a vcpu.
++		 */
++		if (gic_irq(d) >= 8192 || forwarded_irq(d))
+ 			return;
+ 		gic_write_dir(gic_irq(d));
+ 	} else {
+@@ -331,6 +351,16 @@ static int gic_set_type(struct irq_data *d, unsigned int type)
+ 	return gic_configure_irq(irq, type, base, rwp_wait);
+ }
+ 
++static int gic_irq_set_vcpu_affinity(struct irq_data *d, void *vcpu)
++{
++	if (static_key_true(&supports_deactivate)) {
++		d->handler_data = vcpu;
++		return 0;
++	}
++
++	return -EINVAL;
++}
++
+ static u64 gic_mpidr_to_affinity(u64 mpidr)
+ {
+ 	u64 aff;
+@@ -681,6 +711,7 @@ static struct irq_chip gic_chip = {
+ 	.irq_set_affinity	= gic_set_affinity,
+ 	.irq_get_irqchip_state	= gic_irq_get_irqchip_state,
+ 	.irq_set_irqchip_state	= gic_irq_set_irqchip_state,
++	.irq_set_vcpu_affinity	= gic_irq_set_vcpu_affinity,
+ 	.flags			= IRQCHIP_SET_TYPE_MASKED,
+ };
+ 
+-- 
+2.1.4
