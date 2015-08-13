@@ -1,61 +1,25 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Thu, 13 Aug 2015 03:20:35 +0200
-Subject: 3.18: lockdep problems in cpufreq
-In-Reply-To: <20150811170357.GA24529@n2100.arm.linux.org.uk>
-References: <20141214213655.GA11285@n2100.arm.linux.org.uk>
- <2574268.XBqpdL2VLI@vostro.rjw.lan>
- <20150811170357.GA24529@n2100.arm.linux.org.uk>
-Message-ID: <5160300.5D2Dvly8u9@vostro.rjw.lan>
+From: eric@anholt.net (Eric Anholt)
+Date: Wed, 12 Aug 2015 17:56:13 -0700
+Subject: Raspberry Pi KMS-only driver
+Message-ID: <1439427380-2436-1-git-send-email-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, August 11, 2015 06:03:57 PM Russell King - ARM Linux wrote:
-> On Tue, May 19, 2015 at 12:05:55AM +0200, Rafael J. Wysocki wrote:
-> > On Monday, May 18, 2015 07:56:45 PM Russell King - ARM Linux wrote:
-> > > On Tue, Dec 16, 2014 at 09:11:53AM +0530, Viresh Kumar wrote:
-> > > > On 16 December 2014 at 04:39, Russell King - ARM Linux
-> > > > <linux@arm.linux.org.uk> wrote:
-> > > > > Well, here's a patch which I'm running on top of 3.18 at the moment,
-> > > > > which is basically what I described in my email, and I'm running with it
-> > > > > and it is without any lockdep complaint.
-> > > > 
-> > > > We need two separate patches now, one for 3.18 and other one for 3.19-rc.
-> > > > 3.19 has see lots of changes in this particular file and so we need to
-> > > > change few things here.
-> > > 
-> > > What happened with this?  I'm still carrying the patch.
-> > 
-> > This should go in through the thermal tree.  Eduardo?
-> 
-> Having waited a long time for any kind of response from Eduardo, I've
-> given up.  My conclusion is that Eduardo isn't interested in this.
-> 
-> I've re-checked, and the AB-BA deadlock is still there in the latest
-> code.  So, I've taken it upon myself to throw this into my for-next
-> branch to force the issue - not something I _want_ to do, but I'm doing
-> this out of frustration.  It's clear to me that "playing nice" by email
-> does _not_ work with some people.
-> 
-> I'm rather hoping that Stephen reports a merge conflict with linux-next
-> this evening to highlight this situation.  I've added additional commentry
-> to the commit message on the patch giving the reason why I've done this,
-> and the relevant message IDs showing the past history.
-> 
-> I've not decided whether I'm going to ask Linus to take this patch
-> directly or not, that rather depends whether there's any co-operation
-> from Eduardo on this.  I'd rather Eduardo took the patch.
-> 
-> The patch I have has had to be updated again for changes to the driver,
-> but I really don't see the point of re-posting it just for it to be
-> ignored yet again.
-> 
-> I'm really disappointed by this dysfunctional state of affairs, and
-> that what should be an urgent fix for an observable problem is still
-> not merged some nine months after it was first identified.
+Here's the first patch series for graphics on the Raspberry Pi.  It
+brings up fbcon on KMS, and the xf86-video-modesetting driver runs so
+you can do X with no further userspace drivers.
 
-I guess it might help if you sent the updated patch in a new thread.
+Right now this series doesn't support changing video modes away from
+the firmware boot setup, because when I set the pixel clock using the
+rpi-dt-clocks series I end up with a black display. even on no-op
+modesets.
 
+I've dropped all of the 3D bits from this series, to simplify this
+review stage.  See vc4-kms-v3d-rpi2 for a series that works with the
+current Mesa driver, based on downstream 2709.  I squashed all of my
+messy KMS series down, but kept Derek's patches separate to make sure
+he gets credit.
 
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+This code can also be found at:
+
+https://github.com/anholt/linux/tree/vc4-kms-squash
