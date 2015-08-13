@@ -1,28 +1,43 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 13 Aug 2015 16:50:06 +0200
-Subject: [PATCH v5 2/2] pinctrl: rockchip: only enable gpio clock when it
- setting
-In-Reply-To: <CACRpkdYYdqm+CfejMA6yrDheNA=3H13zsW2XuKqqYDRNMS=07w@mail.gmail.com>
-References: <1439287924-6988-1-git-send-email-hl@rock-chips.com>
- <2167165.ooWgarx4Ov@diego>
- <CACRpkdYYdqm+CfejMA6yrDheNA=3H13zsW2XuKqqYDRNMS=07w@mail.gmail.com>
-Message-ID: <1632762.z1JEYVnjv5@diego>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Thu, 13 Aug 2015 10:52:56 -0400 (EDT)
+Subject: [PATCH 2/3] Display a DMA error message
+In-Reply-To: <1439416290-21228-3-git-send-email-jeremy.linton@arm.com>
+Message-ID: <Pine.LNX.4.44L0.1508131051500.1277-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 13. August 2015, 16:11:38 schrieb Linus Walleij:
-> On Thu, Aug 13, 2015 at 2:37 PM, Heiko St?bner <heiko@sntech.de> wrote:
-> >> Patch applied with Doug's test tags etc.
-> > 
-> > did you  also take the first patch?
-> > 
-> > Aka bot should probably stay together (hence Stephen's Ack for the clock
-> > change), as the dynamically controlling the gpio clocks exposes the
-> > pclk_pd_pmu.
+On Wed, 12 Aug 2015, Jeremy Linton wrote:
+
+> If the ehci driver fails to configure the dma settings then display
+> a dev error instead of simply failing. This is triggered in an
+> ACPI world if the user fails to set the _CCA on the device.
 > 
-> OK wasn't obvious to me, patch 1/2 applied to the pinctrl tree now.
+> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+> ---
+>  drivers/usb/host/ehci-platform.c | 4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/usb/host/ehci-platform.c b/drivers/usb/host/ehci-platform.c
+> index 2593def..82e396f 100644
+> --- a/drivers/usb/host/ehci-platform.c
+> +++ b/drivers/usb/host/ehci-platform.c
+> @@ -162,8 +162,10 @@ static int ehci_platform_probe(struct platform_device *dev)
+>  
+>  	err = dma_coerce_mask_and_coherent(&dev->dev,
+>  		pdata->dma_mask_64 ? DMA_BIT_MASK(64) : DMA_BIT_MASK(32));
+> -	if (err)
+> +	if (err) {
+> +		dev_err(&dev->dev, "Error: DMA setup failed\n");
+>  		return err;
+> +	}
+>  
+>  	irq = platform_get_irq(dev, 0);
+>  	if (irq < 0) {
+> 
 
-Thanks for picking patch 1/2 too.
+Too bad the ohci-platform driver doesn't get the same update, but 
+it clearly wouldn't belong in this patch set.  Anyway,
 
-Both me and Lin seem to have forgotten to mention this in this new revision 
-(sorry about that), as it was discussed in a previous revision only.
+Acked-by: Alan Stern <stern@rowland.harvard.edu>
+
+Alan Stern
