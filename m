@@ -1,39 +1,45 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 13 Aug 2015 11:04:13 +0200
-Subject: [PATCH v4 1/4] dt-bindings: brcmstb-gpio: document properties for
- wakeup
-In-Reply-To: <1438391865-7862-2-git-send-email-gregory.0xf0@gmail.com>
-References: <1438391865-7862-1-git-send-email-gregory.0xf0@gmail.com>
- <1438391865-7862-2-git-send-email-gregory.0xf0@gmail.com>
-Message-ID: <CACRpkdaZj=vt_nPOxh+PCH6n1i8MkzcoicYwUGAMFyP_MPg_yg@mail.gmail.com>
+From: aballier@gentoo.org (Alexis Ballier)
+Date: Thu, 13 Aug 2015 11:06:53 +0200
+Subject: [PATCH v2] ARM: dts: exynos4412-odroidu3: Enable SPI1.
+Message-ID: <1439456813-4918-1-git-send-email-aballier@gentoo.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 1, 2015 at 3:17 AM, Gregory Fong <gregory.0xf0@gmail.com> wrote:
+SPI1 is available on IO Port #2 (as depicted on their website) in
+PCB Revision 0.5 of Hardkernel Odroid U3 board.
+The shield connects a 256KiB spi-nor flash on that bus.
 
-> Some brcmstb GPIO controllers can be used to wake from suspend, so use
-> the de facto standard property 'wakeup-source' to mark the nodes of
-> controllers with that capability.
->
-> Also document interrupts-extended, which will be used for wakeup
-> handling because the interrupt parent for the wake IRQ is different
-> from the regular IRQ.
->
-> While we're at it, a few more fixes: We don't actually use the
-> "interrupt-names" property, so remove it from the listed optional
-> properties and from the examples.  And since we're modifying the
-> examples, also follow Brian's suggestions to:
-> - change #gpio-cells, #interrupt-cells, and brcm,gpio-bank-widths from
->   hex to dec
-> - use phandles
->
-> Reviewed-by: Brian Norris <computersforpeace@gmail.com>
-> Acked-by: Florian Fainelli <f.fainelli@gmail.com>
-> Signed-off-by: Gregory Fong <gregory.0xf0@gmail.com>
-> ---
-> v4: no changes from v3
+Signed-off-by: Alexis Ballier <aballier@gentoo.org>
 
-I've already applied this, no action.
+---
 
-Yours,
-Linus Walleij
+Changes in v2: Use GPIO_ACTIVE_HIGH (Krzysztof Kozlowski)
+
+ arch/arm/boot/dts/exynos4412-odroidu3.dts | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/arch/arm/boot/dts/exynos4412-odroidu3.dts b/arch/arm/boot/dts/exynos4412-odroidu3.dts
+index 44684e5..8632f35 100644
+--- a/arch/arm/boot/dts/exynos4412-odroidu3.dts
++++ b/arch/arm/boot/dts/exynos4412-odroidu3.dts
+@@ -13,6 +13,7 @@
+ 
+ /dts-v1/;
+ #include "exynos4412-odroid-common.dtsi"
++#include <dt-bindings/gpio/gpio.h>
+ 
+ / {
+ 	model = "Hardkernel ODROID-U3 board based on Exynos4412";
+@@ -61,3 +62,10 @@
+ 		"Speakers", "SPKL",
+ 		"Speakers", "SPKR";
+ };
++
++&spi_1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&spi1_bus>;
++	cs-gpios = <&gpb 5 GPIO_ACTIVE_HIGH>;
++	status = "okay";
++};
+-- 
+2.5.0
