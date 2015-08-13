@@ -1,358 +1,54 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Thu, 13 Aug 2015 16:05:41 -0700
-Subject: [PATCH v5 2/3] clk: Add a Raspberry Pi-specific clock driver.
-In-Reply-To: <1439507142-2965-1-git-send-email-eric@anholt.net>
-References: <1439507142-2965-1-git-send-email-eric@anholt.net>
-Message-ID: <1439507142-2965-3-git-send-email-eric@anholt.net>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 13 Aug 2015 16:18:14 -0700
+Subject: [PATCH 1/3] ARM: qcom: add SFPB nodes to IPQ806x dts
+In-Reply-To: <1439501620-24073-2-git-send-email-mathieu@codeaurora.org>
+References: <1439501620-24073-1-git-send-email-mathieu@codeaurora.org>
+ <1439501620-24073-2-git-send-email-mathieu@codeaurora.org>
+Message-ID: <55CD25B6.6050901@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Unfortunately, the clock manager's registers are not accessible by the
-ARM, so we have to request that the firmware modify our clocks for us.
+On 08/13/2015 02:33 PM, Mathieu Olivari wrote:
+> Add one new node to the ipq806x.dtsi file to declare & register the
+> hardware spinlock devices. This mechanism is required to be used by
+> other drivers such as SMEM.
+>
+> Signed-off-by: Mathieu Olivari <mathieu@codeaurora.org>
+> ---
+>   arch/arm/boot/dts/qcom-ipq8064.dtsi | 12 ++++++++++++
+>   1 file changed, 12 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/qcom-ipq8064.dtsi b/arch/arm/boot/dts/qcom-ipq8064.dtsi
+> index 9f727d8..ea7b959 100644
+> --- a/arch/arm/boot/dts/qcom-ipq8064.dtsi
+> +++ b/arch/arm/boot/dts/qcom-ipq8064.dtsi
+> @@ -67,6 +67,18 @@
+>   			clock-frequency = <32768>;
+>   			#clock-cells = <0>;
+>   		};
+> +
+> +		sfpb_mutex_block: syscon at 01200600 {
 
-This driver only registers the clocks at the point they are requested
-by a client driver.  This is partially to support returning
--EPROBE_DEFER when the firmware driver isn't supported yet, but it
-also avoids issues with disabling "unused" clocks due to them not yet
-being connected to their consumers in the DT.
+I think you can drop the leading 0 here. Also this should be moved into 
+the soc node.
 
-Signed-off-by: Eric Anholt <eric@anholt.net>
----
+> +			compatible = "syscon";
+> +			reg = <0x01200600 0x100>;
+> +		};
+> +
+> +		sfpb_mutex: sfpb-mutex {
+> +			compatible = "qcom,sfpb-mutex";
+> +			syscon = <&sfpb_mutex_block 4 4>;
+> +
+> +			#hwlock-cells = <1>;
+> +		};
 
-v2: Declare the mutex static (from review by Baruch Siach), merge
-    description and copyright comments.
+And this node should be moved to the root /.
+>   	};
+>   
+>   	soc: soc {
 
-v3: Update for new rpi firmware API.  Update the compatible string.
-    Make the firmware handle be under a vendor-namespaced property.
-    Make the DT indices match the firmware clock IDs.  Move the driver
-    under the firmware driver's Kconfig, since it requires it.  Move a
-    container_of() from 2 callers into the callee.
 
-v4: Update commit message to mention subsystem.  Add #defines for a
-    couple of bitfield checks, and use the bitfield check for
-    rpi_clk_is_on().  Return an error when appropriate in
-    rpi_clk_is_on(), and don't return specific rpi_firmware_property()
-    errors in other places when we were only returning -EINVAL.  Add
-    some comment text describing how return values work from
-    the firmware.
-
-v5: Restructure as a platform_driver on suggestion from Michael
-    Turquette.  This works around the -EPROBE_DEFER problem, so now we
-    can register all of our clocks at probe time.  Store the current
-    clock rate in the struct, and avoid asking for no-op changes.  It
-    appears that a no-op change of the pixel clock while the clock is
-    being used (at boot time when the KMS driver calls
-    clk_prepare_enable()) actually breaks the display.  Dropped
-    Stephen's ack since this is a pretty significant rewrite.
-
- drivers/clk/Makefile          |   1 +
- drivers/clk/clk-raspberrypi.c | 286 ++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 287 insertions(+)
- create mode 100644 drivers/clk/clk-raspberrypi.c
-
-diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-index c4cf075..ad0a4a5 100644
---- a/drivers/clk/Makefile
-+++ b/drivers/clk/Makefile
-@@ -20,6 +20,7 @@ obj-$(CONFIG_MACH_ASM9260)		+= clk-asm9260.o
- obj-$(CONFIG_COMMON_CLK_AXI_CLKGEN)	+= clk-axi-clkgen.o
- obj-$(CONFIG_ARCH_AXXIA)		+= clk-axm5516.o
- obj-$(CONFIG_ARCH_BCM2835)		+= clk-bcm2835.o
-+obj-$(CONFIG_RASPBERRYPI_FIRMWARE)	+= clk-raspberrypi.o
- obj-$(CONFIG_COMMON_CLK_CDCE706)	+= clk-cdce706.o
- obj-$(CONFIG_ARCH_CLPS711X)		+= clk-clps711x.o
- obj-$(CONFIG_ARCH_EFM32)		+= clk-efm32gg.o
-diff --git a/drivers/clk/clk-raspberrypi.c b/drivers/clk/clk-raspberrypi.c
-new file mode 100644
-index 0000000..a65a028
---- /dev/null
-+++ b/drivers/clk/clk-raspberrypi.c
-@@ -0,0 +1,286 @@
-+/*
-+ * Implements a clock provider for the clocks controlled by the
-+ * firmware on Raspberry Pi.
-+ *
-+ * These clocks are controlled by the CLOCKMAN peripheral in the
-+ * hardware, but the ARM doesn't have access to the registers for
-+ * them.  As a result, we have to call into the firmware to get it to
-+ * enable, disable, and set their frequencies.
-+ *
-+ * We don't have an interface for getting the set of frequencies
-+ * available from the hardware.  We can request a min/max, but other
-+ * than that we have to request a frequency and take what it gives us.
-+ *
-+ * Copyright ? 2015 Broadcom
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/clk-provider.h>
-+#include <linux/module.h>
-+#include <dt-bindings/clk/raspberrypi.h>
-+#include <soc/bcm2835/raspberrypi-firmware.h>
-+
-+#define RPI_FIRMWARE_CLOCK_STATE_ENABLED		(1 << 0)
-+#define RPI_FIRMWARE_CLOCK_STATE_ERROR			(1 << 1)
-+#define RPI_FIRMWARE_SET_CLOCK_RATE_ERROR		0
-+
-+static const struct {
-+	const char *name;
-+	int flags;
-+} rpi_clocks[] = {
-+	[RPI_CLOCK_EMMC] = { "emmc", CLK_IS_ROOT },
-+	[RPI_CLOCK_UART0] = { "uart0", CLK_IS_ROOT },
-+	[RPI_CLOCK_ARM] = { "arm", CLK_IS_ROOT | CLK_IGNORE_UNUSED },
-+	[RPI_CLOCK_CORE] = { "core", CLK_IS_ROOT | CLK_IGNORE_UNUSED },
-+	[RPI_CLOCK_V3D] = { "v3d", CLK_IS_ROOT },
-+	[RPI_CLOCK_H264] = { "h264", CLK_IS_ROOT },
-+	[RPI_CLOCK_ISP] = { "isp", CLK_IS_ROOT },
-+	[RPI_CLOCK_SDRAM] = { "sdram", CLK_IS_ROOT | CLK_IGNORE_UNUSED },
-+	[RPI_CLOCK_PIXEL] = { "pixel", CLK_IS_ROOT | CLK_IGNORE_UNUSED },
-+	[RPI_CLOCK_PWM] = { "pwm", CLK_IS_ROOT },
-+};
-+
-+struct rpi_firmware_clock {
-+	/* Clock definitions in our static struct. */
-+	const char *name;
-+	int flags;
-+
-+	/* The rest are filled in@init time. */
-+	struct clk_hw hw;
-+	struct device *dev;
-+	struct rpi_firmware *firmware;
-+	uint32_t last_rate;
-+	int id;
-+};
-+
-+static int rpi_clk_is_on(struct clk_hw *hw)
-+{
-+	struct rpi_firmware_clock *rpi_clk =
-+		container_of(hw, struct rpi_firmware_clock, hw);
-+	u32 packet[2];
-+	int ret;
-+
-+	packet[0] = rpi_clk->id;
-+	packet[1] = 0;
-+	ret = rpi_firmware_property(rpi_clk->firmware,
-+				    RPI_FIRMWARE_GET_CLOCK_STATE,
-+				    &packet, sizeof(packet));
-+	/*
-+	 * The second packet field has the new clock state returned in
-+	 * the low bit, or an error flag in the second bit.
-+	 */
-+	if (ret || (packet[1] & RPI_FIRMWARE_CLOCK_STATE_ERROR)) {
-+		dev_err(rpi_clk->dev, "Failed to get clock state\n");
-+		return ret ? ret : -EINVAL;
-+	}
-+
-+	return packet[1] & RPI_FIRMWARE_CLOCK_STATE_ENABLED;
-+}
-+
-+static int rpi_clk_set_state(struct clk_hw *hw, bool on)
-+{
-+	struct rpi_firmware_clock *rpi_clk =
-+		container_of(hw, struct rpi_firmware_clock, hw);
-+	u32 packet[2];
-+	int ret;
-+
-+	if (on == (rpi_clk->last_rate != 0))
-+		return 0;
-+
-+	packet[0] = rpi_clk->id;
-+	packet[1] = on;
-+	ret = rpi_firmware_property(rpi_clk->firmware,
-+				    RPI_FIRMWARE_SET_CLOCK_STATE,
-+				    &packet, sizeof(packet));
-+	/*
-+	 * The second packet field has the new clock state returned in
-+	 * the low bit, or an error flag in the second bit.
-+	 */
-+	if (ret || (packet[1] & RPI_FIRMWARE_CLOCK_STATE_ERROR)) {
-+		dev_err(rpi_clk->dev, "Failed to set clock state\n");
-+		return ret ? ret : -EINVAL;
-+	}
-+
-+	return 0;
-+}
-+
-+static int rpi_clk_on(struct clk_hw *hw)
-+{
-+	return rpi_clk_set_state(hw, true);
-+}
-+
-+static void rpi_clk_off(struct clk_hw *hw)
-+{
-+	rpi_clk_set_state(hw, false);
-+}
-+
-+static unsigned long rpi_clk_get_rate(struct clk_hw *hw,
-+				      unsigned long parent_rate)
-+{
-+	struct rpi_firmware_clock *rpi_clk =
-+		container_of(hw, struct rpi_firmware_clock, hw);
-+	u32 packet[2];
-+	int ret;
-+
-+	packet[0] = rpi_clk->id;
-+	packet[1] = 0;
-+	ret = rpi_firmware_property(rpi_clk->firmware,
-+				    RPI_FIRMWARE_GET_CLOCK_RATE,
-+				    &packet, sizeof(packet));
-+	/*
-+	 * Note that the second packet field returns 0 on an unknown
-+	 * clock error, which would also be a reasonable value for a
-+	 * clock that's off.
-+	 */
-+	if (ret) {
-+		dev_err(rpi_clk->dev, "Failed to get clock rate\n");
-+		return 0;
-+	}
-+
-+	rpi_clk->last_rate = packet[1];
-+
-+	return packet[1];
-+}
-+
-+static int rpi_clk_set_rate(struct clk_hw *hw,
-+			    unsigned long rate, unsigned long parent_rate)
-+{
-+	struct rpi_firmware_clock *rpi_clk =
-+		container_of(hw, struct rpi_firmware_clock, hw);
-+	u32 packet[2];
-+	int ret;
-+
-+	if (rate == rpi_clk->last_rate)
-+		return 0;
-+
-+	packet[0] = rpi_clk->id;
-+	packet[1] = rate;
-+	ret = rpi_firmware_property(rpi_clk->firmware,
-+				    RPI_FIRMWARE_SET_CLOCK_RATE,
-+				    &packet, sizeof(packet));
-+	/*
-+	 * The second packet field has the new clock rate returned, or
-+	 * 0 on error.
-+	 */
-+	if (ret || packet[1] == RPI_FIRMWARE_SET_CLOCK_RATE_ERROR) {
-+		dev_err(rpi_clk->dev, "Failed to set clock rate\n");
-+		return ret;
-+	}
-+
-+	rpi_clk->last_rate = packet[1];
-+
-+	return 0;
-+}
-+
-+static long rpi_clk_round_rate(struct clk_hw *hw, unsigned long rate,
-+			       unsigned long *parent_rate)
-+{
-+	/*
-+	 * The firmware will end up rounding our rate to something,
-+	 * but we don't have an interface for it.  Just return the
-+	 * requested value, and it'll get updated after the clock gets
-+	 * set.
-+	 */
-+	return rate;
-+}
-+
-+static struct clk_ops rpi_clk_ops = {
-+	.is_prepared = rpi_clk_is_on,
-+	.prepare = rpi_clk_on,
-+	.unprepare = rpi_clk_off,
-+	.recalc_rate = rpi_clk_get_rate,
-+	.set_rate = rpi_clk_set_rate,
-+	.round_rate = rpi_clk_round_rate,
-+};
-+
-+static int rpi_clk_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct device_node *firmware_node;
-+	struct rpi_firmware *firmware;
-+	struct clk_init_data init;
-+	int i;
-+	struct clk_onecell_data *onecell;
-+
-+	firmware_node = of_parse_phandle(dev->of_node,
-+					 "raspberrypi,firmware", 0);
-+	if (!firmware_node) {
-+		dev_err(dev, "Missing firmware node\n");
-+		return -ENODEV;
-+	}
-+	firmware = rpi_firmware_get(firmware_node);
-+	if (!firmware)
-+		return -EPROBE_DEFER;
-+
-+	onecell = devm_kmalloc(dev, sizeof(*onecell), GFP_KERNEL);
-+	if (!onecell)
-+		return -ENOMEM;
-+	onecell->clk_num = ARRAY_SIZE(rpi_clocks);
-+	onecell->clks = devm_kzalloc(dev, sizeof(*onecell->clks), GFP_KERNEL);
-+	if (!onecell->clks)
-+		return -ENOMEM;
-+
-+	memset(&init, 0, sizeof(init));
-+	init.ops = &rpi_clk_ops;
-+
-+	for (i = 0; i < ARRAY_SIZE(rpi_clocks); i++) {
-+		struct rpi_firmware_clock *rpi_clk;
-+
-+		if (!rpi_clocks[i].name)
-+			continue;
-+
-+		rpi_clk = devm_kzalloc(dev, sizeof(*rpi_clk), GFP_KERNEL);
-+		if (!rpi_clk)
-+			return -ENOMEM;
-+
-+		rpi_clk->name = rpi_clocks[i].name;
-+		rpi_clk->firmware = firmware;
-+		rpi_clk->dev = dev;
-+		rpi_clk->hw.init = &init;
-+		rpi_clk->id = i;
-+		init.name = rpi_clocks[i].name;
-+		init.flags = rpi_clocks[i].flags;
-+
-+		onecell->clks[i] = devm_clk_register(&pdev->dev, &rpi_clk->hw);
-+		if (IS_ERR(onecell->clks[i]))
-+			return PTR_ERR(onecell->clks[i]);
-+
-+		/* Get the current clock rate/state, to avoid extra on
-+		 * to on transitions at boot.
-+		 */
-+		rpi_clk_get_rate(&rpi_clk->hw, 0);
-+	}
-+
-+	return of_clk_add_provider(pdev->dev.of_node, of_clk_src_onecell_get,
-+				   onecell);
-+}
-+
-+static int rpi_clk_remove(struct platform_device *pdev)
-+{
-+	of_clk_del_provider(pdev->dev.of_node);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id rpi_clk_of_match[] = {
-+	{ .compatible = "raspberrypi,bcm2835-firmware-clocks", },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, rpi_clk_of_match);
-+
-+static struct platform_driver rpi_clk_driver = {
-+	.driver = {
-+		.name = "raspberrypi-clk",
-+		.of_match_table = rpi_clk_of_match,
-+	},
-+	.probe		= rpi_clk_probe,
-+	.remove		= rpi_clk_remove,
-+};
-+module_platform_driver(rpi_clk_driver);
-+
-+MODULE_AUTHOR("Eric Anholt <eric@anholt.net>");
-+MODULE_DESCRIPTION("Raspberry Pi clock driver");
-+MODULE_LICENSE("GPL v2");
 -- 
-2.1.4
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
