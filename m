@@ -1,73 +1,55 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 13 Aug 2015 09:54:07 +0100
-Subject: [PATCH v2 2/6] genirq: fix irqchip_set_wake_parent if
- IRQCHIP_SKIP_SET_WAKE
-In-Reply-To: <1439401562-28874-3-git-send-email-grygorii.strashko@ti.com>
-References: <1439401562-28874-1-git-send-email-grygorii.strashko@ti.com>
- <1439401562-28874-3-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <55CC5B2F.7060503@arm.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Thu, 13 Aug 2015 10:56:31 +0200
+Subject: [PATCH 2/2] clk: Convert __clk_get_name(hw->clk) to
+ clk_hw_get_name(hw)
+In-Reply-To: <1439421161-17868-2-git-send-email-sboyd@codeaurora.org>
+References: <1439421161-17868-1-git-send-email-sboyd@codeaurora.org>
+ <1439421161-17868-2-git-send-email-sboyd@codeaurora.org>
+Message-ID: <55CC5BBF.9060600@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 12/08/15 18:45, Grygorii Strashko wrote:
-> The irqchip_set_wake_parent should not fail if IRQ chip
-> specifies IRQCHIP_SKIP_SET_WAKE. Otherwise, IRQ wakeup
-> configuration can't be propagated properly through IRQ
-> domains hierarchy.
+On 08/13/2015 01:12 AM, Stephen Boyd wrote:
+> Use the provider based method to get a clock's name so that we
+> can get rid of the clk member in struct clk_hw one day. Mostly
+> converted with the following coccinelle script.
 >
-> In case of TI OMAP DRA7 the issue reproduced with following
-> configuration:
-> ARM GIC<-OMAP wakeupgen<-TI CBAR<-GPIO<-GPIO pcf857x<-gpio_key
+> @@
+> struct clk_hw *E;
+> @@
 >
-> gpio_key is wakeup source
->
-> Failure is reproduced during suspend/resume to RAM:
-> suspend:
->   - gpio_keys_suspend
->     enable_irq_wake
->       + pcf857x_irq_set_wake
->         + omap_gpio_wake_enable
->           + TI CBAR irq_chip_set_wake_parent
->             + OMAP wakeupgen has no .irq_set_wake()
->             and -ENOSYS will be returned
->
-> resume:
->   - gpio_keys_resume
->     + disable_irq_wake
->       + irq_set_irq_wake
->         + WARN(1, "Unbalanced IRQ %d wake disable\n", irq);
->
-> Fixes: 08b55e2a9208 ('genirq: Add irqchip_set_wake_parent')
-> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+> -__clk_get_name(E->clk)
+> +clk_hw_get_name(E)
+[...]
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 > ---
->   kernel/irq/chip.c | 4 ++++
->   1 file changed, 4 insertions(+)
+>   drivers/clk/berlin/berlin2-pll.c     |  4 ++--
+
+For Berlin,
+
+Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+
+Thanks!
+
+[...]
+> diff --git a/drivers/clk/berlin/berlin2-pll.c b/drivers/clk/berlin/berlin2-pll.c
+> index f4b8d324b083..1c2294d3ba85 100644
+> --- a/drivers/clk/berlin/berlin2-pll.c
+> +++ b/drivers/clk/berlin/berlin2-pll.c
+> @@ -61,7 +61,7 @@ berlin2_pll_recalc_rate(struct clk_hw *hw, unsigned long parent_rate)
+>   	fbdiv = (val >> map->fbdiv_shift) & FBDIV_MASK;
+>   	rfdiv = (val >> map->rfdiv_shift) & RFDIV_MASK;
+>   	if (rfdiv == 0) {
+> -		pr_warn("%s has zero rfdiv\n", __clk_get_name(hw->clk));
+> +		pr_warn("%s has zero rfdiv\n", clk_hw_get_name(hw));
+>   		rfdiv = 1;
+>   	}
 >
-> diff --git a/kernel/irq/chip.c b/kernel/irq/chip.c
-> index 6de638b..bdb1b9d 100644
-> --- a/kernel/irq/chip.c
-> +++ b/kernel/irq/chip.c
-> @@ -1024,6 +1024,10 @@ int irq_chip_set_vcpu_affinity_parent(struct irq_data *data, void *vcpu_info)
->   int irq_chip_set_wake_parent(struct irq_data *data, unsigned int on)
->   {
->   	data = data->parent_data;
-> +
-> +	if (irq_data_get_irq_chip(data)->flags & IRQCHIP_SKIP_SET_WAKE)
-> +		return 0;
-> +
-
-[Nit] I think the irq core can access data->chip directly. Either way,
-it's better to be consistent, the statement following doesn't use helper
-function.
-
-Otherwise looks good to me.
-
-Regards,
-Sudeep
-
->   	if (data->chip->irq_set_wake)
->   		return data->chip->irq_set_wake(data, on);
->
->
+> @@ -70,7 +70,7 @@ berlin2_pll_recalc_rate(struct clk_hw *hw, unsigned long parent_rate)
+>   	vcodiv = map->vcodiv[vcodivsel];
+>   	if (vcodiv == 0) {
+>   		pr_warn("%s has zero vcodiv (index %d)\n",
+> -			__clk_get_name(hw->clk), vcodivsel);
+> +			clk_hw_get_name(hw), vcodivsel);
+>   		vcodiv = 1;
+>   	}
