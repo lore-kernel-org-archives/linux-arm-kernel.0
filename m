@@ -1,41 +1,90 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 13 Aug 2015 10:47:36 -0500
-Subject: [PATCH-next 1/4] Revert "ARM: 7655/1: smp_twd: make
- twd_local_timer_of_register() no-op for nosmp"
-In-Reply-To: <20150813153707.GF7576@n2100.arm.linux.org.uk>
-References: <1439409416-32673-1-git-send-email-balbi@ti.com>
- <1439409416-32673-2-git-send-email-balbi@ti.com>
- <20150813153707.GF7576@n2100.arm.linux.org.uk>
-Message-ID: <20150813154736.GI27560@saruman.tx.rr.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 13 Aug 2015 16:52:45 +0100
+Subject: [PATCH 5/9] ARM: common: Introduce PM domains for CPUs/clusters
+In-Reply-To: <20150813154503.GO52339@linaro.org>
+References: <1438731339-58317-1-git-send-email-lina.iyer@linaro.org>
+ <1438731339-58317-6-git-send-email-lina.iyer@linaro.org>
+ <CAL_JsqK67=DTtjZwwnonObLDjLbahkREfm0RvyXVV95bhR-d4Q@mail.gmail.com>
+ <20150813150154.GB13356@red-moon>
+ <20150813154503.GO52339@linaro.org>
+Message-ID: <20150813155245.GD13833@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 13, 2015 at 04:37:07PM +0100, Russell King - ARM Linux wrote:
-> On Wed, Aug 12, 2015 at 02:56:53PM -0500, Felipe Balbi wrote:
-> > This reverts commit 904464b91eca8c665acea033489225af02eeb75a.
-> > 
-> > The problem pointed out by commit 904464b91eca ("ARM: 7655/1:
-> > smp_twd: make twd_local_timer_of_register() no-op for nosmp")
-> > doesn't exist anymore.
-> > 
-> > We can safely boot with nosmp and the warning won't show up.
-> > 
-> > The other side benefit of this patch is that TWD has a chance
-> > to probe on single-core A9 systems such as AM437x which sport
-> > TWD.
+On Thu, Aug 13, 2015 at 04:45:03PM +0100, Lina Iyer wrote:
+> On Thu, Aug 13 2015 at 09:01 -0600, Lorenzo Pieralisi wrote:
+> >On Thu, Aug 06, 2015 at 04:14:51AM +0100, Rob Herring wrote:
+> >> On Tue, Aug 4, 2015 at 6:35 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
+> >> > Define and add Generic PM domains (genpd) for ARM CPU clusters. Many new
+> >> > SoCs group CPUs as clusters. Clusters share common resources like GIC,
+> >> > power rail, caches, VFP, Coresight etc. When all CPUs in the cluster are
+> >> > idle, these shared resources may also be put in their idle state.
+> >> >
+> >> > The idle time between the last CPU entering idle and a CPU resuming
+> >> > execution is an opportunity for these shared resources to be powered
+> >> > down. Generic PM domain provides a framework for defining such power
+> >> > domains and attach devices to the domain. When the devices in the domain
+> >> > are idle at runtime, the domain would also be suspended and resumed
+> >> > before the first of the devices resume execution.
+> >> >
+> >> > We define a generic PM domain for each cluster and attach CPU devices in
+> >> > the cluster to that PM domain. The DT definitions for the SoC describe
+> >> > this relationship. Genpd callbacks for power_on and power_off can then
+> >> > be used to power up/down the shared resources for the domain.
+> >>
+> >> [...]
+> >>
+> >> > +ARM CPU Power domains
+> >> > +
+> >> > +The device tree allows describing of CPU power domains in a SoC. In ARM SoC,
+> >> > +CPUs may be grouped as clusters. A cluster may have CPUs, GIC, Coresight,
+> >> > +caches, VFP and power controller and other peripheral hardware. Generally,
+> >> > +when the CPUs in the cluster are idle/suspended, the shared resources may also
+> >> > +be suspended and resumed before any of the CPUs resume execution.
+> >> > +
+> >> > +CPUs are the defined as the PM domain consumers and there is a PM domain
+> >> > +provider for the CPUs. Bindings for generic PM domains (genpd) is described in
+> >> > +[1].
+> >> > +
+> >> > +The ARM CPU PM domain follows the same binding convention as any generic PM
+> >> > +domain. Additional binding properties are -
+> >> > +
+> >> > +- compatible:
+> >> > +       Usage: required
+> >> > +       Value type: <string>
+> >> > +       Definition: Must also have
+> >> > +                       "arm,pd"
+> >> > +               inorder to initialize the genpd provider as ARM CPU PM domain.
+> >>
+> >> A compatible string should represent a particular h/w block. If it is
+> >> generic, it should represent some sort of standard programming
+> >> interface (e.g, AHCI, EHCI, etc.). This doesn't seem to be either and
+> >> is rather just a mapping of what "driver" you want to use.
+> >>
+> >> I would expect that identifying a cpu's or cluster's power domain
+> >> would be done by a phandle between the cpu/cluster node and power
+> >> domain node. But I've not really looked at the power domain bindings
+> >> so who knows.
+> >
+> >I would expect the same, meaning that a cpu node, like any other device
+> >node would have a phandle pointing at the respective HW power domain.
+> >
+> CPUs have phandles to their domains. That is how the relationship
+> between the domain provider (power-controller) and the consumer (CPU) is
+> established.
 > 
-> I don't remember all the details from Feb 2013 on why we made that
-> change.  If this is proven safe, then I guess it's okay.
+> >I do not really understand why we want a "generic" CPU power domain, what
+> >purpose does it serve ? Creating a collection of cpu devices that we
+> >can call "cluster" ?
+> >
+> Nope, not for calling a cluster, a cluster :)
+> 
+> This compatible is used to define a generic behavior of the CPU domain
+> controller (in addition to the platform specific behavior of the domain
+> power controller). The kernel activities for such power controller are
+> generally the same which otherwise would be repeated across platforms.
 
-Do you want me to upload to your patch system and, perhaps, keep in
-linux-next for v4.4 merge window ? (too late for v4.3 I guess).
+What activities ? CPU PM notifiers ?
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150813/67ef08f1/attachment-0001.sig>
+Thanks,
+Lorenzo
