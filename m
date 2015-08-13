@@ -1,39 +1,102 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 13 Aug 2015 18:23:10 +0100
-Subject: [PATCH 0/2] x86/KASAN updates for 4.3
-In-Reply-To: <20150813112428.GG10280@arm.com>
-References: <1439444244-26057-1-git-send-email-ryabinin.a.a@gmail.com>
- <20150813065040.GA17983@gmail.com>
- <20150813081641.GA14402@gmail.com> <20150813090119.GA10280@arm.com>
- <CAPAsAGxk2+v5VG77cOHAThsXyWx-_UJ1XVeJProaa0gQWH5jvA@mail.gmail.com>
- <20150813112428.GG10280@arm.com>
-Message-ID: <20150813172310.GK10280@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 13 Aug 2015 18:26:52 +0100
+Subject: [PATCH 5/9] ARM: common: Introduce PM domains for CPUs/clusters
+In-Reply-To: <20150813154503.GO52339@linaro.org>
+References: <1438731339-58317-1-git-send-email-lina.iyer@linaro.org>
+ <1438731339-58317-6-git-send-email-lina.iyer@linaro.org>
+ <CAL_JsqK67=DTtjZwwnonObLDjLbahkREfm0RvyXVV95bhR-d4Q@mail.gmail.com>
+ <20150813150154.GB13356@red-moon> <20150813154503.GO52339@linaro.org>
+Message-ID: <55CCD35C.4000901@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 13, 2015 at 12:24:28PM +0100, Will Deacon wrote:
-> On Thu, Aug 13, 2015 at 12:02:26PM +0100, Andrey Ryabinin wrote:
-> > 2015-08-13 12:01 GMT+03:00 Will Deacon <will.deacon@arm.com>:
-> > > Yes please, works for me! If we're targetting 4.3, then please can you base
-> > > on 4.2-rc4, as that's what our current arm64 queue is using?
-> > >
-> > 
-> > Does this mean that we are targeting arm64 part for 4.3 too?
-> 
-> It depends on how well it merges with our current queue and whether it
-> holds up to regression testing. The patches have been reviewed, so I'm
-> comfortable with the content, but we're not at a stage where we can debug
-> and fix any failures that might crop up from the merge.
 
-Scratch that :(
 
-I tried this out under EFI and it dies horribly in the stub code because
-we're missing at least one KASAN_SANITIZE_ Makefile entry.
+On 13/08/15 16:45, Lina Iyer wrote:
+> On Thu, Aug 13 2015 at 09:01 -0600, Lorenzo Pieralisi wrote:
+>> On Thu, Aug 06, 2015 at 04:14:51AM +0100, Rob Herring wrote:
+>>> On Tue, Aug 4, 2015 at 6:35 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
 
-So I think this needs longer to stew before hitting mainline. By all means
-get the x86 dependencies in for 4.3, but the arm64 port can probably use
-another cycle to iron out the bugs.
+[..]
 
-Cheers,
+>>>
+>>>> +ARM CPU Power domains
+>>>> +
+>>>> +The device tree allows describing of CPU power domains in a SoC. In ARM SoC,
+>>>> +CPUs may be grouped as clusters. A cluster may have CPUs, GIC, Coresight,
+>>>> +caches, VFP and power controller and other peripheral hardware. Generally,
+>>>> +when the CPUs in the cluster are idle/suspended, the shared resources may also
+>>>> +be suspended and resumed before any of the CPUs resume execution.
+>>>> +
+>>>> +CPUs are the defined as the PM domain consumers and there is a PM domain
+>>>> +provider for the CPUs. Bindings for generic PM domains (genpd) is described in
+>>>> +[1].
+>>>> +
+>>>> +The ARM CPU PM domain follows the same binding convention as any generic PM
+>>>> +domain. Additional binding properties are -
+>>>> +
+>>>> +- compatible:
+>>>> +       Usage: required
+>>>> +       Value type: <string>
+>>>> +       Definition: Must also have
+>>>> +                       "arm,pd"
+>>>> +               inorder to initialize the genpd provider as ARM CPU PM domain.
+>>>
+>>> A compatible string should represent a particular h/w block. If it is
+>>> generic, it should represent some sort of standard programming
+>>> interface (e.g, AHCI, EHCI, etc.). This doesn't seem to be either and
+>>> is rather just a mapping of what "driver" you want to use.
+>>>
+>>> I would expect that identifying a cpu's or cluster's power domain
+>>> would be done by a phandle between the cpu/cluster node and power
+>>> domain node. But I've not really looked at the power domain bindings
+>>> so who knows.
+>>
+>> I would expect the same, meaning that a cpu node, like any other device
+>> node would have a phandle pointing at the respective HW power domain.
+>>
+> CPUs have phandles to their domains. That is how the relationship
+> between the domain provider (power-controller) and the consumer (CPU) is
+> established.
+>
+>> I do not really understand why we want a "generic" CPU power domain, what
+>> purpose does it serve ? Creating a collection of cpu devices that we
+>> can call "cluster" ?
+>>
+> Nope, not for calling a cluster, a cluster :)
+>
+> This compatible is used to define a generic behavior of the CPU domain
+> controller (in addition to the platform specific behavior of the domain
+> power controller). The kernel activities for such power controller are
+> generally the same which otherwise would be repeated across platforms.
 
-Will
+Having gone through this series and the one using it[1], the only common
+activity is just cluster pm notifiers. Other than that it's just
+creating indirection for now. The scenario might change in future, but
+for now it seems unnecessary.
+
+Also if you look at the shmobile power controller driver, it covers all
+the devices including CPUs unlike QCOM power controller which handles
+only CPU. Yes we can skip CPU genpd creation there only for CPU, IMO
+creating the power domains should be part of power controller driver.
+
+You can add helper functions for all the ARM specific code that can be
+reused by multiple power controller drivers handling CPU/Cluster power
+domain.
+
+> An analogy to this would be the "arm,idle-state" that defines the DT
+> node as something that also depicts a generic cpuidle C state.
+>
+
+I tend to disagree. In idle-states, the nodes define that generic
+properties and they can be parsed in a generic way. That's not the case
+here. Each power controller binding differs.
+
+Yes the generic compatible might be useful to identify that this power
+domain handles CPU/Cluster, but there will be more power controller
+specific things compared to generic code.
+
+Regards,
+Sudeep
+
+[1] http://www.spinics.net/lists/arm-kernel/msg437304.html
