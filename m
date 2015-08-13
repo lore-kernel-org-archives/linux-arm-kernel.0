@@ -1,37 +1,25 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Thu, 13 Aug 2015 22:55:48 +0200
-Subject: [PATCH V3 0/5] clk: support clocks which requires parent clock on
- during operation
-In-Reply-To: <1438089585-30103-1-git-send-email-aisheng.dong@freescale.com>
-References: <1438089585-30103-1-git-send-email-aisheng.dong@freescale.com>
-Message-ID: <CAGhQ9VyoepPsoLhuqFz397UnrM+n4SH0rp5Y3xfTQYvDXr=APw@mail.gmail.com>
+From: leoli@freescale.com (Li Yang)
+Date: Thu, 13 Aug 2015 15:58:01 -0500
+Subject: [PATCH v2] dmaengine: fsl-edma: add PM suspend/resume support
+In-Reply-To: <1437469005-3162-1-git-send-email-yao.yuan@freescale.com>
+References: <1437469005-3162-1-git-send-email-yao.yuan@freescale.com>
+Message-ID: <CADRPPNQJi_x+mdQV=DEVuhCL_p6VOWcPiV3jzioeRdWgSW2w3g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dong,
-
-On 28 July 2015 at 15:19, Dong Aisheng <aisheng.dong@freescale.com> wrote:
-> This patch series adds support in clock framework for clocks which operations
-> requires its parent clock is on.
+On Tue, Jul 21, 2015 at 3:56 AM, Yuan Yao <yao.yuan@freescale.com> wrote:
+> This add power management suspend/resume support for the fsl-edma
+> driver.
 >
-> Such clock type is initially met on Freescale i.MX7D platform that all clocks
-> operations, including enable/disable, rate change and re-parent, requires its
-> parent clock on. No sure if any other SoC has the similar clock type.
+> eDMA acted as a basic function used by others. What it needs to do is
+> the two steps below to support power management.
+>
+> In fsl_edma_suspend_late:
+> Check whether the DMA chan is idle and if it is not idle, stop PM
+> operation.
 
-Just noticed this patch set.
+You should try to quiesce the device on suspend instead of depending
+on itself to be happen in idle and failing if it is not.
 
-One of clock-controller blocks (CCU) on lpc18xx has a similar
-requirement. The CCU is clock fanout block with gates and the gate
-registers can not be accessed if the base (parent) clock for the gate
-is not running. Doing so causes the cpu to wedge.
-
-The workaround I have locally is to check in the is_enabled gate op if
-the parent is running or not. This works fine, but I am all for a more
-generic solution in the clk framework.
-
-I'll see if I can find the time to test your patch set. Thanks for
-working on this.
-
-
-regards,
-Joachim Eastwood
+Regards,
+Leo
