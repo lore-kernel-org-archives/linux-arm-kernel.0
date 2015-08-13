@@ -1,29 +1,59 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 13 Aug 2015 11:03:32 +0900
-Subject: [PATCH] drm/exynos: Staticize local function in exynos_drm_gem.c
-Message-ID: <1439431412-20023-1-git-send-email-k.kozlowski@samsung.com>
+From: leilk.liu@mediatek.com (lei liu)
+Date: Thu, 13 Aug 2015 10:11:59 +0800
+Subject: [PATCH] spi: Mediatek: fix endian warnings
+In-Reply-To: <CAOiHx=mrDhxkMd5WVTpayyyxXHUDRTELubErynN3qd-v5qpCfw@mail.gmail.com>
+References: <1439289789-29026-1-git-send-email-leilk.liu@mediatek.com>
+ <CAOiHx=mrDhxkMd5WVTpayyyxXHUDRTELubErynN3qd-v5qpCfw@mail.gmail.com>
+Message-ID: <1439431919.21454.13.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The exynos_drm_gem_mmap_buffer() is not used outside so make it static.
+Hello Mark,
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
----
- drivers/gpu/drm/exynos/exynos_drm_gem.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ This patch is applied, should I append a new patch or you rollback it?
+Thanks.
 
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_gem.c b/drivers/gpu/drm/exynos/exynos_drm_gem.c
-index 0d5b9698d384..d9f6de012235 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_gem.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_gem.c
-@@ -318,7 +318,7 @@ void exynos_drm_gem_put_dma_addr(struct drm_device *dev,
- 	drm_gem_object_unreference_unlocked(obj);
- }
- 
--int exynos_drm_gem_mmap_buffer(struct exynos_drm_gem_obj *exynos_gem_obj,
-+static int exynos_drm_gem_mmap_buffer(struct exynos_drm_gem_obj *exynos_gem_obj,
- 				      struct vm_area_struct *vma)
- {
- 	struct drm_device *drm_dev = exynos_gem_obj->base.dev;
--- 
-1.9.1
+On Wed, 2015-08-12 at 16:45 +0200, Jonas Gorski wrote:
+> Hi,
+> 
+> On Tue, Aug 11, 2015 at 12:43 PM, Leilk Liu <leilk.liu@mediatek.com> wrote:
+> > This patch fixes endian warnings detected by sparse:
+> > - sparse: incorrect type in argument 1 (different base types)
+> >           expected unsigned int [unsigned] val
+> >           got restricted __le32 [usertype] <noident>
+> > - sparse: incorrect type in argument 1 (different base types)
+> >           expected unsigned int [unsigned] val
+> >           got restricted __le32 [usertype] <noident>
+> 
+> This doesn't "fix" the warning, it only hides the warning and leaves
+> the actual issue unfixed.
+> 
+> >
+> > Signed-off-by: Leilk Liu <leilk.liu@mediatek.com>
+> > ---
+> >  drivers/spi/spi-mt65xx.c | 6 ++++--
+> >  1 file changed, 4 insertions(+), 2 deletions(-)
+> >
+> > diff --git a/drivers/spi/spi-mt65xx.c b/drivers/spi/spi-mt65xx.c
+> > index 4676b01..ae645fa 100644
+> > --- a/drivers/spi/spi-mt65xx.c
+> > +++ b/drivers/spi/spi-mt65xx.c
+> > @@ -359,9 +359,11 @@ static void mtk_spi_setup_dma_addr(struct spi_master *master,
+> >         struct mtk_spi *mdata = spi_master_get_devdata(master);
+> >
+> >         if (mdata->tx_sgl)
+> > -               writel(cpu_to_le32(xfer->tx_dma), mdata->base + SPI_TX_SRC_REG);
+> > +               writel((__force u32)cpu_to_le32(xfer->tx_dma),
+> > +                      mdata->base + SPI_TX_SRC_REG);
+> >         if (mdata->rx_sgl)
+> > -               writel(cpu_to_le32(xfer->rx_dma), mdata->base + SPI_RX_DST_REG);
+> > +               writel((__force u32)cpu_to_le32(xfer->rx_dma),
+> > +                      mdata->base + SPI_RX_DST_REG);
+> 
+> The issue here is that writel already does a cpu_to_le32 conversion,
+> so the extra cpu_to_le32 calls are actually bogus and need to be
+> removed. Else it will do a double conversion on big endian systems,
+> resulting in the data being written in big endian.
+> 
+> 
+> Jonas
