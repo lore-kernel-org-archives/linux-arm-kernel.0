@@ -1,45 +1,43 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Thu, 13 Aug 2015 19:02:57 +0900
-Subject: [GIT PULL 4/5] Samsung 2nd DT updates for v4.3
-In-Reply-To: <20150813091814.GA30160@localhost>
-References: <55C069D5.1050409@kernel.org> <20150813091814.GA30160@localhost>
-Message-ID: <004101d0d5af$3c688420$b5398c60$@kernel.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 13 Aug 2015 03:08:46 -0700
+Subject: [GIT PULL 2/2] omap device tree changes for v4.3, part 4
+In-Reply-To: <pull-1439455019-336197>
+References: <pull-1439455019-336197>
+Message-ID: <pull-1439455019-336197-2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof Johansson wrote:
-> 
-> On Tue, Aug 04, 2015 at 04:29:25PM +0900, Kukjin Kim wrote:
-> > Hi Arnd, Olof, Kevin
-> >
-> > This 2nd DT update branch is based tags/samsung-dt-1 +
-> > v4.3-topic/clk-samsung branch because of dependency to support generic
-> > cpufreq driver. Please pull.
-> >
-> > Thanks,
-> > Kukjin
-> >
-> >
-> > The following changes since commit e4a39d904c3c3e4855287b7325306289ff044b06:
-> >
-> >   Merge branch 'v4.3-topic/clk-samsung' into v4.3-next/dt-samsung-2
-> > (2015-07-24 12:54:00 +0900)
-> >
-> > are available in the git repository at:
-> >
-> >
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> > tags/samsung-dt-2
-> 
-> "clk: exynos5250: add cpu clock configuration data and instantiate cpu
-> clock" is applied twice, once to your own branch, and once merged in
-> from Mike's branch. That doesn't look right.
-> 
-Oops, it's my fault. Sorry for that.
+The following changes since commit ed05637c30e6d13e5793aab64d6a6e57e30228af:
 
-> Can you please respin? Thanks.
-> 
-Sure, I'll tonight in my time.
+  ARM: dts: omap3-devkit8000: Add ADS7846 Touchscreen support (2015-08-06 02:43:09 -0700)
 
-Thanks,
-Kukjin
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.3/dt-pt4-v2
+
+for you to fetch changes up to 8cbd4c2f6a996f6cf5dfdf8775d331606cff95bd:
+
+  arm: boot: dts: am4372: add ARM timers and SCU nodes (2015-08-13 01:25:11 -0700)
+
+----------------------------------------------------------------
+Fix up bogus RTC compatible change for am4372 and add missing
+DPLL for am4372 cpsw Ethernet driver. Also add ARM global and
+local timers for am4372.
+
+----------------------------------------------------------------
+Felipe Balbi (1):
+      arm: boot: dts: am4372: add ARM timers and SCU nodes
+
+Keerthy (3):
+      ARM: dts: AM437X: add dpll_clksel_mac_clk node
+      ARM: dts: am4372: Set the default clock rate for dpll_clksel_mac_clk clock
+      ARM: dts: AM4372: Add the am4372-rtc compatible string
+
+Tony Lindgren (1):
+      Merge branch 'for-4.3/ti-clk-dt' of https://github.com/t-kristo/linux-pm into omap-for-v4.3/dt-v2
+
+ Documentation/devicetree/bindings/rtc/rtc-omap.txt |  1 +
+ arch/arm/boot/dts/am4372.dtsi                      | 31 +++++++++++++++++++---
+ arch/arm/boot/dts/am43xx-clocks.dtsi               |  9 +++++++
+ drivers/clk/ti/clk-43xx.c                          |  1 +
+ 4 files changed, 39 insertions(+), 3 deletions(-)
