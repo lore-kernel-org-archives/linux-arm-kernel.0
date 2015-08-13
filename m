@@ -1,103 +1,64 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Thu, 13 Aug 2015 13:28:28 +0100
-Subject: [PATCH 12/14] arm64: Check for selected granule support
-In-Reply-To: <1439465645-22584-13-git-send-email-suzuki.poulose@arm.com>
-References: <1439465645-22584-1-git-send-email-suzuki.poulose@arm.com>
- <1439465645-22584-13-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <CAPvkgC3=S1BxdzZM4uUOmyXLjii48SMpCof6i6HdNeTG_fydfg@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 13 Aug 2015 14:26:43 +0200
+Subject: [GIT PULL] at91: defconfig for 4.3 #2
+In-Reply-To: <20150813112118.GA22269@piout.net>
+References: <20150807162754.GA20169@piout.net>
+ <20150813100938.GN30160@localhost>
+ <20150813112118.GA22269@piout.net>
+Message-ID: <20150813122643.GA23581@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 August 2015 at 12:34, Suzuki K. Poulose <suzuki.poulose@arm.com> wrote:
-> From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
->
-> Ensure that the selected page size is supported by the
-> CPU(s).
->
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
-> ---
->  arch/arm64/include/asm/sysreg.h |    6 ++++++
->  arch/arm64/kernel/head.S        |   24 +++++++++++++++++++++++-
->  2 files changed, 29 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-> index a7f3d4b..e01d323 100644
-> --- a/arch/arm64/include/asm/sysreg.h
-> +++ b/arch/arm64/include/asm/sysreg.h
-> @@ -87,4 +87,10 @@ static inline void config_sctlr_el1(u32 clear, u32 set)
->  }
->  #endif
->
-> +#define ID_AA64MMFR0_TGran4_SHIFT      28
-> +#define ID_AA64MMFR0_TGran64_SHIFT     24
-> +
-> +#define ID_AA64MMFR0_TGran4_ENABLED    0x0
-> +#define ID_AA64MMFR0_TGran64_ENABLED   0x0
-> +
->  #endif /* __ASM_SYSREG_H */
-> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-> index 01b8e58..0cb04db 100644
-> --- a/arch/arm64/kernel/head.S
-> +++ b/arch/arm64/kernel/head.S
-> @@ -31,10 +31,11 @@
->  #include <asm/cputype.h>
->  #include <asm/kernel-pgtable.h>
->  #include <asm/memory.h>
-> -#include <asm/thread_info.h>
->  #include <asm/pgtable-hwdef.h>
->  #include <asm/pgtable.h>
->  #include <asm/page.h>
-> +#include <asm/sysreg.h>
-> +#include <asm/thread_info.h>
->  #include <asm/virt.h>
->
->  #define __PHYS_OFFSET  (KERNEL_START - TEXT_OFFSET)
-> @@ -606,9 +607,25 @@ ENDPROC(__secondary_switched)
->   *  x27 = *virtual* address to jump to upon completion
->   *
->   * other registers depend on the function called upon completion
-> + * Checks if the selected granule size is supported by the CPU.
->   */
-> +#if    defined(CONFIG_ARM64_64K_PAGES)
-> +
-> +#define ID_AA64MMFR0_TGran_SHIFT       ID_AA64MMFR0_TGran64_SHIFT
-> +#define ID_AA64MMFR0_TGran_ENABLED     ID_AA64MMFR0_TGran64_ENABLED
-> +
-> +#else
-> +
-> +#define ID_AA64MMFR0_TGran_SHIFT       ID_AA64MMFR0_TGran4_SHIFT
-> +#define ID_AA64MMFR0_TGran_ENABLED     ID_AA64MMFR0_TGran4_ENABLED
-> +
-> +#endif
->         .section        ".idmap.text", "ax"
->  __enable_mmu:
-> +       mrs     x1, ID_AA64MMFR0_EL1
-> +       ubfx    x2, x1, #ID_AA64MMFR0_TGran_SHIFT, 4
-> +       cmp     x2, #ID_AA64MMFR0_TGran_ENABLED
-> +       b.ne    __no_granule_support
->         ldr     x5, =vectors
->         msr     vbar_el1, x5
->         msr     ttbr0_el1, x25                  // load TTBR0
-> @@ -626,3 +643,8 @@ __enable_mmu:
->         isb
->         br      x27
->  ENDPROC(__enable_mmu)
-> +
-> +__no_granule_support:
-> +       wfe
-> +       b __no_granule_support
-> +ENDPROC(__no_granule_support)
-> --
-> 1.7.9.5
->
+On Thu, Aug 13, 2015 at 01:21:18PM +0200, Alexandre Belloni wrote:
+> On 13/08/2015 at 12:09:38 +0200, Olof Johansson wrote :
+> > On Fri, Aug 07, 2015 at 06:27:54PM +0200, Alexandre Belloni wrote:
+> > > Arnd, Olof, Kevin,
+> > > 
+> > > A little defconfig update. That will probably be all for this cycle.
+> > > 
+> > > Thanks, bye,
+> > > 
+> > > 
+> > > The following changes since commit eff7f41572a645bf14a96a6f844be4f1c88cd9dd:
+> > > 
+> > >   ARM: at91: at91_dt_defconfig: enable ISI and ov2640 support (2015-07-30 14:17:31 +0200)
+> > > 
+> > > are available in the git repository at:
+> > > 
+> > >   git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-defconfig2
+> > > 
+> > > for you to fetch changes up to ea7bf603fd494391acc1f42acbfc34260b965c44:
+> > > 
+> > >   ARM: at91/defconfig: at91_dt: remove ARM_AT91_ETHER (2015-08-07 12:07:50 +0200)
+> > 
+> > Nicolas had sent me one patch which you've also included here but it's not in
+> > the pull request ("enable ISI and ov2640 support"). That caused a conflict
+> > here, so to avoid having the patch in the tree twice I instead also directly
+> > applied your patches from this branch instead of merging.
+> > 
+> > Sorry about that, it started due to Nicolas sending the discrete patch to us.
+> > So it seems like we'll apply at91 defconfig updates directly this release, in
+> > case there are any more. No big deal I hope. :)
+> > 
+> 
+> That's not a big deal and there will most probably be all for that cycle
+> anyway.
+> 
+> However, I'm wondering how I should have done. From the PR, if you get
+> eff7f41572a645bf14a96a6f844be4f1c88cd9dd..tags/at91-ab-defconfig2, it
+> correctly excludes "enable ISI and ov2640 support" so I was thinking it
+> was fine.
+> Be cause the first patch was taken as a patch, should I have prepared a
+> branch without it?
 
-Hi Suzuki,
-Is is possible to tell the user that the kernel has failed to boot due
-to the kernel granule being unsupported?
+Yeah, you could have applied the other two if there were no conflicts. If there
+were conflicts then it gets complicated, and the best answer would probably
+have been to continue applying directly as patches.
 
-Cheers,
---
-Steve
+This is the drawback of us sometimes applying patches directly -- when we do,
+we no longer put them on a branch of their own that you can use as base. We
+used to once upon a time but it is quite a bit of overhead for us and the
+upside was pretty limited.
+
+
+-Olof
