@@ -1,21 +1,32 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 13 Aug 2015 12:12:29 +0200
-Subject: [PATCH] ARM: UniPhier: drop v7_invalidate_l1 call at secondary
- entry
-In-Reply-To: <1439036024-1933-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1439036024-1933-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <20150813101229.GQ30160@localhost>
+Date: Thu, 13 Aug 2015 12:00:16 +0200
+Subject: [GIT PULL] ARM: mvebu: dt changes for v4.3 #3
+In-Reply-To: <55C4D663.4050508@free-electrons.com>
+References: <55C4D663.4050508@free-electrons.com>
+Message-ID: <20150813100016.GL30160@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 08, 2015 at 09:13:44PM +0900, Masahiro Yamada wrote:
-> This is unnecessary since commit 02b4e2756e01 ("ARM: v7 setup
-> function should invalidate L1 cache").
+On Fri, Aug 07, 2015 at 06:01:39PM +0200, Gregory CLEMENT wrote:
+> Hi,
 > 
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> ---
+> Here is the third  pull request for dt for mvebu for v4.3
+> 
+> Gregory
+> 
+> he following changes since commit dc57844a736f10bf3799d63d7c0d0efc29b1ad7d:
+> 
+>   ARM: dts: orion5x: add buffalo linkstation ls-wtgl (2015-07-25 16:19:20 +0200)
+> 
+> are available in the git repository at:
+> 
+>   git://git.infradead.org/linux-mvebu.git tags/mvebu-dt-4.3-3
+> 
+> for you to fetch changes up to 15979aeeb548e020b6107214f0405be894891a57:
+> 
+>   ARM: dts: Convert Linkstation Mini to Device Tree (2015-08-06 18:51:29 +0200)
 
-Applied, thanks.
+Merged, thanks!
 
 
 -Olof
