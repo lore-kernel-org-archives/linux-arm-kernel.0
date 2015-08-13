@@ -1,30 +1,111 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 13 Aug 2015 16:37:07 +0100
-Subject: [PATCH-next 1/4] Revert "ARM: 7655/1: smp_twd: make
- twd_local_timer_of_register() no-op for nosmp"
-In-Reply-To: <1439409416-32673-2-git-send-email-balbi@ti.com>
-References: <1439409416-32673-1-git-send-email-balbi@ti.com>
- <1439409416-32673-2-git-send-email-balbi@ti.com>
-Message-ID: <20150813153707.GF7576@n2100.arm.linux.org.uk>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Thu, 13 Aug 2015 21:10:59 +0530
+Subject: [PATCH v2 3/6] mailbox: Add support for ST's Mailbox IP
+In-Reply-To: <1437990272-23111-4-git-send-email-lee.jones@linaro.org>
+References: <1437990272-23111-1-git-send-email-lee.jones@linaro.org>
+ <1437990272-23111-4-git-send-email-lee.jones@linaro.org>
+Message-ID: <CABb+yY3NTHLx2N-sUABjxQW=MUCntdUg1d8kjvjH0dkb4n9EgA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 12, 2015 at 02:56:53PM -0500, Felipe Balbi wrote:
-> This reverts commit 904464b91eca8c665acea033489225af02eeb75a.
-> 
-> The problem pointed out by commit 904464b91eca ("ARM: 7655/1:
-> smp_twd: make twd_local_timer_of_register() no-op for nosmp")
-> doesn't exist anymore.
-> 
-> We can safely boot with nosmp and the warning won't show up.
-> 
-> The other side benefit of this patch is that TWD has a chance
-> to probe on single-core A9 systems such as AM437x which sport
-> TWD.
+On Mon, Jul 27, 2015 at 3:14 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-I don't remember all the details from Feb 2013 on why we made that
-change.  If this is proven safe, then I guess it's okay.
+> +
+> +static bool sti_mbox_tx_is_ready(struct mbox_chan *chan)
+> +{
+> +       struct sti_channel *chan_info = chan->con_priv;
+> +       struct sti_mbox_device *mdev = chan_info->mdev;
+> +       unsigned int instance = chan_info->instance;
+> +       unsigned int channel = chan_info->channel;
+> +       void __iomem *base = MBOX_BASE(mdev, instance);
+> +
+> +       if (!(chan_info->direction & MBOX_TX))
+> +               return false;
+>
+Here the 'direction' is gotten via DT node of the client i.e, you
+expect consumer drivers to tell the provider what its limitations are?
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+IMO if some physical channel can't do TX then that should be either
+hardcoded inside the controller driver or learnt via DT node of the
+_controller_.
+
+
+> +static struct mbox_chan *sti_mbox_xlate(struct mbox_controller *mbox,
+> +                                       const struct of_phandle_args *spec)
+> +{
+> +       struct sti_mbox_device *mdev = dev_get_drvdata(mbox->dev);
+> +       struct sti_mbox_pdata *pdata = dev_get_platdata(mdev->dev);
+> +       struct sti_channel *chan_info;
+> +       struct mbox_chan *chan = NULL;
+> +       unsigned int instance  = spec->args[0];
+> +       unsigned int channel   = spec->args[1];
+> +       unsigned int direction = spec->args[2];
+> +       int i;
+> +
+> +       /* Bounds checking */
+> +       if (instance >= pdata->num_inst || channel  >= pdata->num_chan) {
+> +               dev_err(mbox->dev,
+> +                       "Invalid channel requested instance: %d channel: %d\n",
+> +                       instance, channel);
+> +               return NULL;
+return ERR_PTR(-EINVAL)
+
+> +       }
+> +
+> +       for (i = 0; i < mbox->num_chans; i++) {
+> +               chan_info = mbox->chans[i].con_priv;
+> +
+> +               /* Is requested channel free? */
+> +               if (direction != MBOX_LOOPBACK &&
+>
+Consider this example when 2 clients ask for same physical channel but
+in different modes.
+           mboxes = <&mboxA 0 1 MBOX_TX>;
+           mboxes = <&mboxA 0 1 MBOX_LOOPBACK>;
+
+You happily assign 2 virtual channels backed by one physical channel
+{mboxA, 0, 1}. The 2 clients think they can freely do startup(),
+shutdown() and send_data() on the channels. But obviously we are
+screwed with races like
+   client1.startup()
+    -> client2.startup()
+        -> client2.send_data()
+            -> client2.shutdown()
+                -> client1.send_data()  XXXX
+
+ Now you can shove in some more checks to 'fix' the race OR you can
+simply expose only physical channels. Practically no client would ever
+ask it to do what it can't, and for the hypothetical possibility that
+some does, just return error.
+
+> +                   chan_info &&
+> +                   mbox->dev == chan_info->mdev->dev &&
+> +                   instance == chan_info->instance &&
+> +                   channel == chan_info->channel) {
+> +                       dev_err(mbox->dev, "Channel in use\n");
+> +                       return NULL;
+return ERR_PTR(-EBUSY)
+
+> +               }
+> +
+> +               /*
+> +                * Find the first free slot, then continue checking
+> +                * to see if requested channel is in use
+> +                */
+> +               if (!chan && !chan_info)
+> +                       chan = &mbox->chans[i];
+> +       }
+> +
+> +       if (!chan) {
+> +               dev_err(mbox->dev, "No free channels left\n");
+> +               return NULL;
+return ERR_PTR(-EBUSY)
+
+> +       }
+> +
+> +       chan_info = devm_kzalloc(mbox->dev, sizeof(*chan_info), GFP_KERNEL);
+> +       if (!chan_info)
+> +               return NULL;
+return ERR_PTR(-ENOMEM)
+
+Thanks.
