@@ -1,27 +1,43 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 13 Aug 2015 12:25:56 +0200
-Subject: [PATCH] ARM/fb: ep93xx: switch framebuffer to use modedb only
-In-Reply-To: <1439306238-30655-1-git-send-email-linus.walleij@linaro.org>
-References: <1439306238-30655-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20150813102556.GX30160@localhost>
+Date: Thu, 13 Aug 2015 12:30:56 +0200
+Subject: [GIT PULL] RPi DT changes due for v4.3
+In-Reply-To: <20150811160642.GQ18282@x1>
+References: <20150811160642.GQ18282@x1>
+Message-ID: <20150813103056.GY30160@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 11, 2015 at 05:17:18PM +0200, Linus Walleij wrote:
-> All the EP93xx boards exclusively use modedb to look up video
-> modes from the command line. Root out the parametrization of
-> custom video modes from the platform data and board files
-> and simplify the driver.
+Hi,
+
+On Tue, Aug 11, 2015 at 05:06:42PM +0100, Lee Jones wrote:
+> ARM SoC Chaps,
 > 
-> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-> Reviewed-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-> Acked-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> Hi ARM SoC maintainers, please apply this directly to the
-> EP93xx/cleanup branch now that I have Tomi's ACK.
+> Please find a couple of simple RPi changes pertaining to Firmware.
+> 
+> The following changes since commit bc0195aad0daa2ad5b0d76cce22b167bc3435590:
+> 
+>   Linux 4.2-rc2 (2015-07-12 15:10:30 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/rpi/linux-rpi.git tags/rpi-dt-for-armsoc-4.3
+> 
+> for you to fetch changes up to fd26f8830979de48eb3f1c253eb9d2ee2e468eb6:
+> 
+>   dt/bindings: Add binding for the Raspberry Pi firmware driver (2015-08-11 16:56:41 +0100)
 
-Applied to next/cleanup, thanks.
+I've merged this but I'm a little confused about bcm2835 maintainership:
+I got a MAINTAINERS update from Florian earlier grouped in a set of
+other bcm changes (adding Eric), and now this directly from you.
 
+In general the bcm platforms are quite diverse and we've asked Florian
+to be the funnel for all of the new ones, but I don't think we talked
+much about 2835 at that time. Should we expect to see merges directly
+from you and the other maintainers there or will it go through Florian?
+
+Either way is OK with me, just looking to clarify.
+
+
+Thanks!
 
 -Olof
