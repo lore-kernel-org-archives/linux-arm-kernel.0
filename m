@@ -1,77 +1,47 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 12 Aug 2015 16:47:56 -0700
-Subject: [PATCH 9/9] ARM: smp: Add runtime PM support for CPU hotplug
-In-Reply-To: <1438731339-58317-10-git-send-email-lina.iyer@linaro.org>
-References: <1438731339-58317-1-git-send-email-lina.iyer@linaro.org>
- <1438731339-58317-10-git-send-email-lina.iyer@linaro.org>
-Message-ID: <20150812234756.GO26614@codeaurora.org>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 13 Aug 2015 09:05:38 +0900
+Subject: [PATCH v2] ARM: shmobile: kzm9g dts: Use adxl345-specific
+ compatible property
+In-Reply-To: <20150708005148.GA28100@verge.net.au>
+References: <1436180132-26190-1-git-send-email-geert+renesas@glider.be>
+ <15966074.zDS67FO48r@avalon> <20150707002621.GD13326@verge.net.au>
+ <9389528.5qtaECVqX7@avalon> <20150708005148.GA28100@verge.net.au>
+Message-ID: <20150813000537.GD5221@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/04, Lina Iyer wrote:
-> @@ -137,7 +138,6 @@ int __cpu_up(unsigned int cpu, struct task_struct *idle)
->  		pr_err("CPU%u: failed to boot: %d\n", cpu, ret);
->  	}
->  
-> -
+On Wed, Jul 08, 2015 at 09:51:49AM +0900, Simon Horman wrote:
+> On Tue, Jul 07, 2015 at 09:56:29AM +0300, Laurent Pinchart wrote:
+> > Hi Simon,
+> > 
+> > On Tuesday 07 July 2015 09:26:21 Simon Horman wrote:
+> > > On Mon, Jul 06, 2015 at 04:29:33PM +0300, Laurent Pinchart wrote:
+> > > > On Monday 06 July 2015 12:55:32 Geert Uytterhoeven wrote:
+> > > > > Replace the deprecated generic "adi,adxl34x" compatible value by the
+> > > > > adxl345-specific "adi,adxl345" value, cfr. commit e465bf6fc55d5ce2 ("DT:
+> > > > > i2c: Deprecate adi,adxl34x compatible string").
+> > > > > 
+> > > > > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> > > > 
+> > > > Acked-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> > > > 
+> > > > > ---
+> > > > > Depends on commit 3a38958d2477b718 ("Input: adxl34x - add OF match
+> > > > > support"), which is in v4.2-rc1.
+> > > > > 
+> > > > > This is v2 of "ARM: shmobile: kzm9g dts: Add adxl345-specific compatible
+> > > > > property".
+> > > 
+> > > It appears to me that this will cause a regression when booting old kernels
+> > > with new dts blobs. For that reason think we should consider v1
+> > > of this change coupled with a schedule to remove use of the deprecated
+> > > compat string.
+> > 
+> > That's the forward compatibility that Geert mentioned, is that really an 
+> > issue, especially on this board ?
+> 
+> I think it would be best to provide backwards compatibility unless there
+> is a compelling reason not to.
 
-Remove noise please.
-
->  	memset(&secondary_data, 0, sizeof(secondary_data));
->  	return ret;
->  }
-> @@ -205,6 +205,9 @@ int __cpu_disable(void)
->  	unsigned int cpu = smp_processor_id();
->  	int ret;
->  
-> +	/* We dont need the CPU device anymore. */
-> +	pm_runtime_put_sync(get_cpu_device(cpu));
-
-This is all very generic. Any reason it can't be done at a higher
-level for all architectures? It certainly seems like
-cpu_startup_entry() could be modifed to do the
-pm_runtime_get_sync().
-
-> +
->  	ret = platform_cpu_disable(cpu);
->  	if (ret)
->  		return ret;
-> @@ -272,6 +275,13 @@ void __ref cpu_die(void)
->  {
->  	unsigned int cpu = smp_processor_id();
->  
-> +	/*
-> +	 * We dont need the CPU device anymore.
-> +	 * Lets do this before IRQs are disabled to allow
-> +	 * runtime PM to suspend the domain as well.
-> +	 */
-> +	pm_runtime_put_sync(get_cpu_device(cpu));
-
-The two put calls is confusing. __cpu_disable() is called on the
-CPU that's dying, and cpu_die() is called on the CPU that's doing
-the takedown. That would be two decrements but only one increment
-in secondary_start_kernel()? How is this properly balanced?
-
-> +
->  	idle_task_exit();
->  
->  	local_irq_disable();
-> @@ -401,6 +412,11 @@ asmlinkage void secondary_start_kernel(void)
->  	local_irq_enable();
->  	local_fiq_enable();
->  
-> +	/* We are running, enable runtime PM for the CPU. */
-> +	cpu_dev = get_cpu_device(cpu);
-> +	if (cpu_dev)
-> +		pm_runtime_get_sync(cpu_dev);
-
-Also, where would the dev->power.irq_safe flag be set if we
-aren't using the genpd DT stuff? It looks like we're going to
-start causing warnings on devices that don't have the DT magic.
-Please add a hotplug test with some device that isn't using this
-genpd code to catch problems. Also please turn on lockdep and RCU
-lockdep, touching the idle code like this
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+I would like to revisit this discussion with a view to getting some version
+of this patch queued up (yes I know I pushed back on it earlier in this thread).
