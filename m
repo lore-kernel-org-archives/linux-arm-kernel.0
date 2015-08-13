@@ -1,23 +1,75 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Thu, 13 Aug 2015 15:13:16 -0700
-Subject: [PATCH v5] mtd: spi-nor: add driver for NXP SPI Flash Interface
- (SPIFI)
-In-Reply-To: <CAGhQ9Vzs2h3mw2qnYvy83RAvrX8uPZGGzNASr1csk_LhLnHB8g@mail.gmail.com>
-References: <1439486380-17720-1-git-send-email-manabian@gmail.com>
- <20150813214739.GH60523@google.com>
- <CAGhQ9Vzs2h3mw2qnYvy83RAvrX8uPZGGzNASr1csk_LhLnHB8g@mail.gmail.com>
-Message-ID: <20150813221316.GI60523@google.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 14 Aug 2015 01:47:12 +0300
+Subject: [PATCH v2] ARM: shmobile: silk: add SDHI1 DT support
+In-Reply-To: <2757472.iuyUyRzJ3z@wasted.cogentembedded.com>
+References: <10037494.4LD4T2QGPX@wasted.cogentembedded.com>
+ <2757472.iuyUyRzJ3z@wasted.cogentembedded.com>
+Message-ID: <55CD1E70.6050103@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 14, 2015 at 12:10:59AM +0200, Joachim Eastwood wrote:
-> On 13 August 2015 at 23:47, Brian Norris <computersforpeace@gmail.com> wrote:
-> > BTW, is this driver worth a MAINTAINERS entry? It's nice to always have
-> > someone on CC that has the hardware. The git history should probably
-> > pick you up anyway when running get_maintainers.pl, so it may not be
-> > absolutely necessary.
-> 
-> Sure. I can add it under the main lpc18xx platform entry in
-> MAINTAINERS. I'll queue up a patch for arm-soc.
+Hello.
 
-Sounds good.
+On 08/11/2015 01:44 AM, Sergei Shtylyov wrote:
+
+> Define the SILK board dependent part of the SDHI1 (connected to micro-SD slot)
+> device nodes along with the necessary voltage regulators.
+>
+> Based on the original patch by Vladimir Barinov
+> <vladimir.barinov@cogentembedded.com>.
+>
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>
+> ---
+> This patch is against 'renesas-devel-20150810-v4.2-rc6' tag of Simon Horman's
+> 'renesas.git' repo plus the R8A7794/SILK QSPI patches just re-posted. It needs
+> the R8A7794 GPIO patches in order to compile.
+>
+> Changes in version 2:
+> - removed not working SDHI0 stuff, renamed the patch;
+> - replaced SDHI1's "wp-gpios" property with "disable-wp".
+>
+>   arch/arm/boot/dts/r8a7794-silk.dts |   40 +++++++++++++++++++++++++++++++++++++
+>   1 file changed, 40 insertions(+)
+>
+> Index: renesas/arch/arm/boot/dts/r8a7794-silk.dts
+> ===================================================================
+> --- renesas.orig/arch/arm/boot/dts/r8a7794-silk.dts
+> +++ renesas/arch/arm/boot/dts/r8a7794-silk.dts
+[...]
+> @@ -39,6 +40,29 @@
+>   		regulator-boot-on;
+>   		regulator-always-on;
+>   	};
+
+    Oops, need a newline here. I'll repost.
+
+> +	vcc_sdhi1: regulator at 3 {
+> +		compatible = "regulator-fixed";
+> +
+> +		regulator-name = "SDHI1 Vcc";
+> +		regulator-min-microvolt = <3300000>;
+> +		regulator-max-microvolt = <3300000>;
+> +
+> +		gpio = <&gpio4 26 GPIO_ACTIVE_HIGH>;
+> +		enable-active-high;
+> +	};
+> +
+> +	vccq_sdhi1: regulator at 4 {
+> +		compatible = "regulator-gpio";
+> +
+> +		regulator-name = "SDHI1 VccQ";
+> +		regulator-min-microvolt = <1800000>;
+> +		regulator-max-microvolt = <3300000>;
+> +
+> +		gpios = <&gpio4 29 GPIO_ACTIVE_HIGH>;
+> +		gpios-states = <1>;
+> +		states = <3300000 1
+> +			  1800000 0>;
+> +	};
+>   };
+>
+>   &extal_clk {
+[...]
+
+MBR, Sergei
