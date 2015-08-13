@@ -1,46 +1,62 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 13 Aug 2015 10:57:38 +0200
-Subject: [PATCH 2/9] PM / Domains: Remove dev->driver check for runtime PM
-In-Reply-To: <7hfv3onv5c.fsf@deeprootsystems.com>
-References: <1438731339-58317-1-git-send-email-lina.iyer@linaro.org>
- <1438731339-58317-3-git-send-email-lina.iyer@linaro.org>
- <7hfv3onv5c.fsf@deeprootsystems.com>
-Message-ID: <CAMuHMdVeffa-jgXuSjDQBKTrhgW-d87OKzs1iXX+4y-9U_AJbg@mail.gmail.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 13 Aug 2015 09:58:20 +0100
+Subject: [PATCH v2 3/6] genirq: introduce irq_chip_set_type_parent() helper
+In-Reply-To: <1439401562-28874-4-git-send-email-grygorii.strashko@ti.com>
+References: <1439401562-28874-1-git-send-email-grygorii.strashko@ti.com>
+ <1439401562-28874-4-git-send-email-grygorii.strashko@ti.com>
+Message-ID: <55CC5C2C.4080301@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
 
-On Wed, Aug 12, 2015 at 9:50 PM, Kevin Hilman <khilman@kernel.org> wrote:
-> Lina Iyer <lina.iyer@linaro.org> writes:
+
+On 12/08/15 18:45, Grygorii Strashko wrote:
+> It's expected to use this helper when the current
+> domain doesn't implement .irq_set_type(),  but expect
+> the parent to do so.
 >
->> Remove check for driver of a device, for runtime PM. Device may be
->> suspended without an explicit driver. This check seems to be vestigial
->> and incorrect in the current context.
+> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+> ---
+>   include/linux/irq.h |  1 +
+>   kernel/irq/chip.c   | 20 ++++++++++++++++++++
+>   2 files changed, 21 insertions(+)
 >
-> This one should probably have been RFC.
+> diff --git a/include/linux/irq.h b/include/linux/irq.h
+> index 92188b0..51744bc 100644
+> --- a/include/linux/irq.h
+> +++ b/include/linux/irq.h
+> @@ -484,6 +484,7 @@ extern int irq_chip_set_affinity_parent(struct irq_data *data,
+>   extern int irq_chip_set_wake_parent(struct irq_data *data, unsigned int on);
+>   extern int irq_chip_set_vcpu_affinity_parent(struct irq_data *data,
+>   					     void *vcpu_info);
+> +extern int irq_chip_set_type_parent(struct irq_data *data, unsigned int type);
+>   #endif
 >
-> For a little more context here, this was uncovered when experimenting
-> with using runtime PM for CPU devices which don't have a dev->driver.
+>   /* Handling of unhandled and spurious interrupts: */
+> diff --git a/kernel/irq/chip.c b/kernel/irq/chip.c
+> index bdb1b9d..b48938b 100644
+> --- a/kernel/irq/chip.c
+> +++ b/kernel/irq/chip.c
+> @@ -985,6 +985,26 @@ int irq_chip_set_affinity_parent(struct irq_data *data,
+>   }
 >
-> This check might have made sense before PM domains, but with PM domains,
-> it's entirely possible to have a simple device without a driver and the
-> PM domain handles all the necesary PM, so I think this check
-> could/should be removed.
->
-> Thoughts?
+>   /**
+> + * irq_chip_set_type_parent - Set IRQ type on the parent interrupt
+> + * @data:	Pointer to interrupt specific data
+> + * @type:	IRQ_TYPE_{LEVEL,EDGE}_* value - see include/linux/irq.h
+> + *
+> + * Conditional, as the underlying parent chip might not implement it.
+> + */
+> +int irq_chip_set_type_parent(struct irq_data *data, unsigned int type)
+> +{
+> +	data = data->parent_data;
+> +
+> +	if (irq_data_get_irq_chip(data)->flags & IRQCHIP_SKIP_SET_WAKE)
+> +		return 0;
+> +
 
-Simple devices without a driver aren't handled automatically.
-At minimum, the driver should call pm_runtime_enable(), cfr.
-drivers/bus/simple-pm-bus.c.
+I think this is unrelated here(perhaps copy-paste error ?). I fail to
+see how wakeup and trigger type are related.
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Regards,
+Sudeep
