@@ -1,40 +1,158 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 13 Aug 2015 13:52:59 +0530
-Subject: 3.18: lockdep problems in cpufreq
-In-Reply-To: <20150813081744.GN7557@n2100.arm.linux.org.uk>
-References: <20141214213655.GA11285@n2100.arm.linux.org.uk>
- <2574268.XBqpdL2VLI@vostro.rjw.lan>
- <20150811170357.GA24529@n2100.arm.linux.org.uk>
- <5160300.5D2Dvly8u9@vostro.rjw.lan>
- <20150813081744.GN7557@n2100.arm.linux.org.uk>
-Message-ID: <20150813082259.GR20238@linux>
+From: gg@slimlogic.co.uk (Graeme Gregory)
+Date: Thu, 13 Aug 2015 09:27:59 +0100
+Subject: [PATCH 2/2] Convert smsc911x to use ACPI as well as DT
+In-Reply-To: <1439417187-21411-3-git-send-email-jeremy.linton@arm.com>
+References: <1439417187-21411-1-git-send-email-jeremy.linton@arm.com>
+ <1439417187-21411-3-git-send-email-jeremy.linton@arm.com>
+Message-ID: <20150813082759.GB5468@xora-haswell.xora.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13-08-15, 09:17, Russell King - ARM Linux wrote:
-> That I doubt.  Eduardo has not bothered to reply at _any_ time.  I
-> have to question whether there is anyone even reading that email
-> address, or whether it's a redirect to /dev/null.  All the evidence I
-> have right now is that this Eduardo is a ficticous character.
+On Wed, Aug 12, 2015 at 05:06:27PM -0500, Jeremy Linton wrote:
+> Add ACPI bindings for the smsc911x driver. Convert the DT specific calls
+> to nonspecific device* calls, This allows the driver to work
+> with both ACPI and DT configurations. Ethernet should now work when using
+> ACPI on ARM Juno.
 > 
-> I would have at least expected some complaints when I said "I've put
-> it in linux-next" but... absolutely nothing.
+> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+
+The code looks fine to me.
+
+Currently the compulsary DT properties seem to match the "approved" ACPI
+NIC properties from here
+
+http://www.uefi.org/sites/default/files/resources/nic-request-v2.pdf
+
+Reviewed-by: Graeme Gregory <graeme.gregory@linaro.org>
+
+Thanks
+
+> ---
+>  drivers/net/ethernet/smsc/smsc911x.c | 48 +++++++++++++++++-------------------
+>  1 file changed, 22 insertions(+), 26 deletions(-)
 > 
-> So... my only conclusion is that you're all pulling my leg that there
-> _is_ this "Eduardo" maintainer who's supposed to be taking patches for
-> this stuff.
-
-Haha, If that's the case then we are all in the same boat.
-Who is Eduardo ? A bot ? :)
-
-Anyway, AFAIK, he wasn't around for sometime and came back last week
-only. Even I have expected him to reply to yesterday's discussions.
-
-> As I've said, I'm not bothering with this anymore, it's just far too
-> much effort to play these stupid games.  The deadlock can stay for all
-> I care.
-
-And finally I took the charge to carry it now. :)
-
--- 
-viresh
+> diff --git a/drivers/net/ethernet/smsc/smsc911x.c b/drivers/net/ethernet/smsc/smsc911x.c
+> index 959aeea..0f21aa3 100644
+> --- a/drivers/net/ethernet/smsc/smsc911x.c
+> +++ b/drivers/net/ethernet/smsc/smsc911x.c
+> @@ -59,7 +59,9 @@
+>  #include <linux/of_device.h>
+>  #include <linux/of_gpio.h>
+>  #include <linux/of_net.h>
+> +#include <linux/acpi.h>
+>  #include <linux/pm_runtime.h>
+> +#include <linux/property.h>
+>  
+>  #include "smsc911x.h"
+>  
+> @@ -2362,59 +2364,46 @@ static const struct smsc911x_ops shifted_smsc911x_ops = {
+>  	.tx_writefifo = smsc911x_tx_writefifo_shift,
+>  };
+>  
+> -#ifdef CONFIG_OF
+> -static int smsc911x_probe_config_dt(struct smsc911x_platform_config *config,
+> -				    struct device_node *np)
+> +static int smsc911x_probe_config(struct smsc911x_platform_config *config,
+> +				 struct device *dev)
+>  {
+> -	const char *mac;
+>  	u32 width = 0;
+>  
+> -	if (!np)
+> +	if (!dev)
+>  		return -ENODEV;
+>  
+> -	config->phy_interface = of_get_phy_mode(np);
+> +	config->phy_interface = device_get_phy_mode(dev);
+>  
+> -	mac = of_get_mac_address(np);
+> -	if (mac)
+> -		memcpy(config->mac, mac, ETH_ALEN);
+> +	device_get_mac_address(dev, config->mac, ETH_ALEN);
+>  
+> -	of_property_read_u32(np, "reg-shift", &config->shift);
+> +	device_property_read_u32(dev, "reg-shift", &config->shift);
+>  
+> -	of_property_read_u32(np, "reg-io-width", &width);
+> +	device_property_read_u32(dev, "reg-io-width", &width);
+>  	if (width == 4)
+>  		config->flags |= SMSC911X_USE_32BIT;
+>  	else
+>  		config->flags |= SMSC911X_USE_16BIT;
+>  
+> -	if (of_get_property(np, "smsc,irq-active-high", NULL))
+> +	if (device_property_present(dev, "smsc,irq-active-high"))
+>  		config->irq_polarity = SMSC911X_IRQ_POLARITY_ACTIVE_HIGH;
+>  
+> -	if (of_get_property(np, "smsc,irq-push-pull", NULL))
+> +	if (device_property_present(dev, "smsc,irq-push-pull"))
+>  		config->irq_type = SMSC911X_IRQ_TYPE_PUSH_PULL;
+>  
+> -	if (of_get_property(np, "smsc,force-internal-phy", NULL))
+> +	if (device_property_present(dev, "smsc,force-internal-phy"))
+>  		config->flags |= SMSC911X_FORCE_INTERNAL_PHY;
+>  
+> -	if (of_get_property(np, "smsc,force-external-phy", NULL))
+> +	if (device_property_present(dev, "smsc,force-external-phy"))
+>  		config->flags |= SMSC911X_FORCE_EXTERNAL_PHY;
+>  
+> -	if (of_get_property(np, "smsc,save-mac-address", NULL))
+> +	if (device_property_present(dev, "smsc,save-mac-address"))
+>  		config->flags |= SMSC911X_SAVE_MAC_ADDRESS;
+>  
+>  	return 0;
+>  }
+> -#else
+> -static inline int smsc911x_probe_config_dt(
+> -				struct smsc911x_platform_config *config,
+> -				struct device_node *np)
+> -{
+> -	return -ENODEV;
+> -}
+> -#endif /* CONFIG_OF */
+>  
+>  static int smsc911x_drv_probe(struct platform_device *pdev)
+>  {
+> -	struct device_node *np = pdev->dev.of_node;
+>  	struct net_device *dev;
+>  	struct smsc911x_data *pdata;
+>  	struct smsc911x_platform_config *config = dev_get_platdata(&pdev->dev);
+> @@ -2478,7 +2467,7 @@ static int smsc911x_drv_probe(struct platform_device *pdev)
+>  		goto out_disable_resources;
+>  	}
+>  
+> -	retval = smsc911x_probe_config_dt(&pdata->config, np);
+> +	retval = smsc911x_probe_config(&pdata->config, &pdev->dev);
+>  	if (retval && config) {
+>  		/* copy config parameters across to pdata */
+>  		memcpy(&pdata->config, config, sizeof(pdata->config));
+> @@ -2654,6 +2643,12 @@ static const struct of_device_id smsc911x_dt_ids[] = {
+>  MODULE_DEVICE_TABLE(of, smsc911x_dt_ids);
+>  #endif
+>  
+> +static const struct acpi_device_id smsc911x_acpi_match[] = {
+> +	{ "ARMH9118", 0 },
+> +	{ }
+> +};
+> +MODULE_DEVICE_TABLE(acpi, smsc911x_acpi_match);
+> +
+>  static struct platform_driver smsc911x_driver = {
+>  	.probe = smsc911x_drv_probe,
+>  	.remove = smsc911x_drv_remove,
+> @@ -2661,6 +2656,7 @@ static struct platform_driver smsc911x_driver = {
+>  		.name	= SMSC_CHIPNAME,
+>  		.pm	= SMSC911X_PM_OPS,
+>  		.of_match_table = of_match_ptr(smsc911x_dt_ids),
+> +		.acpi_match_table = ACPI_PTR(smsc911x_acpi_match),
+>  	},
+>  };
+>  
+> -- 
+> 2.4.3
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
