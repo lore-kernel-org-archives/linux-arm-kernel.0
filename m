@@ -1,73 +1,92 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 13 Aug 2015 16:01:54 +0100
-Subject: [PATCH 5/9] ARM: common: Introduce PM domains for CPUs/clusters
-In-Reply-To: <CAL_JsqK67=DTtjZwwnonObLDjLbahkREfm0RvyXVV95bhR-d4Q@mail.gmail.com>
-References: <1438731339-58317-1-git-send-email-lina.iyer@linaro.org>
- <1438731339-58317-6-git-send-email-lina.iyer@linaro.org>
- <CAL_JsqK67=DTtjZwwnonObLDjLbahkREfm0RvyXVV95bhR-d4Q@mail.gmail.com>
-Message-ID: <20150813150154.GB13356@red-moon>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 13 Aug 2015 16:06:42 +0100
+Subject: [PATCH v2 2/5] irqchip, gicv3: Add HW revision detection and
+ configuration
+In-Reply-To: <1439477277-6157-3-git-send-email-rric@kernel.org>
+References: <1439477277-6157-1-git-send-email-rric@kernel.org>
+ <1439477277-6157-3-git-send-email-rric@kernel.org>
+Message-ID: <55CCB282.8070405@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 06, 2015 at 04:14:51AM +0100, Rob Herring wrote:
-> On Tue, Aug 4, 2015 at 6:35 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
-> > Define and add Generic PM domains (genpd) for ARM CPU clusters. Many new
-> > SoCs group CPUs as clusters. Clusters share common resources like GIC,
-> > power rail, caches, VFP, Coresight etc. When all CPUs in the cluster are
-> > idle, these shared resources may also be put in their idle state.
-> >
-> > The idle time between the last CPU entering idle and a CPU resuming
-> > execution is an opportunity for these shared resources to be powered
-> > down. Generic PM domain provides a framework for defining such power
-> > domains and attach devices to the domain. When the devices in the domain
-> > are idle at runtime, the domain would also be suspended and resumed
-> > before the first of the devices resume execution.
-> >
-> > We define a generic PM domain for each cluster and attach CPU devices in
-> > the cluster to that PM domain. The DT definitions for the SoC describe
-> > this relationship. Genpd callbacks for power_on and power_off can then
-> > be used to power up/down the shared resources for the domain.
+On 13/08/15 15:47, Robert Richter wrote:
+> From: Robert Richter <rrichter@cavium.com>
 > 
-> [...]
+> Some GIC revisions require an individual configuration to esp. add
+> workarounds for HW bugs. This patch implements generic code to parse
+> the hw revision provided by an IIDR register value and runs specific
+> code if hw matches. There are functions that read the IIDR registers
+> for GICV3 and ITS (GICD_IIDR/GITS_IIDR) and then go through a list of
+> init functions to be called for specific versions.
 > 
-> > +ARM CPU Power domains
-> > +
-> > +The device tree allows describing of CPU power domains in a SoC. In ARM SoC,
-> > +CPUs may be grouped as clusters. A cluster may have CPUs, GIC, Coresight,
-> > +caches, VFP and power controller and other peripheral hardware. Generally,
-> > +when the CPUs in the cluster are idle/suspended, the shared resources may also
-> > +be suspended and resumed before any of the CPUs resume execution.
-> > +
-> > +CPUs are the defined as the PM domain consumers and there is a PM domain
-> > +provider for the CPUs. Bindings for generic PM domains (genpd) is described in
-> > +[1].
-> > +
-> > +The ARM CPU PM domain follows the same binding convention as any generic PM
-> > +domain. Additional binding properties are -
-> > +
-> > +- compatible:
-> > +       Usage: required
-> > +       Value type: <string>
-> > +       Definition: Must also have
-> > +                       "arm,pd"
-> > +               inorder to initialize the genpd provider as ARM CPU PM domain.
+> A MIDR register value may also be used, this is especially useful for
+> hw detection from a guest.
 > 
-> A compatible string should represent a particular h/w block. If it is
-> generic, it should represent some sort of standard programming
-> interface (e.g, AHCI, EHCI, etc.). This doesn't seem to be either and
-> is rather just a mapping of what "driver" you want to use.
+> The patch is needed to implement workarounds for HW errata in Cavium's
+> ThunderX GICV3.
 > 
-> I would expect that identifying a cpu's or cluster's power domain
-> would be done by a phandle between the cpu/cluster node and power
-> domain node. But I've not really looked at the power domain bindings
-> so who knows.
+> V2:
+>  * adding MIDR check
+> 
+> Signed-off-by: Robert Richter <rrichter@cavium.com>
+> ---
+>  drivers/irqchip/irq-gic-common.c | 13 +++++++++++++
+>  drivers/irqchip/irq-gic-common.h | 11 +++++++++++
+>  drivers/irqchip/irq-gic-v3-its.c | 15 +++++++++++++++
+>  drivers/irqchip/irq-gic-v3.c     | 14 ++++++++++++++
+>  4 files changed, 53 insertions(+)
+> 
+> diff --git a/drivers/irqchip/irq-gic-common.c b/drivers/irqchip/irq-gic-common.c
+> index 9448e391cb71..886c09e645bf 100644
+> --- a/drivers/irqchip/irq-gic-common.c
+> +++ b/drivers/irqchip/irq-gic-common.c
+> @@ -21,6 +21,19 @@
+>  
+>  #include "irq-gic-common.h"
+>  
+> +void gic_check_capabilities(u32 iidr, const struct gic_capabilities *cap,
+> +			void *data)
+> +{
+> +	for (; cap->desc; cap++) {
+> +		if (cap->midr != (cap->midr_mask & read_cpuid_id()))
+> +			continue;
+> +		if (cap->iidr != (cap->iidr_mask & iidr))
+> +			continue;
+> +		cap->init(data);
+> +		pr_info("%s\n", cap->desc);
+> +	}
+> +}
+> +
+>  int gic_configure_irq(unsigned int irq, unsigned int type,
+>  		       void __iomem *base, void (*sync_access)(void))
+>  {
+> diff --git a/drivers/irqchip/irq-gic-common.h b/drivers/irqchip/irq-gic-common.h
+> index 35a9884778bd..e9a3e2800005 100644
+> --- a/drivers/irqchip/irq-gic-common.h
+> +++ b/drivers/irqchip/irq-gic-common.h
+> @@ -20,10 +20,21 @@
+>  #include <linux/of.h>
+>  #include <linux/irqdomain.h>
+>  
+> +struct gic_capabilities {
+> +	const char *desc;
+> +	void (*init)(void *data);
+> +	u32 iidr;
+> +	u32 iidr_mask;
+> +	u32 midr;
+> +	u32 midr_mask;
+> +};
 
-I would expect the same, meaning that a cpu node, like any other device
-node would have a phandle pointing at the respective HW power domain.
+Sorry to ask the obvious, but why should we implement another MIDR check
+that is private to the GIC driver, while we already have an
+infrastructure that deals with that kind of things?
 
-I do not really understand why we want a "generic" CPU power domain, what
-purpose does it serve ? Creating a collection of cpu devices that we
-can call "cluster" ?
+Also, the GIC CPU interface is very much part of the CPU, not part the
+GIC itself. I'd rather see a CPU erratum being handler at the same
+location as all the other errata.
 
 Thanks,
-Lorenzo
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
