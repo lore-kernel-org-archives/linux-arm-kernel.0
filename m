@@ -1,29 +1,62 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Thu, 13 Aug 2015 19:16:20 +0530
-Subject: [PATCH v2 5/6] mailbox: Add generic mechanism for testing Mailbox
- Controllers
-In-Reply-To: <20150813130736.GG8782@x1>
-References: <20150812102328.GD18282@x1>
- <CABb+yY0A74Vy3-KOvj0URU_4zb2FAC7Yp3gmEwnFaBrD0mzt0w@mail.gmail.com>
- <20150813091914.GB8782@x1>
- <CABb+yY0cgbtM68-E_Xqgh5O6GRLXESYTLa5WcAwUBoVL3ufrxA@mail.gmail.com>
- <20150813102335.GC8782@x1>
- <CABb+yY3z7p97eOhncQ2i+g6yoYGfDgSN9BDPKmiDaVLa3oPocA@mail.gmail.com>
- <20150813110008.GD8782@x1>
- <CABb+yY34i=VUnswUE21vgeQYAGOS=7uwvdnTAFFgYkTV0CFk=w@mail.gmail.com>
- <20150813114005.GF8782@x1>
- <CABb+yY2OH16mgOwi=yH_eEHQN2Ck2x5xtVk-p-8Un9gGmcACdw@mail.gmail.com>
- <20150813130736.GG8782@x1>
-Message-ID: <CABb+yY2N6=oTrwni0tw1WffLv-udtBWh9LJR43EMVqYf+i2xUg@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 13 Aug 2015 15:54:18 +0200
+Subject: [PATCH 2/2] soc/fsl: add ftm alarm driver for ls1021a platform
+In-Reply-To: <1439358807-9024-2-git-send-email-dongsheng.wang@freescale.com>
+References: <1439358807-9024-1-git-send-email-dongsheng.wang@freescale.com>
+ <1439358807-9024-2-git-send-email-dongsheng.wang@freescale.com>
+Message-ID: <CACRpkdbninKuGzhEc5mN+85j-=w_wYQgra-Ark_Du6gWKN2=tg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 13, 2015 at 6:37 PM, Lee Jones <lee.jones@linaro.org> wrote:
+On Wed, Aug 12, 2015 at 7:53 AM, Dongsheng Wang
+<dongsheng.wang@freescale.com> wrote:
+
+> From: Wang Dongsheng <dongsheng.wang@freescale.com>
 >
-> Now just agree with me that mbox_request_chan() should fail on request
-> of a known bad configuration request and I can code all this up and
-> re-submit. :D
+> Only Ftm0 can be used when system going to deep sleep. So this driver
+> to support ftm0 as a wakeup source.
 >
-You make me look like a jerk :(   My problem is not with validation as
-such. I see problem in the way you implement that makes validation
-necessary. I'll explain step-by-step in the driver post.
+> Signed-off-by: Wang Dongsheng <dongsheng.wang@freescale.com>
+> ---
+> *V2*
+> Change Copyright 2014 to 2015.
+(...)
+> +config FTM_ALARM
+> +       bool "FTM alarm driver"
+> +       depends on SOC_LS1021A
+> +       default n
+> +       help
+> +         Say y here to enable FTM alarm support.  The FTM alarm provides
+> +         alarm functions for wakeup system from deep sleep.  There is only
+> +         one FTM can be used in ALARM(FTM 0).
+(...)
+> +static u32 time_to_cycle(unsigned long time)
+> +static u32 cycle_to_time(u32 cycle)
+> +static int ftm_set_alarm(u64 cycle)
+> +static irqreturn_t ftm_alarm_interrupt(int irq, void *dev_id)
+> +static ssize_t ftm_alarm_show(struct device *dev,
+> +                             struct device_attribute *attr,
+> +                             char *buf)
+> +static ssize_t ftm_alarm_store(struct device *dev,
+> +                              struct device_attribute *attr,
+> +                              const char *buf, size_t count)
+(...)
+> +static struct device_attribute ftm_alarm_attributes = __ATTR(ftm_alarm, 0644,
+> +                       ftm_alarm_show, ftm_alarm_store);
+
+If you're gonna invent ABIs, document then in Documentation/ABI/testing/*.
+
+But I don't get it. Why is this driver not in drivers/rtc?
+
+It does a subset of what an RTC does. The ioctl()'s of an RTC
+can do what you want to do. And much much more.
+
+If it can't do all an RTC can do, surely the RTC subsystem
+can be augmented to host it anyway. It's way to close to
+an RTC to have it's own random sysfs driver like this.
+
+Unless I'm totally off, rewrite this to an RTC driver and post
+it to the RTC maintainers.
+
+Yours,
+Linus Walleij
