@@ -1,42 +1,41 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Thu, 13 Aug 2015 09:13:12 +0900
-Subject: [GIT PULL 2nd 4/4] Samsung defconfig 2nd update for v4.3
-Message-ID: <55CBE118.7060000@kernel.org>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 13 Aug 2015 09:38:10 +0900
+Subject: [PATCH] ARM: dts: exynos4412-odroidu3: Enable SPI1.
+In-Reply-To: <1439378871-28117-1-git-send-email-aballier@gentoo.org>
+References: <1439378871-28117-1-git-send-email-aballier@gentoo.org>
+Message-ID: <55CBE6F2.9030405@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here is enable cpufreq-dt driver for exynos stuff.
+On 12.08.2015 20:27, Alexis Ballier wrote:
+> SPI1 is available on IO Port #2 (as depicted on their website) in
+> PCB Revision 0.5 of Hardkernel Odroid U3 board.
+> The shield connects a 256KiB spi-nor flash on that bus.
+> 
+> Signed-off-by: Alexis Ballier <aballier@gentoo.org>
+> ---
+>  arch/arm/boot/dts/exynos4412-odroidu3.dts | 7 +++++++
+>  1 file changed, 7 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/exynos4412-odroidu3.dts b/arch/arm/boot/dts/exynos4412-odroidu3.dts
+> index 44684e5..37698e4 100644
+> --- a/arch/arm/boot/dts/exynos4412-odroidu3.dts
+> +++ b/arch/arm/boot/dts/exynos4412-odroidu3.dts
+> @@ -61,3 +61,10 @@
+>  		"Speakers", "SPKL",
+>  		"Speakers", "SPKR";
+>  };
+> +
+> +&spi_1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&spi1_bus>;
+> +	cs-gpios = <&gpb 5 0>;
 
-Please pull and sorry for little bit confused branches in this time...
+Please use GPIO_ACTIVE_HIGH.
 
-Thanks,
-Kukjin
+Best regards,
+Krzysztof
 
-
-The following changes since commit c3e71f4b5f580b43e0eb3be18059c8844d8713e7:
-
-  ARM: multi_v7_defconfig: Enable max77802 regulator (2015-08-12
-08:15:02 +0900)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-tags/samsung-defconfig-2
-
-for you to fetch changes up to 2b347c6494cbc6bfdc81b5201b8aa34afb2c3500:
-
-  ARM: exynos_defconfig: Enable cpufreq-dt driver (2015-08-12 08:17:31
-+0900)
-
-----------------------------------------------------------------
-Samsung 2nd defconfig updates for v4.3
-
-- enable cpufreq-dt driver with ONDEMAND governor
-  for Exynos SoCs 3250, 4210, 4212, 4412 and 5250
-
-----------------------------------------------------------------
-Krzysztof Kozlowski (1):
-      ARM: exynos_defconfig: Enable cpufreq-dt driver
-
- arch/arm/configs/exynos_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+> +	status = "okay";
+> +};
+> 
