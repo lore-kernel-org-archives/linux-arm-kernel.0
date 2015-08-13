@@ -1,307 +1,67 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Thu, 13 Aug 2015 14:48:27 +0200
-Subject: [PATCH v2 08/15] KVM: arm64: introduce ITS emulation file with
- stub functions
-In-Reply-To: <1436538111-4294-9-git-send-email-andre.przywara@arm.com>
-References: <1436538111-4294-1-git-send-email-andre.przywara@arm.com>
- <1436538111-4294-9-git-send-email-andre.przywara@arm.com>
-Message-ID: <55CC921B.503@linaro.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 13 Aug 2015 14:49:22 +0200
+Subject: [GIT PULL] ARM: berlin: Initial Marvell Berlin ARM64 support
+In-Reply-To: <20150813203948.31de7849@xhacker>
+References: <1438629886-6390-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20150813203948.31de7849@xhacker>
+Message-ID: <CAOesGMhf2sjCUnX5thJZ=dmVbgH25dtwekF=YA96fCvsxpAZ3g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/10/2015 04:21 PM, Andre Przywara wrote:
-> The ARM GICv3 ITS emulation code goes into a separate file, but
-> needs to be connected to the GICv3 emulation, of which it is an
-> option.
-> Introduce the skeleton with function stubs to be filled later.
-> Introduce the basic ITS data structure and initialize it, but don't
-> return any success yet, as we are not yet ready for the show.
-> 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
->  arch/arm64/kvm/Makefile            |   1 +
->  include/kvm/arm_vgic.h             |   6 ++
->  include/linux/irqchip/arm-gic-v3.h |   1 +
->  virt/kvm/arm/its-emul.c            | 125 +++++++++++++++++++++++++++++++++++++
->  virt/kvm/arm/its-emul.h            |  35 +++++++++++
->  virt/kvm/arm/vgic-v3-emul.c        |  24 ++++++-
->  6 files changed, 189 insertions(+), 3 deletions(-)
->  create mode 100644 virt/kvm/arm/its-emul.c
->  create mode 100644 virt/kvm/arm/its-emul.h
-> 
-> diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
-> index f90f4aa..9803307 100644
-> --- a/arch/arm64/kvm/Makefile
-> +++ b/arch/arm64/kvm/Makefile
-> @@ -25,5 +25,6 @@ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v2-emul.o
->  kvm-$(CONFIG_KVM_ARM_HOST) += vgic-v2-switch.o
->  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v3.o
->  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v3-emul.o
-> +kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/its-emul.o
->  kvm-$(CONFIG_KVM_ARM_HOST) += vgic-v3-switch.o
->  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/arch_timer.o
-> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-> index 8c6cb0e..9e9d4aa 100644
-> --- a/include/kvm/arm_vgic.h
-> +++ b/include/kvm/arm_vgic.h
-> @@ -156,6 +156,11 @@ struct vgic_io_device {
->  	struct kvm_io_device dev;
->  };
->  
-> +struct vgic_its {
-> +	bool			enabled;
-> +	spinlock_t		lock;
-> +};
-> +
->  struct vgic_dist {
->  	spinlock_t		lock;
->  	bool			in_kernel;
-> @@ -264,6 +269,7 @@ struct vgic_dist {
->  	u64			*pendbaser;
->  
->  	bool			lpis_enabled;
-> +	struct vgic_its		its;
->  };
->  
->  struct vgic_v2_cpu_if {
-> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-> index ffbc034..df4e527 100644
-> --- a/include/linux/irqchip/arm-gic-v3.h
-> +++ b/include/linux/irqchip/arm-gic-v3.h
-> @@ -177,6 +177,7 @@
->  #define GITS_CWRITER			0x0088
->  #define GITS_CREADR			0x0090
->  #define GITS_BASER			0x0100
-> +#define GITS_IDREGS_BASE		0xffd0
->  #define GITS_PIDR2			GICR_PIDR2
->  
->  #define GITS_TRANSLATER			0x10040
-> diff --git a/virt/kvm/arm/its-emul.c b/virt/kvm/arm/its-emul.c
-> new file mode 100644
-> index 0000000..659dd39
-> --- /dev/null
-> +++ b/virt/kvm/arm/its-emul.c
-> @@ -0,0 +1,125 @@
-> +/*
-> + * GICv3 ITS emulation
-> + *
-> + * Copyright (C) 2015 ARM Ltd.
-> + * Author: Andre Przywara <andre.przywara@arm.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +
-> +#include <linux/cpu.h>
-> +#include <linux/kvm.h>
-> +#include <linux/kvm_host.h>
-> +#include <linux/interrupt.h>
-> +
-> +#include <linux/irqchip/arm-gic-v3.h>
-> +#include <kvm/arm_vgic.h>
-> +
-> +#include <asm/kvm_emulate.h>
-> +#include <asm/kvm_arm.h>
-> +#include <asm/kvm_mmu.h>
-> +
-> +#include "vgic.h"
-> +#include "its-emul.h"
-> +
-> +static bool handle_mmio_misc_gits(struct kvm_vcpu *vcpu,
-> +				  struct kvm_exit_mmio *mmio,
-> +				  phys_addr_t offset)
-> +{
-> +	return false;
-> +}
-> +
-> +static bool handle_mmio_gits_idregs(struct kvm_vcpu *vcpu,
-> +				    struct kvm_exit_mmio *mmio,
-> +				    phys_addr_t offset)
-> +{
-> +	return false;
-> +}
-> +
-> +static bool handle_mmio_gits_cbaser(struct kvm_vcpu *vcpu,
-> +				    struct kvm_exit_mmio *mmio,
-> +				    phys_addr_t offset)
-> +{
-> +	return false;
-> +}
-> +
-> +static bool handle_mmio_gits_cwriter(struct kvm_vcpu *vcpu,
-> +				     struct kvm_exit_mmio *mmio,
-> +				     phys_addr_t offset)
-> +{
-> +	return false;
-> +}
-> +
-> +static bool handle_mmio_gits_creadr(struct kvm_vcpu *vcpu,
-> +				    struct kvm_exit_mmio *mmio,
-> +				    phys_addr_t offset)
-> +{
-> +	return false;
-> +}
-> +
-> +static const struct vgic_io_range vgicv3_its_ranges[] = {
-> +	{
-> +		.base		= GITS_CTLR,
-> +		.len		= 0x10,
-> +		.bits_per_irq	= 0,
-> +		.handle_mmio	= handle_mmio_misc_gits,
-> +	},
-> +	{
-> +		.base		= GITS_CBASER,
-> +		.len		= 0x08,
-> +		.bits_per_irq	= 0,
-> +		.handle_mmio	= handle_mmio_gits_cbaser,
-> +	},
-> +	{
-> +		.base		= GITS_CWRITER,
-> +		.len		= 0x08,
-> +		.bits_per_irq	= 0,
-> +		.handle_mmio	= handle_mmio_gits_cwriter,
-> +	},
-> +	{
-> +		.base		= GITS_CREADR,
-> +		.len		= 0x08,
-> +		.bits_per_irq	= 0,
-> +		.handle_mmio	= handle_mmio_gits_creadr,
-> +	},
-> +	{
-> +		/* We don't need any memory from the guest. */
-> +		.base		= GITS_BASER,
-> +		.len		= 0x40,
-> +		.bits_per_irq	= 0,
-> +		.handle_mmio	= handle_mmio_raz_wi,
-> +	},
-> +	{
-> +		.base		= GITS_IDREGS_BASE,
-> +		.len		= 0x30,
-> +		.bits_per_irq	= 0,
-> +		.handle_mmio	= handle_mmio_gits_idregs,
-> +	},
-> +};
-> +
-> +/* This is called on setting the LPI enable bit in the redistributor. */
-> +void vgic_enable_lpis(struct kvm_vcpu *vcpu)
-> +{
-> +}
-> +
-> +int vits_init(struct kvm *kvm)
-> +{
-> +	struct vgic_dist *dist = &kvm->arch.vgic;
-> +	struct vgic_its *its = &dist->its;
-> +
-> +	spin_lock_init(&its->lock);
-> +
-> +	its->enabled = false;
-> +
-> +	return -ENXIO;
-> +}
-> diff --git a/virt/kvm/arm/its-emul.h b/virt/kvm/arm/its-emul.h
-> new file mode 100644
-> index 0000000..5dc8e2f
-> --- /dev/null
-> +++ b/virt/kvm/arm/its-emul.h
-> @@ -0,0 +1,35 @@
-> +/*
-> + * GICv3 ITS emulation definitions
-> + *
-> + * Copyright (C) 2015 ARM Ltd.
-> + * Author: Andre Przywara <andre.przywara@arm.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +
-> +#ifndef __KVM_ITS_EMUL_H__
-> +#define __KVM_ITS_EMUL_H__
-> +
-> +#include <linux/kvm.h>
-> +#include <linux/kvm_host.h>
-> +
-> +#include <asm/kvm_emulate.h>
-> +#include <asm/kvm_arm.h>
-> +#include <asm/kvm_mmu.h>
-> +
-> +#include "vgic.h"
-> +
-> +void vgic_enable_lpis(struct kvm_vcpu *vcpu);
-> +int vits_init(struct kvm *kvm);
-> +
-> +#endif
-> diff --git a/virt/kvm/arm/vgic-v3-emul.c b/virt/kvm/arm/vgic-v3-emul.c
-> index 5269ad1..f5865e7 100644
-> --- a/virt/kvm/arm/vgic-v3-emul.c
-> +++ b/virt/kvm/arm/vgic-v3-emul.c
-> @@ -48,6 +48,7 @@
->  #include <asm/kvm_mmu.h>
->  
->  #include "vgic.h"
-> +#include "its-emul.h"
->  
->  static bool handle_mmio_rao_wi(struct kvm_vcpu *vcpu,
->  			       struct kvm_exit_mmio *mmio, phys_addr_t offset)
-> @@ -530,9 +531,20 @@ static bool handle_mmio_ctlr_redist(struct kvm_vcpu *vcpu,
->  				    struct kvm_exit_mmio *mmio,
->  				    phys_addr_t offset)
->  {
-> -	/* since we don't support LPIs, this register is zero for now */
-> -	vgic_reg_access(mmio, NULL, offset,
-> -			ACCESS_READ_RAZ | ACCESS_WRITE_IGNORED);
-> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-> +	u32 reg;
-> +
-> +	if (!vgic_has_its(vcpu->kvm)) {
-> +		vgic_reg_access(mmio, NULL, offset,
-> +				ACCESS_READ_RAZ | ACCESS_WRITE_IGNORED);
-> +		return false;
-> +	}
-can't we remove above block and ...
-> +	reg = dist->lpis_enabled ? GICR_CTLR_ENABLE_LPIS : 0;
-> +	vgic_reg_access(mmio, &reg, offset,
-> +			ACCESS_READ_VALUE | ACCESS_WRITE_VALUE);
-> +	if (!dist->lpis_enabled && (reg & GICR_CTLR_ENABLE_LPIS
-add vgic_has_its(vcpu->kvm) && above?
+Hi,
 
-Besides Reviewed-by: Eric Auger <eric.auger@linaro.org>
+On Thu, Aug 13, 2015 at 2:39 PM, Jisheng Zhang <jszhang@marvell.com> wrote:
+> Dear Olof,
+>
+> On Mon,  3 Aug 2015 21:24:44 +0200
+> Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
+>
+>> Hi Arnd, Kevin, Olof,
+>>
+>> this is initial Marvell Berlin4CT ARM64 support for v4.3. It contains minimum SoC
+>> dtsi and basic dts for the development board. The patches have been posted by
+>> Marvell's Jisheng Zhang a while ago on the lists.
+>>
+>> Please pull.
+>>
+>> The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
+>>
+>>   Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
+>>
+>> are available in the git repository at:
+>>
+>>   git://git.infradead.org/users/hesselba/linux-berlin.git tags/berlin64-for-v4.3-1
+>>
+>> for you to fetch changes up to d93ac74ad150c89f2d0a3b90754cbccdc6ab102c:
+>>
+>>   arm64: dts: Add dts files for Marvell Berlin4CT SoC (2015-08-03 20:45:54 +0200)
+>>
+>> ----------------------------------------------------------------
+>> Initial support for Marvell Berlin4CT ARM64 SoC
+>>
+>> ----------------------------------------------------------------
+>> Jisheng Zhang (1):
+>>       arm64: dts: Add dts files for Marvell Berlin4CT SoC
+>>
+>>  arch/arm64/boot/dts/Makefile                  |   1 +
+>>  arch/arm64/boot/dts/marvell/Makefile          |   5 +
+>>  arch/arm64/boot/dts/marvell/berlin4ct-dmp.dts |  66 +++++++++++
+>>  arch/arm64/boot/dts/marvell/berlin4ct.dtsi    | 164 ++++++++++++++++++++++++++
+>>  4 files changed, 236 insertions(+)
+>>  create mode 100644 arch/arm64/boot/dts/marvell/Makefile
+>>  create mode 100644 arch/arm64/boot/dts/marvell/berlin4ct-dmp.dts
+>>  create mode 100644 arch/arm64/boot/dts/marvell/berlin4ct.dtsi
+>
+> I just saw you were online ;)
+>
+> Thank you very much for appling the patches for Kconfig and defconfig, I'm not
+> sure you missed this dts pull ;) could you please help?
 
-Eric
-)) {
-> +		/* Eventually do something */
-> +	}
->  	return false;
->  }
->  
-> @@ -861,6 +873,12 @@ static int vgic_v3_map_resources(struct kvm *kvm,
->  		rdbase += GIC_V3_REDIST_SIZE;
->  	}
->  
-> +	if (vgic_has_its(kvm)) {
-> +		ret = vits_init(kvm);
-> +		if (ret)
-> +			goto out_unregister;
-> +	}
-> +
->  	dist->redist_iodevs = iodevs;
->  	dist->ready = true;
->  	goto out;
-> 
+Yeah, sorry, not sure why I missed this twice. I must have
+accidentally marked the email as read (twice) from my phone, that's
+normally how it happens..
+
+Anyway, merged now.
+
+
+-Olof
