@@ -1,55 +1,26 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 13 Aug 2015 13:21:18 +0200
-Subject: [GIT PULL] at91: defconfig for 4.3 #2
-In-Reply-To: <20150813100938.GN30160@localhost>
-References: <20150807162754.GA20169@piout.net>
- <20150813100938.GN30160@localhost>
-Message-ID: <20150813112118.GA22269@piout.net>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 13 Aug 2015 12:24:28 +0100
+Subject: [PATCH 0/2] x86/KASAN updates for 4.3
+In-Reply-To: <CAPAsAGxk2+v5VG77cOHAThsXyWx-_UJ1XVeJProaa0gQWH5jvA@mail.gmail.com>
+References: <1439444244-26057-1-git-send-email-ryabinin.a.a@gmail.com>
+ <20150813065040.GA17983@gmail.com>
+ <20150813081641.GA14402@gmail.com> <20150813090119.GA10280@arm.com>
+ <CAPAsAGxk2+v5VG77cOHAThsXyWx-_UJ1XVeJProaa0gQWH5jvA@mail.gmail.com>
+Message-ID: <20150813112428.GG10280@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/08/2015 at 12:09:38 +0200, Olof Johansson wrote :
-> On Fri, Aug 07, 2015 at 06:27:54PM +0200, Alexandre Belloni wrote:
-> > Arnd, Olof, Kevin,
-> > 
-> > A little defconfig update. That will probably be all for this cycle.
-> > 
-> > Thanks, bye,
-> > 
-> > 
-> > The following changes since commit eff7f41572a645bf14a96a6f844be4f1c88cd9dd:
-> > 
-> >   ARM: at91: at91_dt_defconfig: enable ISI and ov2640 support (2015-07-30 14:17:31 +0200)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-defconfig2
-> > 
-> > for you to fetch changes up to ea7bf603fd494391acc1f42acbfc34260b965c44:
-> > 
-> >   ARM: at91/defconfig: at91_dt: remove ARM_AT91_ETHER (2015-08-07 12:07:50 +0200)
+On Thu, Aug 13, 2015 at 12:02:26PM +0100, Andrey Ryabinin wrote:
+> 2015-08-13 12:01 GMT+03:00 Will Deacon <will.deacon@arm.com>:
+> > Yes please, works for me! If we're targetting 4.3, then please can you base
+> > on 4.2-rc4, as that's what our current arm64 queue is using?
+> >
 > 
-> Nicolas had sent me one patch which you've also included here but it's not in
-> the pull request ("enable ISI and ov2640 support"). That caused a conflict
-> here, so to avoid having the patch in the tree twice I instead also directly
-> applied your patches from this branch instead of merging.
-> 
-> Sorry about that, it started due to Nicolas sending the discrete patch to us.
-> So it seems like we'll apply at91 defconfig updates directly this release, in
-> case there are any more. No big deal I hope. :)
-> 
+> Does this mean that we are targeting arm64 part for 4.3 too?
 
-That's not a big deal and there will most probably be all for that cycle
-anyway.
+It depends on how well it merges with our current queue and whether it
+holds up to regression testing. The patches have been reviewed, so I'm
+comfortable with the content, but we're not at a stage where we can debug
+and fix any failures that might crop up from the merge.
 
-However, I'm wondering how I should have done. From the PR, if you get
-eff7f41572a645bf14a96a6f844be4f1c88cd9dd..tags/at91-ab-defconfig2, it
-correctly excludes "enable ISI and ov2640 support" so I was thinking it
-was fine.
-Be cause the first patch was taken as a patch, should I have prepared a
-branch without it?
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Will
