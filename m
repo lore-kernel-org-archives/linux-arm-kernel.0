@@ -1,104 +1,244 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Thu, 13 Aug 2015 10:00:38 -0600
-Subject: [PATCH 9/9] ARM: smp: Add runtime PM support for CPU hotplug
-In-Reply-To: <20150812234756.GO26614@codeaurora.org>
-References: <1438731339-58317-1-git-send-email-lina.iyer@linaro.org>
- <1438731339-58317-10-git-send-email-lina.iyer@linaro.org>
- <20150812234756.GO26614@codeaurora.org>
-Message-ID: <20150813160038.GP52339@linaro.org>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Fri, 14 Aug 2015 00:16:16 +0800
+Subject: [PATCH] pinctrl: mediatek: Implement wake handler and suspend
+ resume
+In-Reply-To: <1439453936-8315-1-git-send-email-maoguang.meng@mediatek.com>
+References: <1439453936-8315-1-git-send-email-maoguang.meng@mediatek.com>
+Message-ID: <CAGS+omAVFUXg3WRyDrPsaWGmpTVwY5r5PZW8azT442+FLqMM8A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 12 2015 at 17:47 -0600, Stephen Boyd wrote:
->On 08/04, Lina Iyer wrote:
->> @@ -137,7 +138,6 @@ int __cpu_up(unsigned int cpu, struct task_struct *idle)
->>  		pr_err("CPU%u: failed to boot: %d\n", cpu, ret);
->>  	}
->>
->> -
->
->Remove noise please.
->
-OK
+Hi Maoguang,
 
->>  	memset(&secondary_data, 0, sizeof(secondary_data));
->>  	return ret;
->>  }
->> @@ -205,6 +205,9 @@ int __cpu_disable(void)
->>  	unsigned int cpu = smp_processor_id();
->>  	int ret;
->>
->> +	/* We dont need the CPU device anymore. */
->> +	pm_runtime_put_sync(get_cpu_device(cpu));
->
->This is all very generic. Any reason it can't be done at a higher
->level for all architectures? It certainly seems like
->cpu_startup_entry() could be modifed to do the
->pm_runtime_get_sync().
->
-I am suspecting, when the concept of CPU PM domains are finalized, they
-would probably move out of the ARM domain and into generic.  Will keep
-that in mind.
+This patch looks pretty good now.  Just some small nitpicks below...
 
->> +
->>  	ret = platform_cpu_disable(cpu);
->>  	if (ret)
->>  		return ret;
->> @@ -272,6 +275,13 @@ void __ref cpu_die(void)
->>  {
->>  	unsigned int cpu = smp_processor_id();
->>
->> +	/*
->> +	 * We dont need the CPU device anymore.
->> +	 * Lets do this before IRQs are disabled to allow
->> +	 * runtime PM to suspend the domain as well.
->> +	 */
->> +	pm_runtime_put_sync(get_cpu_device(cpu));
+On Thu, Aug 13, 2015 at 4:18 PM,  <maoguang.meng@mediatek.com> wrote:
+> From: Maoguang Meng <maoguang.meng@mediatek.com>
 >
->The two put calls is confusing. __cpu_disable() is called on the
->CPU that's dying, and cpu_die() is called on the CPU that's doing
->the takedown.
+> This patch implement irq_set_wake to get who is wakeup source and
+> setup on suspend resume.
 >
-Is that right? Looking at the code and the comments, I can only imagine
-that they must be called on the CPU going down. If thats not the case,
-then I need to fix this.
+> Signed-off-by: Maoguang Meng <maoguang.meng@mediatek.com>
+>
+> ---
+> changes since v2:
+> -modify irq_wake to handle irq wakeup source.
+> -allocate two buffers separately.
+> -fix some codestyle.
+>
+> Changes since v1:
+> -implement irq_wake handler.
+> ---
+>  drivers/pinctrl/mediatek/pinctrl-mt8173.c     |  1 +
+>  drivers/pinctrl/mediatek/pinctrl-mtk-common.c | 94 ++++++++++++++++++++++++++-
+>  drivers/pinctrl/mediatek/pinctrl-mtk-common.h |  4 ++
+>  3 files changed, 97 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/pinctrl/mediatek/pinctrl-mt8173.c b/drivers/pinctrl/mediatek/pinctrl-mt8173.c
+> index d0c811d..ad27184 100644
+> --- a/drivers/pinctrl/mediatek/pinctrl-mt8173.c
+> +++ b/drivers/pinctrl/mediatek/pinctrl-mt8173.c
+> @@ -385,6 +385,7 @@ static struct platform_driver mtk_pinctrl_driver = {
+>         .driver = {
+>                 .name = "mediatek-mt8173-pinctrl",
+>                 .of_match_table = mt8173_pctrl_match,
+> +               .pm = &mtk_eint_pm_ops,
+>         },
+>  };
+>
+> diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+> index ad1ea16..7d4ba926 100644
+> --- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+> +++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+> @@ -33,6 +33,7 @@
+>  #include <linux/mfd/syscon.h>
+>  #include <linux/delay.h>
+>  #include <linux/interrupt.h>
+> +#include <linux/pm.h>
+>  #include <dt-bindings/pinctrl/mt65xx.h>
+>
+>  #include "../core.h"
+> @@ -1062,11 +1063,82 @@ static int mtk_eint_set_type(struct irq_data *d,
+>         return 0;
+>  }
+>
+> +static int mtk_eint_irq_set_wake(struct irq_data *d, unsigned int on)
+> +{
+> +       struct mtk_pinctrl *pctl = irq_data_get_irq_chip_data(d);
+> +       int shift = d->hwirq & 0x1f;
+> +       int reg = d->hwirq >> 5;
+> +
+> +       if (on)
+> +               pctl->wake_mask[reg] |= BIT(shift);
+> +       else
+> +               pctl->wake_mask[reg] &= ~BIT(shift);
+> +
+> +       return 0;
+> +}
+> +
+> +static void mtk_eint_chip_write_mask(const struct mtk_eint_offsets *chip,
+> +               void __iomem *eint_reg_base, u32 *buf)
+> +{
+> +       int port;
+> +       void __iomem *reg;
+> +
+> +       for (port = 0; port < chip->ports; port++) {
+> +               reg = eint_reg_base + (port << 2);
+> +               writel_relaxed(~buf[port], reg + chip->mask_set);
+> +               writel_relaxed(buf[port], reg + chip->mask_clr);
+> +       }
+> +}
+> +
+> +static void mtk_eint_chip_read_mask(const struct mtk_eint_offsets *chip,
+> +               void __iomem *eint_reg_base, u32 *buf)
+> +{
+> +       int port;
+> +       void __iomem *reg;
+> +
+> +       for (port = 0; port < chip->ports; port++) {
+> +               reg = eint_reg_base + chip->mask + (port << 2);
+> +               buf[port] = ~readl_relaxed(reg);
 
->That would be two decrements but only one increment
->in secondary_start_kernel()? How is this properly balanced?
->
-I dont see __cpu_disable() ending up at cpu_die(). These seem two
-different exit points. I will check again.
+You are storing the registers inverted.
+This is a bit counter-intuititve, so please add a comment....
 
->> +
->>  	idle_task_exit();
->>
->>  	local_irq_disable();
->> @@ -401,6 +412,11 @@ asmlinkage void secondary_start_kernel(void)
->>  	local_irq_enable();
->>  	local_fiq_enable();
->>
->> +	/* We are running, enable runtime PM for the CPU. */
->> +	cpu_dev = get_cpu_device(cpu);
->> +	if (cpu_dev)
->> +		pm_runtime_get_sync(cpu_dev);
->
->Also, where would the dev->power.irq_safe flag be set if we
->aren't using the genpd DT stuff? It looks like we're going to
->start causing warnings on devices that don't have the DT magic.
->
-Not necessarily. I have added _get and _put at points, when the
-interrupts are still enabled. So there should not be a need for the CPU
-devices to be IRQ safe. They will operate as regular devices. If they
-are attached to a non-IRQ safe domain, they would effect power savings
-on the domain.
+Better yet, perhaps just do the inversion when modifying wake_mask[]
+in mtk_eint_irq_set_wake() (and add the comment there):
 
->Please add a hotplug test with some device that isn't using this
->genpd code to catch problems. Also please turn on lockdep and RCU
->lockdep, touching the idle code like this
->
-Good idea. Will add and test.
+  /* Mask is 0 when irq is enabled, and 1 when disabled. */
 
-Thanks Stephen for the review.
+> +       }
+> +}
+> +
+> +static int mtk_eint_suspend(struct device *device)
+> +{
+> +       void __iomem *reg;
+> +       struct mtk_pinctrl *pctl = dev_get_drvdata(device);
+> +       const struct mtk_eint_offsets *eint_offsets =
+> +                       &pctl->devdata->eint_offsets;
+> +
+> +       reg = pctl->eint_reg_base;
+> +       mtk_eint_chip_read_mask(eint_offsets, reg, pctl->cur_mask);
+> +       mtk_eint_chip_write_mask(eint_offsets, reg, pctl->wake_mask);
+> +
+> +       return 0;
+> +}
+> +
+> +static int mtk_eint_resume(struct device *device)
+> +{
+> +       struct platform_device *pdev = to_platform_device(device);
+> +       struct mtk_pinctrl *pctl = platform_get_drvdata(pdev);
+
+Aren't these two lines just:
+  struct mtk_pinctrl *pctl = dev_get_drvdata(device);
+
+> +       const struct mtk_eint_offsets *eint_offsets =
+> +                       &pctl->devdata->eint_offsets;
+> +
+> +       mtk_eint_chip_write_mask(eint_offsets,
+> +                       pctl->eint_reg_base, pctl->cur_mask);
+> +
+> +       return 0;
+> +}
+> +
+> +const struct dev_pm_ops mtk_eint_pm_ops = {
+> +       .suspend = mtk_eint_suspend,
+> +       .resume = mtk_eint_resume,
+> +};
+> +
+>  static void mtk_eint_ack(struct irq_data *d)
+>  {
+>         struct mtk_pinctrl *pctl = irq_data_get_irq_chip_data(d);
+>         const struct mtk_eint_offsets *eint_offsets =
+> -               &pctl->devdata->eint_offsets;
+> +                       &pctl->devdata->eint_offsets;
+
+Unrelated change; it is often preferred to fix something like this in
+a separate patch.
+
+>         u32 mask = BIT(d->hwirq & 0x1f);
+>         void __iomem *reg = mtk_eint_get_offset(pctl, d->hwirq,
+>                         eint_offsets->ack);
+> @@ -1076,10 +1148,12 @@ static void mtk_eint_ack(struct irq_data *d)
+>
+>  static struct irq_chip mtk_pinctrl_irq_chip = {
+>         .name = "mt-eint",
+> +       .irq_disable = mtk_eint_mask,
+>         .irq_mask = mtk_eint_mask,
+>         .irq_unmask = mtk_eint_unmask,
+>         .irq_ack = mtk_eint_ack,
+>         .irq_set_type = mtk_eint_set_type,
+> +       .irq_set_wake = mtk_eint_irq_set_wake,
+>         .irq_request_resources = mtk_pinctrl_irq_request_resources,
+>         .irq_release_resources = mtk_pinctrl_irq_release_resources,
+>  };
+> @@ -1217,7 +1291,7 @@ int mtk_pctrl_init(struct platform_device *pdev,
+>         struct device_node *np = pdev->dev.of_node, *node;
+>         struct property *prop;
+>         struct resource *res;
+> -       int i, ret, irq;
+> +       int i, ret, irq, ports_buf;
+>
+>         pctl = devm_kzalloc(&pdev->dev, sizeof(*pctl), GFP_KERNEL);
+>         if (!pctl)
+> @@ -1319,6 +1393,22 @@ int mtk_pctrl_init(struct platform_device *pdev,
+>                 goto chip_error;
+>         }
+>
+> +       ports_buf = ALIGN(pctl->devdata->eint_offsets.ports,
+> +                       sizeof(long)/sizeof(u32));
+
+Why this ALIGN?
+Shouldn't we allocate eint_offsets.ports * sizeof(u32), like this:
+
+  pctl->wake_mask = devm_kcalloc(&pdev->dev, pctl->devdata->eint_offsets.ports,
+                  sizeof(*pctl->wake_mask), GFP_KERNEL);
 
 Thanks,
-Lina
+-Dan
+
+> +       pctl->wake_mask = devm_kcalloc(&pdev->dev, ports_buf,
+> +                                       sizeof(*pctl->wake_mask), GFP_KERNEL);
+> +       if (!pctl->wake_mask) {
+> +               ret = -ENOMEM;
+> +               goto chip_error;
+> +       }
+> +
+> +       pctl->cur_mask = devm_kcalloc(&pdev->dev, ports_buf,
+> +                                       sizeof(*pctl->cur_mask), GFP_KERNEL);
+> +       if (!pctl->cur_mask) {
+> +               ret = -ENOMEM;
+> +               goto chip_error;
+> +       }
+> +
+>         pctl->eint_dual_edges = devm_kcalloc(&pdev->dev, pctl->devdata->ap_num,
+>                                              sizeof(int), GFP_KERNEL);
+>         if (!pctl->eint_dual_edges) {
+> diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.h b/drivers/pinctrl/mediatek/pinctrl-mtk-common.h
+> index 30213e5..f1be8e8 100644
+> --- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.h
+> +++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.h
+> @@ -266,6 +266,8 @@ struct mtk_pinctrl {
+>         void __iomem            *eint_reg_base;
+>         struct irq_domain       *domain;
+>         int                     *eint_dual_edges;
+> +       u32 *wake_mask;
+> +       u32 *cur_mask;
+>  };
+>
+>  int mtk_pctrl_init(struct platform_device *pdev,
+> @@ -281,4 +283,6 @@ int mtk_pconf_spec_set_ies_smt_range(struct regmap *regmap,
+>                 const struct mtk_pin_ies_smt_set *ies_smt_infos, unsigned int info_num,
+>                 unsigned int pin, unsigned char align, int value);
+>
+> +extern const struct dev_pm_ops mtk_eint_pm_ops;
+> +
+>  #endif /* __PINCTRL_MTK_COMMON_H */
+> --
+> 1.8.1.1.dirty
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
