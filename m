@@ -1,72 +1,103 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Thu, 13 Aug 2015 16:34:13 +0800
-Subject: [PATCH v2 0/2] net: thunder: Add ACPI support.
-In-Reply-To: <55CB67E4.8030001@caviumnetworks.com>
-References: <1439254717-2875-1-git-send-email-ddaney.cavm@gmail.com>
- <20150811.114908.1384923604512568161.davem@davemloft.net>
- <55CA5567.9010002@caviumnetworks.com>
- <20150812152337.GB5393@e104818-lin.cambridge.arm.com>
- <55CB67E4.8030001@caviumnetworks.com>
-Message-ID: <55CC5685.4000807@linaro.org>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 13 Aug 2015 10:35:16 +0200
+Subject: [PATCH v2 1/5] clocksource: mediatek: do not enable GPT_CLK_EVT
+ when setup
+In-Reply-To: <1437552878-3684-1-git-send-email-yingjoe.chen@mediatek.com>
+References: <CAGS+omD8k_Cfxv3bYyjmjtLbiavo-WmJPn0Z-CBhN_nnv65Tag@mail.gmail.com>
+ <1437552878-3684-1-git-send-email-yingjoe.chen@mediatek.com>
+Message-ID: <55CC56C4.8080201@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/12/2015 11:36 PM, David Daney wrote:
-> On 08/12/2015 08:23 AM, Catalin Marinas wrote:
->> On Tue, Aug 11, 2015 at 01:04:55PM -0700, David Daney wrote:
->>> On 08/11/2015 11:49 AM, David Miller wrote:
->>>> From: David Daney <ddaney.cavm@gmail.com>
->>>> Date: Mon, 10 Aug 2015 17:58:35 -0700
->>>>
->>>>> Change from v1:  Drop PHY binding part, use fwnode_property* APIs.
->>>>>
->>>>> The first patch (1/2) rearranges the existing code a little with no
->>>>> functional change to get ready for the second.  The second (2/2) does
->>>>> the actual work of adding support to extract the needed information
->>>> >from the ACPI tables.
->>>>
->>>> Series applied.
->>>
->>> Thank you very much.
->>>
->>>> In the future it might be better structured to try and get the OF
->>>> node, and if that fails then try and use the ACPI method to obtain
->>>> these values.
->>>
->>> Our current approach, as you can see in the patch, is the opposite.
->>> If ACPI
->>> is being used, prefer that over the OF device tree.
->>>
->>> You seem to be recommending precedence for OF.  It should be consistent
->>> across all drivers/sub-systems, so do you really think that OF before
->>> ACPI
->>> is the way to go?
->>
->> On arm64 (unless you use a vendor kernel), DT takes precedence over ACPI
->> if both arm provided to the kernel (and it's a fair assumption given
->> that ACPI on ARM is still in the early days). You could also force ACPI
->> with acpi=force on the kernel cmd line and the arch code will not
->> unflatten the DT even if it is provided, therefore is_of_node(fwnode)
->> returning false.
-
-Yes. on the other hand, if no DT is provided, will try ACPI even
-if no acpi=force on the kernel cmd line.
-
->>
->> I haven't looked at your driver in detail but something like AMD's
->> xgbe_probe() uses a single function for both DT and ACPI with
->> device_property_read_*() functions getting the information from the
->> correct place in either case. The ACPI vs DT precedence is handled by
->> the arch boot code, we never mix the two and confuse the drivers.
->>
+On 07/22/2015 10:14 AM, Yingjoe Chen wrote:
+> Spurious mtk timer interrupt is noticed at boot and cause kernel
+> crash. It seems if GPT is enabled, it will latch irq status even
+> when its IRQ is disabled. When irq is enabled afterward, we see
+> spurious interrupt.
+> Change init flow to only enable GPT_CLK_SRC at mtk_timer_init.
 >
-> My long term plan is to create something like
-> firmware_get_mac_address(), that would encapsulate  of_get_mac_address()
-> and the ACPI equivalent.
+> Acked-by: Matthias Brugger <matthias.bgg@gmail.com>
+> Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
+> Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
+> ---
 >
-> Same for firmware_phy_find_device().
+> Update to my patch [1], added __init as Daniel suggest. This is the
+> only patch that need to change in that series, so I only sent this one.
+>
+> http://lists.infradead.org/pipermail/linux-mediatek/2015-July/001545.html
+>
+>   drivers/clocksource/mtk_timer.c | 16 ++++++++++------
+>   1 file changed, 10 insertions(+), 6 deletions(-)
+>
+> diff --git a/drivers/clocksource/mtk_timer.c b/drivers/clocksource/mtk_timer.c
+> index 68ab423..2ba5b66 100644
+> --- a/drivers/clocksource/mtk_timer.c
+> +++ b/drivers/clocksource/mtk_timer.c
+> @@ -156,9 +156,11 @@ static void mtk_timer_global_reset(struct mtk_clock_event_device *evt)
+>   	writel(0x3f, evt->gpt_base + GPT_IRQ_ACK_REG);
+>   }
+>
+> -static void
+> -mtk_timer_setup(struct mtk_clock_event_device *evt, u8 timer, u8 option)
+> +static void __init mtk_timer_setup(struct mtk_clock_event_device *evt,
+> +				   u8 timer, u8 option, bool enable)
+>   {
+> +	u32 val;
+> +
+>   	writel(TIMER_CTRL_CLEAR | TIMER_CTRL_DISABLE,
+>   		evt->gpt_base + TIMER_CTRL_REG(timer));
+>
+> @@ -167,8 +169,10 @@ mtk_timer_setup(struct mtk_clock_event_device *evt, u8 timer, u8 option)
+>
+>   	writel(0x0, evt->gpt_base + TIMER_CMP_REG(timer));
+>
+> -	writel(TIMER_CTRL_OP(option) | TIMER_CTRL_ENABLE,
+> -			evt->gpt_base + TIMER_CTRL_REG(timer));
+> +	val = TIMER_CTRL_OP(option);
+> +	if (enable)
+> +		val |= TIMER_CTRL_ENABLE;
+> +	writel(val, evt->gpt_base + TIMER_CTRL_REG(timer));
 
-I'm very keen on seeing that happens :)
+Instead of the 'enable' new option, I prefer a test with 'timer' with a 
+comment:
 
-Thanks
-Hanjun
+	/*
+	 * the timer hw is broken in that way ... bla bla, so we only
+	 * enable the clocksource ...
+	 */
+	if (timer == GPT_CLK_SRC)
+		val |= TIMER_CTRL_ENABLE;
+
+That said, can you have a look at commit 1096be08 ?
+"clockevents: sun5i: Fix setup_irq init sequence"
+
+first and check if moving the interrupt request after the 
+clockevents_config_and_register could fix your issue.
+
+>   }
+>
+>   static void mtk_timer_enable_irq(struct mtk_clock_event_device *evt, u8 timer)
+> @@ -235,12 +239,12 @@ static void __init mtk_timer_init(struct device_node *node)
+>   	evt->ticks_per_jiffy = DIV_ROUND_UP(rate, HZ);
+>
+>   	/* Configure clock source */
+> -	mtk_timer_setup(evt, GPT_CLK_SRC, TIMER_CTRL_OP_FREERUN);
+> +	mtk_timer_setup(evt, GPT_CLK_SRC, TIMER_CTRL_OP_FREERUN, true);
+>   	clocksource_mmio_init(evt->gpt_base + TIMER_CNT_REG(GPT_CLK_SRC),
+>   			node->name, rate, 300, 32, clocksource_mmio_readl_up);
+>
+>   	/* Configure clock event */
+> -	mtk_timer_setup(evt, GPT_CLK_EVT, TIMER_CTRL_OP_REPEAT);
+> +	mtk_timer_setup(evt, GPT_CLK_EVT, TIMER_CTRL_OP_REPEAT, false);
+>   	clockevents_config_and_register(&evt->dev, rate, 0x3,
+>   					0xffffffff);
+
+
+
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
