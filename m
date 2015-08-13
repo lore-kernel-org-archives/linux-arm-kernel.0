@@ -1,106 +1,128 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Wed, 12 Aug 2015 17:56:14 -0700
-Subject: [PATCH 1/7] drm/vc4: Add devicetree bindings for VC4.
+Date: Wed, 12 Aug 2015 17:56:17 -0700
+Subject: [PATCH 4/7] drm/vc4: Use the fbdev_cma helpers
 In-Reply-To: <1439427380-2436-1-git-send-email-eric@anholt.net>
 References: <1439427380-2436-1-git-send-email-eric@anholt.net>
-Message-ID: <1439427380-2436-2-git-send-email-eric@anholt.net>
+Message-ID: <1439427380-2436-5-git-send-email-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Derek Foreman <derekf@osg.samsung.com>
+
+Keep the fbdev_cma pointer around so we can use it on hotplog and close
+to ensure the frame buffer console is in a useful state.
+
+Signed-off-by: Derek Foreman <derekf@osg.samsung.com>
 Signed-off-by: Eric Anholt <eric@anholt.net>
 ---
- .../devicetree/bindings/gpu/brcm,bcm-vc4.txt       | 83 ++++++++++++++++++++++
- 1 file changed, 83 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/gpu/brcm,bcm-vc4.txt
+ drivers/gpu/drm/vc4/vc4_drv.c | 15 +++++++++++++++
+ drivers/gpu/drm/vc4/vc4_drv.h |  2 ++
+ drivers/gpu/drm/vc4/vc4_kms.c | 18 +++++++++++++++---
+ 3 files changed, 32 insertions(+), 3 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/gpu/brcm,bcm-vc4.txt b/Documentation/devicetree/bindings/gpu/brcm,bcm-vc4.txt
-new file mode 100644
-index 0000000..2b13e61
---- /dev/null
-+++ b/Documentation/devicetree/bindings/gpu/brcm,bcm-vc4.txt
-@@ -0,0 +1,83 @@
-+Broadcom VC4 GPU
+diff --git a/drivers/gpu/drm/vc4/vc4_drv.c b/drivers/gpu/drm/vc4/vc4_drv.c
+index 9ecf4b8b..90414d1 100644
+--- a/drivers/gpu/drm/vc4/vc4_drv.c
++++ b/drivers/gpu/drm/vc4/vc4_drv.c
+@@ -14,6 +14,7 @@
+ #include <linux/module.h>
+ #include <linux/of_platform.h>
+ #include <linux/platform_device.h>
++#include "drm_fb_cma_helper.h"
+ 
+ #include "vc4_drv.h"
+ #include "vc4_regs.h"
+@@ -70,6 +71,11 @@ static int vc4_drm_load(struct drm_device *dev, unsigned long flags)
+ 
+ static int vc4_drm_unload(struct drm_device *dev)
+ {
++	struct vc4_dev *vc4 = to_vc4_dev(dev);
 +
-+The VC4 device present on the Raspberry Pi includes a display system
-+with HDMI output and the HVS scaler for compositing display planes.
++	if (vc4->fbdev)
++		drm_fbdev_cma_fini(vc4->fbdev);
 +
-+Required properties for VC4:
-+- compatible:	Should be "brcm,vc4"
-+- crtcs:	List of references to pixelvalve scanout engines
-+- hvss:		List of references to HVS video scalers
-+- encoders:	List of references to output encoders (HDMI, SDTV)
+ 	drm_mode_config_cleanup(dev);
+ 
+ 	component_unbind_all(dev->dev, dev);
+@@ -85,6 +91,14 @@ static void vc4_drm_preclose(struct drm_device *dev, struct drm_file *file)
+ 		vc4_cancel_page_flip(crtc, file);
+ }
+ 
++static void vc4_lastclose(struct drm_device *dev)
++{
++	struct vc4_dev *vc4 = to_vc4_dev(dev);
 +
-+Required properties for Pixel Valve:
-+- compatible:	Should be "brcm,vc4-pixelvalve"
-+- reg:		Physical base address and length of the PV's registers
-+- interrupts:	The interrupt number
-+		  See bindings/interrupt-controller/brcm,bcm2835-armctrl-ic.txt
++	if (vc4->fbdev)
++		drm_fbdev_cma_restore_mode(vc4->fbdev);
++}
 +
-+Required properties for HVS:
-+- compatible:	Should be "brcm,vc4-hvs"
-+- reg:		Physical base address and length of the HVS's registers
-+- interrupts:	The interrupt number
-+		  See bindings/interrupt-controller/brcm,bcm2835-armctrl-ic.txt
+ static const struct file_operations vc4_drm_fops = {
+ 	.owner = THIS_MODULE,
+ 	.open = drm_open,
+@@ -109,6 +123,7 @@ static struct drm_driver vc4_drm_driver = {
+ 			    DRIVER_PRIME),
+ 	.load = vc4_drm_load,
+ 	.unload = vc4_drm_unload,
++	.lastclose = vc4_lastclose,
+ 	.set_busid = drm_platform_set_busid,
+ 	.preclose = vc4_drm_preclose,
+ 
+diff --git a/drivers/gpu/drm/vc4/vc4_drv.h b/drivers/gpu/drm/vc4/vc4_drv.h
+index 1b0a0b0..6edc14b 100644
+--- a/drivers/gpu/drm/vc4/vc4_drv.h
++++ b/drivers/gpu/drm/vc4/vc4_drv.h
+@@ -15,6 +15,8 @@ struct vc4_dev {
+ 	struct vc4_hdmi *hdmi;
+ 	struct vc4_hvs *hvs;
+ 	struct vc4_crtc *crtc[3];
 +
-+Required properties for HDMI
-+- compatible:	Should be "brcm,vc4-hdmi"
-+- reg:		Physical base address and length of the two register ranges
-+		  ("HDMI" and "HD")
-+- interrupts:	The interrupt numbers
-+		  See bindings/interrupt-controller/brcm,bcm2835-armctrl-ic.txt
-+- ddc:		phandle of the I2C controller used for DDC EDID probing
-+- crtc:		phandle to the pixelvalve CRTC the HDMI encoder is attached to
++	struct drm_fbdev_cma *fbdev;
+ };
+ 
+ static inline struct vc4_dev *
+diff --git a/drivers/gpu/drm/vc4/vc4_kms.c b/drivers/gpu/drm/vc4/vc4_kms.c
+index e5e96bc..a34439f 100644
+--- a/drivers/gpu/drm/vc4/vc4_kms.c
++++ b/drivers/gpu/drm/vc4/vc4_kms.c
+@@ -21,7 +21,16 @@
+ #include "drm_fb_cma_helper.h"
+ #include "vc4_drv.h"
+ 
++static void vc4_output_poll_changed(struct drm_device *dev)
++{
++	struct vc4_dev *vc4 = to_vc4_dev(dev);
 +
-+Optional properties for HDMI:
-+- hpd-gpio:	The GPIO pin for HDMI hotplug detect (if it doesn't appear
-+		  as an interrupt/status bit in the HDMI controller
-+		  itself).  See bindings/pinctrl/brcm,bcm2835-gpio.txt
++	if (vc4->fbdev)
++		drm_fbdev_cma_hotplug_event(vc4->fbdev);
++}
 +
-+Example:
-+/ {
-+	soc {
-+		pv0: brcm,vc4-pixelvalve at 7e206000 {
-+			compatible = "brcm,vc4-pixelvalve";
-+			reg = <0x7e206000 0x100>;
-+			interrupts = <2 13>; /* pwa2 */
-+		};
-+
-+		pv1: brcm,vc4-pixelvalve at 7e207000 {
-+			compatible = "brcm,vc4-pixelvalve";
-+			reg = <0x7e207000 0x100>;
-+			interrupts = <2 14>; /* pwa1 */
-+		};
-+
-+		pv2: brcm,vc4-pixelvalve at 7e807000 {
-+			compatible = "brcm,vc4-pixelvalve";
-+			reg = <0x7e807000 0x100>;
-+			interrupts = <2 10>; /* pixelvalve */
-+		};
-+
-+		hvs: brcm,hvs at 7e400000 {
-+			compatible = "brcm,vc4-hvs";
-+			reg = <0x7e400000 0x6000>;
-+			interrupts = <2 1>;
-+		};
-+
-+		hdmi: brcm,vc4-hdmi at 7e902000 {
-+			compatible = "brcm,vc4-hdmi";
-+			reg = <0x7e902000 0x600>,
-+			      <0x7e808000 0x100>;
-+			interrupts = <2 8>, <2 9>;
-+			ddc = <&i2c2>;
-+			hpd-gpio = <&gpio 46 GPIO_ACTIVE_HIGH>;
-+			crtc = <&pv2>;
-+		};
-+
-+		vc4: vc4 at 0x7e4c0000 {
-+			compatible = "brcm,vc4";
-+
-+			crtcs = <&pv0>, <&pv1>, <&pv2>;
-+			encoders = <&hdmi>;
-+			hvss = <&hvs>;
-+		};
-+	};
-+};
+ static const struct drm_mode_config_funcs vc4_mode_funcs = {
++	.output_poll_changed = vc4_output_poll_changed,
+ 	.atomic_check = drm_atomic_helper_check,
+ 	.atomic_commit = drm_atomic_helper_commit,
+ 	.fb_create = drm_fb_cma_create,
+@@ -54,6 +63,7 @@ fail:
+ 
+ int vc4_kms_load(struct drm_device *dev)
+ {
++	struct vc4_dev *vc4 = to_vc4_dev(dev);
+ 	int ret;
+ 
+ 	ret = drm_vblank_init(dev, dev->mode_config.num_crtc);
+@@ -73,9 +83,11 @@ int vc4_kms_load(struct drm_device *dev)
+ 
+ 	drm_mode_config_reset(dev);
+ 
+-	drm_fbdev_cma_init(dev, 32,
+-			   dev->mode_config.num_crtc,
+-			   dev->mode_config.num_connector);
++	vc4->fbdev = drm_fbdev_cma_init(dev, 32,
++					dev->mode_config.num_crtc,
++					dev->mode_config.num_connector);
++	if (IS_ERR(vc4->fbdev))
++		vc4->fbdev = NULL;
+ 
+ 	drm_kms_helper_poll_init(dev);
+ 
 -- 
 2.1.4
