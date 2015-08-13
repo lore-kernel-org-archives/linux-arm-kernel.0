@@ -1,27 +1,57 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 13 Aug 2015 14:37:54 +0200
-Subject: [PATCH] pinctrl: atlas7: clear ugly branch statements for pull
- and drivestrength
-In-Reply-To: <1438744934-15395-1-git-send-email-21cnbao@gmail.com>
-References: <1438744934-15395-1-git-send-email-21cnbao@gmail.com>
-Message-ID: <CACRpkdYtFSps1R-YgMFoekkW8osDVf+ujrnGLP47YBCcq2ZBzg@mail.gmail.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Thu, 13 Aug 2015 20:39:48 +0800
+Subject: [GIT PULL] ARM: berlin: Initial Marvell Berlin ARM64 support
+In-Reply-To: <1438629886-6390-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1438629886-6390-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20150813203948.31de7849@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 5, 2015 at 5:22 AM, Barry Song <21cnbao@gmail.com> wrote:
+Dear Olof,
 
-> From: Wei Chen <Wei.Chen@csr.com>
->
-> To set/get atlas7 pull & drive strength, we use lots of if/else
-> to check pad type. But except mask value or immediate value, all
-> actions in these conditional branches are the same.
-> So we use predefined pull info table and drive strength table
-> to reduce these redundancy code.
->
-> Signed-off-by: Wei Chen <Wei.Chen@csr.com>
-> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+On Mon,  3 Aug 2015 21:24:44 +0200
+Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
 
-Patch applied.
+> Hi Arnd, Kevin, Olof,
+> 
+> this is initial Marvell Berlin4CT ARM64 support for v4.3. It contains minimum SoC
+> dtsi and basic dts for the development board. The patches have been posted by
+> Marvell's Jisheng Zhang a while ago on the lists.
+> 
+> Please pull.
+> 
+> The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
+> 
+>   Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.infradead.org/users/hesselba/linux-berlin.git tags/berlin64-for-v4.3-1
+> 
+> for you to fetch changes up to d93ac74ad150c89f2d0a3b90754cbccdc6ab102c:
+> 
+>   arm64: dts: Add dts files for Marvell Berlin4CT SoC (2015-08-03 20:45:54 +0200)
+> 
+> ----------------------------------------------------------------
+> Initial support for Marvell Berlin4CT ARM64 SoC
+> 
+> ----------------------------------------------------------------
+> Jisheng Zhang (1):
+>       arm64: dts: Add dts files for Marvell Berlin4CT SoC
+> 
+>  arch/arm64/boot/dts/Makefile                  |   1 +
+>  arch/arm64/boot/dts/marvell/Makefile          |   5 +
+>  arch/arm64/boot/dts/marvell/berlin4ct-dmp.dts |  66 +++++++++++
+>  arch/arm64/boot/dts/marvell/berlin4ct.dtsi    | 164 ++++++++++++++++++++++++++
+>  4 files changed, 236 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/marvell/Makefile
+>  create mode 100644 arch/arm64/boot/dts/marvell/berlin4ct-dmp.dts
+>  create mode 100644 arch/arm64/boot/dts/marvell/berlin4ct.dtsi
 
-Yours,
-Linus Walleij
+I just saw you were online ;)
+
+Thank you very much for appling the patches for Kconfig and defconfig, I'm not
+sure you missed this dts pull ;) could you please help?
+
+Sorry for noise,
+Jisheng
