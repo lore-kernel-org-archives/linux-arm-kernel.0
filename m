@@ -1,57 +1,217 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Thu, 13 Aug 2015 13:17:28 +0300
-Subject: [PATCH v2 6/6] irqchip: crossbar: fix irq masking at suspend
-In-Reply-To: <55CC63D0.8030707@arm.com>
-References: <1439401562-28874-1-git-send-email-grygorii.strashko@ti.com>
- <1439401562-28874-7-git-send-email-grygorii.strashko@ti.com>
- <55CC63D0.8030707@arm.com>
-Message-ID: <55CC6EB8.3050906@ti.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 13 Aug 2015 11:23:35 +0100
+Subject: [PATCH v2 5/6] mailbox: Add generic mechanism for testing
+ Mailbox Controllers
+In-Reply-To: <CABb+yY0cgbtM68-E_Xqgh5O6GRLXESYTLa5WcAwUBoVL3ufrxA@mail.gmail.com>
+References: <1437990272-23111-1-git-send-email-lee.jones@linaro.org>
+ <1437990272-23111-6-git-send-email-lee.jones@linaro.org>
+ <CABb+yY20nQbiEEZeRvWTMUsJ2qgwRn8CrWvnFDSB-b1dgVaAuw@mail.gmail.com>
+ <20150812102328.GD18282@x1>
+ <CABb+yY0A74Vy3-KOvj0URU_4zb2FAC7Yp3gmEwnFaBrD0mzt0w@mail.gmail.com>
+ <20150813091914.GB8782@x1>
+ <CABb+yY0cgbtM68-E_Xqgh5O6GRLXESYTLa5WcAwUBoVL3ufrxA@mail.gmail.com>
+Message-ID: <20150813102335.GC8782@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/13/2015 12:30 PM, Sudeep Holla wrote:
+On Thu, 13 Aug 2015, Jassi Brar wrote:
+
+> On Thu, Aug 13, 2015 at 2:49 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> > On Thu, 13 Aug 2015, Jassi Brar wrote:
 > 
-> 
-> On 12/08/15 18:46, Grygorii Strashko wrote:
->> All ARM GIC IRQs have to masked during suspend if they are not
->> wakeup source. Now this is not happen, since switching to
->> use IRQ domain hierarchy, because suspend_device_irq() only checks flags
->> in the last IRQ chip in hierarchy for IRQCHIP_MASK_ON_SUSPEND
->> bit set. And in the case of TI OMAP DRA7 the last IRQ chip is TI Crossbar
->> which do not have this flag set.
->>
->> In case of TI OMAP DRA7 the following IRQ hierarchy is defined:
->>    ARM GIC <- OMAP wakeupgen <- TI CBAR
->> ARM GIC - IRQCHIP_MASK_ON_SUSPEND=n
-> 
-> May be this won't affect your platform or this patch but even GIC marks
-> IRQCHIP_MASK_ON_SUSPEND=y now since GIC doesn't provide any facility to
-> configure the wakeup source and keeps all the interrupt source enabled.
+> >> >> > +
+> >> >> > +static void mbox_test_prepare_message(struct mbox_client *client, void *message)
+> >> >> > +{
+> >> >> > +       struct mbox_test_device *tdev = dev_get_drvdata(client->dev);
+> >> >> > +
+> >> >> > +       if (tdev->mmio)
+> >> >> > +               memcpy(tdev->mmio, message, MBOX_MAX_MSG_LEN);
+> >> >> >
+> >> >> This is unlikely to work. Those platforms that need to send a 2 part
+> >> >> message, they do :
+> >> >> (a) Signal/Command/Target code via some controller register (via
+> >> >> mbox_send_message).
+> >> >> (b) Setup the payload in Shared-Memory (via tx_prepare).
+> >> >>
+> >> >> This test driver assumes both are the same. I think you have to
+> >> >> declare something like
+> >> >
+> >> > This driver assumes that the framework will call client->tx_prepare()
+> >> > first, which satisfies (b).  It then assumes controller->send_data()
+> >> > will be invoked, which will send the platform specific
+> >> > signal/command/target code, which then satisfies (a).
+> >> >
+> >> Yeah, but what would be that code? Who provides that?
+> >>
+> >> > In what way does it assume they are the same?
+> >> >
+> >> notice the 'message' pointer in
+> >> mbox_send_message(tdev->tx_channel, message);
+> >>     and
+> >> memcpy(tdev->mmio, message, MBOX_MAX_MSG_LEN);
+> >>
+> >> >> struct mbox_test_message { /* same for TX and RX */
+> >> >>           unsigned sig_len;
+> >> >>           void *signal;               /* rx/tx via mailbox api */
+> >> >>           unsigned pl_len;
+> >> >>           void *payload;           /* rx/tx via shared-memory */
+> >> >> };
+> >> >
+> >> > How do you think this should be set and use these?
+> >> >
+> >> The userspace would want to specify the command code (32bits or not)
+> >> that would be passed via the fifo/register of the controller. So we
+> >> need signal[]
+> >>
+> >> The data to be passed via share-memory could be provided by userspace
+> >> via the payload[] array.
+> >
+> > Okay, so would the solution be two userspace files 'signal' and
+> > 'message', so in the case of a client specified signal we can write it
+> > into there first.
+> >
+> > echo 255  > signal
+> > echo test > message
+> >
+> > ... or in the case where no signal is required, or the controller
+> > driver taking care of it, we just don't write anything to signal?
+> >
+> file_operations.write() should parse signal and message, coming from
+> userspace, into a local structure before routing them via
+> mbox_send_message and tx_prepare respectively.
 
-That's true for next, bur not true for 4.2-rc6 or 4.1 :(
+Okay.  So before I code this up we should agree on syntax.
 
-> 
-> We have this flag enabled now as it's always safer to mask all the non
-> wakeup interrupts are masked at the chip level when suspending.
+How would you like to represent the break between signal and message?
+Obviously ' ' would be a bad idea, as some clients may want to send
+messages with white space contained.  How about '\t' or '\n'?
 
-Indeed, but that's do not work in case of IRQ domain hierarchy and
-it's do not clear how should it work?
-I've tried to describe this problem in cover letter actually.
+> > Just for clarification, in the case where a signal is required, do
+> > clients usually pass that through mbox_send_message() too?
+> >
+> >   mbox_send_message(tdev->tx_channel, signal);
+> >   mbox_send_message(tdev->tx_channel, message);
+> >
+> No. Command/Signal code is passed via mbox_send_message(signal). The
+> payload is passed via Shared-Memory during tx_prepare(message)
 
-> 
-> Also the beginning of the commit message contradicts when you also say
-> in the following statement IRQCHIP_MASK_ON_SUSPEND=n. So you may need to
-> update the log.
+Okay, I see.  Thanks for the clarification.
 
-I'll try to reword. What I've tried to mention that IRQs masking on
-suspend is default expected behavior and that how it was before
-switching to IRQ domain hierarchy.
+> >> >> > +static void mbox_test_message_sent(struct mbox_client *client,
+> >> >> > +                                  void *message, int r)
+> >> >> > +{
+> >> >> > +       if (r)
+> >> >> > +               dev_warn(client->dev,
+> >> >> > +                        "Client: Message could not be sent: %d\n", r);
+> >> >> > +       else
+> >> >> > +               dev_info(client->dev,
+> >> >> > +                        "Client: Message sent\n");
+> >> >> > +}
+> >> >> > +
+> >> >> > +static struct mbox_chan *
+> >> >> > +mbox_test_request_channel(struct platform_device *pdev, const char *name)
+> >> >> > +{
+> >> >> > +       struct mbox_client *client;
+> >> >> > +
+> >> >> > +       client = devm_kzalloc(&pdev->dev, sizeof(*client), GFP_KERNEL);
+> >> >> > +       if (!client)
+> >> >> > +               return ERR_PTR(-ENOMEM);
+> >> >> > +
+> >> >> > +       client->dev             = &pdev->dev;
+> >> >> > +       client->rx_callback     = mbox_test_receive_message;
+> >> >> > +       client->tx_prepare      = mbox_test_prepare_message;
+> >> >> > +       client->tx_done         = mbox_test_message_sent;
+> >> >> > +       client->tx_block        = true;
+> >> >> > +       client->knows_txdone    = false;
+> >> >> > +       client->tx_tout         = 500;
+> >> >> > +
+> >> >> > +       return mbox_request_channel_byname(client, name);
+> >> >> > +}
+> >> >> > +
+> >> >> > +static int mbox_test_probe(struct platform_device *pdev)
+> >> >> > +{
+> >> >> > +       struct mbox_test_device *tdev;
+> >> >> > +       struct resource *res;
+> >> >> > +       int ret;
+> >> >> > +
+> >> >> > +       tdev = devm_kzalloc(&pdev->dev, sizeof(*tdev), GFP_KERNEL);
+> >> >> > +       if (!tdev)
+> >> >> > +               return -ENOMEM;
+> >> >> > +
+> >> >> > +       /* It's okay for MMIO to be NULL */
+> >> >> > +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> >> >> > +       tdev->mmio = devm_ioremap_resource(&pdev->dev, res);
+> >> >> > +       if (IS_ERR(tdev->mmio))
+> >> >> > +               tdev->mmio = NULL;
+> >> >> > +
+> >> >> > +       tdev->tx_channel = mbox_test_request_channel(pdev, "tx");
+> >> >> > +       if (IS_ERR(tdev->tx_channel))
+> >> >> > +               return PTR_ERR(tdev->tx_channel);
+> >> >> > +
+> >> >> > +       tdev->rx_channel = mbox_test_request_channel(pdev, "rx");
+> >> >> > +       if (IS_ERR(tdev->rx_channel))
+> >> >> > +               return PTR_ERR(tdev->rx_channel);
+> >> >> > +
+> >> >> Should it really fail on TX or RX only clients?
+> >> >
+> >> > Good question.  Probably not, but I guess we'd need a flag for that.
+> >> >
+> >> Just assume 1 channel. You can't make it receive if the controller
+> >> can't do rx, so the userspace will simply block on read requests. And
+> >> you can't make the controller send, if it can't. So any write attempt
+> >> will simply return with an error.
+> >>  And we are going to need very platform specific knowledge to execute
+> >> the tests. It's not like some loop enumerating all possible
+> >> combinations of parameters that the api must pass... so we are good.
+> >
+> > I'm guessing most tests will be some kind of send-reply test, so we'd
+> > need two channels for that.  I can make it so the driver does not fail
+> > if 'tx' or 'rx' is missing, but will fail if both are.
+> >
+> I have seen more channels to be rx+tx, than rx/tx only. And for latter
+> case the user should run 2 test threads, one each for RX and TX.
 
-"All ARM GIC IRQs have to masked during suspend if they are not
- wakeup source - this is expected behavior and that's how it was before
- switching to IRQ domain hierarchy. ..."
-ok?
+Okay, makes sense to me.
+
+> > Bare in mind that this test driver isn't designed to cover all of the
+> > corner cases, but more designed as a helpful boiler plate where it
+> > will tick some use-case boxes, but is clear enough to be hacked around
+> > by other vendors who have different requirements.
+> >
+> > With regards to you comments on userspace; I suggest that whoever is
+> > testing the controller will know it and will not attempt to check for
+> > a reply from a controller (or co-proc) which is write-only.
+> >
+> That's actually my point :)
+> When the userspace already has all that platform specific knowledge,
+> why check for 'valid' usage in controller driver? Simply reject any
+> request that the controller isn't capable of (which is practically
+> never supposed to happen).
+
+This conversation doesn't really belong in this thread; but seeing as
+you bought it up ...
+
+I absolutely and fundamentally disagree that the controller shouldn't
+do error checking during mbox_request_channel(). It is
+mbox_request_channel() that should fail on a known bad configuration,
+rather than pass back a known rotten apple and wait for that it to be
+eaten (appreciate I've gone a little overboard with the analogies)
+before flagging it up.  And for what purpose?  To make the controller
+driver a little simpler?  I do hope that you do see sense on this one
+and allow me to keep the error checking in the driver!
+
+If you have a reply to this, please do so one the driver thread, so
+it's easier to follow.
+
+Secondly, a reply more akin to this thread.  The guys using _this_
+driver are more likely to be Controller authors.  These are the chaps
+I was speaking about that are going to know the platform specifics of
+the controller.  The error checking in mbox_request_channel() is
+designed for 'client' authors, who are more likely to be requesting
+invalid configurations.
 
 -- 
-regards,
--grygorii
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
