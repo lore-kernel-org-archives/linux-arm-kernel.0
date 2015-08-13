@@ -1,48 +1,216 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Thu, 13 Aug 2015 11:18:10 +0100
-Subject: [RFC PATCH v4 6/9] arm: hisi_defconfig: remove CONFIG_MMC_DW_IDMAC
-In-Reply-To: <1438843553-24058-1-git-send-email-shawn.lin@rock-chips.com>
-References: <1438843469-23807-1-git-send-email-shawn.lin@rock-chips.com>
- <1438843553-24058-1-git-send-email-shawn.lin@rock-chips.com>
-Message-ID: <55CC6EE2.4070308@hisilicon.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 13 Aug 2015 11:30:08 +0100
+Subject: [PATCH 2/2] Convert smsc911x to use ACPI as well as DT
+In-Reply-To: <20150813093838.GC5468@xora-haswell.xora.org.uk>
+References: <1439417187-21411-1-git-send-email-jeremy.linton@arm.com>
+ <1439417187-21411-3-git-send-email-jeremy.linton@arm.com>
+ <20150813082759.GB5468@xora-haswell.xora.org.uk>
+ <20150813090117.GA13833@red-moon>
+ <20150813093838.GC5468@xora-haswell.xora.org.uk>
+Message-ID: <20150813103008.GA13356@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 8/6/2015 7:45 AM, Shawn Lin wrote:
-> DesignWare MMC Controller's transfer mode should be decided
-> at runtime instead of compile-time. So we remove this config
-> option and read dw_mmc's register to select DMA master.
+On Thu, Aug 13, 2015 at 10:38:38AM +0100, Graeme Gregory wrote:
+> On Thu, Aug 13, 2015 at 10:01:17AM +0100, Lorenzo Pieralisi wrote:
+> > On Thu, Aug 13, 2015 at 09:27:59AM +0100, Graeme Gregory wrote:
+> > > On Wed, Aug 12, 2015 at 05:06:27PM -0500, Jeremy Linton wrote:
+> > > > Add ACPI bindings for the smsc911x driver. Convert the DT specific calls
+> > > > to nonspecific device* calls, This allows the driver to work
+> > > > with both ACPI and DT configurations. Ethernet should now work when using
+> > > > ACPI on ARM Juno.
+> > 
+> > Last sentence does not belong in the commit log.
+> > 
+> > > > 
+> > > > Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+> > > 
+> > > The code looks fine to me.
+> > > 
+> > > Currently the compulsary DT properties seem to match the "approved" ACPI
+> > > NIC properties from here
+> > > 
+> > > http://www.uefi.org/sites/default/files/resources/nic-request-v2.pdf
+> > 
+> > What about _DSD device specific properties (eg "smsc,save-mac-address") ?
+> > Are we taking 1:1 translation between DT and ACPI for granted ?
+> > 
+> > I thought some process must be put in place to define the corresponding
+> > bindings in ACPI before starting this mechanical translation or maybe
+> > I missed something, I would like to understand.
+> > 
+> > How does the device specific _DSD definitions work in ACPI world ? Where
+> > are they published ? How will we translate those to DT bindings if there
+> > is need ?
+> > 
 > 
-> Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
+> This I do not know as that discussion is still ongoing. But those
+> options are currently marked as optional so driver should not fail if
+> they are not present in ACPI.
 
-Acked-by: Wei Xu <xuwei5@hisilicon.com>
+Well yes, but if they are present this patch uses them when booting
+with ACPI and that's what I am arguing about, because they are
+undocumented.
 
-> ---
-> 
-> Changes in v4: None
-> Changes in v3: None
-> Changes in v2: None
-> 
->  arch/arm/configs/hisi_defconfig | 1 -
->  1 file changed, 1 deletion(-)
-> 
-> diff --git a/arch/arm/configs/hisi_defconfig b/arch/arm/configs/hisi_defconfig
-> index 5997dbc..b2e340b 100644
-> --- a/arch/arm/configs/hisi_defconfig
-> +++ b/arch/arm/configs/hisi_defconfig
-> @@ -69,7 +69,6 @@ CONFIG_NOP_USB_XCEIV=y
->  CONFIG_MMC=y
->  CONFIG_RTC_CLASS=y
->  CONFIG_MMC_DW=y
-> -CONFIG_MMC_DW_IDMAC=y
->  CONFIG_MMC_DW_PLTFM=y
->  CONFIG_RTC_DRV_PL031=y
->  CONFIG_DMADEVICES=y
-> 
+This discussion should be brought to completion, the _DSD usage and
+bindings sharing between DT and ACPI well defined before we can
+enable drivers to rely on properties that in ACPI world have no
+binding definition at all, if we go by this route we might end
+up having drivers reusing DT properties that have no reason whatsoever
+to exist in ACPI world.
 
-Thanks!
+So, to make this clear, the _DSD usage must be documented and there
+has to be a way to define the related bindings in ACPI world so that
+driver code can be reviewed accordingly.
 
-Best Regards,
-Wei
+Lorenzo
+
+> Graeme
+> 
+> > Lorenzo
+> > 
+> > > Reviewed-by: Graeme Gregory <graeme.gregory@linaro.org>
+> > > 
+> > > Thanks
+> > > 
+> > > > ---
+> > > >  drivers/net/ethernet/smsc/smsc911x.c | 48 +++++++++++++++++-------------------
+> > > >  1 file changed, 22 insertions(+), 26 deletions(-)
+> > > > 
+> > > > diff --git a/drivers/net/ethernet/smsc/smsc911x.c b/drivers/net/ethernet/smsc/smsc911x.c
+> > > > index 959aeea..0f21aa3 100644
+> > > > --- a/drivers/net/ethernet/smsc/smsc911x.c
+> > > > +++ b/drivers/net/ethernet/smsc/smsc911x.c
+> > > > @@ -59,7 +59,9 @@
+> > > >  #include <linux/of_device.h>
+> > > >  #include <linux/of_gpio.h>
+> > > >  #include <linux/of_net.h>
+> > > > +#include <linux/acpi.h>
+> > > >  #include <linux/pm_runtime.h>
+> > > > +#include <linux/property.h>
+> > > >  
+> > > >  #include "smsc911x.h"
+> > > >  
+> > > > @@ -2362,59 +2364,46 @@ static const struct smsc911x_ops shifted_smsc911x_ops = {
+> > > >  	.tx_writefifo = smsc911x_tx_writefifo_shift,
+> > > >  };
+> > > >  
+> > > > -#ifdef CONFIG_OF
+> > > > -static int smsc911x_probe_config_dt(struct smsc911x_platform_config *config,
+> > > > -				    struct device_node *np)
+> > > > +static int smsc911x_probe_config(struct smsc911x_platform_config *config,
+> > > > +				 struct device *dev)
+> > > >  {
+> > > > -	const char *mac;
+> > > >  	u32 width = 0;
+> > > >  
+> > > > -	if (!np)
+> > > > +	if (!dev)
+> > > >  		return -ENODEV;
+> > > >  
+> > > > -	config->phy_interface = of_get_phy_mode(np);
+> > > > +	config->phy_interface = device_get_phy_mode(dev);
+> > > >  
+> > > > -	mac = of_get_mac_address(np);
+> > > > -	if (mac)
+> > > > -		memcpy(config->mac, mac, ETH_ALEN);
+> > > > +	device_get_mac_address(dev, config->mac, ETH_ALEN);
+> > > >  
+> > > > -	of_property_read_u32(np, "reg-shift", &config->shift);
+> > > > +	device_property_read_u32(dev, "reg-shift", &config->shift);
+> > > >  
+> > > > -	of_property_read_u32(np, "reg-io-width", &width);
+> > > > +	device_property_read_u32(dev, "reg-io-width", &width);
+> > > >  	if (width == 4)
+> > > >  		config->flags |= SMSC911X_USE_32BIT;
+> > > >  	else
+> > > >  		config->flags |= SMSC911X_USE_16BIT;
+> > > >  
+> > > > -	if (of_get_property(np, "smsc,irq-active-high", NULL))
+> > > > +	if (device_property_present(dev, "smsc,irq-active-high"))
+> > > >  		config->irq_polarity = SMSC911X_IRQ_POLARITY_ACTIVE_HIGH;
+> > > >  
+> > > > -	if (of_get_property(np, "smsc,irq-push-pull", NULL))
+> > > > +	if (device_property_present(dev, "smsc,irq-push-pull"))
+> > > >  		config->irq_type = SMSC911X_IRQ_TYPE_PUSH_PULL;
+> > > >  
+> > > > -	if (of_get_property(np, "smsc,force-internal-phy", NULL))
+> > > > +	if (device_property_present(dev, "smsc,force-internal-phy"))
+> > > >  		config->flags |= SMSC911X_FORCE_INTERNAL_PHY;
+> > > >  
+> > > > -	if (of_get_property(np, "smsc,force-external-phy", NULL))
+> > > > +	if (device_property_present(dev, "smsc,force-external-phy"))
+> > > >  		config->flags |= SMSC911X_FORCE_EXTERNAL_PHY;
+> > > >  
+> > > > -	if (of_get_property(np, "smsc,save-mac-address", NULL))
+> > > > +	if (device_property_present(dev, "smsc,save-mac-address"))
+> > > >  		config->flags |= SMSC911X_SAVE_MAC_ADDRESS;
+> > > >  
+> > > >  	return 0;
+> > > >  }
+> > > > -#else
+> > > > -static inline int smsc911x_probe_config_dt(
+> > > > -				struct smsc911x_platform_config *config,
+> > > > -				struct device_node *np)
+> > > > -{
+> > > > -	return -ENODEV;
+> > > > -}
+> > > > -#endif /* CONFIG_OF */
+> > > >  
+> > > >  static int smsc911x_drv_probe(struct platform_device *pdev)
+> > > >  {
+> > > > -	struct device_node *np = pdev->dev.of_node;
+> > > >  	struct net_device *dev;
+> > > >  	struct smsc911x_data *pdata;
+> > > >  	struct smsc911x_platform_config *config = dev_get_platdata(&pdev->dev);
+> > > > @@ -2478,7 +2467,7 @@ static int smsc911x_drv_probe(struct platform_device *pdev)
+> > > >  		goto out_disable_resources;
+> > > >  	}
+> > > >  
+> > > > -	retval = smsc911x_probe_config_dt(&pdata->config, np);
+> > > > +	retval = smsc911x_probe_config(&pdata->config, &pdev->dev);
+> > > >  	if (retval && config) {
+> > > >  		/* copy config parameters across to pdata */
+> > > >  		memcpy(&pdata->config, config, sizeof(pdata->config));
+> > > > @@ -2654,6 +2643,12 @@ static const struct of_device_id smsc911x_dt_ids[] = {
+> > > >  MODULE_DEVICE_TABLE(of, smsc911x_dt_ids);
+> > > >  #endif
+> > > >  
+> > > > +static const struct acpi_device_id smsc911x_acpi_match[] = {
+> > > > +	{ "ARMH9118", 0 },
+> > > > +	{ }
+> > > > +};
+> > > > +MODULE_DEVICE_TABLE(acpi, smsc911x_acpi_match);
+> > > > +
+> > > >  static struct platform_driver smsc911x_driver = {
+> > > >  	.probe = smsc911x_drv_probe,
+> > > >  	.remove = smsc911x_drv_remove,
+> > > > @@ -2661,6 +2656,7 @@ static struct platform_driver smsc911x_driver = {
+> > > >  		.name	= SMSC_CHIPNAME,
+> > > >  		.pm	= SMSC911X_PM_OPS,
+> > > >  		.of_match_table = of_match_ptr(smsc911x_dt_ids),
+> > > > +		.acpi_match_table = ACPI_PTR(smsc911x_acpi_match),
+> > > >  	},
+> > > >  };
+> > > >  
+> > > > -- 
+> > > > 2.4.3
+> > > > 
+> > > > 
+> > > > 
+> > > > _______________________________________________
+> > > > linux-arm-kernel mailing list
+> > > > linux-arm-kernel at lists.infradead.org
+> > > > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> > > 
+> > > _______________________________________________
+> > > linux-arm-kernel mailing list
+> > > linux-arm-kernel at lists.infradead.org
+> > > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> > > 
+> > 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
