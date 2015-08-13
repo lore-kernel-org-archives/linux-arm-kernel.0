@@ -1,150 +1,307 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Thu, 13 Aug 2015 18:17:18 +0530
-Subject: [PATCH v2 5/6] mailbox: Add generic mechanism for testing Mailbox
- Controllers
-In-Reply-To: <20150813114005.GF8782@x1>
-References: <1437990272-23111-6-git-send-email-lee.jones@linaro.org>
- <CABb+yY20nQbiEEZeRvWTMUsJ2qgwRn8CrWvnFDSB-b1dgVaAuw@mail.gmail.com>
- <20150812102328.GD18282@x1>
- <CABb+yY0A74Vy3-KOvj0URU_4zb2FAC7Yp3gmEwnFaBrD0mzt0w@mail.gmail.com>
- <20150813091914.GB8782@x1>
- <CABb+yY0cgbtM68-E_Xqgh5O6GRLXESYTLa5WcAwUBoVL3ufrxA@mail.gmail.com>
- <20150813102335.GC8782@x1>
- <CABb+yY3z7p97eOhncQ2i+g6yoYGfDgSN9BDPKmiDaVLa3oPocA@mail.gmail.com>
- <20150813110008.GD8782@x1>
- <CABb+yY34i=VUnswUE21vgeQYAGOS=7uwvdnTAFFgYkTV0CFk=w@mail.gmail.com>
- <20150813114005.GF8782@x1>
-Message-ID: <CABb+yY2OH16mgOwi=yH_eEHQN2Ck2x5xtVk-p-8Un9gGmcACdw@mail.gmail.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Thu, 13 Aug 2015 14:48:27 +0200
+Subject: [PATCH v2 08/15] KVM: arm64: introduce ITS emulation file with
+ stub functions
+In-Reply-To: <1436538111-4294-9-git-send-email-andre.przywara@arm.com>
+References: <1436538111-4294-1-git-send-email-andre.przywara@arm.com>
+ <1436538111-4294-9-git-send-email-andre.przywara@arm.com>
+Message-ID: <55CC921B.503@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 13, 2015 at 5:10 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> On Thu, 13 Aug 2015, Jassi Brar wrote:
->
->> On Thu, Aug 13, 2015 at 4:30 PM, Lee Jones <lee.jones@linaro.org> wrote:
->> > On Thu, 13 Aug 2015, Jassi Brar wrote:
->> >
->> >> On Thu, Aug 13, 2015 at 3:53 PM, Lee Jones <lee.jones@linaro.org> wrote:
->> >> > On Thu, 13 Aug 2015, Jassi Brar wrote:
->> >> >
->> >> >> On Thu, Aug 13, 2015 at 2:49 PM, Lee Jones <lee.jones@linaro.org> wrote:
->> >> >> > On Thu, 13 Aug 2015, Jassi Brar wrote:
->> >> >>
->> >> >> >> >> > +
->> >> >> >> >> > +static void mbox_test_prepare_message(struct mbox_client *client, void *message)
->> >> >> >> >> > +{
->> >> >> >> >> > +       struct mbox_test_device *tdev = dev_get_drvdata(client->dev);
->> >> >> >> >> > +
->> >> >> >> >> > +       if (tdev->mmio)
->> >> >> >> >> > +               memcpy(tdev->mmio, message, MBOX_MAX_MSG_LEN);
->> >> >> >> >> >
->> >> >> >> >> This is unlikely to work. Those platforms that need to send a 2 part
->> >> >> >> >> message, they do :
->> >> >> >> >> (a) Signal/Command/Target code via some controller register (via
->> >> >> >> >> mbox_send_message).
->> >> >> >> >> (b) Setup the payload in Shared-Memory (via tx_prepare).
->> >> >> >> >>
->> >> >> >> >> This test driver assumes both are the same. I think you have to
->> >> >> >> >> declare something like
->> >> >> >> >
->> >> >> >> > This driver assumes that the framework will call client->tx_prepare()
->> >> >> >> > first, which satisfies (b).  It then assumes controller->send_data()
->> >> >> >> > will be invoked, which will send the platform specific
->> >> >> >> > signal/command/target code, which then satisfies (a).
->> >> >> >> >
->> >> >> >> Yeah, but what would be that code? Who provides that?
->> >> >> >>
->> >> >> >> > In what way does it assume they are the same?
->> >> >> >> >
->> >> >> >> notice the 'message' pointer in
->> >> >> >> mbox_send_message(tdev->tx_channel, message);
->> >> >> >>     and
->> >> >> >> memcpy(tdev->mmio, message, MBOX_MAX_MSG_LEN);
->> >> >> >>
->> >> >> >> >> struct mbox_test_message { /* same for TX and RX */
->> >> >> >> >>           unsigned sig_len;
->> >> >> >> >>           void *signal;               /* rx/tx via mailbox api */
->> >> >> >> >>           unsigned pl_len;
->> >> >> >> >>           void *payload;           /* rx/tx via shared-memory */
->> >> >> >> >> };
->> >> >> >> >
->> >> >> >> > How do you think this should be set and use these?
->> >> >> >> >
->> >> >> >> The userspace would want to specify the command code (32bits or not)
->> >> >> >> that would be passed via the fifo/register of the controller. So we
->> >> >> >> need signal[]
->> >> >> >>
->> >> >> >> The data to be passed via share-memory could be provided by userspace
->> >> >> >> via the payload[] array.
->> >> >> >
->> >> >> > Okay, so would the solution be two userspace files 'signal' and
->> >> >> > 'message', so in the case of a client specified signal we can write it
->> >> >> > into there first.
->> >> >> >
->> >> >> > echo 255  > signal
->> >> >> > echo test > message
->> >> >> >
->> >> >> > ... or in the case where no signal is required, or the controller
->> >> >> > driver taking care of it, we just don't write anything to signal?
->> >> >> >
->> >> >> file_operations.write() should parse signal and message, coming from
->> >> >> userspace, into a local structure before routing them via
->> >> >> mbox_send_message and tx_prepare respectively.
->> >> >
->> >> > Okay.  So before I code this up we should agree on syntax.
->> >> >
->> >> > How would you like to represent the break between signal and message?
->> >> > Obviously ' ' would be a bad idea, as some clients may want to send
->> >> > messages with white space contained.  How about '\t' or '\n'?
->> >> >
->> >> Yeah, I am not a fan of markers and flags either.
->> >>
->> >> Maybe we should share with userspace
->> >>   struct mbox_test_message { /* same for TX and RX */
->> >>            unsigned sig_len;
->> >>            void __user *signal;        /* rx/tx via mailbox api */
->> >>            unsigned pl_len;
->> >>            void __user *payload;    /* rx/tx via shared-memory */
->> >>   };
->> >>
->> >> First copy_from_user the structure of length sizof(struct
->> >> mbox_test_message) and then copy_from_user length sig_len and pl_len
->> >> from signal[] and payload[] respectively (usually ioctls would carry
->> >> such data).
->> >
->> > Simplicity and ease of use should be the goals here.  Testers should
->> > not have to write applications to use this driver.  Can we come up
->> > with a simple/effective method that uses SYSFS/DEBUGFS please?
->> >
->> > The easiest way I can think of which avoids markers/separators AND the
->> > requirement for users to have to write applications is to have two
->> > files, 'signal' and 'message' as mentioned before.  Once both are
->> > populated I can get this driver to draft the message appropriately and
->> > fire it off.
->> >
->> And then write to more files for RX data? ... which should also be in
->> the form of 'signal' and 'message'.
->>
->> BTW like for spi there is a stock application in
->> Documentation/spi/spidev_test.c we could do the same?
->
-> Coming from personal experience, testing drivers with (even stock)
-> applications is much more painful that simply writing/reading
-> (cat/echo) to a file in SYSFS/DEBUGFS.  Particularly if people are
-> using initramfs or thelike.  If it is possible to use SYSFS/DEBUGFS,
-> which it is in this case, then I believe that's the route we could go
-> down.
->
-Well, where could sysfs/debugfs not be used? :)  Anyways I am ok if
-prefer debugfs.
+On 07/10/2015 04:21 PM, Andre Przywara wrote:
+> The ARM GICv3 ITS emulation code goes into a separate file, but
+> needs to be connected to the GICv3 emulation, of which it is an
+> option.
+> Introduce the skeleton with function stubs to be filled later.
+> Introduce the basic ITS data structure and initialize it, but don't
+> return any success yet, as we are not yet ready for the show.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+>  arch/arm64/kvm/Makefile            |   1 +
+>  include/kvm/arm_vgic.h             |   6 ++
+>  include/linux/irqchip/arm-gic-v3.h |   1 +
+>  virt/kvm/arm/its-emul.c            | 125 +++++++++++++++++++++++++++++++++++++
+>  virt/kvm/arm/its-emul.h            |  35 +++++++++++
+>  virt/kvm/arm/vgic-v3-emul.c        |  24 ++++++-
+>  6 files changed, 189 insertions(+), 3 deletions(-)
+>  create mode 100644 virt/kvm/arm/its-emul.c
+>  create mode 100644 virt/kvm/arm/its-emul.h
+> 
+> diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
+> index f90f4aa..9803307 100644
+> --- a/arch/arm64/kvm/Makefile
+> +++ b/arch/arm64/kvm/Makefile
+> @@ -25,5 +25,6 @@ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v2-emul.o
+>  kvm-$(CONFIG_KVM_ARM_HOST) += vgic-v2-switch.o
+>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v3.o
+>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v3-emul.o
+> +kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/its-emul.o
+>  kvm-$(CONFIG_KVM_ARM_HOST) += vgic-v3-switch.o
+>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/arch_timer.o
+> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+> index 8c6cb0e..9e9d4aa 100644
+> --- a/include/kvm/arm_vgic.h
+> +++ b/include/kvm/arm_vgic.h
+> @@ -156,6 +156,11 @@ struct vgic_io_device {
+>  	struct kvm_io_device dev;
+>  };
+>  
+> +struct vgic_its {
+> +	bool			enabled;
+> +	spinlock_t		lock;
+> +};
+> +
+>  struct vgic_dist {
+>  	spinlock_t		lock;
+>  	bool			in_kernel;
+> @@ -264,6 +269,7 @@ struct vgic_dist {
+>  	u64			*pendbaser;
+>  
+>  	bool			lpis_enabled;
+> +	struct vgic_its		its;
+>  };
+>  
+>  struct vgic_v2_cpu_if {
+> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+> index ffbc034..df4e527 100644
+> --- a/include/linux/irqchip/arm-gic-v3.h
+> +++ b/include/linux/irqchip/arm-gic-v3.h
+> @@ -177,6 +177,7 @@
+>  #define GITS_CWRITER			0x0088
+>  #define GITS_CREADR			0x0090
+>  #define GITS_BASER			0x0100
+> +#define GITS_IDREGS_BASE		0xffd0
+>  #define GITS_PIDR2			GICR_PIDR2
+>  
+>  #define GITS_TRANSLATER			0x10040
+> diff --git a/virt/kvm/arm/its-emul.c b/virt/kvm/arm/its-emul.c
+> new file mode 100644
+> index 0000000..659dd39
+> --- /dev/null
+> +++ b/virt/kvm/arm/its-emul.c
+> @@ -0,0 +1,125 @@
+> +/*
+> + * GICv3 ITS emulation
+> + *
+> + * Copyright (C) 2015 ARM Ltd.
+> + * Author: Andre Przywara <andre.przywara@arm.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#include <linux/cpu.h>
+> +#include <linux/kvm.h>
+> +#include <linux/kvm_host.h>
+> +#include <linux/interrupt.h>
+> +
+> +#include <linux/irqchip/arm-gic-v3.h>
+> +#include <kvm/arm_vgic.h>
+> +
+> +#include <asm/kvm_emulate.h>
+> +#include <asm/kvm_arm.h>
+> +#include <asm/kvm_mmu.h>
+> +
+> +#include "vgic.h"
+> +#include "its-emul.h"
+> +
+> +static bool handle_mmio_misc_gits(struct kvm_vcpu *vcpu,
+> +				  struct kvm_exit_mmio *mmio,
+> +				  phys_addr_t offset)
+> +{
+> +	return false;
+> +}
+> +
+> +static bool handle_mmio_gits_idregs(struct kvm_vcpu *vcpu,
+> +				    struct kvm_exit_mmio *mmio,
+> +				    phys_addr_t offset)
+> +{
+> +	return false;
+> +}
+> +
+> +static bool handle_mmio_gits_cbaser(struct kvm_vcpu *vcpu,
+> +				    struct kvm_exit_mmio *mmio,
+> +				    phys_addr_t offset)
+> +{
+> +	return false;
+> +}
+> +
+> +static bool handle_mmio_gits_cwriter(struct kvm_vcpu *vcpu,
+> +				     struct kvm_exit_mmio *mmio,
+> +				     phys_addr_t offset)
+> +{
+> +	return false;
+> +}
+> +
+> +static bool handle_mmio_gits_creadr(struct kvm_vcpu *vcpu,
+> +				    struct kvm_exit_mmio *mmio,
+> +				    phys_addr_t offset)
+> +{
+> +	return false;
+> +}
+> +
+> +static const struct vgic_io_range vgicv3_its_ranges[] = {
+> +	{
+> +		.base		= GITS_CTLR,
+> +		.len		= 0x10,
+> +		.bits_per_irq	= 0,
+> +		.handle_mmio	= handle_mmio_misc_gits,
+> +	},
+> +	{
+> +		.base		= GITS_CBASER,
+> +		.len		= 0x08,
+> +		.bits_per_irq	= 0,
+> +		.handle_mmio	= handle_mmio_gits_cbaser,
+> +	},
+> +	{
+> +		.base		= GITS_CWRITER,
+> +		.len		= 0x08,
+> +		.bits_per_irq	= 0,
+> +		.handle_mmio	= handle_mmio_gits_cwriter,
+> +	},
+> +	{
+> +		.base		= GITS_CREADR,
+> +		.len		= 0x08,
+> +		.bits_per_irq	= 0,
+> +		.handle_mmio	= handle_mmio_gits_creadr,
+> +	},
+> +	{
+> +		/* We don't need any memory from the guest. */
+> +		.base		= GITS_BASER,
+> +		.len		= 0x40,
+> +		.bits_per_irq	= 0,
+> +		.handle_mmio	= handle_mmio_raz_wi,
+> +	},
+> +	{
+> +		.base		= GITS_IDREGS_BASE,
+> +		.len		= 0x30,
+> +		.bits_per_irq	= 0,
+> +		.handle_mmio	= handle_mmio_gits_idregs,
+> +	},
+> +};
+> +
+> +/* This is called on setting the LPI enable bit in the redistributor. */
+> +void vgic_enable_lpis(struct kvm_vcpu *vcpu)
+> +{
+> +}
+> +
+> +int vits_init(struct kvm *kvm)
+> +{
+> +	struct vgic_dist *dist = &kvm->arch.vgic;
+> +	struct vgic_its *its = &dist->its;
+> +
+> +	spin_lock_init(&its->lock);
+> +
+> +	its->enabled = false;
+> +
+> +	return -ENXIO;
+> +}
+> diff --git a/virt/kvm/arm/its-emul.h b/virt/kvm/arm/its-emul.h
+> new file mode 100644
+> index 0000000..5dc8e2f
+> --- /dev/null
+> +++ b/virt/kvm/arm/its-emul.h
+> @@ -0,0 +1,35 @@
+> +/*
+> + * GICv3 ITS emulation definitions
+> + *
+> + * Copyright (C) 2015 ARM Ltd.
+> + * Author: Andre Przywara <andre.przywara@arm.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#ifndef __KVM_ITS_EMUL_H__
+> +#define __KVM_ITS_EMUL_H__
+> +
+> +#include <linux/kvm.h>
+> +#include <linux/kvm_host.h>
+> +
+> +#include <asm/kvm_emulate.h>
+> +#include <asm/kvm_arm.h>
+> +#include <asm/kvm_mmu.h>
+> +
+> +#include "vgic.h"
+> +
+> +void vgic_enable_lpis(struct kvm_vcpu *vcpu);
+> +int vits_init(struct kvm *kvm);
+> +
+> +#endif
+> diff --git a/virt/kvm/arm/vgic-v3-emul.c b/virt/kvm/arm/vgic-v3-emul.c
+> index 5269ad1..f5865e7 100644
+> --- a/virt/kvm/arm/vgic-v3-emul.c
+> +++ b/virt/kvm/arm/vgic-v3-emul.c
+> @@ -48,6 +48,7 @@
+>  #include <asm/kvm_mmu.h>
+>  
+>  #include "vgic.h"
+> +#include "its-emul.h"
+>  
+>  static bool handle_mmio_rao_wi(struct kvm_vcpu *vcpu,
+>  			       struct kvm_exit_mmio *mmio, phys_addr_t offset)
+> @@ -530,9 +531,20 @@ static bool handle_mmio_ctlr_redist(struct kvm_vcpu *vcpu,
+>  				    struct kvm_exit_mmio *mmio,
+>  				    phys_addr_t offset)
+>  {
+> -	/* since we don't support LPIs, this register is zero for now */
+> -	vgic_reg_access(mmio, NULL, offset,
+> -			ACCESS_READ_RAZ | ACCESS_WRITE_IGNORED);
+> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+> +	u32 reg;
+> +
+> +	if (!vgic_has_its(vcpu->kvm)) {
+> +		vgic_reg_access(mmio, NULL, offset,
+> +				ACCESS_READ_RAZ | ACCESS_WRITE_IGNORED);
+> +		return false;
+> +	}
+can't we remove above block and ...
+> +	reg = dist->lpis_enabled ? GICR_CTLR_ENABLE_LPIS : 0;
+> +	vgic_reg_access(mmio, &reg, offset,
+> +			ACCESS_READ_VALUE | ACCESS_WRITE_VALUE);
+> +	if (!dist->lpis_enabled && (reg & GICR_CTLR_ENABLE_LPIS
+add vgic_has_its(vcpu->kvm) && above?
 
-> In answer to your question; we only need those two files.  The reply
-> can be placed back into 'message' and can be read from there.
->
-Testing shouldn't be restricted to 'send command and receive reply'.
-What if Linux only listens to broadcasts from the remote? Who knows
-someone might want to (ab)use this test client to implement userspace
-handler of remote commands?
-So please see RX to be independent of TX.
+Besides Reviewed-by: Eric Auger <eric.auger@linaro.org>
 
-Thanks.
+Eric
+)) {
+> +		/* Eventually do something */
+> +	}
+>  	return false;
+>  }
+>  
+> @@ -861,6 +873,12 @@ static int vgic_v3_map_resources(struct kvm *kvm,
+>  		rdbase += GIC_V3_REDIST_SIZE;
+>  	}
+>  
+> +	if (vgic_has_its(kvm)) {
+> +		ret = vits_init(kvm);
+> +		if (ret)
+> +			goto out_unregister;
+> +	}
+> +
+>  	dist->redist_iodevs = iodevs;
+>  	dist->ready = true;
+>  	goto out;
+> 
