@@ -1,101 +1,29 @@
-From: rsahu@apm.com (Rameshwar Sahu)
-Date: Thu, 13 Aug 2015 12:48:28 +0530
-Subject: [PATCH] dmaengine: xgene-dma: Add ACPI support for X-Gene DMA
- engine driver
-In-Reply-To: <1437484479-2822-1-git-send-email-rsahu@apm.com>
-References: <1437484479-2822-1-git-send-email-rsahu@apm.com>
-Message-ID: <CAFd313zR468nZN+CZZ+efr9eKoY4N72jQ8+cF=iH+vkZEZ=7Xg@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 13 Aug 2015 00:51:05 -0700
+Subject: [PATCH v2 07/13] memory: kill off set_irq_flags usage
+In-Reply-To: <1436711211-18223-8-git-send-email-robh@kernel.org>
+References: <1436711211-18223-1-git-send-email-robh@kernel.org>
+ <1436711211-18223-8-git-send-email-robh@kernel.org>
+Message-ID: <20150813075105.GX4215@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
+* Rob Herring <robh@kernel.org> [150712 07:29]:
+> set_irq_flags is ARM specific with custom flags which have genirq
+> equivalents. Convert drivers to use the genirq interfaces directly, so we
+> can kill off set_irq_flags. The translation of flags is as follows:
+> 
+> IRQF_VALID -> !IRQ_NOREQUEST
+> IRQF_PROBE -> !IRQ_NOPROBE
+> IRQF_NOAUTOEN -> IRQ_NOAUTOEN
+> 
+> For IRQs managed by an irqdomain, the irqdomain core code handles clearing
+> and setting IRQ_NOREQUEST already, so there is no need to do this in
+> .map() functions and we can simply remove the set_irq_flags calls. Some
+> users also set IRQ_NOPROBE and this has been maintained although it is not
+> clear that is really needed. There appears to be a great deal of blind
+> copy and paste of this code.
 
-On Tue, Jul 21, 2015 at 6:44 PM, Rameshwar Prasad Sahu <rsahu@apm.com> wrote:
-> This patch adds ACPI support for the APM X-Gene DMA engine driver.
->
-> Signed-off-by: Rameshwar Prasad Sahu <rsahu@apm.com>
-> ---
->  drivers/dma/xgene-dma.c | 28 +++++++++++++++++++++-------
->  1 file changed, 21 insertions(+), 7 deletions(-)
->
-> diff --git a/drivers/dma/xgene-dma.c b/drivers/dma/xgene-dma.c
-> index dff22ab..d0a148d 100644
-> --- a/drivers/dma/xgene-dma.c
-> +++ b/drivers/dma/xgene-dma.c
-> @@ -21,6 +21,7 @@
->   * NOTE: PM support is currently not available.
->   */
->
-> +#include <linux/acpi.h>
->  #include <linux/clk.h>
->  #include <linux/delay.h>
->  #include <linux/dma-mapping.h>
-> @@ -1944,16 +1945,18 @@ static int xgene_dma_probe(struct platform_device *pdev)
->                 return ret;
->
->         pdma->clk = devm_clk_get(&pdev->dev, NULL);
-> -       if (IS_ERR(pdma->clk)) {
-> +       if (IS_ERR(pdma->clk) && !ACPI_COMPANION(&pdev->dev)) {
->                 dev_err(&pdev->dev, "Failed to get clk\n");
->                 return PTR_ERR(pdma->clk);
->         }
->
->         /* Enable clk before accessing registers */
-> -       ret = clk_prepare_enable(pdma->clk);
-> -       if (ret) {
-> -               dev_err(&pdev->dev, "Failed to enable clk %d\n", ret);
-> -               return ret;
-> +       if (!IS_ERR(pdma->clk)) {
-> +               ret = clk_prepare_enable(pdma->clk);
-> +               if (ret) {
-> +                       dev_err(&pdev->dev, "Failed to enable clk %d\n", ret);
-> +                       return ret;
-> +               }
->         }
->
->         /* Remove DMA RAM out of shutdown */
-> @@ -1998,7 +2001,8 @@ err_request_irq:
->
->  err_dma_mask:
->  err_clk_enable:
-> -       clk_disable_unprepare(pdma->clk);
-> +       if (!IS_ERR(pdma->clk))
-> +               clk_disable_unprepare(pdma->clk);
->
->         return ret;
->  }
-> @@ -2022,11 +2026,20 @@ static int xgene_dma_remove(struct platform_device *pdev)
->                 xgene_dma_delete_chan_rings(chan);
->         }
->
-> -       clk_disable_unprepare(pdma->clk);
-> +       if (!IS_ERR(pdma->clk))
-> +               clk_disable_unprepare(pdma->clk);
->
->         return 0;
->  }
->
-> +#ifdef CONFIG_ACPI
-> +static const struct acpi_device_id xgene_dma_acpi_match_ptr[] = {
-> +       {"APMC0D43", 0},
-> +       {},
-> +};
-> +MODULE_DEVICE_TABLE(acpi, xgene_dma_acpi_match_ptr);
-> +#endif
-> +
->  static const struct of_device_id xgene_dma_of_match_ptr[] = {
->         {.compatible = "apm,xgene-storm-dma",},
->         {},
-> @@ -2039,6 +2052,7 @@ static struct platform_driver xgene_dma_driver = {
->         .driver = {
->                 .name = "X-Gene-DMA",
->                 .of_match_table = xgene_dma_of_match_ptr,
-> +               .acpi_match_table = ACPI_PTR(xgene_dma_acpi_match_ptr),
->         },
->  };
->
-> --
-> 1.8.2.1
+Applying this one into omap-for-v4.3/soc thanks.
 
-
-Any Comments on the above patch ??
+Tony
