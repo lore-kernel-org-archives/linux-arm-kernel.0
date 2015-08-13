@@ -1,48 +1,38 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 13 Aug 2015 15:24:44 +0100
-Subject: [GIT PULL] ARM64: juno: SCPI and dependent drivers for v4.3
-In-Reply-To: <20150813124026.GD23581@localhost>
-References: <55C1E3FB.5090309@arm.com>
- <20150813124026.GD23581@localhost>
-Message-ID: <20150813142444.GA4602@e104818-lin.cambridge.arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 13 Aug 2015 15:26:14 +0100
+Subject: [PATCH v2 5/6] mailbox: Add generic mechanism for testing
+ Mailbox Controllers
+In-Reply-To: <CABb+yY2N6=oTrwni0tw1WffLv-udtBWh9LJR43EMVqYf+i2xUg@mail.gmail.com>
+References: <20150813091914.GB8782@x1>
+ <CABb+yY0cgbtM68-E_Xqgh5O6GRLXESYTLa5WcAwUBoVL3ufrxA@mail.gmail.com>
+ <20150813102335.GC8782@x1>
+ <CABb+yY3z7p97eOhncQ2i+g6yoYGfDgSN9BDPKmiDaVLa3oPocA@mail.gmail.com>
+ <20150813110008.GD8782@x1>
+ <CABb+yY34i=VUnswUE21vgeQYAGOS=7uwvdnTAFFgYkTV0CFk=w@mail.gmail.com>
+ <20150813114005.GF8782@x1>
+ <CABb+yY2OH16mgOwi=yH_eEHQN2Ck2x5xtVk-p-8Un9gGmcACdw@mail.gmail.com>
+ <20150813130736.GG8782@x1>
+ <CABb+yY2N6=oTrwni0tw1WffLv-udtBWh9LJR43EMVqYf+i2xUg@mail.gmail.com>
+Message-ID: <20150813142614.GH8782@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 13, 2015 at 02:40:26PM +0200, Olof Johansson wrote:
-> On Wed, Aug 05, 2015 at 11:22:51AM +0100, Sudeep Holla wrote:
-> > Here is the first pull request for SCPI, clock and cpufreq support on
-> > ARM64 Juno development platform for v4.3
-> 
-> I'd like to hear from Catalin and Will on why ARM is doing this. Catalin
-> and Will are pushing back very hard at vendors who don't use PSCI for
-> CPU power management, and then they have coworkers that are looking to
-> merge this directly into the kernel.
+On Thu, 13 Aug 2015, Jassi Brar wrote:
 
-Actually, the arm64 CPU power management story is pretty much handled by
-Lorenzo and Sudeep in my team, so I trust their judgement ;). But I
-agree with you that a better explanation on the reasons behind this is
-needed, otherwise we risk confusing messages. I'll try to summarise it
-below but Sudeep can reply with more details.
+> On Thu, Aug 13, 2015 at 6:37 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> >
+> > Now just agree with me that mbox_request_chan() should fail on request
+> > of a known bad configuration request and I can code all this up and
+> > re-submit. :D
+> >
+> You make me look like a jerk :(   My problem is not with validation as
+> such. I see problem in the way you implement that makes validation
+> necessary. I'll explain step-by-step in the driver post.
 
-PSCI only covers CPU boot/cpuidle and platform suspend. It does not have
-any provisions for DVFS and I'm not sure this could be easily
-standardised (or whether we could find enough supporters to get it
-adopted).
-
-SCPI is a (standard) interface to a coprocessor handling clocks etc. to
-be used with cpufreq. This patchset adds support for cpufreq/dvs which
-is not handled by PSCI. So, just to clarify the acronyms:
-
-SCPI - System Control and Power Interface - it's a protocol for
-communicating with a System Control Processor (e.g. Cortex-M3) via
-mailboxes. It is used in Linux for DVFS but this is *not* a secure/EL3
-firmware interface (a.k.a. SMC calls). It indeed a firmware interface
-but the firmware runs on a separate coprocessor and not on the CPU itself.
-
-PSCI - Power State Coordination Interface - it is a secure firmware
-interface for coordinating the CPU power states (idle, not DVFS). The
-firmware may use an SCPI communication channel (e.g. deeper sleep states
-where clock changes are needed).
+That wasn't the intention, don't be so sensitive. ;)
 
 -- 
-Catalin
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
