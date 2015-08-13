@@ -1,35 +1,65 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 13 Aug 2015 22:29:36 +0100
-Subject: [PATCH 3/7] drm/vc4: Add KMS support for Raspberry Pi.
-In-Reply-To: <87d1yqq5po.fsf@eliezer.anholt.net>
-References: <1439427380-2436-1-git-send-email-eric@anholt.net>
- <1439427380-2436-4-git-send-email-eric@anholt.net>
- <20150813075141.GX17734@phenom.ffwll.local>
- <87d1yqq5po.fsf@eliezer.anholt.net>
-Message-ID: <20150813212936.GT7557@n2100.arm.linux.org.uk>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 14 Aug 2015 00:31:09 +0300
+Subject: [PATCH v2] ARM: shmobile: kzm9g dts: Use adxl345-specific
+ compatible property
+In-Reply-To: <CAMuHMdV0fqjJSjmYqP0uFa0x5ydc1iztu4za1Ufu7OMdhC29Ug@mail.gmail.com>
+References: <1436180132-26190-1-git-send-email-geert+renesas@glider.be>
+ <20150813000537.GD5221@verge.net.au>
+ <CAMuHMdV0fqjJSjmYqP0uFa0x5ydc1iztu4za1Ufu7OMdhC29Ug@mail.gmail.com>
+Message-ID: <10744920.2768uXkYtL@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 13, 2015 at 01:44:03PM -0700, Eric Anholt wrote:
-> Struct mutex is here because this code is from the V3D series, with the
-> in-kernel BO cache ripped out (it turns out that the CMA allocator is
-> slow, and you can't just userspace cache since we have to do allocations
-> within the kernel to the tune of a couple per draw and that's too much).
+On Thursday 13 August 2015 11:26:32 Geert Uytterhoeven wrote:
+> On Thu, Aug 13, 2015 at 2:05 AM, Simon Horman <horms@verge.net.au> wrote:
+> > On Wed, Jul 08, 2015 at 09:51:49AM +0900, Simon Horman wrote:
+> >> On Tue, Jul 07, 2015 at 09:56:29AM +0300, Laurent Pinchart wrote:
+> >>> On Tuesday 07 July 2015 09:26:21 Simon Horman wrote:
+> >>>> On Mon, Jul 06, 2015 at 04:29:33PM +0300, Laurent Pinchart wrote:
+> >>>>> On Monday 06 July 2015 12:55:32 Geert Uytterhoeven wrote:
+> >>>>>> Replace the deprecated generic "adi,adxl34x" compatible value by
+> >>>>>> the adxl345-specific "adi,adxl345" value, cfr. commit
+> >>>>>> e465bf6fc55d5ce2 ("DT:
+> >>>>>> i2c: Deprecate adi,adxl34x compatible string").
+> >>>>>> 
+> >>>>>> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> >>>>> 
+> >>>>> Acked-by: Laurent Pinchart
+> >>>>> <laurent.pinchart+renesas@ideasonboard.com>
+> >>>>> 
+> >>>>>> ---
+> >>>>>> Depends on commit 3a38958d2477b718 ("Input: adxl34x - add OF
+> >>>>>> match support"), which is in v4.2-rc1.
+> >>>>>> 
+> >>>>>> This is v2 of "ARM: shmobile: kzm9g dts: Add adxl345-specific
+> >>>>>> compatible property".
+> >>>> 
+> >>>> It appears to me that this will cause a regression when booting old
+> >>>> kernels with new dts blobs. For that reason think we should consider
+> >>>> v1 of this change coupled with a schedule to remove use of the
+> >>>> deprecated compat string.
+> >>> 
+> >>> That's the forward compatibility that Geert mentioned, is that really
+> >>> an issue, especially on this board ?
+> >> 
+> >> I think it would be best to provide backwards compatibility unless there
+> >> is a compelling reason not to.
+> > 
+> > I would like to revisit this discussion with a view to getting some
+> > version of this patch queued up (yes I know I pushed back on it earlier in
+> > this thread).
+>
+> I'm fine with applying v1.
 
-The CMA allocator is fast until you have pinned pages in its region,
-where it becomes _very_ slow to do allocations, sometimes getting up
-to the order of seconds.
+And I'm quite unsurprisingly not, as I've asked for a v2.
 
-The main culpret of this are GFP_HIGHUSER_MOVABLE allocations which
-then pin the page.  It doesn't take many of those to make CMA really
-inefficient.
-
-The problem is that CMA doesn't get any information back from the
-internal page migration about which pages couldn't be moved, so it
-dumbly just tries incrementing the allocation by one page (subject
-to alignment constraints) and retrying again - repeating over the
-entire CMA region.  The bigger the region, the more time this takes.
+The "adi,adxl34x" compatible string is deprecated. That means we still support 
+it in the driver for device trees that haven't been updated, but it shouldn't 
+be used forward by new device trees. That's why the device tree sources 
+contained in the kernel shouldn't use it, especially given that they often 
+serve as references for device trees shipped out of tree.
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Regards,
+
+Laurent Pinchart
