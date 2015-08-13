@@ -1,34 +1,73 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 13 Aug 2015 10:01:14 -0500
-Subject: [PATCH-next 2/4] arm: boot: dts: am4372: add ARM timers and SCU
- nodes
-In-Reply-To: <20150813083215.GY4215@atomide.com>
-References: <1439409416-32673-1-git-send-email-balbi@ti.com>
- <1439409416-32673-3-git-send-email-balbi@ti.com>
- <20150813083215.GY4215@atomide.com>
-Message-ID: <20150813150114.GH27560@saruman.tx.rr.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 13 Aug 2015 16:01:54 +0100
+Subject: [PATCH 5/9] ARM: common: Introduce PM domains for CPUs/clusters
+In-Reply-To: <CAL_JsqK67=DTtjZwwnonObLDjLbahkREfm0RvyXVV95bhR-d4Q@mail.gmail.com>
+References: <1438731339-58317-1-git-send-email-lina.iyer@linaro.org>
+ <1438731339-58317-6-git-send-email-lina.iyer@linaro.org>
+ <CAL_JsqK67=DTtjZwwnonObLDjLbahkREfm0RvyXVV95bhR-d4Q@mail.gmail.com>
+Message-ID: <20150813150154.GB13356@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 13, 2015 at 01:32:15AM -0700, Tony Lindgren wrote:
-> * Felipe Balbi <balbi@ti.com> [150812 13:00]:
-> > AM437x devices sport SCU, TWD and Global timers,
-> > let's add them to DTS so they have a chance to
-> > probe and be used by Linux.
+On Thu, Aug 06, 2015 at 04:14:51AM +0100, Rob Herring wrote:
+> On Tue, Aug 4, 2015 at 6:35 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
+> > Define and add Generic PM domains (genpd) for ARM CPU clusters. Many new
+> > SoCs group CPUs as clusters. Clusters share common resources like GIC,
+> > power rail, caches, VFP, Coresight etc. When all CPUs in the cluster are
+> > idle, these shared resources may also be put in their idle state.
+> >
+> > The idle time between the last CPU entering idle and a CPU resuming
+> > execution is an opportunity for these shared resources to be powered
+> > down. Generic PM domain provides a framework for defining such power
+> > domains and attach devices to the domain. When the devices in the domain
+> > are idle at runtime, the domain would also be suspended and resumed
+> > before the first of the devices resume execution.
+> >
+> > We define a generic PM domain for each cluster and attach CPU devices in
+> > the cluster to that PM domain. The DT definitions for the SoC describe
+> > this relationship. Genpd callbacks for power_on and power_off can then
+> > be used to power up/down the shared resources for the domain.
 > 
-> Applying this one into omap-for-v4.3/dt-v2. Not sure
-> if it will get merged as we're getting close to the
-> merge window. The rest we can patch once Russell has
-> reverted the bogus SMP dependency.
+> [...]
+> 
+> > +ARM CPU Power domains
+> > +
+> > +The device tree allows describing of CPU power domains in a SoC. In ARM SoC,
+> > +CPUs may be grouped as clusters. A cluster may have CPUs, GIC, Coresight,
+> > +caches, VFP and power controller and other peripheral hardware. Generally,
+> > +when the CPUs in the cluster are idle/suspended, the shared resources may also
+> > +be suspended and resumed before any of the CPUs resume execution.
+> > +
+> > +CPUs are the defined as the PM domain consumers and there is a PM domain
+> > +provider for the CPUs. Bindings for generic PM domains (genpd) is described in
+> > +[1].
+> > +
+> > +The ARM CPU PM domain follows the same binding convention as any generic PM
+> > +domain. Additional binding properties are -
+> > +
+> > +- compatible:
+> > +       Usage: required
+> > +       Value type: <string>
+> > +       Definition: Must also have
+> > +                       "arm,pd"
+> > +               inorder to initialize the genpd provider as ARM CPU PM domain.
+> 
+> A compatible string should represent a particular h/w block. If it is
+> generic, it should represent some sort of standard programming
+> interface (e.g, AHCI, EHCI, etc.). This doesn't seem to be either and
+> is rather just a mapping of what "driver" you want to use.
+> 
+> I would expect that identifying a cpu's or cluster's power domain
+> would be done by a phandle between the cpu/cluster node and power
+> domain node. But I've not really looked at the power domain bindings
+> so who knows.
 
-I'm just waiting for Russell's "it's okay to post on patch system".
+I would expect the same, meaning that a cpu node, like any other device
+node would have a phandle pointing at the respective HW power domain.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150813/a9e68a66/attachment-0001.sig>
+I do not really understand why we want a "generic" CPU power domain, what
+purpose does it serve ? Creating a collection of cpu devices that we
+can call "cluster" ?
+
+Thanks,
+Lorenzo
