@@ -1,33 +1,36 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 13 Aug 2015 03:08:45 -0700
-Subject: [GIT PULL 1/2] omap soc fix for v4.3 merge window
-Message-ID: <pull-1439455019-336197>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Thu, 13 Aug 2015 19:11:04 +0900
+Subject: [GIT PULL 2nd 2/4] Samsung DT 3rd updates for v4.3
+In-Reply-To: <20150813092038.GC30160@localhost>
+References: <55CBE0F2.4020104@kernel.org> <20150813092038.GC30160@localhost>
+Message-ID: <005101d0d5b0$5d4333b0$17c99b10$@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 24da741c678f865de3182194604dbddcc7fc7f3c:
+Olof Johansson wrote:
+> 
+> On Thu, Aug 13, 2015 at 09:12:34AM +0900, Kukjin Kim wrote:
+> > Hi Arnd, Olof, Kevin
+> >
+> > This is based on tags/samsung-dt-2 and including exynos4 related clock
+> > changes to support cpufreq-dt driver for exynos4 SoCs. Note that I've
+> > created one more clk topic branch called v4.3-topic/clk-samsung-2 based
+> > on previous one has been merged by Mike into clock tree before but I'm
+> > not sure new one merged into clk tree that's why I've noted its merge in
+> > this signed tag.
+> 
+> Since this depends on the previous DT branch that I asked for a respin, please
+> do it all over and send a fresh pull request that we hopefully can include.
+> 
+Yes, will make a fresh pull request for the exynos cpufreq-dt driver.
 
-  Merge branch 'dm814x-soc' into omap-for-v4.3/soc (2015-07-23 21:59:18 -0700)
+> We normally ask that you don't queue up merge requests like these for that
+> reason: If there's need to redo an earlier branch there's a lot of work that
+> needs to be done on your side. Instead, please wait until previous pull request
+> has been merged before you send the next one. Thanks!
+> 
+Yeah, you're right. Actually, it was hard to handle it because of dependencies
+of clk and cpufreq...Anyway I'll keep in mind what you suggested.
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.3/soc-pt2
-
-for you to fetch changes up to ed293d1ad2b0c28b6abc3bd728b07754bc00f1cd:
-
-  memory: kill off set_irq_flags usage (2015-08-13 00:48:52 -0700)
-
-----------------------------------------------------------------
-Fix omap PM regression in Linux next and kill set_irq_flags usage
-for GPMC.
-
-----------------------------------------------------------------
-Rob Herring (1):
-      memory: kill off set_irq_flags usage
-
-Tony Lindgren (1):
-      ARM: OMAP2+: Fix power domain operations regression caused by 81xx
-
- arch/arm/mach-omap2/powerdomains3xxx_data.c | 6 +++++-
- drivers/memory/omap-gpmc.c                  | 5 ++---
- 2 files changed, 7 insertions(+), 4 deletions(-)
+Thanks,
+Kukjin
