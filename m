@@ -1,43 +1,123 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 13 Aug 2015 12:30:56 +0200
-Subject: [GIT PULL] RPi DT changes due for v4.3
-In-Reply-To: <20150811160642.GQ18282@x1>
-References: <20150811160642.GQ18282@x1>
-Message-ID: <20150813103056.GY30160@localhost>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 13 Aug 2015 12:00:08 +0100
+Subject: [PATCH v2 5/6] mailbox: Add generic mechanism for testing
+ Mailbox Controllers
+In-Reply-To: <CABb+yY3z7p97eOhncQ2i+g6yoYGfDgSN9BDPKmiDaVLa3oPocA@mail.gmail.com>
+References: <1437990272-23111-1-git-send-email-lee.jones@linaro.org>
+ <1437990272-23111-6-git-send-email-lee.jones@linaro.org>
+ <CABb+yY20nQbiEEZeRvWTMUsJ2qgwRn8CrWvnFDSB-b1dgVaAuw@mail.gmail.com>
+ <20150812102328.GD18282@x1>
+ <CABb+yY0A74Vy3-KOvj0URU_4zb2FAC7Yp3gmEwnFaBrD0mzt0w@mail.gmail.com>
+ <20150813091914.GB8782@x1>
+ <CABb+yY0cgbtM68-E_Xqgh5O6GRLXESYTLa5WcAwUBoVL3ufrxA@mail.gmail.com>
+ <20150813102335.GC8782@x1>
+ <CABb+yY3z7p97eOhncQ2i+g6yoYGfDgSN9BDPKmiDaVLa3oPocA@mail.gmail.com>
+Message-ID: <20150813110008.GD8782@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, 13 Aug 2015, Jassi Brar wrote:
 
-On Tue, Aug 11, 2015 at 05:06:42PM +0100, Lee Jones wrote:
-> ARM SoC Chaps,
+> On Thu, Aug 13, 2015 at 3:53 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> > On Thu, 13 Aug 2015, Jassi Brar wrote:
+> >
+> >> On Thu, Aug 13, 2015 at 2:49 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> >> > On Thu, 13 Aug 2015, Jassi Brar wrote:
+> >>
+> >> >> >> > +
+> >> >> >> > +static void mbox_test_prepare_message(struct mbox_client *client, void *message)
+> >> >> >> > +{
+> >> >> >> > +       struct mbox_test_device *tdev = dev_get_drvdata(client->dev);
+> >> >> >> > +
+> >> >> >> > +       if (tdev->mmio)
+> >> >> >> > +               memcpy(tdev->mmio, message, MBOX_MAX_MSG_LEN);
+> >> >> >> >
+> >> >> >> This is unlikely to work. Those platforms that need to send a 2 part
+> >> >> >> message, they do :
+> >> >> >> (a) Signal/Command/Target code via some controller register (via
+> >> >> >> mbox_send_message).
+> >> >> >> (b) Setup the payload in Shared-Memory (via tx_prepare).
+> >> >> >>
+> >> >> >> This test driver assumes both are the same. I think you have to
+> >> >> >> declare something like
+> >> >> >
+> >> >> > This driver assumes that the framework will call client->tx_prepare()
+> >> >> > first, which satisfies (b).  It then assumes controller->send_data()
+> >> >> > will be invoked, which will send the platform specific
+> >> >> > signal/command/target code, which then satisfies (a).
+> >> >> >
+> >> >> Yeah, but what would be that code? Who provides that?
+> >> >>
+> >> >> > In what way does it assume they are the same?
+> >> >> >
+> >> >> notice the 'message' pointer in
+> >> >> mbox_send_message(tdev->tx_channel, message);
+> >> >>     and
+> >> >> memcpy(tdev->mmio, message, MBOX_MAX_MSG_LEN);
+> >> >>
+> >> >> >> struct mbox_test_message { /* same for TX and RX */
+> >> >> >>           unsigned sig_len;
+> >> >> >>           void *signal;               /* rx/tx via mailbox api */
+> >> >> >>           unsigned pl_len;
+> >> >> >>           void *payload;           /* rx/tx via shared-memory */
+> >> >> >> };
+> >> >> >
+> >> >> > How do you think this should be set and use these?
+> >> >> >
+> >> >> The userspace would want to specify the command code (32bits or not)
+> >> >> that would be passed via the fifo/register of the controller. So we
+> >> >> need signal[]
+> >> >>
+> >> >> The data to be passed via share-memory could be provided by userspace
+> >> >> via the payload[] array.
+> >> >
+> >> > Okay, so would the solution be two userspace files 'signal' and
+> >> > 'message', so in the case of a client specified signal we can write it
+> >> > into there first.
+> >> >
+> >> > echo 255  > signal
+> >> > echo test > message
+> >> >
+> >> > ... or in the case where no signal is required, or the controller
+> >> > driver taking care of it, we just don't write anything to signal?
+> >> >
+> >> file_operations.write() should parse signal and message, coming from
+> >> userspace, into a local structure before routing them via
+> >> mbox_send_message and tx_prepare respectively.
+> >
+> > Okay.  So before I code this up we should agree on syntax.
+> >
+> > How would you like to represent the break between signal and message?
+> > Obviously ' ' would be a bad idea, as some clients may want to send
+> > messages with white space contained.  How about '\t' or '\n'?
+> >
+> Yeah, I am not a fan of markers and flags either.
 > 
-> Please find a couple of simple RPi changes pertaining to Firmware.
+> Maybe we should share with userspace
+>   struct mbox_test_message { /* same for TX and RX */
+>            unsigned sig_len;
+>            void __user *signal;        /* rx/tx via mailbox api */
+>            unsigned pl_len;
+>            void __user *payload;    /* rx/tx via shared-memory */
+>   };
 > 
-> The following changes since commit bc0195aad0daa2ad5b0d76cce22b167bc3435590:
-> 
->   Linux 4.2-rc2 (2015-07-12 15:10:30 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/rpi/linux-rpi.git tags/rpi-dt-for-armsoc-4.3
-> 
-> for you to fetch changes up to fd26f8830979de48eb3f1c253eb9d2ee2e468eb6:
-> 
->   dt/bindings: Add binding for the Raspberry Pi firmware driver (2015-08-11 16:56:41 +0100)
+> First copy_from_user the structure of length sizof(struct
+> mbox_test_message) and then copy_from_user length sig_len and pl_len
+> from signal[] and payload[] respectively (usually ioctls would carry
+> such data).
 
-I've merged this but I'm a little confused about bcm2835 maintainership:
-I got a MAINTAINERS update from Florian earlier grouped in a set of
-other bcm changes (adding Eric), and now this directly from you.
+Simplicity and ease of use should be the goals here.  Testers should
+not have to write applications to use this driver.  Can we come up
+with a simple/effective method that uses SYSFS/DEBUGFS please?
 
-In general the bcm platforms are quite diverse and we've asked Florian
-to be the funnel for all of the new ones, but I don't think we talked
-much about 2835 at that time. Should we expect to see merges directly
-from you and the other maintainers there or will it go through Florian?
+The easiest way I can think of which avoids markers/separators AND the
+requirement for users to have to write applications is to have two
+files, 'signal' and 'message' as mentioned before.  Once both are
+populated I can get this driver to draft the message appropriately and
+fire it off.
 
-Either way is OK with me, just looking to clarify.
-
-
-Thanks!
-
--Olof
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
