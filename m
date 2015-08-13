@@ -1,42 +1,39 @@
-From: santosh.shilimkar@oracle.com (santosh.shilimkar at oracle.com)
-Date: Thu, 13 Aug 2015 10:21:31 -0700
-Subject: [GIT PULL] ARM: Couple of Keystone MDIO DTS fixes for 4.2-rc6+
-In-Reply-To: <20150813102434.GV30160@localhost>
-References: <1439177200-32434-1-git-send-email-ssantosh@kernel.org>
- <20150813102434.GV30160@localhost>
-Message-ID: <55CCD21B.5030309@oracle.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 13 Aug 2015 18:23:10 +0100
+Subject: [PATCH 0/2] x86/KASAN updates for 4.3
+In-Reply-To: <20150813112428.GG10280@arm.com>
+References: <1439444244-26057-1-git-send-email-ryabinin.a.a@gmail.com>
+ <20150813065040.GA17983@gmail.com>
+ <20150813081641.GA14402@gmail.com> <20150813090119.GA10280@arm.com>
+ <CAPAsAGxk2+v5VG77cOHAThsXyWx-_UJ1XVeJProaa0gQWH5jvA@mail.gmail.com>
+ <20150813112428.GG10280@arm.com>
+Message-ID: <20150813172310.GK10280@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/13/15 3:24 AM, Olof Johansson wrote:
-> On Sun, Aug 09, 2015 at 08:26:40PM -0700, Santosh Shilimkar wrote:
->> ARM-SoC folks,
->>
->> Please pull below couple of late fixes for 4.2-rc6+. I know its late
->> with rc6 already out but if possible please consider.
->>
->> The following changes since commit f7644cbfcdf03528f0f450f3940c4985b2291f49:
->>
->>    Linux 4.2-rc6 (2015-08-09 15:54:30 -0400)
->>
->> are available in the git repository at:
->>
->>    git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone-dts-late-fixes
->>
->> for you to fetch changes up to 6a024079862443b3ec9455931e9219cd5912656d:
->>
->>    ARM: dts: keystone: Fix the mdio bindings by moving it to soc specific file (2015-08-09 20:06:27 -0700)
->
-> Hi,
->
-> Our fixes branch is still at -rc2. Would you mind respinning with an older
-> base unless there are conflicts?
->
-Just created v2. I tried merging with arm-soc/fixes and it merge
-cleanly. Please pull below.
+On Thu, Aug 13, 2015 at 12:24:28PM +0100, Will Deacon wrote:
+> On Thu, Aug 13, 2015 at 12:02:26PM +0100, Andrey Ryabinin wrote:
+> > 2015-08-13 12:01 GMT+03:00 Will Deacon <will.deacon@arm.com>:
+> > > Yes please, works for me! If we're targetting 4.3, then please can you base
+> > > on 4.2-rc4, as that's what our current arm64 queue is using?
+> > >
+> > 
+> > Does this mean that we are targeting arm64 part for 4.3 too?
+> 
+> It depends on how well it merges with our current queue and whether it
+> holds up to regression testing. The patches have been reviewed, so I'm
+> comfortable with the content, but we're not at a stage where we can debug
+> and fix any failures that might crop up from the merge.
 
- 
-git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone-dts-late-fixes-v2
+Scratch that :(
 
-Thanks and regards,
-Santosh
+I tried this out under EFI and it dies horribly in the stub code because
+we're missing at least one KASAN_SANITIZE_ Makefile entry.
+
+So I think this needs longer to stew before hitting mainline. By all means
+get the x86 dependencies in for 4.3, but the arm64 port can probably use
+another cycle to iron out the bugs.
+
+Cheers,
+
+Will
