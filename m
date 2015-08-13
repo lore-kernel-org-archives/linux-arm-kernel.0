@@ -1,29 +1,41 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 13 Aug 2015 11:20:38 +0200
-Subject: [GIT PULL 2nd 2/4] Samsung DT 3rd updates for v4.3
-In-Reply-To: <55CBE0F2.4020104@kernel.org>
-References: <55CBE0F2.4020104@kernel.org>
-Message-ID: <20150813092038.GC30160@localhost>
+Date: Thu, 13 Aug 2015 11:18:14 +0200
+Subject: [GIT PULL 4/5] Samsung 2nd DT updates for v4.3
+In-Reply-To: <55C069D5.1050409@kernel.org>
+References: <55C069D5.1050409@kernel.org>
+Message-ID: <20150813091814.GA30160@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 13, 2015 at 09:12:34AM +0900, Kukjin Kim wrote:
+On Tue, Aug 04, 2015 at 04:29:25PM +0900, Kukjin Kim wrote:
 > Hi Arnd, Olof, Kevin
 > 
-> This is based on tags/samsung-dt-2 and including exynos4 related clock
-> changes to support cpufreq-dt driver for exynos4 SoCs. Note that I've
-> created one more clk topic branch called v4.3-topic/clk-samsung-2 based
-> on previous one has been merged by Mike into clock tree before but I'm
-> not sure new one merged into clk tree that's why I've noted its merge in
-> this signed tag.
+> This 2nd DT update branch is based tags/samsung-dt-1 +
+> v4.3-topic/clk-samsung branch because of dependency to support generic
+> cpufreq driver. Please pull.
+> 
+> Thanks,
+> Kukjin
+> 
+> 
+> The following changes since commit e4a39d904c3c3e4855287b7325306289ff044b06:
+> 
+>   Merge branch 'v4.3-topic/clk-samsung' into v4.3-next/dt-samsung-2
+> (2015-07-24 12:54:00 +0900)
+> 
+> are available in the git repository at:
+> 
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> tags/samsung-dt-2
 
-Since this depends on the previous DT branch that I asked for a respin, please
-do it all over and send a fresh pull request that we hopefully can include.
+"clk: exynos5250: add cpu clock configuration data and instantiate cpu
+clock" is applied twice, once to your own branch, and once merged in
+from Mike's branch. That doesn't look right.
 
-We normally ask that you don't queue up merge requests like these for that
-reason: If there's need to redo an earlier branch there's a lot of work that
-needs to be done on your side. Instead, please wait until previous pull request
-has been merged before you send the next one. Thanks!
+Can you please respin? Thanks.
 
+
+Thanks,
 
 -Olof
