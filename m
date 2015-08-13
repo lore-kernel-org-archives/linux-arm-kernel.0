@@ -1,34 +1,27 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Thu, 13 Aug 2015 12:11:18 +0200
-Subject: [PATCH] can: at91: move at91_can_data to at91_can.c
-In-Reply-To: <1439217894-15230-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1439217894-15230-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <55CC6D46.8020202@pengutronix.de>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Thu, 13 Aug 2015 19:12:24 +0900
+Subject: [GIT PULL 5/5] Samsung driver updates for v4.3
+In-Reply-To: <20150813091848.GB30160@localhost>
+References: <55C06A0A.6040407@kernel.org> <20150813091848.GB30160@localhost>
+Message-ID: <007601d0d5b0$8c6eb3d0$a54c1b70$@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/10/2015 04:44 PM, Alexandre Belloni wrote:
-> struct at91_can_data is now only used inside the driver, move it to
-> its c file.
+Olof Johansson wrote:
+> 
+> On Tue, Aug 04, 2015 at 04:30:18PM +0900, Kukjin Kim wrote:
+> > Hi,
+> >
+> > This branch is including to support generic cpufreq driver in
+> > mach-exynos dir. for exynos3250 and exynos5250 even the tag name is
+> > driver. Because it is depending on clk and cpufreq changes which acked
+> > by regarding maintainers, Mike and Viresh.
+> >
+> > Please pull and if any problems, please kindly let me know.
+> 
+> This now needs to be respun too, apparantly, since it includes dt2.
+> 
+Sure, I'll.
 
-It was supposed to be the interface between the board and the CAN
-driver. In commit 4403ac46edcdb51e92d36ad9f00ea3bbb766342e the
-at91sam9263 board was removed. As the driver has no support for DT
-transceiver switch, this functionality was lost. We should either remove
-the transceiver support or add a DT regulator for this.
-
-Marc
-
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 455 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150813/726599ba/attachment.sig>
+Thanks
+Kukjin
