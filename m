@@ -1,77 +1,72 @@
-From: maitysanchayan@gmail.com (maitysanchayan at gmail.com)
-Date: Thu, 13 Aug 2015 18:47:20 +0530
-Subject: [PATCH v3 0/3] Add support for touchscreen on Colibri VF50
-In-Reply-To: <cover.1438763030.git.maitysanchayan@gmail.com>
-References: <cover.1438763030.git.maitysanchayan@gmail.com>
-Message-ID: <20150813131720.GA2925@Sanchayan-Arch.toradex.int>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Thu, 13 Aug 2015 15:28:13 +0200
+Subject: [PATCH 2/6] gpio: Introduce gpio descriptor 'name'
+In-Reply-To: <CACRpkdYv=-fCj+ts9tTmFsovPN0RPYkOdYh9Dj6oFDJiRV=RUA@mail.gmail.com>
+References: <1438680203-13432-1-git-send-email-mpa@pengutronix.de>
+ <1438680203-13432-3-git-send-email-mpa@pengutronix.de>
+ <CACRpkdYv=-fCj+ts9tTmFsovPN0RPYkOdYh9Dj6oFDJiRV=RUA@mail.gmail.com>
+Message-ID: <20150813132813.GX19600@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Mon, Aug 10, 2015 at 11:37:06AM +0200, Linus Walleij wrote:
+> On Tue, Aug 4, 2015 at 11:23 AM, Markus Pargmann <mpa@pengutronix.de> wrote:
+> 
+> > The latest gpio hogging mechanism assigns each gpio a 'line-name' in the
+> > devicetree. The 'name' field is different from the 'label' field.
+> > 'label' is only used for requested GPIOs to describe its current use by
+> > driver or userspace.
+> >
+> > The 'name' field describes the GPIO itself, not the use. This is most
+> > likely identical to the label in the schematic on the GPIO line and
+> > should help to find this particular GPIO.
+> >
+> > This patch adds a helper function to find gpio descriptors by name
+> > instead of gpio number.
+> >
+> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> 
+> Oh I realized there is a big problem with this.
+> 
+> struct gpio_chip already contains this:
+> 
+>         const char              *const *names;
+> 
+> Now it seems like names can be stored in two places:
+> in an array in the gpio_chip and in a name tag in struct
+> gpio_desc.
+> 
+> So how do we handle this?
+> 
+> I guess we need to keep just *one* of them, so maybe remove
+> the names array from the struct gpio_chip and add a helper function
+> that sets the names on the descs for the lines like:
+> 
+> int gpiochip_set_names(struct gpio_chip *gc, const char * const names);
+> 
+> And then refactor all code and chips that use the old names
+> array to use this instead. I don't think they are too many, really.
 
-Ping?
+That sounds good. There are just a few users of this names array, so it
+should all be fine.
 
-- Sanchayan.
+Just to clarify: The line names will then be the same as this name
+array? So all GPIOs with name/line-names are then exported by their name
+and not the number?
 
-On 15-08-05 14:25:48, Sanchayan Maity wrote:
-> Hello,
-> 
-> The patchset adds support for 4 wire touchscreen on Toradex Colibri
-> VF50 modules. Patches are tested on top of shawn's for-next branch.
-> 
-> Changes since v2:
-> 1. Fix pin multiplexing for pins in idle state. Configuration of the
-> pen detect pull up viz. PTA19__GPIO_9 resulted in generation of pen
-> irq's on a continuous basis.
-> 2. Fix pinmux of the ADC pins as per the recommended pinmux in TRM.
-> 3. Use a threaded irq handler instead of a irq handler plus workqueue
-> approach.
-> 4. Use a low level trigger with oneshot flag specifier instead of the
-> previous falling edge triggered irq's. This coupled with the fix in
-> point 1 fixes the previous continuous spurious irq generation bug.
-> 5. Change/fix the TS measurement logic to account for the fact that
-> iio_channel_read_raw might actually return an error. To be more
-> specific use break instead of continue and take care to close the
-> FET's in case of channel read error.
-> 6. Drop the first patch "Add io-channel-cells property for ADC node"
-> as it has already been applied.
-> 7. Move the iio channel get call again at the start. Having it in
-> the end resulted in crashes sometimes when iio was not probed and
-> the ts device got probed and opened earlier.
-> 
-> Changes since v1:
-> 1. Fix/drop comments
-> 2. Use an inline function for multiple gpiod_get calls in probe
-> 3. Remove the pull up in the pinmux specified in DT for touchctrl_gpios
-> 4. Add the io-channel-cells property before status property.
-> 5. Add GPIOLIB as dependency in the Kconfig file
-> 
-> Version 2 of the patchset can be found here
-> https://www.mail-archive.com/linux-input at vger.kernel.org/msg18090.html
-> 
-> Version 1 of the patchset can be found here
-> https://lkml.org/lkml/2015/6/30/103
-> 
-> Thank you very much for the feedback till now.
-> 
-> Regards,
-> Sanchayan.
-> 
-> Sanchayan Maity (3):
->   ARM: dts: vf500-colibri: Add device tree node for touchscreen support
->   input: Add DT binding documentation for Colibri VF50 touchscreen
->   touchscreen: colibri-vf50-ts: Add touchscreen support for Colibri VF50
-> 
->  .../bindings/input/touchscreen/colibri-vf50-ts.txt |  32 ++
->  arch/arm/boot/dts/vf500-colibri-eval-v3.dts        |   4 +
->  arch/arm/boot/dts/vf500-colibri.dtsi               |  45 +++
->  drivers/input/touchscreen/Kconfig                  |  12 +
->  drivers/input/touchscreen/Makefile                 |   1 +
->  drivers/input/touchscreen/colibri-vf50-ts.c        | 404 +++++++++++++++++++++
->  6 files changed, 498 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/input/touchscreen/colibri-vf50-ts.txt
->  create mode 100644 drivers/input/touchscreen/colibri-vf50-ts.c
-> 
-> -- 
-> 2.5.0
-> 
+Best Regards,
+
+Markus
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150813/240de3a7/attachment-0001.sig>
