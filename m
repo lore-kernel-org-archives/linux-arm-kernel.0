@@ -1,80 +1,75 @@
 From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Thu, 13 Aug 2015 12:33:56 +0100
-Subject: [PATCH 06/14] arm64: Clean config usages for page size
+Date: Thu, 13 Aug 2015 12:33:53 +0100
+Subject: [PATCH 03/14] arm64: Introduce helpers for page table levels
 In-Reply-To: <1439465645-22584-1-git-send-email-suzuki.poulose@arm.com>
 References: <1439465645-22584-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1439465645-22584-7-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1439465645-22584-4-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
 
-We use !CONFIG_ARM64_64K_PAGES for CONFIG_ARM64_4K_PAGES
-(and vice versa) in code. It all worked well, so far since
-we only had two options. Now, with the introduction of 16K,
-these cases will break. This patch cleans up the code to
-use the required CONFIG symbol expression without the assumption
-that !64K => 4K (and vice versa)
+Introduce helpers for finding the number of page table
+levels required for a given VA width, shift for a particular
+page table level.
+
+Convert the existing users to the new helpers. More users
+to follow.
 
 Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
-Cc: Steve Capper <steve.capper@linaro.org>
-Acked-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/Kconfig                   |    4 ++--
- arch/arm64/Kconfig.debug             |    2 +-
- arch/arm64/include/asm/thread_info.h |    2 +-
- 3 files changed, 4 insertions(+), 4 deletions(-)
+ arch/arm64/include/asm/pgtable-hwdef.h |   15 ++++++++++++---
+ 1 file changed, 12 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 78b89fa..d1fb2a3 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -550,7 +550,7 @@ config ARCH_WANT_GENERAL_HUGETLB
- 	def_bool y
+diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
+index 24154b0..ce18389 100644
+--- a/arch/arm64/include/asm/pgtable-hwdef.h
++++ b/arch/arm64/include/asm/pgtable-hwdef.h
+@@ -16,13 +16,21 @@
+ #ifndef __ASM_PGTABLE_HWDEF_H
+ #define __ASM_PGTABLE_HWDEF_H
  
- config ARCH_WANT_HUGE_PMD_SHARE
--	def_bool y if !ARM64_64K_PAGES
-+	def_bool y if ARM64_4K_PAGES
++/*
++ * Number of page-table levels required to address 'va_bits' wide
++ * address, without section mapping
++ */
++#define ARM64_HW_PGTABLE_LEVELS(va_bits) (((va_bits) - 4) / (PAGE_SHIFT - 3))
++#define ARM64_HW_PGTABLE_LEVEL_SHIFT(level) \
++		((PAGE_SHIFT - 3) * (level) + 3)
++
+ #define PTRS_PER_PTE		(1 << (PAGE_SHIFT - 3))
  
- config HAVE_ARCH_TRANSPARENT_HUGEPAGE
- 	def_bool y
-@@ -762,7 +762,7 @@ source "fs/Kconfig.binfmt"
- 
- config COMPAT
- 	bool "Kernel support for 32-bit EL0"
--	depends on !ARM64_64K_PAGES || EXPERT
-+	depends on ARM64_4K_PAGES || EXPERT
- 	select COMPAT_BINFMT_ELF
- 	select HAVE_UID16
- 	select OLD_SIGSUSPEND3
-diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
-index d6285ef..c24d6ad 100644
---- a/arch/arm64/Kconfig.debug
-+++ b/arch/arm64/Kconfig.debug
-@@ -77,7 +77,7 @@ config DEBUG_RODATA
-           If in doubt, say Y
- 
- config DEBUG_ALIGN_RODATA
--	depends on DEBUG_RODATA && !ARM64_64K_PAGES
-+	depends on DEBUG_RODATA && ARM64_4K_PAGES
- 	bool "Align linker sections up to SECTION_SIZE"
- 	help
- 	  If this option is enabled, sections that may potentially be marked as
-diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
-index dcd06d1..d9c8c9f 100644
---- a/arch/arm64/include/asm/thread_info.h
-+++ b/arch/arm64/include/asm/thread_info.h
-@@ -23,7 +23,7 @@
- 
- #include <linux/compiler.h>
- 
--#ifndef CONFIG_ARM64_64K_PAGES
-+#ifdef CONFIG_ARM64_4K_PAGES
- #define THREAD_SIZE_ORDER	2
- #endif
- 
+ /*
+  * PMD_SHIFT determines the size a level 2 page table entry can map.
+  */
+ #if CONFIG_PGTABLE_LEVELS > 2
+-#define PMD_SHIFT		((PAGE_SHIFT - 3) * 2 + 3)
++#define PMD_SHIFT		ARM64_HW_PGTABLE_LEVEL_SHIFT(2)
+ #define PMD_SIZE		(_AC(1, UL) << PMD_SHIFT)
+ #define PMD_MASK		(~(PMD_SIZE-1))
+ #define PTRS_PER_PMD		PTRS_PER_PTE
+@@ -32,7 +40,7 @@
+  * PUD_SHIFT determines the size a level 1 page table entry can map.
+  */
+ #if CONFIG_PGTABLE_LEVELS > 3
+-#define PUD_SHIFT		((PAGE_SHIFT - 3) * 3 + 3)
++#define PUD_SHIFT		ARM64_HW_PGTABLE_LEVEL_SHIFT(3)
+ #define PUD_SIZE		(_AC(1, UL) << PUD_SHIFT)
+ #define PUD_MASK		(~(PUD_SIZE-1))
+ #define PTRS_PER_PUD		PTRS_PER_PTE
+@@ -42,7 +50,8 @@
+  * PGDIR_SHIFT determines the size a top-level page table entry can map
+  * (depending on the configuration, this level can be 0, 1 or 2).
+  */
+-#define PGDIR_SHIFT		((PAGE_SHIFT - 3) * CONFIG_PGTABLE_LEVELS + 3)
++#define PGDIR_SHIFT	\
++		ARM64_HW_PGTABLE_LEVEL_SHIFT(CONFIG_PGTABLE_LEVELS)
+ #define PGDIR_SIZE		(_AC(1, UL) << PGDIR_SHIFT)
+ #define PGDIR_MASK		(~(PGDIR_SIZE-1))
+ #define PTRS_PER_PGD		(1 << (VA_BITS - PGDIR_SHIFT))
 -- 
 1.7.9.5
