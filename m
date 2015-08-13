@@ -1,26 +1,27 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 13 Aug 2015 12:25:11 +0200
-Subject: [GIT PULL] ARM: imx: fixes for 4.2, 3rd round
-In-Reply-To: <20150810153542.GA10035@tiger>
-References: <20150810153542.GA10035@tiger>
-Message-ID: <20150813102511.GW30160@localhost>
+Date: Thu, 13 Aug 2015 12:25:56 +0200
+Subject: [PATCH] ARM/fb: ep93xx: switch framebuffer to use modedb only
+In-Reply-To: <1439306238-30655-1-git-send-email-linus.walleij@linaro.org>
+References: <1439306238-30655-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20150813102556.GX30160@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 10, 2015 at 11:35:42PM +0800, Shawn Guo wrote:
-> The following changes since commit e053f96b1a00022b4e2c7ceb7ac0229646626507:
+On Tue, Aug 11, 2015 at 05:17:18PM +0200, Linus Walleij wrote:
+> All the EP93xx boards exclusively use modedb to look up video
+> modes from the command line. Root out the parametrization of
+> custom video modes from the platform data and board files
+> and simplify the driver.
 > 
->   ARM: dts: i.MX35: Fix can support. (2015-07-25 11:35:08 +0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-fixes-4.2-3
-> 
-> for you to fetch changes up to 1a9fa190956f45c1e58c4d8bfa5ac051691ea590:
-> 
->   ARM: imx6: correct i.MX6 PCIe interrupt routing (2015-08-06 16:30:18 +0800)
+> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+> Reviewed-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+> Acked-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> Hi ARM SoC maintainers, please apply this directly to the
+> EP93xx/cleanup branch now that I have Tomi's ACK.
 
-Merged, thanks.
+Applied to next/cleanup, thanks.
 
 
 -Olof
