@@ -1,34 +1,29 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Thu, 13 Aug 2015 19:13:59 +0900
-Subject: [GIT PULL 2nd 3/4] Samsung driver 2nd updates for v4.3
-In-Reply-To: <20150813092144.GD30160@localhost>
-References: <55CBE10B.2030103@kernel.org> <20150813092144.GD30160@localhost>
-Message-ID: <007a01d0d5b0$c53d6580$4fb83080$@kernel.org>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 13 Aug 2015 19:14:51 +0900
+Subject: [PATCH v2] ARM: dts: exynos4412-odroidu3: Enable SPI1.
+In-Reply-To: <1439456813-4918-1-git-send-email-aballier@gentoo.org>
+References: <1439456813-4918-1-git-send-email-aballier@gentoo.org>
+Message-ID: <55CC6E1B.2050707@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof Johansson wrote:
+W dniu 13.08.2015 o 18:06, Alexis Ballier pisze:
+> SPI1 is available on IO Port #2 (as depicted on their website) in
+> PCB Revision 0.5 of Hardkernel Odroid U3 board.
+> The shield connects a 256KiB spi-nor flash on that bus.
 > 
-> On Thu, Aug 13, 2015 at 09:12:59AM +0900, Kukjin Kim wrote:
-> > Hi,
-> >
-> > I've created the signed tag based on previous tags/samsung-driver so you
-> > can see several merge in there. To support cpufreq-dt driver requires
-> > clk/cpufreq/exynos changes together and clk/cpufreq maintainers are
-> > aware of this changes. And we can remove exynos cpufreq driver at last.
-> >
-> > Note this drivers update is including previous dependencies and if
-> > you're OK, please pull.
+> Signed-off-by: Alexis Ballier <aballier@gentoo.org>
 > 
-> Again, this needs to be revisited.
+> ---
 > 
-YES.
+> Changes in v2: Use GPIO_ACTIVE_HIGH (Krzysztof Kozlowski)
+> 
+>  arch/arm/boot/dts/exynos4412-odroidu3.dts | 8 ++++++++
+>  1 file changed, 8 insertions(+)
 
-> Please try to keep the dependency only driver->dt if you can,
-> and we can merge drivers before DT this release cycle. If you do
-> driver->dt->driver->dt like here then things get messy.
-> 
-It looks better. OK.
+Thanks for fixing, looks good:
 
-Thanks,
-Kukjin
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+
+Best regards,
+Krzysztof
