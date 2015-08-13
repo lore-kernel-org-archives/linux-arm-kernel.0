@@ -1,59 +1,83 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 13 Aug 2015 18:29:47 +0100
-Subject: [PATCH 12/14] arm64: Check for selected granule support
-In-Reply-To: <55CCAD73.7080702@arm.com>
-References: <1439465645-22584-1-git-send-email-suzuki.poulose@arm.com>
- <1439465645-22584-13-git-send-email-suzuki.poulose@arm.com>
- <CAPvkgC3=S1BxdzZM4uUOmyXLjii48SMpCof6i6HdNeTG_fydfg@mail.gmail.com>
- <55CCAD73.7080702@arm.com>
-Message-ID: <20150813172946.GD4602@e104818-lin.cambridge.arm.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 13 Aug 2015 12:29:35 -0500
+Subject: [PATCH v2 1/2] ARM: common: Introduce PM domains for CPUs/clusters
+In-Reply-To: <1439406024-41893-1-git-send-email-lina.iyer@linaro.org>
+References: <CAL_JsqLhHy5gO=usm1HLf8h6iz_5FguCDo-Qz2Km+XEwaCODUA@mail.gmail.com>
+ <1439406024-41893-1-git-send-email-lina.iyer@linaro.org>
+Message-ID: <CAL_JsqLcSs79bnj4ELN0uiwJ6gxt46PghxvuGQ7prkq-4gLKhg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 13, 2015 at 03:45:07PM +0100, Suzuki K. Poulose wrote:
-> On 13/08/15 13:28, Steve Capper wrote:
-> >On 13 August 2015 at 12:34, Suzuki K. Poulose <suzuki.poulose@arm.com> wrote:
-> >>  __enable_mmu:
-> >>+       mrs     x1, ID_AA64MMFR0_EL1
-> >>+       ubfx    x2, x1, #ID_AA64MMFR0_TGran_SHIFT, 4
-> >>+       cmp     x2, #ID_AA64MMFR0_TGran_ENABLED
-> >>+       b.ne    __no_granule_support
-> >>         ldr     x5, =vectors
-> >>         msr     vbar_el1, x5
-> >>         msr     ttbr0_el1, x25                  // load TTBR0
-> >>@@ -626,3 +643,8 @@ __enable_mmu:
-> >>         isb
-> >>         br      x27
-> >>  ENDPROC(__enable_mmu)
-> >>+
-> >>+__no_granule_support:
-> >>+       wfe
-> >>+       b __no_granule_support
-> >>+ENDPROC(__no_granule_support)
-> >>--
-> >>1.7.9.5
-> >>
-> >
-> >Is is possible to tell the user that the kernel has failed to boot due
-> >to the kernel granule being unsupported?
-> 
-> We don't have anything up at this time. The "looping address" is actually a clue
-> to the (expert) user. Not sure we can do something, until we get something like DEBUG_LL(?)
+On Wed, Aug 12, 2015 at 2:00 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
+> Define and add Generic PM domains (genpd) for CPU clusters. Many new
+> SoCs group CPUs as clusters. Clusters share common resources like GIC,
+> power rail, caches, VFP, Coresight etc. When all CPUs in the cluster are
+> idle, these shared resources may also be put in their idle state.
+>
+> The idle time between the last CPU entering idle and a CPU resuming
+> execution is an opportunity for these shared resources to be powered
+> down. Generic PM domain provides a framework for defining such power
+> domains and attach devices to the domain. When the devices in the domain
+> are idle at runtime, the domain would also be suspended and resumed
+> before the first of the devices resume execution.
+>
+> We define a generic PM domain for each cluster and attach CPU devices in
+> the cluster to that PM domain. The DT definitions for the SoC describe
+> this relationship. Genpd callbacks for power_on and power_off can then
+> be used to power up/down the shared resources for the domain.
+>
+> Cc: Stephen Boyd <sboyd@codeaurora.org>
+> Cc: Kevin Hilman <khilman@linaro.org>
+> Cc: Ulf Hansson <ulf.hansson@linaro.org>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Signed-off-by: Kevin Hilman <khilman@linaro.org>
+> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+> ---
+> Changes since v1:
+>
+> - Function name changes and split out common code
+> - Use cpu,pd for now. Removed references to ARM. Open to recommendations.
+> - Still located in arch/arm/common/. May move to a more appropriate location.
+> - Platform drivers can directly call of_init_cpu_domain() without using
+>   compatibles.
+> - Now maintains a list of CPU PM domains.
 
-No.
+[...]
 
-> Or we should let it continue and end in a panic(?). The current situation can boot a
-> multi-cluster system with boot cluster having the Tgran support(which doesn't make a
-> strong use case though). I will try out some options and get back to you.
+> +static int __init of_pm_domain_attach_cpus(void)
+> +{
+> +       int cpuid, ret;
+> +
+> +       /* Find any CPU nodes with a phandle to this power domain */
+> +       for_each_possible_cpu(cpuid) {
+> +               struct device *cpu_dev;
+> +               struct of_phandle_args pd_args;
+> +
+> +               cpu_dev = get_cpu_device(cpuid);
+> +               if (!cpu_dev) {
+> +                       pr_warn("%s: Unable to get device for CPU%d\n",
+> +                                       __func__, cpuid);
+> +                       return -ENODEV;
+> +               }
+> +
+> +               /*
+> +                * We are only interested in CPUs that can be attached to
+> +                * PM domains that are cpu,pd compatible.
+> +                */
 
-If the boot CPU does not support 16KB pages, in general there isn't much
-we can do since the console printing is done after we enabled the MMU.
-Even mapping the UART address requires fixmap support and the PAGE_SIZE
-is hard-coded in the kernel image. The DT is also mapped at run-time.
+Under what conditions would the power domain for a cpu not be cpu,pd compatible?
 
-While in theory it's possible to fall back to a 4KB page size just
-enough to load the DT and figure out the early console, I suggest we
-just live with the "looping address" clue.
+Why can't the driver handling the power domain register with gen_pd
+and the cpu_pd as the driver is going to be aware of which domains are
+for cpus. While there could be h/w such that all power domains within
+a chip have a nice uniform programming model, I'd guess that is the
+exception, not the rule. First, chips I have worked on were not that
+way. CPU related and peripheral related domains are handled quite
+differently. Second, often the actions on the CPU power domains don't
+take effect until a WFI, so you end up with a different programming
+sequence.
 
--- 
-Catalin
+Rob
