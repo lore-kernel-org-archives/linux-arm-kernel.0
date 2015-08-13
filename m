@@ -1,32 +1,44 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 13 Aug 2015 12:20:22 +0200
-Subject: [GIT PULL] SoCFPGA DTS updates for v4.3, part 2
-In-Reply-To: <1439176556-30367-1-git-send-email-dinh.linux@gmail.com>
-References: <1439176556-30367-1-git-send-email-dinh.linux@gmail.com>
-Message-ID: <20150813102022.GU30160@localhost>
+Date: Thu, 13 Aug 2015 12:19:04 +0200
+Subject: [GIT PULL] Samsung mach fixes for 4.2
+In-Reply-To: <040901d0d310$e233fde0$a69bf9a0$@kernel.org>
+References: <1439171530-971-1-git-send-email-k.kozlowski@samsung.com>
+ <040901d0d310$e233fde0$a69bf9a0$@kernel.org>
+Message-ID: <20150813101904.GT30160@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 09, 2015 at 10:15:56PM -0500, dinh.linux at gmail.com wrote:
-> Hi Arnd, Kevin, and Olof:
+On Mon, Aug 10, 2015 at 11:04:25AM +0900, Kukjin Kim wrote:
+> Hi arm-soc guys,
 > 
-> This is a 2nd pull-request for v4.3. Please consider pulling in this patches.
+> Can you please pull this into arm-soc fixes for v4.2 directly?
+> I don't have other samsung fixes in my tree at this moment.
 > 
 > Thanks,
-> Dinh
+> Kukjin
 > 
-> 
-> The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
-> 
->   Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git socfpga_dts_for_v4.3_part_2
-> 
-> for you to fetch changes up to 6855e5b7090330add9521d8947017875d5f4f88e:
-> 
->   ARM: socfpga: dts: Add resets for EMACs on Arria10 (2015-08-09 21:58:58 -0500)
+> Krzysztof Kozlowski wrote:
+> > 
+> > Dear Kukjin,
+> > 
+> > Please find latest two fixes for v4.2 cycle. You can find more detailed
+> > description with the tag.
+> > 
+> > Best regards,
+> > Krzysztof
+> > 
+> > 
+> > The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
+> > 
+> >   Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
+> > 
+> > are available in the git repository at:
+> > 
+> >   https://github.com/krzk/linux.git tags/samsung-mach-fixes-4.2
+> > 
+> > for you to fetch changes up to 3e9f798784b30293012682021d5a0352f78658b8:
+> > 
+> >   ARM: EXYNOS: fix double of_node_put() on error path (2015-07-31 10:12:17 +0900)
 
 Merged, thanks.
 
