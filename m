@@ -1,62 +1,69 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 13 Aug 2015 09:58:20 +0100
-Subject: [PATCH v2 3/6] genirq: introduce irq_chip_set_type_parent() helper
-In-Reply-To: <1439401562-28874-4-git-send-email-grygorii.strashko@ti.com>
-References: <1439401562-28874-1-git-send-email-grygorii.strashko@ti.com>
- <1439401562-28874-4-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <55CC5C2C.4080301@arm.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu, 13 Aug 2015 10:58:44 +0200
+Subject: [linux-sunxi] [PATCH v2] pinctrl: sun4i: add spdif to pin
+ description.
+In-Reply-To: <1439400468-1563-2-git-send-email-codekipper@gmail.com>
+References: <1439400468-1563-1-git-send-email-codekipper@gmail.com>
+ <1439400468-1563-2-git-send-email-codekipper@gmail.com>
+Message-ID: <55CC5C44.5060507@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
+On 12-08-15 19:27, codekipper at gmail.com wrote:
+> From: Marcus Cooper <codekipper@gmail.com>
+>
+> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
 
-On 12/08/15 18:45, Grygorii Strashko wrote:
-> It's expected to use this helper when the current
-> domain doesn't implement .irq_set_type(),  but expect
-> the parent to do so.
->
-> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-> ---
->   include/linux/irq.h |  1 +
->   kernel/irq/chip.c   | 20 ++++++++++++++++++++
->   2 files changed, 21 insertions(+)
->
-> diff --git a/include/linux/irq.h b/include/linux/irq.h
-> index 92188b0..51744bc 100644
-> --- a/include/linux/irq.h
-> +++ b/include/linux/irq.h
-> @@ -484,6 +484,7 @@ extern int irq_chip_set_affinity_parent(struct irq_data *data,
->   extern int irq_chip_set_wake_parent(struct irq_data *data, unsigned int on);
->   extern int irq_chip_set_vcpu_affinity_parent(struct irq_data *data,
->   					     void *vcpu_info);
-> +extern int irq_chip_set_type_parent(struct irq_data *data, unsigned int type);
->   #endif
->
->   /* Handling of unhandled and spurious interrupts: */
-> diff --git a/kernel/irq/chip.c b/kernel/irq/chip.c
-> index bdb1b9d..b48938b 100644
-> --- a/kernel/irq/chip.c
-> +++ b/kernel/irq/chip.c
-> @@ -985,6 +985,26 @@ int irq_chip_set_affinity_parent(struct irq_data *data,
->   }
->
->   /**
-> + * irq_chip_set_type_parent - Set IRQ type on the parent interrupt
-> + * @data:	Pointer to interrupt specific data
-> + * @type:	IRQ_TYPE_{LEVEL,EDGE}_* value - see include/linux/irq.h
-> + *
-> + * Conditional, as the underlying parent chip might not implement it.
-> + */
-> +int irq_chip_set_type_parent(struct irq_data *data, unsigned int type)
-> +{
-> +	data = data->parent_data;
-> +
-> +	if (irq_data_get_irq_chip(data)->flags & IRQCHIP_SKIP_SET_WAKE)
-> +		return 0;
-> +
+LGTM:
 
-I think this is unrelated here(perhaps copy-paste error ?). I fail to
-see how wakeup and trigger type are related.
+Reviewed-by: Hans de Goede <hdegoede@redhat.com>
 
 Regards,
-Sudeep
+
+Hans
+
+> ---
+>   drivers/pinctrl/sunxi/pinctrl-sun4i-a10.c | 17 ++++++++++++++---
+>   1 file changed, 14 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/pinctrl/sunxi/pinctrl-sun4i-a10.c b/drivers/pinctrl/sunxi/pinctrl-sun4i-a10.c
+> index 7376a97..862a096 100644
+> --- a/drivers/pinctrl/sunxi/pinctrl-sun4i-a10.c
+> +++ b/drivers/pinctrl/sunxi/pinctrl-sun4i-a10.c
+> @@ -135,7 +135,14 @@ static const struct sunxi_desc_pin sun4i_a10_pins[] = {
+>   	SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 3),
+>   		  SUNXI_FUNCTION(0x0, "gpio_in"),
+>   		  SUNXI_FUNCTION(0x1, "gpio_out"),
+> -		  SUNXI_FUNCTION(0x2, "ir0")),		/* TX */
+> +		  SUNXI_FUNCTION(0x2, "ir0"),		/* TX */
+> +		/*
+> +		 * The SPDIF block is not referenced at all in the A10 user
+> +		 * manual. However it is described in the code leaked and the
+> +		 * pin descriptions are declared in the A20 user manual which
+> +		 * is pin compatible with this device.
+> +		 */
+> +		  SUNXI_FUNCTION(0x4, "spdif")),        /* SPDIF MCLK */
+>   	SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 4),
+>   		  SUNXI_FUNCTION(0x0, "gpio_in"),
+>   		  SUNXI_FUNCTION(0x1, "gpio_out"),
+> @@ -176,11 +183,15 @@ static const struct sunxi_desc_pin sun4i_a10_pins[] = {
+>   		  SUNXI_FUNCTION(0x0, "gpio_in"),
+>   		  SUNXI_FUNCTION(0x1, "gpio_out"),
+>   		  SUNXI_FUNCTION(0x2, "i2s"),		/* DI */
+> -		  SUNXI_FUNCTION(0x3, "ac97")),		/* DI */
+> +		  SUNXI_FUNCTION(0x3, "ac97"),		/* DI */
+> +		/* Undocumented mux function - See SPDIF MCLK above */
+> +		  SUNXI_FUNCTION(0x4, "spdif")),        /* SPDIF IN */
+>   	SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 13),
+>   		  SUNXI_FUNCTION(0x0, "gpio_in"),
+>   		  SUNXI_FUNCTION(0x1, "gpio_out"),
+> -		  SUNXI_FUNCTION(0x2, "spi2")),		/* CS1 */
+> +		  SUNXI_FUNCTION(0x2, "spi2"),		/* CS1 */
+> +		/* Undocumented mux function - See SPDIF MCLK above */
+> +		  SUNXI_FUNCTION(0x4, "spdif")),        /* SPDIF OUT */
+>   	SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 14),
+>   		  SUNXI_FUNCTION(0x0, "gpio_in"),
+>   		  SUNXI_FUNCTION(0x1, "gpio_out"),
+>
