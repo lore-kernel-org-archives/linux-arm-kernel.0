@@ -1,35 +1,27 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 13 Aug 2015 14:37:36 +0200
-Subject: [PATCH v5 2/2] pinctrl: rockchip: only enable gpio clock when it
- setting
-In-Reply-To: <CACRpkda0FXz1dpdS-wLRNmkt1KBESMyCWKMMa0ArH9Z-L=i_sw@mail.gmail.com>
-References: <1439287924-6988-1-git-send-email-hl@rock-chips.com>
- <1439287924-6988-2-git-send-email-hl@rock-chips.com>
- <CACRpkda0FXz1dpdS-wLRNmkt1KBESMyCWKMMa0ArH9Z-L=i_sw@mail.gmail.com>
-Message-ID: <2167165.ooWgarx4Ov@diego>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 13 Aug 2015 14:37:54 +0200
+Subject: [PATCH] pinctrl: atlas7: clear ugly branch statements for pull
+ and drivestrength
+In-Reply-To: <1438744934-15395-1-git-send-email-21cnbao@gmail.com>
+References: <1438744934-15395-1-git-send-email-21cnbao@gmail.com>
+Message-ID: <CACRpkdYtFSps1R-YgMFoekkW8osDVf+ujrnGLP47YBCcq2ZBzg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Wed, Aug 5, 2015 at 5:22 AM, Barry Song <21cnbao@gmail.com> wrote:
 
-Am Donnerstag, 13. August 2015, 14:24:28 schrieb Linus Walleij:
-> On Tue, Aug 11, 2015 at 12:12 PM, Lin Huang <hl@rock-chips.com> wrote:
-> > gpio can keep state even the clock disable, for save power
-> > consumption, only enable gpio clock when it setting
-> > 
-> > Signed-off-by: Lin Huang <hl@rock-chips.com>
-> > Reviewed-by: Heiko Stuebner <heiko@sntech.de>
-> > ---
-> > Changes in v5:
-> > -rebase patch
-> 
-> Patch applied with Doug's test tags etc.
+> From: Wei Chen <Wei.Chen@csr.com>
+>
+> To set/get atlas7 pull & drive strength, we use lots of if/else
+> to check pad type. But except mask value or immediate value, all
+> actions in these conditional branches are the same.
+> So we use predefined pull info table and drive strength table
+> to reduce these redundancy code.
+>
+> Signed-off-by: Wei Chen <Wei.Chen@csr.com>
+> Signed-off-by: Barry Song <Baohua.Song@csr.com>
 
-did you  also take the first patch?
+Patch applied.
 
-Aka bot should probably stay together (hence Stephen's Ack for the clock 
-change), as the dynamically controlling the gpio clocks exposes the 
-pclk_pd_pmu.
-
-
-Heiko
+Yours,
+Linus Walleij
