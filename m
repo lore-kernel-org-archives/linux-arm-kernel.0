@@ -1,138 +1,101 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 13 Aug 2015 17:01:47 -0500
-Subject: [PATCH v2 1/2] ARM: common: Introduce PM domains for CPUs/clusters
-In-Reply-To: <20150813201248.GB84868@linaro.org>
-References: <CAL_JsqLhHy5gO=usm1HLf8h6iz_5FguCDo-Qz2Km+XEwaCODUA@mail.gmail.com>
- <1439406024-41893-1-git-send-email-lina.iyer@linaro.org>
- <CAL_JsqLcSs79bnj4ELN0uiwJ6gxt46PghxvuGQ7prkq-4gLKhg@mail.gmail.com>
- <20150813201248.GB84868@linaro.org>
-Message-ID: <CAL_Jsq+-9vS4_KRQKAsQnHXBMfubkRtnWwuBHSrD166trmTVSw@mail.gmail.com>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Fri, 14 Aug 2015 00:10:59 +0200
+Subject: [PATCH v5] mtd: spi-nor: add driver for NXP SPI Flash Interface
+ (SPIFI)
+In-Reply-To: <20150813214739.GH60523@google.com>
+References: <1439486380-17720-1-git-send-email-manabian@gmail.com>
+ <20150813214739.GH60523@google.com>
+Message-ID: <CAGhQ9Vzs2h3mw2qnYvy83RAvrX8uPZGGzNASr1csk_LhLnHB8g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 13, 2015 at 3:12 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
-> On Thu, Aug 13 2015 at 11:29 -0600, Rob Herring wrote:
->>
->> On Wed, Aug 12, 2015 at 2:00 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
->>>
->>> Define and add Generic PM domains (genpd) for CPU clusters. Many new
->>> SoCs group CPUs as clusters. Clusters share common resources like GIC,
->>> power rail, caches, VFP, Coresight etc. When all CPUs in the cluster are
->>> idle, these shared resources may also be put in their idle state.
->>>
->>> The idle time between the last CPU entering idle and a CPU resuming
->>> execution is an opportunity for these shared resources to be powered
->>> down. Generic PM domain provides a framework for defining such power
->>> domains and attach devices to the domain. When the devices in the domain
->>> are idle at runtime, the domain would also be suspended and resumed
->>> before the first of the devices resume execution.
->>>
->>> We define a generic PM domain for each cluster and attach CPU devices in
->>> the cluster to that PM domain. The DT definitions for the SoC describe
->>> this relationship. Genpd callbacks for power_on and power_off can then
->>> be used to power up/down the shared resources for the domain.
->>>
->>> Cc: Stephen Boyd <sboyd@codeaurora.org>
->>> Cc: Kevin Hilman <khilman@linaro.org>
->>> Cc: Ulf Hansson <ulf.hansson@linaro.org>
->>> Cc: Catalin Marinas <catalin.marinas@arm.com>
->>> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
->>> Cc: Mark Rutland <mark.rutland@arm.com>
->>> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->>> Signed-off-by: Kevin Hilman <khilman@linaro.org>
->>> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
->>> ---
->>> Changes since v1:
->>>
->>> - Function name changes and split out common code
->>> - Use cpu,pd for now. Removed references to ARM. Open to recommendations.
->>> - Still located in arch/arm/common/. May move to a more appropriate
->>> location.
->>> - Platform drivers can directly call of_init_cpu_domain() without using
->>>   compatibles.
->>> - Now maintains a list of CPU PM domains.
->>
->>
->> [...]
->>
->>> +static int __init of_pm_domain_attach_cpus(void)
->>> +{
->>> +       int cpuid, ret;
->>> +
->>> +       /* Find any CPU nodes with a phandle to this power domain */
->>> +       for_each_possible_cpu(cpuid) {
->>> +               struct device *cpu_dev;
->>> +               struct of_phandle_args pd_args;
->>> +
->>> +               cpu_dev = get_cpu_device(cpuid);
->>> +               if (!cpu_dev) {
->>> +                       pr_warn("%s: Unable to get device for CPU%d\n",
->>> +                                       __func__, cpuid);
->>> +                       return -ENODEV;
->>> +               }
->>> +
->>> +               /*
->>> +                * We are only interested in CPUs that can be attached to
->>> +                * PM domains that are cpu,pd compatible.
->>> +                */
->>
->>
->> Under what conditions would the power domain for a cpu not be cpu,pd
->> compatible?
->>
-> Mostly never. But I dont want to assume and attach a CPU to its domain
-> that I am not concerned with.
+Hi Brian,
 
-Which is why the power controller driver should tell you.
-
->> Why can't the driver handling the power domain register with gen_pd
->> and the cpu_pd as the driver is going to be aware of which domains are
->> for cpus.
+On 13 August 2015 at 23:47, Brian Norris <computersforpeace@gmail.com> wrote:
+> On Thu, Aug 13, 2015 at 07:19:40PM +0200, Joachim Eastwood wrote:
+>> Add SPI-NOR driver for the SPI Flash Interface (SPIFI)
+>> controller that is found on newer NXP MCU devices.
+>>
+>> The controller supports serial SPI Flash devices with 1-, 2-
+>> and 4-bit width in either SPI mode 0 or 3. The controller
+>> can operate in either command or memory mode. In memory mode
+>> the Flash is exposed as normal memory and can be directly
+>> accessed by the CPU.
+>>
+>> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+>> Reviewed-by: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
+>> ---
+>> Hi Brian,
+>>
+>> I skipped the cover letter since you already applied the 2nd
+>> of patch of the original set and using a cover letter for
+>> just one patch seemed a bit useless. Cover letter for v4 can
+>> be found here: http://marc.info/?l=devicetree&m=143647330431908&w=2
+>>
+>> This version address all comments from Brian Norris except
+>> for two things noted below.
+>>
+>> If the line below is removed the kernel opses on jffs2 mount.
+>> spifi->mtd.priv  = &spifi->nor;
+>> It seems like spi-nor.c doesn't setup this field. fsl-quadspi
+>> also assigns this field, btw.
 >
-> They could and like Renesas they would. They could have an intricate
-> hierarchy of domains that they may want to deal with in their platform
-> drivers. Platforms could define the CPU devices as IRQ-safe and attach
-> it to their domains. Ensure the reference count of the online and
-> running CPUs are correct and they are good to go. They also would attach
-> the CPU devices to the domain and everything would work as they would
-> here. Its just repeated code across platforms that we are trying to
-> avoid.
+> Sorry, I overlooked that. But that code's pretty dumb. I'll take yours
+> as-is, but I'll send a patch to fix both.
 
-I agree that we want to have core code doing all that setup, But that
-has nothing to do with needing to have a DT property. The driver just
-needs to tell you the list of cpu power domains and the associated
-cpus they want the core to manage. Then it is up to you to do the rest
-of the setup.
+OK.
 
-So I really don't think we need a DT binding here.
-
->> While there could be h/w such that all power domains within
->> a chip have a nice uniform programming model, I'd guess that is the
->> exception, not the rule. First, chips I have worked on were not that
->> way. CPU related and peripheral related domains are handled quite
->> differently.
+>> The read/wait ordering in nxp_spifi_read_reg is correct. I
+>> don't really have a good explaination for the ordering. The
+>> user manual doesn't document the SPIFI in detail, but the
+>> offcial NXP spifilib has the same ordering.
 >
-> Agreed. These are very SoC specific components and would require
-> platform specific programming. But most SoCs, would need to do many
-> other things like suspending debuggers, reducing clocks, GIC save and
-> restore, cluster state determination etc that are only getting more
-> generalized. We have generalized ARM CPU idle, I see this as the
-> platform for the next set of power saving in an SoC.
+> OK, no problem.
 >
->> Second, often the actions on the CPU power domains don't
->> take effect until a WFI, so you end up with a different programming
->> sequence.
+>> Changes since v4:
+>>  - spifi: always autodetect SPI Flash
+>>  - s/spi/SPI on dev_* output
+>>  - add parentheses to SPIFI_CMD_DATALEN macro
+>>  - rebase on mtd-master
 >>
-> How so? The last core going down (in this case, when the domain is
-> suspended the last core is the last device that does a _put() on the
-> domain) would determine and perform the power domain's programming
-> sequence, in the context of the last CPU. A sequence that would only be
-> effected in hardware when the the CPU executes WFI. I dont see why it
-> would be any different than how it is today.
+>> Changes since v3:
+>>  - fix bug in write function
+>>  - rebase on 4.2-rc1
+>>
+>> Changes since v2:
+>>  - default to auto detection unless chip is specified
+>>  - update doc with reference to jedec,spi-nor.txt
+>>
+>> Test on the following boards.
+>> Hitex board boots on SPIFI Flash with JFFS2.
+>>
+>> Hitex LPC4350 Eval board:
+>> [    2.093956] nxp-spifi 40003000.spifi: s25sl064p (8192 Kbytes)
+>>
+>> Embedded Artists' LPC4357 Developer's Kit:
+>> [    3.051627] nxp-spifi 40003000.spifi: s25fl016k (2048 Kbytes)
+>
+> Applied to l2-mtd.git, thanks!
 
-I just mean that for a peripheral (e.g a SATA controller), you simply
-quiesce the device and driver and shut off power. With a cpu or cpu
-related component, you can't really shut it off until you stop
-running. So cpu domains are special.
+Excellent. Thanks Brian.
 
-Rob
+> BTW, is this driver worth a MAINTAINERS entry? It's nice to always have
+> someone on CC that has the hardware. The git history should probably
+> pick you up anyway when running get_maintainers.pl, so it may not be
+> absolutely necessary.
+
+Sure. I can add it under the main lpc18xx platform entry in
+MAINTAINERS. I'll queue up a patch for arm-soc.
+
+>> Both s25fl016k and s25sl064p support dual/quad mode, but this
+>> is not flagged in spi-nor.c. I have sent a patch for s25fl016k
+>> and will send a patch s25sl064p please apply when you get them.
+>
+> I'll see if I can dig these out of the mailing list eventually. I have a
+> sizable backlog.
+
+Ok, thanks.
+
+
+regards,
+Joachim Eastwood
