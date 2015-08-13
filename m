@@ -1,81 +1,33 @@
-From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Wed, 12 Aug 2015 21:30:36 -0700
-Subject: [PATCH RFC 08/10] hwspinlock: qcom: Lock #7 is special lock,
- uses dynamic proc_id
-In-Reply-To: <1438792366-2737-9-git-send-email-lina.iyer@linaro.org>
-References: <438731339-58317-1-git-send-email-lina.iyer@linaro.org>
- <1438792366-2737-1-git-send-email-lina.iyer@linaro.org>
- <1438792366-2737-9-git-send-email-lina.iyer@linaro.org>
-Message-ID: <20150813043036.GJ13472@usrtlx11787.corpusers.net>
+From: lho@apm.com (Loc Ho)
+Date: Wed, 12 Aug 2015 21:30:58 -0700
+Subject: [PATCH v3 1/4] edac: Add an function to retrieve the EDAC debugfs
+ node
+In-Reply-To: <CAPw-ZT=AFtyLt4CNGBzLZcdPr-ekJpQxKA4Y_AiDzqKfhF1-=w@mail.gmail.com>
+References: <1439326077-25507-1-git-send-email-lho@apm.com>
+ <1439326077-25507-2-git-send-email-lho@apm.com>
+ <20150812101219.GC14011@nazgul.tnic>
+ <20150812104954.GD14011@nazgul.tnic>
+ <CAPw-ZT=AFtyLt4CNGBzLZcdPr-ekJpQxKA4Y_AiDzqKfhF1-=w@mail.gmail.com>
+Message-ID: <CAPw-ZTkfAxqG6HQHU3WomrqRwXa+jyTWCg=ns1HKC323ds1yug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 05 Aug 09:32 PDT 2015, Lina Iyer wrote:
+Hi,
 
-> Hwspinlocks are widely used between processors in an SoC, and also
-> between elevation levels within in the same processor.  QCOM SoC's use
-> hwspinlock to serialize entry into a low power mode when the context
-> switches from Linux to secure monitor.
-> 
-> Lock #7 has been assigned for this purpose. In order to differentiate
-> between one cpu core holding a lock while another cpu is contending for
-> the same lock, the proc id written into the lock is (128 + cpu id). This
-> makes it unique value among the cpu cores and therefore when a core
-> locks the hwspinlock, other cores would wait for the lock to be released
-> since they would have a different proc id.  This value is specific for
-> the lock #7 only.
-> 
+>
+>>> EXPORT_SYMBOL_GPL() if it is going to be used by modules.
+>>
+>> Better yet, move it to the header.
+>
+> I can't move it completely to the header and make it static. It will
+> generate a lot of compiler warning as it isn't used by other modules.
+> I will add EXPORT_SYMBOL_GPL() in the next version.
 
-As I was thinking about this, I came to the conclusion that my argument
-that it's system configuration and not a property of the block that lock
-#7 is special is actually biting myself.
+Okay... The 'inline' helps with the compiler warning. If I move all to
+header file with 'static inline' and wrapper around CONFIG_EDAC_DEBUG,
+don't I need to export and declare the variable 'edac_debugfs'? Are
+you okay with export this variable? Or, it is static inline if not
+defined CONFIG_EDAC_DEBUG. Otherwise, just  an extern header function
+and export it as well?
 
-Just as #7 is system configuration, so is the fact that 1 is the lock
-value for all other locks.
-
-I've been meaning to answer you, but I haven't come to a good conclusion
-in this matter. I think that both of these properties should be possible
-to express in DT, but I don't know how.
-
-
-Perhaps we should just list each lock that we expose as a subnode in DT
-with a property to indicate the lock value - with the possibility of
-indicating cpu_id.
-
-Something like:
-
-tcsr-mutex {
-	compatible = "qcom,tcsr-mutex";
-	syscon = <&tcsr_mutex_block 0 0x80>;
-
-	#hwlock-cells = <1>;
-	#address-cells = <1>;
-	#size-cells = <0>;
-
-	smem-lock at 3 {
-		reg = <3>;
-		qcom,lock-value = <1>;
-	};
-
-	scm-lock at 7 {
-		reg = <7>;
-		qcom,lock-value-from-cpu-id;
-		qcom,lock-raw;
-	};
-};
-
-As we don't reference most of these locks anyways I don't think this
-would still be reasonable. And if reg is an array it's quite compact.
-
-> Declare lock #7 as raw capable, so the hwspinlock framework would not
-> enfore acquiring a s/w spinlock before acquiring the hwspinlock.
-> 
-
-I'm fine with this part!
-
-
-Sorry for the extremely slow response, but this took some time to
-process...
-
-Regards,
-Bjorn
+-Loc
