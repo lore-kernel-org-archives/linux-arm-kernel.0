@@ -1,49 +1,80 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Thu, 13 Aug 2015 10:16:41 +0200
-Subject: [PATCH 0/2] x86/KASAN updates for 4.3
-In-Reply-To: <20150813065040.GA17983@gmail.com>
-References: <1439444244-26057-1-git-send-email-ryabinin.a.a@gmail.com>
- <20150813065040.GA17983@gmail.com>
-Message-ID: <20150813081641.GA14402@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 13 Aug 2015 09:17:44 +0100
+Subject: 3.18: lockdep problems in cpufreq
+In-Reply-To: <5160300.5D2Dvly8u9@vostro.rjw.lan>
+References: <20141214213655.GA11285@n2100.arm.linux.org.uk>
+ <2574268.XBqpdL2VLI@vostro.rjw.lan>
+ <20150811170357.GA24529@n2100.arm.linux.org.uk>
+ <5160300.5D2Dvly8u9@vostro.rjw.lan>
+Message-ID: <20150813081744.GN7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-* Ingo Molnar <mingo@kernel.org> wrote:
-
-> 
-> * Andrey Ryabinin <ryabinin.a.a@gmail.com> wrote:
-> 
-> > These 2 patches taken from v5 'KASAN for arm64' series.
-> > The only change is updated changelog in second patch.
+On Thu, Aug 13, 2015 at 03:20:35AM +0200, Rafael J. Wysocki wrote:
+> On Tuesday, August 11, 2015 06:03:57 PM Russell King - ARM Linux wrote:
+> > On Tue, May 19, 2015 at 12:05:55AM +0200, Rafael J. Wysocki wrote:
+> > > On Monday, May 18, 2015 07:56:45 PM Russell King - ARM Linux wrote:
+> > > > On Tue, Dec 16, 2014 at 09:11:53AM +0530, Viresh Kumar wrote:
+> > > > > On 16 December 2014 at 04:39, Russell King - ARM Linux
+> > > > > <linux@arm.linux.org.uk> wrote:
+> > > > > > Well, here's a patch which I'm running on top of 3.18 at the moment,
+> > > > > > which is basically what I described in my email, and I'm running with it
+> > > > > > and it is without any lockdep complaint.
+> > > > > 
+> > > > > We need two separate patches now, one for 3.18 and other one for 3.19-rc.
+> > > > > 3.19 has see lots of changes in this particular file and so we need to
+> > > > > change few things here.
+> > > > 
+> > > > What happened with this?  I'm still carrying the patch.
+> > > 
+> > > This should go in through the thermal tree.  Eduardo?
 > > 
-> > I hope this is not too late to queue these for 4.3,
-> > as this allow us to merge arm64/KASAN patches in v4.4
-> > through arm64 tree.
+> > Having waited a long time for any kind of response from Eduardo, I've
+> > given up.  My conclusion is that Eduardo isn't interested in this.
 > > 
-> > Andrey Ryabinin (2):
-> >   x86/kasan: define KASAN_SHADOW_OFFSET per architecture
-> >   x86/kasan, mm: introduce generic kasan_populate_zero_shadow()
+> > I've re-checked, and the AB-BA deadlock is still there in the latest
+> > code.  So, I've taken it upon myself to throw this into my for-next
+> > branch to force the issue - not something I _want_ to do, but I'm doing
+> > this out of frustration.  It's clear to me that "playing nice" by email
+> > does _not_ work with some people.
 > > 
-> >  arch/x86/include/asm/kasan.h |   3 +
-> >  arch/x86/mm/kasan_init_64.c  | 123 ++--------------------------------
-> >  include/linux/kasan.h        |  10 ++-
-> >  mm/kasan/Makefile            |   2 +-
-> >  mm/kasan/kasan_init.c        | 152 +++++++++++++++++++++++++++++++++++++++++++
-> >  5 files changed, 170 insertions(+), 120 deletions(-)
-> >  create mode 100644 mm/kasan/kasan_init.c
+> > I'm rather hoping that Stephen reports a merge conflict with linux-next
+> > this evening to highlight this situation.  I've added additional commentry
+> > to the commit message on the patch giving the reason why I've done this,
+> > and the relevant message IDs showing the past history.
+> > 
+> > I've not decided whether I'm going to ask Linus to take this patch
+> > directly or not, that rather depends whether there's any co-operation
+> > from Eduardo on this.  I'd rather Eduardo took the patch.
+> > 
+> > The patch I have has had to be updated again for changes to the driver,
+> > but I really don't see the point of re-posting it just for it to be
+> > ignored yet again.
+> > 
+> > I'm really disappointed by this dysfunctional state of affairs, and
+> > that what should be an urgent fix for an observable problem is still
+> > not merged some nine months after it was first identified.
 > 
-> It's absolutely too late in the -rc cycle for v4.3!
+> I guess it might help if you sent the updated patch in a new thread.
 
-Stupid me, I have read 'v4.2' ...
+That I doubt.  Eduardo has not bothered to reply at _any_ time.  I
+have to question whether there is anyone even reading that email
+address, or whether it's a redirect to /dev/null.  All the evidence I
+have right now is that this Eduardo is a ficticous character.
 
-So yes, it's still good for v4.3, the development window is still open.
+I would have at least expected some complaints when I said "I've put
+it in linux-next" but... absolutely nothing.
 
-The rest still stands:
+So... my only conclusion is that you're all pulling my leg that there
+_is_ this "Eduardo" maintainer who's supposed to be taking patches for
+this stuff.
 
-> I can create a stable topic tree for it, tip:mm/kasan or so, which arm64 could 
-> pull and base its own ARM specific work on, if that's OK with everyone.
+As I've said, I'm not bothering with this anymore, it's just far too
+much effort to play these stupid games.  The deadlock can stay for all
+I care.
 
-Thanks,
+Sorry.
 
-	Ingo
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
