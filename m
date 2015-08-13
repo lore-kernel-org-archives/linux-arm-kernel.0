@@ -1,55 +1,101 @@
-From: robert.richter@caviumnetworks.com (Robert Richter)
-Date: Thu, 13 Aug 2015 18:17:41 +0200
-Subject: [PATCH v2 3/5] irqchip, gicv3: Workaround for Cavium ThunderX
- erratum 23154
-In-Reply-To: <55CCB393.1040909@arm.com>
-References: <1439477277-6157-1-git-send-email-rric@kernel.org>
- <1439477277-6157-4-git-send-email-rric@kernel.org>
- <55CCB393.1040909@arm.com>
-Message-ID: <20150813161741.GO1820@rric.localhost>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Thu, 13 Aug 2015 10:22:05 -0600
+Subject: [PATCH 5/9] ARM: common: Introduce PM domains for CPUs/clusters
+In-Reply-To: <20150813155245.GD13833@red-moon>
+References: <1438731339-58317-1-git-send-email-lina.iyer@linaro.org>
+ <1438731339-58317-6-git-send-email-lina.iyer@linaro.org>
+ <CAL_JsqK67=DTtjZwwnonObLDjLbahkREfm0RvyXVV95bhR-d4Q@mail.gmail.com>
+ <20150813150154.GB13356@red-moon>
+ <20150813154503.GO52339@linaro.org>
+ <20150813155245.GD13833@red-moon>
+Message-ID: <20150813162205.GQ52339@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc,
+On Thu, Aug 13 2015 at 09:52 -0600, Lorenzo Pieralisi wrote:
+>On Thu, Aug 13, 2015 at 04:45:03PM +0100, Lina Iyer wrote:
+>> On Thu, Aug 13 2015 at 09:01 -0600, Lorenzo Pieralisi wrote:
+>> >On Thu, Aug 06, 2015 at 04:14:51AM +0100, Rob Herring wrote:
+>> >> On Tue, Aug 4, 2015 at 6:35 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
+>> >> > Define and add Generic PM domains (genpd) for ARM CPU clusters. Many new
+>> >> > SoCs group CPUs as clusters. Clusters share common resources like GIC,
+>> >> > power rail, caches, VFP, Coresight etc. When all CPUs in the cluster are
+>> >> > idle, these shared resources may also be put in their idle state.
+>> >> >
+>> >> > The idle time between the last CPU entering idle and a CPU resuming
+>> >> > execution is an opportunity for these shared resources to be powered
+>> >> > down. Generic PM domain provides a framework for defining such power
+>> >> > domains and attach devices to the domain. When the devices in the domain
+>> >> > are idle at runtime, the domain would also be suspended and resumed
+>> >> > before the first of the devices resume execution.
+>> >> >
+>> >> > We define a generic PM domain for each cluster and attach CPU devices in
+>> >> > the cluster to that PM domain. The DT definitions for the SoC describe
+>> >> > this relationship. Genpd callbacks for power_on and power_off can then
+>> >> > be used to power up/down the shared resources for the domain.
+>> >>
+>> >> [...]
+>> >>
+>> >> > +ARM CPU Power domains
+>> >> > +
+>> >> > +The device tree allows describing of CPU power domains in a SoC. In ARM SoC,
+>> >> > +CPUs may be grouped as clusters. A cluster may have CPUs, GIC, Coresight,
+>> >> > +caches, VFP and power controller and other peripheral hardware. Generally,
+>> >> > +when the CPUs in the cluster are idle/suspended, the shared resources may also
+>> >> > +be suspended and resumed before any of the CPUs resume execution.
+>> >> > +
+>> >> > +CPUs are the defined as the PM domain consumers and there is a PM domain
+>> >> > +provider for the CPUs. Bindings for generic PM domains (genpd) is described in
+>> >> > +[1].
+>> >> > +
+>> >> > +The ARM CPU PM domain follows the same binding convention as any generic PM
+>> >> > +domain. Additional binding properties are -
+>> >> > +
+>> >> > +- compatible:
+>> >> > +       Usage: required
+>> >> > +       Value type: <string>
+>> >> > +       Definition: Must also have
+>> >> > +                       "arm,pd"
+>> >> > +               inorder to initialize the genpd provider as ARM CPU PM domain.
+>> >>
+>> >> A compatible string should represent a particular h/w block. If it is
+>> >> generic, it should represent some sort of standard programming
+>> >> interface (e.g, AHCI, EHCI, etc.). This doesn't seem to be either and
+>> >> is rather just a mapping of what "driver" you want to use.
+>> >>
+>> >> I would expect that identifying a cpu's or cluster's power domain
+>> >> would be done by a phandle between the cpu/cluster node and power
+>> >> domain node. But I've not really looked at the power domain bindings
+>> >> so who knows.
+>> >
+>> >I would expect the same, meaning that a cpu node, like any other device
+>> >node would have a phandle pointing at the respective HW power domain.
+>> >
+>> CPUs have phandles to their domains. That is how the relationship
+>> between the domain provider (power-controller) and the consumer (CPU) is
+>> established.
+>>
+>> >I do not really understand why we want a "generic" CPU power domain, what
+>> >purpose does it serve ? Creating a collection of cpu devices that we
+>> >can call "cluster" ?
+>> >
+>> Nope, not for calling a cluster, a cluster :)
+>>
+>> This compatible is used to define a generic behavior of the CPU domain
+>> controller (in addition to the platform specific behavior of the domain
+>> power controller). The kernel activities for such power controller are
+>> generally the same which otherwise would be repeated across platforms.
+>
+>What activities ? CPU PM notifiers ?
+>
+Yes, for now. May be someday we can get rid of these notifiers and
+directly invoke subsystems from these callbacks directly. Kevin proposed
+this idea. With little exploration that I have done, I dont have a good
+way to do that yet.
 
-thanks for your quick review.
+I am imagining here (only imagining at this time) that I could tie this
+with last man down for cluster idle state determination and call into
+cpuidle-PSCI to help compose the composite state id.
 
-On 13.08.15 16:11:15, Marc Zyngier wrote:
-> On 13/08/15 15:47, Robert Richter wrote:
-> > From: Robert Richter <rrichter@cavium.com>
-
-> >  static const struct gic_capabilities gicv3_errata[] = {
-> >  	{
-> > +		.desc		= "GIC: Cavium erratum 23154",
-> > +		.iidr		= 0xa100034c,	/* ThunderX pass 1.x */
-> > +		.iidr_mask	= 0xffff0fff,
-> > +		.init		= gicv3_enable_cavium_thunderx,
-> > +	},
-> 
-> I'm even more puzzled. You're working around a CPU bug based on the ITS
-> ID registers? Or have you swapped the detection methods for the two errata?
-
-:/ Right, I mixed this up... Must have starred on this for too long.
-Will fix that.
-
-Wrt midr: Originally this was written to support iidr. I wanted to
-keep the version check in the driver of the hw, an implementation
-outside of drivers/irqchip looked not appropriate here as it would
-rely then on arch arm64 only. This is the main reason. Apart from
-that, I think an implmentation based on struct arm64_cpu_capabilities,
-etc. would require much rework compared to my current easy
-implementation, e.g:
-
- * binding flags to callbacks and actually run them,
-
- * handing over private driver data (base addr for iidr detection) to
-   a capabilty's match function.
-
-Overall this looked bloated. Now, that the MIDR also needs to be
-checked, it looked better to me to keep the gic hw detection at a
-single location in the driver. This also allows us to check a
-combination of midr and iidr values.
-
-I hope this sounds reasonable?
-
--Robert
+Thanks,
+Lina
