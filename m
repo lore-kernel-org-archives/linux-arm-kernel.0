@@ -1,147 +1,245 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 13 Aug 2015 12:40:05 +0100
-Subject: [PATCH v2 5/6] mailbox: Add generic mechanism for testing
- Mailbox Controllers
-In-Reply-To: <CABb+yY34i=VUnswUE21vgeQYAGOS=7uwvdnTAFFgYkTV0CFk=w@mail.gmail.com>
-References: <1437990272-23111-6-git-send-email-lee.jones@linaro.org>
- <CABb+yY20nQbiEEZeRvWTMUsJ2qgwRn8CrWvnFDSB-b1dgVaAuw@mail.gmail.com>
- <20150812102328.GD18282@x1>
- <CABb+yY0A74Vy3-KOvj0URU_4zb2FAC7Yp3gmEwnFaBrD0mzt0w@mail.gmail.com>
- <20150813091914.GB8782@x1>
- <CABb+yY0cgbtM68-E_Xqgh5O6GRLXESYTLa5WcAwUBoVL3ufrxA@mail.gmail.com>
- <20150813102335.GC8782@x1>
- <CABb+yY3z7p97eOhncQ2i+g6yoYGfDgSN9BDPKmiDaVLa3oPocA@mail.gmail.com>
- <20150813110008.GD8782@x1>
- <CABb+yY34i=VUnswUE21vgeQYAGOS=7uwvdnTAFFgYkTV0CFk=w@mail.gmail.com>
-Message-ID: <20150813114005.GF8782@x1>
+From: suzuki.poulose@arm.com (Suzuki K. Poulose)
+Date: Thu, 13 Aug 2015 12:34:03 +0100
+Subject: [PATCH 13/14] arm64: Add 16K page size support
+In-Reply-To: <1439465645-22584-1-git-send-email-suzuki.poulose@arm.com>
+References: <1439465645-22584-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1439465645-22584-14-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 13 Aug 2015, Jassi Brar wrote:
+From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
 
-> On Thu, Aug 13, 2015 at 4:30 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> > On Thu, 13 Aug 2015, Jassi Brar wrote:
-> >
-> >> On Thu, Aug 13, 2015 at 3:53 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> >> > On Thu, 13 Aug 2015, Jassi Brar wrote:
-> >> >
-> >> >> On Thu, Aug 13, 2015 at 2:49 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> >> >> > On Thu, 13 Aug 2015, Jassi Brar wrote:
-> >> >>
-> >> >> >> >> > +
-> >> >> >> >> > +static void mbox_test_prepare_message(struct mbox_client *client, void *message)
-> >> >> >> >> > +{
-> >> >> >> >> > +       struct mbox_test_device *tdev = dev_get_drvdata(client->dev);
-> >> >> >> >> > +
-> >> >> >> >> > +       if (tdev->mmio)
-> >> >> >> >> > +               memcpy(tdev->mmio, message, MBOX_MAX_MSG_LEN);
-> >> >> >> >> >
-> >> >> >> >> This is unlikely to work. Those platforms that need to send a 2 part
-> >> >> >> >> message, they do :
-> >> >> >> >> (a) Signal/Command/Target code via some controller register (via
-> >> >> >> >> mbox_send_message).
-> >> >> >> >> (b) Setup the payload in Shared-Memory (via tx_prepare).
-> >> >> >> >>
-> >> >> >> >> This test driver assumes both are the same. I think you have to
-> >> >> >> >> declare something like
-> >> >> >> >
-> >> >> >> > This driver assumes that the framework will call client->tx_prepare()
-> >> >> >> > first, which satisfies (b).  It then assumes controller->send_data()
-> >> >> >> > will be invoked, which will send the platform specific
-> >> >> >> > signal/command/target code, which then satisfies (a).
-> >> >> >> >
-> >> >> >> Yeah, but what would be that code? Who provides that?
-> >> >> >>
-> >> >> >> > In what way does it assume they are the same?
-> >> >> >> >
-> >> >> >> notice the 'message' pointer in
-> >> >> >> mbox_send_message(tdev->tx_channel, message);
-> >> >> >>     and
-> >> >> >> memcpy(tdev->mmio, message, MBOX_MAX_MSG_LEN);
-> >> >> >>
-> >> >> >> >> struct mbox_test_message { /* same for TX and RX */
-> >> >> >> >>           unsigned sig_len;
-> >> >> >> >>           void *signal;               /* rx/tx via mailbox api */
-> >> >> >> >>           unsigned pl_len;
-> >> >> >> >>           void *payload;           /* rx/tx via shared-memory */
-> >> >> >> >> };
-> >> >> >> >
-> >> >> >> > How do you think this should be set and use these?
-> >> >> >> >
-> >> >> >> The userspace would want to specify the command code (32bits or not)
-> >> >> >> that would be passed via the fifo/register of the controller. So we
-> >> >> >> need signal[]
-> >> >> >>
-> >> >> >> The data to be passed via share-memory could be provided by userspace
-> >> >> >> via the payload[] array.
-> >> >> >
-> >> >> > Okay, so would the solution be two userspace files 'signal' and
-> >> >> > 'message', so in the case of a client specified signal we can write it
-> >> >> > into there first.
-> >> >> >
-> >> >> > echo 255  > signal
-> >> >> > echo test > message
-> >> >> >
-> >> >> > ... or in the case where no signal is required, or the controller
-> >> >> > driver taking care of it, we just don't write anything to signal?
-> >> >> >
-> >> >> file_operations.write() should parse signal and message, coming from
-> >> >> userspace, into a local structure before routing them via
-> >> >> mbox_send_message and tx_prepare respectively.
-> >> >
-> >> > Okay.  So before I code this up we should agree on syntax.
-> >> >
-> >> > How would you like to represent the break between signal and message?
-> >> > Obviously ' ' would be a bad idea, as some clients may want to send
-> >> > messages with white space contained.  How about '\t' or '\n'?
-> >> >
-> >> Yeah, I am not a fan of markers and flags either.
-> >>
-> >> Maybe we should share with userspace
-> >>   struct mbox_test_message { /* same for TX and RX */
-> >>            unsigned sig_len;
-> >>            void __user *signal;        /* rx/tx via mailbox api */
-> >>            unsigned pl_len;
-> >>            void __user *payload;    /* rx/tx via shared-memory */
-> >>   };
-> >>
-> >> First copy_from_user the structure of length sizof(struct
-> >> mbox_test_message) and then copy_from_user length sig_len and pl_len
-> >> from signal[] and payload[] respectively (usually ioctls would carry
-> >> such data).
-> >
-> > Simplicity and ease of use should be the goals here.  Testers should
-> > not have to write applications to use this driver.  Can we come up
-> > with a simple/effective method that uses SYSFS/DEBUGFS please?
-> >
-> > The easiest way I can think of which avoids markers/separators AND the
-> > requirement for users to have to write applications is to have two
-> > files, 'signal' and 'message' as mentioned before.  Once both are
-> > populated I can get this driver to draft the message appropriately and
-> > fire it off.
-> >
-> And then write to more files for RX data? ... which should also be in
-> the form of 'signal' and 'message'.
-> 
-> BTW like for spi there is a stock application in
-> Documentation/spi/spidev_test.c we could do the same?
+This patch turns on the 16K page support in the kernel. We
+support 48bit VA (4 level page tables) and 47bit VA (3 level
+page tables).
 
-Coming from personal experience, testing drivers with (even stock)
-applications is much more painful that simply writing/reading
-(cat/echo) to a file in SYSFS/DEBUGFS.  Particularly if people are
-using initramfs or thelike.  If it is possible to use SYSFS/DEBUGFS,
-which it is in this case, then I believe that's the route we could go
-down.
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Steve Capper <steve.capper@linaro.org>
+Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
+---
+ arch/arm64/Kconfig                   |   25 ++++++++++++++++++++-----
+ arch/arm64/include/asm/fixmap.h      |    4 +++-
+ arch/arm64/include/asm/kvm_arm.h     |   12 ++++++++++++
+ arch/arm64/include/asm/page.h        |    2 ++
+ arch/arm64/include/asm/sysreg.h      |    2 ++
+ arch/arm64/include/asm/thread_info.h |    2 ++
+ arch/arm64/kernel/head.S             |    7 ++++++-
+ arch/arm64/mm/proc.S                 |    4 +++-
+ 8 files changed, 50 insertions(+), 8 deletions(-)
 
-In answer to your question; we only need those two files.  The reply
-can be placed back into 'message' and can be read from there.
-
-Simple to use, simple to code (on both sides), elegant, no overhead.
-
-Win, win, win, win.
-
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index b247897..8327edf 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -167,7 +167,8 @@ config PGTABLE_LEVELS
+ 	default 2 if ARM64_64K_PAGES && ARM64_VA_BITS_42
+ 	default 3 if ARM64_64K_PAGES && ARM64_VA_BITS_48
+ 	default 3 if ARM64_4K_PAGES && ARM64_VA_BITS_39
+-	default 4 if ARM64_4K_PAGES && ARM64_VA_BITS_48
++	default 3 if ARM64_16K_PAGES && ARM64_VA_BITS_47
++	default 4 if !ARM64_64K_PAGES && ARM64_VA_BITS_48
+ 
+ source "init/Kconfig"
+ 
+@@ -444,6 +445,13 @@ config ARM64_4K_PAGES
+ 	help
+ 	  This feature enables 4KB pages support.
+ 
++config ARM64_16K_PAGES
++	bool "16KB"
++	help
++	  The system will use 16KB pages support. AArch32 emulation
++	  requires applications compiled with 16K(or multiple of 16K)
++	  aligned segments.
++
+ config ARM64_64K_PAGES
+ 	bool "64KB"
+ 	help
+@@ -457,6 +465,7 @@ endchoice
+ choice
+ 	prompt "Virtual address space size"
+ 	default ARM64_VA_BITS_39 if ARM64_4K_PAGES
++	default ARM64_VA_BITS_47 if ARM64_16K_PAGES
+ 	default ARM64_VA_BITS_42 if ARM64_64K_PAGES
+ 	help
+ 	  Allows choosing one of multiple possible virtual address
+@@ -471,6 +480,10 @@ config ARM64_VA_BITS_42
+ 	bool "42-bit"
+ 	depends on ARM64_64K_PAGES
+ 
++config ARM64_VA_BITS_47
++	bool "47-bit"
++	depends on ARM64_16K_PAGES
++
+ config ARM64_VA_BITS_48
+ 	bool "48-bit"
+ 
+@@ -480,6 +493,7 @@ config ARM64_VA_BITS
+ 	int
+ 	default 39 if ARM64_VA_BITS_39
+ 	default 42 if ARM64_VA_BITS_42
++	default 47 if ARM64_VA_BITS_47
+ 	default 48 if ARM64_VA_BITS_48
+ 
+ config CPU_BIG_ENDIAN
+@@ -550,7 +564,7 @@ config ARCH_WANT_GENERAL_HUGETLB
+ 	def_bool y
+ 
+ config ARCH_WANT_HUGE_PMD_SHARE
+-	def_bool y if ARM64_4K_PAGES
++	def_bool y if ARM64_4K_PAGES || ARM64_16K_PAGES
+ 
+ config HAVE_ARCH_TRANSPARENT_HUGEPAGE
+ 	def_bool y
+@@ -587,6 +601,7 @@ config XEN
+ config FORCE_MAX_ZONEORDER
+ 	int
+ 	default "14" if (ARM64_64K_PAGES && TRANSPARENT_HUGEPAGE)
++	default "12" if (ARM64_16K_PAGES && TRANSPARENT_HUGEPAGE)
+ 	default "11"
+ 
+ menuconfig ARMV8_DEPRECATED
+@@ -773,9 +788,9 @@ config COMPAT
+ 	  the user helper functions, VFP support and the ptrace interface are
+ 	  handled appropriately by the kernel.
+ 
+-	  If you also enabled CONFIG_ARM64_64K_PAGES, please be aware that you
+-	  will only be able to execute AArch32 binaries that were compiled with
+-	  64k aligned segments.
++	  If you use a page size other than 4KB(i.e, 16KB or 64KB), please be aware
++	  that you will only be able to execute AArch32 binaries that were compiled
++	  with page size aligned segments.
+ 
+ 	  If you want to execute 32-bit userspace applications, say Y.
+ 
+diff --git a/arch/arm64/include/asm/fixmap.h b/arch/arm64/include/asm/fixmap.h
+index c0739187..f44a390 100644
+--- a/arch/arm64/include/asm/fixmap.h
++++ b/arch/arm64/include/asm/fixmap.h
+@@ -55,8 +55,10 @@ enum fixed_addresses {
+ 	 * Temporary boot-time mappings, used by early_ioremap(),
+ 	 * before ioremap() is functional.
+ 	 */
+-#ifdef CONFIG_ARM64_64K_PAGES
++#if	defined(CONFIG_ARM64_64K_PAGES)
+ #define NR_FIX_BTMAPS		4
++#elif	defined (CONFIG_ARM64_16K_PAGES)
++#define NR_FIX_BTMAPS		16
+ #else
+ #define NR_FIX_BTMAPS		64
+ #endif
+diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+index dcaf799..4d6a022 100644
+--- a/arch/arm64/include/asm/kvm_arm.h
++++ b/arch/arm64/include/asm/kvm_arm.h
+@@ -113,6 +113,7 @@
+ #define VTCR_EL2_TG0_MASK	(3 << 14)
+ #define VTCR_EL2_TG0_4K		(0 << 14)
+ #define VTCR_EL2_TG0_64K	(1 << 14)
++#define VTCR_EL2_TG0_16K	(2 << 14)
+ #define VTCR_EL2_SH0_MASK	(3 << 12)
+ #define VTCR_EL2_SH0_INNER	(3 << 12)
+ #define VTCR_EL2_ORGN0_MASK	(3 << 10)
+@@ -134,6 +135,8 @@
+  *
+  * Note that when using 4K pages, we concatenate two first level page tables
+  * together.
++ * With 16K pages, we concatenate 16 first level page tables and enter at
++ * level 2.
+  *
+  * The magic numbers used for VTTBR_X in this patch can be found in Tables
+  * D4-23 and D4-25 in ARM DDI 0487A.b.
+@@ -151,6 +154,15 @@
+ #define VTCR_EL2_FLAGS		(VTCR_EL2_TG0_64K | VTCR_EL2_SL0_LVL1 | \
+ 				 VTCR_EL2_COMMON_BITS)
+ #define VTTBR_X		(38 - VTCR_EL2_T0SZ_40B)
++#elif defined(CONFIG_ARM64_16K_PAGES)
++/*
++ * Stage2 translation configuration:
++ * 16kB pages (TG0 = 2)
++ * 2 level page tables (SL0 = 1)
++ */
++#define VTCR_EL2_FLAGS		(VTCR_EL2_TG0_16K | VTCR_EL2_SL0_LVL1 | \
++				 VTCR_EL2_COMMON_BITS)
++#define VTTBR_X			(42 - VTCR_EL2_T0SZ_40B)
+ #else
+ /*
+  * Stage2 translation configuration:
+diff --git a/arch/arm64/include/asm/page.h b/arch/arm64/include/asm/page.h
+index 3c9ce8c..6aee732 100644
+--- a/arch/arm64/include/asm/page.h
++++ b/arch/arm64/include/asm/page.h
+@@ -22,6 +22,8 @@
+ /* PAGE_SHIFT determines the page size */
+ #ifdef CONFIG_ARM64_64K_PAGES
+ #define PAGE_SHIFT		16
++#elif defined(CONFIG_ARM64_16K_PAGES)
++#define PAGE_SHIFT		14
+ #else
+ #define PAGE_SHIFT		12
+ #endif
+diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+index e01d323..310592c 100644
+--- a/arch/arm64/include/asm/sysreg.h
++++ b/arch/arm64/include/asm/sysreg.h
+@@ -89,8 +89,10 @@ static inline void config_sctlr_el1(u32 clear, u32 set)
+ 
+ #define ID_AA64MMFR0_TGran4_SHIFT	28
+ #define ID_AA64MMFR0_TGran64_SHIFT	24
++#define ID_AA64MMFR0_TGran16_SHIFT	20
+ 
+ #define ID_AA64MMFR0_TGran4_ENABLED	0x0
+ #define ID_AA64MMFR0_TGran64_ENABLED	0x0
++#define ID_AA64MMFR0_TGran16_ENABLED	0x1
+ 
+ #endif	/* __ASM_SYSREG_H */
+diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
+index d9c8c9f..338a4ac 100644
+--- a/arch/arm64/include/asm/thread_info.h
++++ b/arch/arm64/include/asm/thread_info.h
+@@ -25,6 +25,8 @@
+ 
+ #ifdef CONFIG_ARM64_4K_PAGES
+ #define THREAD_SIZE_ORDER	2
++#elif defined(CONFIG_ARM64_16K_PAGES)
++#define THREAD_SIZE_ORDER	0
+ #endif
+ 
+ #define THREAD_SIZE		16384
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index 0cb04db..959100b 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -614,7 +614,12 @@ ENDPROC(__secondary_switched)
+ #define ID_AA64MMFR0_TGran_SHIFT	ID_AA64MMFR0_TGran64_SHIFT
+ #define ID_AA64MMFR0_TGran_ENABLED	ID_AA64MMFR0_TGran64_ENABLED
+ 
+-#else
++#elif	defined(CONFIG_ARM64_16K_PAGES)
++
++#define ID_AA64MMFR0_TGran_SHIFT	ID_AA64MMFR0_TGran16_SHIFT
++#define ID_AA64MMFR0_TGran_ENABLED	ID_AA64MMFR0_TGran16_ENABLED
++
++#elif	defined(CONFIG_ARM64_4K_PAGES)
+ 
+ #define ID_AA64MMFR0_TGran_SHIFT	ID_AA64MMFR0_TGran4_SHIFT
+ #define ID_AA64MMFR0_TGran_ENABLED	ID_AA64MMFR0_TGran4_ENABLED
+diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+index 6e8765a..182bced 100644
+--- a/arch/arm64/mm/proc.S
++++ b/arch/arm64/mm/proc.S
+@@ -30,7 +30,9 @@
+ 
+ #ifdef CONFIG_ARM64_64K_PAGES
+ #define TCR_TG_FLAGS	TCR_TG0_64K | TCR_TG1_64K
+-#else
++#elif defined(CONFIG_ARM64_16K_PAGES)
++#define TCR_TG_FLAGS	TCR_TG0_16K | TCR_TG1_16K
++#else /* CONFIG_ARM64_4K_PAGES */
+ #define TCR_TG_FLAGS	TCR_TG0_4K | TCR_TG1_4K
+ #endif
+ 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.7.9.5
