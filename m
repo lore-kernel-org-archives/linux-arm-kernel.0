@@ -1,33 +1,25 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 13 Aug 2015 16:16:40 +0200
-Subject: [PATCH] [ARM][TEGRA] Fix AHB base address on tegra20, tegra30
- and tegra114
-In-Reply-To: <1439042292-19912-1-git-send-email-kwizart@gmail.com>
-References: <1439042292-19912-1-git-send-email-kwizart@gmail.com>
-Message-ID: <20150813141639.GA26559@ulmo>
+Date: Thu, 13 Aug 2015 16:18:41 +0200
+Subject: [PATCH] soc: tegra: remove redundant $(CONFIG_ARCH_TEGRA) in
+ Makefile
+In-Reply-To: <1438322301-24584-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1438322301-24584-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <20150813141840.GB26559@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 08, 2015 at 03:58:12PM +0200, Nicolas Chauvet wrote:
-> Current base address is wrong by 0x04 bytes for AHB bus device as shown in dmesg:
->  tegra-ahb 6000c004.ahb: incorrect AHB base address in DT data - enabling workaround
+On Fri, Jul 31, 2015 at 02:58:21PM +0900, Masahiro Yamada wrote:
+> Kbuild descends into drivers/soc/tegra/ only when CONFIG_ARCH_TEGRA
+> is enabled. (see drivers/soc/Makefile)
 > 
-> To correct old dtbs,  the commit ce7a10b0ff3db63 checks for the low bit
-> of the base address and removes theses 0x04 bytes at runtime.
+> $(CONFIG_ARCH_TEGRA) in drivers/soc/tegra/Makefile always evaluates
+> to 'y'.
 > 
-> This patch fix the original dts, so upstream version doesn't need
-> the workaround of the base address.
-> 
-> As both addresses are valid, this patch doesn't break compatibility
-> 
-> Tested on tegra20-paz00 (aka ac100)
-> 
-> Signed-off-by: Nicolas Chauvet <kwizart@gmail.com>
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 > ---
->  arch/arm/boot/dts/tegra114.dtsi | 4 ++--
->  arch/arm/boot/dts/tegra20.dtsi  | 4 ++--
->  arch/arm/boot/dts/tegra30.dtsi  | 4 ++--
->  3 files changed, 6 insertions(+), 6 deletions(-)
+> 
+>  drivers/soc/tegra/Makefile | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
 
 Applied, thanks.
 
@@ -38,4 +30,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150813/f2090462/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150813/7536bad6/attachment.sig>
