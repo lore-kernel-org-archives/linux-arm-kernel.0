@@ -1,155 +1,179 @@
-From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
-Date: Thu, 13 Aug 2015 16:58:45 +0700
-Subject: [PATCH] pci: acpi: Generic function for setting up PCI device DMA
- coherency
-Message-ID: <1439459925-2361-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Thu, 13 Aug 2015 15:31:36 +0530
+Subject: [PATCH v2 5/6] mailbox: Add generic mechanism for testing Mailbox
+ Controllers
+In-Reply-To: <20150813091914.GB8782@x1>
+References: <1437990272-23111-1-git-send-email-lee.jones@linaro.org>
+ <1437990272-23111-6-git-send-email-lee.jones@linaro.org>
+ <CABb+yY20nQbiEEZeRvWTMUsJ2qgwRn8CrWvnFDSB-b1dgVaAuw@mail.gmail.com>
+ <20150812102328.GD18282@x1>
+ <CABb+yY0A74Vy3-KOvj0URU_4zb2FAC7Yp3gmEwnFaBrD0mzt0w@mail.gmail.com>
+ <20150813091914.GB8782@x1>
+Message-ID: <CABb+yY0cgbtM68-E_Xqgh5O6GRLXESYTLa5WcAwUBoVL3ufrxA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch refactors of_pci_dma_configure() into a more generic
-pci_dma_configure(), which can be reused by non-OF code.
-Then, it adds support for setting up PCI device DMA coherency from
-ACPI _CCA object that should normally be specified in the DSDT node
-of its PCI host bridge..
+On Thu, Aug 13, 2015 at 2:49 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> On Thu, 13 Aug 2015, Jassi Brar wrote:
 
-Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-CC: Bjorn Helgaas <bhelgaas@google.com>
-CC: Catalin Marinas <catalin.marinas@arm.com>
-CC: Will Deacon <will.deacon@arm.com>
-CC: Rafael J. Wysocki <rjw@rjwysocki.net>
-CC: Rob Herring <robh+dt@kernel.org>
-CC: Murali Karicheri <m-karicheri2@ti.com>
----
-Note: According to the ACPI spec, the _CCA attribute is required
-      for ARM64. Therefore, this patch is a pre-req for ACPI PCI
-      support for ARM64 which is currently in development.
+>> >> > +
+>> >> > +static void mbox_test_prepare_message(struct mbox_client *client, void *message)
+>> >> > +{
+>> >> > +       struct mbox_test_device *tdev = dev_get_drvdata(client->dev);
+>> >> > +
+>> >> > +       if (tdev->mmio)
+>> >> > +               memcpy(tdev->mmio, message, MBOX_MAX_MSG_LEN);
+>> >> >
+>> >> This is unlikely to work. Those platforms that need to send a 2 part
+>> >> message, they do :
+>> >> (a) Signal/Command/Target code via some controller register (via
+>> >> mbox_send_message).
+>> >> (b) Setup the payload in Shared-Memory (via tx_prepare).
+>> >>
+>> >> This test driver assumes both are the same. I think you have to
+>> >> declare something like
+>> >
+>> > This driver assumes that the framework will call client->tx_prepare()
+>> > first, which satisfies (b).  It then assumes controller->send_data()
+>> > will be invoked, which will send the platform specific
+>> > signal/command/target code, which then satisfies (a).
+>> >
+>> Yeah, but what would be that code? Who provides that?
+>>
+>> > In what way does it assume they are the same?
+>> >
+>> notice the 'message' pointer in
+>> mbox_send_message(tdev->tx_channel, message);
+>>     and
+>> memcpy(tdev->mmio, message, MBOX_MAX_MSG_LEN);
+>>
+>> >> struct mbox_test_message { /* same for TX and RX */
+>> >>           unsigned sig_len;
+>> >>           void *signal;               /* rx/tx via mailbox api */
+>> >>           unsigned pl_len;
+>> >>           void *payload;           /* rx/tx via shared-memory */
+>> >> };
+>> >
+>> > How do you think this should be set and use these?
+>> >
+>> The userspace would want to specify the command code (32bits or not)
+>> that would be passed via the fifo/register of the controller. So we
+>> need signal[]
+>>
+>> The data to be passed via share-memory could be provided by userspace
+>> via the payload[] array.
+>
+> Okay, so would the solution be two userspace files 'signal' and
+> 'message', so in the case of a client specified signal we can write it
+> into there first.
+>
+> echo 255  > signal
+> echo test > message
+>
+> ... or in the case where no signal is required, or the controller
+> driver taking care of it, we just don't write anything to signal?
+>
+file_operations.write() should parse signal and message, coming from
+userspace, into a local structure before routing them via
+mbox_send_message and tx_prepare respectively.
 
-      Also, this should not affect other architectures since
-      if CCA is not required, the default value is coherent.
-      Please see include/acpi/acpi_bus.h: acpi_check_dma() and
-      drivers/acpi/scan.c: acpi_init_coherency() for more information
+> Just for clarification, in the case where a signal is required, do
+> clients usually pass that through mbox_send_message() too?
+>
+>   mbox_send_message(tdev->tx_channel, signal);
+>   mbox_send_message(tdev->tx_channel, message);
+>
+No. Command/Signal code is passed via mbox_send_message(signal). The
+payload is passed via Shared-Memory during tx_prepare(message)
 
- drivers/of/of_pci.c    | 20 --------------------
- drivers/pci/probe.c    | 35 +++++++++++++++++++++++++++++++++--
- include/linux/of_pci.h |  3 ---
- 3 files changed, 33 insertions(+), 25 deletions(-)
 
-diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
-index 5751dc5..b66ee4e 100644
---- a/drivers/of/of_pci.c
-+++ b/drivers/of/of_pci.c
-@@ -117,26 +117,6 @@ int of_get_pci_domain_nr(struct device_node *node)
- }
- EXPORT_SYMBOL_GPL(of_get_pci_domain_nr);
- 
--/**
-- * of_pci_dma_configure - Setup DMA configuration
-- * @dev: ptr to pci_dev struct of the PCI device
-- *
-- * Function to update PCI devices's DMA configuration using the same
-- * info from the OF node of host bridge's parent (if any).
-- */
--void of_pci_dma_configure(struct pci_dev *pci_dev)
--{
--	struct device *dev = &pci_dev->dev;
--	struct device *bridge = pci_get_host_bridge_device(pci_dev);
--
--	if (!bridge->parent)
--		return;
--
--	of_dma_configure(dev, bridge->parent->of_node);
--	pci_put_host_bridge_device(bridge);
--}
--EXPORT_SYMBOL_GPL(of_pci_dma_configure);
--
- #if defined(CONFIG_OF_ADDRESS)
- /**
-  * of_pci_get_host_bridge_resources - Parse PCI host bridge resources from DT
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index cefd636..e2fcd3b 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -6,12 +6,14 @@
- #include <linux/delay.h>
- #include <linux/init.h>
- #include <linux/pci.h>
--#include <linux/of_pci.h>
-+#include <linux/of_device.h>
- #include <linux/pci_hotplug.h>
- #include <linux/slab.h>
- #include <linux/module.h>
- #include <linux/cpumask.h>
- #include <linux/pci-aspm.h>
-+#include <linux/acpi.h>
-+#include <linux/property.h>
- #include <asm-generic/pci-bridge.h>
- #include "pci.h"
- 
-@@ -1544,6 +1546,35 @@ static void pci_init_capabilities(struct pci_dev *dev)
- 	pci_enable_acs(dev);
- }
- 
-+/**
-+ * pci_dma_configure - Setup DMA configuration
-+ * @pci_dev: ptr to pci_dev struct of the PCI device
-+ *
-+ * Function to update PCI devices's DMA configuration using the same
-+ * info from the OF node or ACPI node of host bridge's parent (if any).
-+ */
-+static void pci_dma_configure(struct pci_dev *pci_dev)
-+{
-+	struct device *dev = &pci_dev->dev;
-+	struct device *bridge = pci_get_host_bridge_device(pci_dev);
-+	struct acpi_device *adev;
-+	bool coherent;
-+
-+	if (has_acpi_companion(bridge)) {
-+		adev = to_acpi_node(bridge->fwnode);
-+		if (acpi_check_dma(adev, &coherent))
-+			arch_setup_dma_ops(dev, 0, 0, NULL, coherent);
-+	} else {
-+		struct device *host = bridge->parent;
-+		if (!host)
-+			return;
-+
-+		of_dma_configure(dev, host->of_node);
-+	}
-+
-+	pci_put_host_bridge_device(bridge);
-+}
-+
- void pci_device_add(struct pci_dev *dev, struct pci_bus *bus)
- {
- 	int ret;
-@@ -1557,7 +1588,7 @@ void pci_device_add(struct pci_dev *dev, struct pci_bus *bus)
- 	dev->dev.dma_mask = &dev->dma_mask;
- 	dev->dev.dma_parms = &dev->dma_parms;
- 	dev->dev.coherent_dma_mask = 0xffffffffull;
--	of_pci_dma_configure(dev);
-+	pci_dma_configure(dev);
- 
- 	pci_set_dma_max_seg_size(dev, 65536);
- 	pci_set_dma_seg_boundary(dev, 0xffffffff);
-diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
-index 29fd3fe..ce0e5ab 100644
---- a/include/linux/of_pci.h
-+++ b/include/linux/of_pci.h
-@@ -16,7 +16,6 @@ int of_pci_get_devfn(struct device_node *np);
- int of_irq_parse_and_map_pci(const struct pci_dev *dev, u8 slot, u8 pin);
- int of_pci_parse_bus_range(struct device_node *node, struct resource *res);
- int of_get_pci_domain_nr(struct device_node *node);
--void of_pci_dma_configure(struct pci_dev *pci_dev);
- #else
- static inline int of_irq_parse_pci(const struct pci_dev *pdev, struct of_phandle_args *out_irq)
- {
-@@ -51,8 +50,6 @@ of_get_pci_domain_nr(struct device_node *node)
- {
- 	return -1;
- }
--
--static inline void of_pci_dma_configure(struct pci_dev *pci_dev) { }
- #endif
- 
- #if defined(CONFIG_OF_ADDRESS)
--- 
-2.1.0
+>> >> > +static void mbox_test_message_sent(struct mbox_client *client,
+>> >> > +                                  void *message, int r)
+>> >> > +{
+>> >> > +       if (r)
+>> >> > +               dev_warn(client->dev,
+>> >> > +                        "Client: Message could not be sent: %d\n", r);
+>> >> > +       else
+>> >> > +               dev_info(client->dev,
+>> >> > +                        "Client: Message sent\n");
+>> >> > +}
+>> >> > +
+>> >> > +static struct mbox_chan *
+>> >> > +mbox_test_request_channel(struct platform_device *pdev, const char *name)
+>> >> > +{
+>> >> > +       struct mbox_client *client;
+>> >> > +
+>> >> > +       client = devm_kzalloc(&pdev->dev, sizeof(*client), GFP_KERNEL);
+>> >> > +       if (!client)
+>> >> > +               return ERR_PTR(-ENOMEM);
+>> >> > +
+>> >> > +       client->dev             = &pdev->dev;
+>> >> > +       client->rx_callback     = mbox_test_receive_message;
+>> >> > +       client->tx_prepare      = mbox_test_prepare_message;
+>> >> > +       client->tx_done         = mbox_test_message_sent;
+>> >> > +       client->tx_block        = true;
+>> >> > +       client->knows_txdone    = false;
+>> >> > +       client->tx_tout         = 500;
+>> >> > +
+>> >> > +       return mbox_request_channel_byname(client, name);
+>> >> > +}
+>> >> > +
+>> >> > +static int mbox_test_probe(struct platform_device *pdev)
+>> >> > +{
+>> >> > +       struct mbox_test_device *tdev;
+>> >> > +       struct resource *res;
+>> >> > +       int ret;
+>> >> > +
+>> >> > +       tdev = devm_kzalloc(&pdev->dev, sizeof(*tdev), GFP_KERNEL);
+>> >> > +       if (!tdev)
+>> >> > +               return -ENOMEM;
+>> >> > +
+>> >> > +       /* It's okay for MMIO to be NULL */
+>> >> > +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>> >> > +       tdev->mmio = devm_ioremap_resource(&pdev->dev, res);
+>> >> > +       if (IS_ERR(tdev->mmio))
+>> >> > +               tdev->mmio = NULL;
+>> >> > +
+>> >> > +       tdev->tx_channel = mbox_test_request_channel(pdev, "tx");
+>> >> > +       if (IS_ERR(tdev->tx_channel))
+>> >> > +               return PTR_ERR(tdev->tx_channel);
+>> >> > +
+>> >> > +       tdev->rx_channel = mbox_test_request_channel(pdev, "rx");
+>> >> > +       if (IS_ERR(tdev->rx_channel))
+>> >> > +               return PTR_ERR(tdev->rx_channel);
+>> >> > +
+>> >> Should it really fail on TX or RX only clients?
+>> >
+>> > Good question.  Probably not, but I guess we'd need a flag for that.
+>> >
+>> Just assume 1 channel. You can't make it receive if the controller
+>> can't do rx, so the userspace will simply block on read requests. And
+>> you can't make the controller send, if it can't. So any write attempt
+>> will simply return with an error.
+>>  And we are going to need very platform specific knowledge to execute
+>> the tests. It's not like some loop enumerating all possible
+>> combinations of parameters that the api must pass... so we are good.
+>
+> I'm guessing most tests will be some kind of send-reply test, so we'd
+> need two channels for that.  I can make it so the driver does not fail
+> if 'tx' or 'rx' is missing, but will fail if both are.
+>
+I have seen more channels to be rx+tx, than rx/tx only. And for latter
+case the user should run 2 test threads, one each for RX and TX.
+
+> Bare in mind that this test driver isn't designed to cover all of the
+> corner cases, but more designed as a helpful boiler plate where it
+> will tick some use-case boxes, but is clear enough to be hacked around
+> by other vendors who have different requirements.
+>
+> With regards to you comments on userspace; I suggest that whoever is
+> testing the controller will know it and will not attempt to check for
+> a reply from a controller (or co-proc) which is write-only.
+>
+That's actually my point :)
+When the userspace already has all that platform specific knowledge,
+why check for 'valid' usage in controller driver? Simply reject any
+request that the controller isn't capable of (which is practically
+never supposed to happen).
+
+Thanks.
