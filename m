@@ -1,33 +1,57 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Thu, 13 Aug 2015 19:17:27 +0900
-Subject: [PATCH v2] ARM: dts: exynos4412-odroidu3: Enable SPI1.
-In-Reply-To: <55CC6E1B.2050707@samsung.com>
-References: <1439456813-4918-1-git-send-email-aballier@gentoo.org>
- <55CC6E1B.2050707@samsung.com>
-Message-ID: <009d01d0d5b1$417e5370$c47afa50$@kernel.org>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Thu, 13 Aug 2015 13:17:28 +0300
+Subject: [PATCH v2 6/6] irqchip: crossbar: fix irq masking at suspend
+In-Reply-To: <55CC63D0.8030707@arm.com>
+References: <1439401562-28874-1-git-send-email-grygorii.strashko@ti.com>
+ <1439401562-28874-7-git-send-email-grygorii.strashko@ti.com>
+ <55CC63D0.8030707@arm.com>
+Message-ID: <55CC6EB8.3050906@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Krzysztof Kozlowski wrote:
+On 08/13/2015 12:30 PM, Sudeep Holla wrote:
 > 
-> W dniu 13.08.2015 o 18:06, Alexis Ballier pisze:
-> > SPI1 is available on IO Port #2 (as depicted on their website) in
-> > PCB Revision 0.5 of Hardkernel Odroid U3 board.
-> > The shield connects a 256KiB spi-nor flash on that bus.
-> >
-> > Signed-off-by: Alexis Ballier <aballier@gentoo.org>
-> >
-> > ---
-> >
-> > Changes in v2: Use GPIO_ACTIVE_HIGH (Krzysztof Kozlowski)
-> >
-> >  arch/arm/boot/dts/exynos4412-odroidu3.dts | 8 ++++++++
-> >  1 file changed, 8 insertions(+)
 > 
-> Thanks for fixing, looks good:
+> On 12/08/15 18:46, Grygorii Strashko wrote:
+>> All ARM GIC IRQs have to masked during suspend if they are not
+>> wakeup source. Now this is not happen, since switching to
+>> use IRQ domain hierarchy, because suspend_device_irq() only checks flags
+>> in the last IRQ chip in hierarchy for IRQCHIP_MASK_ON_SUSPEND
+>> bit set. And in the case of TI OMAP DRA7 the last IRQ chip is TI Crossbar
+>> which do not have this flag set.
+>>
+>> In case of TI OMAP DRA7 the following IRQ hierarchy is defined:
+>>    ARM GIC <- OMAP wakeupgen <- TI CBAR
+>> ARM GIC - IRQCHIP_MASK_ON_SUSPEND=n
 > 
-> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> 
-Applied, thanks.
+> May be this won't affect your platform or this patch but even GIC marks
+> IRQCHIP_MASK_ON_SUSPEND=y now since GIC doesn't provide any facility to
+> configure the wakeup source and keeps all the interrupt source enabled.
 
-- Kukjin
+That's true for next, bur not true for 4.2-rc6 or 4.1 :(
+
+> 
+> We have this flag enabled now as it's always safer to mask all the non
+> wakeup interrupts are masked at the chip level when suspending.
+
+Indeed, but that's do not work in case of IRQ domain hierarchy and
+it's do not clear how should it work?
+I've tried to describe this problem in cover letter actually.
+
+> 
+> Also the beginning of the commit message contradicts when you also say
+> in the following statement IRQCHIP_MASK_ON_SUSPEND=n. So you may need to
+> update the log.
+
+I'll try to reword. What I've tried to mention that IRQs masking on
+suspend is default expected behavior and that how it was before
+switching to IRQ domain hierarchy.
+
+"All ARM GIC IRQs have to masked during suspend if they are not
+ wakeup source - this is expected behavior and that's how it was before
+ switching to IRQ domain hierarchy. ..."
+ok?
+
+-- 
+regards,
+-grygorii
