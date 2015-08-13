@@ -1,41 +1,61 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 13 Aug 2015 09:38:10 +0900
-Subject: [PATCH] ARM: dts: exynos4412-odroidu3: Enable SPI1.
-In-Reply-To: <1439378871-28117-1-git-send-email-aballier@gentoo.org>
-References: <1439378871-28117-1-git-send-email-aballier@gentoo.org>
-Message-ID: <55CBE6F2.9030405@samsung.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Thu, 13 Aug 2015 03:20:35 +0200
+Subject: 3.18: lockdep problems in cpufreq
+In-Reply-To: <20150811170357.GA24529@n2100.arm.linux.org.uk>
+References: <20141214213655.GA11285@n2100.arm.linux.org.uk>
+ <2574268.XBqpdL2VLI@vostro.rjw.lan>
+ <20150811170357.GA24529@n2100.arm.linux.org.uk>
+Message-ID: <5160300.5D2Dvly8u9@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12.08.2015 20:27, Alexis Ballier wrote:
-> SPI1 is available on IO Port #2 (as depicted on their website) in
-> PCB Revision 0.5 of Hardkernel Odroid U3 board.
-> The shield connects a 256KiB spi-nor flash on that bus.
+On Tuesday, August 11, 2015 06:03:57 PM Russell King - ARM Linux wrote:
+> On Tue, May 19, 2015 at 12:05:55AM +0200, Rafael J. Wysocki wrote:
+> > On Monday, May 18, 2015 07:56:45 PM Russell King - ARM Linux wrote:
+> > > On Tue, Dec 16, 2014 at 09:11:53AM +0530, Viresh Kumar wrote:
+> > > > On 16 December 2014 at 04:39, Russell King - ARM Linux
+> > > > <linux@arm.linux.org.uk> wrote:
+> > > > > Well, here's a patch which I'm running on top of 3.18 at the moment,
+> > > > > which is basically what I described in my email, and I'm running with it
+> > > > > and it is without any lockdep complaint.
+> > > > 
+> > > > We need two separate patches now, one for 3.18 and other one for 3.19-rc.
+> > > > 3.19 has see lots of changes in this particular file and so we need to
+> > > > change few things here.
+> > > 
+> > > What happened with this?  I'm still carrying the patch.
+> > 
+> > This should go in through the thermal tree.  Eduardo?
 > 
-> Signed-off-by: Alexis Ballier <aballier@gentoo.org>
-> ---
->  arch/arm/boot/dts/exynos4412-odroidu3.dts | 7 +++++++
->  1 file changed, 7 insertions(+)
+> Having waited a long time for any kind of response from Eduardo, I've
+> given up.  My conclusion is that Eduardo isn't interested in this.
 > 
-> diff --git a/arch/arm/boot/dts/exynos4412-odroidu3.dts b/arch/arm/boot/dts/exynos4412-odroidu3.dts
-> index 44684e5..37698e4 100644
-> --- a/arch/arm/boot/dts/exynos4412-odroidu3.dts
-> +++ b/arch/arm/boot/dts/exynos4412-odroidu3.dts
-> @@ -61,3 +61,10 @@
->  		"Speakers", "SPKL",
->  		"Speakers", "SPKR";
->  };
-> +
-> +&spi_1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&spi1_bus>;
-> +	cs-gpios = <&gpb 5 0>;
-
-Please use GPIO_ACTIVE_HIGH.
-
-Best regards,
-Krzysztof
-
-> +	status = "okay";
-> +};
+> I've re-checked, and the AB-BA deadlock is still there in the latest
+> code.  So, I've taken it upon myself to throw this into my for-next
+> branch to force the issue - not something I _want_ to do, but I'm doing
+> this out of frustration.  It's clear to me that "playing nice" by email
+> does _not_ work with some people.
 > 
+> I'm rather hoping that Stephen reports a merge conflict with linux-next
+> this evening to highlight this situation.  I've added additional commentry
+> to the commit message on the patch giving the reason why I've done this,
+> and the relevant message IDs showing the past history.
+> 
+> I've not decided whether I'm going to ask Linus to take this patch
+> directly or not, that rather depends whether there's any co-operation
+> from Eduardo on this.  I'd rather Eduardo took the patch.
+> 
+> The patch I have has had to be updated again for changes to the driver,
+> but I really don't see the point of re-posting it just for it to be
+> ignored yet again.
+> 
+> I'm really disappointed by this dysfunctional state of affairs, and
+> that what should be an urgent fix for an observable problem is still
+> not merged some nine months after it was first identified.
+
+I guess it might help if you sent the updated patch in a new thread.
+
+
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
