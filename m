@@ -1,28 +1,27 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 13 Aug 2015 11:21:44 +0200
-Subject: [GIT PULL 2nd 3/4] Samsung driver 2nd updates for v4.3
-In-Reply-To: <55CBE10B.2030103@kernel.org>
-References: <55CBE10B.2030103@kernel.org>
-Message-ID: <20150813092144.GD30160@localhost>
+Date: Thu, 13 Aug 2015 11:24:15 +0200
+Subject: [PATCH] ARM/EP93xx/timer: Migrate to new 'set-state' interface
+In-Reply-To: <BN3PR0101MB10579524DEE61E49B8725469D07E0@BN3PR0101MB1057.prod.exchangelabs.com>
+References: <744dca162a7626694770a9f51457566a33c3e08f.1438852023.git.viresh.kumar@linaro.org>
+ <BN3PR0101MB10579524DEE61E49B8725469D07E0@BN3PR0101MB1057.prod.exchangelabs.com>
+Message-ID: <20150813092415.GE30160@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 13, 2015 at 09:12:59AM +0900, Kukjin Kim wrote:
-> Hi,
+On Wed, Aug 12, 2015 at 04:39:46PM +0000, Hartley Sweeten wrote:
+> On Thursday, August 06, 2015 2:11 AM, Viresh Kumar wrote:
+> > Migrate EP93xx driver to the new 'set-state' interface provided by
+> > clockevents core, the earlier 'set-mode' interface is marked obsolete
+> > now.
+> >
+> > This also enables us to implement callbacks for new states of clockevent
+> > devices, for example: ONESHOT_STOPPED.
+> >
+> > Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 > 
-> I've created the signed tag based on previous tags/samsung-driver so you
-> can see several merge in there. To support cpufreq-dt driver requires
-> clk/cpufreq/exynos changes together and clk/cpufreq maintainers are
-> aware of this changes. And we can remove exynos cpufreq driver at last.
-> 
-> Note this drivers update is including previous dependencies and if
-> you're OK, please pull.
+> Reviewed-by: H Hartley Sweeten <hsweeten@visionengravers.com>
 
-Again, this needs to be revisited.
-
-Please try to keep the dependency only driver->dt if you can,
-and we can merge drivers before DT this release cycle. If you do
-driver->dt->driver->dt like here then things get messy.
+Thanks, applied now.
 
 
 -Olof
