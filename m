@@ -1,55 +1,147 @@
-From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Thu, 13 Aug 2015 12:33:58 +0100
-Subject: [PATCH 08/14] arm64: kvm: Fix {V}TCR_EL2_TG0 mask
-In-Reply-To: <1439465645-22584-1-git-send-email-suzuki.poulose@arm.com>
-References: <1439465645-22584-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1439465645-22584-9-git-send-email-suzuki.poulose@arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 13 Aug 2015 12:40:05 +0100
+Subject: [PATCH v2 5/6] mailbox: Add generic mechanism for testing
+ Mailbox Controllers
+In-Reply-To: <CABb+yY34i=VUnswUE21vgeQYAGOS=7uwvdnTAFFgYkTV0CFk=w@mail.gmail.com>
+References: <1437990272-23111-6-git-send-email-lee.jones@linaro.org>
+ <CABb+yY20nQbiEEZeRvWTMUsJ2qgwRn8CrWvnFDSB-b1dgVaAuw@mail.gmail.com>
+ <20150812102328.GD18282@x1>
+ <CABb+yY0A74Vy3-KOvj0URU_4zb2FAC7Yp3gmEwnFaBrD0mzt0w@mail.gmail.com>
+ <20150813091914.GB8782@x1>
+ <CABb+yY0cgbtM68-E_Xqgh5O6GRLXESYTLa5WcAwUBoVL3ufrxA@mail.gmail.com>
+ <20150813102335.GC8782@x1>
+ <CABb+yY3z7p97eOhncQ2i+g6yoYGfDgSN9BDPKmiDaVLa3oPocA@mail.gmail.com>
+ <20150813110008.GD8782@x1>
+ <CABb+yY34i=VUnswUE21vgeQYAGOS=7uwvdnTAFFgYkTV0CFk=w@mail.gmail.com>
+Message-ID: <20150813114005.GF8782@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
+On Thu, 13 Aug 2015, Jassi Brar wrote:
 
-{V}TCR_EL2_TG0 is a 2bit wide field, where:
+> On Thu, Aug 13, 2015 at 4:30 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> > On Thu, 13 Aug 2015, Jassi Brar wrote:
+> >
+> >> On Thu, Aug 13, 2015 at 3:53 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> >> > On Thu, 13 Aug 2015, Jassi Brar wrote:
+> >> >
+> >> >> On Thu, Aug 13, 2015 at 2:49 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> >> >> > On Thu, 13 Aug 2015, Jassi Brar wrote:
+> >> >>
+> >> >> >> >> > +
+> >> >> >> >> > +static void mbox_test_prepare_message(struct mbox_client *client, void *message)
+> >> >> >> >> > +{
+> >> >> >> >> > +       struct mbox_test_device *tdev = dev_get_drvdata(client->dev);
+> >> >> >> >> > +
+> >> >> >> >> > +       if (tdev->mmio)
+> >> >> >> >> > +               memcpy(tdev->mmio, message, MBOX_MAX_MSG_LEN);
+> >> >> >> >> >
+> >> >> >> >> This is unlikely to work. Those platforms that need to send a 2 part
+> >> >> >> >> message, they do :
+> >> >> >> >> (a) Signal/Command/Target code via some controller register (via
+> >> >> >> >> mbox_send_message).
+> >> >> >> >> (b) Setup the payload in Shared-Memory (via tx_prepare).
+> >> >> >> >>
+> >> >> >> >> This test driver assumes both are the same. I think you have to
+> >> >> >> >> declare something like
+> >> >> >> >
+> >> >> >> > This driver assumes that the framework will call client->tx_prepare()
+> >> >> >> > first, which satisfies (b).  It then assumes controller->send_data()
+> >> >> >> > will be invoked, which will send the platform specific
+> >> >> >> > signal/command/target code, which then satisfies (a).
+> >> >> >> >
+> >> >> >> Yeah, but what would be that code? Who provides that?
+> >> >> >>
+> >> >> >> > In what way does it assume they are the same?
+> >> >> >> >
+> >> >> >> notice the 'message' pointer in
+> >> >> >> mbox_send_message(tdev->tx_channel, message);
+> >> >> >>     and
+> >> >> >> memcpy(tdev->mmio, message, MBOX_MAX_MSG_LEN);
+> >> >> >>
+> >> >> >> >> struct mbox_test_message { /* same for TX and RX */
+> >> >> >> >>           unsigned sig_len;
+> >> >> >> >>           void *signal;               /* rx/tx via mailbox api */
+> >> >> >> >>           unsigned pl_len;
+> >> >> >> >>           void *payload;           /* rx/tx via shared-memory */
+> >> >> >> >> };
+> >> >> >> >
+> >> >> >> > How do you think this should be set and use these?
+> >> >> >> >
+> >> >> >> The userspace would want to specify the command code (32bits or not)
+> >> >> >> that would be passed via the fifo/register of the controller. So we
+> >> >> >> need signal[]
+> >> >> >>
+> >> >> >> The data to be passed via share-memory could be provided by userspace
+> >> >> >> via the payload[] array.
+> >> >> >
+> >> >> > Okay, so would the solution be two userspace files 'signal' and
+> >> >> > 'message', so in the case of a client specified signal we can write it
+> >> >> > into there first.
+> >> >> >
+> >> >> > echo 255  > signal
+> >> >> > echo test > message
+> >> >> >
+> >> >> > ... or in the case where no signal is required, or the controller
+> >> >> > driver taking care of it, we just don't write anything to signal?
+> >> >> >
+> >> >> file_operations.write() should parse signal and message, coming from
+> >> >> userspace, into a local structure before routing them via
+> >> >> mbox_send_message and tx_prepare respectively.
+> >> >
+> >> > Okay.  So before I code this up we should agree on syntax.
+> >> >
+> >> > How would you like to represent the break between signal and message?
+> >> > Obviously ' ' would be a bad idea, as some clients may want to send
+> >> > messages with white space contained.  How about '\t' or '\n'?
+> >> >
+> >> Yeah, I am not a fan of markers and flags either.
+> >>
+> >> Maybe we should share with userspace
+> >>   struct mbox_test_message { /* same for TX and RX */
+> >>            unsigned sig_len;
+> >>            void __user *signal;        /* rx/tx via mailbox api */
+> >>            unsigned pl_len;
+> >>            void __user *payload;    /* rx/tx via shared-memory */
+> >>   };
+> >>
+> >> First copy_from_user the structure of length sizof(struct
+> >> mbox_test_message) and then copy_from_user length sig_len and pl_len
+> >> from signal[] and payload[] respectively (usually ioctls would carry
+> >> such data).
+> >
+> > Simplicity and ease of use should be the goals here.  Testers should
+> > not have to write applications to use this driver.  Can we come up
+> > with a simple/effective method that uses SYSFS/DEBUGFS please?
+> >
+> > The easiest way I can think of which avoids markers/separators AND the
+> > requirement for users to have to write applications is to have two
+> > files, 'signal' and 'message' as mentioned before.  Once both are
+> > populated I can get this driver to draft the message appropriately and
+> > fire it off.
+> >
+> And then write to more files for RX data? ... which should also be in
+> the form of 'signal' and 'message'.
+> 
+> BTW like for spi there is a stock application in
+> Documentation/spi/spidev_test.c we could do the same?
 
- 00 - 4K
- 01 - 64K
- 10 - 16K
+Coming from personal experience, testing drivers with (even stock)
+applications is much more painful that simply writing/reading
+(cat/echo) to a file in SYSFS/DEBUGFS.  Particularly if people are
+using initramfs or thelike.  If it is possible to use SYSFS/DEBUGFS,
+which it is in this case, then I believe that's the route we could go
+down.
 
-But we use only 1 bit, which has worked well so far since
-we never cared about 16K. Fix it for 16K support.
+In answer to your question; we only need those two files.  The reply
+can be placed back into 'message' and can be read from there.
 
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Christoffer Dall <christoffer.dall@linaro.org>
-Cc: kvmarm at lists.cs.columbia.edu
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
----
- arch/arm64/include/asm/kvm_arm.h |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Simple to use, simple to code (on both sides), elegant, no overhead.
 
-diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-index ac6fafb..52dc9cc 100644
---- a/arch/arm64/include/asm/kvm_arm.h
-+++ b/arch/arm64/include/asm/kvm_arm.h
-@@ -98,7 +98,7 @@
- #define TCR_EL2_TBI	(1 << 20)
- #define TCR_EL2_PS	(7 << 16)
- #define TCR_EL2_PS_40B	(2 << 16)
--#define TCR_EL2_TG0	(1 << 14)
-+#define TCR_EL2_TG0	(3 << 14)
- #define TCR_EL2_SH0	(3 << 12)
- #define TCR_EL2_ORGN0	(3 << 10)
- #define TCR_EL2_IRGN0	(3 << 8)
-@@ -110,7 +110,7 @@
- 
- /* VTCR_EL2 Registers bits */
- #define VTCR_EL2_PS_MASK	(7 << 16)
--#define VTCR_EL2_TG0_MASK	(1 << 14)
-+#define VTCR_EL2_TG0_MASK	(3 << 14)
- #define VTCR_EL2_TG0_4K		(0 << 14)
- #define VTCR_EL2_TG0_64K	(1 << 14)
- #define VTCR_EL2_SH0_MASK	(3 << 12)
+Win, win, win, win.
+
 -- 
-1.7.9.5
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
