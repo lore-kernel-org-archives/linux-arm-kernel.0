@@ -1,81 +1,84 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 13 Aug 2015 12:18:18 -0700
-Subject: [PATCH 9/9] ARM: smp: Add runtime PM support for CPU hotplug
-In-Reply-To: <20150813160038.GP52339@linaro.org>
-References: <1438731339-58317-1-git-send-email-lina.iyer@linaro.org>
- <1438731339-58317-10-git-send-email-lina.iyer@linaro.org>
- <20150812234756.GO26614@codeaurora.org>
- <20150813160038.GP52339@linaro.org>
-Message-ID: <20150813191818.GT26614@codeaurora.org>
+From: stuart.yoder@freescale.com (Stuart Yoder)
+Date: Thu, 13 Aug 2015 19:24:00 +0000
+Subject: [RFC] arm64: defconfig: enable 48-bit VA by default
+In-Reply-To: <CAKv+Gu-SH7MjkrgevfcUurPc7iQm+11cntfEo84opkqQoN2YPQ@mail.gmail.com>
+References: <CY1PR0301MB07488D6DC5F0B171D6B290E187830@CY1PR0301MB0748.namprd03.prod.outlook.com>
+ <55B0E1AD.60409@arm.com>
+ <BY2PR0301MB0743CBCFC5476E39A5D1EC0B878C0@BY2PR0301MB0743.namprd03.prod.outlook.com>
+ <CAKv+Gu9LHBd7wM6P4H0X5WigzDETtpr2++_Ebo=adg5QtTOW2w@mail.gmail.com>
+ <BY2PR0301MB074300C5F31701D9211827F0878C0@BY2PR0301MB0743.namprd03.prod.outlook.com>
+ <20150730101358.GA30796@e104818-lin.cambridge.arm.com>
+ <CY1PR0301MB074850E27D5D298D1B8495D2878B0@CY1PR0301MB0748.namprd03.prod.outlook.com>
+ <20150730161210.GE407@e104818-lin.cambridge.arm.com>
+ <CY1PR0301MB0748FA3A10AFA9BFC1AB0A39878B0@CY1PR0301MB0748.namprd03.prod.outlook.com>
+ <CAKv+Gu-Wbv3J9-2KbXrz_3W_=VXChrD+REo1-q1Ns_=RUM1BFw@mail.gmail.com>
+ <BY2PR0301MB07436AC9C8D023DC7C67DE3D87730@BY2PR0301MB0743.namprd03.prod.outlook.com>
+ <CAKv+Gu-SH7MjkrgevfcUurPc7iQm+11cntfEo84opkqQoN2YPQ@mail.gmail.com>
+Message-ID: <CY1PR0301MB07488764C02CCA3F653ED6A5877D0@CY1PR0301MB0748.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/13, Lina Iyer wrote:
-> On Wed, Aug 12 2015 at 17:47 -0600, Stephen Boyd wrote:
-> >On 08/04, Lina Iyer wrote:
+
+> -----Original Message-----
+> From: Ard Biesheuvel [mailto:ard.biesheuvel at linaro.org]
+> Sent: Saturday, August 08, 2015 3:21 AM
+> To: Yoder Stuart-B08248
+> Cc: Catalin Marinas; Mark Rutland; Marc Zyngier; Will Deacon; Newton Peter-RA3823; linux-arm-
+> kernel at lists.infradead.org; Sun York-R58495
+> Subject: Re: [RFC] arm64: defconfig: enable 48-bit VA by default
 > 
-> >>+
-> >> 	ret = platform_cpu_disable(cpu);
-> >> 	if (ret)
-> >> 		return ret;
-> >>@@ -272,6 +275,13 @@ void __ref cpu_die(void)
-> >> {
-> >> 	unsigned int cpu = smp_processor_id();
-> >>
-> >>+	/*
-> >>+	 * We dont need the CPU device anymore.
-> >>+	 * Lets do this before IRQs are disabled to allow
-> >>+	 * runtime PM to suspend the domain as well.
-> >>+	 */
-> >>+	pm_runtime_put_sync(get_cpu_device(cpu));
-> >
-> >The two put calls is confusing. __cpu_disable() is called on the
-> >CPU that's dying, and cpu_die() is called on the CPU that's doing
-> >the takedown.
-> >
-> Is that right? Looking at the code and the comments, I can only imagine
-> that they must be called on the CPU going down. If thats not the case,
-> then I need to fix this.
+> On 7 aug. 2015, at 21:01, Stuart Yoder <stuart.yoder@freescale.com> wrote:
 > 
-> >That would be two decrements but only one increment
-> >in secondary_start_kernel()? How is this properly balanced?
+> >> Whether defconfig supports your platform optimally has nothing to do
+> >> with that. Of course, we should deal with the unexpected memory layout
+> >> gracefully, which is why Mark Rutland and myself proposed patches to
+> >> fix the panic you reported. But in a development context, I think it
+> >> is perfectly acceptable to simply load the kernel at 0x80_8000_0000,
+> >> and be able to run defconfig fine while losing just 2 GB of your 16 GB
+> >> at the low end.
 > >
-> I dont see __cpu_disable() ending up at cpu_die(). These seem two
-> different exit points. I will check again.
-
-Yeah I suspect we want a single call in __cpu_disable() so that
-it runs on the CPU that's being hotplugged out.
-
+> > I've done this experiment-- loading/running the kernel at 0x80_8000_0000
+> > and losing the lower 2GB of memory.  And in fact I can see the kernel
+> > ignoring the low memory:
+> >
+> >   [    0.000000] Ignoring memory block 0x80000000 - 0x100000000
+> >
 > 
-> >>+
-> >> 	idle_task_exit();
-> >>
-> >> 	local_irq_disable();
-> >>@@ -401,6 +412,11 @@ asmlinkage void secondary_start_kernel(void)
-> >> 	local_irq_enable();
-> >> 	local_fiq_enable();
-> >>
-> >>+	/* We are running, enable runtime PM for the CPU. */
-> >>+	cpu_dev = get_cpu_device(cpu);
-> >>+	if (cpu_dev)
-> >>+		pm_runtime_get_sync(cpu_dev);
+> Yes that looks correct
+> 
+> > However, this only works with 48-bit VA enabled.  With 39-bit VA
+> > enabled the kernel crashes before the early console is working
+> > and I see nothing.
 > >
-> >Also, where would the dev->power.irq_safe flag be set if we
-> >aren't using the genpd DT stuff? It looks like we're going to
-> >start causing warnings on devices that don't have the DT magic.
+> 
+> That may well be a kernel bug: the changes to allow 39-bit VA kernels
+> to execute on systems whose memory is outside the 39-bit VA range was
+> developed and tested on AMD Seattle only, which has its RAM at
+> 0x80_0000_0000. But it is hard to be sure, of course, with no output
+> at all ...
+> 
+> > Does the linear mapping we've been talking about just need to cover
+> > all of _RAM_, or does it need to cover all of I/O as well in
+> > the same mapping.
 > >
-> Not necessarily. I have added _get and _put at points, when the
-> interrupts are still enabled. So there should not be a need for the CPU
-> devices to be IRQ safe. They will operate as regular devices. If they
-> are attached to a non-IRQ safe domain, they would effect power savings
-> on the domain.
+> > In our case we have various SoC I/O devices, like the UART
+> > in the space below 4 GB... at 0x0100_0000.
+> >
+> 
+> The linear mapping only covers system RAM, so that should not matter at all.
+> 
+> > Before debugging further I want to check whether this should
+> > work in theory.  I had the impression that the issue was
+> > discontiguous RAM regions, and I/O was a separate issue.
+> 
+> Yes, it should work in theory. The linear region starts at the base of
+> the kernel Image, and extends all the way up to the end of DRAM (14 GB
+> in your case, IIRC)
 
-What about preemption? Preemption is disabled in __cpu_disable()
-and secondary_start_kernel() where this patch is calling
-pm_runtime_{get,put}_sync(). That should still trigger a warning
-with the might_sleep() inside the runtime PM functions if we
-haven't set the irq_safe flag.
+An update on this... in my original test where the kernel did not run from
+high memory I was using a 4.0.x kernel.  I re-tried with a 4.2-rc4 kernel
+and it booted fine.  So, there is no kernel bug it in the latest kernel,
+it appears.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Thanks,
+Stuart
