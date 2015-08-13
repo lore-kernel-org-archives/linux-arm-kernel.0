@@ -1,35 +1,81 @@
-From: linux@horizon.com (George Spelvin)
-Date: 13 Aug 2015 15:09:25 -0400
-Subject: enabling libgcc for 64-bit divisions,
- was Re: PROBLEM: XFS on ARM corruption 'Structure needs cl
-In-Reply-To: <CA+55aFw9-sN0nHn-ohdhSEt9i-mUjXN3fBj+dXLg56jgsOwgDw@mail.gmail.com>
-Message-ID: <20150813190925.16478.qmail@ns.horizon.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 13 Aug 2015 12:18:18 -0700
+Subject: [PATCH 9/9] ARM: smp: Add runtime PM support for CPU hotplug
+In-Reply-To: <20150813160038.GP52339@linaro.org>
+References: <1438731339-58317-1-git-send-email-lina.iyer@linaro.org>
+ <1438731339-58317-10-git-send-email-lina.iyer@linaro.org>
+ <20150812234756.GO26614@codeaurora.org>
+ <20150813160038.GP52339@linaro.org>
+Message-ID: <20150813191818.GT26614@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> On x86, the case that msword >= divsor causes a divide exception
->> (divide ba generalization of divide by zero), so it's tempting
->> to do the same sort of "assume no trap and fix up in the handler"
->> trick as <asm/uaccess.h>.
+On 08/13, Lina Iyer wrote:
+> On Wed, Aug 12 2015 at 17:47 -0600, Stephen Boyd wrote:
+> >On 08/04, Lina Iyer wrote:
+> 
+> >>+
+> >> 	ret = platform_cpu_disable(cpu);
+> >> 	if (ret)
+> >> 		return ret;
+> >>@@ -272,6 +275,13 @@ void __ref cpu_die(void)
+> >> {
+> >> 	unsigned int cpu = smp_processor_id();
+> >>
+> >>+	/*
+> >>+	 * We dont need the CPU device anymore.
+> >>+	 * Lets do this before IRQs are disabled to allow
+> >>+	 * runtime PM to suspend the domain as well.
+> >>+	 */
+> >>+	pm_runtime_put_sync(get_cpu_device(cpu));
+> >
+> >The two put calls is confusing. __cpu_disable() is called on the
+> >CPU that's dying, and cpu_die() is called on the CPU that's doing
+> >the takedown.
+> >
+> Is that right? Looking at the code and the comments, I can only imagine
+> that they must be called on the CPU going down. If thats not the case,
+> then I need to fix this.
+> 
+> >That would be two decrements but only one increment
+> >in secondary_start_kernel()? How is this properly balanced?
+> >
+> I dont see __cpu_disable() ending up at cpu_die(). These seem two
+> different exit points. I will check again.
 
-> That would be horrible. One of the reasonably common cases of do_div()
-> is for printing out numbers. And they are often in the 4G+ range..
+Yeah I suspect we want a single call in __cpu_disable() so that
+it runs on the CPU that's being hotplugged out.
 
-Actually, printing numbers is *not* such an instance; I've had my fingers
-in lib/vsprintf.c, and since the divisor is constant, it uses reciprocal
-multiplies.
+> 
+> >>+
+> >> 	idle_task_exit();
+> >>
+> >> 	local_irq_disable();
+> >>@@ -401,6 +412,11 @@ asmlinkage void secondary_start_kernel(void)
+> >> 	local_irq_enable();
+> >> 	local_fiq_enable();
+> >>
+> >>+	/* We are running, enable runtime PM for the CPU. */
+> >>+	cpu_dev = get_cpu_device(cpu);
+> >>+	if (cpu_dev)
+> >>+		pm_runtime_get_sync(cpu_dev);
+> >
+> >Also, where would the dev->power.irq_safe flag be set if we
+> >aren't using the genpd DT stuff? It looks like we're going to
+> >start causing warnings on devices that don't have the DT magic.
+> >
+> Not necessarily. I have added _get and _put at points, when the
+> interrupts are still enabled. So there should not be a need for the CPU
+> devices to be IRQ safe. They will operate as regular devices. If they
+> are attached to a non-IRQ safe domain, they would effect power savings
+> on the domain.
 
-The only instance of do_div in lib/vsprintf.c is in a version of put_dec()
-which is used only if BITS_PER_LONG == 64.  If bits_per_long == 32,
-it uses a neat hack due to Douglas Jones which avoids using divide
-instructions entirely!
+What about preemption? Preemption is disabled in __cpu_disable()
+and secondary_start_kernel() where this patch is calling
+pm_runtime_{get,put}_sync(). That should still trigger a warning
+with the might_sleep() inside the runtime PM functions if we
+haven't set the irq_safe flag.
 
-(Commit 133fd9f5cd if you are curious.)
-
-
-The hot paths with 64-bit results are in the block layer and RAID
-code, and that's why I wasn't seriously suggesting replacing *all*
-instances; it was more of a static code size diet hack.
-
-(It's also not likely worth the maintenance burden of the additional
-code subtlety.  "Tempting" is not necessarily a good idea.)
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
