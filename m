@@ -1,57 +1,46 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Thu, 13 Aug 2015 20:39:48 +0800
-Subject: [GIT PULL] ARM: berlin: Initial Marvell Berlin ARM64 support
-In-Reply-To: <1438629886-6390-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1438629886-6390-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20150813203948.31de7849@xhacker>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 13 Aug 2015 14:45:55 +0200
+Subject: [PATCH v2 0/6] ARM: shmobile: Move gpio ranges from C code to DT
+In-Reply-To: <CACRpkdY7P86+SxMr5-HnhrN5fC-N1U135jiGAJGTV=xx47VW5g@mail.gmail.com>
+References: <1438696519-13727-1-git-send-email-geert+renesas@glider.be>
+ <20150805005540.GB20726@verge.net.au>
+ <CACRpkdY7P86+SxMr5-HnhrN5fC-N1U135jiGAJGTV=xx47VW5g@mail.gmail.com>
+Message-ID: <CAMuHMdW0T6MW6s4Gg_rqvtt+MRPtp_MpuiKtamfFrx-Tcm6WmQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Olof,
+Hi Linus,
 
-On Mon,  3 Aug 2015 21:24:44 +0200
-Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
+On Thu, Aug 13, 2015 at 2:29 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Wed, Aug 5, 2015 at 2:55 AM, Simon Horman <horms@verge.net.au> wrote:
+>> Where possible I prefer not to apply non-DTS/DTSI patches on top of
+>> DTS/DTSI patches, I believe this is in keeping with how the ARM SoC
+>> maintainers like things handled.  With this in mind I have done the following:
+>>
+>> 1. Queued up the DTSI patches (patches 1 - 3) for v4.3 in my dt branch.
+>>    I intend for this to turn up in next soon.
+>> 2. Queued up for pinctrl patches (patches 4 - 6) for v4.4 in a pinctrl patch.
+>>    I intend for these to be present in the renesas devel branch but
+>>    not in next until after the release of v4.3-rc1. I would also be
+>>    happy to drop them and let Linus Walleij take these patches for v4.4,
+>>    assuming patches 1 - 3 are accepted for v4.3.
+>
+> OK.
+>
+> Will the world explode if I try to queue the pinctrl patches 4-6 in my
+> tree now for v4.3? Then I prefer to defer to v4.4. Else I can merge
+> it in parallel?
 
-> Hi Arnd, Kevin, Olof,
-> 
-> this is initial Marvell Berlin4CT ARM64 support for v4.3. It contains minimum SoC
-> dtsi and basic dts for the development board. The patches have been posted by
-> Marvell's Jisheng Zhang a while ago on the lists.
-> 
-> Please pull.
-> 
-> The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
-> 
->   Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.infradead.org/users/hesselba/linux-berlin.git tags/berlin64-for-v4.3-1
-> 
-> for you to fetch changes up to d93ac74ad150c89f2d0a3b90754cbccdc6ab102c:
-> 
->   arm64: dts: Add dts files for Marvell Berlin4CT SoC (2015-08-03 20:45:54 +0200)
-> 
-> ----------------------------------------------------------------
-> Initial support for Marvell Berlin4CT ARM64 SoC
-> 
-> ----------------------------------------------------------------
-> Jisheng Zhang (1):
->       arm64: dts: Add dts files for Marvell Berlin4CT SoC
-> 
->  arch/arm64/boot/dts/Makefile                  |   1 +
->  arch/arm64/boot/dts/marvell/Makefile          |   5 +
->  arch/arm64/boot/dts/marvell/berlin4ct-dmp.dts |  66 +++++++++++
->  arch/arm64/boot/dts/marvell/berlin4ct.dtsi    | 164 ++++++++++++++++++++++++++
->  4 files changed, 236 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/marvell/Makefile
->  create mode 100644 arch/arm64/boot/dts/marvell/berlin4ct-dmp.dts
->  create mode 100644 arch/arm64/boot/dts/marvell/berlin4ct.dtsi
+There won't be a mapping between gpio and pins in any branch having the
+pinctrl changes but not the dtsi changes.
 
-I just saw you were online ;)
+Gr{oetje,eeting}s,
 
-Thank you very much for appling the patches for Kconfig and defconfig, I'm not
-sure you missed this dts pull ;) could you please help?
+                        Geert
 
-Sorry for noise,
-Jisheng
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
