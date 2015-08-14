@@ -1,343 +1,94 @@
-From: suneel.garapati@xilinx.com (Suneel Garapati)
-Date: Fri, 14 Aug 2015 20:39:03 +0530
-Subject: [PATCH v3 2/2] drivers: rtc: add xilinx zynqmp rtc driver
-In-Reply-To: <1439564943-21590-1-git-send-email-suneel.garapati@xilinx.com>
-References: <1439564943-21590-1-git-send-email-suneel.garapati@xilinx.com>
-Message-ID: <1439564943-21590-2-git-send-email-suneel.garapati@xilinx.com>
+From: santosh.shilimkar@oracle.com (santosh shilimkar)
+Date: Fri, 14 Aug 2015 08:14:52 -0700
+Subject: [PATCH] ARM: keystone: add a work around to handle asynchronous
+ external abort
+In-Reply-To: <20150814140934.GX7557@n2100.arm.linux.org.uk>
+References: <1439320409-20084-1-git-send-email-m-karicheri2@ti.com>
+ <55CDF579.4050408@ti.com> <20150814140934.GX7557@n2100.arm.linux.org.uk>
+Message-ID: <55CE05EC.4040909@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-adds support for RTC controller found on
-Xilinx Zynq Ultrascale+ MPSoC platform.
+On 8/14/2015 7:09 AM, Russell King - ARM Linux wrote:
+> On Fri, Aug 14, 2015 at 10:04:41AM -0400, Murali Karicheri wrote:
+>> On 08/11/2015 03:13 PM, Murali Karicheri wrote:
+>>> Currently on some devices, an asynchronous external abort exception
+>>> happens during boot up when exception handlers are enabled in kernel
+>>> before switching to user space. This patch adds a workaround to handle
+>>> this once during boot. Many customers are already using this
+>>> with out any issues and is required to workaround the above issue.
+>>>
+>>> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+>>> ---
+>>>   arch/arm/mach-keystone/keystone.c | 26 ++++++++++++++++++++++++++
+>>>   1 file changed, 26 insertions(+)
+>>>
+>>> diff --git a/arch/arm/mach-keystone/keystone.c b/arch/arm/mach-keystone/keystone.c
+>>> index e2880105..c1d0fe5 100644
+>>> --- a/arch/arm/mach-keystone/keystone.c
+>>> +++ b/arch/arm/mach-keystone/keystone.c
+>>> @@ -15,6 +15,7 @@
+>>>   #include <linux/of_platform.h>
+>>>   #include <linux/of_address.h>
+>>>   #include <linux/memblock.h>
+>>> +#include <linux/signal.h>
+>>>
+>>>   #include <asm/setup.h>
+>>>   #include <asm/mach/map.h>
+>>> @@ -52,6 +53,24 @@ static struct notifier_block platform_nb = {
+>>>   	.notifier_call = keystone_platform_notifier,
+>>>   };
+>>>
+>>> +static bool ignore_first = true;
+>>> +static int keystone_async_ext_abort_fault(unsigned long addr, unsigned int fsr,
+>>> +					  struct pt_regs *regs)
+>>> +{
+>>> +	/*
+>>> +	 * if first time, ignore this as this is a asynchronous external abort
+>>> +	 * happening only some devices that couldn't be root caused and we add
+>>> +	 * this work around to handle this first time.
+>>> +	 */
+>>> +	if (ignore_first) {
+>>> +		ignore_first = false;
+>>> +		return 0;
+>>> +	}
+>>> +
+>>> +	/* Subsequent ones should be handled as fault */
+>>> +	return 1;
+>>> +}
+>>> +
+>>>   static void __init keystone_init(void)
+>>>   {
+>>>   	if (PHYS_OFFSET >= KEYSTONE_HIGH_PHYS_START) {
+>>> @@ -61,6 +80,13 @@ static void __init keystone_init(void)
+>>>   	}
+>>>   	keystone_pm_runtime_init();
+>>>   	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+>>> +
+>>> +	/*
+>>> +	 * Add a one time exception handler to catch asynchronous external
+>>> +	 * abort
+>>> +	 */
+>>> +	hook_fault_code(17, keystone_async_ext_abort_fault, SIGBUS, 0,
+>>> +			"async external abort handler");
+>>>   }
+>>>
+>>>   static phys_addr_t keystone_virt_to_idmap(unsigned long x)
+>>>
+>> Can this be applied if it looks good?
+>
+> What causes the abort?  We shouldn't be adding hacks like this to the
+> kernel without having the full picture...
+>
+Indeed. These external aborts are notorious and often hides dangerous
+bugs. On OMAP as well many folks burn their had with it till the
+interconnect handlers were added to detect those and hunt those
+bugs.
 
-Signed-off-by: Suneel Garapati <suneel.garapati@xilinx.com>
----
-Changes v3 
-- fix checkpatch errors 
-- check time in secs arg against max sec val 
-- order header files 
-- use ptr_err_or_zero macro 
-- use time64 variants 
-Changes v2 
-- change alm to alarm 
----
- drivers/rtc/Kconfig      |   7 ++
- drivers/rtc/Makefile     |   1 +
- drivers/rtc/rtc-zynqmp.c | 279 +++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 287 insertions(+)
- create mode 100644 drivers/rtc/rtc-zynqmp.c
+In my experience such aborts happen outside ARM subsystem, either in
+the interconnect or at the salve targets which are reported over
+the ARM bus as async external aborts. And often these errors are
+due to bad accesses/wrong accesses/un-clocked accesses at slaves.
 
-diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
-index 35ea04c..bc96277 100644
---- a/drivers/rtc/Kconfig
-+++ b/drivers/rtc/Kconfig
-@@ -1116,6 +1116,13 @@ config RTC_DRV_OPAL
- 	  This driver can also be built as a module. If so, the module
- 	  will be called rtc-opal.
- 
-+config RTC_DRV_ZYNQMP
-+	tristate "Xilinx Zynq Ultrascale+ MPSoC RTC"
-+	depends on OF
-+	help
-+	  If you say yes here you get support for the RTC controller found on
-+	  Xilinx Zynq Ultrascale+ MPSoC.
-+
- comment "on-CPU RTC drivers"
- 
- config RTC_DRV_DAVINCI
-diff --git a/drivers/rtc/Makefile b/drivers/rtc/Makefile
-index 2797384..e491eb5 100644
---- a/drivers/rtc/Makefile
-+++ b/drivers/rtc/Makefile
-@@ -159,3 +159,4 @@ obj-$(CONFIG_RTC_DRV_WM831X)	+= rtc-wm831x.o
- obj-$(CONFIG_RTC_DRV_WM8350)	+= rtc-wm8350.o
- obj-$(CONFIG_RTC_DRV_X1205)	+= rtc-x1205.o
- obj-$(CONFIG_RTC_DRV_XGENE)	+= rtc-xgene.o
-+obj-$(CONFIG_RTC_DRV_ZYNQMP)	+= rtc-zynqmp.o
-diff --git a/drivers/rtc/rtc-zynqmp.c b/drivers/rtc/rtc-zynqmp.c
-new file mode 100644
-index 0000000..8b28762
---- /dev/null
-+++ b/drivers/rtc/rtc-zynqmp.c
-@@ -0,0 +1,279 @@
-+/*
-+ * Xilinx Zynq Ultrascale+ MPSoC Real Time Clock Driver
-+ *
-+ * Copyright (C) 2015 Xilinx, Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along with
-+ * this program. If not, see <http://www.gnu.org/licenses/>.
-+ *
-+ */
-+
-+#include <linux/delay.h>
-+#include <linux/init.h>
-+#include <linux/io.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
-+#include <linux/rtc.h>
-+
-+/* RTC Registers */
-+#define RTC_SET_TM_WR		0x00
-+#define RTC_SET_TM_RD		0x04
-+#define RTC_CALIB_WR		0x08
-+#define RTC_CALIB_RD		0x0C
-+#define RTC_CUR_TM		0x10
-+#define RTC_CUR_TICK		0x14
-+#define RTC_ALRM		0x18
-+#define RTC_INT_STS		0x20
-+#define RTC_INT_MASK		0x24
-+#define RTC_INT_EN		0x28
-+#define RTC_INT_DIS		0x2C
-+#define RTC_CTRL		0x40
-+
-+#define RTC_FR_EN		BIT(20)
-+#define RTC_FR_DATSHIFT		16
-+#define RTC_TICK_MASK		0xFFFF
-+#define RTC_INT_SEC		BIT(0)
-+#define RTC_INT_ALRM		BIT(1)
-+#define RTC_OSC_EN		BIT(24)
-+
-+#define RTC_CALIB_DEF		0x198233
-+#define RTC_CALIB_MASK		0x1FFFFF
-+#define RTC_SEC_MAX_VAL		0xFFFFFFFF
-+
-+struct xlnx_rtc_dev {
-+	struct rtc_device	*rtc;
-+	void __iomem		*reg_base;
-+	int			alarm_irq;
-+	int			sec_irq;
-+};
-+
-+static int xlnx_rtc_set_time(struct device *dev, struct rtc_time *tm)
-+{
-+	struct xlnx_rtc_dev *xrtcdev = dev_get_drvdata(dev);
-+	unsigned long new_time;
-+
-+	new_time = rtc_tm_to_time64(tm);
-+
-+	if (new_time > RTC_SEC_MAX_VAL)
-+		return -EINVAL;
-+
-+	writel(new_time, xrtcdev->reg_base + RTC_SET_TM_WR);
-+
-+	return 0;
-+}
-+
-+static int xlnx_rtc_read_time(struct device *dev, struct rtc_time *tm)
-+{
-+	struct xlnx_rtc_dev *xrtcdev = dev_get_drvdata(dev);
-+
-+	rtc_time64_to_tm(readl(xrtcdev->reg_base + RTC_CUR_TM), tm);
-+
-+	return rtc_valid_tm(tm);
-+}
-+
-+static int xlnx_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *alrm)
-+{
-+	struct xlnx_rtc_dev *xrtcdev = dev_get_drvdata(dev);
-+
-+	rtc_time64_to_tm(readl(xrtcdev->reg_base + RTC_ALRM), &alrm->time);
-+	alrm->enabled = readl(xrtcdev->reg_base + RTC_INT_MASK) & RTC_INT_ALRM;
-+
-+	return 0;
-+}
-+
-+static int xlnx_rtc_alarm_irq_enable(struct device *dev, u32 enabled)
-+{
-+	struct xlnx_rtc_dev *xrtcdev = dev_get_drvdata(dev);
-+
-+	if (enabled)
-+		writel(RTC_INT_ALRM, xrtcdev->reg_base + RTC_INT_EN);
-+	else
-+		writel(RTC_INT_ALRM, xrtcdev->reg_base + RTC_INT_DIS);
-+
-+	return 0;
-+}
-+
-+static int xlnx_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alrm)
-+{
-+	struct xlnx_rtc_dev *xrtcdev = dev_get_drvdata(dev);
-+	unsigned long alarm_time;
-+
-+	alarm_time = rtc_tm_to_time64(&alrm->time);
-+
-+	if (alarm_time > RTC_SEC_MAX_VAL)
-+		return -EINVAL;
-+
-+	writel((u32)alarm_time, (xrtcdev->reg_base + RTC_ALRM));
-+
-+	xlnx_rtc_alarm_irq_enable(dev, alrm->enabled);
-+
-+	return 0;
-+}
-+
-+static void xlnx_init_rtc(struct xlnx_rtc_dev *xrtcdev, u32 calibval)
-+{
-+	/*
-+	 * Based on crystal freq of 33.330 KHz
-+	 * set the seconds counter and enable, set fractions counter
-+	 * to default value suggested as per design spec
-+	 * to correct RTC delay in frequency over period of time.
-+	 */
-+	calibval &= RTC_CALIB_MASK;
-+	writel(calibval, (xrtcdev->reg_base + RTC_CALIB_WR));
-+}
-+
-+static const struct rtc_class_ops xlnx_rtc_ops = {
-+	.set_time	  = xlnx_rtc_set_time,
-+	.read_time	  = xlnx_rtc_read_time,
-+	.read_alarm	  = xlnx_rtc_read_alarm,
-+	.set_alarm	  = xlnx_rtc_set_alarm,
-+	.alarm_irq_enable = xlnx_rtc_alarm_irq_enable,
-+};
-+
-+static irqreturn_t xlnx_rtc_interrupt(int irq, void *id)
-+{
-+	struct xlnx_rtc_dev *xrtcdev = (struct xlnx_rtc_dev *)id;
-+	unsigned int status;
-+
-+	status = readl(xrtcdev->reg_base + RTC_INT_STS);
-+	/* Check if interrupt asserted */
-+	if (!(status & (RTC_INT_SEC | RTC_INT_ALRM)))
-+		return IRQ_NONE;
-+
-+	/* Clear interrupt */
-+	writel(status, xrtcdev->reg_base + RTC_INT_STS);
-+
-+	if (status & RTC_INT_SEC)
-+		rtc_update_irq(xrtcdev->rtc, 1, RTC_IRQF | RTC_UF);
-+	if (status & RTC_INT_ALRM)
-+		rtc_update_irq(xrtcdev->rtc, 1, RTC_IRQF | RTC_AF);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static int xlnx_rtc_probe(struct platform_device *pdev)
-+{
-+	struct xlnx_rtc_dev *xrtcdev;
-+	struct resource *res;
-+	int ret;
-+	unsigned int calibvalue;
-+
-+	xrtcdev = devm_kzalloc(&pdev->dev, sizeof(*xrtcdev), GFP_KERNEL);
-+	if (!xrtcdev)
-+		return -ENOMEM;
-+
-+	platform_set_drvdata(pdev, xrtcdev);
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+
-+	xrtcdev->reg_base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(xrtcdev->reg_base))
-+		return PTR_ERR(xrtcdev->reg_base);
-+
-+	xrtcdev->alarm_irq = platform_get_irq_byname(pdev, "alarm");
-+	if (xrtcdev->alarm_irq < 0) {
-+		dev_err(&pdev->dev, "no irq resource\n");
-+		return xrtcdev->alarm_irq;
-+	}
-+	ret = devm_request_irq(&pdev->dev, xrtcdev->alarm_irq,
-+			       xlnx_rtc_interrupt, 0,
-+			       dev_name(&pdev->dev), xrtcdev);
-+	if (ret) {
-+		dev_err(&pdev->dev, "request irq failed\n");
-+		return ret;
-+	}
-+
-+	xrtcdev->sec_irq = platform_get_irq_byname(pdev, "sec");
-+	if (xrtcdev->sec_irq < 0) {
-+		dev_err(&pdev->dev, "no irq resource\n");
-+		return xrtcdev->sec_irq;
-+	}
-+	ret = devm_request_irq(&pdev->dev, xrtcdev->sec_irq,
-+			       xlnx_rtc_interrupt, 0,
-+			       dev_name(&pdev->dev), xrtcdev);
-+	if (ret) {
-+		dev_err(&pdev->dev, "request irq failed\n");
-+		return ret;
-+	}
-+
-+	ret = of_property_read_u32(pdev->dev.of_node, "calibration",
-+				   &calibvalue);
-+	if (ret)
-+		calibvalue = RTC_CALIB_DEF;
-+
-+	xlnx_init_rtc(xrtcdev, calibvalue);
-+
-+	device_init_wakeup(&pdev->dev, 1);
-+
-+	xrtcdev->rtc = devm_rtc_device_register(&pdev->dev, pdev->name,
-+					 &xlnx_rtc_ops, THIS_MODULE);
-+	return PTR_ERR_OR_ZERO(xrtcdev->rtc);
-+}
-+
-+static int xlnx_rtc_remove(struct platform_device *pdev)
-+{
-+	xlnx_rtc_alarm_irq_enable(&pdev->dev, 0);
-+	device_init_wakeup(&pdev->dev, 0);
-+
-+	return 0;
-+}
-+
-+static int __maybe_unused xlnx_rtc_suspend(struct device *dev)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct xlnx_rtc_dev *xrtcdev = platform_get_drvdata(pdev);
-+
-+	if (device_may_wakeup(&pdev->dev))
-+		enable_irq_wake(xrtcdev->alarm_irq);
-+	else
-+		xlnx_rtc_alarm_irq_enable(dev, 0);
-+
-+	return 0;
-+}
-+
-+static int __maybe_unused xlnx_rtc_resume(struct device *dev)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct xlnx_rtc_dev *xrtcdev = platform_get_drvdata(pdev);
-+
-+	if (device_may_wakeup(&pdev->dev))
-+		disable_irq_wake(xrtcdev->alarm_irq);
-+	else
-+		xlnx_rtc_alarm_irq_enable(dev, 1);
-+
-+	return 0;
-+}
-+
-+static SIMPLE_DEV_PM_OPS(xlnx_rtc_pm_ops, xlnx_rtc_suspend, xlnx_rtc_resume);
-+
-+static const struct of_device_id xlnx_rtc_of_match[] = {
-+	{.compatible = "xlnx,zynqmp-rtc" },
-+	{ }
-+};
-+MODULE_DEVICE_TABLE(of, xlnx_rtc_of_match);
-+
-+static struct platform_driver xlnx_rtc_driver = {
-+	.probe		= xlnx_rtc_probe,
-+	.remove		= xlnx_rtc_remove,
-+	.driver		= {
-+		.name	= KBUILD_MODNAME,
-+		.pm	= &xlnx_rtc_pm_ops,
-+		.of_match_table	= xlnx_rtc_of_match,
-+	},
-+};
-+
-+module_platform_driver(xlnx_rtc_driver);
-+
-+MODULE_DESCRIPTION("Xilinx Zynq MPSoC RTC driver");
-+MODULE_AUTHOR("Xilinx Inc.");
-+MODULE_LICENSE("GPL v2");
--- 
-2.1.2
+Regards,
+Santosh
