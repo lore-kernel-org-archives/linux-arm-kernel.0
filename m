@@ -1,32 +1,46 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 14 Aug 2015 14:28:30 -0300
-Subject: [PATCH v3] ARM: configs: Add Freescale LS1021A defconfig
-In-Reply-To: <55CE1FFE.2080200@freescale.com>
-References: <1438941784-38403-1-git-send-email-b18965@freescale.com>
- <55CB4829.40204@freescale.com> <55CE1FFE.2080200@freescale.com>
-Message-ID: <CAOMZO5By_15OCsb7z2pbywPi3n9vKGj=393hWYHVEQ32=jDNaA@mail.gmail.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 14 Aug 2015 19:37:13 +0200
+Subject: [PATCH] ARM: rockchip: pm: Fix PTR_ERR() argument
+In-Reply-To: <1439520199-16076-1-git-send-email-festevam@gmail.com>
+References: <1439520199-16076-1-git-send-email-festevam@gmail.com>
+Message-ID: <1447521.3N0AVjqGBX@ubix>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 14, 2015 at 2:06 PM, Horia Geant?
-<horia.geanta@freescale.com> wrote:
+On Thursday, August 13, 2015 11:43:19 PM Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
+> 
+> PTR_ERR should access the value just tested by IS_ERR.
+> 
+> The semantic patch that makes this change is available
+> in scripts/coccinelle/tests/odd_ptr_err.cocci.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
 
-> Another thing:
-> Commit 385c0fb0e2c4 ("ARM: imx_v6_v7_defconfig: Select LS1021A") added
-> CONFIG_SOC_LS1021A in imx_v6_v7_defconfig.
->
-> Besides this, booting a LS1021 AQDS board (Rev2) using
-> imx_v6_v7_defconfig did not work (stuck at "Starting kernel").
+Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
 
-What would be the recommended approach?
-
-- Fix imx_v6_v7_defconfig so that it can make LS1021A to boot
-
-or
-
-- Use this proposed ls1021a_defconfig and remove LS1021A from
-imx_v6_v7_defconfig?
-
-Regards,
-
-Fabio Estevam
+>  arch/arm/mach-rockchip/pm.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-rockchip/pm.c b/arch/arm/mach-rockchip/pm.c
+> index 892bace..01123dd 100644
+> --- a/arch/arm/mach-rockchip/pm.c
+> +++ b/arch/arm/mach-rockchip/pm.c
+> @@ -224,14 +224,14 @@ static int rk3288_suspend_init(struct device_node *np)
+> "rockchip,rk3288-sgrf");
+>  	if (IS_ERR(sgrf_regmap)) {
+>  		pr_err("%s: could not find sgrf regmap\n", __func__);
+> -		return PTR_ERR(pmu_regmap);
+> +		return PTR_ERR(sgrf_regmap);
+>  	}
+> 
+>  	grf_regmap = syscon_regmap_lookup_by_compatible(
+>  				"rockchip,rk3288-grf");
+>  	if (IS_ERR(grf_regmap)) {
+>  		pr_err("%s: could not find grf regmap\n", __func__);
+> -		return PTR_ERR(pmu_regmap);
+> +		return PTR_ERR(grf_regmap);
+>  	}
+> 
+>  	sram_np = of_find_compatible_node(NULL, NULL,
