@@ -1,38 +1,60 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Fri, 14 Aug 2015 16:36:27 +0800
-Subject: [RFC PATCH v5 8/9] arm: multi_v7_defconfig: remove CONFIG_MMC_DW_IDMAC
-In-Reply-To: <1439541232-30100-1-git-send-email-shawn.lin@rock-chips.com>
-References: <1439541232-30100-1-git-send-email-shawn.lin@rock-chips.com>
-Message-ID: <1439541387-30435-1-git-send-email-shawn.lin@rock-chips.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Fri, 14 Aug 2015 10:30:35 +0100
+Subject: [PATCH 0/5] iommu/msm: Add DT adaptation and generic bindings
+ support
+In-Reply-To: <1439390869-6347-1-git-send-email-sricharan@codeaurora.org>
+References: <1439390869-6347-1-git-send-email-sricharan@codeaurora.org>
+Message-ID: <55CDB53B.9000605@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DesignWare MMC Controller's transfer mode should be decided
-at runtime instead of compile-time. So we remove this config
-option and read dw_mmc's register to select DMA master.
+Hi Sricharan,
 
-Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
----
+thanks for the patches,
 
-Changes in v5: None
-Changes in v4: None
-Changes in v3: None
-Changes in v2: None
+On 12/08/15 15:47, Sricharan R wrote:
+> The msm_iommu.c driver currently works based on platform data. A single master
+> device can be connected to more than one iommu and multiple contexts in each
+> of the iommu. This association between master and iommus was represented
+> from platform data using parent/child devices. The master drivers were
+> responsible for attaching all of the iommus/context to a domain. Now the
+> platform data support is removed and DT support is added. The master/iommus
+> are added through generic iommu bindings.
+>
+> This is essentially rework of the patch posted earlier by
+> Rob Clark <robdclark@gmail.com>. This series folds the changes
+> in to the existing driver with the addition of generic bindings.
+>
+>          http://www.spinics.net/lists/linux-arm-msm/msg10077.html
+>
+> This series is based on the IOMMU probe deferral series from
+> Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+>
+>          https://lkml.org/lkml/2015/5/14/786
+>
+> Tested this series on ifc6410 board.
+>
+I tested this series on IFC6410 with both HDMI and LVDS Panel with 
+openbox desktop. It works.. :-)
 
- arch/arm/configs/multi_v7_defconfig | 1 -
- 1 file changed, 1 deletion(-)
+Tested-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 5fd8df6..a3734b5 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -520,7 +520,6 @@ CONFIG_MMC_ATMELMCI=y
- CONFIG_MMC_MVSDIO=y
- CONFIG_MMC_SDHI=y
- CONFIG_MMC_DW=y
--CONFIG_MMC_DW_IDMAC=y
- CONFIG_MMC_DW_PLTFM=y
- CONFIG_MMC_DW_EXYNOS=y
- CONFIG_MMC_DW_ROCKCHIP=y
--- 
-2.3.7
+--srini
+> Sricharan R (5):
+>    iommu/msm: Add DT adaptation
+>    iommu/msm: Move the contents from msm_iommu_dev.c to msm_iommu.c
+>    iommu/msm: Add support for generic master bindings
+>    iommu/msm: Set cacheability attributes without tex remap
+>    iommu/msm: Remove driver BROKEN
+>
+>   .../devicetree/bindings/iommu/msm,iommu-v0.txt     |  59 +++
+>   drivers/iommu/Kconfig                              |   1 -
+>   drivers/iommu/Makefile                             |   2 +-
+>   drivers/iommu/msm_iommu.c                          | 508 ++++++++++++++-------
+>   drivers/iommu/msm_iommu.h                          |  73 ++-
+>   drivers/iommu/msm_iommu_dev.c                      | 392 ----------------
+>   drivers/iommu/msm_iommu_hw-8xxx.h                  |  10 +-
+>   7 files changed, 432 insertions(+), 613 deletions(-)
+>   create mode 100644 Documentation/devicetree/bindings/iommu/msm,iommu-v0.txt
+>   delete mode 100644 drivers/iommu/msm_iommu_dev.c
+>
