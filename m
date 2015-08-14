@@ -1,58 +1,39 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 14 Aug 2015 15:41:07 +0100
-Subject: [PATCH 2/3] powerpc: PCI: Fix lookup of linux, pci-probe-only property
-In-Reply-To: <1439563268-13418-1-git-send-email-marc.zyngier@arm.com>
-References: <1439563268-13418-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1439563268-13418-3-git-send-email-marc.zyngier@arm.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Fri, 14 Aug 2015 16:44:32 +0200
+Subject: [PATCH 1/6] ARM: dts: sun5i: Add simplefb node for tvencoder output
+In-Reply-To: <1439563477-12295-1-git-send-email-hdegoede@redhat.com>
+References: <1439563477-12295-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <1439563477-12295-2-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When find_and_init_phbs() looks for the probe-only property, it seems
-to trust the firmware to be correctly written, and assumes that there
-is a parameter to the property.
+Add a simplefb node for tvencoder / composite-video output, such as found
+on the Auxtek-T003 and the CHIP.
 
-It is conceivable that the firmware could not be that perfect, and it
-could expose this property naked (at least one arm64 platform seems to
-exhibit this exact behaviour). The setup code the ends up making
-a decision based on whatever the property pointer points to, which
-is likely to be junk.
-
-Instead, let's check for the validity of the property, and ignore
-it if the firmware couldn't make up its mind.
-
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- arch/powerpc/platforms/pseries/setup.c | 15 ++++++++++-----
- 1 file changed, 10 insertions(+), 5 deletions(-)
+ arch/arm/boot/dts/sun5i-a10s.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/arch/powerpc/platforms/pseries/setup.c b/arch/powerpc/platforms/pseries/setup.c
-index df6a704..6bdc1f9 100644
---- a/arch/powerpc/platforms/pseries/setup.c
-+++ b/arch/powerpc/platforms/pseries/setup.c
-@@ -490,14 +490,19 @@ static void __init find_and_init_phbs(void)
- 	 */
- 	if (of_chosen) {
- 		const int *prop;
-+		int len;
+diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
+index a6d55f0..3e47b3d 100644
+--- a/arch/arm/boot/dts/sun5i-a10s.dtsi
++++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
+@@ -77,6 +77,15 @@
+ 			clocks = <&pll5 1>, <&ahb_gates 36>, <&ahb_gates 44>;
+ 			status = "disabled";
+ 		};
++
++		framebuffer at 2 {
++			compatible = "allwinner,simple-framebuffer",
++				     "simple-framebuffer";
++			allwinner,pipeline = "de_be0-lcd0-tve0";
++			clocks = <&pll5 1>, <&ahb_gates 34>, <&ahb_gates 36>,
++				 <&ahb_gates 44>;
++			status = "disabled";
++		};
+ 	};
  
- 		prop = of_get_property(of_chosen,
--				"linux,pci-probe-only", NULL);
-+				"linux,pci-probe-only", &len);
- 		if (prop) {
--			if (*prop)
--				pci_add_flags(PCI_PROBE_ONLY);
--			else
--				pci_clear_flags(PCI_PROBE_ONLY);
-+			if (len) {
-+				if (be32_to_cpup(prop))
-+					pci_add_flags(PCI_PROBE_ONLY);
-+				else
-+					pci_clear_flags(PCI_PROBE_ONLY);
-+			} else {
-+				pr_warn("linux,pci-probe-only set without value, ignoring\n");
-+			}
- 		}
- 	}
- }
+ 	clocks {
 -- 
-2.1.4
+2.4.3
