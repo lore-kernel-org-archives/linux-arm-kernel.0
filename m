@@ -1,112 +1,219 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri, 14 Aug 2015 10:52:01 +0100
-Subject: [PATCH 5/9] ARM: common: Introduce PM domains for CPUs/clusters
-In-Reply-To: <20150813192713.GA84868@linaro.org>
-References: <1438731339-58317-1-git-send-email-lina.iyer@linaro.org>
- <1438731339-58317-6-git-send-email-lina.iyer@linaro.org>
- <CAL_JsqK67=DTtjZwwnonObLDjLbahkREfm0RvyXVV95bhR-d4Q@mail.gmail.com>
- <20150813150154.GB13356@red-moon> <20150813154503.GO52339@linaro.org>
- <55CCD35C.4000901@arm.com> <20150813192713.GA84868@linaro.org>
-Message-ID: <55CDBA41.2080703@arm.com>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Fri, 14 Aug 2015 17:57:17 +0800
+Subject: [PATCH v4] pinctrl: mediatek: Implement wake handler and suspend
+ resume
+In-Reply-To: <1439541486-22203-1-git-send-email-maoguang.meng@mediatek.com>
+References: <1439541486-22203-1-git-send-email-maoguang.meng@mediatek.com>
+Message-ID: <CAGS+omAtW0O2FgGkDsw7BgZA1Vhdkp2UhCvsgjf5rP1Q+jybuA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 13/08/15 20:27, Lina Iyer wrote:
-> On Thu, Aug 13 2015 at 11:26 -0600, Sudeep Holla wrote:
->>
-
-[...]
-
->>
->> Having gone through this series and the one using it[1], the only common
->> activity is just cluster pm notifiers. Other than that it's just
->> creating indirection for now. The scenario might change in future, but
->> for now it seems unnecessary.
->>
-> Not sure, what seems unnecessary to you. Platforms do have to send
-> cluster PM notifications, and they have to duplicate reference counting.
-> Also PM domain framework allows hierarchy which is quite desirable to
-> power down parts of the SoC that are powered on or have to clocked high,
-> until the CPU is running.
+On Fri, Aug 14, 2015 at 4:38 PM, <maoguang.meng@mediatek.com> wrote:
 >
-
-Agreed, no argument on using genpd for CPU PM for all the goodies genpd
-provides, but the way this patch was creating the genpd domains. It
-needs to be part of your power controller.
-
-> Cluster PM notifications are just one aspect of this that we currently
-> handle in the first submission. The patchset as a whole provides a way
-> to determine in Linux the last man down and the first man up and carry
-> out activities. There are a bunch of things that are done to power save
-> when the last man goes down - Turn off debuggers, switch off PLLs,
-> reduce bus clocks, flush caches amongst a few that I know of. Some of it
-> are platform specific and some of it arent. This patches provide the way
-> for both of them to be done easily. The CPU runtime PM and PM domains as
-> a framework, closely track what the hardware does.
+> From: Maoguang Meng <maoguang.meng@mediatek.com>
 >
-
-Again no argument, I just favour common interface functions. Since each
-power controller/platform will have specific sequence, it might be hard
-to generalize that, but I may be wrong. OTH common interface functions
-to handle those components might give some flexibility to the power
-controllers.
-
-> Mentioned in an other mail in this thread, is also an option to
-> determine the cluster flush state and use it in conjunction with PSCI to
-> do OS-Initiated cluster power down.
+> This patch implement irq_set_wake to get who is wakeup source and
+> setup on suspend resume.
 >
+> Signed-off-by: Maoguang Meng <maoguang.meng@mediatek.com>
 
-I haven't yet explored down that route yet, with platform co-ordination
-we don't need much complexity in kernel :). OS co-ordination is a
-different story as we need to consider the secure/non-secure world
-dimensions there. We will have to consider the privileges/restrictions
-Linux has.
+Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
 
->> Also if you look at the shmobile power controller driver, it covers all
->> the devices including CPUs unlike QCOM power controller which handles
->> only CPU. Yes we can skip CPU genpd creation there only for CPU, IMO
->> creating the power domains should be part of power controller driver.
->>
->> You can add helper functions for all the ARM specific code that can be
->> reused by multiple power controller drivers handling CPU/Cluster power
->> domain.
->>
-> Sure, some architectures may desire that. I have them addressed in [2].
+Thanks!
+-Dan
+
 >
-
-I haven't looked at that yet, but will do soon.
-
->>> An analogy to this would be the "arm,idle-state" that defines the DT
->>> node as something that also depicts a generic cpuidle C state.
->>>
->>
->> I tend to disagree. In idle-states, the nodes define that generic
->> properties and they can be parsed in a generic way. That's not the case
->> here. Each power controller binding differs.
->>
-> Yes, may be we will have common elements like latency, residency of
-> powering on/off a domain that a genpd governor can utilize in
-> determining if its worth powering off the domain or not.
+> ---
+> changes since v3:
+> -add a comment in mtk_eint_chip_read_mask.
+> -delete ALIGN when allocate eint_offsets.ports.
+> -fix unrelated change.
 >
-
-Make sense, but as Rob pointed how generic are those on various
-platforms is something we need to check considering few platforms before
-we build the generic infrastructure.
-
->> Yes the generic compatible might be useful to identify that this power
->> domain handles CPU/Cluster, but there will be more power controller
->> specific things compared to generic code.
->>
-> Agreed, not debating that. Power controller is very SoC specific, but
-> not debuggers, GIC, caches, buses etc. Many SoCs have almost similiar
-> needs for many of these supplemental hardware to the CPUs and trend
-> seems to be generalizing on many of these components.
+> changes since v2:
+> -modify irq_wake to handle irq wakeup source.
+> -allocate two buffers separately.
+> -fix some codestyle.
 >
-
-Generalizing those components and using genpd is absolutely fine, just
-the mechanics is what I am debating on.
-
-Regards,
-Sudeep
+> Changes since v1:
+> -implement irq_wake handler.
+> ---
+>
+>  drivers/pinctrl/mediatek/pinctrl-mt8173.c     |  1 +
+>  drivers/pinctrl/mediatek/pinctrl-mtk-common.c | 91 ++++++++++++++++++++++++++-
+>  drivers/pinctrl/mediatek/pinctrl-mtk-common.h |  4 ++
+>  3 files changed, 95 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/pinctrl/mediatek/pinctrl-mt8173.c b/drivers/pinctrl/mediatek/pinctrl-mt8173.c
+> index d0c811d..ad27184 100644
+> --- a/drivers/pinctrl/mediatek/pinctrl-mt8173.c
+> +++ b/drivers/pinctrl/mediatek/pinctrl-mt8173.c
+> @@ -385,6 +385,7 @@ static struct platform_driver mtk_pinctrl_driver = {
+>         .driver = {
+>                 .name = "mediatek-mt8173-pinctrl",
+>                 .of_match_table = mt8173_pctrl_match,
+> +               .pm = &mtk_eint_pm_ops,
+>         },
+>  };
+>
+> diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+> index ad1ea16..fe34ce9 100644
+> --- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+> +++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+> @@ -33,6 +33,7 @@
+>  #include <linux/mfd/syscon.h>
+>  #include <linux/delay.h>
+>  #include <linux/interrupt.h>
+> +#include <linux/pm.h>
+>  #include <dt-bindings/pinctrl/mt65xx.h>
+>
+>  #include "../core.h"
+> @@ -1062,6 +1063,77 @@ static int mtk_eint_set_type(struct irq_data *d,
+>         return 0;
+>  }
+>
+> +static int mtk_eint_irq_set_wake(struct irq_data *d, unsigned int on)
+> +{
+> +       struct mtk_pinctrl *pctl = irq_data_get_irq_chip_data(d);
+> +       int shift = d->hwirq & 0x1f;
+> +       int reg = d->hwirq >> 5;
+> +
+> +       if (on)
+> +               pctl->wake_mask[reg] |= BIT(shift);
+> +       else
+> +               pctl->wake_mask[reg] &= ~BIT(shift);
+> +
+> +       return 0;
+> +}
+> +
+> +static void mtk_eint_chip_write_mask(const struct mtk_eint_offsets *chip,
+> +               void __iomem *eint_reg_base, u32 *buf)
+> +{
+> +       int port;
+> +       void __iomem *reg;
+> +
+> +       for (port = 0; port < chip->ports; port++) {
+> +               reg = eint_reg_base + (port << 2);
+> +               writel_relaxed(~buf[port], reg + chip->mask_set);
+> +               writel_relaxed(buf[port], reg + chip->mask_clr);
+> +       }
+> +}
+> +
+> +static void mtk_eint_chip_read_mask(const struct mtk_eint_offsets *chip,
+> +               void __iomem *eint_reg_base, u32 *buf)
+> +{
+> +       int port;
+> +       void __iomem *reg;
+> +
+> +       for (port = 0; port < chip->ports; port++) {
+> +               reg = eint_reg_base + chip->mask + (port << 2);
+> +               buf[port] = ~readl_relaxed(reg);
+> +               /* Mask is 0 when irq is enabled, and 1 when disabled. */
+> +       }
+> +}
+> +
+> +static int mtk_eint_suspend(struct device *device)
+> +{
+> +       void __iomem *reg;
+> +       struct mtk_pinctrl *pctl = dev_get_drvdata(device);
+> +       const struct mtk_eint_offsets *eint_offsets =
+> +                       &pctl->devdata->eint_offsets;
+> +
+> +       reg = pctl->eint_reg_base;
+> +       mtk_eint_chip_read_mask(eint_offsets, reg, pctl->cur_mask);
+> +       mtk_eint_chip_write_mask(eint_offsets, reg, pctl->wake_mask);
+> +
+> +       return 0;
+> +}
+> +
+> +static int mtk_eint_resume(struct device *device)
+> +{
+> +       struct mtk_pinctrl *pctl = dev_get_drvdata(device);
+> +       const struct mtk_eint_offsets *eint_offsets =
+> +                       &pctl->devdata->eint_offsets;
+> +
+> +       mtk_eint_chip_write_mask(eint_offsets,
+> +                       pctl->eint_reg_base, pctl->cur_mask);
+> +
+> +       return 0;
+> +}
+> +
+> +const struct dev_pm_ops mtk_eint_pm_ops = {
+> +       .suspend = mtk_eint_suspend,
+> +       .resume = mtk_eint_resume,
+> +};
+> +
+>  static void mtk_eint_ack(struct irq_data *d)
+>  {
+>         struct mtk_pinctrl *pctl = irq_data_get_irq_chip_data(d);
+> @@ -1076,10 +1148,12 @@ static void mtk_eint_ack(struct irq_data *d)
+>
+>  static struct irq_chip mtk_pinctrl_irq_chip = {
+>         .name = "mt-eint",
+> +       .irq_disable = mtk_eint_mask,
+>         .irq_mask = mtk_eint_mask,
+>         .irq_unmask = mtk_eint_unmask,
+>         .irq_ack = mtk_eint_ack,
+>         .irq_set_type = mtk_eint_set_type,
+> +       .irq_set_wake = mtk_eint_irq_set_wake,
+>         .irq_request_resources = mtk_pinctrl_irq_request_resources,
+>         .irq_release_resources = mtk_pinctrl_irq_release_resources,
+>  };
+> @@ -1217,7 +1291,7 @@ int mtk_pctrl_init(struct platform_device *pdev,
+>         struct device_node *np = pdev->dev.of_node, *node;
+>         struct property *prop;
+>         struct resource *res;
+> -       int i, ret, irq;
+> +       int i, ret, irq, ports_buf;
+>
+>         pctl = devm_kzalloc(&pdev->dev, sizeof(*pctl), GFP_KERNEL);
+>         if (!pctl)
+> @@ -1319,6 +1393,21 @@ int mtk_pctrl_init(struct platform_device *pdev,
+>                 goto chip_error;
+>         }
+>
+> +       ports_buf = pctl->devdata->eint_offsets.ports;
+> +       pctl->wake_mask = devm_kcalloc(&pdev->dev, ports_buf,
+> +                                       sizeof(*pctl->wake_mask), GFP_KERNEL);
+> +       if (!pctl->wake_mask) {
+> +               ret = -ENOMEM;
+> +               goto chip_error;
+> +       }
+> +
+> +       pctl->cur_mask = devm_kcalloc(&pdev->dev, ports_buf,
+> +                                       sizeof(*pctl->cur_mask), GFP_KERNEL);
+> +       if (!pctl->cur_mask) {
+> +               ret = -ENOMEM;
+> +               goto chip_error;
+> +       }
+> +
+>         pctl->eint_dual_edges = devm_kcalloc(&pdev->dev, pctl->devdata->ap_num,
+>                                              sizeof(int), GFP_KERNEL);
+>         if (!pctl->eint_dual_edges) {
+> diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.h b/drivers/pinctrl/mediatek/pinctrl-mtk-common.h
+> index 30213e5..f1be8e8 100644
+> --- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.h
+> +++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.h
+> @@ -266,6 +266,8 @@ struct mtk_pinctrl {
+>         void __iomem            *eint_reg_base;
+>         struct irq_domain       *domain;
+>         int                     *eint_dual_edges;
+> +       u32 *wake_mask;
+> +       u32 *cur_mask;
+>  };
+>
+>  int mtk_pctrl_init(struct platform_device *pdev,
+> @@ -281,4 +283,6 @@ int mtk_pconf_spec_set_ies_smt_range(struct regmap *regmap,
+>                 const struct mtk_pin_ies_smt_set *ies_smt_infos, unsigned int info_num,
+>                 unsigned int pin, unsigned char align, int value);
+>
+> +extern const struct dev_pm_ops mtk_eint_pm_ops;
+> +
+>  #endif /* __PINCTRL_MTK_COMMON_H */
+> --
+> 1.8.1.1.dirty
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
