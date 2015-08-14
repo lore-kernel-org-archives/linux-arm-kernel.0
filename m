@@ -1,69 +1,112 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Fri, 14 Aug 2015 16:40:51 +0800
-Subject: [PATCH v3 08/10] Doc: usb: ci-hdrc-usb2: add
- tx(rx)-burst-config-dword for binding doc
-In-Reply-To: <1439541450.13210.31.camel@pengutronix.de>
-References: <1438931747-25209-1-git-send-email-peter.chen@freescale.com>
- <1438931747-25209-9-git-send-email-peter.chen@freescale.com>
- <1439541450.13210.31.camel@pengutronix.de>
-Message-ID: <20150814084050.GE11072@shlinux2>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Fri, 14 Aug 2015 10:52:01 +0100
+Subject: [PATCH 5/9] ARM: common: Introduce PM domains for CPUs/clusters
+In-Reply-To: <20150813192713.GA84868@linaro.org>
+References: <1438731339-58317-1-git-send-email-lina.iyer@linaro.org>
+ <1438731339-58317-6-git-send-email-lina.iyer@linaro.org>
+ <CAL_JsqK67=DTtjZwwnonObLDjLbahkREfm0RvyXVV95bhR-d4Q@mail.gmail.com>
+ <20150813150154.GB13356@red-moon> <20150813154503.GO52339@linaro.org>
+ <55CCD35C.4000901@arm.com> <20150813192713.GA84868@linaro.org>
+Message-ID: <55CDBA41.2080703@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 14, 2015 at 10:37:30AM +0200, Lucas Stach wrote:
-> Am Freitag, den 07.08.2015, 15:15 +0800 schrieb Peter Chen:
-> > It is used to override the default setting for burst size, changing
-> > burst size takes effect only when the SBUSCFG.AHBBRST = 0.
-> > 
-> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> > ---
-> >  Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt | 10 ++++++++++
-> >  1 file changed, 10 insertions(+)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt b/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt
-> > index d52a747..d71ef07 100644
-> > --- a/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt
-> > +++ b/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt
-> > @@ -37,6 +37,14 @@ Optional properties:
-> >    property is used to change AHB burst configuration, check the chipidea
-> >    spec for meaning of each value. If this property is not existed, it
-> >    will use the reset value.
-> > +- tx-burst-size-dword: it is vendor dependent, the tx burst size in dword
-> > +  (4 bytes), This register represents the maximum length of a the burst
-> > +  in 32-bit words while moving data from system memory to the USB
-> > +  bus, changing this value takes effect only the SBUSCFG.AHBBRST is 0.
-> 
-> The last bits about SBUSCFG.AHBBRST don't make any sense in the DT
-> binding. The DT writer doesn't know about the SBUSCFG.AHBBRST value and
-> should not care either.
-> If someone sets the burst size to something
-> non-standard in the DT, the driver should make sure to enable to
-> necessary bits to make this setting take effect.
 
-The SBUSCFG.AHBBRST property description is just above this one,
-and the user should read the spec for changing these system
-configuration parameters.
 
-This requirement is from the spec, and the code logic makes sure
-the burst size changes only when SBUSCFG.AHBBRST is 0, since the
-hardware will only change burst size if SBUSCFG.AHBBRST is 0.
+On 13/08/15 20:27, Lina Iyer wrote:
+> On Thu, Aug 13 2015 at 11:26 -0600, Sudeep Holla wrote:
+>>
 
-> 
-> Also both those descriptions are missing a description to what value the
-> burst sizes will be set if the DT properties are not found. If it's
-> implementation defined spell this out in the doc.
+[...]
 
-It is optional property, if without this property, it will use the
-default value.
+>>
+>> Having gone through this series and the one using it[1], the only common
+>> activity is just cluster pm notifiers. Other than that it's just
+>> creating indirection for now. The scenario might change in future, but
+>> for now it seems unnecessary.
+>>
+> Not sure, what seems unnecessary to you. Platforms do have to send
+> cluster PM notifications, and they have to duplicate reference counting.
+> Also PM domain framework allows hierarchy which is quite desirable to
+> power down parts of the SoC that are powered on or have to clocked high,
+> until the CPU is running.
+>
 
-> 
-> Are there really cases where it makes sense to set RX and TX burst sizes
-> to different values?
+Agreed, no argument on using genpd for CPU PM for all the goodies genpd
+provides, but the way this patch was creating the genpd domains. It
+needs to be part of your power controller.
 
-Yes, the default burst size is the same for all SoCs, but the bus
-burst size may be larger for some SoCs.
+> Cluster PM notifications are just one aspect of this that we currently
+> handle in the first submission. The patchset as a whole provides a way
+> to determine in Linux the last man down and the first man up and carry
+> out activities. There are a bunch of things that are done to power save
+> when the last man goes down - Turn off debuggers, switch off PLLs,
+> reduce bus clocks, flush caches amongst a few that I know of. Some of it
+> are platform specific and some of it arent. This patches provide the way
+> for both of them to be done easily. The CPU runtime PM and PM domains as
+> a framework, closely track what the hardware does.
+>
 
--- 
+Again no argument, I just favour common interface functions. Since each
+power controller/platform will have specific sequence, it might be hard
+to generalize that, but I may be wrong. OTH common interface functions
+to handle those components might give some flexibility to the power
+controllers.
 
-Best Regards,
-Peter Chen
+> Mentioned in an other mail in this thread, is also an option to
+> determine the cluster flush state and use it in conjunction with PSCI to
+> do OS-Initiated cluster power down.
+>
+
+I haven't yet explored down that route yet, with platform co-ordination
+we don't need much complexity in kernel :). OS co-ordination is a
+different story as we need to consider the secure/non-secure world
+dimensions there. We will have to consider the privileges/restrictions
+Linux has.
+
+>> Also if you look at the shmobile power controller driver, it covers all
+>> the devices including CPUs unlike QCOM power controller which handles
+>> only CPU. Yes we can skip CPU genpd creation there only for CPU, IMO
+>> creating the power domains should be part of power controller driver.
+>>
+>> You can add helper functions for all the ARM specific code that can be
+>> reused by multiple power controller drivers handling CPU/Cluster power
+>> domain.
+>>
+> Sure, some architectures may desire that. I have them addressed in [2].
+>
+
+I haven't looked at that yet, but will do soon.
+
+>>> An analogy to this would be the "arm,idle-state" that defines the DT
+>>> node as something that also depicts a generic cpuidle C state.
+>>>
+>>
+>> I tend to disagree. In idle-states, the nodes define that generic
+>> properties and they can be parsed in a generic way. That's not the case
+>> here. Each power controller binding differs.
+>>
+> Yes, may be we will have common elements like latency, residency of
+> powering on/off a domain that a genpd governor can utilize in
+> determining if its worth powering off the domain or not.
+>
+
+Make sense, but as Rob pointed how generic are those on various
+platforms is something we need to check considering few platforms before
+we build the generic infrastructure.
+
+>> Yes the generic compatible might be useful to identify that this power
+>> domain handles CPU/Cluster, but there will be more power controller
+>> specific things compared to generic code.
+>>
+> Agreed, not debating that. Power controller is very SoC specific, but
+> not debuggers, GIC, caches, buses etc. Many SoCs have almost similiar
+> needs for many of these supplemental hardware to the CPUs and trend
+> seems to be generalizing on many of these components.
+>
+
+Generalizing those components and using genpd is absolutely fine, just
+the mechanics is what I am debating on.
+
+Regards,
+Sudeep
