@@ -1,39 +1,52 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Fri, 14 Aug 2015 16:36:11 +0800
-Subject: [RFC PATCH v5 7/9] arm: lpc18xx_defconfig: remove CONFIG_MMC_DW_IDMAC
-In-Reply-To: <1439541232-30100-1-git-send-email-shawn.lin@rock-chips.com>
-References: <1439541232-30100-1-git-send-email-shawn.lin@rock-chips.com>
-Message-ID: <1439541371-30394-1-git-send-email-shawn.lin@rock-chips.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Fri, 14 Aug 2015 16:43:52 +0800
+Subject: CLK_IGNORE_UNUSE looks buggy
+Message-ID: <CAGsJ_4wxVL9sFWkc9dnZsAA++MfFJ1KXoq481wPLoQ-HaDRFEA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DesignWare MMC Controller's transfer mode should be decided
-at runtime instead of compile-time. So we remove this config
-option and read dw_mmc's register to select DMA master.
+hi Stephen, Michael,
 
-Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
-Acked-by: Joachim Eastwood <manabian@gmail.com>
----
+currently we can set a CLK_IGNORE_UNUSE flag to  a clock to stop
+clk_disable_unused()  from disabling it at the boot stage:
 
-Changes in v5: None
-Changes in v4: None
-Changes in v3: None
-Changes in v2: None
+static void clk_disable_unused_subtree(struct clk_core *core)
+{
+...
+if (core->flags & CLK_IGNORE_UNUSED)
+goto unlock_out;
 
- arch/arm/configs/lpc18xx_defconfig | 1 -
- 1 file changed, 1 deletion(-)
+...
+}
 
-diff --git a/arch/arm/configs/lpc18xx_defconfig b/arch/arm/configs/lpc18xx_defconfig
-index 1c47f86..b7e8cda 100644
---- a/arch/arm/configs/lpc18xx_defconfig
-+++ b/arch/arm/configs/lpc18xx_defconfig
-@@ -119,7 +119,6 @@ CONFIG_USB_EHCI_HCD=y
- CONFIG_USB_EHCI_ROOT_HUB_TT=y
- CONFIG_MMC=y
- CONFIG_MMC_DW=y
--CONFIG_MMC_DW_IDMAC=y
- CONFIG_NEW_LEDS=y
- CONFIG_LEDS_CLASS=y
- CONFIG_LEDS_PCA9532=y
--- 
-2.3.7
+static int clk_disable_unused(void)
+{
+...
+clk_unprepare_unused_subtree(core);
+...
+
+return 0;
+}
+late_initcall_sync(clk_disable_unused);
+
+so if there are two clocks A and B, A is the parent of B, and A is
+marked as CLK_IGNORE_UNUSED.
+
+in boot stage if there is nobody using A and B, Linux will disable B
+due to clk_disable_unused() , but keep A being enabled since A has
+CLK_IGNORE_UNUSED.
+
+but in Linux runtime, we might frequently disable /enable B in runtime
+power management, this will cause A disabled since Linux will not
+check CLK_IGNORE_UNUSED for runtime disabling clk .
+
+so this makes CLK_IGNORE_UNUSE only work if we don't disable its
+sub-clock at runtime. this looks making no sense.
+
+i am thinking whether we should do some changes to make it have side
+affect for runtime clk disable. otherwise, why do we want to stop it
+from being disabled during boot stage?
+
+I am not sure whether i missed something in clk core level support.
+
+-barry
