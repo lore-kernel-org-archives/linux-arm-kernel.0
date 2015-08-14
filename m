@@ -1,96 +1,58 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Fri, 14 Aug 2015 13:09:13 +0530
-Subject: [PATCH v2 3/6] mailbox: Add support for ST's Mailbox IP
-In-Reply-To: <20150814063343.GI8782@x1>
-References: <1437990272-23111-1-git-send-email-lee.jones@linaro.org>
- <1437990272-23111-4-git-send-email-lee.jones@linaro.org>
- <CABb+yY3NTHLx2N-sUABjxQW=MUCntdUg1d8kjvjH0dkb4n9EgA@mail.gmail.com>
- <20150814063343.GI8782@x1>
-Message-ID: <CABb+yY07A=jWvDgbPMpDdT=WPhwSzLumMGiJSB4NddTA4z7Hww@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 14 Aug 2015 09:46:41 +0200
+Subject: [PATCH v2 0/6] ARM: shmobile: Move gpio ranges from C code to DT
+In-Reply-To: <20150814003023.GC12589@verge.net.au>
+References: <1438696519-13727-1-git-send-email-geert+renesas@glider.be>
+ <20150805005540.GB20726@verge.net.au>
+ <CACRpkdY7P86+SxMr5-HnhrN5fC-N1U135jiGAJGTV=xx47VW5g@mail.gmail.com>
+ <CAMuHMdW0T6MW6s4Gg_rqvtt+MRPtp_MpuiKtamfFrx-Tcm6WmQ@mail.gmail.com>
+ <20150814003023.GC12589@verge.net.au>
+Message-ID: <CAMuHMdU0XoZ-comYSAau6e3kAY9VUbNgyeRcS_LzmV1gm31ZKA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 14, 2015 at 12:03 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> On Thu, 13 Aug 2015, Jassi Brar wrote:
->> On Mon, Jul 27, 2015 at 3:14 PM, Lee Jones <lee.jones@linaro.org> wrote:
->>
->> > +
->> > +static bool sti_mbox_tx_is_ready(struct mbox_chan *chan)
->> > +{
->> > +       struct sti_channel *chan_info = chan->con_priv;
->> > +       struct sti_mbox_device *mdev = chan_info->mdev;
->> > +       unsigned int instance = chan_info->instance;
->> > +       unsigned int channel = chan_info->channel;
->> > +       void __iomem *base = MBOX_BASE(mdev, instance);
->> > +
->> > +       if (!(chan_info->direction & MBOX_TX))
->> > +               return false;
+On Fri, Aug 14, 2015 at 2:30 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Thu, Aug 13, 2015 at 02:45:55PM +0200, Geert Uytterhoeven wrote:
+>> On Thu, Aug 13, 2015 at 2:29 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+>> > On Wed, Aug 5, 2015 at 2:55 AM, Simon Horman <horms@verge.net.au> wrote:
+>> >> Where possible I prefer not to apply non-DTS/DTSI patches on top of
+>> >> DTS/DTSI patches, I believe this is in keeping with how the ARM SoC
+>> >> maintainers like things handled.  With this in mind I have done the following:
+>> >>
+>> >> 1. Queued up the DTSI patches (patches 1 - 3) for v4.3 in my dt branch.
+>> >>    I intend for this to turn up in next soon.
+>> >> 2. Queued up for pinctrl patches (patches 4 - 6) for v4.4 in a pinctrl patch.
+>> >>    I intend for these to be present in the renesas devel branch but
+>> >>    not in next until after the release of v4.3-rc1. I would also be
+>> >>    happy to drop them and let Linus Walleij take these patches for v4.4,
+>> >>    assuming patches 1 - 3 are accepted for v4.3.
 >> >
->> Here the 'direction' is gotten via DT node of the client i.e, you
->> expect consumer drivers to tell the provider what its limitations are?
->>
->> IMO if some physical channel can't do TX then that should be either
->> hardcoded inside the controller driver or learnt via DT node of the
->> _controller_.
->
-> That's a fair point.
-.
-
->  I need to create a new property similar to the
-> already existing 'read-only'.  I guess 'tx-only' is equivalent.
->
-Just to be clear, if you must have such a property it should come from
-the _controller_ node.
-
-However at one point you said,  "Only the A9 (Mbox 0) can Rx."
-  Which sounds like the 'simplex' constraint is not coming from the
-mailbox controller but from the remote endpoints that don't RX+TX
-except for one of them. That makes more sense than a controller with
-differently capable physical channels. If that is indeed the
-situation, then the controller is actually 'duplex' and there should
-be no tx-only/rx-only property anywhere. Everything automatically
-falls into place because client drivers are written for specific
-targets and, unless you write some code, there can be no TX call to a
-remote that doesn't listen.
-
->> > +
->> > +       for (i = 0; i < mbox->num_chans; i++) {
->> > +               chan_info = mbox->chans[i].con_priv;
->> > +
->> > +               /* Is requested channel free? */
->> > +               if (direction != MBOX_LOOPBACK &&
+>> > OK.
 >> >
->> Consider this example when 2 clients ask for same physical channel but
->> in different modes.
->>            mboxes = <&mboxA 0 1 MBOX_TX>;
->>            mboxes = <&mboxA 0 1 MBOX_LOOPBACK>;
+>> > Will the world explode if I try to queue the pinctrl patches 4-6 in my
+>> > tree now for v4.3? Then I prefer to defer to v4.4. Else I can merge
+>> > it in parallel?
 >>
->> You happily assign 2 virtual channels backed by one physical channel
->> {mboxA, 0, 1}. The 2 clients think they can freely do startup(),
->> shutdown() and send_data() on the channels. But obviously we are
->> screwed with races like
->>    client1.startup()
->>     -> client2.startup()
->>         -> client2.send_data()
->>             -> client2.shutdown()
->>                 -> client1.send_data()  XXXX
+>> There won't be a mapping between gpio and pins in any branch having the
+>> pinctrl changes but not the dtsi changes.
 >
-> Good catch and a fair point.  As you say, it's unlikely to happen, but
-> I would like to prevent it in any case.
->
-No, such races are a practical problem. We must own them.
+> It sounds to me that Linus should take his option 2; defer to v4.4.
+> In which case I should drop the changes from my tree (they are not in next
+> anyway). Please let me know if thats the way we will move this forwards.
 
-I was talking about problems that arise because someone wrote bad
-DT... those are not 'practical' problems because there are too many
-ways to screw up with bad DT properties that if we try to check for
-them we'll go insane.
+Sounds fine to me.
 
->>  Now you can shove in some more checks to 'fix' the race OR you can
->> simply expose only physical channels.
->
-> We can't expose all of the channels.  There are too many and would
-> take up too much *unused* memory.
->
-I am aware of that. I said expose _only_ physical channels, not _all_ :)
+And in the unlikely event we discover regressions in v4.3-rc1 due to having
+the dtsi changes without the pinctrl changes, we can still fast-track them
+into v4.3-rc2.
 
-Cheers!
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
