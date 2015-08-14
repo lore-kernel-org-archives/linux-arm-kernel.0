@@ -1,20 +1,18 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 14 Aug 2015 17:38:20 +0200
+From: dv@vollmann.ch (Detlef Vollmann)
+Date: Fri, 14 Aug 2015 17:43:28 +0200
 Subject: commit a71b092 "ARM: Convert handle_IRQ to use
  __handle_domain_irq" breaks DNS-323
-In-Reply-To: <55CE0AD8.3030800@vollmann.ch>
+In-Reply-To: <55CE0636.3050205@arm.com>
 References: <55CDF5C3.7080204@vollmann.ch>
- <55CDF78F.6070001@free-electrons.com> <55CE0AD8.3030800@vollmann.ch>
-Message-ID: <55CE0B6C.509@free-electrons.com>
+ <55CDF78F.6070001@free-electrons.com> <55CE0636.3050205@arm.com>
+Message-ID: <55CE0CA0.5010806@vollmann.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Detlef,
-
-On 14/08/2015 17:35, Detlef Vollmann wrote:
-> Hi Gregory,
-> 
-> On 08/14/15 16:13, Gregory CLEMENT wrote:
+On 08/14/15 17:16, Marc Zyngier wrote:
+> On 14/08/15 15:13, Gregory CLEMENT wrote:
+>> Hi Detlef,
+>>
 >> On 14/08/2015 16:05, Detlef Vollmann wrote:
 >>> Hello,
 >>>
@@ -39,24 +37,16 @@ On 14/08/2015 17:35, Detlef Vollmann wrote:
 >> Could you try the following patch ?
 >>
 >> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/356501.html
-> Thanks for the pointer.
-> Yes, this patch fixes it :-)
-> 
-> I've also tested Arnd's patch at
-> 
-> http://git.kernel.org/cgit/linux/kernel/git/arnd/playground.git/commit/?h=multiplatform-4.2-next&id=44b55cab3bd74739e4c39205d41e1b2ed8953155
-> 
-> But at least in isolation this doesn't fix the problem.
+>
+> As a side note, having to revert that patch to get your system up and
+> running is a reliable indication that something is wrong with your
+> interrupt mapping, and that you are using 0 as a valid interrupt number
+> (which has been declared invalid a long time ago by the chief penguin).
+Well, in this case it wasn't me ;-)
+I wanted to avoid looking at the sources myself as the DNS-323 is still
+a widely used hardware.
 
-Thanks for doing these two tests, so I will take Benjamin and also add your
-Tested-by if you agree.
+> Hopefully Gregory has put you in the right direction.
+Yes.  Now I'll use that patch until some fix is accepted in mainline.
 
-Gregory
-
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+   Detlef
