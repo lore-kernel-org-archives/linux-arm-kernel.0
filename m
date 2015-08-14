@@ -1,91 +1,70 @@
-From: sjg@chromium.org (Simon Glass)
-Date: Fri, 14 Aug 2015 12:34:41 -0600
-Subject: [PATCH] arm: rpi: Device tree modifications for U-Boot
-In-Reply-To: <CAPnjgZ3ztXnkxZJvitiXiKMzq5+x46hbv0PW4HcF7yGgsXUV+Q@mail.gmail.com>
-References: <1439303153-12171-1-git-send-email-sjg@chromium.org>
- <1439312701.2451.3.camel@lynxeye.de>
- <CAPnjgZ3ztXnkxZJvitiXiKMzq5+x46hbv0PW4HcF7yGgsXUV+Q@mail.gmail.com>
-Message-ID: <CAPnjgZ0hzyjy=8o8ocaGCoOC7Js4CirhystidbvtabzbhRi4RQ@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 14 Aug 2015 19:46:50 +0100
+Subject: [PATCH] arm: footbridge_defconfig: disable IDE subsystem
+In-Reply-To: <4667234.QqV6GaKOSx@amdc1976>
+References: <1439571876-13758-1-git-send-email-b.zolnierkie@samsung.com>
+ <1439571876-13758-8-git-send-email-b.zolnierkie@samsung.com>
+ <20150814174330.GY7557@n2100.arm.linux.org.uk>
+ <4667234.QqV6GaKOSx@amdc1976>
+Message-ID: <20150814184649.GZ7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
--linux-tegra
+On Fri, Aug 14, 2015 at 08:08:13PM +0200, Bartlomiej Zolnierkiewicz wrote:
+> On Friday, August 14, 2015 06:43:30 PM Russell King - ARM Linux wrote:
+> > On Fri, Aug 14, 2015 at 07:04:23PM +0200, Bartlomiej Zolnierkiewicz wrote:
+> > > This patch disables deprecated IDE subsystem in footbridge_defconfig
+> > > (no IDE host drivers are selected in this config so there is no valid
+> > > reason to enable IDE subsystem itself).
+> > 
+> > That's actually incorrect.  I use IDE on Footbridge because it works
+> > loads with my CY82C693 board.  I never submitted the patches which make
+> > CY82C693 work on ARM though...
+> > 
+> > However, the CY82C693 must not be allowed to use DMA (which is why the
+> > ATA driver can't be used) - if it does, it locks the PCI bus.  It's
+> > a hardware incompatibility between some PCI devices and the Footbridge.
+> 
+> PATA driver is the same in this regard as IDE one.  They both try to
+> use DMA if supported by a device.  Would be great if you could fix
+> them (or at least PATA one) to limit your setup to PIO automatically
+> (please also note that you can limit libata to PIO manually these
+> days).
+> 
+> When it comes to CY82C693 there is also a leftover issue with PATA
+> driver that it only supports primary interface currently (BTW this is
+> why I left Alpha's defconfig alone for now - it uses CY82C693).  I can
+> look into fixing this (or assist in this work) if you are interested
+> in it.
 
-Hi,
+Well, it looks like the PCI layer has been screwed for this for some time:
 
-On 12 August 2015 at 07:21, Simon Glass <sjg@chromium.org> wrote:
-> Hi Lucas,
->
-> On 11 August 2015 at 11:05, Lucas Stach <dev@lynxeye.de> wrote:
->> Hi Simon,
->>
->> why did you send this to the Tegra ML?
->>
->> Am Dienstag, den 11.08.2015, 08:25 -0600 schrieb Simon Glass:
->>> This updates the device tree from the kernel version to something suitable
->>> for U-Boot:
->>>
->>> - Add stdout-path alias for console
->>> - Mark the /soc node to be available pre-relocation so that the early
->>> serial console works (we need the 'ranges' property to be available)
->>>
->>> Signed-off-by: Simon Glass <sjg@chromium.org>
->>> ---
->>>
->>>  arch/arm/boot/dts/bcm2835.dtsi | 4 +++-
->>>  1 file changed, 3 insertions(+), 1 deletion(-)
->>>
->>> diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
->>> index 301c73f..bd6bff6 100644
->>> --- a/arch/arm/boot/dts/bcm2835.dtsi
->>> +++ b/arch/arm/boot/dts/bcm2835.dtsi
->>> @@ -8,6 +8,7 @@
->>>
->>>       chosen {
->>>               bootargs = "earlyprintk console=ttyAMA0";
->>> +             stdout-path = &uart;
->>>       };
->>>
->>>       soc {
->>> @@ -16,6 +17,7 @@
->>>               #size-cells = <1>;
->>>               ranges = <0x7e000000 0x20000000 0x02000000>;
->>>               dma-ranges = <0x40000000 0x00000000 0x20000000>;
->>> +             u-boot,dm-pre-reloc;
->>
->> Why do you need this and why should upstream carry your favourite
->> bootloaders configuration? This is in no way hardware description.
->
-> I'm not sure how much you know about U-Boot, so let me know if you
-> need more info.
->
-> U-Boot normally starts up by setting up its serial UART and displaying
-> a banner message. At this stage typically only a few devices are
-> initialised (e.g. maybe just the UART). It then relocates itself to
-> the top of memory and starts up all the devices. It throws away any
-> previous devices that it set up before relocation and starts again.
->
-> U-Boot uses a thing called driver model (dm) which handles driver
-> binding and probing. Driver model has the device tree and would
-> normally scan through it and create devices for everything it finds.
->
-> Before relocation we don't need every device. Also the CPU is often
-> running slowly, perhaps without the cache enabled. SDRAM may not be
-> available yet so space is short. We want to avoid starting up things
-> that will not be used.
->
-> So this property indicates that the device is needed before relocation
-> and should be set up by driver model. We need it to avoid a very slow
-> and memory-hungry startup.
->
-> As to why upstream should accept it, my understanding of upstream is
-> that people can send patches to it and in fact are encouraged to do
-> so, to avoid misunderstandings and duplication. The device tree files
-> are stored in Linux so any binding or source file changes should end
-> up there. Otherwise the files tend to diverge and we end up with
-> multiple bindings and multiple versions of the same source file.
+cy82c693 0000:00:06.1: IDE controller (0x1080:0xc693 rev 0x00)
+Cypress_IDE 0000:00:06.1: device not available (can't reserve [io  0x0170-0x0177])
+Cypress_IDE 0000:00:06.1: device not available (can't reserve [io  0x0170-0x0177])
+cy82c693 0000:00:06.1: couldn't enable device
+Cypress_IDE: probe of 0000:00:06.1 failed with error -22
 
-Is the above explanation sufficient? Will this patch be applied?
+The PCI layer forces the standard legacy ports onto the Cypress device,
+and then the "primary" resources get null'd out by the long-standing
+CY82C693 quirk in the ARM bios32.c.
 
-Regards,
-Simon
+However - the ARM quick is not what causes the above - the above looks
+to be caused by the generic PCI code going wrong - it adds those
+legacy resources, and nothing ever connects them to the resource tree:
+
+000000a0-000000bf : pic2
+000000c0-000000df : dma2
+00000213-00000213 : ISAPnP
+000002f8-000002ff : serial8250.0
+
+which then causes pci_enable_device() to fail.
+
+I doubt CY82C693 even works on Alpha... or any IDE interface using the
+legacy IO ports...  So it may take quite a bit of work to get going
+again - not something I'm going to attempt prior to the 4.3 merge
+window.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
