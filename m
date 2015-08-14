@@ -1,74 +1,61 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 14 Aug 2015 16:44:02 +0100
-Subject: [PATCH 2/3] powerpc: PCI: Fix lookup of linux,pci-probe-only
- property
-In-Reply-To: <20150814145755.GE26431@google.com>
-References: <1439563268-13418-1-git-send-email-marc.zyngier@arm.com>
- <1439563268-13418-3-git-send-email-marc.zyngier@arm.com>
- <20150814145755.GE26431@google.com>
-Message-ID: <55CE0CC2.7010705@arm.com>
+From: dv@vollmann.ch (Detlef Vollmann)
+Date: Fri, 14 Aug 2015 17:45:02 +0200
+Subject: commit a71b092 "ARM: Convert handle_IRQ to use
+ __handle_domain_irq" breaks DNS-323
+In-Reply-To: <55CE0B6C.509@free-electrons.com>
+References: <55CDF5C3.7080204@vollmann.ch>
+ <55CDF78F.6070001@free-electrons.com> <55CE0AD8.3030800@vollmann.ch>
+ <55CE0B6C.509@free-electrons.com>
+Message-ID: <55CE0CFE.4040206@vollmann.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+On 08/14/15 17:38, Gregory CLEMENT wrote:
+> Hi Detlef,
+>
+> On 14/08/2015 17:35, Detlef Vollmann wrote:
+>> Hi Gregory,
+>>
+>> On 08/14/15 16:13, Gregory CLEMENT wrote:
+>>> On 14/08/2015 16:05, Detlef Vollmann wrote:
+>>>> Hello,
+>>>>
+>>>> this commit:
+>>>>    > commit a71b092a9c68685a270ebdde7b5986ba8787e575
+>>>>    > Author: Marc Zyngier <marc.zyngier@arm.com>
+>>>>    > Date:   Tue Aug 26 11:03:18 2014 +0100
+>>>>    >
+>>>>    >     ARM: Convert handle_IRQ to use __handle_domain_irq
+>>>> [...]
+>>>> causes the kernel not to boot anymore on my DNS-323.
+>>>> Soc: MV88F5182 Rev 2
+>>>> CPU: ARM926 (Rev 0) running @ 500Mhz
+>>>> CPU: Feroceon [41069260] revision 0 (ARMv5TEJ), cr=a005317f
+>>>> Orion ID: MV88F5182-A2. TCLK=166666667.
+>>>> DNS-323: Identified HW revision B1
+>>>>
+>>>> Boot stops after "Uncompressing Linux... done, booting the kernel."
+>>>> Reverting the commit works fine for me.
+>>>> Tested 4.1.2 and 4.2.0-rc6 with orion5x_defconfig.
+>>>
+>>> Could you try the following patch ?
+>>>
+>>> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/356501.html
+>> Thanks for the pointer.
+>> Yes, this patch fixes it :-)
+>>
+>> I've also tested Arnd's patch at
+>>
+>> http://git.kernel.org/cgit/linux/kernel/git/arnd/playground.git/commit/?h=multiplatform-4.2-next&id=44b55cab3bd74739e4c39205d41e1b2ed8953155
+>>
+>> But at least in isolation this doesn't fix the problem.
+>
+> Thanks for doing these two tests,
+Well, thanks for the pointer!
 
-On 14/08/15 15:57, Bjorn Helgaas wrote:
-> Hi Marc,
-> 
-> On Fri, Aug 14, 2015 at 03:41:07PM +0100, Marc Zyngier wrote:
->> When find_and_init_phbs() looks for the probe-only property, it seems
->> to trust the firmware to be correctly written, and assumes that there
->> is a parameter to the property.
->>
->> It is conceivable that the firmware could not be that perfect, and it
->> could expose this property naked (at least one arm64 platform seems to
->> exhibit this exact behaviour). The setup code the ends up making
->> a decision based on whatever the property pointer points to, which
->> is likely to be junk.
->>
->> Instead, let's check for the validity of the property, and ignore
->> it if the firmware couldn't make up its mind.
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  arch/powerpc/platforms/pseries/setup.c | 15 ++++++++++-----
->>  1 file changed, 10 insertions(+), 5 deletions(-)
->>
->> diff --git a/arch/powerpc/platforms/pseries/setup.c b/arch/powerpc/platforms/pseries/setup.c
->> index df6a704..6bdc1f9 100644
->> --- a/arch/powerpc/platforms/pseries/setup.c
->> +++ b/arch/powerpc/platforms/pseries/setup.c
->> @@ -490,14 +490,19 @@ static void __init find_and_init_phbs(void)
->>  	 */
->>  	if (of_chosen) {
->>  		const int *prop;
->> +		int len;
->>  
->>  		prop = of_get_property(of_chosen,
->> -				"linux,pci-probe-only", NULL);
->> +				"linux,pci-probe-only", &len);
->>  		if (prop) {
->> -			if (*prop)
->> -				pci_add_flags(PCI_PROBE_ONLY);
->> -			else
->> -				pci_clear_flags(PCI_PROBE_ONLY);
->> +			if (len) {
->> +				if (be32_to_cpup(prop))
->> +					pci_add_flags(PCI_PROBE_ONLY);
->> +				else
->> +					pci_clear_flags(PCI_PROBE_ONLY);
->> +			} else {
->> +				pr_warn("linux,pci-probe-only set without value, ignoring\n");
->> +			}
-> 
-> This seems essentially identical to the pci-host-generic version.
-> Is there a way we can factor it out so there's only one copy?
-
-Probably. drivers/of/of_pci.c seems like a good landing place for it.
-I'll hack something and repost it.
+> so I will take Benjamin and also add your
+> Tested-by if you agree.
+Fine by me.
 
 Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+   Detlef
