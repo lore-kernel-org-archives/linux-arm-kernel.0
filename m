@@ -1,48 +1,67 @@
 From: lho@apm.com (Loc Ho)
-Date: Fri, 14 Aug 2015 00:46:06 -0600
-Subject: [PATCH v4 1/4] edac: Export edac_debugfs
-In-Reply-To: <1439534769-22811-1-git-send-email-lho@apm.com>
+Date: Fri, 14 Aug 2015 00:46:07 -0600
+Subject: [PATCH v4 2/4] Documentation: Update the APM X-Gene SoC EDAC DTS
+ binding for L3/SoC subnodes
+In-Reply-To: <1439534769-22811-2-git-send-email-lho@apm.com>
 References: <1439534769-22811-1-git-send-email-lho@apm.com>
-Message-ID: <1439534769-22811-2-git-send-email-lho@apm.com>
+ <1439534769-22811-2-git-send-email-lho@apm.com>
+Message-ID: <1439534769-22811-3-git-send-email-lho@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch exports and expose the edac_debugfs file node. This allows
-EDAC driver to create debugfs node under the EDAC debugfs node.
+This patch updates documentation for the APM X-Gene SoC EDAC DTS binding
+for L3/SoC subnodes.
 
 Signed-off-by: Loc Ho <lho@apm.com>
 ---
- drivers/edac/edac_core.h     |    1 +
- drivers/edac/edac_mc_sysfs.c |    5 +++--
- 2 files changed, 4 insertions(+), 2 deletions(-)
+ .../devicetree/bindings/edac/apm-xgene-edac.txt    |   23 ++++++++++++++++++++
+ 1 files changed, 23 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/edac/edac_core.h b/drivers/edac/edac_core.h
-index ad42587..a978a4f 100644
---- a/drivers/edac/edac_core.h
-+++ b/drivers/edac/edac_core.h
-@@ -511,5 +511,6 @@ extern void edac_pci_remove_sysfs(struct edac_pci_ctl_info *pci);
-  * edac misc APIs
-  */
- extern char *edac_op_state_to_string(int op_state);
-+extern struct dentry *edac_debugfs;
+diff --git a/Documentation/devicetree/bindings/edac/apm-xgene-edac.txt b/Documentation/devicetree/bindings/edac/apm-xgene-edac.txt
+index 78edb80..78e2a31 100644
+--- a/Documentation/devicetree/bindings/edac/apm-xgene-edac.txt
++++ b/Documentation/devicetree/bindings/edac/apm-xgene-edac.txt
+@@ -5,6 +5,8 @@ The follow error types are supported:
  
- #endif				/* _EDAC_CORE_H_ */
-diff --git a/drivers/edac/edac_mc_sysfs.c b/drivers/edac/edac_mc_sysfs.c
-index 33df7d9..236e76c 100644
---- a/drivers/edac/edac_mc_sysfs.c
-+++ b/drivers/edac/edac_mc_sysfs.c
-@@ -896,9 +896,10 @@ static struct device_type mci_attr_type = {
- 	.release	= mci_attr_release,
- };
+   memory controller	- Memory controller
+   PMD (L1/L2)		- Processor module unit (PMD) L1/L2 cache
++  L3			- L3 cache controller
++  SoC			- SoC IP's such as Ethernet, SATA, and etc
  
--#ifdef CONFIG_EDAC_DEBUG
--static struct dentry *edac_debugfs;
-+struct dentry *edac_debugfs;
-+EXPORT_SYMBOL_GPL(edac_debugfs);
+ The following section describes the EDAC DT node binding.
  
-+#ifdef CONFIG_EDAC_DEBUG
- int __init edac_debugfs_init(void)
- {
- 	edac_debugfs = debugfs_create_dir("edac", NULL);
+@@ -30,6 +32,17 @@ Required properties for PMD subnode:
+ - reg			: First resource shall be the PMD resource.
+ - pmd-controller	: Instance number of the PMD controller.
+ 
++Required properties for L3 subnode:
++- compatible		: Shall be "apm,xgene-edac-l3" or
++                          "apm,xgene-edac-l3-v2".
++- reg			: First resource shall be the L3 EDAC resource.
++
++Required properties for SoC subnode:
++- compatible		: Shall be "apm,xgene-edac-soc-v1" for revision 1 or
++                          "apm,xgene-edac-l3-soc" for general value reporting
++                          only.
++- reg			: First resource shall be the SoC EDAC resource.
++
+ Example:
+ 	csw: csw at 7e200000 {
+ 		compatible = "apm,xgene-csw", "syscon";
+@@ -76,4 +89,14 @@ Example:
+ 			reg = <0x0 0x7c000000 0x0 0x200000>;
+ 			pmd-controller = <0>;
+ 		};
++
++		edacl3 at 7e600000 {
++			compatible = "apm,xgene-edac-l3";
++			reg = <0x0 0x7e600000 0x0 0x1000>;
++		};
++
++		edacsoc at 7e930000 {
++			compatible = "apm,xgene-edac-soc-v1";
++			reg = <0x0 0x7e930000 0x0 0x1000>;
++		};
+ 	};
 -- 
 1.7.1
