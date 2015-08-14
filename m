@@ -1,46 +1,26 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 14 Aug 2015 19:37:13 +0200
-Subject: [PATCH] ARM: rockchip: pm: Fix PTR_ERR() argument
-In-Reply-To: <1439520199-16076-1-git-send-email-festevam@gmail.com>
-References: <1439520199-16076-1-git-send-email-festevam@gmail.com>
-Message-ID: <1447521.3N0AVjqGBX@ubix>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 14 Aug 2015 18:43:30 +0100
+Subject: [PATCH] arm: footbridge_defconfig: disable IDE subsystem
+In-Reply-To: <1439571876-13758-8-git-send-email-b.zolnierkie@samsung.com>
+References: <1439571876-13758-1-git-send-email-b.zolnierkie@samsung.com>
+ <1439571876-13758-8-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <20150814174330.GY7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, August 13, 2015 11:43:19 PM Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-> PTR_ERR should access the value just tested by IS_ERR.
-> 
-> The semantic patch that makes this change is available
-> in scripts/coccinelle/tests/odd_ptr_err.cocci.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
+On Fri, Aug 14, 2015 at 07:04:23PM +0200, Bartlomiej Zolnierkiewicz wrote:
+> This patch disables deprecated IDE subsystem in footbridge_defconfig
+> (no IDE host drivers are selected in this config so there is no valid
+> reason to enable IDE subsystem itself).
 
-Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
+That's actually incorrect.  I use IDE on Footbridge because it works
+loads with my CY82C693 board.  I never submitted the patches which make
+CY82C693 work on ARM though...
 
->  arch/arm/mach-rockchip/pm.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-rockchip/pm.c b/arch/arm/mach-rockchip/pm.c
-> index 892bace..01123dd 100644
-> --- a/arch/arm/mach-rockchip/pm.c
-> +++ b/arch/arm/mach-rockchip/pm.c
-> @@ -224,14 +224,14 @@ static int rk3288_suspend_init(struct device_node *np)
-> "rockchip,rk3288-sgrf");
->  	if (IS_ERR(sgrf_regmap)) {
->  		pr_err("%s: could not find sgrf regmap\n", __func__);
-> -		return PTR_ERR(pmu_regmap);
-> +		return PTR_ERR(sgrf_regmap);
->  	}
-> 
->  	grf_regmap = syscon_regmap_lookup_by_compatible(
->  				"rockchip,rk3288-grf");
->  	if (IS_ERR(grf_regmap)) {
->  		pr_err("%s: could not find grf regmap\n", __func__);
-> -		return PTR_ERR(pmu_regmap);
-> +		return PTR_ERR(grf_regmap);
->  	}
-> 
->  	sram_np = of_find_compatible_node(NULL, NULL,
+However, the CY82C693 must not be allowed to use DMA (which is why the
+ATA driver can't be used) - if it does, it locks the PCI bus.  It's
+a hardware incompatibility between some PCI devices and the Footbridge.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
