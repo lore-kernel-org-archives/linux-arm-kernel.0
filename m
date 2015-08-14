@@ -1,126 +1,50 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Fri, 14 Aug 2015 16:20:59 +0200
-Subject: [PATCH] ARM: keystone: add a work around to handle asynchronous
- external abort
-In-Reply-To: <20150814140934.GX7557@n2100.arm.linux.org.uk>
-References: <1439320409-20084-1-git-send-email-m-karicheri2@ti.com>
- <55CDF579.4050408@ti.com> <20150814140934.GX7557@n2100.arm.linux.org.uk>
-Message-ID: <1439562059.13210.61.camel@pengutronix.de>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Fri, 14 Aug 2015 16:11:03 +0200
+Subject: [PATCH v3 6/9] gpiolib-sysfs: Show gpio-name in
+ /sys/class/gpio/gpio*/name
+In-Reply-To: <1439561466-14350-1-git-send-email-mpa@pengutronix.de>
+References: <1439561466-14350-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <1439561466-14350-7-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+This patch adds a sysfs attribute 'name' to gpios that were exported. It
+exposes the newly added name property of gpio descriptors.
 
-Am Freitag, den 14.08.2015, 15:09 +0100 schrieb Russell King - ARM
-Linux:
-
-[...]
-
-> 
-> What causes the abort?  We shouldn't be adding hacks like this to the
-> kernel without having the full picture...
-> 
-
-some of the issues with tracking down such imprecise external aborts are
-due to the fact that we only enable the signaling of those aborts on
-entering the user-space. So the first schedule() crashes on the previous
-dangling abort.
-
-I'm carrying this patch locally to enable imprecise aborts much earlier
-in the boot process. I think it has already been on the list some times,
-but apparently it has fallen through the cracks. If you agree that this
-is the right thing to do I can do a proper repost.
-
-Regards,
-Lucas
-
----------------------->8---------------------------------------------
->From bb9117d94cc2f1061dc364f42c446ccd9191e869 Mon Sep 17 00:00:00 2001
-From: Lucas Stach <l.stach@pengutronix.de>
-Date: Thu, 19 Feb 2015 18:12:50 +0100
-Subject: [PATCH] ARM: Add imprecise abort enable/disable macro
-
-This patch adds imprecise abort enable/disable macros.
-It also enables imprecise aborts when starting kernel.
-
-Changes in v2:
-Only ARMv6 and later have CPSR.A bit. On earlier CPUs,
-and ARMv7M this should be a no-op.
-
-Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 ---
-lst: rebased on v3.19
----
- arch/arm/include/asm/irqflags.h | 10 ++++++++++
- arch/arm/kernel/smp.c           |  1 +
- arch/arm/kernel/traps.c         |  4 ++++
- 3 files changed, 15 insertions(+)
+ drivers/gpio/gpiolib-sysfs.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/arch/arm/include/asm/irqflags.h
-b/arch/arm/include/asm/irqflags.h
-index 3b763d6652a0..8301f875564e 100644
---- a/arch/arm/include/asm/irqflags.h
-+++ b/arch/arm/include/asm/irqflags.h
-@@ -51,6 +51,14 @@ static inline void arch_local_irq_disable(void)
+diff --git a/drivers/gpio/gpiolib-sysfs.c b/drivers/gpio/gpiolib-sysfs.c
+index 3e81f28e3aee..2022cfb00aeb 100644
+--- a/drivers/gpio/gpiolib-sysfs.c
++++ b/drivers/gpio/gpiolib-sysfs.c
+@@ -139,6 +139,17 @@ static ssize_t value_store(struct device *dev,
+ }
+ static DEVICE_ATTR_RW(value);
  
- #define local_fiq_enable()  __asm__("cpsie f   @ __stf" : : : "memory",
-"cc")
- #define local_fiq_disable() __asm__("cpsid f   @ __clf" : : : "memory",
-"cc")
++static ssize_t name_show(struct device *dev, struct device_attribute *attr,
++			 char *buf)
++{
++	struct gpiod_data *data = dev_get_drvdata(dev);
++	struct gpio_desc *desc = data->desc;
 +
-+#ifndef CONFIG_CPU_V7M
-+#define local_abt_enable()  __asm__("cpsie a   @ __sta" : : : "memory",
-"cc")
-+#define local_abt_disable() __asm__("cpsid a   @ __cla" : : : "memory",
-"cc")
-+#else
-+#define local_abt_enable()     do { } while (0)
-+#define local_abt_disable()    do { } while (0)
-+#endif
- #else
- 
- /*
-@@ -130,6 +138,8 @@ static inline void arch_local_irq_disable(void)
-        : "memory", "cc");                                      \
-        })
- 
-+#define local_abt_enable()     do { } while (0)
-+#define local_abt_disable()    do { } while (0)
- #endif
- 
- /*
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 86ef244c5a24..7b6b93cabef4 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -378,6 +378,7 @@ asmlinkage void secondary_start_kernel(void)
- 
-        local_irq_enable();
-        local_fiq_enable();
-+       local_abt_enable();
- 
-        /*
-         * OK, it's off to the idle thread for us
-diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-index 788e23fe64d8..466726ba9bdb 100644
---- a/arch/arm/kernel/traps.c
-+++ b/arch/arm/kernel/traps.c
-@@ -881,6 +881,10 @@ void __init early_trap_init(void *vectors_base)
- 
-        flush_icache_range(vectors, vectors + PAGE_SIZE * 2);
-        modify_domain(DOMAIN_USER, DOMAIN_CLIENT);
++	return sprintf(buf, "%s\n", desc->name ? : "");
++}
 +
-+       /* Enable imprecise aborts */
-+       local_abt_enable();
++static DEVICE_ATTR_RO(name);
 +
- #else /* ifndef CONFIG_CPU_V7M */
-        /*
-         * on V7-M there is no need to copy the vector table to a
-dedicated
+ static irqreturn_t gpio_sysfs_irq(int irq, void *priv)
+ {
+ 	struct gpiod_data *data = priv;
+@@ -377,6 +388,7 @@ static struct attribute *gpio_attrs[] = {
+ 	&dev_attr_edge.attr,
+ 	&dev_attr_value.attr,
+ 	&dev_attr_active_low.attr,
++	&dev_attr_name.attr,
+ 	NULL,
+ };
+ 
 -- 
-2.1.4
-
--- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+2.4.6
