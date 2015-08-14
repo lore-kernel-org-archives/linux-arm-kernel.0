@@ -1,33 +1,58 @@
 From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Fri, 14 Aug 2015 19:04:34 +0200
-Subject: [PATCH] arm: shannon_defconfig: disable IDE subsystem
+Date: Fri, 14 Aug 2015 19:04:31 +0200
+Subject: [RFT PATCH] arm: omap1_defconfig: convert to use libata PATA drivers
 In-Reply-To: <1439571876-13758-1-git-send-email-b.zolnierkie@samsung.com>
 References: <1439571876-13758-1-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <1439571876-13758-19-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <1439571876-13758-16-git-send-email-b.zolnierkie@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch disables deprecated IDE subsystem in shannon_defconfig
-(no IDE host drivers are selected in this config so there is no
-valid reason to enable IDE subsystem itself).
+IDE subsystem has been deprecated since 2009 and the majority
+(if not all) of Linux distributions have switched to use
+libata for ATA support exclusively.  However there are still
+some users (mostly old or/and embedded non-x86 systems) that
+have not converted from using IDE subsystem to libata PATA
+drivers.  This doesn't seem to be good thing in the long-term
+for Linux as while there is less and less PATA systems left
+in use:
 
-Cc: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+* testing efforts are divided between two subsystems
+
+* having duplicate drivers for same hardware confuses users
+
+This patch converts omap1_defconfig to use libata PATA
+drivers.
+
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: linux-omap at vger.kernel.org
 Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 ---
- arch/arm/configs/shannon_defconfig | 1 -
- 1 file changed, 1 deletion(-)
+Build tested only.
+If you have affected hardware please test.  Thank you.
 
-diff --git a/arch/arm/configs/shannon_defconfig b/arch/arm/configs/shannon_defconfig
-index b0b9694..e523956 100644
---- a/arch/arm/configs/shannon_defconfig
-+++ b/arch/arm/configs/shannon_defconfig
-@@ -25,7 +25,6 @@ CONFIG_MTD_CFI_AMDSTD=y
- CONFIG_MTD_SA1100=y
+ arch/arm/configs/omap1_defconfig | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/configs/omap1_defconfig b/arch/arm/configs/omap1_defconfig
+index 0c8a787..6ffc984 100644
+--- a/arch/arm/configs/omap1_defconfig
++++ b/arch/arm/configs/omap1_defconfig
+@@ -96,14 +96,14 @@ CONFIG_BLK_DEV_LOOP=y
  CONFIG_BLK_DEV_RAM=y
+ CONFIG_BLK_DEV_RAM_COUNT=2
  CONFIG_BLK_DEV_RAM_SIZE=8192
 -CONFIG_IDE=m
+-CONFIG_BLK_DEV_IDECS=m
+ CONFIG_SCSI=y
+ # CONFIG_SCSI_PROC_FS is not set
+ CONFIG_BLK_DEV_SD=y
+ CONFIG_CHR_DEV_ST=y
+ CONFIG_BLK_DEV_SR=y
+ CONFIG_CHR_DEV_SG=y
++CONFIG_ATA=m
++CONFIG_PATA_PCMCIA=m
  CONFIG_NETDEVICES=y
- CONFIG_NET_ETHERNET=y
- CONFIG_NET_PCMCIA=y
+ CONFIG_TUN=y
+ CONFIG_PHYLIB=y
 -- 
 1.9.1
