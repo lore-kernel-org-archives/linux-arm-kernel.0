@@ -1,133 +1,242 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Fri, 14 Aug 2015 15:20:24 +0300
-Subject: [PATCH v3 0/6] genirq: irqdomain_hierarchy: fixes
-Message-ID: <1439554830-19502-1-git-send-email-grygorii.strashko@ti.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Fri, 14 Aug 2015 14:35:50 +0200
+Subject: [PATCH v2 12/15] KVM: arm64: sync LPI configuration and pending
+ tables
+In-Reply-To: <55CDD7CB.9020103@linaro.org>
+References: <1436538111-4294-1-git-send-email-andre.przywara@arm.com>
+ <1436538111-4294-13-git-send-email-andre.przywara@arm.com>
+ <55CDD7CB.9020103@linaro.org>
+Message-ID: <55CDE0A6.5010906@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+On 08/14/2015 01:58 PM, Eric Auger wrote:
+> On 07/10/2015 04:21 PM, Andre Przywara wrote:
+>> The LPI configuration and pending tables of the GICv3 LPIs are held
+>> in tables in (guest) memory. To achieve reasonable performance, we
+>> cache this data in our own data structures, so we need to sync those
+>> two views from time to time. This behaviour is well described in the
+>> GICv3 spec and is also exercised by hardware, so the sync points are
+>> well known.
+>>
+>> Provide functions that read the guest memory and store the
+>> information from the configuration and pending tables in the kernel.
+>>
+>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>> ---
+> would help to have change log between v1 -> v2 (valid for the whole series)
+>>  include/kvm/arm_vgic.h  |   2 +
+>>  virt/kvm/arm/its-emul.c | 124 ++++++++++++++++++++++++++++++++++++++++++++++++
+>>  virt/kvm/arm/its-emul.h |   3 ++
+>>  3 files changed, 129 insertions(+)
+>>
+>> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+>> index 2a67a10..323c33a 100644
+>> --- a/include/kvm/arm_vgic.h
+>> +++ b/include/kvm/arm_vgic.h
+>> @@ -167,6 +167,8 @@ struct vgic_its {
+>>  	int			cwriter;
+>>  	struct list_head	device_list;
+>>  	struct list_head	collection_list;
+>> +	/* memory used for buffering guest's memory */
+>> +	void			*buffer_page;
+>>  };
+>>  
+>>  struct vgic_dist {
+>> diff --git a/virt/kvm/arm/its-emul.c b/virt/kvm/arm/its-emul.c
+>> index b9c40d7..05245cb 100644
+>> --- a/virt/kvm/arm/its-emul.c
+>> +++ b/virt/kvm/arm/its-emul.c
+>> @@ -50,6 +50,7 @@ struct its_itte {
+>>  	struct its_collection *collection;
+>>  	u32 lpi;
+>>  	u32 event_id;
+>> +	u8 priority;
+>>  	bool enabled;
+>>  	unsigned long *pending;
+>>  };
+>> @@ -70,8 +71,124 @@ static struct its_itte *find_itte_by_lpi(struct kvm *kvm, int lpi)
+>>  	return NULL;
+>>  }
+>>  
+>> +#define LPI_PROP_ENABLE_BIT(p)	((p) & LPI_PROP_ENABLED)
+>> +#define LPI_PROP_PRIORITY(p)	((p) & 0xfc)
+>> +
+>> +/* stores the priority and enable bit for a given LPI */
+>> +static void update_lpi_config(struct kvm *kvm, struct its_itte *itte, u8 prop)
+>> +{
+>> +	itte->priority = LPI_PROP_PRIORITY(prop);
+>> +	itte->enabled  = LPI_PROP_ENABLE_BIT(prop);
+>> +}
+>> +
+>> +#define GIC_LPI_OFFSET 8192
+>> +
+>> +/* We scan the table in chunks the size of the smallest page size */
+> 4kB chunks?
+>> +#define CHUNK_SIZE 4096U
+>> +
+>>  #define BASER_BASE_ADDRESS(x) ((x) & 0xfffffffff000ULL)
+>>  
+>> +static int nr_idbits_propbase(u64 propbaser)
+>> +{
+>> +	int nr_idbits = (1U << (propbaser & 0x1f)) + 1;
+>> +
+>> +	return max(nr_idbits, INTERRUPT_ID_BITS_ITS);
+>> +}
+>> +
+>> +/*
+>> + * Scan the whole LPI configuration table and put the LPI configuration
+>> + * data in our own data structures. This relies on the LPI being
+>> + * mapped before.
+>> + */
+>> +static bool its_update_lpis_configuration(struct kvm *kvm)
+>> +{
+>> +	struct vgic_dist *dist = &kvm->arch.vgic;
+>> +	u8 *prop = dist->its.buffer_page;
+>> +	u32 tsize;
+>> +	gpa_t propbase;
+>> +	int lpi = GIC_LPI_OFFSET;
+>> +	struct its_itte *itte;
+>> +	struct its_device *device;
+>> +	int ret;
+>> +
+>> +	propbase = BASER_BASE_ADDRESS(dist->propbaser);
+>> +	tsize = nr_idbits_propbase(dist->propbaser);
+>> +
+>> +	while (tsize > 0) {
+>> +		int chunksize = min(tsize, CHUNK_SIZE);
+>> +
+>> +		ret = kvm_read_guest(kvm, propbase, prop, chunksize);
+> I think you still have the spin_lock issue  since if my understanding is
+> correct this is called from
+> vgic_handle_mmio_access/vcall_range_handler/gic_enable_lpis
+> where vgic_handle_mmio_access. Or does it take another path?
+> 
+> Shouldn't we create a new kvm_io_device to avoid holding the dist lock?
 
-I've had able to identify and reproduce four issues related to switching on
-using IRQ domain hierarchy on TI OMAP DRA7 (dra7-evm). Most of them were
-discovered during testing of Suspend to RAM and IRQ wakeup functionality.
-In my opinion, most of these issue could also affect on other ARM SoC if
-they are using IRQ domain hierarchy.
+Sorry I forgot it was the case already. But currently we always register
+the same io ops (registration entry point being
+vgic_register_kvm_io_dev) and maybe we should have separate dispatcher
+function for dist, redit and its?
 
-In case of TI OMAP DRA7 the following IRQ hierarchy is defined:
- ARM GIC <- OMAP wakeupgen <- TI CBAR
-
-Issue 1 - patch 1: IRQ re-triggering is not working if IRQ domain
-hierarchy used in combination with ARM GIC and irq_chip_retrigger_hierarchy()
-is used by child IRQ domain.
-
-Issue 2 - patches 2-4: ARM GIC IRQ triggering type is not configured
-properly when IRQ is routed through IRQ domain hierarchy and
-system started using DT. As result, system will start using default
-ARM GIC configuration, ignore DT IRQ triggering configuration,
-and value of desc->irq_data.state_use_accessors = 0.
-
-/ # cat /proc/interrupts -- before
-230:          0          0      CBAR  30 Edge    -00000000  48051000.gpio
-263:          0          0      CBAR 116 Edge    -00000000  48053000.gpio
-296:        246          0      CBAR  67 Edge    -00000000  OMAP UART0
-311:        341          0      CBAR  51 Edge    -00000000  48070000.i2c
-312:          3          0      CBAR  52 Edge    -00000000  48072000.i2c
-313:          0          0      CBAR  56 Edge    -00000000  48060000.i2c
-314:        255          0      CBAR  78 Edge    -00000000  mmc0
-315:         40          0      CBAR  81 Edge    -00000000  mmc1
-316:         13          0      CBAR  91 Edge    -00000000  mmc2
-320:          0          0      CBAR  49 Edge    -00000000  4a140000.sata
-324:          0          0      CBAR   1 Edge    -00000000  48078000.elm
-325:          0          0      CBAR  15 Edge    -00000000  gpmc
-333:          0          0      CBAR 335 Edge    -00000000  48484000.ethernet
-334:          0          0      CBAR 336 Edge    -00000000  48484000.ethernet
-415:          0          0   pcf857x   2 Edge    -00000000  btnUser1
-416:          0          0   pcf857x   3 Edge    -00000000  btnUser2
-445:          0          0   pinctrl 992 Edge    -00010000  4806a000.seria
-
-/ # cat /proc/interrupts -- after
-230:          0          0      CBAR  30 Level   -00002004  48051000.gpio
-263:          0          0      CBAR 116 Level   -00002004  48053000.gpio
-296:        567          0      CBAR  67 Level   -00002004  OMAP UART0
-311:        363          0      CBAR  51 Level   -00002004  48070000.i2c
-312:          3          0      CBAR  52 Level   -00002004  48072000.i2c
-313:          0          0      CBAR  56 Level   -00002004  48060000.i2c
-314:        197          0      CBAR  78 Level   -00002004  mmc0
-315:         40          0      CBAR  81 Level   -00002004  mmc1
-316:         13          0      CBAR  91 Level   -00002004  mmc2
-320:          0          0      CBAR  49 Level   -00002004  4a140000.sata
-324:          0          0      CBAR   1 Level   -00002004  48078000.elm
-325:          0          0      CBAR  15 Level   -00002004  gpmc
-333:          0          0      CBAR 335 Level   -00002004  48484000.ethernet
-334:          0          0      CBAR 336 Level   -00002004  48484000.ethernet
-415:          0          0   pcf857x   2 Edge    -00000000  btnUser1
-416:          4          2   pcf857x   3 Edge    -00000000  btnUser2
-445:          0          0   pinctrl 992 Edge    -00010000  4806a000.serial
-
--xxxxxxxx are current values of desc->irq_data.state_use_accessors
-
-Issue 3 - patch 5: ARM GIC IRQs are not masked during suspend even
-if they are not wakeup source. 
-	This issue related to IRQCHIP MASK ON SUSPEND flag usage and,
-honestly, it's not clear how this flag has to be processed in
-case of IRQ domain hierarchy - previously there was one IRQ chip per IRQ
-desc and if it has IRQCHIP MASK ON SUSPEND flag set we had to mask IRQ.
-But now there are up to three (DRA7) IRQ chip per IRQ desc, and all of them
-could have different IRQCHIP MASK ON SUSPEND flag's configuration.
-	Here, to fix an issue, I've just added IRQCHIP MASK ON SUSPEND flag
-to TI Crossbar which is the last IRQ domain in hierarchy.
-
-Issue 4 - patch 6: On TI dra7-evm, when irq_set_irq_type() is called for
-IRQ which belongs to IRQ domain hierarchy the .irq_set_wake() callback
-will be executed for TI Crossbar IRQ chip. The TI Crossbar doesn't provides
-any facility to configure the wakeup sources, but it implements
-.irq_set_wake() callback as:
-	.irq_set_wake		= irq_chip_set_wake_parent
-As result, the irq_chip_set_wake_parent() will try to execute
-.irq_set_wake() callback for parent IRQ domain, which is TI OMAP wakeupgen,
-but TI OMAP wakeupgen has IRQCHIP_SKIP_SET_WAKE flag set and do not
-implement .irq_set_wake() callback. Thus, irq_chip_set_wake_parent() will
-fail with -ENOSYS, but it shouldn't.
-
-IRQ domain hierarchy code was merged in 4.1, so it seems these patches
-are material for stable 4.1+.
-
-Tested on:
- TI OMAP DRA7, dra7-evm
-
-Series based on:
- Linux 4.2-rc6
-
-Changes in v3:
- - copy-past issue fixed in patch 'genirq: introduce
-   irq_chip_set_type_parent() helper'
- - dropped patch 'genirq: fix irqchip_set_wake_parent if
-   IRQCHIP_SKIP_SET_WAKE'
- - added patch 'irqchip: crossbar: fix set_wake functionality'
-
-Changes in v2:
-- initial patch has been split on three;
-- added three more patches.
-
-Links:
- v2: https://lkml.org/lkml/2015/8/12/759
- v1: https://lkml.org/lkml/2015/8/11/179
-
-Cc: Sudeep Holla <sudeep.holla@arm.com>
-Cc: Jiang Liu <jiang.liu@linux.intel.com>
-Grygorii Strashko (6):
-  genirq: fix irq_chip_retrigger_hierarchy
-  genirq: introduce irq_chip_set_type_parent() helper
-  irqchip: crossbar: fix arm gic irq type configuration
-  ARM: OMAP: wakeupgen: fix arm gic irq type configuration
-  irqchip: crossbar: fix irq masking at suspend
-  irqchip: crossbar: fix set_wake functionality
-
- arch/arm/mach-omap2/omap-wakeupgen.c |  1 +
- drivers/irqchip/irq-crossbar.c       |  4 +++-
- include/linux/irq.h                  |  1 +
- kernel/irq/chip.c                    | 19 ++++++++++++++++++-
- 4 files changed, 23 insertions(+), 2 deletions(-)
-
--- 
-2.5.0
+Eric
+> 
+> Eric
+>> +		if (ret)
+>> +			return false;
+>> +
+>> +		spin_lock(&dist->its.lock);
+>> +		/*
+>> +		 * Updating the status for all allocated LPIs. We catch
+>> +		 * those LPIs that get disabled. We really don't care
+>> +		 * about unmapped LPIs, as they need to be updated
+>> +		 * later manually anyway once they get mapped.
+>> +		 */
+>> +		for_each_lpi(device, itte, kvm) {
+>> +			if (itte->lpi < lpi || itte->lpi >= lpi + chunksize)
+>> +				continue;
+>> +
+>> +			update_lpi_config(kvm, itte, prop[itte->lpi - lpi]);
+>> +		}
+>> +		spin_unlock(&dist->its.lock);
+>> +		tsize -= chunksize;
+>> +		lpi += chunksize;
+>> +		propbase += chunksize;
+>> +	}
+>> +
+>> +	return true;
+>> +}
+>> +
+>> +/*
+>> + * Scan the whole LPI pending table and sync the pending bit in there
+>> + * with our own data structures. This relies on the LPI being
+>> + * mapped before.
+>> + */
+>> +static bool its_sync_lpi_pending_table(struct kvm_vcpu *vcpu)
+>> +{
+>> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+>> +	unsigned long *pendmask = dist->its.buffer_page;
+>> +	u32 nr_lpis = VITS_NR_LPIS;
+>> +	gpa_t pendbase;
+>> +	int lpi = 0;
+>> +	struct its_itte *itte;
+>> +	struct its_device *device;
+>> +	int ret;
+>> +	int lpi_bit, nr_bits;
+>> +
+>> +	pendbase = BASER_BASE_ADDRESS(dist->pendbaser[vcpu->vcpu_id]);
+>> +
+>> +	while (nr_lpis > 0) {
+>> +		nr_bits = min(nr_lpis, CHUNK_SIZE * 8);
+>> +
+>> +		ret = kvm_read_guest(vcpu->kvm, pendbase, pendmask,
+>> +				     nr_bits / 8);
+>> +		if (ret)
+>> +			return false;
+>> +
+>> +		spin_lock(&dist->its.lock);
+>> +		for_each_lpi(device, itte, vcpu->kvm) {
+>> +			lpi_bit = itte->lpi - lpi;
+>> +			if (lpi_bit < 0 || lpi_bit >= nr_bits)
+>> +				continue;
+>> +			if (test_bit(lpi_bit, pendmask))
+>> +				__set_bit(vcpu->vcpu_id, itte->pending);
+>> +			else
+>> +				__clear_bit(vcpu->vcpu_id, itte->pending);
+>> +		}
+>> +		spin_unlock(&dist->its.lock);
+>> +		nr_lpis -= nr_bits;
+>> +		lpi += nr_bits;
+>> +		pendbase += nr_bits / 8;
+>> +	}
+>> +
+>> +	return true;
+>> +}
+>> +
+>>  /* The distributor lock is held by the VGIC MMIO handler. */
+>>  static bool handle_mmio_misc_gits(struct kvm_vcpu *vcpu,
+>>  				  struct kvm_exit_mmio *mmio,
+>> @@ -389,6 +506,8 @@ static const struct vgic_io_range vgicv3_its_ranges[] = {
+>>  /* This is called on setting the LPI enable bit in the redistributor. */
+>>  void vgic_enable_lpis(struct kvm_vcpu *vcpu)
+>>  {
+>> +	its_update_lpis_configuration(vcpu->kvm);
+>> +	its_sync_lpi_pending_table(vcpu);
+>>  }
+>>  
+>>  int vits_init(struct kvm *kvm)
+>> @@ -400,6 +519,10 @@ int vits_init(struct kvm *kvm)
+>>  	if (!dist->pendbaser)
+>>  		return -ENOMEM;
+>>  
+>> +	its->buffer_page = kmalloc(CHUNK_SIZE, GFP_KERNEL);
+>> +	if (!its->buffer_page)
+>> +		return -ENOMEM;
+>> +
+>>  	spin_lock_init(&its->lock);
+>>  
+>>  	INIT_LIST_HEAD(&its->device_list);
+>> @@ -442,6 +565,7 @@ void vits_destroy(struct kvm *kvm)
+>>  		kfree(container_of(cur, struct its_collection, coll_list));
+>>  	}
+>>  
+>> +	kfree(its->buffer_page);
+>>  	kfree(dist->pendbaser);
+>>  
+>>  	its->enabled = false;
+>> diff --git a/virt/kvm/arm/its-emul.h b/virt/kvm/arm/its-emul.h
+>> index cc5d5ff..cbc3877 100644
+>> --- a/virt/kvm/arm/its-emul.h
+>> +++ b/virt/kvm/arm/its-emul.h
+>> @@ -29,6 +29,9 @@
+>>  
+>>  #include "vgic.h"
+>>  
+>> +#define INTERRUPT_ID_BITS_ITS 16
+>> +#define VITS_NR_LPIS (1U << INTERRUPT_ID_BITS_ITS)
+>> +
+>>  void vgic_enable_lpis(struct kvm_vcpu *vcpu);
+>>  int vits_init(struct kvm *kvm);
+>>  void vits_destroy(struct kvm *kvm);
+>>
+> 
