@@ -1,162 +1,75 @@
 From: rric@kernel.org (Robert Richter)
-Date: Fri, 14 Aug 2015 15:18:36 +0200
-Subject: [PATCH v3 2/6] irqchip,
- gicv3: Add HW revision detection and configuration
+Date: Fri, 14 Aug 2015 15:18:35 +0200
+Subject: [PATCH v3 1/6] irqchip,
+ gicv3-its: Add range check for number of allocated pages
 In-Reply-To: <1439558320-5777-1-git-send-email-rric@kernel.org>
 References: <1439558320-5777-1-git-send-email-rric@kernel.org>
-Message-ID: <1439558320-5777-3-git-send-email-rric@kernel.org>
+Message-ID: <1439558320-5777-2-git-send-email-rric@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Robert Richter <rrichter@cavium.com>
 
-Some GIC revisions require an individual configuration to esp. add
-workarounds for HW bugs. This patch implements generic code to parse
-the hw revision provided by an IIDR register value and runs specific
-code if hw matches. There are functions that read the IIDR registers
-for GICV3 and ITS (GICD_IIDR/GITS_IIDR) and then go through a list of
-init functions to be called for specific versions.
+The number of pages for the its table may exceed the maximum of 256.
+Adding a range check and limitting the number to its maximum.
 
-A MIDR register value may also be used, this is especially useful for
-hw detection from a guest.
+Based on a patch from Tirumalesh Chalamarla <tchalamarla@cavium.com>.
 
-The patch is needed to implement workarounds for HW errata in Cavium's
-ThunderX GICV3.
-
-v3:
- * use arm64 errata framework for midr check
-
-v2:
- * adding MIDR check
-
+Signed-off-by: Tirumalesh Chalamarla <tchalamarla@cavium.com>
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Robert Richter <rrichter@cavium.com>
 ---
- drivers/irqchip/irq-gic-common.c | 13 +++++++++++++
- drivers/irqchip/irq-gic-common.h | 10 ++++++++++
- drivers/irqchip/irq-gic-v3-its.c | 15 +++++++++++++++
- drivers/irqchip/irq-gic-v3.c     | 14 ++++++++++++++
- 4 files changed, 52 insertions(+)
+ drivers/irqchip/irq-gic-v3-its.c   | 11 ++++++++++-
+ include/linux/irqchip/arm-gic-v3.h |  1 +
+ 2 files changed, 11 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/irqchip/irq-gic-common.c b/drivers/irqchip/irq-gic-common.c
-index 9448e391cb71..f5e901a62ea5 100644
---- a/drivers/irqchip/irq-gic-common.c
-+++ b/drivers/irqchip/irq-gic-common.c
-@@ -21,6 +21,19 @@
- 
- #include "irq-gic-common.h"
- 
-+void gic_check_capabilities(u32 iidr, const struct gic_capabilities *cap,
-+			void *data)
-+{
-+	for (; cap->desc; cap++) {
-+		if (cap->cpu_cap && !cpus_have_cap(cap->cpu_cap))
-+			continue;
-+		if (cap->iidr != (cap->mask & iidr))
-+			continue;
-+		cap->init(data);
-+		pr_info("%s\n", cap->desc);
-+	}
-+}
-+
- int gic_configure_irq(unsigned int irq, unsigned int type,
- 		       void __iomem *base, void (*sync_access)(void))
- {
-diff --git a/drivers/irqchip/irq-gic-common.h b/drivers/irqchip/irq-gic-common.h
-index 35a9884778bd..6d019a238f3b 100644
---- a/drivers/irqchip/irq-gic-common.h
-+++ b/drivers/irqchip/irq-gic-common.h
-@@ -20,10 +20,20 @@
- #include <linux/of.h>
- #include <linux/irqdomain.h>
- 
-+struct gic_capabilities {
-+	const char *desc;
-+	void (*init)(void *data);
-+	u32 iidr;
-+	u32 mask;
-+	u16 cpu_cap;
-+};
-+
- int gic_configure_irq(unsigned int irq, unsigned int type,
-                        void __iomem *base, void (*sync_access)(void));
- void gic_dist_config(void __iomem *base, int gic_irqs,
- 		     void (*sync_access)(void));
- void gic_cpu_config(void __iomem *base, void (*sync_access)(void));
-+void gic_check_capabilities(u32 iidr, const struct gic_capabilities *cap,
-+			void *data);
- 
- #endif /* _IRQ_GIC_COMMON_H */
 diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 466edf8a7477..105674037618 100644
+index 1b7e155869f6..466edf8a7477 100644
 --- a/drivers/irqchip/irq-gic-v3-its.c
 +++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -36,6 +36,7 @@
- #include <asm/cputype.h>
- #include <asm/exception.h>
+@@ -810,6 +810,7 @@ static int its_alloc_tables(struct its_node *its)
+ 		u64 entry_size = GITS_BASER_ENTRY_SIZE(val);
+ 		int order = get_order(psz);
+ 		int alloc_size;
++		int alloc_pages;
+ 		u64 tmp;
+ 		void *base;
  
-+#include "irq-gic-common.h"
- #include "irqchip.h"
+@@ -844,6 +845,14 @@ static int its_alloc_tables(struct its_node *its)
+ 		}
  
- #define ITS_FLAGS_CMDQ_NEEDS_FLUSHING		(1 << 0)
-@@ -1391,6 +1392,18 @@ static int its_force_quiescent(void __iomem *base)
- 	}
- }
+ 		alloc_size = (1 << order) * PAGE_SIZE;
++		alloc_pages = (alloc_size / psz);
++		if (alloc_pages > GITS_BASER_PAGES_MAX) {
++			alloc_pages = GITS_BASER_PAGES_MAX;
++			order = get_order(GITS_BASER_PAGES_MAX * psz);
++			pr_warn("%s: Device Table too large, reduce its page order to %u (%u pages)\n",
++				its->msi_chip.of_node->full_name, order, alloc_pages);
++		}
++
+ 		base = (void *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, order);
+ 		if (!base) {
+ 			err = -ENOMEM;
+@@ -872,7 +881,7 @@ static int its_alloc_tables(struct its_node *its)
+ 			break;
+ 		}
  
-+static const struct gic_capabilities its_errata[] = {
-+	{
-+	}
-+};
-+
-+static void its_check_capabilities(struct its_node *its)
-+{
-+	u32 iidr = readl_relaxed(its->base + GITS_IIDR);
-+
-+	gic_check_capabilities(iidr, its_errata, its);
-+}
-+
- static int its_probe(struct device_node *node, struct irq_domain *parent)
- {
- 	struct resource res;
-@@ -1449,6 +1462,8 @@ static int its_probe(struct device_node *node, struct irq_domain *parent)
- 	}
- 	its->cmd_write = its->cmd_base;
+-		val |= (alloc_size / psz) - 1;
++		val |= alloc_pages - 1;
  
-+	its_check_capabilities(its);
-+
- 	err = its_alloc_tables(its);
- 	if (err)
- 		goto out_free_cmd;
-diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-index c52f7ba205b4..1a91902be0b1 100644
---- a/drivers/irqchip/irq-gic-v3.c
-+++ b/drivers/irqchip/irq-gic-v3.c
-@@ -766,6 +766,18 @@ static const struct irq_domain_ops gic_irq_domain_ops = {
- 	.free = gic_irq_domain_free,
- };
+ 		writeq_relaxed(val, its->base + GITS_BASER + i * 8);
+ 		tmp = readq_relaxed(its->base + GITS_BASER + i * 8);
+diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+index ffbc034c8810..f28da189c4aa 100644
+--- a/include/linux/irqchip/arm-gic-v3.h
++++ b/include/linux/irqchip/arm-gic-v3.h
+@@ -229,6 +229,7 @@
+ #define GITS_BASER_PAGE_SIZE_16K	(1UL << GITS_BASER_PAGE_SIZE_SHIFT)
+ #define GITS_BASER_PAGE_SIZE_64K	(2UL << GITS_BASER_PAGE_SIZE_SHIFT)
+ #define GITS_BASER_PAGE_SIZE_MASK	(3UL << GITS_BASER_PAGE_SIZE_SHIFT)
++#define GITS_BASER_PAGES_MAX		256
  
-+static const struct gic_capabilities gicv3_errata[] = {
-+	{
-+	}
-+};
-+
-+static void gicv3_check_capabilities(void)
-+{
-+	u32 iidr = readl_relaxed(gic_data.dist_base + GICD_IIDR);
-+
-+	gic_check_capabilities(iidr, gicv3_errata, NULL);
-+}
-+
- static int __init gic_of_init(struct device_node *node, struct device_node *parent)
- {
- 	void __iomem *dist_base;
-@@ -825,6 +837,8 @@ static int __init gic_of_init(struct device_node *node, struct device_node *pare
- 	gic_data.nr_redist_regions = nr_redist_regions;
- 	gic_data.redist_stride = redist_stride;
- 
-+	gicv3_check_capabilities();
-+
- 	/*
- 	 * Find out how many interrupts are supported.
- 	 * The GIC only supports up to 1020 interrupt sources (SGI+PPI+SPI)
+ #define GITS_BASER_TYPE_NONE		0
+ #define GITS_BASER_TYPE_DEVICE		1
 -- 
 2.1.1
