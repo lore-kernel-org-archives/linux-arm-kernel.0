@@ -1,29 +1,68 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Fri, 14 Aug 2015 14:55:07 +0000
-Subject: [PATCH v6 3/6] PCI: designware: Add ARM64 support
-In-Reply-To: <55CDFFC0.40604@arm.com>
-References: <1438848559-232109-1-git-send-email-wangzhou1@hisilicon.com>
- <1438848559-232109-4-git-send-email-wangzhou1@hisilicon.com>
- <55C44B18.4010103@hisilicon.com> <55CDFFC0.40604@arm.com>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E01D7BC19@lhreml503-mbs>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Fri, 14 Aug 2015 09:57:55 -0500
+Subject: [PATCH 2/3] powerpc: PCI: Fix lookup of linux,pci-probe-only
+ property
+In-Reply-To: <1439563268-13418-3-git-send-email-marc.zyngier@arm.com>
+References: <1439563268-13418-1-git-send-email-marc.zyngier@arm.com>
+ <1439563268-13418-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20150814145755.GE26431@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> 
-> I've tested this whole series on an ARM32 PCIe board:'Freescale i.MX6
-> Quad
-> SABRE Lite Board' with an Intel wireless card on v4.2-rc6.
-> 
-> I can rescan the bus, load firmware, list nearby APs, and even get MSIs
-> coming from the card.
-> 
-> Tested-By: James Morse <james.morse@arm.com>
-> 
-> 
-> Thanks,
-> 
-> James
+Hi Marc,
 
-Many Thanks for this James!
+On Fri, Aug 14, 2015 at 03:41:07PM +0100, Marc Zyngier wrote:
+> When find_and_init_phbs() looks for the probe-only property, it seems
+> to trust the firmware to be correctly written, and assumes that there
+> is a parameter to the property.
+> 
+> It is conceivable that the firmware could not be that perfect, and it
+> could expose this property naked (at least one arm64 platform seems to
+> exhibit this exact behaviour). The setup code the ends up making
+> a decision based on whatever the property pointer points to, which
+> is likely to be junk.
+> 
+> Instead, let's check for the validity of the property, and ignore
+> it if the firmware couldn't make up its mind.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/powerpc/platforms/pseries/setup.c | 15 ++++++++++-----
+>  1 file changed, 10 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/powerpc/platforms/pseries/setup.c b/arch/powerpc/platforms/pseries/setup.c
+> index df6a704..6bdc1f9 100644
+> --- a/arch/powerpc/platforms/pseries/setup.c
+> +++ b/arch/powerpc/platforms/pseries/setup.c
+> @@ -490,14 +490,19 @@ static void __init find_and_init_phbs(void)
+>  	 */
+>  	if (of_chosen) {
+>  		const int *prop;
+> +		int len;
+>  
+>  		prop = of_get_property(of_chosen,
+> -				"linux,pci-probe-only", NULL);
+> +				"linux,pci-probe-only", &len);
+>  		if (prop) {
+> -			if (*prop)
+> -				pci_add_flags(PCI_PROBE_ONLY);
+> -			else
+> -				pci_clear_flags(PCI_PROBE_ONLY);
+> +			if (len) {
+> +				if (be32_to_cpup(prop))
+> +					pci_add_flags(PCI_PROBE_ONLY);
+> +				else
+> +					pci_clear_flags(PCI_PROBE_ONLY);
+> +			} else {
+> +				pr_warn("linux,pci-probe-only set without value, ignoring\n");
+> +			}
 
-Gab
+This seems essentially identical to the pci-host-generic version.
+Is there a way we can factor it out so there's only one copy?
+
+>  		}
+>  	}
+>  }
+> -- 
+> 2.1.4
+> 
