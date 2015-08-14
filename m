@@ -1,52 +1,75 @@
 From: rric@kernel.org (Robert Richter)
-Date: Fri, 14 Aug 2015 15:18:38 +0200
-Subject: [PATCH v3 4/6] irqchip,
- gicv3-its: Read typer register outside the loop
+Date: Fri, 14 Aug 2015 15:18:40 +0200
+Subject: [PATCH v3 6/6] arm64: errata: Match all cpus if capability value is
+ zero
 In-Reply-To: <1439558320-5777-1-git-send-email-rric@kernel.org>
 References: <1439558320-5777-1-git-send-email-rric@kernel.org>
-Message-ID: <1439558320-5777-5-git-send-email-rric@kernel.org>
+Message-ID: <1439558320-5777-7-git-send-email-rric@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Robert Richter <rrichter@cavium.com>
 
-No need to read the typer register in the loop. Values do not change.
+This patch make caps usable optionally. If its value is zero, then all
+cpus are matched. E.g. if caps resides in a stuct for marking it
+dependend on a certain cpu feature/errata, then an empty value will
+indicate not to use caps detection. An empty value will match all cpus
+and thus just skip the cpu feature test.
 
-This patch is basically a prerequisite for a follow-on patch that adds
-errata code for Cavium ThunderX. It moves the calculation of the
-number of id entries to the beginning of the function close to other
-setup values that are needed to allocate the its table. Now we have a
-central location to modify the setup parameters and the errata code
-can be implemented in a single block.
-
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Robert Richter <rrichter@cavium.com>
 ---
- drivers/irqchip/irq-gic-v3-its.c | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
+ arch/arm64/include/asm/cpufeature.h | 17 +++++++++++------
+ drivers/irqchip/irq-gic-common.c    |  2 +-
+ 2 files changed, 12 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 105674037618..bf0659821683 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -804,6 +804,8 @@ static int its_alloc_tables(struct its_node *its)
- 	int psz = SZ_64K;
- 	u64 shr = GITS_BASER_InnerShareable;
- 	u64 cache = GITS_BASER_WaWb;
-+	u64 typer = readq_relaxed(its->base + GITS_TYPER);
-+	u32 ids = GITS_TYPER_DEVBITS(typer);
+diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+index 2a5e4c163ee5..a5f8a007d982 100644
+--- a/arch/arm64/include/asm/cpufeature.h
++++ b/arch/arm64/include/asm/cpufeature.h
+@@ -21,13 +21,15 @@
+ #define MAX_CPU_FEATURES	(8 * sizeof(elf_hwcap))
+ #define cpu_feature(x)		ilog2(HWCAP_ ## x)
  
- 	for (i = 0; i < GITS_BASER_NR_REGS; i++) {
- 		u64 val = readq_relaxed(its->base + GITS_BASER + i * 8);
-@@ -827,9 +829,6 @@ static int its_alloc_tables(struct its_node *its)
- 		 * For other tables, only allocate a single page.
- 		 */
- 		if (type == GITS_BASER_TYPE_DEVICE) {
--			u64 typer = readq_relaxed(its->base + GITS_TYPER);
--			u32 ids = GITS_TYPER_DEVBITS(typer);
--
- 			/*
- 			 * 'order' was initialized earlier to the default page
- 			 * granule of the the ITS.  We can't have an allocation
+-#define ARM64_WORKAROUND_CLEAN_CACHE		0
+-#define ARM64_WORKAROUND_DEVICE_LOAD_ACQUIRE	1
+-#define ARM64_WORKAROUND_845719			2
+-#define ARM64_HAS_SYSREG_GIC_CPUIF		3
+-#define ARM64_WORKAROUND_CAVIUM_23154		4
++/* reserve zero to match all cpus for use of caps in empty structs */
++#define ARM64_ALL_CPUS				0
++#define ARM64_WORKAROUND_CLEAN_CACHE		1
++#define ARM64_WORKAROUND_DEVICE_LOAD_ACQUIRE	2
++#define ARM64_WORKAROUND_845719			3
++#define ARM64_HAS_SYSREG_GIC_CPUIF		4
++#define ARM64_WORKAROUND_CAVIUM_23154		5
+ 
+-#define ARM64_NCAPS				5
++#define ARM64_NCAPS				6
+ 
+ #ifndef __ASSEMBLY__
+ 
+@@ -57,6 +59,9 @@ static inline bool cpu_have_feature(unsigned int num)
+ 
+ static inline bool cpus_have_cap(unsigned int num)
+ {
++	/* zero matches for all cpus */
++	if (!num)
++		return true;
+ 	if (num >= ARM64_NCAPS)
+ 		return false;
+ 	return test_bit(num, cpu_hwcaps);
+diff --git a/drivers/irqchip/irq-gic-common.c b/drivers/irqchip/irq-gic-common.c
+index f5e901a62ea5..cb55aaf960bb 100644
+--- a/drivers/irqchip/irq-gic-common.c
++++ b/drivers/irqchip/irq-gic-common.c
+@@ -25,7 +25,7 @@ void gic_check_capabilities(u32 iidr, const struct gic_capabilities *cap,
+ 			void *data)
+ {
+ 	for (; cap->desc; cap++) {
+-		if (cap->cpu_cap && !cpus_have_cap(cap->cpu_cap))
++		if (!cpus_have_cap(cap->cpu_cap))
+ 			continue;
+ 		if (cap->iidr != (cap->mask & iidr))
+ 			continue;
 -- 
 2.1.1
