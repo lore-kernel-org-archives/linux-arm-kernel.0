@@ -1,50 +1,84 @@
-From: rnayak@codeaurora.org (Rajendra Nayak)
-Date: Fri, 14 Aug 2015 08:39:06 +0530
-Subject: [PATCH 5/9] clk: qcom: gcc-msm8960: add child devices support.
-In-Reply-To: <20150814004206.GU26614@codeaurora.org>
-References: <1436348838-22671-1-git-send-email-rnayak@codeaurora.org>
- <1436348838-22671-6-git-send-email-rnayak@codeaurora.org>
- <20150811224902.GO2839@codeaurora.org> <55CB0B26.2020105@linaro.org>
- <55CC1CFE.7000005@codeaurora.org> <20150814004206.GU26614@codeaurora.org>
-Message-ID: <55CD5BD2.3070907@codeaurora.org>
+From: Dongsheng.Wang@freescale.com (Wang Dongsheng)
+Date: Fri, 14 Aug 2015 03:12:13 +0000
+Subject: [PATCH 2/2] soc/fsl: add ftm alarm driver for ls1021a platform
+In-Reply-To: <CACRpkdbninKuGzhEc5mN+85j-=w_wYQgra-Ark_Du6gWKN2=tg@mail.gmail.com>
+References: <1439358807-9024-1-git-send-email-dongsheng.wang@freescale.com>
+ <1439358807-9024-2-git-send-email-dongsheng.wang@freescale.com>
+ <CACRpkdbninKuGzhEc5mN+85j-=w_wYQgra-Ark_Du6gWKN2=tg@mail.gmail.com>
+Message-ID: <SN1PR0301MB161682A7FC5200580BED09119D7C0@SN1PR0301MB1616.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[]..
->>>> Also, I don't like having a subnode in DT. Why can't we use the
->>>> same node as the GCC node and create a virtual child device here
->>>> for tsens? We can assign the same of_node that this platform
->>>> device has so that DT keeps working correctly.
->>
->> So the current driver looks up data based on compatible strings.
->
-> The tsens device is always the same piece of hardware. The only
 
-Well, not always. The one in 8960 does need additional initializations,
-requires you to save/restore context as it can be powered off
-not being in an always powered on domain etc.
 
-> thing that's changing is the qfprom data and the number of
-> sensors. So we should be looking at the qfprom compatible string
+> -----Original Message-----
+> From: Linus Walleij [mailto:linus.walleij at linaro.org]
+> Sent: Thursday, August 13, 2015 9:54 PM
+> To: Wang Dongsheng-B40534; John Stultz; Alessandro Zummo; Alexandre Belloni
+> Cc: Shawn Guo; Nair, Sandeep; Hans de Goede; Wang Huan-B18965; linux-arm-
+> kernel at lists.infradead.org; linux-kernel at vger.kernel.org; rtc-
+> linux at googlegroups.com
+> Subject: Re: [PATCH 2/2] soc/fsl: add ftm alarm driver for ls1021a platform
+> 
+> On Wed, Aug 12, 2015 at 7:53 AM, Dongsheng Wang
+> <dongsheng.wang@freescale.com> wrote:
+> 
+> > From: Wang Dongsheng <dongsheng.wang@freescale.com>
+> >
+> > Only Ftm0 can be used when system going to deep sleep. So this driver
+> > to support ftm0 as a wakeup source.
+> >
+> > Signed-off-by: Wang Dongsheng <dongsheng.wang@freescale.com>
+> > ---
+> > *V2*
+> > Change Copyright 2014 to 2015.
+> (...)
+> > +config FTM_ALARM
+> > +       bool "FTM alarm driver"
+> > +       depends on SOC_LS1021A
+> > +       default n
+> > +       help
+> > +         Say y here to enable FTM alarm support.  The FTM alarm provides
+> > +         alarm functions for wakeup system from deep sleep.  There is only
+> > +         one FTM can be used in ALARM(FTM 0).
+> (...)
+> > +static u32 time_to_cycle(unsigned long time)
+> > +static u32 cycle_to_time(u32 cycle)
+> > +static int ftm_set_alarm(u64 cycle)
+> > +static irqreturn_t ftm_alarm_interrupt(int irq, void *dev_id)
+> > +static ssize_t ftm_alarm_show(struct device *dev,
+> > +                             struct device_attribute *attr,
+> > +                             char *buf)
+> > +static ssize_t ftm_alarm_store(struct device *dev,
+> > +                              struct device_attribute *attr,
+> > +                              const char *buf, size_t count)
+> (...)
+> > +static struct device_attribute ftm_alarm_attributes = __ATTR(ftm_alarm, 0644,
+> > +                       ftm_alarm_show, ftm_alarm_store);
+> 
+> If you're gonna invent ABIs, document then in Documentation/ABI/testing/*.
+> 
+> But I don't get it. Why is this driver not in drivers/rtc?
+> 
+> It does a subset of what an RTC does. The ioctl()'s of an RTC
+> can do what you want to do. And much much more.
+> 
+> If it can't do all an RTC can do, surely the RTC subsystem
+> can be augmented to host it anyway. It's way to close to
+> an RTC to have it's own random sysfs driver like this.
+> 
+> Unless I'm totally off, rewrite this to an RTC driver and post
+> it to the RTC maintainers.
+> 
 
-How? Tsens uses nvmem framework apis to read the qfprom atleast
-in this series.
+FlexTimer is not a RTC device and not have any rtc deivce function. They belong to
+different devices, why we need to register this to RTC framework? I am confused about this.
 
-> to figure out how to interpret the qfprom data which would
-> include the number of sensors and how the data is encoded.
->
->> So you suggesting to create a virtual child device for gcc and
->> associate the gcc DT node to it? (And have the tsens compatible
->> mentioned as part of the gcc DT node?)
->
-> No. The driver should work just fine without having to
-> interrogate the device's compatible string. If we still need the
-> compatible check for some reason, then we can always match based
-> on qcom,gcc-msm8960, qcom,gcc-apq8064, etc. But I don't see why
+Now in freescale layerscape platform this driver is only for FlexTimer0, and not
+fit for each flextimer. Because only FlexTimer0 still turn-on when system in the Deep Sleep.
 
-Thats not quite possible I guess. 2 drivers (gcc and tsens) matching
-the same compatibles? Will it not just depend on which ends up being
-the first match?
+If the "alarm" make you feel confused or mislead you think this is a RTC devices. I think
+I need to change the "alarm" to "timer".
 
-> we need to do that when we should be looking at what type of
-> qfprom is connected so we can correctly parse the data.
+Regards,
+-Dongsheng
