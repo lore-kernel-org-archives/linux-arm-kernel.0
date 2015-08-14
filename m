@@ -1,96 +1,83 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Fri, 14 Aug 2015 08:12:22 -0600
-Subject: [PATCH RFC 08/10] hwspinlock: qcom: Lock #7 is special lock,
- uses dynamic proc_id
-In-Reply-To: <20150813043036.GJ13472@usrtlx11787.corpusers.net>
-References: <438731339-58317-1-git-send-email-lina.iyer@linaro.org>
- <1438792366-2737-1-git-send-email-lina.iyer@linaro.org>
- <1438792366-2737-9-git-send-email-lina.iyer@linaro.org>
- <20150813043036.GJ13472@usrtlx11787.corpusers.net>
-Message-ID: <20150814141222.GC86880@linaro.org>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Fri, 14 Aug 2015 16:11:00 +0200
+Subject: [PATCH v3 3/9] gpiolib: Use GPIO name from names array for gpio
+ descriptor
+In-Reply-To: <1439561466-14350-1-git-send-email-mpa@pengutronix.de>
+References: <1439561466-14350-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <1439561466-14350-4-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 12 2015 at 22:30 -0600, Bjorn Andersson wrote:
->On Wed 05 Aug 09:32 PDT 2015, Lina Iyer wrote:
->
->> Hwspinlocks are widely used between processors in an SoC, and also
->> between elevation levels within in the same processor.  QCOM SoC's use
->> hwspinlock to serialize entry into a low power mode when the context
->> switches from Linux to secure monitor.
->>
->> Lock #7 has been assigned for this purpose. In order to differentiate
->> between one cpu core holding a lock while another cpu is contending for
->> the same lock, the proc id written into the lock is (128 + cpu id). This
->> makes it unique value among the cpu cores and therefore when a core
->> locks the hwspinlock, other cores would wait for the lock to be released
->> since they would have a different proc id.  This value is specific for
->> the lock #7 only.
->>
->
->As I was thinking about this, I came to the conclusion that my argument
->that it's system configuration and not a property of the block that lock
->#7 is special is actually biting myself.
->
->Just as #7 is system configuration, so is the fact that 1 is the lock
->value for all other locks.
->
->I've been meaning to answer you, but I haven't come to a good conclusion
->in this matter. I think that both of these properties should be possible
->to express in DT, but I don't know how.
->
-I thought about that. These are s/w imposed behavior. As a far as the
-h/w is concerned, you could just write a non-zero value and the lock is
-considered acquired. So placing that in DT may not be appropriate.
+This patch adds GPIO names to the GPIO descriptors when initializing the
+gpiochip. It also introduces a check whether any of the new names will
+conflict with an existing GPIO name.
 
->
->Perhaps we should just list each lock that we expose as a subnode in DT
->with a property to indicate the lock value - with the possibility of
->indicating cpu_id.
->
->Something like:
->
->tcsr-mutex {
->	compatible = "qcom,tcsr-mutex";
->	syscon = <&tcsr_mutex_block 0 0x80>;
->
->	#hwlock-cells = <1>;
->	#address-cells = <1>;
->	#size-cells = <0>;
->
->	smem-lock at 3 {
->		reg = <3>;
->		qcom,lock-value = <1>;
->	};
->
->	scm-lock at 7 {
->		reg = <7>;
->		qcom,lock-value-from-cpu-id;
->		qcom,lock-raw;
->	};
->};
->
->As we don't reference most of these locks anyways I don't think this
->would still be reasonable. And if reg is an array it's quite compact.
->
-But, looking at the DT, its not evident what lock-value-from-cpu-id,
-would mean.  It is an implementation detail of Linux (as a result of
-firmware). May be better to just hide it in the hwspinlock driver.
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+---
+ drivers/gpio/gpiolib.c | 37 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 37 insertions(+)
 
-I am not sure about lock-raw, but I would think its not QCOM specific.
-Imagine the case, when hwspinlock framework does not s/w spinlock around
-the hwspinlock, we wouldnt have this property. The reason why we
-spinlock around the hwspinlock is because we dont have a good way to
-generate a unique value for the hwspinlock, so multiple threads
-acquiring the same locks could safely be assured that they have acquired
-the lock. While convenient and probably more effecient to just have s/w
-spinlocks around the hwspinlock, the problem here is it is mandated
-across all locks.
-
-To me it seems OK to explicity call out lock #7 as unique entity in the
-bank that is compatible with a raw hwspinlock in the DT. But the value
-that lock #7 uses is an implementation detail and should rest wth the
-drivers.
-
-Thanks,
-Lina
+diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
+index eed3751fe14f..3908503bebfe 100644
+--- a/drivers/gpio/gpiolib.c
++++ b/drivers/gpio/gpiolib.c
+@@ -250,6 +250,38 @@ static int gpiochip_add_to_list(struct gpio_chip *chip)
+ 	return err;
+ }
+ 
++/*
++ * Takes the names from gc->names and checks if they are all unique. If they
++ * are, they are assigned to their gpio descriptors.
++ *
++ * Returns -EEXIST if one of the names is already used for a different GPIO.
++ */
++static int gpiochip_set_desc_names(struct gpio_chip *gc)
++{
++	int i;
++
++	if (!gc->names)
++		return 0;
++
++	/* First check all names if they are unique */
++	for (i = 0; i != gc->ngpio; ++i) {
++		struct gpio_desc *gpio;
++
++		gpio = gpio_name_to_desc(gc->names[i]);
++		if (gpio) {
++			dev_err(gc->dev, "Detected name collision for GPIO name '%s'\n",
++				gc->names[i]);
++			return -EEXIST;
++		}
++	}
++
++	/* Then add all names to the GPIO descriptors */
++	for (i = 0; i != gc->ngpio; ++i)
++		gc->desc[i].name = gc->names[i];
++
++	return 0;
++}
++
+ /**
+  * gpiochip_add() - register a gpio_chip
+  * @chip: the chip to register, with chip->base initialized
+@@ -319,6 +351,10 @@ int gpiochip_add(struct gpio_chip *chip)
+ 	INIT_LIST_HEAD(&chip->pin_ranges);
+ #endif
+ 
++	status = gpiochip_set_desc_names(chip);
++	if (status)
++		goto err_remove_from_list;
++
+ 	of_gpiochip_add(chip);
+ 	acpi_gpiochip_add(chip);
+ 
+@@ -336,6 +372,7 @@ err_remove_chip:
+ 	acpi_gpiochip_remove(chip);
+ 	gpiochip_free_hogs(chip);
+ 	of_gpiochip_remove(chip);
++err_remove_from_list:
+ 	spin_lock_irqsave(&gpio_lock, flags);
+ 	list_del(&chip->list);
+ 	spin_unlock_irqrestore(&gpio_lock, flags);
+-- 
+2.4.6
