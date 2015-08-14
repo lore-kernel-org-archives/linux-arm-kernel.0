@@ -1,31 +1,53 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 14 Aug 2015 11:25:56 +0530
-Subject: [PATCH V2] thermal: cpu_cooling: fix lockdep problems in
- cpu_cooling
-In-Reply-To: <16e7d7d811fa2b0f8dcf6cade345a5f2f3e3c36a.1439372926.git.viresh.kumar@linaro.org>
-References: <16e7d7d811fa2b0f8dcf6cade345a5f2f3e3c36a.1439372926.git.viresh.kumar@linaro.org>
-Message-ID: <20150814055556.GZ20238@linux>
+From: yao.yuan@freescale.com (Yao Yuan)
+Date: Fri, 14 Aug 2015 06:24:48 +0000
+Subject: [PATCH v2] dmaengine: fsl-edma: add PM suspend/resume support
+In-Reply-To: <CADRPPNQJi_x+mdQV=DEVuhCL_p6VOWcPiV3jzioeRdWgSW2w3g@mail.gmail.com>
+References: <1437469005-3162-1-git-send-email-yao.yuan@freescale.com>
+ <CADRPPNQJi_x+mdQV=DEVuhCL_p6VOWcPiV3jzioeRdWgSW2w3g@mail.gmail.com>
+Message-ID: <CY1PR0301MB15628DD5CFCE2B65BF4FECB2837C0@CY1PR0301MB1562.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12-08-15, 15:22, Viresh Kumar wrote:
-> From: Russell King <rmk+kernel@arm.linux.org.uk>
-> Fixes: 2dcd851fe4b4 ("thermal: cpu_cooling: Update always cpufreq policy with
-> Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-> ---
+Hi Leo,
+
+Thanks for your review.
+About those two methods for DMA suspend that you have mentioned. We have a lot of the discussions in other DMA driver like DMA for Freescale PowerPC.
+
+Finally, we think the device which used the DMA transmission service should cancel the transmission service in its suspend. 
+So DMA in suspend should be idle.
+
+Once the DMA in late_suspend is not be idle, we think some driver haven't canceled the DMA transmission. So maybe something is error when other driver in suspend.
+
+In the case, we should return failed to stop PM. DMA should not make a choice for other drivers(which used DMA) to force stop DMA transmission.
+
+Thanks.
+
+Best Regards,
+Yuan Yao
+
+> -----Original Message-----
+> From: pku.leo at gmail.com [mailto:pku.leo at gmail.com] On Behalf Of Li Yang
+> Sent: Friday, August 14, 2015 4:58 AM
+> To: Yuan Yao-B46683
+> Cc: Vinod Koul; stefan at agner.ch; Arnd Bergmann; Dan Williams;
+> dmaengine at vger.kernel.org; lkml; linux-arm-kernel at lists.infradead.org; linux-
+> pm at vger.kernel.org
+> Subject: Re: [PATCH v2] dmaengine: fsl-edma: add PM suspend/resume
+> support
 > 
-> Hi Eduardo/Zhang,
+> On Tue, Jul 21, 2015 at 3:56 AM, Yuan Yao <yao.yuan@freescale.com> wrote:
+> > This add power management suspend/resume support for the fsl-edma
+> > driver.
+> >
+> > eDMA acted as a basic function used by others. What it needs to do is
+> > the two steps below to support power management.
+> >
+> > In fsl_edma_suspend_late:
+> > Check whether the DMA chan is idle and if it is not idle, stop PM
+> > operation.
 > 
-> This is 4.2-rc material, please apply soon.
-
-Hey,
-
-Please apply this one and drop
-
-8ad61f934e9e ("thermal: cpu_cooling: fix lockdep problems in
-cpu_cooling")
-
--- 
-viresh
+> You should try to quiesce the device on suspend instead of depending on itself
+> to be happen in idle and failing if it is not.
+> 
+> Regards,
+> Leo
