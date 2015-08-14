@@ -1,128 +1,361 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Thu, 13 Aug 2015 22:02:05 -0600
-Subject: [PATCH 5/9] ARM: common: Introduce PM domains for CPUs/clusters
-In-Reply-To: <7hegj6le8c.fsf@deeprootsystems.com>
-References: <1438731339-58317-1-git-send-email-lina.iyer@linaro.org>
- <1438731339-58317-6-git-send-email-lina.iyer@linaro.org>
- <CAL_JsqK67=DTtjZwwnonObLDjLbahkREfm0RvyXVV95bhR-d4Q@mail.gmail.com>
- <20150813150154.GB13356@red-moon>
- <20150813154503.GO52339@linaro.org>
- <20150813155245.GD13833@red-moon>
- <7hegj6le8c.fsf@deeprootsystems.com>
-Message-ID: <20150814040205.GA86880@linaro.org>
+From: yinghai@kernel.org (Yinghai Lu)
+Date: Thu, 13 Aug 2015 21:22:24 -0700
+Subject: [PATCH v2] lib/decompressors: Use real out buf size for gunzip with
+ kernel
+Message-ID: <1439526144-3243-1-git-send-email-yinghai@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 13 2015 at 21:51 -0600, Kevin Hilman wrote:
->Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> writes:
->
->> On Thu, Aug 13, 2015 at 04:45:03PM +0100, Lina Iyer wrote:
->>> On Thu, Aug 13 2015 at 09:01 -0600, Lorenzo Pieralisi wrote:
->>> >On Thu, Aug 06, 2015 at 04:14:51AM +0100, Rob Herring wrote:
->>> >> On Tue, Aug 4, 2015 at 6:35 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
->>> >> > Define and add Generic PM domains (genpd) for ARM CPU clusters. Many new
->>> >> > SoCs group CPUs as clusters. Clusters share common resources like GIC,
->>> >> > power rail, caches, VFP, Coresight etc. When all CPUs in the cluster are
->>> >> > idle, these shared resources may also be put in their idle state.
->>> >> >
->>> >> > The idle time between the last CPU entering idle and a CPU resuming
->>> >> > execution is an opportunity for these shared resources to be powered
->>> >> > down. Generic PM domain provides a framework for defining such power
->>> >> > domains and attach devices to the domain. When the devices in the domain
->>> >> > are idle at runtime, the domain would also be suspended and resumed
->>> >> > before the first of the devices resume execution.
->>> >> >
->>> >> > We define a generic PM domain for each cluster and attach CPU devices in
->>> >> > the cluster to that PM domain. The DT definitions for the SoC describe
->>> >> > this relationship. Genpd callbacks for power_on and power_off can then
->>> >> > be used to power up/down the shared resources for the domain.
->>> >>
->>> >> [...]
->>> >>
->>> >> > +ARM CPU Power domains
->>> >> > +
->>> >> > +The device tree allows describing of CPU power domains in a SoC. In ARM SoC,
->>> >> > +CPUs may be grouped as clusters. A cluster may have CPUs, GIC, Coresight,
->>> >> > +caches, VFP and power controller and other peripheral hardware. Generally,
->>> >> > +when the CPUs in the cluster are idle/suspended, the shared resources may also
->>> >> > +be suspended and resumed before any of the CPUs resume execution.
->>> >> > +
->>> >> > +CPUs are the defined as the PM domain consumers and there is a PM domain
->>> >> > +provider for the CPUs. Bindings for generic PM domains (genpd) is described in
->>> >> > +[1].
->>> >> > +
->>> >> > +The ARM CPU PM domain follows the same binding convention as any generic PM
->>> >> > +domain. Additional binding properties are -
->>> >> > +
->>> >> > +- compatible:
->>> >> > +       Usage: required
->>> >> > +       Value type: <string>
->>> >> > +       Definition: Must also have
->>> >> > +                       "arm,pd"
->>> >> > +               inorder to initialize the genpd provider as ARM CPU PM domain.
->>> >>
->>> >> A compatible string should represent a particular h/w block. If it is
->>> >> generic, it should represent some sort of standard programming
->>> >> interface (e.g, AHCI, EHCI, etc.). This doesn't seem to be either and
->>> >> is rather just a mapping of what "driver" you want to use.
->>> >>
->>> >> I would expect that identifying a cpu's or cluster's power domain
->>> >> would be done by a phandle between the cpu/cluster node and power
->>> >> domain node. But I've not really looked at the power domain bindings
->>> >> so who knows.
->>> >
->>> >I would expect the same, meaning that a cpu node, like any other device
->>> >node would have a phandle pointing at the respective HW power domain.
->>> >
->>> CPUs have phandles to their domains. That is how the relationship
->>> between the domain provider (power-controller) and the consumer (CPU) is
->>> established.
->>>
->>> >I do not really understand why we want a "generic" CPU power domain, what
->>> >purpose does it serve ? Creating a collection of cpu devices that we
->>> >can call "cluster" ?
->>> >
->>> Nope, not for calling a cluster, a cluster :)
->>>
->>> This compatible is used to define a generic behavior of the CPU domain
->>> controller (in addition to the platform specific behavior of the domain
->>> power controller). The kernel activities for such power controller are
->>> generally the same which otherwise would be repeated across platforms.
->>
->> What activities ? CPU PM notifiers ?
->
->For today, yes.
->
->However, you can think of CPU PM notifiers as the equivalent of runtime
->PM hooks.  They're called when the "devices" are about to be powered off
->(runtime suspended) or powered on (runtime resumed.)
->
->However the CPU PM framework and notifiers are rather dumb compared to
->runtime PM.  For example, runtime PM gives you usecounting, autosuspend,
->control from userspace, statistics, etc. etc.  Also, IMO, CPU PM will
->not scale well for multiple clusters.
->
->What if instead, we used runtime PM for the things that the CPU PM
->notifiers manager (GIC, VFP, Coresight, etc.), and those drivers used
->runtime PM callbacks to replace their CPU PM notifiers?  We'd then be in
->a beautiful land where CPU "devices" (and the other connected logic) can
->be modeled as devices using runtime PM just like every other device in
->the system.
->
->Then take it up a level... what if we then could use genpd to model the
->"cluster", made of of the CPUs and "connected" devices (GIC, VFP, etc.)
->but also modeled the shared L2$ as a device which was using runtime PM.
->
->Now we're in a place where we can use all the benefits of runtime PM,
->plus the governor features of genpd to start doing a real, multi-CPU,
->multi-cluster CPUidle that's flexible enough to model the various
->dependencies in an SoC independent way, but generic enough to be able to
->use common governors for last-man standing, cache flushing, etc. etc.
->
+When loading x86 64bit kernel above 4GiB with patched grub2, got kernel
+gunzip error.
 
-- Off list
+| early console in decompress_kernel
+| decompress_kernel:
+|       input: [0x807f2143b4-0x807ff61aee]
+|      output: [0x807cc00000-0x807f3ea29b] 0x027ea29c: output_len
+| boot via startup_64
+| KASLR using RDTSC...
+|  new output: [0x46fe000000-0x470138cfff] 0x0338d000: output_run_size
+|  decompress: [0x46fe000000-0x47007ea29b] <=== [0x807f2143b4-0x807ff61aee]
+|
+| Decompressing Linux... gz...
+|
+| uncompression error
+|
+| -- System halted
 
-Nicely written response Kevin.
-Thank you.
+the new buffer is at 0x46fe000000ULL, decompressor_gzip is using
+0xffffffb901ffffff as out_len. gunzip in lib/zlib_inflate/inflate.c
+cap that len to 0x01ffffff and decompress fails later.
 
---Lina
+We could hit this problem with crashkernel booting that uses kexec
+loading kernel above 4GiB.
+
+We have decompress_* support:
+    1. inbuf[]/outbuf[] for kernel preboot.
+    2. inbuf[]/flush() for initramfs
+    3. fill()/flush() for initrd.
+This bug only affect kernel preboot path that use outbuf[].
+
+Add __decompress and take real out_buf_len for gunzip instead of guessing
+wrong buf size.
+
+-v2: fix unused warning on sh/arm/m32r from Fengguang.
+
+Signed-off-by: Yinghai Lu <yinghai@kernel.org>
+Fixes: 1431574a1c4 (lib/decompressors: fix "no limit" output buffer length)
+Cc: Alexandre Courbot <acourbot@nvidia.com>
+Cc: Jon Medhurst <tixy@linaro.org>
+Cc: Stephen Warren <swarren@wwwdotorg.org>
+Cc: "H. Peter Anvin" <hpa@zytor.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Ingo Molnar <mingo@redhat.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Yoshinori Sato <ysato@users.sourceforge.jp>
+Cc: Ralf Baechle <ralf@linux-mips.org>
+Cc: Martin Schwidefsky <schwidefsky@de.ibm.com>
+Cc: Heiko Carstens <heiko.carstens@de.ibm.com>
+Cc: Guan Xuetao <gxt@mprc.pku.edu.cn>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: uclinux-h8-devel at lists.sourceforge.jp
+Cc: linux-mips at linux-mips.org
+Cc: linux-s390 at vger.kernel.org
+Cc: linux-sh at vger.kernel.org
+Cc: Fengguang Wu <fengguang.wu@intel.com>
+Cc: stable <stable@vger.kernel.org>
+
+---
+ arch/arm/boot/compressed/decompress.c  |    2 +-
+ arch/h8300/boot/compressed/misc.c      |    2 +-
+ arch/m32r/boot/compressed/misc.c       |    3 ++-
+ arch/mips/boot/compressed/decompress.c |    4 ++--
+ arch/s390/boot/compressed/misc.c       |    2 +-
+ arch/sh/boot/compressed/misc.c         |    2 +-
+ arch/unicore32/boot/compressed/misc.c  |    4 ++--
+ arch/x86/boot/compressed/misc.c        |    3 ++-
+ lib/decompress_bunzip2.c               |    6 +++---
+ lib/decompress_inflate.c               |   31 ++++++++++++++++++++++++++-----
+ lib/decompress_unlz4.c                 |    6 +++---
+ lib/decompress_unlzma.c                |    7 +++----
+ lib/decompress_unlzo.c                 |   13 ++++++++++++-
+ lib/decompress_unxz.c                  |   12 +++++++++++-
+ 14 files changed, 70 insertions(+), 27 deletions(-)
+
+Index: linux-2.6/arch/arm/boot/compressed/decompress.c
+===================================================================
+--- linux-2.6.orig/arch/arm/boot/compressed/decompress.c
++++ linux-2.6/arch/arm/boot/compressed/decompress.c
+@@ -57,5 +57,5 @@ extern char * strstr(const char * s1, co
+ 
+ int do_decompress(u8 *input, int len, u8 *output, void (*error)(char *x))
+ {
+-	return decompress(input, len, NULL, NULL, output, NULL, error);
++	return __decompress(input, len, NULL, NULL, output, 0, NULL, error);
+ }
+Index: linux-2.6/arch/h8300/boot/compressed/misc.c
+===================================================================
+--- linux-2.6.orig/arch/h8300/boot/compressed/misc.c
++++ linux-2.6/arch/h8300/boot/compressed/misc.c
+@@ -70,5 +70,5 @@ void decompress_kernel(void)
+ 	free_mem_ptr = (unsigned long)&_end;
+ 	free_mem_end_ptr = free_mem_ptr + HEAP_SIZE;
+ 
+-	decompress(input_data, input_len, NULL, NULL, output, NULL, error);
++	__decompress(input_data, input_len, NULL, NULL, output, 0, NULL, error);
+ }
+Index: linux-2.6/arch/m32r/boot/compressed/misc.c
+===================================================================
+--- linux-2.6.orig/arch/m32r/boot/compressed/misc.c
++++ linux-2.6/arch/m32r/boot/compressed/misc.c
+@@ -86,6 +86,7 @@ decompress_kernel(int mmu_on, unsigned c
+ 	free_mem_end_ptr = free_mem_ptr + BOOT_HEAP_SIZE;
+ 
+ 	puts("\nDecompressing Linux... ");
+-	decompress(input_data, input_len, NULL, NULL, output_data, NULL, error);
++	__decompress(input_data, input_len, NULL, NULL, output_data, 0,
++			NULL, error);
+ 	puts("done.\nBooting the kernel.\n");
+ }
+Index: linux-2.6/arch/mips/boot/compressed/decompress.c
+===================================================================
+--- linux-2.6.orig/arch/mips/boot/compressed/decompress.c
++++ linux-2.6/arch/mips/boot/compressed/decompress.c
+@@ -111,8 +111,8 @@ void decompress_kernel(unsigned long boo
+ 	puts("\n");
+ 
+ 	/* Decompress the kernel with according algorithm */
+-	decompress((char *)zimage_start, zimage_size, 0, 0,
+-		   (void *)VMLINUX_LOAD_ADDRESS_ULL, 0, error);
++	__decompress((char *)zimage_start, zimage_size, 0, 0,
++		   (void *)VMLINUX_LOAD_ADDRESS_ULL, 0, 0, error);
+ 
+ 	/* FIXME: should we flush cache here? */
+ 	puts("Now, booting the kernel...\n");
+Index: linux-2.6/arch/s390/boot/compressed/misc.c
+===================================================================
+--- linux-2.6.orig/arch/s390/boot/compressed/misc.c
++++ linux-2.6/arch/s390/boot/compressed/misc.c
+@@ -167,7 +167,7 @@ unsigned long decompress_kernel(void)
+ #endif
+ 
+ 	puts("Uncompressing Linux... ");
+-	decompress(input_data, input_len, NULL, NULL, output, NULL, error);
++	__decompress(input_data, input_len, NULL, NULL, output, 0, NULL, error);
+ 	puts("Ok, booting the kernel.\n");
+ 	return (unsigned long) output;
+ }
+Index: linux-2.6/arch/sh/boot/compressed/misc.c
+===================================================================
+--- linux-2.6.orig/arch/sh/boot/compressed/misc.c
++++ linux-2.6/arch/sh/boot/compressed/misc.c
+@@ -132,7 +132,7 @@ void decompress_kernel(void)
+ 
+ 	puts("Uncompressing Linux... ");
+ 	cache_control(CACHE_ENABLE);
+-	decompress(input_data, input_len, NULL, NULL, output, NULL, error);
++	__decompress(input_data, input_len, NULL, NULL, output, 0, NULL, error);
+ 	cache_control(CACHE_DISABLE);
+ 	puts("Ok, booting the kernel.\n");
+ }
+Index: linux-2.6/arch/unicore32/boot/compressed/misc.c
+===================================================================
+--- linux-2.6.orig/arch/unicore32/boot/compressed/misc.c
++++ linux-2.6/arch/unicore32/boot/compressed/misc.c
+@@ -119,8 +119,8 @@ unsigned long decompress_kernel(unsigned
+ 	output_ptr = get_unaligned_le32(tmp);
+ 
+ 	arch_decomp_puts("Uncompressing Linux...");
+-	decompress(input_data, input_data_end - input_data, NULL, NULL,
+-			output_data, NULL, error);
++	__decompress(input_data, input_data_end - input_data, NULL, NULL,
++			output_data, 0, NULL, error);
+ 	arch_decomp_puts(" done, booting the kernel.\n");
+ 	return output_ptr;
+ }
+Index: linux-2.6/arch/x86/boot/compressed/misc.c
+===================================================================
+--- linux-2.6.orig/arch/x86/boot/compressed/misc.c
++++ linux-2.6/arch/x86/boot/compressed/misc.c
+@@ -448,7 +448,8 @@ asmlinkage __visible void *decompress_ke
+ #endif
+ 
+ 	debug_putstr("\nDecompressing Linux... ");
+-	decompress(input_data, input_len, NULL, NULL, output, NULL, error);
++	__decompress(input_data, input_len, NULL, NULL, output, output_len,
++			NULL, error);
+ 	parse_elf(output);
+ 	/*
+ 	 * 32-bit always performs relocations. 64-bit relocations are only
+Index: linux-2.6/lib/decompress_bunzip2.c
+===================================================================
+--- linux-2.6.orig/lib/decompress_bunzip2.c
++++ linux-2.6/lib/decompress_bunzip2.c
+@@ -743,12 +743,12 @@ exit_0:
+ }
+ 
+ #ifdef PREBOOT
+-STATIC int INIT decompress(unsigned char *buf, long len,
++STATIC int INIT __decompress(unsigned char *buf, long len,
+ 			long (*fill)(void*, unsigned long),
+ 			long (*flush)(void*, unsigned long),
+-			unsigned char *outbuf,
++			unsigned char *outbuf, long olen,
+ 			long *pos,
+-			void(*error)(char *x))
++			void (*error)(char *x))
+ {
+ 	return bunzip2(buf, len - 4, fill, flush, outbuf, pos, error);
+ }
+Index: linux-2.6/lib/decompress_inflate.c
+===================================================================
+--- linux-2.6.orig/lib/decompress_inflate.c
++++ linux-2.6/lib/decompress_inflate.c
+@@ -1,4 +1,5 @@
+ #ifdef STATIC
++#define PREBOOT
+ /* Pre-boot environment: included */
+ 
+ /* prevent inclusion of _LINUX_KERNEL_H in pre-boot environment: lots
+@@ -33,23 +34,23 @@ static long INIT nofill(void *buffer, un
+ }
+ 
+ /* Included from initramfs et al code */
+-STATIC int INIT gunzip(unsigned char *buf, long len,
++STATIC int INIT __gunzip(unsigned char *buf, long len,
+ 		       long (*fill)(void*, unsigned long),
+ 		       long (*flush)(void*, unsigned long),
+-		       unsigned char *out_buf,
++		       unsigned char *out_buf, long out_len,
+ 		       long *pos,
+ 		       void(*error)(char *x)) {
+ 	u8 *zbuf;
+ 	struct z_stream_s *strm;
+ 	int rc;
+-	size_t out_len;
+ 
+ 	rc = -1;
+ 	if (flush) {
+ 		out_len = 0x8000; /* 32 K */
+ 		out_buf = malloc(out_len);
+ 	} else {
+-		out_len = ((size_t)~0) - (size_t)out_buf; /* no limit */
++		if (!out_len)
++			out_len = ((size_t)~0) - (size_t)out_buf; /* no limit */
+ 	}
+ 	if (!out_buf) {
+ 		error("Out of memory while allocating output buffer");
+@@ -181,4 +182,24 @@ gunzip_nomem1:
+ 	return rc; /* returns Z_OK (0) if successful */
+ }
+ 
+-#define decompress gunzip
++#ifndef PREBOOT
++STATIC int INIT gunzip(unsigned char *buf, long len,
++		       long (*fill)(void*, unsigned long),
++		       long (*flush)(void*, unsigned long),
++		       unsigned char *out_buf,
++		       long *pos,
++		       void (*error)(char *x))
++{
++	return __gunzip(buf, len, fill, flush, out_buf, 0, pos, error);
++}
++#else
++STATIC int INIT __decompress(unsigned char *buf, long len,
++			   long (*fill)(void*, unsigned long),
++			   long (*flush)(void*, unsigned long),
++			   unsigned char *out_buf, long out_len,
++			   long *pos,
++			   void (*error)(char *x))
++{
++	return __gunzip(buf, len, fill, flush, out_buf, out_len, pos, error);
++}
++#endif
+Index: linux-2.6/lib/decompress_unlz4.c
+===================================================================
+--- linux-2.6.orig/lib/decompress_unlz4.c
++++ linux-2.6/lib/decompress_unlz4.c
+@@ -196,12 +196,12 @@ exit_0:
+ }
+ 
+ #ifdef PREBOOT
+-STATIC int INIT decompress(unsigned char *buf, long in_len,
++STATIC int INIT __decompress(unsigned char *buf, long in_len,
+ 			      long (*fill)(void*, unsigned long),
+ 			      long (*flush)(void*, unsigned long),
+-			      unsigned char *output,
++			      unsigned char *output, long out_len,
+ 			      long *posp,
+-			      void(*error)(char *x)
++			      void (*error)(char *x)
+ 	)
+ {
+ 	return unlz4(buf, in_len - 4, fill, flush, output, posp, error);
+Index: linux-2.6/lib/decompress_unlzma.c
+===================================================================
+--- linux-2.6.orig/lib/decompress_unlzma.c
++++ linux-2.6/lib/decompress_unlzma.c
+@@ -667,13 +667,12 @@ exit_0:
+ }
+ 
+ #ifdef PREBOOT
+-STATIC int INIT decompress(unsigned char *buf, long in_len,
++STATIC int INIT __decompress(unsigned char *buf, long in_len,
+ 			      long (*fill)(void*, unsigned long),
+ 			      long (*flush)(void*, unsigned long),
+-			      unsigned char *output,
++			      unsigned char *output, long out_len,
+ 			      long *posp,
+-			      void(*error)(char *x)
+-	)
++			      void (*error)(char *x))
+ {
+ 	return unlzma(buf, in_len - 4, fill, flush, output, posp, error);
+ }
+Index: linux-2.6/lib/decompress_unlzo.c
+===================================================================
+--- linux-2.6.orig/lib/decompress_unlzo.c
++++ linux-2.6/lib/decompress_unlzo.c
+@@ -31,6 +31,7 @@
+  */
+ 
+ #ifdef STATIC
++#define PREBOOT
+ #include "lzo/lzo1x_decompress_safe.c"
+ #else
+ #include <linux/decompress/unlzo.h>
+@@ -287,4 +288,14 @@ exit:
+ 	return ret;
+ }
+ 
+-#define decompress unlzo
++#ifdef PREBOOT
++STATIC int INIT __decompress(unsigned char *buf, long len,
++			   long (*fill)(void*, unsigned long),
++			   long (*flush)(void*, unsigned long),
++			   unsigned char *out_buf, long olen,
++			   long *pos,
++			   void (*error)(char *x))
++{
++	return unlzo(buf, len, fill, flush, out_buf, pos, error);
++}
++#endif
+Index: linux-2.6/lib/decompress_unxz.c
+===================================================================
+--- linux-2.6.orig/lib/decompress_unxz.c
++++ linux-2.6/lib/decompress_unxz.c
+@@ -394,4 +394,14 @@ error_alloc_state:
+  * This macro is used by architecture-specific files to decompress
+  * the kernel image.
+  */
+-#define decompress unxz
++#ifdef XZ_PREBOOT
++STATIC int INIT __decompress(unsigned char *buf, long len,
++			   long (*fill)(void*, unsigned long),
++			   long (*flush)(void*, unsigned long),
++			   unsigned char *out_buf, long olen,
++			   long *pos,
++			   void (*error)(char *x))
++{
++	return unxz(buf, len, fill, flush, out_buf, pos, error);
++}
++#endif
