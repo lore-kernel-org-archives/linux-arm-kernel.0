@@ -1,114 +1,132 @@
 From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Fri, 14 Aug 2015 17:53:00 -0400
+Date: Fri, 14 Aug 2015 17:55:09 -0400
 Subject: [PATCH] ARM: keystone: add a work around to handle asynchronous
  external abort
-In-Reply-To: <55CE05EC.4040909@oracle.com>
-References: <1439320409-20084-1-git-send-email-m-karicheri2@ti.com>
+In-Reply-To: <1439562059.13210.61.camel@pengutronix.de>
+References: <1439320409-20084-1-git-send-email-m-karicheri2@ti.com>	
  <55CDF579.4050408@ti.com> <20150814140934.GX7557@n2100.arm.linux.org.uk>
- <55CE05EC.4040909@oracle.com>
-Message-ID: <55CE633C.10402@ti.com>
+ <1439562059.13210.61.camel@pengutronix.de>
+Message-ID: <55CE63BD.2060107@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/14/2015 11:14 AM, santosh shilimkar wrote:
-> On 8/14/2015 7:09 AM, Russell King - ARM Linux wrote:
->> On Fri, Aug 14, 2015 at 10:04:41AM -0400, Murali Karicheri wrote:
->>> On 08/11/2015 03:13 PM, Murali Karicheri wrote:
->>>> Currently on some devices, an asynchronous external abort exception
->>>> happens during boot up when exception handlers are enabled in kernel
->>>> before switching to user space. This patch adds a workaround to handle
->>>> this once during boot. Many customers are already using this
->>>> with out any issues and is required to workaround the above issue.
->>>>
->>>> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
->>>> ---
->>>>   arch/arm/mach-keystone/keystone.c | 26 ++++++++++++++++++++++++++
->>>>   1 file changed, 26 insertions(+)
->>>>
->>>> diff --git a/arch/arm/mach-keystone/keystone.c
->>>> b/arch/arm/mach-keystone/keystone.c
->>>> index e2880105..c1d0fe5 100644
->>>> --- a/arch/arm/mach-keystone/keystone.c
->>>> +++ b/arch/arm/mach-keystone/keystone.c
->>>> @@ -15,6 +15,7 @@
->>>>   #include <linux/of_platform.h>
->>>>   #include <linux/of_address.h>
->>>>   #include <linux/memblock.h>
->>>> +#include <linux/signal.h>
->>>>
->>>>   #include <asm/setup.h>
->>>>   #include <asm/mach/map.h>
->>>> @@ -52,6 +53,24 @@ static struct notifier_block platform_nb = {
->>>>       .notifier_call = keystone_platform_notifier,
->>>>   };
->>>>
->>>> +static bool ignore_first = true;
->>>> +static int keystone_async_ext_abort_fault(unsigned long addr,
->>>> unsigned int fsr,
->>>> +                      struct pt_regs *regs)
->>>> +{
->>>> +    /*
->>>> +     * if first time, ignore this as this is a asynchronous
->>>> external abort
->>>> +     * happening only some devices that couldn't be root caused and
->>>> we add
->>>> +     * this work around to handle this first time.
->>>> +     */
->>>> +    if (ignore_first) {
->>>> +        ignore_first = false;
->>>> +        return 0;
->>>> +    }
->>>> +
->>>> +    /* Subsequent ones should be handled as fault */
->>>> +    return 1;
->>>> +}
->>>> +
->>>>   static void __init keystone_init(void)
->>>>   {
->>>>       if (PHYS_OFFSET >= KEYSTONE_HIGH_PHYS_START) {
->>>> @@ -61,6 +80,13 @@ static void __init keystone_init(void)
->>>>       }
->>>>       keystone_pm_runtime_init();
->>>>       of_platform_populate(NULL, of_default_bus_match_table, NULL,
->>>> NULL);
->>>> +
->>>> +    /*
->>>> +     * Add a one time exception handler to catch asynchronous external
->>>> +     * abort
->>>> +     */
->>>> +    hook_fault_code(17, keystone_async_ext_abort_fault, SIGBUS, 0,
->>>> +            "async external abort handler");
->>>>   }
->>>>
->>>>   static phys_addr_t keystone_virt_to_idmap(unsigned long x)
->>>>
->>> Can this be applied if it looks good?
+On 08/14/2015 10:20 AM, Lucas Stach wrote:
+> Hi Russell,
+>
+> Am Freitag, den 14.08.2015, 15:09 +0100 schrieb Russell King - ARM
+> Linux:
+>
+> [...]
+>
 >>
 >> What causes the abort?  We shouldn't be adding hacks like this to the
 >> kernel without having the full picture...
 >>
-> Indeed. These external aborts are notorious and often hides dangerous
-> bugs. On OMAP as well many folks burn their had with it till the
-> interconnect handlers were added to detect those and hunt those
-> bugs.
 >
-> In my experience such aborts happen outside ARM subsystem, either in
-> the interconnect or at the salve targets which are reported over
-> the ARM bus as async external aborts. And often these errors are
-> due to bad accesses/wrong accesses/un-clocked accesses at slaves.
+> some of the issues with tracking down such imprecise external aborts are
+> due to the fact that we only enable the signaling of those aborts on
+> entering the user-space. So the first schedule() crashes on the previous
+> dangling abort.
 >
-We have spend some time already to debug the root cause. Do you have 
-idea on how this was hunted down on OMAP that we can learn from? The bad 
-address is NULL and it seems to happen very rarely and is not easily 
-reproducible. Don't want to put this workaround, but we couldn't track 
-it down either. So any help to debug this will be appreciated.
+> I'm carrying this patch locally to enable imprecise aborts much earlier
+> in the boot process. I think it has already been on the list some times,
+> but apparently it has fallen through the cracks. If you agree that this
+> is the right thing to do I can do a proper repost.
+Lucas,
+
+Would you mind sharing the code? Does that help in root causing where it 
+actually happens? I have spend considerable time debugging this, but so 
+far not successful.
 
 Murali
-
+>
 > Regards,
-> Santosh
+> Lucas
 >
+> ---------------------->8---------------------------------------------
+>>From bb9117d94cc2f1061dc364f42c446ccd9191e869 Mon Sep 17 00:00:00 2001
+> From: Lucas Stach <l.stach@pengutronix.de>
+> Date: Thu, 19 Feb 2015 18:12:50 +0100
+> Subject: [PATCH] ARM: Add imprecise abort enable/disable macro
 >
+> This patch adds imprecise abort enable/disable macros.
+> It also enables imprecise aborts when starting kernel.
+>
+> Changes in v2:
+> Only ARMv6 and later have CPSR.A bit. On earlier CPUs,
+> and ARMv7M this should be a no-op.
+>
+> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> ---
+> lst: rebased on v3.19
+> ---
+>   arch/arm/include/asm/irqflags.h | 10 ++++++++++
+>   arch/arm/kernel/smp.c           |  1 +
+>   arch/arm/kernel/traps.c         |  4 ++++
+>   3 files changed, 15 insertions(+)
+>
+> diff --git a/arch/arm/include/asm/irqflags.h
+> b/arch/arm/include/asm/irqflags.h
+> index 3b763d6652a0..8301f875564e 100644
+> --- a/arch/arm/include/asm/irqflags.h
+> +++ b/arch/arm/include/asm/irqflags.h
+> @@ -51,6 +51,14 @@ static inline void arch_local_irq_disable(void)
+>
+>   #define local_fiq_enable()  __asm__("cpsie f   @ __stf" : : : "memory",
+> "cc")
+>   #define local_fiq_disable() __asm__("cpsid f   @ __clf" : : : "memory",
+> "cc")
+> +
+> +#ifndef CONFIG_CPU_V7M
+> +#define local_abt_enable()  __asm__("cpsie a   @ __sta" : : : "memory",
+> "cc")
+> +#define local_abt_disable() __asm__("cpsid a   @ __cla" : : : "memory",
+> "cc")
+> +#else
+> +#define local_abt_enable()     do { } while (0)
+> +#define local_abt_disable()    do { } while (0)
+> +#endif
+>   #else
+>
+>   /*
+> @@ -130,6 +138,8 @@ static inline void arch_local_irq_disable(void)
+>          : "memory", "cc");                                      \
+>          })
+>
+> +#define local_abt_enable()     do { } while (0)
+> +#define local_abt_disable()    do { } while (0)
+>   #endif
+>
+>   /*
+> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+> index 86ef244c5a24..7b6b93cabef4 100644
+> --- a/arch/arm/kernel/smp.c
+> +++ b/arch/arm/kernel/smp.c
+> @@ -378,6 +378,7 @@ asmlinkage void secondary_start_kernel(void)
+>
+>          local_irq_enable();
+>          local_fiq_enable();
+> +       local_abt_enable();
+>
+>          /*
+>           * OK, it's off to the idle thread for us
+> diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+> index 788e23fe64d8..466726ba9bdb 100644
+> --- a/arch/arm/kernel/traps.c
+> +++ b/arch/arm/kernel/traps.c
+> @@ -881,6 +881,10 @@ void __init early_trap_init(void *vectors_base)
+>
+>          flush_icache_range(vectors, vectors + PAGE_SIZE * 2);
+>          modify_domain(DOMAIN_USER, DOMAIN_CLIENT);
+> +
+> +       /* Enable imprecise aborts */
+> +       local_abt_enable();
+> +
+>   #else /* ifndef CONFIG_CPU_V7M */
+>          /*
+>           * on V7-M there is no need to copy the vector table to a
+> dedicated
 >
 
 
