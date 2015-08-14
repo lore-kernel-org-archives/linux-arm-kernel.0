@@ -1,30 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 14 Aug 2015 23:19:46 +0200
-Subject: [PATCH 2/3] Display a DMA error message
-In-Reply-To: <1439416290-21228-3-git-send-email-jeremy.linton@arm.com>
-References: <1439416290-21228-1-git-send-email-jeremy.linton@arm.com>
- <1439416290-21228-3-git-send-email-jeremy.linton@arm.com>
-Message-ID: <2099290.n6l88bWDgg@wuerfel>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 14 Aug 2015 16:21:51 -0500
+Subject: [PATCH v5] dtb: Create a common home for cross-architecture dtsi
+ files.
+In-Reply-To: <1439287646.9747.212.camel@citrix.com>
+References: <1438618000-1091-1-git-send-email-ian.campbell@citrix.com>
+ <1439287646.9747.212.camel@citrix.com>
+Message-ID: <CAL_JsqKv2aOEM-U7JNZnaHomA6HFBSFhSLZ-zhp7c20s6gQBaQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 12 August 2015 16:51:29 Jeremy Linton wrote:
-> diff --git a/drivers/usb/host/ehci-platform.c b/drivers/usb/host/ehci-platform.c
-> index 2593def..82e396f 100644
-> --- a/drivers/usb/host/ehci-platform.c
-> +++ b/drivers/usb/host/ehci-platform.c
-> @@ -162,8 +162,10 @@ static int ehci_platform_probe(struct platform_device *dev)
->  
->         err = dma_coerce_mask_and_coherent(&dev->dev,
->                 pdata->dma_mask_64 ? DMA_BIT_MASK(64) : DMA_BIT_MASK(32));
-> -       if (err)
-> +       if (err) {
-> +               dev_err(&dev->dev, "Error: DMA setup failed\n");
->                 return err;
-> +       }
++arm-soc
 
-We should really stop doing this: the platform should provide the
-correct dma mask when creating the device, instead of setting a
-bogus pdata field. Do not duplicate this bug for ACPI.
+On Tue, Aug 11, 2015 at 5:07 AM, Ian Campbell <ian.campbell@citrix.com> wrote:
+> On Mon, 2015-08-03 at 17:06 +0100, Ian Campbell wrote:
+>> Commit 9ccd608070b6 ("arm64: dts: add device tree for ARM SMM-A53x2 on
+>> LogicTile Express 20MG") added a new dts file to arch/arm64 which
+>> included "../../../../arm/boot/dts/vexpress-v2m-rs1.dtsi", i.e. a
+>> .dtsi supplied by arch/arm.
+>>
+>> Unfortunately this causes some issues for the split device tree
+>> repository[0], since things get moved around there. In that context
+>> the new .dts ends up at src/arm64/arm/vexpress-v2f-1xv7-ca53x2.dts
+>> while the include is at src/arm/vexpress-v2m-rs1.dtsi.
+>
+> Hi Grant,
+>
+> Do you think there is any chance of getting this into 4.2-rc$NEXT or shall
+> we wait until 4.3? I'm assuming this should go via the DT tree, but maybe
+> it should go via an ARM tree?
 
-	Arnd
+I was assuming this would go thru the arm-soc tree which is why I
+acked it. It is getting a bit late for 4.2 at this point, but I guess
+the standalone tree remains broken for these platforms until this is
+done. Probably not such a big deal in grand scheme of things.
+
+Rob
