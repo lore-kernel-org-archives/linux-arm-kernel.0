@@ -1,85 +1,624 @@
 From: liguozhu@hisilicon.com (Kenneth Lee)
-Date: Fri, 14 Aug 2015 18:30:17 +0800
-Subject: [PATCH 0/5] net: Hisilicon Network Subsystem support
-Message-ID: <1439548222-231611-1-git-send-email-liguozhu@hisilicon.com>
+Date: Fri, 14 Aug 2015 18:30:20 +0800
+Subject: [PATCH 3/5] net: add Hisilicon Network Subsystem MDIO support
+In-Reply-To: <1439548222-231611-1-git-send-email-liguozhu@hisilicon.com>
+References: <1439548222-231611-1-git-send-email-liguozhu@hisilicon.com>
+Message-ID: <1439548222-231611-4-git-send-email-liguozhu@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset add Hisilicon Network Subsystem support. The subsystem
-provides a long term developing network accelerate engine with ring buffer
-interface. The network interface can be used as standard ethernet network
-interface card or be made use by a network application with decoded L2 to
-L4 data.
+The MDIO support for Hisilicon Network Subsystem. It is used in Hislicon
+P660 and Hi1610 SoC to control the external PHY
 
-The patchset is porting from some internal-use drivers, it is tested and
-working fine with the hardware. But some detail design is not that good.
-But we want to know if the community can accept the structure/arch before
-refining it. Thank you.
-
-Kenneth Lee (5):
-  net: add Hisilicon Network Subsystem support (config and documents)
-  net: add Hisilicon Network Subsystem hnae framework support
-  net: add Hisilicon Network Subsystem MDIO support
-  net: add Hisilicon Network Subsystem DSAF support
-  net: add Hisilicon Network Subsystem basic ethernet support
-
- .../devicetree/bindings/net/hisilicon-hns-dsaf.txt |   40 +
- .../devicetree/bindings/net/hisilicon-hns-mdio.txt |   22 +
- .../devicetree/bindings/net/hisilicon-hns-nic.txt  |   14 +
- arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi       |  197 ++
- drivers/net/ethernet/hisilicon/Kconfig             |   33 +-
- drivers/net/ethernet/hisilicon/Makefile            |    1 +
- drivers/net/ethernet/hisilicon/hns/Makefile        |   15 +
- drivers/net/ethernet/hisilicon/hns/hnae.c          |  494 ++++
- drivers/net/ethernet/hisilicon/hns/hnae.h          |  582 +++++
- drivers/net/ethernet/hisilicon/hns/hns_ae_adapt.c  |  766 ++++++
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_gmac.c |  705 +++++
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_gmac.h |   45 +
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.c  |  942 +++++++
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.h  |  462 ++++
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c | 2681 ++++++++++++++++++++
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.h |  438 ++++
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c |  311 +++
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.h |   45 +
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c  |  582 +++++
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.h  |  105 +
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_rcb.c  |  972 +++++++
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_rcb.h  |  136 +
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h  |  958 +++++++
- .../net/ethernet/hisilicon/hns/hns_dsaf_xgmac.c    |  826 ++++++
- .../net/ethernet/hisilicon/hns/hns_dsaf_xgmac.h    |   15 +
- drivers/net/ethernet/hisilicon/hns/hns_enet.c      | 1552 +++++++++++
- drivers/net/ethernet/hisilicon/hns/hns_enet.h      |   81 +
- drivers/net/ethernet/hisilicon/hns/hns_ethtool.c   | 1174 +++++++++
- drivers/net/ethernet/hisilicon/hns/hns_mdio_main.c |  597 +++++
- 29 files changed, 14790 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/net/hisilicon-hns-dsaf.txt
- create mode 100644 Documentation/devicetree/bindings/net/hisilicon-hns-mdio.txt
- create mode 100644 Documentation/devicetree/bindings/net/hisilicon-hns-nic.txt
- create mode 100644 arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi
- create mode 100644 drivers/net/ethernet/hisilicon/hns/Makefile
- create mode 100644 drivers/net/ethernet/hisilicon/hns/hnae.c
- create mode 100644 drivers/net/ethernet/hisilicon/hns/hnae.h
- create mode 100644 drivers/net/ethernet/hisilicon/hns/hns_ae_adapt.c
- create mode 100644 drivers/net/ethernet/hisilicon/hns/hns_dsaf_gmac.c
- create mode 100644 drivers/net/ethernet/hisilicon/hns/hns_dsaf_gmac.h
- create mode 100644 drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.c
- create mode 100644 drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.h
- create mode 100644 drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c
- create mode 100644 drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.h
- create mode 100644 drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c
- create mode 100644 drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.h
- create mode 100644 drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c
- create mode 100644 drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.h
- create mode 100644 drivers/net/ethernet/hisilicon/hns/hns_dsaf_rcb.c
- create mode 100644 drivers/net/ethernet/hisilicon/hns/hns_dsaf_rcb.h
- create mode 100644 drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h
- create mode 100644 drivers/net/ethernet/hisilicon/hns/hns_dsaf_xgmac.c
- create mode 100644 drivers/net/ethernet/hisilicon/hns/hns_dsaf_xgmac.h
- create mode 100644 drivers/net/ethernet/hisilicon/hns/hns_enet.c
- create mode 100644 drivers/net/ethernet/hisilicon/hns/hns_enet.h
- create mode 100644 drivers/net/ethernet/hisilicon/hns/hns_ethtool.c
+Signed-off-by: Yisen Zhuang <Yisen.Zhuang@huawei.com>
+Signed-off-by: Kenneth Lee <liguozhu@huawei.com>
+---
+ drivers/net/ethernet/hisilicon/hns/hns_mdio_main.c | 597 +++++++++++++++++++++
+ 1 file changed, 597 insertions(+)
  create mode 100644 drivers/net/ethernet/hisilicon/hns/hns_mdio_main.c
 
+diff --git a/drivers/net/ethernet/hisilicon/hns/hns_mdio_main.c b/drivers/net/ethernet/hisilicon/hns/hns_mdio_main.c
+new file mode 100644
+index 0000000..7113fa8
+--- /dev/null
++++ b/drivers/net/ethernet/hisilicon/hns/hns_mdio_main.c
+@@ -0,0 +1,597 @@
++/*
++ * Copyright (c) 2014-2015 Hisilicon Limited.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++
++#include <linux/errno.h>
++#include <linux/etherdevice.h>
++#include <linux/init.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/mutex.h>
++#include <linux/netdevice.h>
++#include <linux/of_address.h>
++#include <linux/of.h>
++#include <linux/of_mdio.h>
++#include <linux/of_platform.h>
++#include <linux/phy.h>
++#include <linux/platform_device.h>
++#include <linux/spinlock_types.h>
++
++#define MDIO_DRV_NAME "hi-mdio"
++#define MDIO_BUS_NAME "Hisilicon MII Bus"
++#define MDIO_DRV_VERSION "1.1.0"
++#define MDIO_COPYRIGHT "Copyright(c) 2015 Huawei Corporation."
++#define MDIO_DRV_STRING MDIO_BUS_NAME
++#define MDIO_DEFAULT_DEVICE_DESCR MDIO_BUS_NAME
++
++#define MDIO_CTL_DEV_ADDR(x)	(x & 0x1f)
++#define MDIO_CTL_PORT_ADDR(x)	((x & 0x1f) << 5)
++
++#define MDIO_BASE_ADDR			0x403C0000
++#define MDIO_REG_ADDR_LEN		0x1000
++#define MDIO_PHY_GRP_LEN		0x100
++#define MDIO_REG_LEN			0x10
++#define MDIO_PHY_ADDR_NUM		5
++#define MDIO_MAX_PHY_ADDR		0x1F
++#define MDIO_MAX_PHY_REG_ADDR		0xFFFF
++
++#define MDIO_TIMEOUT			1000000
++
++struct hns_mdio_device {
++	struct device *dev;
++	void *vbase;		/* mdio reg base address */
++	u8 phy_class[PHY_MAX_ADDR];
++	u8 index;
++	u8 chip_id;
++	u8 gidx;		/* global index */
++};
++
++#define MDIO_COMMAND_REG		0x0
++#define MDIO_ADDR_REG			0x4
++#define MDIO_WDATA_REG			0x8
++#define MDIO_RDATA_REG			0xc
++#define MDIO_STA_REG			0x10
++
++#define MDIO_CMD_DEVAD_M	0x1f
++#define MDIO_CMD_DEVAD_S	0
++#define MDIO_CMD_PRTAD_M	0x1f
++#define MDIO_CMD_PRTAD_S	5
++#define MDIO_CMD_OP_M		0x3
++#define MDIO_CMD_OP_S		10
++#define MDIO_CMD_ST_M		0x3
++#define MDIO_CMD_ST_S		12
++#define MDIO_CMD_START_B	14
++
++#define MDIO_ADDR_DATA_M	0xffff
++#define MDIO_ADDR_DATA_S	0
++
++#define MDIO_WDATA_DATA_M	0xffff
++#define MDIO_WDATA_DATA_S	0
++
++#define MDIO_RDATA_DATA_M	0xffff
++#define MDIO_RDATA_DATA_S	0
++
++#define MDIO_STATE_STA_B	0
++
++enum mdio_st_clause {
++	MDIO_ST_CLAUSE_45 = 0,
++	MDIO_ST_CLAUSE_22
++};
++
++enum mdio_c22_op_seq {
++	MDIO_C22_WRITE = 1,
++	MDIO_C22_READ = 2
++};
++
++enum mdio_c45_op_seq {
++	MDIO_C45_WRITE_ADDR = 0,
++	MDIO_C45_WRITE_DATA,
++	MDIO_C45_READ_INCREMENT,
++	MDIO_C45_READ
++};
++
++static inline void mdio_write_reg(void *base, u32 reg, u32 value)
++{
++	u8 __iomem *reg_addr = ACCESS_ONCE(base);
++
++	writel(value, reg_addr + reg);
++}
++
++#define MDIO_WRITE_REG(a, reg, value) \
++	mdio_write_reg((a)->vbase, (reg), (value))
++
++static inline u32 mdio_read_reg(void *base, u32 reg)
++{
++	u8 __iomem *reg_addr = ACCESS_ONCE(base);
++
++	return readl(reg_addr + reg);
++}
++
++#define MDIO_READ_REG(a, reg) \
++	mdio_read_reg((a)->vbase, (reg))
++
++#define mdio_set_field(origin, mask, shift, val) \
++	do { \
++		(origin) &= (~((mask) << (shift))); \
++		(origin) |= (((val) & (mask)) << (shift)); \
++	} while (0)
++
++#define mdio_get_field(origin, mask, shift) (((origin) >> (shift)) & (mask))
++
++static void mdio_set_reg_field(void *base, u32 reg, u32 mask, u32 shift,
++			       u32 val)
++{
++	u32 origin = mdio_read_reg(base, reg);
++
++	mdio_set_field(origin, mask, shift, val);
++	mdio_write_reg(base, reg, origin);
++}
++
++#define MDIO_SET_REG_FIELD(dev, reg, mask, shift, val) \
++	mdio_set_reg_field((dev)->vbase, (reg), (mask), (shift), (val))
++
++static u32 mdio_get_reg_field(void *base, u32 reg, u32 mask, u32 shift)
++{
++	u32 origin;
++
++	origin = mdio_read_reg(base, reg);
++	return mdio_get_field(origin, mask, shift);
++}
++
++#define MDIO_GET_REG_FIELD(dev, reg, mask, shift) \
++		mdio_get_reg_field((dev)->vbase, (reg), (mask), (shift))
++
++#define MDIO_SET_REG_BIT(dev, reg, bit, val) \
++		mdio_set_reg_field((dev)->vbase, (reg), 0x1ull, (bit), (val))
++
++#define MDIO_GET_REG_BIT(dev, reg, bit) \
++		mdio_get_reg_field((dev)->vbase, (reg), 0x1ull, (bit))
++
++/**
++ *hns_mdio_read_hw - read phy regs
++ *@mdio_dev: mdio device
++ *@phy_addr:phy addr
++ *@is_c45:
++ *@page:
++ *@reg: reg
++ *@data:regs data
++ *return status
++ */
++static int hns_mdio_read_hw(struct hns_mdio_device *mdio_dev, u8 phy_addr,
++			    u8 is_c45, u8 page, u16 reg, u16 *data)
++{
++	u32 cmd_reg_value;
++	u32 sta_reg_value;
++	u32 time_cnt;
++
++	if (phy_addr > MDIO_MAX_PHY_ADDR) {
++		dev_err(mdio_dev->dev, "Wrong phy address: phy_addr(%x)\n",
++			phy_addr);
++		return -EINVAL;
++	}
++
++	dev_dbg(mdio_dev->dev, "mdio(%d) base is %p\n",
++		mdio_dev->gidx, mdio_dev->vbase);
++	dev_dbg(mdio_dev->dev,
++		"phy_addr=%d, is_c45=%d, devad=%d, regnum=%#x!\n",
++		phy_addr, is_c45, page, reg);
++
++	/* Step 1; waiting for MDIO_COMMAND_REG 's mdio_start==0,	*/
++	/*	after that can do read or write*/
++	for (time_cnt = MDIO_TIMEOUT; time_cnt; time_cnt--) {
++		cmd_reg_value = MDIO_GET_REG_BIT(mdio_dev,
++						 MDIO_COMMAND_REG,
++						 MDIO_CMD_START_B);
++		if (!cmd_reg_value)
++			break;
++	}
++	if (cmd_reg_value) {
++		dev_err(mdio_dev->dev, "MDIO is busy!\n");
++		return -EBUSY;
++	}
++
++	if (!is_c45) {
++		cmd_reg_value = MDIO_ST_CLAUSE_22 << MDIO_CMD_ST_S;
++		cmd_reg_value |= MDIO_C22_READ << MDIO_CMD_OP_S;
++		cmd_reg_value |=
++			(phy_addr & MDIO_CMD_PRTAD_M) << MDIO_CMD_PRTAD_S;
++		cmd_reg_value |= (reg & MDIO_CMD_DEVAD_M) << MDIO_CMD_DEVAD_S;
++		cmd_reg_value |= 1 << MDIO_CMD_START_B;
++
++		MDIO_WRITE_REG(mdio_dev, MDIO_COMMAND_REG, cmd_reg_value);
++	} else {
++		MDIO_SET_REG_FIELD(mdio_dev, MDIO_ADDR_REG, MDIO_ADDR_DATA_M,
++				   MDIO_ADDR_DATA_S, reg);
++
++		/* Step 2; config the cmd-reg to write addr*/
++		cmd_reg_value = MDIO_ST_CLAUSE_45 << MDIO_CMD_ST_S;
++		cmd_reg_value |= MDIO_C45_WRITE_ADDR << MDIO_CMD_OP_S;
++
++		/* mdio_st==2'b00: is configing port addr*/
++		cmd_reg_value |=
++			(phy_addr & MDIO_CMD_PRTAD_M) << MDIO_CMD_PRTAD_S;
++
++		/* mdio_st == 2'b00: is configing dev_addr*/
++		cmd_reg_value |= (page & MDIO_CMD_DEVAD_M) << MDIO_CMD_DEVAD_S;
++		cmd_reg_value |= 1 << MDIO_CMD_START_B;
++		MDIO_WRITE_REG(mdio_dev, MDIO_COMMAND_REG, cmd_reg_value);
++
++		/* Step 3; waiting for MDIO_COMMAND_REG 's mdio_start==0,*/
++		/*check for read or write opt is finished */
++		for (time_cnt = MDIO_TIMEOUT; time_cnt; time_cnt--) {
++			cmd_reg_value = MDIO_GET_REG_BIT(mdio_dev,
++							 MDIO_COMMAND_REG,
++							 MDIO_CMD_START_B);
++			if (!cmd_reg_value)
++				break;
++		}
++		if (cmd_reg_value) {
++			dev_err(mdio_dev->dev, "MDIO is busy\n");
++			return -EBUSY;
++		}
++
++		/* Step 4; config cmd-reg, send read opt */
++		cmd_reg_value = MDIO_ST_CLAUSE_45 << MDIO_CMD_ST_S;
++		cmd_reg_value |= MDIO_C45_READ << MDIO_CMD_OP_S;
++
++		/* mdio_st==2'b00: is configing port addr*/
++		cmd_reg_value |=
++			(phy_addr & MDIO_CMD_PRTAD_M) << MDIO_CMD_PRTAD_S;
++
++		/* mdio_st == 2'b00: is configing dev_addr*/
++		cmd_reg_value |= (page & MDIO_CMD_DEVAD_M) << MDIO_CMD_DEVAD_S;
++		cmd_reg_value |= 1 << MDIO_CMD_START_B;
++		MDIO_WRITE_REG(mdio_dev, MDIO_COMMAND_REG, cmd_reg_value);
++	}
++
++	/* Step 5; waiting for MDIO_COMMAND_REG 's mdio_start==0,*/
++	/* check for read or write opt is finished */
++	for (time_cnt = MDIO_TIMEOUT; time_cnt; time_cnt--) {
++		cmd_reg_value = MDIO_GET_REG_BIT(mdio_dev,
++						 MDIO_COMMAND_REG,
++						 MDIO_CMD_START_B);
++		if (!cmd_reg_value)
++			break;
++	}
++	if (cmd_reg_value) {
++		dev_err(mdio_dev->dev, "MDIO is busy\n");
++		return -EBUSY;
++	}
++
++	sta_reg_value = MDIO_GET_REG_BIT(mdio_dev,
++					 MDIO_STA_REG, MDIO_STATE_STA_B);
++	if (sta_reg_value) {
++		dev_err(mdio_dev->dev, "MDIO Read failed!\n");
++		return -EBUSY;
++	}
++
++	/* Step 6; get out data*/
++	*data = (u16)MDIO_GET_REG_FIELD(mdio_dev, MDIO_RDATA_REG,
++					MDIO_RDATA_DATA_M, MDIO_RDATA_DATA_S);
++
++	return 0;
++}
++
++/**
++ *hns_mdio_write_hw - write phy regs
++ *@mdio_dev: mdio device
++ *@phy_addr: phy addr
++ *@is_c45: 0 means the clause 22, none 0 means clause 45
++ *@page: phy page addr
++ *@reg:  phy reg
++ *@data: regs data
++ *return status
++ */
++static int hns_mdio_write_hw(struct hns_mdio_device *mdio_dev, u8 phy_addr,
++			     u8 is_c45, u8 page, u16 reg, u16 data)
++{
++	u32 cmd_reg_value;
++	u32 time_cnt;
++
++	if (phy_addr > MDIO_MAX_PHY_ADDR) {
++		dev_err(mdio_dev->dev, "Wrong phy address: phy_addr(%x)\n",
++			phy_addr);
++		return -EINVAL;
++	}
++
++	dev_dbg(mdio_dev->dev, "mdio(%d) base is %p,write data=%d\n",
++		mdio_dev->gidx, mdio_dev->vbase, data);
++	dev_dbg(mdio_dev->dev, "phy_addr=%d, is_c45=%d, devad=%d, regnum=%#x\n",
++		phy_addr, is_c45, page, reg);
++
++	/* Step 1; waiting for MDIO_COMMAND_REG 's mdio_start==0,*/
++	/*	after that can do read or wtrite*/
++	for (time_cnt = MDIO_TIMEOUT; time_cnt; time_cnt--) {
++		cmd_reg_value = MDIO_GET_REG_BIT(mdio_dev,
++						 MDIO_COMMAND_REG,
++						 MDIO_CMD_START_B);
++		if (!cmd_reg_value)
++			break;
++	}
++	if (cmd_reg_value) {
++		dev_err(mdio_dev->dev, "MDIO is busy\n");
++		return -EBUSY;
++	}
++
++	if (!is_c45) {
++		MDIO_SET_REG_FIELD(mdio_dev, MDIO_WDATA_REG, MDIO_WDATA_DATA_M,
++				   MDIO_WDATA_DATA_S, data);
++
++		cmd_reg_value = MDIO_ST_CLAUSE_22 << MDIO_CMD_ST_S;
++		cmd_reg_value |= MDIO_C22_WRITE << MDIO_CMD_OP_S;
++		cmd_reg_value |=
++			(phy_addr & MDIO_CMD_PRTAD_M) << MDIO_CMD_PRTAD_S;
++		cmd_reg_value |= (reg & MDIO_CMD_DEVAD_M) << MDIO_CMD_DEVAD_S;
++		cmd_reg_value |= 1 << MDIO_CMD_START_B;
++
++		MDIO_WRITE_REG(mdio_dev, MDIO_COMMAND_REG, cmd_reg_value);
++	} else {
++		/* Step 2; config the cmd-reg to write addr*/
++		MDIO_SET_REG_FIELD(mdio_dev, MDIO_ADDR_REG, MDIO_ADDR_DATA_M,
++				   MDIO_ADDR_DATA_S, reg);
++
++		cmd_reg_value = MDIO_ST_CLAUSE_45 << MDIO_CMD_ST_S;
++		cmd_reg_value |= MDIO_C45_WRITE_ADDR << MDIO_CMD_OP_S;
++
++		/* mdio_st==2'b00: is configing port addr*/
++		cmd_reg_value |=
++			(phy_addr & MDIO_CMD_PRTAD_M) << MDIO_CMD_PRTAD_S;
++
++		/* mdio_st == 2'b00: is configing dev_addr*/
++		cmd_reg_value |= (page & MDIO_CMD_DEVAD_M) << MDIO_CMD_DEVAD_S;
++		cmd_reg_value |= 1 << MDIO_CMD_START_B;
++		MDIO_WRITE_REG(mdio_dev, MDIO_COMMAND_REG, cmd_reg_value);
++
++		/* Step 3; waiting for MDIO_COMMAND_REG's mdio_start==0,*/
++		/* check for read or write opt is finished */
++		for (time_cnt = MDIO_TIMEOUT; time_cnt; time_cnt--) {
++			cmd_reg_value = MDIO_GET_REG_BIT(mdio_dev,
++							 MDIO_COMMAND_REG,
++							 MDIO_CMD_START_B);
++			if (!cmd_reg_value)
++				break;
++		}
++		if (cmd_reg_value) {
++			dev_err(mdio_dev->dev, "MDIO is busy\n");
++			return -EBUSY;
++		}
++
++		/* Step 4; config the data needed writing */
++		MDIO_SET_REG_FIELD(mdio_dev, MDIO_WDATA_REG, MDIO_WDATA_DATA_M,
++				   MDIO_WDATA_DATA_S, data);
++
++		/* Step 5; config the cmd-reg for the write opt*/
++		cmd_reg_value = MDIO_ST_CLAUSE_45 << MDIO_CMD_ST_S;
++		cmd_reg_value |= MDIO_C45_WRITE_DATA << MDIO_CMD_OP_S;
++
++		/* mdio_st==2'b00: is configing port addr*/
++		cmd_reg_value |=
++			(phy_addr & MDIO_CMD_PRTAD_M) << MDIO_CMD_PRTAD_S;
++
++		/* mdio_st == 2'b00: is configing dev_addr*/
++		cmd_reg_value |= (page & MDIO_CMD_DEVAD_M) << MDIO_CMD_DEVAD_S;
++		cmd_reg_value |= 1 << MDIO_CMD_START_B;
++		MDIO_WRITE_REG(mdio_dev, MDIO_COMMAND_REG, cmd_reg_value);
++	}
++
++	return 0;
++}
++
++/**
++ * hns_mdio_get_chip_id - get parent node's chip-id attribute
++ * @dpev: mdio platform device
++ * return chip id if found the chip-id, or return 0
++ */
++static u32 hns_mdio_get_chip_id(struct platform_device *pdev)
++{
++	struct device_node *np;
++	u32 chip_id;
++	int ret;
++
++	np = of_get_parent(pdev->dev.of_node);
++	if (!np)
++		return 0;
++
++	ret = of_property_read_u32(np, "chip-id", &chip_id);
++	if (ret)
++		return 0;
++
++	return chip_id;
++}
++
++/**
++ * hns_mdio_write - access phy register
++ * @bus: mdio bus
++ * @phy_id: phy id
++ * @regnum: register num
++ * @value: register value
++ *
++ * Return 0 on success, negative on failure
++ */
++static int hns_mdio_write(struct mii_bus *bus,
++			  int phy_id, int regnum, u16 value)
++{
++	int ret;
++	struct hns_mdio_device *mdio_dev = (struct hns_mdio_device *)bus->priv;
++	u8 devad = ((regnum >> 16) & 0x1f);
++	u8 is_c45 = !!(regnum & MII_ADDR_C45);
++
++	ret = hns_mdio_write_hw(mdio_dev, phy_id, is_c45, devad,
++				(u16)(regnum & 0xffff), value);
++	if (ret) {
++		dev_err(&bus->dev, "write_phy_reg fail, phy_id=%d, devad=%d,regnum=%#x, value=%#x!\n",
++			phy_id, devad, regnum, value);
++
++		return ret;
++	}
++
++	return 0;
++}
++
++/**
++ * hns_mdio_read - access phy register
++ * @bus: mdio bus
++ * @phy_id: phy id
++ * @regnum: register num
++ * @value: register value
++ *
++ * Return phy register value
++ */
++static int hns_mdio_read(struct mii_bus *bus, int phy_id, int regnum)
++{
++	int ret;
++	u16 reg_val = 0;
++	u8 devad = ((regnum >> 16) & 0x1f);
++	u8 is_c45 = !!(regnum & MII_ADDR_C45);
++	struct hns_mdio_device *mdio_dev = (struct hns_mdio_device *)bus->priv;
++
++	ret = hns_mdio_read_hw(mdio_dev, phy_id, is_c45, devad,
++			       (u16)(regnum & 0xffff), &reg_val);
++	if (ret) {
++		dev_err(&bus->dev, "read_phy_reg fail, mdio_idx=%d, phy_id=%d, devad=%d,regnum=%#x!\n",
++			mdio_dev->gidx,	phy_id, devad, regnum);
++
++		return ret;
++	}
++
++	return reg_val;
++}
++
++/**
++ * hns_mdio_reset - reset mdio bus
++ * @bus: mdio bus
++ *
++ * Return 0 on success, negative on failure
++ */
++static int hns_mdio_reset(struct mii_bus *bus)
++{
++	return 0;
++}
++
++/**
++ * hns_mdio_bus_name - get mdio bus name
++ * @name: mdio bus name
++ * @np: mdio device node pointer
++ */
++static void hns_mdio_bus_name(char *name, struct device_node *np)
++{
++	const u32 *addr;
++	u64 taddr = OF_BAD_ADDR;
++
++	addr = of_get_address(np, 0, NULL, NULL);
++	if (addr)
++		taddr = of_translate_address(np, addr);
++
++	snprintf(name, MII_BUS_ID_SIZE, "%s@%llx", np->name,
++		 (unsigned long long)taddr);
++}
++
++/**
++ * hns_mdio_probe - probe mdio device
++ * @pdev: mdio platform device
++ *
++ * Return 0 on success, negative on failure
++ */
++static int hns_mdio_probe(struct platform_device *pdev)
++{
++	struct device_node *np;
++	struct hns_mdio_device *mdio_dev;
++	struct mii_bus *new_bus;
++	struct resource *res;
++	int ret;
++
++	if (!pdev) {
++		dev_err(NULL, "pdev is NULL!\r\n");
++		return -ENODEV;
++	}
++	np = pdev->dev.of_node;
++	mdio_dev = devm_kzalloc(&pdev->dev, sizeof(*mdio_dev), GFP_KERNEL);
++	if (!mdio_dev)
++		return -ENOMEM;
++
++	new_bus = devm_mdiobus_alloc(&pdev->dev);
++	if (!new_bus) {
++		dev_err(&pdev->dev, "mdiobus_alloc fail!\n");
++		return -ENOMEM;
++	}
++
++	new_bus->name = MDIO_BUS_NAME;
++	new_bus->read = hns_mdio_read;
++	new_bus->write = hns_mdio_write;
++	new_bus->reset = hns_mdio_reset;
++	new_bus->priv = mdio_dev;
++	hns_mdio_bus_name(new_bus->id, np);
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	mdio_dev->vbase = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(mdio_dev->vbase)) {
++		ret = PTR_ERR(mdio_dev->vbase);
++		return -EFAULT;
++	}
++	mdio_dev->index = 0;
++	mdio_dev->chip_id = hns_mdio_get_chip_id(pdev);
++	mdio_dev->gidx = mdio_dev->chip_id;
++	mdio_dev->dev = &pdev->dev;
++
++	new_bus->irq = devm_kcalloc(&pdev->dev, PHY_MAX_ADDR,
++				    sizeof(int), GFP_KERNEL);
++	if (!new_bus->irq)
++		return -ENOMEM;
++
++	new_bus->parent = &pdev->dev;
++	platform_set_drvdata(pdev, new_bus);
++
++	ret = of_mdiobus_register(new_bus, np);
++	if (ret) {
++		dev_err(&pdev->dev, "Cannot register as MDIO bus!\n");
++		platform_set_drvdata(pdev, NULL);
++		return ret;
++	}
++
++	return 0;
++}
++
++/**
++ * hns_mdio_remove - remove mdio device
++ * @pdev: mdio platform device
++ *
++ * Return 0 on success, negative on failure
++ */
++static int hns_mdio_remove(struct platform_device *pdev)
++{
++	struct hns_mdio_device *mdio_dev;
++	struct mii_bus *bus;
++
++	bus = platform_get_drvdata(pdev);
++	mdio_dev = (struct hns_mdio_device *)bus->priv;
++
++	mdiobus_unregister(bus);
++	platform_set_drvdata(pdev, NULL);
++	return 0;
++}
++
++static const struct of_device_id hns_mdio_match[] = {
++	{.compatible = "hisilicon,mdio"},
++	{}
++};
++
++static struct platform_driver hns_mdio_driver = {
++	.probe = hns_mdio_probe,
++	.remove = hns_mdio_remove,
++	.driver = {
++		   .name = MDIO_DRV_NAME,
++		   .of_match_table = hns_mdio_match,
++		   },
++};
++
++module_platform_driver(hns_mdio_driver);
++
++MODULE_LICENSE("GPL");
++MODULE_AUTHOR("Huawei Tech. Co., Ltd.");
++MODULE_DESCRIPTION("Hisilicon HNS MDIO driver");
++MODULE_ALIAS("platform:" MDIO_DRV_NAME);
 -- 
 1.9.1
