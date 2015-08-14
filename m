@@ -1,60 +1,62 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 13 Aug 2015 18:01:09 -0700
-Subject: [PATCH V3 4/5] clk: core: add CLK_OPS_PARENT_ON flags to support
- clocks require parent on
-In-Reply-To: <1438089585-30103-5-git-send-email-aisheng.dong@freescale.com>
-References: <1438089585-30103-1-git-send-email-aisheng.dong@freescale.com>
- <1438089585-30103-5-git-send-email-aisheng.dong@freescale.com>
-Message-ID: <20150814010109.GW26614@codeaurora.org>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Fri, 14 Aug 2015 01:11:02 +0000
+Subject: [PATCH 1/2] clk: atlas7: move variable-definition together
+Message-ID: <1439514663-23979-1-git-send-email-21cnbao@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/28, Dong Aisheng wrote:
-> On Freescale i.MX7D platform, all clocks operations, including
-> enable/disable, rate change and re-parent, requires its parent
-> clock on. Current clock core can not support it well.
-> This patch introduce a new flag CLK_OPS_PARENT_ON to handle this
-> special case in clock core that enable its parent clock firstly for
-> each operation and disable it later after operation complete.
-> 
-> This patch fixes disaling clocks while its parent is off.
-> This is a special case that is caused by a state mis-align between
-> HW and SW in clock tree during booting.
-> Usually in uboot, we may enable all clocks in HW by default.
-> And during kernel booting time, the parent clock could be disabled in its
-> driver probe due to calling clk_prepare_enable and clk_disable_unprepare.
-> Because it's child clock is only enabled in HW while its SW usecount
-> in clock tree is still 0, so clk_disable of parent clock will gate
-> the parent clock in both HW and SW usecount ultimately.
-> Then there will be a clock is on in HW while its parent is disabled.
-> 
-> Later when clock core does clk_disable_unused, this clock disable
-> will cause system hang due to the limitation of operation requiring
-> its parent clock on.
-> 
-> Cc: Mike Turquette <mturquette@linaro.org>
-> Cc: Stephen Boyd <sboyd@codeaurora.org>
-> Signed-off-by: Dong Aisheng <aisheng.dong@freescale.com>
-> ---
+From: Guo Zeng <Guo.Zeng@csr.com>
 
-Sorry, I still don't agree with this patch. There's no reason we
-should be turning on clocks during late init so that we can turn
-off clocks. If there's some sort of problem in doing that we
-should figure it out and make it so that during late init we turn
-off clocks from the leaves of the tree to the root.
+re-order the codes more reasonable by moving variable-definition
+together.
 
-I agree that there's a problem here where we don't properly
-handle keeping children clocks on if a driver comes in and turns
-off a clock in the middle of the tree before late init. That's a
-real bug, and we should fix it. Mike Turquette has been doing
-some work to have a way to indicate that certain clocks should be
-kept on until client drivers grab them. I think it will also make
-sure to up refcounts on parent clocks in the middle of the tree
-when it figures out that a child clock is enabled. Would that be
-all that we need to do to fix this problem?
+Signed-off-by: Guo Zeng <Guo.Zeng@csr.com>
+Signed-off-by: Barry Song <Baohua.Song@csr.com>
+---
+ drivers/clk/sirf/clk-atlas7.c | 24 ++++++++++++------------
+ 1 file changed, 12 insertions(+), 12 deletions(-)
 
-Also, the subject of this patch and patch 5 are the same. Why?
-
+diff --git a/drivers/clk/sirf/clk-atlas7.c b/drivers/clk/sirf/clk-atlas7.c
+index a98e21f..d34d1b3 100644
+--- a/drivers/clk/sirf/clk-atlas7.c
++++ b/drivers/clk/sirf/clk-atlas7.c
+@@ -206,18 +206,6 @@
+ #define SIRFSOC_CLKC_LEAF_CLK_EN8_SET        0x0548
+ 
+ 
+-static void __iomem *sirfsoc_clk_vbase;
+-static struct clk_onecell_data clk_data;
+-
+-static const struct clk_div_table pll_div_table[] = {
+-	{ .val = 0, .div = 1 },
+-	{ .val = 1, .div = 2 },
+-	{ .val = 2, .div = 4 },
+-	{ .val = 3, .div = 8 },
+-	{ .val = 4, .div = 16 },
+-	{ .val = 5, .div = 32 },
+-};
+-
+ struct clk_pll {
+ 	struct clk_hw hw;
+ 	u16 regofs;  /* register offset */
+@@ -284,6 +272,18 @@ struct atlas7_reset_desc {
+ 	spinlock_t *lock;
+ };
+ 
++static void __iomem *sirfsoc_clk_vbase;
++static struct clk_onecell_data clk_data;
++
++static const struct clk_div_table pll_div_table[] = {
++	{ .val = 0, .div = 1 },
++	{ .val = 1, .div = 2 },
++	{ .val = 2, .div = 4 },
++	{ .val = 3, .div = 8 },
++	{ .val = 4, .div = 16 },
++	{ .val = 5, .div = 32 },
++};
++
+ static DEFINE_SPINLOCK(cpupll_ctrl1_lock);
+ static DEFINE_SPINLOCK(mempll_ctrl1_lock);
+ static DEFINE_SPINLOCK(sys0pll_ctrl1_lock);
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+1.9.1
