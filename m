@@ -1,9 +1,9 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 14 Aug 2015 16:48:38 +0200
-Subject: [GIT PULL 7/9] ARM: tegra: Memory controller updates for v4.3-rc1
+Date: Fri, 14 Aug 2015 16:48:39 +0200
+Subject: [GIT PULL 8/9] ARM: tegra: Devicetree changes for v4.3-rc1
 In-Reply-To: <1439563720-13189-1-git-send-email-thierry.reding@gmail.com>
 References: <1439563720-13189-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <1439563720-13189-8-git-send-email-thierry.reding@gmail.com>
+Message-ID: <1439563720-13189-9-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,40 +15,55 @@ The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.3-memory
+  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.3-dt
 
-for you to fetch changes up to 588c43a7bd5a53ae523b318e1db16bdd59963a3c:
+for you to fetch changes up to 6909c6632fdbea441b5077b4f882c0bf4b71997e:
 
-  memory: tegra: Add Tegra210 support (2015-08-13 16:07:52 +0200)
+  ARM: tegra: Add gpio-ranges property (2015-08-13 16:31:53 +0200)
 
 Thanks,
 Thierry
 
 ----------------------------------------------------------------
-ARM: tegra: Memory controller updates for v4.3-rc1
+ARM: tegra: Devicetree changes for v4.3-rc1
 
-Adds support for Tegra210, which allows the SMMU to be used on this new
-SoC generation.
+Enables CPU frequency scaling on Jetson TK1 and enables the GK20A GPU on
+Venice2 and Jetson TK1. This also enables support for the PMU hardware
+found on Tegra124, which among other things, can be used for performance
+measurements.
 
 ----------------------------------------------------------------
-Paul Walmsley (1):
-      memory: tegra: Add support for a variable-size client ID bitfield
+Alexandre Courbot (2):
+      ARM: tegra: Add IOMMU node to GK20A
+      ARM: tegra: jetson-tk1: Add GK20A GPU DT node
+
+Kyle Huey (1):
+      ARM: tegra: Add Tegra124 PMU support
+
+Mikko Perttunen (1):
+      ARM: tegra: Add CPU regulator to the Jetson TK1 device tree
+
+Nicolas Chauvet (1):
+      ARM: tegra: Fix AHB base address on Tegra20, Tegra30 and Tegra114
 
 Thierry Reding (2):
-      memory: tegra: Expose supported rates via debugfs
-      memory: tegra: Add Tegra210 support
+      Merge branch 'for-4.3/pinctrl' into for-4.3/dt
+      ARM: tegra: venice2: Add GK20A GPU DT node
 
- drivers/iommu/Kconfig                    |    2 +-
- drivers/memory/tegra/Makefile            |    1 +
- drivers/memory/tegra/mc.c                |    8 +-
- drivers/memory/tegra/mc.h                |    4 +
- drivers/memory/tegra/tegra114.c          |    1 +
- drivers/memory/tegra/tegra124-emc.c      |   42 +-
- drivers/memory/tegra/tegra124.c          |    2 +
- drivers/memory/tegra/tegra210.c          | 1080 ++++++++++++++++++++++++++++++
- drivers/memory/tegra/tegra30.c           |    1 +
- include/dt-bindings/memory/tegra210-mc.h |   36 +
- include/soc/tegra/mc.h                   |    2 +
- 11 files changed, 1174 insertions(+), 5 deletions(-)
- create mode 100644 drivers/memory/tegra/tegra210.c
- create mode 100644 include/dt-bindings/memory/tegra210-mc.h
+Tomeu Vizoso (2):
+      pinctrl: tegra: Only set the gpio range if needed
+      ARM: tegra: Add gpio-ranges property
+
+Tuomas Tynkkynen (3):
+      ARM: tegra: Add the DFLL to Tegra124 device tree
+      ARM: tegra: Enable the DFLL on the Jetson TK1
+      ARM: tegra: Add entries for cpufreq on Tegra124
+
+ arch/arm/boot/dts/tegra114.dtsi           |  5 ++--
+ arch/arm/boot/dts/tegra124-jetson-tk1.dts | 25 ++++++++++++++--
+ arch/arm/boot/dts/tegra124-venice2.dts    | 10 ++++++-
+ arch/arm/boot/dts/tegra124.dtsi           | 50 +++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/tegra20.dtsi            |  5 ++--
+ arch/arm/boot/dts/tegra30.dtsi            |  5 ++--
+ drivers/pinctrl/pinctrl-tegra.c           | 19 +++++++++++-
+ 7 files changed, 109 insertions(+), 10 deletions(-)
