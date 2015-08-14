@@ -1,58 +1,65 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 14 Aug 2015 09:46:41 +0200
-Subject: [PATCH v2 0/6] ARM: shmobile: Move gpio ranges from C code to DT
-In-Reply-To: <20150814003023.GC12589@verge.net.au>
-References: <1438696519-13727-1-git-send-email-geert+renesas@glider.be>
- <20150805005540.GB20726@verge.net.au>
- <CACRpkdY7P86+SxMr5-HnhrN5fC-N1U135jiGAJGTV=xx47VW5g@mail.gmail.com>
- <CAMuHMdW0T6MW6s4Gg_rqvtt+MRPtp_MpuiKtamfFrx-Tcm6WmQ@mail.gmail.com>
- <20150814003023.GC12589@verge.net.au>
-Message-ID: <CAMuHMdU0XoZ-comYSAau6e3kAY9VUbNgyeRcS_LzmV1gm31ZKA@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 14 Aug 2015 00:58:59 -0700
+Subject: [PATCH] ARM: smp: Collapse arch_cpu_idle_dead() into cpu_die()
+Message-ID: <1439539139-8783-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 14, 2015 at 2:30 AM, Simon Horman <horms@verge.net.au> wrote:
-> On Thu, Aug 13, 2015 at 02:45:55PM +0200, Geert Uytterhoeven wrote:
->> On Thu, Aug 13, 2015 at 2:29 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
->> > On Wed, Aug 5, 2015 at 2:55 AM, Simon Horman <horms@verge.net.au> wrote:
->> >> Where possible I prefer not to apply non-DTS/DTSI patches on top of
->> >> DTS/DTSI patches, I believe this is in keeping with how the ARM SoC
->> >> maintainers like things handled.  With this in mind I have done the following:
->> >>
->> >> 1. Queued up the DTSI patches (patches 1 - 3) for v4.3 in my dt branch.
->> >>    I intend for this to turn up in next soon.
->> >> 2. Queued up for pinctrl patches (patches 4 - 6) for v4.4 in a pinctrl patch.
->> >>    I intend for these to be present in the renesas devel branch but
->> >>    not in next until after the release of v4.3-rc1. I would also be
->> >>    happy to drop them and let Linus Walleij take these patches for v4.4,
->> >>    assuming patches 1 - 3 are accepted for v4.3.
->> >
->> > OK.
->> >
->> > Will the world explode if I try to queue the pinctrl patches 4-6 in my
->> > tree now for v4.3? Then I prefer to defer to v4.4. Else I can merge
->> > it in parallel?
->>
->> There won't be a mapping between gpio and pins in any branch having the
->> pinctrl changes but not the dtsi changes.
->
-> It sounds to me that Linus should take his option 2; defer to v4.4.
-> In which case I should drop the changes from my tree (they are not in next
-> anyway). Please let me know if thats the way we will move this forwards.
+The only caller of cpu_die() on ARM is arch_cpu_idle_dead(), so
+let's simplify the code by renaming cpu_die() to
+arch_cpu_idle_dead(). While were here, drop the __ref annotation
+because __cpuinit is gone nowadays.
 
-Sounds fine to me.
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ arch/arm/include/asm/smp.h | 1 -
+ arch/arm/kernel/process.c  | 7 -------
+ arch/arm/kernel/smp.c      | 2 +-
+ 3 files changed, 1 insertion(+), 9 deletions(-)
 
-And in the unlikely event we discover regressions in v4.3-rc1 due to having
-the dtsi changes without the pinctrl changes, we can still fast-track them
-into v4.3-rc2.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/arch/arm/include/asm/smp.h b/arch/arm/include/asm/smp.h
+index 318ce89eeff7..ef356659b4f4 100644
+--- a/arch/arm/include/asm/smp.h
++++ b/arch/arm/include/asm/smp.h
+@@ -74,7 +74,6 @@ extern void secondary_startup_arm(void);
+ extern int __cpu_disable(void);
+ 
+ extern void __cpu_die(unsigned int cpu);
+-extern void cpu_die(void);
+ 
+ extern void arch_send_call_function_single_ipi(int cpu);
+ extern void arch_send_call_function_ipi_mask(const struct cpumask *mask);
+diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+index f192a2a41719..358984b7f249 100644
+--- a/arch/arm/kernel/process.c
++++ b/arch/arm/kernel/process.c
+@@ -91,13 +91,6 @@ void arch_cpu_idle_exit(void)
+ 	ledtrig_cpu(CPU_LED_IDLE_END);
+ }
+ 
+-#ifdef CONFIG_HOTPLUG_CPU
+-void arch_cpu_idle_dead(void)
+-{
+-	cpu_die();
+-}
+-#endif
+-
+ void __show_regs(struct pt_regs *regs)
+ {
+ 	unsigned long flags;
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 0496b481ad88..48185a773852 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -268,7 +268,7 @@ void __cpu_die(unsigned int cpu)
+  * of the other hotplug-cpu capable cores, so presumably coming
+  * out of idle fixes this.
+  */
+-void __ref cpu_die(void)
++void arch_cpu_idle_dead(void)
+ {
+ 	unsigned int cpu = smp_processor_id();
+ 
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
