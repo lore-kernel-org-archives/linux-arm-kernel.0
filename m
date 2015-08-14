@@ -1,85 +1,118 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Fri, 14 Aug 2015 15:26:21 -0500
-Subject: [PATCH v2 2/4] PCI: pci-host-generic: Fix lookup of
- linux,pci-probe-only property
-In-Reply-To: <20150814164324.GC22809@arm.com>
-References: <1439569159-10051-1-git-send-email-marc.zyngier@arm.com>
- <1439569159-10051-3-git-send-email-marc.zyngier@arm.com>
- <20150814164051.GF26431@google.com>
- <20150814164324.GC22809@arm.com>
-Message-ID: <CAErSpo5abs2Qj25Bs+JVg87ve346f_RVz7jhNwqdv856+WvXQA@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 14 Aug 2015 15:29:03 -0500
+Subject: [PATCH] arm: rpi: Device tree modifications for U-Boot
+In-Reply-To: <CAPnjgZ0hzyjy=8o8ocaGCoOC7Js4CirhystidbvtabzbhRi4RQ@mail.gmail.com>
+References: <1439303153-12171-1-git-send-email-sjg@chromium.org>
+ <1439312701.2451.3.camel@lynxeye.de>
+ <CAPnjgZ3ztXnkxZJvitiXiKMzq5+x46hbv0PW4HcF7yGgsXUV+Q@mail.gmail.com>
+ <CAPnjgZ0hzyjy=8o8ocaGCoOC7Js4CirhystidbvtabzbhRi4RQ@mail.gmail.com>
+Message-ID: <CAL_Jsq++ihz6svJAKWwT7-=KyJvyWXjdf=tZb4aDGgV_Dc=-Nw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 14, 2015 at 11:43 AM, Will Deacon <will.deacon@arm.com> wrote:
-> On Fri, Aug 14, 2015 at 05:40:51PM +0100, Bjorn Helgaas wrote:
->> On Fri, Aug 14, 2015 at 05:19:17PM +0100, Marc Zyngier wrote:
->> > When pci-host-generic looks for the probe-only property, it seems
->> > to trust the DT to be correctly written, and assumes that there
->> > is a parameter to the property.
->> >
->> > Unfortunately, this is not always the case, and some firmware expose
->> > this property naked. The driver ends up making a decision based on
->> > whatever the property pointer points to, which is likely to be junk.
->> >
->> > Switch to the common of_pci.c implementation that doesn't suffer
->> > from this problem.
->> >
->> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> > ---
->> >  drivers/pci/host/pci-host-generic.c | 9 +--------
->> >  1 file changed, 1 insertion(+), 8 deletions(-)
->> >
->> > diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
->> > index 265dd25..545ff4e 100644
->> > --- a/drivers/pci/host/pci-host-generic.c
->> > +++ b/drivers/pci/host/pci-host-generic.c
->> > @@ -210,7 +210,6 @@ static int gen_pci_probe(struct platform_device *pdev)
->> >     int err;
->> >     const char *type;
->> >     const struct of_device_id *of_id;
->> > -   const int *prop;
->> >     struct device *dev = &pdev->dev;
->> >     struct device_node *np = dev->of_node;
->> >     struct gen_pci *pci = devm_kzalloc(dev, sizeof(*pci), GFP_KERNEL);
->> > @@ -225,13 +224,7 @@ static int gen_pci_probe(struct platform_device *pdev)
->> >             return -EINVAL;
->> >     }
->> >
->> > -   prop = of_get_property(of_chosen, "linux,pci-probe-only", NULL);
->> > -   if (prop) {
->> > -           if (*prop)
->> > -                   pci_add_flags(PCI_PROBE_ONLY);
->> > -           else
->> > -                   pci_clear_flags(PCI_PROBE_ONLY);
->> > -   }
->> > +   of_pci_check_probe_only(of_chosen);
->>
->> Do we need support for pci-probe-only in pci-host-generic at all?
->> You're removing the use in amd-overdrive.dts, and there are no other
->> DTs in the kernel tree that mention it.
->>
->> If we can live without it, that would be nice.  It seems like a relic from
->> days when we couldn't reliably assign resources.  (I'm not saying we can do
->> that reliably even today, but I'd rather make it reliable than turn it
->> off.)
+On Fri, Aug 14, 2015 at 1:34 PM, Simon Glass <sjg@chromium.org> wrote:
+> -linux-tegra
 >
-> Kvmtool certainly uses it (and generates its own DT, hence why you don't
-> see it in mainline). Not sure about qemu, though.
+> Hi,
+>
+> On 12 August 2015 at 07:21, Simon Glass <sjg@chromium.org> wrote:
+>> Hi Lucas,
+>>
+>> On 11 August 2015 at 11:05, Lucas Stach <dev@lynxeye.de> wrote:
+>>> Hi Simon,
+>>>
+>>> why did you send this to the Tegra ML?
+>>>
+>>> Am Dienstag, den 11.08.2015, 08:25 -0600 schrieb Simon Glass:
+>>>> This updates the device tree from the kernel version to something suitable
+>>>> for U-Boot:
+>>>>
+>>>> - Add stdout-path alias for console
+>>>> - Mark the /soc node to be available pre-relocation so that the early
+>>>> serial console works (we need the 'ranges' property to be available)
 
-Do you know why kvmtool wants probe-only?  Would something break if we
-didn't support probe-only?  I guess we'd be looking for a case where
-Linux assigns resources and that assignment doesn't work with kvmtool?
+I find it quite strange that you must explicitly enable the parent
+node, but not the uart node.
 
-"pci-probe-only" doesn't appear in qemu
-(git://git.qemu-project.org/qemu.git).  (I guess Alexander confirmed
-that later.)
+>>>>
+>>>> Signed-off-by: Simon Glass <sjg@chromium.org>
+>>>> ---
+>>>>
+>>>>  arch/arm/boot/dts/bcm2835.dtsi | 4 +++-
+>>>>  1 file changed, 3 insertions(+), 1 deletion(-)
+>>>>
+>>>> diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
+>>>> index 301c73f..bd6bff6 100644
+>>>> --- a/arch/arm/boot/dts/bcm2835.dtsi
+>>>> +++ b/arch/arm/boot/dts/bcm2835.dtsi
+>>>> @@ -8,6 +8,7 @@
+>>>>
+>>>>       chosen {
+>>>>               bootargs = "earlyprintk console=ttyAMA0";
+>>>> +             stdout-path = &uart;
+>>>>       };
+>>>>
+>>>>       soc {
+>>>> @@ -16,6 +17,7 @@
+>>>>               #size-cells = <1>;
+>>>>               ranges = <0x7e000000 0x20000000 0x02000000>;
+>>>>               dma-ranges = <0x40000000 0x00000000 0x20000000>;
+>>>> +             u-boot,dm-pre-reloc;
+>>>
+>>> Why do you need this and why should upstream carry your favourite
+>>> bootloaders configuration? This is in no way hardware description.
+>>
+>> I'm not sure how much you know about U-Boot, so let me know if you
+>> need more info.
+>>
+>> U-Boot normally starts up by setting up its serial UART and displaying
+>> a banner message. At this stage typically only a few devices are
+>> initialised (e.g. maybe just the UART). It then relocates itself to
+>> the top of memory and starts up all the devices. It throws away any
+>> previous devices that it set up before relocation and starts again.
+>>
+>> U-Boot uses a thing called driver model (dm) which handles driver
+>> binding and probing. Driver model has the device tree and would
+>> normally scan through it and create devices for everything it finds.
 
-Alexander wrote:
-> QEMU definitely doesn't do proble-only.
-> Is this driver used on real PPC machines too?
+How do you debug the DM itself? It seems like you still would need
+something earlier for debug like earlycon in the kernel. u-boot DM is
+probably simple enough you can get away with using it early, but you
+often can't as the complexity increases. Ultimately you need something
+simple that just hits all the registers needed to get characters out.
+What happens when you add pinmux, clocks, PMIC, power domains, etc. to
+the DM and they all become dependencies for the UART?
 
-I think you're asking about pci-host-generic.c, and the answer is
-"no," because pci-host-generic.c currently depends on CONFIG_ARM.
+>> Before relocation we don't need every device. Also the CPU is often
+>> running slowly, perhaps without the cache enabled. SDRAM may not be
+>> available yet so space is short. We want to avoid starting up things
+>> that will not be used.
+>>
+>> So this property indicates that the device is needed before relocation
+>> and should be set up by driver model. We need it to avoid a very slow
+>> and memory-hungry startup.
 
-Bjorn
+Can't the need for that property change over time? Either as more
+drivers are converted to DM you need to add this or you add some
+feature that depends on a driver (e.g. get a board rev or boot mode
+from GPIO). You would have backwards compatibility issues with this.
+I'm somewhat less worried about that for u-boot as we should be
+bundling the dtb and bootloader rather than kernel and dtb. For the
+UART, you can just get which UART to initialize early from
+stdout-path. But for other cases, couldn't you just have the platform
+provide the list of needed drivers. Then when u-boot needs change, you
+just change u-boot.
+
+>> As to why upstream should accept it, my understanding of upstream is
+>> that people can send patches to it and in fact are encouraged to do
+>> so, to avoid misunderstandings and duplication. The device tree files
+>> are stored in Linux so any binding or source file changes should end
+>> up there. Otherwise the files tend to diverge and we end up with
+>> multiple bindings and multiple versions of the same source file.
+>
+> Is the above explanation sufficient? Will this patch be applied?
+
+Well, for starters bindings need to be documented, so you need to send
+this as a binding doc with this detail.
+
+Rob
