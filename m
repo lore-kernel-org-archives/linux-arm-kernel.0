@@ -1,29 +1,47 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Fri, 14 Aug 2015 09:46:44 -0500
-Subject: [PATCH v4 1/3] PCI: generic: remove dependency on hw_pci
-In-Reply-To: <20150812090449.GA22485@arm.com>
-References: <1438721620-15493-1-git-send-email-jchandra@broadcom.com>
- <20150804234956.GF17327@google.com>
- <007501d0d4ce$1d2dd9c0$57898d40$@samsung.com>
- <20150812090449.GA22485@arm.com>
-Message-ID: <20150814144644.GC26431@google.com>
+From: james.morse@arm.com (James Morse)
+Date: Fri, 14 Aug 2015 15:48:32 +0100
+Subject: [PATCH v6 3/6] PCI: designware: Add ARM64 support
+In-Reply-To: <55C44B18.4010103@hisilicon.com>
+References: <1438848559-232109-1-git-send-email-wangzhou1@hisilicon.com>
+ <1438848559-232109-4-git-send-email-wangzhou1@hisilicon.com>
+ <55C44B18.4010103@hisilicon.com>
+Message-ID: <55CDFFC0.40604@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 12, 2015 at 10:04:50AM +0100, Will Deacon wrote:
-> On Wed, Aug 12, 2015 at 08:11:29AM +0100, Pavel Fedin wrote:
-> > > I dropped the acks and tested-by because of that change, but I'll happily
-> > > add them back if Lorenzo and Pavel confirm.  
-> > 
-> >  Confirm.
-> >  Tested-by: Pavel Fedin <p.fedin@samsung.com>
-> > 
-> >  I also added MSI support. Can i post it as patch on top of your branch?
-> 
-> There shouldn't be any need with the changes queued in tip/irq/core. Can
-> you give the following branch a go, please (it doesn't look like Bjorn's
-> stuff is in linux-next, unfortunately)?
+On 07/08/15 07:07, Zhou Wang wrote:
+> On 2015/8/6 16:09, Zhou Wang wrote:
+>> This patch tries to unify ARM32 and ARM64 PCIe in designware driver. Delete
+>> function dw_pcie_setup, dw_pcie_scan_bus, dw_pcie_map_irq and struct hw_pci,
+>> move related operations to dw_pcie_host_init.
+>>
+>> In past, we use:
+>> pci_common_init_dev
+>>       -> pcibios_init_hw
+>>               -> hw->scan (dw_pcie_scan_bus)
+>> to pass 0 to root_bus_nr in struct pcie_port. This patch set pp->root_bus_nr = 0
+>> in each PCIe host driver which is based on pcie-designware.
+>>
+>> This patch also try to use of_pci_get_host_bridge_resources for ARM32 and ARM64
+>> according to the suggestion for Gabriele[1]
+>>
+>> Finally this patch reverts commit f4c55c5a3f7f "PCI: designware: Program ATU
+>> with untranslated address" based on 1/6 in this series. we delete *_mod_base in
+>> pcie-designware. This was discussed in [2]
+>>
+>> I have compiled the driver with multi_v7_defconfig. However, I don't have
+>> ARM32 PCIe related board to do test. It will be appreciated if someone could
+>> help to test it.
 
-We still have a build issue (undefined reference to pci_write_msi_msg
-in imx_v6_v7_defconfig) to resolve before putting it in linux-next.
-Hopefully we can resolve that today.
+I've tested this whole series on an ARM32 PCIe board:'Freescale i.MX6 Quad
+SABRE Lite Board' with an Intel wireless card on v4.2-rc6.
+
+I can rescan the bus, load firmware, list nearby APs, and even get MSIs
+coming from the card.
+
+Tested-By: James Morse <james.morse@arm.com>
+
+
+Thanks,
+
+James
