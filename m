@@ -1,111 +1,85 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Fri, 14 Aug 2015 13:18:49 +0300
-Subject: [PATCH v2 2/6] genirq: fix irqchip_set_wake_parent if
- IRQCHIP_SKIP_SET_WAKE
-In-Reply-To: <55CC9493.9020101@ti.com>
-References: <1439401562-28874-1-git-send-email-grygorii.strashko@ti.com>
- <1439401562-28874-3-git-send-email-grygorii.strashko@ti.com>
- <55CC6AFF.8060400@arm.com> <55CC71E8.80604@ti.com> <55CC9493.9020101@ti.com>
-Message-ID: <55CDC089.1060309@ti.com>
+From: liguozhu@hisilicon.com (Kenneth Lee)
+Date: Fri, 14 Aug 2015 18:30:17 +0800
+Subject: [PATCH 0/5] net: Hisilicon Network Subsystem support
+Message-ID: <1439548222-231611-1-git-send-email-liguozhu@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/13/2015 03:58 PM, Grygorii Strashko wrote:
-> On 08/13/2015 01:31 PM, Grygorii Strashko wrote:
->> On 08/13/2015 01:01 PM, Marc Zyngier wrote:
->>> On 12/08/15 18:45, Grygorii Strashko wrote:
->>>> The irqchip_set_wake_parent should not fail if IRQ chip
->>>> specifies IRQCHIP_SKIP_SET_WAKE. Otherwise, IRQ wakeup
->>>> configuration can't be propagated properly through IRQ
->>>> domains hierarchy.
->>>>
->>>> In case of TI OMAP DRA7 the issue reproduced with following
->>>> configuration:
->>>> ARM GIC<-OMAP wakeupgen<-TI CBAR<-GPIO<-GPIO pcf857x<-gpio_key
->>>>
->>>> gpio_key is wakeup source
->>>>
->>>> Failure is reproduced during suspend/resume to RAM:
->>>> suspend:
->>>>    - gpio_keys_suspend
->>>>      enable_irq_wake
->>>>        + pcf857x_irq_set_wake
->>>>          + omap_gpio_wake_enable
->>>>            + TI CBAR irq_chip_set_wake_parent
->>>>              + OMAP wakeupgen has no .irq_set_wake()
->>>
->>> Most importantly, wakeupgen has IRQCHIP_SKIP_SET_WAKE set.
->>>
->>>>              and -ENOSYS will be returned
->>>>
->>>> resume:
->>>>    - gpio_keys_resume
->>>>      + disable_irq_wake
->>>>        + irq_set_irq_wake
->>>>          + WARN(1, "Unbalanced IRQ %d wake disable\n", irq);
->>>>
->>>> Fixes: 08b55e2a9208 ('genirq: Add irqchip_set_wake_parent')
->>>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
->>>> ---
->>>>    kernel/irq/chip.c | 4 ++++
->>>>    1 file changed, 4 insertions(+)
->>>>
->>>> diff --git a/kernel/irq/chip.c b/kernel/irq/chip.c
->>>> index 6de638b..bdb1b9d 100644
->>>> --- a/kernel/irq/chip.c
->>>> +++ b/kernel/irq/chip.c
->>>> @@ -1024,6 +1024,10 @@ int irq_chip_set_vcpu_affinity_parent(struct
->>>> irq_data *data, void *vcpu_info)
->>>>    int irq_chip_set_wake_parent(struct irq_data *data, unsigned int on)
->>>>    {
->>>>        data = data->parent_data;
->>>> +
->>>> +    if (irq_data_get_irq_chip(data)->flags & IRQCHIP_SKIP_SET_WAKE)
->>>> +        return 0;
->>>> +
->>>>        if (data->chip->irq_set_wake)
->>>>            return data->chip->irq_set_wake(data, on);
->>>>
->>>>
->>>
->>> We have a more general issue with chip flags, and how they combine
->>> within a stack of irqchips.
->>
->> Indeed. Problem looks similar to IRQCHIP_MASK_ON_SUSPEND flag usage.
->>
->>>
->>> What if you remove the irq_chip_set_wake_parent from the crossbar
->>> driver, and instead set IRQCHIP_SKIP_SET_WAKE?
->>
->> I've thought about this and it should work for me.
->> One question - what if crossbar will be not the last one in
->> IRQ domains hierarchy?
->>
-> 
-> I can confirm, if I revert this patch, add IRQCHIP_SKIP_SET_WAKE to
-> the crossbar and remove irq_chip_set_wake_parent wakeups still works.
-> What do you prefer me to do: add additional patch for the crossbar,
-> drop/keep this patch?
-> 
+This patchset add Hisilicon Network Subsystem support. The subsystem
+provides a long term developing network accelerate engine with ring buffer
+interface. The network interface can be used as standard ethernet network
+interface card or be made use by a network application with decoded L2 to
+L4 data.
 
-OK. There are two possibilities to fix set_wake functionality for TI OMAPs
-where below HW configurations are used:
-  OMAP4/5: GIC <- OMAP wakeupgen
-  DRA7: GIC <- OMAP wakeupgen <- TI CBAR
+The patchset is porting from some internal-use drivers, it is tested and
+working fine with the hardware. But some detail design is not that good.
+But we want to know if the community can accept the structure/arch before
+refining it. Thank you.
 
+Kenneth Lee (5):
+  net: add Hisilicon Network Subsystem support (config and documents)
+  net: add Hisilicon Network Subsystem hnae framework support
+  net: add Hisilicon Network Subsystem MDIO support
+  net: add Hisilicon Network Subsystem DSAF support
+  net: add Hisilicon Network Subsystem basic ethernet support
 
-1) ensure that IRQCHIP_SKIP_SET_WAKE flag is set only for GIC and
-use irq_chip_set_wake_parent() in both wakeupgen and crossbar 
- [this patch is required]
-
-2) ensure that IRQCHIP_SKIP_SET_WAKE flag is set and drop 
-.irq_set_wake()/irq_chip_set_wake_parent() for all IRQ chips
-in IRQ domains hierarchy.
- [this patch can be dropped]
-
-I'm going to select approach 2 and re-send.
-
+ .../devicetree/bindings/net/hisilicon-hns-dsaf.txt |   40 +
+ .../devicetree/bindings/net/hisilicon-hns-mdio.txt |   22 +
+ .../devicetree/bindings/net/hisilicon-hns-nic.txt  |   14 +
+ arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi       |  197 ++
+ drivers/net/ethernet/hisilicon/Kconfig             |   33 +-
+ drivers/net/ethernet/hisilicon/Makefile            |    1 +
+ drivers/net/ethernet/hisilicon/hns/Makefile        |   15 +
+ drivers/net/ethernet/hisilicon/hns/hnae.c          |  494 ++++
+ drivers/net/ethernet/hisilicon/hns/hnae.h          |  582 +++++
+ drivers/net/ethernet/hisilicon/hns/hns_ae_adapt.c  |  766 ++++++
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_gmac.c |  705 +++++
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_gmac.h |   45 +
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.c  |  942 +++++++
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.h  |  462 ++++
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c | 2681 ++++++++++++++++++++
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.h |  438 ++++
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c |  311 +++
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.h |   45 +
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c  |  582 +++++
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.h  |  105 +
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_rcb.c  |  972 +++++++
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_rcb.h  |  136 +
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h  |  958 +++++++
+ .../net/ethernet/hisilicon/hns/hns_dsaf_xgmac.c    |  826 ++++++
+ .../net/ethernet/hisilicon/hns/hns_dsaf_xgmac.h    |   15 +
+ drivers/net/ethernet/hisilicon/hns/hns_enet.c      | 1552 +++++++++++
+ drivers/net/ethernet/hisilicon/hns/hns_enet.h      |   81 +
+ drivers/net/ethernet/hisilicon/hns/hns_ethtool.c   | 1174 +++++++++
+ drivers/net/ethernet/hisilicon/hns/hns_mdio_main.c |  597 +++++
+ 29 files changed, 14790 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/net/hisilicon-hns-dsaf.txt
+ create mode 100644 Documentation/devicetree/bindings/net/hisilicon-hns-mdio.txt
+ create mode 100644 Documentation/devicetree/bindings/net/hisilicon-hns-nic.txt
+ create mode 100644 arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi
+ create mode 100644 drivers/net/ethernet/hisilicon/hns/Makefile
+ create mode 100644 drivers/net/ethernet/hisilicon/hns/hnae.c
+ create mode 100644 drivers/net/ethernet/hisilicon/hns/hnae.h
+ create mode 100644 drivers/net/ethernet/hisilicon/hns/hns_ae_adapt.c
+ create mode 100644 drivers/net/ethernet/hisilicon/hns/hns_dsaf_gmac.c
+ create mode 100644 drivers/net/ethernet/hisilicon/hns/hns_dsaf_gmac.h
+ create mode 100644 drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.c
+ create mode 100644 drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.h
+ create mode 100644 drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c
+ create mode 100644 drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.h
+ create mode 100644 drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c
+ create mode 100644 drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.h
+ create mode 100644 drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c
+ create mode 100644 drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.h
+ create mode 100644 drivers/net/ethernet/hisilicon/hns/hns_dsaf_rcb.c
+ create mode 100644 drivers/net/ethernet/hisilicon/hns/hns_dsaf_rcb.h
+ create mode 100644 drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h
+ create mode 100644 drivers/net/ethernet/hisilicon/hns/hns_dsaf_xgmac.c
+ create mode 100644 drivers/net/ethernet/hisilicon/hns/hns_dsaf_xgmac.h
+ create mode 100644 drivers/net/ethernet/hisilicon/hns/hns_enet.c
+ create mode 100644 drivers/net/ethernet/hisilicon/hns/hns_enet.h
+ create mode 100644 drivers/net/ethernet/hisilicon/hns/hns_ethtool.c
+ create mode 100644 drivers/net/ethernet/hisilicon/hns/hns_mdio_main.c
 
 -- 
-regards,
--grygorii
+1.9.1
