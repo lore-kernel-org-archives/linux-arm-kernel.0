@@ -1,101 +1,89 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Fri, 14 Aug 2015 16:10:57 +0200
-Subject: [PATCH v3 0/9] gpiolib: Add GPIO name support
-Message-ID: <1439561466-14350-1-git-send-email-mpa@pengutronix.de>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Fri, 14 Aug 2015 16:11:59 +0200
+Subject: [PATCH] ARM: keystone: add a work around to handle asynchronous
+ external abort
+In-Reply-To: <55CDF579.4050408@ti.com>
+References: <1439320409-20084-1-git-send-email-m-karicheri2@ti.com>
+ <55CDF579.4050408@ti.com>
+Message-ID: <1439561519.13210.55.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changes in v3:
-As discussed in the v2 thread, we are using the already existing gpiochip names
-now. To avoid races between kernel and userspace, the setup of gpio names in
-the gpio descriptors has to happen right before the gpiochip is added for use
-and after the gpio descriptors are available. Unfortunately this is exactly in
-the function gpiochip_add().
+Am Freitag, den 14.08.2015, 10:04 -0400 schrieb Murali Karicheri:
+> On 08/11/2015 03:13 PM, Murali Karicheri wrote:
+> > Currently on some devices, an asynchronous external abort exception
+> > happens during boot up when exception handlers are enabled in kernel
+> > before switching to user space. This patch adds a workaround to handle
+> > this once during boot. Many customers are already using this
+> > with out any issues and is required to workaround the above issue.
+> >
+> > Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+> > ---
+> >   arch/arm/mach-keystone/keystone.c | 26 ++++++++++++++++++++++++++
+> >   1 file changed, 26 insertions(+)
+> >
+> > diff --git a/arch/arm/mach-keystone/keystone.c b/arch/arm/mach-keystone/keystone.c
+> > index e2880105..c1d0fe5 100644
+> > --- a/arch/arm/mach-keystone/keystone.c
+> > +++ b/arch/arm/mach-keystone/keystone.c
+> > @@ -15,6 +15,7 @@
+> >   #include <linux/of_platform.h>
+> >   #include <linux/of_address.h>
+> >   #include <linux/memblock.h>
+> > +#include <linux/signal.h>
+> >
+> >   #include <asm/setup.h>
+> >   #include <asm/mach/map.h>
+> > @@ -52,6 +53,24 @@ static struct notifier_block platform_nb = {
+> >   	.notifier_call = keystone_platform_notifier,
+> >   };
+> >
+> > +static bool ignore_first = true;
+> > +static int keystone_async_ext_abort_fault(unsigned long addr, unsigned int fsr,
+> > +					  struct pt_regs *regs)
+> > +{
+> > +	/*
+> > +	 * if first time, ignore this as this is a asynchronous external abort
+> > +	 * happening only some devices that couldn't be root caused and we add
+> > +	 * this work around to handle this first time.
+> > +	 */
+> > +	if (ignore_first) {
+> > +		ignore_first = false;
+> > +		return 0;
+> > +	}
+> > +
+> > +	/* Subsequent ones should be handled as fault */
+> > +	return 1;
+> > +}
+> > +
+> >   static void __init keystone_init(void)
+> >   {
+> >   	if (PHYS_OFFSET >= KEYSTONE_HIGH_PHYS_START) {
+> > @@ -61,6 +80,13 @@ static void __init keystone_init(void)
+> >   	}
+> >   	keystone_pm_runtime_init();
+> >   	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+> > +
+> > +	/*
+> > +	 * Add a one time exception handler to catch asynchronous external
+> > +	 * abort
+> > +	 */
+> > +	hook_fault_code(17, keystone_async_ext_abort_fault, SIGBUS, 0,
+> > +			"async external abort handler");
+> >   }
+> >
+> >   static phys_addr_t keystone_virt_to_idmap(unsigned long x)
+> >
+> Can this be applied if it looks good?
+> 
+The keystone PCIe host driver already hooks the same fault code. Those
+hooks are no chain, but a simple pointer, so one of those handlers is
+going to loose out.
 
-So we can't use a a function as proposed in the discussion like
-gpiochip_set_names(), as this function would only be possible after we executed
-gpiochip_add(). Before that point the gpio descriptors are not available. But
-this can potentially lead to races between userspace and the gpio chip.
+This likely isn't what you intended.
 
-That is the reason why I left the names array in the gpioscript. But this array
-is now only used to initialize the GPIO descriptors. The named sysfs
-directories are now created using the name stored in the gpio descriptor.
-
-As the name is now directly represented through the sysfs directory name, I am
-not sure if it makes sense to keep the patch which adds a 'name' property to
-the sysfs GPIO directories. For the moment it is still in this series.
-
-Other changes in v3:
- - Renamed generic of_parse_gpio() to of_parse_own_gpio()
- - Replaced pr_warn with dev_warn as the device is available in the parsing code
-   in gpiolib-of
- - Introduced name collision checks when adding the names from gpiochip->names
-   to the gpio descriptors
- - Added documentation about /sys/class/gpio/<GPIO>/name
- - Added check for DT in case the GPIO already has a name. This may happen as
-   there are different ways to set a name, through 'line-name' property and
-   node name
-
-Best Regards,
-
-Markus
-
-
-Changes in v2:
- - Removed patch 'gpiolib: Fix possible use of wrong name'
- - Removed discussed patch 'gpio: Allow hogged gpios to be requested' from this
-   series
- - Fixed show gpio name patch (locks, (null) printing, and getting the descriptor)
- - Merged gpio name patch into gpio_name_to_desc() patch
-
-Description from v1:
-
-This is a proposal to add GPIO names to the kernel based on devicetree
-descriptions.
-
-This series adds GPIO name support. Until now it is only possible to use names
-for already requested GPIOs (for example what they are used for). It is not
-possible to identify GPIOs by a name although most of them have a name for
-example in the schematics of the board. This makes it difficult to identify
-a specific GPIO from userspace.
-
-As the GPIO name information is a hardware description this series uses the
-devicetree bindings introduced by the GPIO hogging mechanism, specifically
-'line-name', to identify GPIOs. The sysfs 'export' file is changed to accept
-names as fallback. The gpio numbers still have a higher priority to ensure
-backwards compatibility.
-
-Exported GPIOs are still using their number as directory name (gpio<ID>). But the
-directories now contain a 'name' file which is '' for non-existent names and
-the name otherwise.
-
-This series can be used to have an easy name mapping for udev with a quite
-simple rule similar to this:
-	SUBSYSTEM=="gpio", KERNEL=="gpio*", ATTR{name}!="(null)", ACTION=="add", \
-	PROGRAM+="/bin/sh -c 'mkdir -p /dev/gpios; rm -f /dev/gpios/$attr{name}; ln -s /sys%p/ /dev/gpios/$attr{name}"
-With this rule udev adds a link for each exported GPIO with a name into
-/dev/gpios/. This way it is not necessary to know the number of a GPIO to use
-it.
-
-
-Markus Pargmann (9):
-  gpiolib-of: Rename gpio_hog functions to be generic
-  gpio: Introduce gpio descriptor 'name'
-  gpiolib: Use GPIO name from names array for gpio descriptor
-  gpio-sysfs: Use gpio descriptor name instead of gpiochip names array
-  gpiolib: Add gpio name information to /sys/kernel/debug/gpio
-  gpiolib-sysfs: Show gpio-name in /sys/class/gpio/gpio*/name
-  gpiolib-sysfs: Add gpio name parsing for sysfs export
-  gpiolib-of: Reuse 'line-name' from DT as gpio descriptor name
-  gpiolib-of: Use dev_warn instead of pr_warn
-
- Documentation/ABI/testing/sysfs-gpio |  1 +
- drivers/gpio/gpiolib-of.c            | 50 +++++++++++++---------
- drivers/gpio/gpiolib-sysfs.c         | 67 +++++++++++++++++++++---------
- drivers/gpio/gpiolib.c               | 80 ++++++++++++++++++++++++++++++++++--
- drivers/gpio/gpiolib.h               |  3 ++
- include/linux/gpio/consumer.h        |  7 ++++
- 6 files changed, 166 insertions(+), 42 deletions(-)
-
+Regards,
+Lucas
 -- 
-2.4.6
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
