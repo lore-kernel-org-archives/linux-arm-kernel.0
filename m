@@ -1,9 +1,9 @@
 From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Fri, 14 Aug 2015 19:04:33 +0200
-Subject: [RFT PATCH] arm: s3c2410_defconfig: convert to use libata PATA drivers
+Date: Fri, 14 Aug 2015 19:04:35 +0200
+Subject: [RFT PATCH] arm: spitz_defconfig: convert to use libata PATA drivers
 In-Reply-To: <1439571876-13758-1-git-send-email-b.zolnierkie@samsung.com>
 References: <1439571876-13758-1-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <1439571876-13758-18-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <1439571876-13758-20-git-send-email-b.zolnierkie@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -20,50 +20,42 @@ in use:
 
 * having duplicate drivers for same hardware confuses users
 
-This patch converts s3c2410_defconfig to use libata PATA
+This patch converts spitz_defconfig to use libata PATA
 drivers.
 
-Cc: Kukjin Kim <kgene@kernel.org>
-Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Cc: linux-samsung-soc at vger.kernel.org
-Cc: Ben Dooks <ben.dooks@codethink.co.uk>
-Cc: Vincent Sanders <vince@simtec.co.uk>
-Cc: Simtec Linux Team <linux@simtec.co.uk>
+Cc: Daniel Mack <daniel@zonque.org>
+Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
+Cc: Robert Jarzmik <robert.jarzmik@free.fr>
 Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 ---
 Build tested only.
 If you have affected hardware please test.  Thank you.
 
- arch/arm/configs/s3c2410_defconfig | 10 +++-------
- 1 file changed, 3 insertions(+), 7 deletions(-)
+ arch/arm/configs/spitz_defconfig | 8 +++-----
+ 1 file changed, 3 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/configs/s3c2410_defconfig b/arch/arm/configs/s3c2410_defconfig
-index f314236..f44fa09 100644
---- a/arch/arm/configs/s3c2410_defconfig
-+++ b/arch/arm/configs/s3c2410_defconfig
-@@ -220,20 +220,16 @@ CONFIG_BLK_DEV_NBD=m
- CONFIG_BLK_DEV_UB=m
- CONFIG_BLK_DEV_RAM=y
- CONFIG_ATA_OVER_ETH=m
+diff --git a/arch/arm/configs/spitz_defconfig b/arch/arm/configs/spitz_defconfig
+index a1ede19..d8c5293 100644
+--- a/arch/arm/configs/spitz_defconfig
++++ b/arch/arm/configs/spitz_defconfig
+@@ -96,15 +96,13 @@ CONFIG_MTD_COMPLEX_MAPPINGS=y
+ CONFIG_MTD_NAND=y
+ CONFIG_MTD_NAND_SHARPSL=y
+ CONFIG_BLK_DEV_LOOP=y
 -CONFIG_IDE=y
--CONFIG_BLK_DEV_IDECD=y
--CONFIG_BLK_DEV_IDETAPE=m
--CONFIG_BLK_DEV_PLATFORM=y
--CONFIG_SCSI=y
- CONFIG_BLK_DEV_SD=y
+-CONFIG_BLK_DEV_IDECS=y
+-CONFIG_SCSI=m
+-CONFIG_BLK_DEV_SD=m
++CONFIG_BLK_DEV_SD=y
  CONFIG_CHR_DEV_ST=m
--CONFIG_BLK_DEV_SR=m
-+CONFIG_BLK_DEV_SR=y
- CONFIG_BLK_DEV_SR_VENDOR=y
- CONFIG_CHR_DEV_SG=y
- CONFIG_CHR_DEV_SCH=m
+ CONFIG_CHR_DEV_OSST=m
+ CONFIG_BLK_DEV_SR=m
+ CONFIG_CHR_DEV_SG=m
 -CONFIG_SCSI_MULTI_LUN=y
- CONFIG_SCSI_CONSTANTS=y
- CONFIG_SCSI_SCAN_ASYNC=y
 +CONFIG_ATA=y
-+CONFIG_PATA_PLATFORM=y
++CONFIG_PATA_PCMCIA=y
  CONFIG_NETDEVICES=y
- CONFIG_DM9000=y
- CONFIG_INPUT_EVDEV=y
+ CONFIG_NET_ETHERNET=y
+ CONFIG_USB_CATC=m
 -- 
 1.9.1
