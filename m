@@ -1,53 +1,57 @@
-From: sakari.ailus@iki.fi (Sakari Ailus)
-Date: Fri, 14 Aug 2015 13:33:48 +0300
-Subject: [PATCH RFC v3 07/16] media: get rid of unused "extra_links"
- param on media_entity_init()
-In-Reply-To: <7b9f2654888f0fd54c290c50f50248a367768da7.1439410053.git.mchehab@osg.samsung.com>
-References: <cover.1439410053.git.mchehab@osg.samsung.com>
- <7b9f2654888f0fd54c290c50f50248a367768da7.1439410053.git.mchehab@osg.samsung.com>
-Message-ID: <20150814103348.GC19840@valkosipuli.retiisi.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 14 Aug 2015 12:34:33 +0200
+Subject: [PATCH v2 0/6] ARM: shmobile: Move gpio ranges from C code to DT
+In-Reply-To: <CAMuHMdU0XoZ-comYSAau6e3kAY9VUbNgyeRcS_LzmV1gm31ZKA@mail.gmail.com>
+References: <1438696519-13727-1-git-send-email-geert+renesas@glider.be>
+ <20150805005540.GB20726@verge.net.au>
+ <CACRpkdY7P86+SxMr5-HnhrN5fC-N1U135jiGAJGTV=xx47VW5g@mail.gmail.com>
+ <CAMuHMdW0T6MW6s4Gg_rqvtt+MRPtp_MpuiKtamfFrx-Tcm6WmQ@mail.gmail.com>
+ <20150814003023.GC12589@verge.net.au>
+ <CAMuHMdU0XoZ-comYSAau6e3kAY9VUbNgyeRcS_LzmV1gm31ZKA@mail.gmail.com>
+Message-ID: <CACRpkdYe5z9vG+Aekdq1wcKdhUUN5bpxQ52RgNt17+bhJbjVEQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mauro,
+On Fri, Aug 14, 2015 at 9:46 AM, Geert Uytterhoeven
+<geert@linux-m68k.org> wrote:
+> On Fri, Aug 14, 2015 at 2:30 AM, Simon Horman <horms@verge.net.au> wrote:
+>> On Thu, Aug 13, 2015 at 02:45:55PM +0200, Geert Uytterhoeven wrote:
+>>> On Thu, Aug 13, 2015 at 2:29 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+>>> > On Wed, Aug 5, 2015 at 2:55 AM, Simon Horman <horms@verge.net.au> wrote:
+>>> >> Where possible I prefer not to apply non-DTS/DTSI patches on top of
+>>> >> DTS/DTSI patches, I believe this is in keeping with how the ARM SoC
+>>> >> maintainers like things handled.  With this in mind I have done the following:
+>>> >>
+>>> >> 1. Queued up the DTSI patches (patches 1 - 3) for v4.3 in my dt branch.
+>>> >>    I intend for this to turn up in next soon.
+>>> >> 2. Queued up for pinctrl patches (patches 4 - 6) for v4.4 in a pinctrl patch.
+>>> >>    I intend for these to be present in the renesas devel branch but
+>>> >>    not in next until after the release of v4.3-rc1. I would also be
+>>> >>    happy to drop them and let Linus Walleij take these patches for v4.4,
+>>> >>    assuming patches 1 - 3 are accepted for v4.3.
+>>> >
+>>> > OK.
+>>> >
+>>> > Will the world explode if I try to queue the pinctrl patches 4-6 in my
+>>> > tree now for v4.3? Then I prefer to defer to v4.4. Else I can merge
+>>> > it in parallel?
+>>>
+>>> There won't be a mapping between gpio and pins in any branch having the
+>>> pinctrl changes but not the dtsi changes.
+>>
+>> It sounds to me that Linus should take his option 2; defer to v4.4.
+>> In which case I should drop the changes from my tree (they are not in next
+>> anyway). Please let me know if thats the way we will move this forwards.
+>
+> Sounds fine to me.
+>
+> And in the unlikely event we discover regressions in v4.3-rc1 due to having
+> the dtsi changes without the pinctrl changes, we can still fast-track them
+> into v4.3-rc2.
 
-On Wed, Aug 12, 2015 at 05:14:51PM -0300, Mauro Carvalho Chehab wrote:
-> Currently, media_entity_init() creates an array with the links,
-> allocated at init time. It provides a parameter (extra_links)
-> that would allocate more links than the current needs, but this
-> is not used by any driver.
-> 
-> As we want to be able to do dynamic link allocation/removal,
-> we'll need to change the implementation of the links. So,
-> before doing that, let's first remove that extra unused
-> parameter, in order to cleanup the interface first.
-> 
-> Signed-off-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
-> 
-...
+Sounds like a plan.
 
+Hit me on the head about this once v4.3-rc1 is out!
 
-> diff --git a/include/media/media-entity.h b/include/media/media-entity.h
-> index 738e1d5d25dc..be6885e7c8ed 100644
-> --- a/include/media/media-entity.h
-> +++ b/include/media/media-entity.h
-> @@ -177,7 +177,7 @@ void graph_obj_init(struct media_device *mdev,
->  void graph_obj_remove(struct media_graph_obj *gobj);
->  
->  int media_entity_init(struct media_entity *entity, u16 num_pads,
-> -		struct media_pad *pads, u16 extra_links);
-> +		struct media_pad *pads);
->  void media_entity_cleanup(struct media_entity *entity);
->  
->  int media_entity_create_link(struct media_entity *source, u16 source_pad,
-
-How about putting this in front of the set? It has no dependencies to the
-other patches, does it?
-
-Acked-by: Sakari Ailus <sakari.ailus@linux.intel.com>
-
--- 
-Regards,
-
-Sakari Ailus
-e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
+Yours,
+Linus Walleij
