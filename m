@@ -1,93 +1,42 @@
-From: rric@kernel.org (Robert Richter)
-Date: Fri, 14 Aug 2015 15:18:39 +0200
-Subject: [PATCH v3 5/6] irqchip,
- gicv3-its: Workaround for Cavium ThunderX errata 22375, 24313
-In-Reply-To: <1439558320-5777-1-git-send-email-rric@kernel.org>
-References: <1439558320-5777-1-git-send-email-rric@kernel.org>
-Message-ID: <1439558320-5777-6-git-send-email-rric@kernel.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 14 Aug 2015 14:24:29 +0100
+Subject: [RFC] arm64: defconfig: enable 48-bit VA by default
+In-Reply-To: <CAKv+Gu9gvrBwZry+pwXqsso9qg2vZcrYA8wgogRaRPhd6rsJuw@mail.gmail.com>
+References: <BY2PR0301MB074300C5F31701D9211827F0878C0@BY2PR0301MB0743.namprd03.prod.outlook.com>
+ <20150730101358.GA30796@e104818-lin.cambridge.arm.com>
+ <CY1PR0301MB074850E27D5D298D1B8495D2878B0@CY1PR0301MB0748.namprd03.prod.outlook.com>
+ <20150730161210.GE407@e104818-lin.cambridge.arm.com>
+ <CY1PR0301MB0748FA3A10AFA9BFC1AB0A39878B0@CY1PR0301MB0748.namprd03.prod.outlook.com>
+ <CAKv+Gu-Wbv3J9-2KbXrz_3W_=VXChrD+REo1-q1Ns_=RUM1BFw@mail.gmail.com>
+ <BY2PR0301MB07436AC9C8D023DC7C67DE3D87730@BY2PR0301MB0743.namprd03.prod.outlook.com>
+ <CAKv+Gu-SH7MjkrgevfcUurPc7iQm+11cntfEo84opkqQoN2YPQ@mail.gmail.com>
+ <CY1PR0301MB07488764C02CCA3F653ED6A5877D0@CY1PR0301MB0748.namprd03.prod.outlook.com>
+ <CAKv+Gu9gvrBwZry+pwXqsso9qg2vZcrYA8wgogRaRPhd6rsJuw@mail.gmail.com>
+Message-ID: <20150814132428.GE16368@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Robert Richter <rrichter@cavium.com>
+On Fri, Aug 14, 2015 at 02:15:23PM +0200, Ard Biesheuvel wrote:
+> >> On 7 aug. 2015, at 21:01, Stuart Yoder <stuart.yoder@freescale.com> wrote:
+> >>
+> >> >> Whether defconfig supports your platform optimally has nothing to do
+> >> >> with that. Of course, we should deal with the unexpected memory layout
+> >> >> gracefully, which is why Mark Rutland and myself proposed patches to
+> >> >> fix the panic you reported. But in a development context, I think it
+> >> >> is perfectly acceptable to simply load the kernel at 0x80_8000_0000,
+> >> >> and be able to run defconfig fine while losing just 2 GB of your 16 GB
+> >> >> at the low end.
+[...]
+> So we still need to decide how to fix the case where the linear region
+> is not of sufficient size to cover all of memory, considering that is
+> what got this discussion started in the first place.
 
-This implements two gicv3-its errata workarounds for ThunderX. Both
-with small impact affecting only ITS table allocation.
+We already have a solution, just enable 4-levels of page tables (only
+that I don't think we should change defconfig as well).
 
- erratum 22375: only alloc 8MB table size
- erratum 24313: ignore memory access type
+If we want to do any tricks like compacting the memory range, it needs
+to be backed by benchmarks to prove that it's worth compared to a full
+48-bit VA.
 
-The fixes are in ITS initialization and basically ignore memory access
-type and table size provided by the TYPER and BASER registers.
-
-v3:
- * fix erratum to be dependend from iidr
-
-Signed-off-by: Robert Richter <rrichter@cavium.com>
----
- drivers/irqchip/irq-gic-v3-its.c | 35 +++++++++++++++++++++++++++++++----
- 1 file changed, 31 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index bf0659821683..ab888eeef4b1 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -39,7 +39,8 @@
- #include "irq-gic-common.h"
- #include "irqchip.h"
- 
--#define ITS_FLAGS_CMDQ_NEEDS_FLUSHING		(1 << 0)
-+#define ITS_FLAGS_CMDQ_NEEDS_FLUSHING		(1ULL << 0)
-+#define ITS_FLAGS_CAVIUM_THUNDERX		(1ULL << 1)
- 
- #define RDIST_FLAGS_PROPBASE_NEEDS_FLUSHING	(1 << 0)
- 
-@@ -803,9 +804,22 @@ static int its_alloc_tables(struct its_node *its)
- 	int i;
- 	int psz = SZ_64K;
- 	u64 shr = GITS_BASER_InnerShareable;
--	u64 cache = GITS_BASER_WaWb;
--	u64 typer = readq_relaxed(its->base + GITS_TYPER);
--	u32 ids = GITS_TYPER_DEVBITS(typer);
-+	u64 cache;
-+	u64 typer;
-+	u32 ids;
-+
-+	if (its->flags & ITS_FLAGS_CAVIUM_THUNDERX) {
-+		/*
-+		 * erratum 22375: only alloc 8MB table size
-+		 * erratum 24313: ignore memory access type
-+		 */
-+		cache	= 0;
-+		ids	= 0x13;			/* 20 bits, 8MB */
-+	} else {
-+		cache	= GITS_BASER_WaWb;
-+		typer	= readq_relaxed(its->base + GITS_TYPER);
-+		ids	= GITS_TYPER_DEVBITS(typer);
-+	}
- 
- 	for (i = 0; i < GITS_BASER_NR_REGS; i++) {
- 		u64 val = readq_relaxed(its->base + GITS_BASER + i * 8);
-@@ -1391,8 +1405,21 @@ static int its_force_quiescent(void __iomem *base)
- 	}
- }
- 
-+static void its_enable_cavium_thunderx(void *data)
-+{
-+	struct its_node *its = data;
-+
-+	its->flags |= ITS_FLAGS_CAVIUM_THUNDERX;
-+}
-+
- static const struct gic_capabilities its_errata[] = {
- 	{
-+		.desc	= "ITS: Cavium errata 22375, 24313",
-+		.iidr	= 0xa100034c,	/* ThunderX pass 1.x */
-+		.mask	= 0xffff0fff,
-+		.init	= its_enable_cavium_thunderx,
-+	},
-+	{
- 	}
- };
- 
 -- 
-2.1.1
+Catalin
