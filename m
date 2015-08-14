@@ -1,135 +1,57 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Fri, 14 Aug 2015 17:55:09 -0400
-Subject: [PATCH] ARM: keystone: add a work around to handle asynchronous
- external abort
-In-Reply-To: <1439562059.13210.61.camel@pengutronix.de>
-References: <1439320409-20084-1-git-send-email-m-karicheri2@ti.com>	
- <55CDF579.4050408@ti.com> <20150814140934.GX7557@n2100.arm.linux.org.uk>
- <1439562059.13210.61.camel@pengutronix.de>
-Message-ID: <55CE63BD.2060107@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 14 Aug 2015 23:56:46 +0200
+Subject: [PATCH 2/3] Display a DMA error message
+In-Reply-To: <55CE612C.4010405@arm.com>
+References: <1439416290-21228-1-git-send-email-jeremy.linton@arm.com>
+ <2099290.n6l88bWDgg@wuerfel> <55CE612C.4010405@arm.com>
+Message-ID: <3034536.ALogCXmi9A@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/14/2015 10:20 AM, Lucas Stach wrote:
-> Hi Russell,
->
-> Am Freitag, den 14.08.2015, 15:09 +0100 schrieb Russell King - ARM
-> Linux:
->
-> [...]
->
->>
->> What causes the abort?  We shouldn't be adding hacks like this to the
->> kernel without having the full picture...
->>
->
-> some of the issues with tracking down such imprecise external aborts are
-> due to the fact that we only enable the signaling of those aborts on
-> entering the user-space. So the first schedule() crashes on the previous
-> dangling abort.
->
-> I'm carrying this patch locally to enable imprecise aborts much earlier
-> in the boot process. I think it has already been on the list some times,
-> but apparently it has fallen through the cracks. If you agree that this
-> is the right thing to do I can do a proper repost.
-Lucas,
+On Friday 14 August 2015 16:44:12 Jeremy Linton wrote:
+> On 08/14/2015 04:19 PM, Arnd Bergmann wrote:
+> > On Wednesday 12 August 2015 16:51:29 Jeremy Linton wrote:
+> >> diff --git a/drivers/usb/host/ehci-platform.c b/drivers/usb/host/ehci-platform.c
+> >> index 2593def..82e396f 100644
+> >> --- a/drivers/usb/host/ehci-platform.c
+> >> +++ b/drivers/usb/host/ehci-platform.c
+> >> @@ -162,8 +162,10 @@ static int ehci_platform_probe(struct platform_device *dev)
+> >>
+> >>          err = dma_coerce_mask_and_coherent(&dev->dev,
+> >>                  pdata->dma_mask_64 ? DMA_BIT_MASK(64) : DMA_BIT_MASK(32));
+> >> -       if (err)
+> >> +       if (err) {
+> >> +               dev_err(&dev->dev, "Error: DMA setup failed\n");
+> >>                  return err;
+> >> +       }
+> >
+> > We should really stop doing this: the platform should provide the
+> > correct dma mask when creating the device, instead of setting a
+> > bogus pdata field. Do not duplicate this bug for ACPI.
+> 
+> 
+> I'm not sure I understand, I'm not changing the mask anywhere, all I'm 
+> doing is printing a message if the mask cannot be set.
 
-Would you mind sharing the code? Does that help in root causing where it 
-actually happens? I have spend considerable time debugging this, but so 
-far not successful.
+The problem is that dma_coerce_mask_and_coherent() is not a proper
+interface for a driver to use, it's an annotation that tells us
+that the driver is trying to do something horrible by overriding
+the dma mask that was set by the platform.
 
-Murali
->
-> Regards,
-> Lucas
->
-> ---------------------->8---------------------------------------------
->>From bb9117d94cc2f1061dc364f42c446ccd9191e869 Mon Sep 17 00:00:00 2001
-> From: Lucas Stach <l.stach@pengutronix.de>
-> Date: Thu, 19 Feb 2015 18:12:50 +0100
-> Subject: [PATCH] ARM: Add imprecise abort enable/disable macro
->
-> This patch adds imprecise abort enable/disable macros.
-> It also enables imprecise aborts when starting kernel.
->
-> Changes in v2:
-> Only ARMv6 and later have CPSR.A bit. On earlier CPUs,
-> and ARMv7M this should be a no-op.
->
-> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-> ---
-> lst: rebased on v3.19
-> ---
->   arch/arm/include/asm/irqflags.h | 10 ++++++++++
->   arch/arm/kernel/smp.c           |  1 +
->   arch/arm/kernel/traps.c         |  4 ++++
->   3 files changed, 15 insertions(+)
->
-> diff --git a/arch/arm/include/asm/irqflags.h
-> b/arch/arm/include/asm/irqflags.h
-> index 3b763d6652a0..8301f875564e 100644
-> --- a/arch/arm/include/asm/irqflags.h
-> +++ b/arch/arm/include/asm/irqflags.h
-> @@ -51,6 +51,14 @@ static inline void arch_local_irq_disable(void)
->
->   #define local_fiq_enable()  __asm__("cpsie f   @ __stf" : : : "memory",
-> "cc")
->   #define local_fiq_disable() __asm__("cpsid f   @ __clf" : : : "memory",
-> "cc")
-> +
-> +#ifndef CONFIG_CPU_V7M
-> +#define local_abt_enable()  __asm__("cpsie a   @ __sta" : : : "memory",
-> "cc")
-> +#define local_abt_disable() __asm__("cpsid a   @ __cla" : : : "memory",
-> "cc")
-> +#else
-> +#define local_abt_enable()     do { } while (0)
-> +#define local_abt_disable()    do { } while (0)
-> +#endif
->   #else
->
->   /*
-> @@ -130,6 +138,8 @@ static inline void arch_local_irq_disable(void)
->          : "memory", "cc");                                      \
->          })
->
-> +#define local_abt_enable()     do { } while (0)
-> +#define local_abt_disable()    do { } while (0)
->   #endif
->
->   /*
-> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-> index 86ef244c5a24..7b6b93cabef4 100644
-> --- a/arch/arm/kernel/smp.c
-> +++ b/arch/arm/kernel/smp.c
-> @@ -378,6 +378,7 @@ asmlinkage void secondary_start_kernel(void)
->
->          local_irq_enable();
->          local_fiq_enable();
-> +       local_abt_enable();
->
->          /*
->           * OK, it's off to the idle thread for us
-> diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-> index 788e23fe64d8..466726ba9bdb 100644
-> --- a/arch/arm/kernel/traps.c
-> +++ b/arch/arm/kernel/traps.c
-> @@ -881,6 +881,10 @@ void __init early_trap_init(void *vectors_base)
->
->          flush_icache_range(vectors, vectors + PAGE_SIZE * 2);
->          modify_domain(DOMAIN_USER, DOMAIN_CLIENT);
-> +
-> +       /* Enable imprecise aborts */
-> +       local_abt_enable();
-> +
->   #else /* ifndef CONFIG_CPU_V7M */
->          /*
->           * on V7-M there is no need to copy the vector table to a
-> dedicated
->
+> AKA if CCA is missing or set to 0 then, this line is triggered because 
+> the dma_coerce_mask_and_coherent() routine returns with a failure 
+> indicating there aren't any DMA ops to set a mask on. Right now what 
+> happens is the device detection displays that there is an EHCI 
+> controller then silently disappears with telling the user why it didn't 
+> configure.
 
+Adding a warning is fine, but the text is not right here (the driver is
+not setting up the dma mask, but trying to override the one that has been
+set up by the platform), and the solution should really be to not
+call dma_coerce_mask_and_coherent() at all for ACPI. The main reason
+that we have not removed this call here yet is that there is still a
+MIPS platform that relies on it. We should probably remove it for DT
+already and only do it if platform data was provided, but that requires
+careful testing.
 
--- 
-Murali Karicheri
-Linux Kernel, Keystone
+	Arnd
