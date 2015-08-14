@@ -1,66 +1,68 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 14 Aug 2015 16:59:11 +0100
-Subject: commit a71b092 "ARM: Convert handle_IRQ to use
- __handle_domain_irq" breaks DNS-323
-In-Reply-To: <55CE0CA0.5010806@vollmann.ch>
-References: <55CDF5C3.7080204@vollmann.ch>
- <55CDF78F.6070001@free-electrons.com> <55CE0636.3050205@arm.com>
- <55CE0CA0.5010806@vollmann.ch>
-Message-ID: <55CE104F.1080901@arm.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 14 Aug 2015 11:09:21 -0500
+Subject: [GIT PULL] SA1100/PXA RTC for 4.3
+Message-ID: <CAL_JsqKMN1SEQoJRSPixih4ckDh1pGb4x3T_t+2oWVvW8fqzmg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/08/15 16:43, Detlef Vollmann wrote:
-> On 08/14/15 17:16, Marc Zyngier wrote:
->> On 14/08/15 15:13, Gregory CLEMENT wrote:
->>> Hi Detlef,
->>>
->>> On 14/08/2015 16:05, Detlef Vollmann wrote:
->>>> Hello,
->>>>
->>>> this commit:
->>>>   > commit a71b092a9c68685a270ebdde7b5986ba8787e575
->>>>   > Author: Marc Zyngier <marc.zyngier@arm.com>
->>>>   > Date:   Tue Aug 26 11:03:18 2014 +0100
->>>>   >
->>>>   >     ARM: Convert handle_IRQ to use __handle_domain_irq
->>>> [...]
->>>> causes the kernel not to boot anymore on my DNS-323.
->>>> Soc: MV88F5182 Rev 2
->>>> CPU: ARM926 (Rev 0) running @ 500Mhz
->>>> CPU: Feroceon [41069260] revision 0 (ARMv5TEJ), cr=a005317f
->>>> Orion ID: MV88F5182-A2. TCLK=166666667.
->>>> DNS-323: Identified HW revision B1
->>>>
->>>> Boot stops after "Uncompressing Linux... done, booting the kernel."
->>>> Reverting the commit works fine for me.
->>>> Tested 4.1.2 and 4.2.0-rc6 with orion5x_defconfig.
->>>
->>> Could you try the following patch ?
->>>
->>> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/356501.html
->>
->> As a side note, having to revert that patch to get your system up and
->> running is a reliable indication that something is wrong with your
->> interrupt mapping, and that you are using 0 as a valid interrupt number
->> (which has been declared invalid a long time ago by the chief penguin).
-> Well, in this case it wasn't me ;-)
+Alexandre,
 
-Guilty by association! ;-)
+Please pull SA1100/PXA changes for 4.3. This series has had several
+rounds of review over several months without comment from PXA
+maintainers other than Robert.
 
-> I wanted to avoid looking at the sources myself as the DNS-323 is still
-> a widely used hardware.
+Rob
 
-You're missing out! Think of all these sleepless nights you could spend
-staring at all kind of weird and fascinating code! :D
+The following changes since commit 52721d9d3334c1cb1f76219a161084094ec634dc:
 
->> Hopefully Gregory has put you in the right direction.
-> Yes.  Now I'll use that patch until some fix is accepted in mainline.
+  Linux 4.2-rc3 (2015-07-19 14:45:02 -0700)
 
-Hopefully soon.
+are available in the git repository at:
 
-Thanks,
+  git://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git
+tags/pxa-rtc-for-4.3
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+for you to fetch changes up to e473ff0fe8548941ef67bf956a6b7943f4663ab1:
+
+  ARM: config: Switch PXA27x platforms to use PXA RTC driver
+(2015-08-14 10:53:44 -0500)
+
+----------------------------------------------------------------
+SA1100 and PXA RTC clean-ups
+
+This series enables building the SA1100 RTC driver for ARM64 in
+preparation for enabling CONFIG_ARCH_MMP on ARM64. This is needed for
+supporting the PXA1928 SOC. Clean-up of SA1100 RTC is complicated by the
+fact that some PXA chips use both sa1100-rtc and pxa-rtc drivers and
+share the same registers. This does not work well with the Linux driver
+model. So the first step is removing this sharing by the 2 drivers and
+making sa1100-rtc and pxa-rtc mutually exclusive.
+
+----------------------------------------------------------------
+Rob Herring (7):
+      rtc: sa1100: prepare to share sa1100_rtc_ops
+      rtc: pxa: convert to use shared sa1100 functions
+      ARM: pxa: add memory resource to SA1100 RTC device
+      rtc: sa1100/pxa: convert to run-time register mapping
+      ARM: sa1100: remove unused RTC register definitions
+      ARM: mmp: remove unused RTC register definitions
+      ARM: config: Switch PXA27x platforms to use PXA RTC driver
+
+ arch/arm/configs/cm_x2xx_defconfig          |   2 +-
+ arch/arm/configs/em_x270_defconfig          |   2 +-
+ arch/arm/configs/magician_defconfig         |   2 +-
+ arch/arm/configs/palmz72_defconfig          |   2 +-
+ arch/arm/configs/pcm027_defconfig           |   2 +-
+ arch/arm/configs/trizeps4_defconfig         |   2 +-
+ arch/arm/mach-mmp/include/mach/regs-rtc.h   |  23 -----
+ arch/arm/mach-pxa/devices.c                 |  18 +---
+ arch/arm/mach-pxa/pxa27x.c                  |   1 -
+ arch/arm/mach-pxa/pxa3xx.c                  |   1 -
+ arch/arm/mach-sa1100/include/mach/SA-1100.h |  34 -------
+ drivers/rtc/Kconfig                         |  12 ++-
+ drivers/rtc/rtc-pxa.c                       |  55 +++++------
+ drivers/rtc/rtc-sa1100.c                    | 139 +++++++++++++++++-----------
+ drivers/rtc/rtc-sa1100.h                    |  23 +++++
+ 15 files changed, 150 insertions(+), 168 deletions(-)
+ delete mode 100644 arch/arm/mach-mmp/include/mach/regs-rtc.h
+ create mode 100644 drivers/rtc/rtc-sa1100.h
