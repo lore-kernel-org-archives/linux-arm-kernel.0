@@ -1,75 +1,93 @@
 From: rric@kernel.org (Robert Richter)
-Date: Fri, 14 Aug 2015 15:18:40 +0200
-Subject: [PATCH v3 6/6] arm64: errata: Match all cpus if capability value is
- zero
+Date: Fri, 14 Aug 2015 15:18:39 +0200
+Subject: [PATCH v3 5/6] irqchip,
+ gicv3-its: Workaround for Cavium ThunderX errata 22375, 24313
 In-Reply-To: <1439558320-5777-1-git-send-email-rric@kernel.org>
 References: <1439558320-5777-1-git-send-email-rric@kernel.org>
-Message-ID: <1439558320-5777-7-git-send-email-rric@kernel.org>
+Message-ID: <1439558320-5777-6-git-send-email-rric@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Robert Richter <rrichter@cavium.com>
 
-This patch make caps usable optionally. If its value is zero, then all
-cpus are matched. E.g. if caps resides in a stuct for marking it
-dependend on a certain cpu feature/errata, then an empty value will
-indicate not to use caps detection. An empty value will match all cpus
-and thus just skip the cpu feature test.
+This implements two gicv3-its errata workarounds for ThunderX. Both
+with small impact affecting only ITS table allocation.
+
+ erratum 22375: only alloc 8MB table size
+ erratum 24313: ignore memory access type
+
+The fixes are in ITS initialization and basically ignore memory access
+type and table size provided by the TYPER and BASER registers.
+
+v3:
+ * fix erratum to be dependend from iidr
 
 Signed-off-by: Robert Richter <rrichter@cavium.com>
 ---
- arch/arm64/include/asm/cpufeature.h | 17 +++++++++++------
- drivers/irqchip/irq-gic-common.c    |  2 +-
- 2 files changed, 12 insertions(+), 7 deletions(-)
+ drivers/irqchip/irq-gic-v3-its.c | 35 +++++++++++++++++++++++++++++++----
+ 1 file changed, 31 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index 2a5e4c163ee5..a5f8a007d982 100644
---- a/arch/arm64/include/asm/cpufeature.h
-+++ b/arch/arm64/include/asm/cpufeature.h
-@@ -21,13 +21,15 @@
- #define MAX_CPU_FEATURES	(8 * sizeof(elf_hwcap))
- #define cpu_feature(x)		ilog2(HWCAP_ ## x)
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index bf0659821683..ab888eeef4b1 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -39,7 +39,8 @@
+ #include "irq-gic-common.h"
+ #include "irqchip.h"
  
--#define ARM64_WORKAROUND_CLEAN_CACHE		0
--#define ARM64_WORKAROUND_DEVICE_LOAD_ACQUIRE	1
--#define ARM64_WORKAROUND_845719			2
--#define ARM64_HAS_SYSREG_GIC_CPUIF		3
--#define ARM64_WORKAROUND_CAVIUM_23154		4
-+/* reserve zero to match all cpus for use of caps in empty structs */
-+#define ARM64_ALL_CPUS				0
-+#define ARM64_WORKAROUND_CLEAN_CACHE		1
-+#define ARM64_WORKAROUND_DEVICE_LOAD_ACQUIRE	2
-+#define ARM64_WORKAROUND_845719			3
-+#define ARM64_HAS_SYSREG_GIC_CPUIF		4
-+#define ARM64_WORKAROUND_CAVIUM_23154		5
+-#define ITS_FLAGS_CMDQ_NEEDS_FLUSHING		(1 << 0)
++#define ITS_FLAGS_CMDQ_NEEDS_FLUSHING		(1ULL << 0)
++#define ITS_FLAGS_CAVIUM_THUNDERX		(1ULL << 1)
  
--#define ARM64_NCAPS				5
-+#define ARM64_NCAPS				6
+ #define RDIST_FLAGS_PROPBASE_NEEDS_FLUSHING	(1 << 0)
  
- #ifndef __ASSEMBLY__
+@@ -803,9 +804,22 @@ static int its_alloc_tables(struct its_node *its)
+ 	int i;
+ 	int psz = SZ_64K;
+ 	u64 shr = GITS_BASER_InnerShareable;
+-	u64 cache = GITS_BASER_WaWb;
+-	u64 typer = readq_relaxed(its->base + GITS_TYPER);
+-	u32 ids = GITS_TYPER_DEVBITS(typer);
++	u64 cache;
++	u64 typer;
++	u32 ids;
++
++	if (its->flags & ITS_FLAGS_CAVIUM_THUNDERX) {
++		/*
++		 * erratum 22375: only alloc 8MB table size
++		 * erratum 24313: ignore memory access type
++		 */
++		cache	= 0;
++		ids	= 0x13;			/* 20 bits, 8MB */
++	} else {
++		cache	= GITS_BASER_WaWb;
++		typer	= readq_relaxed(its->base + GITS_TYPER);
++		ids	= GITS_TYPER_DEVBITS(typer);
++	}
  
-@@ -57,6 +59,9 @@ static inline bool cpu_have_feature(unsigned int num)
+ 	for (i = 0; i < GITS_BASER_NR_REGS; i++) {
+ 		u64 val = readq_relaxed(its->base + GITS_BASER + i * 8);
+@@ -1391,8 +1405,21 @@ static int its_force_quiescent(void __iomem *base)
+ 	}
+ }
  
- static inline bool cpus_have_cap(unsigned int num)
- {
-+	/* zero matches for all cpus */
-+	if (!num)
-+		return true;
- 	if (num >= ARM64_NCAPS)
- 		return false;
- 	return test_bit(num, cpu_hwcaps);
-diff --git a/drivers/irqchip/irq-gic-common.c b/drivers/irqchip/irq-gic-common.c
-index f5e901a62ea5..cb55aaf960bb 100644
---- a/drivers/irqchip/irq-gic-common.c
-+++ b/drivers/irqchip/irq-gic-common.c
-@@ -25,7 +25,7 @@ void gic_check_capabilities(u32 iidr, const struct gic_capabilities *cap,
- 			void *data)
- {
- 	for (; cap->desc; cap++) {
--		if (cap->cpu_cap && !cpus_have_cap(cap->cpu_cap))
-+		if (!cpus_have_cap(cap->cpu_cap))
- 			continue;
- 		if (cap->iidr != (cap->mask & iidr))
- 			continue;
++static void its_enable_cavium_thunderx(void *data)
++{
++	struct its_node *its = data;
++
++	its->flags |= ITS_FLAGS_CAVIUM_THUNDERX;
++}
++
+ static const struct gic_capabilities its_errata[] = {
+ 	{
++		.desc	= "ITS: Cavium errata 22375, 24313",
++		.iidr	= 0xa100034c,	/* ThunderX pass 1.x */
++		.mask	= 0xffff0fff,
++		.init	= its_enable_cavium_thunderx,
++	},
++	{
+ 	}
+ };
+ 
 -- 
 2.1.1
