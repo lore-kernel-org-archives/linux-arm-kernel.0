@@ -1,57 +1,26 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 14 Aug 2015 23:56:46 +0200
-Subject: [PATCH 2/3] Display a DMA error message
-In-Reply-To: <55CE612C.4010405@arm.com>
-References: <1439416290-21228-1-git-send-email-jeremy.linton@arm.com>
- <2099290.n6l88bWDgg@wuerfel> <55CE612C.4010405@arm.com>
-Message-ID: <3034536.ALogCXmi9A@wuerfel>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 14 Aug 2015 22:56:17 +0100
+Subject: [PATCH] ARM: keystone: add a work around to handle asynchronous
+ external abort
+In-Reply-To: <55CE633C.10402@ti.com>
+References: <1439320409-20084-1-git-send-email-m-karicheri2@ti.com>
+ <55CDF579.4050408@ti.com>
+ <20150814140934.GX7557@n2100.arm.linux.org.uk>
+ <55CE05EC.4040909@oracle.com> <55CE633C.10402@ti.com>
+Message-ID: <20150814215617.GA7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 14 August 2015 16:44:12 Jeremy Linton wrote:
-> On 08/14/2015 04:19 PM, Arnd Bergmann wrote:
-> > On Wednesday 12 August 2015 16:51:29 Jeremy Linton wrote:
-> >> diff --git a/drivers/usb/host/ehci-platform.c b/drivers/usb/host/ehci-platform.c
-> >> index 2593def..82e396f 100644
-> >> --- a/drivers/usb/host/ehci-platform.c
-> >> +++ b/drivers/usb/host/ehci-platform.c
-> >> @@ -162,8 +162,10 @@ static int ehci_platform_probe(struct platform_device *dev)
-> >>
-> >>          err = dma_coerce_mask_and_coherent(&dev->dev,
-> >>                  pdata->dma_mask_64 ? DMA_BIT_MASK(64) : DMA_BIT_MASK(32));
-> >> -       if (err)
-> >> +       if (err) {
-> >> +               dev_err(&dev->dev, "Error: DMA setup failed\n");
-> >>                  return err;
-> >> +       }
-> >
-> > We should really stop doing this: the platform should provide the
-> > correct dma mask when creating the device, instead of setting a
-> > bogus pdata field. Do not duplicate this bug for ACPI.
-> 
-> 
-> I'm not sure I understand, I'm not changing the mask anywhere, all I'm 
-> doing is printing a message if the mask cannot be set.
+On Fri, Aug 14, 2015 at 05:53:00PM -0400, Murali Karicheri wrote:
+> We have spend some time already to debug the root cause. Do you have idea on
+> how this was hunted down on OMAP that we can learn from? The bad address is
+> NULL and it seems to happen very rarely and is not easily reproducible.
+> Don't want to put this workaround, but we couldn't track it down either. So
+> any help to debug this will be appreciated.
 
-The problem is that dma_coerce_mask_and_coherent() is not a proper
-interface for a driver to use, it's an annotation that tells us
-that the driver is trying to do something horrible by overriding
-the dma mask that was set by the platform.
+If you try applying Lucas' patch, you should receive the abort earlier
+in the kernel boot up, which may help narrow down what is provoking it.
 
-> AKA if CCA is missing or set to 0 then, this line is triggered because 
-> the dma_coerce_mask_and_coherent() routine returns with a failure 
-> indicating there aren't any DMA ops to set a mask on. Right now what 
-> happens is the device detection displays that there is an EHCI 
-> controller then silently disappears with telling the user why it didn't 
-> configure.
-
-Adding a warning is fine, but the text is not right here (the driver is
-not setting up the dma mask, but trying to override the one that has been
-set up by the platform), and the solution should really be to not
-call dma_coerce_mask_and_coherent() at all for ACPI. The main reason
-that we have not removed this call here yet is that there is still a
-MIPS platform that relies on it. We should probably remove it for DT
-already and only do it if platform data was provided, but that requires
-careful testing.
-
-	Arnd
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
