@@ -1,45 +1,61 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Fri, 14 Aug 2015 20:08:13 +0200
-Subject: [PATCH] arm: footbridge_defconfig: disable IDE subsystem
-In-Reply-To: <20150814174330.GY7557@n2100.arm.linux.org.uk>
-References: <1439571876-13758-1-git-send-email-b.zolnierkie@samsung.com>
- <1439571876-13758-8-git-send-email-b.zolnierkie@samsung.com>
- <20150814174330.GY7557@n2100.arm.linux.org.uk>
-Message-ID: <4667234.QqV6GaKOSx@amdc1976>
+From: rric@kernel.org (Robert Richter)
+Date: Fri, 14 Aug 2015 20:28:00 +0200
+Subject: [PATCH v4 0/5] irqchip,
+ gicv3: Updates and Cavium ThunderX errata workarounds
+Message-ID: <1439576885-15621-1-git-send-email-rric@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Robert Richter <rrichter@cavium.com>
 
-Hi,
+This patch series adds gicv3 updates and workarounds for HW errata in
+Cavium's ThunderX GICV3.
 
-On Friday, August 14, 2015 06:43:30 PM Russell King - ARM Linux wrote:
-> On Fri, Aug 14, 2015 at 07:04:23PM +0200, Bartlomiej Zolnierkiewicz wrote:
-> > This patch disables deprecated IDE subsystem in footbridge_defconfig
-> > (no IDE host drivers are selected in this config so there is no valid
-> > reason to enable IDE subsystem itself).
-> 
-> That's actually incorrect.  I use IDE on Footbridge because it works
-> loads with my CY82C693 board.  I never submitted the patches which make
-> CY82C693 work on ARM though...
-> 
-> However, the CY82C693 must not be allowed to use DMA (which is why the
-> ATA driver can't be used) - if it does, it locks the PCI bus.  It's
-> a hardware incompatibility between some PCI devices and the Footbridge.
+The first one is an unchanged resubmission of a patch from a gicv3
+series I sent a while ago.
 
-PATA driver is the same in this regard as IDE one.  They both try to
-use DMA if supported by a device.  Would be great if you could fix
-them (or at least PATA one) to limit your setup to PIO automatically
-(please also note that you can limit libata to PIO manually these
-days).
+The next patches implement the workarounds for ThunderX's gicv3. Patch
+#2 implements the cpu workaround for gicv3 on ThunderX. Patch #3 is a
+prerequisit for patch #5. Patch #4 adds generic code to parse the hw
+revision provided by an IIDR. This patch is used for the implementa-
+tion of the actual gicv3-its workaround in #5.
 
-When it comes to CY82C693 there is also a leftover issue with PATA
-driver that it only supports primary interface currently (BTW this is
-why I left Alpha's defconfig alone for now - it uses CY82C693).  I can
-look into fixing this (or assist in this work) if you are interested
-in it.
+All current review comments addressed so far with v4.
 
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+v4:
+ * simplify code to only use cpus_have_cap() in gicv3_enable_quirks()
+ * only enable hw detection for its in its_enable_quirks()
+ * removed gicv3_check_capabilities()
+ * drop special cpu capability for zero
+
+v3:
+ * use arm64 errata framework for midr check
+ * fix mixup of errata to be dependend from midr/iidr
+
+v2:
+ * Workaround for 23154:
+   * implement code in a single asm() to keep instruction sequence
+   * added comment to the code that explains the erratum
+   * apply workaround also if running as guest, thus check MIDR
+ * adding MIDR check
+
+Robert Richter (5):
+  irqchip, gicv3-its: Add range check for number of allocated pages
+  irqchip, gicv3: Workaround for Cavium ThunderX erratum 23154
+  irqchip, gicv3-its: Read typer register outside the loop
+  irqchip, gicv3-its: Add HW revision detection and configuration
+  irqchip, gicv3-its: Workaround for Cavium ThunderX errata 22375, 24313
+
+ arch/arm64/Kconfig                  | 11 +++++++
+ arch/arm64/include/asm/cpufeature.h |  3 +-
+ arch/arm64/include/asm/cputype.h    | 18 ++++++-----
+ arch/arm64/kernel/cpu_errata.c      |  9 ++++++
+ drivers/irqchip/irq-gic-common.c    | 11 +++++++
+ drivers/irqchip/irq-gic-common.h    |  9 ++++++
+ drivers/irqchip/irq-gic-v3-its.c    | 62 +++++++++++++++++++++++++++++++++----
+ drivers/irqchip/irq-gic-v3.c        | 42 ++++++++++++++++++++++++-
+ include/linux/irqchip/arm-gic-v3.h  |  1 +
+ 9 files changed, 151 insertions(+), 15 deletions(-)
+
+-- 
+2.1.1
