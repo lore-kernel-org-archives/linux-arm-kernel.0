@@ -1,84 +1,64 @@
-From: Dongsheng.Wang@freescale.com (Wang Dongsheng)
-Date: Fri, 14 Aug 2015 03:12:13 +0000
-Subject: [PATCH 2/2] soc/fsl: add ftm alarm driver for ls1021a platform
-In-Reply-To: <CACRpkdbninKuGzhEc5mN+85j-=w_wYQgra-Ark_Du6gWKN2=tg@mail.gmail.com>
-References: <1439358807-9024-1-git-send-email-dongsheng.wang@freescale.com>
- <1439358807-9024-2-git-send-email-dongsheng.wang@freescale.com>
- <CACRpkdbninKuGzhEc5mN+85j-=w_wYQgra-Ark_Du6gWKN2=tg@mail.gmail.com>
-Message-ID: <SN1PR0301MB161682A7FC5200580BED09119D7C0@SN1PR0301MB1616.namprd03.prod.outlook.com>
+From: Peter.Chen@freescale.com (Peter Chen)
+Date: Fri, 14 Aug 2015 03:13:26 +0000
+Subject: [PATCH v3 00/10] USB: chipidea misc patches
+In-Reply-To: <1438931747-25209-1-git-send-email-peter.chen@freescale.com>
+References: <1438931747-25209-1-git-send-email-peter.chen@freescale.com>
+Message-ID: <BN3PR0301MB0849D5DDFF2A5EBAE79CF673817C0@BN3PR0301MB0849.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-
-> -----Original Message-----
-> From: Linus Walleij [mailto:linus.walleij at linaro.org]
-> Sent: Thursday, August 13, 2015 9:54 PM
-> To: Wang Dongsheng-B40534; John Stultz; Alessandro Zummo; Alexandre Belloni
-> Cc: Shawn Guo; Nair, Sandeep; Hans de Goede; Wang Huan-B18965; linux-arm-
-> kernel at lists.infradead.org; linux-kernel at vger.kernel.org; rtc-
-> linux at googlegroups.com
-> Subject: Re: [PATCH 2/2] soc/fsl: add ftm alarm driver for ls1021a platform
+ 
 > 
-> On Wed, Aug 12, 2015 at 7:53 AM, Dongsheng Wang
-> <dongsheng.wang@freescale.com> wrote:
+> In this series, I add several new interfaces for chipidea driver, they are mainly
+> for system configuration adjustment. The USB performance may be improved
+> with these configuration changing, but each vendor driver owner needs to
+> consult with your IC owner which configuration parameters are suitable for
+> your system before changing it, and only change it if necessary.
 > 
-> > From: Wang Dongsheng <dongsheng.wang@freescale.com>
-> >
-> > Only Ftm0 can be used when system going to deep sleep. So this driver
-> > to support ftm0 as a wakeup source.
-> >
-> > Signed-off-by: Wang Dongsheng <dongsheng.wang@freescale.com>
-> > ---
-> > *V2*
-> > Change Copyright 2014 to 2015.
-> (...)
-> > +config FTM_ALARM
-> > +       bool "FTM alarm driver"
-> > +       depends on SOC_LS1021A
-> > +       default n
-> > +       help
-> > +         Say y here to enable FTM alarm support.  The FTM alarm provides
-> > +         alarm functions for wakeup system from deep sleep.  There is only
-> > +         one FTM can be used in ALARM(FTM 0).
-> (...)
-> > +static u32 time_to_cycle(unsigned long time)
-> > +static u32 cycle_to_time(u32 cycle)
-> > +static int ftm_set_alarm(u64 cycle)
-> > +static irqreturn_t ftm_alarm_interrupt(int irq, void *dev_id)
-> > +static ssize_t ftm_alarm_show(struct device *dev,
-> > +                             struct device_attribute *attr,
-> > +                             char *buf)
-> > +static ssize_t ftm_alarm_store(struct device *dev,
-> > +                              struct device_attribute *attr,
-> > +                              const char *buf, size_t count)
-> (...)
-> > +static struct device_attribute ftm_alarm_attributes = __ATTR(ftm_alarm, 0644,
-> > +                       ftm_alarm_show, ftm_alarm_store);
-> 
-> If you're gonna invent ABIs, document then in Documentation/ABI/testing/*.
-> 
-> But I don't get it. Why is this driver not in drivers/rtc?
-> 
-> It does a subset of what an RTC does. The ioctl()'s of an RTC
-> can do what you want to do. And much much more.
-> 
-> If it can't do all an RTC can do, surely the RTC subsystem
-> can be augmented to host it anyway. It's way to close to
-> an RTC to have it's own random sysfs driver like this.
-> 
-> Unless I'm totally off, rewrite this to an RTC driver and post
-> it to the RTC maintainers.
+> The other changes are for imx, it shows how imx uses these interfaces.
+> Shawn, the patch [5/10] and [9/10] are dts changes, help to review it please.
 > 
 
-FlexTimer is not a RTC device and not have any rtc deivce function. They belong to
-different devices, why we need to register this to RTC framework? I am confused about this.
+Shawn, there are no comments for week, I will queue chipidea changes for
+v4.3-rc1, would you help to queue dts changes (5/10 and 9/10), thanks.
 
-Now in freescale layerscape platform this driver is only for FlexTimer0, and not
-fit for each flextimer. Because only FlexTimer0 still turn-on when system in the Deep Sleep.
+Peter
 
-If the "alarm" make you feel confused or mislead you think this is a RTC devices. I think
-I need to change the "alarm" to "timer".
-
-Regards,
--Dongsheng
+> Changes for v3:
+> - Improve the binding doc according to Rob's comment [Patch 4/10, 8/10]
+> 
+> Changes for v2:
+> - Use the bit fields which are not used. [Patch 2/10, 6/10, 10/10]
+> - According to Greg and Sascha comments, format patch 2/10's
+>   commit log.
+> - using non-burst instead of unburst for patch 7/10
+> 
+> Peter Chen (10):
+>   usb: chipidea: udc: zero-length packet is only needed for TX
+>   usb: chipidea: define stream mode disable for both roles
+>   usb: chipidea: imx: add stream mode enable for device mode at
+>     imx6sl/imx6sx
+>   Doc: usb: ci-hdrc-usb2: add ahb-burst-config for binding doc
+>   ARM: imx6: set ahb-burst-config as 0 for USB
+>   usb: chipidea: add ahb burst configuration interface
+>   usb: chipidea: usbmisc_imx: add non-burst setting for imx6
+>   Doc: usb: ci-hdrc-usb2: add tx(rx)-burst-config-dword for binding doc
+>   ARM: imx6: change default burst size for USB
+>   usb: chipidea: add tx/rx burst size configuration interface
+> 
+>  .../devicetree/bindings/usb/ci-hdrc-usb2.txt       | 17 ++++++
+>  arch/arm/boot/dts/imx6qdl.dtsi                     | 12 +++++
+>  arch/arm/boot/dts/imx6sl.dtsi                      |  9 ++++
+>  arch/arm/boot/dts/imx6sx.dtsi                      |  9 ++++
+>  drivers/usb/chipidea/bits.h                        |  7 +++
+>  drivers/usb/chipidea/ci.h                          |  1 +
+>  drivers/usb/chipidea/ci_hdrc_imx.c                 | 16 +++---
+>  drivers/usb/chipidea/core.c                        | 62 +++++++++++++++++++++-
+>  drivers/usb/chipidea/udc.c                         |  2 +-
+>  drivers/usb/chipidea/usbmisc_imx.c                 | 12 ++++-
+>  include/linux/usb/chipidea.h                       | 11 +++-
+>  11 files changed, 147 insertions(+), 11 deletions(-)
+> 
+> --
+> 1.9.1
