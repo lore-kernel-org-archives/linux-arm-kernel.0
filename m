@@ -1,57 +1,37 @@
-From: mathieu@codeaurora.org (Mathieu Olivari)
-Date: Fri, 14 Aug 2015 10:25:37 -0700
-Subject: [PATCH 1/3] ARM: qcom: add SFPB nodes to IPQ806x dts
-In-Reply-To: <55CD25B6.6050901@codeaurora.org>
-References: <1439501620-24073-1-git-send-email-mathieu@codeaurora.org>
- <1439501620-24073-2-git-send-email-mathieu@codeaurora.org>
- <55CD25B6.6050901@codeaurora.org>
-Message-ID: <20150814172536.GA7516@codeaurora.org>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Fri, 14 Aug 2015 20:25:45 +0300
+Subject: [RFT PATCH] arm: collie_defconfig: convert to use libata PATA
+ drivers
+In-Reply-To: <1439571876-13758-6-git-send-email-b.zolnierkie@samsung.com>
+References: <1439571876-13758-1-git-send-email-b.zolnierkie@samsung.com>
+ <1439571876-13758-6-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <CALT56yO0Z3hs4CGAmT_Qtpc8482cUzK_GMROjQ=_4+rOJs0TBw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 13, 2015 at 04:18:14PM -0700, Stephen Boyd wrote:
-> On 08/13/2015 02:33 PM, Mathieu Olivari wrote:
-> >Add one new node to the ipq806x.dtsi file to declare & register the
-> >hardware spinlock devices. This mechanism is required to be used by
-> >other drivers such as SMEM.
-> >
-> >Signed-off-by: Mathieu Olivari <mathieu@codeaurora.org>
-> >---
-> >  arch/arm/boot/dts/qcom-ipq8064.dtsi | 12 ++++++++++++
-> >  1 file changed, 12 insertions(+)
-> >
-> >diff --git a/arch/arm/boot/dts/qcom-ipq8064.dtsi b/arch/arm/boot/dts/qcom-ipq8064.dtsi
-> >index 9f727d8..ea7b959 100644
-> >--- a/arch/arm/boot/dts/qcom-ipq8064.dtsi
-> >+++ b/arch/arm/boot/dts/qcom-ipq8064.dtsi
-> >@@ -67,6 +67,18 @@
-> >  			clock-frequency = <32768>;
-> >  			#clock-cells = <0>;
-> >  		};
-> >+
-> >+		sfpb_mutex_block: syscon at 01200600 {
-> 
-> I think you can drop the leading 0 here. Also this should be moved into the
-> soc node.
-> 
-> >+			compatible = "syscon";
-> >+			reg = <0x01200600 0x100>;
-> >+		};
-> >+
-> >+		sfpb_mutex: sfpb-mutex {
-> >+			compatible = "qcom,sfpb-mutex";
-> >+			syscon = <&sfpb_mutex_block 4 4>;
-> >+
-> >+			#hwlock-cells = <1>;
-> >+		};
-> 
-> And this node should be moved to the root /.
-> >  	};
-> >  	soc: soc {
-Right; I'll repost a patch to address both of these.
-> 
-> 
-> -- 
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> a Linux Foundation Collaborative Project
-> 
+2015-08-14 20:04 GMT+03:00 Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>:
+> IDE subsystem has been deprecated since 2009 and the majority
+> (if not all) of Linux distributions have switched to use
+> libata for ATA support exclusively.  However there are still
+> some users (mostly old or/and embedded non-x86 systems) that
+> have not converted from using IDE subsystem to libata PATA
+> drivers.  This doesn't seem to be good thing in the long-term
+> for Linux as while there is less and less PATA systems left
+> in use:
+>
+> * testing efforts are divided between two subsystems
+>
+> * having duplicate drivers for same hardware confuses users
+>
+> This patch converts collie_defconfig to use libata PATA
+> drivers.
+>
+> Cc: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+
+Acked-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+
+
+-- 
+With best wishes
+Dmitry
