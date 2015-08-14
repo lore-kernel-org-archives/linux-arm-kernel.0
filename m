@@ -1,21 +1,31 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 14 Aug 2015 11:23:59 +0530
-Subject: [PATCH] thermal: cpu_cooling: fix lockdep problems in cpu_cooling
-In-Reply-To: <20150814045009.GB10354@localhost.localdomain>
-References: <20150812073530.GA16445@linux>
- <E1ZPQfV-0005nb-DN@rmk-PC.arm.linux.org.uk>
- <20150814045009.GB10354@localhost.localdomain>
-Message-ID: <20150814055359.GY20238@linux>
+Date: Fri, 14 Aug 2015 11:25:56 +0530
+Subject: [PATCH V2] thermal: cpu_cooling: fix lockdep problems in
+ cpu_cooling
+In-Reply-To: <16e7d7d811fa2b0f8dcf6cade345a5f2f3e3c36a.1439372926.git.viresh.kumar@linaro.org>
+References: <16e7d7d811fa2b0f8dcf6cade345a5f2f3e3c36a.1439372926.git.viresh.kumar@linaro.org>
+Message-ID: <20150814055556.GZ20238@linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13-08-15, 21:50, Eduardo Valentin wrote:
-> Sorry if I let this one to fall into the cracks for this long.
+On 12-08-15, 15:22, Viresh Kumar wrote:
+> From: Russell King <rmk+kernel@arm.linux.org.uk>
+> Fixes: 2dcd851fe4b4 ("thermal: cpu_cooling: Update always cpufreq policy with
+> Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> ---
 > 
-> I am looking at this now and queuing as soon as possible.
+> Hi Eduardo/Zhang,
+> 
+> This is 4.2-rc material, please apply soon.
 
-You applied the wrong one, please drop it. And apply the one I have
-sent as a separate thread, with my sob on it.
+Hey,
+
+Please apply this one and drop
+
+8ad61f934e9e ("thermal: cpu_cooling: fix lockdep problems in
+cpu_cooling")
 
 -- 
 viresh
