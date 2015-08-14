@@ -1,120 +1,64 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Thu, 13 Aug 2015 21:50:11 -0700
-Subject: [PATCH] thermal: cpu_cooling: fix lockdep problems in cpu_cooling
-In-Reply-To: <E1ZPQfV-0005nb-DN@rmk-PC.arm.linux.org.uk>
-References: <20150812073530.GA16445@linux>
- <E1ZPQfV-0005nb-DN@rmk-PC.arm.linux.org.uk>
-Message-ID: <20150814045009.GB10354@localhost.localdomain>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 14 Aug 2015 13:54:16 +0900
+Subject: [PATCH v2] ARM: shmobile: kzm9g dts: Use adxl345-specific
+ compatible property
+In-Reply-To: <10744920.2768uXkYtL@avalon>
+References: <1436180132-26190-1-git-send-email-geert+renesas@glider.be>
+ <20150813000537.GD5221@verge.net.au>
+ <CAMuHMdV0fqjJSjmYqP0uFa0x5ydc1iztu4za1Ufu7OMdhC29Ug@mail.gmail.com>
+ <10744920.2768uXkYtL@avalon>
+Message-ID: <20150814045414.GA7739@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
-
-On Wed, Aug 12, 2015 at 08:41:49AM +0100, Russell King wrote:
-
-<cut>
-
+On Fri, Aug 14, 2015 at 12:31:09AM +0300, Laurent Pinchart wrote:
+> On Thursday 13 August 2015 11:26:32 Geert Uytterhoeven wrote:
+> > On Thu, Aug 13, 2015 at 2:05 AM, Simon Horman <horms@verge.net.au> wrote:
+> > > On Wed, Jul 08, 2015 at 09:51:49AM +0900, Simon Horman wrote:
+> > >> On Tue, Jul 07, 2015 at 09:56:29AM +0300, Laurent Pinchart wrote:
+> > >>> On Tuesday 07 July 2015 09:26:21 Simon Horman wrote:
+> > >>>> On Mon, Jul 06, 2015 at 04:29:33PM +0300, Laurent Pinchart wrote:
+> > >>>>> On Monday 06 July 2015 12:55:32 Geert Uytterhoeven wrote:
+> > >>>>>> Replace the deprecated generic "adi,adxl34x" compatible value by
+> > >>>>>> the adxl345-specific "adi,adxl345" value, cfr. commit
+> > >>>>>> e465bf6fc55d5ce2 ("DT:
+> > >>>>>> i2c: Deprecate adi,adxl34x compatible string").
+> > >>>>>> 
+> > >>>>>> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> > >>>>> 
+> > >>>>> Acked-by: Laurent Pinchart
+> > >>>>> <laurent.pinchart+renesas@ideasonboard.com>
+> > >>>>> 
+> > >>>>>> ---
+> > >>>>>> Depends on commit 3a38958d2477b718 ("Input: adxl34x - add OF
+> > >>>>>> match support"), which is in v4.2-rc1.
+> > >>>>>> 
+> > >>>>>> This is v2 of "ARM: shmobile: kzm9g dts: Add adxl345-specific
+> > >>>>>> compatible property".
+> > >>>> 
+> > >>>> It appears to me that this will cause a regression when booting old
+> > >>>> kernels with new dts blobs. For that reason think we should consider
+> > >>>> v1 of this change coupled with a schedule to remove use of the
+> > >>>> deprecated compat string.
+> > >>> 
+> > >>> That's the forward compatibility that Geert mentioned, is that really
+> > >>> an issue, especially on this board ?
+> > >> 
+> > >> I think it would be best to provide backwards compatibility unless there
+> > >> is a compelling reason not to.
+> > > 
+> > > I would like to revisit this discussion with a view to getting some
+> > > version of this patch queued up (yes I know I pushed back on it earlier in
+> > > this thread).
+> >
+> > I'm fine with applying v1.
 > 
-> For some reason, despite Rafael saying that this should go in, despite it
-> having been reviewed, Eduardo appears to be ignoring basic fixes to code
-> under his control.  Having waited more than a reasonable amount of time,
-> it is now time to take some action against this blockage.  Hence, I'm
-> putting this into linux-next in the hope that it'll conflict and elicit
-> a response for this important bug fix.
-
-Sorry if I let this one to fall into the cracks for this long.
-
-I am looking at this now and queuing as soon as possible.
-
-Thanks for pushing this fix.
-
-BR,
-
-Eduardo
-
+> And I'm quite unsurprisingly not, as I've asked for a v2.
 > 
-> Relevant message IDs:
-> 20141214213655.GA11285 at n2100.arm.linux.org.uk
-> 7573578.UE8ufgjWuX at vostro.rjw.lan
-> 20141215230922.GL11285 at n2100.arm.linux.org.uk
-> CAKohponhkk9BK6-7ScHeZa4R43iooWQFV8YoPLv6LjO40GNq=A at mail.gmail.com
-> 20150518185645.GA28053 at n2100.arm.linux.org.uk
-> 2574268.XBqpdL2VLI at vostro.rjw.lan
-> ---
->  drivers/thermal/cpu_cooling.c | 22 ++++++++++++++++------
->  1 file changed, 16 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/thermal/cpu_cooling.c b/drivers/thermal/cpu_cooling.c
-> index 6509c61b9648..d1fd02eec58d 100644
-> --- a/drivers/thermal/cpu_cooling.c
-> +++ b/drivers/thermal/cpu_cooling.c
-> @@ -107,6 +107,9 @@ struct cpufreq_cooling_device {
->  static DEFINE_IDR(cpufreq_idr);
->  static DEFINE_MUTEX(cooling_cpufreq_lock);
->  
-> +static unsigned int cpufreq_dev_count;
-> +
-> +static DEFINE_MUTEX(cooling_list_lock);
->  static LIST_HEAD(cpufreq_dev_list);
->  
->  /**
-> @@ -221,7 +224,7 @@ static int cpufreq_thermal_notifier(struct notifier_block *nb,
->  	switch (event) {
->  
->  	case CPUFREQ_ADJUST:
-> -		mutex_lock(&cooling_cpufreq_lock);
-> +		mutex_lock(&cooling_list_lock);
->  		list_for_each_entry(cpufreq_dev, &cpufreq_dev_list, node) {
->  			if (!cpumask_test_cpu(policy->cpu,
->  					      &cpufreq_dev->allowed_cpus))
-> @@ -233,7 +236,7 @@ static int cpufreq_thermal_notifier(struct notifier_block *nb,
->  				cpufreq_verify_within_limits(policy, 0,
->  							     max_freq);
->  		}
-> -		mutex_unlock(&cooling_cpufreq_lock);
-> +		mutex_unlock(&cooling_list_lock);
->  		break;
->  	default:
->  		return NOTIFY_DONE;
-> @@ -865,12 +868,15 @@ __cpufreq_cooling_register(struct device_node *np,
->  	cpufreq_dev->cool_dev = cool_dev;
->  
->  	mutex_lock(&cooling_cpufreq_lock);
-> +	mutex_lock(&cooling_list_lock);
-> +	list_add(&cpufreq_dev->node, &cpufreq_dev_list);
-> +	mutex_unlock(&cooling_list_lock);
->  
->  	/* Register the notifier for first cpufreq cooling device */
-> -	if (list_empty(&cpufreq_dev_list))
-> +	if (cpufreq_dev_count == 0)
->  		cpufreq_register_notifier(&thermal_cpufreq_notifier_block,
->  					  CPUFREQ_POLICY_NOTIFIER);
-> -	list_add(&cpufreq_dev->node, &cpufreq_dev_list);
-> +	cpufreq_dev_count++;
->  
->  	mutex_unlock(&cooling_cpufreq_lock);
->  
-> @@ -1014,14 +1020,18 @@ void cpufreq_cooling_unregister(struct thermal_cooling_device *cdev)
->  
->  	cpufreq_dev = cdev->devdata;
->  	mutex_lock(&cooling_cpufreq_lock);
-> -	list_del(&cpufreq_dev->node);
-> +	cpufreq_dev_count--;
->  
->  	/* Unregister the notifier for the last cpufreq cooling device */
-> -	if (list_empty(&cpufreq_dev_list))
-> +	if (cpufreq_dev_count == 0)
->  		cpufreq_unregister_notifier(&thermal_cpufreq_notifier_block,
->  					    CPUFREQ_POLICY_NOTIFIER);
->  	mutex_unlock(&cooling_cpufreq_lock);
->  
-> +	mutex_lock(&cooling_list_lock);
-> +	list_del(&cpufreq_dev->node);
-> +	mutex_unlock(&cooling_list_lock);
-> +
->  	thermal_cooling_device_unregister(cpufreq_dev->cool_dev);
->  	release_idr(&cpufreq_idr, cpufreq_dev->id);
->  	kfree(cpufreq_dev->time_in_idle_timestamp);
-> -- 
-> 2.1.0
-> 
+> The "adi,adxl34x" compatible string is deprecated. That means we still support 
+> it in the driver for device trees that haven't been updated, but it shouldn't 
+> be used forward by new device trees. That's why the device tree sources 
+> contained in the kernel shouldn't use it, especially given that they often 
+> serve as references for device trees shipped out of tree.
+
+Thanks, I see your point now. I have queued up v2.
