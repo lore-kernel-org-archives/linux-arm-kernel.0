@@ -1,76 +1,61 @@
-From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
-Date: Fri, 14 Aug 2015 22:14:27 +0530
-Subject: [PATCH v5 0/8] arm64, numa: Add numa support for arm64 platforms.
-In-Reply-To: <1439570374-4079-1-git-send-email-gkulkarni@caviumnetworks.com>
-References: <1439570374-4079-1-git-send-email-gkulkarni@caviumnetworks.com>
-Message-ID: <CAFpQJXXXFmWE5rk9=KW_Vg0B9aA+Cd_6YQOeiCZ21Q61cSQ+ew@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 14 Aug 2015 17:45:12 +0100
+Subject: [PATCH v2 2/4] PCI: pci-host-generic: Fix lookup of
+ linux,pci-probe-only property
+In-Reply-To: <1439569159-10051-3-git-send-email-marc.zyngier@arm.com>
+References: <1439569159-10051-1-git-send-email-marc.zyngier@arm.com>
+ <1439569159-10051-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20150814164512.GD22809@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 14, 2015 at 10:09 PM, Ganapatrao Kulkarni
-<gkulkarni@caviumnetworks.com> wrote:
-> v5:
->         - created base verion of numa.c which creates dummy numa without using dt
->           on single socket platforms. Then added patches for dt support.
->         - Incorporated review comments from Hanjun Guo.
->
-> v4:
-> done changes as per Arnd review comments.
->
-> v3:
-> Added changes to support numa on arm64 based platforms.
-> Tested these patches on cavium's multinode(2 node topology) platform.
-> In this patchset, defined and implemented dt bindings for numa mapping
-> for core and memory using device node property arm,associativity.
->
-> v2:
-> Defined and implemented numa map for memory, cores to node and
-> proximity distance matrix of nodes.
->
-> v1:
-> Initial patchset to support numa on arm64 platforms.
->
-> Note:
->         1. This patchset is tested for numa with dt on
->            thunderx single socket and dual socket boards.
->         2. Numa DT booting needs the dt memory nodes, which are deleted in current efi-stub,
->         hence to try numa with dt, you need to rebase with ard's patchset.
->         http://git.linaro.org/people/ard.biesheuvel/linux-arm.git/shortlog/refs/heads/arm64-uefi-early-fdt-handling
->
->
-> Ganapatrao Kulkarni (4):
->   arm64, numa: adding numa support for arm64 platforms.
->   Documentation: arm64/arm: dt bindings for numa.
->   arm64, numa: adding numa support for arm64 platforms.
->   arm64, dt, thunderx: Add initial dts for Cavium Thunder SoC in 2 Node
->     topology.
->
->  Documentation/devicetree/bindings/arm/numa.txt  | 212 +++++++
->  arch/arm64/Kconfig                              |  32 +
->  arch/arm64/boot/dts/cavium/Makefile             |   2 +-
->  arch/arm64/boot/dts/cavium/thunder-88xx-2n.dts  |  78 +++
->  arch/arm64/boot/dts/cavium/thunder-88xx-2n.dtsi | 790 ++++++++++++++++++++++++
->  arch/arm64/include/asm/mmzone.h                 |  32 +
->  arch/arm64/include/asm/numa.h                   |  49 ++
->  arch/arm64/kernel/Makefile                      |   1 +
->  arch/arm64/kernel/dt_numa.c                     | 316 ++++++++++
->  arch/arm64/kernel/setup.c                       |   9 +
->  arch/arm64/kernel/smp.c                         |   3 +
->  arch/arm64/mm/Makefile                          |   1 +
->  arch/arm64/mm/init.c                            |  34 +-
->  arch/arm64/mm/numa.c                            | 563 +++++++++++++++++
->  14 files changed, 2115 insertions(+), 7 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/arm/numa.txt
->  create mode 100644 arch/arm64/boot/dts/cavium/thunder-88xx-2n.dts
->  create mode 100644 arch/arm64/boot/dts/cavium/thunder-88xx-2n.dtsi
->  create mode 100644 arch/arm64/include/asm/mmzone.h
->  create mode 100644 arch/arm64/include/asm/numa.h
->  create mode 100644 arch/arm64/kernel/dt_numa.c
->  create mode 100644 arch/arm64/mm/numa.c
->
-> --
-> 1.8.1.4
->
-sorry, minor correction, this patchset has 4 patches.
+On Fri, Aug 14, 2015 at 05:19:17PM +0100, Marc Zyngier wrote:
+> When pci-host-generic looks for the probe-only property, it seems
+> to trust the DT to be correctly written, and assumes that there
+> is a parameter to the property.
+> 
+> Unfortunately, this is not always the case, and some firmware expose
+> this property naked. The driver ends up making a decision based on
+> whatever the property pointer points to, which is likely to be junk.
+> 
+> Switch to the common of_pci.c implementation that doesn't suffer
+> from this problem.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  drivers/pci/host/pci-host-generic.c | 9 +--------
+>  1 file changed, 1 insertion(+), 8 deletions(-)
+> 
+> diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
+> index 265dd25..545ff4e 100644
+> --- a/drivers/pci/host/pci-host-generic.c
+> +++ b/drivers/pci/host/pci-host-generic.c
+> @@ -210,7 +210,6 @@ static int gen_pci_probe(struct platform_device *pdev)
+>  	int err;
+>  	const char *type;
+>  	const struct of_device_id *of_id;
+> -	const int *prop;
+>  	struct device *dev = &pdev->dev;
+>  	struct device_node *np = dev->of_node;
+>  	struct gen_pci *pci = devm_kzalloc(dev, sizeof(*pci), GFP_KERNEL);
+> @@ -225,13 +224,7 @@ static int gen_pci_probe(struct platform_device *pdev)
+>  		return -EINVAL;
+>  	}
+>  
+> -	prop = of_get_property(of_chosen, "linux,pci-probe-only", NULL);
+> -	if (prop) {
+> -		if (*prop)
+> -			pci_add_flags(PCI_PROBE_ONLY);
+> -		else
+> -			pci_clear_flags(PCI_PROBE_ONLY);
+> -	}
+> +	of_pci_check_probe_only(of_chosen);
 
-PATCH v5 0/8 => PATCH v5 0/4
+You could probably just make this take void, as the probe-only property
+is always in the /chosen node.
+
+Either way:
+
+  Acked-by: Will Deacon <will.deacon@arm.com>
+
+Will
