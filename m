@@ -1,52 +1,59 @@
 From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Fri, 14 Aug 2015 15:20:27 +0300
-Subject: [PATCH v3 3/6] irqchip: crossbar: fix arm gic irq type configuration
+Date: Fri, 14 Aug 2015 15:20:25 +0300
+Subject: [PATCH v3 1/6] genirq: fix irq_chip_retrigger_hierarchy
 In-Reply-To: <1439554830-19502-1-git-send-email-grygorii.strashko@ti.com>
 References: <1439554830-19502-1-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <1439554830-19502-4-git-send-email-grygorii.strashko@ti.com>
+Message-ID: <1439554830-19502-2-git-send-email-grygorii.strashko@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It's observed that ARM GIC IRQ triggering type is not configured
-properly when IRQ is routed through IRQ domain hierarchy and
-system started using DT. As result, system will start using default
-ARM GIC configuration, ignore DT IRQ triggering configuration,
-and value of desc->irq_data.state_use_accessors = 0.
+Now irq_chip_retrigger_hierarchy() returns -ENOSYS if it
+was not able to find at least one .irq_retrigger() callback
+implemented in IRQ domain hierarchy. As result, IRQ
+re-triggering is not working now on ARM (TI OMAP) where
+ARM GIC is not implemented this callback.
+The .irq_retrigger() is optional (see check_irq_resend())
+and there are no reasons to fail if it was not found, hence
+lets return 0 in this case.
 
 In case of TI OMAP DRA7 the following IRQ hierarchy is defined:
 ARM GIC <- OMAP wakeupgen <- TI CBAR
 
-Failed call chain:
-     irq_create_of_mapping
-     irq_set_irq_type
-     __irq_set_trigger
-     if (!chip || !chip->irq_set_type) {
-        return 0; <- return here
-     }
-Crossbar has no .irq_set_type() defined and, so, IRQ triggering
-configuration will not be propagated to parent IRQ domain.
-
-Hence, fix it by using irq_chip_set_type_parent() for
-propagation IRQ triggering type to parent IRQ domains.
+Failure is reproduced during resume from suspend to RAM:
+- wakeup by IRQx
+- suspend_enter
+  + arch_suspend_enable_irqs
+    + handle_fasteoi_irq
+      + irq_may_run
+        + irq_pm_check_wakeup
+          + irq_disable(IRQx)
+  + dpm_resume_noirq()
+    + resume_device_irqs
+      + resume_irqs
+        + resume_irq
+          + __enable_irq <== IRQx is not re-triggered
 
 Cc: Sudeep Holla <sudeep.holla@arm.com>
-Fixes: 783d31863fb8 ('irqchip: crossbar: Convert dra7 crossbar...')
+Cc: Jiang Liu <jiang.liu@linux.intel.com>
+Fixes: 85f08c17de26 ('genirq: Introduce helper functions...')
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
 ---
- drivers/irqchip/irq-crossbar.c | 1 +
- 1 file changed, 1 insertion(+)
+ kernel/irq/chip.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/irqchip/irq-crossbar.c b/drivers/irqchip/irq-crossbar.c
-index 692fe2b..3ba58e7 100644
---- a/drivers/irqchip/irq-crossbar.c
-+++ b/drivers/irqchip/irq-crossbar.c
-@@ -69,6 +69,7 @@ static struct irq_chip crossbar_chip = {
- 	.irq_unmask		= irq_chip_unmask_parent,
- 	.irq_retrigger		= irq_chip_retrigger_hierarchy,
- 	.irq_set_wake		= irq_chip_set_wake_parent,
-+	.irq_set_type		= irq_chip_set_type_parent,
- #ifdef CONFIG_SMP
- 	.irq_set_affinity	= irq_chip_set_affinity_parent,
- #endif
+diff --git a/kernel/irq/chip.c b/kernel/irq/chip.c
+index 27f4332..6de638b 100644
+--- a/kernel/irq/chip.c
++++ b/kernel/irq/chip.c
+@@ -997,7 +997,7 @@ int irq_chip_retrigger_hierarchy(struct irq_data *data)
+ 		if (data->chip && data->chip->irq_retrigger)
+ 			return data->chip->irq_retrigger(data);
+ 
+-	return -ENOSYS;
++	return 0;
+ }
+ 
+ /**
 -- 
 2.5.0
