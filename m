@@ -1,69 +1,59 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 14 Aug 2015 14:14:28 +0100
-Subject: [PATCH 1/3] Honor ACPI _CCA attribute setting
-In-Reply-To: <55CD4832.7070301@amd.com>
-References: <1439416290-21228-1-git-send-email-jeremy.linton@arm.com>
- <1439416290-21228-2-git-send-email-jeremy.linton@arm.com>
- <55CD4832.7070301@amd.com>
-Message-ID: <20150814131427.GD16368@e104818-lin.cambridge.arm.com>
+From: rric@kernel.org (Robert Richter)
+Date: Fri, 14 Aug 2015 15:18:34 +0200
+Subject: [PATCH v3 0/6] irqchip,
+ gicv3: Updates and Cavium ThunderX errata workarounds
+Message-ID: <1439558320-5777-1-git-send-email-rric@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 14, 2015 at 08:45:22AM +0700, Suravee Suthikulpanit wrote:
-> On 8/13/15 04:51, Jeremy Linton wrote:
-> >ACPI configurations can now mark devices as noncoherent,
-> >support that choice.
-> >
-> >Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
-> >---
-> >  include/acpi/acpi_bus.h | 5 +++--
-> >  1 file changed, 3 insertions(+), 2 deletions(-)
-> >
-> >diff --git a/include/acpi/acpi_bus.h b/include/acpi/acpi_bus.h
-> >index 83061ca..7ecb8e4 100644
-> >--- a/include/acpi/acpi_bus.h
-> >+++ b/include/acpi/acpi_bus.h
-> >@@ -399,7 +399,7 @@ static inline bool acpi_check_dma(struct acpi_device *adev, bool *coherent)
-> >  	 * case 1. Do not support and disable DMA.
-> >  	 * case 2. Support but rely on arch-specific cache maintenance for
-> >  	 *         non-coherence DMA operations.
-> >-	 * Currently, we implement case 1 above.
-> >+	 * Currently, we implement case 2 above.
-> >  	 *
-> >  	 * For the case when _CCA is missing (i.e. cca_seen=0) and
-> >  	 * platform specifies ACPI_CCA_REQUIRED, we do not support DMA,
-> >@@ -407,7 +407,8 @@ static inline bool acpi_check_dma(struct acpi_device *adev, bool *coherent)
-> >  	 *
-> >  	 * See acpi_init_coherency() for more info.
-> >  	 */
-> >-	if (adev->flags.coherent_dma) {
-> >+	if (adev->flags.coherent_dma ||
-> >+	    (adev->flags.cca_seen && IS_ENABLED(CONFIG_ARM64))) {
-> >  		ret = true;
-> >  		if (coherent)
-> >  			*coherent = adev->flags.coherent_dma;
-> >
-> 
-> This change was in my earlier revisions for the original patch series to add
-> ACPI CCA support. At the time, this was pushed back since we were not sure
-> whether this would be a useful case, and whether such hardware exists.
-> 
-> Would it be useful to document somewhere (may be in the GIT commit message)
-> about which hardware might need this?
+From: Robert Richter <rrichter@cavium.com>
 
-So far, it's the ARM Juno development board (the emphasis here is on
-being able to use it for development, not a production system).
+This patch series adds gicv3 updates and workarounds for HW errata in
+Cavium's ThunderX GICV3.
 
-I think the commit log should also give you credit for the original
-implementation.
+The first one is an unchanged resubmission of a patch from a gicv3
+series I sent a while ago.
 
-> Arnd/Catalin, any feedback on this?
+The next patches implement the workarounds for ThunderX's gicv3. Patch
+#2 adds generic code to parse the hw revision provided by an IIDR or
+MIDR register value and runs specific code if hw matches. For MIDR
+detection it uses the arm64 errata framework. This patch is used for
+the implementation of the actual errata fixes in patch #3 (gicv3) and
+#5 (gicv3-its). Patch #4 is a prerequisit for patch #5. Patch #6 is a
+change to the errata framework to only check for cpu features if the
+capability value is non-zero.
 
-That's where it was left in the previous thread:
+All current review comments addressed so far with v3.
 
-https://lkml.org/lkml/2015/5/21/376
+v3:
+ * use arm64 errata framework for midr check
+ * fix mixup of errata to be dependend from midr/iidr
 
-(and I'll refrain from further comments ;))
+v2:
+ * Workaround for 23154:
+   * implement code in a single asm() to keep instruction sequence
+   * added comment to the code that explains the erratum
+   * apply workaround also if running as guest, thus check MIDR
+ * adding MIDR check
+
+Robert Richter (6):
+  irqchip, gicv3-its: Add range check for number of allocated pages
+  irqchip, gicv3: Add HW revision detection and configuration
+  irqchip, gicv3: Workaround for Cavium ThunderX erratum 23154
+  irqchip, gicv3-its: Read typer register outside the loop
+  irqchip, gicv3-its: Workaround for Cavium ThunderX errata 22375, 24313
+  arm64: errata: Match all cpus if capability value is zero
+
+ arch/arm64/Kconfig                  | 11 +++++++
+ arch/arm64/include/asm/cpufeature.h | 16 +++++++---
+ arch/arm64/include/asm/cputype.h    | 18 ++++++-----
+ arch/arm64/kernel/cpu_errata.c      |  9 ++++++
+ drivers/irqchip/irq-gic-common.c    | 13 ++++++++
+ drivers/irqchip/irq-gic-common.h    | 10 ++++++
+ drivers/irqchip/irq-gic-v3-its.c    | 62 ++++++++++++++++++++++++++++++++----
+ drivers/irqchip/irq-gic-v3.c        | 63 ++++++++++++++++++++++++++++++++++++-
+ include/linux/irqchip/arm-gic-v3.h  |  1 +
+ 9 files changed, 184 insertions(+), 19 deletions(-)
 
 -- 
-Catalin
+2.1.1
