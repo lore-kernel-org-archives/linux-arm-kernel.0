@@ -1,62 +1,96 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Fri, 14 Aug 2015 16:11:02 +0200
-Subject: [PATCH v3 5/9] gpiolib: Add gpio name information to
- /sys/kernel/debug/gpio
-In-Reply-To: <1439561466-14350-1-git-send-email-mpa@pengutronix.de>
-References: <1439561466-14350-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1439561466-14350-6-git-send-email-mpa@pengutronix.de>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Fri, 14 Aug 2015 08:12:22 -0600
+Subject: [PATCH RFC 08/10] hwspinlock: qcom: Lock #7 is special lock,
+ uses dynamic proc_id
+In-Reply-To: <20150813043036.GJ13472@usrtlx11787.corpusers.net>
+References: <438731339-58317-1-git-send-email-lina.iyer@linaro.org>
+ <1438792366-2737-1-git-send-email-lina.iyer@linaro.org>
+ <1438792366-2737-9-git-send-email-lina.iyer@linaro.org>
+ <20150813043036.GJ13472@usrtlx11787.corpusers.net>
+Message-ID: <20150814141222.GC86880@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add some information about gpio names to the debugfs gpio file. name and
-label of a GPIO are then displayed next to each other. This way it is
-easy to see what the real name of GPIO is and what the driver requested
-it for.
+On Wed, Aug 12 2015 at 22:30 -0600, Bjorn Andersson wrote:
+>On Wed 05 Aug 09:32 PDT 2015, Lina Iyer wrote:
+>
+>> Hwspinlocks are widely used between processors in an SoC, and also
+>> between elevation levels within in the same processor.  QCOM SoC's use
+>> hwspinlock to serialize entry into a low power mode when the context
+>> switches from Linux to secure monitor.
+>>
+>> Lock #7 has been assigned for this purpose. In order to differentiate
+>> between one cpu core holding a lock while another cpu is contending for
+>> the same lock, the proc id written into the lock is (128 + cpu id). This
+>> makes it unique value among the cpu cores and therefore when a core
+>> locks the hwspinlock, other cores would wait for the lock to be released
+>> since they would have a different proc id.  This value is specific for
+>> the lock #7 only.
+>>
+>
+>As I was thinking about this, I came to the conclusion that my argument
+>that it's system configuration and not a property of the block that lock
+>#7 is special is actually biting myself.
+>
+>Just as #7 is system configuration, so is the fact that 1 is the lock
+>value for all other locks.
+>
+>I've been meaning to answer you, but I haven't come to a good conclusion
+>in this matter. I think that both of these properties should be possible
+>to express in DT, but I don't know how.
+>
+I thought about that. These are s/w imposed behavior. As a far as the
+h/w is concerned, you could just write a non-zero value and the lock is
+considered acquired. So placing that in DT may not be appropriate.
 
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
----
- Documentation/ABI/testing/sysfs-gpio |  1 +
- drivers/gpio/gpiolib.c               | 11 ++++++++---
- 2 files changed, 9 insertions(+), 3 deletions(-)
+>
+>Perhaps we should just list each lock that we expose as a subnode in DT
+>with a property to indicate the lock value - with the possibility of
+>indicating cpu_id.
+>
+>Something like:
+>
+>tcsr-mutex {
+>	compatible = "qcom,tcsr-mutex";
+>	syscon = <&tcsr_mutex_block 0 0x80>;
+>
+>	#hwlock-cells = <1>;
+>	#address-cells = <1>;
+>	#size-cells = <0>;
+>
+>	smem-lock at 3 {
+>		reg = <3>;
+>		qcom,lock-value = <1>;
+>	};
+>
+>	scm-lock at 7 {
+>		reg = <7>;
+>		qcom,lock-value-from-cpu-id;
+>		qcom,lock-raw;
+>	};
+>};
+>
+>As we don't reference most of these locks anyways I don't think this
+>would still be reasonable. And if reg is an array it's quite compact.
+>
+But, looking at the DT, its not evident what lock-value-from-cpu-id,
+would mean.  It is an implementation detail of Linux (as a result of
+firmware). May be better to just hide it in the hwspinlock driver.
 
-diff --git a/Documentation/ABI/testing/sysfs-gpio b/Documentation/ABI/testing/sysfs-gpio
-index 55ffa2df1c10..2c1e199fd4e1 100644
---- a/Documentation/ABI/testing/sysfs-gpio
-+++ b/Documentation/ABI/testing/sysfs-gpio
-@@ -21,6 +21,7 @@ Description:
- 	    /value ... always readable, writes fail for input GPIOs
- 	    /direction ... r/w as: in, out (default low); write: high, low
- 	    /edge ... r/w as: none, falling, rising, both
-+	    /name ... r/o, unique name of the GPIO
- 	/gpiochipN ... for each gpiochip; #N is its first GPIO
- 	    /base ... (r/o) same as N
- 	    /label ... (r/o) descriptive, not necessarily unique
-diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
-index 3908503bebfe..79a0b41ce57b 100644
---- a/drivers/gpio/gpiolib.c
-+++ b/drivers/gpio/gpiolib.c
-@@ -2344,14 +2344,19 @@ static void gpiolib_dbg_show(struct seq_file *s, struct gpio_chip *chip)
- 	int			is_irq;
- 
- 	for (i = 0; i < chip->ngpio; i++, gpio++, gdesc++) {
--		if (!test_bit(FLAG_REQUESTED, &gdesc->flags))
-+		if (!test_bit(FLAG_REQUESTED, &gdesc->flags)) {
-+			if (gdesc->name) {
-+				seq_printf(s, " gpio-%-3d (%-20.20s)\n",
-+					   gpio, gdesc->name);
-+			}
- 			continue;
-+		}
- 
- 		gpiod_get_direction(gdesc);
- 		is_out = test_bit(FLAG_IS_OUT, &gdesc->flags);
- 		is_irq = test_bit(FLAG_USED_AS_IRQ, &gdesc->flags);
--		seq_printf(s, " gpio-%-3d (%-20.20s) %s %s %s",
--			gpio, gdesc->label,
-+		seq_printf(s, " gpio-%-3d (%-20.20s|%-20.20s) %s %s %s",
-+			gpio, gdesc->name ? gdesc->name : "", gdesc->label,
- 			is_out ? "out" : "in ",
- 			chip->get
- 				? (chip->get(chip, i) ? "hi" : "lo")
--- 
-2.4.6
+I am not sure about lock-raw, but I would think its not QCOM specific.
+Imagine the case, when hwspinlock framework does not s/w spinlock around
+the hwspinlock, we wouldnt have this property. The reason why we
+spinlock around the hwspinlock is because we dont have a good way to
+generate a unique value for the hwspinlock, so multiple threads
+acquiring the same locks could safely be assured that they have acquired
+the lock. While convenient and probably more effecient to just have s/w
+spinlocks around the hwspinlock, the problem here is it is mandated
+across all locks.
+
+To me it seems OK to explicity call out lock #7 as unique entity in the
+bank that is compatible with a raw hwspinlock in the DT. But the value
+that lock #7 uses is an implementation detail and should rest wth the
+drivers.
+
+Thanks,
+Lina
