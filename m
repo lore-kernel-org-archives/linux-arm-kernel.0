@@ -1,94 +1,125 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Fri, 14 Aug 2015 12:02:37 +0200
-Subject: [PATCH v3 08/10] Doc: usb: ci-hdrc-usb2: add
- tx(rx)-burst-config-dword for binding doc
-In-Reply-To: <20150814084050.GE11072@shlinux2>
-References: <1438931747-25209-1-git-send-email-peter.chen@freescale.com>
- <1438931747-25209-9-git-send-email-peter.chen@freescale.com>
- <1439541450.13210.31.camel@pengutronix.de>
- <20150814084050.GE11072@shlinux2>
-Message-ID: <1439546557.13210.52.camel@pengutronix.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 14 Aug 2015 12:06:32 +0200
+Subject: [PATCH 2/2] soc/fsl: add ftm alarm driver for ls1021a platform
+In-Reply-To: <SN1PR0301MB161682A7FC5200580BED09119D7C0@SN1PR0301MB1616.namprd03.prod.outlook.com>
+References: <1439358807-9024-1-git-send-email-dongsheng.wang@freescale.com>
+ <1439358807-9024-2-git-send-email-dongsheng.wang@freescale.com>
+ <CACRpkdbninKuGzhEc5mN+85j-=w_wYQgra-Ark_Du6gWKN2=tg@mail.gmail.com>
+ <SN1PR0301MB161682A7FC5200580BED09119D7C0@SN1PR0301MB1616.namprd03.prod.outlook.com>
+Message-ID: <CACRpkdYB23PbECUb2FP=_ck8PJe42wdifEcMSdKWrKnJLNp=pg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, den 14.08.2015, 16:40 +0800 schrieb Peter Chen:
-> On Fri, Aug 14, 2015 at 10:37:30AM +0200, Lucas Stach wrote:
-> > Am Freitag, den 07.08.2015, 15:15 +0800 schrieb Peter Chen:
-> > > It is used to override the default setting for burst size, changing
-> > > burst size takes effect only when the SBUSCFG.AHBBRST = 0.
-> > > 
-> > > Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> > > ---
-> > >  Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt | 10 ++++++++++
-> > >  1 file changed, 10 insertions(+)
-> > > 
-> > > diff --git a/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt b/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt
-> > > index d52a747..d71ef07 100644
-> > > --- a/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt
-> > > +++ b/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt
-> > > @@ -37,6 +37,14 @@ Optional properties:
-> > >    property is used to change AHB burst configuration, check the chipidea
-> > >    spec for meaning of each value. If this property is not existed, it
-> > >    will use the reset value.
-> > > +- tx-burst-size-dword: it is vendor dependent, the tx burst size in dword
-> > > +  (4 bytes), This register represents the maximum length of a the burst
-> > > +  in 32-bit words while moving data from system memory to the USB
-> > > +  bus, changing this value takes effect only the SBUSCFG.AHBBRST is 0.
-> > 
-> > The last bits about SBUSCFG.AHBBRST don't make any sense in the DT
-> > binding. The DT writer doesn't know about the SBUSCFG.AHBBRST value and
-> > should not care either.
-> > If someone sets the burst size to something
-> > non-standard in the DT, the driver should make sure to enable to
-> > necessary bits to make this setting take effect.
-> 
-> The SBUSCFG.AHBBRST property description is just above this one,
-> and the user should read the spec for changing these system
-> configuration parameters.
-> 
-This is not clear from the description. This should read something like
-"The value of this property will only take effect if property
-ahb-burst-config is set to 0."
+On Fri, Aug 14, 2015 at 5:12 AM, Wang Dongsheng
+<Dongsheng.Wang@freescale.com> wrote:
+>> On Wed, Aug 12, 2015 at 7:53 AM, Dongsheng Wang
+>> <dongsheng.wang@freescale.com> wrote:
+>>
+>> > From: Wang Dongsheng <dongsheng.wang@freescale.com>
+>> >
+>> > Only Ftm0 can be used when system going to deep sleep. So this driver
+>> > to support ftm0 as a wakeup source.
+>> >
+>> > Signed-off-by: Wang Dongsheng <dongsheng.wang@freescale.com>
+>> > ---
+>> > *V2*
+>> > Change Copyright 2014 to 2015.
+>> (...)
+>> > +config FTM_ALARM
+>> > +       bool "FTM alarm driver"
+>> > +       depends on SOC_LS1021A
+>> > +       default n
+>> > +       help
+>> > +         Say y here to enable FTM alarm support.  The FTM alarm provides
+>> > +         alarm functions for wakeup system from deep sleep.  There is only
+>> > +         one FTM can be used in ALARM(FTM 0).
+>> (...)
+>> > +static u32 time_to_cycle(unsigned long time)
+>> > +static u32 cycle_to_time(u32 cycle)
+>> > +static int ftm_set_alarm(u64 cycle)
+>> > +static irqreturn_t ftm_alarm_interrupt(int irq, void *dev_id)
+>> > +static ssize_t ftm_alarm_show(struct device *dev,
+>> > +                             struct device_attribute *attr,
+>> > +                             char *buf)
+>> > +static ssize_t ftm_alarm_store(struct device *dev,
+>> > +                              struct device_attribute *attr,
+>> > +                              const char *buf, size_t count)
+>> (...)
+>> > +static struct device_attribute ftm_alarm_attributes = __ATTR(ftm_alarm, 0644,
+>> > +                       ftm_alarm_show, ftm_alarm_store);
+>>
+>> If you're gonna invent ABIs, document then in Documentation/ABI/testing/*.
+>>
+>> But I don't get it. Why is this driver not in drivers/rtc?
+>>
+>> It does a subset of what an RTC does. The ioctl()'s of an RTC
+>> can do what you want to do. And much much more.
+>>
+>> If it can't do all an RTC can do, surely the RTC subsystem
+>> can be augmented to host it anyway. It's way to close to
+>> an RTC to have it's own random sysfs driver like this.
+>>
+>> Unless I'm totally off, rewrite this to an RTC driver and post
+>> it to the RTC maintainers.
+>
+> FlexTimer is not a RTC device and not have any rtc deivce function. They belong to
+> different devices, why we need to register this to RTC framework? I am confused about this.
+>
+> Now in freescale layerscape platform this driver is only for FlexTimer0, and not
+> fit for each flextimer. Because only FlexTimer0 still turn-on when system in the Deep Sleep.
+>
+> If the "alarm" make you feel confused or mislead you think this is a RTC devices. I think
+> I need to change the "alarm" to "timer".
 
-The DT binding should be coherent and understandable without reading the
-DW USB spec and/or the code. Please take some care about this.
+I think it is an RTC, it is just that the hardware engineer
+designed it with a wakeup usecase in mind and did not call
+it an RTC. Wakeup is one of the things RTCs do.
 
-> This requirement is from the spec, and the code logic makes sure
-> the burst size changes only when SBUSCFG.AHBBRST is 0, since the
-> hardware will only change burst size if SBUSCFG.AHBBRST is 0.
-> 
-> > 
-> > Also both those descriptions are missing a description to what value the
-> > burst sizes will be set if the DT properties are not found. If it's
-> > implementation defined spell this out in the doc.
-> 
-> It is optional property, if without this property, it will use the
-> default value.
-> 
-Then specify this in the binding. Again, the binding is a spec that one
-should be able to understand without reading the code.
+If you inspect a few drivers in drivers/rtc such as drivers/rtc/rtc-pl030.c
+you will find that they are just as crude as this "alarm" thing.
 
-"If this property is missing the reset defaults of the hardware
-implementation will be used."
+It has a counter that counts cycles, it has a comparator
+and an alarm function. It is an on-chip RTC, just like PL030
+no matter what the datasheet or hardware engineer thinks it
+should be called, the Linux kernel calls this an RTC, and it
+has a subsystem for handling it, so we should use it and
+not invent random new stuff.
 
-> > 
-> > Are there really cases where it makes sense to set RX and TX burst sizes
-> > to different values?
-> 
-> Yes, the default burst size is the same for all SoCs, but the bus
-> burst size may be larger for some SoCs.
-> 
-This question wasn't meant to dispute the RX/TX burst size
-configuration, but I'm questioning if it really makes sense to set them
-to different values. Do we really need 2 properties for this, or is 1
-enough?
+If the hardware is really so strange that the counter can only
+be started if you also put an alarm at the same time (I doubt
+it, but OK if you say so) it is a subset of an RTC that can
+only be used for alarms but not timekeeping, but it should
+*still* live in drivers/rtc.
 
-Do you see any use case where someone would like to do something like:
-tx-burst-size-dword = <0x8>;
-rx-burst-size-dword = <0x10>;
+Think for a moment on the huge effort that John Stultz put into
+integrating Android alarm timers with POSIX and the RTC
+subsystem and fixing it all from the smallest handset to
+the largest S360 supercomputer. The approach of a custom
+device just throws all of that out the window and reinvents the
+mechanism in userspace, forcing all standardized userspace to
+have special code to handle this special alarm with its
+special sysfs ABI.
 
-Regards,
-Lucas
--- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+Check
+commit ff3ead96d17f47ee70c294a5cc2cce9b61e82f0f
+"timers: Introduce in-kernel alarm-timer interface"
+for example.
+
+Even if you persist on keeping it in its own magic driver
+like this, it should implement the alarm timer interface
+from <linux/alarmtimer.h> and I bet after that you don't
+need the sysfs files anymore, as the system will sleep
+and wake up from the regular syscalls instead of using
+magic poking in sysfs from userspace. AFAICT this hardware
+is designed for exactly this usecase.
+
+tools/testing/selftests/timers/alarmtimer-suspend.c
+is there for you to test your driver with alarmtimer
+support.
+
+Needless to say: if you implement it as an RTC you get the
+alarmtimer interaction for free. That is why we have the
+subsystem after all: to be helpful.
+
+Yours,
+Linus Walleij
