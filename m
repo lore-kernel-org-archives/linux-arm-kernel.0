@@ -1,76 +1,119 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Fri, 14 Aug 2015 16:11:05 +0200
-Subject: [PATCH v3 8/9] gpiolib-of: Reuse 'line-name' from DT as gpio
- descriptor name
+Date: Fri, 14 Aug 2015 16:10:59 +0200
+Subject: [PATCH v3 2/9] gpio: Introduce gpio descriptor 'name'
 In-Reply-To: <1439561466-14350-1-git-send-email-mpa@pengutronix.de>
 References: <1439561466-14350-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1439561466-14350-9-git-send-email-mpa@pengutronix.de>
+Message-ID: <1439561466-14350-3-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DT describes gpios with subnodes. These subnodes can contain a
-property 'line-name'. This information can be useful in other areas
-where we want to identify a GPIO by its name.
+The latest gpio hogging mechanism assigns each gpio a 'line-name' in the
+devicetree. The 'name' field is different from the 'label' field.
+'label' is only used for requested GPIOs to describe its current use by
+driver or userspace.
 
-This patch stores the line-name in the gpio descriptor.
+The 'name' field describes the GPIO itself, not the use. This is most
+likely identical to the label in the schematic on the GPIO line and
+should help to find this particular GPIO.
+
+This is equivalent to the gpiochip->names array. However names should be
+stored in the GPIO descriptor. We will use gpiochip->names in the future
+only as initializer for the GPIO descriptors for drivers that assign
+GPIO names hardcoded. All other GPIO names will be parsed from DT and
+directly assigned to the GPIO descriptor.
+
+This patch adds a helper function to find gpio descriptors by name
+instead of gpio number.
 
 Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 ---
- drivers/gpio/gpiolib-of.c | 30 +++++++++++++++++++++---------
- 1 file changed, 21 insertions(+), 9 deletions(-)
+ drivers/gpio/gpiolib.c        | 32 ++++++++++++++++++++++++++++++++
+ drivers/gpio/gpiolib.h        |  3 +++
+ include/linux/gpio/consumer.h |  7 +++++++
+ 3 files changed, 42 insertions(+)
 
-diff --git a/drivers/gpio/gpiolib-of.c b/drivers/gpio/gpiolib-of.c
-index fea80bbccf12..1911b692f735 100644
---- a/drivers/gpio/gpiolib-of.c
-+++ b/drivers/gpio/gpiolib-of.c
-@@ -184,11 +184,6 @@ static struct gpio_desc *of_parse_own_gpio(struct device_node *np,
- 		*dflags |= GPIOD_OUT_LOW;
- 	else if (of_property_read_bool(np, "output-high"))
- 		*dflags |= GPIOD_OUT_HIGH;
--	else {
--		pr_warn("GPIO line %d (%s): no hogging state specified, bailing out\n",
--			desc_to_gpio(gg_data.out_gpio), np->name);
--		return ERR_PTR(-EINVAL);
--	}
+diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
+index bf4bd1d120c3..eed3751fe14f 100644
+--- a/drivers/gpio/gpiolib.c
++++ b/drivers/gpio/gpiolib.c
+@@ -90,6 +90,38 @@ struct gpio_desc *gpio_to_desc(unsigned gpio)
+ EXPORT_SYMBOL_GPL(gpio_to_desc);
  
- 	if (name && of_property_read_string(np, "line-name", name))
- 		*name = np->name;
-@@ -214,15 +209,32 @@ static void of_gpiochip_scan_gpios(struct gpio_chip *chip)
- 	enum gpiod_flags dflags;
- 
- 	for_each_child_of_node(chip->of_node, np) {
--		if (!of_property_read_bool(np, "gpio-hog"))
--			continue;
-+		struct gpio_desc *name_desc;
- 
- 		desc = of_parse_own_gpio(np, &name, &lflags, &dflags);
- 		if (IS_ERR(desc))
- 			continue;
- 
--		if (gpiod_hog(desc, name, lflags, dflags))
--			continue;
-+		name_desc = gpio_name_to_desc(name);
-+		if (name_desc)
-+			dev_warn(chip->dev, "GPIO name collision for '%s' detected at GPIO line %d (%s)\n",
-+				 name, desc_to_gpio(desc), np->name);
-+		else if (desc->name)
-+			dev_warn(chip->dev, "GPIO has already a name '%s' new name would be '%s' at GPIO %d\n",
-+				 desc->name, name, desc_to_gpio(desc));
-+		else
-+			desc->name = name;
+ /**
++ * Convert a GPIO name to its descriptor
++ */
++struct gpio_desc *gpio_name_to_desc(const char * const name)
++{
++	struct gpio_chip *chip;
++	unsigned long flags;
 +
-+		if (of_property_read_bool(np, "gpio-hog")) {
-+			if (!dflags) {
-+				pr_warn("GPIO line %d (%s): no hogging state specified, bailing out\n",
-+					desc_to_gpio(desc), np->name);
++	spin_lock_irqsave(&gpio_lock, flags);
++
++	list_for_each_entry(chip, &gpio_chips, list) {
++		int i;
++
++		for (i = 0; i != chip->ngpio; ++i) {
++			struct gpio_desc *gpio = &chip->desc[i];
++
++			if (!gpio->name)
 +				continue;
++
++			if (!strcmp(gpio->name, name)) {
++				spin_unlock_irqrestore(&gpio_lock, flags);
++				return gpio;
 +			}
-+
-+			if (gpiod_hog(desc, name, lflags, dflags))
-+				continue;
 +		}
- 	}
- }
++	}
++
++	spin_unlock_irqrestore(&gpio_lock, flags);
++
++	return NULL;
++}
++EXPORT_SYMBOL_GPL(gpio_name_to_desc);
++
++/**
+  * Get the GPIO descriptor corresponding to the given hw number for this chip.
+  */
+ struct gpio_desc *gpiochip_get_desc(struct gpio_chip *chip,
+diff --git a/drivers/gpio/gpiolib.h b/drivers/gpio/gpiolib.h
+index bf343004b008..78e634d1c719 100644
+--- a/drivers/gpio/gpiolib.h
++++ b/drivers/gpio/gpiolib.h
+@@ -89,7 +89,10 @@ struct gpio_desc {
+ #define FLAG_USED_AS_IRQ 9	/* GPIO is connected to an IRQ */
+ #define FLAG_IS_HOGGED	11	/* GPIO is hogged */
  
++	/* Connection label */
+ 	const char		*label;
++	/* Name of the GPIO */
++	const char		*name;
+ };
+ 
+ int gpiod_request(struct gpio_desc *desc, const char *label);
+diff --git a/include/linux/gpio/consumer.h b/include/linux/gpio/consumer.h
+index adac255aee86..a873b8b47ab3 100644
+--- a/include/linux/gpio/consumer.h
++++ b/include/linux/gpio/consumer.h
+@@ -130,6 +130,7 @@ int gpiod_to_irq(const struct gpio_desc *desc);
+ /* Convert between the old gpio_ and new gpiod_ interfaces */
+ struct gpio_desc *gpio_to_desc(unsigned gpio);
+ int desc_to_gpio(const struct gpio_desc *desc);
++struct gpio_desc *gpio_name_to_desc(const char *name);
+ 
+ /* Child properties interface */
+ struct fwnode_handle;
+@@ -400,6 +401,12 @@ static inline struct gpio_desc *gpio_to_desc(unsigned gpio)
+ {
+ 	return ERR_PTR(-EINVAL);
+ }
++
++static inline struct gpio_desc *gpio_name_to_desc(const char *name)
++{
++	return ERR_PTR(-EINVAL);
++}
++
+ static inline int desc_to_gpio(const struct gpio_desc *desc)
+ {
+ 	/* GPIO can never have been requested */
 -- 
 2.4.6
