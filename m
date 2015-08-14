@@ -1,39 +1,51 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 14 Aug 2015 22:49:50 +0200
-Subject: [PATCH 1/5] net: add Hisilicon Network Subsystem support (config
- and documents)
-In-Reply-To: <1439548222-231611-2-git-send-email-liguozhu@hisilicon.com>
+Date: Fri, 14 Aug 2015 22:57:28 +0200
+Subject: [PATCH 3/5] net: add Hisilicon Network Subsystem MDIO support
+In-Reply-To: <1439548222-231611-4-git-send-email-liguozhu@hisilicon.com>
 References: <1439548222-231611-1-git-send-email-liguozhu@hisilicon.com>
- <1439548222-231611-2-git-send-email-liguozhu@hisilicon.com>
-Message-ID: <1536926.jEJjsM70Lj@wuerfel>
+ <1439548222-231611-4-git-send-email-liguozhu@hisilicon.com>
+Message-ID: <2142879.tTtWetb0nc@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 14 August 2015 18:30:18 Kenneth Lee wrote:
-> diff --git a/Documentation/devicetree/bindings/net/hisilicon-hns-nic.txt b/Documentation/devicetree/bindings/net/hisilicon-hns-nic.txt
-> new file mode 100644
-> index 0000000..5ab6969
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/net/hisilicon-hns-nic.txt
-> @@ -0,0 +1,14 @@
-> +Hisilicon Network Subsystem NIC controller
+On Friday 14 August 2015 18:30:20 Kenneth Lee wrote:
+
+> +#define MDIO_BASE_ADDR                 0x403C0000
+
+Does not belong in here (and is not used)
+
+> +#define MDIO_COMMAND_REG               0x0
+> +#define MDIO_ADDR_REG                  0x4
+> +#define MDIO_WDATA_REG                 0x8
+> +#define MDIO_RDATA_REG                 0xc
+> +#define MDIO_STA_REG                   0x10
+
+These look suspiciously similar to definitions from
+drivers/net/ethernet/hisilicon/hip04_mdio.c.
+
+Could the hardware be related? If so, please try to share
+the common parts.
+
+> +static inline void mdio_write_reg(void *base, u32 reg, u32 value)
+> +{
+> +       u8 __iomem *reg_addr = ACCESS_ONCE(base);
 > +
-> +Required properties:
-> +- compatible: hisilicon,hns-nic
-> +- ae-name: accelerator name who provide this interface
-> +- ae-opts: options (string) to the accelerator. e.g. the index interface
+> +       writel(value, reg_addr + reg);
+> +}
 > +
-> +Example:
-> +
-> +       ethernet at 0{
-> +               compatible = "hisilicon,hns-nic";
-> +               ae-name = "soc0-n4";
-> +               ae-opts = "0";
-> +       };
+> +#define MDIO_WRITE_REG(a, reg, value) \
+> +       mdio_write_reg((a)->vbase, (reg), (value))
 > 
 
-These properties look very unconventional. What are the valid strings
-for ae-name and ae-opts? It looks like the latter is just a number,
-so why not use an integer property?
+Something seems wrong here: why do you have an ACCESS_ONCE() on a
+local variable? Doesn't this just make the code less efficient
+without providing lockless access to shared variables?
+
+The types are inconsistent here, you should get a warning from
+running this through 'make C=1' because of the missing __iomem
+annotation of the pointer.
+
+Also, why both a macro and an inline function? Just use an inline
+function.
 
 	Arnd
