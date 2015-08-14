@@ -1,65 +1,91 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Fri, 14 Aug 2015 11:29:02 -0700
-Subject: [GIT PULL] RPi DT changes due for v4.3
-In-Reply-To: <20150813103056.GY30160@localhost>
-References: <20150811160642.GQ18282@x1> <20150813103056.GY30160@localhost>
-Message-ID: <878u9dhggh.fsf@eliezer.anholt.net>
+From: sjg@chromium.org (Simon Glass)
+Date: Fri, 14 Aug 2015 12:34:41 -0600
+Subject: [PATCH] arm: rpi: Device tree modifications for U-Boot
+In-Reply-To: <CAPnjgZ3ztXnkxZJvitiXiKMzq5+x46hbv0PW4HcF7yGgsXUV+Q@mail.gmail.com>
+References: <1439303153-12171-1-git-send-email-sjg@chromium.org>
+ <1439312701.2451.3.camel@lynxeye.de>
+ <CAPnjgZ3ztXnkxZJvitiXiKMzq5+x46hbv0PW4HcF7yGgsXUV+Q@mail.gmail.com>
+Message-ID: <CAPnjgZ0hzyjy=8o8ocaGCoOC7Js4CirhystidbvtabzbhRi4RQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof Johansson <olof@lixom.net> writes:
+-linux-tegra
 
-> Hi,
+Hi,
+
+On 12 August 2015 at 07:21, Simon Glass <sjg@chromium.org> wrote:
+> Hi Lucas,
 >
-> On Tue, Aug 11, 2015 at 05:06:42PM +0100, Lee Jones wrote:
->> ARM SoC Chaps,
->> 
->> Please find a couple of simple RPi changes pertaining to Firmware.
->> 
->> The following changes since commit bc0195aad0daa2ad5b0d76cce22b167bc3435590:
->> 
->>   Linux 4.2-rc2 (2015-07-12 15:10:30 -0700)
->> 
->> are available in the git repository at:
->> 
->>   git://git.kernel.org/pub/scm/linux/kernel/git/rpi/linux-rpi.git tags/rpi-dt-for-armsoc-4.3
->> 
->> for you to fetch changes up to fd26f8830979de48eb3f1c253eb9d2ee2e468eb6:
->> 
->>   dt/bindings: Add binding for the Raspberry Pi firmware driver (2015-08-11 16:56:41 +0100)
+> On 11 August 2015 at 11:05, Lucas Stach <dev@lynxeye.de> wrote:
+>> Hi Simon,
+>>
+>> why did you send this to the Tegra ML?
+>>
+>> Am Dienstag, den 11.08.2015, 08:25 -0600 schrieb Simon Glass:
+>>> This updates the device tree from the kernel version to something suitable
+>>> for U-Boot:
+>>>
+>>> - Add stdout-path alias for console
+>>> - Mark the /soc node to be available pre-relocation so that the early
+>>> serial console works (we need the 'ranges' property to be available)
+>>>
+>>> Signed-off-by: Simon Glass <sjg@chromium.org>
+>>> ---
+>>>
+>>>  arch/arm/boot/dts/bcm2835.dtsi | 4 +++-
+>>>  1 file changed, 3 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
+>>> index 301c73f..bd6bff6 100644
+>>> --- a/arch/arm/boot/dts/bcm2835.dtsi
+>>> +++ b/arch/arm/boot/dts/bcm2835.dtsi
+>>> @@ -8,6 +8,7 @@
+>>>
+>>>       chosen {
+>>>               bootargs = "earlyprintk console=ttyAMA0";
+>>> +             stdout-path = &uart;
+>>>       };
+>>>
+>>>       soc {
+>>> @@ -16,6 +17,7 @@
+>>>               #size-cells = <1>;
+>>>               ranges = <0x7e000000 0x20000000 0x02000000>;
+>>>               dma-ranges = <0x40000000 0x00000000 0x20000000>;
+>>> +             u-boot,dm-pre-reloc;
+>>
+>> Why do you need this and why should upstream carry your favourite
+>> bootloaders configuration? This is in no way hardware description.
 >
-> I've merged this but I'm a little confused about bcm2835 maintainership:
-> I got a MAINTAINERS update from Florian earlier grouped in a set of
-> other bcm changes (adding Eric), and now this directly from you.
+> I'm not sure how much you know about U-Boot, so let me know if you
+> need more info.
 >
-> In general the bcm platforms are quite diverse and we've asked Florian
-> to be the funnel for all of the new ones, but I don't think we talked
-> much about 2835 at that time. Should we expect to see merges directly
-> from you and the other maintainers there or will it go through Florian?
+> U-Boot normally starts up by setting up its serial UART and displaying
+> a banner message. At this stage typically only a few devices are
+> initialised (e.g. maybe just the UART). It then relocates itself to
+> the top of memory and starts up all the devices. It throws away any
+> previous devices that it set up before relocation and starts again.
+>
+> U-Boot uses a thing called driver model (dm) which handles driver
+> binding and probing. Driver model has the device tree and would
+> normally scan through it and create devices for everything it finds.
+>
+> Before relocation we don't need every device. Also the CPU is often
+> running slowly, perhaps without the cache enabled. SDRAM may not be
+> available yet so space is short. We want to avoid starting up things
+> that will not be used.
+>
+> So this property indicates that the device is needed before relocation
+> and should be set up by driver model. We need it to avoid a very slow
+> and memory-hungry startup.
+>
+> As to why upstream should accept it, my understanding of upstream is
+> that people can send patches to it and in fact are encouraged to do
+> so, to avoid misunderstandings and duplication. The device tree files
+> are stored in Linux so any binding or source file changes should end
+> up there. Otherwise the files tend to diverge and we end up with
+> multiple bindings and multiple versions of the same source file.
 
-I'd been talking with Arnd and Florian about the delays in RPi patch
-acceptance (Stephen and Lee have limited time to dedicate to 2835), and
-Florian suggested me becoming a maintainer and routing patches through
-him.  He's been great to work with and has had useful feedback on my
-patches.
+Is the above explanation sufficient? Will this patch be applied?
 
-I was kind of surprised to see Lee send this pull request -- these
-patches had been sitting un-merged for 2 months and pings on irc didn't
-get replies, so I thought I was stepping in where the others definitely
-didn't have time.  It was also odd to see just these two patches, but
-not the actual driver.
-
-I'm willing to do the merging process for 2835, and if I'm doing so, I
-like the idea of feeding it through a more experienced maintainer who's
-ready to look at my pull requests whenever, without bothering the main
-arm-soc folks.  My goal here, besides my actual job of getting open
-source graphics working for Broadcom, is to hopefully push the rpi
-foundation toward getting their code merged, so that this hardware fully
-works on stock upstream.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150814/a6508819/attachment.sig>
+Regards,
+Simon
