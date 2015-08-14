@@ -1,116 +1,51 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 14 Aug 2015 18:16:49 +0300
-Subject: [PATCH v4 1/6] media: get rid of unused "extra_links" param on
- media_entity_init()
-In-Reply-To: <b0b576e0bfcc043b4fdab3a57665b525fc054add.1439563682.git.mchehab@osg.samsung.com>
-References: <cover.1439563682.git.mchehab@osg.samsung.com>
- <b0b576e0bfcc043b4fdab3a57665b525fc054add.1439563682.git.mchehab@osg.samsung.com>
-Message-ID: <3975256.nCAQDV8Exf@avalon>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 14 Aug 2015 16:16:06 +0100
+Subject: commit a71b092 "ARM: Convert handle_IRQ to use
+ __handle_domain_irq" breaks DNS-323
+In-Reply-To: <55CDF78F.6070001@free-electrons.com>
+References: <55CDF5C3.7080204@vollmann.ch>
+ <55CDF78F.6070001@free-electrons.com>
+Message-ID: <55CE0636.3050205@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mauro,
-
-Thank you for the patch.
-
-On Friday 14 August 2015 11:56:38 Mauro Carvalho Chehab wrote:
-> Currently, media_entity_init() creates an array with the links,
-> allocated at init time. It provides a parameter (extra_links)
-> that would allocate more links than the current needs, but this
-> is not used by any driver.
+On 14/08/15 15:13, Gregory CLEMENT wrote:
+> Hi Detlef,
 > 
-> As we want to be able to do dynamic link allocation/removal,
-> we'll need to change the implementation of the links. So,
-> before doing that, let's first remove that extra unused
-> parameter, in order to cleanup the interface first.
+> On 14/08/2015 16:05, Detlef Vollmann wrote:
+>> Hello,
+>>
+>> this commit:
+>>  > commit a71b092a9c68685a270ebdde7b5986ba8787e575
+>>  > Author: Marc Zyngier <marc.zyngier@arm.com>
+>>  > Date:   Tue Aug 26 11:03:18 2014 +0100
+>>  >
+>>  >     ARM: Convert handle_IRQ to use __handle_domain_irq
+>> [...]
+>> causes the kernel not to boot anymore on my DNS-323.
+>> Soc: MV88F5182 Rev 2
+>> CPU: ARM926 (Rev 0) running @ 500Mhz
+>> CPU: Feroceon [41069260] revision 0 (ARMv5TEJ), cr=a005317f
+>> Orion ID: MV88F5182-A2. TCLK=166666667.
+>> DNS-323: Identified HW revision B1
+>>
+>> Boot stops after "Uncompressing Linux... done, booting the kernel."
+>> Reverting the commit works fine for me.
+>> Tested 4.1.2 and 4.2.0-rc6 with orion5x_defconfig.
 > 
-> Signed-off-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
-> Acked-by: Sakari Ailus <sakari.ailus@linux.intel.com>
+> Could you try the following patch ?
 > 
-> diff --git a/Documentation/media-framework.txt
-> b/Documentation/media-framework.txt index f552a75c0e70..2cc6019f7147 100644
-> --- a/Documentation/media-framework.txt
-> +++ b/Documentation/media-framework.txt
-> @@ -104,7 +104,7 @@ although drivers can allocate entities directly.
->  Drivers initialize entities by calling
-> 
->  	media_entity_init(struct media_entity *entity, u16 num_pads,
-> -			  struct media_pad *pads, u16 extra_links);
-> +			  struct media_pad *pads);
-> 
->  The media_entity name, type, flags, revision and group_id fields can be
->  initialized before or after calling media_entity_init. Entities embedded in
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/356501.html
 
-The extra_links parameter is documented later on in this file. Could you 
-replace the paragraph
+As a side note, having to revert that patch to get your system up and
+running is a reliable indication that something is wrong with your
+interrupt mapping, and that you are using 0 as a valid interrupt number
+(which has been declared invalid a long time ago by the chief penguin).
 
-"Unlike the number of pads, the total number of links isn't always known in
-advance by the entity driver. As an initial estimate, media_entity_init
-pre-allocates a number of links equal to the number of pads plus an optional
-number of extra links. The links array will be reallocated if it grows beyond
-the initial estimate."
+Hopefully Gregory has put you in the right direction.
 
-with
+Thanks,
 
-"Unlike the number of pads, the total number of links isn't always known in
-advance by the entity driver. As an initial estimate, media_entity_init
-pre-allocates a number of links equal to the number of pads. The links array 
-will be reallocated if it grows beyond the initial estimate."
-
-?
-
-[snip]
-
-> diff --git a/drivers/media/media-entity.c b/drivers/media/media-entity.c
-> index 4d8e01c7b1b2..78440c7aad94 100644
-> --- a/drivers/media/media-entity.c
-> +++ b/drivers/media/media-entity.c
-> @@ -30,7 +30,6 @@
->   * media_entity_init - Initialize a media entity
->   *
->   * @num_pads: Total number of sink and source pads.
-> - * @extra_links: Initial estimate of the number of extra links.
->   * @pads: Array of 'num_pads' pads.
->   *
->   * The total number of pads is an intrinsic property of entities known by
-> the
-
-Similarly here, I would rewrite the documentation as
-
- * The total number of pads is an intrinsic property of entities known by the
- * entity driver, while the total number of links depends on hardware design
- * and is an extrinsic property unknown to the entity driver. However, in most
- * use cases the number of links can safely be assumed to be equal to or
- * larger than the number of pads.
- *
- * For those reasons the links array can be preallocated based on the number
- * of pads and will be reallocated later if extra links need to be created.
- *
- * This function allocates a links array with enough space to hold at least
- * 'num_pads' elements. The media_entity::max_links field will be set to the
- * number of allocated elements.
-
-With that fixed,
-
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-
-And feel free to merge this patch for v4.3 independently of the rest.
-
-> @@ -52,10 +51,10 @@
->   */
->  int
->  media_entity_init(struct media_entity *entity, u16 num_pads,
-> -		  struct media_pad *pads, u16 extra_links)
-> +		  struct media_pad *pads)
->  {
->  	struct media_link *links;
-> -	unsigned int max_links = num_pads + extra_links;
-> +	unsigned int max_links = num_pads;
->  	unsigned int i;
-> 
->  	links = kzalloc(max_links * sizeof(links[0]), GFP_KERNEL);
-
+	M.
 -- 
-Regards,
-
-Laurent Pinchart
+Jazz is not dead. It just smells funny...
