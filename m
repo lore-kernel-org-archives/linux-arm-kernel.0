@@ -1,41 +1,209 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 14 Aug 2015 09:30:23 +0900
-Subject: [PATCH v2 0/6] ARM: shmobile: Move gpio ranges from C code to DT
-In-Reply-To: <CAMuHMdW0T6MW6s4Gg_rqvtt+MRPtp_MpuiKtamfFrx-Tcm6WmQ@mail.gmail.com>
-References: <1438696519-13727-1-git-send-email-geert+renesas@glider.be>
- <20150805005540.GB20726@verge.net.au>
- <CACRpkdY7P86+SxMr5-HnhrN5fC-N1U135jiGAJGTV=xx47VW5g@mail.gmail.com>
- <CAMuHMdW0T6MW6s4Gg_rqvtt+MRPtp_MpuiKtamfFrx-Tcm6WmQ@mail.gmail.com>
-Message-ID: <20150814003023.GC12589@verge.net.au>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 13 Aug 2015 17:38:02 -0700
+Subject: [PATCH 3/3] mtd: add SMEM parser for QCOM platforms
+In-Reply-To: <1439501620-24073-4-git-send-email-mathieu@codeaurora.org>
+References: <1439501620-24073-1-git-send-email-mathieu@codeaurora.org>
+ <1439501620-24073-4-git-send-email-mathieu@codeaurora.org>
+Message-ID: <55CD386A.5070801@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 13, 2015 at 02:45:55PM +0200, Geert Uytterhoeven wrote:
-> Hi Linus,
-> 
-> On Thu, Aug 13, 2015 at 2:29 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> > On Wed, Aug 5, 2015 at 2:55 AM, Simon Horman <horms@verge.net.au> wrote:
-> >> Where possible I prefer not to apply non-DTS/DTSI patches on top of
-> >> DTS/DTSI patches, I believe this is in keeping with how the ARM SoC
-> >> maintainers like things handled.  With this in mind I have done the following:
-> >>
-> >> 1. Queued up the DTSI patches (patches 1 - 3) for v4.3 in my dt branch.
-> >>    I intend for this to turn up in next soon.
-> >> 2. Queued up for pinctrl patches (patches 4 - 6) for v4.4 in a pinctrl patch.
-> >>    I intend for these to be present in the renesas devel branch but
-> >>    not in next until after the release of v4.3-rc1. I would also be
-> >>    happy to drop them and let Linus Walleij take these patches for v4.4,
-> >>    assuming patches 1 - 3 are accepted for v4.3.
-> >
-> > OK.
-> >
-> > Will the world explode if I try to queue the pinctrl patches 4-6 in my
-> > tree now for v4.3? Then I prefer to defer to v4.4. Else I can merge
-> > it in parallel?
-> 
-> There won't be a mapping between gpio and pins in any branch having the
-> pinctrl changes but not the dtsi changes.
+On 08/13/2015 02:33 PM, Mathieu Olivari wrote:
+> diff --git a/drivers/mtd/qcom_smem_part.c b/drivers/mtd/qcom_smem_part.c
+> new file mode 100644
+> index 0000000..6cbf610
+> --- /dev/null
+> +++ b/drivers/mtd/qcom_smem_part.c
+>
+> +#define SMEM_PARTS_MAX			32
+> +
+> +struct smem_partition {
+> +	char name[SMEM_PART_NAME_SZ];
+> +	uint32_t start;
+> +	uint32_t size;
+> +	uint32_t attr;
 
-It sounds to me that Linus should take his option 2; defer to v4.4.
-In which case I should drop the changes from my tree (they are not in next
-anyway). Please let me know if thats the way we will move this forwards.
+Is this little endian? __le32? I think so.
+
+> +};
+> +
+> +struct smem_partition_table {
+> +	uint32_t magic[2];
+> +	uint32_t version;
+> +	uint32_t len;
+
+Same for these being little endian. And if so, please make magic into a 
+byte array of size 8 and then do a memcmp with another static byte array.
+
+> +	struct smem_partition parts[SMEM_PARTS_MAX];
+> +};
+> +
+> +static int qcom_smem_get_flash_blksz(uint64_t **smem_blksz)
+
+I don't know, but I prefer u64 because it's short and sweet. But I'm not 
+the maintainer here.
+
+> +{
+> +	int ret;
+> +	size_t size;
+> +
+> +	ret = qcom_smem_get(SMEM_HOST_APPS, SMEM_BOOT_FLASH_BLOCK_SIZE,
+> +			    (void **) smem_blksz, &size);
+
+Is the cast necessary?
+
+> +
+> +	if (ret < 0) {
+> +		pr_err("Unable to read flash blksz from SMEM\n");
+> +		return -ENOENT;
+> +	}
+> +
+> +	if (size != sizeof(**smem_blksz)) {
+> +		pr_err("Invalid flash blksz size in SMEM\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static int qcom_smem_get_flash_type(uint64_t **smem_flash_type)
+> +{
+> +	int ret;
+> +	size_t size;
+> +
+> +	ret = qcom_smem_get(SMEM_HOST_APPS, SMEM_BOOT_FLASH_TYPE,
+> +			    (void **) smem_flash_type, &size);
+> +
+> +	if (ret < 0) {
+> +		pr_err("Unable to read flash type from SMEM\n");
+> +		return -ENOENT;
+> +	}
+> +
+> +	if (size != sizeof(**smem_flash_type)) {
+> +		pr_err("Invalid flash type size in SMEM\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static int qcom_smem_get_flash_partitions(struct smem_partition_table **pparts)
+> +{
+> +	int ret;
+> +	size_t size;
+> +
+> +	ret = qcom_smem_get(SMEM_HOST_APPS, SMEM_AARM_PARTITION_TABLE,
+> +			    (void **) pparts, &size);
+> +
+> +	if (ret < 0) {
+> +		pr_err("Unable to read partition table from SMEM\n");
+> +		return -ENOENT;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static int of_dev_node_match(struct device *dev, void *data)
+> +{
+> +	return dev->of_node == data;
+> +}
+> +
+> +static bool is_spi_device(struct device_node *np)
+> +{
+> +	struct device *dev;
+> +
+> +	dev = bus_find_device(&spi_bus_type, NULL, np, of_dev_node_match);
+
+I'm pretty sure this holds a reference to the device that needs to be 
+released with put_device().
+
+> +	return dev ? true : false;
+> +}
+> +
+> +static int parse_qcom_smem_partitions(struct mtd_info *master,
+> +				      struct mtd_partition **pparts,
+> +				      struct mtd_part_parser_data *data)
+> +{
+> +	struct smem_partition_table *smem_parts;
+> +	uint64_t *smem_flash_type, *smem_blksz;
+> +	struct mtd_partition *mtd_parts;
+> +	struct device_node *of_node = data->of_node;
+> +	int i, ret;
+> +
+> +	/*
+> +	 * SMEM will only store the partition table of the boot device.
+> +	 * If this is not the boot device, do not return any partition.
+> +	 */
+> +	ret = qcom_smem_get_flash_type(&smem_flash_type);
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	if ((*smem_flash_type == SMEM_FLASH_NAND && !mtd_type_is_nand(master))
+> +	    || (*smem_flash_type == SMEM_FLASH_SPI && !is_spi_device(of_node)))
+> +		return 0;
+> +
+> +	/*
+> +	 * Just for sanity purpose, make sure the block size in SMEM matches the
+> +	 * block size of the MTD device
+> +	 */
+> +	ret = qcom_smem_get_flash_blksz(&smem_blksz);
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	if (*smem_blksz != master->erasesize) {
+> +		pr_err("SMEM block size differs from MTD block size\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	/* Get partition pointer from SMEM */
+> +	ret = qcom_smem_get_flash_partitions(&smem_parts);
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	if (smem_parts->magic[0] != SMEM_PTABLE_MAGIC_1 ||
+> +	    smem_parts->magic[1] != SMEM_PTABLE_MAGIC_2) {
+> +		pr_err("SMEM partition magic invalid\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	/* Allocate and populate the mtd structures */
+> +	mtd_parts = kcalloc(smem_parts->len, sizeof(struct mtd_partition),
+
+sizeof(*mtd_parts)?
+
+> +			    GFP_KERNEL);
+> +	if (mtd_parts == NULL)
+
+if (!mtd_parts) is more kernel style.
+
+> +		return -ENOMEM;
+> +
+> +	for (i = 0; i < smem_parts->len; i++) {
+> +		struct smem_partition *part = &smem_parts->parts[i];
+> +
+> +		mtd_parts[i].name = part->name;
+> +		mtd_parts[i].size = part->size * (*smem_blksz);
+> +		mtd_parts[i].offset = part->start * (*smem_blksz);
+> +
+> +		/*
+> +		 * The last SMEM partition may have its size marked as
+> +		 * something like 0xffffffff, which means "until the end of the
+> +		 * flash device". In this case, truncate it.
+> +		 */
+> +		if (mtd_parts[i].offset + mtd_parts[i].size > master->size)
+> +			mtd_parts[i].size = master->size - mtd_parts[i].offset;
+
+That is 7 mtd_parts[i]. instances. Consider making a local variable 
+pointer instead. Actually we could make two pointers for 
+smem_parts->part and mtd_parts and increment both in the loop to make 
+tighter code.
+
+> +	}
+> +
+> +	*pparts = mtd_parts;
+
+Oh we already have the pointer, so just do this assignment before iterating.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
