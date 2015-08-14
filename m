@@ -1,54 +1,39 @@
-From: vthakkar1994@gmail.com (Vaishali Thakkar)
-Date: Sat, 15 Aug 2015 07:21:00 +0530
-Subject: [PATCH] ASoC: rockchip: i2s: Adjust devm usage
-Message-ID: <20150815015059.GA31009@localhost>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 14 Aug 2015 18:56:16 +0100
+Subject: [PATCH] regmap: Add function check before called format_val
+In-Reply-To: <1439479505.32674.43.camel@mtksdaap41>
+References: <1437396110-5192-1-git-send-email-henryc.chen@mediatek.com>
+ <20150720150254.GC11162@sirena.org.uk>
+ <1437458845.30329.51.camel@mtksdaap41>
+ <CAGS+omDa+FhKD2u_VwBG3cWvN+ZiHneqFVz=mtdYuPsiQu4JEQ@mail.gmail.com>
+ <1439479505.32674.43.camel@mtksdaap41>
+Message-ID: <20150814175616.GA10748@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove use of snd_soc_unregister_component in remove function
-as devm_snd_soc_register_component in probe function automatically
-handles it.
+On Thu, Aug 13, 2015 at 11:25:05PM +0800, Henry Chen wrote:
+> On Wed, 2015-08-12 at 22:20 +0800, Daniel Kurtz wrote:
 
-Also, convert call of snd_dmaengine_pcm_register to managed resource
-function devm_snd_dmaengine_pcm_register and remove usage of
-snd_dmaengine_pcm_unregister in probe and remove functions.
+> > Making mtk_pmic-wrap into a regmap_bus makes a bit of sense
+> > architecturally, too, since it is essentially just a bus for accessing
+> > the registers of an off-chip PMIC.  The CPU sees a platform bus, but
+> > the registers of the remote PMIC are accessed over a dedicated SPI
+> > bus.
 
-Signed-off-by: Vaishali Thakkar <vthakkar1994@gmail.com>
----
- sound/soc/rockchip/rockchip_i2s.c | 8 ++------
- 1 file changed, 2 insertions(+), 6 deletions(-)
+> Sorry, I'm afraid that I cannot do this right on init as you said last
+> time. What do you think about regmap_bus, can you accept that way?
 
-diff --git a/sound/soc/rockchip/rockchip_i2s.c b/sound/soc/rockchip/rockchip_i2s.c
-index acb5be5..b936102 100644
---- a/sound/soc/rockchip/rockchip_i2s.c
-+++ b/sound/soc/rockchip/rockchip_i2s.c
-@@ -483,16 +483,14 @@ static int rockchip_i2s_probe(struct platform_device *pdev)
- 		goto err_suspend;
- 	}
- 
--	ret = snd_dmaengine_pcm_register(&pdev->dev, NULL, 0);
-+	ret = devm_snd_dmaengine_pcm_register(&pdev->dev, NULL, 0);
- 	if (ret) {
- 		dev_err(&pdev->dev, "Could not register PCM\n");
--		goto err_pcm_register;
-+		return ret;
- 	}
- 
- 	return 0;
- 
--err_pcm_register:
--	snd_dmaengine_pcm_unregister(&pdev->dev);
- err_suspend:
- 	if (!pm_runtime_status_suspended(&pdev->dev))
- 		i2s_runtime_suspend(&pdev->dev);
-@@ -512,8 +510,6 @@ static int rockchip_i2s_remove(struct platform_device *pdev)
- 
- 	clk_disable_unprepare(i2s->mclk);
- 	clk_disable_unprepare(i2s->hclk);
--	snd_dmaengine_pcm_unregister(&pdev->dev);
--	snd_soc_unregister_component(&pdev->dev);
- 
- 	return 0;
- }
--- 
-1.9.1
+I don't have enough context from the above to understand what's going
+on, sorry.  Implementing a bus for something that isn't actually a Linux
+bus doesn't seem like the best idea though and in general what I'm
+seeing of the discussion sounds like you're hacking around in driver
+code to bodge around problems that are being seen rather than really
+addressing things, the code I can see certainly looks like it just wants
+to be implementing read and write operations for a single MFD.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150814/b7f823b8/attachment-0001.sig>
