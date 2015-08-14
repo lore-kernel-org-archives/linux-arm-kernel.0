@@ -1,233 +1,84 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 14 Aug 2015 15:08:19 +0100
-Subject: [PATCH v3 3/6] irqchip, gicv3: Workaround for Cavium ThunderX
- erratum 23154
-In-Reply-To: <1439558320-5777-4-git-send-email-rric@kernel.org>
-References: <1439558320-5777-1-git-send-email-rric@kernel.org>
- <1439558320-5777-4-git-send-email-rric@kernel.org>
-Message-ID: <55CDF653.6090601@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 14 Aug 2015 15:09:34 +0100
+Subject: [PATCH] ARM: keystone: add a work around to handle asynchronous
+ external abort
+In-Reply-To: <55CDF579.4050408@ti.com>
+References: <1439320409-20084-1-git-send-email-m-karicheri2@ti.com>
+ <55CDF579.4050408@ti.com>
+Message-ID: <20150814140934.GX7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/08/15 14:18, Robert Richter wrote:
-> From: Robert Richter <rrichter@cavium.com>
-> 
-> This patch implements Cavium ThunderX erratum 23154.
-> 
-> The gicv3 of ThunderX requires a modified version for reading the IAR
-> status to ensure data synchronization. Since this is in the fast-path
-> and called with each interrupt, runtime patching is used using jump
-> label patching for smallest overhead (no-op). This is the same
-> technique as used for tracepoints.
-> 
-> v3:
->  * fix erratum to be dependend from midr
->  * use arm64 errata framework
-> 
-> v2:
->  * implement code in a single asm() to keep instruction sequence
->  * added comment to the code that explains the erratum
->  * apply workaround also if running as guest, thus check MIDR
-> 
-> Signed-off-by: Robert Richter <rrichter@cavium.com>
-> ---
->  arch/arm64/Kconfig                  | 11 +++++++++
->  arch/arm64/include/asm/cpufeature.h |  3 ++-
->  arch/arm64/include/asm/cputype.h    | 18 ++++++++------
->  arch/arm64/kernel/cpu_errata.c      |  9 +++++++
->  drivers/irqchip/irq-gic-v3.c        | 49 ++++++++++++++++++++++++++++++++++++-
->  5 files changed, 81 insertions(+), 9 deletions(-)
-> 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 0f6edb14b7e4..4f866a4c6536 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -417,6 +417,17 @@ config ARM64_ERRATUM_845719
->  
->  	  If unsure, say Y.
->  
-> +config CAVIUM_ERRATUM_23154
-> +	bool "Cavium erratum 23154: Access to ICC_IAR1_EL1 is not sync'ed"
-> +	depends on ARCH_THUNDER
-> +	default y
-> +	help
-> +	  The gicv3 of ThunderX requires a modified version for
-> +	  reading the IAR status to ensure data synchronization
-> +	  (access to icc_iar1_el1 is not sync'ed before and after).
-> +
-> +	  If unsure, say Y.
-> +
->  endmenu
->  
->  
-> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-> index c1044218a63a..2a5e4c163ee5 100644
-> --- a/arch/arm64/include/asm/cpufeature.h
-> +++ b/arch/arm64/include/asm/cpufeature.h
-> @@ -25,8 +25,9 @@
->  #define ARM64_WORKAROUND_DEVICE_LOAD_ACQUIRE	1
->  #define ARM64_WORKAROUND_845719			2
->  #define ARM64_HAS_SYSREG_GIC_CPUIF		3
-> +#define ARM64_WORKAROUND_CAVIUM_23154		4
->  
-> -#define ARM64_NCAPS				4
-> +#define ARM64_NCAPS				5
->  
->  #ifndef __ASSEMBLY__
->  
-> diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
-> index a84ec605bed8..3f0c7683f252 100644
-> --- a/arch/arm64/include/asm/cputype.h
-> +++ b/arch/arm64/include/asm/cputype.h
-> @@ -62,15 +62,19 @@
->  	(0xf			<< MIDR_ARCHITECTURE_SHIFT) | \
->  	((partnum)		<< MIDR_PARTNUM_SHIFT))
->  
-> -#define ARM_CPU_IMP_ARM		0x41
-> -#define ARM_CPU_IMP_APM		0x50
-> +#define ARM_CPU_IMP_ARM			0x41
-> +#define ARM_CPU_IMP_APM			0x50
-> +#define ARM_CPU_IMP_CAVIUM		0x43
->  
-> -#define ARM_CPU_PART_AEM_V8	0xD0F
-> -#define ARM_CPU_PART_FOUNDATION	0xD00
-> -#define ARM_CPU_PART_CORTEX_A57	0xD07
-> -#define ARM_CPU_PART_CORTEX_A53	0xD03
-> +#define ARM_CPU_PART_AEM_V8		0xD0F
-> +#define ARM_CPU_PART_FOUNDATION		0xD00
-> +#define ARM_CPU_PART_CORTEX_A57		0xD07
-> +#define ARM_CPU_PART_CORTEX_A53		0xD03
-> +
-> +#define APM_CPU_PART_POTENZA		0x000
-> +
-> +#define CAVIUM_CPU_PART_THUNDERX	0x0A1
->  
-> -#define APM_CPU_PART_POTENZA	0x000
->  
->  #define ID_AA64MMFR0_BIGENDEL0_SHIFT	16
->  #define ID_AA64MMFR0_BIGENDEL0_MASK	(0xf << ID_AA64MMFR0_BIGENDEL0_SHIFT)
-> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-> index 6ffd91438560..574450c257a4 100644
-> --- a/arch/arm64/kernel/cpu_errata.c
-> +++ b/arch/arm64/kernel/cpu_errata.c
-> @@ -23,6 +23,7 @@
->  
->  #define MIDR_CORTEX_A53 MIDR_CPU_PART(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A53)
->  #define MIDR_CORTEX_A57 MIDR_CPU_PART(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A57)
-> +#define MIDR_THUNDERX	MIDR_CPU_PART(ARM_CPU_IMP_CAVIUM, CAVIUM_CPU_PART_THUNDERX)
->  
->  #define CPU_MODEL_MASK (MIDR_IMPLEMENTOR_MASK | MIDR_PARTNUM_MASK | \
->  			MIDR_ARCHITECTURE_MASK)
-> @@ -82,6 +83,14 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
->  		MIDR_RANGE(MIDR_CORTEX_A53, 0x00, 0x04),
->  	},
->  #endif
-> +#ifdef CONFIG_CAVIUM_ERRATUM_23154
-> +	{
-> +	/* Cavium ThunderX, pass 1.x */
-> +		.desc = "Cavium erratum 23154",
-> +		.capability = ARM64_WORKAROUND_CAVIUM_23154,
-> +		MIDR_RANGE(MIDR_THUNDERX, 0x00, 0x01),
-> +	},
-> +#endif
->  	{
->  	}
->  };
-> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-> index 1a91902be0b1..59a5f13f3c10 100644
-> --- a/drivers/irqchip/irq-gic-v3.c
-> +++ b/drivers/irqchip/irq-gic-v3.c
-> @@ -107,7 +107,7 @@ static void gic_redist_wait_for_rwp(void)
->  }
->  
->  /* Low level accessors */
-> -static u64 __maybe_unused gic_read_iar(void)
-> +static u64 gic_read_iar_common(void)
->  {
->  	u64 irqstat;
->  
-> @@ -115,6 +115,38 @@ static u64 __maybe_unused gic_read_iar(void)
->  	return irqstat;
->  }
->  
-> +/*
-> + * Cavium ThunderX erratum 23154
-> + *
-> + * The gicv3 of ThunderX requires a modified version for reading the
-> + * IAR status to ensure data synchronization (access to icc_iar1_el1
-> + * is not sync'ed before and after).
-> + */
-> +static u64 gic_read_iar_cavium_thunderx(void)
-> +{
-> +	u64 irqstat;
-> +
-> +	asm volatile(
-> +		"nop;nop;nop;nop\n\t"
-> +		"nop;nop;nop;nop\n\t"
-> +		"mrs_s %0, " __stringify(ICC_IAR1_EL1) "\n\t"
-> +		"nop;nop;nop;nop"
-> +		: "=r" (irqstat));
-> +	mb();
-> +
-> +	return irqstat;
-> +}
-> +
-> +struct static_key is_cavium_thunderx = STATIC_KEY_INIT_FALSE;
-> +
-> +static u64 __maybe_unused gic_read_iar(void)
-> +{
-> +	if (static_key_false(&is_cavium_thunderx))
-> +		return gic_read_iar_common();
-> +	else
-> +		return gic_read_iar_cavium_thunderx();
-> +}
-> +
->  static void __maybe_unused gic_write_pmr(u64 val)
->  {
->  	asm volatile("msr_s " __stringify(ICC_PMR_EL1) ", %0" : : "r" (val));
-> @@ -766,8 +798,23 @@ static const struct irq_domain_ops gic_irq_domain_ops = {
->  	.free = gic_irq_domain_free,
->  };
->  
-> +static void gicv3_enable_cavium_thunderx(void *data)
-> +{
-> +	static_key_slow_inc(&is_cavium_thunderx);
-> +}
-> +
->  static const struct gic_capabilities gicv3_errata[] = {
->  	{
-> +		/*
-> +		 * Need to be applied in guests too, thus use cpu
-> +		 * detection as iidr is emulated with different vendor
-> +		 * id.
-> +		 */
-> +		.desc		= "GIC: Cavium erratum 23154",
-> +		.cpu_cap	= ARM64_WORKAROUND_CAVIUM_23154,
-> +		.init		= gicv3_enable_cavium_thunderx,
-> +	},
-> +	{
->  	}
->  };
->  
-> 
+On Fri, Aug 14, 2015 at 10:04:41AM -0400, Murali Karicheri wrote:
+> On 08/11/2015 03:13 PM, Murali Karicheri wrote:
+> >Currently on some devices, an asynchronous external abort exception
+> >happens during boot up when exception handlers are enabled in kernel
+> >before switching to user space. This patch adds a workaround to handle
+> >this once during boot. Many customers are already using this
+> >with out any issues and is required to workaround the above issue.
+> >
+> >Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+> >---
+> >  arch/arm/mach-keystone/keystone.c | 26 ++++++++++++++++++++++++++
+> >  1 file changed, 26 insertions(+)
+> >
+> >diff --git a/arch/arm/mach-keystone/keystone.c b/arch/arm/mach-keystone/keystone.c
+> >index e2880105..c1d0fe5 100644
+> >--- a/arch/arm/mach-keystone/keystone.c
+> >+++ b/arch/arm/mach-keystone/keystone.c
+> >@@ -15,6 +15,7 @@
+> >  #include <linux/of_platform.h>
+> >  #include <linux/of_address.h>
+> >  #include <linux/memblock.h>
+> >+#include <linux/signal.h>
+> >
+> >  #include <asm/setup.h>
+> >  #include <asm/mach/map.h>
+> >@@ -52,6 +53,24 @@ static struct notifier_block platform_nb = {
+> >  	.notifier_call = keystone_platform_notifier,
+> >  };
+> >
+> >+static bool ignore_first = true;
+> >+static int keystone_async_ext_abort_fault(unsigned long addr, unsigned int fsr,
+> >+					  struct pt_regs *regs)
+> >+{
+> >+	/*
+> >+	 * if first time, ignore this as this is a asynchronous external abort
+> >+	 * happening only some devices that couldn't be root caused and we add
+> >+	 * this work around to handle this first time.
+> >+	 */
+> >+	if (ignore_first) {
+> >+		ignore_first = false;
+> >+		return 0;
+> >+	}
+> >+
+> >+	/* Subsequent ones should be handled as fault */
+> >+	return 1;
+> >+}
+> >+
+> >  static void __init keystone_init(void)
+> >  {
+> >  	if (PHYS_OFFSET >= KEYSTONE_HIGH_PHYS_START) {
+> >@@ -61,6 +80,13 @@ static void __init keystone_init(void)
+> >  	}
+> >  	keystone_pm_runtime_init();
+> >  	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+> >+
+> >+	/*
+> >+	 * Add a one time exception handler to catch asynchronous external
+> >+	 * abort
+> >+	 */
+> >+	hook_fault_code(17, keystone_async_ext_abort_fault, SIGBUS, 0,
+> >+			"async external abort handler");
+> >  }
+> >
+> >  static phys_addr_t keystone_virt_to_idmap(unsigned long x)
+> >
+> Can this be applied if it looks good?
 
-Robert,
+What causes the abort?  We shouldn't be adding hacks like this to the
+kernel without having the full picture...
 
-I probably didn't express myself very well, because this not what I had
-in mind, sorry...
-
-I think this is very much overdesigned for something that should be very
-simple. Why can't you have a simple:
-
-	if (cpu_have_feature(ARM64_WORKAROUND_CAVIUM_23154))
-		static_key_slow_inc(&is_cavium_thunderx);
-
-No need for a cpu_cap field, no need to special-case feature 0, and it
-keeps the code fairly readable. You can even hide it in a
-gic_enable_cpu_quirks() function.
-
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
