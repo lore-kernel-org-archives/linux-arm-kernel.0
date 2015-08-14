@@ -1,130 +1,79 @@
-From: gary.bisson@boundarydevices.com (Gary Bisson)
-Date: Fri, 14 Aug 2015 14:51:07 +0200
-Subject: [PATCH v3 2/2] ARM: dts: imx6qdl-sabrelite: add Okaya LCD panel
-In-Reply-To: <1439556667-3424-1-git-send-email-gary.bisson@boundarydevices.com>
-References: <1432314867-30888-1-git-send-email-gary.bisson@boundarydevices.com>
- <1439556667-3424-1-git-send-email-gary.bisson@boundarydevices.com>
-Message-ID: <1439556667-3424-3-git-send-email-gary.bisson@boundarydevices.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Fri, 14 Aug 2015 15:05:21 +0200
+Subject: [linux-sunxi] [RFC PATCH 0/6] mtd: nand: per-partition ECC config
+In-Reply-To: <1438264225-23796-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1438264225-23796-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <55CDE791.8030306@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for the 7" LCD display available for Sabrelite:
-http://boundarydevices.com/product/7-800x480-display/
+Hi all,
 
-Also add label to backlight_lcd and connect it to the panel.
+On 30-07-15 15:50, Boris Brezillon wrote:
+> Hello,
+>
+> It's been a year and a half since I posted my first series proposing
+> an approach to support per-partition ECC config [1].
+>
+> First of all, before describing what's done in this patch series, I'd
+> like to sum-up why this is needed, and why a generic approach is
+> preferred over a NAND controller specific one.
+> On one side we have a lot of NAND chips out there and they all have
+> their own requirements in term of ECC strength and step size. On the
+> other side, most SoCs support booting from NAND (they embed a simple
+> logic in the ROM code to access a NAND chip through their NAND
+> controller).
+> In a ideal world all NAND chips would use the ONFI or JEDEC standard
+> exposing their requirements in a standard way, and the SoC vendors
+> would put the ONFI and JEDEC detection code in their ROM code and use
+> it to properly configure their NAND controller.
+> But we're not leaving in an ideal world, and some SoC vendors have
+> decided to hardcode (or use a simplified logic) to select the ECC
+> controller config. And in the case where the NAND requirement does
+> not match the ROM code config, you only have two solutions:
+>
+> 1/ leave with the unsuitable ECC config for the whole chip
+> 2/ isolate the portion of NAND read by the ROM code into a sperate
+>     partition and use a suitable ECC config for the rest of the
+>     NAND
+>
+> IMHO the second solution is far better than the first one, but it
+> requires some adjustments in the mtdpart and NAND code layer to be
+> applicable.
+>
+> Now, why should we prefer a generic approach over a NAND controller/SoC
+> specific one ?
+> Because, this seems to be a problem faced by other people on other
+> platform than the sunxi one. Moreover, the ECC config is not the only
+> thing we'd have to tweak per partition: I'm currently working on the
+> NAND randomizer/scrambler aspect (required to support some MLC chips),
+> and this is also something the ROM code configure differently to
+> boot the first stage bootloader.
+> For all these reasons, I think providing a generic infrastructure allowing
+> specific implementation to tweak their behavior is better than hardcoding
+> it somewhere in the NAND controller driver.
+>
+> This series proposes a solution to allow such per-partition config by
+> first letting MTD implementations (or subframework) overload the MTD
+> partition functions (patches 1 and 2), and then providing the appropriate
+> modifications in the NAND layer to support per-partition ECC config
+> (patches 3 to 5).
+> The last patch is showing how a NAND controller can add support for
+> per-partition ECC config.
+>
+> Note that I tried to keep the changes as less invasive as impossible, but
+> I might have missed some aspects.
+> Any suggestions are welcome.
+>
+> Best Regards,
+>
+> Boris
 
-Signed-off-by: Gary Bisson <gary.bisson@boundarydevices.com>
----
- arch/arm/boot/dts/imx6qdl-sabrelite.dtsi | 76 +++++++++++++++++++++++++++++++-
- 1 file changed, 75 insertions(+), 1 deletion(-)
+Thanks for doing this, this series looks good to me.
 
-diff --git a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
-index ce4c731..6adbcdd 100644
---- a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
-@@ -123,7 +123,7 @@
- 		mux-ext-port = <4>;
- 	};
- 
--	backlight_lcd {
-+	backlight_lcd: backlight_lcd {
- 		compatible = "pwm-backlight";
- 		pwms = <&pwm1 0 5000000>;
- 		brightness-levels = <0 4 8 16 32 64 128 255>;
-@@ -141,6 +141,43 @@
- 		status = "okay";
- 	};
- 
-+	lcd_display: display at di0 {
-+		compatible = "fsl,imx-parallel-display";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		interface-pix-fmt = "bgr666";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_j15>;
-+		status = "okay";
-+
-+		port at 0 {
-+			reg = <0>;
-+
-+			lcd_display_in: endpoint {
-+				remote-endpoint = <&ipu1_di0_disp0>;
-+			};
-+		};
-+
-+		port at 1 {
-+			reg = <1>;
-+
-+			lcd_display_out: endpoint {
-+				remote-endpoint = <&lcd_panel_in>;
-+			};
-+		};
-+	};
-+
-+	lcd_panel {
-+		compatible = "okaya,rs800480t-7x0gp";
-+		backlight = <&backlight_lcd>;
-+
-+		port {
-+			lcd_panel_in: endpoint {
-+				remote-endpoint = <&lcd_display_out>;
-+			};
-+		};
-+	};
-+
- 	panel {
- 		compatible = "hannstar,hsd100pxn1";
- 		backlight = <&backlight_lvds>;
-@@ -348,6 +385,39 @@
- 			>;
- 		};
- 
-+		pinctrl_j15: j15grp {
-+			fsl,pins = <
-+				MX6QDL_PAD_DI0_DISP_CLK__IPU1_DI0_DISP_CLK 0x10
-+				MX6QDL_PAD_DI0_PIN15__IPU1_DI0_PIN15       0x10
-+				MX6QDL_PAD_DI0_PIN2__IPU1_DI0_PIN02        0x10
-+				MX6QDL_PAD_DI0_PIN3__IPU1_DI0_PIN03        0x10
-+				MX6QDL_PAD_DISP0_DAT0__IPU1_DISP0_DATA00   0x10
-+				MX6QDL_PAD_DISP0_DAT1__IPU1_DISP0_DATA01   0x10
-+				MX6QDL_PAD_DISP0_DAT2__IPU1_DISP0_DATA02   0x10
-+				MX6QDL_PAD_DISP0_DAT3__IPU1_DISP0_DATA03   0x10
-+				MX6QDL_PAD_DISP0_DAT4__IPU1_DISP0_DATA04   0x10
-+				MX6QDL_PAD_DISP0_DAT5__IPU1_DISP0_DATA05   0x10
-+				MX6QDL_PAD_DISP0_DAT6__IPU1_DISP0_DATA06   0x10
-+				MX6QDL_PAD_DISP0_DAT7__IPU1_DISP0_DATA07   0x10
-+				MX6QDL_PAD_DISP0_DAT8__IPU1_DISP0_DATA08   0x10
-+				MX6QDL_PAD_DISP0_DAT9__IPU1_DISP0_DATA09   0x10
-+				MX6QDL_PAD_DISP0_DAT10__IPU1_DISP0_DATA10  0x10
-+				MX6QDL_PAD_DISP0_DAT11__IPU1_DISP0_DATA11  0x10
-+				MX6QDL_PAD_DISP0_DAT12__IPU1_DISP0_DATA12  0x10
-+				MX6QDL_PAD_DISP0_DAT13__IPU1_DISP0_DATA13  0x10
-+				MX6QDL_PAD_DISP0_DAT14__IPU1_DISP0_DATA14  0x10
-+				MX6QDL_PAD_DISP0_DAT15__IPU1_DISP0_DATA15  0x10
-+				MX6QDL_PAD_DISP0_DAT16__IPU1_DISP0_DATA16  0x10
-+				MX6QDL_PAD_DISP0_DAT17__IPU1_DISP0_DATA17  0x10
-+				MX6QDL_PAD_DISP0_DAT18__IPU1_DISP0_DATA18  0x10
-+				MX6QDL_PAD_DISP0_DAT19__IPU1_DISP0_DATA19  0x10
-+				MX6QDL_PAD_DISP0_DAT20__IPU1_DISP0_DATA20  0x10
-+				MX6QDL_PAD_DISP0_DAT21__IPU1_DISP0_DATA21  0x10
-+				MX6QDL_PAD_DISP0_DAT22__IPU1_DISP0_DATA22  0x10
-+				MX6QDL_PAD_DISP0_DAT23__IPU1_DISP0_DATA23  0x10
-+			>;
-+		};
-+
- 		pinctrl_pwm1: pwm1grp {
- 			fsl,pins = <
- 				MX6QDL_PAD_SD1_DAT3__PWM1_OUT 0x1b0b1
-@@ -416,6 +486,10 @@
- 	};
- };
- 
-+&ipu1_di0_disp0 {
-+	remote-endpoint = <&lcd_display_in>;
-+};
-+
- &ldb {
- 	status = "okay";
- 
--- 
-2.4.6
+MTD maintainers, what do we need to do to get this upstream, submit
+a non RFC version ? Or ... ?
+
+Regards,
+
+Hans
