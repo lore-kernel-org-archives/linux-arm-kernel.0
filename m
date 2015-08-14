@@ -1,51 +1,39 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 14 Aug 2015 16:16:06 +0100
-Subject: commit a71b092 "ARM: Convert handle_IRQ to use
- __handle_domain_irq" breaks DNS-323
-In-Reply-To: <55CDF78F.6070001@free-electrons.com>
-References: <55CDF5C3.7080204@vollmann.ch>
- <55CDF78F.6070001@free-electrons.com>
-Message-ID: <55CE0636.3050205@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 14 Aug 2015 16:24:38 +0100
+Subject: [PATCH v4 1/3] PCI: generic: remove dependency on hw_pci
+In-Reply-To: <20150814144644.GC26431@google.com>
+References: <1438721620-15493-1-git-send-email-jchandra@broadcom.com>
+ <20150804234956.GF17327@google.com>
+ <007501d0d4ce$1d2dd9c0$57898d40$@samsung.com>
+ <20150812090449.GA22485@arm.com>
+ <20150814144644.GC26431@google.com>
+Message-ID: <20150814152438.GA24806@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/08/15 15:13, Gregory CLEMENT wrote:
-> Hi Detlef,
-> 
-> On 14/08/2015 16:05, Detlef Vollmann wrote:
->> Hello,
->>
->> this commit:
->>  > commit a71b092a9c68685a270ebdde7b5986ba8787e575
->>  > Author: Marc Zyngier <marc.zyngier@arm.com>
->>  > Date:   Tue Aug 26 11:03:18 2014 +0100
->>  >
->>  >     ARM: Convert handle_IRQ to use __handle_domain_irq
->> [...]
->> causes the kernel not to boot anymore on my DNS-323.
->> Soc: MV88F5182 Rev 2
->> CPU: ARM926 (Rev 0) running @ 500Mhz
->> CPU: Feroceon [41069260] revision 0 (ARMv5TEJ), cr=a005317f
->> Orion ID: MV88F5182-A2. TCLK=166666667.
->> DNS-323: Identified HW revision B1
->>
->> Boot stops after "Uncompressing Linux... done, booting the kernel."
->> Reverting the commit works fine for me.
->> Tested 4.1.2 and 4.2.0-rc6 with orion5x_defconfig.
-> 
-> Could you try the following patch ?
-> 
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/356501.html
+Hi Bjorn,
 
-As a side note, having to revert that patch to get your system up and
-running is a reliable indication that something is wrong with your
-interrupt mapping, and that you are using 0 as a valid interrupt number
-(which has been declared invalid a long time ago by the chief penguin).
+On Fri, Aug 14, 2015 at 03:46:44PM +0100, Bjorn Helgaas wrote:
+> On Wed, Aug 12, 2015 at 10:04:50AM +0100, Will Deacon wrote:
+> > On Wed, Aug 12, 2015 at 08:11:29AM +0100, Pavel Fedin wrote:
+> > > > I dropped the acks and tested-by because of that change, but I'll happily
+> > > > add them back if Lorenzo and Pavel confirm.  
+> > > 
+> > >  Confirm.
+> > >  Tested-by: Pavel Fedin <p.fedin@samsung.com>
+> > > 
+> > >  I also added MSI support. Can i post it as patch on top of your branch?
+> > 
+> > There shouldn't be any need with the changes queued in tip/irq/core. Can
+> > you give the following branch a go, please (it doesn't look like Bjorn's
+> > stuff is in linux-next, unfortunately)?
+> 
+> We still have a build issue (undefined reference to pci_write_msi_msg
+> in imx_v6_v7_defconfig) to resolve before putting it in linux-next.
+> Hopefully we can resolve that today.
 
-Hopefully Gregory has put you in the right direction.
+I have sent you a fix for that, please let me know if that's ok with
+you or you want me to rework it.
 
 Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Lorenzo
