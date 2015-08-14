@@ -1,67 +1,42 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Fri, 14 Aug 2015 11:40:51 -0500
-Subject: [PATCH v2 2/4] PCI: pci-host-generic: Fix lookup of
- linux,pci-probe-only property
-In-Reply-To: <1439569159-10051-3-git-send-email-marc.zyngier@arm.com>
-References: <1439569159-10051-1-git-send-email-marc.zyngier@arm.com>
- <1439569159-10051-3-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20150814164051.GF26431@google.com>
+From: horia.geanta@freescale.com (=?UTF-8?Q?Horia_Geant=c4=83?=)
+Date: Fri, 14 Aug 2015 20:06:06 +0300
+Subject: [PATCH v3] ARM: configs: Add Freescale LS1021A defconfig
+In-Reply-To: <55CB4829.40204@freescale.com>
+References: <1438941784-38403-1-git-send-email-b18965@freescale.com>
+ <55CB4829.40204@freescale.com>
+Message-ID: <55CE1FFE.2080200@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 14, 2015 at 05:19:17PM +0100, Marc Zyngier wrote:
-> When pci-host-generic looks for the probe-only property, it seems
-> to trust the DT to be correctly written, and assumes that there
-> is a parameter to the property.
+On 8/12/2015 4:20 PM, Horia Geant? wrote:
+> On 8/7/2015 1:03 PM, Alison Wang wrote:
+>> Add Freescale LS1021A initial defconfig file.
+>> The LS1021A SoC is a dual-core Cortex-A7 based processor.
+>>
+>> LS1021A has some special configure options against common V7 SOCs,
+>> such as CONFIG_THUMB2_KERNEL, CONFIG_VMSPLIT_2G, CONFIG_VFP...
+>>
+>> Enable I2C, LPUART, eDMA, WDT, GIANFAR, Sound, DSPI at default.
+>>
+>> Signed-off-by: Haikun Wang <haikun.wang@freescale.com>
+>> Signed-off-by: Alison Wang <alison.wang@freescale.com>
+>> ---
+>> Changes since v2:
+>> - Enable PSCI, as PSCI is enabled in u-boot.
+>> Changes since v1:
+>> - Enable GIANFAR, Sound and DSPI.
 > 
-> Unfortunately, this is not always the case, and some firmware expose
-> this property naked. The driver ends up making a decision based on
-> whatever the property pointer points to, which is likely to be junk.
-> 
-> Switch to the common of_pci.c implementation that doesn't suffer
-> from this problem.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  drivers/pci/host/pci-host-generic.c | 9 +--------
->  1 file changed, 1 insertion(+), 8 deletions(-)
-> 
-> diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
-> index 265dd25..545ff4e 100644
-> --- a/drivers/pci/host/pci-host-generic.c
-> +++ b/drivers/pci/host/pci-host-generic.c
-> @@ -210,7 +210,6 @@ static int gen_pci_probe(struct platform_device *pdev)
->  	int err;
->  	const char *type;
->  	const struct of_device_id *of_id;
-> -	const int *prop;
->  	struct device *dev = &pdev->dev;
->  	struct device_node *np = dev->of_node;
->  	struct gen_pci *pci = devm_kzalloc(dev, sizeof(*pci), GFP_KERNEL);
-> @@ -225,13 +224,7 @@ static int gen_pci_probe(struct platform_device *pdev)
->  		return -EINVAL;
->  	}
->  
-> -	prop = of_get_property(of_chosen, "linux,pci-probe-only", NULL);
-> -	if (prop) {
-> -		if (*prop)
-> -			pci_add_flags(PCI_PROBE_ONLY);
-> -		else
-> -			pci_clear_flags(PCI_PROBE_ONLY);
-> -	}
-> +	of_pci_check_probe_only(of_chosen);
+> Looks like CONFIG_ARCH_DMA_ADDR_T_64BIT=y is missing.
+> For e.g. CAAM (crypto engine) is a DMA device able to use 40-bit bus
+> addresses.
+> Note that ARCH_DMA_ADDR_T_64BIT does not depend / is not selected by
+> ARM_LPAE.
 
-Do we need support for pci-probe-only in pci-host-generic at all?
-You're removing the use in amd-overdrive.dts, and there are no other
-DTs in the kernel tree that mention it.
+Another thing:
+Commit 385c0fb0e2c4 ("ARM: imx_v6_v7_defconfig: Select LS1021A") added
+CONFIG_SOC_LS1021A in imx_v6_v7_defconfig.
 
-If we can live without it, that would be nice.  It seems like a relic from
-days when we couldn't reliably assign resources.  (I'm not saying we can do
-that reliably even today, but I'd rather make it reliable than turn it
-off.)
+Besides this, booting a LS1021 AQDS board (Rev2) using
+imx_v6_v7_defconfig did not work (stuck at "Starting kernel").
 
->  	of_id = of_match_node(gen_pci_of_match, np);
->  	pci->cfg.ops = of_id->data;
-> -- 
-> 2.1.4
-> 
+Horia
