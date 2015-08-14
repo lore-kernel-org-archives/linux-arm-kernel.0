@@ -1,42 +1,53 @@
-From: horia.geanta@freescale.com (=?UTF-8?Q?Horia_Geant=c4=83?=)
-Date: Fri, 14 Aug 2015 20:06:06 +0300
-Subject: [PATCH v3] ARM: configs: Add Freescale LS1021A defconfig
-In-Reply-To: <55CB4829.40204@freescale.com>
-References: <1438941784-38403-1-git-send-email-b18965@freescale.com>
- <55CB4829.40204@freescale.com>
-Message-ID: <55CE1FFE.2080200@freescale.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Fri, 14 Aug 2015 19:04:16 +0200
+Subject: [RFT PATCH] arm: am200epdkit_defconfig: convert to use libata PATA
+ drivers
+Message-ID: <1439571876-13758-1-git-send-email-b.zolnierkie@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/12/2015 4:20 PM, Horia Geant? wrote:
-> On 8/7/2015 1:03 PM, Alison Wang wrote:
->> Add Freescale LS1021A initial defconfig file.
->> The LS1021A SoC is a dual-core Cortex-A7 based processor.
->>
->> LS1021A has some special configure options against common V7 SOCs,
->> such as CONFIG_THUMB2_KERNEL, CONFIG_VMSPLIT_2G, CONFIG_VFP...
->>
->> Enable I2C, LPUART, eDMA, WDT, GIANFAR, Sound, DSPI at default.
->>
->> Signed-off-by: Haikun Wang <haikun.wang@freescale.com>
->> Signed-off-by: Alison Wang <alison.wang@freescale.com>
->> ---
->> Changes since v2:
->> - Enable PSCI, as PSCI is enabled in u-boot.
->> Changes since v1:
->> - Enable GIANFAR, Sound and DSPI.
-> 
-> Looks like CONFIG_ARCH_DMA_ADDR_T_64BIT=y is missing.
-> For e.g. CAAM (crypto engine) is a DMA device able to use 40-bit bus
-> addresses.
-> Note that ARCH_DMA_ADDR_T_64BIT does not depend / is not selected by
-> ARM_LPAE.
+IDE subsystem has been deprecated since 2009 and the majority
+(if not all) of Linux distributions have switched to use
+libata for ATA support exclusively.  However there are still
+some users (mostly old or/and embedded non-x86 systems) that
+have not converted from using IDE subsystem to libata PATA
+drivers.  This doesn't seem to be good thing in the long-term
+for Linux as while there is less and less PATA systems left
+in use:
 
-Another thing:
-Commit 385c0fb0e2c4 ("ARM: imx_v6_v7_defconfig: Select LS1021A") added
-CONFIG_SOC_LS1021A in imx_v6_v7_defconfig.
+* testing efforts are divided between two subsystems
 
-Besides this, booting a LS1021 AQDS board (Rev2) using
-imx_v6_v7_defconfig did not work (stuck at "Starting kernel").
+* having duplicate drivers for same hardware confuses users
 
-Horia
+This patch converts am200epdkit_defconfig to use libata PATA
+drivers.
+
+Cc: Daniel Mack <daniel@zonque.org>
+Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
+Cc: Robert Jarzmik <robert.jarzmik@free.fr>
+Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+---
+Build tested only.
+If you have affected hardware please test.  Thank you.
+
+ arch/arm/configs/am200epdkit_defconfig | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/configs/am200epdkit_defconfig b/arch/arm/configs/am200epdkit_defconfig
+index f0dea52..113a5d8 100644
+--- a/arch/arm/configs/am200epdkit_defconfig
++++ b/arch/arm/configs/am200epdkit_defconfig
+@@ -55,8 +55,9 @@ CONFIG_MTD_CFI_INTELEXT=y
+ CONFIG_MTD_COMPLEX_MAPPINGS=y
+ CONFIG_MTD_PXA2XX=y
+ CONFIG_BLK_DEV_LOOP=m
+-CONFIG_IDE=m
+-CONFIG_BLK_DEV_IDECS=m
++CONFIG_BLK_DEV_SD=m
++CONFIG_ATA=m
++CONFIG_PATA_PCMCIA=m
+ CONFIG_NETDEVICES=y
+ CONFIG_NET_ETHERNET=y
+ CONFIG_SMC91X=m
+-- 
+1.9.1
