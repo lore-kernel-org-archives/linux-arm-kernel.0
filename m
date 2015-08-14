@@ -1,29 +1,31 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 13 Aug 2015 16:57:50 -0700
-Subject: [PATCH 2/3] ARM: qcom: add SMEM device node to IPQ806x dts
-In-Reply-To: <1439501620-24073-3-git-send-email-mathieu@codeaurora.org>
-References: <1439501620-24073-1-git-send-email-mathieu@codeaurora.org>
- <1439501620-24073-3-git-send-email-mathieu@codeaurora.org>
-Message-ID: <55CD2EFE.8040606@codeaurora.org>
+From: davem@davemloft.net (David Miller)
+Date: Thu, 13 Aug 2015 17:00:15 -0700 (PDT)
+Subject: [PATCH 0/2] Enable smsc911x for use with ACPI
+In-Reply-To: <1439417187-21411-1-git-send-email-jeremy.linton@arm.com>
+References: <1439417187-21411-1-git-send-email-jeremy.linton@arm.com>
+Message-ID: <20150813.170015.1983400219932580352.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/13/2015 02:33 PM, Mathieu Olivari wrote:
-> @@ -79,6 +79,15 @@
->   
->   			#hwlock-cells = <1>;
->   		};
-> +
-> +		smem {
-> +			compatible = "qcom,smem";
-> +
-> +			memory-region = <&smem>;
-> +			reg = <0x41000000 0x4000>;
+From: Jeremy Linton <jeremy.linton@arm.com>
+Date: Wed, 12 Aug 2015 17:06:25 -0500
 
-Does this reg property do something? I thought we were supposed to leave 
-this out when not using the rpm msg ram. Also, if there's no reg, it 
-should be at the root /.
+> This set of patches enables the front Ethernet port on the
+> ARM Juno development platform when used with an ACPI enabled kernel.
+> 
+> These patches covert the of_property* calls in the driver to the
+> DT/ACPI agnostic device_property* calls, and add the arm hardware
+> id to the acpi_match_table.
+> 
+> To support the above changes I copied a couple routines from
+> of_net into the properties.c file, and modified them to
+> be ACPI/DT agnostic. I'm not 100% sure this is the correct location
+> for these functions. But I think they are required to avoid having
+> a dozen different implementations scattered across assorted Ethernet
+> adapters that are being enabled to use ACPI properties.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+I realize that there are still some rinkles to work out, but I applied
+this patch series as-is to net-next, and any fixups should be
+submitted as followups.
+
+Thanks.
