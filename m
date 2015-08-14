@@ -1,95 +1,203 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Fri, 14 Aug 2015 16:33:52 +0800
-Subject: [RFC PATCH v5 0/9] Add external dma support for Synopsys MSHC
-Message-ID: <1439541232-30100-1-git-send-email-shawn.lin@rock-chips.com>
+From: maoguang.meng@mediatek.com (maoguang.meng at mediatek.com)
+Date: Fri, 14 Aug 2015 16:38:06 +0800
+Subject: [PATCH v4] pinctrl: mediatek: Implement wake handler and suspend
+ resume
+Message-ID: <1439541486-22203-1-git-send-email-maoguang.meng@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Maoguang Meng <maoguang.meng@mediatek.com>
 
-Synopsys DesignWare mobile storage host controller supports three
-types of transfer mode: pio, internal dma and external dma. However,
-dw_mmc can only supports pio and internal dma now. Thus some platforms
-using dw-mshc integrated with generic dma can't work in dma mode. So we
-submit this patch to achieve it.
+This patch implement irq_set_wake to get who is wakeup source and
+setup on suspend resume.
 
-And the config option, CONFIG_MMC_DW_IDMAC, was added by Will Newton
-(commit:f95f3850) for the first version of dw_mmc and never be touched since
-then. At that time dt-bindings hadn't been introduced into dw_mmc yet means
-we should select CONFIG_MMC_DW_IDMAC to enable internal dma mode at compile
-time. Nowadays, device-tree helps us to support a variety of boards with one
-kernel. That's why we need to remove it and decide the transfer mode by reading
-dw_mmc's HCON reg at runtime.
+Signed-off-by: Maoguang Meng <maoguang.meng@mediatek.com>
 
-This RFC patch needs lots of ACKs. I know it's hard, but it does need someone
-to make the running.
+---
+changes since v3:
+-add a comment in mtk_eint_chip_read_mask.
+-delete ALIGN when allocate eint_offsets.ports.
+-fix unrelated change.
 
-Patch does the following things:
-- remove CONFIG_MMC_DW_IDMAC config option
-- add bindings for edmac used by synopsys-dw-mshc
-  at runtime
-- add edmac support for synopsys-dw-mshc
+changes since v2:
+-modify irq_wake to handle irq wakeup source.
+-allocate two buffers separately.
+-fix some codestyle.
 
-Patch v1~v4 is based on next of git://git.linaro.org/people/ulf.hansson/mmc
-Patch v5 is rebased on dw-mmc-for-ulf-v4.2 of https://github.com/jh80chung/dw-mmc.git
+Changes since v1:
+-implement irq_wake handler.
+---
 
+ drivers/pinctrl/mediatek/pinctrl-mt8173.c     |  1 +
+ drivers/pinctrl/mediatek/pinctrl-mtk-common.c | 91 ++++++++++++++++++++++++++-
+ drivers/pinctrl/mediatek/pinctrl-mtk-common.h |  4 ++
+ 3 files changed, 95 insertions(+), 1 deletion(-)
 
-Changes in v5:
-- add the title of cover letter
-- fix typo of comment
-- add macro for reading HCON register
-- add "Acked-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>" for exynos_defconfig patch
-- add "Acked-by: Vineet Gupta <vgupta@synopsys.com>" for axs10x_defconfig patch
-- add "Acked-by: Govindraj Raja <govindraj.raja@imgtec.com>" and
-  "Acked-by: Ralf Baechle <ralf@linux-mips.org>" for pistachio_defconfig patch
-- add "Acked-by: Joachim Eastwood <manabian@gmail.com>" for lpc18xx_defconfig patch
-- add "Acked-by: Wei Xu <xuwei5@hisilicon.com>" for hisi_defconfig patch
-- rebase on "https://github.com/jh80chung/dw-mmc.git tags/dw-mmc-for-ulf-v4.2" for merging easily
-
-Changes in v4:
-- remove "host->trans_mode" and use "host->use_dma" to indicate
-  transfer mode.
-- remove all bt-bindings' changes since we don't need new properities.
-- check transfer mode at runtime by reading HCON reg
-- spilt defconfig changes for each sub-architecture
-- fix the title of cover letter
-- reuse some code for reducing code size
-
-Changes in v3:
-- choose transfer mode at runtime
-- remove all CONFIG_MMC_DW_IDMAC config option
-- add supports-idmac property for some platforms
-
-Changes in v2:
-- Fix typo of dev_info msg
-- remove unused dmach from declaration of dw_mci_dma_slave
-
-Shawn Lin (9):
-  mmc: dw_mmc: Add external dma interface support
-  Documentation: synopsys-dw-mshc: add bindings for idmac and edmac
-  mips: pistachio_defconfig: remove CONFIG_MMC_DW_IDMAC
-  arc: axs10x_defconfig: remove CONFIG_MMC_DW_IDMAC
-  arm: exynos_defconfig: remove CONFIG_MMC_DW_IDMAC
-  arm: hisi_defconfig: remove CONFIG_MMC_DW_IDMAC
-  arm: lpc18xx_defconfig: remove CONFIG_MMC_DW_IDMAC
-  arm: multi_v7_defconfig: remove CONFIG_MMC_DW_IDMAC
-  arm: zx_defconfig: remove CONFIG_MMC_DW_IDMAC
-
- .../devicetree/bindings/mmc/synopsys-dw-mshc.txt   |  25 +++
- arch/arc/configs/axs101_defconfig                  |   1 -
- arch/arc/configs/axs103_defconfig                  |   1 -
- arch/arc/configs/axs103_smp_defconfig              |   1 -
- arch/arm/configs/exynos_defconfig                  |   1 -
- arch/arm/configs/hisi_defconfig                    |   1 -
- arch/arm/configs/lpc18xx_defconfig                 |   1 -
- arch/arm/configs/multi_v7_defconfig                |   1 -
- arch/arm/configs/zx_defconfig                      |   1 -
- arch/mips/configs/pistachio_defconfig              |   1 -
- drivers/mmc/host/Kconfig                           |  11 +-
- drivers/mmc/host/dw_mmc-pltfm.c                    |   2 +
- drivers/mmc/host/dw_mmc.c                          | 209 ++++++++++++++++++---
- drivers/mmc/host/dw_mmc.h                          |   5 +
- include/linux/mmc/dw_mmc.h                         |  27 ++-
- 15 files changed, 235 insertions(+), 53 deletions(-)
-
+diff --git a/drivers/pinctrl/mediatek/pinctrl-mt8173.c b/drivers/pinctrl/mediatek/pinctrl-mt8173.c
+index d0c811d..ad27184 100644
+--- a/drivers/pinctrl/mediatek/pinctrl-mt8173.c
++++ b/drivers/pinctrl/mediatek/pinctrl-mt8173.c
+@@ -385,6 +385,7 @@ static struct platform_driver mtk_pinctrl_driver = {
+ 	.driver = {
+ 		.name = "mediatek-mt8173-pinctrl",
+ 		.of_match_table = mt8173_pctrl_match,
++		.pm = &mtk_eint_pm_ops,
+ 	},
+ };
+ 
+diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+index ad1ea16..fe34ce9 100644
+--- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
++++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+@@ -33,6 +33,7 @@
+ #include <linux/mfd/syscon.h>
+ #include <linux/delay.h>
+ #include <linux/interrupt.h>
++#include <linux/pm.h>
+ #include <dt-bindings/pinctrl/mt65xx.h>
+ 
+ #include "../core.h"
+@@ -1062,6 +1063,77 @@ static int mtk_eint_set_type(struct irq_data *d,
+ 	return 0;
+ }
+ 
++static int mtk_eint_irq_set_wake(struct irq_data *d, unsigned int on)
++{
++	struct mtk_pinctrl *pctl = irq_data_get_irq_chip_data(d);
++	int shift = d->hwirq & 0x1f;
++	int reg = d->hwirq >> 5;
++
++	if (on)
++		pctl->wake_mask[reg] |= BIT(shift);
++	else
++		pctl->wake_mask[reg] &= ~BIT(shift);
++
++	return 0;
++}
++
++static void mtk_eint_chip_write_mask(const struct mtk_eint_offsets *chip,
++		void __iomem *eint_reg_base, u32 *buf)
++{
++	int port;
++	void __iomem *reg;
++
++	for (port = 0; port < chip->ports; port++) {
++		reg = eint_reg_base + (port << 2);
++		writel_relaxed(~buf[port], reg + chip->mask_set);
++		writel_relaxed(buf[port], reg + chip->mask_clr);
++	}
++}
++
++static void mtk_eint_chip_read_mask(const struct mtk_eint_offsets *chip,
++		void __iomem *eint_reg_base, u32 *buf)
++{
++	int port;
++	void __iomem *reg;
++
++	for (port = 0; port < chip->ports; port++) {
++		reg = eint_reg_base + chip->mask + (port << 2);
++		buf[port] = ~readl_relaxed(reg);
++		/* Mask is 0 when irq is enabled, and 1 when disabled. */
++	}
++}
++
++static int mtk_eint_suspend(struct device *device)
++{
++	void __iomem *reg;
++	struct mtk_pinctrl *pctl = dev_get_drvdata(device);
++	const struct mtk_eint_offsets *eint_offsets =
++			&pctl->devdata->eint_offsets;
++
++	reg = pctl->eint_reg_base;
++	mtk_eint_chip_read_mask(eint_offsets, reg, pctl->cur_mask);
++	mtk_eint_chip_write_mask(eint_offsets, reg, pctl->wake_mask);
++
++	return 0;
++}
++
++static int mtk_eint_resume(struct device *device)
++{
++	struct mtk_pinctrl *pctl = dev_get_drvdata(device);
++	const struct mtk_eint_offsets *eint_offsets =
++			&pctl->devdata->eint_offsets;
++
++	mtk_eint_chip_write_mask(eint_offsets,
++			pctl->eint_reg_base, pctl->cur_mask);
++
++	return 0;
++}
++
++const struct dev_pm_ops mtk_eint_pm_ops = {
++	.suspend = mtk_eint_suspend,
++	.resume = mtk_eint_resume,
++};
++
+ static void mtk_eint_ack(struct irq_data *d)
+ {
+ 	struct mtk_pinctrl *pctl = irq_data_get_irq_chip_data(d);
+@@ -1076,10 +1148,12 @@ static void mtk_eint_ack(struct irq_data *d)
+ 
+ static struct irq_chip mtk_pinctrl_irq_chip = {
+ 	.name = "mt-eint",
++	.irq_disable = mtk_eint_mask,
+ 	.irq_mask = mtk_eint_mask,
+ 	.irq_unmask = mtk_eint_unmask,
+ 	.irq_ack = mtk_eint_ack,
+ 	.irq_set_type = mtk_eint_set_type,
++	.irq_set_wake = mtk_eint_irq_set_wake,
+ 	.irq_request_resources = mtk_pinctrl_irq_request_resources,
+ 	.irq_release_resources = mtk_pinctrl_irq_release_resources,
+ };
+@@ -1217,7 +1291,7 @@ int mtk_pctrl_init(struct platform_device *pdev,
+ 	struct device_node *np = pdev->dev.of_node, *node;
+ 	struct property *prop;
+ 	struct resource *res;
+-	int i, ret, irq;
++	int i, ret, irq, ports_buf;
+ 
+ 	pctl = devm_kzalloc(&pdev->dev, sizeof(*pctl), GFP_KERNEL);
+ 	if (!pctl)
+@@ -1319,6 +1393,21 @@ int mtk_pctrl_init(struct platform_device *pdev,
+ 		goto chip_error;
+ 	}
+ 
++	ports_buf = pctl->devdata->eint_offsets.ports;
++	pctl->wake_mask = devm_kcalloc(&pdev->dev, ports_buf,
++					sizeof(*pctl->wake_mask), GFP_KERNEL);
++	if (!pctl->wake_mask) {
++		ret = -ENOMEM;
++		goto chip_error;
++	}
++
++	pctl->cur_mask = devm_kcalloc(&pdev->dev, ports_buf,
++					sizeof(*pctl->cur_mask), GFP_KERNEL);
++	if (!pctl->cur_mask) {
++		ret = -ENOMEM;
++		goto chip_error;
++	}
++
+ 	pctl->eint_dual_edges = devm_kcalloc(&pdev->dev, pctl->devdata->ap_num,
+ 					     sizeof(int), GFP_KERNEL);
+ 	if (!pctl->eint_dual_edges) {
+diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.h b/drivers/pinctrl/mediatek/pinctrl-mtk-common.h
+index 30213e5..f1be8e8 100644
+--- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.h
++++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.h
+@@ -266,6 +266,8 @@ struct mtk_pinctrl {
+ 	void __iomem		*eint_reg_base;
+ 	struct irq_domain	*domain;
+ 	int			*eint_dual_edges;
++	u32 *wake_mask;
++	u32 *cur_mask;
+ };
+ 
+ int mtk_pctrl_init(struct platform_device *pdev,
+@@ -281,4 +283,6 @@ int mtk_pconf_spec_set_ies_smt_range(struct regmap *regmap,
+ 		const struct mtk_pin_ies_smt_set *ies_smt_infos, unsigned int info_num,
+ 		unsigned int pin, unsigned char align, int value);
+ 
++extern const struct dev_pm_ops mtk_eint_pm_ops;
++
+ #endif /* __PINCTRL_MTK_COMMON_H */
 -- 
-2.3.7
+1.8.1.1.dirty
