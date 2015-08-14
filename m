@@ -1,71 +1,28 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 14 Aug 2015 21:33:11 +0800
-Subject: CLK_IGNORE_UNUSE looks buggy
-In-Reply-To: <CAGsJ_4wxVL9sFWkc9dnZsAA++MfFJ1KXoq481wPLoQ-HaDRFEA@mail.gmail.com>
-References: <CAGsJ_4wxVL9sFWkc9dnZsAA++MfFJ1KXoq481wPLoQ-HaDRFEA@mail.gmail.com>
-Message-ID: <CAGb2v661-dzXHpa4Vt7fPXONRgPvWuOmBixUKg=wRj6Se5--VQ@mail.gmail.com>
+From: p.fedin@samsung.com (Pavel Fedin)
+Date: Fri, 14 Aug 2015 16:44:24 +0300
+Subject: [PATCH v4 1/3] PCI: generic: remove dependency on hw_pci
+In-Reply-To: <20150812090449.GA22485@arm.com>
+References: <1438721620-15493-1-git-send-email-jchandra@broadcom.com>
+ <20150804234956.GF17327@google.com>
+ <007501d0d4ce$1d2dd9c0$57898d40$@samsung.com> <20150812090449.GA22485@arm.com>
+Message-ID: <019001d0d697$55a5cf40$00f16dc0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 14, 2015 at 4:43 PM, Barry Song <21cnbao@gmail.com> wrote:
-> hi Stephen, Michael,
->
-> currently we can set a CLK_IGNORE_UNUSE flag to  a clock to stop
-> clk_disable_unused()  from disabling it at the boot stage:
->
-> static void clk_disable_unused_subtree(struct clk_core *core)
-> {
-> ...
-> if (core->flags & CLK_IGNORE_UNUSED)
-> goto unlock_out;
->
-> ...
-> }
->
-> static int clk_disable_unused(void)
-> {
-> ...
-> clk_unprepare_unused_subtree(core);
-> ...
->
-> return 0;
-> }
-> late_initcall_sync(clk_disable_unused);
->
-> so if there are two clocks A and B, A is the parent of B, and A is
-> marked as CLK_IGNORE_UNUSED.
->
-> in boot stage if there is nobody using A and B, Linux will disable B
-> due to clk_disable_unused() , but keep A being enabled since A has
-> CLK_IGNORE_UNUSED.
->
-> but in Linux runtime, we might frequently disable /enable B in runtime
-> power management, this will cause A disabled since Linux will not
-> check CLK_IGNORE_UNUSED for runtime disabling clk .
->
-> so this makes CLK_IGNORE_UNUSE only work if we don't disable its
-> sub-clock at runtime. this looks making no sense.
->
-> i am thinking whether we should do some changes to make it have side
-> affect for runtime clk disable. otherwise, why do we want to stop it
-> from being disabled during boot stage?
->
-> I am not sure whether i missed something in clk core level support.
+ Hello!
 
-CLK_IGNORE_UNUSED is not really a safe or proper mechanism to
-protect critical clocks from being disabled. Quite a few people
-have noticed this.
+> >  I also added MSI support. Can i post it as patch on top of your branch?
+> 
+> There shouldn't be any need with the changes queued in tip/irq/core. Can
+> you give the following branch a go, please (it doesn't look like Bjorn's
+> stuff is in linux-next, unfortunately)?
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git devel
 
-People are using their own "critical clocks" implementations.
-Sunxi uses a list of clocks the clock driver is supposed to get
-and enable. Newer clock providers directly enable the clock
-after registering it.
+ I have checked, they already implemented generic handling for "msi-parent" property in the device
+tree, and MSI works out of the box.
 
-Both Lee Jones [1] and Mike [2] have posted patches to move the
-critical clock preservation mechanism into the clock core.
-
-[1] https://lkml.org/lkml/2015/7/22/311
-[2] http://www.spinics.net/lists/kernel/msg2052297.html
-
-
-ChenYu
+Kind regards,
+Pavel Fedin
+Expert Engineer
+Samsung Electronics Research center Russia
