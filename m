@@ -1,53 +1,96 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 14 Aug 2015 09:24:49 +0200
-Subject: [PATCH 2/9] PM / Domains: Remove dev->driver check for runtime PM
-In-Reply-To: <7hwpwylepx.fsf@deeprootsystems.com>
-References: <1438731339-58317-1-git-send-email-lina.iyer@linaro.org>
- <1438731339-58317-3-git-send-email-lina.iyer@linaro.org>
- <7hfv3onv5c.fsf@deeprootsystems.com>
- <CAMuHMdVeffa-jgXuSjDQBKTrhgW-d87OKzs1iXX+4y-9U_AJbg@mail.gmail.com>
- <7hwpwylepx.fsf@deeprootsystems.com>
-Message-ID: <CAMuHMdW-T9rUWXsQeffwtXspHbjfGqo_0G4QMB1o0TwTLJAQAg@mail.gmail.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Fri, 14 Aug 2015 13:09:13 +0530
+Subject: [PATCH v2 3/6] mailbox: Add support for ST's Mailbox IP
+In-Reply-To: <20150814063343.GI8782@x1>
+References: <1437990272-23111-1-git-send-email-lee.jones@linaro.org>
+ <1437990272-23111-4-git-send-email-lee.jones@linaro.org>
+ <CABb+yY3NTHLx2N-sUABjxQW=MUCntdUg1d8kjvjH0dkb4n9EgA@mail.gmail.com>
+ <20150814063343.GI8782@x1>
+Message-ID: <CABb+yY07A=jWvDgbPMpDdT=WPhwSzLumMGiJSB4NddTA4z7Hww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
-
-On Fri, Aug 14, 2015 at 5:40 AM, Kevin Hilman <khilman@kernel.org> wrote:
-> Geert Uytterhoeven <geert@linux-m68k.org> writes:
->> On Wed, Aug 12, 2015 at 9:50 PM, Kevin Hilman <khilman@kernel.org> wrote:
->>> This check might have made sense before PM domains, but with PM domains,
->>> it's entirely possible to have a simple device without a driver and the
->>> PM domain handles all the necesary PM, so I think this check
->>> could/should be removed.
->>>
->>> Thoughts?
+On Fri, Aug 14, 2015 at 12:03 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> On Thu, 13 Aug 2015, Jassi Brar wrote:
+>> On Mon, Jul 27, 2015 at 3:14 PM, Lee Jones <lee.jones@linaro.org> wrote:
 >>
->> Simple devices without a driver aren't handled automatically.
->> At minimum, the driver should call pm_runtime_enable(), cfr.
->> drivers/bus/simple-pm-bus.c.
+>> > +
+>> > +static bool sti_mbox_tx_is_ready(struct mbox_chan *chan)
+>> > +{
+>> > +       struct sti_channel *chan_info = chan->con_priv;
+>> > +       struct sti_mbox_device *mdev = chan_info->mdev;
+>> > +       unsigned int instance = chan_info->instance;
+>> > +       unsigned int channel = chan_info->channel;
+>> > +       void __iomem *base = MBOX_BASE(mdev, instance);
+>> > +
+>> > +       if (!(chan_info->direction & MBOX_TX))
+>> > +               return false;
+>> >
+>> Here the 'direction' is gotten via DT node of the client i.e, you
+>> expect consumer drivers to tell the provider what its limitations are?
+>>
+>> IMO if some physical channel can't do TX then that should be either
+>> hardcoded inside the controller driver or learnt via DT node of the
+>> _controller_.
 >
-> That's correct, and in the proof-of-concept stuff I hacked up and in
-> Lina's series, the CPU "devices" do indeed to this.  Without that, they
-> wouldn't end up ever taking this codepath through genpd's
-> runtime_suspend and power_off hooks.
+> That's a fair point.
+.
+
+>  I need to create a new property similar to the
+> already existing 'read-only'.  I guess 'tx-only' is equivalent.
 >
-> Also, I'm not sure if your comment was meant to be an objection to the
-> patch?  or if you're OK with it.
+Just to be clear, if you must have such a property it should come from
+the _controller_ node.
 
-My comment was purely meant as a response to "it's entirely possible to have a
-simple device without a driver and the PM domain handles all the necesary PM".
+However at one point you said,  "Only the A9 (Mbox 0) can Rx."
+  Which sounds like the 'simplex' constraint is not coming from the
+mailbox controller but from the remote endpoints that don't RX+TX
+except for one of them. That makes more sense than a controller with
+differently capable physical channels. If that is indeed the
+situation, then the controller is actually 'duplex' and there should
+be no tx-only/rx-only property anywhere. Everything automatically
+falls into place because client drivers are written for specific
+targets and, unless you write some code, there can be no TX call to a
+remote that doesn't listen.
 
-I have no objections to the patch (read: I'm not sufficiently familiar with
-the code to make educated guesses about the side effects of this change ;-).
+>> > +
+>> > +       for (i = 0; i < mbox->num_chans; i++) {
+>> > +               chan_info = mbox->chans[i].con_priv;
+>> > +
+>> > +               /* Is requested channel free? */
+>> > +               if (direction != MBOX_LOOPBACK &&
+>> >
+>> Consider this example when 2 clients ask for same physical channel but
+>> in different modes.
+>>            mboxes = <&mboxA 0 1 MBOX_TX>;
+>>            mboxes = <&mboxA 0 1 MBOX_LOOPBACK>;
+>>
+>> You happily assign 2 virtual channels backed by one physical channel
+>> {mboxA, 0, 1}. The 2 clients think they can freely do startup(),
+>> shutdown() and send_data() on the channels. But obviously we are
+>> screwed with races like
+>>    client1.startup()
+>>     -> client2.startup()
+>>         -> client2.send_data()
+>>             -> client2.shutdown()
+>>                 -> client1.send_data()  XXXX
+>
+> Good catch and a fair point.  As you say, it's unlikely to happen, but
+> I would like to prevent it in any case.
+>
+No, such races are a practical problem. We must own them.
 
-Gr{oetje,eeting}s,
+I was talking about problems that arise because someone wrote bad
+DT... those are not 'practical' problems because there are too many
+ways to screw up with bad DT properties that if we try to check for
+them we'll go insane.
 
-                        Geert
+>>  Now you can shove in some more checks to 'fix' the race OR you can
+>> simply expose only physical channels.
+>
+> We can't expose all of the channels.  There are too many and would
+> take up too much *unused* memory.
+>
+I am aware of that. I said expose _only_ physical channels, not _all_ :)
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Cheers!
