@@ -1,43 +1,53 @@
-From: lho@apm.com (Loc Ho)
-Date: Fri, 14 Aug 2015 00:46:09 -0600
-Subject: [PATCH v4 4/4] arm64: Add L3/SoC DT subnodes to the APM X-Gene SoC
- EDAC node
-In-Reply-To: <1439534769-22811-4-git-send-email-lho@apm.com>
-References: <1439534769-22811-1-git-send-email-lho@apm.com>
- <1439534769-22811-2-git-send-email-lho@apm.com>
- <1439534769-22811-3-git-send-email-lho@apm.com>
- <1439534769-22811-4-git-send-email-lho@apm.com>
-Message-ID: <1439534769-22811-5-git-send-email-lho@apm.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 14 Aug 2015 09:24:49 +0200
+Subject: [PATCH 2/9] PM / Domains: Remove dev->driver check for runtime PM
+In-Reply-To: <7hwpwylepx.fsf@deeprootsystems.com>
+References: <1438731339-58317-1-git-send-email-lina.iyer@linaro.org>
+ <1438731339-58317-3-git-send-email-lina.iyer@linaro.org>
+ <7hfv3onv5c.fsf@deeprootsystems.com>
+ <CAMuHMdVeffa-jgXuSjDQBKTrhgW-d87OKzs1iXX+4y-9U_AJbg@mail.gmail.com>
+ <7hwpwylepx.fsf@deeprootsystems.com>
+Message-ID: <CAMuHMdW-T9rUWXsQeffwtXspHbjfGqo_0G4QMB1o0TwTLJAQAg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds L3/SoC DT subnodes to the APM X-Gene SoC EDAC node.
+Hi Kevin,
 
-Signed-off-by: Loc Ho <lho@apm.com>
----
- arch/arm64/boot/dts/apm/apm-storm.dtsi |   10 ++++++++++
- 1 files changed, 10 insertions(+), 0 deletions(-)
+On Fri, Aug 14, 2015 at 5:40 AM, Kevin Hilman <khilman@kernel.org> wrote:
+> Geert Uytterhoeven <geert@linux-m68k.org> writes:
+>> On Wed, Aug 12, 2015 at 9:50 PM, Kevin Hilman <khilman@kernel.org> wrote:
+>>> This check might have made sense before PM domains, but with PM domains,
+>>> it's entirely possible to have a simple device without a driver and the
+>>> PM domain handles all the necesary PM, so I think this check
+>>> could/should be removed.
+>>>
+>>> Thoughts?
+>>
+>> Simple devices without a driver aren't handled automatically.
+>> At minimum, the driver should call pm_runtime_enable(), cfr.
+>> drivers/bus/simple-pm-bus.c.
+>
+> That's correct, and in the proof-of-concept stuff I hacked up and in
+> Lina's series, the CPU "devices" do indeed to this.  Without that, they
+> wouldn't end up ever taking this codepath through genpd's
+> runtime_suspend and power_off hooks.
+>
+> Also, I'm not sure if your comment was meant to be an objection to the
+> patch?  or if you're OK with it.
 
-diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-index 58093ed..8ab6b0e 100644
---- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
-+++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-@@ -477,6 +477,16 @@
- 				reg = <0x0 0x7c600000 0x0 0x200000>;
- 				pmd-controller = <3>;
- 			};
-+
-+			edacl3 at 7e600000 {
-+				compatible = "apm,xgene-edac-l3";
-+				reg = <0x0 0x7e600000 0x0 0x1000>;
-+			};
-+
-+			edacsoc at 7e930000 {
-+				compatible = "apm,xgene-edac-soc-v1";
-+				reg = <0x0 0x7e930000 0x0 0x1000>;
-+			};
- 		};
- 
- 		pcie0: pcie at 1f2b0000 {
--- 
-1.7.1
+My comment was purely meant as a response to "it's entirely possible to have a
+simple device without a driver and the PM domain handles all the necesary PM".
+
+I have no objections to the patch (read: I'm not sufficiently familiar with
+the code to make educated guesses about the side effects of this change ;-).
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
