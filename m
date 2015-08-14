@@ -1,190 +1,126 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 14 Aug 2015 15:30:01 +0100
-Subject: [PATCH] ARM: dma-mapping: Don't use outer_flush_range when the
- L2C is coherent
-In-Reply-To: <55CDE3F6.7050401@free-electrons.com>
-References: <1439474365-12058-1-git-send-email-gregory.clement@free-electrons.com>
- <20150813151603.GB4602@e104818-lin.cambridge.arm.com>
- <55CDE3F6.7050401@free-electrons.com>
-Message-ID: <20150814143000.GF16368@e104818-lin.cambridge.arm.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Fri, 14 Aug 2015 16:20:59 +0200
+Subject: [PATCH] ARM: keystone: add a work around to handle asynchronous
+ external abort
+In-Reply-To: <20150814140934.GX7557@n2100.arm.linux.org.uk>
+References: <1439320409-20084-1-git-send-email-m-karicheri2@ti.com>
+ <55CDF579.4050408@ti.com> <20150814140934.GX7557@n2100.arm.linux.org.uk>
+Message-ID: <1439562059.13210.61.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 14, 2015 at 02:49:58PM +0200, Gregory CLEMENT wrote:
-> On 13/08/2015 17:16, Catalin Marinas wrote:
-> > On Thu, Aug 13, 2015 at 03:59:25PM +0200, Gregory CLEMENT wrote:
-> >> @@ -1131,7 +1143,8 @@ static inline void __free_iova(struct dma_iommu_mapping *mapping,
-> >>  }
-> >>  
-> >>  static struct page **__iommu_alloc_buffer(struct device *dev, size_t size,
-> >> -					  gfp_t gfp, struct dma_attrs *attrs)
-> >> +					gfp_t gfp, struct dma_attrs *attrs,
-> >> +					bool is_coherent)
-> >>  {
-> >>  	struct page **pages;
-> >>  	int count = size >> PAGE_SHIFT;
-> >> @@ -1154,7 +1167,7 @@ static struct page **__iommu_alloc_buffer(struct device *dev, size_t size,
-> >>  		if (!page)
-> >>  			goto error;
-> >>  
-> >> -		__dma_clear_buffer(page, size);
-> >> +		__dma_clear_buffer(page, size, is_coherent);
-> >>  
-> >>  		for (i = 0; i < count; i++)
-> >>  			pages[i] = page + i;
-> >> @@ -1198,7 +1211,7 @@ static struct page **__iommu_alloc_buffer(struct device *dev, size_t size,
-> >>  				pages[i + j] = pages[i] + j;
-> >>  		}
-> >>  
-> >> -		__dma_clear_buffer(pages[i], PAGE_SIZE << order);
-> >> +		__dma_clear_buffer(pages[i], PAGE_SIZE << order, is_coherent);
-> >>  		i += 1 << order;
-> >>  		count -= 1 << order;
-> >>  	}
-> >> @@ -1359,8 +1372,9 @@ static void __iommu_free_atomic(struct device *dev, void *cpu_addr,
-> >>  	__free_from_pool(cpu_addr, size);
-> >>  }
-> >>  
-> >> -static void *arm_iommu_alloc_attrs(struct device *dev, size_t size,
-> >> -	    dma_addr_t *handle, gfp_t gfp, struct dma_attrs *attrs)
-> >> +static void *__arm_iommu_alloc_attrs(struct device *dev, size_t size,
-> >> +	    dma_addr_t *handle, gfp_t gfp, struct dma_attrs *attrs,
-> >> +	    bool is_coherent)
-> >>  {
-> >>  	pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL);
-> >>  	struct page **pages;
-> >> @@ -1381,7 +1395,7 @@ static void *arm_iommu_alloc_attrs(struct device *dev, size_t size,
-> >>  	 */
-> >>  	gfp &= ~(__GFP_COMP);
-> >>  
-> >> -	pages = __iommu_alloc_buffer(dev, size, gfp, attrs);
-> >> +	pages = __iommu_alloc_buffer(dev, size, gfp, attrs, is_coherent);
-> >>  	if (!pages)
-> >>  		return NULL;
-> >>  
-> > 
-> > I can see you are trying to fix the iommu_alloc code to cope with
-> > coherent devices. I think it's currently broken and if you want to fix
+Hi Russell,
+
+Am Freitag, den 14.08.2015, 15:09 +0100 schrieb Russell King - ARM
+Linux:
+
+[...]
+
 > 
-> Could you explain what is broken exactly?
-> The way I tried to deal with coherency or something more low level?
-
-The problem is that __iommu_alloc_atomic() allocates from a
-non-cacheable pool, which is fine when the device is not cache coherent
-but won't work as expected in the is_coherent case (the CPU and device
-must access the memory using the same cacheability attributes).
-
-> > In arm_iommu_alloc_attrs(), there is an __iommu_alloc_atomic() call
-> > which goes to the non-cacheable pool, it should use
-> > __alloc_simple_buffer() instead if is_coherent.
+> What causes the abort?  We shouldn't be adding hacks like this to the
+> kernel without having the full picture...
 > 
-> __iommu_alloc_atomic is called when GFP_WAIT is not set meaning that
-> we can't sleep, but _alloc_simple_buffer can sleep. I follow the calls
-> inside this function and at a point we found a call to the might_sleep_if
-> macro:
-> http://lxr.free-electrons.com/source/mm/page_alloc.c#L2859
 
-This might sleep thing is:
+some of the issues with tracking down such imprecise external aborts are
+due to the fact that we only enable the signaling of those aborts on
+entering the user-space. So the first schedule() crashes on the previous
+dangling abort.
 
-	might_sleep_if(gfp_mask & __GFP_WAIT);
+I'm carrying this patch locally to enable imprecise aborts much earlier
+in the boot process. I think it has already been on the list some times,
+but apparently it has fallen through the cracks. If you agree that this
+is the right thing to do I can do a proper repost.
 
-So it only sleeps if the __GFP_WAIT is set, but we would only call
-__alloc_simple_buffer() in the !__GFP_WAIT case, so there is no
-sleeping.
+Regards,
+Lucas
 
-The reason to call __alloc_simple_buffer() (in the atomic alloc case) is
-to get cacheable memory, unlike __alloc_from_pool() which only returns
-memory from the non-cacheable pool.
+---------------------->8---------------------------------------------
+>From bb9117d94cc2f1061dc364f42c446ccd9191e869 Mon Sep 17 00:00:00 2001
+From: Lucas Stach <l.stach@pengutronix.de>
+Date: Thu, 19 Feb 2015 18:12:50 +0100
+Subject: [PATCH] ARM: Add imprecise abort enable/disable macro
 
-> The _alloc_simple_buffer function ended by calling gen_pool_alloc
-> which won't sleep so from my point of view it is still the right
-> function to call. Did I miss something?
+This patch adds imprecise abort enable/disable macros.
+It also enables imprecise aborts when starting kernel.
 
-It's not just about sleep vs atomic but about cacheable vs non-cacheable
-as well.
+Changes in v2:
+Only ARMv6 and later have CPSR.A bit. On earlier CPUs,
+and ARMv7M this should be a no-op.
 
-As a quick fix, below is what I meant. It needs extra snippets from your
-patch to add arm_iommu_alloc_attrs_(coherent|noncoherent) and it's not
-tested, but just to give you an idea:
+Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+---
+lst: rebased on v3.19
+---
+ arch/arm/include/asm/irqflags.h | 10 ++++++++++
+ arch/arm/kernel/smp.c           |  1 +
+ arch/arm/kernel/traps.c         |  4 ++++
+ 3 files changed, 15 insertions(+)
 
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index 9f509b264346..e20a31d45ff3 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -1335,13 +1335,16 @@ static struct page **__iommu_get_pages(void *cpu_addr, struct dma_attrs *attrs)
- 	return NULL;
- }
+diff --git a/arch/arm/include/asm/irqflags.h
+b/arch/arm/include/asm/irqflags.h
+index 3b763d6652a0..8301f875564e 100644
+--- a/arch/arm/include/asm/irqflags.h
++++ b/arch/arm/include/asm/irqflags.h
+@@ -51,6 +51,14 @@ static inline void arch_local_irq_disable(void)
  
--static void *__iommu_alloc_atomic(struct device *dev, size_t size,
--				  dma_addr_t *handle)
-+static void *__iommu_alloc_simple(struct device *dev, size_t size, gfp_t gfp,
-+				  dma_addr_t *handle, bool is_coherent)
- {
- 	struct page *page;
- 	void *addr;
+ #define local_fiq_enable()  __asm__("cpsie f   @ __stf" : : : "memory",
+"cc")
+ #define local_fiq_disable() __asm__("cpsid f   @ __clf" : : : "memory",
+"cc")
++
++#ifndef CONFIG_CPU_V7M
++#define local_abt_enable()  __asm__("cpsie a   @ __sta" : : : "memory",
+"cc")
++#define local_abt_disable() __asm__("cpsid a   @ __cla" : : : "memory",
+"cc")
++#else
++#define local_abt_enable()     do { } while (0)
++#define local_abt_disable()    do { } while (0)
++#endif
+ #else
  
--	addr = __alloc_from_pool(size, &page);
-+	if (is_coherent)
-+		addr = __alloc_simple_buffer(dev, size, gfp, &page);
-+	else
-+		addr = __alloc_from_pool(size, &page);
- 	if (!addr)
- 		return NULL;
+ /*
+@@ -130,6 +138,8 @@ static inline void arch_local_irq_disable(void)
+        : "memory", "cc");                                      \
+        })
  
-@@ -1356,15 +1359,18 @@ err_mapping:
- 	return NULL;
- }
++#define local_abt_enable()     do { } while (0)
++#define local_abt_disable()    do { } while (0)
+ #endif
  
--static void __iommu_free_atomic(struct device *dev, void *cpu_addr,
--				dma_addr_t handle, size_t size)
-+static void __iommu_free_simple(struct device *dev, void *cpu_addr,
-+				dma_addr_t handle, size_t size, bool is_coherent)
- {
- 	__iommu_remove_mapping(dev, handle, size);
--	__free_from_pool(cpu_addr, size);
-+	if (is_coherent)
-+		__dma_free_buffer(virt_to_page(cpu_addr), size);
-+	else
-+		__free_from_pool(cpu_addr, size);
- }
+ /*
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 86ef244c5a24..7b6b93cabef4 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -378,6 +378,7 @@ asmlinkage void secondary_start_kernel(void)
  
--static void *arm_iommu_alloc_attrs(struct device *dev, size_t size,
--	    dma_addr_t *handle, gfp_t gfp, struct dma_attrs *attrs)
-+static void *__arm_iommu_alloc_attrs(struct device *dev, size_t size,
-+	    dma_addr_t *handle, gfp_t gfp, struct dma_attrs *attrs, bool is_coherent)
- {
- 	pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL);
- 	struct page **pages;
-@@ -1373,8 +1379,8 @@ static void *arm_iommu_alloc_attrs(struct device *dev, size_t size,
- 	*handle = DMA_ERROR_CODE;
- 	size = PAGE_ALIGN(size);
+        local_irq_enable();
+        local_fiq_enable();
++       local_abt_enable();
  
--	if (!(gfp & __GFP_WAIT))
--		return __iommu_alloc_atomic(dev, size, handle);
-+	if (is_coherent || !(gfp & __GFP_WAIT))
-+		return __iommu_alloc_simple(dev, size, gfp, handle, is_coherent);
+        /*
+         * OK, it's off to the idle thread for us
+diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+index 788e23fe64d8..466726ba9bdb 100644
+--- a/arch/arm/kernel/traps.c
++++ b/arch/arm/kernel/traps.c
+@@ -881,6 +881,10 @@ void __init early_trap_init(void *vectors_base)
  
- 	/*
- 	 * Following is a work-around (a.k.a. hack) to prevent pages
-@@ -1440,14 +1446,14 @@ static int arm_iommu_mmap_attrs(struct device *dev, struct vm_area_struct *vma,
-  * free a page as defined by the above mapping.
-  * Must not be called with IRQs disabled.
-  */
--void arm_iommu_free_attrs(struct device *dev, size_t size, void *cpu_addr,
--			  dma_addr_t handle, struct dma_attrs *attrs)
-+void __arm_iommu_free_attrs(struct device *dev, size_t size, void *cpu_addr,
-+			  dma_addr_t handle, struct dma_attrs *attrs, bool is_coherent)
- {
- 	struct page **pages;
- 	size = PAGE_ALIGN(size);
- 
--	if (__in_atomic_pool(cpu_addr, size)) {
--		__iommu_free_atomic(dev, cpu_addr, handle, size);
-+	if (is_coherent || __in_atomic_pool(cpu_addr, size)) {
-+		__iommu_free_simple(dev, cpu_addr, handle, size, is_coherent);
- 		return;
- 	}
- 
+        flush_icache_range(vectors, vectors + PAGE_SIZE * 2);
+        modify_domain(DOMAIN_USER, DOMAIN_CLIENT);
++
++       /* Enable imprecise aborts */
++       local_abt_enable();
++
+ #else /* ifndef CONFIG_CPU_V7M */
+        /*
+         * on V7-M there is no need to copy the vector table to a
+dedicated
+-- 
+2.1.4
 
 -- 
-Catalin
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
