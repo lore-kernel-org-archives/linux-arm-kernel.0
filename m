@@ -1,47 +1,45 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 14 Aug 2015 18:55:06 +0100
-Subject: [PATCH v2 2/2] ARM: dma-mapping: Fix the coherent case when
- iommu is used
-In-Reply-To: <1439568776-17864-3-git-send-email-gregory.clement@free-electrons.com>
-References: <1439568776-17864-1-git-send-email-gregory.clement@free-electrons.com>
- <1439568776-17864-3-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20150814175505.GB21966@e104818-lin.cambridge.arm.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Fri, 14 Aug 2015 20:08:13 +0200
+Subject: [PATCH] arm: footbridge_defconfig: disable IDE subsystem
+In-Reply-To: <20150814174330.GY7557@n2100.arm.linux.org.uk>
+References: <1439571876-13758-1-git-send-email-b.zolnierkie@samsung.com>
+ <1439571876-13758-8-git-send-email-b.zolnierkie@samsung.com>
+ <20150814174330.GY7557@n2100.arm.linux.org.uk>
+Message-ID: <4667234.QqV6GaKOSx@amdc1976>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 14, 2015 at 06:12:56PM +0200, Gregory CLEMENT wrote:
-> When doing dma allocation with IOMMU the __iommu_alloc_atomic() was
-> used even when the system was coherent. However, this function
-> allocates from a non-cacheable pool, which is fine when the device is
-> not cache coherent but won't work as expected in the device is cache
-> coherent. Indeed, the CPU and device must access the memory using the
-> same cacheability attributes.
+
+Hi,
+
+On Friday, August 14, 2015 06:43:30 PM Russell King - ARM Linux wrote:
+> On Fri, Aug 14, 2015 at 07:04:23PM +0200, Bartlomiej Zolnierkiewicz wrote:
+> > This patch disables deprecated IDE subsystem in footbridge_defconfig
+> > (no IDE host drivers are selected in this config so there is no valid
+> > reason to enable IDE subsystem itself).
 > 
-> Tested-by: We need someone here
+> That's actually incorrect.  I use IDE on Footbridge because it works
+> loads with my CY82C693 board.  I never submitted the patches which make
+> CY82C693 work on ARM though...
+> 
+> However, the CY82C693 must not be allowed to use DMA (which is why the
+> ATA driver can't be used) - if it does, it locks the PCI bus.  It's
+> a hardware incompatibility between some PCI devices and the Footbridge.
 
-And at least a build on your side ;).
+PATA driver is the same in this regard as IDE one.  They both try to
+use DMA if supported by a device.  Would be great if you could fix
+them (or at least PATA one) to limit your setup to PIO automatically
+(please also note that you can limit libata to PIO manually these
+days).
 
-Rob Herring added the coherent IOMMU ops in commit 0fa478df444f ("ARM:
-add coherent iommu dma ops"). But it doesn't look like he needed the
-coherent DMA API, only the streaming one.
+When it comes to CY82C693 there is also a leftover issue with PATA
+driver that it only supports primary interface currently (BTW this is
+why I left Alpha's defconfig alone for now - it uses CY82C693).  I can
+look into fixing this (or assist in this work) if you are interested
+in it.
 
-> @@ -1885,7 +1903,7 @@ struct dma_map_ops iommu_ops = {
->  };
->  
->  struct dma_map_ops iommu_coherent_ops = {
-> -	.alloc		= arm_iommu_alloc_attrs,
-> +	.alloc		= arm_coherent_iommu_alloc_attrs,
->  	.free		= arm_iommu_free_attrs,
-
-Does this compile? You renamed arm_iommu_free_attrs to
-__arm_iommu_alloc_attrs but I don't see arm_iommu_free_attrs
-and arm_coherent_iommu_free_attrs functions.
-
->  	.mmap		= arm_iommu_mmap_attrs,
-
-And we need an arm_coherent_iommu_mmap_attrs (similar to
-arm_iommu_mmap_attrs but without __get_dma_pgprot. Use
-arm_(coherent_)dma_mmap as an example.
-
--- 
-Catalin
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
