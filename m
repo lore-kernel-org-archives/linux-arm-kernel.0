@@ -1,9 +1,9 @@
 From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Fri, 14 Aug 2015 19:04:21 +0200
-Subject: [RFT PATCH] arm: collie_defconfig: convert to use libata PATA drivers
+Date: Fri, 14 Aug 2015 19:04:22 +0200
+Subject: [RFT PATCH] arm: corgi_defconfig: convert to use libata PATA drivers
 In-Reply-To: <1439571876-13758-1-git-send-email-b.zolnierkie@samsung.com>
 References: <1439571876-13758-1-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <1439571876-13758-6-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <1439571876-13758-7-git-send-email-b.zolnierkie@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -20,33 +20,42 @@ in use:
 
 * having duplicate drivers for same hardware confuses users
 
-This patch converts collie_defconfig to use libata PATA
+This patch converts corgi_defconfig to use libata PATA
 drivers.
 
-Cc: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+Cc: Daniel Mack <daniel@zonque.org>
+Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
+Cc: Robert Jarzmik <robert.jarzmik@free.fr>
 Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 ---
 Build tested only.
 If you have affected hardware please test.  Thank you.
 
- arch/arm/configs/collie_defconfig | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ arch/arm/configs/corgi_defconfig | 7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/configs/collie_defconfig b/arch/arm/configs/collie_defconfig
-index 6c56ad0..4e6b68f 100644
---- a/arch/arm/configs/collie_defconfig
-+++ b/arch/arm/configs/collie_defconfig
-@@ -43,8 +43,9 @@ CONFIG_MTD_SA1100=y
+diff --git a/arch/arm/configs/corgi_defconfig b/arch/arm/configs/corgi_defconfig
+index c1470a0..462533b 100644
+--- a/arch/arm/configs/corgi_defconfig
++++ b/arch/arm/configs/corgi_defconfig
+@@ -99,15 +99,14 @@ CONFIG_MTD_COMPLEX_MAPPINGS=y
+ CONFIG_MTD_NAND=y
+ CONFIG_MTD_NAND_SHARPSL=y
  CONFIG_BLK_DEV_LOOP=y
- CONFIG_BLK_DEV_RAM=y
- CONFIG_BLK_DEV_RAM_SIZE=1024
 -CONFIG_IDE=y
 -CONFIG_BLK_DEV_IDECS=y
+-CONFIG_SCSI=m
+-CONFIG_BLK_DEV_SD=m
 +CONFIG_BLK_DEV_SD=y
+ CONFIG_CHR_DEV_ST=m
+ CONFIG_CHR_DEV_OSST=m
+ CONFIG_BLK_DEV_SR=m
+ CONFIG_CHR_DEV_SG=m
+ CONFIG_SCSI_MULTI_LUN=y
 +CONFIG_ATA=y
 +CONFIG_PATA_PCMCIA=y
- # CONFIG_INPUT_MOUSEDEV is not set
- CONFIG_INPUT_EVDEV=y
- # CONFIG_KEYBOARD_ATKBD is not set
+ CONFIG_NETDEVICES=y
+ CONFIG_NET_ETHERNET=y
+ CONFIG_USB_CATC=m
 -- 
 1.9.1
