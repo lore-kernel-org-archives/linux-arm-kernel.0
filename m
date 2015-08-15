@@ -1,253 +1,66 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 15 Aug 2015 21:24:01 +0100
-Subject: [PATCH v3] iio: adc: vf610: Add IIO buffer support for Vybrid ADC
-In-Reply-To: <d556443a26070be505f9a5f5f0999253b73d9b71.1439283162.git.maitysanchayan@gmail.com>
-References: <cover.1439283162.git.maitysanchayan@gmail.com>
- <d556443a26070be505f9a5f5f0999253b73d9b71.1439283162.git.maitysanchayan@gmail.com>
-Message-ID: <55CF9FE1.3000103@kernel.org>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Sat, 15 Aug 2015 22:24:28 +0200
+Subject: [PATCH 1/2] i2c: add i2c-lpc2k driver
+In-Reply-To: <1436741242-13489-2-git-send-email-manabian@gmail.com>
+References: <1436741242-13489-1-git-send-email-manabian@gmail.com>
+ <1436741242-13489-2-git-send-email-manabian@gmail.com>
+Message-ID: <20150815202423.GD3463@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/08/15 10:05, Sanchayan Maity wrote:
-> This patch adds support for IIO buffer to the Vybrid ADC driver.
-> IIO triggered buffer infrastructure along with iio sysfs trigger
-> is used to leverage continuous sampling support provided by the
-> ADC block.
+On Mon, Jul 13, 2015 at 12:47:21AM +0200, Joachim Eastwood wrote:
+> Add support for the I2C controller found on several NXP devices
+> including LPC2xxx, LPC178x/7x and LPC18xx/43xx. The controller
+> is implemented as a state machine and the driver act upon the
+> state changes when the bus is accessed.
 > 
-> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
-Hi Sanchayan,
-
-Very nearly there. One little point to do with the buffer handling.
-Basically I don't think you want anything in the preenable or
-postdisable hooks, just in the 'internal' ones.
-
-Jonathan
-> ---
->  drivers/iio/adc/Kconfig     |   2 +
->  drivers/iio/adc/vf610_adc.c | 102 +++++++++++++++++++++++++++++++++++++++++---
->  2 files changed, 97 insertions(+), 7 deletions(-)
+> The I2C controller supports master/slave operation, bus
+> arbitration, programmable clock rate, and speeds up to 1 Mbit/s.
 > 
-> diff --git a/drivers/iio/adc/Kconfig b/drivers/iio/adc/Kconfig
-> index 7c55658..660f790 100644
-> --- a/drivers/iio/adc/Kconfig
-> +++ b/drivers/iio/adc/Kconfig
-> @@ -337,6 +337,8 @@ config TWL6030_GPADC
->  config VF610_ADC
->  	tristate "Freescale vf610 ADC driver"
->  	depends on OF
-> +	select IIO_BUFFER
-> +	select IIO_TRIGGERED_BUFFER
->  	help
->  	  Say yes here to support for Vybrid board analog-to-digital converter.
->  	  Since the IP is used for i.MX6SLX, the driver also support i.MX6SLX.
-> diff --git a/drivers/iio/adc/vf610_adc.c b/drivers/iio/adc/vf610_adc.c
-> index 23b8fb9..de62c48 100644
-> --- a/drivers/iio/adc/vf610_adc.c
-> +++ b/drivers/iio/adc/vf610_adc.c
-> @@ -34,8 +34,11 @@
->  #include <linux/err.h>
->  
->  #include <linux/iio/iio.h>
-> +#include <linux/iio/buffer.h>
->  #include <linux/iio/sysfs.h>
-> -#include <linux/iio/driver.h>
-> +#include <linux/iio/trigger.h>
-> +#include <linux/iio/trigger_consumer.h>
-> +#include <linux/iio/triggered_buffer.h>
->  
->  /* This will be the driver name the kernel reports */
->  #define DRIVER_NAME "vf610-adc"
-> @@ -170,6 +173,7 @@ struct vf610_adc {
->  	u32 sample_freq_avail[5];
->  
->  	struct completion completion;
-> +	u16 buffer[8];
->  };
->  
->  static const u32 vf610_hw_avgs[] = { 1, 4, 8, 16, 32 };
-> @@ -505,12 +509,24 @@ static const struct iio_chan_spec_ext_info vf610_ext_info[] = {
->  	.info_mask_shared_by_type = BIT(IIO_CHAN_INFO_SCALE) |	\
->  				BIT(IIO_CHAN_INFO_SAMP_FREQ),	\
->  	.ext_info = vf610_ext_info,				\
-> +	.scan_index = (_idx),			\
-> +	.scan_type = {					\
-> +		.sign = 'u',				\
-> +		.realbits = 12,				\
-> +		.storagebits = 16,			\
-> +	},						\
->  }
->  
->  #define VF610_ADC_TEMPERATURE_CHAN(_idx, _chan_type) {	\
->  	.type = (_chan_type),	\
->  	.channel = (_idx),		\
->  	.info_mask_separate = BIT(IIO_CHAN_INFO_PROCESSED),	\
-> +	.scan_index = (_idx),					\
-> +	.scan_type = {						\
-> +		.sign = 'u',					\
-> +		.realbits = 12,					\
-> +		.storagebits = 16,				\
-> +	},							\
->  }
->  
->  static const struct iio_chan_spec vf610_adc_iio_channels[] = {
-> @@ -531,6 +547,7 @@ static const struct iio_chan_spec vf610_adc_iio_channels[] = {
->  	VF610_ADC_CHAN(14, IIO_VOLTAGE),
->  	VF610_ADC_CHAN(15, IIO_VOLTAGE),
->  	VF610_ADC_TEMPERATURE_CHAN(26, IIO_TEMP),
-> +	IIO_CHAN_SOFT_TIMESTAMP(32),
->  	/* sentinel */
->  };
->  
-> @@ -559,13 +576,20 @@ static int vf610_adc_read_data(struct vf610_adc *info)
->  
->  static irqreturn_t vf610_adc_isr(int irq, void *dev_id)
->  {
-> -	struct vf610_adc *info = (struct vf610_adc *)dev_id;
-> +	struct iio_dev *indio_dev = (struct iio_dev *)dev_id;
-> +	struct vf610_adc *info = iio_priv(indio_dev);
->  	int coco;
->  
->  	coco = readl(info->regs + VF610_REG_ADC_HS);
->  	if (coco & VF610_ADC_HS_COCO0) {
->  		info->value = vf610_adc_read_data(info);
-> -		complete(&info->completion);
-> +		if (iio_buffer_enabled(indio_dev)) {
-> +			info->buffer[0] = info->value;
-> +			iio_push_to_buffers_with_timestamp(indio_dev,
-> +					info->buffer, iio_get_time_ns());
-> +			iio_trigger_notify_done(indio_dev->trig);
-> +		} else
-> +			complete(&info->completion);
->  	}
->  
->  	return IRQ_HANDLED;
-> @@ -613,8 +637,12 @@ static int vf610_read_raw(struct iio_dev *indio_dev,
->  	case IIO_CHAN_INFO_RAW:
->  	case IIO_CHAN_INFO_PROCESSED:
->  		mutex_lock(&indio_dev->mlock);
-> -		reinit_completion(&info->completion);
-> +		if (iio_buffer_enabled(indio_dev)) {
-> +			mutex_unlock(&indio_dev->mlock);
-> +			return -EBUSY;
-> +		}
->  
-> +		reinit_completion(&info->completion);
->  		hc_cfg = VF610_ADC_ADCHC(chan->channel);
->  		hc_cfg |= VF610_ADC_AIEN;
->  		writel(hc_cfg, info->regs + VF610_REG_ADC_HC0);
-> @@ -694,6 +722,57 @@ static int vf610_write_raw(struct iio_dev *indio_dev,
->  	return -EINVAL;
->  }
->  
-> +static int vf610_adc_buffer_postenable(struct iio_dev *indio_dev)
+> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+
+Thanks for the submission! Looking mostly good already.
+
+> +static void i2c_lpc2k_pump_msg(struct lpc2k_i2c *i2c)
 > +{
-> +	struct vf610_adc *info = iio_priv(indio_dev);
-> +	unsigned int channel;
-> +	int ret;
-> +	int val;
+> +	unsigned char data;
+> +	u32 status;
 > +
-> +	ret = iio_triggered_buffer_postenable(indio_dev);
-> +	if (ret)
-> +		return ret;
+> +	/*
+> +	 * I2C in the LPC2xxx series is basically a state machine.
+> +	 * Just run through the steps based on the current status.
+> +	 */
+> +	status = readl(i2c->reg_base + LPC24XX_I2STAT);
 > +
-> +	val = readl(info->regs + VF610_REG_ADC_GC);
-> +	val |= VF610_ADC_ADCON;
-> +	writel(val, info->regs + VF610_REG_ADC_GC);
+> +	switch (status) {
+> +	case M_START:
+> +	case M_REPSTART:
+> +		/* Start bit was just sent out, send out addr and dir */
+> +		data = (i2c->msg->addr << 1);
+> +		if (i2c->msg->flags & I2C_M_RD)
+> +			data |= 1;
 > +
-> +	channel = find_first_bit(indio_dev->active_scan_mask,
-> +						indio_dev->masklength);
+> +		writel(data, i2c->reg_base + LPC24XX_I2DAT);
+> +		writel(LPC24XX_STA, i2c->reg_base + LPC24XX_I2CONCLR);
 > +
-> +	val = VF610_ADC_ADCHC(channel);
-> +	val |= VF610_ADC_AIEN;
-> +
-> +	writel(val, info->regs + VF610_REG_ADC_HC0);
-> +
-> +	return 0;
-> +}
-> +
+> +		dev_dbg(&i2c->adap.dev, "Start sent with addr 0x%02x\n", data);
 
-These are suppose to be pair wise matched, so anything set up
-in postenable has to be torn down in predisable.
-Likewise, preenable setup torn down in postdisable.
+I assume the driver is basically working. So, in my book, most of this
+debug output is useful when the driver was developed, not so much
+afterwards. Also, it is printed in interrupt context possibly causing
+latency. However, the information is useful for understanding the
+driver, so I'd suggest to convert them into comments?
 
-The distinction is meant to be that a query will return that the
-buffer is enabled from a point between the pre and post enable
-and return that it is disabled from a point between the pre and
-post disable.  Actually locks are held so there may no longer
-be a window where it matters, but best to keep to convention.
+> +	i2c->adap.nr = pdev->id;
+> +
+> +	ret = i2c_add_numbered_adapter(&i2c->adap);
 
-I think you want the postdisable -> predisable and then call the
-standard predisable from there.
+Intended? Most DT enabled drivers simply user i2c_add_adapter(). The
+core then takes care of aliases defined in DT.
 
-> +static int vf610_adc_buffer_postdisable(struct iio_dev *indio_dev)
-> +{
-> +	struct vf610_adc *info = iio_priv(indio_dev);
-> +	unsigned int hc_cfg = 0;
-> +	int val;
-> +
-> +	val = readl(info->regs + VF610_REG_ADC_GC);
-> +	val &= ~VF610_ADC_ADCON;
-> +	writel(val, info->regs + VF610_REG_ADC_GC);
-> +
-> +	hc_cfg |= VF610_ADC_CONV_DISABLE;
-> +	hc_cfg &= ~VF610_ADC_AIEN;
-> +
-> +	writel(hc_cfg, info->regs + VF610_REG_ADC_HC0);
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct iio_buffer_setup_ops iio_triggered_buffer_setup_ops = {
-> +	.postenable = &vf610_adc_buffer_postenable,
-> +	.predisable = &iio_triggered_buffer_predisable,
-> +	.postdisable = &vf610_adc_buffer_postdisable,
-> +	.validate_scan_mask = &iio_validate_scan_mask_onehot,
-> +};
-> +
->  static int vf610_adc_reg_access(struct iio_dev *indio_dev,
->  			unsigned reg, unsigned writeval,
->  			unsigned *readval)
-> @@ -753,7 +832,7 @@ static int vf610_adc_probe(struct platform_device *pdev)
->  
->  	ret = devm_request_irq(info->dev, irq,
->  				vf610_adc_isr, 0,
-> -				dev_name(&pdev->dev), info);
-> +				dev_name(&pdev->dev), indio_dev);
->  	if (ret < 0) {
->  		dev_err(&pdev->dev, "failed requesting irq, irq = %d\n", irq);
->  		return ret;
-> @@ -806,15 +885,23 @@ static int vf610_adc_probe(struct platform_device *pdev)
->  	vf610_adc_cfg_init(info);
->  	vf610_adc_hw_init(info);
->  
-> +	ret = iio_triggered_buffer_setup(indio_dev, &iio_pollfunc_store_time,
-> +					NULL, &iio_triggered_buffer_setup_ops);
-> +	if (ret < 0) {
-> +		dev_err(&pdev->dev, "Couldn't initialise the buffer\n");
-> +		goto error_iio_device_register;
-> +	}
-> +
->  	ret = iio_device_register(indio_dev);
->  	if (ret) {
->  		dev_err(&pdev->dev, "Couldn't register the device.\n");
-> -		goto error_iio_device_register;
-> +		goto error_adc_buffer_init;
->  	}
->  
->  	return 0;
->  
-> -
-> +error_adc_buffer_init:
-> +	iio_triggered_buffer_cleanup(indio_dev);
->  error_iio_device_register:
->  	clk_disable_unprepare(info->clk);
->  error_adc_clk_enable:
-> @@ -829,6 +916,7 @@ static int vf610_adc_remove(struct platform_device *pdev)
->  	struct vf610_adc *info = iio_priv(indio_dev);
->  
->  	iio_device_unregister(indio_dev);
-> +	iio_triggered_buffer_cleanup(indio_dev);
->  	regulator_disable(info->vref);
->  	clk_disable_unprepare(info->clk);
->  
-> 
+And please have a look at Documentation/i2c/fault-codes. Arbitration
+Lost should be -EAGAIN, NACK should be -ENXIO, and so forth...
+
+Thanks,
+
+   Wolfram
