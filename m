@@ -1,72 +1,47 @@
-From: santosh.shilimkar@oracle.com (santosh.shilimkar at oracle.com)
-Date: Fri, 14 Aug 2015 17:01:49 -0700
-Subject: [PATCH] ARM: keystone: add a work around to handle asynchronous
- external abort
-In-Reply-To: <55CE633C.10402@ti.com>
-References: <1439320409-20084-1-git-send-email-m-karicheri2@ti.com>
- <55CDF579.4050408@ti.com> <20150814140934.GX7557@n2100.arm.linux.org.uk>
- <55CE05EC.4040909@oracle.com> <55CE633C.10402@ti.com>
-Message-ID: <55CE816D.1020809@oracle.com>
+From: jianwei.wang.chn@gmail.com (Jianwei Wang)
+Date: Fri, 14 Aug 2015 20:13:36 -0400
+Subject: [PATCH v14 3/6] drm/panel: simple: Add support for NEC
+ NL4827HC19-05B 480x272 panel
+In-Reply-To: <20150813122312.GC11095@ulmo>
+References: <1438158605-28248-1-git-send-email-jianwei.wang.chn@gmail.com>
+ <1438158605-28248-4-git-send-email-jianwei.wang.chn@gmail.com>
+ <20150813122312.GC11095@ulmo>
+Message-ID: <CANk3uyBZuBOZNHqNmiRTcFAEH6BOXhD2sS=EKsY_EHfzjY406Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/14/15 2:53 PM, Murali Karicheri wrote:
-> On 08/14/2015 11:14 AM, santosh shilimkar wrote:
->> On 8/14/2015 7:09 AM, Russell King - ARM Linux wrote:
->>> On Fri, Aug 14, 2015 at 10:04:41AM -0400, Murali Karicheri wrote:
->>>> On 08/11/2015 03:13 PM, Murali Karicheri wrote:
->>>>> Currently on some devices, an asynchronous external abort exception
->>>>> happens during boot up when exception handlers are enabled in kernel
->>>>> before switching to user space. This patch adds a workaround to handle
->>>>> this once during boot. Many customers are already using this
->>>>> with out any issues and is required to workaround the above issue.
->>>>>
->>>>> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
->>>>> ---
->>>>>   arch/arm/mach-keystone/keystone.c | 26 ++++++++++++++++++++++++++
->>>>>   1 file changed, 26 insertions(+)
-
-[...]
-
->>>>> +
->>>>> +    /*
->>>>> +     * Add a one time exception handler to catch asynchronous
->>>>> external
->>>>> +     * abort
->>>>> +     */
->>>>> +    hook_fault_code(17, keystone_async_ext_abort_fault, SIGBUS, 0,
->>>>> +            "async external abort handler");
->>>>>   }
->>>>>
->>>>>   static phys_addr_t keystone_virt_to_idmap(unsigned long x)
->>>>>
->>>> Can this be applied if it looks good?
->>>
->>> What causes the abort?  We shouldn't be adding hacks like this to the
->>> kernel without having the full picture...
->>>
->> Indeed. These external aborts are notorious and often hides dangerous
->> bugs. On OMAP as well many folks burn their had with it till the
->> interconnect handlers were added to detect those and hunt those
->> bugs.
+On Thu, Aug 13, 2015 at 8:23 AM, Thierry Reding
+<thierry.reding@gmail.com> wrote:
+> On Wed, Jul 29, 2015 at 04:30:02PM +0800, Jianwei Wang wrote:
+>> This adds support for the NEC NL4827HC19-05B 480x272 panel to the DRM
+>> simple panel driver.
 >>
->> In my experience such aborts happen outside ARM subsystem, either in
->> the interconnect or at the salve targets which are reported over
->> the ARM bus as async external aborts. And often these errors are
->> due to bad accesses/wrong accesses/un-clocked accesses at slaves.
+>> Signed-off-by: Alison Wang <b18965@freescale.com>
+>> Signed-off-by: Xiubo Li <lixiubo@cmss.chinamobile.com>
+>> Signed-off-by: Jianwei Wang <jianwei.wang.chn@gmail.com>
+>> Acked-by: Daniel Vetter <daniel.vetter@ffwll.ch>
+>> ---
+>>  .../bindings/panel/nec,nl4827hc19_05b.txt          |  7 ++++++
+>>  drivers/gpu/drm/panel/panel-simple.c               | 26 ++++++++++++++++++++++
+>>  2 files changed, 33 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/panel/nec,nl4827hc19_05b.txt
 >>
-> We have spend some time already to debug the root cause. Do you have
-> idea on how this was hunted down on OMAP that we can learn from? The bad
-> address is NULL and it seems to happen very rarely and is not easily
-> reproducible. Don't want to put this workaround, but we couldn't track
-> it down either. So any help to debug this will be appreciated.
+>> diff --git a/Documentation/devicetree/bindings/panel/nec,nl4827hc19_05b.txt b/Documentation/devicetree/bindings/panel/nec,nl4827hc19_05b.txt
+>> new file mode 100644
+>> index 0000000..20e9473
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/panel/nec,nl4827hc19_05b.txt
+>> @@ -0,0 +1,7 @@
+>> +NEC LCD Technologies,Ltd. WQVGA TFT LCD panel
+>> +
+>> +Required properties:
+>> +- compatible: should be "nec,nl4827hc19_05b"
 >
-As RMK pointed out, try Lucas patch and see if it gives any useful
-information to narrow it down.
+> Underscores are deprecated in compatible strings, so I've applied this
+> with "nec,nl4827hc19-05b".
+>
+> Thierry
 
-On OMAP, fortunately interconnect has IRQ(s) which are hooked with
-ARM subsystem. So the bus driver(drivers/bus/omap-l3*) was able to
-handle those events and report the offenders.
+Okay, thanks.
 
-Regards,
-Santosh
+Jianwei
