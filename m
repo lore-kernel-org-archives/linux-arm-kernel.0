@@ -1,32 +1,43 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 14 Aug 2015 22:45:12 -0600
-Subject: [PATCH 3/7] drm/vc4: Add KMS support for Raspberry Pi.
-In-Reply-To: <1439427380-2436-4-git-send-email-eric@anholt.net>
-References: <1439427380-2436-1-git-send-email-eric@anholt.net>
- <1439427380-2436-4-git-send-email-eric@anholt.net>
-Message-ID: <55CEC3D8.7060103@wwwdotorg.org>
+From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
+Date: Fri, 14 Aug 2015 21:50:17 -0700
+Subject: [PATCH] soc: qcom: smem: Fix errant private access
+In-Reply-To: <1439610990-8427-1-git-send-email-agross@codeaurora.org>
+References: <1439610990-8427-1-git-send-email-agross@codeaurora.org>
+Message-ID: <20150815045017.GK13472@usrtlx11787.corpusers.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/12/2015 06:56 PM, Eric Anholt wrote:
-> This is the start of a full VC4 driver.  Right now this just supports
-> configuring the display using a pre-existing video mode (because
-> changing the pixel clock isn't available yet, and doesn't work when it
-> is).  However, this is enough for fbcon and bringing up X using
-> xf86-video-modesetting.
+On Fri 14 Aug 20:56 PDT 2015, Andy Gross wrote:
 
-> diff --git a/drivers/gpu/drm/vc4/Kconfig b/drivers/gpu/drm/vc4/Kconfig
+> This patch corrects private partition item access.  Instead of falling back to
+> global for instances where we have an actual host and remote partition existing,
+> return the results of the private lookup.
+> 
+> Signed-off-by: Andy Gross <agross@codeaurora.org>
+> ---
+>  drivers/soc/qcom/smem.c |    5 +++--
+>  1 file changed, 3 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/soc/qcom/smem.c b/drivers/soc/qcom/smem.c
+> index 7c2c324c..6603201d 100644
+> --- a/drivers/soc/qcom/smem.c
+> +++ b/drivers/soc/qcom/smem.c
+> @@ -484,8 +484,9 @@ int qcom_smem_get(unsigned host, unsigned item, void **ptr, size_t *size)
+>  	if (ret)
+>  		return ret;
+>  
+> -	ret = qcom_smem_get_private(__smem, host, item, ptr, size);
+> -	if (ret == -ENOENT)
+> +	if (host < SMEM_HOST_COUNT && __smem->partitions[host])
+> +		ret = qcom_smem_get_private(__smem, host, item, ptr, size);
+> +	else
+>  		ret = qcom_smem_get_global(__smem, item, ptr, size);
 
-> +config DRM_VC4
-> +	tristate "Broadcom VC4 Graphics"
+Looks good, but you can drop the if statement in the beginning of the
+qcom_smem_get_private() now.
 
-> +	help
-> +	  Choose this option if you have a system that has a Broadcom
-> +	  VC4 GPU, such as the Raspberry Pi or other BCM2708/BCM2835.
-> +
-> +	  This driver requires that "avoid_warnings=2" be present in
-> +	  the config.txt for the firmware, to keep it from smashing
-> +	  our display setup.
+Can you please also do the same change in the alloc path, to keep them
+consistent?
 
-The need for "avoid_warnings=2" seems like it will trip people up. I
-don't think it's in any config.txt I've seen. Can you expand more on that?
+Regards,
+Bjorn
