@@ -1,34 +1,54 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Fri, 14 Aug 2015 18:19:19 -0700
-Subject: [PATCH] thermal: cpu_cooling: fix lockdep problems in cpu_cooling
-In-Reply-To: <20150814055359.GY20238@linux>
-References: <20150812073530.GA16445@linux>
- <E1ZPQfV-0005nb-DN@rmk-PC.arm.linux.org.uk>
- <20150814045009.GB10354@localhost.localdomain>
- <20150814055359.GY20238@linux>
-Message-ID: <20150815011918.GB4125@localhost.localdomain>
+From: vthakkar1994@gmail.com (Vaishali Thakkar)
+Date: Sat, 15 Aug 2015 07:21:00 +0530
+Subject: [PATCH] ASoC: rockchip: i2s: Adjust devm usage
+Message-ID: <20150815015059.GA31009@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 14, 2015 at 11:23:59AM +0530, Viresh Kumar wrote:
-> On 13-08-15, 21:50, Eduardo Valentin wrote:
-> > Sorry if I let this one to fall into the cracks for this long.
-> > 
-> > I am looking at this now and queuing as soon as possible.
-> 
-> You applied the wrong one, please drop it. And apply the one I have
-> sent as a separate thread, with my sob on it.
+Remove use of snd_soc_unregister_component in remove function
+as devm_snd_soc_register_component in probe function automatically
+handles it.
 
-OK. I am updating it to your V2.
+Also, convert call of snd_dmaengine_pcm_register to managed resource
+function devm_snd_dmaengine_pcm_register and remove usage of
+snd_dmaengine_pcm_unregister in probe and remove functions.
 
+Signed-off-by: Vaishali Thakkar <vthakkar1994@gmail.com>
+---
+ sound/soc/rockchip/rockchip_i2s.c | 8 ++------
+ 1 file changed, 2 insertions(+), 6 deletions(-)
 
-> 
-> -- 
-> viresh
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 490 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150814/825916ac/attachment.sig>
+diff --git a/sound/soc/rockchip/rockchip_i2s.c b/sound/soc/rockchip/rockchip_i2s.c
+index acb5be5..b936102 100644
+--- a/sound/soc/rockchip/rockchip_i2s.c
++++ b/sound/soc/rockchip/rockchip_i2s.c
+@@ -483,16 +483,14 @@ static int rockchip_i2s_probe(struct platform_device *pdev)
+ 		goto err_suspend;
+ 	}
+ 
+-	ret = snd_dmaengine_pcm_register(&pdev->dev, NULL, 0);
++	ret = devm_snd_dmaengine_pcm_register(&pdev->dev, NULL, 0);
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "Could not register PCM\n");
+-		goto err_pcm_register;
++		return ret;
+ 	}
+ 
+ 	return 0;
+ 
+-err_pcm_register:
+-	snd_dmaengine_pcm_unregister(&pdev->dev);
+ err_suspend:
+ 	if (!pm_runtime_status_suspended(&pdev->dev))
+ 		i2s_runtime_suspend(&pdev->dev);
+@@ -512,8 +510,6 @@ static int rockchip_i2s_remove(struct platform_device *pdev)
+ 
+ 	clk_disable_unprepare(i2s->mclk);
+ 	clk_disable_unprepare(i2s->hclk);
+-	snd_dmaengine_pcm_unregister(&pdev->dev);
+-	snd_soc_unregister_component(&pdev->dev);
+ 
+ 	return 0;
+ }
+-- 
+1.9.1
