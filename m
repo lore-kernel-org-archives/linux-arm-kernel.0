@@ -1,44 +1,37 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 15 Aug 2015 20:55:22 +0100
-Subject: [PATCH v4] iio: adc: xilinx-xadc: Push interrupts into hardirq
- context
-In-Reply-To: <55CB7558.3090608@linutronix.de>
-References: <55C07160.5040907@metafoo.de>
- <1439334049-28671-1-git-send-email-xander.huff@ni.com>
- <55CB6391.7060502@metafoo.de> <55CB7558.3090608@linutronix.de>
-Message-ID: <55CF992A.5040505@kernel.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 15 Aug 2015 22:05:09 +0200
+Subject: [PATCH v5 1/2] usb: make xhci platform driver use 64 bit or 32
+ bit DMA
+In-Reply-To: <CADaLNDn4SvW3hvi7H0c_z2xgVSgRHLOK06xMyTYJd+ddFqc7Nw@mail.gmail.com>
+References: <CADaLNDkU14GCPZE_zNt_9kMSsUdywyNp1QCiWpokXQgbfRS0qw@mail.gmail.com>
+ <20150808092252.GJ7557@n2100.arm.linux.org.uk>
+ <CADaLNDn4SvW3hvi7H0c_z2xgVSgRHLOK06xMyTYJd+ddFqc7Nw@mail.gmail.com>
+Message-ID: <1643536.i8Q5EFEN01@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/08/15 17:33, Sebastian Andrzej Siewior wrote:
-> On 08/12/2015 05:17 PM, Lars-Peter Clausen wrote:
->> On 08/12/2015 01:00 AM, Xander Huff wrote:
->>> Unfortunately, this breaks PREEMPT_RT builds, where a spinlock can sleep,
->>> and is thus not able to be acquired from a hardirq handler. This patch gets
->>> rid of the threaded handler and pushes all interrupt handling into the
->>> hardirq context, and uses request_irq().
->>>
->>> To validate that this change has no impact on RT performance, here are
->>> cyclictest values with no processes running:
->>
->> Looks good, thanks.
->>
->> Acked-by: Lars-Peter Clausen <lars@metafoo.de>
+On Saturday 08 August 2015 13:31:02 Duc Dang wrote:
+> >
+> > If we know that pdev->dev.dma_mask will always be initialised at this
+> > point, then the above change is fine.  If not, it's introducing a
+> > regression - dma_set_mask_and_coherent() will fail if pdev->dev.dma_mask
+> > is NULL (depending on the architectures implementation of dma_set_mask()).
+> >
+> > Prefixing the above change with the two lines I mention above would
+> > ensure equivalent behaviour.  Even if we do want to get rid of this,
+> > I'd advise to do it as a separate patch after this change, which can
+> > be independently reverted if there's problems with its removal.
+> >
+> Hi Russell,
 > 
-> Yes, I'm fine with the rework, too.
-Formal Acked-by would be good but I'll take this on the basis of Lars' one
-and that the code clearly should work from a read through.
+> I will add the 2 lines you mentioned back to next version of the
+> patch. It is safer to do it that way as I do not see
+> pdev->dev.dma_mask gets initialized before the call
+> dma_set_mask_and_coherent  inside this xhci_plat.c file.
 
-Applied to the togreg branch of iio.git.  Thanks for following through
-the various twists of this one. Will initially be pushed out as testing.
-Note this has almost certainly (unless Linus announces a delay) missed the
-upcoming merge window so will be lined up for the 4.4 one.
+It would be good to add a WARN_ON() to the case where dma_mask
+is a NULL pointer at the least. That way, we will at least
+find out if there are some broken platforms that do not correctly
+initialize the mask pointer.
 
-Jonathan
-> 
-> Sebastian
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+	Arnd
