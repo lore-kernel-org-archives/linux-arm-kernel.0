@@ -1,35 +1,26 @@
 From: edubezval@gmail.com (Eduardo Valentin)
-Date: Fri, 14 Aug 2015 18:10:16 -0700
-Subject: [PATCH V2] thermal: cpu_cooling: fix lockdep problems in
- cpu_cooling
-In-Reply-To: <20150814055556.GZ20238@linux>
-References: <16e7d7d811fa2b0f8dcf6cade345a5f2f3e3c36a.1439372926.git.viresh.kumar@linaro.org>
- <20150814055556.GZ20238@linux>
-Message-ID: <20150815011015.GA4125@localhost.localdomain>
+Date: Fri, 14 Aug 2015 18:19:19 -0700
+Subject: [PATCH] thermal: cpu_cooling: fix lockdep problems in cpu_cooling
+In-Reply-To: <20150814055359.GY20238@linux>
+References: <20150812073530.GA16445@linux>
+ <E1ZPQfV-0005nb-DN@rmk-PC.arm.linux.org.uk>
+ <20150814045009.GB10354@localhost.localdomain>
+ <20150814055359.GY20238@linux>
+Message-ID: <20150815011918.GB4125@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 14, 2015 at 11:25:56AM +0530, Viresh Kumar wrote:
-> On 12-08-15, 15:22, Viresh Kumar wrote:
-> > From: Russell King <rmk+kernel@arm.linux.org.uk>
-> > Fixes: 2dcd851fe4b4 ("thermal: cpu_cooling: Update always cpufreq policy with
-> > Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
-> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-> > ---
+On Fri, Aug 14, 2015 at 11:23:59AM +0530, Viresh Kumar wrote:
+> On 13-08-15, 21:50, Eduardo Valentin wrote:
+> > Sorry if I let this one to fall into the cracks for this long.
 > > 
-> > Hi Eduardo/Zhang,
-> > 
-> > This is 4.2-rc material, please apply soon.
+> > I am looking at this now and queuing as soon as possible.
 > 
-> Hey,
-> 
-> Please apply this one and drop
-> 
-> 8ad61f934e9e ("thermal: cpu_cooling: fix lockdep problems in
-> cpu_cooling")
+> You applied the wrong one, please drop it. And apply the one I have
+> sent as a separate thread, with my sob on it.
 
-OK, I am having a looking at this.
+OK. I am updating it to your V2.
+
 
 > 
 > -- 
@@ -40,4 +31,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 490 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150814/7b2c8ec3/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150814/825916ac/attachment.sig>
