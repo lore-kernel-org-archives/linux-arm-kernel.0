@@ -1,31 +1,69 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 14 Aug 2015 22:54:00 -0600
-Subject: [PATCH 7/7] ARM: bcm2835: Add VC4 to the device tree.
-In-Reply-To: <1439427380-2436-8-git-send-email-eric@anholt.net>
-References: <1439427380-2436-1-git-send-email-eric@anholt.net>
- <1439427380-2436-8-git-send-email-eric@anholt.net>
-Message-ID: <55CEC5E8.6090203@wwwdotorg.org>
+From: agross@codeaurora.org (Andy Gross)
+Date: Fri, 14 Aug 2015 23:56:59 -0500
+Subject: [Patch v2] soc: qcom: smem: Fix errant private access
+Message-ID: <1439614619-29808-1-git-send-email-agross@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/12/2015 06:56 PM, Eric Anholt wrote:
-> Signed-off-by: Eric Anholt <eric@anholt.net>
+This patch corrects private partition item access.  Instead of falling back to
+global for instances where we have an actual host and remote partition existing,
+return the results of the private lookup.
 
-Patch description?
+Signed-off-by: Andy Gross <agross@codeaurora.org>
+---
+ drivers/soc/qcom/smem.c |   18 ++++++------------
+ 1 file changed, 6 insertions(+), 12 deletions(-)
 
-
-> diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
-
->  		arm-pmu {
->  			compatible = "arm,arm1176-pmu";
->  		};
-> +
-> +		hdmi: brcm,vc4-hdmi at 7e902000 {
-
-It'd be nice to keep all the DT nodes with a reg property together, and
-sorted in reg order.
-
-As before, I think any DT node for a HW block that may-or-may-not-be
-used based on board connectivity/features should be disabled in the SoC
-.dtsi file, and enabled in the board's DT file if the feature is useful
-for that board.
+diff --git a/drivers/soc/qcom/smem.c b/drivers/soc/qcom/smem.c
+index c809127..7fddf3b 100644
+--- a/drivers/soc/qcom/smem.c
++++ b/drivers/soc/qcom/smem.c
+@@ -264,10 +264,6 @@ static int qcom_smem_alloc_private(struct qcom_smem *smem,
+ 	size_t alloc_size;
+ 	void *p;
+ 
+-	/* We're not going to find it if there's no matching partition */
+-	if (host >= SMEM_HOST_COUNT || !smem->partitions[host])
+-		return -ENOENT;
+-
+ 	phdr = smem->partitions[host];
+ 
+ 	p = (void *)phdr + sizeof(*phdr);
+@@ -377,8 +373,9 @@ int qcom_smem_alloc(unsigned host, unsigned item, size_t size)
+ 	if (ret)
+ 		return ret;
+ 
+-	ret = qcom_smem_alloc_private(__smem, host, item, size);
+-	if (ret == -ENOENT)
++	if (host < SMEM_HOST_COUNT && __smem->partitions[host])
++		ret = qcom_smem_alloc_private(__smem, host, item, size);
++	else
+ 		ret = qcom_smem_alloc_global(__smem, item, size);
+ 
+ 	hwspin_unlock_irqrestore(__smem->hwlock, &flags);
+@@ -434,10 +431,6 @@ static int qcom_smem_get_private(struct qcom_smem *smem,
+ 	struct smem_private_entry *hdr;
+ 	void *p;
+ 
+-	/* We're not going to find it if there's no matching partition */
+-	if (host >= SMEM_HOST_COUNT || !smem->partitions[host])
+-		return -ENOENT;
+-
+ 	phdr = smem->partitions[host];
+ 
+ 	p = (void *)phdr + sizeof(*phdr);
+@@ -490,8 +483,9 @@ int qcom_smem_get(unsigned host, unsigned item, void **ptr, size_t *size)
+ 	if (ret)
+ 		return ret;
+ 
+-	ret = qcom_smem_get_private(__smem, host, item, ptr, size);
+-	if (ret == -ENOENT)
++	if (host < SMEM_HOST_COUNT && __smem->partitions[host])
++		ret = qcom_smem_get_private(__smem, host, item, ptr, size);
++	else
+ 		ret = qcom_smem_get_global(__smem, item, ptr, size);
+ 
+ 	hwspin_unlock_irqrestore(__smem->hwlock, &flags);
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
