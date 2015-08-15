@@ -1,35 +1,55 @@
-From: scottwood@freescale.com (Scott Wood)
-Date: Sat, 15 Aug 2015 01:43:37 -0500
-Subject: [RFC PATCH 0/8] clk: qoriq: Move chip-specific knowledge into
- driver
-In-Reply-To: <20150811182535.31346.52965@quantum>
-References: <1434682158-7243-1-git-send-email-scottwood@freescale.com>
- <20150811182535.31346.52965@quantum>
-Message-ID: <1439621017.15601.23.camel@freescale.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Sat, 15 Aug 2015 09:21:56 +0200 (CEST)
+Subject: [PATCH RFC 3/3] nvmem: add permission flags in nvmem_config
+In-Reply-To: <1439291024-18375-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1439290931-18232-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1439291024-18375-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1634428787.18822.1439623316281.JavaMail.open-xchange@oxbsltgw04.schlund.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2015-08-11 at 11:25 -0700, Michael Turquette wrote:
-> Hi Scott,
-> 
-> Quoting Scott Wood (2015-06-18 19:49:10)
-> > The existing device tree bindings are error-prone and inflexible. 
-> > Correct the mistake by moving the knowledge into the driver, which
-> > has more flexibility in describing the quirks of each chip.  This leaves
-> > the device tree to its proper role of identifying a programming interface
-> > rather than describing its individual registers.
-> 
-> Sorry for not responding to this one sooner. Fell through the cracks.
-> 
-> All of the changes to drives/clk/clk-qoriq.c look great to me. I assume
-> you need to keep all of these patches together and want to the take
-> through the freescale tree? If so feel free to add,
-> 
-> Acked-by: Michael Turquette <mturquette@baylibre.com>
+Hi Srinivas,
 
-I just sent a non-RFC v2, with improved compatibility with old device trees 
-(especially ls1021a).  It depends on the cpufreq patch though (at least, to 
-avoid breaking qoriq-cpufreq until that patch is merged), so I'll also need 
-an ack from Rafael for that if I'm taking it through my tree.
+> Srinivas Kandagatla <srinivas.kandagatla@linaro.org> hat am 11. August 2015 um
+> 13:03 geschrieben:
+>
+>
+> This patch adds perm variable to nvmem_config structure which will allow
+> providers to specify the permissions required for the sysfs binary file.
+> This permission is applied on top of root-only access permissions set by
+> the core.
+>
+> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> ---
+> drivers/nvmem/core.c | 1 +
+> include/linux/nvmem-provider.h | 1 +
+> 2 files changed, 2 insertions(+)
+>
+> diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
+> index 414ed23..7481387 100644
+> --- a/drivers/nvmem/core.c
+> +++ b/drivers/nvmem/core.c
+> @@ -312,6 +312,7 @@ struct nvmem_device *nvmem_register(const struct
+> nvmem_config *config)
+> config->read_only;
+> nvmem->bin = bin_attr_template;
+> nvmem->bin.attr.mode = nvmem->read_only ? : (S_IRUSR | S_IWUSR);
+> + nvmem->bin.attr.mode |= config->perm;
+> nvmem->bin.size = nvmem->size;
+> device_initialize(&nvmem->dev);
+>
+> diff --git a/include/linux/nvmem-provider.h b/include/linux/nvmem-provider.h
+> index 0b68caf..de9a61f 100644
+> --- a/include/linux/nvmem-provider.h
+> +++ b/include/linux/nvmem-provider.h
+> @@ -23,6 +23,7 @@ struct nvmem_config {
+> const struct nvmem_cell_info *cells;
+> int ncells;
+> bool read_only;
+> + u16 perm; /* visibility in sysfs */
 
--Scott
+how about "umode_t mode" or "umode_t sysfs_mode"?
+
+Beside that the whole series looks good to me.
+
+Thanks Stefan
