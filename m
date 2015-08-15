@@ -1,35 +1,32 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Fri, 14 Aug 2015 22:56:30 -0500
-Subject: [PATCH] soc: qcom: smem: Fix errant private access
-Message-ID: <1439610990-8427-1-git-send-email-agross@codeaurora.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 14 Aug 2015 22:13:31 -0600
+Subject: [PATCH v5 3/3] ARM: bcm2835: Add DT for the firmware clocks
+ driver.
+In-Reply-To: <1439507142-2965-4-git-send-email-eric@anholt.net>
+References: <1439507142-2965-1-git-send-email-eric@anholt.net>
+ <1439507142-2965-4-git-send-email-eric@anholt.net>
+Message-ID: <55CEBC6B.9070001@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch corrects private partition item access.  Instead of falling back to
-global for instances where we have an actual host and remote partition existing,
-return the results of the private lookup.
+On 08/13/2015 05:05 PM, Eric Anholt wrote:
+> Signed-off-by: Eric Anholt <eric@anholt.net>
+> Acked-by: Lee Jones <lee@kernel.org>
 
-Signed-off-by: Andy Gross <agross@codeaurora.org>
----
- drivers/soc/qcom/smem.c |    5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+A patch description might be nice, although admittedly the subject seems
+clear enough.
 
-diff --git a/drivers/soc/qcom/smem.c b/drivers/soc/qcom/smem.c
-index 7c2c324c..6603201d 100644
---- a/drivers/soc/qcom/smem.c
-+++ b/drivers/soc/qcom/smem.c
-@@ -484,8 +484,9 @@ int qcom_smem_get(unsigned host, unsigned item, void **ptr, size_t *size)
- 	if (ret)
- 		return ret;
- 
--	ret = qcom_smem_get_private(__smem, host, item, ptr, size);
--	if (ret == -ENOENT)
-+	if (host < SMEM_HOST_COUNT && __smem->partitions[host])
-+		ret = qcom_smem_get_private(__smem, host, item, ptr, size);
-+	else
- 		ret = qcom_smem_get_global(__smem, item, ptr, size);
- 
- 	hwspin_unlock_irqrestore(__smem->hwlock, &flags);
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+> diff --git a/arch/arm/boot/dts/bcm2835-rpi.dtsi b/arch/arm/boot/dts/bcm2835-rpi.dtsi
+
+> +		firmware_clocks: firmware-clocks {
+> +			compatible = "raspberrypi,bcm2835-firmware-clocks";
+> +			#clock-cells = <1>;
+> +			raspberrypi,firmware = <&firmware>;
+> +		};
+
+No need to resend for this, but just a background note: DT node names
+usually contain a device type not a device identity, so "clocks" not
+"firmware-clocks" would be typical.
+
+This patch,
+Acked-by: Stephen Warren <swarren@wwwdotorg.org>
