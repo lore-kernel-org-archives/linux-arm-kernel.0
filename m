@@ -1,20 +1,32 @@
-From: dv@vollmann.ch (Detlef Vollmann)
-Date: Sat, 15 Aug 2015 22:09:55 +0200
-Subject: [PATCH] ARM: orion5x: fix legacy orion5x IRQ numbers
-In-Reply-To: <1439648246-32757-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1439648246-32757-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <55CF9C93.801@vollmann.ch>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 15 Aug 2015 22:16:03 +0200
+Subject: [PATCH] spi: Mediatek: fix endian warnings
+In-Reply-To: <1439289789-29026-1-git-send-email-leilk.liu@mediatek.com>
+References: <1439289789-29026-1-git-send-email-leilk.liu@mediatek.com>
+Message-ID: <1871097.B3YgX5rNy0@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gregory,
+On Tuesday 11 August 2015 18:43:09 Leilk Liu wrote:
+> @@ -359,9 +359,11 @@ static void mtk_spi_setup_dma_addr(struct spi_master *master,
+>         struct mtk_spi *mdata = spi_master_get_devdata(master);
+>  
+>         if (mdata->tx_sgl)
+> -               writel(cpu_to_le32(xfer->tx_dma), mdata->base + SPI_TX_SRC_REG);
+> +               writel((__force u32)cpu_to_le32(xfer->tx_dma),
+> +                      mdata->base + SPI_TX_SRC_REG);
+>         if (mdata->rx_sgl)
+> -               writel(cpu_to_le32(xfer->rx_dma), mdata->base + SPI_RX_DST_REG);
+> +               writel((__force u32)cpu_to_le32(xfer->rx_dma),
+> +                      mdata->base + SPI_RX_DST_REG);
+>  }
+> 
 
-On 08/15/15 16:17, Gregory CLEMENT wrote:
-> I amended the patch from Benjamin as it break the build for
-> dove. Could you test it again wit this version?
-Tested with orion5x_defconfig on 4.2.0-rc6 and with my
-own config on 4.1.2.
-Looks good for both :-)
+This looks wrong: writel takes a CPU-endian argument, so the value returned
+from cpu_to_le32() is not appropriate.
 
-Thanks!
-   Detlef
+The warning is correct, and you have to remove the cpu_to_le32() conversion
+in order to get the driver to behave correctly when the kernel is built
+as big-endian.
+
+	Arnd
