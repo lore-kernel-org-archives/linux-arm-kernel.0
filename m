@@ -1,71 +1,72 @@
-From: leoli@freescale.com (Li Yang)
-Date: Fri, 14 Aug 2015 18:48:18 -0500
-Subject: [PATCH v2] dmaengine: fsl-edma: add PM suspend/resume support
-In-Reply-To: <CY1PR0301MB15628DD5CFCE2B65BF4FECB2837C0@CY1PR0301MB1562.namprd03.prod.outlook.com>
-References: <1437469005-3162-1-git-send-email-yao.yuan@freescale.com>
- <CADRPPNQJi_x+mdQV=DEVuhCL_p6VOWcPiV3jzioeRdWgSW2w3g@mail.gmail.com>
- <CY1PR0301MB15628DD5CFCE2B65BF4FECB2837C0@CY1PR0301MB1562.namprd03.prod.outlook.com>
-Message-ID: <CADRPPNS_wzX+mwT0L-H=ZP9w8gH9W4O9KUqnGYiAc39S5v4qLA@mail.gmail.com>
+From: santosh.shilimkar@oracle.com (santosh.shilimkar at oracle.com)
+Date: Fri, 14 Aug 2015 17:01:49 -0700
+Subject: [PATCH] ARM: keystone: add a work around to handle asynchronous
+ external abort
+In-Reply-To: <55CE633C.10402@ti.com>
+References: <1439320409-20084-1-git-send-email-m-karicheri2@ti.com>
+ <55CDF579.4050408@ti.com> <20150814140934.GX7557@n2100.arm.linux.org.uk>
+ <55CE05EC.4040909@oracle.com> <55CE633C.10402@ti.com>
+Message-ID: <55CE816D.1020809@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 14, 2015 at 1:24 AM, Yao Yuan <yao.yuan@freescale.com> wrote:
-> Hi Leo,
->
-> Thanks for your review.
-> About those two methods for DMA suspend that you have mentioned. We have a lot of the discussions in other DMA driver like DMA for Freescale PowerPC.
->
-> Finally, we think the device which used the DMA transmission service should cancel the transmission service in its suspend.
-> So DMA in suspend should be idle.
+On 8/14/15 2:53 PM, Murali Karicheri wrote:
+> On 08/14/2015 11:14 AM, santosh shilimkar wrote:
+>> On 8/14/2015 7:09 AM, Russell King - ARM Linux wrote:
+>>> On Fri, Aug 14, 2015 at 10:04:41AM -0400, Murali Karicheri wrote:
+>>>> On 08/11/2015 03:13 PM, Murali Karicheri wrote:
+>>>>> Currently on some devices, an asynchronous external abort exception
+>>>>> happens during boot up when exception handlers are enabled in kernel
+>>>>> before switching to user space. This patch adds a workaround to handle
+>>>>> this once during boot. Many customers are already using this
+>>>>> with out any issues and is required to workaround the above issue.
+>>>>>
+>>>>> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+>>>>> ---
+>>>>>   arch/arm/mach-keystone/keystone.c | 26 ++++++++++++++++++++++++++
+>>>>>   1 file changed, 26 insertions(+)
 
-If that's the case you should clearly state this in the commit message
-and in code, although I don't know if it is safe to make such
-assumption.  There could be user of the DMA that doesn't track the
-completion of transfers.
+[...]
 
->
-> Once the DMA in late_suspend is not be idle, we think some driver haven't canceled the DMA transmission. So maybe something is error when other driver in suspend.
->
-> In the case, we should return failed to stop PM. DMA should not make a choice for other drivers(which used DMA) to force stop DMA transmission.
-
-The suspend entrance should be terminated by wakeup events and only
-critical issues.  I don't think we should just terminate the suspend
-entrance just because having on-going I/O without even try to stop it.
-
->
-> Thanks.
->
-> Best Regards,
-> Yuan Yao
->
->> -----Original Message-----
->> From: pku.leo at gmail.com [mailto:pku.leo at gmail.com] On Behalf Of Li Yang
->> Sent: Friday, August 14, 2015 4:58 AM
->> To: Yuan Yao-B46683
->> Cc: Vinod Koul; stefan at agner.ch; Arnd Bergmann; Dan Williams;
->> dmaengine at vger.kernel.org; lkml; linux-arm-kernel at lists.infradead.org; linux-
->> pm at vger.kernel.org
->> Subject: Re: [PATCH v2] dmaengine: fsl-edma: add PM suspend/resume
->> support
+>>>>> +
+>>>>> +    /*
+>>>>> +     * Add a one time exception handler to catch asynchronous
+>>>>> external
+>>>>> +     * abort
+>>>>> +     */
+>>>>> +    hook_fault_code(17, keystone_async_ext_abort_fault, SIGBUS, 0,
+>>>>> +            "async external abort handler");
+>>>>>   }
+>>>>>
+>>>>>   static phys_addr_t keystone_virt_to_idmap(unsigned long x)
+>>>>>
+>>>> Can this be applied if it looks good?
+>>>
+>>> What causes the abort?  We shouldn't be adding hacks like this to the
+>>> kernel without having the full picture...
+>>>
+>> Indeed. These external aborts are notorious and often hides dangerous
+>> bugs. On OMAP as well many folks burn their had with it till the
+>> interconnect handlers were added to detect those and hunt those
+>> bugs.
 >>
->> On Tue, Jul 21, 2015 at 3:56 AM, Yuan Yao <yao.yuan@freescale.com> wrote:
->> > This add power management suspend/resume support for the fsl-edma
->> > driver.
->> >
->> > eDMA acted as a basic function used by others. What it needs to do is
->> > the two steps below to support power management.
->> >
->> > In fsl_edma_suspend_late:
->> > Check whether the DMA chan is idle and if it is not idle, stop PM
->> > operation.
+>> In my experience such aborts happen outside ARM subsystem, either in
+>> the interconnect or at the salve targets which are reported over
+>> the ARM bus as async external aborts. And often these errors are
+>> due to bad accesses/wrong accesses/un-clocked accesses at slaves.
 >>
->> You should try to quiesce the device on suspend instead of depending on itself
->> to be happen in idle and failing if it is not.
->>
->> Regards,
->> Leo
+> We have spend some time already to debug the root cause. Do you have
+> idea on how this was hunted down on OMAP that we can learn from? The bad
+> address is NULL and it seems to happen very rarely and is not easily
+> reproducible. Don't want to put this workaround, but we couldn't track
+> it down either. So any help to debug this will be appreciated.
+>
+As RMK pointed out, try Lucas patch and see if it gives any useful
+information to narrow it down.
 
+On OMAP, fortunately interconnect has IRQ(s) which are hooked with
+ARM subsystem. So the bus driver(drivers/bus/omap-l3*) was able to
+handle those events and report the offenders.
 
-
--- 
-- Leo
+Regards,
+Santosh
