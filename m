@@ -1,37 +1,57 @@
-From: emil.l.velikov@gmail.com (Emil Velikov)
-Date: Sun, 16 Aug 2015 09:56:33 +0100
-Subject: [PATCH 2/4] drm: Add support for ARM's HDLCD controller.
-In-Reply-To: <1438784892-27888-3-git-send-email-Liviu.Dudau@arm.com>
-References: <1438784892-27888-1-git-send-email-Liviu.Dudau@arm.com>
- <1438784892-27888-3-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <CACvgo537C6SRfhMTNoE4cSLJukcXuKLvt1TRykynX--ybEhmaQ@mail.gmail.com>
+From: ian.campbell@citrix.com (Ian Campbell)
+Date: Sun, 16 Aug 2015 10:01:11 +0100
+Subject: [PATCH v5] dtb: Create a common home for cross-architecture
+ dtsi files.
+In-Reply-To: <CAL_JsqKv2aOEM-U7JNZnaHomA6HFBSFhSLZ-zhp7c20s6gQBaQ@mail.gmail.com>
+References: <1438618000-1091-1-git-send-email-ian.campbell@citrix.com>
+ <1439287646.9747.212.camel@citrix.com>
+ <CAL_JsqKv2aOEM-U7JNZnaHomA6HFBSFhSLZ-zhp7c20s6gQBaQ@mail.gmail.com>
+Message-ID: <1439715671.3480.21.camel@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Liviu,
+On Fri, 2015-08-14 at 16:21 -0500, Rob Herring wrote:
+> +arm-soc
 
-On 5 August 2015 at 15:28, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
-> The HDLCD controller is a display controller that supports resolutions
-> up to 4096x4096 pixels. It is present on various development boards
-> produced by ARM Ltd and emulated by the latest Fast Models from the
-> company.
->
-I believe there is a unofficial requirement(?) for new drm drivers to
-use atomic modesetting. Not 100% sure on this one though. The
-following drivers: tegra, msm, rcar-du, i915, and Daniel's blog [1]
-[2] cat provide some information on the topic.
+I could've sworn I did the same at one point. Obviously not.
 
-The driver seems to has has a bit of dead code guarded by
-HDLCD_*_UNDERRUN. Perhaps these macros should become build or runtime
-switch(es) ?
+> 
+> On Tue, Aug 11, 2015 at 5:07 AM, Ian Campbell <
+> ian.campbell at citrix.com> wrote:
+> > On Mon, 2015-08-03 at 17:06 +0100, Ian Campbell wrote:
+> > > Commit 9ccd608070b6 ("arm64: dts: add device tree for ARM SMM
+> > > -A53x2 on
+> > > LogicTile Express 20MG") added a new dts file to arch/arm64 which
+> > > included "../../../../arm/boot/dts/vexpress-v2m-rs1.dtsi", i.e. a
+> > > .dtsi supplied by arch/arm.
+> > > 
+> > > Unfortunately this causes some issues for the split device tree
+> > > repository[0], since things get moved around there. In that 
+> > > context
+> > > the new .dts ends up at src/arm64/arm/vexpress-v2f-1xv7
+> > > -ca53x2.dts
+> > > while the include is at src/arm/vexpress-v2m-rs1.dtsi.
+> > 
+> > Hi Grant,
+> > 
+> > Do you think there is any chance of getting this into 4.2-rc$NEXT 
+> > or shall
+> > we wait until 4.3? I'm assuming this should go via the DT tree, but 
+> > maybe
+> > it should go via an ARM tree?
+> 
+> I was assuming this would go thru the arm-soc tree which is why I
+> acked it. It is getting a bit late for 4.2 at this point, but I guess
+> the standalone tree remains broken for these platforms until this is
+> done.
 
-Most DRM drivers do not threat dma, bus_error, vsync and/or underrun
-interrupts as debug functionality. They are of limited use in this
-driver, presently, yet the CONFIG_DEBUG_FS guard seems a bit strange
-imho.
+Correct.
 
-Cheers,
-Emil
+>  Probably not such a big deal in grand scheme of things.
 
-[1] http://blog.ffwll.ch/2014/11/atomic-modeset-support-for-kms-drivers.html
-[2] http://blog.ffwll.ch/2015/01/update-for-atomic-display-updates.html
+I guess not. FWIW I've not pushed since the breakage started happening,
+so the split tree isn't broken, but it's also now however many weeks
+behind. Once 4.3-rc1 arrives with this fixed I'll push all the 4.2-rcN
+and 4.2 as well.
+
+Ian.
