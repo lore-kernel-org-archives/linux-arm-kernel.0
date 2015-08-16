@@ -1,45 +1,42 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Mon, 17 Aug 2015 11:08:55 +1000
-Subject: linux-next: manual merge of the pci tree with the arm-soc tree
-Message-ID: <20150817110855.4fcf9a66@canb.auug.org.au>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Sun, 16 Aug 2015 20:10:15 +0200
+Subject: [PATCH v2 0/2] I2C support for NXP LPC18xx family
+Message-ID: <1439748617-7683-1-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+This patch set adds a I2C driver and documentation for the I2C
+peripheral found on many NXP LPC MCUs.
 
-Today's linux-next merge of the pci tree got a conflict in:
+The driver is a rework of an old driver by Kevin Wells. It has been
+modified to support modern resource allocation, device tree and
+generally cleaned up. Driver was originally written to support the
+LPC2xxx platforms.
 
-  drivers/pci/host/Kconfig
+Patches based on i2c/for-next and tested on Embedded Artists' LPC4357
+Dev Kit and Hitex LPC4350 Eval board with several I2C devices.
 
-between commit:
+This version address comments from Wolfram Sang.
 
-  70d334ca71b0 ("PCI: iproc: Fix BCMA dependency in Kconfig")
+Changes since v1:
+ - remove dev_dbg() leftovers from development/debugging
+ - use i2c_add_adapter
+ - change return value on NACK and arb lost
+   (I think all the others should be okay as they are)
+ - fix 80 char warnings (involved s/reg_base/base)
+ - rebase on i2c/for-next
 
-from the arm-soc tree and commit:
+Joachim Eastwood (2):
+  i2c: add i2c-lpc2k driver
+  doc: dt: add documentation for nxp,lpc1788-i2c
 
-  05aa7d6a72c1 ("PCI: iproc: Allow BCMA bus driver to be built as module")
-
-from the pci tree.
-
-I fixed it up (see below) and can carry the fix as necessary (no action
-is required).
+ .../devicetree/bindings/i2c/i2c-lpc2k.txt          |  33 ++
+ drivers/i2c/busses/Kconfig                         |  10 +
+ drivers/i2c/busses/Makefile                        |   1 +
+ drivers/i2c/busses/i2c-lpc2k.c                     | 513 +++++++++++++++++++++
+ 4 files changed, 557 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/i2c/i2c-lpc2k.txt
+ create mode 100644 drivers/i2c/busses/i2c-lpc2k.c
 
 -- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
-
-diff --cc drivers/pci/host/Kconfig
-index 48b5b3058d9d,e339a8c42f76..000000000000
---- a/drivers/pci/host/Kconfig
-+++ b/drivers/pci/host/Kconfig
-@@@ -135,8 -135,8 +135,8 @@@ config PCIE_IPROC_PLATFOR
-  	  through the generic platform bus interface
-  
-  config PCIE_IPROC_BCMA
-- 	bool "Broadcom iProc PCIe BCMA bus driver"
-+ 	tristate "Broadcom iProc PCIe BCMA bus driver"
- -	depends on ARCH_BCM_IPROC || (ARM && COMPILE_TEST)
- +	depends on ARM && (ARCH_BCM_IPROC || COMPILE_TEST)
-  	select PCIE_IPROC
-  	select BCMA
-  	select PCI_DOMAINS
+1.8.0
