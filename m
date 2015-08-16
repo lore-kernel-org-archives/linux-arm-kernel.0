@@ -1,23 +1,18 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 16 Aug 2015 18:22:21 +0200
-Subject: [PATCH] ARM: dts: sunxi: enable otg port on the
- sun7i-a20-olinuxino-lime2
-In-Reply-To: <1439144578-7890-2-git-send-email-oliver@schinagl.nl>
-References: <1439144578-7890-1-git-send-email-oliver@schinagl.nl>
- <1439144578-7890-2-git-send-email-oliver@schinagl.nl>
-Message-ID: <20150816162221.GF9000@lukather>
+Date: Sun, 16 Aug 2015 18:21:51 +0200
+Subject: [PATCH] ARM: dts: sun4i: Enable i2c1 and i2c2 on the Chuwi
+ V7-CW0825 tablet
+In-Reply-To: <1439048334-14704-1-git-send-email-hdegoede@redhat.com>
+References: <1439048334-14704-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <20150816162151.GE9000@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 09, 2015 at 08:22:58PM +0200, Olliver Schinagl wrote:
-> From: Olliver Schinagl <o.schinagl@ultimaker.com>
+On Sat, Aug 08, 2015 at 05:38:54PM +0200, Hans de Goede wrote:
+> i2c1 has a freescale mma7660 accelerometer connected to it at addr 0x4c,
+> i2c2 has a ft5x touchscreen connected to it at addr 0x38.
 > 
-> This patch enables the musb-otg USB controller on the Lime2. The Lime2
-> differs from the Lime1 series in pins used for usb0 power.
-> 
-> Tested on a OlinuXino Lime2-4GB.
-> 
-> Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
 Queued, thanks!
 
@@ -33,4 +28,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150816/e051e7a0/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150816/ff8b8053/attachment-0001.sig>
