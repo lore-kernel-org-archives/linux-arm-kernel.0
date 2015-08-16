@@ -1,55 +1,99 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Sun, 16 Aug 2015 14:10:46 -0700
-Subject: [RFC PATCH v5 1/9] mmc: dw_mmc: Add external dma interface support
-In-Reply-To: <1522710.BT6Gc0L6oH@diego>
-References: <1439541232-30100-1-git-send-email-shawn.lin@rock-chips.com>
- <1439541275-30146-1-git-send-email-shawn.lin@rock-chips.com>
- <1522710.BT6Gc0L6oH@diego>
-Message-ID: <CAD=FV=W1dzqoJuJtJsD5TPKmSBpUbBcifGz654o9x8J1rX6-GQ@mail.gmail.com>
+From: msalter@redhat.com (Mark Salter)
+Date: Sun, 16 Aug 2015 16:49:27 -0400
+Subject: [PATCH V3 2/3] arm64: support initrd outside kernel linear map
+In-Reply-To: <1439758168-29427-1-git-send-email-msalter@redhat.com>
+References: <1439758168-29427-1-git-send-email-msalter@redhat.com>
+Message-ID: <1439758168-29427-3-git-send-email-msalter@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko,
+The use of mem= could leave part or all of the initrd outside of
+the kernel linear map. This will lead to an error when unpacking
+the initrd and a probable failure to boot. This patch catches that
+situation and relocates the initrd to be fully within the linear
+map.
 
-On Fri, Aug 14, 2015 at 3:13 PM, Heiko St?bner <heiko@sntech.de> wrote:
-> Hi Shawn,
->
-> Am Freitag, 14. August 2015, 16:34:35 schrieb Shawn Lin:
->> DesignWare MMC Controller can supports two types of DMA
->> mode: external dma and internal dma. We get a RK312x platform
->> integrated dw_mmc and ARM pl330 dma controller. This patch add
->> edmac ops to support these platforms. I've tested it on RK312x
->> platform with edmac mode and RK3288 platform with idmac mode.
->>
->> Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
->
-> judging by your "from", I guess you're running this on some older Rockchip soc
-> without the idma? Because I tried testing this on a Radxa Rock, but only got
-> failures, from the start (failed to read card status register). In PIO mode
-> everything works again.
->
->
-> I guess I overlooked just some tiny detail, but to me the dma channel ids seem
-> correct after all. Maybe you have any hints what I'm doing wrong?
+Signed-off-by: Mark Salter <msalter@redhat.com>
+---
+ arch/arm64/kernel/setup.c | 59 +++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 59 insertions(+)
 
-If I were a guessing man (which I'm not), I'd guess that perhaps
-you're running into troubles with our friend the PL330.
-
-There appear to be strange issues with the PL330 on Rockchip SoCs.  I
-was only peripherally involved with them, but I know at least about
-some of the patches in our tree, like:
-
-https://chromium-review.googlesource.com/237607
-FROMLIST: DMA: pl330: support burst mode for dev-to-mem and mem-to-dev transmit
-
-https://chromium-review.googlesource.com/237393
-CHROMIUM: dmaengine: pl330: support quirks for some broken
-
-https://chromium-review.googlesource.com/237396
-CHROMIUM: dmaengine: pl330: add quirk for broken no flushp
-
-https://chromium-review.googlesource.com/237394
-CHROMIUM: ARM: dts: rockchip: Add broken-no-flushp into rk3288.dtsi
-
-https://chromium-review.googlesource.com/242063
-CHROMIUM: ASoC: rockchip_i2s: modify DMA max burst to 1
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index f3067d4..5f45fd9 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -359,6 +359,64 @@ static void __init request_standard_resources(void)
+ 	}
+ }
+ 
++#ifdef CONFIG_BLK_DEV_INITRD
++/*
++ * Relocate initrd if it is not completely within the linear mapping.
++ * This would be the case if mem= cuts out all or part of it.
++ */
++static void __init relocate_initrd(void)
++{
++	phys_addr_t orig_start = __virt_to_phys(initrd_start);
++	phys_addr_t orig_end = __virt_to_phys(initrd_end);
++	phys_addr_t ram_end = memblock_end_of_DRAM();
++	phys_addr_t new_start;
++	unsigned long size, to_free = 0;
++	void *dest;
++
++	if (orig_end <= ram_end)
++		return;
++
++	/* Note if any of original initrd will freeing below */
++	if (orig_start < ram_end)
++		to_free = ram_end - orig_start;
++
++	size = orig_end - orig_start;
++
++	/* initrd needs to be relocated completely inside linear mapping */
++	new_start = memblock_find_in_range(0, PFN_PHYS(max_pfn),
++					   size, PAGE_SIZE);
++	if (!new_start)
++		panic("Cannot relocate initrd of size %ld\n", size);
++	memblock_reserve(new_start, size);
++
++	initrd_start = __phys_to_virt(new_start);
++	initrd_end   = initrd_start + size;
++
++	pr_info("Moving initrd from [%llx-%llx] to [%llx-%llx]\n",
++		orig_start, orig_start + size - 1,
++		new_start, new_start + size - 1);
++
++	dest = (void *)initrd_start;
++
++	if (to_free) {
++		memcpy(dest, (void *)__phys_to_virt(orig_start), to_free);
++		dest += to_free;
++	}
++
++	copy_from_early_mem(dest, orig_start + to_free, size - to_free);
++
++	if (to_free) {
++		pr_info("Freeing original RAMDISK from [%llx-%llx]\n",
++			orig_start, orig_start + to_free - 1);
++		memblock_free(orig_start, to_free);
++	}
++}
++#else
++static inline void __init reserve_initrd(void)
++{
++}
++#endif
++
+ u64 __cpu_logical_map[NR_CPUS] = { [0 ... NR_CPUS-1] = INVALID_HWID };
+ 
+ void __init setup_arch(char **cmdline_p)
+@@ -392,6 +450,7 @@ void __init setup_arch(char **cmdline_p)
+ 	acpi_boot_table_init();
+ 
+ 	paging_init();
++	relocate_initrd();
+ 	request_standard_resources();
+ 
+ 	early_ioremap_reset();
+-- 
+2.4.3
