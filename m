@@ -1,57 +1,36 @@
-From: ian.campbell@citrix.com (Ian Campbell)
-Date: Sun, 16 Aug 2015 10:01:11 +0100
-Subject: [PATCH v5] dtb: Create a common home for cross-architecture
- dtsi files.
-In-Reply-To: <CAL_JsqKv2aOEM-U7JNZnaHomA6HFBSFhSLZ-zhp7c20s6gQBaQ@mail.gmail.com>
-References: <1438618000-1091-1-git-send-email-ian.campbell@citrix.com>
- <1439287646.9747.212.camel@citrix.com>
- <CAL_JsqKv2aOEM-U7JNZnaHomA6HFBSFhSLZ-zhp7c20s6gQBaQ@mail.gmail.com>
-Message-ID: <1439715671.3480.21.camel@citrix.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Sun, 16 Aug 2015 11:23:45 +0200
+Subject: [PATCH v4 3/4] clocksource: tcb_clksrc: fix setup_clkevents error path
+In-Reply-To: <1439717026-30634-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1439717026-30634-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1439717026-30634-4-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-08-14 at 16:21 -0500, Rob Herring wrote:
-> +arm-soc
+From: Boris Brezillon <boris.brezillon@free-electrons.com>
 
-I could've sworn I did the same at one point. Obviously not.
+t2_clk is already disabled before request_irq(), it must not be disabled
+again.
 
-> 
-> On Tue, Aug 11, 2015 at 5:07 AM, Ian Campbell <
-> ian.campbell at citrix.com> wrote:
-> > On Mon, 2015-08-03 at 17:06 +0100, Ian Campbell wrote:
-> > > Commit 9ccd608070b6 ("arm64: dts: add device tree for ARM SMM
-> > > -A53x2 on
-> > > LogicTile Express 20MG") added a new dts file to arch/arm64 which
-> > > included "../../../../arm/boot/dts/vexpress-v2m-rs1.dtsi", i.e. a
-> > > .dtsi supplied by arch/arm.
-> > > 
-> > > Unfortunately this causes some issues for the split device tree
-> > > repository[0], since things get moved around there. In that 
-> > > context
-> > > the new .dts ends up at src/arm64/arm/vexpress-v2f-1xv7
-> > > -ca53x2.dts
-> > > while the include is at src/arm/vexpress-v2m-rs1.dtsi.
-> > 
-> > Hi Grant,
-> > 
-> > Do you think there is any chance of getting this into 4.2-rc$NEXT 
-> > or shall
-> > we wait until 4.3? I'm assuming this should go via the DT tree, but 
-> > maybe
-> > it should go via an ARM tree?
-> 
-> I was assuming this would go thru the arm-soc tree which is why I
-> acked it. It is getting a bit late for 4.2 at this point, but I guess
-> the standalone tree remains broken for these platforms until this is
-> done.
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+---
+ drivers/clocksource/tcb_clksrc.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Correct.
-
->  Probably not such a big deal in grand scheme of things.
-
-I guess not. FWIW I've not pushed since the breakage started happening,
-so the split tree isn't broken, but it's also now however many weeks
-behind. Once 4.3-rc1 arrives with this fixed I'll push all the 4.2-rcN
-and 4.2 as well.
-
-Ian.
+diff --git a/drivers/clocksource/tcb_clksrc.c b/drivers/clocksource/tcb_clksrc.c
+index 8bdbc45c6dad..b9b7277173c2 100644
+--- a/drivers/clocksource/tcb_clksrc.c
++++ b/drivers/clocksource/tcb_clksrc.c
+@@ -199,7 +199,7 @@ static int __init setup_clkevents(struct atmel_tc *tc, int clk32k_divisor_idx)
+ 
+ 	ret = request_irq(irq, ch2_irq, IRQF_TIMER, "tc_clkevt", &clkevt);
+ 	if (ret) {
+-		clk_disable_unprepare(t2_clk);
++		clk_unprepare(t2_clk);
+ 		return ret;
+ 	}
+ 
+-- 
+2.1.4
