@@ -1,41 +1,72 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 17 Aug 2015 09:33:43 +0900
-Subject: [PATCH 0/4] ARM: dts: exynos3250: Add UART2 and MMC2 dt node with
- related clocks
-In-Reply-To: <1439264784-30322-1-git-send-email-cw00.choi@samsung.com>
-References: <1439264784-30322-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <CAJKOXPfvGypFymHzXDMEA295Copi0sjpMG9oKmJ+a_BQoK+SNw@mail.gmail.com>
+From: msalter@redhat.com (Mark Salter)
+Date: Sun, 16 Aug 2015 16:49:26 -0400
+Subject: [PATCH V3 1/3] mm: add utility for early copy from unmapped ram
+In-Reply-To: <1439758168-29427-1-git-send-email-msalter@redhat.com>
+References: <1439758168-29427-1-git-send-email-msalter@redhat.com>
+Message-ID: <1439758168-29427-2-git-send-email-msalter@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-08-11 12:46 GMT+09:00 Chanwoo Choi <cw00.choi@samsung.com>:
-> This patch add the UART2 / MMC2 devicetree node for Exynos3250 SoC and add
-> the related clocks (mux, divider, gate) of UART2 / MMC2 device.
+In some early boot circumstances, it may be necessary to copy
+from RAM outside the kernel linear mapping to mapped RAM. The
+need to relocate an initrd is one example in the x86 code. This
+patch creates a helper function based on current x86 code.
 
-What is the benefit of adding them? Why they are needed?
+Signed-off-by: Mark Salter <msalter@redhat.com>
+---
+ include/asm-generic/early_ioremap.h |  6 ++++++
+ mm/early_ioremap.c                  | 22 ++++++++++++++++++++++
+ 2 files changed, 28 insertions(+)
 
-Best regards,
-Krzysztof
-
-
->
-> Chanwoo Choi (4):
->   clk: samsung: exynos3250: Add UART2 clock
->   clk: samsung: exynos3250: Add MMC2 clock
->   ARM: dts: Add UART2 dt node for Exynos3250 SoC
->   ARM: dts: Add MSHC2 dt node for Exynos3250 SoC
->
->  arch/arm/boot/dts/exynos3250-pinctrl.dtsi | 42 +++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/exynos3250.dtsi         | 25 ++++++++++++++++++
->  drivers/clk/samsung/clk-exynos3250.c      | 15 +++++++++++
->  include/dt-bindings/clock/exynos3250.h    | 11 +++++++-
->  4 files changed, 92 insertions(+), 1 deletion(-)
->
-> --
-> 1.8.5.5
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/include/asm-generic/early_ioremap.h b/include/asm-generic/early_ioremap.h
+index a5de55c..e539f27 100644
+--- a/include/asm-generic/early_ioremap.h
++++ b/include/asm-generic/early_ioremap.h
+@@ -33,6 +33,12 @@ extern void early_ioremap_setup(void);
+  */
+ extern void early_ioremap_reset(void);
+ 
++/*
++ * Early copy from unmapped memory to kernel mapped memory.
++ */
++extern void copy_from_early_mem(void *dest, phys_addr_t src,
++				unsigned long size);
++
+ #else
+ static inline void early_ioremap_init(void) { }
+ static inline void early_ioremap_setup(void) { }
+diff --git a/mm/early_ioremap.c b/mm/early_ioremap.c
+index e10ccd2..a0baeb4 100644
+--- a/mm/early_ioremap.c
++++ b/mm/early_ioremap.c
+@@ -217,6 +217,28 @@ early_memremap(resource_size_t phys_addr, unsigned long size)
+ 	return (__force void *)__early_ioremap(phys_addr, size,
+ 					       FIXMAP_PAGE_NORMAL);
+ }
++
++#define MAX_MAP_CHUNK	(NR_FIX_BTMAPS << PAGE_SHIFT)
++
++void __init copy_from_early_mem(void *dest, phys_addr_t src, unsigned long size)
++{
++	unsigned long slop, clen;
++	char *p;
++
++	while (size) {
++		slop = src & ~PAGE_MASK;
++		clen = size;
++		if (clen > MAX_MAP_CHUNK - slop)
++			clen = MAX_MAP_CHUNK - slop;
++		p = early_memremap(src & PAGE_MASK, clen + slop);
++		memcpy(dest, p + slop, clen);
++		early_memunmap(p, clen + slop);
++		dest += clen;
++		src += clen;
++		size -= clen;
++	}
++}
++
+ #else /* CONFIG_MMU */
+ 
+ void __init __iomem *
+-- 
+2.4.3
