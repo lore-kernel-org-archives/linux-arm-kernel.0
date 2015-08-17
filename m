@@ -1,34 +1,44 @@
-From: wangzhou1@hisilicon.com (Zhou Wang)
-Date: Mon, 17 Aug 2015 19:55:54 +0800
-Subject: [PATCH v7 6/6] MAINTAINERS: Add pcie-hisi maintainer
-In-Reply-To: <1439812554-180426-1-git-send-email-wangzhou1@hisilicon.com>
-References: <1439812554-180426-1-git-send-email-wangzhou1@hisilicon.com>
-Message-ID: <1439812554-180426-7-git-send-email-wangzhou1@hisilicon.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Mon, 17 Aug 2015 19:49:54 +0800
+Subject: [PATCH v2] mmc: sdhci: also set driver type for MMC_DDR52
+In-Reply-To: <1439812041-6596-1-git-send-email-jszhang@marvell.com>
+References: <1439812041-6596-1-git-send-email-jszhang@marvell.com>
+Message-ID: <20150817194954.691729d7@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Zhou Wang <wangzhou1@hisilicon.com>
----
- MAINTAINERS | 7 +++++++
- 1 file changed, 7 insertions(+)
+On Mon, 17 Aug 2015 19:47:21 +0800
+Jisheng Zhang <jszhang@marvell.com> wrote:
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 8133cef..7cd8e47 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -7854,6 +7854,13 @@ S:	Maintained
- F:	Documentation/devicetree/bindings/pci/xgene-pci-msi.txt
- F:	drivers/pci/host/pci-xgene-msi.c
- 
-+PCIE DRIVER FOR HISILICON
-+M:	Zhou Wang <wangzhou1@hisilicon.com>
-+L:	linux-pci at vger.kernel.org
-+S:	Maintained
-+F:	Documentation/devicetree/bindings/pci/hisilicon-pcie.txt
-+F:	drivers/pci/host/pcie-hisi.c
-+
- PCMCIA SUBSYSTEM
- P:	Linux PCMCIA Team
- L:	linux-pcmcia at lists.infradead.org
--- 
-1.9.1
+> commit bb8175a8aa42 ("mmc: sdhci: clarify DDR timing mode between
+> SD-UHS and eMMC") added MMC_DDR52 as eMMC's DDR mode to be
+> distinguished from SD-UHS, but it missed setting driver type for
+> MMC_DDR52 timing mode. This patches adds the missing driver type
+> setting.
+
+This patch fixes unstable emmc read/write on marvell BG2Q DMP board.
+
+> 
+> Fixes: bb8175a8aa42 ("mmc: sdhci: clarify DDR timing mode ...")
+> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> ---
+>  drivers/mmc/host/sdhci.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+> index 1dbe932..32f2a07 100644
+> --- a/drivers/mmc/host/sdhci.c
+> +++ b/drivers/mmc/host/sdhci.c
+> @@ -1559,7 +1559,8 @@ static void sdhci_do_set_ios(struct sdhci_host *host, struct mmc_ios *ios)
+>  				 (ios->timing == MMC_TIMING_UHS_SDR25) ||
+>  				 (ios->timing == MMC_TIMING_UHS_SDR50) ||
+>  				 (ios->timing == MMC_TIMING_UHS_SDR104) ||
+> -				 (ios->timing == MMC_TIMING_UHS_DDR50))) {
+> +				 (ios->timing == MMC_TIMING_UHS_DDR50) ||
+> +				 (ios->timing == MMC_TIMING_MMC_DDR52))) {
+
+I'm not sure whether MMC_HS400 need such fix or not.
+
+>  			u16 preset;
+>  
+>  			sdhci_enable_preset_value(host, true);
