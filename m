@@ -1,92 +1,138 @@
 From: petr.cvek@tul.cz (Petr Cvek)
-Date: Mon, 17 Aug 2015 23:59:22 +0200
-Subject: [PATCH v2 06/21] ARM: pxa: magician: Add normal and power I2C
- definition
+Date: Tue, 18 Aug 2015 00:00:40 +0200
+Subject: [PATCH v2 08/21] ARM: pxa: magician: Add StrataFlash Vpp GPIO and
+ alternative driver
 In-Reply-To: <cover.1439843482.git.petr.cvek@tul.cz>
 References: <cover.1439843482.git.petr.cvek@tul.cz>
-Message-ID: <55D2593A.5060400@tul.cz>
+Message-ID: <55D25988.1090109@tul.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add normal and power I2C definition to HTC Magician.
+Add StrataFlash Vpp GPIO and alternative driver.
 
 Signed-off-by: Petr Cvek <petr.cvek@tul.cz>
 ---
- arch/arm/mach-pxa/magician.c | 38 ++++++++++++++++++++++++++++++++++++--
- 1 file changed, 36 insertions(+), 2 deletions(-)
+ arch/arm/mach-pxa/magician.c | 76 ++++++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 73 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm/mach-pxa/magician.c b/arch/arm/mach-pxa/magician.c
-index fc1c035..702e8e0 100644
+index 7519238..7331b34 100644
 --- a/arch/arm/mach-pxa/magician.c
 +++ b/arch/arm/mach-pxa/magician.c
-@@ -72,6 +72,8 @@
- #include <linux/regulator/machine.h>
- #include <linux/usb/gpio_vbus.h>
- #include <linux/i2c/pxa-i2c.h>
-+#include <linux/i2c-gpio.h>
-+#include <linux/i2c.h>
- 
- #include <mach/hardware.h>
- #include <asm/mach-types.h>
-@@ -873,10 +875,39 @@ static struct platform_device strataflash = {
+@@ -845,20 +845,66 @@ static struct pxaohci_platform_data magician_ohci_info = {
+  * StrataFlash
   */
  
- static struct i2c_pxa_platform_data i2c_info = {
--	.fast_mode = 1,
-+	.fast_mode = 0,	/* fast mode seems to be have bit errors */
-+	.use_pio = 0, /* no polling */
- };
- 
- /*
-+ * PXA I2C power controller
-+ */
++static int magician_flash_init(struct platform_device *pdev)
++{
++	int ret = gpio_request(EGPIO_MAGICIAN_FLASH_VPP, "flash Vpp enable");
 +
-+static struct i2c_pxa_platform_data magician_i2c_power_info = {
-+	.fast_mode = 0,
-+	.use_pio = 0,
-+};
-+
-+/*
-+ * GPIO I2C normal controller (alternative)
-+ */
-+
-+static struct i2c_gpio_platform_data rtc_device_data = {
-+	.sda_pin = GPIO118_MAGICIAN_I2C_SDA,
-+	.scl_pin = GPIO117_MAGICIAN_I2C_SCL,
-+	.udelay = 100
-+};
-+
-+static struct platform_device i2c_gpio_bus_alt = {
-+	.name = "i2c-gpio",
-+	.id = 0,
-+	.dev = {
-+		.platform_data = &rtc_device_data,
++	if (ret) {
++		pr_err("Cannot request flash enable GPIO (%i)\n", ret);
++		return ret;
 +	}
-+};
 +
++	ret = gpio_direction_output(EGPIO_MAGICIAN_FLASH_VPP, 1);
++	if (ret) {
++		pr_err("Cannot set direction for flash enable (%i)\n", ret);
++		gpio_free(EGPIO_MAGICIAN_FLASH_VPP);
++	}
 +
-+/*
-  * Touchscreen
-  */
++	return ret;
++}
++
+ static void magician_set_vpp(struct platform_device *pdev, int vpp)
+ {
+ 	gpio_set_value(EGPIO_MAGICIAN_FLASH_VPP, vpp);
+ }
  
-@@ -936,6 +967,9 @@ static struct platform_device *devices[] __initdata = {
- 	&power_supply,
- 	&strataflash,
- 	&leds_gpio,
++static void magician_flash_exit(struct platform_device *pdev)
++{
++	gpio_free(EGPIO_MAGICIAN_FLASH_VPP);
++}
 +
-+	/* NOTICE mutually exclusive with PXA I2C */
-+	&i2c_gpio_bus_alt,
+ static struct resource strataflash_resource = {
+ 	.start	= PXA_CS0_PHYS,
+ 	.end	= PXA_CS0_PHYS + SZ_64M - 1,
+ 	.flags	= IORESOURCE_MEM,
  };
  
- /*
-@@ -975,7 +1009,7 @@ static void __init magician_init(void)
- 	platform_add_devices(ARRAY_AND_SIZE(devices));
++static struct mtd_partition magician_flash_parts[] = {
++	{
++		.name		= "Bootloader",
++		.offset		= 0x0,
++		.size		= 0x40000,
++		.mask_flags	= MTD_WRITEABLE,	/* EXPERIMENTAL */
++	},
++	{
++		.name	= "Linux Kernel",
++		.offset	= 0x40000,
++		.size	= MTDPART_SIZ_FULL,
++	},
++};
++
++#if 1	/* Choose which one fits you better */
++/*
++ * physmap-flash driver
++ */
++
+ static struct physmap_flash_data strataflash_data = {
+-	.width = 4,
+-	.set_vpp = magician_set_vpp,
++	.width		= 4,
++	.init		= magician_flash_init,
++	.set_vpp	= magician_set_vpp,
++	.exit		= magician_flash_exit,
++	.parts		= magician_flash_parts,
++	.nr_parts	= ARRAY_SIZE(magician_flash_parts),
+ };
  
- 	pxa_set_ficp_info(&magician_ficp_info);
--	pxa27x_set_i2c_power_info(NULL);
-+	pxa27x_set_i2c_power_info(&magician_i2c_power_info);
- 	pxa_set_i2c_info(&i2c_info);
- 	pxa_set_mci_info(&magician_mci_info);
- 	pxa_set_ohci_info(&magician_ohci_info);
+ static struct platform_device strataflash = {
+@@ -871,6 +917,30 @@ static struct platform_device strataflash = {
+ 	},
+ };
+ 
++#else
++
++/*
++ * pxa2xx-flash driver
++ */
++
++static struct flash_platform_data magician_flash_data = {
++	.map_name	= "cfi_probe",
++	.parts		= magician_flash_parts,
++	.nr_parts	= ARRAY_SIZE(magician_flash_parts),
++	.width		= 4,
++};
++
++static struct platform_device strataflash = {
++	.name	= "pxa2xx-flash",
++	.id	= -1,
++	.dev = {
++		.platform_data = &magician_flash_data,
++	},
++	.resource = &strataflash_resource,
++	.num_resources = 1,
++};
++#endif
++
+ /*
+  * PXA I2C normal controller (main)
+  */
+@@ -960,13 +1030,13 @@ static struct spi_board_info ads7846_spi_board_info[] __initdata = {
+ static struct platform_device *devices[] __initdata = {
+ 	&gpio_keys,
+ 	&egpio,
++	&strataflash,
+ 	&pwm_backlight,
+ 	&pasic3,
+ 	&vads7846_device,
+ 	&bq24022,
+ 	&gpio_vbus,
+ 	&power_supply,
+-	&strataflash,
+ 	&leds_gpio,
+ 
+ 	/* NOTICE mutually exclusive with PXA I2C */
 -- 
 1.7.12.1
