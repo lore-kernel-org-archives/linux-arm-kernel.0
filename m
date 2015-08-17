@@ -1,60 +1,66 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Sun, 16 Aug 2015 20:10:17 +0200
-Subject: [PATCH v2 2/2] doc: dt: add documentation for nxp,lpc1788-i2c
-In-Reply-To: <1439748617-7683-1-git-send-email-manabian@gmail.com>
-References: <1439748617-7683-1-git-send-email-manabian@gmail.com>
-Message-ID: <1439748617-7683-3-git-send-email-manabian@gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 17 Aug 2015 09:37:29 +0900
+Subject: [PATCH 0/4] ARM: dts: exynos3250: Add UART2 and MMC2 dt node with
+ related clocks
+In-Reply-To: <55D12C73.6090101@samsung.com>
+References: <1439264784-30322-1-git-send-email-cw00.choi@samsung.com>
+ <CAJKOXPfvGypFymHzXDMEA295Copi0sjpMG9oKmJ+a_BQoK+SNw@mail.gmail.com>
+ <55D12C73.6090101@samsung.com>
+Message-ID: <55D12CC9.2060602@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add binding documentation for the nxp,lpc1788-i2c controller
-which also can be found on LPC2xxx, LPC178x/7x and LPC18xx/43xx
-devices.
+On 17.08.2015 09:36, Chanwoo Choi wrote:
+> On 08/17/2015 09:33 AM, Krzysztof Kozlowski wrote:
+>> 2015-08-11 12:46 GMT+09:00 Chanwoo Choi <cw00.choi@samsung.com>:
+>>> This patch add the UART2 / MMC2 devicetree node for Exynos3250 SoC and add
+>>> the related clocks (mux, divider, gate) of UART2 / MMC2 device.
+>>
+>> What is the benefit of adding them? Why they are needed?
+> 
+> UART2 /MMC2 are used on Exynos3250-based ARTIK-5 board[1].
+> [1] https://www.artik.io/hardware/artik-5
 
-Signed-off-by: Joachim Eastwood <manabian@gmail.com>
----
- .../devicetree/bindings/i2c/i2c-lpc2k.txt          | 33 ++++++++++++++++++++++
- 1 file changed, 33 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/i2c/i2c-lpc2k.txt
+Thanks for explaining this. The patchset missed that information - the
+purpose. I'll start reviewing it.
 
-diff --git a/Documentation/devicetree/bindings/i2c/i2c-lpc2k.txt b/Documentation/devicetree/bindings/i2c/i2c-lpc2k.txt
-new file mode 100644
-index 000000000000..4101aa621ad4
---- /dev/null
-+++ b/Documentation/devicetree/bindings/i2c/i2c-lpc2k.txt
-@@ -0,0 +1,33 @@
-+NXP I2C controller for LPC2xxx/178x/18xx/43xx
-+
-+Required properties:
-+ - compatible: must be "nxp,lpc1788-i2c"
-+ - reg: physical address and length of the device registers
-+ - interrupts: a single interrupt specifier
-+ - clocks: clock for the device
-+ - #address-cells: should be <1>
-+ - #size-cells: should be <0>
-+
-+Optional properties:
-+- clock-frequency: the desired I2C bus clock frequency in Hz; in
-+  absence of this property the default value is used (100 kHz).
-+
-+Example:
-+i2c0: i2c at 400a1000 {
-+	compatible = "nxp,lpc1788-i2c";
-+	reg = <0x400a1000 0x1000>;
-+	interrupts = <18>;
-+	clocks = <&ccu1 CLK_APB1_I2C0>;
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+};
-+
-+&i2c0 {
-+	clock-frequency = <400000>;
-+
-+	lm75 at 48 {
-+		compatible = "nxp,lm75";
-+		reg = <0x48>;
-+	};
-+};
-+
--- 
-1.8.0
+Best regards,
+Krzysztof
+
+> 
+> Thanks,
+> Chanwoo Choi
+> 
+>>
+>> Best regards,
+>> Krzysztof
+>>
+>>
+>>>
+>>> Chanwoo Choi (4):
+>>>   clk: samsung: exynos3250: Add UART2 clock
+>>>   clk: samsung: exynos3250: Add MMC2 clock
+>>>   ARM: dts: Add UART2 dt node for Exynos3250 SoC
+>>>   ARM: dts: Add MSHC2 dt node for Exynos3250 SoC
+>>>
+>>>  arch/arm/boot/dts/exynos3250-pinctrl.dtsi | 42 +++++++++++++++++++++++++++++++
+>>>  arch/arm/boot/dts/exynos3250.dtsi         | 25 ++++++++++++++++++
+>>>  drivers/clk/samsung/clk-exynos3250.c      | 15 +++++++++++
+>>>  include/dt-bindings/clock/exynos3250.h    | 11 +++++++-
+>>>  4 files changed, 92 insertions(+), 1 deletion(-)
+>>>
+>>> --
+>>> 1.8.5.5
+>>>
+>>>
+>>> _______________________________________________
+>>> linux-arm-kernel mailing list
+>>> linux-arm-kernel at lists.infradead.org
+>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>
+> 
+> 
