@@ -1,44 +1,41 @@
 From: petr.cvek@tul.cz (Petr Cvek)
-Date: Tue, 18 Aug 2015 00:07:03 +0200
-Subject: [PATCH v2 21/21] ARM: pxa: magician: Move platform_add_devices() to
- the end of magician_init()
+Date: Mon, 17 Aug 2015 23:59:44 +0200
+Subject: [PATCH v2 07/21] ARM: pxa: magician: Fix IrDA pdata and redundant
+ GPIO request
 In-Reply-To: <cover.1439843482.git.petr.cvek@tul.cz>
 References: <cover.1439843482.git.petr.cvek@tul.cz>
-Message-ID: <55D25B07.1080703@tul.cz>
+Message-ID: <55D25950.6010601@tul.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move platform_add_devices() to the end of magician_init() for better
-clarity of code.
+Fix PXA FICP (IrDA) pdata and redundant GPIO request.
 
 Signed-off-by: Petr Cvek <petr.cvek@tul.cz>
 ---
- arch/arm/mach-pxa/magician.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ arch/arm/mach-pxa/magician.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/mach-pxa/magician.c b/arch/arm/mach-pxa/magician.c
-index 5f02ce4..af86350 100644
+index 702e8e0..7519238 100644
 --- a/arch/arm/mach-pxa/magician.c
 +++ b/arch/arm/mach-pxa/magician.c
-@@ -1355,9 +1355,8 @@ static void __init magician_init(void)
- 	pxa_set_btuart_info(NULL);
- 	pxa_set_stuart_info(NULL);
+@@ -256,7 +256,8 @@ static unsigned long magician_pin_config[] __initdata = {
+ static struct pxaficp_platform_data magician_ficp_info = {
+ 	.gpio_pwdown		= GPIO83_MAGICIAN_nIR_EN,
+ 	/* TODO test with FIR dongle */
+-	.transceiver_cap	= IR_SIRMODE | IR_OFF,
++	.transceiver_cap	= IR_SIRMODE | IR_FIRMODE | IR_OFF,
++	.gpio_pwdown_inverted = 0,
+ };
  
--	platform_add_devices(ARRAY_AND_SIZE(devices));
--
- 	pxa_set_ficp_info(&magician_ficp_info);
-+
- 	pxa27x_set_i2c_power_info(&magician_i2c_power_info);
- 	pxa_set_i2c_info(&i2c_info);
- 	i2c_register_board_info(0,
-@@ -1394,6 +1393,8 @@ static void __init magician_init(void)
+ /*
+@@ -987,7 +988,6 @@ static struct gpio magician_global_gpios[] = {
+ 		"LCD VOFF enable" },
+ 	{ GPIO105_MAGICIAN_LCD_VON_EN, GPIOF_OUT_INIT_HIGH,
+ 		"LCD VON enable" },
+-	{ GPIO83_MAGICIAN_nIR_EN, GPIOF_OUT_INIT_HIGH,	"nIR_EN" },
+ };
  
- 	regulator_register_always_on(0, "power", pwm_backlight_supply,
- 		ARRAY_SIZE(pwm_backlight_supply), 5000000);
-+
-+	platform_add_devices(ARRAY_AND_SIZE(devices));
- }
- 
- MACHINE_START(MAGICIAN, "HTC Magician")
+ static void __init magician_init(void)
 -- 
 1.7.12.1
