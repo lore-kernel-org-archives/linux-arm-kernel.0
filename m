@@ -1,165 +1,272 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Mon, 17 Aug 2015 15:44:50 +0200
-Subject: [PATCH v2 14/15] KVM: arm64: implement MSI injection in ITS
- emulation
-In-Reply-To: <1436538111-4294-15-git-send-email-andre.przywara@arm.com>
-References: <1436538111-4294-1-git-send-email-andre.przywara@arm.com>
- <1436538111-4294-15-git-send-email-andre.przywara@arm.com>
-Message-ID: <55D1E552.4060508@linaro.org>
+From: maitysanchayan@gmail.com (maitysanchayan at gmail.com)
+Date: Mon, 17 Aug 2015 19:26:06 +0530
+Subject: [PATCH v3] iio: adc: vf610: Add IIO buffer support for Vybrid ADC
+In-Reply-To: <55CF9FE1.3000103@kernel.org>
+References: <cover.1439283162.git.maitysanchayan@gmail.com>
+ <d556443a26070be505f9a5f5f0999253b73d9b71.1439283162.git.maitysanchayan@gmail.com>
+ <55CF9FE1.3000103@kernel.org>
+Message-ID: <20150817135606.GB2940@Sanchayan-Arch.toradex.int>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/10/2015 04:21 PM, Andre Przywara wrote:
-> When userland wants to inject a MSI into the guest, we have to use
-> our data structures to find the LPI number and the VCPU to receive
-> the interrupt.
-> Use the wrapper functions to iterate the linked lists and find the
-> proper Interrupt Translation Table Entry. Then set the pending bit
-> in this ITTE to be later picked up by the LR handling code. Kick
-> the VCPU which is meant to handle this interrupt.
-> We provide a VGIC emulation model specific routine for the actual
-> MSI injection. The wrapper functions return an error for models not
-> (yet) implementing MSIs (like the GICv2 emulation).
-> We also provide the handler for the ITS "INT" command, which allows a
-> guest to trigger an MSI via the ITS command queue.
-> 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
->  include/kvm/arm_vgic.h      |  1 +
->  virt/kvm/arm/its-emul.c     | 65 +++++++++++++++++++++++++++++++++++++++++++++
->  virt/kvm/arm/its-emul.h     |  2 ++
->  virt/kvm/arm/vgic-v3-emul.c |  1 +
->  4 files changed, 69 insertions(+)
-> 
-> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-> index 323c33a..9e1abf9 100644
-> --- a/include/kvm/arm_vgic.h
-> +++ b/include/kvm/arm_vgic.h
-> @@ -149,6 +149,7 @@ struct vgic_vm_ops {
->  	int	(*map_resources)(struct kvm *, const struct vgic_params *);
->  	bool	(*queue_lpis)(struct kvm_vcpu *);
->  	void	(*unqueue_lpi)(struct kvm_vcpu *, int irq);
-> +	int	(*inject_msi)(struct kvm *, struct kvm_msi *);
->  };
->  
->  struct vgic_io_device {
-> diff --git a/virt/kvm/arm/its-emul.c b/virt/kvm/arm/its-emul.c
-> index 89534c6..a1c12bb 100644
-> --- a/virt/kvm/arm/its-emul.c
-> +++ b/virt/kvm/arm/its-emul.c
-> @@ -323,6 +323,55 @@ static bool handle_mmio_gits_idregs(struct kvm_vcpu *vcpu,
->  }
->  
->  /*
-> + * Translates an incoming MSI request into the redistributor (=VCPU) and
-> + * the associated LPI number. Sets the LPI pending bit and also marks the
-> + * VCPU as having a pending interrupt.
-> + */
-> +int vits_inject_msi(struct kvm *kvm, struct kvm_msi *msi)
-> +{
-> +	struct vgic_dist *dist = &kvm->arch.vgic;
-> +	struct vgic_its *its = &dist->its;
-> +	struct its_itte *itte;
-> +	int cpuid;
-> +	bool inject = false;
-> +	int ret = 0;
-> +
-> +	if (!vgic_has_its(kvm))
-> +		return -ENODEV;
-> +
-> +	if (!(msi->flags & KVM_MSI_VALID_DEVID))
-> +		return -EINVAL;
-> +
-> +	spin_lock(&its->lock);
-> +
-> +	if (!its->enabled || !dist->lpis_enabled) {
-> +		ret = -EAGAIN;
-> +		goto out_unlock;
-> +	}
-> +
-> +	itte = find_itte(kvm, msi->devid, msi->data);
-> +	/* Triggering an unmapped IRQ gets silently dropped. */
-> +	if (!itte || !itte->collection)
-> +		goto out_unlock;
-> +
-> +	cpuid = itte->collection->target_addr;
-what if MAPC was not done?
-> +	__set_bit(cpuid, itte->pending);
-> +	inject = itte->enabled;
-> +
-> +out_unlock:
-> +	spin_unlock(&its->lock);
-> +
-> +	if (inject) {
-> +		spin_lock(&dist->lock);
-deadlock when called from vits_handle_command?
+Hello Jonathan,
 
-Eric
-> +		__set_bit(cpuid, dist->irq_pending_on_cpu);
-> +		spin_unlock(&dist->lock);
-> +		kvm_vcpu_kick(kvm_get_vcpu(kvm, cpuid));
-> +	}
-> +
-> +	return ret;
-> +}
-> +
-> +/*
->   * Find all enabled and pending LPIs and queue them into the list
->   * registers.
->   * The dist lock is held by the caller.
-> @@ -787,6 +836,19 @@ static int vits_cmd_handle_movall(struct kvm *kvm, u64 *its_cmd)
->  	return 0;
->  }
->  
-> +/* The INT command injects the LPI associated with that DevID/EvID pair. */
-> +static int vits_cmd_handle_int(struct kvm *kvm, u64 *its_cmd)
-> +{
-> +	struct kvm_msi msi = {
-> +		.data = its_cmd_get_id(its_cmd),
-> +		.devid = its_cmd_get_deviceid(its_cmd),
-> +		.flags = KVM_MSI_VALID_DEVID,
-> +	};
-> +
-> +	vits_inject_msi(kvm, &msi);
-> +	return 0;
-> +}
-> +
->  static int vits_handle_command(struct kvm_vcpu *vcpu, u64 *its_cmd)
->  {
->  	u8 cmd = its_cmd_get_command(its_cmd);
-> @@ -817,6 +879,9 @@ static int vits_handle_command(struct kvm_vcpu *vcpu, u64 *its_cmd)
->  	case GITS_CMD_MOVALL:
->  		ret = vits_cmd_handle_movall(vcpu->kvm, its_cmd);
->  		break;
-> +	case GITS_CMD_INT:
-> +		ret = vits_cmd_handle_int(vcpu->kvm, its_cmd);
-> +		break;
->  	case GITS_CMD_INV:
->  		ret = vits_cmd_handle_inv(vcpu->kvm, its_cmd);
->  		break;
-> diff --git a/virt/kvm/arm/its-emul.h b/virt/kvm/arm/its-emul.h
-> index 830524a..95e56a7 100644
-> --- a/virt/kvm/arm/its-emul.h
-> +++ b/virt/kvm/arm/its-emul.h
-> @@ -36,6 +36,8 @@ void vgic_enable_lpis(struct kvm_vcpu *vcpu);
->  int vits_init(struct kvm *kvm);
->  void vits_destroy(struct kvm *kvm);
->  
-> +int vits_inject_msi(struct kvm *kvm, struct kvm_msi *msi);
-> +
->  bool vits_queue_lpis(struct kvm_vcpu *vcpu);
->  void vits_unqueue_lpi(struct kvm_vcpu *vcpu, int irq);
->  
-> diff --git a/virt/kvm/arm/vgic-v3-emul.c b/virt/kvm/arm/vgic-v3-emul.c
-> index 4132c26..30bf7035 100644
-> --- a/virt/kvm/arm/vgic-v3-emul.c
-> +++ b/virt/kvm/arm/vgic-v3-emul.c
-> @@ -948,6 +948,7 @@ void vgic_v3_init_emulation(struct kvm *kvm)
->  	dist->vm_ops.init_model = vgic_v3_init_model;
->  	dist->vm_ops.destroy_model = vgic_v3_destroy_model;
->  	dist->vm_ops.map_resources = vgic_v3_map_resources;
-> +	dist->vm_ops.inject_msi = vits_inject_msi;
->  	dist->vm_ops.queue_lpis = vits_queue_lpis;
->  	dist->vm_ops.unqueue_lpi = vits_unqueue_lpi;
->  
+On 15-08-15 21:24:01, Jonathan Cameron wrote:
+> On 11/08/15 10:05, Sanchayan Maity wrote:
+> > This patch adds support for IIO buffer to the Vybrid ADC driver.
+> > IIO triggered buffer infrastructure along with iio sysfs trigger
+> > is used to leverage continuous sampling support provided by the
+> > ADC block.
+> > 
+> > Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+> Hi Sanchayan,
+> 
+> Very nearly there. One little point to do with the buffer handling.
+> Basically I don't think you want anything in the preenable or
+> postdisable hooks, just in the 'internal' ones.
+> 
+> Jonathan
+> > ---
+> >  drivers/iio/adc/Kconfig     |   2 +
+> >  drivers/iio/adc/vf610_adc.c | 102 +++++++++++++++++++++++++++++++++++++++++---
+> >  2 files changed, 97 insertions(+), 7 deletions(-)
+> > 
+> > diff --git a/drivers/iio/adc/Kconfig b/drivers/iio/adc/Kconfig
+> > index 7c55658..660f790 100644
+> > --- a/drivers/iio/adc/Kconfig
+> > +++ b/drivers/iio/adc/Kconfig
+> > @@ -337,6 +337,8 @@ config TWL6030_GPADC
+> >  config VF610_ADC
+> >  	tristate "Freescale vf610 ADC driver"
+> >  	depends on OF
+> > +	select IIO_BUFFER
+> > +	select IIO_TRIGGERED_BUFFER
+> >  	help
+> >  	  Say yes here to support for Vybrid board analog-to-digital converter.
+> >  	  Since the IP is used for i.MX6SLX, the driver also support i.MX6SLX.
+> > diff --git a/drivers/iio/adc/vf610_adc.c b/drivers/iio/adc/vf610_adc.c
+> > index 23b8fb9..de62c48 100644
+> > --- a/drivers/iio/adc/vf610_adc.c
+> > +++ b/drivers/iio/adc/vf610_adc.c
+> > @@ -34,8 +34,11 @@
+> >  #include <linux/err.h>
+> >  
+> >  #include <linux/iio/iio.h>
+> > +#include <linux/iio/buffer.h>
+> >  #include <linux/iio/sysfs.h>
+> > -#include <linux/iio/driver.h>
+> > +#include <linux/iio/trigger.h>
+> > +#include <linux/iio/trigger_consumer.h>
+> > +#include <linux/iio/triggered_buffer.h>
+> >  
+> >  /* This will be the driver name the kernel reports */
+> >  #define DRIVER_NAME "vf610-adc"
+> > @@ -170,6 +173,7 @@ struct vf610_adc {
+> >  	u32 sample_freq_avail[5];
+> >  
+> >  	struct completion completion;
+> > +	u16 buffer[8];
+> >  };
+> >  
+> >  static const u32 vf610_hw_avgs[] = { 1, 4, 8, 16, 32 };
+> > @@ -505,12 +509,24 @@ static const struct iio_chan_spec_ext_info vf610_ext_info[] = {
+> >  	.info_mask_shared_by_type = BIT(IIO_CHAN_INFO_SCALE) |	\
+> >  				BIT(IIO_CHAN_INFO_SAMP_FREQ),	\
+> >  	.ext_info = vf610_ext_info,				\
+> > +	.scan_index = (_idx),			\
+> > +	.scan_type = {					\
+> > +		.sign = 'u',				\
+> > +		.realbits = 12,				\
+> > +		.storagebits = 16,			\
+> > +	},						\
+> >  }
+> >  
+> >  #define VF610_ADC_TEMPERATURE_CHAN(_idx, _chan_type) {	\
+> >  	.type = (_chan_type),	\
+> >  	.channel = (_idx),		\
+> >  	.info_mask_separate = BIT(IIO_CHAN_INFO_PROCESSED),	\
+> > +	.scan_index = (_idx),					\
+> > +	.scan_type = {						\
+> > +		.sign = 'u',					\
+> > +		.realbits = 12,					\
+> > +		.storagebits = 16,				\
+> > +	},							\
+> >  }
+> >  
+> >  static const struct iio_chan_spec vf610_adc_iio_channels[] = {
+> > @@ -531,6 +547,7 @@ static const struct iio_chan_spec vf610_adc_iio_channels[] = {
+> >  	VF610_ADC_CHAN(14, IIO_VOLTAGE),
+> >  	VF610_ADC_CHAN(15, IIO_VOLTAGE),
+> >  	VF610_ADC_TEMPERATURE_CHAN(26, IIO_TEMP),
+> > +	IIO_CHAN_SOFT_TIMESTAMP(32),
+> >  	/* sentinel */
+> >  };
+> >  
+> > @@ -559,13 +576,20 @@ static int vf610_adc_read_data(struct vf610_adc *info)
+> >  
+> >  static irqreturn_t vf610_adc_isr(int irq, void *dev_id)
+> >  {
+> > -	struct vf610_adc *info = (struct vf610_adc *)dev_id;
+> > +	struct iio_dev *indio_dev = (struct iio_dev *)dev_id;
+> > +	struct vf610_adc *info = iio_priv(indio_dev);
+> >  	int coco;
+> >  
+> >  	coco = readl(info->regs + VF610_REG_ADC_HS);
+> >  	if (coco & VF610_ADC_HS_COCO0) {
+> >  		info->value = vf610_adc_read_data(info);
+> > -		complete(&info->completion);
+> > +		if (iio_buffer_enabled(indio_dev)) {
+> > +			info->buffer[0] = info->value;
+> > +			iio_push_to_buffers_with_timestamp(indio_dev,
+> > +					info->buffer, iio_get_time_ns());
+> > +			iio_trigger_notify_done(indio_dev->trig);
+> > +		} else
+> > +			complete(&info->completion);
+> >  	}
+> >  
+> >  	return IRQ_HANDLED;
+> > @@ -613,8 +637,12 @@ static int vf610_read_raw(struct iio_dev *indio_dev,
+> >  	case IIO_CHAN_INFO_RAW:
+> >  	case IIO_CHAN_INFO_PROCESSED:
+> >  		mutex_lock(&indio_dev->mlock);
+> > -		reinit_completion(&info->completion);
+> > +		if (iio_buffer_enabled(indio_dev)) {
+> > +			mutex_unlock(&indio_dev->mlock);
+> > +			return -EBUSY;
+> > +		}
+> >  
+> > +		reinit_completion(&info->completion);
+> >  		hc_cfg = VF610_ADC_ADCHC(chan->channel);
+> >  		hc_cfg |= VF610_ADC_AIEN;
+> >  		writel(hc_cfg, info->regs + VF610_REG_ADC_HC0);
+> > @@ -694,6 +722,57 @@ static int vf610_write_raw(struct iio_dev *indio_dev,
+> >  	return -EINVAL;
+> >  }
+> >  
+> > +static int vf610_adc_buffer_postenable(struct iio_dev *indio_dev)
+> > +{
+> > +	struct vf610_adc *info = iio_priv(indio_dev);
+> > +	unsigned int channel;
+> > +	int ret;
+> > +	int val;
+> > +
+> > +	ret = iio_triggered_buffer_postenable(indio_dev);
+> > +	if (ret)
+> > +		return ret;
+> > +
+> > +	val = readl(info->regs + VF610_REG_ADC_GC);
+> > +	val |= VF610_ADC_ADCON;
+> > +	writel(val, info->regs + VF610_REG_ADC_GC);
+> > +
+> > +	channel = find_first_bit(indio_dev->active_scan_mask,
+> > +						indio_dev->masklength);
+> > +
+> > +	val = VF610_ADC_ADCHC(channel);
+> > +	val |= VF610_ADC_AIEN;
+> > +
+> > +	writel(val, info->regs + VF610_REG_ADC_HC0);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> 
+> These are suppose to be pair wise matched, so anything set up
+> in postenable has to be torn down in predisable.
+> Likewise, preenable setup torn down in postdisable.
+> 
+> The distinction is meant to be that a query will return that the
+> buffer is enabled from a point between the pre and post enable
+> and return that it is disabled from a point between the pre and
+> post disable.  Actually locks are held so there may no longer
+> be a window where it matters, but best to keep to convention.
+> 
+> I think you want the postdisable -> predisable and then call the
+> standard predisable from there.
+
+Ok. I guess I understood. So the postdisable code actually should
+go into predisable and while taking care of mutex locking.
+
+The way I was reasoning wanting to enable the continuous sampling
+after the buffer is enabled and then after buffer is disabled,
+stopping it. With your explanation it makes sense that I should
+have it in predisable.
+
+Thank you for the feedback. I will incoporate the above change
+and send the new version.
+
+- Sanchayan.
+
+> 
+> > +static int vf610_adc_buffer_postdisable(struct iio_dev *indio_dev)
+> > +{
+> > +	struct vf610_adc *info = iio_priv(indio_dev);
+> > +	unsigned int hc_cfg = 0;
+> > +	int val;
+> > +
+> > +	val = readl(info->regs + VF610_REG_ADC_GC);
+> > +	val &= ~VF610_ADC_ADCON;
+> > +	writel(val, info->regs + VF610_REG_ADC_GC);
+> > +
+> > +	hc_cfg |= VF610_ADC_CONV_DISABLE;
+> > +	hc_cfg &= ~VF610_ADC_AIEN;
+> > +
+> > +	writel(hc_cfg, info->regs + VF610_REG_ADC_HC0);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static const struct iio_buffer_setup_ops iio_triggered_buffer_setup_ops = {
+> > +	.postenable = &vf610_adc_buffer_postenable,
+> > +	.predisable = &iio_triggered_buffer_predisable,
+> > +	.postdisable = &vf610_adc_buffer_postdisable,
+> > +	.validate_scan_mask = &iio_validate_scan_mask_onehot,
+> > +};
+> > +
+> >  static int vf610_adc_reg_access(struct iio_dev *indio_dev,
+> >  			unsigned reg, unsigned writeval,
+> >  			unsigned *readval)
+> > @@ -753,7 +832,7 @@ static int vf610_adc_probe(struct platform_device *pdev)
+> >  
+> >  	ret = devm_request_irq(info->dev, irq,
+> >  				vf610_adc_isr, 0,
+> > -				dev_name(&pdev->dev), info);
+> > +				dev_name(&pdev->dev), indio_dev);
+> >  	if (ret < 0) {
+> >  		dev_err(&pdev->dev, "failed requesting irq, irq = %d\n", irq);
+> >  		return ret;
+> > @@ -806,15 +885,23 @@ static int vf610_adc_probe(struct platform_device *pdev)
+> >  	vf610_adc_cfg_init(info);
+> >  	vf610_adc_hw_init(info);
+> >  
+> > +	ret = iio_triggered_buffer_setup(indio_dev, &iio_pollfunc_store_time,
+> > +					NULL, &iio_triggered_buffer_setup_ops);
+> > +	if (ret < 0) {
+> > +		dev_err(&pdev->dev, "Couldn't initialise the buffer\n");
+> > +		goto error_iio_device_register;
+> > +	}
+> > +
+> >  	ret = iio_device_register(indio_dev);
+> >  	if (ret) {
+> >  		dev_err(&pdev->dev, "Couldn't register the device.\n");
+> > -		goto error_iio_device_register;
+> > +		goto error_adc_buffer_init;
+> >  	}
+> >  
+> >  	return 0;
+> >  
+> > -
+> > +error_adc_buffer_init:
+> > +	iio_triggered_buffer_cleanup(indio_dev);
+> >  error_iio_device_register:
+> >  	clk_disable_unprepare(info->clk);
+> >  error_adc_clk_enable:
+> > @@ -829,6 +916,7 @@ static int vf610_adc_remove(struct platform_device *pdev)
+> >  	struct vf610_adc *info = iio_priv(indio_dev);
+> >  
+> >  	iio_device_unregister(indio_dev);
+> > +	iio_triggered_buffer_cleanup(indio_dev);
+> >  	regulator_disable(info->vref);
+> >  	clk_disable_unprepare(info->clk);
+> >  
+> > 
 > 
