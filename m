@@ -1,73 +1,45 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 17 Aug 2015 12:11:30 +0100
-Subject: [PATCH] arm64: ignore memory outside of the linear range
-In-Reply-To: <CAKv+Gu__o9ZFyx_nnQWm2zfacVvN7B6W-DUhLqfW8xrMeFJp_Q@mail.gmail.com>
-References: <1439640824-30498-1-git-send-email-ard.biesheuvel@linaro.org>
- <20150817094307.GD1688@arm.com>
- <CAKv+Gu8yspV+QtDP=iAas5J99+PezmXgC1_keEKO3zGeziRi6A@mail.gmail.com>
- <20150817105311.GF1688@arm.com>
- <CAKv+Gu__o9ZFyx_nnQWm2zfacVvN7B6W-DUhLqfW8xrMeFJp_Q@mail.gmail.com>
-Message-ID: <20150817111130.GG1688@arm.com>
+From: johan@kernel.org (Johan Hovold)
+Date: Mon, 17 Aug 2015 13:16:25 +0200
+Subject: [PATCH v2 8/9] usb: serial: mxuport: Simplify return statement
+In-Reply-To: <05a5da593419a88886b1e75a0135d7b051b4bb76.1438695318.git.skarajga@visteon.com>
+References: <cover.1438695318.git.skarajga@visteon.com>
+ <05a5da593419a88886b1e75a0135d7b051b4bb76.1438695318.git.skarajga@visteon.com>
+Message-ID: <20150817111625.GE7053@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 17, 2015 at 11:55:33AM +0100, Ard Biesheuvel wrote:
-> On 17 August 2015 at 12:53, Will Deacon <will.deacon@arm.com> wrote:
-> > On Mon, Aug 17, 2015 at 11:35:46AM +0100, Ard Biesheuvel wrote:
-> >> On 17 August 2015 at 11:43, Will Deacon <will.deacon@arm.com> wrote:
-> >> > On Sat, Aug 15, 2015 at 01:13:44PM +0100, Ard Biesheuvel wrote:
-> >> >> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-> >> >> index ad87ce826cce..c65e57d4c3e7 100644
-> >> >> --- a/arch/arm64/mm/init.c
-> >> >> +++ b/arch/arm64/mm/init.c
-> >> >> @@ -158,6 +158,19 @@ early_param("mem", early_mem);
-> >> >>
-> >> >>  void __init arm64_memblock_init(void)
-> >> >>  {
-> >> >> +     /*
-> >> >> +      * Remove the memory that we will not be able to cover
-> >> >> +      * with the linear mapping.
-> >> >> +      */
-> >> >> +     const s64 linear_region_size = -(s64)PAGE_OFFSET;
-> >> >> +
-> >> >> +     if (memstart_addr + linear_region_size < memblock_end_of_DRAM()) {
-> >> >> +             pr_warn("Ignoring memory outside of linear range (0x%012llx - 0x%012llx)\n",
-> >> >> +                     memstart_addr + linear_region_size,
-> >> >> +                     (u64)memblock_end_of_DRAM() - 1);
-> >> >> +             memblock_remove(memstart_addr + linear_region_size, ULLONG_MAX);
-> >> >> +     }
-> >> >> +
-> >> >
-> >> > I think this will interact badly with Mark Salter's patches to relocate
-> >> > the initrd if it falls outside of the linear mapping (which relies on the
-> >> > memblocks remaining intact after paging_init):
-> >> >
-> >> >   https://lkml.org/lkml/2015/8/16/75
-> >> >
-> >>
-> >> Are you sure? By the looks of it, these patches combined would
-> >> correctly address the case where no mem= is passed, but the initial
-> >> ramdisk is loaded past the end of the linear region.
-> >>
-> >> I.e., memblock_end_of_DRAM() will return the clipped value, which
-> >> would be smaller than orig_end, triggering the relocation machinery
-> >> which moves it inside the linear region.
-> >
-> > Ok. I was trying to consider the case where the initrd is outside of the
-> > linear mapping not because of a restrictive "mem=", but because its out
-> > of range of our page tables. AFAICT, we'll end up attempting to memcpy
-> > the thing back down (but I appreciate that things won't work without
-> > your patch too).
-> >
+On Tue, Aug 04, 2015 at 02:04:35PM +0000, Karajgaonkar, Saurabh (S.) wrote:
+> From: Saurabh Karajgaonkar <skarajga@visteon.com>
 > 
-> But isn't the whole point of Mark's patches that the source initrd is
-> memremap()'d and copied to a destination that is covered by the kernel
-> direct mapping? I.e., mem= is enforced in the exact same place where
-> this code is added, and so the initrd will not be mapped if it is
-> outside of mem=
+> Replace redundant variable use in return statement.
+> 
+> Signed-off-by: Saurabh Karajgaonkar <skarajga@visteon.com>
+> ---
+>  drivers/usb/serial/mxuport.c | 10 +++-------
+>  1 file changed, 3 insertions(+), 7 deletions(-)
+> 
+> diff --git a/drivers/usb/serial/mxuport.c b/drivers/usb/serial/mxuport.c
+> index 460a406..31a8b47 100644
+> --- a/drivers/usb/serial/mxuport.c
+> +++ b/drivers/usb/serial/mxuport.c
+> @@ -1137,13 +1137,9 @@ static int mxuport_port_probe(struct usb_serial_port *port)
+>  		return err;
+>  
+>  	/* Set interface (RS-232) */
+> -	err = mxuport_send_ctrl_urb(serial, RQ_VENDOR_SET_INTERFACE,
+> -				    MX_INT_RS232,
+> -				    port->port_number);
+> -	if (err)
+> -		return err;
+> -
+> -	return 0;
+> +	return mxuport_send_ctrl_urb(serial, RQ_VENDOR_SET_INTERFACE,
+> +				     MX_INT_RS232,
+> +				     port->port_number);
 
-Yes, you're right. I'd somehow confused myself with the to_free case,
-but it all falls out in the wash and we'll map what we need to map
-before copying the initrd down.
+I do not consider this an improvement as it makes the final ctrl-request
+call look different from the previous two without any real benefit.
 
-Will
+I'll drop this one.
+
+Johan
