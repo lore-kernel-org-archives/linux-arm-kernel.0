@@ -1,50 +1,40 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Mon, 17 Aug 2015 15:07:00 +0900
-Subject: [RFC v2 1/4] ftrace: allow arch-specific check_stack()
-In-Reply-To: <20150811170321.GB29880@arm.com>
-References: <1438674249-3447-1-git-send-email-takahiro.akashi@linaro.org>
- <1438674249-3447-2-git-send-email-takahiro.akashi@linaro.org>
- <20150811170321.GB29880@arm.com>
-Message-ID: <55D17A04.7020800@linaro.org>
+From: wangzhou1@hisilicon.com (Zhou Wang)
+Date: Mon, 17 Aug 2015 12:50:51 +0800
+Subject: [PATCH v6 3/6] PCI: designware: Add ARM64 support
+In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E01D7BC19@lhreml503-mbs>
+References: <1438848559-232109-1-git-send-email-wangzhou1@hisilicon.com>
+ <1438848559-232109-4-git-send-email-wangzhou1@hisilicon.com>
+ <55C44B18.4010103@hisilicon.com> <55CDFFC0.40604@arm.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E01D7BC19@lhreml503-mbs>
+Message-ID: <55D1682B.8090701@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Will,
-
-On 08/12/2015 02:03 AM, Will Deacon wrote:
-> On Tue, Aug 04, 2015 at 08:44:06AM +0100, AKASHI Takahiro wrote:
->> A stack frame pointer may be used in a different way depending on
->> cpu architecture. Thus it is not always appropriate to slurp the stack
->> contents, as currently done in check_stack(), in order to calcurate
->> a stack index (height) at a given function call. At least not on arm64.
+On 2015/8/14 22:55, Gabriele Paoloni wrote:
 >>
->> This patch extract potentially arch-specific code from check_stack()
->> and puts it into a new arch_check_stack(), which is declared as weak.
->> So we will be able to add arch-specific and most efficient way of
->> stack traversing Later.
+>> I've tested this whole series on an ARM32 PCIe board:'Freescale i.MX6
+>> Quad
+>> SABRE Lite Board' with an Intel wireless card on v4.2-rc6.
 >>
->> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
->
-> If arm64 is the only architecture behaving differently, then I'm happy
-> to reconsider the fix to unwind_frame that we merged in e306dfd06fcb
-> ("ARM64: unwind: Fix PC calculation"). I'd have thought any architecture
-> with a branch-and-link instruction would potentially have the same issue,
-> so we could just be fixing things in the wrong place if ftrace works
-> everywhere else.
+>> I can rescan the bus, load firmware, list nearby APs, and even get MSIs
+>> coming from the card.
+>>
+>> Tested-By: James Morse <james.morse@arm.com>
+>>
+>>
+>> Thanks,
+>>
+>> James
+> 
+> Many Thanks for this James!
+> 
+> Gab
+> 
+> .
+> 
 
-I'm not the right person to answer for other architectures (and ftrace
-behavior on them.) The only thing I know is that current ftrace stack tracer
-works correctly only if the addresses stored and found on stack match to
-the ones returned by save_stack_trace().
+Hi James,
 
-Anyway, the fix above is not the only reason that I want to introduce arch-specific
-arch_check_stack(). Other issues to fix include
-   - combined case of stack tracer and function graph tracer (common across arch's)
-   - exception entries (as I'm trying to address in RFC 4/4)
-   - in-accurate stack size (for each function, my current fix is not perfect though.)
+Your test is very helpful. Many thanks for this!
 
-Thanks,
--Takahiro AKASHI
-
-> Will
->
+Zhou
