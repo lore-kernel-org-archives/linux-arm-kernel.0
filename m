@@ -1,60 +1,98 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 16 Aug 2015 15:06:39 +0100
-Subject: [PATCH] spi: Mediatek: fix endian warnings
-In-Reply-To: <1871097.B3YgX5rNy0@wuerfel>
-References: <1439289789-29026-1-git-send-email-leilk.liu@mediatek.com>
- <1871097.B3YgX5rNy0@wuerfel>
-Message-ID: <20150816140639.GE7557@n2100.arm.linux.org.uk>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 17 Aug 2015 09:34:11 +0200
+Subject: ARM: sunxi: Experiences NAND flash
+In-Reply-To: <55C9E7B4.9090906@schinagl.nl>
+References: <55C9E7B4.9090906@schinagl.nl>
+Message-ID: <20150817093411.4ff853c4@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 15, 2015 at 10:16:03PM +0200, Arnd Bergmann wrote:
-> On Tuesday 11 August 2015 18:43:09 Leilk Liu wrote:
-> > @@ -359,9 +359,11 @@ static void mtk_spi_setup_dma_addr(struct spi_master *master,
-> >         struct mtk_spi *mdata = spi_master_get_devdata(master);
-> >  
-> >         if (mdata->tx_sgl)
-> > -               writel(cpu_to_le32(xfer->tx_dma), mdata->base + SPI_TX_SRC_REG);
-> > +               writel((__force u32)cpu_to_le32(xfer->tx_dma),
-> > +                      mdata->base + SPI_TX_SRC_REG);
-> >         if (mdata->rx_sgl)
-> > -               writel(cpu_to_le32(xfer->rx_dma), mdata->base + SPI_RX_DST_REG);
-> > +               writel((__force u32)cpu_to_le32(xfer->rx_dma),
-> > +                      mdata->base + SPI_RX_DST_REG);
-> >  }
-> > 
+Hi Oliver,
+
+Sorry for the late reply (I was in vacation for the last 2 weeks)
+
+On Tue, 11 Aug 2015 14:16:52 +0200
+Olliver Schinagl <oliver+list@schinagl.nl> wrote:
+
+> Hello everybody,
 > 
-> This looks wrong: writel takes a CPU-endian argument, so the value returned
-> from cpu_to_le32() is not appropriate.
+> We are working with Boris and Roy's patch series on getting the NAND 
+> flash chip working on Olimex OLinuXino Lime2 boards. Initially, 
+> everything looks fine, but we noticed that occasionally (after 
+> power/cycle or power cut) ubi fails to mount the partition. It is not 
+> something easily enough to reproduce, but it has failed on 5 boards out 
+> of 30 we have.
+
+I remember warning you about that problem before: MLC NANDs are not as
+reliable as SLC ones (please read my presentation about MLC support in
+Linux [1]). I also remember recommending using an SLC chip if you were
+tight on time to avoid dealing with all these MLC related problems, but
+you decided to go for the MLC solution.
+
+Back to your problem now, what you're seeing here is probably caused by
+interrupted PROGRAM operations on paired pages (page 17, 18 and 26 to 32
+of my presentation for more information).
+
 > 
-> The warning is correct, and you have to remove the cpu_to_le32() conversion
-> in order to get the driver to behave correctly when the kernel is built
-> as big-endian.
+> U-boot reports the following:
+> UBI: default fastmap pool size: 100
+> UBI: default fastmap WL pool size: 25
+> UBI: attaching mtd1 to ubi0
+> UBI: scanning is finished
+> UBI init error 22
+> Error reading superblock on volume 'ubi:boot' errno=-19!
+> ubifsmount - mount UBIFS volume
+> 
+> whereas the linux kernel booted from sd card gives:
+> ubiattach /dev/ubi_ctrl -m 0
+> [  100.560704] ubi0: default fastmap pool size: 8
+> [  100.565186] ubi0: default fastmap WL pool size: 4
+> [  100.570100] ubi0: attaching mtd0
+> [  100.590469] ubi0: scanning is finished
+> [  100.594732] ubi0 error: ubi_read_volume_table: the layout volume was 
+> not found
+> [  100.602675] ubi0 error: ubi_attach_mtd_dev: failed to attach mtd0, 
+> error -22
+> ubiattach: error!: cannot attach mtd0
+>             error 22 (Invalid argument)
+> 
+> The u-boot version we are using is a few months out of date
+> U-Boot 2015.07-rc2-g2540c39 (Aug 04 2015 - 16:09:02 +0200) Allwinner 
+> Technology
+> arm-none-eabi-gcc (4.8.4-1+11-1) 4.8.4 20141219 (release)
+> GNU ld (2.25-5+5+b1) 2.25
+> 
+> but the kernel is fairly up to date:
+> 4.2.0-rc4-opinicus-g8ec3671
+> 
+> 
+> Now I know that the mtd stuff is all very new and all very untested, 
+> what I am curious about is a) have other people actually tried the mtd 
+> stuff on Allwinner hardware, and b) has anybody encountered this issue 
+> as well?
 
-Indeed, it's about time people started thinking more about the warnings
-and why we have coded things in the way we have.
+Yes we did. So far we're using the NAND in SLC mode to address this
+problem. It seems to work, but you also loose half the NAND capacity.
 
-Look people.  cpu_to_le32() takes a value in the CPU endian, and
-converts it to a little endian 32-bit number.  See, the clue is in
-the name.
+> 
+> It's not something very easily reproducible (toggling a machine on/off 
+> repeatedly did not trigger it yet) but it does happen.
 
-All writel() implementations take a CPU number and write it in little
-endian format.  Hence, writel() almost always uses cpu_to_le32()
-internally.
+I managed to reproduce it by faking a power cut directly in the NAND
+core code (by sending a RESET command to the NAND chip in the middle of
+a program operation), and I can confirm SLC mode address the problem.
 
-Now think about what you're saying with "cpu_to_le32(cpu_to_le32())".
-It's utter rubbish, total crap.  It's wrong no matter which way you
-look at it.
+Anyway, remember that MLC NANDs have other sources of unreliability
+(e.g the unstable bits problem).
 
-We have le32_to_cpu() which does what it says on the tin.  Same with
-be32_to_cpu() and cpu_to_be32().
+Best Regards,
 
-Don't hack around this stuff with __force.  If you're having to use
-__force to get rid of a warning here, you _ARE_ doing something wrong,
-no questions about that.  __force in driver code is a definite sign
-that you are doing something wrong.  Don't do it.  Ask the question
-if you think you need it.
+Boris
+
+
+[1]http://events.linuxfoundation.org/sites/events/files/slides/brezillon-mlc-nand_0.pdf
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
