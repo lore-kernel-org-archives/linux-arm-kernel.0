@@ -1,68 +1,43 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Mon, 17 Aug 2015 17:45:31 -0500
-Subject: [PATCH 3/3] [v2] hvc_dcc: disable user-space access to DCC
-In-Reply-To: <20150810094755.GE1604@arm.com>
-References: <1438992995-22610-1-git-send-email-timur@codeaurora.org>
- <1438992995-22610-3-git-send-email-timur@codeaurora.org>
- <20150810094755.GE1604@arm.com>
-Message-ID: <55D2640B.5090709@codeaurora.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 17 Aug 2015 23:47:54 +0100
+Subject: [PATCH] ARM: keystone: add a work around to handle asynchronous
+ external abort
+In-Reply-To: <55D25C64.3090107@ti.com>
+References: <1439320409-20084-1-git-send-email-m-karicheri2@ti.com>
+ <55CDF579.4050408@ti.com>
+ <20150814140934.GX7557@n2100.arm.linux.org.uk>
+ <55CE05EC.4040909@oracle.com> <55CE633C.10402@ti.com>
+ <20150814215617.GA7557@n2100.arm.linux.org.uk>
+ <55D25C64.3090107@ti.com>
+Message-ID: <20150817224754.GI7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/10/2015 04:47 AM, Will Deacon wrote:
->> +static inline void __dcc_initialize(void)
->> +{
->> +	u32 val;
->> +
->> +	/* Disable user-space access to DCC */
->> +	asm volatile ("mrs %0, mdscr_el1\n"
->> +		"	orr %0, %0, #4096\n" /* Set the TDCC bit */
->
-> So this is the same as your "1 << 12" for arch/arm/. Shouldn't we
-> #define that someplace common?
+On Mon, Aug 17, 2015 at 06:12:52PM -0400, Murali Karicheri wrote:
+> Unfortunately, this patch causes boot to stop very early just after
+> local_abt_enable() is called in early_trap_init(). Before and After applying
+> the patch, here is what the boot log looks like. Do you see any issue with
+> the patch diff shown below? Patch is applied on top of v4.2-rc7. I have some
+> additional base port patches applied to boot kernel on my EVM based on a new
+> SoC.
 
-Well, I'm not sure.  First, there is no common place currently 
-available.  I would need to create a new header file that only has one 
-line in it.
+Try moving the call to local_abt_enable() below forward to the end of
+devicemaps_init().  I suspect this is too early for the abort handlers
+to reliably run.
 
-Secondly, DBGDSCR in ARMv7 and MDSCR_EL1 on ARMv8 don't have that much 
-in common.  Those two registers probably serve the same function, but 
-only a few bits are the same.
-
-I've documented the code.  I can clean it up so that it looks like the same.
-
->> +	__dcc_initialize();
->> +
->>   	/* Returns -1 if error */
->>   	ret = hvc_instantiate(0, 0, &hvc_dcc_get_put_ops);
->
-> Can this driver be built as a module and unloaded? If so, should we
-> re-enable userspace access when the kernel doesn't need it anymore?
-
-Not according to the Kconfig:
-
-config HVC_DCC
-        bool "ARM JTAG DCC console"
-
-> Finally, have you checked the behaviour on CPU hotplug? It looks like we
-> zero mdscr_el1 in the cold boot path. The alternative is to set this bit
-> there and never allow userspace access. Do you know of any compelling
-> use-cases where userspace accesses the DCC directly?
-
-Maybe KVM?
-
-I have to admit, this is starting to get a little out of my league.  All 
-I really wanted to do was make DCC available on ARM64, the same exact 
-way it's available on ARM32.  I don't want to have to solve every DCC 
-problem that exists today on every ARM platform.  I would rather drop 
-this patch than have to spend an inordinate amount of time making it 
-perfect.
-
-We've never disabled user-space DCC support on any ARM platform before. 
-  If there is a problem with user-space DCC, I've never seen it, and I 
-don't know anyone who has.
+> diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+> index d358226..381c4e4 100644
+> --- a/arch/arm/kernel/traps.c
+> +++ b/arch/arm/kernel/traps.c
+> @@ -871,6 +871,11 @@ void __init early_trap_init(void *vectors_base)
+> 
+>         flush_icache_range(vectors, vectors + PAGE_SIZE * 2);
+>         modify_domain(DOMAIN_USER, DOMAIN_CLIENT);
+> +
+> +       /* Enable imprecise aborts */
+> +       local_abt_enable();
+> +
 
 -- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
