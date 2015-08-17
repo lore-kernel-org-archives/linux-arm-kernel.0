@@ -1,41 +1,50 @@
-From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
-Date: Mon, 17 Aug 2015 17:18:30 -0300
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Mon, 17 Aug 2015 22:37:19 +0200
 Subject: [PATCH v2 1/2] i2c: add i2c-lpc2k driver
-In-Reply-To: <1439748617-7683-2-git-send-email-manabian@gmail.com>
+In-Reply-To: <20150817201830.GA11033@laptop>
 References: <1439748617-7683-1-git-send-email-manabian@gmail.com>
  <1439748617-7683-2-git-send-email-manabian@gmail.com>
-Message-ID: <20150817201830.GA11033@laptop>
+ <20150817201830.GA11033@laptop>
+Message-ID: <CAGhQ9VzO=mQyCB2B-2Ys32amRNcPVicZWKVygssZmN+NURXKsQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 Aug 08:10 PM, Joachim Eastwood wrote:
-[..]
-> +
-> +static int i2c_lpc2k_clear_arb(struct lpc2k_i2c *i2c)
-> +{
-> +	unsigned long timeout = jiffies + msecs_to_jiffies(1000);
-> +
-> +	/*
-> +	 * If the transfer needs to abort for some reason, we'll try to
-> +	 * force a stop condition to clear any pending bus conditions
-> +	 */
-> +	writel(LPC24XX_STO, i2c->base + LPC24XX_I2CONSET);
-> +
-> +	/* Wait for status change */
-> +	while (readl(i2c->base + LPC24XX_I2STAT) != M_I2C_IDLE) {
-> +		if (time_after(jiffies, timeout)) {
-> +			/* Bus was not idle, try to reset adapter */
-> +			i2c_lpc2k_reset(i2c);
-> +			return -EBUSY;
-> +		}
-> +
-> +		cpu_relax();
-> +	}
+On 17 August 2015 at 22:18, Ezequiel Garcia
+<ezequiel@vanguardiasur.com.ar> wrote:
+> On 16 Aug 08:10 PM, Joachim Eastwood wrote:
+> [..]
+>> +
+>> +static int 2(struct lpc2k_i2c *i2c)
+>> +{
+>> +     unsigned long timeout = jiffies + msecs_to_jiffies(1000);
+>> +
+>> +     /*1
+>> +      * If the transfer needs to abort for some reason, we'll try to
+>> +      * force a stop condition to clear any pending bus conditions
+>> +      */
+>> +     writel(LPC24XX_STO, i2c->base + LPC24XX_I2CONSET);
+>> +
+>> +     /* Wait for status change */
+>> +     while (readl(i2c->base + LPC24XX_I2STAT) != M_I2C_IDLE) {
+>> +             if (time_after(jiffies, timeout)) {
+>> +                     /* Bus was not idle, try to reset adapter */
+>> +                     i2c_lpc2k_reset(i2c);
+>> +                     return -EBUSY;
+>> +             }
+>> +
+>> +             cpu_relax();
+>> +     }
+>
+> I believe you can use readl_{relaxed}_poll_timeout_{atomic} here.
 
-I believe you can use readl_{relaxed}_poll_timeout_{atomic} here.
+I did consider it, but since I don't have a good to way test the code
+path I left it as it was.
+Also since readl_{relaxed}_poll_timeout_{atomic} takes parameters in
+us it seemed unsuitable for a 1s total sleep, but I may be wrong.
 
-Ccing Ariel, maybe he can help with a test.
+> Ccing Ariel, maybe he can help with a test.
 
--- 
-Ezequiel Garcia, VanguardiaSur
-www.vanguardiasur.com.ar
+That would be great.
+
+regards,
+Joachim Eastwood
