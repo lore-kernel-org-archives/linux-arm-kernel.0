@@ -1,43 +1,73 @@
-From: alison.wang@freescale.com (Huan Wang)
-Date: Mon, 17 Aug 2015 03:42:37 +0000
-Subject: [PATCH v3] ARM: configs: Add Freescale LS1021A defconfig
-In-Reply-To: <CAOMZO5By_15OCsb7z2pbywPi3n9vKGj=393hWYHVEQ32=jDNaA@mail.gmail.com>
-References: <1438941784-38403-1-git-send-email-b18965@freescale.com>
- <55CB4829.40204@freescale.com>	<55CE1FFE.2080200@freescale.com>
- <CAOMZO5By_15OCsb7z2pbywPi3n9vKGj=393hWYHVEQ32=jDNaA@mail.gmail.com>
-Message-ID: <BN3PR0301MB08672520CA978383BBF2CF6CFE790@BN3PR0301MB0867.namprd03.prod.outlook.com>
+From: leilk.liu@mediatek.com (Leilk Liu)
+Date: Mon, 17 Aug 2015 11:29:58 +0800
+Subject: [PATCH v6] arm64: dts: Add spi bus dts
+Message-ID: <1439782198-32396-1-git-send-email-leilk.liu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Fabio,
+This patch adds MT8173 spi bus controllers into device tree.
 
-	Based on the analysis and discussion, we prefer to use ls1021a_defconfig and remove LS1021A from imx_v6_v7_defconfig.
+Signed-off-by: Leilk Liu <leilk.liu@mediatek.com>
+---
+Change in this patch:
+pinctl and pad-select fields are board specific, so move to
+mt8173-evb.dtsi, and status = "okay".
+---
+ arch/arm64/boot/dts/mediatek/mt8173-evb.dts | 18 ++++++++++++++++++
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi    | 12 ++++++++++++
+ 2 files changed, 30 insertions(+)
 
-	Thanks.
-
-Best Regards,
-Alison Wang
-
-> On Fri, Aug 14, 2015 at 2:06 PM, Horia Geant?
-> <horia.geanta@freescale.com> wrote:
-> 
-> > Another thing:
-> > Commit 385c0fb0e2c4 ("ARM: imx_v6_v7_defconfig: Select LS1021A")
-> added
-> > CONFIG_SOC_LS1021A in imx_v6_v7_defconfig.
-> >
-> > Besides this, booting a LS1021 AQDS board (Rev2) using
-> > imx_v6_v7_defconfig did not work (stuck at "Starting kernel").
-> 
-> What would be the recommended approach?
-> 
-> - Fix imx_v6_v7_defconfig so that it can make LS1021A to boot
-> 
-> or
-> 
-> - Use this proposed ls1021a_defconfig and remove LS1021A from
-> imx_v6_v7_defconfig?
-> 
-> Regards,
-> 
-> Fabio Estevam
+diff --git a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+index 4be66ca..811cb76 100644
+--- a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
++++ b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+@@ -387,6 +387,24 @@
+ 	};
+ };
+ 
++&pio {
++	spi_pins_a: spi0 {
++		pins_spi {
++			pinmux = <MT8173_PIN_69_SPI_CK__FUNC_SPI_CK_0_>,
++				<MT8173_PIN_70_SPI_MI__FUNC_SPI_MI_0_>,
++				<MT8173_PIN_71_SPI_MO__FUNC_SPI_MO_0_>,
++				<MT8173_PIN_72_SPI_CS__FUNC_SPI_CS_0_>;
++		};
++	};
++};
++
++&spi {
++	pinctrl-names = "default";
++	pinctrl-0 = <&spi_pins_a>;
++	mediatek,pad-select = <0>;
++	status = "okay";
++};
++
+ &uart0 {
+ 	status = "okay";
+ };
+diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+index d18ee42..3dfb6ed 100644
+--- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
++++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+@@ -365,6 +365,18 @@
+ 			status = "disabled";
+ 		};
+ 
++		spi: spi at 1100a000 {
++			compatible = "mediatek,mt8173-spi";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0 0x1100a000 0 0x1000>;
++			interrupts = <GIC_SPI 110 IRQ_TYPE_LEVEL_LOW>;
++			clocks = <&topckgen CLK_TOP_SPI_SEL>,
++				 <&topckgen CLK_TOP_SYSPLL3_D2>;
++			clock-names = "spi-clk", "parent-clk";
++			status = "disabled";
++		};
++
+ 		i2c3: i2c3 at 11010000 {
+ 			compatible = "mediatek,mt8173-i2c";
+ 			reg = <0 0x11010000 0 0x70>,
+-- 
+1.8.1.1.dirty
