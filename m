@@ -1,142 +1,53 @@
-From: tchalamarla@caviumnetworks.com (tchalamarla at caviumnetworks.com)
-Date: Mon, 17 Aug 2015 16:13:55 -0700
-Subject: [PATCH V3] iommu/arm-smmu-v2: ThunderX mis-extends 64bit registers
-Message-ID: <1439853235-12162-1-git-send-email-tchalamarla@caviumnetworks.com>
+From: mturquette@linaro.org (Michael Turquette)
+Date: Mon, 17 Aug 2015 16:22:35 -0700
+Subject: [PATCH v4 RESEND 1/3] clk: Add regmap support
+In-Reply-To: <1438355659-21558-2-git-send-email-matthias.bgg@gmail.com>
+References: <1438355659-21558-1-git-send-email-matthias.bgg@gmail.com>
+ <1438355659-21558-2-git-send-email-matthias.bgg@gmail.com>
+Message-ID: <20150817232235.31346.30218@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
+Quoting Matthias Brugger (2015-07-31 08:14:17)
+> diff --git a/drivers/clk/clk-io.c b/drivers/clk/clk-io.c
+> new file mode 100644
+> index 0000000..9630ef5
+> --- /dev/null
+> +++ b/drivers/clk/clk-io.c
+> @@ -0,0 +1,48 @@
+> +/*
+> + * Copyright (C) 2015 Matthias Brugger <matthias.bgg@gmail.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + */
+> +
+> +#include <linux/clk-provider.h>
+> +
+> +void clk_io_writel(struct clk_hw *hw, void __iomem *reg, struct regmap *regmap,
+> +                       u32 offset, u32 val)
+> +{
+> +       if (__clk_get_flags(hw->clk) & CLK_USE_REGMAP)
+> +               regmap_write(regmap, offset, val);
+> +       else
+> +               clk_writel(val, reg);
+> +}
 
-The SMMU architecture defines two different behaviors when 64-bit
-registers are written with 32-bit writes.  The first behavior causes
-zero extension into the upper 32-bits.  The second behavior splits a
-64-bit register into "normal" 32-bit register pairs.
+So we have clk_writel, which already wraps direct io accesses depending
+on arch/platform, and then this patch adds regmap support, and both of
+those are wrapped in clk_io_writel? :-/
 
-On some buggy implementations, registers incorrectly zero extended
-when they should instead behave as normal 32-bit register pairs.
+I agree that we should merge some unified regmap support into the clock
+framework for the basic clocks, but I do not think that this is the
+right way to do it. This patch simply adds more code to already crowded
+basic clock types.
 
-Signed-off-by: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
+Replacing the basic clock types by separating policy and machine-driver
+code into separate, modular pieces is a high priority on my todo list.
+I'd like to do that first and then revisit regmap clocks instead of
+merging this series as-is.
 
-Changes from V2:
-	- removed unused definitions
-
-Changes from V1:
-	- Introduced smmu_writeq
----
- drivers/iommu/arm-smmu.c | 57 +++++++++++++++++++++++++-----------------------
- 1 file changed, 30 insertions(+), 27 deletions(-)
-
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 66a803b..26572d6 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -69,6 +69,18 @@
- 		((smmu->options & ARM_SMMU_OPT_SECURE_CFG_ACCESS)	\
- 			? 0x400 : 0))
- 
-+#ifdef CONFIG_64BIT
-+#define smmu_writeq(reg64, addr)	writeq_relaxed((reg64), (addr))
-+#else
-+#define smmu_writeq(reg64, addr)				\
-+	do {							\
-+		u64 __val = (reg64);				\
-+		void __iomem *__addr = (addr);			\
-+		writel_relaxed(__val >> 32, __addr + 4);	\
-+		writel_relaxed(__val, __addr);			\
-+	} while (0)
-+#endif
-+
- /* Configuration registers */
- #define ARM_SMMU_GR0_sCR0		0x0
- #define sCR0_CLIENTPD			(1 << 0)
-@@ -184,10 +196,8 @@
- #define ARM_SMMU_CB_SCTLR		0x0
- #define ARM_SMMU_CB_RESUME		0x8
- #define ARM_SMMU_CB_TTBCR2		0x10
--#define ARM_SMMU_CB_TTBR0_LO		0x20
--#define ARM_SMMU_CB_TTBR0_HI		0x24
--#define ARM_SMMU_CB_TTBR1_LO		0x28
--#define ARM_SMMU_CB_TTBR1_HI		0x2c
-+#define ARM_SMMU_CB_TTBR0		0x20
-+#define ARM_SMMU_CB_TTBR1		0x28
- #define ARM_SMMU_CB_TTBCR		0x30
- #define ARM_SMMU_CB_S1_MAIR0		0x38
- #define ARM_SMMU_CB_S1_MAIR1		0x3c
-@@ -202,8 +212,7 @@
- #define ARM_SMMU_CB_S1_TLBIVAL		0x620
- #define ARM_SMMU_CB_S2_TLBIIPAS2	0x630
- #define ARM_SMMU_CB_S2_TLBIIPAS2L	0x638
--#define ARM_SMMU_CB_ATS1PR_LO		0x800
--#define ARM_SMMU_CB_ATS1PR_HI		0x804
-+#define ARM_SMMU_CB_ATS1PR		0x800
- #define ARM_SMMU_CB_ATSR		0x8f0
- 
- #define SCTLR_S1_ASIDPNE		(1 << 12)
-@@ -226,7 +235,7 @@
- #define TTBCR2_SEP_SHIFT		15
- #define TTBCR2_SEP_UPSTREAM		(0x7 << TTBCR2_SEP_SHIFT)
- 
--#define TTBRn_HI_ASID_SHIFT            16
-+#define TTBRn_ASID_SHIFT		48
- 
- #define FSR_MULTI			(1 << 31)
- #define FSR_SS				(1 << 30)
-@@ -719,6 +728,7 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
- 				       struct io_pgtable_cfg *pgtbl_cfg)
- {
- 	u32 reg;
-+	u64 reg64;
- 	bool stage1;
- 	struct arm_smmu_cfg *cfg = &smmu_domain->cfg;
- 	struct arm_smmu_device *smmu = smmu_domain->smmu;
-@@ -762,22 +772,17 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
- 
- 	/* TTBRs */
- 	if (stage1) {
--		reg = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[0];
--		writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR0_LO);
--		reg = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[0] >> 32;
--		reg |= ARM_SMMU_CB_ASID(cfg) << TTBRn_HI_ASID_SHIFT;
--		writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR0_HI);
--
--		reg = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[1];
--		writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR1_LO);
--		reg = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[1] >> 32;
--		reg |= ARM_SMMU_CB_ASID(cfg) << TTBRn_HI_ASID_SHIFT;
--		writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR1_HI);
-+		reg64 = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[0];
-+
-+		reg64 |= ((u64)ARM_SMMU_CB_ASID(cfg)) << TTBRn_ASID_SHIFT;
-+		smmu_writeq(reg64, cb_base + ARM_SMMU_CB_TTBR0);
-+
-+		reg64 = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[1];
-+		reg64 |= ((u64)ARM_SMMU_CB_ASID(cfg)) << TTBRn_ASID_SHIFT;
-+		smmu_writeq(reg64, cb_base + ARM_SMMU_CB_TTBR1);
- 	} else {
--		reg = pgtbl_cfg->arm_lpae_s2_cfg.vttbr;
--		writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR0_LO);
--		reg = pgtbl_cfg->arm_lpae_s2_cfg.vttbr >> 32;
--		writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR0_HI);
-+		reg64 = pgtbl_cfg->arm_lpae_s2_cfg.vttbr;
-+		smmu_writeq(reg64, cb_base + ARM_SMMU_CB_TTBR0);
- 	}
- 
- 	/* TTBCR */
-@@ -1234,12 +1239,10 @@ static phys_addr_t arm_smmu_iova_to_phys_hard(struct iommu_domain *domain,
- 
- 	if (smmu->version == 1) {
- 		u32 reg = iova & ~0xfff;
--		writel_relaxed(reg, cb_base + ARM_SMMU_CB_ATS1PR_LO);
-+		writel_relaxed(reg, cb_base + ARM_SMMU_CB_ATS1PR);
- 	} else {
--		u32 reg = iova & ~0xfff;
--		writel_relaxed(reg, cb_base + ARM_SMMU_CB_ATS1PR_LO);
--		reg = ((u64)iova & ~0xfff) >> 32;
--		writel_relaxed(reg, cb_base + ARM_SMMU_CB_ATS1PR_HI);
-+		u64 reg64 = iova & ~0xfff;
-+		smmu_writeq(reg64, cb_base + ARM_SMMU_CB_ATS1PR);
- 	}
- 
- 	if (readl_poll_timeout_atomic(cb_base + ARM_SMMU_CB_ATSR, tmp,
--- 
-2.1.0
+Regards,
+Mike
