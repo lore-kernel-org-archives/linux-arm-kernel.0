@@ -1,99 +1,134 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Mon, 17 Aug 2015 10:11:11 -0400
-Subject: [PATCH] ARM: keystone: add a work around to handle asynchronous
- external abort
-In-Reply-To: <1439561519.13210.55.camel@pengutronix.de>
-References: <1439320409-20084-1-git-send-email-m-karicheri2@ti.com>	
- <55CDF579.4050408@ti.com> <1439561519.13210.55.camel@pengutronix.de>
-Message-ID: <55D1EB7F.4030905@ti.com>
+From: alim.akhtar@gmail.com (Alim Akhtar)
+Date: Mon, 17 Aug 2015 20:12:17 +0530
+Subject: [PATCH 2/3] mmc: dw_mmc: simplify the SDMMC_CLKEN_LOW_PWR logic
+In-Reply-To: <55D1C4CD.4040200@samsung.com>
+References: <cover.1439381423.git.hramrach@gmail.com>
+ <3d03bfe2c18789eefa038018467c9c63c94ae4a2.1439381423.git.hramrach@gmail.com>
+ <55D13F07.70309@samsung.com>
+ <CAOMqctQ8DHj6qPg8zR93OGRHXAZDd0yUmG_J8Vz7dGFuDpCgRQ@mail.gmail.com>
+ <55D1C4CD.4040200@samsung.com>
+Message-ID: <CAGOxZ51oHoX+zQSO8tRp8V5RUmDg8CAnM9HO5FQ5h6JeCy=1og@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/14/2015 10:11 AM, Lucas Stach wrote:
-> Am Freitag, den 14.08.2015, 10:04 -0400 schrieb Murali Karicheri:
->> On 08/11/2015 03:13 PM, Murali Karicheri wrote:
->>> Currently on some devices, an asynchronous external abort exception
->>> happens during boot up when exception handlers are enabled in kernel
->>> before switching to user space. This patch adds a workaround to handle
->>> this once during boot. Many customers are already using this
->>> with out any issues and is required to workaround the above issue.
->>>
->>> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
->>> ---
->>>    arch/arm/mach-keystone/keystone.c | 26 ++++++++++++++++++++++++++
->>>    1 file changed, 26 insertions(+)
->>>
->>> diff --git a/arch/arm/mach-keystone/keystone.c b/arch/arm/mach-keystone/keystone.c
->>> index e2880105..c1d0fe5 100644
->>> --- a/arch/arm/mach-keystone/keystone.c
->>> +++ b/arch/arm/mach-keystone/keystone.c
->>> @@ -15,6 +15,7 @@
->>>    #include <linux/of_platform.h>
->>>    #include <linux/of_address.h>
->>>    #include <linux/memblock.h>
->>> +#include <linux/signal.h>
->>>
->>>    #include <asm/setup.h>
->>>    #include <asm/mach/map.h>
->>> @@ -52,6 +53,24 @@ static struct notifier_block platform_nb = {
->>>    	.notifier_call = keystone_platform_notifier,
->>>    };
->>>
->>> +static bool ignore_first = true;
->>> +static int keystone_async_ext_abort_fault(unsigned long addr, unsigned int fsr,
->>> +					  struct pt_regs *regs)
->>> +{
->>> +	/*
->>> +	 * if first time, ignore this as this is a asynchronous external abort
->>> +	 * happening only some devices that couldn't be root caused and we add
->>> +	 * this work around to handle this first time.
->>> +	 */
->>> +	if (ignore_first) {
->>> +		ignore_first = false;
->>> +		return 0;
->>> +	}
->>> +
->>> +	/* Subsequent ones should be handled as fault */
->>> +	return 1;
->>> +}
->>> +
->>>    static void __init keystone_init(void)
->>>    {
->>>    	if (PHYS_OFFSET >= KEYSTONE_HIGH_PHYS_START) {
->>> @@ -61,6 +80,13 @@ static void __init keystone_init(void)
->>>    	}
->>>    	keystone_pm_runtime_init();
->>>    	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
->>> +
->>> +	/*
->>> +	 * Add a one time exception handler to catch asynchronous external
->>> +	 * abort
->>> +	 */
->>> +	hook_fault_code(17, keystone_async_ext_abort_fault, SIGBUS, 0,
->>> +			"async external abort handler");
->>>    }
->>>
->>>    static phys_addr_t keystone_virt_to_idmap(unsigned long x)
->>>
->> Can this be applied if it looks good?
+HI
+
+On Mon, Aug 17, 2015 at 4:56 PM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
+> On 08/17/2015 02:52 PM, Michal Suchanek wrote:
+>> Hello,
 >>
-> The keystone PCIe host driver already hooks the same fault code. Those
-> hooks are no chain, but a simple pointer, so one of those handlers is
-> going to loose out.
+>> On 17 August 2015 at 03:55, Jaehoon Chung <jh80.chung@samsung.com> wrote:
+>>> Hi, Michal.
+>>>
+>>> On 08/12/2015 09:23 PM, Michal Suchanek wrote:
+>>>> The driver has open-coded test for SDIO cards. Use the mmc core provided
+>>>> MMC_QUIRK_BROKEN_CLK_GATING flag instead.
+>>>
+>>> Did you use the clock-gating for SDIO cards?
+>>> Doesn't MMC_CAP_SDIO_IRQ bit set? Which case is broken?
+>>> Could you explain to me more?
+>>
+>> The core flag for disabling power saving is MMC_QUIRK_BROKEN_CLK_GATING.
 >
-> This likely isn't what you intended.
-You are right. I will try to debug this further based on your patch and 
-as per RMK's suggestion.
+> I understood your intention. And i read the comment into mmc/core/quirks.c
+> I will test SDIO card with this patch. Thanks.
+>
+When you test, please check if SDIO IRQ still works, we need to put
+dw_mmc in low_power mode otherwise SDIO IRQ will be not be generated
+by dw_mmc host controller.
 
-Thanks and regards,
+> Best Regards,
+> Jaehoon Chung
+>
+>>
+>> It may coincide with MMC_CAP_SDIO_IRQ but that's different flag for
+>> different purpose.
+>>
+>> MMC_QUIRK_BROKEN_CLK_GATING is currently set for all SDIO cards except
+>> for cards on a whitelist.
+>>
+>> I don't know any particular SDIO card that has problems when the clock
+>> is off and does not use an IRQ.
+>>
+>> Thanks
+>>
+>> Michal
+>>
+>>>
+>>> Best Regards,
+>>> Jaehoon Chung
+>>>
+>>>>
+>>>> As a bonus this may enable clock gating on SDIO cards that are known to
+>>>> work with it.
+>>>>
+>>>> Signed-off-by: Michal Suchanek <hramrach@gmail.com>
+>>>> ---
+>>>>  drivers/mmc/host/dw_mmc.c | 33 +++++++++++++++------------------
+>>>>  1 file changed, 15 insertions(+), 18 deletions(-)
+>>>>
+>>>> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+>>>> index 40e9d8e..3bc9fd7 100644
+>>>> --- a/drivers/mmc/host/dw_mmc.c
+>>>> +++ b/drivers/mmc/host/dw_mmc.c
+>>>> @@ -1335,27 +1335,24 @@ static void dw_mci_init_card(struct mmc_host *mmc, struct mmc_card *card)
+>>>>        * description of the CLKENA register we should disable low power mode
+>>>>        * for SDIO cards if we need SDIO interrupts to work.
+>>>>        */
+>>>> -     if (mmc->caps & MMC_CAP_SDIO_IRQ) {
+>>>> -             const u32 clken_low_pwr = SDMMC_CLKEN_LOW_PWR << slot->id;
+>>>> -             u32 clk_en_a_old;
+>>>> -             u32 clk_en_a;
+>>>> +     const u32 clken_low_pwr = SDMMC_CLKEN_LOW_PWR << slot->id;
+>>>> +     u32 clk_en_a_old;
+>>>> +     u32 clk_en_a;
+>>>>
+>>>> -             clk_en_a_old = mci_readl(host, CLKENA);
+>>>> +     clk_en_a_old = mci_readl(host, CLKENA);
+>>>>
+>>>> -             if (card->type == MMC_TYPE_SDIO ||
+>>>> -                 card->type == MMC_TYPE_SD_COMBO) {
+>>>> -                     set_bit(DW_MMC_CARD_NO_LOW_PWR, &slot->flags);
+>>>> -                     clk_en_a = clk_en_a_old & ~clken_low_pwr;
+>>>> -             } else {
+>>>> -                     clear_bit(DW_MMC_CARD_NO_LOW_PWR, &slot->flags);
+>>>> -                     clk_en_a = clk_en_a_old | clken_low_pwr;
+>>>> -             }
+>>>> +     if (card->quirks & MMC_QUIRK_BROKEN_CLK_GATING) {
+>>>> +             set_bit(DW_MMC_CARD_NO_LOW_PWR, &slot->flags);
+>>>> +             clk_en_a = clk_en_a_old & ~clken_low_pwr;
+>>>> +     } else {
+>>>> +             clear_bit(DW_MMC_CARD_NO_LOW_PWR, &slot->flags);
+>>>> +             clk_en_a = clk_en_a_old | clken_low_pwr;
+>>>> +     }
+>>>>
+>>>> -             if (clk_en_a != clk_en_a_old) {
+>>>> -                     mci_writel(host, CLKENA, clk_en_a);
+>>>> -                     mci_send_cmd(slot, SDMMC_CMD_UPD_CLK |
+>>>> -                                  SDMMC_CMD_PRV_DAT_WAIT, 0);
+>>>> -             }
+>>>> +     if (clk_en_a != clk_en_a_old) {
+>>>> +             mci_writel(host, CLKENA, clk_en_a);
+>>>> +             mci_send_cmd(slot, SDMMC_CMD_UPD_CLK |
+>>>> +                             SDMMC_CMD_PRV_DAT_WAIT, 0);
+>>>>       }
+>>>>  }
+>>>>
+>>>>
+>>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-Murali
->
-> Regards,
-> Lucas
->
 
 
 -- 
-Murali Karicheri
-Linux Kernel, Keystone
+Regards,
+Alim
