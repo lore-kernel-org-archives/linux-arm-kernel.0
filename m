@@ -1,57 +1,23 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Mon, 17 Aug 2015 13:35:47 +0100
-Subject: [PATCH V6 1/3] DT: nvmem: add binding for mxs-ocotp
-In-Reply-To: <1439418116-1833-2-git-send-email-stefan.wahren@i2se.com>
-References: <1439418116-1833-1-git-send-email-stefan.wahren@i2se.com>
- <1439418116-1833-2-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <55D1D523.3000309@linaro.org>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Mon, 17 Aug 2015 14:40:35 +0200
+Subject: [GIT PULL 6/9] iommu/tegra-smmu: Changes for v4.3-rc1
+In-Reply-To: <1439563720-13189-7-git-send-email-thierry.reding@gmail.com>
+References: <1439563720-13189-1-git-send-email-thierry.reding@gmail.com>
+ <1439563720-13189-7-git-send-email-thierry.reding@gmail.com>
+Message-ID: <20150817124035.GK14980@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Aug 14, 2015 at 04:48:37PM +0200, Thierry Reding wrote:
+> Hi Joerg,
+> 
+> The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
+> 
+>   Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.3-iommu
 
 
-On 12/08/15 23:21, Stefan Wahren wrote:
-> This patch adds the devicetree bindings for the Freescale MXS On Chip
-> OTP driver.
->
-> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
-
-Acked-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-
-> ---
->   .../devicetree/bindings/nvmem/mxs-ocotp.txt        |   25 ++++++++++++++++++++
->   1 file changed, 25 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/nvmem/mxs-ocotp.txt
->
-> diff --git a/Documentation/devicetree/bindings/nvmem/mxs-ocotp.txt b/Documentation/devicetree/bindings/nvmem/mxs-ocotp.txt
-> new file mode 100644
-> index 0000000..daebce9
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/nvmem/mxs-ocotp.txt
-> @@ -0,0 +1,25 @@
-> +On-Chip OTP Memory for Freescale i.MX23/i.MX28
-> +
-> +Required properties :
-> +- compatible :
-> +  - "fsl,imx23-ocotp" for i.MX23
-> +  - "fsl,imx28-ocotp" for i.MX28
-> +- #address-cells : Should be 1
-> +- #size-cells : Should be 1
-> +- reg : Address and length of OTP controller registers
-> +- clocks : Should contain a reference to the hbus clock
-> +
-> += Data cells =
-> +Are child nodes of mxs-ocotp, bindings of which as described in
-> +bindings/nvmem/nvmem.txt
-> +
-> +Example for i.MX28:
-> +
-> +	ocotp: ocotp at 8002c000 {
-> +		compatible = "fsl,imx28-ocotp", "fsl,ocotp";
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		reg = <0x8002c000 0x2000>;
-> +		clocks = <&clks 25>;
-> +		status = "okay";
-> +	};
->
+Pulled, thanks.
