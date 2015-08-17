@@ -1,55 +1,30 @@
-From: shijie.huang@arm.com (Huang Shijie)
-Date: Mon, 17 Aug 2015 11:24:43 +0800
-Subject: [PATCH] arm64: dts: Juno: fix the wrong memory map sizes for the
- I2C/EHCI/OHCI
-Message-ID: <1439781883-2335-1-git-send-email-shijie.huang@arm.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 17 Aug 2015 10:48:05 +0900
+Subject: [PATCH 2/4] clk: samsung: exynos3250: Add MMC2 clock
+In-Reply-To: <1439264784-30322-3-git-send-email-cw00.choi@samsung.com>
+References: <1439264784-30322-1-git-send-email-cw00.choi@samsung.com>
+ <1439264784-30322-3-git-send-email-cw00.choi@samsung.com>
+Message-ID: <55D13D55.5030207@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From the "Juno ARM Development Platform Soc Techinical Reference Mannual(r1p0)",
-we get the following memory map sizes (3-25):
-	I2C      : 0x7ffa0000  0x7ffa00ff       (256B)
-	USB OHCI : 0x7ffb0000  0x7ffb0fff       (4KB)
-	USB EHCI : 0x7ffc0000  0x7ffc0fff       (4KB)
+On 11.08.2015 12:46, Chanwoo Choi wrote:
+> This patch add the MMC2 clocks (mux, divider, gate) of Exynos3250 SoC.
+> 
+> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> Cc: Tomasz Figa <tomasz.figa@gmail.com>
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> ---
+>  drivers/clk/samsung/clk-exynos3250.c   | 9 +++++++++
+>  include/dt-bindings/clock/exynos3250.h | 7 ++++++-
+>  2 files changed, 15 insertions(+), 1 deletion(-)
 
-This patch fixes the wrong memory map sizes for them.
 
-Signed-off-by: Huang Shijie <shijie.huang@arm.com>
----
-There is something wrong with my email account, so try to send it out again.
----
- arch/arm64/boot/dts/arm/juno-base.dtsi | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
-index e3ee960..7b2715f 100644
---- a/arch/arm64/boot/dts/arm/juno-base.dtsi
-+++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
-@@ -74,7 +74,7 @@
- 
- 	i2c at 7ffa0000 {
- 		compatible = "snps,designware-i2c";
--		reg = <0x0 0x7ffa0000 0x0 0x1000>;
-+		reg = <0x0 0x7ffa0000 0x0 0x100>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 		interrupts = <GIC_SPI 104 IRQ_TYPE_LEVEL_HIGH>;
-@@ -95,14 +95,14 @@
- 
- 	ohci at 7ffb0000 {
- 		compatible = "generic-ohci";
--		reg = <0x0 0x7ffb0000 0x0 0x10000>;
-+		reg = <0x0 0x7ffb0000 0x0 0x1000>;
- 		interrupts = <GIC_SPI 116 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&soc_usb48mhz>;
- 	};
- 
- 	ehci at 7ffc0000 {
- 		compatible = "generic-ehci";
--		reg = <0x0 0x7ffc0000 0x0 0x10000>;
-+		reg = <0x0 0x7ffc0000 0x0 0x1000>;
- 		interrupts = <GIC_SPI 117 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&soc_usb48mhz>;
- 	};
--- 
-2.1.4
+Assuming that numbers/addresses are good (reserved in my datasheet) the
+code itself looks good:
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+
+
+Best regards,
+Krzysztof
