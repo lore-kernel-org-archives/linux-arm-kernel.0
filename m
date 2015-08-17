@@ -1,43 +1,142 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 17 Aug 2015 23:47:54 +0100
-Subject: [PATCH] ARM: keystone: add a work around to handle asynchronous
- external abort
-In-Reply-To: <55D25C64.3090107@ti.com>
-References: <1439320409-20084-1-git-send-email-m-karicheri2@ti.com>
- <55CDF579.4050408@ti.com>
- <20150814140934.GX7557@n2100.arm.linux.org.uk>
- <55CE05EC.4040909@oracle.com> <55CE633C.10402@ti.com>
- <20150814215617.GA7557@n2100.arm.linux.org.uk>
- <55D25C64.3090107@ti.com>
-Message-ID: <20150817224754.GI7557@n2100.arm.linux.org.uk>
+From: tchalamarla@caviumnetworks.com (tchalamarla at caviumnetworks.com)
+Date: Mon, 17 Aug 2015 16:13:55 -0700
+Subject: [PATCH V3] iommu/arm-smmu-v2: ThunderX mis-extends 64bit registers
+Message-ID: <1439853235-12162-1-git-send-email-tchalamarla@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 17, 2015 at 06:12:52PM -0400, Murali Karicheri wrote:
-> Unfortunately, this patch causes boot to stop very early just after
-> local_abt_enable() is called in early_trap_init(). Before and After applying
-> the patch, here is what the boot log looks like. Do you see any issue with
-> the patch diff shown below? Patch is applied on top of v4.2-rc7. I have some
-> additional base port patches applied to boot kernel on my EVM based on a new
-> SoC.
+From: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
 
-Try moving the call to local_abt_enable() below forward to the end of
-devicemaps_init().  I suspect this is too early for the abort handlers
-to reliably run.
+The SMMU architecture defines two different behaviors when 64-bit
+registers are written with 32-bit writes.  The first behavior causes
+zero extension into the upper 32-bits.  The second behavior splits a
+64-bit register into "normal" 32-bit register pairs.
 
-> diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-> index d358226..381c4e4 100644
-> --- a/arch/arm/kernel/traps.c
-> +++ b/arch/arm/kernel/traps.c
-> @@ -871,6 +871,11 @@ void __init early_trap_init(void *vectors_base)
-> 
->         flush_icache_range(vectors, vectors + PAGE_SIZE * 2);
->         modify_domain(DOMAIN_USER, DOMAIN_CLIENT);
-> +
-> +       /* Enable imprecise aborts */
-> +       local_abt_enable();
-> +
+On some buggy implementations, registers incorrectly zero extended
+when they should instead behave as normal 32-bit register pairs.
 
+Signed-off-by: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
+
+Changes from V2:
+	- removed unused definitions
+
+Changes from V1:
+	- Introduced smmu_writeq
+---
+ drivers/iommu/arm-smmu.c | 57 +++++++++++++++++++++++++-----------------------
+ 1 file changed, 30 insertions(+), 27 deletions(-)
+
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index 66a803b..26572d6 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -69,6 +69,18 @@
+ 		((smmu->options & ARM_SMMU_OPT_SECURE_CFG_ACCESS)	\
+ 			? 0x400 : 0))
+ 
++#ifdef CONFIG_64BIT
++#define smmu_writeq(reg64, addr)	writeq_relaxed((reg64), (addr))
++#else
++#define smmu_writeq(reg64, addr)				\
++	do {							\
++		u64 __val = (reg64);				\
++		void __iomem *__addr = (addr);			\
++		writel_relaxed(__val >> 32, __addr + 4);	\
++		writel_relaxed(__val, __addr);			\
++	} while (0)
++#endif
++
+ /* Configuration registers */
+ #define ARM_SMMU_GR0_sCR0		0x0
+ #define sCR0_CLIENTPD			(1 << 0)
+@@ -184,10 +196,8 @@
+ #define ARM_SMMU_CB_SCTLR		0x0
+ #define ARM_SMMU_CB_RESUME		0x8
+ #define ARM_SMMU_CB_TTBCR2		0x10
+-#define ARM_SMMU_CB_TTBR0_LO		0x20
+-#define ARM_SMMU_CB_TTBR0_HI		0x24
+-#define ARM_SMMU_CB_TTBR1_LO		0x28
+-#define ARM_SMMU_CB_TTBR1_HI		0x2c
++#define ARM_SMMU_CB_TTBR0		0x20
++#define ARM_SMMU_CB_TTBR1		0x28
+ #define ARM_SMMU_CB_TTBCR		0x30
+ #define ARM_SMMU_CB_S1_MAIR0		0x38
+ #define ARM_SMMU_CB_S1_MAIR1		0x3c
+@@ -202,8 +212,7 @@
+ #define ARM_SMMU_CB_S1_TLBIVAL		0x620
+ #define ARM_SMMU_CB_S2_TLBIIPAS2	0x630
+ #define ARM_SMMU_CB_S2_TLBIIPAS2L	0x638
+-#define ARM_SMMU_CB_ATS1PR_LO		0x800
+-#define ARM_SMMU_CB_ATS1PR_HI		0x804
++#define ARM_SMMU_CB_ATS1PR		0x800
+ #define ARM_SMMU_CB_ATSR		0x8f0
+ 
+ #define SCTLR_S1_ASIDPNE		(1 << 12)
+@@ -226,7 +235,7 @@
+ #define TTBCR2_SEP_SHIFT		15
+ #define TTBCR2_SEP_UPSTREAM		(0x7 << TTBCR2_SEP_SHIFT)
+ 
+-#define TTBRn_HI_ASID_SHIFT            16
++#define TTBRn_ASID_SHIFT		48
+ 
+ #define FSR_MULTI			(1 << 31)
+ #define FSR_SS				(1 << 30)
+@@ -719,6 +728,7 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
+ 				       struct io_pgtable_cfg *pgtbl_cfg)
+ {
+ 	u32 reg;
++	u64 reg64;
+ 	bool stage1;
+ 	struct arm_smmu_cfg *cfg = &smmu_domain->cfg;
+ 	struct arm_smmu_device *smmu = smmu_domain->smmu;
+@@ -762,22 +772,17 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
+ 
+ 	/* TTBRs */
+ 	if (stage1) {
+-		reg = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[0];
+-		writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR0_LO);
+-		reg = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[0] >> 32;
+-		reg |= ARM_SMMU_CB_ASID(cfg) << TTBRn_HI_ASID_SHIFT;
+-		writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR0_HI);
+-
+-		reg = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[1];
+-		writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR1_LO);
+-		reg = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[1] >> 32;
+-		reg |= ARM_SMMU_CB_ASID(cfg) << TTBRn_HI_ASID_SHIFT;
+-		writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR1_HI);
++		reg64 = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[0];
++
++		reg64 |= ((u64)ARM_SMMU_CB_ASID(cfg)) << TTBRn_ASID_SHIFT;
++		smmu_writeq(reg64, cb_base + ARM_SMMU_CB_TTBR0);
++
++		reg64 = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[1];
++		reg64 |= ((u64)ARM_SMMU_CB_ASID(cfg)) << TTBRn_ASID_SHIFT;
++		smmu_writeq(reg64, cb_base + ARM_SMMU_CB_TTBR1);
+ 	} else {
+-		reg = pgtbl_cfg->arm_lpae_s2_cfg.vttbr;
+-		writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR0_LO);
+-		reg = pgtbl_cfg->arm_lpae_s2_cfg.vttbr >> 32;
+-		writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR0_HI);
++		reg64 = pgtbl_cfg->arm_lpae_s2_cfg.vttbr;
++		smmu_writeq(reg64, cb_base + ARM_SMMU_CB_TTBR0);
+ 	}
+ 
+ 	/* TTBCR */
+@@ -1234,12 +1239,10 @@ static phys_addr_t arm_smmu_iova_to_phys_hard(struct iommu_domain *domain,
+ 
+ 	if (smmu->version == 1) {
+ 		u32 reg = iova & ~0xfff;
+-		writel_relaxed(reg, cb_base + ARM_SMMU_CB_ATS1PR_LO);
++		writel_relaxed(reg, cb_base + ARM_SMMU_CB_ATS1PR);
+ 	} else {
+-		u32 reg = iova & ~0xfff;
+-		writel_relaxed(reg, cb_base + ARM_SMMU_CB_ATS1PR_LO);
+-		reg = ((u64)iova & ~0xfff) >> 32;
+-		writel_relaxed(reg, cb_base + ARM_SMMU_CB_ATS1PR_HI);
++		u64 reg64 = iova & ~0xfff;
++		smmu_writeq(reg64, cb_base + ARM_SMMU_CB_ATS1PR);
+ 	}
+ 
+ 	if (readl_poll_timeout_atomic(cb_base + ARM_SMMU_CB_ATSR, tmp,
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+2.1.0
