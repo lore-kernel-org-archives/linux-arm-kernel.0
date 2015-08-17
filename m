@@ -1,37 +1,123 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 17 Aug 2015 17:18:51 +0200
-Subject: [PATCH v2] ARM: dts: sunxi: Raise minimum CPU voltage for
- sun7i-a20 to meet SoC specifications
-In-Reply-To: <1438722481-2302-1-git-send-email-public_timo.s@silentcreek.de>
-References: <1438722481-2302-1-git-send-email-public_timo.s@silentcreek.de>
-Message-ID: <20150817151851.GE2547@lukather>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Mon, 17 Aug 2015 17:25:52 +0200
+Subject: [PATCH v3 03/10] VFIO: platform: single handler using function
+ pointer
+In-Reply-To: <1439405780.4023.527.camel@redhat.com>
+References: <1439212864-12954-1-git-send-email-eric.auger@linaro.org>	
+ <1439212864-12954-4-git-send-email-eric.auger@linaro.org>
+ <1439405780.4023.527.camel@redhat.com>
+Message-ID: <55D1FD00.8030400@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Timo,
-
-On Tue, Aug 04, 2015 at 11:08:01PM +0200, Timo Sigurdsson wrote:
-> sun7i-a20.dtsi contains a cpufreq operating point at 0.9 volts. The minimum
-> CPU voltage for the Allwinner A20 SoC, however, is 1.0 volts. Thus, raise
-> the voltage for the lowest operating point to 1.0 volts in order to stay
-> within the SoC specifications. It is an undervolted setting that isn't
-> stable across all SoCs and boards out there.
+Alex,
+On 08/12/2015 08:56 PM, Alex Williamson wrote:
+> On Mon, 2015-08-10 at 15:20 +0200, Eric Auger wrote:
+>> A single handler now is registered whatever the use case: automasked
+>> or not. A function pointer is set according to the wished behavior
+>> and the handler calls this function.
+>>
+>> The irq lock is taken/released in the root handler. eventfd_signal can
+>> be called in regions not allowed to sleep.
+>>
+>> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+>>
+>> ---
+>>
+>> v4: creation
+>> ---
+>>  drivers/vfio/platform/vfio_platform_irq.c     | 21 +++++++++++++++------
+>>  drivers/vfio/platform/vfio_platform_private.h |  1 +
+>>  2 files changed, 16 insertions(+), 6 deletions(-)
+>>
+>> diff --git a/drivers/vfio/platform/vfio_platform_irq.c b/drivers/vfio/platform/vfio_platform_irq.c
+>> index 40f057a..b31b1f0 100644
+>> --- a/drivers/vfio/platform/vfio_platform_irq.c
+>> +++ b/drivers/vfio/platform/vfio_platform_irq.c
+>> @@ -148,11 +148,8 @@ static int vfio_platform_set_irq_unmask(struct vfio_platform_device *vdev,
+>>  static irqreturn_t vfio_automasked_irq_handler(int irq, void *dev_id)
+>>  {
+>>  	struct vfio_platform_irq *irq_ctx = dev_id;
+>> -	unsigned long flags;
+>>  	int ret = IRQ_NONE;
+>>  
+>> -	spin_lock_irqsave(&irq_ctx->lock, flags);
+>> -
+>>  	if (!irq_ctx->masked) {
+>>  		ret = IRQ_HANDLED;
+>>  
+>> @@ -161,8 +158,6 @@ static irqreturn_t vfio_automasked_irq_handler(int irq, void *dev_id)
+>>  		irq_ctx->masked = true;
+>>  	}
+>>  
+>> -	spin_unlock_irqrestore(&irq_ctx->lock, flags);
+>> -
+>>  	if (ret == IRQ_HANDLED)
+>>  		eventfd_signal(irq_ctx->trigger, 1);
 > 
-> Signed-off-by: Timo Sigurdsson <public_timo.s@silentcreek.de>
+> Has this been run with lockdep to check whether this is safe to call
+> with spinlock_irqsave held?
 
-Added Iain's Ack, and Cc stable
+No I did not check with lockdep and I will do. There is a comment in
+fs/eventfd.c in eventfd_signal function comments that says:
 
-Thanks!
-Maxime
+"This function is supposed to be called by the kernel in paths that do
+not allow sleeping. In this function we allow the counter to reach the
+ULLONG_MAX value, and we signal this as overflow condition by returining
+a POLLERR to poll(2)."
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150817/fb0da564/attachment.sig>
+so I understood from this it is safe.
+
+Best Regards
+
+Eric
+
+> 
+>>  
+>> @@ -178,6 +173,19 @@ static irqreturn_t vfio_irq_handler(int irq, void *dev_id)
+>>  	return IRQ_HANDLED;
+>>  }
+>>  
+>> +static irqreturn_t vfio_handler(int irq, void *dev_id)
+>> +{
+>> +	struct vfio_platform_irq *irq_ctx = dev_id;
+>> +	unsigned long flags;
+>> +	irqreturn_t ret;
+>> +
+>> +	spin_lock_irqsave(&irq_ctx->lock, flags);
+>> +	ret = irq_ctx->handler(irq, dev_id);
+>> +	spin_unlock_irqrestore(&irq_ctx->lock, flags);
+>> +
+>> +	return ret;
+>> +}
+>> +
+>>  static void vfio_platform_irq_bypass_stop(struct irq_bypass_producer *prod)
+>>  {
+>>  }
+>> @@ -229,9 +237,10 @@ static int vfio_set_trigger(struct vfio_platform_device *vdev, int index,
+>>  	}
+>>  
+>>  	irq->trigger = trigger;
+>> +	irq->handler = handler;
+>>  
+>>  	irq_set_status_flags(irq->hwirq, IRQ_NOAUTOEN);
+>> -	ret = request_irq(irq->hwirq, handler, 0, irq->name, irq);
+>> +	ret = request_irq(irq->hwirq, vfio_handler, 0, irq->name, irq);
+>>  	if (ret) {
+>>  		kfree(irq->name);
+>>  		eventfd_ctx_put(trigger);
+>> diff --git a/drivers/vfio/platform/vfio_platform_private.h b/drivers/vfio/platform/vfio_platform_private.h
+>> index 8b4f814..f848a6b 100644
+>> --- a/drivers/vfio/platform/vfio_platform_private.h
+>> +++ b/drivers/vfio/platform/vfio_platform_private.h
+>> @@ -40,6 +40,7 @@ struct vfio_platform_irq {
+>>  	struct virqfd		*mask;
+>>  	struct irq_bypass_producer producer;
+>>  	bool			forwarded;
+>> +	irqreturn_t (*handler)(int irq, void *dev_id);
+>>  };
+>>  
+>>  struct vfio_platform_region {
+> 
+> 
+> 
