@@ -1,53 +1,80 @@
-From: shijie.huang@arm.com (Huang Shijie)
-Date: Mon, 17 Aug 2015 10:05:25 +0800
-Subject: [PATCH] arm64: dts: Juno: fix the wrong memory map sizes for the
- I2C/EHCI/OHCI
-Message-ID: <1439777125-9409-1-git-send-email-shijie.huang@arm.com>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Mon, 17 Aug 2015 10:55:19 +0900
+Subject: [PATCH 2/3] mmc: dw_mmc: simplify the SDMMC_CLKEN_LOW_PWR logic
+In-Reply-To: <3d03bfe2c18789eefa038018467c9c63c94ae4a2.1439381423.git.hramrach@gmail.com>
+References: <cover.1439381423.git.hramrach@gmail.com>
+ <3d03bfe2c18789eefa038018467c9c63c94ae4a2.1439381423.git.hramrach@gmail.com>
+Message-ID: <55D13F07.70309@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From the "Juno ARM Development Platform Soc Techinical Reference Mannual(r1p0)",
-we get the following memory map sizes (3-25):
-	I2C      : 0x7ffa0000  0x7ffa00ff       (256B)
-	USB OHCI : 0x7ffb0000  0x7ffb0fff       (4KB)
-	USB EHCI : 0x7ffc0000  0x7ffc0fff       (4KB)
+Hi, Michal.
 
-This patch fixes the wrong memory map sizes for them.
+On 08/12/2015 09:23 PM, Michal Suchanek wrote:
+> The driver has open-coded test for SDIO cards. Use the mmc core provided
+> MMC_QUIRK_BROKEN_CLK_GATING flag instead.
 
-Signed-off-by: Huang Shijie <shijie.huang@arm.com>
----
- arch/arm64/boot/dts/arm/juno-base.dtsi | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+Did you use the clock-gating for SDIO cards?
+Doesn't MMC_CAP_SDIO_IRQ bit set? Which case is broken?
+Could you explain to me more?
 
-diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
-index e3ee960..7b2715f 100644
---- a/arch/arm64/boot/dts/arm/juno-base.dtsi
-+++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
-@@ -74,7 +74,7 @@
- 
- 	i2c at 7ffa0000 {
- 		compatible = "snps,designware-i2c";
--		reg = <0x0 0x7ffa0000 0x0 0x1000>;
-+		reg = <0x0 0x7ffa0000 0x0 0x100>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 		interrupts = <GIC_SPI 104 IRQ_TYPE_LEVEL_HIGH>;
-@@ -95,14 +95,14 @@
- 
- 	ohci at 7ffb0000 {
- 		compatible = "generic-ohci";
--		reg = <0x0 0x7ffb0000 0x0 0x10000>;
-+		reg = <0x0 0x7ffb0000 0x0 0x1000>;
- 		interrupts = <GIC_SPI 116 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&soc_usb48mhz>;
- 	};
- 
- 	ehci at 7ffc0000 {
- 		compatible = "generic-ehci";
--		reg = <0x0 0x7ffc0000 0x0 0x10000>;
-+		reg = <0x0 0x7ffc0000 0x0 0x1000>;
- 		interrupts = <GIC_SPI 117 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&soc_usb48mhz>;
- 	};
--- 
-2.1.4
+Best Regards,
+Jaehoon Chung
+
+> 
+> As a bonus this may enable clock gating on SDIO cards that are known to
+> work with it.
+> 
+> Signed-off-by: Michal Suchanek <hramrach@gmail.com>
+> ---
+>  drivers/mmc/host/dw_mmc.c | 33 +++++++++++++++------------------
+>  1 file changed, 15 insertions(+), 18 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+> index 40e9d8e..3bc9fd7 100644
+> --- a/drivers/mmc/host/dw_mmc.c
+> +++ b/drivers/mmc/host/dw_mmc.c
+> @@ -1335,27 +1335,24 @@ static void dw_mci_init_card(struct mmc_host *mmc, struct mmc_card *card)
+>  	 * description of the CLKENA register we should disable low power mode
+>  	 * for SDIO cards if we need SDIO interrupts to work.
+>  	 */
+> -	if (mmc->caps & MMC_CAP_SDIO_IRQ) {
+> -		const u32 clken_low_pwr = SDMMC_CLKEN_LOW_PWR << slot->id;
+> -		u32 clk_en_a_old;
+> -		u32 clk_en_a;
+> +	const u32 clken_low_pwr = SDMMC_CLKEN_LOW_PWR << slot->id;
+> +	u32 clk_en_a_old;
+> +	u32 clk_en_a;
+>  
+> -		clk_en_a_old = mci_readl(host, CLKENA);
+> +	clk_en_a_old = mci_readl(host, CLKENA);
+>  
+> -		if (card->type == MMC_TYPE_SDIO ||
+> -		    card->type == MMC_TYPE_SD_COMBO) {
+> -			set_bit(DW_MMC_CARD_NO_LOW_PWR, &slot->flags);
+> -			clk_en_a = clk_en_a_old & ~clken_low_pwr;
+> -		} else {
+> -			clear_bit(DW_MMC_CARD_NO_LOW_PWR, &slot->flags);
+> -			clk_en_a = clk_en_a_old | clken_low_pwr;
+> -		}
+> +	if (card->quirks & MMC_QUIRK_BROKEN_CLK_GATING) {
+> +		set_bit(DW_MMC_CARD_NO_LOW_PWR, &slot->flags);
+> +		clk_en_a = clk_en_a_old & ~clken_low_pwr;
+> +	} else {
+> +		clear_bit(DW_MMC_CARD_NO_LOW_PWR, &slot->flags);
+> +		clk_en_a = clk_en_a_old | clken_low_pwr;
+> +	}
+>  
+> -		if (clk_en_a != clk_en_a_old) {
+> -			mci_writel(host, CLKENA, clk_en_a);
+> -			mci_send_cmd(slot, SDMMC_CMD_UPD_CLK |
+> -				     SDMMC_CMD_PRV_DAT_WAIT, 0);
+> -		}
+> +	if (clk_en_a != clk_en_a_old) {
+> +		mci_writel(host, CLKENA, clk_en_a);
+> +		mci_send_cmd(slot, SDMMC_CMD_UPD_CLK |
+> +				SDMMC_CMD_PRV_DAT_WAIT, 0);
+>  	}
+>  }
+>  
+> 
