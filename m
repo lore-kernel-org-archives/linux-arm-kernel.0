@@ -1,37 +1,58 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 17 Aug 2015 11:11:17 +0200
-Subject: [PATCH v4 1/6] mfd: fsl imx25 Touchscreen ADC driver
-In-Reply-To: <CACRpkdbFcgK69yakt+XYOg2q_QT8R263+FrADzz=r+fYNEFPSg@mail.gmail.com>
-References: <1403621185-9581-1-git-send-email-denis@eukrea.com>
- <CACRpkdbFcgK69yakt+XYOg2q_QT8R263+FrADzz=r+fYNEFPSg@mail.gmail.com>
-Message-ID: <CACRpkda9LTxmOBXyGDUuhMej4W_waJwYkmay4ELYmQ1zJstSRA@mail.gmail.com>
+From: liguozhu@hisilicon.com (Kenneth Lee)
+Date: Mon, 17 Aug 2015 17:17:50 +0800
+Subject: [PATCH 3/5] net: add Hisilicon Network Subsystem MDIO support
+In-Reply-To: <2142879.tTtWetb0nc@wuerfel>
+References: <1439548222-231611-1-git-send-email-liguozhu@hisilicon.com>
+ <1439548222-231611-4-git-send-email-liguozhu@hisilicon.com>
+ <2142879.tTtWetb0nc@wuerfel>
+Message-ID: <20150817091750.GA134983@Turing-Arch-b>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 27, 2014 at 11:18 AM, Linus Walleij
-<linus.walleij@linaro.org> wrote:
-> On Tue, Jun 24, 2014 at 4:46 PM, Denis Carikli <denis@eukrea.com> wrote:
+Thanks, Arnd, 
 
->> +       irq_set_chip_and_handler(irq, &dummy_irq_chip,
->> +                                handle_level_irq);
->> +       set_irq_flags(irq, IRQF_VALID);
->
-> This function only exists on ARM. Unless Kconfig ensures
-> this is only available on ARM platforms, use
->
-> #ifdef CONFIG_ARM
->       set_irq_flags(irq, IRQF_VALID);
-> #else
->       irq_set_noprobe(irq);
-> #endif
->
-> (Sorry we have no better way of doing it.)
+You are right. This is the same IP as hip04_mdio.c. We just mis-understand the
+hardware design. We will merge them and re-submit the patches.
 
-Since I wrote this, there have been cleanups from Rob Herring merged
-to the kernel to get rid of this oddity. Please check in linux-next how
-to get this right, see c.f. commit
-e8d36d5dbb6a6ec4f5222f8775d664ec29d5527d
-"ARM: kill off set_irq_flags usage"
-
-Yours,
-Linus Walleij
+On Fri, Aug 14, 2015 at 10:57:28PM +0200, Arnd Bergmann wrote:
+> On Friday 14 August 2015 18:30:20 Kenneth Lee wrote:
+> 
+> > +#define MDIO_BASE_ADDR                 0x403C0000
+> 
+> Does not belong in here (and is not used)
+> 
+> > +#define MDIO_COMMAND_REG               0x0
+> > +#define MDIO_ADDR_REG                  0x4
+> > +#define MDIO_WDATA_REG                 0x8
+> > +#define MDIO_RDATA_REG                 0xc
+> > +#define MDIO_STA_REG                   0x10
+> 
+> These look suspiciously similar to definitions from
+> drivers/net/ethernet/hisilicon/hip04_mdio.c.
+> 
+> Could the hardware be related? If so, please try to share
+> the common parts.
+> 
+> > +static inline void mdio_write_reg(void *base, u32 reg, u32 value)
+> > +{
+> > +       u8 __iomem *reg_addr = ACCESS_ONCE(base);
+> > +
+> > +       writel(value, reg_addr + reg);
+> > +}
+> > +
+> > +#define MDIO_WRITE_REG(a, reg, value) \
+> > +       mdio_write_reg((a)->vbase, (reg), (value))
+> > 
+> 
+> Something seems wrong here: why do you have an ACCESS_ONCE() on a
+> local variable? Doesn't this just make the code less efficient
+> without providing lockless access to shared variables?
+> 
+> The types are inconsistent here, you should get a warning from
+> running this through 'make C=1' because of the missing __iomem
+> annotation of the pointer.
+> 
+> Also, why both a macro and an inline function? Just use an inline
+> function.
+> 
+> 	Arnd
