@@ -1,63 +1,70 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Sun, 16 Aug 2015 11:24:51 +0200
-Subject: [PATCH 2/9] PM / Domains: Remove dev->driver check for runtime PM
-In-Reply-To: <CAMAWPa-0R42thqBo0omn0KK7y0wyxoyaP+wsfoRvXBmWhBytKg@mail.gmail.com>
-References: <1438731339-58317-1-git-send-email-lina.iyer@linaro.org>
- <1438731339-58317-3-git-send-email-lina.iyer@linaro.org>
- <7hfv3onv5c.fsf@deeprootsystems.com>
- <CAMuHMdVeffa-jgXuSjDQBKTrhgW-d87OKzs1iXX+4y-9U_AJbg@mail.gmail.com>
- <7hwpwylepx.fsf@deeprootsystems.com>
- <CAMuHMdW-T9rUWXsQeffwtXspHbjfGqo_0G4QMB1o0TwTLJAQAg@mail.gmail.com>
- <CAMAWPa-0R42thqBo0omn0KK7y0wyxoyaP+wsfoRvXBmWhBytKg@mail.gmail.com>
-Message-ID: <CAMuHMdV2gDBaPRb3yE=tVPO_pr7PFA6bwhyQE5raumCh_qPXww@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Sun, 16 Aug 2015 23:34:55 -0700
+Subject: [RFT PATCH] arm: omap1_defconfig: convert to use libata PATA
+ drivers
+In-Reply-To: <1439571876-13758-16-git-send-email-b.zolnierkie@samsung.com>
+References: <1439571876-13758-1-git-send-email-b.zolnierkie@samsung.com>
+ <1439571876-13758-16-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <20150817063454.GF4215@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
+* Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com> [150814 10:10]:
+> IDE subsystem has been deprecated since 2009 and the majority
+> (if not all) of Linux distributions have switched to use
+> libata for ATA support exclusively.  However there are still
+> some users (mostly old or/and embedded non-x86 systems) that
+> have not converted from using IDE subsystem to libata PATA
+> drivers.  This doesn't seem to be good thing in the long-term
+> for Linux as while there is less and less PATA systems left
+> in use:
+> 
+> * testing efforts are divided between two subsystems
+> 
+> * having duplicate drivers for same hardware confuses users
+> 
+> This patch converts omap1_defconfig to use libata PATA
+> drivers.
+> 
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: linux-omap at vger.kernel.org
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> ---
+> Build tested only.
+> If you have affected hardware please test.  Thank you.
 
-On Fri, Aug 14, 2015 at 7:19 PM, Kevin Hilman <khilman@kernel.org> wrote:
-> On Fri, Aug 14, 2015 at 12:24 AM, Geert Uytterhoeven
-> <geert@linux-m68k.org> wrote:
->> On Fri, Aug 14, 2015 at 5:40 AM, Kevin Hilman <khilman@kernel.org> wrote:
->>> Geert Uytterhoeven <geert@linux-m68k.org> writes:
->>>> On Wed, Aug 12, 2015 at 9:50 PM, Kevin Hilman <khilman@kernel.org> wrote:
->>>>> This check might have made sense before PM domains, but with PM domains,
->>>>> it's entirely possible to have a simple device without a driver and the
->>>>> PM domain handles all the necesary PM, so I think this check
->>>>> could/should be removed.
->>>>>
->>>>> Thoughts?
->>>>
->>>> Simple devices without a driver aren't handled automatically.
->>>> At minimum, the driver should call pm_runtime_enable(), cfr.
->>>> drivers/bus/simple-pm-bus.c.
->>>
->>> That's correct, and in the proof-of-concept stuff I hacked up and in
->>> Lina's series, the CPU "devices" do indeed to this.  Without that, they
->>> wouldn't end up ever taking this codepath through genpd's
->>> runtime_suspend and power_off hooks.
->>>
->>> Also, I'm not sure if your comment was meant to be an objection to the
->>> patch?  or if you're OK with it.
->>
->> My comment was purely meant as a response to "it's entirely possible to have a
->> simple device without a driver and the PM domain handles all the necesary PM".
->
-> Right, so if the PM domain does the pm_runtime_enable() for these
-> "simple" devices without drivers, they can still exist without a
-> driver, and the PM domain doing all the magic.
+All my omap1 devices are in a rack using NFSroot or MMC so
+I can't test this. Seems like a good idea to me thoug, and does
+not cause merge conflicts. So if you want to queue this via
+along with other PATA related patches, please feel free to
+add:
 
-Is it possible to let the PM Domain do the pm_runtime_enable() itself in
-the absence of a driver? If yes, I wouldn't have needed simple-pm-bus.c.
-What if a driver is bound later?
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Acked-by: Tony Lindgren <tony@atomide.com>
+ 
+>  arch/arm/configs/omap1_defconfig | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/configs/omap1_defconfig b/arch/arm/configs/omap1_defconfig
+> index 0c8a787..6ffc984 100644
+> --- a/arch/arm/configs/omap1_defconfig
+> +++ b/arch/arm/configs/omap1_defconfig
+> @@ -96,14 +96,14 @@ CONFIG_BLK_DEV_LOOP=y
+>  CONFIG_BLK_DEV_RAM=y
+>  CONFIG_BLK_DEV_RAM_COUNT=2
+>  CONFIG_BLK_DEV_RAM_SIZE=8192
+> -CONFIG_IDE=m
+> -CONFIG_BLK_DEV_IDECS=m
+>  CONFIG_SCSI=y
+>  # CONFIG_SCSI_PROC_FS is not set
+>  CONFIG_BLK_DEV_SD=y
+>  CONFIG_CHR_DEV_ST=y
+>  CONFIG_BLK_DEV_SR=y
+>  CONFIG_CHR_DEV_SG=y
+> +CONFIG_ATA=m
+> +CONFIG_PATA_PCMCIA=m
+>  CONFIG_NETDEVICES=y
+>  CONFIG_TUN=y
+>  CONFIG_PHYLIB=y
+> -- 
+> 1.9.1
+> 
