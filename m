@@ -1,151 +1,91 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Mon, 17 Aug 2015 10:09:15 -0400
-Subject: [PATCH] ARM: keystone: add a work around to handle asynchronous
- external abort
-In-Reply-To: <20150814215658.GB7557@n2100.arm.linux.org.uk>
-References: <1439320409-20084-1-git-send-email-m-karicheri2@ti.com>
- <55CDF579.4050408@ti.com> <20150814140934.GX7557@n2100.arm.linux.org.uk>
- <1439562059.13210.61.camel@pengutronix.de> <55CE63BD.2060107@ti.com>
- <20150814215658.GB7557@n2100.arm.linux.org.uk>
-Message-ID: <55D1EB0B.8020607@ti.com>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Mon, 17 Aug 2015 22:10:02 +0800
+Subject: [PATCH v2 1/5] clocksource: mediatek: do not enable GPT_CLK_EVT
+ when setup
+In-Reply-To: <55CC56C4.8080201@linaro.org>
+References: <CAGS+omD8k_Cfxv3bYyjmjtLbiavo-WmJPn0Z-CBhN_nnv65Tag@mail.gmail.com>
+ <1437552878-3684-1-git-send-email-yingjoe.chen@mediatek.com>
+ <55CC56C4.8080201@linaro.org>
+Message-ID: <1439820602.3414.12.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/14/2015 05:56 PM, Russell King - ARM Linux wrote:
-> On Fri, Aug 14, 2015 at 05:55:09PM -0400, Murali Karicheri wrote:
->> On 08/14/2015 10:20 AM, Lucas Stach wrote:
->>> Hi Russell,
->>>
->>> Am Freitag, den 14.08.2015, 15:09 +0100 schrieb Russell King - ARM
->>> Linux:
->>>
->>> [...]
->>>
->>>>
->>>> What causes the abort?  We shouldn't be adding hacks like this to the
->>>> kernel without having the full picture...
->>>>
->>>
->>> some of the issues with tracking down such imprecise external aborts are
->>> due to the fact that we only enable the signaling of those aborts on
->>> entering the user-space. So the first schedule() crashes on the previous
->>> dangling abort.
->>>
->>> I'm carrying this patch locally to enable imprecise aborts much earlier
->>> in the boot process. I think it has already been on the list some times,
->>> but apparently it has fallen through the cracks. If you agree that this
->>> is the right thing to do I can do a proper repost.
->> Lucas,
->>
->> Would you mind sharing the code? Does that help in root causing where it
->> actually happens? I have spend considerable time debugging this, but so far
->> not successful.
->
-> If you look below, Lucas provided the patch.
-Oops! Thanks
+On Thu, 2015-08-13 at 10:35 +0200, Daniel Lezcano wrote:
+> On 07/22/2015 10:14 AM, Yingjoe Chen wrote:
+> > Spurious mtk timer interrupt is noticed at boot and cause kernel
+> > crash. It seems if GPT is enabled, it will latch irq status even
+> > when its IRQ is disabled. When irq is enabled afterward, we see
+> > spurious interrupt.
+> > Change init flow to only enable GPT_CLK_SRC at mtk_timer_init.
+> >
+> > Acked-by: Matthias Brugger <matthias.bgg@gmail.com>
+> > Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
+> > Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
+> > ---
+> >
+> > Update to my patch [1], added __init as Daniel suggest. This is the
+> > only patch that need to change in that series, so I only sent this one.
+> >
+> > http://lists.infradead.org/pipermail/linux-mediatek/2015-July/001545.html
+> >
+> >   drivers/clocksource/mtk_timer.c | 16 ++++++++++------
+> >   1 file changed, 10 insertions(+), 6 deletions(-)
+> >
+> > diff --git a/drivers/clocksource/mtk_timer.c b/drivers/clocksource/mtk_timer.c
+> > index 68ab423..2ba5b66 100644
+> > --- a/drivers/clocksource/mtk_timer.c
+> > +++ b/drivers/clocksource/mtk_timer.c
+> > @@ -156,9 +156,11 @@ static void mtk_timer_global_reset(struct mtk_clock_event_device *evt)
+> >   	writel(0x3f, evt->gpt_base + GPT_IRQ_ACK_REG);
+> >   }
+> >
+> > -static void
+> > -mtk_timer_setup(struct mtk_clock_event_device *evt, u8 timer, u8 option)
+> > +static void __init mtk_timer_setup(struct mtk_clock_event_device *evt,
+> > +				   u8 timer, u8 option, bool enable)
+> >   {
+> > +	u32 val;
+> > +
+> >   	writel(TIMER_CTRL_CLEAR | TIMER_CTRL_DISABLE,
+> >   		evt->gpt_base + TIMER_CTRL_REG(timer));
+> >
+> > @@ -167,8 +169,10 @@ mtk_timer_setup(struct mtk_clock_event_device *evt, u8 timer, u8 option)
+> >
+> >   	writel(0x0, evt->gpt_base + TIMER_CMP_REG(timer));
+> >
+> > -	writel(TIMER_CTRL_OP(option) | TIMER_CTRL_ENABLE,
+> > -			evt->gpt_base + TIMER_CTRL_REG(timer));
+> > +	val = TIMER_CTRL_OP(option);
+> > +	if (enable)
+> > +		val |= TIMER_CTRL_ENABLE;
+> > +	writel(val, evt->gpt_base + TIMER_CTRL_REG(timer));
+> 
+> Instead of the 'enable' new option, I prefer a test with 'timer' with a 
+> comment:
+> 
+> 	/*
+> 	 * the timer hw is broken in that way ... bla bla, so we only
+> 	 * enable the clocksource ...
+> 	 */
+> 	if (timer == GPT_CLK_SRC)
+> 		val |= TIMER_CTRL_ENABLE;
 
-Murali
+Hi Daniel,
 
->
->>
->> Murali
->>>
->>> Regards,
->>> Lucas
->>>
->>> ---------------------->8---------------------------------------------
->>> >From bb9117d94cc2f1061dc364f42c446ccd9191e869 Mon Sep 17 00:00:00 2001
->>> From: Lucas Stach <l.stach@pengutronix.de>
->>> Date: Thu, 19 Feb 2015 18:12:50 +0100
->>> Subject: [PATCH] ARM: Add imprecise abort enable/disable macro
->>>
->>> This patch adds imprecise abort enable/disable macros.
->>> It also enables imprecise aborts when starting kernel.
->>>
->>> Changes in v2:
->>> Only ARMv6 and later have CPSR.A bit. On earlier CPUs,
->>> and ARMv7M this should be a no-op.
->>>
->>> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
->>> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
->>> ---
->>> lst: rebased on v3.19
->>> ---
->>>   arch/arm/include/asm/irqflags.h | 10 ++++++++++
->>>   arch/arm/kernel/smp.c           |  1 +
->>>   arch/arm/kernel/traps.c         |  4 ++++
->>>   3 files changed, 15 insertions(+)
->>>
->>> diff --git a/arch/arm/include/asm/irqflags.h
->>> b/arch/arm/include/asm/irqflags.h
->>> index 3b763d6652a0..8301f875564e 100644
->>> --- a/arch/arm/include/asm/irqflags.h
->>> +++ b/arch/arm/include/asm/irqflags.h
->>> @@ -51,6 +51,14 @@ static inline void arch_local_irq_disable(void)
->>>
->>>   #define local_fiq_enable()  __asm__("cpsie f   @ __stf" : : : "memory",
->>> "cc")
->>>   #define local_fiq_disable() __asm__("cpsid f   @ __clf" : : : "memory",
->>> "cc")
->>> +
->>> +#ifndef CONFIG_CPU_V7M
->>> +#define local_abt_enable()  __asm__("cpsie a   @ __sta" : : : "memory",
->>> "cc")
->>> +#define local_abt_disable() __asm__("cpsid a   @ __cla" : : : "memory",
->>> "cc")
->>> +#else
->>> +#define local_abt_enable()     do { } while (0)
->>> +#define local_abt_disable()    do { } while (0)
->>> +#endif
->>>   #else
->>>
->>>   /*
->>> @@ -130,6 +138,8 @@ static inline void arch_local_irq_disable(void)
->>>          : "memory", "cc");                                      \
->>>          })
->>>
->>> +#define local_abt_enable()     do { } while (0)
->>> +#define local_abt_disable()    do { } while (0)
->>>   #endif
->>>
->>>   /*
->>> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
->>> index 86ef244c5a24..7b6b93cabef4 100644
->>> --- a/arch/arm/kernel/smp.c
->>> +++ b/arch/arm/kernel/smp.c
->>> @@ -378,6 +378,7 @@ asmlinkage void secondary_start_kernel(void)
->>>
->>>          local_irq_enable();
->>>          local_fiq_enable();
->>> +       local_abt_enable();
->>>
->>>          /*
->>>           * OK, it's off to the idle thread for us
->>> diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
->>> index 788e23fe64d8..466726ba9bdb 100644
->>> --- a/arch/arm/kernel/traps.c
->>> +++ b/arch/arm/kernel/traps.c
->>> @@ -881,6 +881,10 @@ void __init early_trap_init(void *vectors_base)
->>>
->>>          flush_icache_range(vectors, vectors + PAGE_SIZE * 2);
->>>          modify_domain(DOMAIN_USER, DOMAIN_CLIENT);
->>> +
->>> +       /* Enable imprecise aborts */
->>> +       local_abt_enable();
->>> +
->>>   #else /* ifndef CONFIG_CPU_V7M */
->>>          /*
->>>           * on V7-M there is no need to copy the vector table to a
->>> dedicated
->>>
->>
->>
->> --
->> Murali Karicheri
->> Linux Kernel, Keystone
->
+Thanks for your review.
+Since this bug happens to anyone using interrupt, I'm not sure checking
+timer and only enable it for GPT_CLK_SRC is easier to read. Anyway, I'll
+change to this in next version.
 
+> That said, can you have a look at commit 1096be08 ?
+> "clockevents: sun5i: Fix setup_irq init sequence"
+> 
+> first and check if moving the interrupt request after the 
+> clockevents_config_and_register could fix your issue.
 
--- 
-Murali Karicheri
-Linux Kernel, Keystone
+I've tested this before, see:
+
+http://lists.infradead.org/pipermail/linux-mediatek/2015-May/000539.html
+http://lists.infradead.org/pipermail/linux-mediatek/2015-May/000551.html
+
+Joe.C
