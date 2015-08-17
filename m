@@ -1,86 +1,82 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Mon, 17 Aug 2015 12:32:29 +0800
-Subject: [PATCH v6] arm64: dts: Add spi bus dts
-In-Reply-To: <1439782198-32396-1-git-send-email-leilk.liu@mediatek.com>
-References: <1439782198-32396-1-git-send-email-leilk.liu@mediatek.com>
-Message-ID: <CAGS+omCFQRoH3ft2O5qPLBgngCuLPaminTys5OU6QcKmRXTyNw@mail.gmail.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 17 Aug 2015 09:18:27 +0200
+Subject: [PATCH v2 00/10] pwm: add support for atomic update
+In-Reply-To: <20150725083657.6111ff59@bbrezillon>
+References: <1437406327-6207-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20150725083657.6111ff59@bbrezillon>
+Message-ID: <20150817091827.70eae7eb@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 17, 2015 at 11:29 AM, Leilk Liu <leilk.liu@mediatek.com> wrote:
->
-> This patch adds MT8173 spi bus controllers into device tree.
->
-> Signed-off-by: Leilk Liu <leilk.liu@mediatek.com>
+On Sat, 25 Jul 2015 08:36:57 +0200
+Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
 
-Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
+> Hi Thierry,
+> 
+> Should I resend a new version rebased on Mark's pwm topic branch or
+> would you like to review this one first ?
 
-> ---
-> Change in this patch:
-> pinctl and pad-select fields are board specific, so move to
-> mt8173-evb.dtsi, and status = "okay".
-> ---
->  arch/arm64/boot/dts/mediatek/mt8173-evb.dts | 18 ++++++++++++++++++
->  arch/arm64/boot/dts/mediatek/mt8173.dtsi    | 12 ++++++++++++
->  2 files changed, 30 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-> index 4be66ca..811cb76 100644
-> --- a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-> +++ b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-> @@ -387,6 +387,24 @@
->         };
->  };
->
-> +&pio {
-> +       spi_pins_a: spi0 {
-> +               pins_spi {
-> +                       pinmux = <MT8173_PIN_69_SPI_CK__FUNC_SPI_CK_0_>,
-> +                               <MT8173_PIN_70_SPI_MI__FUNC_SPI_MI_0_>,
-> +                               <MT8173_PIN_71_SPI_MO__FUNC_SPI_MO_0_>,
-> +                               <MT8173_PIN_72_SPI_CS__FUNC_SPI_CS_0_>;
-> +               };
-> +       };
-> +};
-> +
-> +&spi {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&spi_pins_a>;
-> +       mediatek,pad-select = <0>;
-> +       status = "okay";
-> +};
-> +
->  &uart0 {
->         status = "okay";
->  };
-> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> index d18ee42..3dfb6ed 100644
-> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> @@ -365,6 +365,18 @@
->                         status = "disabled";
->                 };
->
-> +               spi: spi at 1100a000 {
-> +                       compatible = "mediatek,mt8173-spi";
-> +                       #address-cells = <1>;
-> +                       #size-cells = <0>;
-> +                       reg = <0 0x1100a000 0 0x1000>;
-> +                       interrupts = <GIC_SPI 110 IRQ_TYPE_LEVEL_LOW>;
-> +                       clocks = <&topckgen CLK_TOP_SPI_SEL>,
-> +                                <&topckgen CLK_TOP_SYSPLL3_D2>;
-> +                       clock-names = "spi-clk", "parent-clk";
-> +                       status = "disabled";
-> +               };
-> +
->                 i2c3: i2c3 at 11010000 {
->                         compatible = "mediatek,mt8173-i2c";
->                         reg = <0 0x11010000 0 0x70>,
-> --
-> 1.8.1.1.dirty
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+Ping.
+
+> 
+> Best Regards,
+> 
+> Boris
+> 
+> On Mon, 20 Jul 2015 17:31:57 +0200
+> Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
+> 
+> > Hello Thierry,
+> > 
+> > This series adds support for atomic PWM update, or IOW, the capability
+> > to update all the parameters of a PWM device (enabled/disabled, period,
+> > duty and polarity) in one go.
+> > 
+> > Best Regards,
+> > 
+> > Boris
+> > 
+> > Changes since v1:
+> > - dropped applied patches
+> > - squashed Heiko's fixes into the rockchip driver changes
+> > - made a few cosmetic changes
+> > - added kerneldoc comments
+> > - added Heiko's patch to display more information in debugfs
+> > - dropped pwm-regulator patches (should be submitted separately)
+> > 
+> > Boris Brezillon (9):
+> >   pwm: introduce default period and polarity concepts
+> >   pwm: define a new pwm_state struct
+> >   pwm: move the enabled/disabled info to pwm_state struct
+> >   backlight: pwm_bl: remove useless call to pwm_set_period
+> >   pwm: declare a default PWM state
+> >   pwm: add the PWM initial state retrieval infra
+> >   pwm: add the core infrastructure to allow atomic update
+> >   pwm: rockchip: add initial state retrieval
+> >   pwm: rockchip: add support for atomic update
+> > 
+> > Heiko St?bner (1):
+> >   pwm: add information about polarity, duty cycle and period to debugfs
+> > 
+> >  drivers/leds/leds-pwm.c              |   2 +-
+> >  drivers/pwm/core.c                   | 169 +++++++++++++++++++++++++++++++----
+> >  drivers/pwm/pwm-pxa.c                |   2 +-
+> >  drivers/pwm/pwm-rockchip.c           | 119 +++++++++++++++++++-----
+> >  drivers/pwm/pwm-sun4i.c              |   3 +-
+> >  drivers/regulator/pwm-regulator.c    |   2 +-
+> >  drivers/video/backlight/lm3630a_bl.c |   4 +-
+> >  drivers/video/backlight/pwm_bl.c     |  10 ++-
+> >  drivers/video/fbdev/ssd1307fb.c      |   2 +-
+> >  include/linux/pwm.h                  |  86 +++++++++++++++---
+> >  10 files changed, 336 insertions(+), 63 deletions(-)
+> > 
+> 
+> 
+> 
+
+
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
