@@ -1,85 +1,146 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 17 Aug 2015 14:50:31 +0900
-Subject: [2/2] ARM: dts: Add missing irq pinctrl for max77686 on smdk5250
-In-Reply-To: <5544657A.7010006@gmail.com>
-References: <1416312509-11530-2-git-send-email-yadi.brar@samsung.com>
- <553F68CC.6030504@samsung.com> <5544657A.7010006@gmail.com>
-Message-ID: <CAJKOXPdzhqXFWT0=eXpr+jjs8R4kFAMq2DSSsFHVEZq_PdAN2w@mail.gmail.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Mon, 17 Aug 2015 13:43:55 +0800
+Subject: [PATCH v7 4/5] clk: Provide critical clock support
+In-Reply-To: <1437570255-21049-5-git-send-email-lee.jones@linaro.org>
+References: <1437570255-21049-1-git-send-email-lee.jones@linaro.org>
+ <1437570255-21049-5-git-send-email-lee.jones@linaro.org>
+Message-ID: <CAGsJ_4zKn-o4ZxZ0-xzCStvuTkdC5xqD9FneWna-0dNVgp=1DQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-05-02 14:49 GMT+09:00 Krzysztof Kozlowski <k.kozlowski.k@gmail.com>:
-> W dniu 28.04.2015 o 20:02, Pankaj Dubey pisze:
->> Hi Kukjin,
->>
->> Any updated for this patch. Without this PMIC RTC is not working on
->> SMDK5250.
->>
+2015-07-22 21:04 GMT+08:00 Lee Jones <lee.jones@linaro.org>:
+> Lots of platforms contain clocks which if turned off would prove fatal.
+> The only way to recover from these catastrophic failures is to restart
+> the board(s).  Now, when a clock provider is registered with the
+> framework it is possible for a list of critical clocks to be supplied
+> which must be kept ungated.  Each clock mentioned in the newly
+> introduced 'critical-clock' property will be clk_prepare_enable()d
+> where the normal references will be taken.  This will prevent the
+> common clk framework from attempting to gate them during the normal
+> clk_disable_unused() and disable_clock() procedures.
 >
-> Could you resend the patch after rebasing it?
+> Note that it will still be possible for knowledgeable drivers to turn
+> these clocks off using clk_{enable,disable}_critical() calls.
 >
-> Best regards,
-> Krzysztof
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-Dear Pankaj and Yadwinder,
-
-Do you plan to do anything with this patch?
-
-Best regards,
-Krzysztof
+hi Lee,
+i have another email about this. i am wondering whether
+CLK_IGNORE_UNUSE is still useful after your patch. another solution
+for your patch might be extending the current CLK_IGNORE_UNUSE to
+runtime?
 
 
->> Thanks,
->> Pankaj Dubey
->>
->> On Tuesday 18 November 2014 05:38 PM, Yadwinder Singh Brar wrote:
->>> This patch adds pinctrl configuration for using configuring gpx3-2 as an
->>> external interrupt from max77686. Though max77686 RTC is enabled and gets
->>> probed by default, it doesnt work as its unable to get interrupt.
->>>
->>> This patch makes max77686 RTC work and also configures it as wakeup
->>> source.
->>>
->>> Signed-off-by: Yadwinder Singh Brar <yadi.brar@samsung.com>
->>> Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
->>> Tested-by: Pankaj Dubey <pankaj.dubey@samsung.com>
->>>
->>> ---
->>> arch/arm/boot/dts/exynos5250-smdk5250.dts |   12 ++++++++++++
->>>   1 files changed, 12 insertions(+), 0 deletions(-)
->>>
->>> diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts
->>> b/arch/arm/boot/dts/exynos5250-smdk5250.dts
->>> index 95b5b51..19cd918 100644
->>> --- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
->>> +++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
->>> @@ -131,6 +131,9 @@
->>>           reg = <0x09>;
->>>           interrupt-parent = <&gpx3>;
->>>           interrupts = <2 IRQ_TYPE_NONE>;
->>> +        pinctrl-names = "default";
->>> +        pinctrl-0 = <&max77686_irq>;
->>> +        wakeup-source;
->>>
->>>           voltage-regulators {
->>>               ldo1_reg: LDO1 {
->>> @@ -411,3 +414,12 @@
->>>           };
->>>       };
->>>   };
->>> +
->>> +&pinctrl_0 {
->>> +    max77686_irq: max77686-irq {
->>> +        samsung,pins = "gpx3-2";
->>> +        samsung,pin-function = <0xf>;
->>> +        samsung,pin-pud = <0>;
->>> +        samsung,pin-drv = <0>;
->>> +    };
->>> +};
->>>
->> --
->> To unsubscribe from this list: send the line "unsubscribe
->> linux-samsung-soc" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+copy the mail here:
+currently we can set a CLK_IGNORE_UNUSE flag to  a clock to stop
+clk_disable_unused()  from disabling it at the boot stage:
+
+static void clk_disable_unused_subtree(struct clk_core *core)
+{
+...
+
+if (core->flags & CLK_IGNORE_UNUSED)
+goto unlock_out;
+}
+
+static int clk_disable_unused(void)
+{
+...
+
+clk_unprepare_unused_subtree(core);
+...
+ return 0;
+}
+
+late_initcall_sync(clk_disable_unused);
+
+so if there are two clocks A and B, A is the parent of B, and A is
+marked as CLK_IGNORE_UNUSED.
+
+in boot stage if there is nobody using A and B, Linux will disable B
+due to clk_disable_unused() , but keep A being enabled since A has
+CLK_IGNORE_UNUSED.
+
+but in Linux runtime, we might frequently disable /enable B in runtime
+power management, this will cause A disabled since Linux will not
+check CLK_IGNORE_UNUSED for runtime disabling clk .
+
+ so this makes CLK_IGNORE_UNUSE only work if we don't disable its
+sub-clock at runtime. this looks making no sense.
+
+ i am thinking whether we should do some changes to make it have side
+affect for runtime clk disable. otherwise, why do we want to stop it
+from being disabled during boot stage?
+
+ I am not sure whether i missed something in clk core level support.
+
+-barry
+
+> ---
+>  drivers/clk/clk-conf.c | 45 ++++++++++++++++++++++++++++++++++++++++++++-
+>  1 file changed, 44 insertions(+), 1 deletion(-)
 >
+> diff --git a/drivers/clk/clk-conf.c b/drivers/clk/clk-conf.c
+> index aad4796..f83c1c2 100644
+> --- a/drivers/clk/clk-conf.c
+> +++ b/drivers/clk/clk-conf.c
+> @@ -116,6 +116,45 @@ static int __set_clk_rates(struct device_node *node, bool clk_supplier)
+>         return 0;
+>  }
+>
+> +static int __set_critical_clocks(struct device_node *node, bool clk_supplier)
+> +{
+> +       struct of_phandle_args clkspec;
+> +       struct clk *clk;
+> +       struct property *prop;
+> +       const __be32 *cur;
+> +       uint32_t index;
+> +       int ret;
+> +
+> +       if (!clk_supplier)
+> +               return 0;
+> +
+> +       of_property_for_each_u32(node, "critical-clock", prop, cur, index) {
+> +               clkspec.np = node;
+> +               clkspec.args_count = 1;
+> +               clkspec.args[0] = index;
+> +
+> +               clk = of_clk_get_from_provider(&clkspec);
+> +               if (IS_ERR(clk)) {
+> +                       pr_err("clk: couldn't get clock %u for %s\n",
+> +                               index, node->full_name);
+> +                       return PTR_ERR(clk);
+> +               }
+> +
+> +               clk_init_critical(clk);
+> +
+> +               ret = clk_prepare_enable(clk);
+> +               if (ret) {
+> +                       pr_err("Failed to enable clock %u for %s: %d\n",
+> +                              index, node->full_name, ret);
+> +                       return ret;
+> +               }
+> +
+> +               pr_debug("Setting clock as critical %pC\n", clk);
+> +       }
+> +
+> +       return 0;
+> +}
+> +
+>  /**
+>   * of_clk_set_defaults() - parse and set assigned clocks configuration
+>   * @node: device node to apply clock settings for
+> @@ -139,6 +178,10 @@ int of_clk_set_defaults(struct device_node *node, bool clk_supplier)
+>         if (rc < 0)
+>                 return rc;
+>
+> -       return __set_clk_rates(node, clk_supplier);
+> +       rc = __set_clk_rates(node, clk_supplier);
+> +       if (rc < 0)
+> +               return rc;
+> +
+> +       return __set_critical_clocks(node, clk_supplier);
+>  }
+>  EXPORT_SYMBOL_GPL(of_clk_set_defaults);
+> --
+> 1.9.1
