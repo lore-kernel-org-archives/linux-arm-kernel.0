@@ -1,29 +1,44 @@
-From: linux@mniewoehner.de (Michael Niewoehner)
-Date: Mon, 17 Aug 2015 19:38:22 +0200
-Subject: [PATCH] clk: rockchip: add pclk_cpu to the list of rk3188 critical
- clocks
-Message-ID: <5400BEF8-5245-4F7B-845B-D326A7BC56B5@mniewoehner.de>
+From: eric@anholt.net (Eric Anholt)
+Date: Mon, 17 Aug 2015 10:56:23 -0700
+Subject: [PATCH 3/7] drm/vc4: Add KMS support for Raspberry Pi.
+In-Reply-To: <55CEC3D8.7060103@wwwdotorg.org>
+References: <1439427380-2436-1-git-send-email-eric@anholt.net>
+ <1439427380-2436-4-git-send-email-eric@anholt.net>
+ <55CEC3D8.7060103@wwwdotorg.org>
+Message-ID: <877fotx0hk.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-gpio clock is getting disabled to save power but pclk_cpu is needed for act8865 regulator
+r<#secure method=pgpmime mode=sign>
+Stephen Warren <swarren@wwwdotorg.org> writes:
 
-Signed-off-by: Michael Niewoehner <linux@mniewoehner.de>
----
- drivers/clk/rockchip/clk-rk3188.c | 1 +
- 1 file changed, 1 insertion(+)
+> On 08/12/2015 06:56 PM, Eric Anholt wrote:
+>> This is the start of a full VC4 driver.  Right now this just supports
+>> configuring the display using a pre-existing video mode (because
+>> changing the pixel clock isn't available yet, and doesn't work when it
+>> is).  However, this is enough for fbcon and bringing up X using
+>> xf86-video-modesetting.
+>
+>> diff --git a/drivers/gpu/drm/vc4/Kconfig b/drivers/gpu/drm/vc4/Kconfig
+>
+>> +config DRM_VC4
+>> +	tristate "Broadcom VC4 Graphics"
+>
+>> +	help
+>> +	  Choose this option if you have a system that has a Broadcom
+>> +	  VC4 GPU, such as the Raspberry Pi or other BCM2708/BCM2835.
+>> +
+>> +	  This driver requires that "avoid_warnings=2" be present in
+>> +	  the config.txt for the firmware, to keep it from smashing
+>> +	  our display setup.
+>
+> The need for "avoid_warnings=2" seems like it will trip people up. I
+> don't think it's in any config.txt I've seen. Can you expand more on that?
 
-diff --git a/drivers/clk/rockchip/clk-rk3188.c b/drivers/clk/rockchip/clk-rk3188.c
-index e4f9d47..1c93229 100644
---- a/drivers/clk/rockchip/clk-rk3188.c
-+++ b/drivers/clk/rockchip/clk-rk3188.c
-@@ -708,6 +708,7 @@ static const char *const rk3188_critical_clocks[] __initconst = {
- 	"aclk_cpu",
- 	"aclk_peri",
- 	"hclk_peri",
-+	"pclk_cpu",
- };
- 
- static void __init rk3188_common_clk_init(struct device_node *np)
--- 
-2.5.0
+The warnings thing is the firmware watching for undervoltage and then it
+calls into dispmanx to overlay a little rainbow box on the screen.  This
+of course interferes with our display setup.
+
+I think we'll be able to wire up notifications to Linux for
+undervoltage, at which point we can do something useful with that
+information, ourselves.
