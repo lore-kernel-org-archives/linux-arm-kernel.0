@@ -1,78 +1,123 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Mon, 17 Aug 2015 16:15:47 +0100
-Subject: [PATCH 2/4] drm: Add support for ARM's HDLCD controller.
-In-Reply-To: <CACvgo537C6SRfhMTNoE4cSLJukcXuKLvt1TRykynX--ybEhmaQ@mail.gmail.com>
-References: <1438784892-27888-1-git-send-email-Liviu.Dudau@arm.com>
- <1438784892-27888-3-git-send-email-Liviu.Dudau@arm.com>
- <CACvgo537C6SRfhMTNoE4cSLJukcXuKLvt1TRykynX--ybEhmaQ@mail.gmail.com>
-Message-ID: <20150817151547.GA1020@e106497-lin.cambridge.arm.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Mon, 17 Aug 2015 17:17:12 +0200
+Subject: [PATCH v3 01/10] VFIO: platform: registration of a dummy IRQ
+ bypass producer
+In-Reply-To: <1439405770.4023.526.camel@redhat.com>
+References: <1439212864-12954-1-git-send-email-eric.auger@linaro.org>	
+ <1439212864-12954-2-git-send-email-eric.auger@linaro.org>
+ <1439405770.4023.526.camel@redhat.com>
+Message-ID: <55D1FAF8.9000700@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 16, 2015 at 09:56:33AM +0100, Emil Velikov wrote:
-> Hi Liviu,
-
-Hi Emil,
-
+Hi Alex,
+On 08/12/2015 08:56 PM, Alex Williamson wrote:
+> On Mon, 2015-08-10 at 15:20 +0200, Eric Auger wrote:
+>> Register a dummy producer with void callbacks
+>>
+>> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+>>
+>> ---
+>>
+>> v2 -> v3:
+>> - rename vfio_platform_irq_bypass_resume into *_start
+>> ---
+>>  drivers/vfio/platform/vfio_platform_irq.c     | 32 +++++++++++++++++++++++++++
+>>  drivers/vfio/platform/vfio_platform_private.h |  2 ++
+>>  2 files changed, 34 insertions(+)
+>>
+>> diff --git a/drivers/vfio/platform/vfio_platform_irq.c b/drivers/vfio/platform/vfio_platform_irq.c
+>> index 88bba57..b5cb8c7 100644
+>> --- a/drivers/vfio/platform/vfio_platform_irq.c
+>> +++ b/drivers/vfio/platform/vfio_platform_irq.c
+>> @@ -20,6 +20,7 @@
+>>  #include <linux/types.h>
+>>  #include <linux/vfio.h>
+>>  #include <linux/irq.h>
+>> +#include <linux/irqbypass.h>
+>>  
+>>  #include "vfio_platform_private.h"
+>>  
+>> @@ -177,6 +178,27 @@ static irqreturn_t vfio_irq_handler(int irq, void *dev_id)
+>>  	return IRQ_HANDLED;
+>>  }
+>>  
+>> +static void vfio_platform_irq_bypass_stop(struct irq_bypass_producer *prod)
+>> +{
+>> +}
+>> +
+>> +static void vfio_platform_irq_bypass_start(struct irq_bypass_producer *prod)
+>> +{
+>> +}
+>> +
+>> +static int vfio_platform_irq_bypass_add_consumer(
+>> +			struct irq_bypass_producer *prod,
+>> +			struct irq_bypass_consumer *cons)
+>> +{
+>> +	return 0;
+>> +}
+>> +
+>> +static void vfio_platform_irq_bypass_del_consumer(
+>> +			struct irq_bypass_producer *prod,
+>> +			struct irq_bypass_consumer *cons)
+>> +{
+>> +}
+>> +
+>>  static int vfio_set_trigger(struct vfio_platform_device *vdev, int index,
+>>  			    int fd, irq_handler_t handler)
+>>  {
+>> @@ -186,6 +208,7 @@ static int vfio_set_trigger(struct vfio_platform_device *vdev, int index,
+>>  
+>>  	if (irq->trigger) {
+>>  		free_irq(irq->hwirq, irq);
+>> +		irq_bypass_unregister_producer(&irq->producer);
+>>  		kfree(irq->name);
+>>  		eventfd_ctx_put(irq->trigger);
+>>  		irq->trigger = NULL;
+>> @@ -216,6 +239,15 @@ static int vfio_set_trigger(struct vfio_platform_device *vdev, int index,
+>>  		return ret;
+>>  	}
+>>  
+>> +	irq->producer.token = (void *)trigger;
+>> +	irq->producer.irq = irq->hwirq;
+>> +	irq->producer.add_consumer = vfio_platform_irq_bypass_add_consumer;
+>> +	irq->producer.del_consumer = vfio_platform_irq_bypass_del_consumer;
+>> +	irq->producer.stop = vfio_platform_irq_bypass_stop;
+>> +	irq->producer.start = vfio_platform_irq_bypass_start;
+>> +	ret = irq_bypass_register_producer(&irq->producer);
+>> +	WARN_ON(ret);
 > 
-> On 5 August 2015 at 15:28, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
-> > The HDLCD controller is a display controller that supports resolutions
-> > up to 4096x4096 pixels. It is present on various development boards
-> > produced by ARM Ltd and emulated by the latest Fast Models from the
-> > company.
-> >
-> I believe there is a unofficial requirement(?) for new drm drivers to
-> use atomic modesetting. Not 100% sure on this one though. The
-> following drivers: tegra, msm, rcar-du, i915, and Daniel's blog [1]
-> [2] cat provide some information on the topic.
+> For what purpose?
+Yes. I will replace by a simple pr_info as done in eventfd.c.
 
-I am also interested to know if this is a requirement or not.
-Thanks for the pointers, I will review them again to see if I did miss
-anything. I remember reading them at the beginning of the year but probably
-the Christmas haze did not clear enough when I did.
+Best Regards
 
+Eric
 > 
-> The driver seems to has has a bit of dead code guarded by
-> HDLCD_*_UNDERRUN. Perhaps these macros should become build or runtime
-> switch(es) ?
-
-There is a comment in hdlcd_drv.h explaining what HDLCD_SHOW_UNDERRUN can
-be used for. As for HDLCD_COUNT_BUFFERUNDERRUNS, you are right, it's dead
-code from the earlier debugging code that got removed before submission.
-I will correct that.
-
+>> +
+>>  	if (!irq->masked)
+>>  		enable_irq(irq->hwirq);
+>>  
+>> diff --git a/drivers/vfio/platform/vfio_platform_private.h b/drivers/vfio/platform/vfio_platform_private.h
+>> index 1c9b3d5..1d2d4d6 100644
+>> --- a/drivers/vfio/platform/vfio_platform_private.h
+>> +++ b/drivers/vfio/platform/vfio_platform_private.h
+>> @@ -17,6 +17,7 @@
+>>  
+>>  #include <linux/types.h>
+>>  #include <linux/interrupt.h>
+>> +#include <linux/irqbypass.h>
+>>  
+>>  #define VFIO_PLATFORM_OFFSET_SHIFT   40
+>>  #define VFIO_PLATFORM_OFFSET_MASK (((u64)(1) << VFIO_PLATFORM_OFFSET_SHIFT) - 1)
+>> @@ -37,6 +38,7 @@ struct vfio_platform_irq {
+>>  	spinlock_t		lock;
+>>  	struct virqfd		*unmask;
+>>  	struct virqfd		*mask;
+>> +	struct irq_bypass_producer producer;
+>>  };
+>>  
+>>  struct vfio_platform_region {
 > 
-> Most DRM drivers do not threat dma, bus_error, vsync and/or underrun
-> interrupts as debug functionality. They are of limited use in this
-> driver, presently, yet the CONFIG_DEBUG_FS guard seems a bit strange
-> imho.
-
-The HDLCD device has only 1 interrupt that can fire and there is no other
-way to show the reason for the interrupt in the driver. It was useful when
-debugging underruns and/or vsync issues so I thought it might be useful
-to keep around. Putting it the other way: if you are going to use this device
-and the image is not completely rendered I would not be able to give you
-support to figure out what went wrong without this debugging information.
-With this in place I can tell the difference between a busy system vs one
-where the interrupt latency is large.
-
-Best regards,
-Liviu
-
 > 
-> Cheers,
-> Emil
 > 
-> [1] http://blog.ffwll.ch/2014/11/atomic-modeset-support-for-kms-drivers.html
-> [2] http://blog.ffwll.ch/2015/01/update-for-atomic-display-updates.html
-> 
-
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
