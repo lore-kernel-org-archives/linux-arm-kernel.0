@@ -1,28 +1,53 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 17 Aug 2015 11:11:45 +0900
-Subject: [PATCH 3/4] ARM: dts: Add UART2 dt node for Exynos3250 SoC
-In-Reply-To: <1439264784-30322-4-git-send-email-cw00.choi@samsung.com>
-References: <1439264784-30322-1-git-send-email-cw00.choi@samsung.com>
- <1439264784-30322-4-git-send-email-cw00.choi@samsung.com>
-Message-ID: <55D142E1.2000208@samsung.com>
+From: shijie.huang@arm.com (Huang Shijie)
+Date: Mon, 17 Aug 2015 10:05:25 +0800
+Subject: [PATCH] arm64: dts: Juno: fix the wrong memory map sizes for the
+ I2C/EHCI/OHCI
+Message-ID: <1439777125-9409-1-git-send-email-shijie.huang@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11.08.2015 12:46, Chanwoo Choi wrote:
-> This patch add the uart2 devicetree node for Exynos3250 SoC.
-"This patch adds the UART2 Device Tree node..."
+>From the "Juno ARM Development Platform Soc Techinical Reference Mannual(r1p0)",
+we get the following memory map sizes (3-25):
+	I2C      : 0x7ffa0000  0x7ffa00ff       (256B)
+	USB OHCI : 0x7ffb0000  0x7ffb0fff       (4KB)
+	USB EHCI : 0x7ffc0000  0x7ffc0fff       (4KB)
 
-> 
-> Cc: Kukjin Kim <kgene@kernel.org>
-> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> ---
->  arch/arm/boot/dts/exynos3250-pinctrl.dtsi |  7 +++++++
->  arch/arm/boot/dts/exynos3250.dtsi         | 12 ++++++++++++
->  2 files changed, 19 insertions(+)
+This patch fixes the wrong memory map sizes for them.
 
+Signed-off-by: Huang Shijie <shijie.huang@arm.com>
+---
+ arch/arm64/boot/dts/arm/juno-base.dtsi | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-
-Best regards,
-Krzysztof
+diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
+index e3ee960..7b2715f 100644
+--- a/arch/arm64/boot/dts/arm/juno-base.dtsi
++++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
+@@ -74,7 +74,7 @@
+ 
+ 	i2c at 7ffa0000 {
+ 		compatible = "snps,designware-i2c";
+-		reg = <0x0 0x7ffa0000 0x0 0x1000>;
++		reg = <0x0 0x7ffa0000 0x0 0x100>;
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 		interrupts = <GIC_SPI 104 IRQ_TYPE_LEVEL_HIGH>;
+@@ -95,14 +95,14 @@
+ 
+ 	ohci at 7ffb0000 {
+ 		compatible = "generic-ohci";
+-		reg = <0x0 0x7ffb0000 0x0 0x10000>;
++		reg = <0x0 0x7ffb0000 0x0 0x1000>;
+ 		interrupts = <GIC_SPI 116 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&soc_usb48mhz>;
+ 	};
+ 
+ 	ehci at 7ffc0000 {
+ 		compatible = "generic-ehci";
+-		reg = <0x0 0x7ffc0000 0x0 0x10000>;
++		reg = <0x0 0x7ffc0000 0x0 0x1000>;
+ 		interrupts = <GIC_SPI 117 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&soc_usb48mhz>;
+ 	};
+-- 
+2.1.4
