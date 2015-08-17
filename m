@@ -1,66 +1,45 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Sun, 16 Aug 2015 16:49:28 -0400
-Subject: [PATCH V3 3/3] x86: use generic early mem copy
-In-Reply-To: <1439758168-29427-1-git-send-email-msalter@redhat.com>
-References: <1439758168-29427-1-git-send-email-msalter@redhat.com>
-Message-ID: <1439758168-29427-4-git-send-email-msalter@redhat.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Mon, 17 Aug 2015 11:08:55 +1000
+Subject: linux-next: manual merge of the pci tree with the arm-soc tree
+Message-ID: <20150817110855.4fcf9a66@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The early_ioremap library now has a generic copy_from_early_mem()
-function. Use the generic copy function for x86 relocate_initrd().
+Hi Bjorn,
 
-Signed-off-by: Mark Salter <msalter@redhat.com>
----
- arch/x86/kernel/setup.c | 22 +---------------------
- 1 file changed, 1 insertion(+), 21 deletions(-)
+Today's linux-next merge of the pci tree got a conflict in:
 
-diff --git a/arch/x86/kernel/setup.c b/arch/x86/kernel/setup.c
-index 80f874b..21fa9a3 100644
---- a/arch/x86/kernel/setup.c
-+++ b/arch/x86/kernel/setup.c
-@@ -317,15 +317,12 @@ static u64 __init get_ramdisk_size(void)
- 	return ramdisk_size;
- }
- 
--#define MAX_MAP_CHUNK	(NR_FIX_BTMAPS << PAGE_SHIFT)
- static void __init relocate_initrd(void)
- {
- 	/* Assume only end is not page aligned */
- 	u64 ramdisk_image = get_ramdisk_image();
- 	u64 ramdisk_size  = get_ramdisk_size();
- 	u64 area_size     = PAGE_ALIGN(ramdisk_size);
--	unsigned long slop, clen, mapaddr;
--	char *p, *q;
- 
- 	/* We need to move the initrd down into directly mapped mem */
- 	relocated_ramdisk = memblock_find_in_range(0, PFN_PHYS(max_pfn_mapped),
-@@ -343,25 +340,8 @@ static void __init relocate_initrd(void)
- 	printk(KERN_INFO "Allocated new RAMDISK: [mem %#010llx-%#010llx]\n",
- 	       relocated_ramdisk, relocated_ramdisk + ramdisk_size - 1);
- 
--	q = (char *)initrd_start;
--
--	/* Copy the initrd */
--	while (ramdisk_size) {
--		slop = ramdisk_image & ~PAGE_MASK;
--		clen = ramdisk_size;
--		if (clen > MAX_MAP_CHUNK-slop)
--			clen = MAX_MAP_CHUNK-slop;
--		mapaddr = ramdisk_image & PAGE_MASK;
--		p = early_memremap(mapaddr, clen+slop);
--		memcpy(q, p+slop, clen);
--		early_memunmap(p, clen+slop);
--		q += clen;
--		ramdisk_image += clen;
--		ramdisk_size  -= clen;
--	}
-+	copy_from_early_mem((void *)initrd_start, ramdisk_image, ramdisk_size);
- 
--	ramdisk_image = get_ramdisk_image();
--	ramdisk_size  = get_ramdisk_size();
- 	printk(KERN_INFO "Move RAMDISK from [mem %#010llx-%#010llx] to"
- 		" [mem %#010llx-%#010llx]\n",
- 		ramdisk_image, ramdisk_image + ramdisk_size - 1,
+  drivers/pci/host/Kconfig
+
+between commit:
+
+  70d334ca71b0 ("PCI: iproc: Fix BCMA dependency in Kconfig")
+
+from the arm-soc tree and commit:
+
+  05aa7d6a72c1 ("PCI: iproc: Allow BCMA bus driver to be built as module")
+
+from the pci tree.
+
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
+
 -- 
-2.4.3
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+
+diff --cc drivers/pci/host/Kconfig
+index 48b5b3058d9d,e339a8c42f76..000000000000
+--- a/drivers/pci/host/Kconfig
++++ b/drivers/pci/host/Kconfig
+@@@ -135,8 -135,8 +135,8 @@@ config PCIE_IPROC_PLATFOR
+  	  through the generic platform bus interface
+  
+  config PCIE_IPROC_BCMA
+- 	bool "Broadcom iProc PCIe BCMA bus driver"
++ 	tristate "Broadcom iProc PCIe BCMA bus driver"
+ -	depends on ARCH_BCM_IPROC || (ARM && COMPILE_TEST)
+ +	depends on ARM && (ARCH_BCM_IPROC || COMPILE_TEST)
+  	select PCIE_IPROC
+  	select BCMA
+  	select PCI_DOMAINS
