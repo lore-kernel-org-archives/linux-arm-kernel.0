@@ -1,35 +1,71 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Mon, 17 Aug 2015 19:47:21 +0800
-Subject: [PATCH v2] mmc: sdhci: also set driver type for MMC_DDR52
-Message-ID: <1439812041-6596-1-git-send-email-jszhang@marvell.com>
+From: wangzhou1@hisilicon.com (Zhou Wang)
+Date: Mon, 17 Aug 2015 19:55:53 +0800
+Subject: [PATCH v7 5/6] Documentation: DT: Add HiSilicon PCIe host binding
+In-Reply-To: <1439812554-180426-1-git-send-email-wangzhou1@hisilicon.com>
+References: <1439812554-180426-1-git-send-email-wangzhou1@hisilicon.com>
+Message-ID: <1439812554-180426-6-git-send-email-wangzhou1@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit bb8175a8aa42 ("mmc: sdhci: clarify DDR timing mode between
-SD-UHS and eMMC") added MMC_DDR52 as eMMC's DDR mode to be
-distinguished from SD-UHS, but it missed setting driver type for
-MMC_DDR52 timing mode. This patches adds the missing driver type
-setting.
+This patch adds related DTS binding document for HiSilicon PCIe host driver.
 
-Fixes: bb8175a8aa42 ("mmc: sdhci: clarify DDR timing mode ...")
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+Signed-off-by: Zhou Wang <wangzhou1@hisilicon.com>
 ---
- drivers/mmc/host/sdhci.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ .../devicetree/bindings/pci/hisilicon-pcie.txt     | 46 ++++++++++++++++++++++
+ 1 file changed, 46 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pci/hisilicon-pcie.txt
 
-diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-index 1dbe932..32f2a07 100644
---- a/drivers/mmc/host/sdhci.c
-+++ b/drivers/mmc/host/sdhci.c
-@@ -1559,7 +1559,8 @@ static void sdhci_do_set_ios(struct sdhci_host *host, struct mmc_ios *ios)
- 				 (ios->timing == MMC_TIMING_UHS_SDR25) ||
- 				 (ios->timing == MMC_TIMING_UHS_SDR50) ||
- 				 (ios->timing == MMC_TIMING_UHS_SDR104) ||
--				 (ios->timing == MMC_TIMING_UHS_DDR50))) {
-+				 (ios->timing == MMC_TIMING_UHS_DDR50) ||
-+				 (ios->timing == MMC_TIMING_MMC_DDR52))) {
- 			u16 preset;
- 
- 			sdhci_enable_preset_value(host, true);
+diff --git a/Documentation/devicetree/bindings/pci/hisilicon-pcie.txt b/Documentation/devicetree/bindings/pci/hisilicon-pcie.txt
+new file mode 100644
+index 0000000..2afc9d1
+--- /dev/null
++++ b/Documentation/devicetree/bindings/pci/hisilicon-pcie.txt
+@@ -0,0 +1,46 @@
++HiSilicon PCIe host bridge DT description
++
++HiSilicon PCIe host controller is based on Designware PCI core.
++It shares common functions with PCIe Designware core driver and inherits
++common properties defined in
++Documentation/devicetree/bindings/pci/designware-pci.txt.
++
++Additional properties are described here:
++
++Required properties:
++- compatible: Should contain "hisilicon,hip05-pcie".
++- reg: Should contain rc_dbi, subctrl, config registers location and length.
++- reg-names: Must include the following entries:
++  "rc_dbi": controller configuration registers;
++  "subctrl": whole PCIe hosts configuration registers;
++  "config": PCIe configuration space registers.
++- msi-parent: Should be its_pcie which is an ITS receiving MSI interrupts.
++- port-id: Should be 0, 1, 2 or 3.
++
++Optional properties:
++- status: Either "ok" or "disabled".
++- dma-coherent: Present if DMA operations are coherent.
++
++Example:
++	pcie at 0xb0080000 {
++		compatible = "hisilicon,hip05-pcie", "snps,dw-pcie";
++		reg = <0 0xb0080000 0 0x10000>, <0 0xb0000000 0 0x10000>,
++		      <0x220 0x00000000 0 0x2000>;
++		reg-names = "rc_dbi", "subctrl", "config";
++		bus-range = <0  15>;
++		msi-parent = <&its_pcie>;
++		#address-cells = <3>;
++		#size-cells = <2>;
++		device_type = "pci";
++		dma-coherent;
++		ranges = <0x82000000 0 0x00000000 0x220 0x00000000 0 0x10000000>;
++		num-lanes = <8>;
++		port-id = <1>;
++		#interrupts-cells = <1>;
++		interrupts-map-mask = <0xf800 0 0 7>;
++		interrupts-map = <0x0 0 0 1 &mbigen_pcie 1 10
++				  0x0 0 0 2 &mbigen_pcie 2 11
++				  0x0 0 0 3 &mbigen_pcie 3 12
++				  0x0 0 0 4 &mbigen_pcie 4 13>;
++		status = "ok";
++	};
 -- 
-2.5.0
+1.9.1
