@@ -1,91 +1,99 @@
-From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Mon, 17 Aug 2015 22:10:02 +0800
-Subject: [PATCH v2 1/5] clocksource: mediatek: do not enable GPT_CLK_EVT
- when setup
-In-Reply-To: <55CC56C4.8080201@linaro.org>
-References: <CAGS+omD8k_Cfxv3bYyjmjtLbiavo-WmJPn0Z-CBhN_nnv65Tag@mail.gmail.com>
- <1437552878-3684-1-git-send-email-yingjoe.chen@mediatek.com>
- <55CC56C4.8080201@linaro.org>
-Message-ID: <1439820602.3414.12.camel@mtksdaap41>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Mon, 17 Aug 2015 10:11:11 -0400
+Subject: [PATCH] ARM: keystone: add a work around to handle asynchronous
+ external abort
+In-Reply-To: <1439561519.13210.55.camel@pengutronix.de>
+References: <1439320409-20084-1-git-send-email-m-karicheri2@ti.com>	
+ <55CDF579.4050408@ti.com> <1439561519.13210.55.camel@pengutronix.de>
+Message-ID: <55D1EB7F.4030905@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2015-08-13 at 10:35 +0200, Daniel Lezcano wrote:
-> On 07/22/2015 10:14 AM, Yingjoe Chen wrote:
-> > Spurious mtk timer interrupt is noticed at boot and cause kernel
-> > crash. It seems if GPT is enabled, it will latch irq status even
-> > when its IRQ is disabled. When irq is enabled afterward, we see
-> > spurious interrupt.
-> > Change init flow to only enable GPT_CLK_SRC at mtk_timer_init.
-> >
-> > Acked-by: Matthias Brugger <matthias.bgg@gmail.com>
-> > Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
-> > Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
-> > ---
-> >
-> > Update to my patch [1], added __init as Daniel suggest. This is the
-> > only patch that need to change in that series, so I only sent this one.
-> >
-> > http://lists.infradead.org/pipermail/linux-mediatek/2015-July/001545.html
-> >
-> >   drivers/clocksource/mtk_timer.c | 16 ++++++++++------
-> >   1 file changed, 10 insertions(+), 6 deletions(-)
-> >
-> > diff --git a/drivers/clocksource/mtk_timer.c b/drivers/clocksource/mtk_timer.c
-> > index 68ab423..2ba5b66 100644
-> > --- a/drivers/clocksource/mtk_timer.c
-> > +++ b/drivers/clocksource/mtk_timer.c
-> > @@ -156,9 +156,11 @@ static void mtk_timer_global_reset(struct mtk_clock_event_device *evt)
-> >   	writel(0x3f, evt->gpt_base + GPT_IRQ_ACK_REG);
-> >   }
-> >
-> > -static void
-> > -mtk_timer_setup(struct mtk_clock_event_device *evt, u8 timer, u8 option)
-> > +static void __init mtk_timer_setup(struct mtk_clock_event_device *evt,
-> > +				   u8 timer, u8 option, bool enable)
-> >   {
-> > +	u32 val;
-> > +
-> >   	writel(TIMER_CTRL_CLEAR | TIMER_CTRL_DISABLE,
-> >   		evt->gpt_base + TIMER_CTRL_REG(timer));
-> >
-> > @@ -167,8 +169,10 @@ mtk_timer_setup(struct mtk_clock_event_device *evt, u8 timer, u8 option)
-> >
-> >   	writel(0x0, evt->gpt_base + TIMER_CMP_REG(timer));
-> >
-> > -	writel(TIMER_CTRL_OP(option) | TIMER_CTRL_ENABLE,
-> > -			evt->gpt_base + TIMER_CTRL_REG(timer));
-> > +	val = TIMER_CTRL_OP(option);
-> > +	if (enable)
-> > +		val |= TIMER_CTRL_ENABLE;
-> > +	writel(val, evt->gpt_base + TIMER_CTRL_REG(timer));
-> 
-> Instead of the 'enable' new option, I prefer a test with 'timer' with a 
-> comment:
-> 
-> 	/*
-> 	 * the timer hw is broken in that way ... bla bla, so we only
-> 	 * enable the clocksource ...
-> 	 */
-> 	if (timer == GPT_CLK_SRC)
-> 		val |= TIMER_CTRL_ENABLE;
+On 08/14/2015 10:11 AM, Lucas Stach wrote:
+> Am Freitag, den 14.08.2015, 10:04 -0400 schrieb Murali Karicheri:
+>> On 08/11/2015 03:13 PM, Murali Karicheri wrote:
+>>> Currently on some devices, an asynchronous external abort exception
+>>> happens during boot up when exception handlers are enabled in kernel
+>>> before switching to user space. This patch adds a workaround to handle
+>>> this once during boot. Many customers are already using this
+>>> with out any issues and is required to workaround the above issue.
+>>>
+>>> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+>>> ---
+>>>    arch/arm/mach-keystone/keystone.c | 26 ++++++++++++++++++++++++++
+>>>    1 file changed, 26 insertions(+)
+>>>
+>>> diff --git a/arch/arm/mach-keystone/keystone.c b/arch/arm/mach-keystone/keystone.c
+>>> index e2880105..c1d0fe5 100644
+>>> --- a/arch/arm/mach-keystone/keystone.c
+>>> +++ b/arch/arm/mach-keystone/keystone.c
+>>> @@ -15,6 +15,7 @@
+>>>    #include <linux/of_platform.h>
+>>>    #include <linux/of_address.h>
+>>>    #include <linux/memblock.h>
+>>> +#include <linux/signal.h>
+>>>
+>>>    #include <asm/setup.h>
+>>>    #include <asm/mach/map.h>
+>>> @@ -52,6 +53,24 @@ static struct notifier_block platform_nb = {
+>>>    	.notifier_call = keystone_platform_notifier,
+>>>    };
+>>>
+>>> +static bool ignore_first = true;
+>>> +static int keystone_async_ext_abort_fault(unsigned long addr, unsigned int fsr,
+>>> +					  struct pt_regs *regs)
+>>> +{
+>>> +	/*
+>>> +	 * if first time, ignore this as this is a asynchronous external abort
+>>> +	 * happening only some devices that couldn't be root caused and we add
+>>> +	 * this work around to handle this first time.
+>>> +	 */
+>>> +	if (ignore_first) {
+>>> +		ignore_first = false;
+>>> +		return 0;
+>>> +	}
+>>> +
+>>> +	/* Subsequent ones should be handled as fault */
+>>> +	return 1;
+>>> +}
+>>> +
+>>>    static void __init keystone_init(void)
+>>>    {
+>>>    	if (PHYS_OFFSET >= KEYSTONE_HIGH_PHYS_START) {
+>>> @@ -61,6 +80,13 @@ static void __init keystone_init(void)
+>>>    	}
+>>>    	keystone_pm_runtime_init();
+>>>    	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+>>> +
+>>> +	/*
+>>> +	 * Add a one time exception handler to catch asynchronous external
+>>> +	 * abort
+>>> +	 */
+>>> +	hook_fault_code(17, keystone_async_ext_abort_fault, SIGBUS, 0,
+>>> +			"async external abort handler");
+>>>    }
+>>>
+>>>    static phys_addr_t keystone_virt_to_idmap(unsigned long x)
+>>>
+>> Can this be applied if it looks good?
+>>
+> The keystone PCIe host driver already hooks the same fault code. Those
+> hooks are no chain, but a simple pointer, so one of those handlers is
+> going to loose out.
+>
+> This likely isn't what you intended.
+You are right. I will try to debug this further based on your patch and 
+as per RMK's suggestion.
 
-Hi Daniel,
+Thanks and regards,
 
-Thanks for your review.
-Since this bug happens to anyone using interrupt, I'm not sure checking
-timer and only enable it for GPT_CLK_SRC is easier to read. Anyway, I'll
-change to this in next version.
+Murali
+>
+> Regards,
+> Lucas
+>
 
-> That said, can you have a look at commit 1096be08 ?
-> "clockevents: sun5i: Fix setup_irq init sequence"
-> 
-> first and check if moving the interrupt request after the 
-> clockevents_config_and_register could fix your issue.
 
-I've tested this before, see:
-
-http://lists.infradead.org/pipermail/linux-mediatek/2015-May/000539.html
-http://lists.infradead.org/pipermail/linux-mediatek/2015-May/000551.html
-
-Joe.C
+-- 
+Murali Karicheri
+Linux Kernel, Keystone
