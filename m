@@ -1,58 +1,88 @@
-From: hramrach@gmail.com (Michal Suchanek)
-Date: Mon, 17 Aug 2015 16:55:46 +0200
-Subject: [PATCH 2/3] mmc: dw_mmc: simplify the SDMMC_CLKEN_LOW_PWR logic
-In-Reply-To: <CAGOxZ51oHoX+zQSO8tRp8V5RUmDg8CAnM9HO5FQ5h6JeCy=1og@mail.gmail.com>
-References: <cover.1439381423.git.hramrach@gmail.com>
- <3d03bfe2c18789eefa038018467c9c63c94ae4a2.1439381423.git.hramrach@gmail.com>
- <55D13F07.70309@samsung.com>
- <CAOMqctQ8DHj6qPg8zR93OGRHXAZDd0yUmG_J8Vz7dGFuDpCgRQ@mail.gmail.com>
- <55D1C4CD.4040200@samsung.com>
- <CAGOxZ51oHoX+zQSO8tRp8V5RUmDg8CAnM9HO5FQ5h6JeCy=1og@mail.gmail.com>
-Message-ID: <CAOMqctQ_gA=QxRVFQ8L=q7kBX3GROvz9mnHGu2yo1VrBO1Le6w@mail.gmail.com>
+From: mathias.nyman@linux.intel.com (Mathias Nyman)
+Date: Mon, 17 Aug 2015 18:07:35 +0300
+Subject: [PATCH v5 4/5] xhci: mediatek: support MTK xHCI host controller
+In-Reply-To: <1438950644-27290-5-git-send-email-chunfeng.yun@mediatek.com>
+References: <1438950644-27290-1-git-send-email-chunfeng.yun@mediatek.com>
+ <1438950644-27290-5-git-send-email-chunfeng.yun@mediatek.com>
+Message-ID: <55D1F8B7.9060306@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Hello,
+Hi
 
-On 17 August 2015 at 16:42, Alim Akhtar <alim.akhtar@gmail.com> wrote:
-> HI
+On 07.08.2015 15:30, Chunfeng Yun wrote:
+> MTK xhci host controller defines some extra SW scheduling
+> parameters for HW to minimize the scheduling effort for
+> synchronous and interrupt endpoints. The parameters are
+> put into reseved DWs of slot context and endpoint context
 >
-> On Mon, Aug 17, 2015 at 4:56 PM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
->> On 08/17/2015 02:52 PM, Michal Suchanek wrote:
->>> Hello,
->>>
->>> On 17 August 2015 at 03:55, Jaehoon Chung <jh80.chung@samsung.com> wrote:
->>>> Hi, Michal.
->>>>
->>>> On 08/12/2015 09:23 PM, Michal Suchanek wrote:
->>>>> The driver has open-coded test for SDIO cards. Use the mmc core provided
->>>>> MMC_QUIRK_BROKEN_CLK_GATING flag instead.
->>>>
->>>> Did you use the clock-gating for SDIO cards?
->>>> Doesn't MMC_CAP_SDIO_IRQ bit set? Which case is broken?
->>>> Could you explain to me more?
->>>
->>> The core flag for disabling power saving is MMC_QUIRK_BROKEN_CLK_GATING.
->>
->> I understood your intention. And i read the comment into mmc/core/quirks.c
->> I will test SDIO card with this patch. Thanks.
->>
-> When you test, please check if SDIO IRQ still works, we need to put
-> dw_mmc in low_power mode otherwise SDIO IRQ will be not be generated
-> by dw_mmc host controller.
 >
 
-As far as I understand the logic which is removed in this patch and
-the core logic which replaces it is the same -  low power by means of
-clock gating is *not* enabled for SDIO cards in either case.
+...
 
-The original code also checks for SDIO IRQ and disables clock gating
-regardless of card type which is probably redundant. If not it should
-be fixed in mmc core.
+> + * The TD size is the number of max packet sized packets remaining in the TD
+> + * (including this TRB), right shifted by 10.
+> + * It must fit in bits 21:17, so it can't be bigger than 31.
+> + */
+> +u32 xhci_mtk_td_remainder_quirk(unsigned int td_running_total,
+> +	unsigned trb_buffer_length, struct urb *urb)
+> +{
+> +	u32 max = 31;
+> +	int remainder, td_packet_count, packet_transferred;
+> +	unsigned int td_transfer_size = urb->transfer_buffer_length;
+> +	unsigned int maxp;
+> +
+> +	maxp = GET_MAX_PACKET(usb_endpoint_maxp(&urb->ep->desc));
+> +
+> +	/* 0 for the last TRB */
+> +	if (td_running_total + trb_buffer_length == td_transfer_size)
+> +		return 0;
+> +
+> +	packet_transferred = td_running_total / maxp;
+> +	td_packet_count = DIV_ROUND_UP(td_transfer_size, maxp);
+> +	remainder = td_packet_count - packet_transferred;
+> +
+> +	if (remainder > max)
+> +		return max << 17;
+> +	else
+> +		return remainder << 17;
+> +}
 
-My recent kernel builds which I run on a system with mwifiex card
-probably include this patch.
+I started looking at this xhci_mtk_td_remainder() function, one
+of the places this patch touches the existing xhci code.
 
-Thanks
+The remainder functions in xhci are already bit too messy, and
+adding one more function which does almost the same thing makes
+it even messier.
 
-Michal
+For example queuing a bulk transfer will end up like this:
+
+>   		/* Set the TRB length, TD size, and interrupter fields. */
+>   		if (xhci->hci_version < 0x100) {
+> -			remainder = xhci_td_remainder(
+> +			if (xhci->quirks & XHCI_MTK_HOST) {
+> +				remainder = xhci_mtk_td_remainder_quirk(
+> +					running_total, trb_buff_len, urb);
+> +			} else {
+> +				remainder = xhci_td_remainder(
+>   					urb->transfer_buffer_length -
+>   					running_total);
+> +			}
+>   		} else {
+>   			remainder = xhci_v1_0_td_remainder(running_total,
+>   					trb_buff_len, total_packet_count, urb,
+
+and similar for isoc and control transfers.
+
+I'll see if I can simplify the existing remainder calculations into one function, then it should
+be enough to just add something like this into it:
+
+if (xhci->quirks & XHCI_MTK_HOST)
+	trb_buff_len = 0;
+  	
+This way we can skip all the extra hassle that comes with a new exported quirk function
+
+Is the Mediatek xhci really a xHCI 0.96 or older controller? (hci_version < 0x100)
+Not a xHCI 1.0 or 1.1 ?
+
+-Mathias
