@@ -1,41 +1,101 @@
-From: nigel@nigelcunningham.com.au (Nigel Cunningham)
-Date: Mon, 17 Aug 2015 16:48:49 +1000
-Subject: [PATCH v2] dmaengine: fsl-edma: add PM suspend/resume support
-In-Reply-To: <CY1PR0301MB1562103588FB0C6BEFDDBF3C83790@CY1PR0301MB1562.namprd03.prod.outlook.com>
-References: <1437469005-3162-1-git-send-email-yao.yuan@freescale.com>	<CADRPPNQJi_x+mdQV=DEVuhCL_p6VOWcPiV3jzioeRdWgSW2w3g@mail.gmail.com>	<CY1PR0301MB15628DD5CFCE2B65BF4FECB2837C0@CY1PR0301MB1562.namprd03.prod.outlook.com>
- <CADRPPNS_wzX+mwT0L-H=ZP9w8gH9W4O9KUqnGYiAc39S5v4qLA@mail.gmail.com>
- <CY1PR0301MB1562103588FB0C6BEFDDBF3C83790@CY1PR0301MB1562.namprd03.prod.outlook.com>
-Message-ID: <55D183D1.9020401@nigelcunningham.com.au>
+From: hramrach@gmail.com (Michal Suchanek)
+Date: Mon, 17 Aug 2015 07:52:00 +0200
+Subject: [PATCH 2/3] mmc: dw_mmc: simplify the SDMMC_CLKEN_LOW_PWR logic
+In-Reply-To: <55D13F07.70309@samsung.com>
+References: <cover.1439381423.git.hramrach@gmail.com>
+ <3d03bfe2c18789eefa038018467c9c63c94ae4a2.1439381423.git.hramrach@gmail.com>
+ <55D13F07.70309@samsung.com>
+Message-ID: <CAOMqctQ8DHj6qPg8zR93OGRHXAZDd0yUmG_J8Vz7dGFuDpCgRQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yao.
+Hello,
 
-On 17/08/15 13:59, Yao Yuan wrote:
-> On Sat, Aug 15, 2015 at 7:48 AM, pku.leo < pku.leo@gmail.com > wrote:
->> On Fri, Aug 14, 2015 at 1:24 AM, Yao Yuan <yao.yuan@freescale.com> wrote:
->>> Hi Leo,
->>>
->>> Thanks for your review.
->>> About those two methods for DMA suspend that you have mentioned. We
->> have a lot of the discussions in other DMA driver like DMA for Freescale
->> PowerPC.
->>> Finally, we think the device which used the DMA transmission service should
->> cancel the transmission service in its suspend.
->>> So DMA in suspend should be idle.
->> If that's the case you should clearly state this in the commit message and in
->> code, although I don't know if it is safe to make such assumption.  There could
->> be user of the DMA that doesn't track the completion of transfers.
-> I think it should be safe. In my opinion, even some client(the user of the DMA) forget to cancel its DMA transmission,
-> It will just lead to PM failed but no other system and data risk.
-> Although we should first fix the behavior of the client.
-> Once you are no need the DMA transmission, why not stop it?
+On 17 August 2015 at 03:55, Jaehoon Chung <jh80.chung@samsung.com> wrote:
+> Hi, Michal.
 >
-> Is it right?
-Think of it from the end user perspective. Would you like your laptop (or whatever) to refuse to suspend because of this condition? The user may well expect that closing the lid on their laptop will reliably lead to it suspending to ram. Returning a failure here could result in a loss of data if the condition is not detected and the machine subsequently runs out of power.
+> On 08/12/2015 09:23 PM, Michal Suchanek wrote:
+>> The driver has open-coded test for SDIO cards. Use the mmc core provided
+>> MMC_QUIRK_BROKEN_CLK_GATING flag instead.
+>
+> Did you use the clock-gating for SDIO cards?
+> Doesn't MMC_CAP_SDIO_IRQ bit set? Which case is broken?
+> Could you explain to me more?
 
-I do agree that whatever is submitting DMA should be stopped first; ideally this driver would always be idle because whatever producers of work exist would already have been quiesced and output flushed.
+The core flag for disabling power saving is MMC_QUIRK_BROKEN_CLK_GATING.
 
-Regards,
+It may coincide with MMC_CAP_SDIO_IRQ but that's different flag for
+different purpose.
 
-Nigel
+MMC_QUIRK_BROKEN_CLK_GATING is currently set for all SDIO cards except
+for cards on a whitelist.
+
+I don't know any particular SDIO card that has problems when the clock
+is off and does not use an IRQ.
+
+Thanks
+
+Michal
+
+>
+> Best Regards,
+> Jaehoon Chung
+>
+>>
+>> As a bonus this may enable clock gating on SDIO cards that are known to
+>> work with it.
+>>
+>> Signed-off-by: Michal Suchanek <hramrach@gmail.com>
+>> ---
+>>  drivers/mmc/host/dw_mmc.c | 33 +++++++++++++++------------------
+>>  1 file changed, 15 insertions(+), 18 deletions(-)
+>>
+>> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+>> index 40e9d8e..3bc9fd7 100644
+>> --- a/drivers/mmc/host/dw_mmc.c
+>> +++ b/drivers/mmc/host/dw_mmc.c
+>> @@ -1335,27 +1335,24 @@ static void dw_mci_init_card(struct mmc_host *mmc, struct mmc_card *card)
+>>        * description of the CLKENA register we should disable low power mode
+>>        * for SDIO cards if we need SDIO interrupts to work.
+>>        */
+>> -     if (mmc->caps & MMC_CAP_SDIO_IRQ) {
+>> -             const u32 clken_low_pwr = SDMMC_CLKEN_LOW_PWR << slot->id;
+>> -             u32 clk_en_a_old;
+>> -             u32 clk_en_a;
+>> +     const u32 clken_low_pwr = SDMMC_CLKEN_LOW_PWR << slot->id;
+>> +     u32 clk_en_a_old;
+>> +     u32 clk_en_a;
+>>
+>> -             clk_en_a_old = mci_readl(host, CLKENA);
+>> +     clk_en_a_old = mci_readl(host, CLKENA);
+>>
+>> -             if (card->type == MMC_TYPE_SDIO ||
+>> -                 card->type == MMC_TYPE_SD_COMBO) {
+>> -                     set_bit(DW_MMC_CARD_NO_LOW_PWR, &slot->flags);
+>> -                     clk_en_a = clk_en_a_old & ~clken_low_pwr;
+>> -             } else {
+>> -                     clear_bit(DW_MMC_CARD_NO_LOW_PWR, &slot->flags);
+>> -                     clk_en_a = clk_en_a_old | clken_low_pwr;
+>> -             }
+>> +     if (card->quirks & MMC_QUIRK_BROKEN_CLK_GATING) {
+>> +             set_bit(DW_MMC_CARD_NO_LOW_PWR, &slot->flags);
+>> +             clk_en_a = clk_en_a_old & ~clken_low_pwr;
+>> +     } else {
+>> +             clear_bit(DW_MMC_CARD_NO_LOW_PWR, &slot->flags);
+>> +             clk_en_a = clk_en_a_old | clken_low_pwr;
+>> +     }
+>>
+>> -             if (clk_en_a != clk_en_a_old) {
+>> -                     mci_writel(host, CLKENA, clk_en_a);
+>> -                     mci_send_cmd(slot, SDMMC_CMD_UPD_CLK |
+>> -                                  SDMMC_CMD_PRV_DAT_WAIT, 0);
+>> -             }
+>> +     if (clk_en_a != clk_en_a_old) {
+>> +             mci_writel(host, CLKENA, clk_en_a);
+>> +             mci_send_cmd(slot, SDMMC_CMD_UPD_CLK |
+>> +                             SDMMC_CMD_PRV_DAT_WAIT, 0);
+>>       }
+>>  }
+>>
+>>
+>
