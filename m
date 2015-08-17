@@ -1,43 +1,27 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 26 Aug 2015 17:40:12 +0100
-Subject: [PATCH 1/4] remoteproc: dt: Provide bindings for ST's Remote
- Processor Controller driver
-In-Reply-To: <55DDE25A.2050000@mentor.com>
-References: <1440594483-29601-1-git-send-email-lee.jones@linaro.org>
- <1440594483-29601-2-git-send-email-lee.jones@linaro.org>
- <55DDE25A.2050000@mentor.com>
-Message-ID: <20150826164012.GA19409@x1>
+From: drew.richardson@arm.com (Drew Richardson)
+Date: Mon, 17 Aug 2015 13:58:09 -0700
+Subject: [PATCH] arm: perf: Add event descriptions
+In-Reply-To: <20150804001522.GA13214@dreric01-gentoo.localdomain>
+References: <20150804001522.GA13214@dreric01-gentoo.localdomain>
+Message-ID: <20150817205809.GA16506@dreric01-gentoo.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 26 Aug 2015, Nathan Lynch wrote:
-
-> On 08/26/2015 08:08 AM, Lee Jones wrote:
-> > diff --git a/Documentation/devicetree/bindings/remoteproc/st-rproc.txt b/Documentation/devicetree/bindings/remoteproc/st-rproc.txt
-> > new file mode 100644
-> > index 0000000..6a933c1
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/remoteproc/st-rproc.txt
-> > @@ -0,0 +1,38 @@
-> > +STMicroelectronics Remote Processor
-> > +-----------------------------------
-> > +
-> > +This binding provides support for adjunct processors found on ST SoCs.
-> > +
-> > +The remote processors can be controlled from the bootloader or the primary OS.
-> > +If the bootloader starts a remote processor processor the primary OS must detect
-> > +its state and act accordingly.
-> > +
-> > +The node name is significant, as it defines the name of the CPU and the name
-> > +of the firmware to load: "rproc-<name>-fw".
+On Tue, Aug 04, 2015 at 01:15:23AM +0100, Drew Richardson wrote:
+> Add additional information about hardware events to make counters self
+> describing. This makes the hardware PMUs easier to use as perf list
+> contains the possible events instead of users having to refer to
+> documentation like the ARM TRMs. This could also allow tools like
+> oprofile to support PMUs without requiring an update.
 > 
-> This business about the firmware name describes a behavior of Linux's
-> core remoteproc code and seems out of place in a binding document.
+> Signed-off-by: Drew Richardson <drew.richardson@arm.com>
+> ---
+>  arch/arm/kernel/perf_event.c    |   1 +
+>  arch/arm/kernel/perf_event_v7.c | 617 ++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 618 insertions(+)
 
-Agreed, will remove.
+Any concerns with merging this?
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Thanks,
+
+Drew
