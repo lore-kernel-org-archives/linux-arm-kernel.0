@@ -1,41 +1,34 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Mon, 17 Aug 2015 14:46:26 -0400
-Subject: [PATCH 4/4] serial: xuartps: Rewrite the interrupt handling logic
-In-Reply-To: <59506B47DEDD3943ABF9AC60020F4E2978D6E80A@XAP-PVEXMBX02.xlnx.xilinx.com>
-References: <5b154ba97bcd79e49e2131152eb2fc1761594a6c.1439796149.git.michal.simek@xilinx.com>
- <ead0c38140e815133a47797a2527229a2fc077c1.1439796149.git.michal.simek@xilinx.com>
- <55D2040F.1010205@hurleysoftware.com>
- <59506B47DEDD3943ABF9AC60020F4E2978D6E80A@XAP-PVEXMBX02.xlnx.xilinx.com>
-Message-ID: <55D22C02.5000702@hurleysoftware.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Mon, 17 Aug 2015 11:47:55 -0700
+Subject: [PATCH 2/7] MAINTAINERS: Add myself for the new VC4 (RPi GPU)
+ graphics driver.
+In-Reply-To: <55CEC29C.806@wwwdotorg.org>
+References: <1439427380-2436-1-git-send-email-eric@anholt.net>
+ <1439427380-2436-3-git-send-email-eric@anholt.net>
+ <55CEC29C.806@wwwdotorg.org>
+Message-ID: <871tf1iwf8.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/17/2015 12:00 PM, Anirudha Sarangi wrote:
->> From: Peter Hurley [mailto:peter at hurleysoftware.com]
->> On 08/17/2015 03:22 AM, Michal Simek wrote:
->>> From: Anirudha Sarangi <anirudha.sarangi@xilinx.com>
->>>
->>> The existing interrupt handling logic has followins issues.
->>> - Upon a parity error with default configuration, the control
->>>   never comes out of the ISR thereby hanging Linux.
->>> - The error handling logic around framing and parity error are buggy.
->>>   There are chances that the errors will never be captured.
->>> - The existing ISR is just too long.
->>> This patch fixes all these concerns.
->>
->> This patch is unreviewable. Please break this down into multiple patches.
->>
-> Thanks. Let me give a shot. It is just breaking the single big ISR that has both Rx and Tx in a single function into smaller ones.
-> Not sure how I will create smaller patches, but I will try and get back.
+Stephen Warren <swarren@wwwdotorg.org> writes:
 
-I would start with a refactor patch that splits up the ISR but
-makes no other functional changes. Then add the bug fix patches.
+> On 08/12/2015 06:56 PM, Eric Anholt wrote:
+>
+>> diff --git a/MAINTAINERS b/MAINTAINERS
+>
+>> +DRM DRIVERS FOR VC4
+>> +M:	Eric Anholt <eric@anholt.net>
+>> +T:	git git://github.com/anholt/linux
+>> +S:	Maintained
+>> +F:	drivers/gpu/drm/vc4/*
+>
+> S: Supported
 
-Regards,
-Peter Hurley
-
-ps - The email signature below is not appropriate for lkml.
-
-> 
-> This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
-> 
+Fixed.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150817/20d212eb/attachment.sig>
