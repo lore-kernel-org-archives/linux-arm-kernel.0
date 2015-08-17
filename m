@@ -1,108 +1,160 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Mon, 17 Aug 2015 14:21:20 +0900
-Subject: [RFC v2 4/4] arm64: ftrace: add a stack frame for exception
- handler
-In-Reply-To: <6399AE18-786B-41C2-B1C7-428567D9CF47@gmail.com>
-References: <1438674249-3447-1-git-send-email-takahiro.akashi@linaro.org>
- <1438674249-3447-5-git-send-email-takahiro.akashi@linaro.org>
- <6399AE18-786B-41C2-B1C7-428567D9CF47@gmail.com>
-Message-ID: <55D16F50.3060009@linaro.org>
+From: drinkcat@chromium.org (Nicolas Boichat)
+Date: Mon, 17 Aug 2015 11:52:54 +0800
+Subject: [PATCH v2] spi: bitbang: Replace spinlock by mutex
+Message-ID: <1439783574-5933-1-git-send-email-drinkcat@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/11/2015 11:57 PM, Jungseok Lee wrote:
-> On Aug 4, 2015, at 4:44 PM, AKASHI Takahiro wrote:
->
-> Hi Akashi,
->
->> On arm64, an exception handler use the same stack as in non-exception
->> contexts, but doesn't create a stack frame for elx_xx entry, only updating
->> sp register. This behavior results in save_stace_trace() missing a function
->> that is the one when an exception happens.
->>
->> This patch creates a stack frame for this case, and puts an additional
->> entry for the function  in a stack trace list.
->>
->> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
->> ---
->> arch/arm64/kernel/entry.S      |    4 ++++
->> arch/arm64/kernel/stacktrace.c |   17 +++++++++++++++++
->> 2 files changed, 21 insertions(+)
->>
->> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
->> index f860bfd..aacb6c6 100644
->> --- a/arch/arm64/kernel/entry.S
->> +++ b/arch/arm64/kernel/entry.S
->> @@ -107,6 +107,8 @@
->> 	str	x21, [sp, #S_SYSCALLNO]
->> 	.endif
->>
->> +	/* create a stack frame for stack tracer */
->> +	mov	x29, sp
->> 	/*
->> 	 * Registers that may be useful after this macro is invoked:
->> 	 *
->> @@ -737,3 +739,5 @@ ENTRY(sys_rt_sigreturn_wrapper)
->> 	mov	x0, sp
->> 	b	sys_rt_sigreturn
->> ENDPROC(sys_rt_sigreturn_wrapper)
->> +
->> +ENTRY(end_of_vectors)
->> diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
->> index d1790eb..22ce7c9 100644
->> --- a/arch/arm64/kernel/stacktrace.c
->> +++ b/arch/arm64/kernel/stacktrace.c
->> @@ -25,6 +25,10 @@
->> #include <asm/stacktrace.h>
->>
->> #define S_FRAME_SIZE sizeof(struct pt_regs) /* asm-offsets.h */
->> +#define S_FP offsetof(struct pt_regs, regs[29])
->> +#define S_LR offsetof(struct pt_regs, regs[30])
->> +
->> +extern unsigned int *vectors, *end_of_vectors;
->>
->> /*
->>   * AArch64 PCS assigns the frame pointer to x29.
->> @@ -50,6 +54,19 @@ int notrace unwind_frame(struct stackframe *frame)
->> 	if (fp < low || fp > high - 0x18 || fp & 0xf)
->> 		return -EINVAL;
->>
->> +	if ((frame->pc >= (unsigned long)&vectors) &&
->> +			(frame->pc < (unsigned long)&end_of_vectors)) {
->> +		/*
->> +		 * Expection handler does not use a normal format of
->> +		 * stack frame, but allocates struct pt_regs.
->> +		 */
->> +		frame->sp = frame->sp + S_FRAME_SIZE;
->> +		frame->fp = *(unsigned long *)(fp + S_FP);
->> +		frame->pc = *(unsigned long *)(fp + S_LR);
->
-> Not frame->pc = *(unsigned long *)(fp + S_PC)? Don't we need to look up elr_el1
-> since this is an exception?
+chipselect (in the case of spi-gpio: spi_gpio_chipselect, which
+calls gpiod_set_raw_value_cansleep) can sleep, so we should not
+hold a spinlock while calling it from spi_bitbang_setup.
 
-You are right. Will fix it if I submit the next version.
+This issue was introduced by this commit, which converted spi-gpio
+to cansleep variants:
+d9dda5a191 "spi: spi-gpio: Use 'cansleep' variants to access GPIO"
 
->> +
->> +		return 0;
->> +	}
->> +
->> 	frame->sp = fp + 0x10;
->
-> I'm just curious about this constant, 0x10. Do you have an idea on this value?
-> As reviewing objdump of vmlinux, it looks needed to analyze the first store-pair
-> instruction of each function.
->
-> Please correct me if I'm wrong.
+Replacing the lock variable by a mutex fixes the issue: This is
+safe as all instances where the lock is used are called from
+contexts that can sleep.
 
-I don't know Catalin's intention here, but fp always points to saved pair of
-<fp, lr> and so, in general, "fp + 0x10" is the address of succeeding local variables
-in callee function. (Remember my acsii art :)
-This can be the easily-approximated (but not accurate) stack pointer of caller unless
-we decode function prologues.
+Finally, update spi-ppc4xx and and spi-s3c24xx to use mutex
+functions, as they directly hold the lock for similar purpose.
 
-Thanks,
--Takahiro AKASHI
+Signed-off-by: Nicolas Boichat <drinkcat@chromium.org>
+---
+Going the "safer" way and just replacing the spinlock by a
+mutex.
 
-> Best Regards
-> Jungseok Lee
->
+Applies on top of broonie-sound/for-next, and compile-tested on
+x86-64/arm (allyesconfig) and ppc44x (defconfig+SPI driver),
+and runtime-tested on an arm platform.
+
+Thanks!
+
+ drivers/spi/spi-bitbang.c       | 17 +++++++----------
+ drivers/spi/spi-ppc4xx.c        |  4 ++--
+ drivers/spi/spi-s3c24xx.c       |  4 ++--
+ include/linux/spi/spi_bitbang.h |  2 +-
+ 4 files changed, 12 insertions(+), 15 deletions(-)
+
+diff --git a/drivers/spi/spi-bitbang.c b/drivers/spi/spi-bitbang.c
+index 840a498..ef43ef5 100644
+--- a/drivers/spi/spi-bitbang.c
++++ b/drivers/spi/spi-bitbang.c
+@@ -180,7 +180,6 @@ int spi_bitbang_setup(struct spi_device *spi)
+ {
+ 	struct spi_bitbang_cs	*cs = spi->controller_state;
+ 	struct spi_bitbang	*bitbang;
+-	unsigned long		flags;
+ 
+ 	bitbang = spi_master_get_devdata(spi->master);
+ 
+@@ -210,12 +209,12 @@ int spi_bitbang_setup(struct spi_device *spi)
+ 	 */
+ 
+ 	/* deselect chip (low or high) */
+-	spin_lock_irqsave(&bitbang->lock, flags);
++	mutex_lock(&bitbang->lock);
+ 	if (!bitbang->busy) {
+ 		bitbang->chipselect(spi, BITBANG_CS_INACTIVE);
+ 		ndelay(cs->nsecs);
+ 	}
+-	spin_unlock_irqrestore(&bitbang->lock, flags);
++	mutex_unlock(&bitbang->lock);
+ 
+ 	return 0;
+ }
+@@ -255,13 +254,12 @@ static int spi_bitbang_bufs(struct spi_device *spi, struct spi_transfer *t)
+ static int spi_bitbang_prepare_hardware(struct spi_master *spi)
+ {
+ 	struct spi_bitbang	*bitbang;
+-	unsigned long		flags;
+ 
+ 	bitbang = spi_master_get_devdata(spi);
+ 
+-	spin_lock_irqsave(&bitbang->lock, flags);
++	mutex_lock(&bitbang->lock);
+ 	bitbang->busy = 1;
+-	spin_unlock_irqrestore(&bitbang->lock, flags);
++	mutex_unlock(&bitbang->lock);
+ 
+ 	return 0;
+ }
+@@ -378,13 +376,12 @@ static int spi_bitbang_transfer_one(struct spi_master *master,
+ static int spi_bitbang_unprepare_hardware(struct spi_master *spi)
+ {
+ 	struct spi_bitbang	*bitbang;
+-	unsigned long		flags;
+ 
+ 	bitbang = spi_master_get_devdata(spi);
+ 
+-	spin_lock_irqsave(&bitbang->lock, flags);
++	mutex_lock(&bitbang->lock);
+ 	bitbang->busy = 0;
+-	spin_unlock_irqrestore(&bitbang->lock, flags);
++	mutex_unlock(&bitbang->lock);
+ 
+ 	return 0;
+ }
+@@ -427,7 +424,7 @@ int spi_bitbang_start(struct spi_bitbang *bitbang)
+ 	if (!master || !bitbang->chipselect)
+ 		return -EINVAL;
+ 
+-	spin_lock_init(&bitbang->lock);
++	mutex_init(&bitbang->lock);
+ 
+ 	if (!master->mode_bits)
+ 		master->mode_bits = SPI_CPOL | SPI_CPHA | bitbang->flags;
+diff --git a/drivers/spi/spi-ppc4xx.c b/drivers/spi/spi-ppc4xx.c
+index 54fb984..dd3d0a2 100644
+--- a/drivers/spi/spi-ppc4xx.c
++++ b/drivers/spi/spi-ppc4xx.c
+@@ -210,12 +210,12 @@ static int spi_ppc4xx_setupxfer(struct spi_device *spi, struct spi_transfer *t)
+ 	if (in_8(&hw->regs->cdm) != cdm)
+ 		out_8(&hw->regs->cdm, cdm);
+ 
+-	spin_lock(&hw->bitbang.lock);
++	mutex_lock(&hw->bitbang.lock);
+ 	if (!hw->bitbang.busy) {
+ 		hw->bitbang.chipselect(spi, BITBANG_CS_INACTIVE);
+ 		/* Need to ndelay here? */
+ 	}
+-	spin_unlock(&hw->bitbang.lock);
++	mutex_unlock(&hw->bitbang.lock);
+ 
+ 	return 0;
+ }
+diff --git a/drivers/spi/spi-s3c24xx.c b/drivers/spi/spi-s3c24xx.c
+index f36bc32..4e7d1bf 100644
+--- a/drivers/spi/spi-s3c24xx.c
++++ b/drivers/spi/spi-s3c24xx.c
+@@ -198,12 +198,12 @@ static int s3c24xx_spi_setup(struct spi_device *spi)
+ 	if (ret)
+ 		return ret;
+ 
+-	spin_lock(&hw->bitbang.lock);
++	mutex_lock(&hw->bitbang.lock);
+ 	if (!hw->bitbang.busy) {
+ 		hw->bitbang.chipselect(spi, BITBANG_CS_INACTIVE);
+ 		/* need to ndelay for 0.5 clocktick ? */
+ 	}
+-	spin_unlock(&hw->bitbang.lock);
++	mutex_unlock(&hw->bitbang.lock);
+ 
+ 	return 0;
+ }
+diff --git a/include/linux/spi/spi_bitbang.h b/include/linux/spi/spi_bitbang.h
+index 85578d4..154788e 100644
+--- a/include/linux/spi/spi_bitbang.h
++++ b/include/linux/spi/spi_bitbang.h
+@@ -4,7 +4,7 @@
+ #include <linux/workqueue.h>
+ 
+ struct spi_bitbang {
+-	spinlock_t		lock;
++	struct mutex		lock;
+ 	u8			busy;
+ 	u8			use_dma;
+ 	u8			flags;		/* extra spi->mode support */
+-- 
+2.5.0.276.gf5e568e
