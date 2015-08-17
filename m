@@ -1,82 +1,52 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Mon, 17 Aug 2015 19:17:53 +0100
-Subject: [PATCH 2/4] drm: Add support for ARM's HDLCD controller.
-In-Reply-To: <1438784892-27888-3-git-send-email-Liviu.Dudau@arm.com>
-References: <1438784892-27888-1-git-send-email-Liviu.Dudau@arm.com>
- <1438784892-27888-3-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <1439835473.3341.88.camel@linaro.org>
+From: eric@anholt.net (Eric Anholt)
+Date: Mon, 17 Aug 2015 11:30:14 -0700
+Subject: [PATCH 1/7] drm/vc4: Add devicetree bindings for VC4.
+In-Reply-To: <55CEC25E.7070303@wwwdotorg.org>
+References: <1439427380-2436-1-git-send-email-eric@anholt.net>
+ <1439427380-2436-2-git-send-email-eric@anholt.net>
+ <55CEC25E.7070303@wwwdotorg.org>
+Message-ID: <874mjxwyx5.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I haven't reviewed the code in detail, just had one comment I alluded to
-in a private email the other day...
+Stephen Warren <swarren@wwwdotorg.org> writes:
 
-On Wed, 2015-08-05 at 15:28 +0100, Liviu Dudau wrote:
+> On 08/12/2015 06:56 PM, Eric Anholt wrote:
+>> Signed-off-by: Eric Anholt <eric@anholt.net>
+>
+> This one definitely needs a patch description, since someone might not
+> know what a VC4 is, and "git log" won't show the text from the binding
+> doc itself. I'd suggest adding the initial paragraph of the binding doc
+> as the patch description, or more.
+>
+>> diff --git a/Documentation/devicetree/bindings/gpu/brcm,bcm-vc4.txt b/Documentation/devicetree/bindings/gpu/brcm,bcm-vc4.txt
 
-> diff --git a/drivers/gpu/drm/arm/hdlcd_crtc.c b/drivers/gpu/drm/arm/hdlcd_crtc.c
-[...]
-> +void hdlcd_set_scanout(struct hdlcd_drm_private *hdlcd)
-> +{
-> +	struct drm_framebuffer *fb = hdlcd->crtc.primary->fb;
-> +	struct drm_gem_cma_object *gem;
-> +	unsigned int depth, bpp;
-> +	dma_addr_t scanout_start;
-> +
-> +	drm_fb_get_bpp_depth(fb->pixel_format, &depth, &bpp);
-> +	gem = drm_fb_cma_get_gem_obj(fb, 0);
-> +
-> +	scanout_start = gem->paddr + fb->offsets[0] +
-> +		(hdlcd->crtc.y * fb->pitches[0]) + (hdlcd->crtc.x * bpp/8);
-> +
-> +	hdlcd_write(hdlcd, HDLCD_REG_FB_BASE, scanout_start);
-> +}
-> +
+>> +- hvss:		List of references to HVS video scalers
+>> +- encoders:	List of references to output encoders (HDMI, SDTV)
+>
+> Would it make sense to make all those nodes child node of the vc4
+> object. That way, there's no need to have these lists of objects; they
+> can be automatically built up as the DT is enumerated. I know that e.g.
+> the NVIDIA Tegra host1x binding works this way, and I think it may have
+> been inspired by other similar cases.
 
-The above function accesses various pointers and values, which
-presumably all need to be valid and consistent. However...
+I've looked at tegra, and the component system used by msm appears to be
+nicer than it.  To follow tegra's model, it looks like I need to build
+this extra bus thing corresponding to host1x that is effectively the
+drivers/base/component.c code, so that I can get at vc4's structure from
+the component drivers.
 
-[...]
-> diff --git a/drivers/gpu/drm/arm/hdlcd_drv.c b/drivers/gpu/drm/arm/hdlcd_drv.c
-[...]
-> +static irqreturn_t hdlcd_irq(int irq, void *arg)
-> +{
-> +	struct drm_device *dev = arg;
-> +	struct hdlcd_drm_private *hdlcd = dev->dev_private;
-> +	unsigned long irq_status;
-> +
-> +	irq_status = hdlcd_read(hdlcd, HDLCD_REG_INT_STATUS);
-> +
-> +#ifdef CONFIG_DEBUG_FS
-> +	if (irq_status & HDLCD_INTERRUPT_UNDERRUN) {
-> +		atomic_inc(&hdlcd->buffer_underrun_count);
-> +	}
-> +	if (irq_status & HDLCD_INTERRUPT_DMA_END) {
-> +		atomic_inc(&hdlcd->dma_end_count);
-> +	}
-> +	if (irq_status & HDLCD_INTERRUPT_BUS_ERROR) {
-> +		atomic_inc(&hdlcd->bus_error_count);
-> +	}
-> +	if (irq_status & HDLCD_INTERRUPT_VSYNC) {
-> +		atomic_inc(&hdlcd->vsync_count);
-> +	}
-> +#endif
-> +	if (irq_status & HDLCD_INTERRUPT_VSYNC) {
-> +		struct drm_pending_vblank_event *event;
-> +		unsigned long flags;
-> +
-> +		hdlcd_set_scanout(hdlcd);
+> Of course, this is only appropriate if the HW modules really are
+> logically children of the VC4 HW module. Perhaps they aren't. If they
+> aren't though, I wonder what this "vc4" module actually represents in HW?
 
-hdlcd_set_scanout is being called on every vsync interrupt, can we
-guarantee that is safe? What if we're in the middle of a page flip or
-panning operation? Seems to me that there is at least scope for
-incorrect addresses being calculated leading to a nasty glitch on the
-screen for one frame. And in the worst case, possibly invalid pointer
-being dereferenced.
-
-So, if scanout needs to be set on every vsync, would it not be safer
-(and more efficient) to have a single variable storing the value to use
-during interrupts, and recalculate that value outside of interrupts
-whenever things are changed?
-
--- 
-Tixy
+It's the subsystem, same as we use a subsystem node for msm, sti,
+rockchip, imx, and exynos.  This appears to be the common model of how
+the collection of graphics-related components is represented in the DT.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150817/0b3f40da/attachment.sig>
