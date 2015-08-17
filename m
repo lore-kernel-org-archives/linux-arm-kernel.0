@@ -1,55 +1,41 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Mon, 17 Aug 2015 11:35:30 -0700
-Subject: [PATCH 6/7] ARM: bcm2835: Add the DDC I2C controller to the
- device tree.
-In-Reply-To: <55CEC567.109@wwwdotorg.org>
-References: <1439427380-2436-1-git-send-email-eric@anholt.net>
- <1439427380-2436-7-git-send-email-eric@anholt.net>
- <55CEC567.109@wwwdotorg.org>
-Message-ID: <871tf1wyod.fsf@eliezer.anholt.net>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Mon, 17 Aug 2015 14:46:26 -0400
+Subject: [PATCH 4/4] serial: xuartps: Rewrite the interrupt handling logic
+In-Reply-To: <59506B47DEDD3943ABF9AC60020F4E2978D6E80A@XAP-PVEXMBX02.xlnx.xilinx.com>
+References: <5b154ba97bcd79e49e2131152eb2fc1761594a6c.1439796149.git.michal.simek@xilinx.com>
+ <ead0c38140e815133a47797a2527229a2fc077c1.1439796149.git.michal.simek@xilinx.com>
+ <55D2040F.1010205@hurleysoftware.com>
+ <59506B47DEDD3943ABF9AC60020F4E2978D6E80A@XAP-PVEXMBX02.xlnx.xilinx.com>
+Message-ID: <55D22C02.5000702@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen Warren <swarren@wwwdotorg.org> writes:
+On 08/17/2015 12:00 PM, Anirudha Sarangi wrote:
+>> From: Peter Hurley [mailto:peter at hurleysoftware.com]
+>> On 08/17/2015 03:22 AM, Michal Simek wrote:
+>>> From: Anirudha Sarangi <anirudha.sarangi@xilinx.com>
+>>>
+>>> The existing interrupt handling logic has followins issues.
+>>> - Upon a parity error with default configuration, the control
+>>>   never comes out of the ISR thereby hanging Linux.
+>>> - The error handling logic around framing and parity error are buggy.
+>>>   There are chances that the errors will never be captured.
+>>> - The existing ISR is just too long.
+>>> This patch fixes all these concerns.
+>>
+>> This patch is unreviewable. Please break this down into multiple patches.
+>>
+> Thanks. Let me give a shot. It is just breaking the single big ISR that has both Rx and Tx in a single function into smaller ones.
+> Not sure how I will create smaller patches, but I will try and get back.
 
-> On 08/12/2015 06:56 PM, Eric Anholt wrote:
->> We need to use it for getting video modes over HDMI.
->
->> diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
->
->> +		i2c2: i2c at 7e805000 {
->> +			compatible = "brcm,bcm2835-i2c";
->> +			reg = <0x7e805000 0x1000>;
->> +			interrupts = <2 21>;
->> +			clocks = <&clk_i2c>;
->> +			#address-cells = <1>;
->> +			#size-cells = <0>;
->> +		};
->
-> In an SoC .dtsi file, you'd typically write:
->
-> 	status = "disabled";
->
-> ... in all nodes that represent IO controllers that interface to
-> external HW, so that board DT files can/must explicitly choose to enable
-> the device if it's actually in use on the board. Some systems might not
-> have HDMI and hence might not hook up the HDMI_SCL/SDA pads.
->
-> BCM2835-ARM-Peripherals.pdf states "Note that the BSC2 master is used
-> dedicated with the HDMI interface and should not be accessed by user
-> programs.". Does this imply the Linux kernel shouldn't be touching this
-> I2C controller; that the VC4 firmware might also be attempting to use
-> it? I wonder how any such sharing of the HW would work.
+I would start with a refactor patch that splits up the ISR but
+makes no other functional changes. Then add the bug fix patches.
 
-In order for *any* of this driver to work, we need to ensure that the
-firmware doesn't try to write to the corresponding part of the hardware.
-DDC I2C is no different.  All that will cause the firmware to do
-anything with display is generating mbox/dispmanx requests (through the
-firmware driver), and the undervoltage warnings.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150817/39e1921f/attachment-0001.sig>
+Regards,
+Peter Hurley
+
+ps - The email signature below is not appropriate for lkml.
+
+> 
+> This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
+> 
