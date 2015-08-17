@@ -1,50 +1,37 @@
-From: lftan@altera.com (Ley Foon Tan)
-Date: Mon, 17 Aug 2015 17:09:39 +0800
-Subject: [PATCH v4 5/5] MAINTAINERS: Add Altera PCIe and MSI drivers maintainer
-In-Reply-To: <1439802579-22651-1-git-send-email-lftan@altera.com>
-References: <1439802579-22651-1-git-send-email-lftan@altera.com>
-Message-ID: <1439802579-22651-6-git-send-email-lftan@altera.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 17 Aug 2015 11:11:17 +0200
+Subject: [PATCH v4 1/6] mfd: fsl imx25 Touchscreen ADC driver
+In-Reply-To: <CACRpkdbFcgK69yakt+XYOg2q_QT8R263+FrADzz=r+fYNEFPSg@mail.gmail.com>
+References: <1403621185-9581-1-git-send-email-denis@eukrea.com>
+ <CACRpkdbFcgK69yakt+XYOg2q_QT8R263+FrADzz=r+fYNEFPSg@mail.gmail.com>
+Message-ID: <CACRpkda9LTxmOBXyGDUuhMej4W_waJwYkmay4ELYmQ1zJstSRA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Ley Foon Tan <lftan@altera.com>
----
- MAINTAINERS | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+On Fri, Jun 27, 2014 at 11:18 AM, Linus Walleij
+<linus.walleij@linaro.org> wrote:
+> On Tue, Jun 24, 2014 at 4:46 PM, Denis Carikli <denis@eukrea.com> wrote:
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index fd60784..32f5287 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -7759,6 +7759,14 @@ F:	include/linux/pci*
- F:	arch/x86/pci/
- F:	arch/x86/kernel/quirks.c
- 
-+PCI DRIVER FOR ALTERA PCIE IP
-+M:	Ley Foon Tan <lftan@altera.com>
-+L:	rfi at lists.rocketboards.org (moderated for non-subscribers)
-+L:	linux-pci at vger.kernel.org
-+S:	Supported
-+F:	Documentation/devicetree/bindings/pci/altera-pcie.txt
-+F:	drivers/pci/host/pcie-altera.c
-+
- PCI DRIVER FOR ARM VERSATILE PLATFORM
- M:	Rob Herring <robh@kernel.org>
- L:	linux-pci at vger.kernel.org
-@@ -7860,6 +7868,14 @@ L:	linux-pci at vger.kernel.org
- S:	Maintained
- F:	drivers/pci/host/*spear*
- 
-+PCI MSI DRIVER FOR ALTERA MSI IP
-+M:	Ley Foon Tan <lftan@altera.com>
-+L:	rfi at lists.rocketboards.org (moderated for non-subscribers)
-+L:	linux-pci at vger.kernel.org
-+S:	Supported
-+F:	Documentation/devicetree/bindings/pci/altera-pcie-msi.txt
-+F:	drivers/pci/host/pcie-altera-msi.c
-+
- PCI MSI DRIVER FOR APPLIEDMICRO XGENE
- M:	Duc Dang <dhdang@apm.com>
- L:	linux-pci at vger.kernel.org
--- 
-1.8.2.1
+>> +       irq_set_chip_and_handler(irq, &dummy_irq_chip,
+>> +                                handle_level_irq);
+>> +       set_irq_flags(irq, IRQF_VALID);
+>
+> This function only exists on ARM. Unless Kconfig ensures
+> this is only available on ARM platforms, use
+>
+> #ifdef CONFIG_ARM
+>       set_irq_flags(irq, IRQF_VALID);
+> #else
+>       irq_set_noprobe(irq);
+> #endif
+>
+> (Sorry we have no better way of doing it.)
+
+Since I wrote this, there have been cleanups from Rob Herring merged
+to the kernel to get rid of this oddity. Please check in linux-next how
+to get this right, see c.f. commit
+e8d36d5dbb6a6ec4f5222f8775d664ec29d5527d
+"ARM: kill off set_irq_flags usage"
+
+Yours,
+Linus Walleij
