@@ -1,74 +1,60 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Mon, 17 Aug 2015 10:00:53 -0700
-Subject: [PATCH v4 2/5] irqchip, gicv3: Workaround for Cavium ThunderX
- erratum 23154
-In-Reply-To: <1439576885-15621-3-git-send-email-rric@kernel.org>
-References: <1439576885-15621-1-git-send-email-rric@kernel.org>
- <1439576885-15621-3-git-send-email-rric@kernel.org>
-Message-ID: <55D21345.3040903@caviumnetworks.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 17 Aug 2015 19:11:15 +0200
+Subject: [PATCH 1/2] mmc: core: enable CMD19 tuning for DDR50 mode
+In-Reply-To: <1439282492-6274-1-git-send-email-21cnbao@gmail.com>
+References: <1439282492-6274-1-git-send-email-21cnbao@gmail.com>
+Message-ID: <CAPDyKFpXZD28NwNAhKQyxmWasVhk_7AeyOW6oXaBPHKuSTmGUA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/14/2015 11:28 AM, Robert Richter wrote:
-> From: Robert Richter <rrichter@cavium.com>
+On 11 August 2015 at 10:41, Barry Song <21cnbao@gmail.com> wrote:
+> From: Weijun Yang <york.yang@csr.com>
 >
-> This patch implements Cavium ThunderX erratum 23154.
+> As SD Specifications Part1 Physical Layer Specification Version
+> 3.01 says, CMD19 tuning is available for unlocked cards in transfer
+> state of 1.8V signaling mode. The small difference between v3.00
+> and 3.01 spec means that CMD19 tuning is also available for DDR50
+> mode.
+
+So what happens with cards following the 3.0 spec version, those
+doesn't need to support the tuning CMD right? Perhaps that needs to be
+addressed in this patch well!?
+
+Kind regards
+Uffe
+
 >
-> The gicv3 of ThunderX requires a modified version for reading the IAR
-> status to ensure data synchronization. Since this is in the fast-path
-> and called with each interrupt, runtime patching is used using jump
-> label patching for smallest overhead (no-op). This is the same
-> technique as used for tracepoints.
->
-> v4:
->   * simplify code to only use cpus_have_cap() in gicv3_enable_quirks()
->
-> v3:
->   * fix erratum to be dependend from midr
->   * use arm64 errata framework
->
-> v2:
->   * implement code in a single asm() to keep instruction sequence
->   * added comment to the code that explains the erratum
->   * apply workaround also if running as guest, thus check MIDR
->
-> Signed-off-by: Robert Richter <rrichter@cavium.com>
+> Signed-off-by: Weijun Yang <york.yang@csr.com>
+> Signed-off-by: Barry Song <Baohua.Song@csr.com>
 > ---
->   arch/arm64/Kconfig                  | 11 ++++++++++
->   arch/arm64/include/asm/cpufeature.h |  3 ++-
->   arch/arm64/include/asm/cputype.h    | 18 +++++++++-------
->   arch/arm64/kernel/cpu_errata.c      |  9 ++++++++
->   drivers/irqchip/irq-gic-v3.c        | 42 ++++++++++++++++++++++++++++++++++++-
->   5 files changed, 74 insertions(+), 9 deletions(-)
+>  drivers/mmc/core/sd.c    | 1 +
+>  drivers/mmc/host/sdhci.c | 1 +
+>  2 files changed, 2 insertions(+)
 >
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 0f6edb14b7e4..4f866a4c6536 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -417,6 +417,17 @@ config ARM64_ERRATUM_845719
+> diff --git a/drivers/mmc/core/sd.c b/drivers/mmc/core/sd.c
+> index 4e7366a..a1ed24d 100644
+> --- a/drivers/mmc/core/sd.c
+> +++ b/drivers/mmc/core/sd.c
+> @@ -629,6 +629,7 @@ static int mmc_sd_init_uhs_card(struct mmc_card *card)
+>          */
+>         if (!mmc_host_is_spi(card->host) &&
+>             (card->sd_bus_speed == UHS_SDR50_BUS_SPEED ||
+> +            card->sd_bus_speed == UHS_DDR50_BUS_SPEED ||
+>              card->sd_bus_speed == UHS_SDR104_BUS_SPEED))
+>                 err = mmc_execute_tuning(card);
+>  out:
+> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+> index 1dbe932..812c19b 100644
+> --- a/drivers/mmc/host/sdhci.c
+> +++ b/drivers/mmc/host/sdhci.c
+> @@ -1891,6 +1891,7 @@ static int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode)
+>                 break;
 >
->   	  If unsure, say Y.
+>         case MMC_TIMING_UHS_SDR104:
+> +       case MMC_TIMING_UHS_DDR50:
+>                 break;
 >
-> +config CAVIUM_ERRATUM_23154
-> +	bool "Cavium erratum 23154: Access to ICC_IAR1_EL1 is not sync'ed"
-> +	depends on ARCH_THUNDER
-
-None of the other errata depend on a specific ARCH_*.  I think we should 
-remove this 'depends on', so that a generic kernel can be configured to 
-work on Thunder without having to first select ARCH_THUNDER.
-
-David Daney
-
-
-> +	default y
-> +	help
-> +	  The gicv3 of ThunderX requires a modified version for
-> +	  reading the IAR status to ensure data synchronization
-> +	  (access to icc_iar1_el1 is not sync'ed before and after).
-> +
-> +	  If unsure, say Y.
-> +
->   endmenu
->
->
+>         case MMC_TIMING_UHS_SDR50:
+> --
+> 1.9.1
 >
