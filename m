@@ -1,79 +1,73 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Mon, 17 Aug 2015 12:19:30 -0400
-Subject: [PATCH 2/4] serial: xuartps: Do not handle overrun errors under
- IGNPAR option
-In-Reply-To: <59506B47DEDD3943ABF9AC60020F4E2978D6E7FF@XAP-PVEXMBX02.xlnx.xilinx.com>
-References: <5b154ba97bcd79e49e2131152eb2fc1761594a6c.1439796149.git.michal.simek@xilinx.com>
- <41df6eb35d69801afa5b686a6974e3c3bf65178a.1439796149.git.michal.simek@xilinx.com>
- <55D20297.6010500@hurleysoftware.com>
- <59506B47DEDD3943ABF9AC60020F4E2978D6E7FF@XAP-PVEXMBX02.xlnx.xilinx.com>
-Message-ID: <55D20992.60302@hurleysoftware.com>
+From: alim.akhtar@gmail.com (Alim Akhtar)
+Date: Mon, 17 Aug 2015 21:51:26 +0530
+Subject: [PATCH 2/3] mmc: dw_mmc: simplify the SDMMC_CLKEN_LOW_PWR logic
+In-Reply-To: <CAOMqctQ_gA=QxRVFQ8L=q7kBX3GROvz9mnHGu2yo1VrBO1Le6w@mail.gmail.com>
+References: <cover.1439381423.git.hramrach@gmail.com>
+ <3d03bfe2c18789eefa038018467c9c63c94ae4a2.1439381423.git.hramrach@gmail.com>
+ <55D13F07.70309@samsung.com>
+ <CAOMqctQ8DHj6qPg8zR93OGRHXAZDd0yUmG_J8Vz7dGFuDpCgRQ@mail.gmail.com>
+ <55D1C4CD.4040200@samsung.com>
+ <CAGOxZ51oHoX+zQSO8tRp8V5RUmDg8CAnM9HO5FQ5h6JeCy=1og@mail.gmail.com>
+ <CAOMqctQ_gA=QxRVFQ8L=q7kBX3GROvz9mnHGu2yo1VrBO1Le6w@mail.gmail.com>
+Message-ID: <CAGOxZ53FipjSbYMeBfr_+OWxn_WxpDfbfr8Vzs4uX6t3TBS3vw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/17/2015 11:58 AM, Anirudha Sarangi wrote:
-> Hi,
-> 
->> -----Original Message-----
->> From: Peter Hurley [mailto:peter at hurleysoftware.com]
->> Sent: Monday, August 17, 2015 9:20 PM
->> To: Michal Simek
->> Cc: linux-kernel at vger.kernel.org; monstr at monstr.eu; Anirudha Sarangi; Soren
->> Brinkmann; Jiri Slaby; linux-serial at vger.kernel.org; Greg Kroah-Hartman; linux-
->> arm-kernel at lists.infradead.org
->> Subject: Re: [PATCH 2/4] serial: xuartps: Do not handle overrun errors under
->> IGNPAR option
->>
->> On 08/17/2015 03:22 AM, Michal Simek wrote:
->>> From: Anirudha Sarangi <anirudha.sarangi@xilinx.com>
->>>
->>> The existing implementation includes overrun errors under IGNPAR
->>> option. This patch fixes it by including only parity and framing error
->>> under IGNPAR option.
->>
->> The convention adopted by Linux serial drivers is to ignore overrun errors if both
->> IGNPAR and IGNBRK are set.
->>
-> I just followed the set_termios documentation, which says that IGNPAR is for parity and framing.
-> The current controller does not support break detection reliably.
-> That is probably why we don?t have IGNBRK.
+Hi Michal,
 
-My point is about how a user-space process tells the serial driver to ignore
-overrun errors, as well, and not specifically about break handling.
-
-> 
-> Regards
-> Anirudha
-> 
->> Regards,
->> Peter Hurley
+On Mon, Aug 17, 2015 at 8:25 PM, Michal Suchanek <hramrach@gmail.com> wrote:
+>  Hello,
+>
+> On 17 August 2015 at 16:42, Alim Akhtar <alim.akhtar@gmail.com> wrote:
+>> HI
 >>
->>> Signed-off-by: Anirudha Sarangi <anirudh@xilinx.com>
->>> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
->>> ---
+>> On Mon, Aug 17, 2015 at 4:56 PM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
+>>> On 08/17/2015 02:52 PM, Michal Suchanek wrote:
+>>>> Hello,
+>>>>
+>>>> On 17 August 2015 at 03:55, Jaehoon Chung <jh80.chung@samsung.com> wrote:
+>>>>> Hi, Michal.
+>>>>>
+>>>>> On 08/12/2015 09:23 PM, Michal Suchanek wrote:
+>>>>>> The driver has open-coded test for SDIO cards. Use the mmc core provided
+>>>>>> MMC_QUIRK_BROKEN_CLK_GATING flag instead.
+>>>>>
+>>>>> Did you use the clock-gating for SDIO cards?
+>>>>> Doesn't MMC_CAP_SDIO_IRQ bit set? Which case is broken?
+>>>>> Could you explain to me more?
+>>>>
+>>>> The core flag for disabling power saving is MMC_QUIRK_BROKEN_CLK_GATING.
 >>>
->>>  drivers/tty/serial/xilinx_uartps.c | 2 +-
->>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>> I understood your intention. And i read the comment into mmc/core/quirks.c
+>>> I will test SDIO card with this patch. Thanks.
 >>>
->>> diff --git a/drivers/tty/serial/xilinx_uartps.c
->>> b/drivers/tty/serial/xilinx_uartps.c
->>> index a3020344ac9d..c4437e8929ff 100644
->>> --- a/drivers/tty/serial/xilinx_uartps.c
->>> +++ b/drivers/tty/serial/xilinx_uartps.c
->>> @@ -691,7 +691,7 @@ static void cdns_uart_set_termios(struct uart_port
->>> *port,
->>>
->>>     if (termios->c_iflag & IGNPAR)
->>>             port->ignore_status_mask |= CDNS_UART_IXR_PARITY |
->>> -                   CDNS_UART_IXR_FRAMING |
->> CDNS_UART_IXR_OVERRUN;
->>> +                                       CDNS_UART_IXR_FRAMING;
->>>
->>>     /* ignore all characters if CREAD is not set */
->>>     if ((termios->c_cflag & CREAD) == 0)
->>>
-> 
-> 
-> 
-> This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
-> 
+>> When you test, please check if SDIO IRQ still works, we need to put
+>> dw_mmc in low_power mode otherwise SDIO IRQ will be not be generated
+>> by dw_mmc host controller.
+>>
+>
+> As far as I understand the logic which is removed in this patch and
+> the core logic which replaces it is the same -  low power by means of
+> clock gating is *not* enabled for SDIO cards in either case.
+>
+> The original code also checks for SDIO IRQ and disables clock gating
+> regardless of card type which is probably redundant. If not it should
+> be fixed in mmc core.
+>
+> My recent kernel builds which I run on a system with mwifiex card
+> probably include this patch.
+>
+I have no objection to this patch as such, it just that some extra
+testing on few other boards will be good, which I am sure Jeahoon will
+take care.
+Thanks!!
+
+> Thanks
+>
+> Michal
+
+
+
+-- 
+Regards,
+Alim
