@@ -1,55 +1,55 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Mon, 17 Aug 2015 09:36:03 +0900
-Subject: [PATCH 0/4] ARM: dts: exynos3250: Add UART2 and MMC2 dt node with
- related clocks
-In-Reply-To: <CAJKOXPfvGypFymHzXDMEA295Copi0sjpMG9oKmJ+a_BQoK+SNw@mail.gmail.com>
-References: <1439264784-30322-1-git-send-email-cw00.choi@samsung.com>
- <CAJKOXPfvGypFymHzXDMEA295Copi0sjpMG9oKmJ+a_BQoK+SNw@mail.gmail.com>
-Message-ID: <55D12C73.6090101@samsung.com>
+From: shijie.huang@arm.com (Huang Shijie)
+Date: Mon, 17 Aug 2015 11:24:43 +0800
+Subject: [PATCH] arm64: dts: Juno: fix the wrong memory map sizes for the
+ I2C/EHCI/OHCI
+Message-ID: <1439781883-2335-1-git-send-email-shijie.huang@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/17/2015 09:33 AM, Krzysztof Kozlowski wrote:
-> 2015-08-11 12:46 GMT+09:00 Chanwoo Choi <cw00.choi@samsung.com>:
->> This patch add the UART2 / MMC2 devicetree node for Exynos3250 SoC and add
->> the related clocks (mux, divider, gate) of UART2 / MMC2 device.
-> 
-> What is the benefit of adding them? Why they are needed?
+>From the "Juno ARM Development Platform Soc Techinical Reference Mannual(r1p0)",
+we get the following memory map sizes (3-25):
+	I2C      : 0x7ffa0000  0x7ffa00ff       (256B)
+	USB OHCI : 0x7ffb0000  0x7ffb0fff       (4KB)
+	USB EHCI : 0x7ffc0000  0x7ffc0fff       (4KB)
 
-UART2 /MMC2 are used on Exynos3250-based ARTIK-5 board[1].
-[1] https://www.artik.io/hardware/artik-5
+This patch fixes the wrong memory map sizes for them.
 
-Thanks,
-Chanwoo Choi
+Signed-off-by: Huang Shijie <shijie.huang@arm.com>
+---
+There is something wrong with my email account, so try to send it out again.
+---
+ arch/arm64/boot/dts/arm/juno-base.dtsi | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-> 
-> Best regards,
-> Krzysztof
-> 
-> 
->>
->> Chanwoo Choi (4):
->>   clk: samsung: exynos3250: Add UART2 clock
->>   clk: samsung: exynos3250: Add MMC2 clock
->>   ARM: dts: Add UART2 dt node for Exynos3250 SoC
->>   ARM: dts: Add MSHC2 dt node for Exynos3250 SoC
->>
->>  arch/arm/boot/dts/exynos3250-pinctrl.dtsi | 42 +++++++++++++++++++++++++++++++
->>  arch/arm/boot/dts/exynos3250.dtsi         | 25 ++++++++++++++++++
->>  drivers/clk/samsung/clk-exynos3250.c      | 15 +++++++++++
->>  include/dt-bindings/clock/exynos3250.h    | 11 +++++++-
->>  4 files changed, 92 insertions(+), 1 deletion(-)
->>
->> --
->> 1.8.5.5
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
+index e3ee960..7b2715f 100644
+--- a/arch/arm64/boot/dts/arm/juno-base.dtsi
++++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
+@@ -74,7 +74,7 @@
+ 
+ 	i2c at 7ffa0000 {
+ 		compatible = "snps,designware-i2c";
+-		reg = <0x0 0x7ffa0000 0x0 0x1000>;
++		reg = <0x0 0x7ffa0000 0x0 0x100>;
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 		interrupts = <GIC_SPI 104 IRQ_TYPE_LEVEL_HIGH>;
+@@ -95,14 +95,14 @@
+ 
+ 	ohci at 7ffb0000 {
+ 		compatible = "generic-ohci";
+-		reg = <0x0 0x7ffb0000 0x0 0x10000>;
++		reg = <0x0 0x7ffb0000 0x0 0x1000>;
+ 		interrupts = <GIC_SPI 116 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&soc_usb48mhz>;
+ 	};
+ 
+ 	ehci at 7ffc0000 {
+ 		compatible = "generic-ehci";
+-		reg = <0x0 0x7ffc0000 0x0 0x10000>;
++		reg = <0x0 0x7ffc0000 0x0 0x1000>;
+ 		interrupts = <GIC_SPI 117 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&soc_usb48mhz>;
+ 	};
+-- 
+2.1.4
