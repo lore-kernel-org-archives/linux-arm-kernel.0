@@ -1,144 +1,133 @@
-From: aisheng.dong@freescale.com (Dong Aisheng)
-Date: Mon, 17 Aug 2015 20:45:18 +0800
-Subject: [PATCH V3 4/5] clk: core: add CLK_OPS_PARENT_ON flags to
- support clocks require parent on
-In-Reply-To: <20150814010109.GW26614@codeaurora.org>
-References: <1438089585-30103-1-git-send-email-aisheng.dong@freescale.com>
- <1438089585-30103-5-git-send-email-aisheng.dong@freescale.com>
- <20150814010109.GW26614@codeaurora.org>
-Message-ID: <20150817124514.GA30536@shlinux1.ap.freescale.net>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 17 Aug 2015 15:23:00 +0200
+Subject: [PATCH v6 2/3] pwm: add MediaTek display PWM driver support
+In-Reply-To: <1437380237-28961-3-git-send-email-yh.huang@mediatek.com>
+References: <1437380237-28961-1-git-send-email-yh.huang@mediatek.com>
+ <1437380237-28961-3-git-send-email-yh.huang@mediatek.com>
+Message-ID: <20150817132259.GM8453@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 13, 2015 at 06:01:09PM -0700, Stephen Boyd wrote:
-> On 07/28, Dong Aisheng wrote:
-> > On Freescale i.MX7D platform, all clocks operations, including
-> > enable/disable, rate change and re-parent, requires its parent
-> > clock on. Current clock core can not support it well.
-> > This patch introduce a new flag CLK_OPS_PARENT_ON to handle this
-> > special case in clock core that enable its parent clock firstly for
-> > each operation and disable it later after operation complete.
-> > 
-> > This patch fixes disaling clocks while its parent is off.
-> > This is a special case that is caused by a state mis-align between
-> > HW and SW in clock tree during booting.
-> > Usually in uboot, we may enable all clocks in HW by default.
-> > And during kernel booting time, the parent clock could be disabled in its
-> > driver probe due to calling clk_prepare_enable and clk_disable_unprepare.
-> > Because it's child clock is only enabled in HW while its SW usecount
-> > in clock tree is still 0, so clk_disable of parent clock will gate
-> > the parent clock in both HW and SW usecount ultimately.
-> > Then there will be a clock is on in HW while its parent is disabled.
-> > 
-> > Later when clock core does clk_disable_unused, this clock disable
-> > will cause system hang due to the limitation of operation requiring
-> > its parent clock on.
-> > 
-> > Cc: Mike Turquette <mturquette@linaro.org>
-> > Cc: Stephen Boyd <sboyd@codeaurora.org>
-> > Signed-off-by: Dong Aisheng <aisheng.dong@freescale.com>
-> > ---
+On Mon, Jul 20, 2015 at 04:17:16PM +0800, YH Huang wrote:
+> Add display PWM driver support to modify backlight for MT8173 and MT6595.
+> The PWM has one channel to control the brightness of the display.
+> When the (high_width / period) is closer to 1, the screen is brighter;
+> otherwise, it is darker.
 > 
-> Sorry, I still don't agree with this patch. There's no reason we
-> should be turning on clocks during late init so that we can turn
-> off clocks.
-
-Can't the reason be that it's fairly possible one clock is enabled
-in HW while it's parent is disabled in initial clock tree state
-and to enable parent clocks to disable itself is required by its special
-HW characteristic?
-
-Dosen't it quite clear from HW point of view?
-
-> If there's some sort of problem in doing that we
-> should figure it out and make it so that during late init we turn
-> off clocks from the leaves of the tree to the root.
+> Signed-off-by: YH Huang <yh.huang@mediatek.com>
+> ---
+>  drivers/pwm/Kconfig        |  10 ++
+>  drivers/pwm/Makefile       |   1 +
+>  drivers/pwm/pwm-mtk-disp.c | 232 +++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 243 insertions(+)
+>  create mode 100644 drivers/pwm/pwm-mtk-disp.c
 > 
+> diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
+> index b1541f4..f5b03a4 100644
+> --- a/drivers/pwm/Kconfig
+> +++ b/drivers/pwm/Kconfig
+> @@ -211,6 +211,16 @@ config PWM_LPSS_PLATFORM
+>  	  To compile this driver as a module, choose M here: the module
+>  	  will be called pwm-lpss-platform.
+>  
+> +config PWM_MTK_DISP
+> +	tristate "MediaTek display PWM driver"
+> +	depends on ARCH_MEDIATEK || COMPILE_TEST
 
-Turning off clocks from the leaves to root probably may require clock core
-to provide a way to keep the parent clock enabled once finding its child
-is still on in HW (clk_core_is_enabled() returns true) but enable_count
-is zero before late init.
+This is going to break randconfig builds. From a quick look your driver
+will fail to build at least on architectures that don't set HAVE_IOMEM.
+I know that's quite exotic, but I've had to deal with fallout from
+things like this in the past. If you want || COMPILE_TEST you should at
+least add a "depends on HAVE_IOMEM".
 
-One possible solution may be leaving parent clocks on in HW during disable
-once finding its child is on in HW and only decrease the parent's refcount,
-and then replying on the later clk_disable_unused() to disable both child
-and parent from leave to root.
-e.g. clock A: parent, clock B: child of A
-Initial state: clock B is enabled in HW while refcount is zero
-Step1: Driver A enable clock A during probe
- A: refcount becomes 1 HW state: enabled
-Step2: Driver A disable clock A after probe
- A: refcount becomes 0 HW state: enabled (only decrease refcount)
+linux/clk.h seems to have stubs for all of the functions that you use,
+so those shouldn't be a problem.
 
-Then Clock A will be the same state as B, HW enabled while refcount is zero(
-means no users), the later clk_disable_unusersd() will disable them all
-from leave to root.
+> +	help
+> +	  Generic PWM framework driver for MediaTek disp-pwm device.
+> +	  The PWM is used to control the backlight brightness for display.
+> +
+> +	  To compile this driver as a module, choose M here: the module
+> +	  will be called pwm-mtk-disp.
+> +
+>  config PWM_MXS
+>  	tristate "Freescale MXS PWM support"
+>  	depends on ARCH_MXS && OF
+[...]
+> diff --git a/drivers/pwm/pwm-mtk-disp.c b/drivers/pwm/pwm-mtk-disp.c
+> new file mode 100644
+> index 0000000..69682a0
+> --- /dev/null
+> +++ b/drivers/pwm/pwm-mtk-disp.c
+> @@ -0,0 +1,232 @@
+> +/*
+> + * MediaTek display pulse-width-modulation controller driver.
+> + * Copyright (c) 2015 MediaTek Inc.
+> + * Author: YH Huang <yh.huang@mediatek.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/clk.h>
+> +#include <linux/err.h>
+> +#include <linux/io.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/pwm.h>
+> +#include <linux/platform_device.h>
 
-This is a workable solution but seems much more complicated than the exist
-one in this patch which is only 5 lines of code changes.
+The above two aren't correctly sorted.
 
-And the question is:
-since we already have the support of CLK_OPS_PARENT_ON (required by
-clock set_rate/re-parent), why we still need invent another complicated
-mechanism to support avoiding enable parent clock only for clk_disable_unused()?
-Is that really worthy?
-And it's also less power efficiency than the one in the patch.
+> +#include <linux/slab.h>
+> +
+> +#define DISP_PWM_EN		0x00
+> +#define PWM_ENABLE_MASK		BIT(0)
+> +
+> +#define DISP_PWM_COMMIT		0x08
+> +#define PWM_COMMIT_MASK		BIT(0)
+> +
+> +#define DISP_PWM_CON_0		0x10
+> +#define PWM_CLKDIV_SHIFT	16
+> +#define PWM_CLKDIV_MAX		0x3ff
+> +#define PWM_CLKDIV_MASK		(PWM_CLKDIV_MAX << PWM_CLKDIV_SHIFT)
+> +
+> +#define DISP_PWM_CON_1		0x14
+> +#define PWM_PERIOD_MASK		0xfff
+> +/* Shift log2(PWM_PERIOD_MASK + 1) as divisor */
+> +#define PWM_PERIOD_BIT_SHIFT	12
 
-> I agree that there's a problem here where we don't properly
-> handle keeping children clocks on if a driver comes in and turns
-> off a clock in the middle of the tree before late init. That's a
-> real bug, and we should fix it.
+There are still two names for the same value here. I thought we had
+agreed on this becoming something like the below?
 
-Sorry, i still can't understand it's a bug.
-Can you help explain more?
+	#define PWM_PERIOD_BIT_SHIFT 12
+	#define PWM_PERIOD_MASK ((1 << PWM_PERIOD_BIT_SHIFT) - 1)
 
-It looks to me like reasonable.
-Enable/disable clock in driver is just one case, the initial clock tree may
-also have such cases.
-(Here i took the 'children clocks' you said as the one who's child clock is on
-in HW while refcount is zero, fix me if wrong)
+Although PWM_PERIOD_BIT_WIDTH would probably be a better name. Or
+PWM_PERIOD_BITS or similar.
 
-And it seems not so quite make sense to not physically disable the clock
-when there's already no child users(refcount becomes zero) and i don't
-think the child clock's default enablement state in HW means a valid user
-since it's just caused by misalignment between HW and SW clock tree during
-kernel booting phase which is meaningless.
-And that seems is why the clk_disable_unused() function exist for fixing
-this state misalignment issue.
+> +static int mtk_disp_pwm_remove(struct platform_device *pdev)
+> +{
+> +	struct mtk_disp_pwm *mdp = platform_get_drvdata(pdev);
+> +	int ret = pwmchip_remove(&mdp->chip);
 
-> Mike Turquette has been doing
-> some work to have a way to indicate that certain clocks should be
-> kept on until client drivers grab them. 
+I'd prefer this to be separate lines:
 
-Sorry i can't see how this help on my issue.
+	int ret;
 
-> I think it will also make
-> sure to up refcounts on parent clocks in the middle of the tree
-> when it figures out that a child clock is enabled. Would that be
-> all that we need to do to fix this problem?
-> 
+	ret = pwmchip_remove(&mdp->chip);
 
-Then when will we down the refcounts on parent clocks and when to disable it?
-The current clk_disable_unused() only handle HW clk enable/disable, no
-refcount operations.
-Not sure how this is going to fix my issues.
-
-And again, as i said above, i don't think it makes much sense to not disable
-parent only if child is enabled in HW, unless there's more strong reasons.
-
-> Also, the subject of this patch and patch 5 are the same. Why?
-> 
-
-Sorry, mainly because the full feature of CLK_OPS_PARENT_ON is divided into
-two patches for better review, their commit message is different.
-patch 4 is adding support for clk_disable_unused() while patch 5 is for
-clk_setrate/clk_reparent.
-I could reform the subject if needed.
-
-Regards
-Dong Aisheng
-
-> -- 
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> a Linux Foundation Collaborative Project
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150817/cfca2726/attachment.sig>
