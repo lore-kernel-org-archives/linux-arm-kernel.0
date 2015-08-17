@@ -1,66 +1,74 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Mon, 17 Aug 2015 13:01:07 -0400
-Subject: [PATCH V4 3/3] x86: use generic early mem copy
-In-Reply-To: <1439830867-14935-1-git-send-email-msalter@redhat.com>
-References: <1439830867-14935-1-git-send-email-msalter@redhat.com>
-Message-ID: <1439830867-14935-4-git-send-email-msalter@redhat.com>
+From: ddaney@caviumnetworks.com (David Daney)
+Date: Mon, 17 Aug 2015 10:00:53 -0700
+Subject: [PATCH v4 2/5] irqchip, gicv3: Workaround for Cavium ThunderX
+ erratum 23154
+In-Reply-To: <1439576885-15621-3-git-send-email-rric@kernel.org>
+References: <1439576885-15621-1-git-send-email-rric@kernel.org>
+ <1439576885-15621-3-git-send-email-rric@kernel.org>
+Message-ID: <55D21345.3040903@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The early_ioremap library now has a generic copy_from_early_mem()
-function. Use the generic copy function for x86 relocate_initrd().
+On 08/14/2015 11:28 AM, Robert Richter wrote:
+> From: Robert Richter <rrichter@cavium.com>
+>
+> This patch implements Cavium ThunderX erratum 23154.
+>
+> The gicv3 of ThunderX requires a modified version for reading the IAR
+> status to ensure data synchronization. Since this is in the fast-path
+> and called with each interrupt, runtime patching is used using jump
+> label patching for smallest overhead (no-op). This is the same
+> technique as used for tracepoints.
+>
+> v4:
+>   * simplify code to only use cpus_have_cap() in gicv3_enable_quirks()
+>
+> v3:
+>   * fix erratum to be dependend from midr
+>   * use arm64 errata framework
+>
+> v2:
+>   * implement code in a single asm() to keep instruction sequence
+>   * added comment to the code that explains the erratum
+>   * apply workaround also if running as guest, thus check MIDR
+>
+> Signed-off-by: Robert Richter <rrichter@cavium.com>
+> ---
+>   arch/arm64/Kconfig                  | 11 ++++++++++
+>   arch/arm64/include/asm/cpufeature.h |  3 ++-
+>   arch/arm64/include/asm/cputype.h    | 18 +++++++++-------
+>   arch/arm64/kernel/cpu_errata.c      |  9 ++++++++
+>   drivers/irqchip/irq-gic-v3.c        | 42 ++++++++++++++++++++++++++++++++++++-
+>   5 files changed, 74 insertions(+), 9 deletions(-)
+>
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 0f6edb14b7e4..4f866a4c6536 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -417,6 +417,17 @@ config ARM64_ERRATUM_845719
+>
+>   	  If unsure, say Y.
+>
+> +config CAVIUM_ERRATUM_23154
+> +	bool "Cavium erratum 23154: Access to ICC_IAR1_EL1 is not sync'ed"
+> +	depends on ARCH_THUNDER
 
-Signed-off-by: Mark Salter <msalter@redhat.com>
----
- arch/x86/kernel/setup.c | 22 +---------------------
- 1 file changed, 1 insertion(+), 21 deletions(-)
+None of the other errata depend on a specific ARCH_*.  I think we should 
+remove this 'depends on', so that a generic kernel can be configured to 
+work on Thunder without having to first select ARCH_THUNDER.
 
-diff --git a/arch/x86/kernel/setup.c b/arch/x86/kernel/setup.c
-index 80f874b..21fa9a3 100644
---- a/arch/x86/kernel/setup.c
-+++ b/arch/x86/kernel/setup.c
-@@ -317,15 +317,12 @@ static u64 __init get_ramdisk_size(void)
- 	return ramdisk_size;
- }
- 
--#define MAX_MAP_CHUNK	(NR_FIX_BTMAPS << PAGE_SHIFT)
- static void __init relocate_initrd(void)
- {
- 	/* Assume only end is not page aligned */
- 	u64 ramdisk_image = get_ramdisk_image();
- 	u64 ramdisk_size  = get_ramdisk_size();
- 	u64 area_size     = PAGE_ALIGN(ramdisk_size);
--	unsigned long slop, clen, mapaddr;
--	char *p, *q;
- 
- 	/* We need to move the initrd down into directly mapped mem */
- 	relocated_ramdisk = memblock_find_in_range(0, PFN_PHYS(max_pfn_mapped),
-@@ -343,25 +340,8 @@ static void __init relocate_initrd(void)
- 	printk(KERN_INFO "Allocated new RAMDISK: [mem %#010llx-%#010llx]\n",
- 	       relocated_ramdisk, relocated_ramdisk + ramdisk_size - 1);
- 
--	q = (char *)initrd_start;
--
--	/* Copy the initrd */
--	while (ramdisk_size) {
--		slop = ramdisk_image & ~PAGE_MASK;
--		clen = ramdisk_size;
--		if (clen > MAX_MAP_CHUNK-slop)
--			clen = MAX_MAP_CHUNK-slop;
--		mapaddr = ramdisk_image & PAGE_MASK;
--		p = early_memremap(mapaddr, clen+slop);
--		memcpy(q, p+slop, clen);
--		early_memunmap(p, clen+slop);
--		q += clen;
--		ramdisk_image += clen;
--		ramdisk_size  -= clen;
--	}
-+	copy_from_early_mem((void *)initrd_start, ramdisk_image, ramdisk_size);
- 
--	ramdisk_image = get_ramdisk_image();
--	ramdisk_size  = get_ramdisk_size();
- 	printk(KERN_INFO "Move RAMDISK from [mem %#010llx-%#010llx] to"
- 		" [mem %#010llx-%#010llx]\n",
- 		ramdisk_image, ramdisk_image + ramdisk_size - 1,
--- 
-2.4.3
+David Daney
+
+
+> +	default y
+> +	help
+> +	  The gicv3 of ThunderX requires a modified version for
+> +	  reading the IAR status to ensure data synchronization
+> +	  (access to icc_iar1_el1 is not sync'ed before and after).
+> +
+> +	  If unsure, say Y.
+> +
+>   endmenu
+>
+>
+>
