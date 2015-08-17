@@ -1,42 +1,41 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon, 17 Aug 2015 21:55:11 +0200
-Subject: [PATCH v2] clk: rockchip: add pclk_cpu to the list of rk3188
- critical clocks
-In-Reply-To: <F5234F5E-2A91-4B63-B260-3F20A4D16A9D@mniewoehner.de>
-References: <5400BEF8-5245-4F7B-845B-D326A7BC56B5@mniewoehner.de>
- <10213368.VjAQGt7Kjq@phil>
- <F5234F5E-2A91-4B63-B260-3F20A4D16A9D@mniewoehner.de>
-Message-ID: <14545587.HIDVkPerl6@phil>
+From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
+Date: Mon, 17 Aug 2015 17:18:30 -0300
+Subject: [PATCH v2 1/2] i2c: add i2c-lpc2k driver
+In-Reply-To: <1439748617-7683-2-git-send-email-manabian@gmail.com>
+References: <1439748617-7683-1-git-send-email-manabian@gmail.com>
+ <1439748617-7683-2-git-send-email-manabian@gmail.com>
+Message-ID: <20150817201830.GA11033@laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 17. August 2015, 21:50:53 schrieb Michael Niewoehner:
-> pclk_cpu needs to keep running because it is needed for devices like
-> the act8865 regulator but with the recent gpio clock handling this is
-> not always the case anymore. So add it to the list of critical clocks.
-> 
-> Signed-off-by: Michael Niewoehner <linux@mniewoehner.de>
+On 16 Aug 08:10 PM, Joachim Eastwood wrote:
+[..]
+> +
+> +static int i2c_lpc2k_clear_arb(struct lpc2k_i2c *i2c)
+> +{
+> +	unsigned long timeout = jiffies + msecs_to_jiffies(1000);
+> +
+> +	/*
+> +	 * If the transfer needs to abort for some reason, we'll try to
+> +	 * force a stop condition to clear any pending bus conditions
+> +	 */
+> +	writel(LPC24XX_STO, i2c->base + LPC24XX_I2CONSET);
+> +
+> +	/* Wait for status change */
+> +	while (readl(i2c->base + LPC24XX_I2STAT) != M_I2C_IDLE) {
+> +		if (time_after(jiffies, timeout)) {
+> +			/* Bus was not idle, try to reset adapter */
+> +			i2c_lpc2k_reset(i2c);
+> +			return -EBUSY;
+> +		}
+> +
+> +		cpu_relax();
+> +	}
 
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+I believe you can use readl_{relaxed}_poll_timeout_{atomic} here.
 
-> ---
-> Changes in v2:
-> - adapt commit message
-> - add Linus Walleij to recipients, as the patch is related to the gpio clock
-> change in the rockchip pinctrl driver it should go through his tree as well
-> 
-> drivers/clk/rockchip/clk-rk3188.c | 1 +
-> 1 file changed, 1 insertion(+)
-> 
-> diff --git a/drivers/clk/rockchip/clk-rk3188.c
-> b/drivers/clk/rockchip/clk-rk3188.c index e4f9d47..1c93229 100644
-> --- a/drivers/clk/rockchip/clk-rk3188.c
-> +++ b/drivers/clk/rockchip/clk-rk3188.c
-> @@ -708,6 +708,7 @@ static const char *const rk3188_critical_clocks[]
-> __initconst = { "aclk_cpu",
-> 	"aclk_peri",
-> 	"hclk_peri",
-> +	"pclk_cpu",
-> };
-> 
-> static void __init rk3188_common_clk_init(struct device_node *np)
+Ccing Ariel, maybe he can help with a test.
+
+-- 
+Ezequiel Garcia, VanguardiaSur
+www.vanguardiasur.com.ar
