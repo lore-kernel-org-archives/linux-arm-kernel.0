@@ -1,101 +1,85 @@
-From: hramrach@gmail.com (Michal Suchanek)
-Date: Mon, 17 Aug 2015 07:52:00 +0200
-Subject: [PATCH 2/3] mmc: dw_mmc: simplify the SDMMC_CLKEN_LOW_PWR logic
-In-Reply-To: <55D13F07.70309@samsung.com>
-References: <cover.1439381423.git.hramrach@gmail.com>
- <3d03bfe2c18789eefa038018467c9c63c94ae4a2.1439381423.git.hramrach@gmail.com>
- <55D13F07.70309@samsung.com>
-Message-ID: <CAOMqctQ8DHj6qPg8zR93OGRHXAZDd0yUmG_J8Vz7dGFuDpCgRQ@mail.gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 17 Aug 2015 14:50:31 +0900
+Subject: [2/2] ARM: dts: Add missing irq pinctrl for max77686 on smdk5250
+In-Reply-To: <5544657A.7010006@gmail.com>
+References: <1416312509-11530-2-git-send-email-yadi.brar@samsung.com>
+ <553F68CC.6030504@samsung.com> <5544657A.7010006@gmail.com>
+Message-ID: <CAJKOXPdzhqXFWT0=eXpr+jjs8R4kFAMq2DSSsFHVEZq_PdAN2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On 17 August 2015 at 03:55, Jaehoon Chung <jh80.chung@samsung.com> wrote:
-> Hi, Michal.
+2015-05-02 14:49 GMT+09:00 Krzysztof Kozlowski <k.kozlowski.k@gmail.com>:
+> W dniu 28.04.2015 o 20:02, Pankaj Dubey pisze:
+>> Hi Kukjin,
+>>
+>> Any updated for this patch. Without this PMIC RTC is not working on
+>> SMDK5250.
+>>
 >
-> On 08/12/2015 09:23 PM, Michal Suchanek wrote:
->> The driver has open-coded test for SDIO cards. Use the mmc core provided
->> MMC_QUIRK_BROKEN_CLK_GATING flag instead.
+> Could you resend the patch after rebasing it?
 >
-> Did you use the clock-gating for SDIO cards?
-> Doesn't MMC_CAP_SDIO_IRQ bit set? Which case is broken?
-> Could you explain to me more?
+> Best regards,
+> Krzysztof
 
-The core flag for disabling power saving is MMC_QUIRK_BROKEN_CLK_GATING.
+Dear Pankaj and Yadwinder,
 
-It may coincide with MMC_CAP_SDIO_IRQ but that's different flag for
-different purpose.
+Do you plan to do anything with this patch?
 
-MMC_QUIRK_BROKEN_CLK_GATING is currently set for all SDIO cards except
-for cards on a whitelist.
+Best regards,
+Krzysztof
 
-I don't know any particular SDIO card that has problems when the clock
-is off and does not use an IRQ.
 
-Thanks
-
-Michal
-
->
-> Best Regards,
-> Jaehoon Chung
->
+>> Thanks,
+>> Pankaj Dubey
 >>
->> As a bonus this may enable clock gating on SDIO cards that are known to
->> work with it.
->>
->> Signed-off-by: Michal Suchanek <hramrach@gmail.com>
->> ---
->>  drivers/mmc/host/dw_mmc.c | 33 +++++++++++++++------------------
->>  1 file changed, 15 insertions(+), 18 deletions(-)
->>
->> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
->> index 40e9d8e..3bc9fd7 100644
->> --- a/drivers/mmc/host/dw_mmc.c
->> +++ b/drivers/mmc/host/dw_mmc.c
->> @@ -1335,27 +1335,24 @@ static void dw_mci_init_card(struct mmc_host *mmc, struct mmc_card *card)
->>        * description of the CLKENA register we should disable low power mode
->>        * for SDIO cards if we need SDIO interrupts to work.
->>        */
->> -     if (mmc->caps & MMC_CAP_SDIO_IRQ) {
->> -             const u32 clken_low_pwr = SDMMC_CLKEN_LOW_PWR << slot->id;
->> -             u32 clk_en_a_old;
->> -             u32 clk_en_a;
->> +     const u32 clken_low_pwr = SDMMC_CLKEN_LOW_PWR << slot->id;
->> +     u32 clk_en_a_old;
->> +     u32 clk_en_a;
->>
->> -             clk_en_a_old = mci_readl(host, CLKENA);
->> +     clk_en_a_old = mci_readl(host, CLKENA);
->>
->> -             if (card->type == MMC_TYPE_SDIO ||
->> -                 card->type == MMC_TYPE_SD_COMBO) {
->> -                     set_bit(DW_MMC_CARD_NO_LOW_PWR, &slot->flags);
->> -                     clk_en_a = clk_en_a_old & ~clken_low_pwr;
->> -             } else {
->> -                     clear_bit(DW_MMC_CARD_NO_LOW_PWR, &slot->flags);
->> -                     clk_en_a = clk_en_a_old | clken_low_pwr;
->> -             }
->> +     if (card->quirks & MMC_QUIRK_BROKEN_CLK_GATING) {
->> +             set_bit(DW_MMC_CARD_NO_LOW_PWR, &slot->flags);
->> +             clk_en_a = clk_en_a_old & ~clken_low_pwr;
->> +     } else {
->> +             clear_bit(DW_MMC_CARD_NO_LOW_PWR, &slot->flags);
->> +             clk_en_a = clk_en_a_old | clken_low_pwr;
->> +     }
->>
->> -             if (clk_en_a != clk_en_a_old) {
->> -                     mci_writel(host, CLKENA, clk_en_a);
->> -                     mci_send_cmd(slot, SDMMC_CMD_UPD_CLK |
->> -                                  SDMMC_CMD_PRV_DAT_WAIT, 0);
->> -             }
->> +     if (clk_en_a != clk_en_a_old) {
->> +             mci_writel(host, CLKENA, clk_en_a);
->> +             mci_send_cmd(slot, SDMMC_CMD_UPD_CLK |
->> +                             SDMMC_CMD_PRV_DAT_WAIT, 0);
->>       }
->>  }
->>
->>
+>> On Tuesday 18 November 2014 05:38 PM, Yadwinder Singh Brar wrote:
+>>> This patch adds pinctrl configuration for using configuring gpx3-2 as an
+>>> external interrupt from max77686. Though max77686 RTC is enabled and gets
+>>> probed by default, it doesnt work as its unable to get interrupt.
+>>>
+>>> This patch makes max77686 RTC work and also configures it as wakeup
+>>> source.
+>>>
+>>> Signed-off-by: Yadwinder Singh Brar <yadi.brar@samsung.com>
+>>> Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+>>> Tested-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+>>>
+>>> ---
+>>> arch/arm/boot/dts/exynos5250-smdk5250.dts |   12 ++++++++++++
+>>>   1 files changed, 12 insertions(+), 0 deletions(-)
+>>>
+>>> diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts
+>>> b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+>>> index 95b5b51..19cd918 100644
+>>> --- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
+>>> +++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+>>> @@ -131,6 +131,9 @@
+>>>           reg = <0x09>;
+>>>           interrupt-parent = <&gpx3>;
+>>>           interrupts = <2 IRQ_TYPE_NONE>;
+>>> +        pinctrl-names = "default";
+>>> +        pinctrl-0 = <&max77686_irq>;
+>>> +        wakeup-source;
+>>>
+>>>           voltage-regulators {
+>>>               ldo1_reg: LDO1 {
+>>> @@ -411,3 +414,12 @@
+>>>           };
+>>>       };
+>>>   };
+>>> +
+>>> +&pinctrl_0 {
+>>> +    max77686_irq: max77686-irq {
+>>> +        samsung,pins = "gpx3-2";
+>>> +        samsung,pin-function = <0xf>;
+>>> +        samsung,pin-pud = <0>;
+>>> +        samsung,pin-drv = <0>;
+>>> +    };
+>>> +};
+>>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe
+>> linux-samsung-soc" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 >
