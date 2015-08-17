@@ -1,61 +1,41 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Sun, 16 Aug 2015 13:42:41 +0200
-Subject: [4.1.3-rt3] [report][suspend to ram] BUG: sleeping function
- called from invalid context at kernel/locking/rtmutex.c:917
-In-Reply-To: <55CB8FAE.9020309@ti.com>
-References: <55CB8FAE.9020309@ti.com>
-Message-ID: <20150816114241.GC7004@linutronix.de>
+From: nigel@nigelcunningham.com.au (Nigel Cunningham)
+Date: Mon, 17 Aug 2015 16:48:49 +1000
+Subject: [PATCH v2] dmaengine: fsl-edma: add PM suspend/resume support
+In-Reply-To: <CY1PR0301MB1562103588FB0C6BEFDDBF3C83790@CY1PR0301MB1562.namprd03.prod.outlook.com>
+References: <1437469005-3162-1-git-send-email-yao.yuan@freescale.com>	<CADRPPNQJi_x+mdQV=DEVuhCL_p6VOWcPiV3jzioeRdWgSW2w3g@mail.gmail.com>	<CY1PR0301MB15628DD5CFCE2B65BF4FECB2837C0@CY1PR0301MB1562.namprd03.prod.outlook.com>
+ <CADRPPNS_wzX+mwT0L-H=ZP9w8gH9W4O9KUqnGYiAc39S5v4qLA@mail.gmail.com>
+ <CY1PR0301MB1562103588FB0C6BEFDDBF3C83790@CY1PR0301MB1562.namprd03.prod.outlook.com>
+Message-ID: <55D183D1.9020401@nigelcunningham.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Grygorii Strashko | 2015-08-12 21:25:50 [+0300]:
+Hi Yao.
 
->Hi All,
+On 17/08/15 13:59, Yao Yuan wrote:
+> On Sat, Aug 15, 2015 at 7:48 AM, pku.leo < pku.leo@gmail.com > wrote:
+>> On Fri, Aug 14, 2015 at 1:24 AM, Yao Yuan <yao.yuan@freescale.com> wrote:
+>>> Hi Leo,
+>>>
+>>> Thanks for your review.
+>>> About those two methods for DMA suspend that you have mentioned. We
+>> have a lot of the discussions in other DMA driver like DMA for Freescale
+>> PowerPC.
+>>> Finally, we think the device which used the DMA transmission service should
+>> cancel the transmission service in its suspend.
+>>> So DMA in suspend should be idle.
+>> If that's the case you should clearly state this in the commit message and in
+>> code, although I don't know if it is safe to make such assumption.  There could
+>> be user of the DMA that doesn't track the completion of transfers.
+> I think it should be safe. In my opinion, even some client(the user of the DMA) forget to cancel its DMA transmission,
+> It will just lead to PM failed but no other system and data risk.
+> Although we should first fix the behavior of the client.
+> Once you are no need the DMA transmission, why not stop it?
 >
->I can constantly see below error report with RT-kernel on TI ARM dra7-evm 
->if I'm trying to do Suspend to RAM.
+> Is it right?
+Think of it from the end user perspective. Would you like your laptop (or whatever) to refuse to suspend because of this condition? The user may well expect that closing the lid on their laptop will reliably lead to it suspending to ram. Returning a failure here could result in a loss of data if the condition is not detected and the machine subsequently runs out of power.
 
-do you see the same problem on x86 with -RT?
+I do agree that whatever is submitting DMA should be stopped first; ideally this driver would always be idle because whatever producers of work exist would already have been quiesced and output flushed.
 
-> Disabling non-boot CPUs ...
-> PM: noirq suspend of devices complete after 7.295 msecs
->[  100.285729] Disabling non-boot CPUs ...
->[  100.287575] BUG: sleeping function called from invalid context at kernel/locking/rtmutex.c:917
->[  100.287580] in_atomic(): 1, irqs_disabled(): 128, pid: 18, name: migration/1
->[  100.287583] INFO: lockdep is turned off.
->[  100.287586] irq event stamp: 122
->[  100.287600] hardirqs last  enabled at (121): [<c06ac0ac>] _raw_spin_unlock_irqrestore+0x88/0x90
->[  100.287609] hardirqs last disabled at (122): [<c06abed0>] _raw_spin_lock_irq+0x28/0x5c
->[  100.287620] softirqs last  enabled at (0): [<c003d294>] copy_process.part.52+0x410/0x19d8
->[  100.287625] softirqs last disabled at (0): [<  (null)>]   (null)
->[  100.287630] Preemption disabled at:[<  (null)>]   (null)
->[  100.287631] 
->[  100.287639] CPU: 1 PID: 18 Comm: migration/1 Tainted: G        W       4.1.4-rt3-01046-g96ac8da #204
->[  100.287642] Hardware name: Generic DRA74X (Flattened Device Tree)
->[  100.287659] [<c0019134>] (unwind_backtrace) from [<c0014774>] (show_stack+0x20/0x24)
->[  100.287671] [<c0014774>] (show_stack) from [<c06a70f4>] (dump_stack+0x88/0xdc)
->[  100.287681] [<c06a70f4>] (dump_stack) from [<c006cab8>] (___might_sleep+0x198/0x2a8)
->[  100.287689] [<c006cab8>] (___might_sleep) from [<c06ac4dc>] (rt_spin_lock+0x30/0x70)
->[  100.287699] [<c06ac4dc>] (rt_spin_lock) from [<c013f790>] (find_lock_task_mm+0x9c/0x174)
+Regards,
 
-this is task_lock() which takes a sleeping lock.
-
->[  100.287710] [<c013f790>] (find_lock_task_mm) from [<c00409ac>] (clear_tasks_mm_cpumask+0xb4/0x1ac)
->[  100.287720] [<c00409ac>] (clear_tasks_mm_cpumask) from [<c00166a4>] (__cpu_disable+0x98/0xbc)
->[  100.287728] [<c00166a4>] (__cpu_disable) from [<c06a2e8c>] (take_cpu_down+0x1c/0x50)
->[  100.287742] [<c06a2e8c>] (take_cpu_down) from [<c00f2600>] (multi_cpu_stop+0x11c/0x158)
->[  100.287754] [<c00f2600>] (multi_cpu_stop) from [<c00f2a9c>] (cpu_stopper_thread+0xc4/0x184)
-
-this function contains local_save_flags().
-
->[  100.287767] [<c00f2a9c>] (cpu_stopper_thread) from [<c0069058>] (smpboot_thread_fn+0x18c/0x324)
->[  100.287779] [<c0069058>] (smpboot_thread_fn) from [<c00649c4>] (kthread+0xe8/0x104)
->[  100.287791] [<c00649c4>] (kthread) from [<c0010058>] (ret_from_fork+0x14/0x3c)
->[  100.288114] CPU1: shutdown
-
-The local_save_flags() should be probably replaced with something else. 
-
->regards,
->-grygorii
-
-Sebastian
+Nigel
