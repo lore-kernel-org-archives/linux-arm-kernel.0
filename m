@@ -1,115 +1,35 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Mon, 17 Aug 2015 20:26:05 +0900
-Subject: [PATCH 2/3] mmc: dw_mmc: simplify the SDMMC_CLKEN_LOW_PWR logic
-In-Reply-To: <CAOMqctQ8DHj6qPg8zR93OGRHXAZDd0yUmG_J8Vz7dGFuDpCgRQ@mail.gmail.com>
-References: <cover.1439381423.git.hramrach@gmail.com>
- <3d03bfe2c18789eefa038018467c9c63c94ae4a2.1439381423.git.hramrach@gmail.com>
- <55D13F07.70309@samsung.com>
- <CAOMqctQ8DHj6qPg8zR93OGRHXAZDd0yUmG_J8Vz7dGFuDpCgRQ@mail.gmail.com>
-Message-ID: <55D1C4CD.4040200@samsung.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Mon, 17 Aug 2015 19:34:39 +0800
+Subject: [PATCH] mmc: sdhci: also set driver type for MMC_DDR52
+Message-ID: <1439811279-6340-1-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/17/2015 02:52 PM, Michal Suchanek wrote:
-> Hello,
-> 
-> On 17 August 2015 at 03:55, Jaehoon Chung <jh80.chung@samsung.com> wrote:
->> Hi, Michal.
->>
->> On 08/12/2015 09:23 PM, Michal Suchanek wrote:
->>> The driver has open-coded test for SDIO cards. Use the mmc core provided
->>> MMC_QUIRK_BROKEN_CLK_GATING flag instead.
->>
->> Did you use the clock-gating for SDIO cards?
->> Doesn't MMC_CAP_SDIO_IRQ bit set? Which case is broken?
->> Could you explain to me more?
-> 
-> The core flag for disabling power saving is MMC_QUIRK_BROKEN_CLK_GATING.
+commit 08f90f14aa93ad424c20bb176b52f329583e2183 ("mmc: sdhci: clarify
+DDR timing mode between SD-UHS and eMMC") added MMC_DDR52 as eMMC's DDR
+mode to be distinguished from SD-UHS, but it missed setting driver type
+for MMC_DDR52 timing mode. This patches adds the missing driver type
+setting.
 
-I understood your intention. And i read the comment into mmc/core/quirks.c
-I will test SDIO card with this patch. Thanks.
+Fixes: 79f7ae7c45a6("mmc: clarify DDR timing mode between SD-UHS and eMMC")
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+---
+ drivers/mmc/host/sdhci.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-Best Regards,
-Jaehoon Chung
-
-> 
-> It may coincide with MMC_CAP_SDIO_IRQ but that's different flag for
-> different purpose.
-> 
-> MMC_QUIRK_BROKEN_CLK_GATING is currently set for all SDIO cards except
-> for cards on a whitelist.
-> 
-> I don't know any particular SDIO card that has problems when the clock
-> is off and does not use an IRQ.
-> 
-> Thanks
-> 
-> Michal
-> 
->>
->> Best Regards,
->> Jaehoon Chung
->>
->>>
->>> As a bonus this may enable clock gating on SDIO cards that are known to
->>> work with it.
->>>
->>> Signed-off-by: Michal Suchanek <hramrach@gmail.com>
->>> ---
->>>  drivers/mmc/host/dw_mmc.c | 33 +++++++++++++++------------------
->>>  1 file changed, 15 insertions(+), 18 deletions(-)
->>>
->>> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
->>> index 40e9d8e..3bc9fd7 100644
->>> --- a/drivers/mmc/host/dw_mmc.c
->>> +++ b/drivers/mmc/host/dw_mmc.c
->>> @@ -1335,27 +1335,24 @@ static void dw_mci_init_card(struct mmc_host *mmc, struct mmc_card *card)
->>>        * description of the CLKENA register we should disable low power mode
->>>        * for SDIO cards if we need SDIO interrupts to work.
->>>        */
->>> -     if (mmc->caps & MMC_CAP_SDIO_IRQ) {
->>> -             const u32 clken_low_pwr = SDMMC_CLKEN_LOW_PWR << slot->id;
->>> -             u32 clk_en_a_old;
->>> -             u32 clk_en_a;
->>> +     const u32 clken_low_pwr = SDMMC_CLKEN_LOW_PWR << slot->id;
->>> +     u32 clk_en_a_old;
->>> +     u32 clk_en_a;
->>>
->>> -             clk_en_a_old = mci_readl(host, CLKENA);
->>> +     clk_en_a_old = mci_readl(host, CLKENA);
->>>
->>> -             if (card->type == MMC_TYPE_SDIO ||
->>> -                 card->type == MMC_TYPE_SD_COMBO) {
->>> -                     set_bit(DW_MMC_CARD_NO_LOW_PWR, &slot->flags);
->>> -                     clk_en_a = clk_en_a_old & ~clken_low_pwr;
->>> -             } else {
->>> -                     clear_bit(DW_MMC_CARD_NO_LOW_PWR, &slot->flags);
->>> -                     clk_en_a = clk_en_a_old | clken_low_pwr;
->>> -             }
->>> +     if (card->quirks & MMC_QUIRK_BROKEN_CLK_GATING) {
->>> +             set_bit(DW_MMC_CARD_NO_LOW_PWR, &slot->flags);
->>> +             clk_en_a = clk_en_a_old & ~clken_low_pwr;
->>> +     } else {
->>> +             clear_bit(DW_MMC_CARD_NO_LOW_PWR, &slot->flags);
->>> +             clk_en_a = clk_en_a_old | clken_low_pwr;
->>> +     }
->>>
->>> -             if (clk_en_a != clk_en_a_old) {
->>> -                     mci_writel(host, CLKENA, clk_en_a);
->>> -                     mci_send_cmd(slot, SDMMC_CMD_UPD_CLK |
->>> -                                  SDMMC_CMD_PRV_DAT_WAIT, 0);
->>> -             }
->>> +     if (clk_en_a != clk_en_a_old) {
->>> +             mci_writel(host, CLKENA, clk_en_a);
->>> +             mci_send_cmd(slot, SDMMC_CMD_UPD_CLK |
->>> +                             SDMMC_CMD_PRV_DAT_WAIT, 0);
->>>       }
->>>  }
->>>
->>>
->>
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+index 1dbe932..32f2a07 100644
+--- a/drivers/mmc/host/sdhci.c
++++ b/drivers/mmc/host/sdhci.c
+@@ -1559,7 +1559,8 @@ static void sdhci_do_set_ios(struct sdhci_host *host, struct mmc_ios *ios)
+ 				 (ios->timing == MMC_TIMING_UHS_SDR25) ||
+ 				 (ios->timing == MMC_TIMING_UHS_SDR50) ||
+ 				 (ios->timing == MMC_TIMING_UHS_SDR104) ||
+-				 (ios->timing == MMC_TIMING_UHS_DDR50))) {
++				 (ios->timing == MMC_TIMING_UHS_DDR50) ||
++				 (ios->timing == MMC_TIMING_MMC_DDR52))) {
+ 			u16 preset;
+ 
+ 			sdhci_enable_preset_value(host, true);
+-- 
+2.5.0
