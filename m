@@ -1,78 +1,42 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Mon, 17 Aug 2015 17:38:16 +0200
-Subject: [PATCH v3 04/10] VFIO: platform: add vfio_platform_set_automasked
-In-Reply-To: <1439405794.4023.528.camel@redhat.com>
-References: <1439212864-12954-1-git-send-email-eric.auger@linaro.org>	
- <1439212864-12954-5-git-send-email-eric.auger@linaro.org>
- <1439405794.4023.528.camel@redhat.com>
-Message-ID: <55D1FFE8.9050104@linaro.org>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Mon, 17 Aug 2015 11:39:03 -0400
+Subject: [PATCH 1/4] serial: xuartps: Fix termios issue for enabling odd
+ parity
+In-Reply-To: <5b154ba97bcd79e49e2131152eb2fc1761594a6c.1439796149.git.michal.simek@xilinx.com>
+References: <5b154ba97bcd79e49e2131152eb2fc1761594a6c.1439796149.git.michal.simek@xilinx.com>
+Message-ID: <55D20017.4010008@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/12/2015 08:56 PM, Alex Williamson wrote:
-> On Mon, 2015-08-10 at 15:20 +0200, Eric Auger wrote:
->> This function makes possible to change the automasked mode.
->>
->> Signed-off-by: Eric Auger <eric.auger@linaro.org>
->>
->> ---
->>
->> v1 -> v2:
->> - set forwarded flag
->> ---
->>  drivers/vfio/platform/vfio_platform_irq.c | 19 +++++++++++++++++++
->>  1 file changed, 19 insertions(+)
->>
->> diff --git a/drivers/vfio/platform/vfio_platform_irq.c b/drivers/vfio/platform/vfio_platform_irq.c
->> index b31b1f0..a285384 100644
->> --- a/drivers/vfio/platform/vfio_platform_irq.c
->> +++ b/drivers/vfio/platform/vfio_platform_irq.c
->> @@ -186,6 +186,25 @@ static irqreturn_t vfio_handler(int irq, void *dev_id)
->>  	return ret;
->>  }
->>  
->> +static int vfio_platform_set_automasked(struct vfio_platform_irq *irq,
->> +					   bool automasked)
->> +{
->> +	unsigned long flags;
->> +
->> +	spin_lock_irqsave(&irq->lock, flags);
->> +	if (automasked) {
->> +		irq->forwarded = true;
->> +		irq->flags |= VFIO_IRQ_INFO_AUTOMASKED;
->> +		irq->handler = vfio_automasked_irq_handler;
->> +	} else {
->> +		irq->forwarded = false;
->> +		irq->flags &= ~VFIO_IRQ_INFO_AUTOMASKED;
->> +		irq->handler = vfio_irq_handler;
->> +	}
->> +	spin_unlock_irqrestore(&irq->lock, flags);
->> +	return 0;
+On 08/17/2015 03:22 AM, Michal Simek wrote:
+> From: Anirudha Sarangi <anirudha.sarangi@xilinx.com>
 > 
-> In vfio-speak, automasked means level and we're not magically changing
-> the IRQ from level to edge, we're simply able to handle level
-> differently based on a hardware optimization.  Should the user visible
-> flags therefore change based on this?  Aren't we really setting the
-> forwarded state rather than the automasked state?
+> Existing set_termios does not handle the option for enabling
+> odd parity. This patch fixes it.
 
-Well actually this was following the discussion we had a long time ago
-about that topic:
+NAK. PARODD does not enable parity generation or detection.
 
-http://lkml.iu.edu/hypermail/linux/kernel/1409.1/03659.html
+Regards,
+Peter Hurley
 
-I did not really know how to conclude ...
-
-If it is preferred I can hide this to the userspace, no problem.
-
-Eric
-
-
+> Signed-off-by: Anirudha Sarangi <anirudh@xilinx.com>
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+> ---
 > 
->> +}
->> +
->>  static void vfio_platform_irq_bypass_stop(struct irq_bypass_producer *prod)
->>  {
->>  }
+>  drivers/tty/serial/xilinx_uartps.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> 
+> diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
+> index 009e0dbc12d2..a3020344ac9d 100644
+> --- a/drivers/tty/serial/xilinx_uartps.c
+> +++ b/drivers/tty/serial/xilinx_uartps.c
+> @@ -723,7 +723,7 @@ static void cdns_uart_set_termios(struct uart_port *port,
+>  	else
+>  		cval |= CDNS_UART_MR_STOPMODE_1_BIT; /* 1 STOP bit */
+>  
+> -	if (termios->c_cflag & PARENB) {
+> +	if ((termios->c_cflag & PARENB) || (termios->c_cflag & PARODD)) {
+>  		/* Mark or Space parity */
+>  		if (termios->c_cflag & CMSPAR) {
+>  			if (termios->c_cflag & PARODD)
 > 
