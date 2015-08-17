@@ -1,30 +1,27 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 17 Aug 2015 10:48:05 +0900
-Subject: [PATCH 2/4] clk: samsung: exynos3250: Add MMC2 clock
-In-Reply-To: <1439264784-30322-3-git-send-email-cw00.choi@samsung.com>
-References: <1439264784-30322-1-git-send-email-cw00.choi@samsung.com>
- <1439264784-30322-3-git-send-email-cw00.choi@samsung.com>
-Message-ID: <55D13D55.5030207@samsung.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Sun, 16 Aug 2015 20:30:47 -0700
+Subject: [PATCH] spi: Mediatek: fix endian warnings
+In-Reply-To: <20150816140639.GE7557@n2100.arm.linux.org.uk>
+References: <1439289789-29026-1-git-send-email-leilk.liu@mediatek.com>
+ <1871097.B3YgX5rNy0@wuerfel>
+ <20150816140639.GE7557@n2100.arm.linux.org.uk>
+Message-ID: <20150817033047.GM10748@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11.08.2015 12:46, Chanwoo Choi wrote:
-> This patch add the MMC2 clocks (mux, divider, gate) of Exynos3250 SoC.
-> 
-> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> Cc: Tomasz Figa <tomasz.figa@gmail.com>
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> ---
->  drivers/clk/samsung/clk-exynos3250.c   | 9 +++++++++
->  include/dt-bindings/clock/exynos3250.h | 7 ++++++-
->  2 files changed, 15 insertions(+), 1 deletion(-)
+On Sun, Aug 16, 2015 at 03:06:39PM +0100, Russell King - ARM Linux wrote:
 
+> All writel() implementations take a CPU number and write it in little
+> endian format.  Hence, writel() almost always uses cpu_to_le32()
+> internally.
 
-
-Assuming that numbers/addresses are good (reserved in my datasheet) the
-code itself looks good:
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-
-
-Best regards,
-Krzysztof
+I think the reason this keeps coming up is that people aren't expecting
+writel() to be doing endianness conversion, it's easy to get caught out
+by it.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150816/42f0fde6/attachment.sig>
