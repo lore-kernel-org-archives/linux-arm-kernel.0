@@ -1,58 +1,72 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 17 Aug 2015 08:56:29 -0700
-Subject: [PATCH v2 0/6] ARM: shmobile: Move gpio ranges from C code to DT
-In-Reply-To: <CACRpkdYe5z9vG+Aekdq1wcKdhUUN5bpxQ52RgNt17+bhJbjVEQ@mail.gmail.com>
-References: <1438696519-13727-1-git-send-email-geert+renesas@glider.be>
- <20150805005540.GB20726@verge.net.au>
- <CACRpkdY7P86+SxMr5-HnhrN5fC-N1U135jiGAJGTV=xx47VW5g@mail.gmail.com>
- <CAMuHMdW0T6MW6s4Gg_rqvtt+MRPtp_MpuiKtamfFrx-Tcm6WmQ@mail.gmail.com>
- <20150814003023.GC12589@verge.net.au>
- <CAMuHMdU0XoZ-comYSAau6e3kAY9VUbNgyeRcS_LzmV1gm31ZKA@mail.gmail.com>
- <CACRpkdYe5z9vG+Aekdq1wcKdhUUN5bpxQ52RgNt17+bhJbjVEQ@mail.gmail.com>
-Message-ID: <20150817155629.GA8401@verge.net.au>
+From: anirudha.sarangi@xilinx.com (Anirudha Sarangi)
+Date: Mon, 17 Aug 2015 15:58:36 +0000
+Subject: [PATCH 2/4] serial: xuartps: Do not handle overrun errors under
+ IGNPAR option
+In-Reply-To: <55D20297.6010500@hurleysoftware.com>
+References: <5b154ba97bcd79e49e2131152eb2fc1761594a6c.1439796149.git.michal.simek@xilinx.com>
+ <41df6eb35d69801afa5b686a6974e3c3bf65178a.1439796149.git.michal.simek@xilinx.com>
+ <55D20297.6010500@hurleysoftware.com>
+Message-ID: <59506B47DEDD3943ABF9AC60020F4E2978D6E7FF@XAP-PVEXMBX02.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 14, 2015 at 12:34:33PM +0200, Linus Walleij wrote:
-> On Fri, Aug 14, 2015 at 9:46 AM, Geert Uytterhoeven
-> <geert@linux-m68k.org> wrote:
-> > On Fri, Aug 14, 2015 at 2:30 AM, Simon Horman <horms@verge.net.au> wrote:
-> >> On Thu, Aug 13, 2015 at 02:45:55PM +0200, Geert Uytterhoeven wrote:
-> >>> On Thu, Aug 13, 2015 at 2:29 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> >>> > On Wed, Aug 5, 2015 at 2:55 AM, Simon Horman <horms@verge.net.au> wrote:
-> >>> >> Where possible I prefer not to apply non-DTS/DTSI patches on top of
-> >>> >> DTS/DTSI patches, I believe this is in keeping with how the ARM SoC
-> >>> >> maintainers like things handled.  With this in mind I have done the following:
-> >>> >>
-> >>> >> 1. Queued up the DTSI patches (patches 1 - 3) for v4.3 in my dt branch.
-> >>> >>    I intend for this to turn up in next soon.
-> >>> >> 2. Queued up for pinctrl patches (patches 4 - 6) for v4.4 in a pinctrl patch.
-> >>> >>    I intend for these to be present in the renesas devel branch but
-> >>> >>    not in next until after the release of v4.3-rc1. I would also be
-> >>> >>    happy to drop them and let Linus Walleij take these patches for v4.4,
-> >>> >>    assuming patches 1 - 3 are accepted for v4.3.
-> >>> >
-> >>> > OK.
-> >>> >
-> >>> > Will the world explode if I try to queue the pinctrl patches 4-6 in my
-> >>> > tree now for v4.3? Then I prefer to defer to v4.4. Else I can merge
-> >>> > it in parallel?
-> >>>
-> >>> There won't be a mapping between gpio and pins in any branch having the
-> >>> pinctrl changes but not the dtsi changes.
-> >>
-> >> It sounds to me that Linus should take his option 2; defer to v4.4.
-> >> In which case I should drop the changes from my tree (they are not in next
-> >> anyway). Please let me know if thats the way we will move this forwards.
-> >
-> > Sounds fine to me.
-> >
-> > And in the unlikely event we discover regressions in v4.3-rc1 due to having
-> > the dtsi changes without the pinctrl changes, we can still fast-track them
-> > into v4.3-rc2.
-> 
-> Sounds like a plan.
-> 
-> Hit me on the head about this once v4.3-rc1 is out!
+Hi,
 
-Thanks, I will drop the patches from my tree.
+> -----Original Message-----
+> From: Peter Hurley [mailto:peter at hurleysoftware.com]
+> Sent: Monday, August 17, 2015 9:20 PM
+> To: Michal Simek
+> Cc: linux-kernel at vger.kernel.org; monstr at monstr.eu; Anirudha Sarangi; Soren
+> Brinkmann; Jiri Slaby; linux-serial at vger.kernel.org; Greg Kroah-Hartman; linux-
+> arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH 2/4] serial: xuartps: Do not handle overrun errors under
+> IGNPAR option
+>
+> On 08/17/2015 03:22 AM, Michal Simek wrote:
+> > From: Anirudha Sarangi <anirudha.sarangi@xilinx.com>
+> >
+> > The existing implementation includes overrun errors under IGNPAR
+> > option. This patch fixes it by including only parity and framing error
+> > under IGNPAR option.
+>
+> The convention adopted by Linux serial drivers is to ignore overrun errors if both
+> IGNPAR and IGNBRK are set.
+>
+I just followed the set_termios documentation, which says that IGNPAR is for parity and framing.
+The current controller does not support break detection reliably.
+That is probably why we don?t have IGNBRK.
+
+Regards
+Anirudha
+
+> Regards,
+> Peter Hurley
+>
+> > Signed-off-by: Anirudha Sarangi <anirudh@xilinx.com>
+> > Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+> > ---
+> >
+> >  drivers/tty/serial/xilinx_uartps.c | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> >
+> > diff --git a/drivers/tty/serial/xilinx_uartps.c
+> > b/drivers/tty/serial/xilinx_uartps.c
+> > index a3020344ac9d..c4437e8929ff 100644
+> > --- a/drivers/tty/serial/xilinx_uartps.c
+> > +++ b/drivers/tty/serial/xilinx_uartps.c
+> > @@ -691,7 +691,7 @@ static void cdns_uart_set_termios(struct uart_port
+> > *port,
+> >
+> >     if (termios->c_iflag & IGNPAR)
+> >             port->ignore_status_mask |= CDNS_UART_IXR_PARITY |
+> > -                   CDNS_UART_IXR_FRAMING |
+> CDNS_UART_IXR_OVERRUN;
+> > +                                       CDNS_UART_IXR_FRAMING;
+> >
+> >     /* ignore all characters if CREAD is not set */
+> >     if ((termios->c_cflag & CREAD) == 0)
+> >
+
+
+
+This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
