@@ -1,70 +1,78 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sun, 16 Aug 2015 23:34:55 -0700
-Subject: [RFT PATCH] arm: omap1_defconfig: convert to use libata PATA
- drivers
-In-Reply-To: <1439571876-13758-16-git-send-email-b.zolnierkie@samsung.com>
-References: <1439571876-13758-1-git-send-email-b.zolnierkie@samsung.com>
- <1439571876-13758-16-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <20150817063454.GF4215@atomide.com>
+From: p.fedin@samsung.com (Pavel Fedin)
+Date: Mon, 17 Aug 2015 09:44:53 +0300
+Subject: PING: [PATCH v2 TRIVIAL] Enable GICv2m on ARM virt machine
+Message-ID: <00f001d0d8b8$39650c10$ac2f2430$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com> [150814 10:10]:
-> IDE subsystem has been deprecated since 2009 and the majority
-> (if not all) of Linux distributions have switched to use
-> libata for ATA support exclusively.  However there are still
-> some users (mostly old or/and embedded non-x86 systems) that
-> have not converted from using IDE subsystem to libata PATA
-> drivers.  This doesn't seem to be good thing in the long-term
-> for Linux as while there is less and less PATA systems left
-> in use:
+ PING
+
+Kind regards,
+Pavel Fedin
+Expert Engineer
+Samsung Electronics Research center Russia
+
+> -----Original Message-----
+> From: linux-arm-kernel [mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf Of Pavel
+> Fedin
+> Sent: Friday, August 07, 2015 1:51 PM
+> To: linux-arm-kernel at lists.infradead.org
+> Cc: 'Marc Zyngier'; trivial at kernel.org; 'Russell King'
+> Subject: [PATCH v2 TRIVIAL] Enable GICv2m on ARM virt machine
 > 
-> * testing efforts are divided between two subsystems
+> qemu implementation of "virt" includes GICv2m. This commit allows to use
+> it also on ARM32 architecture.
 > 
-> * having duplicate drivers for same hardware confuses users
+> msi.h is added because it is required by linux/msi.h
+> if CONFIG_GENERIC_MSI_IRQ_DOMAIN is defined. It gets enabled by the
+> following KConfig dependency chain:
+> ARM_GIC_V2M => PCI_MSI_IRQ_DOMAIN => GENERIC_MSI_IRQ_DOMAIN
 > 
-> This patch converts omap1_defconfig to use libata PATA
-> drivers.
-> 
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: linux-omap at vger.kernel.org
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> Signed-off-by: Pavel Fedin <p.fedin@samsung.com>
 > ---
-> Build tested only.
-> If you have affected hardware please test.  Thank you.
-
-All my omap1 devices are in a rack using NFSroot or MMC so
-I can't test this. Seems like a good idea to me thoug, and does
-not cause merge conflicts. So if you want to queue this via
-along with other PATA related patches, please feel free to
-add:
-
-Acked-by: Tony Lindgren <tony@atomide.com>
- 
->  arch/arm/configs/omap1_defconfig | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+> v1 => v2:
+> Added verbose explanation in commit message
+> ---
+>  arch/arm/Kconfig            | 1 +
+>  arch/arm/include/asm/Kbuild | 1 +
+>  2 files changed, 2 insertions(+)
 > 
-> diff --git a/arch/arm/configs/omap1_defconfig b/arch/arm/configs/omap1_defconfig
-> index 0c8a787..6ffc984 100644
-> --- a/arch/arm/configs/omap1_defconfig
-> +++ b/arch/arm/configs/omap1_defconfig
-> @@ -96,14 +96,14 @@ CONFIG_BLK_DEV_LOOP=y
->  CONFIG_BLK_DEV_RAM=y
->  CONFIG_BLK_DEV_RAM_COUNT=2
->  CONFIG_BLK_DEV_RAM_SIZE=8192
-> -CONFIG_IDE=m
-> -CONFIG_BLK_DEV_IDECS=m
->  CONFIG_SCSI=y
->  # CONFIG_SCSI_PROC_FS is not set
->  CONFIG_BLK_DEV_SD=y
->  CONFIG_CHR_DEV_ST=y
->  CONFIG_BLK_DEV_SR=y
->  CONFIG_CHR_DEV_SG=y
-> +CONFIG_ATA=m
-> +CONFIG_PATA_PCMCIA=m
->  CONFIG_NETDEVICES=y
->  CONFIG_TUN=y
->  CONFIG_PHYLIB=y
-> -- 
-> 1.9.1
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 45df48b..1091025 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -815,6 +815,7 @@ config ARCH_VIRT
+>  	bool "Dummy Virtual Machine" if ARCH_MULTI_V7
+>  	select ARM_AMBA
+>  	select ARM_GIC
+> +	select ARM_GIC_V2M if PCI_MSI
+>  	select ARM_PSCI
+>  	select HAVE_ARM_ARCH_TIMER
 > 
+> diff --git a/arch/arm/include/asm/Kbuild b/arch/arm/include/asm/Kbuild
+> index 3c4596d..01806f5 100644
+> --- a/arch/arm/include/asm/Kbuild
+> +++ b/arch/arm/include/asm/Kbuild
+> @@ -14,6 +14,7 @@ generic-y += local.h
+>  generic-y += local64.h
+>  generic-y += mcs_spinlock.h
+>  generic-y += msgbuf.h
+> +generic-y += msi.h
+>  generic-y += param.h
+>  generic-y += parport.h
+>  generic-y += poll.h
+> --
+> 1.9.5.msysgit.0
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
