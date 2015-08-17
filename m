@@ -1,111 +1,68 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Mon, 17 Aug 2015 09:32:27 -0400
-Subject: [PATCH V3 2/3] arm64: support initrd outside kernel linear map
-In-Reply-To: <20150817112256.GH1688@arm.com>
-References: <1439758168-29427-1-git-send-email-msalter@redhat.com>
- <1439758168-29427-3-git-send-email-msalter@redhat.com>
- <20150817112256.GH1688@arm.com>
-Message-ID: <1439818347.3153.95.camel@redhat.com>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Mon, 17 Aug 2015 15:32:16 +0200
+Subject: [PATCH] pinctrl: at91: Use generic irq_{request,release}_resources()
+Message-ID: <1439818336-31230-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-08-17 at 12:22 +0100, Will Deacon wrote:
-> Hi Mark,
-> 
-> On Sun, Aug 16, 2015 at 09:49:27PM +0100, Mark Salter wrote:
-> > The use of mem= could leave part or all of the initrd outside of
-> > the kernel linear map. This will lead to an error when unpacking
-> > the initrd and a probable failure to boot. This patch catches that
-> > situation and relocates the initrd to be fully within the linear
-> > map.
-> > 
-> > Signed-off-by: Mark Salter <msalter@redhat.com>
-> > ---
-> >  arch/arm64/kernel/setup.c | 59 
-> > +++++++++++++++++++++++++++++++++++++++++++++++
-> >  1 file changed, 59 insertions(+)
-> > 
-> > diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-> > index f3067d4..5f45fd9 100644
-> > --- a/arch/arm64/kernel/setup.c
-> > +++ b/arch/arm64/kernel/setup.c
-> > @@ -359,6 +359,64 @@ static void __init 
-> > request_standard_resources(void)
-> >  	}
-> >  }
-> >  
-> > +#ifdef CONFIG_BLK_DEV_INITRD
-> > +/*
-> > + * Relocate initrd if it is not completely within the linear mapping.
-> > + * This would be the case if mem= cuts out all or part of it.
-> > + */
-> > +static void __init relocate_initrd(void)
-> > +{
-> > +	phys_addr_t orig_start = __virt_to_phys(initrd_start);
-> > +	phys_addr_t orig_end = __virt_to_phys(initrd_end);
-> 
-> Any particular reason to use the __* variants here?
+The at91-specific irq_{request,release}_resources() callbacks are
+identical to the generic ones, modulo the bug fix in 5b76e79c77264899
+("gpiolib: irqchip: prevent driver unloading if gpio is used as irq
+only").
 
-To avoid need to cast initrd_{start,end} to pointer.
+Until commit 8b67a1f0ad1f260f ("gpio: don't override irq_*_resources()
+callbacks"), the buggy at91-specific callbacks were never used, though.
 
-> 
-> > +	phys_addr_t ram_end = memblock_end_of_DRAM();
-> > +	phys_addr_t new_start;
-> > +	unsigned long size, to_free = 0;
-> > +	void *dest;
-> > +
-> > +	if (orig_end <= ram_end)
-> > +		return;
-> > +
-> > +	/* Note if any of original initrd will freeing below */
-> 
-> The comment doesn't make sense.
+Hence drop the at91-specific ones in favor of the generic ones.
 
-No it doesn't.
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+Compile-tested only.
+---
+ drivers/pinctrl/pinctrl-at91.c | 24 ------------------------
+ 1 file changed, 24 deletions(-)
 
-> 
-> > +	if (orig_start < ram_end)
-> > +		to_free = ram_end - orig_start;
-> > +
-> > +	size = orig_end - orig_start;
-> > +
-> > +	/* initrd needs to be relocated completely inside linear 
-> > mapping */
-> > +	new_start = memblock_find_in_range(0, PFN_PHYS(max_pfn),
-> > +					   size, PAGE_SIZE);
-> > +	if (!new_start)
-> > +		panic("Cannot relocate initrd of size %ld\n", size);
-> > +	memblock_reserve(new_start, size);
-> > +
-> > +	initrd_start = __phys_to_virt(new_start);
-> > +	initrd_end   = initrd_start + size;
-> > +
-> > +	pr_info("Moving initrd from [%llx-%llx] to [%llx-%llx]\n",
-> > +		orig_start, orig_start + size - 1,
-> > +		new_start, new_start + size - 1);
-> > +
-> > +	dest = (void *)initrd_start;
-> > +
-> > +	if (to_free) {
-> > +		memcpy(dest, (void *)__phys_to_virt(orig_start), 
-> > to_free);
-> > +		dest += to_free;
-> > +	}
-> > +
-> > +	copy_from_early_mem(dest, orig_start + to_free, size - 
-> > to_free);
-> > +
-> > +	if (to_free) {
-> > +		pr_info("Freeing original RAMDISK from [%llx-%llx]\n",
-> > +			orig_start, orig_start + to_free - 1);
-> > +		memblock_free(orig_start, to_free);
-> > +	}
-> > +}
-> > +#else
-> > +static inline void __init reserve_initrd(void)
-> 
-> relocate_initrd ?
-
-Yes
-
-Thanks, will fix that and the comment.
+diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
+index e1ab69928bba38b4..72a3e632c4d9b495 100644
+--- a/drivers/pinctrl/pinctrl-at91.c
++++ b/drivers/pinctrl/pinctrl-at91.c
+@@ -1488,28 +1488,6 @@ static void gpio_irq_ack(struct irq_data *d)
+ 	/* the interrupt is already cleared before by reading ISR */
+ }
+ 
+-static int gpio_irq_request_res(struct irq_data *d)
+-{
+-	struct at91_gpio_chip *at91_gpio = irq_data_get_irq_chip_data(d);
+-	unsigned	pin = d->hwirq;
+-	int ret;
+-
+-	ret = gpiochip_lock_as_irq(&at91_gpio->chip, pin);
+-	if (ret)
+-		dev_err(at91_gpio->chip.dev, "unable to lock pind %lu IRQ\n",
+-			d->hwirq);
+-
+-	return ret;
+-}
+-
+-static void gpio_irq_release_res(struct irq_data *d)
+-{
+-	struct at91_gpio_chip *at91_gpio = irq_data_get_irq_chip_data(d);
+-	unsigned	pin = d->hwirq;
+-
+-	gpiochip_unlock_as_irq(&at91_gpio->chip, pin);
+-}
+-
+ #ifdef CONFIG_PM
+ 
+ static u32 wakeups[MAX_GPIO_BANKS];
+@@ -1585,8 +1563,6 @@ void at91_pinctrl_gpio_resume(void)
+ static struct irq_chip gpio_irqchip = {
+ 	.name		= "GPIO",
+ 	.irq_ack	= gpio_irq_ack,
+-	.irq_request_resources = gpio_irq_request_res,
+-	.irq_release_resources = gpio_irq_release_res,
+ 	.irq_disable	= gpio_irq_mask,
+ 	.irq_mask	= gpio_irq_mask,
+ 	.irq_unmask	= gpio_irq_unmask,
+-- 
+1.9.1
