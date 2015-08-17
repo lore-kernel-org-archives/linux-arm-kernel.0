@@ -1,123 +1,37 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Mon, 17 Aug 2015 17:17:12 +0200
-Subject: [PATCH v3 01/10] VFIO: platform: registration of a dummy IRQ
- bypass producer
-In-Reply-To: <1439405770.4023.526.camel@redhat.com>
-References: <1439212864-12954-1-git-send-email-eric.auger@linaro.org>	
- <1439212864-12954-2-git-send-email-eric.auger@linaro.org>
- <1439405770.4023.526.camel@redhat.com>
-Message-ID: <55D1FAF8.9000700@linaro.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 17 Aug 2015 17:18:51 +0200
+Subject: [PATCH v2] ARM: dts: sunxi: Raise minimum CPU voltage for
+ sun7i-a20 to meet SoC specifications
+In-Reply-To: <1438722481-2302-1-git-send-email-public_timo.s@silentcreek.de>
+References: <1438722481-2302-1-git-send-email-public_timo.s@silentcreek.de>
+Message-ID: <20150817151851.GE2547@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alex,
-On 08/12/2015 08:56 PM, Alex Williamson wrote:
-> On Mon, 2015-08-10 at 15:20 +0200, Eric Auger wrote:
->> Register a dummy producer with void callbacks
->>
->> Signed-off-by: Eric Auger <eric.auger@linaro.org>
->>
->> ---
->>
->> v2 -> v3:
->> - rename vfio_platform_irq_bypass_resume into *_start
->> ---
->>  drivers/vfio/platform/vfio_platform_irq.c     | 32 +++++++++++++++++++++++++++
->>  drivers/vfio/platform/vfio_platform_private.h |  2 ++
->>  2 files changed, 34 insertions(+)
->>
->> diff --git a/drivers/vfio/platform/vfio_platform_irq.c b/drivers/vfio/platform/vfio_platform_irq.c
->> index 88bba57..b5cb8c7 100644
->> --- a/drivers/vfio/platform/vfio_platform_irq.c
->> +++ b/drivers/vfio/platform/vfio_platform_irq.c
->> @@ -20,6 +20,7 @@
->>  #include <linux/types.h>
->>  #include <linux/vfio.h>
->>  #include <linux/irq.h>
->> +#include <linux/irqbypass.h>
->>  
->>  #include "vfio_platform_private.h"
->>  
->> @@ -177,6 +178,27 @@ static irqreturn_t vfio_irq_handler(int irq, void *dev_id)
->>  	return IRQ_HANDLED;
->>  }
->>  
->> +static void vfio_platform_irq_bypass_stop(struct irq_bypass_producer *prod)
->> +{
->> +}
->> +
->> +static void vfio_platform_irq_bypass_start(struct irq_bypass_producer *prod)
->> +{
->> +}
->> +
->> +static int vfio_platform_irq_bypass_add_consumer(
->> +			struct irq_bypass_producer *prod,
->> +			struct irq_bypass_consumer *cons)
->> +{
->> +	return 0;
->> +}
->> +
->> +static void vfio_platform_irq_bypass_del_consumer(
->> +			struct irq_bypass_producer *prod,
->> +			struct irq_bypass_consumer *cons)
->> +{
->> +}
->> +
->>  static int vfio_set_trigger(struct vfio_platform_device *vdev, int index,
->>  			    int fd, irq_handler_t handler)
->>  {
->> @@ -186,6 +208,7 @@ static int vfio_set_trigger(struct vfio_platform_device *vdev, int index,
->>  
->>  	if (irq->trigger) {
->>  		free_irq(irq->hwirq, irq);
->> +		irq_bypass_unregister_producer(&irq->producer);
->>  		kfree(irq->name);
->>  		eventfd_ctx_put(irq->trigger);
->>  		irq->trigger = NULL;
->> @@ -216,6 +239,15 @@ static int vfio_set_trigger(struct vfio_platform_device *vdev, int index,
->>  		return ret;
->>  	}
->>  
->> +	irq->producer.token = (void *)trigger;
->> +	irq->producer.irq = irq->hwirq;
->> +	irq->producer.add_consumer = vfio_platform_irq_bypass_add_consumer;
->> +	irq->producer.del_consumer = vfio_platform_irq_bypass_del_consumer;
->> +	irq->producer.stop = vfio_platform_irq_bypass_stop;
->> +	irq->producer.start = vfio_platform_irq_bypass_start;
->> +	ret = irq_bypass_register_producer(&irq->producer);
->> +	WARN_ON(ret);
-> 
-> For what purpose?
-Yes. I will replace by a simple pr_info as done in eventfd.c.
+Hi Timo,
 
-Best Regards
+On Tue, Aug 04, 2015 at 11:08:01PM +0200, Timo Sigurdsson wrote:
+> sun7i-a20.dtsi contains a cpufreq operating point at 0.9 volts. The minimum
+> CPU voltage for the Allwinner A20 SoC, however, is 1.0 volts. Thus, raise
+> the voltage for the lowest operating point to 1.0 volts in order to stay
+> within the SoC specifications. It is an undervolted setting that isn't
+> stable across all SoCs and boards out there.
+> 
+> Signed-off-by: Timo Sigurdsson <public_timo.s@silentcreek.de>
 
-Eric
-> 
->> +
->>  	if (!irq->masked)
->>  		enable_irq(irq->hwirq);
->>  
->> diff --git a/drivers/vfio/platform/vfio_platform_private.h b/drivers/vfio/platform/vfio_platform_private.h
->> index 1c9b3d5..1d2d4d6 100644
->> --- a/drivers/vfio/platform/vfio_platform_private.h
->> +++ b/drivers/vfio/platform/vfio_platform_private.h
->> @@ -17,6 +17,7 @@
->>  
->>  #include <linux/types.h>
->>  #include <linux/interrupt.h>
->> +#include <linux/irqbypass.h>
->>  
->>  #define VFIO_PLATFORM_OFFSET_SHIFT   40
->>  #define VFIO_PLATFORM_OFFSET_MASK (((u64)(1) << VFIO_PLATFORM_OFFSET_SHIFT) - 1)
->> @@ -37,6 +38,7 @@ struct vfio_platform_irq {
->>  	spinlock_t		lock;
->>  	struct virqfd		*unmask;
->>  	struct virqfd		*mask;
->> +	struct irq_bypass_producer producer;
->>  };
->>  
->>  struct vfio_platform_region {
-> 
-> 
-> 
+Added Iain's Ack, and Cc stable
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150817/fb0da564/attachment.sig>
