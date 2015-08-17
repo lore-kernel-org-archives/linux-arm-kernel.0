@@ -1,79 +1,58 @@
-From: mchehab@osg.samsung.com (Mauro Carvalho Chehab)
-Date: Mon, 17 Aug 2015 11:52:42 -0300
-Subject: [PATCH v2 05/11] ARM: DT: STi: STiH407: Add c8sectpfe LinuxDVB
- DT node.
-In-Reply-To: <1438276141-16902-6-git-send-email-peter.griffin@linaro.org>
-References: <1438276141-16902-1-git-send-email-peter.griffin@linaro.org>
- <1438276141-16902-6-git-send-email-peter.griffin@linaro.org>
-Message-ID: <20150817115242.4ae9a51e@recife.lan>
+From: hramrach@gmail.com (Michal Suchanek)
+Date: Mon, 17 Aug 2015 16:55:46 +0200
+Subject: [PATCH 2/3] mmc: dw_mmc: simplify the SDMMC_CLKEN_LOW_PWR logic
+In-Reply-To: <CAGOxZ51oHoX+zQSO8tRp8V5RUmDg8CAnM9HO5FQ5h6JeCy=1og@mail.gmail.com>
+References: <cover.1439381423.git.hramrach@gmail.com>
+ <3d03bfe2c18789eefa038018467c9c63c94ae4a2.1439381423.git.hramrach@gmail.com>
+ <55D13F07.70309@samsung.com>
+ <CAOMqctQ8DHj6qPg8zR93OGRHXAZDd0yUmG_J8Vz7dGFuDpCgRQ@mail.gmail.com>
+ <55D1C4CD.4040200@samsung.com>
+ <CAGOxZ51oHoX+zQSO8tRp8V5RUmDg8CAnM9HO5FQ5h6JeCy=1og@mail.gmail.com>
+Message-ID: <CAOMqctQ_gA=QxRVFQ8L=q7kBX3GROvz9mnHGu2yo1VrBO1Le6w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Thu, 30 Jul 2015 18:08:55 +0100
-Peter Griffin <peter.griffin@linaro.org> escreveu:
+ Hello,
 
-> This patch adds in the required DT node for the c8sectpfe
-> Linux DVB demux driver which allows the tsin channels
-> to be used on an upstream kernel.
-> 
-> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> ---
->  arch/arm/boot/dts/stihxxx-b2120.dtsi | 38 ++++++++++++++++++++++++++++++++++++
->  1 file changed, 38 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/stihxxx-b2120.dtsi b/arch/arm/boot/dts/stihxxx-b2120.dtsi
-> index 62994ae..1bc018e 100644
-> --- a/arch/arm/boot/dts/stihxxx-b2120.dtsi
-> +++ b/arch/arm/boot/dts/stihxxx-b2120.dtsi
-> @@ -6,6 +6,10 @@
->   * it under the terms of the GNU General Public License version 2 as
->   * published by the Free Software Foundation.
->   */
-> +
-> +#include <dt-bindings/clock/stih407-clks.h>
-> +#include <dt-bindings/media/c8sectpfe.h>
-> +
->  / {
->  	soc {
->  		sbc_serial0: serial at 9530000 {
-> @@ -85,5 +89,39 @@
->  			status = "okay";
->  		};
->  
-> +		c8sectpfe at 08a20000 {
-> +			compatible = "st,stih407-c8sectpfe";
-> +			status = "okay";
-> +			reg = <0x08a20000 0x10000>, <0x08a00000 0x4000>;
-> +			reg-names = "c8sectpfe", "c8sectpfe-ram";
-> +
-> +			interrupts = <0 34 0>, <0 35 0>;
-> +			interrupt-names = "c8sectpfe-error-irq",
-> +					  "c8sectpfe-idle-irq";
-> +
-> +			pinctrl-names	= "tsin0-serial", "tsin0-parallel",
-> +					  "tsin3-serial", "tsin4-serial",
-> +					  "tsin5-serial";
-> +
-> +			pinctrl-0	= <&pinctrl_tsin0_serial>;
-> +			pinctrl-1	= <&pinctrl_tsin0_parallel>;
-> +			pinctrl-2	= <&pinctrl_tsin3_serial>;
-> +			pinctrl-3	= <&pinctrl_tsin4_serial_alt3>;
-> +			pinctrl-4	= <&pinctrl_tsin5_serial_alt1>;
-> +
-> +			clocks = <&clk_s_c0_flexgen CLK_PROC_STFE>;
-> +			clock-names = "c8sectpfe";
-> +
-> +			/* tsin0 is TSA on NIMA */
-> +			tsin0: port at 0 {
-> +
-> +				tsin-num = <0>;
-> +				serial-not-parallel;
-> +				i2c-bus = <&ssc2>;
+On 17 August 2015 at 16:42, Alim Akhtar <alim.akhtar@gmail.com> wrote:
+> HI
+>
+> On Mon, Aug 17, 2015 at 4:56 PM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
+>> On 08/17/2015 02:52 PM, Michal Suchanek wrote:
+>>> Hello,
+>>>
+>>> On 17 August 2015 at 03:55, Jaehoon Chung <jh80.chung@samsung.com> wrote:
+>>>> Hi, Michal.
+>>>>
+>>>> On 08/12/2015 09:23 PM, Michal Suchanek wrote:
+>>>>> The driver has open-coded test for SDIO cards. Use the mmc core provided
+>>>>> MMC_QUIRK_BROKEN_CLK_GATING flag instead.
+>>>>
+>>>> Did you use the clock-gating for SDIO cards?
+>>>> Doesn't MMC_CAP_SDIO_IRQ bit set? Which case is broken?
+>>>> Could you explain to me more?
+>>>
+>>> The core flag for disabling power saving is MMC_QUIRK_BROKEN_CLK_GATING.
+>>
+>> I understood your intention. And i read the comment into mmc/core/quirks.c
+>> I will test SDIO card with this patch. Thanks.
+>>
+> When you test, please check if SDIO IRQ still works, we need to put
+> dw_mmc in low_power mode otherwise SDIO IRQ will be not be generated
+> by dw_mmc host controller.
+>
 
-There's no ssc2 defined at the device tree.
+As far as I understand the logic which is removed in this patch and
+the core logic which replaces it is the same -  low power by means of
+clock gating is *not* enabled for SDIO cards in either case.
 
-I'll revert this patch and mark the driver as broken until this gets
-fixed.
+The original code also checks for SDIO IRQ and disables clock gating
+regardless of card type which is probably redundant. If not it should
+be fixed in mmc core.
 
-Regards,
-Mauro
+My recent kernel builds which I run on a system with mwifiex card
+probably include this patch.
+
+Thanks
+
+Michal
