@@ -1,80 +1,71 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Mon, 17 Aug 2015 10:55:19 +0900
-Subject: [PATCH 2/3] mmc: dw_mmc: simplify the SDMMC_CLKEN_LOW_PWR logic
-In-Reply-To: <3d03bfe2c18789eefa038018467c9c63c94ae4a2.1439381423.git.hramrach@gmail.com>
-References: <cover.1439381423.git.hramrach@gmail.com>
- <3d03bfe2c18789eefa038018467c9c63c94ae4a2.1439381423.git.hramrach@gmail.com>
-Message-ID: <55D13F07.70309@samsung.com>
+From: liguozhu@hisilicon.com (Liguozhu (Kenneth))
+Date: Mon, 17 Aug 2015 01:28:07 +0000
+Subject: =?gb2312?B?tPC4tDogW1BBVENIIDEvNV0gbmV0OiBhZGQgSGlzaWxpY29uIE5ldHdvcmsg?=
+ =?gb2312?Q?Subsystem_support_(config_and_documents)?=
+In-Reply-To: <1536926.jEJjsM70Lj@wuerfel>
+References: <1439548222-231611-1-git-send-email-liguozhu@hisilicon.com>
+ <1439548222-231611-2-git-send-email-liguozhu@hisilicon.com>
+ <1536926.jEJjsM70Lj@wuerfel>
+Message-ID: <161EFA05D917D0419F95C4CAEEF86C1094E95FAA@SZXEMA504-MBS.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Michal.
+Thanks, Arnd. 
 
-On 08/12/2015 09:23 PM, Michal Suchanek wrote:
-> The driver has open-coded test for SDIO cards. Use the mmc core provided
-> MMC_QUIRK_BROKEN_CLK_GATING flag instead.
+Regarding the ae-name: it is the name of the Acceleration Engine. It is provided by the BIOS according to the position and the feature enabled of the IP. So "soc0" means it is on SoC No. 0, while "n4" means it is running on "Non-dsaf mode 4". Ideally, we should setup the rule to name it. But as I said in the patchset, the IP is original designed for a bare metal solution, it is worthless to export all modes and we are planning to add more mode for Linux itself in the IP in future version. So I think the better way is to leave it as a "name" but add more meaning in the future.
 
-Did you use the clock-gating for SDIO cards?
-Doesn't MMC_CAP_SDIO_IRQ bit set? Which case is broken?
-Could you explain to me more?
+Regarding the ae-opts: it is the initial value for the AE's runtime options, Currently, we have only "port number" (there are 6XGE+2GE port for a DSAF AE) as option. But for future version, we will add other options such as "enable Spanning Tree Protocol algorithm)" and so on. 
 
-Best Regards,
-Jaehoon Chung
+Should I add these background to somewhere?
 
+Best Regards
+-Kenneth Lee (Hisilicon)
+__________________________________________________________
+????????????????????????????????????????
+????????????????????????????????????????
+???????????????????????????????????
+This e-mail and its attachments contain confidential information from HUAWEI, which 
+is intended only for the person or entity whose address is listed above. Any use of the 
+information contained herein in any way (including, but not limited to, total or partial 
+disclosure, reproduction, or dissemination) by persons other than the intended 
+recipient(s) is prohibited. If you receive this e-mail in error, please notify the sender by 
+phone or email immediately and delete it!
+
+
+
+
+-----????-----
+???: Arnd Bergmann [mailto:arnd at arndb.de] 
+????: 2015?8?15? 4:50
+???: Liguozhu (Kenneth)
+??: robh+dt at kernel.org; pawel.moll at arm.com; mark.rutland at arm.com; ijc+devicetree at hellion.org.uk; galak at codeaurora.org; catalin.marinas at arm.com; will.deacon at arm.com; Zhuangyuzeng (Yisen); davem at davemloft.net; paul.gortmaker at windriver.com; Dingtianhong; zhangfei.gao at linaro.org; devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; netdev at vger.kernel.org; Linuxarm; Salil Mehta; huangdaode; Liguozhu (Kenneth)
+??: Re: [PATCH 1/5] net: add Hisilicon Network Subsystem support (config and documents)
+
+On Friday 14 August 2015 18:30:18 Kenneth Lee wrote:
+> diff --git a/Documentation/devicetree/bindings/net/hisilicon-hns-nic.txt b/Documentation/devicetree/bindings/net/hisilicon-hns-nic.txt
+> new file mode 100644
+> index 0000000..5ab6969
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/net/hisilicon-hns-nic.txt
+> @@ -0,0 +1,14 @@
+> +Hisilicon Network Subsystem NIC controller
+> +
+> +Required properties:
+> +- compatible: hisilicon,hns-nic
+> +- ae-name: accelerator name who provide this interface
+> +- ae-opts: options (string) to the accelerator. e.g. the index interface
+> +
+> +Example:
+> +
+> +       ethernet at 0{
+> +               compatible = "hisilicon,hns-nic";
+> +               ae-name = "soc0-n4";
+> +               ae-opts = "0";
+> +       };
 > 
-> As a bonus this may enable clock gating on SDIO cards that are known to
-> work with it.
-> 
-> Signed-off-by: Michal Suchanek <hramrach@gmail.com>
-> ---
->  drivers/mmc/host/dw_mmc.c | 33 +++++++++++++++------------------
->  1 file changed, 15 insertions(+), 18 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-> index 40e9d8e..3bc9fd7 100644
-> --- a/drivers/mmc/host/dw_mmc.c
-> +++ b/drivers/mmc/host/dw_mmc.c
-> @@ -1335,27 +1335,24 @@ static void dw_mci_init_card(struct mmc_host *mmc, struct mmc_card *card)
->  	 * description of the CLKENA register we should disable low power mode
->  	 * for SDIO cards if we need SDIO interrupts to work.
->  	 */
-> -	if (mmc->caps & MMC_CAP_SDIO_IRQ) {
-> -		const u32 clken_low_pwr = SDMMC_CLKEN_LOW_PWR << slot->id;
-> -		u32 clk_en_a_old;
-> -		u32 clk_en_a;
-> +	const u32 clken_low_pwr = SDMMC_CLKEN_LOW_PWR << slot->id;
-> +	u32 clk_en_a_old;
-> +	u32 clk_en_a;
->  
-> -		clk_en_a_old = mci_readl(host, CLKENA);
-> +	clk_en_a_old = mci_readl(host, CLKENA);
->  
-> -		if (card->type == MMC_TYPE_SDIO ||
-> -		    card->type == MMC_TYPE_SD_COMBO) {
-> -			set_bit(DW_MMC_CARD_NO_LOW_PWR, &slot->flags);
-> -			clk_en_a = clk_en_a_old & ~clken_low_pwr;
-> -		} else {
-> -			clear_bit(DW_MMC_CARD_NO_LOW_PWR, &slot->flags);
-> -			clk_en_a = clk_en_a_old | clken_low_pwr;
-> -		}
-> +	if (card->quirks & MMC_QUIRK_BROKEN_CLK_GATING) {
-> +		set_bit(DW_MMC_CARD_NO_LOW_PWR, &slot->flags);
-> +		clk_en_a = clk_en_a_old & ~clken_low_pwr;
-> +	} else {
-> +		clear_bit(DW_MMC_CARD_NO_LOW_PWR, &slot->flags);
-> +		clk_en_a = clk_en_a_old | clken_low_pwr;
-> +	}
->  
-> -		if (clk_en_a != clk_en_a_old) {
-> -			mci_writel(host, CLKENA, clk_en_a);
-> -			mci_send_cmd(slot, SDMMC_CMD_UPD_CLK |
-> -				     SDMMC_CMD_PRV_DAT_WAIT, 0);
-> -		}
-> +	if (clk_en_a != clk_en_a_old) {
-> +		mci_writel(host, CLKENA, clk_en_a);
-> +		mci_send_cmd(slot, SDMMC_CMD_UPD_CLK |
-> +				SDMMC_CMD_PRV_DAT_WAIT, 0);
->  	}
->  }
->  
-> 
+
+These properties look very unconventional. What are the valid strings
+for ae-name and ae-opts? It looks like the latter is just a number,
+so why not use an integer property?
+
+	Arnd
