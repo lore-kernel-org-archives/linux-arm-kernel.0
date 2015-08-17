@@ -1,44 +1,46 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Mon, 17 Aug 2015 19:49:54 +0800
-Subject: [PATCH v2] mmc: sdhci: also set driver type for MMC_DDR52
-In-Reply-To: <1439812041-6596-1-git-send-email-jszhang@marvell.com>
-References: <1439812041-6596-1-git-send-email-jszhang@marvell.com>
-Message-ID: <20150817194954.691729d7@xhacker>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Mon, 17 Aug 2015 12:58:07 +0100
+Subject: [PATCH] pwrseq: bind pinctrl pins before using the gpios
+Message-ID: <1439812687-18259-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 17 Aug 2015 19:47:21 +0800
-Jisheng Zhang <jszhang@marvell.com> wrote:
+Some of the pin-controllers like the Qualcomms "qcom,pm8921", which
+require a pinconf to be setup to use pins as gpios. Using the pins
+directly without pinconf setup would result in incorrect output voltage
+or load settings. On the other hand pwrseq code does not configure the
+pinctrl by default as it does not go thru the driver core.
 
-> commit bb8175a8aa42 ("mmc: sdhci: clarify DDR timing mode between
-> SD-UHS and eMMC") added MMC_DDR52 as eMMC's DDR mode to be
-> distinguished from SD-UHS, but it missed setting driver type for
-> MMC_DDR52 timing mode. This patches adds the missing driver type
-> setting.
+This patch adds a call to pinctrl_bind_pins() to bind pins which
+are going to be used as gpios.
 
-This patch fixes unstable emmc read/write on marvell BG2Q DMP board.
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+---
+ drivers/mmc/core/pwrseq.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-> 
-> Fixes: bb8175a8aa42 ("mmc: sdhci: clarify DDR timing mode ...")
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> ---
->  drivers/mmc/host/sdhci.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-> index 1dbe932..32f2a07 100644
-> --- a/drivers/mmc/host/sdhci.c
-> +++ b/drivers/mmc/host/sdhci.c
-> @@ -1559,7 +1559,8 @@ static void sdhci_do_set_ios(struct sdhci_host *host, struct mmc_ios *ios)
->  				 (ios->timing == MMC_TIMING_UHS_SDR25) ||
->  				 (ios->timing == MMC_TIMING_UHS_SDR50) ||
->  				 (ios->timing == MMC_TIMING_UHS_SDR104) ||
-> -				 (ios->timing == MMC_TIMING_UHS_DDR50))) {
-> +				 (ios->timing == MMC_TIMING_UHS_DDR50) ||
-> +				 (ios->timing == MMC_TIMING_MMC_DDR52))) {
-
-I'm not sure whether MMC_HS400 need such fix or not.
-
->  			u16 preset;
->  
->  			sdhci_enable_preset_value(host, true);
+diff --git a/drivers/mmc/core/pwrseq.c b/drivers/mmc/core/pwrseq.c
+index 4c1d175..6e5d8b3 100644
+--- a/drivers/mmc/core/pwrseq.c
++++ b/drivers/mmc/core/pwrseq.c
+@@ -12,6 +12,7 @@
+ #include <linux/err.h>
+ #include <linux/of.h>
+ #include <linux/of_platform.h>
++#include <linux/pinctrl/devinfo.h>
+ 
+ #include <linux/mmc/host.h>
+ 
+@@ -65,6 +66,10 @@ int mmc_pwrseq_alloc(struct mmc_host *host)
+ 		goto err;
+ 	}
+ 
++	ret = pinctrl_bind_pins(&pdev->dev);
++	if (ret)
++		goto err;
++
+ 	match = mmc_pwrseq_find(np);
+ 	if (IS_ERR(match)) {
+ 		ret = PTR_ERR(match);
+-- 
+1.9.1
