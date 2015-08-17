@@ -1,59 +1,96 @@
-From: koro.chen@mediatek.com (Koro Chen)
-Date: Mon, 17 Aug 2015 19:16:51 +0800
-Subject: [PATCH] ASoC: mediatek: Remove AIF widgets for backend DAIs
-Message-ID: <1439810211-45518-1-git-send-email-koro.chen@mediatek.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 17 Aug 2015 12:22:56 +0100
+Subject: [PATCH V3 2/3] arm64: support initrd outside kernel linear map
+In-Reply-To: <1439758168-29427-3-git-send-email-msalter@redhat.com>
+References: <1439758168-29427-1-git-send-email-msalter@redhat.com>
+ <1439758168-29427-3-git-send-email-msalter@redhat.com>
+Message-ID: <20150817112256.GH1688@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DAPM core already creates widgets for DAIs. It is not necessary
-to declare them by SND_SOC_DAPM_AIF_IN/SND_SOC_DAPM_AIF_OUT.
-Furthermore, original codes use backend DAI's stream name to be the AIF
-widget name. It causes the same widget to be created twice, and after
-commit 92fa12426741 ("ASoC: dapm: Add new widgets to the end of the
-widget list") the first created widget (by snd_soc_dapm_new_controls)
-is used, not the 2nd created one (by snd_soc_dapm_new_dai_widgets),
-so audio path is broken.
+Hi Mark,
 
-Signed-off-by: Koro Chen <koro.chen@mediatek.com>
----
- sound/soc/mediatek/mtk-afe-pcm.c |   11 -----------
- 1 file changed, 11 deletions(-)
+On Sun, Aug 16, 2015 at 09:49:27PM +0100, Mark Salter wrote:
+> The use of mem= could leave part or all of the initrd outside of
+> the kernel linear map. This will lead to an error when unpacking
+> the initrd and a probable failure to boot. This patch catches that
+> situation and relocates the initrd to be fully within the linear
+> map.
+> 
+> Signed-off-by: Mark Salter <msalter@redhat.com>
+> ---
+>  arch/arm64/kernel/setup.c | 59 +++++++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 59 insertions(+)
+> 
+> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+> index f3067d4..5f45fd9 100644
+> --- a/arch/arm64/kernel/setup.c
+> +++ b/arch/arm64/kernel/setup.c
+> @@ -359,6 +359,64 @@ static void __init request_standard_resources(void)
+>  	}
+>  }
+>  
+> +#ifdef CONFIG_BLK_DEV_INITRD
+> +/*
+> + * Relocate initrd if it is not completely within the linear mapping.
+> + * This would be the case if mem= cuts out all or part of it.
+> + */
+> +static void __init relocate_initrd(void)
+> +{
+> +	phys_addr_t orig_start = __virt_to_phys(initrd_start);
+> +	phys_addr_t orig_end = __virt_to_phys(initrd_end);
 
-diff --git a/sound/soc/mediatek/mtk-afe-pcm.c b/sound/soc/mediatek/mtk-afe-pcm.c
-index 55471ee..d190fe0 100644
---- a/sound/soc/mediatek/mtk-afe-pcm.c
-+++ b/sound/soc/mediatek/mtk-afe-pcm.c
-@@ -897,10 +897,6 @@ static const struct snd_kcontrol_new mtk_afe_o10_mix[] = {
- };
- 
- static const struct snd_soc_dapm_widget mtk_afe_pcm_widgets[] = {
--	/* Backend DAIs  */
--	SND_SOC_DAPM_AIF_IN("I2S Capture", NULL, 0, SND_SOC_NOPM, 0, 0),
--	SND_SOC_DAPM_AIF_OUT("I2S Playback", NULL, 0, SND_SOC_NOPM, 0, 0),
--
- 	/* inter-connections */
- 	SND_SOC_DAPM_MIXER("I05", SND_SOC_NOPM, 0, 0, NULL, 0),
- 	SND_SOC_DAPM_MIXER("I06", SND_SOC_NOPM, 0, 0, NULL, 0),
-@@ -932,11 +928,6 @@ static const struct snd_soc_dapm_route mtk_afe_pcm_routes[] = {
- 	{ "O10", "I18 Switch", "I18" },
- };
- 
--static const struct snd_soc_dapm_widget mtk_afe_hdmi_widgets[] = {
--	/* Backend DAIs  */
--	SND_SOC_DAPM_AIF_OUT("HDMIO Playback", NULL, 0, SND_SOC_NOPM, 0, 0),
--};
--
- static const struct snd_soc_dapm_route mtk_afe_hdmi_routes[] = {
- 	{"HDMIO Playback", NULL, "HDMI"},
- };
-@@ -951,8 +942,6 @@ static const struct snd_soc_component_driver mtk_afe_pcm_dai_component = {
- 
- static const struct snd_soc_component_driver mtk_afe_hdmi_dai_component = {
- 	.name = "mtk-afe-hdmi-dai",
--	.dapm_widgets = mtk_afe_hdmi_widgets,
--	.num_dapm_widgets = ARRAY_SIZE(mtk_afe_hdmi_widgets),
- 	.dapm_routes = mtk_afe_hdmi_routes,
- 	.num_dapm_routes = ARRAY_SIZE(mtk_afe_hdmi_routes),
- };
--- 
-1.7.9.5
+Any particular reason to use the __* variants here?
+
+> +	phys_addr_t ram_end = memblock_end_of_DRAM();
+> +	phys_addr_t new_start;
+> +	unsigned long size, to_free = 0;
+> +	void *dest;
+> +
+> +	if (orig_end <= ram_end)
+> +		return;
+> +
+> +	/* Note if any of original initrd will freeing below */
+
+The comment doesn't make sense.
+
+> +	if (orig_start < ram_end)
+> +		to_free = ram_end - orig_start;
+> +
+> +	size = orig_end - orig_start;
+> +
+> +	/* initrd needs to be relocated completely inside linear mapping */
+> +	new_start = memblock_find_in_range(0, PFN_PHYS(max_pfn),
+> +					   size, PAGE_SIZE);
+> +	if (!new_start)
+> +		panic("Cannot relocate initrd of size %ld\n", size);
+> +	memblock_reserve(new_start, size);
+> +
+> +	initrd_start = __phys_to_virt(new_start);
+> +	initrd_end   = initrd_start + size;
+> +
+> +	pr_info("Moving initrd from [%llx-%llx] to [%llx-%llx]\n",
+> +		orig_start, orig_start + size - 1,
+> +		new_start, new_start + size - 1);
+> +
+> +	dest = (void *)initrd_start;
+> +
+> +	if (to_free) {
+> +		memcpy(dest, (void *)__phys_to_virt(orig_start), to_free);
+> +		dest += to_free;
+> +	}
+> +
+> +	copy_from_early_mem(dest, orig_start + to_free, size - to_free);
+> +
+> +	if (to_free) {
+> +		pr_info("Freeing original RAMDISK from [%llx-%llx]\n",
+> +			orig_start, orig_start + to_free - 1);
+> +		memblock_free(orig_start, to_free);
+> +	}
+> +}
+> +#else
+> +static inline void __init reserve_initrd(void)
+
+relocate_initrd ?
+
+Will
