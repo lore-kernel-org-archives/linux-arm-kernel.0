@@ -1,117 +1,111 @@
-From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Mon, 17 Aug 2015 21:25:53 +0800
-Subject: [PATCH v4] pinctrl: mediatek: Implement wake handler and
- suspend resume
-In-Reply-To: <CAGS+omCQN65pCP7mYFCj8sDOihLNc15GgELw1u7fTXuq=KBXnw@mail.gmail.com>
-References: <1439541486-22203-1-git-send-email-maoguang.meng@mediatek.com>
- <1439797974.22004.2.camel@mtksdaap41>
- <CAGS+omCQN65pCP7mYFCj8sDOihLNc15GgELw1u7fTXuq=KBXnw@mail.gmail.com>
-Message-ID: <1439817953.3414.4.camel@mtksdaap41>
+From: msalter@redhat.com (Mark Salter)
+Date: Mon, 17 Aug 2015 09:32:27 -0400
+Subject: [PATCH V3 2/3] arm64: support initrd outside kernel linear map
+In-Reply-To: <20150817112256.GH1688@arm.com>
+References: <1439758168-29427-1-git-send-email-msalter@redhat.com>
+ <1439758168-29427-3-git-send-email-msalter@redhat.com>
+ <20150817112256.GH1688@arm.com>
+Message-ID: <1439818347.3153.95.camel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-08-17 at 17:09 +0800, Daniel Kurtz wrote:
-> On Mon, Aug 17, 2015 at 3:52 PM, Yingjoe Chen <yingjoe.chen@mediatek.com> wrote:
-> > On Fri, 2015-08-14 at 16:38 +0800, maoguang.meng at mediatek.com wrote:
-> >> From: Maoguang Meng <maoguang.meng@mediatek.com>
-> >>
-> >> This patch implement irq_set_wake to get who is wakeup source and
-> >> setup on suspend resume.
-> >>
-> >> Signed-off-by: Maoguang Meng <maoguang.meng@mediatek.com>
-> >>
-> >> ---
-> >> changes since v3:
-> >> -add a comment in mtk_eint_chip_read_mask.
-> >> -delete ALIGN when allocate eint_offsets.ports.
-> >> -fix unrelated change.
-> >>
-> >> changes since v2:
-> >> -modify irq_wake to handle irq wakeup source.
-> >> -allocate two buffers separately.
-> >> -fix some codestyle.
-> >>
-> >> Changes since v1:
-> >> -implement irq_wake handler.
-> >> ---
-> >>
-> >>  drivers/pinctrl/mediatek/pinctrl-mt8173.c     |  1 +
-> >>  drivers/pinctrl/mediatek/pinctrl-mtk-common.c | 91 ++++++++++++++++++++++++++-
-> >>  drivers/pinctrl/mediatek/pinctrl-mtk-common.h |  4 ++
-> >>  3 files changed, 95 insertions(+), 1 deletion(-)
-> >>
-> >> diff --git a/drivers/pinctrl/mediatek/pinctrl-mt8173.c b/drivers/pinctrl/mediatek/pinctrl-mt8173.c
-> >> index d0c811d..ad27184 100644
-> >> --- a/drivers/pinctrl/mediatek/pinctrl-mt8173.c
-> >> +++ b/drivers/pinctrl/mediatek/pinctrl-mt8173.c
-> >> @@ -385,6 +385,7 @@ static struct platform_driver mtk_pinctrl_driver = {
-> >>       .driver = {
-> >>               .name = "mediatek-mt8173-pinctrl",
-> >>               .of_match_table = mt8173_pctrl_match,
-> >> +             .pm = &mtk_eint_pm_ops,
-> >>       },
-> >>  };
-> >>
-> >> diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-> >> index ad1ea16..fe34ce9 100644
-> >> --- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-> >> +++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-> >> @@ -33,6 +33,7 @@
-> >>  #include <linux/mfd/syscon.h>
-> >>  #include <linux/delay.h>
-> >>  #include <linux/interrupt.h>
-> >> +#include <linux/pm.h>
-> >>  #include <dt-bindings/pinctrl/mt65xx.h>
-> >>
-> >>  #include "../core.h"
-> >> @@ -1062,6 +1063,77 @@ static int mtk_eint_set_type(struct irq_data *d,
-> >>       return 0;
-> >>  }
-> >>
-> >> +static int mtk_eint_irq_set_wake(struct irq_data *d, unsigned int on)
-> >> +{
-> >> +     struct mtk_pinctrl *pctl = irq_data_get_irq_chip_data(d);
-> >> +     int shift = d->hwirq & 0x1f;
-> >> +     int reg = d->hwirq >> 5;
-> >> +
-> >> +     if (on)
-> >> +             pctl->wake_mask[reg] |= BIT(shift);
-> >> +     else
-> >> +             pctl->wake_mask[reg] &= ~BIT(shift);
-> >> +
-> >> +     return 0;
-> >> +}
-> >
-> > Hi Maoguang,
-> >
-> > You changed from set_bit/clear_bit to this, but didn't add any locking.
-> > Since this is basic read/modify/write, is it OK to do it without
-> > locking?
+On Mon, 2015-08-17 at 12:22 +0100, Will Deacon wrote:
+> Hi Mark,
 > 
-> I believe calling .irq_set_wake() concurrently with itself is
-> protected by irq_get_desc_buslock():
+> On Sun, Aug 16, 2015 at 09:49:27PM +0100, Mark Salter wrote:
+> > The use of mem= could leave part or all of the initrd outside of
+> > the kernel linear map. This will lead to an error when unpacking
+> > the initrd and a probable failure to boot. This patch catches that
+> > situation and relocates the initrd to be fully within the linear
+> > map.
+> > 
+> > Signed-off-by: Mark Salter <msalter@redhat.com>
+> > ---
+> >  arch/arm64/kernel/setup.c | 59 
+> > +++++++++++++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 59 insertions(+)
+> > 
+> > diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+> > index f3067d4..5f45fd9 100644
+> > --- a/arch/arm64/kernel/setup.c
+> > +++ b/arch/arm64/kernel/setup.c
+> > @@ -359,6 +359,64 @@ static void __init 
+> > request_standard_resources(void)
+> >  	}
+> >  }
+> >  
+> > +#ifdef CONFIG_BLK_DEV_INITRD
+> > +/*
+> > + * Relocate initrd if it is not completely within the linear mapping.
+> > + * This would be the case if mem= cuts out all or part of it.
+> > + */
+> > +static void __init relocate_initrd(void)
+> > +{
+> > +	phys_addr_t orig_start = __virt_to_phys(initrd_start);
+> > +	phys_addr_t orig_end = __virt_to_phys(initrd_end);
 > 
->  int irq_set_irq_wake(unsigned int irq, unsigned int on)
->  {
->          unsigned long flags;
->          struct irq_desc *desc = irq_get_desc_buslock(irq, &flags,
-> IRQ_GET_DESC_CHECK_GLOBAL);
->          int ret = 0;
-> ...
->                          ret = set_irq_wake_real(irq, on);
-> ...
->          irq_put_desc_busunlock(desc, flags);
->          return ret;
->  }
+> Any particular reason to use the __* variants here?
 
-Hi Dan,
+To avoid need to cast initrd_{start,end} to pointer.
 
-You are right, irq_get_desc_buslock will acquire desc lock even when
-irq_chip didn't provide irq_bus_lock callback. So this should be OK.
-Sorry for the noise.
+> 
+> > +	phys_addr_t ram_end = memblock_end_of_DRAM();
+> > +	phys_addr_t new_start;
+> > +	unsigned long size, to_free = 0;
+> > +	void *dest;
+> > +
+> > +	if (orig_end <= ram_end)
+> > +		return;
+> > +
+> > +	/* Note if any of original initrd will freeing below */
+> 
+> The comment doesn't make sense.
 
-For this patch:
+No it doesn't.
 
-Acked-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
+> 
+> > +	if (orig_start < ram_end)
+> > +		to_free = ram_end - orig_start;
+> > +
+> > +	size = orig_end - orig_start;
+> > +
+> > +	/* initrd needs to be relocated completely inside linear 
+> > mapping */
+> > +	new_start = memblock_find_in_range(0, PFN_PHYS(max_pfn),
+> > +					   size, PAGE_SIZE);
+> > +	if (!new_start)
+> > +		panic("Cannot relocate initrd of size %ld\n", size);
+> > +	memblock_reserve(new_start, size);
+> > +
+> > +	initrd_start = __phys_to_virt(new_start);
+> > +	initrd_end   = initrd_start + size;
+> > +
+> > +	pr_info("Moving initrd from [%llx-%llx] to [%llx-%llx]\n",
+> > +		orig_start, orig_start + size - 1,
+> > +		new_start, new_start + size - 1);
+> > +
+> > +	dest = (void *)initrd_start;
+> > +
+> > +	if (to_free) {
+> > +		memcpy(dest, (void *)__phys_to_virt(orig_start), 
+> > to_free);
+> > +		dest += to_free;
+> > +	}
+> > +
+> > +	copy_from_early_mem(dest, orig_start + to_free, size - 
+> > to_free);
+> > +
+> > +	if (to_free) {
+> > +		pr_info("Freeing original RAMDISK from [%llx-%llx]\n",
+> > +			orig_start, orig_start + to_free - 1);
+> > +		memblock_free(orig_start, to_free);
+> > +	}
+> > +}
+> > +#else
+> > +static inline void __init reserve_initrd(void)
+> 
+> relocate_initrd ?
 
-Joe.C
+Yes
+
+Thanks, will fix that and the comment.
