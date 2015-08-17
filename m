@@ -1,107 +1,45 @@
-From: seven@nimrod-online.com (Roy Spliet)
-Date: Mon, 17 Aug 2015 09:30:38 +0100
-Subject: ARM: sunxi: Experiences NAND flash
-In-Reply-To: <20150817093411.4ff853c4@bbrezillon>
-References: <55C9E7B4.9090906@schinagl.nl> <20150817093411.4ff853c4@bbrezillon>
-Message-ID: <55D19BAE.5000204@nimrod-online.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 17 Aug 2015 10:45:20 +0200
+Subject: Build regressions/improvements in v4.2-rc7
+In-Reply-To: <1439801034-23948-1-git-send-email-geert@linux-m68k.org>
+References: <1439801034-23948-1-git-send-email-geert@linux-m68k.org>
+Message-ID: <CAMuHMdW=neYoFrTS5Nr8yvC0Zu1dJciZopWXS4=pcLyhWOctuA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Mon, Aug 17, 2015 at 10:43 AM, Geert Uytterhoeven
+<geert@linux-m68k.org> wrote:
+> JFYI, when comparing v4.2-rc7[1] to v4.2-rc6[3], the summaries are:
+>   - build errors: +6/-14
 
-Reply in-line
+  + /home/kisskb/slave/src/arch/arm/kernel/devtree.c: error: implicit
+declaration of function 'early_init_dt_scan_nodes'
+[-Werror=implicit-function-declaration]:  => 244:2
+  + /home/kisskb/slave/src/arch/arm/kernel/devtree.c: error: implicit
+declaration of function 'early_init_dt_verify'
+[-Werror=implicit-function-declaration]:  => 215:2
+  + /home/kisskb/slave/src/arch/arm/kernel/devtree.c: error: implicit
+declaration of function 'of_flat_dt_match_machine'
+[-Werror=implicit-function-declaration]:  => 218:2
+  + /home/kisskb/slave/src/arch/arm/kernel/devtree.c: error: implicit
+declaration of function 'of_get_flat_dt_prop'
+[-Werror=implicit-function-declaration]:  => 229:3
+  + /home/kisskb/slave/src/arch/arm/kernel/devtree.c: error: implicit
+declaration of function 'of_get_flat_dt_root'
+[-Werror=implicit-function-declaration]:  => 228:3
 
-Op 17-08-15 om 08:34 schreef Boris Brezillon:
-> Hi Oliver,
->
-> Sorry for the late reply (I was in vacation for the last 2 weeks)
->
-> On Tue, 11 Aug 2015 14:16:52 +0200
-> Olliver Schinagl <oliver+list@schinagl.nl> wrote:
->
->> Hello everybody,
->>
->> We are working with Boris and Roy's patch series on getting the NAND
->> flash chip working on Olimex OLinuXino Lime2 boards. Initially,
->> everything looks fine, but we noticed that occasionally (after
->> power/cycle or power cut) ubi fails to mount the partition. It is not
->> something easily enough to reproduce, but it has failed on 5 boards out
->> of 30 we have.
-> I remember warning you about that problem before: MLC NANDs are not as
-> reliable as SLC ones (please read my presentation about MLC support in
-> Linux [1]). I also remember recommending using an SLC chip if you were
-> tight on time to avoid dealing with all these MLC related problems, but
-> you decided to go for the MLC solution.
->
-> Back to your problem now, what you're seeing here is probably caused by
-> interrupted PROGRAM operations on paired pages (page 17, 18 and 26 to 32
-> of my presentation for more information).
-In his defence; we looked at it, and from what we could tell it is not 
-possible to find an affordable SLC chip that the Allwinner A10/A20 
-BootROM would even boot from. In general, chips below 8K page size 
-require 64-bit EEC strength to operate, which in turn required more OOB 
-area than any chip would provide. This limitation is in my opinion a 
-design fault from AllWinners side and I hope that their future SoCs can 
-boot with more relaxed EEC settings to facilitate for cheap SLC chips, 
-but right now there is nothing we can do to change that situation.
->> U-boot reports the following:
->> UBI: default fastmap pool size: 100
->> UBI: default fastmap WL pool size: 25
->> UBI: attaching mtd1 to ubi0
->> UBI: scanning is finished
->> UBI init error 22
->> Error reading superblock on volume 'ubi:boot' errno=-19!
->> ubifsmount - mount UBIFS volume
->>
->> whereas the linux kernel booted from sd card gives:
->> ubiattach /dev/ubi_ctrl -m 0
->> [  100.560704] ubi0: default fastmap pool size: 8
->> [  100.565186] ubi0: default fastmap WL pool size: 4
->> [  100.570100] ubi0: attaching mtd0
->> [  100.590469] ubi0: scanning is finished
->> [  100.594732] ubi0 error: ubi_read_volume_table: the layout volume was
->> not found
->> [  100.602675] ubi0 error: ubi_attach_mtd_dev: failed to attach mtd0,
->> error -22
->> ubiattach: error!: cannot attach mtd0
->>              error 22 (Invalid argument)
->>
->> The u-boot version we are using is a few months out of date
->> U-Boot 2015.07-rc2-g2540c39 (Aug 04 2015 - 16:09:02 +0200) Allwinner
->> Technology
->> arm-none-eabi-gcc (4.8.4-1+11-1) 4.8.4 20141219 (release)
->> GNU ld (2.25-5+5+b1) 2.25
->>
->> but the kernel is fairly up to date:
->> 4.2.0-rc4-opinicus-g8ec3671
->>
->>
->> Now I know that the mtd stuff is all very new and all very untested,
->> what I am curious about is a) have other people actually tried the mtd
->> stuff on Allwinner hardware, and b) has anybody encountered this issue
->> as well?
-> Yes we did. So far we're using the NAND in SLC mode to address this
-> problem. It seems to work, but you also loose half the NAND capacity.
-So as requested by someone else: how exactly does that work? Can we just 
-give your NAND driver a mapping between shared pages and instruct it to 
-ignore half, or does the driver require some serious patchery?
-Cheers,
+arm-randconfig
 
-Roy
->
->> It's not something very easily reproducible (toggling a machine on/off
->> repeatedly did not trigger it yet) but it does happen.
-> I managed to reproduce it by faking a power cut directly in the NAND
-> core code (by sending a RESET command to the NAND chip in the middle of
-> a program operation), and I can confirm SLC mode address the problem.
->
-> Anyway, remember that MLC NANDs have other sources of unreliability
-> (e.g the unstable bits problem).
->
-> Best Regards,
->
-> Boris
->
->
-> [1]http://events.linuxfoundation.org/sites/events/files/slides/brezillon-mlc-nand_0.pdf
->
+> [1] http://kisskb.ellerman.id.au/kisskb/head/9260/ (all 254 configs)
+> [3] http://kisskb.ellerman.id.au/kisskb/head/9234/ (253 out of 254 configs)
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
