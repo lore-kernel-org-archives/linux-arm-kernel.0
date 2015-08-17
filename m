@@ -1,63 +1,98 @@
-From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Mon, 17 Aug 2015 11:28:47 +0800
-Subject: [PATCH v3 1/6] genirq: fix irq_chip_retrigger_hierarchy
-In-Reply-To: <1439554830-19502-2-git-send-email-grygorii.strashko@ti.com>
-References: <1439554830-19502-1-git-send-email-grygorii.strashko@ti.com>
- <1439554830-19502-2-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <55D154EF.1070500@linux.intel.com>
+From: yao.yuan@freescale.com (Yao Yuan)
+Date: Mon, 17 Aug 2015 03:59:41 +0000
+Subject: [PATCH v2] dmaengine: fsl-edma: add PM suspend/resume support
+In-Reply-To: <CADRPPNS_wzX+mwT0L-H=ZP9w8gH9W4O9KUqnGYiAc39S5v4qLA@mail.gmail.com>
+References: <1437469005-3162-1-git-send-email-yao.yuan@freescale.com>
+ <CADRPPNQJi_x+mdQV=DEVuhCL_p6VOWcPiV3jzioeRdWgSW2w3g@mail.gmail.com>
+ <CY1PR0301MB15628DD5CFCE2B65BF4FECB2837C0@CY1PR0301MB1562.namprd03.prod.outlook.com>
+ <CADRPPNS_wzX+mwT0L-H=ZP9w8gH9W4O9KUqnGYiAc39S5v4qLA@mail.gmail.com>
+Message-ID: <CY1PR0301MB1562103588FB0C6BEFDDBF3C83790@CY1PR0301MB1562.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/8/14 20:20, Grygorii Strashko wrote:
-> Now irq_chip_retrigger_hierarchy() returns -ENOSYS if it
-> was not able to find at least one .irq_retrigger() callback
-> implemented in IRQ domain hierarchy. As result, IRQ
-> re-triggering is not working now on ARM (TI OMAP) where
-> ARM GIC is not implemented this callback.
-> The .irq_retrigger() is optional (see check_irq_resend())
-> and there are no reasons to fail if it was not found, hence
-> lets return 0 in this case.
+On Sat, Aug 15, 2015 at 7:48 AM, pku.leo < pku.leo@gmail.com > wrote:
+> On Fri, Aug 14, 2015 at 1:24 AM, Yao Yuan <yao.yuan@freescale.com> wrote:
+> > Hi Leo,
+> >
+> > Thanks for your review.
+> > About those two methods for DMA suspend that you have mentioned. We
+> have a lot of the discussions in other DMA driver like DMA for Freescale
+> PowerPC.
+> >
+> > Finally, we think the device which used the DMA transmission service should
+> cancel the transmission service in its suspend.
+> > So DMA in suspend should be idle.
 > 
-> In case of TI OMAP DRA7 the following IRQ hierarchy is defined:
-> ARM GIC <- OMAP wakeupgen <- TI CBAR
-> 
-> Failure is reproduced during resume from suspend to RAM:
-> - wakeup by IRQx
-> - suspend_enter
->   + arch_suspend_enable_irqs
->     + handle_fasteoi_irq
->       + irq_may_run
->         + irq_pm_check_wakeup
->           + irq_disable(IRQx)
->   + dpm_resume_noirq()
->     + resume_device_irqs
->       + resume_irqs
->         + resume_irq
->           + __enable_irq <== IRQx is not re-triggered
-> 
-> Cc: Sudeep Holla <sudeep.holla@arm.com>
-> Cc: Jiang Liu <jiang.liu@linux.intel.com>
-> Fixes: 85f08c17de26 ('genirq: Introduce helper functions...')
-> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-> ---
->  kernel/irq/chip.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/kernel/irq/chip.c b/kernel/irq/chip.c
-> index 27f4332..6de638b 100644
-> --- a/kernel/irq/chip.c
-> +++ b/kernel/irq/chip.c
-> @@ -997,7 +997,7 @@ int irq_chip_retrigger_hierarchy(struct irq_data *data)
->  		if (data->chip && data->chip->irq_retrigger)
->  			return data->chip->irq_retrigger(data);
->  
-> -	return -ENOSYS;
-> +	return 0;
->  }
->  
->  /**
+> If that's the case you should clearly state this in the commit message and in
+> code, although I don't know if it is safe to make such assumption.  There could
+> be user of the DMA that doesn't track the completion of transfers.
 
-Hi Grygorii,
-	Thanks for fixing this regression:)
-Reviewed-by: Jiang Liu <jiang.liu@linux.intel.com>
+I think it should be safe. In my opinion, even some client(the user of the DMA) forget to cancel its DMA transmission,
+It will just lead to PM failed but no other system and data risk.
+Although we should first fix the behavior of the client.
+Once you are no need the DMA transmission, why not stop it?
+
+Is it right?
+
+> >
+> > Once the DMA in late_suspend is not be idle, we think some driver haven't
+> canceled the DMA transmission. So maybe something is error when other
+> driver in suspend.
+> >
+> > In the case, we should return failed to stop PM. DMA should not make a
+> choice for other drivers(which used DMA) to force stop DMA transmission.
+> 
+> The suspend entrance should be terminated by wakeup events and only critical
+> issues.  I don't think we should just terminate the suspend entrance just
+> because having on-going I/O without even try to stop it.
+
+The graceful behavior would be to for client to PAUSE or terminate and then suspend
+followed by DMA suspend.
+We need to rely on client doing the right thing here. 
+The DMA should not make a decision instead of client.
+If the DMA is not idle in DMA suspend, it should be the client's issue.
+We don't know what the client really want to do, so just return the non-success value.
+
+I'm not sure my description is clear.  So we may refer the discussion about the DMA PM support before.
+Such as "DMA: Freescale: add suspend resume functions for DMA driver"
+
+Like:https://lkml.org/lkml/2014/5/21/1
+
+> >
+> > Thanks.
+> >
+> > Best Regards,
+> > Yuan Yao
+> >
+> >> -----Original Message-----
+> >> From: pku.leo at gmail.com [mailto:pku.leo at gmail.com] On Behalf Of Li
+> >> Yang
+> >> Sent: Friday, August 14, 2015 4:58 AM
+> >> To: Yuan Yao-B46683
+> >> Cc: Vinod Koul; stefan at agner.ch; Arnd Bergmann; Dan Williams;
+> >> dmaengine at vger.kernel.org; lkml;
+> >> linux-arm-kernel at lists.infradead.org; linux- pm at vger.kernel.org
+> >> Subject: Re: [PATCH v2] dmaengine: fsl-edma: add PM suspend/resume
+> >> support
+> >>
+> >> On Tue, Jul 21, 2015 at 3:56 AM, Yuan Yao <yao.yuan@freescale.com> wrote:
+> >> > This add power management suspend/resume support for the fsl-edma
+> >> > driver.
+> >> >
+> >> > eDMA acted as a basic function used by others. What it needs to do
+> >> > is the two steps below to support power management.
+> >> >
+> >> > In fsl_edma_suspend_late:
+> >> > Check whether the DMA chan is idle and if it is not idle, stop PM
+> >> > operation.
+> >>
+> >> You should try to quiesce the device on suspend instead of depending
+> >> on itself to be happen in idle and failing if it is not.
+> >>
+> >> Regards,
+> >> Leo
+> 
+> 
+> 
+> --
+> - Leo
