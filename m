@@ -1,88 +1,78 @@
-From: mathias.nyman@linux.intel.com (Mathias Nyman)
-Date: Mon, 17 Aug 2015 18:07:35 +0300
-Subject: [PATCH v5 4/5] xhci: mediatek: support MTK xHCI host controller
-In-Reply-To: <1438950644-27290-5-git-send-email-chunfeng.yun@mediatek.com>
-References: <1438950644-27290-1-git-send-email-chunfeng.yun@mediatek.com>
- <1438950644-27290-5-git-send-email-chunfeng.yun@mediatek.com>
-Message-ID: <55D1F8B7.9060306@linux.intel.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Mon, 17 Aug 2015 16:15:47 +0100
+Subject: [PATCH 2/4] drm: Add support for ARM's HDLCD controller.
+In-Reply-To: <CACvgo537C6SRfhMTNoE4cSLJukcXuKLvt1TRykynX--ybEhmaQ@mail.gmail.com>
+References: <1438784892-27888-1-git-send-email-Liviu.Dudau@arm.com>
+ <1438784892-27888-3-git-send-email-Liviu.Dudau@arm.com>
+ <CACvgo537C6SRfhMTNoE4cSLJukcXuKLvt1TRykynX--ybEhmaQ@mail.gmail.com>
+Message-ID: <20150817151547.GA1020@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+On Sun, Aug 16, 2015 at 09:56:33AM +0100, Emil Velikov wrote:
+> Hi Liviu,
 
-On 07.08.2015 15:30, Chunfeng Yun wrote:
-> MTK xhci host controller defines some extra SW scheduling
-> parameters for HW to minimize the scheduling effort for
-> synchronous and interrupt endpoints. The parameters are
-> put into reseved DWs of slot context and endpoint context
->
->
+Hi Emil,
 
-...
+> 
+> On 5 August 2015 at 15:28, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+> > The HDLCD controller is a display controller that supports resolutions
+> > up to 4096x4096 pixels. It is present on various development boards
+> > produced by ARM Ltd and emulated by the latest Fast Models from the
+> > company.
+> >
+> I believe there is a unofficial requirement(?) for new drm drivers to
+> use atomic modesetting. Not 100% sure on this one though. The
+> following drivers: tegra, msm, rcar-du, i915, and Daniel's blog [1]
+> [2] cat provide some information on the topic.
 
-> + * The TD size is the number of max packet sized packets remaining in the TD
-> + * (including this TRB), right shifted by 10.
-> + * It must fit in bits 21:17, so it can't be bigger than 31.
-> + */
-> +u32 xhci_mtk_td_remainder_quirk(unsigned int td_running_total,
-> +	unsigned trb_buffer_length, struct urb *urb)
-> +{
-> +	u32 max = 31;
-> +	int remainder, td_packet_count, packet_transferred;
-> +	unsigned int td_transfer_size = urb->transfer_buffer_length;
-> +	unsigned int maxp;
-> +
-> +	maxp = GET_MAX_PACKET(usb_endpoint_maxp(&urb->ep->desc));
-> +
-> +	/* 0 for the last TRB */
-> +	if (td_running_total + trb_buffer_length == td_transfer_size)
-> +		return 0;
-> +
-> +	packet_transferred = td_running_total / maxp;
-> +	td_packet_count = DIV_ROUND_UP(td_transfer_size, maxp);
-> +	remainder = td_packet_count - packet_transferred;
-> +
-> +	if (remainder > max)
-> +		return max << 17;
-> +	else
-> +		return remainder << 17;
-> +}
+I am also interested to know if this is a requirement or not.
+Thanks for the pointers, I will review them again to see if I did miss
+anything. I remember reading them at the beginning of the year but probably
+the Christmas haze did not clear enough when I did.
 
-I started looking at this xhci_mtk_td_remainder() function, one
-of the places this patch touches the existing xhci code.
+> 
+> The driver seems to has has a bit of dead code guarded by
+> HDLCD_*_UNDERRUN. Perhaps these macros should become build or runtime
+> switch(es) ?
 
-The remainder functions in xhci are already bit too messy, and
-adding one more function which does almost the same thing makes
-it even messier.
+There is a comment in hdlcd_drv.h explaining what HDLCD_SHOW_UNDERRUN can
+be used for. As for HDLCD_COUNT_BUFFERUNDERRUNS, you are right, it's dead
+code from the earlier debugging code that got removed before submission.
+I will correct that.
 
-For example queuing a bulk transfer will end up like this:
+> 
+> Most DRM drivers do not threat dma, bus_error, vsync and/or underrun
+> interrupts as debug functionality. They are of limited use in this
+> driver, presently, yet the CONFIG_DEBUG_FS guard seems a bit strange
+> imho.
 
->   		/* Set the TRB length, TD size, and interrupter fields. */
->   		if (xhci->hci_version < 0x100) {
-> -			remainder = xhci_td_remainder(
-> +			if (xhci->quirks & XHCI_MTK_HOST) {
-> +				remainder = xhci_mtk_td_remainder_quirk(
-> +					running_total, trb_buff_len, urb);
-> +			} else {
-> +				remainder = xhci_td_remainder(
->   					urb->transfer_buffer_length -
->   					running_total);
-> +			}
->   		} else {
->   			remainder = xhci_v1_0_td_remainder(running_total,
->   					trb_buff_len, total_packet_count, urb,
+The HDLCD device has only 1 interrupt that can fire and there is no other
+way to show the reason for the interrupt in the driver. It was useful when
+debugging underruns and/or vsync issues so I thought it might be useful
+to keep around. Putting it the other way: if you are going to use this device
+and the image is not completely rendered I would not be able to give you
+support to figure out what went wrong without this debugging information.
+With this in place I can tell the difference between a busy system vs one
+where the interrupt latency is large.
 
-and similar for isoc and control transfers.
+Best regards,
+Liviu
 
-I'll see if I can simplify the existing remainder calculations into one function, then it should
-be enough to just add something like this into it:
+> 
+> Cheers,
+> Emil
+> 
+> [1] http://blog.ffwll.ch/2014/11/atomic-modeset-support-for-kms-drivers.html
+> [2] http://blog.ffwll.ch/2015/01/update-for-atomic-display-updates.html
+> 
 
-if (xhci->quirks & XHCI_MTK_HOST)
-	trb_buff_len = 0;
-  	
-This way we can skip all the extra hassle that comes with a new exported quirk function
-
-Is the Mediatek xhci really a xHCI 0.96 or older controller? (hci_version < 0x100)
-Not a xHCI 1.0 or 1.1 ?
-
--Mathias
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
