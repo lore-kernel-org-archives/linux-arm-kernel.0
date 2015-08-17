@@ -1,21 +1,72 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 17 Aug 2015 17:40:03 +0100
-Subject: [PATCH v4 2/5] irqchip, gicv3: Workaround for Cavium ThunderX
- erratum 23154
-In-Reply-To: <1439576885-15621-3-git-send-email-rric@kernel.org>
-References: <1439576885-15621-1-git-send-email-rric@kernel.org>
- <1439576885-15621-3-git-send-email-rric@kernel.org>
-Message-ID: <20150817164003.GB2906@e104818-lin.cambridge.arm.com>
+From: msalter@redhat.com (Mark Salter)
+Date: Mon, 17 Aug 2015 13:01:05 -0400
+Subject: [PATCH V4 1/3] mm: add utility for early copy from unmapped ram
+In-Reply-To: <1439830867-14935-1-git-send-email-msalter@redhat.com>
+References: <1439830867-14935-1-git-send-email-msalter@redhat.com>
+Message-ID: <1439830867-14935-2-git-send-email-msalter@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 14, 2015 at 08:28:02PM +0200, Robert Richter wrote:
-> +struct static_key is_cavium_thunderx = STATIC_KEY_INIT_FALSE;
+In some early boot circumstances, it may be necessary to copy
+from RAM outside the kernel linear mapping to mapped RAM. The
+need to relocate an initrd is one example in the x86 code. This
+patch creates a helper function based on current x86 code.
 
-This could also be "static struct ...". BTW, the use of static_key
-directly is deprecated, so just do:
+Signed-off-by: Mark Salter <msalter@redhat.com>
+---
+ include/asm-generic/early_ioremap.h |  6 ++++++
+ mm/early_ioremap.c                  | 22 ++++++++++++++++++++++
+ 2 files changed, 28 insertions(+)
 
-static DEFINE_STATIC_KEY_FALSE(is_cavium_thunderx);
-
+diff --git a/include/asm-generic/early_ioremap.h b/include/asm-generic/early_ioremap.h
+index a5de55c..e539f27 100644
+--- a/include/asm-generic/early_ioremap.h
++++ b/include/asm-generic/early_ioremap.h
+@@ -33,6 +33,12 @@ extern void early_ioremap_setup(void);
+  */
+ extern void early_ioremap_reset(void);
+ 
++/*
++ * Early copy from unmapped memory to kernel mapped memory.
++ */
++extern void copy_from_early_mem(void *dest, phys_addr_t src,
++				unsigned long size);
++
+ #else
+ static inline void early_ioremap_init(void) { }
+ static inline void early_ioremap_setup(void) { }
+diff --git a/mm/early_ioremap.c b/mm/early_ioremap.c
+index e10ccd2..a0baeb4 100644
+--- a/mm/early_ioremap.c
++++ b/mm/early_ioremap.c
+@@ -217,6 +217,28 @@ early_memremap(resource_size_t phys_addr, unsigned long size)
+ 	return (__force void *)__early_ioremap(phys_addr, size,
+ 					       FIXMAP_PAGE_NORMAL);
+ }
++
++#define MAX_MAP_CHUNK	(NR_FIX_BTMAPS << PAGE_SHIFT)
++
++void __init copy_from_early_mem(void *dest, phys_addr_t src, unsigned long size)
++{
++	unsigned long slop, clen;
++	char *p;
++
++	while (size) {
++		slop = src & ~PAGE_MASK;
++		clen = size;
++		if (clen > MAX_MAP_CHUNK - slop)
++			clen = MAX_MAP_CHUNK - slop;
++		p = early_memremap(src & PAGE_MASK, clen + slop);
++		memcpy(dest, p + slop, clen);
++		early_memunmap(p, clen + slop);
++		dest += clen;
++		src += clen;
++		size -= clen;
++	}
++}
++
+ #else /* CONFIG_MMU */
+ 
+ void __init __iomem *
 -- 
-Catalin
+2.4.3
