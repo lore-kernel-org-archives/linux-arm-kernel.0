@@ -1,121 +1,376 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Mon, 17 Aug 2015 17:09:32 +0800
-Subject: [PATCH v4] pinctrl: mediatek: Implement wake handler and suspend
- resume
-In-Reply-To: <1439797974.22004.2.camel@mtksdaap41>
-References: <1439541486-22203-1-git-send-email-maoguang.meng@mediatek.com>
- <1439797974.22004.2.camel@mtksdaap41>
-Message-ID: <CAGS+omCQN65pCP7mYFCj8sDOihLNc15GgELw1u7fTXuq=KBXnw@mail.gmail.com>
+From: lftan@altera.com (Ley Foon Tan)
+Date: Mon, 17 Aug 2015 17:09:37 +0800
+Subject: [PATCH v4 3/5] pci: altera: Add Altera PCIe MSI driver
+In-Reply-To: <1439802579-22651-1-git-send-email-lftan@altera.com>
+References: <1439802579-22651-1-git-send-email-lftan@altera.com>
+Message-ID: <1439802579-22651-4-git-send-email-lftan@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 17, 2015 at 3:52 PM, Yingjoe Chen <yingjoe.chen@mediatek.com> wrote:
-> On Fri, 2015-08-14 at 16:38 +0800, maoguang.meng at mediatek.com wrote:
->> From: Maoguang Meng <maoguang.meng@mediatek.com>
->>
->> This patch implement irq_set_wake to get who is wakeup source and
->> setup on suspend resume.
->>
->> Signed-off-by: Maoguang Meng <maoguang.meng@mediatek.com>
->>
->> ---
->> changes since v3:
->> -add a comment in mtk_eint_chip_read_mask.
->> -delete ALIGN when allocate eint_offsets.ports.
->> -fix unrelated change.
->>
->> changes since v2:
->> -modify irq_wake to handle irq wakeup source.
->> -allocate two buffers separately.
->> -fix some codestyle.
->>
->> Changes since v1:
->> -implement irq_wake handler.
->> ---
->>
->>  drivers/pinctrl/mediatek/pinctrl-mt8173.c     |  1 +
->>  drivers/pinctrl/mediatek/pinctrl-mtk-common.c | 91 ++++++++++++++++++++++++++-
->>  drivers/pinctrl/mediatek/pinctrl-mtk-common.h |  4 ++
->>  3 files changed, 95 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/pinctrl/mediatek/pinctrl-mt8173.c b/drivers/pinctrl/mediatek/pinctrl-mt8173.c
->> index d0c811d..ad27184 100644
->> --- a/drivers/pinctrl/mediatek/pinctrl-mt8173.c
->> +++ b/drivers/pinctrl/mediatek/pinctrl-mt8173.c
->> @@ -385,6 +385,7 @@ static struct platform_driver mtk_pinctrl_driver = {
->>       .driver = {
->>               .name = "mediatek-mt8173-pinctrl",
->>               .of_match_table = mt8173_pctrl_match,
->> +             .pm = &mtk_eint_pm_ops,
->>       },
->>  };
->>
->> diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
->> index ad1ea16..fe34ce9 100644
->> --- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
->> +++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
->> @@ -33,6 +33,7 @@
->>  #include <linux/mfd/syscon.h>
->>  #include <linux/delay.h>
->>  #include <linux/interrupt.h>
->> +#include <linux/pm.h>
->>  #include <dt-bindings/pinctrl/mt65xx.h>
->>
->>  #include "../core.h"
->> @@ -1062,6 +1063,77 @@ static int mtk_eint_set_type(struct irq_data *d,
->>       return 0;
->>  }
->>
->> +static int mtk_eint_irq_set_wake(struct irq_data *d, unsigned int on)
->> +{
->> +     struct mtk_pinctrl *pctl = irq_data_get_irq_chip_data(d);
->> +     int shift = d->hwirq & 0x1f;
->> +     int reg = d->hwirq >> 5;
->> +
->> +     if (on)
->> +             pctl->wake_mask[reg] |= BIT(shift);
->> +     else
->> +             pctl->wake_mask[reg] &= ~BIT(shift);
->> +
->> +     return 0;
->> +}
->
-> Hi Maoguang,
->
-> You changed from set_bit/clear_bit to this, but didn't add any locking.
-> Since this is basic read/modify/write, is it OK to do it without
-> locking?
+This patch adds Altera PCIe MSI driver. This soft IP supports configurable
+number of vectors, which is a dts parameter.
 
-I believe calling .irq_set_wake() concurrently with itself is
-protected by irq_get_desc_buslock():
+Signed-off-by: Ley Foon Tan <lftan@altera.com>
+---
+ drivers/pci/host/Kconfig           |   8 +
+ drivers/pci/host/Makefile          |   1 +
+ drivers/pci/host/pcie-altera-msi.c | 322 +++++++++++++++++++++++++++++++++++++
+ 3 files changed, 331 insertions(+)
+ create mode 100644 drivers/pci/host/pcie-altera-msi.c
 
- int irq_set_irq_wake(unsigned int irq, unsigned int on)
- {
-         unsigned long flags;
-         struct irq_desc *desc = irq_get_desc_buslock(irq, &flags,
-IRQ_GET_DESC_CHECK_GLOBAL);
-         int ret = 0;
-...
-                         ret = set_irq_wake_real(irq, on);
-...
-         irq_put_desc_busunlock(desc, flags);
-         return ret;
- }
-
-
-I'm not 100% sure about the .suspend/.resume paths, but I don't think
-they can occur during .irq_set_wake(), either.
-Nor were they protected by the set_bit/clear_bit implementation.
-
--Dan
-
-
->
-> Joe.C
->
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
+index 4b4754a..d28cc6d 100644
+--- a/drivers/pci/host/Kconfig
++++ b/drivers/pci/host/Kconfig
+@@ -152,4 +152,12 @@ config PCIE_ALTERA
+ 	  Say Y here if you want to enable PCIe controller support for Altera
+ 	  SoCFPGA family of SoCs.
+ 
++config PCIE_ALTERA_MSI
++	bool "Altera PCIe MSI feature"
++	depends on PCI_MSI
++	select PCI_MSI_IRQ_DOMAIN
++	help
++	  Say Y here if you want PCIe MSI support for the Altera SocFPGA SoC.
++	  This MSI driver supports Altera MSI to GIC controller IP.
++
+ endmenu
+diff --git a/drivers/pci/host/Makefile b/drivers/pci/host/Makefile
+index 6954f76..6c4913d 100644
+--- a/drivers/pci/host/Makefile
++++ b/drivers/pci/host/Makefile
+@@ -18,3 +18,4 @@ obj-$(CONFIG_PCIE_IPROC) += pcie-iproc.o
+ obj-$(CONFIG_PCIE_IPROC_PLATFORM) += pcie-iproc-platform.o
+ obj-$(CONFIG_PCIE_IPROC_BCMA) += pcie-iproc-bcma.o
+ obj-$(CONFIG_PCIE_ALTERA) += pcie-altera.o
++obj-$(CONFIG_PCIE_ALTERA_MSI) += pcie-altera-msi.o
+diff --git a/drivers/pci/host/pcie-altera-msi.c b/drivers/pci/host/pcie-altera-msi.c
+new file mode 100644
+index 0000000..d3ad96f
+--- /dev/null
++++ b/drivers/pci/host/pcie-altera-msi.c
+@@ -0,0 +1,322 @@
++/*
++ * Copyright Altera Corporation (C) 2013-2015. All rights reserved
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License along with
++ * this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++#include <linux/interrupt.h>
++#include <linux/irqchip/chained_irq.h>
++#include <linux/module.h>
++#include <linux/msi.h>
++#include <linux/of_address.h>
++#include <linux/of_irq.h>
++#include <linux/of_pci.h>
++#include <linux/pci.h>
++#include <linux/platform_device.h>
++#include <linux/slab.h>
++
++#define MSI_STATUS		0x0
++#define MSI_ERROR		0x4
++#define MSI_INTMASK		0x8
++
++#define MAX_MSI_VECTORS		32
++struct altera_msi {
++	DECLARE_BITMAP(used, MAX_MSI_VECTORS);
++	struct mutex		lock;	/* proctect used variable */
++	struct platform_device	*pdev;
++	struct irq_domain		*msi_domain;
++	struct irq_domain		*inner_domain;
++	void __iomem		*csr_base;
++	void __iomem		*vector_base;
++	phys_addr_t		vector_phy;
++	u32			num_of_vectors;
++	int			irq;
++};
++
++static inline void msi_writel(struct altera_msi *msi, u32 value, u32 reg)
++{
++	writel_relaxed(value, msi->csr_base + reg);
++}
++
++static inline u32 msi_readl(struct altera_msi *msi, u32 reg)
++{
++	return readl_relaxed(msi->csr_base + reg);
++}
++
++static void altera_msi_isr(unsigned int irq, struct irq_desc *desc)
++{
++	struct irq_chip *chip = irq_desc_get_chip(desc);
++	struct altera_msi *msi;
++	unsigned long status;
++	u32 num_of_vectors;
++	u32 bit;
++	u32 virq;
++
++	chained_irq_enter(chip, desc);
++	msi = irq_desc_get_handler_data(desc);
++	num_of_vectors = msi->num_of_vectors;
++
++	do {
++		status = msi_readl(msi, MSI_STATUS);
++		if (!status)
++			break;
++
++		do {
++			bit = find_first_bit(&status, num_of_vectors);
++			/* Dummy read from vector to clear the interrupt */
++			readl_relaxed(msi->vector_base + (bit * sizeof(u32)));
++
++			virq = irq_find_mapping(msi->inner_domain, bit);
++			if (virq && test_bit(bit, msi->used))
++				generic_handle_irq(virq);
++			else
++				dev_err(&msi->pdev->dev, "unexpected MSI\n");
++
++			/* Clear the bit from status and repeat without reading
++			 * again status register. */
++			__clear_bit(bit, &status);
++		} while (status);
++	} while (1);
++
++	chained_irq_exit(chip, desc);
++}
++
++static struct irq_chip altera_msi_irq_chip = {
++	.name = "Altera PCIe MSI",
++	.irq_enable = pci_msi_unmask_irq,
++	.irq_disable = pci_msi_mask_irq,
++	.irq_mask = pci_msi_mask_irq,
++	.irq_unmask = pci_msi_unmask_irq,
++};
++
++static struct msi_domain_info altera_msi_domain_info = {
++	.flags	= (MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS |
++		     MSI_FLAG_PCI_MSIX),
++	.chip	= &altera_msi_irq_chip,
++};
++
++static void altera_compose_msi_msg(struct irq_data *data, struct msi_msg *msg)
++{
++	struct altera_msi *msi = irq_data_get_irq_chip_data(data);
++	phys_addr_t addr = msi->vector_phy + (data->hwirq * sizeof(u32));
++
++	msg->address_lo = lower_32_bits(addr);
++	msg->address_hi = upper_32_bits(addr);
++	msg->data = data->hwirq;
++
++	dev_dbg(&msi->pdev->dev, "msi#%d address_lo 0x%x address_hi 0x%x\n",
++		(int)data->hwirq, msg->address_hi, msg->address_lo);
++}
++
++static int altera_msi_set_affinity(struct irq_data *irq_data,
++				   const struct cpumask *mask, bool force)
++{
++	 return -EINVAL;
++}
++
++static struct irq_chip altera_msi_bottom_irq_chip = {
++	.name			= "Altera MSI",
++	.irq_compose_msi_msg	= altera_compose_msi_msg,
++	.irq_set_affinity	= altera_msi_set_affinity,
++};
++
++static int altera_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
++				   unsigned int nr_irqs, void *args)
++{
++	struct altera_msi *msi = domain->host_data;
++	unsigned long bit;
++	u32 mask;
++
++	WARN_ON(nr_irqs != 1);
++	mutex_lock(&msi->lock);
++
++	bit = find_first_zero_bit(msi->used, msi->num_of_vectors);
++	if (bit >= msi->num_of_vectors)
++		return -ENOSPC;
++
++	set_bit(bit, msi->used);
++
++	mutex_unlock(&msi->lock);
++
++	irq_domain_set_info(domain, virq, bit, &altera_msi_bottom_irq_chip,
++			    domain->host_data, handle_simple_irq,
++			    NULL, NULL);
++	set_irq_flags(virq, IRQF_VALID);
++
++	mask = msi_readl(msi, MSI_INTMASK);
++	mask |= 1 << bit;
++	msi_writel(msi, mask, MSI_INTMASK);
++
++	return 0;
++}
++
++static void altera_irq_domain_free(struct irq_domain *domain,
++				   unsigned int virq, unsigned int nr_irqs)
++{
++	struct irq_data *d = irq_domain_get_irq_data(domain, virq);
++	struct altera_msi *msi = irq_data_get_irq_chip_data(d);
++	u32 mask;
++
++	mutex_lock(&msi->lock);
++
++	if (!test_bit(d->hwirq, msi->used)) {
++		dev_err(&msi->pdev->dev, "trying to free unused MSI#%lu\n",
++			d->hwirq);
++	} else {
++		__clear_bit(d->hwirq, msi->used);
++		mask = msi_readl(msi, MSI_INTMASK);
++		mask &= ~(1 << d->hwirq);
++		msi_writel(msi, mask, MSI_INTMASK);
++	}
++
++	mutex_unlock(&msi->lock);
++}
++
++static const struct irq_domain_ops msi_domain_ops = {
++	.alloc	= altera_irq_domain_alloc,
++	.free	= altera_irq_domain_free,
++};
++
++static int altera_allocate_domains(struct altera_msi *msi)
++{
++	msi->inner_domain = irq_domain_add_linear(NULL, msi->num_of_vectors,
++					     &msi_domain_ops, msi);
++	if (!msi->inner_domain) {
++		dev_err(&msi->pdev->dev, "failed to create IRQ domain\n");
++		return -ENOMEM;
++	}
++
++	msi->msi_domain = pci_msi_create_irq_domain(msi->pdev->dev.of_node,
++				&altera_msi_domain_info, msi->inner_domain);
++	if (!msi->msi_domain) {
++		dev_err(&msi->pdev->dev, "failed to create MSI domain\n");
++		irq_domain_remove(msi->inner_domain);
++		return -ENOMEM;
++	}
++
++	return 0;
++}
++
++static void altera_free_domains(struct altera_msi *msi)
++{
++	irq_domain_remove(msi->msi_domain);
++	irq_domain_remove(msi->inner_domain);
++}
++
++static int altera_msi_remove(struct platform_device *pdev)
++{
++	struct altera_msi *msi = platform_get_drvdata(pdev);
++
++	msi_writel(msi, 0, MSI_INTMASK);
++	irq_set_chained_handler(msi->irq, NULL);
++	irq_set_handler_data(msi->irq, NULL);
++
++	altera_free_domains(msi);
++
++	platform_set_drvdata(pdev, NULL);
++	return 0;
++}
++
++static int altera_msi_probe(struct platform_device *pdev)
++{
++	struct altera_msi *msi;
++	struct device_node *np = pdev->dev.of_node;
++	struct resource *res;
++	int ret;
++
++	msi = devm_kzalloc(&pdev->dev, sizeof(struct altera_msi),
++			   GFP_KERNEL);
++	if (!msi)
++		return -ENOMEM;
++
++	mutex_init(&msi->lock);
++	msi->pdev = pdev;
++
++	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "csr");
++	if (!res) {
++		dev_err(&pdev->dev,
++			"no csr memory resource defined\n");
++		return -ENODEV;
++	}
++
++	msi->csr_base = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(msi->csr_base)) {
++		dev_err(&pdev->dev, "failed to map csr memory\n");
++		return PTR_ERR(msi->csr_base);
++	}
++
++	res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
++					   "vector_slave");
++	if (!res) {
++		dev_err(&pdev->dev,
++			"no vector_slave memory resource defined\n");
++		return -ENODEV;
++	}
++
++	msi->vector_base = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(msi->vector_base)) {
++		dev_err(&pdev->dev, "failed to map vector_slave memory\n");
++		return PTR_ERR(msi->vector_base);
++	}
++
++	msi->vector_phy = res->start;
++
++	if (of_property_read_u32(np, "num-vectors", &msi->num_of_vectors)) {
++		dev_err(&pdev->dev, "failed to parse the number of vectors\n");
++		return -EINVAL;
++	}
++
++	ret = altera_allocate_domains(msi);
++	if (ret)
++		return ret;
++
++	msi->irq = platform_get_irq(pdev, 0);
++	if (msi->irq <= 0) {
++		dev_err(&pdev->dev, "failed to map IRQ: %d\n", msi->irq);
++		ret = -ENODEV;
++		goto err;
++	}
++
++	irq_set_chained_handler_and_data(msi->irq, altera_msi_isr, msi);
++	platform_set_drvdata(pdev, msi);
++
++	return 0;
++
++err:
++	altera_msi_remove(pdev);
++	return ret;
++}
++
++static const struct of_device_id altera_msi_of_match[] = {
++	{ .compatible = "altr,msi-1.0", NULL },
++	{ },
++};
++
++static struct platform_driver altera_msi_driver = {
++	.driver = {
++		.name = "altera-msi",
++		.of_match_table = altera_msi_of_match,
++	},
++	.probe = altera_msi_probe,
++	.remove = altera_msi_remove,
++};
++
++static int __init altera_msi_init(void)
++{
++	return platform_driver_register(&altera_msi_driver);
++}
++
++subsys_initcall(altera_msi_init);
++
++MODULE_AUTHOR("Ley Foon Tan <lftan@altera.com>");
++MODULE_DESCRIPTION("Altera PCIe MSI support");
++MODULE_LICENSE("GPL v2");
+-- 
+1.8.2.1
