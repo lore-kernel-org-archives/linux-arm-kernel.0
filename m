@@ -1,269 +1,70 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon, 17 Aug 2015 09:22:34 +0200
-Subject: [PATCH 4/4] serial: xuartps: Rewrite the interrupt handling logic
-In-Reply-To: <5b154ba97bcd79e49e2131152eb2fc1761594a6c.1439796149.git.michal.simek@xilinx.com>
-References: <5b154ba97bcd79e49e2131152eb2fc1761594a6c.1439796149.git.michal.simek@xilinx.com>
-Message-ID: <ead0c38140e815133a47797a2527229a2fc077c1.1439796149.git.michal.simek@xilinx.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Mon, 17 Aug 2015 09:24:03 +0200
+Subject: [PATCH 16/20] iio: bmc150: Fix irq checks
+In-Reply-To: <55CF3AEA.2070508@kernel.org>
+References: <1439374365-20623-1-git-send-email-mpa@pengutronix.de>
+ <1439374365-20623-17-git-send-email-mpa@pengutronix.de>
+ <55CF3AEA.2070508@kernel.org>
+Message-ID: <20150817072403.GI19600@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Anirudha Sarangi <anirudha.sarangi@xilinx.com>
+On Sat, Aug 15, 2015 at 02:13:14PM +0100, Jonathan Cameron wrote:
+> On 12/08/15 11:12, Markus Pargmann wrote:
+> > Valid irqs are > 0. This patch fixes the check which fails for the new
+> > spi driver part if no interrupt was given.
+> > 
+> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> This one crossed with Octavian's patch that cleaned up all cases of this.
+> c176becd81843 iio: fix drivers that consider 0 as a valid IRQ in client->irq
+> 
+> Hence you can drop this one from the v2 of this series.
 
-The existing interrupt handling logic has followins issues.
-- Upon a parity error with default configuration, the control
-  never comes out of the ISR thereby hanging Linux.
-- The error handling logic around framing and parity error are buggy.
-  There are chances that the errors will never be captured.
-- The existing ISR is just too long.
-This patch fixes all these concerns. It separates out the Tx and Rx
-hanling logic into separate functions. It ensures that the status
-registers are cleared on all cases so that a hang situation never
-arises.
+Thanks, didn't notice this. Will drop it.
 
-Signed-off-by: Anirudha Sarangi <anirudh@xilinx.com>
-Signed-off-by: Michal Simek <michal.simek@xilinx.com>
----
+Best regards,
 
- drivers/tty/serial/xilinx_uartps.c | 194 ++++++++++++++++++++-----------------
- 1 file changed, 104 insertions(+), 90 deletions(-)
+Markus
 
-diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
-index 2dc26e5f1384..c771dbbf6161 100644
---- a/drivers/tty/serial/xilinx_uartps.c
-+++ b/drivers/tty/serial/xilinx_uartps.c
-@@ -173,61 +173,86 @@ struct cdns_uart {
- 		clk_rate_change_nb);
- 
- /**
-- * cdns_uart_isr - Interrupt handler
-- * @irq: Irq number
-- * @dev_id: Id of the port
-- *
-- * Return: IRQHANDLED
-+ * cdns_uart_handle_tx - Handle the bytes to be Txed.
-+ * @dev_id: Id of the UART port
-+ * Return: None
-  */
--static irqreturn_t cdns_uart_isr(int irq, void *dev_id)
-+static void cdns_uart_handle_tx(void *dev_id)
- {
- 	struct uart_port *port = (struct uart_port *)dev_id;
--	unsigned long flags;
--	unsigned int isrstatus, numbytes;
--	unsigned int data;
--	char status = TTY_NORMAL;
-+	unsigned int numbytes;
- 
--	spin_lock_irqsave(&port->lock, flags);
-+	if (uart_circ_empty(&port->state->xmit)) {
-+		writel(CDNS_UART_IXR_TXEMPTY, port->membase +
-+		       CDNS_UART_IDR_OFFSET);
-+	} else {
-+		numbytes = port->fifosize;
-+		/* Break if no more data available in the UART buffer */
-+		while (numbytes--) {
-+			if (uart_circ_empty(&port->state->xmit))
-+				break;
-+			/*
-+			 * Get the data from the UART circular buffer
-+			 * and write it to the cdns_uart's TX_FIFO
-+			 * register.
-+			 */
-+			writel(port->state->xmit.buf[port->state->xmit.tail],
-+			       port->membase + CDNS_UART_FIFO_OFFSET);
- 
--	/* Read the interrupt status register to determine which
--	 * interrupt(s) is/are active.
--	 */
--	isrstatus = readl(port->membase + CDNS_UART_ISR_OFFSET);
-+			port->icount.tx++;
- 
--	/*
--	 * There is no hardware break detection, so we interpret framing
--	 * error with all-zeros data as a break sequence. Most of the time,
--	 * there's another non-zero byte at the end of the sequence.
--	 */
--	if (isrstatus & CDNS_UART_IXR_FRAMING) {
--		while (!(readl(port->membase + CDNS_UART_SR_OFFSET) &
--					CDNS_UART_SR_RXEMPTY)) {
--			if (!readl(port->membase + CDNS_UART_FIFO_OFFSET)) {
--				port->read_status_mask |= CDNS_UART_IXR_BRK;
--				isrstatus &= ~CDNS_UART_IXR_FRAMING;
--			}
-+			/*
-+			 * Adjust the tail of the UART buffer and wrap
-+			 * the buffer if it reaches limit.
-+			 */
-+			port->state->xmit.tail =
-+				(port->state->xmit.tail + 1) &
-+					(UART_XMIT_SIZE - 1);
- 		}
--		writel(CDNS_UART_IXR_FRAMING,
--				port->membase + CDNS_UART_ISR_OFFSET);
--	}
- 
--	/* drop byte with parity error if IGNPAR specified */
--	if (isrstatus & port->ignore_status_mask & CDNS_UART_IXR_PARITY)
--		isrstatus &= ~(CDNS_UART_IXR_RXTRIG | CDNS_UART_IXR_TOUT);
-+		if (uart_circ_chars_pending(
-+				&port->state->xmit) < WAKEUP_CHARS)
-+			uart_write_wakeup(port);
-+	}
-+}
- 
--	isrstatus &= port->read_status_mask;
--	isrstatus &= ~port->ignore_status_mask;
-+/**
-+ * cdns_uart_handle_rx - Handle the received bytes along with Rx errors.
-+ * @dev_id: Id of the UART port
-+ * @isrstatus: The interrupt status register value as read
-+ * Return: None
-+ */
-+static void cdns_uart_handle_rx(void *dev_id, unsigned int isrstatus)
-+{
-+	struct uart_port *port = (struct uart_port *)dev_id;
-+	unsigned int data;
-+	unsigned int framerrprocessed = 0;
-+	char status = TTY_NORMAL;
- 
--	if ((isrstatus & CDNS_UART_IXR_TOUT) ||
--		(isrstatus & CDNS_UART_IXR_RXTRIG)) {
--		/* Receive Timeout Interrupt */
--		while (!(readl(port->membase + CDNS_UART_SR_OFFSET) &
--					CDNS_UART_SR_RXEMPTY)) {
--			data = readl(port->membase + CDNS_UART_FIFO_OFFSET);
-+	while ((readl(port->membase + CDNS_UART_SR_OFFSET) &
-+		CDNS_UART_SR_RXEMPTY) != CDNS_UART_SR_RXEMPTY) {
-+		data = readl(port->membase + CDNS_UART_FIFO_OFFSET);
-+		port->icount.rx++;
-+		/*
-+		 * There is no hardware break detection, so we interpret
-+		 * framing error with all-zeros data as a break sequence.
-+		 * Most of the time, there's another non-zero byte at the
-+		 * end of the sequence.
-+		 */
-+		if (isrstatus & CDNS_UART_IXR_FRAMING) {
-+			if (!data) {
-+				port->read_status_mask |= CDNS_UART_IXR_BRK;
-+				framerrprocessed = 1;
-+				continue;
-+			}
-+		}
-+		isrstatus &= port->read_status_mask;
-+		isrstatus &= ~port->ignore_status_mask;
- 
--			/* Non-NULL byte after BREAK is garbage (99%) */
--			if (data && (port->read_status_mask &
--						CDNS_UART_IXR_BRK)) {
-+		if ((isrstatus & CDNS_UART_IXR_TOUT) ||
-+		    (isrstatus & CDNS_UART_IXR_RXTRIG)) {
-+			if (data &&
-+			    (port->read_status_mask & CDNS_UART_IXR_BRK)) {
- 				port->read_status_mask &= ~CDNS_UART_IXR_BRK;
- 				port->icount.brk++;
- 				if (uart_handle_break(port))
-@@ -249,67 +274,56 @@ static irqreturn_t cdns_uart_isr(int irq, void *dev_id)
- 				spin_lock(&port->lock);
- 			}
- #endif
--
--			port->icount.rx++;
--
- 			if (isrstatus & CDNS_UART_IXR_PARITY) {
- 				port->icount.parity++;
- 				status = TTY_PARITY;
--			} else if (isrstatus & CDNS_UART_IXR_FRAMING) {
-+			}
-+			if ((isrstatus & CDNS_UART_IXR_FRAMING) &&
-+			    !framerrprocessed) {
- 				port->icount.frame++;
- 				status = TTY_FRAME;
--			} else if (isrstatus & CDNS_UART_IXR_OVERRUN) {
-+			}
-+			if (isrstatus & CDNS_UART_IXR_OVERRUN) {
- 				port->icount.overrun++;
-+				tty_insert_flip_char(&port->state->port, 0,
-+						     TTY_OVERRUN);
- 			}
--
--			uart_insert_char(port, isrstatus, CDNS_UART_IXR_OVERRUN,
--					data, status);
-+			tty_insert_flip_char(&port->state->port, data, status);
- 		}
--		spin_unlock(&port->lock);
--		tty_flip_buffer_push(&port->state->port);
--		spin_lock(&port->lock);
- 	}
-+	spin_unlock(&port->lock);
-+	tty_flip_buffer_push(&port->state->port);
-+	spin_lock(&port->lock);
-+}
- 
--	/* Dispatch an appropriate handler */
--	if ((isrstatus & CDNS_UART_IXR_TXEMPTY) == CDNS_UART_IXR_TXEMPTY) {
--		if (uart_circ_empty(&port->state->xmit)) {
--			writel(CDNS_UART_IXR_TXEMPTY,
--					port->membase + CDNS_UART_IDR_OFFSET);
--		} else {
--			numbytes = port->fifosize;
--			/* Break if no more data available in the UART buffer */
--			while (numbytes--) {
--				if (uart_circ_empty(&port->state->xmit))
--					break;
--				/* Get the data from the UART circular buffer
--				 * and write it to the cdns_uart's TX_FIFO
--				 * register.
--				 */
--				writel(port->state->xmit.buf[
--						port->state->xmit.tail],
--					port->membase + CDNS_UART_FIFO_OFFSET);
--
--				port->icount.tx++;
--
--				/* Adjust the tail of the UART buffer and wrap
--				 * the buffer if it reaches limit.
--				 */
--				port->state->xmit.tail =
--					(port->state->xmit.tail + 1) &
--						(UART_XMIT_SIZE - 1);
--			}
-+/**
-+ * cdns_uart_isr - Interrupt handler
-+ * @irq: Irq number
-+ * @dev_id: Id of the port
-+ *
-+ * Return: IRQHANDLED
-+ */
-+static irqreturn_t cdns_uart_isr(int irq, void *dev_id)
-+{
-+	struct uart_port *port = (struct uart_port *)dev_id;
-+	unsigned int isrstatus;
- 
--			if (uart_circ_chars_pending(
--					&port->state->xmit) < WAKEUP_CHARS)
--				uart_write_wakeup(port);
--		}
--	}
-+	spin_lock(&port->lock);
- 
-+	/* Read the interrupt status register to determine which
-+	 * interrupt(s) is/are active and clear them.
-+	 */
-+	isrstatus = readl(port->membase + CDNS_UART_ISR_OFFSET);
- 	writel(isrstatus, port->membase + CDNS_UART_ISR_OFFSET);
- 
--	/* be sure to release the lock and tty before leaving */
--	spin_unlock_irqrestore(&port->lock, flags);
-+	if (isrstatus & CDNS_UART_IXR_TXEMPTY) {
-+		cdns_uart_handle_tx(dev_id);
-+		isrstatus &= ~CDNS_UART_IXR_TXEMPTY;
-+	}
-+	if (isrstatus & CDNS_UART_IXR_MASK)
-+		cdns_uart_handle_rx(dev_id, isrstatus);
- 
-+	spin_unlock(&port->lock);
- 	return IRQ_HANDLED;
- }
- 
+> 
+> (Its amazing how many times we get multiple patches for the same issue that
+> has been there for ages in the same week or so!)
+> 
+> Jonathan
+> > ---
+> >  drivers/iio/accel/bmc150-accel.c | 4 ++--
+> >  1 file changed, 2 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/drivers/iio/accel/bmc150-accel.c b/drivers/iio/accel/bmc150-accel.c
+> > index 4e70f51c2370..fe2d2316158f 100644
+> > --- a/drivers/iio/accel/bmc150-accel.c
+> > +++ b/drivers/iio/accel/bmc150-accel.c
+> > @@ -1660,10 +1660,10 @@ static int bmc150_accel_probe(struct i2c_client *client,
+> >  		return ret;
+> >  	}
+> >  
+> > -	if (client->irq < 0)
+> > +	if (client->irq <= 0)
+> >  		client->irq = bmc150_accel_gpio_probe(client, data);
+> >  
+> > -	if (client->irq >= 0) {
+> > +	if (client->irq > 0) {
+> >  		ret = devm_request_threaded_irq(
+> >  						&client->dev, client->irq,
+> >  						bmc150_accel_irq_handler,
+> > 
+> 
+> 
+
 -- 
-2.3.5
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150817/303e7960/attachment.sig>
