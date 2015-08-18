@@ -1,29 +1,39 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 18 Aug 2015 20:29:25 +0530
-Subject: [PATCH v2 0/6] ARM: berlin: add cpufreq support
-In-Reply-To: <20150818143911.GB12017@kwain>
-References: <1439898368-11543-1-git-send-email-antoine.tenart@free-electrons.com>
- <CAOh2x=ke9NWa-GjL=c+RgEWWfsNeKvE2O9CRHmW2dG5mj8ATCg@mail.gmail.com>
- <20150818143911.GB12017@kwain>
-Message-ID: <20150818145925.GF31148@linux>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 18 Aug 2015 17:32:08 +0200
+Subject: [PATCH v2] ARM: dts: sunxi: Add regulators for LeMaker BananaPi
+In-Reply-To: <20150804090224.4B5676C83963@dd34104.kasserver.com>
+References: <1438532305-5884-1-git-send-email-public_timo.s@silentcreek.de>
+ <20150803094723.GD2564@lukather>
+ <20150804090224.4B5676C83963@dd34104.kasserver.com>
+Message-ID: <20150818153208.GF2547@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18-08-15, 16:39, Antoine Tenart wrote:
-> However, it seems the OPP-v2 table takes precedence over the old one.
-> When a default OPP-v2 table is supplied in the device tree, if the
-> bootloader supplies an OPP table the old way it won't be taken into
-> account.
+On Tue, Aug 04, 2015 at 11:02:24AM +0200, Timo Sigurdsson wrote:
+> Hi Maxime,
 > 
-> So if I understood correctly, this won't work here for the BG2Q.
+> Maxime Ripard schrieb am 03.08.2015 11:47:
+> > What regulator provides the 3.3V regulator used in the rest of this DT
+> > then (MMC, GMAC) ?
+> 
+> For GMAC, there is a reg_gmac_3v3 defined in sun7i-a20-bananapi.dts [1].
+> MMC uses reg_vcc3v3 included from sunxi-common-regulators.dtsi. Am I
+> missing something? Is this not sufficient?
 
-Didn't understood it completely. Are you saying that your dtb will
-have two operating-points tables ?
+Well, this 3.3v regulator doesn't appear out of nowhere. Most likely,
+it's either one of the AXP output, or a regulator directly taking the
+5v output of the DC plug.
 
-The deal is that for any device, parsing of opp-v2 will be attempted
-first. If its not available, then opp-v1 will be tried. But this is
-per-device. So, one device can have opp-v2 tables and other one can do
-v1 type.
+Maxime
 
 -- 
-viresh
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150818/d5790184/attachment.sig>
