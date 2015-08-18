@@ -1,35 +1,28 @@
-From: dinguyen@opensource.altera.com (Dinh Nguyen)
-Date: Tue, 18 Aug 2015 11:04:32 -0500
-Subject: [PATCHv2] arm64: dts: Add base stratix 10 dtsi
-In-Reply-To: <1439308127-7412-1-git-send-email-dinguyen@opensource.altera.com>
-References: <1439308127-7412-1-git-send-email-dinguyen@opensource.altera.com>
-Message-ID: <alpine.DEB.2.02.1508181103230.23339@linux-builds1>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 18 Aug 2015 17:16:49 +0100
+Subject: [PATCH 2/2] arm64: set MAX_MEMBLOCK_ADDR according to linear
+ region size
+In-Reply-To: <20150818145149.GQ7557@n2100.arm.linux.org.uk>
+References: <1439890482-20798-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1439890482-20798-3-git-send-email-ard.biesheuvel@linaro.org>
+ <20150818100018.GA11021@arm.com>
+ <20150818142435.GC11571@e104818-lin.cambridge.arm.com>
+ <20150818145149.GQ7557@n2100.arm.linux.org.uk>
+Message-ID: <20150818161649.GD11571@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 11 Aug 2015, dinguyen at opensource.altera.com wrote:
-
-> From: Dinh Nguyen <dinguyen@opensource.altera.com>
+On Tue, Aug 18, 2015 at 03:51:49PM +0100, Russell King - ARM Linux wrote:
+> On Tue, Aug 18, 2015 at 03:24:36PM +0100, Catalin Marinas wrote:
+> > With the current memory layout, this could also be __pa(~0UL). I guess
+> > we could solve this with a single patch, though I'm not sure whether we
+> > break other architectures:
 > 
-> Add the base DTS for Altera's SoCFPGA Stratix 10 platform.
-> 
-> Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
-> ---
-> v2: use interrupt-affinity for pmu node
-> ---
->  arch/arm64/Kconfig                                 |   5 +
->  arch/arm64/boot/dts/Makefile                       |   1 +
->  arch/arm64/boot/dts/altera/Makefile                |   5 +
->  arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi  | 358 +++++++++++++++++++++
->  .../boot/dts/altera/socfpga_stratix10_socdk.dts    |  38 +++
->  arch/arm64/configs/defconfig                       |   1 +
->  6 files changed, 408 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/altera/Makefile
->  create mode 100644 arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
->  create mode 100644 arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts
-> 
+> No.  __pa() is only valid within the lowmem mapping, not outside of it.
+> What you'd get for a virtual address of ~0UL is not well defined, so
+> you should not use this in generic code.
 
-Soft ping on this pach?
+You are right. We'll keep this max memblock address in the arch code.
 
-BR,
-Dinh
+-- 
+Catalin
