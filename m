@@ -1,91 +1,118 @@
-From: briannorris@chromium.org (Brian Norris)
-Date: Tue, 18 Aug 2015 16:28:06 -0700
-Subject: [PATCH 2/2] ARM: dts: rockchip: correct regulator PM properties
-In-Reply-To: <20150818224831.GA140911@google.com>
-References: <1439923455-109818-1-git-send-email-briannorris@chromium.org>
- <1439923455-109818-2-git-send-email-briannorris@chromium.org>
- <51457775.D3ds00ymOJ@phil> <20150818224831.GA140911@google.com>
-Message-ID: <20150818232806.GC140911@google.com>
+From: edubezval@gmail.com (Eduardo Valentin)
+Date: Tue, 18 Aug 2015 16:33:58 -0700
+Subject: [PATCH] Revert "serial: imx: remove unbalanced clk_prepare"
+In-Reply-To: <1439912592-14779-1-git-send-email-fabio.estevam@freescale.com>
+References: <1439912592-14779-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20150818233356.GA4494@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 18, 2015 at 03:48:31PM -0700, Brian Norris wrote:
-> On Tue, Aug 18, 2015 at 09:17:06PM +0200, Heiko Stuebner wrote:
-> > Am Dienstag, 18. August 2015, 11:44:15 schrieb Brian Norris:
-> > > This DTS file was submitted with non-upstream bindings. I happened
-> > > across this while reviewing the jaq DTS.
-> > > 
-> > > Signed-off-by: Brian Norris <briannorris@chromium.org>
-> > > Cc: Alexandru M Stan <amstan@chromium.org>
-> > > Cc: Douglas Anderson <dianders@chromium.org>
-> > > ---
-> > > Tested on jaq, not minnie
-> > > 
-> > >  arch/arm/boot/dts/rk3288-veyron-minnie.dts | 8 ++++++--
-> > >  1 file changed, 6 insertions(+), 2 deletions(-)
-> > > 
-> > > diff --git a/arch/arm/boot/dts/rk3288-veyron-minnie.dts
-> > > b/arch/arm/boot/dts/rk3288-veyron-minnie.dts index
-> > > 0e30bd6bf92b..6f619c154dc6 100644
-> > > --- a/arch/arm/boot/dts/rk3288-veyron-minnie.dts
-> > > +++ b/arch/arm/boot/dts/rk3288-veyron-minnie.dts
-> > > @@ -128,12 +128,16 @@
-> > >  			regulator-min-microvolt = <3300000>;
-> > >  			regulator-max-microvolt = <3300000>;
-> > >  			regulator-name = "vcc33_touch";
-> > > -			regulator-suspend-mem-disabled;
-> > > +			regulator-state-mem {
-> > > +				regulator-on-in-suspend;
-> > > +			};
-> > >  		};
-> > > 
-> > >  		vcc5v_touch: SWITCH_REG2 {
-> > >  			regulator-name = "vcc5v_touch";
-> > > -			regulator-suspend-mem-disabled;
-> > > +			regulator-state-mem {
-> > > +				regulator-on-in-suspend;
-> > > +			};
-> > 
-> > wouldn't regulator-suspend-mem-disabled translate to regulator-off-in-suspend?
-> > At least looks like it according to https://lkml.org/lkml/2013/7/25/592
+On Tue, Aug 18, 2015 at 12:43:12PM -0300, Fabio Estevam wrote:
+> This reverts commit 9e7b399d6528eac33a6fbfceb2b92af209c3454d.
 > 
-> You are right. My bad. Will fix. (Need to fix this in jaq too.)
+> Commit ("9e7b399d6528ea") causes the following warning and sometimes
+> also hangs the system:
+> 
+> ------------[ cut here ]------------
+>  WARNING: CPU: 0 PID: 0 at kernel/locking/mutex.c:868 mutex_trylock+0x20c/0x22c()
+>  DEBUG_LOCKS_WARN_ON(in_interrupt())
+>  Modules linked in:
+> CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.2.0-rc7-next-20150818-00001-g14418a6 #4
+> Hardware name: Freescale i.MX6 Quad/DualLite (Device Tree)
+> Backtrace: 
+> [<80012f08>] (dump_backtrace) from [<800130a4>] (show_stack+0x18/0x1c)
+> r6:00000364 r5:00000000 r4:00000000 r3:00000000
+> [<8001308c>] (show_stack) from [<807902b8>] (dump_stack+0x88/0xa4)
+> [<80790230>] (dump_stack) from [<8002a604>] (warn_slowpath_common+0x80/0xbc)
+> r5:807945c4 r4:80ab3b50
+> [<8002a584>] (warn_slowpath_common) from [<8002a6e4>] (warn_slowpath_fmt+0x38/0x40)
+> r8:00000000 r7:8131100c r6:8054c3cc r5:8131300c r4:80b0a570
+> [<8002a6b0>] (warn_slowpath_fmt) from [<807945c4>] (mutex_trylock+0x20c/0x22c)
+> r3:8095d0d8 r2:8095ab28
+> [<807943b8>] (mutex_trylock) from [<8054c3cc>] (clk_prepare_lock+0x14/0xf4)
+> r7:8131100c r6:be3f0c80 r5:00000037 r4:be3f0c80
+> [<8054c3b8>] (clk_prepare_lock) from [<8054dbfc>] (clk_prepare+0x18/0x30)
+> r5:00000037 r4:be3f0c80
+> [<8054dbe4>] (clk_prepare) from [<8036a600>] (imx_console_write+0x30/0x244)
+> r4:812d0bc8 r3:8132b9a4
+> 
+> To reproduce the problem we only need to let the board idle for something
+> like 30 seconds.
 
-Now that I'm looking a little closer, it seems like other existing DTS's
-are broken too, then. Jerry looks like it was converted to the
-regulator-state-mem node binding, but the conversion doesn't seem to
-make sense when I compare the chromium DTS sources with the for-next
-source I see in your tree.
+hmmm.. I really did not see this one. Looking at the code looks like we
+could be atomic in some of the uart console callbacks.
 
-In -next:
+For this one:
 
-     regulators {
-             mic_vcc: LDO_REG2 {
-                        regulator-name = "mic_vcc";
-                        regulator-always-on;
-                        regulator-boot-on;
-                        regulator-min-microvolt = <1800000>;
-                        regulator-max-microvolt = <1800000>;
-                        regulator-state-mem {
-                                regulator-on-in-suspend;
-                        };
-                };
-         };
+Reviewed-by: Eduardo Valentin <edubezval@gmail.com>
 
-But chromium had:
+Did you try the runtime pm patch on your end?
 
-       regulators {
-                mic_vcc: LDO_REG2 {
-                        regulator-always-on;
-                        regulator-boot-on;
-                        regulator-min-microvolt = <1800000>;
-                        regulator-max-microvolt = <1800000>;
-                        regulator-name = "mic_vcc";
-                        regulator-suspend-mem-disabled;
-                };
-       };
+BR,
 
-So I guess I'll make the proper conversion for all the veyron variants I
-see.
-
-Brian
+> 
+> Tested on a imx6q-sabresd.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+>  drivers/tty/serial/imx.c | 20 ++++++++++++++------
+>  1 file changed, 14 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+> index fe3d41c..d0388a0 100644
+> --- a/drivers/tty/serial/imx.c
+> +++ b/drivers/tty/serial/imx.c
+> @@ -1631,12 +1631,12 @@ imx_console_write(struct console *co, const char *s, unsigned int count)
+>  	int locked = 1;
+>  	int retval;
+>  
+> -	retval = clk_prepare_enable(sport->clk_per);
+> +	retval = clk_enable(sport->clk_per);
+>  	if (retval)
+>  		return;
+> -	retval = clk_prepare_enable(sport->clk_ipg);
+> +	retval = clk_enable(sport->clk_ipg);
+>  	if (retval) {
+> -		clk_disable_unprepare(sport->clk_per);
+> +		clk_disable(sport->clk_per);
+>  		return;
+>  	}
+>  
+> @@ -1675,8 +1675,8 @@ imx_console_write(struct console *co, const char *s, unsigned int count)
+>  	if (locked)
+>  		spin_unlock_irqrestore(&sport->port.lock, flags);
+>  
+> -	clk_disable_unprepare(sport->clk_ipg);
+> -	clk_disable_unprepare(sport->clk_per);
+> +	clk_disable(sport->clk_ipg);
+> +	clk_disable(sport->clk_per);
+>  }
+>  
+>  /*
+> @@ -1777,7 +1777,15 @@ imx_console_setup(struct console *co, char *options)
+>  
+>  	retval = uart_set_options(&sport->port, co, baud, parity, bits, flow);
+>  
+> -	clk_disable_unprepare(sport->clk_ipg);
+> +	clk_disable(sport->clk_ipg);
+> +	if (retval) {
+> +		clk_unprepare(sport->clk_ipg);
+> +		goto error_console;
+> +	}
+> +
+> +	retval = clk_prepare(sport->clk_per);
+> +	if (retval)
+> +		clk_disable_unprepare(sport->clk_ipg);
+>  
+>  error_console:
+>  	return retval;
+> -- 
+> 1.9.1
+> 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 490 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150818/74d2fbee/attachment.sig>
