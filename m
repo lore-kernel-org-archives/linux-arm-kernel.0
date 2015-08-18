@@ -1,64 +1,163 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 18 Aug 2015 10:08:51 +0200
-Subject: [PATCH 00/10] ARM: marvell/dt: add crypto nodes in existing DTs
-Message-ID: <1439885341-14644-1-git-send-email-boris.brezillon@free-electrons.com>
+Date: Tue, 18 Aug 2015 10:08:53 +0200
+Subject: [PATCH 02/10] ARM: marvell/dt: define crypto SRAM ranges for all
+ armada-xp boards
+In-Reply-To: <1439885341-14644-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1439885341-14644-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1439885341-14644-3-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Define the crypto SRAM ranges so that the resources referenced by the
+sa-sram node can be properly extracted from the DT.
 
-This series declares and enables the crypto engine on the armada, orion,
-kirkwood and dove SoCs.
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+---
+ arch/arm/boot/dts/armada-xp-axpwifiap.dts        | 4 +++-
+ arch/arm/boot/dts/armada-xp-db.dts               | 4 +++-
+ arch/arm/boot/dts/armada-xp-gp.dts               | 4 +++-
+ arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts  | 4 +++-
+ arch/arm/boot/dts/armada-xp-linksys-mamba.dts    | 4 +++-
+ arch/arm/boot/dts/armada-xp-matrix.dts           | 4 +++-
+ arch/arm/boot/dts/armada-xp-netgear-rn2120.dts   | 4 +++-
+ arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts | 4 +++-
+ arch/arm/boot/dts/armada-xp-synology-ds414.dts   | 4 +++-
+ 9 files changed, 27 insertions(+), 9 deletions(-)
 
-Best Regards,
-
-Boris
-
-
-Arnaud Ebalard (1):
-  ARM: marvell/dt: add crypto related nodes to armada 370 dtsi
-
-Boris Brezillon (9):
-  ARM: marvell/dt: add crypto related nodes to armada-xp.dtsi
-  ARM: marvell/dt: define crypto SRAM ranges for all armada-xp boards
-  ARM: marvell/dt: define crypto SRAM ranges for all armada-370 boards
-  ARM: marvell/dt: add crypto related nodes to armada 375 dtsi
-  ARM: marvell/dt: define crypto SRAM ranges in armada-375-db.dts
-  ARM: marvell/dt: add crypto related nodes to armada 38x dtsi
-  ARM: marvell/dt: define crypto SRAM ranges for all armada-38x boards
-  ARM: marvell: use new bindings for existing crypto devices
-  ARM: marvell: modify Orion and Kirkwoord crypto compatible strings
-
- arch/arm/boot/dts/armada-370-db.dts              |  3 ++-
- arch/arm/boot/dts/armada-370-dlink-dns327l.dts   |  3 ++-
- arch/arm/boot/dts/armada-370-mirabox.dts         |  7 ++++-
- arch/arm/boot/dts/armada-370-netgear-rn102.dts   |  3 ++-
- arch/arm/boot/dts/armada-370-netgear-rn104.dts   |  3 ++-
- arch/arm/boot/dts/armada-370-rd.dts              |  3 ++-
- arch/arm/boot/dts/armada-370-synology-ds213j.dts |  3 ++-
- arch/arm/boot/dts/armada-370.dtsi                | 25 ++++++++++++++++++
- arch/arm/boot/dts/armada-375-db.dts              |  4 ++-
- arch/arm/boot/dts/armada-375.dtsi                | 33 ++++++++++++++++++++++++
- arch/arm/boot/dts/armada-385-db-ap.dts           |  4 ++-
- arch/arm/boot/dts/armada-385-linksys.dtsi        |  4 ++-
- arch/arm/boot/dts/armada-388-db.dts              |  4 ++-
- arch/arm/boot/dts/armada-388-gp.dts              |  4 ++-
- arch/arm/boot/dts/armada-388-rd.dts              |  4 ++-
- arch/arm/boot/dts/armada-38x.dtsi                | 33 ++++++++++++++++++++++++
- arch/arm/boot/dts/armada-xp-axpwifiap.dts        |  4 ++-
- arch/arm/boot/dts/armada-xp-db.dts               |  4 ++-
- arch/arm/boot/dts/armada-xp-gp.dts               |  4 ++-
- arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts  |  4 ++-
- arch/arm/boot/dts/armada-xp-linksys-mamba.dts    |  4 ++-
- arch/arm/boot/dts/armada-xp-matrix.dts           |  4 ++-
- arch/arm/boot/dts/armada-xp-netgear-rn2120.dts   |  4 ++-
- arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts |  4 ++-
- arch/arm/boot/dts/armada-xp-synology-ds414.dts   |  4 ++-
- arch/arm/boot/dts/armada-xp.dtsi                 | 30 +++++++++++++++++++++
- arch/arm/boot/dts/dove.dtsi                      | 17 +++++++++---
- arch/arm/boot/dts/kirkwood.dtsi                  | 29 ++++++++++++++-------
- arch/arm/boot/dts/orion5x.dtsi                   | 22 +++++++++++-----
- 29 files changed, 231 insertions(+), 43 deletions(-)
-
+diff --git a/arch/arm/boot/dts/armada-xp-axpwifiap.dts b/arch/arm/boot/dts/armada-xp-axpwifiap.dts
+index 60bbfe3..23fc670 100644
+--- a/arch/arm/boot/dts/armada-xp-axpwifiap.dts
++++ b/arch/arm/boot/dts/armada-xp-axpwifiap.dts
+@@ -69,7 +69,9 @@
+ 
+ 	soc {
+ 		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xf1000000 0x100000
+-			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000>;
++			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
++			  MBUS_ID(0x09, 0x09) 0 0 0xf8100000 0x10000
++			  MBUS_ID(0x09, 0x05) 0 0 0xf8110000 0x10000>;
+ 
+ 		pcie-controller {
+ 			status = "okay";
+diff --git a/arch/arm/boot/dts/armada-xp-db.dts b/arch/arm/boot/dts/armada-xp-db.dts
+index 7dd900f..f774101 100644
+--- a/arch/arm/boot/dts/armada-xp-db.dts
++++ b/arch/arm/boot/dts/armada-xp-db.dts
+@@ -75,7 +75,9 @@
+ 	soc {
+ 		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xf1000000 0x100000
+ 			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
+-			  MBUS_ID(0x01, 0x2f) 0 0 0xf0000000 0x1000000>;
++			  MBUS_ID(0x01, 0x2f) 0 0 0xf0000000 0x1000000
++			  MBUS_ID(0x09, 0x09) 0 0 0xf8100000 0x10000
++			  MBUS_ID(0x09, 0x05) 0 0 0xf8110000 0x10000>;
+ 
+ 		devbus-bootcs {
+ 			status = "okay";
+diff --git a/arch/arm/boot/dts/armada-xp-gp.dts b/arch/arm/boot/dts/armada-xp-gp.dts
+index bf724ca..4878d73 100644
+--- a/arch/arm/boot/dts/armada-xp-gp.dts
++++ b/arch/arm/boot/dts/armada-xp-gp.dts
+@@ -94,7 +94,9 @@
+ 	soc {
+ 		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xf1000000 0x100000
+ 			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
+-			  MBUS_ID(0x01, 0x2f) 0 0 0xf0000000 0x1000000>;
++			  MBUS_ID(0x01, 0x2f) 0 0 0xf0000000 0x1000000
++			  MBUS_ID(0x09, 0x09) 0 0 0xf8100000 0x10000
++			  MBUS_ID(0x09, 0x05) 0 0 0xf8110000 0x10000>;
+ 
+ 		devbus-bootcs {
+ 			status = "okay";
+diff --git a/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts b/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
+index 06a6a6c..58b5008 100644
+--- a/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
++++ b/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
+@@ -64,7 +64,9 @@
+ 
+ 	soc {
+ 		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xd0000000 0x100000
+-			MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000>;
++			MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
++			MBUS_ID(0x09, 0x09) 0 0 0xf8100000 0x10000
++			MBUS_ID(0x09, 0x05) 0 0 0xf8110000 0x10000>;
+ 
+ 		pcie-controller {
+ 			status = "okay";
+diff --git a/arch/arm/boot/dts/armada-xp-linksys-mamba.dts b/arch/arm/boot/dts/armada-xp-linksys-mamba.dts
+index fdd187c..6e9820e 100644
+--- a/arch/arm/boot/dts/armada-xp-linksys-mamba.dts
++++ b/arch/arm/boot/dts/armada-xp-linksys-mamba.dts
+@@ -69,7 +69,9 @@
+ 
+ 	soc {
+ 		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xf1000000 0x100000
+-			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000>;
++			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
++			  MBUS_ID(0x09, 0x09) 0 0 0xf8100000 0x10000
++			  MBUS_ID(0x09, 0x05) 0 0 0xf8110000 0x10000>;
+ 
+ 		pcie-controller {
+ 			status = "okay";
+diff --git a/arch/arm/boot/dts/armada-xp-matrix.dts b/arch/arm/boot/dts/armada-xp-matrix.dts
+index f894bc8..6ab3383 100644
+--- a/arch/arm/boot/dts/armada-xp-matrix.dts
++++ b/arch/arm/boot/dts/armada-xp-matrix.dts
+@@ -67,7 +67,9 @@
+ 
+ 	soc {
+ 		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xf1000000 0x100000
+-			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000>;
++			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
++			  MBUS_ID(0x09, 0x09) 0 0 0xf8100000 0x10000
++			  MBUS_ID(0x09, 0x05) 0 0 0xf8110000 0x10000>;
+ 
+ 		internal-regs {
+ 			serial at 12000 {
+diff --git a/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts b/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
+index 1516fc2..979fae9 100644
+--- a/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
++++ b/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
+@@ -63,7 +63,9 @@
+ 
+ 	soc {
+ 		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xd0000000 0x100000
+-			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000>;
++			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
++			  MBUS_ID(0x09, 0x09) 0 0 0xf8100000 0x10000
++			  MBUS_ID(0x09, 0x05) 0 0 0xf8110000 0x10000>;
+ 
+ 		pcie-controller {
+ 			status = "okay";
+diff --git a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
+index 990e8a2..a5db177 100644
+--- a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
++++ b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
+@@ -65,7 +65,9 @@
+ 	soc {
+ 		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xd0000000 0x100000
+ 			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
+-			  MBUS_ID(0x01, 0x2f) 0 0 0xf0000000 0x8000000>;
++			  MBUS_ID(0x01, 0x2f) 0 0 0xf0000000 0x8000000
++			  MBUS_ID(0x09, 0x09) 0 0 0xf8100000 0x10000
++			  MBUS_ID(0x09, 0x05) 0 0 0xf8110000 0x10000>;
+ 
+ 		devbus-bootcs {
+ 			status = "okay";
+diff --git a/arch/arm/boot/dts/armada-xp-synology-ds414.dts b/arch/arm/boot/dts/armada-xp-synology-ds414.dts
+index 20267ad..2391b11 100644
+--- a/arch/arm/boot/dts/armada-xp-synology-ds414.dts
++++ b/arch/arm/boot/dts/armada-xp-synology-ds414.dts
+@@ -77,7 +77,9 @@
+ 
+ 	soc {
+ 		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xf1000000 0x100000
+-			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000>;
++			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
++			  MBUS_ID(0x09, 0x09) 0 0 0xf8100000 0x10000
++			  MBUS_ID(0x09, 0x05) 0 0 0xf8110000 0x10000>;
+ 
+ 		pcie-controller {
+ 			status = "okay";
 -- 
 1.9.1
