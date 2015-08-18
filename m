@@ -1,66 +1,42 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Tue, 18 Aug 2015 13:46:03 +0200
-Subject: [PATCH v2 1/6] clk: berlin: move MAX_CLKS out of drivers/clk/berlin
+Date: Tue, 18 Aug 2015 13:46:08 +0200
+Subject: [PATCH v2 6/6] ARM: berlin: register cpufreq-dt
 In-Reply-To: <1439898368-11543-1-git-send-email-antoine.tenart@free-electrons.com>
 References: <1439898368-11543-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1439898368-11543-2-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1439898368-11543-7-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the MAX_CLKS definition used in the Berlin clock driver outside the
-driver.
+The Berlin SoCs use cpufreq-dt for cpufreq. Register a platform device.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 ---
- drivers/clk/berlin/bg2.c             | 1 -
- drivers/clk/berlin/bg2q.c            | 1 -
- include/dt-bindings/clock/berlin2.h  | 2 ++
- include/dt-bindings/clock/berlin2q.h | 2 ++
- 4 files changed, 4 insertions(+), 2 deletions(-)
+ arch/arm/mach-berlin/berlin.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/drivers/clk/berlin/bg2.c b/drivers/clk/berlin/bg2.c
-index 73153fc45ee9..469a2c57e1b4 100644
---- a/drivers/clk/berlin/bg2.c
-+++ b/drivers/clk/berlin/bg2.c
-@@ -91,7 +91,6 @@
-  *
-  */
+diff --git a/arch/arm/mach-berlin/berlin.c b/arch/arm/mach-berlin/berlin.c
+index ac181c6797ee..25d73870ccca 100644
+--- a/arch/arm/mach-berlin/berlin.c
++++ b/arch/arm/mach-berlin/berlin.c
+@@ -18,6 +18,11 @@
+ #include <asm/hardware/cache-l2x0.h>
+ #include <asm/mach/arch.h>
  
--#define	MAX_CLKS 41
- static struct clk *clks[MAX_CLKS];
- static struct clk_onecell_data clk_data;
- static DEFINE_SPINLOCK(lock);
-diff --git a/drivers/clk/berlin/bg2q.c b/drivers/clk/berlin/bg2q.c
-index 221f40c2b850..a27958efab92 100644
---- a/drivers/clk/berlin/bg2q.c
-+++ b/drivers/clk/berlin/bg2q.c
-@@ -45,7 +45,6 @@
- #define REG_SDIO0XIN_CLKCTL	0x0158
- #define REG_SDIO1XIN_CLKCTL	0x015c
++static void __init berlin_init_late(void)
++{
++	platform_device_register_simple("cpufreq-dt", -1, NULL, 0);
++}
++
+ static const char * const berlin_dt_compat[] = {
+ 	"marvell,berlin",
+ 	NULL,
+@@ -25,6 +30,7 @@ static const char * const berlin_dt_compat[] = {
  
--#define	MAX_CLKS 27
- static struct clk *clks[MAX_CLKS];
- static struct clk_onecell_data clk_data;
- static DEFINE_SPINLOCK(lock);
-diff --git a/include/dt-bindings/clock/berlin2.h b/include/dt-bindings/clock/berlin2.h
-index 0c30800175df..97832b840beb 100644
---- a/include/dt-bindings/clock/berlin2.h
-+++ b/include/dt-bindings/clock/berlin2.h
-@@ -43,3 +43,5 @@
- #define CLKID_VIDEO1		38
- #define CLKID_VIDEO2		39
- #define CLKID_TWD		40
-+
-+#define MAX_CLKS		41
-diff --git a/include/dt-bindings/clock/berlin2q.h b/include/dt-bindings/clock/berlin2q.h
-index 287fc3b4afb2..c79af928ae92 100644
---- a/include/dt-bindings/clock/berlin2q.h
-+++ b/include/dt-bindings/clock/berlin2q.h
-@@ -29,3 +29,5 @@
- #define CLKID_SMEMC		24
- #define CLKID_PCIE		25
- #define CLKID_TWD		26
-+
-+#define MAX_CLKS		27
+ DT_MACHINE_START(BERLIN_DT, "Marvell Berlin")
+ 	.dt_compat	= berlin_dt_compat,
++	.init_late	= berlin_init_late,
+ 	/*
+ 	 * with DT probing for L2CCs, berlin_init_machine can be removed.
+ 	 * Note: 88DE3005 (Armada 1500-mini) uses pl310 l2cc
 -- 
 2.5.0
