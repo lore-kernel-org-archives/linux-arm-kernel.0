@@ -1,43 +1,77 @@
-From: afzal.mohd.ma@gmail.com (Afzal Mohammed)
-Date: Tue, 18 Aug 2015 17:36:18 +0530
-Subject: [PATCH] ARM: keystone: add a work around to handle asynchronous
- external abort
-In-Reply-To: <1439886500.31432.4.camel@pengutronix.de>
-References: <1439320409-20084-1-git-send-email-m-karicheri2@ti.com>
- <55CDF579.4050408@ti.com>
- <20150814140934.GX7557@n2100.arm.linux.org.uk>
- <55CE05EC.4040909@oracle.com> <55CE633C.10402@ti.com>
- <20150814215617.GA7557@n2100.arm.linux.org.uk>
- <55D25C64.3090107@ti.com> <55D2A1DD.9000007@oracle.com>
- <20150818081334.GK7557@n2100.arm.linux.org.uk>
- <1439886500.31432.4.camel@pengutronix.de>
-Message-ID: <20150818120618.GA4294@afzalpc>
+From: jogo@openwrt.org (Jonas Gorski)
+Date: Tue, 18 Aug 2015 14:19:54 +0200
+Subject: [PATCH] spi: mediatek: fix spi incorrect endian usage and remove
+ redundant clock
+In-Reply-To: <1439895231-17778-1-git-send-email-leilk.liu@mediatek.com>
+References: <1439895231-17778-1-git-send-email-leilk.liu@mediatek.com>
+Message-ID: <CAOiHx=nBOtm3c7QQpA-SSxXzJGjUEJQBtR9CynoeqsXRoz4fRg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Murali,
+Hi,
 
-On Tue, Aug 18, 2015 at 10:28:20AM +0200, Lucas Stach wrote:
-> Am Dienstag, den 18.08.2015, 09:13 +0100 schrieb Russell King - ARM
-> Linux:
+On Tue, Aug 18, 2015 at 12:53 PM, Leilk Liu <leilk.liu@mediatek.com> wrote:
+> This patch fixes incorrect endian usage, removes redundant
+> clock in prepare_hardware/unprepare_hardware and revises
+> coding styles.
+>
+> Signed-off-by: Leilk Liu <leilk.liu@mediatek.com>
+>
+> ---
+> Change in this patch:
+> 1. fix incorrect endian usage on big-endian system.
+> 2. delete redundant clock in prepare/unprepare_hardware.
+> 3. revise coding styles.
 
-> > It seems to be pointing towards something in the boot loader...
-> > 
-> > Normally, uboot will hook itself into the vectors to report errors, but
-> > I wonder whether uboot enables asynchronous aborts while it's running.
-> > Don't forget to make sure that the aborts are disabled again prior to
-> > calling the kernel.
-> > 
-> At least one of the Marvell platforms has the same issue with the
-> bootloader (I think it is some downstream U-Boot) leaving an imprecise
-> abort hanging around as a nice present for Linux to crash on.
+The usual philosophy is to have one change per patch, so this might be
+better as three patches. But this is Mark's call. Since the driver
+isn't yet in Linus' tree, it might be a-ok to mix style improvements
+and actual fixes, but as soon as it landed in Linus' tree you need to
+keep them separate, so fixes can be easily backported.
 
-If you have a JTAG, maybe you can manually set CPSR.A bit (equivalent
-of Lucas's patch) at bootloader/kernel entry and conclude who is the
-culprit or maybe even localize it better.
+Regarding the content ...
 
-This method did help in rootcausing issue in one of the SoC that showed
-the same behaviour.
+> ---
+>  drivers/spi/spi-mt65xx.c                 | 163 +++++++++++++------------------
+>  include/linux/platform_data/spi-mt65xx.h |   2 -
+>  2 files changed, 69 insertions(+), 96 deletions(-)
+>
+> diff --git a/drivers/spi/spi-mt65xx.c b/drivers/spi/spi-mt65xx.c
+> index 519f50c..a9da887 100644
+> --- a/drivers/spi/spi-mt65xx.c
+> +++ b/drivers/spi/spi-mt65xx.c
+> @@ -694,6 +662,7 @@ static int mtk_spi_resume(struct device *dev)
+>         if (!pm_runtime_suspended(dev)) {
+>                 ret = clk_prepare_enable(mdata->spi_clk);
+>                 if (ret < 0)
+> +                       dev_err(dev, "failed to enable spi_clk (%d)\n", ret);
+>                         return ret;
 
-Regards
-Afzal
+You need to add braces here, else the "return ret" isn't covered by
+the if () anymore and you always return at this place.
+
+>         }
+>
+> @@ -720,8 +689,14 @@ static int mtk_spi_runtime_resume(struct device *dev)
+>  {
+>         struct spi_master *master = dev_get_drvdata(dev);
+>         struct mtk_spi *mdata = spi_master_get_devdata(master);
+> +       int ret;
+> +
+> +       ret = clk_prepare_enable(mdata->spi_clk);
+> +       if (ret < 0)
+> +               dev_err(dev, "failed to enable spi_clk (%d)\n", ret);
+> +               return ret;
+
+Same here. Although at least here it should be harmless, as
+clk_prepare_enable doesn't return > 0.
+
+>
+> -       return clk_prepare_enable(mdata->spi_clk);
+> +       return 0;
+>  }
+>  #endif /* CONFIG_PM */
+>
+
+
+Jonas
