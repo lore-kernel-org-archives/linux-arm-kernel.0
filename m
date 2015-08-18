@@ -1,28 +1,36 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 18 Aug 2015 13:16:16 -0700
-Subject: [GIT PULL 3/3] ARM: imx: defconfig updates for 4.3
-In-Reply-To: <1439311351-5268-3-git-send-email-shawnguo@kernel.org>
-References: <1439311351-5268-1-git-send-email-shawnguo@kernel.org>
- <1439311351-5268-3-git-send-email-shawnguo@kernel.org>
-Message-ID: <20150818201616.GC4732@localhost>
+Date: Tue, 18 Aug 2015 13:18:09 -0700
+Subject: [PATCH 2/2] ARM64: dts: vexpress: Use assigned-clock-parents for
+ sp810
+In-Reply-To: <1439343411-29168-2-git-send-email-sboyd@codeaurora.org>
+References: <1439343411-29168-1-git-send-email-sboyd@codeaurora.org>
+ <1439343411-29168-2-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20150818201809.GE4732@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 12, 2015 at 12:42:31AM +0800, Shawn Guo wrote:
-> The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
+On Tue, Aug 11, 2015 at 06:36:51PM -0700, Stephen Boyd wrote:
+> The sp810 clk driver is calling the clk consumer APIs from
+> clk_prepare ops to change the parent to a 1 MHz fixed rate clock
+> for each of the clocks that the driver provides. Use
+> assigned-clock-parents for this instead of doing it in the driver
+> to avoid using the consumer API in provider code. This also
+> allows us to remove the usage of clk provider APIs that take a
+> struct clk as an argument from the sp810 driver.
 > 
->   Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
+> Cc: Pawel Moll <pawel.moll@arm.com>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Tested-by: Sudeep Holla <sudeep.holla@arm.com>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
 > 
-> are available in the git repository at:
+> This came out of a larger series to change this binding[1]. This
+> patch can go through arm-soc independently though, so please apply.
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-defconfig-4.3
-> 
-> for you to fetch changes up to 9559b3a38b26ab8410aeb822cf0596ea0b4adde4:
-> 
->   ARM: imx_v6_v7_defconfig: Select CONFIG_IKCONFIG_PROC (2015-07-27 22:33:50 +0800)
-> 
+> [1] http://lkml.kernel.org/r/1438386285-5070-1-git-send-email-sboyd at codeaurora.org
 
-Merged, thanks.
+
+Applied, thanks.
 
 
 -Olof
