@@ -1,70 +1,35 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 18 Aug 2015 10:08:58 +0200
-Subject: [PATCH 07/10] ARM: marvell/dt: add crypto related nodes to armada 38x
- dtsi
+Date: Tue, 18 Aug 2015 10:08:57 +0200
+Subject: [PATCH 06/10] ARM: marvell/dt: define crypto SRAM ranges in
+ armada-375-db.dts
 In-Reply-To: <1439885341-14644-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1439885341-14644-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1439885341-14644-8-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1439885341-14644-7-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add crypto related nodes in armada-38x.dtsi.
+Define the crypto SRAM ranges so that the resources referenced by the
+sa-sram node can be properly extracted from the DT.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-38x.dtsi | 33 +++++++++++++++++++++++++++++++++
- 1 file changed, 33 insertions(+)
+ arch/arm/boot/dts/armada-375-db.dts | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
-index f9f2347..db6e939 100644
---- a/arch/arm/boot/dts/armada-38x.dtsi
-+++ b/arch/arm/boot/dts/armada-38x.dtsi
-@@ -509,6 +509,21 @@
- 				clocks = <&gateclk 4>;
- 			};
+diff --git a/arch/arm/boot/dts/armada-375-db.dts b/arch/arm/boot/dts/armada-375-db.dts
+index 5711b97..cded5f0 100644
+--- a/arch/arm/boot/dts/armada-375-db.dts
++++ b/arch/arm/boot/dts/armada-375-db.dts
+@@ -65,7 +65,9 @@
  
-+			crypto at 90000 {
-+				compatible = "marvell,armada-375-crypto";
-+				reg = <0x90000 0x10000>;
-+				reg-names = "regs";
-+				interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>,
-+					     <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&gateclk 23>, <&gateclk 21>,
-+					 <&gateclk 14>, <&gateclk 16>;
-+				clock-names = "cesa0", "cesa1",
-+					      "cesaz0", "cesaz1";
-+				marvell,crypto-srams = <&crypto_sram0>,
-+						       <&crypto_sram1>;
-+				marvell,crypto-sram-size = <0x800>;
-+			};
-+
- 			rtc at a3800 {
- 				compatible = "marvell,armada-380-rtc";
- 				reg = <0xa3800 0x20>, <0x184a0 0x0c>;
-@@ -584,6 +599,24 @@
- 				status = "disabled";
- 			};
- 		};
-+
-+		crypto_sram0: sa-sram0 {
-+			compatible = "mmio-sram";
-+			reg = <MBUS_ID(0x09, 0x19) 0 0x800>;
-+			clocks = <&gateclk 23>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges = <0 MBUS_ID(0x09, 0x19) 0 0x800>;
-+		};
-+
-+		crypto_sram1: sa-sram1 {
-+			compatible = "mmio-sram";
-+			reg = <MBUS_ID(0x09, 0x15) 0 0x800>;
-+			clocks = <&gateclk 21>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges = <0 MBUS_ID(0x09, 0x15) 0 0x800>;
-+		};
- 	};
+ 	soc {
+ 		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000
+-			  MBUS_ID(0x01, 0x1d) 0 0xfff00000 0x100000>;
++			  MBUS_ID(0x01, 0x1d) 0 0xfff00000 0x100000
++			  MBUS_ID(0x09, 0x09) 0 0xf1100000 0x10000
++			  MBUS_ID(0x09, 0x05) 0 0xf1110000 0x10000>;
  
- 	clocks {
+ 		internal-regs {
+ 			spi at 10600 {
 -- 
 1.9.1
