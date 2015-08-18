@@ -1,37 +1,25 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 18 Aug 2015 13:31:41 -0700
-Subject: [GIT PULL] Fourth Round of Renesas ARM Based SoC DT Updates for
- v4.3
-In-Reply-To: <cover.1439366241.git.horms+renesas@verge.net.au>
-References: <cover.1439366241.git.horms+renesas@verge.net.au>
-Message-ID: <20150818203141.GG4732@localhost>
+Date: Tue, 18 Aug 2015 13:33:26 -0700
+Subject: [GIT PULL 1/2] omap soc fix for v4.3 merge window
+In-Reply-To: <55cc6d03.8a8d420a.93b25.50c3SMTPIN_ADDED_BROKEN@mx.google.com>
+References: <55cc6d03.8a8d420a.93b25.50c3SMTPIN_ADDED_BROKEN@mx.google.com>
+Message-ID: <20150818203326.GH4732@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 12, 2015 at 05:15:25PM +0900, Simon Horman wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
+On Thu, Aug 13, 2015 at 03:08:45AM -0700, Tony Lindgren wrote:
+> The following changes since commit 24da741c678f865de3182194604dbddcc7fc7f3c:
 > 
-> Please consider these fourth round of Renesas ARM based SoC DT updates for v4.3.
+>   Merge branch 'dm814x-soc' into omap-for-v4.3/soc (2015-07-23 21:59:18 -0700)
 > 
-> As requested by Olof, this is a repost of patches broken out of a now
-> defunct pull-request, "Renesas ARM Based SoC CPG MSTP Clock Domain Updates
-> for v4.3".  The motivation being to have driver changes in a separate
-> branch to DT changes.
+> are available in the git repository at:
 > 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.3/soc-pt2
 > 
-> This pull request is based on a merge of:
+> for you to fetch changes up to ed293d1ad2b0c28b6abc3bd728b07754bc00f1cd:
 > 
-> * "Renesas ARM Based SoC CPG/MSTP Clock Driver Updates for v4.3",
->   tagged as renesas-clk-for-v4.3, which I have also sent a pull request for.
-> 
->   The patches in this pull request depend on driver changes in
->   renesas-clk-for-v4.3.
-> 
-> * "Third Round of Renesas ARM Based SoC DT Updates for v4.3",
->   tagged as renesas-dt3-for-v4.3, which you have already merged.
-> 
->   The patches in this pull request update nodes added by patches
->   present in renesas-dt3-for-v4.3.
+>   memory: kill off set_irq_flags usage (2015-08-13 00:48:52 -0700)
+
 
 Merged, thanks.
 
