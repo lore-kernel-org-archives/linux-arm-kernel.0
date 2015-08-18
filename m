@@ -1,38 +1,67 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Tue, 18 Aug 2015 09:10:27 +0200
-Subject: [PATCH] ARM: multi_v7_defconfig: Enable CROS_EC_PROTO for ChromeOS EC
- mfd driver
-Message-ID: <1439881827-22613-1-git-send-email-javier@osg.samsung.com>
+From: yh.huang@mediatek.com (YH Huang)
+Date: Tue, 18 Aug 2015 15:27:52 +0800
+Subject: [PATCH v7 0/3] Add MediaTek display PWM driver
+Message-ID: <1439882875-19596-1-git-send-email-yh.huang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ChromeOS mfd driver (MFD_CROS_EC) select the CROS_EC_PROTO config
-symbol because the driver uses some communication helper functions in
-drivers/platform/chrome/cros_ec_proto.c but other drivers depends on
-CROS_EC_PROTO instead. Mixing select and depends can lead to circular
-Kconfig dependencies so the MFD_CROS_EC select should be changed to a
-depends on CROS_EC_PROTO instead.
+This patch series add the use of display PWM driver, documentation 
+and device tree for Mediatek SoCs. The driver is used to support 
+the backlight of the panel. This is based on v4.2-rc1.
 
-But doing so will break git bisect-ability since MFD_CROS_EC will not
-be enabled anymore unless the default configs first explicitly enable
-the CROS_EC_PROTO dependency.
+The clock definitions (CLK_MM_DISP_PWM*) are added by James Liao's patch: 
+clk: mediatek: Add subsystem clocks of MT8173
 
-Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
----
- arch/arm/configs/multi_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+Change in v7:
+1. Add the dependency HAS_IOMEM in Kconfig.
+2. Revise misprints and coding style for readability.
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index b2facab87399..bd406f660ffe 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -619,6 +619,7 @@ CONFIG_QCOM_PM=y
- CONFIG_COMMON_CLK_QCOM=y
- CONFIG_CHROME_PLATFORMS=y
- CONFIG_CROS_EC_CHARDEV=m
-+CONFIG_CROS_EC_PROTO=y
- CONFIG_COMMON_CLK_MAX77686=y
- CONFIG_COMMON_CLK_MAX77802=m
- CONFIG_COMMON_CLK_S2MPS11=m
--- 
-2.4.3
+Change in v6:
+1. Enable clocks in the pwm_enable function.
+2. Remove suspend/resume code since pwm-backlight driver has done the
+same things.
+3. Revise some code to make it easier to read.
+
+Change in v5:
+1. Configure PWM output via pinctrl.
+2. Fix the parameter name in dtsi.
+
+Change in v4:
+1. Codebase is on v4.2-rc1.
+2. Add the PWM node in dtsi.
+3. Change the dependency in Kconfig.
+4. Rewrite some code for readability.
+
+Change in v3:
+1. Add suspend/resume function.
+2. Fix the formula for high_width calculation.
+3. Rewrite some code to make it easier to read.
+4. Add more information in the commit message.
+
+Change in v2:
+1. Rewrite descriptions for driver in kconfig to make it much clear.
+2. Rename the driver from "pwm-mediatek-disp" to "pwm-mtk-disp".
+3. Disable clocks in the error path.
+4. Change the shift values in decimal instead of hex.
+5. Rename and add some variables or function name for consistency and
+readability.
+6. Drop unnecessary parentheses, spaces, variables and add newlines to
+make the code easiler to read.
+
+YH Huang (3):
+  dt-bindings: pwm: add MediaTek display PWM bindings
+  pwm: add MediaTek display PWM driver support
+  arm64: dts: mt8173: add MT8173 display PWM driver support node
+
+ .../devicetree/bindings/pwm/pwm-mtk-disp.txt       |   42 ++++
+ arch/arm64/boot/dts/mediatek/mt8173-evb.dts        |   13 ++
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi           |   22 ++
+ drivers/pwm/Kconfig                                |   11 +
+ drivers/pwm/Makefile                               |    1 +
+ drivers/pwm/pwm-mtk-disp.c                         |  232 ++++++++++++++++++++
+ 6 files changed, 321 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
+ create mode 100644 drivers/pwm/pwm-mtk-disp.c
+
+--
+1.7.9.5
