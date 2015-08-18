@@ -1,76 +1,48 @@
-From: emil.l.velikov@gmail.com (Emil Velikov)
-Date: Tue, 18 Aug 2015 17:41:59 +0100
-Subject: [PATCH 2/4] drm: Add support for ARM's HDLCD controller.
-In-Reply-To: <20150817151547.GA1020@e106497-lin.cambridge.arm.com>
-References: <1438784892-27888-1-git-send-email-Liviu.Dudau@arm.com>
- <1438784892-27888-3-git-send-email-Liviu.Dudau@arm.com>
- <CACvgo537C6SRfhMTNoE4cSLJukcXuKLvt1TRykynX--ybEhmaQ@mail.gmail.com>
- <20150817151547.GA1020@e106497-lin.cambridge.arm.com>
-Message-ID: <CACvgo53KWsC1ZeYYF2bW=4=BeuexaEgBHT=+h2U60iS9nYvYpw@mail.gmail.com>
+From: HartleyS@visionengravers.com (Hartley Sweeten)
+Date: Tue, 18 Aug 2015 16:45:44 +0000
+Subject: [PATCH V2] Watchdog: Fix parent of watchdog_devices
+In-Reply-To: <9fcc2a2cc8273f461baa13c6c9992f3ca56b508a.1439915117.git.panand@redhat.com>
+References: <9fcc2a2cc8273f461baa13c6c9992f3ca56b508a.1439915117.git.panand@redhat.com>
+Message-ID: <BN3PR0101MB1057C3FE09F00EEC55D2C9B1D0780@BN3PR0101MB1057.prod.exchangelabs.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 August 2015 at 16:15, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
-> On Sun, Aug 16, 2015 at 09:56:33AM +0100, Emil Velikov wrote:
->> Hi Liviu,
+On Tuesday, August 18, 2015 9:34 AM, Pratyush Anand wrote:
+> 
+> /sys/class/watchdog/watchdogn/device/modalias can help to identify the
+> driver/module for a given watchdog node. However, many wdt devices does not set
+> its parent and so, we do not see an entry for device in sysfs for such devices.
 >
-> Hi Emil,
+> This patch fixes parent of watchdog_device so that
+> /sys/class/watchdog/watchdogn/device is populated.
 >
->>
->> On 5 August 2015 at 15:28, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
->> > The HDLCD controller is a display controller that supports resolutions
->> > up to 4096x4096 pixels. It is present on various development boards
->> > produced by ARM Ltd and emulated by the latest Fast Models from the
->> > company.
->> >
->> I believe there is a unofficial requirement(?) for new drm drivers to
->> use atomic modesetting. Not 100% sure on this one though. The
->> following drivers: tegra, msm, rcar-du, i915, and Daniel's blog [1]
->> [2] cat provide some information on the topic.
+> Exceptions: booke, diag288, mpc8xxx, octeon, softdog and w83627hf -- They do not
+> have any parent. Not sure, how we can we identify driver for these devices.
 >
-> I am also interested to know if this is a requirement or not.
-> Thanks for the pointers, I will review them again to see if I did miss
-> anything. I remember reading them at the beginning of the year but probably
-> the Christmas haze did not clear enough when I did.
->
-There was a similar question from the freescale dcu people [1]. I
-believe that the answer still applies.
+> Signed-off-by: Pratyush Anand <panand@redhat.com>
+> ---
+[snip]
 
-[1] http://lists.freedesktop.org/archives/dri-devel/2015-March/078689.html
+drivers/watchdog/ep93xx_wdt.c       | 1 +
 
->>
->> The driver seems to has has a bit of dead code guarded by
->> HDLCD_*_UNDERRUN. Perhaps these macros should become build or runtime
->> switch(es) ?
->
-> There is a comment in hdlcd_drv.h explaining what HDLCD_SHOW_UNDERRUN can
-> be used for. As for HDLCD_COUNT_BUFFERUNDERRUNS, you are right, it's dead
-> code from the earlier debugging code that got removed before submission.
-> I will correct that.
->
-I haven't seen other drm drivers follow the "set a macro that is
-documented in a header and rebuild" approach. Devs either add a CONFIG
-option for it, or expose it as a module parameter. IIRC the nouveau
-driver does even more - it enables the underrun machinery
-unconditionally.
+[snip]
 
->>
->> Most DRM drivers do not threat dma, bus_error, vsync and/or underrun
->> interrupts as debug functionality. They are of limited use in this
->> driver, presently, yet the CONFIG_DEBUG_FS guard seems a bit strange
->> imho.
->
-> The HDLCD device has only 1 interrupt that can fire and there is no other
-> way to show the reason for the interrupt in the driver. It was useful when
-> debugging underruns and/or vsync issues so I thought it might be useful
-> to keep around. Putting it the other way: if you are going to use this device
-> and the image is not completely rendered I would not be able to give you
-> support to figure out what went wrong without this debugging information.
-> With this in place I can tell the difference between a busy system vs one
-> where the interrupt latency is large.
->
-Out of curiosity - are there any implications/side-effects from having
-these enabled ?
+diff --git a/drivers/watchdog/ep93xx_wdt.c b/drivers/watchdog/ep93xx_wdt.c
+index 7a2cc7191c58..0a4d7cc05d54 100644
+--- a/drivers/watchdog/ep93xx_wdt.c
++++ b/drivers/watchdog/ep93xx_wdt.c
+@@ -132,6 +132,7 @@ static int ep93xx_wdt_probe(struct platform_device *pdev)
+ 	val = readl(mmio_base + EP93XX_WATCHDOG);
+ 	ep93xx_wdt_wdd.bootstatus = (val & 0x01) ? WDIOF_CARDRESET : 0;
+ 	ep93xx_wdt_wdd.timeout = timeout;
++	ep93xx_wdt_wdd.parent = &pdev->dev;
+ 
+ 	watchdog_set_nowayout(&ep93xx_wdt_wdd, nowayout);
+
+For ep93xx_wdt.c, use whichever tag you prefer:
+
+Reviewed-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
 
 Thanks,
-Emil
+Hartley
