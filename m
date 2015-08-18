@@ -1,100 +1,51 @@
 From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Tue, 18 Aug 2015 11:57:13 +0530
-Subject: [2/2] ARM: dts: Add missing irq pinctrl for max77686 on smdk5250
-In-Reply-To: <CAJKOXPdzhqXFWT0=eXpr+jjs8R4kFAMq2DSSsFHVEZq_PdAN2w@mail.gmail.com>
-References: <1416312509-11530-2-git-send-email-yadi.brar@samsung.com>
- <553F68CC.6030504@samsung.com> <5544657A.7010006@gmail.com>
- <CAJKOXPdzhqXFWT0=eXpr+jjs8R4kFAMq2DSSsFHVEZq_PdAN2w@mail.gmail.com>
-Message-ID: <55D2D041.9020700@samsung.com>
+Date: Tue, 18 Aug 2015 11:59:20 +0530
+Subject: [PATCHi v2] ARM: dts: Fix bootup issue on smdk5250
+Message-ID: <1439879360-21150-1-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+From: Yadwinder Singh Brar <yadi.brar01@gmail.com>
 
-On Monday 17 August 2015 11:20 AM, Krzysztof Kozlowski wrote:
-> 2015-05-02 14:49 GMT+09:00 Krzysztof Kozlowski <k.kozlowski.k@gmail.com>:
->> W dniu 28.04.2015 o 20:02, Pankaj Dubey pisze:
->>> Hi Kukjin,
->>>
->>> Any updated for this patch. Without this PMIC RTC is not working on
->>> SMDK5250.
->>>
->>
->> Could you resend the patch after rebasing it?
->>
->> Best regards,
->> Krzysztof
->
-> Dear Pankaj and Yadwinder,
->
-> Do you plan to do anything with this patch?
->
-> Best regards,
-> Krzysztof
->
->
+With default config on smdk5250 latest tree throws below message :
 
-Just noticed that the patch in subject is already merged in kgene tree.
-There was another patch "[1/2]: ARM: dts: Fix bootup issue on smdk5250" 
-which was posted along with this is still not merged. Resending it once 
-again.
+[    2.226049] thermal thermal_zone0: critical temperature reached(224 C),shutting down
+[    2.227840] reboot: Failed to start orderly shutdown: forcing the issue
+
+and hangs randomly because it reads wrong temperature value.
+
+I can't figure out any direct relation between LDO10 and TMU from board
+schematics which I have. So making LDO10 always-on to fix issue for now.
+
+Signed-off-by: Yadwinder Singh Brar <yadi.brar01@gmail.com>
+[pankaj.dubey: resubmitted after rebasing to latest kgene tree]
+Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+Tested-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+---
+Resending this patch after rebasing. Previous discussion can be found here [1]
+
 
 [1]: http://www.spinics.net/lists/linux-samsung-soc/msg39100.html
 
-Thanks,
-Pankaj Dubey
->>> Thanks,
->>> Pankaj Dubey
->>>
->>> On Tuesday 18 November 2014 05:38 PM, Yadwinder Singh Brar wrote:
->>>> This patch adds pinctrl configuration for using configuring gpx3-2 as an
->>>> external interrupt from max77686. Though max77686 RTC is enabled and gets
->>>> probed by default, it doesnt work as its unable to get interrupt.
->>>>
->>>> This patch makes max77686 RTC work and also configures it as wakeup
->>>> source.
->>>>
->>>> Signed-off-by: Yadwinder Singh Brar <yadi.brar@samsung.com>
->>>> Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
->>>> Tested-by: Pankaj Dubey <pankaj.dubey@samsung.com>
->>>>
->>>> ---
->>>> arch/arm/boot/dts/exynos5250-smdk5250.dts |   12 ++++++++++++
->>>>    1 files changed, 12 insertions(+), 0 deletions(-)
->>>>
->>>> diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts
->>>> b/arch/arm/boot/dts/exynos5250-smdk5250.dts
->>>> index 95b5b51..19cd918 100644
->>>> --- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
->>>> +++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
->>>> @@ -131,6 +131,9 @@
->>>>            reg = <0x09>;
->>>>            interrupt-parent = <&gpx3>;
->>>>            interrupts = <2 IRQ_TYPE_NONE>;
->>>> +        pinctrl-names = "default";
->>>> +        pinctrl-0 = <&max77686_irq>;
->>>> +        wakeup-source;
->>>>
->>>>            voltage-regulators {
->>>>                ldo1_reg: LDO1 {
->>>> @@ -411,3 +414,12 @@
->>>>            };
->>>>        };
->>>>    };
->>>> +
->>>> +&pinctrl_0 {
->>>> +    max77686_irq: max77686-irq {
->>>> +        samsung,pins = "gpx3-2";
->>>> +        samsung,pin-function = <0xf>;
->>>> +        samsung,pin-pud = <0>;
->>>> +        samsung,pin-drv = <0>;
->>>> +    };
->>>> +};
->>>>
->>> --
->>> To unsubscribe from this list: send the line "unsubscribe
->>> linux-samsung-soc" in
->>> the body of a message to majordomo at vger.kernel.org
->>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>
->
+Changes since v1:
+ - Rebased on latest kgene tree, test booting and s2r on SMDK5250 board.
+ - Removed Yadwinder Singh's Samsung's email id as it's no more valid.
+ - Added my Signed-off-by for touching this file and patch.
+
+ arch/arm/boot/dts/exynos5250-smdk5250.dts | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+index 15aea76..c625e71 100644
+--- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
++++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+@@ -197,6 +197,7 @@
+ 				regulator-name = "P1.8V_LDO_OUT10";
+ 				regulator-min-microvolt = <1800000>;
+ 				regulator-max-microvolt = <1800000>;
++				regulator-always-on;
+ 			};
+ 
+ 			ldo11_reg: LDO11 {
+-- 
+2.4.5
