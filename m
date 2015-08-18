@@ -1,214 +1,182 @@
-From: briannorris@chromium.org (Brian Norris)
-Date: Tue, 18 Aug 2015 11:44:14 -0700
-Subject: [PATCH 1/2] ARM: dts: rockchip: add veyron-jaq board
-Message-ID: <1439923455-109818-1-git-send-email-briannorris@chromium.org>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Tue, 18 Aug 2015 21:01:09 +0200
+Subject: [PATCH v2 04/21] ARM: pxa: magician: Add, fix and init (new) GPIOs
+In-Reply-To: <55D258E9.9010303@tul.cz> (Petr Cvek's message of "Mon, 17 Aug
+ 2015 23:58:01 +0200")
+References: <cover.1439843482.git.petr.cvek@tul.cz> <55D258E9.9010303@tul.cz>
+Message-ID: <87mvxo8lqi.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-a.k.a. Haier Chromebook 11
+Petr Cvek <petr.cvek@tul.cz> writes:
 
-Signed-off-by: Brian Norris <briannorris@chromium.org>
-Cc: Alexandru M Stan <amstan@chromium.org>
-Cc: Douglas Anderson <dianders@chromium.org>
----
- arch/arm/boot/dts/Makefile              |   1 +
- arch/arm/boot/dts/rk3288-veyron-jaq.dts | 176 ++++++++++++++++++++++++++++++++
- 2 files changed, 177 insertions(+)
- create mode 100644 arch/arm/boot/dts/rk3288-veyron-jaq.dts
+> Add new GPIOs, fix some GPIO names and initialization (EGPIO, LCD power on
+> sequence).
+>
+> Signed-off-by: Petr Cvek <petr.cvek@tul.cz>
+> ---
+>  arch/arm/mach-pxa/include/mach/magician.h |  39 ++++---
+>  arch/arm/mach-pxa/magician.c              | 166 +++++++++++++++++++++++-------
+>  2 files changed, 153 insertions(+), 52 deletions(-)
+>
+> diff --git a/arch/arm/mach-pxa/include/mach/magician.h b/arch/arm/mach-pxa/include/mach/magician.h
+> index ba6a6e1..d19e504 100644
+> --- a/arch/arm/mach-pxa/include/mach/magician.h
+> +++ b/arch/arm/mach-pxa/include/mach/magician.h
+> @@ -21,10 +21,10 @@
+>  
+>  #define GPIO0_MAGICIAN_KEY_POWER		0
+>  #define GPIO9_MAGICIAN_UNKNOWN			9
+> -#define GPIO10_MAGICIAN_GSM_IRQ			10
+> +#define GPIO10_MAGICIAN_GSM_IRQ		10
+Whitespace/indentation changes ?
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 7805a6541a38..7a2c3c88ce9e 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -493,6 +493,7 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += \
- 	rk3288-veyron-jerry.dtb \
- 	rk3288-veyron-minnie.dtb \
- 	rk3288-veyron-pinky.dtb \
-+	rk3288-veyron-jaq.dtb \
- 	rk3288-veyron-speedy.dtb
- dtb-$(CONFIG_ARCH_S3C24XX) += \
- 	s3c2416-smdk2416.dtb
-diff --git a/arch/arm/boot/dts/rk3288-veyron-jaq.dts b/arch/arm/boot/dts/rk3288-veyron-jaq.dts
-new file mode 100644
-index 000000000000..ea6130156216
---- /dev/null
-+++ b/arch/arm/boot/dts/rk3288-veyron-jaq.dts
-@@ -0,0 +1,176 @@
-+/*
-+ * Google Veyron Jaq Rev 1+ board device tree source
-+ *
-+ * Copyright 2015 Google, Inc
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ *  Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+
-+#include "rk3288-veyron-chromebook.dtsi"
-+#include "cros-ec-sbs.dtsi"
-+
-+/ {
-+	model = "Google Jaq";
-+	compatible = "google,veyron-jaq-rev5", "google,veyron-jaq-rev4",
-+		     "google,veyron-jaq-rev3", "google,veyron-jaq-rev2",
-+		     "google,veyron-jaq-rev1", "google,veyron-jaq",
-+		     "google,veyron", "rockchip,rk3288";
-+
-+	panel_regulator: panel-regulator {
-+		compatible = "regulator-fixed";
-+		enable-active-high;
-+		gpio = <&gpio7 14 GPIO_ACTIVE_HIGH>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&lcd_enable_h>;
-+		regulator-name = "panel_regulator";
-+		vin-supply = <&vcc33_sys>;
-+	};
-+
-+	vcc18_lcd: vcc18-lcd {
-+		compatible = "regulator-fixed";
-+		enable-active-high;
-+		gpio = <&gpio2 13 GPIO_ACTIVE_HIGH>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&avdd_1v8_disp_en>;
-+		regulator-name = "vcc18_lcd";
-+		regulator-always-on;
-+		regulator-boot-on;
-+		vin-supply = <&vcc18_wl>;
-+	};
-+
-+	backlight_regulator: backlight-regulator {
-+		compatible = "regulator-fixed";
-+		enable-active-high;
-+		gpio = <&gpio2 12 GPIO_ACTIVE_HIGH>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&bl_pwr_en>;
-+		regulator-name = "backlight_regulator";
-+		vin-supply = <&vcc33_sys>;
-+		startup-delay-us = <15000>;
-+	};
-+};
-+
-+&rk808 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pmic_int_l &dvs_1 &dvs_2>;
-+	dvs-gpios = <&gpio7 12 GPIO_ACTIVE_HIGH>,
-+		    <&gpio7 15 GPIO_ACTIVE_HIGH>;
-+
-+	regulators {
-+		mic_vcc: LDO_REG2 {
-+			regulator-name = "mic_vcc";
-+			regulator-always-on;
-+			regulator-boot-on;
-+			regulator-min-microvolt = <1800000>;
-+			regulator-max-microvolt = <1800000>;
-+			regulator-state-mem {
-+				regulator-on-in-suspend;
-+			};
-+		};
-+	};
-+};
-+
-+&sdmmc {
-+	disable-wp;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&sdmmc_clk &sdmmc_cmd &sdmmc_cd_disabled &sdmmc_cd_gpio
-+			&sdmmc_bus4>;
-+};
-+
-+&vcc_5v {
-+	enable-active-high;
-+	gpio = <&gpio7 21 GPIO_ACTIVE_HIGH>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&drv_5v>;
-+};
-+
-+&vcc50_hdmi {
-+	enable-active-high;
-+	gpio = <&gpio5 19 GPIO_ACTIVE_HIGH>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&vcc50_hdmi_en>;
-+};
-+
-+&pinctrl {
-+	backlight {
-+		bl_pwr_en: bl_pwr_en {
-+			rockchip,pins = <2 12 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+	};
-+
-+	buck-5v {
-+		drv_5v: drv-5v {
-+			rockchip,pins = <7 21 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+	};
-+
-+	edp {
-+		edp_hpd: edp_hpd {
-+			rockchip,pins = <7 11 RK_FUNC_2 &pcfg_pull_down>;
-+		};
-+	};
-+
-+	hdmi {
-+		vcc50_hdmi_en: vcc50-hdmi-en {
-+			rockchip,pins = <5 19 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+	};
-+
-+	lcd {
-+		lcd_enable_h: lcd-en {
-+			rockchip,pins = <7 14 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+
-+		avdd_1v8_disp_en: avdd-1v8-disp-en {
-+			rockchip,pins = <2 13 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+	};
-+
-+	pmic {
-+		dvs_1: dvs-1 {
-+			rockchip,pins = <7 12 RK_FUNC_GPIO &pcfg_pull_down>;
-+		};
-+
-+		dvs_2: dvs-2 {
-+			rockchip,pins = <7 15 RK_FUNC_GPIO &pcfg_pull_down>;
-+		};
-+	};
-+};
+>  #define GPIO11_MAGICIAN_GSM_OUT1		11
+>  #define GPIO13_MAGICIAN_CPLD_IRQ		13
+> -#define GPIO18_MAGICIAN_UNKNOWN			18
+> +#define GPIO18_MAGICIAN_UNKNOWN		18
+Ditto.
+
+> @@ -32,8 +32,10 @@
+>  #define GPIO37_MAGICIAN_KEY_HANGUP		37
+>  #define GPIO38_MAGICIAN_KEY_CONTACTS		38
+>  #define GPIO40_MAGICIAN_GSM_OUT2		40
+> -#define GPIO48_MAGICIAN_UNKNOWN			48
+> -#define GPIO56_MAGICIAN_UNKNOWN			56
+> +#define GPIO46_MAGICIAN_IR_RX			46
+> +#define GPIO47_MAGICIAN_IR_TX			47
+> +#define GPIO48_MAGICIAN_UNKNOWN		48
+> +#define GPIO56_MAGICIAN_UNKNOWN		56
+Ditto for 48, 56 ?
+
+>  #define GPIO57_MAGICIAN_CAM_RESET		57
+>  #define GPIO75_MAGICIAN_SAMSUNG_POWER		75
+>  #define GPIO83_MAGICIAN_nIR_EN			83
+> @@ -51,15 +53,17 @@
+>  #define GPIO100_MAGICIAN_KEY_VOL_UP		100
+>  #define GPIO101_MAGICIAN_KEY_VOL_DOWN 		101
+>  #define GPIO102_MAGICIAN_KEY_PHONE		102
+> -#define GPIO103_MAGICIAN_LED_KP			103
+> -#define GPIO104_MAGICIAN_LCD_POWER_1 		104
+> -#define GPIO105_MAGICIAN_LCD_POWER_2		105
+> -#define GPIO106_MAGICIAN_LCD_POWER_3		106
+> +#define GPIO103_MAGICIAN_LED_KP		103
+Ditto ?
+> +#define GPIO104_MAGICIAN_LCD_VOFF_EN		104
+> +#define GPIO105_MAGICIAN_LCD_VON_EN		105
+> +#define GPIO106_MAGICIAN_LCD_DCDC_NRESET	106
+>  #define GPIO107_MAGICIAN_DS1WM_IRQ		107
+>  #define GPIO108_MAGICIAN_GSM_READY		108
+>  #define GPIO114_MAGICIAN_UNKNOWN		114
+>  #define GPIO115_MAGICIAN_nPEN_IRQ		115
+>  #define GPIO116_MAGICIAN_nCAM_EN		116
+> +#define GPIO117_MAGICIAN_I2C_SCL		117
+> +#define GPIO118_MAGICIAN_I2C_SDA		118
+>  #define GPIO119_MAGICIAN_UNKNOWN		119
+>  #define GPIO120_MAGICIAN_UNKNOWN		120
+>  
+> @@ -78,7 +82,7 @@
+>   * CPLD EGPIOs
+>   */
+>  
+> -#define MAGICIAN_EGPIO_BASE			PXA_NR_BUILTIN_GPIO
+> +#define MAGICIAN_EGPIO_BASE	PXA_NR_BUILTIN_GPIO
+Ditto ?
+
+>From here onward, I'll suppose you'll catch all whitespace/indentation changes
+and extract them towards patch 01/21 ...
+
+>  /* input */
+>  
+> -#define EGPIO_MAGICIAN_CABLE_STATE_AC		MAGICIAN_EGPIO(4, 0)
+> -#define EGPIO_MAGICIAN_CABLE_STATE_USB		MAGICIAN_EGPIO(4, 1)
+> +/* AC=1, USB=0 */
+> +#define EGPIO_MAGICIAN_CABLE_TYPE		MAGICIAN_EGPIO(4, 0)
+> +/* =1 when AC or USB cable inserted */
+> +#define EGPIO_MAGICIAN_CABLE_INSERT1		MAGICIAN_EGPIO(4, 1)
+The naming makes me uneasy : it's rather vague "cable insert".
+If AC and USB are the only charging methods, why not have something like
+"EGPIO_MAGICIAN_POWERED" or the like ?
+
+>  	GPIO10_GPIO,	/* GSM_IRQ */
+>  	GPIO13_GPIO,	/* CPLD_IRQ */
+>  	GPIO107_GPIO,	/* DS1WM_IRQ */
+>  	GPIO108_GPIO,	/* GSM_READY */
+>  	GPIO115_GPIO,	/* nPEN_IRQ */
+>  
+> -	/* I2C */
+> -	GPIO117_I2C_SCL,
+> -	GPIO118_I2C_SDA,
+Okay so that are no I2C devices on magician ? Why keep GPIO119_MAGICIAN_I2C_* at
+the beginning of the file then ?
+
+> +	MFP_CFG_OUT(GPIO40, AF0, DRIVE_LOW),	/* FIXME GSM? */
+> +	MFP_CFG_OUT(GPIO87, AF0, DRIVE_LOW),	/* FIXME GSM? */
+> +
+> +	/* Left GPIOs (undefined here):
+> +	 * 18, 49 : bootloader=VLIO?, WinM=TODO
+> +	 * 48 : AF0/out0
+> +	 * 56 : AF0/out0
+> +	 * 74 : bootloader=AF0/output
+> +	 * 86 : bootloader=AF0/input (but should be gsm reset???)
+> +	 * 114 : AF0/out0
+> +	 * 119 : AF0/out0
+> +	 * 120 : AF0/out
+> +	 * 1 : dedicated reset, AF0/output
+> +	 * 13 : cpld irq, output (??)
+> +	 */
+This is not describing current code. This doesn't belong to this file, even if I
+know how frustrating it is to reverse engineer all these gpios. I created a wiki
+web page will all GPIOs to let go my frustration in the past :)
+
+> @@ -241,8 +324,9 @@ static struct htc_egpio_chip egpio_chips[] = {
+>  
+>  		/*
+>  		 * Depends on modules configuration
+> +		 * Things like MMC and LCD should be enabled
+>  		 */
+> -		.initial_values = 0x40,
+> +		.initial_values = 0x21a0c0,
+Aren't they enabled by each driver upon its probe() ? What if MMC nor LCD is
+compiled in the kernel ?
+
+> @@ -343,21 +427,19 @@ static void samsung_lcd_power(int on, struct fb_var_screeninfo *si)
+>  			gpio_set_value(GPIO75_MAGICIAN_SAMSUNG_POWER, 1);
+>  		else
+>  			gpio_set_value(EGPIO_MAGICIAN_LCD_POWER, 1);
+> -		mdelay(10);
+> -		gpio_set_value(GPIO106_MAGICIAN_LCD_POWER_3, 1);
+> -		mdelay(10);
+> -		gpio_set_value(GPIO104_MAGICIAN_LCD_POWER_1, 1);
+> -		mdelay(30);
+> -		gpio_set_value(GPIO105_MAGICIAN_LCD_POWER_2, 1);
+> -		mdelay(10);
+> +		mdelay(6);
+> +		gpio_set_value(GPIO106_MAGICIAN_LCD_DCDC_NRESET, 1);
+> +		mdelay(6);	/* Avdd -> Voff >5ms */
+> +		gpio_set_value(GPIO104_MAGICIAN_LCD_VOFF_EN, 1);
+> +		mdelay(16);	/* Voff -> Von >(5+10)ms */
+> +		gpio_set_value(GPIO105_MAGICIAN_LCD_VON_EN, 1);
+>  	} else {
+> -		mdelay(10);
+> -		gpio_set_value(GPIO105_MAGICIAN_LCD_POWER_2, 0);
+> -		mdelay(30);
+> -		gpio_set_value(GPIO104_MAGICIAN_LCD_POWER_1, 0);
+> -		mdelay(10);
+> -		gpio_set_value(GPIO106_MAGICIAN_LCD_POWER_3, 0);
+> -		mdelay(10);
+> +		gpio_set_value(GPIO105_MAGICIAN_LCD_VON_EN, 0);
+> +		mdelay(16);
+> +		gpio_set_value(GPIO104_MAGICIAN_LCD_VOFF_EN, 0);
+> +		mdelay(6);
+> +		gpio_set_value(GPIO106_MAGICIAN_LCD_DCDC_NRESET, 0);
+> +		mdelay(6);
+You're changing the timings here, right ? This should be an appart patch. What
+is the reason of the change by the way ?
+
+Cheers.
+
 -- 
-2.5.0.276.gf5e568e
+Robert
+
+PS: My workforce is done for today, next review tomorrow.
