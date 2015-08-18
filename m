@@ -1,32 +1,45 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 18 Aug 2015 11:21:52 +0200
-Subject: [PATCH] rtc: armada38x: Align RTC set time procedure with the
- official errata
-In-Reply-To: <1438874328-31844-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1438874328-31844-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20150818092152.GV22269@piout.net>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 18 Aug 2015 11:26:55 +0200
+Subject: [PULL] drm: atmel-hlcdc: new features for 4.3 or 4.4
+Message-ID: <20150818112655.26143418@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/08/2015 at 17:18:48 +0200, Gregory CLEMENT wrote :
-> From: Nadav Haklai <nadavh@marvell.com>
-> 
-> According to the Armada38x functional errata FE-3124064, writing to
-> the RTC TIME register may fail. As a workaround, after writing to RTC
-> TIME register, issue a dummy write of 0x0 twice to the RTC Status
-> register.  This is the updated implementation of the Errata that
-> eliminates the need of the long 100ms delay during the RTC set time
-> procedure.
-> 
-> [gregory.clement at free-electrons.com]: removed the mutex and use the
-> spinlock again
-> 
-> Signed-off-by: Nadav Haklai <nadavh@marvell.com>
-> Reviewed-by: Neta Zur Hershkovits <neta@marvell.com>
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Applied, thanks.
+Hello Dave,
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+The following PR add support for 3 more atmel SoCs and for some missing
+features (new input formats and PRIME support).
+
+As for the other PR I just sent, ideally I would like to get those new
+features into 4.3 but since we're already at 4.1-rc7 I'll let you decide
+whether this should be queued for the next release or not.
+
+Best Regards,
+
+Boris
+
+The following changes since commit 294947a5c7f6d228b70fcc51a89527e74a38a2c5:
+
+  Merge branch 'vmwgfx-next' of git://people.freedesktop.org/~thomash/linux into drm-next (2015-08-17 16:03:48 +1000)
+
+are available in the git repository at:
+
+
+  https://github.com/bbrezillon/linux-at91.git drm-atmel-hlcdc-devel
+
+for you to fetch changes up to 5b9fb5e6c6c74666f88f34bd0db183b9c4269d97:
+
+  drm: atmel-hlcdc: add support for sama5d4 SoCs (2015-08-18 11:02:27 +0200)
+
+----------------------------------------------------------------
+Boris Brezillon (6):
+      drm: atmel-hlcdc: add PRIME support
+      drm: atmel-hlcdc: add the missing DRM_ATOMIC flag
+      drm: atmel-hlcdc: add RGB565 and RGB444 output support
+      drm: atmel-hlcdc: add support for at91sam9x5 SoCs
+      drm: atmel-hlcdc: add support for at91sam9n12 SoC
+      drm: atmel-hlcdc: add support for sama5d4 SoCs
+
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c     | 216 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c |   4 ++++
+ 2 files changed, 219 insertions(+), 1 deletion(-)
