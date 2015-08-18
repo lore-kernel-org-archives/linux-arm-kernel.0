@@ -1,29 +1,19 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 18 Aug 2015 14:46:08 -0700
-Subject: [PATCH] ARM: multi_v7_defconfig: Enable CROS_EC_PROTO for
- ChromeOS EC mfd driver
-In-Reply-To: <1439881827-22613-1-git-send-email-javier@osg.samsung.com>
-References: <1439881827-22613-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <20150818214608.GA21855@localhost>
+Date: Tue, 18 Aug 2015 14:44:42 -0700
+Subject: [PATCH] ARM: add TC2 PM support to multi_v7_defconfig
+In-Reply-To: <alpine.LFD.2.20.1508142239070.1515@knanqh.ubzr>
+References: <alpine.LFD.2.20.1508142239070.1515@knanqh.ubzr>
+Message-ID: <20150818214442.GJ4732@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 18, 2015 at 09:10:27AM +0200, Javier Martinez Canillas wrote:
-> The ChromeOS mfd driver (MFD_CROS_EC) select the CROS_EC_PROTO config
-> symbol because the driver uses some communication helper functions in
-> drivers/platform/chrome/cros_ec_proto.c but other drivers depends on
-> CROS_EC_PROTO instead. Mixing select and depends can lead to circular
-> Kconfig dependencies so the MFD_CROS_EC select should be changed to a
-> depends on CROS_EC_PROTO instead.
+On Fri, Aug 14, 2015 at 10:46:25PM -0400, Nicolas Pitre wrote:
+> Without this, the multi_v7_defconfig kernel cannot boot all CPUs
+> nor do deep cpuidle power saving on a TC2 board.
 > 
-> But doing so will break git bisect-ability since MFD_CROS_EC will not
-> be enabled anymore unless the default configs first explicitly enable
-> the CROS_EC_PROTO dependency.
-> 
-> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> Signed-off-by: Nicolas Pitre <nico@linaro.org>
 
-Applied to cros/ec-config in arm-soc, which will stay stable in case others
-need to bring in as a prereq.
+Applied, thanks.
 
 
 -Olof
