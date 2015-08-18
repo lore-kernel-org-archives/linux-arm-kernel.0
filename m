@@ -1,21 +1,48 @@
-From: yh.huang@mediatek.com (YH Huang)
-Date: Tue, 18 Aug 2015 10:23:17 +0800
-Subject: [PATCH v6 1/3] dt-bindings: pwm: add MediaTek display PWM bindings
-In-Reply-To: <20150817132358.GN8453@ulmo.nvidia.com>
-References: <1437380237-28961-1-git-send-email-yh.huang@mediatek.com>
- <1437380237-28961-2-git-send-email-yh.huang@mediatek.com>
- <20150817132358.GN8453@ulmo.nvidia.com>
-Message-ID: <1439864597.26145.3.camel@mtksdaap41>
+From: edubezval@gmail.com (Eduardo Valentin)
+Date: Tue, 18 Aug 2015 02:30:49 -0700
+Subject: 3.18: lockdep problems in cpufreq
+In-Reply-To: <4248436.YMvuzoKMLH@vostro.rjw.lan>
+References: <20141214213655.GA11285@n2100.arm.linux.org.uk>
+ <5160300.5D2Dvly8u9@vostro.rjw.lan>
+ <20150813081744.GN7557@n2100.arm.linux.org.uk>
+ <4248436.YMvuzoKMLH@vostro.rjw.lan>
+Message-ID: <20150818093049.GA26346@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-08-17 at 15:23 +0200, Thierry Reding wrote:
-> On Mon, Jul 20, 2015 at 04:17:15PM +0800, YH Huang wrote:
-> > Document the device-tree binding of MediatTek display PWM.
-> 
-> I already mentioned this a while back: s/MediatTek/MediaTek/.
-> 
-Sorry, I will correct it to "MediaTek".
+Hi there,
 
-Regards,
-YH Huang
+On Mon, Aug 17, 2015 at 6:32 PM, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+
+<cut>
+
+>
+> Well, that's the situation as per MAINTAINERS today.  You seem to be concerned
+> that it may not reflect the reality, but in that case I can only recommend
+> sending a patch against MAINTAINERS to remove Eduardo from there.
+>
+>> As I've said, I'm not bothering with this anymore, it's just far too
+>> much effort to play these stupid games.
+>
+> I'm not sure what you mean by "these stupid games" here.
+>
+>> The deadlock can stay for all I care.
+>
+> Fair enough.
+
+I applied the patch. And it has generated the conflict in linux-next, as was mentioned in this thread. I already sent the pull request.
+
+Yes, I missed the thread. Apologize for this and for the inconvenience I have caused. The deadlock will be taken care using Russel's patch.
+
+Thanks Viresh for notifying me.
+
+
+>
+> Thanks,
+> Rafael
+>
+
+BR,
+
+-- 
+Eduardo Bezerra Valentin
