@@ -1,56 +1,133 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Tue, 18 Aug 2015 14:07:09 -0500
-Subject: [PATCH 2/3] [v4] ARM64: TTY: hvc_dcc: Add support for ARM64 dcc
-In-Reply-To: <20150818082141.GA6281@e103592.cambridge.arm.com>
-References: <1438992995-22610-1-git-send-email-timur@codeaurora.org>
- <1438992995-22610-2-git-send-email-timur@codeaurora.org>
- <20150810094008.GD1604@arm.com> <55D2749A.401@codeaurora.org>
- <20150818082141.GA6281@e103592.cambridge.arm.com>
-Message-ID: <55D3825D.6020105@codeaurora.org>
+From: dinh.linux@gmail.com (Dinh Nguyen)
+Date: Tue, 18 Aug 2015 14:11:58 -0500
+Subject: [PATCH v4 2/5] pci:host: Add Altera PCIe host controller driver
+In-Reply-To: <1439802579-22651-3-git-send-email-lftan@altera.com>
+References: <1439802579-22651-1-git-send-email-lftan@altera.com>
+ <1439802579-22651-3-git-send-email-lftan@altera.com>
+Message-ID: <CADhT+wfjYaEefScKNz-R5miA+_Ybm8PTHgG6jDT9ntb9e89twQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/18/2015 03:21 AM, Dave Martin wrote:
->> Do you think that I need an explicit instruction to clear the upper
->> >bits?  I tried a few compiler tricks (e.g. "c && 0xff" and the
->> >like), and they had no effect.
-> The in-register representation of a char permits the upper bits to be
-> nonzero, so you need to convert to a register-sized type if you want
-> to be able to force those bits to zero.
+On Mon, Aug 17, 2015 at 4:09 AM, Ley Foon Tan <lftan@altera.com> wrote:
+> This patch adds the Altera PCIe host controller driver.
 >
-> Try: (unsigned long)(unsigned char)c or (unsigned long)c & 0xff.
+> Signed-off-by: Ley Foon Tan <lftan@altera.com>
+> ---
+>  drivers/pci/host/Kconfig       |   7 +
+>  drivers/pci/host/Makefile      |   1 +
+>  drivers/pci/host/pcie-altera.c | 543 +++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 551 insertions(+)
+>  create mode 100644 drivers/pci/host/pcie-altera.c
+>
+> diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
+> index 675c2d1..4b4754a 100644
+> --- a/drivers/pci/host/Kconfig
+> +++ b/drivers/pci/host/Kconfig
+> @@ -145,4 +145,11 @@ config PCIE_IPROC_BCMA
+>           Say Y here if you want to use the Broadcom iProc PCIe controller
+>           through the BCMA bus interface
+>
 
-I tried all those, and more, and I still always get the same thing:
+<snip>
 
-   28:	38401423 	ldrb	w3, [x1],#1
-   2c:	d5130503 	msr	dbgdtrrx_el0, x3
+> +
+> +/* Address translation table entry size */
+> +#define ATT_ENTRY_SIZE         8
+> +
+> +#define DWORD_MASK             3
+> +
+> +struct altera_pcie {
+> +       struct platform_device  *pdev;
+> +       struct resource         *txs;
 
-I know that ldrb will zero-extend the byte to a 32-bit word.  But I 
-don't see any way to zero-extend the word into a 64-bit register.
+You have "Txs" documented in the bindings document, you have a pointer
+here, but you've never used it
+anywhre in the code? What is it for?
 
-I'm not even sure that this is necessary.  The dbgdtrrx_el0 register is 
-technically only 32-bit anyway.  It looks to me like the code is already 
-correct.
+> +       void __iomem            *cra_base;
+> +       int                     irq;
+> +       u8                      root_bus_nr;
+> +       struct irq_domain               *irq_domain;
+> +       struct resource         bus_range;
+> +       struct list_head                resources;
+> +};
+> +
 
-I could change the (c) to "(c && 0xff)" to be extra sure, but I can't 
-verify that it actually works.
+<snip>
 
->> >it gives this assembly code:
->> >
->> >   28:	38401423 	ldrb	w3, [x1],#1
->> >   2c:	53001c63 	uxtb	w3, w3
->> >   30:	d5130503 	msr	dbgdtrrx_el0, x3
->> >
->> >Is this correct?  Shouldn't it be "uxtb x3, w3"?
-> Check the ARM ARM for what operand combinations are allowed.  However,
-> it doesn't really make any difference here because it's a general rule
-> in the architecture that when an instruction's output is in a
-> W-register, the upper 32 bits of the corresponding X-register are
-> always zeroed anyway.
+> +
+> +static int tlp_cfg_dword_read(struct altera_pcie *pcie, u8 bus, u32 devfn,
+> +                             int where, u32 *value)
+> +{
+> +       int ret;
+> +       u32 headers[TLP_HDR_SIZE];
+> +
+> +       if (bus == pcie->root_bus_nr)
+> +               headers[0] = TLP_CFG_DW0(TLP_FMTTYPE_CFGRD0);
+> +       else
+> +               headers[0] = TLP_CFG_DW0(TLP_FMTTYPE_CFGRD1);
+> +
+> +       headers[1] = TLP_CFG_DW1(TLP_REQ_ID(pcie->root_bus_nr, devfn),
+> +                                       TLP_READ_TAG);
+> +       headers[2] = TLP_CFG_DW2(bus, devfn, where);
+> +
+> +       tlp_write_packet(pcie, headers, 0);
+> +
+> +       ret = tlp_read_packet(pcie, value);
+> +       if (ret)
+> +               *value = ~0UL;  /* return 0xFFFFFFFF if error */
+> +
+> +       return ret;
+> +}
+> +
+> +static int tlp_cfg_dword_write(struct altera_pcie *pcie, u8 bus, u32 devfn,
+> +                              int where, u32 value)
+> +{
+> +       u32 headers[TLP_HDR_SIZE];
+> +
+> +       if (bus == pcie->root_bus_nr)
+> +               headers[0] = TLP_CFG_DW0(TLP_FMTTYPE_CFGWR0);
+> +       else
+> +               headers[0] = TLP_CFG_DW0(TLP_FMTTYPE_CFGWR1);
+> +
+> +       headers[1] = TLP_CFG_DW1(TLP_REQ_ID(pcie->root_bus_nr, devfn),
+> +                                       TLP_WRITE_TAG);
+> +       headers[2] = TLP_CFG_DW2(bus, devfn, where);
+> +
+> +       tlp_write_packet(pcie, headers, value);
+> +
+> +       tlp_read_packet(pcie, NULL);
 
-So does that mean that ldrb will zero-extend the byte to all 64 bits of x3?
+You need to check for the error here.
 
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+> +
+> +       /* Keep an eye out for changes to the root bus number */
+> +       if ((bus == pcie->root_bus_nr) && (where == PCI_PRIMARY_BUS))
+> +               pcie->root_bus_nr = (u8)(value);
+> +
+> +       return PCIBIOS_SUCCESSFUL;
+> +}
+> +
+
+<snip>
+
+> +
+> +static int altera_pcie_parse_dt(struct altera_pcie *pcie)
+> +{
+> +       struct resource *cra;
+> +       struct platform_device *pdev = pcie->pdev;
+> +
+> +       cra = platform_get_resource_byname(pdev, IORESOURCE_MEM, "Cra");
+> +       if (!cra) {
+> +               cra = platform_get_resource_byname(pdev, IORESOURCE_MEM, "cra");
+> +               if (!cra) {
+> +                       dev_err(&pdev->dev,
+> +                               "no cra memory resource defined\n");
+> +                       return -ENODEV;
+> +               }
+> +       }
+> +
+
+What about "Txs"?
+
+Dinh
