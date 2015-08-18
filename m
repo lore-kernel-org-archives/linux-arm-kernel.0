@@ -1,46 +1,41 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Tue, 18 Aug 2015 16:39:11 +0200
-Subject: [PATCH v2 0/6] ARM: berlin: add cpufreq support
-In-Reply-To: <CAOh2x=ke9NWa-GjL=c+RgEWWfsNeKvE2O9CRHmW2dG5mj8ATCg@mail.gmail.com>
-References: <1439898368-11543-1-git-send-email-antoine.tenart@free-electrons.com>
- <CAOh2x=ke9NWa-GjL=c+RgEWWfsNeKvE2O9CRHmW2dG5mj8ATCg@mail.gmail.com>
-Message-ID: <20150818143911.GB12017@kwain>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 18 Aug 2015 09:43:47 -0500
+Subject: [PATCH v3] i2c: omap: improve duty cycle on SCL
+In-Reply-To: <CAFqkuUbO1CZ8bu8g8O7SsLF-0nUV274GZ08=6J1sVS4Foy+_EA@mail.gmail.com>
+References: <1434569475-17378-1-git-send-email-balbi@ti.com>
+ <55827CD7.7030207@nokia.com>
+ <20150618172558.GC27790@saruman.tx.rr.com>
+ <20150709194241.GF4744@katana>
+ <20150710172714.GC20408@saruman.tx.rr.com>
+ <20150813143651.GG27560@saruman.tx.rr.com>
+ <CAFqkuUbO1CZ8bu8g8O7SsLF-0nUV274GZ08=6J1sVS4Foy+_EA@mail.gmail.com>
+Message-ID: <20150818144347.GD9143@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+HI,
 
-On Tue, Aug 18, 2015 at 06:26:42PM +0530, Viresh Kumar wrote:
-> On Tue, Aug 18, 2015 at 5:16 PM, Antoine Tenart
-> <antoine.tenart@free-electrons.com> wrote:
-> >
-> > This series adds the cpufreq support to the Berlin SoCs, using
-> > cpufreq-dt.
-> >
-> > First, the cpuclk clock is added to the BG2Q clock driver. This clock
-> > has a divider fixed to 1, so we use a fixed factor clock here.
-> >
-> > Then register a platform device for cpufreq-dt.
-> >
-> > I also added the OPP table definition in the BG2Q, BG2 and BG2CD device
-> > trees. When using a BG2Q, some bootloaders may update this table when
-> > booting (mine doesn't).
+On Mon, Aug 17, 2015 at 06:28:11PM -0700, Matt Reimer wrote:
+> This doesn't seem to work for higher speeds, like 2.6 MHz. hssclh and
+> hsscll end up going negative.
 > 
-> You can switch to OPP-v2 bindings if you want. Just have a look, they are
-> much more powerful.. Should be in linux-next/master.
+> My case is an OMAP3 trying to configure i2c1 at 2.6 MHz, on which it talks
+> to TPS65950. I end up with the following values:
+> 
+>         SCLL 0x0000fd12 SCLH 0x0000fe13
+> 
+> The end result is that the high-speed part gets configured way too slow and
+> so the OMAP3 can't talk to the TPS65950.
 
-Nice!
-
-However, it seems the OPP-v2 table takes precedence over the old one.
-When a default OPP-v2 table is supplied in the device tree, if the
-bootloader supplies an OPP table the old way it won't be taken into
-account.
-
-So if I understood correctly, this won't work here for the BG2Q.
-
-Antoine
+hmm, indeed. Seems like anything above 1MHz would have an issue. I'll
+see what can be done there.
 
 -- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150818/1ab4b88c/attachment.sig>
