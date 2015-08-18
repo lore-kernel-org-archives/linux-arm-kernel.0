@@ -1,56 +1,71 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Tue, 18 Aug 2015 16:25:44 -0400
-Subject: [PATCH] ARM: keystone: add a work around to handle asynchronous
- external abort
-In-Reply-To: <20150818081334.GK7557@n2100.arm.linux.org.uk>
-References: <1439320409-20084-1-git-send-email-m-karicheri2@ti.com>
- <55CDF579.4050408@ti.com> <20150814140934.GX7557@n2100.arm.linux.org.uk>
- <55CE05EC.4040909@oracle.com> <55CE633C.10402@ti.com>
- <20150814215617.GA7557@n2100.arm.linux.org.uk> <55D25C64.3090107@ti.com>
- <55D2A1DD.9000007@oracle.com> <20150818081334.GK7557@n2100.arm.linux.org.uk>
-Message-ID: <55D394C8.7070605@ti.com>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Tue, 18 Aug 2015 22:30:18 +0200
+Subject: [PATCH 2/2] ARM: dts: rockchip: correct regulator PM properties
+In-Reply-To: <51457775.D3ds00ymOJ@phil>
+References: <1439923455-109818-1-git-send-email-briannorris@chromium.org>
+ <1439923455-109818-2-git-send-email-briannorris@chromium.org>
+ <51457775.D3ds00ymOJ@phil>
+Message-ID: <CABxcv==hssVa-b=cOjh3QhEOmQPZVvEPt0apLHQOva3GjJb9PA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
+Hello Heiko,
 
-On 08/18/2015 04:13 AM, Russell King - ARM Linux wrote:
-> On Mon, Aug 17, 2015 at 08:09:17PM -0700, santosh.shilimkar at oracle.com wrote:
->>  From the logs this seems to be mostly clock related issue for some
->> peripheral. If the bootloader clock enable all hack still exists,
->> may be you can try that out.
+On Tue, Aug 18, 2015 at 9:17 PM, Heiko Stuebner <heiko@sntech.de> wrote:
+> Hi Brian,
+>
+>
+> thanks for catching these oversights, but see below
+>
+> Am Dienstag, 18. August 2015, 11:44:15 schrieb Brian Norris:
+>> This DTS file was submitted with non-upstream bindings. I happened
+>> across this while reviewing the jaq DTS.
 >>
->> Another way to debug this is to start disabling peripheral drivers
->> from the kernel 1 by 1 and see if the issue goes away.
+>> Signed-off-by: Brian Norris <briannorris@chromium.org>
+>> Cc: Alexandru M Stan <amstan@chromium.org>
+>> Cc: Douglas Anderson <dianders@chromium.org>
+>> ---
+>> Tested on jaq, not minnie
+>>
+>>  arch/arm/boot/dts/rk3288-veyron-minnie.dts | 8 ++++++--
+>>  1 file changed, 6 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/rk3288-veyron-minnie.dts
+>> b/arch/arm/boot/dts/rk3288-veyron-minnie.dts index
+>> 0e30bd6bf92b..6f619c154dc6 100644
+>> --- a/arch/arm/boot/dts/rk3288-veyron-minnie.dts
+>> +++ b/arch/arm/boot/dts/rk3288-veyron-minnie.dts
+>> @@ -128,12 +128,16 @@
+>>                       regulator-min-microvolt = <3300000>;
+>>                       regulator-max-microvolt = <3300000>;
+>>                       regulator-name = "vcc33_touch";
+>> -                     regulator-suspend-mem-disabled;
+>> +                     regulator-state-mem {
+>> +                             regulator-on-in-suspend;
+>> +                     };
+>>               };
+>>
+>>               vcc5v_touch: SWITCH_REG2 {
+>>                       regulator-name = "vcc5v_touch";
+>> -                     regulator-suspend-mem-disabled;
+>> +                     regulator-state-mem {
+>> +                             regulator-on-in-suspend;
+>> +                     };
 >
-> Highly unlikely to make any difference.  As the failure happens soo early
-> with the patch applied, the kernel hasn't had much of a chance to touch
-> the hardware - about the only things are the decompressor and the kernel
-> touching the early console.  As they seem to be working, it suggests
-> that's not the cause.
->
-> It seems to be pointing towards something in the boot loader...
->
-> Normally, uboot will hook itself into the vectors to report errors, but
-> I wonder whether uboot enables asynchronous aborts while it's running.
-> Don't forget to make sure that the aborts are disabled again prior to
-> calling the kernel.
->
-Thanks for your input.
+> wouldn't regulator-suspend-mem-disabled translate to regulator-off-in-suspend?
 
-The patch works now once I move the local_abort_enable() to later just 
-before calling reserve_crashkernel() in setup_arch(). The abort handler 
-gets called right after enabling it which means it has happened even 
-before reaching here.
+Correct, the downstream regulator-suspend-mem-disabled is equivalent
+to regulator-off-in-suspend in mainline.
 
-I have added the abort handler to u-boot code and I get the same abort 
-which means the root cause is u-boot or ROM boot loader. I would try to 
-debug if root cause is u-boot. If it is ROM boot loader, I will have to 
-add a work around in u-boot or Linux. Is there a preference of one over 
-the other? The exception handling in u-boot is premature and will 
-require more work to add a work around. Is there still a possibility of 
-adding the work around in Linux?
+> At least looks like it according to https://lkml.org/lkml/2013/7/25/592
+>
 
--- 
-Murali Karicheri
-Linux Kernel, Keystone
+I guess you meant https://lkml.org/lkml/2014/10/10/162 since it was
+Chanwoo's and not Vincent's version that finally landed.
+
+>
+> Heiko
+>
+
+Best regards,
+Javier
