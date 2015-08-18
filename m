@@ -1,67 +1,69 @@
 From: yh.huang@mediatek.com (YH Huang)
-Date: Tue, 18 Aug 2015 15:27:52 +0800
-Subject: [PATCH v7 0/3] Add MediaTek display PWM driver
-Message-ID: <1439882875-19596-1-git-send-email-yh.huang@mediatek.com>
+Date: Tue, 18 Aug 2015 15:27:53 +0800
+Subject: [PATCH v7 1/3] dt-bindings: pwm: add MediaTek display PWM bindings
+In-Reply-To: <1439882875-19596-1-git-send-email-yh.huang@mediatek.com>
+References: <1439882875-19596-1-git-send-email-yh.huang@mediatek.com>
+Message-ID: <1439882875-19596-2-git-send-email-yh.huang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series add the use of display PWM driver, documentation 
-and device tree for Mediatek SoCs. The driver is used to support 
-the backlight of the panel. This is based on v4.2-rc1.
+Document the device-tree binding of MediaTek display PWM.
+The PWM has one channel to control the backlight brightness for display.
+It supports MT8173 and MT6595.
 
-The clock definitions (CLK_MM_DISP_PWM*) are added by James Liao's patch: 
-clk: mediatek: Add subsystem clocks of MT8173
-
-Change in v7:
-1. Add the dependency HAS_IOMEM in Kconfig.
-2. Revise misprints and coding style for readability.
-
-Change in v6:
-1. Enable clocks in the pwm_enable function.
-2. Remove suspend/resume code since pwm-backlight driver has done the
-same things.
-3. Revise some code to make it easier to read.
-
-Change in v5:
-1. Configure PWM output via pinctrl.
-2. Fix the parameter name in dtsi.
-
-Change in v4:
-1. Codebase is on v4.2-rc1.
-2. Add the PWM node in dtsi.
-3. Change the dependency in Kconfig.
-4. Rewrite some code for readability.
-
-Change in v3:
-1. Add suspend/resume function.
-2. Fix the formula for high_width calculation.
-3. Rewrite some code to make it easier to read.
-4. Add more information in the commit message.
-
-Change in v2:
-1. Rewrite descriptions for driver in kconfig to make it much clear.
-2. Rename the driver from "pwm-mediatek-disp" to "pwm-mtk-disp".
-3. Disable clocks in the error path.
-4. Change the shift values in decimal instead of hex.
-5. Rename and add some variables or function name for consistency and
-readability.
-6. Drop unnecessary parentheses, spaces, variables and add newlines to
-make the code easiler to read.
-
-YH Huang (3):
-  dt-bindings: pwm: add MediaTek display PWM bindings
-  pwm: add MediaTek display PWM driver support
-  arm64: dts: mt8173: add MT8173 display PWM driver support node
-
- .../devicetree/bindings/pwm/pwm-mtk-disp.txt       |   42 ++++
- arch/arm64/boot/dts/mediatek/mt8173-evb.dts        |   13 ++
- arch/arm64/boot/dts/mediatek/mt8173.dtsi           |   22 ++
- drivers/pwm/Kconfig                                |   11 +
- drivers/pwm/Makefile                               |    1 +
- drivers/pwm/pwm-mtk-disp.c                         |  232 ++++++++++++++++++++
- 6 files changed, 321 insertions(+)
+Signed-off-by: YH Huang <yh.huang@mediatek.com>
+---
+ .../devicetree/bindings/pwm/pwm-mtk-disp.txt       |   42 ++++++++++++++++++++
+ 1 file changed, 42 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
- create mode 100644 drivers/pwm/pwm-mtk-disp.c
 
---
+diff --git a/Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt b/Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
+new file mode 100644
+index 0000000..f8f59ba
+--- /dev/null
++++ b/Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
+@@ -0,0 +1,42 @@
++MediaTek display PWM controller
++
++Required properties:
++ - compatible: should be "mediatek,<name>-disp-pwm":
++   - "mediatek,mt8173-disp-pwm": found on mt8173 SoC.
++   - "mediatek,mt6595-disp-pwm": found on mt6595 SoC.
++ - reg: physical base address and length of the controller's registers.
++ - #pwm-cells: must be 2. See pwm.txt in this directory for a description of
++   the cell format.
++ - clocks: phandle and clock specifier of the PWM reference clock.
++ - clock-names: must contain the following:
++   - "main": clock used to generate PWM signals.
++   - "mm": sync signals from the modules of mmsys.
++ - pinctrl-names: Must contain a "default" entry.
++ - pinctrl-0: One property must exist for each entry in pinctrl-names.
++   See pinctrl/pinctrl-bindings.txt for details of the property values.
++
++Example:
++	pwm0: pwm at 1401e000 {
++		compatible = "mediatek,mt8173-disp-pwm",
++			     "mediatek,mt6595-disp-pwm";
++		reg = <0 0x1401e000 0 0x1000>;
++		#pwm-cells = <2>;
++		clocks = <&mmsys CLK_MM_DISP_PWM026M>,
++			 <&mmsys CLK_MM_DISP_PWM0MM>;
++		clock-names = "main", "mm";
++		pinctrl-names = "default";
++		pinctrl-0 = <&disp_pwm0_pins>;
++	};
++
++	backlight_lcd: backlight_lcd {
++		compatible = "pwm-backlight";
++		pwms = <&pwm0 0 1000000>;
++		brightness-levels = <
++			  0  16  32  48  64  80  96 112
++			128 144 160 176 192 208 224 240
++			255
++		>;
++		default-brightness-level = <9>;
++		power-supply = <&mt6397_vio18_reg>;
++		enable-gpios = <&pio 95 GPIO_ACTIVE_HIGH>;
++	};
+-- 
 1.7.9.5
