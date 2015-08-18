@@ -1,44 +1,114 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Tue, 18 Aug 2015 16:28:58 +0800
-Subject: [PATCH] ARM: keystone: add a work around to handle asynchronous
- external abort
-In-Reply-To: <20150818081334.GK7557@n2100.arm.linux.org.uk>
-References: <1439320409-20084-1-git-send-email-m-karicheri2@ti.com>
- <55CDF579.4050408@ti.com>	<20150814140934.GX7557@n2100.arm.linux.org.uk>
- <55CE05EC.4040909@oracle.com>	<55CE633C.10402@ti.com>
- <20150814215617.GA7557@n2100.arm.linux.org.uk>	<55D25C64.3090107@ti.com>
- <55D2A1DD.9000007@oracle.com>	<20150818081334.GK7557@n2100.arm.linux.org.uk>
-Message-ID: <20150818162858.42035da0@xhacker>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 18 Aug 2015 09:56:26 +0100
+Subject: [PATCH V4 2/3] arm64: support initrd outside kernel linear map
+In-Reply-To: <1439830867-14935-3-git-send-email-msalter@redhat.com>
+References: <1439830867-14935-1-git-send-email-msalter@redhat.com>
+ <1439830867-14935-3-git-send-email-msalter@redhat.com>
+Message-ID: <20150818085626.GD10301@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 18 Aug 2015 09:13:34 +0100
-Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+On Mon, Aug 17, 2015 at 06:01:06PM +0100, Mark Salter wrote:
+> The use of mem= could leave part or all of the initrd outside of
+> the kernel linear map. This will lead to an error when unpacking
+> the initrd and a probable failure to boot. This patch catches that
+> situation and relocates the initrd to be fully within the linear
+> map.
+> 
+> Signed-off-by: Mark Salter <msalter@redhat.com>
+> ---
+>  arch/arm64/kernel/setup.c | 62 +++++++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 62 insertions(+)
 
-> On Mon, Aug 17, 2015 at 08:09:17PM -0700, santosh.shilimkar at oracle.com wrote:
-> > From the logs this seems to be mostly clock related issue for some
-> > peripheral. If the bootloader clock enable all hack still exists,
-> > may be you can try that out.
-> > 
-> > Another way to debug this is to start disabling peripheral drivers
-> > from the kernel 1 by 1 and see if the issue goes away.
-> 
-> Highly unlikely to make any difference.  As the failure happens soo early
-> with the patch applied, the kernel hasn't had much of a chance to touch
-> the hardware - about the only things are the decompressor and the kernel
-> touching the early console.  As they seem to be working, it suggests
-> that's not the cause.
-> 
-> It seems to be pointing towards something in the boot loader...
-> 
-> Normally, uboot will hook itself into the vectors to report errors, but
-> I wonder whether uboot enables asynchronous aborts while it's running.
-> Don't forget to make sure that the aborts are disabled again prior to
-> calling the kernel.
-> 
+Looks good to me:
 
-Another possible cause: trustzone software.
+  Acked-by: Will Deacon <will.deacon@arm.com>
 
-we root caused such kind of asynchronous external abort on Marvell Berlin SoCs
-to a trustzone bug. I'm not sure whether keystone linux is running at normal
-world or not.
+This series should replace the version that Andrew has currently got in
+linux-next.
+
+Will
+
+> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+> index f3067d4..40a894e 100644
+> --- a/arch/arm64/kernel/setup.c
+> +++ b/arch/arm64/kernel/setup.c
+> @@ -359,6 +359,67 @@ static void __init request_standard_resources(void)
+>  	}
+>  }
+>  
+> +#ifdef CONFIG_BLK_DEV_INITRD
+> +/*
+> + * Relocate initrd if it is not completely within the linear mapping.
+> + * This would be the case if mem= cuts out all or part of it.
+> + */
+> +static void __init relocate_initrd(void)
+> +{
+> +	phys_addr_t orig_start = __virt_to_phys(initrd_start);
+> +	phys_addr_t orig_end = __virt_to_phys(initrd_end);
+> +	phys_addr_t ram_end = memblock_end_of_DRAM();
+> +	phys_addr_t new_start;
+> +	unsigned long size, to_free = 0;
+> +	void *dest;
+> +
+> +	if (orig_end <= ram_end)
+> +		return;
+> +
+> +	/*
+> +	 * Any of the original initrd which overlaps the linear map should
+> +	 * be freed after relocating.
+> +	 */
+> +	if (orig_start < ram_end)
+> +		to_free = ram_end - orig_start;
+> +
+> +	size = orig_end - orig_start;
+> +
+> +	/* initrd needs to be relocated completely inside linear mapping */
+> +	new_start = memblock_find_in_range(0, PFN_PHYS(max_pfn),
+> +					   size, PAGE_SIZE);
+> +	if (!new_start)
+> +		panic("Cannot relocate initrd of size %ld\n", size);
+> +	memblock_reserve(new_start, size);
+> +
+> +	initrd_start = __phys_to_virt(new_start);
+> +	initrd_end   = initrd_start + size;
+> +
+> +	pr_info("Moving initrd from [%llx-%llx] to [%llx-%llx]\n",
+> +		orig_start, orig_start + size - 1,
+> +		new_start, new_start + size - 1);
+> +
+> +	dest = (void *)initrd_start;
+> +
+> +	if (to_free) {
+> +		memcpy(dest, (void *)__phys_to_virt(orig_start), to_free);
+> +		dest += to_free;
+> +	}
+> +
+> +	copy_from_early_mem(dest, orig_start + to_free, size - to_free);
+> +
+> +	if (to_free) {
+> +		pr_info("Freeing original RAMDISK from [%llx-%llx]\n",
+> +			orig_start, orig_start + to_free - 1);
+> +		memblock_free(orig_start, to_free);
+> +	}
+> +}
+> +#else
+> +static inline void __init relocate_initrd(void)
+> +{
+> +}
+> +#endif
+> +
+>  u64 __cpu_logical_map[NR_CPUS] = { [0 ... NR_CPUS-1] = INVALID_HWID };
+>  
+>  void __init setup_arch(char **cmdline_p)
+> @@ -392,6 +453,7 @@ void __init setup_arch(char **cmdline_p)
+>  	acpi_boot_table_init();
+>  
+>  	paging_init();
+> +	relocate_initrd();
+>  	request_standard_resources();
+>  
+>  	early_ioremap_reset();
+> -- 
+> 2.4.3
+> 
