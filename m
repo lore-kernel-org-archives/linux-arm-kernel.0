@@ -1,57 +1,54 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 18 Aug 2015 12:04:27 +0200
-Subject: [PATCH 2/2] arm64: set MAX_MEMBLOCK_ADDR according to linear
- region size
-In-Reply-To: <20150818100018.GA11021@arm.com>
-References: <1439890482-20798-1-git-send-email-ard.biesheuvel@linaro.org>
- <1439890482-20798-3-git-send-email-ard.biesheuvel@linaro.org>
- <20150818100018.GA11021@arm.com>
-Message-ID: <CAKv+Gu-YDEKSrkSG2fywgrHBB3Hao+jodknmCAkFCWqG4OpXCA@mail.gmail.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Tue, 18 Aug 2015 11:08:03 +0100
+Subject: Tegra baseline test results for v4.2-rc6
+Message-ID: <55D30403.2030702@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 August 2015 at 12:00, Will Deacon <will.deacon@arm.com> wrote:
-> On Tue, Aug 18, 2015 at 10:34:42AM +0100, Ard Biesheuvel wrote:
->> The linear region size of a 39-bit VA kernel is only 256 GB, which
->> may be insufficient to cover all of system RAM, even on platforms
->> that have much less than 256 GB of memory but which is laid out
->> very sparsely.
->>
->> So make sure we clip the memory we will not be able to map before
->> installing it into the memblock memory table, by setting
->> MAX_MEMBLOCK_ADDR accordingly.
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>  arch/arm64/include/asm/memory.h | 8 ++++++++
->>  1 file changed, 8 insertions(+)
->>
->> diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
->> index f800d45ea226..44a59c20e773 100644
->> --- a/arch/arm64/include/asm/memory.h
->> +++ b/arch/arm64/include/asm/memory.h
->> @@ -114,6 +114,14 @@ extern phys_addr_t               memstart_addr;
->>  #define PHYS_OFFSET          ({ memstart_addr; })
->>
->>  /*
->> + * The maximum physical address that the linear direct mapping
->> + * of system RAM can cover. (PAGE_OFFSET can be interpreted as
->> + * a 2's complement signed quantity and negated to derive the
->> + * maximum size of the linear mapping.)
->> + */
->> +#define MAX_MEMBLOCK_ADDR    ({ memstart_addr - PAGE_OFFSET - 1; })
->
-> If we initialised memory_limit to this value and changed early_mem to
-> use min (i.e. only restrict the limit further), would that avoid the
-> need to change the of code? It looks like PPC uses
-> memblock_enforce_memory_limit for similar reasons.
->
+Here are some basic Tegra test results for Linux v4.2-rc6.
+Logs and other details at:
 
-Yes, that would be yet another way of doing things. But since Catalin
-explicitly requested that both checks (i.e., bottom end and top end)
-occur in the same place, and indicated his preference not to override
-early_init_dt_add_memory_arch() if we can avoid it, the only way is to
-hack it in there.
+    https://nvtb.github.io//linux/test_v4.2-rc6/20150809133102/
 
--- 
-Ard.
+
+Test summary
+------------
+
+Build: zImage:
+    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
+
+Build: Image:
+    Pass: ( 1/ 1): defconfig
+
+Boot to userspace: defconfig:
+    Pass: ( 1/ 1): qemu-vexpress64
+
+Boot to userspace: multi_v7_defconfig:
+    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice, tegra30-beaver
+
+Boot to userspace: tegra_defconfig:
+    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice, tegra30-beaver
+
+
+vmlinux object size
+(delta in bytes from test_v4.2-rc5 (74d33293e467df61de1b1d8b2fbe29e550dec33b)):
+   text     data      bss    total  kernel
+     -1        0        0       -1  defconfig
+   +576        0        0     +576  multi_v7_defconfig
+  +4431        0        0    +4431  tegra_defconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v4.2-rc5 (74d33293e467df61de1b1d8b2fbe29e550dec33b))
+    avail    rsrvd     high    freed                board              kconfig                  dtb
+        .        .        .        .      qemu-vexpress64            defconfig           __internal
+        .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
+      -8k       8k        .       4k tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
+        .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
+      -8k       8k        .       4k  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
+        .        .        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
+      -8k       8k        .       4k    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
+        .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+      -8k       8k        .       4k       tegra30-beaver      tegra_defconfig       tegra30-beaver
