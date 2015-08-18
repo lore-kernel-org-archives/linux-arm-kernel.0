@@ -1,28 +1,31 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 18 Aug 2015 17:16:49 +0100
-Subject: [PATCH 2/2] arm64: set MAX_MEMBLOCK_ADDR according to linear
- region size
-In-Reply-To: <20150818145149.GQ7557@n2100.arm.linux.org.uk>
-References: <1439890482-20798-1-git-send-email-ard.biesheuvel@linaro.org>
- <1439890482-20798-3-git-send-email-ard.biesheuvel@linaro.org>
- <20150818100018.GA11021@arm.com>
- <20150818142435.GC11571@e104818-lin.cambridge.arm.com>
- <20150818145149.GQ7557@n2100.arm.linux.org.uk>
-Message-ID: <20150818161649.GD11571@e104818-lin.cambridge.arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 18 Aug 2015 09:07:49 -0700
+Subject: [PATCH] spi: mediatek: fix spi incorrect endian usage and remove
+ redundant clock
+In-Reply-To: <CAOiHx=nBOtm3c7QQpA-SSxXzJGjUEJQBtR9CynoeqsXRoz4fRg@mail.gmail.com>
+References: <1439895231-17778-1-git-send-email-leilk.liu@mediatek.com>
+ <CAOiHx=nBOtm3c7QQpA-SSxXzJGjUEJQBtR9CynoeqsXRoz4fRg@mail.gmail.com>
+Message-ID: <20150818160749.GJ10748@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 18, 2015 at 03:51:49PM +0100, Russell King - ARM Linux wrote:
-> On Tue, Aug 18, 2015 at 03:24:36PM +0100, Catalin Marinas wrote:
-> > With the current memory layout, this could also be __pa(~0UL). I guess
-> > we could solve this with a single patch, though I'm not sure whether we
-> > break other architectures:
-> 
-> No.  __pa() is only valid within the lowmem mapping, not outside of it.
-> What you'd get for a virtual address of ~0UL is not well defined, so
-> you should not use this in generic code.
+On Tue, Aug 18, 2015 at 02:19:54PM +0200, Jonas Gorski wrote:
 
-You are right. We'll keep this max memblock address in the arch code.
+> The usual philosophy is to have one change per patch, so this might be
+> better as three patches. But this is Mark's call. Since the driver
+> isn't yet in Linus' tree, it might be a-ok to mix style improvements
+> and actual fixes, but as soon as it landed in Linus' tree you need to
+> keep them separate, so fixes can be easily backported.
 
--- 
-Catalin
+This isn't just about making the fixes easy to backport, it's also about
+making the patch reviewable and understandable.  When many changes are
+included in one patch it makes it harder to tell what any one part of
+the patch is intended to do.  As Jonas has identified several bugs
+you'll need to resend anyway, please split the series up.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150818/27b60471/attachment-0001.sig>
