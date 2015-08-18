@@ -1,55 +1,57 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Tue, 18 Aug 2015 12:04:03 +0200
-Subject: [PATCH] ARM: multi_v7_defconfig: Enable DWC2 USB driver and USB
- ethernet gadget
-In-Reply-To: <1439891799-15302-1-git-send-email-m.szyprowski@samsung.com>
-References: <1439891799-15302-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <55D30313.7080107@osg.samsung.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 18 Aug 2015 12:04:27 +0200
+Subject: [PATCH 2/2] arm64: set MAX_MEMBLOCK_ADDR according to linear
+ region size
+In-Reply-To: <20150818100018.GA11021@arm.com>
+References: <1439890482-20798-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1439890482-20798-3-git-send-email-ard.biesheuvel@linaro.org>
+ <20150818100018.GA11021@arm.com>
+Message-ID: <CAKv+Gu-YDEKSrkSG2fywgrHBB3Hao+jodknmCAkFCWqG4OpXCA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Marek,
+On 18 August 2015 at 12:00, Will Deacon <will.deacon@arm.com> wrote:
+> On Tue, Aug 18, 2015 at 10:34:42AM +0100, Ard Biesheuvel wrote:
+>> The linear region size of a 39-bit VA kernel is only 256 GB, which
+>> may be insufficient to cover all of system RAM, even on platforms
+>> that have much less than 256 GB of memory but which is laid out
+>> very sparsely.
+>>
+>> So make sure we clip the memory we will not be able to map before
+>> installing it into the memblock memory table, by setting
+>> MAX_MEMBLOCK_ADDR accordingly.
+>>
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> ---
+>>  arch/arm64/include/asm/memory.h | 8 ++++++++
+>>  1 file changed, 8 insertions(+)
+>>
+>> diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+>> index f800d45ea226..44a59c20e773 100644
+>> --- a/arch/arm64/include/asm/memory.h
+>> +++ b/arch/arm64/include/asm/memory.h
+>> @@ -114,6 +114,14 @@ extern phys_addr_t               memstart_addr;
+>>  #define PHYS_OFFSET          ({ memstart_addr; })
+>>
+>>  /*
+>> + * The maximum physical address that the linear direct mapping
+>> + * of system RAM can cover. (PAGE_OFFSET can be interpreted as
+>> + * a 2's complement signed quantity and negated to derive the
+>> + * maximum size of the linear mapping.)
+>> + */
+>> +#define MAX_MEMBLOCK_ADDR    ({ memstart_addr - PAGE_OFFSET - 1; })
+>
+> If we initialised memory_limit to this value and changed early_mem to
+> use min (i.e. only restrict the limit further), would that avoid the
+> need to change the of code? It looks like PPC uses
+> memblock_enforce_memory_limit for similar reasons.
+>
 
-On 08/18/2015 11:56 AM, Marek Szyprowski wrote:
-> DWC2 (s3c-hsotg) hardware module is available on many Exynos based boards,
-> so enable DWC2 driver as well as the most common USB Ethernet gadget.
-> 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> ---
->  arch/arm/configs/multi_v7_defconfig | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-> index b2facab..d15f719 100644
-> --- a/arch/arm/configs/multi_v7_defconfig
-> +++ b/arch/arm/configs/multi_v7_defconfig
-> @@ -506,6 +506,7 @@ CONFIG_USB_R8A66597_HCD=m
->  CONFIG_USB_RENESAS_USBHS=m
->  CONFIG_USB_STORAGE=y
->  CONFIG_USB_DWC3=y
-> +CONFIG_USB_DWC2=y
->  CONFIG_USB_CHIPIDEA=y
->  CONFIG_USB_CHIPIDEA_HOST=y
->  CONFIG_AB8500_USB=y
-> @@ -517,6 +518,7 @@ CONFIG_USB_MXS_PHY=y
->  CONFIG_USB_RCAR_PHY=m
->  CONFIG_USB_GADGET=y
->  CONFIG_USB_RENESAS_USBHS_UDC=m
-> +CONFIG_USB_ETH=y
->  CONFIG_MMC=y
->  CONFIG_MMC_BLOCK_MINORS=16
->  CONFIG_MMC_ARMMMCI=y
-> 
+Yes, that would be yet another way of doing things. But since Catalin
+explicitly requested that both checks (i.e., bottom end and top end)
+occur in the same place, and indicated his preference not to override
+early_init_dt_add_memory_arch() if we can avoid it, the only way is to
+hack it in there.
 
-Both are tristate Kconfig symbols and the current multi_v7 policy is
-to build as much as possible as a module.
-
-Other than that the patch looks good to me. So if you change that:
-
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
-
-Best regards,
 -- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+Ard.
