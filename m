@@ -1,64 +1,138 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Tue, 18 Aug 2015 16:21:39 +0800
-Subject: [PATCH v3] mmc: sdhci: also get preset value and driver type for
- MMC_DDR52
-Message-ID: <1439886099-5531-1-git-send-email-jszhang@marvell.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Tue, 18 Aug 2015 10:26:08 +0200
+Subject: [PATCH v2 4/4] irqchip: GIC: Don't deactivate interrupts forwarded
+ to a guest
+In-Reply-To: <1439454526-1185-5-git-send-email-marc.zyngier@arm.com>
+References: <1439454526-1185-1-git-send-email-marc.zyngier@arm.com>
+ <1439454526-1185-5-git-send-email-marc.zyngier@arm.com>
+Message-ID: <55D2EC20.9020304@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit bb8175a8aa42 ("mmc: sdhci: clarify DDR timing mode between
-SD-UHS and eMMC") added MMC_DDR52 as eMMC's DDR mode to be
-distinguished from SD-UHS, but it missed setting driver type for
-MMC_DDR52 timing mode.
+Hi Marc,
+On 08/13/2015 10:28 AM, Marc Zyngier wrote:
+> Commit 0a4377de3056 ("genirq: Introduce irq_set_vcpu_affinity() to
+> target an interrupt to a VCPU") added just what we needed at the
+> lowest level to allow an interrupt to be deactivated by a guest.
+> 
+> When such a request reaches the GIC, it knows it doesn't need to
+> perform the deactivation anymore, and can safely leave the guest
+> do its magic. This of course requires additional support in both
+> VFIO and KVM.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  drivers/irqchip/irq-gic.c | 58 +++++++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 58 insertions(+)
+> 
+> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+> index b020c3a..ea691be 100644
+> --- a/drivers/irqchip/irq-gic.c
+> +++ b/drivers/irqchip/irq-gic.c
+> @@ -148,6 +148,34 @@ static inline bool primary_gic_irq(struct irq_data *d)
+>  	return true;
+>  }
+>  
+> +static inline bool cascading_gic_irq(struct irq_data *d)
+> +{
+> +	/*
+> +	 * If handler_data pointing to one of the secondary GICs, then
+> +	 * this is the cascading interrupt, and it cannot possibly be
+a cascading interrupt?
+> +	 * forwarded.
+> +	 */
+> +	if (d->handler_data >= (void *)(gic_data + 1) &&
+> +	    d->handler_data <  (void *)(gic_data + MAX_GIC_NR))
+there is an accessor for d->handler_data: irq_data_get_irq_handler_data
 
-So sometimes we get the following error on Marvell BG2Q DMP board:
+besides:
+Reviewed-by: Eric Auger <eric.auger@linaro.org>
+Tested-by: Eric Auger <eric.auger@linaro.org> on Calxeda Midway with
+VFIO SPI assignment
 
-[    1.559598] mmcblk0: error -84 transferring data, sector 0, nr 8, cmd
-response 0x900, card status 0xb00
-[    1.569314] mmcblk0: retrying using single block read
-[    1.575676] mmcblk0: error -84 transferring data, sector 2, nr 6, cmd
-response 0x900, card status 0x0
-[    1.585202] blk_update_request: I/O error, dev mmcblk0, sector 2
-[    1.591818] mmcblk0: error -84 transferring data, sector 3, nr 5, cmd
-response 0x900, card status 0x0
-[    1.601341] blk_update_request: I/O error, dev mmcblk0, sector 3
+Best Regards
 
-This patches fixes this by adding the missing driver type setting.
+Eric
 
-Fixes: bb8175a8aa42 ("mmc: sdhci: clarify DDR timing mode ...")
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
----
- Since v2:
-  - fix sdhci_get_preset_value for MMC_DDR52
-  - add typical emmc error log which this patch intends to fix
 
- Since v1:
-  - correct commit-msg
-
- drivers/mmc/host/sdhci.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-index 1dbe932..673d703 100644
---- a/drivers/mmc/host/sdhci.c
-+++ b/drivers/mmc/host/sdhci.c
-@@ -1132,6 +1132,7 @@ static u16 sdhci_get_preset_value(struct sdhci_host *host)
- 		preset = sdhci_readw(host, SDHCI_PRESET_FOR_SDR104);
- 		break;
- 	case MMC_TIMING_UHS_DDR50:
-+	case MMC_TIMING_MMC_DDR52:
- 		preset = sdhci_readw(host, SDHCI_PRESET_FOR_DDR50);
- 		break;
- 	case MMC_TIMING_MMC_HS400:
-@@ -1559,7 +1560,8 @@ static void sdhci_do_set_ios(struct sdhci_host *host, struct mmc_ios *ios)
- 				 (ios->timing == MMC_TIMING_UHS_SDR25) ||
- 				 (ios->timing == MMC_TIMING_UHS_SDR50) ||
- 				 (ios->timing == MMC_TIMING_UHS_SDR104) ||
--				 (ios->timing == MMC_TIMING_UHS_DDR50))) {
-+				 (ios->timing == MMC_TIMING_UHS_DDR50) ||
-+				 (ios->timing == MMC_TIMING_MMC_DDR52))) {
- 			u16 preset;
- 
- 			sdhci_enable_preset_value(host, true);
--- 
-2.5.0
+> +		return true;
+> +
+> +	return false;
+> +}
+> +
+> +static inline bool forwarded_irq(struct irq_data *d)
+> +{
+> +	/*
+> +	 * A forwarded interrupt:
+> +	 * - is on the primary GIC
+> +	 * - has its handler_data set to a value
+> +	 * - that isn't a secondary GIC
+> +	 */
+> +	if (primary_gic_irq(d) && d->handler_data && !cascading_gic_irq(d))
+> +		return true;
+> +
+> +	return false;
+> +}
+> +
+>  /*
+>   * Routines to acknowledge, disable and enable interrupts
+>   */
+> @@ -166,6 +194,18 @@ static int gic_peek_irq(struct irq_data *d, u32 offset)
+>  static void gic_mask_irq(struct irq_data *d)
+>  {
+>  	gic_poke_irq(d, GIC_DIST_ENABLE_CLEAR);
+> +	/*
+> +	 * When masking a forwarded interrupt, make sure it is
+> +	 * deactivated as well.
+> +	 *
+> +	 * This ensures that an interrupt that is getting
+> +	 * disabled/masked will not get "stuck", because there is
+> +	 * noone to deactivate it (guest is being terminated).
+> +	 */
+> +	if (static_key_true(&supports_deactivate)) {
+> +		if (forwarded_irq(d))
+> +			gic_poke_irq(d, GIC_DIST_ACTIVE_CLEAR);
+> +	}
+>  }
+>  
+>  static void gic_unmask_irq(struct irq_data *d)
+> @@ -178,6 +218,10 @@ static void gic_eoi_irq(struct irq_data *d)
+>  	u32 deact_offset = GIC_CPU_EOI;
+>  
+>  	if (static_key_true(&supports_deactivate)) {
+> +		/* Do not deactivate an IRQ forwarded to a vcpu. */
+> +		if (forwarded_irq(d))
+> +			return;
+> +
+>  		if (primary_gic_irq(d))
+>  			deact_offset = GIC_CPU_DEACTIVATE;
+>  	}
+> @@ -251,6 +295,19 @@ static int gic_set_type(struct irq_data *d, unsigned int type)
+>  	return gic_configure_irq(gicirq, type, base, NULL);
+>  }
+>  
+> +static int gic_irq_set_vcpu_affinity(struct irq_data *d, void *vcpu)
+> +{
+> +	/* Only interrupts on the primary GIC can be forwarded to a vcpu. */
+> +	if (static_key_true(&supports_deactivate)) {
+> +		if (primary_gic_irq(d) && !cascading_gic_irq(d)) {
+> +			d->handler_data = vcpu;
+> +			return 0;
+> +		}
+> +	}
+> +
+> +	return -EINVAL;
+> +}
+> +
+>  #ifdef CONFIG_SMP
+>  static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
+>  			    bool force)
+> @@ -346,6 +403,7 @@ static struct irq_chip gic_chip = {
+>  #endif
+>  	.irq_get_irqchip_state	= gic_irq_get_irqchip_state,
+>  	.irq_set_irqchip_state	= gic_irq_set_irqchip_state,
+> +	.irq_set_vcpu_affinity	= gic_irq_set_vcpu_affinity,
+>  	.flags			= IRQCHIP_SET_TYPE_MASKED,
+>  };
+>  
+> 
