@@ -1,145 +1,56 @@
-From: michael@smart-africa.com (Michael van der Westhuizen)
-Date: Tue, 18 Aug 2015 22:21:53 +0200
-Subject: [PATCH v3 2/2] spi: dw: Allow interface drivers to limit data I/O to
- word sizes
-In-Reply-To: <1439929313-4948-1-git-send-email-michael@smart-africa.com>
-References: <1439929313-4948-1-git-send-email-michael@smart-africa.com>
-Message-ID: <1439929313-4948-3-git-send-email-michael@smart-africa.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Tue, 18 Aug 2015 16:25:44 -0400
+Subject: [PATCH] ARM: keystone: add a work around to handle asynchronous
+ external abort
+In-Reply-To: <20150818081334.GK7557@n2100.arm.linux.org.uk>
+References: <1439320409-20084-1-git-send-email-m-karicheri2@ti.com>
+ <55CDF579.4050408@ti.com> <20150814140934.GX7557@n2100.arm.linux.org.uk>
+ <55CE05EC.4040909@oracle.com> <55CE633C.10402@ti.com>
+ <20150814215617.GA7557@n2100.arm.linux.org.uk> <55D25C64.3090107@ti.com>
+ <55D2A1DD.9000007@oracle.com> <20150818081334.GK7557@n2100.arm.linux.org.uk>
+Message-ID: <55D394C8.7070605@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The commit dd11444327ce ("spi: dw-spi: Convert 16bit accesses to 32bit
-accesses") changed all 16bit accesses in the DW_apb_ssi driver to 32bit.
-This, unfortunately, breaks data register access on picoXcell, where the
-DW IP needs data register accesses to be word accesses (all other
-accesses appear to be OK).
+Russell,
 
-This change introduces a new master variable to allow interface drivers
-to specify that 16bit data transfer I/O is required.  This change also
-introduces the ability to set this variable via device tree bindings in
-the MMIO interface driver.  Both the core and the MMIO interface driver
-default to the current 32bit behaviour.
+On 08/18/2015 04:13 AM, Russell King - ARM Linux wrote:
+> On Mon, Aug 17, 2015 at 08:09:17PM -0700, santosh.shilimkar at oracle.com wrote:
+>>  From the logs this seems to be mostly clock related issue for some
+>> peripheral. If the bootloader clock enable all hack still exists,
+>> may be you can try that out.
+>>
+>> Another way to debug this is to start disabling peripheral drivers
+>> from the kernel 1 by 1 and see if the issue goes away.
+>
+> Highly unlikely to make any difference.  As the failure happens soo early
+> with the patch applied, the kernel hasn't had much of a chance to touch
+> the hardware - about the only things are the decompressor and the kernel
+> touching the early console.  As they seem to be working, it suggests
+> that's not the cause.
+>
+> It seems to be pointing towards something in the boot loader...
+>
+> Normally, uboot will hook itself into the vectors to report errors, but
+> I wonder whether uboot enables asynchronous aborts while it's running.
+> Don't forget to make sure that the aborts are disabled again prior to
+> calling the kernel.
+>
+Thanks for your input.
 
-Before this change, on a picoXcell pc3x3:
- spi_master spi32766: interrupt_transfer: fifo overrun/underrun
- m25p80 spi32766.0: error -5 reading 9f
- m25p80: probe of spi32766.0 failed with error -5
+The patch works now once I move the local_abort_enable() to later just 
+before calling reserve_crashkernel() in setup_arch(). The abort handler 
+gets called right after enabling it which means it has happened even 
+before reaching here.
 
-After this change:
- m25p80 spi32766.0: m25p40 (512 Kbytes)
+I have added the abort handler to u-boot code and I get the same abort 
+which means the root cause is u-boot or ROM boot loader. I would try to 
+debug if root cause is u-boot. If it is ROM boot loader, I will have to 
+add a work around in u-boot or Linux. Is there a preference of one over 
+the other? The exception handling in u-boot is premature and will 
+require more work to add a work around. Is there still a possibility of 
+adding the work around in Linux?
 
-Fixes: dd11444327ce ("spi: dw-spi: Convert 16bit accesses to 32bit accesses")
-Signed-off-by: Michael van der Westhuizen <michael@smart-africa.com>
----
-Changes in v3:
-  - Rename the DT property as requested by Rob Herring.
-
-Changes in v2:
-  - Incorporate review feedback from Andy Shevchenko
-    - Rework the DT bindings to accept an I/O register width as a
-      number of bytes rather than using a boolean spefifying the
-      width preference to be 16 bits.
-    - Add data register access wrapper functions and use them when
-      reading and writing the data register.
-
- drivers/spi/spi-dw-mmio.c |  3 +++
- drivers/spi/spi-dw.c      |  4 ++--
- drivers/spi/spi-dw.h      | 35 +++++++++++++++++++++++++++++++++++
- 3 files changed, 40 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/spi/spi-dw-mmio.c b/drivers/spi/spi-dw-mmio.c
-index eb03e12..7edede6 100644
---- a/drivers/spi/spi-dw-mmio.c
-+++ b/drivers/spi/spi-dw-mmio.c
-@@ -74,6 +74,9 @@ static int dw_spi_mmio_probe(struct platform_device *pdev)
- 
- 	dws->max_freq = clk_get_rate(dwsmmio->clk);
- 
-+	of_property_read_u32(pdev->dev.of_node, "reg-io-width",
-+			     &dws->reg_io_width);
-+
- 	num_cs = 4;
- 
- 	if (pdev->dev.of_node)
-diff --git a/drivers/spi/spi-dw.c b/drivers/spi/spi-dw.c
-index 8d67d03..4fbfcdc 100644
---- a/drivers/spi/spi-dw.c
-+++ b/drivers/spi/spi-dw.c
-@@ -194,7 +194,7 @@ static void dw_writer(struct dw_spi *dws)
- 			else
- 				txw = *(u16 *)(dws->tx);
- 		}
--		dw_writel(dws, DW_SPI_DR, txw);
-+		dw_write_io_reg(dws, DW_SPI_DR, txw);
- 		dws->tx += dws->n_bytes;
- 	}
- }
-@@ -205,7 +205,7 @@ static void dw_reader(struct dw_spi *dws)
- 	u16 rxw;
- 
- 	while (max--) {
--		rxw = dw_readl(dws, DW_SPI_DR);
-+		rxw = dw_read_io_reg(dws, DW_SPI_DR);
- 		/* Care rx only if the transfer's original "rx" is not null */
- 		if (dws->rx_end - dws->len) {
- 			if (dws->n_bytes == 1)
-diff --git a/drivers/spi/spi-dw.h b/drivers/spi/spi-dw.h
-index 6c91391..b75ed32 100644
---- a/drivers/spi/spi-dw.h
-+++ b/drivers/spi/spi-dw.h
-@@ -109,6 +109,7 @@ struct dw_spi {
- 	u32			fifo_len;	/* depth of the FIFO buffer */
- 	u32			max_freq;	/* max bus freq supported */
- 
-+	u32			reg_io_width;	/* DR I/O width in bytes */
- 	u16			bus_num;
- 	u16			num_cs;		/* supported slave numbers */
- 
-@@ -145,11 +146,45 @@ static inline u32 dw_readl(struct dw_spi *dws, u32 offset)
- 	return __raw_readl(dws->regs + offset);
- }
- 
-+static inline u16 dw_readw(struct dw_spi *dws, u32 offset)
-+{
-+	return __raw_readw(dws->regs + offset);
-+}
-+
- static inline void dw_writel(struct dw_spi *dws, u32 offset, u32 val)
- {
- 	__raw_writel(val, dws->regs + offset);
- }
- 
-+static inline void dw_writew(struct dw_spi *dws, u32 offset, u16 val)
-+{
-+	__raw_writew(val, dws->regs + offset);
-+}
-+
-+static inline u32 dw_read_io_reg(struct dw_spi *dws, u32 offset)
-+{
-+	switch (dws->reg_io_width) {
-+	case 2:
-+		return dw_readw(dws, offset);
-+	case 4:
-+	default:
-+		return dw_readl(dws, offset);
-+	}
-+}
-+
-+static inline void dw_write_io_reg(struct dw_spi *dws, u32 offset, u32 val)
-+{
-+	switch (dws->reg_io_width) {
-+	case 2:
-+		dw_writew(dws, offset, val);
-+		break;
-+	case 4:
-+	default:
-+		dw_writel(dws, offset, val);
-+		break;
-+	}
-+}
-+
- static inline void spi_enable_chip(struct dw_spi *dws, int enable)
- {
- 	dw_writel(dws, DW_SPI_SSIENR, (enable ? 1 : 0));
 -- 
-2.1.4
+Murali Karicheri
+Linux Kernel, Keystone
