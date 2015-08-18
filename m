@@ -1,25 +1,29 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 18 Aug 2015 15:51:49 +0100
-Subject: [PATCH 2/2] arm64: set MAX_MEMBLOCK_ADDR according to linear
- region size
-In-Reply-To: <20150818142435.GC11571@e104818-lin.cambridge.arm.com>
-References: <1439890482-20798-1-git-send-email-ard.biesheuvel@linaro.org>
- <1439890482-20798-3-git-send-email-ard.biesheuvel@linaro.org>
- <20150818100018.GA11021@arm.com>
- <20150818142435.GC11571@e104818-lin.cambridge.arm.com>
-Message-ID: <20150818145149.GQ7557@n2100.arm.linux.org.uk>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 18 Aug 2015 20:29:25 +0530
+Subject: [PATCH v2 0/6] ARM: berlin: add cpufreq support
+In-Reply-To: <20150818143911.GB12017@kwain>
+References: <1439898368-11543-1-git-send-email-antoine.tenart@free-electrons.com>
+ <CAOh2x=ke9NWa-GjL=c+RgEWWfsNeKvE2O9CRHmW2dG5mj8ATCg@mail.gmail.com>
+ <20150818143911.GB12017@kwain>
+Message-ID: <20150818145925.GF31148@linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 18, 2015 at 03:24:36PM +0100, Catalin Marinas wrote:
-> With the current memory layout, this could also be __pa(~0UL). I guess
-> we could solve this with a single patch, though I'm not sure whether we
-> break other architectures:
+On 18-08-15, 16:39, Antoine Tenart wrote:
+> However, it seems the OPP-v2 table takes precedence over the old one.
+> When a default OPP-v2 table is supplied in the device tree, if the
+> bootloader supplies an OPP table the old way it won't be taken into
+> account.
+> 
+> So if I understood correctly, this won't work here for the BG2Q.
 
-No.  __pa() is only valid within the lowmem mapping, not outside of it.
-What you'd get for a virtual address of ~0UL is not well defined, so
-you should not use this in generic code.
+Didn't understood it completely. Are you saying that your dtb will
+have two operating-points tables ?
+
+The deal is that for any device, parsing of opp-v2 will be attempted
+first. If its not available, then opp-v1 will be tried. But this is
+per-device. So, one device can have opp-v2 tables and other one can do
+v1 type.
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+viresh
