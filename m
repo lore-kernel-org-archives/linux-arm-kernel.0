@@ -1,35 +1,48 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 18 Aug 2015 10:08:57 +0200
-Subject: [PATCH 06/10] ARM: marvell/dt: define crypto SRAM ranges in
- armada-375-db.dts
+Date: Tue, 18 Aug 2015 10:09:01 +0200
+Subject: [PATCH 10/10] ARM: marvell: modify Orion and Kirkwoord crypto
+ compatible strings
 In-Reply-To: <1439885341-14644-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1439885341-14644-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1439885341-14644-7-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1439885341-14644-11-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the crypto SRAM ranges so that the resources referenced by the
-sa-sram node can be properly extracted from the DT.
+Explicitly use the SoC specific compatible strings in kirkwood.dtsi and
+dove.dtsi, so that the crypto devices have access to the TDMA feature
+when attached to the new CESA driver.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-375-db.dts | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/dove.dtsi     | 2 +-
+ arch/arm/boot/dts/kirkwood.dtsi | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-375-db.dts b/arch/arm/boot/dts/armada-375-db.dts
-index 5711b97..cded5f0 100644
---- a/arch/arm/boot/dts/armada-375-db.dts
-+++ b/arch/arm/boot/dts/armada-375-db.dts
-@@ -65,7 +65,9 @@
+diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
+index 9bb3131..cd58c2e 100644
+--- a/arch/arm/boot/dts/dove.dtsi
++++ b/arch/arm/boot/dts/dove.dtsi
+@@ -263,7 +263,7 @@
+ 			};
  
- 	soc {
- 		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000
--			  MBUS_ID(0x01, 0x1d) 0 0xfff00000 0x100000>;
-+			  MBUS_ID(0x01, 0x1d) 0 0xfff00000 0x100000
-+			  MBUS_ID(0x09, 0x09) 0 0xf1100000 0x10000
-+			  MBUS_ID(0x09, 0x05) 0 0xf1110000 0x10000>;
+ 			crypto: crypto-engine at 30000 {
+-				compatible = "marvell,orion-crypto";
++				compatible = "marvell,dove-crypto";
+ 				reg = <0x30000 0x10000>;
+ 				reg-names = "regs";
+ 				interrupts = <31>;
+diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
+index c5f913b..7b5a4a1 100644
+--- a/arch/arm/boot/dts/kirkwood.dtsi
++++ b/arch/arm/boot/dts/kirkwood.dtsi
+@@ -251,7 +251,7 @@
+ 		};
  
- 		internal-regs {
- 			spi at 10600 {
+ 		cesa: crypto at 30000 {
+-			compatible = "marvell,orion-crypto";
++			compatible = "marvell,kirkwood-crypto";
+ 			reg = <0x30000 0x10000>;
+ 			reg-names = "regs";
+ 			interrupts = <22>;
 -- 
 1.9.1
