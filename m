@@ -1,41 +1,49 @@
 From: mathieu@codeaurora.org (Mathieu Olivari)
-Date: Tue, 18 Aug 2015 14:04:17 -0700
-Subject: [PATCH v4 0/3] qcom: Add SMEM MTD parser
-Message-ID: <1439931860-7473-1-git-send-email-mathieu@codeaurora.org>
+Date: Tue, 18 Aug 2015 14:04:19 -0700
+Subject: [PATCH v4 2/3] ARM: qcom: add SMEM device node to IPQ806x dts
+In-Reply-To: <1439931860-7473-1-git-send-email-mathieu@codeaurora.org>
+References: <1439931860-7473-1-git-send-email-mathieu@codeaurora.org>
+Message-ID: <1439931860-7473-3-git-send-email-mathieu@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-QCOM platforms such as IPQ806x are using SMEM to store their flash
-layout. This patch set adds the DT nodes required to instanciate SMEM
-on IPQ806x and add an MTD parser using it.
+SMEM is used on IPQ806x to store various board related information such
+as boot device and flash partition layout. We'll declare it as a device
+so we can make use of it thanks to the new SMEM soc driver.
 
-This change is based on the SMEM driver posted here:
-*https://lkml.org/lkml/2015/7/27/1125
+Signed-off-by: Mathieu Olivari <mathieu@codeaurora.org>
+---
 
-v2:
-*Release the SPI device reference after looking it up (put_device())
-*Represent SMEM data as __le32 rather than u32
-*Move new DT nodes in their proper respective location
-*Address readability concerns in MTD parser
+Notes:
+    v2:
+    *Rename "smem" tag into "smem_region"
 
-v3:
-*Address Bjorn's comments
+ arch/arm/boot/dts/qcom-ipq8064.dtsi | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
 
-v4:
-*Fix licensing case
-*Fix smem tag in dts file
-
-Mathieu Olivari (3):
-  ARM: qcom: add SFPB nodes to IPQ806x dts
-  ARM: qcom: add SMEM device node to IPQ806x dts
-  mtd: add SMEM parser for QCOM platforms
-
- arch/arm/boot/dts/qcom-ipq8064.dtsi |  23 +++-
- drivers/mtd/Kconfig                 |   7 ++
- drivers/mtd/Makefile                |   1 +
- drivers/mtd/qcom_smem_part.c        | 224 ++++++++++++++++++++++++++++++++++++
- 4 files changed, 254 insertions(+), 1 deletion(-)
- create mode 100644 drivers/mtd/qcom_smem_part.c
-
+diff --git a/arch/arm/boot/dts/qcom-ipq8064.dtsi b/arch/arm/boot/dts/qcom-ipq8064.dtsi
+index 8d366ae..9834c94 100644
+--- a/arch/arm/boot/dts/qcom-ipq8064.dtsi
++++ b/arch/arm/boot/dts/qcom-ipq8064.dtsi
+@@ -55,7 +55,7 @@
+ 			no-map;
+ 		};
+ 
+-		smem at 41000000 {
++		smem_region: smem at 41000000 {
+ 			reg = <0x41000000 0x200000>;
+ 			no-map;
+ 		};
+@@ -341,4 +341,10 @@
+ 
+ 		#hwlock-cells = <1>;
+ 	};
++
++	smem {
++		compatible = "qcom,smem";
++		memory-region = <&smem_region>;
++		hwlocks = <&sfpb_mutex 3>;
++	};
+ };
 -- 
 2.1.4
