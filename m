@@ -1,48 +1,64 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 18 Aug 2015 10:24:01 +0200
-Subject: [PULL] clk: at91: sama5d2 materials
-Message-ID: <20150818102401.17de779b@bbrezillon>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Tue, 18 Aug 2015 16:21:39 +0800
+Subject: [PATCH v3] mmc: sdhci: also get preset value and driver type for
+ MMC_DDR52
+Message-ID: <1439886099-5531-1-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen, Mike,
+commit bb8175a8aa42 ("mmc: sdhci: clarify DDR timing mode between
+SD-UHS and eMMC") added MMC_DDR52 as eMMC's DDR mode to be
+distinguished from SD-UHS, but it missed setting driver type for
+MMC_DDR52 timing mode.
 
-Here is a PR for the sama5d2 materials.
-I know we're already late in the release cycle and I'm not sure you can
-take this PR into account for 4.3, so if you can't could you please
-queue it for 4.4?
+So sometimes we get the following error on Marvell BG2Q DMP board:
 
-Thanks,
+[    1.559598] mmcblk0: error -84 transferring data, sector 0, nr 8, cmd
+response 0x900, card status 0xb00
+[    1.569314] mmcblk0: retrying using single block read
+[    1.575676] mmcblk0: error -84 transferring data, sector 2, nr 6, cmd
+response 0x900, card status 0x0
+[    1.585202] blk_update_request: I/O error, dev mmcblk0, sector 2
+[    1.591818] mmcblk0: error -84 transferring data, sector 3, nr 5, cmd
+response 0x900, card status 0x0
+[    1.601341] blk_update_request: I/O error, dev mmcblk0, sector 3
 
-Boris
+This patches fixes this by adding the missing driver type setting.
 
-The following changes since commit c42743f11f58646a50bc4b96da363429dca0c5e6:
+Fixes: bb8175a8aa42 ("mmc: sdhci: clarify DDR timing mode ...")
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+---
+ Since v2:
+  - fix sdhci_get_preset_value for MMC_DDR52
+  - add typical emmc error log which this patch intends to fix
 
-  clk: add bindings for the Ux500 clocks (2015-08-13 11:29:45 -0700)
+ Since v1:
+  - correct commit-msg
 
-are available in the git repository at:
+ drivers/mmc/host/sdhci.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-  https://github.com/bbrezillon/linux-at91.git clk/atmel-clk-next
-
-for you to fetch changes up to 3be0527c0f8bbbb744a6a34603d6a83e511c6741:
-
-  clk: at91: add generated clock driver (2015-08-18 10:11:57 +0200)
-
-----------------------------------------------------------------
-Nicolas Ferre (4):
-      clk: at91: cleanup PMC header file for PCR register fields
-      clk: at91: modify PMC peripheral clock to deal with newer register layout
-      clk: at91: add PMC sama5d2 support
-      clk: at91: add generated clock driver
-
- Documentation/devicetree/bindings/clock/at91-clock.txt |  35 +++++++++++++++++++++
- arch/arm/mach-at91/Kconfig                             |   3 ++
- drivers/clk/at91/Makefile                              |   1 +
- drivers/clk/at91/clk-generated.c                       | 306 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- drivers/clk/at91/clk-peripheral.c                      |  24 +++++++++-----
- drivers/clk/at91/pmc.c                                 |  21 +++++++++++++
- drivers/clk/at91/pmc.h                                 |   3 ++
- include/dt-bindings/clock/at91.h                       |   1 +
- include/linux/clk/at91_pmc.h                           |  22 ++++++++-----
- 9 files changed, 400 insertions(+), 16 deletions(-)
- create mode 100644 drivers/clk/at91/clk-generated.c
+diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+index 1dbe932..673d703 100644
+--- a/drivers/mmc/host/sdhci.c
++++ b/drivers/mmc/host/sdhci.c
+@@ -1132,6 +1132,7 @@ static u16 sdhci_get_preset_value(struct sdhci_host *host)
+ 		preset = sdhci_readw(host, SDHCI_PRESET_FOR_SDR104);
+ 		break;
+ 	case MMC_TIMING_UHS_DDR50:
++	case MMC_TIMING_MMC_DDR52:
+ 		preset = sdhci_readw(host, SDHCI_PRESET_FOR_DDR50);
+ 		break;
+ 	case MMC_TIMING_MMC_HS400:
+@@ -1559,7 +1560,8 @@ static void sdhci_do_set_ios(struct sdhci_host *host, struct mmc_ios *ios)
+ 				 (ios->timing == MMC_TIMING_UHS_SDR25) ||
+ 				 (ios->timing == MMC_TIMING_UHS_SDR50) ||
+ 				 (ios->timing == MMC_TIMING_UHS_SDR104) ||
+-				 (ios->timing == MMC_TIMING_UHS_DDR50))) {
++				 (ios->timing == MMC_TIMING_UHS_DDR50) ||
++				 (ios->timing == MMC_TIMING_MMC_DDR52))) {
+ 			u16 preset;
+ 
+ 			sdhci_enable_preset_value(host, true);
+-- 
+2.5.0
