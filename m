@@ -1,80 +1,39 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Tue, 18 Aug 2015 10:12:46 +0200
-Subject: [PATCH] ARM: exynos_defconfig: Enable CROS_EC_PROTO for ChromeOS
- EC mfd driver
-In-Reply-To: <55D2E83D.70206@samsung.com>
-References: <1439881281-22054-1-git-send-email-javier@osg.samsung.com>
- <55D2E569.3000800@samsung.com> <55D2E767.50807@osg.samsung.com>
- <55D2E83D.70206@samsung.com>
-Message-ID: <55D2E8FE.7090008@osg.samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 18 Aug 2015 09:13:34 +0100
+Subject: [PATCH] ARM: keystone: add a work around to handle asynchronous
+ external abort
+In-Reply-To: <55D2A1DD.9000007@oracle.com>
+References: <1439320409-20084-1-git-send-email-m-karicheri2@ti.com>
+ <55CDF579.4050408@ti.com>
+ <20150814140934.GX7557@n2100.arm.linux.org.uk>
+ <55CE05EC.4040909@oracle.com> <55CE633C.10402@ti.com>
+ <20150814215617.GA7557@n2100.arm.linux.org.uk>
+ <55D25C64.3090107@ti.com> <55D2A1DD.9000007@oracle.com>
+Message-ID: <20150818081334.GK7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+On Mon, Aug 17, 2015 at 08:09:17PM -0700, santosh.shilimkar at oracle.com wrote:
+> From the logs this seems to be mostly clock related issue for some
+> peripheral. If the bootloader clock enable all hack still exists,
+> may be you can try that out.
+> 
+> Another way to debug this is to start disabling peripheral drivers
+> from the kernel 1 by 1 and see if the issue goes away.
 
-On 08/18/2015 10:09 AM, Krzysztof Kozlowski wrote:
-> On 18.08.2015 17:05, Javier Martinez Canillas wrote:
->> Hello Krzysztof,
->>
->> On 08/18/2015 09:57 AM, Krzysztof Kozlowski wrote:
->>> On 18.08.2015 16:01, Javier Martinez Canillas wrote:
->>>> The ChromeOS mfd driver (MFD_CROS_EC) select the CROS_EC_PROTO config
->>>> symbol because the driver uses some communication helper functions in
->>>> drivers/platform/chrome/cros_ec_proto.c but other drivers depends on
->>>> CROS_EC_PROTO instead. Mixing select and depends can lead to circular
->>>> Kconfig dependencies so the MFD_CROS_EC select should be changed to a
->>>> depends on CROS_EC_PROTO instead.
->>>>
->>>> But doing so will break git bisect-ability since MFD_CROS_EC will not
->>>> be enabled anymore unless the default configs first explicitly enable
->>>> the CROS_EC_PROTO dependency.
->>>>
->>>> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
->>>> ---
->>>>  arch/arm/configs/exynos_defconfig | 1 +
->>>>  1 file changed, 1 insertion(+)
->>>
->>> I saw the discussion about circular dependency but I wasn't following
->>> it. Currently the CROS_EC_PROTO is not user-selectable. How can you
->>> depend on it? How can be enabled on different configs (customized by user)?
->>>
->>> Maybe the questions are answered by code in different patches?
->>
->> Yes, that's why I posted "[PATCH] platform/chrome: Make CROS_EC_PROTO
->> a user selectable option" [0].
->>
->> I posted as separate patches because there isn't a dependency between
->> them and once all the defconfig patches and the patch to make the
->> CROS_EC_PROTO symbol user selectable lands, I'll post the patch to
->> change select for depends on to avoid a regression.
-> 
-> Makes sense now.
-> 
-> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> 
+Highly unlikely to make any difference.  As the failure happens soo early
+with the patch applied, the kernel hasn't had much of a chance to touch
+the hardware - about the only things are the decompressor and the kernel
+touching the early console.  As they seem to be working, it suggests
+that's not the cause.
 
-Thanks!
+It seems to be pointing towards something in the boot loader...
 
->>
->> Maybe I should had posted as a series (or at least cc all the people
->> in all the patches) to not left these questions unanswered...
-> 
-> Yep, Cc-ing or a short cover letter would probably answer my question. :)
->
+Normally, uboot will hook itself into the vectors to report errors, but
+I wonder whether uboot enables asynchronous aborts while it's running.
+Don't forget to make sure that the aborts are disabled again prior to
+calling the kernel.
 
-Yes, sorry about that.
- 
-> Best regards,
-> Krzysztof
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-
-Best regards,
 -- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
