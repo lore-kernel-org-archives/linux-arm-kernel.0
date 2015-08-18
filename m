@@ -1,74 +1,76 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 18 Aug 2015 19:44:59 +0200
-Subject: [PATCH 2/2] arm64: set MAX_MEMBLOCK_ADDR according to linear
- region size
-In-Reply-To: <20150818173938.GH11571@e104818-lin.cambridge.arm.com>
-References: <1439890482-20798-1-git-send-email-ard.biesheuvel@linaro.org>
- <1439890482-20798-3-git-send-email-ard.biesheuvel@linaro.org>
- <20150818100018.GA11021@arm.com>
- <CAKv+Gu-YDEKSrkSG2fywgrHBB3Hao+jodknmCAkFCWqG4OpXCA@mail.gmail.com>
- <20150818173938.GH11571@e104818-lin.cambridge.arm.com>
-Message-ID: <CAKv+Gu8hBCtxUHqBwCjfiati7kbWrq314_mTjRvzf7ZnjWXsuw@mail.gmail.com>
+From: alex.williamson@redhat.com (Alex Williamson)
+Date: Tue, 18 Aug 2015 11:44:24 -0600
+Subject: [PATCH v3 04/10] VFIO: platform: add vfio_platform_set_automasked
+In-Reply-To: <55D1FFE8.9050104@linaro.org>
+References: <1439212864-12954-1-git-send-email-eric.auger@linaro.org>
+ <1439212864-12954-5-git-send-email-eric.auger@linaro.org>
+ <1439405794.4023.528.camel@redhat.com> <55D1FFE8.9050104@linaro.org>
+Message-ID: <1439919864.4023.626.camel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 August 2015 at 19:39, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Tue, Aug 18, 2015 at 12:04:27PM +0200, Ard Biesheuvel wrote:
->> On 18 August 2015 at 12:00, Will Deacon <will.deacon@arm.com> wrote:
->> > On Tue, Aug 18, 2015 at 10:34:42AM +0100, Ard Biesheuvel wrote:
->> >> The linear region size of a 39-bit VA kernel is only 256 GB, which
->> >> may be insufficient to cover all of system RAM, even on platforms
->> >> that have much less than 256 GB of memory but which is laid out
->> >> very sparsely.
->> >>
->> >> So make sure we clip the memory we will not be able to map before
->> >> installing it into the memblock memory table, by setting
->> >> MAX_MEMBLOCK_ADDR accordingly.
->> >>
->> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> >> ---
->> >>  arch/arm64/include/asm/memory.h | 8 ++++++++
->> >>  1 file changed, 8 insertions(+)
->> >>
->> >> diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
->> >> index f800d45ea226..44a59c20e773 100644
->> >> --- a/arch/arm64/include/asm/memory.h
->> >> +++ b/arch/arm64/include/asm/memory.h
->> >> @@ -114,6 +114,14 @@ extern phys_addr_t               memstart_addr;
->> >>  #define PHYS_OFFSET          ({ memstart_addr; })
->> >>
->> >>  /*
->> >> + * The maximum physical address that the linear direct mapping
->> >> + * of system RAM can cover. (PAGE_OFFSET can be interpreted as
->> >> + * a 2's complement signed quantity and negated to derive the
->> >> + * maximum size of the linear mapping.)
->> >> + */
->> >> +#define MAX_MEMBLOCK_ADDR    ({ memstart_addr - PAGE_OFFSET - 1; })
->> >
->> > If we initialised memory_limit to this value and changed early_mem to
->> > use min (i.e. only restrict the limit further), would that avoid the
->> > need to change the of code? It looks like PPC uses
->> > memblock_enforce_memory_limit for similar reasons.
->>
->> Yes, that would be yet another way of doing things. But since Catalin
->> explicitly requested that both checks (i.e., bottom end and top end)
->> occur in the same place, and indicated his preference not to override
->> early_init_dt_add_memory_arch() if we can avoid it, the only way is to
->> hack it in there.
->
-> Talking to Will, we decided to go for a quick fix with cc stable that
-> does something like:
->
->         memblock_enforce_memory_limit(min(memory_limit, ~PAGE_OFFSET));
->
+On Mon, 2015-08-17 at 17:38 +0200, Eric Auger wrote:
+> On 08/12/2015 08:56 PM, Alex Williamson wrote:
+> > On Mon, 2015-08-10 at 15:20 +0200, Eric Auger wrote:
+> >> This function makes possible to change the automasked mode.
+> >>
+> >> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+> >>
+> >> ---
+> >>
+> >> v1 -> v2:
+> >> - set forwarded flag
+> >> ---
+> >>  drivers/vfio/platform/vfio_platform_irq.c | 19 +++++++++++++++++++
+> >>  1 file changed, 19 insertions(+)
+> >>
+> >> diff --git a/drivers/vfio/platform/vfio_platform_irq.c b/drivers/vfio/platform/vfio_platform_irq.c
+> >> index b31b1f0..a285384 100644
+> >> --- a/drivers/vfio/platform/vfio_platform_irq.c
+> >> +++ b/drivers/vfio/platform/vfio_platform_irq.c
+> >> @@ -186,6 +186,25 @@ static irqreturn_t vfio_handler(int irq, void *dev_id)
+> >>  	return ret;
+> >>  }
+> >>  
+> >> +static int vfio_platform_set_automasked(struct vfio_platform_irq *irq,
+> >> +					   bool automasked)
+> >> +{
+> >> +	unsigned long flags;
+> >> +
+> >> +	spin_lock_irqsave(&irq->lock, flags);
+> >> +	if (automasked) {
+> >> +		irq->forwarded = true;
+> >> +		irq->flags |= VFIO_IRQ_INFO_AUTOMASKED;
+> >> +		irq->handler = vfio_automasked_irq_handler;
+> >> +	} else {
+> >> +		irq->forwarded = false;
+> >> +		irq->flags &= ~VFIO_IRQ_INFO_AUTOMASKED;
+> >> +		irq->handler = vfio_irq_handler;
+> >> +	}
+> >> +	spin_unlock_irqrestore(&irq->lock, flags);
+> >> +	return 0;
+> > 
+> > In vfio-speak, automasked means level and we're not magically changing
+> > the IRQ from level to edge, we're simply able to handle level
+> > differently based on a hardware optimization.  Should the user visible
+> > flags therefore change based on this?  Aren't we really setting the
+> > forwarded state rather than the automasked state?
+> 
+> Well actually this was following the discussion we had a long time ago
+> about that topic:
+> 
+> http://lkml.iu.edu/hypermail/linux/kernel/1409.1/03659.html
+> 
+> I did not really know how to conclude ...
+> 
+> If it is preferred I can hide this to the userspace, no problem.
 
-~PAGE_OFFSET + 1 ?
+I think that was based on the user being involved in enabling forwarding
+though, now that it's hidden and automatic, it doesn't make much sense
+to me to toggle any of the interrupt info details based on the state of
+the forward.  The user always needs to handle the interrupt as level
+since the bypass can be torn down at any point in time.  We're taking
+advantage of the in-kernel path to make further optimizations, which
+seems like they should be transparent to the user.  Thanks,
 
-> Afterwards, we should still sort early_init_dt_add_memory_arch() to get
-> the nicer printing since, as it stands, checking that a u64 is bigger
-> than ULONG_MAX is pointless on 64-bit.
->
-> Thanks.
->
-> --
-> Catalin
+Alex
