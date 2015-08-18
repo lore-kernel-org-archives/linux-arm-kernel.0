@@ -1,45 +1,33 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 18 Aug 2015 11:34:42 +0200
-Subject: [PATCH 2/2] arm64: set MAX_MEMBLOCK_ADDR according to linear region
- size
-In-Reply-To: <1439890482-20798-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1439890482-20798-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1439890482-20798-3-git-send-email-ard.biesheuvel@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 18 Aug 2015 10:38:18 +0100
+Subject: [PATCH v8 1/7] arm64: Add HAVE_REGS_AND_STACK_ACCESS_API feature
+In-Reply-To: <55CC1410.1090900@linaro.org>
+References: <1439254364-15362-1-git-send-email-dave.long@linaro.org>
+ <1439254364-15362-2-git-send-email-dave.long@linaro.org>
+ <20150811173121.GC29880@arm.com> <55CC1410.1090900@linaro.org>
+Message-ID: <20150818093817.GE10301@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The linear region size of a 39-bit VA kernel is only 256 GB, which
-may be insufficient to cover all of system RAM, even on platforms
-that have much less than 256 GB of memory but which is laid out
-very sparsely.
+Hi David,
 
-So make sure we clip the memory we will not be able to map before
-installing it into the memblock memory table, by setting
-MAX_MEMBLOCK_ADDR accordingly.
+On Thu, Aug 13, 2015 at 04:50:40AM +0100, David Long wrote:
+> On 08/11/15 13:31, Will Deacon wrote:
+> > On Tue, Aug 11, 2015 at 01:52:38AM +0100, David Long wrote:
+> >> +	REG_OFFSET_NAME(x30),
+> >
+> > Does this interact badly with perf tools, which expect to pass "lr" for
+> > x30? (see tools/perf/arch/arm64/include/perf_regs.h).
+> >
+> 
+> Possibly, I can test that when I'm back from my short vacation this 
+> week.  The lr/x30 thing seems to be a recurring issue.  Perhaps it is 
+> best simply to add a reundant entry for x30 as "lr".  It's simple enough 
+> to do, although just slightly ugly looking as it would have to be done 
+> without a macro.  Would one ever use "x31" in place of "sp"?
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/include/asm/memory.h | 8 ++++++++
- 1 file changed, 8 insertions(+)
+No; "sp" should always be "sp". Let me know how you get on with perf. I
+couldn't quite tie the two ends together, but it does look like it expects
+"lr" to work.
 
-diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-index f800d45ea226..44a59c20e773 100644
---- a/arch/arm64/include/asm/memory.h
-+++ b/arch/arm64/include/asm/memory.h
-@@ -114,6 +114,14 @@ extern phys_addr_t		memstart_addr;
- #define PHYS_OFFSET		({ memstart_addr; })
- 
- /*
-+ * The maximum physical address that the linear direct mapping
-+ * of system RAM can cover. (PAGE_OFFSET can be interpreted as
-+ * a 2's complement signed quantity and negated to derive the
-+ * maximum size of the linear mapping.)
-+ */
-+#define MAX_MEMBLOCK_ADDR	({ memstart_addr - PAGE_OFFSET - 1; })
-+
-+/*
-  * PFNs are used to describe any physical page; this means
-  * PFN 0 == physical address 0.
-  *
--- 
-1.9.1
+Will
