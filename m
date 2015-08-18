@@ -1,39 +1,48 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 18 Aug 2015 09:13:34 +0100
-Subject: [PATCH] ARM: keystone: add a work around to handle asynchronous
- external abort
-In-Reply-To: <55D2A1DD.9000007@oracle.com>
-References: <1439320409-20084-1-git-send-email-m-karicheri2@ti.com>
- <55CDF579.4050408@ti.com>
- <20150814140934.GX7557@n2100.arm.linux.org.uk>
- <55CE05EC.4040909@oracle.com> <55CE633C.10402@ti.com>
- <20150814215617.GA7557@n2100.arm.linux.org.uk>
- <55D25C64.3090107@ti.com> <55D2A1DD.9000007@oracle.com>
-Message-ID: <20150818081334.GK7557@n2100.arm.linux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 18 Aug 2015 09:21:36 +0100
+Subject: [RFC v2 1/4] ftrace: allow arch-specific check_stack()
+In-Reply-To: <55D17A04.7020800@linaro.org>
+References: <1438674249-3447-1-git-send-email-takahiro.akashi@linaro.org>
+ <1438674249-3447-2-git-send-email-takahiro.akashi@linaro.org>
+ <20150811170321.GB29880@arm.com> <55D17A04.7020800@linaro.org>
+Message-ID: <20150818082136.GA10301@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 17, 2015 at 08:09:17PM -0700, santosh.shilimkar at oracle.com wrote:
-> From the logs this seems to be mostly clock related issue for some
-> peripheral. If the bootloader clock enable all hack still exists,
-> may be you can try that out.
+On Mon, Aug 17, 2015 at 07:07:00AM +0100, AKASHI Takahiro wrote:
+> On 08/12/2015 02:03 AM, Will Deacon wrote:
+> > On Tue, Aug 04, 2015 at 08:44:06AM +0100, AKASHI Takahiro wrote:
+> >> A stack frame pointer may be used in a different way depending on
+> >> cpu architecture. Thus it is not always appropriate to slurp the stack
+> >> contents, as currently done in check_stack(), in order to calcurate
+> >> a stack index (height) at a given function call. At least not on arm64.
+> >>
+> >> This patch extract potentially arch-specific code from check_stack()
+> >> and puts it into a new arch_check_stack(), which is declared as weak.
+> >> So we will be able to add arch-specific and most efficient way of
+> >> stack traversing Later.
+> >>
+> >> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> >
+> > If arm64 is the only architecture behaving differently, then I'm happy
+> > to reconsider the fix to unwind_frame that we merged in e306dfd06fcb
+> > ("ARM64: unwind: Fix PC calculation"). I'd have thought any architecture
+> > with a branch-and-link instruction would potentially have the same issue,
+> > so we could just be fixing things in the wrong place if ftrace works
+> > everywhere else.
 > 
-> Another way to debug this is to start disabling peripheral drivers
-> from the kernel 1 by 1 and see if the issue goes away.
+> I'm not the right person to answer for other architectures (and ftrace
+> behavior on them.) The only thing I know is that current ftrace stack tracer
+> works correctly only if the addresses stored and found on stack match to
+> the ones returned by save_stack_trace().
+> 
+> Anyway, the fix above is not the only reason that I want to introduce arch-specific
+> arch_check_stack(). Other issues to fix include
+>    - combined case of stack tracer and function graph tracer (common across arch's)
+>    - exception entries (as I'm trying to address in RFC 4/4)
+>    - in-accurate stack size (for each function, my current fix is not perfect though.)
 
-Highly unlikely to make any difference.  As the failure happens soo early
-with the patch applied, the kernel hasn't had much of a chance to touch
-the hardware - about the only things are the decompressor and the kernel
-touching the early console.  As they seem to be working, it suggests
-that's not the cause.
+Ok, if you have other reasons for the callback, then fine. I just didn't
+want you to think that you had to work around e306dfd06fcb at all costs.
 
-It seems to be pointing towards something in the boot loader...
-
-Normally, uboot will hook itself into the vectors to report errors, but
-I wonder whether uboot enables asynchronous aborts while it's running.
-Don't forget to make sure that the aborts are disabled again prior to
-calling the kernel.
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Will
