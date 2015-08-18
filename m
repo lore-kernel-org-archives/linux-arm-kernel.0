@@ -1,67 +1,48 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 18 Aug 2015 09:21:52 +0100
-Subject: [PATCH 2/3] [v4] ARM64: TTY: hvc_dcc: Add support for ARM64 dcc
-In-Reply-To: <55D2749A.401@codeaurora.org>
-References: <1438992995-22610-1-git-send-email-timur@codeaurora.org>
- <1438992995-22610-2-git-send-email-timur@codeaurora.org>
- <20150810094008.GD1604@arm.com> <55D2749A.401@codeaurora.org>
-Message-ID: <20150818082141.GA6281@e103592.cambridge.arm.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 18 Aug 2015 10:24:01 +0200
+Subject: [PULL] clk: at91: sama5d2 materials
+Message-ID: <20150818102401.17de779b@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 17, 2015 at 06:56:10PM -0500, Timur Tabi wrote:
-> On 08/10/2015 04:40 AM, Will Deacon wrote:
-> >>>+static inline void __dcc_putchar(char c)
-> >>>+{
-> >>>+	asm volatile("msr dbgdtrtx_el0, %0"
-> >>>+			: /* No output register */
-> >>>+			: "r" (c));
-> >>>+	isb();
-> 
-> >I think we should be masking out the upper bits of c before the msr
-> >(the compiler probably expects a uxtb).
-> 
-> Well, we've never seen a problem, but that doesn't mean it doesn't
-> exist.  I couldn't find anything in the ARMv8 ARM (section H9.2.7
-> DBGDTRTX_EL0) about word sizes.
-> 
-> Do you think that I need an explicit instruction to clear the upper
-> bits?  I tried a few compiler tricks (e.g. "c && 0xff" and the
-> like), and they had no effect.
+Stephen, Mike,
 
-The in-register representation of a char permits the upper bits to be
-nonzero, so you need to convert to a register-sized type if you want
-to be able to force those bits to zero.
+Here is a PR for the sama5d2 materials.
+I know we're already late in the release cycle and I'm not sure you can
+take this PR into account for 4.3, so if you can't could you please
+queue it for 4.4?
 
-Try: (unsigned long)(unsigned char)c or (unsigned long)c & 0xff.
+Thanks,
 
-> 
-> I do need help with the inline assembly.  I tried this:
-> 
-> static inline void __dcc_putchar(char c)
-> {
-> 	unsigned int __c;
-> 
-> 	asm volatile("uxtb %0, %w1\n"
-> 		"msr dbgdtrtx_el0, %0"
-> 			: "=r" (__c)
-> 			: "r" (c));
-> 	isb();
-> }
-> 
-> it gives this assembly code:
-> 
->   28:	38401423 	ldrb	w3, [x1],#1
->   2c:	53001c63 	uxtb	w3, w3
->   30:	d5130503 	msr	dbgdtrrx_el0, x3
-> 
-> Is this correct?  Shouldn't it be "uxtb x3, w3"?
+Boris
 
-Check the ARM ARM for what operand combinations are allowed.  However,
-it doesn't really make any difference here because it's a general rule
-in the architecture that when an instruction's output is in a
-W-register, the upper 32 bits of the corresponding X-register are
-always zeroed anyway.
+The following changes since commit c42743f11f58646a50bc4b96da363429dca0c5e6:
 
-Cheers
----Dave
+  clk: add bindings for the Ux500 clocks (2015-08-13 11:29:45 -0700)
+
+are available in the git repository at:
+
+  https://github.com/bbrezillon/linux-at91.git clk/atmel-clk-next
+
+for you to fetch changes up to 3be0527c0f8bbbb744a6a34603d6a83e511c6741:
+
+  clk: at91: add generated clock driver (2015-08-18 10:11:57 +0200)
+
+----------------------------------------------------------------
+Nicolas Ferre (4):
+      clk: at91: cleanup PMC header file for PCR register fields
+      clk: at91: modify PMC peripheral clock to deal with newer register layout
+      clk: at91: add PMC sama5d2 support
+      clk: at91: add generated clock driver
+
+ Documentation/devicetree/bindings/clock/at91-clock.txt |  35 +++++++++++++++++++++
+ arch/arm/mach-at91/Kconfig                             |   3 ++
+ drivers/clk/at91/Makefile                              |   1 +
+ drivers/clk/at91/clk-generated.c                       | 306 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ drivers/clk/at91/clk-peripheral.c                      |  24 +++++++++-----
+ drivers/clk/at91/pmc.c                                 |  21 +++++++++++++
+ drivers/clk/at91/pmc.h                                 |   3 ++
+ include/dt-bindings/clock/at91.h                       |   1 +
+ include/linux/clk/at91_pmc.h                           |  22 ++++++++-----
+ 9 files changed, 400 insertions(+), 16 deletions(-)
+ create mode 100644 drivers/clk/at91/clk-generated.c
