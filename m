@@ -1,48 +1,67 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 18 Aug 2015 09:21:36 +0100
-Subject: [RFC v2 1/4] ftrace: allow arch-specific check_stack()
-In-Reply-To: <55D17A04.7020800@linaro.org>
-References: <1438674249-3447-1-git-send-email-takahiro.akashi@linaro.org>
- <1438674249-3447-2-git-send-email-takahiro.akashi@linaro.org>
- <20150811170321.GB29880@arm.com> <55D17A04.7020800@linaro.org>
-Message-ID: <20150818082136.GA10301@arm.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue, 18 Aug 2015 09:21:52 +0100
+Subject: [PATCH 2/3] [v4] ARM64: TTY: hvc_dcc: Add support for ARM64 dcc
+In-Reply-To: <55D2749A.401@codeaurora.org>
+References: <1438992995-22610-1-git-send-email-timur@codeaurora.org>
+ <1438992995-22610-2-git-send-email-timur@codeaurora.org>
+ <20150810094008.GD1604@arm.com> <55D2749A.401@codeaurora.org>
+Message-ID: <20150818082141.GA6281@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 17, 2015 at 07:07:00AM +0100, AKASHI Takahiro wrote:
-> On 08/12/2015 02:03 AM, Will Deacon wrote:
-> > On Tue, Aug 04, 2015 at 08:44:06AM +0100, AKASHI Takahiro wrote:
-> >> A stack frame pointer may be used in a different way depending on
-> >> cpu architecture. Thus it is not always appropriate to slurp the stack
-> >> contents, as currently done in check_stack(), in order to calcurate
-> >> a stack index (height) at a given function call. At least not on arm64.
-> >>
-> >> This patch extract potentially arch-specific code from check_stack()
-> >> and puts it into a new arch_check_stack(), which is declared as weak.
-> >> So we will be able to add arch-specific and most efficient way of
-> >> stack traversing Later.
-> >>
-> >> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> >
-> > If arm64 is the only architecture behaving differently, then I'm happy
-> > to reconsider the fix to unwind_frame that we merged in e306dfd06fcb
-> > ("ARM64: unwind: Fix PC calculation"). I'd have thought any architecture
-> > with a branch-and-link instruction would potentially have the same issue,
-> > so we could just be fixing things in the wrong place if ftrace works
-> > everywhere else.
+On Mon, Aug 17, 2015 at 06:56:10PM -0500, Timur Tabi wrote:
+> On 08/10/2015 04:40 AM, Will Deacon wrote:
+> >>>+static inline void __dcc_putchar(char c)
+> >>>+{
+> >>>+	asm volatile("msr dbgdtrtx_el0, %0"
+> >>>+			: /* No output register */
+> >>>+			: "r" (c));
+> >>>+	isb();
 > 
-> I'm not the right person to answer for other architectures (and ftrace
-> behavior on them.) The only thing I know is that current ftrace stack tracer
-> works correctly only if the addresses stored and found on stack match to
-> the ones returned by save_stack_trace().
+> >I think we should be masking out the upper bits of c before the msr
+> >(the compiler probably expects a uxtb).
 > 
-> Anyway, the fix above is not the only reason that I want to introduce arch-specific
-> arch_check_stack(). Other issues to fix include
->    - combined case of stack tracer and function graph tracer (common across arch's)
->    - exception entries (as I'm trying to address in RFC 4/4)
->    - in-accurate stack size (for each function, my current fix is not perfect though.)
+> Well, we've never seen a problem, but that doesn't mean it doesn't
+> exist.  I couldn't find anything in the ARMv8 ARM (section H9.2.7
+> DBGDTRTX_EL0) about word sizes.
+> 
+> Do you think that I need an explicit instruction to clear the upper
+> bits?  I tried a few compiler tricks (e.g. "c && 0xff" and the
+> like), and they had no effect.
 
-Ok, if you have other reasons for the callback, then fine. I just didn't
-want you to think that you had to work around e306dfd06fcb at all costs.
+The in-register representation of a char permits the upper bits to be
+nonzero, so you need to convert to a register-sized type if you want
+to be able to force those bits to zero.
 
-Will
+Try: (unsigned long)(unsigned char)c or (unsigned long)c & 0xff.
+
+> 
+> I do need help with the inline assembly.  I tried this:
+> 
+> static inline void __dcc_putchar(char c)
+> {
+> 	unsigned int __c;
+> 
+> 	asm volatile("uxtb %0, %w1\n"
+> 		"msr dbgdtrtx_el0, %0"
+> 			: "=r" (__c)
+> 			: "r" (c));
+> 	isb();
+> }
+> 
+> it gives this assembly code:
+> 
+>   28:	38401423 	ldrb	w3, [x1],#1
+>   2c:	53001c63 	uxtb	w3, w3
+>   30:	d5130503 	msr	dbgdtrrx_el0, x3
+> 
+> Is this correct?  Shouldn't it be "uxtb x3, w3"?
+
+Check the ARM ARM for what operand combinations are allowed.  However,
+it doesn't really make any difference here because it's a general rule
+in the architecture that when an instruction's output is in a
+W-register, the upper 32 bits of the corresponding X-register are
+always zeroed anyway.
+
+Cheers
+---Dave
