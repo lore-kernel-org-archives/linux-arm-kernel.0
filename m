@@ -1,27 +1,29 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 18 Aug 2015 13:33:26 -0700
-Subject: [GIT PULL 1/2] omap soc fix for v4.3 merge window
-In-Reply-To: <55cc6d03.8a8d420a.93b25.50c3SMTPIN_ADDED_BROKEN@mx.google.com>
-References: <55cc6d03.8a8d420a.93b25.50c3SMTPIN_ADDED_BROKEN@mx.google.com>
-Message-ID: <20150818203326.GH4732@localhost>
+Date: Tue, 18 Aug 2015 14:46:08 -0700
+Subject: [PATCH] ARM: multi_v7_defconfig: Enable CROS_EC_PROTO for
+ ChromeOS EC mfd driver
+In-Reply-To: <1439881827-22613-1-git-send-email-javier@osg.samsung.com>
+References: <1439881827-22613-1-git-send-email-javier@osg.samsung.com>
+Message-ID: <20150818214608.GA21855@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 13, 2015 at 03:08:45AM -0700, Tony Lindgren wrote:
-> The following changes since commit 24da741c678f865de3182194604dbddcc7fc7f3c:
+On Tue, Aug 18, 2015 at 09:10:27AM +0200, Javier Martinez Canillas wrote:
+> The ChromeOS mfd driver (MFD_CROS_EC) select the CROS_EC_PROTO config
+> symbol because the driver uses some communication helper functions in
+> drivers/platform/chrome/cros_ec_proto.c but other drivers depends on
+> CROS_EC_PROTO instead. Mixing select and depends can lead to circular
+> Kconfig dependencies so the MFD_CROS_EC select should be changed to a
+> depends on CROS_EC_PROTO instead.
 > 
->   Merge branch 'dm814x-soc' into omap-for-v4.3/soc (2015-07-23 21:59:18 -0700)
+> But doing so will break git bisect-ability since MFD_CROS_EC will not
+> be enabled anymore unless the default configs first explicitly enable
+> the CROS_EC_PROTO dependency.
 > 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.3/soc-pt2
-> 
-> for you to fetch changes up to ed293d1ad2b0c28b6abc3bd728b07754bc00f1cd:
-> 
->   memory: kill off set_irq_flags usage (2015-08-13 00:48:52 -0700)
+> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
-
-Merged, thanks.
+Applied to cros/ec-config in arm-soc, which will stay stable in case others
+need to bring in as a prereq.
 
 
 -Olof
