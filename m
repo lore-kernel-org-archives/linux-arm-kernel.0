@@ -1,20 +1,20 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Tue, 18 Aug 2015 10:28:20 +0200
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Tue, 18 Aug 2015 16:28:58 +0800
 Subject: [PATCH] ARM: keystone: add a work around to handle asynchronous
  external abort
 In-Reply-To: <20150818081334.GK7557@n2100.arm.linux.org.uk>
 References: <1439320409-20084-1-git-send-email-m-karicheri2@ti.com>
- <55CDF579.4050408@ti.com> <20150814140934.GX7557@n2100.arm.linux.org.uk>
- <55CE05EC.4040909@oracle.com> <55CE633C.10402@ti.com>
- <20150814215617.GA7557@n2100.arm.linux.org.uk> <55D25C64.3090107@ti.com>
- <55D2A1DD.9000007@oracle.com>
- <20150818081334.GK7557@n2100.arm.linux.org.uk>
-Message-ID: <1439886500.31432.4.camel@pengutronix.de>
+ <55CDF579.4050408@ti.com>	<20150814140934.GX7557@n2100.arm.linux.org.uk>
+ <55CE05EC.4040909@oracle.com>	<55CE633C.10402@ti.com>
+ <20150814215617.GA7557@n2100.arm.linux.org.uk>	<55D25C64.3090107@ti.com>
+ <55D2A1DD.9000007@oracle.com>	<20150818081334.GK7557@n2100.arm.linux.org.uk>
+Message-ID: <20150818162858.42035da0@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, den 18.08.2015, 09:13 +0100 schrieb Russell King - ARM
-Linux:
+On Tue, 18 Aug 2015 09:13:34 +0100
+Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+
 > On Mon, Aug 17, 2015 at 08:09:17PM -0700, santosh.shilimkar at oracle.com wrote:
 > > From the logs this seems to be mostly clock related issue for some
 > > peripheral. If the bootloader clock enable all hack still exists,
@@ -36,19 +36,9 @@ Linux:
 > Don't forget to make sure that the aborts are disabled again prior to
 > calling the kernel.
 > 
-At least one of the Marvell platforms has the same issue with the
-bootloader (I think it is some downstream U-Boot) leaving an imprecise
-abort hanging around as a nice present for Linux to crash on.
 
-If it turns out to be the same issue the only kernel level workaround
-would be to ignore exactly 1 abort after bootup.
+Another possible cause: trustzone software.
 
-Then we still need a solution for the platform and the PCIe driver abort
-handler both hooking into the same abort vector, which won't work
-currently.
-
-Regards,
-Lucas
--- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+we root caused such kind of asynchronous external abort on Marvell Berlin SoCs
+to a trustzone bug. I'm not sure whether keystone linux is running at normal
+world or not.
