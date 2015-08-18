@@ -1,80 +1,87 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Tue, 18 Aug 2015 13:56:24 -0700
-Subject: [PATCH 3/7] drm/vc4: Add KMS support for Raspberry Pi.
-In-Reply-To: <20150813211755.GE17734@phenom.ffwll.local>
-References: <1439427380-2436-1-git-send-email-eric@anholt.net>
- <1439427380-2436-4-git-send-email-eric@anholt.net>
- <20150813075141.GX17734@phenom.ffwll.local>
- <87d1yqq5po.fsf@eliezer.anholt.net>
- <20150813211755.GE17734@phenom.ffwll.local>
-Message-ID: <87y4h8iadj.fsf@eliezer.anholt.net>
+From: petr.cvek@tul.cz (Petr Cvek)
+Date: Tue, 18 Aug 2015 23:01:25 +0200
+Subject: [PATCH v2 18/21] mfd: htc-pasic3: Prepare driver for leds-pasic3
+In-Reply-To: <20150818065207.GC6180@x1>
+References: <cover.1439843482.git.petr.cvek@tul.cz> <55D25ABC.1000405@tul.cz>
+ <20150818065207.GC6180@x1>
+Message-ID: <55D39D25.7010909@tul.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel Vetter <daniel@ffwll.ch> writes:
+Dne 18.8.2015 v 08:52 Lee Jones napsal(a):
+> On Tue, 18 Aug 2015, Petr Cvek wrote:
+> 
+>> Fix register definitions and prepare structures for new leds-pasic3
+>> driver.
+>>
+>> Signed-off-by: Petr Cvek <petr.cvek@tul.cz>
+>> ---
+>>  drivers/mfd/htc-pasic3.c       | 54 ++++++++++++++++-----------
+>>  include/linux/mfd/htc-pasic3.h | 85 +++++++++++++++++++++++++++++++-----------
+>>  2 files changed, 97 insertions(+), 42 deletions(-)
+>>
+>> diff --git a/drivers/mfd/htc-pasic3.c b/drivers/mfd/htc-pasic3.c
+>> index e88d4f6..16e156d 100644
+>> --- a/drivers/mfd/htc-pasic3.c
+>> +++ b/drivers/mfd/htc-pasic3.c
+>> @@ -3,6 +3,9 @@
+>>   *
+>>   * Copyright (C) 2006 Philipp Zabel <philipp.zabel@gmail.com>
+>>   *
+>> + * 2015:	Added registers for LED and RESET, see htc-pasic3.h
+>> + *		-- Petr Cvek
+>> + *
+> 
+> This is pretty unconventional.
+> 
+> Please look to see what others have done.
 
-> On Thu, Aug 13, 2015 at 01:44:03PM -0700, Eric Anholt wrote:
->> Daniel Vetter <daniel@ffwll.ch> writes:
->> 
->> > On Wed, Aug 12, 2015 at 05:56:16PM -0700, Eric Anholt wrote:
->> >> This is the start of a full VC4 driver.  Right now this just supports
->> >> configuring the display using a pre-existing video mode (because
->> >> changing the pixel clock isn't available yet, and doesn't work when it
->> >> is).  However, this is enough for fbcon and bringing up X using
->> >> xf86-video-modesetting.
->> >> 
->> >> Signed-off-by: Eric Anholt <eric@anholt.net>
->> >> ---
->> >>  drivers/gpu/drm/Kconfig           |   2 +
->> >>  drivers/gpu/drm/Makefile          |   1 +
->> >>  drivers/gpu/drm/vc4/Kconfig       |  14 +
->> >>  drivers/gpu/drm/vc4/Makefile      |  18 ++
->> >>  drivers/gpu/drm/vc4/vc4_bo.c      |  54 ++++
->> >>  drivers/gpu/drm/vc4/vc4_crtc.c    | 583 ++++++++++++++++++++++++++++++++++
->> >>  drivers/gpu/drm/vc4/vc4_debugfs.c |  38 +++
->> >>  drivers/gpu/drm/vc4/vc4_drv.c     | 249 +++++++++++++++
->> >>  drivers/gpu/drm/vc4/vc4_drv.h     | 123 +++++++
->> >>  drivers/gpu/drm/vc4/vc4_hdmi.c    | 651 ++++++++++++++++++++++++++++++++++++++
->> >>  drivers/gpu/drm/vc4/vc4_hvs.c     | 172 ++++++++++
->> >>  drivers/gpu/drm/vc4/vc4_kms.c     |  84 +++++
->> >>  drivers/gpu/drm/vc4/vc4_plane.c   | 320 +++++++++++++++++++
->> >>  drivers/gpu/drm/vc4/vc4_regs.h    | 562 ++++++++++++++++++++++++++++++++
->> >>  14 files changed, 2871 insertions(+)
->> >>  create mode 100644 drivers/gpu/drm/vc4/Kconfig
->> >>  create mode 100644 drivers/gpu/drm/vc4/Makefile
->> >>  create mode 100644 drivers/gpu/drm/vc4/vc4_bo.c
->> >>  create mode 100644 drivers/gpu/drm/vc4/vc4_crtc.c
->> >>  create mode 100644 drivers/gpu/drm/vc4/vc4_debugfs.c
->> >>  create mode 100644 drivers/gpu/drm/vc4/vc4_drv.c
->> >>  create mode 100644 drivers/gpu/drm/vc4/vc4_drv.h
->> >>  create mode 100644 drivers/gpu/drm/vc4/vc4_hdmi.c
->> >>  create mode 100644 drivers/gpu/drm/vc4/vc4_hvs.c
->> >>  create mode 100644 drivers/gpu/drm/vc4/vc4_kms.c
->> >>  create mode 100644 drivers/gpu/drm/vc4/vc4_plane.c
->> >>  create mode 100644 drivers/gpu/drm/vc4/vc4_regs.h
->> >
->> > Made a quick pass and found a few things to update to latest drm
->> > developments. Of course didn't look at the hardware details since no clue,
->> > but looks really nice overall.
->> 
->> If you have anything about the hardware that you were curious about, I'd
->> be interested in trying to explain them in the comments to the extent
->> that I can.  It's unfortunate that we haven't shipped docs for the
->> display side of things, but had to do a lot of reading of the verilog
->> just to get this far, anyway.
->
-> The only thing I spotted is that you right now only register a primary and
-> cursor plane. I guess the plan we once discussed about exposing piles of
-> planes for -modesetting accel isn't there yet?
->
-> But otherwise I really didn't go into the hardware details.
+LED support: Petr Cvek <petr.cvek@tul.cz>
 
-Yeah, I haven't done piles of planes because what we have right now
-means I don't have to do the bandwidth limits tracking yet.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150818/efaeaf36/attachment.sig>
+OK?
+
+>> @@ -130,6 +140,7 @@ static int __init pasic3_probe(struct platform_device *pdev)
+>>  	struct device *dev = &pdev->dev;
+>>  	struct pasic3_data *asic;
+>>  	struct resource *r;
+>> +	struct pasic3_leds_pdata *leds_pdata;
+>>  	int ret;
+>>  	int irq = 0;
+>>  
+>> @@ -162,6 +173,8 @@ static int __init pasic3_probe(struct platform_device *pdev)
+>>  	/* calculate bus shift from mem resource */
+>>  	asic->bus_shift = (resource_size(r) - 5) >> 3;
+>>  
+>> +	spin_lock_init(&asic->lock);
+>> +
+>>  	if (pdata && pdata->clock_rate) {
+>>  		ds1wm_pdata.clock_rate = pdata->clock_rate;
+>>  		/* the first 5 PASIC3 registers control the DS1WM */
+>> @@ -172,13 +185,12 @@ static int __init pasic3_probe(struct platform_device *pdev)
+>>  			dev_warn(dev, "failed to register DS1WM\n");
+>>  	}
+>>  
+>> -	if (pdata && pdata->led_pdata) {
+>> -		led_cell.platform_data = pdata->led_pdata;
+>> -		led_cell.pdata_size = sizeof(struct pasic3_leds_machinfo);
+>> -		ret = mfd_add_devices(&pdev->dev, pdev->id, &led_cell, 1, r,
+>> -				      0, NULL);
+>> -		if (ret < 0)
+>> -			dev_warn(dev, "failed to register LED device\n");
+>> +	if (pdata && pdata->pasic3_leds) {
+>> +		leds_pdata = dev_get_platdata(&pdata->pasic3_leds->dev);
+> 
+> Whoa!  You're passing a pointer to a device through pdata?
+> 
+> I don't like that at all.  Please explain.
+
+> 
+>> +		if (leds_pdata) {
+>> +			leds_pdata->mfd_dev = dev;
+>> +			platform_device_register(pdata->pasic3_leds);
+> 
+> What's the idea here?
+
+Actually, I don't know how to do this in a clean way as pasic3_read_register() and pasic3_write_register() require device struct to pass address for accessing the registers. Only way would be to rewrite all functions which call pasic3_*_register() (removing struct device *dev and change it to struct pasic3_data *asic).
+
+Petr
