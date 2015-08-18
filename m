@@ -1,51 +1,61 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 18 Aug 2015 16:57:29 +0900
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Tue, 18 Aug 2015 10:05:59 +0200
 Subject: [PATCH] ARM: exynos_defconfig: Enable CROS_EC_PROTO for ChromeOS
  EC mfd driver
-In-Reply-To: <1439881281-22054-1-git-send-email-javier@osg.samsung.com>
+In-Reply-To: <55D2E569.3000800@samsung.com>
 References: <1439881281-22054-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <55D2E569.3000800@samsung.com>
+ <55D2E569.3000800@samsung.com>
+Message-ID: <55D2E767.50807@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18.08.2015 16:01, Javier Martinez Canillas wrote:
-> The ChromeOS mfd driver (MFD_CROS_EC) select the CROS_EC_PROTO config
-> symbol because the driver uses some communication helper functions in
-> drivers/platform/chrome/cros_ec_proto.c but other drivers depends on
-> CROS_EC_PROTO instead. Mixing select and depends can lead to circular
-> Kconfig dependencies so the MFD_CROS_EC select should be changed to a
-> depends on CROS_EC_PROTO instead.
-> 
-> But doing so will break git bisect-ability since MFD_CROS_EC will not
-> be enabled anymore unless the default configs first explicitly enable
-> the CROS_EC_PROTO dependency.
-> 
-> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> ---
->  arch/arm/configs/exynos_defconfig | 1 +
->  1 file changed, 1 insertion(+)
+Hello Krzysztof,
 
-I saw the discussion about circular dependency but I wasn't following
-it. Currently the CROS_EC_PROTO is not user-selectable. How can you
-depend on it? How can be enabled on different configs (customized by user)?
+On 08/18/2015 09:57 AM, Krzysztof Kozlowski wrote:
+> On 18.08.2015 16:01, Javier Martinez Canillas wrote:
+>> The ChromeOS mfd driver (MFD_CROS_EC) select the CROS_EC_PROTO config
+>> symbol because the driver uses some communication helper functions in
+>> drivers/platform/chrome/cros_ec_proto.c but other drivers depends on
+>> CROS_EC_PROTO instead. Mixing select and depends can lead to circular
+>> Kconfig dependencies so the MFD_CROS_EC select should be changed to a
+>> depends on CROS_EC_PROTO instead.
+>>
+>> But doing so will break git bisect-ability since MFD_CROS_EC will not
+>> be enabled anymore unless the default configs first explicitly enable
+>> the CROS_EC_PROTO dependency.
+>>
+>> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+>> ---
+>>  arch/arm/configs/exynos_defconfig | 1 +
+>>  1 file changed, 1 insertion(+)
+> 
+> I saw the discussion about circular dependency but I wasn't following
+> it. Currently the CROS_EC_PROTO is not user-selectable. How can you
+> depend on it? How can be enabled on different configs (customized by user)?
+> 
+> Maybe the questions are answered by code in different patches?
 
-Maybe the questions are answered by code in different patches?
+Yes, that's why I posted "[PATCH] platform/chrome: Make CROS_EC_PROTO
+a user selectable option" [0].
+
+I posted as separate patches because there isn't a dependency between
+them and once all the defconfig patches and the patch to make the
+CROS_EC_PROTO symbol user selectable lands, I'll post the patch to
+change select for depends on to avoid a regression.
+
+Maybe I should had posted as a series (or at least cc all the people
+in all the patches) to not left these questions unanswered...
+
+> 
+> Best regards,
+> Krzysztof
+> 
+> 
+
+[0]: https://lkml.org/lkml/2015/8/18/61
 
 Best regards,
-Krzysztof
-
-
-> 
-> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-> index 1ff2bfa2e183..537391ea37ac 100644
-> --- a/arch/arm/configs/exynos_defconfig
-> +++ b/arch/arm/configs/exynos_defconfig
-> @@ -177,6 +177,7 @@ CONFIG_DMADEVICES=y
->  CONFIG_PL330_DMA=y
->  CONFIG_CHROME_PLATFORMS=y
->  CONFIG_CROS_EC_CHARDEV=y
-> +CONFIG_CROS_EC_PROTO=y
->  CONFIG_COMMON_CLK_MAX77686=y
->  CONFIG_COMMON_CLK_MAX77802=y
->  CONFIG_COMMON_CLK_S2MPS11=y
-> 
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
