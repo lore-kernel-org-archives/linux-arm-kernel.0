@@ -1,84 +1,51 @@
-From: yh.huang@mediatek.com (YH Huang)
-Date: Tue, 18 Aug 2015 15:27:55 +0800
-Subject: [PATCH v7 3/3] arm64: dts: mt8173: add MT8173 display PWM driver
- support node
-In-Reply-To: <1439882875-19596-1-git-send-email-yh.huang@mediatek.com>
-References: <1439882875-19596-1-git-send-email-yh.huang@mediatek.com>
-Message-ID: <1439882875-19596-4-git-send-email-yh.huang@mediatek.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 18 Aug 2015 16:57:29 +0900
+Subject: [PATCH] ARM: exynos_defconfig: Enable CROS_EC_PROTO for ChromeOS
+ EC mfd driver
+In-Reply-To: <1439881281-22054-1-git-send-email-javier@osg.samsung.com>
+References: <1439881281-22054-1-git-send-email-javier@osg.samsung.com>
+Message-ID: <55D2E569.3000800@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add display PWM node in mt8173-evb.dts and mt8173.dtsi.
+On 18.08.2015 16:01, Javier Martinez Canillas wrote:
+> The ChromeOS mfd driver (MFD_CROS_EC) select the CROS_EC_PROTO config
+> symbol because the driver uses some communication helper functions in
+> drivers/platform/chrome/cros_ec_proto.c but other drivers depends on
+> CROS_EC_PROTO instead. Mixing select and depends can lead to circular
+> Kconfig dependencies so the MFD_CROS_EC select should be changed to a
+> depends on CROS_EC_PROTO instead.
+> 
+> But doing so will break git bisect-ability since MFD_CROS_EC will not
+> be enabled anymore unless the default configs first explicitly enable
+> the CROS_EC_PROTO dependency.
+> 
+> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> ---
+>  arch/arm/configs/exynos_defconfig | 1 +
+>  1 file changed, 1 insertion(+)
 
-Signed-off-by: YH Huang <yh.huang@mediatek.com>
----
- arch/arm64/boot/dts/mediatek/mt8173-evb.dts |   13 +++++++++++++
- arch/arm64/boot/dts/mediatek/mt8173.dtsi    |   22 ++++++++++++++++++++++
- 2 files changed, 35 insertions(+)
+I saw the discussion about circular dependency but I wasn't following
+it. Currently the CROS_EC_PROTO is not user-selectable. How can you
+depend on it? How can be enabled on different configs (customized by user)?
 
-diff --git a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-index 4be66ca..de95cf3 100644
---- a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-+++ b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-@@ -92,6 +92,13 @@
- };
- 
- &pio {
-+	disp_pwm0_pins: disp_pwm0_pins {
-+		pins1 {
-+			pinmux = <MT8173_PIN_87_DISP_PWM0__FUNC_DISP_PWM0>;
-+			output-low;
-+		};
-+	};
-+
- 	mmc0_pins_default: mmc0default {
- 		pins_cmd_dat {
- 			pinmux = <MT8173_PIN_57_MSDC0_DAT0__FUNC_MSDC0_DAT0>,
-@@ -190,6 +197,12 @@
- 	};
- };
- 
-+&pwm0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&disp_pwm0_pins>;
-+	status = "okay";
-+};
-+
- &pwrap {
- 	pmic: mt6397 {
- 		compatible = "mediatek,mt6397";
-diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-index 6c3f047..68b1ef0 100644
---- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-+++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-@@ -501,6 +501,28 @@
- 			#clock-cells = <1>;
- 		};
- 
-+		pwm0: pwm at 1401e000 {
-+			compatible = "mediatek,mt8173-disp-pwm",
-+				     "mediatek,mt6595-disp-pwm";
-+			reg = <0 0x1401e000 0 0x1000>;
-+			#pwm-cells = <2>;
-+			clocks = <&mmsys CLK_MM_DISP_PWM026M>,
-+				 <&mmsys CLK_MM_DISP_PWM0MM>;
-+			clock-names = "main", "mm";
-+			status = "disabled";
-+		};
-+
-+		pwm1: pwm at 1401f000 {
-+			compatible = "mediatek,mt8173-disp-pwm",
-+				     "mediatek,mt6595-disp-pwm";
-+			reg = <0 0x1401f000 0 0x1000>;
-+			#pwm-cells = <2>;
-+			clocks = <&mmsys CLK_MM_DISP_PWM126M>,
-+				 <&mmsys CLK_MM_DISP_PWM1MM>;
-+			clock-names = "main", "mm";
-+			status = "disabled";
-+		};
-+
- 		imgsys: clock-controller at 15000000 {
- 			compatible = "mediatek,mt8173-imgsys", "syscon";
- 			reg = <0 0x15000000 0 0x1000>;
--- 
-1.7.9.5
+Maybe the questions are answered by code in different patches?
+
+Best regards,
+Krzysztof
+
+
+> 
+> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+> index 1ff2bfa2e183..537391ea37ac 100644
+> --- a/arch/arm/configs/exynos_defconfig
+> +++ b/arch/arm/configs/exynos_defconfig
+> @@ -177,6 +177,7 @@ CONFIG_DMADEVICES=y
+>  CONFIG_PL330_DMA=y
+>  CONFIG_CHROME_PLATFORMS=y
+>  CONFIG_CROS_EC_CHARDEV=y
+> +CONFIG_CROS_EC_PROTO=y
+>  CONFIG_COMMON_CLK_MAX77686=y
+>  CONFIG_COMMON_CLK_MAX77802=y
+>  CONFIG_COMMON_CLK_S2MPS11=y
+> 
