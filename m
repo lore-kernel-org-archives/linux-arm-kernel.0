@@ -1,112 +1,32 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Tue, 18 Aug 2015 14:54:02 -0700
-Subject: [PATCH v2 1/7] drm/vc4: Add devicetree bindings for VC4.
-In-Reply-To: <1439934848-7196-1-git-send-email-eric@anholt.net>
-References: <1439934848-7196-1-git-send-email-eric@anholt.net>
-Message-ID: <1439934848-7196-2-git-send-email-eric@anholt.net>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 18 Aug 2015 13:18:00 -0700
+Subject: [PATCH 1/2] ARM: dts: vexpress: Use assigned-clock-parents for
+ sp810
+In-Reply-To: <1439343411-29168-1-git-send-email-sboyd@codeaurora.org>
+References: <1439343411-29168-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20150818201800.GD4732@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-VC4 is the GPU (display and 3D) subsystem present on the 2835 and some
-other Broadcom SoCs.
+On Tue, Aug 11, 2015 at 06:36:50PM -0700, Stephen Boyd wrote:
+> The sp810 clk driver is calling the clk consumer APIs from
+> clk_prepare ops to change the parent to a 1 MHz fixed rate clock
+> for each of the clocks that the driver provides. Use
+> assigned-clock-parents for this instead of doing it in the driver
+> to avoid using the consumer API in provider code. This also
+> allows us to remove the usage of clk provider APIs that take a
+> struct clk as an argument from the sp810 driver.
+> 
+> Cc: Pawel Moll <pawel.moll@arm.com>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Tested-by: Sudeep Holla <sudeep.holla@arm.com>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+> 
+> This came out of a larger series to change this binding[1]. This
+> patch can go through arm-soc independently though, so please apply.
 
-This binding follows the model of msm, imx, sti, and others, where
-there is a subsystem node for the whole GPU, with nodes for the
-individual HW components within it.
+Applied, thanks.
 
-Signed-off-by: Eric Anholt <eric@anholt.net>
----
 
-v2: Extend the commit message, fix several nits from Stephen Warren.
-
- .../devicetree/bindings/gpu/brcm,bcm-vc4.txt       | 79 ++++++++++++++++++++++
- 1 file changed, 79 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/gpu/brcm,bcm-vc4.txt
-
-diff --git a/Documentation/devicetree/bindings/gpu/brcm,bcm-vc4.txt b/Documentation/devicetree/bindings/gpu/brcm,bcm-vc4.txt
-new file mode 100644
-index 0000000..1b9fedc
---- /dev/null
-+++ b/Documentation/devicetree/bindings/gpu/brcm,bcm-vc4.txt
-@@ -0,0 +1,79 @@
-+Broadcom VC4 GPU
-+
-+The VC4 device present on the Raspberry Pi includes a display system
-+with HDMI output and the HVS scaler for compositing display planes.
-+
-+Required properties for VC4:
-+- compatible:	Should be "brcm,vc4"
-+- crtcs:	List of phandles of pixelvalve scanout engines
-+- hvss:		List of phandles of HVS video scalers
-+- encoders:	List of phandles of output encoders (HDMI, SDTV)
-+
-+Required properties for Pixel Valve:
-+- compatible:	Should be "brcm,vc4-pixelvalve"
-+- reg:		Physical base address and length of the PV's registers
-+- interrupts:	The interrupt number
-+		  See bindings/interrupt-controller/brcm,bcm2835-armctrl-ic.txt
-+
-+Required properties for HVS:
-+- compatible:	Should be "brcm,vc4-hvs"
-+- reg:		Physical base address and length of the HVS's registers
-+- interrupts:	The interrupt number
-+		  See bindings/interrupt-controller/brcm,bcm2835-armctrl-ic.txt
-+
-+Required properties for HDMI
-+- compatible:	Should be "brcm,vc4-hdmi"
-+- reg:		Physical base address and length of the two register ranges
-+		  ("HDMI" and "HD", in that order)
-+- interrupts:	The interrupt numbers
-+		  See bindings/interrupt-controller/brcm,bcm2835-armctrl-ic.txt
-+- ddc:		phandle of the I2C controller used for DDC EDID probing
-+- crtc:		phandle to the pixelvalve CRTC the HDMI encoder is attached to
-+
-+Optional properties for HDMI:
-+- hpd-gpio:	The GPIO pin for HDMI hotplug detect (if it doesn't appear
-+		  as an interrupt/status bit in the HDMI controller
-+		  itself).  See bindings/pinctrl/brcm,bcm2835-gpio.txt
-+
-+Example:
-+pv0: brcm,vc4-pixelvalve at 7e206000 {
-+	compatible = "brcm,vc4-pixelvalve";
-+	reg = <0x7e206000 0x100>;
-+	interrupts = <2 13>; /* pwa2 */
-+};
-+
-+pv1: brcm,vc4-pixelvalve at 7e207000 {
-+	compatible = "brcm,vc4-pixelvalve";
-+	reg = <0x7e207000 0x100>;
-+	interrupts = <2 14>; /* pwa1 */
-+};
-+
-+pv2: brcm,vc4-pixelvalve at 7e807000 {
-+	compatible = "brcm,vc4-pixelvalve";
-+	reg = <0x7e807000 0x100>;
-+	interrupts = <2 10>; /* pixelvalve */
-+};
-+
-+hvs: brcm,hvs at 7e400000 {
-+	compatible = "brcm,vc4-hvs";
-+	reg = <0x7e400000 0x6000>;
-+	interrupts = <2 1>;
-+};
-+
-+hdmi: brcm,vc4-hdmi at 7e902000 {
-+	compatible = "brcm,vc4-hdmi";
-+	reg = <0x7e902000 0x600>,
-+	      <0x7e808000 0x100>;
-+	interrupts = <2 8>, <2 9>;
-+	ddc = <&i2c2>;
-+	hpd-gpio = <&gpio 46 GPIO_ACTIVE_HIGH>;
-+	crtc = <&pv2>;
-+};
-+
-+vc4: vc4 at 0x7e4c0000 {
-+	compatible = "brcm,vc4";
-+
-+	crtcs = <&pv0>, <&pv1>, <&pv2>;
-+	encoders = <&hdmi>;
-+	hvss = <&hvs>;
-+};
--- 
-2.1.4
+-Olof
