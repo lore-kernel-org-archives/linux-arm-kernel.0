@@ -1,135 +1,134 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 19 Aug 2015 01:43:47 +0300
-Subject: [PATCH] dmaengine: vdma: Add 64 bit addressing support to the
- driver
-In-Reply-To: <1438775257-3511-1-git-send-email-anuragku@xilinx.com>
-References: <1438775257-3511-1-git-send-email-anuragku@xilinx.com>
-Message-ID: <2214014.FVHbR3JRBK@avalon>
+From: petr.cvek@tul.cz (Petr Cvek)
+Date: Wed, 19 Aug 2015 00:46:25 +0200
+Subject: [PATCH v2 04/21] ARM: pxa: magician: Add, fix and init (new) GPIOs
+In-Reply-To: <87mvxo8lqi.fsf@belgarion.home>
+References: <cover.1439843482.git.petr.cvek@tul.cz> <55D258E9.9010303@tul.cz>
+ <87mvxo8lqi.fsf@belgarion.home>
+Message-ID: <55D3B5C1.2070806@tul.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Anurag,
-
-Thank you for the patch.
-
-On Wednesday 05 August 2015 17:17:37 Anurag Kumar Vulisha wrote:
-> This patch adds the 64 bit addressing support to the vdma driver.
+Dne 18.8.2015 v 21:01 Robert Jarzmik napsal(a):
 > 
-> Signed-off-by: Anurag Kumar Vulisha <anuragku@xilinx.com>
-> ---
->  drivers/dma/Kconfig              |    2 +-
->  drivers/dma/xilinx/xilinx_vdma.c |   36 ++++++++++++++++++++++++++++------
->  2 files changed, 31 insertions(+), 7 deletions(-)
+> From here onward, I'll suppose you'll catch all whitespace/indentation changes
+> and extract them towards patch 01/21 ...
+
+OK
+
 > 
-> diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
-> index bda2cb0..a7cd0a8 100644
-> --- a/drivers/dma/Kconfig
-> +++ b/drivers/dma/Kconfig
-> @@ -398,7 +398,7 @@ config FSL_EDMA
+>>  /* input */
+>>  
+>> -#define EGPIO_MAGICIAN_CABLE_STATE_AC		MAGICIAN_EGPIO(4, 0)
+>> -#define EGPIO_MAGICIAN_CABLE_STATE_USB		MAGICIAN_EGPIO(4, 1)
+>> +/* AC=1, USB=0 */
+>> +#define EGPIO_MAGICIAN_CABLE_TYPE		MAGICIAN_EGPIO(4, 0)
+>> +/* =1 when AC or USB cable inserted */
+>> +#define EGPIO_MAGICIAN_CABLE_INSERT1		MAGICIAN_EGPIO(4, 1)
+> The naming makes me uneasy : it's rather vague "cable insert".
+> If AC and USB are the only charging methods, why not have something like
+> "EGPIO_MAGICIAN_POWERED" or the like ?
+
+I don't see why not, but there are two GPIOs and it may turn out they have different function. I found it only for power/usb cable insertion. For example they may differ when usb device is connected (magician is now a host) but I did not test it (yet, phone does not generate vbus power).
+
 > 
->  config XILINX_VDMA
->  	tristate "Xilinx AXI VDMA Engine"
-> -	depends on (ARCH_ZYNQ || MICROBLAZE)
-> +	depends on (ARCH_ZYNQ || MICROBLAZE || ARM64)
->  	select DMA_ENGINE
->  	help
->  	  Enable support for Xilinx AXI VDMA Soft IP.
-> diff --git a/drivers/dma/xilinx/xilinx_vdma.c
-> b/drivers/dma/xilinx/xilinx_vdma.c index d8434d4..3dcbd29 100644
-> --- a/drivers/dma/xilinx/xilinx_vdma.c
-> +++ b/drivers/dma/xilinx/xilinx_vdma.c
-> @@ -98,7 +98,11 @@
->  #define XILINX_VDMA_FRMDLY_STRIDE_FRMDLY_SHIFT	24
->  #define XILINX_VDMA_FRMDLY_STRIDE_STRIDE_SHIFT	0
+>>  	GPIO10_GPIO,	/* GSM_IRQ */
+>>  	GPIO13_GPIO,	/* CPLD_IRQ */
+>>  	GPIO107_GPIO,	/* DS1WM_IRQ */
+>>  	GPIO108_GPIO,	/* GSM_READY */
+>>  	GPIO115_GPIO,	/* nPEN_IRQ */
+>>  
+>> -	/* I2C */
+>> -	GPIO117_I2C_SCL,
+>> -	GPIO118_I2C_SDA,
+> Okay so that are no I2C devices on magician ? Why keep GPIO119_MAGICIAN_I2C_* at
+> the beginning of the file then ?
+
+It is a duplicite definition.
+
+	http://lxr.free-electrons.com/source/arch/arm/mach-pxa/magician.c#L60
+
+and in the same array again at:
+
+	http://lxr.free-electrons.com/source/arch/arm/mach-pxa/magician.c#L118
+
 > 
-> +#if defined(CONFIG_PHYS_ADDR_T_64BIT)
+>> +	MFP_CFG_OUT(GPIO40, AF0, DRIVE_LOW),	/* FIXME GSM? */
+>> +	MFP_CFG_OUT(GPIO87, AF0, DRIVE_LOW),	/* FIXME GSM? */
+>> +
+>> +	/* Left GPIOs (undefined here):
+>> +	 * 18, 49 : bootloader=VLIO?, WinM=TODO
+>> +	 * 48 : AF0/out0
+>> +	 * 56 : AF0/out0
+>> +	 * 74 : bootloader=AF0/output
+>> +	 * 86 : bootloader=AF0/input (but should be gsm reset???)
+>> +	 * 114 : AF0/out0
+>> +	 * 119 : AF0/out0
+>> +	 * 120 : AF0/out
+>> +	 * 1 : dedicated reset, AF0/output
+>> +	 * 13 : cpld irq, output (??)
+>> +	 */
+> This is not describing current code. This doesn't belong to this file, even if I
+> know how frustrating it is to reverse engineer all these gpios. I created a wiki
+> web page will all GPIOs to let go my frustration in the past :)
 
-Strictly speaking that should be CONFIG_ARCH_DMA_ADDR_T_64BIT.
+OK I can create file in Documentation for that (at least one pin has a different direction in kernel vs bootloader).
 
-> +#define XILINX_VDMA_REG_START_ADDRESS(n)	(0x000c + 8 * (n))
-> +#else
->  #define XILINX_VDMA_REG_START_ADDRESS(n)	(0x000c + 4 * (n))
-> +#endif
+BTW on xda wiki?
+
 > 
->  /* HW specific definitions */
->  #define XILINX_VDMA_MAX_CHANS_PER_DEVICE	0x2
-> @@ -143,16 +147,16 @@
->   * @next_desc: Next Descriptor Pointer @0x00
->   * @pad1: Reserved @0x04
->   * @buf_addr: Buffer address @0x08
-> - * @pad2: Reserved @0x0C
-> - * @vsize: Vertical Size @0x10
-> - * @hsize: Horizontal Size @0x14
-> + * @pad2: Reserved @0x10
-> + * @vsize: Vertical Size @0x14
-> + * @hsize: Horizontal Size @0x18
->   * @stride: Number of bytes between the first
-> - *	    pixels of each horizontal line @0x18
-> + *	    pixels of each horizontal line @0x1C
->   */
->  struct xilinx_vdma_desc_hw {
->  	u32 next_desc;
->  	u32 pad1;
-> -	u32 buf_addr;
-> +	u64 buf_addr;
-
-This will change the descriptor layout for 32-bit VDMA, I don't think that's 
-right.
-
->  	u32 pad2;
->  	u32 vsize;
->  	u32 hsize;
-> @@ -272,6 +276,20 @@ static inline void vdma_desc_write(struct
-> xilinx_vdma_chan *chan, u32 reg, vdma_write(chan, chan->desc_offset + reg,
-> value);
->  }
+>> @@ -241,8 +324,9 @@ static struct htc_egpio_chip egpio_chips[] = {
+>>  
+>>  		/*
+>>  		 * Depends on modules configuration
+>> +		 * Things like MMC and LCD should be enabled
+>>  		 */
+>> -		.initial_values = 0x40,
+>> +		.initial_values = 0x21a0c0,
+> Aren't they enabled by each driver upon its probe() ? What if MMC nor LCD is
+> compiled in the kernel ?
 > 
-> +#if defined(CONFIG_PHYS_ADDR_T_64BIT)
-> +static inline void vdma_desc_write_64(struct xilinx_vdma_chan *chan, u32
-> reg,
-> +				 u64 value)
-> +{
-> +	/* Write the lsb 32 bits*/
-> +	writel(lower_32_bits(value),
-> +			chan->xdev->regs + chan->desc_offset + reg);
-> +
-> +	/* Write the msb 32 bits */
-> +	writel(upper_32_bits(value),
-> +			chan->xdev->regs + chan->desc_offset + reg + 4);
 
-So the CPU can't perform 64-bit register access ?
+Some of it is from time kernel did not get to rootfs detection: 0x8000 for to be able to read panic errors (before a backlight driver is loaded - which is BTW not working now in vanilla). 0x80 should be for a valid LCD power sequence (broken one causes invalid voltages on LCD power lines). 0x2000 is RESET for soundcard as original 0x40 is for GSM. MMC can be probably changed to "0" now when everything is working. 0x200000 as 500mA charging should be enabled (for safety) as sometimes boot on weak accu can cause overcurrent, which will hardreset the phone.
 
-How is 64 bit DMA addressing implemented ? Can you use a 64-bit VDMA on a 32-
-bit platform with LPAE ? Can you use a 32-bit VDMA on a 64-bit platform ? 
-Given that VDMA is an IP core you can instantiate in the programmable logic I 
-expect some level of flexibility to be possible, but this patch doesn't seem 
-to support it. Please provide more context to allow a proper review (and 
-please include it in the commit message of v2).
 
-> +}
-> +#endif
-> +
->  static inline u32 vdma_ctrl_read(struct xilinx_vdma_chan *chan, u32 reg)
->  {
->  	return vdma_read(chan, chan->ctrl_offset + reg);
-> @@ -700,9 +718,15 @@ static void xilinx_vdma_start_transfer(struct
-> xilinx_vdma_chan *chan) int i = 0;
+>> @@ -343,21 +427,19 @@ static void samsung_lcd_power(int on, struct fb_var_screeninfo *si)
+>>  			gpio_set_value(GPIO75_MAGICIAN_SAMSUNG_POWER, 1);
+>>  		else
+>>  			gpio_set_value(EGPIO_MAGICIAN_LCD_POWER, 1);
+>> -		mdelay(10);
+>> -		gpio_set_value(GPIO106_MAGICIAN_LCD_POWER_3, 1);
+>> -		mdelay(10);
+>> -		gpio_set_value(GPIO104_MAGICIAN_LCD_POWER_1, 1);
+>> -		mdelay(30);
+>> -		gpio_set_value(GPIO105_MAGICIAN_LCD_POWER_2, 1);
+>> -		mdelay(10);
+>> +		mdelay(6);
+>> +		gpio_set_value(GPIO106_MAGICIAN_LCD_DCDC_NRESET, 1);
+>> +		mdelay(6);	/* Avdd -> Voff >5ms */
+>> +		gpio_set_value(GPIO104_MAGICIAN_LCD_VOFF_EN, 1);
+>> +		mdelay(16);	/* Voff -> Von >(5+10)ms */
+>> +		gpio_set_value(GPIO105_MAGICIAN_LCD_VON_EN, 1);
+>>  	} else {
+>> -		mdelay(10);
+>> -		gpio_set_value(GPIO105_MAGICIAN_LCD_POWER_2, 0);
+>> -		mdelay(30);
+>> -		gpio_set_value(GPIO104_MAGICIAN_LCD_POWER_1, 0);
+>> -		mdelay(10);
+>> -		gpio_set_value(GPIO106_MAGICIAN_LCD_POWER_3, 0);
+>> -		mdelay(10);
+>> +		gpio_set_value(GPIO105_MAGICIAN_LCD_VON_EN, 0);
+>> +		mdelay(16);
+>> +		gpio_set_value(GPIO104_MAGICIAN_LCD_VOFF_EN, 0);
+>> +		mdelay(6);
+>> +		gpio_set_value(GPIO106_MAGICIAN_LCD_DCDC_NRESET, 0);
+>> +		mdelay(6);
+> You're changing the timings here, right ? This should be an appart patch. What
+> is the reason of the change by the way ?
+
+Faster reaction, one change from msleep to mdelay (in toppoly LCD) and reading a datasheet for a valid sequence.
+
 > 
->  		list_for_each_entry(segment, &desc->segments, node) {
-> -			vdma_desc_write(chan,
-> +#if defined(CONFIG_PHYS_ADDR_T_64BIT)
-> +			vdma_desc_write_64(chan,
->  					XILINX_VDMA_REG_START_ADDRESS(i++),
->  					segment->hw.buf_addr);
-> +#else
-> +			vdma_desc_write(chan,
-> +					XILINX_VDMA_REG_START_ADDRESS(i++),
-> +					(u32)segment->hw.buf_addr);
-> +#endif
->  			last = segment;
->  		}
-
--- 
-Regards,
-
-Laurent Pinchart
+> Cheers.
+> 
+Best regards,
+Petr
