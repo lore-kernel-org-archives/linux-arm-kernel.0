@@ -1,77 +1,54 @@
 From: aalonso@freescale.com (Adrian Alonso)
-Date: Tue, 18 Aug 2015 10:48:57 -0500
-Subject: [PATCH 6/8] pinctrl: freescale: imx7d: support iomux lpsr controller
+Date: Tue, 18 Aug 2015 10:48:59 -0500
+Subject: [PATCH 8/8] pinctrl: freescale: imx: fix system crash if enable two
+ pinctl instances
 In-Reply-To: <1439912939-17535-1-git-send-email-aalonso@freescale.com>
 References: <1439912939-17535-1-git-send-email-aalonso@freescale.com>
-Message-ID: <1439912939-17535-6-git-send-email-aalonso@freescale.com>
+Message-ID: <1439912939-17535-8-git-send-email-aalonso@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-iMX7D has two iomuxc controllers, iomuxc controller similar as
-previous iMX SoC generation and iomuxc-lpsr which provides low
-power state rentetion capabilities on gpios that are part of
-iomuxc-lpsr
+From: Robin Gong <b38343@freescale.com>
 
-- Add iomuxc-lpsr gpio group id's
-- Use flag ZERO_OFFSET_VALID and SHARE_INPUT_SELECT_REG to
-  properly set pads from iomuxc-lpsr domain
+Remove 'static' for 'grp_index', otherwise, it cause the groups whose number is
+smaller than the number of groups of the last pinctl instance never to be
+intialized, thus cause system crash as below
 
+[    0.661012] [<802a6cb0>] (strcmp) from [<802cc80c>] (imx_dt_node_to_map+0x58/0x208)
+[    0.668879] [<802cc80c>] (imx_dt_node_to_map) from [<802cbe24>] (pinctrl_dt_to_map+0x174/0x2b0)
+[    0.677654] [<802cbe24>] (pinctrl_dt_to_map) from [<802c8f18>] (pinctrl_get+0x100/0x424)
+[    0.685878] [<802c8f18>] (pinctrl_get) from [<802c9510>] (pinctrl_register+0x26c/0x480)
+[    0.694104] [<802c9510>] (pinctrl_register) from [<802ccf3c>] (imx_pinctrl_probe+0x580/0x6e8)
+[    0.702706] [<802ccf3c>] (imx_pinctrl_probe) from [<80351b58>] (platform_drv_probe+0x44/0xa4)
+[    0.711455] [<80351b58>] (platform_drv_probe) from [<803503ec>] (driver_probe_device+0x174/0x2b4)
+[    0.720405] [<803503ec>] (driver_probe_device) from [<803505fc>] (__driver_attach+0x8c/0x90)
+[    0.728982] [<803505fc>] (__driver_attach) from [<8034e930>] (bus_for_each_dev+0x6c/0xa0)
+[    0.737381] [<8034e930>] (bus_for_each_dev) from [<8034fb88>] (bus_add_driver+0x148/0x1f0)
+[    0.745804] [<8034fb88>] (bus_add_driver) from [<80350c00>] (driver_register+0x78/0xf8)
+[    0.753880] [<80350c00>] (driver_register) from [<800097d0>] (do_one_initcall+0x8c/0x1d4)
+[    0.762282] [<800097d0>] (do_one_initcall) from [<80987dac>] (kernel_init_freeable+0x144/0x1e4)
+[    0.771061] [<80987dac>] (kernel_init_freeable) from [<806d9c7c>] (kernel_init+0x8/0xe8)
+[    0.779285] [<806d9c7c>] (kernel_init) from [<8000f628>] (ret_from_fork+0x14/0x2c)
+[    0.786981] Code: e3520000 e5e32001 1afffffb e12fff1e (e4d03001)
+
+Signed-off-by: Robin Gong <b38343@freescale.com>
 Signed-off-by: Adrian Alonso <aalonso@freescale.com>
 ---
- drivers/pinctrl/freescale/pinctrl-imx7d.c | 27 +++++++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
+ drivers/pinctrl/freescale/pinctrl-imx.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/pinctrl/freescale/pinctrl-imx7d.c b/drivers/pinctrl/freescale/pinctrl-imx7d.c
-index 1fa7530..a347c22 100644
---- a/drivers/pinctrl/freescale/pinctrl-imx7d.c
-+++ b/drivers/pinctrl/freescale/pinctrl-imx7d.c
-@@ -172,6 +172,14 @@ enum imx7d_pads {
- 	MX7D_PAD_ENET1_RX_CLK = 152,
- 	MX7D_PAD_ENET1_CRS = 153,
- 	MX7D_PAD_ENET1_COL = 154,
-+	MX7D_PAD_GPIO1_IO00 = 0,
-+	MX7D_PAD_GPIO1_IO01 = 1,
-+	MX7D_PAD_GPIO1_IO02 = 2,
-+	MX7D_PAD_GPIO1_IO03 = 3,
-+	MX7D_PAD_GPIO1_IO04 = 4,
-+	MX7D_PAD_GPIO1_IO05 = 5,
-+	MX7D_PAD_GPIO1_IO06 = 6,
-+	MX7D_PAD_GPIO1_IO07 = 7,
- };
+diff --git a/drivers/pinctrl/freescale/pinctrl-imx.c b/drivers/pinctrl/freescale/pinctrl-imx.c
+index 3e02887..cdb5463 100644
+--- a/drivers/pinctrl/freescale/pinctrl-imx.c
++++ b/drivers/pinctrl/freescale/pinctrl-imx.c
+@@ -595,7 +595,7 @@ static int imx_pinctrl_parse_functions(struct device_node *np,
+ 	struct device_node *child;
+ 	struct imx_pmx_func *func;
+ 	struct imx_pin_group *grp;
+-	static u32 grp_index;
++	u32 grp_index = 0;
+ 	u32 i = 0;
  
- /* Pad names for the pinmux subsystem */
-@@ -333,13 +341,32 @@ static const struct pinctrl_pin_desc imx7d_pinctrl_pads[] = {
- 	IMX_PINCTRL_PIN(MX7D_PAD_ENET1_COL),
- };
- 
-+/* Pad names for the pinmux subsystem */
-+static const struct pinctrl_pin_desc imx7d_lpsr_pinctrl_pads[] = {
-+	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO00),
-+	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO01),
-+	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO02),
-+	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO03),
-+	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO04),
-+	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO05),
-+	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO06),
-+	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO07),
-+};
-+
- static struct imx_pinctrl_soc_info imx7d_pinctrl_info = {
- 	.pins = imx7d_pinctrl_pads,
- 	.npins = ARRAY_SIZE(imx7d_pinctrl_pads),
- };
- 
-+static struct imx_pinctrl_soc_info imx7d_lpsr_pinctrl_info = {
-+	.pins = imx7d_lpsr_pinctrl_pads,
-+	.npins = ARRAY_SIZE(imx7d_lpsr_pinctrl_pads),
-+	.flags = SHARE_INPUT_SELECT_REG | ZERO_OFFSET_VALID,
-+};
-+
- static struct of_device_id imx7d_pinctrl_of_match[] = {
- 	{ .compatible = "fsl,imx7d-iomuxc", .data = &imx7d_pinctrl_info, },
-+	{ .compatible = "fsl,imx7d-iomuxc-lpsr", .data = &imx7d_lpsr_pinctrl_info },
- 	{ /* sentinel */ }
- };
- 
+ 	dev_dbg(info->dev, "parse function(%d): %s\n", index, np->name);
 -- 
 2.1.4
