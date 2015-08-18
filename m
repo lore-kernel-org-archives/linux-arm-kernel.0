@@ -1,35 +1,39 @@
-From: jeffv@google.com (Jeff Vander Stoep)
-Date: Tue, 18 Aug 2015 12:50:10 -0700
-Subject: [PATCH v2] arm64 Kconfig: Move LIST_POISON to a safe value
-Message-ID: <1439927410-15522-1-git-send-email-jeffv@google.com>
+From: petr.cvek@tul.cz (Petr Cvek)
+Date: Tue, 18 Aug 2015 22:02:40 +0200
+Subject: [PATCH v2 01/21] ARM: pxa: magician: Fix Kconfig for magician to
+ always include htc-egpio
+In-Reply-To: <87zj1o8n3w.fsf@belgarion.home>
+References: <cover.1439843482.git.petr.cvek@tul.cz> <55D25880.3030507@tul.cz>
+ <87zj1o8n3w.fsf@belgarion.home>
+Message-ID: <55D38F60.7010405@tul.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the poison pointer offset to 0xdead000000000000, a
-recognized value that is not mappable by user-space exploits.
+Dne 18.8.2015 v 20:31 Robert Jarzmik napsal(a):
+> Petr Cvek <petr.cvek@tul.cz> writes:
+> 
+>> The htc-egpio driver should be always included in the kernel as it
+>> controls MMC/charging/IrDA power, which is the only way to get
+>> an useful rootfs.
+>>
+>> Signed-off-by: Petr Cvek <petr.cvek@tul.cz>
+> It's already defined in magician_defconfig, why enforce it in Kconfig ?
 
-Signed-off-by: Thierry Strudel <tstrudel@google.com>
-Signed-off-by: Jeff Vander Stoep <jeffv@google.com>
----
-v2 removes an extra newline.
+Good remark, I did not use defconfig at all (as I had to fix from zero configuration + I did not know if defconfig works and will be supported in the future).
 
- arch/arm64/Kconfig | 4 ++++
- 1 file changed, 4 insertions(+)
+I will check if magician_defconfig needs to be updated (probably for leds).
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 318175f..8f1789c 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -104,6 +104,10 @@ config NO_IOPORT_MAP
- config STACKTRACE_SUPPORT
- 	def_bool y
- 
-+config ILLEGAL_POINTER_VALUE
-+	hex
-+	default 0xdead000000000000
-+
- config LOCKDEP_SUPPORT
- 	def_bool y
- 
--- 
-2.5.0.276.gf5e568e
+> 
+> And if it's enforced and I want to build a kernel for magician without
+> MMC/charging/IrDA, why should I be forced to build in HTC_EGPIO ?
+> 
+> Or said differently, does a kernel without HTC_EGPIO is proven to fail 100%
+> without this option ?
+
+Kernel will probably run OK, but the phone will be unusable (for any practical purposes). The EGPIO chip (CPLD) will stay in the state programmed from the previous environment (bootloader or WinCE/Mobile) and drivers fail to init because of the missing EGPIO (and if they init, they will be without any idea about state of the peripherals (no charger detection/charging current stuck on the previous settings, no LCD backlight control, no IrDA, no rootfs, no GSM, no sound, no LEDs).
+
+Different PCB revisions probably use EGPIO pin for LCD power (and at least on my phone, LCD power must have very specific order).
+
+For future (when ROM XIP will work) I would like to be able boot kernel from flash, which itself uses EGPIO for Vpp control (another initial EGPIO configuration). Last possible boot is from JTAG and there will be no previous EGPIO initialization.
+
+Petr
