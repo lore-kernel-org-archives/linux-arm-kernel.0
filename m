@@ -1,33 +1,38 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 18 Aug 2015 10:38:18 +0100
-Subject: [PATCH v8 1/7] arm64: Add HAVE_REGS_AND_STACK_ACCESS_API feature
-In-Reply-To: <55CC1410.1090900@linaro.org>
-References: <1439254364-15362-1-git-send-email-dave.long@linaro.org>
- <1439254364-15362-2-git-send-email-dave.long@linaro.org>
- <20150811173121.GC29880@arm.com> <55CC1410.1090900@linaro.org>
-Message-ID: <20150818093817.GE10301@arm.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 18 Aug 2015 11:56:39 +0200
+Subject: [PATCH] ARM: multi_v7_defconfig: Enable DWC2 USB driver and USB
+ ethernet gadget
+Message-ID: <1439891799-15302-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+DWC2 (s3c-hsotg) hardware module is available on many Exynos based boards,
+so enable DWC2 driver as well as the most common USB Ethernet gadget.
 
-On Thu, Aug 13, 2015 at 04:50:40AM +0100, David Long wrote:
-> On 08/11/15 13:31, Will Deacon wrote:
-> > On Tue, Aug 11, 2015 at 01:52:38AM +0100, David Long wrote:
-> >> +	REG_OFFSET_NAME(x30),
-> >
-> > Does this interact badly with perf tools, which expect to pass "lr" for
-> > x30? (see tools/perf/arch/arm64/include/perf_regs.h).
-> >
-> 
-> Possibly, I can test that when I'm back from my short vacation this 
-> week.  The lr/x30 thing seems to be a recurring issue.  Perhaps it is 
-> best simply to add a reundant entry for x30 as "lr".  It's simple enough 
-> to do, although just slightly ugly looking as it would have to be done 
-> without a macro.  Would one ever use "x31" in place of "sp"?
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+---
+ arch/arm/configs/multi_v7_defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-No; "sp" should always be "sp". Let me know how you get on with perf. I
-couldn't quite tie the two ends together, but it does look like it expects
-"lr" to work.
-
-Will
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index b2facab..d15f719 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -506,6 +506,7 @@ CONFIG_USB_R8A66597_HCD=m
+ CONFIG_USB_RENESAS_USBHS=m
+ CONFIG_USB_STORAGE=y
+ CONFIG_USB_DWC3=y
++CONFIG_USB_DWC2=y
+ CONFIG_USB_CHIPIDEA=y
+ CONFIG_USB_CHIPIDEA_HOST=y
+ CONFIG_AB8500_USB=y
+@@ -517,6 +518,7 @@ CONFIG_USB_MXS_PHY=y
+ CONFIG_USB_RCAR_PHY=m
+ CONFIG_USB_GADGET=y
+ CONFIG_USB_RENESAS_USBHS_UDC=m
++CONFIG_USB_ETH=y
+ CONFIG_MMC=y
+ CONFIG_MMC_BLOCK_MINORS=16
+ CONFIG_MMC_ARMMMCI=y
+-- 
+1.9.2
