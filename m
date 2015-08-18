@@ -1,118 +1,132 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Tue, 18 Aug 2015 16:33:58 -0700
-Subject: [PATCH] Revert "serial: imx: remove unbalanced clk_prepare"
-In-Reply-To: <1439912592-14779-1-git-send-email-fabio.estevam@freescale.com>
-References: <1439912592-14779-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20150818233356.GA4494@localhost.localdomain>
+From: tchalamarla@caviumnetworks.com (tchalamarla at caviumnetworks.com)
+Date: Tue, 18 Aug 2015 16:40:30 -0700
+Subject: [PATCH V4] iommu/arm-smmu-v2: ThunderX mis-extends 64bit registers
+Message-ID: <1439941230-27183-1-git-send-email-tchalamarla@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 18, 2015 at 12:43:12PM -0300, Fabio Estevam wrote:
-> This reverts commit 9e7b399d6528eac33a6fbfceb2b92af209c3454d.
-> 
-> Commit ("9e7b399d6528ea") causes the following warning and sometimes
-> also hangs the system:
-> 
-> ------------[ cut here ]------------
->  WARNING: CPU: 0 PID: 0 at kernel/locking/mutex.c:868 mutex_trylock+0x20c/0x22c()
->  DEBUG_LOCKS_WARN_ON(in_interrupt())
->  Modules linked in:
-> CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.2.0-rc7-next-20150818-00001-g14418a6 #4
-> Hardware name: Freescale i.MX6 Quad/DualLite (Device Tree)
-> Backtrace: 
-> [<80012f08>] (dump_backtrace) from [<800130a4>] (show_stack+0x18/0x1c)
-> r6:00000364 r5:00000000 r4:00000000 r3:00000000
-> [<8001308c>] (show_stack) from [<807902b8>] (dump_stack+0x88/0xa4)
-> [<80790230>] (dump_stack) from [<8002a604>] (warn_slowpath_common+0x80/0xbc)
-> r5:807945c4 r4:80ab3b50
-> [<8002a584>] (warn_slowpath_common) from [<8002a6e4>] (warn_slowpath_fmt+0x38/0x40)
-> r8:00000000 r7:8131100c r6:8054c3cc r5:8131300c r4:80b0a570
-> [<8002a6b0>] (warn_slowpath_fmt) from [<807945c4>] (mutex_trylock+0x20c/0x22c)
-> r3:8095d0d8 r2:8095ab28
-> [<807943b8>] (mutex_trylock) from [<8054c3cc>] (clk_prepare_lock+0x14/0xf4)
-> r7:8131100c r6:be3f0c80 r5:00000037 r4:be3f0c80
-> [<8054c3b8>] (clk_prepare_lock) from [<8054dbfc>] (clk_prepare+0x18/0x30)
-> r5:00000037 r4:be3f0c80
-> [<8054dbe4>] (clk_prepare) from [<8036a600>] (imx_console_write+0x30/0x244)
-> r4:812d0bc8 r3:8132b9a4
-> 
-> To reproduce the problem we only need to let the board idle for something
-> like 30 seconds.
+From: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
 
-hmmm.. I really did not see this one. Looking at the code looks like we
-could be atomic in some of the uart console callbacks.
+The SMMU architecture defines two different behaviors when 64-bit
+registers are written with 32-bit writes.  The first behavior causes
+zero extension into the upper 32-bits.  The second behavior splits a
+64-bit register into "normal" 32-bit register pairs.
 
-For this one:
+On some buggy implementations, registers incorrectly zero extended
+when they should instead behave as normal 32-bit register pairs.
 
-Reviewed-by: Eduardo Valentin <edubezval@gmail.com>
+Signed-off-by: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
 
-Did you try the runtime pm patch on your end?
+Changes from V3:
+        - rebased on iommu/devel
 
-BR,
+Changes from V2:
+        - removed unused definitions
 
-> 
-> Tested on a imx6q-sabresd.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
->  drivers/tty/serial/imx.c | 20 ++++++++++++++------
->  1 file changed, 14 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-> index fe3d41c..d0388a0 100644
-> --- a/drivers/tty/serial/imx.c
-> +++ b/drivers/tty/serial/imx.c
-> @@ -1631,12 +1631,12 @@ imx_console_write(struct console *co, const char *s, unsigned int count)
->  	int locked = 1;
->  	int retval;
->  
-> -	retval = clk_prepare_enable(sport->clk_per);
-> +	retval = clk_enable(sport->clk_per);
->  	if (retval)
->  		return;
-> -	retval = clk_prepare_enable(sport->clk_ipg);
-> +	retval = clk_enable(sport->clk_ipg);
->  	if (retval) {
-> -		clk_disable_unprepare(sport->clk_per);
-> +		clk_disable(sport->clk_per);
->  		return;
->  	}
->  
-> @@ -1675,8 +1675,8 @@ imx_console_write(struct console *co, const char *s, unsigned int count)
->  	if (locked)
->  		spin_unlock_irqrestore(&sport->port.lock, flags);
->  
-> -	clk_disable_unprepare(sport->clk_ipg);
-> -	clk_disable_unprepare(sport->clk_per);
-> +	clk_disable(sport->clk_ipg);
-> +	clk_disable(sport->clk_per);
->  }
->  
->  /*
-> @@ -1777,7 +1777,15 @@ imx_console_setup(struct console *co, char *options)
->  
->  	retval = uart_set_options(&sport->port, co, baud, parity, bits, flow);
->  
-> -	clk_disable_unprepare(sport->clk_ipg);
-> +	clk_disable(sport->clk_ipg);
-> +	if (retval) {
-> +		clk_unprepare(sport->clk_ipg);
-> +		goto error_console;
-> +	}
-> +
-> +	retval = clk_prepare(sport->clk_per);
-> +	if (retval)
-> +		clk_disable_unprepare(sport->clk_ipg);
->  
->  error_console:
->  	return retval;
-> -- 
-> 1.9.1
-> 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 490 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150818/74d2fbee/attachment.sig>
+Changes from V1:
+        - Introduced smmu_writeq
+---
+ drivers/iommu/arm-smmu.c | 50 ++++++++++++++++++++++++++----------------------
+ 1 file changed, 27 insertions(+), 23 deletions(-)
+
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index 48a39df..b58bfa4 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -70,6 +70,18 @@
+ 		((smmu->options & ARM_SMMU_OPT_SECURE_CFG_ACCESS)	\
+ 			? 0x400 : 0))
+ 
++#ifdef CONFIG_64BIT
++#define smmu_writeq(reg64, addr)	writeq_relaxed((reg64), (addr))
++#else
++#define smmu_writeq(reg64, addr)				\
++	do {							\
++		u64 __val = (reg64);				\
++		void __iomem *__addr = (addr);			\
++		writel_relaxed(__val >> 32, __addr + 4);	\
++		writel_relaxed(__val, __addr);			\
++	} while (0)
++#endif
++
+ /* Configuration registers */
+ #define ARM_SMMU_GR0_sCR0		0x0
+ #define sCR0_CLIENTPD			(1 << 0)
+@@ -185,10 +197,8 @@
+ #define ARM_SMMU_CB_SCTLR		0x0
+ #define ARM_SMMU_CB_RESUME		0x8
+ #define ARM_SMMU_CB_TTBCR2		0x10
+-#define ARM_SMMU_CB_TTBR0_LO		0x20
+-#define ARM_SMMU_CB_TTBR0_HI		0x24
+-#define ARM_SMMU_CB_TTBR1_LO		0x28
+-#define ARM_SMMU_CB_TTBR1_HI		0x2c
++#define ARM_SMMU_CB_TTBR0		0x20
++#define ARM_SMMU_CB_TTBR1		0x28
+ #define ARM_SMMU_CB_TTBCR		0x30
+ #define ARM_SMMU_CB_S1_MAIR0		0x38
+ #define ARM_SMMU_CB_S1_MAIR1		0x3c
+@@ -226,7 +236,7 @@
+ #define TTBCR2_SEP_SHIFT		15
+ #define TTBCR2_SEP_UPSTREAM		(0x7 << TTBCR2_SEP_SHIFT)
+ 
+-#define TTBRn_HI_ASID_SHIFT            16
++#define TTBRn_ASID_SHIFT		48
+ 
+ #define FSR_MULTI			(1 << 31)
+ #define FSR_SS				(1 << 30)
+@@ -695,6 +705,7 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
+ 				       struct io_pgtable_cfg *pgtbl_cfg)
+ {
+ 	u32 reg;
++	u64 reg64;
+ 	bool stage1;
+ 	struct arm_smmu_cfg *cfg = &smmu_domain->cfg;
+ 	struct arm_smmu_device *smmu = smmu_domain->smmu;
+@@ -738,22 +749,17 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
+ 
+ 	/* TTBRs */
+ 	if (stage1) {
+-		reg = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[0];
+-		writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR0_LO);
+-		reg = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[0] >> 32;
+-		reg |= ARM_SMMU_CB_ASID(cfg) << TTBRn_HI_ASID_SHIFT;
+-		writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR0_HI);
+-
+-		reg = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[1];
+-		writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR1_LO);
+-		reg = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[1] >> 32;
+-		reg |= ARM_SMMU_CB_ASID(cfg) << TTBRn_HI_ASID_SHIFT;
+-		writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR1_HI);
++		reg64 = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[0];
++
++		reg64 |= ((u64)ARM_SMMU_CB_ASID(cfg)) << TTBRn_ASID_SHIFT;
++		smmu_writeq(reg64, cb_base + ARM_SMMU_CB_TTBR0);
++
++		reg64 = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[1];
++		reg64 |= ((u64)ARM_SMMU_CB_ASID(cfg)) << TTBRn_ASID_SHIFT;
++		smmu_writeq(reg64, cb_base + ARM_SMMU_CB_TTBR1);
+ 	} else {
+-		reg = pgtbl_cfg->arm_lpae_s2_cfg.vttbr;
+-		writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR0_LO);
+-		reg = pgtbl_cfg->arm_lpae_s2_cfg.vttbr >> 32;
+-		writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR0_HI);
++		reg64 = pgtbl_cfg->arm_lpae_s2_cfg.vttbr;
++		smmu_writeq(reg64, cb_base + ARM_SMMU_CB_TTBR0);
+ 	}
+ 
+ 	/* TTBCR */
+@@ -1212,11 +1218,9 @@ static phys_addr_t arm_smmu_iova_to_phys_hard(struct iommu_domain *domain,
+ 
+ 	/* ATS1 registers can only be written atomically */
+ 	va = iova & ~0xfffUL;
+-#ifdef CONFIG_64BIT
+ 	if (smmu->version == ARM_SMMU_V2)
+-		writeq_relaxed(va, cb_base + ARM_SMMU_CB_ATS1PR);
++		smmu_writeq(va, cb_base + ARM_SMMU_CB_ATS1PR);
+ 	else
+-#endif
+ 		writel_relaxed(va, cb_base + ARM_SMMU_CB_ATS1PR);
+ 
+ 	if (readl_poll_timeout_atomic(cb_base + ARM_SMMU_CB_ATSR, tmp,
+-- 
+2.1.0
