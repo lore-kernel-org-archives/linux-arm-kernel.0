@@ -1,32 +1,59 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 18 Aug 2015 13:18:00 -0700
-Subject: [PATCH 1/2] ARM: dts: vexpress: Use assigned-clock-parents for
- sp810
-In-Reply-To: <1439343411-29168-1-git-send-email-sboyd@codeaurora.org>
-References: <1439343411-29168-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20150818201800.GD4732@localhost>
+From: eric@anholt.net (Eric Anholt)
+Date: Tue, 18 Aug 2015 14:54:07 -0700
+Subject: [PATCH v2 6/7] ARM: bcm2835: Add the DDC I2C controller to the device
+ tree.
+In-Reply-To: <1439934848-7196-1-git-send-email-eric@anholt.net>
+References: <1439934848-7196-1-git-send-email-eric@anholt.net>
+Message-ID: <1439934848-7196-7-git-send-email-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 11, 2015 at 06:36:50PM -0700, Stephen Boyd wrote:
-> The sp810 clk driver is calling the clk consumer APIs from
-> clk_prepare ops to change the parent to a 1 MHz fixed rate clock
-> for each of the clocks that the driver provides. Use
-> assigned-clock-parents for this instead of doing it in the driver
-> to avoid using the consumer API in provider code. This also
-> allows us to remove the usage of clk provider APIs that take a
-> struct clk as an argument from the sp810 driver.
-> 
-> Cc: Pawel Moll <pawel.moll@arm.com>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Tested-by: Sudeep Holla <sudeep.holla@arm.com>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
-> 
-> This came out of a larger series to change this binding[1]. This
-> patch can go through arm-soc independently though, so please apply.
+We need to use it for getting video modes over HDMI.
 
-Applied, thanks.
+Signed-off-by: Eric Anholt <eric@anholt.net>
+---
 
+v2: Mark it as disabled by default, and enable it in bcm2835-rpi.
 
--Olof
+ arch/arm/boot/dts/bcm2835-rpi.dtsi |  4 ++++
+ arch/arm/boot/dts/bcm2835.dtsi     | 10 ++++++++++
+ 2 files changed, 14 insertions(+)
+
+diff --git a/arch/arm/boot/dts/bcm2835-rpi.dtsi b/arch/arm/boot/dts/bcm2835-rpi.dtsi
+index 46780bb..29cc7ba 100644
+--- a/arch/arm/boot/dts/bcm2835-rpi.dtsi
++++ b/arch/arm/boot/dts/bcm2835-rpi.dtsi
+@@ -45,6 +45,10 @@
+ 	clock-frequency = <100000>;
+ };
+ 
++&i2c2 {
++	status = "okay";
++};
++
+ &sdhci {
+ 	status = "okay";
+ 	bus-width = <4>;
+diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
+index 301c73f..20574cc 100644
+--- a/arch/arm/boot/dts/bcm2835.dtsi
++++ b/arch/arm/boot/dts/bcm2835.dtsi
+@@ -149,6 +149,16 @@
+ 			status = "disabled";
+ 		};
+ 
++		i2c2: i2c at 7e805000 {
++			compatible = "brcm,bcm2835-i2c";
++			reg = <0x7e805000 0x1000>;
++			interrupts = <2 21>;
++			clocks = <&clk_i2c>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "disabled";
++		};
++
+ 		usb at 7e980000 {
+ 			compatible = "brcm,bcm2835-usb";
+ 			reg = <0x7e980000 0x10000>;
+-- 
+2.1.4
