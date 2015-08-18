@@ -1,96 +1,33 @@
-From: dinh.linux@gmail.com (Dinh Nguyen)
-Date: Tue, 18 Aug 2015 14:22:11 -0500
-Subject: [PATCH v4 4/5] Documentation: dt-bindings: pci: altera pcie
- device tree binding
-In-Reply-To: <1439802579-22651-5-git-send-email-lftan@altera.com>
-References: <1439802579-22651-1-git-send-email-lftan@altera.com>
- <1439802579-22651-5-git-send-email-lftan@altera.com>
-Message-ID: <CADhT+wdwYQWq=yiw1R9YEXX=WTDtoj-5=6EysX=aHUjdSvU89w@mail.gmail.com>
+From: jeffv@google.com (Jeff Vander Stoep)
+Date: Tue, 18 Aug 2015 12:29:37 -0700
+Subject: [PATCH] arm64 Kconfig: Move LIST_POISON to a safe value
+Message-ID: <1439926177-13839-1-git-send-email-jeffv@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 17, 2015 at 4:09 AM, Ley Foon Tan <lftan@altera.com> wrote:
-> This patch adds the bindings for Altera PCIe host controller driver and
-> Altera PCIe MSI driver.
->
-> Signed-off-by: Ley Foon Tan <lftan@altera.com>
-> ---
->  .../devicetree/bindings/pci/altera-pcie-msi.txt    | 27 ++++++++++++
->  .../devicetree/bindings/pci/altera-pcie.txt        | 49 ++++++++++++++++++++++
->  2 files changed, 76 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pci/altera-pcie-msi.txt
->  create mode 100644 Documentation/devicetree/bindings/pci/altera-pcie.txt
->
-> diff --git a/Documentation/devicetree/bindings/pci/altera-pcie-msi.txt b/Documentation/devicetree/bindings/pci/altera-pcie-msi.txt
-> new file mode 100644
-> index 0000000..7f330c9
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pci/altera-pcie-msi.txt
-> @@ -0,0 +1,27 @@
-> +* Altera PCIe MSI controller
-> +
-> +Required properties:
-> +- compatible:  should contain "altr,msi-1.0"
-> +- reg:         specifies the physical base address of the controller and
-> +               the length of the memory mapped region.
-> +- reg-names:   Must include the following entries:
-> +               "csr": CSR registers
-> +               "vector_slave": vectors region
+Move the poison pointer offset to 0xdead000000000000, a
+recognized value that is not mappable by user-space exploits.
 
-Can you be a little bit more specific here? What is a vectors region?
-Also, I'm not 100% sure, but I think "vector-slave" should be used.
+Signed-off-by: Jeff Vander Stoep <jeffv@google.com>
+---
+ arch/arm64/Kconfig | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-> +-interrupts:   specifies the interrupt source of the parent interrupt
-> +               controller. The format of the interrupt specifier depends on the
-> +               parent interrupt controller.
-
-Need to document "interrupt-parent" .
-
-> +- num-vectors: Number of vectors, range 1 to 32.
-> +- msi-controller:      indicates that this is MSI controller node
-> +
-> +
-> +Example
-> +msi0: msi at 0xFF200000 {
-> +       compatible = "altr,msi-1.0";
-> +       reg = <0xFF200000 0x00000010
-> +               0xFF200010 0x00000080>;
-> +       reg-names = "csr", "vector_slave";
-> +       interrupt-parent = <&hps_0_arm_gic_0>;
-> +       interrupts = <0 42 4>;
-> +       msi-controller = <1>;
-> +       num-vectors = <32>;
-> +};
-> diff --git a/Documentation/devicetree/bindings/pci/altera-pcie.txt b/Documentation/devicetree/bindings/pci/altera-pcie.txt
-> new file mode 100644
-> index 0000000..73a8dc0
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pci/altera-pcie.txt
-> @@ -0,0 +1,49 @@
-> +* Altera PCIe controller
-> +
-> +Required properties:
-> +- compatible : should contain "altr,pcie-root-port-1.0"
-> +- reg:         A list of physical base address and length for TXS and CRA.
-> +- reg-names:   Must include the following entries:
-> +               "Txs" or "txs": TXS region
-
-What is a TXS region?
-
-> +               "Cra" or "cra": Control register access region
-> +-interrupts:   specifies the interrupt source of the parent interrupt controller.
-> +               The format of the interrupt specifier depends on the parent interrupt
-> +               controller.
-> +- device_type: must be "pci"
-> +- #address-cells:      set to <3>
-> +- #size-cells: set to <2>
-> +- #interrupt-cells:    set to <1>
-> +- ranges:              Describes the translation of addresses for root ports and standard
-> +               PCI regions.
-> +- interrupt-map-mask and interrupt-map: standard PCI properties
-> +       to define the mapping of the PCIe interface to interrupt
-> +       numbers.
-
-"interrupt-parent" ?
-
-Dinh
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 9532f8d..c003911 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -91,6 +91,11 @@ config NO_IOPORT_MAP
+ config STACKTRACE_SUPPORT
+ 	def_bool y
+ 
++config ILLEGAL_POINTER_VALUE
++	hex
++	default 0xdead000000000000
++
++
+ config LOCKDEP_SUPPORT
+ 	def_bool y
+ 
+-- 
+2.5.0.rc2.392.g76e840b
