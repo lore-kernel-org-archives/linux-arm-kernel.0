@@ -1,40 +1,27 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 18 Aug 2015 13:44:48 +0100
-Subject: [PATCH V3] iommu/arm-smmu-v2: ThunderX mis-extends 64bit registers
-In-Reply-To: <1439853235-12162-1-git-send-email-tchalamarla@caviumnetworks.com>
-References: <1439853235-12162-1-git-send-email-tchalamarla@caviumnetworks.com>
-Message-ID: <20150818124448.GA13507@arm.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 18 Aug 2015 18:26:42 +0530
+Subject: [PATCH v2 0/6] ARM: berlin: add cpufreq support
+In-Reply-To: <1439898368-11543-1-git-send-email-antoine.tenart@free-electrons.com>
+References: <1439898368-11543-1-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <CAOh2x=ke9NWa-GjL=c+RgEWWfsNeKvE2O9CRHmW2dG5mj8ATCg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tirumalesh,
+On Tue, Aug 18, 2015 at 5:16 PM, Antoine Tenart
+<antoine.tenart@free-electrons.com> wrote:
+> Hi,
+>
+> This series adds the cpufreq support to the Berlin SoCs, using
+> cpufreq-dt.
+>
+> First, the cpuclk clock is added to the BG2Q clock driver. This clock
+> has a divider fixed to 1, so we use a fixed factor clock here.
+>
+> Then register a platform device for cpufreq-dt.
+>
+> I also added the OPP table definition in the BG2Q, BG2 and BG2CD device
+> trees. When using a BG2Q, some bootloaders may update this table when
+> booting (mine doesn't).
 
-On Tue, Aug 18, 2015 at 12:13:55AM +0100, tchalamarla at caviumnetworks.com wrote:
-> From: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
-> 
-> The SMMU architecture defines two different behaviors when 64-bit
-> registers are written with 32-bit writes.  The first behavior causes
-> zero extension into the upper 32-bits.  The second behavior splits a
-> 64-bit register into "normal" 32-bit register pairs.
-> 
-> On some buggy implementations, registers incorrectly zero extended
-> when they should instead behave as normal 32-bit register pairs.
-> 
-> Signed-off-by: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
-> 
-> Changes from V2:
-> 	- removed unused definitions
-> 
-> Changes from V1:
-> 	- Introduced smmu_writeq
-> ---
->  drivers/iommu/arm-smmu.c | 57 +++++++++++++++++++++++++-----------------------
->  1 file changed, 30 insertions(+), 27 deletions(-)
-
-I'm happy with this, but it doesn't apply against mainline or my tree.
-Please can you rebase it onto something more recent, preferably my
-iommu/devel branch?
-
-Thanks,
-
-Will
+You can switch to OPP-v2 bindings if you want. Just have a look, they are
+much more powerful.. Should be in linux-next/master.
