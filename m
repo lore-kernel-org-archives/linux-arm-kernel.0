@@ -1,27 +1,40 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 18 Aug 2015 18:26:42 +0530
-Subject: [PATCH v2 0/6] ARM: berlin: add cpufreq support
-In-Reply-To: <1439898368-11543-1-git-send-email-antoine.tenart@free-electrons.com>
-References: <1439898368-11543-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <CAOh2x=ke9NWa-GjL=c+RgEWWfsNeKvE2O9CRHmW2dG5mj8ATCg@mail.gmail.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Tue, 18 Aug 2015 14:04:29 +0100
+Subject: [PATCH v2 0/6] DT: APQ8064 for qcom-dt-next
+Message-ID: <1439903069-19752-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 18, 2015 at 5:16 PM, Antoine Tenart
-<antoine.tenart@free-electrons.com> wrote:
-> Hi,
->
-> This series adds the cpufreq support to the Berlin SoCs, using
-> cpufreq-dt.
->
-> First, the cpuclk clock is added to the BG2Q clock driver. This clock
-> has a divider fixed to 1, so we use a fixed factor clock here.
->
-> Then register a platform device for cpufreq-dt.
->
-> I also added the OPP table definition in the BG2Q, BG2 and BG2CD device
-> trees. When using a BG2Q, some bootloaders may update this table when
-> booting (mine doesn't).
+Hi Andy,
 
-You can switch to OPP-v2 bindings if you want. Just have a look, they are
-much more powerful.. Should be in linux-next/master.
+Apologies for the long delay in sending new version of the patches.
+Here are the new patches with fixes and dropping the MDP and panel
+related changes.
+
+Some dt patches which depend on pmic header
+ "dt-bindings/pinctrl/qcom,pmic-gpio.h" which is availble in linux-next.
+
+
+Changes since v1(https://lkml.org/lkml/2015/7/28/489)
+ - Fixed style related errors spotted by Stephen and Bjorn
+ - dropped mdp and Panel related DT, as it seems to go no where
+  w.r.t cleaning up the driver.
+ - Added few more patches for qs600 which are very trival.
+
+ thanks,
+ srini
+
+Srinivas Kandagatla (6):
+  ARM: dts: ifc6410: Add pwrseq support for WLAN
+  ARM: dts: qs600: add pwrseq support to WLAN
+  ARM: dts: apq8064-ifc6410: add notify led support.
+  ARM: dts: qs600: remove unnecessary i2c pinctrl nodes in board file.
+  ARM: dts: qs600: add alias to serial0
+  ARM: dts: qs600: Add SD card detect support.
+
+ arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts | 46 +++++++++++++++++++++++--
+ arch/arm/boot/dts/qcom-apq8064-ifc6410.dts  | 52 +++++++++++++++++++++++++++++
+ 2 files changed, 95 insertions(+), 3 deletions(-)
+
+-- 
+1.9.1
