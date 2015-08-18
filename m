@@ -1,61 +1,67 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Tue, 18 Aug 2015 10:05:59 +0200
-Subject: [PATCH] ARM: exynos_defconfig: Enable CROS_EC_PROTO for ChromeOS
- EC mfd driver
-In-Reply-To: <55D2E569.3000800@samsung.com>
-References: <1439881281-22054-1-git-send-email-javier@osg.samsung.com>
- <55D2E569.3000800@samsung.com>
-Message-ID: <55D2E767.50807@osg.samsung.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 18 Aug 2015 10:08:52 +0200
+Subject: [PATCH 01/10] ARM: marvell/dt: add crypto related nodes to
+ armada-xp.dtsi
+In-Reply-To: <1439885341-14644-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1439885341-14644-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1439885341-14644-2-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+Add crypto related nodes to armada-xp.dtsi.
 
-On 08/18/2015 09:57 AM, Krzysztof Kozlowski wrote:
-> On 18.08.2015 16:01, Javier Martinez Canillas wrote:
->> The ChromeOS mfd driver (MFD_CROS_EC) select the CROS_EC_PROTO config
->> symbol because the driver uses some communication helper functions in
->> drivers/platform/chrome/cros_ec_proto.c but other drivers depends on
->> CROS_EC_PROTO instead. Mixing select and depends can lead to circular
->> Kconfig dependencies so the MFD_CROS_EC select should be changed to a
->> depends on CROS_EC_PROTO instead.
->>
->> But doing so will break git bisect-ability since MFD_CROS_EC will not
->> be enabled anymore unless the default configs first explicitly enable
->> the CROS_EC_PROTO dependency.
->>
->> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
->> ---
->>  arch/arm/configs/exynos_defconfig | 1 +
->>  1 file changed, 1 insertion(+)
-> 
-> I saw the discussion about circular dependency but I wasn't following
-> it. Currently the CROS_EC_PROTO is not user-selectable. How can you
-> depend on it? How can be enabled on different configs (customized by user)?
-> 
-> Maybe the questions are answered by code in different patches?
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+---
+ arch/arm/boot/dts/armada-xp.dtsi | 30 ++++++++++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
 
-Yes, that's why I posted "[PATCH] platform/chrome: Make CROS_EC_PROTO
-a user selectable option" [0].
-
-I posted as separate patches because there isn't a dependency between
-them and once all the defconfig patches and the patch to make the
-CROS_EC_PROTO symbol user selectable lands, I'll post the patch to
-change select for depends on to avoid a regression.
-
-Maybe I should had posted as a series (or at least cc all the people
-in all the patches) to not left these questions unanswered...
-
-> 
-> Best regards,
-> Krzysztof
-> 
-> 
-
-[0]: https://lkml.org/lkml/2015/8/18/61
-
-Best regards,
+diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
+index 3de9b76..4e65196 100644
+--- a/arch/arm/boot/dts/armada-xp.dtsi
++++ b/arch/arm/boot/dts/armada-xp.dtsi
+@@ -236,6 +236,18 @@
+ 				compatible = "marvell,armada-xp-neta";
+ 			};
+ 
++			crypto at 90000 {
++				compatible = "marvell,armada-xp-crypto";
++				reg = <0x90000 0x10000>;
++				reg-names = "regs";
++				interrupts = <48>, <49>;
++				clocks = <&gateclk 23>, <&gateclk 23>;
++				clock-names = "cesa0", "cesa1";
++				marvell,crypto-srams = <&crypto_sram0>,
++						       <&crypto_sram1>;
++				marvell,crypto-sram-size = <0x800>;
++			};
++
+ 			xor at f0900 {
+ 				compatible = "marvell,orion-xor";
+ 				reg = <0xF0900 0x100
+@@ -256,6 +268,24 @@
+ 				};
+ 			};
+ 		};
++
++		crypto_sram0: sa-sram0 {
++			compatible = "mmio-sram";
++			reg = <MBUS_ID(0x09, 0x09) 0 0x800>;
++			clocks = <&gateclk 23>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges = <0 MBUS_ID(0x09, 0x09) 0 0x800>;
++		};
++
++		crypto_sram1: sa-sram1 {
++			compatible = "mmio-sram";
++			reg = <MBUS_ID(0x09, 0x05) 0 0x800>;
++			clocks = <&gateclk 23>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges = <0 MBUS_ID(0x09, 0x05) 0 0x800>;
++		};
+ 	};
+ 
+ 	clocks {
 -- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+1.9.1
