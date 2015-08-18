@@ -1,91 +1,43 @@
-From: petr.cvek@tul.cz (Petr Cvek)
-Date: Tue, 18 Aug 2015 23:48:34 +0200
-Subject: [PATCH v2 19/21] leds: leds-pasic3: Add support for PASIC3 LED
- controller
-In-Reply-To: <55D30875.3090103@samsung.com>
-References: <cover.1439843482.git.petr.cvek@tul.cz> <55D25ADC.10703@tul.cz>
- <55D30875.3090103@samsung.com>
-Message-ID: <55D3A832.90705@tul.cz>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 18 Aug 2015 13:14:16 -0700
+Subject: [GIT PULL 1/3] ARM: imx: soc updates for 4.3
+In-Reply-To: <1439311351-5268-1-git-send-email-shawnguo@kernel.org>
+References: <1439311351-5268-1-git-send-email-shawnguo@kernel.org>
+Message-ID: <20150818201416.GA4732@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne 18.8.2015 v 12:27 Jacek Anaszewski napsal(a):
-> Hi Petr,
+Hi,
+
+On Wed, Aug 12, 2015 at 12:42:29AM +0800, Shawn Guo wrote:
+> Hi arm-soc maintainers,
 > 
-> On 08/18/2015 12:06 AM, Petr Cvek wrote:
->> +/*
->> + * AIC3 (or PASIC3) LED driver for HTC Magician/Alpine/.. (not Compaq ASIC3)
+> This is the i.MX SoC changes for 4.3.  There are some input and rtc
+> changes, because they are applied as a series.  Subsystem maintainers
+> have ACKed these changes, so it should be fine to send them via arm-soc
+> tree.
+
+In some of these cases, may I ask why? For example, the RTC changes look
+like they could just go in through the driver tree -- adding DT support to
+a driver can definitely do so (and the DT changes to plumb up the device can go
+through your DT branch).
+
+> The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
 > 
-> s/AIC3/ASIC3/
+>   Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
 > 
-> I am a bit confused. What's the relation between ASIC3 and PASIC3?
-
-Actually both drivers should be renamed to AIC3 (or AIC only, as there is version 2). "HTC_AIC3" is written on the chip and "pasic3" is confusing with compaq asic3 driver, which claims in Kconfig help to be compatible with HTC machines. Compaq ASIC3 has much more functionality and from brief look it seems it has 16 bit registers (HTC_AIC3 has only LEDs, RESET and DS1WM and has 8 bit registers).
-
->> +spinlock_t lock;
+> are available in the git repository at:
 > 
-> Please move it to the struct pasic3_leds_data.
-
-OK
-
+>   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-soc-4.3
 > 
->> +
->> +static void brightness_set(struct led_classdev *cdev,
->> +    enum led_brightness value)
->> +{
->> +    struct platform_device *pdev = to_platform_device(cdev->dev->parent);
->> +    struct pasic3_led *led = dev_get_platdata(cdev->dev);
->> +    struct pasic3_leds_pdata *pdata = dev_get_platdata(&pdev->dev);
->> +    unsigned long flags;
->> +    u8 val;
->> +
->> +    spin_lock_irqsave(&lock, flags);
->> +
->> +    if (value == LED_OFF) {
->> +        val = pasic3_read_register(pdata->mfd_dev, PASIC3_CH_CONTROL);
->> +        pasic3_write_register(pdata->mfd_dev, PASIC3_CH_CONTROL,
->> +            val & ~(led->bit_blink_en | led->bit_force_on));
->> +
->> +        val = pasic3_read_register(pdata->mfd_dev, PASIC3_MASK_A);
->> +        pasic3_write_register(pdata->mfd_dev, PASIC3_MASK_A,
->> +            val & ~led->bit_mask);
->> +
->> +        if (pdata->power_gpio) {
->> +            pdata->power_gpio_users--;
+> for you to fetch changes up to 8a0fa1843638c5078e6606114ed8bdf9ea56fab1:
 > 
-> Now it is possible that power_gpio_users will have negative value.
-> You should check the value before decrementing it.
+>   rtc: snvs: select option REGMAP_MMIO (2015-08-11 23:04:47 +0800)
 
-> Now you are setting power_gpio_users to 1 each time brightness is set,
-> whereas it should be set to 1 only if it was 0.
-> 
-> This could be changed to:
-> 
-> if (pdata->power_gpio_users == 0)
->     gpio_set_value(pdata->power_gpio, 1);
-> 
-> pdata->power_gpio_users++;
-
-> 
-> Shouldn't you check if also power_gpio state doesn't need to be altered
-> here?
-> 
+I've merged this, and we can merge acked drivers in the future too if needed,
+but ideally only where it's needed.
 
 
-Can the same brightness_set() function be called multiple times with same value (like LED_ON)?
+Thanks!
 
-I think I will change it to a different code altogether, power_gpio is shared variable and power can be shut off when two of three leds are disabled (green LED does not use power_gpio). Something like:
-
-enabled_leds |= BIT(hw_num);
-
-or
-
-enabled_leds &= ~BIT(hw_num);
-
->> +        ret = gpio_request(pdata->power_gpio,
->> +            "Red-Blue LED Power");
-> 
-> Please use devm_gpio_request. Then you will not need pasic3_led_remove.
-> 
-
-OK
+-Olof
