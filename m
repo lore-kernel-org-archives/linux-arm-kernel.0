@@ -1,93 +1,135 @@
-From: tyler.baker@linaro.org (Tyler Baker)
-Date: Tue, 18 Aug 2015 15:30:41 -0700
-Subject: [GIT PULL 9/9] ARM: tegra: Default configuration updates for
- v4.3-rc1
-In-Reply-To: <1439563720-13189-10-git-send-email-thierry.reding@gmail.com>
-References: <1439563720-13189-1-git-send-email-thierry.reding@gmail.com>
- <1439563720-13189-10-git-send-email-thierry.reding@gmail.com>
-Message-ID: <CANMBJr7PKy-eCcB3HiBajpApHS_BYPa7xfKjTqV4o8Z1hwY99A@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 19 Aug 2015 01:43:47 +0300
+Subject: [PATCH] dmaengine: vdma: Add 64 bit addressing support to the
+ driver
+In-Reply-To: <1438775257-3511-1-git-send-email-anuragku@xilinx.com>
+References: <1438775257-3511-1-git-send-email-anuragku@xilinx.com>
+Message-ID: <2214014.FVHbR3JRBK@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Theirry,
+Hi Anurag,
 
-On 14 August 2015 at 07:48, Thierry Reding <thierry.reding@gmail.com> wrote:
-> Hi ARM SoC maintainers,
->
-> The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
->
->   Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.3-defconfig
->
-> for you to fetch changes up to 258d9bc5e77fa40e290a0bd480d5349224374480:
->
->   ARM: tegra: Update multi_v7_defconfig (2015-08-14 16:26:00 +0200)
->
-> Thanks,
-> Thierry
->
-> ----------------------------------------------------------------
-> ARM: tegra: Default configuration updates for v4.3-rc1
->
-> Enable the GK20A GPU (via the Nouveau driver) and CPU frequency scaling
-> on Tegra124.
->
-> ----------------------------------------------------------------
-> Thierry Reding (1):
->       ARM: tegra: Update multi_v7_defconfig
+Thank you for the patch.
 
-The kernelci.org bot recently reported jetson-tk1 boot failures[1][2]
-in next-20150818, only when booting the mult_v7_defconfig kernels. I
-bisected[3] these boot failure down to this commit, it didn't cleanly
-revert, so I manually removed that options this patch added, and my
-jetson-tk1 booted again. Digging a bit further, if I apply the patch
-below to next-20150818, my jetson-tk1 boots.
+On Wednesday 05 August 2015 17:17:37 Anurag Kumar Vulisha wrote:
+> This patch adds the 64 bit addressing support to the vdma driver.
+> 
+> Signed-off-by: Anurag Kumar Vulisha <anuragku@xilinx.com>
+> ---
+>  drivers/dma/Kconfig              |    2 +-
+>  drivers/dma/xilinx/xilinx_vdma.c |   36 ++++++++++++++++++++++++++++------
+>  2 files changed, 31 insertions(+), 7 deletions(-)
+> 
+> diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
+> index bda2cb0..a7cd0a8 100644
+> --- a/drivers/dma/Kconfig
+> +++ b/drivers/dma/Kconfig
+> @@ -398,7 +398,7 @@ config FSL_EDMA
+> 
+>  config XILINX_VDMA
+>  	tristate "Xilinx AXI VDMA Engine"
+> -	depends on (ARCH_ZYNQ || MICROBLAZE)
+> +	depends on (ARCH_ZYNQ || MICROBLAZE || ARM64)
+>  	select DMA_ENGINE
+>  	help
+>  	  Enable support for Xilinx AXI VDMA Soft IP.
+> diff --git a/drivers/dma/xilinx/xilinx_vdma.c
+> b/drivers/dma/xilinx/xilinx_vdma.c index d8434d4..3dcbd29 100644
+> --- a/drivers/dma/xilinx/xilinx_vdma.c
+> +++ b/drivers/dma/xilinx/xilinx_vdma.c
+> @@ -98,7 +98,11 @@
+>  #define XILINX_VDMA_FRMDLY_STRIDE_FRMDLY_SHIFT	24
+>  #define XILINX_VDMA_FRMDLY_STRIDE_STRIDE_SHIFT	0
+> 
+> +#if defined(CONFIG_PHYS_ADDR_T_64BIT)
 
-diff --git a/arch/arm/configs/multi_v7_defconfig
-b/arch/arm/configs/multi_v7_defconfig
-index b2facab..a285afe 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -468,7 +468,6 @@ CONFIG_FRAMEBUFFER_CONSOLE_ROTATION=y
- CONFIG_SOUND=m
- CONFIG_SND=m
- CONFIG_SND_DYNAMIC_MINORS=y
--CONFIG_SND_HDA_TEGRA=m
- CONFIG_SND_HDA_INPUT_BEEP=y
- CONFIG_SND_HDA_PATCH_LOADER=y
- CONFIG_SND_HDA_CODEC_REALTEK=m
+Strictly speaking that should be CONFIG_ARCH_DMA_ADDR_T_64BIT.
 
-This isn't where the story ends unfortunately. The collabora lab also
-has a jetson-tk1, booted in the same manner, which boots next-20150818
-fine[4]. The only differences I can spot in the two boot logs is that
-the collabora board is using an older version of u-boot, where as my
-board is using a newer version. U-Boot 2015.01-00231-gab77f24-dirty
-(Good) vs U-Boot 2015.07-00130-gb217c89 (Bad). I've also noticed some
-angry udev messages after the modules probe in userspace present in
-both boot logs that look suspicious.
+> +#define XILINX_VDMA_REG_START_ADDRESS(n)	(0x000c + 8 * (n))
+> +#else
+>  #define XILINX_VDMA_REG_START_ADDRESS(n)	(0x000c + 4 * (n))
+> +#endif
+> 
+>  /* HW specific definitions */
+>  #define XILINX_VDMA_MAX_CHANS_PER_DEVICE	0x2
+> @@ -143,16 +147,16 @@
+>   * @next_desc: Next Descriptor Pointer @0x00
+>   * @pad1: Reserved @0x04
+>   * @buf_addr: Buffer address @0x08
+> - * @pad2: Reserved @0x0C
+> - * @vsize: Vertical Size @0x10
+> - * @hsize: Horizontal Size @0x14
+> + * @pad2: Reserved @0x10
+> + * @vsize: Vertical Size @0x14
+> + * @hsize: Horizontal Size @0x18
+>   * @stride: Number of bytes between the first
+> - *	    pixels of each horizontal line @0x18
+> + *	    pixels of each horizontal line @0x1C
+>   */
+>  struct xilinx_vdma_desc_hw {
+>  	u32 next_desc;
+>  	u32 pad1;
+> -	u32 buf_addr;
+> +	u64 buf_addr;
 
-[   70.469914] udevd[108]: worker [113] /devices/soc0/70030000.hda is
-taking a long time
-[   70.479849] udevd[108]: worker [115] /devices/soc0/70300000.ahub is
-taking a long time
-[   70.490769] udevd[108]: worker [117] /devices/soc0/sound is taking
-a long time
+This will change the descriptor layout for 32-bit VDMA, I don't think that's 
+right.
 
-FWIW, When I went searching for this patch, I couldn't find it on any
-of the mailing lists. The only reference to this patch was from this
-pull request, thus why I'm reporting the issue here. :)
+>  	u32 pad2;
+>  	u32 vsize;
+>  	u32 hsize;
+> @@ -272,6 +276,20 @@ static inline void vdma_desc_write(struct
+> xilinx_vdma_chan *chan, u32 reg, vdma_write(chan, chan->desc_offset + reg,
+> value);
+>  }
+> 
+> +#if defined(CONFIG_PHYS_ADDR_T_64BIT)
+> +static inline void vdma_desc_write_64(struct xilinx_vdma_chan *chan, u32
+> reg,
+> +				 u64 value)
+> +{
+> +	/* Write the lsb 32 bits*/
+> +	writel(lower_32_bits(value),
+> +			chan->xdev->regs + chan->desc_offset + reg);
+> +
+> +	/* Write the msb 32 bits */
+> +	writel(upper_32_bits(value),
+> +			chan->xdev->regs + chan->desc_offset + reg + 4);
 
-Anyways, let me know if you can reproduce this issue, and/or can think
-of a reason this might may be causing trouble.
+So the CPU can't perform 64-bit register access ?
 
-Cheers,
+How is 64 bit DMA addressing implemented ? Can you use a 64-bit VDMA on a 32-
+bit platform with LPAE ? Can you use a 32-bit VDMA on a 64-bit platform ? 
+Given that VDMA is an IP core you can instantiate in the programmable logic I 
+expect some level of flexibility to be possible, but this patch doesn't seem 
+to support it. Please provide more context to allow a proper review (and 
+please include it in the commit message of v2).
 
-Tyler
+> +}
+> +#endif
+> +
+>  static inline u32 vdma_ctrl_read(struct xilinx_vdma_chan *chan, u32 reg)
+>  {
+>  	return vdma_read(chan, chan->ctrl_offset + reg);
+> @@ -700,9 +718,15 @@ static void xilinx_vdma_start_transfer(struct
+> xilinx_vdma_chan *chan) int i = 0;
+> 
+>  		list_for_each_entry(segment, &desc->segments, node) {
+> -			vdma_desc_write(chan,
+> +#if defined(CONFIG_PHYS_ADDR_T_64BIT)
+> +			vdma_desc_write_64(chan,
+>  					XILINX_VDMA_REG_START_ADDRESS(i++),
+>  					segment->hw.buf_addr);
+> +#else
+> +			vdma_desc_write(chan,
+> +					XILINX_VDMA_REG_START_ADDRESS(i++),
+> +					(u32)segment->hw.buf_addr);
+> +#endif
+>  			last = segment;
+>  		}
 
-[1] http://kernelci.org/boot/all/job/next/kernel/next-20150818/
-[2] http://storage.kernelci.org/next/next-20150818/arm-multi_v7_defconfig/lab-tbaker/boot-tegra124-jetson-tk1.html
-[3] http://hastebin.com/bixofozaji.vhdl
-[4] http://storage.kernelci.org/next/next-20150818/arm-multi_v7_defconfig/lab-collabora/boot-tegra124-jetson-tk1.html
+-- 
+Regards,
+
+Laurent Pinchart
