@@ -1,37 +1,52 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Tue, 18 Aug 2015 13:38:08 +0200
-Subject: [PATCH v4 5/5] ARM: berlin: add a PWM node on the BG2CD
-In-Reply-To: <1439897888-10921-1-git-send-email-antoine.tenart@free-electrons.com>
-References: <1439897888-10921-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1439897888-10921-6-git-send-email-antoine.tenart@free-electrons.com>
+Date: Tue, 18 Aug 2015 13:46:02 +0200
+Subject: [PATCH v2 0/6] ARM: berlin: add cpufreq support
+Message-ID: <1439898368-11543-1-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a PWM node in the Berlin BG2CD device tree, using the
-newly added Berlin PWM driver.
+Hi,
 
-Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
----
- arch/arm/boot/dts/berlin2cd.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+This series adds the cpufreq support to the Berlin SoCs, using
+cpufreq-dt.
 
-diff --git a/arch/arm/boot/dts/berlin2cd.dtsi b/arch/arm/boot/dts/berlin2cd.dtsi
-index 900213d78a32..5d984f58dde7 100644
---- a/arch/arm/boot/dts/berlin2cd.dtsi
-+++ b/arch/arm/boot/dts/berlin2cd.dtsi
-@@ -368,6 +368,13 @@
- 			status = "disabled";
- 		};
- 
-+		pwm: pwm at f20000 {
-+			compatible = "marvell,berlin-pwm";
-+			reg = <0xf20000 0x40>;
-+			clocks = <&chip_clk CLKID_CFG>;
-+			#pwm-cells = <3>;
-+		};
-+
- 		apb at fc0000 {
- 			compatible = "simple-bus";
- 			#address-cells = <1>;
+First, the cpuclk clock is added to the BG2Q clock driver. This clock
+has a divider fixed to 1, so we use a fixed factor clock here.
+
+Then register a platform device for cpufreq-dt.
+
+I also added the OPP table definition in the BG2Q, BG2 and BG2CD device
+trees. When using a BG2Q, some bootloaders may update this table when
+booting (mine doesn't).
+
+Tested on a BG2Q DMP.
+
+Thanks,
+
+Antoine
+
+Changes since v1:
+	- added the BG2 and BG2CD support
+	- moved MAX_CLKS out of the Berlin clk driver
+	- reordered the patches
+
+Antoine Tenart (6):
+  clk: berlin: move MAX_CLKS out of drivers/clk/berlin
+  clk: berlin: add cpuclk
+  ARM: berlin: dts: add the cpufreq-dt bindings on the BG2Q
+  ARM: berlin: dts: add the cpufreq-dt bindings on the BG2
+  ARM: berlin: dts: add the cpufreq-dt bindings on the BG2CD
+  ARM: berlin: register cpufreq-dt
+
+ arch/arm/boot/dts/berlin2.dtsi       | 10 ++++++++++
+ arch/arm/boot/dts/berlin2cd.dtsi     |  8 ++++++++
+ arch/arm/boot/dts/berlin2q.dtsi      | 11 +++++++++++
+ arch/arm/mach-berlin/berlin.c        |  6 ++++++
+ drivers/clk/berlin/bg2.c             |  1 -
+ drivers/clk/berlin/bg2q.c            | 13 ++++++-------
+ include/dt-bindings/clock/berlin2.h  |  2 ++
+ include/dt-bindings/clock/berlin2q.h |  3 +++
+ 8 files changed, 46 insertions(+), 8 deletions(-)
+
 -- 
 2.5.0
