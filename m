@@ -1,169 +1,60 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Tue, 18 Aug 2015 13:36:09 +0300
-Subject: [RESEND PATCH v2 2/2] spi: dw: Allow interface drivers to limit
- data I/O to word sizes
-In-Reply-To: <1437997035-3046-3-git-send-email-michael@smart-africa.com>
-References: <1435163696-14767-1-git-send-email-michael@smart-africa.com>
- <1437997035-3046-1-git-send-email-michael@smart-africa.com>
- <1437997035-3046-3-git-send-email-michael@smart-africa.com>
-Message-ID: <CAHp75Ve4sQ+QM_oRvhqo=k7hoBRByFbB4eaU0j38KTZ6wVrLkw@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 18 Aug 2015 11:37:42 +0100
+Subject: [PATCH 00/12] dw-hdmi development
+In-Reply-To: <20150810122135.GZ1262@ulmo.nvidia.com>
+References: <20150808160251.GM7557@n2100.arm.linux.org.uk>
+ <20150810122135.GZ1262@ulmo.nvidia.com>
+Message-ID: <20150818103742.GN7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 27, 2015 at 2:37 PM, Michael van der Westhuizen
-<michael@smart-africa.com> wrote:
-> The commit dd11444327ce ("spi: dw-spi: Convert 16bit accesses to 32bit
-> accesses") changed all 16bit accesses in the DW_apb_ssi driver to 32bit.
-> This, unfortunately, breaks data register access on picoXcell, where the
-> DW IP needs data register accesses to be word accesses (all other
-> accesses appear to be OK).
->
-> This change introduces a new master variable to allow interface drivers
-> to specify that 16bit data transfer I/O is required.  This change also
-> introduces the ability to set this variable via device tree bindings in
-> the MMIO interface driver.
->
-> Before this change, on a picoXcell pc3x3:
->  spi_master spi32766: interrupt_transfer: fifo overrun/underrun
->  m25p80 spi32766.0: error -5 reading 9f
->  m25p80: probe of spi32766.0 failed with error -5
->
-> After this change:
->  m25p80 spi32766.0: m25p40 (512 Kbytes)
->
-> Fixes: dd11444327ce ("spi: dw-spi: Convert 16bit accesses to 32bit accesses")
-> Signed-off-by: Michael van der Westhuizen <michael@smart-africa.com>
-> Reviewed-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+On Mon, Aug 10, 2015 at 02:21:36PM +0200, Thierry Reding wrote:
+> On Sat, Aug 08, 2015 at 05:02:51PM +0100, Russell King - ARM Linux wrote:
+> > This sub-series is a mixture of development:
+> > 
+> > * Removing the incorrect pixel repetition configuration code
+> > * Preventing pixel-doubled modes from being used
+> > * Adding interlaced video support
+> > * Implementing the sink_is_hdmi/sink_has_audio flags I suggested a few
+> >   months ago
+> > * Only enabling audio support if the sink indicates it has audio
+> > * Avoiding double-enabling the HDMI interface
+> > * Fixing the mis-leading name of "dw_hdmi_phy_enable_power"
+> > * Adding connector mode forcing (important if your monitor bounces
+> >   RXSENSE and HPD signals while in low-power mode.)
+> > * Improving the HDMI enable/disabling on sink status
+> > 
+> > For review (and testing if people feel like it).  Acks/tested-bys etc
+> > welcome.  It applies on top of my drm-dwhdmi-devel branch, which is
+> > waiting for David Airlie to pull (see pull request on dri-devel, 15th
+> > July.)
+> 
+> Hi Russell,
+> 
+> I have in the past merged patches for the bridge subdirectory via the
+> drm/panel tree, though lately much of the dw-hdmi patches have gone in
+> via Philipp or you directly. This seems to have worked fine so far, but
+> this time around I carry a patch to clean up Kconfig and Makefile a
+> little and bring more consistency to the subdirectory and I think it's
+> going to conflict with your series here (and potentially any ongoing
+> work you have).
+> 
+> Would you be open to me picking up these patches into the drm/panel
+> tree? It feeds into linux-next, so the code would get some exposure
+> before Dave's return.
 
-One minor comment below.
+I haven't seen any acks or comments on this set of 12 patches yet which
+is rather disappointing.
 
-> ---
->
-> Changes in v2:
->   - Incorporate review feedback from Andy Shevchenko
->     - Rework the DT bindings to accept an I/O register width as a
->       number of bytes rather than using a boolean spefifying the
->       width preference to be 16 bits.
->     - Add data register access wrapper functions and use them when
->       reading and writing the data register.
->
->  drivers/spi/spi-dw-mmio.c |  4 ++++
->  drivers/spi/spi-dw.c      |  4 ++--
->  drivers/spi/spi-dw.h      | 35 +++++++++++++++++++++++++++++++++++
->  3 files changed, 41 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/spi/spi-dw-mmio.c b/drivers/spi/spi-dw-mmio.c
-> index eb03e12..e76bf72 100644
-> --- a/drivers/spi/spi-dw-mmio.c
-> +++ b/drivers/spi/spi-dw-mmio.c
-> @@ -74,6 +74,10 @@ static int dw_spi_mmio_probe(struct platform_device *pdev)
->
->         dws->max_freq = clk_get_rate(dwsmmio->clk);
->
-> +       if (pdev->dev.of_node)
+David has now returned, and as David hasn't pulled stuff from the 15th,
+my intention is to re-send that pull request, but with certain patches
+from this set included in that - patches 1, 2, 6, 7, 8, 9 and 10.  I'll
+also include Vladimir Zapolskiy's "fix register I2CM_ADDRESS register
+name" patch in the set too.
 
-of_property_read_u32() is NULL-aware. Since the option is optional we
-may drop the condition.
-
-> +               of_property_read_u32(pdev->dev.of_node, "snps,reg-io-width",
-
-Like Rob said, drop 'snps,' prefix as it is a generic property name.
-
-> +                                    &dws->reg_io_width);
-> +
->         num_cs = 4;
->
->         if (pdev->dev.of_node)
-> diff --git a/drivers/spi/spi-dw.c b/drivers/spi/spi-dw.c
-> index 8d67d03..4fbfcdc 100644
-> --- a/drivers/spi/spi-dw.c
-> +++ b/drivers/spi/spi-dw.c
-> @@ -194,7 +194,7 @@ static void dw_writer(struct dw_spi *dws)
->                         else
->                                 txw = *(u16 *)(dws->tx);
->                 }
-> -               dw_writel(dws, DW_SPI_DR, txw);
-> +               dw_write_io_reg(dws, DW_SPI_DR, txw);
->                 dws->tx += dws->n_bytes;
->         }
->  }
-> @@ -205,7 +205,7 @@ static void dw_reader(struct dw_spi *dws)
->         u16 rxw;
->
->         while (max--) {
-> -               rxw = dw_readl(dws, DW_SPI_DR);
-> +               rxw = dw_read_io_reg(dws, DW_SPI_DR);
->                 /* Care rx only if the transfer's original "rx" is not null */
->                 if (dws->rx_end - dws->len) {
->                         if (dws->n_bytes == 1)
-> diff --git a/drivers/spi/spi-dw.h b/drivers/spi/spi-dw.h
-> index 6c91391..b75ed32 100644
-> --- a/drivers/spi/spi-dw.h
-> +++ b/drivers/spi/spi-dw.h
-> @@ -109,6 +109,7 @@ struct dw_spi {
->         u32                     fifo_len;       /* depth of the FIFO buffer */
->         u32                     max_freq;       /* max bus freq supported */
->
-> +       u32                     reg_io_width;   /* DR I/O width in bytes */
->         u16                     bus_num;
->         u16                     num_cs;         /* supported slave numbers */
->
-> @@ -145,11 +146,45 @@ static inline u32 dw_readl(struct dw_spi *dws, u32 offset)
->         return __raw_readl(dws->regs + offset);
->  }
->
-> +static inline u16 dw_readw(struct dw_spi *dws, u32 offset)
-> +{
-> +       return __raw_readw(dws->regs + offset);
-> +}
-> +
->  static inline void dw_writel(struct dw_spi *dws, u32 offset, u32 val)
->  {
->         __raw_writel(val, dws->regs + offset);
->  }
->
-> +static inline void dw_writew(struct dw_spi *dws, u32 offset, u16 val)
-> +{
-> +       __raw_writew(val, dws->regs + offset);
-> +}
-> +
-> +static inline u32 dw_read_io_reg(struct dw_spi *dws, u32 offset)
-> +{
-> +       switch (dws->reg_io_width) {
-> +       case 2:
-> +               return dw_readw(dws, offset);
-> +       case 4:
-> +       default:
-> +               return dw_readl(dws, offset);
-> +       }
-> +}
-> +
-> +static inline void dw_write_io_reg(struct dw_spi *dws, u32 offset, u32 val)
-> +{
-> +       switch (dws->reg_io_width) {
-> +       case 2:
-> +               dw_writew(dws, offset, val);
-> +               break;
-> +       case 4:
-> +       default:
-> +               dw_writel(dws, offset, val);
-> +               break;
-> +       }
-> +}
-> +
->  static inline void spi_enable_chip(struct dw_spi *dws, int enable)
->  {
->         dw_writel(dws, DW_SPI_SSIENR, (enable ? 1 : 0));
-> --
-> 2.1.4
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-spi" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
-
+None of that touches the Makefile or Kconfig, so there shouldn't be any
+conflicts with your work.
 
 -- 
-With Best Regards,
-Andy Shevchenko
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
