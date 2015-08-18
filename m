@@ -1,25 +1,86 @@
-From: davem@davemloft.net (David Miller)
-Date: Mon, 17 Aug 2015 17:27:11 -0700 (PDT)
-Subject: [PATCH v1 2/2] drivers: net: xgene: Adding support for TSO
-In-Reply-To: <1439847185-22046-3-git-send-email-isubramanian@apm.com>
-References: <1439847185-22046-1-git-send-email-isubramanian@apm.com>
- <1439847185-22046-3-git-send-email-isubramanian@apm.com>
-Message-ID: <20150817.172711.1231947431645678967.davem@davemloft.net>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Tue, 18 Aug 2015 03:32:06 +0200
+Subject: 3.18: lockdep problems in cpufreq
+In-Reply-To: <20150813081744.GN7557@n2100.arm.linux.org.uk>
+References: <20141214213655.GA11285@n2100.arm.linux.org.uk>
+ <5160300.5D2Dvly8u9@vostro.rjw.lan>
+ <20150813081744.GN7557@n2100.arm.linux.org.uk>
+Message-ID: <4248436.YMvuzoKMLH@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Iyappan Subramanian <isubramanian@apm.com>
-Date: Mon, 17 Aug 2015 14:33:05 -0700
+On Thursday, August 13, 2015 09:17:44 AM Russell King - ARM Linux wrote:
+> On Thu, Aug 13, 2015 at 03:20:35AM +0200, Rafael J. Wysocki wrote:
+> > On Tuesday, August 11, 2015 06:03:57 PM Russell King - ARM Linux wrote:
+> > > On Tue, May 19, 2015 at 12:05:55AM +0200, Rafael J. Wysocki wrote:
+> > > > On Monday, May 18, 2015 07:56:45 PM Russell King - ARM Linux wrote:
+> > > > > On Tue, Dec 16, 2014 at 09:11:53AM +0530, Viresh Kumar wrote:
+> > > > > > On 16 December 2014 at 04:39, Russell King - ARM Linux
+> > > > > > <linux@arm.linux.org.uk> wrote:
+> > > > > > > Well, here's a patch which I'm running on top of 3.18 at the moment,
+> > > > > > > which is basically what I described in my email, and I'm running with it
+> > > > > > > and it is without any lockdep complaint.
+> > > > > > 
+> > > > > > We need two separate patches now, one for 3.18 and other one for 3.19-rc.
+> > > > > > 3.19 has see lots of changes in this particular file and so we need to
+> > > > > > change few things here.
+> > > > > 
+> > > > > What happened with this?  I'm still carrying the patch.
+> > > > 
+> > > > This should go in through the thermal tree.  Eduardo?
+> > > 
+> > > Having waited a long time for any kind of response from Eduardo, I've
+> > > given up.  My conclusion is that Eduardo isn't interested in this.
+> > > 
+> > > I've re-checked, and the AB-BA deadlock is still there in the latest
+> > > code.  So, I've taken it upon myself to throw this into my for-next
+> > > branch to force the issue - not something I _want_ to do, but I'm doing
+> > > this out of frustration.  It's clear to me that "playing nice" by email
+> > > does _not_ work with some people.
+> > > 
+> > > I'm rather hoping that Stephen reports a merge conflict with linux-next
+> > > this evening to highlight this situation.  I've added additional commentry
+> > > to the commit message on the patch giving the reason why I've done this,
+> > > and the relevant message IDs showing the past history.
+> > > 
+> > > I've not decided whether I'm going to ask Linus to take this patch
+> > > directly or not, that rather depends whether there's any co-operation
+> > > from Eduardo on this.  I'd rather Eduardo took the patch.
+> > > 
+> > > The patch I have has had to be updated again for changes to the driver,
+> > > but I really don't see the point of re-posting it just for it to be
+> > > ignored yet again.
+> > > 
+> > > I'm really disappointed by this dysfunctional state of affairs, and
+> > > that what should be an urgent fix for an observable problem is still
+> > > not merged some nine months after it was first identified.
+> > 
+> > I guess it might help if you sent the updated patch in a new thread.
+> 
+> That I doubt.  Eduardo has not bothered to reply at _any_ time.  I
+> have to question whether there is anyone even reading that email
+> address, or whether it's a redirect to /dev/null.  All the evidence I
+> have right now is that this Eduardo is a ficticous character.
+> 
+> I would have at least expected some complaints when I said "I've put
+> it in linux-next" but... absolutely nothing.
+> 
+> So... my only conclusion is that you're all pulling my leg that there
+> _is_ this "Eduardo" maintainer who's supposed to be taking patches for
+> this stuff.
 
-> +			/* HW requires all header resides in the first buffer */
-> +			if (skb_is_nonlinear(skb) &&
-> +			    (skb_headlen(skb) < hdr_len)) {
-> +				netdev_warn(ndev, "Headers are required to reside in header buffer\n");
-> +				dev_kfree_skb(skb);
-> +				return 0;
-> +			}
+Well, that's the situation as per MAINTAINERS today.  You seem to be concerned
+that it may not reflect the reality, but in that case I can only recommend
+sending a patch against MAINTAINERS to remove Eduardo from there.
 
-You can't just drop the packet in this situation.
+> As I've said, I'm not bothering with this anymore, it's just far too
+> much effort to play these stupid games.
 
-Instead, you must at least try to linearize the header to fit your
-needs.
+I'm not sure what you mean by "these stupid games" here.
+
+> The deadlock can stay for all I care.
+
+Fair enough.
+
+Thanks,
+Rafael
