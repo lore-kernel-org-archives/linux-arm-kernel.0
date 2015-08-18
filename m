@@ -1,116 +1,40 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 18 Aug 2015 14:36:13 +0200
-Subject: MUSB dual-role on AM335x behaving weirdly
-In-Reply-To: <20150804193257.GF9623@saruman.tx.rr.com>
-References: <CADYTM3Zk2iD8YMj75CoLJn=4kpoXoXEKUWj2QzdXKGCJjtfG2A@mail.gmail.com>
- <CADYTM3a1QWnec1D=wT=fgZ-RCXAx_qZYYoFg5gWOy0yT4vovHA@mail.gmail.com>
- <20150514212653.GC3338@piout.net>
- <CADYTM3baVqoEBdWoQb5JFyGR2_GKm1FHMYWST1YkZV=m=ZdycQ@mail.gmail.com>
- <20150526145118.GD26599@saruman.tx.rr.com> <20150527094205.GO3199@piout.net>
- <5594E56B.3040200@free-electrons.com>
- <CADYTM3ZF5m++N1NqmOJoH5agbYrzpvSbLnuLVgttxwzdzwmGwQ@mail.gmail.com>
- <55C0B954.3020106@free-electrons.com> <55C0CAC6.3020603@free-electrons.com>
- <20150804193257.GF9623@saruman.tx.rr.com>
-Message-ID: <55D326BD.2030706@free-electrons.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 18 Aug 2015 13:44:48 +0100
+Subject: [PATCH V3] iommu/arm-smmu-v2: ThunderX mis-extends 64bit registers
+In-Reply-To: <1439853235-12162-1-git-send-email-tchalamarla@caviumnetworks.com>
+References: <1439853235-12162-1-git-send-email-tchalamarla@caviumnetworks.com>
+Message-ID: <20150818124448.GA13507@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi again Felipe,
+Hi Tirumalesh,
 
-I sent this email again without the capture because it prevented to be delivered
-to the mailing lists.
-
-On 04/08/2015 21:32, Felipe Balbi wrote:
-> On Tue, Aug 04, 2015 at 04:23:02PM +0200, Gregory CLEMENT wrote:
->> Hi again,
->> On 04/08/2015 15:08, Gregory CLEMENT wrote:
->>> Hi Bin,
->>>
->>> On 02/07/2015 19:05, Bin Liu wrote:
->>>> Hi,
->>>>
->>>> On Thu, Jul 2, 2015 at 2:16 AM, Gregory CLEMENT
->>>> <gregory.clement@free-electrons.com> wrote:
->>>>> Hi Felipe,
->>>>>
->>>>> On 27/05/2015 11:42, Alexandre Belloni wrote:
->>>>>> Hi,
->>>>>>
->>>>>> On 26/05/2015 at 09:51:18 -0500, Felipe Balbi wrote :
->>>>>>> On Thu, May 14, 2015 at 04:36:33PM -0500, Bin Liu wrote:
->>>>>>>> Alexandre,
->>>>>>>>
->>>>>>>> On Thu, May 14, 2015 at 4:26 PM, Alexandre Belloni
->>>>>>>> <alexandre.belloni@free-electrons.com> wrote:
->>>>>>>>> On 14/05/2015 at 16:16:12 -0500, Bin Liu wrote :
->>>>>>>>>> I think I found the root cause of the problem: board design issue - I
->>>>>>>>>> bet the custom board has too much cap on VBUS line. It should be <
->>>>>>>>>> 10uF.
->>>>>>>>>>
->>>>>>>>>
->>>>>>>>> We have a custom board that exhibits the issue but it only has a 100nF
->>>>>>>>> cap on VBUS.
->>>>>>>>
->>>>>>>> Have you measured the VBUS discharging? Is there any way to share your
->>>>>>>> schematics?
->>>>>>>
->>>>>>> Alexandre, any further comments ?
->>>>>>>
->>>>>>
->>>>>> Yeah, I have just got more info.
->>>>>>
->>>>>> This is the relevant part of the schematic:
->>>>>> http://free-electrons.com/~alexandre/usb.png
->>>>>>
->>>>>> The total VBUS capacitance is 200nF and the USB0 pins are connected
->>>>>> directly to the AM3358 pins. U1 is actually not fitted.
->>>>>>
->>>>>> We didn't measure VBUS discharging but we observe the OTG pin sensing
->>>>>> stops when plugging an OTG cable without any device.
->>>>>
->>>>> Do you have any news about this topic?
->>>>>
->>>>>
->>>>> Is there something else that we can do to help solving this issue?
->>>>
->>>> In the case of CONFIG_USB_MUSB_DUAL_ROLE=y and dr_mode=otg, how is the
->>>> gadget driver configured? It has to be a module not built-in.
->>>
->>> Indeed when I configured CONFIG_USB_MUSB_HDRC=m and CONFIG_USB_MUSB_DSPS=m
->>> it worked seamless.
->>>
->>
->> Actually it didn't worked. And now sometimes I even received continuously
->> the following message:
->>
->>  musb_bus_suspend 2484: trying to suspend as a_wait_vfall while active
+On Tue, Aug 18, 2015 at 12:13:55AM +0100, tchalamarla at caviumnetworks.com wrote:
+> From: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
 > 
-> this is likely because your VBUS hasn't dropped below 0.8V fast enough.
+> The SMMU architecture defines two different behaviors when 64-bit
+> registers are written with 32-bit writes.  The first behavior causes
+> zero extension into the upper 32-bits.  The second behavior splits a
+> 64-bit register into "normal" 32-bit register pairs.
 > 
-> I could only trigger this message in that situation. Use a scope to poke
-> at VBUS and see how long is takes to reach 0.8V, this could all be cause
-> by too much capacitance on VBUS line.
+> On some buggy implementations, registers incorrectly zero extended
+> when they should instead behave as normal 32-bit register pairs.
+> 
+> Signed-off-by: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
+> 
+> Changes from V2:
+> 	- removed unused definitions
+> 
+> Changes from V1:
+> 	- Introduced smmu_writeq
+> ---
+>  drivers/iommu/arm-smmu.c | 57 +++++++++++++++++++++++++-----------------------
+>  1 file changed, 30 insertions(+), 27 deletions(-)
 
-We got some news:
-"The capacitance on VBUS due to components is 200nF and the additional parasitic
-capacitance will be much smaller than this"
-
-The rail discharge time is ~36ms when an USB drive is removed from the OTG adapter.
-I attached a capture of this.
-
-What do you think about these values?
-
-
-However, "there appears to be a considerable delay between the removal of a usb
-drive and the initiation of the VBUS discharge (maybe ~1 second, I wasn't able
-to measure this time)."
+I'm happy with this, but it doesn't apply against mainline or my tree.
+Please can you rebase it onto something more recent, preferably my
+iommu/devel branch?
 
 Thanks,
 
-Gregory
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Will
