@@ -1,39 +1,41 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 19 Aug 2015 11:11:20 +0530
-Subject: [PATCH v7 2/3] cpufreq: mediatek: Add MT8173 cpufreq driver
-In-Reply-To: <1439949906-22177-1-git-send-email-pi-cheng.chen@linaro.org>
-References: <20150818102428.GD31148@linux>
- <1439949906-22177-1-git-send-email-pi-cheng.chen@linaro.org>
-Message-ID: <20150819054120.GA3258@linux>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Wed, 19 Aug 2015 14:45:47 +0900
+Subject: [PATCH] ARM: dts: UniPhier: fix PPI interrupt CPU mask of timer nodes
+Message-ID: <1439963147-2592-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19-08-15, 10:05, Pi-Cheng Chen wrote:
-> Mediatek MT8173 is an ARMv8 based quad-core (2*Cortex-A53 and
-> 2*Cortex-A72) SoC with duall clusters. For each cluster, two voltage
-> inputs, Vproc and Vsram are supplied by two regulators. For the big
-> cluster, two regulators come from different PMICs. In this case, when
-> scaling voltage inputs of the cluster, the voltages of two regulator
-> inputs need to be controlled by software explicitly under the SoC
-> specific limitation:
-> 
-> 	100mV < Vsram - Vproc < 200mV
-> 
-> which is called 'voltage tracking' mechanism. And when scaling the
-> frequency of cluster clock input, the input MUX need to be parented to
-> another "intermediate" stable PLL first and reparented to the original
-> PLL once the original PLL is stable at the target frequency. This patch
-> implements those mechanisms to enable CPU DVFS support for Mediatek
-> MT8173 SoC.
-> 
-> Signed-off-by: Pi-Cheng Chen <pi-cheng.chen@linaro.org>
-> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-> ---
-> 
-> Changes in v7:
-> - add of_machine_is_compatible() check to be multiplatform friendly
+This SoC is integrated with 4 Cortex-A9 cores.  The GIC bindings
+says that the bits[15:8] of the 3rd cell of the interrupts property
+represents PPI interrupt CPU mask.  Because the timer interrupts are
+wired to all of the 4 cores, bits[15:8] should be set to 0xf.
 
-Looks fine, thanks.
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
 
+ arch/arm/boot/dts/uniphier-proxstream2.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/boot/dts/uniphier-proxstream2.dtsi b/arch/arm/boot/dts/uniphier-proxstream2.dtsi
+index ccf795a..4c7b246 100644
+--- a/arch/arm/boot/dts/uniphier-proxstream2.dtsi
++++ b/arch/arm/boot/dts/uniphier-proxstream2.dtsi
+@@ -249,14 +249,14 @@
+ 		timer at 60000200 {
+ 			compatible = "arm,cortex-a9-global-timer";
+ 			reg = <0x60000200 0x20>;
+-			interrupts = <1 11 0x304>;
++			interrupts = <1 11 0xf04>;
+ 			clocks = <&arm_timer_clk>;
+ 		};
+ 
+ 		timer at 60000600 {
+ 			compatible = "arm,cortex-a9-twd-timer";
+ 			reg = <0x60000600 0x20>;
+-			interrupts = <1 13 0x304>;
++			interrupts = <1 13 0xf04>;
+ 			clocks = <&arm_timer_clk>;
+ 		};
+ 
 -- 
-viresh
+1.9.1
