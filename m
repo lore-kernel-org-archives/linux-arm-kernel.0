@@ -1,552 +1,280 @@
 From: ykk@rock-chips.com (Yakir Yang)
-Date: Wed, 19 Aug 2015 09:50:44 -0500
-Subject: [PATCH v3 07/14] drm: rockchip/dp: add rockchip platform dp driver
+Date: Wed, 19 Aug 2015 09:51:17 -0500
+Subject: [PATCH v3 08/14] phy: Add driver for rockchip Display Port PHY
 In-Reply-To: <1439995728-18046-1-git-send-email-ykk@rock-chips.com>
 References: <1439995728-18046-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <1439995844-18419-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <1439995877-18496-1-git-send-email-ykk@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-Rockchip have three clocks for dp controller, we leave pclk_edp
-to analogix_dp driver control, and keep the sclk_edp_24m and
-sclk_edp in platform driver.
 
 Signed-off-by: Yakir Yang <ykk@rock-chips.com>
 ---
 Changes in v3:
-- Take Thierry Reding and Heiko suggest, leave "sclk_edp_24m" to rockchip
-  dp phy driver which name to "24m", and leave "sclk_edp" to analogix dp
-  core driver which name to "dp", and leave "pclk_edp" to rockchip dp platform
-  driver which name to "pclk".
-- Take Heiko suggest, add devicetree binding document.
-- Take Heiko suggest, remove "rockchip,panel" DT property, take use of remote
-  point to get panel node.
-- Add the new function point analogix_dp_platdata.get_modes init.
+- Take Heiko suggest, add rockchip dp phy driver,
+  collect the phy clocks and power control.
 
-Changes in v2:
-- Take Heiko suggest, get panel node with remote-endpoint method,
-  and create devicetree binding for driver.
-- Remove the clock enable/disbale with "sclk_edp" & "sclk_edp_24m",
-  leave those clock to rockchip dp phy driver.
+Changes in v2: None
 
- .../bindings/video/analogix_dp-rockchip.txt        |  82 +++++
- drivers/gpu/drm/rockchip/Kconfig                   |   9 +
- drivers/gpu/drm/rockchip/Makefile                  |   1 +
- drivers/gpu/drm/rockchip/analogix_dp-rockchip.c    | 389 +++++++++++++++++++++
- 4 files changed, 481 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/video/analogix_dp-rockchip.txt
- create mode 100644 drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+ .../devicetree/bindings/phy/rockchip-dp-phy.txt    |  26 +++
+ drivers/phy/Kconfig                                |   7 +
+ drivers/phy/Makefile                               |   1 +
+ drivers/phy/phy-rockchip-dp.c                      | 185 +++++++++++++++++++++
+ 4 files changed, 219 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/rockchip-dp-phy.txt
+ create mode 100644 drivers/phy/phy-rockchip-dp.c
 
-diff --git a/Documentation/devicetree/bindings/video/analogix_dp-rockchip.txt b/Documentation/devicetree/bindings/video/analogix_dp-rockchip.txt
+diff --git a/Documentation/devicetree/bindings/phy/rockchip-dp-phy.txt b/Documentation/devicetree/bindings/phy/rockchip-dp-phy.txt
 new file mode 100644
-index 0000000..99fd421
+index 0000000..5de1088
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/video/analogix_dp-rockchip.txt
-@@ -0,0 +1,82 @@
-+Rockchip RK3288 specific extensions to the Analogix Display Port
-+================================
++++ b/Documentation/devicetree/bindings/phy/rockchip-dp-phy.txt
+@@ -0,0 +1,26 @@
++Rockchip Soc Seroes Display Port PHY
++------------------------------------
 +
 +Required properties:
-+- compatible: "rockchip,rk3288-edp";
++- compatible : should be one of the following supported values:
++	 - "rockchip.rk3288-dp-phy"
 +
-+- reg: physical base address of the controller and length
++- reg : a list of registers used by phy driver
 +- clocks: from common clock binding: handle to dp clock.
 +	of memory mapped region.
 +- clock-names: from common clock binding:
-+	Required elements: "dp" "pclk"
-+- resets: Must contain an entry for each entry in reset-names.
-+	See ../reset/reset.txt for details.
-+- reset-names: Must include the name "dp"
++	Required elements: "sclk_dp" "sclk_dp_24m"
 +
 +- rockchip,grf: this soc should set GRF regs, so need get grf here.
-+
-+- ports: contain a port node with endpoint definitions as defined in
-+  Documentation/devicetree/bindings/media/video-interfaces.txt.
-+
-+
-+For the below properties, please refer to Analogix DP binding document:
-+ * Documentation/devicetree/bindings/drm/bridge/analogix_dp.txt
-+- phys (required)
-+- phy-names (required)
-+- analogix,color-space (required)
-+- analogix,color-depth (required)
-+- analogix,link-rate (required)
-+- analogix,lane-count (required)
-+- analogix,hpd-gpio (optional)
-+- video interfaces (optional)
-+-------------------------------------------------------------------------------
++- #phy-cells : from the generic PHY bindings, must be 0;
 +
 +Example:
-+	dp-controller: dp at ff970000 {
-+		compatible = "rockchip,rk3288-dp";
-+		reg = <0xff970000 0x4000>;
-+		interrupts = <GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&cru SCLK_EDP>, <&cru PCLK_EDP_CTRL>;
-+		clock-names = "dp", "pclk";
-+		phys = <&dp_phy>;
-+		phy-names = "dp";
 +
-+		rockchip,grf = <&grf>;
-+		resets = <&cru 111>;
-+		reset-names = "dp";
-+
-+		hsync-active-high = <0>;
-+		vsync-active-high = <0>;
-+		interlaced = <0>;
-+		analogix,color-space = <0>;
-+		analogix,color-depth = <1>;
-+		analogix,link-rate = <0x0a>;
-+		analogix,lane-count = <4>;
-+		status = "disabled";
-+
-+		ports {
-+			edp_in: port {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				edp_in_vopb: endpoint at 0 {
-+					reg = <0>;
-+					remote-endpoint = <&vopb_out_edp>;
-+				};
-+				edp_in_vopl: endpoint at 1 {
-+					reg = <1>;
-+					remote-endpoint = <&vopl_out_edp>;
-+				};
-+			};
-+
-+			edp_out: port at 1 {
-+				reg = <1>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				edp_out_panel: endpoint {
-+					reg = <0>;
-+					remote-endpoint = <&panel_in_edp>
-+				};
-+			};
-+		};
-+	};
-+
-diff --git a/drivers/gpu/drm/rockchip/Kconfig b/drivers/gpu/drm/rockchip/Kconfig
-index 35215f6..c2ba945 100644
---- a/drivers/gpu/drm/rockchip/Kconfig
-+++ b/drivers/gpu/drm/rockchip/Kconfig
-@@ -25,3 +25,12 @@ config ROCKCHIP_DW_HDMI
- 	  for the Synopsys DesignWare HDMI driver. If you want to
- 	  enable HDMI on RK3288 based SoC, you should selet this
- 	  option.
-+
-+config ROCKCHIP_ANALOGIX_DP
-+        tristate "Rockchip specific extensions for Analogix DP driver"
-+        depends on DRM_ROCKCHIP
-+        select DRM_ANALOGIX_DP
-+        help
-+	  This selects support for Rockchip SoC specific extensions
-+	  for the Analogix Core DP driver. If you want to enable DP
-+	  on RK3288 based SoC, you should selet this option.
-diff --git a/drivers/gpu/drm/rockchip/Makefile b/drivers/gpu/drm/rockchip/Makefile
-index f3d8a19..8ad01fb 100644
---- a/drivers/gpu/drm/rockchip/Makefile
-+++ b/drivers/gpu/drm/rockchip/Makefile
-@@ -6,5 +6,6 @@ rockchipdrm-y := rockchip_drm_drv.o rockchip_drm_fb.o rockchip_drm_fbdev.o \
- 		rockchip_drm_gem.o
++edp_phy: phy at ff770274 {
++	compatilble = "rockchip,rk3288-dp-phy";
++	reg = <0xff770274 4>;
++	rockchip,grf = <&grf>;
++	clocks = <&cru SCLK_EDP_24M>;
++	clock-names = "24m";
++	#phy-cells = <0>;
++}
+diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+index 6b8dd16..da00440 100644
+--- a/drivers/phy/Kconfig
++++ b/drivers/phy/Kconfig
+@@ -297,6 +297,13 @@ config PHY_ROCKCHIP_USB
+ 	help
+ 	  Enable this to support the Rockchip USB 2.0 PHY.
  
- obj-$(CONFIG_ROCKCHIP_DW_HDMI) += dw_hdmi-rockchip.o
-+obj-$(CONFIG_ROCKCHIP_ANALOGIX_DP) += analogix_dp-rockchip.o
- 
- obj-$(CONFIG_DRM_ROCKCHIP) += rockchipdrm.o rockchip_drm_vop.o
-diff --git a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
++config PHY_ROCKCHIP_DP
++	tristate "Rockchip Display Port PHY Driver"
++	depends on ARCH_ROCKCHIP && OF
++	select GENERIC_PHY
++	help
++	  Enable this to support the Rockchip Display Port PHY.
++
+ config PHY_ST_SPEAR1310_MIPHY
+ 	tristate "ST SPEAR1310-MIPHY driver"
+ 	select GENERIC_PHY
+diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
+index f344e1b..35e3ce6 100644
+--- a/drivers/phy/Makefile
++++ b/drivers/phy/Makefile
+@@ -33,6 +33,7 @@ phy-exynos-usb2-$(CONFIG_PHY_S5PV210_USB2)	+= phy-s5pv210-usb2.o
+ obj-$(CONFIG_PHY_EXYNOS5_USBDRD)	+= phy-exynos5-usbdrd.o
+ obj-$(CONFIG_PHY_QCOM_APQ8064_SATA)	+= phy-qcom-apq8064-sata.o
+ obj-$(CONFIG_PHY_ROCKCHIP_USB) += phy-rockchip-usb.o
++obj-$(CONFIG_PHY_ROCKCHIP_DP)		+= phy-rockchip-dp.o
+ obj-$(CONFIG_PHY_QCOM_IPQ806X_SATA)	+= phy-qcom-ipq806x-sata.o
+ obj-$(CONFIG_PHY_ST_SPEAR1310_MIPHY)	+= phy-spear1310-miphy.o
+ obj-$(CONFIG_PHY_ST_SPEAR1340_MIPHY)	+= phy-spear1340-miphy.o
+diff --git a/drivers/phy/phy-rockchip-dp.c b/drivers/phy/phy-rockchip-dp.c
 new file mode 100644
-index 0000000..cebff9e
+index 0000000..4759111
 --- /dev/null
-+++ b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
-@@ -0,0 +1,389 @@
++++ b/drivers/phy/phy-rockchip-dp.c
+@@ -0,0 +1,185 @@
 +/*
-+ * Rockchip SoC DP (Display Port) interface driver.
++ * Rockchip DP PHY driver
 + *
-+ * Copyright (C) Fuzhou Rockchip Electronics Co., Ltd.
-+ * Author: Andy Yan <andy.yan@rock-chips.com>
-+ *         Yakir Yang <ykk@rock-chips.com>
-+ *         Jeff Chen <jeff.chen@rock-chips.com>
++ * Copyright (C) 2015 FuZhou Rockchip Co., Ltd.
++ * Author: Yakir Yang <ykk@@rock-chips.com>
 + *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms of the GNU General Public License as published by the
-+ * Free Software Foundation; either version 2 of the License, or (at your
-+ * option) any later version.
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License.
 + */
-+#include <drm/drmP.h>
-+#include <drm/drm_crtc_helper.h>
-+#include <drm/drm_panel.h>
-+#include <drm/drm_of.h>
-+#include <drm/drm_dp_helper.h>
 +
-+#include <linux/component.h>
-+#include <linux/mfd/syscon.h>
-+#include <linux/of_graph.h>
-+#include <linux/regmap.h>
-+#include <linux/reset.h>
++#include <linux/io.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
 +#include <linux/clk.h>
++#include <linux/phy/phy.h>
++#include <linux/regmap.h>
++#include <linux/mfd/syscon.h>
++#include <linux/platform_device.h>
 +
-+#include <video/of_videomode.h>
-+#include <video/videomode.h>
++#define GRF_SOC_CON12                   0x0274
++#define GRF_EDP_REF_CLK_SEL_INTER       BIT(4)
 +
-+#include <drm/bridge/analogix_dp.h>
++#define DP_PHY_SIDDQ_WRITE_EN           BIT(21)
++#define DP_PHY_SIDDQ_ON                 0
++#define DP_PHY_SIDDQ_OFF                BIT(5)
 +
-+#include "rockchip_drm_drv.h"
-+#include "rockchip_drm_vop.h"
-+
-+#define encoder_to_dp(c) \
-+		container_of(c, struct rockchip_dp_device, encoder)
-+
-+#define plat_data_to_dp(pd) \
-+		container_of(pd, struct rockchip_dp_device, plat_data)
-+
-+/* dp grf register offset */
-+#define GRF_GPIO7B_IOMUX                        0x0070
-+#define GPIO7B3_SEL_MASK                        (0x03 << 6)
-+#define GPIO7B3_SEL_EDP_HOTPLUG                 BIT(7)
-+
-+#define GRF_SOC_CON6                            0x025c
-+#define GRF_EDP_LCD_SEL_MASK                    BIT(5)
-+#define GRF_EDP_SEL_VOP_LIT                     BIT(5)
-+#define GRF_EDP_SEL_VOP_BIG                     0
-+
-+struct rockchip_dp_device {
-+	struct drm_device        *drm_dev;
-+	struct device            *dev;
-+	struct drm_encoder       encoder;
-+	struct drm_display_mode  mode;
-+
-+	struct clk               *pclk;
-+	struct regmap            *grf;
-+	struct reset_control     *rst;
-+
-+	struct analogix_dp_plat_data plat_data;
++struct rockchip_dp_phy {
++	struct device  *dev;
++	struct regmap  *grf;
++	void __iomem   *regs;
++	struct clk     *phy_24m;
 +};
 +
-+static int rockchip_dp_pre_init(struct rockchip_dp_device *dp)
++static int rockchip_dp_phy_clk_enable(struct rockchip_dp_phy *dp)
 +{
-+	u32 val;
-+	int ret;
++	int ret = 0;
 +
-+	val = GPIO7B3_SEL_EDP_HOTPLUG | (GPIO7B3_SEL_MASK << 16);
-+	ret = regmap_write(dp->grf, GRF_GPIO7B_IOMUX, val);
-+	if (ret != 0) {
-+		dev_err(dp->dev, "Could not config GRF edp hpd: %d\n", ret);
++	ret = clk_set_rate(dp->phy_24m, 24000000);
++	if (ret < 0) {
++		dev_err(dp->dev, "cannot set clock phy_24m %d\n", ret);
 +		return ret;
 +	}
 +
-+	reset_control_assert(dp->rst);
-+	usleep_range(10, 20);
-+	reset_control_deassert(dp->rst);
-+
-+	return 0;
-+}
-+
-+static int rockchip_dp_poweron(struct analogix_dp_plat_data *plat_data)
-+{
-+	struct rockchip_dp_device *dp = plat_data_to_dp(plat_data);
-+	int ret;
-+
-+	ret = clk_prepare_enable(dp->pclk);
++	ret = clk_prepare_enable(dp->phy_24m);
 +	if (ret < 0) {
-+		dev_err(dp->dev, "failed to enable pclk %d\n", ret);
-+		return ret;
-+	}
-+
-+	ret = rockchip_dp_pre_init(dp);
-+	if (ret < 0) {
-+		dev_err(dp->dev, "failed to dp pre init %d\n", ret);
++		dev_err(dp->dev, "cannot enable clock phy_24m %d\n", ret);
 +		return ret;
 +	}
 +
 +	return 0;
 +}
 +
-+static int rockchip_dp_powerdown(struct analogix_dp_plat_data *plat_data)
++static int rockchip_dp_phy_clk_disable(struct rockchip_dp_phy *dp)
 +{
-+	struct rockchip_dp_device *dp = plat_data_to_dp(plat_data);
-+
-+	clk_disable_unprepare(dp->pclk);
++	clk_disable_unprepare(dp->phy_24m);
 +
 +	return 0;
 +}
 +
-+static bool
-+rockchip_dp_drm_encoder_mode_fixup(struct drm_encoder *encoder,
-+				   const struct drm_display_mode *mode,
-+				   struct drm_display_mode *adjusted_mode)
++static int rockchip_set_phy_state(struct phy *phy, bool enable)
 +{
-+	/* do nothing */
-+	return true;
-+}
++	struct rockchip_dp_phy *dp = phy_get_drvdata(phy);
 +
-+static void rockchip_dp_drm_encoder_mode_set(struct drm_encoder *encoder,
-+					     struct drm_display_mode *mode,
-+					     struct drm_display_mode *adjusted)
-+{
-+	/* do nothing */
-+}
-+
-+static void rockchip_dp_drm_encoder_prepare(struct drm_encoder *encoder)
-+{
-+	struct rockchip_dp_device *dp = encoder_to_dp(encoder);
-+	u32 val;
-+	int ret;
-+
-+	ret = rockchip_drm_crtc_mode_config(encoder->crtc,
-+					    DRM_MODE_CONNECTOR_eDP,
-+					    ROCKCHIP_OUT_MODE_AAAA);
-+	if (ret < 0) {
-+		dev_err(dp->dev, "Could not set crtc mode config: %d.\n", ret);
-+		return;
++	if (enable) {
++		rockchip_dp_phy_clk_enable(dp);
++		writel(DP_PHY_SIDDQ_WRITE_EN | DP_PHY_SIDDQ_ON, dp->regs);
++	} else {
++		rockchip_dp_phy_clk_disable(dp);
++		writel(DP_PHY_SIDDQ_WRITE_EN | DP_PHY_SIDDQ_OFF, dp->regs);
 +	}
 +
-+	ret = rockchip_drm_encoder_get_mux_id(dp->dev->of_node, encoder);
-+	if (ret < 0)
-+		return;
-+
-+	if (ret)
-+		val = GRF_EDP_SEL_VOP_LIT | (GRF_EDP_LCD_SEL_MASK << 16);
-+	else
-+		val = GRF_EDP_SEL_VOP_BIG | (GRF_EDP_LCD_SEL_MASK << 16);
-+
-+	dev_dbg(dp->dev, "vop %s output to dp\n", (ret) ? "LIT" : "BIG");
-+
-+	ret = regmap_write(dp->grf, GRF_SOC_CON6, val);
-+	if (ret != 0) {
-+		dev_err(dp->dev, "Could not write to GRF: %d\n", ret);
-+		return;
-+	}
++	return 0;
 +}
 +
-+static void rockchip_dp_drm_encoder_nop(struct drm_encoder *encoder)
++static int rockchip_dp_phy_power_on(struct phy *phy)
 +{
-+	/* do nothing */
++	return rockchip_set_phy_state(phy, true);
 +}
 +
-+static struct drm_encoder_helper_funcs rockchip_dp_encoder_helper_funcs = {
-+	.mode_fixup = rockchip_dp_drm_encoder_mode_fixup,
-+	.mode_set = rockchip_dp_drm_encoder_mode_set,
-+	.prepare = rockchip_dp_drm_encoder_prepare,
-+	.commit = rockchip_dp_drm_encoder_nop,
-+	.disable = rockchip_dp_drm_encoder_nop,
++static int rockchip_dp_phy_power_off(struct phy *phy)
++{
++	return rockchip_set_phy_state(phy, false);
++}
++
++static struct phy_ops rockchip_dp_phy_ops = {
++	.power_on	= rockchip_dp_phy_power_on,
++	.power_off	= rockchip_dp_phy_power_off,
++	.owner		= THIS_MODULE,
 +};
 +
-+static void rockchip_dp_drm_encoder_destroy(struct drm_encoder *encoder)
-+{
-+	drm_encoder_cleanup(encoder);
-+}
-+
-+static struct drm_encoder_funcs rockchip_dp_encoder_funcs = {
-+	.destroy = rockchip_dp_drm_encoder_destroy,
-+};
-+
-+static int rockchip_dp_init(struct rockchip_dp_device *dp)
++static int rockchip_dp_phy_init(struct rockchip_dp_phy *dp)
 +{
 +	struct device *dev = dp->dev;
 +	struct device_node *np = dev->of_node;
 +	int ret;
 +
++	dp->phy_24m = devm_clk_get(dev, "24m");
++	if (IS_ERR(dp->phy_24m)) {
++		dev_err(dev, "cannot get clock 24m\n");
++		return PTR_ERR(dp->phy_24m);
++	}
++
++	ret = rockchip_dp_phy_clk_enable(dp);
++	if (ret < 0) {
++		dev_err(dp->dev, "cannot enable dp phy clk %d\n", ret);
++		return ret;
++	}
++
 +	dp->grf = syscon_regmap_lookup_by_phandle(np, "rockchip,grf");
 +	if (IS_ERR(dp->grf)) {
-+		dev_err(dev, "failed to get rockchip,grf property\n");
++		dev_err(dev, "rk3288-dp needs rockchip,grf property\n");
 +		return PTR_ERR(dp->grf);
 +	}
 +
-+	dp->pclk = devm_clk_get(dev, "pclk");
-+	if (IS_ERR(dp->pclk)) {
-+		dev_err(dev, "failed to get pclk property\n");
-+		return PTR_ERR(dp->pclk);
-+	}
-+
-+	dp->rst = devm_reset_control_get(dev, "dp");
-+	if (IS_ERR(dp->rst)) {
-+		dev_err(dev, "failed to get dp reset control\n");
-+		return PTR_ERR(dp->rst);
-+	}
-+
-+	ret = clk_prepare_enable(dp->pclk);
-+	if (ret < 0) {
-+		dev_err(dp->dev, "failed to enable pclk %d\n", ret);
-+		return ret;
-+	}
-+
-+	ret = rockchip_dp_pre_init(dp);
-+	if (ret < 0) {
-+		dev_err(dp->dev, "failed to pre init %d\n", ret);
++	ret = regmap_write(dp->grf, GRF_SOC_CON12,
++			   GRF_EDP_REF_CLK_SEL_INTER |
++			   (GRF_EDP_REF_CLK_SEL_INTER << 16));
++	if (ret != 0) {
++		dev_err(dp->dev, "Could not config GRF edp ref clk: %d\n", ret);
 +		return ret;
 +	}
 +
 +	return 0;
 +}
 +
-+static int rockchip_dp_drm_create_encoder(struct rockchip_dp_device *dp)
-+{
-+	struct drm_encoder *encoder = &dp->encoder;
-+	struct drm_device *drm_dev = dp->drm_dev;
-+	struct device *dev = dp->dev;
-+	int ret;
-+
-+	encoder->possible_crtcs = drm_of_find_possible_crtcs(drm_dev,
-+							     dev->of_node);
-+	DRM_DEBUG_KMS("possible_crtcs = 0x%x\n", encoder->possible_crtcs);
-+
-+	ret = drm_encoder_init(drm_dev, encoder, &rockchip_dp_encoder_funcs,
-+			       DRM_MODE_ENCODER_TMDS);
-+	if (ret) {
-+		DRM_ERROR("failed to initialize encoder with drm\n");
-+		return ret;
-+	}
-+
-+	drm_encoder_helper_add(encoder, &rockchip_dp_encoder_helper_funcs);
-+
-+	return 0;
-+}
-+
-+static int rockchip_dp_bind(struct device *dev, struct device *master,
-+			    void *data)
-+{
-+	struct rockchip_dp_device *dp = dev_get_drvdata(dev);
-+	struct drm_device *drm_dev = data;
-+	int ret;
-+
-+	/*
-+	 * Just like the probe function said, we don't need the
-+	 * device drvrate anymore, we should leave the charge to
-+	 * analogix dp driver, set the device drvdata to NULL.
-+	 */
-+	dev_set_drvdata(dev, NULL);
-+
-+	ret = rockchip_dp_init(dp);
-+	if (ret < 0)
-+		return ret;
-+
-+	dp->drm_dev = drm_dev;
-+
-+	ret = rockchip_dp_drm_create_encoder(dp);
-+	if (ret) {
-+		DRM_ERROR("failed to create drm encoder\n");
-+		return ret;
-+	}
-+
-+	dp->plat_data.attach = NULL;
-+	dp->plat_data.get_modes = NULL;
-+	dp->plat_data.power_on = rockchip_dp_poweron;
-+	dp->plat_data.power_off = rockchip_dp_powerdown;
-+
-+	return analogix_dp_bind(dev, dp->drm_dev, &dp->encoder,
-+				&dp->plat_data);
-+}
-+
-+static void rockchip_dp_unbind(struct device *dev, struct device *master,
-+			       void *data)
-+{
-+	return analogix_dp_unbind(dev, master, data);
-+}
-+
-+static const struct component_ops rockchip_dp_component_ops = {
-+	.bind = rockchip_dp_bind,
-+	.unbind = rockchip_dp_unbind,
-+};
-+
-+static int rockchip_dp_probe(struct platform_device *pdev)
++static int rockchip_dp_phy_probe(struct platform_device *pdev)
 +{
 +	struct device *dev = &pdev->dev;
-+	struct device_node *panel_node, *port, *endpoint;
-+	struct rockchip_dp_device *dp;
-+	struct drm_panel *panel;
-+
-+	port = of_graph_get_port_by_id(dev->of_node, 1);
-+	if (!port) {
-+		dev_err(dev, "can't find output port\n");
-+		return -EINVAL;
-+	}
-+
-+	endpoint = of_get_child_by_name(port, "endpoint");
-+	of_node_put(port);
-+	if (!endpoint) {
-+		dev_err(dev, "no output endpoint found\n");
-+		return -EINVAL;
-+	}
-+
-+	panel_node = of_graph_get_remote_port_parent(endpoint);
-+	of_node_put(endpoint);
-+	if (!panel_node) {
-+		dev_err(dev, "no output node found\n");
-+		return -EINVAL;
-+	}
-+
-+	panel = of_drm_find_panel(panel_node);
-+	if (!panel) {
-+		DRM_ERROR("failed to find panel\n");
-+		of_node_put(panel_node);
-+		return -EPROBE_DEFER;
-+	}
-+
-+	of_node_put(panel_node);
++	struct phy_provider *phy_provider;
++	struct rockchip_dp_phy *dp;
++	struct resource *res;
++	struct phy *phy;
++	int ret;
 +
 +	dp = devm_kzalloc(dev, sizeof(*dp), GFP_KERNEL);
-+	if (!dp)
++	if (IS_ERR(dp))
 +		return -ENOMEM;
 +
 +	dp->dev = dev;
 +
-+	dp->plat_data.panel = panel;
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	dp->regs = devm_ioremap_resource(dev, res);
++	if (IS_ERR(dp->regs))
++		return PTR_ERR(dp->regs);
 +
-+	/*
-+	 * We just use the drvdata until driver run into component
-+	 * add function, and then we would set drvdata to null, so
-+	 * that analogix dp driver could take charge of the drvdata.
-+	 */
-+	platform_set_drvdata(pdev, dp);
++	ret = rockchip_dp_phy_init(dp);
++	if (ret)
++		return ret;
 +
-+	return component_add(dev, &rockchip_dp_component_ops);
++	phy = devm_phy_create(dev, NULL, &rockchip_dp_phy_ops, NULL);
++	if (IS_ERR(phy)) {
++		dev_err(dev, "failed to create phy\n");
++		return PTR_ERR(phy);
++	}
++	phy_set_drvdata(phy, dp);
++
++	phy_provider = devm_of_phy_provider_register(dev, of_phy_simple_xlate);
++
++	return PTR_ERR_OR_ZERO(phy_provider);
 +}
 +
-+static int rockchip_dp_remove(struct platform_device *pdev)
-+{
-+	component_del(&pdev->dev, &rockchip_dp_component_ops);
-+
-+	return 0;
-+}
-+
-+#ifdef CONFIG_PM_SLEEP
-+static int rockchip_dp_suspend(struct device *dev)
-+{
-+	return analogix_dp_suspend(dev);
-+}
-+
-+static int rockchip_dp_resume(struct device *dev)
-+{
-+	return analogix_dp_resume(dev);
-+}
-+#endif
-+
-+static const struct dev_pm_ops rockchip_dp_pm_ops = {
-+	SET_SYSTEM_SLEEP_PM_OPS(rockchip_dp_suspend, rockchip_dp_resume)
-+};
-+
-+static const struct of_device_id rockchip_dp_dt_ids[] = {
-+	{.compatible = "rockchip,rk3288-dp",},
++static const struct of_device_id rockchip_dp_phy_dt_ids[] = {
++	{ .compatible = "rockchip,rk3288-dp-phy" },
 +	{}
 +};
-+MODULE_DEVICE_TABLE(of, rockchip_dp_dt_ids);
 +
-+static struct platform_driver rockchip_dp_driver = {
-+	.probe = rockchip_dp_probe,
-+	.remove = rockchip_dp_remove,
-+	.driver = {
-+		   .name = "rockchip-dp",
-+		   .owner = THIS_MODULE,
-+		   .pm = &rockchip_dp_pm_ops,
-+		   .of_match_table = of_match_ptr(rockchip_dp_dt_ids),
++MODULE_DEVICE_TABLE(of, rockchip_dp_phy_dt_ids);
++
++static struct platform_driver rockchip_dp_phy_driver = {
++	.probe		= rockchip_dp_phy_probe,
++	.driver		= {
++		.name	= "rockchip-dp-phy",
++		.owner	= THIS_MODULE,
++		.of_match_table = rockchip_dp_phy_dt_ids,
 +	},
 +};
 +
-+module_platform_driver(rockchip_dp_driver);
++module_platform_driver(rockchip_dp_phy_driver);
 +
 +MODULE_AUTHOR("Yakir Yang <ykk@rock-chips.com>");
-+MODULE_AUTHOR("Jeff chen <jeff.chen@rock-chips.com>");
-+MODULE_DESCRIPTION("Rockchip Specific Analogix-DP Driver Extension");
++MODULE_DESCRIPTION("Rockchip DP PHY driver");
 +MODULE_LICENSE("GPL v2");
 -- 
 1.9.1
