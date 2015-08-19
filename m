@@ -1,111 +1,547 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 19 Aug 2015 07:58:26 +0100
-Subject: [PATCH v2 18/21] mfd: htc-pasic3: Prepare driver for leds-pasic3
-In-Reply-To: <55D39D25.7010909@tul.cz>
-References: <cover.1439843482.git.petr.cvek@tul.cz> <55D25ABC.1000405@tul.cz>
- <20150818065207.GC6180@x1> <55D39D25.7010909@tul.cz>
-Message-ID: <20150819065826.GH6180@x1>
+From: maitysanchayan@gmail.com (maitysanchayan at gmail.com)
+Date: Wed, 19 Aug 2015 12:52:42 +0530
+Subject: [PATCH v3 3/3] touchscreen: colibri-vf50-ts: Add touchscreen
+ support for Colibri VF50
+In-Reply-To: <20150814225346.GA9160@dtor-ws>
+References: <cover.1438763030.git.maitysanchayan@gmail.com>
+ <bb234514d6921c3d184930d78e7822381c481b79.1438763030.git.maitysanchayan@gmail.com>
+ <20150814225346.GA9160@dtor-ws>
+Message-ID: <20150819072242.GA2166@Sanchayan-Arch.toradex.int>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 18 Aug 2015, Petr Cvek wrote:
+Hello Dmitry,
 
-> Dne 18.8.2015 v 08:52 Lee Jones napsal(a):
-> > On Tue, 18 Aug 2015, Petr Cvek wrote:
-> > 
-> >> Fix register definitions and prepare structures for new leds-pasic3
-> >> driver.
-> >>
-> >> Signed-off-by: Petr Cvek <petr.cvek@tul.cz>
-> >> ---
-> >>  drivers/mfd/htc-pasic3.c       | 54 ++++++++++++++++-----------
-> >>  include/linux/mfd/htc-pasic3.h | 85 +++++++++++++++++++++++++++++++-----------
-> >>  2 files changed, 97 insertions(+), 42 deletions(-)
-> >>
-> >> diff --git a/drivers/mfd/htc-pasic3.c b/drivers/mfd/htc-pasic3.c
-> >> index e88d4f6..16e156d 100644
-> >> --- a/drivers/mfd/htc-pasic3.c
-> >> +++ b/drivers/mfd/htc-pasic3.c
-> >> @@ -3,6 +3,9 @@
-> >>   *
-> >>   * Copyright (C) 2006 Philipp Zabel <philipp.zabel@gmail.com>
-> >>   *
-> >> + * 2015:	Added registers for LED and RESET, see htc-pasic3.h
-> >> + *		-- Petr Cvek
-> >> + *
-> > 
-> > This is pretty unconventional.
-> > 
-> > Please look to see what others have done.
+Will take care of all points with the next revision.
+
+Thank you for the feedback.
+
+- Sanchayan.
+
+On 15-08-14 15:53:46, Dmitry Torokhov wrote:
+> Hi Sanchayan,
 > 
-> LED support: Petr Cvek <petr.cvek@tul.cz>
-
-We can see what changes/support you added in the Git log.  No need to
-reflect that here at all.  If everyone did that, the headers would be
-a complete mess.
-
-Just:
- * Copyright (C) 2015 Petr Cvek <petr.cvek@tul.cz>
-
-... will do fine.
-
-> >> @@ -130,6 +140,7 @@ static int __init pasic3_probe(struct platform_device *pdev)
-> >>  	struct device *dev = &pdev->dev;
-> >>  	struct pasic3_data *asic;
-> >>  	struct resource *r;
-> >> +	struct pasic3_leds_pdata *leds_pdata;
-> >>  	int ret;
-> >>  	int irq = 0;
-> >>  
-> >> @@ -162,6 +173,8 @@ static int __init pasic3_probe(struct platform_device *pdev)
-> >>  	/* calculate bus shift from mem resource */
-> >>  	asic->bus_shift = (resource_size(r) - 5) >> 3;
-> >>  
-> >> +	spin_lock_init(&asic->lock);
-> >> +
-> >>  	if (pdata && pdata->clock_rate) {
-> >>  		ds1wm_pdata.clock_rate = pdata->clock_rate;
-> >>  		/* the first 5 PASIC3 registers control the DS1WM */
-> >> @@ -172,13 +185,12 @@ static int __init pasic3_probe(struct platform_device *pdev)
-> >>  			dev_warn(dev, "failed to register DS1WM\n");
-> >>  	}
-> >>  
-> >> -	if (pdata && pdata->led_pdata) {
-> >> -		led_cell.platform_data = pdata->led_pdata;
-> >> -		led_cell.pdata_size = sizeof(struct pasic3_leds_machinfo);
-> >> -		ret = mfd_add_devices(&pdev->dev, pdev->id, &led_cell, 1, r,
-> >> -				      0, NULL);
-> >> -		if (ret < 0)
-> >> -			dev_warn(dev, "failed to register LED device\n");
-> >> +	if (pdata && pdata->pasic3_leds) {
-> >> +		leds_pdata = dev_get_platdata(&pdata->pasic3_leds->dev);
+> On Wed, Aug 05, 2015 at 02:25:51PM +0530, Sanchayan Maity wrote:
+> > The Colibri Vybrid VF50 module supports 4-wire touchscreens using
+> > FETs and ADC inputs. This driver uses the IIO consumer interface
+> > and relies on the vf610_adc driver based on the IIO framework.
 > > 
-> > Whoa!  You're passing a pointer to a device through pdata?
+> > Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+> > ---
+> >  drivers/input/touchscreen/Kconfig           |  12 +
+> >  drivers/input/touchscreen/Makefile          |   1 +
+> >  drivers/input/touchscreen/colibri-vf50-ts.c | 404 ++++++++++++++++++++++++++++
+> >  3 files changed, 417 insertions(+)
+> >  create mode 100644 drivers/input/touchscreen/colibri-vf50-ts.c
 > > 
-> > I don't like that at all.  Please explain.
+> > diff --git a/drivers/input/touchscreen/Kconfig b/drivers/input/touchscreen/Kconfig
+> > index 80f6386..28948ca 100644
+> > --- a/drivers/input/touchscreen/Kconfig
+> > +++ b/drivers/input/touchscreen/Kconfig
+> > @@ -1027,4 +1027,16 @@ config TOUCHSCREEN_ZFORCE
+> >  	  To compile this driver as a module, choose M here: the
+> >  	  module will be called zforce_ts.
+> >  
+> > +config TOUCHSCREEN_COLIBRI_VF50
+> > +	tristate "Toradex Colibri on board touchscreen driver"
+> > +	depends on GPIOLIB && IIO && VF610_ADC
+> > +	help
+> > +	  Say Y here if you have a Colibri VF50 and plan to use
+> > +	  the on-board provided 4-wire touchscreen driver.
+> > +
+> > +	  If unsure, say N.
+> > +
+> > +	  To compile this driver as a module, choose M here: the
+> > +	  module will be called colibri_vf50_ts.
+> > +
+> >  endif
+> > diff --git a/drivers/input/touchscreen/Makefile b/drivers/input/touchscreen/Makefile
+> > index 44deea7..93746a0 100644
+> > --- a/drivers/input/touchscreen/Makefile
+> > +++ b/drivers/input/touchscreen/Makefile
+> > @@ -84,3 +84,4 @@ obj-$(CONFIG_TOUCHSCREEN_W90X900)	+= w90p910_ts.o
+> >  obj-$(CONFIG_TOUCHSCREEN_SX8654)	+= sx8654.o
+> >  obj-$(CONFIG_TOUCHSCREEN_TPS6507X)	+= tps6507x-ts.o
+> >  obj-$(CONFIG_TOUCHSCREEN_ZFORCE)	+= zforce_ts.o
+> > +obj-$(CONFIG_TOUCHSCREEN_COLIBRI_VF50)	+= colibri-vf50-ts.o
+> > diff --git a/drivers/input/touchscreen/colibri-vf50-ts.c b/drivers/input/touchscreen/colibri-vf50-ts.c
+> > new file mode 100644
+> > index 0000000..d7bc91a
+> > --- /dev/null
+> > +++ b/drivers/input/touchscreen/colibri-vf50-ts.c
+> > @@ -0,0 +1,404 @@
+> > +/* Copyright 2015 Toradex AG
+> > + *
+> > + * Toradex Colibri VF50 Touchscreen driver
+> > + *
+> > + * Originally authored by Stefan Agner for 3.0 kernel
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License as published by
+> > + * the Free Software Foundation; either version 2 of the License, or
+> > + * (at your option) any later version.
+> > + */
+> > +
+> > +#include <linux/delay.h>
+> > +#include <linux/err.h>
+> > +#include <linux/gpio.h>
+> > +#include <linux/iio/consumer.h>
+> > +#include <linux/iio/types.h>
+> > +#include <linux/input.h>
+> > +#include <linux/interrupt.h>
+> > +#include <linux/kernel.h>
+> > +#include <linux/module.h>
+> > +#include <linux/pinctrl/consumer.h>
+> > +#include <linux/platform_device.h>
+> > +#include <linux/slab.h>
+> > +#include <linux/types.h>
+> > +
+> > +#define DRIVER_NAME "colibri-vf50-ts"
+> > +#define DRV_VERSION "1.0"
+> > +
+> > +#define VF_ADC_MAX ((1 << 12) - 1)
+> > +
+> > +#define COLI_TOUCH_MIN_DELAY_US 1000
+> > +#define COLI_TOUCH_MAX_DELAY_US 2000
+> > +
+> > +static int min_pressure = 200;
+> > +
+> > +struct vf50_touch_device {
+> > +	struct platform_device	*pdev;
+> > +	struct input_dev	*ts_input;
+> > +	struct iio_channel	*channels;
+> > +	struct gpio_desc *gpio_xp;
+> > +	struct gpio_desc *gpio_xm;
+> > +	struct gpio_desc *gpio_yp;
+> > +	struct gpio_desc *gpio_ym;
+> > +	struct gpio_desc *gpio_pen_detect;
+> > +	int pen_irq;
+> > +	bool stop_touchscreen;
+> > +};
+> > +
+> > +/*
+> > + * Enables given plates and measures touch parameters using ADC
+> > + */
+> > +static int adc_ts_measure(struct iio_channel *channel,
+> > +		  struct gpio_desc *plate_p, struct gpio_desc *plate_m)
+> > +{
+> > +	int i, value = 0, val = 0;
+> > +	int ret;
+> > +
+> > +	gpiod_set_value(plate_p, 1);
+> > +	gpiod_set_value(plate_m, 1);
+> > +
+> > +	usleep_range(COLI_TOUCH_MIN_DELAY_US, COLI_TOUCH_MAX_DELAY_US);
+> > +
+> > +	for (i = 0; i < 5; i++) {
 > 
-> > 
-> >> +		if (leds_pdata) {
-> >> +			leds_pdata->mfd_dev = dev;
-> >> +			platform_device_register(pdata->pasic3_leds);
-> > 
-> > What's the idea here?
+> Can we have a #define for 5?
 > 
-> Actually, I don't know how to do this in a clean way as
-> pasic3_read_register() and pasic3_write_register() require device
-> struct to pass address for accessing the registers. Only way would
-> be to rewrite all functions which call pasic3_*_register() (removing
-> struct device *dev and change it to struct pasic3_data *asic).
-
-I'm still not entirely sure what the problem is.
-
-Why are you calling platform_device_register() instead of using the
-MFD API?
-
-Where does the 'struct device' actually get loaded into pdata?
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+> > +		ret = iio_read_channel_raw(channel, &val);
+> > +		if (ret < 0) {
+> > +			value = ret;
+> > +			goto error_iio_read;
+> > +		}
+> > +
+> > +		value += val;
+> > +	}
+> > +
+> > +	value /= 5;
+> > +
+> > +error_iio_read:
+> > +	gpiod_set_value(plate_p, 0);
+> > +	gpiod_set_value(plate_m, 0);
+> > +
+> > +	return value;
+> > +}
+> > +
+> > +/*
+> > + * Enable touch detection using falling edge detection on XM
+> > + */
+> > +static void vf50_ts_enable_touch_detection(struct vf50_touch_device *vf50_ts)
+> > +{
+> > +	/* Enable plate YM (needs to be strong GND, high active) */
+> > +	gpiod_set_value(vf50_ts->gpio_ym, 1);
+> > +
+> > +	/*
+> > +	 * Let the platform mux to idle state in order to enable
+> > +	 * Pull-Up on GPIO
+> > +	 */
+> > +	pinctrl_pm_select_idle_state(&vf50_ts->pdev->dev);
+> > +}
+> > +
+> > +/*
+> > + * ADC touch screen sampling bottom half irq handler
+> > + */
+> > +static irqreturn_t vf50_ts_irq_bh(int irq, void *private)
+> > +{
+> > +	struct vf50_touch_device *vf50_ts = (struct vf50_touch_device *)private;
+> > +	struct device *dev = &vf50_ts->pdev->dev;
+> > +	int val_x, val_y, val_z1, val_z2, val_p = 0;
+> > +	bool discard_val_on_start = true;
+> > +
+> > +	/* Disable the touch detection plates */
+> > +	gpiod_set_value(vf50_ts->gpio_ym, 0);
+> > +
+> > +	/* Let the platform mux to default state in order to mux as ADC */
+> > +	pinctrl_pm_select_default_state(dev);
+> > +
+> > +	while (!vf50_ts->stop_touchscreen) {
+> > +		/* X-Direction */
+> > +		val_x = adc_ts_measure(&vf50_ts->channels[0],
+> > +				vf50_ts->gpio_xp, vf50_ts->gpio_xm);
+> > +		if (val_x < 0)
+> > +			break;
+> > +
+> > +		/* Y-Direction */
+> > +		val_y = adc_ts_measure(&vf50_ts->channels[1],
+> > +				vf50_ts->gpio_yp, vf50_ts->gpio_ym);
+> > +		if (val_y < 0)
+> > +			break;
+> > +
+> > +		/*
+> > +		 * Touch pressure
+> > +		 * Measure on XP/YM
+> > +		 */
+> > +		val_z1 = adc_ts_measure(&vf50_ts->channels[2],
+> > +				vf50_ts->gpio_yp, vf50_ts->gpio_xm);
+> > +		if (val_z1 < 0)
+> > +			break;
+> > +		val_z2 = adc_ts_measure(&vf50_ts->channels[3],
+> > +				vf50_ts->gpio_yp, vf50_ts->gpio_xm);
+> > +		if (val_z2 < 0)
+> > +			break;
+> > +
+> > +		/* Validate signal (avoid calculation using noise) */
+> > +		if (val_z1 > 64 && val_x > 64) {
+> > +			/*
+> > +			 * Calculate resistance between the plates
+> > +			 * lower resistance means higher pressure
+> > +			 */
+> > +			int r_x = (1000 * val_x) / VF_ADC_MAX;
+> > +
+> > +			val_p = (r_x * val_z2) / val_z1 - r_x;
+> > +
+> > +		} else {
+> > +			val_p = 2000;
+> > +		}
+> > +
+> > +		val_p = 2000 - val_p;
+> > +		dev_dbg(dev, "Measured values: x: %d, y: %d, z1: %d, z2: %d, "
+> > +			"p: %d\n", val_x, val_y, val_z1, val_z2, val_p);
+> > +
+> > +		/*
+> > +		 * If touch pressure is too low, stop measuring and reenable
+> > +		 * touch detection
+> > +		 */
+> > +		if (val_p < min_pressure || val_p > 2000)
+> > +			break;
+> > +
+> > +		/*
+> > +		 * The pressure may not be enough for the first x and the
+> > +		 * second y measurement, but, the pressure is ok when the
+> > +		 * driver is doing the third and fourth measurement. To
+> > +		 * take care of this, we drop the first measurement always.
+> > +		 */
+> > +		if (discard_val_on_start) {
+> > +			discard_val_on_start = false;
+> > +		} else {
+> > +			/*
+> > +			 * Report touch position and sleep for
+> > +			 * next measurement
+> > +			 */
+> > +			input_report_abs(vf50_ts->ts_input,
+> > +					ABS_X, VF_ADC_MAX - val_x);
+> > +			input_report_abs(vf50_ts->ts_input,
+> > +					ABS_Y, VF_ADC_MAX - val_y);
+> > +			input_report_abs(vf50_ts->ts_input,
+> > +					ABS_PRESSURE, val_p);
+> > +			input_report_key(vf50_ts->ts_input, BTN_TOUCH, 1);
+> > +			input_sync(vf50_ts->ts_input);
+> > +		}
+> > +
+> > +		msleep(10);
+> > +	}
+> > +
+> > +	/* Report no more touch, reenable touch detection */
+> > +	input_report_abs(vf50_ts->ts_input, ABS_PRESSURE, 0);
+> > +	input_report_key(vf50_ts->ts_input, BTN_TOUCH, 0);
+> > +	input_sync(vf50_ts->ts_input);
+> > +
+> > +	vf50_ts_enable_touch_detection(vf50_ts);
+> > +
+> > +	/* Wait for the pull-up to be stable on high */
+> > +	msleep(10);
+> > +
+> > +	return IRQ_HANDLED;
+> > +}
+> > +
+> > +static int vf50_ts_open(struct input_dev *dev_input)
+> > +{
+> > +	int ret;
+> > +	struct vf50_touch_device *touchdev = input_get_drvdata(dev_input);
+> > +	struct device *dev = &touchdev->pdev->dev;
+> > +
+> > +	dev_dbg(dev, "Input device %s opened, starting touch detection\n",
+> > +			dev_input->name);
+> > +
+> > +	touchdev->stop_touchscreen = false;
+> > +
+> > +	ret = gpiod_direction_output(touchdev->gpio_xp, 0);
+> > +	if (ret) {
+> > +		dev_err(dev, "Could not set gpio xp as output %d\n", ret);
+> > +		return ret;
+> > +	}
+> > +
+> > +	ret = gpiod_direction_output(touchdev->gpio_xm, 0);
+> > +	if (ret) {
+> > +		dev_err(dev, "Could not set gpio xm as output %d\n", ret);
+> > +		return ret;
+> > +	}
+> > +
+> > +	ret = gpiod_direction_output(touchdev->gpio_yp, 0);
+> > +	if (ret) {
+> > +		dev_err(dev, "Could not set gpio yp as output %d\n", ret);
+> > +		return ret;
+> > +	}
+> > +
+> > +	ret = gpiod_direction_output(touchdev->gpio_ym, 0);
+> > +	if (ret) {
+> > +		dev_err(dev, "Could not set gpio ym as output %d\n", ret);
+> > +		return ret;
+> > +	}
+> > +
+> > +	ret = gpiod_direction_input(touchdev->gpio_pen_detect);
+> > +	if (ret) {
+> > +		dev_err(dev,
+> > +			"Could not set gpio pen detect as input %d\n", ret);
+> > +		return ret;
+> > +	}
+> 
+> Why do we do this on every open? You can configure gpios as you request
+> them.
+> 
+> > +
+> > +	/* Mux detection before request IRQ, wait for pull-up to settle */
+> > +	vf50_ts_enable_touch_detection(touchdev);
+> > +	msleep(10);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static void vf50_ts_close(struct input_dev *dev_input)
+> > +{
+> > +	struct vf50_touch_device *touchdev = input_get_drvdata(dev_input);
+> > +	struct device *dev = &touchdev->pdev->dev;
+> > +
+> > +	touchdev->stop_touchscreen = true;
+> 
+> I think you also need:
+> 
+> 	mb();
+> 	synchronize_irq(touchdev->irq);
+> 
+> to make sure interrupt routine is not running past close.
+> 
+> > +
+> > +	dev_dbg(dev, "Input device %s closed, disable touch detection\n",
+> > +		dev_input->name);
+> > +}
+> > +
+> > +static inline int vf50_ts_get_gpiod(struct device *dev,
+> 
+> Drop inline, let compiler decide whether it should be inlined or not.
+> 
+> > +			struct gpio_desc **gpio_d, const char *con_id)
+> > +{
+> > +	int ret;
+> 
+> Personal preference: call this variable "error".
+> 
+> > +
+> > +	*gpio_d = devm_gpiod_get(dev, con_id);
+> 
+> I think you need use GPIOD_OUT_LOW (assuming you do not use the function
+> for pen detect gpio, see below).
+> 
+> > +	if (IS_ERR(*gpio_d)) {
+> > +		ret = PTR_ERR(*gpio_d);
+> > +		dev_err(dev, "Could not get gpio_%s %d\n", con_id, ret);
+> > +		return ret;
+> > +	}
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static int vf50_ts_probe(struct platform_device *pdev)
+> > +{
+> > +	struct input_dev *input;
+> > +	struct iio_channel *channels;
+> > +	struct device *dev = &pdev->dev;
+> > +	struct vf50_touch_device *touchdev;
+> > +	int ret;
+> 
+> Personal preference: call this variable "error".
+> 
+> 
+> > +
+> > +	channels = iio_channel_get_all(dev);
+> > +	if (IS_ERR(channels))
+> > +		return PTR_ERR(channels);
+> 
+> 
+> Please either introduce devm_iio_channel_get_all() or install
+> iio_channel_release_all as a custom devm action (devm_add_action).
+> 
+> > +
+> > +	touchdev = devm_kzalloc(dev, sizeof(*touchdev), GFP_KERNEL);
+> > +	if (touchdev == NULL) {
+> 
+> 	if (!touchdev)
+> 
+> please.
+> 
+> > +		ret = -ENOMEM;
+> > +		goto error_release_channels;
+> > +	}
+> > +
+> > +	input = devm_input_allocate_device(dev);
+> > +	if (!input) {
+> > +		dev_err(dev, "Failed to allocate TS input device\n");
+> > +		ret = -ENOMEM;
+> > +		goto error_release_channels;
+> > +	}
+> > +
+> > +	platform_set_drvdata(pdev, touchdev);
+> > +
+> > +	touchdev->pdev = pdev;
+> > +	touchdev->channels = channels;
+> > +
+> > +	input->name = DRIVER_NAME;
+> > +	input->id.bustype = BUS_HOST;
+> > +	input->dev.parent = dev;
+> > +	input->open = vf50_ts_open;
+> > +	input->close = vf50_ts_close;
+> > +
+> > +	_set_bit(EV_ABS, input->evbit);
+> > +	_set_bit(EV_KEY, input->evbit);
+> > +	_set_bit(BTN_TOUCH, input->keybit);
+> 
+> input_set_capability(dev, EV_KEY, BTN_TOUCH);
+> 
+> and kill _set_bit()s above.
+> 
+> > +	input_set_abs_params(input, ABS_X, 0, VF_ADC_MAX, 0, 0);
+> > +	input_set_abs_params(input, ABS_Y, 0, VF_ADC_MAX, 0, 0);
+> > +	input_set_abs_params(input, ABS_PRESSURE, 0, VF_ADC_MAX, 0, 0);
+> > +
+> > +	touchdev->ts_input = input;
+> > +	input_set_drvdata(input, touchdev);
+> > +	ret = input_register_device(input);
+> > +	if (ret) {
+> > +		dev_err(dev, "Failed to register input device\n");
+> > +		goto error_release_channels;
+> > +	}
+> > +
+> > +	ret = vf50_ts_get_gpiod(dev, &touchdev->gpio_xp, "xp");
+> > +	if (ret)
+> > +		goto error_release_channels;
+> > +
+> > +	ret = vf50_ts_get_gpiod(dev, &touchdev->gpio_xm, "xm");
+> > +	if (ret)
+> > +		goto error_release_channels;
+> > +
+> > +	ret = vf50_ts_get_gpiod(dev, &touchdev->gpio_yp, "yp");
+> > +	if (ret)
+> > +		goto error_release_channels;
+> > +
+> > +	ret = vf50_ts_get_gpiod(dev, &touchdev->gpio_ym, "ym");
+> > +	if (ret)
+> > +		goto error_release_channels;
+> > +
+> > +	ret = vf50_ts_get_gpiod(dev, &touchdev->gpio_pen_detect,
+> > +				"pen-detect");
+> > +	if (ret)
+> > +		goto error_release_channels;
+> > +
+> > +	touchdev->pen_irq = gpiod_to_irq(touchdev->gpio_pen_detect);
+> > +	if (touchdev->pen_irq < 0) {
+> > +		ret = touchdev->pen_irq;
+> > +		dev_err(dev, "Unable to get IRQ for GPIO\n");
+> > +		goto error_release_channels;
+> > +	}
+> 
+> I do not think you need to specify this as gpio, since you are not
+> reading it's state. Map it using "interrupts" property instead and do
+> 
+> 	touchdev->pen_irq = platform_get_irq(pdev, 0);
+> 
+> > +
+> > +	ret = devm_request_threaded_irq(dev, touchdev->pen_irq, NULL,
+> > +			vf50_ts_irq_bh, IRQF_TRIGGER_LOW | IRQF_ONESHOT,
+> 
+> Just use IRQF_ONESHOT here, rely on the platform/OF to read and set up
+> the trigger properly (via "interrupts" property).
+> 
+> > +			"vf50 touch", touchdev);
+> > +	if (ret < 0) {
+> > +		dev_err(dev, "Unable to request IRQ %d\n", touchdev->pen_irq);
+> > +		goto error_release_channels;
+> > +	}
+> > +
+> > +	return 0;
+> > +
+> > +error_release_channels:
+> > +	iio_channel_release_all(channels);
+> > +	return ret;
+> > +}
+> > +
+> > +static int vf50_ts_remove(struct platform_device *pdev)
+> > +{
+> > +	struct vf50_touch_device *touchdev = platform_get_drvdata(pdev);
+> > +
+> > +	iio_channel_release_all(touchdev->channels);
+> 
+> This is wrong order, I do not think you want to release channels while
+> your interrupt routine still running. With custom devm action you can
+> avoid this and also remove whole vf50_ts_remove.
+> 
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static const struct of_device_id vf50_touch_of_match[] = {
+> > +	{ .compatible = "toradex,vf50-touchscreen", },
+> > +	{ }
+> > +};
+> > +MODULE_DEVICE_TABLE(of, vf50_touch_of_match);
+> > +
+> > +static struct platform_driver vf50_touch_driver = {
+> > +	.driver = {
+> > +		.name = "toradex,vf50_touchctrl",
+> > +		.of_match_table = vf50_touch_of_match,
+> > +	},
+> > +	.probe = vf50_ts_probe,
+> > +	.remove = vf50_ts_remove,
+> > +};
+> > +
+> > +module_platform_driver(vf50_touch_driver);
+> > +
+> > +module_param(min_pressure, int, 0600);
+> > +MODULE_PARM_DESC(min_pressure, "Minimum pressure for touch detection");
+> 
+> Since it is my understanding this is not user preference but rather
+> property of device, I'd rather this been part of DT binding.
+> 
+> > +MODULE_AUTHOR("Sanchayan Maity");
+> > +MODULE_DESCRIPTION("Colibri VF50 Touchscreen driver");
+> > +MODULE_LICENSE("GPL v2");
+> > +MODULE_VERSION(DRV_VERSION);
+> > -- 
+> > 2.5.0
+> > 
+> 
+> Thanks.
+> 
+> -- 
+> Dmitry
