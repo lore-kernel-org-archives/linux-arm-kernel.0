@@ -1,24 +1,66 @@
-From: tyler.baker@linaro.org (Tyler Baker)
-Date: Wed, 19 Aug 2015 09:50:13 -0700
-Subject: [GIT PULL 9/9] ARM: tegra: Default configuration updates for
- v4.3-rc1
-In-Reply-To: <55D46550.7090203@kapsi.fi>
-References: <1439563720-13189-1-git-send-email-thierry.reding@gmail.com>
- <1439563720-13189-10-git-send-email-thierry.reding@gmail.com>
- <CANMBJr7PKy-eCcB3HiBajpApHS_BYPa7xfKjTqV4o8Z1hwY99A@mail.gmail.com>
- <55D46550.7090203@kapsi.fi>
-Message-ID: <CANMBJr7y3Nz+wXQqxmOVsWVgdu+ZOk0Vvzamd4e+S9JJx2iBQw@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 19 Aug 2015 17:50:09 +0100
+Subject: [PATCH v5 1/5] arm/arm64: add smccc ARCH32
+In-Reply-To: <1439973629-19505-2-git-send-email-jens.wiklander@linaro.org>
+References: <1439973629-19505-1-git-send-email-jens.wiklander@linaro.org>
+ <1439973629-19505-2-git-send-email-jens.wiklander@linaro.org>
+Message-ID: <20150819165009.GC10297@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mikko,
+On Wed, Aug 19, 2015 at 09:40:25AM +0100, Jens Wiklander wrote:
+> Adds helpers to do SMC based on ARM SMC Calling Convention.
+> CONFIG_HAVE_SMCCC is enabled for architectures that may support
+> the SMC instruction. It's the responsibility of the caller to
+> know if the SMC instruction is supported by the platform.
 
-On 19 August 2015 at 04:15, Mikko Perttunen <mikko.perttunen@kapsi.fi> wrote:
-> Please try disabling TEGRA124_EMC and seeing if that makes any difference.
+[...]
+> diff --git a/arch/arm64/kernel/smccc-call.S b/arch/arm64/kernel/smccc-call.S
+> new file mode 100644
+> index 0000000..3ce7fe8
+> --- /dev/null
+> +++ b/arch/arm64/kernel/smccc-call.S
+> @@ -0,0 +1,34 @@
+> +/*
+> + * Copyright (c) 2015, Linaro Limited
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License Version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+> + * GNU General Public License for more details.
+> + *
+> + */
+> +#include <linux/linkage.h>
+> +
+> +#define SMC_PARAM_W0_OFFS      0
+> +#define SMC_PARAM_W2_OFFS      8
+> +#define SMC_PARAM_W4_OFFS      16
+> +#define SMC_PARAM_W6_OFFS      24
+> +
+> +/* void smccc_call32(struct smccc_param32 *param) */
+> +ENTRY(smccc_call32)
+> +       stp     x28, x30, [sp, #-16]!
 
-I disabled CONFIG_TEGRA124_EMC and the problem on my end still exists.
-Thanks for the suggestion.
+Why are you saving lr?
 
-Cheers,
+> +       mov     x28, x0
+> +       ldp     w0, w1, [x28, #SMC_PARAM_W0_OFFS]
+> +       ldp     w2, w3, [x28, #SMC_PARAM_W2_OFFS]
+> +       ldp     w4, w5, [x28, #SMC_PARAM_W4_OFFS]
+> +       ldp     w6, w7, [x28, #SMC_PARAM_W6_OFFS]
+> +       smc     #0
+> +       stp     w0, w1, [x28, #SMC_PARAM_W0_OFFS]
+> +       stp     w2, w3, [x28, #SMC_PARAM_W2_OFFS]
+> +       ldp     x28, x30, [sp], #16
+> +       ret
+> +ENDPROC(smccc_call32)
 
-Tyler
+Could we deal with this like we do for PSCI instead? (see
+__invoke_psci_fn_smc). We could also then rename psci-call.S to fw-call.S
+and stick this in there too.
+
+Will
