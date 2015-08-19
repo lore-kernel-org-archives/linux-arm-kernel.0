@@ -1,213 +1,583 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 19 Aug 2015 14:14:53 +0200
-Subject: [PATCH v2 5/5] arm64: add KASan support
-In-Reply-To: <55AFD8D0.9020308@samsung.com>
-References: <1431698344-28054-1-git-send-email-a.ryabinin@samsung.com>
- <1431698344-28054-6-git-send-email-a.ryabinin@samsung.com>
- <CACRpkdaRJJjCXR=vK1M2YhR26JZfGoBB+jcqz8r2MhERfxRzqA@mail.gmail.com>
- <CAPAsAGy-r8Z2N09wKV+e0kLfbwxd-eWK6N5Xajsnqq9jfyWqcQ@mail.gmail.com>
- <CACRpkdZmHLMxosLXjyOPdkavo=UNzmTcHOLF5vV4cS1ULfbq6A@mail.gmail.com>
- <CAPAsAGw-iawTpjJh66rQN5fqBFT6UBZCcv2eKx7JTqCXzhzpsw@mail.gmail.com>
- <CACRpkdY2i2M27gP_fXawkFrC_GFgWaKr5rEn6d47refNPiEk=g@mail.gmail.com>
- <55AE56DB.4040607@samsung.com>
- <CACRpkdYaqK8upK-3b01JbO_y+sHnk4-Hm1MfvjSy0tKUkFREtQ@mail.gmail.com>
- <55AFD8D0.9020308@samsung.com>
-Message-ID: <CACRpkdaJVRuLTCh585rLEjua2TpnLsALhLdu0ma56TBA=C+EiQ@mail.gmail.com>
+From: wangzhou1@hisilicon.com (Zhou Wang)
+Date: Wed, 19 Aug 2015 20:20:51 +0800
+Subject: [PATCH v7 3/6] PCI: designware: Add ARM64 support
+In-Reply-To: <1439812554-180426-4-git-send-email-wangzhou1@hisilicon.com>
+References: <1439812554-180426-1-git-send-email-wangzhou1@hisilicon.com>
+ <1439812554-180426-4-git-send-email-wangzhou1@hisilicon.com>
+Message-ID: <55D474A3.8090201@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 22, 2015 at 7:54 PM, Andrey Ryabinin <a.ryabinin@samsung.com> wrote:
+Hi Pratyush and Jingoo,
 
-> So here is updated version:
->         git://github.com/aryabinin/linux.git kasan/arm_v0_1
->
-> The code is still ugly in some places and it probably have some bugs.
-> Lightly tested on exynos 5410/5420.
+what is your opinion about this patch? It will be very appreciated if you
+could take a look at it.
 
-I compiled this for various ARM platforms and tested to boot.
-I used GCC version 4.9.3 20150113 (prerelease) (Linaro).
+Thanks,
+Zhou
 
-I get these compilation warnings no matter what I compile,
-I chose to ignore them:
-
-WARNING: vmlinux.o(.meminit.text+0x2c):
-Section mismatch in reference from the function kasan_pte_populate()
-to the function
-.init.text:kasan_alloc_block.constprop.7()
-The function __meminit kasan_pte_populate() references
-a function __init kasan_alloc_block.constprop.7().
-If kasan_alloc_block.constprop.7 is only used by kasan_pte_populate then
-annotate kasan_alloc_block.constprop.7 with a matching annotation.
-
-WARNING: vmlinux.o(.meminit.text+0x98):
-Section mismatch in reference from the function kasan_pmd_populate()
-to the function
-.init.text:kasan_alloc_block.constprop.7()
-The function __meminit kasan_pmd_populate() references
-a function __init kasan_alloc_block.constprop.7().
-If kasan_alloc_block.constprop.7 is only used by kasan_pmd_populate then
-annotate kasan_alloc_block.constprop.7 with a matching annotation.
-
-These KASan outline tests run fine:
-
-kasan test: kmalloc_oob_right out-of-bounds to right
-kasan test: kmalloc_oob_left out-of-bounds to left
-kasan test: kmalloc_node_oob_right kmalloc_node(): out-of-bounds to right
-kasan test: kmalloc_large_oob_rigth kmalloc large allocation:
-out-of-bounds to right
-kasan test: kmalloc_oob_krealloc_more out-of-bounds after krealloc more
-kasan test: kmalloc_oob_krealloc_less out-of-bounds after krealloc less
-kasan test: kmalloc_oob_16 kmalloc out-of-bounds for 16-bytes access
-kasan test: kmalloc_oob_in_memset out-of-bounds in memset
-kasan test: kmalloc_uaf use-after-free
-kasan test: kmalloc_uaf_memset use-after-free in memset
-kasan test: kmalloc_uaf2 use-after-free after another kmalloc
-kasan test: kmem_cache_oob out-of-bounds in kmem_cache_alloc
-
-These two tests seems to not trigger KASan BUG()s, and seemse to
-be like so on all hardware, so I guess it is this kind of test
-that requires GCC 5.0:
-
-kasan test: kasan_stack_oob out-of-bounds on stack
-kasan test: kasan_global_oob out-of-bounds global variable
-
-
-Hardware test targets:
-
-Ux500 (ARMv7):
-
-On Ux500 I get a real slow boot (as exepected) and after
-enabling the test cases produce KASan warnings
-expectedly.
-
-MSM APQ8060 (ARMv7):
-
-Also a real slow boot and the expected KASan warnings when
-running the tests.
-
-Integrator/AP (ARMv5):
-
-This one mounted with an ARMv5 ARM926 tile. It boots nicely
-(but takes forever) with KASan and run all test cases (!) just like
-for the other platforms but before reaching userspace this happens:
-
-Unable to handle kernel paging request at virtual address 00021144
-pgd = c5a74000
-[00021144] *pgd=00000000
-Internal error: Oops: 5 [#1] PREEMPT ARM
-Modules linked in:
-CPU: 0 PID: 24 Comm: modprobe Tainted: G    B
-4.2.0-rc2-77613-g11c2df68e4a8 #1
-Hardware name: ARM Integrator/AP (Device Tree)
-task: c69f8cc0 ti: c5a68000 task.ti: c5a68000
-PC is at v4wbi_flush_user_tlb_range+0x10/0x4c
-LR is at move_page_tables+0x320/0x46c
-pc : [<c00182d0>]    lr : [<c00ce9d0>]    psr: 60000013
-sp : c5a6bd78  ip : c5a70000  fp : 9f000000
-r10: 9eaab000  r9 : ffaab000  r8 : 0093d34f
-r7 : c5a782ac  r6 : c5a68000  r5 : 9effe000  r4 : c0900044
-r3 : 00021000  r2 : c5a4c000  r1 : 9f000000  r0 : 9effe000
-Flags: nZCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment user
-Control: 0005317f  Table: 05a74000  DAC: 00000015
-Process modprobe (pid: 24, stack limit = 0xc5a68190)
-Stack: (0xc5a6bd78 to 0xc5a6c000)
-bd60:                                                       9f000000 00002000
-bd80: 00000000 9f000000 c5a4c000 00000000 00000000 c5a4c020 c5a68000 c5a68004
-bda0: c5a4c000 9effe000 00000000 c5a4c000 c59a6540 c5a4c004 c5a70034 c59a65cc
-bdc0: 9effe000 00000000 00002000 c00f4558 00002000 00000000 00000000 9f000000
-bde0: 9eaa9000 c5a70000 9eaab000 c5a4c04c 00000000 c5a4c000 00000000 00000000
-be00: 00000000 00000000 00000000 0f4a4438 b0a5485b 8881364f c0910aec 00000000
-be20: 00000000 00000000 c69f8cc0 0f4a4438 c0910aec 00000018 9f000000 c59a68c0
-be40: c69f8cc0 c592db40 c59a6540 c592db50 9f000000 c59a68c0 c69f8cc0 00c00000
-be60: c5a6be68 c015694c c59a6540 00000080 c5a4aa80 c59a65d8 c5e9bc00 c592db6c
-be80: c6a0da00 c592db40 00000001 00000000 c59a6540 c00f4f10 00000000 00002000
-bea0: 9f000000 c5a4c000 c69f8cc0 c00f5008 00000017 c5a6bec4 00000000 00000008
-bec0: 9efff000 c00b5160 c7e937a0 c00a4684 00000000 c7e937a0 9efff000 c09089a8
-bee0: c09089b0 c59a6540 c0908590 fffffff8 c59a65d4 c5a68000 c5a68004 c00f4b28
-bf00: c59a65c8 00000001 00000018 c69f8cc0 c5a4ab60 00000018 c6a38000 c59a6540
-bf20: 00000001 c59a65e8 c59a65cc c00f6fec c090476c 00000000 c59a65c8 0000038f
-bf40: c5a4c028 c59a65c0 c59a65f0 c5a4c004 00000000 c69f8ec0 00000000 c6a38000
-bf60: c5a11a00 c5a4ab60 00000000 00000000 ffffffff 00000000 00000000 c00f71a4
-bf80: 00000000 ffffffff 00000000 c00361fc c5a11a00 c0036044 00000000 00000000
-bfa0: 00000000 00000000 00000000 c000aa60 00000000 00000000 00000000 00000000
-bfc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
-bfe0: 00000000 00000000 00000000 00000000 00000013 00000000 00002000 41000001
-[<c00182d0>] (v4wbi_flush_user_tlb_range) from [<9f000000>] (0x9f000000)
-Code: e592c020 e3cd3d7f e3c3303f e593300c (e5933144)
----[ end trace 7fa2f634c630ab6d ]---
-
-
-Compaq iPAQ H3600 (ARMv4):
-
-This is an ARMv4 machine, SA1100-based. It boots nicely
-with KASan and run all test cases (!) just like for the other platforms
-but before reaching userspace this happens:
-
-Unable to handle kernel paging request at virtual address e3e57b43
-pgd = c08e8000
-[e3e57b43] *pgd=00000000
-Internal error: Oops: 408eb003 [#1] PREEMPT ARM
-Modules linked in:
-CPU: 0 PID: 944 Comm: modprobe Tainted: G    B
-4.2.0-rc2-77612-g66bb8b6c242c #1
-Hardware name: Compaq iPAQ H3600
-task: c14d4880 ti: c08dc000 task.ti: c08dc000
-PC is at v4wb_flush_user_tlb_range+0x10/0x48
-LR is at change_protection_range+0x3c8/0x464
-pc : [<c001cb10>]    lr : [<c00c9d58>]    psr: 20000013
-sp : c08dfd20  ip : c08e6000  fp : 00000000
-r10: c08dc000  r9 : c08ea7c8  r8 : 00000001
-r7 : 9f000000  r6 : 9f000000  r5 : c08ed800  r4 : c1ff834f
-r3 : e3e579ff  r2 : c08ec000  r1 : 9f000000  r0 : 9effe000
-Flags: nzCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment user
-Control: c08eb17f  Table: c08eb17f  DAC: 00000015
-Process modprobe (pid: 944, stack limit = 0xc08dc190)
-Stack: (0xc08dfd20 to 0xc08e0000)
-fd20: 00000001 9f000000 9effffff c08ec000 00000181 c08dc004 c14bc050 c08ea7c0
-fd40: c08dc000 c08e6000 9effe000 c08e6170 c0800d90 00000000 c08ec000 00118177
-fd60: 9effe000 00000000 00118173 9f000000 c08e6000 c00c9f50 00000000 00000000
-fd80: 00000000 0009effe 00000000 c00e9868 00000000 00000002 c08ef000 00000000
-fda0: 00000000 c08ec000 c12d4000 c08ec004 c08e6034 c12d408c 00118177 9effe000
-fdc0: 001b8000 c00f0a24 00118177 ffffa1d9 00000000 00100177 00000000 00000000
-fde0: 00000000 00000000 00000000 c08ec000 00000000 00000000 00000000 00000000
-fe00: 00000000 673bd3e6 80a09842 cd271319 c08087f8 00000000 00000000 00000000
-fe20: c14d4880 673bd3e6 c08087f8 000003b0 9f000000 c08f0000 c14d4880 c0ace8c0
-fe40: c12d4000 c0ace8d0 9f000000 c08f0000 c14d4880 00c00000 c08dfe60 c015474c
-fe60: c12d4000 00000080 c08e5d20 c12d4098 c08f0d80 c0ace8ec c14bc000 c0ace8c0
-fe80: 00000002 00000000 9f000000 00000000 c12d4000 c00f14dc 00000000 00002000
-fea0: 9f000000 c08ec000 c14d4880 c00f15d4 00000017 c08dfec4 00000000 9efff000
-fec0: 00000000 c00b0eb4 c1f38f00 c00a3590 00000000 c0801f28 c12d4000 c08dc000
-fee0: c08dc004 fffffff8 c0801b10 c12d4094 00000000 c00f118c c12d4098 c12d4088
-ff00: 00000001 c12d4001 000003b0 c14d4880 c08e5e00 000003b0 c1494300 c12d4000
-ff20: 00000001 c12d40a8 c12d408c c00f35e8 c07fdd8c 00000000 c12d4088 0000038f
-ff40: c08ec028 c12d4080 c12d40b0 c08ec004 00000000 c14d4a80 00000000 c1494300
-ff60: c08db300 c08e5e00 00000000 00000000 ffffffff 00000000 00000000 c00f3778
-ff80: 00000000 ffffffff 00000000 c0038f3c c08db300 c0038d40 00000000 00000000
-ffa0: 00000000 00000000 00000000 c00108a0 00000000 00000000 00000000 00000000
-ffc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
-ffe0: 00000000 00000000 00000000 00000000 00000013 00000000 e85b38dd 6e46c80d
-[<c001cb10>] (v4wb_flush_user_tlb_range) from [<c08ec000>] (0xc08ec000)
-Code: e592c020 e3cd3d7f e3c3303f e593300c (e5933144)
----[ end trace 66be5d28dde42c9f ]---
-random: nonblocking pool is initialized
-
-So it seems v4wb_flush_user_tlb_range+0x10/0x48 is the culprit
-on these two systems. It is in arch/arm/mm/tlb-v4wb.S.
-
-Uninstrumenting these files with ASAN_SANITIZE_tlb-v4wb.o := n does
-not help.
-
-I then tested on the Footbridge, another ARMv4 system, the oldest I have
-SA110-based. This passes decompression and then you may *think* it hangs.
-But it doesn't. It just takes a few minutes to boot with KASan
-instrumentation, then all tests run fine also on this hardware.
-The crash logs scroll by on the physical console.
-
-They keep scrolling forever however, and are still scrolling as I
-write this. I suspect some real memory usage bugs to be causing it,
-as it is exercising some ages old code that didn't see much scrutiny
-in recent years.
-
-
-Yours,
-Linus Walleij
+On 2015/8/17 19:55, Zhou Wang wrote:
+> This patch tries to unify ARM32 and ARM64 PCIe in designware driver. Delete
+> function dw_pcie_setup, dw_pcie_scan_bus, dw_pcie_map_irq and struct hw_pci,
+> move related operations to dw_pcie_host_init.
+> 
+> In past, we use:
+> pci_common_init_dev
+> 	-> pcibios_init_hw
+> 		-> hw->scan (dw_pcie_scan_bus)
+> to pass 0 to root_bus_nr in struct pcie_port. This patch set pp->root_bus_nr = 0
+> in each PCIe host driver which is based on pcie-designware.
+> 
+> This patch also try to use of_pci_get_host_bridge_resources for ARM32 and ARM64
+> according to the suggestion for Gabriele[1]
+> 
+> Finally this patch reverts commit f4c55c5a3f7f "PCI: designware: Program ATU
+> with untranslated address" based on 1/6 in this series. we delete *_mod_base in
+> pcie-designware. This was discussed in [2]
+> 
+> I have compiled the driver with multi_v7_defconfig. However, I don't have
+> ARM32 PCIe related board to do test. It will be appreciated if someone could
+> help to test it.
+> 
+> Signed-off-by: Zhou Wang <wangzhou1@hisilicon.com>
+> Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Tested-By: James Morse <james.morse@arm.com>
+> 
+> [1] http://www.spinics.net/lists/linux-pci/msg42194.html
+> [2] http://www.spinics.net/lists/arm-kernel/msg436779.html
+> ---
+>  drivers/pci/host/pci-dra7xx.c      |  15 +--
+>  drivers/pci/host/pci-exynos.c      |   2 +-
+>  drivers/pci/host/pci-imx6.c        |   2 +-
+>  drivers/pci/host/pci-keystone-dw.c |   2 +-
+>  drivers/pci/host/pci-keystone.c    |   2 +-
+>  drivers/pci/host/pci-layerscape.c  |   2 +-
+>  drivers/pci/host/pcie-designware.c | 229 ++++++++++++-------------------------
+>  drivers/pci/host/pcie-designware.h |  14 +--
+>  drivers/pci/host/pcie-spear13xx.c  |   2 +-
+>  9 files changed, 95 insertions(+), 175 deletions(-)
+> 
+> diff --git a/drivers/pci/host/pci-dra7xx.c b/drivers/pci/host/pci-dra7xx.c
+> index 18ae7ff..1268c69 100644
+> --- a/drivers/pci/host/pci-dra7xx.c
+> +++ b/drivers/pci/host/pci-dra7xx.c
+> @@ -141,15 +141,15 @@ static void dra7xx_pcie_host_init(struct pcie_port *pp)
+>  {
+>  	dw_pcie_setup_rc(pp);
+>  
+> -	if (pp->io_mod_base)
+> -		pp->io_mod_base &= CPU_TO_BUS_ADDR;
+> +	if (pp->io_base)
+> +		pp->io_base &= CPU_TO_BUS_ADDR;
+>  
+> -	if (pp->mem_mod_base)
+> -		pp->mem_mod_base &= CPU_TO_BUS_ADDR;
+> +	if (pp->mem_base)
+> +		pp->mem_base &= CPU_TO_BUS_ADDR;
+>  
+> -	if (pp->cfg0_mod_base) {
+> -		pp->cfg0_mod_base &= CPU_TO_BUS_ADDR;
+> -		pp->cfg1_mod_base &= CPU_TO_BUS_ADDR;
+> +	if (pp->cfg0_base) {
+> +		pp->cfg0_base &= CPU_TO_BUS_ADDR;
+> +		pp->cfg1_base &= CPU_TO_BUS_ADDR;
+>  	}
+>  
+>  	dra7xx_pcie_establish_link(pp);
+> @@ -288,6 +288,7 @@ static int __init dra7xx_add_pcie_port(struct dra7xx_pcie *dra7xx,
+>  
+>  	pp = &dra7xx->pp;
+>  	pp->dev = dev;
+> +	pp->root_bus_nr = 0;
+>  	pp->ops = &dra7xx_pcie_host_ops;
+>  
+>  	pp->irq = platform_get_irq(pdev, 1);
+> diff --git a/drivers/pci/host/pci-exynos.c b/drivers/pci/host/pci-exynos.c
+> index f9f468d..9771bb0 100644
+> --- a/drivers/pci/host/pci-exynos.c
+> +++ b/drivers/pci/host/pci-exynos.c
+> @@ -530,7 +530,7 @@ static int __init exynos_add_pcie_port(struct pcie_port *pp,
+>  		}
+>  	}
+>  
+> -	pp->root_bus_nr = -1;
+> +	pp->root_bus_nr = 0;
+>  	pp->ops = &exynos_pcie_host_ops;
+>  
+>  	ret = dw_pcie_host_init(pp);
+> diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
+> index 233a196..bec256c 100644
+> --- a/drivers/pci/host/pci-imx6.c
+> +++ b/drivers/pci/host/pci-imx6.c
+> @@ -551,7 +551,7 @@ static int __init imx6_add_pcie_port(struct pcie_port *pp,
+>  		}
+>  	}
+>  
+> -	pp->root_bus_nr = -1;
+> +	pp->root_bus_nr = 0;
+>  	pp->ops = &imx6_pcie_host_ops;
+>  
+>  	ret = dw_pcie_host_init(pp);
+> diff --git a/drivers/pci/host/pci-keystone-dw.c b/drivers/pci/host/pci-keystone-dw.c
+> index f34892e..b1e4135 100644
+> --- a/drivers/pci/host/pci-keystone-dw.c
+> +++ b/drivers/pci/host/pci-keystone-dw.c
+> @@ -327,7 +327,7 @@ static void ks_dw_pcie_clear_dbi_mode(void __iomem *reg_virt)
+>  void ks_dw_pcie_setup_rc_app_regs(struct keystone_pcie *ks_pcie)
+>  {
+>  	struct pcie_port *pp = &ks_pcie->pp;
+> -	u32 start = pp->mem.start, end = pp->mem.end;
+> +	u32 start = pp->mem->start, end = pp->mem->end;
+>  	int i, tr_size;
+>  
+>  	/* Disable BARs for inbound access */
+> diff --git a/drivers/pci/host/pci-keystone.c b/drivers/pci/host/pci-keystone.c
+> index 734da58..8113832 100644
+> --- a/drivers/pci/host/pci-keystone.c
+> +++ b/drivers/pci/host/pci-keystone.c
+> @@ -309,7 +309,7 @@ static int __init ks_add_pcie_port(struct keystone_pcie *ks_pcie,
+>  			return ret;
+>  	}
+>  
+> -	pp->root_bus_nr = -1;
+> +	pp->root_bus_nr = 0;
+>  	pp->ops = &keystone_pcie_host_ops;
+>  	ret = ks_dw_pcie_host_init(ks_pcie, ks_pcie->msi_intc_np);
+>  	if (ret) {
+> diff --git a/drivers/pci/host/pci-layerscape.c b/drivers/pci/host/pci-layerscape.c
+> index b2328ea1..79ff08c 100644
+> --- a/drivers/pci/host/pci-layerscape.c
+> +++ b/drivers/pci/host/pci-layerscape.c
+> @@ -106,7 +106,7 @@ static int ls_add_pcie_port(struct ls_pcie *pcie)
+>  	pp = &pcie->pp;
+>  	pp->dev = pcie->dev;
+>  	pp->dbi_base = pcie->dbi;
+> -	pp->root_bus_nr = -1;
+> +	pp->root_bus_nr = 0;
+>  	pp->ops = &ls_pcie_host_ops;
+>  
+>  	ret = dw_pcie_host_init(pp);
+> diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
+> index c5d407c..e71a88e 100644
+> --- a/drivers/pci/host/pcie-designware.c
+> +++ b/drivers/pci/host/pcie-designware.c
+> @@ -11,6 +11,7 @@
+>   * published by the Free Software Foundation.
+>   */
+>  
+> +#include <linux/hardirq.h>
+>  #include <linux/irq.h>
+>  #include <linux/irqdomain.h>
+>  #include <linux/kernel.h>
+> @@ -69,16 +70,7 @@
+>  #define PCIE_ATU_FUNC(x)		(((x) & 0x7) << 16)
+>  #define PCIE_ATU_UPPER_TARGET		0x91C
+>  
+> -static struct hw_pci dw_pci;
+> -
+> -static unsigned long global_io_offset;
+> -
+> -static inline struct pcie_port *sys_to_pcie(struct pci_sys_data *sys)
+> -{
+> -	BUG_ON(!sys->private_data);
+> -
+> -	return sys->private_data;
+> -}
+> +static struct pci_ops dw_pcie_ops;
+>  
+>  int dw_pcie_cfg_read(void __iomem *addr, int where, int size, u32 *val)
+>  {
+> @@ -255,7 +247,7 @@ static void dw_pcie_msi_set_irq(struct pcie_port *pp, int irq)
+>  static int assign_irq(int no_irqs, struct msi_desc *desc, int *pos)
+>  {
+>  	int irq, pos0, i;
+> -	struct pcie_port *pp = sys_to_pcie(desc->dev->bus->sysdata);
+> +	struct pcie_port *pp = desc->dev->bus->sysdata;
+>  
+>  	pos0 = bitmap_find_free_region(pp->msi_irq_in_use, MAX_MSI_IRQS,
+>  				       order_base_2(no_irqs));
+> @@ -298,7 +290,7 @@ static int dw_msi_setup_irq(struct msi_controller *chip, struct pci_dev *pdev,
+>  {
+>  	int irq, pos;
+>  	struct msi_msg msg;
+> -	struct pcie_port *pp = sys_to_pcie(pdev->bus->sysdata);
+> +	struct pcie_port *pp = pdev->bus->sysdata;
+>  
+>  	if (desc->msi_attrib.is_msix)
+>  		return -EINVAL;
+> @@ -327,7 +319,7 @@ static void dw_msi_teardown_irq(struct msi_controller *chip, unsigned int irq)
+>  {
+>  	struct irq_data *data = irq_get_irq_data(irq);
+>  	struct msi_desc *msi = irq_data_get_msi(data);
+> -	struct pcie_port *pp = sys_to_pcie(msi->dev->bus->sysdata);
+> +	struct pcie_port *pp = msi->dev->bus->sysdata;
+>  
+>  	clear_irq_range(pp, irq, 1, data->hwirq);
+>  }
+> @@ -363,14 +355,12 @@ int dw_pcie_host_init(struct pcie_port *pp)
+>  {
+>  	struct device_node *np = pp->dev->of_node;
+>  	struct platform_device *pdev = to_platform_device(pp->dev);
+> -	struct of_pci_range range;
+> -	struct of_pci_range_parser parser;
+> +	struct pci_bus *bus;
+>  	struct resource *cfg_res;
+> -	u32 val, ns;
+> -	const __be32 *addrp;
+> -	int i, index, ret;
+> -
+> -	ns = of_n_size_cells(np);
+> +	LIST_HEAD(res);
+> +	u32 val;
+> +	int i, ret;
+> +	struct resource_entry *win;
+>  
+>  	cfg_res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "config");
+>  	if (cfg_res) {
+> @@ -378,85 +368,60 @@ int dw_pcie_host_init(struct pcie_port *pp)
+>  		pp->cfg1_size = resource_size(cfg_res)/2;
+>  		pp->cfg0_base = cfg_res->start;
+>  		pp->cfg1_base = cfg_res->start + pp->cfg0_size;
+> -
+> -		/* Find the untranslated configuration space address */
+> -		index = of_property_match_string(np, "reg-names", "config");
+> -		addrp = of_get_address(np, index, NULL, NULL);
+> -		pp->cfg0_mod_base = of_read_number(addrp, ns);
+> -		pp->cfg1_mod_base = pp->cfg0_mod_base + pp->cfg0_size;
+>  	} else {
+>  		dev_err(pp->dev, "missing *config* reg space\n");
+>  	}
+>  
+> -	if (of_pci_range_parser_init(&parser, np)) {
+> -		dev_err(pp->dev, "missing ranges property\n");
+> -		return -EINVAL;
+> -	}
+> +	ret = of_pci_get_host_bridge_resources(np, 0, 0xff, &res, &pp->io_base);
+> +	if (ret)
+> +		return ret;
+>  
+>  	/* Get the I/O and memory ranges from DT */
+> -	for_each_of_pci_range(&parser, &range) {
+> -		unsigned long restype = range.flags & IORESOURCE_TYPE_BITS;
+> -
+> -		if (restype == IORESOURCE_IO) {
+> -			of_pci_range_to_resource(&range, np, &pp->io);
+> -			pp->io.name = "I/O";
+> -			pp->io.start = max_t(resource_size_t,
+> -					     PCIBIOS_MIN_IO,
+> -					     range.pci_addr + global_io_offset);
+> -			pp->io.end = min_t(resource_size_t,
+> -					   IO_SPACE_LIMIT,
+> -					   range.pci_addr + range.size
+> -					   + global_io_offset - 1);
+> -			pp->io_size = resource_size(&pp->io);
+> -			pp->io_bus_addr = range.pci_addr;
+> -			pp->io_base = range.cpu_addr;
+> -
+> -			/* Find the untranslated IO space address */
+> -			pp->io_mod_base = range.cpu_addr;
+> -		}
+> -		if (restype == IORESOURCE_MEM) {
+> -			of_pci_range_to_resource(&range, np, &pp->mem);
+> -			pp->mem.name = "MEM";
+> -			pp->mem_size = resource_size(&pp->mem);
+> -			pp->mem_bus_addr = range.pci_addr;
+> -
+> -			/* Find the untranslated MEM space address */
+> -			pp->mem_mod_base = range.cpu_addr;
+> -		}
+> -		if (restype == 0) {
+> -			of_pci_range_to_resource(&range, np, &pp->cfg);
+> -			pp->cfg0_size = resource_size(&pp->cfg)/2;
+> -			pp->cfg1_size = resource_size(&pp->cfg)/2;
+> -			pp->cfg0_base = pp->cfg.start;
+> -			pp->cfg1_base = pp->cfg.start + pp->cfg0_size;
+> -
+> -			/* Find the untranslated configuration space address */
+> -			pp->cfg0_mod_base = range.cpu_addr;
+> -			pp->cfg1_mod_base = pp->cfg0_mod_base +
+> -					    pp->cfg0_size;
+> +	resource_list_for_each_entry(win, &res) {
+> +		switch (resource_type(win->res)) {
+> +		case IORESOURCE_IO:
+> +			pp->io = win->res;
+> +			pp->io->name = "I/O";
+> +			pp->io_size = resource_size(pp->io);
+> +			pp->io_bus_addr = pp->io->start - win->offset;
+> +			ret = pci_remap_iospace(pp->io, pp->io_base);
+> +			if (ret) {
+> +				dev_warn(pp->dev, "error %d: failed to map resource %pR\n",
+> +					 ret, pp->io);
+> +				continue;
+> +			}
+> +			break;
+> +		case IORESOURCE_MEM:
+> +			pp->mem = win->res;
+> +			pp->mem->name = "MEM";
+> +			pp->mem_size = resource_size(pp->mem);
+> +			pp->mem_bus_addr = pp->mem->start - win->offset;
+> +			break;
+> +		case 0:
+> +			pp->cfg = win->res;
+> +			pp->cfg0_size = resource_size(pp->cfg)/2;
+> +			pp->cfg1_size = resource_size(pp->cfg)/2;
+> +			pp->cfg0_base = pp->cfg->start;
+> +			pp->cfg1_base = pp->cfg->start + pp->cfg0_size;
+> +			break;
+> +		case IORESOURCE_BUS:
+> +			pp->busn = win->res;
+> +			break;
+> +		default:
+> +			continue;
+>  		}
+>  	}
+>  
+> -	ret = of_pci_parse_bus_range(np, &pp->busn);
+> -	if (ret < 0) {
+> -		pp->busn.name = np->name;
+> -		pp->busn.start = 0;
+> -		pp->busn.end = 0xff;
+> -		pp->busn.flags = IORESOURCE_BUS;
+> -		dev_dbg(pp->dev, "failed to parse bus-range property: %d, using default %pR\n",
+> -			ret, &pp->busn);
+> -	}
+> -
+>  	if (!pp->dbi_base) {
+> -		pp->dbi_base = devm_ioremap(pp->dev, pp->cfg.start,
+> -					resource_size(&pp->cfg));
+> +		pp->dbi_base = devm_ioremap(pp->dev, pp->cfg->start,
+> +					resource_size(pp->cfg));
+>  		if (!pp->dbi_base) {
+>  			dev_err(pp->dev, "error with ioremap\n");
+>  			return -ENOMEM;
+>  		}
+>  	}
+>  
+> -	pp->mem_base = pp->mem.start;
+> +	pp->mem_base = pp->mem->start;
+>  
+>  	if (!pp->va_cfg0_base) {
+>  		pp->va_cfg0_base = devm_ioremap(pp->dev, pp->cfg0_base,
+> @@ -505,7 +470,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
+>  
+>  	if (!pp->ops->rd_other_conf)
+>  		dw_pcie_prog_outbound_atu(pp, PCIE_ATU_REGION_INDEX1,
+> -					  PCIE_ATU_TYPE_MEM, pp->mem_mod_base,
+> +					  PCIE_ATU_TYPE_MEM, pp->mem_base,
+>  					  pp->mem_bus_addr, pp->mem_size);
+>  
+>  	dw_pcie_wr_own_conf(pp, PCI_BASE_ADDRESS_0, 4, 0);
+> @@ -517,15 +482,29 @@ int dw_pcie_host_init(struct pcie_port *pp)
+>  	val |= PORT_LOGIC_SPEED_CHANGE;
+>  	dw_pcie_wr_own_conf(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, 4, val);
+>  
+> -#ifdef CONFIG_PCI_MSI
+> +	bus = pci_create_root_bus(pp->dev, pp->root_bus_nr, &dw_pcie_ops,
+> +				  pp, &res);
+> +	if (!bus)
+> +		return -ENOMEM;
+> +
+> +#ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
+> +	bus->msi = container_of(&pp->irq_domain, struct msi_controller, domain);
+> +#else
+>  	dw_pcie_msi_chip.dev = pp->dev;
+> -	dw_pci.msi_ctrl = &dw_pcie_msi_chip;
+> +	bus->msi = &dw_pcie_msi_chip;
+>  #endif
+>  
+> -	dw_pci.nr_controllers = 1;
+> -	dw_pci.private_data = (void **)&pp;
+> +	pci_scan_child_bus(bus);
+> +	if (pp->ops->scan_bus)
+> +		pp->ops->scan_bus(pp);
+> +
+> +#ifdef CONFIG_ARM
+> +	/* support old dtbs that incorrectly describe IRQs */
+> +	pci_fixup_irqs(pci_common_swizzle, of_irq_parse_and_map_pci);
+> +#endif
+>  
+> -	pci_common_init_dev(pp->dev, &dw_pci);
+> +	pci_assign_unassigned_bus_resources(bus);
+> +	pci_bus_add_devices(bus);
+>  
+>  	return 0;
+>  }
+> @@ -544,12 +523,12 @@ static int dw_pcie_rd_other_conf(struct pcie_port *pp, struct pci_bus *bus,
+>  
+>  	if (bus->parent->number == pp->root_bus_nr) {
+>  		type = PCIE_ATU_TYPE_CFG0;
+> -		cpu_addr = pp->cfg0_mod_base;
+> +		cpu_addr = pp->cfg0_base;
+>  		cfg_size = pp->cfg0_size;
+>  		va_cfg_base = pp->va_cfg0_base;
+>  	} else {
+>  		type = PCIE_ATU_TYPE_CFG1;
+> -		cpu_addr = pp->cfg1_mod_base;
+> +		cpu_addr = pp->cfg1_base;
+>  		cfg_size = pp->cfg1_size;
+>  		va_cfg_base = pp->va_cfg1_base;
+>  	}
+> @@ -559,7 +538,7 @@ static int dw_pcie_rd_other_conf(struct pcie_port *pp, struct pci_bus *bus,
+>  				  busdev, cfg_size);
+>  	ret = dw_pcie_cfg_read(va_cfg_base + address, where, size, val);
+>  	dw_pcie_prog_outbound_atu(pp, PCIE_ATU_REGION_INDEX0,
+> -				  PCIE_ATU_TYPE_IO, pp->io_mod_base,
+> +				  PCIE_ATU_TYPE_IO, pp->io_base,
+>  				  pp->io_bus_addr, pp->io_size);
+>  
+>  	return ret;
+> @@ -579,12 +558,12 @@ static int dw_pcie_wr_other_conf(struct pcie_port *pp, struct pci_bus *bus,
+>  
+>  	if (bus->parent->number == pp->root_bus_nr) {
+>  		type = PCIE_ATU_TYPE_CFG0;
+> -		cpu_addr = pp->cfg0_mod_base;
+> +		cpu_addr = pp->cfg0_base;
+>  		cfg_size = pp->cfg0_size;
+>  		va_cfg_base = pp->va_cfg0_base;
+>  	} else {
+>  		type = PCIE_ATU_TYPE_CFG1;
+> -		cpu_addr = pp->cfg1_mod_base;
+> +		cpu_addr = pp->cfg1_base;
+>  		cfg_size = pp->cfg1_size;
+>  		va_cfg_base = pp->va_cfg1_base;
+>  	}
+> @@ -594,7 +573,7 @@ static int dw_pcie_wr_other_conf(struct pcie_port *pp, struct pci_bus *bus,
+>  				  busdev, cfg_size);
+>  	ret = dw_pcie_cfg_write(va_cfg_base + address, where, size, val);
+>  	dw_pcie_prog_outbound_atu(pp, PCIE_ATU_REGION_INDEX0,
+> -				  PCIE_ATU_TYPE_IO, pp->io_mod_base,
+> +				  PCIE_ATU_TYPE_IO, pp->io_base,
+>  				  pp->io_bus_addr, pp->io_size);
+>  
+>  	return ret;
+> @@ -626,7 +605,7 @@ static int dw_pcie_valid_config(struct pcie_port *pp,
+>  static int dw_pcie_rd_conf(struct pci_bus *bus, u32 devfn, int where,
+>  			int size, u32 *val)
+>  {
+> -	struct pcie_port *pp = sys_to_pcie(bus->sysdata);
+> +	struct pcie_port *pp = bus->sysdata;
+>  	int ret;
+>  
+>  	if (dw_pcie_valid_config(pp, bus, PCI_SLOT(devfn)) == 0) {
+> @@ -650,7 +629,7 @@ static int dw_pcie_rd_conf(struct pci_bus *bus, u32 devfn, int where,
+>  static int dw_pcie_wr_conf(struct pci_bus *bus, u32 devfn,
+>  			int where, int size, u32 val)
+>  {
+> -	struct pcie_port *pp = sys_to_pcie(bus->sysdata);
+> +	struct pcie_port *pp = bus->sysdata;
+>  	int ret;
+>  
+>  	if (dw_pcie_valid_config(pp, bus, PCI_SLOT(devfn)) == 0)
+> @@ -674,62 +653,6 @@ static struct pci_ops dw_pcie_ops = {
+>  	.write = dw_pcie_wr_conf,
+>  };
+>  
+> -static int dw_pcie_setup(int nr, struct pci_sys_data *sys)
+> -{
+> -	struct pcie_port *pp;
+> -
+> -	pp = sys_to_pcie(sys);
+> -
+> -	if (global_io_offset < SZ_1M && pp->io_size > 0) {
+> -		sys->io_offset = global_io_offset - pp->io_bus_addr;
+> -		pci_ioremap_io(global_io_offset, pp->io_base);
+> -		global_io_offset += SZ_64K;
+> -		pci_add_resource_offset(&sys->resources, &pp->io,
+> -					sys->io_offset);
+> -	}
+> -
+> -	sys->mem_offset = pp->mem.start - pp->mem_bus_addr;
+> -	pci_add_resource_offset(&sys->resources, &pp->mem, sys->mem_offset);
+> -	pci_add_resource(&sys->resources, &pp->busn);
+> -
+> -	return 1;
+> -}
+> -
+> -static struct pci_bus *dw_pcie_scan_bus(int nr, struct pci_sys_data *sys)
+> -{
+> -	struct pci_bus *bus;
+> -	struct pcie_port *pp = sys_to_pcie(sys);
+> -
+> -	pp->root_bus_nr = sys->busnr;
+> -	bus = pci_scan_root_bus(pp->dev, sys->busnr,
+> -				  &dw_pcie_ops, sys, &sys->resources);
+> -	if (!bus)
+> -		return NULL;
+> -
+> -	if (bus && pp->ops->scan_bus)
+> -		pp->ops->scan_bus(pp);
+> -
+> -	return bus;
+> -}
+> -
+> -static int dw_pcie_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
+> -{
+> -	struct pcie_port *pp = sys_to_pcie(dev->bus->sysdata);
+> -	int irq;
+> -
+> -	irq = of_irq_parse_and_map_pci(dev, slot, pin);
+> -	if (!irq)
+> -		irq = pp->irq;
+> -
+> -	return irq;
+> -}
+> -
+> -static struct hw_pci dw_pci = {
+> -	.setup		= dw_pcie_setup,
+> -	.scan		= dw_pcie_scan_bus,
+> -	.map_irq	= dw_pcie_map_irq,
+> -};
+> -
+>  void dw_pcie_setup_rc(struct pcie_port *pp)
+>  {
+>  	u32 val;
+> diff --git a/drivers/pci/host/pcie-designware.h b/drivers/pci/host/pcie-designware.h
+> index d0bbd27..264c969 100644
+> --- a/drivers/pci/host/pcie-designware.h
+> +++ b/drivers/pci/host/pcie-designware.h
+> @@ -27,25 +27,21 @@ struct pcie_port {
+>  	u8			root_bus_nr;
+>  	void __iomem		*dbi_base;
+>  	u64			cfg0_base;
+> -	u64			cfg0_mod_base;
+>  	void __iomem		*va_cfg0_base;
+>  	u32			cfg0_size;
+>  	u64			cfg1_base;
+> -	u64			cfg1_mod_base;
+>  	void __iomem		*va_cfg1_base;
+>  	u32			cfg1_size;
+> -	u64			io_base;
+> -	u64			io_mod_base;
+> +	resource_size_t		io_base;
+>  	phys_addr_t		io_bus_addr;
+>  	u32			io_size;
+>  	u64			mem_base;
+> -	u64			mem_mod_base;
+>  	phys_addr_t		mem_bus_addr;
+>  	u32			mem_size;
+> -	struct resource		cfg;
+> -	struct resource		io;
+> -	struct resource		mem;
+> -	struct resource		busn;
+> +	struct resource		*cfg;
+> +	struct resource		*io;
+> +	struct resource		*mem;
+> +	struct resource		*busn;
+>  	int			irq;
+>  	u32			lanes;
+>  	struct pcie_host_ops	*ops;
+> diff --git a/drivers/pci/host/pcie-spear13xx.c b/drivers/pci/host/pcie-spear13xx.c
+> index c49fbdc..03eb204 100644
+> --- a/drivers/pci/host/pcie-spear13xx.c
+> +++ b/drivers/pci/host/pcie-spear13xx.c
+> @@ -286,7 +286,7 @@ static int spear13xx_add_pcie_port(struct pcie_port *pp,
+>  		return ret;
+>  	}
+>  
+> -	pp->root_bus_nr = -1;
+> +	pp->root_bus_nr = 0;
+>  	pp->ops = &spear13xx_pcie_host_ops;
+>  
+>  	ret = dw_pcie_host_init(pp);
+> 
