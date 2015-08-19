@@ -1,33 +1,23 @@
 From: gabriel.fernandez@linaro.org (Gabriel Fernandez)
-Date: Wed, 19 Aug 2015 10:48:13 +0200
-Subject: [PATCH 1/2] dt-bindings: Fix tipo in st,clkgen-pll documentation
-In-Reply-To: <1439974094-32322-1-git-send-email-gabriel.fernandez@linaro.org>
-References: <1439974094-32322-1-git-send-email-gabriel.fernandez@linaro.org>
-Message-ID: <1439974094-32322-2-git-send-email-gabriel.fernandez@linaro.org>
+Date: Wed, 19 Aug 2015 10:48:12 +0200
+Subject: [PATCH 0/2] ST PLL fixes for 4.3
+Message-ID: <1439974094-32322-1-git-send-email-gabriel.fernandez@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-replace "sst,plls-c32-cx_x" by "st,plls-c32-cx_x"
+Should be apply with 
+commit 5eb26c605909 ("ARM: STi: DT: Rename st_pll3200c32_407_c0_x into st_pll3200c32_cx_x")
+to avoid broken compatibility.
 
-Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
----
- Documentation/devicetree/bindings/clock/st/st,clkgen-pll.txt | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Gabriel Fernandez (2):
+  dt-bindings: Fix tipo in st,clkgen-pll documentation
+  drivers: clk: st: Rename st_pll3200c32_407_c0_x into
+    st_pll3200c32_cx_x
 
-diff --git a/Documentation/devicetree/bindings/clock/st/st,clkgen-pll.txt b/Documentation/devicetree/bindings/clock/st/st,clkgen-pll.txt
-index d8b168e..e2c6db0 100644
---- a/Documentation/devicetree/bindings/clock/st/st,clkgen-pll.txt
-+++ b/Documentation/devicetree/bindings/clock/st/st,clkgen-pll.txt
-@@ -21,8 +21,8 @@ Required properties:
- 	"st,stih416-plls-c32-ddr",	"st,clkgen-plls-c32"
- 	"st,stih407-plls-c32-a0",	"st,clkgen-plls-c32"
- 	"st,stih407-plls-c32-a9",	"st,clkgen-plls-c32"
--	"sst,plls-c32-cx_0",		"st,clkgen-plls-c32"
--	"sst,plls-c32-cx_1",		"st,clkgen-plls-c32"
-+	"st,plls-c32-cx_0",		"st,clkgen-plls-c32"
-+	"st,plls-c32-cx_1",		"st,clkgen-plls-c32"
- 
- 	"st,stih415-gpu-pll-c32",	"st,clkgengpu-pll-c32"
- 	"st,stih416-gpu-pll-c32",	"st,clkgengpu-pll-c32"
+ Documentation/devicetree/bindings/clock/st/st,clkgen-pll.txt |  4 ++--
+ drivers/clk/st/clkgen-fsyn.c                                 |  8 ++++----
+ drivers/clk/st/clkgen-pll.c                                  | 12 ++++++------
+ 3 files changed, 12 insertions(+), 12 deletions(-)
+
 -- 
 1.9.1
