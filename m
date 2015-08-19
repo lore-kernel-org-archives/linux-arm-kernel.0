@@ -1,106 +1,170 @@
-From: j.anaszewski@samsung.com (Jacek Anaszewski)
-Date: Wed, 19 Aug 2015 10:49:08 +0200
-Subject: [PATCH v2 19/21] leds: leds-pasic3: Add support for PASIC3 LED
- controller
-In-Reply-To: <55D3A832.90705@tul.cz>
-References: <cover.1439843482.git.petr.cvek@tul.cz> <55D25ADC.10703@tul.cz>
- <55D30875.3090103@samsung.com> <55D3A832.90705@tul.cz>
-Message-ID: <55D44304.1000503@samsung.com>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Wed, 19 Aug 2015 11:51:06 +0300
+Subject: [PATCH v3 2/2] spi: dw: Allow interface drivers to limit data
+ I/O to word sizes
+In-Reply-To: <1439929313-4948-3-git-send-email-michael@smart-africa.com>
+References: <1439929313-4948-1-git-send-email-michael@smart-africa.com>
+ <1439929313-4948-3-git-send-email-michael@smart-africa.com>
+Message-ID: <1439974266.23314.8.camel@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/18/2015 11:48 PM, Petr Cvek wrote:
-> Dne 18.8.2015 v 12:27 Jacek Anaszewski napsal(a):
->> Hi Petr,
->>
->> On 08/18/2015 12:06 AM, Petr Cvek wrote:
->>> +/*
->>> + * AIC3 (or PASIC3) LED driver for HTC Magician/Alpine/.. (not Compaq ASIC3)
->>
->> s/AIC3/ASIC3/
->>
->> I am a bit confused. What's the relation between ASIC3 and PASIC3?
->
-> Actually both drivers should be renamed to AIC3 (or AIC only, as there is version 2). "HTC_AIC3" is written on the chip and "pasic3" is confusing with compaq asic3 driver, which claims in Kconfig help to be compatible with HTC machines. Compaq ASIC3 has much more functionality and from brief look it seems it has 16 bit registers (HTC_AIC3 has only LEDs, RESET and DS1WM and has 8 bit registers).
+On Tue, 2015-08-18 at 22:21 +0200, Michael van der Westhuizen wrote:
+> The commit dd11444327ce ("spi: dw-spi: Convert 16bit accesses to 
+> 32bit
+> accesses") changed all 16bit accesses in the DW_apb_ssi driver to 
+> 32bit.
+> This, unfortunately, breaks data register access on picoXcell, where 
+> the
+> DW IP needs data register accesses to be word accesses (all other
+> accesses appear to be OK).
+> 
+> This change introduces a new master variable to allow interface 
+> drivers
+> to specify that 16bit data transfer I/O is required.  This change 
+> also
+> introduces the ability to set this variable via device tree bindings 
+> in
+> the MMIO interface driver.  Both the core and the MMIO interface 
+> driver
+> default to the current 32bit behaviour.
+> 
+> Before this change, on a picoXcell pc3x3:
+>  spi_master spi32766: interrupt_transfer: fifo overrun/underrun
+>  m25p80 spi32766.0: error -5 reading 9f
+>  m25p80: probe of spi32766.0 failed with error -5
+> 
+> After this change:
+>  m25p80 spi32766.0: m25p40 (512 Kbytes)
 
-I see, thanks for the explanation.
+Reviewed-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
 
->>> +spinlock_t lock;
->>
->> Please move it to the struct pasic3_leds_data.
->
-> OK
->
->>
->>> +
->>> +static void brightness_set(struct led_classdev *cdev,
->>> +    enum led_brightness value)
->>> +{
->>> +    struct platform_device *pdev = to_platform_device(cdev->dev->parent);
->>> +    struct pasic3_led *led = dev_get_platdata(cdev->dev);
->>> +    struct pasic3_leds_pdata *pdata = dev_get_platdata(&pdev->dev);
->>> +    unsigned long flags;
->>> +    u8 val;
->>> +
->>> +    spin_lock_irqsave(&lock, flags);
->>> +
->>> +    if (value == LED_OFF) {
->>> +        val = pasic3_read_register(pdata->mfd_dev, PASIC3_CH_CONTROL);
->>> +        pasic3_write_register(pdata->mfd_dev, PASIC3_CH_CONTROL,
->>> +            val & ~(led->bit_blink_en | led->bit_force_on));
->>> +
->>> +        val = pasic3_read_register(pdata->mfd_dev, PASIC3_MASK_A);
->>> +        pasic3_write_register(pdata->mfd_dev, PASIC3_MASK_A,
->>> +            val & ~led->bit_mask);
->>> +
->>> +        if (pdata->power_gpio) {
->>> +            pdata->power_gpio_users--;
->>
->> Now it is possible that power_gpio_users will have negative value.
->> You should check the value before decrementing it.
->
->> Now you are setting power_gpio_users to 1 each time brightness is set,
->> whereas it should be set to 1 only if it was 0.
->>
->> This could be changed to:
->>
->> if (pdata->power_gpio_users == 0)
->>      gpio_set_value(pdata->power_gpio, 1);
->>
->> pdata->power_gpio_users++;
->
->>
->> Shouldn't you check if also power_gpio state doesn't need to be altered
->> here?
->>
->
->
-> Can the same brightness_set() function be called multiple times with same value (like LED_ON)?
-
-Yes it can. LED core doesn't check if the value isn't already set.
-
-> I think I will change it to a different code altogether, power_gpio is shared variable and power can be shut off when two of three leds are disabled (green LED does not use power_gpio). Something like:
->
-> enabled_leds |= BIT(hw_num);
->
-> or
->
-> enabled_leds &= ~BIT(hw_num);
-
-OK, we'll discuss that after you'll submit the next version.
-
->
->>> +        ret = gpio_request(pdata->power_gpio,
->>> +            "Red-Blue LED Power");
->>
->> Please use devm_gpio_request. Then you will not need pasic3_led_remove.
->>
->
-> OK
->
->
-
+> 
+> Fixes: dd11444327ce ("spi: dw-spi: Convert 16bit accesses to 32bit 
+> accesses")
+> Signed-off-by: Michael van der Westhuizen <michael@smart-africa.com>
+> ---
+> Changes in v3:
+>   - Rename the DT property as requested by Rob Herring.
+> 
+> Changes in v2:
+>   - Incorporate review feedback from Andy Shevchenko
+>     - Rework the DT bindings to accept an I/O register width as a
+>       number of bytes rather than using a boolean spefifying the
+>       width preference to be 16 bits.
+>     - Add data register access wrapper functions and use them when
+>       reading and writing the data register.
+> 
+>  drivers/spi/spi-dw-mmio.c |  3 +++
+>  drivers/spi/spi-dw.c      |  4 ++--
+>  drivers/spi/spi-dw.h      | 35 +++++++++++++++++++++++++++++++++++
+>  3 files changed, 40 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/spi/spi-dw-mmio.c b/drivers/spi/spi-dw-mmio.c
+> index eb03e12..7edede6 100644
+> --- a/drivers/spi/spi-dw-mmio.c
+> +++ b/drivers/spi/spi-dw-mmio.c
+> @@ -74,6 +74,9 @@ static int dw_spi_mmio_probe(struct platform_device 
+> *pdev)
+>  
+>  	dws->max_freq = clk_get_rate(dwsmmio->clk);
+>  
+> +	of_property_read_u32(pdev->dev.of_node, "reg-io-width",
+> +			     &dws->reg_io_width);
+> +
+>  	num_cs = 4;
+>  
+>  	if (pdev->dev.of_node)
+> diff --git a/drivers/spi/spi-dw.c b/drivers/spi/spi-dw.c
+> index 8d67d03..4fbfcdc 100644
+> --- a/drivers/spi/spi-dw.c
+> +++ b/drivers/spi/spi-dw.c
+> @@ -194,7 +194,7 @@ static void dw_writer(struct dw_spi *dws)
+>  			else
+>  				txw = *(u16 *)(dws->tx);
+>  		}
+> -		dw_writel(dws, DW_SPI_DR, txw);
+> +		dw_write_io_reg(dws, DW_SPI_DR, txw);
+>  		dws->tx += dws->n_bytes;
+>  	}
+>  }
+> @@ -205,7 +205,7 @@ static void dw_reader(struct dw_spi *dws)
+>  	u16 rxw;
+>  
+>  	while (max--) {
+> -		rxw = dw_readl(dws, DW_SPI_DR);
+> +		rxw = dw_read_io_reg(dws, DW_SPI_DR);
+>  		/* Care rx only if the transfer's original "rx" is 
+> not null */
+>  		if (dws->rx_end - dws->len) {
+>  			if (dws->n_bytes == 1)
+> diff --git a/drivers/spi/spi-dw.h b/drivers/spi/spi-dw.h
+> index 6c91391..b75ed32 100644
+> --- a/drivers/spi/spi-dw.h
+> +++ b/drivers/spi/spi-dw.h
+> @@ -109,6 +109,7 @@ struct dw_spi {
+>  	u32			fifo_len;	/* depth of the FIFO 
+> buffer */
+>  	u32			max_freq;	/* max bus freq 
+> supported */
+>  
+> +	u32			reg_io_width;	/* DR I/O width in 
+> bytes */
+>  	u16			bus_num;
+>  	u16			num_cs;		/* supported 
+> slave numbers */
+>  
+> @@ -145,11 +146,45 @@ static inline u32 dw_readl(struct dw_spi *dws, 
+> u32 offset)
+>  	return __raw_readl(dws->regs + offset);
+>  }
+>  
+> +static inline u16 dw_readw(struct dw_spi *dws, u32 offset)
+> +{
+> +	return __raw_readw(dws->regs + offset);
+> +}
+> +
+>  static inline void dw_writel(struct dw_spi *dws, u32 offset, u32 
+> val)
+>  {
+>  	__raw_writel(val, dws->regs + offset);
+>  }
+>  
+> +static inline void dw_writew(struct dw_spi *dws, u32 offset, u16 
+> val)
+> +{
+> +	__raw_writew(val, dws->regs + offset);
+> +}
+> +
+> +static inline u32 dw_read_io_reg(struct dw_spi *dws, u32 offset)
+> +{
+> +	switch (dws->reg_io_width) {
+> +	case 2:
+> +		return dw_readw(dws, offset);
+> +	case 4:
+> +	default:
+> +		return dw_readl(dws, offset);
+> +	}
+> +}
+> +
+> +static inline void dw_write_io_reg(struct dw_spi *dws, u32 offset, 
+> u32 val)
+> +{
+> +	switch (dws->reg_io_width) {
+> +	case 2:
+> +		dw_writew(dws, offset, val);
+> +		break;
+> +	case 4:
+> +	default:
+> +		dw_writel(dws, offset, val);
+> +		break;
+> +	}
+> +}
+> +
+>  static inline void spi_enable_chip(struct dw_spi *dws, int enable)
+>  {
+>  	dw_writel(dws, DW_SPI_SSIENR, (enable ? 1 : 0));
 
 -- 
-Best Regards,
-Jacek Anaszewski
+Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Intel Finland Oy
