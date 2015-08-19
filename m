@@ -1,59 +1,59 @@
-From: rabin.vincent@axis.com (Rabin Vincent)
-Date: Wed, 19 Aug 2015 15:43:38 +0200
-Subject: [PATCH] clocksource: arm_global_timer: register delay timer
-Message-ID: <1439991818-31989-1-git-send-email-rabin.vincent@axis.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 19 Aug 2015 15:22:50 +0100
+Subject: [PATCH v3 0/5] Mailbox: Provide support STi based platforms
+Message-ID: <1439994175-13360-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide a delay timer using the lower 32-bits of the global timer so
-that we can use that instead of having to calibrating delays.
+ST's platforms currently support a maximum of 5 Mailboxes, one for
+each of the supported co-processors situated on the platform.  Each
+Mailbox is divided up into 4 instances which consist of 32 channels.
+Messages are passed between the application and co-processors using
+shared memory areas.
 
-Signed-off-by: Rabin Vincent <rabin.vincent@axis.com>
----
- drivers/clocksource/arm_global_timer.c |   17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+Also included in the set is an example Client which should be generic
+enough to use as a testing environment for all Mailbox IPs which use
+shared memory or the API to pass messages.  With small changes, it
+should also be able to test more extravagant implementations.
 
-diff --git a/drivers/clocksource/arm_global_timer.c b/drivers/clocksource/arm_global_timer.c
-index e683377..f92a77d 100644
---- a/drivers/clocksource/arm_global_timer.c
-+++ b/drivers/clocksource/arm_global_timer.c
-@@ -16,6 +16,7 @@
- #include <linux/clockchips.h>
- #include <linux/cpu.h>
- #include <linux/clk.h>
-+#include <linux/delay.h>
- #include <linux/err.h>
- #include <linux/io.h>
- #include <linux/of.h>
-@@ -208,6 +209,21 @@ static u64 notrace gt_sched_clock_read(void)
- }
- #endif
+v2 => v3:
+ - Controller
+   - Shared (DT <=> Device Driver) defines removed
+   - Return actual error codes instead of NULL in xlate()
+   - Not passing 'direction' configuration via DT anymore
+     - Removed all accompanying configuration checking code
+ - Test F/W
+   - Allow Rx-only and Tx-only controllers to be tested
+   - Cater for controllers requiring pre-Tx 'signal' to be sent
+   - Supply 'wr-' message debugfs file
+     - When written to, will Tx message through Mailbox Framework
+     - When read from, will print out a hexdump of Rx'ed message
  
-+static unsigned long gt_read_long(void)
-+{
-+	return readl_relaxed(gt_base + GT_COUNTER0);
-+}
-+
-+static struct delay_timer gt_delay_timer = {
-+	.read_current_timer = gt_read_long,
-+};
-+
-+static void __init gt_delay_timer_init(void)
-+{
-+	gt_delay_timer.freq = gt_clk_rate;
-+	register_current_timer_delay(&gt_delay_timer);
-+}
-+
- static void __init gt_clocksource_init(void)
- {
- 	writel(0, gt_base + GT_CONTROL);
-@@ -304,6 +320,7 @@ static void __init global_timer_of_register(struct device_node *np)
- 	/* Immediately configure the timer on the boot CPU */
- 	gt_clocksource_init();
- 	gt_clockevents_init(this_cpu_ptr(gt_evt));
-+	gt_delay_timer_init();
- 
- 	return;
- 
+v1 => v2:
+ - New MACRO() to obtain base address for a given instance
+ - Move locking into the structure it protects
+ - Stop checking for 'ready' state when sending data
+ - Don't clear channel data (that belongs to the API)
+ - #define register offsets instead of providing via pdata
+ - Register driver with module_platform_driver()
+
+Lee Jones (5):
+  mailbox: dt: Supply bindings for ST's Mailbox IP
+  mailbox: Add support for ST's Mailbox IP
+  ARM: STi: stih407-family: Add nodes for Mailbox
+  mailbox: Add generic mechanism for testing Mailbox Controllers
+  ARM: STi: DT: STiH407: Enable Mailbox testing facility
+
+ .../devicetree/bindings/mailbox/sti-mailbox.txt    |  52 +++
+ arch/arm/boot/dts/stih407-family.dtsi              |  42 ++
+ drivers/mailbox/Kconfig                            |  14 +
+ drivers/mailbox/Makefile                           |   4 +
+ drivers/mailbox/mailbox-sti.c                      | 516 +++++++++++++++++++++
+ drivers/mailbox/mailbox-test.c                     | 361 ++++++++++++++
+ 6 files changed, 989 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mailbox/sti-mailbox.txt
+ create mode 100644 drivers/mailbox/mailbox-sti.c
+ create mode 100644 drivers/mailbox/mailbox-test.c
+
 -- 
-1.7.10.4
+1.9.1
