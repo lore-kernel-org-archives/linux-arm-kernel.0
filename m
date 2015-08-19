@@ -1,40 +1,33 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Wed, 19 Aug 2015 21:29:46 +0200
-Subject: [PATCH] ARM: tegra: Enable CROS_EC_PROTO for ChromeOS EC mfd
- driver
-In-Reply-To: <1439881599-22348-1-git-send-email-javier@osg.samsung.com>
-References: <1439881599-22348-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <55D4D92A.7010107@osg.samsung.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 19 Aug 2015 17:36:12 -0300
+Subject: [GIT PULL 1/3] ARM: imx: soc updates for 4.3
+In-Reply-To: <CAOMZO5AL2iFJSpSukcV44Y=JZecRrm0sCRZQgyTM6w8_R6OHqw@mail.gmail.com>
+References: <1439311351-5268-1-git-send-email-shawnguo@kernel.org>
+ <20150818201416.GA4732@localhost>
+ <CAOesGMg_TocMprCDQK69CTLtnyiyf4hn_hEzWoEhdKsXH3OuBw@mail.gmail.com>
+ <CAOMZO5AL2iFJSpSukcV44Y=JZecRrm0sCRZQgyTM6w8_R6OHqw@mail.gmail.com>
+Message-ID: <CAOMZO5AtmWPLeGDQP+VRLDuxMq6AXXHXjOQxHje1W5sz2bMvYQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Wed, Aug 19, 2015 at 3:17 PM, Fabio Estevam <festevam@gmail.com> wrote:
 
-On 08/18/2015 09:06 AM, Javier Martinez Canillas wrote:
-> The ChromeOS mfd driver (MFD_CROS_EC) select the CROS_EC_PROTO config
-> symbol because the driver uses some communication helper functions in
-> drivers/platform/chrome/cros_ec_proto.c but other drivers depends on
-> CROS_EC_PROTO instead. Mixing select and depends can lead to circular
-> Kconfig dependencies so the MFD_CROS_EC select should be changed to a
-> depends on CROS_EC_PROTO instead.
-> 
-> But doing so will break git bisect-ability since MFD_CROS_EC will not
-> be enabled anymore unless the default configs first explicitly enable
-> the CROS_EC_PROTO dependency.
-> 
-> Also enable CHROME_PLATFORMS since the CROS_EC_PROTO symbol is inside
-> that submenu.
-> 
-> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> ---
+>> Please send an incremental fix (or I can drop this branch if you need
+>> more time).
+>
+> Does this fix it?
+>
+> --- a/arch/arm/mach-imx/mach-imx6ul.c
+> +++ b/arch/arm/mach-imx/mach-imx6ul.c
+> @@ -45,7 +45,9 @@ static int ksz8081_phy_fixup(struct phy_device *dev)
+>
+>  static void __init imx6ul_enet_phy_init(void)
+>  {
+> -       phy_register_fixup_for_uid(PHY_ID_KSZ8081, 0xffffffff,
+> ksz8081_phy_fixup);
+> +       if (IS_BUILTIN(CONFIG_PHYLIB))
+> +               phy_register_fixup_for_uid(PHY_ID_KSZ8081, 0xffffffff,
+> +                                          ksz8081_phy_fixup);
+>  }
 
-This patch has been superseded by the "[PATCH 0/6] ChromeOS EC
-Kconfig cleanups" series: https://lkml.org/lkml/2015/8/19/194
-
-Please just ignore it.
-
-Best regards,
---
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+Yes, just confirmed that this fixes the issue and sent a formal patch.
