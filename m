@@ -1,47 +1,61 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Wed, 19 Aug 2015 17:30:24 +0200
-Subject: [PATCH v2 0/2] I2C support for NXP LPC18xx family
-In-Reply-To: <20150819151838.GC1634@katana>
-References: <1439748617-7683-1-git-send-email-manabian@gmail.com>
- <20150819151838.GC1634@katana>
-Message-ID: <CAGhQ9VxEOMg7hG=L4A9QZLQOfZQgtBhgs2PH1zajxqbrZpi3Wg@mail.gmail.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Wed, 19 Aug 2015 17:35:18 +0200
+Subject: [PATCH 0/4] [media] Media entity cleanups and build fixes
+Message-ID: <1439998526-12832-1-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 August 2015 at 17:18, Wolfram Sang <wsa@the-dreams.de> wrote:
-> On Sun, Aug 16, 2015 at 08:10:15PM +0200, Joachim Eastwood wrote:
->> This patch set adds a I2C driver and documentation for the I2C
->> peripheral found on many NXP LPC MCUs.
->>
->> The driver is a rework of an old driver by Kevin Wells. It has been
->> modified to support modern resource allocation, device tree and
->> generally cleaned up. Driver was originally written to support the
->> LPC2xxx platforms.
->>
->> Patches based on i2c/for-next and tested on Embedded Artists' LPC4357
->> Dev Kit and Hitex LPC4350 Eval board with several I2C devices.
->>
->> This version address comments from Wolfram Sang.
->>
->> Changes since v1:
->>  - remove dev_dbg() leftovers from development/debugging
->>  - use i2c_add_adapter
->>  - change return value on NACK and arb lost
->>    (I think all the others should be okay as they are)
->>  - fix 80 char warnings (involved s/reg_base/base)
->>  - rebase on i2c/for-next
->>
->> Joachim Eastwood (2):
->>   i2c: add i2c-lpc2k driver
->>   doc: dt: add documentation for nxp,lpc1788-i2c
->
-> Applied to for-next, thanks!
+Hello,
 
-Thanks, Wolfram.
+This series contains a couple of build fixes and cleanups for the
+Media Controller framework. The goal of the series is to get rid of
+the struct media_entity .parent member since now that a media_gobj is
+embedded into entities, the media_gobj .mdev member can be used to
+store a pointer to the parent struct media_device.
 
-> Changes regarding readl_poll_timeout() can be sent incrementally.
+So the .parent field becomes redundant and can be removed after all
+the users are converted to use entity .graph_obj.mdev instead.
 
-Got it. I'll see if I can figure out a way to test the code path properly.
+Patches 1/4 and 2/4 are build fixes I found while build testing if no
+regressions were introduced by the conversion. Patch 3/4 converts
+all the drivers and the MC core to use .mdev instead of .parent and
+finally patch 4/4 removes the .parent field since now is unused.
 
-regards,
-Joachim Eastwood
+The series depend on Mauro's "[PATCH v6 0/8] MC preparation patches
+series" [0].
+
+The transformation were automated using a coccinelle semantic patch
+and the drivers were build tested using allyesconfig and x-building
+the ARM Exynos and OMAP defconfigs + the needed media config options.
+
+Best regards,
+Javier
+
+[0]: http://www.mail-archive.com/linux-media at vger.kernel.org/msg91330.html
+
+
+Javier Martinez Canillas (4):
+  [media] staging: omap4iss: get entity ID using media_entity_id()
+  [media] omap3isp: get entity ID using media_entity_id()
+  [media] media: use entity.graph_obj.mdev instead of .parent
+  [media] media: remove media entity .parent field
+
+ drivers/media/media-device.c                       |  8 ++---
+ drivers/media/media-entity.c                       | 34 ++++++++++++----------
+ drivers/media/platform/exynos4-is/fimc-isp-video.c |  6 ++--
+ drivers/media/platform/exynos4-is/fimc-lite.c      |  8 ++---
+ drivers/media/platform/exynos4-is/media-dev.c      |  2 +-
+ drivers/media/platform/exynos4-is/media-dev.h      |  8 ++---
+ drivers/media/platform/omap3isp/isp.c              | 11 ++++---
+ drivers/media/platform/omap3isp/ispccdc.c          |  2 +-
+ drivers/media/platform/omap3isp/ispvideo.c         | 10 ++++---
+ drivers/media/platform/vsp1/vsp1_video.c           |  2 +-
+ drivers/media/platform/xilinx/xilinx-dma.c         |  2 +-
+ drivers/staging/media/davinci_vpfe/vpfe_video.c    |  6 ++--
+ drivers/staging/media/omap4iss/iss.c               |  6 ++--
+ drivers/staging/media/omap4iss/iss_video.c         |  4 +--
+ include/media/media-entity.h                       |  1 -
+ 15 files changed, 58 insertions(+), 52 deletions(-)
+
+-- 
+2.4.3
