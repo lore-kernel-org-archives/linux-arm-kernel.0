@@ -1,50 +1,96 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 19 Aug 2015 20:36:05 +0530
-Subject: [PATCH 1/7] dmaengine: st_fdma: Add STMicroelectronics FDMA DT
- binding documentation
-In-Reply-To: <1436371888-27863-2-git-send-email-peter.griffin@linaro.org>
-References: <1436371888-27863-1-git-send-email-peter.griffin@linaro.org>
- <1436371888-27863-2-git-send-email-peter.griffin@linaro.org>
-Message-ID: <20150819150605.GA13546@localhost>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 19 Aug 2015 16:09:49 +0100
+Subject: [PATCH] arm64: entry: always restore x0 from the stack on syscall
+ return
+Message-ID: <1439996989-5772-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 08, 2015 at 05:11:22PM +0100, Peter Griffin wrote:
-> This patch adds the DT binding documentation for the FDMA constroller
-> found on STi based chipsets from STMicroelectronics.
-> 
-> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
-> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> ---
->  Documentation/devicetree/bindings/dma/st_fdma.txt | 76 +++++++++++++++++++++++
->  1 file changed, 76 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/dma/st_fdma.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/dma/st_fdma.txt b/Documentation/devicetree/bindings/dma/st_fdma.txt
-> new file mode 100644
-> index 0000000..1ec7470
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/dma/st_fdma.txt
-> @@ -0,0 +1,76 @@
-> +* STMicroelectronics Flexible Direct Memory Access Device Tree bindings
-> +
-> +The FDMA is a general-purpose direct memory access controller capable of
-> +supporting 16 independent DMA channels. It accepts up to 32 DMA requests.
-> +The FDMA is based on a Slim processor which require a firmware.
-> +
-> +* FDMA Controller
-> +
-> +Required properties:
-> +- compatible	: Should be "st,fdma_mpe31"
-> +- reg		: Should contain DMA registers location and length
-> +- interrupts	: Should contain one interrupt shared by all channel
+We have a micro-optimisation on the fast syscall return path where we
+take care to keep x0 live with the return value from the syscall so that
+we can avoid restoring it from the stack. The benefit of doing this is
+fairly suspect, since we will be restoring x1 from the stack anyway
+(which lives adjacent in the pt_regs structure) and the only additional
+cost is saving x0 back to pt_regs after the syscall handler, which could
+be seen as a poor man's prefetch.
 
-s/channel/channels
+More importantly, this causes issues with the context tracking code.
 
-> +- dma-channels	: Number of channels supported by the controller
-> +- #dma-cells	: Must be <3>.
+The ct_user_enter macro ends up branching into C code, which is free to
+use x0 as a scratch register and consequently leads to us returning junk
+back to userspace as the syscall return value. Rather than special case
+the context-tracking code, this patch removes the questionable
+optimisation entirely.
 
-any reason three?
+Cc: <stable@vger.kernel.org>
+Cc: Larry Bassel <larry.bassel@linaro.org>
+Cc: Kevin Hilman <khilman@linaro.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Reported-by: Hanjun Guo <hanjun.guo@linaro.org>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/kernel/entry.S | 15 +++++----------
+ 1 file changed, 5 insertions(+), 10 deletions(-)
 
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index 301c37207c64..2a5e64ccc991 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -116,7 +116,7 @@
+ 	*/
+ 	.endm
+ 
+-	.macro	kernel_exit, el, ret = 0
++	.macro	kernel_exit, el
+ 	ldp	x21, x22, [sp, #S_PC]		// load ELR, SPSR
+ 	.if	\el == 0
+ 	ct_user_enter
+@@ -146,11 +146,7 @@
+ 	.endif
+ 	msr	elr_el1, x21			// set up the return data
+ 	msr	spsr_el1, x22
+-	.if	\ret
+-	ldr	x1, [sp, #S_X1]			// preserve x0 (syscall return)
+-	.else
+ 	ldp	x0, x1, [sp, #16 * 0]
+-	.endif
+ 	ldp	x2, x3, [sp, #16 * 1]
+ 	ldp	x4, x5, [sp, #16 * 2]
+ 	ldp	x6, x7, [sp, #16 * 3]
+@@ -613,13 +609,14 @@ ENDPROC(cpu_switch_to)
+  */
+ ret_fast_syscall:
+ 	disable_irq				// disable interrupts
++	str	x0, [sp, #S_X0]			// returned x0
+ 	ldr	x1, [tsk, #TI_FLAGS]		// re-check for syscall tracing
+ 	and	x2, x1, #_TIF_SYSCALL_WORK
+ 	cbnz	x2, ret_fast_syscall_trace
+ 	and	x2, x1, #_TIF_WORK_MASK
+-	cbnz	x2, fast_work_pending
++	cbnz	x2, work_pending
+ 	enable_step_tsk x1, x2
+-	kernel_exit 0, ret = 1
++	kernel_exit 0
+ ret_fast_syscall_trace:
+ 	enable_irq				// enable interrupts
+ 	b	__sys_trace_return
+@@ -627,8 +624,6 @@ ret_fast_syscall_trace:
+ /*
+  * Ok, we need to do extra processing, enter the slow path.
+  */
+-fast_work_pending:
+-	str	x0, [sp, #S_X0]			// returned x0
+ work_pending:
+ 	tbnz	x1, #TIF_NEED_RESCHED, work_resched
+ 	/* TIF_SIGPENDING, TIF_NOTIFY_RESUME or TIF_FOREIGN_FPSTATE case */
+@@ -652,7 +647,7 @@ ret_to_user:
+ 	cbnz	x2, work_pending
+ 	enable_step_tsk x1, x2
+ no_work_pending:
+-	kernel_exit 0, ret = 0
++	kernel_exit 0
+ ENDPROC(ret_to_user)
+ 
+ /*
 -- 
-~Vinod
+2.1.4
