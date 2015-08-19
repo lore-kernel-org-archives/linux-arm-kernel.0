@@ -1,29 +1,36 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Wed, 19 Aug 2015 16:21:14 -0700
-Subject: [PATCH v4 1/2] arm64: KVM: Optimize arm64 skip 30-50% vfp/simd
- save/restore on exits
-In-Reply-To: <20150819232839.69531eca@arm.com>
-References: <1437082178-11039-1-git-send-email-m.smarduch@samsung.com>
- <1437082178-11039-2-git-send-email-m.smarduch@samsung.com>
- <55C235B9.3000800@arm.com> <20150819174958.GA11518@cbox>
- <55D4FA88.5060305@samsung.com> <20150819232839.69531eca@arm.com>
-Message-ID: <55D50F6A.9020604@samsung.com>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Thu, 20 Aug 2015 01:35:41 +0200
+Subject: [PATCH v2 2/3] ARM: dts: rockchip: correct regulator PM properties
+In-Reply-To: <1440022721-73712-2-git-send-email-briannorris@chromium.org>
+References: <1440022721-73712-1-git-send-email-briannorris@chromium.org>
+ <1440022721-73712-2-git-send-email-briannorris@chromium.org>
+Message-ID: <CABxcv=kV2YW7gTmvaLTQiQUbmfVcqttV8prRfm0zxV=hvsRe9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Great that's even better.
+Hello Brian,
 
-On 8/19/2015 3:28 PM, Marc Zyngier wrote:
-> On Wed, 19 Aug 2015 14:52:08 -0700
-> Mario Smarduch <m.smarduch@samsung.com> wrote:
-> 
->> Hi Christoffer,
->>    I'll test it and work with it.
-> 
-> FWIW, I've added these patches to both -queue and -next, and from the
-> tests Christoffer has run, it looks pretty good.
-> 
-> Thanks,
-> 
-> 	M.
-> 
+On Thu, Aug 20, 2015 at 12:18 AM, Brian Norris <briannorris@chromium.org> wrote:
+> This DTS file was submitted with non-upstream bindings. I happened
+> across this while reviewing the jaq DTS.
+>
+> Signed-off-by: Brian Norris <briannorris@chromium.org>
+> Cc: Alexandru M Stan <amstan@chromium.org>
+> Cc: Douglas Anderson <dianders@chromium.org>
+> ---
+> Did not test minnie
+>
+> v1 -> v2:
+>  - use "off-in-suspend", as that's the equivalent to the downstream
+>    'regulator-suspend-mem-disabled'
+>
+>  arch/arm/boot/dts/rk3288-veyron-minnie.dts | 8 ++++++--
+>  1 file changed, 6 insertions(+), 2 deletions(-)
+>
+
+Patch looks good to me.
+
+Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+
+Best regards,
+Javier
