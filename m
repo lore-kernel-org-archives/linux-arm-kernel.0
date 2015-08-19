@@ -1,73 +1,116 @@
 From: b38611@freescale.com (Fugang Duan)
-Date: Wed, 19 Aug 2015 13:34:00 +0800
-Subject: [PATCH v1 2/6] ARM: imx7d: add imx7d iomux-gpr field define
+Date: Wed, 19 Aug 2015 13:34:01 +0800
+Subject: [PATCH v1 3/6] ARM: imx: add enet init for i.MX7D platform
 In-Reply-To: <1439962444-27486-1-git-send-email-b38611@freescale.com>
 References: <1439962444-27486-1-git-send-email-b38611@freescale.com>
-Message-ID: <1439962444-27486-3-git-send-email-b38611@freescale.com>
+Message-ID: <1439962444-27486-4-git-send-email-b38611@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add imx7d iomux-gpr field define.
+Add enet phy fixup, clock source init for i.MX7D platform.
 
 Signed-off-by: Fugang Duan <B38611@freescale.com>
 ---
- include/linux/mfd/syscon/imx7-iomuxc-gpr.h | 49 ++++++++++++++++++++++++++++++
- 1 file changed, 49 insertions(+)
+ arch/arm/mach-imx/mach-imx7d.c | 75 ++++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 73 insertions(+), 2 deletions(-)
 
-diff --git a/include/linux/mfd/syscon/imx7-iomuxc-gpr.h b/include/linux/mfd/syscon/imx7-iomuxc-gpr.h
-new file mode 100644
-index 0000000..5cc0553
---- /dev/null
-+++ b/include/linux/mfd/syscon/imx7-iomuxc-gpr.h
-@@ -0,0 +1,49 @@
-+/*
-+ * Copyright (C) 2015 Freescale Semiconductor, Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
+diff --git a/arch/arm/mach-imx/mach-imx7d.c b/arch/arm/mach-imx/mach-imx7d.c
+index 4d4a190..67d7939 100644
+--- a/arch/arm/mach-imx/mach-imx7d.c
++++ b/arch/arm/mach-imx/mach-imx7d.c
+@@ -5,13 +5,83 @@
+  * it under the terms of the GNU General Public License version 2 as
+  * published by the Free Software Foundation.
+  */
+-#include <linux/irqchip.h>
+-#include <linux/of_platform.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
++#include <linux/brcmphy.h>
++#include <linux/irqchip.h>
++#include <linux/mfd/syscon.h>
++#include <linux/mfd/syscon/imx7-iomuxc-gpr.h>
++#include <linux/of_platform.h>
++#include <linux/regmap.h>
+ 
+ #include "common.h"
+ 
++static int ar8031_phy_fixup(struct phy_device *dev)
++{
++	u16 val;
 +
-+#ifndef __LINUX_IMX7_IOMUXC_GPR_H
-+#define __LINUX_IMX7_IOMUXC_GPR_H
++	/* Set RGMII IO voltage to 1.8V */
++	phy_write(dev, 0x1d, 0x1f);
++	phy_write(dev, 0x1e, 0x8);
 +
-+#include <linux/bitops.h>
++	/* disable phy AR8031 SmartEEE function. */
++	phy_write(dev, 0xd, 0x3);
++	phy_write(dev, 0xe, 0x805d);
++	phy_write(dev, 0xd, 0x4003);
++	val = phy_read(dev, 0xe);
++	val &= ~(0x1 << 8);
++	phy_write(dev, 0xe, val);
 +
-+#define IOMUXC_GPR0	0x00
-+#define IOMUXC_GPR1	0x04
-+#define IOMUXC_GPR2	0x08
-+#define IOMUXC_GPR3	0x0c
-+#define IOMUXC_GPR4	0x10
-+#define IOMUXC_GPR5	0x14
-+#define IOMUXC_GPR6	0x18
-+#define IOMUXC_GPR7	0x1c
-+#define IOMUXC_GPR8	0x20
-+#define IOMUXC_GPR9	0x24
-+#define IOMUXC_GPR10	0x28
-+#define IOMUXC_GPR11	0x2c
-+#define IOMUXC_GPR12	0x30
-+#define IOMUXC_GPR13	0x34
-+#define IOMUXC_GPR14	0x38
-+#define IOMUXC_GPR15	0x3c
-+#define IOMUXC_GPR16	0x40
-+#define IOMUXC_GPR17	0x44
-+#define IOMUXC_GPR18	0x48
-+#define IOMUXC_GPR19	0x4c
-+#define IOMUXC_GPR20	0x50
-+#define IOMUXC_GPR21	0x54
-+#define IOMUXC_GPR22	0x58
++	/* introduce tx clock delay */
++	phy_write(dev, 0x1d, 0x5);
++	val = phy_read(dev, 0x1e);
++	val |= 0x0100;
++	phy_write(dev, 0x1e, val);
 +
-+/* For imx7d iomux gpr register field define */
-+#define IMX7D_GPR1_IRQ_MASK			(0x1 << 12)
-+#define IMX7D_GPR1_ENET1_TX_CLK_SEL_MASK	(0x1 << 13)
-+#define IMX7D_GPR1_ENET2_TX_CLK_SEL_MASK	(0x1 << 14)
-+#define IMX7D_GPR1_ENET_TX_CLK_SEL_MASK		(0x3 << 13)
-+#define IMX7D_GPR1_ENET1_CLK_DIR_MASK		(0x1 << 17)
-+#define IMX7D_GPR1_ENET2_CLK_DIR_MASK		(0x1 << 18)
-+#define IMX7D_GPR1_ENET_CLK_DIR_MASK		(0x3 << 17)
++	return 0;
++}
 +
-+#define IMX7D_GPR5_CSI_MUX_CONTROL_MIPI		(0x1 << 4)
++static int bcm54220_phy_fixup(struct phy_device *dev)
++{
++	/* enable RXC skew select RGMII copper mode */
++	phy_write(dev, 0x1e, 0x21);
++	phy_write(dev, 0x1f, 0x7ea8);
++	phy_write(dev, 0x1e, 0x2f);
++	phy_write(dev, 0x1f, 0x71b7);
 +
-+#endif /* __LINUX_IMX7_IOMUXC_GPR_H */
++	return 0;
++}
++
++#define PHY_ID_AR8031   0x004dd074
++static void __init imx7d_enet_phy_init(void)
++{
++	if (IS_BUILTIN(CONFIG_PHYLIB)) {
++		phy_register_fixup_for_uid(PHY_ID_AR8031, 0xffffffff,
++					   ar8031_phy_fixup);
++		phy_register_fixup_for_uid(PHY_ID_BCM54220, 0xffffffff,
++					   bcm54220_phy_fixup);
++	}
++}
++
++static void __init imx7d_enet_clk_sel(void)
++{
++	struct regmap *gpr;
++
++	gpr = syscon_regmap_lookup_by_compatible("fsl,imx7d-iomuxc-gpr");
++	if (!IS_ERR(gpr)) {
++		regmap_update_bits(gpr, IOMUXC_GPR1, IMX7D_GPR1_ENET_TX_CLK_SEL_MASK, 0);
++		regmap_update_bits(gpr, IOMUXC_GPR1, IMX7D_GPR1_ENET_CLK_DIR_MASK, 0);
++	} else {
++		pr_err("failed to find fsl,imx7d-iomux-gpr regmap\n");
++	}
++}
++
++static inline void imx7d_enet_init(void)
++{
++	imx7d_enet_phy_init();
++	imx7d_enet_clk_sel();
++}
++
+ static void __init imx7d_init_machine(void)
+ {
+ 	struct device *parent;
+@@ -22,6 +92,7 @@ static void __init imx7d_init_machine(void)
+ 
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ 	imx_anatop_init();
++	imx7d_enet_init();
+ }
+ 
+ static void __init imx7d_init_irq(void)
 -- 
 1.9.1
