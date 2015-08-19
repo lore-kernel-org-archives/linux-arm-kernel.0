@@ -1,109 +1,68 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Wed, 19 Aug 2015 10:46:26 +0100
-Subject: [PATCH 2/4] drm: Add support for ARM's HDLCD controller.
-In-Reply-To: <1439835473.3341.88.camel@linaro.org>
-References: <1438784892-27888-1-git-send-email-Liviu.Dudau@arm.com>
- <1438784892-27888-3-git-send-email-Liviu.Dudau@arm.com>
- <1439835473.3341.88.camel@linaro.org>
-Message-ID: <20150819094626.GG1020@e106497-lin.cambridge.arm.com>
+From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
+Date: Wed, 19 Aug 2015 11:48:44 +0200
+Subject: [GIT PULL 9/9] ARM: tegra: Default configuration updates for
+ v4.3-rc1
+In-Reply-To: <20150819091358.GA26627@ulmo>
+References: <1439563720-13189-1-git-send-email-thierry.reding@gmail.com>
+ <1439563720-13189-10-git-send-email-thierry.reding@gmail.com>
+ <CANMBJr7PKy-eCcB3HiBajpApHS_BYPa7xfKjTqV4o8Z1hwY99A@mail.gmail.com>
+ <20150819091358.GA26627@ulmo>
+Message-ID: <1439977724.4135.90.camel@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 17, 2015 at 07:17:53PM +0100, Jon Medhurst (Tixy) wrote:
-> I haven't reviewed the code in detail, just had one comment I alluded to
-> in a private email the other day...
-> 
-> On Wed, 2015-08-05 at 15:28 +0100, Liviu Dudau wrote:
-> 
-> > diff --git a/drivers/gpu/drm/arm/hdlcd_crtc.c b/drivers/gpu/drm/arm/hdlcd_crtc.c
-> [...]
-> > +void hdlcd_set_scanout(struct hdlcd_drm_private *hdlcd)
-> > +{
-> > +	struct drm_framebuffer *fb = hdlcd->crtc.primary->fb;
-> > +	struct drm_gem_cma_object *gem;
-> > +	unsigned int depth, bpp;
-> > +	dma_addr_t scanout_start;
-> > +
-> > +	drm_fb_get_bpp_depth(fb->pixel_format, &depth, &bpp);
-> > +	gem = drm_fb_cma_get_gem_obj(fb, 0);
-> > +
-> > +	scanout_start = gem->paddr + fb->offsets[0] +
-> > +		(hdlcd->crtc.y * fb->pitches[0]) + (hdlcd->crtc.x * bpp/8);
-> > +
-> > +	hdlcd_write(hdlcd, HDLCD_REG_FB_BASE, scanout_start);
-> > +}
-> > +
-> 
-> The above function accesses various pointers and values, which
-> presumably all need to be valid and consistent. However...
-> 
-> [...]
-> > diff --git a/drivers/gpu/drm/arm/hdlcd_drv.c b/drivers/gpu/drm/arm/hdlcd_drv.c
-> [...]
-> > +static irqreturn_t hdlcd_irq(int irq, void *arg)
-> > +{
-> > +	struct drm_device *dev = arg;
-> > +	struct hdlcd_drm_private *hdlcd = dev->dev_private;
-> > +	unsigned long irq_status;
-> > +
-> > +	irq_status = hdlcd_read(hdlcd, HDLCD_REG_INT_STATUS);
-> > +
-> > +#ifdef CONFIG_DEBUG_FS
-> > +	if (irq_status & HDLCD_INTERRUPT_UNDERRUN) {
-> > +		atomic_inc(&hdlcd->buffer_underrun_count);
-> > +	}
-> > +	if (irq_status & HDLCD_INTERRUPT_DMA_END) {
-> > +		atomic_inc(&hdlcd->dma_end_count);
-> > +	}
-> > +	if (irq_status & HDLCD_INTERRUPT_BUS_ERROR) {
-> > +		atomic_inc(&hdlcd->bus_error_count);
-> > +	}
-> > +	if (irq_status & HDLCD_INTERRUPT_VSYNC) {
-> > +		atomic_inc(&hdlcd->vsync_count);
-> > +	}
-> > +#endif
-> > +	if (irq_status & HDLCD_INTERRUPT_VSYNC) {
-> > +		struct drm_pending_vblank_event *event;
-> > +		unsigned long flags;
-> > +
-> > +		hdlcd_set_scanout(hdlcd);
-> 
-> hdlcd_set_scanout is being called on every vsync interrupt, can we
-> guarantee that is safe? What if we're in the middle of a page flip or
-> panning operation? Seems to me that there is at least scope for
-> incorrect addresses being calculated leading to a nasty glitch on the
-> screen for one frame. And in the worst case, possibly invalid pointer
-> being dereferenced.
+On Wed, 2015-08-19 at 11:14 +0200, Thierry Reding wrote:
+> On Tue, Aug 18, 2015 at 03:30:41PM -0700, Tyler Baker wrote:
+> > Hi Theirry,
+> > 
+> > 
+> > This isn't where the story ends unfortunately. The collabora lab 
+> > also
+> > has a jetson-tk1, booted in the same manner, which boots next
+> > -20150818
+> > fine[4]. The only differences I can spot in the two boot logs is 
+> > that
+> > the collabora board is using an older version of u-boot, where as 
+> > my
+> > board is using a newer version. U-Boot 2015.01-00231-gab77f24-dirty
+> > (Good) vs U-Boot 2015.07-00130-gb217c89 (Bad).
 
-Agree, there is a risk of corruption here. I'm going to look at the atomic
-mode setting which should hopefully resolve most of these issues.
+Our 2015.01-00231-gab77f24-dirty is 2015.01-00231-gab77f24 + changes
+which got merged as 053b86e6d8e50359412e626c33bae3f7bafd74dd in
+upstream u-boot.
 
+Fwiw:
+$ git show 2015.01-00231-gab77f24
+commit ab77f24119e80257de4ab017b877f92f96980562
+Merge: d928664 fa58b10
+Author: Tom Rini <trini@ti.com>
+Date:   Thu Jan 15 14:05:31 2015 -0500
+
+    Merge branch 'master' of git://git.denx.de/u-boot-ti
+
+Which is definately a commit you should hae in your upstream u-boot
+tree.
+
+
+
+
+> I don't have either of those commits in any of the U-Boot trees I 
+> have.
+> Perhaps whatever tree this comes from has local patches that cause 
+> the
+> breakage? The version that I use a recent upstream U-Boot with some
+> local patches, none of which should impact Jetson TK1 in any way. 
+> Just
+> to make sure I tried running latest origin/master, which identifies
+> thusly:
 > 
-> So, if scanout needs to be set on every vsync, would it not be safer
-> (and more efficient) to have a single variable storing the value to use
-> during interrupts, and recalculate that value outside of interrupts
-> whenever things are changed?
-
-hdlcd_set_scanout() function is merely a convenience function to calculate
-the scanout_start variable. The interrupt handler probably doesn't need to
-call that and it was mostly a shortcut to make sure the HDLCD_REG_FB_BASE
-register was up-to-date when the vsync interrupt happened. I hope the
-atomic modeset will cleanup things here.
-
-Best regards,
-Liviu
-
+> 	U-Boot 2015.10-rc2-00040-g0f9258228e2b
 > 
-> -- 
-> Tixy
-> 
+> And that boots next-20150818 fine.
+
+Probably worth for tyler to test that u-boot commit on his jetson to
+see if that solves the issue he's having...
 
 -- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+Collabora Ltd.
