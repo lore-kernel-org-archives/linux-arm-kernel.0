@@ -1,77 +1,143 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Wed, 19 Aug 2015 09:51:28 -0500
-Subject: [PATCH v3 09/14] drm: bridge/analogix_dp: add platform device type
- support
-In-Reply-To: <1439995728-18046-1-git-send-email-ykk@rock-chips.com>
-References: <1439995728-18046-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <1439995888-18548-1-git-send-email-ykk@rock-chips.com>
+From: ryabinin.a.a@gmail.com (Andrey Ryabinin)
+Date: Wed, 19 Aug 2015 17:51:40 +0300
+Subject: [PATCH v2 5/5] arm64: add KASan support
+In-Reply-To: <CACRpkdaJVRuLTCh585rLEjua2TpnLsALhLdu0ma56TBA=C+EiQ@mail.gmail.com>
+References: <1431698344-28054-1-git-send-email-a.ryabinin@samsung.com>
+ <1431698344-28054-6-git-send-email-a.ryabinin@samsung.com>
+ <CACRpkdaRJJjCXR=vK1M2YhR26JZfGoBB+jcqz8r2MhERfxRzqA@mail.gmail.com>
+ <CAPAsAGy-r8Z2N09wKV+e0kLfbwxd-eWK6N5Xajsnqq9jfyWqcQ@mail.gmail.com>
+ <CACRpkdZmHLMxosLXjyOPdkavo=UNzmTcHOLF5vV4cS1ULfbq6A@mail.gmail.com>
+ <CAPAsAGw-iawTpjJh66rQN5fqBFT6UBZCcv2eKx7JTqCXzhzpsw@mail.gmail.com>
+ <CACRpkdY2i2M27gP_fXawkFrC_GFgWaKr5rEn6d47refNPiEk=g@mail.gmail.com>
+ <55AE56DB.4040607@samsung.com>
+ <CACRpkdYaqK8upK-3b01JbO_y+sHnk4-Hm1MfvjSy0tKUkFREtQ@mail.gmail.com>
+ <55AFD8D0.9020308@samsung.com>
+ <CACRpkdaJVRuLTCh585rLEjua2TpnLsALhLdu0ma56TBA=C+EiQ@mail.gmail.com>
+Message-ID: <55D497FC.9060506@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+On 08/19/2015 03:14 PM, Linus Walleij wrote:
+> On Wed, Jul 22, 2015 at 7:54 PM, Andrey Ryabinin <a.ryabinin@samsung.com> wrote:
+> 
+>> So here is updated version:
+>>         git://github.com/aryabinin/linux.git kasan/arm_v0_1
+>>
+>> The code is still ugly in some places and it probably have some bugs.
+>> Lightly tested on exynos 5410/5420.
+> 
+> I compiled this for various ARM platforms and tested to boot.
+> I used GCC version 4.9.3 20150113 (prerelease) (Linaro).
+> 
+> I get these compilation warnings no matter what I compile,
+> I chose to ignore them:
+> 
+> WARNING: vmlinux.o(.meminit.text+0x2c):
+> Section mismatch in reference from the function kasan_pte_populate()
+> to the function
+> .init.text:kasan_alloc_block.constprop.7()
+> The function __meminit kasan_pte_populate() references
+> a function __init kasan_alloc_block.constprop.7().
+> If kasan_alloc_block.constprop.7 is only used by kasan_pte_populate then
+> annotate kasan_alloc_block.constprop.7 with a matching annotation.
+> 
+> WARNING: vmlinux.o(.meminit.text+0x98):
+> Section mismatch in reference from the function kasan_pmd_populate()
+> to the function
+> .init.text:kasan_alloc_block.constprop.7()
+> The function __meminit kasan_pmd_populate() references
+> a function __init kasan_alloc_block.constprop.7().
+> If kasan_alloc_block.constprop.7 is only used by kasan_pmd_populate then
+> annotate kasan_alloc_block.constprop.7 with a matching annotation.
+> 
+> These KASan outline tests run fine:
+> 
+> kasan test: kmalloc_oob_right out-of-bounds to right
+> kasan test: kmalloc_oob_left out-of-bounds to left
+> kasan test: kmalloc_node_oob_right kmalloc_node(): out-of-bounds to right
+> kasan test: kmalloc_large_oob_rigth kmalloc large allocation:
+> out-of-bounds to right
+> kasan test: kmalloc_oob_krealloc_more out-of-bounds after krealloc more
+> kasan test: kmalloc_oob_krealloc_less out-of-bounds after krealloc less
+> kasan test: kmalloc_oob_16 kmalloc out-of-bounds for 16-bytes access
+> kasan test: kmalloc_oob_in_memset out-of-bounds in memset
+> kasan test: kmalloc_uaf use-after-free
+> kasan test: kmalloc_uaf_memset use-after-free in memset
+> kasan test: kmalloc_uaf2 use-after-free after another kmalloc
+> kasan test: kmem_cache_oob out-of-bounds in kmem_cache_alloc
+> 
+> These two tests seems to not trigger KASan BUG()s, and seemse to
+> be like so on all hardware, so I guess it is this kind of test
+> that requires GCC 5.0:
+> 
+> kasan test: kasan_stack_oob out-of-bounds on stack
+> kasan test: kasan_global_oob out-of-bounds global variable
+> 
+> 
+> Hardware test targets:
+> 
+> Ux500 (ARMv7):
+> 
+> On Ux500 I get a real slow boot (as exepected) and after
+> enabling the test cases produce KASan warnings
+> expectedly.
+> 
+> MSM APQ8060 (ARMv7):
+> 
+> Also a real slow boot and the expected KASan warnings when
+> running the tests.
+> 
+> Integrator/AP (ARMv5):
+> 
+> This one mounted with an ARMv5 ARM926 tile. It boots nicely
+> (but takes forever) with KASan and run all test cases (!) just like
+> for the other platforms but before reaching userspace this happens:
+> 
+
+THREAD_SIZE hardcoded in act_mm macro.
+
+This hack should help:
+
+diff --git a/arch/arm/mm/proc-macros.S b/arch/arm/mm/proc-macros.S
+index c671f34..b1765f2 100644
+--- a/arch/arm/mm/proc-macros.S
++++ b/arch/arm/mm/proc-macros.S
+@@ -32,6 +32,9 @@
+ 	.macro	act_mm, rd
+ 	bic	\rd, sp, #8128
+ 	bic	\rd, \rd, #63
++#ifdef CONFIG_KASAN
++	bic	\rd, \rd, #8192
++#endif
+ 	ldr	\rd, [\rd, #TI_TASK]
+ 	ldr	\rd, [\rd, #TSK_ACTIVE_MM]
+ 	.endm
 ---
-Changes in v3: None
-Changes in v2:
-- Add GNU license v2 declared and samsung copyright
 
- drivers/gpu/drm/exynos/analogix_dp-exynos.c     |  1 +
- drivers/gpu/drm/rockchip/analogix_dp-rockchip.c |  1 +
- include/drm/bridge/analogix_dp.h                | 16 ++++++++++++++++
- 3 files changed, 18 insertions(+)
 
-diff --git a/drivers/gpu/drm/exynos/analogix_dp-exynos.c b/drivers/gpu/drm/exynos/analogix_dp-exynos.c
-index 17da2c8..b160159 100644
---- a/drivers/gpu/drm/exynos/analogix_dp-exynos.c
-+++ b/drivers/gpu/drm/exynos/analogix_dp-exynos.c
-@@ -220,6 +220,7 @@ static int exynos_dp_bind(struct device *dev, struct device *master, void *data)
- 	dp->dev = dev;
- 	dp->drm_dev = drm_dev;
- 
-+	dp->plat_data.dev_type = EXYNOS_DP;
- 	dp->plat_data.power_on = exynos_dp_poweron;
- 	dp->plat_data.power_off = exynos_dp_poweroff;
- 	dp->plat_data.get_modes = exynos_dp_get_modes;
-diff --git a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
-index cebff9e..f2c5c26 100644
---- a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
-+++ b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
-@@ -267,6 +267,7 @@ static int rockchip_dp_bind(struct device *dev, struct device *master,
- 		return ret;
- 	}
- 
-+	dp->plat_data.dev_type = RK3288_DP;
- 	dp->plat_data.attach = NULL;
- 	dp->plat_data.get_modes = NULL;
- 	dp->plat_data.power_on = rockchip_dp_poweron;
-diff --git a/include/drm/bridge/analogix_dp.h b/include/drm/bridge/analogix_dp.h
-index 8b4ffad..7209a64 100644
---- a/include/drm/bridge/analogix_dp.h
-+++ b/include/drm/bridge/analogix_dp.h
-@@ -1,9 +1,25 @@
-+/*
-+ * Analogix Core DP (Display Port) interface driver.
-+ *
-+ * Copyright (C) 2012 Samsung Electronics Co., Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms of the GNU General Public License as published by the
-+ * Free Software Foundation; either version 2 of the License, or (at your
-+ * option) any later version.
-+ */
- #ifndef _ANALOGIX_DP_H_
- #define _ANALOGIX_DP_H_
- 
- #include <drm/drm_crtc.h>
- 
-+enum analogix_dp_devtype {
-+	EXYNOS_DP,
-+	RK3288_DP,
-+};
-+
- struct analogix_dp_plat_data {
-+	enum analogix_dp_devtype dev_type;
- 	struct drm_panel *panel;
- 
- 	int (*power_on)(struct analogix_dp_plat_data *);
--- 
-1.9.1
+
+
+> 
+> I then tested on the Footbridge, another ARMv4 system, the oldest I have
+> SA110-based. This passes decompression and then you may *think* it hangs.
+> But it doesn't. It just takes a few minutes to boot with KASan
+> instrumentation, then all tests run fine also on this hardware.
+> The crash logs scroll by on the physical console.
+> 
+> They keep scrolling forever however, and are still scrolling as I
+> write this. I suspect some real memory usage bugs to be causing it,
+> as it is exercising some ages old code that didn't see much scrutiny
+> in recent years.
+> 
+
+I would suspect some kasan bug here.
+
+BTW, we probably need to introduce one-shot mode in kasan to prevent such report spam.
+I mean print only the first report and ignore the rest. The first report is the most important usually,
+next reports usually just noise.
+
+
+> 
+> Yours,
+> Linus Walleij
+> 
