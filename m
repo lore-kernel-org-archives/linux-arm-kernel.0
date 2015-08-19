@@ -1,28 +1,29 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Wed, 19 Aug 2015 17:51:23 -0500
-Subject: [PATCH 1/3] [v2] hvc_dcc: don't ignore errors during
- initialization
-In-Reply-To: <20150810094859.GF1604@arm.com>
-References: <1438992995-22610-1-git-send-email-timur@codeaurora.org>
- <20150810094859.GF1604@arm.com>
-Message-ID: <55D5086B.7050907@codeaurora.org>
+From: briannorris@chromium.org (Brian Norris)
+Date: Wed, 19 Aug 2015 15:59:38 -0700
+Subject: [PATCH v2 1/3] ARM: dts: rockchip: add veyron-jaq board
+In-Reply-To: <CAHNYxRzWHvy=mv+G6wwO29=9smOCwKh6gBPLbT-TNq0PmP2Xiw@mail.gmail.com>
+References: <1440022721-73712-1-git-send-email-briannorris@chromium.org>
+ <CAHNYxRzWHvy=mv+G6wwO29=9smOCwKh6gBPLbT-TNq0PmP2Xiw@mail.gmail.com>
+Message-ID: <20150819225938.GA68578@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/10/2015 04:48 AM, Will Deacon wrote:
->> >
->> >  static int __init hvc_dcc_console_init(void)
->> >  {
->> >+	int ret;
->> >+
->> >+	/* This always runs on boot core */
-> Does this really "always run on the boot core"? I couldn't find anything
-> suggesting that console_init is limited in that regard.
+On Wed, Aug 19, 2015 at 03:38:43PM -0700, Alexandru Stan wrote:
+> On Wed, Aug 19, 2015 at 3:18 PM, Brian Norris <briannorris@chromium.org>
+> wrote:
+> 
+> > +++ b/Documentation/devicetree/bindings/arm/rockchip.txt
+> 
+> ...
+> 
+> > +- Google Jaq (Haier Chromebook 11):
+> 
+> 
+> Could you add s/)/ and more)/ similar to what Jerry has? This is jaq too:
+> http://sasthamarket.com/wp-content/uploads/2015/06/34.jpg
 
-So this is a left-over comment from some other code that actually cared 
-what code this function runs on.  I've removed the comment.
+Sure. I'll wait for any other comments on v2 before sending the next
+(and final?) version.
 
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+Thanks,
+Brian
