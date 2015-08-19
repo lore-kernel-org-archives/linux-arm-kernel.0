@@ -1,24 +1,58 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Wed, 19 Aug 2015 11:16:52 -0500
-Subject: [PATCH 2/3] [v4] ARM64: TTY: hvc_dcc: Add support for ARM64 dcc
-In-Reply-To: <20150819101426.GB6281@e103592.cambridge.arm.com>
-References: <1438992995-22610-1-git-send-email-timur@codeaurora.org>
- <1438992995-22610-2-git-send-email-timur@codeaurora.org>
- <20150810094008.GD1604@arm.com> <55D2749A.401@codeaurora.org>
- <20150818082141.GA6281@e103592.cambridge.arm.com>
- <55D3825D.6020105@codeaurora.org>
- <20150819101426.GB6281@e103592.cambridge.arm.com>
-Message-ID: <55D4ABF4.5020600@codeaurora.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 19 Aug 2015 17:23:59 +0100
+Subject: [PATCH] arm64: entry: always restore x0 from the stack on
+ syscall return
+In-Reply-To: <20150819160320.GI24062@e104818-lin.cambridge.arm.com>
+References: <1439996989-5772-1-git-send-email-will.deacon@arm.com>
+ <20150819160320.GI24062@e104818-lin.cambridge.arm.com>
+Message-ID: <20150819162359.GA10297@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/19/2015 05:14 AM, Dave Martin wrote:
->> >So does that mean that ldrb will zero-extend the byte to all 64 bits of x3?
-> Yes.  No extra operation is required.
+On Wed, Aug 19, 2015 at 05:03:20PM +0100, Catalin Marinas wrote:
+> On Wed, Aug 19, 2015 at 04:09:49PM +0100, Will Deacon wrote:
+> > @@ -613,13 +609,14 @@ ENDPROC(cpu_switch_to)
+> >   */
+> >  ret_fast_syscall:
+> >  	disable_irq				// disable interrupts
+> > +	str	x0, [sp, #S_X0]			// returned x0
+> >  	ldr	x1, [tsk, #TI_FLAGS]		// re-check for syscall tracing
+> >  	and	x2, x1, #_TIF_SYSCALL_WORK
+> >  	cbnz	x2, ret_fast_syscall_trace
+> >  	and	x2, x1, #_TIF_WORK_MASK
+> > -	cbnz	x2, fast_work_pending
+> > +	cbnz	x2, work_pending
+> >  	enable_step_tsk x1, x2
+> > -	kernel_exit 0, ret = 1
+> > +	kernel_exit 0
+> >  ret_fast_syscall_trace:
+> >  	enable_irq				// enable interrupts
+> >  	b	__sys_trace_return
+> 
+> There is another str x0 in __sys_trace_return which I think we could
+> remove.
 
-So my patch is actually correct as-is?
+Hmm, I don't think we can remove that. It's needed on the slowpath to
+update the pt_regs with either -ENOSYS (for __ni_sys_trace) or the
+syscall return value from the blr in __sys_trace.
 
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+What we can do instead is change the branch above to branch to
+__sys_trace_return_skipped. Patch below.
+
+Will
+
+--->8
+
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index 2a5e64ccc991..088322ff1ba0 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -619,7 +619,7 @@ ret_fast_syscall:
+        kernel_exit 0
+ ret_fast_syscall_trace:
+        enable_irq                              // enable interrupts
+-       b       __sys_trace_return
++       b       __sys_trace_return_skipped      // we already saved x0
+ 
+ /*
+  * Ok, we need to do extra processing, enter the slow path.
