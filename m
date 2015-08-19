@@ -1,34 +1,35 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 19 Aug 2015 17:03:20 +0100
-Subject: [PATCH] arm64: entry: always restore x0 from the stack on
- syscall return
-In-Reply-To: <1439996989-5772-1-git-send-email-will.deacon@arm.com>
-References: <1439996989-5772-1-git-send-email-will.deacon@arm.com>
-Message-ID: <20150819160320.GI24062@e104818-lin.cambridge.arm.com>
+From: robert.richter@caviumnetworks.com (Robert Richter)
+Date: Wed, 19 Aug 2015 18:05:58 +0200
+Subject: [PATCH v4 2/5] irqchip, gicv3: Workaround for Cavium ThunderX
+ erratum 23154
+In-Reply-To: <55D21345.3040903@caviumnetworks.com>
+References: <1439576885-15621-1-git-send-email-rric@kernel.org>
+ <1439576885-15621-3-git-send-email-rric@kernel.org>
+ <55D21345.3040903@caviumnetworks.com>
+Message-ID: <20150819160558.GY1820@rric.localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 19, 2015 at 04:09:49PM +0100, Will Deacon wrote:
-> @@ -613,13 +609,14 @@ ENDPROC(cpu_switch_to)
->   */
->  ret_fast_syscall:
->  	disable_irq				// disable interrupts
-> +	str	x0, [sp, #S_X0]			// returned x0
->  	ldr	x1, [tsk, #TI_FLAGS]		// re-check for syscall tracing
->  	and	x2, x1, #_TIF_SYSCALL_WORK
->  	cbnz	x2, ret_fast_syscall_trace
->  	and	x2, x1, #_TIF_WORK_MASK
-> -	cbnz	x2, fast_work_pending
-> +	cbnz	x2, work_pending
->  	enable_step_tsk x1, x2
-> -	kernel_exit 0, ret = 1
-> +	kernel_exit 0
->  ret_fast_syscall_trace:
->  	enable_irq				// enable interrupts
->  	b	__sys_trace_return
+On 17.08.15 10:00:53, David Daney wrote:
+> On 08/14/2015 11:28 AM, Robert Richter wrote:
+> >+config CAVIUM_ERRATUM_23154
+> >+	bool "Cavium erratum 23154: Access to ICC_IAR1_EL1 is not sync'ed"
+> >+	depends on ARCH_THUNDER
+> 
+> None of the other errata depend on a specific ARCH_*.  I think we should
+> remove this 'depends on', so that a generic kernel can be configured to work
+> on Thunder without having to first select ARCH_THUNDER.
 
-There is another str x0 in __sys_trace_return which I think we could
-remove.
+Right, will remove the dependency. Same as for the other errata then.
 
--- 
-Catalin
+Thanks,
+
+-Robert
+
+> >+	default y
+> >+	help
+> >+	  The gicv3 of ThunderX requires a modified version for
+> >+	  reading the IAR status to ensure data synchronization
+> >+	  (access to icc_iar1_el1 is not sync'ed before and after).
+> >+
+> >+	  If unsure, say Y.
