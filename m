@@ -1,132 +1,147 @@
-From: tchalamarla@caviumnetworks.com (tchalamarla at caviumnetworks.com)
-Date: Tue, 18 Aug 2015 16:40:30 -0700
-Subject: [PATCH V4] iommu/arm-smmu-v2: ThunderX mis-extends 64bit registers
-Message-ID: <1439941230-27183-1-git-send-email-tchalamarla@caviumnetworks.com>
+From: lftan@altera.com (Ley Foon Tan)
+Date: Wed, 19 Aug 2015 09:22:36 +0800
+Subject: [PATCH v4 2/5] pci:host: Add Altera PCIe host controller driver
+In-Reply-To: <CADhT+wfjYaEefScKNz-R5miA+_Ybm8PTHgG6jDT9ntb9e89twQ@mail.gmail.com>
+References: <1439802579-22651-1-git-send-email-lftan@altera.com>
+ <1439802579-22651-3-git-send-email-lftan@altera.com>
+ <CADhT+wfjYaEefScKNz-R5miA+_Ybm8PTHgG6jDT9ntb9e89twQ@mail.gmail.com>
+Message-ID: <CAFiDJ5-_1QAfox_KTGf4mNCdN-fNm9L3jP=xAWmLvn66sYXfqA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
+On Wed, Aug 19, 2015 at 3:11 AM, Dinh Nguyen <dinh.linux@gmail.com> wrote:
+>
+> On Mon, Aug 17, 2015 at 4:09 AM, Ley Foon Tan <lftan@altera.com> wrote:
+> > This patch adds the Altera PCIe host controller driver.
+> >
+> > Signed-off-by: Ley Foon Tan <lftan@altera.com>
+> > ---
+> >  drivers/pci/host/Kconfig       |   7 +
+> >  drivers/pci/host/Makefile      |   1 +
+> >  drivers/pci/host/pcie-altera.c | 543 +++++++++++++++++++++++++++++++++++++++++
+> >  3 files changed, 551 insertions(+)
+> >  create mode 100644 drivers/pci/host/pcie-altera.c
+> >
+> > diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
+> > index 675c2d1..4b4754a 100644
+> > --- a/drivers/pci/host/Kconfig
+> > +++ b/drivers/pci/host/Kconfig
+> > @@ -145,4 +145,11 @@ config PCIE_IPROC_BCMA
+> >           Say Y here if you want to use the Broadcom iProc PCIe controller
+> >           through the BCMA bus interface
+> >
+>
+> <snip>
+>
+> > +
+> > +/* Address translation table entry size */
+> > +#define ATT_ENTRY_SIZE         8
+> > +
+> > +#define DWORD_MASK             3
+> > +
+> > +struct altera_pcie {
+> > +       struct platform_device  *pdev;
+> > +       struct resource         *txs;
+>
+> You have "Txs" documented in the bindings document, you have a pointer
+> here, but you've never used it
+> anywhre in the code? What is it for?
+Good catch. Forgot to remove this txs field here, we no longer require
+to keep this in struct.
 
-The SMMU architecture defines two different behaviors when 64-bit
-registers are written with 32-bit writes.  The first behavior causes
-zero extension into the upper 32-bits.  The second behavior splits a
-64-bit register into "normal" 32-bit register pairs.
+>
+> > +       void __iomem            *cra_base;
+> > +       int                     irq;
+> > +       u8                      root_bus_nr;
+> > +       struct irq_domain               *irq_domain;
+> > +       struct resource         bus_range;
+> > +       struct list_head                resources;
+> > +};
+> > +
+>
+> <snip>
+>
+> > +
+> > +static int tlp_cfg_dword_read(struct altera_pcie *pcie, u8 bus, u32 devfn,
+> > +                             int where, u32 *value)
+> > +{
+> > +       int ret;
+> > +       u32 headers[TLP_HDR_SIZE];
+> > +
+> > +       if (bus == pcie->root_bus_nr)
+> > +               headers[0] = TLP_CFG_DW0(TLP_FMTTYPE_CFGRD0);
+> > +       else
+> > +               headers[0] = TLP_CFG_DW0(TLP_FMTTYPE_CFGRD1);
+> > +
+> > +       headers[1] = TLP_CFG_DW1(TLP_REQ_ID(pcie->root_bus_nr, devfn),
+> > +                                       TLP_READ_TAG);
+> > +       headers[2] = TLP_CFG_DW2(bus, devfn, where);
+> > +
+> > +       tlp_write_packet(pcie, headers, 0);
+> > +
+> > +       ret = tlp_read_packet(pcie, value);
+> > +       if (ret)
+> > +               *value = ~0UL;  /* return 0xFFFFFFFF if error */
+> > +
+> > +       return ret;
+> > +}
+> > +
+> > +static int tlp_cfg_dword_write(struct altera_pcie *pcie, u8 bus, u32 devfn,
+> > +                              int where, u32 value)
+> > +{
+> > +       u32 headers[TLP_HDR_SIZE];
+> > +
+> > +       if (bus == pcie->root_bus_nr)
+> > +               headers[0] = TLP_CFG_DW0(TLP_FMTTYPE_CFGWR0);
+> > +       else
+> > +               headers[0] = TLP_CFG_DW0(TLP_FMTTYPE_CFGWR1);
+> > +
+> > +       headers[1] = TLP_CFG_DW1(TLP_REQ_ID(pcie->root_bus_nr, devfn),
+> > +                                       TLP_WRITE_TAG);
+> > +       headers[2] = TLP_CFG_DW2(bus, devfn, where);
+> > +
+> > +       tlp_write_packet(pcie, headers, value);
+> > +
+> > +       tlp_read_packet(pcie, NULL);
+>
+> You need to check for the error here.
+Okay.
 
-On some buggy implementations, registers incorrectly zero extended
-when they should instead behave as normal 32-bit register pairs.
+>
+> > +
+> > +       /* Keep an eye out for changes to the root bus number */
+> > +       if ((bus == pcie->root_bus_nr) && (where == PCI_PRIMARY_BUS))
+> > +               pcie->root_bus_nr = (u8)(value);
+> > +
+> > +       return PCIBIOS_SUCCESSFUL;
+> > +}
+> > +
+>
+> <snip>
+>
+> > +
+> > +static int altera_pcie_parse_dt(struct altera_pcie *pcie)
+> > +{
+> > +       struct resource *cra;
+> > +       struct platform_device *pdev = pcie->pdev;
+> > +
+> > +       cra = platform_get_resource_byname(pdev, IORESOURCE_MEM, "Cra");
+> > +       if (!cra) {
+> > +               cra = platform_get_resource_byname(pdev, IORESOURCE_MEM, "cra");
+> > +               if (!cra) {
+> > +                       dev_err(&pdev->dev,
+> > +                               "no cra memory resource defined\n");
+> > +                       return -ENODEV;
+> > +               }
+> > +       }
+> > +
+>
+> What about "Txs"?
+We doesn't need to get resource for "Txs" here. We use standard pci
+binding with "ranges" dts parameter to map the pci memory region.
+Our dts generator still will generate this "Txs" dts parameter,
+because it is one of Avalon slave port of PCIe IP.
 
-Signed-off-by: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
 
-Changes from V3:
-        - rebased on iommu/devel
-
-Changes from V2:
-        - removed unused definitions
-
-Changes from V1:
-        - Introduced smmu_writeq
----
- drivers/iommu/arm-smmu.c | 50 ++++++++++++++++++++++++++----------------------
- 1 file changed, 27 insertions(+), 23 deletions(-)
-
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 48a39df..b58bfa4 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -70,6 +70,18 @@
- 		((smmu->options & ARM_SMMU_OPT_SECURE_CFG_ACCESS)	\
- 			? 0x400 : 0))
- 
-+#ifdef CONFIG_64BIT
-+#define smmu_writeq(reg64, addr)	writeq_relaxed((reg64), (addr))
-+#else
-+#define smmu_writeq(reg64, addr)				\
-+	do {							\
-+		u64 __val = (reg64);				\
-+		void __iomem *__addr = (addr);			\
-+		writel_relaxed(__val >> 32, __addr + 4);	\
-+		writel_relaxed(__val, __addr);			\
-+	} while (0)
-+#endif
-+
- /* Configuration registers */
- #define ARM_SMMU_GR0_sCR0		0x0
- #define sCR0_CLIENTPD			(1 << 0)
-@@ -185,10 +197,8 @@
- #define ARM_SMMU_CB_SCTLR		0x0
- #define ARM_SMMU_CB_RESUME		0x8
- #define ARM_SMMU_CB_TTBCR2		0x10
--#define ARM_SMMU_CB_TTBR0_LO		0x20
--#define ARM_SMMU_CB_TTBR0_HI		0x24
--#define ARM_SMMU_CB_TTBR1_LO		0x28
--#define ARM_SMMU_CB_TTBR1_HI		0x2c
-+#define ARM_SMMU_CB_TTBR0		0x20
-+#define ARM_SMMU_CB_TTBR1		0x28
- #define ARM_SMMU_CB_TTBCR		0x30
- #define ARM_SMMU_CB_S1_MAIR0		0x38
- #define ARM_SMMU_CB_S1_MAIR1		0x3c
-@@ -226,7 +236,7 @@
- #define TTBCR2_SEP_SHIFT		15
- #define TTBCR2_SEP_UPSTREAM		(0x7 << TTBCR2_SEP_SHIFT)
- 
--#define TTBRn_HI_ASID_SHIFT            16
-+#define TTBRn_ASID_SHIFT		48
- 
- #define FSR_MULTI			(1 << 31)
- #define FSR_SS				(1 << 30)
-@@ -695,6 +705,7 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
- 				       struct io_pgtable_cfg *pgtbl_cfg)
- {
- 	u32 reg;
-+	u64 reg64;
- 	bool stage1;
- 	struct arm_smmu_cfg *cfg = &smmu_domain->cfg;
- 	struct arm_smmu_device *smmu = smmu_domain->smmu;
-@@ -738,22 +749,17 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
- 
- 	/* TTBRs */
- 	if (stage1) {
--		reg = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[0];
--		writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR0_LO);
--		reg = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[0] >> 32;
--		reg |= ARM_SMMU_CB_ASID(cfg) << TTBRn_HI_ASID_SHIFT;
--		writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR0_HI);
--
--		reg = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[1];
--		writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR1_LO);
--		reg = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[1] >> 32;
--		reg |= ARM_SMMU_CB_ASID(cfg) << TTBRn_HI_ASID_SHIFT;
--		writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR1_HI);
-+		reg64 = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[0];
-+
-+		reg64 |= ((u64)ARM_SMMU_CB_ASID(cfg)) << TTBRn_ASID_SHIFT;
-+		smmu_writeq(reg64, cb_base + ARM_SMMU_CB_TTBR0);
-+
-+		reg64 = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[1];
-+		reg64 |= ((u64)ARM_SMMU_CB_ASID(cfg)) << TTBRn_ASID_SHIFT;
-+		smmu_writeq(reg64, cb_base + ARM_SMMU_CB_TTBR1);
- 	} else {
--		reg = pgtbl_cfg->arm_lpae_s2_cfg.vttbr;
--		writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR0_LO);
--		reg = pgtbl_cfg->arm_lpae_s2_cfg.vttbr >> 32;
--		writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR0_HI);
-+		reg64 = pgtbl_cfg->arm_lpae_s2_cfg.vttbr;
-+		smmu_writeq(reg64, cb_base + ARM_SMMU_CB_TTBR0);
- 	}
- 
- 	/* TTBCR */
-@@ -1212,11 +1218,9 @@ static phys_addr_t arm_smmu_iova_to_phys_hard(struct iommu_domain *domain,
- 
- 	/* ATS1 registers can only be written atomically */
- 	va = iova & ~0xfffUL;
--#ifdef CONFIG_64BIT
- 	if (smmu->version == ARM_SMMU_V2)
--		writeq_relaxed(va, cb_base + ARM_SMMU_CB_ATS1PR);
-+		smmu_writeq(va, cb_base + ARM_SMMU_CB_ATS1PR);
- 	else
--#endif
- 		writel_relaxed(va, cb_base + ARM_SMMU_CB_ATS1PR);
- 
- 	if (readl_poll_timeout_atomic(cb_base + ARM_SMMU_CB_ATSR, tmp,
--- 
-2.1.0
+Regards
+Ley Foon
