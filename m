@@ -1,49 +1,29 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 19 Aug 2015 14:28:54 -0700
-Subject: [PATCH v1 1/6] net: phy: broadcom: add bcm54220 phy ID
-In-Reply-To: <1439962444-27486-2-git-send-email-b38611@freescale.com>
-References: <1439962444-27486-1-git-send-email-b38611@freescale.com>
- <1439962444-27486-2-git-send-email-b38611@freescale.com>
-Message-ID: <CAGVrzcak2u_kBg1o061OO0UK8sdrXaKF+-7eREwByD-dQ1r1XQ@mail.gmail.com>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Wed, 19 Aug 2015 16:36:30 -0500
+Subject: [PATCHv2 0/2] USB: Enable EHCI-platform driver for use with ACPI
+Message-ID: <1440020192-23754-1-git-send-email-jeremy.linton@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-08-18 22:33 GMT-07:00 Fugang Duan <b38611@freescale.com>:
-> Add bcm54220 phy ID entry.
+This patch set enables USB on the ARM Juno development platform when
+using an ACPI kernel.
 
-This change itself is fine, but looking at the rest of your changes,
-we are not adding an entry for this PHY in drivers/net/phy/broadcom.c,
-which means that we will bind to the Generic PHY driver, and so this
-looks sufficient, even with your fixup done in the subsequent patch.
+First it adds an error message if the device cannot be configured with
+the current DMA settings (missing/unsupported CCA attribute). It then
+adds the ACPI PNP id to the acpi_match_table entry.
 
->
-> Signed-off-by: Fugang Duan <B38611@freescale.com>
-> ---
->  include/linux/brcmphy.h | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/include/linux/brcmphy.h b/include/linux/brcmphy.h
-> index 697ca77..20bed15 100644
-> --- a/include/linux/brcmphy.h
-> +++ b/include/linux/brcmphy.h
-> @@ -16,6 +16,7 @@
->  #define PHY_ID_BCM5482                 0x0143bcb0
->  #define PHY_ID_BCM5411                 0x00206070
->  #define PHY_ID_BCM5421                 0x002060e0
-> +#define PHY_ID_BCM54220                        0x600d8589
->  #define PHY_ID_BCM5464                 0x002060b0
->  #define PHY_ID_BCM5461                 0x002060c0
->  #define PHY_ID_BCM54616S               0x03625d10
-> --
-> 1.9.1
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Tested-by: Huang Shijie <shijie.huang@arm.com>
+Reviewed-by: Graeme Gregory <graeme.gregory@linaro.org>
+Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
+Acked-by: Alan Stern <stern@rowland.harvard.edu>
+Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
 
+Jeremy Linton (2):
+  USB: ehci-platform: Display a DMA configuration error message
+  USB: ehci-platform: Add ACPI bindings for the EHCI platform driver.
 
+ drivers/usb/host/ehci-platform.c | 12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
 
 -- 
-Florian
+2.4.3
