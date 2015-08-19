@@ -1,831 +1,512 @@
-From: majun258@huawei.com (MaJun)
-Date: Wed, 19 Aug 2015 10:55:19 +0800
-Subject: [PATCH v4 1/2] Add the driver of mbigen interrupt controller
-In-Reply-To: <1439952920-2296-1-git-send-email-majun258@huawei.com>
-References: <1439952920-2296-1-git-send-email-majun258@huawei.com>
-Message-ID: <1439952920-2296-2-git-send-email-majun258@huawei.com>
+From: panand@redhat.com (Pratyush Anand)
+Date: Wed, 19 Aug 2015 08:58:24 +0530
+Subject: [PATCH V3] Watchdog: Fix parent of watchdog_devices
+Message-ID: <db7db9102158b87a4a7169e84e2272b3ba03f9f7.1439954581.git.panand@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ma Jun <majun258@huawei.com>
+/sys/class/watchdog/watchdogn/device/modalias can help to identify the
+driver/module for a given watchdog node. However, many wdt devices does not set
+its parent and so, we do not see an entry for device in sysfs for such devices.
 
-Mbigen means Message Based Interrupt Generator(MBIGEN).
+This patch fixes parent of watchdog_device so that
+/sys/class/watchdog/watchdogn/device is populated.
 
-Its a kind of interrupt controller that collects
+Exceptions: booke, diag288, mpc8xxx, octeon, softdog and w83627hf -- They do not
+have any parent. Not sure, how we can we identify driver for these devices.
 
-the interrupts from external devices and generate msi interrupt.
-
-Mbigen is applied to reduce the number of wire connected interrupts.
-
-As the peripherals increasing, the interrupts lines needed is 
-increasing much, especially on the Arm64 server soc.
-
-Therefore, the interrupt pin in gic is not enough to cover so
-many peripherals.
-
-Mbigen is designed to fix this problem.
-
-Mbigen chip locates in ITS or outside of ITS.
-
-Mbigen chip hardware structure shows as below:
-
-		mbigen chip
-|---------------------|-------------------|
-mgn_node0	  mgn_node1		mgn_node2
- |		 |-------|		|-------|------|        
-dev1		dev1    dev2		dev1   dev3   dev4
-
-Each mbigen chip contains several mbigen nodes.
-
-External devices can connects to mbigen node through wire connecting way.
-
-Because a mbigen node only can support 128 interrupt maximum, depends
-on the interrupt lines number of devices, a device can connects to one
-more mbigen nodes.
-
-Also, several different devices can connect to a same mbigen node.
-
-When devices triggered interrupt,mbigen chip detects and collects 
-the interrupts and generates the MBI interrupts by writing the ITS
-Translator register.
-
-
-Signed-off-by: Ma Jun <majun258@huawei.com>
+Signed-off-by: Pratyush Anand <panand@redhat.com>
 ---
- drivers/irqchip/Kconfig      |    8 +
- drivers/irqchip/Makefile     |    1 +
- drivers/irqchip/irq-mbigen.c |  732 ++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 741 insertions(+), 0 deletions(-)
- create mode 100644 drivers/irqchip/irq-mbigen.c
+Changes since v2:
+Fixed drivers/watchdog/txx9wdt.c:134:20: error: 'pdev' undeclared
+Reported-by: kbuild test robot <fengguang.wu@intel.com>
+Changes since v1:
+Squash all commits of V1 into a single patch.
+V1 was here:
+http://www.spinics.net/lists/linux-watchdog/msg07220.html
 
-diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
-index 120d815..356507f 100644
---- a/drivers/irqchip/Kconfig
-+++ b/drivers/irqchip/Kconfig
-@@ -27,6 +27,14 @@ config ARM_GIC_V3_ITS
- 	bool
- 	select PCI_MSI_IRQ_DOMAIN
+ drivers/misc/mei/wd.c               | 1 +
+ drivers/watchdog/bcm2835_wdt.c      | 1 +
+ drivers/watchdog/bcm47xx_wdt.c      | 1 +
+ drivers/watchdog/bcm_kona_wdt.c     | 1 +
+ drivers/watchdog/coh901327_wdt.c    | 1 +
+ drivers/watchdog/da9052_wdt.c       | 1 +
+ drivers/watchdog/da9055_wdt.c       | 1 +
+ drivers/watchdog/da9062_wdt.c       | 1 +
+ drivers/watchdog/da9063_wdt.c       | 1 +
+ drivers/watchdog/davinci_wdt.c      | 1 +
+ drivers/watchdog/digicolor_wdt.c    | 1 +
+ drivers/watchdog/ep93xx_wdt.c       | 1 +
+ drivers/watchdog/gpio_wdt.c         | 1 +
+ drivers/watchdog/ie6xx_wdt.c        | 1 +
+ drivers/watchdog/intel-mid_wdt.c    | 1 +
+ drivers/watchdog/jz4740_wdt.c       | 1 +
+ drivers/watchdog/mena21_wdt.c       | 1 +
+ drivers/watchdog/menf21bmc_wdt.c    | 1 +
+ drivers/watchdog/omap_wdt.c         | 1 +
+ drivers/watchdog/orion_wdt.c        | 1 +
+ drivers/watchdog/pnx4008_wdt.c      | 1 +
+ drivers/watchdog/qcom-wdt.c         | 1 +
+ drivers/watchdog/retu_wdt.c         | 1 +
+ drivers/watchdog/rt2880_wdt.c       | 1 +
+ drivers/watchdog/s3c2410_wdt.c      | 1 +
+ drivers/watchdog/shwdt.c            | 1 +
+ drivers/watchdog/sirfsoc_wdt.c      | 1 +
+ drivers/watchdog/sp805_wdt.c        | 1 +
+ drivers/watchdog/st_lpc_wdt.c       | 1 +
+ drivers/watchdog/stmp3xxx_rtc_wdt.c | 1 +
+ drivers/watchdog/tegra_wdt.c        | 1 +
+ drivers/watchdog/twl4030_wdt.c      | 1 +
+ drivers/watchdog/txx9wdt.c          | 1 +
+ drivers/watchdog/ux500_wdt.c        | 1 +
+ drivers/watchdog/via_wdt.c          | 1 +
+ drivers/watchdog/wm831x_wdt.c       | 1 +
+ drivers/watchdog/wm8350_wdt.c       | 1 +
+ 37 files changed, 37 insertions(+)
+
+diff --git a/drivers/misc/mei/wd.c b/drivers/misc/mei/wd.c
+index 2bc0f5089f82..b346638833b0 100644
+--- a/drivers/misc/mei/wd.c
++++ b/drivers/misc/mei/wd.c
+@@ -364,6 +364,7 @@ int mei_watchdog_register(struct mei_device *dev)
  
-+config HISILICON_IRQ_MBIGEN
-+	bool "Support mbigen interrupt controller"
-+	default n
-+	depends on ARM_GIC_V3 && ARM_GIC_V3_ITS
-+	help
-+	 Enable the mbigen interrupt controller used on
-+	 Hisilicon platform.
-+
- config ARM_NVIC
- 	bool
- 	select IRQ_DOMAIN
-diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
-index 11d08c9..c6f3d66 100644
---- a/drivers/irqchip/Makefile
-+++ b/drivers/irqchip/Makefile
-@@ -23,6 +23,7 @@ obj-$(CONFIG_ARM_GIC)			+= irq-gic.o irq-gic-common.o
- obj-$(CONFIG_ARM_GIC_V2M)		+= irq-gic-v2m.o
- obj-$(CONFIG_ARM_GIC_V3)		+= irq-gic-v3.o irq-gic-common.o
- obj-$(CONFIG_ARM_GIC_V3_ITS)		+= irq-gic-v3-its.o irq-gic-v3-its-pci-msi.o irq-gic-v3-its-platform-msi.o
-+obj-$(CONFIG_HISILICON_IRQ_MBIGEN)	+= irq-mbigen.o
- obj-$(CONFIG_ARM_NVIC)			+= irq-nvic.o
- obj-$(CONFIG_ARM_VIC)			+= irq-vic.o
- obj-$(CONFIG_ATMEL_AIC_IRQ)		+= irq-atmel-aic-common.o irq-atmel-aic.o
-diff --git a/drivers/irqchip/irq-mbigen.c b/drivers/irqchip/irq-mbigen.c
-new file mode 100644
-index 0000000..4bbbd76
---- /dev/null
-+++ b/drivers/irqchip/irq-mbigen.c
-@@ -0,0 +1,732 @@
-+/*
-+ * Copyright (C) 2014 Hisilicon Limited, All Rights Reserved.
-+ * Author: Jun Ma <majun258@huawei.com>
-+ * Author: Yun Wu <wuyun.wu@huawei.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include <linux/init.h>
-+#include <linux/io.h>
-+#include <linux/slab.h>
-+#include <linux/interrupt.h>
-+#include <linux/irqchip/chained_irq.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
-+#include <linux/of_platform.h>
-+#include <linux/kernel.h>
-+#include <linux/platform_device.h>
-+#include <linux/module.h>
-+#include <linux/msi.h>
-+#include "irqchip.h"
-+
-+#define	MBIGEN_NODE_SHIFT	(8)
-+#define MBIGEN_DEV_SHIFT	(12)
-+
-+/*
-+ * To avoid the duplicate hwirq number problem
-+ * we use device id, mbigen node number and interrupt
-+ * pin offset to generate a new hwirq number in mbigen
-+ * domain.
-+ *
-+ * hwirq[32:12]: did. device id
-+ * hwirq[11:8]: nid. mbigen node number
-+ * hwirq[7:0]: pin. hardware pin offset of this interrupt
-+ */
-+#define	COMPOSE_MBIGEN_HWIRQ(did, nid, pin)	\
-+		(((did) << MBIGEN_DEV_SHIFT) | \
-+		((nid) << MBIGEN_NODE_SHIFT) | (pin))
-+
-+/* get the interrupt pin offset from mbigen hwirq */
-+#define	GET_IRQ_PIN_OFFSET(hwirq)	((hwirq) & 0xff)
-+/* get the mbigen node number from mbigen hwirq */
-+#define GET_MBIGEN_NODE_NUM(hwirq)	(((hwirq) >> MBIGEN_NODE_SHIFT) & 0xf)
-+/* get the mbigen device id from mbigen hwirq */
-+#define GET_MBIGEN_DEVICE_ID(hwirq)	\
-+		(((hwirq) >> MBIGEN_DEV_SHIFT) & 0xfffff)
-+
-+/*
-+ * In mbigen vector register
-+ * bit[21:12]: event id value
-+ * bit[11:0]: device id
-+ */
-+#define IRQ_EVENT_ID_SHIFT	(12)
-+#define IRQ_EVENT_ID_MASK	(0x3ff)
-+
-+/* register range of mbigen node  */
-+#define MBIGEN_NODE_OFFSET	0x1000
-+
-+/* offset of vector register in mbigen node */
-+#define REG_MBIGEN_VEC_OFFSET	0x200
-+
-+/* offset of clear register in mbigen node.
-+ * This register is used to clear the status
-+ * of interrupt.
-+ */
-+#define REG_MBIGEN_CLEAR_OFFSET	0xa00
-+
-+/* offset of interrupt type register */
-+#define REG_MBIGEN_TYPE_OFFSET	0x0
-+
-+/*
-+ * get the base address of mbigen node
-+ * nid: mbigen node number
-+ */
-+#define MBIGEN_NODE_ADDR_BASE(nid)	((nid) * MBIGEN_NODE_OFFSET)
-+
-+/*
-+ * struct mbigen_chip - holds the information of mbigen
-+ * chip.
-+ * @lock: spin lock protecting mbigen device list
-+ * @domain: irq domain of this mbigen chip.
-+ * @node: represents the mbigen chip node defined in device tree
-+ * @mbigen_device_list: list of devices connected to this mbigen chip.
-+ * @base: mapped address of this mbigen chip.
-+ */
-+struct mbigen_chip {
-+	raw_spinlock_t		lock;
-+	struct list_head	entry;
-+	struct irq_domain	*domain;
-+	struct device_node	*node;
-+	struct list_head	mbigen_device_list;
-+	void __iomem		*base;
-+};
-+
-+/*
-+ * struct mbigen_device--Holds the  information of devices connected 
-+ * to mbigen chip
-+ * @lock: spin lock protecting mbigen node list
-+ * @entry: node in mbigen chip's mbigen_device_list
-+ * @chip: pointer to mbigen chip
-+ * @mbigen_node_list: list of mbigen nodes.The interrupt lines
-+		of some devices maybe connected with several different
-+		mbigen nodes.
-+ * @dev: device structure of this mbigen device.
-+ * @node: represents the mbigen device node defined in device tree.
-+ * @mgn_data: pointer to mbigen_irq_data
-+ * @nr_irqs: the total interrupt lines of this device
-+ * @did: device id
-+*/
-+struct mbigen_device {
-+	raw_spinlock_t		lock;
-+	struct list_head	entry;
-+	struct mbigen_chip	*chip;
-+	struct list_head 	mbigen_node_list;
-+	struct device		dev;
-+	struct device_node	*node;
-+	struct mbigen_irq_data	*mgn_data;
-+	unsigned int		nr_irqs;
-+	unsigned int		did;
-+};
-+
-+/*
-+ * struct mbigen_node--structure of mbigen node.
-+ * usually, a mbigen chip contains 8 ~ 11 mbigen nodes.
-+ * Each mbigen nodes has its own register region.
-+ * Devices connects to mbigen nodes directly.
-+ *
-+ * @entry: node in mbigen device's mbigen_node_list
-+ * @node_num: mbigen node number.
-+ * @pin_offset: the pin offset of first interrupt line
-+ *		connected with this mbigen node.
-+ * @irq_nr: the irq numbers of a device connected with mbigen node
-+ * @msi_idx_offset: start of msi index of irq connected
-+ *		to this mbigen node
-+ */
-+struct mbigen_node {
-+	struct list_head	entry;
-+	unsigned int		node_num;
-+	unsigned int		pin_offset;
-+	unsigned int		irq_nr;
-+	unsigned int		index_offset;
-+};
-+
-+/*
-+ * struct mbigen_irq_data -- private data of each irq
-+ *
-+ * @parent_irq: irq number of this
-+ * @devid: id of devices this irq belong to
-+ * @nid: id of mbigen node this irq connected.
-+ * @pin_offset: pin offset of this irq.
-+ * @index: msi index of this irq
-+ * @base: address of mbigen chip this irq connected.
-+ * @dev: mbigen device this irq belong to.
-+ */
-+struct mbigen_irq_data {
-+	struct mbigen_device	*dev;
-+	void __iomem		*base;
-+	unsigned int		parent_irq;
-+	unsigned int		dev_id;
-+	unsigned int		nid;
-+	unsigned int		pin_offset;
-+	unsigned int		index;
-+};
-+
-+static LIST_HEAD(mbigen_chip_list);
-+static DEFINE_SPINLOCK(mbigen_chip_lock);
-+
-+static inline int get_mbigen_vec_reg_addr(u32 nid, u32 offset)
-+{
-+	return MBIGEN_NODE_ADDR_BASE(nid) + REG_MBIGEN_VEC_OFFSET
-+	    + (offset * 4);
-+}
-+
-+static inline int get_mbigen_type_reg_addr(u32 nid, u32 offset)
-+{
-+	return MBIGEN_NODE_ADDR_BASE(nid) + REG_MBIGEN_TYPE_OFFSET + offset;
-+}
-+
-+static struct mbigen_device *mbigen_find_device(struct mbigen_chip *chip,
-+						u32 did)
-+{
-+	struct mbigen_device *dev = NULL, *tmp;
-+
-+	raw_spin_lock(&chip->lock);
-+	list_for_each_entry(tmp, &chip->mbigen_device_list, entry) {
-+		if (tmp->did == did) {
-+			dev = tmp;
-+			break;
-+		}
-+	}
-+	raw_spin_unlock(&chip->lock);
-+
-+	return dev;
-+}
-+
-+/* calc_irq_index() - calculate the msi index of this interrupt
-+ *
-+ * @dev: pointer to mbigen device.
-+ * @nid: number of mbigen node this interrupt connected.
-+ * @offset: interrupt pin offset.
-+*/
-+static u32 calc_irq_index(struct mbigen_device *dev, u32 nid, u32 offset)
-+{
-+	struct mbigen_node *mgn_node = NULL, *tmp;
-+	unsigned long flags;
-+	u32 index = 0;
-+
-+	raw_spin_lock_irqsave(&dev->lock, flags);
-+	list_for_each_entry(tmp, &dev->mbigen_node_list, entry) {
-+		if (tmp->node_num == nid)
-+			mgn_node = tmp;
-+	}
-+	raw_spin_unlock_irqrestore(&dev->lock, flags);
-+
-+	if (mgn_node == NULL) {
-+		pr_err("No mbigen node found in device:%s\n",
-+			 dev->node->full_name);
-+		return -ENXIO;
-+	}
-+
-+	if ((offset <= (mgn_node->pin_offset + mgn_node->irq_nr))
-+	    && (offset >= mgn_node->pin_offset))
-+		index = mgn_node->index_offset + (offset - mgn_node->pin_offset);
-+	else {
-+		pr_err("Err: no invalid index\n");
-+		index = -EINVAL;
-+	}
-+
-+	return index;
-+}
-+
-+static struct mbigen_irq_data *get_mbigen_irq_data(struct mbigen_chip *chip,
-+						   struct irq_data *d)
-+{
-+	struct mbigen_device *mgn_dev;
-+	struct mbigen_irq_data *mgn_irq_data;
-+	u32 nid, did, offset;
-+	u32 index;
-+
-+	did = GET_MBIGEN_DEVICE_ID(d->hwirq);
-+	offset = GET_IRQ_PIN_OFFSET(d->hwirq);
-+	nid = GET_MBIGEN_NODE_NUM(d->hwirq);
-+
-+	mgn_dev = mbigen_find_device(chip, did);
-+	if (!mgn_dev) {
-+		pr_err("no mbigen device found with did: 0x%x\n", did);
-+		return NULL;
-+	}
-+
-+	mgn_irq_data = mgn_dev->mgn_data;
-+
-+	index = calc_irq_index(mgn_dev, nid, offset);
-+	if (index < 0)
-+		return NULL;
-+
-+	if (offset != mgn_irq_data[index].pin_offset) {
-+		pr_err("No invalid mgn irq data found:offset:%d,nid:%d\n",
-+			offset, mgn_irq_data[index].pin_offset);
-+		return NULL;
-+	}
-+
-+	return &mgn_irq_data[index];
-+}
-+
-+static void mbigen_write_msg(struct msi_desc *desc, struct msi_msg *msg)
-+{
-+	struct mbigen_irq_data *mgn_irq_data = irq_get_handler_data(desc->irq);
-+	u32 val;
-+	int addr;
-+
-+	addr = get_mbigen_vec_reg_addr(mgn_irq_data->nid,
-+				    mgn_irq_data->pin_offset);
-+
-+	val = readl_relaxed(addr + mgn_irq_data->base);
-+
-+	val &= ~(IRQ_EVENT_ID_MASK << IRQ_EVENT_ID_SHIFT);
-+	val |= (msg->data << IRQ_EVENT_ID_SHIFT);
-+	writel_relaxed(val, addr + mgn_irq_data->base);
-+}
-+
-+/*
-+ * Interrupt controller operations
-+ */
-+static int mbigen_set_type(struct irq_data *d, unsigned int type)
-+{
-+	struct mbigen_chip *chip = d->domain->host_data;
-+	u32 ofst, mask;
-+	u32 val, nid, pin_offset;
-+	int addr;
-+
-+	if (type != IRQ_TYPE_LEVEL_HIGH && type != IRQ_TYPE_EDGE_RISING)
-+		return -EINVAL;
-+
-+	nid = GET_MBIGEN_NODE_NUM(d->hwirq);
-+	pin_offset = GET_IRQ_PIN_OFFSET(d->hwirq);
-+
-+	ofst = pin_offset / 32 * 4;
-+	mask = 1 << (pin_offset % 32);
-+
-+	addr = get_mbigen_type_reg_addr(nid, ofst);
-+	val = readl_relaxed(addr + chip->base);
-+
-+	if (type == IRQ_TYPE_LEVEL_HIGH)
-+		val |= mask;
-+	else if (type == IRQ_TYPE_EDGE_RISING)
-+		val &= ~mask;
-+
-+	writel_relaxed(val, addr + chip->base);
-+
-+	return 0;
-+}
-+
-+static int mbigen_set_affinity(struct irq_data *data,
-+				const struct cpumask *mask_val,
-+				bool force)
-+{
-+	struct mbigen_irq_data *mgn_irq_data = irq_data_get_irq_chip_data(data);
-+	struct irq_chip *chip = irq_get_chip(mgn_irq_data->parent_irq);
-+	struct irq_data *parent_d = irq_get_irq_data(mgn_irq_data->parent_irq);
-+
-+	if (chip && chip->irq_set_affinity)
-+		return chip->irq_set_affinity(parent_d, mask_val, force);
-+	else
-+		return -EINVAL;
-+}
-+
-+static void mbigen_mask_irq(struct irq_data *data)
-+{
-+	struct mbigen_irq_data *mgn_irq_data = irq_data_get_irq_chip_data(data);
-+	struct irq_chip *chip = irq_get_chip(mgn_irq_data->parent_irq);
-+	struct irq_data *parent_d = irq_get_irq_data(mgn_irq_data->parent_irq);
-+
-+	if (chip && chip->irq_mask)
-+		return chip->irq_mask(parent_d);
-+}
-+
-+static void mbigen_unmask_irq(struct irq_data *data)
-+{
-+	struct mbigen_irq_data *mgn_irq_data = irq_data_get_irq_chip_data(data);
-+	struct irq_chip *chip = irq_get_chip(mgn_irq_data->parent_irq);
-+	struct irq_data *parent_d = irq_get_irq_data(mgn_irq_data->parent_irq);
-+
-+	if (chip && chip->irq_unmask)
-+		chip->irq_unmask(parent_d);
-+}
-+
-+static void mbigen_eoi_irq(struct irq_data *data)
-+{
-+
-+	struct mbigen_irq_data *mgn_irq_data = irq_data_get_irq_chip_data(data);
-+	struct irq_chip *chip = irq_get_chip(mgn_irq_data->parent_irq);
-+	struct irq_data *parent_d = irq_get_irq_data(mgn_irq_data->parent_irq);
-+	u32 pin_offset, ofst, mask;
-+
-+	pin_offset = GET_IRQ_PIN_OFFSET(data->hwirq);
-+	ofst = pin_offset / 32 * 4;
-+	mask = 1 << (pin_offset % 32);
-+
-+	writel_relaxed(mask, mgn_irq_data->base + ofst
-+			+ REG_MBIGEN_CLEAR_OFFSET);
-+
-+	if (chip && chip->irq_eoi)
-+		chip->irq_eoi(parent_d);
-+}
-+
-+static struct irq_chip mbigen_irq_chip = {
-+	.name = "MBIGEN-v2",
-+	.irq_mask = mbigen_mask_irq,
-+	.irq_unmask = mbigen_unmask_irq,
-+	.irq_eoi = mbigen_eoi_irq,
-+	.irq_set_affinity = mbigen_set_affinity,
-+	.irq_set_type = mbigen_set_type,
-+};
-+
-+static int mbigen_domain_xlate(struct irq_domain *d,
-+			       struct device_node *controller,
-+			       const u32 *intspec, unsigned int intsize,
-+			       unsigned long *out_hwirq,
-+			       unsigned int *out_type)
-+{
-+
-+	if (d->of_node != controller)
-+		return -EINVAL;
-+
-+	if (intsize < 4)
-+		return -EINVAL;
-+
-+	/* Compose the hwirq local to mbigen domain
-+	 * intspec[0]: device id
-+	 * intspec[1]: mbigen node number(nid) defined in dts file.
-+	 * intspec[2]: interrut pin offset
-+	 */
-+	*out_hwirq = COMPOSE_MBIGEN_HWIRQ(intspec[0], intspec[1], intspec[2]);
-+
-+	*out_type = intspec[3] & IRQ_TYPE_SENSE_MASK;
-+
-+	return 0;
-+}
-+
-+static int mbigen_domain_map(struct irq_domain *d, unsigned int irq,
-+				irq_hw_number_t hw)
-+{
-+	struct mbigen_chip *mgn_chip = d->host_data;
-+	struct mbigen_irq_data *mgn_irq_data = NULL;
-+	struct irq_data *data = irq_get_irq_data(irq);
-+
-+	irq_set_chip_and_handler(irq, &mbigen_irq_chip, handle_fasteoi_irq);
-+
-+	mgn_irq_data = get_mbigen_irq_data(mgn_chip, data);
-+	if (!mgn_irq_data)
-+		return -EINVAL;
-+
-+	irq_set_chip_data(irq, mgn_irq_data);
-+
-+	set_irq_flags(irq, IRQF_VALID);
-+
-+	return 0;
-+}
-+
-+static struct irq_domain_ops mbigen_domain_ops = {
-+	.xlate = mbigen_domain_xlate,
-+	.map = mbigen_domain_map,
-+};
-+
-+static void mbigen_handle_cascade_irq(unsigned int irq, struct irq_desc *desc)
-+{
-+	struct mbigen_irq_data *mgn_irq_data = irq_get_handler_data(irq);
-+	struct mbigen_device *mgn_dev = mgn_irq_data->dev;
-+	struct irq_domain *domain = mgn_dev->chip->domain;
-+	unsigned int cascade_irq;
-+	u32 hwirq;
-+
-+	hwirq = COMPOSE_MBIGEN_HWIRQ(mgn_irq_data->dev_id,
-+					mgn_irq_data->nid,
-+					mgn_irq_data->pin_offset);
-+
-+	/* find cascade_irq within mbigen domain */
-+	cascade_irq = irq_find_mapping(domain, hwirq);
-+
-+	if (unlikely(!cascade_irq))
-+		handle_bad_irq(irq, desc);
-+	else
-+		generic_handle_irq(cascade_irq);
-+}
-+
-+/*
-+ * get_mbigen_node_info() - Get the mbigen node information
-+ * and compose a new hwirq.
-+ *
-+ * @irq: irq number need to be handled
-+ * @device_id: id of device which generates this interrupt
-+ * @node_num: number of mbigen node this interrupt connected.
-+ * @offset: interrupt pin offset in a mbigen node.
-+ */
-+static int get_mbigen_node_info(u32 irq, struct mbigen_device *dev,
-+				    struct mbigen_irq_data *mgn_irq_data)
-+{
-+	struct irq_data *irq_data = irq_get_irq_data(irq);
-+	struct mbigen_node *mgn_node;
-+	u32 irqs_range = 0, tmp;
-+	u32 msi_index;
-+
-+	mgn_irq_data->dev_id = dev->did;
-+	msi_index = irq_data->hwirq & 0xff;
-+
-+	raw_spin_lock(&dev->lock);
-+
-+	list_for_each_entry(mgn_node, &dev->mbigen_node_list, entry) {
-+		tmp = irqs_range;
-+		irqs_range += mgn_node->irq_nr;
-+
-+		if (msi_index < irqs_range) {
-+			mgn_irq_data->nid = mgn_node->node_num;
-+			mgn_irq_data->pin_offset =
-+			    mgn_node->pin_offset + (msi_index - tmp);
-+			break;
-+		}
-+	}
-+	raw_spin_unlock(&dev->lock);
-+
-+	return 0;
-+}
-+
-+/*
-+ * parse the information of mbigen node included in
-+ * mbigen device node.
-+ * @dev: the mbigen device pointer
-+ *
-+ * Some devices in hisilicon soc has more than 128
-+ * interrupts and beyond a mbigen node can connect.
-+ * So It need to be connect to several mbigen nodes.
-+ */
-+static int parse_mbigen_node(struct mbigen_device *dev)
-+{
-+	struct mbigen_chip *chip = dev->chip;
-+	struct device_node *p = chip->node;
-+	const __be32 *intspec, *tmp;
-+	u32 intsize, intlen, index = 0;
-+	u32 node_num;
-+	int i;
-+
-+	intspec = of_get_property(dev->node, "mbigen_node", &intlen);
-+	if (intspec == NULL)
-+		return -EINVAL;
-+
-+	intlen /= sizeof(*intspec);
-+
-+	/* Get size of mbigen_node specifier */
-+	tmp = of_get_property(p, "#mbigen-node-cells", NULL);
-+	if (tmp == NULL)
-+		return -EINVAL;
-+
-+	intsize = be32_to_cpu(*tmp);
-+	node_num = intlen / intsize;
-+
-+	for (i = 0; i < node_num; i++) {
-+		struct mbigen_node *mgn_node;
-+
-+		mgn_node = kzalloc(sizeof(*mgn_node), GFP_KERNEL);
-+		if (!mgn_node)
-+			return -ENOMEM;
-+
-+		mgn_node->node_num = be32_to_cpup(intspec++);
-+		mgn_node->irq_nr = be32_to_cpup(intspec++);
-+		mgn_node->pin_offset = be32_to_cpup(intspec++);
-+
-+		mgn_node->index_offset = index;
-+		index += mgn_node->irq_nr;
-+
-+		INIT_LIST_HEAD(&mgn_node->entry);
-+
-+		raw_spin_lock(&dev->lock);
-+		list_add_tail(&mgn_node->entry, &dev->mbigen_node_list);
-+		raw_spin_unlock(&dev->lock);
-+	}
-+
-+	return 0;
-+}
-+
-+static void mbigen_set_irq_handler_data(struct msi_desc *desc,
-+					struct mbigen_device *mgn_dev,
-+					struct mbigen_irq_data *mgn_irq_data)
-+{
-+	struct mbigen_chip *chip = mgn_dev->chip;
-+
-+	mgn_irq_data->base = chip->base;
-+	mgn_irq_data->index = desc->platform.msi_index;
-+
-+	get_mbigen_node_info(desc->irq, mgn_dev, mgn_irq_data);
-+
-+	mgn_irq_data->dev = mgn_dev;
-+	mgn_irq_data->parent_irq = desc->irq;
-+
-+	irq_set_handler_data(desc->irq, mgn_irq_data);
-+
-+}
-+/*
-+ * mbigen_device_init()- initial the devices connected to
-+ * mbigen chip.
-+ *
-+ * @chip: pointer to mbigen chip.
-+ * @node: represents the node of devices which defined
-+ *			in device tree as a child node of mbigen chip
-+ *			node.
-+ */
-+static int mbigen_device_init(struct mbigen_chip *chip,
-+			struct device_node *node)
-+{
-+	struct mbigen_device *mgn_dev;
-+	struct device_node *msi_np;
-+	struct irq_domain *msi_domain;
-+	struct msi_desc *desc;
-+	struct mbigen_irq_data *mgn_irq_data;
-+	u32 nvec, dev_id;
-+	int ret;
-+
-+	of_property_read_u32(node, "nr-interrupts", &nvec);
-+	if (!nvec)
-+		return -EINVAL;
-+
-+	ret = of_property_read_u32_index(node, "msi-parent", 1, &dev_id);
-+	if (ret)
-+		return -EINVAL;
-+
-+	msi_np = of_parse_phandle(node, "msi-parent", 0);
-+	if (!msi_np) {
-+		pr_err("%s- no msi node found: %s\n", __func__,
-+			node->full_name);
-+		return -ENXIO;
-+	}
-+
-+	msi_domain = irq_find_matching_host(msi_np, DOMAIN_BUS_PLATFORM_MSI);
-+	if (!msi_domain) {
-+		pr_err("MBIGEN: no platform-msi domain for %s\n",
-+			msi_np->full_name);
-+		return -ENXIO;
-+	}
-+
-+	mgn_dev = kzalloc(sizeof(*mgn_dev), GFP_KERNEL);
-+	if (!mgn_dev)
-+		return -ENOMEM;
-+
-+	mgn_dev->dev.msi_domain = msi_domain;
-+	mgn_dev->dev.of_node = node;
-+	mgn_dev->chip = chip;
-+	mgn_dev->nr_irqs = nvec;
-+	mgn_dev->node = node;
-+	mgn_dev->did = dev_id;
-+
-+	INIT_LIST_HEAD(dev_to_msi_list(&mgn_dev->dev));
-+
-+	ret = platform_msi_domain_alloc_irqs(&mgn_dev->dev,
-+					     nvec, mbigen_write_msg);
-+	if (ret)
-+		goto out_free_dev;
-+
-+	INIT_LIST_HEAD(&mgn_dev->entry);
-+	raw_spin_lock_init(&mgn_dev->lock);
-+	INIT_LIST_HEAD(&mgn_dev->mbigen_node_list);
-+
-+	/* Parse and get the info of mbigen nodes this
-+	 * device connected
-+	 */
-+	parse_mbigen_node(mgn_dev);
-+
-+	mgn_irq_data = kcalloc(nvec, sizeof(*mgn_irq_data), GFP_KERNEL);
-+	if (!mgn_irq_data)
-+		return -ENOMEM;
-+
-+	mgn_dev->mgn_data = mgn_irq_data;
-+
-+	for_each_msi_entry(desc, &mgn_dev->dev) {
-+		mbigen_set_irq_handler_data(desc, mgn_dev,
-+					    &mgn_irq_data[desc->platform.msi_index]);
-+		irq_set_chained_handler(desc->irq, mbigen_handle_cascade_irq);
-+	}
-+
-+	raw_spin_lock(&chip->lock);
-+	list_add(&mgn_dev->entry, &chip->mbigen_device_list);
-+	raw_spin_unlock(&chip->lock);
-+
-+	return 0;
-+
-+out_free_dev:
-+	kfree(mgn_dev);
-+	pr_err("failed to get MSIs for device:%s (%d)\n", node->full_name,
-+		ret);
-+	return ret;
-+}
-+
-+/*
-+ * Early initialization as an interrupt controller
-+ */
-+static int __init mbigen_of_init(struct device_node *node)
-+{
-+	struct mbigen_chip *mgn_chip;
-+	struct device_node *child;
-+	struct irq_domain *domain;
-+	void __iomem *base;
-+	int err;
-+
-+	base = of_iomap(node, 0);
-+	if (!base) {
-+		pr_err("%s: unable to map registers\n", node->full_name);
-+		return -ENOMEM;
-+	}
-+
-+	mgn_chip = kzalloc(sizeof(*mgn_chip), GFP_KERNEL);
-+	if (!mgn_chip) {
-+		err = -ENOMEM;
-+		goto unmap_reg;
-+	}
-+
-+	mgn_chip->base = base;
-+	mgn_chip->node = node;
-+
-+	domain = irq_domain_add_tree(node, &mbigen_domain_ops, mgn_chip);
-+	mgn_chip->domain = domain;
-+
-+	raw_spin_lock_init(&mgn_chip->lock);
-+	INIT_LIST_HEAD(&mgn_chip->entry);
-+	INIT_LIST_HEAD(&mgn_chip->mbigen_device_list);
-+
-+	for_each_child_of_node(node, child) {
-+		mbigen_device_init(mgn_chip, child);
-+	}
-+
-+	spin_lock(&mbigen_chip_lock);
-+	list_add(&mgn_chip->entry, &mbigen_chip_list);
-+	spin_unlock(&mbigen_chip_lock);
-+
-+	return 0;
-+
-+unmap_reg:
-+	iounmap(base);
-+	pr_err("MBIGEN: failed probing:%s (%d)\n", node->full_name, err);
-+	return err;
-+}
-+
-+static struct of_device_id mbigen_chip_id[] = {
-+	{	.compatible = "hisilicon,mbigen-v2",},
-+	{},
-+};
-+
-+static int __init mbigen_init(void)
-+{
-+	struct device_node *np;
-+
-+	for (np = of_find_matching_node(NULL, mbigen_chip_id); np;
-+	     np = of_find_matching_node(np, mbigen_chip_id)) {
-+		mbigen_of_init(np);
-+	}
-+
-+	return 0;
-+}
-+
-+core_initcall(mbigen_init);
-+
-+MODULE_AUTHOR("Jun Ma <majun258@huawei.com>");
-+MODULE_AUTHOR("Yun Wu <wuyun.wu@huawei.com>");
-+MODULE_LICENSE("GPL");
-+MODULE_DESCRIPTION("Hisilicon MBI Generator driver");
+ 	int ret;
+ 
++	amt_wd_dev.parent = dev->dev;
+ 	/* unlock to perserve correct locking order */
+ 	mutex_unlock(&dev->device_lock);
+ 	ret = watchdog_register_device(&amt_wd_dev);
+diff --git a/drivers/watchdog/bcm2835_wdt.c b/drivers/watchdog/bcm2835_wdt.c
+index 7116968dee12..66c3e656a616 100644
+--- a/drivers/watchdog/bcm2835_wdt.c
++++ b/drivers/watchdog/bcm2835_wdt.c
+@@ -182,6 +182,7 @@ static int bcm2835_wdt_probe(struct platform_device *pdev)
+ 	watchdog_set_drvdata(&bcm2835_wdt_wdd, wdt);
+ 	watchdog_init_timeout(&bcm2835_wdt_wdd, heartbeat, dev);
+ 	watchdog_set_nowayout(&bcm2835_wdt_wdd, nowayout);
++	bcm2835_wdt_wdd.parent = &pdev->dev;
+ 	err = watchdog_register_device(&bcm2835_wdt_wdd);
+ 	if (err) {
+ 		dev_err(dev, "Failed to register watchdog device");
+diff --git a/drivers/watchdog/bcm47xx_wdt.c b/drivers/watchdog/bcm47xx_wdt.c
+index b28a072abf78..4064a43f1360 100644
+--- a/drivers/watchdog/bcm47xx_wdt.c
++++ b/drivers/watchdog/bcm47xx_wdt.c
+@@ -209,6 +209,7 @@ static int bcm47xx_wdt_probe(struct platform_device *pdev)
+ 
+ 	wdt->wdd.info = &bcm47xx_wdt_info;
+ 	wdt->wdd.timeout = WDT_DEFAULT_TIME;
++	wdt->wdd.parent = &pdev->dev;
+ 	ret = wdt->wdd.ops->set_timeout(&wdt->wdd, timeout);
+ 	if (ret)
+ 		goto err_timer;
+diff --git a/drivers/watchdog/bcm_kona_wdt.c b/drivers/watchdog/bcm_kona_wdt.c
+index 22d8ae65772a..e0c98423f2c9 100644
+--- a/drivers/watchdog/bcm_kona_wdt.c
++++ b/drivers/watchdog/bcm_kona_wdt.c
+@@ -319,6 +319,7 @@ static int bcm_kona_wdt_probe(struct platform_device *pdev)
+ 	spin_lock_init(&wdt->lock);
+ 	platform_set_drvdata(pdev, wdt);
+ 	watchdog_set_drvdata(&bcm_kona_wdt_wdd, wdt);
++	bcm_kona_wdt_wdd.parent = &pdev->dev;
+ 
+ 	ret = bcm_kona_wdt_set_timeout_reg(&bcm_kona_wdt_wdd, 0);
+ 	if (ret) {
+diff --git a/drivers/watchdog/coh901327_wdt.c b/drivers/watchdog/coh901327_wdt.c
+index ce12f437f195..a099b77fc0b9 100644
+--- a/drivers/watchdog/coh901327_wdt.c
++++ b/drivers/watchdog/coh901327_wdt.c
+@@ -358,6 +358,7 @@ static int __init coh901327_probe(struct platform_device *pdev)
+ 	if (ret < 0)
+ 		coh901327_wdt.timeout = 60;
+ 
++	coh901327_wdt.parent = &pdev->dev;
+ 	ret = watchdog_register_device(&coh901327_wdt);
+ 	if (ret == 0)
+ 		dev_info(&pdev->dev,
+diff --git a/drivers/watchdog/da9052_wdt.c b/drivers/watchdog/da9052_wdt.c
+index 2e9589652e1e..67e67977bd29 100644
+--- a/drivers/watchdog/da9052_wdt.c
++++ b/drivers/watchdog/da9052_wdt.c
+@@ -195,6 +195,7 @@ static int da9052_wdt_probe(struct platform_device *pdev)
+ 	da9052_wdt->timeout = DA9052_DEF_TIMEOUT;
+ 	da9052_wdt->info = &da9052_wdt_info;
+ 	da9052_wdt->ops = &da9052_wdt_ops;
++	da9052_wdt->parent = &pdev->dev;
+ 	watchdog_set_drvdata(da9052_wdt, driver_data);
+ 
+ 	kref_init(&driver_data->kref);
+diff --git a/drivers/watchdog/da9055_wdt.c b/drivers/watchdog/da9055_wdt.c
+index 495089d8dbfe..04d1430d93d2 100644
+--- a/drivers/watchdog/da9055_wdt.c
++++ b/drivers/watchdog/da9055_wdt.c
+@@ -161,6 +161,7 @@ static int da9055_wdt_probe(struct platform_device *pdev)
+ 	da9055_wdt->timeout = DA9055_DEF_TIMEOUT;
+ 	da9055_wdt->info = &da9055_wdt_info;
+ 	da9055_wdt->ops = &da9055_wdt_ops;
++	da9055_wdt->parent = &pdev->dev;
+ 	watchdog_set_nowayout(da9055_wdt, nowayout);
+ 	watchdog_set_drvdata(da9055_wdt, driver_data);
+ 
+diff --git a/drivers/watchdog/da9062_wdt.c b/drivers/watchdog/da9062_wdt.c
+index b3a870ce85be..7386111220d5 100644
+--- a/drivers/watchdog/da9062_wdt.c
++++ b/drivers/watchdog/da9062_wdt.c
+@@ -210,6 +210,7 @@ static int da9062_wdt_probe(struct platform_device *pdev)
+ 	wdt->wdtdev.max_timeout = DA9062_WDT_MAX_TIMEOUT;
+ 	wdt->wdtdev.timeout = DA9062_WDG_DEFAULT_TIMEOUT;
+ 	wdt->wdtdev.status = WATCHDOG_NOWAYOUT_INIT_STATUS;
++	wdt->wdtdev.parent = &pdev->dev;
+ 
+ 	watchdog_set_drvdata(&wdt->wdtdev, wdt);
+ 	dev_set_drvdata(&pdev->dev, wdt);
+diff --git a/drivers/watchdog/da9063_wdt.c b/drivers/watchdog/da9063_wdt.c
+index e2fe2ebdebd4..6bf130bd863d 100644
+--- a/drivers/watchdog/da9063_wdt.c
++++ b/drivers/watchdog/da9063_wdt.c
+@@ -175,6 +175,7 @@ static int da9063_wdt_probe(struct platform_device *pdev)
+ 	wdt->wdtdev.min_timeout = DA9063_WDT_MIN_TIMEOUT;
+ 	wdt->wdtdev.max_timeout = DA9063_WDT_MAX_TIMEOUT;
+ 	wdt->wdtdev.timeout = DA9063_WDG_TIMEOUT;
++	wdt->wdtdev.parent = &pdev->dev;
+ 
+ 	wdt->wdtdev.status = WATCHDOG_NOWAYOUT_INIT_STATUS;
+ 
+diff --git a/drivers/watchdog/davinci_wdt.c b/drivers/watchdog/davinci_wdt.c
+index cfdf8a408aea..17454ca653f4 100644
+--- a/drivers/watchdog/davinci_wdt.c
++++ b/drivers/watchdog/davinci_wdt.c
+@@ -179,6 +179,7 @@ static int davinci_wdt_probe(struct platform_device *pdev)
+ 	wdd->min_timeout	= 1;
+ 	wdd->max_timeout	= MAX_HEARTBEAT;
+ 	wdd->timeout		= DEFAULT_HEARTBEAT;
++	wdd->parent		= &pdev->dev;
+ 
+ 	watchdog_init_timeout(wdd, heartbeat, dev);
+ 
+diff --git a/drivers/watchdog/digicolor_wdt.c b/drivers/watchdog/digicolor_wdt.c
+index 31d8e4936611..50abe1bf62a5 100644
+--- a/drivers/watchdog/digicolor_wdt.c
++++ b/drivers/watchdog/digicolor_wdt.c
+@@ -143,6 +143,7 @@ static int dc_wdt_probe(struct platform_device *pdev)
+ 	}
+ 	dc_wdt_wdd.max_timeout = U32_MAX / clk_get_rate(wdt->clk);
+ 	dc_wdt_wdd.timeout = dc_wdt_wdd.max_timeout;
++	dc_wdt_wdd.parent = &pdev->dev;
+ 
+ 	spin_lock_init(&wdt->lock);
+ 
+diff --git a/drivers/watchdog/ep93xx_wdt.c b/drivers/watchdog/ep93xx_wdt.c
+index 7a2cc7191c58..0a4d7cc05d54 100644
+--- a/drivers/watchdog/ep93xx_wdt.c
++++ b/drivers/watchdog/ep93xx_wdt.c
+@@ -132,6 +132,7 @@ static int ep93xx_wdt_probe(struct platform_device *pdev)
+ 	val = readl(mmio_base + EP93XX_WATCHDOG);
+ 	ep93xx_wdt_wdd.bootstatus = (val & 0x01) ? WDIOF_CARDRESET : 0;
+ 	ep93xx_wdt_wdd.timeout = timeout;
++	ep93xx_wdt_wdd.parent = &pdev->dev;
+ 
+ 	watchdog_set_nowayout(&ep93xx_wdt_wdd, nowayout);
+ 
+diff --git a/drivers/watchdog/gpio_wdt.c b/drivers/watchdog/gpio_wdt.c
+index 1687cc2d7122..336bddd84809 100644
+--- a/drivers/watchdog/gpio_wdt.c
++++ b/drivers/watchdog/gpio_wdt.c
+@@ -217,6 +217,7 @@ static int gpio_wdt_probe(struct platform_device *pdev)
+ 	priv->wdd.ops		= &gpio_wdt_ops;
+ 	priv->wdd.min_timeout	= SOFT_TIMEOUT_MIN;
+ 	priv->wdd.max_timeout	= SOFT_TIMEOUT_MAX;
++	priv->wdd.parent	= &pdev->dev;
+ 
+ 	if (watchdog_init_timeout(&priv->wdd, 0, &pdev->dev) < 0)
+ 		priv->wdd.timeout = SOFT_TIMEOUT_DEF;
+diff --git a/drivers/watchdog/ie6xx_wdt.c b/drivers/watchdog/ie6xx_wdt.c
+index 9bc39ae51624..78c2541f5d52 100644
+--- a/drivers/watchdog/ie6xx_wdt.c
++++ b/drivers/watchdog/ie6xx_wdt.c
+@@ -267,6 +267,7 @@ static int ie6xx_wdt_probe(struct platform_device *pdev)
+ 
+ 	ie6xx_wdt_dev.timeout = timeout;
+ 	watchdog_set_nowayout(&ie6xx_wdt_dev, nowayout);
++	ie6xx_wdt_dev.parent = &pdev->dev;
+ 
+ 	spin_lock_init(&ie6xx_wdt_data.unlock_sequence);
+ 
+diff --git a/drivers/watchdog/intel-mid_wdt.c b/drivers/watchdog/intel-mid_wdt.c
+index 84f6701c391f..0a436b5d1e84 100644
+--- a/drivers/watchdog/intel-mid_wdt.c
++++ b/drivers/watchdog/intel-mid_wdt.c
+@@ -137,6 +137,7 @@ static int mid_wdt_probe(struct platform_device *pdev)
+ 	wdt_dev->min_timeout = MID_WDT_TIMEOUT_MIN;
+ 	wdt_dev->max_timeout = MID_WDT_TIMEOUT_MAX;
+ 	wdt_dev->timeout = MID_WDT_DEFAULT_TIMEOUT;
++	wdt_dev->parent = &pdev->dev;
+ 
+ 	watchdog_set_drvdata(wdt_dev, &pdev->dev);
+ 	platform_set_drvdata(pdev, wdt_dev);
+diff --git a/drivers/watchdog/jz4740_wdt.c b/drivers/watchdog/jz4740_wdt.c
+index 4c2cc09c0c57..6a7d5c365438 100644
+--- a/drivers/watchdog/jz4740_wdt.c
++++ b/drivers/watchdog/jz4740_wdt.c
+@@ -174,6 +174,7 @@ static int jz4740_wdt_probe(struct platform_device *pdev)
+ 	jz4740_wdt->timeout = heartbeat;
+ 	jz4740_wdt->min_timeout = 1;
+ 	jz4740_wdt->max_timeout = MAX_HEARTBEAT;
++	jz4740_wdt->parent = &pdev->dev;
+ 	watchdog_set_nowayout(jz4740_wdt, nowayout);
+ 	watchdog_set_drvdata(jz4740_wdt, drvdata);
+ 
+diff --git a/drivers/watchdog/mena21_wdt.c b/drivers/watchdog/mena21_wdt.c
+index d193a5e79c38..69013007dc47 100644
+--- a/drivers/watchdog/mena21_wdt.c
++++ b/drivers/watchdog/mena21_wdt.c
+@@ -197,6 +197,7 @@ static int a21_wdt_probe(struct platform_device *pdev)
+ 	watchdog_init_timeout(&a21_wdt, 30, &pdev->dev);
+ 	watchdog_set_nowayout(&a21_wdt, nowayout);
+ 	watchdog_set_drvdata(&a21_wdt, drv);
++	a21_wdt.parent = &pdev->dev;
+ 
+ 	reset = a21_wdt_get_bootstatus(drv);
+ 	if (reset == 2)
+diff --git a/drivers/watchdog/menf21bmc_wdt.c b/drivers/watchdog/menf21bmc_wdt.c
+index 59f0913c7341..3aefddebb386 100644
+--- a/drivers/watchdog/menf21bmc_wdt.c
++++ b/drivers/watchdog/menf21bmc_wdt.c
+@@ -130,6 +130,7 @@ static int menf21bmc_wdt_probe(struct platform_device *pdev)
+ 	drv_data->wdt.info = &menf21bmc_wdt_info;
+ 	drv_data->wdt.min_timeout = BMC_WD_TIMEOUT_MIN;
+ 	drv_data->wdt.max_timeout = BMC_WD_TIMEOUT_MAX;
++	drv_data->wdt.parent = &pdev->dev;
+ 	drv_data->i2c_client = i2c_client;
+ 
+ 	/*
+diff --git a/drivers/watchdog/omap_wdt.c b/drivers/watchdog/omap_wdt.c
+index de911c7e477c..d96bee017fd3 100644
+--- a/drivers/watchdog/omap_wdt.c
++++ b/drivers/watchdog/omap_wdt.c
+@@ -253,6 +253,7 @@ static int omap_wdt_probe(struct platform_device *pdev)
+ 	wdev->wdog.ops = &omap_wdt_ops;
+ 	wdev->wdog.min_timeout = TIMER_MARGIN_MIN;
+ 	wdev->wdog.max_timeout = TIMER_MARGIN_MAX;
++	wdev->wdog.parent = &pdev->dev;
+ 
+ 	if (watchdog_init_timeout(&wdev->wdog, timer_margin, &pdev->dev) < 0)
+ 		wdev->wdog.timeout = TIMER_MARGIN_DEFAULT;
+diff --git a/drivers/watchdog/orion_wdt.c b/drivers/watchdog/orion_wdt.c
+index ef0c628d5037..c6b8f4a43bde 100644
+--- a/drivers/watchdog/orion_wdt.c
++++ b/drivers/watchdog/orion_wdt.c
+@@ -567,6 +567,7 @@ static int orion_wdt_probe(struct platform_device *pdev)
+ 
+ 	dev->wdt.timeout = wdt_max_duration;
+ 	dev->wdt.max_timeout = wdt_max_duration;
++	dev->wdt.parent = &pdev->dev;
+ 	watchdog_init_timeout(&dev->wdt, heartbeat, &pdev->dev);
+ 
+ 	platform_set_drvdata(pdev, &dev->wdt);
+diff --git a/drivers/watchdog/pnx4008_wdt.c b/drivers/watchdog/pnx4008_wdt.c
+index b9c6049c3e78..4224b3ec83a5 100644
+--- a/drivers/watchdog/pnx4008_wdt.c
++++ b/drivers/watchdog/pnx4008_wdt.c
+@@ -167,6 +167,7 @@ static int pnx4008_wdt_probe(struct platform_device *pdev)
+ 
+ 	pnx4008_wdd.bootstatus = (readl(WDTIM_RES(wdt_base)) & WDOG_RESET) ?
+ 			WDIOF_CARDRESET : 0;
++	pnx4008_wdd.parent = &pdev->dev;
+ 	watchdog_set_nowayout(&pnx4008_wdd, nowayout);
+ 
+ 	pnx4008_wdt_stop(&pnx4008_wdd);	/* disable for now */
+diff --git a/drivers/watchdog/qcom-wdt.c b/drivers/watchdog/qcom-wdt.c
+index aa03ca8f2d9b..773dcfaee7b2 100644
+--- a/drivers/watchdog/qcom-wdt.c
++++ b/drivers/watchdog/qcom-wdt.c
+@@ -171,6 +171,7 @@ static int qcom_wdt_probe(struct platform_device *pdev)
+ 	wdt->wdd.ops = &qcom_wdt_ops;
+ 	wdt->wdd.min_timeout = 1;
+ 	wdt->wdd.max_timeout = 0x10000000U / wdt->rate;
++	wdt->wdd.parent = &pdev->dev;
+ 
+ 	/*
+ 	 * If 'timeout-sec' unspecified in devicetree, assume a 30 second
+diff --git a/drivers/watchdog/retu_wdt.c b/drivers/watchdog/retu_wdt.c
+index b7c68e275aeb..39cd51df2ffc 100644
+--- a/drivers/watchdog/retu_wdt.c
++++ b/drivers/watchdog/retu_wdt.c
+@@ -127,6 +127,7 @@ static int retu_wdt_probe(struct platform_device *pdev)
+ 	retu_wdt->timeout	= RETU_WDT_MAX_TIMER;
+ 	retu_wdt->min_timeout	= 0;
+ 	retu_wdt->max_timeout	= RETU_WDT_MAX_TIMER;
++	retu_wdt->parent	= &pdev->dev;
+ 
+ 	watchdog_set_drvdata(retu_wdt, wdev);
+ 	watchdog_set_nowayout(retu_wdt, nowayout);
+diff --git a/drivers/watchdog/rt2880_wdt.c b/drivers/watchdog/rt2880_wdt.c
+index a6f7e2e29beb..1967919ae743 100644
+--- a/drivers/watchdog/rt2880_wdt.c
++++ b/drivers/watchdog/rt2880_wdt.c
+@@ -161,6 +161,7 @@ static int rt288x_wdt_probe(struct platform_device *pdev)
+ 	rt288x_wdt_dev.dev = &pdev->dev;
+ 	rt288x_wdt_dev.bootstatus = rt288x_wdt_bootcause();
+ 	rt288x_wdt_dev.max_timeout = (0xfffful / rt288x_wdt_freq);
++	rt288x_wdt_dev.parent = &pdev->dev;
+ 
+ 	watchdog_init_timeout(&rt288x_wdt_dev, rt288x_wdt_dev.max_timeout,
+ 			      &pdev->dev);
+diff --git a/drivers/watchdog/s3c2410_wdt.c b/drivers/watchdog/s3c2410_wdt.c
+index e89ae027c91d..d781000c7825 100644
+--- a/drivers/watchdog/s3c2410_wdt.c
++++ b/drivers/watchdog/s3c2410_wdt.c
+@@ -607,6 +607,7 @@ static int s3c2410wdt_probe(struct platform_device *pdev)
+ 	watchdog_set_nowayout(&wdt->wdt_device, nowayout);
+ 
+ 	wdt->wdt_device.bootstatus = s3c2410wdt_get_bootstatus(wdt);
++	wdt->wdt_device.parent = &pdev->dev;
+ 
+ 	ret = watchdog_register_device(&wdt->wdt_device);
+ 	if (ret) {
+diff --git a/drivers/watchdog/shwdt.c b/drivers/watchdog/shwdt.c
+index 567458b137a6..f90812170657 100644
+--- a/drivers/watchdog/shwdt.c
++++ b/drivers/watchdog/shwdt.c
+@@ -252,6 +252,7 @@ static int sh_wdt_probe(struct platform_device *pdev)
+ 
+ 	watchdog_set_nowayout(&sh_wdt_dev, nowayout);
+ 	watchdog_set_drvdata(&sh_wdt_dev, wdt);
++	sh_wdt_dev.parent = &pdev->dev;
+ 
+ 	spin_lock_init(&wdt->lock);
+ 
+diff --git a/drivers/watchdog/sirfsoc_wdt.c b/drivers/watchdog/sirfsoc_wdt.c
+index 42fa5c0c518a..d0578ab2e636 100644
+--- a/drivers/watchdog/sirfsoc_wdt.c
++++ b/drivers/watchdog/sirfsoc_wdt.c
+@@ -154,6 +154,7 @@ static int sirfsoc_wdt_probe(struct platform_device *pdev)
+ 
+ 	watchdog_init_timeout(&sirfsoc_wdd, timeout, &pdev->dev);
+ 	watchdog_set_nowayout(&sirfsoc_wdd, nowayout);
++	sirfsoc_wdd.parent = &pdev->dev;
+ 
+ 	ret = watchdog_register_device(&sirfsoc_wdd);
+ 	if (ret)
+diff --git a/drivers/watchdog/sp805_wdt.c b/drivers/watchdog/sp805_wdt.c
+index 4e7fec36f5c3..01d816251302 100644
+--- a/drivers/watchdog/sp805_wdt.c
++++ b/drivers/watchdog/sp805_wdt.c
+@@ -226,6 +226,7 @@ sp805_wdt_probe(struct amba_device *adev, const struct amba_id *id)
+ 	wdt->adev = adev;
+ 	wdt->wdd.info = &wdt_info;
+ 	wdt->wdd.ops = &wdt_ops;
++	wdt->wdd.parent = &adev->dev;
+ 
+ 	spin_lock_init(&wdt->lock);
+ 	watchdog_set_nowayout(&wdt->wdd, nowayout);
+diff --git a/drivers/watchdog/st_lpc_wdt.c b/drivers/watchdog/st_lpc_wdt.c
+index 6785afdc0fca..14e9badf2bfa 100644
+--- a/drivers/watchdog/st_lpc_wdt.c
++++ b/drivers/watchdog/st_lpc_wdt.c
+@@ -241,6 +241,7 @@ static int st_wdog_probe(struct platform_device *pdev)
+ 		return -EINVAL;
+ 	}
+ 	st_wdog_dev.max_timeout = 0xFFFFFFFF / st_wdog->clkrate;
++	st_wdog_dev.parent = &pdev->dev;
+ 
+ 	ret = clk_prepare_enable(clk);
+ 	if (ret) {
+diff --git a/drivers/watchdog/stmp3xxx_rtc_wdt.c b/drivers/watchdog/stmp3xxx_rtc_wdt.c
+index e7f0d5b60d3d..3ee6128a540e 100644
+--- a/drivers/watchdog/stmp3xxx_rtc_wdt.c
++++ b/drivers/watchdog/stmp3xxx_rtc_wdt.c
+@@ -76,6 +76,7 @@ static int stmp3xxx_wdt_probe(struct platform_device *pdev)
+ 	watchdog_set_drvdata(&stmp3xxx_wdd, &pdev->dev);
+ 
+ 	stmp3xxx_wdd.timeout = clamp_t(unsigned, heartbeat, 1, STMP3XXX_MAX_TIMEOUT);
++	stmp3xxx_wdd.parent = &pdev->dev;
+ 
+ 	ret = watchdog_register_device(&stmp3xxx_wdd);
+ 	if (ret < 0) {
+diff --git a/drivers/watchdog/tegra_wdt.c b/drivers/watchdog/tegra_wdt.c
+index 30451ea46902..7f97cdd53f29 100644
+--- a/drivers/watchdog/tegra_wdt.c
++++ b/drivers/watchdog/tegra_wdt.c
+@@ -218,6 +218,7 @@ static int tegra_wdt_probe(struct platform_device *pdev)
+ 	wdd->ops = &tegra_wdt_ops;
+ 	wdd->min_timeout = MIN_WDT_TIMEOUT;
+ 	wdd->max_timeout = MAX_WDT_TIMEOUT;
++	wdd->parent = &pdev->dev;
+ 
+ 	watchdog_set_drvdata(wdd, wdt);
+ 
+diff --git a/drivers/watchdog/twl4030_wdt.c b/drivers/watchdog/twl4030_wdt.c
+index 2c1db6fa9a27..9bf3cc0f3961 100644
+--- a/drivers/watchdog/twl4030_wdt.c
++++ b/drivers/watchdog/twl4030_wdt.c
+@@ -83,6 +83,7 @@ static int twl4030_wdt_probe(struct platform_device *pdev)
+ 	wdt->timeout		= 30;
+ 	wdt->min_timeout	= 1;
+ 	wdt->max_timeout	= 30;
++	wdt->parent = &pdev->dev;
+ 
+ 	watchdog_set_nowayout(wdt, nowayout);
+ 	platform_set_drvdata(pdev, wdt);
+diff --git a/drivers/watchdog/txx9wdt.c b/drivers/watchdog/txx9wdt.c
+index 7f615933d31a..c2da880292bc 100644
+--- a/drivers/watchdog/txx9wdt.c
++++ b/drivers/watchdog/txx9wdt.c
+@@ -131,6 +131,7 @@ static int __init txx9wdt_probe(struct platform_device *dev)
+ 	txx9wdt.timeout = timeout;
+ 	txx9wdt.min_timeout = 1;
+ 	txx9wdt.max_timeout = WD_MAX_TIMEOUT;
++	txx9wdt.parent = &dev->dev;
+ 	watchdog_set_nowayout(&txx9wdt, nowayout);
+ 
+ 	ret = watchdog_register_device(&txx9wdt);
+diff --git a/drivers/watchdog/ux500_wdt.c b/drivers/watchdog/ux500_wdt.c
+index 9de09ab00838..37c084353cce 100644
+--- a/drivers/watchdog/ux500_wdt.c
++++ b/drivers/watchdog/ux500_wdt.c
+@@ -96,6 +96,7 @@ static int ux500_wdt_probe(struct platform_device *pdev)
+ 			ux500_wdt.max_timeout = WATCHDOG_MAX28;
+ 	}
+ 
++	ux500_wdt.parent = &pdev->dev;
+ 	watchdog_set_nowayout(&ux500_wdt, nowayout);
+ 
+ 	/* disable auto off on sleep */
+diff --git a/drivers/watchdog/via_wdt.c b/drivers/watchdog/via_wdt.c
+index 56369c4f1961..5f9cbc37520d 100644
+--- a/drivers/watchdog/via_wdt.c
++++ b/drivers/watchdog/via_wdt.c
+@@ -206,6 +206,7 @@ static int wdt_probe(struct pci_dev *pdev,
+ 		timeout = WDT_TIMEOUT;
+ 
+ 	wdt_dev.timeout = timeout;
++	wdt_dev.parent = &pdev->dev;
+ 	watchdog_set_nowayout(&wdt_dev, nowayout);
+ 	if (readl(wdt_mem) & VIA_WDT_FIRED)
+ 		wdt_dev.bootstatus |= WDIOF_CARDRESET;
+diff --git a/drivers/watchdog/wm831x_wdt.c b/drivers/watchdog/wm831x_wdt.c
+index 2fa17e746ff6..8d1184aee932 100644
+--- a/drivers/watchdog/wm831x_wdt.c
++++ b/drivers/watchdog/wm831x_wdt.c
+@@ -215,6 +215,7 @@ static int wm831x_wdt_probe(struct platform_device *pdev)
+ 
+ 	wm831x_wdt->info = &wm831x_wdt_info;
+ 	wm831x_wdt->ops = &wm831x_wdt_ops;
++	wm831x_wdt->parent = &pdev->dev;
+ 	watchdog_set_nowayout(wm831x_wdt, nowayout);
+ 	watchdog_set_drvdata(wm831x_wdt, driver_data);
+ 
+diff --git a/drivers/watchdog/wm8350_wdt.c b/drivers/watchdog/wm8350_wdt.c
+index 34d272ada23d..4ab4b8347d45 100644
+--- a/drivers/watchdog/wm8350_wdt.c
++++ b/drivers/watchdog/wm8350_wdt.c
+@@ -151,6 +151,7 @@ static int wm8350_wdt_probe(struct platform_device *pdev)
+ 
+ 	watchdog_set_nowayout(&wm8350_wdt, nowayout);
+ 	watchdog_set_drvdata(&wm8350_wdt, wm8350);
++	wm8350_wdt.parent = &pdev->dev;
+ 
+ 	/* Default to 4s timeout */
+ 	wm8350_wdt_set_timeout(&wm8350_wdt, 4);
 -- 
-1.7.1
+2.4.3
