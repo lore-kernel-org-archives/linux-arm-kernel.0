@@ -1,147 +1,110 @@
 From: lftan@altera.com (Ley Foon Tan)
-Date: Wed, 19 Aug 2015 09:22:36 +0800
-Subject: [PATCH v4 2/5] pci:host: Add Altera PCIe host controller driver
-In-Reply-To: <CADhT+wfjYaEefScKNz-R5miA+_Ybm8PTHgG6jDT9ntb9e89twQ@mail.gmail.com>
+Date: Wed, 19 Aug 2015 09:28:48 +0800
+Subject: [PATCH v4 4/5] Documentation: dt-bindings: pci: altera pcie
+ device tree binding
+In-Reply-To: <CADhT+wdwYQWq=yiw1R9YEXX=WTDtoj-5=6EysX=aHUjdSvU89w@mail.gmail.com>
 References: <1439802579-22651-1-git-send-email-lftan@altera.com>
- <1439802579-22651-3-git-send-email-lftan@altera.com>
- <CADhT+wfjYaEefScKNz-R5miA+_Ybm8PTHgG6jDT9ntb9e89twQ@mail.gmail.com>
-Message-ID: <CAFiDJ5-_1QAfox_KTGf4mNCdN-fNm9L3jP=xAWmLvn66sYXfqA@mail.gmail.com>
+ <1439802579-22651-5-git-send-email-lftan@altera.com>
+ <CADhT+wdwYQWq=yiw1R9YEXX=WTDtoj-5=6EysX=aHUjdSvU89w@mail.gmail.com>
+Message-ID: <CAFiDJ59Y0-w7vNcgNU6Y1F_a1vtamTeeNS-dTSb5JHOLjG2MgQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 19, 2015 at 3:11 AM, Dinh Nguyen <dinh.linux@gmail.com> wrote:
->
+On Wed, Aug 19, 2015 at 3:22 AM, Dinh Nguyen <dinh.linux@gmail.com> wrote:
 > On Mon, Aug 17, 2015 at 4:09 AM, Ley Foon Tan <lftan@altera.com> wrote:
-> > This patch adds the Altera PCIe host controller driver.
-> >
-> > Signed-off-by: Ley Foon Tan <lftan@altera.com>
-> > ---
-> >  drivers/pci/host/Kconfig       |   7 +
-> >  drivers/pci/host/Makefile      |   1 +
-> >  drivers/pci/host/pcie-altera.c | 543 +++++++++++++++++++++++++++++++++++++++++
-> >  3 files changed, 551 insertions(+)
-> >  create mode 100644 drivers/pci/host/pcie-altera.c
-> >
-> > diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
-> > index 675c2d1..4b4754a 100644
-> > --- a/drivers/pci/host/Kconfig
-> > +++ b/drivers/pci/host/Kconfig
-> > @@ -145,4 +145,11 @@ config PCIE_IPROC_BCMA
-> >           Say Y here if you want to use the Broadcom iProc PCIe controller
-> >           through the BCMA bus interface
-> >
+>> This patch adds the bindings for Altera PCIe host controller driver and
+>> Altera PCIe MSI driver.
+>>
+>> Signed-off-by: Ley Foon Tan <lftan@altera.com>
+>> ---
+>>  .../devicetree/bindings/pci/altera-pcie-msi.txt    | 27 ++++++++++++
+>>  .../devicetree/bindings/pci/altera-pcie.txt        | 49 ++++++++++++++++++++++
+>>  2 files changed, 76 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/pci/altera-pcie-msi.txt
+>>  create mode 100644 Documentation/devicetree/bindings/pci/altera-pcie.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/pci/altera-pcie-msi.txt b/Documentation/devicetree/bindings/pci/altera-pcie-msi.txt
+>> new file mode 100644
+>> index 0000000..7f330c9
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/pci/altera-pcie-msi.txt
+>> @@ -0,0 +1,27 @@
+>> +* Altera PCIe MSI controller
+>> +
+>> +Required properties:
+>> +- compatible:  should contain "altr,msi-1.0"
+>> +- reg:         specifies the physical base address of the controller and
+>> +               the length of the memory mapped region.
+>> +- reg-names:   Must include the following entries:
+>> +               "csr": CSR registers
+>> +               "vector_slave": vectors region
 >
-> <snip>
->
-> > +
-> > +/* Address translation table entry size */
-> > +#define ATT_ENTRY_SIZE         8
-> > +
-> > +#define DWORD_MASK             3
-> > +
-> > +struct altera_pcie {
-> > +       struct platform_device  *pdev;
-> > +       struct resource         *txs;
->
-> You have "Txs" documented in the bindings document, you have a pointer
-> here, but you've never used it
-> anywhre in the code? What is it for?
-Good catch. Forgot to remove this txs field here, we no longer require
-to keep this in struct.
+> Can you be a little bit more specific here? What is a vectors region?
+> Also, I'm not 100% sure, but I think "vector-slave" should be used.
+This parameter is the Avalon slave name in MSI IP hardware. It is auto
+generated from dts generator.
+I can add more description for it here.
 
 >
-> > +       void __iomem            *cra_base;
-> > +       int                     irq;
-> > +       u8                      root_bus_nr;
-> > +       struct irq_domain               *irq_domain;
-> > +       struct resource         bus_range;
-> > +       struct list_head                resources;
-> > +};
-> > +
+>> +-interrupts:   specifies the interrupt source of the parent interrupt
+>> +               controller. The format of the interrupt specifier depends on the
+>> +               parent interrupt controller.
 >
-> <snip>
->
-> > +
-> > +static int tlp_cfg_dword_read(struct altera_pcie *pcie, u8 bus, u32 devfn,
-> > +                             int where, u32 *value)
-> > +{
-> > +       int ret;
-> > +       u32 headers[TLP_HDR_SIZE];
-> > +
-> > +       if (bus == pcie->root_bus_nr)
-> > +               headers[0] = TLP_CFG_DW0(TLP_FMTTYPE_CFGRD0);
-> > +       else
-> > +               headers[0] = TLP_CFG_DW0(TLP_FMTTYPE_CFGRD1);
-> > +
-> > +       headers[1] = TLP_CFG_DW1(TLP_REQ_ID(pcie->root_bus_nr, devfn),
-> > +                                       TLP_READ_TAG);
-> > +       headers[2] = TLP_CFG_DW2(bus, devfn, where);
-> > +
-> > +       tlp_write_packet(pcie, headers, 0);
-> > +
-> > +       ret = tlp_read_packet(pcie, value);
-> > +       if (ret)
-> > +               *value = ~0UL;  /* return 0xFFFFFFFF if error */
-> > +
-> > +       return ret;
-> > +}
-> > +
-> > +static int tlp_cfg_dword_write(struct altera_pcie *pcie, u8 bus, u32 devfn,
-> > +                              int where, u32 value)
-> > +{
-> > +       u32 headers[TLP_HDR_SIZE];
-> > +
-> > +       if (bus == pcie->root_bus_nr)
-> > +               headers[0] = TLP_CFG_DW0(TLP_FMTTYPE_CFGWR0);
-> > +       else
-> > +               headers[0] = TLP_CFG_DW0(TLP_FMTTYPE_CFGWR1);
-> > +
-> > +       headers[1] = TLP_CFG_DW1(TLP_REQ_ID(pcie->root_bus_nr, devfn),
-> > +                                       TLP_WRITE_TAG);
-> > +       headers[2] = TLP_CFG_DW2(bus, devfn, where);
-> > +
-> > +       tlp_write_packet(pcie, headers, value);
-> > +
-> > +       tlp_read_packet(pcie, NULL);
->
-> You need to check for the error here.
+> Need to document "interrupt-parent" .
 Okay.
 
 >
-> > +
-> > +       /* Keep an eye out for changes to the root bus number */
-> > +       if ((bus == pcie->root_bus_nr) && (where == PCI_PRIMARY_BUS))
-> > +               pcie->root_bus_nr = (u8)(value);
-> > +
-> > +       return PCIBIOS_SUCCESSFUL;
-> > +}
-> > +
+>> +- num-vectors: Number of vectors, range 1 to 32.
+>> +- msi-controller:      indicates that this is MSI controller node
+>> +
+>> +
+>> +Example
+>> +msi0: msi at 0xFF200000 {
+>> +       compatible = "altr,msi-1.0";
+>> +       reg = <0xFF200000 0x00000010
+>> +               0xFF200010 0x00000080>;
+>> +       reg-names = "csr", "vector_slave";
+>> +       interrupt-parent = <&hps_0_arm_gic_0>;
+>> +       interrupts = <0 42 4>;
+>> +       msi-controller = <1>;
+>> +       num-vectors = <32>;
+>> +};
+>> diff --git a/Documentation/devicetree/bindings/pci/altera-pcie.txt b/Documentation/devicetree/bindings/pci/altera-pcie.txt
+>> new file mode 100644
+>> index 0000000..73a8dc0
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/pci/altera-pcie.txt
+>> @@ -0,0 +1,49 @@
+>> +* Altera PCIe controller
+>> +
+>> +Required properties:
+>> +- compatible : should contain "altr,pcie-root-port-1.0"
+>> +- reg:         A list of physical base address and length for TXS and CRA.
+>> +- reg-names:   Must include the following entries:
+>> +               "Txs" or "txs": TXS region
 >
-> <snip>
->
-> > +
-> > +static int altera_pcie_parse_dt(struct altera_pcie *pcie)
-> > +{
-> > +       struct resource *cra;
-> > +       struct platform_device *pdev = pcie->pdev;
-> > +
-> > +       cra = platform_get_resource_byname(pdev, IORESOURCE_MEM, "Cra");
-> > +       if (!cra) {
-> > +               cra = platform_get_resource_byname(pdev, IORESOURCE_MEM, "cra");
-> > +               if (!cra) {
-> > +                       dev_err(&pdev->dev,
-> > +                               "no cra memory resource defined\n");
-> > +                       return -ENODEV;
-> > +               }
-> > +       }
-> > +
->
-> What about "Txs"?
-We doesn't need to get resource for "Txs" here. We use standard pci
-binding with "ranges" dts parameter to map the pci memory region.
-Our dts generator still will generate this "Txs" dts parameter,
-because it is one of Avalon slave port of PCIe IP.
+> What is a TXS region?
+It is TX slave port in PCIe IP. I can update this.
 
+>
+>> +               "Cra" or "cra": Control register access region
+>> +-interrupts:   specifies the interrupt source of the parent interrupt controller.
+>> +               The format of the interrupt specifier depends on the parent interrupt
+>> +               controller.
+>> +- device_type: must be "pci"
+>> +- #address-cells:      set to <3>
+>> +- #size-cells: set to <2>
+>> +- #interrupt-cells:    set to <1>
+>> +- ranges:              Describes the translation of addresses for root ports and standard
+>> +               PCI regions.
+>> +- interrupt-map-mask and interrupt-map: standard PCI properties
+>> +       to define the mapping of the PCIe interface to interrupt
+>> +       numbers.
+>
+> "interrupt-parent" ?
+Will add it.
+
+Thanks.
 
 Regards
 Ley Foon
