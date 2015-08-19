@@ -1,98 +1,106 @@
-From: gabriel.fernandez@linaro.org (Gabriel Fernandez)
-Date: Wed, 19 Aug 2015 10:48:14 +0200
-Subject: [PATCH 2/2] drivers: clk: st: Rename st_pll3200c32_407_c0_x into
- st_pll3200c32_cx_x
-In-Reply-To: <1439974094-32322-1-git-send-email-gabriel.fernandez@linaro.org>
-References: <1439974094-32322-1-git-send-email-gabriel.fernandez@linaro.org>
-Message-ID: <1439974094-32322-3-git-send-email-gabriel.fernandez@linaro.org>
+From: j.anaszewski@samsung.com (Jacek Anaszewski)
+Date: Wed, 19 Aug 2015 10:49:08 +0200
+Subject: [PATCH v2 19/21] leds: leds-pasic3: Add support for PASIC3 LED
+ controller
+In-Reply-To: <55D3A832.90705@tul.cz>
+References: <cover.1439843482.git.petr.cvek@tul.cz> <55D25ADC.10703@tul.cz>
+ <55D30875.3090103@samsung.com> <55D3A832.90705@tul.cz>
+Message-ID: <55D44304.1000503@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use a generic name for this kind of PLL
+On 08/18/2015 11:48 PM, Petr Cvek wrote:
+> Dne 18.8.2015 v 12:27 Jacek Anaszewski napsal(a):
+>> Hi Petr,
+>>
+>> On 08/18/2015 12:06 AM, Petr Cvek wrote:
+>>> +/*
+>>> + * AIC3 (or PASIC3) LED driver for HTC Magician/Alpine/.. (not Compaq ASIC3)
+>>
+>> s/AIC3/ASIC3/
+>>
+>> I am a bit confused. What's the relation between ASIC3 and PASIC3?
+>
+> Actually both drivers should be renamed to AIC3 (or AIC only, as there is version 2). "HTC_AIC3" is written on the chip and "pasic3" is confusing with compaq asic3 driver, which claims in Kconfig help to be compatible with HTC machines. Compaq ASIC3 has much more functionality and from brief look it seems it has 16 bit registers (HTC_AIC3 has only LEDs, RESET and DS1WM and has 8 bit registers).
 
-Correction in dts files are already done here:
-commit 5eb26c605909 ("ARM: STi: DT: Rename st_pll3200c32_407_c0_x into st_pll3200c32_cx_x")
+I see, thanks for the explanation.
 
-Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
----
- drivers/clk/st/clkgen-fsyn.c |  8 ++++----
- drivers/clk/st/clkgen-pll.c  | 12 ++++++------
- 2 files changed, 10 insertions(+), 10 deletions(-)
+>>> +spinlock_t lock;
+>>
+>> Please move it to the struct pasic3_leds_data.
+>
+> OK
+>
+>>
+>>> +
+>>> +static void brightness_set(struct led_classdev *cdev,
+>>> +    enum led_brightness value)
+>>> +{
+>>> +    struct platform_device *pdev = to_platform_device(cdev->dev->parent);
+>>> +    struct pasic3_led *led = dev_get_platdata(cdev->dev);
+>>> +    struct pasic3_leds_pdata *pdata = dev_get_platdata(&pdev->dev);
+>>> +    unsigned long flags;
+>>> +    u8 val;
+>>> +
+>>> +    spin_lock_irqsave(&lock, flags);
+>>> +
+>>> +    if (value == LED_OFF) {
+>>> +        val = pasic3_read_register(pdata->mfd_dev, PASIC3_CH_CONTROL);
+>>> +        pasic3_write_register(pdata->mfd_dev, PASIC3_CH_CONTROL,
+>>> +            val & ~(led->bit_blink_en | led->bit_force_on));
+>>> +
+>>> +        val = pasic3_read_register(pdata->mfd_dev, PASIC3_MASK_A);
+>>> +        pasic3_write_register(pdata->mfd_dev, PASIC3_MASK_A,
+>>> +            val & ~led->bit_mask);
+>>> +
+>>> +        if (pdata->power_gpio) {
+>>> +            pdata->power_gpio_users--;
+>>
+>> Now it is possible that power_gpio_users will have negative value.
+>> You should check the value before decrementing it.
+>
+>> Now you are setting power_gpio_users to 1 each time brightness is set,
+>> whereas it should be set to 1 only if it was 0.
+>>
+>> This could be changed to:
+>>
+>> if (pdata->power_gpio_users == 0)
+>>      gpio_set_value(pdata->power_gpio, 1);
+>>
+>> pdata->power_gpio_users++;
+>
+>>
+>> Shouldn't you check if also power_gpio state doesn't need to be altered
+>> here?
+>>
+>
+>
+> Can the same brightness_set() function be called multiple times with same value (like LED_ON)?
 
-diff --git a/drivers/clk/st/clkgen-fsyn.c b/drivers/clk/st/clkgen-fsyn.c
-index 83ccf14..576cd03 100644
---- a/drivers/clk/st/clkgen-fsyn.c
-+++ b/drivers/clk/st/clkgen-fsyn.c
-@@ -307,7 +307,7 @@ static const struct clkgen_quadfs_data st_fs660c32_F_416 = {
- 	.get_rate	= clk_fs660c32_dig_get_rate,
- };
- 
--static const struct clkgen_quadfs_data st_fs660c32_C_407 = {
-+static const struct clkgen_quadfs_data st_fs660c32_C = {
- 	.nrst_present = true,
- 	.nrst	= { CLKGEN_FIELD(0x2f0, 0x1, 0),
- 		    CLKGEN_FIELD(0x2f0, 0x1, 1),
-@@ -350,7 +350,7 @@ static const struct clkgen_quadfs_data st_fs660c32_C_407 = {
- 	.get_rate	= clk_fs660c32_dig_get_rate,
- };
- 
--static const struct clkgen_quadfs_data st_fs660c32_D_407 = {
-+static const struct clkgen_quadfs_data st_fs660c32_D = {
- 	.nrst_present = true,
- 	.nrst	= { CLKGEN_FIELD(0x2a0, 0x1, 0),
- 		    CLKGEN_FIELD(0x2a0, 0x1, 1),
-@@ -1077,11 +1077,11 @@ static const struct of_device_id quadfs_of_match[] = {
- 	},
- 	{
- 		.compatible = "st,stih407-quadfs660-C",
--		.data = &st_fs660c32_C_407
-+		.data = &st_fs660c32_C
- 	},
- 	{
- 		.compatible = "st,stih407-quadfs660-D",
--		.data = &st_fs660c32_D_407
-+		.data = &st_fs660c32_D
- 	},
- 	{}
- };
-diff --git a/drivers/clk/st/clkgen-pll.c b/drivers/clk/st/clkgen-pll.c
-index 47a38a9..b2a332c 100644
---- a/drivers/clk/st/clkgen-pll.c
-+++ b/drivers/clk/st/clkgen-pll.c
-@@ -193,7 +193,7 @@ static const struct clkgen_pll_data st_pll3200c32_407_a0 = {
- 	.ops		= &stm_pll3200c32_ops,
- };
- 
--static const struct clkgen_pll_data st_pll3200c32_407_c0_0 = {
-+static const struct clkgen_pll_data st_pll3200c32_cx_0 = {
- 	/* 407 C0 PLL0 */
- 	.pdn_status	= CLKGEN_FIELD(0x2a0,	0x1,			8),
- 	.locked_status	= CLKGEN_FIELD(0x2a0,	0x1,			24),
-@@ -205,7 +205,7 @@ static const struct clkgen_pll_data st_pll3200c32_407_c0_0 = {
- 	.ops		= &stm_pll3200c32_ops,
- };
- 
--static const struct clkgen_pll_data st_pll3200c32_407_c0_1 = {
-+static const struct clkgen_pll_data st_pll3200c32_cx_1 = {
- 	/* 407 C0 PLL1 */
- 	.pdn_status	= CLKGEN_FIELD(0x2c8,	0x1,			8),
- 	.locked_status	= CLKGEN_FIELD(0x2c8,	0x1,			24),
-@@ -624,12 +624,12 @@ static const struct of_device_id c32_pll_of_match[] = {
- 		.data = &st_pll3200c32_407_a0,
- 	},
- 	{
--		.compatible = "st,stih407-plls-c32-c0_0",
--		.data = &st_pll3200c32_407_c0_0,
-+		.compatible = "st,plls-c32-cx_0",
-+		.data = &st_pll3200c32_cx_0,
- 	},
- 	{
--		.compatible = "st,stih407-plls-c32-c0_1",
--		.data = &st_pll3200c32_407_c0_1,
-+		.compatible = "st,plls-c32-cx_1",
-+		.data = &st_pll3200c32_cx_1,
- 	},
- 	{
- 		.compatible = "st,stih407-plls-c32-a9",
+Yes it can. LED core doesn't check if the value isn't already set.
+
+> I think I will change it to a different code altogether, power_gpio is shared variable and power can be shut off when two of three leds are disabled (green LED does not use power_gpio). Something like:
+>
+> enabled_leds |= BIT(hw_num);
+>
+> or
+>
+> enabled_leds &= ~BIT(hw_num);
+
+OK, we'll discuss that after you'll submit the next version.
+
+>
+>>> +        ret = gpio_request(pdata->power_gpio,
+>>> +            "Red-Blue LED Power");
+>>
+>> Please use devm_gpio_request. Then you will not need pasic3_led_remove.
+>>
+>
+> OK
+>
+>
+
+
 -- 
-1.9.1
+Best Regards,
+Jacek Anaszewski
