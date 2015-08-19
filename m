@@ -1,94 +1,47 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 21 Aug 2015 10:27:53 +0900
-Subject: [PATCH 1/5] drivers: soc: add support for exynos SROM driver
-In-Reply-To: <55D5BB56.1030405@samsung.com>
-References: <1430296712-10287-1-git-send-email-pankaj.dubey@samsung.com>
- <1430296712-10287-2-git-send-email-pankaj.dubey@samsung.com>
- <5565AFE6.5030106@samsung.com> <55D5BB56.1030405@samsung.com>
-Message-ID: <55D67E99.60505@samsung.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 19 Aug 2015 09:18:34 -0700
+Subject: [PATCH] ARM: multi_v7_defconfig: Enable CROS_EC_PROTO for
+ ChromeOS EC mfd driver
+In-Reply-To: <55D3B195.6030608@osg.samsung.com>
+References: <1439881827-22613-1-git-send-email-javier@osg.samsung.com>
+ <20150818214608.GA21855@localhost>
+ <55D3B195.6030608@osg.samsung.com>
+Message-ID: <20150819161834.GB21855@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20.08.2015 20:34, Pankaj Dubey wrote:
-> Hi Krzysztof,
+On Wed, Aug 19, 2015 at 12:28:37AM +0200, Javier Martinez Canillas wrote:
+> Hello Olof,
 > 
-> Sorry for delay in reply, as I got busy in some other official
-> assignments and could not take this series further at that time.
+> On 08/18/2015 11:46 PM, Olof Johansson wrote:
+> > On Tue, Aug 18, 2015 at 09:10:27AM +0200, Javier Martinez Canillas wrote:
+> >> The ChromeOS mfd driver (MFD_CROS_EC) select the CROS_EC_PROTO config
+> >> symbol because the driver uses some communication helper functions in
+> >> drivers/platform/chrome/cros_ec_proto.c but other drivers depends on
+> >> CROS_EC_PROTO instead. Mixing select and depends can lead to circular
+> >> Kconfig dependencies so the MFD_CROS_EC select should be changed to a
+> >> depends on CROS_EC_PROTO instead.
+> >>
+> >> But doing so will break git bisect-ability since MFD_CROS_EC will not
+> >> be enabled anymore unless the default configs first explicitly enable
+> >> the CROS_EC_PROTO dependency.
+> >>
+> >> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> > 
+> > Applied to cros/ec-config in arm-soc, which will stay stable in case others
+> > need to bring in as a prereq.
+> >
 > 
-> On Wednesday 27 May 2015 05:22 PM, Krzysztof Kozlowski wrote:
->> W dniu 29.04.2015 o 17:38, Pankaj Dubey pisze:
->>> This patch adds Exynos SROM controller driver which will handle
->>> save restore of SROM registers during S2R.
->>>
->>> Change-Id: Iaddaaebc1d7090c9889e948e68e886519562c43c
->>
->> Please remove it.
+> Thanks but Bartolomiej's feedback [0] on my patch that made CROS_EC_PROTO
+> a user selectable option was to leave it as a non-visible option and instead
+> change the other Kconfig symbols to select CROS_EC_PROTO consistently.
 > 
-> Will do it.
+> So tomorrow I'll post a new patch series along those lines that will make
+> this patch obsolete since no defconfig changes will be needed.
 > 
->>
->>> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
->>> ---
->>>   drivers/soc/Kconfig               |   1 +
->>>   drivers/soc/Makefile              |   1 +
->>>   drivers/soc/samsung/Kconfig       |  14 ++++
->>>   drivers/soc/samsung/Makefile      |   1 +
->>>   drivers/soc/samsung/exynos-srom.c | 142
->>> ++++++++++++++++++++++++++++++++++++++
->>>   drivers/soc/samsung/exynos-srom.h |  51 ++++++++++++++
->>>   6 files changed, 210 insertions(+)
->>>   create mode 100644 drivers/soc/samsung/Kconfig
->>>   create mode 100644 drivers/soc/samsung/Makefile
->>>   create mode 100644 drivers/soc/samsung/exynos-srom.c
->>>   create mode 100644 drivers/soc/samsung/exynos-srom.h
->>>
->>> diff --git a/drivers/soc/Kconfig b/drivers/soc/Kconfig
->>> index 76d6bd4..c3abfbe 100644
->>> --- a/drivers/soc/Kconfig
->>> +++ b/drivers/soc/Kconfig
->>> @@ -1,6 +1,7 @@
->>>   menu "SOC (System On Chip) specific Drivers"
->>>
->>>   source "drivers/soc/qcom/Kconfig"
->>> +source "drivers/soc/samsung/Kconfig"
->>>   source "drivers/soc/ti/Kconfig"
->>>   source "drivers/soc/versatile/Kconfig"
->>>
->>> diff --git a/drivers/soc/Makefile b/drivers/soc/Makefile
->>> index 063113d..620366f 100644
->>> --- a/drivers/soc/Makefile
->>> +++ b/drivers/soc/Makefile
->>> @@ -3,6 +3,7 @@
->>>   #
->>>
->>>   obj-$(CONFIG_ARCH_QCOM)        += qcom/
->>> +obj-$(CONFIG_SOC_SAMSUNG)    += samsung/
->>>   obj-$(CONFIG_ARCH_TEGRA)    += tegra/
->>>   obj-$(CONFIG_SOC_TI)        += ti/
->>>   obj-$(CONFIG_PLAT_VERSATILE)    += versatile/
->>> diff --git a/drivers/soc/samsung/Kconfig b/drivers/soc/samsung/Kconfig
->>> new file mode 100644
->>> index 0000000..b6fa4e6
->>> --- /dev/null
->>> +++ b/drivers/soc/samsung/Kconfig
->>> @@ -0,0 +1,14 @@
->>> +#
->>> +# SAMSUNG SoC drivers
->>> +#
->>> +menu "Samsung SOC driver support"
->>> +
->>> +config SOC_SAMSUNG
->>> +    bool
->>
->> Any reason for not using menuconfig?
->>
-> 
-> For one of my Exynos PMU patchset [1] this suggestion came from Russel
-> King, not to use user-visible sysmbol if not required.
-> [1]:
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/304451.html
+> IOW, please drop this patch and sorry for the inconvenience.
 
-Okay, thanks. I'm fine with that.
+Done.
 
-Best regards,
-Krzysztof
+
+-Olof
