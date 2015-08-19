@@ -1,52 +1,64 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 19 Aug 2015 09:28:06 +0200
-Subject: [PATCH v3 2/4] ASoC: rockchip: Add rockchip SPDIF transceiver
- driver
-In-Reply-To: <1439967408.4135.84.camel@collabora.co.uk>
-References: <1438947854-3743-1-git-send-email-sjoerd.simons@collabora.co.uk>
- <1463451.tH10lfH9Hm@phil> <1439967408.4135.84.camel@collabora.co.uk>
-Message-ID: <2559509.ITzpmR5XN3@phil>
+From: philipp.zabel@gmail.com (Philipp Zabel)
+Date: Wed, 19 Aug 2015 09:29:42 +0200
+Subject: [PATCH v2 01/21] ARM: pxa: magician: Fix Kconfig for magician
+ to always include htc-egpio
+In-Reply-To: <55D38F60.7010405@tul.cz>
+References: <cover.1439843482.git.petr.cvek@tul.cz>
+ <55D25880.3030507@tul.cz> <87zj1o8n3w.fsf@belgarion.home>
+ <55D38F60.7010405@tul.cz>
+Message-ID: <1439969382.11928.6.camel@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sjoerd,
-
-Am Mittwoch, 19. August 2015, 08:56:48 schrieb Sjoerd Simons:
-> Hey Heiko,
-> 
-> Thanks for the comments, i'm hoping to address them and Marks comments
-> in a next patch series next week.
-> 
-> On Tue, 2015-08-18 at 20:25 +0200, Heiko Stuebner wrote:
-> > > +
-> > > +     spdif->hclk = devm_clk_get(&pdev->dev, "spdif_hclk");
+Am Dienstag, den 18.08.2015, 22:02 +0200 schrieb Petr Cvek:
+> Dne 18.8.2015 v 20:31 Robert Jarzmik napsal(a):
+> > Petr Cvek <petr.cvek@tul.cz> writes:
 > > 
-> > I guess this could be named just "hclk" - as it is the identifier
-> > local to the spdif-ip. (Of course in the binding too)
+> > > The htc-egpio driver should be always included in the kernel as 
+> > > it
+> > > controls MMC/charging/IrDA power, which is the only way to get
+> > > an useful rootfs.
+> > > 
+> > > Signed-off-by: Petr Cvek <petr.cvek@tul.cz>
+> > It's already defined in magician_defconfig, why enforce it in 
+> > Kconfig ?
 > 
-> I'm entirely happy to change that, just wanted to note that the reason
-> i used spdif_hclk and spidf_clk is for consistency with the rockchip
-> -i2s binding which uses i2s_hclk ans i2s_mclk.
+> Good remark, I did not use defconfig at all (as I had to fix from 
+> zero configuration + I did not know if defconfig works and will be 
+> supported in the future).
+> 
+> I will check if magician_defconfig needs to be updated (probably for 
+> leds).
+> 
+> > 
+> > And if it's enforced and I want to build a kernel for magician 
+> > without
+> > MMC/charging/IrDA, why should I be forced to build in HTC_EGPIO ?
+> > 
+> > Or said differently, does a kernel without HTC_EGPIO is proven to 
+> > fail 100%
+> > without this option ?
+> 
+> Kernel will probably run OK, but the phone will be unusable (for any 
+> practical purposes). The EGPIO chip (CPLD) will stay in the state 
+> programmed from the previous environment (bootloader or WinCE/Mobile) 
+> and drivers fail to init because of the missing EGPIO (and if they 
+> init, they will be without any idea about state of the peripherals 
+> (no charger detection/charging current stuck on the previous 
+> settings, no LCD backlight control, no IrDA, no rootfs, no GSM, no 
+> sound, no LEDs).
+> 
+> Different PCB revisions probably use EGPIO pin for LCD power (and at 
+> least on my phone, LCD power must have very specific order).
+> 
+> For future (when ROM XIP will work) I would like to be able boot 
+> kernel from flash, which itself uses EGPIO for Vpp control (another 
+> initial EGPIO configuration). Last possible boot is from JTAG and 
+> there will be no previous EGPIO initialization.
+> 
+> Petr
 
-I was also just remembering something Thierry Reding said in the edp thread: 
-"The names are in a per-driver scope, so "dp-phy" is implied by the device 
-tree binding and driver already. You could simply use shorter names such as 
-"phy" and "24m" for example."
+I agree with Robert, let's drop this patch.
 
-
-> However i guess we could update the i2s binding at some poit as well to
-> follow similar names (with fallbacks to the old one). In general a lot
-> of the comments yourself and Mark have given actually apply to the
-> rockchip-i2s code as well so there is some cleanup to do there :)
-
-I'm not sure about updating the binding though, as it we'd need to provide 
-backwards-compatibility for the old names as well. So I don't think renaming 
-these will bring much benefit, but we can choose better names for followup 
-drivers like the spdif.
-
-I haven't looked to much into the i2s stuff yet. But with me getting a grasp on 
-the fractional dividers and the hardware drivers making it into the asoc tree 
-now, I also plan to give the i2s audio on the Chromebooks a try :-)
-
-
-Heiko
+regards
+Philipp
