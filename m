@@ -1,139 +1,50 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Wed, 19 Aug 2015 09:52:29 -0500
-Subject: [PATCH v3 14/14] drm: bridge/analogix_dp: add edid modes parse in
- get_modes method
-In-Reply-To: <1439995728-18046-1-git-send-email-ykk@rock-chips.com>
-References: <1439995728-18046-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <1439995949-18821-1-git-send-email-ykk@rock-chips.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 19 Aug 2015 20:36:05 +0530
+Subject: [PATCH 1/7] dmaengine: st_fdma: Add STMicroelectronics FDMA DT
+ binding documentation
+In-Reply-To: <1436371888-27863-2-git-send-email-peter.griffin@linaro.org>
+References: <1436371888-27863-1-git-send-email-peter.griffin@linaro.org>
+ <1436371888-27863-2-git-send-email-peter.griffin@linaro.org>
+Message-ID: <20150819150605.GA13546@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Display Port monitor could support kinds of mode which indicate
-in monitor edid, not just one single display resolution which
-defined in panel or devivetree property display timing.
+On Wed, Jul 08, 2015 at 05:11:22PM +0100, Peter Griffin wrote:
+> This patch adds the DT binding documentation for the FDMA constroller
+> found on STi based chipsets from STMicroelectronics.
+> 
+> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> ---
+>  Documentation/devicetree/bindings/dma/st_fdma.txt | 76 +++++++++++++++++++++++
+>  1 file changed, 76 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/dma/st_fdma.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/dma/st_fdma.txt b/Documentation/devicetree/bindings/dma/st_fdma.txt
+> new file mode 100644
+> index 0000000..1ec7470
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/dma/st_fdma.txt
+> @@ -0,0 +1,76 @@
+> +* STMicroelectronics Flexible Direct Memory Access Device Tree bindings
+> +
+> +The FDMA is a general-purpose direct memory access controller capable of
+> +supporting 16 independent DMA channels. It accepts up to 32 DMA requests.
+> +The FDMA is based on a Slim processor which require a firmware.
+> +
+> +* FDMA Controller
+> +
+> +Required properties:
+> +- compatible	: Should be "st,fdma_mpe31"
+> +- reg		: Should contain DMA registers location and length
+> +- interrupts	: Should contain one interrupt shared by all channel
 
-Signed-off-by: Yakir Yang <ykk@rock-chips.com>
----
-Changes in v3:
-- Add edid modes parse support
+s/channel/channels
 
-Changes in v2: None
+> +- dma-channels	: Number of channels supported by the controller
+> +- #dma-cells	: Must be <3>.
 
- drivers/gpu/drm/bridge/analogix_dp_core.c | 17 +++++++-----
- drivers/gpu/drm/bridge/analogix_dp_core.h | 45 ++++++++++++++++---------------
- 2 files changed, 33 insertions(+), 29 deletions(-)
+any reason three?
 
-diff --git a/drivers/gpu/drm/bridge/analogix_dp_core.c b/drivers/gpu/drm/bridge/analogix_dp_core.c
-index 052b9b3..83698c6 100644
---- a/drivers/gpu/drm/bridge/analogix_dp_core.c
-+++ b/drivers/gpu/drm/bridge/analogix_dp_core.c
-@@ -111,7 +111,7 @@ static unsigned char analogix_dp_calc_edid_check_sum(unsigned char *edid_data)
- 
- static int analogix_dp_read_edid(struct analogix_dp_device *dp)
- {
--	unsigned char edid[EDID_BLOCK_LENGTH * 2];
-+	unsigned char *edid = dp->edid;
- 	unsigned int extend_block = 0;
- 	unsigned char sum;
- 	unsigned char test_vector;
-@@ -915,12 +915,6 @@ static void analogix_dp_commit(struct analogix_dp_device *dp)
- 			DRM_ERROR("failed to disable the panel\n");
- 	}
- 
--	ret = analogix_dp_handle_edid(dp);
--	if (ret) {
--		dev_err(dp->dev, "unable to handle edid\n");
--		return;
--	}
--
- 	ret = analogix_dp_set_link_train(dp, dp->video_info->max_lane_count,
- 					 dp->video_info->max_link_rate);
- 	if (ret) {
-@@ -976,8 +970,17 @@ static int analogix_dp_get_modes(struct drm_connector *connector)
- {
- 	struct analogix_dp_device *dp = connector_to_dp(connector);
- 	struct analogix_dp_plat_data *plat_data = dp->plat_data;
-+	struct edid *edid = (struct edid *)dp->edid;
- 	int num_modes = 0;
- 
-+	if (analogix_dp_handle_edid(dp)) {
-+		dev_err(dp->dev, "unable to handle edid\n");
-+		return -EINVAL;
-+	}
-+
-+	drm_mode_connector_update_edid_property(connector, edid);
-+	num_modes += drm_add_edid_modes(connector, edid);
-+
- 	if (plat_data && plat_data->panel)
- 		num_modes += drm_panel_get_modes(plat_data->panel);
- 
-diff --git a/drivers/gpu/drm/bridge/analogix_dp_core.h b/drivers/gpu/drm/bridge/analogix_dp_core.h
-index 2405155..950b6ca 100644
---- a/drivers/gpu/drm/bridge/analogix_dp_core.h
-+++ b/drivers/gpu/drm/bridge/analogix_dp_core.h
-@@ -20,6 +20,28 @@
- #define MAX_CR_LOOP 5
- #define MAX_EQ_LOOP 5
- 
-+/* I2C EDID Chip ID, Slave Address */
-+#define I2C_EDID_DEVICE_ADDR			0x50
-+#define I2C_E_EDID_DEVICE_ADDR			0x30
-+
-+#define EDID_BLOCK_LENGTH			0x80
-+#define EDID_HEADER_PATTERN			0x00
-+#define EDID_EXTENSION_FLAG			0x7e
-+#define EDID_CHECKSUM				0x7f
-+
-+/* DP_MAX_LANE_COUNT */
-+#define DPCD_ENHANCED_FRAME_CAP(x)		(((x) >> 7) & 0x1)
-+#define DPCD_MAX_LANE_COUNT(x)			((x) & 0x1f)
-+
-+/* DP_LANE_COUNT_SET */
-+#define DPCD_LANE_COUNT_SET(x)			((x) & 0x1f)
-+
-+/* DP_TRAINING_LANE0_SET */
-+#define DPCD_PRE_EMPHASIS_SET(x)		(((x) & 0x3) << 3)
-+#define DPCD_PRE_EMPHASIS_GET(x)		(((x) >> 3) & 0x3)
-+#define DPCD_VOLTAGE_SWING_SET(x)		(((x) & 0x3) << 0)
-+#define DPCD_VOLTAGE_SWING_GET(x)		(((x) >> 0) & 0x3)
-+
- enum link_rate_type {
- 	LINK_RATE_1_62GBPS = DP_LINK_BW_1_62,
- 	LINK_RATE_2_70GBPS = DP_LINK_BW_2_7,
-@@ -161,6 +183,7 @@ struct analogix_dp_device {
- 	int			dpms_mode;
- 	int			hpd_gpio;
- 	bool                    need_force_hpd;
-+	unsigned char           edid[EDID_BLOCK_LENGTH * 2];
- 
- 	struct analogix_dp_plat_data *plat_data;
- };
-@@ -260,26 +283,4 @@ void analogix_dp_config_video_slave_mode(struct analogix_dp_device *dp);
- void analogix_dp_enable_scrambling(struct analogix_dp_device *dp);
- void analogix_dp_disable_scrambling(struct analogix_dp_device *dp);
- 
--/* I2C EDID Chip ID, Slave Address */
--#define I2C_EDID_DEVICE_ADDR			0x50
--#define I2C_E_EDID_DEVICE_ADDR			0x30
--
--#define EDID_BLOCK_LENGTH			0x80
--#define EDID_HEADER_PATTERN			0x00
--#define EDID_EXTENSION_FLAG			0x7e
--#define EDID_CHECKSUM				0x7f
--
--/* DP_MAX_LANE_COUNT */
--#define DPCD_ENHANCED_FRAME_CAP(x)		(((x) >> 7) & 0x1)
--#define DPCD_MAX_LANE_COUNT(x)			((x) & 0x1f)
--
--/* DP_LANE_COUNT_SET */
--#define DPCD_LANE_COUNT_SET(x)			((x) & 0x1f)
--
--/* DP_TRAINING_LANE0_SET */
--#define DPCD_PRE_EMPHASIS_SET(x)		(((x) & 0x3) << 3)
--#define DPCD_PRE_EMPHASIS_GET(x)		(((x) >> 3) & 0x3)
--#define DPCD_VOLTAGE_SWING_SET(x)		(((x) & 0x3) << 0)
--#define DPCD_VOLTAGE_SWING_GET(x)		(((x) >> 0) & 0x3)
--
- #endif /* _ANALOGIX_DP_CORE_H */
 -- 
-1.9.1
+~Vinod
