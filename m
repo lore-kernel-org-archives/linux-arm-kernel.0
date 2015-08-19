@@ -1,71 +1,103 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 19 Aug 2015 10:15:53 +0100
-Subject: [PATCH 2/2] arm64: set MAX_MEMBLOCK_ADDR according to linear
- region size
-In-Reply-To: <CAKv+Gu8hBCtxUHqBwCjfiati7kbWrq314_mTjRvzf7ZnjWXsuw@mail.gmail.com>
-References: <1439890482-20798-1-git-send-email-ard.biesheuvel@linaro.org>
- <1439890482-20798-3-git-send-email-ard.biesheuvel@linaro.org>
- <20150818100018.GA11021@arm.com>
- <CAKv+Gu-YDEKSrkSG2fywgrHBB3Hao+jodknmCAkFCWqG4OpXCA@mail.gmail.com>
- <20150818173938.GH11571@e104818-lin.cambridge.arm.com>
- <CAKv+Gu8hBCtxUHqBwCjfiati7kbWrq314_mTjRvzf7ZnjWXsuw@mail.gmail.com>
-Message-ID: <20150819091553.GD21913@e104818-lin.cambridge.arm.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Wed, 19 Aug 2015 10:28:16 +0100
+Subject: [PATCH 2/4] drm: Add support for ARM's HDLCD controller.
+In-Reply-To: <CACvgo53KWsC1ZeYYF2bW=4=BeuexaEgBHT=+h2U60iS9nYvYpw@mail.gmail.com>
+References: <1438784892-27888-1-git-send-email-Liviu.Dudau@arm.com>
+ <1438784892-27888-3-git-send-email-Liviu.Dudau@arm.com>
+ <CACvgo537C6SRfhMTNoE4cSLJukcXuKLvt1TRykynX--ybEhmaQ@mail.gmail.com>
+ <20150817151547.GA1020@e106497-lin.cambridge.arm.com>
+ <CACvgo53KWsC1ZeYYF2bW=4=BeuexaEgBHT=+h2U60iS9nYvYpw@mail.gmail.com>
+Message-ID: <20150819092816.GF1020@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 18, 2015 at 07:44:59PM +0200, Ard Biesheuvel wrote:
-> On 18 August 2015 at 19:39, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > On Tue, Aug 18, 2015 at 12:04:27PM +0200, Ard Biesheuvel wrote:
-> >> On 18 August 2015 at 12:00, Will Deacon <will.deacon@arm.com> wrote:
-> >> > On Tue, Aug 18, 2015 at 10:34:42AM +0100, Ard Biesheuvel wrote:
-> >> >> The linear region size of a 39-bit VA kernel is only 256 GB, which
-> >> >> may be insufficient to cover all of system RAM, even on platforms
-> >> >> that have much less than 256 GB of memory but which is laid out
-> >> >> very sparsely.
-> >> >>
-> >> >> So make sure we clip the memory we will not be able to map before
-> >> >> installing it into the memblock memory table, by setting
-> >> >> MAX_MEMBLOCK_ADDR accordingly.
-> >> >>
-> >> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> >> >> ---
-> >> >>  arch/arm64/include/asm/memory.h | 8 ++++++++
-> >> >>  1 file changed, 8 insertions(+)
-> >> >>
-> >> >> diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-> >> >> index f800d45ea226..44a59c20e773 100644
-> >> >> --- a/arch/arm64/include/asm/memory.h
-> >> >> +++ b/arch/arm64/include/asm/memory.h
-> >> >> @@ -114,6 +114,14 @@ extern phys_addr_t               memstart_addr;
-> >> >>  #define PHYS_OFFSET          ({ memstart_addr; })
-> >> >>
-> >> >>  /*
-> >> >> + * The maximum physical address that the linear direct mapping
-> >> >> + * of system RAM can cover. (PAGE_OFFSET can be interpreted as
-> >> >> + * a 2's complement signed quantity and negated to derive the
-> >> >> + * maximum size of the linear mapping.)
-> >> >> + */
-> >> >> +#define MAX_MEMBLOCK_ADDR    ({ memstart_addr - PAGE_OFFSET - 1; })
-> >> >
-> >> > If we initialised memory_limit to this value and changed early_mem to
-> >> > use min (i.e. only restrict the limit further), would that avoid the
-> >> > need to change the of code? It looks like PPC uses
-> >> > memblock_enforce_memory_limit for similar reasons.
+On Tue, Aug 18, 2015 at 05:41:59PM +0100, Emil Velikov wrote:
+> On 17 August 2015 at 16:15, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+> > On Sun, Aug 16, 2015 at 09:56:33AM +0100, Emil Velikov wrote:
+> >> Hi Liviu,
+> >
+> > Hi Emil,
+> >
 > >>
-> >> Yes, that would be yet another way of doing things. But since Catalin
-> >> explicitly requested that both checks (i.e., bottom end and top end)
-> >> occur in the same place, and indicated his preference not to override
-> >> early_init_dt_add_memory_arch() if we can avoid it, the only way is to
-> >> hack it in there.
+> >> On 5 August 2015 at 15:28, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+> >> > The HDLCD controller is a display controller that supports resolutions
+> >> > up to 4096x4096 pixels. It is present on various development boards
+> >> > produced by ARM Ltd and emulated by the latest Fast Models from the
+> >> > company.
+> >> >
+> >> I believe there is a unofficial requirement(?) for new drm drivers to
+> >> use atomic modesetting. Not 100% sure on this one though. The
+> >> following drivers: tegra, msm, rcar-du, i915, and Daniel's blog [1]
+> >> [2] cat provide some information on the topic.
 > >
-> > Talking to Will, we decided to go for a quick fix with cc stable that
-> > does something like:
+> > I am also interested to know if this is a requirement or not.
+> > Thanks for the pointers, I will review them again to see if I did miss
+> > anything. I remember reading them at the beginning of the year but probably
+> > the Christmas haze did not clear enough when I did.
 > >
-> >         memblock_enforce_memory_limit(min(memory_limit, ~PAGE_OFFSET));
+> There was a similar question from the freescale dcu people [1]. I
+> believe that the answer still applies.
 > 
-> ~PAGE_OFFSET + 1 ?
+> [1] http://lists.freedesktop.org/archives/dri-devel/2015-March/078689.html
+> 
+> >>
+> >> The driver seems to has has a bit of dead code guarded by
+> >> HDLCD_*_UNDERRUN. Perhaps these macros should become build or runtime
+> >> switch(es) ?
+> >
+> > There is a comment in hdlcd_drv.h explaining what HDLCD_SHOW_UNDERRUN can
+> > be used for. As for HDLCD_COUNT_BUFFERUNDERRUNS, you are right, it's dead
+> > code from the earlier debugging code that got removed before submission.
+> > I will correct that.
+> >
+> I haven't seen other drm drivers follow the "set a macro that is
+> documented in a header and rebuild" approach. Devs either add a CONFIG
+> option for it, or expose it as a module parameter. IIRC the nouveau
+> driver does even more - it enables the underrun machinery
+> unconditionally.
 
-Yes.
+Adding a module parameter probably makes more sense, I will look into that.
+
+> 
+> >>
+> >> Most DRM drivers do not threat dma, bus_error, vsync and/or underrun
+> >> interrupts as debug functionality. They are of limited use in this
+> >> driver, presently, yet the CONFIG_DEBUG_FS guard seems a bit strange
+> >> imho.
+> >
+> > The HDLCD device has only 1 interrupt that can fire and there is no other
+> > way to show the reason for the interrupt in the driver. It was useful when
+> > debugging underruns and/or vsync issues so I thought it might be useful
+> > to keep around. Putting it the other way: if you are going to use this device
+> > and the image is not completely rendered I would not be able to give you
+> > support to figure out what went wrong without this debugging information.
+> > With this in place I can tell the difference between a busy system vs one
+> > where the interrupt latency is large.
+> >
+> Out of curiosity - are there any implications/side-effects from having
+> these enabled ?
+
+Having the counters counting the interrupts should not affect the latency and
+having the default colour red means parts of the screen will flash with that
+colour when the data that was supposed to be there could not be fetched in
+time (underrun). Yes, probably not something casual users of the ARM boards
+will complain about and a highly visible effect when you have bandwidth
+starvation issues.
+
+Best regards,
+Liviu
+
+> 
+> Thanks,
+> Emil
+> 
 
 -- 
-Catalin
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
