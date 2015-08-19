@@ -1,116 +1,66 @@
 From: b38611@freescale.com (Fugang Duan)
-Date: Wed, 19 Aug 2015 13:34:01 +0800
-Subject: [PATCH v1 3/6] ARM: imx: add enet init for i.MX7D platform
+Date: Wed, 19 Aug 2015 13:34:03 +0800
+Subject: [PATCH v1 5/6] ARM: dts: imx7d: add fec1 and fec2 support for i.MX7d
+ soc
 In-Reply-To: <1439962444-27486-1-git-send-email-b38611@freescale.com>
 References: <1439962444-27486-1-git-send-email-b38611@freescale.com>
-Message-ID: <1439962444-27486-4-git-send-email-b38611@freescale.com>
+Message-ID: <1439962444-27486-6-git-send-email-b38611@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add enet phy fixup, clock source init for i.MX7D platform.
+Add fec1 and fec2 nodes for i.MX7d soc.
 
 Signed-off-by: Fugang Duan <B38611@freescale.com>
 ---
- arch/arm/mach-imx/mach-imx7d.c | 75 ++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 73 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/imx7d.dtsi | 36 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
 
-diff --git a/arch/arm/mach-imx/mach-imx7d.c b/arch/arm/mach-imx/mach-imx7d.c
-index 4d4a190..67d7939 100644
---- a/arch/arm/mach-imx/mach-imx7d.c
-+++ b/arch/arm/mach-imx/mach-imx7d.c
-@@ -5,13 +5,83 @@
-  * it under the terms of the GNU General Public License version 2 as
-  * published by the Free Software Foundation.
-  */
--#include <linux/irqchip.h>
--#include <linux/of_platform.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
-+#include <linux/brcmphy.h>
-+#include <linux/irqchip.h>
-+#include <linux/mfd/syscon.h>
-+#include <linux/mfd/syscon/imx7-iomuxc-gpr.h>
-+#include <linux/of_platform.h>
-+#include <linux/regmap.h>
- 
- #include "common.h"
- 
-+static int ar8031_phy_fixup(struct phy_device *dev)
-+{
-+	u16 val;
+diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
+index b738ce0..7631492 100644
+--- a/arch/arm/boot/dts/imx7d.dtsi
++++ b/arch/arm/boot/dts/imx7d.dtsi
+@@ -729,6 +729,42 @@
+ 				bus-width = <4>;
+ 				status = "disabled";
+ 			};
 +
-+	/* Set RGMII IO voltage to 1.8V */
-+	phy_write(dev, 0x1d, 0x1f);
-+	phy_write(dev, 0x1e, 0x8);
++			fec1: ethernet at 30be0000 {
++				compatible = "fsl,imx7d-fec", "fsl,imx6sx-fec";
++				reg = <0x30be0000 0x10000>;
++				interrupts = <GIC_SPI 118 IRQ_TYPE_LEVEL_HIGH>,
++					<GIC_SPI 119 IRQ_TYPE_LEVEL_HIGH>,
++					<GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks IMX7D_ENET_AXI_ROOT_CLK>,
++					<&clks IMX7D_ENET_AXI_ROOT_CLK>,
++					<&clks IMX7D_ENET1_TIME_ROOT_CLK>,
++					<&clks IMX7D_PLL_ENET_MAIN_125M_CLK>,
++					<&clks IMX7D_ENET_PHY_REF_ROOT_CLK>;
++				clock-names = "ipg", "ahb", "ptp",
++					"enet_clk_ref", "enet_out";
++				fsl,num-tx-queues=<3>;
++				fsl,num-rx-queues=<3>;
++				status = "disabled";
++			};
 +
-+	/* disable phy AR8031 SmartEEE function. */
-+	phy_write(dev, 0xd, 0x3);
-+	phy_write(dev, 0xe, 0x805d);
-+	phy_write(dev, 0xd, 0x4003);
-+	val = phy_read(dev, 0xe);
-+	val &= ~(0x1 << 8);
-+	phy_write(dev, 0xe, val);
-+
-+	/* introduce tx clock delay */
-+	phy_write(dev, 0x1d, 0x5);
-+	val = phy_read(dev, 0x1e);
-+	val |= 0x0100;
-+	phy_write(dev, 0x1e, val);
-+
-+	return 0;
-+}
-+
-+static int bcm54220_phy_fixup(struct phy_device *dev)
-+{
-+	/* enable RXC skew select RGMII copper mode */
-+	phy_write(dev, 0x1e, 0x21);
-+	phy_write(dev, 0x1f, 0x7ea8);
-+	phy_write(dev, 0x1e, 0x2f);
-+	phy_write(dev, 0x1f, 0x71b7);
-+
-+	return 0;
-+}
-+
-+#define PHY_ID_AR8031   0x004dd074
-+static void __init imx7d_enet_phy_init(void)
-+{
-+	if (IS_BUILTIN(CONFIG_PHYLIB)) {
-+		phy_register_fixup_for_uid(PHY_ID_AR8031, 0xffffffff,
-+					   ar8031_phy_fixup);
-+		phy_register_fixup_for_uid(PHY_ID_BCM54220, 0xffffffff,
-+					   bcm54220_phy_fixup);
-+	}
-+}
-+
-+static void __init imx7d_enet_clk_sel(void)
-+{
-+	struct regmap *gpr;
-+
-+	gpr = syscon_regmap_lookup_by_compatible("fsl,imx7d-iomuxc-gpr");
-+	if (!IS_ERR(gpr)) {
-+		regmap_update_bits(gpr, IOMUXC_GPR1, IMX7D_GPR1_ENET_TX_CLK_SEL_MASK, 0);
-+		regmap_update_bits(gpr, IOMUXC_GPR1, IMX7D_GPR1_ENET_CLK_DIR_MASK, 0);
-+	} else {
-+		pr_err("failed to find fsl,imx7d-iomux-gpr regmap\n");
-+	}
-+}
-+
-+static inline void imx7d_enet_init(void)
-+{
-+	imx7d_enet_phy_init();
-+	imx7d_enet_clk_sel();
-+}
-+
- static void __init imx7d_init_machine(void)
- {
- 	struct device *parent;
-@@ -22,6 +92,7 @@ static void __init imx7d_init_machine(void)
- 
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- 	imx_anatop_init();
-+	imx7d_enet_init();
- }
- 
- static void __init imx7d_init_irq(void)
++			fec2: ethernet at 30bf0000 {
++				compatible = "fsl,imx7d-fec", "fsl,imx6sx-fec";
++				reg = <0x30bf0000 0x10000>;
++				interrupts = <GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>,
++					<GIC_SPI 101 IRQ_TYPE_LEVEL_HIGH>,
++					<GIC_SPI 102 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks IMX7D_ENET_AXI_ROOT_CLK>,
++					<&clks IMX7D_ENET_AXI_ROOT_CLK>,
++					<&clks IMX7D_ENET2_TIME_ROOT_CLK>,
++					<&clks IMX7D_PLL_ENET_MAIN_125M_CLK>,
++					<&clks IMX7D_ENET_PHY_REF_ROOT_CLK>;
++				clock-names = "ipg", "ahb", "ptp",
++					"enet_clk_ref", "enet_out";
++				fsl,num-tx-queues=<3>;
++				fsl,num-rx-queues=<3>;
++				status = "disabled";
++			};
+ 		};
+ 	};
+ };
 -- 
 1.9.1
