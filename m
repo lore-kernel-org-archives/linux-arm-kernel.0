@@ -1,27 +1,73 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 19 Aug 2015 09:53:16 -0700
-Subject: [PATCH 1/3] spi: mediatek: revise coding style
-In-Reply-To: <1439955478-2733-2-git-send-email-leilk.liu@mediatek.com>
-References: <1439955478-2733-1-git-send-email-leilk.liu@mediatek.com>
- <1439955478-2733-2-git-send-email-leilk.liu@mediatek.com>
-Message-ID: <20150819165316.GU10748@sirena.org.uk>
+From: mathieu@codeaurora.org (Mathieu Olivari)
+Date: Wed, 19 Aug 2015 10:53:21 -0700
+Subject: [PATCH 1/2] ARM: qcom: add mdio bus on IPQ806x/AP148
+Message-ID: <1440006802-2415-1-git-send-email-mathieu@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 19, 2015 at 11:37:56AM +0800, Leilk Liu wrote:
-> This patch revises mediatek spi driver coding styles.
+Ethernet switch on AP148 is connected through MDIO using GPIO 0 and 1.
+We'll add the new node using the bitbang driver on these two pins.
 
-Two problems here.  One is that it's best practice to make purely
-stylistic changes after any substantial ones, that way people can pick
-up bug fixes without needing the stylistic changes.  The other is that
-this just isn't an adequate changelog - what are the revisions that are
-being made to the coding style and why are they being made?  This is a
-very large change and there seem to be many different and unrelated
-changes being made here.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150819/946a63f0/attachment-0001.sig>
+Signed-off-by: Mathieu Olivari <mathieu@codeaurora.org>
+---
+ arch/arm/boot/dts/qcom-ipq8064-ap148.dts | 31 ++++++++++++++++++++++++++++++-
+ 1 file changed, 30 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/qcom-ipq8064-ap148.dts b/arch/arm/boot/dts/qcom-ipq8064-ap148.dts
+index 6886d09..d73df24 100644
+--- a/arch/arm/boot/dts/qcom-ipq8064-ap148.dts
++++ b/arch/arm/boot/dts/qcom-ipq8064-ap148.dts
+@@ -19,8 +19,9 @@
+ 		};
+ 	};
+ 
+-	alias {
++	aliases {
+ 		serial0 = &uart4;
++		mdio-gpio0 = &mdio0;
+ 	};
+ 
+ 	chosen {
+@@ -84,6 +85,15 @@
+ 					};
+ 				};
+ 			};
++
++			mdio0_pins: mdio0_pins {
++				mux {
++					pins = "gpio0", "gpio1";
++					function = "gpio";
++					drive-strength = <8>;
++					bias-disable;
++				};
++			};
+ 		};
+ 
+ 		sata-phy at 1b400000 {
+@@ -93,5 +103,24 @@
+ 		sata at 29000000 {
+ 			status = "ok";
+ 		};
++
++		mdio0: mdio {
++			compatible = "virtual,mdio-gpio";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			gpios = <&qcom_pinmux 1 0 &qcom_pinmux 0 0>;
++			pinctrl-0 = <&mdio0_pins>;
++			pinctrl-names = "default";
++
++			phy0: ethernet-phy at 0 {
++				device_type = "ethernet-phy";
++				reg = <0>;
++			};
++
++			phy4: ethernet-phy at 4 {
++				device_type = "ethernet-phy";
++				reg = <4>;
++			};
++		};
+ 	};
+ };
+-- 
+2.1.4
