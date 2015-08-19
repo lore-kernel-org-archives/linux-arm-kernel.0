@@ -1,38 +1,36 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 19 Aug 2015 15:22:55 +0100
-Subject: [PATCH v3 5/5] ARM: STi: DT: STiH407: Enable Mailbox testing facility
-In-Reply-To: <1439994175-13360-1-git-send-email-lee.jones@linaro.org>
-References: <1439994175-13360-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1439994175-13360-6-git-send-email-lee.jones@linaro.org>
+From: hramrach@gmail.com (Michal Suchanek)
+Date: Wed, 19 Aug 2015 16:35:36 +0200
+Subject: un4i-ss-cipher.c warning
+Message-ID: <CAOMqctShdb9xEkBmuaQKfB1cwGupbfH5TS5ZB_P85Hwpn+4zAA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch supplies a Client node to enable the Mailbox testing
-facility.  It will be used to send and receive messages from any
-given co-processor in order to test the STi Mailbox Controller
-driver.
+Hello,
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- arch/arm/boot/dts/stih407-family.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+when building a kernel with sunxi crypto driver as merged into the
+sinxi-wip branch I get a compiler warning.
 
-diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
-index 32da3f8..ac1d1ee 100644
---- a/arch/arm/boot/dts/stih407-family.dtsi
-+++ b/arch/arm/boot/dts/stih407-family.dtsi
-@@ -566,6 +566,12 @@
- 			};
- 		};
- 
-+		mailbox_test {
-+			compatible = "mailbox_test";
-+			mboxes = <&mailbox2 1 31>, <&mailbox0 1 31>;
-+			mbox-names = "tx", "rx";
-+		};
-+
- 		mailbox0: mailbox at 0  {
- 			compatible	= "st,stih407-mailbox";
- 			reg		= <0x8f00000 0x1000>;
--- 
-1.9.1
+I am not sure this is the latest version of the driver. It does not
+seem to be in mainline yet.
+
+Thanks
+
+Michal
+
+In file included from /scratch/build/linux/include/linux/printk.h:277:0,
+                 from /scratch/build/linux/include/linux/kernel.h:13,
+                 from /scratch/build/linux/include/linux/clk.h:16,
+                 from
+/scratch/build/linux/drivers/crypto/sunxi-ss/sun4i-ss.h:15,
+                 from
+/scratch/build/linux/drivers/crypto/sunxi-ss/sun4i-ss-cipher.c:17:
+/scratch/build/linux/drivers/crypto/sunxi-ss/sun4i-ss-cipher.c: In
+function ?sun4i_ss_cipher_poll?:
+/scratch/build/linux/include/linux/dynamic_debug.h:86:3: warning:
+?todo? may be used uninitialized in this function
+[-Wmaybe-uninitialized]
+   __dynamic_dev_dbg(&descriptor, dev, fmt, \
+   ^
+/scratch/build/linux/drivers/crypto/sunxi-ss/sun4i-ss-cipher.c:144:15:
+note: ?todo? was declared here
+  unsigned int todo;
