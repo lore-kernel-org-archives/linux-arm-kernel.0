@@ -1,58 +1,49 @@
-From: dhdang@apm.com (Duc Dang)
-Date: Wed, 19 Aug 2015 14:28:33 -0700
-Subject: [PATCH v5 1/2] usb: make xhci platform driver use 64 bit or 32
- bit DMA
-In-Reply-To: <1643536.i8Q5EFEN01@wuerfel>
-References: <CADaLNDkU14GCPZE_zNt_9kMSsUdywyNp1QCiWpokXQgbfRS0qw@mail.gmail.com>
- <20150808092252.GJ7557@n2100.arm.linux.org.uk>
- <CADaLNDn4SvW3hvi7H0c_z2xgVSgRHLOK06xMyTYJd+ddFqc7Nw@mail.gmail.com>
- <1643536.i8Q5EFEN01@wuerfel>
-Message-ID: <CADaLNDmYt+k6Sw6q+t2-FA7muk=x6h_hfYV321B03qBPMD_=AA@mail.gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 19 Aug 2015 14:28:54 -0700
+Subject: [PATCH v1 1/6] net: phy: broadcom: add bcm54220 phy ID
+In-Reply-To: <1439962444-27486-2-git-send-email-b38611@freescale.com>
+References: <1439962444-27486-1-git-send-email-b38611@freescale.com>
+ <1439962444-27486-2-git-send-email-b38611@freescale.com>
+Message-ID: <CAGVrzcak2u_kBg1o061OO0UK8sdrXaKF+-7eREwByD-dQ1r1XQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 15, 2015 at 1:05 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->
-> On Saturday 08 August 2015 13:31:02 Duc Dang wrote:
-> > >
-> > > If we know that pdev->dev.dma_mask will always be initialised at this
-> > > point, then the above change is fine.  If not, it's introducing a
-> > > regression - dma_set_mask_and_coherent() will fail if pdev->dev.dma_mask
-> > > is NULL (depending on the architectures implementation of dma_set_mask()).
-> > >
-> > > Prefixing the above change with the two lines I mention above would
-> > > ensure equivalent behaviour.  Even if we do want to get rid of this,
-> > > I'd advise to do it as a separate patch after this change, which can
-> > > be independently reverted if there's problems with its removal.
-> > >
-> > Hi Russell,
-> >
-> > I will add the 2 lines you mentioned back to next version of the
-> > patch. It is safer to do it that way as I do not see
-> > pdev->dev.dma_mask gets initialized before the call
-> > dma_set_mask_and_coherent  inside this xhci_plat.c file.
->
-> It would be good to add a WARN_ON() to the case where dma_mask
-> is a NULL pointer at the least. That way, we will at least
-> find out if there are some broken platforms that do not correctly
-> initialize the mask pointer.
+2015-08-18 22:33 GMT-07:00 Fugang Duan <b38611@freescale.com>:
+> Add bcm54220 phy ID entry.
 
-Hi Arnd,
-
-So the check will look like this, please let me know what do you think:
-        if (!pdev->dev.dma_mask) {
-                WARN_ON(1);
-                /* Initialize dma_mask if the broken platform code has
-not done so */
-                pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
-        }
+This change itself is fine, but looking at the rest of your changes,
+we are not adding an entry for this PHY in drivers/net/phy/broadcom.c,
+which means that we will bind to the Generic PHY driver, and so this
+looks sufficient, even with your fixup done in the subsequent patch.
 
 >
->         Arnd
-
+> Signed-off-by: Fugang Duan <B38611@freescale.com>
+> ---
+>  include/linux/brcmphy.h | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/include/linux/brcmphy.h b/include/linux/brcmphy.h
+> index 697ca77..20bed15 100644
+> --- a/include/linux/brcmphy.h
+> +++ b/include/linux/brcmphy.h
+> @@ -16,6 +16,7 @@
+>  #define PHY_ID_BCM5482                 0x0143bcb0
+>  #define PHY_ID_BCM5411                 0x00206070
+>  #define PHY_ID_BCM5421                 0x002060e0
+> +#define PHY_ID_BCM54220                        0x600d8589
+>  #define PHY_ID_BCM5464                 0x002060b0
+>  #define PHY_ID_BCM5461                 0x002060c0
+>  #define PHY_ID_BCM54616S               0x03625d10
+> --
+> 1.9.1
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
 
 
 -- 
-Regards,
-Duc Dang.
+Florian
