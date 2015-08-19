@@ -1,38 +1,52 @@
 From: ykk@rock-chips.com (Yakir Yang)
-Date: Wed, 19 Aug 2015 09:52:09 -0500
-Subject: [PATCH v3 12/14] drm: bridge/analogix_dp: expand the delay time for
- hpd detect
+Date: Wed, 19 Aug 2015 09:52:19 -0500
+Subject: [PATCH v3 13/14] drm: bridge/analogix_dp: move hpd detect to
+ connector detect function
 In-Reply-To: <1439995728-18046-1-git-send-email-ykk@rock-chips.com>
 References: <1439995728-18046-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <1439995929-18719-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <1439995939-18770-1-git-send-email-ykk@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some edp screen with no hpd signal would need some delay time
-to ensure that screen would be ready for work, so we can expand
-the delay time in hpd detect function, it works prefectly on my
-rk3288 sdk board.
-
 Signed-off-by: Yakir Yang <ykk@rock-chips.com>
 ---
-Changes in v3: None
+Changes in v3:
+- move dp hpd detect to connector detect function.
+
 Changes in v2: None
 
- drivers/gpu/drm/bridge/analogix_dp_core.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/gpu/drm/bridge/analogix_dp_core.c | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/gpu/drm/bridge/analogix_dp_core.c b/drivers/gpu/drm/bridge/analogix_dp_core.c
-index 99870f7..75dd44a 100644
+index 75dd44a..052b9b3 100644
 --- a/drivers/gpu/drm/bridge/analogix_dp_core.c
 +++ b/drivers/gpu/drm/bridge/analogix_dp_core.c
-@@ -68,7 +68,7 @@ static int analogix_dp_detect_hpd(struct analogix_dp_device *dp)
- 			return 0;
- 
- 		timeout_loop++;
--		usleep_range(10, 11);
-+		usleep_range(100, 110);
+@@ -915,12 +915,6 @@ static void analogix_dp_commit(struct analogix_dp_device *dp)
+ 			DRM_ERROR("failed to disable the panel\n");
  	}
  
- 	/*
+-	ret = analogix_dp_detect_hpd(dp);
+-	if (ret) {
+-		/* Cable has been disconnected, we're done */
+-		return;
+-	}
+-
+ 	ret = analogix_dp_handle_edid(dp);
+ 	if (ret) {
+ 		dev_err(dp->dev, "unable to handle edid\n");
+@@ -953,6 +947,12 @@ static void analogix_dp_commit(struct analogix_dp_device *dp)
+ static enum drm_connector_status analogix_dp_detect(
+ 				struct drm_connector *connector, bool force)
+ {
++	struct analogix_dp_device *dp = connector_to_dp(connector);
++
++	if (analogix_dp_detect_hpd(dp))
++		/* Cable has been disconnected, we're done */
++		return connector_status_disconnected;
++
+ 	return connector_status_connected;
+ }
+ 
 -- 
 1.9.1
