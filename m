@@ -1,48 +1,50 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 19 Aug 2015 22:23:49 +0530
-Subject: [PATCHv4 2/6] dmaengine: mv_xor: add suspend/resume support
-In-Reply-To: <20150729113405.2b337ae0@free-electrons.com>
-References: <1436365699-6862-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1436365699-6862-3-git-send-email-thomas.petazzoni@free-electrons.com>
- <20150722051011.GQ23525@localhost>
- <20150729113405.2b337ae0@free-electrons.com>
-Message-ID: <20150819165349.GJ13546@localhost>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 19 Aug 2015 17:56:43 +0100
+Subject: [PATCH] arm64: entry: always restore x0 from the stack on
+ syscall return
+In-Reply-To: <20150819163504.GL24062@e104818-lin.cambridge.arm.com>
+References: <1439996989-5772-1-git-send-email-will.deacon@arm.com>
+ <20150819160320.GI24062@e104818-lin.cambridge.arm.com>
+ <20150819162359.GA10297@arm.com>
+ <20150819163504.GL24062@e104818-lin.cambridge.arm.com>
+Message-ID: <20150819165643.GD10297@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 29, 2015 at 11:34:05AM +0200, Thomas Petazzoni wrote:
-> Vinod,
+On Wed, Aug 19, 2015 at 05:35:05PM +0100, Catalin Marinas wrote:
+> On Wed, Aug 19, 2015 at 05:23:59PM +0100, Will Deacon wrote:
+> > On Wed, Aug 19, 2015 at 05:03:20PM +0100, Catalin Marinas wrote:
+> > > There is another str x0 in __sys_trace_return which I think we could
+> > > remove.
+> > 
+> > Hmm, I don't think we can remove that. It's needed on the slowpath to
+> > update the pt_regs with either -ENOSYS (for __ni_sys_trace) or the
+> > syscall return value from the blr in __sys_trace.
+> > 
+> > What we can do instead is change the branch above to branch to
+> > __sys_trace_return_skipped. Patch below.
+> > 
+> > Will
+> > 
+> > --->8
+> > 
+> > diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+> > index 2a5e64ccc991..088322ff1ba0 100644
+> > --- a/arch/arm64/kernel/entry.S
+> > +++ b/arch/arm64/kernel/entry.S
+> > @@ -619,7 +619,7 @@ ret_fast_syscall:
+> >         kernel_exit 0
+> >  ret_fast_syscall_trace:
+> >         enable_irq                              // enable interrupts
+> > -       b       __sys_trace_return
+> > +       b       __sys_trace_return_skipped      // we already saved x0
 > 
-> On Wed, 22 Jul 2015 10:40:11 +0530, Vinod Koul wrote:
+> That would do. With this added:
 > 
-> > > +static int mv_xor_suspend(struct platform_device *pdev, pm_message_t state)
-> > > +{
-> > > +	struct mv_xor_device *xordev = platform_get_drvdata(pdev);
-> > > +	int i;
-> > > +
-> > > +	for (i = 0; i < MV_XOR_MAX_CHANNELS; i++) {
-> > > +		struct mv_xor_chan *mv_chan = xordev->channels[i];
-> > > +
-> > > +		if (!mv_chan)
-> > > +			continue;
-> > > +
-> > > +		mv_chan->saved_config_reg =
-> > > +			readl_relaxed(XOR_CONFIG(mv_chan));
-> > > +		mv_chan->saved_int_mask_reg =
-> > > +			readl_relaxed(XOR_INTR_MASK(mv_chan));
-> > this sound fine, but I am missing the suspension of the channel. If a
-> > transfer was active while suspend was invoked then how would this work?
+> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 > 
-> There are indeed no provisions to handle this problem. Does the
-> dmaengine framework provide any helpers to ease with this? I have
-> quickly looked at other dmaengine drivers, and I haven't seen any of
-> them taking care of this problem. Do you have a pointer to a driver
-> handling this problem?
+> (or I can take it for 4.2 but I'd like more testing like LTP)
 
-Sorry for delay...
+Yeah, I'll run some tests overnight and see how it holds up.
 
-Should this be solved at framework level? We should rather suspend the
-channels, save the cfg and then restore that on resume.
-
--- 
-~Vinod
+Will
