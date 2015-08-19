@@ -1,158 +1,71 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 19 Aug 2015 11:14:00 +0200
-Subject: [GIT PULL 9/9] ARM: tegra: Default configuration updates for
- v4.3-rc1
-In-Reply-To: <CANMBJr7PKy-eCcB3HiBajpApHS_BYPa7xfKjTqV4o8Z1hwY99A@mail.gmail.com>
-References: <1439563720-13189-1-git-send-email-thierry.reding@gmail.com>
- <1439563720-13189-10-git-send-email-thierry.reding@gmail.com>
- <CANMBJr7PKy-eCcB3HiBajpApHS_BYPa7xfKjTqV4o8Z1hwY99A@mail.gmail.com>
-Message-ID: <20150819091358.GA26627@ulmo>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 19 Aug 2015 10:15:53 +0100
+Subject: [PATCH 2/2] arm64: set MAX_MEMBLOCK_ADDR according to linear
+ region size
+In-Reply-To: <CAKv+Gu8hBCtxUHqBwCjfiati7kbWrq314_mTjRvzf7ZnjWXsuw@mail.gmail.com>
+References: <1439890482-20798-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1439890482-20798-3-git-send-email-ard.biesheuvel@linaro.org>
+ <20150818100018.GA11021@arm.com>
+ <CAKv+Gu-YDEKSrkSG2fywgrHBB3Hao+jodknmCAkFCWqG4OpXCA@mail.gmail.com>
+ <20150818173938.GH11571@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu8hBCtxUHqBwCjfiati7kbWrq314_mTjRvzf7ZnjWXsuw@mail.gmail.com>
+Message-ID: <20150819091553.GD21913@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 18, 2015 at 03:30:41PM -0700, Tyler Baker wrote:
-> Hi Theirry,
+On Tue, Aug 18, 2015 at 07:44:59PM +0200, Ard Biesheuvel wrote:
+> On 18 August 2015 at 19:39, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > On Tue, Aug 18, 2015 at 12:04:27PM +0200, Ard Biesheuvel wrote:
+> >> On 18 August 2015 at 12:00, Will Deacon <will.deacon@arm.com> wrote:
+> >> > On Tue, Aug 18, 2015 at 10:34:42AM +0100, Ard Biesheuvel wrote:
+> >> >> The linear region size of a 39-bit VA kernel is only 256 GB, which
+> >> >> may be insufficient to cover all of system RAM, even on platforms
+> >> >> that have much less than 256 GB of memory but which is laid out
+> >> >> very sparsely.
+> >> >>
+> >> >> So make sure we clip the memory we will not be able to map before
+> >> >> installing it into the memblock memory table, by setting
+> >> >> MAX_MEMBLOCK_ADDR accordingly.
+> >> >>
+> >> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> >> >> ---
+> >> >>  arch/arm64/include/asm/memory.h | 8 ++++++++
+> >> >>  1 file changed, 8 insertions(+)
+> >> >>
+> >> >> diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+> >> >> index f800d45ea226..44a59c20e773 100644
+> >> >> --- a/arch/arm64/include/asm/memory.h
+> >> >> +++ b/arch/arm64/include/asm/memory.h
+> >> >> @@ -114,6 +114,14 @@ extern phys_addr_t               memstart_addr;
+> >> >>  #define PHYS_OFFSET          ({ memstart_addr; })
+> >> >>
+> >> >>  /*
+> >> >> + * The maximum physical address that the linear direct mapping
+> >> >> + * of system RAM can cover. (PAGE_OFFSET can be interpreted as
+> >> >> + * a 2's complement signed quantity and negated to derive the
+> >> >> + * maximum size of the linear mapping.)
+> >> >> + */
+> >> >> +#define MAX_MEMBLOCK_ADDR    ({ memstart_addr - PAGE_OFFSET - 1; })
+> >> >
+> >> > If we initialised memory_limit to this value and changed early_mem to
+> >> > use min (i.e. only restrict the limit further), would that avoid the
+> >> > need to change the of code? It looks like PPC uses
+> >> > memblock_enforce_memory_limit for similar reasons.
+> >>
+> >> Yes, that would be yet another way of doing things. But since Catalin
+> >> explicitly requested that both checks (i.e., bottom end and top end)
+> >> occur in the same place, and indicated his preference not to override
+> >> early_init_dt_add_memory_arch() if we can avoid it, the only way is to
+> >> hack it in there.
+> >
+> > Talking to Will, we decided to go for a quick fix with cc stable that
+> > does something like:
+> >
+> >         memblock_enforce_memory_limit(min(memory_limit, ~PAGE_OFFSET));
 > 
-> On 14 August 2015 at 07:48, Thierry Reding <thierry.reding@gmail.com> wrote:
-> > Hi ARM SoC maintainers,
-> >
-> > The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
-> >
-> >   Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
-> >
-> > are available in the git repository at:
-> >
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.3-defconfig
-> >
-> > for you to fetch changes up to 258d9bc5e77fa40e290a0bd480d5349224374480:
-> >
-> >   ARM: tegra: Update multi_v7_defconfig (2015-08-14 16:26:00 +0200)
-> >
-> > Thanks,
-> > Thierry
-> >
-> > ----------------------------------------------------------------
-> > ARM: tegra: Default configuration updates for v4.3-rc1
-> >
-> > Enable the GK20A GPU (via the Nouveau driver) and CPU frequency scaling
-> > on Tegra124.
-> >
-> > ----------------------------------------------------------------
-> > Thierry Reding (1):
-> >       ARM: tegra: Update multi_v7_defconfig
-> 
-> The kernelci.org bot recently reported jetson-tk1 boot failures[1][2]
-> in next-20150818, only when booting the mult_v7_defconfig kernels. I
-> bisected[3] these boot failure down to this commit, it didn't cleanly
-> revert, so I manually removed that options this patch added, and my
-> jetson-tk1 booted again. Digging a bit further, if I apply the patch
-> below to next-20150818, my jetson-tk1 boots.
+> ~PAGE_OFFSET + 1 ?
 
-I'm not able to reproduce this here. Building next-20150818 with
-multi_v7_config and booting the resulting kernel works just fine.
+Yes.
 
-> diff --git a/arch/arm/configs/multi_v7_defconfig
-> b/arch/arm/configs/multi_v7_defconfig
-> index b2facab..a285afe 100644
-> --- a/arch/arm/configs/multi_v7_defconfig
-> +++ b/arch/arm/configs/multi_v7_defconfig
-> @@ -468,7 +468,6 @@ CONFIG_FRAMEBUFFER_CONSOLE_ROTATION=y
->  CONFIG_SOUND=m
->  CONFIG_SND=m
->  CONFIG_SND_DYNAMIC_MINORS=y
-> -CONFIG_SND_HDA_TEGRA=m
->  CONFIG_SND_HDA_INPUT_BEEP=y
->  CONFIG_SND_HDA_PATCH_LOADER=y
->  CONFIG_SND_HDA_CODEC_REALTEK=m
-
-lsmod output confirms that snd-hda-tegra.ko was loaded:
-
-	# lsmod
-	Module                  Size  Used by
-	snd_soc_tegra30_i2s     5591  2 
-	snd_soc_tegra_pcm       1184  1 snd_soc_tegra30_i2s
-	snd_hda_tegra           4771  0 
-	snd_soc_rt5640         56972  1 
-	snd_soc_tegra_rt5640     3960  0 
-	snd_hda_codec          76398  1 snd_hda_tegra
-	snd_soc_rl6231          1897  1 snd_soc_rt5640
-	snd_soc_tegra_utils     2825  1 snd_soc_tegra_rt5640
-	snd_hda_core           26151  2 snd_hda_codec,snd_hda_tegra
-	snd_soc_core          119213  4 snd_soc_tegra_pcm,snd_soc_rt5640,snd_soc_tegra_rt5640,snd_soc_tegra30_i2s
-	snd_compress            7114  1 snd_soc_core
-	snd_pcm_dmaengine       2943  1 snd_soc_core
-	snd_pcm                67835  6 snd_soc_rt5640,snd_soc_core,snd_hda_codec,snd_hda_tegra,snd_pcm_dmaengine,snd_hda_core
-	snd_timer              16881  1 snd_pcm
-	snd                    41480  6 snd_soc_core,snd_timer,snd_pcm,snd_hda_codec,snd_hda_tegra,snd_compress
-	soundcore                858  1 snd
-	snd_soc_tegra30_ahub     8747  1 snd_soc_tegra30_i2s
-	nouveau              1217903  0 
-	tegra_devfreq           5389  0 
-	ttm                    65073  1 nouveau
-
-> This isn't where the story ends unfortunately. The collabora lab also
-> has a jetson-tk1, booted in the same manner, which boots next-20150818
-> fine[4]. The only differences I can spot in the two boot logs is that
-> the collabora board is using an older version of u-boot, where as my
-> board is using a newer version. U-Boot 2015.01-00231-gab77f24-dirty
-> (Good) vs U-Boot 2015.07-00130-gb217c89 (Bad).
-
-I don't have either of those commits in any of the U-Boot trees I have.
-Perhaps whatever tree this comes from has local patches that cause the
-breakage? The version that I use a recent upstream U-Boot with some
-local patches, none of which should impact Jetson TK1 in any way. Just
-to make sure I tried running latest origin/master, which identifies
-thusly:
-
-	U-Boot 2015.10-rc2-00040-g0f9258228e2b
-
-And that boots next-20150818 fine.
-
-If you can point me at the source for the version that you use I may be
-able to find something that could cause this.
-
->                                                I've also noticed some
-> angry udev messages after the modules probe in userspace present in
-> both boot logs that look suspicious.
-> 
-> [   70.469914] udevd[108]: worker [113] /devices/soc0/70030000.hda is
-> taking a long time
-> [   70.479849] udevd[108]: worker [115] /devices/soc0/70300000.ahub is
-> taking a long time
-> [   70.490769] udevd[108]: worker [117] /devices/soc0/sound is taking
-> a long time
-
-These look suspicious indeed. Unfortunately I don't see those in the
-boot log on my setup either. Then again, you seem to be using Eudev
-2.1.1, whereas I use the one shipped with systemd 219, so this could
-also be some sort of weird userspace issue.
-
->From the logs it further seems like you've configured the root to be
-on NFS, but the logs never show NFS to be mounted. Perhaps that's
-because you're booting into a ramdisk rather than a full root file-
-system.
-
-> FWIW, When I went searching for this patch, I couldn't find it on any
-> of the mailing lists. The only reference to this patch was from this
-> pull request, thus why I'm reporting the issue here. :)
-
-That's because it's merely sync'ing up the multi_v7_defconfig changes
-with tegra_defconfig that I forgot to submit for v4.2. I didn't think it
-necessary to send out a separate patch for that.
-
-> Anyways, let me know if you can reproduce this issue, and/or can think
-> of a reason this might may be causing trouble.
-
-Like I said, if you can point me at the U-Boot sources I can take a look
-if anything jumps out. I've also noticed that the initial ramdisks in
-both boot logs that you linked to have a slightly different size. But
-they use the same Eudev version, so I suspect that that's unrelated.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150819/908f330e/attachment.sig>
+-- 
+Catalin
