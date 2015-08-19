@@ -1,290 +1,120 @@
 From: ykk@rock-chips.com (Yakir Yang)
-Date: Wed, 19 Aug 2015 09:49:50 -0500
-Subject: [PATCH v3 02/14] drm: exynos/dp: convert to drm bridge mode
+Date: Wed, 19 Aug 2015 09:50:24 -0500
+Subject: [PATCH v3 05/14] drm: bridge/analogix_dp: fix link_rate & lane_count
+ bug
 In-Reply-To: <1439995728-18046-1-git-send-email-ykk@rock-chips.com>
 References: <1439995728-18046-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <1439995790-18155-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <1439995824-18312-1-git-send-email-ykk@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to move exynos dp code to bridge directory,
-we need to convert driver drm bridge mode first. As
-dp driver already have a ptn3460 bridge, so we need
-to move ptn bridge to the next bridge of dp bridge.
+link_rate and lane_count already configed in analogix_dp_set_link_train(),
+so we don't need to config those repeatly after training finished, just
+remove them out.
+
+Beside Display Port 1.2 already support 5.4Gbps link rate, the maximum sets
+would change from {1.62Gbps, 2.7Gbps} to {1.62Gbps, 2.7Gbps, 5.4Gbps}.
 
 Signed-off-by: Yakir Yang <ykk@rock-chips.com>
 ---
-Changes in v3: None
-Changes in v2:
-- Take Jingoo Han suggest, just remove my name from author list.
+Changes in v3:
+- Take Thierry Reding suggest, link_rate and lane_count shouldn't config to
+  the DT property value directly, but we can take those as hardware limite.
+  For example, RK3288 only support 4 physical lanes of 2.7/1.62 Gbps/lane,
+  so DT property would like "link-rate = 0x0a" "lane-count = 4".
 
- drivers/gpu/drm/exynos/exynos_dp_core.c | 194 ++++++++++++++++++++------------
- drivers/gpu/drm/exynos/exynos_dp_core.h |   1 +
- 2 files changed, 123 insertions(+), 72 deletions(-)
+Changes in v2: None
 
-diff --git a/drivers/gpu/drm/exynos/exynos_dp_core.c b/drivers/gpu/drm/exynos/exynos_dp_core.c
-index 562f4a8..2b87406 100644
---- a/drivers/gpu/drm/exynos/exynos_dp_core.c
-+++ b/drivers/gpu/drm/exynos/exynos_dp_core.c
-@@ -997,59 +997,6 @@ static struct drm_connector_helper_funcs exynos_dp_connector_helper_funcs = {
- 	.best_encoder = exynos_dp_best_encoder,
+ drivers/gpu/drm/bridge/analogix_dp_core.c | 16 ++++++++--------
+ drivers/gpu/drm/bridge/analogix_dp_core.h |  9 +++++----
+ 2 files changed, 13 insertions(+), 12 deletions(-)
+
+diff --git a/drivers/gpu/drm/bridge/analogix_dp_core.c b/drivers/gpu/drm/bridge/analogix_dp_core.c
+index 480cc13..1778e0a 100644
+--- a/drivers/gpu/drm/bridge/analogix_dp_core.c
++++ b/drivers/gpu/drm/bridge/analogix_dp_core.c
+@@ -635,6 +635,8 @@ static void analogix_dp_get_max_rx_bandwidth(struct analogix_dp_device *dp,
+ 	/*
+ 	 * For DP rev.1.1, Maximum link rate of Main Link lanes
+ 	 * 0x06 = 1.62 Gbps, 0x0a = 2.7 Gbps
++	 * For DP rev.1.2, Maximum link rate of Main Link lanes
++	 * 0x06 = 1.62 Gbps, 0x0a = 2.7 Gbps, 0x14 = 5.4Gbps
+ 	 */
+ 	analogix_dp_read_byte_from_dpcd(dp, DP_MAX_LINK_RATE, &data);
+ 	*bandwidth = data;
+@@ -668,7 +670,8 @@ static void analogix_dp_init_training(struct analogix_dp_device *dp,
+ 	analogix_dp_get_max_rx_lane_count(dp, &dp->link_train.lane_count);
+ 
+ 	if ((dp->link_train.link_rate != LINK_RATE_1_62GBPS) &&
+-	    (dp->link_train.link_rate != LINK_RATE_2_70GBPS)) {
++	    (dp->link_train.link_rate != LINK_RATE_2_70GBPS) &&
++	    (dp->link_train.link_rate != LINK_RATE_5_40GBPS)) {
+ 		dev_err(dp->dev, "Rx Max Link Rate is abnormal :%x !\n",
+ 			dp->link_train.link_rate);
+ 		dp->link_train.link_rate = LINK_RATE_1_62GBPS;
+@@ -901,8 +904,8 @@ static void analogix_dp_commit(struct analogix_dp_device *dp)
+ 		return;
+ 	}
+ 
+-	ret = analogix_dp_set_link_train(dp, dp->video_info->lane_count,
+-					 dp->video_info->link_rate);
++	ret = analogix_dp_set_link_train(dp, dp->video_info->max_lane_count,
++					 dp->video_info->max_link_rate);
+ 	if (ret) {
+ 		dev_err(dp->dev, "unable to do link train\n");
+ 		return;
+@@ -912,9 +915,6 @@ static void analogix_dp_commit(struct analogix_dp_device *dp)
+ 	analogix_dp_enable_rx_to_enhanced_mode(dp, 1);
+ 	analogix_dp_enable_enhanced_mode(dp, 1);
+ 
+-	analogix_dp_set_lane_count(dp, dp->video_info->lane_count);
+-	analogix_dp_set_link_bandwidth(dp, dp->video_info->link_rate);
+-
+ 	analogix_dp_init_video(dp);
+ 	ret = analogix_dp_config_video(dp);
+ 	if (ret)
+@@ -1198,13 +1198,13 @@ static struct video_info *analogix_dp_dt_parse_pdata(struct device *dev)
+ 	}
+ 
+ 	if (of_property_read_u32(dp_node, "analogix,link-rate",
+-				 &dp_video_config->link_rate)) {
++				 &dp_video_config->max_link_rate)) {
+ 		dev_err(dev, "failed to get link-rate\n");
+ 		return ERR_PTR(-EINVAL);
+ 	}
+ 
+ 	if (of_property_read_u32(dp_node, "analogix,lane-count",
+-				 &dp_video_config->lane_count)) {
++				 &dp_video_config->max_lane_count)) {
+ 		dev_err(dev, "failed to get lane-count\n");
+ 		return ERR_PTR(-EINVAL);
+ 	}
+diff --git a/drivers/gpu/drm/bridge/analogix_dp_core.h b/drivers/gpu/drm/bridge/analogix_dp_core.h
+index 2cefde9..941b34f 100644
+--- a/drivers/gpu/drm/bridge/analogix_dp_core.h
++++ b/drivers/gpu/drm/bridge/analogix_dp_core.h
+@@ -21,8 +21,9 @@
+ #define MAX_EQ_LOOP 5
+ 
+ enum link_rate_type {
+-	LINK_RATE_1_62GBPS = 0x06,
+-	LINK_RATE_2_70GBPS = 0x0a
++	LINK_RATE_1_62GBPS = DP_LINK_BW_1_62,
++	LINK_RATE_2_70GBPS = DP_LINK_BW_2_7,
++	LINK_RATE_5_40GBPS = DP_LINK_BW_5_4,
  };
  
--/* returns the number of bridges attached */
--static int exynos_drm_attach_lcd_bridge(struct exynos_dp_device *dp,
--					struct drm_encoder *encoder)
--{
--	int ret;
--
--	encoder->bridge = dp->bridge;
--	dp->bridge->encoder = encoder;
--	ret = drm_bridge_attach(encoder->dev, dp->bridge);
--	if (ret) {
--		DRM_ERROR("Failed to attach bridge to drm\n");
--		return ret;
--	}
--
--	return 0;
--}
--
--static int exynos_dp_create_connector(struct exynos_drm_display *display,
--				      struct drm_encoder *encoder)
--{
--	struct exynos_dp_device *dp = display_to_dp(display);
--	struct drm_connector *connector = &dp->connector;
--	int ret;
--
--	dp->encoder = encoder;
--
--	/* Pre-empt DP connector creation if there's a bridge */
--	if (dp->bridge) {
--		ret = exynos_drm_attach_lcd_bridge(dp, encoder);
--		if (!ret)
--			return 0;
--	}
--
--	connector->polled = DRM_CONNECTOR_POLL_HPD;
--
--	ret = drm_connector_init(dp->drm_dev, connector,
--				 &exynos_dp_connector_funcs,
--				 DRM_MODE_CONNECTOR_eDP);
--	if (ret) {
--		DRM_ERROR("Failed to initialize connector with drm\n");
--		return ret;
--	}
--
--	drm_connector_helper_add(connector, &exynos_dp_connector_helper_funcs);
--	drm_connector_register(connector);
--	drm_mode_connector_attach_encoder(connector, encoder);
--
--	if (dp->panel)
--		ret = drm_panel_attach(dp->panel, &dp->connector);
--
--	return ret;
--}
--
- static void exynos_dp_phy_init(struct exynos_dp_device *dp)
- {
- 	if (dp->phy)
-@@ -1114,23 +1061,126 @@ static void exynos_dp_poweroff(struct exynos_dp_device *dp)
- 	}
- }
+ enum link_lane_count_type {
+@@ -128,8 +129,8 @@ struct video_info {
+ 	enum color_coefficient ycbcr_coeff;
+ 	enum color_depth color_depth;
  
--static void exynos_dp_dpms(struct exynos_drm_display *display, int mode)
-+/* returns the number of bridges attached */
-+static int exynos_drm_attach_lcd_bridge(struct exynos_dp_device *dp,
-+		struct drm_encoder *encoder)
-+{
-+	int ret;
-+
-+	dp->bridge->next = dp->ptn_bridge;
-+	dp->bridge->encoder = encoder;
-+	ret = drm_bridge_attach(encoder->dev, dp->bridge);
-+	if (ret) {
-+		DRM_ERROR("Failed to attach ptn bridge to drm\n");
-+		return ret;
-+	}
-+
-+	return 0;
-+}
-+
-+static int exynos_dp_bridge_attach(struct drm_bridge *bridge)
-+{
-+
-+	struct exynos_dp_device *dp = bridge->driver_private;
-+	struct drm_encoder *encoder = dp->encoder;
-+	struct drm_connector *connector = &dp->connector;
-+	int ret;
-+
-+	if (!bridge->encoder) {
-+		DRM_ERROR("Parent encoder object not found");
-+		return -ENODEV;
-+	}
-+
-+	encoder->bridge = bridge;
-+
-+	/* Pre-empt DP connector creation if there's a bridge */
-+	if (dp->ptn_bridge) {
-+		ret = exynos_drm_attach_lcd_bridge(dp, encoder);
-+		if (ret)
-+			return -ENODEV;
-+	}
-+
-+	connector->polled = DRM_CONNECTOR_POLL_HPD;
-+
-+	ret = drm_connector_init(dp->drm_dev, connector,
-+			&exynos_dp_connector_funcs, DRM_MODE_CONNECTOR_eDP);
-+	if (ret) {
-+		DRM_ERROR("Failed to initialize connector with drm\n");
-+		return ret;
-+	}
-+
-+	drm_connector_helper_add(connector, &exynos_dp_connector_helper_funcs);
-+	drm_connector_register(connector);
-+	drm_mode_connector_attach_encoder(connector, encoder);
-+
-+	if (dp->panel)
-+		ret = drm_panel_attach(dp->panel, &dp->connector);
-+
-+	return ret;
-+}
-+
-+static void exynos_dp_bridge_nop(struct drm_bridge *bridge)
-+{
-+	/* do nothing */
-+}
-+
-+static void exynos_dp_bridge_enable(struct drm_bridge *bridge)
-+{
-+	struct exynos_dp_device *dp = bridge->driver_private;
-+
-+	exynos_dp_poweron(dp);
-+	dp->dpms_mode = DRM_MODE_DPMS_ON;
-+}
-+
-+static void exynos_dp_bridge_disable(struct drm_bridge *bridge)
-+{
-+	struct exynos_dp_device *dp = bridge->driver_private;
-+
-+	exynos_dp_poweroff(dp);
-+	dp->dpms_mode = DRM_MODE_DPMS_OFF;
-+}
-+
-+static const struct drm_bridge_funcs exynos_dp_bridge_funcs = {
-+	.enable = exynos_dp_bridge_enable,
-+	.disable = exynos_dp_bridge_disable,
-+	.pre_enable = exynos_dp_bridge_nop,
-+	.post_disable = exynos_dp_bridge_nop,
-+	.attach = exynos_dp_bridge_attach,
-+};
-+
-+static int exynos_dp_create_connector(struct exynos_drm_display *display,
-+				struct drm_encoder *encoder)
- {
- 	struct exynos_dp_device *dp = display_to_dp(display);
-+	struct drm_device *drm_dev = dp->drm_dev;
-+	struct drm_bridge *bridge;
-+	int ret;
+-	enum link_rate_type link_rate;
+-	enum link_lane_count_type lane_count;
++	enum link_rate_type       max_link_rate;
++	enum link_lane_count_type max_lane_count;
+ };
  
--	switch (mode) {
--	case DRM_MODE_DPMS_ON:
--		exynos_dp_poweron(dp);
--		break;
--	case DRM_MODE_DPMS_STANDBY:
--	case DRM_MODE_DPMS_SUSPEND:
--	case DRM_MODE_DPMS_OFF:
--		exynos_dp_poweroff(dp);
--		break;
--	default:
--		break;
-+	bridge = devm_kzalloc(drm_dev->dev, sizeof(*bridge), GFP_KERNEL);
-+	if (!bridge) {
-+		DRM_ERROR("failed to allocate for drm bridge\n");
-+		return -ENOMEM;
- 	}
--	dp->dpms_mode = mode;
-+
-+	dp->bridge = bridge;
-+	dp->encoder = encoder;
-+
-+	bridge->driver_private = dp;
-+	bridge->encoder = dp->encoder;
-+	bridge->funcs = &exynos_dp_bridge_funcs;
-+
-+	ret = drm_bridge_attach(drm_dev, bridge);
-+	if (ret) {
-+		DRM_ERROR("failed to attach drm bridge\n");
-+		return -EINVAL;
-+	}
-+
-+	return 0;
-+}
-+
-+static void exynos_dp_dpms(struct exynos_drm_display *display, int mode)
-+{
-+	/* do nothing */
- }
- 
- static struct exynos_drm_display_ops exynos_dp_display_ops = {
-@@ -1242,7 +1292,7 @@ static int exynos_dp_bind(struct device *dev, struct device *master, void *data)
- 		}
- 	}
- 
--	if (!dp->panel && !dp->bridge) {
-+	if (!dp->panel && !dp->ptn_bridge) {
- 		ret = exynos_dp_dt_parse_panel(dp);
- 		if (ret)
- 			return ret;
-@@ -1315,7 +1365,7 @@ static void exynos_dp_unbind(struct device *dev, struct device *master,
- {
- 	struct exynos_dp_device *dp = dev_get_drvdata(dev);
- 
--	exynos_dp_dpms(&dp->display, DRM_MODE_DPMS_OFF);
-+	exynos_dp_bridge_disable(dp->bridge);
- }
- 
- static const struct component_ops exynos_dp_ops = {
-@@ -1350,9 +1400,9 @@ static int exynos_dp_probe(struct platform_device *pdev)
- 	if (endpoint) {
- 		bridge_node = of_graph_get_remote_port_parent(endpoint);
- 		if (bridge_node) {
--			dp->bridge = of_drm_find_bridge(bridge_node);
-+			dp->ptn_bridge = of_drm_find_bridge(bridge_node);
- 			of_node_put(bridge_node);
--			if (!dp->bridge)
-+			if (!dp->ptn_bridge)
- 				return -EPROBE_DEFER;
- 		} else {
- 			return -EPROBE_DEFER;
-@@ -1374,7 +1424,7 @@ static int exynos_dp_suspend(struct device *dev)
- {
- 	struct exynos_dp_device *dp = dev_get_drvdata(dev);
- 
--	exynos_dp_dpms(&dp->display, DRM_MODE_DPMS_OFF);
-+	exynos_dp_bridge_disable(dp->bridge);
- 	return 0;
- }
- 
-@@ -1382,7 +1432,7 @@ static int exynos_dp_resume(struct device *dev)
- {
- 	struct exynos_dp_device *dp = dev_get_drvdata(dev);
- 
--	exynos_dp_dpms(&dp->display, DRM_MODE_DPMS_ON);
-+	exynos_dp_bridge_enable(dp->bridge);
- 	return 0;
- }
- #endif
-diff --git a/drivers/gpu/drm/exynos/exynos_dp_core.h b/drivers/gpu/drm/exynos/exynos_dp_core.h
-index c321ad5..29bd56e 100644
---- a/drivers/gpu/drm/exynos/exynos_dp_core.h
-+++ b/drivers/gpu/drm/exynos/exynos_dp_core.h
-@@ -154,6 +154,7 @@ struct exynos_dp_device {
- 	struct drm_encoder	*encoder;
- 	struct drm_panel	*panel;
- 	struct drm_bridge	*bridge;
-+	struct drm_bridge	*ptn_bridge;
- 	struct clk		*clock;
- 	unsigned int		irq;
- 	void __iomem		*reg_base;
+ struct link_train {
 -- 
 1.9.1
