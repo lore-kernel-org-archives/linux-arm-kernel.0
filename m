@@ -1,29 +1,55 @@
-From: briannorris@chromium.org (Brian Norris)
-Date: Wed, 19 Aug 2015 15:59:38 -0700
-Subject: [PATCH v2 1/3] ARM: dts: rockchip: add veyron-jaq board
-In-Reply-To: <CAHNYxRzWHvy=mv+G6wwO29=9smOCwKh6gBPLbT-TNq0PmP2Xiw@mail.gmail.com>
-References: <1440022721-73712-1-git-send-email-briannorris@chromium.org>
- <CAHNYxRzWHvy=mv+G6wwO29=9smOCwKh6gBPLbT-TNq0PmP2Xiw@mail.gmail.com>
-Message-ID: <20150819225938.GA68578@google.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Wed, 19 Aug 2015 18:02:48 -0500
+Subject: [PATCH 1/3] [v3] hvc_dcc: don't ignore errors during initialization
+Message-ID: <1440025370-9519-1-git-send-email-timur@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 19, 2015 at 03:38:43PM -0700, Alexandru Stan wrote:
-> On Wed, Aug 19, 2015 at 3:18 PM, Brian Norris <briannorris@chromium.org>
-> wrote:
-> 
-> > +++ b/Documentation/devicetree/bindings/arm/rockchip.txt
-> 
-> ...
-> 
-> > +- Google Jaq (Haier Chromebook 11):
-> 
-> 
-> Could you add s/)/ and more)/ similar to what Jerry has? This is jaq too:
-> http://sasthamarket.com/wp-content/uploads/2015/06/34.jpg
+hvc_instantiate() and hvc_alloc() return errors if they fail, so don't
+ignore them.
 
-Sure. I'll wait for any other comments on v2 before sending the next
-(and final?) version.
+Signed-off-by: Timur Tabi <timur@codeaurora.org>
+---
+ drivers/tty/hvc/hvc_dcc.c | 15 +++++++++++----
+ 1 file changed, 11 insertions(+), 4 deletions(-)
 
-Thanks,
-Brian
+diff --git a/drivers/tty/hvc/hvc_dcc.c b/drivers/tty/hvc/hvc_dcc.c
+index 809920d..82f240f 100644
+--- a/drivers/tty/hvc/hvc_dcc.c
++++ b/drivers/tty/hvc/hvc_dcc.c
+@@ -70,20 +70,27 @@ static const struct hv_ops hvc_dcc_get_put_ops = {
+ 
+ static int __init hvc_dcc_console_init(void)
+ {
++	int ret;
++
+ 	if (!hvc_dcc_check())
+ 		return -ENODEV;
+ 
+-	hvc_instantiate(0, 0, &hvc_dcc_get_put_ops);
+-	return 0;
++	/* Returns -1 if error */
++	ret = hvc_instantiate(0, 0, &hvc_dcc_get_put_ops);
++
++	return ret < 0 ? -ENODEV : 0;
+ }
+ console_initcall(hvc_dcc_console_init);
+ 
+ static int __init hvc_dcc_init(void)
+ {
++	struct hvc_struct *p;
++
+ 	if (!hvc_dcc_check())
+ 		return -ENODEV;
+ 
+-	hvc_alloc(0, 0, &hvc_dcc_get_put_ops, 128);
+-	return 0;
++	p = hvc_alloc(0, 0, &hvc_dcc_get_put_ops, 128);
++
++	return PTR_ERR_OR_ZERO(p);
+ }
+ device_initcall(hvc_dcc_init);
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
