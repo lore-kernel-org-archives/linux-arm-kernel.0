@@ -1,85 +1,69 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 19 Aug 2015 12:33:06 +0200
-Subject: [GIT PULL 9/9] ARM: tegra: Default configuration updates for
- v4.3-rc1
-In-Reply-To: <1439977724.4135.90.camel@collabora.co.uk>
-References: <1439563720-13189-1-git-send-email-thierry.reding@gmail.com>
- <1439563720-13189-10-git-send-email-thierry.reding@gmail.com>
- <CANMBJr7PKy-eCcB3HiBajpApHS_BYPa7xfKjTqV4o8Z1hwY99A@mail.gmail.com>
- <20150819091358.GA26627@ulmo>
- <1439977724.4135.90.camel@collabora.co.uk>
-Message-ID: <20150819103305.GF26627@ulmo>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Wed, 19 Aug 2015 12:35:58 +0200
+Subject: [PATCH 0/3] gpiolib: Initializing GPIOs using DT property
+ gpio-initval
+In-Reply-To: <1439979512-3894-1-git-send-email-mpa@pengutronix.de>
+References: <1439979512-3894-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <20150819103558.GP11161@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 19, 2015 at 11:48:44AM +0200, Sjoerd Simons wrote:
-> On Wed, 2015-08-19 at 11:14 +0200, Thierry Reding wrote:
-> > On Tue, Aug 18, 2015 at 03:30:41PM -0700, Tyler Baker wrote:
-> > > Hi Theirry,
-> > > 
-> > > 
-> > > This isn't where the story ends unfortunately. The collabora lab 
-> > > also
-> > > has a jetson-tk1, booted in the same manner, which boots next
-> > > -20150818
-> > > fine[4]. The only differences I can spot in the two boot logs is 
-> > > that
-> > > the collabora board is using an older version of u-boot, where as 
-> > > my
-> > > board is using a newer version. U-Boot 2015.01-00231-gab77f24-dirty
-> > > (Good) vs U-Boot 2015.07-00130-gb217c89 (Bad).
+On Wed, Aug 19, 2015 at 12:18:29PM +0200, Markus Pargmann wrote:
+> Hi,
 > 
-> Our 2015.01-00231-gab77f24-dirty is 2015.01-00231-gab77f24 + changes
-> which got merged as 053b86e6d8e50359412e626c33bae3f7bafd74dd in
-> upstream u-boot.
+> This series adds a gpio-initval property to the devicetree. It provides a way
+> to initialize GPIOs to a defined value.
 > 
-> Fwiw:
-> $ git show 2015.01-00231-gab77f24
-> commit ab77f24119e80257de4ab017b877f92f96980562
-> Merge: d928664 fa58b10
-> Author: Tom Rini <trini@ti.com>
-> Date:   Thu Jan 15 14:05:31 2015 -0500
+> The previous patch was '[PATCH v2] gpio: Allow hogged gpios to be requested'
+> which would have allowed to request hogged GPIOs. Linus suggested a separate DT
+> property as hogged gpios should not be requested.
 > 
->     Merge branch 'master' of git://git.denx.de/u-boot-ti
+> There are 3 patches. The first two simplify the function gpiod_hog. The third
+> reuses the gpiod_hog()_code for a new gpiod_initialize() and adds the parsing
+> of the DT.
 > 
-> Which is definately a commit you should hae in your upstream u-boot
-> tree.
+> This series is based on the series
+> "[PATCH v3 0/9] gpiolib: Add GPIO name support".
 
-Yeah, I suck. I was running:
+Messed up all the author/signed-off-bys. I will fix it in v2 but will
+wait for some feedback first.
 
-	$ git show gab77f24
+Best regards,
 
-I didn't know git could parse the full output from git describe.
+Markus
 
-> > I don't have either of those commits in any of the U-Boot trees I 
-> > have.
-> > Perhaps whatever tree this comes from has local patches that cause 
-> > the
-> > breakage? The version that I use a recent upstream U-Boot with some
-> > local patches, none of which should impact Jetson TK1 in any way. 
-> > Just
-> > to make sure I tried running latest origin/master, which identifies
-> > thusly:
-> > 
-> > 	U-Boot 2015.10-rc2-00040-g0f9258228e2b
-> > 
-> > And that boots next-20150818 fine.
 > 
-> Probably worth for tyler to test that u-boot commit on his jetson to
-> see if that solves the issue he's having...
+> Best regards,
+> 
+> Markus
+> 
+> 
+> Markus Pargmann (3):
+>   gpio: Use __gpiod_request directly
+>   gpiolib: gpiod_hog remove separate name argument
+>   gpiolib: Add GPIO initialization
+> 
+>  Documentation/devicetree/bindings/gpio/gpio.txt | 29 ++++++----
+>  drivers/gpio/gpiolib-of.c                       | 11 +++-
+>  drivers/gpio/gpiolib.c                          | 74 +++++++++++++++++--------
+>  drivers/gpio/gpiolib.h                          |  6 +-
+>  4 files changed, 83 insertions(+), 37 deletions(-)
+> 
+> -- 
+> 2.4.6
+> 
+> 
+> 
 
-I've tried reconstructing the version that Tyler is running by checking
-out 2015.01-00231-gab77f24 and applying 053b86e6d8e5 ("pci: tegra: Fix
-port information parsing") on top, but that also leaves me with a
-bootable system, so no way of reproducing. I agree that upgrading to a
-more recent U-Boot version sounds like the best way forward because it
-has already proven to work on at least two setups.
-
-Thierry
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150819/63181835/attachment.sig>
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150819/bbf71c15/attachment.sig>
