@@ -1,42 +1,43 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Wed, 19 Aug 2015 10:17:57 +0200
-Subject: [PATCH v2 0/6] ARM: berlin: add cpufreq support
-In-Reply-To: <20150818145925.GF31148@linux>
-References: <1439898368-11543-1-git-send-email-antoine.tenart@free-electrons.com>
- <CAOh2x=ke9NWa-GjL=c+RgEWWfsNeKvE2O9CRHmW2dG5mj8ATCg@mail.gmail.com>
- <20150818143911.GB12017@kwain> <20150818145925.GF31148@linux>
-Message-ID: <20150819081757.GA1089@kwain>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 19 Aug 2015 10:19:37 +0200
+Subject: [PATCH v2] ARM: multi_v7_defconfig: Enable DWC2 USB driver and USB
+ ethernet gadget
+In-Reply-To: <55D30313.7080107@osg.samsung.com>
+References: <55D30313.7080107@osg.samsung.com>
+Message-ID: <1439972377-22683-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 18, 2015 at 08:29:25PM +0530, Viresh Kumar wrote:
-> On 18-08-15, 16:39, Antoine Tenart wrote:
-> > However, it seems the OPP-v2 table takes precedence over the old one.
-> > When a default OPP-v2 table is supplied in the device tree, if the
-> > bootloader supplies an OPP table the old way it won't be taken into
-> > account.
-> > 
-> > So if I understood correctly, this won't work here for the BG2Q.
-> 
-> Didn't understood it completely. Are you saying that your dtb will
-> have two operating-points tables ?
+DWC2 (s3c-hsotg) hardware module is available on many Exynos based boards,
+so enable DWC2 driver as well as the most common USB Ethernet gadget.
 
-Yes. If the device tree has an OPP-v2 table and the bootloader modify it
-to add an old OPP table at boot, the one added by the bootloader won't
-be taken into account by the kernel.
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+---
+Changes since v1: build DWC2 and USB gadget as modules
+---
+ arch/arm/configs/multi_v7_defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-> The deal is that for any device, parsing of opp-v2 will be attempted
-> first. If its not available, then opp-v1 will be tried. But this is
-> per-device. So, one device can have opp-v2 tables and other one can do
-> v1 type.
-
-Sure. OPP-v2 tables can be used for devices having an up-to-date
-bootloader or if the bootloader do not modify the device tree at boot
-time to add an (old) OPP table.
-
-Antoine
-
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index b2facab..d15f719 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -506,6 +506,7 @@ CONFIG_USB_R8A66597_HCD=m
+ CONFIG_USB_RENESAS_USBHS=m
+ CONFIG_USB_STORAGE=y
+ CONFIG_USB_DWC3=y
++CONFIG_USB_DWC2=m
+ CONFIG_USB_CHIPIDEA=y
+ CONFIG_USB_CHIPIDEA_HOST=y
+ CONFIG_AB8500_USB=y
+@@ -517,6 +518,7 @@ CONFIG_USB_MXS_PHY=y
+ CONFIG_USB_RCAR_PHY=m
+ CONFIG_USB_GADGET=y
+ CONFIG_USB_RENESAS_USBHS_UDC=m
++CONFIG_USB_ETH=m
+ CONFIG_MMC=y
+ CONFIG_MMC_BLOCK_MINORS=16
+ CONFIG_MMC_ARMMMCI=y
 -- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+1.9.2
