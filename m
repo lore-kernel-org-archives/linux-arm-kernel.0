@@ -1,19 +1,34 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 19 Aug 2015 21:21:54 +0530
-Subject: [PATCH] dmaengine: at_xdmac: fix bug in prep_dma_cyclic
-In-Reply-To: <1437574349-13816-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1437574349-13816-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <20150819155154.GC13546@localhost>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 19 Aug 2015 17:03:20 +0100
+Subject: [PATCH] arm64: entry: always restore x0 from the stack on
+ syscall return
+In-Reply-To: <1439996989-5772-1-git-send-email-will.deacon@arm.com>
+References: <1439996989-5772-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20150819160320.GI24062@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 22, 2015 at 04:12:29PM +0200, Ludovic Desroches wrote:
-> In cyclic mode, the round chaining has been broken by the introduction
-> of at_xdmac_queue_desc(): AT_XDMAC_MBR_UBC_NDE is set for all descriptors
-> excepted for the last one. at_xdmac_queue_desc() has to be called one
-> more time to chain the last and the first descriptors.
+On Wed, Aug 19, 2015 at 04:09:49PM +0100, Will Deacon wrote:
+> @@ -613,13 +609,14 @@ ENDPROC(cpu_switch_to)
+>   */
+>  ret_fast_syscall:
+>  	disable_irq				// disable interrupts
+> +	str	x0, [sp, #S_X0]			// returned x0
+>  	ldr	x1, [tsk, #TI_FLAGS]		// re-check for syscall tracing
+>  	and	x2, x1, #_TIF_SYSCALL_WORK
+>  	cbnz	x2, ret_fast_syscall_trace
+>  	and	x2, x1, #_TIF_WORK_MASK
+> -	cbnz	x2, fast_work_pending
+> +	cbnz	x2, work_pending
+>  	enable_step_tsk x1, x2
+> -	kernel_exit 0, ret = 1
+> +	kernel_exit 0
+>  ret_fast_syscall_trace:
+>  	enable_irq				// enable interrupts
+>  	b	__sys_trace_return
 
-Applied, thanks
+There is another str x0 in __sys_trace_return which I think we could
+remove.
 
 -- 
-~Vinod
+Catalin
