@@ -1,500 +1,751 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 19 Aug 2015 12:20:05 +0800
-Subject: [PATCH v3 4/8] rsb: sunxi: Add driver for Allwinner Reduced Serial
- Bus controller
+Date: Wed, 19 Aug 2015 12:20:04 +0800
+Subject: [PATCH v3 3/8] rsb: Linux driver framework for Reduced Serial Bus
+ (RSB)
 In-Reply-To: <1439958009-14056-1-git-send-email-wens@csie.org>
 References: <1439958009-14056-1-git-send-email-wens@csie.org>
-Message-ID: <1439958009-14056-5-git-send-email-wens@csie.org>
+Message-ID: <1439958009-14056-4-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Reduced Serial Bus (RSB) is an Allwinner proprietery interface
+used to communicate with PMICs and other peripheral ICs.
+
+RSB is a two-wire push-pull serial bus that supports 1 master
+device and up to 15 active slave devices.
+
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/rsb/Kconfig     |  15 ++
- drivers/rsb/Makefile    |   2 +
- drivers/rsb/rsb-sunxi.c | 441 ++++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 458 insertions(+)
- create mode 100644 drivers/rsb/rsb-sunxi.c
+ drivers/Kconfig        |   2 +
+ drivers/Makefile       |   1 +
+ drivers/rsb/Kconfig    |  11 ++
+ drivers/rsb/Makefile   |   4 +
+ drivers/rsb/rsb-core.c | 511 +++++++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/rsb.h    | 144 ++++++++++++++
+ 6 files changed, 673 insertions(+)
+ create mode 100644 drivers/rsb/Kconfig
+ create mode 100644 drivers/rsb/Makefile
+ create mode 100644 drivers/rsb/rsb-core.c
+ create mode 100644 include/linux/rsb.h
 
-diff --git a/drivers/rsb/Kconfig b/drivers/rsb/Kconfig
-index 6642e1db6d98..54a28a39e0e2 100644
---- a/drivers/rsb/Kconfig
-+++ b/drivers/rsb/Kconfig
-@@ -9,3 +9,18 @@ menuconfig RSB
- 	  Integrated Circuits (PMIC) or other peripherals.
+diff --git a/drivers/Kconfig b/drivers/Kconfig
+index 6e973b8e3a3b..4ada2d3eb832 100644
+--- a/drivers/Kconfig
++++ b/drivers/Kconfig
+@@ -54,6 +54,8 @@ source "drivers/spi/Kconfig"
  
- 	  These are commonly seen on newer Allwinner SoCs and X-Powers ICs.
+ source "drivers/spmi/Kconfig"
+ 
++source "drivers/rsb/Kconfig"
 +
-+if RSB
-+
-+config RSB_SUNXI
-+	tristate "Allwinner RSB Controller"
-+	depends on ARCH_SUNXI || COMPILE_TEST
-+	default MACH_SUN8I || MACH_SUN9I
-+	help
-+	  If you say yes to this option, support will be included for the
-+	  built-in RSB controller on Allwinner sun8i/sun9i family SoCs.
-+
-+	  This is required for communicating with X-Powers PMICs and other
-+	  devices that have the RSB interface.
-+
-+endif
-diff --git a/drivers/rsb/Makefile b/drivers/rsb/Makefile
-index 6fe56526fbf3..31cd615f7e58 100644
---- a/drivers/rsb/Makefile
-+++ b/drivers/rsb/Makefile
-@@ -2,3 +2,5 @@
- # Makefile for kernel RSB framework.
- #
- obj-$(CONFIG_RSB)	+= rsb-core.o
-+
-+obj-$(CONFIG_RSB_SUNXI)	+= rsb-sunxi.o
-diff --git a/drivers/rsb/rsb-sunxi.c b/drivers/rsb/rsb-sunxi.c
+ source "drivers/hsi/Kconfig"
+ 
+ source "drivers/pps/Kconfig"
+diff --git a/drivers/Makefile b/drivers/Makefile
+index e4b260ecec15..75e0fc8fe28c 100644
+--- a/drivers/Makefile
++++ b/drivers/Makefile
+@@ -75,6 +75,7 @@ obj-$(CONFIG_TARGET_CORE)	+= target/
+ obj-$(CONFIG_MTD)		+= mtd/
+ obj-$(CONFIG_SPI)		+= spi/
+ obj-$(CONFIG_SPMI)		+= spmi/
++obj-$(CONFIG_RSB)		+= rsb/
+ obj-y				+= hsi/
+ obj-y				+= net/
+ obj-$(CONFIG_ATM)		+= atm/
+diff --git a/drivers/rsb/Kconfig b/drivers/rsb/Kconfig
 new file mode 100644
-index 000000000000..07b24291fe4d
+index 000000000000..6642e1db6d98
 --- /dev/null
-+++ b/drivers/rsb/rsb-sunxi.c
-@@ -0,0 +1,441 @@
++++ b/drivers/rsb/Kconfig
+@@ -0,0 +1,11 @@
++#
++# RSB driver configuration
++#
++menuconfig RSB
++	tristate "RSB support"
++	help
++	  RSB (Reduced Serial Bus) is a two-wire serial interface between
++	  baseband and application processors and Power Management
++	  Integrated Circuits (PMIC) or other peripherals.
++
++	  These are commonly seen on newer Allwinner SoCs and X-Powers ICs.
+diff --git a/drivers/rsb/Makefile b/drivers/rsb/Makefile
+new file mode 100644
+index 000000000000..6fe56526fbf3
+--- /dev/null
++++ b/drivers/rsb/Makefile
+@@ -0,0 +1,4 @@
++#
++# Makefile for kernel RSB framework.
++#
++obj-$(CONFIG_RSB)	+= rsb-core.o
+diff --git a/drivers/rsb/rsb-core.c b/drivers/rsb/rsb-core.c
+new file mode 100644
+index 000000000000..6682d827aebb
+--- /dev/null
++++ b/drivers/rsb/rsb-core.c
+@@ -0,0 +1,511 @@
 +/*
-+ * RSB (Reduced Serial Bus) driver.
++ * Copyright (c) 2015, Chen-Yu Tsai
 + *
-+ * Author: Chen-Yu Tsai <wens@csie.org>
++ * Chen-Yu Tsai <wens@csie.org>
 + *
-+ * This file is licensed under the terms of the GNU General Public License
-+ * version 2.  This program is licensed "as is" without any warranty of any
-+ * kind, whether express or implied.
++ * Allwinner Reduced Serial Bus (RSB) driver
 + *
-+ * The RSB controller looks like an SMBus controller which only supports
-+ * byte and word data transfers. But, it differs from standard SMBus
-+ * protocol on several aspects:
-+ * - it uses addresses set at runtime to address slaves. Runtime addresses
-+ *   are sent to slaves using their 12bit hardware addresses. Up to 15
-+ *   runtime addresses are available.
-+ * - it adds a parity bit every 8bits of data and address for read and
-+ *   write accesses; this replaces the ack bit
-+ * - only one read access is required to read a byte (instead of a write
-+ *   followed by a read access in standard SMBus protocol)
-+ * - there's no Ack bit after each read access
++ * based on spmi/spmi.c
 + *
-+ * This means this bus cannot be used to interface with standard SMBus
-+ * devices. Devices known to support this interface include the AXP223,
-+ * AXP809, and AXP806 PMICs, and the AC100 audio codec, all from X-Powers.
++ * Copyright (c) 2012-2015, The Linux Foundation. All rights reserved.
 + *
-+ * A description of the operation and wire protocol can be found in the
-+ * RSB section of Allwinner's A80 user manual, which can be found at
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
 + *
-+ *     https://github.com/allwinner-zh/documents/tree/master/A80
-+ *
-+ * This document is officially released by Allwinner.
-+ *
-+ * This driver is based on i2c-sun6i-p2wi.c, the P2WI bus driver.
-+ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
 + */
-+#include <linux/clk.h>
-+#include <linux/interrupt.h>
-+#include <linux/io.h>
-+#include <linux/iopoll.h>
++
++#include <linux/clk/clk-conf.h>
++#include <linux/kernel.h>
++#include <linux/errno.h>
++#include <linux/idr.h>
 +#include <linux/module.h>
 +#include <linux/of.h>
++#include <linux/of_device.h>
++#include <linux/of_irq.h>
 +#include <linux/platform_device.h>
-+#include <linux/reset.h>
 +#include <linux/rsb.h>
++#include <linux/slab.h>
 +
-+/* RSB registers */
-+#define RSB_CTRL	0x0	/* Global control */
-+#define RSB_CCR		0x4	/* Clock control */
-+#define RSB_INTE	0x8	/* Interrupt controls */
-+#define RSB_INTS	0xc	/* Interrupt status */
-+#define RSB_ADDR	0x10	/* Address to send with read/write command */
-+#define RSB_DATA	0x1c	/* Data to read/write */
-+#define RSB_LCR		0x24	/* Line control */
-+#define RSB_DMCR	0x28	/* Device mode (init) control */
-+#define RSB_CMD		0x2c	/* RSB Command */
-+#define RSB_DAR		0x30	/* Device address / runtime address */
++static DEFINE_IDA(ctrl_ida);
 +
-+/* CTRL fields */
-+#define RSB_CTRL_START_TRANS		BIT(7)
-+#define RSB_CTRL_ABORT_TRANS		BIT(6)
-+#define RSB_CTRL_GLOBAL_INT_ENB		BIT(1)
-+#define RSB_CTRL_SOFT_RST		BIT(0)
++static void rsb_dev_release(struct device *dev)
++{
++	struct rsb_device *rdev = to_rsb_device(dev);
 +
-+/* CLK CTRL fields */
-+#define RSB_CCR_SDA_OUT_DELAY(v)	(((v) & 0x7) << 8)
-+#define RSB_CCR_MAX_CLK_DIV		0xff
-+#define RSB_CCR_CLK_DIV(v)		((v) & RSB_CCR_MAX_CLK_DIV)
++	kfree(rdev);
++}
 +
-+/* STATUS fields */
-+#define RSB_INTS_TRANS_ERR_ACK		BIT(16)
-+#define RSB_INTS_TRANS_ERR_DATA_BIT(v)	(((v) >> 8) & 0xf)
-+#define RSB_INTS_TRANS_ERR_DATA		GENMASK(11, 8)
-+#define RSB_INTS_LOAD_BSY		BIT(2)
-+#define RSB_INTS_TRANS_ERR		BIT(1)
-+#define RSB_INTS_TRANS_OVER		BIT(0)
-+
-+/* LINE CTRL fields*/
-+#define RSB_LCR_SCL_STATE		BIT(5)
-+#define RSB_LCR_SDA_STATE		BIT(4)
-+#define RSB_LCR_SCL_CTL			BIT(3)
-+#define RSB_LCR_SCL_CTL_EN		BIT(2)
-+#define RSB_LCR_SDA_CTL			BIT(1)
-+#define RSB_LCR_SDA_CTL_EN		BIT(0)
-+
-+/* DEVICE MODE CTRL field values */
-+#define RSB_DMCR_DEVICE_START		BIT(31)
-+#define RSB_DMCR_MODE_DATA		(0x7c << 16)
-+#define RSB_DMCR_MODE_REG		(0x3e << 8)
-+#define RSB_DMCR_DEV_ADDR		0x00
-+
-+/* CMD values */
-+#define RSB_CMD_RD8			0x8b
-+#define RSB_CMD_RD16			0x9c
-+#define RSB_CMD_RD32			0xa6
-+#define RSB_CMD_WR8			0x4e
-+#define RSB_CMD_WR16			0x59
-+#define RSB_CMD_WR32			0x63
-+#define RSB_CMD_STRA			0xe8
-+
-+/* DAR fields */
-+#define RSB_DAR_RTA(v)			(((v) & 0xff) << 16)
-+#define RSB_DAR_DA(v)			((v) & 0xffff)
-+
-+#define RSB_MAX_FREQ			20000000
-+
-+#define RSB_CTRL_NAME			"sunxi-rsb"
-+
-+struct rsb {
-+	struct rsb_controller *ctrl;
-+	void __iomem *regs;
-+	struct clk *clk;
-+	struct reset_control *rstc;
-+	struct completion complete;
-+	unsigned int status;
++static const struct device_type rsb_dev_type = {
++	.release	= rsb_dev_release,
 +};
 +
-+static irqreturn_t rsb_interrupt(int irq, void *dev_id)
++static void rsb_ctrl_release(struct device *dev)
 +{
-+	struct rsb *rsb = dev_id;
-+	u32 status;
++	struct rsb_controller *ctrl = to_rsb_controller(dev);
 +
-+	/* Clear interrupts */
-+	status = readl(rsb->regs + RSB_INTS);
-+	rsb->status = status;
-+	writel(status, rsb->regs + RSB_INTS);
-+
-+	complete(&rsb->complete);
-+
-+	return IRQ_HANDLED;
++	ida_simple_remove(&ctrl_ida, ctrl->nr);
++	kfree(ctrl);
 +}
 +
-+/* common code that starts a transfer */
-+static int rsb_run_xfer(struct rsb *rsb)
-+{
-+	if (readl(rsb->regs + RSB_CTRL) & RSB_CTRL_START_TRANS) {
-+		dev_dbg(&rsb->ctrl->dev, "RSB transfer still in progress\n");
-+		return -EBUSY;
-+	}
-+
-+	reinit_completion(&rsb->complete);
-+
-+	writel(RSB_INTS_LOAD_BSY | RSB_INTS_TRANS_ERR | RSB_INTS_TRANS_OVER,
-+	       rsb->regs + RSB_INTE);
-+	writel(RSB_CTRL_START_TRANS | RSB_CTRL_GLOBAL_INT_ENB,
-+	       rsb->regs + RSB_CTRL);
-+
-+	if (!wait_for_completion_io_timeout(&rsb->complete,
-+					    msecs_to_jiffies(100))) {
-+		dev_dbg(&rsb->ctrl->dev, "RSB timeout\n");
-+
-+		/* abort the transfer */
-+		writel(RSB_CTRL_ABORT_TRANS, rsb->regs + RSB_CTRL);
-+
-+		/* clear any interrupt flags */
-+		writel(readl(rsb->regs + RSB_INTS), rsb->regs + RSB_INTS);
-+
-+		return -ETIMEDOUT;
-+	}
-+
-+	if (rsb->status & RSB_INTS_LOAD_BSY) {
-+		dev_dbg(&rsb->ctrl->dev, "RSB busy\n");
-+		return -EBUSY;
-+	}
-+
-+	if (rsb->status & RSB_INTS_TRANS_ERR_ACK) {
-+		dev_dbg(&rsb->ctrl->dev, "RSB slave nack\n");
-+		return -EINVAL;
-+	}
-+
-+	if (rsb->status & RSB_INTS_TRANS_ERR_DATA) {
-+		dev_dbg(&rsb->ctrl->dev, "RSB transfer data error\n");
-+		return -EIO;
-+	}
-+
-+	/* This should be covered by the above 2 cases */
-+	if (rsb->status & RSB_INTS_TRANS_ERR) {
-+		dev_dbg(&rsb->ctrl->dev, "bus transfer error\n");
-+		return -EIO;
-+	}
-+
-+	return 0;
-+}
-+
-+static int rsb_read_cmd(struct rsb_controller *ctrl, u8 rtaddr,
-+			u8 addr, u32 *buf, size_t len)
-+{
-+	struct rsb *rsb = rsb_controller_get_drvdata(ctrl);
-+	u32 cmd;
-+	int ret;
-+
-+	if (!buf)
-+		return -EINVAL;
-+
-+	switch (len) {
-+	case 1:
-+		cmd = RSB_CMD_RD8;
-+		break;
-+	case 2:
-+		cmd = RSB_CMD_RD16;
-+		break;
-+	case 4:
-+		cmd = RSB_CMD_RD32;
-+		break;
-+	default:
-+		dev_err(&ctrl->dev, "Invalid access width: %d", len);
-+		return -EINVAL;
-+	}
-+
-+	writel(addr, rsb->regs + RSB_ADDR);
-+	writel(RSB_DAR_RTA(rtaddr), rsb->regs + RSB_DAR);
-+	writel(cmd, rsb->regs + RSB_CMD);
-+
-+	ret = rsb_run_xfer(rsb);
-+	if (ret)
-+		return ret;
-+
-+	*buf = readl(rsb->regs + RSB_DATA);
-+
-+	return 0;
-+}
-+
-+static int rsb_write_cmd(struct rsb_controller *ctrl, u8 rtaddr,
-+			 u8 addr, const u32 *buf, size_t len)
-+{
-+	struct rsb *rsb = rsb_controller_get_drvdata(ctrl);
-+	u32 cmd;
-+
-+	if (!buf)
-+		return -EINVAL;
-+
-+	switch (len) {
-+	case 1:
-+		cmd = RSB_CMD_WR8;
-+		break;
-+	case 2:
-+		cmd = RSB_CMD_WR16;
-+		break;
-+	case 4:
-+		cmd = RSB_CMD_WR32;
-+		break;
-+	default:
-+		dev_err(&ctrl->dev, "Invalid access width: %d", len);
-+		return -EINVAL;
-+	}
-+
-+	writel(addr, rsb->regs + RSB_ADDR);
-+	writel(RSB_DAR_RTA(rtaddr), rsb->regs + RSB_DAR);
-+	writel(*buf, rsb->regs + RSB_DATA);
-+	writel(cmd, rsb->regs + RSB_CMD);
-+
-+	return rsb_run_xfer(rsb);
-+}
-+
-+static int rsb_rtsaddr_cmd(struct rsb_controller *ctrl, u16 hwaddr, u8 rtaddr)
-+{
-+	struct rsb *rsb = rsb_controller_get_drvdata(ctrl);
-+
-+	/* setup command parameters */
-+	writel(RSB_DAR_RTA(rtaddr) | RSB_DAR_DA(hwaddr), rsb->regs + RSB_DAR);
-+	writel(RSB_CMD_STRA, rsb->regs + RSB_CMD);
-+
-+	/* send command */
-+	return rsb_run_xfer(rsb);
-+}
-+
-+static int rsb_init_cmd(struct rsb_controller *ctrl)
-+{
-+	struct rsb *rsb = rsb_controller_get_drvdata(ctrl);
-+	int reg;
-+
-+	/* send init sequence */
-+	writel(RSB_DMCR_DEVICE_START | RSB_DMCR_MODE_DATA |
-+	       RSB_DMCR_MODE_REG | RSB_DMCR_DEV_ADDR, rsb->regs + RSB_DMCR);
-+
-+	readl_poll_timeout(rsb->regs + RSB_DMCR, reg,
-+			   !(reg & RSB_DMCR_DEVICE_START), 100, 250000);
-+	if (reg & RSB_DMCR_DEVICE_START)
-+		dev_warn(&ctrl->dev, "send init sequence timeout\n");
-+
-+	/* clear any interrupt flags */
-+	writel(readl(rsb->regs + RSB_INTS), rsb->regs + RSB_INTS);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id rsb_of_match_table[] = {
-+	{ .compatible = "allwinner,sun8i-a23-rsb" },
-+	{}
++static const struct device_type rsb_ctrl_type = {
++	.release	= rsb_ctrl_release,
 +};
-+MODULE_DEVICE_TABLE(of, rsb_of_match_table);
 +
-+static int rsb_probe(struct platform_device *pdev)
++static int rsb_device_match(struct device *dev, struct device_driver *drv)
 +{
-+	struct device *dev = &pdev->dev;
-+	struct device_node *np = dev->of_node;
-+	struct resource *r;
-+	struct rsb_controller *ctrl;
-+	struct rsb *rsb;
-+	unsigned long parent_clk_freq;
-+	u32 clk_freq = 100000;
-+	int clk_div;
-+	int irq;
++	if (of_driver_match_device(dev, drv))
++		return 1;
++
++	return strcmp(dev_name(dev), drv->name) == 0;
++}
++
++static inline int rsb_init_cmd(struct rsb_controller *ctrl)
++{
 +	int ret;
-+	u32 reg;
 +
-+	of_property_read_u32(np, "clock-frequency", &clk_freq);
-+	if (clk_freq > RSB_MAX_FREQ) {
-+		dev_err(dev,
-+			"clock-frequency (%u Hz) is too high (max = 20MHz)",
-+			clk_freq);
++	if (!ctrl || !ctrl->init_cmd || ctrl->dev.type != &rsb_ctrl_type)
 +		return -EINVAL;
-+	}
 +
-+	ctrl = rsb_controller_alloc(dev, sizeof(*rsb));
-+	if (!ctrl)
-+		return -ENOMEM;
-+
-+	platform_set_drvdata(pdev, ctrl);
-+
-+	/* set callbacks */
-+	ctrl->init_cmd = rsb_init_cmd;
-+	ctrl->rtsaddr_cmd = rsb_rtsaddr_cmd;
-+	ctrl->read_cmd = rsb_read_cmd;
-+	ctrl->write_cmd = rsb_write_cmd;
-+
-+	rsb = rsb_controller_get_drvdata(ctrl);
-+	rsb->ctrl = ctrl;
-+
-+	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	rsb->regs = devm_ioremap_resource(dev, r);
-+	if (IS_ERR(rsb->regs)) {
-+		ret = PTR_ERR(rsb->regs);
-+		goto err_rsb_controller_put;
-+	}
-+
-+	irq = platform_get_irq(pdev, 0);
-+	if (irq < 0) {
-+		dev_err(dev, "failed to retrieve irq: %d\n", irq);
-+		ret = irq;
-+		goto err_rsb_controller_put;
-+	}
-+
-+	rsb->clk = devm_clk_get(dev, NULL);
-+	if (IS_ERR(rsb->clk)) {
-+		ret = PTR_ERR(rsb->clk);
-+		dev_err(dev, "failed to retrieve clk: %d\n", ret);
-+		goto err_rsb_controller_put;
-+	}
-+
-+	ret = clk_prepare_enable(rsb->clk);
-+	if (ret) {
-+		dev_err(dev, "failed to enable clk: %d\n", ret);
-+		goto err_rsb_controller_put;
-+	}
-+
-+	parent_clk_freq = clk_get_rate(rsb->clk);
-+
-+	rsb->rstc = devm_reset_control_get(dev, NULL);
-+	if (IS_ERR(rsb->rstc)) {
-+		ret = PTR_ERR(rsb->rstc);
-+		dev_err(dev, "failed to retrieve reset controller: %d\n", ret);
-+		goto err_clk_disable;
-+	}
-+
-+	ret = reset_control_deassert(rsb->rstc);
-+	if (ret) {
-+		dev_err(dev, "failed to deassert reset line: %d\n", ret);
-+		goto err_clk_disable;
-+	}
-+
-+	init_completion(&rsb->complete);
-+
-+	/* reset the controller */
-+	writel(RSB_CTRL_SOFT_RST, rsb->regs + RSB_CTRL);
-+	readl_poll_timeout(rsb->regs + RSB_CTRL, reg,
-+			   !(reg & RSB_CTRL_SOFT_RST), 1000, 100000);
-+
-+	clk_div = parent_clk_freq / clk_freq;
-+	if (!clk_div) {
-+		dev_warn(dev,
-+			 "clock-frequency is too high, setting it to %lu Hz\n",
-+			 parent_clk_freq);
-+		clk_div = 1;
-+	} else if (clk_div > RSB_CCR_MAX_CLK_DIV + 1) {
-+		dev_warn(dev,
-+			 "clock-frequency is too low, setting it to %lu Hz\n",
-+			 parent_clk_freq / (RSB_CCR_MAX_CLK_DIV + 1));
-+		clk_div = RSB_CCR_MAX_CLK_DIV + 1;
-+	}
-+
-+	writel(RSB_CCR_SDA_OUT_DELAY(1) | RSB_CCR_CLK_DIV(clk_div - 1),
-+	       rsb->regs + RSB_CCR);
-+
-+	ret = devm_request_irq(dev, irq, rsb_interrupt, 0, RSB_CTRL_NAME, rsb);
-+	if (ret) {
-+		dev_err(dev, "can't register interrupt handler irq%d: %d\n",
-+			irq, ret);
-+		goto err_reset_assert;
-+	}
-+
-+	ret = rsb_controller_add(ctrl);
-+	if (!ret)
-+		return 0;
-+
-+err_reset_assert:
-+	reset_control_assert(rsb->rstc);
-+
-+err_clk_disable:
-+	clk_disable_unprepare(rsb->clk);
-+
-+err_rsb_controller_put:
-+	rsb_controller_put(ctrl);
++	mutex_lock(&ctrl->lock);
++	ret = ctrl->init_cmd(ctrl);
++	mutex_unlock(&ctrl->lock);
 +
 +	return ret;
 +}
 +
-+static int rsb_remove(struct platform_device *pdev)
++static inline int rsb_rtsaddr_cmd(struct rsb_controller *ctrl, u16 hwaddr,
++				  u8 rtaddr)
 +{
-+	struct rsb_controller *ctrl = platform_get_drvdata(pdev);
-+	struct rsb *rsb = rsb_controller_get_drvdata(ctrl);
++	int ret;
 +
-+	rsb_controller_remove(ctrl);
-+	reset_control_assert(rsb->rstc);
-+	clk_disable_unprepare(rsb->clk);
++	if (!ctrl || !ctrl->rtsaddr_cmd || ctrl->dev.type != &rsb_ctrl_type)
++		return -EINVAL;
 +
++	mutex_lock(&ctrl->lock);
++	ret = ctrl->rtsaddr_cmd(ctrl, hwaddr, rtaddr);
++	mutex_unlock(&ctrl->lock);
++
++	return ret;
++}
++
++static inline int rsb_read_cmd(struct rsb_controller *ctrl, u8 rtaddr,
++			       u8 addr, u32 *buf, size_t len)
++{
++	int ret;
++
++	if (!ctrl || !ctrl->read_cmd || ctrl->dev.type != &rsb_ctrl_type)
++		return -EINVAL;
++
++	mutex_lock(&ctrl->lock);
++	ret = ctrl->read_cmd(ctrl, rtaddr, addr, buf, len);
++	mutex_unlock(&ctrl->lock);
++
++	return ret;
++}
++
++static inline int rsb_write_cmd(struct rsb_controller *ctrl, u8 rtaddr,
++				u8 addr, const u32 *buf, size_t len)
++{
++	int ret;
++
++	if (!ctrl || !ctrl->write_cmd || ctrl->dev.type != &rsb_ctrl_type)
++		return -EINVAL;
++
++	mutex_lock(&ctrl->lock);
++	ret = ctrl->write_cmd(ctrl, rtaddr, addr, buf, len);
++	mutex_unlock(&ctrl->lock);
++
++	return ret;
++}
++
++/**
++ * rsb_register_read() - register read
++ * @rdev:	RSB device.
++ * @addr:	slave register address.
++ * @buf:	buffer to be populated with data from the Slave.
++ * @size:	width of the slave register in bytes
++ *
++ * Reads data from a Slave device register.
++ */
++int rsb_register_read(struct rsb_device *rdev, u8 addr, u32 *buf, int size)
++{
++	switch (size) {
++	case 1:
++	case 2:
++	case 4:
++		break;
++	default:
++		return -EINVAL;
++	}
++
++	return rsb_read_cmd(rdev->ctrl, rdev->rtaddr, addr, buf, size);
++}
++EXPORT_SYMBOL_GPL(rsb_register_read);
++
++/**
++ * rsb_register_write() - register write
++ * @rdev:	RSB device
++ * @addr:	slave register address.
++ * @data:	buffer containing the data to be transferred to the Slave.
++ * @size:	width of the slave register in bytes
++ *
++ * Writes data to a Slave device register.
++ */
++int rsb_register_write(struct rsb_device *rdev, u8 addr, u32 data, int size)
++{
++	switch (size) {
++	case 1:
++	case 2:
++	case 4:
++		break;
++	default:
++		return -EINVAL;
++	}
++
++	return rsb_write_cmd(rdev->ctrl, rdev->rtaddr, addr, &data, size);
++}
++EXPORT_SYMBOL_GPL(rsb_register_write);
++
++static struct bus_type rsb_bus_type;
++
++static int rsb_device_probe(struct device *dev)
++{
++	const struct rsb_driver *drv = to_rsb_driver(dev->driver);
++	struct rsb_device *rsb = to_rsb_device(dev);
++	int ret;
++
++	if (dev->type != &rsb_dev_type)
++		return 0;
++
++	if (!drv->probe)
++		return -ENODEV;
++
++	if (!rsb->irq) {
++		int irq = -ENOENT;
++
++		if (dev->of_node)
++			irq = of_irq_get(dev->of_node, 0);
++
++		if (irq == -EPROBE_DEFER)
++			return irq;
++		if (irq < 0)
++			irq = 0;
++
++		rsb->irq = irq;
++	}
++
++	ret = of_clk_set_defaults(dev->of_node, false);
++	if (ret < 0)
++		return ret;
++
++	return drv->probe(rsb);
++}
++
++static int rsb_device_remove(struct device *dev)
++{
++	const struct rsb_driver *drv = to_rsb_driver(dev->driver);
++
++	if (dev->type != &rsb_dev_type)
++		return 0;
++
++	return drv->remove(to_rsb_device(dev));
++}
++
++static struct bus_type rsb_bus_type = {
++	.name		= "rsb",
++	.match		= rsb_device_match,
++	.probe		= rsb_device_probe,
++	.remove		= rsb_device_remove,
++};
++
++/**
++ * rsb_device_alloc() - Allocate a new RSB device
++ * @ctrl:	associated controller
++ *
++ * Caller is responsible for either calling rsb_device_add() to add the
++ * newly allocated controller, or calling rsb_device_put() to discard it.
++ */
++static struct rsb_device *rsb_device_alloc(struct rsb_controller *ctrl)
++{
++	struct rsb_device *rdev;
++
++	rdev = kzalloc(sizeof(*rdev), GFP_KERNEL);
++	if (!rdev)
++		return NULL;
++
++	rdev->ctrl = ctrl;
++	device_initialize(&rdev->dev);
++	rdev->dev.parent = &ctrl->dev;
++	rdev->dev.bus = &rsb_bus_type;
++	rdev->dev.type = &rsb_dev_type;
++	return rdev;
++}
++
++static inline void rsb_device_put(struct rsb_device *rdev)
++{
++	if (rdev)
++		put_device(&rdev->dev);
++}
++
++/* 15 valid runtime addresses for RSB slaves */
++static const u8 rsb_valid_rtaddr[] = {
++	0x17, 0x2d, 0x3a, 0x4e, 0x59, 0x63, 0x74, 0x8b,
++	0x9c, 0xa6, 0xb1, 0xc5, 0xd2, 0xe8, 0xff,
++};
++
++static inline int rsb_check_rt_addr(u8 addr)
++{
++	int i;
++
++	for (i = 0; i < ARRAY_SIZE(rsb_valid_rtaddr); i++)
++		if (addr == rsb_valid_rtaddr[i])
++			return 0;
++
++	return -EINVAL;
++}
++
++/**
++ * rsb_device_add() - add a device previously constructed via rsb_device_alloc()
++ * @rdev:	rsb_device to be added
++ */
++static int rsb_device_add(struct rsb_device *rdev)
++{
++	struct rsb_controller *ctrl = rdev->ctrl;
++	int err;
++
++	dev_set_name(&rdev->dev, "%d-%02x", ctrl->nr, rdev->rtaddr);
++
++	err = device_add(&rdev->dev);
++	if (err < 0) {
++		dev_err(&rdev->dev, "Can't add %s, status %d\n",
++			dev_name(&rdev->dev), err);
++		goto err_device_add;
++	}
++
++	dev_dbg(&rdev->dev, "device %s registered\n", dev_name(&rdev->dev));
++
++err_device_add:
++	return err;
++}
++
++/**
++ * rsb_device_unregister(): unregister an RSB device
++ * @rdev:	rsb_device to be removed
++ */
++static void rsb_device_unregister(struct rsb_device *rdev)
++{
++	device_unregister(&rdev->dev);
++}
++
++/**
++ * rsb_controller_alloc() - Allocate a new RSB controller
++ * @parent:	parent device
++ * @size:	size of private data
++ *
++ * Caller is responsible for either calling rsb_controller_add() to add the
++ * newly allocated controller, or calling rsb_controller_put() to discard it.
++ * The allocated private data region may be accessed via
++ * rsb_controller_get_drvdata()
++ */
++struct rsb_controller *rsb_controller_alloc(struct device *parent, size_t size)
++{
++	struct rsb_controller *ctrl;
++	int id;
++
++	if (WARN_ON(!parent))
++		return NULL;
++
++	ctrl = kzalloc(sizeof(*ctrl) + size, GFP_KERNEL);
++	if (!ctrl)
++		return NULL;
++
++	device_initialize(&ctrl->dev);
++	mutex_init(&ctrl->lock);
++	ctrl->dev.type = &rsb_ctrl_type;
++	ctrl->dev.bus = &rsb_bus_type;
++	ctrl->dev.parent = parent;
++	ctrl->dev.of_node = parent->of_node;
++	rsb_controller_set_drvdata(ctrl, &ctrl[1]);
++
++	id = ida_simple_get(&ctrl_ida, 0, 0, GFP_KERNEL);
++	if (id < 0) {
++		dev_err(parent,
++			"unable to allocate RSB controller identifier.\n");
++		rsb_controller_put(ctrl);
++		return NULL;
++	}
++
++	ctrl->nr = id;
++	dev_set_name(&ctrl->dev, "rsb-%d", id);
++	dev_dbg(&ctrl->dev, "allocated controller 0x%p id %d\n", ctrl, id);
++
++	return ctrl;
++}
++EXPORT_SYMBOL_GPL(rsb_controller_alloc);
++
++static void of_rsb_register_devices(struct rsb_controller *ctrl)
++{
++	struct device_node *node;
++	int err;
++	u32 reg[2];
++
++	if (!ctrl->dev.of_node)
++		return;
++
++	/* Runtime addresses for all slaves should be set first */
++	for_each_available_child_of_node(ctrl->dev.of_node, node) {
++		dev_dbg(&ctrl->dev, "setting child %s runtime address\n",
++			node->full_name);
++
++		err = of_property_read_u32_array(node, "reg", reg, 2);
++		if (err) {
++			dev_err(&ctrl->dev,
++				"node %s err (%d) does not have 'reg' property\n",
++				node->full_name, err);
++			continue;
++		}
++
++		if (reg[0] > 0xff || rsb_check_rt_addr(reg[0]) < 0) {
++			dev_err(&ctrl->dev,
++				"invalid runtime address on node %s\n",
++				node->full_name);
++			continue;
++		}
++
++		/* This fails if the slave device was already initialized */
++		err = rsb_rtsaddr_cmd(ctrl, (u16)reg[1], (u8)reg[0]);
++		if (err)
++			dev_info(&ctrl->dev,
++				 "failed to set runtime address: %d\n", err);
++	}
++
++	for_each_available_child_of_node(ctrl->dev.of_node, node) {
++		struct rsb_device *rdev;
++
++		dev_dbg(&ctrl->dev, "adding child %s\n", node->full_name);
++
++		err = of_property_read_u32_array(node, "reg", reg, 2);
++		if (err)
++			continue;
++
++		if (reg[0] > 0xff || rsb_check_rt_addr(reg[0]) < 0)
++			continue;
++
++		rdev = rsb_device_alloc(ctrl);
++		if (!rdev)
++			continue;
++
++		rdev->dev.of_node = node;
++		rdev->rtaddr = (u8)reg[0];
++		rdev->hwaddr = (u16)reg[1];
++
++		err = rsb_device_add(rdev);
++		if (err) {
++			dev_err(&rdev->dev, "failed to add device: %d\n", err);
++			rsb_device_put(rdev);
++		}
++	}
++}
++
++/**
++ * rsb_controller_add() - Add an RSB controller
++ * @ctrl:	controller to be registered.
++ *
++ * Register a controller previously allocated via rsb_controller_alloc() with
++ * the RSB core.
++ */
++int rsb_controller_add(struct rsb_controller *ctrl)
++{
++	int ret;
++
++	/* Can't register until after driver model init */
++	if (WARN_ON(!rsb_bus_type.p))
++		return -EAGAIN;
++
++	ret = device_add(&ctrl->dev);
++	if (ret)
++		return ret;
++
++	/*
++	 * Send RSB init sequence on the bus. This fails if the bus was
++	 * already initialized.
++	 */
++	ret = rsb_init_cmd(ctrl);
++	if (ret)
++		dev_info(&ctrl->dev, "RSB init sequence failed: %d\n", ret);
++
++	if (IS_ENABLED(CONFIG_OF))
++		of_rsb_register_devices(ctrl);
++
++	dev_dbg(&ctrl->dev, "rsb-%d registered: dev:%p\n",
++		ctrl->nr, &ctrl->dev);
++
++	return 0;
++};
++EXPORT_SYMBOL_GPL(rsb_controller_add);
++
++/* Remove a device associated with a controller */
++static int rsb_ctrl_remove_device(struct device *dev, void *data)
++{
++	struct rsb_device *rsb = to_rsb_device(dev);
++
++	if (dev->type == &rsb_dev_type)
++		rsb_device_unregister(rsb);
 +	return 0;
 +}
 +
-+static struct platform_driver rsb_driver = {
-+	.probe = rsb_probe,
-+	.remove	= rsb_remove,
-+	.driver	= {
-+		.name = "rsb-sunxi",
-+		.of_match_table = rsb_of_match_table,
-+	},
-+};
-+module_platform_driver(rsb_driver);
++/**
++ * rsb_controller_remove(): remove an RSB controller
++ * @ctrl:	controller to remove
++ *
++ * Remove a RSB controller.  Caller is responsible for calling
++ * rsb_controller_put() to discard the allocated controller.
++ */
++void rsb_controller_remove(struct rsb_controller *ctrl)
++{
++	int dummy;
 +
-+MODULE_AUTHOR("Chen-Yu Tsai <wens@csie.org>");
-+MODULE_DESCRIPTION("Allwinner RSB driver");
++	if (!ctrl)
++		return;
++
++	dummy = device_for_each_child(&ctrl->dev, NULL,
++				      rsb_ctrl_remove_device);
++	mutex_destroy(&ctrl->lock);
++	device_del(&ctrl->dev);
++}
++EXPORT_SYMBOL_GPL(rsb_controller_remove);
++
++/**
++ * rsb_driver_register() - Register device driver with RSB core
++ * @rdrv:	device driver to be associated with slave-device.
++ *
++ * This API will register the client driver with the RSB framework.
++ * It is typically called from the driver's module-init function.
++ */
++int rsb_driver_register(struct rsb_driver *rdrv)
++{
++	rdrv->driver.bus = &rsb_bus_type;
++	return driver_register(&rdrv->driver);
++}
++EXPORT_SYMBOL_GPL(rsb_driver_register);
++
++static void __exit rsb_exit(void)
++{
++	bus_unregister(&rsb_bus_type);
++}
++module_exit(rsb_exit);
++
++static int __init rsb_init(void)
++{
++	return bus_register(&rsb_bus_type);
++}
++postcore_initcall(rsb_init);
++
 +MODULE_LICENSE("GPL v2");
++MODULE_DESCRIPTION("Reduce Serial Bus (RSB) core module");
++MODULE_ALIAS("platform:rsb");
+diff --git a/include/linux/rsb.h b/include/linux/rsb.h
+new file mode 100644
+index 000000000000..51a53468f547
+--- /dev/null
++++ b/include/linux/rsb.h
+@@ -0,0 +1,144 @@
++/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++#ifndef _LINUX_RSB_H
++#define _LINUX_RSB_H
++
++#include <linux/device.h>
++#include <linux/mod_devicetable.h>
++#include <linux/mutex.h>
++#include <linux/types.h>
++
++/**
++ * struct rsb_device - Basic representation of an RSB device
++ * @dev:	Driver model representation of the device.
++ * @ctrl:	RSB controller managing the bus hosting this device.
++ * @rtaddr:	This device's runtime address
++ * @hwaddr:	This device's hardware address
++ */
++struct rsb_device {
++	struct device		dev;
++	struct rsb_controller	*ctrl;
++	int			irq;
++	u8			rtaddr;
++	u16			hwaddr;
++};
++
++static inline struct rsb_device *to_rsb_device(struct device *d)
++{
++	return container_of(d, struct rsb_device, dev);
++}
++
++static inline void *rsb_device_get_drvdata(const struct rsb_device *rdev)
++{
++	return dev_get_drvdata(&rdev->dev);
++}
++
++static inline void rsb_device_set_drvdata(struct rsb_device *rdev, void *data)
++{
++	dev_set_drvdata(&rdev->dev, data);
++}
++
++/**
++ * struct rsb_controller - interface to the RSB master controller
++ * @dev:	Driver model representation of the device.
++ * @nr:		board-specific number identifier for this controller/bus
++ * @init_cmd:	sends a device initialization command sequence on the bus.
++ * @rtsaddr_cmd: sends a "set runtime address" command sequence on the bus.
++ * @read_cmd:	sends a register read command sequence on the RSB bus.
++ * @write_cmd:	sends a register write command sequence on the RSB bus.
++ */
++struct rsb_controller {
++	struct device		dev;
++	unsigned int		nr;
++	struct mutex		lock; /* serialize access to the bus */
++	int	(*init_cmd)(struct rsb_controller *ctrl);
++	int	(*rtsaddr_cmd)(struct rsb_controller *ctrl,
++			       u16 hwaddr, u8 rtaddr);
++	int	(*read_cmd)(struct rsb_controller *ctrl, u8 rtaddr,
++			    u8 addr, u32 *buf, size_t len);
++	int	(*write_cmd)(struct rsb_controller *ctrl, u8 rtaddr,
++			     u8 addr, const u32 *buf, size_t len);
++};
++
++static inline struct rsb_controller *to_rsb_controller(struct device *d)
++{
++	return container_of(d, struct rsb_controller, dev);
++}
++
++static inline
++void *rsb_controller_get_drvdata(const struct rsb_controller *ctrl)
++{
++	return dev_get_drvdata(&ctrl->dev);
++}
++
++static inline void rsb_controller_set_drvdata(struct rsb_controller *ctrl,
++					      void *data)
++{
++	dev_set_drvdata(&ctrl->dev, data);
++}
++
++struct rsb_controller *rsb_controller_alloc(struct device *parent,
++					    size_t size);
++
++/**
++ * rsb_controller_put() - decrement controller refcount
++ * @ctrl	RSB controller.
++ */
++static inline void rsb_controller_put(struct rsb_controller *ctrl)
++{
++	if (ctrl) {
++		mutex_destroy(&ctrl->lock);
++		put_device(&ctrl->dev);
++	}
++}
++
++int rsb_controller_add(struct rsb_controller *ctrl);
++void rsb_controller_remove(struct rsb_controller *ctrl);
++
++/**
++ * struct rsb_driver - RSB slave device driver
++ * @driver:	RSB device drivers should initialize name and owner field of
++ *		this structure.
++ * @probe:	binds this driver to a RSB device.
++ * @remove:	unbinds this driver from the RSB device.
++ */
++struct rsb_driver {
++	struct device_driver driver;
++	int (*probe)(struct rsb_device *rdev);
++	int (*remove)(struct rsb_device *rdev);
++};
++
++static inline struct rsb_driver *to_rsb_driver(struct device_driver *d)
++{
++	return container_of(d, struct rsb_driver, driver);
++}
++
++int rsb_driver_register(struct rsb_driver *rdrv);
++
++/**
++ * rsb_driver_unregister() - unregister an RSB client driver
++ * @rdrv:	the driver to unregister
++ */
++static inline void rsb_driver_unregister(struct rsb_driver *rdrv)
++{
++	if (rdrv)
++		driver_unregister(&rdrv->driver);
++}
++
++#define module_rsb_driver(__rsb_driver) \
++	module_driver(__rsb_driver, rsb_driver_register, \
++			rsb_driver_unregister)
++
++int rsb_register_read(struct rsb_device *rdev, u8 addr, u32 *buf, int size);
++int rsb_register_write(struct rsb_device *rdev, u8 addr, u32 data, int size);
++
++#endif
 -- 
 2.5.0
