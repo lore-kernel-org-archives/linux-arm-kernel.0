@@ -1,38 +1,22 @@
-From: al.stone@linaro.org (Al Stone)
-Date: Wed, 19 Aug 2015 16:07:28 -0600
-Subject: [PATCH v2 5/5] ACPI: remove definition of BAD_MADT_ENTRY macro
-In-Reply-To: <1440022048-6285-1-git-send-email-al.stone@linaro.org>
-References: <1440022048-6285-1-git-send-email-al.stone@linaro.org>
-Message-ID: <1440022048-6285-6-git-send-email-al.stone@linaro.org>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 20 Aug 2015 01:08:33 +0300
+Subject: [PATCH 0/2] Add R8A7794/SILK I2C device tree support
+In-Reply-To: <2390854.nqPs17CVpc@wasted.cogentembedded.com>
+References: <2390854.nqPs17CVpc@wasted.cogentembedded.com>
+Message-ID: <55D4FE61.5010800@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have introduced to bad_madt_entry(), and we have removed
-all the usages of the BAD_MADT_ENTRY macro from all of the various
-architectures that use it (arm64, ia64, x86), we can remove the macro
-definition since it is no longer used.
+On 08/20/2015 12:57 AM, Sergei Shtylyov wrote:
 
-Signed-off-by: Al Stone <al.stone@linaro.org>
-Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
-Cc: Len Brown <lenb@kernel.org>
----
- include/linux/acpi.h | 4 ----
- 1 file changed, 4 deletions(-)
+>     Here's the set of 2 patches against Simon Horman's 'renesas.git' repo's
+> 'renesas-devel-20150819-v4.2-rc7' tag. Here we add the I2C device tree support
+> for the R8A7794/SILK board.
+>
+> [1/2] ARM: shmobile: r8a7794: add I2C DT support
+> [2/2] ARM: shmobile: silk: add I2C1 DT support
 
-diff --git a/include/linux/acpi.h b/include/linux/acpi.h
-index 01e6770..96729d3 100644
---- a/include/linux/acpi.h
-+++ b/include/linux/acpi.h
-@@ -127,10 +127,6 @@ static inline void acpi_initrd_override(void *data, size_t size)
- }
- #endif
- 
--#define BAD_MADT_ENTRY(entry, end) (					    \
--		(!entry) || (unsigned long)entry + sizeof(*entry) > end ||  \
--		((struct acpi_subtable_header *)entry)->length < sizeof(*entry))
--
- char * __acpi_map_table (unsigned long phys_addr, unsigned long size);
- void __acpi_unmap_table(char *map, unsigned long size);
- int early_acpi_boot_init(void);
--- 
-2.4.3
+    Simon, actually the above patch is atop of my SILK SDHI1 patch but should 
+apply with offsets atop of your tag.
+
+MBR, Sergei
