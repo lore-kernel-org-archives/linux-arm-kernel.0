@@ -1,20 +1,56 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 20 Aug 2015 01:20:42 +0300
-Subject: [PATCH 0/2] Add VIN and ADV7180 device tree support for R8A7794/SILK
- board
-Message-ID: <1750082.WpWf34HsI6@wasted.cogentembedded.com>
+Date: Thu, 20 Aug 2015 01:22:24 +0300
+Subject: [PATCH 1/2] ARM: shmobile: r8a7794: add VIN DT support
+In-Reply-To: <1750082.WpWf34HsI6@wasted.cogentembedded.com>
+References: <1750082.WpWf34HsI6@wasted.cogentembedded.com>
+Message-ID: <6082759.38ZG7ZtnPq@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Define the generic R8A7794 part of the VIN[01] device nodes. Add aliases for
+the VIN[01] device nodes. 
 
-   Here's the set of 2 patches against Simon Horman's 'renesas.git' repo's
-'renesas-devel-20150819-v4.2-rc7' tag. Here we add the VIN and ADV7180
-video decoder device tree support on the R8A7794/SILK board. The patchset
-requires previously posted SILK SDHI1 support patch in order to apply and 
-R8A7794/SILK I2C1 support in order to apply and build.
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-[1/2] ARM: shmobile: r8a7794: add VIN DT support
-[2/2] ARM: shmobile: silk: add VIN0/ADV7180 DT support
+---
+ arch/arm/boot/dts/r8a7794.dtsi |   20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-MBR, Sergei
+Index: renesas/arch/arm/boot/dts/r8a7794.dtsi
+===================================================================
+--- renesas.orig/arch/arm/boot/dts/r8a7794.dtsi
++++ renesas/arch/arm/boot/dts/r8a7794.dtsi
+@@ -27,6 +27,8 @@
+ 		i2c4 = &i2c4;
+ 		i2c5 = &i2c5;
+ 		spi0 = &qspi;
++		vin0 = &vin0;
++		vin1 = &vin1;
+ 	};
+ 
+ 	cpus {
+@@ -628,6 +630,24 @@
+ 		status = "disabled";
+ 	};
+ 
++	vin0: video at e6ef0000 {
++		compatible = "renesas,vin-r8a7794";
++		reg = <0 0xe6ef0000 0 0x1000>;
++		interrupts = <0 188 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp8_clks R8A7794_CLK_VIN0>;
++		power-domains = <&cpg_clocks>;
++		status = "disabled";
++	};
++
++	vin1: video at e6ef1000 {
++		compatible = "renesas,vin-r8a7794";
++		reg = <0 0xe6ef1000 0 0x1000>;
++		interrupts = <0 189 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp8_clks R8A7794_CLK_VIN1>;
++		power-domains = <&cpg_clocks>;
++		status = "disabled";
++	};
++
+ 	clocks {
+ 		#address-cells = <2>;
+ 		#size-cells = <2>;
