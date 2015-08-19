@@ -1,90 +1,60 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Wed, 19 Aug 2015 07:54:34 +0200
-Subject: [PATCH v2 2/5] Documentation: Detail permitted DT properties for
- the imx6ul_tsc
-In-Reply-To: <1438077521-12857-3-git-send-email-haibo.chen@freescale.com>
-References: <1438077521-12857-1-git-send-email-haibo.chen@freescale.com>
- <1438077521-12857-3-git-send-email-haibo.chen@freescale.com>
-Message-ID: <20150819055434.GF11161@pengutronix.de>
+Date: Wed, 19 Aug 2015 08:12:11 +0200
+Subject: [PATCH 7/8] pinctrl: freescale: imx: fix flat functions default
+ return
+In-Reply-To: <1439912939-17535-7-git-send-email-aalonso@freescale.com>
+References: <1439912939-17535-1-git-send-email-aalonso@freescale.com>
+ <1439912939-17535-7-git-send-email-aalonso@freescale.com>
+Message-ID: <20150819061211.GG11161@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Aug 18, 2015 at 10:48:58AM -0500, Adrian Alonso wrote:
+> Fix imx pinctrl dt flat functions default return value.
+> If property fsl,pins is not found in function_np and
+> pinctrl_np return false to indicate that DT is not using
+> flat functions.
 
-On Tue, Jul 28, 2015 at 05:58:38PM +0800, Haibo Chen wrote:
-> Here we apply required documentation for the imx6ul touch screen
-> controller driver which describe available properties and how to
-> use them.
-> 
-> Signed-off-by: Haibo Chen <haibo.chen@freescale.com>
-> ---
->  .../bindings/input/touchscreen/imx6ul_tsc.txt      | 36 ++++++++++++++++++++++
->  1 file changed, 36 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/input/touchscreen/imx6ul_tsc.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/input/touchscreen/imx6ul_tsc.txt b/Documentation/devicetree/bindings/input/touchscreen/imx6ul_tsc.txt
-> new file mode 100644
-> index 0000000..ac41c32
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/input/touchscreen/imx6ul_tsc.txt
-> @@ -0,0 +1,36 @@
-> +* Freescale i.MX6UL Touch Controller
-> +
-> +Required properties:
-> +- compatible: must be "fsl,imx6ul-tsc".
-> +- reg: this touch controller address and the ADC2 address.
+The for loop in this function checks the child nodes and the child's
+child nodes. Therefore if we exit the for loop we didn't find any nodes
+on any level with the 'fsl,pins' property.
 
-This suggests that this driver is using a unit ADC2. Which also means
-that there are more than one ADC which are probably identical?
+So this 'default' return value is never used unless there is no fsl,pins
+property anywhere. So this return value is not important but I wrote
+true because we want to use the new flat dt option as default. The extra
+indention doesn't make sense anymore.
 
-Shouldn't these ADCs be properly described by their own device nodes
-instead of these two register ranges, two interrupts and two clocks?
-
-Is 'ADC2' usable without tsc? Then ADC1/ADC2 should perhaps get a proper
-IIO driver.
-
-Unfortunately I don't have the reference manual to have a look how this
-all works.
-
-Best regards,
+Regards,
 
 Markus
 
-> +- interrupts: the interrupt of this touch controller and ADC2.
-> +- clocks: the root clock of touch controller and ADC2.
-> +- clock-names; must be "tsc" and "adc".
-> +- xnur-gpio: the X- gpio this controller connect to.
-> +  This xnur-gpio returns to high once the finger leave the touch screen (The
-> +  last touch event the touch controller capture).
-> +
-> +Optional properties:
-> +- measure-delay-time: the value of measure delay time.
-> +  Before X-axis or Y-axis measurement, the screen need some time before
-> +  even potential distribution ready.
-> +  This value depends on the touch screen.
-> +- pre-charge-time: the touch screen need some time to precharge.
-> +  This value depends on the touch screen.
-> +
-> +Example:
-> +	tsc: tsc at 02040000 {
-> +		compatible = "fsl,imx6ul-tsc";
-> +		reg = <0x02040000 0x4000>, <0x0219c000 0x4000>;
-> +		interrupts = <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <GIC_SPI 101 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&clks IMX6UL_CLK_IPG>,
-> +			 <&clks IMX6UL_CLK_ADC2>;
-> +		clock-names = "tsc", "adc";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pinctrl_tsc>;
-> +		xnur-gpio = <&gpio1 3 GPIO_ACTIVE_HIGH>;
-> +		measure-delay-time = <0xfff>;
-> +		pre-charge-time = <0xffff>;
-> +		status = "okay";
-> +	};
+> 
+> Signed-off-by: Adrian Alonso <aalonso@freescale.com>
+> ---
+>  drivers/pinctrl/freescale/pinctrl-imx.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/pinctrl/freescale/pinctrl-imx.c b/drivers/pinctrl/freescale/pinctrl-imx.c
+> index 1009b52..3e02887 100644
+> --- a/drivers/pinctrl/freescale/pinctrl-imx.c
+> +++ b/drivers/pinctrl/freescale/pinctrl-imx.c
+> @@ -641,7 +641,7 @@ static bool imx_pinctrl_dt_is_flat_functions(struct device_node *np)
+>  		}
+>  	}
+>  
+> -	return true;
+> +	return false;
+>  }
+>  
+>  static int imx_pinctrl_probe_dt(struct platform_device *pdev,
 > -- 
-> 1.9.1
+> 2.1.4
 > 
 > 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 > 
 
 -- 
@@ -98,4 +68,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150819/b2431b04/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150819/6a97a423/attachment.sig>
