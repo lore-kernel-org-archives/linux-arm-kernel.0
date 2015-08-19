@@ -1,27 +1,19 @@
-From: robert.richter@caviumnetworks.com (Robert Richter)
-Date: Wed, 19 Aug 2015 17:43:46 +0200
-Subject: [PATCH v4 2/5] irqchip, gicv3: Workaround for Cavium ThunderX
- erratum 23154
-In-Reply-To: <20150817164003.GB2906@e104818-lin.cambridge.arm.com>
-References: <1439576885-15621-1-git-send-email-rric@kernel.org>
- <1439576885-15621-3-git-send-email-rric@kernel.org>
- <20150817164003.GB2906@e104818-lin.cambridge.arm.com>
-Message-ID: <20150819154346.GX1820@rric.localhost>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 19 Aug 2015 21:21:54 +0530
+Subject: [PATCH] dmaengine: at_xdmac: fix bug in prep_dma_cyclic
+In-Reply-To: <1437574349-13816-1-git-send-email-ludovic.desroches@atmel.com>
+References: <1437574349-13816-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <20150819155154.GC13546@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17.08.15 17:40:03, Catalin Marinas wrote:
-> On Fri, Aug 14, 2015 at 08:28:02PM +0200, Robert Richter wrote:
-> > +struct static_key is_cavium_thunderx = STATIC_KEY_INIT_FALSE;
+On Wed, Jul 22, 2015 at 04:12:29PM +0200, Ludovic Desroches wrote:
+> In cyclic mode, the round chaining has been broken by the introduction
+> of at_xdmac_queue_desc(): AT_XDMAC_MBR_UBC_NDE is set for all descriptors
+> excepted for the last one. at_xdmac_queue_desc() has to be called one
+> more time to chain the last and the first descriptors.
 
-Will add the static ...
+Applied, thanks
 
-> This could also be "static struct ...". BTW, the use of static_key
-> directly is deprecated, so just do:
-> 
-> static DEFINE_STATIC_KEY_FALSE(is_cavium_thunderx);
-
-... and for simplicity a patch with this after the jump laber bits are
-merged upstream.
-
--Robert
+-- 
+~Vinod
