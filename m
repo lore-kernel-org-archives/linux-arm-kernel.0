@@ -1,39 +1,27 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 19 Aug 2015 17:37:36 +0100
-Subject: [PATCH 2/3] [v4] ARM64: TTY: hvc_dcc: Add support for ARM64 dcc
-In-Reply-To: <55D4ABF4.5020600@codeaurora.org>
-References: <1438992995-22610-1-git-send-email-timur@codeaurora.org>
- <1438992995-22610-2-git-send-email-timur@codeaurora.org>
- <20150810094008.GD1604@arm.com> <55D2749A.401@codeaurora.org>
- <20150818082141.GA6281@e103592.cambridge.arm.com>
- <55D3825D.6020105@codeaurora.org>
- <20150819101426.GB6281@e103592.cambridge.arm.com>
- <55D4ABF4.5020600@codeaurora.org>
-Message-ID: <20150819163736.GC6281@e103592.cambridge.arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 19 Aug 2015 09:32:32 -0700
+Subject: [PATCH v3 0/8] ARM: sunxi: Add Reduced Serial Bus support
+In-Reply-To: <1439958009-14056-1-git-send-email-wens@csie.org>
+References: <1439958009-14056-1-git-send-email-wens@csie.org>
+Message-ID: <20150819163232.GS10748@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 19, 2015 at 11:16:52AM -0500, Timur Tabi wrote:
-> On 08/19/2015 05:14 AM, Dave Martin wrote:
-> >>>So does that mean that ldrb will zero-extend the byte to all 64 bits of x3?
-> >Yes.  No extra operation is required.
+On Wed, Aug 19, 2015 at 12:20:01PM +0800, Chen-Yu Tsai wrote:
+> Hi everyone,
 > 
-> So my patch is actually correct as-is?
+> This is my third attempt at adding support for Allwinner's Reduced
+> Serial Bus (RSB), which is used to communicate with PMICs and other
+> peripherals on their newer SoCs, such as the A23/A33/A80.
 
-+static inline void __dcc_putchar(char c)
-+{
-+	asm volatile("msr dbgdtrtx_el0, %0"
-+			: /* No output register */
-+			: "r" (c));
-
-For safety, you still need to make sure that c is appropriately masked
-before passing it to the asm.  Something like this should definitely be
-safe:
-
-			: "r" ((unsigned long)(unsigned char)c)
-
-GCC can then emit uxtb or not, depending on whether it's needed in each
-context where the asm is inlined.
-
-Cheers
----Dave
+This is flagged as something that is specific to the Allwinner SoCs.
+Why add generic regmap support rather than just implement the regmap
+reg_read() and reg_write() in a regmap in the controller driver?  Are
+there expected to be other controller drivers from other vendors?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150819/63d78ebe/attachment.sig>
