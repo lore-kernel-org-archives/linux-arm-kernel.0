@@ -1,64 +1,90 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 19 Aug 2015 11:13:58 +0200
-Subject: [PATCH v2 1/7] clk: Add a basic factor clock
-In-Reply-To: <20150811213041.31346.58562@quantum>
-References: <1432241646-9511-1-git-send-email-maxime.ripard@free-electrons.com>
- <1432241646-9511-2-git-send-email-maxime.ripard@free-electrons.com>
- <CAGb2v64rqRC24wPWz5xYZv=w2QAtsCb-pd76Qynkb5NBCptXhQ@mail.gmail.com>
- <20150523074930.GI8557@lukather> <20150724000001.642.84690@quantum>
- <20150724065017.GJ2373@lukather> <20150724182619.642.11590@quantum>
- <20150725073925.GK2564@lukather>
- <20150811213041.31346.58562@quantum>
-Message-ID: <20150819091358.GB30520@lukather>
+Date: Wed, 19 Aug 2015 11:15:00 +0200
+Subject: [PATCH v2 5/7] ARM: sun8i: Add clock indices
+In-Reply-To: <CAGb2v64nvA1K=Ya7_99-2G1LtFjcuj+qQbO1GJaqsL+yPF+Xdw@mail.gmail.com>
+References: <1438364782-3968-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1438364782-3968-6-git-send-email-maxime.ripard@free-electrons.com>
+ <CAGb2v64nvA1K=Ya7_99-2G1LtFjcuj+qQbO1GJaqsL+yPF+Xdw@mail.gmail.com>
+Message-ID: <20150819091500.GC30520@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 11, 2015 at 02:30:41PM -0700, Michael Turquette wrote:
-> > > The real problem with these basic clock types is that they are an
-> > > abstraction layer at the wrong level. Each clock type implements both
-> > > the policy of a given clock, as well as the machine-specific details.
-> > > For example clk-divider.c has made some assumptions in the past about
-> > > rounding the rate, or how to calculate the best divider; this is a
-> > > matter of policy and is useful on its own. But additionally that same
-> > > policy is glued to a specific implementation: memory-mapped register
-> > > controls for a clock divider.
-> > > 
-> > > The I/O accessor stuff needs to be addressed at some point.  Currently
-> > > the basic clock types assume specific patterns of access to
-> > > memory-mapped clock registers. There are lots of other clock controls
-> > > out there that talk to firmware, or over i2c, or whatever. The amount of
-> > > code that has to be copy/pasted for each different type of access is
-> > > 100%; i.e. we do not have abstractions at the right level such as
-> > > .get_best_div(struct clk_hw *hw, unsigned long rate).
-> > > 
-> > > What I would like to see in time is a re-usable layer for clock policy
-> > > (e.g. common rules for how dividers or multipliers should behave), and
-> > > then have that sit on top of the machine-specific callbacks that
-> > > directly touch the hardware, such as the .get_best_div callback above.
-> > 
-> > Can't that be solved by moving to regmap using Matthias' patches, or
-> > at least the IO method abstraction?
+Hi Chen-Yu,
+
+On Sat, Aug 08, 2015 at 12:21:17AM +0800, Chen-Yu Tsai wrote:
+> On Sat, Aug 1, 2015 at 1:46 AM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > The A23 and A33 gates have a non continuous set of clock IDs that are
+> > valid. Add the clock-indices property to the DT to express this.
+> >
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > ---
+> >  arch/arm/boot/dts/sun8i-a23-a33.dtsi | 15 +++++++++++++++
+> >  1 file changed, 15 insertions(+)
+> >
+> > diff --git a/arch/arm/boot/dts/sun8i-a23-a33.dtsi b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
+> > index 7abd0ae3143d..c318c770b6c1 100644
+> > --- a/arch/arm/boot/dts/sun8i-a23-a33.dtsi
+> > +++ b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
+> > @@ -180,6 +180,15 @@
+> >                         compatible = "allwinner,sun8i-a23-ahb1-gates-clk";
+> >                         reg = <0x01c20060 0x8>;
+> >                         clocks = <&ahb1>;
+> > +                       clock-indices = <1>, <6>,
 > 
-> I need to look at those patches again, but I do not think they address
-> the problem I described above: abstraction at the wrong level (or more
-> specifically, combining two abstract layers into one).
+> Turns out the A33 (and I assume the same with the A23) has
+> an ahb1 clock gate for the Security System at clock-index <5>.
+> 
+> This is found in the updated A33 user manual.
+> 
+> > +                                       <8>, <9>, <10>,
+> > +                                       <13>, <14>,
+> > +                                       <19>, <20>,
+> > +                                       <21>, <24>, <26>,
+> > +                                       <29>, <32>, <36>,
+> > +                                       <40>, <44>, <46>,
+> > +                                       <52>, <54>,
+> 
+> <53> is ahb1 clock gate for msgbox, again found in A33 manual.
+> 
+> > +                                       <57>;
+> 
+> <58> is ahb1 clock gate for SAT, which seems to be part of the
+> display pipeline.
+> 
+> >                         clock-output-names = "ahb1_mipidsi", "ahb1_dma",
+> >                                         "ahb1_mmc0", "ahb1_mmc1", "ahb1_mmc2",
+> >                                         "ahb1_nand", "ahb1_sdram",
+> > @@ -196,6 +205,8 @@
+> >                         compatible = "allwinner,sun8i-a23-apb1-gates-clk";
+> >                         reg = <0x01c20068 0x4>;
+> >                         clocks = <&apb1>;
+> > +                       clock-indices = <0>, <5>,
+> > +                                       <12>, <13>;
+> >                         clock-output-names = "apb1_codec", "apb1_pio",
+> >                                         "apb1_daudio0", "apb1_daudio1";
+> >                 };
+> > @@ -213,6 +224,10 @@
+> >                         compatible = "allwinner,sun8i-a23-apb2-gates-clk";
+> >                         reg = <0x01c2006c 0x4>;
+> >                         clocks = <&apb2>;
+> > +                       clock-indices = <0>, <1>,
+> > +                                       <2>, <16>,
+> > +                                       <17>, <18>,
+> > +                                       <19>, <20>;
+> >                         clock-output-names = "apb2_i2c0", "apb2_i2c1",
+> >                                         "apb2_i2c2", "apb2_uart0",
+> >                                         "apb2_uart1", "apb2_uart2",
+> > --
+> > 2.4.6
+> >
+> 
+> Not sure if you want to add the clocks I mentioned together
+> in this patch, or do a separate patch.
+> 
+> The rest look good.
 
-Well, maybe I'm missing something, but you end up with this patch with
-the clock driver allocating the regmap, and passing it to the generic
-part of the clock framework, that will only do regmap calls and not
-care anymore about what kind of accesses it is (the point of regmap
-being the abstraction).
-
-Isn't it what you were looking for?
-
-> I'll have more bandwidth to look at this problem after the next merge
-> window. The clk framework is slowly be rewritten in bits and pieces here
-> on the list (shh don't tell anybody) and this is on my radar and
-> Stephen's.
-
-Ok, i'll resend it after the merge window then.
-
-Maxime
+Thanks for your input, I'll send some new patches to deal with this.
 
 -- 
 Maxime Ripard, Free Electrons
@@ -70,4 +96,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150819/4a3c9aeb/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150819/a2f3d6ad/attachment-0001.sig>
