@@ -1,19 +1,36 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Wed, 19 Aug 2015 20:41:51 +0200
-Subject: [PATCH v2 07/21] ARM: pxa: magician: Fix IrDA pdata and redundant
- GPIO request
-References: <cover.1439843482.git.petr.cvek@tul.cz> <55D25950.6010601@tul.cz>
-Message-ID: <87fv3f6ryo.fsf@belgarion.home>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Wed, 19 Aug 2015 21:28:36 +0200
+Subject: [PATCH] ARM: exynos_defconfig: Enable CROS_EC_PROTO for ChromeOS
+ EC mfd driver
+In-Reply-To: <1439881281-22054-1-git-send-email-javier@osg.samsung.com>
+References: <1439881281-22054-1-git-send-email-javier@osg.samsung.com>
+Message-ID: <55D4D8E4.2090003@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Petr Cvek <petr.cvek@tul.cz> writes:
+Hello,
 
-> Fix PXA FICP (IrDA) pdata and redundant GPIO request.
-Fix what ? What is broken, what is not working before the patch and what will be
-working after ? Could I have a better explanation in the commit message please ?
+On 08/18/2015 09:01 AM, Javier Martinez Canillas wrote:
+> The ChromeOS mfd driver (MFD_CROS_EC) select the CROS_EC_PROTO config
+> symbol because the driver uses some communication helper functions in
+> drivers/platform/chrome/cros_ec_proto.c but other drivers depends on
+> CROS_EC_PROTO instead. Mixing select and depends can lead to circular
+> Kconfig dependencies so the MFD_CROS_EC select should be changed to a
+> depends on CROS_EC_PROTO instead.
+> 
+> But doing so will break git bisect-ability since MFD_CROS_EC will not
+> be enabled anymore unless the default configs first explicitly enable
+> the CROS_EC_PROTO dependency.
+> 
+> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
-Cheers.
+This patch has been superseded by the "[PATCH 0/6] ChromeOS EC
+Kconfig cleanups" series: https://lkml.org/lkml/2015/8/19/194
 
---
-Robert
+Please just ignore it.
+
+Best regards,
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
