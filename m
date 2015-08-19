@@ -1,22 +1,14 @@
-From: wangzhou1@hisilicon.com (Zhou Wang)
-Date: Wed, 19 Aug 2015 20:20:51 +0800
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Wed, 19 Aug 2015 14:54:12 +0200
 Subject: [PATCH v7 3/6] PCI: designware: Add ARM64 support
 In-Reply-To: <1439812554-180426-4-git-send-email-wangzhou1@hisilicon.com>
 References: <1439812554-180426-1-git-send-email-wangzhou1@hisilicon.com>
  <1439812554-180426-4-git-send-email-wangzhou1@hisilicon.com>
-Message-ID: <55D474A3.8090201@hisilicon.com>
+Message-ID: <1439988852.31432.15.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pratyush and Jingoo,
-
-what is your opinion about this patch? It will be very appreciated if you
-could take a look at it.
-
-Thanks,
-Zhou
-
-On 2015/8/17 19:55, Zhou Wang wrote:
+Am Montag, den 17.08.2015, 19:55 +0800 schrieb Zhou Wang:
 > This patch tries to unify ARM32 and ARM64 PCIe in designware driver. Delete
 > function dw_pcie_setup, dw_pcie_scan_bus, dw_pcie_map_irq and struct hw_pci,
 > move related operations to dw_pcie_host_init.
@@ -28,6 +20,18 @@ On 2015/8/17 19:55, Zhou Wang wrote:
 > to pass 0 to root_bus_nr in struct pcie_port. This patch set pp->root_bus_nr = 0
 > in each PCIe host driver which is based on pcie-designware.
 > 
+This is incorrect at least if there are 2 instances of DW PCIe host in
+the same SoC without using PCI domains. In that the case the bus range
+determines the range of valid bus numbers per instance and the first
+number is the root bus. Please look at the "bus-range" DT property in
+the DW PCIe bindings.
+
+Also we should finally remove this root-bus setup from the glue drivers
+altogether. It's something that entirely belongs into the DW core code.
+
+Regards,
+Lucas
+
 > This patch also try to use of_pci_get_host_bridge_resources for ARM32 and ARM64
 > according to the suggestion for Gabriele[1]
 > 
@@ -580,4 +584,7 @@ On 2015/8/17 19:55, Zhou Wang wrote:
 >  	pp->ops = &spear13xx_pcie_host_ops;
 >  
 >  	ret = dw_pcie_host_init(pp);
-> 
+
+-- 
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
