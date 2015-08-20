@@ -1,36 +1,32 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 20 Aug 2015 17:04:24 +0200
-Subject: [PATCH 5/6] ARM: dts: sun7i: Enable USB DRC on cubieboard2
-In-Reply-To: <1439563477-12295-6-git-send-email-hdegoede@redhat.com>
-References: <1439563477-12295-1-git-send-email-hdegoede@redhat.com>
- <1439563477-12295-6-git-send-email-hdegoede@redhat.com>
-Message-ID: <20150820150424.GA30520@lukather>
+From: julien.grall@citrix.com (Julien Grall)
+Date: Thu, 20 Aug 2015 08:03:33 -0700
+Subject: [Xen-devel] [PATCH v3 00/20] xen/arm64: Add support for 64KB page
+In-Reply-To: <55D5A7CB.3070207@citrix.com>
+References: <1438966019-19322-1-git-send-email-julien.grall@citrix.com>
+ <55D521F2.5080504@citrix.com> <55D5A7CB.3070207@citrix.com>
+Message-ID: <55D5EC45.5010306@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 14, 2015 at 04:44:36PM +0200, Hans de Goede wrote:
-> From: Ralph Benadski <benadski@gmail.com>
-> 
-> Enable the otg/drc usb controller on the cubieboard2.
-> 
-> Note this board has the otg-vbus connected directly to the 5v-dcc of
-> the board, so there is no vbus0 regulator, nor vbus0-det.
-> 
-> Signed-off-by: Ralph Benadski <benadski@gmail.com>
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
-Queued, thanks!
 
-Maxime
+On 20/08/2015 03:11, David Vrabel wrote:
+> On 20/08/15 01:40, Julien Grall wrote:
+>> Hi,
+>>
+>> Ping? I'm missing some reviews on block and netfront code.
+>>
+>> We'd like to see this series going in Linux 4.3. Some distributions
+>> plans to use this version for aarch64 support. If we miss it, we won't
+>> have any Xen guests support, even it's minimal, for Linux using 64KB
+>> page granularity.
+>
+> This is too late for Linux 4.3.
+
+May I know why it's too late for Linux 4.3? AFAICT, Linux 4.2 is not yet 
+out and therefore the merge window for Linux 4.3 is not yet opened.
+
+Regards,
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150820/342e3c86/attachment.sig>
+Julien Grall
