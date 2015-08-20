@@ -1,25 +1,24 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 20 Aug 2015 22:26:39 +0200
-Subject: [PATCH v2 09/21] ARM: pxa: magician: Add OV9640 camera support
-In-Reply-To: <87lhd568sb.fsf@belgarion.home>
-References: <cover.1439843482.git.petr.cvek@tul.cz> <55D259A1.6090102@tul.cz>
- <87lhd568sb.fsf@belgarion.home>
-Message-ID: <2889798.x6xcIzdYMU@wuerfel>
+From: davem@davemloft.net (David Miller)
+Date: Thu, 20 Aug 2015 14:05:31 -0700 (PDT)
+Subject: [PATCH v1 0/6] Add fec1 and fec2 support for i.MX7d sdb board
+In-Reply-To: <1439962444-27486-1-git-send-email-b38611@freescale.com>
+References: <1439962444-27486-1-git-send-email-b38611@freescale.com>
+Message-ID: <20150820.140531.1320709021949935376.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 20 August 2015 21:48:20 Robert Jarzmik wrote:
-> Petr Cvek <petr.cvek@tul.cz> writes:
-> 
-> > +     mdelay(3);
-> Okay, there are several mdelay(3) in this file.
-> 
-> Could you please test if removing these mdelays prevents the camera from working
-> ? If not, I'd like to have them removed.
-> 
-> 
+From: Fugang Duan <b38611@freescale.com>
+Date: Wed, 19 Aug 2015 13:33:58 +0800
 
-FWIW, it might be possible to replace some of them with msleep() calls,
-potentially after replacing spinlocks with mutexes where necessary.
+> The patch series is to add fec support for i.MX7d sdb board. Since i.MX7d fec ip is
+> the same as i.MX6SX, so there have no change for driver itself.
+> 
+> Patch#1: add bcm54220 PHY ID entry into brcmphy.h file.
 
-	Arnd
+This is completely, and utterly, pointless.
+
+The only reason a PHY ID should be defined in brcmphy.h is so that it can
+be used in the broadcom.c PHY driver or similar.
+
+If there is no user in the tree, there is no reason to add it to the
+header file.
