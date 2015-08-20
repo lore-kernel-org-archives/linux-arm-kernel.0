@@ -1,32 +1,109 @@
-From: julien.grall@citrix.com (Julien Grall)
-Date: Thu, 20 Aug 2015 08:03:33 -0700
-Subject: [Xen-devel] [PATCH v3 00/20] xen/arm64: Add support for 64KB page
-In-Reply-To: <55D5A7CB.3070207@citrix.com>
-References: <1438966019-19322-1-git-send-email-julien.grall@citrix.com>
- <55D521F2.5080504@citrix.com> <55D5A7CB.3070207@citrix.com>
-Message-ID: <55D5EC45.5010306@citrix.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 20 Aug 2015 17:08:45 +0200
+Subject: [PATCH v3 1/8] rsb: Add generic Reduced Serial Bus (RSB)
+ controller binding documentation
+In-Reply-To: <1439958009-14056-2-git-send-email-wens@csie.org>
+References: <1439958009-14056-1-git-send-email-wens@csie.org>
+ <1439958009-14056-2-git-send-email-wens@csie.org>
+Message-ID: <20150820150845.GB30520@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
+
+Thanks a lot for working on this.
+
+On Wed, Aug 19, 2015 at 12:20:02PM +0800, Chen-Yu Tsai wrote:
+> Reduced Serial Bus is a proprietary 2-line push-pull serial bus
+> supporting multiple slave devices.
+> 
+> It was developed by Allwinner, Inc. and used by Allwinner and X-Powers,
+> Inc. for their line of PMICs and other peripheral ICs.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+>  Documentation/devicetree/bindings/rsb/rsb.txt | 50 +++++++++++++++++++++++++++
+>  1 file changed, 50 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/rsb/rsb.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/rsb/rsb.txt b/Documentation/devicetree/bindings/rsb/rsb.txt
+> new file mode 100644
+> index 000000000000..0b027948ca9c
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/rsb/rsb.txt
+> @@ -0,0 +1,50 @@
+> +Reduced Serial Bus (RSB) Controller
+> +
+> +This document defines a generic set of bindings for use by RSB controllers.
+> +A controller is modelled in device tree as a node with zero or more child
+> +nodes, each representing a unique slave device on the bus.
+> +
+> +Required properties:
+> +
+> + - #address-cells : must be 2
+> + - #size-cells : must be 0
+> +
+> +Optional properties:
+> +
+> + - clock-frequency : Desired bus clock frequency in Hz. Maximum is 20 MHz.
+
+What is the default if not set?
+
+> +
+> +Child nodes:
+> +
+> +An RSB controller node can contain zero or more child nodes representing
+> +slave devices on the bus.  Child 'reg' properties are specified as a
+> +runtime address, hardware address pair. The hardware address is hardwired
+> +in the device, which can normally be found in the datasheet. The runtime
+> +address is set by software. No 2 devices on the same bus shall have the
+> +same runtime address.
+> +
+> +Valid runtime addresses - There are only 15 valid runtime addresses:
+> +
+> +    0x17, 0x2d, 0x3a, 0x4e, 0x59, 0x63, 0x74, 0x8b,
+> +    0x9c, 0xa6, 0xb1, 0xc5, 0xd2, 0xe8, 0xff
+> +
+> +It is highly recommended that one choose the same runtime addresses as
+> +vendor BSPs use so that a) the addresses remain the same across different
+> +software systems, and b) addresses of supported and listed slave devices
+> +don't conflict with unsupported or not yet listed devices.
+
+I'd expect to have the hardware address first, but maybe it's just me
+:)
 
 
-On 20/08/2015 03:11, David Vrabel wrote:
-> On 20/08/15 01:40, Julien Grall wrote:
->> Hi,
->>
->> Ping? I'm missing some reviews on block and netfront code.
->>
->> We'd like to see this series going in Linux 4.3. Some distributions
->> plans to use this version for aarch64 support. If we miss it, we won't
->> have any Xen guests support, even it's minimal, for Linux using 64KB
->> page granularity.
->
-> This is too late for Linux 4.3.
+> +Example:
+> +
+> +	rsb at ... {
+> +		compatible = "...";
+> +		reg = <...>;
+> +		/* ... */
+> +		#address-cells = <2>;
+> +		#size-cells = <0>;
+> +
+> +		pmic at 2d {
 
-May I know why it's too late for Linux 4.3? AFAICT, Linux 4.2 is not yet 
-out and therefore the merge window for Linux 4.3 is not yet opened.
+The unit-address should be 2d,3e3.
 
-Regards,
+> +			compatible = "...";
+> +			reg = <0x2d 0x3e3>;
+> +
+> +			/* ... */
+> +		};
+> +	};
+> -- 
+> 2.5.0
+> 
 
 -- 
-Julien Grall
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150820/8efe28ec/attachment.sig>
