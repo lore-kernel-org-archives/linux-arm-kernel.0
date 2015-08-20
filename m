@@ -1,149 +1,71 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 20 Aug 2015 11:46:56 -0500
-Subject: MUSB dual-role on AM335x behaving weirdly
-In-Reply-To: <55D601C5.40608@free-electrons.com>
-References: <20150526145118.GD26599@saruman.tx.rr.com>
- <20150527094205.GO3199@piout.net>
- <5594E56B.3040200@free-electrons.com>
- <CADYTM3ZF5m++N1NqmOJoH5agbYrzpvSbLnuLVgttxwzdzwmGwQ@mail.gmail.com>
- <55C0B954.3020106@free-electrons.com>
- <55C0CAC6.3020603@free-electrons.com>
- <20150804193257.GF9623@saruman.tx.rr.com>
- <55D326BD.2030706@free-electrons.com>
- <20150818141334.GC9143@saruman.tx.rr.com>
- <55D601C5.40608@free-electrons.com>
-Message-ID: <20150820164656.GA4938@saruman.tx.rr.com>
+Date: Thu, 20 Aug 2015 11:48:08 -0500
+Subject: [PATCH v5 01/46] usb: gadget: encapsulate endpoint claiming
+ mechanism
+In-Reply-To: <55D6001E.3000504@hackerion.com>
+References: <1438351258-31578-1-git-send-email-r.baldyga@samsung.com>
+ <1438351258-31578-2-git-send-email-r.baldyga@samsung.com>
+ <20150820153553.GD1639@saruman.tx.rr.com>
+ <55D6001E.3000504@hackerion.com>
+Message-ID: <20150820164808.GB4938@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 20, 2015 at 06:35:17PM +0200, Gregory CLEMENT wrote:
+On Thu, Aug 20, 2015 at 06:28:14PM +0200, Robert Baldyga wrote:
 > Hi Felipe,
 > 
-> On 18/08/2015 16:13, Felipe Balbi wrote:
-> > Hi,
-> > 
-> > On Tue, Aug 18, 2015 at 02:36:13PM +0200, Gregory CLEMENT wrote:
-> >> Hi again Felipe,
-> >>
-> >> I sent this email again without the capture because it prevented to be delivered
-> >> to the mailing lists.
-> >>
-> >> On 04/08/2015 21:32, Felipe Balbi wrote:
-> >>> On Tue, Aug 04, 2015 at 04:23:02PM +0200, Gregory CLEMENT wrote:
-> >>>> Hi again,
-> >>>> On 04/08/2015 15:08, Gregory CLEMENT wrote:
-> >>>>> Hi Bin,
-> >>>>>
-> >>>>> On 02/07/2015 19:05, Bin Liu wrote:
-> >>>>>> Hi,
-> >>>>>>
-> >>>>>> On Thu, Jul 2, 2015 at 2:16 AM, Gregory CLEMENT
-> >>>>>> <gregory.clement@free-electrons.com> wrote:
-> >>>>>>> Hi Felipe,
-> >>>>>>>
-> >>>>>>> On 27/05/2015 11:42, Alexandre Belloni wrote:
-> >>>>>>>> Hi,
-> >>>>>>>>
-> >>>>>>>> On 26/05/2015 at 09:51:18 -0500, Felipe Balbi wrote :
-> >>>>>>>>> On Thu, May 14, 2015 at 04:36:33PM -0500, Bin Liu wrote:
-> >>>>>>>>>> Alexandre,
-> >>>>>>>>>>
-> >>>>>>>>>> On Thu, May 14, 2015 at 4:26 PM, Alexandre Belloni
-> >>>>>>>>>> <alexandre.belloni@free-electrons.com> wrote:
-> >>>>>>>>>>> On 14/05/2015 at 16:16:12 -0500, Bin Liu wrote :
-> >>>>>>>>>>>> I think I found the root cause of the problem: board design issue - I
-> >>>>>>>>>>>> bet the custom board has too much cap on VBUS line. It should be <
-> >>>>>>>>>>>> 10uF.
-> >>>>>>>>>>>>
-> >>>>>>>>>>>
-> >>>>>>>>>>> We have a custom board that exhibits the issue but it only has a 100nF
-> >>>>>>>>>>> cap on VBUS.
-> >>>>>>>>>>
-> >>>>>>>>>> Have you measured the VBUS discharging? Is there any way to share your
-> >>>>>>>>>> schematics?
-> >>>>>>>>>
-> >>>>>>>>> Alexandre, any further comments ?
-> >>>>>>>>>
-> >>>>>>>>
-> >>>>>>>> Yeah, I have just got more info.
-> >>>>>>>>
-> >>>>>>>> This is the relevant part of the schematic:
-> >>>>>>>> http://free-electrons.com/~alexandre/usb.png
-> >>>>>>>>
-> >>>>>>>> The total VBUS capacitance is 200nF and the USB0 pins are connected
-> >>>>>>>> directly to the AM3358 pins. U1 is actually not fitted.
-> >>>>>>>>
-> >>>>>>>> We didn't measure VBUS discharging but we observe the OTG pin sensing
-> >>>>>>>> stops when plugging an OTG cable without any device.
-> >>>>>>>
-> >>>>>>> Do you have any news about this topic?
-> >>>>>>>
-> >>>>>>>
-> >>>>>>> Is there something else that we can do to help solving this issue?
-> >>>>>>
-> >>>>>> In the case of CONFIG_USB_MUSB_DUAL_ROLE=y and dr_mode=otg, how is the
-> >>>>>> gadget driver configured? It has to be a module not built-in.
-> >>>>>
-> >>>>> Indeed when I configured CONFIG_USB_MUSB_HDRC=m and CONFIG_USB_MUSB_DSPS=m
-> >>>>> it worked seamless.
-> >>>>>
-> >>>>
-> >>>> Actually it didn't worked. And now sometimes I even received continuously
-> >>>> the following message:
-> >>>>
-> >>>>  musb_bus_suspend 2484: trying to suspend as a_wait_vfall while active
-> >>>
-> >>> this is likely because your VBUS hasn't dropped below 0.8V fast enough.
-> >>>
-> >>> I could only trigger this message in that situation. Use a scope to poke
-> >>> at VBUS and see how long is takes to reach 0.8V, this could all be cause
-> >>> by too much capacitance on VBUS line.
-> >>
-> >> We got some news:
-> >> "The capacitance on VBUS due to components is 200nF and the additional parasitic
-> >> capacitance will be much smaller than this"
-> >>
-> >> The rail discharge time is ~36ms when an USB drive is removed from the OTG adapter.
-> >> I attached a capture of this.
-> >>
-> >> What do you think about these values?
-> >>
-> >>
-> >> However, "there appears to be a considerable delay between the removal of a usb
-> >> drive and the initiation of the VBUS discharge (maybe ~1 second, I wasn't able
-> >> to measure this time)."
-> > 
-> > yeah, this is really weird. I can't think of anything that would make
-> > VBUS discharge slower from a SW point of view. Once you remove the
-> > cable, VBUS is physically removed and there's nothing else charging it.
+> On 08/20/2015 05:35 PM, Felipe Balbi wrote:
+> [...]
+> >just letting you know that this regresses all gadget drivers making them
+> >try to disable previously disabled endpoints and enable previously
+> >enabled endpoints.
+> >
+> >I have a possible fix (see below) but then it shows a problem on the
+> >host side when using with g_zero (see further below):
+> >
+> >commit 3b8932100aacb6cfbffe288ca93025d8b8430c00
+> >Author: Felipe Balbi <balbi@ti.com>
+> >Date:   Wed Aug 19 18:05:27 2015 -0500
+> >
+> >     usb: gadget: fix ep->claimed lifetime
+> >
+> >     In order to fix a regression introduced by commit
+> >     cc476b42a39d ("usb: gadget: encapsulate endpoint
+> >     claiming mechanism") we have to introduce a simple
+> >     helper to check if a particular is enabled or not.
+> >
+> >     After that, we need to move ep->claimed lifetime to
+> >     usb_ep_enable() and usb_ep_disable() since those
+> >     are the only functions which actually enable and
+> >     disable endpoints.
+> >
+> >     A follow-up patch will come to drop all driver_data
+> >     checks from function drivers, since those are, now,
+> >     pointless.
+> >
+> >     Fixes: cc476b42a39d ("usb: gadget: encapsulate endpoint
+> >     	claiming mechanism")
+> >     Cc: Robert Baldyga <r.baldyga@samsung.com>
+> >     Signed-off-by: Felipe Balbi <balbi@ti.com>
+> >
+> >diff --git a/drivers/usb/gadget/epautoconf.c b/drivers/usb/gadget/epautoconf.c
+> >index 978435a51038..ad45070cd76f 100644
+> >--- a/drivers/usb/gadget/epautoconf.c
+> >+++ b/drivers/usb/gadget/epautoconf.c
+> >@@ -126,7 +126,6 @@ found_ep:
+> >  	ep->address = desc->bEndpointAddress;
+> >  	ep->desc = NULL;
+> >  	ep->comp_desc = NULL;
+> >-	ep->claimed = true;
 > 
-> I have more feedback about it: "When I look at it on the oscilloscope
-> this isn't a 'slow discharge' like a slowly draining capacitor, it is
-> a delay between the removal of a device and the initiation of the
-> discharge.  The discharge itself is quite fast once it begins, it just
-> seems as if the SOC/driver is taking a long time to notice the cable
-> is disconnected. At this stage, this isn't actually a problem, just
-> odd."
+> Removing this line causes autoconfig can return the same endpoint many
+> times. This probably causes problems with g_zero.
 > 
-> While working on this issue we found that the
-> tg_state_a_wait_vrise_timeout case seemed not managed by musb_dsps
-> driver. I've just submitted a patch for it:
-> https://lkml.org/lkml/2015/8/20/507
+> I will try to fix it ASAP.
 
-cool, I'll test it next week. Good finding btw.
-
-> I made most of my test on a 3.17 kernel and today by using a 4.1
-> kernel with the patch I have submitted I didn't manage to reproduce
-> the issue. I saw that since 3.17, there were some patches related to
-> the babble interrupts; so maybe it was enough to fix the issue we saw.
-> It is still weird because one month ago I also tested with a 4.1
-> kernel and I had issues...
-> 
-> It needs more testing to see if it is really fixed because the issue
-> comes only time to time. I will keep you inform about our last tests.
-
-all right. Seems like we really need to turn some of those states
-handling into a reusable (musb-specific) library.
+I was considering the same thing, but the lifetime of ->claimed doesn't
+look correct to me either way. Note that once the flag is enabled, it
+won't get disabled by most gadget drivers.
 
 -- 
 balbi
@@ -153,4 +75,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150820/dcebba1f/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150820/e52d8009/attachment-0001.sig>
