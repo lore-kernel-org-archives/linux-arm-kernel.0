@@ -1,153 +1,283 @@
-From: architt@codeaurora.org (Archit Taneja)
-Date: Thu, 20 Aug 2015 09:59:49 +0530
-Subject: [PATCH v3 0/14] Add Analogix Core Display Port Driver
-In-Reply-To: <1439995728-18046-1-git-send-email-ykk@rock-chips.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 20 Aug 2015 10:10:30 +0530
+Subject: [PATCH v3 08/14] phy: Add driver for rockchip Display Port PHY
+In-Reply-To: <1439995877-18496-1-git-send-email-ykk@rock-chips.com>
 References: <1439995728-18046-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <55D557BD.8070004@codeaurora.org>
+ <1439995877-18496-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <55D55A3E.8090905@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On 08/19/2015 08:18 PM, Yakir Yang wrote:
->
-> Hi all,
->     The Samsung Exynos eDP controller and Rockchip RK3288 eDP controller
-> share the same IP, so a lot of parts can be re-used. I split the common
-> code into bridge directory, then rk3288 and exynos only need to keep
-> some platform code. Cause I can't find the exact IP name of exynos dp
-> controller, so I decide to name dp core driver with "analogix" which I
-> find in rk3288 eDP TRM ;)
->
-> Beyond that, there are three light registers setting differents bewteen
-> exynos and rk3288.
-> 1. RK3288 have five special pll resigters which not indicata in exynos
->     dp controller.
-> 2. The address of DP_PHY_PD(dp phy power manager register) are different
->     between rk3288 and exynos.
-> 3. Rk3288 and exynos have different setting with AUX_HW_RETRY_CTL(dp debug
->     register).
->
-> I have verified this series on two kinds of rockchip platform board, one
-> is rk3288 sdk board which connect with a 2K display port monitor, the other
-> is google jerry chromebook which connect with a eDP screen "cnm,n116bgeea2",
-> both of them works rightlly.
->
-> I haven't verified the dp function on samsung platform, cause I haven't got
-> exynos boards. I can only ensure that there are no build error on samsung
-> platform, wish some samsung guys help to test. ;)
->
-> Thanks,
-> - Yakir
->
+On Wednesday 19 August 2015 08:21 PM, Yakir Yang wrote:
+> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+
+where's the commit message?
+> ---
 > Changes in v3:
-> - Take Thierry Reding suggest, move exynos's video_timing code
->    to analogix_dp-exynos platform driver, add get_modes method
->    to struct analogix_dp_plat_data.
-> - Take Heiko suggest, rename some "samsung*" dts propery to "analogix*".
-> - Take Thierry Reding suggest, dynamic parse video timing info from
->    struct drm_display_mode and struct drm_display_info.
-> - Take Thierry Reding suggest, link_rate and lane_count shouldn't config to
->    the DT property value directly, but we can take those as hardware limite.
->    For example, RK3288 only support 4 physical lanes of 2.7/1.62 Gbps/lane,
->    so DT property would like "link-rate = 0x0a" "lane-count = 4".
-> - Take Heiko suggest, add devicetree binding documents.
-> - Take Thierry Reding suggest, remove sync pol & colorimetry properies
->    from the new analogix dp driver devicetree binding.
-> - Update the exist exynos dtsi file with the latest DP DT properies.
-> - Take Thierry Reding and Heiko suggest, leave "sclk_edp_24m" to rockchip
->    dp phy driver which name to "24m", and leave "sclk_edp" to analogix dp
->    core driver which name to "dp", and leave "pclk_edp" to rockchip dp platform
->    driver which name to "pclk".
-> - Take Heiko suggest, add devicetree binding document.
-> - Take Heiko suggest, remove "rockchip,panel" DT property, take use of remote
->    point to get panel node.
-> - Add the new function point analogix_dp_platdata.get_modes init.
 > - Take Heiko suggest, add rockchip dp phy driver,
->    collect the phy clocks and power control.
-> - Add "analogix,need-force-hpd" to indicate whether driver need foce
->    hpd when hpd detect failed.
-> - move dp hpd detect to connector detect function.
-> - Add edid modes parse support
->
-> Changes in v2:
-> - Take Joe Preches advise, improved commit message more readable, and
->    avoid using some uncommon style like bellow:
->    -  retval = exynos_dp_read_bytes_from_i2c(...
-> 				...)
->    +  retval =
->    +  exynos_dp_read_bytes_from_i2c(......);
-> - Take Jingoo Han suggest, just remove my name from author list.
-> - Take Jingoo Han suggest, remove new copyright
-> - Fix compiled failed dut to analogix_dp_device misspell
-> - Take Heiko suggest, get panel node with remote-endpoint method,
->    and create devicetree binding for driver.
-> - Remove the clock enable/disbale with "sclk_edp" & "sclk_edp_24m",
->    leave those clock to rockchip dp phy driver.
-> - Add GNU license v2 declared and samsung copyright
-> - Fix compile failed dut to phy_pd_addr variable misspell error
->
-> Yakir Yang (14):
->    drm: exynos/dp: fix code style
->    drm: exynos/dp: convert to drm bridge mode
->    drm: bridge: analogix_dp: split exynos dp driver to bridge dir
->    drm: bridge/analogix_dp: dynamic parse sync_pol & interlace &
->      colorimetry
->    drm: bridge/analogix_dp: fix link_rate & lane_count bug
->    Documentation: drm/bridge: add document for analogix_dp
->    drm: rockchip/dp: add rockchip platform dp driver
->    phy: Add driver for rockchip Display Port PHY
->    drm: bridge/analogix_dp: add platform device type support
->    drm: bridge: analogix_dp: add some rk3288 special registers setting
->    drm: bridge: analogix_dp: try force hpd after plug in lookup failed
->    drm: bridge/analogix_dp: expand the delay time for hpd detect
->    drm: bridge/analogix_dp: move hpd detect to connector detect function
->    drm: bridge/analogix_dp: add edid modes parse in get_modes method
->
->   .../devicetree/bindings/drm/bridge/analogix_dp.txt |   73 +
->   .../devicetree/bindings/phy/rockchip-dp-phy.txt    |   26 +
->   .../bindings/video/analogix_dp-rockchip.txt        |   83 ++
->   .../devicetree/bindings/video/exynos_dp.txt        |   51 +-
->   arch/arm/boot/dts/exynos5250-arndale.dts           |   10 +-
->   arch/arm/boot/dts/exynos5250-smdk5250.dts          |   10 +-
->   arch/arm/boot/dts/exynos5250-snow.dts              |   12 +-
->   arch/arm/boot/dts/exynos5250-spring.dts            |   12 +-
->   arch/arm/boot/dts/exynos5420-peach-pit.dts         |   12 +-
->   arch/arm/boot/dts/exynos5420-smdk5420.dts          |   10 +-
->   arch/arm/boot/dts/exynos5800-peach-pi.dts          |   12 +-
->   drivers/gpu/drm/bridge/Kconfig                     |    5 +
->   drivers/gpu/drm/bridge/Makefile                    |    1 +
->   drivers/gpu/drm/bridge/analogix_dp_core.c          | 1382 +++++++++++++++++++
->   drivers/gpu/drm/bridge/analogix_dp_core.h          |  286 ++++
->   drivers/gpu/drm/bridge/analogix_dp_reg.c           | 1294 ++++++++++++++++++
->   .../exynos_dp_reg.h => bridge/analogix_dp_reg.h}   |  270 ++--
->   drivers/gpu/drm/exynos/Kconfig                     |    5 +-
->   drivers/gpu/drm/exynos/Makefile                    |    2 +-
->   drivers/gpu/drm/exynos/analogix_dp-exynos.c        |  347 +++++
->   drivers/gpu/drm/exynos/exynos_dp_core.c            | 1416 --------------------
->   drivers/gpu/drm/exynos/exynos_dp_core.h            |  282 ----
->   drivers/gpu/drm/exynos/exynos_dp_reg.c             | 1263 -----------------
->   drivers/gpu/drm/rockchip/Kconfig                   |    9 +
->   drivers/gpu/drm/rockchip/Makefile                  |    1 +
->   drivers/gpu/drm/rockchip/analogix_dp-rockchip.c    |  390 ++++++
->   drivers/phy/Kconfig                                |    7 +
->   drivers/phy/Makefile                               |    1 +
->   drivers/phy/phy-rockchip-dp.c                      |  185 +++
->   include/drm/bridge/analogix_dp.h                   |   40 +
->   30 files changed, 4325 insertions(+), 3172 deletions(-)
->   create mode 100644 Documentation/devicetree/bindings/drm/bridge/analogix_dp.txt
->   create mode 100644 Documentation/devicetree/bindings/phy/rockchip-dp-phy.txt
->   create mode 100644 Documentation/devicetree/bindings/video/analogix_dp-rockchip.txt
->   create mode 100644 drivers/gpu/drm/bridge/analogix_dp_core.c
->   create mode 100644 drivers/gpu/drm/bridge/analogix_dp_core.h
->   create mode 100644 drivers/gpu/drm/bridge/analogix_dp_reg.c
+>   collect the phy clocks and power control.
+> 
+> Changes in v2: None
+> 
+>  .../devicetree/bindings/phy/rockchip-dp-phy.txt    |  26 +++
+>  drivers/phy/Kconfig                                |   7 +
+>  drivers/phy/Makefile                               |   1 +
+>  drivers/phy/phy-rockchip-dp.c                      | 185 +++++++++++++++++++++
+>  4 files changed, 219 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/phy/rockchip-dp-phy.txt
+>  create mode 100644 drivers/phy/phy-rockchip-dp.c
+> 
+> diff --git a/Documentation/devicetree/bindings/phy/rockchip-dp-phy.txt b/Documentation/devicetree/bindings/phy/rockchip-dp-phy.txt
+> new file mode 100644
+> index 0000000..5de1088
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/phy/rockchip-dp-phy.txt
+> @@ -0,0 +1,26 @@
+> +Rockchip Soc Seroes Display Port PHY
+> +------------------------------------
+> +
+> +Required properties:
+> +- compatible : should be one of the following supported values:
+> +	 - "rockchip.rk3288-dp-phy"
+> +
+> +- reg : a list of registers used by phy driver
+> +- clocks: from common clock binding: handle to dp clock.
+> +	of memory mapped region.
+> +- clock-names: from common clock binding:
+> +	Required elements: "sclk_dp" "sclk_dp_24m"
+> +
+> +- rockchip,grf: this soc should set GRF regs, so need get grf here.
+> +- #phy-cells : from the generic PHY bindings, must be 0;
+> +
+> +Example:
+> +
+> +edp_phy: phy at ff770274 {
+> +	compatilble = "rockchip,rk3288-dp-phy";
+> +	reg = <0xff770274 4>;
+> +	rockchip,grf = <&grf>;
+> +	clocks = <&cru SCLK_EDP_24M>;
+> +	clock-names = "24m";
+> +	#phy-cells = <0>;
+> +}
+> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+> index 6b8dd16..da00440 100644
+> --- a/drivers/phy/Kconfig
+> +++ b/drivers/phy/Kconfig
+> @@ -297,6 +297,13 @@ config PHY_ROCKCHIP_USB
+>  	help
+>  	  Enable this to support the Rockchip USB 2.0 PHY.
+>  
+> +config PHY_ROCKCHIP_DP
+> +	tristate "Rockchip Display Port PHY Driver"
+> +	depends on ARCH_ROCKCHIP && OF
+> +	select GENERIC_PHY
+> +	help
+> +	  Enable this to support the Rockchip Display Port PHY.
+> +
+>  config PHY_ST_SPEAR1310_MIPHY
+>  	tristate "ST SPEAR1310-MIPHY driver"
+>  	select GENERIC_PHY
+> diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
+> index f344e1b..35e3ce6 100644
+> --- a/drivers/phy/Makefile
+> +++ b/drivers/phy/Makefile
+> @@ -33,6 +33,7 @@ phy-exynos-usb2-$(CONFIG_PHY_S5PV210_USB2)	+= phy-s5pv210-usb2.o
+>  obj-$(CONFIG_PHY_EXYNOS5_USBDRD)	+= phy-exynos5-usbdrd.o
+>  obj-$(CONFIG_PHY_QCOM_APQ8064_SATA)	+= phy-qcom-apq8064-sata.o
+>  obj-$(CONFIG_PHY_ROCKCHIP_USB) += phy-rockchip-usb.o
+> +obj-$(CONFIG_PHY_ROCKCHIP_DP)		+= phy-rockchip-dp.o
+>  obj-$(CONFIG_PHY_QCOM_IPQ806X_SATA)	+= phy-qcom-ipq806x-sata.o
+>  obj-$(CONFIG_PHY_ST_SPEAR1310_MIPHY)	+= phy-spear1310-miphy.o
+>  obj-$(CONFIG_PHY_ST_SPEAR1340_MIPHY)	+= phy-spear1340-miphy.o
+> diff --git a/drivers/phy/phy-rockchip-dp.c b/drivers/phy/phy-rockchip-dp.c
+> new file mode 100644
+> index 0000000..4759111
+> --- /dev/null
+> +++ b/drivers/phy/phy-rockchip-dp.c
+> @@ -0,0 +1,185 @@
+> +/*
+> + * Rockchip DP PHY driver
+> + *
+> + * Copyright (C) 2015 FuZhou Rockchip Co., Ltd.
+> + * Author: Yakir Yang <ykk@@rock-chips.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License.
+> + */
+> +
+> +#include <linux/io.h>
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/clk.h>
+> +#include <linux/phy/phy.h>
+> +#include <linux/regmap.h>
+> +#include <linux/mfd/syscon.h>
+> +#include <linux/platform_device.h>
+> +
+> +#define GRF_SOC_CON12                   0x0274
+> +#define GRF_EDP_REF_CLK_SEL_INTER       BIT(4)
+> +
+> +#define DP_PHY_SIDDQ_WRITE_EN           BIT(21)
+> +#define DP_PHY_SIDDQ_ON                 0
+> +#define DP_PHY_SIDDQ_OFF                BIT(5)
+> +
+> +struct rockchip_dp_phy {
+> +	struct device  *dev;
+> +	struct regmap  *grf;
+> +	void __iomem   *regs;
+> +	struct clk     *phy_24m;
+> +};
+> +
+> +static int rockchip_dp_phy_clk_enable(struct rockchip_dp_phy *dp)
+> +{
+> +	int ret = 0;
+> +
+> +	ret = clk_set_rate(dp->phy_24m, 24000000);
+> +	if (ret < 0) {
+> +		dev_err(dp->dev, "cannot set clock phy_24m %d\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	ret = clk_prepare_enable(dp->phy_24m);
+> +	if (ret < 0) {
+> +		dev_err(dp->dev, "cannot enable clock phy_24m %d\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static int rockchip_dp_phy_clk_disable(struct rockchip_dp_phy *dp)
+> +{
+> +	clk_disable_unprepare(dp->phy_24m);
+> +
+> +	return 0;
+> +}
+> +
+> +static int rockchip_set_phy_state(struct phy *phy, bool enable)
+> +{
+> +	struct rockchip_dp_phy *dp = phy_get_drvdata(phy);
+> +
+> +	if (enable) {
+> +		rockchip_dp_phy_clk_enable(dp);
+> +		writel(DP_PHY_SIDDQ_WRITE_EN | DP_PHY_SIDDQ_ON, dp->regs);
+> +	} else {
+> +		rockchip_dp_phy_clk_disable(dp);
+> +		writel(DP_PHY_SIDDQ_WRITE_EN | DP_PHY_SIDDQ_OFF, dp->regs);
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static int rockchip_dp_phy_power_on(struct phy *phy)
+> +{
+> +	return rockchip_set_phy_state(phy, true);
+> +}
+> +
+> +static int rockchip_dp_phy_power_off(struct phy *phy)
+> +{
+> +	return rockchip_set_phy_state(phy, false);
+> +}
+> +
+> +static struct phy_ops rockchip_dp_phy_ops = {
+> +	.power_on	= rockchip_dp_phy_power_on,
+> +	.power_off	= rockchip_dp_phy_power_off,
+> +	.owner		= THIS_MODULE,
+> +};
+> +
+> +static int rockchip_dp_phy_init(struct rockchip_dp_phy *dp)
+> +{
+> +	struct device *dev = dp->dev;
+> +	struct device_node *np = dev->of_node;
+> +	int ret;
+> +
+> +	dp->phy_24m = devm_clk_get(dev, "24m");
+> +	if (IS_ERR(dp->phy_24m)) {
+> +		dev_err(dev, "cannot get clock 24m\n");
+> +		return PTR_ERR(dp->phy_24m);
+> +	}
+> +
+> +	ret = rockchip_dp_phy_clk_enable(dp);
+> +	if (ret < 0) {
+> +		dev_err(dp->dev, "cannot enable dp phy clk %d\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	dp->grf = syscon_regmap_lookup_by_phandle(np, "rockchip,grf");
+> +	if (IS_ERR(dp->grf)) {
+> +		dev_err(dev, "rk3288-dp needs rockchip,grf property\n");
+> +		return PTR_ERR(dp->grf);
+> +	}
+> +
+> +	ret = regmap_write(dp->grf, GRF_SOC_CON12,
+> +			   GRF_EDP_REF_CLK_SEL_INTER |
+> +			   (GRF_EDP_REF_CLK_SEL_INTER << 16));
+> +	if (ret != 0) {
+> +		dev_err(dp->dev, "Could not config GRF edp ref clk: %d\n", ret);
+> +		return ret;
+> +	}
 
-Minor comment: Since there are a few files required for the driver,
-could you create a separate folder within drivers/gpu/drm/bridge?
+This function can be split to do only clk_get and syscon_regmap_lookup in
+probe, clk_enable and regmap_write in phy_init?
+> +
+> +	return 0;
+> +}
+> +
+> +static int rockchip_dp_phy_probe(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	struct phy_provider *phy_provider;
+> +	struct rockchip_dp_phy *dp;
+> +	struct resource *res;
+> +	struct phy *phy;
+> +	int ret;
+> +
+> +	dp = devm_kzalloc(dev, sizeof(*dp), GFP_KERNEL);
+> +	if (IS_ERR(dp))
+> +		return -ENOMEM;
+> +
+> +	dp->dev = dev;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	dp->regs = devm_ioremap_resource(dev, res);
+> +	if (IS_ERR(dp->regs))
+> +		return PTR_ERR(dp->regs);
+> +
+> +	ret = rockchip_dp_phy_init(dp);
+> +	if (ret)
+> +		return ret;
+> +
+> +	phy = devm_phy_create(dev, NULL, &rockchip_dp_phy_ops, NULL);
+> +	if (IS_ERR(phy)) {
+> +		dev_err(dev, "failed to create phy\n");
+> +		return PTR_ERR(phy);
+> +	}
+> +	phy_set_drvdata(phy, dp);
+> +
+> +	phy_provider = devm_of_phy_provider_register(dev, of_phy_simple_xlate);
+> +
+> +	return PTR_ERR_OR_ZERO(phy_provider);
+> +}
+> +
+> +static const struct of_device_id rockchip_dp_phy_dt_ids[] = {
+> +	{ .compatible = "rockchip,rk3288-dp-phy" },
+> +	{}
+> +};
+> +
+> +MODULE_DEVICE_TABLE(of, rockchip_dp_phy_dt_ids);
+> +
+> +static struct platform_driver rockchip_dp_phy_driver = {
+> +	.probe		= rockchip_dp_phy_probe,
+> +	.driver		= {
+> +		.name	= "rockchip-dp-phy",
+> +		.owner	= THIS_MODULE,
 
-Thanks,
-Archit
+owner is not required here.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Thanks
+Kishon
