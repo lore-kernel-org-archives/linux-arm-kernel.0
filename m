@@ -1,61 +1,53 @@
-From: ahs3@redhat.com (Al Stone)
-Date: Thu, 20 Aug 2015 10:57:05 -0600
-Subject: [PATCH v2 2/5] ACPI / ARM64: remove usage of
- BAD_MADT_ENTRY/BAD_MADT_GICC_ENTRY
-In-Reply-To: <20150820101322.GA19328@arm.com>
-References: <1440022048-6285-1-git-send-email-al.stone@linaro.org>
- <1440022048-6285-3-git-send-email-al.stone@linaro.org>
- <20150820101322.GA19328@arm.com>
-Message-ID: <55D606E1.4040804@redhat.com>
+From: horia.geanta@freescale.com (=?UTF-8?Q?Horia_Geant=c4=83?=)
+Date: Thu, 20 Aug 2015 19:58:36 +0300
+Subject: [PATCH v3] ARM: configs: Add Freescale LS1021A defconfig
+In-Reply-To: <BN3PR0301MB08672520CA978383BBF2CF6CFE790@BN3PR0301MB0867.namprd03.prod.outlook.com>
+References: <1438941784-38403-1-git-send-email-b18965@freescale.com>
+ <55CB4829.40204@freescale.com> <55CE1FFE.2080200@freescale.com>
+ <CAOMZO5By_15OCsb7z2pbywPi3n9vKGj=393hWYHVEQ32=jDNaA@mail.gmail.com>
+ <BN3PR0301MB08672520CA978383BBF2CF6CFE790@BN3PR0301MB0867.namprd03.prod.outlook.com>
+Message-ID: <55D6073C.1020000@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/20/2015 04:13 AM, Will Deacon wrote:
-> Hi Al,
+On 8/17/2015 6:42 AM, Wang Huan-B18965 wrote:
+> Hi, Fabio,
+
+Please don't top post.
+
 > 
-> On Wed, Aug 19, 2015 at 11:07:25PM +0100, Al Stone wrote:
->> Now that we have introduced the bad_madt_entry() function, and that
->> function is being invoked in acpi_table_parse_madt() for us, there
->> is no longer any need to use the BAD_MADT_ENTRY macro, or in the case
->> of arm64, the BAD_MADT_GICC_ENTRY, too.
+> 	Based on the analysis and discussion, we prefer to use ls1021a_defconfig and remove LS1021A from imx_v6_v7_defconfig.
+
+Alison, when you submit v4 for this patch (adding
+CONFIG_ARCH_DMA_ADDR_T_64BIT=y as suggested), could you also send a
+patch removing CONFIG_SOC_LS1021A from imx_v6_v7_config?
+
+> 
+> 	Thanks.
+> 
+> Best Regards,
+> Alison Wang
+> 
+>> On Fri, Aug 14, 2015 at 2:06 PM, Horia Geant?
+>> <horia.geanta@freescale.com> wrote:
 >>
->> Signed-off-by: Al Stone <al.stone@linaro.org>
->> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
->> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> Cc: Thomas Gleixner <tglx@linutronix.de>
->> Cc: Jason Cooper <jason@lakedaemon.net>
->> ---
->>  arch/arm64/include/asm/acpi.h | 8 --------
->>  arch/arm64/kernel/smp.c       | 2 --
->>  drivers/irqchip/irq-gic.c     | 6 ------
->>  3 files changed, 16 deletions(-)
-> 
-> How are you planning to merge this (and which kernel are you targetting?)
-> You've got Acks for both arm64 and irqchip, so I guess either of those
-> trees could take it.
-
-Yeah, this is a little messy.  If I can get into 4.2, that would be nice,
-but not required -- arm64 already has a usable patch for now, and that's
-the only arch affected.  So, 4.3 was my primary target (which is why I
-worked with linux-next for these).
-
-Which tree?  Yeesh.  1/5 and 5/5 are ACPI only and required for the rest
-to work properly; 2/5 is arm64, 3/5 is ia64, and 4/5 is x86.  ARM folks are
-the only ones to have provided acks or reviews, however.  I guess I was
-assuming this would have to go in via Rafael's ACPI tree since those are
-the key parts -- the arch-specific patches would remove safety checks on
-MADT subtables without replacing them, if they went in before the ACPI
-patches.
-
-Does that make sense?  What do you think?
-
--- 
-ciao,
-al
------------------------------------
-Al Stone
-Software Engineer
-Red Hat, Inc.
-ahs3 at redhat.com
------------------------------------
+>>> Another thing:
+>>> Commit 385c0fb0e2c4 ("ARM: imx_v6_v7_defconfig: Select LS1021A")
+>> added
+>>> CONFIG_SOC_LS1021A in imx_v6_v7_defconfig.
+>>>
+>>> Besides this, booting a LS1021 AQDS board (Rev2) using
+>>> imx_v6_v7_defconfig did not work (stuck at "Starting kernel").
+>>
+>> What would be the recommended approach?
+>>
+>> - Fix imx_v6_v7_defconfig so that it can make LS1021A to boot
+>>
+>> or
+>>
+>> - Use this proposed ls1021a_defconfig and remove LS1021A from
+>> imx_v6_v7_defconfig?
+>>
+>> Regards,
+>>
+>> Fabio Estevam
