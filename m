@@ -1,29 +1,40 @@
 From: david.vrabel@citrix.com (David Vrabel)
-Date: Thu, 20 Aug 2015 10:49:43 +0100
-Subject: [Xen-devel] [PATCH v3 03/20] xen: Add Xen specific page definition
-In-Reply-To: <1438966019-19322-4-git-send-email-julien.grall@citrix.com>
+Date: Thu, 20 Aug 2015 10:51:51 +0100
+Subject: [Xen-devel] [PATCH v3 04/20] xen/grant: Introduce helpers to
+ split a page into grant
+In-Reply-To: <1438966019-19322-5-git-send-email-julien.grall@citrix.com>
 References: <1438966019-19322-1-git-send-email-julien.grall@citrix.com>
- <1438966019-19322-4-git-send-email-julien.grall@citrix.com>
-Message-ID: <55D5A2B7.5000106@citrix.com>
+ <1438966019-19322-5-git-send-email-julien.grall@citrix.com>
+Message-ID: <55D5A337.7090704@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 07/08/15 17:46, Julien Grall wrote:
-> The Xen hypercall interface is always using 4K page granularity on ARM
-> and x86 architecture.
+> Currently, a grant is always based on the Xen page granularity (i.e
+> 4KB). When Linux is using a different page granularity, a single page
+> will be split between multiple grants.
 > 
-> With the incoming support of 64K page granularity for ARM64 guest, it
-> won't be possible to re-use the Linux page definition in Xen drivers.
+> The new helpers will be in charge to split the Linux page into grants and
+> call a function given by the caller on each grant.
 > 
-> Introduce Xen page definition helpers based on the Linux page
-> definition. They have exactly the same name but prefixed with
-> XEN_/xen_ prefix.
+> Also provide an helper to count the number of grants within a given
+> contiguous region.
 > 
-> Also modify xen_page_to_gfn to use new Xen page definition.
-[...]
-> +#define xen_page_to_pfn(page)	\
-> +	(((page_to_pfn(page)) << PAGE_SHIFT) >> XEN_PAGE_SHIFT)
+> Note that the x86/include/asm/xen/page.h is now including
+> xen/interface/grant_table.h rather than xen/grant_table.h. It's
+> necessary because xen/grant_table.h depends on asm/xen/page.h and will
+> break the compilation. Furthermore, only definition in
+> interface/grant_table.h was required.
 
-Rename this to page_to_xen_pfn()
+Reviewed-by: David Vrabel <david.vrabel@citrix.com>
+
+But...
+
+> +/* Helper to get to call fn only on the first "grant chunk" */
+> +static inline void gnttab_one_grant(struct page *page, unsigned int offset,
+> +				    unsigned len, xen_grant_fn_t fn,
+> +				    void *data)
+
+...call this gnttab_for_one_grant().
 
 David
