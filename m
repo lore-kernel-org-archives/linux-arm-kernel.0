@@ -1,53 +1,53 @@
-From: horia.geanta@freescale.com (=?UTF-8?Q?Horia_Geant=c4=83?=)
-Date: Thu, 20 Aug 2015 19:58:36 +0300
-Subject: [PATCH v3] ARM: configs: Add Freescale LS1021A defconfig
-In-Reply-To: <BN3PR0301MB08672520CA978383BBF2CF6CFE790@BN3PR0301MB0867.namprd03.prod.outlook.com>
-References: <1438941784-38403-1-git-send-email-b18965@freescale.com>
- <55CB4829.40204@freescale.com> <55CE1FFE.2080200@freescale.com>
- <CAOMZO5By_15OCsb7z2pbywPi3n9vKGj=393hWYHVEQ32=jDNaA@mail.gmail.com>
- <BN3PR0301MB08672520CA978383BBF2CF6CFE790@BN3PR0301MB0867.namprd03.prod.outlook.com>
-Message-ID: <55D6073C.1020000@freescale.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 20 Aug 2015 10:02:11 -0700
+Subject: [PATCH v3 0/8] ARM: sunxi: Add Reduced Serial Bus support
+In-Reply-To: <CAGb2v66X-CMQiS1dNqhwamTsVbnf+7siSTV3xGwn-C91Zhw3uA@mail.gmail.com>
+References: <1439958009-14056-1-git-send-email-wens@csie.org>
+ <20150819163232.GS10748@sirena.org.uk>
+ <CAGb2v66X-CMQiS1dNqhwamTsVbnf+7siSTV3xGwn-C91Zhw3uA@mail.gmail.com>
+Message-ID: <20150820170211.GB12027@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/17/2015 6:42 AM, Wang Huan-B18965 wrote:
-> Hi, Fabio,
+On Thu, Aug 20, 2015 at 09:59:27AM +0800, Chen-Yu Tsai wrote:
+> On Thu, Aug 20, 2015 at 12:32 AM, Mark Brown <broonie@kernel.org> wrote:
 
-Please don't top post.
+> > This is flagged as something that is specific to the Allwinner SoCs.
+> > Why add generic regmap support rather than just implement the regmap
+> > reg_read() and reg_write() in a regmap in the controller driver?  Are
+> > there expected to be other controller drivers from other vendors?
 
-> 
-> 	Based on the analysis and discussion, we prefer to use ls1021a_defconfig and remove LS1021A from imx_v6_v7_defconfig.
+> I don't expect there to be any other controller drivers. And it seems
+> at least some of the devices are dual interface (I2C/RSB). Though I
+> don't see how its connected to the generic regmap support. Regmap
+> is for device drivers connected to the RSB bus, not the bus controller
+> itself.
 
-Alison, when you submit v4 for this patch (adding
-CONFIG_ARCH_DMA_ADDR_T_64BIT=y as suggested), could you also send a
-patch removing CONFIG_SOC_LS1021A from imx_v6_v7_config?
+The point here is that you can use regmap for a custom controller
+without having to implement a bus, to repeat what I said:
 
-> 
-> 	Thanks.
-> 
-> Best Regards,
-> Alison Wang
-> 
->> On Fri, Aug 14, 2015 at 2:06 PM, Horia Geant?
->> <horia.geanta@freescale.com> wrote:
->>
->>> Another thing:
->>> Commit 385c0fb0e2c4 ("ARM: imx_v6_v7_defconfig: Select LS1021A")
->> added
->>> CONFIG_SOC_LS1021A in imx_v6_v7_defconfig.
->>>
->>> Besides this, booting a LS1021 AQDS board (Rev2) using
->>> imx_v6_v7_defconfig did not work (stuck at "Starting kernel").
->>
->> What would be the recommended approach?
->>
->> - Fix imx_v6_v7_defconfig so that it can make LS1021A to boot
->>
->> or
->>
->> - Use this proposed ls1021a_defconfig and remove LS1021A from
->> imx_v6_v7_defconfig?
->>
->> Regards,
->>
->> Fabio Estevam
+| > Why add generic regmap support rather than just implement the regmap
+| > reg_read() and reg_write() in a regmap in the controller driver?  Are
+
+> I could throw all the RSB-related stuff together, presumably under
+> drivers/soc/sunxi/rsb, though that doesn't help the fact that common
+> regmap code would be  better than scattering regmap_* in various mfd
+> drivers.
+
+If there is only one controller driver you just have a single call into
+that driver in the client device which gives you the same level of
+shared code, having a wrapper layer in regmap that puts regmap_
+functions around the equivalent controller specific functions isn't
+really adding a huge amount.
+
+It's a similar thing to the way we just reuse the platform bus for basic
+buses rather than copying it to make new bus types, we don't need to
+create lots of new boilerplate regmap types that are just really basic
+wrappers.  There are a lot of these custom buses that people have.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150820/7be80764/attachment.sig>
