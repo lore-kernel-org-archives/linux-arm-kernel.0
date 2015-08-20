@@ -1,56 +1,39 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Thu, 20 Aug 2015 14:50:53 +0200
-Subject: [PATCH 0/4] [media] Media entity cleanups and build fixes
-In-Reply-To: <55D5CB04.50508@xs4all.nl>
-References: <1439998526-12832-1-git-send-email-javier@osg.samsung.com>
- <55D5CB04.50508@xs4all.nl>
-Message-ID: <55D5CD2D.2010607@osg.samsung.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 20 Aug 2015 14:02:00 +0100
+Subject: [PATCH 3/3] [v2] hvc_dcc: disable user-space access to DCC
+In-Reply-To: <20150820104645.GD19328@arm.com>
+References: <1440025370-9519-1-git-send-email-timur@codeaurora.org>
+ <1440025370-9519-3-git-send-email-timur@codeaurora.org>
+ <20150820104645.GD19328@arm.com>
+Message-ID: <20150820130200.GE2972@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Hans,
-
-On 08/20/2015 02:41 PM, Hans Verkuil wrote:
-> On 08/19/15 17:35, Javier Martinez Canillas wrote:
->> Hello,
->>
->> This series contains a couple of build fixes and cleanups for the
->> Media Controller framework. The goal of the series is to get rid of
->> the struct media_entity .parent member since now that a media_gobj is
->> embedded into entities, the media_gobj .mdev member can be used to
->> store a pointer to the parent struct media_device.
->>
->> So the .parent field becomes redundant and can be removed after all
->> the users are converted to use entity .graph_obj.mdev instead.
->>
->> Patches 1/4 and 2/4 are build fixes I found while build testing if no
->> regressions were introduced by the conversion. Patch 3/4 converts
->> all the drivers and the MC core to use .mdev instead of .parent and
->> finally patch 4/4 removes the .parent field since now is unused.
+On Thu, Aug 20, 2015 at 11:46:45AM +0100, Will Deacon wrote:
+> On Thu, Aug 20, 2015 at 12:02:50AM +0100, Timur Tabi wrote:
+> > If the DCC driver loads, then disable user-space access to the DCC so that
+> > we don't have two entities trying to access the DCC at the same time.
 > 
-> Regarding patches 1 and 2: these should of course be merged with Mauro's
-> patches that make this particular change (patch 3/8), otherwise it would
-> break git bisect.
+> In the interests of making some headway with this, just drop this patch
+> and I'll queue the diff below via the arm64 tree.
 > 
-> Anyway,
+> Will
 > 
-> Acked-by: Hans Verkuil <hans.verkuil@cisco.com> for the changes in patch
-
-Thanks a lot for the acks.
-
-> 1 and 2, as long as they are added to Mauro's patch 3/8.
->
-
-Indeed, I completely agree that these should be squashed with
-Mauro's patch to maintain git bisect-ability.
- 
-> Regards,
+> --->8
 > 
-> 	Hans
-> 
+> diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+> index 39139a3aa16d..4c922ecce600 100644
+> --- a/arch/arm64/mm/proc.S
+> +++ b/arch/arm64/mm/proc.S
+> @@ -156,7 +156,7 @@ ENTRY(__cpu_setup)
+>  
+>  	mov	x0, #3 << 20
+>  	msr	cpacr_el1, x0			// Enable FP/ASIMD
+> -	msr	mdscr_el1, xzr			// Reset mdscr_el1
+> +	msr	mdscr_el1, #1 << 12		// Reset mdscr_el1
 
-Best regards,
+Nitpick: expand the "Reset..." comment to include some text about this
+bit.
+
 -- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+Catalin
