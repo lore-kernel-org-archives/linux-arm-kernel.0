@@ -1,62 +1,85 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Thu, 20 Aug 2015 21:44:38 +0800
-Subject: [PATCH v2 2/3] mailbox: Hi6220: add mailbox driver
-In-Reply-To: <55D568E2.9060505@hisilicon.com>
-References: <1440039239-8772-1-git-send-email-leo.yan@linaro.org>
- <1440039239-8772-3-git-send-email-leo.yan@linaro.org>
- <55D568E2.9060505@hisilicon.com>
-Message-ID: <20150820134438.GA18629@leoy-linaro>
+From: clabbe.montjoie@gmail.com (Corentin LABBE)
+Date: Thu, 20 Aug 2015 15:56:39 +0200
+Subject: un4i-ss-cipher.c warning
+In-Reply-To: <CAOMqctShdb9xEkBmuaQKfB1cwGupbfH5TS5ZB_P85Hwpn+4zAA@mail.gmail.com>
+References: <CAOMqctShdb9xEkBmuaQKfB1cwGupbfH5TS5ZB_P85Hwpn+4zAA@mail.gmail.com>
+Message-ID: <55D5DC97.1040209@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yiping,
+On 19/08/2015 16:35, Michal Suchanek wrote:
+> Hello,
+>
+> when building a kernel with sunxi crypto driver as merged into the
+> sinxi-wip branch I get a compiler warning.
+>
+> I am not sure this is the latest version of the driver. It does not
+> seem to be in mainline yet.
+>
+> Thanks
+>
+> Michal
+>
+> In file included from /scratch/build/linux/include/linux/printk.h:277:0,
+>                   from /scratch/build/linux/include/linux/kernel.h:13,
+>                   from /scratch/build/linux/include/linux/clk.h:16,
+>                   from
+> /scratch/build/linux/drivers/crypto/sunxi-ss/sun4i-ss.h:15,
+>                   from
+> /scratch/build/linux/drivers/crypto/sunxi-ss/sun4i-ss-cipher.c:17:
+> /scratch/build/linux/drivers/crypto/sunxi-ss/sun4i-ss-cipher.c: In
+> function ?sun4i_ss_cipher_poll?:
+> /scratch/build/linux/include/linux/dynamic_debug.h:86:3: warning:
+> ?todo? may be used uninitialized in this function
+> [-Wmaybe-uninitialized]
+>     __dynamic_dev_dbg(&descriptor, dev, fmt, \
+>     ^
+> /scratch/build/linux/drivers/crypto/sunxi-ss/sun4i-ss-cipher.c:144:15:
+> note: ?todo? was declared here
+>    unsigned int todo;
+>
 
-Thanks for review, please see below comments.
+Hello
 
-On Thu, Aug 20, 2015 at 01:42:58PM +0800, YiPing Xu wrote:
-> On 2015/8/20 10:53, Leo Yan wrote:
-> >Add driver for Hi6220 mailbox, the mailbox communicates with MCU; for
-> >sending data, it can support two methods for low level implementation:
-> >one is to use interrupt as acknowledge, another is automatic mode which
-> >without any acknowledge. These two methods have been supported in the
-> >driver. For receiving data, it will depend on the interrupt to notify
-> >the channel has incoming message; enhance rx channel's message queue,
-> >which is based on the code in drivers/mailbox/omap-mailbox.c.
-> >
-> >Now mailbox driver is used to send message to MCU to control dynamic
-> >voltage and frequency scaling for CPU, GPU and DDR.
-> >
-> >Signed-off-by: Leo Yan <leo.yan@linaro.org>
+Thanks for the report, strange that I do not have that warning.
+todo is always initialized, since oleft and ileft are always > 0 at start.
+But setting todo to 0 is a simple fix.
+The following patch will suppress the warning.
 
-[...]
+Regards
 
-> >+static int hi6220_mbox_send_data(struct mbox_chan *chan, void *msg)
-> >+{
-> >+	struct hi6220_mbox_chan *mchan = chan->con_priv;
-> >+	struct hi6220_mbox *mbox = mchan->parent;
-> >+	int irq = mchan->remote_irq;
-> >+	u32 *buf = msg;
-> >+	unsigned long flags;
-> >+	int i;
-> >+
-> >+	hi6220_mbox_set_status(mchan, HI6220_MBOX_STATUS_TX);
-> 
-> 	hi6220_mbox_set_status is called in send_data context, and it is
-> also called in hi6220_mbox_rx_interrupt and
-> hi6220_mbox_tx_interrupt.
-> 
-> 	no race condition here?
+-- >8 --
+ From 67f2d0749041b08c4c4ad671ab710b3b83f6dfd3 Mon Sep 17 00:00:00 2001
+From: LABBE Corentin <clabbe.montjoie@gmail.com>
+Date: Thu, 20 Aug 2015 12:18:46 +0200
+Subject: [PATCH] crypto: sun4i-ss: suppress the todo uninitialized warning
 
-Have thought this question yet when writing code; it will _NOT_
-introduce race condition according to below implementation details:
+Signed-off-by: LABBE Corentin <clabbe.montjoie@gmail.com>
+---
+  drivers/crypto/sunxi-ss/sun4i-ss-cipher.c | 4 ++--
+  1 file changed, 2 insertions(+), 2 deletions(-)
 
-- Every channel have its own slot, so there have no race condition
-  between channels;
-- The channel is unidirectional; so it will be only for tx or rx at
-  the same time;
-- The channel operation is sequential, so it have the sequence as:
-  For tx: startup -> send_data -> tx_irq (for ack);
-  For rx: startup -> rx_irq -> recv_data;
+diff --git a/drivers/crypto/sunxi-ss/sun4i-ss-cipher.c b/drivers/crypto/sunxi-ss/sun4i-ss-cipher.c
+index e070c31..9299914 100644
+--- a/drivers/crypto/sunxi-ss/sun4i-ss-cipher.c
++++ b/drivers/crypto/sunxi-ss/sun4i-ss-cipher.c
+@@ -32,7 +32,7 @@ static int sun4i_ss_opti_poll(struct ablkcipher_request *areq)
+  	int i, err = 0;
+  	unsigned int ileft = areq->nbytes;
+  	unsigned int oleft = areq->nbytes;
+-	unsigned int todo;
++	unsigned int todo = 0;
+  	struct sg_mapping_iter mi, mo;
+  	unsigned int oi, oo; /* offset for in and out */
 
-Thanks,
-Leo Yan
+@@ -141,7 +141,7 @@ static int sun4i_ss_cipher_poll(struct ablkcipher_request *areq)
+  	int i, err = 0;
+  	unsigned int ileft = areq->nbytes;
+  	unsigned int oleft = areq->nbytes;
+-	unsigned int todo;
++	unsigned int todo = 0;
+  	struct sg_mapping_iter mi, mo;
+  	unsigned int oi, oo;	/* offset for in and out */
+  	char buf[4 * SS_RX_MAX];/* buffer for linearize SG src */
+-- 
+2.4.6
