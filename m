@@ -1,137 +1,227 @@
-From: danindrey@mail.ru (Andrey Danin)
-Date: Thu, 20 Aug 2015 15:14:34 +0300
-Subject: [PATCH v3 1/4] i2c: tegra: implement slave mode
-In-Reply-To: <20150724105251.GA22787@katana>
-References: <1437424546-30405-1-git-send-email-danindrey@mail.ru>
- <1437424546-30405-2-git-send-email-danindrey@mail.ru>
- <20150724092720.GA1597@katana> <55B210F4.6030700@mail.ru>
- <20150724105251.GA22787@katana>
-Message-ID: <55D5C4AA.2000307@mail.ru>
+From: varada@codeaurora.org (Varadarajan Narayanan)
+Date: Thu, 20 Aug 2015 17:45:41 +0530
+Subject: [PATCH] ARM: Set proper TEXT_OFFSET for IPQ806x
+Message-ID: <20150820121541.GA14664@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24.07.2015 13:52, Wolfram Sang wrote:
->
->> At the begin of my work on this patchset I even denied clock disable call if
->> slave is registered (to minimize code that can affect transfer).
->
-> I hacked something like this, but it seems it was not enough.
->
->> If only slave mode is used, then this logic is not needed.
->
-> This is not sufficent. We shouldn't break being a master only because we
-> also listen to a slave address (as long as the HW supports that of
-> course).
->
->> tegra_i2c_init is called on probe and resume. Also it is called in case of
->> xfer fail. If xfer is ok, then I think slave addr must be kept unchanged.
->
-> This is fragile. Try scanning the bus with i2cdetect and slave setup
-> will be gone.
->
->> As far as I understand it is a loopback mode. Probably it will not work
->> (Stephen Warren already mentioned this).
->
-> Just to make clear: I am not saying we should support talking to our own
-> slave address. But it should still be possible to communicate with other
-> remote devices on the bus.
+RAM starts at 0x40000000 for IPQ. The lower 21MB of RAM is used
+for Shared Memory and the kernel can start from 0x41500000. However,
+this cannot be accomodated within the current AUTO_ZRELADDR framework.
+If textofs-y is set to 0x01508000, compilation breaks with
 
-Sorry for the long delay. I tried to analyze the issue. Attached patch 
-works on AC100 (Misha Komarovsky helped me with testing).
+	arch/arm/kernel/head.S:181:
+		Error: invalid constant (1508000) after fixup
 
-Wolfram could you please try the patch with your environment?
+Hence, cannot use Linux's self extractor. Instead, create a compressed
+image that will be de-compressed from U-Boot.
 
+Signed-off-by: Varadarajan Narayanan <varada@codeaurora.org>
 
-Thanks.
-
--------------- next part --------------
->From 0927b4007786b19e51415c4900863dd4e74fa034 Mon Sep 17 00:00:00 2001
-From: Andrey Danin <danindrey@mail.ru>
-Date: Thu, 20 Aug 2015 00:41:39 +0300
-Subject: [PATCH] i2c: tegra: don't reset I2C slave address on init
-
-Init function is called multuple times. If I2C controller works
-in slave mode, then driver must keep slave registers otherwise
-slave configuration will be reseted.
-
-Signed-off-by: Andrey Danin <danindrey@mail.ru>
----
- drivers/i2c/busses/i2c-tegra.c |   42 +++++++++++++++++++++++++--------------
- 1 files changed, 27 insertions(+), 15 deletions(-)
-
-diff --git a/drivers/i2c/busses/i2c-tegra.c b/drivers/i2c/busses/i2c-tegra.c
-index 6467ce0..50250a1 100644
---- a/drivers/i2c/busses/i2c-tegra.c
-+++ b/drivers/i2c/busses/i2c-tegra.c
-@@ -402,6 +402,22 @@ static void tegra_dvc_init(struct tegra_i2c_dev *i2c_dev)
- 	dvc_writel(i2c_dev, val, DVC_CTRL_REG1);
- }
- 
-+static int tegra_i2c_init_slave(struct tegra_i2c_dev *i2c_dev, u32 addr, u32 flags)
-+{
-+	int addr2 = 0;
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index 07ab3d2..cce8ea6 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -142,6 +142,8 @@ textofs-$(CONFIG_SA1111) := 0x00208000
+ endif
+ textofs-$(CONFIG_ARCH_MSM8X60) := 0x00208000
+ textofs-$(CONFIG_ARCH_MSM8960) := 0x00208000
++textofs-$(CONFIG_ARCH_IPQ8064) := 0x00008000
 +
-+	i2c_writel(i2c_dev, I2C_SL_CNFG_NEWSL, I2C_SL_CNFG);
-+	i2c_writel(i2c_dev, I2C_SL_DELAY_COUNT_DEFAULT, I2C_SL_DELAY_COUNT);
+ textofs-$(CONFIG_ARCH_AXXIA) := 0x00308000
+ 
+ # Machine directory name.  This list is sorted alphanumerically
+diff --git a/arch/arm/configs/ipq_defconfig b/arch/arm/configs/ipq_defconfig
+new file mode 100644
+index 0000000..8562a2f
+--- /dev/null
++++ b/arch/arm/configs/ipq_defconfig
+@@ -0,0 +1,175 @@
++CONFIG_SYSVIPC=y
++CONFIG_NO_HZ=y
++CONFIG_HIGH_RES_TIMERS=y
++CONFIG_IKCONFIG=y
++CONFIG_IKCONFIG_PROC=y
++CONFIG_BLK_DEV_INITRD=y
++CONFIG_SYSCTL_SYSCALL=y
++CONFIG_KALLSYMS_ALL=y
++CONFIG_EMBEDDED=y
++# CONFIG_SLUB_DEBUG is not set
++# CONFIG_COMPAT_BRK is not set
++CONFIG_PROFILING=y
++CONFIG_OPROFILE=y
++CONFIG_KPROBES=y
++CONFIG_MODULES=y
++CONFIG_MODULE_UNLOAD=y
++CONFIG_MODULE_FORCE_UNLOAD=y
++CONFIG_MODVERSIONS=y
++CONFIG_PARTITION_ADVANCED=y
++CONFIG_ARCH_QCOM=y
++CONFIG_ARCH_MSM8X60=y
++CONFIG_ARCH_MSM8960=y
++CONFIG_ARCH_MSM8974=y
++CONFIG_ARCH_IPQ8064=y
++CONFIG_SMP=y
++CONFIG_PREEMPT=y
++CONFIG_AEABI=y
++CONFIG_HIGHMEM=y
++CONFIG_HIGHPTE=y
++CONFIG_CLEANCACHE=y
++CONFIG_ARM_APPENDED_DTB=y
++CONFIG_ARM_ATAG_DTB_COMPAT=y
++CONFIG_CPU_IDLE=y
++CONFIG_ARM_CPUIDLE=y
++CONFIG_VFP=y
++CONFIG_NEON=y
++# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
++CONFIG_NET=y
++CONFIG_PACKET=y
++CONFIG_UNIX=y
++CONFIG_INET=y
++CONFIG_IP_ADVANCED_ROUTER=y
++CONFIG_IP_MULTIPLE_TABLES=y
++CONFIG_IP_ROUTE_VERBOSE=y
++CONFIG_IP_PNP=y
++CONFIG_IP_PNP_DHCP=y
++# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
++# CONFIG_INET_XFRM_MODE_TUNNEL is not set
++# CONFIG_INET_XFRM_MODE_BEET is not set
++# CONFIG_INET_LRO is not set
++# CONFIG_IPV6 is not set
++CONFIG_CFG80211=y
++CONFIG_RFKILL=y
++CONFIG_DEVTMPFS=y
++CONFIG_DEVTMPFS_MOUNT=y
++CONFIG_MTD=y
++CONFIG_MTD_BLOCK=y
++CONFIG_MTD_M25P80=y
++CONFIG_MTD_SPI_NOR=y
++CONFIG_BLK_DEV_LOOP=y
++CONFIG_BLK_DEV_RAM=y
++CONFIG_SCSI=y
++CONFIG_BLK_DEV_SD=y
++CONFIG_CHR_DEV_SG=y
++CONFIG_CHR_DEV_SCH=y
++CONFIG_SCSI_CONSTANTS=y
++CONFIG_SCSI_LOGGING=y
++CONFIG_SCSI_SCAN_ASYNC=y
++CONFIG_NETDEVICES=y
++CONFIG_DUMMY=y
++CONFIG_MDIO_BITBANG=y
++CONFIG_MDIO_GPIO=y
++CONFIG_SLIP=y
++CONFIG_SLIP_COMPRESSED=y
++CONFIG_SLIP_MODE_SLIP6=y
++CONFIG_USB_USBNET=y
++# CONFIG_USB_NET_AX8817X is not set
++# CONFIG_USB_NET_ZAURUS is not set
++CONFIG_INPUT_EVDEV=y
++# CONFIG_KEYBOARD_ATKBD is not set
++# CONFIG_MOUSE_PS2 is not set
++CONFIG_INPUT_JOYSTICK=y
++CONFIG_INPUT_TOUCHSCREEN=y
++CONFIG_INPUT_MISC=y
++CONFIG_INPUT_UINPUT=y
++CONFIG_SERIO_LIBPS2=y
++# CONFIG_LEGACY_PTYS is not set
++CONFIG_SERIAL_MSM=y
++CONFIG_SERIAL_MSM_CONSOLE=y
++CONFIG_HW_RANDOM=y
++CONFIG_I2C=y
++CONFIG_I2C_CHARDEV=y
++CONFIG_I2C_QUP=y
++CONFIG_SPI=y
++CONFIG_SPI_QUP=y
++CONFIG_SPMI=y
++CONFIG_PINCTRL_APQ8064=y
++CONFIG_PINCTRL_APQ8084=y
++CONFIG_PINCTRL_IPQ8064=y
++CONFIG_PINCTRL_MSM8960=y
++CONFIG_PINCTRL_MSM8X74=y
++CONFIG_GPIOLIB=y
++CONFIG_DEBUG_GPIO=y
++CONFIG_GPIO_SYSFS=y
++CONFIG_POWER_RESET=y
++CONFIG_POWER_RESET_MSM=y
++CONFIG_THERMAL=y
++CONFIG_REGULATOR=y
++CONFIG_REGULATOR_FIXED_VOLTAGE=y
++CONFIG_MEDIA_SUPPORT=y
++CONFIG_FB=y
++CONFIG_SOUND=y
++CONFIG_SND=y
++CONFIG_SND_DYNAMIC_MINORS=y
++# CONFIG_SND_ARM is not set
++# CONFIG_SND_SPI is not set
++# CONFIG_SND_USB is not set
++CONFIG_SND_SOC=y
++CONFIG_HID_BATTERY_STRENGTH=y
++CONFIG_USB=y
++CONFIG_USB_ANNOUNCE_NEW_DEVICES=y
++CONFIG_USB_MON=y
++CONFIG_USB_EHCI_HCD=y
++CONFIG_USB_ACM=y
++CONFIG_USB_SERIAL=y
++CONFIG_USB_GADGET=y
++CONFIG_USB_GADGET_DEBUG_FILES=y
++CONFIG_USB_GADGET_VBUS_DRAW=500
++CONFIG_MMC=y
++CONFIG_MMC_BLOCK_MINORS=32
++CONFIG_MMC_ARMMMCI=y
++CONFIG_MMC_SDHCI=y
++CONFIG_MMC_SDHCI_PLTFM=y
++CONFIG_MMC_SDHCI_MSM=y
++CONFIG_RTC_CLASS=y
++CONFIG_DMADEVICES=y
++CONFIG_QCOM_BAM_DMA=y
++CONFIG_STAGING=y
++CONFIG_COMMON_CLK_QCOM=y
++CONFIG_APQ_MMCC_8084=y
++CONFIG_IPQ_LCC_806X=y
++CONFIG_MSM_GCC_8660=y
++CONFIG_MSM_LCC_8960=y
++CONFIG_MSM_MMCC_8960=y
++CONFIG_MSM_MMCC_8974=y
++CONFIG_MSM_IOMMU=y
++CONFIG_QCOM_GSBI=y
++CONFIG_QCOM_PM=y
++CONFIG_PHY_QCOM_APQ8064_SATA=y
++CONFIG_PHY_QCOM_IPQ806X_SATA=y
++CONFIG_EXT2_FS=y
++CONFIG_EXT2_FS_XATTR=y
++CONFIG_EXT3_FS=y
++# CONFIG_EXT3_DEFAULTS_TO_ORDERED is not set
++CONFIG_EXT4_FS=y
++CONFIG_FUSE_FS=y
++CONFIG_VFAT_FS=y
++CONFIG_TMPFS=y
++CONFIG_JFFS2_FS=y
++CONFIG_NFS_FS=y
++CONFIG_NFS_V3_ACL=y
++CONFIG_NFS_V4=y
++CONFIG_CIFS=y
++CONFIG_NLS_CODEPAGE_437=y
++CONFIG_NLS_ASCII=y
++CONFIG_NLS_ISO8859_1=y
++CONFIG_NLS_UTF8=y
++CONFIG_PRINTK_TIME=y
++CONFIG_DYNAMIC_DEBUG=y
++CONFIG_DEBUG_INFO=y
++CONFIG_MAGIC_SYSRQ=y
++CONFIG_LOCKUP_DETECTOR=y
++# CONFIG_DETECT_HUNG_TASK is not set
++# CONFIG_SCHED_DEBUG is not set
++CONFIG_TIMER_STATS=y
+diff --git a/arch/arm/mach-qcom/Kconfig b/arch/arm/mach-qcom/Kconfig
+index 2256cd1..fab49a2 100644
+--- a/arch/arm/mach-qcom/Kconfig
++++ b/arch/arm/mach-qcom/Kconfig
+@@ -22,4 +22,8 @@ config ARCH_MSM8974
+ 	bool "Enable support for MSM8974"
+ 	select HAVE_ARM_ARCH_TIMER
+ 
++config ARCH_IPQ8064
++	bool "Enable support for IPQ806x"
++	select CLKSRC_QCOM
 +
-+	if (flags & I2C_CLIENT_TEN)
-+		addr2 = (addr >> 7) | I2C_SL_ADDR2_TEN_BIT_MODE;
-+
-+	i2c_writel(i2c_dev, addr, I2C_SL_ADDR1);
-+	i2c_writel(i2c_dev, addr2, I2C_SL_ADDR2);
-+
-+	return 0;
-+}
-+
- static inline int tegra_i2c_clock_enable(struct tegra_i2c_dev *i2c_dev)
- {
- 	int ret;
-@@ -461,12 +477,16 @@ static int tegra_i2c_init(struct tegra_i2c_dev *i2c_dev)
- 	i2c_writel(i2c_dev, clk_divisor, I2C_CLK_DIVISOR);
- 
- 	if (!i2c_dev->is_dvc) {
--		u32 sl_cfg = i2c_readl(i2c_dev, I2C_SL_CNFG);
--		sl_cfg |= I2C_SL_CNFG_NACK | I2C_SL_CNFG_NEWSL;
--		i2c_writel(i2c_dev, sl_cfg, I2C_SL_CNFG);
--		i2c_writel(i2c_dev, 0xfc, I2C_SL_ADDR1);
--		i2c_writel(i2c_dev, 0x00, I2C_SL_ADDR2);
--
-+		if (i2c_dev->slave) {
-+			tegra_i2c_init_slave(i2c_dev, i2c_dev->slave->addr,
-+					i2c_dev->slave->flags);
-+		} else {
-+			u32 sl_cfg = i2c_readl(i2c_dev, I2C_SL_CNFG);
-+			sl_cfg |= I2C_SL_CNFG_NACK | I2C_SL_CNFG_NEWSL;
-+			i2c_writel(i2c_dev, sl_cfg, I2C_SL_CNFG);
-+			i2c_writel(i2c_dev, 0xfc, I2C_SL_ADDR1);
-+			i2c_writel(i2c_dev, 0x00, I2C_SL_ADDR2);
-+		}
- 	}
- 
- 	val = 7 << I2C_FIFO_CONTROL_TX_TRIG_SHIFT |
-@@ -767,7 +787,6 @@ static u32 tegra_i2c_func(struct i2c_adapter *adap)
- static int tegra_reg_slave(struct i2c_client *slave)
- {
- 	struct tegra_i2c_dev *i2c_dev = i2c_get_adapdata(slave->adapter);
--	int addr2 = 0;
- 
- 	if (i2c_dev->slave)
- 		return -EBUSY;
-@@ -776,14 +795,7 @@ static int tegra_reg_slave(struct i2c_client *slave)
- 
- 	tegra_i2c_clock_enable(i2c_dev);
- 
--	i2c_writel(i2c_dev, I2C_SL_CNFG_NEWSL, I2C_SL_CNFG);
--	i2c_writel(i2c_dev, I2C_SL_DELAY_COUNT_DEFAULT, I2C_SL_DELAY_COUNT);
--
--	if (slave->flags & I2C_CLIENT_TEN)
--		addr2 = (slave->addr >> 7) | I2C_SL_ADDR2_TEN_BIT_MODE;
--
--	i2c_writel(i2c_dev, slave->addr, I2C_SL_ADDR1);
--	i2c_writel(i2c_dev, addr2, I2C_SL_ADDR2);
-+	tegra_i2c_init_slave(i2c_dev, slave->addr, slave->flags);
- 
- 	return 0;
- }
--- 
-1.7.1
+ endif
