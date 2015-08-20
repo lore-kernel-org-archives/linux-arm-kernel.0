@@ -1,23 +1,32 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 20 Aug 2015 11:54:35 -0700
-Subject: [PATCH 0/2] Add VIN and ADV7180 device tree support for
- R8A7794/SILK board
-In-Reply-To: <1750082.WpWf34HsI6@wasted.cogentembedded.com>
-References: <1750082.WpWf34HsI6@wasted.cogentembedded.com>
-Message-ID: <20150820185435.GE18990@verge.net.au>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 20 Aug 2015 11:58:50 -0700
+Subject: [PATCH 4/9] spi: sun4i: add DMA support
+In-Reply-To: <ccf776869b0d7fe2c78bcc41d6cd1896bf732296.1440080122.git.hramrach@gmail.com>
+References: <cover.1440080122.git.hramrach@gmail.com>
+ <ccf776869b0d7fe2c78bcc41d6cd1896bf732296.1440080122.git.hramrach@gmail.com>
+Message-ID: <20150820185850.GQ12027@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 20, 2015 at 01:20:42AM +0300, Sergei Shtylyov wrote:
-> Hello.
-> 
->    Here's the set of 2 patches against Simon Horman's 'renesas.git' repo's
-> 'renesas-devel-20150819-v4.2-rc7' tag. Here we add the VIN and ADV7180
-> video decoder device tree support on the R8A7794/SILK board. The patchset
-> requires previously posted SILK SDHI1 support patch in order to apply and 
-> R8A7794/SILK I2C1 support in order to apply and build.
-> 
-> [1/2] ARM: shmobile: r8a7794: add VIN DT support
-> [2/2] ARM: shmobile: silk: add VIN0/ADV7180 DT support
+On Thu, Aug 20, 2015 at 02:19:46PM -0000, Emilio L?pez wrote:
 
-Thanks, I have queued these up for v4.4.
+> -	sun4i_spi_drain_fifo(sspi, SUN4I_FIFO_DEPTH);
+> +	if (sun4i_spi_can_dma(master, spi, tfr) && desc_rx) {
+> +		/* The receive transfer should be the last one to finish */
+> +		dma_wait_for_async_tx(desc_rx);
+
+What if it's a transmit only transfer?  We'll fall over to this...
+
+> +	} else {
+> +		sun4i_spi_drain_fifo(sspi, SUN4I_FIFO_DEPTH);
+> +	}
+
+...which manually reads data from the FIFO which doesn't seem like what
+we want, won't it conflict with the DMA?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150820/5d89ea8e/attachment.sig>
