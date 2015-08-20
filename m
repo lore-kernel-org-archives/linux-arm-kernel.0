@@ -1,63 +1,41 @@
-From: fugang.duan@freescale.com (Duan Andy)
-Date: Thu, 20 Aug 2015 01:16:40 +0000
-Subject: [PATCH v1 1/6] net: phy: broadcom: add bcm54220 phy ID
-In-Reply-To: <CAGVrzcak2u_kBg1o061OO0UK8sdrXaKF+-7eREwByD-dQ1r1XQ@mail.gmail.com>
-References: <1439962444-27486-1-git-send-email-b38611@freescale.com>
- <1439962444-27486-2-git-send-email-b38611@freescale.com>
- <CAGVrzcak2u_kBg1o061OO0UK8sdrXaKF+-7eREwByD-dQ1r1XQ@mail.gmail.com>
-Message-ID: <BN3PR0301MB12198F2E8A1D508EE4FB0419F5660@BN3PR0301MB1219.namprd03.prod.outlook.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 20 Aug 2015 09:59:27 +0800
+Subject: [PATCH v3 0/8] ARM: sunxi: Add Reduced Serial Bus support
+In-Reply-To: <20150819163232.GS10748@sirena.org.uk>
+References: <1439958009-14056-1-git-send-email-wens@csie.org>
+ <20150819163232.GS10748@sirena.org.uk>
+Message-ID: <CAGb2v66X-CMQiS1dNqhwamTsVbnf+7siSTV3xGwn-C91Zhw3uA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Florian Fainelli <f.fainelli@gmail.com> Sent: Thursday, August 20, 2015 5:29 AM
-> To: Duan Fugang-B38611
-> Cc: shawnguo at kernel.org; David Miller; netdev; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [PATCH v1 1/6] net: phy: broadcom: add bcm54220 phy ID
-> 
-> 2015-08-18 22:33 GMT-07:00 Fugang Duan <b38611@freescale.com>:
-> > Add bcm54220 phy ID entry.
-> 
-> This change itself is fine, but looking at the rest of your changes, we
-> are not adding an entry for this PHY in drivers/net/phy/broadcom.c, which
-> means that we will bind to the Generic PHY driver, and so this looks
-> sufficient, even with your fixup done in the subsequent patch.
-> 
+On Thu, Aug 20, 2015 at 12:32 AM, Mark Brown <broonie@kernel.org> wrote:
+> On Wed, Aug 19, 2015 at 12:20:01PM +0800, Chen-Yu Tsai wrote:
+>> Hi everyone,
+>>
+>> This is my third attempt at adding support for Allwinner's Reduced
+>> Serial Bus (RSB), which is used to communicate with PMICs and other
+>> peripherals on their newer SoCs, such as the A23/A33/A80.
+>
+> This is flagged as something that is specific to the Allwinner SoCs.
+> Why add generic regmap support rather than just implement the regmap
+> reg_read() and reg_write() in a regmap in the controller driver?  Are
+> there expected to be other controller drivers from other vendors?
 
-Thanks for your comment.
+I don't expect there to be any other controller drivers. And it seems
+at least some of the devices are dual interface (I2C/RSB). Though I
+don't see how its connected to the generic regmap support. Regmap
+is for device drivers connected to the RSB bus, not the bus controller
+itself.
 
-Yes, for the phy, the driver use generic phy driver. 
-I see all Broadcom phy ID are defined in this file, we shouldn't define new phy id in other place.
-When the phy is used more popular, I think the patch is very reasonable.
+That said, there are a few RSB mfd slave devices that need support,
+those being the later AXP series PMICs, and AC100/AC200 audio-codec/RTC
+chips. The current axp20x driver already uses i2c regmaps.
 
-> >
-> > Signed-off-by: Fugang Duan <B38611@freescale.com>
-> > ---
-> >  include/linux/brcmphy.h | 1 +
-> >  1 file changed, 1 insertion(+)
-> >
-> > diff --git a/include/linux/brcmphy.h b/include/linux/brcmphy.h index
-> > 697ca77..20bed15 100644
-> > --- a/include/linux/brcmphy.h
-> > +++ b/include/linux/brcmphy.h
-> > @@ -16,6 +16,7 @@
-> >  #define PHY_ID_BCM5482                 0x0143bcb0
-> >  #define PHY_ID_BCM5411                 0x00206070
-> >  #define PHY_ID_BCM5421                 0x002060e0
-> > +#define PHY_ID_BCM54220                        0x600d8589
-> >  #define PHY_ID_BCM5464                 0x002060b0
-> >  #define PHY_ID_BCM5461                 0x002060c0
-> >  #define PHY_ID_BCM54616S               0x03625d10
-> > --
-> > 1.9.1
-> >
-> >
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-> 
-> 
-> --
-> Florian
+I could throw all the RSB-related stuff together, presumably under
+drivers/soc/sunxi/rsb, though that doesn't help the fact that common
+regmap code would be  better than scattering regmap_* in various mfd
+drivers.
+
+
+Regards
+ChenYu
