@@ -1,79 +1,126 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Thu, 20 Aug 2015 03:18:30 -0500
-Subject: [PATCH v3 13/14] drm: bridge/analogix_dp: move hpd detect to
- connector detect function
-In-Reply-To: <6E5CEF9B-19D4-4AC4-B5B1-BC667979302D@gmail.com>
-References: <1439995728-18046-1-git-send-email-ykk@rock-chips.com>
- <1439995939-18770-1-git-send-email-ykk@rock-chips.com>
- <6E5CEF9B-19D4-4AC4-B5B1-BC667979302D@gmail.com>
-Message-ID: <55D58D56.5070505@rock-chips.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Thu, 20 Aug 2015 10:27:23 +0200
+Subject: [PATCH v7 3/6] PCI: designware: Add ARM64 support
+In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E01D8139B@lhreml503-mbs>
+References: <1439812554-180426-1-git-send-email-wangzhou1@hisilicon.com>
+ <1439812554-180426-4-git-send-email-wangzhou1@hisilicon.com>
+ <1439988852.31432.15.camel@pengutronix.de>
+ <EE11001F9E5DDD47B7634E2F8A612F2E01D81315@lhreml503-mbs>
+ <1439998622.31432.44.camel@pengutronix.de>
+ <EE11001F9E5DDD47B7634E2F8A612F2E01D8139B@lhreml503-mbs>
+Message-ID: <1440059243.31432.59.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jingoo,
+Hi Gab,
 
-On 08/20/2015 02:49 AM, Jingoo Han wrote:
-> On 2015. 8. 19., at PM 11:52, Yakir Yang <ykk@rock-chips.com> wrote:
->
-> What is the reason to make this patch?
->
-> Please make commit message including the reason.
+Am Mittwoch, den 19.08.2015, 16:34 +0000 schrieb Gabriele Paoloni:
+> Hi Lucas
+> 
+> First of all many thanks for the quick reply, really appreciated
+> 
+> > -----Original Message-----
+> > From: Lucas Stach [mailto:l.stach at pengutronix.de]
+> > Sent: Wednesday, August 19, 2015 4:37 PM
+> > To: Gabriele Paoloni
+> > Cc: Wangzhou (B); Bjorn Helgaas; jingoohan1 at gmail.com; Pratyush Anand;
+> > Arnd Bergmann; linux at arm.linux.org.uk; thomas.petazzoni at free-
+> > electrons.com; lorenzo.pieralisi at arm.com; james.morse at arm.com;
+> > Liviu.Dudau at arm.com; jason at lakedaemon.net; robh at kernel.org; linux-
+> > pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> > devicetree at vger.kernel.org; Yuanzhichang; Zhudacai; zhangjukuo;
+> > qiuzhenfa; liudongdong (C); qiujiang; xuwei (O); Liguozhu (Kenneth)
+> > Subject: Re: [PATCH v7 3/6] PCI: designware: Add ARM64 support
+> > 
+> > Hi Gab,
+> > 
+> > Am Mittwoch, den 19.08.2015, 15:16 +0000 schrieb Gabriele Paoloni:
+> > > Hi Lucas
+> > >
+> > > I have rewritten the patch to take into account multiple controllers.
+> > >
+> > > As you can see now there is a static var in dw_pcie_host_init() that
+> > tracks
+> > > the bus numbers used.
+> > 
+> > This is wrong. The DT specifies the valid bus number range. You can not
+> > just assign the next free bus number to the root bus.
+> 
+> I think this is what is being done in
+> http://lxr.free-electrons.com/source/arch/arm/kernel/bios32.c#L495
+> and currently designware assigns the root bus number in
+> http://lxr.free-electrons.com/source/drivers/pci/host/pcie-designware.c#L730
+> 
+You found the right spot. It works a bit different than I remember, but
+is less broken than your current code. :)
 
-Okay, I think the below words would be okay :)
+It actually assigns the next instance a root bus number behind the
+current instances bus range. Please note the difference to your code
+which assigns the next free bus number, which may still lay within the
+current instances bus range.
 
-"This change just make a little clean to make code more like
-drm core expect, move hdp detect code from bridge->enable(),
-and place them into connector->detect()."
+> 
+> In general I agree with you but if you look at all the current drivers 
+> based on designware none of them define the "bus-range" dtb property.
+> Therefore doing as you say would break the current driver when we have
+> multiple controllers...am I right?
+> 
+The current _code_ works fine for multiple controllers. It's just that
+you must define the bus range property in the DTB if you want to enable
+multiple instances of one controller and support a kernel without PCI
+domains support. As all current implementations have only a single
+instance of the controller per SoC, or depend on PCI domain support,
+it's totally fine for them to not define the bus ranges property, as
+it's an optional property and it is well defined how things behave if it
+is absent. We absolutely need to keep that specified behavior.
 
-Thanks,
-- Yakir
+> If that is the case in order to fix this in the way you say I would need
+> to assign "bus-range" for all the PCIe drivers with multiple controllers:
+> in this case I would split the default range evenly (that is, if we have 
+> two controllers I would define "bus-range"  0-127 and 128-255)
+> 
+> If you think this solution is ok I can go for it. My only doubt was about
+> touching other vendors DTBs....
+> 
+You don't need to touch any of the current DTBs, as they are fine with
+the default bus range behavior. You need to keep the specified behavior
+of the bus range property with the new code.
 
-> Best regards,
-> Jingoo Han
->
->> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
->> ---
->> Changes in v3:
->> - move dp hpd detect to connector detect function.
->>
->> Changes in v2: None
->>
->> drivers/gpu/drm/bridge/analogix_dp_core.c | 12 ++++++------
->> 1 file changed, 6 insertions(+), 6 deletions(-)
->>
->> diff --git a/drivers/gpu/drm/bridge/analogix_dp_core.c b/drivers/gpu/drm/bridge/analogix_dp_core.c
->> index 75dd44a..052b9b3 100644
->> --- a/drivers/gpu/drm/bridge/analogix_dp_core.c
->> +++ b/drivers/gpu/drm/bridge/analogix_dp_core.c
->> @@ -915,12 +915,6 @@ static void analogix_dp_commit(struct analogix_dp_device *dp)
->>             DRM_ERROR("failed to disable the panel\n");
->>     }
->>
->> -    ret = analogix_dp_detect_hpd(dp);
->> -    if (ret) {
->> -        /* Cable has been disconnected, we're done */
->> -        return;
->> -    }
->> -
->>     ret = analogix_dp_handle_edid(dp);
->>     if (ret) {
->>         dev_err(dp->dev, "unable to handle edid\n");
->> @@ -953,6 +947,12 @@ static void analogix_dp_commit(struct analogix_dp_device *dp)
->> static enum drm_connector_status analogix_dp_detect(
->>                 struct drm_connector *connector, bool force)
->> {
->> +    struct analogix_dp_device *dp = connector_to_dp(connector);
->> +
->> +    if (analogix_dp_detect_hpd(dp))
->> +        /* Cable has been disconnected, we're done */
->> +        return connector_status_disconnected;
->> +
->>     return connector_status_connected;
->> }
->>
->> -- 
->> 1.9.1
->>
->>
->
->
+Regards,
+Lucas
+> 
+> > 
+> > It is perfectly valid to have a bus range of 0x00-0x10 assigned to one
+> > instance and 0x50-0xff to the next instance. Additional with PCIe
+> > hotplug you may not use the full range of the bus numbers on one
+> > instance at the first scan, but only later populate more buses when
+> > more
+> > bridges are added to the tree.
+> > 
+> > > Drivers that do not specify the bus range in the DTB set pp-
+> > >root_bus_nr = DW_ROOT_NR_UNDEFINED.
+> > > Designware will check if the flag is set and will use the automatic
+> > bus range
+> > > assignment.
+> > 
+> > No, please lets get rid of this assignment altogether. The glue drivers
+> > have no business in assigning the bus range. Please remove the
+> > pp->root_bus_nr assignment from all the glue drivers.
+> > 
+> > "bus range" is a generic DW PCIe property, so just parse the root bus
+> > number from the DT, it is handled the same way for all the DW based
+> > PCIe
+> > drivers. The bindings specifies that if the bus range property is
+> > missing the range is 0x00-0xff, so you can default to 0 as the root bus
+> > number in that case.
+> > 
+> > Also I would think this conversion warrants a patch on its own and
+> > should not be mixed in the ARM64 support patch.
+> > 
+> > Regards,
+> > Lucas
+> > 
+
+-- 
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
