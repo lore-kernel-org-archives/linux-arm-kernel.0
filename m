@@ -1,35 +1,37 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Thu, 20 Aug 2015 08:20:26 +0200
-Subject: [PATCH v4 1/2] Documentation: dt: Add Xilinx zynqmp dma device
- tree binding documentation
-In-Reply-To: <20150820061831.GB13546@localhost>
-References: <1438831173-8761-1-git-send-email-punnaia@xilinx.com>
- <20150820055255.GZ13546@localhost>
- <CAGnW=BbjdAUf5SgRXvNNoamhuVjKC4miBUGSiV_s4+Byb0nzog@mail.gmail.com>
- <20150820061831.GB13546@localhost>
-Message-ID: <55D571AA.1090102@xilinx.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu, 20 Aug 2015 08:23:27 +0200
+Subject: [PATCH 2/3] ARM: dts: sun6i: Turn on gmac on Colombus
+In-Reply-To: <20150819151754.GH30520@lukather>
+References: <1438960955-6551-1-git-send-email-hdegoede@redhat.com>
+ <1438960955-6551-2-git-send-email-hdegoede@redhat.com>
+ <20150819151754.GH30520@lukather>
+Message-ID: <55D5725F.6000106@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/20/2015 08:18 AM, Vinod Koul wrote:
-> On Thu, Aug 20, 2015 at 11:41:33AM +0530, punnaiah choudary kalluri wrote:
->>>> +- interrupts: Should contain DMA channel interrupt
->>> channel interrupt or interrupts, former says it is plural
+Hi,
+
+On 08/19/2015 05:17 PM, Maxime Ripard wrote:
+> On Fri, Aug 07, 2015 at 05:22:34PM +0200, Hans de Goede wrote:
+>> We've everything we need to support the gmac on Colombus, turn it on.
 >>
->> ZynqMP DMA has single interrupt for each channel So, that is the reason
->> i have explicitly mentioned it as interrupt ( not interrupts).
->>
->> Please let me know if you still want it to be plural.
-> 
-> The example had multiple values so plural sounds right
-> 
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>
+> I recall that the phy was powered by one of the AXP221 regulators,
+> does it require some additional stuff (like a recent u-boot), or does
+> it just work and my memory is bad :) ?
 
-I expect you are talking about this "interrupts = <0 117 4>;"
+I think it just works, it MAY be connected to aldo1 but according to
+the git history for the u-boot defconfig that one is used for wifi not
+for the gmac, and we do not enable any other "spare" regulators in the
+u-boot config.
 
-It is 3 cells format used on ARM based on gic spec which is on SPI
-interrupt 117 active high level-sensitive
+I do not have any schematics, so no way to say for sure.
 
-Documentation/devicetree/bindings/arm/gic.txt
+I can confirm that the GMAC work fine with the latest u-boot
+master. Looking in the history we've always enabled ALDO1
+on the Colombus in upstream u-boot, so this should all just work.
 
-Thanks,
-Michal
+Regards,
+
+Hans
