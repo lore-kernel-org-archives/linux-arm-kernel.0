@@ -1,30 +1,39 @@
-From: roger.pau@citrix.com (=?UTF-8?B?Um9nZXIgUGF1IE1vbm7DqQ==?=)
-Date: Thu, 20 Aug 2015 09:33:12 +0200
-Subject: [PATCH v3 08/20] block/xen-blkfront: split get_grant in 2
-In-Reply-To: <1438966019-19322-9-git-send-email-julien.grall@citrix.com>
-References: <1438966019-19322-1-git-send-email-julien.grall@citrix.com>
- <1438966019-19322-9-git-send-email-julien.grall@citrix.com>
-Message-ID: <55D582B8.5030602@citrix.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu, 20 Aug 2015 09:36:33 +0200
+Subject: [linux-sunxi] Re: [PATCH 4/6] ARM: dts: sun7i: Enable USB DRC on
+ pcDuino 3
+In-Reply-To: <20150820064545.GM30520@lukather>
+References: <1439563477-12295-1-git-send-email-hdegoede@redhat.com>
+ <1439563477-12295-5-git-send-email-hdegoede@redhat.com>
+ <20150820064545.GM30520@lukather>
+Message-ID: <55D58381.7040801@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-El 07/08/15 a les 18.46, Julien Grall ha escrit:
-> Prepare the code to support 64KB page granularity. The first
-> implementation will use a full Linux page per indirect and persistent
-> grant. When non-persistent grant is used, each page of a bio request
-> may be split in multiple grant.
-> 
-> Furthermore, the field page of the grant structure is only used to copy
-> data from persistent grant or indirect grant. Avoid to set it for other
-> use case as it will have no meaning given the page will be split in
-> multiple grant.
-> 
-> Provide 2 functions, to setup indirect grant, the other for bio page.
-> 
-> Signed-off-by: Julien Grall <julien.grall@citrix.com>
+Hi,
 
-Thanks, this looks fine:
+On 08/20/2015 08:45 AM, Maxime Ripard wrote:
+> On Fri, Aug 14, 2015 at 04:44:35PM +0200, Hans de Goede wrote:
+>> From: Jelle van der Waa <jelle@vdwaa.nl>
+>>
+>> Enable the otg/drc usb controller on the pcDuino 3.
+>>
+>> Note this board has the otg-vbus connected directly to the 5v-dcc of
+>> the board, so there is no vbus0 regulator, nor vbus0-det.
+>
+> Can it do OTG then?
 
-Acked-by: Roger Pau Monn? <roger.pau@citrix.com>
+Yes.
 
-Roger.
+> If VBUS is tied to the 5v, there's no way for the
+> board to shut it down when acting as peripheral, right?
+
+Correct, the idea is to power it over otg when using it
+as a peripheral, or at least power it from a usb port of
+the machine for which it is a peripheral. Note that the
+original cubieboard (both A10 and A20 versions) have the
+same issue.
+
+Regards,
+
+Hans
