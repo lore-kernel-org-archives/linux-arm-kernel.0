@@ -1,18 +1,26 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Thu, 20 Aug 2015 10:56:31 +0530
-Subject: [PATCH v1 1/4] dmaengine: Add support for new feature CRC32C
-In-Reply-To: <1438258268-3099-2-git-send-email-rsahu@apm.com>
-References: <1438258268-3099-1-git-send-email-rsahu@apm.com>
- <1438258268-3099-2-git-send-email-rsahu@apm.com>
-Message-ID: <20150820052631.GW13546@localhost>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Thu, 20 Aug 2015 13:29:03 +0800
+Subject: un4i-ss-cipher.c warning
+In-Reply-To: <CAOMqctShdb9xEkBmuaQKfB1cwGupbfH5TS5ZB_P85Hwpn+4zAA@mail.gmail.com>
+References: <CAOMqctShdb9xEkBmuaQKfB1cwGupbfH5TS5ZB_P85Hwpn+4zAA@mail.gmail.com>
+Message-ID: <20150820052903.GA26031@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 30, 2015 at 05:41:05PM +0530, Rameshwar Prasad Sahu wrote:
-> This patch adds support for new feature CRC32C calculation in
-> dmaengine framework.
+On Wed, Aug 19, 2015 at 04:35:36PM +0200, Michal Suchanek wrote:
+> Hello,
+> 
+> when building a kernel with sunxi crypto driver as merged into the
+> sinxi-wip branch I get a compiler warning.
+> 
+> I am not sure this is the latest version of the driver. It does not
+> seem to be in mainline yet.
 
-Looks okay can you please update Documentation also
+The warning appears to be spurious as the code always ends up
+initialising todo before using it.
 
+Cheers,
 -- 
-~Vinod
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
