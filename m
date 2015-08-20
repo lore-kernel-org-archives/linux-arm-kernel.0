@@ -1,40 +1,37 @@
 From: david.vrabel@citrix.com (David Vrabel)
-Date: Thu, 20 Aug 2015 10:51:51 +0100
-Subject: [Xen-devel] [PATCH v3 04/20] xen/grant: Introduce helpers to
- split a page into grant
-In-Reply-To: <1438966019-19322-5-git-send-email-julien.grall@citrix.com>
+Date: Thu, 20 Aug 2015 10:55:58 +0100
+Subject: [Xen-devel] [PATCH v3 11/20] tty/hvc: xen: Use xen page definition
+In-Reply-To: <1438966019-19322-12-git-send-email-julien.grall@citrix.com>
 References: <1438966019-19322-1-git-send-email-julien.grall@citrix.com>
- <1438966019-19322-5-git-send-email-julien.grall@citrix.com>
-Message-ID: <55D5A337.7090704@citrix.com>
+ <1438966019-19322-12-git-send-email-julien.grall@citrix.com>
+Message-ID: <55D5A42E.7070800@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 07/08/15 17:46, Julien Grall wrote:
-> Currently, a grant is always based on the Xen page granularity (i.e
-> 4KB). When Linux is using a different page granularity, a single page
-> will be split between multiple grants.
-> 
-> The new helpers will be in charge to split the Linux page into grants and
-> call a function given by the caller on each grant.
-> 
-> Also provide an helper to count the number of grants within a given
-> contiguous region.
-> 
-> Note that the x86/include/asm/xen/page.h is now including
-> xen/interface/grant_table.h rather than xen/grant_table.h. It's
-> necessary because xen/grant_table.h depends on asm/xen/page.h and will
-> break the compilation. Furthermore, only definition in
-> interface/grant_table.h was required.
+> The console ring is always based on the page granularity of Xen.
+[...]
+> --- a/drivers/tty/hvc/hvc_xen.c
+> +++ b/drivers/tty/hvc/hvc_xen.c
+> @@ -230,7 +230,7 @@ static int xen_hvm_console_init(void)
+>  	if (r < 0 || v == 0)
+>  		goto err;
+>  	gfn = v;
+> -	info->intf = xen_remap(gfn << PAGE_SHIFT, PAGE_SIZE);
+> +	info->intf = xen_remap(gfn << XEN_PAGE_SHIFT, PAGE_SIZE);
 
-Reviewed-by: David Vrabel <david.vrabel@citrix.com>
+You need XEN_PAGE_SIZE here I think...
 
-But...
+>  	if (info->intf == NULL)
+>  		goto err;
+>  	info->vtermno = HVC_COOKIE;
+> @@ -472,7 +472,7 @@ static int xencons_resume(struct xenbus_device *dev)
+>  	struct xencons_info *info = dev_get_drvdata(&dev->dev);
+>  
+>  	xencons_disconnect_backend(info);
+> -	memset(info->intf, 0, PAGE_SIZE);
+> +	memset(info->intf, 0, XEN_PAGE_SIZE);
 
-> +/* Helper to get to call fn only on the first "grant chunk" */
-> +static inline void gnttab_one_grant(struct page *page, unsigned int offset,
-> +				    unsigned len, xen_grant_fn_t fn,
-> +				    void *data)
-
-...call this gnttab_for_one_grant().
+...particularly since you use it here.
 
 David
