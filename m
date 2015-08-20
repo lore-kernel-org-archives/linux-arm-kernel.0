@@ -1,31 +1,31 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 20 Aug 2015 10:05:35 -0700
-Subject: [PATCH v3 3/8] rsb: Linux driver framework for Reduced Serial
- Bus (RSB)
-In-Reply-To: <1439958009-14056-4-git-send-email-wens@csie.org>
-References: <1439958009-14056-1-git-send-email-wens@csie.org>
- <1439958009-14056-4-git-send-email-wens@csie.org>
-Message-ID: <20150820170535.GC12027@sirena.org.uk>
+From: vichy.kuo@gmail.com (vichy)
+Date: Fri, 21 Aug 2015 01:09:23 +0800
+Subject: is it possible to liimit the softirq re entrance times
+Message-ID: <CAOVJa8FfHWGVf=ccXFCyTUD5YHrMAAeQ9Tkg1ipHA=J_CyVAHQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 19, 2015 at 12:20:04PM +0800, Chen-Yu Tsai wrote:
+After I tracing softirq flow in ARM platform, I have some colusion like below:
+1. softirq is running at the end of any irq context, when irq is eabled.
+2. as long as any Hard irq happen, softirq can be interrupt and reentrant
 
-> Reduced Serial Bus (RSB) is an Allwinner proprietery interface
-> used to communicate with PMICs and other peripheral ICs.
+My question are:
+1. in __do_sofiq, there is a jiffies setting to make sure the whole
+softirq will not took to long.
+But in my case is there any many hard irq happen like below
 
->  drivers/rsb/Kconfig    |  11 ++
->  drivers/rsb/Makefile   |   4 +
->  drivers/rsb/rsb-core.c | 511 +++++++++++++++++++++++++++++++++++++++++++++++++
+                        trace_softirq_entry(vec_nr);    ------a
+                        h->action(h);
+                        trace_softirq_exit(vec_nr);      ---------b
 
-Based on the changelog and what you were saying in your other mail about
-this being very Allwinner specific I think the current trend would be to
-put this into drivers/soc rather than making a new top level directory
-in drivers.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150820/1133c6fa/attachment.sig>
+from lttng, I see there 100 interrupt happen from entry to exit.
+
+is there kernel config or module parameter to let me down grade the
+hard irq count from 100  --> 80 or 90 and event can controlled me.
+I don't mean I control the count of hard irq, but I found this softirq
+is interrupt by 80 times.
+then I will not enable_irq until I finished the job.
+
+if no, isn't it possible to make starvation in above a and b?
+
+really appreciate ur kind help,
