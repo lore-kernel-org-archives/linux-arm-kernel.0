@@ -1,189 +1,151 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 20 Aug 2015 17:29:00 +0100
-Subject: [PATCH 22/25] KVM: arm/arm64: vgic: Prevent userspace injection of a
- mapped interrupt
-In-Reply-To: <1440088143-4722-1-git-send-email-marc.zyngier@arm.com>
-References: <1440088143-4722-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1440088143-4722-23-git-send-email-marc.zyngier@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 20 Aug 2015 18:35:17 +0200
+Subject: MUSB dual-role on AM335x behaving weirdly
+In-Reply-To: <20150818141334.GC9143@saruman.tx.rr.com>
+References: <20150514212653.GC3338@piout.net>
+ <CADYTM3baVqoEBdWoQb5JFyGR2_GKm1FHMYWST1YkZV=m=ZdycQ@mail.gmail.com>
+ <20150526145118.GD26599@saruman.tx.rr.com> <20150527094205.GO3199@piout.net>
+ <5594E56B.3040200@free-electrons.com>
+ <CADYTM3ZF5m++N1NqmOJoH5agbYrzpvSbLnuLVgttxwzdzwmGwQ@mail.gmail.com>
+ <55C0B954.3020106@free-electrons.com> <55C0CAC6.3020603@free-electrons.com>
+ <20150804193257.GF9623@saruman.tx.rr.com>
+ <55D326BD.2030706@free-electrons.com>
+ <20150818141334.GC9143@saruman.tx.rr.com>
+Message-ID: <55D601C5.40608@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Virtual interrupts mapped to a HW interrupt should only be triggered
-from inside the kernel. Otherwise, you could end up confusing the
-kernel (and the GIC's) state machine.
+Hi Felipe,
 
-Rearrange the injection path so that kvm_vgic_inject_irq is
-used for non-mapped interrupts, and kvm_vgic_inject_mapped_irq is
-used for mapped interrupts. The latter should only be called from
-inside the kernel (timer, irqfd).
+On 18/08/2015 16:13, Felipe Balbi wrote:
+> Hi,
+> 
+> On Tue, Aug 18, 2015 at 02:36:13PM +0200, Gregory CLEMENT wrote:
+>> Hi again Felipe,
+>>
+>> I sent this email again without the capture because it prevented to be delivered
+>> to the mailing lists.
+>>
+>> On 04/08/2015 21:32, Felipe Balbi wrote:
+>>> On Tue, Aug 04, 2015 at 04:23:02PM +0200, Gregory CLEMENT wrote:
+>>>> Hi again,
+>>>> On 04/08/2015 15:08, Gregory CLEMENT wrote:
+>>>>> Hi Bin,
+>>>>>
+>>>>> On 02/07/2015 19:05, Bin Liu wrote:
+>>>>>> Hi,
+>>>>>>
+>>>>>> On Thu, Jul 2, 2015 at 2:16 AM, Gregory CLEMENT
+>>>>>> <gregory.clement@free-electrons.com> wrote:
+>>>>>>> Hi Felipe,
+>>>>>>>
+>>>>>>> On 27/05/2015 11:42, Alexandre Belloni wrote:
+>>>>>>>> Hi,
+>>>>>>>>
+>>>>>>>> On 26/05/2015 at 09:51:18 -0500, Felipe Balbi wrote :
+>>>>>>>>> On Thu, May 14, 2015 at 04:36:33PM -0500, Bin Liu wrote:
+>>>>>>>>>> Alexandre,
+>>>>>>>>>>
+>>>>>>>>>> On Thu, May 14, 2015 at 4:26 PM, Alexandre Belloni
+>>>>>>>>>> <alexandre.belloni@free-electrons.com> wrote:
+>>>>>>>>>>> On 14/05/2015 at 16:16:12 -0500, Bin Liu wrote :
+>>>>>>>>>>>> I think I found the root cause of the problem: board design issue - I
+>>>>>>>>>>>> bet the custom board has too much cap on VBUS line. It should be <
+>>>>>>>>>>>> 10uF.
+>>>>>>>>>>>>
+>>>>>>>>>>>
+>>>>>>>>>>> We have a custom board that exhibits the issue but it only has a 100nF
+>>>>>>>>>>> cap on VBUS.
+>>>>>>>>>>
+>>>>>>>>>> Have you measured the VBUS discharging? Is there any way to share your
+>>>>>>>>>> schematics?
+>>>>>>>>>
+>>>>>>>>> Alexandre, any further comments ?
+>>>>>>>>>
+>>>>>>>>
+>>>>>>>> Yeah, I have just got more info.
+>>>>>>>>
+>>>>>>>> This is the relevant part of the schematic:
+>>>>>>>> http://free-electrons.com/~alexandre/usb.png
+>>>>>>>>
+>>>>>>>> The total VBUS capacitance is 200nF and the USB0 pins are connected
+>>>>>>>> directly to the AM3358 pins. U1 is actually not fitted.
+>>>>>>>>
+>>>>>>>> We didn't measure VBUS discharging but we observe the OTG pin sensing
+>>>>>>>> stops when plugging an OTG cable without any device.
+>>>>>>>
+>>>>>>> Do you have any news about this topic?
+>>>>>>>
+>>>>>>>
+>>>>>>> Is there something else that we can do to help solving this issue?
+>>>>>>
+>>>>>> In the case of CONFIG_USB_MUSB_DUAL_ROLE=y and dr_mode=otg, how is the
+>>>>>> gadget driver configured? It has to be a module not built-in.
+>>>>>
+>>>>> Indeed when I configured CONFIG_USB_MUSB_HDRC=m and CONFIG_USB_MUSB_DSPS=m
+>>>>> it worked seamless.
+>>>>>
+>>>>
+>>>> Actually it didn't worked. And now sometimes I even received continuously
+>>>> the following message:
+>>>>
+>>>>  musb_bus_suspend 2484: trying to suspend as a_wait_vfall while active
+>>>
+>>> this is likely because your VBUS hasn't dropped below 0.8V fast enough.
+>>>
+>>> I could only trigger this message in that situation. Use a scope to poke
+>>> at VBUS and see how long is takes to reach 0.8V, this could all be cause
+>>> by too much capacitance on VBUS line.
+>>
+>> We got some news:
+>> "The capacitance on VBUS due to components is 200nF and the additional parasitic
+>> capacitance will be much smaller than this"
+>>
+>> The rail discharge time is ~36ms when an USB drive is removed from the OTG adapter.
+>> I attached a capture of this.
+>>
+>> What do you think about these values?
+>>
+>>
+>> However, "there appears to be a considerable delay between the removal of a usb
+>> drive and the initiation of the VBUS discharge (maybe ~1 second, I wasn't able
+>> to measure this time)."
+> 
+> yeah, this is really weird. I can't think of anything that would make
+> VBUS discharge slower from a SW point of view. Once you remove the
+> cable, VBUS is physically removed and there's nothing else charging it.
 
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- include/kvm/arm_vgic.h |   2 +
- virt/kvm/arm/vgic.c    | 103 +++++++++++++++++++++++++++++++++----------------
- 2 files changed, 72 insertions(+), 33 deletions(-)
+I have more feedback about it: "When I look at it on the oscilloscope
+this isn't a 'slow discharge' like a slowly draining capacitor, it is
+a delay between the removal of a device and the initiation of the
+discharge.  The discharge itself is quite fast once it begins, it just
+seems as if the SOC/driver is taking a long time to notice the cable
+is disconnected. At this stage, this isn't actually a problem, just
+odd."
 
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index e789e47..d901f1a 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -350,6 +350,8 @@ void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu);
- void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu);
- int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int irq_num,
- 			bool level);
-+int kvm_vgic_inject_mapped_irq(struct kvm *kvm, int cpuid,
-+			       struct irq_phys_map *map, bool level);
- void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg);
- int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
- int kvm_vgic_vcpu_active_irq(struct kvm_vcpu *vcpu);
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index b553a8f..9eb489a 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -1555,7 +1555,8 @@ static int vgic_validate_injection(struct kvm_vcpu *vcpu, int irq, int level)
- }
- 
- static int vgic_update_irq_pending(struct kvm *kvm, int cpuid,
--				  unsigned int irq_num, bool level)
-+				   struct irq_phys_map *map,
-+				   unsigned int irq_num, bool level)
- {
- 	struct vgic_dist *dist = &kvm->arch.vgic;
- 	struct kvm_vcpu *vcpu;
-@@ -1563,6 +1564,9 @@ static int vgic_update_irq_pending(struct kvm *kvm, int cpuid,
- 	int enabled;
- 	bool ret = true, can_inject = true;
- 
-+	if (irq_num >= min(kvm->arch.vgic.nr_irqs, 1020))
-+		return -EINVAL;
-+
- 	spin_lock(&dist->lock);
- 
- 	vcpu = kvm_get_vcpu(kvm, cpuid);
-@@ -1625,18 +1629,46 @@ static int vgic_update_irq_pending(struct kvm *kvm, int cpuid,
- out:
- 	spin_unlock(&dist->lock);
- 
--	return ret ? cpuid : -EINVAL;
-+	if (ret) {
-+		/* kick the specified vcpu */
-+		kvm_vcpu_kick(kvm_get_vcpu(kvm, cpuid));
-+	}
-+
-+	return 0;
-+}
-+
-+static int vgic_lazy_init(struct kvm *kvm)
-+{
-+	int ret = 0;
-+
-+	if (unlikely(!vgic_initialized(kvm))) {
-+		/*
-+		 * We only provide the automatic initialization of the VGIC
-+		 * for the legacy case of a GICv2. Any other type must
-+		 * be explicitly initialized once setup with the respective
-+		 * KVM device call.
-+		 */
-+		if (kvm->arch.vgic.vgic_model != KVM_DEV_TYPE_ARM_VGIC_V2)
-+			return -EBUSY;
-+
-+		mutex_lock(&kvm->lock);
-+		ret = vgic_init(kvm);
-+		mutex_unlock(&kvm->lock);
-+	}
-+
-+	return ret;
- }
- 
- /**
-  * kvm_vgic_inject_irq - Inject an IRQ from a device to the vgic
-  * @kvm:     The VM structure pointer
-  * @cpuid:   The CPU for PPIs
-- * @irq_num: The IRQ number that is assigned to the device
-+ * @irq_num: The IRQ number that is assigned to the device. This IRQ
-+ *           must not be mapped to a HW interrupt.
-  * @level:   Edge-triggered:  true:  to trigger the interrupt
-  *			      false: to ignore the call
-- *	     Level-sensitive  true:  activates an interrupt
-- *			      false: deactivates an interrupt
-+ *	     Level-sensitive  true:  raise the input signal
-+ *			      false: lower the input signal
-  *
-  * The GIC is not concerned with devices being active-LOW or active-HIGH for
-  * level-sensitive interrupts.  You can think of the level parameter as 1
-@@ -1645,39 +1677,44 @@ out:
- int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int irq_num,
- 			bool level)
- {
--	int ret = 0;
--	int vcpu_id;
--
--	if (unlikely(!vgic_initialized(kvm))) {
--		/*
--		 * We only provide the automatic initialization of the VGIC
--		 * for the legacy case of a GICv2. Any other type must
--		 * be explicitly initialized once setup with the respective
--		 * KVM device call.
--		 */
--		if (kvm->arch.vgic.vgic_model != KVM_DEV_TYPE_ARM_VGIC_V2) {
--			ret = -EBUSY;
--			goto out;
--		}
--		mutex_lock(&kvm->lock);
--		ret = vgic_init(kvm);
--		mutex_unlock(&kvm->lock);
-+	struct irq_phys_map *map;
-+	int ret;
- 
--		if (ret)
--			goto out;
--	}
-+	ret = vgic_lazy_init(kvm);
-+	if (ret)
-+		return ret;
- 
--	if (irq_num >= min(kvm->arch.vgic.nr_irqs, 1020))
-+	map = vgic_irq_map_search(kvm_get_vcpu(kvm, cpuid), irq_num);
-+	if (map)
- 		return -EINVAL;
- 
--	vcpu_id = vgic_update_irq_pending(kvm, cpuid, irq_num, level);
--	if (vcpu_id >= 0) {
--		/* kick the specified vcpu */
--		kvm_vcpu_kick(kvm_get_vcpu(kvm, vcpu_id));
--	}
-+	return vgic_update_irq_pending(kvm, cpuid, NULL, irq_num, level);
-+}
- 
--out:
--	return ret;
-+/**
-+ * kvm_vgic_inject_mapped_irq - Inject a physically mapped IRQ to the vgic
-+ * @kvm:     The VM structure pointer
-+ * @cpuid:   The CPU for PPIs
-+ * @map:     Pointer to a irq_phys_map structure describing the mapping
-+ * @level:   Edge-triggered:  true:  to trigger the interrupt
-+ *			      false: to ignore the call
-+ *	     Level-sensitive  true:  raise the input signal
-+ *			      false: lower the input signal
-+ *
-+ * The GIC is not concerned with devices being active-LOW or active-HIGH for
-+ * level-sensitive interrupts.  You can think of the level parameter as 1
-+ * being HIGH and 0 being LOW and all devices being active-HIGH.
-+ */
-+int kvm_vgic_inject_mapped_irq(struct kvm *kvm, int cpuid,
-+			       struct irq_phys_map *map, bool level)
-+{
-+	int ret;
-+
-+	ret = vgic_lazy_init(kvm);
-+	if (ret)
-+		return ret;
-+
-+	return vgic_update_irq_pending(kvm, cpuid, map, map->virt_irq, level);
- }
- 
- static irqreturn_t vgic_maintenance_handler(int irq, void *data)
+While working on this issue we found that the
+tg_state_a_wait_vrise_timeout case seemed not managed by musb_dsps
+driver. I've just submitted a patch for it:
+https://lkml.org/lkml/2015/8/20/507
+
+I made most of my test on a 3.17 kernel and today by using a 4.1
+kernel with the patch I have submitted I didn't manage to reproduce
+the issue. I saw that since 3.17, there were some patches related to
+the babble interrupts; so maybe it was enough to fix the issue we saw.
+It is still weird because one month ago I also tested with a 4.1
+kernel and I had issues...
+
+It needs more testing to see if it is really fixed because the issue
+comes only time to time. I will keep you inform about our last tests.
+
+
+Thanks,
+
+Gregory
+
+
 -- 
-2.1.4
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
