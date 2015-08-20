@@ -1,42 +1,55 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Thu, 20 Aug 2015 08:58:37 +0200
-Subject: [PATCH 5/5] drivers/tty: make serial 8250_lpc18xx.c Kconfig a
- tristate
-In-Reply-To: <1440020889-12120-6-git-send-email-paul.gortmaker@windriver.com>
-References: <1440020889-12120-1-git-send-email-paul.gortmaker@windriver.com>
- <1440020889-12120-6-git-send-email-paul.gortmaker@windriver.com>
-Message-ID: <CAGhQ9VzWBq=gqHhkhfm+2MwaOHDzLKDLo8v1CJX3N-xiZnCv=g@mail.gmail.com>
+From: rsahu@apm.com (Rameshwar Sahu)
+Date: Thu, 20 Aug 2015 12:31:44 +0530
+Subject: [PATCH v1 3/4] Crypto: Add support for APM X-Gene SoC CRC32C h/w
+ accelerator driver
+In-Reply-To: <20150820054828.GY13546@localhost>
+References: <1438258268-3099-1-git-send-email-rsahu@apm.com>
+ <1438258268-3099-4-git-send-email-rsahu@apm.com>
+ <20150820054828.GY13546@localhost>
+Message-ID: <CAFd313xG2_4NGHspuJwThY=jUSPiBm3egvXVvhv8XxKctgMv1A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 August 2015 at 23:48, Paul Gortmaker <paul.gortmaker@windriver.com> wrote:
-> The Kconfig currently controlling compilation of this code is:
+Hi Vinod,
+
+On Thu, Aug 20, 2015 at 11:18 AM, Vinod Koul <vinod.koul@intel.com> wrote:
+> On Thu, Jul 30, 2015 at 05:41:07PM +0530, Rameshwar Prasad Sahu wrote:
+>> +     nents = sg_nents(req->src);
+>> +     sg_count = dma_map_sg(dev, req->src, nents, DMA_TO_DEVICE);
+>> +     if (!sg_count) {
+>> +             dev_err(dev, "Failed to map src sg");
+>> +             return -ENOMEM;
+> mapping error shouldn't be no mem error
+Okay, I guess then -EIO will be fine here??
 >
-> 8250/Kconfig:config SERIAL_8250_LPC18XX
-> 8250/Kconfig:        bool "NXP LPC18xx/43xx serial port support"
+>> +     }
+>> +
+>> +     if (sg_count > XGENE_DMA_MAX_FLYBY_SRC_CNT) {
+>> +             dev_err(dev, "Unsupported src sg len\n");
+> would be worth printing length
+Okay,
 >
-> ...meaning that it currently is not being built as a module by anyone.
+>> +             goto err;
+>> +     }
+>> +
+>> +     flags = DMA_CTRL_ACK;
+> why ACK?
+My understanding about DMA_CTRL_ACK is dma engine driver can
+re-use/free this descriptor once operation completed in cleanup path.
+Am I correct ??
+But yes, I need to look on this because recently you have added one
+more descriptor flag.
+
 >
-> When targetting orphaned modular code in non-modular drivers, this
-> came up.  Joachim indicated that the driver was actually meant to
-> be tristate but ended up bool by accident.  So here we make it
-> tristate instead of removing the modular code that was essentially
-> orphaned.
+>> +
+>> +     tx = dchan->device->device_prep_dma_crc32c(dchan, req->src,
+>> +                                                req->nbytes,
+>> +                                                reqctx->seed,
+>> +                                                req->result,
+>> +                                                flags);
+> We should add helper for this
+Okay
 >
-> Suggested-by: Joachim Eastwood <manabian@gmail.com>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: Jiri Slaby <jslaby@suse.com>
-> Cc: Joachim Eastwood <manabian@gmail.com>
-> Cc: linux-serial at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
-
-Acked-by: Joachim Eastwood <manabian@gmail.com>
-
-Build tested as a module on lpc18xx.
-
-Thanks for fixing it Paul.
-
-
-regards,
-Joachim Eastwood
+> --
+> ~Vinod
+>
