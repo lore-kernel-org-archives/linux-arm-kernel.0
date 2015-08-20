@@ -1,53 +1,50 @@
 From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Thu, 20 Aug 2015 17:07:47 +0530
-Subject: [PATCH 3/5] ARM: EXYNOS: DTS: add SROM device node for exynos4
-In-Reply-To: <5565B24F.9060601@samsung.com>
+Date: Thu, 20 Aug 2015 17:09:45 +0530
+Subject: [PATCH 5/5] Documentation: dt-bindings: add exynos-srom binding
+ information
+In-Reply-To: <CAJKOXPfpu+k-3u3kFzeKL4b9bkh+iwWHak2ea+9QLtGUEZGWdA@mail.gmail.com>
 References: <1430296712-10287-1-git-send-email-pankaj.dubey@samsung.com>
- <1430296712-10287-4-git-send-email-pankaj.dubey@samsung.com>
- <5565B24F.9060601@samsung.com>
-Message-ID: <55D5BC0B.2010203@samsung.com>
+ <1430296712-10287-6-git-send-email-pankaj.dubey@samsung.com>
+ <CAJKOXPfpu+k-3u3kFzeKL4b9bkh+iwWHak2ea+9QLtGUEZGWdA@mail.gmail.com>
+Message-ID: <55D5BC81.9050304@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Krzysztof,
 
-
-On Wednesday 27 May 2015 05:32 PM, Krzysztof Kozlowski wrote:
-> W dniu 29.04.2015 o 17:38, Pankaj Dubey pisze:
->> Add SROM device node for exynos4.
->
-> Subject prefix: "ARM: dts:"
->
-Ok.
+On Wednesday 27 May 2015 04:51 PM, Krzysztof Kozlowski wrote:
+> 2015-04-29 17:38 GMT+09:00 Pankaj Dubey <pankaj.dubey@samsung.com>:
+>> This patch adds exynos-srom binding information for SROM Controller
+>> driver on Exynos SoCs.
 >>
 >> CC: Rob Herring <robh+dt@kernel.org>
 >> CC: Mark Rutland <mark.rutland@arm.com>
 >> CC: Ian Campbell <ijc+devicetree@hellion.org.uk>
 >> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
 >> ---
->>   arch/arm/boot/dts/exynos4.dtsi | 5 +++++
->>   1 file changed, 5 insertions(+)
+>>   .../devicetree/bindings/arm/samsung/exynos-srom.txt          | 12 ++++++++++++
+>>   1 file changed, 12 insertions(+)
+>>   create mode 100644 Documentation/devicetree/bindings/arm/samsung/exynos-srom.txt
 >>
->> diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
->> index 77ea547..48490ea 100644
->> --- a/arch/arm/boot/dts/exynos4.dtsi
->> +++ b/arch/arm/boot/dts/exynos4.dtsi
->> @@ -76,6 +76,11 @@
->>   		reg = <0x10000000 0x100>;
->>   	};
->>
->> +	sromc at 12570000 {
->> +		compatible = "samsung,exynos-srom";
->> +		reg = <0x12570000 0x100>;
+>> diff --git a/Documentation/devicetree/bindings/arm/samsung/exynos-srom.txt b/Documentation/devicetree/bindings/arm/samsung/exynos-srom.txt
+>> new file mode 100644
+>> index 0000000..482d1cd
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/arm/samsung/exynos-srom.txt
+>> @@ -0,0 +1,12 @@
+>> +SAMSUNG Exynos SoCs SROM Controller driver.
+>> +
+>> +Required properties:
+>> +- compatible : Should at least contain "samsung,exynos-srom".
 >
-> There are 5 registers, so size of 0x100 seems to be bigger than needed.
-> Maybe limit it to actual length?
+> "At least" - do you already expect other compatibles?
 >
-Yes, we do not need size of 0x100. Will take care in next version.
+
+Nope, as of now I do not expect any other compatible, so I will change 
+this to "Should contain "samsung,exynos-srom"."
 
 Thanks,
 Pankaj Dubey
-
 > Best regards,
 > Krzysztof
 >
