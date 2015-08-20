@@ -1,63 +1,58 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Thu, 20 Aug 2015 14:44:49 +0200
-Subject: [RFC PATCH 0/3] New Atmel PIO4 pinctrl/gpio driver
-In-Reply-To: <20150820070507.GS5161@pengutronix.de>
-References: <1438355290-28255-1-git-send-email-ludovic.desroches@atmel.com>
- <20150805073117.GP5161@pengutronix.de>
- <20150810065334.GC2635@odux.rfo.atmel.com>
- <20150820070507.GS5161@pengutronix.de>
-Message-ID: <20150820124449.GB23434@odux.rfo.atmel.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 20 Aug 2015 13:50:35 +0100
+Subject: [PATCH 2/2] arm64: set MAX_MEMBLOCK_ADDR according to linear
+ region size
+In-Reply-To: <E830F411-141C-40C4-A608-7709304395C5@linaro.org>
+References: <1439890482-20798-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1439890482-20798-3-git-send-email-ard.biesheuvel@linaro.org>
+ <20150820091915.GC2972@e104818-lin.cambridge.arm.com>
+ <E830F411-141C-40C4-A608-7709304395C5@linaro.org>
+Message-ID: <20150820125035.GD2972@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 20, 2015 at 09:05:07AM +0200, Sascha Hauer wrote:
-> On Mon, Aug 10, 2015 at 08:53:34AM +0200, Ludovic Desroches wrote:
-> > Hi Sascha,
-> > 
-> > On Wed, Aug 05, 2015 at 09:31:17AM +0200, Sascha Hauer wrote:
-> > > On Fri, Jul 31, 2015 at 05:08:07PM +0200, Ludovic Desroches wrote:
-> > > > Hi,
-> > > > 
-> > > > Following our discussion, I send an RFC version of my driver. RFC because it is
-> > > > not totally achieved, some cleanup and feature addition is needed.
-> > > > 
-> > > > At least, we could discuss about the 'core' part. I have used the pinmux
-> > > > property as Mediatek driver. Patch 3 is the internal dt files we are using.
-> > > 
-> > > As you can imagine I am fine with the binding, so I can add my acked-by
-> > > once you send a non-RFC version.
-> > >
-> > 
-> > Great, I'm glad to hear that.
-> >  
-> > > The only thing I never understood is what's so special about GPIOs that
-> > > they have to bypass the pinctrl framework and instead a gpio_request
-> > > magically translates a gpio into a pin.
-> > 
-> > Not sure to really understand your concern here... Do you mean I could
-> > get rid of gpio_request_enable()?
+On Thu, Aug 20, 2015 at 01:54:40PM +0200, Ard Biesheuvel wrote:
 > 
-> I would expect a gpio to be a pin like every other pin, hence configured
-> via the pinctrl framework and not implicitly via gpio_request().
 > 
-
-It is not an issue to get rid of gpio_request_*(). I was thinking it was
-a bonus to provide it.
-
+> > On 20 aug. 2015, at 11:19, Catalin Marinas <catalin.marinas@arm.com> wrote:
 > > 
-> > > Wouldn't it make sense to at
-> > > least add the pins in their GPIO mode to
-> > > arch/arm/boot/dts/sama5d2-pinfunc.h?
+> >> On Tue, Aug 18, 2015 at 11:34:42AM +0200, Ard Biesheuvel wrote:
+> >> The linear region size of a 39-bit VA kernel is only 256 GB, which
+> >> may be insufficient to cover all of system RAM, even on platforms
+> >> that have much less than 256 GB of memory but which is laid out
+> >> very sparsely.
+> >> 
+> >> So make sure we clip the memory we will not be able to map before
+> >> installing it into the memblock memory table, by setting
+> >> MAX_MEMBLOCK_ADDR accordingly.
+> >> 
+> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> >> ---
+> >> arch/arm64/include/asm/memory.h | 8 ++++++++
+> >> 1 file changed, 8 insertions(+)
+> >> 
+> >> diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+> >> index f800d45ea226..44a59c20e773 100644
+> >> --- a/arch/arm64/include/asm/memory.h
+> >> +++ b/arch/arm64/include/asm/memory.h
+> >> @@ -114,6 +114,14 @@ extern phys_addr_t        memstart_addr;
+> >> #define PHYS_OFFSET        ({ memstart_addr; })
+> >> 
+> >> /*
+> >> + * The maximum physical address that the linear direct mapping
+> >> + * of system RAM can cover. (PAGE_OFFSET can be interpreted as
+> >> + * a 2's complement signed quantity and negated to derive the
+> >> + * maximum size of the linear mapping.)
+> >> + */
+> >> +#define MAX_MEMBLOCK_ADDR    ({ memstart_addr - PAGE_OFFSET - 1; })
 > > 
-> > It is done, PIN_PA0 could be used for this purpose.
+> > Would it be easier to understand as just memstart_addr + ~PAGE_OFFSET?
 > 
-> I would expect a define like:
-> 
-> #define PIN_PA3__GPIO                   PINMUX_PIN(PIN_PA3, 0, 2)
-> 
-> PIN_PAx only contains the pin number, but not the function.
+> Whichever you prefer
 
-Ok I can do this change for v2.
+Just leave it as it is, not sure it's any clearer. Basically the maximum
+size we can map is (0 - PAGE_OFFSET), so if we make the range inclusive,
+we get to memstart_addr - PAGE_OFFSET - 1.
 
-
-Ludovic
+-- 
+Catalin
