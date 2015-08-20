@@ -1,24 +1,34 @@
-From: davem@davemloft.net (David Miller)
-Date: Thu, 20 Aug 2015 14:05:31 -0700 (PDT)
-Subject: [PATCH v1 0/6] Add fec1 and fec2 support for i.MX7d sdb board
-In-Reply-To: <1439962444-27486-1-git-send-email-b38611@freescale.com>
-References: <1439962444-27486-1-git-send-email-b38611@freescale.com>
-Message-ID: <20150820.140531.1320709021949935376.davem@davemloft.net>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 20 Aug 2015 14:08:30 -0700
+Subject: [PATCH 1/9] spi: sunxi: fix transfer timeout
+In-Reply-To: <20150820193433.GH30520@lukather>
+References: <cover.1440080122.git.hramrach@gmail.com>
+ <0e0b52774a48ddb71dc8095b66942451cd31ff7d.1440080122.git.hramrach@gmail.com>
+ <20150820184132.GO12027@sirena.org.uk>
+ <20150820193433.GH30520@lukather>
+Message-ID: <20150820210830.GS12027@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fugang Duan <b38611@freescale.com>
-Date: Wed, 19 Aug 2015 13:33:58 +0800
+On Thu, Aug 20, 2015 at 09:34:33PM +0200, Maxime Ripard wrote:
+> On Thu, Aug 20, 2015 at 11:41:32AM -0700, Mark Brown wrote:
+> > On Thu, Aug 20, 2015 at 02:19:45PM -0000, Michal Suchanek wrote:
 
-> The patch series is to add fec support for i.MX7d sdb board. Since i.MX7d fec ip is
-> the same as i.MX6SX, so there have no change for driver itself.
-> 
-> Patch#1: add bcm54220 PHY ID entry into brcmphy.h file.
+> > >  drivers/spi/spi-sun4i.c | 10 +++++++++-
+> > >  drivers/spi/spi-sun6i.c | 10 +++++++++-
 
-This is completely, and utterly, pointless.
+> > Are we *sure* we can't work on merging these drivers :(
 
-The only reason a PHY ID should be defined in brcmphy.h is so that it can
-be used in the broadcom.c PHY driver or similar.
+> Those are two different IPs, that don't really share anything but
+> their author...
 
-If there is no user in the tree, there is no reason to add it to the
-header file.
+I seem to be seeing a number of changes like this one which make
+apparently very similar modifications to both.  Perhaps there is more
+core usage that should be happening instead?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150820/c5c0c589/attachment-0001.sig>
