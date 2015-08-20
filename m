@@ -1,37 +1,40 @@
 From: david.vrabel@citrix.com (David Vrabel)
-Date: Thu, 20 Aug 2015 10:55:58 +0100
-Subject: [Xen-devel] [PATCH v3 11/20] tty/hvc: xen: Use xen page definition
-In-Reply-To: <1438966019-19322-12-git-send-email-julien.grall@citrix.com>
+Date: Thu, 20 Aug 2015 10:59:57 +0100
+Subject: [Xen-devel] [PATCH v3 12/20] xen/balloon: Don't rely on the page
+ granularity is the same for Xen and Linux
+In-Reply-To: <1438966019-19322-13-git-send-email-julien.grall@citrix.com>
 References: <1438966019-19322-1-git-send-email-julien.grall@citrix.com>
- <1438966019-19322-12-git-send-email-julien.grall@citrix.com>
-Message-ID: <55D5A42E.7070800@citrix.com>
+ <1438966019-19322-13-git-send-email-julien.grall@citrix.com>
+Message-ID: <55D5A51D.2060106@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 07/08/15 17:46, Julien Grall wrote:
-> The console ring is always based on the page granularity of Xen.
+> For ARM64 guests, Linux is able to support either 64K or 4K page
+> granularity. Although, the hypercall interface is always based on 4K
+> page granularity.
+> 
+> With 64K page granularity, a single page will be spread over multiple
+> Xen frame.
+> 
+> To avoid splitting the page into 4K frame, take advantage of the
+> extent_order field to directly allocate/free chunk of the Linux page
+> size.
+> 
+> Note that PVMMU is only used for PV guest (which is x86) and the page
+> granularity is always 4KB. Some BUILD_BUG_ON has been added to ensure
+> that because the code has not been modified.
 [...]
-> --- a/drivers/tty/hvc/hvc_xen.c
-> +++ b/drivers/tty/hvc/hvc_xen.c
-> @@ -230,7 +230,7 @@ static int xen_hvm_console_init(void)
->  	if (r < 0 || v == 0)
->  		goto err;
->  	gfn = v;
-> -	info->intf = xen_remap(gfn << PAGE_SHIFT, PAGE_SIZE);
-> +	info->intf = xen_remap(gfn << XEN_PAGE_SHIFT, PAGE_SIZE);
+>  #ifdef CONFIG_XEN_HAVE_PVMMU
+> +		/* We don't support PV MMU when Linux and Xen is using
+> +		 * different page granularity.
+> +		 */
+> +		BUILD_BUG_ON(XEN_PAGE_SIZE != PAGE_SIZE);
 
-You need XEN_PAGE_SIZE here I think...
+You don't need this BUILD_BUG_ON() twice.
 
->  	if (info->intf == NULL)
->  		goto err;
->  	info->vtermno = HVC_COOKIE;
-> @@ -472,7 +472,7 @@ static int xencons_resume(struct xenbus_device *dev)
->  	struct xencons_info *info = dev_get_drvdata(&dev->dev);
->  
->  	xencons_disconnect_backend(info);
-> -	memset(info->intf, 0, PAGE_SIZE);
-> +	memset(info->intf, 0, XEN_PAGE_SIZE);
+Otherwise,
 
-...particularly since you use it here.
+Reviewed-by: David Vrabel <david.vrabel@citrix.com>
 
 David
