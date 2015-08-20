@@ -1,31 +1,26 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 20 Aug 2015 16:27:44 -0700
-Subject: [PATCH] ARM: shmobile: remove Makefile.boot
-Message-ID: <1440113264-30359-1-git-send-email-horms+renesas@verge.net.au>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 20 Aug 2015 16:46:29 -0700
+Subject: [PATCH v2 0/4] regmap: i2c block support
+In-Reply-To: <1440064807-26346-1-git-send-email-mpa@pengutronix.de>
+References: <1440064807-26346-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <20150820234629.GB12027@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the only multiplatform boot is supported for all
-shmobile platforms Makefile.boot may be removed.
+On Thu, Aug 20, 2015 at 12:00:03PM +0200, Markus Pargmann wrote:
+> Hi,
+> 
+> This series adds support for i2c block read/writes. To support the maximum 32
+> byte read/write operations, the regmap core is extended by max_raw_read and
+> max_raw_write. bulk operations are splitted depending of the size of
+> max_raw_read/write.
 
-This seems correct to me given:
-* Setting MACHINE to no value in arch/arm/Makefile
-  if CONFIG_ARCH_MULTIPLATFORM is set
-* Not including Makefile.boot in arch/arm/boot/Makefile
-  if MACHINE has no value
-
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/Makefile.boot | 0
- 1 file changed, 0 insertions(+), 0 deletions(-)
- delete mode 100644 arch/arm/mach-shmobile/Makefile.boot
-
----
-
-Based on renesas-devel-20150820v2-v4.2-rc7
-
-diff --git a/arch/arm/mach-shmobile/Makefile.boot b/arch/arm/mach-shmobile/Makefile.boot
-deleted file mode 100644
-index e69de29bb2d1..000000000000
--- 
-2.1.4
+This looks basically fine but depends on the previous fixes series
+AFAICT.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150820/152cc54d/attachment.sig>
