@@ -1,40 +1,43 @@
-From: david.vrabel@citrix.com (David Vrabel)
-Date: Thu, 20 Aug 2015 10:59:57 +0100
-Subject: [Xen-devel] [PATCH v3 12/20] xen/balloon: Don't rely on the page
- granularity is the same for Xen and Linux
-In-Reply-To: <1438966019-19322-13-git-send-email-julien.grall@citrix.com>
-References: <1438966019-19322-1-git-send-email-julien.grall@citrix.com>
- <1438966019-19322-13-git-send-email-julien.grall@citrix.com>
-Message-ID: <55D5A51D.2060106@citrix.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Thu, 20 Aug 2015 12:00:03 +0200
+Subject: [PATCH v2 0/4] regmap: i2c block support
+Message-ID: <1440064807-26346-1-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/08/15 17:46, Julien Grall wrote:
-> For ARM64 guests, Linux is able to support either 64K or 4K page
-> granularity. Although, the hypercall interface is always based on 4K
-> page granularity.
-> 
-> With 64K page granularity, a single page will be spread over multiple
-> Xen frame.
-> 
-> To avoid splitting the page into 4K frame, take advantage of the
-> extent_order field to directly allocate/free chunk of the Linux page
-> size.
-> 
-> Note that PVMMU is only used for PV guest (which is x86) and the page
-> granularity is always 4KB. Some BUILD_BUG_ON has been added to ensure
-> that because the code has not been modified.
-[...]
->  #ifdef CONFIG_XEN_HAVE_PVMMU
-> +		/* We don't support PV MMU when Linux and Xen is using
-> +		 * different page granularity.
-> +		 */
-> +		BUILD_BUG_ON(XEN_PAGE_SIZE != PAGE_SIZE);
+Hi,
 
-You don't need this BUILD_BUG_ON() twice.
+This series adds support for i2c block read/writes. To support the maximum 32
+byte read/write operations, the regmap core is extended by max_raw_read and
+max_raw_write. bulk operations are splitted depending of the size of
+max_raw_read/write.
 
-Otherwise,
+These patches were included in the previous series "Regmap max_raw_io and
+bmc150 SPI support". The patches are based on "regmap: fixes".
 
-Reviewed-by: David Vrabel <david.vrabel@citrix.com>
+I am not able to perform any tests for the last patch of this series as I don't
+have hardware to test this on.
 
-David
+Changes in v2:
+- max_raw_io splitted into max_raw_read/write
+- Use E2BIG as error value in the block read/write functions
+
+Best Regards,
+
+Markus
+
+
+Markus Pargmann (4):
+  regmap: Introduce max_raw_read/write for regmap_bulk_read/write
+  regmap: regmap max_raw_read/write getter functions
+  regmap: Add raw_write/read checks for max_raw_write/read sizes
+  regmap-i2c: Add smbus i2c block support
+
+ drivers/base/regmap/internal.h   |   4 ++
+ drivers/base/regmap/regmap-i2c.c |  49 +++++++++++++++++
+ drivers/base/regmap/regmap.c     | 113 +++++++++++++++++++++++++++++++++------
+ include/linux/regmap.h           |   6 +++
+ 4 files changed, 157 insertions(+), 15 deletions(-)
+
+-- 
+2.4.6
