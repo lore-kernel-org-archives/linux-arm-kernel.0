@@ -1,23 +1,36 @@
-From: david.vrabel@citrix.com (David Vrabel)
-Date: Thu, 20 Aug 2015 11:11:23 +0100
-Subject: [Xen-devel] [PATCH v3 00/20] xen/arm64: Add support for 64KB page
-In-Reply-To: <55D521F2.5080504@citrix.com>
-References: <1438966019-19322-1-git-send-email-julien.grall@citrix.com>
- <55D521F2.5080504@citrix.com>
-Message-ID: <55D5A7CB.3070207@citrix.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 20 Aug 2015 11:13:22 +0100
+Subject: [PATCH v2 2/5] ACPI / ARM64: remove usage of
+ BAD_MADT_ENTRY/BAD_MADT_GICC_ENTRY
+In-Reply-To: <1440022048-6285-3-git-send-email-al.stone@linaro.org>
+References: <1440022048-6285-1-git-send-email-al.stone@linaro.org>
+ <1440022048-6285-3-git-send-email-al.stone@linaro.org>
+Message-ID: <20150820101322.GA19328@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/08/15 01:40, Julien Grall wrote:
-> Hi,
-> 
-> Ping? I'm missing some reviews on block and netfront code.
-> 
-> We'd like to see this series going in Linux 4.3. Some distributions
-> plans to use this version for aarch64 support. If we miss it, we won't
-> have any Xen guests support, even it's minimal, for Linux using 64KB
-> page granularity.
+Hi Al,
 
-This is too late for Linux 4.3.
+On Wed, Aug 19, 2015 at 11:07:25PM +0100, Al Stone wrote:
+> Now that we have introduced the bad_madt_entry() function, and that
+> function is being invoked in acpi_table_parse_madt() for us, there
+> is no longer any need to use the BAD_MADT_ENTRY macro, or in the case
+> of arm64, the BAD_MADT_GICC_ENTRY, too.
+> 
+> Signed-off-by: Al Stone <al.stone@linaro.org>
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> ---
+>  arch/arm64/include/asm/acpi.h | 8 --------
+>  arch/arm64/kernel/smp.c       | 2 --
+>  drivers/irqchip/irq-gic.c     | 6 ------
+>  3 files changed, 16 deletions(-)
 
-David
+How are you planning to merge this (and which kernel are you targetting?)
+You've got Acks for both arm64 and irqchip, so I guess either of those
+trees could take it.
+
+Will
