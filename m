@@ -1,32 +1,47 @@
-From: hramrach@gmail.com (Michal Suchanek)
-Date: Thu, 20 Aug 2015 21:45:07 +0200
-Subject: [PATCH 3/9] spi: sunxi: check that transfer speed is non-zero
-In-Reply-To: <20150820144836.GV30520@lukather>
-References: <cover.1440080122.git.hramrach@gmail.com>
- <3688fab67e7cdc7bcbff73dfd6b0fcdcc4e79eb6.1440080122.git.hramrach@gmail.com>
- <20150820144836.GV30520@lukather>
-Message-ID: <CAOMqctSfdxWeWDogzHxONE+Qxf7vp6rJnBmxECV89PQO0hXARg@mail.gmail.com>
+From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
+Date: Thu, 20 Aug 2015 16:51:36 -0300
+Subject: [PATCH v2 0/2] Add support for NXP LPC18xx PWM/SCT
+In-Reply-To: <1438828307-14641-1-git-send-email-ariel@vanguardiasur.com.ar>
+References: <1438828307-14641-1-git-send-email-ariel@vanguardiasur.com.ar>
+Message-ID: <CAAEAJfCyZUNadthZ_3-scqv0f8Rjf4dd=fg8Rhqt0xfdoDF9XQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 August 2015 at 16:48, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Thu, Aug 20, 2015 at 02:19:46PM -0000, Michal Suchanek wrote:
->> When the maximum transfer speed is not set for a SPI slave the value
->> remains 0 and the code in sunxi SPI divides by it. Use an arbitrary
->> speed instead in that case.
->>
->> Signed-off-by: Michal Suchanek <hramrach@gmail.com>
+Thierry,
+
+On 5 August 2015 at 23:31, Ariel D'Alessandro
+<ariel@vanguardiasur.com.ar> wrote:
+> This patch series adds support for NXP LPC18xx PWM/SCT.
 >
-> spi->max_speed_hz is set using the spi-max-frequency property, and
-> spi->will error out if that property isn't set. What am I missing?
+> NXP LPC SoCs family, which includes LPC18xx/LPC43xx, provides a State
+> Configurable Timer (SCT) which can be configured as a Pulse Width Modulator.
+> Other SoCs in that family may share the same hardware.
+>
+> Patchset is based on tag next-20150723 of the linux-next repository.
+> It has been successfully tested on a Hitex LPC4350 Evaluation Board.
+>
+> Changes since v1:
+> * Added "sct" in DT compatible string and driver's name.
+> * Allowed period changes when there's only one channel requested.
+>
+> Ariel D'Alessandro (2):
+>   pwm: NXP LPC18xx PWM/SCT driver
+>   DT: pwm: Add NXP LPC18xx PWM/SCT binding documentation
+>
+>  .../devicetree/bindings/pwm/lpc1850-sct-pwm.txt    |  20 +
+>  drivers/pwm/Kconfig                                |  12 +
+>  drivers/pwm/Makefile                               |   1 +
+>  drivers/pwm/pwm-lpc18xx-sct.c                      | 465 +++++++++++++++++++++
+>  4 files changed, 498 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pwm/lpc1850-sct-pwm.txt
+>  create mode 100644 drivers/pwm/pwm-lpc18xx-sct.c
+>
+> --
+> 1.9.1
 >
 
-Spidev I guess.
+Any news about this driver?
 
-You can set the speed to arbitrary value from userspace at any time
-using the spidev ioctls.
-
-Thanks
-
-Michal
+-- 
+Ezequiel Garc?a, VanguardiaSur
+www.vanguardiasur.com.ar
