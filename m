@@ -1,34 +1,24 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 20 Aug 2015 08:44:07 +0200
-Subject: [PATCH 3/6] ARM: dts: sun7i: Add regulator configuration to the
- pcduino3 dts file
-In-Reply-To: <1439563477-12295-4-git-send-email-hdegoede@redhat.com>
-References: <1439563477-12295-1-git-send-email-hdegoede@redhat.com>
- <1439563477-12295-4-git-send-email-hdegoede@redhat.com>
-Message-ID: <20150820064407.GL30520@lukather>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Thu, 20 Aug 2015 14:44:26 +0800
+Subject: un4i-ss-cipher.c warning
+In-Reply-To: <20150820063900.GJ30520@lukather>
+References: <CAOMqctShdb9xEkBmuaQKfB1cwGupbfH5TS5ZB_P85Hwpn+4zAA@mail.gmail.com>
+ <20150820052903.GA26031@gondor.apana.org.au>
+ <20150820063900.GJ30520@lukather>
+Message-ID: <20150820064426.GA26787@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 14, 2015 at 04:44:34PM +0200, Hans de Goede wrote:
-> From: Jelle van der Waa <jelle@vdwaa.nl>
-> 
-> Add regulator configuration to the pcduino3 dts file.
-> 
-> Signed-off-by: Jelle van der Waa <jelle@vdwaa.nl>
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+On Thu, Aug 20, 2015 at 08:39:00AM +0200, Maxime Ripard wrote:
+>
+> Not in the dev_dbg call line 258. If ileft was negative or null, todo
+> isn't assigned to anything.
 
-Queued, thanks!
+If ileft starts out being <= 0, then oleft == ileft will also be
+<= 0, in which case the loop never executes.
 
-Maxime
-
+Cheers,
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150820/53c09db3/attachment.sig>
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
