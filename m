@@ -1,30 +1,53 @@
 From: jonmason@broadcom.com (Jon Mason)
-Date: Thu, 20 Aug 2015 13:47:22 -0400
-Subject: [PATCH 4/5] ARM: multi_v7_defconfig: Add NSP to defconfig
-Message-ID: <1440092842-25792-1-git-send-email-jonmason@broadcom.com>
+Date: Thu, 20 Aug 2015 13:47:41 -0400
+Subject: [PATCH 5/5] MAINTAINERS: add entry for the Broadcom Northstar Plus
+ SoCs
+Message-ID: <1440092861-25825-1-git-send-email-jonmason@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the Broadcom Northstar Plus SoC to the multi_v7_defconfig
+Modify the iProc MAINTAINER to cover the Nortstar Plus SoCs, and add me
+to the list of people responsible for it.
 
 Signed-off-by: Jon Mason <jonmason@broadcom.com>
-Reviewed-by: Ray Jui <rjui@broadcom.com>
 Reviewed-by: Scott Branden <sbranden@broadcom.com>
 ---
- arch/arm/configs/multi_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ MAINTAINERS | 12 ++++++++++--
+ 1 file changed, 10 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 5fd8df6..3fd46f7 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -25,6 +25,7 @@ CONFIG_SOC_SAMA5D3=y
- CONFIG_SOC_SAMA5D4=y
- CONFIG_ARCH_BCM=y
- CONFIG_ARCH_BCM_CYGNUS=y
-+CONFIG_ARCH_BCM_NSP=y
- CONFIG_ARCH_BCM_21664=y
- CONFIG_ARCH_BCM_281XX=y
- CONFIG_ARCH_BCM_5301X=y
+diff --git a/MAINTAINERS b/MAINTAINERS
+index a9ae6c1..4b851f5 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -2315,19 +2315,27 @@ L:	linux-scsi at vger.kernel.org
+ S:	Supported
+ F:	drivers/scsi/bnx2i/
+ 
+-BROADCOM CYGNUS/IPROC ARM ARCHITECTURE
++BROADCOM IPROC ARM ARCHITECTURE
+ M:	Ray Jui <rjui@broadcom.com>
+ M:	Scott Branden <sbranden@broadcom.com>
++M:	Jon Mason <jonmason@broadcom.com>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ L:	bcm-kernel-feedback-list at broadcom.com
+ T:	git git://github.com/broadcom/cygnus-linux.git
+ S:	Maintained
+ N:	iproc
+ N:	cygnus
++N:	nsp
+ N:	bcm9113*
+ N:	bcm9583*
+-N:	bcm583*
++N:	bcm9585*
++N:	bcm9586*
++N:	bcm988312
+ N:	bcm113*
++N:	bcm583*
++N:	bcm585*
++N:	bcm586*
++N:	bcm88312
+ 
+ BROADCOM BRCMSTB GPIO DRIVER
+ M:	Gregory Fong <gregory.0xf0@gmail.com>
 -- 
 1.9.1
