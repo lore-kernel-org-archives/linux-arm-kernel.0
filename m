@@ -1,31 +1,25 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 20 Aug 2015 23:19:11 +0300
-Subject: [PATCH 0/2] Add VIN and ADV7180 device tree support for
- R8A7794/SILK board
-In-Reply-To: <55D624AD.7060801@cogentembedded.com>
-References: <1750082.WpWf34HsI6@wasted.cogentembedded.com>
- <20150820185435.GE18990@verge.net.au> <55D624AD.7060801@cogentembedded.com>
-Message-ID: <55D6363F.4050207@cogentembedded.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 20 Aug 2015 22:26:39 +0200
+Subject: [PATCH v2 09/21] ARM: pxa: magician: Add OV9640 camera support
+In-Reply-To: <87lhd568sb.fsf@belgarion.home>
+References: <cover.1439843482.git.petr.cvek@tul.cz> <55D259A1.6090102@tul.cz>
+ <87lhd568sb.fsf@belgarion.home>
+Message-ID: <2889798.x6xcIzdYMU@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/20/2015 10:04 PM, Sergei Shtylyov wrote:
+On Thursday 20 August 2015 21:48:20 Robert Jarzmik wrote:
+> Petr Cvek <petr.cvek@tul.cz> writes:
+> 
+> > +     mdelay(3);
+> Okay, there are several mdelay(3) in this file.
+> 
+> Could you please test if removing these mdelays prevents the camera from working
+> ? If not, I'd like to have them removed.
+> 
+> 
 
->>>     Here's the set of 2 patches against Simon Horman's 'renesas.git' repo's
->>> 'renesas-devel-20150819-v4.2-rc7' tag. Here we add the VIN and ADV7180
->>> video decoder device tree support on the R8A7794/SILK board. The patchset
->>> requires previously posted SILK SDHI1 support patch in order to apply and
->>> R8A7794/SILK I2C1 support in order to apply and build.
->>>
->>> [1/2] ARM: shmobile: r8a7794: add VIN DT support
->>> [2/2] ARM: shmobile: silk: add VIN0/ADV7180 DT support
->>
->> Thanks, I have queued these up for v4.4.
->
->     Perhaps a bit too early: the PFC VIN patch hasn't been merged yet. Sorry
-> for not specifying the PFC dependency...
+FWIW, it might be possible to replace some of them with msleep() calls,
+potentially after replacing spinlocks with mutexes where necessary.
 
-    OTOH, the frames get captured somehow even without the PFC patch, so might 
-as well leave these patches applied. Your choice...
-
-MBR, Sergei
+	Arnd
