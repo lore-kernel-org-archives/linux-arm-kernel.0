@@ -1,39 +1,32 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 20 Aug 2015 09:36:33 +0200
-Subject: [linux-sunxi] Re: [PATCH 4/6] ARM: dts: sun7i: Enable USB DRC on
- pcDuino 3
-In-Reply-To: <20150820064545.GM30520@lukather>
-References: <1439563477-12295-1-git-send-email-hdegoede@redhat.com>
- <1439563477-12295-5-git-send-email-hdegoede@redhat.com>
- <20150820064545.GM30520@lukather>
-Message-ID: <55D58381.7040801@redhat.com>
+From: rsahu@apm.com (Rameshwar Sahu)
+Date: Thu, 20 Aug 2015 13:18:18 +0530
+Subject: [PATCH v1 1/4] dmaengine: Add support for new feature CRC32C
+In-Reply-To: <20150820070849.GF13546@localhost>
+References: <1438258268-3099-1-git-send-email-rsahu@apm.com>
+ <1438258268-3099-2-git-send-email-rsahu@apm.com>
+ <20150820052631.GW13546@localhost>
+ <CAFd313x+MD5C2stJ-YdKrt6Ywzt4_2GmK3pJTFjfwrhPnCdopQ@mail.gmail.com>
+ <20150820070849.GF13546@localhost>
+Message-ID: <CAFd313wjAayC9++YdfDwO8tCYsTxBvAGNvPNeEVtBjhskY82eg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 08/20/2015 08:45 AM, Maxime Ripard wrote:
-> On Fri, Aug 14, 2015 at 04:44:35PM +0200, Hans de Goede wrote:
->> From: Jelle van der Waa <jelle@vdwaa.nl>
+On Thu, Aug 20, 2015 at 12:38 PM, Vinod Koul <vinod.koul@intel.com> wrote:
+> On Thu, Aug 20, 2015 at 11:59:07AM +0530, Rameshwar Sahu wrote:
+>> Hi Vinod,
 >>
->> Enable the otg/drc usb controller on the pcDuino 3.
+>> On Thu, Aug 20, 2015 at 10:56 AM, Vinod Koul <vinod.koul@intel.com> wrote:
+>> > On Thu, Jul 30, 2015 at 05:41:05PM +0530, Rameshwar Prasad Sahu wrote:
+>> >> This patch adds support for new feature CRC32C calculation in
+>> >> dmaengine framework.
+>> >
+>> > Looks okay can you please update Documentation also
 >>
->> Note this board has the otg-vbus connected directly to the 5v-dcc of
->> the board, so there is no vbus0 regulator, nor vbus0-det.
+>> Thanks, I will update Documentation.
 >
-> Can it do OTG then?
-
-Yes.
-
-> If VBUS is tied to the 5v, there's no way for the
-> board to shut it down when acting as peripheral, right?
-
-Correct, the idea is to power it over otg when using it
-as a peripheral, or at least power it from a usb port of
-the machine for which it is a peripheral. Note that the
-original cubieboard (both A10 and A20 versions) have the
-same issue.
-
-Regards,
-
-Hans
+> Also add a wrapper for new API
+Okay
+>
+> --
+> ~Vinod
+>
