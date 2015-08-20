@@ -1,41 +1,80 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 20 Aug 2015 18:23:08 +0100
-Subject: [PATCHv2] arm64: dts: Add base stratix 10 dtsi
-In-Reply-To: <1439308127-7412-1-git-send-email-dinguyen@opensource.altera.com>
-References: <1439308127-7412-1-git-send-email-dinguyen@opensource.altera.com>
-Message-ID: <20150820172308.GA2711@svinekod>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Thu, 20 Aug 2015 19:23:50 +0200
+Subject: [PATCH v2 12/21] ARM: pxa: magician: Add PXA27x UDC support
+References: <cover.1439843482.git.petr.cvek@tul.cz> <55D25A06.9030507@tul.cz>
+Message-ID: <87twrt6fh5.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Petr Cvek <petr.cvek@tul.cz> writes:
 
-> +/ {
-> +	compatible = "altr,socfpga-stratix10";
-> +	#address-cells = <1>;
-> +	#size-cells = <1>;
+> Add support for PXA27x UDC to HTC Magician.
+>
+> Signed-off-by: Petr Cvek <petr.cvek@tul.cz>
+> ---
+>  arch/arm/mach-pxa/magician.c | 40 +++++++++++++++++++++++++++++++++++++++-
+>  1 file changed, 39 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/mach-pxa/magician.c b/arch/arm/mach-pxa/magician.c
+> index 8ca0b67..23b59a0 100644
+> --- a/arch/arm/mach-pxa/magician.c
+> +++ b/arch/arm/mach-pxa/magician.c
+> @@ -98,6 +98,10 @@
+>  
+>  #include <linux/regulator/max1586.h>
+>  
+> +#include <linux/platform_data/pxa2xx_udc.h>
+> +#include <mach/udc.h>
+> +#include <mach/pxa27x-udc.h>
+> +
+>  #include "devices.h"
+>  #include "generic.h"
+>  
+> @@ -698,6 +702,34 @@ static struct platform_device magician_camera = {
+>   * USB "Transceiver"
+>   */
+>  
+> +#if IS_ENABLED(CONFIG_USB_PXA27X)
+No #if please, just let it out of #ifdefery, no need to.
 
-I would recommend that you make your root #address-cells and #size-cells equal
-to 2, as that will simplify matters later if/when you need to add anything
-beyond the first 4GB for some particular board.
+> +static void magician_udc_command(int cmd)
+> +{
+> +	if (cmd == PXA2XX_UDC_CMD_CONNECT)
+> +		UP2OCR |= UP2OCR_DPPUE | UP2OCR_DPPUBE;
+> +	else if (cmd == PXA2XX_UDC_CMD_DISCONNECT)
+> +		UP2OCR &= ~(UP2OCR_DPPUE | UP2OCR_DPPUBE);
+> +}
+> +
+> +/* HACK, shared USB connected state with pda-power */
+> +int my_usb_online = 1;
+Definitely not, a global (ie. non static variable) is not something I'll let
+in. Besides, can't a "gpio_get_value()" give the same level of information ?
 
-If everything in the SoC falls within the first 4GB you can have a ranges
-property on your /soc node and have only one cell below that.
+> +static int magician_udc_is_connected(void)
+> +{
+> +	/* Shared with pda_power or gpio-vbus */
+> +	return my_usb_online;
+gpio_get_value() something ?
 
-[...]
+> +}
+> +
+> +static struct pxa2xx_udc_mach_info magician_udc_info __initdata = {
+> +	.udc_command		= magician_udc_command,
+> +	.udc_is_connected	= magician_udc_is_connected,
+I don't think udc_is_connected is a field used by pxa27x_udc.c, it it ? The VBus
+connection information comes from a transciever, usually from gpio_vbus driver
+nowadays.
 
-> +	intc: intc at ffff8000 {
+> @@ -1175,6 +1207,11 @@ static struct platform_device *devices[] __initdata = {
+>  
+>  	/* NOTICE mutually exclusive with PXA I2C */
+>  	&i2c_gpio_bus_alt,
+> +
+> +	/* NOTICE mutually exclusive with UDC*/
+Euh why so ?
+In arch/arm/mach-pxa/mioa701.c they cooperate, why can't they for magician ?
 
-The unit-address doesn't match the first address in the reg entry.
+Cheers.
 
-> +		compatible = "arm,gic-400", "arm,cortex-a15-gic";
-> +		#interrupt-cells = <3>;
-> +		interrupt-controller;
-> +		reg = <0x0 0xffff9000 0x1000>,
-> +		      <0x0 0xffffa000 0x2000>,
-> +		      <0x0 0xffffc000 0x1000>,
-> +		      <0x0 0xffffd000 0x1000>;
-> +	};
-
-Shouldn't the virtual CPU interface also be 0x2000 long?
-
-Mark.
+-- 
+Robert
