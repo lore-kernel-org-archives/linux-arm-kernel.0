@@ -1,24 +1,27 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 20 Aug 2015 12:00:03 -0700
-Subject: [PATCH 4/9] spi: sun4i: add DMA support
-In-Reply-To: <ccf776869b0d7fe2c78bcc41d6cd1896bf732296.1440080122.git.hramrach@gmail.com>
-References: <cover.1440080122.git.hramrach@gmail.com>
- <ccf776869b0d7fe2c78bcc41d6cd1896bf732296.1440080122.git.hramrach@gmail.com>
-Message-ID: <20150820190003.GR12027@sirena.org.uk>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 20 Aug 2015 21:03:04 +0200
+Subject: [PATCH] clocksource: arm_global_timer: register delay timer
+In-Reply-To: <1439991818-31989-1-git-send-email-rabin.vincent@axis.com>
+References: <1439991818-31989-1-git-send-email-rabin.vincent@axis.com>
+Message-ID: <55D62468.4050404@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 20, 2015 at 02:19:46PM -0000, Emilio L?pez wrote:
+On 08/19/2015 03:43 PM, Rabin Vincent wrote:
+> Provide a delay timer using the lower 32-bits of the global timer so
+> that we can use that instead of having to calibrating delays.
+>
+> Signed-off-by: Rabin Vincent <rabin.vincent@axis.com>
 
-> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
-> Tested-by: Michal Suchanek <hramrach@gmail.com>
+Applied to my tree for 4.4
 
-Also, if you're sending on a patch from someone else you must add a
-Signed-off-by, see SubmittingPatches.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150820/d0884ad1/attachment.sig>
+Thanks !
+
+   -- Daniel
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
