@@ -1,146 +1,148 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 20 Aug 2015 17:28:58 +0100
-Subject: [PATCH 20/25] KVM: arm/arm64: vgic: Allow HW interrupts to be queued
- to a guest
+Date: Thu, 20 Aug 2015 17:28:55 +0100
+Subject: [PATCH 17/25] KVM: arm/arm64: vgic: Allow HW irq to be encoded in LR
 In-Reply-To: <1440088143-4722-1-git-send-email-marc.zyngier@arm.com>
 References: <1440088143-4722-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1440088143-4722-21-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1440088143-4722-18-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To allow a HW interrupt to be injected into a guest, we lookup the
-guest virtual interrupt in the irq_phys_map list, and if we have
-a match, encode both interrupts in the LR.
+Now that struct vgic_lr supports the LR_HW bit and carries a hwirq
+field, we can encode that information into the list registers.
 
-We also mark the interrupt as "active" at the host distributor level.
-
-On guest EOI on the virtual interrupt, the host interrupt will be
-deactivated.
+This patch provides implementations for both GICv2 and GICv3.
 
 Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/vgic.c | 89 +++++++++++++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 86 insertions(+), 3 deletions(-)
+ include/linux/irqchip/arm-gic-v3.h |  3 +++
+ include/linux/irqchip/arm-gic.h    |  3 ++-
+ virt/kvm/arm/vgic-v2.c             | 16 +++++++++++++++-
+ virt/kvm/arm/vgic-v3.c             | 21 ++++++++++++++++++---
+ 4 files changed, 38 insertions(+), 5 deletions(-)
 
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 51c9900..9d009d2 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -1140,6 +1140,39 @@ static void vgic_queue_irq_to_lr(struct kvm_vcpu *vcpu, int irq,
- 	if (!vgic_irq_is_edge(vcpu, irq))
- 		vlr.state |= LR_EOI_INT;
+diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+index ffbc034..cf637d6 100644
+--- a/include/linux/irqchip/arm-gic-v3.h
++++ b/include/linux/irqchip/arm-gic-v3.h
+@@ -268,9 +268,12 @@
  
-+	if (vlr.irq >= VGIC_NR_SGIS) {
-+		struct irq_phys_map *map;
-+		map = vgic_irq_map_search(vcpu, irq);
-+
-+		/*
-+		 * If we have a mapping, and the virtual interrupt is
-+		 * being injected, then we must set the state to
-+		 * active in the physical world. Otherwise the
-+		 * physical interrupt will fire and the guest will
-+		 * exit before processing the virtual interrupt.
-+		 */
-+		if (map) {
-+			int ret;
-+
-+			BUG_ON(!map->active);
-+			vlr.hwirq = map->phys_irq;
-+			vlr.state |= LR_HW;
-+			vlr.state &= ~LR_EOI_INT;
-+
-+			ret = irq_set_irqchip_state(map->irq,
-+						    IRQCHIP_STATE_ACTIVE,
-+						    true);
-+			WARN_ON(ret);
-+
-+			/*
-+			 * Make sure we're not going to sample this
-+			 * again, as a HW-backed interrupt cannot be
-+			 * in the PENDING_ACTIVE stage.
-+			 */
-+			vgic_irq_set_queued(vcpu, irq);
-+		}
-+	}
-+
- 	vgic_set_lr(vcpu, lr_nr, vlr);
- 	vgic_sync_lr_elrsr(vcpu, lr_nr, vlr);
- }
-@@ -1364,6 +1397,39 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
- 	return level_pending;
- }
+ #define ICH_LR_EOI			(1UL << 41)
+ #define ICH_LR_GROUP			(1UL << 60)
++#define ICH_LR_HW			(1UL << 61)
+ #define ICH_LR_STATE			(3UL << 62)
+ #define ICH_LR_PENDING_BIT		(1UL << 62)
+ #define ICH_LR_ACTIVE_BIT		(1UL << 63)
++#define ICH_LR_PHYS_ID_SHIFT		32
++#define ICH_LR_PHYS_ID_MASK		(0x3ffUL << ICH_LR_PHYS_ID_SHIFT)
  
-+/*
-+ * Save the physical active state, and reset it to inactive.
-+ *
-+ * Return 1 if HW interrupt went from active to inactive, and 0 otherwise.
-+ */
-+static int vgic_sync_hwirq(struct kvm_vcpu *vcpu, struct vgic_lr vlr)
-+{
-+	struct irq_phys_map *map;
-+	int ret;
-+
-+	if (!(vlr.state & LR_HW))
-+		return 0;
-+
-+	map = vgic_irq_map_search(vcpu, vlr.irq);
-+	BUG_ON(!map || !map->active);
-+
-+	ret = irq_get_irqchip_state(map->irq,
-+				    IRQCHIP_STATE_ACTIVE,
-+				    &map->active);
-+
-+	WARN_ON(ret);
-+
-+	if (map->active) {
-+		ret = irq_set_irqchip_state(map->irq,
-+					    IRQCHIP_STATE_ACTIVE,
-+					    false);
-+		WARN_ON(ret);
-+		return 0;
+ #define ICH_MISR_EOI			(1 << 0)
+ #define ICH_MISR_U			(1 << 1)
+diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
+index 9de976b..ca88dad 100644
+--- a/include/linux/irqchip/arm-gic.h
++++ b/include/linux/irqchip/arm-gic.h
+@@ -71,11 +71,12 @@
+ 
+ #define GICH_LR_VIRTUALID		(0x3ff << 0)
+ #define GICH_LR_PHYSID_CPUID_SHIFT	(10)
+-#define GICH_LR_PHYSID_CPUID		(7 << GICH_LR_PHYSID_CPUID_SHIFT)
++#define GICH_LR_PHYSID_CPUID		(0x3ff << GICH_LR_PHYSID_CPUID_SHIFT)
+ #define GICH_LR_STATE			(3 << 28)
+ #define GICH_LR_PENDING_BIT		(1 << 28)
+ #define GICH_LR_ACTIVE_BIT		(1 << 29)
+ #define GICH_LR_EOI			(1 << 19)
++#define GICH_LR_HW			(1 << 31)
+ 
+ #define GICH_VMCR_CTRL_SHIFT		0
+ #define GICH_VMCR_CTRL_MASK		(0x21f << GICH_VMCR_CTRL_SHIFT)
+diff --git a/virt/kvm/arm/vgic-v2.c b/virt/kvm/arm/vgic-v2.c
+index f9b9c7c..8d7b04d 100644
+--- a/virt/kvm/arm/vgic-v2.c
++++ b/virt/kvm/arm/vgic-v2.c
+@@ -48,6 +48,10 @@ static struct vgic_lr vgic_v2_get_lr(const struct kvm_vcpu *vcpu, int lr)
+ 		lr_desc.state |= LR_STATE_ACTIVE;
+ 	if (val & GICH_LR_EOI)
+ 		lr_desc.state |= LR_EOI_INT;
++	if (val & GICH_LR_HW) {
++		lr_desc.state |= LR_HW;
++		lr_desc.hwirq = (val & GICH_LR_PHYSID_CPUID) >> GICH_LR_PHYSID_CPUID_SHIFT;
 +	}
-+
-+	return 1;
-+}
-+
- /* Sync back the VGIC state after a guest run */
- static void __kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
+ 
+ 	return lr_desc;
+ }
+@@ -55,7 +59,9 @@ static struct vgic_lr vgic_v2_get_lr(const struct kvm_vcpu *vcpu, int lr)
+ static void vgic_v2_set_lr(struct kvm_vcpu *vcpu, int lr,
+ 			   struct vgic_lr lr_desc)
  {
-@@ -1378,14 +1444,31 @@ static void __kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
- 	elrsr = vgic_get_elrsr(vcpu);
- 	elrsr_ptr = u64_to_bitmask(&elrsr);
- 
--	/* Clear mappings for empty LRs */
--	for_each_set_bit(lr, elrsr_ptr, vgic->nr_lr) {
-+	/* Deal with HW interrupts, and clear mappings for empty LRs */
-+	for (lr = 0; lr < vgic->nr_lr; lr++) {
- 		struct vgic_lr vlr;
- 
--		if (!test_and_clear_bit(lr, vgic_cpu->lr_used))
-+		if (!test_bit(lr, vgic_cpu->lr_used))
- 			continue;
- 
- 		vlr = vgic_get_lr(vcpu, lr);
-+		if (vgic_sync_hwirq(vcpu, vlr)) {
-+			/*
-+			 * So this is a HW interrupt that the guest
-+			 * EOI-ed. Clean the LR state and allow the
-+			 * interrupt to be sampled again.
-+			 */
-+			vlr.state = 0;
-+			vlr.hwirq = 0;
-+			vgic_set_lr(vcpu, lr, vlr);
-+			vgic_irq_clear_queued(vcpu, vlr.irq);
-+			set_bit(lr, elrsr_ptr);
-+		}
+-	u32 lr_val = (lr_desc.source << GICH_LR_PHYSID_CPUID_SHIFT) | lr_desc.irq;
++	u32 lr_val;
 +
-+		if (!test_bit(lr, elrsr_ptr))
-+			continue;
-+
-+		clear_bit(lr, vgic_cpu->lr_used);
++	lr_val = lr_desc.irq;
  
- 		BUG_ON(vlr.irq >= dist->nr_irqs);
- 		vgic_cpu->vgic_irq_lr_map[vlr.irq] = LR_EMPTY;
+ 	if (lr_desc.state & LR_STATE_PENDING)
+ 		lr_val |= GICH_LR_PENDING_BIT;
+@@ -64,6 +70,14 @@ static void vgic_v2_set_lr(struct kvm_vcpu *vcpu, int lr,
+ 	if (lr_desc.state & LR_EOI_INT)
+ 		lr_val |= GICH_LR_EOI;
+ 
++	if (lr_desc.state & LR_HW) {
++		lr_val |= GICH_LR_HW;
++		lr_val |= (u32)lr_desc.hwirq << GICH_LR_PHYSID_CPUID_SHIFT;
++	}
++
++	if (lr_desc.irq < VGIC_NR_SGIS)
++		lr_val |= (lr_desc.source << GICH_LR_PHYSID_CPUID_SHIFT);
++
+ 	vcpu->arch.vgic_cpu.vgic_v2.vgic_lr[lr] = lr_val;
+ }
+ 
+diff --git a/virt/kvm/arm/vgic-v3.c b/virt/kvm/arm/vgic-v3.c
+index dff0602..afbf925 100644
+--- a/virt/kvm/arm/vgic-v3.c
++++ b/virt/kvm/arm/vgic-v3.c
+@@ -67,6 +67,10 @@ static struct vgic_lr vgic_v3_get_lr(const struct kvm_vcpu *vcpu, int lr)
+ 		lr_desc.state |= LR_STATE_ACTIVE;
+ 	if (val & ICH_LR_EOI)
+ 		lr_desc.state |= LR_EOI_INT;
++	if (val & ICH_LR_HW) {
++		lr_desc.state |= LR_HW;
++		lr_desc.hwirq = (val >> ICH_LR_PHYS_ID_SHIFT) & GENMASK(9, 0);
++	}
+ 
+ 	return lr_desc;
+ }
+@@ -84,10 +88,17 @@ static void vgic_v3_set_lr(struct kvm_vcpu *vcpu, int lr,
+ 	 * Eventually we want to make this configurable, so we may revisit
+ 	 * this in the future.
+ 	 */
+-	if (vcpu->kvm->arch.vgic.vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3)
++	switch (vcpu->kvm->arch.vgic.vgic_model) {
++	case KVM_DEV_TYPE_ARM_VGIC_V3:
+ 		lr_val |= ICH_LR_GROUP;
+-	else
+-		lr_val |= (u32)lr_desc.source << GICH_LR_PHYSID_CPUID_SHIFT;
++		break;
++	case  KVM_DEV_TYPE_ARM_VGIC_V2:
++		if (lr_desc.irq < VGIC_NR_SGIS)
++			lr_val |= (u32)lr_desc.source << GICH_LR_PHYSID_CPUID_SHIFT;
++		break;
++	default:
++		BUG();
++	}
+ 
+ 	if (lr_desc.state & LR_STATE_PENDING)
+ 		lr_val |= ICH_LR_PENDING_BIT;
+@@ -95,6 +106,10 @@ static void vgic_v3_set_lr(struct kvm_vcpu *vcpu, int lr,
+ 		lr_val |= ICH_LR_ACTIVE_BIT;
+ 	if (lr_desc.state & LR_EOI_INT)
+ 		lr_val |= ICH_LR_EOI;
++	if (lr_desc.state & LR_HW) {
++		lr_val |= ICH_LR_HW;
++		lr_val |= ((u64)lr_desc.hwirq) << ICH_LR_PHYS_ID_SHIFT;
++	}
+ 
+ 	vcpu->arch.vgic_cpu.vgic_v3.vgic_lr[LR_INDEX(lr)] = lr_val;
+ }
 -- 
 2.1.4
