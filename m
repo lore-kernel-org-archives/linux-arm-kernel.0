@@ -1,187 +1,315 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 20 Aug 2015 10:35:53 -0500
-Subject: [PATCH v5 01/46] usb: gadget: encapsulate endpoint claiming
- mechanism
-In-Reply-To: <1438351258-31578-2-git-send-email-r.baldyga@samsung.com>
-References: <1438351258-31578-1-git-send-email-r.baldyga@samsung.com>
- <1438351258-31578-2-git-send-email-r.baldyga@samsung.com>
-Message-ID: <20150820153553.GD1639@saruman.tx.rr.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 20 Aug 2015 17:45:45 +0200
+Subject: [linux-sunxi][PATCH] ARM: sun7i: dt: Add new Olimex A20 EVB device
+In-Reply-To: <1440002596-2611-1-git-send-email-codekipper@gmail.com>
+References: <1440002596-2611-1-git-send-email-codekipper@gmail.com>
+Message-ID: <20150820154545.GF30520@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Fri, Jul 31, 2015 at 04:00:13PM +0200, Robert Baldyga wrote:
-> So far it was necessary for usb functions to set ep->driver_data in
-> endpoint obtained from autoconfig to non-null value, to indicate that
-> endpoint is claimed by function (in autoconfig it was checked if endpoint
-> has set this field to non-null value, and if it has, it was assumed that
-> it is claimed). It could cause bugs because if some function doesn't
-> set this field autoconfig could return the same endpoint more than one
-> time.
+On Wed, Aug 19, 2015 at 06:43:16PM +0200, codekipper at gmail.com wrote:
+> From: Marcus Cooper <codekipper@gmail.com>
 > 
-> To help to avoid such bugs this patch adds claimed flag to struct usb_ep,
-> and  encapsulates endpoint claiming mechanism inside usb_ep_autoconfig_ss()
-> and usb_ep_autoconfig_reset(), so now usb functions don't need to perform
-> any additional actions to mark endpoint obtained from autoconfig as claimed.
+> The A20-SOM-EVB is a reference design of a 2-layer board for the
+> A20-SOM.
+> It expands the features of A20-SOM by adding VGA connector, HDMI
+> connector, audio In/Out, LCD connector, 2 Mpix camera, gigabit
+> Ethernet, SATA, USB-OTG and 2 USB hosts.
 > 
-> Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
+> This patch adds basic support for the device
+> https://www.olimex.com/Products/SOM/A20/A20-SOM-EVB/
+> 
+> More information on the SOM can be found here
+> http://linux-sunxi.org/Olimex_A20-SOM.
+> 
+> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
 
-just letting you know that this regresses all gadget drivers making them
-try to disable previously disabled endpoints and enable previously
-enabled endpoints.
+Is there any other SOM planned that could work with that baseboard? Or
+any other baseboard for that SOM?
 
-I have a possible fix (see below) but then it shows a problem on the
-host side when using with g_zero (see further below):
+> ---
+>  arch/arm/boot/dts/Makefile                    |   1 +
+>  arch/arm/boot/dts/sun7i-a20-olinuxino-evb.dts | 233 ++++++++++++++++++++++++++
+>  2 files changed, 234 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/sun7i-a20-olinuxino-evb.dts
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 6d7cec1..fdbda9b 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -613,6 +613,7 @@ dtb-$(CONFIG_MACH_SUN7I) += \
+>  	sun7i-a20-olinuxino-lime.dtb \
+>  	sun7i-a20-olinuxino-lime2.dtb \
+>  	sun7i-a20-olinuxino-micro.dtb \
+> +	sun7i-a20-olinuxino-evb.dtb \
+>  	sun7i-a20-orangepi.dtb \
+>  	sun7i-a20-orangepi-mini.dtb \
+>  	sun7i-a20-pcduino3.dtb \
+> diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-evb.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-evb.dts
+> new file mode 100644
+> index 0000000..a0071fa
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-evb.dts
+> @@ -0,0 +1,233 @@
+> +/*
+> + * Copyright 2015 - Marcus Cooper <codekipper@gmail.com>
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This file is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +
+> +/dts-v1/;
+> +#include "sun7i-a20.dtsi"
+> +#include "sunxi-common-regulators.dtsi"
+> +
+> +#include <dt-bindings/gpio/gpio.h>
+> +#include <dt-bindings/interrupt-controller/irq.h>
+> +#include <dt-bindings/pinctrl/sun4i-a10.h>
+> +
+> +/ {
+> +	model = "Olimex A20-OLinuXino-EVB";
+> +	compatible = "olimex,a20-olinuxino-evb", "allwinner,sun7i-a20";
+> +
+> +	aliases {
+> +		serial0 = &uart0;
+> +	};
+> +
+> +	chosen {
+> +		stdout-path = "serial0:115200n8";
+> +	};
+> +
+> +	leds {
+> +		compatible = "gpio-leds";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&led_pins_olinuxinoevb>;
+> +
+> +		green {
+> +			label = "a20-olinuxino-evb:green:usr";
+> +			gpios = <&pio 7 2 GPIO_ACTIVE_HIGH>;
+> +			default-state = "on";
+> +		};
+> +	};
+> +
+> +	reg_axp_ipsout: axp_ipsout {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "axp-ipsout";
+> +		regulator-min-microvolt = <5000000>;
+> +		regulator-max-microvolt = <5000000>;
+> +		regulator-always-on;
+> +	};
+> +};
+> +
+> +&ahci {
+> +	target-supply = <&reg_ahci_5v>;
+> +	status = "okay";
+> +};
+> +
+> +&ehci0 {
+> +	status = "okay";
+> +};
+> +
+> +&ehci1 {
+> +	status = "okay";
+> +};
+> +
+> +&gmac {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&gmac_pins_rgmii_a>;
+> +	phy = <&phy1>;
+> +	phy-mode = "rgmii";
+> +	status = "okay";
+> +
+> +	phy1: ethernet-phy at 1 {
+> +		reg = <1>;
+> +	};
+> +};
+> +
+> +&i2c0 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&i2c0_pins_a>;
+> +	status = "okay";
+> +
+> +	axp209: pmic at 34 {
+> +		compatible = "x-powers,axp209";
+> +		reg = <0x34>;
+> +		interrupt-parent = <&nmi_intc>;
+> +		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
+> +
+> +		interrupt-controller;
+> +		#interrupt-cells = <1>;
+> +
+> +		acin-supply = <&reg_axp_ipsout>;
+> +		vin2-supply = <&reg_axp_ipsout>;
+> +		vin3-supply = <&reg_axp_ipsout>;
+> +		ldo24in-supply = <&reg_axp_ipsout>;
+> +		ldo3in-supply = <&reg_axp_ipsout>;
 
-commit 3b8932100aacb6cfbffe288ca93025d8b8430c00
-Author: Felipe Balbi <balbi@ti.com>
-Date:   Wed Aug 19 18:05:27 2015 -0500
+Please use the axp209 dtsi.
 
-    usb: gadget: fix ep->claimed lifetime
-    
-    In order to fix a regression introduced by commit
-    cc476b42a39d ("usb: gadget: encapsulate endpoint
-    claiming mechanism") we have to introduce a simple
-    helper to check if a particular is enabled or not.
-    
-    After that, we need to move ep->claimed lifetime to
-    usb_ep_enable() and usb_ep_disable() since those
-    are the only functions which actually enable and
-    disable endpoints.
-    
-    A follow-up patch will come to drop all driver_data
-    checks from function drivers, since those are, now,
-    pointless.
-    
-    Fixes: cc476b42a39d ("usb: gadget: encapsulate endpoint
-    	claiming mechanism")
-    Cc: Robert Baldyga <r.baldyga@samsung.com>
-    Signed-off-by: Felipe Balbi <balbi@ti.com>
+> +
+> +		regulators {
+> +			vdd_rtc: ldo1 {
+> +				regulator-min-microvolt = <1300000>;
+> +				regulator-max-microvolt = <1300000>;
+> +				regulator-always-on;
+> +			};
+> +
+> +			avcc: ldo2 {
+> +				regulator-min-microvolt = <1800000>;
+> +				regulator-max-microvolt = <3300000>;
+> +				regulator-always-on;
+> +			};
+> +
+> +			vcc_csi0: ldo3 {
+> +				regulator-min-microvolt = <700000>;
+> +				regulator-max-microvolt = <3500000>;
+> +				regulator-always-on;
+> +			};
+> +
+> +			vcc_csi1: ldo4 {
+> +				regulator-min-microvolt = <1250000>;
+> +				regulator-max-microvolt = <3300000>;
+> +				regulator-always-on;
+> +			};
 
-diff --git a/drivers/usb/gadget/epautoconf.c b/drivers/usb/gadget/epautoconf.c
-index 978435a51038..ad45070cd76f 100644
---- a/drivers/usb/gadget/epautoconf.c
-+++ b/drivers/usb/gadget/epautoconf.c
-@@ -126,7 +126,6 @@ found_ep:
- 	ep->address = desc->bEndpointAddress;
- 	ep->desc = NULL;
- 	ep->comp_desc = NULL;
--	ep->claimed = true;
- 	return ep;
- }
- EXPORT_SYMBOL_GPL(usb_ep_autoconfig_ss);
-@@ -182,11 +181,6 @@ EXPORT_SYMBOL_GPL(usb_ep_autoconfig);
-  */
- void usb_ep_autoconfig_reset (struct usb_gadget *gadget)
- {
--	struct usb_ep	*ep;
--
--	list_for_each_entry (ep, &gadget->ep_list, ep_list) {
--		ep->claimed = false;
--	}
- 	gadget->in_epnum = 0;
- 	gadget->out_epnum = 0;
- }
-diff --git a/include/linux/usb/gadget.h b/include/linux/usb/gadget.h
-index c14a69b36d27..9b3d60c1cf9f 100644
---- a/include/linux/usb/gadget.h
-+++ b/include/linux/usb/gadget.h
-@@ -243,6 +243,22 @@ static inline void usb_ep_set_maxpacket_limit(struct usb_ep *ep,
- }
- 
- /**
-+ * usb_ep_enabled - is endpoint enabled ?
-+ * @ep: the endpoint being checked. may not be the endpoint named "ep0".
-+ *
-+ * Whenever a function driver wants to check if a particular endpoint is
-+ * enabled or not, it must check using this helper function. This will
-+ * encapsulate details about how the endpoint is checked, saving the function
-+ * driver from using private methods for doing so.
-+ *
-+ * return true if endpoint is enabled, false otherwise.
-+ */
-+static inline bool usb_ep_enabled(struct usb_ep *ep)
-+{
-+	return ep->claimed;
-+}
-+
-+/**
-  * usb_ep_enable - configure endpoint, making it usable
-  * @ep:the endpoint being configured.  may not be the endpoint named "ep0".
-  *	drivers discover endpoints through the ep_list of a usb_gadget.
-@@ -264,7 +280,18 @@ static inline void usb_ep_set_maxpacket_limit(struct usb_ep *ep,
-  */
- static inline int usb_ep_enable(struct usb_ep *ep)
- {
--	return ep->ops->enable(ep, ep->desc);
-+	int ret;
-+
-+	if (usb_ep_enabled(ep))
-+		return 0;
-+
-+	ret = ep->ops->enable(ep, ep->desc);
-+	if (ret)
-+		return ret;
-+
-+	ep->claimed = true;
-+
-+	return 0;
- }
- 
- /**
-@@ -281,7 +308,18 @@ static inline int usb_ep_enable(struct usb_ep *ep)
-  */
- static inline int usb_ep_disable(struct usb_ep *ep)
- {
--	return ep->ops->disable(ep);
-+	int ret;
-+
-+	if (!usb_ep_enabled(ep))
-+		return 0;
-+
-+	ret = ep->ops->disable(ep);
-+	if (ret)
-+		return ret;
-+
-+	ep->claimed = false;
-+
-+	return 0;
- }
- 
- /**
+the csi regulators are always-on too? What function do they provide?
 
+> +			vdd_cpu: dcdc2 {
+> +				regulator-min-microvolt = <700000>;
+> +				regulator-max-microvolt = <2275000>;
 
+This is way outside of the CPU operating range. Are you sure of your
+constraints?
 
-[   73.290345] WARNING: CPU: 0 PID: 300 at lib/kobject.c:240 kobject_add_internal+0x25c/0x2d8()
-[   73.299172] kobject_add_internal failed for ep_81 with -EEXIST, don't try to register things with the same name in the same directory.
-[   73.311825] Modules linked in: usbtest usb_f_ss_lb g_zero libcomposite xhci_plat_hcd xhci_hcd usbcore joydev dwc3 udc_core usb_common m25p80 evdev spi_nor omapfb cpufreq_dt cfbfillrect snd_soc_simple_card cfbimgblt thermal_sys cfbcopyarea hwmon leds_gpio matrix_keypad led_class matrix_keymap panel_dpi pwm_bl snd_soc_tlv320aic3x snd_soc_davinci_mcasp snd_soc_edma snd_soc_omap snd_soc_core omapdss snd_compress snd_pcm_dmaengine snd_pcm dwc3_omap extcon snd_timer pwm_tiecap snd lis3lv02d_i2c lis3lv02d soundcore  input_polldev spi_ti_qspi tps65218_pwrbutton rtc_omap omap_wdt phy_omap_usb2 autofs4
- [   73.367114] CPU: 0 PID: 300 Comm: testusb Tainted: G        W  4.2.0-rc7-next-20150819-00002-g3ccb6c8b6305 #1080
- [   73.378236] Hardware name: Generic AM43 (Flattened Device Tree)
- [   73.384439] [<c0016f14>] (unwind_backtrace) from [<c001339c>] (show_stack+0x10/0x14)
- [   73.392566] [<c001339c>] (show_stack) from [<c0636cec>] (dump_stack+0x84/0x9c)
- [   73.400164] [<c0636cec>] (dump_stack) from [<c003db48>] (warn_slowpath_common+0x78/0xb4)
- [   73.408649] [<c003db48>] (warn_slowpath_common) from [<c003dbb4>] (warn_slowpath_fmt+0x30/0x40)
- [   73.417783] [<c003dbb4>] (warn_slowpath_fmt) from [<c03473e4>] (kobject_add_internal+0x25c/0x2d8)
- [   73.427063] [<c03473e4>] (kobject_add_internal) from [<c03474ac>] (kobject_add+0x4c/0x98)
- [   73.435641] [<c03474ac>] (kobject_add) from [<c03d8a58>] (device_add+0xd4/0x56c)
- [   73.443466] [<c03d8a58>] (device_add) from [<bf2c17b0>] (usb_create_ep_devs+0x60/0xac [usbcore])
- [   73.452788] [<bf2c17b0>] (usb_create_ep_devs [usbcore]) from [<bf2bb210>] (create_intf_ep_devs+0x48/0x70 [usbcore])
- [   73.463801] [<bf2bb210>] (create_intf_ep_devs [usbcore]) from [<bf2bbae0>] (usb_set_interface+0x1c4/0x2f4 [usbcore])
- [   73.474891] [<bf2bbae0>] (usb_set_interface [usbcore]) from [<bf33d370>] (usbtest_ioctl+0x840/0x14c8 [usbtest])
- [   73.485659] [<bf33d370>] (usbtest_ioctl [usbtest]) from [<bf2c569c>] (usbdev_ioctl+0x1728/0x17fc [usbcore])
- [   73.495947] [<bf2c569c>] (usbdev_ioctl [usbcore]) from [<c0185764>] (do_vfs_ioctl+0x3f4/0x6c4)
- [   73.504989] [<c0185764>] (do_vfs_ioctl) from [<c0185aa0>] (SyS_ioctl+0x6c/0x7c)
- [   73.512662] [<c0185aa0>] (SyS_ioctl) from [<c000f540>] (ret_fast_syscall+0x0/0x54)
- [   73.520605] ---[ end trace 4576b2ea698fb13f ]---
+> +				regulator-always-on;
+> +			};
+> +
+> +			vdd_int: dcdc3 {
+> +				regulator-min-microvolt = <700000>;
+> +				regulator-max-microvolt = <3500000>;
+> +				regulator-always-on;
+> +			};
+> +		};
+> +	};
+> +};
+> +
+> +&i2c1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&i2c1_pins_a>;
+> +	status = "okay";
+> +};
+> +
+> +&mmc0 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_reference_design>;
+> +	vmmc-supply = <&reg_vcc3v3>;
+> +	bus-width = <4>;
+> +	cd-gpios = <&pio 7 1 GPIO_ACTIVE_HIGH>; /* PH1 */
+> +	cd-inverted;
+> +	status = "okay";
+> +};
+> +
+> +&ohci0 {
+> +	status = "okay";
+> +};
+> +
+> +&ohci1 {
+> +	status = "okay";
+> +};
+> +
+> +&pio {
+> +	ahci_pwr_pin_olinuxinoevb: ahci_pwr_pin at 1 {
+> +		allwinner,pins = "PC3";
+> +		allwinner,function = "gpio_out";
+> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> +		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+> +	};
+> +
+> +	led_pins_olinuxinoevb: led_pins at 0 {
+> +		allwinner,pins = "PH2";
+> +		allwinner,function = "gpio_out";
+> +		allwinner,drive = <SUN4I_PINCTRL_20_MA>;
+> +		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+> +	};
+> +};
+> +
+> +&reg_ahci_5v {
+> +	pinctrl-0 = <&ahci_pwr_pin_olinuxinoevb>;
+> +	gpio = <&pio 2 3 GPIO_ACTIVE_HIGH>;
+> +	status = "okay";
+> +};
+> +
+> +&reg_usb1_vbus {
+> +	status = "okay";
+> +};
+> +
+> +&reg_usb2_vbus {
+> +	status = "okay";
+> +};
+> +
+> +&uart0 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&uart0_pins_a>;
+> +	status = "okay";
+> +};
+> +
+> +&usbphy {
+> +	usb1_vbus-supply = <&reg_usb1_vbus>;
+> +	usb2_vbus-supply = <&reg_usb2_vbus>;
+> +	status = "okay";
+> +};
+> -- 
+> 2.5.0
+> 
 
+Thanks,
+Maxime
 
 -- 
-balbi
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150820/a85def20/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150820/5daa9a37/attachment-0001.sig>
