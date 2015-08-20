@@ -1,168 +1,62 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Thu, 20 Aug 2015 21:23:02 +0800
-Subject: [PATCH v7 4/5] clk: Provide critical clock support
-In-Reply-To: <20150817074244.GA3239@x1>
-References: <1437570255-21049-1-git-send-email-lee.jones@linaro.org>
- <1437570255-21049-5-git-send-email-lee.jones@linaro.org>
- <CAGsJ_4zKn-o4ZxZ0-xzCStvuTkdC5xqD9FneWna-0dNVgp=1DQ@mail.gmail.com>
- <20150817074244.GA3239@x1>
-Message-ID: <CAGsJ_4xZOktOy=SMft+VA9JOLBauk-_vchVY=Cs62PzrZ+socQ@mail.gmail.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Thu, 20 Aug 2015 21:44:38 +0800
+Subject: [PATCH v2 2/3] mailbox: Hi6220: add mailbox driver
+In-Reply-To: <55D568E2.9060505@hisilicon.com>
+References: <1440039239-8772-1-git-send-email-leo.yan@linaro.org>
+ <1440039239-8772-3-git-send-email-leo.yan@linaro.org>
+ <55D568E2.9060505@hisilicon.com>
+Message-ID: <20150820134438.GA18629@leoy-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-08-17 15:42 GMT+08:00 Lee Jones <lee.jones@linaro.org>:
-> On Mon, 17 Aug 2015, Barry Song wrote:
->
->> 2015-07-22 21:04 GMT+08:00 Lee Jones <lee.jones@linaro.org>:
->> > Lots of platforms contain clocks which if turned off would prove fatal.
->> > The only way to recover from these catastrophic failures is to restart
->> > the board(s).  Now, when a clock provider is registered with the
->> > framework it is possible for a list of critical clocks to be supplied
->> > which must be kept ungated.  Each clock mentioned in the newly
->> > introduced 'critical-clock' property will be clk_prepare_enable()d
->> > where the normal references will be taken.  This will prevent the
->> > common clk framework from attempting to gate them during the normal
->> > clk_disable_unused() and disable_clock() procedures.
->> >
->> > Note that it will still be possible for knowledgeable drivers to turn
->> > these clocks off using clk_{enable,disable}_critical() calls.
->> >
->> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
->>
->> hi Lee,
->> i have another email about this. i am wondering whether
->> CLK_IGNORE_UNUSE is still useful after your patch. another solution
->> for your patch might be extending the current CLK_IGNORE_UNUSE to
->> runtime?
->>
->>
->> copy the mail here:
->> currently we can set a CLK_IGNORE_UNUSE flag to  a clock to stop
->> clk_disable_unused()  from disabling it at the boot stage:
->>
->> static void clk_disable_unused_subtree(struct clk_core *core)
->> {
->> ...
->>
->> if (core->flags & CLK_IGNORE_UNUSED)
->> goto unlock_out;
->> }
->>
->> static int clk_disable_unused(void)
->> {
->> ...
->>
->> clk_unprepare_unused_subtree(core);
->> ...
->>  return 0;
->> }
->>
->> late_initcall_sync(clk_disable_unused);
->>
->> so if there are two clocks A and B, A is the parent of B, and A is
->> marked as CLK_IGNORE_UNUSED.
->>
->> in boot stage if there is nobody using A and B, Linux will disable B
->> due to clk_disable_unused() , but keep A being enabled since A has
->> CLK_IGNORE_UNUSED.
->>
->> but in Linux runtime, we might frequently disable /enable B in runtime
->> power management, this will cause A disabled since Linux will not
->> check CLK_IGNORE_UNUSED for runtime disabling clk .
->>
->>  so this makes CLK_IGNORE_UNUSE only work if we don't disable its
->> sub-clock at runtime. this looks making no sense.
->>
->>  i am thinking whether we should do some changes to make it have side
->> affect for runtime clk disable. otherwise, why do we want to stop it
->> from being disabled during boot stage?
->
-> This is one of this problems, along with some others that this set
-> aims to solve.
->
-> Extending CLK_IGNORE_UNUSED is not a good idea.  In fact, if we can
-> phase it out completely, that will be a good thing.
+Hi Yiping,
 
-i would agree it is better we can drop CLK_IGNORE_UNUSED since it is
-confusing...
+Thanks for review, please see below comments.
 
+On Thu, Aug 20, 2015 at 01:42:58PM +0800, YiPing Xu wrote:
+> On 2015/8/20 10:53, Leo Yan wrote:
+> >Add driver for Hi6220 mailbox, the mailbox communicates with MCU; for
+> >sending data, it can support two methods for low level implementation:
+> >one is to use interrupt as acknowledge, another is automatic mode which
+> >without any acknowledge. These two methods have been supported in the
+> >driver. For receiving data, it will depend on the interrupt to notify
+> >the channel has incoming message; enhance rx channel's message queue,
+> >which is based on the code in drivers/mailbox/omap-mailbox.c.
+> >
+> >Now mailbox driver is used to send message to MCU to control dynamic
+> >voltage and frequency scaling for CPU, GPU and DDR.
+> >
+> >Signed-off-by: Leo Yan <leo.yan@linaro.org>
 
->
-> Since this set Mike has submitted an alternitive solution.
->
-> Please see: https://groups.google.com/forum/#!msg/linux.kernel/kX_nWSsWRxU/IZSjhG5Ed4oJ
->
->>  I am not sure whether i missed something in clk core level support.
->>
->> -barry
->>
->> > ---
->> >  drivers/clk/clk-conf.c | 45 ++++++++++++++++++++++++++++++++++++++++++++-
->> >  1 file changed, 44 insertions(+), 1 deletion(-)
->> >
->> > diff --git a/drivers/clk/clk-conf.c b/drivers/clk/clk-conf.c
->> > index aad4796..f83c1c2 100644
->> > --- a/drivers/clk/clk-conf.c
->> > +++ b/drivers/clk/clk-conf.c
->> > @@ -116,6 +116,45 @@ static int __set_clk_rates(struct device_node *node, bool clk_supplier)
->> >         return 0;
->> >  }
->> >
->> > +static int __set_critical_clocks(struct device_node *node, bool clk_supplier)
->> > +{
->> > +       struct of_phandle_args clkspec;
->> > +       struct clk *clk;
->> > +       struct property *prop;
->> > +       const __be32 *cur;
->> > +       uint32_t index;
->> > +       int ret;
->> > +
->> > +       if (!clk_supplier)
->> > +               return 0;
->> > +
->> > +       of_property_for_each_u32(node, "critical-clock", prop, cur, index) {
->> > +               clkspec.np = node;
->> > +               clkspec.args_count = 1;
->> > +               clkspec.args[0] = index;
->> > +
->> > +               clk = of_clk_get_from_provider(&clkspec);
->> > +               if (IS_ERR(clk)) {
->> > +                       pr_err("clk: couldn't get clock %u for %s\n",
->> > +                               index, node->full_name);
->> > +                       return PTR_ERR(clk);
->> > +               }
->> > +
->> > +               clk_init_critical(clk);
->> > +
->> > +               ret = clk_prepare_enable(clk);
->> > +               if (ret) {
->> > +                       pr_err("Failed to enable clock %u for %s: %d\n",
->> > +                              index, node->full_name, ret);
->> > +                       return ret;
->> > +               }
->> > +
->> > +               pr_debug("Setting clock as critical %pC\n", clk);
->> > +       }
->> > +
->> > +       return 0;
->> > +}
->> > +
->> >  /**
->> >   * of_clk_set_defaults() - parse and set assigned clocks configuration
->> >   * @node: device node to apply clock settings for
->> > @@ -139,6 +178,10 @@ int of_clk_set_defaults(struct device_node *node, bool clk_supplier)
->> >         if (rc < 0)
->> >                 return rc;
->> >
->> > -       return __set_clk_rates(node, clk_supplier);
->> > +       rc = __set_clk_rates(node, clk_supplier);
->> > +       if (rc < 0)
->> > +               return rc;
->> > +
->> > +       return __set_critical_clocks(node, clk_supplier);
->> >  }
->> >  EXPORT_SYMBOL_GPL(of_clk_set_defaults);
->
-> --
+[...]
 
--barry
+> >+static int hi6220_mbox_send_data(struct mbox_chan *chan, void *msg)
+> >+{
+> >+	struct hi6220_mbox_chan *mchan = chan->con_priv;
+> >+	struct hi6220_mbox *mbox = mchan->parent;
+> >+	int irq = mchan->remote_irq;
+> >+	u32 *buf = msg;
+> >+	unsigned long flags;
+> >+	int i;
+> >+
+> >+	hi6220_mbox_set_status(mchan, HI6220_MBOX_STATUS_TX);
+> 
+> 	hi6220_mbox_set_status is called in send_data context, and it is
+> also called in hi6220_mbox_rx_interrupt and
+> hi6220_mbox_tx_interrupt.
+> 
+> 	no race condition here?
+
+Have thought this question yet when writing code; it will _NOT_
+introduce race condition according to below implementation details:
+
+- Every channel have its own slot, so there have no race condition
+  between channels;
+- The channel is unidirectional; so it will be only for tx or rx at
+  the same time;
+- The channel operation is sequential, so it have the sequence as:
+  For tx: startup -> send_data -> tx_irq (for ack);
+  For rx: startup -> rx_irq -> recv_data;
+
+Thanks,
+Leo Yan
