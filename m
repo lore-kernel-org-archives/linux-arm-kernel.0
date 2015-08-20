@@ -1,116 +1,78 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 20 Aug 2015 23:58:39 +0800
-Subject: [PATCH v3 1/8] rsb: Add generic Reduced Serial Bus (RSB)
- controller binding documentation
-In-Reply-To: <20150820150845.GB30520@lukather>
-References: <1439958009-14056-1-git-send-email-wens@csie.org>
- <1439958009-14056-2-git-send-email-wens@csie.org>
- <20150820150845.GB30520@lukather>
-Message-ID: <CAGb2v65jnU859gQG0orb9M9pR6nKcth9EPcgmmR5fckdHxngrQ@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 20 Aug 2015 18:12:33 +0200
+Subject: [PATCH] usb: musb: dsps: handle the otg_state_a_wait_vrise_timeout
+ case
+Message-ID: <1440087153-31084-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 20, 2015 at 11:08 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi,
->
-> Thanks a lot for working on this.
->
-> On Wed, Aug 19, 2015 at 12:20:02PM +0800, Chen-Yu Tsai wrote:
->> Reduced Serial Bus is a proprietary 2-line push-pull serial bus
->> supporting multiple slave devices.
->>
->> It was developed by Allwinner, Inc. and used by Allwinner and X-Powers,
->> Inc. for their line of PMICs and other peripheral ICs.
->>
->> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->> ---
->>  Documentation/devicetree/bindings/rsb/rsb.txt | 50 +++++++++++++++++++++++++++
->>  1 file changed, 50 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/rsb/rsb.txt
->>
->> diff --git a/Documentation/devicetree/bindings/rsb/rsb.txt b/Documentation/devicetree/bindings/rsb/rsb.txt
->> new file mode 100644
->> index 000000000000..0b027948ca9c
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/rsb/rsb.txt
->> @@ -0,0 +1,50 @@
->> +Reduced Serial Bus (RSB) Controller
->> +
->> +This document defines a generic set of bindings for use by RSB controllers.
->> +A controller is modelled in device tree as a node with zero or more child
->> +nodes, each representing a unique slave device on the bus.
->> +
->> +Required properties:
->> +
->> + - #address-cells : must be 2
->> + - #size-cells : must be 0
->> +
->> +Optional properties:
->> +
->> + - clock-frequency : Desired bus clock frequency in Hz. Maximum is 20 MHz.
->
-> What is the default if not set?
+According to the OTG specification after a timeout of
+OTG_TIME_A_WAIT_VRISE (the maximum value is 100ms) the driver must
+move from the state a_wait_vrise to the state a_wait_bcon. However,
+the dsps version of musb does not handle this case.
 
-Presently the driver would have it default to 1 MHz, Which doesn't match
-the driver binding. Will fix this.
+Without it, the driver could remain stuck in the a_wait_vrise. It can
+be reproduce with the following steps:
 
->> +
->> +Child nodes:
->> +
->> +An RSB controller node can contain zero or more child nodes representing
->> +slave devices on the bus.  Child 'reg' properties are specified as a
->> +runtime address, hardware address pair. The hardware address is hardwired
->> +in the device, which can normally be found in the datasheet. The runtime
->> +address is set by software. No 2 devices on the same bus shall have the
->> +same runtime address.
->> +
->> +Valid runtime addresses - There are only 15 valid runtime addresses:
->> +
->> +    0x17, 0x2d, 0x3a, 0x4e, 0x59, 0x63, 0x74, 0x8b,
->> +    0x9c, 0xa6, 0xb1, 0xc5, 0xd2, 0xe8, 0xff
->> +
->> +It is highly recommended that one choose the same runtime addresses as
->> +vendor BSPs use so that a) the addresses remain the same across different
->> +software systems, and b) addresses of supported and listed slave devices
->> +don't conflict with unsupported or not yet listed devices.
->
-> I'd expect to have the hardware address first, but maybe it's just me
-> :)
+1) Boot a board with no USB adapter inserted
+2) Insert an empty OTG adapter
+3) Wait 2 seconds then remove the OTG adapter
+4) The unit is now stuck in host mode, the VBUS switch is latched on
+and the ID pin is no longer polled.
 
-I don't know. It's only used at init time.
+The only way to exit this state was to insert a OTG adapter with an
+USB device connected. Until this, the usb device mode was not
+available.
 
-And in my latest experience, once the runtime address is set by the
-bootloader, it can't be changed. My earlier experience was the opposite,
-though I haven't figured out why.
+It was tested on a AM35x based board.
 
->
->> +Example:
->> +
->> +     rsb at ... {
->> +             compatible = "...";
->> +             reg = <...>;
->> +             /* ... */
->> +             #address-cells = <2>;
->> +             #size-cells = <0>;
->> +
->> +             pmic at 2d {
->
-> The unit-address should be 2d,3e3.
+CC: <stable@vger.kernel.org>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ drivers/usb/musb/musb_dsps.c | 14 +++++++++++++-
+ 1 file changed, 13 insertions(+), 1 deletion(-)
 
-Hmm... I didn't know this was legal.
-
->> +                     compatible = "...";
->> +                     reg = <0x2d 0x3e3>;
->> +
->> +                     /* ... */
->> +             };
->> +     };
->> --
->> 2.5.0
->>
->
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
+diff --git a/drivers/usb/musb/musb_dsps.c b/drivers/usb/musb/musb_dsps.c
+index 65d931a..2d22683 100644
+--- a/drivers/usb/musb/musb_dsps.c
++++ b/drivers/usb/musb/musb_dsps.c
+@@ -145,6 +145,7 @@ struct dsps_glue {
+ 	struct timer_list timer;	/* otg_workaround timer */
+ 	unsigned long last_timer;    /* last timer data for each instance */
+ 	bool sw_babble_enabled;
++	int otg_state_a_wait_vrise_timeout;
+ 
+ 	struct dsps_context context;
+ 	struct debugfs_regset32 regset;
+@@ -268,9 +269,18 @@ static void otg_timer(unsigned long _musb)
+ 
+ 	spin_lock_irqsave(&musb->lock, flags);
+ 	switch (musb->xceiv->otg->state) {
++	case OTG_STATE_A_WAIT_VRISE:
++		if ((glue->otg_state_a_wait_vrise_timeout)) {
++				musb->xceiv->otg->state = OTG_STATE_A_WAIT_BCON;
++				musb->is_active = 0;
++			}
++		mod_timer(&glue->timer, jiffies +
++			  msecs_to_jiffies(OTG_TIME_A_WAIT_VRISE));
++		break;
+ 	case OTG_STATE_A_WAIT_BCON:
+ 		dsps_writeb(musb->mregs, MUSB_DEVCTL, 0);
+ 		skip_session = 1;
++		glue->otg_state_a_wait_vrise_timeout = 0;
+ 		/* fall */
+ 
+ 	case OTG_STATE_A_IDLE:
+@@ -359,7 +369,9 @@ static irqreturn_t dsps_interrupt(int irq, void *hci)
+ 			MUSB_HST_MODE(musb);
+ 			musb->xceiv->otg->default_a = 1;
+ 			musb->xceiv->otg->state = OTG_STATE_A_WAIT_VRISE;
+-			del_timer(&glue->timer);
++			glue->otg_state_a_wait_vrise_timeout = 1;
++			mod_timer(&glue->timer, jiffies +
++				  msecs_to_jiffies(OTG_TIME_A_WAIT_VRISE));
+ 		} else {
+ 			musb->is_active = 0;
+ 			MUSB_DEV_MODE(musb);
+-- 
+2.1.0
