@@ -1,27 +1,23 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Thu, 20 Aug 2015 11:32:13 -0700
-Subject: [PATCH v2 5/5] regmap: No multi_write support if bus->write does
- not exist
-In-Reply-To: <1440061956-29064-6-git-send-email-mpa@pengutronix.de>
-References: <1440061956-29064-1-git-send-email-mpa@pengutronix.de>
- <1440061956-29064-6-git-send-email-mpa@pengutronix.de>
-Message-ID: <20150820183213.GM12027@sirena.org.uk>
+Date: Thu, 20 Aug 2015 11:41:32 -0700
+Subject: [PATCH 1/9] spi: sunxi: fix transfer timeout
+In-Reply-To: <0e0b52774a48ddb71dc8095b66942451cd31ff7d.1440080122.git.hramrach@gmail.com>
+References: <cover.1440080122.git.hramrach@gmail.com>
+ <0e0b52774a48ddb71dc8095b66942451cd31ff7d.1440080122.git.hramrach@gmail.com>
+Message-ID: <20150820184132.GO12027@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 20, 2015 at 11:12:36AM +0200, Markus Pargmann wrote:
-> There is no multi_write support available if we cannot use raw_write.
-> This is the case if bus->write is not implemented.
-> 
-> This patch adds a condition that we need bus and bus->write so that
-> can_multi_write is true.
+On Thu, Aug 20, 2015 at 02:19:45PM -0000, Michal Suchanek wrote:
 
-This is fine but doesn't apply (I guess it has a depedency on one of the
-earlier patches).
+>  drivers/spi/spi-sun4i.c | 10 +++++++++-
+>  drivers/spi/spi-sun6i.c | 10 +++++++++-
+
+Are we *sure* we can't work on merging these drivers :(
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 473 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150820/773feef8/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150820/ffc08de4/attachment.sig>
