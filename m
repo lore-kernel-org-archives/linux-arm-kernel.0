@@ -1,59 +1,34 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Thu, 20 Aug 2015 16:42:12 +0800
-Subject: [PATCH] arm64: entry: always restore x0 from the stack on syscall
- return
-In-Reply-To: <20150819165643.GD10297@arm.com>
-References: <1439996989-5772-1-git-send-email-will.deacon@arm.com>
- <20150819160320.GI24062@e104818-lin.cambridge.arm.com>
- <20150819162359.GA10297@arm.com>
- <20150819163504.GL24062@e104818-lin.cambridge.arm.com>
- <20150819165643.GD10297@arm.com>
-Message-ID: <55D592E4.50609@linaro.org>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 20 Aug 2015 16:57:08 +0800
+Subject: [PATCH] ARM: imx: mach-imx6ul: Fix allmodconfig build
+In-Reply-To: <1440009090-25799-1-git-send-email-festevam@gmail.com>
+References: <1440009090-25799-1-git-send-email-festevam@gmail.com>
+Message-ID: <20150820085707.GA9137@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/20/2015 12:56 AM, Will Deacon wrote:
-> On Wed, Aug 19, 2015 at 05:35:05PM +0100, Catalin Marinas wrote:
->> On Wed, Aug 19, 2015 at 05:23:59PM +0100, Will Deacon wrote:
->>> On Wed, Aug 19, 2015 at 05:03:20PM +0100, Catalin Marinas wrote:
->>>> There is another str x0 in __sys_trace_return which I think we could
->>>> remove.
->>>
->>> Hmm, I don't think we can remove that. It's needed on the slowpath to
->>> update the pt_regs with either -ENOSYS (for __ni_sys_trace) or the
->>> syscall return value from the blr in __sys_trace.
->>>
->>> What we can do instead is change the branch above to branch to
->>> __sys_trace_return_skipped. Patch below.
->>>
->>> Will
->>>
->>> --->8
->>>
->>> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
->>> index 2a5e64ccc991..088322ff1ba0 100644
->>> --- a/arch/arm64/kernel/entry.S
->>> +++ b/arch/arm64/kernel/entry.S
->>> @@ -619,7 +619,7 @@ ret_fast_syscall:
->>>          kernel_exit 0
->>>   ret_fast_syscall_trace:
->>>          enable_irq                              // enable interrupts
->>> -       b       __sys_trace_return
->>> +       b       __sys_trace_return_skipped      // we already saved x0
->>
->> That would do. With this added:
->>
->> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
->>
->> (or I can take it for 4.2 but I'd like more testing like LTP)
->
-> Yeah, I'll run some tests overnight and see how it holds up.
+On Wed, Aug 19, 2015 at 03:31:30PM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
+> 
+> We should call phy_register_fixup_for_uid() only when CONFIG_PHYLIB
+> is built-in, otherwise we get the following link error when building
+> allmodconfig:
+> 
+> arch/arm/mach-imx/built-in.o: In function `imx6ul_init_machine':
+> :(.init.text+0xa714): undefined reference to `phy_register_fixup_for_uid'
+> 
+> This is the same approach done in mach-imx6q.c and mach-imx6sx.c.
+> 
+> Reported-by: Olof Johansson <olof@lixom.net>
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-How is the stress test going on? I didn't do some stress test but
-when I applied this patch (along with above additions), the problem
-I reported is gone,
+Thanks, Fabio.
 
-Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
+Acked-by: Shawn Guo <shawnguo@kernel.org>
 
-Thanks
-Hanjun
+Olof,
+
+I suppose that you will pick up the fix directly.  Let me know if you
+think differently.  Thanks.
+
+Shawn
