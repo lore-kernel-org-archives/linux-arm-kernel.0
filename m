@@ -1,44 +1,42 @@
-From: petr.cvek@tul.cz (Petr Cvek)
-Date: Thu, 20 Aug 2015 22:07:45 +0200
-Subject: [PATCH v1, TRIVIAL] Fix pxafb nonstd field documentation and add
- errata info
-In-Reply-To: <55D5B232.9090006@ti.com>
-References: <55C64864.6070405@tul.cz> <55D5B232.9090006@ti.com>
-Message-ID: <55D63391.3080403@tul.cz>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 20 Aug 2015 21:05:34 +0100
+Subject: is it possible to liimit the softirq re entrance times
+In-Reply-To: <CAOVJa8FfHWGVf=ccXFCyTUD5YHrMAAeQ9Tkg1ipHA=J_CyVAHQ@mail.gmail.com>
+References: <CAOVJa8FfHWGVf=ccXFCyTUD5YHrMAAeQ9Tkg1ipHA=J_CyVAHQ@mail.gmail.com>
+Message-ID: <20150820200534.GU7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne 20.8.2015 v 12:55 Tomi Valkeinen napsal(a):
+On Fri, Aug 21, 2015 at 01:09:23AM +0800, vichy wrote:
+> My question are:
+> 1. in __do_sofiq, there is a jiffies setting to make sure the whole
+> softirq will not took to long.
+> But in my case is there any many hard irq happen like below
 > 
+>                         trace_softirq_entry(vec_nr);    ------a
+>                         h->action(h);
+>                         trace_softirq_exit(vec_nr);      ---------b
 > 
-> On 08/08/15 21:20, Petr Cvek wrote:
-> 
->> diff --git a/drivers/video/fbdev/Kconfig b/drivers/video/fbdev/Kconfig
->> index 2d98de5..8f485ec 100644
->> --- a/drivers/video/fbdev/Kconfig
->> +++ b/drivers/video/fbdev/Kconfig
->> @@ -1893,6 +1893,11 @@ config FB_PXA_OVERLAY
->>  	bool "Support PXA27x/PXA3xx Overlay(s) as framebuffer"
->>  	default n
->>  	depends on FB_PXA && (PXA27x || PXA3xx)
->> +	---help---
->> +	  Using the overlay 2 and YUV420 mode on a PXA27x C0 chip revision will
->> +	  hang the LCD until the next SoC restart (errata E24).
-> 
-> Shouldn't the driver handle this? It should not allow the combination to
-> be used.
-> 
->  Tomi
-> 
+> from lttng, I see there 100 interrupt happen from entry to exit.
 
-Probably, but I don't know which revisions are OK and which are not. Errata document:
+Firstly, I don't trust the trace infrastructure all that much for
+performance measurements: it has a non-zero overhead (especially if
+you turn on stack tracing), and if you want to do these kinds of
+measurements, you first need to ascertain what that overhead is, so
+you can subtract the effect of having trace enabled from the
+observations.  It's quite possible that a number of those 100
+interrupts are happening in the trace code recording the softirq
+entry and exit events.
 
-	Marvell? PXA270M Processor Specification Update
-	MV-S900957-00
+Secondly, you seem to be saying that 100 interrupts happen in
+h->action().  You don't specify the frequency of those interrupts.
+You also don't mention (which is more important) how long h->action()
+takes to run.  You also don't say which softirq it is.
 
-has only 3 revisions, but PXA Manual lists 6 (2.2.5.1 Processor ID Register) and one revision from errata is not shown in my PXA Manual. I can exclude mine revision (from "system_rev" variable), but there should be some warning somewhere in configuration.
+>From the sounds of it, whatever soft irq handler is running, it's the
+handler itself which is the cause of your problem, but not knowing any
+of the details in my second point above, it's impossible to tell.
 
-
-BTW There is software workaround, but I was not able to set registers right (it requires to send some data through FIFO in different mode).
-
-Petr
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
