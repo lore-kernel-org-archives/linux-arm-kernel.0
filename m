@@ -1,49 +1,59 @@
-From: fugang.duan@freescale.com (Duan Andy)
-Date: Thu, 20 Aug 2015 06:50:53 +0000
-Subject: [PATCH v4] iio: adc: vf610: Add IIO buffer support for Vybrid ADC
-In-Reply-To: <9be567ec7d6f6370dd42a41438d64cf7aaa47635.1439826018.git.maitysanchayan@gmail.com>
-References: <d556443a26070be505f9a5f5f0999253b73d9b71.1439283162.git.maitysanchayan@gmail.com>
- <9be567ec7d6f6370dd42a41438d64cf7aaa47635.1439826018.git.maitysanchayan@gmail.com>
-Message-ID: <BN3PR0301MB121977040608F337E69ADADEF5660@BN3PR0301MB1219.namprd03.prod.outlook.com>
+From: rsahu@apm.com (Rameshwar Sahu)
+Date: Thu, 20 Aug 2015 12:23:50 +0530
+Subject: [PATCH v1 2/4] dmaengine: xgene-dma: Add support for CRC32C
+ calculation via DMA engine
+In-Reply-To: <20150820054034.GX13546@localhost>
+References: <1438258268-3099-1-git-send-email-rsahu@apm.com>
+ <1438258268-3099-3-git-send-email-rsahu@apm.com>
+ <20150820054034.GX13546@localhost>
+Message-ID: <CAFd313y3vTCzaGKY7ZVyFGDiSx+KuxQHyBwqKyB+xWfR5dtVSA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sanchayan Maity <maitysanchayan@gmail.com> Sent: Monday, August 17, 2015 11:52 PM
-> To: jic23 at kernel.org; linux-iio at vger.kernel.org
-> Cc: stefan at agner.ch; Duan Fugang-B38611; pmeerw at pmeerw.net; linux-
-> kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Sanchayan
-> Maity
-> Subject: [PATCH v4] iio: adc: vf610: Add IIO buffer support for Vybrid
-> ADC
-> 
-> This patch adds support for IIO buffer to the Vybrid ADC driver.
-> IIO triggered buffer infrastructure along with iio sysfs trigger is used
-> to leverage continuous sampling support provided by the ADC block.
-> 
-> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
-> ---
-> 
-> Changes since v3:
-> Fix iio_buffer_setup_ops for postenable and predisable functions to match
-> pairwise. Before this the predisable work was being done in postdisable.
-> 
-> Changes since v2:
-> 1. Fix the wrong buffer size for statically allocated buffer 2. Drop the
-> use of .address field from the iio_chan_spec 3. Use iio_buffer_enabled
-> call inside the lock 4. Drop wrapper function around iio_trigered_*
-> function calls 5. Drop Kconfig select of sysfs trigger 6. Drop Kconfig
-> select IIO_TRIGGER as it is already selected by IIO_TRIGGERED_BUFFER
-> 
-> Changes since v1:
-> 1. Use a fixed size buffer instead of kmalloc allocated during update
-> scan mode 2. Remove a write to read only register ADC_HS (COCO bit)
-> 
->  drivers/iio/adc/Kconfig     |   2 +
->  drivers/iio/adc/vf610_adc.c | 105
-> +++++++++++++++++++++++++++++++++++++++++---
->  2 files changed, 100 insertions(+), 7 deletions(-)
-> 
+Hi Vinod,
 
-The version is fine for me. Thanks for your effort.
+On Thu, Aug 20, 2015 at 11:10 AM, Vinod Koul <vinod.koul@intel.com> wrote:
+> On Thu, Jul 30, 2015 at 05:41:06PM +0530, Rameshwar Prasad Sahu wrote:
+>> +     /* Invalidate unused source address field */
+>> +     for (; i < 4; i++)
+>> +             xgene_dma_invalidate_buffer(xgene_dma_lookup_ext8(desc2, i));
+>> +
+>> +     /* Check whether requested buffer processed */
+>> +     if (nbytes) {
+>> +             chan_err(chan, "Src count crossed maximum limit\n");
+>> +             return -EINVAL;
+> no cleanup ?
+Here not required, cleanup I am doing in parent function from where
+this function is getting called in case of failure.
+>
+>> +struct dma_async_tx_descriptor *xgene_dma_prep_flyby(
+>> +     struct xgene_dma_chan *chan, struct scatterlist *src_sg,
+>> +     size_t len, u32 seed, u8 *result, unsigned long flags, u8 opcode)
+> please fix style here
 
-Acked-by: Fugang Duan <B38611@freescale.com>
+Could you explain me What kind of coding style you would like here ??
+>
+>> +struct dma_async_tx_descriptor *xgene_dma_prep_crc32c(
+>> +     struct dma_chan *dchan, struct scatterlist *src_sg,
+>> +     size_t len, u32 seed, u8 *result, unsigned long flags)
+> here too
+>
+>> @@ -1309,8 +1512,13 @@ static void xgene_dma_setup_ring(struct xgene_dma_ring *ring)
+>>                 ring->pdma->csr_ring + XGENE_DMA_RING_ID);
+>>
+>>       /* Set DMA ring buffer */
+>> -     iowrite32(XGENE_DMA_RING_ID_BUF_SETUP(ring->num),
+>> -               ring->pdma->csr_ring + XGENE_DMA_RING_ID_BUF);
+>> +     ring_id_buf = XGENE_DMA_RING_ID_BUF_SETUP(ring->num);
+>> +
+>> +     if (ring->is_bufpool)
+>> +             ring_id_buf |= XGENE_DMA_RING_IS_BUFPOOL;
+>> +
+>> +     iowrite32(ring_id_buf, ring->pdma->csr_ring +
+>> +               XGENE_DMA_RING_ID_BUF);
+> pls fix style here
+I didn't see any alignment issue here, just follow checkpatch that
+argument should start just after "function(" in next line also.
+>
+> --
+> ~Vinod
