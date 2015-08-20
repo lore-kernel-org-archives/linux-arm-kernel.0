@@ -1,45 +1,44 @@
 From: hramrach@gmail.com (Michal Suchanek)
-Date: 20 Aug 2015 14:19:46 -0000
-Subject: [PATCH 2/9] spi: sun4i: fix FIFO limit
-In-Reply-To: <cover.1440080122.git.hramrach@gmail.com>
-References: <cover.1440080122.git.hramrach@gmail.com>
-Message-ID: <a40fbf7ca8bd36f08f5e9d3fb6f6de2454066af7.1440080122.git.hramrach@gmail.com>
+Date: Thu, 20 Aug 2015 16:15:22 +0200
+Subject: [PATCH 0/9] spi/sunxi patches
+Message-ID: <cover.1440080122.git.hramrach@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When testing SPI without DMA I noticed that filling the FIFO on the
-spi controller causes timeout.
+Hello,
 
-Always leave room for one byte in the FIFO.
+Since the sun4i dmaengine and DT label conversion patches are in this should be
+now workable.
 
-Signed-off-by: Michal Suchanek <hramrach@gmail.com>
----
- drivers/spi/spi-sun4i.c | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+ - fix some minor issues with the spi driver
+ - add spi dt nodes on some boards
+ - include the DMA patch which depends on the dmaengine
 
-diff --git a/drivers/spi/spi-sun4i.c b/drivers/spi/spi-sun4i.c
-index 48532ec..707f61b 100644
---- a/drivers/spi/spi-sun4i.c
-+++ b/drivers/spi/spi-sun4i.c
-@@ -178,6 +178,8 @@ static int sun4i_spi_transfer_one(struct spi_master *master,
- 	/* We don't support transfer larger than the FIFO */
- 	if (tfr->len > SUN4I_FIFO_DEPTH)
- 		return -EINVAL;
-+	if (tfr->tx_buf && tfr->len => SUN4I_FIFO_DEPTH)
-+		return -EINVAL;
- 
- 	reinit_completion(&sspi->done);
- 	sspi->tx_buf = tfr->tx_buf;
-@@ -271,7 +273,9 @@ static int sun4i_spi_transfer_one(struct spi_master *master,
- 	sun4i_spi_write(sspi, SUN4I_XMIT_CNT_REG, SUN4I_XMIT_CNT(tx_len));
- 
- 	/* Fill the TX FIFO */
--	sun4i_spi_fill_fifo(sspi, SUN4I_FIFO_DEPTH);
-+	/* Filling the fifo fully causes timeout for some reason
-+	 * at least on spi2 on a10s */
-+	sun4i_spi_fill_fifo(sspi, SUN4I_FIFO_DEPTH - 1);
- 
- 	/* Enable the interrupts */
- 	sun4i_spi_write(sspi, SUN4I_INT_CTL_REG, SUN4I_INT_CTL_TC);
+Thanks
+
+Michal
+
+Emilio L?pez (1):
+  spi: sun4i: add DMA support
+
+Michal Suchanek (8):
+  spi: sunxi: fix transfer timeout
+  spi: sun4i: fix FIFO limit
+  spi: sunxi: check that transfer speed is non-zero
+  ARM: dts: sun7i: cubieboard2: Enable SPI0
+  ARM: dts: sunxi: add spi aliases on cubieboards
+  ARM: dts: sun5i: add SPI pins on A13 and A10s
+  ARM: dts: sunxi: A10s Olinuxino Micro: add spi2.
+  ARM: dts: sunxi: Add SPI aliases on A10s Olinuxino.
+
+ arch/arm/boot/dts/sun4i-a10-cubieboard.dts       |   1 +
+ arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts |  10 ++
+ arch/arm/boot/dts/sun5i-a10s.dtsi                |  21 +++
+ arch/arm/boot/dts/sun5i.dtsi                     |  49 +++++++
+ arch/arm/boot/dts/sun7i-a20-cubieboard2.dts      |   8 ++
+ drivers/spi/spi-sun4i.c                          | 166 ++++++++++++++++++++---
+ drivers/spi/spi-sun6i.c                          |  25 +++-
+ 7 files changed, 257 insertions(+), 23 deletions(-)
+
 -- 
 2.1.4
