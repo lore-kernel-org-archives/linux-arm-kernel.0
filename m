@@ -1,35 +1,28 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 20 Aug 2015 21:34:33 +0200
-Subject: [PATCH 1/9] spi: sunxi: fix transfer timeout
-In-Reply-To: <20150820184132.GO12027@sirena.org.uk>
-References: <cover.1440080122.git.hramrach@gmail.com>
- <0e0b52774a48ddb71dc8095b66942451cd31ff7d.1440080122.git.hramrach@gmail.com>
- <20150820184132.GO12027@sirena.org.uk>
-Message-ID: <20150820193433.GH30520@lukather>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Thu, 20 Aug 2015 21:32:21 +0200
+Subject: [PATCH v2 11/21] ARM: pxa: magician: Add MAX1586 Vcore regulator
+ support
+In-Reply-To: <55D259CC.6040307@tul.cz> (Petr Cvek's message of "Tue, 18 Aug
+ 2015 00:01:48 +0200")
+References: <cover.1439843482.git.petr.cvek@tul.cz> <55D259CC.6040307@tul.cz>
+Message-ID: <87pp2h69iy.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 20, 2015 at 11:41:32AM -0700, Mark Brown wrote:
-> On Thu, Aug 20, 2015 at 02:19:45PM -0000, Michal Suchanek wrote:
-> 
-> >  drivers/spi/spi-sun4i.c | 10 +++++++++-
-> >  drivers/spi/spi-sun6i.c | 10 +++++++++-
-> 
-> Are we *sure* we can't work on merging these drivers :(
+Petr Cvek <petr.cvek@tul.cz> writes:
 
-Those are two different IPs, that don't really share anything but
-their author...
+> Add support for MAX1586 Vcore regulator.
+>
+> Signed-off-by: Petr Cvek <petr.cvek@tul.cz>
+I'll leave that for a week and if no objections queue it.
 
-Maxime
+I would have expected a better commit message : for example, from your patch I
+deduce magician has a 1587 regulator, not a 1586 one : that deserves a small
+mention in the commit message. Moreover, the Maxim has 2 outputs : one is
+connected to VCC_Core of the SoC, what about the other output ?  Is it unknown,
+or do you know but don't use it ?
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150820/3fafe925/attachment.sig>
+Cheers.
+
+--
+Robert
