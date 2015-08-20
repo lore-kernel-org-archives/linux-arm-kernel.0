@@ -1,58 +1,56 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 20 Aug 2015 13:50:35 +0100
-Subject: [PATCH 2/2] arm64: set MAX_MEMBLOCK_ADDR according to linear
- region size
-In-Reply-To: <E830F411-141C-40C4-A608-7709304395C5@linaro.org>
-References: <1439890482-20798-1-git-send-email-ard.biesheuvel@linaro.org>
- <1439890482-20798-3-git-send-email-ard.biesheuvel@linaro.org>
- <20150820091915.GC2972@e104818-lin.cambridge.arm.com>
- <E830F411-141C-40C4-A608-7709304395C5@linaro.org>
-Message-ID: <20150820125035.GD2972@e104818-lin.cambridge.arm.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Thu, 20 Aug 2015 14:50:53 +0200
+Subject: [PATCH 0/4] [media] Media entity cleanups and build fixes
+In-Reply-To: <55D5CB04.50508@xs4all.nl>
+References: <1439998526-12832-1-git-send-email-javier@osg.samsung.com>
+ <55D5CB04.50508@xs4all.nl>
+Message-ID: <55D5CD2D.2010607@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 20, 2015 at 01:54:40PM +0200, Ard Biesheuvel wrote:
-> 
-> 
-> > On 20 aug. 2015, at 11:19, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > 
-> >> On Tue, Aug 18, 2015 at 11:34:42AM +0200, Ard Biesheuvel wrote:
-> >> The linear region size of a 39-bit VA kernel is only 256 GB, which
-> >> may be insufficient to cover all of system RAM, even on platforms
-> >> that have much less than 256 GB of memory but which is laid out
-> >> very sparsely.
-> >> 
-> >> So make sure we clip the memory we will not be able to map before
-> >> installing it into the memblock memory table, by setting
-> >> MAX_MEMBLOCK_ADDR accordingly.
-> >> 
-> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> >> ---
-> >> arch/arm64/include/asm/memory.h | 8 ++++++++
-> >> 1 file changed, 8 insertions(+)
-> >> 
-> >> diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-> >> index f800d45ea226..44a59c20e773 100644
-> >> --- a/arch/arm64/include/asm/memory.h
-> >> +++ b/arch/arm64/include/asm/memory.h
-> >> @@ -114,6 +114,14 @@ extern phys_addr_t        memstart_addr;
-> >> #define PHYS_OFFSET        ({ memstart_addr; })
-> >> 
-> >> /*
-> >> + * The maximum physical address that the linear direct mapping
-> >> + * of system RAM can cover. (PAGE_OFFSET can be interpreted as
-> >> + * a 2's complement signed quantity and negated to derive the
-> >> + * maximum size of the linear mapping.)
-> >> + */
-> >> +#define MAX_MEMBLOCK_ADDR    ({ memstart_addr - PAGE_OFFSET - 1; })
-> > 
-> > Would it be easier to understand as just memstart_addr + ~PAGE_OFFSET?
-> 
-> Whichever you prefer
+Hello Hans,
 
-Just leave it as it is, not sure it's any clearer. Basically the maximum
-size we can map is (0 - PAGE_OFFSET), so if we make the range inclusive,
-we get to memstart_addr - PAGE_OFFSET - 1.
+On 08/20/2015 02:41 PM, Hans Verkuil wrote:
+> On 08/19/15 17:35, Javier Martinez Canillas wrote:
+>> Hello,
+>>
+>> This series contains a couple of build fixes and cleanups for the
+>> Media Controller framework. The goal of the series is to get rid of
+>> the struct media_entity .parent member since now that a media_gobj is
+>> embedded into entities, the media_gobj .mdev member can be used to
+>> store a pointer to the parent struct media_device.
+>>
+>> So the .parent field becomes redundant and can be removed after all
+>> the users are converted to use entity .graph_obj.mdev instead.
+>>
+>> Patches 1/4 and 2/4 are build fixes I found while build testing if no
+>> regressions were introduced by the conversion. Patch 3/4 converts
+>> all the drivers and the MC core to use .mdev instead of .parent and
+>> finally patch 4/4 removes the .parent field since now is unused.
+> 
+> Regarding patches 1 and 2: these should of course be merged with Mauro's
+> patches that make this particular change (patch 3/8), otherwise it would
+> break git bisect.
+> 
+> Anyway,
+> 
+> Acked-by: Hans Verkuil <hans.verkuil@cisco.com> for the changes in patch
 
+Thanks a lot for the acks.
+
+> 1 and 2, as long as they are added to Mauro's patch 3/8.
+>
+
+Indeed, I completely agree that these should be squashed with
+Mauro's patch to maintain git bisect-ability.
+ 
+> Regards,
+> 
+> 	Hans
+> 
+
+Best regards,
 -- 
-Catalin
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
