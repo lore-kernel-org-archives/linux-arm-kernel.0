@@ -1,78 +1,61 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 20 Aug 2015 11:48:08 -0500
-Subject: [PATCH v5 01/46] usb: gadget: encapsulate endpoint claiming
- mechanism
-In-Reply-To: <55D6001E.3000504@hackerion.com>
-References: <1438351258-31578-1-git-send-email-r.baldyga@samsung.com>
- <1438351258-31578-2-git-send-email-r.baldyga@samsung.com>
- <20150820153553.GD1639@saruman.tx.rr.com>
- <55D6001E.3000504@hackerion.com>
-Message-ID: <20150820164808.GB4938@saruman.tx.rr.com>
+From: ahs3@redhat.com (Al Stone)
+Date: Thu, 20 Aug 2015 10:57:05 -0600
+Subject: [PATCH v2 2/5] ACPI / ARM64: remove usage of
+ BAD_MADT_ENTRY/BAD_MADT_GICC_ENTRY
+In-Reply-To: <20150820101322.GA19328@arm.com>
+References: <1440022048-6285-1-git-send-email-al.stone@linaro.org>
+ <1440022048-6285-3-git-send-email-al.stone@linaro.org>
+ <20150820101322.GA19328@arm.com>
+Message-ID: <55D606E1.4040804@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 20, 2015 at 06:28:14PM +0200, Robert Baldyga wrote:
-> Hi Felipe,
+On 08/20/2015 04:13 AM, Will Deacon wrote:
+> Hi Al,
 > 
-> On 08/20/2015 05:35 PM, Felipe Balbi wrote:
-> [...]
-> >just letting you know that this regresses all gadget drivers making them
-> >try to disable previously disabled endpoints and enable previously
-> >enabled endpoints.
-> >
-> >I have a possible fix (see below) but then it shows a problem on the
-> >host side when using with g_zero (see further below):
-> >
-> >commit 3b8932100aacb6cfbffe288ca93025d8b8430c00
-> >Author: Felipe Balbi <balbi@ti.com>
-> >Date:   Wed Aug 19 18:05:27 2015 -0500
-> >
-> >     usb: gadget: fix ep->claimed lifetime
-> >
-> >     In order to fix a regression introduced by commit
-> >     cc476b42a39d ("usb: gadget: encapsulate endpoint
-> >     claiming mechanism") we have to introduce a simple
-> >     helper to check if a particular is enabled or not.
-> >
-> >     After that, we need to move ep->claimed lifetime to
-> >     usb_ep_enable() and usb_ep_disable() since those
-> >     are the only functions which actually enable and
-> >     disable endpoints.
-> >
-> >     A follow-up patch will come to drop all driver_data
-> >     checks from function drivers, since those are, now,
-> >     pointless.
-> >
-> >     Fixes: cc476b42a39d ("usb: gadget: encapsulate endpoint
-> >     	claiming mechanism")
-> >     Cc: Robert Baldyga <r.baldyga@samsung.com>
-> >     Signed-off-by: Felipe Balbi <balbi@ti.com>
-> >
-> >diff --git a/drivers/usb/gadget/epautoconf.c b/drivers/usb/gadget/epautoconf.c
-> >index 978435a51038..ad45070cd76f 100644
-> >--- a/drivers/usb/gadget/epautoconf.c
-> >+++ b/drivers/usb/gadget/epautoconf.c
-> >@@ -126,7 +126,6 @@ found_ep:
-> >  	ep->address = desc->bEndpointAddress;
-> >  	ep->desc = NULL;
-> >  	ep->comp_desc = NULL;
-> >-	ep->claimed = true;
+> On Wed, Aug 19, 2015 at 11:07:25PM +0100, Al Stone wrote:
+>> Now that we have introduced the bad_madt_entry() function, and that
+>> function is being invoked in acpi_table_parse_madt() for us, there
+>> is no longer any need to use the BAD_MADT_ENTRY macro, or in the case
+>> of arm64, the BAD_MADT_GICC_ENTRY, too.
+>>
+>> Signed-off-by: Al Stone <al.stone@linaro.org>
+>> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+>> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> Cc: Thomas Gleixner <tglx@linutronix.de>
+>> Cc: Jason Cooper <jason@lakedaemon.net>
+>> ---
+>>  arch/arm64/include/asm/acpi.h | 8 --------
+>>  arch/arm64/kernel/smp.c       | 2 --
+>>  drivers/irqchip/irq-gic.c     | 6 ------
+>>  3 files changed, 16 deletions(-)
 > 
-> Removing this line causes autoconfig can return the same endpoint many
-> times. This probably causes problems with g_zero.
-> 
-> I will try to fix it ASAP.
+> How are you planning to merge this (and which kernel are you targetting?)
+> You've got Acks for both arm64 and irqchip, so I guess either of those
+> trees could take it.
 
-I was considering the same thing, but the lifetime of ->claimed doesn't
-look correct to me either way. Note that once the flag is enabled, it
-won't get disabled by most gadget drivers.
+Yeah, this is a little messy.  If I can get into 4.2, that would be nice,
+but not required -- arm64 already has a usable patch for now, and that's
+the only arch affected.  So, 4.3 was my primary target (which is why I
+worked with linux-next for these).
+
+Which tree?  Yeesh.  1/5 and 5/5 are ACPI only and required for the rest
+to work properly; 2/5 is arm64, 3/5 is ia64, and 4/5 is x86.  ARM folks are
+the only ones to have provided acks or reviews, however.  I guess I was
+assuming this would have to go in via Rafael's ACPI tree since those are
+the key parts -- the arch-specific patches would remove safety checks on
+MADT subtables without replacing them, if they went in before the ACPI
+patches.
+
+Does that make sense?  What do you think?
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150820/e52d8009/attachment-0001.sig>
+ciao,
+al
+-----------------------------------
+Al Stone
+Software Engineer
+Red Hat, Inc.
+ahs3 at redhat.com
+-----------------------------------
