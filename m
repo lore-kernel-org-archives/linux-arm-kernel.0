@@ -1,54 +1,189 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 20 Aug 2015 17:28:51 +0100
-Subject: [PATCH 13/25] arm64: KVM: remove remaining reference to
- vgic_sr_vectors
+Date: Thu, 20 Aug 2015 17:29:00 +0100
+Subject: [PATCH 22/25] KVM: arm/arm64: vgic: Prevent userspace injection of a
+ mapped interrupt
 In-Reply-To: <1440088143-4722-1-git-send-email-marc.zyngier@arm.com>
 References: <1440088143-4722-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1440088143-4722-14-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1440088143-4722-23-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vladimir Murzin <Vladimir.Murzin@arm.com>
+Virtual interrupts mapped to a HW interrupt should only be triggered
+from inside the kernel. Otherwise, you could end up confusing the
+kernel (and the GIC's) state machine.
 
-Since commit 8a14849 (arm64: KVM: Switch vgic save/restore to
-alternative_insn) vgic_sr_vectors is not used anymore, so remove
-remaining leftovers and kill the structure.
+Rearrange the injection path so that kvm_vgic_inject_irq is
+used for non-mapped interrupts, and kvm_vgic_inject_mapped_irq is
+used for mapped interrupts. The latter should only be called from
+inside the kernel (timer, irqfd).
 
-Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/kvm_host.h | 5 -----
- arch/arm64/kernel/asm-offsets.c   | 2 --
- 2 files changed, 7 deletions(-)
+ include/kvm/arm_vgic.h |   2 +
+ virt/kvm/arm/vgic.c    | 103 +++++++++++++++++++++++++++++++++----------------
+ 2 files changed, 72 insertions(+), 33 deletions(-)
 
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 409217f..415938d 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -246,11 +246,6 @@ static inline void __cpu_init_hyp_mode(phys_addr_t boot_pgd_ptr,
- 		     hyp_stack_ptr, vector_ptr);
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index e789e47..d901f1a 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -350,6 +350,8 @@ void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu);
+ void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu);
+ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int irq_num,
+ 			bool level);
++int kvm_vgic_inject_mapped_irq(struct kvm *kvm, int cpuid,
++			       struct irq_phys_map *map, bool level);
+ void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg);
+ int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
+ int kvm_vgic_vcpu_active_irq(struct kvm_vcpu *vcpu);
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index b553a8f..9eb489a 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -1555,7 +1555,8 @@ static int vgic_validate_injection(struct kvm_vcpu *vcpu, int irq, int level)
  }
  
--struct vgic_sr_vectors {
--	void	*save_vgic;
--	void	*restore_vgic;
--};
+ static int vgic_update_irq_pending(struct kvm *kvm, int cpuid,
+-				  unsigned int irq_num, bool level)
++				   struct irq_phys_map *map,
++				   unsigned int irq_num, bool level)
+ {
+ 	struct vgic_dist *dist = &kvm->arch.vgic;
+ 	struct kvm_vcpu *vcpu;
+@@ -1563,6 +1564,9 @@ static int vgic_update_irq_pending(struct kvm *kvm, int cpuid,
+ 	int enabled;
+ 	bool ret = true, can_inject = true;
+ 
++	if (irq_num >= min(kvm->arch.vgic.nr_irqs, 1020))
++		return -EINVAL;
++
+ 	spin_lock(&dist->lock);
+ 
+ 	vcpu = kvm_get_vcpu(kvm, cpuid);
+@@ -1625,18 +1629,46 @@ static int vgic_update_irq_pending(struct kvm *kvm, int cpuid,
+ out:
+ 	spin_unlock(&dist->lock);
+ 
+-	return ret ? cpuid : -EINVAL;
++	if (ret) {
++		/* kick the specified vcpu */
++		kvm_vcpu_kick(kvm_get_vcpu(kvm, cpuid));
++	}
++
++	return 0;
++}
++
++static int vgic_lazy_init(struct kvm *kvm)
++{
++	int ret = 0;
++
++	if (unlikely(!vgic_initialized(kvm))) {
++		/*
++		 * We only provide the automatic initialization of the VGIC
++		 * for the legacy case of a GICv2. Any other type must
++		 * be explicitly initialized once setup with the respective
++		 * KVM device call.
++		 */
++		if (kvm->arch.vgic.vgic_model != KVM_DEV_TYPE_ARM_VGIC_V2)
++			return -EBUSY;
++
++		mutex_lock(&kvm->lock);
++		ret = vgic_init(kvm);
++		mutex_unlock(&kvm->lock);
++	}
++
++	return ret;
+ }
+ 
+ /**
+  * kvm_vgic_inject_irq - Inject an IRQ from a device to the vgic
+  * @kvm:     The VM structure pointer
+  * @cpuid:   The CPU for PPIs
+- * @irq_num: The IRQ number that is assigned to the device
++ * @irq_num: The IRQ number that is assigned to the device. This IRQ
++ *           must not be mapped to a HW interrupt.
+  * @level:   Edge-triggered:  true:  to trigger the interrupt
+  *			      false: to ignore the call
+- *	     Level-sensitive  true:  activates an interrupt
+- *			      false: deactivates an interrupt
++ *	     Level-sensitive  true:  raise the input signal
++ *			      false: lower the input signal
+  *
+  * The GIC is not concerned with devices being active-LOW or active-HIGH for
+  * level-sensitive interrupts.  You can think of the level parameter as 1
+@@ -1645,39 +1677,44 @@ out:
+ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int irq_num,
+ 			bool level)
+ {
+-	int ret = 0;
+-	int vcpu_id;
 -
- static inline void kvm_arch_hardware_disable(void) {}
- static inline void kvm_arch_hardware_unsetup(void) {}
- static inline void kvm_arch_sync_events(struct kvm *kvm) {}
-diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-index d886308..8d89cf8 100644
---- a/arch/arm64/kernel/asm-offsets.c
-+++ b/arch/arm64/kernel/asm-offsets.c
-@@ -132,8 +132,6 @@ int main(void)
-   DEFINE(KVM_TIMER_ENABLED,	offsetof(struct kvm, arch.timer.enabled));
-   DEFINE(VCPU_KVM,		offsetof(struct kvm_vcpu, kvm));
-   DEFINE(VCPU_VGIC_CPU,		offsetof(struct kvm_vcpu, arch.vgic_cpu));
--  DEFINE(VGIC_SAVE_FN,		offsetof(struct vgic_sr_vectors, save_vgic));
--  DEFINE(VGIC_RESTORE_FN,	offsetof(struct vgic_sr_vectors, restore_vgic));
-   DEFINE(VGIC_V2_CPU_HCR,	offsetof(struct vgic_cpu, vgic_v2.vgic_hcr));
-   DEFINE(VGIC_V2_CPU_VMCR,	offsetof(struct vgic_cpu, vgic_v2.vgic_vmcr));
-   DEFINE(VGIC_V2_CPU_MISR,	offsetof(struct vgic_cpu, vgic_v2.vgic_misr));
+-	if (unlikely(!vgic_initialized(kvm))) {
+-		/*
+-		 * We only provide the automatic initialization of the VGIC
+-		 * for the legacy case of a GICv2. Any other type must
+-		 * be explicitly initialized once setup with the respective
+-		 * KVM device call.
+-		 */
+-		if (kvm->arch.vgic.vgic_model != KVM_DEV_TYPE_ARM_VGIC_V2) {
+-			ret = -EBUSY;
+-			goto out;
+-		}
+-		mutex_lock(&kvm->lock);
+-		ret = vgic_init(kvm);
+-		mutex_unlock(&kvm->lock);
++	struct irq_phys_map *map;
++	int ret;
+ 
+-		if (ret)
+-			goto out;
+-	}
++	ret = vgic_lazy_init(kvm);
++	if (ret)
++		return ret;
+ 
+-	if (irq_num >= min(kvm->arch.vgic.nr_irqs, 1020))
++	map = vgic_irq_map_search(kvm_get_vcpu(kvm, cpuid), irq_num);
++	if (map)
+ 		return -EINVAL;
+ 
+-	vcpu_id = vgic_update_irq_pending(kvm, cpuid, irq_num, level);
+-	if (vcpu_id >= 0) {
+-		/* kick the specified vcpu */
+-		kvm_vcpu_kick(kvm_get_vcpu(kvm, vcpu_id));
+-	}
++	return vgic_update_irq_pending(kvm, cpuid, NULL, irq_num, level);
++}
+ 
+-out:
+-	return ret;
++/**
++ * kvm_vgic_inject_mapped_irq - Inject a physically mapped IRQ to the vgic
++ * @kvm:     The VM structure pointer
++ * @cpuid:   The CPU for PPIs
++ * @map:     Pointer to a irq_phys_map structure describing the mapping
++ * @level:   Edge-triggered:  true:  to trigger the interrupt
++ *			      false: to ignore the call
++ *	     Level-sensitive  true:  raise the input signal
++ *			      false: lower the input signal
++ *
++ * The GIC is not concerned with devices being active-LOW or active-HIGH for
++ * level-sensitive interrupts.  You can think of the level parameter as 1
++ * being HIGH and 0 being LOW and all devices being active-HIGH.
++ */
++int kvm_vgic_inject_mapped_irq(struct kvm *kvm, int cpuid,
++			       struct irq_phys_map *map, bool level)
++{
++	int ret;
++
++	ret = vgic_lazy_init(kvm);
++	if (ret)
++		return ret;
++
++	return vgic_update_irq_pending(kvm, cpuid, map, map->virt_irq, level);
+ }
+ 
+ static irqreturn_t vgic_maintenance_handler(int irq, void *data)
 -- 
 2.1.4
