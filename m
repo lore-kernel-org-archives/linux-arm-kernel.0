@@ -1,28 +1,35 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 20 Aug 2015 22:04:13 +0300
-Subject: [PATCH 0/2] Add VIN and ADV7180 device tree support for
- R8A7794/SILK board
-In-Reply-To: <20150820185435.GE18990@verge.net.au>
-References: <1750082.WpWf34HsI6@wasted.cogentembedded.com>
- <20150820185435.GE18990@verge.net.au>
-Message-ID: <55D624AD.7060801@cogentembedded.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 20 Aug 2015 21:34:33 +0200
+Subject: [PATCH 1/9] spi: sunxi: fix transfer timeout
+In-Reply-To: <20150820184132.GO12027@sirena.org.uk>
+References: <cover.1440080122.git.hramrach@gmail.com>
+ <0e0b52774a48ddb71dc8095b66942451cd31ff7d.1440080122.git.hramrach@gmail.com>
+ <20150820184132.GO12027@sirena.org.uk>
+Message-ID: <20150820193433.GH30520@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/20/2015 09:54 PM, Simon Horman wrote:
+On Thu, Aug 20, 2015 at 11:41:32AM -0700, Mark Brown wrote:
+> On Thu, Aug 20, 2015 at 02:19:45PM -0000, Michal Suchanek wrote:
+> 
+> >  drivers/spi/spi-sun4i.c | 10 +++++++++-
+> >  drivers/spi/spi-sun6i.c | 10 +++++++++-
+> 
+> Are we *sure* we can't work on merging these drivers :(
 
->>     Here's the set of 2 patches against Simon Horman's 'renesas.git' repo's
->> 'renesas-devel-20150819-v4.2-rc7' tag. Here we add the VIN and ADV7180
->> video decoder device tree support on the R8A7794/SILK board. The patchset
->> requires previously posted SILK SDHI1 support patch in order to apply and
->> R8A7794/SILK I2C1 support in order to apply and build.
->>
->> [1/2] ARM: shmobile: r8a7794: add VIN DT support
->> [2/2] ARM: shmobile: silk: add VIN0/ADV7180 DT support
->
-> Thanks, I have queued these up for v4.4.
+Those are two different IPs, that don't really share anything but
+their author...
 
-    Perhaps a bit too early: the PFC VIN patch hasn't been merged yet. Sorry 
-for not specifying the PFC dependency...
+Maxime
 
-MBR, Sergei
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150820/3fafe925/attachment.sig>
