@@ -1,205 +1,82 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 20 Aug 2015 17:29:02 +0100
-Subject: [PATCH 24/25] arm64: KVM: Optimize arm64 skip 30-50% vfp/simd
- save/restore on exits
+Date: Thu, 20 Aug 2015 17:28:50 +0100
+Subject: [PATCH 12/25] arm64/kvm: Add generic v8 KVM target
 In-Reply-To: <1440088143-4722-1-git-send-email-marc.zyngier@arm.com>
 References: <1440088143-4722-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1440088143-4722-25-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1440088143-4722-13-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mario Smarduch <m.smarduch@samsung.com>
+From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
 
-This patch only saves and restores FP/SIMD registers on Guest access. To do
-this cptr_el2 FP/SIMD trap is set on Guest entry and later checked on exit.
-lmbench, hackbench show significant improvements, for 30-50% exits FP/SIMD
-context is not saved/restored
+This patch adds a generic ARM v8 KVM target cpu type for use
+by the new CPUs which eventualy ends up using the common sys_reg
+table. For backward compatibility the existing targets have been
+preserved. Any new target CPU that can be covered by generic v8
+sys_reg tables should make use of the new generic target.
 
-[chazy/maz: fixed save/restore logic for 32bit guests]
-
-Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
+Acked-by: Marc Zyngier <Marc.Zyngier@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/kvm_arm.h |  5 ++-
- arch/arm64/kvm/hyp.S             | 73 +++++++++++++++++++++++++++++++++++-----
- 2 files changed, 68 insertions(+), 10 deletions(-)
+ arch/arm64/include/uapi/asm/kvm.h    | 10 ++++++++--
+ arch/arm64/kvm/guest.c               |  3 ++-
+ arch/arm64/kvm/sys_regs_generic_v8.c |  2 ++
+ 3 files changed, 12 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-index ac6fafb..7605e09 100644
---- a/arch/arm64/include/asm/kvm_arm.h
-+++ b/arch/arm64/include/asm/kvm_arm.h
-@@ -171,10 +171,13 @@
- #define HSTR_EL2_TTEE	(1 << 16)
- #define HSTR_EL2_T(x)	(1 << x)
+diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+index d82f3f3..0cd7b59 100644
+--- a/arch/arm64/include/uapi/asm/kvm.h
++++ b/arch/arm64/include/uapi/asm/kvm.h
+@@ -53,14 +53,20 @@ struct kvm_regs {
+ 	struct user_fpsimd_state fp_regs;
+ };
  
-+/* Hyp Coproccessor Trap Register Shifts */
-+#define CPTR_EL2_TFP_SHIFT 10
-+
- /* Hyp Coprocessor Trap Register */
- #define CPTR_EL2_TCPAC	(1 << 31)
- #define CPTR_EL2_TTA	(1 << 20)
--#define CPTR_EL2_TFP	(1 << 10)
-+#define CPTR_EL2_TFP	(1 << CPTR_EL2_TFP_SHIFT)
- 
- /* Hyp Debug Configuration Register bits */
- #define MDCR_EL2_TDRA		(1 << 11)
-diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-index d93c0a2..8188f6a 100644
---- a/arch/arm64/kvm/hyp.S
-+++ b/arch/arm64/kvm/hyp.S
-@@ -385,6 +385,14 @@
- 	tbz	\tmp, #KVM_ARM64_DEBUG_DIRTY_SHIFT, \target
- .endm
- 
+-/* Supported Processor Types */
 +/*
-+ * Branch to target if CPTR_EL2.TFP bit is set (VFP/SIMD trapping enabled)
++ * Supported CPU Targets - Adding a new target type is not recommended,
++ * unless there are some special registers not supported by the
++ * genericv8 syreg table.
 + */
-+.macro skip_fpsimd_state tmp, target
-+	mrs	\tmp, cptr_el2
-+	tbnz	\tmp, #CPTR_EL2_TFP_SHIFT, \target
-+.endm
-+
- .macro compute_debug_state target
- 	// Compute debug state: If any of KDE, MDE or KVM_ARM64_DEBUG_DIRTY
- 	// is set, we do a full save/restore cycle and disable trapping.
-@@ -423,10 +431,12 @@
- 	add	x3, x2, #CPU_SYSREG_OFFSET(DACR32_EL2)
- 	mrs	x4, dacr32_el2
- 	mrs	x5, ifsr32_el2
--	mrs	x6, fpexc32_el2
- 	stp	x4, x5, [x3]
--	str	x6, [x3, #16]
+ #define KVM_ARM_TARGET_AEM_V8		0
+ #define KVM_ARM_TARGET_FOUNDATION_V8	1
+ #define KVM_ARM_TARGET_CORTEX_A57	2
+ #define KVM_ARM_TARGET_XGENE_POTENZA	3
+ #define KVM_ARM_TARGET_CORTEX_A53	4
++/* Generic ARM v8 target */
++#define KVM_ARM_TARGET_GENERIC_V8	5
  
-+	skip_fpsimd_state x8, 3f
-+	mrs	x6, fpexc32_el2
-+	str	x6, [x3, #16]
-+3:
- 	skip_debug_state x8, 2f
- 	mrs	x7, dbgvcr32_el2
- 	str	x7, [x3, #24]
-@@ -453,10 +463,8 @@
+-#define KVM_ARM_NUM_TARGETS		5
++#define KVM_ARM_NUM_TARGETS		6
  
- 	add	x3, x2, #CPU_SYSREG_OFFSET(DACR32_EL2)
- 	ldp	x4, x5, [x3]
--	ldr	x6, [x3, #16]
- 	msr	dacr32_el2, x4
- 	msr	ifsr32_el2, x5
--	msr	fpexc32_el2, x6
+ /* KVM_ARM_SET_DEVICE_ADDR ioctl id encoding */
+ #define KVM_ARM_DEVICE_TYPE_SHIFT	0
+diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
+index 48868d8..d250160 100644
+--- a/arch/arm64/kvm/guest.c
++++ b/arch/arm64/kvm/guest.c
+@@ -295,7 +295,8 @@ int __attribute_const__ kvm_target_cpu(void)
+ 		break;
+ 	};
  
- 	skip_debug_state x8, 2f
- 	ldr	x7, [x3, #24]
-@@ -473,8 +481,22 @@
+-	return -EINVAL;
++	/* Return a default generic target */
++	return KVM_ARM_TARGET_GENERIC_V8;
+ }
  
- .macro activate_traps
- 	ldr     x2, [x0, #VCPU_HCR_EL2]
-+
-+	/*
-+	 * We are about to set CPTR_EL2.TFP to trap all floating point
-+	 * register accesses to EL2, however, the ARM ARM clearly states that
-+	 * traps are only taken to EL2 if the operation would not otherwise
-+	 * trap to EL1.  Therefore, always make sure that for 32-bit guests,
-+	 * we set FPEXC.EN to prevent traps to EL1, when setting the TFP bit.
-+	 */
-+	tbnz	x2, #HCR_RW_SHIFT, 99f // open code skip_32bit_state
-+	mov	x3, #(1 << 30)
-+	msr	fpexc32_el2, x3
-+	isb
-+99:
- 	msr     hcr_el2, x2
- 	mov	x2, #CPTR_EL2_TTA
-+	orr     x2, x2, #CPTR_EL2_TFP
- 	msr	cptr_el2, x2
+ int kvm_vcpu_preferred_target(struct kvm_vcpu_init *init)
+diff --git a/arch/arm64/kvm/sys_regs_generic_v8.c b/arch/arm64/kvm/sys_regs_generic_v8.c
+index 475fd29..1e45768 100644
+--- a/arch/arm64/kvm/sys_regs_generic_v8.c
++++ b/arch/arm64/kvm/sys_regs_generic_v8.c
+@@ -94,6 +94,8 @@ static int __init sys_reg_genericv8_init(void)
+ 					  &genericv8_target_table);
+ 	kvm_register_target_sys_reg_table(KVM_ARM_TARGET_XGENE_POTENZA,
+ 					  &genericv8_target_table);
++	kvm_register_target_sys_reg_table(KVM_ARM_TARGET_GENERIC_V8,
++					  &genericv8_target_table);
  
- 	mov	x2, #(1 << 15)	// Trap CP15 Cr=15
-@@ -488,7 +510,6 @@
- .macro deactivate_traps
- 	mov	x2, #HCR_RW
- 	msr	hcr_el2, x2
--	msr	cptr_el2, xzr
- 	msr	hstr_el2, xzr
- 
- 	mrs	x2, mdcr_el2
-@@ -653,12 +674,41 @@ __restore_debug:
- 	ret
- 
- __save_fpsimd:
-+	skip_fpsimd_state x3, 1f
- 	save_fpsimd
--	ret
-+1:	ret
- 
- __restore_fpsimd:
-+	skip_fpsimd_state x3, 1f
- 	restore_fpsimd
--	ret
-+1:	ret
-+
-+switch_to_guest_fpsimd:
-+	push	x4, lr
-+
-+	mrs	x2, cptr_el2
-+	bic	x2, x2, #CPTR_EL2_TFP
-+	msr	cptr_el2, x2
-+	isb
-+
-+	mrs	x0, tpidr_el2
-+
-+	ldr	x2, [x0, #VCPU_HOST_CONTEXT]
-+	kern_hyp_va x2
-+	bl __save_fpsimd
-+
-+	add	x2, x0, #VCPU_CONTEXT
-+	bl __restore_fpsimd
-+
-+	skip_32bit_state x3, 1f
-+	ldr	x4, [x2, #CPU_SYSREG_OFFSET(FPEXC32_EL2)]
-+	msr	fpexc32_el2, x4
-+1:
-+	pop	x4, lr
-+	pop	x2, x3
-+	pop	x0, x1
-+
-+	eret
- 
- /*
-  * u64 __kvm_vcpu_run(struct kvm_vcpu *vcpu);
-@@ -680,7 +730,6 @@ ENTRY(__kvm_vcpu_run)
- 	kern_hyp_va x2
- 
- 	save_host_regs
--	bl __save_fpsimd
- 	bl __save_sysregs
- 
- 	compute_debug_state 1f
-@@ -697,7 +746,6 @@ ENTRY(__kvm_vcpu_run)
- 	add	x2, x0, #VCPU_CONTEXT
- 
- 	bl __restore_sysregs
--	bl __restore_fpsimd
- 
- 	skip_debug_state x3, 1f
- 	ldr	x3, [x0, #VCPU_DEBUG_PTR]
-@@ -740,6 +788,8 @@ __kvm_vcpu_return:
- 
- 	bl __restore_sysregs
- 	bl __restore_fpsimd
-+	/* Clear FPSIMD and Trace trapping */
-+	msr     cptr_el2, xzr
- 
- 	skip_debug_state x3, 1f
- 	// Clear the dirty flag for the next run, as all the state has
-@@ -949,6 +999,11 @@ el1_trap:
- 	 * x1: ESR
- 	 * x2: ESR_EC
- 	 */
-+
-+	/* Guest accessed VFP/SIMD registers, save host, restore Guest */
-+	cmp	x2, #ESR_ELx_EC_FP_ASIMD
-+	b.eq	switch_to_guest_fpsimd
-+
- 	cmp	x2, #ESR_ELx_EC_DABT_LOW
- 	mov	x0, #ESR_ELx_EC_IABT_LOW
- 	ccmp	x2, x0, #4, ne
+ 	return 0;
+ }
 -- 
 2.1.4
