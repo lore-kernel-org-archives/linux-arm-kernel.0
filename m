@@ -1,32 +1,66 @@
-From: rsahu@apm.com (Rameshwar Sahu)
-Date: Thu, 20 Aug 2015 13:18:18 +0530
-Subject: [PATCH v1 1/4] dmaengine: Add support for new feature CRC32C
-In-Reply-To: <20150820070849.GF13546@localhost>
-References: <1438258268-3099-1-git-send-email-rsahu@apm.com>
- <1438258268-3099-2-git-send-email-rsahu@apm.com>
- <20150820052631.GW13546@localhost>
- <CAFd313x+MD5C2stJ-YdKrt6Ywzt4_2GmK3pJTFjfwrhPnCdopQ@mail.gmail.com>
- <20150820070849.GF13546@localhost>
-Message-ID: <CAFd313wjAayC9++YdfDwO8tCYsTxBvAGNvPNeEVtBjhskY82eg@mail.gmail.com>
+From: jingoohan1@gmail.com (Jingoo Han)
+Date: Thu, 20 Aug 2015 16:49:00 +0900
+Subject: [PATCH v3 13/14] drm: bridge/analogix_dp: move hpd detect to
+ connector detect function
+In-Reply-To: <1439995939-18770-1-git-send-email-ykk@rock-chips.com>
+References: <1439995728-18046-1-git-send-email-ykk@rock-chips.com>
+ <1439995939-18770-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <6E5CEF9B-19D4-4AC4-B5B1-BC667979302D@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 20, 2015 at 12:38 PM, Vinod Koul <vinod.koul@intel.com> wrote:
-> On Thu, Aug 20, 2015 at 11:59:07AM +0530, Rameshwar Sahu wrote:
->> Hi Vinod,
->>
->> On Thu, Aug 20, 2015 at 10:56 AM, Vinod Koul <vinod.koul@intel.com> wrote:
->> > On Thu, Jul 30, 2015 at 05:41:05PM +0530, Rameshwar Prasad Sahu wrote:
->> >> This patch adds support for new feature CRC32C calculation in
->> >> dmaengine framework.
->> >
->> > Looks okay can you please update Documentation also
->>
->> Thanks, I will update Documentation.
->
-> Also add a wrapper for new API
-Okay
->
-> --
-> ~Vinod
->
+On 2015. 8. 19., at PM 11:52, Yakir Yang <ykk@rock-chips.com> wrote:
+> 
+
+
+What is the reason to make this patch?
+
+Please make commit message including the reason.
+
+Best regards,
+Jingoo Han
+
+> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+> ---
+> Changes in v3:
+> - move dp hpd detect to connector detect function.
+> 
+> Changes in v2: None
+> 
+> drivers/gpu/drm/bridge/analogix_dp_core.c | 12 ++++++------
+> 1 file changed, 6 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/bridge/analogix_dp_core.c b/drivers/gpu/drm/bridge/analogix_dp_core.c
+> index 75dd44a..052b9b3 100644
+> --- a/drivers/gpu/drm/bridge/analogix_dp_core.c
+> +++ b/drivers/gpu/drm/bridge/analogix_dp_core.c
+> @@ -915,12 +915,6 @@ static void analogix_dp_commit(struct analogix_dp_device *dp)
+>            DRM_ERROR("failed to disable the panel\n");
+>    }
+> 
+> -    ret = analogix_dp_detect_hpd(dp);
+> -    if (ret) {
+> -        /* Cable has been disconnected, we're done */
+> -        return;
+> -    }
+> -
+>    ret = analogix_dp_handle_edid(dp);
+>    if (ret) {
+>        dev_err(dp->dev, "unable to handle edid\n");
+> @@ -953,6 +947,12 @@ static void analogix_dp_commit(struct analogix_dp_device *dp)
+> static enum drm_connector_status analogix_dp_detect(
+>                struct drm_connector *connector, bool force)
+> {
+> +    struct analogix_dp_device *dp = connector_to_dp(connector);
+> +
+> +    if (analogix_dp_detect_hpd(dp))
+> +        /* Cable has been disconnected, we're done */
+> +        return connector_status_disconnected;
+> +
+>    return connector_status_connected;
+> }
+> 
+> -- 
+> 1.9.1
+> 
+> 
