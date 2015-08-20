@@ -1,123 +1,45 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Thu, 20 Aug 2015 11:25:44 +0900
-Subject: [GIT PULL v2 0/5] Samsung updates for v4.3
-In-Reply-To: <55CCE517.2070003@kernel.org>
-References: <55CCE517.2070003@kernel.org>
-Message-ID: <023501d0daef$86d21c20$94765460$@kernel.org>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Thu, 20 Aug 2015 10:53:56 +0800
+Subject: [PATCH v2 0/3] mailbox: hisilicon: add Hi6220 mailbox driver
+Message-ID: <1440039239-8772-1-git-send-email-leo.yan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kukjin Kim wrote:
-> 
-> Hello Arnd, Olof, Kevin
-> 
-Hi,
+Hi6220 mailbox supports up to 32 channels. Each channel is unidirectional
+with a maximum message size of 8 words. I/O is performed using register
+access (there is no DMA) and the cell raises an interrupt when messages
+are received.
 
-Please pull and if any comments, please kindly let me know.
+This patch series is to implement Hi6220 mailbox driver. It registers
+two channels into framework for communication with MCU, one is tx channel
+and another is rx channel. Now mailbox driver is used to send message to
+MCU to control dynamic voltage and frequency scaling for CPU, GPU and DDR.
 
-Thanks,
-Kukjin
+Changes from v1:
+* Correct lock usage for SMP scenario
 
-> Here is re-spin of pull request for Samsung stuff for v4.3 as per Olof's
-> suggestion.
-> 
-> Most of this pull-requests are to switch to support generic cpufreq
-> driver for exynos3250, 4210, 4412 and 5250 and several exynos dt updates.
-> 
-> Note as I commented in each tag, each pull-request(signed tag) has a
-> dependency with each other, so please keep the ordering in this time.
-> 
-> 1) tags/samsung-clk-driver
-> 2) tags/samsung-late-dt
-> 3) tags/samsung-soc
-> 4) tags/samsung-late-cpufreq-driver
-> 5) tags/samsung-defconfig-new
-> 
-> If any problems, please kindly let me know.
-> 
-> Thanks,
-> Kukjin
-> 
-> Alexis Ballier (1):
->       ARM: dts: enable SPI1 for exynos4412-odroidu3
-> 
-> Anand Moon (1):
->       ARM: exynos_defconfig: Enable CONFIG_SND_SOC_ODROIDX2 for Odroid-XU3
-> 
-> Bartlomiej Zolnierkiewicz (5):
->       cpufreq: exynos: remove exynos5250 specific cpufreq driver support
->       clk: exynos4x12: add cpu clock configuration data and instantiate
-> cpu clock
->       cpufreq: exynos: remove Exynos4x12 specific cpufreq driver support
->       ARM: dts: add CPU OPP and regulator supply property for exynos4x12
->       ARM: EXYNOS: switch to using generic cpufreq driver for exynos4x12
-> 
-> Chanho Park (1):
->       ARM: dts: add exynos5422-cpus.dtsi to correct cpu order
-> 
-> Chanwoo Choi (4):
->       clk: exynos3250: Add cpu clock configuration data and instaniate
-> cpu clock
->       ARM: EXYNOS: Add exynos3250 compatible to use generic cpufreq driver
->       ARM: dts: Add CPU OPP and regulator supply property for exynos3250
->       ARM: dts: Add CPU cooling binding for exynos3250 boards
-> 
-> Javier Martinez Canillas (4):
->       ARM: multi_v7_defconfig: Remove old Samsung USB PHY configs
->       ARM: multi_v7_defconfig: Enable NTC Thermistors support
->       ARM: exynos_defconfig: Enable NTC Thermistors support
->       ARM: multi_v7_defconfig: Enable max77802 regulator
-> 
-> Jonas Rabenstein (1):
->       cpufreq: exynos: Remove unselectable rule for arm-exynos-cpufreq.o
-> 
-> Krzysztof Kozlowski (1):
->       ARM: exynos_defconfig: Enable cpufreq-dt driver
-> 
-> Marek Szyprowski (1):
->       ARM: dts: add iommu property to JPEG device for exynos4
-> 
-> Michal Suchanek (1):
->       ARM: dts: Add SPI CS on exynos5250-snow
-> 
-> Thomas Abraham (3):
->       clk: exynos5250: add cpu clock configuration data and instantiate
-> cpu clock
->       ARM: EXYNOS: switch to using generic cpufreq driver for exynos5250
->       ARM: dts: add CPU OPP and regulator supply property for exynos5250
-> 
->  arch/arm/boot/dts/exynos3250-monk.dts              |  19 ++
->  arch/arm/boot/dts/exynos3250-rinato.dts            |  19 ++
->  arch/arm/boot/dts/exynos3250.dtsi                  |  16 ++
->  arch/arm/boot/dts/exynos4.dtsi                     |   1 +
->  arch/arm/boot/dts/exynos4212.dtsi                  |  81 +++++++
->  arch/arm/boot/dts/exynos4412-odroid-common.dtsi    |   4 +
->  arch/arm/boot/dts/exynos4412-odroidu3.dts          |   8 +
->  arch/arm/boot/dts/exynos4412-origen.dts            |   4 +
->  arch/arm/boot/dts/exynos4412-trats2.dts            |   4 +
->  arch/arm/boot/dts/exynos4412.dtsi                  |  83 ++++++++
->  arch/arm/boot/dts/exynos5250-arndale.dts           |   4 +
->  arch/arm/boot/dts/exynos5250-smdk5250.dts          |   4 +
->  arch/arm/boot/dts/exynos5250-snow.dts              |   5 +
->  arch/arm/boot/dts/exynos5250-spring.dts            |   4 +
->  arch/arm/boot/dts/exynos5250.dtsi                  |  22 ++
->  arch/arm/boot/dts/exynos5422-cpus.dtsi             |  81 +++++++
->  arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi |   1 +
->  arch/arm/configs/exynos_defconfig                  |   5 +
->  arch/arm/configs/multi_v7_defconfig                |   5 +-
->  arch/arm/mach-exynos/Kconfig                       |   2 +
->  arch/arm/mach-exynos/exynos.c                      |   4 +
->  drivers/clk/samsung/clk-exynos3250.c               |  32 ++-
->  drivers/clk/samsung/clk-exynos4.c                  |  50 +++++
->  drivers/clk/samsung/clk-exynos5250.c               |  31 +++
->  drivers/cpufreq/Kconfig.arm                        |  49 -----
->  drivers/cpufreq/Makefile                           |   4 -
->  drivers/cpufreq/exynos-cpufreq.c                   | 237
-> ---------------------
->  drivers/cpufreq/exynos-cpufreq.h                   |  89 --------
->  drivers/cpufreq/exynos4x12-cpufreq.c               | 236
-> --------------------
->  drivers/cpufreq/exynos5250-cpufreq.c               | 210 ------------------
->  include/dt-bindings/clock/exynos3250.h             |   1 +
->  include/dt-bindings/clock/exynos5250.h             |   1 +
->  32 files changed, 487 insertions(+), 829 deletions(-)
+Changes from RFC:
+* According to Jassi's review, totally remove the abstract common driver
+  layer and only commit driver dedicated for Hi6220
+* According to Paul Bolle's review, fix typo issue for Kconfig and remove
+  unnecessary dependency with OF and fix minor for mailbox driver
+* Refine a little for dts nodes
+
+
+Leo Yan (3):
+  dt-bindings: mailbox: Document Hi6220 mailbox driver
+  mailbox: Hi6220: add mailbox driver
+  arm64: dts: add Hi6220 mailbox node
+
+ .../bindings/mailbox/hisilicon,hi6220-mailbox.txt  |  57 +++
+ arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts     |  20 +-
+ arch/arm64/boot/dts/hisilicon/hi6220.dtsi          |   8 +
+ drivers/mailbox/Kconfig                            |   8 +
+ drivers/mailbox/Makefile                           |   2 +
+ drivers/mailbox/hi6220-mailbox.c                   | 519 +++++++++++++++++++++
+ 6 files changed, 611 insertions(+), 3 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mailbox/hisilicon,hi6220-mailbox.txt
+ create mode 100644 drivers/mailbox/hi6220-mailbox.c
+
+-- 
+1.9.1
