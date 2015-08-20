@@ -1,126 +1,61 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Thu, 20 Aug 2015 10:27:23 +0200
-Subject: [PATCH v7 3/6] PCI: designware: Add ARM64 support
-In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E01D8139B@lhreml503-mbs>
-References: <1439812554-180426-1-git-send-email-wangzhou1@hisilicon.com>
- <1439812554-180426-4-git-send-email-wangzhou1@hisilicon.com>
- <1439988852.31432.15.camel@pengutronix.de>
- <EE11001F9E5DDD47B7634E2F8A612F2E01D81315@lhreml503-mbs>
- <1439998622.31432.44.camel@pengutronix.de>
- <EE11001F9E5DDD47B7634E2F8A612F2E01D8139B@lhreml503-mbs>
-Message-ID: <1440059243.31432.59.camel@pengutronix.de>
+From: Adam.Thomson.Opensource@diasemi.com (Opensource [Adam Thomson])
+Date: Thu, 20 Aug 2015 08:30:35 +0000
+Subject: [PATCH V3] Watchdog: Fix parent of watchdog_devices
+In-Reply-To: <db7db9102158b87a4a7169e84e2272b3ba03f9f7.1439954581.git.panand@redhat.com>
+References: <db7db9102158b87a4a7169e84e2272b3ba03f9f7.1439954581.git.panand@redhat.com>
+Message-ID: <2E89032DDAA8B9408CB92943514A0337AB56C694@SW-EX-MBX01.diasemi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gab,
+On August 19, 2015 04:28, Pratyush Anand wrote:
 
-Am Mittwoch, den 19.08.2015, 16:34 +0000 schrieb Gabriele Paoloni:
-> Hi Lucas
+> diff --git a/drivers/watchdog/da9052_wdt.c b/drivers/watchdog/da9052_wdt.c
+> index 2e9589652e1e..67e67977bd29 100644
+> --- a/drivers/watchdog/da9052_wdt.c
+> +++ b/drivers/watchdog/da9052_wdt.c
+> @@ -195,6 +195,7 @@ static int da9052_wdt_probe(struct platform_device *pdev)
+>  	da9052_wdt->timeout = DA9052_DEF_TIMEOUT;
+>  	da9052_wdt->info = &da9052_wdt_info;
+>  	da9052_wdt->ops = &da9052_wdt_ops;
+> +	da9052_wdt->parent = &pdev->dev;
+>  	watchdog_set_drvdata(da9052_wdt, driver_data);
 > 
-> First of all many thanks for the quick reply, really appreciated
+>  	kref_init(&driver_data->kref);
+> diff --git a/drivers/watchdog/da9055_wdt.c b/drivers/watchdog/da9055_wdt.c
+> index 495089d8dbfe..04d1430d93d2 100644
+> --- a/drivers/watchdog/da9055_wdt.c
+> +++ b/drivers/watchdog/da9055_wdt.c
+> @@ -161,6 +161,7 @@ static int da9055_wdt_probe(struct platform_device *pdev)
+>  	da9055_wdt->timeout = DA9055_DEF_TIMEOUT;
+>  	da9055_wdt->info = &da9055_wdt_info;
+>  	da9055_wdt->ops = &da9055_wdt_ops;
+> +	da9055_wdt->parent = &pdev->dev;
+>  	watchdog_set_nowayout(da9055_wdt, nowayout);
+>  	watchdog_set_drvdata(da9055_wdt, driver_data);
 > 
-> > -----Original Message-----
-> > From: Lucas Stach [mailto:l.stach at pengutronix.de]
-> > Sent: Wednesday, August 19, 2015 4:37 PM
-> > To: Gabriele Paoloni
-> > Cc: Wangzhou (B); Bjorn Helgaas; jingoohan1 at gmail.com; Pratyush Anand;
-> > Arnd Bergmann; linux at arm.linux.org.uk; thomas.petazzoni at free-
-> > electrons.com; lorenzo.pieralisi at arm.com; james.morse at arm.com;
-> > Liviu.Dudau at arm.com; jason at lakedaemon.net; robh at kernel.org; linux-
-> > pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> > devicetree at vger.kernel.org; Yuanzhichang; Zhudacai; zhangjukuo;
-> > qiuzhenfa; liudongdong (C); qiujiang; xuwei (O); Liguozhu (Kenneth)
-> > Subject: Re: [PATCH v7 3/6] PCI: designware: Add ARM64 support
-> > 
-> > Hi Gab,
-> > 
-> > Am Mittwoch, den 19.08.2015, 15:16 +0000 schrieb Gabriele Paoloni:
-> > > Hi Lucas
-> > >
-> > > I have rewritten the patch to take into account multiple controllers.
-> > >
-> > > As you can see now there is a static var in dw_pcie_host_init() that
-> > tracks
-> > > the bus numbers used.
-> > 
-> > This is wrong. The DT specifies the valid bus number range. You can not
-> > just assign the next free bus number to the root bus.
+> diff --git a/drivers/watchdog/da9062_wdt.c b/drivers/watchdog/da9062_wdt.c
+> index b3a870ce85be..7386111220d5 100644
+> --- a/drivers/watchdog/da9062_wdt.c
+> +++ b/drivers/watchdog/da9062_wdt.c
+> @@ -210,6 +210,7 @@ static int da9062_wdt_probe(struct platform_device *pdev)
+>  	wdt->wdtdev.max_timeout = DA9062_WDT_MAX_TIMEOUT;
+>  	wdt->wdtdev.timeout = DA9062_WDG_DEFAULT_TIMEOUT;
+>  	wdt->wdtdev.status = WATCHDOG_NOWAYOUT_INIT_STATUS;
+> +	wdt->wdtdev.parent = &pdev->dev;
 > 
-> I think this is what is being done in
-> http://lxr.free-electrons.com/source/arch/arm/kernel/bios32.c#L495
-> and currently designware assigns the root bus number in
-> http://lxr.free-electrons.com/source/drivers/pci/host/pcie-designware.c#L730
+>  	watchdog_set_drvdata(&wdt->wdtdev, wdt);
+>  	dev_set_drvdata(&pdev->dev, wdt);
+> diff --git a/drivers/watchdog/da9063_wdt.c b/drivers/watchdog/da9063_wdt.c
+> index e2fe2ebdebd4..6bf130bd863d 100644
+> --- a/drivers/watchdog/da9063_wdt.c
+> +++ b/drivers/watchdog/da9063_wdt.c
+> @@ -175,6 +175,7 @@ static int da9063_wdt_probe(struct platform_device *pdev)
+>  	wdt->wdtdev.min_timeout = DA9063_WDT_MIN_TIMEOUT;
+>  	wdt->wdtdev.max_timeout = DA9063_WDT_MAX_TIMEOUT;
+>  	wdt->wdtdev.timeout = DA9063_WDG_TIMEOUT;
+> +	wdt->wdtdev.parent = &pdev->dev;
 > 
-You found the right spot. It works a bit different than I remember, but
-is less broken than your current code. :)
+>  	wdt->wdtdev.status = WATCHDOG_NOWAYOUT_INIT_STATUS;
+> 
 
-It actually assigns the next instance a root bus number behind the
-current instances bus range. Please note the difference to your code
-which assigns the next free bus number, which may still lay within the
-current instances bus range.
-
-> 
-> In general I agree with you but if you look at all the current drivers 
-> based on designware none of them define the "bus-range" dtb property.
-> Therefore doing as you say would break the current driver when we have
-> multiple controllers...am I right?
-> 
-The current _code_ works fine for multiple controllers. It's just that
-you must define the bus range property in the DTB if you want to enable
-multiple instances of one controller and support a kernel without PCI
-domains support. As all current implementations have only a single
-instance of the controller per SoC, or depend on PCI domain support,
-it's totally fine for them to not define the bus ranges property, as
-it's an optional property and it is well defined how things behave if it
-is absent. We absolutely need to keep that specified behavior.
-
-> If that is the case in order to fix this in the way you say I would need
-> to assign "bus-range" for all the PCIe drivers with multiple controllers:
-> in this case I would split the default range evenly (that is, if we have 
-> two controllers I would define "bus-range"  0-127 and 128-255)
-> 
-> If you think this solution is ok I can go for it. My only doubt was about
-> touching other vendors DTBs....
-> 
-You don't need to touch any of the current DTBs, as they are fine with
-the default bus range behavior. You need to keep the specified behavior
-of the bus range property with the new code.
-
-Regards,
-Lucas
-> 
-> > 
-> > It is perfectly valid to have a bus range of 0x00-0x10 assigned to one
-> > instance and 0x50-0xff to the next instance. Additional with PCIe
-> > hotplug you may not use the full range of the bus numbers on one
-> > instance at the first scan, but only later populate more buses when
-> > more
-> > bridges are added to the tree.
-> > 
-> > > Drivers that do not specify the bus range in the DTB set pp-
-> > >root_bus_nr = DW_ROOT_NR_UNDEFINED.
-> > > Designware will check if the flag is set and will use the automatic
-> > bus range
-> > > assignment.
-> > 
-> > No, please lets get rid of this assignment altogether. The glue drivers
-> > have no business in assigning the bus range. Please remove the
-> > pp->root_bus_nr assignment from all the glue drivers.
-> > 
-> > "bus range" is a generic DW PCIe property, so just parse the root bus
-> > number from the DT, it is handled the same way for all the DW based
-> > PCIe
-> > drivers. The bindings specifies that if the bus range property is
-> > missing the range is 0x00-0xff, so you can default to 0 as the root bus
-> > number in that case.
-> > 
-> > Also I would think this conversion warrants a patch on its own and
-> > should not be mixed in the ARM64 support patch.
-> > 
-> > Regards,
-> > Lucas
-> > 
-
--- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+Acked-by: Adam Thomson <Adam.Thomson.Opensource@diasemi.com>
