@@ -1,50 +1,56 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Thu, 20 Aug 2015 17:09:45 +0530
-Subject: [PATCH 5/5] Documentation: dt-bindings: add exynos-srom binding
- information
-In-Reply-To: <CAJKOXPfpu+k-3u3kFzeKL4b9bkh+iwWHak2ea+9QLtGUEZGWdA@mail.gmail.com>
-References: <1430296712-10287-1-git-send-email-pankaj.dubey@samsung.com>
- <1430296712-10287-6-git-send-email-pankaj.dubey@samsung.com>
- <CAJKOXPfpu+k-3u3kFzeKL4b9bkh+iwWHak2ea+9QLtGUEZGWdA@mail.gmail.com>
-Message-ID: <55D5BC81.9050304@samsung.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 20 Aug 2015 13:54:40 +0200
+Subject: [PATCH 2/2] arm64: set MAX_MEMBLOCK_ADDR according to linear
+ region size
+In-Reply-To: <20150820091915.GC2972@e104818-lin.cambridge.arm.com>
+References: <1439890482-20798-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1439890482-20798-3-git-send-email-ard.biesheuvel@linaro.org>
+ <20150820091915.GC2972@e104818-lin.cambridge.arm.com>
+Message-ID: <E830F411-141C-40C4-A608-7709304395C5@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
 
-On Wednesday 27 May 2015 04:51 PM, Krzysztof Kozlowski wrote:
-> 2015-04-29 17:38 GMT+09:00 Pankaj Dubey <pankaj.dubey@samsung.com>:
->> This patch adds exynos-srom binding information for SROM Controller
->> driver on Exynos SoCs.
->>
->> CC: Rob Herring <robh+dt@kernel.org>
->> CC: Mark Rutland <mark.rutland@arm.com>
->> CC: Ian Campbell <ijc+devicetree@hellion.org.uk>
->> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+
+> On 20 aug. 2015, at 11:19, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> 
+>> On Tue, Aug 18, 2015 at 11:34:42AM +0200, Ard Biesheuvel wrote:
+>> The linear region size of a 39-bit VA kernel is only 256 GB, which
+>> may be insufficient to cover all of system RAM, even on platforms
+>> that have much less than 256 GB of memory but which is laid out
+>> very sparsely.
+>> 
+>> So make sure we clip the memory we will not be able to map before
+>> installing it into the memblock memory table, by setting
+>> MAX_MEMBLOCK_ADDR accordingly.
+>> 
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 >> ---
->>   .../devicetree/bindings/arm/samsung/exynos-srom.txt          | 12 ++++++++++++
->>   1 file changed, 12 insertions(+)
->>   create mode 100644 Documentation/devicetree/bindings/arm/samsung/exynos-srom.txt
->>
->> diff --git a/Documentation/devicetree/bindings/arm/samsung/exynos-srom.txt b/Documentation/devicetree/bindings/arm/samsung/exynos-srom.txt
->> new file mode 100644
->> index 0000000..482d1cd
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/arm/samsung/exynos-srom.txt
->> @@ -0,0 +1,12 @@
->> +SAMSUNG Exynos SoCs SROM Controller driver.
->> +
->> +Required properties:
->> +- compatible : Should at least contain "samsung,exynos-srom".
->
-> "At least" - do you already expect other compatibles?
->
+>> arch/arm64/include/asm/memory.h | 8 ++++++++
+>> 1 file changed, 8 insertions(+)
+>> 
+>> diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+>> index f800d45ea226..44a59c20e773 100644
+>> --- a/arch/arm64/include/asm/memory.h
+>> +++ b/arch/arm64/include/asm/memory.h
+>> @@ -114,6 +114,14 @@ extern phys_addr_t        memstart_addr;
+>> #define PHYS_OFFSET        ({ memstart_addr; })
+>> 
+>> /*
+>> + * The maximum physical address that the linear direct mapping
+>> + * of system RAM can cover. (PAGE_OFFSET can be interpreted as
+>> + * a 2's complement signed quantity and negated to derive the
+>> + * maximum size of the linear mapping.)
+>> + */
+>> +#define MAX_MEMBLOCK_ADDR    ({ memstart_addr - PAGE_OFFSET - 1; })
+> 
+> Would it be easier to understand as just memstart_addr + ~PAGE_OFFSET?
+> 
 
-Nope, as of now I do not expect any other compatible, so I will change 
-this to "Should contain "samsung,exynos-srom"."
+Whichever you prefer
 
-Thanks,
-Pankaj Dubey
-> Best regards,
-> Krzysztof
->
+> Otherwise:
+> 
+> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+
+Thanks
