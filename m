@@ -1,76 +1,54 @@
 From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Thu, 20 Aug 2015 14:41:40 +0200
-Subject: [PATCH 0/4] [media] Media entity cleanups and build fixes
-In-Reply-To: <1439998526-12832-1-git-send-email-javier@osg.samsung.com>
+Date: Thu, 20 Aug 2015 14:43:11 +0200
+Subject: [PATCH 3/4] [media] media: use entity.graph_obj.mdev instead
+ of .parent
+In-Reply-To: <1439998526-12832-4-git-send-email-javier@osg.samsung.com>
 References: <1439998526-12832-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <55D5CB04.50508@xs4all.nl>
+ <1439998526-12832-4-git-send-email-javier@osg.samsung.com>
+Message-ID: <55D5CB5F.2010106@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 08/19/15 17:35, Javier Martinez Canillas wrote:
-> Hello,
+> The struct media_entity has a .parent field that stores a pointer
+> to the parent struct media_device. But recently a media_gobj was
+> embedded into the entities and since struct media_gojb already has
+> a pointer to a struct media_device in the .mdev field, the .parent
+> field becomes redundant and can be removed.
 > 
-> This series contains a couple of build fixes and cleanups for the
-> Media Controller framework. The goal of the series is to get rid of
-> the struct media_entity .parent member since now that a media_gobj is
-> embedded into entities, the media_gobj .mdev member can be used to
-> store a pointer to the parent struct media_device.
+> This patch replaces all the usage of .parent by .graph_obj.mdev so
+> that field will become unused and can be removed on a later patch.
 > 
-> So the .parent field becomes redundant and can be removed after all
-> the users are converted to use entity .graph_obj.mdev instead.
+> No functional changes.
 > 
-> Patches 1/4 and 2/4 are build fixes I found while build testing if no
-> regressions were introduced by the conversion. Patch 3/4 converts
-> all the drivers and the MC core to use .mdev instead of .parent and
-> finally patch 4/4 removes the .parent field since now is unused.
+> The transformation was made using the following coccinelle spatch:
+> 
+> @@
+> struct media_entity *me;
+> @@
+> 
+> - me->parent
+> + me->graph_obj.mdev
+> 
+> @@
+> struct media_entity *link;
+> @@
+> 
+> - link->source->entity->parent
+> + link->source->entity->graph_obj.mdev
+> 
+> @@
+> struct exynos_video_entity *ve;
+> @@
+> 
+> - ve->vdev.entity.parent
+> + ve->vdev.entity.graph_obj.mdev
+> 
+> Suggested-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
+> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
-Regarding patches 1 and 2: these should of course be merged with Mauro's
-patches that make this particular change (patch 3/8), otherwise it would
-break git bisect.
-
-Anyway,
-
-Acked-by: Hans Verkuil <hans.verkuil@cisco.com> for the changes in patch
-1 and 2, as long as they are added to Mauro's patch 3/8.
+Acked-by: Hans Verkuil <hans.verkuil@cisco.com>
 
 Regards,
 
 	Hans
-
-> 
-> The series depend on Mauro's "[PATCH v6 0/8] MC preparation patches
-> series" [0].
-> 
-> The transformation were automated using a coccinelle semantic patch
-> and the drivers were build tested using allyesconfig and x-building
-> the ARM Exynos and OMAP defconfigs + the needed media config options.
-> 
-> Best regards,
-> Javier
-> 
-> [0]: http://www.mail-archive.com/linux-media at vger.kernel.org/msg91330.html
-> 
-> 
-> Javier Martinez Canillas (4):
->   [media] staging: omap4iss: get entity ID using media_entity_id()
->   [media] omap3isp: get entity ID using media_entity_id()
->   [media] media: use entity.graph_obj.mdev instead of .parent
->   [media] media: remove media entity .parent field
-> 
->  drivers/media/media-device.c                       |  8 ++---
->  drivers/media/media-entity.c                       | 34 ++++++++++++----------
->  drivers/media/platform/exynos4-is/fimc-isp-video.c |  6 ++--
->  drivers/media/platform/exynos4-is/fimc-lite.c      |  8 ++---
->  drivers/media/platform/exynos4-is/media-dev.c      |  2 +-
->  drivers/media/platform/exynos4-is/media-dev.h      |  8 ++---
->  drivers/media/platform/omap3isp/isp.c              | 11 ++++---
->  drivers/media/platform/omap3isp/ispccdc.c          |  2 +-
->  drivers/media/platform/omap3isp/ispvideo.c         | 10 ++++---
->  drivers/media/platform/vsp1/vsp1_video.c           |  2 +-
->  drivers/media/platform/xilinx/xilinx-dma.c         |  2 +-
->  drivers/staging/media/davinci_vpfe/vpfe_video.c    |  6 ++--
->  drivers/staging/media/omap4iss/iss.c               |  6 ++--
->  drivers/staging/media/omap4iss/iss_video.c         |  4 +--
->  include/media/media-entity.h                       |  1 -
->  15 files changed, 58 insertions(+), 52 deletions(-)
-> 
