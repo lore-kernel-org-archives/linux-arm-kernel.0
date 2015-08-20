@@ -1,107 +1,76 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 20 Aug 2015 17:28:38 +0100
-Subject: [GIT PULL] KVM/ARM pull request for 4.3
-Message-ID: <1440088143-4722-1-git-send-email-marc.zyngier@arm.com>
+Date: Thu, 20 Aug 2015 17:28:40 +0100
+Subject: [PATCH 02/25] KVM: arm64: guest debug, define API headers
+In-Reply-To: <1440088143-4722-1-git-send-email-marc.zyngier@arm.com>
+References: <1440088143-4722-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1440088143-4722-3-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paolo,
+From: Alex Benn?e <alex.bennee@linaro.org>
 
-This is the KVM/ARM pull request for Linux 4.3. Some rather major
-things this time around (guest debug, management of interrupt active
-state, lazy FP save/restore).
+This commit defines the API headers for guest debugging. There are two
+architecture specific debug structures:
 
-Thanks!
+  - kvm_guest_debug_arch, allows us to pass in HW debug registers
+  - kvm_debug_exit_arch, signals exception and possible faulting address
 
-	M.
+The type of debugging being used is controlled by the architecture
+specific control bits of the kvm_guest_debug->control flags in the ioctl
+structure.
 
-The following changes since commit bc0195aad0daa2ad5b0d76cce22b167bc3435590:
+Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+Reviewed-by: David Hildenbrand <dahi@linux.vnet.ibm.com>
+Reviewed-by: Andrew Jones <drjones@redhat.com>
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/include/uapi/asm/kvm.h | 27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
 
-  Linux 4.2-rc2 (2015-07-12 15:10:30 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-for-4.3
-
-for you to fetch changes up to 054167b3d55127feb64978eddf3f9f3a84fe493b:
-
-  arm: KVM: keep arm vfp/simd exit handling consistent with arm64 (2015-08-19 22:27:58 +0100)
-
-----------------------------------------------------------------
-KVM/ARM changes for 4.3
-
-- Full debug support for arm64
-- Active state switching for timer interrupts
-- Lazy FP/SIMD save/restore for arm64
-- Generic ARMv8 target
-
-----------------------------------------------------------------
-Alex Benn?e (11):
-      KVM: add comments for kvm_debug_exit_arch struct
-      KVM: arm64: guest debug, define API headers
-      KVM: arm: guest debug, add stub KVM_SET_GUEST_DEBUG ioctl
-      KVM: arm: introduce kvm_arm_init/setup/clear_debug
-      KVM: arm64: guest debug, add SW break point support
-      KVM: arm64: guest debug, add support for single-step
-      KVM: arm64: re-factor hyp.S debug register code
-      KVM: arm64: introduce vcpu->arch.debug_ptr
-      KVM: arm64: guest debug, HW assisted debug support
-      KVM: arm64: enable KVM_CAP_SET_GUEST_DEBUG
-      KVM: arm64: add trace points for guest_debug debug
-
-Marc Zyngier (10):
-      arm/arm64: KVM: Fix ordering of timer/GIC on guest entry
-      arm/arm64: KVM: Move vgic handling to a non-preemptible section
-      KVM: arm/arm64: vgic: Convert struct vgic_lr to use bitfields
-      KVM: arm/arm64: vgic: Allow HW irq to be encoded in LR
-      KVM: arm/arm64: vgic: Relax vgic_can_sample_irq for edge IRQs
-      KVM: arm/arm64: vgic: Allow dynamic mapping of physical/virtual interrupts
-      KVM: arm/arm64: vgic: Allow HW interrupts to be queued to a guest
-      KVM: arm/arm64: vgic: Add vgic_{get,set}_phys_irq_active
-      KVM: arm/arm64: vgic: Prevent userspace injection of a mapped interrupt
-      KVM: arm/arm64: timer: Allow the timer to control the active state
-
-Mario Smarduch (2):
-      arm64: KVM: Optimize arm64 skip 30-50% vfp/simd save/restore on exits
-      arm: KVM: keep arm vfp/simd exit handling consistent with arm64
-
-Suzuki K. Poulose (1):
-      arm64/kvm: Add generic v8 KVM target
-
-Vladimir Murzin (1):
-      arm64: KVM: remove remaining reference to vgic_sr_vectors
-
- Documentation/virtual/kvm/api.txt      |  15 +-
- arch/arm/include/asm/kvm_host.h        |   5 +
- arch/arm/kvm/arm.c                     |  36 +-
- arch/arm/kvm/guest.c                   |   6 +
- arch/arm/kvm/interrupts.S              |  14 +-
- arch/arm/kvm/reset.c                   |   4 +-
- arch/arm64/include/asm/hw_breakpoint.h |  14 +
- arch/arm64/include/asm/kvm_arm.h       |   5 +-
- arch/arm64/include/asm/kvm_asm.h       |  26 +-
- arch/arm64/include/asm/kvm_host.h      |  42 ++-
- arch/arm64/include/uapi/asm/kvm.h      |  37 +-
- arch/arm64/kernel/asm-offsets.c        |   9 +-
- arch/arm64/kernel/hw_breakpoint.c      |  12 -
- arch/arm64/kvm/Makefile                |   2 +-
- arch/arm64/kvm/debug.c                 | 217 ++++++++++++
- arch/arm64/kvm/guest.c                 |  43 ++-
- arch/arm64/kvm/handle_exit.c           |  44 +++
- arch/arm64/kvm/hyp.S                   | 617 ++++++++++++---------------------
- arch/arm64/kvm/reset.c                 |  20 +-
- arch/arm64/kvm/sys_regs.c              | 291 ++++++++++++++--
- arch/arm64/kvm/sys_regs.h              |   6 +
- arch/arm64/kvm/sys_regs_generic_v8.c   |   2 +
- arch/arm64/kvm/trace.h                 | 123 +++++++
- include/kvm/arm_arch_timer.h           |   7 +-
- include/kvm/arm_vgic.h                 |  39 ++-
- include/linux/irqchip/arm-gic-v3.h     |   3 +
- include/linux/irqchip/arm-gic.h        |   3 +-
- include/uapi/linux/kvm.h               |   5 +
- virt/kvm/arm/arch_timer.c              |  29 +-
- virt/kvm/arm/vgic-v2.c                 |  16 +-
- virt/kvm/arm/vgic-v3.c                 |  21 +-
- virt/kvm/arm/vgic.c                    | 427 +++++++++++++++++++++--
- 32 files changed, 1596 insertions(+), 544 deletions(-)
- create mode 100644 arch/arm64/kvm/debug.c
+diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+index d268320..d82f3f3 100644
+--- a/arch/arm64/include/uapi/asm/kvm.h
++++ b/arch/arm64/include/uapi/asm/kvm.h
+@@ -100,12 +100,39 @@ struct kvm_sregs {
+ struct kvm_fpu {
+ };
+ 
++/*
++ * See v8 ARM ARM D7.3: Debug Registers
++ *
++ * The architectural limit is 16 debug registers of each type although
++ * in practice there are usually less (see ID_AA64DFR0_EL1).
++ *
++ * Although the control registers are architecturally defined as 32
++ * bits wide we use a 64 bit structure here to keep parity with
++ * KVM_GET/SET_ONE_REG behaviour which treats all system registers as
++ * 64 bit values. It also allows for the possibility of the
++ * architecture expanding the control registers without having to
++ * change the userspace ABI.
++ */
++#define KVM_ARM_MAX_DBG_REGS 16
+ struct kvm_guest_debug_arch {
++	__u64 dbg_bcr[KVM_ARM_MAX_DBG_REGS];
++	__u64 dbg_bvr[KVM_ARM_MAX_DBG_REGS];
++	__u64 dbg_wcr[KVM_ARM_MAX_DBG_REGS];
++	__u64 dbg_wvr[KVM_ARM_MAX_DBG_REGS];
+ };
+ 
+ struct kvm_debug_exit_arch {
++	__u32 hsr;
++	__u64 far;	/* used for watchpoints */
+ };
+ 
++/*
++ * Architecture specific defines for kvm_guest_debug->control
++ */
++
++#define KVM_GUESTDBG_USE_SW_BP		(1 << 16)
++#define KVM_GUESTDBG_USE_HW		(1 << 17)
++
+ struct kvm_sync_regs {
+ };
+ 
+-- 
+2.1.4
