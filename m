@@ -1,29 +1,41 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Thu, 20 Aug 2015 12:20:10 -0500
-Subject: [PATCH] ARM: Set proper TEXT_OFFSET for IPQ806x
-In-Reply-To: <20150820130005.GS7557@n2100.arm.linux.org.uk>
-References: <20150820121541.GA14664@codeaurora.org>
- <20150820130005.GS7557@n2100.arm.linux.org.uk>
-Message-ID: <20150820172010.GB10796@qualcomm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 20 Aug 2015 18:23:08 +0100
+Subject: [PATCHv2] arm64: dts: Add base stratix 10 dtsi
+In-Reply-To: <1439308127-7412-1-git-send-email-dinguyen@opensource.altera.com>
+References: <1439308127-7412-1-git-send-email-dinguyen@opensource.altera.com>
+Message-ID: <20150820172308.GA2711@svinekod>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 20, 2015 at 02:00:06PM +0100, Russell King - ARM Linux wrote:
-> On Thu, Aug 20, 2015 at 05:45:41PM +0530, Varadarajan Narayanan wrote:
-> > RAM starts at 0x40000000 for IPQ. The lower 21MB of RAM is used
-> > for Shared Memory and the kernel can start from 0x41500000.
-> 
-> Why do people keep creating crap like this?  Each time something like
-> this is created, it means that you _need_ to have a special kernel for
-> your platform and you can't be part of the single zImage.
-> 
-> Please, rather than creating crap like this, find a better way.
+Hi,
 
-In the case of the IPQ, we don't use the zImage because the decompress requires
-a larger jump than we can do on that platform.  Having this change at least gets
-us back 2MB of memory.
+> +/ {
+> +	compatible = "altr,socfpga-stratix10";
+> +	#address-cells = <1>;
+> +	#size-cells = <1>;
 
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+I would recommend that you make your root #address-cells and #size-cells equal
+to 2, as that will simplify matters later if/when you need to add anything
+beyond the first 4GB for some particular board.
+
+If everything in the SoC falls within the first 4GB you can have a ranges
+property on your /soc node and have only one cell below that.
+
+[...]
+
+> +	intc: intc at ffff8000 {
+
+The unit-address doesn't match the first address in the reg entry.
+
+> +		compatible = "arm,gic-400", "arm,cortex-a15-gic";
+> +		#interrupt-cells = <3>;
+> +		interrupt-controller;
+> +		reg = <0x0 0xffff9000 0x1000>,
+> +		      <0x0 0xffffa000 0x2000>,
+> +		      <0x0 0xffffc000 0x1000>,
+> +		      <0x0 0xffffd000 0x1000>;
+> +	};
+
+Shouldn't the virtual CPU interface also be 0x2000 long?
+
+Mark.
