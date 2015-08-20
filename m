@@ -1,38 +1,51 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 20 Aug 2015 17:28:56 +0100
-Subject: [PATCH 18/25] KVM: arm/arm64: vgic: Relax vgic_can_sample_irq for
- edge IRQs
+Date: Thu, 20 Aug 2015 17:28:54 +0100
+Subject: [PATCH 16/25] KVM: arm/arm64: vgic: Convert struct vgic_lr to use
+ bitfields
 In-Reply-To: <1440088143-4722-1-git-send-email-marc.zyngier@arm.com>
 References: <1440088143-4722-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1440088143-4722-19-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1440088143-4722-17-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We only set the irq_queued flag for level interrupts, meaning
-that "!vgic_irq_is_queued(vcpu, irq)" is a good enough predicate
-for all interrupts.
+As we're about to cram more information in the vgic_lr structure
+(HW interrupt number and additional state information), we switch
+to a layout similar to the HW's:
 
-This will allow us to inject edge HW interrupts, for which the
-state ACTIVE+PENDING is not allowed.
+- use bitfields to save space (we don't need more than 10 bits
+  to represent the irq numbers)
+- source CPU and HW interrupt can share the same field, as
+  a SGI doesn't have a physical line.
 
+Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
 Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/vgic.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ include/kvm/arm_vgic.h | 10 +++++++---
+ 1 file changed, 7 insertions(+), 3 deletions(-)
 
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index bc40137..5bd1695 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -375,7 +375,7 @@ void vgic_cpu_irq_clear(struct kvm_vcpu *vcpu, int irq)
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index 133ea00..a881e39 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -95,11 +95,15 @@ enum vgic_type {
+ #define LR_STATE_ACTIVE		(1 << 1)
+ #define LR_STATE_MASK		(3 << 0)
+ #define LR_EOI_INT		(1 << 2)
++#define LR_HW			(1 << 3)
  
- static bool vgic_can_sample_irq(struct kvm_vcpu *vcpu, int irq)
- {
--	return vgic_irq_is_edge(vcpu, irq) || !vgic_irq_is_queued(vcpu, irq);
-+	return !vgic_irq_is_queued(vcpu, irq);
- }
+ struct vgic_lr {
+-	u16	irq;
+-	u8	source;
+-	u8	state;
++	unsigned irq:10;
++	union {
++		unsigned hwirq:10;
++		unsigned source:3;
++	};
++	unsigned state:4;
+ };
  
- /**
+ struct vgic_vmcr {
 -- 
 2.1.4
