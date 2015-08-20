@@ -1,34 +1,39 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 20 Aug 2015 14:08:30 -0700
-Subject: [PATCH 1/9] spi: sunxi: fix transfer timeout
-In-Reply-To: <20150820193433.GH30520@lukather>
-References: <cover.1440080122.git.hramrach@gmail.com>
- <0e0b52774a48ddb71dc8095b66942451cd31ff7d.1440080122.git.hramrach@gmail.com>
- <20150820184132.GO12027@sirena.org.uk>
- <20150820193433.GH30520@lukather>
-Message-ID: <20150820210830.GS12027@sirena.org.uk>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 20 Aug 2015 14:14:24 -0700
+Subject: [PATCH v1 0/6] Add fec1 and fec2 support for i.MX7d sdb board
+In-Reply-To: <20150820.140531.1320709021949935376.davem@davemloft.net>
+References: <1439962444-27486-1-git-send-email-b38611@freescale.com>
+ <20150820.140531.1320709021949935376.davem@davemloft.net>
+Message-ID: <55D64330.4020503@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 20, 2015 at 09:34:33PM +0200, Maxime Ripard wrote:
-> On Thu, Aug 20, 2015 at 11:41:32AM -0700, Mark Brown wrote:
-> > On Thu, Aug 20, 2015 at 02:19:45PM -0000, Michal Suchanek wrote:
+On 20/08/15 14:05, David Miller wrote:
+> From: Fugang Duan <b38611@freescale.com>
+> Date: Wed, 19 Aug 2015 13:33:58 +0800
+> 
+>> The patch series is to add fec support for i.MX7d sdb board. Since i.MX7d fec ip is
+>> the same as i.MX6SX, so there have no change for driver itself.
+>>
+>> Patch#1: add bcm54220 PHY ID entry into brcmphy.h file.
+> 
+> This is completely, and utterly, pointless.
+> 
+> The only reason a PHY ID should be defined in brcmphy.h is so that it can
+> be used in the broadcom.c PHY driver or similar.
+> 
+> If there is no user in the tree, there is no reason to add it to the
+> header file.
 
-> > >  drivers/spi/spi-sun4i.c | 10 +++++++++-
-> > >  drivers/spi/spi-sun6i.c | 10 +++++++++-
+There is a valid reason for which you may have a PHY id, which is
+defining a PHY fixup in your platform code like Andy is doing, however,
+this should not be used in conjunction with the Generic PHY driver,
+because this driver has absolutely no clue about your PHY fixup, and
+this could create at best inconsistencies in how the fixup is managed
+later on.
 
-> > Are we *sure* we can't work on merging these drivers :(
-
-> Those are two different IPs, that don't really share anything but
-> their author...
-
-I seem to be seeing a number of changes like this one which make
-apparently very similar modifications to both.  Perhaps there is more
-core usage that should be happening instead?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150820/c5c0c589/attachment-0001.sig>
+At the very least, I would like to see a change to
+drivers/net/phy/broadcom.c which identifies this PHY id, and eventually
+just invokes the genphy_* functions where relevant.
+-- 
+Florian
