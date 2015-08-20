@@ -1,227 +1,76 @@
-From: varada@codeaurora.org (Varadarajan Narayanan)
-Date: Thu, 20 Aug 2015 17:45:41 +0530
-Subject: [PATCH] ARM: Set proper TEXT_OFFSET for IPQ806x
-Message-ID: <20150820121541.GA14664@codeaurora.org>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Thu, 20 Aug 2015 14:41:40 +0200
+Subject: [PATCH 0/4] [media] Media entity cleanups and build fixes
+In-Reply-To: <1439998526-12832-1-git-send-email-javier@osg.samsung.com>
+References: <1439998526-12832-1-git-send-email-javier@osg.samsung.com>
+Message-ID: <55D5CB04.50508@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-RAM starts at 0x40000000 for IPQ. The lower 21MB of RAM is used
-for Shared Memory and the kernel can start from 0x41500000. However,
-this cannot be accomodated within the current AUTO_ZRELADDR framework.
-If textofs-y is set to 0x01508000, compilation breaks with
+On 08/19/15 17:35, Javier Martinez Canillas wrote:
+> Hello,
+> 
+> This series contains a couple of build fixes and cleanups for the
+> Media Controller framework. The goal of the series is to get rid of
+> the struct media_entity .parent member since now that a media_gobj is
+> embedded into entities, the media_gobj .mdev member can be used to
+> store a pointer to the parent struct media_device.
+> 
+> So the .parent field becomes redundant and can be removed after all
+> the users are converted to use entity .graph_obj.mdev instead.
+> 
+> Patches 1/4 and 2/4 are build fixes I found while build testing if no
+> regressions were introduced by the conversion. Patch 3/4 converts
+> all the drivers and the MC core to use .mdev instead of .parent and
+> finally patch 4/4 removes the .parent field since now is unused.
 
-	arch/arm/kernel/head.S:181:
-		Error: invalid constant (1508000) after fixup
+Regarding patches 1 and 2: these should of course be merged with Mauro's
+patches that make this particular change (patch 3/8), otherwise it would
+break git bisect.
 
-Hence, cannot use Linux's self extractor. Instead, create a compressed
-image that will be de-compressed from U-Boot.
+Anyway,
 
-Signed-off-by: Varadarajan Narayanan <varada@codeaurora.org>
+Acked-by: Hans Verkuil <hans.verkuil@cisco.com> for the changes in patch
+1 and 2, as long as they are added to Mauro's patch 3/8.
 
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 07ab3d2..cce8ea6 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -142,6 +142,8 @@ textofs-$(CONFIG_SA1111) := 0x00208000
- endif
- textofs-$(CONFIG_ARCH_MSM8X60) := 0x00208000
- textofs-$(CONFIG_ARCH_MSM8960) := 0x00208000
-+textofs-$(CONFIG_ARCH_IPQ8064) := 0x00008000
-+
- textofs-$(CONFIG_ARCH_AXXIA) := 0x00308000
- 
- # Machine directory name.  This list is sorted alphanumerically
-diff --git a/arch/arm/configs/ipq_defconfig b/arch/arm/configs/ipq_defconfig
-new file mode 100644
-index 0000000..8562a2f
---- /dev/null
-+++ b/arch/arm/configs/ipq_defconfig
-@@ -0,0 +1,175 @@
-+CONFIG_SYSVIPC=y
-+CONFIG_NO_HZ=y
-+CONFIG_HIGH_RES_TIMERS=y
-+CONFIG_IKCONFIG=y
-+CONFIG_IKCONFIG_PROC=y
-+CONFIG_BLK_DEV_INITRD=y
-+CONFIG_SYSCTL_SYSCALL=y
-+CONFIG_KALLSYMS_ALL=y
-+CONFIG_EMBEDDED=y
-+# CONFIG_SLUB_DEBUG is not set
-+# CONFIG_COMPAT_BRK is not set
-+CONFIG_PROFILING=y
-+CONFIG_OPROFILE=y
-+CONFIG_KPROBES=y
-+CONFIG_MODULES=y
-+CONFIG_MODULE_UNLOAD=y
-+CONFIG_MODULE_FORCE_UNLOAD=y
-+CONFIG_MODVERSIONS=y
-+CONFIG_PARTITION_ADVANCED=y
-+CONFIG_ARCH_QCOM=y
-+CONFIG_ARCH_MSM8X60=y
-+CONFIG_ARCH_MSM8960=y
-+CONFIG_ARCH_MSM8974=y
-+CONFIG_ARCH_IPQ8064=y
-+CONFIG_SMP=y
-+CONFIG_PREEMPT=y
-+CONFIG_AEABI=y
-+CONFIG_HIGHMEM=y
-+CONFIG_HIGHPTE=y
-+CONFIG_CLEANCACHE=y
-+CONFIG_ARM_APPENDED_DTB=y
-+CONFIG_ARM_ATAG_DTB_COMPAT=y
-+CONFIG_CPU_IDLE=y
-+CONFIG_ARM_CPUIDLE=y
-+CONFIG_VFP=y
-+CONFIG_NEON=y
-+# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
-+CONFIG_NET=y
-+CONFIG_PACKET=y
-+CONFIG_UNIX=y
-+CONFIG_INET=y
-+CONFIG_IP_ADVANCED_ROUTER=y
-+CONFIG_IP_MULTIPLE_TABLES=y
-+CONFIG_IP_ROUTE_VERBOSE=y
-+CONFIG_IP_PNP=y
-+CONFIG_IP_PNP_DHCP=y
-+# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
-+# CONFIG_INET_XFRM_MODE_TUNNEL is not set
-+# CONFIG_INET_XFRM_MODE_BEET is not set
-+# CONFIG_INET_LRO is not set
-+# CONFIG_IPV6 is not set
-+CONFIG_CFG80211=y
-+CONFIG_RFKILL=y
-+CONFIG_DEVTMPFS=y
-+CONFIG_DEVTMPFS_MOUNT=y
-+CONFIG_MTD=y
-+CONFIG_MTD_BLOCK=y
-+CONFIG_MTD_M25P80=y
-+CONFIG_MTD_SPI_NOR=y
-+CONFIG_BLK_DEV_LOOP=y
-+CONFIG_BLK_DEV_RAM=y
-+CONFIG_SCSI=y
-+CONFIG_BLK_DEV_SD=y
-+CONFIG_CHR_DEV_SG=y
-+CONFIG_CHR_DEV_SCH=y
-+CONFIG_SCSI_CONSTANTS=y
-+CONFIG_SCSI_LOGGING=y
-+CONFIG_SCSI_SCAN_ASYNC=y
-+CONFIG_NETDEVICES=y
-+CONFIG_DUMMY=y
-+CONFIG_MDIO_BITBANG=y
-+CONFIG_MDIO_GPIO=y
-+CONFIG_SLIP=y
-+CONFIG_SLIP_COMPRESSED=y
-+CONFIG_SLIP_MODE_SLIP6=y
-+CONFIG_USB_USBNET=y
-+# CONFIG_USB_NET_AX8817X is not set
-+# CONFIG_USB_NET_ZAURUS is not set
-+CONFIG_INPUT_EVDEV=y
-+# CONFIG_KEYBOARD_ATKBD is not set
-+# CONFIG_MOUSE_PS2 is not set
-+CONFIG_INPUT_JOYSTICK=y
-+CONFIG_INPUT_TOUCHSCREEN=y
-+CONFIG_INPUT_MISC=y
-+CONFIG_INPUT_UINPUT=y
-+CONFIG_SERIO_LIBPS2=y
-+# CONFIG_LEGACY_PTYS is not set
-+CONFIG_SERIAL_MSM=y
-+CONFIG_SERIAL_MSM_CONSOLE=y
-+CONFIG_HW_RANDOM=y
-+CONFIG_I2C=y
-+CONFIG_I2C_CHARDEV=y
-+CONFIG_I2C_QUP=y
-+CONFIG_SPI=y
-+CONFIG_SPI_QUP=y
-+CONFIG_SPMI=y
-+CONFIG_PINCTRL_APQ8064=y
-+CONFIG_PINCTRL_APQ8084=y
-+CONFIG_PINCTRL_IPQ8064=y
-+CONFIG_PINCTRL_MSM8960=y
-+CONFIG_PINCTRL_MSM8X74=y
-+CONFIG_GPIOLIB=y
-+CONFIG_DEBUG_GPIO=y
-+CONFIG_GPIO_SYSFS=y
-+CONFIG_POWER_RESET=y
-+CONFIG_POWER_RESET_MSM=y
-+CONFIG_THERMAL=y
-+CONFIG_REGULATOR=y
-+CONFIG_REGULATOR_FIXED_VOLTAGE=y
-+CONFIG_MEDIA_SUPPORT=y
-+CONFIG_FB=y
-+CONFIG_SOUND=y
-+CONFIG_SND=y
-+CONFIG_SND_DYNAMIC_MINORS=y
-+# CONFIG_SND_ARM is not set
-+# CONFIG_SND_SPI is not set
-+# CONFIG_SND_USB is not set
-+CONFIG_SND_SOC=y
-+CONFIG_HID_BATTERY_STRENGTH=y
-+CONFIG_USB=y
-+CONFIG_USB_ANNOUNCE_NEW_DEVICES=y
-+CONFIG_USB_MON=y
-+CONFIG_USB_EHCI_HCD=y
-+CONFIG_USB_ACM=y
-+CONFIG_USB_SERIAL=y
-+CONFIG_USB_GADGET=y
-+CONFIG_USB_GADGET_DEBUG_FILES=y
-+CONFIG_USB_GADGET_VBUS_DRAW=500
-+CONFIG_MMC=y
-+CONFIG_MMC_BLOCK_MINORS=32
-+CONFIG_MMC_ARMMMCI=y
-+CONFIG_MMC_SDHCI=y
-+CONFIG_MMC_SDHCI_PLTFM=y
-+CONFIG_MMC_SDHCI_MSM=y
-+CONFIG_RTC_CLASS=y
-+CONFIG_DMADEVICES=y
-+CONFIG_QCOM_BAM_DMA=y
-+CONFIG_STAGING=y
-+CONFIG_COMMON_CLK_QCOM=y
-+CONFIG_APQ_MMCC_8084=y
-+CONFIG_IPQ_LCC_806X=y
-+CONFIG_MSM_GCC_8660=y
-+CONFIG_MSM_LCC_8960=y
-+CONFIG_MSM_MMCC_8960=y
-+CONFIG_MSM_MMCC_8974=y
-+CONFIG_MSM_IOMMU=y
-+CONFIG_QCOM_GSBI=y
-+CONFIG_QCOM_PM=y
-+CONFIG_PHY_QCOM_APQ8064_SATA=y
-+CONFIG_PHY_QCOM_IPQ806X_SATA=y
-+CONFIG_EXT2_FS=y
-+CONFIG_EXT2_FS_XATTR=y
-+CONFIG_EXT3_FS=y
-+# CONFIG_EXT3_DEFAULTS_TO_ORDERED is not set
-+CONFIG_EXT4_FS=y
-+CONFIG_FUSE_FS=y
-+CONFIG_VFAT_FS=y
-+CONFIG_TMPFS=y
-+CONFIG_JFFS2_FS=y
-+CONFIG_NFS_FS=y
-+CONFIG_NFS_V3_ACL=y
-+CONFIG_NFS_V4=y
-+CONFIG_CIFS=y
-+CONFIG_NLS_CODEPAGE_437=y
-+CONFIG_NLS_ASCII=y
-+CONFIG_NLS_ISO8859_1=y
-+CONFIG_NLS_UTF8=y
-+CONFIG_PRINTK_TIME=y
-+CONFIG_DYNAMIC_DEBUG=y
-+CONFIG_DEBUG_INFO=y
-+CONFIG_MAGIC_SYSRQ=y
-+CONFIG_LOCKUP_DETECTOR=y
-+# CONFIG_DETECT_HUNG_TASK is not set
-+# CONFIG_SCHED_DEBUG is not set
-+CONFIG_TIMER_STATS=y
-diff --git a/arch/arm/mach-qcom/Kconfig b/arch/arm/mach-qcom/Kconfig
-index 2256cd1..fab49a2 100644
---- a/arch/arm/mach-qcom/Kconfig
-+++ b/arch/arm/mach-qcom/Kconfig
-@@ -22,4 +22,8 @@ config ARCH_MSM8974
- 	bool "Enable support for MSM8974"
- 	select HAVE_ARM_ARCH_TIMER
- 
-+config ARCH_IPQ8064
-+	bool "Enable support for IPQ806x"
-+	select CLKSRC_QCOM
-+
- endif
+Regards,
+
+	Hans
+
+> 
+> The series depend on Mauro's "[PATCH v6 0/8] MC preparation patches
+> series" [0].
+> 
+> The transformation were automated using a coccinelle semantic patch
+> and the drivers were build tested using allyesconfig and x-building
+> the ARM Exynos and OMAP defconfigs + the needed media config options.
+> 
+> Best regards,
+> Javier
+> 
+> [0]: http://www.mail-archive.com/linux-media at vger.kernel.org/msg91330.html
+> 
+> 
+> Javier Martinez Canillas (4):
+>   [media] staging: omap4iss: get entity ID using media_entity_id()
+>   [media] omap3isp: get entity ID using media_entity_id()
+>   [media] media: use entity.graph_obj.mdev instead of .parent
+>   [media] media: remove media entity .parent field
+> 
+>  drivers/media/media-device.c                       |  8 ++---
+>  drivers/media/media-entity.c                       | 34 ++++++++++++----------
+>  drivers/media/platform/exynos4-is/fimc-isp-video.c |  6 ++--
+>  drivers/media/platform/exynos4-is/fimc-lite.c      |  8 ++---
+>  drivers/media/platform/exynos4-is/media-dev.c      |  2 +-
+>  drivers/media/platform/exynos4-is/media-dev.h      |  8 ++---
+>  drivers/media/platform/omap3isp/isp.c              | 11 ++++---
+>  drivers/media/platform/omap3isp/ispccdc.c          |  2 +-
+>  drivers/media/platform/omap3isp/ispvideo.c         | 10 ++++---
+>  drivers/media/platform/vsp1/vsp1_video.c           |  2 +-
+>  drivers/media/platform/xilinx/xilinx-dma.c         |  2 +-
+>  drivers/staging/media/davinci_vpfe/vpfe_video.c    |  6 ++--
+>  drivers/staging/media/omap4iss/iss.c               |  6 ++--
+>  drivers/staging/media/omap4iss/iss_video.c         |  4 +--
+>  include/media/media-entity.h                       |  1 -
+>  15 files changed, 58 insertions(+), 52 deletions(-)
+> 
