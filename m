@@ -1,46 +1,75 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Thu, 20 Aug 2015 09:38:01 +0530
-Subject: [PATCH v2] dmaengine: fsl-edma: add PM suspend/resume support
-In-Reply-To: <CADRPPNRaDaUBD1JG_QHrEQ5pKP9Ap1hV+bBdUnC-V32Nzr2qQw@mail.gmail.com>
-References: <1437469005-3162-1-git-send-email-yao.yuan@freescale.com>
- <CADRPPNQJi_x+mdQV=DEVuhCL_p6VOWcPiV3jzioeRdWgSW2w3g@mail.gmail.com>
- <CY1PR0301MB15628DD5CFCE2B65BF4FECB2837C0@CY1PR0301MB1562.namprd03.prod.outlook.com>
- <CADRPPNS_wzX+mwT0L-H=ZP9w8gH9W4O9KUqnGYiAc39S5v4qLA@mail.gmail.com>
- <CY1PR0301MB1562103588FB0C6BEFDDBF3C83790@CY1PR0301MB1562.namprd03.prod.outlook.com>
- <55D183D1.9020401@nigelcunningham.com.au>
- <CY1PR0301MB1562FBE9818C1973651D2B7183790@CY1PR0301MB1562.namprd03.prod.outlook.com>
- <CADRPPNRaDaUBD1JG_QHrEQ5pKP9Ap1hV+bBdUnC-V32Nzr2qQw@mail.gmail.com>
-Message-ID: <20150820040801.GS13546@localhost>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 20 Aug 2015 07:09:25 +0200
+Subject: [PATCH 2/2] arm64: set MAX_MEMBLOCK_ADDR according to linear
+ region size
+In-Reply-To: <20150818173938.GH11571@e104818-lin.cambridge.arm.com>
+References: <1439890482-20798-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1439890482-20798-3-git-send-email-ard.biesheuvel@linaro.org>
+ <20150818100018.GA11021@arm.com>
+ <CAKv+Gu-YDEKSrkSG2fywgrHBB3Hao+jodknmCAkFCWqG4OpXCA@mail.gmail.com>
+ <20150818173938.GH11571@e104818-lin.cambridge.arm.com>
+Message-ID: <CAKv+Gu8BVJF9MEsRRonprEkyhvrbTsWdUnz0wQyi2zUNAd_bpg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 17, 2015 at 02:10:46PM -0500, Li Yang wrote:
-> >> Think of it from the end user perspective. Would you like your laptop (or
-> >> whatever) to refuse to suspend because of this condition? The user may well
-> >> expect that closing the lid on their laptop will reliably lead to it suspending to
-> >> ram. Returning a failure here could result in a loss of data if the condition is not
-> >> detected and the machine subsequently runs out of power.
-> >>
-> >
-> > Yes, the user may well expect that closing the lid on their laptop will reliably lead to it suspending to ram.
-> > So the client(the user of the DMA) must  to PAUSE or terminate the DMA transmission.
-> >
-> > We need to rely on client doing the right thing here.
-> > The DMA should not make a decision instead of client.
-> > If the DMA is not idle in DMA suspend, it should be the client's issue.
-> > We don't know what the client really want to do, so just return the non-success value.
-> 
-> The problem here is that neither the client nor the DMA controller
-> driver should easily decide to stop the suspend entrance and rollback.
-> I don't think the non-idle situation is serious enough to cause a
-> rollback.  You should do whatever can be done with the DMA
-> controller(such as stop the controller and leave whatever to be done
-> to the wake up) and continue with the suspend.
+On 18 August 2015 at 19:39, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Tue, Aug 18, 2015 at 12:04:27PM +0200, Ard Biesheuvel wrote:
+>> On 18 August 2015 at 12:00, Will Deacon <will.deacon@arm.com> wrote:
+>> > On Tue, Aug 18, 2015 at 10:34:42AM +0100, Ard Biesheuvel wrote:
+>> >> The linear region size of a 39-bit VA kernel is only 256 GB, which
+>> >> may be insufficient to cover all of system RAM, even on platforms
+>> >> that have much less than 256 GB of memory but which is laid out
+>> >> very sparsely.
+>> >>
+>> >> So make sure we clip the memory we will not be able to map before
+>> >> installing it into the memblock memory table, by setting
+>> >> MAX_MEMBLOCK_ADDR accordingly.
+>> >>
+>> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> >> ---
+>> >>  arch/arm64/include/asm/memory.h | 8 ++++++++
+>> >>  1 file changed, 8 insertions(+)
+>> >>
+>> >> diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+>> >> index f800d45ea226..44a59c20e773 100644
+>> >> --- a/arch/arm64/include/asm/memory.h
+>> >> +++ b/arch/arm64/include/asm/memory.h
+>> >> @@ -114,6 +114,14 @@ extern phys_addr_t               memstart_addr;
+>> >>  #define PHYS_OFFSET          ({ memstart_addr; })
+>> >>
+>> >>  /*
+>> >> + * The maximum physical address that the linear direct mapping
+>> >> + * of system RAM can cover. (PAGE_OFFSET can be interpreted as
+>> >> + * a 2's complement signed quantity and negated to derive the
+>> >> + * maximum size of the linear mapping.)
+>> >> + */
+>> >> +#define MAX_MEMBLOCK_ADDR    ({ memstart_addr - PAGE_OFFSET - 1; })
+>> >
+>> > If we initialised memory_limit to this value and changed early_mem to
+>> > use min (i.e. only restrict the limit further), would that avoid the
+>> > need to change the of code? It looks like PPC uses
+>> > memblock_enforce_memory_limit for similar reasons.
+>>
+>> Yes, that would be yet another way of doing things. But since Catalin
+>> explicitly requested that both checks (i.e., bottom end and top end)
+>> occur in the same place, and indicated his preference not to override
+>> early_init_dt_add_memory_arch() if we can avoid it, the only way is to
+>> hack it in there.
+>
+> Talking to Will, we decided to go for a quick fix with cc stable that
+> does something like:
+>
+>         memblock_enforce_memory_limit(min(memory_limit, ~PAGE_OFFSET));
+>
 
-Ideally yes client should suspend first and dmaengine driver then being idle
-when suspend is invoked. But we know we are in idle world!
-So, driver should ensure it suspends the active channels and then goes to
-suspend and restores that on resume
+Actually, this won't work. The function limits the /amount/ of memory,
+and disregards holes when doing so.
 
--- 
-~Vinod
+> Afterwards, we should still sort early_init_dt_add_memory_arch() to get
+> the nicer printing since, as it stands, checking that a u64 is bigger
+> than ULONG_MAX is pointless on 64-bit.
+>
+> Thanks.
+>
+> --
+> Catalin
