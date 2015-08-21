@@ -1,39 +1,110 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 21 Aug 2015 09:12:30 -0700
-Subject: [GIT PULL] ARM: mvebu: cleanup changes for v4.3
-In-Reply-To: <55D748E0.3080004@free-electrons.com>
-References: <55D748E0.3080004@free-electrons.com>
-Message-ID: <20150821161230.GB14452@localhost>
+Date: Fri, 21 Aug 2015 09:17:32 -0700
+Subject: [GIT PULL] ARM64: juno: SCPI and dependent drivers for v4.3
+In-Reply-To: <55CCAF50.4040503@arm.com>
+References: <55C1E3FB.5090309@arm.com> <20150813124026.GD23581@localhost>
+ <20150813142444.GA4602@e104818-lin.cambridge.arm.com>
+ <55CCAF50.4040503@arm.com>
+Message-ID: <20150821161732.GC14452@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Fri, Aug 21, 2015 at 05:50:56PM +0200, Gregory CLEMENT wrote:
-> Hi,
+On Thu, Aug 13, 2015 at 03:53:04PM +0100, Sudeep Holla wrote:
 > 
-> Here is the first pull request for fixes for mvebu for v4.2.
-> I hope it is not too late, if it can't make ti for 4.2, then we
-> will apply it on 4.3, anyway the bug is here since 3.18.
+> 
+> On 13/08/15 15:24, Catalin Marinas wrote:
+> >On Thu, Aug 13, 2015 at 02:40:26PM +0200, Olof Johansson wrote:
+> >>On Wed, Aug 05, 2015 at 11:22:51AM +0100, Sudeep Holla wrote:
+> >>>Here is the first pull request for SCPI, clock and cpufreq support on
+> >>>ARM64 Juno development platform for v4.3
+> >>
+> >>I'd like to hear from Catalin and Will on why ARM is doing this. Catalin
+> >>and Will are pushing back very hard at vendors who don't use PSCI for
+> >>CPU power management, and then they have coworkers that are looking to
+> >>merge this directly into the kernel.
+> >
+> >Actually, the arm64 CPU power management story is pretty much handled by
+> >Lorenzo and Sudeep in my team, so I trust their judgement ;). But I
+> >agree with you that a better explanation on the reasons behind this is
+> >needed, otherwise we risk confusing messages. I'll try to summarise it
+> >below but Sudeep can reply with more details.
+> >
+> 
+> (I will use the acronomys directly as Catalin has already explained the
+> difference)
+> 
+> Thanks Catalin for the detailed explanation. I agree that this pull
+> request has not much details, but the patch series makes reference only
+> to the clocks and features provided by the SCP(System Control Processor)
+> to be used by Linux(non-secure) and nothing about CPU power states that
+> are handled by PSCI. This SCPI is completely independent and orthogonal
+> to PSCI.
 
-Given the longevity of the bug (i.e. not a recent regression) and the lateness
-in the release cycle, I've decided to queue this up for the 4.3
-next/fixes-non-critical branch instead. I.e. it'll be included in the next
-merge window.
+Yes, I am aware that PSCI and SCPI are two confusingly similar acronyms that
+represent separate things. My concern though is that we're letting in a poorly
+architected solution into the kernel with SCPI. PSCI is already choosing to
+abstract this outside of the kernel. Is there a reason SCPI isn't using the
+same approach?
 
-> The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
+> >PSCI only covers CPU boot/cpuidle and platform suspend. It does not have
+> >any provisions for DVFS and I'm not sure this could be easily
+> >standardised (or whether we could find enough supporters to get it
+> >adopted).
+> >
 > 
->   Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-4.2-1
-> 
-> for you to fetch changes up to 5be9fc23cdb42e1d383ecc8eae8a8ff70a752708:
-> 
->   ARM: orion5x: fix legacy orion5x IRQ numbers (2015-08-21 17:33:08 +0200)
+> Though we are not campaigning it as aggressively as PSCI.
 
-Merged, thanks!
+Which, given the resistance to pick up PSCI, this is unlikely to be used by
+anyone...
+
+> >SCPI is a (standard) interface to a coprocessor handling clocks etc. to
+> >be used with cpufreq. This patchset adds support for cpufreq/dvs which
+> >is not handled by PSCI. So, just to clarify the acronyms:
+> >
+> >SCPI - System Control and Power Interface - it's a protocol for
+> >communicating with a System Control Processor (e.g. Cortex-M3) via
+> >mailboxes. It is used in Linux for DVFS but this is *not* a secure/EL3
+> >firmware interface (a.k.a. SMC calls). It indeed a firmware interface
+> >but the firmware runs on a separate coprocessor and not on the CPU itself.
+> >
+> >PSCI - Power State Coordination Interface - it is a secure firmware
+> >interface for coordinating the CPU power states (idle, not DVFS). The
+> >firmware may use an SCPI communication channel (e.g. deeper sleep states
+> >where clock changes are needed).
+> >
+> 
+> I will add some more information to (hopefully) clarify the doubts.
+> 
+> SCP(System Control Processor) offers control and management of the
+> core/cluster power states, various power domain DVFS including the
+> core/cluster, certain system clocks configuration, thermal sensors and
+> many others.
+> 
+> Though the core/cluster power states are also handled this SCP,
+> they are accessible only through secure channels and PSCI firmware
+> implementations on the platform rely on that internally. Non-secure
+> access/requests are not possible.
+> 
+> Just to summarize, this SCP helps to offload all the power management
+> work to a dedicated low power processor which can be always running.
+> On Juno, its Cortex-M while on AMD Seattle it's Cortex-A5.
+
+I understand what the SCP is used for. What I don't understand is why you're
+adding all this complexity in the kernel for it.
+
+Also, is there only one known implementation of this today on Juno? Are there
+others coming soon? Single-user frameworks tend to be hard to get right, and
+it's usually much better to wait until it's clear it will fit more than just
+the original target.
+
+Anyway, the git server you provided the link to in the original email
+(linux-arm.org) seems to be offline so I couldn't fetch a fresh copy of
+the branch to look at.
+
+It's pretty clear this is not 4.3 material at this point, so I'll take
+a look at it later.
 
 
 -Olof
