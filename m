@@ -1,55 +1,53 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 21 Aug 2015 16:32:47 -0700
-Subject: [GIT PULL] RPi DT changes due for v4.3
-In-Reply-To: <55D7B3DB.8070405@gmail.com>
-References: <20150811160642.GQ18282@x1> <20150813103056.GY30160@localhost>
- <55D7B3DB.8070405@gmail.com>
-Message-ID: <CAOesGMjpR01rLHpj5ZSJq6eze4wU8KDS3wBmZdqKOAJmH0U5UQ@mail.gmail.com>
+From: fugang.duan@freescale.com (Duan Andy)
+Date: Fri, 21 Aug 2015 23:48:10 +0000
+Subject: [PATCH v1 0/6] Add fec1 and fec2 support for i.MX7d sdb board
+In-Reply-To: <55D64330.4020503@gmail.com>
+References: <1439962444-27486-1-git-send-email-b38611@freescale.com>
+ <20150820.140531.1320709021949935376.davem@davemloft.net>
+ <55D64330.4020503@gmail.com>
+Message-ID: <BN3PR0301MB1219287CCC621469BA444143F5650@BN3PR0301MB1219.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 21, 2015 at 4:27 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
-> On 13/08/15 03:30, Olof Johansson wrote:
->> Hi,
->>
->> On Tue, Aug 11, 2015 at 05:06:42PM +0100, Lee Jones wrote:
->>> ARM SoC Chaps,
->>>
->>> Please find a couple of simple RPi changes pertaining to Firmware.
->>>
->>> The following changes since commit bc0195aad0daa2ad5b0d76cce22b167bc3435590:
->>>
->>>   Linux 4.2-rc2 (2015-07-12 15:10:30 -0700)
->>>
->>> are available in the git repository at:
->>>
->>>   git://git.kernel.org/pub/scm/linux/kernel/git/rpi/linux-rpi.git tags/rpi-dt-for-armsoc-4.3
->>>
->>> for you to fetch changes up to fd26f8830979de48eb3f1c253eb9d2ee2e468eb6:
->>>
->>>   dt/bindings: Add binding for the Raspberry Pi firmware driver (2015-08-11 16:56:41 +0100)
->>
->> I've merged this but I'm a little confused about bcm2835 maintainership:
->> I got a MAINTAINERS update from Florian earlier grouped in a set of
->> other bcm changes (adding Eric), and now this directly from you.
->>
->> In general the bcm platforms are quite diverse and we've asked Florian
->> to be the funnel for all of the new ones, but I don't think we talked
->> much about 2835 at that time. Should we expect to see merges directly
->> from you and the other maintainers there or will it go through Florian?
->>
->> Either way is OK with me, just looking to clarify.
->
-> Could you merge this pull request directly? Eric and I met recently and
-> we agreed on a more formal process for the next submissions which will
-> be having me route the RPi changes through the Broadcom pull requests.
+From: Florian Fainelli <f.fainelli@gmail.com>
+> Sent: Friday, August 21, 2015 5:14 AM
+> To: David Miller; Duan Fugang-B38611
+> Cc: netdev at vger.kernel.org; shawnguo at kernel.org; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [PATCH v1 0/6] Add fec1 and fec2 support for i.MX7d sdb
+> board
+> 
+> On 20/08/15 14:05, David Miller wrote:
+> > From: Fugang Duan <b38611@freescale.com>
+> > Date: Wed, 19 Aug 2015 13:33:58 +0800
+> >
+> >> The patch series is to add fec support for i.MX7d sdb board. Since
+> >> i.MX7d fec ip is the same as i.MX6SX, so there have no change for
+> driver itself.
+> >>
+> >> Patch#1: add bcm54220 PHY ID entry into brcmphy.h file.
+> >
+> > This is completely, and utterly, pointless.
+> >
+> > The only reason a PHY ID should be defined in brcmphy.h is so that it
+> > can be used in the broadcom.c PHY driver or similar.
+> >
+> > If there is no user in the tree, there is no reason to add it to the
+> > header file.
+> 
+> There is a valid reason for which you may have a PHY id, which is
+> defining a PHY fixup in your platform code like Andy is doing, however,
+> this should not be used in conjunction with the Generic PHY driver,
+> because this driver has absolutely no clue about your PHY fixup, and this
+> could create at best inconsistencies in how the fixup is managed later on.
+> 
+> At the very least, I would like to see a change to
+> drivers/net/phy/broadcom.c which identifies this PHY id, and eventually
+> just invokes the genphy_* functions where relevant.
+> --
+> Florian
 
-Yeah, as I said above I merged it already, I was just looking for clarification.
+I will try to add the phy support in Broadcom phy driver. Thanks for your comments.
 
-Merging through you sounds like a good way forward, and keeps the brcm
-platforms consistent.
-
-
-Thanks!
-
--Olof
+Regards,
+Andy
