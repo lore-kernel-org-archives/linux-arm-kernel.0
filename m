@@ -1,35 +1,44 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 20 Aug 2015 18:30:44 -0700
-Subject: [GIT PULL] Reset controller changes for v4.3
-In-Reply-To: <1439973419.3160.6.camel@pengutronix.de>
-References: <1439973419.3160.6.camel@pengutronix.de>
-Message-ID: <20150821013044.GB4865@localhost>
+Date: Thu, 20 Aug 2015 18:34:19 -0700
+Subject: [GIT PULL v2 0/5] Samsung updates for v4.3
+In-Reply-To: <55CCE517.2070003@kernel.org>
+References: <55CCE517.2070003@kernel.org>
+Message-ID: <20150821013419.GC4865@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 19, 2015 at 10:36:59AM +0200, Philipp Zabel wrote:
-> Hi arm-soc maintainers,
+On Fri, Aug 14, 2015 at 03:42:31AM +0900, Kukjin Kim wrote:
+> Hello Arnd, Olof, Kevin
 > 
-> This tag includes reset controller support for LPC18xx, SocFPGA Arria10,
-> AR71XX/AR9XXX and Zynq and moves all dt-bindings include files into the
-> same place.
+> Here is re-spin of pull request for Samsung stuff for v4.3 as per Olof's
+> suggestion.
 > 
-> regards
-> Philipp
+> Most of this pull-requests are to switch to support generic cpufreq
+> driver for exynos3250, 4210, 4412 and 5250 and several exynos dt updates.
 > 
-> The following changes since commit bc0195aad0daa2ad5b0d76cce22b167bc3435590:
+> Note as I commented in each tag, each pull-request(signed tag) has a
+> dependency with each other, so please keep the ordering in this time.
 > 
->   Linux 4.2-rc2 (2015-07-12 15:10:30 -0700)
+> 1) tags/samsung-clk-driver
+> 2) tags/samsung-late-dt
+> 3) tags/samsung-soc
+> 4) tags/samsung-late-cpufreq-driver
+> 5) tags/samsung-defconfig-new
 > 
-> are available in the git repository at:
-> 
->   git://git.pengutronix.de/git/pza/linux.git tags/reset-for-4.3
-> 
-> for you to fetch changes up to 5d44595c2627f7edcd8c24a76b13bd115f9fc2da:
-> 
->   Merge branch 'reset/ath79' into reset/next (2015-08-16 17:11:20 +0200)
+> If any problems, please kindly let me know.
 
-Thanks, merged into next/drivers.
+That ordering is awkward for us. driver->dt->soc->driver->defconfig is
+not the way we do it.
+
+I'll merge them into a next/late branch together, and we might or might not
+send it in this merge window depending on how it goes.
+
+The lesson to learn here (for us and you) is that if there is complex
+contents, getting it sent in very early is important: rc2/rc3 is
+ideal. We're likely to be less tolerant of messy dependencies as we start
+to approach -rc6 and already have a lot of things merged up. We might
+also have locked into ordering between branches by then that doesn't
+match what you've used.
 
 
 -Olof
