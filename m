@@ -1,97 +1,65 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 21 Aug 2015 14:29:37 +0200
-Subject: [PATCH] usb: musb: dsps: handle the otg_state_a_wait_vrise_timeout
- case
-In-Reply-To: <1440087153-31084-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1440087153-31084-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <55D719B1.8010700@free-electrons.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Fri, 21 Aug 2015 14:33:37 +0200
+Subject: [PATCH RFT] phy: sun4i-usb: Use devm_gpiod_get_optional for
+ optional GPIOs
+In-Reply-To: <1440146978.29130.1.camel@ingics.com>
+References: <1440146978.29130.1.camel@ingics.com>
+Message-ID: <55D71AA1.9050607@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Hi,
 
-On 20/08/2015 18:12, Gregory CLEMENT wrote:
-> According to the OTG specification after a timeout of
-> OTG_TIME_A_WAIT_VRISE (the maximum value is 100ms) the driver must
-> move from the state a_wait_vrise to the state a_wait_bcon. However,
-> the dsps version of musb does not handle this case.
-> 
-> Without it, the driver could remain stuck in the a_wait_vrise. It can
-> be reproduce with the following steps:
-> 
-> 1) Boot a board with no USB adapter inserted
-> 2) Insert an empty OTG adapter
-> 3) Wait 2 seconds then remove the OTG adapter
-> 4) The unit is now stuck in host mode, the VBUS switch is latched on
-> and the ID pin is no longer polled.
-> 
-> The only way to exit this state was to insert a OTG adapter with an
-> USB device connected. Until this, the usb device mode was not
-> available.
-> 
-> It was tested on a AM35x based board.
-> 
-> CC: <stable@vger.kernel.org>
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+On 21-08-15 10:49, Axel Lin wrote:
+> Both data->id_det_gpio and data->vbus_det_gpio are optional, so use
+> devm_gpiod_get_optional for them.
+>
+> Signed-off-by: Axel Lin <axel.lin@ingics.com>
+
+Thanks for the patch, looks good to me:
+
+Reviewed-by: Hans de Goede <hdegoede@redhat.com>
+
+Regards,
+
+Hans
+
+
 > ---
->  drivers/usb/musb/musb_dsps.c | 14 +++++++++++++-
->  1 file changed, 13 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/usb/musb/musb_dsps.c b/drivers/usb/musb/musb_dsps.c
-> index 65d931a..2d22683 100644
-> --- a/drivers/usb/musb/musb_dsps.c
-> +++ b/drivers/usb/musb/musb_dsps.c
-> @@ -145,6 +145,7 @@ struct dsps_glue {
->  	struct timer_list timer;	/* otg_workaround timer */
->  	unsigned long last_timer;    /* last timer data for each instance */
->  	bool sw_babble_enabled;
-> +	int otg_state_a_wait_vrise_timeout;
->  
->  	struct dsps_context context;
->  	struct debugfs_regset32 regset;
-> @@ -268,9 +269,18 @@ static void otg_timer(unsigned long _musb)
->  
->  	spin_lock_irqsave(&musb->lock, flags);
->  	switch (musb->xceiv->otg->state) {
-> +	case OTG_STATE_A_WAIT_VRISE:
-> +		if ((glue->otg_state_a_wait_vrise_timeout)) {
-> +				musb->xceiv->otg->state = OTG_STATE_A_WAIT_BCON;
-> +				musb->is_active = 0;
-> +			}
-> +		mod_timer(&glue->timer, jiffies +
-> +			  msecs_to_jiffies(OTG_TIME_A_WAIT_VRISE));
-
-After more test on more USB drive, it seems that for some of them
-OTG_TIME_A_WAIT_VRISE is too short. 200ms seems better. It is
-disturbing because according to the OTG specification the maximum
-is 100ms, however I am not so surprised that USB device maker don't
-follow it.
-
-
-> +		break;
->  	case OTG_STATE_A_WAIT_BCON:
->  		dsps_writeb(musb->mregs, MUSB_DEVCTL, 0);
->  		skip_session = 1;
-> +		glue->otg_state_a_wait_vrise_timeout = 0;
->  		/* fall */
->  
->  	case OTG_STATE_A_IDLE:
-> @@ -359,7 +369,9 @@ static irqreturn_t dsps_interrupt(int irq, void *hci)
->  			MUSB_HST_MODE(musb);
->  			musb->xceiv->otg->default_a = 1;
->  			musb->xceiv->otg->state = OTG_STATE_A_WAIT_VRISE;
-> -			del_timer(&glue->timer);
-> +			glue->otg_state_a_wait_vrise_timeout = 1;
-> +			mod_timer(&glue->timer, jiffies +
-> +				  msecs_to_jiffies(OTG_TIME_A_WAIT_VRISE));
->  		} else {
->  			musb->is_active = 0;
->  			MUSB_DEV_MODE(musb);
-> 
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+>   drivers/phy/phy-sun4i-usb.c | 22 +++++++++-------------
+>   1 file changed, 9 insertions(+), 13 deletions(-)
+>
+> diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
+> index 731b395..b12964b 100644
+> --- a/drivers/phy/phy-sun4i-usb.c
+> +++ b/drivers/phy/phy-sun4i-usb.c
+> @@ -551,19 +551,15 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+>   	if (IS_ERR(data->base))
+>   		return PTR_ERR(data->base);
+>
+> -	data->id_det_gpio = devm_gpiod_get(dev, "usb0_id_det", GPIOD_IN);
+> -	if (IS_ERR(data->id_det_gpio)) {
+> -		if (PTR_ERR(data->id_det_gpio) == -EPROBE_DEFER)
+> -			return -EPROBE_DEFER;
+> -		data->id_det_gpio = NULL;
+> -	}
+> -
+> -	data->vbus_det_gpio = devm_gpiod_get(dev, "usb0_vbus_det", GPIOD_IN);
+> -	if (IS_ERR(data->vbus_det_gpio)) {
+> -		if (PTR_ERR(data->vbus_det_gpio) == -EPROBE_DEFER)
+> -			return -EPROBE_DEFER;
+> -		data->vbus_det_gpio = NULL;
+> -	}
+> +	data->id_det_gpio = devm_gpiod_get_optional(dev, "usb0_id_det",
+> +						    GPIOD_IN);
+> +	if (IS_ERR(data->id_det_gpio))
+> +		return PTR_ERR(data->id_det_gpio);
+> +
+> +	data->vbus_det_gpio = devm_gpiod_get_optional(dev, "usb0_vbus_det",
+> +						      GPIOD_IN);
+> +	if (IS_ERR(data->vbus_det_gpio))
+> +		return PTR_ERR(data->vbus_det_gpio);
+>
+>   	if (of_find_property(np, "usb0_vbus_power-supply", NULL)) {
+>   		data->vbus_power_supply = devm_power_supply_get_by_phandle(dev,
+>
