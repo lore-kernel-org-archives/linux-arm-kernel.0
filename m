@@ -1,220 +1,226 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 21 Aug 2015 14:31:51 +0100
-Subject: [PATCH 8/9] ARM: entry: provide uaccess assembly macro hooks
+Date: Fri, 21 Aug 2015 14:31:56 +0100
+Subject: [PATCH 9/9] ARM: software-based priviledged-no-access support
 In-Reply-To: <20150821133043.GV7557@n2100.arm.linux.org.uk>
 References: <20150821133043.GV7557@n2100.arm.linux.org.uk>
-Message-ID: <E1ZSmQB-0002zT-A6@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1ZSmQG-0002za-E3@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide hooks into the kernel entry and exit paths to permit control
-of userspace visibility to the kernel.  The intended use is:
+Provide a software-based implementation of the priviledged no access
+support found in ARMv8.1.
 
-- on entry to kernel from user, uaccess_disable will be called to
-  disable userspace visibility
-- on exit from kernel to user, uaccess_enable will be called to
-  enable userspace visibility
-- on entry from a kernel exception, uaccess_save_and_disable will be
-  called to save the current userspace visibility setting, and disable
-  access
-- on exit from a kernel exception, uaccess_restore will be called to
-  restore the userspace visibility as it was before the exception
-  occurred.
+Userspace pages are mapped using a different domain number from the
+kernel and IO mappings.  If we switch the user domain to "no access"
+when we enter the kernel, we can prevent the kernel from touching
+userspace.
 
-These hooks allows us to keep userspace visibility disabled for the
-vast majority of the kernel, except for localised regions where we
-want to explicitly access userspace.
+However, the kernel needs to be able to access userspace via the
+various user accessor functions.  With the wrapping in the previous
+patch, we can temporarily enable access when the kernel needs user
+access, and re-disable it afterwards.
+
+This allows us to trap non-intended accesses to userspace, eg, caused
+by an inadvertent dereference of the LIST_POISON* values, which, with
+appropriate user mappings setup, can be made to succeed.  This in turn
+can allow use-after-free bugs to be further exploited than would
+otherwise be possible.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/kernel/entry-armv.S   | 25 ++++++++++++++++++-------
- arch/arm/kernel/entry-common.S |  2 ++
- arch/arm/kernel/entry-header.S | 17 +++++++++++++++++
- 3 files changed, 37 insertions(+), 7 deletions(-)
+ arch/arm/Kconfig               | 15 +++++++++++++++
+ arch/arm/include/asm/domain.h  | 15 ++++++++++++---
+ arch/arm/include/asm/uaccess.h | 14 ++++++++++++++
+ arch/arm/kernel/entry-header.S | 25 +++++++++++++++++++++++++
+ arch/arm/kernel/process.c      | 24 ++++++++++++++++++------
+ 5 files changed, 84 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-index d19adcf6c580..f6102b39517c 100644
---- a/arch/arm/kernel/entry-armv.S
-+++ b/arch/arm/kernel/entry-armv.S
-@@ -152,7 +152,7 @@ ENDPROC(__und_invalid)
- 	.macro	svc_entry, stack_hole=0, trace=1
-  UNWIND(.fnstart		)
-  UNWIND(.save {r0 - pc}		)
--	sub	sp, sp, #(S_FRAME_SIZE + \stack_hole - 4)
-+	sub	sp, sp, #(S_FRAME_SIZE + 8 + \stack_hole - 4)
- #ifdef CONFIG_THUMB2_KERNEL
-  SPFIX(	str	r0, [sp]	)	@ temporarily saved
-  SPFIX(	mov	r0, sp		)
-@@ -167,7 +167,7 @@ ENDPROC(__und_invalid)
- 	ldmia	r0, {r3 - r5}
- 	add	r7, sp, #S_SP - 4	@ here for interlock avoidance
- 	mov	r6, #-1			@  ""  ""      ""       ""
--	add	r2, sp, #(S_FRAME_SIZE + \stack_hole - 4)
-+	add	r2, sp, #(S_FRAME_SIZE + 8 + \stack_hole - 4)
-  SPFIX(	addeq	r2, r2, #4	)
- 	str	r3, [sp, #-4]!		@ save the "real" r0 copied
- 					@ from the exception stack
-@@ -185,6 +185,8 @@ ENDPROC(__und_invalid)
- 	@
- 	stmia	r7, {r2 - r6}
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index a750c1425c3a..a898eb72da51 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1694,6 +1694,21 @@ config HIGHPTE
+ 	bool "Allocate 2nd-level pagetables from highmem"
+ 	depends on HIGHMEM
  
-+	uaccess_save_and_disable r0
++config CPU_SW_DOMAIN_PAN
++	bool "Enable use of CPU domains to implement priviledged no-access"
++	depends on MMU && !ARM_LPAE
++	default y
++	help
++	  Increase kernel security by ensuring that normal kernel accesses
++	  are unable to access userspace addresses.  This can help prevent
++	  use-after-free bugs becoming an exploitable privilege escalation
++	  by ensuring that magic values (such as LIST_POISON) will always
++	  fault when dereferenced.
 +
- 	.if \trace
- #ifdef CONFIG_TRACE_IRQFLAGS
- 	bl	trace_hardirqs_off
-@@ -368,7 +370,7 @@ ENDPROC(__fiq_abt)
- #error "sizeof(struct pt_regs) must be a multiple of 8"
- #endif
- 
--	.macro	usr_entry, trace=1
-+	.macro	usr_entry, trace=1, uaccess=1
-  UNWIND(.fnstart	)
-  UNWIND(.cantunwind	)	@ don't unwind the user space
- 	sub	sp, sp, #S_FRAME_SIZE
-@@ -400,6 +402,10 @@ ENDPROC(__fiq_abt)
-  ARM(	stmdb	r0, {sp, lr}^			)
-  THUMB(	store_user_sp_lr r0, r1, S_SP - S_PC	)
- 
-+	.if \uaccess
-+	uaccess_disable ip
-+	.endif
++	  CPUs with low-vector mappings use a best-efforts implementation.
++	  Their lower 1MB needs to remain accessible for the vectors, but
++	  the remainder of userspace will become appropriately inaccessible.
 +
- 	@ Enable the alignment trap while in kernel mode
-  ATRAP(	teq	r8, r7)
-  ATRAP( mcrne	p15, 0, r8, c1, c0, 0)
-@@ -458,7 +464,7 @@ ENDPROC(__irq_usr)
+ config HW_PERF_EVENTS
+ 	bool "Enable hardware performance counter support for perf events"
+ 	depends on PERF_EVENTS
+diff --git a/arch/arm/include/asm/domain.h b/arch/arm/include/asm/domain.h
+index 2be929549938..0c373979af00 100644
+--- a/arch/arm/include/asm/domain.h
++++ b/arch/arm/include/asm/domain.h
+@@ -58,11 +58,21 @@
+ #define domain_val(dom,type)	((type) << (2 * (dom)))
  
- 	.align	5
- __und_usr:
--	usr_entry
-+	usr_entry uaccess=0
+ #define DACR_INIT \
+-	(domain_val(DOMAIN_USER, DOMAIN_CLIENT) | \
++	(domain_val(DOMAIN_USER, DOMAIN_NOACCESS) | \
+ 	 domain_val(DOMAIN_KERNEL, DOMAIN_MANAGER) | \
+ 	 domain_val(DOMAIN_IO, DOMAIN_CLIENT) | \
+ 	 domain_val(DOMAIN_VECTORS, DOMAIN_CLIENT))
  
- 	mov	r2, r4
- 	mov	r3, r5
-@@ -484,6 +490,8 @@ __und_usr:
- 1:	ldrt	r0, [r4]
-  ARM_BE8(rev	r0, r0)				@ little endian instruction
- 
-+	uaccess_disable ip
++#define __DACR_DEFAULT \
++	domain_val(DOMAIN_KERNEL, DOMAIN_CLIENT) | \
++	domain_val(DOMAIN_IO, DOMAIN_CLIENT) | \
++	domain_val(DOMAIN_VECTORS, DOMAIN_CLIENT)
 +
- 	@ r0 = 32-bit ARM instruction which caused the exception
- 	@ r2 = PC value for the following instruction (:= regs->ARM_pc)
- 	@ r4 = PC value for the faulting instruction
-@@ -518,9 +526,10 @@ __und_usr_thumb:
- 2:	ldrht	r5, [r4]
- ARM_BE8(rev16	r5, r5)				@ little endian instruction
- 	cmp	r5, #0xe800			@ 32bit instruction if xx != 0
--	blo	__und_usr_fault_16		@ 16bit undefined instruction
-+	blo	__und_usr_fault_16_pan		@ 16bit undefined instruction
- 3:	ldrht	r0, [r2]
- ARM_BE8(rev16	r0, r0)				@ little endian instruction
-+	uaccess_disable ip
- 	add	r2, r2, #2			@ r2 is PC + 2, make it PC + 4
- 	str	r2, [sp, #S_PC]			@ it's a 2x16bit instr, update
- 	orr	r0, r0, r5, lsl #16
-@@ -715,6 +724,8 @@ ENDPROC(no_fp)
- __und_usr_fault_32:
- 	mov	r1, #4
- 	b	1f
-+__und_usr_fault_16_pan:
-+	uaccess_disable ip
- __und_usr_fault_16:
- 	mov	r1, #2
- 1:	mov	r0, sp
-@@ -769,7 +780,7 @@ ENTRY(__switch_to)
-  THUMB(	str	lr, [ip], #4		   )
- 	ldr	r4, [r2, #TI_TP_VALUE]
- 	ldr	r5, [r2, #TI_TP_VALUE + 4]
++#define DACR_UACCESS_DISABLE	\
++	(__DACR_DEFAULT | domain_val(DOMAIN_USER, DOMAIN_NOACCESS))
++#define DACR_UACCESS_ENABLE	\
++	(__DACR_DEFAULT | domain_val(DOMAIN_USER, DOMAIN_CLIENT))
++
+ #ifndef __ASSEMBLY__
+ 
+ static inline unsigned int get_domain(void)
+@@ -76,7 +86,6 @@ static inline unsigned int get_domain(void)
+ 	return domain;
+ }
+ 
 -#ifdef CONFIG_CPU_USE_DOMAINS
-+#if defined(CONFIG_CPU_USE_DOMAINS) || defined(CONFIG_CPU_SW_DOMAIN_PAN)
- 	mrc	p15, 0, r6, c3, c0, 0		@ Get domain register
- 	str	r6, [r1, #TI_CPU_DOMAIN]	@ Save old domain register
- 	ldr	r6, [r2, #TI_CPU_DOMAIN]
-@@ -780,7 +791,7 @@ ENTRY(__switch_to)
- 	ldr	r8, =__stack_chk_guard
- 	ldr	r7, [r7, #TSK_STACK_CANARY]
- #endif
--#ifdef CONFIG_CPU_USE_DOMAINS
-+#if defined(CONFIG_CPU_USE_DOMAINS) || defined(CONFIG_CPU_SW_DOMAIN_PAN)
- 	mcr	p15, 0, r6, c3, c0, 0		@ Set domain register
- #endif
- 	mov	r5, r0
-diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
-index 92828a1dec80..189154980703 100644
---- a/arch/arm/kernel/entry-common.S
-+++ b/arch/arm/kernel/entry-common.S
-@@ -173,6 +173,8 @@ ENTRY(vector_swi)
-  USER(	ldr	scno, [lr, #-4]		)	@ get SWI instruction
+ static inline void set_domain(unsigned val)
+ {
+ 	asm volatile(
+@@ -85,6 +94,7 @@ static inline void set_domain(unsigned val)
+ 	isb();
+ }
+ 
++#ifdef CONFIG_CPU_USE_DOMAINS
+ #define modify_domain(dom,type)					\
+ 	do {							\
+ 		unsigned int domain = get_domain();		\
+@@ -94,7 +104,6 @@ static inline void set_domain(unsigned val)
+ 	} while (0)
+ 
+ #else
+-static inline void set_domain(unsigned val) { }
+ static inline void modify_domain(unsigned dom, unsigned type)	{ }
  #endif
  
-+	uaccess_disable tbl
+diff --git a/arch/arm/include/asm/uaccess.h b/arch/arm/include/asm/uaccess.h
+index 4ae10967a8ba..cb802870ffb9 100644
+--- a/arch/arm/include/asm/uaccess.h
++++ b/arch/arm/include/asm/uaccess.h
+@@ -101,11 +101,25 @@ static inline void set_fs(mm_segment_t fs)
+  */
+ static inline unsigned int uaccess_save_and_enable(void)
+ {
++#ifdef CONFIG_CPU_SW_DOMAIN_PAN
++	unsigned int old_domain = get_domain();
 +
- 	adr	tbl, sys_call_table		@ load syscall table pointer
++	/* Set the current domain access to permit user accesses */
++	set_domain((old_domain & ~domain_mask(DOMAIN_USER)) |
++		   domain_val(DOMAIN_USER, DOMAIN_CLIENT));
++
++	return old_domain;
++#else
+ 	return 0;
++#endif
+ }
  
- #if defined(CONFIG_OABI_COMPAT)
+ static inline void uaccess_restore(unsigned int flags)
+ {
++#ifdef CONFIG_CPU_SW_DOMAIN_PAN
++	/* Restore the user access mask */
++	set_domain(flags);
++#endif
+ }
+ 
+ /*
 diff --git a/arch/arm/kernel/entry-header.S b/arch/arm/kernel/entry-header.S
-index 1a0045abead7..3aa6c3742182 100644
+index 3aa6c3742182..bec7ee0764e1 100644
 --- a/arch/arm/kernel/entry-header.S
 +++ b/arch/arm/kernel/entry-header.S
-@@ -53,6 +53,18 @@
- #endif
+@@ -54,15 +54,40 @@
  	.endm
  
-+	.macro	uaccess_disable, tmp
-+	.endm
-+
-+	.macro	uaccess_enable, tmp
-+	.endm
-+
-+	.macro	uaccess_save_and_disable, tmp
-+	.endm
-+
-+	.macro	uaccess_restore
-+	.endm
-+
+ 	.macro	uaccess_disable, tmp
++#ifdef CONFIG_CPU_SW_DOMAIN_PAN
++	/*
++	 * Whenever we re-enter userspace, the domains should always be
++	 * set appropriately.
++	 */
++	mov	\tmp, #DACR_UACCESS_DISABLE
++	mcr	p15, 0, \tmp, c3, c0, 0		@ Set domain register
++#endif
+ 	.endm
+ 
+ 	.macro	uaccess_enable, tmp
++#ifdef CONFIG_CPU_SW_DOMAIN_PAN
++	/*
++	 * Whenever we re-enter userspace, the domains should always be
++	 * set appropriately.
++	 */
++	mov	\tmp, #DACR_UACCESS_ENABLE
++	mcr	p15, 0, \tmp, c3, c0, 0
++#endif
+ 	.endm
+ 
+ 	.macro	uaccess_save_and_disable, tmp
++#ifdef CONFIG_CPU_SW_DOMAIN_PAN
++	mrc	p15, 0, \tmp, c3, c0, 0
++	str	\tmp, [sp, #S_FRAME_SIZE]
++#endif
++	uaccess_disable \tmp
+ 	.endm
+ 
+ 	.macro	uaccess_restore
++#ifdef CONFIG_CPU_SW_DOMAIN_PAN
++	ldr	r0, [sp, #S_FRAME_SIZE]
++	mcr	p15, 0, r0, c3, c0, 0
++#endif
+ 	.endm
+ 
  #ifdef CONFIG_CPU_V7M
- /*
-  * ARMv7-M exception entry/exit macros.
-@@ -215,6 +227,7 @@
- 	blne	trace_hardirqs_off
- #endif
- 	.endif
-+	uaccess_restore
- 	msr	spsr_cxsf, \rpsr
- #if defined(CONFIG_CPU_V6) || defined(CONFIG_CPU_32v6K)
- 	@ We must avoid clrex due to Cortex-A15 erratum #830321
-@@ -241,6 +254,7 @@
- 	@ on the stack remains correct).
- 	@
- 	.macro  svc_exit_via_fiq
-+	uaccess_restore
- 	mov	r0, sp
- 	ldmib	r0, {r1 - r14}	@ abort is deadly from here onward (it will
- 				@ clobber state restored below)
-@@ -253,6 +267,7 @@
- 	.endm
+diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+index e722f9b3c9b1..b407cc7a7b55 100644
+--- a/arch/arm/kernel/process.c
++++ b/arch/arm/kernel/process.c
+@@ -129,12 +129,24 @@ void __show_regs(struct pt_regs *regs)
+ 	buf[4] = '\0';
  
- 	.macro	restore_user_regs, fast = 0, offset = 0
-+	uaccess_enable r1
- 	mov	r2, sp
- 	ldr	r1, [r2, #\offset + S_PSR]	@ get calling cpsr
- 	ldr	lr, [r2, #\offset + S_PC]!	@ get pc
-@@ -329,6 +344,7 @@
- 	 * part of each exception entry and exit sequence.
- 	 */
- 	.macro	restore_user_regs, fast = 0, offset = 0
-+	uaccess_enable r1
- 	.if	\offset
- 	add	sp, #\offset
- 	.endif
-@@ -336,6 +352,7 @@
- 	.endm
- #else	/* ifdef CONFIG_CPU_V7M */
- 	.macro	restore_user_regs, fast = 0, offset = 0
-+	uaccess_enable r1
- 	mov	r2, sp
- 	load_user_sp_lr r2, r3, \offset + S_SP	@ calling sp, lr
- 	ldr	r1, [sp, #\offset + S_PSR]	@ get calling cpsr
+ #ifndef CONFIG_CPU_V7M
+-	printk("Flags: %s  IRQs o%s  FIQs o%s  Mode %s  ISA %s  Segment %s\n",
+-		buf, interrupts_enabled(regs) ? "n" : "ff",
+-		fast_interrupts_enabled(regs) ? "n" : "ff",
+-		processor_modes[processor_mode(regs)],
+-		isa_modes[isa_mode(regs)],
+-		get_fs() == get_ds() ? "kernel" : "user");
++	{
++		unsigned int domain = get_domain();
++		const char *segment;
++
++		if ((domain & domain_mask(DOMAIN_USER)) ==
++		    domain_val(DOMAIN_USER, DOMAIN_NOACCESS))
++			segment = "none";
++		else if (get_fs() == get_ds())
++			segment = "kernel";
++		else
++			segment = "user";
++
++		printk("Flags: %s  IRQs o%s  FIQs o%s  Mode %s  ISA %s  Segment %s\n",
++			buf, interrupts_enabled(regs) ? "n" : "ff",
++			fast_interrupts_enabled(regs) ? "n" : "ff",
++			processor_modes[processor_mode(regs)],
++			isa_modes[isa_mode(regs)], segment);
++	}
+ #else
+ 	printk("xPSR: %08lx\n", regs->ARM_cpsr);
+ #endif
 -- 
 2.1.0
