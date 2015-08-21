@@ -1,148 +1,59 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri, 21 Aug 2015 18:37:21 +0100
-Subject: [GIT PULL] ARM64: juno: SCPI and dependent drivers for v4.3
-In-Reply-To: <20150821161732.GC14452@localhost>
-References: <55C1E3FB.5090309@arm.com> <20150813124026.GD23581@localhost>
- <20150813142444.GA4602@e104818-lin.cambridge.arm.com>
- <55CCAF50.4040503@arm.com> <20150821161732.GC14452@localhost>
-Message-ID: <CAPKp9uaO7pznZM0ZOqEGTuJCvNXRPcH1rwQCUa2wwScb8ekQpg@mail.gmail.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Fri, 21 Aug 2015 19:36:09 +0200
+Subject: [PATCH v2 09/21] ARM: pxa: magician: Add OV9640 camera support
+In-Reply-To: <1634812.ZDaECJ9ClW@wuerfel> (Arnd Bergmann's message of "Fri, 21
+ Aug 2015 15:45:53 +0200")
+References: <cover.1439843482.git.petr.cvek@tul.cz>
+ <2889798.x6xcIzdYMU@wuerfel> <55D65722.9030508@tul.cz>
+ <1634812.ZDaECJ9ClW@wuerfel>
+Message-ID: <874mjs5yt2.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+I shrunk a bit the mailing list.
 
-On Fri, Aug 21, 2015 at 5:17 PM, Olof Johansson <olof@lixom.net> wrote:
-> Hi,
+Arnd Bergmann <arnd@arndb.de> writes:
+
+> On Friday 21 August 2015 00:39:30 Petr Cvek wrote:
+>> Dne 20.8.2015 v 22:26 Arnd Bergmann napsal(a):
+>> > On Thursday 20 August 2015 21:48:20 Robert Jarzmik wrote:
+>> >> Petr Cvek <petr.cvek@tul.cz> writes:
+>> Datasheet says:
+>> 
+>>         tS:RESET        Setting time after software/hardware reset      1 ms
+>> 
+>> So at least one ~1 ms should be left there. Are msleep less than 20ms valid? 
+>> 
+>> (checkpatch: msleep < 20ms  can sleep for up to 20ms)
 >
-> On Thu, Aug 13, 2015 at 03:53:04PM +0100, Sudeep Holla wrote:
->>
->>
->> On 13/08/15 15:24, Catalin Marinas wrote:
->> >On Thu, Aug 13, 2015 at 02:40:26PM +0200, Olof Johansson wrote:
->> >>On Wed, Aug 05, 2015 at 11:22:51AM +0100, Sudeep Holla wrote:
->> >>>Here is the first pull request for SCPI, clock and cpufreq support on
->> >>>ARM64 Juno development platform for v4.3
->> >>
->> >>I'd like to hear from Catalin and Will on why ARM is doing this. Catalin
->> >>and Will are pushing back very hard at vendors who don't use PSCI for
->> >>CPU power management, and then they have coworkers that are looking to
->> >>merge this directly into the kernel.
->> >
->> >Actually, the arm64 CPU power management story is pretty much handled by
->> >Lorenzo and Sudeep in my team, so I trust their judgement ;). But I
->> >agree with you that a better explanation on the reasons behind this is
->> >needed, otherwise we risk confusing messages. I'll try to summarise it
->> >below but Sudeep can reply with more details.
->> >
->>
->> (I will use the acronomys directly as Catalin has already explained the
->> difference)
->>
->> Thanks Catalin for the detailed explanation. I agree that this pull
->> request has not much details, but the patch series makes reference only
->> to the clocks and features provided by the SCP(System Control Processor)
->> to be used by Linux(non-secure) and nothing about CPU power states that
->> are handled by PSCI. This SCPI is completely independent and orthogonal
->> to PSCI.
->
-> Yes, I am aware that PSCI and SCPI are two confusingly similar acronyms that
-> represent separate things. My concern though is that we're letting in a poorly
-> architected solution into the kernel with SCPI. PSCI is already choosing to
-> abstract this outside of the kernel. Is there a reason SCPI isn't using the
-> same approach?
->
+> On most kernels, an msleep(1) will sleep somewhere between 1 and 3 milliseconds
+> (but could be much longer), while an mdelay(1) tries to sleep around one
+> millisecond, more or less.
 
-I am not sure we can compare the CPU power states with the CPU DVFS.
-In case of power states, we need to ensure all the exception levels have
-saved the context and hence PSCI abstraction makes sense for the kernel.
-However the CPU DVFS is mostly driven by the kernel based on the load,
-so we talk directly to the power controller from the kernel.
+I have rethought of that a bit more. I'm convinced a delay of "at least 1ms" is
+necessary according to the specification, it can also be more.
 
-In way SCPI is abstracting by hiding all the regulators and PLLs you need
-to handle. So I may be missing to understand when you say SCPI also use
-PSCI approach.
+Moreover, I came to the conclusion this reset sequence is not something that is
+"magician" specific (see palmz72_camera_reset() in
+.../mach-pxa/palmz72.c). Actually it's not even mach-pxa specific, it's "ov9640"
+specific.
 
->> >PSCI only covers CPU boot/cpuidle and platform suspend. It does not have
->> >any provisions for DVFS and I'm not sure this could be easily
->> >standardised (or whether we could find enough supporters to get it
->> >adopted).
->> >
->>
->> Though we are not campaigning it as aggressively as PSCI.
->
-> Which, given the resistance to pick up PSCI, this is unlikely to be used by
-> anyone...
->
+Now add this to the fact that it would be good to have a solution working for
+devicetree as well, and on any board, and the conclusion I came to was that this
+handling deserves to be in ov9640 driver (please correct me if I'm wrong).
 
-Agreed even I am not sure how widely will that be accepted, but we need to
-support the systems which have SCPI right ? Like Juno for now.
+The idea behind it is have the reset handled in ov9640, and the gpio provided by
+platform data or devicetree.
 
->> >SCPI is a (standard) interface to a coprocessor handling clocks etc. to
->> >be used with cpufreq. This patchset adds support for cpufreq/dvs which
->> >is not handled by PSCI. So, just to clarify the acronyms:
->> >
->> >SCPI - System Control and Power Interface - it's a protocol for
->> >communicating with a System Control Processor (e.g. Cortex-M3) via
->> >mailboxes. It is used in Linux for DVFS but this is *not* a secure/EL3
->> >firmware interface (a.k.a. SMC calls). It indeed a firmware interface
->> >but the firmware runs on a separate coprocessor and not on the CPU itself.
->> >
->> >PSCI - Power State Coordination Interface - it is a secure firmware
->> >interface for coordinating the CPU power states (idle, not DVFS). The
->> >firmware may use an SCPI communication channel (e.g. deeper sleep states
->> >where clock changes are needed).
->> >
->>
->> I will add some more information to (hopefully) clarify the doubts.
->>
->> SCP(System Control Processor) offers control and management of the
->> core/cluster power states, various power domain DVFS including the
->> core/cluster, certain system clocks configuration, thermal sensors and
->> many others.
->>
->> Though the core/cluster power states are also handled this SCP,
->> they are accessible only through secure channels and PSCI firmware
->> implementations on the platform rely on that internally. Non-secure
->> access/requests are not possible.
->>
->> Just to summarize, this SCP helps to offload all the power management
->> work to a dedicated low power processor which can be always running.
->> On Juno, its Cortex-M while on AMD Seattle it's Cortex-A5.
->
-> I understand what the SCP is used for. What I don't understand is why you're
-> adding all this complexity in the kernel for it.
->
+So Guennadi, is it possible to add a gpio through platform data to ov9640
+driver, does it make sense, and would you accept to have the reset handled there
+? And if yes, would you, Petr, accept to revamp your patch to have the reset and
+power handled in ov9640 ?
 
-I am not sure how we can avoid that though. Any thoughts ?
+Please note that it is a proposal, I'm not forcing anybody, I'd like to choose a
+path that agrees with the future push to remove as many machine files as possible.
 
-> Also, is there only one known implementation of this today on Juno? Are there
-> others coming soon? Single-user frameworks tend to be hard to get right, and
-> it's usually much better to wait until it's clear it will fit more than just
-> the original target.
->
+Cheers.
 
-No argument on that, the specification is not reviewed as much as PSCI but we do
-have version, so can be fixed/enhanced in future. It's no different
-w.r.t PSCI in that
-respect IMO.
-
-Yes currently only on Juno, but future ARM Ltd. platforms have plans to reuse
-the same.
-
-> Anyway, the git server you provided the link to in the original email
-> (linux-arm.org) seems to be offline so I couldn't fetch a fresh copy of
-> the branch to look at.
->
-
-Extremely sorry for that(not much under my control :(), I will get it
-fixed ASAP.
-I am current away attending LPC.
-
-> It's pretty clear this is not 4.3 material at this point, so I'll take
-> a look at it later.
->
-
-Fair enough, I understand that its too late for v4.3
-
-Regards,
-Sudeep
+-- 
+Robert
