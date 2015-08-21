@@ -1,30 +1,45 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 21 Aug 2015 16:54:25 +0100
-Subject: [PATCH] arm64: enable generic idle loop
-In-Reply-To: <20150821091446.GB4280@leoy-linaro>
-References: <1440128422-4170-1-git-send-email-leo.yan@linaro.org>
- <20150821090043.GA14072@e104818-lin.cambridge.arm.com>
- <20150821091446.GB4280@leoy-linaro>
-Message-ID: <20150821155425.GC16410@e104818-lin.cambridge.arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 21 Aug 2015 17:55:38 +0200
+Subject: [PATCH] ARM: orion5x: fix legacy orion5x IRQ numbers
+In-Reply-To: <1440156836.5070.9.camel@dolka.fr>
+References: <1439648246-32757-1-git-send-email-gregory.clement@free-electrons.com>
+ <1440156836.5070.9.camel@dolka.fr>
+Message-ID: <55D749FA.6010600@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 21, 2015 at 05:14:46PM +0800, Leo Yan wrote:
-> On Fri, Aug 21, 2015 at 10:00:43AM +0100, Catalin Marinas wrote:
-> > On Fri, Aug 21, 2015 at 11:40:22AM +0800, Leo Yan wrote:
-> > > Enable generic idle loop for ARM64, so can support for hlt/nohlt
-> > > command line options to override default idle loop behavior.
-> > 
-> > Just curious, what do you need this for?
-> 
-> With this config, usually we can add "nohlt" in command line to force
-> the cpu will never be powered off; so can quickly narrow down if some
-> issues are related with cpuidle or not.
-> 
-> And if CPU is powered off, then its debug logic also will be powered off.
-> So we can simply use this method to let debugger always hot connect with
-> the target CPU.
+Hi Benjamin,
 
-OK.
+On 21/08/2015 13:33, Benjamin Cama wrote:
+> Hi Gr?gory,
+> 
+> Le samedi 15 ao?t 2015 ? 16:17 +0200, Gregory CLEMENT a ?crit :
+>> I amended the patch from Benjamin as it break the build for
+>> dove. Could you test it again wit this version?
+> 
+> Thanks for the fix. I don't have much time to test it, but as the dts
+> conversion patch for my Linkstation Mini is in the series, this fix
+> shouldn't change anything, as the dts board file uses the generic
+> irqchip handler, isn't it?
+> 
+> Tell me if I missed something. Regards,
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Detlef tested it so it's OK. I was asking you also because it a patch
+you wrote.
+
+
+Thanks,
+
+Gregory
+
+
+> --
+> benjamin
+> 
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
