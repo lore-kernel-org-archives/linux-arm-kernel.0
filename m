@@ -1,64 +1,32 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Fri, 21 Aug 2015 14:04:20 -0700
-Subject: [PATCH 2/9] PM / Domains: Remove dev->driver check for runtime PM
-In-Reply-To: <CAMuHMdV2gDBaPRb3yE=tVPO_pr7PFA6bwhyQE5raumCh_qPXww@mail.gmail.com>
- (Geert Uytterhoeven's message of "Sun, 16 Aug 2015 11:24:51 +0200")
-References: <1438731339-58317-1-git-send-email-lina.iyer@linaro.org>
- <1438731339-58317-3-git-send-email-lina.iyer@linaro.org>
- <7hfv3onv5c.fsf@deeprootsystems.com>
- <CAMuHMdVeffa-jgXuSjDQBKTrhgW-d87OKzs1iXX+4y-9U_AJbg@mail.gmail.com>
- <7hwpwylepx.fsf@deeprootsystems.com>
- <CAMuHMdW-T9rUWXsQeffwtXspHbjfGqo_0G4QMB1o0TwTLJAQAg@mail.gmail.com>
- <CAMAWPa-0R42thqBo0omn0KK7y0wyxoyaP+wsfoRvXBmWhBytKg@mail.gmail.com>
- <CAMuHMdV2gDBaPRb3yE=tVPO_pr7PFA6bwhyQE5raumCh_qPXww@mail.gmail.com>
-Message-ID: <7hio88gxpn.fsf@deeprootsystems.com>
+From: fkan@apm.com (Feng Kan)
+Date: Fri, 21 Aug 2015 15:00:58 -0700
+Subject: [PATCH V4 0/2] arm64: copy to/in/from user optimization
+Message-ID: <1440194458-4837-1-git-send-email-fkan@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Geert Uytterhoeven <geert@linux-m68k.org> writes:
+This coverts all copy in/from/to user file to use the copy template file.
+The copy template file is based on the memcpy.S. The second patch converts
+the memcpy to use the copy template as well. Overnight trinity test and
+10G iperf was used to test correctness and performance. Noticeable
+iperf improvement (~30%) on the receive side.
 
-> Hi Kevin,
->
-> On Fri, Aug 14, 2015 at 7:19 PM, Kevin Hilman <khilman@kernel.org> wrote:
->> On Fri, Aug 14, 2015 at 12:24 AM, Geert Uytterhoeven
->> <geert@linux-m68k.org> wrote:
->>> On Fri, Aug 14, 2015 at 5:40 AM, Kevin Hilman <khilman@kernel.org> wrote:
->>>> Geert Uytterhoeven <geert@linux-m68k.org> writes:
->>>>> On Wed, Aug 12, 2015 at 9:50 PM, Kevin Hilman <khilman@kernel.org> wrote:
->>>>>> This check might have made sense before PM domains, but with PM domains,
->>>>>> it's entirely possible to have a simple device without a driver and the
->>>>>> PM domain handles all the necesary PM, so I think this check
->>>>>> could/should be removed.
->>>>>>
->>>>>> Thoughts?
->>>>>
->>>>> Simple devices without a driver aren't handled automatically.
->>>>> At minimum, the driver should call pm_runtime_enable(), cfr.
->>>>> drivers/bus/simple-pm-bus.c.
->>>>
->>>> That's correct, and in the proof-of-concept stuff I hacked up and in
->>>> Lina's series, the CPU "devices" do indeed to this.  Without that, they
->>>> wouldn't end up ever taking this codepath through genpd's
->>>> runtime_suspend and power_off hooks.
->>>>
->>>> Also, I'm not sure if your comment was meant to be an objection to the
->>>> patch?  or if you're OK with it.
->>>
->>> My comment was purely meant as a response to "it's entirely possible to have a
->>> simple device without a driver and the PM domain handles all the necesary PM".
->>
->> Right, so if the PM domain does the pm_runtime_enable() for these
->> "simple" devices without drivers, they can still exist without a
->> driver, and the PM domain doing all the magic.
->
-> Is it possible to let the PM Domain do the pm_runtime_enable() itself in
-> the absence of a driver? 
+V4 Change:
+	- base the copy template file on the existing memcpy.S
+	- convert copy*.s to user copy template
+	- conver the memcpy to use the copy template.
 
-Well, I suppose it's possible, not sure it's recommended. :)
+Feng Kan (2):
+  arm64: copy_to-from-in_user optimization using copy template
+  arm64: Change memcpy in kernel to use the copy template file
 
-> If yes, I wouldn't have needed simple-pm-bus.c.  
-> What if a driver is bound later?
+ arch/arm64/lib/copy_from_user.S |  78 +++++++++-------
+ arch/arm64/lib/copy_in_user.S   |  66 ++++++++------
+ arch/arm64/lib/copy_template.S  | 196 ++++++++++++++++++++++++++++++++++++++++
+ arch/arm64/lib/copy_to_user.S   |  66 ++++++++------
+ arch/arm64/lib/memcpy.S         | 179 ++++++------------------------------
+ 5 files changed, 340 insertions(+), 245 deletions(-)
+ create mode 100644 arch/arm64/lib/copy_template.S
 
-Yeah, you're approach is better.
-
-Kevin
+-- 
+1.9.1
