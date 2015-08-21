@@ -1,121 +1,35 @@
-From: moritz.fischer@ettus.com (Moritz Fischer)
-Date: Fri, 21 Aug 2015 09:42:24 -0700
-Subject: [PATCH v4 1/2] Documentation: dt: Add Xilinx zynqmp dma device
- tree binding documentation
-In-Reply-To: <1438831173-8761-1-git-send-email-punnaia@xilinx.com>
-References: <1438831173-8761-1-git-send-email-punnaia@xilinx.com>
-Message-ID: <CAAtXAHdu10dchedaApLiw6+b583z4D8Of1TAEGDmhhVLOy+8YA@mail.gmail.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Fri, 21 Aug 2015 11:45:18 -0500
+Subject: [PATCH v3 15/31] arm64: SMP support
+In-Reply-To: <55C8D9DB.5080207@codeaurora.org>
+References: <1347035226-18649-1-git-send-email-catalin.marinas@arm.com>
+ <1347035226-18649-16-git-send-email-catalin.marinas@arm.com>
+ <CAOZdJXVoDJM3y2mnKO+91yf2EHogKfMjumjhhi85REAfhcJM=Q@mail.gmail.com>
+ <20150806095621.GB17691@e104818-lin.cambridge.arm.com>
+ <55C8843D.8050600@linaro.org> <55C8D9DB.5080207@codeaurora.org>
+Message-ID: <55D7559E.8080609@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
-
-sorry for HTML mail spam last night ... couple of nits below
-
-On Wed, Aug 5, 2015 at 8:19 PM, Punnaiah Choudary Kalluri
-<punnaiah.choudary.kalluri@xilinx.com> wrote:
-> Device-tree binding documentation for Xilinx zynqmp dma engine used in
-> Zynq UltraScale+ MPSoC.
+On 08/10/2015 12:05 PM, Timur Tabi wrote:
+>>>
+>>> This code was inherited from arch/arm which initially was always dumping
+>>> the stack but it later gained the system_state check. Unless it's useful
+>>> to anyone for debugging purposes, I'm ok with removing it.
+>>
+>> Do you have patch for this one? My colleagues said that they met the
+>> same problem :)
 >
-> Signed-off-by: Punnaiah Choudary Kalluri <punnaia@xilinx.com>
-> ---
-> Changes in v4:
-> - None
-> Changes in v3:
-> - None
-> Changes in v2:
-> - None
-> ---
->  .../devicetree/bindings/dma/xilinx/zynqmp_dma.txt  |   61 ++++++++++++++++++++
->  1 files changed, 61 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/dma/xilinx/zynqmp_dma.txt
->
-> diff --git a/Documentation/devicetree/bindings/dma/xilinx/zynqmp_dma.txt b/Documentation/devicetree/bindings/dma/xilinx/zynqmp_dma.txt
-> new file mode 100644
-> index 0000000..e4f92b9
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/dma/xilinx/zynqmp_dma.txt
-> @@ -0,0 +1,61 @@
-> +Xilinx ZynqMP DMA engine, it does support memory to memory transfers,
-> +memory to device and device to memory transfers. It also has flow
-> +control and rate control support for slave/peripheral dma access.
+> Dropping the call to dump_stack() would probably be sufficient.
 
-How about: The Xilinx ZynqMP DMA engine does support memory to memory transfers,
-memory to device and device to memory transfers. It also has flow
-control and rate control
-support for slave / peripheral DMA access.
-> +
-> +Required properties:
-> +- compatible: Should be "xlnx,zynqmp-dma-1.0"
-> +- #dma-cells: Should be <1>, a single cell holding a line request number
-> +- reg: Memory map for module access
-> +- interrupt-parent: Interrupt controller the interrupt is routed through
-> +- interrupts: Should contain DMA channel interrupt
-> +- xlnx,bus-width: AXI buswidth in bits. Should contain 128 or 64
-> +
-> +Optional properties:
-> +- xlnx,include-sg: Indicates the controller to operate in simple or scatter
-> +                  gather dma mode
-s/dma/DMA
-> +- xlnx,ratectrl: Scheduling interval in terms of clock cycles for
-> +                source AXI transaction
-> +- xlnx,overfetch: Tells whether the channel is allowed to over fetch the data
-(Maybe) s/Tells/Determines/
-> +- xlnx,src-issue: Number of AXI outstanding transactions on source side
-> +- xlnx,desc-axi-cohrnt: Tells whether the AXI transactions generated for the
-> +                       descriptor read are marked Non-coherent
-(Maybe) s/Tells/Determines/
-> +- xlnx,src-axi-cohrnt: Tells whether the AXI transactions generated for the
-> +                       source descriptor payload are marked Non-coherent
-same
-> +- xlnx,dst-axi-cohrnt: Tells whether the AXI transactions generated for the
-> +                       dst descriptor payload are marked Non-coherent
-> +- xlnx,desc-axi-qos: AXI QOS bits to be used for descriptor fetch
-> +- xlnx,src-axi-qos: AXI QOS bits to be used for data read
-> +- xlnx,dst-axi-qos: AXI QOS bits to be used for data write
-> +- xlnx,desc-axi-cache: AXI cache bits to be used for descriptor fetch.
-> +- xlnx,desc-axi-cache: AXI cache bits to be used for data read
-> +- xlnx,desc-axi-cache: AXI cache bits to be used for data write
-> +- xlnx,src-burst-len: AXI length for data read. Support only power of 2 values
-> +                     i.e 1,2,4,8 and 16
-> +- xlnx,dst-burst-len: AXI length for data write. Support only power of 2 values
-> +                     i.e 1,2,4,8 and 16
-> +
-> +Example:
-> +++++++++
-> +fpd_dma_chan1: dma at FD500000 {
-> +       compatible = "xlnx,zynqmp-dma-1.0";
-> +       reg = <0x0 0xFD500000 0x1000>;
-> +       #dma_cells = <1>;
-#dma-cells = <1>;
-> +       interrupt-parent = <&gic>;
-> +       interrupts = <0 117 4>;
-> +       xlnx,bus-width = <128>;
-> +       xlnx,include-sg;
-> +       xlnx,overfetch;
-> +       xlnx,ratectrl = <0>;
-> +       xlnx,src-issue = <16>;
-> +       xlnx,desc-axi-cohrnt;
-> +       xlnx,src-axi-cohrnt;
-> +       xlnx,dst-axi-cohrnt;
-> +       xlnx,desc-axi-qos = <0>;
-> +       xlnx,desc-axi-cache = <0>;
-> +       xlnx,src-axi-qos = <0>;
-> +       xlnx,src-axi-cache = <2>;
-> +       xlnx,dst-axi-qos = <0>;
-> +       xlnx,dst-axi-cache = <2>;
-> +       xlnx,src-burst-len = <4>;
-> +       xlnx,dst-burst-len = <4>;
-> +};
-> --
-> 1.7.4
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Actually, I think we need to keep it.  I just heard from another 
+developer who does actually use it for debugging.
 
-Cheers,
+I think the real problem is that emergency_restart() should not be 
+causing these outputs.  Shouldn't machine_restart() change the 
+system_state to SYSTEM_RESTART before it calls smp_send_stop()?
 
-Moritz
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
