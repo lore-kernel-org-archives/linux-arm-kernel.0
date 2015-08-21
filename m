@@ -1,206 +1,347 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Fri, 21 Aug 2015 16:38:41 +0900
-Subject: [RFC PATCH v6 1/9] mmc: dw_mmc: Add external dma interface support
-In-Reply-To: <55D6D2EF.7010501@rock-chips.com>
-References: <1440060204-26203-1-git-send-email-shawn.lin@rock-chips.com>
- <1440060233-26244-1-git-send-email-shawn.lin@rock-chips.com>
- <55D6C4D4.8010005@samsung.com> <55D6C57D.4070402@rock-chips.com>
- <55D6C6B6.3060706@samsung.com> <55D6D2EF.7010501@rock-chips.com>
-Message-ID: <55D6D581.3050509@samsung.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Fri, 21 Aug 2015 09:42:44 +0200
+Subject: [linux-sunxi][PATCH] ARM: sun7i: dt: Add new Olimex A20 EVB device
+In-Reply-To: <CAEKpxBnQ+kCVYfE8JL5JzH5ZXb3azjwmjfAE5OXULaVm0bj2ew@mail.gmail.com>
+References: <1440002596-2611-1-git-send-email-codekipper@gmail.com>
+ <20150820154545.GF30520@lukather>
+ <CAEKpxBnQ+kCVYfE8JL5JzH5ZXb3azjwmjfAE5OXULaVm0bj2ew@mail.gmail.com>
+Message-ID: <55D6D674.7060205@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/21/2015 04:27 PM, Shawn Lin wrote:
-> On 2015/8/21 14:35, Jaehoon Chung wrote:
->> On 08/21/2015 03:30 PM, Shawn Lin wrote:
->>> On 2015/8/21 14:27, Jaehoon Chung wrote:
->>>> Hi, Shawn.
->>>>
->>>> Is this based on Ulf's repository?
->>>
->>>
->>> no, it's based on "https://github.com/jh80chung/dw-mmc.git tags/dw-mmc-for-ulf-v4.2" ??
->>
->> Oh..I will rebase to Ulf's next branch on this weekend.
->> Then could you rebase this patch? And i added more comments at below.. :)
->>
-> 
-> Okay, I will rebase to Ulf's next.
-> 
->> Best Regards,
->> Jaehoon Chung
->>
->>>
-> 
-> [...]
-> 
->>>>> index ec6dbcd..7e1d13b 100644
->>>>> --- a/drivers/mmc/host/dw_mmc-pltfm.c
->>>>> +++ b/drivers/mmc/host/dw_mmc-pltfm.c
->>>>> @@ -59,6 +59,8 @@ int dw_mci_pltfm_register(struct platform_device *pdev,
->>>>>        host->pdata = pdev->dev.platform_data;
->>>>>
->>>>>        regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->>>>> +    /* Get registers' physical base address */
->>>>> +    host->phy_regs = (void *)(regs->start);
->>>>>        host->regs = devm_ioremap_resource(&pdev->dev, regs);
->>>>>        if (IS_ERR(host->regs))
->>>>>            return PTR_ERR(host->regs);
->>>>
->>>> Is this board specific code? If so, separate the patch.
-> 
-> It's might not board specific code.
-> dmaengine need dw_mmc's *physical* fifo address for data transfer, so I get controller physical address  here in order to calculate physical fifo address.
-> 
-> regs is from dt-bindings, for instance:
->          dwmmc0 at 12200000 {
->                  compatible = "snps,dw-mshc";
->                   clocks = <&clock 351>, <&clock 132>;
->                  clock-names = "biu", "ciu";
->                  reg = <0x12200000 0x1000>;
->                  interrupts = <0 75 0>;
->                  #address-cells = <1>;
->                  #size-cells = <0>;
->          };
-> 
-> so, host->phy_regs will be 0x12200000 .
-> 
-> [...]
-> 
->>>>> +static void dw_mci_dmac_complete_dma(void *arg)
->>>>>    {
->>>>> +    struct dw_mci *host = arg;
->>>>>        struct mmc_data *data = host->data;
->>>>>
->>>>>        dev_vdbg(host->dev, "DMA complete\n");
->>>>>
->>>>> +    if (host->use_dma == TRANS_MODE_EDMAC)
->>>>> +        if (data && (data->flags & MMC_DATA_READ))
->>>>
->>>> Combine one condition.
-> 
-> okay.
-> 
-> [...]
-> 
->>>>> +    u32 fifo_offset = host->fifo_reg - host->regs;
->>>>> +    int ret = 0;
->>>>> +
->>>>> +    /* Set external dma config: burst size, burst width */
->>>>> +    cfg.dst_addr = (dma_addr_t)(host->phy_regs + fifo_offset);
->>>>
->>>> host->phy_regs is not assigned?
-> 
-> we got it at dw_mci_pltfm_register. See comments above. :)
-> 
-> [...]
-> 
->>>>>            mmc->max_blk_count = mmc->max_req_size / 512;
->>>>> +    } else if (host->use_dma == TRANS_MODE_EDMAC) {
->>>>> +            mmc->max_segs = 64;
->>>>> +            mmc->max_blk_size = 65536;
->>>>> +            mmc->max_blk_count = 65535;
->>>>> +            mmc->max_req_size =
->>>>> +                    mmc->max_blk_size * mmc->max_blk_count;
->>>>> +            mmc->max_seg_size = mmc->max_req_size;
->>>>
->>>> Fix the indention
-> 
-> Hmm..I check it attentively but can't find the indention . Might it's because you apply it against Ulf's repo?
-> 
->>>>
-> 
-> [...]
-> 
->>>>>
->>>>> -    /* Alloc memory for sg translation */
->>>>> -    host->sg_cpu = dmam_alloc_coherent(host->dev, PAGE_SIZE,
->>>>> -                      &host->sg_dma, GFP_KERNEL);
->>>>> -    if (!host->sg_cpu) {
->>>>> -        dev_err(host->dev, "%s: could not alloc DMA memory\n",
->>>>> -            __func__);
->>>>> +    /* Check tansfer mode */
->>>>> +    trans_mode = SDMMC_GET_TRANS_MODE(mci_readl(host, HCON));
->>>>> +    if (trans_mode == 0) {
->>>>> +        trans_mode = TRANS_MODE_IDMAC;
->>>>> +    } else if (trans_mode == 1 || trans_mode == 2) {
->>>>> +        trans_mode = TRANS_MODE_EDMAC;
->>>>> +    } else {
->>>>> +        trans_mode = TRANS_MODE_PIO;
->>>>
->>>> what are trans_mode "0, 1, 2"?
->>>> (00 - none) is NO-DMA interface, isn't? is it IDMAC mode?
->>>>
-> 
-> No, I guess the databook's ambiguous description confuse everybody.
-> 
-> I got double comfirm from my ASCI team as well as Synoposys
-> 2b'00: NO-DMA interface -->  It support IDMAC actually
-> 2b'01 & 2b'02: DW_DMA & GENERIC_DMA --> Support 2 types of external dma.
-> 2b'02: NON-DW-DMA --> only support PIO
+Hi,
 
-Then Could you add the comment about this?
-Use definition instead of "0, 1, 2". Developer don't know meaning that is 0, 1, 2.
-
-Best Regards,
-Jaehoon Chung
-
-> 
-> refer to the description below:
-> Parameter Name: DMA_INTERFACE
-> Legal Values: 0-3
-> Default Value: 0
-> Description:
->  0- No DMA Interface
->  1- DesignWare DMA Interface
->  2- Generic DMA Interface
->  3- Non DW DMA Interface
-> In DesignWare DMA mode, request/acknowledge protocol meets DW_ahb_dmac
-> controller protocol. In this mode, host data bus is also used for DMA transfers.Generic DMA-type interface has simpler request/acknowledge handshake and has dedicated read/write data bus for DMA transfers. Non DW DMAC interface uses dw_dma_single interface in addition to the existing interface and uses host data bus for DMA transfers. This is configurable only if INTERNAL_DMAC=0.
-> 
->>>>>            goto no_dma;
->>>>>        }
+On 21-08-15 07:36, Code Kipper wrote:
+> On 20 August 2015 at 17:45, Maxime Ripard <maxime.ripard@free-electrons.com>
+> wrote:
+>
+>> Hi,
 >>
->>>>> +        dev_info(host->dev, "Using external DMA controller.\n");
->>>>> +    }
->>>>>
->>>>>        if (!host->dma_ops)
->>>>>            goto no_dma;
->>>>> @@ -2562,12 +2720,12 @@ static void dw_mci_init_dma(struct dw_mci *host)
->>>>>            goto no_dma;
->>>>>        }
->>>>>
->>>>> -    host->use_dma = 1;
->>>>> +    host->use_dma = trans_mode;
->>>>
->>>> Also confuse, if trans_mode is assigned host->use_dma, can mode value be directly assigned to host->use_dma?
->>>>
-> 
-> Good idea, I will do it.  :)
-> 
->>>> trans_mode = TRAMS_MODE_PIO;
->>>> host->use_dma = trans_mode;
->>>>
-> 
-> [...]
-> 
->>>>>
->>>>> @@ -2890,7 +3047,7 @@ int dw_mci_probe(struct dw_mci *host)
->>>>>         * Get the host data width - this assumes that HCON has been set with
->>>>>         * the correct values.
->>>>>         */
->>>>> -    i = (mci_readl(host, HCON) >> 7) & 0x7;
->>>>> +    i = SDMMC_GET_HDATA_WIDTH(mci_readl(host, HCON));
->>>>
->>>> This is not related with supporting external dma interface.
->>>> Separate this.
->>>>
-> 
-> Okay, It will be split into another one.
-> 
->>>>>        if (!i) {
->>>>>            host->push_data = dw_mci_push_data16;
->>>>>            host->pull_data = dw_mci_pull_data16;
-> 
-> 
-> 
+>> On Wed, Aug 19, 2015 at 06:43:16PM +0200, codekipper at gmail.com wrote:
+>>> From: Marcus Cooper <codekipper@gmail.com>
+>>>
+>>> The A20-SOM-EVB is a reference design of a 2-layer board for the
+>>> A20-SOM.
+>>> It expands the features of A20-SOM by adding VGA connector, HDMI
+>>> connector, audio In/Out, LCD connector, 2 Mpix camera, gigabit
+>>> Ethernet, SATA, USB-OTG and 2 USB hosts.
+>>>
+>>> This patch adds basic support for the device
+>>> https://www.olimex.com/Products/SOM/A20/A20-SOM-EVB/
+>>>
+>>> More information on the SOM can be found here
+>>> http://linux-sunxi.org/Olimex_A20-SOM.
+>>>
+>>> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+>>
+>> Is there any other SOM planned that could work with that baseboard? Or
+>> any other baseboard for that SOM?
+>>
+> I've seen neither. We could always create a som.dtsi later is one emerges.
+>
+>>
+>>> ---
+>>>   arch/arm/boot/dts/Makefile                    |   1 +
+>>>   arch/arm/boot/dts/sun7i-a20-olinuxino-evb.dts | 233
+>> ++++++++++++++++++++++++++
+>>>   2 files changed, 234 insertions(+)
+>>>   create mode 100644 arch/arm/boot/dts/sun7i-a20-olinuxino-evb.dts
+>>
+> Relooking at their website I can see that the device does not come under
+> the olinuxino brand so maybe I should rename the dts to
+> sun7i-a20-olimex-som-evb.dts
+
+Ack for renaming / +1
+
+Regards,
+
+Hans
+
+>
+>>>
+>>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+>>> index 6d7cec1..fdbda9b 100644
+>>> --- a/arch/arm/boot/dts/Makefile
+>>> +++ b/arch/arm/boot/dts/Makefile
+>>> @@ -613,6 +613,7 @@ dtb-$(CONFIG_MACH_SUN7I) += \
+>>>        sun7i-a20-olinuxino-lime.dtb \
+>>>        sun7i-a20-olinuxino-lime2.dtb \
+>>>        sun7i-a20-olinuxino-micro.dtb \
+>>> +     sun7i-a20-olinuxino-evb.dtb \
+>>>        sun7i-a20-orangepi.dtb \
+>>>        sun7i-a20-orangepi-mini.dtb \
+>>>        sun7i-a20-pcduino3.dtb \
+>>> diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-evb.dts
+>> b/arch/arm/boot/dts/sun7i-a20-olinuxino-evb.dts
+>>> new file mode 100644
+>>> index 0000000..a0071fa
+>>> --- /dev/null
+>>> +++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-evb.dts
+>>> @@ -0,0 +1,233 @@
+>>> +/*
+>>> + * Copyright 2015 - Marcus Cooper <codekipper@gmail.com>
+>>> + *
+>>> + * This file is dual-licensed: you can use it either under the terms
+>>> + * of the GPL or the X11 license, at your option. Note that this dual
+>>> + * licensing only applies to this file, and not this project as a
+>>> + * whole.
+>>> + *
+>>> + *  a) This file is free software; you can redistribute it and/or
+>>> + *     modify it under the terms of the GNU General Public License as
+>>> + *     published by the Free Software Foundation; either version 2 of
+>> the
+>>> + *     License, or (at your option) any later version.
+>>> + *
+>>> + *     This file is distributed in the hope that it will be useful,
+>>> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+>>> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>>> + *     GNU General Public License for more details.
+>>> + *
+>>> + * Or, alternatively,
+>>> + *
+>>> + *  b) Permission is hereby granted, free of charge, to any person
+>>> + *     obtaining a copy of this software and associated documentation
+>>> + *     files (the "Software"), to deal in the Software without
+>>> + *     restriction, including without limitation the rights to use,
+>>> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+>>> + *     sell copies of the Software, and to permit persons to whom the
+>>> + *     Software is furnished to do so, subject to the following
+>>> + *     conditions:
+>>> + *
+>>> + *     The above copyright notice and this permission notice shall be
+>>> + *     included in all copies or substantial portions of the Software.
+>>> + *
+>>> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+>>> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+>>> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+>>> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+>>> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+>>> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+>>> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+>>> + *     OTHER DEALINGS IN THE SOFTWARE.
+>>> + */
+>>> +
+>>> +/dts-v1/;
+>>> +#include "sun7i-a20.dtsi"
+>>> +#include "sunxi-common-regulators.dtsi"
+>>> +
+>>> +#include <dt-bindings/gpio/gpio.h>
+>>> +#include <dt-bindings/interrupt-controller/irq.h>
+>>> +#include <dt-bindings/pinctrl/sun4i-a10.h>
+>>> +
+>>> +/ {
+>>> +     model = "Olimex A20-OLinuXino-EVB";
+>>> +     compatible = "olimex,a20-olinuxino-evb", "allwinner,sun7i-a20";
+>>> +
+>>> +     aliases {
+>>> +             serial0 = &uart0;
+>>> +     };
+>>> +
+>>> +     chosen {
+>>> +             stdout-path = "serial0:115200n8";
+>>> +     };
+>>> +
+>>> +     leds {
+>>> +             compatible = "gpio-leds";
+>>> +             pinctrl-names = "default";
+>>> +             pinctrl-0 = <&led_pins_olinuxinoevb>;
+>>> +
+>>> +             green {
+>>> +                     label = "a20-olinuxino-evb:green:usr";
+>>> +                     gpios = <&pio 7 2 GPIO_ACTIVE_HIGH>;
+>>> +                     default-state = "on";
+>>> +             };
+>>> +     };
+>>> +
+>>> +     reg_axp_ipsout: axp_ipsout {
+>>> +             compatible = "regulator-fixed";
+>>> +             regulator-name = "axp-ipsout";
+>>> +             regulator-min-microvolt = <5000000>;
+>>> +             regulator-max-microvolt = <5000000>;
+>>> +             regulator-always-on;
+>>> +     };
+>>> +};
+>>> +
+>>> +&ahci {
+>>> +     target-supply = <&reg_ahci_5v>;
+>>> +     status = "okay";
+>>> +};
+>>> +
+>>> +&ehci0 {
+>>> +     status = "okay";
+>>> +};
+>>> +
+>>> +&ehci1 {
+>>> +     status = "okay";
+>>> +};
+>>> +
+>>> +&gmac {
+>>> +     pinctrl-names = "default";
+>>> +     pinctrl-0 = <&gmac_pins_rgmii_a>;
+>>> +     phy = <&phy1>;
+>>> +     phy-mode = "rgmii";
+>>> +     status = "okay";
+>>> +
+>>> +     phy1: ethernet-phy at 1 {
+>>> +             reg = <1>;
+>>> +     };
+>>> +};
+>>> +
+>>> +&i2c0 {
+>>> +     pinctrl-names = "default";
+>>> +     pinctrl-0 = <&i2c0_pins_a>;
+>>> +     status = "okay";
+>>> +
+>>> +     axp209: pmic at 34 {
+>>> +             compatible = "x-powers,axp209";
+>>> +             reg = <0x34>;
+>>> +             interrupt-parent = <&nmi_intc>;
+>>> +             interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
+>>> +
+>>> +             interrupt-controller;
+>>> +             #interrupt-cells = <1>;
+>>> +
+>>> +             acin-supply = <&reg_axp_ipsout>;
+>>> +             vin2-supply = <&reg_axp_ipsout>;
+>>> +             vin3-supply = <&reg_axp_ipsout>;
+>>> +             ldo24in-supply = <&reg_axp_ipsout>;
+>>> +             ldo3in-supply = <&reg_axp_ipsout>;
+>>
+>> Please use the axp209 dtsi.
+>>
+> Will do
+>
+>>
+>>> +
+>>> +             regulators {
+>>> +                     vdd_rtc: ldo1 {
+>>> +                             regulator-min-microvolt = <1300000>;
+>>> +                             regulator-max-microvolt = <1300000>;
+>>> +                             regulator-always-on;
+>>> +                     };
+>>> +
+>>> +                     avcc: ldo2 {
+>>> +                             regulator-min-microvolt = <1800000>;
+>>> +                             regulator-max-microvolt = <3300000>;
+>>> +                             regulator-always-on;
+>>> +                     };
+>>> +
+>>> +                     vcc_csi0: ldo3 {
+>>> +                             regulator-min-microvolt = <700000>;
+>>> +                             regulator-max-microvolt = <3500000>;
+>>> +                             regulator-always-on;
+>>> +                     };
+>>> +
+>>> +                     vcc_csi1: ldo4 {
+>>> +                             regulator-min-microvolt = <1250000>;
+>>> +                             regulator-max-microvolt = <3300000>;
+>>> +                             regulator-always-on;
+>>> +                     };
+>>
+>> the csi regulators are always-on too? What function do they provide?
+>>
+> This was a c & p from the lime 2 dts as their fex files are very similar. I
+> can remove this for now.
+>
+>>
+>>> +                     vdd_cpu: dcdc2 {
+>>> +                             regulator-min-microvolt = <700000>;
+>>> +                             regulator-max-microvolt = <2275000>;
+>>
+>> This is way outside of the CPU operating range. Are you sure of your
+>> constraints?
+>>
+> ditto. I will check on this.
+>
+>
+>>
+>>> +                             regulator-always-on;
+>>> +                     };
+>>> +
+>>> +                     vdd_int: dcdc3 {
+>>> +                             regulator-min-microvolt = <700000>;
+>>> +                             regulator-max-microvolt = <3500000>;
+>>> +                             regulator-always-on;
+>>> +                     };
+>>> +             };
+>>> +     };
+>>> +};
+>>> +
+>>> +&i2c1 {
+>>> +     pinctrl-names = "default";
+>>> +     pinctrl-0 = <&i2c1_pins_a>;
+>>> +     status = "okay";
+>>> +};
+>>> +
+>>> +&mmc0 {
+>>> +     pinctrl-names = "default";
+>>> +     pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_reference_design>;
+>>> +     vmmc-supply = <&reg_vcc3v3>;
+>>> +     bus-width = <4>;
+>>> +     cd-gpios = <&pio 7 1 GPIO_ACTIVE_HIGH>; /* PH1 */
+>>> +     cd-inverted;
+>>> +     status = "okay";
+>>> +};
+>>> +
+>>> +&ohci0 {
+>>> +     status = "okay";
+>>> +};
+>>> +
+>>> +&ohci1 {
+>>> +     status = "okay";
+>>> +};
+>>> +
+>>> +&pio {
+>>> +     ahci_pwr_pin_olinuxinoevb: ahci_pwr_pin at 1 {
+>>> +             allwinner,pins = "PC3";
+>>> +             allwinner,function = "gpio_out";
+>>> +             allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+>>> +             allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+>>> +     };
+>>> +
+>>> +     led_pins_olinuxinoevb: led_pins at 0 {
+>>> +             allwinner,pins = "PH2";
+>>> +             allwinner,function = "gpio_out";
+>>> +             allwinner,drive = <SUN4I_PINCTRL_20_MA>;
+>>> +             allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+>>> +     };
+>>> +};
+>>> +
+>>> +&reg_ahci_5v {
+>>> +     pinctrl-0 = <&ahci_pwr_pin_olinuxinoevb>;
+>>> +     gpio = <&pio 2 3 GPIO_ACTIVE_HIGH>;
+>>> +     status = "okay";
+>>> +};
+>>> +
+>>> +&reg_usb1_vbus {
+>>> +     status = "okay";
+>>> +};
+>>> +
+>>> +&reg_usb2_vbus {
+>>> +     status = "okay";
+>>> +};
+>>> +
+>>> +&uart0 {
+>>> +     pinctrl-names = "default";
+>>> +     pinctrl-0 = <&uart0_pins_a>;
+>>> +     status = "okay";
+>>> +};
+>>> +
+>>> +&usbphy {
+>>> +     usb1_vbus-supply = <&reg_usb1_vbus>;
+>>> +     usb2_vbus-supply = <&reg_usb2_vbus>;
+>>> +     status = "okay";
+>>> +};
+>>> --
+>>> 2.5.0
+>>>
+>>
+>> Thanks,
+>> Maxime
+>>
+>> --
+>> Maxime Ripard, Free Electrons
+>> Embedded Linux, Kernel and Android engineering
+>> http://free-electrons.com
+>>
+>
