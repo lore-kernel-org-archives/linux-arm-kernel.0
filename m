@@ -1,81 +1,75 @@
-From: hongzhou.yang@mediatek.com (Hongzhou Yang)
-Date: Thu, 20 Aug 2015 21:46:44 -0700
-Subject: [PATCH v3] pinctrl: mediatek: Fix multiple registration issue.
-Message-ID: <1440132404-27749-1-git-send-email-hongzhou.yang@mediatek.com>
+From: jon.nettleton@gmail.com (Jon Nettleton)
+Date: Fri, 21 Aug 2015 06:49:20 +0200
+Subject: RX packet loss on i.MX6Q running 4.2-rc7
+In-Reply-To: <20150820223049.GA20710@pqgruber.com>
+References: <20150820223049.GA20710@pqgruber.com>
+Message-ID: <CALHpu37TYT8bL3BmaNhYCukiJQrMPMgmwXFToGH6Y7xRRrPJ-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since our common driver need support main chip and PMU
-at the same time, that means it will register two
-pinctrl device, and the pinctrl_desc structure should
-be used two times.
+On Fri, Aug 21, 2015 at 12:30 AM, Clemens Gruber
+<clemens.gruber@pqgruber.com> wrote:
+> Hi,
+>
+> I am experiencing massive RX packet loss on my i.MX6Q (Chip rev 1.3) on Linux
+> 4.2-rc7 with a Marvell 88E1510 Gigabit Ethernet PHY connected over RGMII.
+> I noticed it when doing an UDP benchmark with iperf3. When sending UDP packets
+> from a Debian PC to the i.MX6 with a rate of 100 Mbit/s, 99% of the packets are
+> lost. With a rate of 10 Mbit/s, we are still losing 93% of all packets. TCP RX
+> does suffer from packet loss too, but still achieves about 211 Mbit/s.
+> TX is not affected.
+>
+> Steps to reproduce:
+> On the i.MX6: iperf3 -s
+> On a desktop PC:  iperf3 -b 10M -u -c MX6IP
+>
+> The iperf3 results:
+> [ ID] Interval           Transfer     Bandwidth       Jitter    Lost/Total
+> [  4]   0.00-10.00  sec  11.8 MBytes  9.90 Mbits/sec  0.687 ms  1397/1497 (93%)
+>
+> During the 10 Mbit UDP test, the IEEE_rx_macerr counter increased to 5371.
+> ifconfig eth0 shows:
+>  RX packets:9216 errors:5248 dropped:170 overruns:5248 frame:5248
+>  TX packets:83 errors:0 dropped:0 overruns:0 carrier:0
+>  collisions:0
+>
+> Here are the TCP results with iperf3 -c MX6IP:
+> [ ID] Interval           Transfer     Bandwidth       Retr
+> [  4]   0.00-10.00  sec   252 MBytes   211 Mbits/sec  4343             sender
+> [  4]   0.00-10.00  sec   251 MBytes   211 Mbits/sec                  receiver
+>
+> During the TCP test, IEEE_rx_macerr increased to 4059.
+> ifconfig eth0 shows:
+> RX packets:186368 errors:4206 dropped:50 overruns:4206 frame:4206
+> TX packets:41861 errors:0 dropped:0 overruns:0 carrier:0
+> collisions:0
+>
+> Freescale errata entry ERR004512 did mention a RX FIFO overrun. Is this related?
+>
+> Forcing pause frames via ethtool -A eth0 rx on tx on, does not improve it:
+> Same amount of UDP packet loss with reduced TCP throughput of 190 Mbit/s.
+> IEEE_rx_macerr increased up to 5232 during UDP 10Mbit and up to 4270 for TCP.
+>
+> I am already using the MX6QDL_PAD_GPIO_6__ENET_IRQ workaround, which solved the
+> ping latency issues from ERR006687 but not the packet loss problem.
+>
+> I read through the mailing list archives and found a discussion between Russell
+> King, Marek Vasut, Eric Nelson, Fugang Duan and others about a similar problem.
+> I therefore added you and contributors to fec_main.c to the CC.
+>
+> One suggestion I found, was adding udelay(210); to fec_enet_rx():
+> https://lkml.org/lkml/2014/8/22/88
+> But this also did not reduce the packet loss. (I added it to the fec_enet_rx
+> function just before return pkt_received; but I still got 93% packet loss)
+>
+> Does anyone have the equipment/setup to trace an i.MX6Q during UDP RX traffic
+> from iperf3 to find the root cause of this packet loss problem?
+>
+> What else could we do to fix this?
+>
 
-But pinctrl_desc use global static definition, then
-the latest registered pinctrl device will overwrite
-the old one's, all members in pinctrl_desc will set to
-the new one's, such as name, pins and pins numbers, etc.
-This is a bug. Changing to use devm_kzalloc to fix it.
+This is a bug in iperf3's UDP tests.  Do the same test with iperf2 and
+you will see expected performance.  I believe there is a bug open in
+github about it.
 
-Cc: stable at vger.kernel.org # v4.1+
-Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
----
- Use dynamic allocation to fix multiple registration issue.
-
- drivers/pinctrl/mediatek/pinctrl-mtk-common.c |   21 ++++++++++-----------
- drivers/pinctrl/mediatek/pinctrl-mtk-common.h |    1 +
- 2 files changed, 11 insertions(+), 11 deletions(-)
-
-diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-index ad1ea16..4a52072 100644
---- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-+++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-@@ -1202,12 +1202,6 @@ static int mtk_pctrl_build_state(struct platform_device *pdev)
- 	return 0;
- }
- 
--static struct pinctrl_desc mtk_pctrl_desc = {
--	.confops	= &mtk_pconf_ops,
--	.pctlops	= &mtk_pctrl_ops,
--	.pmxops		= &mtk_pmx_ops,
--};
--
- int mtk_pctrl_init(struct platform_device *pdev,
- 		const struct mtk_pinctrl_devdata *data,
- 		struct regmap *regmap)
-@@ -1265,12 +1259,17 @@ int mtk_pctrl_init(struct platform_device *pdev,
- 
- 	for (i = 0; i < pctl->devdata->npins; i++)
- 		pins[i] = pctl->devdata->pins[i].pin;
--	mtk_pctrl_desc.name = dev_name(&pdev->dev);
--	mtk_pctrl_desc.owner = THIS_MODULE;
--	mtk_pctrl_desc.pins = pins;
--	mtk_pctrl_desc.npins = pctl->devdata->npins;
-+
-+	pctl->pctl_desc.name = dev_name(&pdev->dev);
-+	pctl->pctl_desc.owner = THIS_MODULE;
-+	pctl->pctl_desc.pins = pins;
-+	pctl->pctl_desc.npins = pctl->devdata->npins;
-+	pctl->pctl_desc.confops = &mtk_pconf_ops;
-+	pctl->pctl_desc.pctlops = &mtk_pctrl_ops;
-+	pctl->pctl_desc.pmxops = &mtk_pmx_ops;
- 	pctl->dev = &pdev->dev;
--	pctl->pctl_dev = pinctrl_register(&mtk_pctrl_desc, &pdev->dev, pctl);
-+
-+	pctl->pctl_dev = pinctrl_register(&pctl->pctl_desc, &pdev->dev, pctl);
- 	if (IS_ERR(pctl->pctl_dev)) {
- 		dev_err(&pdev->dev, "couldn't register pinctrl driver\n");
- 		return PTR_ERR(pctl->pctl_dev);
-diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.h b/drivers/pinctrl/mediatek/pinctrl-mtk-common.h
-index 30213e5..c532c23 100644
---- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.h
-+++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.h
-@@ -256,6 +256,7 @@ struct mtk_pinctrl_devdata {
- struct mtk_pinctrl {
- 	struct regmap	*regmap1;
- 	struct regmap	*regmap2;
-+	struct pinctrl_desc pctl_desc;
- 	struct device           *dev;
- 	struct gpio_chip	*chip;
- 	struct mtk_pinctrl_group	*groups;
--- 
-1.7.9.5
+-Jon
