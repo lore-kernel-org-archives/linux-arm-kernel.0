@@ -1,55 +1,47 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Fri, 21 Aug 2015 15:56:42 -0700
-Subject: [PATCH] gpio: vf610: handle level IRQ's properly
-Message-ID: <1440197802-29720-1-git-send-email-stefan@agner.ch>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Fri, 21 Aug 2015 16:27:23 -0700
+Subject: [GIT PULL] RPi DT changes due for v4.3
+In-Reply-To: <20150813103056.GY30160@localhost>
+References: <20150811160642.GQ18282@x1> <20150813103056.GY30160@localhost>
+Message-ID: <55D7B3DB.8070405@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The GPIO IRQ controller is able to generate level triggered
-interrupts, however, these were handled by handle_simple_irq so far
-which did not take care of IRQ masking. This lead to "nobody cared
-(try booting with the "irqpoll" option)" stack traces.
+On 13/08/15 03:30, Olof Johansson wrote:
+> Hi,
+> 
+> On Tue, Aug 11, 2015 at 05:06:42PM +0100, Lee Jones wrote:
+>> ARM SoC Chaps,
+>>
+>> Please find a couple of simple RPi changes pertaining to Firmware.
+>>
+>> The following changes since commit bc0195aad0daa2ad5b0d76cce22b167bc3435590:
+>>
+>>   Linux 4.2-rc2 (2015-07-12 15:10:30 -0700)
+>>
+>> are available in the git repository at:
+>>
+>>   git://git.kernel.org/pub/scm/linux/kernel/git/rpi/linux-rpi.git tags/rpi-dt-for-armsoc-4.3
+>>
+>> for you to fetch changes up to fd26f8830979de48eb3f1c253eb9d2ee2e468eb6:
+>>
+>>   dt/bindings: Add binding for the Raspberry Pi firmware driver (2015-08-11 16:56:41 +0100)
+> 
+> I've merged this but I'm a little confused about bcm2835 maintainership:
+> I got a MAINTAINERS update from Florian earlier grouped in a set of
+> other bcm changes (adding Eric), and now this directly from you.
+> 
+> In general the bcm platforms are quite diverse and we've asked Florian
+> to be the funnel for all of the new ones, but I don't think we talked
+> much about 2835 at that time. Should we expect to see merges directly
+> from you and the other maintainers there or will it go through Florian?
+> 
+> Either way is OK with me, just looking to clarify.
 
-Use the generic interrupt handlers depending on the IRQ type.
+Could you merge this pull request directly? Eric and I met recently and
+we agreed on a more formal process for the next submissions which will
+be having me route the RPi changes through the Broadcom pull requests.
 
-Signed-off-by: Stefan Agner <stefan@agner.ch>
----
- drivers/gpio/gpio-vf610.c | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/gpio/gpio-vf610.c b/drivers/gpio/gpio-vf610.c
-index 7bd9f20..b6a0887 100644
---- a/drivers/gpio/gpio-vf610.c
-+++ b/drivers/gpio/gpio-vf610.c
-@@ -60,6 +60,8 @@ struct vf610_gpio_port {
- #define PORT_INT_EITHER_EDGE	0xb
- #define PORT_INT_LOGIC_ONE	0xc
- 
-+static struct irq_chip vf610_gpio_irq_chip;
-+
- static const struct of_device_id vf610_gpio_dt_ids[] = {
- 	{ .compatible = "fsl,vf610-gpio" },
- 	{ /* sentinel */ }
-@@ -173,6 +175,11 @@ static int vf610_gpio_irq_set_type(struct irq_data *d, u32 type)
- 
- 	port->irqc[d->hwirq] = irqc;
- 
-+	if (type & IRQ_TYPE_LEVEL_MASK)
-+		__irq_set_handler_locked(d->irq, handle_level_irq);
-+	else
-+		__irq_set_handler_locked(d->irq, handle_edge_irq);
-+
- 	return 0;
- }
- 
-@@ -263,7 +270,7 @@ static int vf610_gpio_probe(struct platform_device *pdev)
- 	vf610_gpio_writel(~0, port->base + PORT_ISFR);
- 
- 	ret = gpiochip_irqchip_add(gc, &vf610_gpio_irq_chip, 0,
--				   handle_simple_irq, IRQ_TYPE_NONE);
-+				   handle_edge_irq, IRQ_TYPE_NONE);
- 	if (ret) {
- 		dev_err(dev, "failed to add irqchip\n");
- 		gpiochip_remove(gc);
+Thanks!
 -- 
-2.5.0
+Florian
