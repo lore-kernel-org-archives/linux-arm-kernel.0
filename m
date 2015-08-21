@@ -1,51 +1,55 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sat, 22 Aug 2015 01:18:09 +0300
-Subject: [PATCH v2] ARM: shmobile: silk: add SDHI1 DT support
-In-Reply-To: <55D790A5.1050008@cogentembedded.com>
-References: <10037494.4LD4T2QGPX@wasted.cogentembedded.com>
- <2757472.iuyUyRzJ3z@wasted.cogentembedded.com>
- <20150812012652.GH15957@verge.net.au> <55D790A5.1050008@cogentembedded.com>
-Message-ID: <55D7A3A1.9020009@cogentembedded.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Fri, 21 Aug 2015 15:56:42 -0700
+Subject: [PATCH] gpio: vf610: handle level IRQ's properly
+Message-ID: <1440197802-29720-1-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/21/2015 11:57 PM, Sergei Shtylyov wrote:
+The GPIO IRQ controller is able to generate level triggered
+interrupts, however, these were handled by handle_simple_irq so far
+which did not take care of IRQ masking. This lead to "nobody cared
+(try booting with the "irqpoll" option)" stack traces.
 
->>> Define the SILK board dependent part of the SDHI1 (connected to micro-SD slot)
->>> device nodes along with the necessary voltage regulators.
->>>
->>> Based on the original patch by Vladimir Barinov
->>> <vladimir.barinov@cogentembedded.com>.
->>>
->>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->>>
->>> ---
->>> This patch is against 'renesas-devel-20150810-v4.2-rc6' tag of Simon Horman's
->>> 'renesas.git' repo plus the R8A7794/SILK QSPI patches just re-posted. It needs
->>> the R8A7794 GPIO patches in order to compile.
->>>
->>> Changes in version 2:
->>> - removed not working SDHI0 stuff, renamed the patch;
->>> - replaced SDHI1's "wp-gpios" property with "disable-wp".
->>
->> I am wondering if you could explain the motivation for the "disable-wp"
->> update
->
->     Please see the comment in mmc_sd_get_ro().
->
->> and weather it is appropriate for other r8a779* dts files.
->
->     In case of micro-SD slots, yes.
+Use the generic interrupt handlers depending on the IRQ type.
 
-    The MMC binding document says it should only be specified if the 
-controller has WP detection logic. We, so far, seem to have been replying on 
-the GPIOs despite this logic is present (according to the R-Car gen2 SDHI 
-manuals I have). The driver will first call mmc_gpio_get_ro() and when that 
-fails due to "wp-gpios" not being specified, it proceeds to reading the 
-register but that is forbidden by TMIO_MMC_WRPROTECT_DISABLE flag set for the 
-R-Car gen1/2 chips, so 0 is always returned from tmio_mmc_get_ro(). There 
-seems to be no point in going that far (and doing the runtime PM dances) --
-and MMC_CAP2_NO_WRITE_PROTECT (set when "disable-wp" is specified) prohibits 
-doing that...
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+---
+ drivers/gpio/gpio-vf610.c | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
 
-MBR, Sergei
+diff --git a/drivers/gpio/gpio-vf610.c b/drivers/gpio/gpio-vf610.c
+index 7bd9f20..b6a0887 100644
+--- a/drivers/gpio/gpio-vf610.c
++++ b/drivers/gpio/gpio-vf610.c
+@@ -60,6 +60,8 @@ struct vf610_gpio_port {
+ #define PORT_INT_EITHER_EDGE	0xb
+ #define PORT_INT_LOGIC_ONE	0xc
+ 
++static struct irq_chip vf610_gpio_irq_chip;
++
+ static const struct of_device_id vf610_gpio_dt_ids[] = {
+ 	{ .compatible = "fsl,vf610-gpio" },
+ 	{ /* sentinel */ }
+@@ -173,6 +175,11 @@ static int vf610_gpio_irq_set_type(struct irq_data *d, u32 type)
+ 
+ 	port->irqc[d->hwirq] = irqc;
+ 
++	if (type & IRQ_TYPE_LEVEL_MASK)
++		__irq_set_handler_locked(d->irq, handle_level_irq);
++	else
++		__irq_set_handler_locked(d->irq, handle_edge_irq);
++
+ 	return 0;
+ }
+ 
+@@ -263,7 +270,7 @@ static int vf610_gpio_probe(struct platform_device *pdev)
+ 	vf610_gpio_writel(~0, port->base + PORT_ISFR);
+ 
+ 	ret = gpiochip_irqchip_add(gc, &vf610_gpio_irq_chip, 0,
+-				   handle_simple_irq, IRQ_TYPE_NONE);
++				   handle_edge_irq, IRQ_TYPE_NONE);
+ 	if (ret) {
+ 		dev_err(dev, "failed to add irqchip\n");
+ 		gpiochip_remove(gc);
+-- 
+2.5.0
