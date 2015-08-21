@@ -1,72 +1,215 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 21 Aug 2015 14:30:43 +0100
-Subject: Prevent list poison values from being mapped by userspace
- processes
-In-Reply-To: <CABXk95C=CpeL4mNmS6-jJ-0bMJf6fawwfs6DM1-p8FctTEFbpw@mail.gmail.com>
-References: <CABXk95C=CpeL4mNmS6-jJ-0bMJf6fawwfs6DM1-p8FctTEFbpw@mail.gmail.com>
-Message-ID: <20150821133043.GV7557@n2100.arm.linux.org.uk>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Fri, 21 Aug 2015 14:42:30 +0100
+Subject: [PATCH v7 3/6] PCI: designware: Add ARM64 support
+In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E01D81BAC@lhreml503-mbs>
+References: <1439812554-180426-1-git-send-email-wangzhou1@hisilicon.com>
+ <1439812554-180426-4-git-send-email-wangzhou1@hisilicon.com>
+ <1439988852.31432.15.camel@pengutronix.de>
+ <EE11001F9E5DDD47B7634E2F8A612F2E01D81315@lhreml503-mbs>
+ <1439998622.31432.44.camel@pengutronix.de>
+ <EE11001F9E5DDD47B7634E2F8A612F2E01D8139B@lhreml503-mbs>
+ <1440059243.31432.59.camel@pengutronix.de>
+ <EE11001F9E5DDD47B7634E2F8A612F2E01D81BAC@lhreml503-mbs>
+Message-ID: <20150821134230.GQ1020@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 18, 2015 at 02:42:44PM -0700, Jeffrey Vander Stoep wrote:
-> List poison pointer values point to memory that is mappable by
-> userspace. i.e. LIST_POISON1 = 0x00100100 and LIST_POISON2 =
-> 0x00200200. This means poison values can be valid pointers controlled
-> by userspace and can be used to exploit the kernel as demonstrated in
-> a recent blackhat talk:
-> https://www.blackhat.com/docs/us-15/materials/us-15-Xu-Ah-Universal-Android-Rooting-Is-Back-wp.pdf
+On Thu, Aug 20, 2015 at 12:10:24PM +0100, Gabriele Paoloni wrote:
+> Hi Lucas
 > 
-> Can these poison values be moved to an area not mappable by userspace
-> on 32 bit ARM?
+> Again many thanks for explaining and for your time.
+> 
+> I got your point now and I have dug a bit better in the PCI_DOMAINS code.
+> 
+> However I have a question...see inline below
+> 
+> > -----Original Message-----
+> > From: Lucas Stach [mailto:l.stach at pengutronix.de]
+> > Sent: Thursday, August 20, 2015 9:27 AM
+> > To: Gabriele Paoloni
+> > Cc: Wangzhou (B); Bjorn Helgaas; jingoohan1 at gmail.com; Pratyush Anand;
+> > Arnd Bergmann; linux at arm.linux.org.uk; thomas.petazzoni at free-
+> > electrons.com; lorenzo.pieralisi at arm.com; james.morse at arm.com;
+> > Liviu.Dudau at arm.com; jason at lakedaemon.net; robh at kernel.org; linux-
+> > pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> > devicetree at vger.kernel.org; Yuanzhichang; Zhudacai; zhangjukuo;
+> > qiuzhenfa; liudongdong (C); qiujiang; xuwei (O); Liguozhu (Kenneth)
+> > Subject: Re: [PATCH v7 3/6] PCI: designware: Add ARM64 support
+> > 
+> > Hi Gab,
+> > 
+> > Am Mittwoch, den 19.08.2015, 16:34 +0000 schrieb Gabriele Paoloni:
+> > > Hi Lucas
+> > >
+> > > First of all many thanks for the quick reply, really appreciated
+> > >
+> > > > -----Original Message-----
+> > > > From: Lucas Stach [mailto:l.stach at pengutronix.de]
+> > > > Sent: Wednesday, August 19, 2015 4:37 PM
+> > > > To: Gabriele Paoloni
+> > > > Cc: Wangzhou (B); Bjorn Helgaas; jingoohan1 at gmail.com; Pratyush
+> > Anand;
+> > > > Arnd Bergmann; linux at arm.linux.org.uk; thomas.petazzoni at free-
+> > > > electrons.com; lorenzo.pieralisi at arm.com; james.morse at arm.com;
+> > > > Liviu.Dudau at arm.com; jason at lakedaemon.net; robh at kernel.org; linux-
+> > > > pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> > > > devicetree at vger.kernel.org; Yuanzhichang; Zhudacai; zhangjukuo;
+> > > > qiuzhenfa; liudongdong (C); qiujiang; xuwei (O); Liguozhu (Kenneth)
+> > > > Subject: Re: [PATCH v7 3/6] PCI: designware: Add ARM64 support
+> > > >
+> > > > Hi Gab,
+> > > >
+> > > > Am Mittwoch, den 19.08.2015, 15:16 +0000 schrieb Gabriele Paoloni:
+> > > > > Hi Lucas
+> > > > >
+> > > > > I have rewritten the patch to take into account multiple
+> > controllers.
+> > > > >
+> > > > > As you can see now there is a static var in dw_pcie_host_init()
+> > that
+> > > > tracks
+> > > > > the bus numbers used.
+> > > >
+> > > > This is wrong. The DT specifies the valid bus number range. You can
+> > not
+> > > > just assign the next free bus number to the root bus.
+> > >
+> > > I think this is what is being done in
+> > > http://lxr.free-electrons.com/source/arch/arm/kernel/bios32.c#L495
+> > > and currently designware assigns the root bus number in
+> > > http://lxr.free-electrons.com/source/drivers/pci/host/pcie-
+> > designware.c#L730
+> > >
+> > You found the right spot. It works a bit different than I remember, but
+> > is less broken than your current code. :)
+> > 
+> > It actually assigns the next instance a root bus number behind the
+> > current instances bus range. Please note the difference to your code
+> > which assigns the next free bus number, which may still lay within the
+> > current instances bus range.
 
-As was discussed privately before your message, both Catalin and myself
-agreed that this is not possible, and I proposed alternatives which were
-feasible.
+Hi Gabriele,
 
-I have now implemented the domain access alternative which I mentioned
-during that discussion, which is suitable for all non-LPAE setups, which
-has the effect of blocking almost all implicit kernel accesses to
-userspace, thereby substantially reducing the possibility for an attack
-similar to that given in the above paper.
+> 
+> Mmmm here I have done a mistake: in the current designware the number of hw
+> controllers is always 1
+> http://lxr.free-electrons.com/source/drivers/pci/host/pcie-designware.c#L510
+> So the loop in bios32.c does not work on multiple PCIe ports...
 
-It should be said that with the following patches applied, it won't stop
-the original bug being used to crash the system (that's already been
-fixed) but it will prevent userspace being able to mask the crash, and
-therefore prevent such use-after-free bugs being used to gain privileges.
+Bios32.c is broken for multiple PCIe hosts for multiple reasons, this is just
+one of them. Hence the effort to get rid of it for maintained drivers.
 
-This approach also covers low-vector CPUs as well, with one caveat: the
-lower 1MB of userspace will remain accessible to the kernel due to the
-need for the vectors to remain visible.  Doing otherwise crashes the
-machine on the first exception event.  So here, we offer a "best efforts"
-implementation rather than something which completely blocks userspace
-access from kernel space.
+> However your comment about PCI_DOMAINS enlightened my mind and now I see
+> that when CONFIG_PCI_DOMAINS is defined we have the domains numbers
+> (tracked by __domain_nr).
 
-This is not a simple fix - it's quite involved, and it changes a fair
-number of places in the kernel.  It needs time to be proven before any
-thought can be given to backporting these changes to stable kernels.
-It would be good to get some testing of these changes.
+CONFIG_PCI_DOMAINS in itself doesn't do much without adding code to your driver.
+You could request a new domain for each controller with a special property to
+disable that behaviour in the dts, or you could enable CONFIG_PCI_DOMAINS_GENERIC
+which will give you a new domain automatically.
 
- arch/arm/Kconfig                            | 15 +++++
- arch/arm/include/asm/domain.h               | 45 +++++++++++----
- arch/arm/include/asm/futex.h                | 19 ++++++-
- arch/arm/include/asm/pgtable-2level-hwdef.h |  1 +
- arch/arm/include/asm/thread_info.h          |  3 -
- arch/arm/include/asm/uaccess.h              | 85 +++++++++++++++++++++++++++--
- arch/arm/kernel/armksyms.c                  |  6 +-
- arch/arm/kernel/entry-armv.S                | 27 ++++++---
- arch/arm/kernel/entry-common.S              |  2 +
- arch/arm/kernel/entry-header.S              | 42 ++++++++++++++
- arch/arm/kernel/head.S                      |  5 +-
- arch/arm/kernel/process.c                   | 37 ++++++++++---
- arch/arm/kernel/traps.c                     |  1 -
- arch/arm/lib/clear_user.S                   |  6 +-
- arch/arm/lib/copy_from_user.S               |  6 +-
- arch/arm/lib/copy_to_user.S                 |  6 +-
- arch/arm/lib/uaccess_with_memcpy.c          |  4 +-
- arch/arm/mm/mmu.c                           |  4 +-
- arch/arm/mm/pgd.c                           | 10 ++++
- 19 files changed, 267 insertions(+), 57 deletions(-)
+> So (correct me if I am wrong) if we have 2 PCIe ports that do not specify
+> the "bus-range" property, both root ports will enumerate starting from 
+> root_bus_nr = 0 and everything will still work ok.
+
+Correct.
+
+Best regards,
+Liviu
+
+> 
+> So if my assumption is correct, I do not see why the orginal patch from Wang 
+> Zhou is wrong. 
+> The only point can be that assigning pp->root_bus_nr = 0 is not required 
+> as pp memory is kzalloc'ed (an therefore init to zero).
+> 
+> 
+> > 
+> > >
+> > > In general I agree with you but if you look at all the current
+> > drivers
+> > > based on designware none of them define the "bus-range" dtb property.
+> > > Therefore doing as you say would break the current driver when we
+> > have
+> > > multiple controllers...am I right?
+> > >
+> > The current _code_ works fine for multiple controllers. It's just that
+> > you must define the bus range property in the DTB if you want to enable
+> > multiple instances of one controller and support a kernel without PCI
+> > domains support. As all current implementations have only a single
+> > instance of the controller per SoC, or depend on PCI domain support,
+> > it's totally fine for them to not define the bus ranges property, as
+> > it's an optional property and it is well defined how things behave if
+> > it
+> > is absent. We absolutely need to keep that specified behavior.
+> > 
+> > > If that is the case in order to fix this in the way you say I would
+> > need
+> > > to assign "bus-range" for all the PCIe drivers with multiple
+> > controllers:
+> > > in this case I would split the default range evenly (that is, if we
+> > have
+> > > two controllers I would define "bus-range"  0-127 and 128-255)
+> > >
+> > > If you think this solution is ok I can go for it. My only doubt was
+> > about
+> > > touching other vendors DTBs....
+> > >
+> > You don't need to touch any of the current DTBs, as they are fine with
+> > the default bus range behavior. You need to keep the specified behavior
+> > of the bus range property with the new code.
+> > 
+> > Regards,
+> > Lucas
+> > >
+> > > >
+> > > > It is perfectly valid to have a bus range of 0x00-0x10 assigned to
+> > one
+> > > > instance and 0x50-0xff to the next instance. Additional with PCIe
+> > > > hotplug you may not use the full range of the bus numbers on one
+> > > > instance at the first scan, but only later populate more buses when
+> > > > more
+> > > > bridges are added to the tree.
+> > > >
+> > > > > Drivers that do not specify the bus range in the DTB set pp-
+> > > > >root_bus_nr = DW_ROOT_NR_UNDEFINED.
+> > > > > Designware will check if the flag is set and will use the
+> > automatic
+> > > > bus range
+> > > > > assignment.
+> > > >
+> > > > No, please lets get rid of this assignment altogether. The glue
+> > drivers
+> > > > have no business in assigning the bus range. Please remove the
+> > > > pp->root_bus_nr assignment from all the glue drivers.
+> > > >
+> > > > "bus range" is a generic DW PCIe property, so just parse the root
+> > bus
+> > > > number from the DT, it is handled the same way for all the DW based
+> > > > PCIe
+> > > > drivers. The bindings specifies that if the bus range property is
+> > > > missing the range is 0x00-0xff, so you can default to 0 as the root
+> > bus
+> > > > number in that case.
+> > > >
+> > > > Also I would think this conversion warrants a patch on its own and
+> > > > should not be mixed in the ARM64 support patch.
+> > > >
+> > > > Regards,
+> > > > Lucas
+> > > >
+> > 
+> > --
+> > Pengutronix e.K.             | Lucas Stach                 |
+> > Industrial Linux Solutions   | http://www.pengutronix.de/  |
+> 
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
