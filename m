@@ -1,59 +1,70 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Fri, 21 Aug 2015 19:36:09 +0200
-Subject: [PATCH v2 09/21] ARM: pxa: magician: Add OV9640 camera support
-In-Reply-To: <1634812.ZDaECJ9ClW@wuerfel> (Arnd Bergmann's message of "Fri, 21
- Aug 2015 15:45:53 +0200")
-References: <cover.1439843482.git.petr.cvek@tul.cz>
- <2889798.x6xcIzdYMU@wuerfel> <55D65722.9030508@tul.cz>
- <1634812.ZDaECJ9ClW@wuerfel>
-Message-ID: <874mjs5yt2.fsf@belgarion.home>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Fri, 21 Aug 2015 19:46:31 +0200
+Subject: [PATCH 1/3] clk: add flag for clocks that need to be enabled on rate
+ changes
+Message-ID: <1929669.AsgMSusdJb@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I shrunk a bit the mailing list.
+Some clocks need to be enabled to accept rate changes. This patch adds a
+new flag CLK_SET_RATE_UNGATE that lets clk_change_rate enable the clock
+before trying to change the rate and disable it again afterwards.
+This of course doesn't effect clocks that are already running at that
+point, as their refcount will only temporarily increase.
 
-Arnd Bergmann <arnd@arndb.de> writes:
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ drivers/clk/clk.c            | 18 ++++++++++++++++++
+ include/linux/clk-provider.h |  1 +
+ 2 files changed, 19 insertions(+)
 
-> On Friday 21 August 2015 00:39:30 Petr Cvek wrote:
->> Dne 20.8.2015 v 22:26 Arnd Bergmann napsal(a):
->> > On Thursday 20 August 2015 21:48:20 Robert Jarzmik wrote:
->> >> Petr Cvek <petr.cvek@tul.cz> writes:
->> Datasheet says:
->> 
->>         tS:RESET        Setting time after software/hardware reset      1 ms
->> 
->> So at least one ~1 ms should be left there. Are msleep less than 20ms valid? 
->> 
->> (checkpatch: msleep < 20ms  can sleep for up to 20ms)
->
-> On most kernels, an msleep(1) will sleep somewhere between 1 and 3 milliseconds
-> (but could be much longer), while an mdelay(1) tries to sleep around one
-> millisecond, more or less.
-
-I have rethought of that a bit more. I'm convinced a delay of "at least 1ms" is
-necessary according to the specification, it can also be more.
-
-Moreover, I came to the conclusion this reset sequence is not something that is
-"magician" specific (see palmz72_camera_reset() in
-.../mach-pxa/palmz72.c). Actually it's not even mach-pxa specific, it's "ov9640"
-specific.
-
-Now add this to the fact that it would be good to have a solution working for
-devicetree as well, and on any board, and the conclusion I came to was that this
-handling deserves to be in ov9640 driver (please correct me if I'm wrong).
-
-The idea behind it is have the reset handled in ov9640, and the gpio provided by
-platform data or devicetree.
-
-So Guennadi, is it possible to add a gpio through platform data to ov9640
-driver, does it make sense, and would you accept to have the reset handled there
-? And if yes, would you, Petr, accept to revamp your patch to have the reset and
-power handled in ov9640 ?
-
-Please note that it is a proposal, I'm not forcing anybody, I'd like to choose a
-path that agrees with the future push to remove as many machine files as possible.
-
-Cheers.
-
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index 28cd923..564f11e 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -1438,6 +1438,15 @@ static void clk_change_rate(struct clk_core *core)
+ 	else if (core->parent)
+ 		best_parent_rate = core->parent->rate;
+ 
++	if (core->flags & CLK_SET_RATE_UNGATE) {
++		unsigned long flags;
++
++		clk_core_prepare(core);
++		flags = clk_enable_lock();
++		clk_core_enable(core);
++		clk_enable_unlock(flags);
++	}
++
+ 	if (core->new_parent && core->new_parent != core->parent) {
+ 		old_parent = __clk_set_parent_before(core, core->new_parent);
+ 		trace_clk_set_parent(core, core->new_parent);
+@@ -1464,6 +1473,15 @@ static void clk_change_rate(struct clk_core *core)
+ 
+ 	core->rate = clk_recalc(core, best_parent_rate);
+ 
++	if (core->flags & CLK_SET_RATE_UNGATE) {
++		unsigned long flags;
++
++		flags = clk_enable_lock();
++		clk_core_disable(core);
++		clk_enable_unlock(flags);
++		clk_core_unprepare(core);
++	}
++
+ 	if (core->notifier_count && old_rate != core->rate)
+ 		__clk_notify(core, POST_RATE_CHANGE, old_rate, core->rate);
+ 
+diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+index 3ecc07d..21e0025 100644
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -31,6 +31,7 @@
+ #define CLK_SET_RATE_NO_REPARENT BIT(7) /* don't re-parent on rate change */
+ #define CLK_GET_ACCURACY_NOCACHE BIT(8) /* do not use the cached clk accuracy */
+ #define CLK_RECALC_NEW_RATES	BIT(9) /* recalc rates after notifications */
++#define CLK_SET_RATE_UNGATE	BIT(10) /* clock needs to run to set rate */
+ 
+ struct clk;
+ struct clk_hw;
 -- 
-Robert
+2.1.4
