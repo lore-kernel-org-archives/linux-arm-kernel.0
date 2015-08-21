@@ -1,66 +1,48 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 21 Aug 2015 18:01:14 +0200
-Subject: [PATCH v2 2/2] ARM: dma-mapping: Fix the coherent case when iommu
- is used
-In-Reply-To: <20150814175505.GB21966@e104818-lin.cambridge.arm.com>
-References: <1439568776-17864-1-git-send-email-gregory.clement@free-electrons.com>
- <1439568776-17864-3-git-send-email-gregory.clement@free-electrons.com>
- <20150814175505.GB21966@e104818-lin.cambridge.arm.com>
-Message-ID: <55D74B4A.4000800@free-electrons.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 21 Aug 2015 09:09:05 -0700
+Subject: [GIT PULL 8/9] ARM: tegra: Devicetree changes for v4.3-rc1
+In-Reply-To: <20150821015848.GM4865@localhost>
+References: <1439563720-13189-1-git-send-email-thierry.reding@gmail.com>
+ <1439563720-13189-9-git-send-email-thierry.reding@gmail.com>
+ <20150821015848.GM4865@localhost>
+Message-ID: <20150821160905.GP4865@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
-
-Sorry to answer only today, I xas busy on other task until now.
-
-On 14/08/2015 19:55, Catalin Marinas wrote:
-> On Fri, Aug 14, 2015 at 06:12:56PM +0200, Gregory CLEMENT wrote:
->> When doing dma allocation with IOMMU the __iommu_alloc_atomic() was
->> used even when the system was coherent. However, this function
->> allocates from a non-cacheable pool, which is fine when the device is
->> not cache coherent but won't work as expected in the device is cache
->> coherent. Indeed, the CPU and device must access the memory using the
->> same cacheability attributes.
->>
->> Tested-by: We need someone here
+On Thu, Aug 20, 2015 at 06:58:48PM -0700, Olof Johansson wrote:
+> On Fri, Aug 14, 2015 at 04:48:39PM +0200, Thierry Reding wrote:
+> > Hi ARM SoC maintainers,
+> > 
+> > The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
+> > 
+> >   Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.3-dt
+> > 
+> > for you to fetch changes up to 6909c6632fdbea441b5077b4f882c0bf4b71997e:
+> > 
+> >   ARM: tegra: Add gpio-ranges property (2015-08-13 16:31:53 +0200)
+> > 
+> > Thanks,
+> > Thierry
+> > 
+> > ----------------------------------------------------------------
+> > ARM: tegra: Devicetree changes for v4.3-rc1
+> > 
+> > Enables CPU frequency scaling on Jetson TK1 and enables the GK20A GPU on
+> > Venice2 and Jetson TK1. This also enables support for the PMU hardware
+> > found on Tegra124, which among other things, can be used for performance
+> > measurements.
 > 
-> And at least a build on your side ;).
+> Merged, thanks.
 
-It build but I forgot to set the CONFIG_ARM_DMA_USE_IOMMU config!
+This caused build failures due to missing tegra124-car.h:
 
-> 
-> Rob Herring added the coherent IOMMU ops in commit 0fa478df444f ("ARM:
-> add coherent iommu dma ops"). But it doesn't look like he needed the
-> coherent DMA API, only the streaming one.
-> 
->> @@ -1885,7 +1903,7 @@ struct dma_map_ops iommu_ops = {
->>  };
->>  
->>  struct dma_map_ops iommu_coherent_ops = {
->> -	.alloc		= arm_iommu_alloc_attrs,
->> +	.alloc		= arm_coherent_iommu_alloc_attrs,
->>  	.free		= arm_iommu_free_attrs,
-> 
-> Does this compile? You renamed arm_iommu_free_attrs to
-> __arm_iommu_alloc_attrs but I don't see arm_iommu_free_attrs
-> and arm_coherent_iommu_free_attrs functions.
-> 
->>  	.mmap		= arm_iommu_mmap_attrs,
-> 
-> And we need an arm_coherent_iommu_mmap_attrs (similar to
-> arm_iommu_mmap_attrs but without __get_dma_pgprot. Use
-> arm_(coherent_)dma_mmap as an example.
-> 
-I am going to take care of it
+http://arm-soc.lixom.net/buildlogs/arm-soc/v4.2-rc2-954-g5825349/buildall.arm.tegra_defconfig.log.failed
 
-Thanks,
-
-Gregory
+I've dropped this branch again.
 
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+-Olof
