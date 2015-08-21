@@ -1,34 +1,42 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 21 Aug 2015 14:46:30 +0100
-Subject: [PATCH 0/4] Efficiency cleanups
-In-Reply-To: <20150821133043.GV7557@n2100.arm.linux.org.uk>
-References: <CABXk95C=CpeL4mNmS6-jJ-0bMJf6fawwfs6DM1-p8FctTEFbpw@mail.gmail.com>
- <20150821133043.GV7557@n2100.arm.linux.org.uk>
-Message-ID: <20150821134630.GW7557@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 21 Aug 2015 15:45:53 +0200
+Subject: [PATCH v2 09/21] ARM: pxa: magician: Add OV9640 camera support
+In-Reply-To: <55D65722.9030508@tul.cz>
+References: <cover.1439843482.git.petr.cvek@tul.cz>
+ <2889798.x6xcIzdYMU@wuerfel> <55D65722.9030508@tul.cz>
+Message-ID: <1634812.ZDaECJ9ClW@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While developing the previous patch set, I noticed that the kernel's
-"fast" exit path efficiency was not what it's supposed to be due to the
-addition of trace and context tracking.
+On Friday 21 August 2015 00:39:30 Petr Cvek wrote:
+> Dne 20.8.2015 v 22:26 Arnd Bergmann napsal(a):
+> > On Thursday 20 August 2015 21:48:20 Robert Jarzmik wrote:
+> >> Petr Cvek <petr.cvek@tul.cz> writes:
+> >>
+> >>> +     mdelay(3);
+> >> Okay, there are several mdelay(3) in this file.
+> >>
+> >> Could you please test if removing these mdelays prevents the camera from working
+> >> ? If not, I'd like to have them removed.
+> >>
+> >>
+> > 
+> > FWIW, it might be possible to replace some of them with msleep() calls,
+> > potentially after replacing spinlocks with mutexes where necessary.
+> > 
+> >       Arnd
+> > 
+> 
+> Datasheet says:
+> 
+>         tS:RESET        Setting time after software/hardware reset      1 ms
+> 
+> So at least one ~1 ms should be left there. Are msleep less than 20ms valid? 
+> 
+> (checkpatch: msleep < 20ms  can sleep for up to 20ms)
 
-These add several instances of register stacking and unstacking around
-various function calls, several of which we can avoid.  Many of these
-instances don't need to stack any register other than r0.
+On most kernels, an msleep(1) will sleep somewhere between 1 and 3 milliseconds
+(but could be much longer), while an mdelay(1) tries to sleep around one
+millisecond, more or less.
 
-Moreover, we can avoid stacking and unstacking r0 if these features are
-enabled by storing r0 in the pt_regs as we would do in our slow return
-path.
-
-Various other cleanups are included in this set as well.  Acks welcome.
-
- arch/arm/include/asm/assembler.h   | 22 ++++++++------
- arch/arm/include/asm/thread_info.h | 20 +++++--------
- arch/arm/include/asm/uaccess.h     | 47 ++++++++---------------------
- arch/arm/kernel/entry-common.S     | 61 ++++++++++++++++++++++++++++----------
- arch/arm/kernel/signal.c           |  6 ++++
- 5 files changed, 84 insertions(+), 72 deletions(-)
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+	Arnd
