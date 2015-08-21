@@ -1,75 +1,121 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 21 Aug 2015 18:41:10 +0200
-Subject: [PATCH] mtd: nand: sunxi: rely on nand_dt_init initialization
-Message-ID: <1440175270-11334-1-git-send-email-boris.brezillon@free-electrons.com>
+From: moritz.fischer@ettus.com (Moritz Fischer)
+Date: Fri, 21 Aug 2015 09:42:24 -0700
+Subject: [PATCH v4 1/2] Documentation: dt: Add Xilinx zynqmp dma device
+ tree binding documentation
+In-Reply-To: <1438831173-8761-1-git-send-email-punnaia@xilinx.com>
+References: <1438831173-8761-1-git-send-email-punnaia@xilinx.com>
+Message-ID: <CAAtXAHdu10dchedaApLiw6+b583z4D8Of1TAEGDmhhVLOy+8YA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-nand_dt_init(), called from nand_scan_ident(), is already parsing the
-generic MTD/NAND DT properties, and initializing the nand_chip struct
-accordingly.
-Rely on this initialization instead of manually parsing those properties.
+Hi all,
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
----
- drivers/mtd/nand/sunxi_nand.c | 18 +++++-------------
- 1 file changed, 5 insertions(+), 13 deletions(-)
+sorry for HTML mail spam last night ... couple of nits below
 
-diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
-index f97a58d..6bd7099 100644
---- a/drivers/mtd/nand/sunxi_nand.c
-+++ b/drivers/mtd/nand/sunxi_nand.c
-@@ -1166,12 +1166,7 @@ static int sunxi_nand_ecc_init(struct mtd_info *mtd, struct nand_ecc_ctrl *ecc,
- 	int blk_size;
- 	int ret;
- 
--	blk_size = of_get_nand_ecc_step_size(np);
--	strength = of_get_nand_ecc_strength(np);
--	if (blk_size > 0 && strength > 0) {
--		ecc->size = blk_size;
--		ecc->strength = strength;
--	} else {
-+	if (!ecc->size) {
- 		ecc->size = nand->ecc_step_ds;
- 		ecc->strength = nand->ecc_strength_ds;
- 	}
-@@ -1181,10 +1176,6 @@ static int sunxi_nand_ecc_init(struct mtd_info *mtd, struct nand_ecc_ctrl *ecc,
- 
- 	ecc->mode = NAND_ECC_HW;
- 
--	ret = of_get_nand_ecc_mode(np);
--	if (ret >= 0)
--		ecc->mode = ret;
--
- 	switch (ecc->mode) {
- 	case NAND_ECC_SOFT_BCH:
- 		break;
-@@ -1310,15 +1301,13 @@ static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
- 	/* Default tR value specified in the ONFI spec (chapter 4.15.1) */
- 	nand->chip_delay = 200;
- 	nand->controller = &nfc->controller;
-+	nand->dn = np;
- 	nand->select_chip = sunxi_nfc_select_chip;
- 	nand->cmd_ctrl = sunxi_nfc_cmd_ctrl;
- 	nand->read_buf = sunxi_nfc_read_buf;
- 	nand->write_buf = sunxi_nfc_write_buf;
- 	nand->read_byte = sunxi_nfc_read_byte;
- 
--	if (of_get_nand_on_flash_bbt(np))
--		nand->bbt_options |= NAND_BBT_USE_FLASH | NAND_BBT_NO_OOB;
--
- 	mtd = &chip->mtd;
- 	mtd->dev.parent = dev;
- 	mtd->priv = nand;
-@@ -1328,6 +1317,9 @@ static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
- 	if (ret)
- 		return ret;
- 
-+	if (nand->bbt_options & NAND_BBT_USE_FLASH)
-+		nand->bbt_options |= NAND_BBT_NO_OOB;
-+
- 	ret = sunxi_nand_chip_init_timings(chip, np);
- 	if (ret) {
- 		dev_err(dev, "could not configure chip timings: %d\n", ret);
--- 
-1.9.1
+On Wed, Aug 5, 2015 at 8:19 PM, Punnaiah Choudary Kalluri
+<punnaiah.choudary.kalluri@xilinx.com> wrote:
+> Device-tree binding documentation for Xilinx zynqmp dma engine used in
+> Zynq UltraScale+ MPSoC.
+>
+> Signed-off-by: Punnaiah Choudary Kalluri <punnaia@xilinx.com>
+> ---
+> Changes in v4:
+> - None
+> Changes in v3:
+> - None
+> Changes in v2:
+> - None
+> ---
+>  .../devicetree/bindings/dma/xilinx/zynqmp_dma.txt  |   61 ++++++++++++++++++++
+>  1 files changed, 61 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/dma/xilinx/zynqmp_dma.txt
+>
+> diff --git a/Documentation/devicetree/bindings/dma/xilinx/zynqmp_dma.txt b/Documentation/devicetree/bindings/dma/xilinx/zynqmp_dma.txt
+> new file mode 100644
+> index 0000000..e4f92b9
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/dma/xilinx/zynqmp_dma.txt
+> @@ -0,0 +1,61 @@
+> +Xilinx ZynqMP DMA engine, it does support memory to memory transfers,
+> +memory to device and device to memory transfers. It also has flow
+> +control and rate control support for slave/peripheral dma access.
+
+How about: The Xilinx ZynqMP DMA engine does support memory to memory transfers,
+memory to device and device to memory transfers. It also has flow
+control and rate control
+support for slave / peripheral DMA access.
+> +
+> +Required properties:
+> +- compatible: Should be "xlnx,zynqmp-dma-1.0"
+> +- #dma-cells: Should be <1>, a single cell holding a line request number
+> +- reg: Memory map for module access
+> +- interrupt-parent: Interrupt controller the interrupt is routed through
+> +- interrupts: Should contain DMA channel interrupt
+> +- xlnx,bus-width: AXI buswidth in bits. Should contain 128 or 64
+> +
+> +Optional properties:
+> +- xlnx,include-sg: Indicates the controller to operate in simple or scatter
+> +                  gather dma mode
+s/dma/DMA
+> +- xlnx,ratectrl: Scheduling interval in terms of clock cycles for
+> +                source AXI transaction
+> +- xlnx,overfetch: Tells whether the channel is allowed to over fetch the data
+(Maybe) s/Tells/Determines/
+> +- xlnx,src-issue: Number of AXI outstanding transactions on source side
+> +- xlnx,desc-axi-cohrnt: Tells whether the AXI transactions generated for the
+> +                       descriptor read are marked Non-coherent
+(Maybe) s/Tells/Determines/
+> +- xlnx,src-axi-cohrnt: Tells whether the AXI transactions generated for the
+> +                       source descriptor payload are marked Non-coherent
+same
+> +- xlnx,dst-axi-cohrnt: Tells whether the AXI transactions generated for the
+> +                       dst descriptor payload are marked Non-coherent
+> +- xlnx,desc-axi-qos: AXI QOS bits to be used for descriptor fetch
+> +- xlnx,src-axi-qos: AXI QOS bits to be used for data read
+> +- xlnx,dst-axi-qos: AXI QOS bits to be used for data write
+> +- xlnx,desc-axi-cache: AXI cache bits to be used for descriptor fetch.
+> +- xlnx,desc-axi-cache: AXI cache bits to be used for data read
+> +- xlnx,desc-axi-cache: AXI cache bits to be used for data write
+> +- xlnx,src-burst-len: AXI length for data read. Support only power of 2 values
+> +                     i.e 1,2,4,8 and 16
+> +- xlnx,dst-burst-len: AXI length for data write. Support only power of 2 values
+> +                     i.e 1,2,4,8 and 16
+> +
+> +Example:
+> +++++++++
+> +fpd_dma_chan1: dma at FD500000 {
+> +       compatible = "xlnx,zynqmp-dma-1.0";
+> +       reg = <0x0 0xFD500000 0x1000>;
+> +       #dma_cells = <1>;
+#dma-cells = <1>;
+> +       interrupt-parent = <&gic>;
+> +       interrupts = <0 117 4>;
+> +       xlnx,bus-width = <128>;
+> +       xlnx,include-sg;
+> +       xlnx,overfetch;
+> +       xlnx,ratectrl = <0>;
+> +       xlnx,src-issue = <16>;
+> +       xlnx,desc-axi-cohrnt;
+> +       xlnx,src-axi-cohrnt;
+> +       xlnx,dst-axi-cohrnt;
+> +       xlnx,desc-axi-qos = <0>;
+> +       xlnx,desc-axi-cache = <0>;
+> +       xlnx,src-axi-qos = <0>;
+> +       xlnx,src-axi-cache = <2>;
+> +       xlnx,dst-axi-qos = <0>;
+> +       xlnx,dst-axi-cache = <2>;
+> +       xlnx,src-burst-len = <4>;
+> +       xlnx,dst-burst-len = <4>;
+> +};
+> --
+> 1.7.4
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+Cheers,
+
+Moritz
