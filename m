@@ -1,158 +1,46 @@
-From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Fri, 21 Aug 2015 22:39:10 +0800
-Subject: [PATCH v2 1/5] clocksource: mediatek: do not enable GPT_CLK_EVT
- when setup
-In-Reply-To: <55D5E40A.6080904@linaro.org>
-References: <CAGS+omD8k_Cfxv3bYyjmjtLbiavo-WmJPn0Z-CBhN_nnv65Tag@mail.gmail.com>
- <1437552878-3684-1-git-send-email-yingjoe.chen@mediatek.com>
- <55CC56C4.8080201@linaro.org> <1439820602.3414.12.camel@mtksdaap41>
- <55D5E40A.6080904@linaro.org>
-Message-ID: <1440167950.20169.29.camel@mtksdaap41>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 21 Aug 2015 17:50:56 +0200
+Subject: [GIT PULL] ARM: mvebu: cleanup changes for v4.3
+Message-ID: <55D748E0.3080004@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2015-08-20 at 16:28 +0200, Daniel Lezcano wrote:
-> On 08/17/2015 04:10 PM, Yingjoe Chen wrote:
-> > On Thu, 2015-08-13 at 10:35 +0200, Daniel Lezcano wrote:
-> >> On 07/22/2015 10:14 AM, Yingjoe Chen wrote:
-> >>> Spurious mtk timer interrupt is noticed at boot and cause kernel
-> >>> crash. It seems if GPT is enabled, it will latch irq status even
-> >>> when its IRQ is disabled.
-> 
-> It "seems" ?
-
 Hi,
 
-Datasheet doesn't mention detail. So I did some experiments, playing
-around with registers. Based on my observation, I think this is what
-happens:
+Here is the first pull request for fixes for mvebu for v4.2.
+I hope it is not too late, if it can't make ti for 4.2, then we
+will apply it on 4.3, anyway the bug is here since 3.18.
 
-For each GPT timer, it has ENABLE, IRQ_EN, IRQ status, IRQ_ACK, counter
-& compare.
+Gregory
 
-When mtk_timer_init calls mtk_timer_setup to setup GPT_CLK_EVT, it
-enable the timer but didn't set counter or compare. Both counter &
-compare is zero on reset, so GPT immediately raise IRQ status. IRQ_EN is
-still disabled now, so it didn't trigger interrupt right away.
+The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
 
-At end of mtk_timer_init, it calls mtk_timer_enable_irq to enable irq.
-Since IRQ status is 1 now, GPT trigger interrupt immediately. The
-interrupt is serviced by mtk_timer_interrupt. Since this is not an
-expected event, evt->dev.event_handler will be NULL and system crashed
-in the handler.
+  Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
 
-> >>> When irq is enabled afterward, we see
-> >>> spurious interrupt.
-> 
-> Doesn't have the firmware something to do with that ?
+are available in the git repository at:
 
-We have 6 GPT on mt8173, mtk timer use 2 of them. The spurious interrupt
-only happens on GPT_CLK_EVT (GPT1). Our firmware didn't touch that one,
-so it is in reset default when mtk timer driver try to enable it.
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-4.2-1
 
-> I have a mtk 8173 board I can use next week. How do you reproduce the 
-> issue ?
->
-> >>> Change init flow to only enable GPT_CLK_SRC at mtk_timer_init.
-> >>>
-> >>> Acked-by: Matthias Brugger <matthias.bgg@gmail.com>
-> >>> Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
-> >>> Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
-> >>> ---
-> >>>
-> >>> Update to my patch [1], added __init as Daniel suggest. This is the
-> >>> only patch that need to change in that series, so I only sent this one.
-> >>>
-> >>> http://lists.infradead.org/pipermail/linux-mediatek/2015-July/001545.html
-> >>>
-> >>>    drivers/clocksource/mtk_timer.c | 16 ++++++++++------
-> >>>    1 file changed, 10 insertions(+), 6 deletions(-)
-> >>>
-> >>> diff --git a/drivers/clocksource/mtk_timer.c b/drivers/clocksource/mtk_timer.c
-> >>> index 68ab423..2ba5b66 100644
-> >>> --- a/drivers/clocksource/mtk_timer.c
-> >>> +++ b/drivers/clocksource/mtk_timer.c
-> >>> @@ -156,9 +156,11 @@ static void mtk_timer_global_reset(struct mtk_clock_event_device *evt)
-> >>>    	writel(0x3f, evt->gpt_base + GPT_IRQ_ACK_REG);
-> >>>    }
-> >>>
-> >>> -static void
-> >>> -mtk_timer_setup(struct mtk_clock_event_device *evt, u8 timer, u8 option)
-> >>> +static void __init mtk_timer_setup(struct mtk_clock_event_device *evt,
-> >>> +				   u8 timer, u8 option, bool enable)
-> >>>    {
-> >>> +	u32 val;
-> >>> +
-> >>>    	writel(TIMER_CTRL_CLEAR | TIMER_CTRL_DISABLE,
-> >>>    		evt->gpt_base + TIMER_CTRL_REG(timer));
-> >>>
-> >>> @@ -167,8 +169,10 @@ mtk_timer_setup(struct mtk_clock_event_device *evt, u8 timer, u8 option)
-> >>>
-> >>>    	writel(0x0, evt->gpt_base + TIMER_CMP_REG(timer));
-> >>>
-> >>> -	writel(TIMER_CTRL_OP(option) | TIMER_CTRL_ENABLE,
-> >>> -			evt->gpt_base + TIMER_CTRL_REG(timer));
-> >>> +	val = TIMER_CTRL_OP(option);
-> >>> +	if (enable)
-> >>> +		val |= TIMER_CTRL_ENABLE;
-> >>> +	writel(val, evt->gpt_base + TIMER_CTRL_REG(timer));
-> >>
-> >> Instead of the 'enable' new option, I prefer a test with 'timer' with a
-> >> comment:
-> >>
-> >> 	/*
-> >> 	 * the timer hw is broken in that way ... bla bla, so we only
-> >> 	 * enable the clocksource ...
-> >> 	 */
-> >> 	if (timer == GPT_CLK_SRC)
-> >> 		val |= TIMER_CTRL_ENABLE;
-> >
-> > Hi Daniel,
-> >
-> > Thanks for your review.
-> > Since this bug happens to anyone using interrupt,
-> 
-> Can you elaborate ? I don't get the point.
-> 
-> > I'm not sure checking
-> > timer and only enable it for GPT_CLK_SRC is easier to read. Anyway, I'll
-> > change to this in next version.
-> >> That said, can you have a look at commit 1096be08 ?
-> >> "clockevents: sun5i: Fix setup_irq init sequence"
-> >>
-> >> first and check if moving the interrupt request after the
-> >> clockevents_config_and_register could fix your issue.
-> >
-> > I've tested this before, see:
-> >
-> > http://lists.infradead.org/pipermail/linux-mediatek/2015-May/000539.html
-> > http://lists.infradead.org/pipermail/linux-mediatek/2015-May/000551.html
-> 
-> I could take or ack this patch trusting it fixes the issue but there are 
-> some points that need clarifications.
-> 
->   - Does the spurious interrupt occurs *every* time ? at each boot ?
+for you to fetch changes up to 5be9fc23cdb42e1d383ecc8eae8a8ff70a752708:
 
-Yes. If you applied this series to enable mtk timer without this fix on
-mt8173 or mt8135 you can reproduce it. It occurs for every boot.
+  ARM: orion5x: fix legacy orion5x IRQ numbers (2015-08-21 17:33:08 +0200)
 
-It crash before uart driver is ready, so you'll have to use earlycon to
-see the crash log.
+----------------------------------------------------------------
+mvebu fixes changes for v4.2
 
-> The previous patches were supposed to fix the issue but they actually 
-> didn't. So how is tested the patch ?
+Fix legacy orion5x IRQ numbers broken since 3.18
 
-I'm not sure. I believe Matthias test that one on mt6589, maybe it have
-different behavior, or different timing.
+----------------------------------------------------------------
+Benjamin Cama (1):
+      ARM: orion5x: fix legacy orion5x IRQ numbers
 
-> Regarding the different fixes for this problem, it sounds like you are 
-> proceeding by trial and error.
-> 
-> Please give a more detailed analysis of the problem and especially check 
-> the timer is not altered by the firmware leaving it in a transient state 
-> or whatever.
+ arch/arm/Kconfig                          |  1 +
+ arch/arm/mach-orion5x/include/mach/irqs.h | 64 +++++++++++++++----------------
+ arch/arm/mach-orion5x/irq.c               |  4 +-
+ 3 files changed, 35 insertions(+), 34 deletions(-)
 
-See above for my analysis.
-Thanks.
-
-Joe.C
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
