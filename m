@@ -1,292 +1,158 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Fri, 21 Aug 2015 14:19:32 +0000
-Subject: [PATCH v7 3/6] PCI: designware: Add ARM64 support
-In-Reply-To: <20150821134230.GQ1020@e106497-lin.cambridge.arm.com>
-References: <1439812554-180426-1-git-send-email-wangzhou1@hisilicon.com>
- <1439812554-180426-4-git-send-email-wangzhou1@hisilicon.com>
- <1439988852.31432.15.camel@pengutronix.de>
- <EE11001F9E5DDD47B7634E2F8A612F2E01D81315@lhreml503-mbs>
- <1439998622.31432.44.camel@pengutronix.de>
- <EE11001F9E5DDD47B7634E2F8A612F2E01D8139B@lhreml503-mbs>
- <1440059243.31432.59.camel@pengutronix.de>
- <EE11001F9E5DDD47B7634E2F8A612F2E01D81BAC@lhreml503-mbs>
- <20150821134230.GQ1020@e106497-lin.cambridge.arm.com>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E01D826BD@lhreml503-mbs>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Fri, 21 Aug 2015 22:39:10 +0800
+Subject: [PATCH v2 1/5] clocksource: mediatek: do not enable GPT_CLK_EVT
+ when setup
+In-Reply-To: <55D5E40A.6080904@linaro.org>
+References: <CAGS+omD8k_Cfxv3bYyjmjtLbiavo-WmJPn0Z-CBhN_nnv65Tag@mail.gmail.com>
+ <1437552878-3684-1-git-send-email-yingjoe.chen@mediatek.com>
+ <55CC56C4.8080201@linaro.org> <1439820602.3414.12.camel@mtksdaap41>
+ <55D5E40A.6080904@linaro.org>
+Message-ID: <1440167950.20169.29.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Liviu
+On Thu, 2015-08-20 at 16:28 +0200, Daniel Lezcano wrote:
+> On 08/17/2015 04:10 PM, Yingjoe Chen wrote:
+> > On Thu, 2015-08-13 at 10:35 +0200, Daniel Lezcano wrote:
+> >> On 07/22/2015 10:14 AM, Yingjoe Chen wrote:
+> >>> Spurious mtk timer interrupt is noticed at boot and cause kernel
+> >>> crash. It seems if GPT is enabled, it will latch irq status even
+> >>> when its IRQ is disabled.
+> 
+> It "seems" ?
 
-Many Thanks for reviewing
+Hi,
 
-> -----Original Message-----
-> From: linux-pci-owner at vger.kernel.org [mailto:linux-pci-
-> owner at vger.kernel.org] On Behalf Of Liviu Dudau
-> Sent: Friday, August 21, 2015 2:43 PM
-> To: Gabriele Paoloni
-> Cc: Lucas Stach; Wangzhou (B); Bjorn Helgaas; jingoohan1 at gmail.com;
-> Pratyush Anand; Arnd Bergmann; linux at arm.linux.org.uk;
-> thomas.petazzoni at free-electrons.com; Lorenzo Pieralisi; James Morse;
-> jason at lakedaemon.net; robh at kernel.org; linux-pci at vger.kernel.org;
-> linux-arm-kernel at lists.infradead.org; devicetree at vger.kernel.org;
-> Yuanzhichang; Zhudacai; zhangjukuo; qiuzhenfa; liudongdong (C);
-> qiujiang; xuwei (O); Liguozhu (Kenneth)
-> Subject: Re: [PATCH v7 3/6] PCI: designware: Add ARM64 support
-> 
-> On Thu, Aug 20, 2015 at 12:10:24PM +0100, Gabriele Paoloni wrote:
-> > Hi Lucas
-> >
-> > Again many thanks for explaining and for your time.
-> >
-> > I got your point now and I have dug a bit better in the PCI_DOMAINS
-> code.
-> >
-> > However I have a question...see inline below
-> >
-> > > -----Original Message-----
-> > > From: Lucas Stach [mailto:l.stach at pengutronix.de]
-> > > Sent: Thursday, August 20, 2015 9:27 AM
-> > > To: Gabriele Paoloni
-> > > Cc: Wangzhou (B); Bjorn Helgaas; jingoohan1 at gmail.com; Pratyush
-> Anand;
-> > > Arnd Bergmann; linux at arm.linux.org.uk; thomas.petazzoni at free-
-> > > electrons.com; lorenzo.pieralisi at arm.com; james.morse at arm.com;
-> > > Liviu.Dudau at arm.com; jason at lakedaemon.net; robh at kernel.org; linux-
-> > > pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> > > devicetree at vger.kernel.org; Yuanzhichang; Zhudacai; zhangjukuo;
-> > > qiuzhenfa; liudongdong (C); qiujiang; xuwei (O); Liguozhu (Kenneth)
-> > > Subject: Re: [PATCH v7 3/6] PCI: designware: Add ARM64 support
-> > >
-> > > Hi Gab,
-> > >
-> > > Am Mittwoch, den 19.08.2015, 16:34 +0000 schrieb Gabriele Paoloni:
-> > > > Hi Lucas
-> > > >
-> > > > First of all many thanks for the quick reply, really appreciated
-> > > >
-> > > > > -----Original Message-----
-> > > > > From: Lucas Stach [mailto:l.stach at pengutronix.de]
-> > > > > Sent: Wednesday, August 19, 2015 4:37 PM
-> > > > > To: Gabriele Paoloni
-> > > > > Cc: Wangzhou (B); Bjorn Helgaas; jingoohan1 at gmail.com; Pratyush
-> > > Anand;
-> > > > > Arnd Bergmann; linux at arm.linux.org.uk; thomas.petazzoni at free-
-> > > > > electrons.com; lorenzo.pieralisi at arm.com; james.morse at arm.com;
-> > > > > Liviu.Dudau at arm.com; jason at lakedaemon.net; robh at kernel.org;
-> linux-
-> > > > > pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> > > > > devicetree at vger.kernel.org; Yuanzhichang; Zhudacai; zhangjukuo;
-> > > > > qiuzhenfa; liudongdong (C); qiujiang; xuwei (O); Liguozhu
-> (Kenneth)
-> > > > > Subject: Re: [PATCH v7 3/6] PCI: designware: Add ARM64 support
-> > > > >
-> > > > > Hi Gab,
-> > > > >
-> > > > > Am Mittwoch, den 19.08.2015, 15:16 +0000 schrieb Gabriele
-> Paoloni:
-> > > > > > Hi Lucas
-> > > > > >
-> > > > > > I have rewritten the patch to take into account multiple
-> > > controllers.
-> > > > > >
-> > > > > > As you can see now there is a static var in
-> dw_pcie_host_init()
-> > > that
-> > > > > tracks
-> > > > > > the bus numbers used.
-> > > > >
-> > > > > This is wrong. The DT specifies the valid bus number range. You
-> can
-> > > not
-> > > > > just assign the next free bus number to the root bus.
-> > > >
-> > > > I think this is what is being done in
-> > > > http://lxr.free-
-> electrons.com/source/arch/arm/kernel/bios32.c#L495
-> > > > and currently designware assigns the root bus number in
-> > > > http://lxr.free-electrons.com/source/drivers/pci/host/pcie-
-> > > designware.c#L730
-> > > >
-> > > You found the right spot. It works a bit different than I remember,
-> but
-> > > is less broken than your current code. :)
-> > >
-> > > It actually assigns the next instance a root bus number behind the
-> > > current instances bus range. Please note the difference to your
-> code
-> > > which assigns the next free bus number, which may still lay within
-> the
-> > > current instances bus range.
-> 
-> Hi Gabriele,
-> 
-> >
-> > Mmmm here I have done a mistake: in the current designware the number
-> of hw
-> > controllers is always 1
-> > http://lxr.free-electrons.com/source/drivers/pci/host/pcie-
-> designware.c#L510
-> > So the loop in bios32.c does not work on multiple PCIe ports...
-> 
-> Bios32.c is broken for multiple PCIe hosts for multiple reasons, this
-> is just
-> one of them. Hence the effort to get rid of it for maintained drivers.
+Datasheet doesn't mention detail. So I did some experiments, playing
+around with registers. Based on my observation, I think this is what
+happens:
 
-As you can see we're pushing hard for this :)
+For each GPT timer, it has ENABLE, IRQ_EN, IRQ status, IRQ_ACK, counter
+& compare.
 
-> 
-> > However your comment about PCI_DOMAINS enlightened my mind and now I
-> see
-> > that when CONFIG_PCI_DOMAINS is defined we have the domains numbers
-> > (tracked by __domain_nr).
-> 
-> CONFIG_PCI_DOMAINS in itself doesn't do much without adding code to
-> your driver.
-> You could request a new domain for each controller with a special
-> property to
-> disable that behaviour in the dts, or you could enable
-> CONFIG_PCI_DOMAINS_GENERIC
-> which will give you a new domain automatically.
+When mtk_timer_init calls mtk_timer_setup to setup GPT_CLK_EVT, it
+enable the timer but didn't set counter or compare. Both counter &
+compare is zero on reset, so GPT immediately raise IRQ status. IRQ_EN is
+still disabled now, so it didn't trigger interrupt right away.
 
-So far I see that for ARM and ARM64 CONFIG_PCI_DOMAINS_GENERIC defaults to 
-the same value as CONFIG_PCI_DOMAINS (see arch/arm/Kconfig, arch/arm64/Kconfig). 
-So I think this is how current designware based drivers get multiple PCIe 
-controller to work (they just enable CONFIG_PCI_DOMAINS)...
+At end of mtk_timer_init, it calls mtk_timer_enable_irq to enable irq.
+Since IRQ status is 1 now, GPT trigger interrupt immediately. The
+interrupt is serviced by mtk_timer_interrupt. Since this is not an
+expected event, evt->dev.event_handler will be NULL and system crashed
+in the handler.
 
- 
+> >>> When irq is enabled afterward, we see
+> >>> spurious interrupt.
+> 
+> Doesn't have the firmware something to do with that ?
 
-> 
-> > So (correct me if I am wrong) if we have 2 PCIe ports that do not
-> specify
-> > the "bus-range" property, both root ports will enumerate starting
-> from
-> > root_bus_nr = 0 and everything will still work ok.
-> 
-> Correct.
-> 
-> Best regards,
-> Liviu
-> 
+We have 6 GPT on mt8173, mtk timer use 2 of them. The spurious interrupt
+only happens on GPT_CLK_EVT (GPT1). Our firmware didn't touch that one,
+so it is in reset default when mtk timer driver try to enable it.
+
+> I have a mtk 8173 board I can use next week. How do you reproduce the 
+> issue ?
+>
+> >>> Change init flow to only enable GPT_CLK_SRC at mtk_timer_init.
+> >>>
+> >>> Acked-by: Matthias Brugger <matthias.bgg@gmail.com>
+> >>> Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
+> >>> Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
+> >>> ---
+> >>>
+> >>> Update to my patch [1], added __init as Daniel suggest. This is the
+> >>> only patch that need to change in that series, so I only sent this one.
+> >>>
+> >>> http://lists.infradead.org/pipermail/linux-mediatek/2015-July/001545.html
+> >>>
+> >>>    drivers/clocksource/mtk_timer.c | 16 ++++++++++------
+> >>>    1 file changed, 10 insertions(+), 6 deletions(-)
+> >>>
+> >>> diff --git a/drivers/clocksource/mtk_timer.c b/drivers/clocksource/mtk_timer.c
+> >>> index 68ab423..2ba5b66 100644
+> >>> --- a/drivers/clocksource/mtk_timer.c
+> >>> +++ b/drivers/clocksource/mtk_timer.c
+> >>> @@ -156,9 +156,11 @@ static void mtk_timer_global_reset(struct mtk_clock_event_device *evt)
+> >>>    	writel(0x3f, evt->gpt_base + GPT_IRQ_ACK_REG);
+> >>>    }
+> >>>
+> >>> -static void
+> >>> -mtk_timer_setup(struct mtk_clock_event_device *evt, u8 timer, u8 option)
+> >>> +static void __init mtk_timer_setup(struct mtk_clock_event_device *evt,
+> >>> +				   u8 timer, u8 option, bool enable)
+> >>>    {
+> >>> +	u32 val;
+> >>> +
+> >>>    	writel(TIMER_CTRL_CLEAR | TIMER_CTRL_DISABLE,
+> >>>    		evt->gpt_base + TIMER_CTRL_REG(timer));
+> >>>
+> >>> @@ -167,8 +169,10 @@ mtk_timer_setup(struct mtk_clock_event_device *evt, u8 timer, u8 option)
+> >>>
+> >>>    	writel(0x0, evt->gpt_base + TIMER_CMP_REG(timer));
+> >>>
+> >>> -	writel(TIMER_CTRL_OP(option) | TIMER_CTRL_ENABLE,
+> >>> -			evt->gpt_base + TIMER_CTRL_REG(timer));
+> >>> +	val = TIMER_CTRL_OP(option);
+> >>> +	if (enable)
+> >>> +		val |= TIMER_CTRL_ENABLE;
+> >>> +	writel(val, evt->gpt_base + TIMER_CTRL_REG(timer));
+> >>
+> >> Instead of the 'enable' new option, I prefer a test with 'timer' with a
+> >> comment:
+> >>
+> >> 	/*
+> >> 	 * the timer hw is broken in that way ... bla bla, so we only
+> >> 	 * enable the clocksource ...
+> >> 	 */
+> >> 	if (timer == GPT_CLK_SRC)
+> >> 		val |= TIMER_CTRL_ENABLE;
 > >
-> > So if my assumption is correct, I do not see why the orginal patch
-> from Wang
-> > Zhou is wrong.
-> > The only point can be that assigning pp->root_bus_nr = 0 is not
-> required
-> > as pp memory is kzalloc'ed (an therefore init to zero).
+> > Hi Daniel,
 > >
-> >
-> > >
-> > > >
-> > > > In general I agree with you but if you look at all the current
-> > > drivers
-> > > > based on designware none of them define the "bus-range" dtb
-> property.
-> > > > Therefore doing as you say would break the current driver when we
-> > > have
-> > > > multiple controllers...am I right?
-> > > >
-> > > The current _code_ works fine for multiple controllers. It's just
-> that
-> > > you must define the bus range property in the DTB if you want to
-> enable
-> > > multiple instances of one controller and support a kernel without
-> PCI
-> > > domains support. As all current implementations have only a single
-> > > instance of the controller per SoC, or depend on PCI domain support,
-> > > it's totally fine for them to not define the bus ranges property,
-> as
-> > > it's an optional property and it is well defined how things behave
-> if
-> > > it
-> > > is absent. We absolutely need to keep that specified behavior.
-> > >
-> > > > If that is the case in order to fix this in the way you say I
-> would
-> > > need
-> > > > to assign "bus-range" for all the PCIe drivers with multiple
-> > > controllers:
-> > > > in this case I would split the default range evenly (that is, if
-> we
-> > > have
-> > > > two controllers I would define "bus-range"  0-127 and 128-255)
-> > > >
-> > > > If you think this solution is ok I can go for it. My only doubt
-> was
-> > > about
-> > > > touching other vendors DTBs....
-> > > >
-> > > You don't need to touch any of the current DTBs, as they are fine
-> with
-> > > the default bus range behavior. You need to keep the specified
-> behavior
-> > > of the bus range property with the new code.
-> > >
-> > > Regards,
-> > > Lucas
-> > > >
-> > > > >
-> > > > > It is perfectly valid to have a bus range of 0x00-0x10 assigned
-> to
-> > > one
-> > > > > instance and 0x50-0xff to the next instance. Additional with
-> PCIe
-> > > > > hotplug you may not use the full range of the bus numbers on
-> one
-> > > > > instance at the first scan, but only later populate more buses
-> when
-> > > > > more
-> > > > > bridges are added to the tree.
-> > > > >
-> > > > > > Drivers that do not specify the bus range in the DTB set pp-
-> > > > > >root_bus_nr = DW_ROOT_NR_UNDEFINED.
-> > > > > > Designware will check if the flag is set and will use the
-> > > automatic
-> > > > > bus range
-> > > > > > assignment.
-> > > > >
-> > > > > No, please lets get rid of this assignment altogether. The glue
-> > > drivers
-> > > > > have no business in assigning the bus range. Please remove the
-> > > > > pp->root_bus_nr assignment from all the glue drivers.
-> > > > >
-> > > > > "bus range" is a generic DW PCIe property, so just parse the
-> root
-> > > bus
-> > > > > number from the DT, it is handled the same way for all the DW
-> based
-> > > > > PCIe
-> > > > > drivers. The bindings specifies that if the bus range property
-> is
-> > > > > missing the range is 0x00-0xff, so you can default to 0 as the
-> root
-> > > bus
-> > > > > number in that case.
-> > > > >
-> > > > > Also I would think this conversion warrants a patch on its own
-> and
-> > > > > should not be mixed in the ARM64 support patch.
-> > > > >
-> > > > > Regards,
-> > > > > Lucas
-> > > > >
-> > >
-> > > --
-> > > Pengutronix e.K.             | Lucas Stach                 |
-> > > Industrial Linux Solutions   | http://www.pengutronix.de/  |
-> >
+> > Thanks for your review.
+> > Since this bug happens to anyone using interrupt,
 > 
-> --
-> ====================
-> | I would like to |
-> | fix the world,  |
-> | but they're not |
-> | giving me the   |
->  \ source code!  /
->   ---------------
->     ?\_(?)_/?
+> Can you elaborate ? I don't get the point.
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> > I'm not sure checking
+> > timer and only enable it for GPT_CLK_SRC is easier to read. Anyway, I'll
+> > change to this in next version.
+> >> That said, can you have a look at commit 1096be08 ?
+> >> "clockevents: sun5i: Fix setup_irq init sequence"
+> >>
+> >> first and check if moving the interrupt request after the
+> >> clockevents_config_and_register could fix your issue.
+> >
+> > I've tested this before, see:
+> >
+> > http://lists.infradead.org/pipermail/linux-mediatek/2015-May/000539.html
+> > http://lists.infradead.org/pipermail/linux-mediatek/2015-May/000551.html
+> 
+> I could take or ack this patch trusting it fixes the issue but there are 
+> some points that need clarifications.
+> 
+>   - Does the spurious interrupt occurs *every* time ? at each boot ?
+
+Yes. If you applied this series to enable mtk timer without this fix on
+mt8173 or mt8135 you can reproduce it. It occurs for every boot.
+
+It crash before uart driver is ready, so you'll have to use earlycon to
+see the crash log.
+
+> The previous patches were supposed to fix the issue but they actually 
+> didn't. So how is tested the patch ?
+
+I'm not sure. I believe Matthias test that one on mt6589, maybe it have
+different behavior, or different timing.
+
+> Regarding the different fixes for this problem, it sounds like you are 
+> proceeding by trial and error.
+> 
+> Please give a more detailed analysis of the problem and especially check 
+> the timer is not altered by the firmware leaving it in a transient state 
+> or whatever.
+
+See above for my analysis.
+Thanks.
+
+Joe.C
