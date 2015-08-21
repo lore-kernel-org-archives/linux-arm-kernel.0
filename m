@@ -1,65 +1,28 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 21 Aug 2015 09:33:44 -0700
-Subject: [GIT PULL 8/9] ARM: tegra: Devicetree changes for v4.3-rc1
-In-Reply-To: <55D75187.8010007@nvidia.com>
-References: <1439563720-13189-1-git-send-email-thierry.reding@gmail.com>
- <1439563720-13189-9-git-send-email-thierry.reding@gmail.com>
- <20150821015848.GM4865@localhost> <20150821160905.GP4865@localhost>
- <55D75187.8010007@nvidia.com>
-Message-ID: <20150821163344.GA18595@localhost>
+Date: Fri, 21 Aug 2015 09:37:00 -0700
+Subject: [PATCH] ARM: imx: mach-imx6ul: Fix allmodconfig build
+In-Reply-To: <1440009090-25799-1-git-send-email-festevam@gmail.com>
+References: <1440009090-25799-1-git-send-email-festevam@gmail.com>
+Message-ID: <20150821163700.GA25276@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 21, 2015 at 05:27:51PM +0100, Jon Hunter wrote:
+On Wed, Aug 19, 2015 at 03:31:30PM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
 > 
-> On 21/08/15 17:09, Olof Johansson wrote:
-> > On Thu, Aug 20, 2015 at 06:58:48PM -0700, Olof Johansson wrote:
-> >> On Fri, Aug 14, 2015 at 04:48:39PM +0200, Thierry Reding wrote:
-> >>> Hi ARM SoC maintainers,
-> >>>
-> >>> The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
-> >>>
-> >>>   Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
-> >>>
-> >>> are available in the git repository at:
-> >>>
-> >>>   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.3-dt
-> >>>
-> >>> for you to fetch changes up to 6909c6632fdbea441b5077b4f882c0bf4b71997e:
-> >>>
-> >>>   ARM: tegra: Add gpio-ranges property (2015-08-13 16:31:53 +0200)
-> >>>
-> >>> Thanks,
-> >>> Thierry
-> >>>
-> >>> ----------------------------------------------------------------
-> >>> ARM: tegra: Devicetree changes for v4.3-rc1
-> >>>
-> >>> Enables CPU frequency scaling on Jetson TK1 and enables the GK20A GPU on
-> >>> Venice2 and Jetson TK1. This also enables support for the PMU hardware
-> >>> found on Tegra124, which among other things, can be used for performance
-> >>> measurements.
-> >>
-> >> Merged, thanks.
-> > 
-> > This caused build failures due to missing tegra124-car.h:
+> We should call phy_register_fixup_for_uid() only when CONFIG_PHYLIB
+> is built-in, otherwise we get the following link error when building
+> allmodconfig:
 > 
-> Should be included by Paul's patch, "clk: tegra: Add DFLL DVCO reset
-> control for Tegra124", which is part of the clk series pull request [0].
+> arch/arm/mach-imx/built-in.o: In function `imx6ul_init_machine':
+> :(.init.text+0xa714): undefined reference to `phy_register_fixup_for_uid'
 > 
-> > http://arm-soc.lixom.net/buildlogs/arm-soc/v4.2-rc2-954-g5825349/buildall.arm.tegra_defconfig.log.failed
-> > 
-> > I've dropped this branch again.
+> This is the same approach done in mach-imx6q.c and mach-imx6sx.c.
 > 
-> It is building ok on linux-next today.
+> Reported-by: Olof Johansson <olof@lixom.net>
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-Yeah, it builds when the dependent changes from the clk tree are included, but
-this breaks bisectability potentially for quite a bit of code, and requires
-that we merge after the clk branch goes in or mainline will be busted.
-
-As mentioned just now on IRC too, it might make most sense to rebase on top
-of the clk branch to avoid this breakage. Either that or drop the patch in
-question for 4.3.
+Thanks, applied.
 
 
 -Olof
