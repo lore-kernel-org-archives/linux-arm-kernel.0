@@ -1,51 +1,41 @@
-From: axel.lin@ingics.com (Axel Lin)
-Date: Fri, 21 Aug 2015 16:49:38 +0800
-Subject: [PATCH RFT] phy: sun4i-usb: Use devm_gpiod_get_optional for
- optional GPIOs
-Message-ID: <1440146978.29130.1.camel@ingics.com>
+From: rsahu@apm.com (Rameshwar Sahu)
+Date: Fri, 21 Aug 2015 14:20:58 +0530
+Subject: [PATCH] dmaengine: xgene-dma: Fix holding lock while calling tx
+ callback in cleanup path
+In-Reply-To: <20150821085146.GP13546@localhost>
+References: <1440066656-15516-1-git-send-email-rsahu@apm.com>
+ <20150821083946.GO13546@localhost>
+ <CAFd313wEAWjzJa82R1ujh3vyMasDvicQ4nZHq1qqZ5y7D4ixzQ@mail.gmail.com>
+ <20150821085146.GP13546@localhost>
+Message-ID: <CAFd313xZ1ZinER=xRnMDX4e_Z02+AtKDoKYaUaQ7BWGpfBg3iw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Both data->id_det_gpio and data->vbus_det_gpio are optional, so use
-devm_gpiod_get_optional for them.
+On Fri, Aug 21, 2015 at 2:21 PM, Vinod Koul <vinod.koul@intel.com> wrote:
+> On Fri, Aug 21, 2015 at 02:15:08PM +0530, Rameshwar Sahu wrote:
+>> Hi Vinod,
+>>
+>> On Fri, Aug 21, 2015 at 2:09 PM, Vinod Koul <vinod.koul@intel.com> wrote:
+>> > On Thu, Aug 20, 2015 at 04:00:56PM +0530, Rameshwar Prasad Sahu wrote:
+>> >> This patch fixes the an locking issue where client callback performs
+>> >                 ^^^^^^^^^^^^
+>> > ??
+>> >
+>> >> further submission.
+>> > Do you men you are preventing that or fixing for this to be allowed?
+>>
+>> Fixing lock to allow client to submit further request in there
+>> callback routine if they would like.
+>
+> Okay please fix the changelog to make it clear :)
 
-Signed-off-by: Axel Lin <axel.lin@ingics.com>
----
- drivers/phy/phy-sun4i-usb.c | 22 +++++++++-------------
- 1 file changed, 9 insertions(+), 13 deletions(-)
+Okay Vinod
 
-diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
-index 731b395..b12964b 100644
---- a/drivers/phy/phy-sun4i-usb.c
-+++ b/drivers/phy/phy-sun4i-usb.c
-@@ -551,19 +551,15 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
- 	if (IS_ERR(data->base))
- 		return PTR_ERR(data->base);
- 
--	data->id_det_gpio = devm_gpiod_get(dev, "usb0_id_det", GPIOD_IN);
--	if (IS_ERR(data->id_det_gpio)) {
--		if (PTR_ERR(data->id_det_gpio) == -EPROBE_DEFER)
--			return -EPROBE_DEFER;
--		data->id_det_gpio = NULL;
--	}
--
--	data->vbus_det_gpio = devm_gpiod_get(dev, "usb0_vbus_det", GPIOD_IN);
--	if (IS_ERR(data->vbus_det_gpio)) {
--		if (PTR_ERR(data->vbus_det_gpio) == -EPROBE_DEFER)
--			return -EPROBE_DEFER;
--		data->vbus_det_gpio = NULL;
--	}
-+	data->id_det_gpio = devm_gpiod_get_optional(dev, "usb0_id_det",
-+						    GPIOD_IN);
-+	if (IS_ERR(data->id_det_gpio))
-+		return PTR_ERR(data->id_det_gpio);
-+
-+	data->vbus_det_gpio = devm_gpiod_get_optional(dev, "usb0_vbus_det",
-+						      GPIOD_IN);
-+	if (IS_ERR(data->vbus_det_gpio))
-+		return PTR_ERR(data->vbus_det_gpio);
- 
- 	if (of_find_property(np, "usb0_vbus_power-supply", NULL)) {
- 		data->vbus_power_supply = devm_power_supply_get_by_phandle(dev,
--- 
-2.1.0
+>
+> --
+> ~Vinod
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe dmaengine" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
