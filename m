@@ -1,75 +1,77 @@
-From: jon.nettleton@gmail.com (Jon Nettleton)
-Date: Fri, 21 Aug 2015 06:49:20 +0200
-Subject: RX packet loss on i.MX6Q running 4.2-rc7
-In-Reply-To: <20150820223049.GA20710@pqgruber.com>
-References: <20150820223049.GA20710@pqgruber.com>
-Message-ID: <CALHpu37TYT8bL3BmaNhYCukiJQrMPMgmwXFToGH6Y7xRRrPJ-Q@mail.gmail.com>
+From: varada@codeaurora.org (Varadarajan Narayanan)
+Date: Fri, 21 Aug 2015 10:29:18 +0530
+Subject: [PATCH] ARM: Set proper TEXT_OFFSET for IPQ806x
+In-Reply-To: <20150820195455.GT7557@n2100.arm.linux.org.uk>
+References: <20150820121541.GA14664@codeaurora.org>
+ <20150820130005.GS7557@n2100.arm.linux.org.uk>
+ <20150820172010.GB10796@qualcomm.com>
+ <20150820195455.GT7557@n2100.arm.linux.org.uk>
+Message-ID: <20150821045918.GB26963@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 21, 2015 at 12:30 AM, Clemens Gruber
-<clemens.gruber@pqgruber.com> wrote:
-> Hi,
+On Thu, Aug 20, 2015 at 08:54:55PM +0100, Russell King - ARM Linux wrote:
+> On Thu, Aug 20, 2015 at 12:20:10PM -0500, Andy Gross wrote:
+> > On Thu, Aug 20, 2015 at 02:00:06PM +0100, Russell King - ARM Linux wrote:
+> > > On Thu, Aug 20, 2015 at 05:45:41PM +0530, Varadarajan Narayanan wrote:
+> > > > RAM starts at 0x40000000 for IPQ. The lower 21MB of RAM is used
+> > > > for Shared Memory and the kernel can start from 0x41500000.
+> > >
+> > > Why do people keep creating crap like this?  Each time something like
+> > > this is created, it means that you _need_ to have a special kernel for
+> > > your platform and you can't be part of the single zImage.
+> > >
+> > > Please, rather than creating crap like this, find a better way.
+> >
+> > In the case of the IPQ, we don't use the zImage because the decompress
+> > requires a larger jump than we can do on that platform.  Having this
+> > change at least gets us back 2MB of memory.
 >
-> I am experiencing massive RX packet loss on my i.MX6Q (Chip rev 1.3) on Linux
-> 4.2-rc7 with a Marvell 88E1510 Gigabit Ethernet PHY connected over RGMII.
-> I noticed it when doing an UDP benchmark with iperf3. When sending UDP packets
-> from a Debian PC to the i.MX6 with a rate of 100 Mbit/s, 99% of the packets are
-> lost. With a rate of 10 Mbit/s, we are still losing 93% of all packets. TCP RX
-> does suffer from packet loss too, but still achieves about 211 Mbit/s.
-> TX is not affected.
+> Your argument about "a larger jump" makes no sense what so ever.  The
+> branches between the decompressor and the main kernel are all done
+> using a mov, which can jump to any 32-bit address.
 >
-> Steps to reproduce:
-> On the i.MX6: iperf3 -s
-> On a desktop PC:  iperf3 -b 10M -u -c MX6IP
->
-> The iperf3 results:
-> [ ID] Interval           Transfer     Bandwidth       Jitter    Lost/Total
-> [  4]   0.00-10.00  sec  11.8 MBytes  9.90 Mbits/sec  0.687 ms  1397/1497 (93%)
->
-> During the 10 Mbit UDP test, the IEEE_rx_macerr counter increased to 5371.
-> ifconfig eth0 shows:
->  RX packets:9216 errors:5248 dropped:170 overruns:5248 frame:5248
->  TX packets:83 errors:0 dropped:0 overruns:0 carrier:0
->  collisions:0
->
-> Here are the TCP results with iperf3 -c MX6IP:
-> [ ID] Interval           Transfer     Bandwidth       Retr
-> [  4]   0.00-10.00  sec   252 MBytes   211 Mbits/sec  4343             sender
-> [  4]   0.00-10.00  sec   251 MBytes   211 Mbits/sec                  receiver
->
-> During the TCP test, IEEE_rx_macerr increased to 4059.
-> ifconfig eth0 shows:
-> RX packets:186368 errors:4206 dropped:50 overruns:4206 frame:4206
-> TX packets:41861 errors:0 dropped:0 overruns:0 carrier:0
-> collisions:0
->
-> Freescale errata entry ERR004512 did mention a RX FIFO overrun. Is this related?
->
-> Forcing pause frames via ethtool -A eth0 rx on tx on, does not improve it:
-> Same amount of UDP packet loss with reduced TCP throughput of 190 Mbit/s.
-> IEEE_rx_macerr increased up to 5232 during UDP 10Mbit and up to 4270 for TCP.
->
-> I am already using the MX6QDL_PAD_GPIO_6__ENET_IRQ workaround, which solved the
-> ping latency issues from ERR006687 but not the packet loss problem.
->
-> I read through the mailing list archives and found a discussion between Russell
-> King, Marek Vasut, Eric Nelson, Fugang Duan and others about a similar problem.
-> I therefore added you and contributors to fec_main.c to the CC.
->
-> One suggestion I found, was adding udelay(210); to fec_enet_rx():
-> https://lkml.org/lkml/2014/8/22/88
-> But this also did not reduce the packet loss. (I added it to the fec_enet_rx
-> function just before return pkt_received; but I still got 93% packet loss)
->
-> Does anyone have the equipment/setup to trace an i.MX6Q during UDP RX traffic
-> from iperf3 to find the root cause of this packet loss problem?
->
-> What else could we do to fix this?
->
+> Even if you load the compressed kernel image at 0x41500000, the
+> decompressor will mask that with 0xf8000000, and decide that RAM
+> starts at 0x40000000.  It will then want to place the decompressed
+> kernel image at 0x40008000.  Nothing there has anything to do with
+> jump ranges.
 
-This is a bug in iperf3's UDP tests.  Do the same test with iperf2 and
-you will see expected performance.  I believe there is a bug open in
-github about it.
+With the qcom_defconfig, the kernel gets loaded at
+0x40008000. This region is reserved for NSS.
 
--Jon
+> The only restriction that the ARM has as far as jump ranges are
+> concerned is the 'b' or 'bl' instruction, which in ARM mode is
+> limited to +/- 32MB.  That doesn't apply here since we don't use
+> that to jump between the decompressor and the decompressed kernel
+> image.
+>
+> So...
+>
+> Why is it necessary to have this 21MB block of shared memory at
+> the start of RAM?  Why can't it be reserved by other means higher
+> up in system memory?
+
+The NSS subsystem needs memory to be reserved at 0x40000000.
+The Ubi32 cores (part of NSS) need low address memory close
+to the Ubi32 address space to do short calls from what is
+called Ubi32 On Chip Memory to DDR and back again.  Since
+there isn't a way to circumvent this restriction had to
+reserve at 0x40000000.
+
+-Varada
+
+> It's up to the submitter to justify why any change is required, and
+> in this case, part of that justification is why the shared memory is
+> placed at the start of RAM, and why you need to be different from
+> almost everyone else, and why you need to be a special case.  The
+> justification also must make sense.
+>
+> --
+> FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+> according to speedtest.net.
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
