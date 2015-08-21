@@ -1,110 +1,305 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 21 Aug 2015 09:17:32 -0700
-Subject: [GIT PULL] ARM64: juno: SCPI and dependent drivers for v4.3
-In-Reply-To: <55CCAF50.4040503@arm.com>
-References: <55C1E3FB.5090309@arm.com> <20150813124026.GD23581@localhost>
- <20150813142444.GA4602@e104818-lin.cambridge.arm.com>
- <55CCAF50.4040503@arm.com>
-Message-ID: <20150821161732.GC14452@localhost>
+From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
+Date: Fri, 21 Aug 2015 09:21:33 -0700
+Subject: [PATCH v2] qcom: ipq40xx: Add basic board/dts support for
+ IPQ40XX SoC
+In-Reply-To: <20150821103253.GA27466@codeaurora.org>
+References: <20150821103253.GA27466@codeaurora.org>
+Message-ID: <20150821162133.GF13472@usrtlx11787.corpusers.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri 21 Aug 03:32 PDT 2015, Varadarajan Narayanan wrote:
 
-On Thu, Aug 13, 2015 at 03:53:04PM +0100, Sudeep Holla wrote:
+> Add initial dts files and SoC support for IPQ40XX
 > 
+> Signed-off-by: Varadarajan Narayanan <varada@codeaurora.org>
+> ---
+> Changes in v2:
+>   - Added devicetree bindings documentation
 > 
-> On 13/08/15 15:24, Catalin Marinas wrote:
-> >On Thu, Aug 13, 2015 at 02:40:26PM +0200, Olof Johansson wrote:
-> >>On Wed, Aug 05, 2015 at 11:22:51AM +0100, Sudeep Holla wrote:
-> >>>Here is the first pull request for SCPI, clock and cpufreq support on
-> >>>ARM64 Juno development platform for v4.3
-> >>
-> >>I'd like to hear from Catalin and Will on why ARM is doing this. Catalin
-> >>and Will are pushing back very hard at vendors who don't use PSCI for
-> >>CPU power management, and then they have coworkers that are looking to
-> >>merge this directly into the kernel.
-> >
-> >Actually, the arm64 CPU power management story is pretty much handled by
-> >Lorenzo and Sudeep in my team, so I trust their judgement ;). But I
-> >agree with you that a better explanation on the reasons behind this is
-> >needed, otherwise we risk confusing messages. I'll try to summarise it
-> >below but Sudeep can reply with more details.
-> >
+>  .../devicetree/bindings/clock/qca,gcnt.txt         | 14 ++++
+>  Documentation/devicetree/bindings/ipq.txt          | 16 ++++
+>  arch/arm/boot/dts/Makefile                         |  3 +-
+>  arch/arm/boot/dts/qcom-ipq40xx-r3pc.dts            | 33 +++++++++
+>  arch/arm/boot/dts/qcom-ipq40xx.dtsi                | 86 ++++++++++++++++++++++
+>  arch/arm/configs/ipq_defconfig                     |  1 +
+>  arch/arm/mach-qcom/Kconfig                         |  4 +
+>  arch/arm/mach-qcom/board.c                         |  1 +
+>  8 files changed, 157 insertions(+), 1 deletion(-)
+>  create mode 100644 Documentation/devicetree/bindings/clock/qca,gcnt.txt
+>  create mode 100644 Documentation/devicetree/bindings/ipq.txt
+>  create mode 100644 arch/arm/boot/dts/qcom-ipq40xx-r3pc.dts
+>  create mode 100644 arch/arm/boot/dts/qcom-ipq40xx.dtsi
 > 
-> (I will use the acronomys directly as Catalin has already explained the
-> difference)
-> 
-> Thanks Catalin for the detailed explanation. I agree that this pull
-> request has not much details, but the patch series makes reference only
-> to the clocks and features provided by the SCP(System Control Processor)
-> to be used by Linux(non-secure) and nothing about CPU power states that
-> are handled by PSCI. This SCPI is completely independent and orthogonal
-> to PSCI.
+> diff --git a/Documentation/devicetree/bindings/clock/qca,gcnt.txt b/Documentation/devicetree/bindings/clock/qca,gcnt.txt
+> new file mode 100644
+> index 0000000..dd0d71e
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/qca,gcnt.txt
+> @@ -0,0 +1,14 @@
+> +QCA Global Counter
 
-Yes, I am aware that PSCI and SCPI are two confusingly similar acronyms that
-represent separate things. My concern though is that we're letting in a poorly
-architected solution into the kernel with SCPI. PSCI is already choosing to
-abstract this outside of the kernel. Is there a reason SCPI isn't using the
-same approach?
+I don't think I've seen the "global counter" blocks before, what is it?
+What does it do? Do you have a upcoming driver for it? (Have I just
+missed it?)
 
-> >PSCI only covers CPU boot/cpuidle and platform suspend. It does not have
-> >any provisions for DVFS and I'm not sure this could be easily
-> >standardised (or whether we could find enough supporters to get it
-> >adopted).
-> >
-> 
-> Though we are not campaigning it as aggressively as PSCI.
+You add it to the dts below, but don't seem to reference it. What is
+its purpose?
 
-Which, given the resistance to pick up PSCI, this is unlikely to be used by
-anyone...
+Also, you should split this definition into its own patch.
 
-> >SCPI is a (standard) interface to a coprocessor handling clocks etc. to
-> >be used with cpufreq. This patchset adds support for cpufreq/dvs which
-> >is not handled by PSCI. So, just to clarify the acronyms:
-> >
-> >SCPI - System Control and Power Interface - it's a protocol for
-> >communicating with a System Control Processor (e.g. Cortex-M3) via
-> >mailboxes. It is used in Linux for DVFS but this is *not* a secure/EL3
-> >firmware interface (a.k.a. SMC calls). It indeed a firmware interface
-> >but the firmware runs on a separate coprocessor and not on the CPU itself.
-> >
-> >PSCI - Power State Coordination Interface - it is a secure firmware
-> >interface for coordinating the CPU power states (idle, not DVFS). The
-> >firmware may use an SCPI communication channel (e.g. deeper sleep states
-> >where clock changes are needed).
-> >
-> 
-> I will add some more information to (hopefully) clarify the doubts.
-> 
-> SCP(System Control Processor) offers control and management of the
-> core/cluster power states, various power domain DVFS including the
-> core/cluster, certain system clocks configuration, thermal sensors and
-> many others.
-> 
-> Though the core/cluster power states are also handled this SCP,
-> they are accessible only through secure channels and PSCI firmware
-> implementations on the platform rely on that internally. Non-secure
-> access/requests are not possible.
-> 
-> Just to summarize, this SCP helps to offload all the power management
-> work to a dedicated low power processor which can be always running.
-> On Juno, its Cortex-M while on AMD Seattle it's Cortex-A5.
+> +------------------------------------------------
+> +
+> +Required properties :
+> +- compatible : "qcom,qca-gcnt"
+> +
+> +- reg : shall contain base register location and length
+> +
+> +Example:
+> +
+> +	counter {
+> +		compatible = "qcom,qca-gcnt";
+> +		reg = <0x004a1000 0x4>;
 
-I understand what the SCP is used for. What I don't understand is why you're
-adding all this complexity in the kernel for it.
+Most of the time when there's a device consuming one register it turns
+out to be part of some larger hw block and down the road things get
+complicated from the fact that we mapped 4 bytes in the middle.
 
-Also, is there only one known implementation of this today on Juno? Are there
-others coming soon? Single-user frameworks tend to be hard to get right, and
-it's usually much better to wait until it's clear it will fit more than just
-the original target.
+Is this part of a larger block? Can we better implement that as a
+simple-mfd or syscon?
 
-Anyway, the git server you provided the link to in the original email
-(linux-arm.org) seems to be offline so I couldn't fetch a fresh copy of
-the branch to look at.
+> +	};
+> diff --git a/Documentation/devicetree/bindings/ipq.txt b/Documentation/devicetree/bindings/ipq.txt
+> new file mode 100644
+> index 0000000..7d56bd0
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/ipq.txt
 
-It's pretty clear this is not 4.3 material at this point, so I'll take
-a look at it later.
+This doesn't really follow the general pattern of this directory. There
+are some files like this, but then you should probably name it
+qualcomm.txt.
 
+> @@ -0,0 +1,16 @@
+> +Qualcomm IPQ device tree bindings
+> +---------------------------------
+> +
+> +System on Chip
+> +
+> +Device tree must specify which SoC it uses, with one of the
+> +following compatible strings
+> +
+> +       "qcom,ipq40xx"
+> +
+> +Platform
+> +
+> +Device tree must specify which Platform it uses, with one of the
+> +following compatible strings
+> +
+> +       "qcom,ipq40xx-r3pc"
 
--Olof
+I would expect an "ipq.txt" to contain "qcom,ipq8064-ap148" and
+"qcom,ipq8064" as well.
+
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 246473a..6b4caee 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -477,7 +477,8 @@ dtb-$(CONFIG_ARCH_QCOM) += \
+>  	qcom-ipq8064-ap148.dtb \
+>  	qcom-msm8660-surf.dtb \
+>  	qcom-msm8960-cdp.dtb \
+> -	qcom-msm8974-sony-xperia-honami.dtb
+> +	qcom-msm8974-sony-xperia-honami.dtb \
+> +	qcom-ipq40xx-r3pc.dtb
+
+Please insert your entry alphabetically.
+
+>  dtb-$(CONFIG_ARCH_REALVIEW) += \
+>  	arm-realview-pb1176.dtb
+>  dtb-$(CONFIG_ARCH_ROCKCHIP) += \
+> diff --git a/arch/arm/boot/dts/qcom-ipq40xx-r3pc.dts b/arch/arm/boot/dts/qcom-ipq40xx-r3pc.dts
+> new file mode 100644
+> index 0000000..7e4e629
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/qcom-ipq40xx-r3pc.dts
+> @@ -0,0 +1,33 @@
+> +/* Copyright (c) 2014, The Linux Foundation. All rights reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 and
+> + * only version 2 as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include "qcom-ipq40xx.dtsi"
+> +
+> +/ {
+> +	model = "Qualcomm Technologies, Inc. IPQ40XX R3PC";
+> +	compatible = "qcom,ipq40xx-r3pc", "qcom,ipq40xx";
+> +
+> +	memory {
+> +		device_type = "memory";
+> +		reg = <0x80000000 0x20000000>; /* 512MB */
+> +	};
+> +
+> +	chosen {
+> +		bootargs = "root=/dev/ram rw init=/init console=ttyMSM0,115200n8 initrd=0x82000000,0x000E2246";
+> +	};
+> +
+> +	soc {
+> +		serial at 78b0000 {
+> +			status = "ok";
+> +		};
+> +	};
+> +};
+
+This part looks good.
+
+> diff --git a/arch/arm/boot/dts/qcom-ipq40xx.dtsi b/arch/arm/boot/dts/qcom-ipq40xx.dtsi
+> new file mode 100644
+> index 0000000..76c55a3
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/qcom-ipq40xx.dtsi
+> @@ -0,0 +1,86 @@
+> +/*
+> + * Copyright (c) 2014, The Linux Foundation. All rights reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 and
+> + * only version 2 as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +/dts-v1/;
+> +
+> +#include "skeleton.dtsi"
+> +
+> +/ {
+> +	model = "Qualcomm Technologies, Inc. IPQ40XX";
+> +	compatible = "qcom,ipq40xx";
+> +	interrupt-parent = <&intc>;
+> +
+> +	cpus {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		cpu at 0 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a7";
+> +			reg = <0x0>;
+> +		};
+> +
+> +		cpu at 1 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a7";
+> +			reg = <0x1>;
+> +		};
+> +
+> +		cpu at 2 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a7";
+> +			reg = <0x2>;
+> +		};
+> +
+> +		cpu at 3 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a7";
+> +			reg = <0x3>;
+> +		};
+> +	};
+> +
+> +	soc {
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges;
+> +		compatible = "simple-bus";
+> +
+> +		intc: interrupt-controller at b000000 {
+> +			compatible = "qcom,msm-qgic2";
+> +			interrupt-controller;
+> +			#interrupt-cells = <3>;
+> +			reg = <0x0b000000 0x1000>,
+> +			<0x0b002000 0x1000>;
+> +		};
+> +
+> +		counter {
+> +			compatible = "qcom,qca-gcnt";
+> +			reg = <0x004a1000 0x4>;
+> +		};
+> +
+> +		timer {
+> +			compatible = "arm,armv7-timer";
+> +			interrupts = <1 2 0xf08>,
+> +				     <1 3 0xf08>,
+> +				     <1 4 0xf08>,
+> +				     <1 1 0xf08>;
+> +			clock-frequency = <20833333>;
+> +		};
+> +
+> +		serial at 78b0000 {
+> +			compatible = "qcom,msm-uartdm-v1.4", "qcom,msm-uartdm";
+> +			reg = <0x78b0000 0x200>;
+> +			interrupts = <0 108 0>;
+> +			status = "disabled";
+> +		};
+> +	};
+> +};
+
+Unless the counter has a critical function I suggest you add that
+separately, otherwise this looks good.
+
+> diff --git a/arch/arm/configs/ipq_defconfig b/arch/arm/configs/ipq_defconfig
+> index 1cabd8b..054a159 100644
+> --- a/arch/arm/configs/ipq_defconfig
+> +++ b/arch/arm/configs/ipq_defconfig
+> @@ -22,6 +22,7 @@ CONFIG_ARCH_MSM8X60=y
+>  CONFIG_ARCH_MSM8960=y
+>  CONFIG_ARCH_MSM8974=y
+>  CONFIG_ARCH_IPQ8064=y
+> +CONFIG_ARCH_IPQ40XX=y
+>  CONFIG_SMP=y
+>  CONFIG_PREEMPT=y
+>  CONFIG_AEABI=y
+> diff --git a/arch/arm/mach-qcom/Kconfig b/arch/arm/mach-qcom/Kconfig
+> index fab49a2..3add9f9 100644
+> --- a/arch/arm/mach-qcom/Kconfig
+> +++ b/arch/arm/mach-qcom/Kconfig
+> @@ -26,4 +26,8 @@ config ARCH_IPQ8064
+>  	bool "Enable support for IPQ806x"
+>  	select CLKSRC_QCOM
+>  
+> +config ARCH_IPQ40XX
+> +	bool "Enable support for IPQ40XX"
+> +	select HAVE_ARM_ARCH_TIMER
+> +
+
+Please insert your entry alphabetically.
+
+>  endif
+> diff --git a/arch/arm/mach-qcom/board.c b/arch/arm/mach-qcom/board.c
+> index 6d8bbf7..566487d 100644
+> --- a/arch/arm/mach-qcom/board.c
+> +++ b/arch/arm/mach-qcom/board.c
+> @@ -22,6 +22,7 @@ static const char * const qcom_dt_match[] __initconst = {
+>  	"qcom,ipq8064",
+>  	"qcom,msm8660-surf",
+>  	"qcom,msm8960-cdp",
+> +	"qcom,ipq40xx-r3pc",
+
+Please add qcom,ipq40xx instead, so that we don't need to list every
+single device.
+
+Also, please keep the list alphabetically sorted.
+
+>  	NULL
+>  };
+
+Regards,
+Bjorn
