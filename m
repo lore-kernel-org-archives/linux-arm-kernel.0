@@ -1,38 +1,34 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 20 Aug 2015 18:57:50 -0700
-Subject: [GIT PULL 7/9] ARM: tegra: Memory controller updates for v4.3-rc1
-In-Reply-To: <1439563720-13189-8-git-send-email-thierry.reding@gmail.com>
-References: <1439563720-13189-1-git-send-email-thierry.reding@gmail.com>
- <1439563720-13189-8-git-send-email-thierry.reding@gmail.com>
-Message-ID: <20150821015750.GL4865@localhost>
+Date: Thu, 20 Aug 2015 19:03:22 -0700
+Subject: [GIT PULL] Xilinx Zynq DT changes for v4.3 v2
+In-Reply-To: <55D4646F.7010404@monstr.eu>
+References: <55D4646F.7010404@monstr.eu>
+Message-ID: <20150821020322.GO4865@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 14, 2015 at 04:48:38PM +0200, Thierry Reding wrote:
-> Hi ARM SoC maintainers,
+On Wed, Aug 19, 2015 at 01:11:43PM +0200, Michal Simek wrote:
+> Hi guys,
 > 
-> The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
-> 
->   Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.3-memory
-> 
-> for you to fetch changes up to 588c43a7bd5a53ae523b318e1db16bdd59963a3c:
-> 
->   memory: tegra: Add Tegra210 support (2015-08-13 16:07:52 +0200)
-> 
-> Thanks,
-> Thierry
-> 
-> ----------------------------------------------------------------
-> ARM: tegra: Memory controller updates for v4.3-rc1
-> 
-> Adds support for Tegra210, which allows the SMMU to be used on this new
-> SoC generation.
+> Philipp just sent his PR to you with adding reset controller for Zynq
+> (http://www.spinics.net/lists/arm-kernel/msg440136.html).
+> Can you please consider to add this one more patch to your tree?
+> It is one more patch on the top of existing zynq/dt branch which you
+> already have in arm-soc git repo.
 
-Merged, thanks.
+The change is small enough, so yes we can merge it with the below fixed:
+
+> Moritz Fischer (1):
+>       dts: zynq: Add devicetree entry for Xilinx Zynq reset controller.
+
+ARM: dts: <....> is the format we want here -- that's what most other platforms
+use as well. I.e. please add ARM as a prefix.
+
+I can do it here and just apply as a patch too instead of merging, just let me
+know.
+
+
+Thanks,
 
 
 -Olof
