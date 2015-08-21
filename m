@@ -1,45 +1,48 @@
 From: maitysanchayan@gmail.com (Sanchayan Maity)
-Date: Fri, 21 Aug 2015 18:56:30 +0530
-Subject: [PATCH v4 1/3] ARM: dts: vf500-colibri: Add device tree node for
- touchscreen support
+Date: Fri, 21 Aug 2015 18:56:31 +0530
+Subject: [PATCH v4 2/3] input: Add DT binding documentation for Colibri VF50
+ touchscreen
 In-Reply-To: <cover.1440162473.git.maitysanchayan@gmail.com>
 References: <cover.1440162473.git.maitysanchayan@gmail.com>
-Message-ID: <a960c538cf419a816d73fbea7d4380ea773aa6ba.1440162473.git.maitysanchayan@gmail.com>
+Message-ID: <8446d6df4b39f0b0acdc37afd4d66dbcca4d09ba.1440162473.git.maitysanchayan@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device tree node for touchscreen support on Colibri VF50. The
-touchscreen functionality on VF50 uses the ADC channels of Vybrid
-and some GPIOs. Also add pinctrl nodes for proper pinmux.
+This adds device tree binding documentation for the Colibri VF50
+touchscreen driver.
 
 Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
 ---
- arch/arm/boot/dts/vf500-colibri-eval-v3.dts |  4 +++
- arch/arm/boot/dts/vf500-colibri.dtsi        | 47 +++++++++++++++++++++++++++++
- 2 files changed, 51 insertions(+)
+ .../bindings/input/touchscreen/colibri-vf50-ts.txt | 36 ++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/input/touchscreen/colibri-vf50-ts.txt
 
-diff --git a/arch/arm/boot/dts/vf500-colibri-eval-v3.dts b/arch/arm/boot/dts/vf500-colibri-eval-v3.dts
-index 7fc782c..14c0b00 100644
---- a/arch/arm/boot/dts/vf500-colibri-eval-v3.dts
-+++ b/arch/arm/boot/dts/vf500-colibri-eval-v3.dts
-@@ -15,3 +15,7 @@
- 	model = "Toradex Colibri VF50 on Colibri Evaluation Board";
- 	compatible = "toradex,vf500-colibri_vf50-on-eval", "toradex,vf500-colibri_vf50", "fsl,vf500";
- };
+diff --git a/Documentation/devicetree/bindings/input/touchscreen/colibri-vf50-ts.txt b/Documentation/devicetree/bindings/input/touchscreen/colibri-vf50-ts.txt
+new file mode 100644
+index 0000000..e615aa9
+--- /dev/null
++++ b/Documentation/devicetree/bindings/input/touchscreen/colibri-vf50-ts.txt
+@@ -0,0 +1,36 @@
++* Toradex Colibri VF50 Touchscreen driver
 +
-+&touchscreen {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/vf500-colibri.dtsi b/arch/arm/boot/dts/vf500-colibri.dtsi
-index cee34a3..84f091d 100644
---- a/arch/arm/boot/dts/vf500-colibri.dtsi
-+++ b/arch/arm/boot/dts/vf500-colibri.dtsi
-@@ -17,4 +17,51 @@
- 	memory {
- 		reg = <0x80000000 0x8000000>;
- 	};
++Required Properties:
++- compatible must be toradex,vf50-touchscreen
++- io-channels: adc channels being used by the Colibri VF50 module
++- xp-gpios: FET gate driver for input of X+
++- xm-gpios: FET gate driver for input of X-
++- yp-gpios: FET gate driver for input of Y+
++- ym-gpios: FET gate driver for input of Y-
++- interrupt-parent: phandle for the interrupt controller
++- interrupts: pen irq interrupt for touch detection
++- pinctrl-names: "idle", "default", "gpios"
++- pinctrl-0: pinctrl node for idle state gpio pinmux
++- pinctrl-1: pinctrl node for touch detection state pinmux
++- pinctrl-2: pinctrl node for gpios functioning as FET gate drivers
++- vf50-ts-min-pressure: pressure level at which to stop measuring X/Y values
 +
-+	touchscreen: vf50-touchscreen {
++Example:
++
++	touchctrl: vf50_touchctrl {
 +		compatible = "toradex,vf50-touchscreen";
 +		io-channels = <&adc1 0>,<&adc0 0>,
 +				<&adc0 1>,<&adc1 2>;
@@ -56,35 +59,5 @@ index cee34a3..84f091d 100644
 +		vf50-ts-min-pressure = <200>;
 +		status = "disabled";
 +	};
-+};
-+
-+&iomuxc {
-+	vf610-colibri {
-+		pinctrl_touchctrl_idle: touchctrl_idle {
-+			fsl,pins = <
-+				VF610_PAD_PTA18__GPIO_8		0x006d
-+				VF610_PAD_PTA19__GPIO_9		0x006c
-+				>;
-+		};
-+
-+		pinctrl_touchctrl_default: touchctrl_default {
-+			fsl,pins = <
-+				VF610_PAD_PTA18__ADC0_SE0	0x0040
-+				VF610_PAD_PTA19__ADC0_SE1	0x0040
-+				VF610_PAD_PTA16__ADC1_SE0	0x0040
-+				VF610_PAD_PTB2__ADC1_SE2	0x0040
-+				>;
-+		};
-+
-+		pinctrl_touchctrl_gpios: touchctrl_gpios {
-+			fsl,pins = <
-+				VF610_PAD_PTA23__GPIO_13	0x22e9
-+				VF610_PAD_PTB23__GPIO_93	0x22e9
-+				VF610_PAD_PTA22__GPIO_12	0x22e9
-+				VF610_PAD_PTA11__GPIO_4		0x22e9
-+				>;
-+		};
-+	};
- };
 -- 
 2.5.0
