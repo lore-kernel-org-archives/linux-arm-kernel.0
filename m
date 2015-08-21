@@ -1,55 +1,30 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 21 Aug 2015 17:53:21 +0200
-Subject: [GIT PULL] ARM: mvebu: cleanup changes for v4.3
-In-Reply-To: <55D748E0.3080004@free-electrons.com>
-References: <55D748E0.3080004@free-electrons.com>
-Message-ID: <55D74971.2090404@free-electrons.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 21 Aug 2015 16:54:25 +0100
+Subject: [PATCH] arm64: enable generic idle loop
+In-Reply-To: <20150821091446.GB4280@leoy-linaro>
+References: <1440128422-4170-1-git-send-email-leo.yan@linaro.org>
+ <20150821090043.GA14072@e104818-lin.cambridge.arm.com>
+ <20150821091446.GB4280@leoy-linaro>
+Message-ID: <20150821155425.GC16410@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/08/2015 17:50, Gregory CLEMENT wrote:
-> Hi,
+On Fri, Aug 21, 2015 at 05:14:46PM +0800, Leo Yan wrote:
+> On Fri, Aug 21, 2015 at 10:00:43AM +0100, Catalin Marinas wrote:
+> > On Fri, Aug 21, 2015 at 11:40:22AM +0800, Leo Yan wrote:
+> > > Enable generic idle loop for ARM64, so can support for hlt/nohlt
+> > > command line options to override default idle loop behavior.
+> > 
+> > Just curious, what do you need this for?
 > 
-> Here is the first pull request for fixes for mvebu for v4.2.
+> With this config, usually we can add "nohlt" in command line to force
+> the cpu will never be powered off; so can quickly narrow down if some
+> issues are related with cpuidle or not.
+> 
+> And if CPU is powered off, then its debug logic also will be powered off.
+> So we can simply use this method to let debugger always hot connect with
+> the target CPU.
 
-Obviously the title is wrong! it is really a fix for 4.2 and not a
-cleanup for 4.3
+OK.
 
-> I hope it is not too late, if it can't make ti for 4.2, then we
-> will apply it on 4.3, anyway the bug is here since 3.18.
-> 
-> Gregory
-> 
-> The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
-> 
->   Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-4.2-1
-> 
-> for you to fetch changes up to 5be9fc23cdb42e1d383ecc8eae8a8ff70a752708:
-> 
->   ARM: orion5x: fix legacy orion5x IRQ numbers (2015-08-21 17:33:08 +0200)
-> 
-> ----------------------------------------------------------------
-> mvebu fixes changes for v4.2
-> 
-> Fix legacy orion5x IRQ numbers broken since 3.18
-> 
-> ----------------------------------------------------------------
-> Benjamin Cama (1):
->       ARM: orion5x: fix legacy orion5x IRQ numbers
-> 
->  arch/arm/Kconfig                          |  1 +
->  arch/arm/mach-orion5x/include/mach/irqs.h | 64 +++++++++++++++----------------
->  arch/arm/mach-orion5x/irq.c               |  4 +-
->  3 files changed, 35 insertions(+), 34 deletions(-)
-> 
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
