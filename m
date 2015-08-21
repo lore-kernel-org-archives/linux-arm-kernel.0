@@ -1,48 +1,41 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 21 Aug 2015 09:09:05 -0700
-Subject: [GIT PULL 8/9] ARM: tegra: Devicetree changes for v4.3-rc1
-In-Reply-To: <20150821015848.GM4865@localhost>
-References: <1439563720-13189-1-git-send-email-thierry.reding@gmail.com>
- <1439563720-13189-9-git-send-email-thierry.reding@gmail.com>
- <20150821015848.GM4865@localhost>
-Message-ID: <20150821160905.GP4865@localhost>
+Date: Fri, 21 Aug 2015 09:10:15 -0700
+Subject: [GIT PULL] Xilinx Zynq DT changes for v4.3 v2
+In-Reply-To: <55D6C6D9.3070401@monstr.eu>
+References: <55D4646F.7010404@monstr.eu> <20150821020322.GO4865@localhost>
+ <55D6C6D9.3070401@monstr.eu>
+Message-ID: <20150821161015.GA14452@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 20, 2015 at 06:58:48PM -0700, Olof Johansson wrote:
-> On Fri, Aug 14, 2015 at 04:48:39PM +0200, Thierry Reding wrote:
-> > Hi ARM SoC maintainers,
+On Fri, Aug 21, 2015 at 08:36:09AM +0200, Michal Simek wrote:
+> On 08/21/2015 04:03 AM, Olof Johansson wrote:
+> > On Wed, Aug 19, 2015 at 01:11:43PM +0200, Michal Simek wrote:
+> >> Hi guys,
+> >>
+> >> Philipp just sent his PR to you with adding reset controller for Zynq
+> >> (http://www.spinics.net/lists/arm-kernel/msg440136.html).
+> >> Can you please consider to add this one more patch to your tree?
+> >> It is one more patch on the top of existing zynq/dt branch which you
+> >> already have in arm-soc git repo.
 > > 
-> > The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
+> > The change is small enough, so yes we can merge it with the below fixed:
 > > 
-> >   Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
+> >> Moritz Fischer (1):
+> >>       dts: zynq: Add devicetree entry for Xilinx Zynq reset controller.
 > > 
-> > are available in the git repository at:
-> > 
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.3-dt
-> > 
-> > for you to fetch changes up to 6909c6632fdbea441b5077b4f882c0bf4b71997e:
-> > 
-> >   ARM: tegra: Add gpio-ranges property (2015-08-13 16:31:53 +0200)
-> > 
-> > Thanks,
-> > Thierry
-> > 
-> > ----------------------------------------------------------------
-> > ARM: tegra: Devicetree changes for v4.3-rc1
-> > 
-> > Enables CPU frequency scaling on Jetson TK1 and enables the GK20A GPU on
-> > Venice2 and Jetson TK1. This also enables support for the PMU hardware
-> > found on Tegra124, which among other things, can be used for performance
-> > measurements.
+> > ARM: dts: <....> is the format we want here -- that's what most other platforms
+> > use as well. I.e. please add ARM as a prefix.
 > 
-> Merged, thanks.
+> ok. Will keep my eye on it.
+> 
+> > 
+> > I can do it here and just apply as a patch too instead of merging, just let me
+> > know.
+> 
+> Yes that will be great if you can do that change on your side.
 
-This caused build failures due to missing tegra124-car.h:
-
-http://arm-soc.lixom.net/buildlogs/arm-soc/v4.2-rc2-954-g5825349/buildall.arm.tegra_defconfig.log.failed
-
-I've dropped this branch again.
+Great, patch applied to next/dt.
 
 
 -Olof
