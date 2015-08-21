@@ -1,42 +1,64 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 21 Aug 2015 23:57:09 +0300
-Subject: [PATCH v2] ARM: shmobile: silk: add SDHI1 DT support
-In-Reply-To: <20150812012652.GH15957@verge.net.au>
-References: <10037494.4LD4T2QGPX@wasted.cogentembedded.com>
- <2757472.iuyUyRzJ3z@wasted.cogentembedded.com>
- <20150812012652.GH15957@verge.net.au>
-Message-ID: <55D790A5.1050008@cogentembedded.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Fri, 21 Aug 2015 14:04:20 -0700
+Subject: [PATCH 2/9] PM / Domains: Remove dev->driver check for runtime PM
+In-Reply-To: <CAMuHMdV2gDBaPRb3yE=tVPO_pr7PFA6bwhyQE5raumCh_qPXww@mail.gmail.com>
+ (Geert Uytterhoeven's message of "Sun, 16 Aug 2015 11:24:51 +0200")
+References: <1438731339-58317-1-git-send-email-lina.iyer@linaro.org>
+ <1438731339-58317-3-git-send-email-lina.iyer@linaro.org>
+ <7hfv3onv5c.fsf@deeprootsystems.com>
+ <CAMuHMdVeffa-jgXuSjDQBKTrhgW-d87OKzs1iXX+4y-9U_AJbg@mail.gmail.com>
+ <7hwpwylepx.fsf@deeprootsystems.com>
+ <CAMuHMdW-T9rUWXsQeffwtXspHbjfGqo_0G4QMB1o0TwTLJAQAg@mail.gmail.com>
+ <CAMAWPa-0R42thqBo0omn0KK7y0wyxoyaP+wsfoRvXBmWhBytKg@mail.gmail.com>
+ <CAMuHMdV2gDBaPRb3yE=tVPO_pr7PFA6bwhyQE5raumCh_qPXww@mail.gmail.com>
+Message-ID: <7hio88gxpn.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/12/2015 04:26 AM, Simon Horman wrote:
+Geert Uytterhoeven <geert@linux-m68k.org> writes:
 
->> Define the SILK board dependent part of the SDHI1 (connected to micro-SD slot)
->> device nodes along with the necessary voltage regulators.
->>
->> Based on the original patch by Vladimir Barinov
->> <vladimir.barinov@cogentembedded.com>.
->>
->> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->>
->> ---
->> This patch is against 'renesas-devel-20150810-v4.2-rc6' tag of Simon Horman's
->> 'renesas.git' repo plus the R8A7794/SILK QSPI patches just re-posted. It needs
->> the R8A7794 GPIO patches in order to compile.
->>
->> Changes in version 2:
->> - removed not working SDHI0 stuff, renamed the patch;
->> - replaced SDHI1's "wp-gpios" property with "disable-wp".
+> Hi Kevin,
 >
-> I am wondering if you could explain the motivation for the "disable-wp"
-> update
+> On Fri, Aug 14, 2015 at 7:19 PM, Kevin Hilman <khilman@kernel.org> wrote:
+>> On Fri, Aug 14, 2015 at 12:24 AM, Geert Uytterhoeven
+>> <geert@linux-m68k.org> wrote:
+>>> On Fri, Aug 14, 2015 at 5:40 AM, Kevin Hilman <khilman@kernel.org> wrote:
+>>>> Geert Uytterhoeven <geert@linux-m68k.org> writes:
+>>>>> On Wed, Aug 12, 2015 at 9:50 PM, Kevin Hilman <khilman@kernel.org> wrote:
+>>>>>> This check might have made sense before PM domains, but with PM domains,
+>>>>>> it's entirely possible to have a simple device without a driver and the
+>>>>>> PM domain handles all the necesary PM, so I think this check
+>>>>>> could/should be removed.
+>>>>>>
+>>>>>> Thoughts?
+>>>>>
+>>>>> Simple devices without a driver aren't handled automatically.
+>>>>> At minimum, the driver should call pm_runtime_enable(), cfr.
+>>>>> drivers/bus/simple-pm-bus.c.
+>>>>
+>>>> That's correct, and in the proof-of-concept stuff I hacked up and in
+>>>> Lina's series, the CPU "devices" do indeed to this.  Without that, they
+>>>> wouldn't end up ever taking this codepath through genpd's
+>>>> runtime_suspend and power_off hooks.
+>>>>
+>>>> Also, I'm not sure if your comment was meant to be an objection to the
+>>>> patch?  or if you're OK with it.
+>>>
+>>> My comment was purely meant as a response to "it's entirely possible to have a
+>>> simple device without a driver and the PM domain handles all the necesary PM".
+>>
+>> Right, so if the PM domain does the pm_runtime_enable() for these
+>> "simple" devices without drivers, they can still exist without a
+>> driver, and the PM domain doing all the magic.
+>
+> Is it possible to let the PM Domain do the pm_runtime_enable() itself in
+> the absence of a driver? 
 
-    Please see the comment in mmc_sd_get_ro().
+Well, I suppose it's possible, not sure it's recommended. :)
 
-> and weather it is appropriate for other r8a779* dts files.
+> If yes, I wouldn't have needed simple-pm-bus.c.  
+> What if a driver is bound later?
 
-    In case of micro-SD slots, yes.
+Yeah, you're approach is better.
 
-> Thanks.
-
-MBR, Sergei
+Kevin
