@@ -1,35 +1,27 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Fri, 21 Aug 2015 11:45:18 -0500
-Subject: [PATCH v3 15/31] arm64: SMP support
-In-Reply-To: <55C8D9DB.5080207@codeaurora.org>
-References: <1347035226-18649-1-git-send-email-catalin.marinas@arm.com>
- <1347035226-18649-16-git-send-email-catalin.marinas@arm.com>
- <CAOZdJXVoDJM3y2mnKO+91yf2EHogKfMjumjhhi85REAfhcJM=Q@mail.gmail.com>
- <20150806095621.GB17691@e104818-lin.cambridge.arm.com>
- <55C8843D.8050600@linaro.org> <55C8D9DB.5080207@codeaurora.org>
-Message-ID: <55D7559E.8080609@codeaurora.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 21 Aug 2015 09:47:09 -0700
+Subject: [PATCH v2 1/4] regmap: Introduce max_raw_read/write for
+ regmap_bulk_read/write
+In-Reply-To: <1440064807-26346-2-git-send-email-mpa@pengutronix.de>
+References: <1440064807-26346-1-git-send-email-mpa@pengutronix.de>
+ <1440064807-26346-2-git-send-email-mpa@pengutronix.de>
+Message-ID: <20150821164709.GF12027@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/10/2015 12:05 PM, Timur Tabi wrote:
->>>
->>> This code was inherited from arch/arm which initially was always dumping
->>> the stack but it later gained the system_state check. Unless it's useful
->>> to anyone for debugging purposes, I'm ok with removing it.
->>
->> Do you have patch for this one? My colleagues said that they met the
->> same problem :)
->
-> Dropping the call to dump_stack() would probably be sufficient.
+On Thu, Aug 20, 2015 at 12:00:04PM +0200, Markus Pargmann wrote:
+> There are some buses which have a limit on the maximum number of bytes
+> that can be send/received. An example for this is
+> I2C_FUNC_SMBUS_I2C_BLOCK which does not support any reads/writes of more
+> than 32 bytes. The regmap_bulk operations should still be able to
+> utilize the full 32 bytes in this case.
 
-Actually, I think we need to keep it.  I just heard from another 
-developer who does actually use it for debugging.
-
-I think the real problem is that emergency_restart() should not be 
-causing these outputs.  Shouldn't machine_restart() change the 
-system_state to SYSTEM_RESTART before it calls smp_send_stop()?
-
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+This doesn't seem to apply against current code, can you please check
+and resend?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150821/d66efb11/attachment.sig>
