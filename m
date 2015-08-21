@@ -1,136 +1,120 @@
-From: Haibo.Chen@freescale.com (Chen Bough)
-Date: Fri, 21 Aug 2015 08:30:16 +0000
-Subject: [PATCH v2 2/5] Documentation: Detail permitted DT properties for
- the imx6ul_tsc
-In-Reply-To: <20150819055434.GF11161@pengutronix.de>
-References: <1438077521-12857-1-git-send-email-haibo.chen@freescale.com>
- <1438077521-12857-3-git-send-email-haibo.chen@freescale.com>
- <20150819055434.GF11161@pengutronix.de>
-Message-ID: <BY1PR03MB1388BBEF576297D76E7E3F839A650@BY1PR03MB1388.namprd03.prod.outlook.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Fri, 21 Aug 2015 14:09:46 +0530
+Subject: [PATCH] dmaengine: xgene-dma: Fix holding lock while calling tx
+ callback in cleanup path
+In-Reply-To: <1440066656-15516-1-git-send-email-rsahu@apm.com>
+References: <1440066656-15516-1-git-send-email-rsahu@apm.com>
+Message-ID: <20150821083946.GO13546@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Markus,
+On Thu, Aug 20, 2015 at 04:00:56PM +0530, Rameshwar Prasad Sahu wrote:
+> This patch fixes the an locking issue where client callback performs
+		^^^^^^^^^^^^
+??
 
-> -----Original Message-----
-> From: Markus Pargmann [mailto:mpa at pengutronix.de]
-> Sent: Wednesday, August 19, 2015 1:55 PM
-> To: Chen Haibo-B51421
-> Cc: robh+dt at kernel.org; pawel.moll at arm.com; mark.rutland at arm.com;
-> ijc+devicetree at hellion.org.uk; galak at codeaurora.org; shawnguo at kernel.org;
-> kernel at pengutronix.de; linux at arm.linux.org.uk; dmitry.torokhov at gmail.com;
-> devicetree at vger.kernel.org; sbranden at broadcom.com; arnd at arndb.de;
-> mchehab at osg.samsung.com; christian.gmeiner at gmail.com;
-> scott.liu at emc.com.tw; linux-kernel at vger.kernel.org; hdegoede at redhat.com;
-> jonathar at broadcom.com; benjamin.tissoires at redhat.com;
-> hans.verkuil at cisco.com; hadess at hadess.net; linux-input at vger.kernel.org;
-> geert at linux-m68k.org; sebastien.szymanski at armadeus.com;
-> mamlinav at gmail.com; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH v2 2/5] Documentation: Detail permitted DT properties
-> for the imx6ul_tsc
-> 
-> Hi,
-> 
-> On Tue, Jul 28, 2015 at 05:58:38PM +0800, Haibo Chen wrote:
-> > Here we apply required documentation for the imx6ul touch screen
-> > controller driver which describe available properties and how to use
-> > them.
-> >
-> > Signed-off-by: Haibo Chen <haibo.chen@freescale.com>
-> > ---
-> >  .../bindings/input/touchscreen/imx6ul_tsc.txt      | 36
-> ++++++++++++++++++++++
-> >  1 file changed, 36 insertions(+)
-> >  create mode 100644
-> > Documentation/devicetree/bindings/input/touchscreen/imx6ul_tsc.txt
-> >
-> > diff --git
-> > a/Documentation/devicetree/bindings/input/touchscreen/imx6ul_tsc.txt
-> > b/Documentation/devicetree/bindings/input/touchscreen/imx6ul_tsc.txt
-> > new file mode 100644
-> > index 0000000..ac41c32
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/input/touchscreen/imx6ul_tsc.t
-> > +++ xt
-> > @@ -0,0 +1,36 @@
-> > +* Freescale i.MX6UL Touch Controller
-> > +
-> > +Required properties:
-> > +- compatible: must be "fsl,imx6ul-tsc".
-> > +- reg: this touch controller address and the ADC2 address.
-> 
-> This suggests that this driver is using a unit ADC2. Which also means
-> that there are more than one ADC which are probably identical?
-> 
-> Shouldn't these ADCs be properly described by their own device nodes
-> instead of these two register ranges, two interrupts and two clocks?
-> 
-> Is 'ADC2' usable without tsc? Then ADC1/ADC2 should perhaps get a proper
-> IIO driver.
+> further submission.
+Do you men you are preventing that or fixing for this to be allowed?
 
-For i.MX6UL, there are two ADC. ADC1 is a normal ADC, and ADC2 can only works for
-TSC, the channels of ADC2 are connected to TSC directly. TSC and ADC2 should work
-together as a touch screen controller. 
-
-For ADC1, it share the driver vf610_adc.c (drivers/iio/adc/vf610_adc.c). 
-
-Best Regards
-
-Haibo 
- 
 > 
-> Unfortunately I don't have the reference manual to have a look how this
-> all works.
+> Signed-off-by: Rameshwar Prasad Sahu <rsahu@apm.com>
+> ---
+>  drivers/dma/xgene-dma.c | 33 ++++++++++++++++++++++-----------
+>  1 file changed, 22 insertions(+), 11 deletions(-)
 > 
-> Best regards,
+> diff --git a/drivers/dma/xgene-dma.c b/drivers/dma/xgene-dma.c
+> index d1c8809..0b82bc0 100644
+> --- a/drivers/dma/xgene-dma.c
+> +++ b/drivers/dma/xgene-dma.c
+> @@ -763,12 +763,17 @@ static void xgene_dma_cleanup_descriptors(struct xgene_dma_chan *chan)
+>  	struct xgene_dma_ring *ring = &chan->rx_ring;
+>  	struct xgene_dma_desc_sw *desc_sw, *_desc_sw;
+>  	struct xgene_dma_desc_hw *desc_hw;
+> +	struct list_head ld_completed;
+>  	u8 status;
 > 
-> Markus
+> +	INIT_LIST_HEAD(&ld_completed);
+> +
+> +	spin_lock_bh(&chan->lock);
+> +
+>  	/* Clean already completed and acked descriptors */
+>  	xgene_dma_clean_completed_descriptor(chan);
 > 
-> > +- interrupts: the interrupt of this touch controller and ADC2.
-> > +- clocks: the root clock of touch controller and ADC2.
-> > +- clock-names; must be "tsc" and "adc".
-> > +- xnur-gpio: the X- gpio this controller connect to.
-> > +  This xnur-gpio returns to high once the finger leave the touch
-> > +screen (The
-> > +  last touch event the touch controller capture).
-> > +
-> > +Optional properties:
-> > +- measure-delay-time: the value of measure delay time.
-> > +  Before X-axis or Y-axis measurement, the screen need some time
-> > +before
-> > +  even potential distribution ready.
-> > +  This value depends on the touch screen.
-> > +- pre-charge-time: the touch screen need some time to precharge.
-> > +  This value depends on the touch screen.
-> > +
-> > +Example:
-> > +	tsc: tsc at 02040000 {
-> > +		compatible = "fsl,imx6ul-tsc";
-> > +		reg = <0x02040000 0x4000>, <0x0219c000 0x4000>;
-> > +		interrupts = <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>,
-> > +			     <GIC_SPI 101 IRQ_TYPE_LEVEL_HIGH>;
-> > +		clocks = <&clks IMX6UL_CLK_IPG>,
-> > +			 <&clks IMX6UL_CLK_ADC2>;
-> > +		clock-names = "tsc", "adc";
-> > +		pinctrl-names = "default";
-> > +		pinctrl-0 = <&pinctrl_tsc>;
-> > +		xnur-gpio = <&gpio1 3 GPIO_ACTIVE_HIGH>;
-> > +		measure-delay-time = <0xfff>;
-> > +		pre-charge-time = <0xffff>;
-> > +		status = "okay";
-> > +	};
-> > --
-> > 1.9.1
-> >
-> >
-> >
+> -	/* Run the callback for each descriptor, in order */
+> +	/* Move all completed descriptors to ld completed queue, in order */
+>  	list_for_each_entry_safe(desc_sw, _desc_sw, &chan->ld_running, node) {
+>  		/* Get subsequent hw descriptor from DMA rx ring */
+>  		desc_hw = &ring->desc_hw[ring->head];
+> @@ -811,15 +816,17 @@ static void xgene_dma_cleanup_descriptors(struct xgene_dma_chan *chan)
+>  		/* Mark this hw descriptor as processed */
+>  		desc_hw->m0 = cpu_to_le64(XGENE_DMA_DESC_EMPTY_SIGNATURE);
 > 
+> -		xgene_dma_run_tx_complete_actions(chan, desc_sw);
+> -
+> -		xgene_dma_clean_running_descriptor(chan, desc_sw);
+> -
+>  		/*
+>  		 * Decrement the pending transaction count
+>  		 * as we have processed one
+>  		 */
+>  		chan->pending--;
+> +
+> +		/*
+> +		 * Delete this node from ld running queue and append it to
+> +		 * ld completed queue for further processing
+> +		 */
+> +		list_move_tail(&desc_sw->node, &ld_completed);
+>  	}
+> 
+>  	/*
+> @@ -828,6 +835,14 @@ static void xgene_dma_cleanup_descriptors(struct xgene_dma_chan *chan)
+>  	 * ahead and free the descriptors below.
+>  	 */
+>  	xgene_chan_xfer_ld_pending(chan);
+> +
+> +	spin_unlock_bh(&chan->lock);
+> +
+> +	/* Run the callback for each descriptor, in order */
+> +	list_for_each_entry_safe(desc_sw, _desc_sw, &ld_completed, node) {
+> +		xgene_dma_run_tx_complete_actions(chan, desc_sw);
+> +		xgene_dma_clean_running_descriptor(chan, desc_sw);
+> +	}
+>  }
+> 
+>  static int xgene_dma_alloc_chan_resources(struct dma_chan *dchan)
+> @@ -876,11 +891,11 @@ static void xgene_dma_free_chan_resources(struct dma_chan *dchan)
+>  	if (!chan->desc_pool)
+>  		return;
+> 
+> -	spin_lock_bh(&chan->lock);
+> -
+>  	/* Process all running descriptor */
+>  	xgene_dma_cleanup_descriptors(chan);
+> 
+> +	spin_lock_bh(&chan->lock);
+> +
+>  	/* Clean all link descriptor queues */
+>  	xgene_dma_free_desc_list(chan, &chan->ld_pending);
+>  	xgene_dma_free_desc_list(chan, &chan->ld_running);
+> @@ -1200,15 +1215,11 @@ static void xgene_dma_tasklet_cb(unsigned long data)
+>  {
+>  	struct xgene_dma_chan *chan = (struct xgene_dma_chan *)data;
+> 
+> -	spin_lock_bh(&chan->lock);
+> -
+>  	/* Run all cleanup for descriptors which have been completed */
+>  	xgene_dma_cleanup_descriptors(chan);
+> 
+>  	/* Re-enable DMA channel IRQ */
+>  	enable_irq(chan->rx_irq);
+> -
+> -	spin_unlock_bh(&chan->lock);
+>  }
+> 
+>  static irqreturn_t xgene_dma_chan_ring_isr(int irq, void *id)
 > --
-> Pengutronix e.K.                           |
-> |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/
-> |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0
-> |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555
-> |
+> 1.8.2.1
+> 
+
+-- 
+~Vinod
