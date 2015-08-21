@@ -1,63 +1,51 @@
-From: petr.cvek@tul.cz (Petr Cvek)
-Date: Sat, 22 Aug 2015 00:09:10 +0200
-Subject: [PATCH v2 09/21] ARM: pxa: magician: Add OV9640 camera support
-In-Reply-To: <874mjs5yt2.fsf@belgarion.home>
-References: <cover.1439843482.git.petr.cvek@tul.cz>
- <2889798.x6xcIzdYMU@wuerfel> <55D65722.9030508@tul.cz>
- <1634812.ZDaECJ9ClW@wuerfel> <874mjs5yt2.fsf@belgarion.home>
-Message-ID: <55D7A186.4000505@tul.cz>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sat, 22 Aug 2015 01:18:09 +0300
+Subject: [PATCH v2] ARM: shmobile: silk: add SDHI1 DT support
+In-Reply-To: <55D790A5.1050008@cogentembedded.com>
+References: <10037494.4LD4T2QGPX@wasted.cogentembedded.com>
+ <2757472.iuyUyRzJ3z@wasted.cogentembedded.com>
+ <20150812012652.GH15957@verge.net.au> <55D790A5.1050008@cogentembedded.com>
+Message-ID: <55D7A3A1.9020009@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne 21.8.2015 v 19:36 Robert Jarzmik napsal(a):
-> I shrunk a bit the mailing list.
-> 
-> Arnd Bergmann <arnd@arndb.de> writes:
-> 
->> On Friday 21 August 2015 00:39:30 Petr Cvek wrote:
->>> Dne 20.8.2015 v 22:26 Arnd Bergmann napsal(a):
->>>> On Thursday 20 August 2015 21:48:20 Robert Jarzmik wrote:
->>>>> Petr Cvek <petr.cvek@tul.cz> writes:
->>> Datasheet says:
+On 08/21/2015 11:57 PM, Sergei Shtylyov wrote:
+
+>>> Define the SILK board dependent part of the SDHI1 (connected to micro-SD slot)
+>>> device nodes along with the necessary voltage regulators.
 >>>
->>>         tS:RESET        Setting time after software/hardware reset      1 ms
+>>> Based on the original patch by Vladimir Barinov
+>>> <vladimir.barinov@cogentembedded.com>.
 >>>
->>> So at least one ~1 ms should be left there. Are msleep less than 20ms valid? 
+>>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 >>>
->>> (checkpatch: msleep < 20ms  can sleep for up to 20ms)
+>>> ---
+>>> This patch is against 'renesas-devel-20150810-v4.2-rc6' tag of Simon Horman's
+>>> 'renesas.git' repo plus the R8A7794/SILK QSPI patches just re-posted. It needs
+>>> the R8A7794 GPIO patches in order to compile.
+>>>
+>>> Changes in version 2:
+>>> - removed not working SDHI0 stuff, renamed the patch;
+>>> - replaced SDHI1's "wp-gpios" property with "disable-wp".
 >>
->> On most kernels, an msleep(1) will sleep somewhere between 1 and 3 milliseconds
->> (but could be much longer), while an mdelay(1) tries to sleep around one
->> millisecond, more or less.
-> 
-> I have rethought of that a bit more. I'm convinced a delay of "at least 1ms" is
-> necessary according to the specification, it can also be more.
-> 
-> Moreover, I came to the conclusion this reset sequence is not something that is
-> "magician" specific (see palmz72_camera_reset() in
-> .../mach-pxa/palmz72.c). Actually it's not even mach-pxa specific, it's "ov9640"
-> specific.
-> 
-> Now add this to the fact that it would be good to have a solution working for
-> devicetree as well, and on any board, and the conclusion I came to was that this
-> handling deserves to be in ov9640 driver (please correct me if I'm wrong).
-> 
-> The idea behind it is have the reset handled in ov9640, and the gpio provided by
-> platform data or devicetree.
-> 
-> So Guennadi, is it possible to add a gpio through platform data to ov9640
-> driver, does it make sense, and would you accept to have the reset handled there
-> ? And if yes, would you, Petr, accept to revamp your patch to have the reset and
-> power handled in ov9640 ?
-> 
+>> I am wondering if you could explain the motivation for the "disable-wp"
+>> update
+>
+>     Please see the comment in mmc_sd_get_ro().
+>
+>> and weather it is appropriate for other r8a779* dts files.
+>
+>     In case of micro-SD slots, yes.
 
-OK, why not, so power and reset gpio with polarity settings?
+    The MMC binding document says it should only be specified if the 
+controller has WP detection logic. We, so far, seem to have been replying on 
+the GPIOs despite this logic is present (according to the R-Car gen2 SDHI 
+manuals I have). The driver will first call mmc_gpio_get_ro() and when that 
+fails due to "wp-gpios" not being specified, it proceeds to reading the 
+register but that is forbidden by TMIO_MMC_WRPROTECT_DISABLE flag set for the 
+R-Car gen1/2 chips, so 0 is always returned from tmio_mmc_get_ro(). There 
+seems to be no point in going that far (and doing the runtime PM dances) --
+and MMC_CAP2_NO_WRITE_PROTECT (set when "disable-wp" is specified) prohibits 
+doing that...
 
-> Please note that it is a proposal, I'm not forcing anybody, I'd like to choose a
-> path that agrees with the future push to remove as many machine files as possible.
-
-Anyway I'm planning to send patch for OV9640 in future too (color correction matrix is not complete and some registers too).
-
-> 
-> Cheers.
-> 
+MBR, Sergei
