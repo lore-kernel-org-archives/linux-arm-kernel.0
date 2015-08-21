@@ -1,77 +1,31 @@
-From: varada@codeaurora.org (Varadarajan Narayanan)
-Date: Fri, 21 Aug 2015 10:29:18 +0530
-Subject: [PATCH] ARM: Set proper TEXT_OFFSET for IPQ806x
-In-Reply-To: <20150820195455.GT7557@n2100.arm.linux.org.uk>
-References: <20150820121541.GA14664@codeaurora.org>
- <20150820130005.GS7557@n2100.arm.linux.org.uk>
- <20150820172010.GB10796@qualcomm.com>
- <20150820195455.GT7557@n2100.arm.linux.org.uk>
-Message-ID: <20150821045918.GB26963@codeaurora.org>
+From: axel.lin@ingics.com (Axel Lin)
+Date: Fri, 21 Aug 2015 13:08:24 +0800
+Subject: [PATCH v3] pinctrl: mediatek: Fix multiple registration issue.
+In-Reply-To: <1440132404-27749-1-git-send-email-hongzhou.yang@mediatek.com>
+References: <1440132404-27749-1-git-send-email-hongzhou.yang@mediatek.com>
+Message-ID: <CAFRkauDR_XuMrihptQu1=Oq4nzOqcmne89LwsOHPzQrWCQQgMA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 20, 2015 at 08:54:55PM +0100, Russell King - ARM Linux wrote:
-> On Thu, Aug 20, 2015 at 12:20:10PM -0500, Andy Gross wrote:
-> > On Thu, Aug 20, 2015 at 02:00:06PM +0100, Russell King - ARM Linux wrote:
-> > > On Thu, Aug 20, 2015 at 05:45:41PM +0530, Varadarajan Narayanan wrote:
-> > > > RAM starts at 0x40000000 for IPQ. The lower 21MB of RAM is used
-> > > > for Shared Memory and the kernel can start from 0x41500000.
-> > >
-> > > Why do people keep creating crap like this?  Each time something like
-> > > this is created, it means that you _need_ to have a special kernel for
-> > > your platform and you can't be part of the single zImage.
-> > >
-> > > Please, rather than creating crap like this, find a better way.
-> >
-> > In the case of the IPQ, we don't use the zImage because the decompress
-> > requires a larger jump than we can do on that platform.  Having this
-> > change at least gets us back 2MB of memory.
+2015-08-21 12:46 GMT+08:00 Hongzhou Yang <hongzhou.yang@mediatek.com>:
+> Since our common driver need support main chip and PMU
+> at the same time, that means it will register two
+> pinctrl device, and the pinctrl_desc structure should
+> be used two times.
 >
-> Your argument about "a larger jump" makes no sense what so ever.  The
-> branches between the decompressor and the main kernel are all done
-> using a mov, which can jump to any 32-bit address.
+> But pinctrl_desc use global static definition, then
+> the latest registered pinctrl device will overwrite
+> the old one's, all members in pinctrl_desc will set to
+> the new one's, such as name, pins and pins numbers, etc.
+> This is a bug. Changing to use devm_kzalloc to fix it.
 >
-> Even if you load the compressed kernel image at 0x41500000, the
-> decompressor will mask that with 0xf8000000, and decide that RAM
-> starts at 0x40000000.  It will then want to place the decompressed
-> kernel image at 0x40008000.  Nothing there has anything to do with
-> jump ranges.
+> Cc: stable at vger.kernel.org # v4.1+
+> Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
+> ---
+>  Use dynamic allocation to fix multiple registration issue.
 
-With the qcom_defconfig, the kernel gets loaded at
-0x40008000. This region is reserved for NSS.
+The code looks good to me but the commit log needs fix.
+You don't use devm_kzalloc now.
+Just embedded struct pinctrl_desc pctl_desc to struct mtk_pinctrl.
 
-> The only restriction that the ARM has as far as jump ranges are
-> concerned is the 'b' or 'bl' instruction, which in ARM mode is
-> limited to +/- 32MB.  That doesn't apply here since we don't use
-> that to jump between the decompressor and the decompressed kernel
-> image.
->
-> So...
->
-> Why is it necessary to have this 21MB block of shared memory at
-> the start of RAM?  Why can't it be reserved by other means higher
-> up in system memory?
-
-The NSS subsystem needs memory to be reserved at 0x40000000.
-The Ubi32 cores (part of NSS) need low address memory close
-to the Ubi32 address space to do short calls from what is
-called Ubi32 On Chip Memory to DDR and back again.  Since
-there isn't a way to circumvent this restriction had to
-reserve at 0x40000000.
-
--Varada
-
-> It's up to the submitter to justify why any change is required, and
-> in this case, part of that justification is why the shared memory is
-> placed at the start of RAM, and why you need to be different from
-> almost everyone else, and why you need to be a special case.  The
-> justification also must make sense.
->
-> --
-> FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-> according to speedtest.net.
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Reviewed-by: Axel Lin <axel.lin@ingics.com>
