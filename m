@@ -1,49 +1,94 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 21 Aug 2015 20:24:25 +0200
-Subject: [PATCH] clk: rockchip: Add pclk_peri to critical clocks on
- RK3066/RK3188
-In-Reply-To: <1440180627-4566-1-git-send-email-romain.perier@gmail.com>
-References: <1440180627-4566-1-git-send-email-romain.perier@gmail.com>
-Message-ID: <1855234.LF6EVPIbW1@phil>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 21 Aug 2015 19:40:59 +0100
+Subject: [PATCH v1 3/3] arm64: dts: add Hi6220 mailbox node
+In-Reply-To: <1439977055-1747-4-git-send-email-leo.yan@linaro.org>
+References: <1439977055-1747-1-git-send-email-leo.yan@linaro.org>
+ <1439977055-1747-4-git-send-email-leo.yan@linaro.org>
+Message-ID: <20150821184059.GB2000@svinekod>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Romain,
-
-Am Freitag, 21. August 2015, 18:10:27 schrieb Romain Perier:
-> Clocks for bank GPIO3 and GPIO4 are supplied by pclk_peri. These clocks need
-> to stay on, otherwise pinctrl hangs the system when the driver is probed.
-
-I don't agree with the commit message.
-
-The issue you see does not originate from the pinctrl driver itself. Instead 
-only the new flexible clock handling causes some other (still unhandled) 
-component reyling on pclk_peri to hang the system.
-
-In the past the clocks for the gpio banks were simply enabled once during 
-probe, so pclk_peri as parent clock would also stay enabled for eternity. Now 
-we enable the gpio clocks only when necessary, which results in that pclk_peri 
-might get disabled too when no other component has claimed it - hence its 
-addition to critical clocks.
-
-Also, please note that Stephen Boyd is now also clock maintainer.
-
-
+On Wed, Aug 19, 2015 at 10:37:35AM +0100, Leo Yan wrote:
+> On Hi6220, below memory regions in DDR have specific purpose:
 > 
-> Signed-off-by: Romain Perier <romain.perier@gmail.com>
+>   0x05e0,0000 - 0x05ef,ffff: For MCU firmware using at runtime;
+>   0x0740,f000 - 0x0740,ffff: For MCU firmware's section;
+>   0x06df,f000 - 0x06df,ffff: For mailbox message data.
+> 
+> This patch reserves these memory regions and add device node for
+> mailbox in dts.
+> 
+> Signed-off-by: Leo Yan <leo.yan@linaro.org>
 > ---
->  drivers/clk/rockchip/clk-rk3188.c | 1 +
->  1 file changed, 1 insertion(+)
+>  arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 20 +++++++++++++++++---
+>  arch/arm64/boot/dts/hisilicon/hi6220.dtsi      |  8 ++++++++
+>  2 files changed, 25 insertions(+), 3 deletions(-)
 > 
-> diff --git a/drivers/clk/rockchip/clk-rk3188.c
-> b/drivers/clk/rockchip/clk-rk3188.c index f63a642..596be81 100644
-> --- a/drivers/clk/rockchip/clk-rk3188.c
-> +++ b/drivers/clk/rockchip/clk-rk3188.c
-> @@ -717,6 +717,7 @@ static const char *const rk3188_critical_clocks[]
-> __initconst = { "aclk_peri",
->  	"hclk_peri",
->  	"pclk_cpu",
-> +	"pclk_peri",
+> diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+> index e36a539..d5470d3 100644
+> --- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+> +++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+> @@ -7,9 +7,6 @@
+>  
+>  /dts-v1/;
+>  
+> -/*Reserved 1MB memory for MCU*/
+> -/memreserve/ 0x05e00000 0x00100000;
+> -
+>  #include "hi6220.dtsi"
+>  
+>  / {
+> @@ -28,4 +25,21 @@
+>  		device_type = "memory";
+>  		reg = <0x0 0x0 0x0 0x40000000>;
+>  	};
+> +
+> +	reserved-memory {
+> +		#address-cells = <2>;
+> +		#size-cells = <2>;
+> +		ranges;
+> +
+> +		mcu-buf at 05e00000 {
+> +			no-map;
+> +			reg = <0x0 0x05e00000 0x0 0x00100000>,	/* MCU firmware buffer */
+> +			      <0x0 0x0740f000 0x0 0x00001000>;	/* MCU firmware section */
+> +		};
+> +
+> +		mbox-buf at 06dff000 {
+> +			no-map;
+> +			reg = <0x0 0x06dff000 0x0 0x00001000>;	/* Mailbox message buf */
+> +		};
+> +	};
+
+As far as I can see, it would be simpler to simply carve these out of the
+memory node.
+
+I don't see why you need reserved-memory here, given you're not referring to
+these regions by phandle anyway.
+
+Thanks,
+Mark.
+
+
 >  };
+> diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+> index 3f03380..9ff25bc 100644
+> --- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+> +++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+> @@ -167,5 +167,13 @@
+>  			clocks = <&ao_ctrl 36>, <&ao_ctrl 36>;
+>  			clock-names = "uartclk", "apb_pclk";
+>  		};
+> +
+> +		mailbox: mailbox at f7510000 {
+> +			#mbox-cells = <1>;
+> +			compatible = "hisilicon,hi6220-mbox";
+> +			reg = <0x0 0xf7510000 0x0 0x1000>, /* IPC_S */
+> +			      <0x0 0x06dff800 0x0 0x0800>; /* Mailbox buffer */
+> +			interrupts = <GIC_SPI 94 IRQ_TYPE_LEVEL_HIGH>;
+> +		};
+>  	};
+>  };
+> -- 
+> 1.9.1
 > 
->  static void __init rk3188_common_clk_init(struct device_node *np)
