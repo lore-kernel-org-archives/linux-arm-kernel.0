@@ -1,38 +1,79 @@
-From: fugang.duan@freescale.com (Duan Andy)
-Date: Fri, 21 Aug 2015 23:49:41 +0000
-Subject: [PATCH v1 0/6] Add fec1 and fec2 support for i.MX7d sdb board
-In-Reply-To: <20150820.140531.1320709021949935376.davem@davemloft.net>
-References: <1439962444-27486-1-git-send-email-b38611@freescale.com>
- <20150820.140531.1320709021949935376.davem@davemloft.net>
-Message-ID: <BN3PR0301MB1219615039D291CCCD751B2EF5650@BN3PR0301MB1219.namprd03.prod.outlook.com>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Sat, 22 Aug 2015 09:45:08 +0800
+Subject: [PATCH v6 2/5] dt-bindings: Add a binding for Mediatek xHCI host
+ controller
+In-Reply-To: <1440207911-17666-1-git-send-email-chunfeng.yun@mediatek.com>
+References: <1440207911-17666-1-git-send-email-chunfeng.yun@mediatek.com>
+Message-ID: <1440207911-17666-3-git-send-email-chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: David Miller <davem@davemloft.net> Sent: Friday, August 21, 2015 5:06 AM
-> To: Duan Fugang-B38611
-> Cc: shawnguo at kernel.org; linux-arm-kernel at lists.infradead.org;
-> netdev at vger.kernel.org
-> Subject: Re: [PATCH v1 0/6] Add fec1 and fec2 support for i.MX7d sdb
-> board
-> 
-> From: Fugang Duan <b38611@freescale.com>
-> Date: Wed, 19 Aug 2015 13:33:58 +0800
-> 
-> > The patch series is to add fec support for i.MX7d sdb board. Since
-> > i.MX7d fec ip is the same as i.MX6SX, so there have no change for
-> driver itself.
-> >
-> > Patch#1: add bcm54220 PHY ID entry into brcmphy.h file.
-> 
-> This is completely, and utterly, pointless.
-> 
-> The only reason a PHY ID should be defined in brcmphy.h is so that it can
-> be used in the broadcom.c PHY driver or similar.
-> 
-> If there is no user in the tree, there is no reason to add it to the
-> header file.
+add a DT binding documentation of xHCI host controller for the
+MT8173 SoC from Mediatek.
 
-Ok, I will try to add the phy support in Broadcom phy driver. Thanks for your comment.
+Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+---
+ .../devicetree/bindings/usb/mt8173-xhci.txt        | 52 ++++++++++++++++++++++
+ 1 file changed, 52 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/usb/mt8173-xhci.txt
 
-Regards,
-Andy
+diff --git a/Documentation/devicetree/bindings/usb/mt8173-xhci.txt b/Documentation/devicetree/bindings/usb/mt8173-xhci.txt
+new file mode 100644
+index 0000000..8e6e463
+--- /dev/null
++++ b/Documentation/devicetree/bindings/usb/mt8173-xhci.txt
+@@ -0,0 +1,52 @@
++mt65XX xHCI
++
++The device node for Mediatek SOC usb3.0 host controller
++
++Required properties:
++ - compatible : should contain "mediatek,mt8173-xhci"
++ - reg : specifies physical base address and size of the registers,
++	the first one for MAC, the second for IPPC
++ - interrupts : interrupt used by the controller
++ - power-domains : a phandle to USB power domain node to control usb's
++	mtcmos
++ - vusb33-supply : regulator of usb avdd3.3v
++
++ - clocks : a list of phandle + clock-specifier pairs, one for each
++	entry in clock-names
++ - clock-names : must contain
++	"sys_ck": for clock of xHCI MAC
++	"wakeup_deb_p0": for usb wakeup debounce clock of port0
++	"wakeup_deb_p0": for usb wakeup debounce clock of port1
++
++ - phys : a list of phandle + phy specifier pairs
++ - usb3-lpm-capable : supports USB3 LPM
++ - mediatek,syscon-wakeup : phandle to syscon used to access usb wakeup
++	control register
++ - mediatek,wakeup-src : 1: ip sleep wakeup mode; 2: line state wakeup
++	mode; others means don't enable wakeup source of usb
++
++Optional properties:
++ - vbus-supply : Reference to the VBUS regulator;
++
++Example:
++usb30: usb at 11270000 {
++	compatible = "mediatek,mt8173-xhci";
++	reg = <0 0x11270000 0 0x4000>,
++	      <0 0x11280000 0 0x0800>;
++	interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_LOW>;
++	power-domains = <&scpsys MT8173_POWER_DOMAIN_USB>;
++	clocks = <&topckgen CLK_TOP_USB30_SEL>,
++		 <&pericfg CLK_PERI_USB0>,
++		 <&pericfg CLK_PERI_USB1>;
++	clock-names = "sys_ck",
++		      "wakeup_deb_p0",
++		      "wakeup_deb_p1";
++	phys = <&phy_port0 PHY_TYPE_USB3>,
++	       <&phy_port1 PHY_TYPE_USB2>;
++	vusb33-supply = <&mt6397_vusb_reg>;
++	vbus-supply = <&usb_p1_vbus>;
++	usb3-lpm-capable;
++	mediatek,syscon-wakeup = <&pericfg>;
++	mediatek,wakeup-src = <1>;
++	status = "okay";
++};
+-- 
+1.8.1.1.dirty
