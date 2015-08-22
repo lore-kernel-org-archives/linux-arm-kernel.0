@@ -1,117 +1,45 @@
-From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Sat, 22 Aug 2015 00:00:23 -0700
-Subject: [GIT PULL] KVM/ARM pull request for 4.3
-In-Reply-To: <1440088143-4722-1-git-send-email-marc.zyngier@arm.com>
-References: <1440088143-4722-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <55D81E07.2080002@redhat.com>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Sat, 22 Aug 2015 12:09:22 +0200
+Subject: [PATCH 0/2] x86/KASAN updates for 4.3
+In-Reply-To: <20150813172310.GK10280@arm.com>
+References: <1439444244-26057-1-git-send-email-ryabinin.a.a@gmail.com>
+ <20150813065040.GA17983@gmail.com>
+ <20150813081641.GA14402@gmail.com> <20150813090119.GA10280@arm.com>
+ <CAPAsAGxk2+v5VG77cOHAThsXyWx-_UJ1XVeJProaa0gQWH5jvA@mail.gmail.com>
+ <20150813112428.GG10280@arm.com> <20150813172310.GK10280@arm.com>
+Message-ID: <20150822100922.GA25039@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
+* Will Deacon <will.deacon@arm.com> wrote:
 
-On 20/08/2015 09:28, Marc Zyngier wrote:
-> Hi Paolo,
+> On Thu, Aug 13, 2015 at 12:24:28PM +0100, Will Deacon wrote:
+> > On Thu, Aug 13, 2015 at 12:02:26PM +0100, Andrey Ryabinin wrote:
+> > > 2015-08-13 12:01 GMT+03:00 Will Deacon <will.deacon@arm.com>:
+> > > > Yes please, works for me! If we're targetting 4.3, then please can you base
+> > > > on 4.2-rc4, as that's what our current arm64 queue is using?
+> > > >
+> > > 
+> > > Does this mean that we are targeting arm64 part for 4.3 too?
+> > 
+> > It depends on how well it merges with our current queue and whether it
+> > holds up to regression testing. The patches have been reviewed, so I'm
+> > comfortable with the content, but we're not at a stage where we can debug
+> > and fix any failures that might crop up from the merge.
 > 
-> This is the KVM/ARM pull request for Linux 4.3. Some rather major
-> things this time around (guest debug, management of interrupt active
-> state, lazy FP save/restore).
+> Scratch that :(
 > 
-> Thanks!
+> I tried this out under EFI and it dies horribly in the stub code because
+> we're missing at least one KASAN_SANITIZE_ Makefile entry.
 > 
-> 	M.
-> 
-> The following changes since commit bc0195aad0daa2ad5b0d76cce22b167bc3435590:
-> 
->   Linux 4.2-rc2 (2015-07-12 15:10:30 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-for-4.3
-> 
-> for you to fetch changes up to 054167b3d55127feb64978eddf3f9f3a84fe493b:
-> 
->   arm: KVM: keep arm vfp/simd exit handling consistent with arm64 (2015-08-19 22:27:58 +0100)
+> So I think this needs longer to stew before hitting mainline. By all means
+> get the x86 dependencies in for 4.3, but the arm64 port can probably use
+> another cycle to iron out the bugs.
 
-Pulled---for now in kvm/queue until I get Alex's pull request.
+Is there any known problem with the two patches in this series, or can I apply 
+them?
 
-Paolo
+Thanks,
 
-> ----------------------------------------------------------------
-> KVM/ARM changes for 4.3
-> 
-> - Full debug support for arm64
-> - Active state switching for timer interrupts
-> - Lazy FP/SIMD save/restore for arm64
-> - Generic ARMv8 target
-> 
-> ----------------------------------------------------------------
-> Alex Benn?e (11):
->       KVM: add comments for kvm_debug_exit_arch struct
->       KVM: arm64: guest debug, define API headers
->       KVM: arm: guest debug, add stub KVM_SET_GUEST_DEBUG ioctl
->       KVM: arm: introduce kvm_arm_init/setup/clear_debug
->       KVM: arm64: guest debug, add SW break point support
->       KVM: arm64: guest debug, add support for single-step
->       KVM: arm64: re-factor hyp.S debug register code
->       KVM: arm64: introduce vcpu->arch.debug_ptr
->       KVM: arm64: guest debug, HW assisted debug support
->       KVM: arm64: enable KVM_CAP_SET_GUEST_DEBUG
->       KVM: arm64: add trace points for guest_debug debug
-> 
-> Marc Zyngier (10):
->       arm/arm64: KVM: Fix ordering of timer/GIC on guest entry
->       arm/arm64: KVM: Move vgic handling to a non-preemptible section
->       KVM: arm/arm64: vgic: Convert struct vgic_lr to use bitfields
->       KVM: arm/arm64: vgic: Allow HW irq to be encoded in LR
->       KVM: arm/arm64: vgic: Relax vgic_can_sample_irq for edge IRQs
->       KVM: arm/arm64: vgic: Allow dynamic mapping of physical/virtual interrupts
->       KVM: arm/arm64: vgic: Allow HW interrupts to be queued to a guest
->       KVM: arm/arm64: vgic: Add vgic_{get,set}_phys_irq_active
->       KVM: arm/arm64: vgic: Prevent userspace injection of a mapped interrupt
->       KVM: arm/arm64: timer: Allow the timer to control the active state
-> 
-> Mario Smarduch (2):
->       arm64: KVM: Optimize arm64 skip 30-50% vfp/simd save/restore on exits
->       arm: KVM: keep arm vfp/simd exit handling consistent with arm64
-> 
-> Suzuki K. Poulose (1):
->       arm64/kvm: Add generic v8 KVM target
-> 
-> Vladimir Murzin (1):
->       arm64: KVM: remove remaining reference to vgic_sr_vectors
-> 
->  Documentation/virtual/kvm/api.txt      |  15 +-
->  arch/arm/include/asm/kvm_host.h        |   5 +
->  arch/arm/kvm/arm.c                     |  36 +-
->  arch/arm/kvm/guest.c                   |   6 +
->  arch/arm/kvm/interrupts.S              |  14 +-
->  arch/arm/kvm/reset.c                   |   4 +-
->  arch/arm64/include/asm/hw_breakpoint.h |  14 +
->  arch/arm64/include/asm/kvm_arm.h       |   5 +-
->  arch/arm64/include/asm/kvm_asm.h       |  26 +-
->  arch/arm64/include/asm/kvm_host.h      |  42 ++-
->  arch/arm64/include/uapi/asm/kvm.h      |  37 +-
->  arch/arm64/kernel/asm-offsets.c        |   9 +-
->  arch/arm64/kernel/hw_breakpoint.c      |  12 -
->  arch/arm64/kvm/Makefile                |   2 +-
->  arch/arm64/kvm/debug.c                 | 217 ++++++++++++
->  arch/arm64/kvm/guest.c                 |  43 ++-
->  arch/arm64/kvm/handle_exit.c           |  44 +++
->  arch/arm64/kvm/hyp.S                   | 617 ++++++++++++---------------------
->  arch/arm64/kvm/reset.c                 |  20 +-
->  arch/arm64/kvm/sys_regs.c              | 291 ++++++++++++++--
->  arch/arm64/kvm/sys_regs.h              |   6 +
->  arch/arm64/kvm/sys_regs_generic_v8.c   |   2 +
->  arch/arm64/kvm/trace.h                 | 123 +++++++
->  include/kvm/arm_arch_timer.h           |   7 +-
->  include/kvm/arm_vgic.h                 |  39 ++-
->  include/linux/irqchip/arm-gic-v3.h     |   3 +
->  include/linux/irqchip/arm-gic.h        |   3 +-
->  include/uapi/linux/kvm.h               |   5 +
->  virt/kvm/arm/arch_timer.c              |  29 +-
->  virt/kvm/arm/vgic-v2.c                 |  16 +-
->  virt/kvm/arm/vgic-v3.c                 |  21 +-
->  virt/kvm/arm/vgic.c                    | 427 +++++++++++++++++++++--
->  32 files changed, 1596 insertions(+), 544 deletions(-)
->  create mode 100644 arch/arm64/kvm/debug.c
-> 
+	Ingo
