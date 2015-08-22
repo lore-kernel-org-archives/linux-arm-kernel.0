@@ -1,119 +1,117 @@
-From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Sat, 22 Aug 2015 09:45:11 +0800
-Subject: [PATCH v6 5/5] arm64: dts: mediatek: add xHCI & usb phy for mt8173
-In-Reply-To: <1440207911-17666-1-git-send-email-chunfeng.yun@mediatek.com>
-References: <1440207911-17666-1-git-send-email-chunfeng.yun@mediatek.com>
-Message-ID: <1440207911-17666-6-git-send-email-chunfeng.yun@mediatek.com>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Sat, 22 Aug 2015 00:00:23 -0700
+Subject: [GIT PULL] KVM/ARM pull request for 4.3
+In-Reply-To: <1440088143-4722-1-git-send-email-marc.zyngier@arm.com>
+References: <1440088143-4722-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <55D81E07.2080002@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add xHCI and phy drivers for MT8173-EVB
 
-Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
----
- arch/arm64/boot/dts/mediatek/mt8173-evb.dts | 16 +++++++++++
- arch/arm64/boot/dts/mediatek/mt8173.dtsi    | 44 +++++++++++++++++++++++++++++
- 2 files changed, 60 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-index f433c21..112f3f3 100644
---- a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-+++ b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-@@ -13,6 +13,7 @@
-  */
- 
- /dts-v1/;
-+#include <dt-bindings/gpio/gpio.h>
- #include "mt8173.dtsi"
- 
- / {
-@@ -32,6 +33,15 @@
- 	};
- 
- 	chosen { };
-+
-+	usb_p1_vbus: regulator at 0 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "usb_vbus";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		gpio = <&pio 130 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
-+	};
- };
- 
- &pwrap {
-@@ -211,3 +221,9 @@
- &uart0 {
- 	status = "okay";
- };
-+
-+&usb30 {
-+	vusb33-supply = <&mt6397_vusb_reg>;
-+	vbus-supply = <&usb_p1_vbus>;
-+	mediatek,wakeup-src = <1>;
-+};
-diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-index 0696f8f..f88b2f9 100644
---- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-+++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-@@ -14,6 +14,8 @@
- #include <dt-bindings/clock/mt8173-clk.h>
- #include <dt-bindings/interrupt-controller/irq.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/phy/phy.h>
-+#include <dt-bindings/power/mt8173-power.h>
- #include <dt-bindings/reset-controller/mt8173-resets.h>
- #include "mt8173-pinfunc.h"
- 
-@@ -393,6 +395,48 @@
- 			#size-cells = <0>;
- 			status = "disabled";
- 		};
-+
-+		usb30: usb at 11270000 {
-+			compatible = "mediatek,mt8173-xhci";
-+			reg = <0 0x11270000 0 0x4000>,
-+			      <0 0x11280000 0 0x0800>;
-+			interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_LOW>;
-+			power-domains = <&scpsys MT8173_POWER_DOMAIN_USB>;
-+			clocks = <&topckgen CLK_TOP_USB30_SEL>,
-+				 <&pericfg CLK_PERI_USB0>,
-+				 <&pericfg CLK_PERI_USB1>;
-+			clock-names = "sys_ck",
-+				      "wakeup_deb_p0",
-+				      "wakeup_deb_p1";
-+			phys = <&phy_port0 PHY_TYPE_USB3>,
-+			       <&phy_port1 PHY_TYPE_USB2>;
-+			usb3-lpm-capable;
-+			mediatek,syscon-wakeup = <&pericfg>;
-+			status = "okay";
-+		};
-+
-+		u3phy: usb-phy at 11290000 {
-+			compatible = "mediatek,mt8173-u3phy";
-+			reg = <0 0x11290000 0 0x800>;
-+			clocks = <&apmixedsys CLK_APMIXED_REF2USB_TX>;
-+			clock-names = "u3phya_ref";
-+			#address-cells = <2>;
-+			#size-cells = <2>;
-+			ranges;
-+			status = "okay";
-+
-+			phy_port0: port at 11290800 {
-+				reg = <0 0x11290800 0 0x800>;
-+				#phy-cells = <1>;
-+				status = "okay";
-+			};
-+
-+			phy_port1: port at 11291000 {
-+				reg = <0 0x11291000 0 0x800>;
-+				#phy-cells = <1>;
-+				status = "okay";
-+			};
-+		};
- 	};
- };
- 
--- 
-1.8.1.1.dirty
+On 20/08/2015 09:28, Marc Zyngier wrote:
+> Hi Paolo,
+> 
+> This is the KVM/ARM pull request for Linux 4.3. Some rather major
+> things this time around (guest debug, management of interrupt active
+> state, lazy FP save/restore).
+> 
+> Thanks!
+> 
+> 	M.
+> 
+> The following changes since commit bc0195aad0daa2ad5b0d76cce22b167bc3435590:
+> 
+>   Linux 4.2-rc2 (2015-07-12 15:10:30 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-for-4.3
+> 
+> for you to fetch changes up to 054167b3d55127feb64978eddf3f9f3a84fe493b:
+> 
+>   arm: KVM: keep arm vfp/simd exit handling consistent with arm64 (2015-08-19 22:27:58 +0100)
+
+Pulled---for now in kvm/queue until I get Alex's pull request.
+
+Paolo
+
+> ----------------------------------------------------------------
+> KVM/ARM changes for 4.3
+> 
+> - Full debug support for arm64
+> - Active state switching for timer interrupts
+> - Lazy FP/SIMD save/restore for arm64
+> - Generic ARMv8 target
+> 
+> ----------------------------------------------------------------
+> Alex Benn?e (11):
+>       KVM: add comments for kvm_debug_exit_arch struct
+>       KVM: arm64: guest debug, define API headers
+>       KVM: arm: guest debug, add stub KVM_SET_GUEST_DEBUG ioctl
+>       KVM: arm: introduce kvm_arm_init/setup/clear_debug
+>       KVM: arm64: guest debug, add SW break point support
+>       KVM: arm64: guest debug, add support for single-step
+>       KVM: arm64: re-factor hyp.S debug register code
+>       KVM: arm64: introduce vcpu->arch.debug_ptr
+>       KVM: arm64: guest debug, HW assisted debug support
+>       KVM: arm64: enable KVM_CAP_SET_GUEST_DEBUG
+>       KVM: arm64: add trace points for guest_debug debug
+> 
+> Marc Zyngier (10):
+>       arm/arm64: KVM: Fix ordering of timer/GIC on guest entry
+>       arm/arm64: KVM: Move vgic handling to a non-preemptible section
+>       KVM: arm/arm64: vgic: Convert struct vgic_lr to use bitfields
+>       KVM: arm/arm64: vgic: Allow HW irq to be encoded in LR
+>       KVM: arm/arm64: vgic: Relax vgic_can_sample_irq for edge IRQs
+>       KVM: arm/arm64: vgic: Allow dynamic mapping of physical/virtual interrupts
+>       KVM: arm/arm64: vgic: Allow HW interrupts to be queued to a guest
+>       KVM: arm/arm64: vgic: Add vgic_{get,set}_phys_irq_active
+>       KVM: arm/arm64: vgic: Prevent userspace injection of a mapped interrupt
+>       KVM: arm/arm64: timer: Allow the timer to control the active state
+> 
+> Mario Smarduch (2):
+>       arm64: KVM: Optimize arm64 skip 30-50% vfp/simd save/restore on exits
+>       arm: KVM: keep arm vfp/simd exit handling consistent with arm64
+> 
+> Suzuki K. Poulose (1):
+>       arm64/kvm: Add generic v8 KVM target
+> 
+> Vladimir Murzin (1):
+>       arm64: KVM: remove remaining reference to vgic_sr_vectors
+> 
+>  Documentation/virtual/kvm/api.txt      |  15 +-
+>  arch/arm/include/asm/kvm_host.h        |   5 +
+>  arch/arm/kvm/arm.c                     |  36 +-
+>  arch/arm/kvm/guest.c                   |   6 +
+>  arch/arm/kvm/interrupts.S              |  14 +-
+>  arch/arm/kvm/reset.c                   |   4 +-
+>  arch/arm64/include/asm/hw_breakpoint.h |  14 +
+>  arch/arm64/include/asm/kvm_arm.h       |   5 +-
+>  arch/arm64/include/asm/kvm_asm.h       |  26 +-
+>  arch/arm64/include/asm/kvm_host.h      |  42 ++-
+>  arch/arm64/include/uapi/asm/kvm.h      |  37 +-
+>  arch/arm64/kernel/asm-offsets.c        |   9 +-
+>  arch/arm64/kernel/hw_breakpoint.c      |  12 -
+>  arch/arm64/kvm/Makefile                |   2 +-
+>  arch/arm64/kvm/debug.c                 | 217 ++++++++++++
+>  arch/arm64/kvm/guest.c                 |  43 ++-
+>  arch/arm64/kvm/handle_exit.c           |  44 +++
+>  arch/arm64/kvm/hyp.S                   | 617 ++++++++++++---------------------
+>  arch/arm64/kvm/reset.c                 |  20 +-
+>  arch/arm64/kvm/sys_regs.c              | 291 ++++++++++++++--
+>  arch/arm64/kvm/sys_regs.h              |   6 +
+>  arch/arm64/kvm/sys_regs_generic_v8.c   |   2 +
+>  arch/arm64/kvm/trace.h                 | 123 +++++++
+>  include/kvm/arm_arch_timer.h           |   7 +-
+>  include/kvm/arm_vgic.h                 |  39 ++-
+>  include/linux/irqchip/arm-gic-v3.h     |   3 +
+>  include/linux/irqchip/arm-gic.h        |   3 +-
+>  include/uapi/linux/kvm.h               |   5 +
+>  virt/kvm/arm/arch_timer.c              |  29 +-
+>  virt/kvm/arm/vgic-v2.c                 |  16 +-
+>  virt/kvm/arm/vgic-v3.c                 |  21 +-
+>  virt/kvm/arm/vgic.c                    | 427 +++++++++++++++++++++--
+>  32 files changed, 1596 insertions(+), 544 deletions(-)
+>  create mode 100644 arch/arm64/kvm/debug.c
+> 
