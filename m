@@ -1,102 +1,261 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Sat, 22 Aug 2015 21:30:50 +0800
-Subject: [PATCH v1 3/3] arm64: dts: add Hi6220 mailbox node
-In-Reply-To: <20150821184059.GB2000@svinekod>
-References: <1439977055-1747-1-git-send-email-leo.yan@linaro.org>
- <1439977055-1747-4-git-send-email-leo.yan@linaro.org>
- <20150821184059.GB2000@svinekod>
-Message-ID: <20150822133050.GA4265@leoy-linaro>
+From: robert.richter@caviumnetworks.com (Robert Richter)
+Date: Sat, 22 Aug 2015 17:06:16 +0200
+Subject: [PATCH v5 2/4] Documentation: arm64/arm: dt bindings for numa.
+In-Reply-To: <1439570374-4079-3-git-send-email-gkulkarni@caviumnetworks.com>
+References: <1439570374-4079-1-git-send-email-gkulkarni@caviumnetworks.com>
+ <1439570374-4079-3-git-send-email-gkulkarni@caviumnetworks.com>
+Message-ID: <20150822150616.GC8624@rric.localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On 14.08.15 22:09:32, Ganapatrao Kulkarni wrote:
+> DT bindings for numa map for memory, cores and IOs using
+> arm,associativity device node property.
 
-On Fri, Aug 21, 2015 at 07:40:59PM +0100, Mark Rutland wrote:
-> On Wed, Aug 19, 2015 at 10:37:35AM +0100, Leo Yan wrote:
-> > On Hi6220, below memory regions in DDR have specific purpose:
-> > 
-> >   0x05e0,0000 - 0x05ef,ffff: For MCU firmware using at runtime;
-> >   0x0740,f000 - 0x0740,ffff: For MCU firmware's section;
-> >   0x06df,f000 - 0x06df,ffff: For mailbox message data.
-> > 
-> > This patch reserves these memory regions and add device node for
-> > mailbox in dts.
-> > 
-> > Signed-off-by: Leo Yan <leo.yan@linaro.org>
-> > ---
-> >  arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 20 +++++++++++++++++---
-> >  arch/arm64/boot/dts/hisilicon/hi6220.dtsi      |  8 ++++++++
-> >  2 files changed, 25 insertions(+), 3 deletions(-)
-> > 
-> > diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-> > index e36a539..d5470d3 100644
-> > --- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-> > +++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-> > @@ -7,9 +7,6 @@
-> >  
-> >  /dts-v1/;
-> >  
-> > -/*Reserved 1MB memory for MCU*/
-> > -/memreserve/ 0x05e00000 0x00100000;
-> > -
-> >  #include "hi6220.dtsi"
-> >  
-> >  / {
-> > @@ -28,4 +25,21 @@
-> >  		device_type = "memory";
-> >  		reg = <0x0 0x0 0x0 0x40000000>;
-> >  	};
-> > +
-> > +	reserved-memory {
-> > +		#address-cells = <2>;
-> > +		#size-cells = <2>;
-> > +		ranges;
-> > +
-> > +		mcu-buf at 05e00000 {
-> > +			no-map;
-> > +			reg = <0x0 0x05e00000 0x0 0x00100000>,	/* MCU firmware buffer */
-> > +			      <0x0 0x0740f000 0x0 0x00001000>;	/* MCU firmware section */
-> > +		};
-> > +
-> > +		mbox-buf at 06dff000 {
-> > +			no-map;
-> > +			reg = <0x0 0x06dff000 0x0 0x00001000>;	/* Mailbox message buf */
-> > +		};
-> > +	};
+Arnd, Rob,
+
+as the change below suggests the same topology syntax as already
+implemented for PPC, could you take a look at this one for arm64?
+Please ack the devicetree changes, assuming you are fine with it.
+
+All other review comments are addressed so far and there are no open
+issues with the patches. This would help us to further drive this
+series upstream.
+
+Many thanks,
+
+-Robert
+
+
+> Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
+> ---
+>  Documentation/devicetree/bindings/arm/numa.txt | 212 +++++++++++++++++++++++++
+>  1 file changed, 212 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/numa.txt
 > 
-> As far as I can see, it would be simpler to simply carve these out of the
-> memory node.
-
-Will modify for MCU firmware buffer and section.
-
-> I don't see why you need reserved-memory here, given you're not referring to
-> these regions by phandle anyway.
-
-mbox-buf is used by below mailbox's node, but the start address has
-been truncated with 4KB alignment; so should keep it, right?
-
-Thanks,
-Leo Yan
-
-> >  };
-> > diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-> > index 3f03380..9ff25bc 100644
-> > --- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-> > +++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-> > @@ -167,5 +167,13 @@
-> >  			clocks = <&ao_ctrl 36>, <&ao_ctrl 36>;
-> >  			clock-names = "uartclk", "apb_pclk";
-> >  		};
-> > +
-> > +		mailbox: mailbox at f7510000 {
-> > +			#mbox-cells = <1>;
-> > +			compatible = "hisilicon,hi6220-mbox";
-> > +			reg = <0x0 0xf7510000 0x0 0x1000>, /* IPC_S */
-> > +			      <0x0 0x06dff800 0x0 0x0800>; /* Mailbox buffer */
-> > +			interrupts = <GIC_SPI 94 IRQ_TYPE_LEVEL_HIGH>;
-> > +		};
-> >  	};
-> >  };
-> > -- 
-> > 1.9.1
-> > 
+> diff --git a/Documentation/devicetree/bindings/arm/numa.txt b/Documentation/devicetree/bindings/arm/numa.txt
+> new file mode 100644
+> index 0000000..dc3ef86
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/numa.txt
+> @@ -0,0 +1,212 @@
+> +==============================================================================
+> +NUMA binding description.
+> +==============================================================================
+> +
+> +==============================================================================
+> +1 - Introduction
+> +==============================================================================
+> +
+> +Systems employing a Non Uniform Memory Access (NUMA) architecture contain
+> +collections of hardware resources including processors, memory, and I/O buses,
+> +that comprise what is commonly known as a NUMA node.
+> +Processor accesses to memory within the local NUMA node is generally faster
+> +than processor accesses to memory outside of the local NUMA node.
+> +DT defines interfaces that allow the platform to convey NUMA node
+> +topology information to OS.
+> +
+> +==============================================================================
+> +2 - arm,associativity
+> +==============================================================================
+> +The mapping is done using arm,associativity device property.
+> +this property needs to be present in every device node which needs to to be
+> +mapped to numa nodes.
+> +
+> +arm,associativity property is set of 32-bit integers which defines level of
+> +topology and boundary in the system at which a significant difference in
+> +performance can be measured between cross-device accesses within
+> +a single location and those spanning multiple locations.
+> +The first cell always contains the broadest subdivision within the system,
+> +while the last cell enumerates the individual devices, such as an SMT thread
+> +of a CPU, or a bus bridge within an SoC".
+> +
+> +ex:
+> +	/* board 0, socket 0, cluster 0, core 0  thread 0 */
+> +	arm,associativity = <0 0 0 0 0>;
+> +
+> +==============================================================================
+> +3 - arm,associativity-reference-points
+> +==============================================================================
+> +This property is a set of 32-bit integers, each representing an index into
+> +the arm,associativity nodes. The first integer is the most significant
+> +NUMA boundary and the following are progressively less significant boundaries.
+> +There can be more than one level of NUMA.
+> +
+> +Ex:
+> +	arm,associativity-reference-points = <0 1>;
+> +	The board Id(index 0) used first to calculate the associativity (node
+> +	distance), then follows the  socket id(index 1).
+> +
+> +	arm,associativity-reference-points = <1 0>;
+> +	The socket Id(index 1) used first to calculate the associativity,
+> +	then follows the board id(index 0).
+> +
+> +	arm,associativity-reference-points = <0>;
+> +	Only the board Id(index 0) used to calculate the associativity.
+> +
+> +	arm,associativity-reference-points = <1>;
+> +	Only socket Id(index 1) used to calculate the associativity.
+> +
+> +==============================================================================
+> +4 - Example dts
+> +==============================================================================
+> +
+> +Example: 2 Node system consists of 2 boards and each board having one socket
+> +and 8 core in each socket.
+> +
+> +	arm,associativity-reference-points = <0>;
+> +
+> +	memory at 00c00000 {
+> +		device_type = "memory";
+> +		reg = <0x0 0x00c00000 0x0 0x80000000>;
+> +		/* board 0, socket 0, no specific core */
+> +		arm,associativity = <0 0 0xffff>;
+> +	};
+> +
+> +	memory at 10000000000 {
+> +		device_type = "memory";
+> +		reg = <0x100 0x00000000 0x0 0x80000000>;
+> +		/* board 1, socket 0, no specific core */
+> +		arm,associativity = <1 0 0xffff>;
+> +	};
+> +
+> +	cpus {
+> +		#address-cells = <2>;
+> +		#size-cells = <0>;
+> +
+> +		cpu at 000 {
+> +			device_type = "cpu";
+> +			compatible =  "arm,armv8";
+> +			reg = <0x0 0x000>;
+> +			enable-method = "psci";
+> +			/* board 0, socket 0, core 0*/
+> +			arm,associativity = <0 0 0>;
+> +		};
+> +		cpu at 001 {
+> +			device_type = "cpu";
+> +			compatible =  "arm,armv8";
+> +			reg = <0x0 0x001>;
+> +			enable-method = "psci";
+> +			arm,associativity = <0 0 1>;
+> +		};
+> +		cpu at 002 {
+> +			device_type = "cpu";
+> +			compatible =  "arm,armv8";
+> +			reg = <0x0 0x002>;
+> +			enable-method = "psci";
+> +			arm,associativity = <0 0 2>;
+> +		};
+> +		cpu at 003 {
+> +			device_type = "cpu";
+> +			compatible =  "arm,armv8";
+> +			reg = <0x0 0x003>;
+> +			enable-method = "psci";
+> +			arm,associativity = <0 0 3>;
+> +		};
+> +		cpu at 004 {
+> +			device_type = "cpu";
+> +			compatible =  "arm,armv8";
+> +			reg = <0x0 0x004>;
+> +			enable-method = "psci";
+> +			arm,associativity = <0 0 4>;
+> +		};
+> +		cpu at 005 {
+> +			device_type = "cpu";
+> +			compatible =  "arm,armv8";
+> +			reg = <0x0 0x005>;
+> +			enable-method = "psci";
+> +			arm,associativity = <0 0 5>;
+> +		};
+> +		cpu at 006 {
+> +			device_type = "cpu";
+> +			compatible =  "arm,armv8";
+> +			reg = <0x0 0x006>;
+> +			enable-method = "psci";
+> +			arm,associativity = <0 0 6>;
+> +		};
+> +		cpu at 007 {
+> +			device_type = "cpu";
+> +			compatible =  "arm,armv8";
+> +			reg = <0x0 0x007>;
+> +			enable-method = "psci";
+> +			arm,associativity = <0 0 7>;
+> +		};
+> +		cpu at 008 {
+> +			device_type = "cpu";
+> +			compatible =  "arm,armv8";
+> +			reg = <0x0 0x008>;
+> +			enable-method = "psci";
+> +			/* board 1, socket 0, core 0*/
+> +			arm,associativity = <1 0 0>;
+> +		};
+> +		cpu at 009 {
+> +			device_type = "cpu";
+> +			compatible =  "arm,armv8";
+> +			reg = <0x0 0x009>;
+> +			enable-method = "psci";
+> +			arm,associativity = <1 0 1>;
+> +		};
+> +		cpu at 00a {
+> +			device_type = "cpu";
+> +			compatible =  "arm,armv8";
+> +			reg = <0x0 0x00a>;
+> +			enable-method = "psci";
+> +			arm,associativity = <0 0 2>;
+> +		};
+> +		cpu at 00b {
+> +			device_type = "cpu";
+> +			compatible =  "arm,armv8";
+> +			reg = <0x0 0x00b>;
+> +			enable-method = "psci";
+> +			arm,associativity = <1 0 3>;
+> +		};
+> +		cpu at 00c {
+> +			device_type = "cpu";
+> +			compatible =  "arm,armv8";
+> +			reg = <0x0 0x00c>;
+> +			enable-method = "psci";
+> +			arm,associativity = <1 0 4>;
+> +		};
+> +		cpu at 00d {
+> +			device_type = "cpu";
+> +			compatible =  "arm,armv8";
+> +			reg = <0x0 0x00d>;
+> +			enable-method = "psci";
+> +			arm,associativity = <1 0 5>;
+> +		};
+> +		cpu at 00e {
+> +			device_type = "cpu";
+> +			compatible =  "arm,armv8";
+> +			reg = <0x0 0x00e>;
+> +			enable-method = "psci";
+> +			arm,associativity = <1 0 6>;
+> +		};
+> +		cpu at 00f {
+> +			device_type = "cpu";
+> +			compatible =  "arm,armv8";
+> +			reg = <0x0 0x00f>;
+> +			enable-method = "psci";
+> +			arm,associativity = <1 0 7>;
+> +		};
+> +	};
+> +
+> +	pcie0: pcie0 at 0x8480,00000000 {
+> +		compatible = "arm,armv8";
+> +		device_type = "pci";
+> +		bus-range = <0 255>;
+> +		#size-cells = <2>;
+> +		#address-cells = <3>;
+> +		reg = <0x8480 0x00000000 0 0x10000000>;  /* Configuration space */
+> +		ranges = <0x03000000 0x8010 0x00000000 0x8010 0x00000000 0x70 0x00000000>; /* mem ranges */
+> +		/* board 0, socket 0, pci bus 0*/
+> +		arm,associativity = <0 0 0>;
+> +        };
+> -- 
+> 1.8.1.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
