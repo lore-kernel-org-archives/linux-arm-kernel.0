@@ -1,71 +1,102 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sat, 22 Aug 2015 16:23:41 +0300
-Subject: [PATCH v6 2/5] dt-bindings: Add a binding for Mediatek xHCI host
- controller
-In-Reply-To: <1440207911-17666-3-git-send-email-chunfeng.yun@mediatek.com>
-References: <1440207911-17666-1-git-send-email-chunfeng.yun@mediatek.com>
- <1440207911-17666-3-git-send-email-chunfeng.yun@mediatek.com>
-Message-ID: <55D877DD.3010400@cogentembedded.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Sat, 22 Aug 2015 21:30:50 +0800
+Subject: [PATCH v1 3/3] arm64: dts: add Hi6220 mailbox node
+In-Reply-To: <20150821184059.GB2000@svinekod>
+References: <1439977055-1747-1-git-send-email-leo.yan@linaro.org>
+ <1439977055-1747-4-git-send-email-leo.yan@linaro.org>
+ <20150821184059.GB2000@svinekod>
+Message-ID: <20150822133050.GA4265@leoy-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Hi Mark,
 
-On 8/22/2015 4:45 AM, Chunfeng Yun wrote:
+On Fri, Aug 21, 2015 at 07:40:59PM +0100, Mark Rutland wrote:
+> On Wed, Aug 19, 2015 at 10:37:35AM +0100, Leo Yan wrote:
+> > On Hi6220, below memory regions in DDR have specific purpose:
+> > 
+> >   0x05e0,0000 - 0x05ef,ffff: For MCU firmware using at runtime;
+> >   0x0740,f000 - 0x0740,ffff: For MCU firmware's section;
+> >   0x06df,f000 - 0x06df,ffff: For mailbox message data.
+> > 
+> > This patch reserves these memory regions and add device node for
+> > mailbox in dts.
+> > 
+> > Signed-off-by: Leo Yan <leo.yan@linaro.org>
+> > ---
+> >  arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 20 +++++++++++++++++---
+> >  arch/arm64/boot/dts/hisilicon/hi6220.dtsi      |  8 ++++++++
+> >  2 files changed, 25 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+> > index e36a539..d5470d3 100644
+> > --- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+> > +++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+> > @@ -7,9 +7,6 @@
+> >  
+> >  /dts-v1/;
+> >  
+> > -/*Reserved 1MB memory for MCU*/
+> > -/memreserve/ 0x05e00000 0x00100000;
+> > -
+> >  #include "hi6220.dtsi"
+> >  
+> >  / {
+> > @@ -28,4 +25,21 @@
+> >  		device_type = "memory";
+> >  		reg = <0x0 0x0 0x0 0x40000000>;
+> >  	};
+> > +
+> > +	reserved-memory {
+> > +		#address-cells = <2>;
+> > +		#size-cells = <2>;
+> > +		ranges;
+> > +
+> > +		mcu-buf at 05e00000 {
+> > +			no-map;
+> > +			reg = <0x0 0x05e00000 0x0 0x00100000>,	/* MCU firmware buffer */
+> > +			      <0x0 0x0740f000 0x0 0x00001000>;	/* MCU firmware section */
+> > +		};
+> > +
+> > +		mbox-buf at 06dff000 {
+> > +			no-map;
+> > +			reg = <0x0 0x06dff000 0x0 0x00001000>;	/* Mailbox message buf */
+> > +		};
+> > +	};
+> 
+> As far as I can see, it would be simpler to simply carve these out of the
+> memory node.
 
-> add a DT binding documentation of xHCI host controller for the
-> MT8173 SoC from Mediatek.
+Will modify for MCU firmware buffer and section.
 
-> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
-> ---
->   .../devicetree/bindings/usb/mt8173-xhci.txt        | 52 ++++++++++++++++++++++
->   1 file changed, 52 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/usb/mt8173-xhci.txt
->
-> diff --git a/Documentation/devicetree/bindings/usb/mt8173-xhci.txt b/Documentation/devicetree/bindings/usb/mt8173-xhci.txt
-> new file mode 100644
-> index 0000000..8e6e463
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/usb/mt8173-xhci.txt
-> @@ -0,0 +1,52 @@
-> +mt65XX xHCI
+> I don't see why you need reserved-memory here, given you're not referring to
+> these regions by phandle anyway.
 
-    The file is called mt8173-xhci.txt. Are you sure MT65xx should be here?
+mbox-buf is used by below mailbox's node, but the start address has
+been truncated with 4KB alignment; so should keep it, right?
 
-> +
-> +The device node for Mediatek SOC usb3.0 host controller
-> +
-> +Required properties:
-> + - compatible : should contain "mediatek,mt8173-xhci"
-> + - reg : specifies physical base address and size of the registers,
-> +	the first one for MAC, the second for IPPC
-> + - interrupts : interrupt used by the controller
-> + - power-domains : a phandle to USB power domain node to control usb's
+Thanks,
+Leo Yan
 
-    USB's -- be consistent, please.
-
-> +	mtcmos
-> + - vusb33-supply : regulator of usb avdd3.3v
-> +
-> + - clocks : a list of phandle + clock-specifier pairs, one for each
-> +	entry in clock-names
-> + - clock-names : must contain
-> +	"sys_ck": for clock of xHCI MAC
-> +	"wakeup_deb_p0": for usb wakeup debounce clock of port0
-> +	"wakeup_deb_p0": for usb wakeup debounce clock of port1
-
-    USB.
-
-> +
-> + - phys : a list of phandle + phy specifier pairs
-> + - usb3-lpm-capable : supports USB3 LPM
-> + - mediatek,syscon-wakeup : phandle to syscon used to access usb wakeup
-> +	control register
-> + - mediatek,wakeup-src : 1: ip sleep wakeup mode; 2: line state wakeup
-> +	mode; others means don't enable wakeup source of usb
-
-    "Others mean" and "USB".
-
-[...]
-
-MBR, Sergei
+> >  };
+> > diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+> > index 3f03380..9ff25bc 100644
+> > --- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+> > +++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+> > @@ -167,5 +167,13 @@
+> >  			clocks = <&ao_ctrl 36>, <&ao_ctrl 36>;
+> >  			clock-names = "uartclk", "apb_pclk";
+> >  		};
+> > +
+> > +		mailbox: mailbox at f7510000 {
+> > +			#mbox-cells = <1>;
+> > +			compatible = "hisilicon,hi6220-mbox";
+> > +			reg = <0x0 0xf7510000 0x0 0x1000>, /* IPC_S */
+> > +			      <0x0 0x06dff800 0x0 0x0800>; /* Mailbox buffer */
+> > +			interrupts = <GIC_SPI 94 IRQ_TYPE_LEVEL_HIGH>;
+> > +		};
+> >  	};
+> >  };
+> > -- 
+> > 1.9.1
+> > 
