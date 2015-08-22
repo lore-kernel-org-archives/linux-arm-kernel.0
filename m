@@ -1,40 +1,55 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sat, 22 Aug 2015 14:41:10 +0200
-Subject: [PATCH v2 09/21] ARM: pxa: magician: Add OV9640 camera support
-In-Reply-To: <55D7A186.4000505@tul.cz> (Petr Cvek's message of "Sat, 22 Aug
- 2015 00:09:10 +0200")
-References: <cover.1439843482.git.petr.cvek@tul.cz>
- <2889798.x6xcIzdYMU@wuerfel> <55D65722.9030508@tul.cz>
- <1634812.ZDaECJ9ClW@wuerfel> <874mjs5yt2.fsf@belgarion.home>
- <55D7A186.4000505@tul.cz>
-Message-ID: <87zj1j4hsp.fsf@belgarion.home>
+From: ryabinin.a.a@gmail.com (Andrey Ryabinin)
+Date: Sat, 22 Aug 2015 15:51:03 +0300
+Subject: [PATCH 0/2] x86/KASAN updates for 4.3
+In-Reply-To: <20150822100922.GA25039@gmail.com>
+References: <1439444244-26057-1-git-send-email-ryabinin.a.a@gmail.com>
+ <20150813065040.GA17983@gmail.com>
+ <20150813081641.GA14402@gmail.com> <20150813090119.GA10280@arm.com>
+ <CAPAsAGxk2+v5VG77cOHAThsXyWx-_UJ1XVeJProaa0gQWH5jvA@mail.gmail.com>
+ <20150813112428.GG10280@arm.com> <20150813172310.GK10280@arm.com>
+ <20150822100922.GA25039@gmail.com>
+Message-ID: <CAPAsAGz7Ew3oomDnYvHbq-ANhp5bhZGeUtc-iHXJX4PW5ZUcyg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Petr Cvek <petr.cvek@tul.cz> writes:
-
->> So Guennadi, is it possible to add a gpio through platform data to ov9640
->> driver, does it make sense, and would you accept to have the reset handled there
->> ? And if yes, would you, Petr, accept to revamp your patch to have the reset and
->> power handled in ov9640 ?
->> 
+2015-08-22 13:09 GMT+03:00 Ingo Molnar <mingo@kernel.org>:
 >
-> OK, why not, so power and reset gpio with polarity settings?
-Even better pass ... nothing through platform-data.
+> * Will Deacon <will.deacon@arm.com> wrote:
+>
+>> On Thu, Aug 13, 2015 at 12:24:28PM +0100, Will Deacon wrote:
+>> > On Thu, Aug 13, 2015 at 12:02:26PM +0100, Andrey Ryabinin wrote:
+>> > > 2015-08-13 12:01 GMT+03:00 Will Deacon <will.deacon@arm.com>:
+>> > > > Yes please, works for me! If we're targetting 4.3, then please can you base
+>> > > > on 4.2-rc4, as that's what our current arm64 queue is using?
+>> > > >
+>> > >
+>> > > Does this mean that we are targeting arm64 part for 4.3 too?
+>> >
+>> > It depends on how well it merges with our current queue and whether it
+>> > holds up to regression testing. The patches have been reviewed, so I'm
+>> > comfortable with the content, but we're not at a stage where we can debug
+>> > and fix any failures that might crop up from the merge.
+>>
+>> Scratch that :(
+>>
+>> I tried this out under EFI and it dies horribly in the stub code because
+>> we're missing at least one KASAN_SANITIZE_ Makefile entry.
+>>
+>> So I think this needs longer to stew before hitting mainline. By all means
+>> get the x86 dependencies in for 4.3, but the arm64 port can probably use
+>> another cycle to iron out the bugs.
+>
+> Is there any known problem with the two patches in this series, or can I apply
+> them?
+>
 
-I think there is now a gpio binding for devices which works this way :
- - in ov9640 : devm_gpiod_get(dev, "reset")
- - in magician: GPIO_LOOKUP() and gpiod_add_lookup_table()
+None, as far as I know.
 
-In this way I think we'll gather at the same time :
- - no new platform data
- - ov9640 will follow the same path for devicetree and platform data
+BTW, the second patch was  Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+(https://lkml.org/lkml/2015/8/11/546). I just forgot to add this into changelog.
 
-> Anyway I'm planning to send patch for OV9640 in future too (color correction
-> matrix is not complete and some registers too).
-Good.
 
-Cheers.
 
--- 
-Robert
+> Thanks,
+>
+>         Ingo
