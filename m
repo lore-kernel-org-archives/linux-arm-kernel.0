@@ -1,258 +1,73 @@
-From: robert.richter@caviumnetworks.com (Robert Richter)
-Date: Sat, 22 Aug 2015 17:06:16 +0200
-Subject: [PATCH v5 2/4] Documentation: arm64/arm: dt bindings for numa.
-In-Reply-To: <1439570374-4079-3-git-send-email-gkulkarni@caviumnetworks.com>
-References: <1439570374-4079-1-git-send-email-gkulkarni@caviumnetworks.com>
- <1439570374-4079-3-git-send-email-gkulkarni@caviumnetworks.com>
-Message-ID: <20150822150616.GC8624@rric.localhost>
+From: linux@mniewoehner.de (Michael Niewoehner)
+Date: Sat, 22 Aug 2015 17:04:52 +0200
+Subject: [PATCH] clk: rockchip: handle critical clocks after registrering
+ all clocks
+In-Reply-To: <7786473.0oe27txQFN@phil>
+References: <7786473.0oe27txQFN@phil>
+Message-ID: <12B8A81E-1B35-4EF1-AEC4-08714F91AEC0@mniewoehner.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14.08.15 22:09:32, Ganapatrao Kulkarni wrote:
-> DT bindings for numa map for memory, cores and IOs using
-> arm,associativity device node property.
 
-Arnd, Rob,
+Am 21.08.2015 um 19:51 schrieb Heiko Stuebner <heiko@sntech.de>:
 
-as the change below suggests the same topology syntax as already
-implemented for PPC, could you take a look at this one for arm64?
-Please ack the devicetree changes, assuming you are fine with it.
-
-All other review comments are addressed so far and there are no open
-issues with the patches. This would help us to further drive this
-series upstream.
-
-Many thanks,
-
--Robert
-
-
-> Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
-> ---
->  Documentation/devicetree/bindings/arm/numa.txt | 212 +++++++++++++++++++++++++
->  1 file changed, 212 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/numa.txt
+> Currently the registration of critical clocks is done in the function
+> shared between rk3066 and rk3188 clock trees. That results in them
+> getting handled maybe before all of them are registered.
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/numa.txt b/Documentation/devicetree/bindings/arm/numa.txt
-> new file mode 100644
-> index 0000000..dc3ef86
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/numa.txt
-> @@ -0,0 +1,212 @@
-> +==============================================================================
-> +NUMA binding description.
-> +==============================================================================
+> Therefore move the critical clock handling down to the end of the soc-
+> specific clock registration function, so that all clocks are registered
+> before they're maybe handled as critical clock.
+> 
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+Tested-by: Michael Niewoehner <linux@mniewoehner.de>
+> ---
+> It looks like with the recent flexibilization of the gpio clocks in the
+> pinctrl driver, we're shaking out some oddities from the clock trees.
+> This is another one that surfaced.
+> 
+> drivers/clk/rockchip/clk-rk3188.c | 7 +++++--
+> 1 file changed, 5 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/clk/rockchip/clk-rk3188.c b/drivers/clk/rockchip/clk-
+> rk3188.c
+> index faa6695..bd88542 100644
+> --- a/drivers/clk/rockchip/clk-rk3188.c
+> +++ b/drivers/clk/rockchip/clk-rk3188.c
+> @@ -744,8 +744,6 @@ static void __init rk3188_common_clk_init(struct 
+> device_node *np)
+> 
+> 	rockchip_clk_register_branches(common_clk_branches,
+> 				  ARRAY_SIZE(common_clk_branches));
+> -	rockchip_clk_protect_critical(rk3188_critical_clocks,
+> -				      ARRAY_SIZE(rk3188_critical_clocks));
+> 
+> 	rockchip_register_softrst(np, 9, reg_base + RK2928_SOFTRST_CON(0),
+> 				  ROCKCHIP_SOFTRST_HIWORD_MASK);
+> @@ -765,6 +763,8 @@ static void __init rk3066a_clk_init(struct device_node 
+> *np)
+> 			mux_armclk_p, ARRAY_SIZE(mux_armclk_p),
+> 			&rk3066_cpuclk_data, rk3066_cpuclk_rates,
+> 			ARRAY_SIZE(rk3066_cpuclk_rates));
+> +	rockchip_clk_protect_critical(rk3188_critical_clocks,
+> +				      ARRAY_SIZE(rk3188_critical_clocks));
+> }
+> CLK_OF_DECLARE(rk3066a_cru, "rockchip,rk3066a-cru", rk3066a_clk_init);
+> 
+> @@ -801,6 +801,9 @@ static void __init rk3188a_clk_init(struct device_node 
+> *np)
+> 		pr_warn("%s: missing clocks to reparent aclk_cpu_pre to gpll\n",
+> 			__func__);
+> 	}
 > +
-> +==============================================================================
-> +1 - Introduction
-> +==============================================================================
-> +
-> +Systems employing a Non Uniform Memory Access (NUMA) architecture contain
-> +collections of hardware resources including processors, memory, and I/O buses,
-> +that comprise what is commonly known as a NUMA node.
-> +Processor accesses to memory within the local NUMA node is generally faster
-> +than processor accesses to memory outside of the local NUMA node.
-> +DT defines interfaces that allow the platform to convey NUMA node
-> +topology information to OS.
-> +
-> +==============================================================================
-> +2 - arm,associativity
-> +==============================================================================
-> +The mapping is done using arm,associativity device property.
-> +this property needs to be present in every device node which needs to to be
-> +mapped to numa nodes.
-> +
-> +arm,associativity property is set of 32-bit integers which defines level of
-> +topology and boundary in the system at which a significant difference in
-> +performance can be measured between cross-device accesses within
-> +a single location and those spanning multiple locations.
-> +The first cell always contains the broadest subdivision within the system,
-> +while the last cell enumerates the individual devices, such as an SMT thread
-> +of a CPU, or a bus bridge within an SoC".
-> +
-> +ex:
-> +	/* board 0, socket 0, cluster 0, core 0  thread 0 */
-> +	arm,associativity = <0 0 0 0 0>;
-> +
-> +==============================================================================
-> +3 - arm,associativity-reference-points
-> +==============================================================================
-> +This property is a set of 32-bit integers, each representing an index into
-> +the arm,associativity nodes. The first integer is the most significant
-> +NUMA boundary and the following are progressively less significant boundaries.
-> +There can be more than one level of NUMA.
-> +
-> +Ex:
-> +	arm,associativity-reference-points = <0 1>;
-> +	The board Id(index 0) used first to calculate the associativity (node
-> +	distance), then follows the  socket id(index 1).
-> +
-> +	arm,associativity-reference-points = <1 0>;
-> +	The socket Id(index 1) used first to calculate the associativity,
-> +	then follows the board id(index 0).
-> +
-> +	arm,associativity-reference-points = <0>;
-> +	Only the board Id(index 0) used to calculate the associativity.
-> +
-> +	arm,associativity-reference-points = <1>;
-> +	Only socket Id(index 1) used to calculate the associativity.
-> +
-> +==============================================================================
-> +4 - Example dts
-> +==============================================================================
-> +
-> +Example: 2 Node system consists of 2 boards and each board having one socket
-> +and 8 core in each socket.
-> +
-> +	arm,associativity-reference-points = <0>;
-> +
-> +	memory at 00c00000 {
-> +		device_type = "memory";
-> +		reg = <0x0 0x00c00000 0x0 0x80000000>;
-> +		/* board 0, socket 0, no specific core */
-> +		arm,associativity = <0 0 0xffff>;
-> +	};
-> +
-> +	memory at 10000000000 {
-> +		device_type = "memory";
-> +		reg = <0x100 0x00000000 0x0 0x80000000>;
-> +		/* board 1, socket 0, no specific core */
-> +		arm,associativity = <1 0 0xffff>;
-> +	};
-> +
-> +	cpus {
-> +		#address-cells = <2>;
-> +		#size-cells = <0>;
-> +
-> +		cpu at 000 {
-> +			device_type = "cpu";
-> +			compatible =  "arm,armv8";
-> +			reg = <0x0 0x000>;
-> +			enable-method = "psci";
-> +			/* board 0, socket 0, core 0*/
-> +			arm,associativity = <0 0 0>;
-> +		};
-> +		cpu at 001 {
-> +			device_type = "cpu";
-> +			compatible =  "arm,armv8";
-> +			reg = <0x0 0x001>;
-> +			enable-method = "psci";
-> +			arm,associativity = <0 0 1>;
-> +		};
-> +		cpu at 002 {
-> +			device_type = "cpu";
-> +			compatible =  "arm,armv8";
-> +			reg = <0x0 0x002>;
-> +			enable-method = "psci";
-> +			arm,associativity = <0 0 2>;
-> +		};
-> +		cpu at 003 {
-> +			device_type = "cpu";
-> +			compatible =  "arm,armv8";
-> +			reg = <0x0 0x003>;
-> +			enable-method = "psci";
-> +			arm,associativity = <0 0 3>;
-> +		};
-> +		cpu at 004 {
-> +			device_type = "cpu";
-> +			compatible =  "arm,armv8";
-> +			reg = <0x0 0x004>;
-> +			enable-method = "psci";
-> +			arm,associativity = <0 0 4>;
-> +		};
-> +		cpu at 005 {
-> +			device_type = "cpu";
-> +			compatible =  "arm,armv8";
-> +			reg = <0x0 0x005>;
-> +			enable-method = "psci";
-> +			arm,associativity = <0 0 5>;
-> +		};
-> +		cpu at 006 {
-> +			device_type = "cpu";
-> +			compatible =  "arm,armv8";
-> +			reg = <0x0 0x006>;
-> +			enable-method = "psci";
-> +			arm,associativity = <0 0 6>;
-> +		};
-> +		cpu at 007 {
-> +			device_type = "cpu";
-> +			compatible =  "arm,armv8";
-> +			reg = <0x0 0x007>;
-> +			enable-method = "psci";
-> +			arm,associativity = <0 0 7>;
-> +		};
-> +		cpu at 008 {
-> +			device_type = "cpu";
-> +			compatible =  "arm,armv8";
-> +			reg = <0x0 0x008>;
-> +			enable-method = "psci";
-> +			/* board 1, socket 0, core 0*/
-> +			arm,associativity = <1 0 0>;
-> +		};
-> +		cpu at 009 {
-> +			device_type = "cpu";
-> +			compatible =  "arm,armv8";
-> +			reg = <0x0 0x009>;
-> +			enable-method = "psci";
-> +			arm,associativity = <1 0 1>;
-> +		};
-> +		cpu at 00a {
-> +			device_type = "cpu";
-> +			compatible =  "arm,armv8";
-> +			reg = <0x0 0x00a>;
-> +			enable-method = "psci";
-> +			arm,associativity = <0 0 2>;
-> +		};
-> +		cpu at 00b {
-> +			device_type = "cpu";
-> +			compatible =  "arm,armv8";
-> +			reg = <0x0 0x00b>;
-> +			enable-method = "psci";
-> +			arm,associativity = <1 0 3>;
-> +		};
-> +		cpu at 00c {
-> +			device_type = "cpu";
-> +			compatible =  "arm,armv8";
-> +			reg = <0x0 0x00c>;
-> +			enable-method = "psci";
-> +			arm,associativity = <1 0 4>;
-> +		};
-> +		cpu at 00d {
-> +			device_type = "cpu";
-> +			compatible =  "arm,armv8";
-> +			reg = <0x0 0x00d>;
-> +			enable-method = "psci";
-> +			arm,associativity = <1 0 5>;
-> +		};
-> +		cpu at 00e {
-> +			device_type = "cpu";
-> +			compatible =  "arm,armv8";
-> +			reg = <0x0 0x00e>;
-> +			enable-method = "psci";
-> +			arm,associativity = <1 0 6>;
-> +		};
-> +		cpu at 00f {
-> +			device_type = "cpu";
-> +			compatible =  "arm,armv8";
-> +			reg = <0x0 0x00f>;
-> +			enable-method = "psci";
-> +			arm,associativity = <1 0 7>;
-> +		};
-> +	};
-> +
-> +	pcie0: pcie0 at 0x8480,00000000 {
-> +		compatible = "arm,armv8";
-> +		device_type = "pci";
-> +		bus-range = <0 255>;
-> +		#size-cells = <2>;
-> +		#address-cells = <3>;
-> +		reg = <0x8480 0x00000000 0 0x10000000>;  /* Configuration space */
-> +		ranges = <0x03000000 0x8010 0x00000000 0x8010 0x00000000 0x70 0x00000000>; /* mem ranges */
-> +		/* board 0, socket 0, pci bus 0*/
-> +		arm,associativity = <0 0 0>;
-> +        };
+> +	rockchip_clk_protect_critical(rk3188_critical_clocks,
+> +				      ARRAY_SIZE(rk3188_critical_clocks));
+> }
+> CLK_OF_DECLARE(rk3188a_cru, "rockchip,rk3188a-cru", rk3188a_clk_init);
+> 
 > -- 
-> 1.8.1.4
+> 2.1.4
+> 
 > 
 > 
 > _______________________________________________
