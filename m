@@ -1,414 +1,482 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 24 Aug 2015 09:43:32 +0900
-Subject: [PATCH v3 06/14] Documentation: drm/bridge: add document for
- analogix_dp
-In-Reply-To: <CAL_JsqLz+8RtBucctUj4euXZ3Ac0DvB52N9ONpAerh5T9BiTJg@mail.gmail.com>
-References: <1439995728-18046-1-git-send-email-ykk@rock-chips.com>
- <1439995834-18363-1-git-send-email-ykk@rock-chips.com>
- <CAL_JsqLz+8RtBucctUj4euXZ3Ac0DvB52N9ONpAerh5T9BiTJg@mail.gmail.com>
-Message-ID: <CAJKOXPeEm8exg_UG0tDnaEGO40ejBKZ-ok=bKbVrwYvXnDaMdg@mail.gmail.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Fri, 21 Aug 2015 18:30:57 -0700
+Subject: [PATCH v4 3/3] touchscreen: colibri-vf50-ts: Add touchscreen
+ support for Colibri VF50
+In-Reply-To: <915c9122cfba83c6fbbc519c10ae2d101e27bc5b.1440162473.git.maitysanchayan@gmail.com>
+References: <cover.1440162473.git.maitysanchayan@gmail.com>
+ <915c9122cfba83c6fbbc519c10ae2d101e27bc5b.1440162473.git.maitysanchayan@gmail.com>
+Message-ID: <20150822013057.GA12702@dtor-pixel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-08-24 8:23 GMT+09:00 Rob Herring <robherring2@gmail.com>:
-> On Wed, Aug 19, 2015 at 9:50 AM, Yakir Yang <ykk@rock-chips.com> wrote:
->> Analogix dp driver is split from exynos dp driver, so we just
->> make an copy of exynos_dp.txt, and then simplify exynos_dp.txt
->>
->> Beside update some exynos dtsi file with the latest change
->> according to the devicetree binding documents.
->
-> You can't just change the exynos bindings and break compatibility. Is
-> there some agreement with exynos folks to do this?
+Hi Sanchayan,
 
-No, there is no agreement. This wasn't even sent to Exynos maintainers.
-Additionally the patchset did not look interesting to me because of
-misleading subject - Documentation instead of "ARM: dts:".
+On Fri, Aug 21, 2015 at 06:56:32PM +0530, Sanchayan Maity wrote:
+> The Colibri Vybrid VF50 module supports 4-wire touchscreens using
+> FETs and ADC inputs. This driver uses the IIO consumer interface
+> and relies on the vf610_adc driver based on the IIO framework.
+> 
 
-Yakir, please:
-1. Provide backward compatibility. Mark old properties as deprecated
-but still support them.
-2. Separate all DTS changes to a separate patch, unless bisectability
-would be hurt. Anyway you should prepare it in a such way that
-separation would be possible without breaking bisectability.
-3. Use proper subject for the patch changing DTS. This is not
-documentation change!
-4. Please use script get_maintainers to obtain list of valid
-maintainers and CC-them with at least cover letter and patches
-requiring their attention.
+Thank you for making changes. I have a few comments still.
 
-Best regards,
-Krzysztof
+> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+> ---
+>  drivers/input/touchscreen/Kconfig           |  12 +
+>  drivers/input/touchscreen/Makefile          |   1 +
+>  drivers/input/touchscreen/colibri-vf50-ts.c | 370 ++++++++++++++++++++++++++++
+>  3 files changed, 383 insertions(+)
+>  create mode 100644 drivers/input/touchscreen/colibri-vf50-ts.c
+> 
+> diff --git a/drivers/input/touchscreen/Kconfig b/drivers/input/touchscreen/Kconfig
+> index 80f6386..28948ca 100644
+> --- a/drivers/input/touchscreen/Kconfig
+> +++ b/drivers/input/touchscreen/Kconfig
+> @@ -1027,4 +1027,16 @@ config TOUCHSCREEN_ZFORCE
+>  	  To compile this driver as a module, choose M here: the
+>  	  module will be called zforce_ts.
+>  
+> +config TOUCHSCREEN_COLIBRI_VF50
+> +	tristate "Toradex Colibri on board touchscreen driver"
+> +	depends on GPIOLIB && IIO && VF610_ADC
+
+Can we possibly add "|| COMPILE_TEST" dependency? Will it compile
+without IIO or VF610_ADC enabled?
 
 
->
->
->> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
->> ---
->> Changes in v3:
->> - Take Heiko suggest, add devicetree binding documents.
->> - Take Thierry Reding suggest, remove sync pol & colorimetry properies
->>   from the new analogix dp driver devicetree binding.
->> - Update the exist exynos dtsi file with the latest DP DT properies.
->>
->> Changes in v2: None
->>
->>  .../devicetree/bindings/drm/bridge/analogix_dp.txt | 70 ++++++++++++++++++++++
->>  .../devicetree/bindings/video/exynos_dp.txt        | 50 ++++++----------
->>  arch/arm/boot/dts/exynos5250-arndale.dts           | 10 ++--
->>  arch/arm/boot/dts/exynos5250-smdk5250.dts          | 10 ++--
->>  arch/arm/boot/dts/exynos5250-snow.dts              | 12 ++--
->>  arch/arm/boot/dts/exynos5250-spring.dts            | 12 ++--
->>  arch/arm/boot/dts/exynos5420-peach-pit.dts         | 12 ++--
->>  arch/arm/boot/dts/exynos5420-smdk5420.dts          | 10 ++--
->>  arch/arm/boot/dts/exynos5800-peach-pi.dts          | 12 ++--
->>  9 files changed, 119 insertions(+), 79 deletions(-)
->>  create mode 100644 Documentation/devicetree/bindings/drm/bridge/analogix_dp.txt
->>
->> diff --git a/Documentation/devicetree/bindings/drm/bridge/analogix_dp.txt b/Documentation/devicetree/bindings/drm/bridge/analogix_dp.txt
->> new file mode 100644
->> index 0000000..6127018
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/drm/bridge/analogix_dp.txt
->> @@ -0,0 +1,70 @@
->> +Analogix Display Port bridge bindings
->> +
->> +Required properties for dp-controller:
->> +       -compatible:
->> +               platform specific such as:
->> +                * "samsung,exynos5-dp"
->> +                * "rockchip,rk3288-dp"
->> +       -reg:
->> +               physical base address of the controller and length
->> +               of memory mapped region.
->> +       -interrupts:
->> +               interrupt combiner values.
->> +       -clocks:
->> +               from common clock binding: handle to dp clock.
->> +       -clock-names:
->> +               from common clock binding: Shall be "dp".
->> +       -interrupt-parent:
->> +               phandle to Interrupt combiner node.
->> +       -phys:
->> +               from general PHY binding: the phandle for the PHY device.
->> +       -phy-names:
->> +               from general PHY binding: Should be "dp".
->> +       -analogix,color-space:
->> +               input video data format.
->> +                       COLOR_RGB = 0, COLOR_YCBCR422 = 1, COLOR_YCBCR444 = 2
->> +       -analogix,color-depth:
->> +               number of bits per colour component.
->> +                       COLOR_6 = 0, COLOR_8 = 1, COLOR_10 = 2, COLOR_12 = 3
->
-> This seems pretty generic. Just use 6, 8, 10, or 12 for values. And
-> drop the vendor prefix.
->
->> +       -analogix,link-rate:
->> +               max link rate supported by the eDP controller.
->> +                       LINK_RATE_1_62GBPS = 0x6, LINK_RATE_2_70GBPS = 0x0A,
->> +                       LINK_RATE_5_40GBPS = 0x14
->
-> Same here. I'd rather see something like "link-rate-mbps" and use the
-> actual rate.
->
->> +       -analogix,lane-count:
->> +               max number of lanes supported by the eDP contoller.
->> +                       LANE_COUNT1 = 1, LANE_COUNT2 = 2, LANE_COUNT4 = 4
->
-> And drop the vendor prefix here.
->
->> +       -port@[X]: SoC specific port nodes with endpoint definitions as defined
->> +               in Documentation/devicetree/bindings/media/video-interfaces.txt,
->> +               please refer to the SoC specific binding document:
->> +               * Documentation/devicetree/bindings/video/exynos_dp.txt
->> +               * Documentation/devicetree/bindings/video/analogix_dp-rockchip.txt
->> +
->> +Optional properties for dp-controller:
->> +       -analogix,hpd-gpio:
->> +               Hotplug detect GPIO.
->> +                       Indicates which GPIO should be used for hotplug
->> +                       detection
->
-> We should align with "hpd-gpios" used by HDMI connector binding. Or do
-> we need a DP connector binding that this should be defined in?
-> Probably so.
->
-> The DRM related bindings are such a cluster f*ck with everyone picking
-> their own way to do things. Just grep hpd in bindings for starters.
-> That is just the tip.
->
->> +       -video interfaces: Device node can contain video interface port
->> +                           nodes according to [1].
->
-> Isn't this the same as ports above? How are they optional? 0 ports
-> would be pretty useless.
->
->> +
->> +[1]: Documentation/devicetree/bindings/media/video-interfaces.txt
->> +-------------------------------------------------------------------------------
->> +
->> +Example:
->> +
->> +       dp-controller {
->> +               compatible = "samsung,exynos5-dp";
->> +               reg = <0x145b0000 0x10000>;
->> +               interrupts = <10 3>;
->> +               interrupt-parent = <&combiner>;
->> +               clocks = <&clock 342>;
->> +               clock-names = "dp";
->> +
->> +               phys = <&dp_phy>;
->> +               phy-names = "dp";
->> +
->> +               analogix,color-space = <0>;
->> +               analogix,color-depth = <1>;
->> +               analogix,link-rate = <0x0a>;
->> +               analogix,lane-count = <4>;
->> +       };
->> diff --git a/Documentation/devicetree/bindings/video/exynos_dp.txt b/Documentation/devicetree/bindings/video/exynos_dp.txt
->> index 7a3a9cd..177506f 100644
->> --- a/Documentation/devicetree/bindings/video/exynos_dp.txt
->> +++ b/Documentation/devicetree/bindings/video/exynos_dp.txt
->> @@ -31,28 +31,10 @@ Required properties for dp-controller:
->>                 from general PHY binding: the phandle for the PHY device.
->>         -phy-names:
->>                 from general PHY binding: Should be "dp".
->> -       -samsung,color-space:
->> -               input video data format.
->> -                       COLOR_RGB = 0, COLOR_YCBCR422 = 1, COLOR_YCBCR444 = 2
->> -       -samsung,dynamic-range:
->> -               dynamic range for input video data.
->> -                       VESA = 0, CEA = 1
->> -       -samsung,ycbcr-coeff:
->> -               YCbCr co-efficients for input video.
->> -                       COLOR_YCBCR601 = 0, COLOR_YCBCR709 = 1
->> -       -samsung,color-depth:
->> -               number of bits per colour component.
->> -                       COLOR_6 = 0, COLOR_8 = 1, COLOR_10 = 2, COLOR_12 = 3
->> -       -samsung,link-rate:
->> -               link rate supported by the panel.
->> -                       LINK_RATE_1_62GBPS = 0x6, LINK_RATE_2_70GBPS = 0x0A
->> -       -samsung,lane-count:
->> -               number of lanes supported by the panel.
->> -                       LANE_COUNT1 = 1, LANE_COUNT2 = 2, LANE_COUNT4 = 4
->> -       - display-timings: timings for the connected panel as described by
->> -               Documentation/devicetree/bindings/video/display-timing.txt
->>
->>  Optional properties for dp-controller:
->> +       - display-timings: timings for the connected panel as described by
->> +               Documentation/devicetree/bindings/video/display-timing.txt
->>         -interlaced:
->>                 interlace scan mode.
->>                         Progressive if defined, Interlaced if not defined
->> @@ -62,14 +44,18 @@ Optional properties for dp-controller:
->>         -hsync-active-high:
->>                 HSYNC polarity configuration.
->>                         High if defined, Low if not defined
->> -       -samsung,hpd-gpio:
->> -               Hotplug detect GPIO.
->> -                       Indicates which GPIO should be used for hotplug
->> -                       detection
->> -       -video interfaces: Device node can contain video interface port
->> -                           nodes according to [1].
->>
->> -[1]: Documentation/devicetree/bindings/media/video-interfaces.txt
->> +For the below properties, please refer to Analogix DP binding document:
->> + * Documentation/devicetree/bindings/drm/bridge/analogix_dp.txt
->> +       -phys (required)
->> +       -phy-names (required)
->> +       -analogix,color-space (required)
->> +       -analogix,color-depth (required)
->> +       -analogix,link-rate (required)
->> +       -analogix,lane-count (required)
->> +       -analogix,hpd-gpio (optional)
->> +       -video interfaces (optional)
->> +-------------------------------------------------------------------------------
->>
->>  Example:
->>
->> @@ -88,12 +74,10 @@ SOC specific portion:
->>
->>  Board Specific portion:
->>         dp-controller {
->> -               samsung,color-space = <0>;
->> -               samsung,dynamic-range = <0>;
->> -               samsung,ycbcr-coeff = <0>;
->> -               samsung,color-depth = <1>;
->> -               samsung,link-rate = <0x0a>;
->> -               samsung,lane-count = <4>;
->> +               analogix,color-space = <0>;
->> +               analogix,color-depth = <1>;
->> +               analogix,link-rate = <0x0a>;
->> +               analogix,lane-count = <4>;
->>
->>                 display-timings {
->>                         native-mode = <&lcd_timing>;
->> diff --git a/arch/arm/boot/dts/exynos5250-arndale.dts b/arch/arm/boot/dts/exynos5250-arndale.dts
->> index 7e728a1..e48798d 100644
->> --- a/arch/arm/boot/dts/exynos5250-arndale.dts
->> +++ b/arch/arm/boot/dts/exynos5250-arndale.dts
->> @@ -119,12 +119,10 @@
->>
->>  &dp {
->>         status = "okay";
->> -       samsung,color-space = <0>;
->> -       samsung,dynamic-range = <0>;
->> -       samsung,ycbcr-coeff = <0>;
->> -       samsung,color-depth = <1>;
->> -       samsung,link-rate = <0x0a>;
->> -       samsung,lane-count = <4>;
->> +       analogix,color-space = <0>;
->> +       analogix,color-depth = <1>;
->> +       analogix,link-rate = <0x0a>;
->> +       analogix,lane-count = <4>;
->>  };
->>
->>  &fimd {
->> diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
->> index 4fe186d..b8c6b8b 100644
->> --- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
->> +++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
->> @@ -75,12 +75,10 @@
->>  };
->>
->>  &dp {
->> -       samsung,color-space = <0>;
->> -       samsung,dynamic-range = <0>;
->> -       samsung,ycbcr-coeff = <0>;
->> -       samsung,color-depth = <1>;
->> -       samsung,link-rate = <0x0a>;
->> -       samsung,lane-count = <4>;
->> +       analogix,color-space = <0>;
->> +       analogix,color-depth = <1>;
->> +       analogix,link-rate = <0x0a>;
->> +       analogix,lane-count = <4>;
->>
->>         pinctrl-names = "default";
->>         pinctrl-0 = <&dp_hpd>;
->> diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
->> index b7f4122..9ce2b89 100644
->> --- a/arch/arm/boot/dts/exynos5250-snow.dts
->> +++ b/arch/arm/boot/dts/exynos5250-snow.dts
->> @@ -239,13 +239,11 @@
->>         status = "okay";
->>         pinctrl-names = "default";
->>         pinctrl-0 = <&dp_hpd>;
->> -       samsung,color-space = <0>;
->> -       samsung,dynamic-range = <0>;
->> -       samsung,ycbcr-coeff = <0>;
->> -       samsung,color-depth = <1>;
->> -       samsung,link-rate = <0x0a>;
->> -       samsung,lane-count = <2>;
->> -       samsung,hpd-gpio = <&gpx0 7 GPIO_ACTIVE_HIGH>;
->> +       analogix,color-space = <0>;
->> +       analogix,color-depth = <1>;
->> +       analogix,link-rate = <0x0a>;
->> +       analogix,lane-count = <2>;
->> +       analogix,hpd-gpio = <&gpx0 7 GPIO_ACTIVE_HIGH>;
->>
->>         ports {
->>                 port at 0 {
->> diff --git a/arch/arm/boot/dts/exynos5250-spring.dts b/arch/arm/boot/dts/exynos5250-spring.dts
->> index d03f9b8..9288ae6 100644
->> --- a/arch/arm/boot/dts/exynos5250-spring.dts
->> +++ b/arch/arm/boot/dts/exynos5250-spring.dts
->> @@ -69,13 +69,11 @@
->>         status = "okay";
->>         pinctrl-names = "default";
->>         pinctrl-0 = <&dp_hpd_gpio>;
->> -       samsung,color-space = <0>;
->> -       samsung,dynamic-range = <0>;
->> -       samsung,ycbcr-coeff = <0>;
->> -       samsung,color-depth = <1>;
->> -       samsung,link-rate = <0x0a>;
->> -       samsung,lane-count = <1>;
->> -       samsung,hpd-gpio = <&gpc3 0 GPIO_ACTIVE_HIGH>;
->> +       analogix,color-space = <0>;
->> +       analogix,color-depth = <1>;
->> +       analogix,link-rate = <0x0a>;
->> +       analogix,lane-count = <1>;
->> +       analogix,hpd-gpio = <&gpc3 0 GPIO_ACTIVE_HIGH>;
->>  };
->>
->>  &ehci {
->> diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
->> index 8f4d76c..695a380 100644
->> --- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
->> +++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
->> @@ -147,13 +147,11 @@
->>         status = "okay";
->>         pinctrl-names = "default";
->>         pinctrl-0 = <&dp_hpd_gpio>;
->> -       samsung,color-space = <0>;
->> -       samsung,dynamic-range = <0>;
->> -       samsung,ycbcr-coeff = <0>;
->> -       samsung,color-depth = <1>;
->> -       samsung,link-rate = <0x06>;
->> -       samsung,lane-count = <2>;
->> -       samsung,hpd-gpio = <&gpx2 6 0>;
->> +       analogix,color-space = <0>;
->> +       analogix,color-depth = <1>;
->> +       analogix,link-rate = <0x06>;
->> +       analogix,lane-count = <2>;
->> +       analogix,hpd-gpio = <&gpx2 6 0>;
->>
->>         ports {
->>                 port at 0 {
->> diff --git a/arch/arm/boot/dts/exynos5420-smdk5420.dts b/arch/arm/boot/dts/exynos5420-smdk5420.dts
->> index 98871f9..fd46714 100644
->> --- a/arch/arm/boot/dts/exynos5420-smdk5420.dts
->> +++ b/arch/arm/boot/dts/exynos5420-smdk5420.dts
->> @@ -91,12 +91,10 @@
->>  &dp {
->>         pinctrl-names = "default";
->>         pinctrl-0 = <&dp_hpd>;
->> -       samsung,color-space = <0>;
->> -       samsung,dynamic-range = <0>;
->> -       samsung,ycbcr-coeff = <0>;
->> -       samsung,color-depth = <1>;
->> -       samsung,link-rate = <0x0a>;
->> -       samsung,lane-count = <4>;
->> +       analogix,color-space = <0>;
->> +       analogix,color-depth = <1>;
->> +       analogix,link-rate = <0x0a>;
->> +       analogix,lane-count = <4>;
->>         status = "okay";
->>  };
->>
->> diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
->> index 7d5b386..54b4c63 100644
->> --- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
->> +++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
->> @@ -141,13 +141,11 @@
->>         status = "okay";
->>         pinctrl-names = "default";
->>         pinctrl-0 = <&dp_hpd_gpio>;
->> -       samsung,color-space = <0>;
->> -       samsung,dynamic-range = <0>;
->> -       samsung,ycbcr-coeff = <0>;
->> -       samsung,color-depth = <1>;
->> -       samsung,link-rate = <0x0a>;
->> -       samsung,lane-count = <2>;
->> -       samsung,hpd-gpio = <&gpx2 6 0>;
->> +       analogix,color-space = <0>;
->> +       analogix,color-depth = <1>;
->> +       analogix,link-rate = <0x0a>;
->> +       analogix,lane-count = <2>;
->> +       analogix,hpd-gpio = <&gpx2 6 0>;
->>         panel = <&panel>;
->>  };
->>
->> --
->> 1.9.1
->>
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> +	help
+> +	  Say Y here if you have a Colibri VF50 and plan to use
+> +	  the on-board provided 4-wire touchscreen driver.
+> +
+> +	  If unsure, say N.
+> +
+> +	  To compile this driver as a module, choose M here: the
+> +	  module will be called colibri_vf50_ts.
+> +
+>  endif
+> diff --git a/drivers/input/touchscreen/Makefile b/drivers/input/touchscreen/Makefile
+> index 44deea7..93746a0 100644
+> --- a/drivers/input/touchscreen/Makefile
+> +++ b/drivers/input/touchscreen/Makefile
+> @@ -84,3 +84,4 @@ obj-$(CONFIG_TOUCHSCREEN_W90X900)	+= w90p910_ts.o
+>  obj-$(CONFIG_TOUCHSCREEN_SX8654)	+= sx8654.o
+>  obj-$(CONFIG_TOUCHSCREEN_TPS6507X)	+= tps6507x-ts.o
+>  obj-$(CONFIG_TOUCHSCREEN_ZFORCE)	+= zforce_ts.o
+> +obj-$(CONFIG_TOUCHSCREEN_COLIBRI_VF50)	+= colibri-vf50-ts.o
+> diff --git a/drivers/input/touchscreen/colibri-vf50-ts.c b/drivers/input/touchscreen/colibri-vf50-ts.c
+> new file mode 100644
+> index 0000000..0793fdc
+> --- /dev/null
+> +++ b/drivers/input/touchscreen/colibri-vf50-ts.c
+> @@ -0,0 +1,370 @@
+> +/* Copyright 2015 Toradex AG
+> + *
+> + * Toradex Colibri VF50 Touchscreen driver
+> + *
+> + * Originally authored by Stefan Agner for 3.0 kernel
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + */
+> +
+> +#include <linux/delay.h>
+> +#include <linux/err.h>
+> +#include <linux/gpio.h>
+> +#include <linux/iio/consumer.h>
+> +#include <linux/iio/types.h>
+> +#include <linux/input.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/pinctrl/consumer.h>
+
+Don't you need gpio/consumer.h?
+
+> +#include <linux/platform_device.h>
+> +#include <linux/slab.h>
+> +#include <linux/types.h>
+> +
+> +#define DRIVER_NAME "colibri-vf50-ts"
+> +#define DRV_VERSION "1.0"
+> +
+> +#define VF_ADC_MAX ((1 << 12) - 1)
+> +
+> +#define COLI_TOUCH_MIN_DELAY_US 1000
+> +#define COLI_TOUCH_MAX_DELAY_US 2000
+> +#define COLI_TOUCH_NO_OF_AVGS	5
+> +
+> +struct vf50_touch_device {
+> +	struct platform_device	*pdev;
+> +	struct input_dev	*ts_input;
+> +	struct iio_channel	*channels;
+> +	struct gpio_desc *gpio_xp;
+> +	struct gpio_desc *gpio_xm;
+> +	struct gpio_desc *gpio_yp;
+> +	struct gpio_desc *gpio_ym;
+> +	struct gpio_desc *gpio_pen_detect;
+
+I do not see gpio_pen_detect being used anymore.
+
+> +	int pen_irq;
+> +	int min_pressure;
+> +	bool stop_touchscreen;
+> +};
+> +
+> +/*
+> + * Enables given plates and measures touch parameters using ADC
+> + */
+> +static int adc_ts_measure(struct iio_channel *channel,
+> +		  struct gpio_desc *plate_p, struct gpio_desc *plate_m)
+> +{
+> +	int i, value = 0, val = 0;
+> +	int ret;
+> +
+> +	gpiod_set_value(plate_p, 1);
+> +	gpiod_set_value(plate_m, 1);
+> +
+> +	usleep_range(COLI_TOUCH_MIN_DELAY_US, COLI_TOUCH_MAX_DELAY_US);
+> +
+> +	for (i = 0; i < COLI_TOUCH_NO_OF_AVGS; i++) {
+> +		ret = iio_read_channel_raw(channel, &val);
+> +		if (ret < 0) {
+> +			value = ret;
+> +			goto error_iio_read;
+> +		}
+> +
+> +		value += val;
+> +	}
+> +
+> +	value /= COLI_TOUCH_NO_OF_AVGS;
+> +
+> +error_iio_read:
+> +	gpiod_set_value(plate_p, 0);
+> +	gpiod_set_value(plate_m, 0);
+> +
+> +	return value;
+> +}
+> +
+> +/*
+> + * Enable touch detection using falling edge detection on XM
+> + */
+> +static void vf50_ts_enable_touch_detection(struct vf50_touch_device *vf50_ts)
+> +{
+> +	/* Enable plate YM (needs to be strong GND, high active) */
+> +	gpiod_set_value(vf50_ts->gpio_ym, 1);
+> +
+> +	/*
+> +	 * Let the platform mux to idle state in order to enable
+> +	 * Pull-Up on GPIO
+> +	 */
+> +	pinctrl_pm_select_idle_state(&vf50_ts->pdev->dev);
+> +}
+> +
+> +/*
+> + * ADC touch screen sampling bottom half irq handler
+> + */
+> +static irqreturn_t vf50_ts_irq_bh(int irq, void *private)
+> +{
+> +	struct vf50_touch_device *vf50_ts = (struct vf50_touch_device *)private;
+
+No need to cast from void * pointer.
+
+> +	struct device *dev = &vf50_ts->pdev->dev;
+> +	int val_x, val_y, val_z1, val_z2, val_p = 0;
+> +	bool discard_val_on_start = true;
+> +
+> +	/* Disable the touch detection plates */
+> +	gpiod_set_value(vf50_ts->gpio_ym, 0);
+> +
+> +	/* Let the platform mux to default state in order to mux as ADC */
+> +	pinctrl_pm_select_default_state(dev);
+> +
+> +	while (!vf50_ts->stop_touchscreen) {
+> +		/* X-Direction */
+> +		val_x = adc_ts_measure(&vf50_ts->channels[0],
+> +				vf50_ts->gpio_xp, vf50_ts->gpio_xm);
+> +		if (val_x < 0)
+> +			break;
+> +
+> +		/* Y-Direction */
+> +		val_y = adc_ts_measure(&vf50_ts->channels[1],
+> +				vf50_ts->gpio_yp, vf50_ts->gpio_ym);
+> +		if (val_y < 0)
+> +			break;
+> +
+> +		/*
+> +		 * Touch pressure
+> +		 * Measure on XP/YM
+> +		 */
+> +		val_z1 = adc_ts_measure(&vf50_ts->channels[2],
+> +				vf50_ts->gpio_yp, vf50_ts->gpio_xm);
+> +		if (val_z1 < 0)
+> +			break;
+> +		val_z2 = adc_ts_measure(&vf50_ts->channels[3],
+> +				vf50_ts->gpio_yp, vf50_ts->gpio_xm);
+> +		if (val_z2 < 0)
+> +			break;
+> +
+> +		/* Validate signal (avoid calculation using noise) */
+> +		if (val_z1 > 64 && val_x > 64) {
+> +			/*
+> +			 * Calculate resistance between the plates
+> +			 * lower resistance means higher pressure
+> +			 */
+> +			int r_x = (1000 * val_x) / VF_ADC_MAX;
+> +
+> +			val_p = (r_x * val_z2) / val_z1 - r_x;
+> +
+> +		} else {
+> +			val_p = 2000;
+> +		}
+> +
+> +		val_p = 2000 - val_p;
+> +		dev_dbg(dev, "Measured values: x: %d, y: %d, z1: %d, z2: %d, "
+> +			"p: %d\n", val_x, val_y, val_z1, val_z2, val_p);
+> +
+> +		/*
+> +		 * If touch pressure is too low, stop measuring and reenable
+> +		 * touch detection
+> +		 */
+> +		if (val_p < vf50_ts->min_pressure || val_p > 2000)
+> +			break;
+> +
+> +		/*
+> +		 * The pressure may not be enough for the first x and the
+> +		 * second y measurement, but, the pressure is ok when the
+> +		 * driver is doing the third and fourth measurement. To
+> +		 * take care of this, we drop the first measurement always.
+> +		 */
+> +		if (discard_val_on_start) {
+> +			discard_val_on_start = false;
+> +		} else {
+> +			/*
+> +			 * Report touch position and sleep for
+> +			 * next measurement
+> +			 */
+> +			input_report_abs(vf50_ts->ts_input,
+> +					ABS_X, VF_ADC_MAX - val_x);
+> +			input_report_abs(vf50_ts->ts_input,
+> +					ABS_Y, VF_ADC_MAX - val_y);
+> +			input_report_abs(vf50_ts->ts_input,
+> +					ABS_PRESSURE, val_p);
+> +			input_report_key(vf50_ts->ts_input, BTN_TOUCH, 1);
+> +			input_sync(vf50_ts->ts_input);
+> +		}
+> +
+> +		msleep(10);
+> +	}
+> +
+> +	/* Report no more touch, reenable touch detection */
+> +	input_report_abs(vf50_ts->ts_input, ABS_PRESSURE, 0);
+> +	input_report_key(vf50_ts->ts_input, BTN_TOUCH, 0);
+> +	input_sync(vf50_ts->ts_input);
+> +
+> +	vf50_ts_enable_touch_detection(vf50_ts);
+> +
+> +	/* Wait for the pull-up to be stable on high */
+> +	msleep(10);
+> +
+> +	return IRQ_HANDLED;
+> +}
+> +
+> +static int vf50_ts_open(struct input_dev *dev_input)
+> +{
+> +	struct vf50_touch_device *touchdev = input_get_drvdata(dev_input);
+> +	struct device *dev = &touchdev->pdev->dev;
+> +
+> +	dev_dbg(dev, "Input device %s opened, starting touch detection\n",
+> +			dev_input->name);
+> +
+> +	touchdev->stop_touchscreen = false;
+> +
+> +	/* Mux detection before request IRQ, wait for pull-up to settle */
+> +	vf50_ts_enable_touch_detection(touchdev);
+> +	msleep(10);
+> +
+> +	return 0;
+> +}
+> +
+> +static void vf50_ts_close(struct input_dev *dev_input)
+> +{
+> +	struct vf50_touch_device *touchdev = input_get_drvdata(dev_input);
+> +	struct device *dev = &touchdev->pdev->dev;
+> +
+> +	touchdev->stop_touchscreen = true;
+> +
+> +	/* Make sure IRQ is not running past close */
+> +	mb();
+> +	synchronize_irq(touchdev->pen_irq);
+> +
+
+Should we drive the gpio_ym inactive here? What about pin control?
+
+> +	dev_dbg(dev, "Input device %s closed, disable touch detection\n",
+> +		dev_input->name);
+> +}
+> +
+> +static int vf50_ts_get_gpiod(struct device *dev,
+> +	struct gpio_desc **gpio_d, const char *con_id, enum gpiod_flags flags)
+> +{
+> +	int error;
+> +
+> +	*gpio_d = devm_gpiod_get(dev, con_id, flags);
+> +	if (IS_ERR(*gpio_d)) {
+> +		error = PTR_ERR(*gpio_d);
+> +		dev_err(dev, "Could not get gpio_%s %d\n", con_id, error);
+> +		return error;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static void vf50_ts_channel_release(void *data)
+> +{
+> +	struct vf50_touch_device *touchdev = data;
+> +
+> +	iio_channel_release_all(touchdev->channels);
+> +}
+> +
+> +static int vf50_ts_probe(struct platform_device *pdev)
+> +{
+> +	struct input_dev *input;
+> +	struct iio_channel *channels;
+> +	struct device *dev = &pdev->dev;
+> +	struct vf50_touch_device *touchdev;
+> +	int error;
+> +
+> +	channels = iio_channel_get_all(dev);
+> +	if (IS_ERR(channels))
+> +		return PTR_ERR(channels);
+> +
+> +	touchdev = devm_kzalloc(dev, sizeof(*touchdev), GFP_KERNEL);
+> +	if (!touchdev) {
+> +		error = -ENOMEM;
+> +		return error;
+
+Why not simply
+
+		return -ENOMEM;
+
+here?
+
+Also you are leaking your iio channels here. You need to install the
+custom action earlier.
+
+> +	}
+> +
+> +	error = of_property_read_u32(dev->of_node, "vf50-ts-min-pressure",
+> +				 &touchdev->min_pressure);
+> +	if (error)
+> +		return error;
+> +
+> +	error = devm_add_action(dev, vf50_ts_channel_release, channels);
+> +	if (error) {
+> +		dev_err(dev, "Failed to register iio channel release action");
+
+You also need
+
+		vf50_ts_channel_release(touchdev);
+
+> +		return error;
+> +	}
+> +
+> +	input = devm_input_allocate_device(dev);
+> +	if (!input) {
+> +		dev_err(dev, "Failed to allocate TS input device\n");
+> +		error = -ENOMEM;
+> +		return error;
+
+Again simply return error code, no need to assign to the error variable.
+
+> +	}
+> +
+> +	platform_set_drvdata(pdev, touchdev);
+> +
+> +	touchdev->pdev = pdev;
+> +	touchdev->channels = channels;
+> +
+> +	input->name = DRIVER_NAME;
+> +	input->id.bustype = BUS_HOST;
+> +	input->dev.parent = dev;
+> +	input->open = vf50_ts_open;
+> +	input->close = vf50_ts_close;
+> +
+> +	input_set_capability(input, EV_KEY, BTN_TOUCH);
+> +	input_set_abs_params(input, ABS_X, 0, VF_ADC_MAX, 0, 0);
+> +	input_set_abs_params(input, ABS_Y, 0, VF_ADC_MAX, 0, 0);
+> +	input_set_abs_params(input, ABS_PRESSURE, 0, VF_ADC_MAX, 0, 0);
+> +
+> +	touchdev->ts_input = input;
+> +	input_set_drvdata(input, touchdev);
+> +	error = input_register_device(input);
+> +	if (error) {
+> +		dev_err(dev, "Failed to register input device\n");
+> +		return error;
+> +	}
+> +
+> +	error = vf50_ts_get_gpiod(dev, &touchdev->gpio_xp,
+> +				"xp", GPIOD_OUT_LOW);
+> +	if (error)
+> +		return error;
+> +
+> +	error = vf50_ts_get_gpiod(dev, &touchdev->gpio_xm,
+> +				"xm", GPIOD_OUT_LOW);
+> +	if (error)
+> +		return error;
+> +
+> +	error = vf50_ts_get_gpiod(dev, &touchdev->gpio_yp,
+> +				"yp", GPIOD_OUT_LOW);
+> +	if (error)
+> +		return error;
+> +
+> +	error = vf50_ts_get_gpiod(dev, &touchdev->gpio_ym,
+> +				"ym", GPIOD_OUT_LOW);
+> +	if (error)
+> +		return error;
+> +
+> +	touchdev->pen_irq = platform_get_irq(pdev, 0);
+> +	if (touchdev->pen_irq < 0)
+> +		return touchdev->pen_irq;
+> +
+> +	error = devm_request_threaded_irq(dev, touchdev->pen_irq, NULL,
+> +			vf50_ts_irq_bh, IRQF_ONESHOT,
+> +			"vf50 touch", touchdev);
+> +	if (error < 0)
+> +		return error;
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id vf50_touch_of_match[] = {
+> +	{ .compatible = "toradex,vf50-touchscreen", },
+> +	{ }
+> +};
+> +MODULE_DEVICE_TABLE(of, vf50_touch_of_match);
+> +
+> +static struct platform_driver vf50_touch_driver = {
+> +	.driver = {
+> +		.name = "toradex,vf50_touchctrl",
+> +		.of_match_table = vf50_touch_of_match,
+> +	},
+> +	.probe = vf50_ts_probe,
+> +};
+> +
+> +module_platform_driver(vf50_touch_driver);
+> +
+> +MODULE_AUTHOR("Sanchayan Maity");
+> +MODULE_DESCRIPTION("Colibri VF50 Touchscreen driver");
+> +MODULE_LICENSE("GPL v2");
+
+Please change it to "GPL" which means GPL v2+ to match license notice at
+the top.
+
+> +MODULE_VERSION(DRV_VERSION);
+> -- 
+> 2.5.0
+> 
+
+Thank you.
+
+-- 
+Dmitry
