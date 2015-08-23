@@ -1,41 +1,42 @@
-From: petr.cvek@tul.cz (Petr Cvek)
-Date: Sun, 23 Aug 2015 22:55:51 +0200
-Subject: [PATCH v2 16/21] ARM: pxa: magician: Add support for alternative
- LCD backlight
-In-Reply-To: <878u95685t.fsf@belgarion.home>
-References: <cover.1439843482.git.petr.cvek@tul.cz> <55D25A60.7000900@tul.cz>
- <878u95685t.fsf@belgarion.home>
-Message-ID: <55DA3357.6050304@tul.cz>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Sun, 23 Aug 2015 23:43:15 +0200
+Subject: [GIT PULL] SA1100/PXA RTC for 4.3
+In-Reply-To: <CAL_JsqKMN1SEQoJRSPixih4ckDh1pGb4x3T_t+2oWVvW8fqzmg@mail.gmail.com>
+References: <CAL_JsqKMN1SEQoJRSPixih4ckDh1pGb4x3T_t+2oWVvW8fqzmg@mail.gmail.com>
+Message-ID: <20150823214315.GB13155@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne 20.8.2015 v 22:01 Robert Jarzmik napsal(a):
-> Petr Cvek <petr.cvek@tul.cz> writes:
+Hi,
+
+On 14/08/2015 at 11:09:21 -0500, Rob Herring wrote :
+> Alexandre,
 > 
->> Add support for alternative LCD backlight with GPIO (no brightness).
-> Here, I don't understand, the commit message is too short.
+> Please pull SA1100/PXA changes for 4.3. This series has had several
+> rounds of review over several months without comment from PXA
+> maintainers other than Robert.
 > 
-> Are there 2 brightness controls on magician, or are these 2 different magicians
-> (hardware wise), each having a different backlight control ? Or is it there is a
-> GPIO to light up the screen and a PWM backlight ?
+> Rob
 > 
-> I have to understand first.
+> The following changes since commit 52721d9d3334c1cb1f76219a161084094ec634dc:
 > 
-I have aimed for a configuration, where user can use PWM xor GPIO backlight. As pin mux can set GPIO or PWM (or UART :-D) on PWM pin, you can choose if you spare few kB (as magician has only 64MB RAM and 64MB flash) on GPIO or will have smooth backlight with PWM.
+>   Linux 4.2-rc3 (2015-07-19 14:45:02 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git
+> tags/pxa-rtc-for-4.3
+> 
+> for you to fetch changes up to e473ff0fe8548941ef67bf956a6b7943f4663ab1:
+> 
+>   ARM: config: Switch PXA27x platforms to use PXA RTC driver
+> (2015-08-14 10:53:44 -0500)
+> 
 
-I have tested both (I think I have added the gpio backlight for debugging a regression in pwm_bl).
+Pulled three days ago, it has been in rtc-next since then but didn't hit
+linux-next yet. Thanks!
 
-Only ugly thing is the GPIO definition:
-
-#if IS_ENABLED(CONFIG_PWM_PXA)
-	/* PWM 0 - LCD backlight */
-	GPIO16_PWM0_OUT,
-#else
-	/* Ensure static backlight without any driver */
-	MFP_CFG_OUT(GPIO16, AF0, DRIVE_LOW),    /* Backlight enabled */
-#endif
-
-Hmmm.. I think I can do this better in pwm-backlight init/exit (same way as pxa_ficp). During init the pin mux will switch to Alternate Function (PWM) and during exit it will switch to GPIO (which can be used by gpio-backlight). This will remove ugly ifdef.
-
-Best regards,
-Petr
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
