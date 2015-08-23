@@ -1,42 +1,252 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Sun, 23 Aug 2015 23:43:15 +0200
-Subject: [GIT PULL] SA1100/PXA RTC for 4.3
-In-Reply-To: <CAL_JsqKMN1SEQoJRSPixih4ckDh1pGb4x3T_t+2oWVvW8fqzmg@mail.gmail.com>
-References: <CAL_JsqKMN1SEQoJRSPixih4ckDh1pGb4x3T_t+2oWVvW8fqzmg@mail.gmail.com>
-Message-ID: <20150823214315.GB13155@piout.net>
+From: robherring2@gmail.com (Rob Herring)
+Date: Sun, 23 Aug 2015 16:49:42 -0500
+Subject: [PATCH v5 2/4] Documentation: arm64/arm: dt bindings for numa.
+In-Reply-To: <1439570374-4079-3-git-send-email-gkulkarni@caviumnetworks.com>
+References: <1439570374-4079-1-git-send-email-gkulkarni@caviumnetworks.com>
+ <1439570374-4079-3-git-send-email-gkulkarni@caviumnetworks.com>
+Message-ID: <CAL_JsqJSeehY91D_bbN+XK22aDvWMymeGbHfBmqQX+NotB7ORg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Aug 14, 2015 at 11:39 AM, Ganapatrao Kulkarni
+<gkulkarni@caviumnetworks.com> wrote:
+> DT bindings for numa map for memory, cores and IOs using
+> arm,associativity device node property.
+>
+> Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
 
-On 14/08/2015 at 11:09:21 -0500, Rob Herring wrote :
-> Alexandre,
-> 
-> Please pull SA1100/PXA changes for 4.3. This series has had several
-> rounds of review over several months without comment from PXA
-> maintainers other than Robert.
-> 
-> Rob
-> 
-> The following changes since commit 52721d9d3334c1cb1f76219a161084094ec634dc:
-> 
->   Linux 4.2-rc3 (2015-07-19 14:45:02 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git
-> tags/pxa-rtc-for-4.3
-> 
-> for you to fetch changes up to e473ff0fe8548941ef67bf956a6b7943f4663ab1:
-> 
->   ARM: config: Switch PXA27x platforms to use PXA RTC driver
-> (2015-08-14 10:53:44 -0500)
-> 
+Given this matches PPC, looks fine to me.
 
-Pulled three days ago, it has been in rtc-next since then but didn't hit
-linux-next yet. Thanks!
+Acked-by: Rob Herring <robh@kernel.org>
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+> ---
+>  Documentation/devicetree/bindings/arm/numa.txt | 212 +++++++++++++++++++++++++
+>  1 file changed, 212 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/numa.txt
+>
+> diff --git a/Documentation/devicetree/bindings/arm/numa.txt b/Documentation/devicetree/bindings/arm/numa.txt
+> new file mode 100644
+> index 0000000..dc3ef86
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/numa.txt
+> @@ -0,0 +1,212 @@
+> +==============================================================================
+> +NUMA binding description.
+> +==============================================================================
+> +
+> +==============================================================================
+> +1 - Introduction
+> +==============================================================================
+> +
+> +Systems employing a Non Uniform Memory Access (NUMA) architecture contain
+> +collections of hardware resources including processors, memory, and I/O buses,
+> +that comprise what is commonly known as a NUMA node.
+> +Processor accesses to memory within the local NUMA node is generally faster
+> +than processor accesses to memory outside of the local NUMA node.
+> +DT defines interfaces that allow the platform to convey NUMA node
+> +topology information to OS.
+> +
+> +==============================================================================
+> +2 - arm,associativity
+> +==============================================================================
+> +The mapping is done using arm,associativity device property.
+> +this property needs to be present in every device node which needs to to be
+> +mapped to numa nodes.
+> +
+> +arm,associativity property is set of 32-bit integers which defines level of
+> +topology and boundary in the system at which a significant difference in
+> +performance can be measured between cross-device accesses within
+> +a single location and those spanning multiple locations.
+> +The first cell always contains the broadest subdivision within the system,
+> +while the last cell enumerates the individual devices, such as an SMT thread
+> +of a CPU, or a bus bridge within an SoC".
+> +
+> +ex:
+> +       /* board 0, socket 0, cluster 0, core 0  thread 0 */
+> +       arm,associativity = <0 0 0 0 0>;
+> +
+> +==============================================================================
+> +3 - arm,associativity-reference-points
+> +==============================================================================
+> +This property is a set of 32-bit integers, each representing an index into
+> +the arm,associativity nodes. The first integer is the most significant
+> +NUMA boundary and the following are progressively less significant boundaries.
+> +There can be more than one level of NUMA.
+> +
+> +Ex:
+> +       arm,associativity-reference-points = <0 1>;
+> +       The board Id(index 0) used first to calculate the associativity (node
+> +       distance), then follows the  socket id(index 1).
+> +
+> +       arm,associativity-reference-points = <1 0>;
+> +       The socket Id(index 1) used first to calculate the associativity,
+> +       then follows the board id(index 0).
+> +
+> +       arm,associativity-reference-points = <0>;
+> +       Only the board Id(index 0) used to calculate the associativity.
+> +
+> +       arm,associativity-reference-points = <1>;
+> +       Only socket Id(index 1) used to calculate the associativity.
+> +
+> +==============================================================================
+> +4 - Example dts
+> +==============================================================================
+> +
+> +Example: 2 Node system consists of 2 boards and each board having one socket
+> +and 8 core in each socket.
+> +
+> +       arm,associativity-reference-points = <0>;
+> +
+> +       memory at 00c00000 {
+> +               device_type = "memory";
+> +               reg = <0x0 0x00c00000 0x0 0x80000000>;
+> +               /* board 0, socket 0, no specific core */
+> +               arm,associativity = <0 0 0xffff>;
+> +       };
+> +
+> +       memory at 10000000000 {
+> +               device_type = "memory";
+> +               reg = <0x100 0x00000000 0x0 0x80000000>;
+> +               /* board 1, socket 0, no specific core */
+> +               arm,associativity = <1 0 0xffff>;
+> +       };
+> +
+> +       cpus {
+> +               #address-cells = <2>;
+> +               #size-cells = <0>;
+> +
+> +               cpu at 000 {
+> +                       device_type = "cpu";
+> +                       compatible =  "arm,armv8";
+> +                       reg = <0x0 0x000>;
+> +                       enable-method = "psci";
+> +                       /* board 0, socket 0, core 0*/
+> +                       arm,associativity = <0 0 0>;
+> +               };
+> +               cpu at 001 {
+> +                       device_type = "cpu";
+> +                       compatible =  "arm,armv8";
+> +                       reg = <0x0 0x001>;
+> +                       enable-method = "psci";
+> +                       arm,associativity = <0 0 1>;
+> +               };
+> +               cpu at 002 {
+> +                       device_type = "cpu";
+> +                       compatible =  "arm,armv8";
+> +                       reg = <0x0 0x002>;
+> +                       enable-method = "psci";
+> +                       arm,associativity = <0 0 2>;
+> +               };
+> +               cpu at 003 {
+> +                       device_type = "cpu";
+> +                       compatible =  "arm,armv8";
+> +                       reg = <0x0 0x003>;
+> +                       enable-method = "psci";
+> +                       arm,associativity = <0 0 3>;
+> +               };
+> +               cpu at 004 {
+> +                       device_type = "cpu";
+> +                       compatible =  "arm,armv8";
+> +                       reg = <0x0 0x004>;
+> +                       enable-method = "psci";
+> +                       arm,associativity = <0 0 4>;
+> +               };
+> +               cpu at 005 {
+> +                       device_type = "cpu";
+> +                       compatible =  "arm,armv8";
+> +                       reg = <0x0 0x005>;
+> +                       enable-method = "psci";
+> +                       arm,associativity = <0 0 5>;
+> +               };
+> +               cpu at 006 {
+> +                       device_type = "cpu";
+> +                       compatible =  "arm,armv8";
+> +                       reg = <0x0 0x006>;
+> +                       enable-method = "psci";
+> +                       arm,associativity = <0 0 6>;
+> +               };
+> +               cpu at 007 {
+> +                       device_type = "cpu";
+> +                       compatible =  "arm,armv8";
+> +                       reg = <0x0 0x007>;
+> +                       enable-method = "psci";
+> +                       arm,associativity = <0 0 7>;
+> +               };
+> +               cpu at 008 {
+> +                       device_type = "cpu";
+> +                       compatible =  "arm,armv8";
+> +                       reg = <0x0 0x008>;
+> +                       enable-method = "psci";
+> +                       /* board 1, socket 0, core 0*/
+> +                       arm,associativity = <1 0 0>;
+> +               };
+> +               cpu at 009 {
+> +                       device_type = "cpu";
+> +                       compatible =  "arm,armv8";
+> +                       reg = <0x0 0x009>;
+> +                       enable-method = "psci";
+> +                       arm,associativity = <1 0 1>;
+> +               };
+> +               cpu at 00a {
+> +                       device_type = "cpu";
+> +                       compatible =  "arm,armv8";
+> +                       reg = <0x0 0x00a>;
+> +                       enable-method = "psci";
+> +                       arm,associativity = <0 0 2>;
+> +               };
+> +               cpu at 00b {
+> +                       device_type = "cpu";
+> +                       compatible =  "arm,armv8";
+> +                       reg = <0x0 0x00b>;
+> +                       enable-method = "psci";
+> +                       arm,associativity = <1 0 3>;
+> +               };
+> +               cpu at 00c {
+> +                       device_type = "cpu";
+> +                       compatible =  "arm,armv8";
+> +                       reg = <0x0 0x00c>;
+> +                       enable-method = "psci";
+> +                       arm,associativity = <1 0 4>;
+> +               };
+> +               cpu at 00d {
+> +                       device_type = "cpu";
+> +                       compatible =  "arm,armv8";
+> +                       reg = <0x0 0x00d>;
+> +                       enable-method = "psci";
+> +                       arm,associativity = <1 0 5>;
+> +               };
+> +               cpu at 00e {
+> +                       device_type = "cpu";
+> +                       compatible =  "arm,armv8";
+> +                       reg = <0x0 0x00e>;
+> +                       enable-method = "psci";
+> +                       arm,associativity = <1 0 6>;
+> +               };
+> +               cpu at 00f {
+> +                       device_type = "cpu";
+> +                       compatible =  "arm,armv8";
+> +                       reg = <0x0 0x00f>;
+> +                       enable-method = "psci";
+> +                       arm,associativity = <1 0 7>;
+> +               };
+> +       };
+> +
+> +       pcie0: pcie0 at 0x8480,00000000 {
+> +               compatible = "arm,armv8";
+> +               device_type = "pci";
+> +               bus-range = <0 255>;
+> +               #size-cells = <2>;
+> +               #address-cells = <3>;
+> +               reg = <0x8480 0x00000000 0 0x10000000>;  /* Configuration space */
+> +               ranges = <0x03000000 0x8010 0x00000000 0x8010 0x00000000 0x70 0x00000000>; /* mem ranges */
+> +               /* board 0, socket 0, pci bus 0*/
+> +               arm,associativity = <0 0 0>;
+> +        };
+> --
+> 1.8.1.4
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
