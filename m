@@ -1,35 +1,34 @@
 From: scott.shu@mediatek.com (Scott Shu)
-Date: Sun, 23 Aug 2015 17:01:00 +0800
-Subject: [PATCH v4 1/8] Document: bindings: DT: Add SMP enable method for
- MT6580 SoC platform
+Date: Sun, 23 Aug 2015 17:01:01 +0800
+Subject: [PATCH v4 2/8] dt-bindings: soc: Add SCPSYS compatible support for
+ mt6580
 In-Reply-To: <1440320467-26118-1-git-send-email-scott.shu@mediatek.com>
 References: <1440320467-26118-1-git-send-email-scott.shu@mediatek.com>
-Message-ID: <1440320467-26118-2-git-send-email-scott.shu@mediatek.com>
+Message-ID: <1440320467-26118-3-git-send-email-scott.shu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For MT6580 SoC platform, the secondary cores are in powered off state
-as default, so compared with MT6589, one new enable method is needed.
-This method using the SPM (System Power Manager) inside the SCPSYS to
-control the CPU power.
+This adds "mediatek,mt6580-scpsys" in the compatible properties of
+SCPSYS node for MT6580 SoC.
 
 Signed-off-by: Scott Shu <scott.shu@mediatek.com>
 ---
- Documentation/devicetree/bindings/arm/cpus.txt | 1 +
- 1 file changed, 1 insertion(+)
+ Documentation/devicetree/bindings/soc/mediatek/scpsys.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
-index d58eb45..66a8f03 100644
---- a/Documentation/devicetree/bindings/arm/cpus.txt
-+++ b/Documentation/devicetree/bindings/arm/cpus.txt
-@@ -195,6 +195,7 @@ nodes to be present and contain the properties described below.
- 			    "marvell,armada-380-smp"
- 			    "marvell,armada-390-smp"
- 			    "marvell,armada-xp-smp"
-+			    "mediatek,mt6580-smp"
- 			    "mediatek,mt6589-smp"
- 			    "mediatek,mt81xx-tz-smp"
- 			    "qcom,gcc-msm8660"
+diff --git a/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt b/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
+index c051114..7998bc2 100644
+--- a/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
++++ b/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
+@@ -12,7 +12,7 @@ power/power_domain.txt. It provides the power domains defined in
+ include/dt-bindings/power/mt8173-power.h.
+ 
+ Required properties:
+-- compatible: Must be "mediatek,mt8173-scpsys"
++- compatible: Must be "mediatek,mt6580-scpsys" or "mediatek,mt8173-scpsys"
+ - #power-domain-cells: Must be 1
+ - reg: Address range of the SCPSYS unit
+ - infracfg: must contain a phandle to the infracfg controller
 -- 
 1.9.1
 
