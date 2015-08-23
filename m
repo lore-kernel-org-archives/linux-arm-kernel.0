@@ -1,72 +1,78 @@
-From: robh@kernel.org (Rob Herring)
-Date: Sun, 23 Aug 2015 17:01:09 -0500
-Subject: [PATCH 1/2] of/fdt: make memblock maximum physical address arch
- configurable
-In-Reply-To: <1439890482-20798-2-git-send-email-ard.biesheuvel@linaro.org>
-References: <1439890482-20798-1-git-send-email-ard.biesheuvel@linaro.org>
- <1439890482-20798-2-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <CAL_JsqKRvUfUhF7k8Nf3NbVetiM8_OjPyG81hqgxM=_qe+w0rw@mail.gmail.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Mon, 24 Aug 2015 00:37:24 +0200
+Subject: [PATCH 3/5] ARM: dts: sun4i: inet97fv2: Enable otg controller
+In-Reply-To: <1440369446-22195-1-git-send-email-hdegoede@redhat.com>
+References: <1440369446-22195-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <1440369446-22195-3-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 18, 2015 at 4:34 AM, Ard Biesheuvel
-<ard.biesheuvel@linaro.org> wrote:
-> When parsing the memory nodes to populate the memblock memory
-> table, we check against high and low limits and clip any memory
-> that exceeds either one of them.
->
-> However, for arm64, the high limit of (phys_addr_t)~0 is not very
-> meaningful, since phys_addr_t is 64 bits (i.e., no limit) but there
-> may be other constraints that limit the memory ranges that we can
-> support.
->
-> So rename MAX_PHYS_ADDR to MAX_MEMBLOCK_ADDR (for clarity) and only
-> define it if the arch does not supply a definition of its own.
->
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Enable the otg controller on the inet97fv2 tablet.
 
-Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ arch/arm/boot/dts/sun4i-a10-inet97fv2.dts | 34 +++++++++++++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
 
-> ---
->  drivers/of/fdt.c | 12 +++++++-----
->  1 file changed, 7 insertions(+), 5 deletions(-)
->
-> diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
-> index 07496560e5b9..6e82bc42373b 100644
-> --- a/drivers/of/fdt.c
-> +++ b/drivers/of/fdt.c
-> @@ -967,7 +967,9 @@ int __init early_init_dt_scan_chosen(unsigned long node, const char *uname,
->  }
->
->  #ifdef CONFIG_HAVE_MEMBLOCK
-> -#define MAX_PHYS_ADDR  ((phys_addr_t)~0)
-> +#ifndef MAX_MEMBLOCK_ADDR
-> +#define MAX_MEMBLOCK_ADDR      ((phys_addr_t)~0)
-> +#endif
->
->  void __init __weak early_init_dt_add_memory_arch(u64 base, u64 size)
->  {
-> @@ -984,16 +986,16 @@ void __init __weak early_init_dt_add_memory_arch(u64 base, u64 size)
->         }
->         size &= PAGE_MASK;
->
-> -       if (base > MAX_PHYS_ADDR) {
-> +       if (base > MAX_MEMBLOCK_ADDR) {
->                 pr_warning("Ignoring memory block 0x%llx - 0x%llx\n",
->                                 base, base + size);
->                 return;
->         }
->
-> -       if (base + size - 1 > MAX_PHYS_ADDR) {
-> +       if (base + size - 1 > MAX_MEMBLOCK_ADDR) {
->                 pr_warning("Ignoring memory range 0x%llx - 0x%llx\n",
-> -                               ((u64)MAX_PHYS_ADDR) + 1, base + size);
-> -               size = MAX_PHYS_ADDR - base + 1;
-> +                               ((u64)MAX_MEMBLOCK_ADDR) + 1, base + size);
-> +               size = MAX_MEMBLOCK_ADDR - base + 1;
->         }
->
->         if (base + size < phys_offset) {
-> --
-> 1.9.1
->
+diff --git a/arch/arm/boot/dts/sun4i-a10-inet97fv2.dts b/arch/arm/boot/dts/sun4i-a10-inet97fv2.dts
+index 69e22bd..309a0da 100644
+--- a/arch/arm/boot/dts/sun4i-a10-inet97fv2.dts
++++ b/arch/arm/boot/dts/sun4i-a10-inet97fv2.dts
+@@ -92,6 +92,26 @@
+ 	status = "okay";
+ };
+ 
++&otg_sram {
++	status = "okay";
++};
++
++&pio {
++	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
++		allwinner,pins = "PH4";
++		allwinner,function = "gpio_in";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
++	};
++
++	usb0_vbus_detect_pin: usb0_vbus_detect_pin at 0 {
++		allwinner,pins = "PH5";
++		allwinner,function = "gpio_in";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_PULL_DOWN>;
++	};
++};
++
+ &reg_dcdc2 {
+ 	regulator-always-on;
+ 	regulator-min-microvolt = <1000000>;
+@@ -117,6 +137,10 @@
+ 	regulator-name = "avcc";
+ };
+ 
++&reg_usb0_vbus {
++	status = "okay";
++};
++
+ &reg_usb2_vbus {
+ 	status = "okay";
+ };
+@@ -127,7 +151,17 @@
+ 	status = "okay";
+ };
+ 
++&usb_otg {
++	dr_mode = "otg";
++	status = "okay";
++};
++
+ &usbphy {
++	pinctrl-names = "default";
++	pinctrl-0 = <&usb0_id_detect_pin>, <&usb0_vbus_detect_pin>;
++	usb0_id_det-gpio = <&pio 7 4 GPIO_ACTIVE_HIGH>; /* PH4 */
++	usb0_vbus_det-gpio = <&pio 7 5 GPIO_ACTIVE_HIGH>; /* PH5 */
++	usb0_vbus-supply = <&reg_usb0_vbus>;
+ 	usb2_vbus-supply = <&reg_usb2_vbus>;
+ 	status = "okay";
+ };
+-- 
+2.4.3
