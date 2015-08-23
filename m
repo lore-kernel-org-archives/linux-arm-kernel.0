@@ -1,440 +1,714 @@
 From: mchehab@osg.samsung.com (Mauro Carvalho Chehab)
-Date: Sun, 23 Aug 2015 17:17:28 -0300
-Subject: [PATCH v7 11/44] [media] media: use entity.graph_obj.mdev instead of
- .parent
+Date: Sun, 23 Aug 2015 17:17:27 -0300
+Subject: [PATCH v7 10/44] [media] media: rename the function that create pad
+ links
 In-Reply-To: <cover.1440359643.git.mchehab@osg.samsung.com>
 References: <cover.1440359643.git.mchehab@osg.samsung.com>
-Message-ID: <dc1be98277c46ddd87e431148fc7e332176828ab.1440359643.git.mchehab@osg.samsung.com>
+Message-ID: <f095b87884d435e296a455ab07a9951a74c0c3a6.1440359643.git.mchehab@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Javier Martinez Canillas <javier@osg.samsung.com>
-
-The struct media_entity has a .parent field that stores a pointer
-to the parent struct media_device. But recently a media_gobj was
-embedded into the entities and since struct media_gojb already has
-a pointer to a struct media_device in the .mdev field, the .parent
-field becomes redundant and can be removed.
-
-This patch replaces all the usage of .parent by .graph_obj.mdev so
-that field will become unused and can be removed on a later patch.
+Now that a link can be either between two different graph
+objects, we'll need to add more functions to create links.
+So, rename the existing one that create links only between
+two pads as media_create_pad_link().
 
 No functional changes.
 
-The transformation was made using the following coccinelle spatch:
+This patch was created via this shell script:
+	for i in $(find drivers/media -name '*.[ch]' -type f) $(find drivers/staging/media -name '*.[ch]' -type f) $(find include/ -name '*.h' -type f) ; do sed s,media_entity_create_link,media_create_pad_link,g <$i >a && mv a $i; done
 
-@@
-struct media_entity *me;
-@@
-
-- me->parent
-+ me->graph_obj.mdev
-
-@@
-struct media_entity *link;
-@@
-
-- link->source->entity->parent
-+ link->source->entity->graph_obj.mdev
-
-@@
-struct exynos_video_entity *ve;
-@@
-
-- ve->vdev.entity.parent
-+ ve->vdev.entity.graph_obj.mdev
-
-Suggested-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
-
-Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+Signed-off-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
+Acked-by: Hans Verkuil <hans.verkuil@cisco.com>
 Signed-off-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
 
-diff --git a/drivers/media/media-device.c b/drivers/media/media-device.c
-index 0f3844470147..138b18416460 100644
---- a/drivers/media/media-device.c
-+++ b/drivers/media/media-device.c
-@@ -435,8 +435,8 @@ int __must_check media_device_register_entity(struct media_device *mdev,
- 	int i;
+diff --git a/Documentation/media-framework.txt b/Documentation/media-framework.txt
+index 6903b2503577..b424de6c3bb3 100644
+--- a/Documentation/media-framework.txt
++++ b/Documentation/media-framework.txt
+@@ -199,7 +199,7 @@ pre-allocated and grows dynamically as needed.
  
- 	/* Warn if we apparently re-register an entity */
--	WARN_ON(entity->parent != NULL);
--	entity->parent = mdev;
-+	WARN_ON(entity->graph_obj.mdev != NULL);
-+	entity->graph_obj.mdev = mdev;
+ Drivers create links by calling
  
- 	spin_lock(&mdev->lock);
- 	/* Initialize media_gobj embedded at the entity */
-@@ -471,7 +471,7 @@ EXPORT_SYMBOL_GPL(media_device_register_entity);
- void media_device_unregister_entity(struct media_entity *entity)
- {
- 	int i;
--	struct media_device *mdev = entity->parent;
-+	struct media_device *mdev = entity->graph_obj.mdev;
+-	media_entity_create_link(struct media_entity *source, u16 source_pad,
++	media_create_pad_link(struct media_entity *source, u16 source_pad,
+ 				 struct media_entity *sink,   u16 sink_pad,
+ 				 u32 flags);
  
- 	if (mdev == NULL)
- 		return;
-@@ -484,7 +484,7 @@ void media_device_unregister_entity(struct media_entity *entity)
- 	media_gobj_remove(&entity->graph_obj);
- 	list_del(&entity->list);
- 	spin_unlock(&mdev->lock);
--	entity->parent = NULL;
-+	entity->graph_obj.mdev = NULL;
+diff --git a/drivers/media/dvb-core/dvbdev.c b/drivers/media/dvb-core/dvbdev.c
+index 2fdcbb5f000a..65f59f2124b4 100644
+--- a/drivers/media/dvb-core/dvbdev.c
++++ b/drivers/media/dvb-core/dvbdev.c
+@@ -412,16 +412,16 @@ void dvb_create_media_graph(struct dvb_adapter *adap)
+ 	}
+ 
+ 	if (tuner && fe)
+-		media_entity_create_link(tuner, 0, fe, 0, 0);
++		media_create_pad_link(tuner, 0, fe, 0, 0);
+ 
+ 	if (fe && demux)
+-		media_entity_create_link(fe, 1, demux, 0, MEDIA_LNK_FL_ENABLED);
++		media_create_pad_link(fe, 1, demux, 0, MEDIA_LNK_FL_ENABLED);
+ 
+ 	if (demux && dvr)
+-		media_entity_create_link(demux, 1, dvr, 0, MEDIA_LNK_FL_ENABLED);
++		media_create_pad_link(demux, 1, dvr, 0, MEDIA_LNK_FL_ENABLED);
+ 
+ 	if (demux && ca)
+-		media_entity_create_link(demux, 1, ca, 0, MEDIA_LNK_FL_ENABLED);
++		media_create_pad_link(demux, 1, ca, 0, MEDIA_LNK_FL_ENABLED);
  }
- EXPORT_SYMBOL_GPL(media_device_unregister_entity);
+ EXPORT_SYMBOL_GPL(dvb_create_media_graph);
+ #endif
+diff --git a/drivers/media/i2c/s5c73m3/s5c73m3-core.c b/drivers/media/i2c/s5c73m3/s5c73m3-core.c
+index 6d167428727d..c81bfbfea32f 100644
+--- a/drivers/media/i2c/s5c73m3/s5c73m3-core.c
++++ b/drivers/media/i2c/s5c73m3/s5c73m3-core.c
+@@ -1482,11 +1482,11 @@ static int s5c73m3_oif_registered(struct v4l2_subdev *sd)
+ 		return ret;
+ 	}
+ 
+-	ret = media_entity_create_link(&state->sensor_sd.entity,
++	ret = media_create_pad_link(&state->sensor_sd.entity,
+ 			S5C73M3_ISP_PAD, &state->oif_sd.entity, OIF_ISP_PAD,
+ 			MEDIA_LNK_FL_IMMUTABLE | MEDIA_LNK_FL_ENABLED);
+ 
+-	ret = media_entity_create_link(&state->sensor_sd.entity,
++	ret = media_create_pad_link(&state->sensor_sd.entity,
+ 			S5C73M3_JPEG_PAD, &state->oif_sd.entity, OIF_JPEG_PAD,
+ 			MEDIA_LNK_FL_IMMUTABLE | MEDIA_LNK_FL_ENABLED);
+ 
+diff --git a/drivers/media/i2c/s5k5baf.c b/drivers/media/i2c/s5k5baf.c
+index 30a9ca62e034..d3bff30bcb6f 100644
+--- a/drivers/media/i2c/s5k5baf.c
++++ b/drivers/media/i2c/s5k5baf.c
+@@ -1756,7 +1756,7 @@ static int s5k5baf_registered(struct v4l2_subdev *sd)
+ 		v4l2_err(sd, "failed to register subdev %s\n",
+ 			 state->cis_sd.name);
+ 	else
+-		ret = media_entity_create_link(&state->cis_sd.entity, PAD_CIS,
++		ret = media_create_pad_link(&state->cis_sd.entity, PAD_CIS,
+ 					       &state->sd.entity, PAD_CIS,
+ 					       MEDIA_LNK_FL_IMMUTABLE |
+ 					       MEDIA_LNK_FL_ENABLED);
+diff --git a/drivers/media/i2c/smiapp/smiapp-core.c b/drivers/media/i2c/smiapp/smiapp-core.c
+index 308613ea0aed..5aa49eb393a9 100644
+--- a/drivers/media/i2c/smiapp/smiapp-core.c
++++ b/drivers/media/i2c/smiapp/smiapp-core.c
+@@ -2495,7 +2495,7 @@ static int smiapp_register_subdevs(struct smiapp_sensor *sensor)
+ 			return rval;
+ 		}
+ 
+-		rval = media_entity_create_link(&this->sd.entity,
++		rval = media_create_pad_link(&this->sd.entity,
+ 						this->source_pad,
+ 						&last->sd.entity,
+ 						last->sink_pad,
+@@ -2503,7 +2503,7 @@ static int smiapp_register_subdevs(struct smiapp_sensor *sensor)
+ 						MEDIA_LNK_FL_IMMUTABLE);
+ 		if (rval) {
+ 			dev_err(&client->dev,
+-				"media_entity_create_link failed\n");
++				"media_create_pad_link failed\n");
+ 			return rval;
+ 		}
  
 diff --git a/drivers/media/media-entity.c b/drivers/media/media-entity.c
-index 35e52cd1fc5a..a23c93369a04 100644
+index 6d515e149d7f..35e52cd1fc5a 100644
 --- a/drivers/media/media-entity.c
 +++ b/drivers/media/media-entity.c
-@@ -332,7 +332,7 @@ EXPORT_SYMBOL_GPL(media_entity_graph_walk_next);
- __must_check int media_entity_pipeline_start(struct media_entity *entity,
- 					     struct media_pipeline *pipe)
- {
--	struct media_device *mdev = entity->parent;
-+	struct media_device *mdev = entity->graph_obj.mdev;
- 	struct media_entity_graph graph;
- 	struct media_entity *entity_err = entity;
- 	int ret;
-@@ -387,7 +387,7 @@ __must_check int media_entity_pipeline_start(struct media_entity *entity,
- 
- 			ret = entity->ops->link_validate(link);
- 			if (ret < 0 && ret != -ENOIOCTLCMD) {
--				dev_dbg(entity->parent->dev,
-+				dev_dbg(entity->graph_obj.mdev->dev,
- 					"link validation failed for \"%s\":%u -> \"%s\":%u, error %d\n",
- 					link->source->entity->name,
- 					link->source->index,
-@@ -401,7 +401,7 @@ __must_check int media_entity_pipeline_start(struct media_entity *entity,
- 
- 		if (!bitmap_full(active, entity->num_pads)) {
- 			ret = -EPIPE;
--			dev_dbg(entity->parent->dev,
-+			dev_dbg(entity->graph_obj.mdev->dev,
- 				"\"%s\":%u must be connected by an enabled link\n",
- 				entity->name,
- 				(unsigned)find_first_zero_bit(
-@@ -454,7 +454,7 @@ EXPORT_SYMBOL_GPL(media_entity_pipeline_start);
-  */
- void media_entity_pipeline_stop(struct media_entity *entity)
- {
--	struct media_device *mdev = entity->parent;
-+	struct media_device *mdev = entity->graph_obj.mdev;
- 	struct media_entity_graph graph;
- 
- 	mutex_lock(&mdev->graph_mutex);
-@@ -490,8 +490,8 @@ struct media_entity *media_entity_get(struct media_entity *entity)
- 	if (entity == NULL)
- 		return NULL;
- 
--	if (entity->parent->dev &&
--	    !try_module_get(entity->parent->dev->driver->owner))
-+	if (entity->graph_obj.mdev->dev &&
-+	    !try_module_get(entity->graph_obj.mdev->dev->driver->owner))
- 		return NULL;
- 
- 	return entity;
-@@ -511,8 +511,8 @@ void media_entity_put(struct media_entity *entity)
- 	if (entity == NULL)
- 		return;
- 
--	if (entity->parent->dev)
--		module_put(entity->parent->dev->driver->owner);
-+	if (entity->graph_obj.mdev->dev)
-+		module_put(entity->graph_obj.mdev->dev->driver->owner);
+@@ -542,7 +542,7 @@ static struct media_link *media_entity_add_link(struct media_entity *entity)
  }
- EXPORT_SYMBOL_GPL(media_entity_put);
  
-@@ -561,7 +561,8 @@ media_create_pad_link(struct media_entity *source, u16 source_pad,
- 	link->flags = flags;
- 
- 	/* Initialize graph object embedded at the new link */
--	media_gobj_init(source->parent, MEDIA_GRAPH_LINK, &link->graph_obj);
-+	media_gobj_init(source->graph_obj.mdev, MEDIA_GRAPH_LINK,
-+			&link->graph_obj);
- 
- 	/* Create the backlink. Backlinks are used to help graph traversal and
- 	 * are not reported to userspace.
-@@ -577,7 +578,8 @@ media_create_pad_link(struct media_entity *source, u16 source_pad,
- 	backlink->flags = flags;
- 
- 	/* Initialize graph object embedded at the new link */
--	media_gobj_init(sink->parent, MEDIA_GRAPH_LINK, &backlink->graph_obj);
-+	media_gobj_init(sink->graph_obj.mdev, MEDIA_GRAPH_LINK,
-+			&backlink->graph_obj);
- 
- 	link->reverse = backlink;
- 	backlink->reverse = link;
-@@ -629,12 +631,12 @@ EXPORT_SYMBOL_GPL(__media_entity_remove_links);
- void media_entity_remove_links(struct media_entity *entity)
+ int
+-media_entity_create_link(struct media_entity *source, u16 source_pad,
++media_create_pad_link(struct media_entity *source, u16 source_pad,
+ 			 struct media_entity *sink, u16 sink_pad, u32 flags)
  {
- 	/* Do nothing if the entity is not registered. */
--	if (entity->parent == NULL)
-+	if (entity->graph_obj.mdev == NULL)
- 		return;
+ 	struct media_link *link;
+@@ -586,7 +586,7 @@ media_entity_create_link(struct media_entity *source, u16 source_pad,
  
--	mutex_lock(&entity->parent->graph_mutex);
-+	mutex_lock(&entity->graph_obj.mdev->graph_mutex);
- 	__media_entity_remove_links(entity);
--	mutex_unlock(&entity->parent->graph_mutex);
-+	mutex_unlock(&entity->graph_obj.mdev->graph_mutex);
+ 	return 0;
  }
- EXPORT_SYMBOL_GPL(media_entity_remove_links);
+-EXPORT_SYMBOL_GPL(media_entity_create_link);
++EXPORT_SYMBOL_GPL(media_create_pad_link);
  
-@@ -703,7 +705,7 @@ int __media_entity_setup_link(struct media_link *link, u32 flags)
- 	    (source->stream_count || sink->stream_count))
- 		return -EBUSY;
- 
--	mdev = source->parent;
-+	mdev = source->graph_obj.mdev;
- 
- 	if (mdev->link_notify) {
- 		ret = mdev->link_notify(link, flags,
-@@ -724,9 +726,9 @@ int media_entity_setup_link(struct media_link *link, u32 flags)
+ void __media_entity_remove_links(struct media_entity *entity)
  {
- 	int ret;
- 
--	mutex_lock(&link->source->entity->parent->graph_mutex);
-+	mutex_lock(&link->source->entity->graph_obj.mdev->graph_mutex);
- 	ret = __media_entity_setup_link(link, flags);
--	mutex_unlock(&link->source->entity->parent->graph_mutex);
-+	mutex_unlock(&link->source->entity->graph_obj.mdev->graph_mutex);
- 
- 	return ret;
- }
-diff --git a/drivers/media/platform/exynos4-is/fimc-isp-video.c b/drivers/media/platform/exynos4-is/fimc-isp-video.c
-index b7dc5ac66e36..3d9ccbf5f10f 100644
---- a/drivers/media/platform/exynos4-is/fimc-isp-video.c
-+++ b/drivers/media/platform/exynos4-is/fimc-isp-video.c
-@@ -288,7 +288,7 @@ static int isp_video_open(struct file *file)
- 		goto rel_fh;
- 
- 	if (v4l2_fh_is_singular_file(file)) {
--		mutex_lock(&me->parent->graph_mutex);
-+		mutex_lock(&me->graph_obj.mdev->graph_mutex);
- 
- 		ret = fimc_pipeline_call(ve, open, me, true);
- 
-@@ -296,7 +296,7 @@ static int isp_video_open(struct file *file)
- 		if (ret == 0)
- 			me->use_count++;
- 
--		mutex_unlock(&me->parent->graph_mutex);
-+		mutex_unlock(&me->graph_obj.mdev->graph_mutex);
- 	}
- 	if (!ret)
- 		goto unlock;
-@@ -312,7 +312,7 @@ static int isp_video_release(struct file *file)
- 	struct fimc_isp *isp = video_drvdata(file);
- 	struct fimc_is_video *ivc = &isp->video_capture;
- 	struct media_entity *entity = &ivc->ve.vdev.entity;
--	struct media_device *mdev = entity->parent;
-+	struct media_device *mdev = entity->graph_obj.mdev;
- 
- 	mutex_lock(&isp->video_lock);
- 
-diff --git a/drivers/media/platform/exynos4-is/fimc-lite.c b/drivers/media/platform/exynos4-is/fimc-lite.c
-index e8f707d1729b..b2607da4ad14 100644
---- a/drivers/media/platform/exynos4-is/fimc-lite.c
-+++ b/drivers/media/platform/exynos4-is/fimc-lite.c
-@@ -500,7 +500,7 @@ static int fimc_lite_open(struct file *file)
- 	    atomic_read(&fimc->out_path) != FIMC_IO_DMA)
- 		goto unlock;
- 
--	mutex_lock(&me->parent->graph_mutex);
-+	mutex_lock(&me->graph_obj.mdev->graph_mutex);
- 
- 	ret = fimc_pipeline_call(&fimc->ve, open, me, true);
- 
-@@ -508,7 +508,7 @@ static int fimc_lite_open(struct file *file)
- 	if (ret == 0)
- 		me->use_count++;
- 
--	mutex_unlock(&me->parent->graph_mutex);
-+	mutex_unlock(&me->graph_obj.mdev->graph_mutex);
- 
- 	if (!ret) {
- 		fimc_lite_clear_event_counters(fimc);
-@@ -541,9 +541,9 @@ static int fimc_lite_release(struct file *file)
- 		fimc_pipeline_call(&fimc->ve, close);
- 		clear_bit(ST_FLITE_IN_USE, &fimc->state);
- 
--		mutex_lock(&entity->parent->graph_mutex);
-+		mutex_lock(&entity->graph_obj.mdev->graph_mutex);
- 		entity->use_count--;
--		mutex_unlock(&entity->parent->graph_mutex);
-+		mutex_unlock(&entity->graph_obj.mdev->graph_mutex);
- 	}
- 
- 	_vb2_fop_release(file, NULL);
 diff --git a/drivers/media/platform/exynos4-is/media-dev.c b/drivers/media/platform/exynos4-is/media-dev.c
-index 3ba76940eef5..92dbade2fffc 100644
+index 4f5586a4cbff..3ba76940eef5 100644
 --- a/drivers/media/platform/exynos4-is/media-dev.c
 +++ b/drivers/media/platform/exynos4-is/media-dev.c
-@@ -1046,7 +1046,7 @@ static int __fimc_md_modify_pipeline(struct media_entity *entity, bool enable)
- 	return ret;
+@@ -729,7 +729,7 @@ static int __fimc_md_create_fimc_sink_links(struct fimc_md *fmd,
+ 		flags = ((1 << i) & link_mask) ? MEDIA_LNK_FL_ENABLED : 0;
+ 
+ 		sink = &fmd->fimc[i]->vid_cap.subdev.entity;
+-		ret = media_entity_create_link(source, pad, sink,
++		ret = media_create_pad_link(source, pad, sink,
+ 					      FIMC_SD_PAD_SINK_CAM, flags);
+ 		if (ret)
+ 			return ret;
+@@ -749,7 +749,7 @@ static int __fimc_md_create_fimc_sink_links(struct fimc_md *fmd,
+ 			continue;
+ 
+ 		sink = &fmd->fimc_lite[i]->subdev.entity;
+-		ret = media_entity_create_link(source, pad, sink,
++		ret = media_create_pad_link(source, pad, sink,
+ 					       FLITE_SD_PAD_SINK, 0);
+ 		if (ret)
+ 			return ret;
+@@ -781,13 +781,13 @@ static int __fimc_md_create_flite_source_links(struct fimc_md *fmd)
+ 		source = &fimc->subdev.entity;
+ 		sink = &fimc->ve.vdev.entity;
+ 		/* FIMC-LITE's subdev and video node */
+-		ret = media_entity_create_link(source, FLITE_SD_PAD_SOURCE_DMA,
++		ret = media_create_pad_link(source, FLITE_SD_PAD_SOURCE_DMA,
+ 					       sink, 0, 0);
+ 		if (ret)
+ 			break;
+ 		/* Link from FIMC-LITE to IS-ISP subdev */
+ 		sink = &fmd->fimc_is->isp.subdev.entity;
+-		ret = media_entity_create_link(source, FLITE_SD_PAD_SOURCE_ISP,
++		ret = media_create_pad_link(source, FLITE_SD_PAD_SOURCE_ISP,
+ 					       sink, 0, 0);
+ 		if (ret)
+ 			break;
+@@ -811,7 +811,7 @@ static int __fimc_md_create_fimc_is_links(struct fimc_md *fmd)
+ 
+ 		/* Link from FIMC-IS-ISP subdev to FIMC */
+ 		sink = &fmd->fimc[i]->vid_cap.subdev.entity;
+-		ret = media_entity_create_link(source, FIMC_ISP_SD_PAD_SRC_FIFO,
++		ret = media_create_pad_link(source, FIMC_ISP_SD_PAD_SRC_FIFO,
+ 					       sink, FIMC_SD_PAD_SINK_FIFO, 0);
+ 		if (ret)
+ 			return ret;
+@@ -824,7 +824,7 @@ static int __fimc_md_create_fimc_is_links(struct fimc_md *fmd)
+ 	if (sink->num_pads == 0)
+ 		return 0;
+ 
+-	return media_entity_create_link(source, FIMC_ISP_SD_PAD_SRC_DMA,
++	return media_create_pad_link(source, FIMC_ISP_SD_PAD_SRC_DMA,
+ 					sink, 0, 0);
  }
  
--/* Locking: called with entity->parent->graph_mutex mutex held. */
-+/* Locking: called with entity->graph_obj.mdev->graph_mutex mutex held. */
- static int __fimc_md_modify_pipelines(struct media_entity *entity, bool enable)
- {
- 	struct media_entity *entity_err = entity;
-diff --git a/drivers/media/platform/exynos4-is/media-dev.h b/drivers/media/platform/exynos4-is/media-dev.h
-index 03214541f149..9a69913b31cb 100644
---- a/drivers/media/platform/exynos4-is/media-dev.h
-+++ b/drivers/media/platform/exynos4-is/media-dev.h
-@@ -164,8 +164,8 @@ struct fimc_sensor_info *source_to_sensor_info(struct fimc_source_info *si)
+@@ -873,7 +873,7 @@ static int fimc_md_create_links(struct fimc_md *fmd)
+ 				return -EINVAL;
  
- static inline struct fimc_md *entity_to_fimc_mdev(struct media_entity *me)
- {
--	return me->parent == NULL ? NULL :
--		container_of(me->parent, struct fimc_md, media_dev);
-+	return me->graph_obj.mdev == NULL ? NULL :
-+		container_of(me->graph_obj.mdev, struct fimc_md, media_dev);
- }
+ 			pad = sensor->entity.num_pads - 1;
+-			ret = media_entity_create_link(&sensor->entity, pad,
++			ret = media_create_pad_link(&sensor->entity, pad,
+ 					      &csis->entity, CSIS_PAD_SINK,
+ 					      MEDIA_LNK_FL_IMMUTABLE |
+ 					      MEDIA_LNK_FL_ENABLED);
+@@ -927,7 +927,7 @@ static int fimc_md_create_links(struct fimc_md *fmd)
+ 		source = &fmd->fimc[i]->vid_cap.subdev.entity;
+ 		sink = &fmd->fimc[i]->vid_cap.ve.vdev.entity;
  
- static inline struct fimc_md *notifier_to_fimc_md(struct v4l2_async_notifier *n)
-@@ -175,12 +175,12 @@ static inline struct fimc_md *notifier_to_fimc_md(struct v4l2_async_notifier *n)
- 
- static inline void fimc_md_graph_lock(struct exynos_video_entity *ve)
- {
--	mutex_lock(&ve->vdev.entity.parent->graph_mutex);
-+	mutex_lock(&ve->vdev.entity.graph_obj.mdev->graph_mutex);
- }
- 
- static inline void fimc_md_graph_unlock(struct exynos_video_entity *ve)
- {
--	mutex_unlock(&ve->vdev.entity.parent->graph_mutex);
-+	mutex_unlock(&ve->vdev.entity.graph_obj.mdev->graph_mutex);
- }
- 
- int fimc_md_set_camclk(struct v4l2_subdev *sd, bool on);
+-		ret = media_entity_create_link(source, FIMC_SD_PAD_SOURCE,
++		ret = media_create_pad_link(source, FIMC_SD_PAD_SOURCE,
+ 					      sink, 0, flags);
+ 		if (ret)
+ 			break;
 diff --git a/drivers/media/platform/omap3isp/isp.c b/drivers/media/platform/omap3isp/isp.c
-index 6351f35b0a65..aa13b17d19a0 100644
+index e08183f9d0f7..6351f35b0a65 100644
 --- a/drivers/media/platform/omap3isp/isp.c
 +++ b/drivers/media/platform/omap3isp/isp.c
-@@ -787,7 +787,7 @@ int omap3isp_pipeline_pm_use(struct media_entity *entity, int use)
- 	int change = use ? 1 : -1;
- 	int ret;
+@@ -1865,7 +1865,7 @@ static int isp_link_entity(
+ 		return -EINVAL;
+ 	}
  
--	mutex_lock(&entity->parent->graph_mutex);
-+	mutex_lock(&entity->graph_obj.mdev->graph_mutex);
- 
- 	/* Apply use count to node. */
- 	entity->use_count += change;
-@@ -798,7 +798,7 @@ int omap3isp_pipeline_pm_use(struct media_entity *entity, int use)
- 	if (ret < 0)
- 		entity->use_count -= change;
- 
--	mutex_unlock(&entity->parent->graph_mutex);
-+	mutex_unlock(&entity->graph_obj.mdev->graph_mutex);
- 
- 	return ret;
+-	return media_entity_create_link(entity, i, input, pad, flags);
++	return media_create_pad_link(entity, i, input, pad, flags);
  }
-diff --git a/drivers/media/platform/omap3isp/ispvideo.c b/drivers/media/platform/omap3isp/ispvideo.c
-index 6c89dc40df85..4c367352b1f7 100644
---- a/drivers/media/platform/omap3isp/ispvideo.c
-+++ b/drivers/media/platform/omap3isp/ispvideo.c
-@@ -226,7 +226,7 @@ static int isp_video_get_graph_data(struct isp_video *video,
+ 
+ static int isp_register_entities(struct isp_device *isp)
+@@ -2004,51 +2004,51 @@ static int isp_initialize_modules(struct isp_device *isp)
+ 	}
+ 
+ 	/* Connect the submodules. */
+-	ret = media_entity_create_link(
++	ret = media_create_pad_link(
+ 			&isp->isp_csi2a.subdev.entity, CSI2_PAD_SOURCE,
+ 			&isp->isp_ccdc.subdev.entity, CCDC_PAD_SINK, 0);
+ 	if (ret < 0)
+ 		goto error_link;
+ 
+-	ret = media_entity_create_link(
++	ret = media_create_pad_link(
+ 			&isp->isp_ccp2.subdev.entity, CCP2_PAD_SOURCE,
+ 			&isp->isp_ccdc.subdev.entity, CCDC_PAD_SINK, 0);
+ 	if (ret < 0)
+ 		goto error_link;
+ 
+-	ret = media_entity_create_link(
++	ret = media_create_pad_link(
+ 			&isp->isp_ccdc.subdev.entity, CCDC_PAD_SOURCE_VP,
+ 			&isp->isp_prev.subdev.entity, PREV_PAD_SINK, 0);
+ 	if (ret < 0)
+ 		goto error_link;
+ 
+-	ret = media_entity_create_link(
++	ret = media_create_pad_link(
+ 			&isp->isp_ccdc.subdev.entity, CCDC_PAD_SOURCE_OF,
+ 			&isp->isp_res.subdev.entity, RESZ_PAD_SINK, 0);
+ 	if (ret < 0)
+ 		goto error_link;
+ 
+-	ret = media_entity_create_link(
++	ret = media_create_pad_link(
+ 			&isp->isp_prev.subdev.entity, PREV_PAD_SOURCE,
+ 			&isp->isp_res.subdev.entity, RESZ_PAD_SINK, 0);
+ 	if (ret < 0)
+ 		goto error_link;
+ 
+-	ret = media_entity_create_link(
++	ret = media_create_pad_link(
+ 			&isp->isp_ccdc.subdev.entity, CCDC_PAD_SOURCE_VP,
+ 			&isp->isp_aewb.subdev.entity, 0,
+ 			MEDIA_LNK_FL_ENABLED | MEDIA_LNK_FL_IMMUTABLE);
+ 	if (ret < 0)
+ 		goto error_link;
+ 
+-	ret = media_entity_create_link(
++	ret = media_create_pad_link(
+ 			&isp->isp_ccdc.subdev.entity, CCDC_PAD_SOURCE_VP,
+ 			&isp->isp_af.subdev.entity, 0,
+ 			MEDIA_LNK_FL_ENABLED | MEDIA_LNK_FL_IMMUTABLE);
+ 	if (ret < 0)
+ 		goto error_link;
+ 
+-	ret = media_entity_create_link(
++	ret = media_create_pad_link(
+ 			&isp->isp_ccdc.subdev.entity, CCDC_PAD_SOURCE_VP,
+ 			&isp->isp_hist.subdev.entity, 0,
+ 			MEDIA_LNK_FL_ENABLED | MEDIA_LNK_FL_IMMUTABLE);
+diff --git a/drivers/media/platform/omap3isp/ispccdc.c b/drivers/media/platform/omap3isp/ispccdc.c
+index d96e3be5e252..27555e4f4aa8 100644
+--- a/drivers/media/platform/omap3isp/ispccdc.c
++++ b/drivers/media/platform/omap3isp/ispccdc.c
+@@ -2667,7 +2667,7 @@ static int ccdc_init_entities(struct isp_ccdc_device *ccdc)
+ 		goto error_video;
+ 
+ 	/* Connect the CCDC subdev to the video node. */
+-	ret = media_entity_create_link(&ccdc->subdev.entity, CCDC_PAD_SOURCE_OF,
++	ret = media_create_pad_link(&ccdc->subdev.entity, CCDC_PAD_SOURCE_OF,
+ 			&ccdc->video_out.video.entity, 0, 0);
+ 	if (ret < 0)
+ 		goto error_link;
+diff --git a/drivers/media/platform/omap3isp/ispccp2.c b/drivers/media/platform/omap3isp/ispccp2.c
+index e1b5f5bea541..b215eb5049d6 100644
+--- a/drivers/media/platform/omap3isp/ispccp2.c
++++ b/drivers/media/platform/omap3isp/ispccp2.c
+@@ -1100,7 +1100,7 @@ static int ccp2_init_entities(struct isp_ccp2_device *ccp2)
+ 		goto error_video;
+ 
+ 	/* Connect the video node to the ccp2 subdev. */
+-	ret = media_entity_create_link(&ccp2->video_in.video.entity, 0,
++	ret = media_create_pad_link(&ccp2->video_in.video.entity, 0,
+ 				       &ccp2->subdev.entity, CCP2_PAD_SINK, 0);
+ 	if (ret < 0)
+ 		goto error_link;
+diff --git a/drivers/media/platform/omap3isp/ispcsi2.c b/drivers/media/platform/omap3isp/ispcsi2.c
+index 6fff92f0813a..fcefc1e74881 100644
+--- a/drivers/media/platform/omap3isp/ispcsi2.c
++++ b/drivers/media/platform/omap3isp/ispcsi2.c
+@@ -1265,7 +1265,7 @@ static int csi2_init_entities(struct isp_csi2_device *csi2)
+ 		goto error_video;
+ 
+ 	/* Connect the CSI2 subdev to the video node. */
+-	ret = media_entity_create_link(&csi2->subdev.entity, CSI2_PAD_SOURCE,
++	ret = media_create_pad_link(&csi2->subdev.entity, CSI2_PAD_SOURCE,
+ 				       &csi2->video_out.video.entity, 0, 0);
+ 	if (ret < 0)
+ 		goto error_link;
+diff --git a/drivers/media/platform/omap3isp/isppreview.c b/drivers/media/platform/omap3isp/isppreview.c
+index b440c6342ca4..ad38d20c7770 100644
+--- a/drivers/media/platform/omap3isp/isppreview.c
++++ b/drivers/media/platform/omap3isp/isppreview.c
+@@ -2312,12 +2312,12 @@ static int preview_init_entities(struct isp_prev_device *prev)
+ 		goto error_video_out;
+ 
+ 	/* Connect the video nodes to the previewer subdev. */
+-	ret = media_entity_create_link(&prev->video_in.video.entity, 0,
++	ret = media_create_pad_link(&prev->video_in.video.entity, 0,
+ 			&prev->subdev.entity, PREV_PAD_SINK, 0);
+ 	if (ret < 0)
+ 		goto error_link;
+ 
+-	ret = media_entity_create_link(&prev->subdev.entity, PREV_PAD_SOURCE,
++	ret = media_create_pad_link(&prev->subdev.entity, PREV_PAD_SOURCE,
+ 			&prev->video_out.video.entity, 0, 0);
+ 	if (ret < 0)
+ 		goto error_link;
+diff --git a/drivers/media/platform/omap3isp/ispresizer.c b/drivers/media/platform/omap3isp/ispresizer.c
+index 3deb1ec4a973..b48ad4d4b834 100644
+--- a/drivers/media/platform/omap3isp/ispresizer.c
++++ b/drivers/media/platform/omap3isp/ispresizer.c
+@@ -1756,12 +1756,12 @@ static int resizer_init_entities(struct isp_res_device *res)
+ 	res->video_out.video.entity.flags |= MEDIA_ENT_FL_DEFAULT;
+ 
+ 	/* Connect the video nodes to the resizer subdev. */
+-	ret = media_entity_create_link(&res->video_in.video.entity, 0,
++	ret = media_create_pad_link(&res->video_in.video.entity, 0,
+ 			&res->subdev.entity, RESZ_PAD_SINK, 0);
+ 	if (ret < 0)
+ 		goto error_link;
+ 
+-	ret = media_entity_create_link(&res->subdev.entity, RESZ_PAD_SOURCE,
++	ret = media_create_pad_link(&res->subdev.entity, RESZ_PAD_SOURCE,
+ 			&res->video_out.video.entity, 0, 0);
+ 	if (ret < 0)
+ 		goto error_link;
+diff --git a/drivers/media/platform/s3c-camif/camif-core.c b/drivers/media/platform/s3c-camif/camif-core.c
+index f47b332f0418..3e33c60be004 100644
+--- a/drivers/media/platform/s3c-camif/camif-core.c
++++ b/drivers/media/platform/s3c-camif/camif-core.c
+@@ -263,7 +263,7 @@ static int camif_create_media_links(struct camif_dev *camif)
  {
- 	struct media_entity_graph graph;
- 	struct media_entity *entity = &video->video.entity;
--	struct media_device *mdev = entity->parent;
-+	struct media_device *mdev = entity->graph_obj.mdev;
- 	struct isp_video *far_end = NULL;
+ 	int i, ret;
  
- 	mutex_lock(&mdev->graph_mutex);
-diff --git a/drivers/media/platform/vsp1/vsp1_video.c b/drivers/media/platform/vsp1/vsp1_video.c
-index debe4e539df6..1f94c1a54e00 100644
---- a/drivers/media/platform/vsp1/vsp1_video.c
-+++ b/drivers/media/platform/vsp1/vsp1_video.c
-@@ -409,7 +409,7 @@ static int vsp1_pipeline_validate(struct vsp1_pipeline *pipe,
- {
- 	struct media_entity_graph graph;
- 	struct media_entity *entity = &video->video.entity;
--	struct media_device *mdev = entity->parent;
-+	struct media_device *mdev = entity->graph_obj.mdev;
- 	unsigned int i;
- 	int ret;
+-	ret = media_entity_create_link(&camif->sensor.sd->entity, 0,
++	ret = media_create_pad_link(&camif->sensor.sd->entity, 0,
+ 				&camif->subdev.entity, CAMIF_SD_PAD_SINK,
+ 				MEDIA_LNK_FL_IMMUTABLE |
+ 				MEDIA_LNK_FL_ENABLED);
+@@ -271,7 +271,7 @@ static int camif_create_media_links(struct camif_dev *camif)
+ 		return ret;
  
-diff --git a/drivers/media/platform/xilinx/xilinx-dma.c b/drivers/media/platform/xilinx/xilinx-dma.c
-index f7f9aa353a55..92e8116dc28f 100644
---- a/drivers/media/platform/xilinx/xilinx-dma.c
-+++ b/drivers/media/platform/xilinx/xilinx-dma.c
-@@ -181,7 +181,7 @@ static int xvip_pipeline_validate(struct xvip_pipeline *pipe,
- {
- 	struct media_entity_graph graph;
- 	struct media_entity *entity = &start->video.entity;
--	struct media_device *mdev = entity->parent;
-+	struct media_device *mdev = entity->graph_obj.mdev;
- 	unsigned int num_inputs = 0;
- 	unsigned int num_outputs = 0;
+ 	for (i = 1; i < CAMIF_SD_PADS_NUM && !ret; i++) {
+-		ret = media_entity_create_link(&camif->subdev.entity, i,
++		ret = media_create_pad_link(&camif->subdev.entity, i,
+ 				&camif->vp[i - 1].vdev.entity, 0,
+ 				MEDIA_LNK_FL_IMMUTABLE |
+ 				MEDIA_LNK_FL_ENABLED);
+diff --git a/drivers/media/platform/vsp1/vsp1_drv.c b/drivers/media/platform/vsp1/vsp1_drv.c
+index 4e61886384e3..9cd94a76a9ed 100644
+--- a/drivers/media/platform/vsp1/vsp1_drv.c
++++ b/drivers/media/platform/vsp1/vsp1_drv.c
+@@ -101,7 +101,7 @@ static int vsp1_create_links(struct vsp1_device *vsp1, struct vsp1_entity *sink)
+ 			if (!(entity->pads[pad].flags & MEDIA_PAD_FL_SINK))
+ 				continue;
  
-diff --git a/drivers/staging/media/davinci_vpfe/vpfe_video.c b/drivers/staging/media/davinci_vpfe/vpfe_video.c
-index 61a8d5beff58..92573fa852a9 100644
---- a/drivers/staging/media/davinci_vpfe/vpfe_video.c
-+++ b/drivers/staging/media/davinci_vpfe/vpfe_video.c
-@@ -130,7 +130,7 @@ __vpfe_video_get_format(struct vpfe_video_device *video,
- static void vpfe_prepare_pipeline(struct vpfe_video_device *video)
- {
- 	struct media_entity *entity = &video->video_dev.entity;
--	struct media_device *mdev = entity->parent;
-+	struct media_device *mdev = entity->graph_obj.mdev;
- 	struct vpfe_pipeline *pipe = &video->pipe;
- 	struct vpfe_video_device *far_end = NULL;
- 	struct media_entity_graph graph;
-@@ -288,7 +288,7 @@ static int vpfe_pipeline_enable(struct vpfe_pipeline *pipe)
- 	else
- 		entity = &pipe->inputs[0]->video_dev.entity;
+-			ret = media_entity_create_link(&source->subdev.entity,
++			ret = media_create_pad_link(&source->subdev.entity,
+ 						       source->source_pad,
+ 						       entity, pad, flags);
+ 			if (ret < 0)
+@@ -262,7 +262,7 @@ static int vsp1_create_entities(struct vsp1_device *vsp1)
+ 	}
  
--	mdev = entity->parent;
-+	mdev = entity->graph_obj.mdev;
- 	mutex_lock(&mdev->graph_mutex);
- 	media_entity_graph_walk_start(&graph, entity);
- 	while ((entity = media_entity_graph_walk_next(&graph))) {
-@@ -328,7 +328,7 @@ static int vpfe_pipeline_disable(struct vpfe_pipeline *pipe)
- 	else
- 		entity = &pipe->inputs[0]->video_dev.entity;
+ 	if (vsp1->pdata.features & VSP1_HAS_LIF) {
+-		ret = media_entity_create_link(
++		ret = media_create_pad_link(
+ 			&vsp1->wpf[0]->entity.subdev.entity, RWPF_PAD_SOURCE,
+ 			&vsp1->lif->entity.subdev.entity, LIF_PAD_SINK, 0);
+ 		if (ret < 0)
+diff --git a/drivers/media/platform/vsp1/vsp1_rpf.c b/drivers/media/platform/vsp1/vsp1_rpf.c
+index 3294529a3108..b60a528a8fe8 100644
+--- a/drivers/media/platform/vsp1/vsp1_rpf.c
++++ b/drivers/media/platform/vsp1/vsp1_rpf.c
+@@ -278,7 +278,7 @@ struct vsp1_rwpf *vsp1_rpf_create(struct vsp1_device *vsp1, unsigned int index)
+ 	rpf->entity.video = video;
  
--	mdev = entity->parent;
-+	mdev = entity->graph_obj.mdev;
- 	mutex_lock(&mdev->graph_mutex);
- 	media_entity_graph_walk_start(&graph, entity);
+ 	/* Connect the video device to the RPF. */
+-	ret = media_entity_create_link(&rpf->video.video.entity, 0,
++	ret = media_create_pad_link(&rpf->video.video.entity, 0,
+ 				       &rpf->entity.subdev.entity,
+ 				       RWPF_PAD_SINK,
+ 				       MEDIA_LNK_FL_ENABLED |
+diff --git a/drivers/media/platform/vsp1/vsp1_wpf.c b/drivers/media/platform/vsp1/vsp1_wpf.c
+index 1d2b3a2f1573..d39aa4b8aea1 100644
+--- a/drivers/media/platform/vsp1/vsp1_wpf.c
++++ b/drivers/media/platform/vsp1/vsp1_wpf.c
+@@ -284,7 +284,7 @@ struct vsp1_rwpf *vsp1_wpf_create(struct vsp1_device *vsp1, unsigned int index)
+ 	if (!(vsp1->pdata.features & VSP1_HAS_LIF) || index != 0)
+ 		flags |= MEDIA_LNK_FL_IMMUTABLE;
  
+-	ret = media_entity_create_link(&wpf->entity.subdev.entity,
++	ret = media_create_pad_link(&wpf->entity.subdev.entity,
+ 				       RWPF_PAD_SOURCE,
+ 				       &wpf->video.video.entity, 0, flags);
+ 	if (ret < 0)
+diff --git a/drivers/media/platform/xilinx/xilinx-vipp.c b/drivers/media/platform/xilinx/xilinx-vipp.c
+index 7b7cb9c28d2c..79d4be7ce9a5 100644
+--- a/drivers/media/platform/xilinx/xilinx-vipp.c
++++ b/drivers/media/platform/xilinx/xilinx-vipp.c
+@@ -156,7 +156,7 @@ static int xvip_graph_build_one(struct xvip_composite_device *xdev,
+ 			local->name, local_pad->index,
+ 			remote->name, remote_pad->index);
+ 
+-		ret = media_entity_create_link(local, local_pad->index,
++		ret = media_create_pad_link(local, local_pad->index,
+ 					       remote, remote_pad->index,
+ 					       link_flags);
+ 		if (ret < 0) {
+@@ -270,7 +270,7 @@ static int xvip_graph_build_dma(struct xvip_composite_device *xdev)
+ 			source->name, source_pad->index,
+ 			sink->name, sink_pad->index);
+ 
+-		ret = media_entity_create_link(source, source_pad->index,
++		ret = media_create_pad_link(source, source_pad->index,
+ 					       sink, sink_pad->index,
+ 					       link_flags);
+ 		if (ret < 0) {
+diff --git a/drivers/media/usb/au0828/au0828-core.c b/drivers/media/usb/au0828/au0828-core.c
+index 0378a2c99ebb..a55eb524ea21 100644
+--- a/drivers/media/usb/au0828/au0828-core.c
++++ b/drivers/media/usb/au0828/au0828-core.c
+@@ -260,13 +260,13 @@ static void au0828_create_media_graph(struct au0828_dev *dev)
+ 		return;
+ 
+ 	if (tuner)
+-		media_entity_create_link(tuner, 0, decoder, 0,
++		media_create_pad_link(tuner, 0, decoder, 0,
+ 					 MEDIA_LNK_FL_ENABLED);
+ 	if (dev->vdev.entity.links)
+-		media_entity_create_link(decoder, 1, &dev->vdev.entity, 0,
++		media_create_pad_link(decoder, 1, &dev->vdev.entity, 0,
+ 				 MEDIA_LNK_FL_ENABLED);
+ 	if (dev->vbi_dev.entity.links)
+-		media_entity_create_link(decoder, 2, &dev->vbi_dev.entity, 0,
++		media_create_pad_link(decoder, 2, &dev->vbi_dev.entity, 0,
+ 				 MEDIA_LNK_FL_ENABLED);
+ #endif
+ }
+diff --git a/drivers/media/usb/cx231xx/cx231xx-cards.c b/drivers/media/usb/cx231xx/cx231xx-cards.c
+index 4a117a58c39a..3b5c9ae39ad3 100644
+--- a/drivers/media/usb/cx231xx/cx231xx-cards.c
++++ b/drivers/media/usb/cx231xx/cx231xx-cards.c
+@@ -1264,11 +1264,11 @@ static void cx231xx_create_media_graph(struct cx231xx *dev)
+ 		return;
+ 
+ 	if (tuner)
+-		media_entity_create_link(tuner, 0, decoder, 0,
++		media_create_pad_link(tuner, 0, decoder, 0,
+ 					 MEDIA_LNK_FL_ENABLED);
+-	media_entity_create_link(decoder, 1, &dev->vdev.entity, 0,
++	media_create_pad_link(decoder, 1, &dev->vdev.entity, 0,
+ 				 MEDIA_LNK_FL_ENABLED);
+-	media_entity_create_link(decoder, 2, &dev->vbi_dev.entity, 0,
++	media_create_pad_link(decoder, 2, &dev->vbi_dev.entity, 0,
+ 				 MEDIA_LNK_FL_ENABLED);
+ #endif
+ }
+diff --git a/drivers/media/usb/uvc/uvc_entity.c b/drivers/media/usb/uvc/uvc_entity.c
+index 245445491516..429e428ccd93 100644
+--- a/drivers/media/usb/uvc/uvc_entity.c
++++ b/drivers/media/usb/uvc/uvc_entity.c
+@@ -56,7 +56,7 @@ static int uvc_mc_register_entity(struct uvc_video_chain *chain,
+ 			continue;
+ 
+ 		remote_pad = remote->num_pads - 1;
+-		ret = media_entity_create_link(source, remote_pad,
++		ret = media_create_pad_link(source, remote_pad,
+ 					       sink, i, flags);
+ 		if (ret < 0)
+ 			return ret;
+diff --git a/drivers/staging/media/davinci_vpfe/dm365_ipipeif.c b/drivers/staging/media/davinci_vpfe/dm365_ipipeif.c
+index 8fb676186898..d96bdaaae50e 100644
+--- a/drivers/staging/media/davinci_vpfe/dm365_ipipeif.c
++++ b/drivers/staging/media/davinci_vpfe/dm365_ipipeif.c
+@@ -971,7 +971,7 @@ vpfe_ipipeif_register_entities(struct vpfe_ipipeif_device *ipipeif,
+ 	ipipeif->video_in.vpfe_dev = vpfe_dev;
+ 
+ 	flags = 0;
+-	ret = media_entity_create_link(&ipipeif->video_in.video_dev.entity, 0,
++	ret = media_create_pad_link(&ipipeif->video_in.video_dev.entity, 0,
+ 					&ipipeif->subdev.entity, 0, flags);
+ 	if (ret < 0)
+ 		goto fail;
+diff --git a/drivers/staging/media/davinci_vpfe/dm365_isif.c b/drivers/staging/media/davinci_vpfe/dm365_isif.c
+index b1f01adfa7c8..df77288b0ec0 100644
+--- a/drivers/staging/media/davinci_vpfe/dm365_isif.c
++++ b/drivers/staging/media/davinci_vpfe/dm365_isif.c
+@@ -1817,7 +1817,7 @@ int vpfe_isif_register_entities(struct vpfe_isif_device *isif,
+ 	isif->video_out.vpfe_dev = vpfe_dev;
+ 	flags = 0;
+ 	/* connect isif to video node */
+-	ret = media_entity_create_link(&isif->subdev.entity, 1,
++	ret = media_create_pad_link(&isif->subdev.entity, 1,
+ 				       &isif->video_out.video_dev.entity,
+ 				       0, flags);
+ 	if (ret < 0)
+diff --git a/drivers/staging/media/davinci_vpfe/dm365_resizer.c b/drivers/staging/media/davinci_vpfe/dm365_resizer.c
+index 692789aa22f4..ae942de3a23d 100644
+--- a/drivers/staging/media/davinci_vpfe/dm365_resizer.c
++++ b/drivers/staging/media/davinci_vpfe/dm365_resizer.c
+@@ -1831,27 +1831,27 @@ int vpfe_resizer_register_entities(struct vpfe_resizer_device *resizer,
+ 	resizer->resizer_b.video_out.vpfe_dev = vpfe_dev;
+ 
+ 	/* create link between Resizer Crop----> Resizer A*/
+-	ret = media_entity_create_link(&resizer->crop_resizer.subdev.entity, 1,
++	ret = media_create_pad_link(&resizer->crop_resizer.subdev.entity, 1,
+ 				&resizer->resizer_a.subdev.entity,
+ 				0, flags);
+ 	if (ret < 0)
+ 		goto out_create_link;
+ 
+ 	/* create link between Resizer Crop----> Resizer B*/
+-	ret = media_entity_create_link(&resizer->crop_resizer.subdev.entity, 2,
++	ret = media_create_pad_link(&resizer->crop_resizer.subdev.entity, 2,
+ 				&resizer->resizer_b.subdev.entity,
+ 				0, flags);
+ 	if (ret < 0)
+ 		goto out_create_link;
+ 
+ 	/* create link between Resizer A ----> video out */
+-	ret = media_entity_create_link(&resizer->resizer_a.subdev.entity, 1,
++	ret = media_create_pad_link(&resizer->resizer_a.subdev.entity, 1,
+ 		&resizer->resizer_a.video_out.video_dev.entity, 0, flags);
+ 	if (ret < 0)
+ 		goto out_create_link;
+ 
+ 	/* create link between Resizer B ----> video out */
+-	ret = media_entity_create_link(&resizer->resizer_b.subdev.entity, 1,
++	ret = media_create_pad_link(&resizer->resizer_b.subdev.entity, 1,
+ 		&resizer->resizer_b.video_out.video_dev.entity, 0, flags);
+ 	if (ret < 0)
+ 		goto out_create_link;
+diff --git a/drivers/staging/media/davinci_vpfe/vpfe_mc_capture.c b/drivers/staging/media/davinci_vpfe/vpfe_mc_capture.c
+index 57426199ad7a..08c8a5f967d3 100644
+--- a/drivers/staging/media/davinci_vpfe/vpfe_mc_capture.c
++++ b/drivers/staging/media/davinci_vpfe/vpfe_mc_capture.c
+@@ -445,32 +445,32 @@ static int vpfe_register_entities(struct vpfe_device *vpfe_dev)
+ 		/* if entity has no pads (ex: amplifier),
+ 		   cant establish link */
+ 		if (vpfe_dev->sd[i]->entity.num_pads) {
+-			ret = media_entity_create_link(&vpfe_dev->sd[i]->entity,
++			ret = media_create_pad_link(&vpfe_dev->sd[i]->entity,
+ 				0, &vpfe_dev->vpfe_isif.subdev.entity,
+ 				0, flags);
+ 			if (ret < 0)
+ 				goto out_resizer_register;
+ 		}
+ 
+-	ret = media_entity_create_link(&vpfe_dev->vpfe_isif.subdev.entity, 1,
++	ret = media_create_pad_link(&vpfe_dev->vpfe_isif.subdev.entity, 1,
+ 				       &vpfe_dev->vpfe_ipipeif.subdev.entity,
+ 				       0, flags);
+ 	if (ret < 0)
+ 		goto out_resizer_register;
+ 
+-	ret = media_entity_create_link(&vpfe_dev->vpfe_ipipeif.subdev.entity, 1,
++	ret = media_create_pad_link(&vpfe_dev->vpfe_ipipeif.subdev.entity, 1,
+ 				       &vpfe_dev->vpfe_ipipe.subdev.entity,
+ 				       0, flags);
+ 	if (ret < 0)
+ 		goto out_resizer_register;
+ 
+-	ret = media_entity_create_link(&vpfe_dev->vpfe_ipipe.subdev.entity,
++	ret = media_create_pad_link(&vpfe_dev->vpfe_ipipe.subdev.entity,
+ 			1, &vpfe_dev->vpfe_resizer.crop_resizer.subdev.entity,
+ 			0, flags);
+ 	if (ret < 0)
+ 		goto out_resizer_register;
+ 
+-	ret = media_entity_create_link(&vpfe_dev->vpfe_ipipeif.subdev.entity, 1,
++	ret = media_create_pad_link(&vpfe_dev->vpfe_ipipeif.subdev.entity, 1,
+ 			&vpfe_dev->vpfe_resizer.crop_resizer.subdev.entity,
+ 			0, flags);
+ 	if (ret < 0)
 diff --git a/drivers/staging/media/omap4iss/iss.c b/drivers/staging/media/omap4iss/iss.c
-index 7226553ceb2f..40591963b42b 100644
+index e54a7afd31de..7226553ceb2f 100644
 --- a/drivers/staging/media/omap4iss/iss.c
 +++ b/drivers/staging/media/omap4iss/iss.c
-@@ -494,7 +494,7 @@ int omap4iss_pipeline_pm_use(struct media_entity *entity, int use)
- 	int change = use ? 1 : -1;
- 	int ret;
+@@ -1259,7 +1259,7 @@ static int iss_register_entities(struct iss_device *iss)
+ 			goto done;
+ 		}
  
--	mutex_lock(&entity->parent->graph_mutex);
-+	mutex_lock(&entity->graph_obj.mdev->graph_mutex);
+-		ret = media_entity_create_link(&sensor->entity, 0, input, pad,
++		ret = media_create_pad_link(&sensor->entity, 0, input, pad,
+ 					       flags);
+ 		if (ret < 0)
+ 			goto done;
+@@ -1317,31 +1317,31 @@ static int iss_initialize_modules(struct iss_device *iss)
+ 	}
  
- 	/* Apply use count to node. */
- 	entity->use_count += change;
-@@ -505,7 +505,7 @@ int omap4iss_pipeline_pm_use(struct media_entity *entity, int use)
+ 	/* Connect the submodules. */
+-	ret = media_entity_create_link(
++	ret = media_create_pad_link(
+ 			&iss->csi2a.subdev.entity, CSI2_PAD_SOURCE,
+ 			&iss->ipipeif.subdev.entity, IPIPEIF_PAD_SINK, 0);
  	if (ret < 0)
- 		entity->use_count -= change;
+ 		goto error_link;
  
--	mutex_unlock(&entity->parent->graph_mutex);
-+	mutex_unlock(&entity->graph_obj.mdev->graph_mutex);
+-	ret = media_entity_create_link(
++	ret = media_create_pad_link(
+ 			&iss->csi2b.subdev.entity, CSI2_PAD_SOURCE,
+ 			&iss->ipipeif.subdev.entity, IPIPEIF_PAD_SINK, 0);
+ 	if (ret < 0)
+ 		goto error_link;
  
- 	return ret;
- }
-diff --git a/drivers/staging/media/omap4iss/iss_video.c b/drivers/staging/media/omap4iss/iss_video.c
-index 25e9e7a6b99d..45a3f2d778fc 100644
---- a/drivers/staging/media/omap4iss/iss_video.c
-+++ b/drivers/staging/media/omap4iss/iss_video.c
-@@ -207,7 +207,7 @@ iss_video_far_end(struct iss_video *video)
- {
- 	struct media_entity_graph graph;
- 	struct media_entity *entity = &video->video.entity;
--	struct media_device *mdev = entity->parent;
-+	struct media_device *mdev = entity->graph_obj.mdev;
- 	struct iss_video *far_end = NULL;
+-	ret = media_entity_create_link(
++	ret = media_create_pad_link(
+ 			&iss->ipipeif.subdev.entity, IPIPEIF_PAD_SOURCE_VP,
+ 			&iss->resizer.subdev.entity, RESIZER_PAD_SINK, 0);
+ 	if (ret < 0)
+ 		goto error_link;
  
- 	mutex_lock(&mdev->graph_mutex);
+-	ret = media_entity_create_link(
++	ret = media_create_pad_link(
+ 			&iss->ipipeif.subdev.entity, IPIPEIF_PAD_SOURCE_VP,
+ 			&iss->ipipe.subdev.entity, IPIPE_PAD_SINK, 0);
+ 	if (ret < 0)
+ 		goto error_link;
+ 
+-	ret = media_entity_create_link(
++	ret = media_create_pad_link(
+ 			&iss->ipipe.subdev.entity, IPIPE_PAD_SOURCE_VP,
+ 			&iss->resizer.subdev.entity, RESIZER_PAD_SINK, 0);
+ 	if (ret < 0)
+diff --git a/drivers/staging/media/omap4iss/iss_csi2.c b/drivers/staging/media/omap4iss/iss_csi2.c
+index e936cfc218cb..6b4dcbfa9425 100644
+--- a/drivers/staging/media/omap4iss/iss_csi2.c
++++ b/drivers/staging/media/omap4iss/iss_csi2.c
+@@ -1291,7 +1291,7 @@ static int csi2_init_entities(struct iss_csi2_device *csi2, const char *subname)
+ 		goto error_video;
+ 
+ 	/* Connect the CSI2 subdev to the video node. */
+-	ret = media_entity_create_link(&csi2->subdev.entity, CSI2_PAD_SOURCE,
++	ret = media_create_pad_link(&csi2->subdev.entity, CSI2_PAD_SOURCE,
+ 				       &csi2->video_out.video.entity, 0, 0);
+ 	if (ret < 0)
+ 		goto error_link;
+diff --git a/drivers/staging/media/omap4iss/iss_ipipeif.c b/drivers/staging/media/omap4iss/iss_ipipeif.c
+index be5f80d7b5dc..44c432ef2ac5 100644
+--- a/drivers/staging/media/omap4iss/iss_ipipeif.c
++++ b/drivers/staging/media/omap4iss/iss_ipipeif.c
+@@ -762,7 +762,7 @@ static int ipipeif_init_entities(struct iss_ipipeif_device *ipipeif)
+ 		return ret;
+ 
+ 	/* Connect the IPIPEIF subdev to the video node. */
+-	ret = media_entity_create_link(&ipipeif->subdev.entity,
++	ret = media_create_pad_link(&ipipeif->subdev.entity,
+ 				       IPIPEIF_PAD_SOURCE_ISIF_SF,
+ 				       &ipipeif->video_out.video.entity, 0, 0);
+ 	if (ret < 0)
+diff --git a/drivers/staging/media/omap4iss/iss_resizer.c b/drivers/staging/media/omap4iss/iss_resizer.c
+index 91e724085dba..b659e465cb56 100644
+--- a/drivers/staging/media/omap4iss/iss_resizer.c
++++ b/drivers/staging/media/omap4iss/iss_resizer.c
+@@ -806,7 +806,7 @@ static int resizer_init_entities(struct iss_resizer_device *resizer)
+ 		return ret;
+ 
+ 	/* Connect the RESIZER subdev to the video node. */
+-	ret = media_entity_create_link(&resizer->subdev.entity,
++	ret = media_create_pad_link(&resizer->subdev.entity,
+ 				       RESIZER_PAD_SOURCE_MEM,
+ 				       &resizer->video_out.video.entity, 0, 0);
+ 	if (ret < 0)
+diff --git a/include/media/media-entity.h b/include/media/media-entity.h
+index af6646ddf6db..e0e4b014ce62 100644
+--- a/include/media/media-entity.h
++++ b/include/media/media-entity.h
+@@ -208,7 +208,7 @@ int media_entity_init(struct media_entity *entity, u16 num_pads,
+ 		struct media_pad *pads);
+ void media_entity_cleanup(struct media_entity *entity);
+ 
+-int media_entity_create_link(struct media_entity *source, u16 source_pad,
++int media_create_pad_link(struct media_entity *source, u16 source_pad,
+ 		struct media_entity *sink, u16 sink_pad, u32 flags);
+ void __media_entity_remove_links(struct media_entity *entity);
+ void media_entity_remove_links(struct media_entity *entity);
 -- 
 2.4.3
