@@ -1,54 +1,47 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 23 Aug 2015 15:59:45 +0200
-Subject: [PATCH] dmaengine: vdma: Add 64 bit addressing support to the
- driver
-In-Reply-To: <20150823133933.GY13546@localhost>
-References: <1438775257-3511-1-git-send-email-anuragku@xilinx.com>
- <2348343.VuhoH7scrX@avalon> <20150823133933.GY13546@localhost>
-Message-ID: <3107999.Bu5nBsJYRS@wuerfel>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Sun, 23 Aug 2015 19:38:23 +0530
+Subject: [PATCH v4 2/2] dma: Add Xilinx zynqmp dma engine driver support
+In-Reply-To: <CAGnW=BaU__+B2uAK=qpV3QP60SqSUxx-kgJVs0t42K0fqTxL0g@mail.gmail.com>
+References: <1438831173-8761-1-git-send-email-punnaia@xilinx.com>
+ <1438831173-8761-2-git-send-email-punnaia@xilinx.com>
+ <20150820061312.GA13546@localhost>
+ <CAGnW=BaU__+B2uAK=qpV3QP60SqSUxx-kgJVs0t42K0fqTxL0g@mail.gmail.com>
+Message-ID: <20150823140823.GA13546@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 23 August 2015 19:09:33 Vinod Koul wrote:
-> On Fri, Aug 21, 2015 at 02:01:59AM +0300, Laurent Pinchart wrote:
-> > > > How is 64 bit DMA addressing implemented ? Can you use a 64-bit VDMA on
-> > > > a 32- bit platform with LPAE ? Can you use a 32-bit VDMA on a 64-bit
-> > > > platform ? Given that VDMA is an IP core you can instantiate in the
-> > > > programmable logic I expect some level of flexibility to be possible, but
-> > > > this patch doesn't seem to support it. Please provide more context to
-> > > > allow a proper review (and please include it in the commit message of v2).
-> > > 
-> > > The VDMA core is a soft ip, which can be programmed to support both 32 bit
-> > > and 64 bit addressing.When the VDMA core is configured for 32 bit address
-> > > space , transfer start address is specified by a single register.
-> > > 
-> > > When the  VDMA core is configured for an address space greater than 32, each
-> > > start address is specified by a combination of two registers.The first
-> > > register specifies the LSB 32 bits of address, while the next register
-> > > specifies the MSB 32 bits of address.For example,5Ch will specify the LSB
-> > > bits while 60h will specify the MSB bits of the first start address. So we
-> > > need to program two registers at a time.
-> > > 
-> > > Yes,64 bit vdma can be used on 32 bit platform and 32 bit vdma can also be
-> > > used on 64 bit platform.As far as i know , there is no use case where 64
-> > > bit dma can be used on 32 bit platform.Please correct me if i am wrong.
-> > 
-> > I'm not sure what the use cases would be, but it makes me feel uncomfortable 
-> > to decide on whether the VDMA is 32 or 64 bits based on the type of CPU.
-> > 
-> > As the VDMA flavour is selected at synthesis time, how about specifying it in 
-> > DT instead ? You could just add an address-width property.
-> That would be saner thing to do. People wont check which IP and will mix and
-> match. So you may have a 64 bit system with your 32 bit IP...
+On Thu, Aug 20, 2015 at 12:01:27PM +0530, punnaiah choudary kalluri wrote:
+> On Thu, Aug 20, 2015 at 11:43 AM, Vinod Koul <vinod.koul@intel.com> wrote:
+> > On Thu, Aug 06, 2015 at 08:49:33AM +0530, Punnaiah Choudary Kalluri wrote:
+> >
+> >> +     list_for_each_entry_safe(desc, next, &chan->done_list, node) {
+> >> +             dma_async_tx_callback callback;
+> >> +             void *callback_param;
+> >> +
+> >> +             list_del(&desc->node);
+> >> +
+> >> +             callback = desc->async_tx.callback;
+> >> +             callback_param = desc->async_tx.callback_param;
+> >> +             if (callback) {
+> >> +                     if (in_interrupt())
+> >> +                             spin_unlock_bh(&chan->lock);
+> >> +                     else
+> >> +                             spin_unlock(&chan->lock);
+> >
+> > This looks bad!
+> > Why would callback be called from different context. It should only be
+> > invoked from your tasklet
+> 
+> During the terminate call, driver need to clean up the existing BDs so that time
+> this function will be called from the thread or process context in
+> addition to the
+> tasklet context.
+> 
+> DO you have any suggestion here ?
 
-Note that you need two things here: an identification of whether the IP block
-itself is configured as 64-bit or 32-bit (either using the compatible string,
-or a separate property), and a dma-ranges property of the parent bus that
-describes what the bus can do and how the address range of the device maps to
-the address range of the parent bus.
+Yes you need to terminate but you don't need to invoke user for terminate
+flow. It is not expected.
+Terminate flow expect youu to clean the channels
 
-The DT probe code will set the dma offset according to the dma-ranges, and
-will prevent the device from setting a mask that does not get translated
-properly, e.g. if you have a 64-bit capable device on a 32-bit bus.
-
-	Arnd
+-- 
+~Vinod
