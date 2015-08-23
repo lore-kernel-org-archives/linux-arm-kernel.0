@@ -1,84 +1,55 @@
-From: klimov.linux@gmail.com (Alexey Klimov)
-Date: Mon, 24 Aug 2015 01:53:59 +0300
-Subject: [PATCH] lib: Make _find_next_bit helper function inline
-In-Reply-To: <55B93A47.90107@codeaurora.org>
-References: <1438110564-19932-1-git-send-email-cburden@codeaurora.org>
- <55B7F2C6.9010000@gmail.com>
- <20150728144537.67d46b5714c99d25f0bb33fb@linux-foundation.org>
- <1438176656.18723.8.camel@ceres> <55B93A47.90107@codeaurora.org>
-Message-ID: <CALW4P+LU2iLkT7d=BiaC_=oSJ6K_g152VsVSjfcQGUKx_5q4tQ@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 23 Aug 2015 16:13:54 -0700
+Subject: [PATCH v5] dtb: Create a common home for cross-architecture dtsi
+ files.
+In-Reply-To: <CAL_JsqKv2aOEM-U7JNZnaHomA6HFBSFhSLZ-zhp7c20s6gQBaQ@mail.gmail.com>
+References: <1438618000-1091-1-git-send-email-ian.campbell@citrix.com>
+ <1439287646.9747.212.camel@citrix.com>
+ <CAL_JsqKv2aOEM-U7JNZnaHomA6HFBSFhSLZ-zhp7c20s6gQBaQ@mail.gmail.com>
+Message-ID: <CAOesGMj46mvbdya1OQnZzL8VrxVwxAV3KoZZRtk3c0CTVx7d5w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Cassidy,
-
-
-On Wed, Jul 29, 2015 at 11:40 PM, Cassidy Burden <cburden@codeaurora.org> wrote:
-> I changed the test module to now set the entire array to all 0/1s and
-> only flip a few bits. There appears to be a performance benefit, but
-> it's only 2-3% better (if that). If the main benefit of the original
-> patch was to save space then inlining definitely doesn't seem worth the
-> small gains in real use cases.
+On Fri, Aug 14, 2015 at 2:21 PM, Rob Herring <robherring2@gmail.com> wrote:
+> +arm-soc
 >
-> find_next_zero_bit (us)
-> old      new     inline
-> 14440    17080   17086
-> 4779     5181    5069
-> 10844    12720   12746
-> 9642     11312   11253
-> 3858     3818    3668
-> 10540    12349   12307
-> 12470    14716   14697
-> 5403     6002    5942
-> 2282     1820    1418
-> 13632    16056   15998
-> 11048    13019   13030
-> 6025     6790    6706
-> 13255    15586   15605
-> 3038     2744    2539
-> 10353    12219   12239
-> 10498    12251   12322
-> 14767    17452   17454
-> 12785    15048   15052
-> 1655     1034    691
-> 9924     11611   11558
->
-> find_next_bit (us)
-> old      new     inline
-> 8535     9936    9667
-> 14666    17372   16880
-> 2315     1799    1355
-> 6578     9092    8806
-> 6548     7558    7274
-> 9448     11213   10821
-> 3467     3497    3449
-> 2719     3079    2911
-> 6115     7989    7796
-> 13582    16113   15643
-> 4643     4946    4766
-> 3406     3728    3536
-> 7118     9045    8805
-> 3174     3011    2701
-> 13300    16780   16252
-> 14285    16848   16330
-> 11583    13669   13207
-> 13063    15455   14989
-> 12661    14955   14500
-> 12068    14166   13790
->
-> On 7/29/2015 6:30 AM, Alexey Klimov wrote:
+> On Tue, Aug 11, 2015 at 5:07 AM, Ian Campbell <ian.campbell@citrix.com> wrote:
+>> On Mon, 2015-08-03 at 17:06 +0100, Ian Campbell wrote:
+>>> Commit 9ccd608070b6 ("arm64: dts: add device tree for ARM SMM-A53x2 on
+>>> LogicTile Express 20MG") added a new dts file to arch/arm64 which
+>>> included "../../../../arm/boot/dts/vexpress-v2m-rs1.dtsi", i.e. a
+>>> .dtsi supplied by arch/arm.
+>>>
+>>> Unfortunately this causes some issues for the split device tree
+>>> repository[0], since things get moved around there. In that context
+>>> the new .dts ends up at src/arm64/arm/vexpress-v2f-1xv7-ca53x2.dts
+>>> while the include is at src/arm/vexpress-v2m-rs1.dtsi.
 >>
->> I will re-check on another machine. It's really interesting if
->> __always_inline makes things better for aarch64 and worse for x86_64. It
->> will be nice if someone will check it on x86_64 too.
+>> Hi Grant,
+>>
+>> Do you think there is any chance of getting this into 4.2-rc$NEXT or shall
+>> we wait until 4.3? I'm assuming this should go via the DT tree, but maybe
+>> it should go via an ARM tree?
 >
->
-> Very odd, this may be related to the other compiler optimizations Yuri
-> mentioned?
+> I was assuming this would go thru the arm-soc tree which is why I
+> acked it. It is getting a bit late for 4.2 at this point, but I guess
+> the standalone tree remains broken for these platforms until this is
+> done. Probably not such a big deal in grand scheme of things.
 
-It's better to ask Yury, i hope he can answer some day.
+I'm cc:d in the far tail of a thread, so I'll just comment here
+instead of further up:
 
-Do you need to re-check this (with more iterations or on another machine(s))?
+I'm not a fan at all of creating kernel/dts/<arch>/*, at least if
+there's expected to be contents in there.
 
--- 
-Best regards, Klimov Alexey
+We don't have include/linux/asm-<arch>/ in the common tree either.
+Let's not create that for dts.
+
+So, while I'm all for a prefix-based sharing of DTSI files, I don't
+want them to go in a common kernel/dts directory.
+
+Besides sharing some snippets between arm and arm64, what else is
+expected to need to go into such a shared location today?
+
+
+-Olof
