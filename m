@@ -1,91 +1,66 @@
-From: maitysanchayan@gmail.com (maitysanchayan at gmail.com)
-Date: Sun, 23 Aug 2015 21:45:28 +0530
-Subject: [PATCH v4 2/3] input: Add DT binding documentation for Colibri
- VF50 touchscreen
-In-Reply-To: <24b47f359d019e8871887777372b442b@agner.ch>
-References: <cover.1440162473.git.maitysanchayan@gmail.com>
- <8446d6df4b39f0b0acdc37afd4d66dbcca4d09ba.1440162473.git.maitysanchayan@gmail.com>
- <24b47f359d019e8871887777372b442b@agner.ch>
-Message-ID: <20150823161528.GD3935@Sanchayan-Arch>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sun, 23 Aug 2015 20:31:38 +0200
+Subject: [PATCH] net: sun4i-emac: Claim emac sram
+Message-ID: <1440354698-11144-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15-08-22 18:36:54, Stefan Agner wrote:
-> On 2015-08-21 06:26, Sanchayan Maity wrote:
-> > This adds device tree binding documentation for the Colibri VF50
-> > touchscreen driver.
-> > 
-> > Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
-> > ---
-> >  .../bindings/input/touchscreen/colibri-vf50-ts.txt | 36 ++++++++++++++++++++++
-> >  1 file changed, 36 insertions(+)
-> >  create mode 100644
-> > Documentation/devicetree/bindings/input/touchscreen/colibri-vf50-ts.txt
-> > 
-> > diff --git
-> > a/Documentation/devicetree/bindings/input/touchscreen/colibri-vf50-ts.txt
-> > b/Documentation/devicetree/bindings/input/touchscreen/colibri-vf50-ts.txt
-> > new file mode 100644
-> > index 0000000..e615aa9
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/input/touchscreen/colibri-vf50-ts.txt
-> > @@ -0,0 +1,36 @@
-> > +* Toradex Colibri VF50 Touchscreen driver
-> > +
-> > +Required Properties:
-> > +- compatible must be toradex,vf50-touchscreen
-> > +- io-channels: adc channels being used by the Colibri VF50 module
-> > +- xp-gpios: FET gate driver for input of X+
-> > +- xm-gpios: FET gate driver for input of X-
-> > +- yp-gpios: FET gate driver for input of Y+
-> > +- ym-gpios: FET gate driver for input of Y-
-> > +- interrupt-parent: phandle for the interrupt controller
-> > +- interrupts: pen irq interrupt for touch detection
-> 
-> I like the use of the interrupt interface for the touch detection pin.
-> Maybe you can mention here that this is (typically) a GPIO...
-> 
-> > +- pinctrl-names: "idle", "default", "gpios"
-> > +- pinctrl-0: pinctrl node for idle state gpio pinmux
-> > +- pinctrl-1: pinctrl node for touch detection state pinmux
-> 
-> "touch detection" for default is rather confusing or even wrong. The
-> Idle state is used for pen/touch detection, default is used for X/Y and
-> Pressure measurement (maybe better described as touch measurement).
+Claim the emac sram ourselves, rather then relying on the bootloader
+having mapped the sram to the emac controller during boot.
 
-Ok. Understood. I see how my wordings can create confusion or are
-misleading. Will fix.
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ drivers/net/ethernet/allwinner/sun4i-emac.c | 13 +++++++++++--
+ 1 file changed, 11 insertions(+), 2 deletions(-)
 
-- Sanchayan.
-
-> 
-> > +- pinctrl-2: pinctrl node for gpios functioning as FET gate drivers
-> > +- vf50-ts-min-pressure: pressure level at which to stop measuring X/Y values
-> > +
-> > +Example:
-> > +
-> > +	touchctrl: vf50_touchctrl {
-> > +		compatible = "toradex,vf50-touchscreen";
-> > +		io-channels = <&adc1 0>,<&adc0 0>,
-> > +				<&adc0 1>,<&adc1 2>;
-> > +		xp-gpios = <&gpio0 13 GPIO_ACTIVE_LOW>;
-> > +		xm-gpios = <&gpio2 29 GPIO_ACTIVE_HIGH>;
-> > +		yp-gpios = <&gpio0 12 GPIO_ACTIVE_LOW>;
-> > +		ym-gpios = <&gpio0 4 GPIO_ACTIVE_HIGH>;
-> > +		interrupt-parent = <&gpio0>;
-> > +		interrupts = <8 IRQ_TYPE_LEVEL_LOW>;
-> > +		pinctrl-names = "idle","default","gpios";
-> > +		pinctrl-0 = <&pinctrl_touchctrl_idle>;
-> > +		pinctrl-1 = <&pinctrl_touchctrl_default>;
-> > +		pinctrl-2 = <&pinctrl_touchctrl_gpios>;
-> > +		vf50-ts-min-pressure = <200>;
-> > +		status = "disabled";
-> > +	};
-> 
-> Otherwise I agree with 1 and 2:
-> 
-> Acked-by: Stefan Agner <stefan@agner.ch>
-> 
-> --
-> Stefan
-> 
+diff --git a/drivers/net/ethernet/allwinner/sun4i-emac.c b/drivers/net/ethernet/allwinner/sun4i-emac.c
+index bab01c84..48ce83e 100644
+--- a/drivers/net/ethernet/allwinner/sun4i-emac.c
++++ b/drivers/net/ethernet/allwinner/sun4i-emac.c
+@@ -28,6 +28,7 @@
+ #include <linux/of_platform.h>
+ #include <linux/platform_device.h>
+ #include <linux/phy.h>
++#include <linux/soc/sunxi/sunxi_sram.h>
+ 
+ #include "sun4i-emac.h"
+ 
+@@ -857,11 +858,17 @@ static int emac_probe(struct platform_device *pdev)
+ 
+ 	clk_prepare_enable(db->clk);
+ 
++	ret = sunxi_sram_claim(&pdev->dev);
++	if (ret) {
++		dev_err(&pdev->dev, "Error couldn't map SRAM to device\n");
++		goto out;
++	}
++
+ 	db->phy_node = of_parse_phandle(np, "phy", 0);
+ 	if (!db->phy_node) {
+ 		dev_err(&pdev->dev, "no associated PHY\n");
+ 		ret = -ENODEV;
+-		goto out;
++		goto out_release_sram;
+ 	}
+ 
+ 	/* Read MAC-address from DT */
+@@ -893,7 +900,7 @@ static int emac_probe(struct platform_device *pdev)
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "Registering netdev failed!\n");
+ 		ret = -ENODEV;
+-		goto out;
++		goto out_release_sram;
+ 	}
+ 
+ 	dev_info(&pdev->dev, "%s: at %p, IRQ %d MAC: %pM\n",
+@@ -901,6 +908,8 @@ static int emac_probe(struct platform_device *pdev)
+ 
+ 	return 0;
+ 
++out_release_sram:
++	sunxi_sram_release(&pdev->dev);
+ out:
+ 	dev_err(db->dev, "not found (%d).\n", ret);
+ 
+-- 
+2.4.3
