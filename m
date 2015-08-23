@@ -1,43 +1,72 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Mon, 24 Aug 2015 00:37:26 +0200
-Subject: [PATCH 5/5] ARM: dts: sun4i: inet97fv2: Enable i2c1 and i2c2
- controllers
-In-Reply-To: <1440369446-22195-1-git-send-email-hdegoede@redhat.com>
-References: <1440369446-22195-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1440369446-22195-5-git-send-email-hdegoede@redhat.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Sun, 23 Aug 2015 17:43:03 -0500
+Subject: [PATCH v3 1/8] rsb: Add generic Reduced Serial Bus (RSB)
+ controller binding documentation
+In-Reply-To: <1439958009-14056-2-git-send-email-wens@csie.org>
+References: <1439958009-14056-1-git-send-email-wens@csie.org>
+ <1439958009-14056-2-git-send-email-wens@csie.org>
+Message-ID: <CAL_JsqJA6MEtnF35ThPDgVmEZHyui39-HLsefWPQ1tzzfLAW3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable i2c1 and i2c2 controllers, these are used for the touchscreen resp.
-the accelerometer.
+On Tue, Aug 18, 2015 at 11:20 PM, Chen-Yu Tsai <wens@csie.org> wrote:
+> Reduced Serial Bus is a proprietary 2-line push-pull serial bus
+> supporting multiple slave devices.
+>
+> It was developed by Allwinner, Inc. and used by Allwinner and X-Powers,
+> Inc. for their line of PMICs and other peripheral ICs.
+>
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+>  Documentation/devicetree/bindings/rsb/rsb.txt | 50 +++++++++++++++++++++++++++
+>  1 file changed, 50 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/rsb/rsb.txt
+>
+> diff --git a/Documentation/devicetree/bindings/rsb/rsb.txt b/Documentation/devicetree/bindings/rsb/rsb.txt
+> new file mode 100644
+> index 000000000000..0b027948ca9c
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/rsb/rsb.txt
+> @@ -0,0 +1,50 @@
+> +Reduced Serial Bus (RSB) Controller
+> +
+> +This document defines a generic set of bindings for use by RSB controllers.
+> +A controller is modelled in device tree as a node with zero or more child
+> +nodes, each representing a unique slave device on the bus.
+> +
+> +Required properties:
+> +
+> + - #address-cells : must be 2
+> + - #size-cells : must be 0
+> +
+> +Optional properties:
+> +
+> + - clock-frequency : Desired bus clock frequency in Hz. Maximum is 20 MHz.
+> +
+> +Child nodes:
+> +
+> +An RSB controller node can contain zero or more child nodes representing
+> +slave devices on the bus.  Child 'reg' properties are specified as a
+> +runtime address, hardware address pair. The hardware address is hardwired
+> +in the device, which can normally be found in the datasheet. The runtime
+> +address is set by software. No 2 devices on the same bus shall have the
+> +same runtime address.
+> +
+> +Valid runtime addresses - There are only 15 valid runtime addresses:
+> +
+> +    0x17, 0x2d, 0x3a, 0x4e, 0x59, 0x63, 0x74, 0x8b,
+> +    0x9c, 0xa6, 0xb1, 0xc5, 0xd2, 0xe8, 0xff
+> +
+> +It is highly recommended that one choose the same runtime addresses as
+> +vendor BSPs use so that a) the addresses remain the same across different
+> +software systems, and b) addresses of supported and listed slave devices
+> +don't conflict with unsupported or not yet listed devices.
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- arch/arm/boot/dts/sun4i-a10-inet97fv2.dts | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+I fail to understand why the run-time address belongs in DT or why
+alignment to vendor BSP matters? I can see the desire to align DTs if
+the vendor OS was dependent on having this information. Having to
+access the vendor OS to determine what address to pick does not seem
+like the right way to write a DTS. It seems to me that the RSB bus
+driver should allocate run-time addresses dynamically.
 
-diff --git a/arch/arm/boot/dts/sun4i-a10-inet97fv2.dts b/arch/arm/boot/dts/sun4i-a10-inet97fv2.dts
-index 909fde9..77c31da 100644
---- a/arch/arm/boot/dts/sun4i-a10-inet97fv2.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-inet97fv2.dts
-@@ -83,6 +83,18 @@
- 
- #include "axp209.dtsi"
- 
-+&i2c1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c1_pins_a>;
-+	status = "okay";
-+};
-+
-+&i2c2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c2_pins_a>;
-+	status = "okay";
-+};
-+
- &lradc {
- 	vref-supply = <&reg_ldo2>;
- 	status = "okay";
--- 
-2.4.3
+Rob
