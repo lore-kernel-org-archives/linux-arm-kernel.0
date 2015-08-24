@@ -1,46 +1,70 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 24 Aug 2015 10:36:04 +0200
-Subject: Build regressions/improvements in v4.2-rc8
-In-Reply-To: <1440405251-9184-1-git-send-email-geert@linux-m68k.org>
-References: <1440405251-9184-1-git-send-email-geert@linux-m68k.org>
-Message-ID: <CAMuHMdVomabvJOLLJ-tJs6KjL05YpH3zLkyrPbyEghe=WvOVkA@mail.gmail.com>
+From: kernel@martin.sperl.org (kernel at martin.sperl.org)
+Date: Mon, 24 Aug 2015 08:40:03 +0000
+Subject: [PATCH v4 0/5] bcm2835: auxiliar device support for spi
+Message-ID: <1440405608-3995-1-git-send-email-kernel@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 24, 2015 at 10:34 AM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
-> JFYI, when comparing v4.2-rc8[1] to v4.2-rc7[3], the summaries are:
->   - build errors: +4/-7
+From: Martin Sperl <kernel@martin.sperl.org>
 
-4 regressions:
-  + /home/kisskb/slave/src/include/linux/kvm_host.h: error: array
-subscript is above array bounds [-Werror=array-bounds]:  => 430:19
-    (arch/powerpc/kvm/book3s_64_mmu.c: In function 'kvmppc_mmu
-_book3s_64_tlbie':)
+The BCM2835 contains 3 auxiliar devices:
+* spi1
+* spi2
+* uart1
 
-powerpc-randconfig (seen before in a v3.15-rc1 build?)
+All of those 3 devices are enabled/disabled via a shared register,
+which is set by default to be disabled.
 
-  + error: initramfs.c: undefined reference to `__stack_chk_guard':
-=> .init.text+0x1cb0)
-    (init/built-in.o: In function `parse_header':)
+Access to this register needs to get serialized.
 
-x86_64-randconfig
+So fter several iterations of discussions with the following idea:
+* syscon - device tree should describe HW not drivers to use -
+           'compatiblity = "brcm,bcm2835-aux-enable", "syscon";'
+           is not acceptable
+* regulator - it is not necessarily a regulator or a power gate
+              that is implemented in HW, so it is not valid to use
+              this framework
 
-  + error: pci.c: undefined reference to `pci_ioremap_io':  => .init.text+0x3c4)
-    (arch/arm/mach-versatile/built-in.o: In function `pci_versatile_setup')
+The recommendation was made to create a new minimal API in soc
+just for access to this shared enable/disable register.
 
-arm-randconfig
+This patch-series implements:
+* the bcm2835-auxiliar device enable/disable api in soc.
+* the bcm2835-auxiliar spi device driver
 
-> [1] http://kisskb.ellerman.id.au/kisskb/head/9289/ (253 out of 254 configs)
-> [3] http://kisskb.ellerman.id.au/kisskb/head/9260/ (253 out of 254 configs)
+The uart1 device driver (ns16550 based) is not implemented so far
+but should be using the same API.
 
-Gr{oetje,eeting}s,
+Martin Sperl (5):
+  soc: bcm2835: auxiliar devices enable infrastructure
+  ARM: bcm2835: add DT for the bcm2835 auxiliar devices
+  dt/bindings: bcm2835: add binding documentation for bcm2835-aux
+  spi: bcm2835: new driver implementing auxiliar spi1/spi2 on the
+    bcm2835 soc
+  dt/bindings: bcm2835: Add binding documentation for auxiliar spi
+    devices
 
-                        Geert
+ .../bindings/soc/bcm/brcm,bcm2835-aux.txt          |   27 ++
+ .../bindings/spi/brcm,bcm2835-aux-spi.txt          |   61 +++
+ arch/arm/boot/dts/bcm2835.dtsi                     |   37 ++
+ arch/arm/configs/bcm2835_defconfig                 |    1 +
+ drivers/soc/Kconfig                                |    1 +
+ drivers/soc/Makefile                               |    1 +
+ drivers/soc/bcm/Kconfig                            |   11 +
+ drivers/soc/bcm/Makefile                           |    1 +
+ drivers/soc/bcm/bcm2835-aux.c                      |  154 ++++++
+ drivers/spi/Kconfig                                |   12 +
+ drivers/spi/Makefile                               |    1 +
+ drivers/spi/spi-bcm2835aux.c                       |  506 ++++++++++++++++++++
+ include/linux/soc/bcm/bcm2835-aux.h                |   23 +
+ 13 files changed, 836 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/soc/bcm/brcm,bcm2835-aux.txt
+ create mode 100644 Documentation/devicetree/bindings/spi/brcm,bcm2835-aux-spi.txt
+ create mode 100644 drivers/soc/bcm/Kconfig
+ create mode 100644 drivers/soc/bcm/Makefile
+ create mode 100644 drivers/soc/bcm/bcm2835-aux.c
+ create mode 100644 drivers/spi/spi-bcm2835aux.c
+ create mode 100644 include/linux/soc/bcm/bcm2835-aux.h
 
 --
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+1.7.10.4
