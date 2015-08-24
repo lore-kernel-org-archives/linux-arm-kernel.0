@@ -1,38 +1,37 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon, 24 Aug 2015 09:48:42 +0200
-Subject: [PATCH v3 2/2] drivers: rtc: add xilinx zynqmp rtc driver
-In-Reply-To: <20150824074310.GF13155@piout.net>
-References: <1439978002-12157-1-git-send-email-suneel.garapati@xilinx.com>
- <1439978002-12157-2-git-send-email-suneel.garapati@xilinx.com>
- <20150824074310.GF13155@piout.net>
-Message-ID: <55DACC5A.80707@xilinx.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 24 Aug 2015 09:51:11 +0200
+Subject: [PATCH v2 1/5] clocksource: mediatek: do not enable GPT_CLK_EVT
+ when setup
+In-Reply-To: <1440167950.20169.29.camel@mtksdaap41>
+References: <CAGS+omD8k_Cfxv3bYyjmjtLbiavo-WmJPn0Z-CBhN_nnv65Tag@mail.gmail.com>		
+ <1437552878-3684-1-git-send-email-yingjoe.chen@mediatek.com>		
+ <55CC56C4.8080201@linaro.org> <1439820602.3414.12.camel@mtksdaap41>	
+ <55D5E40A.6080904@linaro.org> <1440167950.20169.29.camel@mtksdaap41>
+Message-ID: <55DACCEF.8040004@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/24/2015 09:43 AM, Alexandre Belloni wrote:
-> On 19/08/2015 at 15:23:22 +0530, Suneel Garapati wrote :
->> adds support for RTC controller found on
->> Xilinx Zynq Ultrascale+ MPSoC platform.
->>
->> Signed-off-by: Suneel Garapati <suneel.garapati@xilinx.com>
->> ---
->> Changes v3 
->> - fix checkpatch errors 
->> - check time in secs arg against max sec val 
->> - order header files 
->> - use ptr_err_or_zero macro 
->> - use time64 variants 
->> Changes v2 
->> - change alm to alarm 
->> ---
->>  drivers/rtc/Kconfig      |   7 ++
->>  drivers/rtc/Makefile     |   1 +
->>  drivers/rtc/rtc-zynqmp.c | 279 +++++++++++++++++++++++++++++++++++++++++++++++
->>  3 files changed, 287 insertions(+)
->>  create mode 100644 drivers/rtc/rtc-zynqmp.c
->>
-> Applied, thanks.
-> 
+On 08/21/2015 04:39 PM, Yingjoe Chen wrote:
 
-Thanks,
-Michal
+[ ... ]
+
+>>    - Does the spurious interrupt occurs *every* time ? at each boot ?
+>
+> Yes. If you applied this series to enable mtk timer without this fix on
+> mt8173 or mt8135 you can reproduce it. It occurs for every boot.
+>
+> It crash before uart driver is ready, so you'll have to use earlycon to
+> see the crash log.
+
+Can you give me the earlycon params ?
+
+Thanks.
+
+  -- Daniel
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
