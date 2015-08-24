@@ -1,34 +1,77 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Mon, 24 Aug 2015 13:36:12 +0900
-Subject: [PATCH 12/18] ARM: rockchip: use const and __initconst for
- smp_operations
+Date: Mon, 24 Aug 2015 13:36:08 +0900
+Subject: [PATCH 08/18] ARM: hisi: do not export smp_operations structures
 In-Reply-To: <1440390978-22796-1-git-send-email-yamada.masahiro@socionext.com>
 References: <1440390978-22796-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1440390978-22796-13-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1440390978-22796-9-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The smp_operations structure is not over-written, so add const
-qualifier and replace __initdata with __initconst.
+These three structures are only defined and referenced in
+mach-hisi/platsmp.c.
+
+Drop the declarations from the header and add static qualifier
+to the definitions.
 
 Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 ---
 
- arch/arm/mach-rockchip/platsmp.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-hisi/core.h    | 3 ---
+ arch/arm/mach-hisi/platsmp.c | 6 +++---
+ 2 files changed, 3 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-rockchip/platsmp.c b/arch/arm/mach-rockchip/platsmp.c
-index 3e7a4b7..938888f 100644
---- a/arch/arm/mach-rockchip/platsmp.c
-+++ b/arch/arm/mach-rockchip/platsmp.c
-@@ -340,7 +340,7 @@ static void rockchip_cpu_die(unsigned int cpu)
- }
- #endif
+diff --git a/arch/arm/mach-hisi/core.h b/arch/arm/mach-hisi/core.h
+index c7648ef..e883583 100644
+--- a/arch/arm/mach-hisi/core.h
++++ b/arch/arm/mach-hisi/core.h
+@@ -6,17 +6,14 @@
+ extern void hi3xxx_set_cpu_jump(int cpu, void *jump_addr);
+ extern int hi3xxx_get_cpu_jump(int cpu);
+ extern void secondary_startup(void);
+-extern struct smp_operations hi3xxx_smp_ops;
  
--static struct smp_operations rockchip_smp_ops __initdata = {
-+static const struct smp_operations rockchip_smp_ops __initconst = {
- 	.smp_prepare_cpus	= rockchip_smp_prepare_cpus,
- 	.smp_boot_secondary	= rockchip_boot_secondary,
+ extern void hi3xxx_cpu_die(unsigned int cpu);
+ extern int hi3xxx_cpu_kill(unsigned int cpu);
+ extern void hi3xxx_set_cpu(int cpu, bool enable);
+ 
+-extern struct smp_operations hix5hd2_smp_ops;
+ extern void hix5hd2_set_cpu(int cpu, bool enable);
+ extern void hix5hd2_cpu_die(unsigned int cpu);
+ 
+-extern struct smp_operations hip01_smp_ops;
+ extern void hip01_set_cpu(int cpu, bool enable);
+ extern void hip01_cpu_die(unsigned int cpu);
+ #endif
+diff --git a/arch/arm/mach-hisi/platsmp.c b/arch/arm/mach-hisi/platsmp.c
+index 5174412..3c5237d 100644
+--- a/arch/arm/mach-hisi/platsmp.c
++++ b/arch/arm/mach-hisi/platsmp.c
+@@ -89,7 +89,7 @@ static int hi3xxx_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 	return 0;
+ }
+ 
+-struct smp_operations hi3xxx_smp_ops __initdata = {
++static struct smp_operations hi3xxx_smp_ops __initdata = {
+ 	.smp_prepare_cpus	= hi3xxx_smp_prepare_cpus,
+ 	.smp_boot_secondary	= hi3xxx_boot_secondary,
  #ifdef CONFIG_HOTPLUG_CPU
+@@ -126,7 +126,7 @@ static int hix5hd2_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ }
+ 
+ 
+-struct smp_operations hix5hd2_smp_ops __initdata = {
++static struct smp_operations hix5hd2_smp_ops __initdata = {
+ 	.smp_prepare_cpus	= hisi_common_smp_prepare_cpus,
+ 	.smp_boot_secondary	= hix5hd2_boot_secondary,
+ #ifdef CONFIG_HOTPLUG_CPU
+@@ -176,7 +176,7 @@ static int hip01_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 	return 0;
+ }
+ 
+-struct smp_operations hip01_smp_ops __initdata = {
++static struct smp_operations hip01_smp_ops __initdata = {
+ 	.smp_prepare_cpus       = hisi_common_smp_prepare_cpus,
+ 	.smp_boot_secondary     = hip01_boot_secondary,
+ };
 -- 
 1.9.1
