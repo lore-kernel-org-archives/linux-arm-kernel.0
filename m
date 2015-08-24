@@ -1,100 +1,75 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 24 Aug 2015 14:54:50 +0100
-Subject: [PATCH-v6 1/6] mfd: 88pm800: remove duplicate dev_err calls
- during probe
-In-Reply-To: <1436358392-15449-2-git-send-email-vaibhav.hiremath@linaro.org>
-References: <1436358392-15449-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1436358392-15449-2-git-send-email-vaibhav.hiremath@linaro.org>
-Message-ID: <20150824135450.GH3237@x1>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 24 Aug 2015 08:56:14 -0500
+Subject: [PATCH 1/7] drm/vc4: Add devicetree bindings for VC4.
+In-Reply-To: <1439427380-2436-2-git-send-email-eric@anholt.net>
+References: <1439427380-2436-1-git-send-email-eric@anholt.net>
+ <1439427380-2436-2-git-send-email-eric@anholt.net>
+Message-ID: <CAL_JsqKhfQS46NwbTq0PNDpnNuztnRkcK+WDhFMaayE_8dDt3Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 08 Jul 2015, Vaibhav Hiremath wrote:
-
-> During probe, inside fn device_800_init(), submodule init is
-> happening and the same error message is getting printed in both
-> the places, <subdev>_init() and inside device_800_init().
-> 
-> So this patch gets rid of dev_err from <subdev>_init() fns.
-> 
-> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
+On Wed, Aug 12, 2015 at 7:56 PM, Eric Anholt <eric@anholt.net> wrote:
+> Signed-off-by: Eric Anholt <eric@anholt.net>
 > ---
->  drivers/mfd/88pm800.c | 32 ++++----------------------------
->  1 file changed, 4 insertions(+), 28 deletions(-)
+>  .../devicetree/bindings/gpu/brcm,bcm-vc4.txt       | 83 ++++++++++++++++++++++
+>  1 file changed, 83 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/gpu/brcm,bcm-vc4.txt
+>
+> diff --git a/Documentation/devicetree/bindings/gpu/brcm,bcm-vc4.txt b/Documentation/devicetree/bindings/gpu/brcm,bcm-vc4.txt
+> new file mode 100644
+> index 0000000..2b13e61
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/gpu/brcm,bcm-vc4.txt
+> @@ -0,0 +1,83 @@
+> +Broadcom VC4 GPU
+> +
+> +The VC4 device present on the Raspberry Pi includes a display system
+> +with HDMI output and the HVS scaler for compositing display planes.
+> +
+> +Required properties for VC4:
+> +- compatible:  Should be "brcm,vc4"
+> +- crtcs:       List of references to pixelvalve scanout engines
+> +- hvss:                List of references to HVS video scalers
+> +- encoders:    List of references to output encoders (HDMI, SDTV)
 
-Acked-by: Lee Jones <lee.jones@linaro.org>
+Creating these links is what the OF graph binding is for. Please use
+it. Plus this is a DRMism in the binding.
 
-> diff --git a/drivers/mfd/88pm800.c b/drivers/mfd/88pm800.c
-> index 841717a..0c5470e 100644
-> --- a/drivers/mfd/88pm800.c
-> +++ b/drivers/mfd/88pm800.c
-> @@ -308,59 +308,35 @@ static int device_gpadc_init(struct pm80x_chip *chip,
->  	return 0;
->  
->  out:
-> -	dev_info(chip->dev, "pm800 device_gpadc_init: Failed!\n");
->  	return ret;
->  }
->  
->  static int device_onkey_init(struct pm80x_chip *chip,
->  				struct pm80x_platform_data *pdata)
->  {
-> -	int ret;
-> -
-> -	ret = mfd_add_devices(chip->dev, 0, &onkey_devs[0],
-> +	return mfd_add_devices(chip->dev, 0, &onkey_devs[0],
->  			      ARRAY_SIZE(onkey_devs), &onkey_resources[0], 0,
->  			      NULL);
-> -	if (ret) {
-> -		dev_err(chip->dev, "Failed to add onkey subdev\n");
-> -		return ret;
-> -	}
-> -
-> -	return 0;
->  }
->  
->  static int device_rtc_init(struct pm80x_chip *chip,
->  				struct pm80x_platform_data *pdata)
->  {
-> -	int ret;
-> -
->  	if (pdata) {
->  		rtc_devs[0].platform_data = pdata->rtc;
->  		rtc_devs[0].pdata_size =
->  				pdata->rtc ? sizeof(struct pm80x_rtc_pdata) : 0;
->  	}
-> -	ret = mfd_add_devices(chip->dev, 0, &rtc_devs[0],
-> -			      ARRAY_SIZE(rtc_devs), NULL, 0, NULL);
-> -	if (ret) {
-> -		dev_err(chip->dev, "Failed to add rtc subdev\n");
-> -		return ret;
-> -	}
->  
-> -	return 0;
-> +	return mfd_add_devices(chip->dev, 0, &rtc_devs[0],
-> +			      ARRAY_SIZE(rtc_devs), NULL, 0, NULL);
->  }
->  
->  static int device_regulator_init(struct pm80x_chip *chip,
->  					   struct pm80x_platform_data *pdata)
->  {
-> -	int ret;
-> -
-> -	ret = mfd_add_devices(chip->dev, 0, &regulator_devs[0],
-> +	return mfd_add_devices(chip->dev, 0, &regulator_devs[0],
->  			      ARRAY_SIZE(regulator_devs), NULL, 0, NULL);
-> -	if (ret) {
-> -		dev_err(chip->dev, "Failed to add regulator subdev\n");
-> -		return ret;
-> -	}
-> -
-> -	return 0;
->  }
->  
->  static int device_irq_init_800(struct pm80x_chip *chip)
+> +
+> +Required properties for Pixel Valve:
+> +- compatible:  Should be "brcm,vc4-pixelvalve"
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+There's only one version of IP and all chips have the same bugs? You
+should have chip names in the compatible strings.
+
+> +- reg:         Physical base address and length of the PV's registers
+> +- interrupts:  The interrupt number
+> +                 See bindings/interrupt-controller/brcm,bcm2835-armctrl-ic.txt
+> +
+> +Required properties for HVS:
+> +- compatible:  Should be "brcm,vc4-hvs"
+> +- reg:         Physical base address and length of the HVS's registers
+> +- interrupts:  The interrupt number
+> +                 See bindings/interrupt-controller/brcm,bcm2835-armctrl-ic.txt
+> +
+> +Required properties for HDMI
+> +- compatible:  Should be "brcm,vc4-hdmi"
+> +- reg:         Physical base address and length of the two register ranges
+> +                 ("HDMI" and "HD")
+> +- interrupts:  The interrupt numbers
+> +                 See bindings/interrupt-controller/brcm,bcm2835-armctrl-ic.txt
+> +- ddc:         phandle of the I2C controller used for DDC EDID probing
+> +- crtc:                phandle to the pixelvalve CRTC the HDMI encoder is attached to
+
+Same comment about OF graph.
+
+> +
+> +Optional properties for HDMI:
+> +- hpd-gpio:    The GPIO pin for HDMI hotplug detect (if it doesn't appear
+> +                 as an interrupt/status bit in the HDMI controller
+> +                 itself).  See bindings/pinctrl/brcm,bcm2835-gpio.txt
+
+Use the hdmi-connector binding. This doesn't belong here. The clue is
+your comment in parenthesis.
+
+Rob
