@@ -1,64 +1,94 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 24 Aug 2015 23:57:30 +0200
-Subject: [PATCH V2] clockevents/drivers/mtk: Fix spurious interrupt leading to
- crash
-In-Reply-To: <1440426924.17418.11.camel@mtksdaap41>
-References: <1440426924.17418.11.camel@mtksdaap41>
-Message-ID: <1440453450-21203-1-git-send-email-daniel.lezcano@linaro.org>
+From: keescook@chromium.org (Kees Cook)
+Date: Mon, 24 Aug 2015 15:01:06 -0700
+Subject: Prevent list poison values from being mapped by userspace
+ processes
+In-Reply-To: <20150824193256.GG7557@n2100.arm.linux.org.uk>
+References: <CABXk95C=CpeL4mNmS6-jJ-0bMJf6fawwfs6DM1-p8FctTEFbpw@mail.gmail.com>
+ <20150821133043.GV7557@n2100.arm.linux.org.uk>
+ <CAGXu5jJ8KOoVkx99rrajEEx77Z6zO4TzCXaXkB74zv9QQFuJFw@mail.gmail.com>
+ <20150824184709.GE7557@n2100.arm.linux.org.uk>
+ <CAGXu5jJFf+9OgnGt_Cx5Q-Pht7LAT7M-sSXftTDORybrr+SECg@mail.gmail.com>
+ <20150824191427.GF7557@n2100.arm.linux.org.uk>
+ <CAGXu5jLW-nfUr40cit25_GsBrPJ6e0topdBQ1RY6vSm2dBFyDA@mail.gmail.com>
+ <20150824193256.GG7557@n2100.arm.linux.org.uk>
+Message-ID: <CAGXu5jK=xfSpJFk9owMoNg7dybdaap+DWzGy+TPTYDHNb+V1Mg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After analysis done by Yingjoe Chen, the timer appears to have a pending
-interrupt when it is enabled.
+On Mon, Aug 24, 2015 at 12:32 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Aug 24, 2015 at 12:22:33PM -0700, Kees Cook wrote:
+>> On Mon, Aug 24, 2015 at 12:14 PM, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>> > On Mon, Aug 24, 2015 at 11:51:04AM -0700, Kees Cook wrote:
+>> >> On Mon, Aug 24, 2015 at 11:47 AM, Russell King - ARM Linux
+>> >> <linux@arm.linux.org.uk> wrote:
+>> >> > That's something which Catalin indicated that he'll work on.  However,
+>> >> > he said in a public email last week that he won't be around for a while.
+>> >> >
+>> >> > So, I have no immediate solution for LPAE - it looks like LPAE will
+>> >> > require switching the page tables on kernel entry or exit, and again
+>> >> > each and every time we want to perform a userspace access.  How this
+>> >> > is done is not something that has been discussed, and neither do we
+>> >> > yet know how expensive this will be.  There are a number of places in
+>> >> > the kernel where a large number of get_user()s or put_user()s follow
+>> >> > one after each other, which necessitates switching back and forth
+>> >> > multiple times.  We may need to address some of those areas by
+>> >> > converting them to copy_(to|from)_user().
+>> >>
+>> >> By the way, have you looked at grsecurity's implementation of these
+>> >> protections? They've been using domains for a while now, and I think
+>> >> have an LPAE solution as well.
+>> >
+>> > *Sigh*.
+>> >
+>> > No, and I really don't care - if people want to do development work out
+>> > of the mainline kernel and not bother to talk about getting it upstream,
+>> > it's their loss.  As far as I'm concerned, such external work doesn't
+>> > exist.
+>>
+>> Sure, I understand, but it's worth at least looking at to compare
+>> feature sets. For example, when doing the W^X kernel memory work, I
+>> looked at both qcom and spender's work, trying to get the best of both
+>> into upstreamable shape.
+>
+> That's one way of looking at it.
+>
+> Another way of looking at it is that by looking at their work, and
+> merging their ideas into your own, it becomes an encouragement for
+> working outside of mainline - not only do they get the kernel itself
+> free, but they get their feature merged without themselves doing any
+> work - while some other bugger has to sort out making their code
+> mergable.
+>
+> Therefore, my standard point of view is that if people can't be
+> bothered to talk about their ARM specific kernel features here with
+> a view to having them merged, they are leeching off the efforts of
+> the upstream kernel community, and their code just isn't worth
+> looking at.
+>
+> I hold the same view on "community" kernel trees which don't bother
+> pushing their code upstream as well.
+>
+> Sorry, I'm *not* supporting leeches.
+>
+> I've already been accused this year by one very mistaken individual
+> for not pushing _my_ iMX6 work into community kernel trees - when
+> the work that I do is solely targetted at mainline kernels.  The
+> leeches are going mad, and I'm saying no more to this crap.  If it's
+> not talked about on a recognised mainline kernel mailing list, it
+> doesn't exist, and deserves to be rewritten.
 
-Fix this by acknowledging the pending interrupt when enabling the timer
-interrupt.
+I certainly see your point, but I'm not sure it serves end users best
+to ignore proven technologies. I am trying to bring up the discussion
+on a mainline list, and it seemed redundant to paste the entire grsec
+forum post here as a starting point. :)
 
-Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
----
- drivers/clocksource/mtk_timer.c | 16 ++++++----------
- 1 file changed, 6 insertions(+), 10 deletions(-)
+Anyway, I just want to see stuff as secure as possible. We're all
+working toward the same goal.
 
-diff --git a/drivers/clocksource/mtk_timer.c b/drivers/clocksource/mtk_timer.c
-index 4cd16fb..505f53d 100644
---- a/drivers/clocksource/mtk_timer.c
-+++ b/drivers/clocksource/mtk_timer.c
-@@ -156,14 +156,6 @@ static irqreturn_t mtk_timer_interrupt(int irq, void *dev_id)
- 	return IRQ_HANDLED;
- }
- 
--static void mtk_timer_global_reset(struct mtk_clock_event_device *evt)
--{
--	/* Disable all interrupts */
--	writel(0x0, evt->gpt_base + GPT_IRQ_EN_REG);
--	/* Acknowledge all interrupts */
--	writel(0x3f, evt->gpt_base + GPT_IRQ_ACK_REG);
--}
--
- static void
- mtk_timer_setup(struct mtk_clock_event_device *evt, u8 timer, u8 option)
- {
-@@ -183,6 +175,12 @@ static void mtk_timer_enable_irq(struct mtk_clock_event_device *evt, u8 timer)
- {
- 	u32 val;
- 
-+	/* Disable all interrupts */
-+	writel(0x0, evt->gpt_base + GPT_IRQ_EN_REG);
-+
-+	/* Acknowledge all spurious pending interrupts */
-+	writel(0x3f, evt->gpt_base + GPT_IRQ_ACK_REG);
-+
- 	val = readl(evt->gpt_base + GPT_IRQ_EN_REG);
- 	writel(val | GPT_IRQ_ENABLE(timer),
- 			evt->gpt_base + GPT_IRQ_EN_REG);
-@@ -232,8 +230,6 @@ static void __init mtk_timer_init(struct device_node *node)
- 	}
- 	rate = clk_get_rate(clk);
- 
--	mtk_timer_global_reset(evt);
--
- 	if (request_irq(evt->dev.irq, mtk_timer_interrupt,
- 			IRQF_TIMER | IRQF_IRQPOLL, "mtk_timer", evt)) {
- 		pr_warn("failed to setup irq %d\n", evt->dev.irq);
+-Kees
+
 -- 
-1.9.1
+Kees Cook
+Chrome OS Security
