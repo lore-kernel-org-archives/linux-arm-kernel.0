@@ -1,109 +1,41 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Mon, 24 Aug 2015 11:27:55 +0800
-Subject: [PATCH v1 3/3] arm64: dts: add Hi6220 mailbox node
-In-Reply-To: <20150822133050.GA4265@leoy-linaro>
-References: <1439977055-1747-1-git-send-email-leo.yan@linaro.org>
- <1439977055-1747-4-git-send-email-leo.yan@linaro.org>
- <20150821184059.GB2000@svinekod>
- <20150822133050.GA4265@leoy-linaro>
-Message-ID: <20150824032755.GA29395@leoy-linaro>
+From: b38611@freescale.com (Fugang Duan)
+Date: Mon, 24 Aug 2015 11:29:47 +0800
+Subject: [PATCH v2 0/5] Add fec1 and fec2 support for i.MX7d sdb board
+Message-ID: <1440386992-6775-1-git-send-email-b38611@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+The patch series is to add fec support for i.MX7d sdb board. Since i.MX7d fec ip is
+the same as i.MX6SX, so there have no change for driver itself.
 
-On Sat, Aug 22, 2015 at 09:30:50PM +0800, Leo Yan wrote:
-> On Fri, Aug 21, 2015 at 07:40:59PM +0100, Mark Rutland wrote:
-> > On Wed, Aug 19, 2015 at 10:37:35AM +0100, Leo Yan wrote:
-> > > On Hi6220, below memory regions in DDR have specific purpose:
-> > > 
-> > >   0x05e0,0000 - 0x05ef,ffff: For MCU firmware using at runtime;
-> > >   0x0740,f000 - 0x0740,ffff: For MCU firmware's section;
-> > >   0x06df,f000 - 0x06df,ffff: For mailbox message data.
-> > > 
-> > > This patch reserves these memory regions and add device node for
-> > > mailbox in dts.
-> > > 
-> > > Signed-off-by: Leo Yan <leo.yan@linaro.org>
-> > > ---
-> > >  arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 20 +++++++++++++++++---
-> > >  arch/arm64/boot/dts/hisilicon/hi6220.dtsi      |  8 ++++++++
-> > >  2 files changed, 25 insertions(+), 3 deletions(-)
-> > > 
-> > > diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-> > > index e36a539..d5470d3 100644
-> > > --- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-> > > +++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-> > > @@ -7,9 +7,6 @@
-> > >  
-> > >  /dts-v1/;
-> > >  
-> > > -/*Reserved 1MB memory for MCU*/
-> > > -/memreserve/ 0x05e00000 0x00100000;
-> > > -
-> > >  #include "hi6220.dtsi"
-> > >  
-> > >  / {
-> > > @@ -28,4 +25,21 @@
-> > >  		device_type = "memory";
-> > >  		reg = <0x0 0x0 0x0 0x40000000>;
-> > >  	};
-> > > +
-> > > +	reserved-memory {
-> > > +		#address-cells = <2>;
-> > > +		#size-cells = <2>;
-> > > +		ranges;
-> > > +
-> > > +		mcu-buf at 05e00000 {
-> > > +			no-map;
-> > > +			reg = <0x0 0x05e00000 0x0 0x00100000>,	/* MCU firmware buffer */
-> > > +			      <0x0 0x0740f000 0x0 0x00001000>;	/* MCU firmware section */
-> > > +		};
-> > > +
-> > > +		mbox-buf at 06dff000 {
-> > > +			no-map;
-> > > +			reg = <0x0 0x06dff000 0x0 0x00001000>;	/* Mailbox message buf */
-> > > +		};
-> > > +	};
-> > 
-> > As far as I can see, it would be simpler to simply carve these out of the
-> > memory node.
-> 
-> Will modify for MCU firmware buffer and section.
-> 
-> > I don't see why you need reserved-memory here, given you're not referring to
-> > these regions by phandle anyway.
-> 
-> mbox-buf is used by below mailbox's node, but the start address has
-> been truncated with 4KB alignment; so should keep it, right?
+Patch#1: add bcm54220 PHY ID entry into brcmphy.h file.
+Patch#2: add new iomux-gpr file to define iomux-gpr register and field for i.MX7d.
+Patch#3: i.MX7d sdb board install bcm54220 phy, i.MX7d arm2 board install AR8031 phy.
+         For the two phys, there needs extra phy setting, so package the setting to fixup.
+Patch#4~6: Add fec dts node and pinmux setting in dts file.
 
-I think i got your point, all these nodes can be removed and just use
-memory node to carve them out; but currently i saw the memory node
-cannot be passed correctly from UEFI to kernel, we will check for
-this. So will follow your suggestion if without any unknown reason.
+Change:
+V2:
+	* Remove patch#1 in V1 patch series. Move the sigle BCM54220 PHY ID define to machine file.
+	* The current BCM54220 switch phy still use generic phy driver since broadcom phy driver don't
+	  support the switch phy, there need effort to add the switch phy support. Once broadcom phy driver
+	  will support the bcm54220 switch phy, we can add the special config to imx_v6_v7_defconfig.
 
-Thanks,
-Leo Yan
 
-> > >  };
-> > > diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-> > > index 3f03380..9ff25bc 100644
-> > > --- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-> > > +++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-> > > @@ -167,5 +167,13 @@
-> > >  			clocks = <&ao_ctrl 36>, <&ao_ctrl 36>;
-> > >  			clock-names = "uartclk", "apb_pclk";
-> > >  		};
-> > > +
-> > > +		mailbox: mailbox at f7510000 {
-> > > +			#mbox-cells = <1>;
-> > > +			compatible = "hisilicon,hi6220-mbox";
-> > > +			reg = <0x0 0xf7510000 0x0 0x1000>, /* IPC_S */
-> > > +			      <0x0 0x06dff800 0x0 0x0800>; /* Mailbox buffer */
-> > > +			interrupts = <GIC_SPI 94 IRQ_TYPE_LEVEL_HIGH>;
-> > > +		};
-> > >  	};
-> > >  };
-> > > -- 
-> > > 1.9.1
-> > > 
+Fugang Duan (5):
+  ARM: imx7d: add imx7d iomux-gpr field define
+  ARM: imx: add enet init for i.MX7D platform
+  ARM: dts: imx: pinfunc: add GPIO1 pin define for i.MX7d
+  ARM: dts: imx7d: add fec1 and fec2 support for i.MX7d soc
+  ARM: dts: imx7d-sdb: add fec1 and fec2 support
+
+ arch/arm/boot/dts/imx7d-pinfunc.h          | 115 +++++++++++++++++++++++++++++
+ arch/arm/boot/dts/imx7d-sdb.dts            |  76 ++++++++++++++++++-
+ arch/arm/boot/dts/imx7d.dtsi               |  36 +++++++++
+ arch/arm/mach-imx/mach-imx7d.c             |  76 ++++++++++++++++++-
+ include/linux/mfd/syscon/imx7-iomuxc-gpr.h |  49 ++++++++++++
+ 5 files changed, 349 insertions(+), 3 deletions(-)
+ create mode 100644 include/linux/mfd/syscon/imx7-iomuxc-gpr.h
+
+-- 
+1.9.1
