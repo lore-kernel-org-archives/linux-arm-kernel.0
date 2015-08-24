@@ -1,40 +1,40 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 24 Aug 2015 14:47:31 +0100
-Subject: [PATCH 1/3] Docs: dt: add generic MSI bindings
-In-Reply-To: <CAL_Jsq+-xKsfBwqjHnSKPxtO1muu-NLEHZTTLpSqw=sBuU1Gjw@mail.gmail.com>
-References: <1437670365-20704-1-git-send-email-mark.rutland@arm.com>
- <1437670365-20704-2-git-send-email-mark.rutland@arm.com>
- <20150805165120.GB28849@leverpostej>
- <20150824101755.GC7139@leverpostej>
- <CAL_Jsq+-xKsfBwqjHnSKPxtO1muu-NLEHZTTLpSqw=sBuU1Gjw@mail.gmail.com>
-Message-ID: <20150824134731.GA31344@leverpostej>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Mon, 24 Aug 2015 15:47:09 +0200
+Subject: [PATCH v4 1/2] Documentation: dt: Add Xilinx zynqmp dma device
+ tree binding documentation
+In-Reply-To: <1438831173-8761-1-git-send-email-punnaia@xilinx.com>
+References: <1438831173-8761-1-git-send-email-punnaia@xilinx.com>
+Message-ID: <55DB205D.7090802@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 24, 2015 at 02:37:59PM +0100, Rob Herring wrote:
-> On Mon, Aug 24, 2015 at 5:17 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> > On Wed, Aug 05, 2015 at 05:51:20PM +0100, Mark Rutland wrote:
-> >> Rob,
-> >>
-> >> Do you have any objections to this, or are you happy to take this patch?
-> >>
-> >> There's a user of this binding (the GICv3 ITS) queued for v4.3 already in
-> >> the tip tree, so either we either need to be ok with this binding or we
-> >> need to rework that before v4.3.
-> >
-> > Sorry to ping, but are you happy to take this? Marc's replied and
-> > provided his ack.
-> 
-> Sorry. Looks fine to me, so I'll apply.
+On 08/06/2015 05:19 AM, Punnaiah Choudary Kalluri wrote:
+[...]
+> +Optional properties:
+> +- xlnx,include-sg: Indicates the controller to operate in simple or scatter
+> +		   gather dma mode
+> +- xlnx,ratectrl: Scheduling interval in terms of clock cycles for
+> +		 source AXI transaction
+> +- xlnx,overfetch: Tells whether the channel is allowed to over fetch the data
+> +- xlnx,src-issue: Number of AXI outstanding transactions on source side
+> +- xlnx,desc-axi-cohrnt: Tells whether the AXI transactions generated for the
+> +			descriptor read are marked Non-coherent
+> +- xlnx,src-axi-cohrnt: Tells whether the AXI transactions generated for the
+> +			source descriptor payload are marked Non-coherent
+> +- xlnx,dst-axi-cohrnt: Tells whether the AXI transactions generated for the
+> +			dst descriptor payload are marked Non-coherent
+> +- xlnx,desc-axi-qos: AXI QOS bits to be used for descriptor fetch
+> +- xlnx,src-axi-qos: AXI QOS bits to be used for data read
+> +- xlnx,dst-axi-qos: AXI QOS bits to be used for data write
+> +- xlnx,desc-axi-cache: AXI cache bits to be used for descriptor fetch.
+> +- xlnx,desc-axi-cache: AXI cache bits to be used for data read
+> +- xlnx,desc-axi-cache: AXI cache bits to be used for data write
+> +- xlnx,src-burst-len: AXI length for data read. Support only power of 2 values
+> +		      i.e 1,2,4,8 and 16
+> +- xlnx,dst-burst-len: AXI length for data write. Support only power of 2 values
+> +		      i.e 1,2,4,8 and 16
 
-Cheers!
+None of these really belong into the devicetree. This is all runtime
+configuration data.
 
-> What about patch 2 and 3? I can't find patch 3 in my mail.
-
-Those should wait for now.
-
-We don't yet have a user and there's ongoing discussion w.r.t. the PCI
-parts that I expect will pick up again as people return from LPC.
-
-Thanks,
-Mark.
+- Lars
