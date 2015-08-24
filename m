@@ -1,91 +1,194 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Mon, 24 Aug 2015 11:06:52 -0700
-Subject: Prevent list poison values from being mapped by userspace
- processes
-In-Reply-To: <20150821133043.GV7557@n2100.arm.linux.org.uk>
-References: <CABXk95C=CpeL4mNmS6-jJ-0bMJf6fawwfs6DM1-p8FctTEFbpw@mail.gmail.com>
- <20150821133043.GV7557@n2100.arm.linux.org.uk>
-Message-ID: <CAGXu5jJ8KOoVkx99rrajEEx77Z6zO4TzCXaXkB74zv9QQFuJFw@mail.gmail.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Mon, 24 Aug 2015 19:08:19 +0100
+Subject: [PATCH v2 07/15] KVM: arm64: handle ITS related GICv3
+ redistributor registers
+In-Reply-To: <55CC8AE2.2070807@linaro.org>
+References: <1436538111-4294-1-git-send-email-andre.przywara@arm.com>
+ <1436538111-4294-8-git-send-email-andre.przywara@arm.com>
+ <55CC8AE2.2070807@linaro.org>
+Message-ID: <55DB5D93.3090007@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 21, 2015 at 6:30 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Aug 18, 2015 at 02:42:44PM -0700, Jeffrey Vander Stoep wrote:
->> List poison pointer values point to memory that is mappable by
->> userspace. i.e. LIST_POISON1 = 0x00100100 and LIST_POISON2 =
->> 0x00200200. This means poison values can be valid pointers controlled
->> by userspace and can be used to exploit the kernel as demonstrated in
->> a recent blackhat talk:
->> https://www.blackhat.com/docs/us-15/materials/us-15-Xu-Ah-Universal-Android-Rooting-Is-Back-wp.pdf
+Hi Eric,
+
+On 13/08/15 13:17, Eric Auger wrote:
+> On 07/10/2015 04:21 PM, Andre Przywara wrote:
+>> In the GICv3 redistributor there are the PENDBASER and PROPBASER
+>> registers which we did not emulate so far, as they only make sense
+>> when having an ITS. In preparation for that emulate those MMIO
+>> accesses by storing the 64-bit data written into it into a variable
+>> which we later read in the ITS emulation.
 >>
->> Can these poison values be moved to an area not mappable by userspace
->> on 32 bit ARM?
->
-> As was discussed privately before your message, both Catalin and myself
-> agreed that this is not possible, and I proposed alternatives which were
-> feasible.
->
-> I have now implemented the domain access alternative which I mentioned
-> during that discussion, which is suitable for all non-LPAE setups, which
-> has the effect of blocking almost all implicit kernel accesses to
-> userspace, thereby substantially reducing the possibility for an attack
-> similar to that given in the above paper.
+>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>> ---
+>>  include/kvm/arm_vgic.h      |  8 ++++++++
+>>  virt/kvm/arm/vgic-v3-emul.c | 44 ++++++++++++++++++++++++++++++++++++++++++++
+>>  virt/kvm/arm/vgic.c         | 35 +++++++++++++++++++++++++++++++++++
+>>  virt/kvm/arm/vgic.h         |  4 ++++
+>>  4 files changed, 91 insertions(+)
+>>
+>> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+>> index 3ee063b..8c6cb0e 100644
+>> --- a/include/kvm/arm_vgic.h
+>> +++ b/include/kvm/arm_vgic.h
+>> @@ -256,6 +256,14 @@ struct vgic_dist {
+>>  	struct vgic_vm_ops	vm_ops;
+>>  	struct vgic_io_device	dist_iodev;
+>>  	struct vgic_io_device	*redist_iodevs;
+>> +
+>> +	/* Address of LPI configuration table shared by all redistributors */
+>> +	u64			propbaser;
+>> +
+>> +	/* Addresses of LPI pending tables per redistributor */
+>> +	u64			*pendbaser;
+>> +
+>> +	bool			lpis_enabled;
+>>  };
+>>  
+>>  struct vgic_v2_cpu_if {
+>> diff --git a/virt/kvm/arm/vgic-v3-emul.c b/virt/kvm/arm/vgic-v3-emul.c
+>> index a8cf669..5269ad1 100644
+>> --- a/virt/kvm/arm/vgic-v3-emul.c
+>> +++ b/virt/kvm/arm/vgic-v3-emul.c
+>> @@ -651,6 +651,38 @@ static bool handle_mmio_cfg_reg_redist(struct kvm_vcpu *vcpu,
+>>  	return vgic_handle_cfg_reg(reg, mmio, offset);
+>>  }
+>>  
+>> +/* We don't trigger any actions here, just store the register value */
+>> +static bool handle_mmio_propbaser_redist(struct kvm_vcpu *vcpu,
+>> +					 struct kvm_exit_mmio *mmio,
+>> +					 phys_addr_t offset)
+>> +{
+>> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+>> +	int mode = ACCESS_READ_VALUE;
+>> +
+>> +	/* Storing a value with LPIs already enabled is undefined */
+>> +	mode |= dist->lpis_enabled ? ACCESS_WRITE_IGNORED : ACCESS_WRITE_VALUE;
+>> +	vgic_handle_base_register(vcpu, mmio, offset, &dist->propbaser, mode);
+>> +
+>> +	return false;
+>> +}
+>> +
+>> +/* We don't trigger any actions here, just store the register value */
+>> +static bool handle_mmio_pendbaser_redist(struct kvm_vcpu *vcpu,
+>> +					 struct kvm_exit_mmio *mmio,
+>> +					 phys_addr_t offset)
+>> +{
+>> +	struct kvm_vcpu *rdvcpu = mmio->private;
+>> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+>> +	int mode = ACCESS_READ_VALUE;
+>> +
+>> +	/* Storing a value with LPIs already enabled is undefined */
+>> +	mode |= dist->lpis_enabled ? ACCESS_WRITE_IGNORED : ACCESS_WRITE_VALUE;
+>> +	vgic_handle_base_register(vcpu, mmio, offset,
+>> +				  &dist->pendbaser[rdvcpu->vcpu_id], mode);
+>> +
+>> +	return false;
+>> +}
+>> +
+>>  #define SGI_base(x) ((x) + SZ_64K)
+>>  
+>>  static const struct vgic_io_range vgic_redist_ranges[] = {
+>> @@ -679,6 +711,18 @@ static const struct vgic_io_range vgic_redist_ranges[] = {
+>>  		.handle_mmio    = handle_mmio_raz_wi,
+>>  	},
+>>  	{
+>> +		.base		= GICR_PENDBASER,
+>> +		.len		= 0x08,
+>> +		.bits_per_irq	= 0,
+>> +		.handle_mmio	= handle_mmio_pendbaser_redist,
+>> +	},
+>> +	{
+>> +		.base		= GICR_PROPBASER,
+>> +		.len		= 0x08,
+>> +		.bits_per_irq	= 0,
+>> +		.handle_mmio	= handle_mmio_propbaser_redist,
+>> +	},
+>> +	{
+>>  		.base           = GICR_IDREGS,
+>>  		.len            = 0x30,
+>>  		.bits_per_irq   = 0,
+>> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+>> index 15e447f..49ee92b 100644
+>> --- a/virt/kvm/arm/vgic.c
+>> +++ b/virt/kvm/arm/vgic.c
+>> @@ -446,6 +446,41 @@ void vgic_reg_access(struct kvm_exit_mmio *mmio, u32 *reg,
+>>  	}
+>>  }
+>>  
+>> +/* handle a 64-bit register access */
+>> +void vgic_handle_base_register(struct kvm_vcpu *vcpu,
+>> +			       struct kvm_exit_mmio *mmio,
+>> +			       phys_addr_t offset, u64 *basereg,
+>> +			       int mode)
+>> +{
+> why do we have vcpu in the proto? I don't see it used. Also if it were
+> can't we fetch it from mmio->private?
+> 
+> why not renaming this into something like vgic_reg64_access as par
+> vgic_reg_access 32b flavor above. vgic_handle* usually is the name of
+> the region handler returning bool?
 
-What's the right solution for LPAE setups?
+Makes sense, I both renamed the function and removed the vcpu parameter.
+I need to check whether we need the vcpu to do some endianness checks in
+the future, though. Using mmio->private would be a hack, then.
 
--Kees
+Cheers,
+Andre.
 
->
-> It should be said that with the following patches applied, it won't stop
-> the original bug being used to crash the system (that's already been
-> fixed) but it will prevent userspace being able to mask the crash, and
-> therefore prevent such use-after-free bugs being used to gain privileges.
->
-> This approach also covers low-vector CPUs as well, with one caveat: the
-> lower 1MB of userspace will remain accessible to the kernel due to the
-> need for the vectors to remain visible.  Doing otherwise crashes the
-> machine on the first exception event.  So here, we offer a "best efforts"
-> implementation rather than something which completely blocks userspace
-> access from kernel space.
->
-> This is not a simple fix - it's quite involved, and it changes a fair
-> number of places in the kernel.  It needs time to be proven before any
-> thought can be given to backporting these changes to stable kernels.
-> It would be good to get some testing of these changes.
->
->  arch/arm/Kconfig                            | 15 +++++
->  arch/arm/include/asm/domain.h               | 45 +++++++++++----
->  arch/arm/include/asm/futex.h                | 19 ++++++-
->  arch/arm/include/asm/pgtable-2level-hwdef.h |  1 +
->  arch/arm/include/asm/thread_info.h          |  3 -
->  arch/arm/include/asm/uaccess.h              | 85 +++++++++++++++++++++++++++--
->  arch/arm/kernel/armksyms.c                  |  6 +-
->  arch/arm/kernel/entry-armv.S                | 27 ++++++---
->  arch/arm/kernel/entry-common.S              |  2 +
->  arch/arm/kernel/entry-header.S              | 42 ++++++++++++++
->  arch/arm/kernel/head.S                      |  5 +-
->  arch/arm/kernel/process.c                   | 37 ++++++++++---
->  arch/arm/kernel/traps.c                     |  1 -
->  arch/arm/lib/clear_user.S                   |  6 +-
->  arch/arm/lib/copy_from_user.S               |  6 +-
->  arch/arm/lib/copy_to_user.S                 |  6 +-
->  arch/arm/lib/uaccess_with_memcpy.c          |  4 +-
->  arch/arm/mm/mmu.c                           |  4 +-
->  arch/arm/mm/pgd.c                           | 10 ++++
->  19 files changed, 267 insertions(+), 57 deletions(-)
->
-> --
-> FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-> according to speedtest.net.
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
-
-
--- 
-Kees Cook
-Chrome OS Security
+> 
+>> +	u32 reg;
+>> +	u64 breg;
+>> +
+>> +	switch (offset & ~3) {
+>> +	case 0x00:
+>> +		breg = *basereg;
+>> +		reg = lower_32_bits(breg);
+>> +		vgic_reg_access(mmio, &reg, offset & 3, mode);
+>> +		if (mmio->is_write && (mode & ACCESS_WRITE_VALUE)) {
+>> +			breg &= GENMASK_ULL(63, 32);
+>> +			breg |= reg;
+>> +			*basereg = breg;
+>> +		}
+>> +		break;
+>> +	case 0x04:
+>> +		breg = *basereg;
+>> +		reg = upper_32_bits(breg);
+>> +		vgic_reg_access(mmio, &reg, offset & 3, mode);
+>> +		if (mmio->is_write && (mode & ACCESS_WRITE_VALUE)) {
+>> +			breg  = lower_32_bits(breg);
+>> +			breg |= (u64)reg << 32;
+>> +			*basereg = breg;
+>> +		}
+>> +		break;
+>> +	}
+>> +}
+>> +
+>> +
+>> +
+> some spare white lines
+> 
+> Best Regards
+> 
+> Eric
+>>  bool handle_mmio_raz_wi(struct kvm_vcpu *vcpu, struct kvm_exit_mmio *mmio,
+>>  			phys_addr_t offset)
+>>  {
+>> diff --git a/virt/kvm/arm/vgic.h b/virt/kvm/arm/vgic.h
+>> index a093f5c..b2d791c 100644
+>> --- a/virt/kvm/arm/vgic.h
+>> +++ b/virt/kvm/arm/vgic.h
+>> @@ -71,6 +71,10 @@ void vgic_reg_access(struct kvm_exit_mmio *mmio, u32 *reg,
+>>  		     phys_addr_t offset, int mode);
+>>  bool handle_mmio_raz_wi(struct kvm_vcpu *vcpu, struct kvm_exit_mmio *mmio,
+>>  			phys_addr_t offset);
+>> +void vgic_handle_base_register(struct kvm_vcpu *vcpu,
+>> +			       struct kvm_exit_mmio *mmio,
+>> +			       phys_addr_t offset, u64 *basereg,
+>> +			       int mode);
+>>  
+>>  static inline
+>>  u32 mmio_data_read(struct kvm_exit_mmio *mmio, u32 mask)
+>>
+> 
