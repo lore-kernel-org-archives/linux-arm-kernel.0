@@ -1,58 +1,54 @@
-From: punnaia@xilinx.com (punnaiah choudary kalluri)
-Date: Tue, 25 Aug 2015 00:09:16 +0530
-Subject: [PATCH v4 1/2] Documentation: dt: Add Xilinx zynqmp dma device
- tree binding documentation
-In-Reply-To: <55DB205D.7090802@metafoo.de>
-References: <1438831173-8761-1-git-send-email-punnaia@xilinx.com>
- <55DB205D.7090802@metafoo.de>
-Message-ID: <CAGnW=Bb-vwvwAm7ztH1XLqRHbVx+5MWZJd=fDgOoqJ7Qtyo=nw@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 24 Aug 2015 19:47:10 +0100
+Subject: Prevent list poison values from being mapped by userspace
+ processes
+In-Reply-To: <CAGXu5jJ8KOoVkx99rrajEEx77Z6zO4TzCXaXkB74zv9QQFuJFw@mail.gmail.com>
+References: <CABXk95C=CpeL4mNmS6-jJ-0bMJf6fawwfs6DM1-p8FctTEFbpw@mail.gmail.com>
+ <20150821133043.GV7557@n2100.arm.linux.org.uk>
+ <CAGXu5jJ8KOoVkx99rrajEEx77Z6zO4TzCXaXkB74zv9QQFuJFw@mail.gmail.com>
+Message-ID: <20150824184709.GE7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 24, 2015 at 7:17 PM, Lars-Peter Clausen <lars@metafoo.de> wrote:
-> On 08/06/2015 05:19 AM, Punnaiah Choudary Kalluri wrote:
-> [...]
->> +Optional properties:
->> +- xlnx,include-sg: Indicates the controller to operate in simple or scatter
->> +                gather dma mode
->> +- xlnx,ratectrl: Scheduling interval in terms of clock cycles for
->> +              source AXI transaction
->> +- xlnx,overfetch: Tells whether the channel is allowed to over fetch the data
->> +- xlnx,src-issue: Number of AXI outstanding transactions on source side
->> +- xlnx,desc-axi-cohrnt: Tells whether the AXI transactions generated for the
->> +                     descriptor read are marked Non-coherent
->> +- xlnx,src-axi-cohrnt: Tells whether the AXI transactions generated for the
->> +                     source descriptor payload are marked Non-coherent
->> +- xlnx,dst-axi-cohrnt: Tells whether the AXI transactions generated for the
->> +                     dst descriptor payload are marked Non-coherent
->> +- xlnx,desc-axi-qos: AXI QOS bits to be used for descriptor fetch
->> +- xlnx,src-axi-qos: AXI QOS bits to be used for data read
->> +- xlnx,dst-axi-qos: AXI QOS bits to be used for data write
->> +- xlnx,desc-axi-cache: AXI cache bits to be used for descriptor fetch.
->> +- xlnx,desc-axi-cache: AXI cache bits to be used for data read
->> +- xlnx,desc-axi-cache: AXI cache bits to be used for data write
->> +- xlnx,src-burst-len: AXI length for data read. Support only power of 2 values
->> +                   i.e 1,2,4,8 and 16
->> +- xlnx,dst-burst-len: AXI length for data write. Support only power of 2 values
->> +                   i.e 1,2,4,8 and 16
->
-> None of these really belong into the devicetree. This is all runtime
-> configuration data.
+On Mon, Aug 24, 2015 at 11:06:52AM -0700, Kees Cook wrote:
+> On Fri, Aug 21, 2015 at 6:30 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Tue, Aug 18, 2015 at 02:42:44PM -0700, Jeffrey Vander Stoep wrote:
+> >> List poison pointer values point to memory that is mappable by
+> >> userspace. i.e. LIST_POISON1 = 0x00100100 and LIST_POISON2 =
+> >> 0x00200200. This means poison values can be valid pointers controlled
+> >> by userspace and can be used to exploit the kernel as demonstrated in
+> >> a recent blackhat talk:
+> >> https://www.blackhat.com/docs/us-15/materials/us-15-Xu-Ah-Universal-Android-Rooting-Is-Back-wp.pdf
+> >>
+> >> Can these poison values be moved to an area not mappable by userspace
+> >> on 32 bit ARM?
+> >
+> > As was discussed privately before your message, both Catalin and myself
+> > agreed that this is not possible, and I proposed alternatives which were
+> > feasible.
+> >
+> > I have now implemented the domain access alternative which I mentioned
+> > during that discussion, which is suitable for all non-LPAE setups, which
+> > has the effect of blocking almost all implicit kernel accesses to
+> > userspace, thereby substantially reducing the possibility for an attack
+> > similar to that given in the above paper.
+> 
+> What's the right solution for LPAE setups?
 
-This is a general purpose dma and provides more flexibility to the
-user for configuring the
-descriptor, data and bus parameters. one way is as you said these
-parameters can be
-configured at runtime but i didn't find a way configuring the channel
-at runtime for mem to
-mem transfers. I have checked the  device_config function description
-and it is strictly
-meant for slave operations only. So, i didn't see anything wrong
-having these parameter values
-from the device tree as these all are hw parameters.
+That's something which Catalin indicated that he'll work on.  However,
+he said in a public email last week that he won't be around for a while.
 
-Regards,
-Punnaiah
+So, I have no immediate solution for LPAE - it looks like LPAE will
+require switching the page tables on kernel entry or exit, and again
+each and every time we want to perform a userspace access.  How this
+is done is not something that has been discussed, and neither do we
+yet know how expensive this will be.  There are a number of places in
+the kernel where a large number of get_user()s or put_user()s follow
+one after each other, which necessitates switching back and forth
+multiple times.  We may need to address some of those areas by
+converting them to copy_(to|from)_user().
 
->
-> - Lars
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
