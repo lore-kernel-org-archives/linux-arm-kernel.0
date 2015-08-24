@@ -1,41 +1,56 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 24 Aug 2015 21:59:51 +0200
-Subject: [PATCH 1/3] ARM: uniphier: add outer cache support
-In-Reply-To: <1440382692-3855-2-git-send-email-yamada.masahiro@socionext.com>
-References: <1440382692-3855-1-git-send-email-yamada.masahiro@socionext.com>
- <1440382692-3855-2-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <2021253.vgeYqalDfp@wuerfel>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Mon, 24 Aug 2015 13:14:59 -0700
+Subject: [PATCH] pci: acpi: Generic function for setting up PCI device DMA
+ coherency
+In-Reply-To: <55DB6BF6.1030206@amd.com>
+References: <1439459925-2361-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <20150814015004.GA26431@google.com>
+ <CAErSpo7yN08tKyo-yyyVG58vUptbHGN=L+MEZ8TQy1gm5a1_0Q@mail.gmail.com>
+ <55DB6BF6.1030206@amd.com>
+Message-ID: <CAErSpo6TcwVH+TT5wZnLjOPMTa1NBoN=qJCev1rg1n_xFbggBQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 24 August 2015 11:18:10 Masahiro Yamada wrote:
-> diff --git a/Documentation/devicetree/bindings/arm/uniphier/cache-uniphier.txt b/Documentation/devicetree/bindings/arm/uniphier/cache-uniphier.txt
-> new file mode 100644
-> index 0000000..6428289
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/uniphier/cache-uniphier.txt
-> @@ -0,0 +1,30 @@
-> +UniPhier outer cache controller
-> +
-> +UniPhier SoCs are integrated with a level 2 cache controller that resides
-> +outside of the ARM cores, some of them also have a level 3 cache controller.
-> +
-> +Required properties:
-> +- compatible: should be one of the followings:
-> +       "socionext,uniphier-l2-cache"   (L2 cache)
-> +       "socionext,uniphier-l3-cache"   (L3 cache)
-> +- reg: offsets and lengths of the register sets for the device.  It should
-> +  contain 3 regions: control registers, revision registers, operation
-> +  registers, in this order.
-> +
-> +The L2 cache must exist to use the L3 cache; adding only an L3 cache device
-> +node to the device tree causes the initialization failure of the whole outer
-> +cache system.
-> 
+On Mon, Aug 24, 2015 at 12:09 PM, Suravee Suthikulpanit
+<Suravee.Suthikulpanit@amd.com> wrote:
 
-How much does this outer cache have in common with the l2x0/pl310 cache
-controller model? Would it make sense to at least share the
-common entry point at l2x0_of_init() so you don't need to call it from
-the platform file?
+>>> commit 84cfb2213cd400fef227ec0d7829ec4e12895da9
+>>> Author: Bjorn Helgaas <bhelgaas@google.com>
+>>> Date:   Thu Aug 13 19:49:52 2015 -0500
+>>>
+>>>      ACPI / scan: Rename acpi_check_dma() to acpi_dma_is_coherent()
+>>>
+>>>      The name "acpi_check_dma()" doesn't give any much indication about
+>>> what
+>>>      exactly it checks.  The function also returns information both as a
+>>> normal
+>>>      return value and as the "bool *coherent" return parameter.  But
+>>> "*coherent"
+>>>      doesn't actually give any extra information: it is unchanged when
+>>> returning
+>>>      false and set to true when returning true.
+>>>
+>>>      Rename acpi_check_dma() to acpi_dma_is_coherent() so the callers
+>>> read more
+>>>      naturally.  Drop the return parameter and just use the function
+>>> return
+>>>      value.
+>>>
+>>>      Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+>
+>
+> This was because, at one point, we wanted to be able to differentiate
+> between the case _CCA=0 and missing _CCA in ARM64, where we would support
+> DMA (using arch-specific cache maintenance) if _CCA=0, and disable DMA when
+> missing _CCA on ARM64.
+>
+> It seems like the logic is now required (please see
+> https://www.mail-archive.com/linux-usb at vger.kernel.org/msg62735.html). So,
+> we would need the true/false return, and the coherent variable to be able to
+> differentiate between the two cases.
+>
+> Please let me know what you think.
 
-	Arnd
+It's hard for me to comment without seeing the actual patches.  I
+think returning two values (_CCA-seen and coherent) is a confusing
+interface.
