@@ -1,164 +1,200 @@
-From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
-Date: Mon, 24 Aug 2015 23:41:29 +0700
-Subject: [PATCH] pci: acpi: Generic function for setting up PCI device DMA
- coherency
-In-Reply-To: <1439459925-2361-1-git-send-email-Suravee.Suthikulpanit@amd.com>
-References: <1439459925-2361-1-git-send-email-Suravee.Suthikulpanit@amd.com>
-Message-ID: <55DB4939.5070605@amd.com>
+From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
+Date: Mon, 24 Aug 2015 18:42:46 +0200
+Subject: [PATCH linux-next v4 3/5] mtd: spi-nor: allow to tune the number
+ of dummy cycles
+In-Reply-To: <201508241248.17466.marex@denx.de>
+References: <cover.1440410236.git.cyrille.pitchen@atmel.com>
+ <b0d8470fdd46e89ef692e27dc2600b880c1d5dde.1440410236.git.cyrille.pitchen@atmel.com>
+ <201508241248.17466.marex@denx.de>
+Message-ID: <55DB4986.1000207@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Marek,
 
-Ping. Does anyone have any comments or suggestions?
+Le 24/08/2015 12:48, Marek Vasut a ?crit :
+> On Monday, August 24, 2015 at 12:13:58 PM, Cyrille Pitchen wrote:
+>> The number of dummy cycles used during Fast Read commands can be reduced
+>> to improve transfer performances. Each manufacturer has a dedicated set of
+>> registers to provide the memory with the exact number of dummy cycles it
+>> should expect. Both the memory and the (Q)SPI controller must agree on
+>> this number of dummy cycles.
+>>
+>> The number of dummy cycles can be found into the memory datasheet and
+>> mostly depends on the SPI clock frequency, the Fast Read op code and the
+>> Single/Dual Data Rate mode.
+>>
+>> Probing JEDEC Serial Flash Discoverable Parameters (SFDP) tables would
+>> only provide the driver with a high enough number of dummy cycles for each
+>> Fast Read command to be used for all clock frequencies: this solution
+>> would not be optimized.
+>>
+>> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+> 
+> Hi!
+> 
+>>  drivers/mtd/spi-nor/spi-nor.c | 97
+>> ++++++++++++++++++++++++++++++++++--------- include/linux/mtd/spi-nor.h  
+>> |  2 +
+>>  2 files changed, 80 insertions(+), 19 deletions(-)
+>>
+>> diff --git a/drivers/mtd/spi-nor/spi-nor.c b/drivers/mtd/spi-nor/spi-nor.c
+>> index e2a6029dc056..869e098a6841 100644
+>> --- a/drivers/mtd/spi-nor/spi-nor.c
+>> +++ b/drivers/mtd/spi-nor/spi-nor.c
+>> @@ -119,24 +119,6 @@ static int read_cr(struct spi_nor *nor)
+>>  }
+>>
+>>  /*
+>> - * Dummy Cycle calculation for different type of read.
+>> - * It can be used to support more commands with
+>> - * different dummy cycle requirements.
+>> - */
+>> -static inline int spi_nor_read_dummy_cycles(struct spi_nor *nor)
+>> -{
+>> -	switch (nor->flash_read) {
+>> -	case SPI_NOR_FAST:
+>> -	case SPI_NOR_DUAL:
+>> -	case SPI_NOR_QUAD:
+>> -		return 8;
+>> -	case SPI_NOR_NORMAL:
+>> -		return 0;
+>> -	}
+>> -	return 0;
+>> -}
+> 
+> You can probably just soup up this function so that it sets the
+> nor->read_dummy, no ?
+>
 
-Thanks,
-Suravee
+Actually, this is what the patch does: spi_nor_read_dummy_cycles() was reused
+and enhanced few lines below where you've pointed out the 
+"switch (nor->flash_read)" block should be move after the else block.
 
-On 8/13/15 16:58, Suravee Suthikulpanit wrote:
-> This patch refactors of_pci_dma_configure() into a more generic
-> pci_dma_configure(), which can be reused by non-OF code.
-> Then, it adds support for setting up PCI device DMA coherency from
-> ACPI _CCA object that should normally be specified in the DSDT node
-> of its PCI host bridge..
->
-> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-> CC: Bjorn Helgaas <bhelgaas@google.com>
-> CC: Catalin Marinas <catalin.marinas@arm.com>
-> CC: Will Deacon <will.deacon@arm.com>
-> CC: Rafael J. Wysocki <rjw@rjwysocki.net>
-> CC: Rob Herring <robh+dt@kernel.org>
-> CC: Murali Karicheri <m-karicheri2@ti.com>
-> ---
-> Note: According to the ACPI spec, the _CCA attribute is required
->        for ARM64. Therefore, this patch is a pre-req for ACPI PCI
->        support for ARM64 which is currently in development.
->
->        Also, this should not affect other architectures since
->        if CCA is not required, the default value is coherent.
->        Please see include/acpi/acpi_bus.h: acpi_check_dma() and
->        drivers/acpi/scan.c: acpi_init_coherency() for more information
->
->   drivers/of/of_pci.c    | 20 --------------------
->   drivers/pci/probe.c    | 35 +++++++++++++++++++++++++++++++++--
->   include/linux/of_pci.h |  3 ---
->   3 files changed, 33 insertions(+), 25 deletions(-)
->
-> diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
-> index 5751dc5..b66ee4e 100644
-> --- a/drivers/of/of_pci.c
-> +++ b/drivers/of/of_pci.c
-> @@ -117,26 +117,6 @@ int of_get_pci_domain_nr(struct device_node *node)
->   }
->   EXPORT_SYMBOL_GPL(of_get_pci_domain_nr);
->
-> -/**
-> - * of_pci_dma_configure - Setup DMA configuration
-> - * @dev: ptr to pci_dev struct of the PCI device
-> - *
-> - * Function to update PCI devices's DMA configuration using the same
-> - * info from the OF node of host bridge's parent (if any).
-> - */
-> -void of_pci_dma_configure(struct pci_dev *pci_dev)
-> -{
-> -	struct device *dev = &pci_dev->dev;
-> -	struct device *bridge = pci_get_host_bridge_device(pci_dev);
-> -
-> -	if (!bridge->parent)
-> -		return;
-> -
-> -	of_dma_configure(dev, bridge->parent->of_node);
-> -	pci_put_host_bridge_device(bridge);
-> -}
-> -EXPORT_SYMBOL_GPL(of_pci_dma_configure);
-> -
->   #if defined(CONFIG_OF_ADDRESS)
->   /**
->    * of_pci_get_host_bridge_resources - Parse PCI host bridge resources from DT
-> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-> index cefd636..e2fcd3b 100644
-> --- a/drivers/pci/probe.c
-> +++ b/drivers/pci/probe.c
-> @@ -6,12 +6,14 @@
->   #include <linux/delay.h>
->   #include <linux/init.h>
->   #include <linux/pci.h>
-> -#include <linux/of_pci.h>
-> +#include <linux/of_device.h>
->   #include <linux/pci_hotplug.h>
->   #include <linux/slab.h>
->   #include <linux/module.h>
->   #include <linux/cpumask.h>
->   #include <linux/pci-aspm.h>
-> +#include <linux/acpi.h>
-> +#include <linux/property.h>
->   #include <asm-generic/pci-bridge.h>
->   #include "pci.h"
->
-> @@ -1544,6 +1546,35 @@ static void pci_init_capabilities(struct pci_dev *dev)
->   	pci_enable_acs(dev);
->   }
->
-> +/**
-> + * pci_dma_configure - Setup DMA configuration
-> + * @pci_dev: ptr to pci_dev struct of the PCI device
-> + *
-> + * Function to update PCI devices's DMA configuration using the same
-> + * info from the OF node or ACPI node of host bridge's parent (if any).
-> + */
-> +static void pci_dma_configure(struct pci_dev *pci_dev)
-> +{
-> +	struct device *dev = &pci_dev->dev;
-> +	struct device *bridge = pci_get_host_bridge_device(pci_dev);
-> +	struct acpi_device *adev;
-> +	bool coherent;
-> +
-> +	if (has_acpi_companion(bridge)) {
-> +		adev = to_acpi_node(bridge->fwnode);
-> +		if (acpi_check_dma(adev, &coherent))
-> +			arch_setup_dma_ops(dev, 0, 0, NULL, coherent);
-> +	} else {
-> +		struct device *host = bridge->parent;
-> +		if (!host)
-> +			return;
-> +
-> +		of_dma_configure(dev, host->of_node);
-> +	}
-> +
-> +	pci_put_host_bridge_device(bridge);
-> +}
-> +
->   void pci_device_add(struct pci_dev *dev, struct pci_bus *bus)
->   {
->   	int ret;
-> @@ -1557,7 +1588,7 @@ void pci_device_add(struct pci_dev *dev, struct pci_bus *bus)
->   	dev->dev.dma_mask = &dev->dma_mask;
->   	dev->dev.dma_parms = &dev->dma_parms;
->   	dev->dev.coherent_dma_mask = 0xffffffffull;
-> -	of_pci_dma_configure(dev);
-> +	pci_dma_configure(dev);
->
->   	pci_set_dma_max_seg_size(dev, 65536);
->   	pci_set_dma_seg_boundary(dev, 0xffffffff);
-> diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
-> index 29fd3fe..ce0e5ab 100644
-> --- a/include/linux/of_pci.h
-> +++ b/include/linux/of_pci.h
-> @@ -16,7 +16,6 @@ int of_pci_get_devfn(struct device_node *np);
->   int of_irq_parse_and_map_pci(const struct pci_dev *dev, u8 slot, u8 pin);
->   int of_pci_parse_bus_range(struct device_node *node, struct resource *res);
->   int of_get_pci_domain_nr(struct device_node *node);
-> -void of_pci_dma_configure(struct pci_dev *pci_dev);
->   #else
->   static inline int of_irq_parse_pci(const struct pci_dev *pdev, struct of_phandle_args *out_irq)
->   {
-> @@ -51,8 +50,6 @@ of_get_pci_domain_nr(struct device_node *node)
->   {
->   	return -1;
->   }
-> -
-> -static inline void of_pci_dma_configure(struct pci_dev *pci_dev) { }
->   #endif
->
->   #if defined(CONFIG_OF_ADDRESS)
->
+I think when I wrote the code I've chosen to move the definition of this
+function instead of adding forward declarations of functions such as read_cr()
+or write_sr_cr(), which are now called by micron_set_dummy_cycles().
+
+>> -/*
+>>   * Write status register 1 byte
+>>   * Returns negative if error occurred.
+>>   */
+>> @@ -1012,6 +994,81 @@ static int set_quad_mode(struct spi_nor *nor, struct
+>> flash_info *info) }
+>>  }
+>>
+>> +static int micron_set_dummy_cycles(struct spi_nor *nor)
+>> +{
+>> +	int ret;
+>> +	u8 val, mask;
+>> +
+>> +	/* read the Volatile Configuration Register (VCR) */
+> 
+> NIT: If this is a sentence, start it with capital letter and end it with 
+> fullstop :)
+> 
+
+done for the next version
+
+>> +	ret = nor->read_reg(nor, SPINOR_OP_RD_VCR, &val, 1);
+>> +	if (ret < 0) {
+>> +		dev_err(nor->dev, "error %d reading VCR\n", ret);
+>> +		return ret;
+>> +	}
+>> +
+>> +	write_enable(nor);
+>> +
+>> +	/* update the number of dummy into the VCR */
+> 
+> DTTO
+> 
+
+done for the next version
+
+>> +	mask = GENMASK(7, 4);
+>> +	val &= ~mask;
+>> +	val |= (nor->read_dummy << 4) & mask;
+>> +	ret = nor->write_reg(nor, SPINOR_OP_WR_VCR, &val, 1, 0);
+>> +	if (ret < 0) {
+>> +		dev_err(nor->dev, "error while writing VCR register\n");
+>> +		return ret;
+>> +	}
+>> +
+>> +	ret = spi_nor_wait_till_ready(nor);
+>> +	if (ret)
+>> +		return ret;
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +/*
+>> + * Dummy Cycle calculation for different type of read.
+>> + * It can be used to support more commands with
+>> + * different dummy cycle requirements.
+>> + */
+>> +static int spi_nor_read_dummy_cycles(struct spi_nor *nor,
+>> +				     const struct flash_info *info)
+>> +{
+>> +	struct device_node *np = nor->dev->of_node;
+>> +	u32 num_dummy_cycles;
+>> +
+>> +	if (np && !of_property_read_u32(np, "m25p,num-dummy-cycles",
+>> +					&num_dummy_cycles)) {
+>> +		nor->read_dummy = num_dummy_cycles;
+>> +
+>> +		/*
+>> +		 * This switch block might be moved after the if...then...else
+>> +		 * statement but it was not tested with all Spansion or Micron
+>> +		 * memories.
+>> +		 * Now the "m25p,num-dummy-cycles" property needs to be
+>> +		 * explicitly set in the device tree so the switch statement is
+>> +		 * executed. This should avoid unwanted side effects and keep
+>> +		 * backward compatibility.
+>> +		 */
+>> +		switch (JEDEC_MFR(info)) {
+>> +		case CFI_MFR_ST:
+>> +			return micron_set_dummy_cycles(nor);
+>> +		default:
+> 
+> If you do have m25p,num-dummy-cycles set for non-micron flash, you have a 
+> problem here I believe.
+> 
+>> +			break;
+>> +		}
+>> +	} else {
+> 
+> The solution would be to drop this else {} bit here, so that if you fail in
+> the DT-based configuration, you fall back to this old behavior. What do you 
+> think please ? :)
+> 
+
+Good idea!
+I also add a trace for the default case of "switch (JEDEC_MFR(info))":
+
+dev_warn(dev, "can't set the number of dummy cycles\n");
+
+So the user is notified that the driver could not use the value of
+"m25p,num-dummy-cycles" from the DT before falling back to the legacy
+code.
+
+>> +		switch (nor->flash_read) {
+>> +		case SPI_NOR_FAST:
+>> +		case SPI_NOR_DUAL:
+>> +		case SPI_NOR_QUAD:
+>> +			nor->read_dummy = 8;
+>> +		case SPI_NOR_NORMAL:
+>> +			nor->read_dummy = 0;
+>> +		}
+>> +	}
+>> +
+>> +	return 0;
+>> +}
+> 
+> [...]
+> 
+
+thanks for the review!
+
+Best regards,
+
+Cyrille
