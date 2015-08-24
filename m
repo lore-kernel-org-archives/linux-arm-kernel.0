@@ -1,166 +1,82 @@
-From: eddie.huang@mediatek.com (Eddie Huang)
-Date: Mon, 24 Aug 2015 13:50:26 +0800
-Subject: [PATCH] soc: mediatek: add scpsys support active_wakeup
-In-Reply-To: <1437631249-706-1-git-send-email-eddie.huang@mediatek.com>
-References: <1437631249-706-1-git-send-email-eddie.huang@mediatek.com>
-Message-ID: <1440395426.7245.2.camel@mtksdaap41>
+From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
+Date: Mon, 24 Aug 2015 11:29:33 +0530
+Subject: [PATCH-v5 RESEND 0/5] i2c: pxa: Add support for PXA910 family of
+ device
+Message-ID: <1440395978-9065-1-git-send-email-vaibhav.hiremath@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2015-07-23 at 14:00 +0800, Eddie Huang wrote:
-> Register gpd_dev_ops.active_wakeup function to support keep power
-> during suspend state. And add flag to each power domain to
-> decide whether keep power during suspend or not.
-> 
-> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
-> Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
-> ---
->  drivers/soc/mediatek/mtk-scpsys.c | 28 ++++++++++++++++++++++++++++
->  1 file changed, 28 insertions(+)
-> 
-> diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
-> index 43a79ed..fc78b70 100644
-> --- a/drivers/soc/mediatek/mtk-scpsys.c
-> +++ b/drivers/soc/mediatek/mtk-scpsys.c
-> @@ -67,6 +67,7 @@ struct scp_domain_data {
->         u32 sram_pdn_ack_bits;
->         u32 bus_prot_mask;
->         enum clk_id clk_id;
-> +       bool active_wakeup;
->  };
-> 
->  static const struct scp_domain_data scp_domain_data[] __initconst = {
-> @@ -77,6 +78,7 @@ static const struct scp_domain_data scp_domain_data[] __initconst = {
->                 .sram_pdn_bits = GENMASK(11, 8),
->                 .sram_pdn_ack_bits = GENMASK(12, 12),
->                 .clk_id = MT8173_CLK_MM,
-> +               .active_wakeup = false,
->         },
->         [MT8173_POWER_DOMAIN_VENC] = {
->                 .name = "venc",
-> @@ -85,6 +87,7 @@ static const struct scp_domain_data scp_domain_data[] __initconst = {
->                 .sram_pdn_bits = GENMASK(11, 8),
->                 .sram_pdn_ack_bits = GENMASK(15, 12),
->                 .clk_id = MT8173_CLK_MM,
-> +               .active_wakeup = false,
->         },
->         [MT8173_POWER_DOMAIN_ISP] = {
->                 .name = "isp",
-> @@ -93,6 +96,7 @@ static const struct scp_domain_data scp_domain_data[] __initconst = {
->                 .sram_pdn_bits = GENMASK(11, 8),
->                 .sram_pdn_ack_bits = GENMASK(13, 12),
->                 .clk_id = MT8173_CLK_MM,
-> +               .active_wakeup = false,
->         },
->         [MT8173_POWER_DOMAIN_MM] = {
->                 .name = "mm",
-> @@ -101,6 +105,7 @@ static const struct scp_domain_data scp_domain_data[] __initconst = {
->                 .sram_pdn_bits = GENMASK(11, 8),
->                 .sram_pdn_ack_bits = GENMASK(12, 12),
->                 .clk_id = MT8173_CLK_MM,
-> +               .active_wakeup = false,
->                 .bus_prot_mask = MT8173_TOP_AXI_PROT_EN_MM_M0 |
->                         MT8173_TOP_AXI_PROT_EN_MM_M1,
->         },
-> @@ -111,6 +116,7 @@ static const struct scp_domain_data scp_domain_data[] __initconst = {
->                 .sram_pdn_bits = GENMASK(11, 8),
->                 .sram_pdn_ack_bits = GENMASK(15, 12),
->                 .clk_id = MT8173_CLK_MM,
-> +               .active_wakeup = false,
->         },
->         [MT8173_POWER_DOMAIN_AUDIO] = {
->                 .name = "audio",
-> @@ -119,6 +125,7 @@ static const struct scp_domain_data scp_domain_data[] __initconst = {
->                 .sram_pdn_bits = GENMASK(11, 8),
->                 .sram_pdn_ack_bits = GENMASK(15, 12),
->                 .clk_id = MT8173_CLK_NONE,
-> +               .active_wakeup = false,
->         },
->         [MT8173_POWER_DOMAIN_USB] = {
->                 .name = "usb",
-> @@ -127,6 +134,7 @@ static const struct scp_domain_data scp_domain_data[] __initconst = {
->                 .sram_pdn_bits = GENMASK(11, 8),
->                 .sram_pdn_ack_bits = GENMASK(15, 12),
->                 .clk_id = MT8173_CLK_NONE,
-> +               .active_wakeup = true,
->         },
->         [MT8173_POWER_DOMAIN_MFG_ASYNC] = {
->                 .name = "mfg_async",
-> @@ -135,6 +143,7 @@ static const struct scp_domain_data scp_domain_data[] __initconst = {
->                 .sram_pdn_bits = GENMASK(11, 8),
->                 .sram_pdn_ack_bits = 0,
->                 .clk_id = MT8173_CLK_MFG,
-> +               .active_wakeup = false,
->         },
->         [MT8173_POWER_DOMAIN_MFG_2D] = {
->                 .name = "mfg_2d",
-> @@ -143,6 +152,7 @@ static const struct scp_domain_data scp_domain_data[] __initconst = {
->                 .sram_pdn_bits = GENMASK(11, 8),
->                 .sram_pdn_ack_bits = GENMASK(13, 12),
->                 .clk_id = MT8173_CLK_NONE,
-> +               .active_wakeup = false,
->         },
->         [MT8173_POWER_DOMAIN_MFG] = {
->                 .name = "mfg",
-> @@ -151,6 +161,7 @@ static const struct scp_domain_data scp_domain_data[] __initconst = {
->                 .sram_pdn_bits = GENMASK(13, 8),
->                 .sram_pdn_ack_bits = GENMASK(21, 16),
->                 .clk_id = MT8173_CLK_NONE,
-> +               .active_wakeup = false,
->                 .bus_prot_mask = MT8173_TOP_AXI_PROT_EN_MFG_S |
->                         MT8173_TOP_AXI_PROT_EN_MFG_M0 |
->                         MT8173_TOP_AXI_PROT_EN_MFG_M1 |
-> @@ -171,6 +182,7 @@ struct scp_domain {
->         u32 sram_pdn_bits;
->         u32 sram_pdn_ack_bits;
->         u32 bus_prot_mask;
-> +       bool active_wakeup;
->  };
-> 
->  struct scp {
-> @@ -370,6 +382,20 @@ out:
->         return ret;
->  }
-> 
-> +static bool scpsys_active_wakeup(struct device *dev)
-> +{
-> +       struct generic_pm_domain *genpd;
-> +       struct scp_domain *scpd;
-> +
-> +       if (IS_ERR_OR_NULL(dev->pm_domain))
-> +               return false;
-> +
-> +       genpd = pd_to_genpd(dev->pm_domain);
-> +       scpd = container_of(genpd, struct scp_domain, genpd);
-> +
-> +       return scpd->active_wakeup;
-> +}
-> +
->  static int __init scpsys_probe(struct platform_device *pdev)
->  {
->         struct genpd_onecell_data *pd_data;
-> @@ -427,12 +453,14 @@ static int __init scpsys_probe(struct platform_device *pdev)
->                 scpd->sram_pdn_bits = data->sram_pdn_bits;
->                 scpd->sram_pdn_ack_bits = data->sram_pdn_ack_bits;
->                 scpd->bus_prot_mask = data->bus_prot_mask;
-> +               scpd->active_wakeup = data->active_wakeup;
->                 if (data->clk_id != MT8173_CLK_NONE)
->                         scpd->clk = clk[data->clk_id];
-> 
->                 genpd->name = data->name;
->                 genpd->power_off = scpsys_power_off;
->                 genpd->power_on = scpsys_power_on;
-> +               genpd->dev_ops.active_wakeup = scpsys_active_wakeup;
-> 
->                 /*
->                  * Initially turn on all domains to make the domains usable
-> --
-> 1.8.1.1.dirty
-> 
+Sorry for not following up on this aggressively, was quit busy with some
+other stuff. Resending this patch with Robert's Tested-By.
 
-Hi Sascha, Matthias,
 
-Any comment about this patch ?
+This patch-series is subset of the original patch-series, submitted
+on 14 Jul 2015.
+Link to Original Patch-series - https://lkml.org/lkml/2015/7/14/80
 
-Eddie
-Thanks
+The first six patches have been already queued up for upstream. So this
+patch-series is respin of remaining 5 patches.
+
+Testing:
+  - Basic testing on PMIC device on I2C-0 interface
+  - Boot tested on platform based on PXA1928
+  - Read few registers of PMIC (RTC, ID, etc...) during boot
+
+V4 => V5
+=======
+Link to V3: https://lkml.org/lkml/2015/7/14/80
+  - Dropped First 6 patches as they are already accepted, queued for upstream
+  - Fixed a bug in PATCH [5/5], where for non PXA910 devices it as resulting into
+    NULL pointer dereference.
+
+
+For the record, pasting all the details from original patch-series -
+
+V3 => V4
+=======
+Link to V3: http://www.spinics.net/lists/devicetree/msg85904.html
+  - [PATCH 06/11] Removed unnecessary dev_err on devm_kzalloc() check
+  - [PATCH 06/11] Removed return check on platform_get_resource(), as 
+    devm_ioremap_resource() does it for us.
+    Also, brought up the devm_ioremap_resource() function call in the execution
+    sequence, as no point in delaying it if we do not have resource.
+    It make sense, after this change.
+  - [PATCH 04/11] Typecast changed to 'enum pxa_i2c_types'
+    Also updated the subject line "Removed ==> Fix"
+
+V2 => V3
+=======
+Link to V2: http://www.spinics.net/lists/linux-i2c/msg20059.html
+  - Removed PATCH [4/12] related to reset of I2C module.
+    Suggested by "Robert Jarzmik"
+  - Updated commit description for,
+      PATCH [11/12]: Mentioned reasoning about moment of clk_get code.
+      PATCH [12/12]: for DT property node.
+  - Added Acked by "Robert Jarzmik" to patched which he acked.
+
+V1 => V2:
+========
+Link to V1 - http://lists.infradead.org/pipermail/linux-arm-kernel/2015-May/347012.html
+  - Fixed all comments from "Robert Jarzmik" and "Wolfram Sang"
+ - Dropped Patch
+     05/12: using core bus reset implementation - under work.
+     08/12: NAKed and dropped
+ - Separated DT binding patch from driver changes, for easy merge
+
+
+Vaibhav Hiremath (4):
+  Documentation: binding: add new property 'disable_after_xfer' to
+    i2c-pxa
+  i2c: pxa: Add support for pxa910/988 & new configuration features
+  Documentation: binding: add sclk adjustment properties to i2c-pxa
+  i2c: pxa: Add ILCR (tLow & tHigh) configuration support
+
+Yi Zhang (1):
+  i2c: pxa: enable/disable i2c module across msg xfer
+
+ Documentation/devicetree/bindings/i2c/i2c-pxa.txt |  18 +++
+ drivers/i2c/busses/i2c-pxa.c                      | 154 ++++++++++++++++++++--
+ 2 files changed, 163 insertions(+), 9 deletions(-)
+
+-- 
+1.9.1
