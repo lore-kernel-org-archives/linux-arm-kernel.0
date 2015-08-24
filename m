@@ -1,270 +1,211 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 24 Aug 2015 11:17:32 +0100
-Subject: [PATCH] irqchip, gicv3-its, numa: Workaround for Cavium ThunderX
- erratum 23144
-In-Reply-To: <20150822131050.GK1820@rric.localdomain>
-References: <20150822131050.GK1820@rric.localdomain>
-Message-ID: <55DAEF3C.5090303@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 24 Aug 2015 11:17:55 +0100
+Subject: [PATCH 1/3] Docs: dt: add generic MSI bindings
+In-Reply-To: <20150805165120.GB28849@leverpostej>
+References: <1437670365-20704-1-git-send-email-mark.rutland@arm.com>
+ <1437670365-20704-2-git-send-email-mark.rutland@arm.com>
+ <20150805165120.GB28849@leverpostej>
+Message-ID: <20150824101755.GC7139@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robert,
-
-Just came back from the Seattle madness, so picking up patches in
-reverse order... ;-)
-
-On 22/08/15 14:10, Robert Richter wrote:
-> The patch below adds a workaround for gicv3 in a numa environment. It
-> is on top of my recent gicv3 errata patch submission v4 and Ganapat's
-> arm64 numa patches for devicetree v5.
+On Wed, Aug 05, 2015 at 05:51:20PM +0100, Mark Rutland wrote:
+> Rob,
 > 
-> Please comment.
+> Do you have any objections to this, or are you happy to take this patch?
 > 
-> Thanks,
-> 
-> -Robert
-> 
-> 
-> 
-> From c432820451a46b8d1e299b8bfbfcdcb3b75340e7 Mon Sep 17 00:00:00 2001
-> From: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
-> Date: Wed, 19 Aug 2015 23:40:05 +0530
-> Subject: [PATCH] irqchip, gicv3-its, numa: Workaround for Cavium ThunderX erratum
->  23144
-> 
-> This implements a workaround for gicv3-its erratum 23144 applicable
-> for Cavium's ThunderX multinode systems.
-> 
-> The erratum fixes the hang of ITS SYNC command by avoiding inter node
-> io and collections/cpu mapping. This fix is only applicable for
-> Cavium's ThunderX dual-socket platforms.
+> There's a user of this binding (the GICv3 ITS) queued for v4.3 already in
+> the tip tree, so either we either need to be ok with this binding or we
+> need to rework that before v4.3.
 
-Can you please elaborate on this? I can't see any reference to the SYNC
-command there. Is that a case of an ITS not being able to route LPIs to
-cores on another socket?
+Sorry to ping, but are you happy to take this? Marc's replied and
+provided his ack.
 
-I really need more details to understand this patch (please use short
-sentences, I'm still in a different time zone).
-
-> 
-> Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
-> [ rric: Reworked errata code, added helper functions, updated commit
->   	message. ]
-> 
-> Signed-off-by: Robert Richter <rrichter@cavium.com>
-> ---
->  arch/arm64/Kconfig               | 14 +++++++++++
->  drivers/irqchip/irq-gic-common.c |  5 ++--
->  drivers/irqchip/irq-gic-v3-its.c | 54 ++++++++++++++++++++++++++++++++++------
->  3 files changed, 64 insertions(+), 9 deletions(-)
-> 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 3809187ed653..b92b7b70b29b 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -421,6 +421,20 @@ config ARM64_ERRATUM_845719
->  
->  	  If unsure, say Y.
->  
-> +config CAVIUM_ERRATUM_22375
-> +	bool "Cavium erratum 22375, 24313"
-> +	depends on NUMA
-> +	default y
-> +	help
-> +		Enable workaround for erratum 22375, 24313.
-> +
-> +config CAVIUM_ERRATUM_23144
-> +	bool "Cavium erratum 23144"
-> +	depends on NUMA
-> +	default y
-> +	help
-> +		Enable workaround for erratum 23144.
-> +
->  config CAVIUM_ERRATUM_23154
->  	bool "Cavium erratum 23154: Access to ICC_IAR1_EL1 is not sync'ed"
->  	depends on ARCH_THUNDER
-> diff --git a/drivers/irqchip/irq-gic-common.c b/drivers/irqchip/irq-gic-common.c
-> index ee789b07f2d1..1dfce64dbdac 100644
-> --- a/drivers/irqchip/irq-gic-common.c
-> +++ b/drivers/irqchip/irq-gic-common.c
-> @@ -24,11 +24,12 @@
->  void gic_check_capabilities(u32 iidr, const struct gic_capabilities *cap,
->  			void *data)
->  {
-> -	for (; cap->desc; cap++) {
-> +	for (; cap->init; cap++) {
->  		if (cap->iidr != (cap->mask & iidr))
->  			continue;
->  		cap->init(data);
-> -		pr_info("%s\n", cap->desc);
-> +		if (cap->desc)
-> +			pr_info("%s\n", cap->desc);
-
-No. I really want to see what errata are applied when I look at a kernel
-log.
-
->  	}
->  }
->  
-> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-> index 4bb135721e72..666be39f13a9 100644
-> --- a/drivers/irqchip/irq-gic-v3-its.c
-> +++ b/drivers/irqchip/irq-gic-v3-its.c
-> @@ -43,7 +43,8 @@
->  #include "irqchip.h"
->  
->  #define ITS_FLAGS_CMDQ_NEEDS_FLUSHING		(1ULL << 0)
-> -#define ITS_FLAGS_CAVIUM_THUNDERX		(1ULL << 1)
-> +#define ITS_WORKAROUND_CAVIUM_22375		(1ULL << 1)
-> +#define ITS_WORKAROUND_CAVIUM_23144		(1ULL << 2)
->  
->  #define RDIST_FLAGS_PROPBASE_NEEDS_FLUSHING	(1 << 0)
->  
-> @@ -76,6 +77,7 @@ struct its_node {
->  	struct list_head	its_device_list;
->  	u64			flags;
->  	u32			ite_size;
-> +	int			numa_node;
->  };
->  
->  #define ITS_ITT_ALIGN		SZ_256
-> @@ -609,11 +611,18 @@ static void its_eoi_irq(struct irq_data *d)
->  static int its_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
->  			    bool force)
->  {
-> -	unsigned int cpu = cpumask_any_and(mask_val, cpu_online_mask);
-> +	unsigned int cpu;
->  	struct its_device *its_dev = irq_data_get_irq_chip_data(d);
->  	struct its_collection *target_col;
->  	u32 id = its_get_event_id(d);
->  
-> +	if (its_dev->its->flags & ITS_WORKAROUND_CAVIUM_23144) {
-> +		cpu = cpumask_any_and(mask_val,
-> +				cpumask_of_node(its_dev->its->numa_node));
-
-I suppose cpumask_of_node returns only the *online* cores of a given
-node, right?
-
-> +	} else {
-> +		cpu = cpumask_any_and(mask_val, cpu_online_mask);
-> +	}
-> +
->  	if (cpu >= nr_cpu_ids)
->  		return -EINVAL;
->  
-> @@ -845,7 +854,7 @@ static int its_alloc_tables(struct its_node *its)
->  	u64 typer;
->  	u32 ids;
->  
-> -	if (its->flags & ITS_FLAGS_CAVIUM_THUNDERX) {
-> +	if (its->flags & ITS_WORKAROUND_CAVIUM_22375) {
->  		/*
->  		 * erratum 22375: only alloc 8MB table size
->  		 * erratum 24313: ignore memory access type
-> @@ -1093,6 +1102,11 @@ static void its_cpu_init_lpis(void)
->  	dsb(sy);
->  }
->  
-> +static inline int numa_node_id_early(void)
-> +{
-> +	return MPIDR_AFFINITY_LEVEL(read_cpuid_mpidr(), 2);
-> +}
-> +
->  static void its_cpu_init_collection(void)
->  {
->  	struct its_node *its;
-> @@ -1104,6 +1118,11 @@ static void its_cpu_init_collection(void)
->  	list_for_each_entry(its, &its_nodes, entry) {
->  		u64 target;
->  
-> +		/* avoid cross node core and its mapping */
-> +		if ((its->flags & ITS_WORKAROUND_CAVIUM_23144) &&
-> +			its->numa_node != numa_node_id_early())
-> +				continue;
-> +
-
-Argh. This is horrible. You really need some topology bindings to
-describe your system instead of hardcoding some random level of
-affinity. The next time someone is going to come up with a similarly
-broken system, they will have to reinvent that wheel.
-
->  		/*
->  		 * We now have to bind each collection to its target
->  		 * redistributor.
-> @@ -1372,9 +1391,15 @@ static void its_irq_domain_activate(struct irq_domain *domain,
->  {
->  	struct its_device *its_dev = irq_data_get_irq_chip_data(d);
->  	u32 event = its_get_event_id(d);
-> +	unsigned int cpu;
-> +
-> +	if (its_dev->its->flags & ITS_WORKAROUND_CAVIUM_23144)
-> +		cpu = cpumask_first(cpumask_of_node(its_dev->its->numa_node));
-> +	else
-> +		cpu = cpumask_first(cpu_online_mask);
-
-Looks like this can be factored with the code you've added in set_affinity.
-
->  
->  	/* Bind the LPI to the first possible CPU */
-> -	its_dev->event_map.col_map[event] = cpumask_first(cpu_online_mask);
-> +	its_dev->event_map.col_map[event] = cpu;
->  
->  	/* Map the GIC IRQ and event to the device */
->  	its_send_mapvi(its_dev, d->hwirq, event);
-> @@ -1457,16 +1482,31 @@ static int its_force_quiescent(void __iomem *base)
->  	}
->  }
->  
-> +static inline int its_get_node_thunderx(struct its_node *its)
-> +{
-> +	return (its->phys_base >> 44) & 0x3;
-
-Why 3? Is that because you have provision for 4 sockets or what?
-
-> +}
-> +
->  static void its_enable_cavium_thunderx(void *data)
->  {
-> -	struct its_node *its = data;
-> +	struct its_node __maybe_unused *its = data;
->  
-> -	its->flags |= ITS_FLAGS_CAVIUM_THUNDERX;
-> +#ifdef CONFIG_CAVIUM_ERRATUM_22375
-> +	its->flags |= ITS_WORKAROUND_CAVIUM_22375;
-> +	pr_info("ITS: Enabling workaround for 22375, 24313\n");
-> +#endif
-> +
-> +#ifdef CONFIG_CAVIUM_ERRATUM_23144
-> +	if (num_possible_nodes() > 1) {
-> +		its->numa_node = its_get_node_thunderx(its);
-
-I'd rather see numa_node being always initialized to something useful.
-If you're adding numa support, why can't this be initialized via
-standard topology bindings?
-
-Also, you're mixing things coming from the address map and information
-coming from the MPIDR. I must say this doesn't fill me with confidence.
-
-> +		its->flags |= ITS_WORKAROUND_CAVIUM_23144;
-> +		pr_info("ITS: Enabling workaround for 23144\n");
-> +	}
-> +#endif
-
-It would probably make sense to split these in two function, each with
-its own erratum entry.
-
->  }
->  
->  static const struct gic_capabilities its_errata[] = {
->  	{
-> -		.desc	= "ITS: Cavium errata 22375, 24313",
->  		.iidr	= 0xa100034c,	/* ThunderX pass 1.x */
->  		.mask	= 0xffff0fff,
->  		.init	= its_enable_cavium_thunderx,
-> 
+I'm happy to resend if you prefer?
 
 Thanks,
+Mark.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> Marc, can I take it from your use of the binding that you are happy to
+> provide your ack?
+> 
+> Thanks,
+> Mark.
+> 
+> On Thu, Jul 23, 2015 at 05:52:43PM +0100, Mark Rutland wrote:
+> > Currently msi-parent is used in a couple of drivers despite being fairly
+> > underspecified. This patch adds a generic binding for MSIs (including
+> > the existing msi-parent property) enabling the description of platform
+> > devices capable of using MSIs.
+> > 
+> > While MSIs are primarily distinguished by doorbell and payload, some MSI
+> > controllers (e.g. the GICv3 ITS) also use side-band information
+> > accompanying the write to identify the master which originated the MSI,
+> > to allow for sandboxing. This sideband information is non-probeable and
+> > needs to be described in the DT. Other MSI controllers may have
+> > additional configuration details which need to be described per-master.
+> > 
+> > This patch adds a generic msi-parent binding document, extending the
+> > de-facto standard with a new (optional) #msi-cells which can be used to
+> > express any per-master configuration and/or sideband data. This is
+> > sufficient to describe non-hotpluggable devices.
+> > 
+> > For busses where sideband data may be derived from some bus-specific
+> > master ID scheme, other properties will be required to describe the
+> > mapping.
+> > 
+> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> > ---
+> >  .../bindings/interrupt-controller/msi.txt          | 135 +++++++++++++++++++++
+> >  1 file changed, 135 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/msi.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/interrupt-controller/msi.txt b/Documentation/devicetree/bindings/interrupt-controller/msi.txt
+> > new file mode 100644
+> > index 0000000..c60c034
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/interrupt-controller/msi.txt
+> > @@ -0,0 +1,135 @@
+> > +This document describes the generic device tree binding for MSI controllers and
+> > +their master(s).
+> > +
+> > +Message Signaled Interrupts (MSIs) are a class of interrupts generated by a
+> > +write to an MMIO address.
+> > +
+> > +MSIs were originally specified by PCI (and are used with PCIe), but may also be
+> > +used with other busses, and hence a mechanism is required to relate devices on
+> > +those busses to the MSI controllers which they are capable of using,
+> > +potentially including additional information.
+> > +
+> > +MSIs are distinguished by some combination of:
+> > +
+> > +- The doorbell (the MMIO address written to).
+> > +  
+> > +  Devices may be configured by software to write to arbitrary doorbells which
+> > +  they can address. An MSI controller may feature a number of doorbells.
+> > +
+> > +- The payload (the value written to the doorbell).
+> > +  
+> > +  Devices may be configured to write an arbitrary payload chosen by software.
+> > +  MSI controllers may have restrictions on permitted payloads.
+> > +
+> > +- Sideband information accompanying the write.
+> > +  
+> > +  Typically this is neither configurable nor probeable, and depends on the path
+> > +  taken through the memory system (i.e. it is a property of the combination of
+> > +  MSI controller and device rather than a property of either in isolation).
+> > +
+> > +
+> > +MSI controllers:
+> > +================
+> > +
+> > +An MSI controller signals interrupts to a CPU when a write is made to an MMIO
+> > +address by some master. An MSI controller may feature a number of doorbells.
+> > +
+> > +Required properties:
+> > +--------------------
+> > +
+> > +- msi-controller: Identifies the node as an MSI controller.
+> > +
+> > +Optional properties:
+> > +--------------------
+> > +
+> > +- #msi-cells: The number of cells in an msi-specifier, required if not zero.
+> > +
+> > +  Typically this will encode information related to sideband data, and will
+> > +  not encode doorbells or payloads as these can be configured dynamically.
+> > +
+> > +  The meaning of the msi-specifier is defined by the device tree binding of
+> > +  the specific MSI controller. 
+> > +
+> > +
+> > +MSI clients
+> > +===========
+> > +
+> > +MSI clients are devices which generate MSIs. For each MSI they wish to
+> > +generate, the doorbell and payload may be configured, though sideband
+> > +information may not be configurable.
+> > +
+> > +Required properties:
+> > +--------------------
+> > +
+> > +- msi-parent: A list of phandle + msi-specifier pairs, one for each MSI
+> > +  controller which the device is capable of using.
+> > +
+> > +  This property is unordered, and MSIs may be allocated from any combination of
+> > +  MSI controllers listed in the msi-parent property.
+> > +
+> > +  If a device has restrictions on the allocation of MSIs, these restrictions
+> > +  must be described with additional properties.
+> > +
+> > +  When #msi-cells is non-zero, busses with an msi-parent will require
+> > +  additional properties to describe the relationship between devices on the bus
+> > +  and the set of MSIs they can potentially generate.
+> > +
+> > +
+> > +Example
+> > +=======
+> > +
+> > +/ {
+> > +	#address-cells = <1>;
+> > +	#size-cells = <1>;
+> > +
+> > +	msi_a: msi-controller at a {
+> > +		reg = <0xa 0xf00>;
+> > +		compatible = "vendor-a,some-controller";
+> > +		msi-controller;
+> > +		/* No sideband data, so #msi-cells omitted */
+> > +	};
+> > +
+> > +	msi_b: msi-controller at b {
+> > +		reg = <0xb 0xf00>;
+> > +		compatible = "vendor-b,another-controller";
+> > +		msi-controller;
+> > +		/* Each device has some unique ID */
+> > +		#msi-cells = <1>;
+> > +	};
+> > +
+> > +	msi_c: msi-controller at c {
+> > +		reg = <0xb 0xf00>;
+> > +		compatible = "vendor-b,another-controller";
+> > +		msi-controller;
+> > +		/* Each device has some unique ID */
+> > +		#msi-cells = <1>;
+> > +	};
+> > +
+> > +	dev at 0 {
+> > +		reg = <0x0 0xf00>;
+> > +		compatible = "vendor-c,some-device";
+> > +
+> > +		/* Can only generate MSIs to msi_a */
+> > +		msi-parent = <&msi_a>;
+> > +	};
+> > +
+> > +	dev at 1 {
+> > +		reg = <0x1 0xf00>;
+> > +		compatible = "vendor-c,some-device";
+> > +
+> > +		/* 
+> > +		 * Can generate MSIs to either A or B.
+> > +		 */
+> > +		msi-parent = <&msi_a>, <&msi_b 0x17>;
+> > +	};
+> > +
+> > +	dev at 2 {
+> > +		reg = <0x2 0xf00>;
+> > +		compatible = "vendor-c,some-device";
+> > +		/*
+> > +		 * Has different IDs at each MSI controller.
+> > +		 * Can generate MSIs to all of the MSI controllers.
+> > +		 */
+> > +		msi-parent = <&msi_a>, <&msi_b 0x17>, <&msi_c 0x53>;
+> > +	};
+> > +};
+> > -- 
+> > 1.9.1
+> > 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
