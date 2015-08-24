@@ -1,31 +1,83 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 24 Aug 2015 13:16:58 +0200
-Subject: [PATCH 1/3] ARM: dts: sun5i: Add support for the Auxtek-T003
- HDMI stick
-In-Reply-To: <1438960955-6551-1-git-send-email-hdegoede@redhat.com>
-References: <1438960955-6551-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <20150824111658.GJ2413@lukather>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 24 Aug 2015 12:48:33 +0100
+Subject: [PATCH v4 1/4] mfd: max77686: Don't suggest in binding to use a
+ deprecated property
+In-Reply-To: <1440406041-25071-2-git-send-email-javier@osg.samsung.com>
+References: <1440406041-25071-1-git-send-email-javier@osg.samsung.com>
+ <1440406041-25071-2-git-send-email-javier@osg.samsung.com>
+Message-ID: <20150824114833.GA3237@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 07, 2015 at 05:22:33PM +0200, Hans de Goede wrote:
-> The Auxtek-T003 HDMI stick is an A10s based HDMI stick with USB wifi,
-> and composite video out support.
+On Mon, 24 Aug 2015, Javier Martinez Canillas wrote:
+
+> The regulator-compatible property from the regulator DT binding was
+> deprecated. But the max77686 DT binding doc still suggest to use it
+> instead of the regulator node name's which is the correct approach.
 > 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Acked-by: Lee Jones <lee.jones@linaro.org>
+> 
+> ---
+> 
+> Changes in v4:
+> - Add Lee Jones Acked-by tag to patch #1.
+> 
+> Changes in v3: None
+> Changes in v2:
+> - Add Krzysztof Kozlowski Reviewed-by tag to patch #1.
+> 
+>  Documentation/devicetree/bindings/mfd/max77686.txt | 11 ++++-------
+>  1 file changed, 4 insertions(+), 7 deletions(-)
 
-Applied, thanks!
+Applied, thanks.
 
-Maxime
+> diff --git a/Documentation/devicetree/bindings/mfd/max77686.txt b/Documentation/devicetree/bindings/mfd/max77686.txt
+> index 163bd81a4607..8221102d3fc2 100644
+> --- a/Documentation/devicetree/bindings/mfd/max77686.txt
+> +++ b/Documentation/devicetree/bindings/mfd/max77686.txt
+> @@ -26,7 +26,7 @@ Optional node:
+>  	};
+>  	refer Documentation/devicetree/bindings/regulator/regulator.txt
+>  
+> -  The regulator-compatible property of regulator should initialized with string
+> +  The regulator node's name should be initialized with a string
+>  to get matched with their hardware counterparts as follow:
+>  
+>  	-LDOn 	:	for LDOs, where n can lie in range 1 to 26.
+> @@ -55,16 +55,14 @@ Example:
+>  		reg = <0x09>;
+>  
+>  		voltage-regulators {
+> -			ldo11_reg {
+> -				regulator-compatible = "LDO11";
+> +			ldo11_reg: LDO11 {
+>  				regulator-name = "vdd_ldo11";
+>  				regulator-min-microvolt = <1900000>;
+>  				regulator-max-microvolt = <1900000>;
+>  				regulator-always-on;
+>  			};
+>  
+> -			buck1_reg {
+> -				regulator-compatible = "BUCK1";
+> +			buck1_reg: BUCK1 {
+>  				regulator-name = "vdd_mif";
+>  				regulator-min-microvolt = <950000>;
+>  				regulator-max-microvolt = <1300000>;
+> @@ -72,8 +70,7 @@ Example:
+>  				regulator-boot-on;
+>  			};
+>  
+> -			buck9_reg {
+> -				regulator-compatible = "BUCK9";
+> +			buck9_reg: BUCK9 {
+>  				regulator-name = "CAM_ISP_CORE_1.2V";
+>  				regulator-min-microvolt = <1000000>;
+>  				regulator-max-microvolt = <1200000>;
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150824/ece8275d/attachment.sig>
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
