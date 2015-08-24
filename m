@@ -1,77 +1,91 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Mon, 24 Aug 2015 19:37:00 +0200 (CEST)
-Subject: [PATCH v8 1/2] irqchip: imx-gpcv2: IMX GPCv2 driver for wakeup
- sources
-In-Reply-To: <CY1PR0301MB084328829F8128A8FBFA6A9283620@CY1PR0301MB0843.namprd03.prod.outlook.com>
-References: <1438378439-11569-1-git-send-email-shenwei.wang@freescale.com>
- <1438378439-11569-2-git-send-email-shenwei.wang@freescale.com>
- <alpine.DEB.2.11.1508231251040.3873@nanos>
- <CY1PR0301MB084328829F8128A8FBFA6A9283620@CY1PR0301MB0843.namprd03.prod.outlook.com>
-Message-ID: <alpine.DEB.2.11.1508241933150.3873@nanos>
+From: marex@denx.de (Marek Vasut)
+Date: Mon, 24 Aug 2015 19:45:33 +0200
+Subject: [PATCH linux-next v4 5/5] mtd: atmel-quadspi: add driver for
+ Atmel QSPI controller
+In-Reply-To: <55DB4EA6.9090807@atmel.com>
+References: <cover.1440410236.git.cyrille.pitchen@atmel.com>
+ <201508241303.52066.marex@denx.de> <55DB4EA6.9090807@atmel.com>
+Message-ID: <201508241945.33577.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 24 Aug 2015, Shenwei Wang wrote:
-> > > +static int gpcv2_wakeup_source_save(void) {
-> > > +	struct gpcv2_irqchip_data *cd;
-> > > +	void __iomem *reg;
-> > > +	int i;
-> > > +
-> > > +	cd = imx_gpcv2_instance;
-> > > +	if (!cd)
-> > > +		return 0;
-> > > +
-> > > +	for (i = 0; i < IMR_NUM; i++) {
-> > > +		reg = cd->gpc_base + cd->cpu2wakeup + i * 4;
-> > > +		cd->enabled_irqs[i] = readl_relaxed(reg);
+On Monday, August 24, 2015 at 07:04:38 PM, Cyrille Pitchen wrote:
+> Hi Marek,
+
+Hi!
+
+> Le 24/08/2015 13:03, Marek Vasut a ?crit :
+> > On Monday, August 24, 2015 at 12:14:00 PM, Cyrille Pitchen wrote:
+> >> This driver add support to the new Atmel QSPI controller embedded into
+> >> sama5d2x SoCs. It expects a NOR memory to be connected to the QSPI
+> >> controller.
+
+[...]
+
+> >> +	/* Compute address parameters */
+> >> +	switch (cmd->enable.bits.address) {
+> >> +	case 4:
+> >> +		ifr |= QSPI_IFR_ADDRL;
+> >> +		/*break;*/ /* fallback to the 24bit address case */
 > > 
-> > You read the full state of the register and restore the full state. So why
-> > enabled_irqs?
+> > What's this commented out bit of code for ? :-)
 > 
-> There are two user scenarios: 
-> In CPU Idle state, the system need to be woke up by any enabled
-> irqs, not just the ones that marked as wakeup sources.
-> In Suspend State, they system will only be woke up by the one that
-> marked as a wakeup source.  Enabled_irqs are used to save the values
-> before suspend, and restore them after resume.
+> I just wanted to stress out there was no missing "break;".
+> I've reworded the comment to:
+> /* No "break" on purpose: fallback to the 24bit address case. */
 
-That's what you want achieve. Still you save the full content of the
-registers and restore the full content. That saves/restores the
-enabled and disabled interrupts. So enabled_irqs is a misnomer as you
-save the full state.
+Oh, the address is in bytes . I see, yes, it makes sense to be more
+explicit here about the purpose of the fallback. I think this change
+in the comment will make it easier for everyone who comes back in a
+few years and reads this code.
 
-> > > +		writel_relaxed(cd->wakeup_sources[i], reg);
-> > > +	}
-> > > +
-> > > +	return 0;
-> > > +}
-> > > +
-> > > +static void gpcv2_wakeup_source_restore(void) {
-> > > +	struct gpcv2_irqchip_data *cd;
-> > > +	void __iomem *reg;
-> > > +	int i;
-> > > +
-> > > +	cd = imx_gpcv2_instance;
-> > > +	if (!cd)
-> > > +		return;
-> > > +
-> > > +	for (i = 0; i < IMR_NUM; i++) {
-> > > +		reg = cd->gpc_base + cd->cpu2wakeup + i * 4;
-> > > +		writel_relaxed(cd->enabled_irqs[i], reg);
-> > > +		cd->wakeup_sources[i] = ~0;
+> >> +	case 3:
+> >> +		iar = (cmd->enable.bits.data) ? 0 : cmd->address;
+> >> +		ifr |= QSPI_IFR_ADDREN;
+> >> +		break;
+> >> +	case 0:
+> >> +		break;
+> >> +	default:
+> >> +		return -EINVAL;
+> >> +	}
 > > 
-> > Why are you clearing that info on resume? Drivers will clear that via
-> > set_wake() or leave it when they want to have resume functionality?
+> > [...]
 > > 
-> Each time system goes into the suspend state, it will call set_wake
-> (ON) again to configure the wakeup sources. Clearing wakeup_sources
-> here can make sure the system work as expected no matter that a
-> driver calls set_wake (OFF) during resume stage.
+> >> +no_data:
+> >> +	/* Poll INSTRuction End status */
+> >> +	sr = qspi_readl(aq, QSPI_SR);
+> >> +	if (sr & QSPI_SR_INSTRE)
+> >> +		return err;
+> >> +
+> >> +	/* Wait for INSTRuction End interrupt */
+> >> +	init_completion(&aq->completion);
+> > 
+> > You should use reinit_completion() in the code. init_completion()
+> > should be used only in the probe() function and nowhere else.
+> 
+> Alright. In the next version I'll rename the "completion" member of
+> struct atmel_qspi into "cmd_completion". Also I'll add another
+> dma_completion member in this very same structure to replace the local
+> "struct completion completion" in atmel_qspi_run_dma_transfer().
+> 
+> Then I'll call init_completion() on both cmd_completion and dma_completion
+> only from atmel_qspi_probe() and reinit_completion() elsewhere.
+> 
+> >> +	aq->pending = 0;
+> >> +	qspi_writel(aq, QSPI_IER, QSPI_SR_INSTRE);
+> >> +	if (!wait_for_completion_timeout(&aq->completion,
+> >> +					 msecs_to_jiffies(1000)))
+> >> +		err = -ETIMEDOUT;
+> >> +	qspi_writel(aq, QSPI_IDR, QSPI_SR_INSTRE);
+> >> +
+> >> +	return err;
+> >> +}
+> > 
+> > [...]
+> > 
+> > Hope this helps :)
+> 
+> Indeed, it does! I still work on the next version of this series to take
+> all your comments into account.
 
-We rather make sure that the drivers call set_wake(OFF) as they are
-supposed to, because if they do not then the set_wake(ON) logic in the
-core code will see the counter != 0 and not invoke the irq callback.
-
-Thanks,
-
-	tglx
+Thanks :)
