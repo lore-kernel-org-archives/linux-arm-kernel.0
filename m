@@ -1,101 +1,74 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 24 Aug 2015 17:27:53 +0100
-Subject: [PATCH v4] pinctrl: mediatek: Implement wake handler and suspend
- resume
-In-Reply-To: <1439541486-22203-1-git-send-email-maoguang.meng@mediatek.com>
-References: <1439541486-22203-1-git-send-email-maoguang.meng@mediatek.com>
-Message-ID: <55DB4609.5040904@arm.com>
+From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
+Date: Mon, 24 Aug 2015 21:58:53 +0530
+Subject: [PATCH] irqchip, gicv3-its, numa: Workaround for Cavium ThunderX
+ erratum 23144
+In-Reply-To: <55DB205E.9070205@arm.com>
+References: <20150822131050.GK1820@rric.localdomain> <55DAEF3C.5090303@arm.com>
+ <CAFpQJXVVcdag7OQnCxqyEw601Y32eO2rHCmH1_bVzyvg+OPzRA@mail.gmail.com>
+ <55DB11F3.1070604@arm.com>
+ <CAFpQJXUTNss=u2x7Ynd9wOObZn_ZHkcMz2+F4MKooy5jrvZ02w@mail.gmail.com>
+ <55DB205E.9070205@arm.com>
+Message-ID: <CAFpQJXV62o5hmn7GpSGpsnWfUMGCXjgVJDE6PAQVJwhRC5XAJA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Marc,
+
+thanks for the suggestions.
+
+On Mon, Aug 24, 2015 at 7:17 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On 24/08/15 14:27, Ganapatrao Kulkarni wrote:
+>> On Mon, Aug 24, 2015 at 6:15 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>
+>>>>>>  static void its_enable_cavium_thunderx(void *data)
+>>>>>>  {
+>>>>>> -     struct its_node *its = data;
+>>>>>> +     struct its_node __maybe_unused *its = data;
+>>>>>>
+>>>>>> -     its->flags |= ITS_FLAGS_CAVIUM_THUNDERX;
+>>>>>> +#ifdef CONFIG_CAVIUM_ERRATUM_22375
+>>>>>> +     its->flags |= ITS_WORKAROUND_CAVIUM_22375;
+>>>>>> +     pr_info("ITS: Enabling workaround for 22375, 24313\n");
+>>>>>> +#endif
+>>>>>> +
+>>>>>> +#ifdef CONFIG_CAVIUM_ERRATUM_23144
+>>>>>> +     if (num_possible_nodes() > 1) {
+>>>>>> +             its->numa_node = its_get_node_thunderx(its);
+>>>>>
+>>>>> I'd rather see numa_node being always initialized to something useful.
+>>>>> If you're adding numa support, why can't this be initialized via
+>>>>> standard topology bindings?
+>>>> IIUC, topology defines only cpu topology.
+>>>
+>>> Well, welcome to a much more complex system where both your CPUs and
+>>> your IOs have some degree of affinity. This needs to be described
+>>> properly, and not hacked on the side.
+>> ok, will add description for the function.
+>
+> I sense that you misunderstood what I meant. What I'd like to see is
+> some topology information coming from DT, showing the relationship
+> between a device (your ITS) and a given node (your socket). This can
+> then be used from two purposes:
+sure will post next version with changes as per you comments.
+>
+> - find the optimal affinity for a MSI so that it doesn't default to a
+> foreign node (a reasonable performance expectation),
+this can be done by adding dt associativity property to its node.
+ i can send in next version of patch.
+> - work around implementation bugs where an LPI cannot be routed to a
+> redistributor that is on a foreign node.
 
 
-On 14/08/15 09:38, maoguang.meng at mediatek.com wrote:
-> From: Maoguang Meng <maoguang.meng@mediatek.com>
 >
-> This patch implement irq_set_wake to get who is wakeup source and
-> setup on suspend resume.
+> I really don't feel like adding a hack just for the second point, and
+> I'd rather get the big picture right so that your workaround is just a
+> special case of the generic one.
 >
-> Signed-off-by: Maoguang Meng <maoguang.meng@mediatek.com>
+> Thanks,
 >
-> ---
-> changes since v3:
-> -add a comment in mtk_eint_chip_read_mask.
-> -delete ALIGN when allocate eint_offsets.ports.
-> -fix unrelated change.
->
-> changes since v2:
-> -modify irq_wake to handle irq wakeup source.
-> -allocate two buffers separately.
-> -fix some codestyle.
->
-> Changes since v1:
-> -implement irq_wake handler.
-> ---
->
->   drivers/pinctrl/mediatek/pinctrl-mt8173.c     |  1 +
->   drivers/pinctrl/mediatek/pinctrl-mtk-common.c | 91 ++++++++++++++++++++++++++-
->   drivers/pinctrl/mediatek/pinctrl-mtk-common.h |  4 ++
->   3 files changed, 95 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/pinctrl/mediatek/pinctrl-mt8173.c b/drivers/pinctrl/mediatek/pinctrl-mt8173.c
-> index d0c811d..ad27184 100644
-> --- a/drivers/pinctrl/mediatek/pinctrl-mt8173.c
-> +++ b/drivers/pinctrl/mediatek/pinctrl-mt8173.c
-> @@ -385,6 +385,7 @@ static struct platform_driver mtk_pinctrl_driver = {
->   	.driver = {
->   		.name = "mediatek-mt8173-pinctrl",
->   		.of_match_table = mt8173_pctrl_match,
-> +		.pm = &mtk_eint_pm_ops,
->   	},
->   };
->
-> diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-> index ad1ea16..fe34ce9 100644
-> --- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-> +++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-> @@ -33,6 +33,7 @@
->   #include <linux/mfd/syscon.h>
->   #include <linux/delay.h>
->   #include <linux/interrupt.h>
-> +#include <linux/pm.h>
->   #include <dt-bindings/pinctrl/mt65xx.h>
->
->   #include "../core.h"
-> @@ -1062,6 +1063,77 @@ static int mtk_eint_set_type(struct irq_data *d,
->   	return 0;
->   }
->
-> +static int mtk_eint_irq_set_wake(struct irq_data *d, unsigned int on)
-> +{
-> +	struct mtk_pinctrl *pctl = irq_data_get_irq_chip_data(d);
-> +	int shift = d->hwirq & 0x1f;
-> +	int reg = d->hwirq >> 5;
-> +
-> +	if (on)
-> +		pctl->wake_mask[reg] |= BIT(shift);
-> +	else
-> +		pctl->wake_mask[reg] &= ~BIT(shift);
-> +
-> +	return 0;
-> +}
+>         M.
+> --
+> Jazz is not dead. It just smells funny...
 
-Does this pinmux controller:
-
-1. Support wake-up configuration ? If not, you need to use
-    IRQCHIP_SKIP_SET_WAKE. I don't see any value in writing the
-    mask_{set,clear} if the same registers are used for {en,dis}able
-
-2. Is in always on domain ? If not, you need save/restore only to
-    resume back the functionality. Generally we can set 	
-    IRQCHIP_MASK_ON_SUSPEND to ensure non-wake-up interrupts are
-    disabled during suspend and re-enabled in resume path. You just
-    save/restore raw values without tracking the wake-up source.
-
-Also I see that no care is taken to set the port irq as wake enable
-source. It may work with current mainline, but won't with -next. Please
-ensure the port irq to the parent interrupt controller remains
-enabled(i.e set as wake).
-
-Regards,
-Sudeep
+thanks
+Ganapat
