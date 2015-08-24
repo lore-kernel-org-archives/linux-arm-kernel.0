@@ -1,54 +1,50 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 24 Aug 2015 15:08:28 +0100
-Subject: [PATCH 0/2] arm64: ignore memory outside of the linear range
-In-Reply-To: <CY1PR0301MB0748EAE8103DDF771A37785787620@CY1PR0301MB0748.namprd03.prod.outlook.com>
-References: <1439890482-20798-1-git-send-email-ard.biesheuvel@linaro.org>
- <CY1PR0301MB0748FC71E6866C8AFACAAFF687780@CY1PR0301MB0748.namprd03.prod.outlook.com>
- <CAKv+Gu-OQ4VyCqe=mEDOrrfAtAWTfRtAiqXMGSVjJxOH6xi4Ow@mail.gmail.com>
- <20150824092256.GA11262@arm.com>
- <CY1PR0301MB0748EAE8103DDF771A37785787620@CY1PR0301MB0748.namprd03.prod.outlook.com>
-Message-ID: <20150824140828.GB20147@arm.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Mon, 24 Aug 2015 15:14:19 +0100
+Subject: [PATCH v2 14/15] KVM: arm64: implement MSI injection in ITS
+ emulation
+In-Reply-To: <55BF9FB0.6070804@arm.com>
+References: <1436538111-4294-1-git-send-email-andre.przywara@arm.com>
+ <1436538111-4294-15-git-send-email-andre.przywara@arm.com>
+ <55BB7678.5080105@linaro.org> <55BE7BA1.40403@arm.com>
+ <00a201d0cdb7$70a623f0$51f26bd0$@samsung.com> <55BF2F51.6020701@linaro.org>
+ <00f101d0cdcd$146a6090$3d3f21b0$@samsung.com> <55BF8AB8.5050408@linaro.org>
+ <55BF9FB0.6070804@arm.com>
+Message-ID: <55DB26BB.7090703@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 24, 2015 at 02:58:26PM +0100, Stuart Yoder wrote:
-> > On Mon, Aug 24, 2015 at 09:00:43AM +0100, Ard Biesheuvel wrote:
-> > > >> This is a followup to the single patch I posted on Aug 15th to ignore
-> > > >> RAM that cannot be covered by the linear mapping. Instead of clipping
-> > > >> the memory after the fact, this clips the memory before installing the
-> > > >> regions into the memblock memory table.
-> > > >>
-> > > >> This is basically the approach that Mark Rutland suggested here
-> > > >>
-> > > >> http://article.gmane.org/gmane.linux.ports.arm.kernel/430239
-> > > >>
-> > > >> but modified to correctly consider the base of the kernel image as the
-> > > >> start of the linear mapping.
-> > > >>
-> > > >> Ard Biesheuvel (2):
-> > > >>   of/fdt: make memblock maximum physical address arch configurable
-> > > >>   arm64: set MAX_MEMBLOCK_ADDR according to linear region size
-> > > >>
-> > > >>  arch/arm64/include/asm/memory.h |  8 ++++++++
-> > > >>  drivers/of/fdt.c                | 12 +++++++-----
-> > > >>  2 files changed, 15 insertions(+), 5 deletions(-)
-> > > >
-> > > > Tested on Freescale LS2085ARDB which has a split memory region
-> > > > that triggers the bug.
-> > > >
-> > > > Tested-by: Stuart Yoder <stuart.yoder@freescale.com>
-> > > >
-> > >
-> > > Will you be picking up this series for v4.3? If so, do you need me to
-> > > resend it with the tags added?
-> > 
-> > Sorry, I missed Rob's ack on the of/fdt.c change. I'll pick these up
-> > later today, no need to resend.
+Hi,
+
+On 03/08/15 18:06, Marc Zyngier wrote:
+> On 03/08/15 16:37, Eric Auger wrote:
+>> Andre, Pavel,
+>> On 08/03/2015 11:16 AM, Pavel Fedin wrote:
+>>>  Hello!
+>>>
+>>>> Again the case that leaves me uncomfortable is the one where the
+>>>> userspace does not provide the devid whereas it must (GICv3 ITS case).
+>>>
+>>>  Hypothetical broken userland which does not exist for now ?
+>> Yes but that's the rule to be not confident in *any* userspace, isn't it?
+
+Well, that's only regarding safety, not regarding functionality, right?
+So if we could break the kernel by not providing the flag and/or devid,
+this needs to be fixed. But if it just doesn't work, that's OK.
+
+>>
+>> As of now I prefer keeping the flags at uapi level and propagate it
+>> downto the kernel, as long as I don't have any answer for the unset
+>> devid discrimination question. Please apologize for my stubbornness ;-)
 > 
-> Are we sending to stable as well?
+> I think this flag should be kept, as it really indicates what is valid
+> in the MSI structure. It also has other benefits such as making obvious
+> what userspace expects, which can then be checked against the kernel's
+> own expectations.
 
-I've already pushed the patch out without a Cc stable (it's not a
-regression afaict), so if you want it backported then you'll need to send
-it to stable separately.
+I agree on this. Usually this kind of redundancy leads to strange code,
+but this does not seem to apply here, since we can at least still guard
+the assignments to demonstrate that the devid field needs to go along
+with the flag.
 
-Will
+Cheers,
+Andre.
