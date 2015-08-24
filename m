@@ -1,58 +1,48 @@
-From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Mon, 24 Aug 2015 20:24:10 +0530
-Subject: [PATCH-v3 1/2] mfd: devicetree: bindings: 88pm800: Add DT property
- for dual phase enable
-In-Reply-To: <20150824130205.GE3237@x1>
-References: <1440420006-31556-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1440420006-31556-2-git-send-email-vaibhav.hiremath@linaro.org>
- <20150824130205.GE3237@x1>
-Message-ID: <55DB3012.6010904@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 24 Aug 2015 16:00:31 +0100
+Subject: [PATCH 0/4] Efficiency cleanups
+In-Reply-To: <20150824143619.GD20147@arm.com>
+References: <CABXk95C=CpeL4mNmS6-jJ-0bMJf6fawwfs6DM1-p8FctTEFbpw@mail.gmail.com>
+ <20150821133043.GV7557@n2100.arm.linux.org.uk>
+ <20150821134630.GW7557@n2100.arm.linux.org.uk>
+ <20150824143619.GD20147@arm.com>
+Message-ID: <20150824150031.GC7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Aug 24, 2015 at 03:36:20PM +0100, Will Deacon wrote:
+> On Fri, Aug 21, 2015 at 02:46:30PM +0100, Russell King - ARM Linux wrote:
+> > While developing the previous patch set, I noticed that the kernel's
+> > "fast" exit path efficiency was not what it's supposed to be due to the
+> > addition of trace and context tracking.
+> > 
+> > These add several instances of register stacking and unstacking around
+> > various function calls, several of which we can avoid.  Many of these
+> > instances don't need to stack any register other than r0.
+> > 
+> > Moreover, we can avoid stacking and unstacking r0 if these features are
+> > enabled by storing r0 in the pt_regs as we would do in our slow return
+> > path.
+> > 
+> > Various other cleanups are included in this set as well.  Acks welcome.
+> 
+> All four patches look fine to me:
+> 
+>   Acked-by: Will Deacon <will.deacon@arm.com>
+> 
+> For some reason, I thought the numbering of the TIF_ flags was important
+> for some immediate construction in asm code, but either I'm mistaken or
+> it's no longer the case.
 
+The only reason they're important is to ensure that the bits are close
+enough together - we use the definitions directly in the asm code.
 
-On Monday 24 August 2015 06:32 PM, Lee Jones wrote:
-> On Mon, 24 Aug 2015, Vaibhav Hiremath wrote:
->
->> 88PM860 family of device supports dual phase mode on BUCK1 supply
->> providing total 6A capacity.
->> Note that by default they operate independently with 3A capacity.
->>
->> This patch updates the devicetree binding with DT property
->> to enable dual-phase mode on BUCK1.
->>
->> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
->> ---
->>   Documentation/devicetree/bindings/mfd/88pm800.txt | 6 ++++++
->>   1 file changed, 6 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/mfd/88pm800.txt b/Documentation/devicetree/bindings/mfd/88pm800.txt
->> index dec842f..2c82fcb 100644
->> --- a/Documentation/devicetree/bindings/mfd/88pm800.txt
->> +++ b/Documentation/devicetree/bindings/mfd/88pm800.txt
->> @@ -9,6 +9,12 @@ Required parent device properties:
->>   - #interrupt-cells 	: should be 1.
->>   			  The cell is the 88pm80x local IRQ number
->>
->> +Optional properties :
->> +- marvell,88pm860-buck1-dualphase-en  : If set, enable dual phase on BUCK1,
->> +  providing 6A capacity.
->> +  Without this both BUCK1A and BUCK1B operates independently with 3A capacity.
->> +  (This property is only applicable to 88PM860)
->
-> This will require a Regulator Ack.
->
-> My suggestion would be to remove the 'buck' number, as the same
-> property could be used on any Buck, and remove the '-en' part, as
-> this is implied.
->
+Over the years, I think we've deleted a number of flags, and grown some
+others, and we've left holes in the bit allocation.  By compressing them,
+we can change the assembly code to check for "is there _any_ work at all
+that needs to be done" as opposed to the two-step approach we've been
+doing up to now.
 
-Ok, Will do it in next version.
-
-Mark,
-
-Any comments here before I spin V4.
-
-Thanks,
-Vaibhav
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
