@@ -1,40 +1,70 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 24 Aug 2015 10:26:04 +0200
-Subject: [PATCH v2 0/2] i.MX6 OCOTP NVMEM support
-In-Reply-To: <1438940901-5779-1-git-send-email-p.zabel@pengutronix.de>
-References: <1438940901-5779-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <1440404764.4444.2.camel@pengutronix.de>
+From: shawn.lin@rock-chips.com (Shawn Lin)
+Date: Mon, 24 Aug 2015 16:27:43 +0800
+Subject: [RESEND PATCH] clk: rockchip: disable init state before mmc card
+ initialization
+Message-ID: <1440404863-14350-1-git-send-email-shawn.lin@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
+mmc host controller's IO input/output timing is unpredictable if
+bootloader execute tuning for HS200 mode. It might make kernel failed
+to initialize mmc card in identification mode. The root cause is
+tuning phase and degree setting for HS200 mode in bootloader aren't
+applicable to that of identification mode in kernel stage. Anyway, we
+can't force all bootloaders to disable tuning phase and degree setting
+before into kernel. Simply disable it in rockchip_clk_register_mmc.
 
-Am Freitag, den 07.08.2015, 11:48 +0200 schrieb Philipp Zabel:
-> Hi,
-> 
-> These patches add support for the i.MX On-Chip OTP (eFuse) Controller found
-> in i.MX6Q/D, i.MX6S/DL, i.MX6SL, and i.MX6SX SoCs to the NVMEM framework.
-> Greg, could you take them into the char-misc tree together with the NVMEM
-> framework?
+Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
 
-is anything blocking this?
+---
 
-best regards
-Philipp
+ drivers/clk/rockchip/clk-mmc-phase.c | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-> Changes since v1:
->  - Dropped unneeded clk.h include
->  - Fixed MODULE_LICENSE
->  - Droped third patch (adding the clock to the device tree node can be done separately)
-> 
-> Philipp Zabel (2):
->   nvmem: Add i.MX6 OCOTP device tree binding documentation
->   nvmem: imx-ocotp: Add i.MX6 OCOTP driver
-> 
->  .../devicetree/bindings/nvmem/imx-ocotp.txt        |  20 +++
->  drivers/nvmem/Kconfig                              |  11 ++
->  drivers/nvmem/Makefile                             |   2 +
->  drivers/nvmem/imx-ocotp.c                          | 154 +++++++++++++++++++++
->  4 files changed, 187 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/nvmem/imx-ocotp.txt
->  create mode 100644 drivers/nvmem/imx-ocotp.c
+diff --git a/drivers/clk/rockchip/clk-mmc-phase.c b/drivers/clk/rockchip/clk-mmc-phase.c
+index e9f8df32..ae21592 100644
+--- a/drivers/clk/rockchip/clk-mmc-phase.c
++++ b/drivers/clk/rockchip/clk-mmc-phase.c
+@@ -38,6 +38,9 @@ static unsigned long rockchip_mmc_recalc(struct clk_hw *hw,
+ #define ROCKCHIP_MMC_DEGREE_MASK 0x3
+ #define ROCKCHIP_MMC_DELAYNUM_OFFSET 2
+ #define ROCKCHIP_MMC_DELAYNUM_MASK (0xff << ROCKCHIP_MMC_DELAYNUM_OFFSET)
++#define ROCKCHIP_MMC_INIT_STATE_DISABLE (0x1)
++#define ROCKCHIP_MMC_INIT_STATE_SHIFT (1)
++#define ROCKCHIP_MMC_INIT_STATE_MASK  (0x1)
+ 
+ #define PSECS_PER_SEC 1000000000000LL
+ 
+@@ -119,6 +122,21 @@ static const struct clk_ops rockchip_mmc_clk_ops = {
+ 	.set_phase	= rockchip_mmc_set_phase,
+ };
+ 
++static void rockchip_clk_mmc_disable_init(struct rockchip_mmc_clock *mmc_clock)
++{
++	if (mmc_clock->shift != ROCKCHIP_MMC_INIT_STATE_SHIFT)
++		return;
++
++	writel(HIWORD_UPDATE(ROCKCHIP_MMC_INIT_STATE_DISABLE,
++			     ROCKCHIP_MMC_INIT_STATE_MASK,
++			     mmc_clock->shift),
++	       mmc_clock->reg);
++
++	pr_debug("%s: clear mmc init state to %d", __func__,
++		 (readl(mmc_clock->reg) >> (mmc_clock->shift)) &
++		 ROCKCHIP_MMC_INIT_STATE_MASK);
++}
++
+ struct clk *rockchip_clk_register_mmc(const char *name,
+ 				const char *const *parent_names, u8 num_parents,
+ 				void __iomem *reg, int shift)
+@@ -139,6 +157,8 @@ struct clk *rockchip_clk_register_mmc(const char *name,
+ 	mmc_clock->reg = reg;
+ 	mmc_clock->shift = shift;
+ 
++	rockchip_clk_mmc_disable_init(mmc_clock);
++
+ 	if (name)
+ 		init.name = name;
+ 
+-- 
+2.3.7
