@@ -1,41 +1,119 @@
 From: b38611@freescale.com (Fugang Duan)
-Date: Mon, 24 Aug 2015 11:29:47 +0800
-Subject: [PATCH v2 0/5] Add fec1 and fec2 support for i.MX7d sdb board
-Message-ID: <1440386992-6775-1-git-send-email-b38611@freescale.com>
+Date: Mon, 24 Aug 2015 11:29:52 +0800
+Subject: [PATCH v2 5/5] ARM: dts: imx7d-sdb: add fec1 and fec2 support
+In-Reply-To: <1440386992-6775-1-git-send-email-b38611@freescale.com>
+References: <1440386992-6775-1-git-send-email-b38611@freescale.com>
+Message-ID: <1440386992-6775-6-git-send-email-b38611@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch series is to add fec support for i.MX7d sdb board. Since i.MX7d fec ip is
-the same as i.MX6SX, so there have no change for driver itself.
+Enable fec1 and fec2 for i.MX7d-sdb board.
 
-Patch#1: add bcm54220 PHY ID entry into brcmphy.h file.
-Patch#2: add new iomux-gpr file to define iomux-gpr register and field for i.MX7d.
-Patch#3: i.MX7d sdb board install bcm54220 phy, i.MX7d arm2 board install AR8031 phy.
-         For the two phys, there needs extra phy setting, so package the setting to fixup.
-Patch#4~6: Add fec dts node and pinmux setting in dts file.
+Signed-off-by: Fugang Duan <B38611@freescale.com>
+---
+ arch/arm/boot/dts/imx7d-sdb.dts | 76 ++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 75 insertions(+), 1 deletion(-)
 
-Change:
-V2:
-	* Remove patch#1 in V1 patch series. Move the sigle BCM54220 PHY ID define to machine file.
-	* The current BCM54220 switch phy still use generic phy driver since broadcom phy driver don't
-	  support the switch phy, there need effort to add the switch phy support. Once broadcom phy driver
-	  will support the bcm54220 switch phy, we can add the special config to imx_v6_v7_defconfig.
-
-
-Fugang Duan (5):
-  ARM: imx7d: add imx7d iomux-gpr field define
-  ARM: imx: add enet init for i.MX7D platform
-  ARM: dts: imx: pinfunc: add GPIO1 pin define for i.MX7d
-  ARM: dts: imx7d: add fec1 and fec2 support for i.MX7d soc
-  ARM: dts: imx7d-sdb: add fec1 and fec2 support
-
- arch/arm/boot/dts/imx7d-pinfunc.h          | 115 +++++++++++++++++++++++++++++
- arch/arm/boot/dts/imx7d-sdb.dts            |  76 ++++++++++++++++++-
- arch/arm/boot/dts/imx7d.dtsi               |  36 +++++++++
- arch/arm/mach-imx/mach-imx7d.c             |  76 ++++++++++++++++++-
- include/linux/mfd/syscon/imx7-iomuxc-gpr.h |  49 ++++++++++++
- 5 files changed, 349 insertions(+), 3 deletions(-)
- create mode 100644 include/linux/mfd/syscon/imx7-iomuxc-gpr.h
-
+diff --git a/arch/arm/boot/dts/imx7d-sdb.dts b/arch/arm/boot/dts/imx7d-sdb.dts
+index 4d1a4b9..7d3e980 100644
+--- a/arch/arm/boot/dts/imx7d-sdb.dts
++++ b/arch/arm/boot/dts/imx7d-sdb.dts
+@@ -101,6 +101,45 @@
+ 	arm-supply = <&sw1a_reg>;
+ };
+ 
++&fec1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_enet1>;
++	assigned-clocks = <&clks IMX7D_ENET1_TIME_ROOT_SRC>,
++			  <&clks IMX7D_ENET1_TIME_ROOT_CLK>;
++	assigned-clock-parents = <&clks IMX7D_PLL_ENET_MAIN_100M_CLK>;
++	assigned-clock-rates = <0>, <100000000>;
++	phy-mode = "rgmii";
++	phy-handle = <&ethphy0>;
++	fsl,magic-packet;
++	status = "okay";
++
++	mdio {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		ethphy0: ethernet-phy at 0 {
++			reg = <0>;
++		};
++
++		ethphy1: ethernet-phy at 1 {
++			reg = <1>;
++		};
++	};
++};
++
++&fec2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_enet2>;
++	assigned-clocks = <&clks IMX7D_ENET2_TIME_ROOT_SRC>,
++			  <&clks IMX7D_ENET2_TIME_ROOT_CLK>;
++	assigned-clock-parents = <&clks IMX7D_PLL_ENET_MAIN_100M_CLK>;
++	assigned-clock-rates = <0>, <100000000>;
++	phy-mode = "rgmii";
++	phy-handle = <&ethphy1>;
++	fsl,magic-packet;
++	status = "okay";
++};
++
+ &i2c1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_i2c1>;
+@@ -246,6 +285,42 @@
+ 	pinctrl-0 = <&pinctrl_hog>;
+ 
+ 	imx7d-sdb {
++		pinctrl_enet1: enet1grp {
++			fsl,pins = <
++				MX7D_PAD_GPIO1_IO10__ENET1_MDIO			0x3
++				MX7D_PAD_GPIO1_IO11__ENET1_MDC			0x3
++				MX7D_PAD_ENET1_RGMII_TXC__ENET1_RGMII_TXC	0x1
++				MX7D_PAD_ENET1_RGMII_TD0__ENET1_RGMII_TD0	0x1
++				MX7D_PAD_ENET1_RGMII_TD1__ENET1_RGMII_TD1	0x1
++				MX7D_PAD_ENET1_RGMII_TD2__ENET1_RGMII_TD2	0x1
++				MX7D_PAD_ENET1_RGMII_TD3__ENET1_RGMII_TD3	0x1
++				MX7D_PAD_ENET1_RGMII_TX_CTL__ENET1_RGMII_TX_CTL	0x1
++				MX7D_PAD_ENET1_RGMII_RXC__ENET1_RGMII_RXC	0x1
++				MX7D_PAD_ENET1_RGMII_RD0__ENET1_RGMII_RD0	0x1
++				MX7D_PAD_ENET1_RGMII_RD1__ENET1_RGMII_RD1	0x1
++				MX7D_PAD_ENET1_RGMII_RD2__ENET1_RGMII_RD2	0x1
++				MX7D_PAD_ENET1_RGMII_RD3__ENET1_RGMII_RD3	0x1
++				MX7D_PAD_ENET1_RGMII_RX_CTL__ENET1_RGMII_RX_CTL	0x1
++			>;
++		};
++
++		pinctrl_enet2: enet2grp {
++			fsl,pins = <
++				MX7D_PAD_EPDC_GDSP__ENET2_RGMII_TXC		0x1
++				MX7D_PAD_EPDC_SDCE2__ENET2_RGMII_TD0		0x1
++				MX7D_PAD_EPDC_SDCE3__ENET2_RGMII_TD1		0x1
++				MX7D_PAD_EPDC_GDCLK__ENET2_RGMII_TD2		0x1
++				MX7D_PAD_EPDC_GDOE__ENET2_RGMII_TD3		0x1
++				MX7D_PAD_EPDC_GDRL__ENET2_RGMII_TX_CTL		0x1
++				MX7D_PAD_EPDC_SDCE1__ENET2_RGMII_RXC		0x1
++				MX7D_PAD_EPDC_SDCLK__ENET2_RGMII_RD0		0x1
++				MX7D_PAD_EPDC_SDLE__ENET2_RGMII_RD1		0x1
++				MX7D_PAD_EPDC_SDOE__ENET2_RGMII_RD2		0x1
++				MX7D_PAD_EPDC_SDSHR__ENET2_RGMII_RD3		0x1
++				MX7D_PAD_EPDC_SDCE0__ENET2_RGMII_RX_CTL		0x1
++			>;
++		};
++
+ 		pinctrl_hog: hoggrp {
+ 			fsl,pins = <
+ 				MX7D_PAD_UART3_CTS_B__GPIO4_IO7		0x14
+@@ -281,7 +356,6 @@
+ 			>;
+ 		};
+ 
+-
+ 		pinctrl_uart1: uart1grp {
+ 			fsl,pins = <
+ 				MX7D_PAD_UART1_TX_DATA__UART1_DCE_TX	0x79
 -- 
 1.9.1
