@@ -1,41 +1,54 @@
-From: Shenwei.Wang@freescale.com (Shenwei Wang)
-Date: Mon, 24 Aug 2015 19:20:51 +0000
-Subject: [PATCH v9 1/1] irqchip: imx-gpcv2: IMX GPCv2 driver for wakeup
- sources
-In-Reply-To: <alpine.DEB.2.11.1508242112450.15006@nanos>
-References: <1440443055-7291-1-git-send-email-shenwei.wang@freescale.com>
- <alpine.DEB.2.11.1508242112450.15006@nanos>
-Message-ID: <BY1PR0301MB0839B96E88B2CCFF8A9D794783620@BY1PR0301MB0839.namprd03.prod.outlook.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Mon, 24 Aug 2015 12:22:33 -0700
+Subject: Prevent list poison values from being mapped by userspace
+ processes
+In-Reply-To: <20150824191427.GF7557@n2100.arm.linux.org.uk>
+References: <CABXk95C=CpeL4mNmS6-jJ-0bMJf6fawwfs6DM1-p8FctTEFbpw@mail.gmail.com>
+ <20150821133043.GV7557@n2100.arm.linux.org.uk>
+ <CAGXu5jJ8KOoVkx99rrajEEx77Z6zO4TzCXaXkB74zv9QQFuJFw@mail.gmail.com>
+ <20150824184709.GE7557@n2100.arm.linux.org.uk>
+ <CAGXu5jJFf+9OgnGt_Cx5Q-Pht7LAT7M-sSXftTDORybrr+SECg@mail.gmail.com>
+ <20150824191427.GF7557@n2100.arm.linux.org.uk>
+Message-ID: <CAGXu5jLW-nfUr40cit25_GsBrPJ6e0topdBQ1RY6vSm2dBFyDA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Aug 24, 2015 at 12:14 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Aug 24, 2015 at 11:51:04AM -0700, Kees Cook wrote:
+>> On Mon, Aug 24, 2015 at 11:47 AM, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>> > That's something which Catalin indicated that he'll work on.  However,
+>> > he said in a public email last week that he won't be around for a while.
+>> >
+>> > So, I have no immediate solution for LPAE - it looks like LPAE will
+>> > require switching the page tables on kernel entry or exit, and again
+>> > each and every time we want to perform a userspace access.  How this
+>> > is done is not something that has been discussed, and neither do we
+>> > yet know how expensive this will be.  There are a number of places in
+>> > the kernel where a large number of get_user()s or put_user()s follow
+>> > one after each other, which necessitates switching back and forth
+>> > multiple times.  We may need to address some of those areas by
+>> > converting them to copy_(to|from)_user().
+>>
+>> By the way, have you looked at grsecurity's implementation of these
+>> protections? They've been using domains for a while now, and I think
+>> have an LPAE solution as well.
+>
+> *Sigh*.
+>
+> No, and I really don't care - if people want to do development work out
+> of the mainline kernel and not bother to talk about getting it upstream,
+> it's their loss.  As far as I'm concerned, such external work doesn't
+> exist.
 
-> -----Original Message-----
-> From: Thomas Gleixner [mailto:tglx at linutronix.de]
-> Sent: 2015?8?24? 14:15
-> To: Wang Shenwei-B38339
-> Cc: shawn.guo at linaro.org; jason at lakedaemon.net;
-> linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org; Huang
-> Yongcai-B20788
-> Subject: Re: [PATCH v9 1/1] irqchip: imx-gpcv2: IMX GPCv2 driver for wakeup
-> sources
-> 
-> On Mon, 24 Aug 2015, Shenwei Wang wrote:
-> >
-> > Signed-off-by: Shenwei Wang <shenwei.wang@freescale.com>
-> > Signed-off-by: Anson Huang <b20788@freescale.com>
-> 
-> Ok, last question. How is Anson related to this? He did not convey your patch and
-> in the first posted versions his SOB was never there.
+Sure, I understand, but it's worth at least looking at to compare
+feature sets. For example, when doing the W^X kernel memory work, I
+looked at both qcom and spender's work, trying to get the best of both
+into upstreamable shape.
 
-This patch was based on his internal version of GPCv2 driver. I reused some of his
-implementation and ported it to latest linux kernel. Adding his name here to give 
-the credits to him.
+-Kees
 
-Thanks,
-Shenwei
- 
-
-> Thanks,
-> 
-> 	tglx
+-- 
+Kees Cook
+Chrome OS Security
