@@ -1,22 +1,38 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 24 Aug 2015 19:54:25 +0530
-Subject: [PATCH v3] dmaengine: hdmac: Add memset capabilities
-In-Reply-To: <1440408075-26438-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1440408075-26438-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20150824142425.GL13546@localhost>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Mon, 24 Aug 2015 22:22:20 +0800
+Subject: [PATCH v2 1/5] clocksource: mediatek: do not enable GPT_CLK_EVT
+ when setup
+In-Reply-To: <55DACCEF.8040004@linaro.org>
+References: <CAGS+omD8k_Cfxv3bYyjmjtLbiavo-WmJPn0Z-CBhN_nnv65Tag@mail.gmail.com>
+ <1437552878-3684-1-git-send-email-yingjoe.chen@mediatek.com>
+ <55CC56C4.8080201@linaro.org> <1439820602.3414.12.camel@mtksdaap41>
+ <55D5E40A.6080904@linaro.org> <1440167950.20169.29.camel@mtksdaap41>
+ <55DACCEF.8040004@linaro.org>
+Message-ID: <1440426140.17418.1.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 24, 2015 at 11:21:15AM +0200, Maxime Ripard wrote:
-> Just like for the XDMAC, the SoCs that embed the HDMAC don't have any kind
-> of GPU, and need to accelerate a few framebuffer-related operations through
-> their DMA controller.
+On Mon, 2015-08-24 at 09:51 +0200, Daniel Lezcano wrote:
+> On 08/21/2015 04:39 PM, Yingjoe Chen wrote:
 > 
-> However, unlike the XDMAC, the HDMAC doesn't have the memset capability
-> built-in. That can be easily emulated though, by doing a transfer with a
-> fixed address on the variable that holds the value we want to set.
+> [ ... ]
+> 
+> >>    - Does the spurious interrupt occurs *every* time ? at each boot ?
+> >
+> > Yes. If you applied this series to enable mtk timer without this fix on
+> > mt8173 or mt8135 you can reproduce it. It occurs for every boot.
+> >
+> > It crash before uart driver is ready, so you'll have to use earlycon to
+> > see the crash log.
+> 
+> Can you give me the earlycon params ?
 
-Applied, thanks
+Hi Daniel,
 
--- 
-~Vinod
+You probably already figure this out. anyway I'm using this to enable
+earlycon:
+
+Add 'earlycon' in bootargs, and in device tree chosen part, add
+"linux,stdout-path=&uart0;"
+
+Joe.C
