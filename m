@@ -1,85 +1,57 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 24 Aug 2015 12:49:01 +0100
-Subject: [PATCH v4 3/4] mfd: Add DT binding for Maxim MAX77802 IC
-In-Reply-To: <1440406041-25071-4-git-send-email-javier@osg.samsung.com>
-References: <1440406041-25071-1-git-send-email-javier@osg.samsung.com>
- <1440406041-25071-4-git-send-email-javier@osg.samsung.com>
-Message-ID: <20150824114901.GC3237@x1>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Mon, 24 Aug 2015 12:49:03 +0100
+Subject: [PATCH v1 3/3] arm64: dts: add Hi6220 mailbox node
+In-Reply-To: <1440411596.3517.12.camel@linaro.org>
+References: <1439977055-1747-1-git-send-email-leo.yan@linaro.org>
+ <1439977055-1747-4-git-send-email-leo.yan@linaro.org>
+ <20150821184059.GB2000@svinekod>
+ <20150824091845.GA28290@leoy-linaro>
+ <20150824095144.GA7139@leverpostej>
+ <1440411596.3517.12.camel@linaro.org>
+Message-ID: <20150824114903.GT10728@bivouac.eciton.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 24 Aug 2015, Javier Martinez Canillas wrote:
+On Mon, Aug 24, 2015 at 06:19:56PM +0800, Haojian Zhuang wrote:
+> > If your EFI memory map describes the memory as mappable, it is wrong.
+> 
+> When kernel is working, kernel will create its own page table based on
+> UEFI memory map. Since it's reserved in DTS file as Leo's patch, it'll
+> be moved to reserved memblock. Why is it wrong?
+> 
+> In the second, UEFI is firmware. When it's stable, nobody should change
+> it without any reason.
 
-> The MAX77802 is a chip that contains regulators, 2 32kHz clocks,
-> a RTC and an I2C interface to program the individual components.
-> 
-> The are already DT bindings for the regulators and clocks and
-> these reference to a bindings/mfd/max77802.txt file, that didn't
-> exist, for the details about the PMIC.
-> 
-> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> 
-> ---
-> 
-> Changes in v4:
-> - Reword section about max77802 clock and regulator DT binding docs.
->   Suggested by Lee Jones.
-> - Align max77802 mfd required properties. Suggested by Lee Jones.
-> 
-> Changes in v3:
-> - Add Krzysztof Kozlowski Reviewed-by tag to patch #3.
-> - Capitalise all acronyms. Suggested by Lee Jones.
-> - Use relative path to refer other bindings. Suggested by Lee Jones.
-> - Use IRQ_TYPE_NONE instead of 0 in example. Suggested by Lee Jones.
-> 
-> Changes in v2:
-> - Use the correct "maxim,max77802" compatible string.
->   Suggested by Krzysztof Kozlowski
-> - Use a pmic generic node name for the max77802 node example.
->   Suggested by Sergei Shtylyov.
-> 
->  Documentation/devicetree/bindings/mfd/max77802.txt | 26 ++++++++++++++++++++++
->  1 file changed, 26 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mfd/max77802.txt
+Much like the memory map.
 
-Applied, thanks.
+> These reserved memory are used in mailbox driver.
+> Look. It's driver, so it could be changed at any time.
 
-> diff --git a/Documentation/devicetree/bindings/mfd/max77802.txt b/Documentation/devicetree/bindings/mfd/max77802.txt
-> new file mode 100644
-> index 000000000000..51fc1a60caa5
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mfd/max77802.txt
-> @@ -0,0 +1,26 @@
-> +Maxim MAX77802 multi-function device
-> +
-> +The Maxim MAX77802 is a Power Management IC (PMIC) that contains 10 high
-> +efficiency Buck regulators, 32 Low-DropOut (LDO) regulators used to power
-> +up application processors and peripherals, a 2-channel 32kHz clock outputs,
-> +a Real-Time-Clock (RTC) and a I2C interface to program the individual
-> +regulators, clocks outputs and the RTC.
-> +
-> +Bindings for the built-in 32k clock generator block and
-> +regulators are defined in ../clk/maxim,max77802.txt and
-> +../regulator/max77802.txt respectively.
-> +
-> +Required properties:
-> +- compatible		: Must be "maxim,max77802"
-> +- reg			: Specifies the I2C slave address of PMIC block.
-> +- interrupts		: I2C device IRQ line connected to the main SoC.
-> +- interrupt-parent	: The parent interrupt controller.
-> +
-> +Example:
-> +
-> +	max77802: pmic at 09 {
-> +		compatible = "maxim,max77802";
-> +		interrupt-parent = <&intc>;
-> +		interrupts = <26 IRQ_TYPE_NONE>;
-> +		reg = <0x09>;
-> +	};
+No, it is a set of regions of memory set aside for use by a different
+master in the system as well as communications with that master.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+The fact that there is a driver somewhere that is aware of this is
+entirely beside the point. All agents in the system must adher to this
+protocol.
+
+> Why do you want
+> to UEFI knowing this memory range? Do you hope UEFI to change when
+> mailbox driver is changed?
+
+Yes.
+
+UEFI is a runtime environment. Having random magic areas not to be
+touched will cause random pieces of software running under it to break
+horribly or break other things horribly.
+Unless you mark them as reserved in the UEFI memory map.
+At which point the Linux kernel will automatically ignore them, and
+the proposed patch is redundant.
+
+So, yes, if you want a system that can boot reliably, run testsuites
+(like SCT or FWTS), run applications (like fastboot ... or the EFI
+stub kernel itself), then any memory regions that is reserved for
+mailbox communication (or other masters in the system) _must_ be
+marked in the EFI memory map.
+
+/
+    Leif
