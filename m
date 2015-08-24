@@ -1,74 +1,58 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 24 Aug 2015 11:33:29 -0700
-Subject: [PATCH 05/18] ARM: BCM: use const and __initconst for
- smp_operations
-In-Reply-To: <1440390978-22796-6-git-send-email-yamada.masahiro@socionext.com>
-References: <1440390978-22796-1-git-send-email-yamada.masahiro@socionext.com>
- <1440390978-22796-6-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <55DB6379.7040009@gmail.com>
+From: punnaia@xilinx.com (punnaiah choudary kalluri)
+Date: Tue, 25 Aug 2015 00:09:16 +0530
+Subject: [PATCH v4 1/2] Documentation: dt: Add Xilinx zynqmp dma device
+ tree binding documentation
+In-Reply-To: <55DB205D.7090802@metafoo.de>
+References: <1438831173-8761-1-git-send-email-punnaia@xilinx.com>
+ <55DB205D.7090802@metafoo.de>
+Message-ID: <CAGnW=Bb-vwvwAm7ztH1XLqRHbVx+5MWZJd=fDgOoqJ7Qtyo=nw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/08/15 21:36, Masahiro Yamada wrote:
-> The smp_operations structure is not over-written, so add const
-> qualifier and replace __initdata with __initconst.
-> 
-> Also, add static to bcm63138_smp_ops.
-> 
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+On Mon, Aug 24, 2015 at 7:17 PM, Lars-Peter Clausen <lars@metafoo.de> wrote:
+> On 08/06/2015 05:19 AM, Punnaiah Choudary Kalluri wrote:
+> [...]
+>> +Optional properties:
+>> +- xlnx,include-sg: Indicates the controller to operate in simple or scatter
+>> +                gather dma mode
+>> +- xlnx,ratectrl: Scheduling interval in terms of clock cycles for
+>> +              source AXI transaction
+>> +- xlnx,overfetch: Tells whether the channel is allowed to over fetch the data
+>> +- xlnx,src-issue: Number of AXI outstanding transactions on source side
+>> +- xlnx,desc-axi-cohrnt: Tells whether the AXI transactions generated for the
+>> +                     descriptor read are marked Non-coherent
+>> +- xlnx,src-axi-cohrnt: Tells whether the AXI transactions generated for the
+>> +                     source descriptor payload are marked Non-coherent
+>> +- xlnx,dst-axi-cohrnt: Tells whether the AXI transactions generated for the
+>> +                     dst descriptor payload are marked Non-coherent
+>> +- xlnx,desc-axi-qos: AXI QOS bits to be used for descriptor fetch
+>> +- xlnx,src-axi-qos: AXI QOS bits to be used for data read
+>> +- xlnx,dst-axi-qos: AXI QOS bits to be used for data write
+>> +- xlnx,desc-axi-cache: AXI cache bits to be used for descriptor fetch.
+>> +- xlnx,desc-axi-cache: AXI cache bits to be used for data read
+>> +- xlnx,desc-axi-cache: AXI cache bits to be used for data write
+>> +- xlnx,src-burst-len: AXI length for data read. Support only power of 2 values
+>> +                   i.e 1,2,4,8 and 16
+>> +- xlnx,dst-burst-len: AXI length for data write. Support only power of 2 values
+>> +                   i.e 1,2,4,8 and 16
+>
+> None of these really belong into the devicetree. This is all runtime
+> configuration data.
 
-For bcm63xx and brcmstb:
+This is a general purpose dma and provides more flexibility to the
+user for configuring the
+descriptor, data and bus parameters. one way is as you said these
+parameters can be
+configured at runtime but i didn't find a way configuring the channel
+at runtime for mem to
+mem transfers. I have checked the  device_config function description
+and it is strictly
+meant for slave operations only. So, i didn't see anything wrong
+having these parameter values
+from the device tree as these all are hw parameters.
 
-Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
+Regards,
+Punnaiah
 
-> ---
-> 
->  arch/arm/mach-bcm/bcm63xx_smp.c     | 2 +-
->  arch/arm/mach-bcm/kona_smp.c        | 2 +-
->  arch/arm/mach-bcm/platsmp-brcmstb.c | 2 +-
->  3 files changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/mach-bcm/bcm63xx_smp.c b/arch/arm/mach-bcm/bcm63xx_smp.c
-> index 19be904..9b6727e 100644
-> --- a/arch/arm/mach-bcm/bcm63xx_smp.c
-> +++ b/arch/arm/mach-bcm/bcm63xx_smp.c
-> @@ -161,7 +161,7 @@ static void __init bcm63138_smp_prepare_cpus(unsigned int max_cpus)
->  	}
->  }
->  
-> -struct smp_operations bcm63138_smp_ops __initdata = {
-> +static const struct smp_operations bcm63138_smp_ops __initconst = {
->  	.smp_prepare_cpus	= bcm63138_smp_prepare_cpus,
->  	.smp_boot_secondary	= bcm63138_smp_boot_secondary,
->  };
-> diff --git a/arch/arm/mach-bcm/kona_smp.c b/arch/arm/mach-bcm/kona_smp.c
-> index 66a0465..da8328b 100644
-> --- a/arch/arm/mach-bcm/kona_smp.c
-> +++ b/arch/arm/mach-bcm/kona_smp.c
-> @@ -194,7 +194,7 @@ static int bcm_boot_secondary(unsigned int cpu, struct task_struct *idle)
->  	return -ENOSYS;
->  }
->  
-> -static struct smp_operations bcm_smp_ops __initdata = {
-> +static const struct smp_operations bcm_smp_ops __initconst = {
->  	.smp_prepare_cpus	= bcm_smp_prepare_cpus,
->  	.smp_boot_secondary	= bcm_boot_secondary,
->  };
-> diff --git a/arch/arm/mach-bcm/platsmp-brcmstb.c b/arch/arm/mach-bcm/platsmp-brcmstb.c
-> index 44d6bddf..40dc844 100644
-> --- a/arch/arm/mach-bcm/platsmp-brcmstb.c
-> +++ b/arch/arm/mach-bcm/platsmp-brcmstb.c
-> @@ -356,7 +356,7 @@ static int brcmstb_boot_secondary(unsigned int cpu, struct task_struct *idle)
->  	return 0;
->  }
->  
-> -static struct smp_operations brcmstb_smp_ops __initdata = {
-> +static const struct smp_operations brcmstb_smp_ops __initconst = {
->  	.smp_prepare_cpus	= brcmstb_cpu_ctrl_setup,
->  	.smp_boot_secondary	= brcmstb_boot_secondary,
->  #ifdef CONFIG_HOTPLUG_CPU
-> 
-
-
--- 
-Florian
+>
+> - Lars
