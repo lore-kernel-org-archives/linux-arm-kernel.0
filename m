@@ -1,27 +1,74 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Mon, 24 Aug 2015 20:31:42 +0200 (CEST)
-Subject: [PATCH v8 1/2] irqchip: imx-gpcv2: IMX GPCv2 driver for wakeup
- sources
-In-Reply-To: <BY1PR0301MB0839B8F390ABA092FB80362083620@BY1PR0301MB0839.namprd03.prod.outlook.com>
-References: <1438378439-11569-1-git-send-email-shenwei.wang@freescale.com>
- <1438378439-11569-2-git-send-email-shenwei.wang@freescale.com>
- <alpine.DEB.2.11.1508231251040.3873@nanos>
- <CY1PR0301MB084328829F8128A8FBFA6A9283620@CY1PR0301MB0843.namprd03.prod.outlook.com>
- <alpine.DEB.2.11.1508241933150.3873@nanos>
- <BY1PR0301MB0839B8F390ABA092FB80362083620@BY1PR0301MB0839.namprd03.prod.outlook.com>
-Message-ID: <alpine.DEB.2.11.1508242031050.15006@nanos>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 24 Aug 2015 11:33:29 -0700
+Subject: [PATCH 05/18] ARM: BCM: use const and __initconst for
+ smp_operations
+In-Reply-To: <1440390978-22796-6-git-send-email-yamada.masahiro@socionext.com>
+References: <1440390978-22796-1-git-send-email-yamada.masahiro@socionext.com>
+ <1440390978-22796-6-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <55DB6379.7040009@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 24 Aug 2015, Shenwei Wang wrote:
-> > That's what you want achieve. Still you save the full content of the registers and
-> > restore the full content. That saves/restores the enabled and disabled interrupts.
-> > So enabled_irqs is a misnomer as you save the full state.
+On 23/08/15 21:36, Masahiro Yamada wrote:
+> The smp_operations structure is not over-written, so add const
+> qualifier and replace __initdata with __initconst.
 > 
-> How about change its name to "saved_irq_mask"?
+> Also, add static to bcm63138_smp_ops.
+> 
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 
-Way better.
- 
-Thanks,
- 
- 	tglx
+For bcm63xx and brcmstb:
+
+Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
+
+> ---
+> 
+>  arch/arm/mach-bcm/bcm63xx_smp.c     | 2 +-
+>  arch/arm/mach-bcm/kona_smp.c        | 2 +-
+>  arch/arm/mach-bcm/platsmp-brcmstb.c | 2 +-
+>  3 files changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/mach-bcm/bcm63xx_smp.c b/arch/arm/mach-bcm/bcm63xx_smp.c
+> index 19be904..9b6727e 100644
+> --- a/arch/arm/mach-bcm/bcm63xx_smp.c
+> +++ b/arch/arm/mach-bcm/bcm63xx_smp.c
+> @@ -161,7 +161,7 @@ static void __init bcm63138_smp_prepare_cpus(unsigned int max_cpus)
+>  	}
+>  }
+>  
+> -struct smp_operations bcm63138_smp_ops __initdata = {
+> +static const struct smp_operations bcm63138_smp_ops __initconst = {
+>  	.smp_prepare_cpus	= bcm63138_smp_prepare_cpus,
+>  	.smp_boot_secondary	= bcm63138_smp_boot_secondary,
+>  };
+> diff --git a/arch/arm/mach-bcm/kona_smp.c b/arch/arm/mach-bcm/kona_smp.c
+> index 66a0465..da8328b 100644
+> --- a/arch/arm/mach-bcm/kona_smp.c
+> +++ b/arch/arm/mach-bcm/kona_smp.c
+> @@ -194,7 +194,7 @@ static int bcm_boot_secondary(unsigned int cpu, struct task_struct *idle)
+>  	return -ENOSYS;
+>  }
+>  
+> -static struct smp_operations bcm_smp_ops __initdata = {
+> +static const struct smp_operations bcm_smp_ops __initconst = {
+>  	.smp_prepare_cpus	= bcm_smp_prepare_cpus,
+>  	.smp_boot_secondary	= bcm_boot_secondary,
+>  };
+> diff --git a/arch/arm/mach-bcm/platsmp-brcmstb.c b/arch/arm/mach-bcm/platsmp-brcmstb.c
+> index 44d6bddf..40dc844 100644
+> --- a/arch/arm/mach-bcm/platsmp-brcmstb.c
+> +++ b/arch/arm/mach-bcm/platsmp-brcmstb.c
+> @@ -356,7 +356,7 @@ static int brcmstb_boot_secondary(unsigned int cpu, struct task_struct *idle)
+>  	return 0;
+>  }
+>  
+> -static struct smp_operations brcmstb_smp_ops __initdata = {
+> +static const struct smp_operations brcmstb_smp_ops __initconst = {
+>  	.smp_prepare_cpus	= brcmstb_cpu_ctrl_setup,
+>  	.smp_boot_secondary	= brcmstb_boot_secondary,
+>  #ifdef CONFIG_HOTPLUG_CPU
+> 
+
+
+-- 
+Florian
