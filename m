@@ -1,75 +1,57 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 24 Aug 2015 08:56:14 -0500
-Subject: [PATCH 1/7] drm/vc4: Add devicetree bindings for VC4.
-In-Reply-To: <1439427380-2436-2-git-send-email-eric@anholt.net>
-References: <1439427380-2436-1-git-send-email-eric@anholt.net>
- <1439427380-2436-2-git-send-email-eric@anholt.net>
-Message-ID: <CAL_JsqKhfQS46NwbTq0PNDpnNuztnRkcK+WDhFMaayE_8dDt3Q@mail.gmail.com>
+From: stuart.yoder@freescale.com (Stuart Yoder)
+Date: Mon, 24 Aug 2015 13:58:26 +0000
+Subject: [PATCH 0/2] arm64: ignore memory outside of the linear range
+In-Reply-To: <20150824092256.GA11262@arm.com>
+References: <1439890482-20798-1-git-send-email-ard.biesheuvel@linaro.org>
+ <CY1PR0301MB0748FC71E6866C8AFACAAFF687780@CY1PR0301MB0748.namprd03.prod.outlook.com>
+ <CAKv+Gu-OQ4VyCqe=mEDOrrfAtAWTfRtAiqXMGSVjJxOH6xi4Ow@mail.gmail.com>
+ <20150824092256.GA11262@arm.com>
+Message-ID: <CY1PR0301MB0748EAE8103DDF771A37785787620@CY1PR0301MB0748.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 12, 2015 at 7:56 PM, Eric Anholt <eric@anholt.net> wrote:
-> Signed-off-by: Eric Anholt <eric@anholt.net>
-> ---
->  .../devicetree/bindings/gpu/brcm,bcm-vc4.txt       | 83 ++++++++++++++++++++++
->  1 file changed, 83 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/gpu/brcm,bcm-vc4.txt
->
-> diff --git a/Documentation/devicetree/bindings/gpu/brcm,bcm-vc4.txt b/Documentation/devicetree/bindings/gpu/brcm,bcm-vc4.txt
-> new file mode 100644
-> index 0000000..2b13e61
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/gpu/brcm,bcm-vc4.txt
-> @@ -0,0 +1,83 @@
-> +Broadcom VC4 GPU
-> +
-> +The VC4 device present on the Raspberry Pi includes a display system
-> +with HDMI output and the HVS scaler for compositing display planes.
-> +
-> +Required properties for VC4:
-> +- compatible:  Should be "brcm,vc4"
-> +- crtcs:       List of references to pixelvalve scanout engines
-> +- hvss:                List of references to HVS video scalers
-> +- encoders:    List of references to output encoders (HDMI, SDTV)
 
-Creating these links is what the OF graph binding is for. Please use
-it. Plus this is a DRMism in the binding.
 
-> +
-> +Required properties for Pixel Valve:
-> +- compatible:  Should be "brcm,vc4-pixelvalve"
+> -----Original Message-----
+> From: Will Deacon [mailto:will.deacon at arm.com]
+> Sent: Monday, August 24, 2015 4:23 AM
+> To: Ard Biesheuvel
+> Cc: linux-arm-kernel at lists.infradead.org; Mark Rutland; Catalin Marinas; robh at kernel.org; Yoder Stuart-B08248
+> Subject: Re: [PATCH 0/2] arm64: ignore memory outside of the linear range
+> 
+> On Mon, Aug 24, 2015 at 09:00:43AM +0100, Ard Biesheuvel wrote:
+> > >> This is a followup to the single patch I posted on Aug 15th to ignore
+> > >> RAM that cannot be covered by the linear mapping. Instead of clipping
+> > >> the memory after the fact, this clips the memory before installing the
+> > >> regions into the memblock memory table.
+> > >>
+> > >> This is basically the approach that Mark Rutland suggested here
+> > >>
+> > >> http://article.gmane.org/gmane.linux.ports.arm.kernel/430239
+> > >>
+> > >> but modified to correctly consider the base of the kernel image as the
+> > >> start of the linear mapping.
+> > >>
+> > >> Ard Biesheuvel (2):
+> > >>   of/fdt: make memblock maximum physical address arch configurable
+> > >>   arm64: set MAX_MEMBLOCK_ADDR according to linear region size
+> > >>
+> > >>  arch/arm64/include/asm/memory.h |  8 ++++++++
+> > >>  drivers/of/fdt.c                | 12 +++++++-----
+> > >>  2 files changed, 15 insertions(+), 5 deletions(-)
+> > >
+> > > Tested on Freescale LS2085ARDB which has a split memory region
+> > > that triggers the bug.
+> > >
+> > > Tested-by: Stuart Yoder <stuart.yoder@freescale.com>
+> > >
+> >
+> > Will you be picking up this series for v4.3? If so, do you need me to
+> > resend it with the tags added?
+> 
+> Sorry, I missed Rob's ack on the of/fdt.c change. I'll pick these up
+> later today, no need to resend.
 
-There's only one version of IP and all chips have the same bugs? You
-should have chip names in the compatible strings.
+Are we sending to stable as well?
 
-> +- reg:         Physical base address and length of the PV's registers
-> +- interrupts:  The interrupt number
-> +                 See bindings/interrupt-controller/brcm,bcm2835-armctrl-ic.txt
-> +
-> +Required properties for HVS:
-> +- compatible:  Should be "brcm,vc4-hvs"
-> +- reg:         Physical base address and length of the HVS's registers
-> +- interrupts:  The interrupt number
-> +                 See bindings/interrupt-controller/brcm,bcm2835-armctrl-ic.txt
-> +
-> +Required properties for HDMI
-> +- compatible:  Should be "brcm,vc4-hdmi"
-> +- reg:         Physical base address and length of the two register ranges
-> +                 ("HDMI" and "HD")
-> +- interrupts:  The interrupt numbers
-> +                 See bindings/interrupt-controller/brcm,bcm2835-armctrl-ic.txt
-> +- ddc:         phandle of the I2C controller used for DDC EDID probing
-> +- crtc:                phandle to the pixelvalve CRTC the HDMI encoder is attached to
-
-Same comment about OF graph.
-
-> +
-> +Optional properties for HDMI:
-> +- hpd-gpio:    The GPIO pin for HDMI hotplug detect (if it doesn't appear
-> +                 as an interrupt/status bit in the HDMI controller
-> +                 itself).  See bindings/pinctrl/brcm,bcm2835-gpio.txt
-
-Use the hdmi-connector binding. This doesn't belong here. The clue is
-your comment in parenthesis.
-
-Rob
+Stuart
