@@ -1,69 +1,69 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 24 Aug 2015 14:42:05 +0100
-Subject: [PATCH] arm64/kvm: set {v,}TCR_EL2 RES1 bits
-Message-ID: <1440423725-31700-1-git-send-email-mark.rutland@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 24 Aug 2015 15:45:18 +0200
+Subject: [PATCH v2 5/5] arm64: add KASan support
+In-Reply-To: <20150824131557.GB7557@n2100.arm.linux.org.uk>
+References: <1431698344-28054-1-git-send-email-a.ryabinin@samsung.com>
+ <1431698344-28054-6-git-send-email-a.ryabinin@samsung.com>
+ <CACRpkdaRJJjCXR=vK1M2YhR26JZfGoBB+jcqz8r2MhERfxRzqA@mail.gmail.com>
+ <CAPAsAGy-r8Z2N09wKV+e0kLfbwxd-eWK6N5Xajsnqq9jfyWqcQ@mail.gmail.com>
+ <CACRpkdZmHLMxosLXjyOPdkavo=UNzmTcHOLF5vV4cS1ULfbq6A@mail.gmail.com>
+ <CAPAsAGw-iawTpjJh66rQN5fqBFT6UBZCcv2eKx7JTqCXzhzpsw@mail.gmail.com>
+ <CACRpkdY2i2M27gP_fXawkFrC_GFgWaKr5rEn6d47refNPiEk=g@mail.gmail.com>
+ <55AE56DB.4040607@samsung.com>
+ <CACRpkdYaqK8upK-3b01JbO_y+sHnk4-Hm1MfvjSy0tKUkFREtQ@mail.gmail.com>
+ <20150824131557.GB7557@n2100.arm.linux.org.uk>
+Message-ID: <CACRpkdYwpucRiXM05y00RQY=gKv8W6YjCNspYFRMGaM605cU0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently we don't set the RES1 bits of TCR_EL2 and VTCR_EL2 when
-configuring them, which could lead to unexpected behaviour when an
-architectural meaning is defined for those bits.
+On Mon, Aug 24, 2015 at 3:15 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Jul 21, 2015 at 11:27:56PM +0200, Linus Walleij wrote:
+>> On Tue, Jul 21, 2015 at 4:27 PM, Andrey Ryabinin <a.ryabinin@samsung.com> wrote:
+>>
+>> > I used vexpress. Anyway, it doesn't matter now, since I have an update
+>> > with a lot of stuff fixed, and it works on hardware.
+>> > I still need to do some work on it and tomorrow, probably, I will share.
+>>
+>> Ah awesome. I have a stash of ARM boards so I can test it on a
+>> range of hardware once you feel it's ready.
+>>
+>> Sorry for pulling stuff out of your hands, people are excited about
+>> KASan ARM32 as it turns out.
+>
+> People may be excited about it because it's a new feature, but we really
+> need to consider whether gobbling up 512MB of userspace for it is a good
+> idea or not.  There are programs around which like to map large amounts
+> of memory into their process space, and the more we steal from them, the
+> more likely these programs are to fail.
 
-Set the RES1 bits to avoid issues.
+I looked at some different approaches over the last weeks for this
+when playing around with KASan.
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Christoffer Dall <christoffer.dall@linaro.org>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Suzuki Poulose <suzuki.poulose@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/include/asm/kvm_arm.h | 10 +++++++---
- 1 file changed, 7 insertions(+), 3 deletions(-)
+It seems since KASan was developed on 64bit systems, this was
+not much of an issue for them as they could take their shadow
+memory from the vmalloc space.
 
-diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-index ac6fafb..d0dac88 100644
---- a/arch/arm64/include/asm/kvm_arm.h
-+++ b/arch/arm64/include/asm/kvm_arm.h
-@@ -95,6 +95,7 @@
- 			 SCTLR_EL2_SA | SCTLR_EL2_I)
- 
- /* TCR_EL2 Registers bits */
-+#define TCR_EL2_RES1	((1 << 31) | (1 << 23))
- #define TCR_EL2_TBI	(1 << 20)
- #define TCR_EL2_PS	(7 << 16)
- #define TCR_EL2_PS_40B	(2 << 16)
-@@ -106,9 +107,10 @@
- #define TCR_EL2_MASK	(TCR_EL2_TG0 | TCR_EL2_SH0 | \
- 			 TCR_EL2_ORGN0 | TCR_EL2_IRGN0 | TCR_EL2_T0SZ)
- 
--#define TCR_EL2_FLAGS	(TCR_EL2_PS_40B)
-+#define TCR_EL2_FLAGS	(TCR_EL2_RES1 | TCR_EL2_PS_40B)
- 
- /* VTCR_EL2 Registers bits */
-+#define VTCR_EL2_RES1		(1 << 31)
- #define VTCR_EL2_PS_MASK	(7 << 16)
- #define VTCR_EL2_TG0_MASK	(1 << 14)
- #define VTCR_EL2_TG0_4K		(0 << 14)
-@@ -147,7 +149,8 @@
-  */
- #define VTCR_EL2_FLAGS		(VTCR_EL2_TG0_64K | VTCR_EL2_SH0_INNER | \
- 				 VTCR_EL2_ORGN0_WBWA | VTCR_EL2_IRGN0_WBWA | \
--				 VTCR_EL2_SL0_LVL1 | VTCR_EL2_T0SZ_40B)
-+				 VTCR_EL2_SL0_LVL1 | VTCR_EL2_T0SZ_40B | \
-+				 VTCR_EL2_RES1)
- #define VTTBR_X		(38 - VTCR_EL2_T0SZ_40B)
- #else
- /*
-@@ -158,7 +161,8 @@
-  */
- #define VTCR_EL2_FLAGS		(VTCR_EL2_TG0_4K | VTCR_EL2_SH0_INNER | \
- 				 VTCR_EL2_ORGN0_WBWA | VTCR_EL2_IRGN0_WBWA | \
--				 VTCR_EL2_SL0_LVL1 | VTCR_EL2_T0SZ_40B)
-+				 VTCR_EL2_SL0_LVL1 | VTCR_EL2_T0SZ_40B | \
-+				 VTCR_EL2_RES1)
- #define VTTBR_X		(37 - VTCR_EL2_T0SZ_40B)
- #endif
- 
--- 
-1.9.1
+I think it is possible to actually just steal as much memory as is
+needed to cover the kernel, and not 1/8 of the entire addressable
+32bit space. So instead of covering all from 0x0-0xffffffff
+at least just MODULES_VADDR thru 0xffffffff should be enough.
+So if that is 0xbf000000-0xffffffff in most cases, 0x41000000
+bytes, then 1/8 of that, 0x8200000, 130MB should be enough.
+(Andrey need to say if this is possible.)
+
+That will probably miss some usecases I'm not familiar with, where
+the kernel is actually executing something below 0xbf000000...
+
+I looked at taking memory from vmalloc instead, but ran into
+problems since this is subject to the highmem split and KASan
+need to have it's address offset at compile time. On
+Ux500 I managed to remove all the static maps and steal memory
+from the top of the vmalloc area instead of the beginning, but
+that is probably not generally feasible.
+
+I suspect you have better ideas than what I can come up
+with though.
+
+Yours,
+Linus Walleij
