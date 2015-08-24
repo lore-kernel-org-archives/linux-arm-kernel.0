@@ -1,93 +1,244 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Mon, 24 Aug 2015 17:18:45 +0800
-Subject: [PATCH v1 3/3] arm64: dts: add Hi6220 mailbox node
-In-Reply-To: <20150821184059.GB2000@svinekod>
-References: <1439977055-1747-1-git-send-email-leo.yan@linaro.org>
- <1439977055-1747-4-git-send-email-leo.yan@linaro.org>
- <20150821184059.GB2000@svinekod>
-Message-ID: <20150824091845.GA28290@leoy-linaro>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 24 Aug 2015 11:21:15 +0200
+Subject: [PATCH v3] dmaengine: hdmac: Add memset capabilities
+Message-ID: <1440408075-26438-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Just like for the XDMAC, the SoCs that embed the HDMAC don't have any kind
+of GPU, and need to accelerate a few framebuffer-related operations through
+their DMA controller.
 
-On Fri, Aug 21, 2015 at 07:40:59PM +0100, Mark Rutland wrote:
-> On Wed, Aug 19, 2015 at 10:37:35AM +0100, Leo Yan wrote:
-> > On Hi6220, below memory regions in DDR have specific purpose:
-> > 
-> >   0x05e0,0000 - 0x05ef,ffff: For MCU firmware using at runtime;
-> >   0x0740,f000 - 0x0740,ffff: For MCU firmware's section;
-> >   0x06df,f000 - 0x06df,ffff: For mailbox message data.
-> > 
-> > This patch reserves these memory regions and add device node for
-> > mailbox in dts.
-> > 
-> > Signed-off-by: Leo Yan <leo.yan@linaro.org>
-> > ---
-> >  arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 20 +++++++++++++++++---
-> >  arch/arm64/boot/dts/hisilicon/hi6220.dtsi      |  8 ++++++++
-> >  2 files changed, 25 insertions(+), 3 deletions(-)
-> > 
-> > diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-> > index e36a539..d5470d3 100644
-> > --- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-> > +++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-> > @@ -7,9 +7,6 @@
-> >  
-> >  /dts-v1/;
-> >  
-> > -/*Reserved 1MB memory for MCU*/
-> > -/memreserve/ 0x05e00000 0x00100000;
-> > -
-> >  #include "hi6220.dtsi"
-> >  
-> >  / {
-> > @@ -28,4 +25,21 @@
-> >  		device_type = "memory";
-> >  		reg = <0x0 0x0 0x0 0x40000000>;
-> >  	};
-> > +
-> > +	reserved-memory {
-> > +		#address-cells = <2>;
-> > +		#size-cells = <2>;
-> > +		ranges;
-> > +
-> > +		mcu-buf at 05e00000 {
-> > +			no-map;
-> > +			reg = <0x0 0x05e00000 0x0 0x00100000>,	/* MCU firmware buffer */
-> > +			      <0x0 0x0740f000 0x0 0x00001000>;	/* MCU firmware section */
-> > +		};
-> > +
-> > +		mbox-buf at 06dff000 {
-> > +			no-map;
-> > +			reg = <0x0 0x06dff000 0x0 0x00001000>;	/* Mailbox message buf */
-> > +		};
-> > +	};
-> 
-> As far as I can see, it would be simpler to simply carve these out of the
-> memory node.
-> 
-> I don't see why you need reserved-memory here, given you're not referring to
-> these regions by phandle anyway.
+However, unlike the XDMAC, the HDMAC doesn't have the memset capability
+built-in. That can be easily emulated though, by doing a transfer with a
+fixed address on the variable that holds the value we want to set.
 
-- Now we have enabled EFI_STUB, so the memory node will be removed in
-  kernel:
-    efi_entry()
-      \-> allocate_new_fdt_and_exit_boot()
-            \-> update_fdt();
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-  Finally in kernel it cannot use memory node to carve out reseved
-  memory regions.
+---
+Changes from v2:
+  - Rebased on top Cyril's patch
 
-- On the other hand, DTS's the memory node is to "describes the
-  physical memory layout for the system"; so it's better to use it only
-  to describe the hardware info for memory. We can use reserved-memory
-  to help manage the memory regions which are reserved from software
-  perspective.
+Changes from v1:
+  - Replaced the dma_alloc_coherent calls by a dma_pool
+---
+ drivers/dma/at_hdmac.c      | 121 ++++++++++++++++++++++++++++++++++++++++++--
+ drivers/dma/at_hdmac_regs.h |   6 +++
+ 2 files changed, 124 insertions(+), 3 deletions(-)
 
-According to upper info, we still need to use reserved-memory node to
-depict the reserved memory regions. i have no knowledge about EFI_STUB,
-so please confirm or correct as needed.
-
-Thanks,
-Leo Yan
+diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
+index 1459c9f3165f..58d406230d89 100644
+--- a/drivers/dma/at_hdmac.c
++++ b/drivers/dma/at_hdmac.c
+@@ -448,6 +448,7 @@ static void
+ atc_chain_complete(struct at_dma_chan *atchan, struct at_desc *desc)
+ {
+ 	struct dma_async_tx_descriptor	*txd = &desc->txd;
++	struct at_dma			*atdma = to_at_dma(atchan->chan_common.device);
+ 
+ 	dev_vdbg(chan2dev(&atchan->chan_common),
+ 		"descriptor %u complete\n", txd->cookie);
+@@ -456,6 +457,13 @@ atc_chain_complete(struct at_dma_chan *atchan, struct at_desc *desc)
+ 	if (!atc_chan_is_cyclic(atchan))
+ 		dma_cookie_complete(txd);
+ 
++	/* If the transfer was a memset, free our temporary buffer */
++	if (desc->memset) {
++		dma_pool_free(atdma->memset_pool, desc->memset_vaddr,
++			      desc->memset_paddr);
++		desc->memset = false;
++	}
++
+ 	/* move children to free_list */
+ 	list_splice_init(&desc->tx_list, &atchan->free_list);
+ 	/* move myself to free_list */
+@@ -873,6 +881,93 @@ err_desc_get:
+ 	return NULL;
+ }
+ 
++/**
++ * atc_prep_dma_memset - prepare a memcpy operation
++ * @chan: the channel to prepare operation on
++ * @dest: operation virtual destination address
++ * @value: value to set memory buffer to
++ * @len: operation length
++ * @flags: tx descriptor status flags
++ */
++static struct dma_async_tx_descriptor *
++atc_prep_dma_memset(struct dma_chan *chan, dma_addr_t dest, int value,
++		    size_t len, unsigned long flags)
++{
++	struct at_dma_chan	*atchan = to_at_dma_chan(chan);
++	struct at_dma		*atdma = to_at_dma(chan->device);
++	struct at_desc		*desc = NULL;
++	size_t			xfer_count;
++	u32			ctrla;
++	u32			ctrlb;
++
++	dev_vdbg(chan2dev(chan), "%s: d0x%x v0x%x l0x%zx f0x%lx\n", __func__,
++		dest, value, len, flags);
++
++	if (unlikely(!len)) {
++		dev_dbg(chan2dev(chan), "%s: length is zero!\n", __func__);
++		return NULL;
++	}
++
++	if (!is_dma_fill_aligned(chan->device, dest, 0, len)) {
++		dev_dbg(chan2dev(chan), "%s: buffer is not aligned\n",
++			__func__);
++		return NULL;
++	}
++
++	xfer_count = len >> 2;
++	if (xfer_count > ATC_BTSIZE_MAX) {
++		dev_err(chan2dev(chan), "%s: buffer is too big\n",
++			__func__);
++		return NULL;
++	}
++
++	ctrlb =   ATC_DEFAULT_CTRLB | ATC_IEN
++		| ATC_SRC_ADDR_MODE_FIXED
++		| ATC_DST_ADDR_MODE_INCR
++		| ATC_FC_MEM2MEM;
++
++	ctrla = ATC_SRC_WIDTH(2) |
++		ATC_DST_WIDTH(2);
++
++	desc = atc_desc_get(atchan);
++	if (!desc) {
++		dev_err(chan2dev(chan), "%s: can't get a descriptor\n",
++			__func__);
++		return NULL;
++	}
++
++	desc->memset_vaddr = dma_pool_alloc(atdma->memset_pool, GFP_ATOMIC,
++					    &desc->memset_paddr);
++	if (!desc->memset_vaddr) {
++		dev_err(chan2dev(chan), "%s: couldn't allocate buffer\n",
++			__func__);
++		goto err_put_desc;
++	}
++
++	*desc->memset_vaddr = value;
++	desc->memset = true;
++
++	desc->lli.saddr = desc->memset_paddr;
++	desc->lli.daddr = dest;
++	desc->lli.ctrla = ctrla | xfer_count;
++	desc->lli.ctrlb = ctrlb;
++
++	desc->txd.cookie = -EBUSY;
++	desc->len = len;
++	desc->total_len = len;
++
++	/* set end-of-link on the descriptor */
++	set_desc_eol(desc);
++
++	desc->txd.flags = flags;
++
++	return &desc->txd;
++
++err_put_desc:
++	atc_desc_put(atchan, desc);
++	return NULL;
++}
++
+ 
+ /**
+  * atc_prep_slave_sg - prepare descriptors for a DMA_SLAVE transaction
+@@ -1755,6 +1850,8 @@ static int __init at_dma_probe(struct platform_device *pdev)
+ 	dma_cap_set(DMA_SG, at91sam9rl_config.cap_mask);
+ 	dma_cap_set(DMA_INTERLEAVE, at91sam9g45_config.cap_mask);
+ 	dma_cap_set(DMA_MEMCPY, at91sam9g45_config.cap_mask);
++	dma_cap_set(DMA_MEMSET, at91sam9g45_config.cap_mask);
++	dma_cap_set(DMA_PRIVATE, at91sam9g45_config.cap_mask);
+ 	dma_cap_set(DMA_SLAVE, at91sam9g45_config.cap_mask);
+ 	dma_cap_set(DMA_SG, at91sam9g45_config.cap_mask);
+ 
+@@ -1818,7 +1915,16 @@ static int __init at_dma_probe(struct platform_device *pdev)
+ 	if (!atdma->dma_desc_pool) {
+ 		dev_err(&pdev->dev, "No memory for descriptors dma pool\n");
+ 		err = -ENOMEM;
+-		goto err_pool_create;
++		goto err_desc_pool_create;
++	}
++
++	/* create a pool of consistent memory blocks for memset blocks */
++	atdma->memset_pool = dma_pool_create("at_hdmac_memset_pool",
++					     &pdev->dev, sizeof(int), 4, 0);
++	if (!atdma->memset_pool) {
++		dev_err(&pdev->dev, "No memory for memset dma pool\n");
++		err = -ENOMEM;
++		goto err_memset_pool_create;
+ 	}
+ 
+ 	/* clear any pending interrupt */
+@@ -1864,6 +1970,11 @@ static int __init at_dma_probe(struct platform_device *pdev)
+ 	if (dma_has_cap(DMA_MEMCPY, atdma->dma_common.cap_mask))
+ 		atdma->dma_common.device_prep_dma_memcpy = atc_prep_dma_memcpy;
+ 
++	if (dma_has_cap(DMA_MEMSET, atdma->dma_common.cap_mask)) {
++		atdma->dma_common.device_prep_dma_memset = atc_prep_dma_memset;
++		atdma->dma_common.fill_align = DMAENGINE_ALIGN_4_BYTES;
++	}
++
+ 	if (dma_has_cap(DMA_SLAVE, atdma->dma_common.cap_mask)) {
+ 		atdma->dma_common.device_prep_slave_sg = atc_prep_slave_sg;
+ 		/* controller can do slave DMA: can trigger cyclic transfers */
+@@ -1884,8 +1995,9 @@ static int __init at_dma_probe(struct platform_device *pdev)
+ 
+ 	dma_writel(atdma, EN, AT_DMA_ENABLE);
+ 
+-	dev_info(&pdev->dev, "Atmel AHB DMA Controller ( %s%s%s), %d channels\n",
++	dev_info(&pdev->dev, "Atmel AHB DMA Controller ( %s%s%s%s), %d channels\n",
+ 	  dma_has_cap(DMA_MEMCPY, atdma->dma_common.cap_mask) ? "cpy " : "",
++	  dma_has_cap(DMA_MEMSET, atdma->dma_common.cap_mask) ? "set " : "",
+ 	  dma_has_cap(DMA_SLAVE, atdma->dma_common.cap_mask)  ? "slave " : "",
+ 	  dma_has_cap(DMA_SG, atdma->dma_common.cap_mask)  ? "sg-cpy " : "",
+ 	  plat_dat->nr_channels);
+@@ -1910,8 +2022,10 @@ static int __init at_dma_probe(struct platform_device *pdev)
+ 
+ err_of_dma_controller_register:
+ 	dma_async_device_unregister(&atdma->dma_common);
++	dma_pool_destroy(atdma->memset_pool);
++err_memset_pool_create:
+ 	dma_pool_destroy(atdma->dma_desc_pool);
+-err_pool_create:
++err_desc_pool_create:
+ 	free_irq(platform_get_irq(pdev, 0), atdma);
+ err_irq:
+ 	clk_disable_unprepare(atdma->clk);
+@@ -1936,6 +2050,7 @@ static int at_dma_remove(struct platform_device *pdev)
+ 	at_dma_off(atdma);
+ 	dma_async_device_unregister(&atdma->dma_common);
+ 
++	dma_pool_destroy(atdma->memset_pool);
+ 	dma_pool_destroy(atdma->dma_desc_pool);
+ 	free_irq(platform_get_irq(pdev, 0), atdma);
+ 
+diff --git a/drivers/dma/at_hdmac_regs.h b/drivers/dma/at_hdmac_regs.h
+index 7f5a08230f76..c3bebbe899ac 100644
+--- a/drivers/dma/at_hdmac_regs.h
++++ b/drivers/dma/at_hdmac_regs.h
+@@ -200,6 +200,11 @@ struct at_desc {
+ 	size_t				boundary;
+ 	size_t				dst_hole;
+ 	size_t				src_hole;
++
++	/* Memset temporary buffer */
++	bool				memset;
++	dma_addr_t			memset_paddr;
++	int				*memset_vaddr;
+ };
+ 
+ static inline struct at_desc *
+@@ -330,6 +335,7 @@ struct at_dma {
+ 	u8			all_chan_mask;
+ 
+ 	struct dma_pool		*dma_desc_pool;
++	struct dma_pool		*memset_pool;
+ 	/* AT THE END channels table */
+ 	struct at_dma_chan	chan[0];
+ };
+-- 
+2.4.6
