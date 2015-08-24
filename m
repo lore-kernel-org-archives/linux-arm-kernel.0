@@ -1,58 +1,70 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 24 Aug 2015 13:06:12 +0100
-Subject: Prevent list poison values from being mapped by userspace
- processes
-In-Reply-To: <20150821173242.GD16410@e104818-lin.cambridge.arm.com>
-References: <CABXk95C=CpeL4mNmS6-jJ-0bMJf6fawwfs6DM1-p8FctTEFbpw@mail.gmail.com>
- <20150821133043.GV7557@n2100.arm.linux.org.uk>
- <20150821173242.GD16410@e104818-lin.cambridge.arm.com>
-Message-ID: <20150824120612.GY7557@n2100.arm.linux.org.uk>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Mon, 24 Aug 2015 20:14:03 +0800
+Subject: [PATCH v3 15/31] arm64: SMP support
+In-Reply-To: <55D7559E.8080609@codeaurora.org>
+References: <1347035226-18649-1-git-send-email-catalin.marinas@arm.com>
+ <1347035226-18649-16-git-send-email-catalin.marinas@arm.com>
+ <CAOZdJXVoDJM3y2mnKO+91yf2EHogKfMjumjhhi85REAfhcJM=Q@mail.gmail.com>
+ <20150806095621.GB17691@e104818-lin.cambridge.arm.com>
+ <55C8843D.8050600@linaro.org> <55C8D9DB.5080207@codeaurora.org>
+ <55D7559E.8080609@codeaurora.org>
+Message-ID: <55DB0A8B.3090700@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 21, 2015 at 06:32:42PM +0100, Catalin Marinas wrote:
-> On Fri, Aug 21, 2015 at 02:30:43PM +0100, Russell King - ARM Linux wrote:
-> > On Tue, Aug 18, 2015 at 02:42:44PM -0700, Jeffrey Vander Stoep wrote:
-> > > List poison pointer values point to memory that is mappable by
-> > > userspace. i.e. LIST_POISON1 = 0x00100100 and LIST_POISON2 =
-> > > 0x00200200. This means poison values can be valid pointers controlled
-> > > by userspace and can be used to exploit the kernel as demonstrated in
-> > > a recent blackhat talk:
-> > > https://www.blackhat.com/docs/us-15/materials/us-15-Xu-Ah-Universal-Android-Rooting-Is-Back-wp.pdf
-> > > 
-> > > Can these poison values be moved to an area not mappable by userspace
-> > > on 32 bit ARM?
-> > 
-> > As was discussed privately before your message, both Catalin and myself
-> > agreed that this is not possible, and I proposed alternatives which were
-> > feasible.
-> 
-> Nice to see these patches so quickly. However, I'll be away for the next
-> ~12 days, so I won't be able to review them.
+Hi Timur,
 
-That'll be after the merge window opens, so I'll drop them into
-linux-next now - they've already been through Olof's builder.  I've
-already tweaked one patch to ensure that it doesn't cause build errors
-with !MMU platforms.
+On 08/22/2015 12:45 AM, Timur Tabi wrote:
+> On 08/10/2015 12:05 PM, Timur Tabi wrote:
+>>>>
+>>>> This code was inherited from arch/arm which initially was always
+>>>> dumping
+>>>> the stack but it later gained the system_state check. Unless it's
+>>>> useful
+>>>> to anyone for debugging purposes, I'm ok with removing it.
+>>>
+>>> Do you have patch for this one? My colleagues said that they met the
+>>> same problem :)
+>>
+>> Dropping the call to dump_stack() would probably be sufficient.
+>
+> Actually, I think we need to keep it.  I just heard from another
+> developer who does actually use it for debugging.
 
-I see that there's some boot failures reported via the mail interface
-to kernelci.org, but I've no idea what they are as kernelci.org is not
-elinks-compatible (kernelci.org makes use of javascript.)  So I'm not
-going to care about them until someone reports the failures in a form
-I can read.
+Hmm, could you please give a example for how it used?
 
-In any case, kernelci.org seems to be random in terms of which platforms
-get a boot test - two builds one after each other show initally 373
-boots tested, and then only 195 despite the second build not failing
-any ARM targets.
+>
+> I think the real problem is that emergency_restart() should not be
+> causing these outputs.  Shouldn't machine_restart() change the
+> system_state to SYSTEM_RESTART before it calls smp_send_stop()?
 
-kernelci.org is not useful to me in this state, so I shall go purely
-on Olof's build system which gave me a successful build and mostly
-successful boot.  (Even with Olof's boot system, it's difficult to
-tell what is a real failure and what is a transient failure - provoking
-the build system to run the same build twice often results in different
-boot results...)
+The system_state is set to SYSTEM_RESTART in kernel_restart_prepare(),
+and kernel_restart() will call kernel_restart_prepare() and
+machine_restart(), so if we change the system_state to SYSTEM_RESTART
+in machine_restart(), it seems duplicate.
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Could we just wait longer than one second in the following function?
+
+void smp_send_stop(void)
+{
+         unsigned long timeout;
+
+         if (num_online_cpus() > 1) {
+                 cpumask_t mask;
+
+                 cpumask_copy(&mask, cpu_online_mask);
+                 cpumask_clear_cpu(smp_processor_id(), &mask);
+
+                 smp_cross_call(&mask, IPI_CPU_STOP);
+         }
+
+         /* Wait up to one second for other CPUs to stop */
+         timeout = USEC_PER_SEC;
+         while (num_online_cpus() > 1 && timeout--)
+                 udelay(1);
+
+If we have lots of CPUs, one second seems not enough as it
+print lots dump message.
+
+Thanks
+Hanjun
