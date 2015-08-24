@@ -1,482 +1,626 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Fri, 21 Aug 2015 18:30:57 -0700
-Subject: [PATCH v4 3/3] touchscreen: colibri-vf50-ts: Add touchscreen
- support for Colibri VF50
-In-Reply-To: <915c9122cfba83c6fbbc519c10ae2d101e27bc5b.1440162473.git.maitysanchayan@gmail.com>
-References: <cover.1440162473.git.maitysanchayan@gmail.com>
- <915c9122cfba83c6fbbc519c10ae2d101e27bc5b.1440162473.git.maitysanchayan@gmail.com>
-Message-ID: <20150822013057.GA12702@dtor-pixel>
+From: shawn.lin@rock-chips.com (Shawn Lin)
+Date: Mon, 24 Aug 2015 09:25:36 +0800
+Subject: [RFC PATCH v7 01/10] mmc: dw_mmc: Add external dma interface support
+In-Reply-To: <1440379479-24308-1-git-send-email-shawn.lin@rock-chips.com>
+References: <1440379479-24308-1-git-send-email-shawn.lin@rock-chips.com>
+Message-ID: <1440379536-24400-1-git-send-email-shawn.lin@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sanchayan,
+DesignWare MMC Controller can supports two types of DMA
+mode: external dma and internal dma. We get a RK312x platform
+integrated dw_mmc and ARM pl330 dma controller. This patch add
+edmac ops to support these platforms. I've tested it on RK31xx
+platform with edmac mode and RK3288 platform with idmac mode.
 
-On Fri, Aug 21, 2015 at 06:56:32PM +0530, Sanchayan Maity wrote:
-> The Colibri Vybrid VF50 module supports 4-wire touchscreens using
-> FETs and ADC inputs. This driver uses the IIO consumer interface
-> and relies on the vf610_adc driver based on the IIO framework.
-> 
+Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
 
-Thank you for making changes. I have a few comments still.
+---
 
-> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
-> ---
->  drivers/input/touchscreen/Kconfig           |  12 +
->  drivers/input/touchscreen/Makefile          |   1 +
->  drivers/input/touchscreen/colibri-vf50-ts.c | 370 ++++++++++++++++++++++++++++
->  3 files changed, 383 insertions(+)
->  create mode 100644 drivers/input/touchscreen/colibri-vf50-ts.c
-> 
-> diff --git a/drivers/input/touchscreen/Kconfig b/drivers/input/touchscreen/Kconfig
-> index 80f6386..28948ca 100644
-> --- a/drivers/input/touchscreen/Kconfig
-> +++ b/drivers/input/touchscreen/Kconfig
-> @@ -1027,4 +1027,16 @@ config TOUCHSCREEN_ZFORCE
->  	  To compile this driver as a module, choose M here: the
->  	  module will be called zforce_ts.
->  
-> +config TOUCHSCREEN_COLIBRI_VF50
-> +	tristate "Toradex Colibri on board touchscreen driver"
-> +	depends on GPIOLIB && IIO && VF610_ADC
+Changes in v7:
+- rebased on Ulf's next
+- combine condition state
+- elaborate more about DMA_INTERFACE
+- define some macro for DMA_INERFACE value
+- spilt HCON ops' changes into another patch
 
-Can we possibly add "|| COMPILE_TEST" dependency? Will it compile
-without IIO or VF610_ADC enabled?
+Changes in v6:
+- add trans_mode condition for IDMAC initialization
+  suggested by Heiko
+- re-test my patch on rk3188 platform and update commit msg
+- update performance of pio vs edmac in cover letter
 
+Changes in v5:
+- add the title of cover letter
+- fix typo of comment
+- add macro for reading HCON register
+- add "Acked-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>" for exynos_defconfig patch
+- add "Acked-by: Vineet Gupta <vgupta@synopsys.com>" for axs10x_defconfig patch
+- add "Acked-by: Govindraj Raja <govindraj.raja@imgtec.com>" and
+  "Acked-by: Ralf Baechle <ralf@linux-mips.org>" for pistachio_defconfig patch
+- add "Acked-by: Joachim Eastwood <manabian@gmail.com>" for lpc18xx_defconfig patch
+- add "Acked-by: Wei Xu <xuwei5@hisilicon.com>" for hisi_defconfig patch
+- rebase on "https://github.com/jh80chung/dw-mmc.git tags/dw-mmc-for-ulf-v4.2" for merging easily
 
-> +	help
-> +	  Say Y here if you have a Colibri VF50 and plan to use
-> +	  the on-board provided 4-wire touchscreen driver.
-> +
-> +	  If unsure, say N.
-> +
-> +	  To compile this driver as a module, choose M here: the
-> +	  module will be called colibri_vf50_ts.
-> +
->  endif
-> diff --git a/drivers/input/touchscreen/Makefile b/drivers/input/touchscreen/Makefile
-> index 44deea7..93746a0 100644
-> --- a/drivers/input/touchscreen/Makefile
-> +++ b/drivers/input/touchscreen/Makefile
-> @@ -84,3 +84,4 @@ obj-$(CONFIG_TOUCHSCREEN_W90X900)	+= w90p910_ts.o
->  obj-$(CONFIG_TOUCHSCREEN_SX8654)	+= sx8654.o
->  obj-$(CONFIG_TOUCHSCREEN_TPS6507X)	+= tps6507x-ts.o
->  obj-$(CONFIG_TOUCHSCREEN_ZFORCE)	+= zforce_ts.o
-> +obj-$(CONFIG_TOUCHSCREEN_COLIBRI_VF50)	+= colibri-vf50-ts.o
-> diff --git a/drivers/input/touchscreen/colibri-vf50-ts.c b/drivers/input/touchscreen/colibri-vf50-ts.c
-> new file mode 100644
-> index 0000000..0793fdc
-> --- /dev/null
-> +++ b/drivers/input/touchscreen/colibri-vf50-ts.c
-> @@ -0,0 +1,370 @@
-> +/* Copyright 2015 Toradex AG
-> + *
-> + * Toradex Colibri VF50 Touchscreen driver
-> + *
-> + * Originally authored by Stefan Agner for 3.0 kernel
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + */
-> +
-> +#include <linux/delay.h>
-> +#include <linux/err.h>
-> +#include <linux/gpio.h>
-> +#include <linux/iio/consumer.h>
-> +#include <linux/iio/types.h>
-> +#include <linux/input.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/pinctrl/consumer.h>
+Changes in v4:
+- remove "host->trans_mode" and use "host->use_dma" to indicate
+  transfer mode.
+- remove all bt-bindings' changes since we don't need new properities.
+- check transfer mode at runtime by reading HCON reg
+- spilt defconfig changes for each sub-architecture
+- fix the title of cover letter
+- reuse some code for reducing code size
 
-Don't you need gpio/consumer.h?
+Changes in v3:
+- choose transfer mode at runtime
+- remove all CONFIG_MMC_DW_IDMAC config option
+- add supports-idmac property for some platforms
 
-> +#include <linux/platform_device.h>
-> +#include <linux/slab.h>
-> +#include <linux/types.h>
-> +
-> +#define DRIVER_NAME "colibri-vf50-ts"
-> +#define DRV_VERSION "1.0"
-> +
-> +#define VF_ADC_MAX ((1 << 12) - 1)
-> +
-> +#define COLI_TOUCH_MIN_DELAY_US 1000
-> +#define COLI_TOUCH_MAX_DELAY_US 2000
-> +#define COLI_TOUCH_NO_OF_AVGS	5
-> +
-> +struct vf50_touch_device {
-> +	struct platform_device	*pdev;
-> +	struct input_dev	*ts_input;
-> +	struct iio_channel	*channels;
-> +	struct gpio_desc *gpio_xp;
-> +	struct gpio_desc *gpio_xm;
-> +	struct gpio_desc *gpio_yp;
-> +	struct gpio_desc *gpio_ym;
-> +	struct gpio_desc *gpio_pen_detect;
+Changes in v2:
+- Fix typo of dev_info msg
+- remove unused dmach from declaration of dw_mci_dma_slave
 
-I do not see gpio_pen_detect being used anymore.
+ drivers/mmc/host/Kconfig        |  11 +-
+ drivers/mmc/host/dw_mmc-pltfm.c |   2 +
+ drivers/mmc/host/dw_mmc.c       | 273 ++++++++++++++++++++++++++++++++--------
+ drivers/mmc/host/dw_mmc.h       |   6 +
+ include/linux/mmc/dw_mmc.h      |  23 +++-
+ 5 files changed, 253 insertions(+), 62 deletions(-)
 
-> +	int pen_irq;
-> +	int min_pressure;
-> +	bool stop_touchscreen;
-> +};
-> +
-> +/*
-> + * Enables given plates and measures touch parameters using ADC
-> + */
-> +static int adc_ts_measure(struct iio_channel *channel,
-> +		  struct gpio_desc *plate_p, struct gpio_desc *plate_m)
-> +{
-> +	int i, value = 0, val = 0;
-> +	int ret;
-> +
-> +	gpiod_set_value(plate_p, 1);
-> +	gpiod_set_value(plate_m, 1);
-> +
-> +	usleep_range(COLI_TOUCH_MIN_DELAY_US, COLI_TOUCH_MAX_DELAY_US);
-> +
-> +	for (i = 0; i < COLI_TOUCH_NO_OF_AVGS; i++) {
-> +		ret = iio_read_channel_raw(channel, &val);
-> +		if (ret < 0) {
-> +			value = ret;
-> +			goto error_iio_read;
-> +		}
-> +
-> +		value += val;
-> +	}
-> +
-> +	value /= COLI_TOUCH_NO_OF_AVGS;
-> +
-> +error_iio_read:
-> +	gpiod_set_value(plate_p, 0);
-> +	gpiod_set_value(plate_m, 0);
-> +
-> +	return value;
-> +}
-> +
-> +/*
-> + * Enable touch detection using falling edge detection on XM
-> + */
-> +static void vf50_ts_enable_touch_detection(struct vf50_touch_device *vf50_ts)
-> +{
-> +	/* Enable plate YM (needs to be strong GND, high active) */
-> +	gpiod_set_value(vf50_ts->gpio_ym, 1);
-> +
-> +	/*
-> +	 * Let the platform mux to idle state in order to enable
-> +	 * Pull-Up on GPIO
-> +	 */
-> +	pinctrl_pm_select_idle_state(&vf50_ts->pdev->dev);
-> +}
-> +
-> +/*
-> + * ADC touch screen sampling bottom half irq handler
-> + */
-> +static irqreturn_t vf50_ts_irq_bh(int irq, void *private)
-> +{
-> +	struct vf50_touch_device *vf50_ts = (struct vf50_touch_device *)private;
-
-No need to cast from void * pointer.
-
-> +	struct device *dev = &vf50_ts->pdev->dev;
-> +	int val_x, val_y, val_z1, val_z2, val_p = 0;
-> +	bool discard_val_on_start = true;
-> +
-> +	/* Disable the touch detection plates */
-> +	gpiod_set_value(vf50_ts->gpio_ym, 0);
-> +
-> +	/* Let the platform mux to default state in order to mux as ADC */
-> +	pinctrl_pm_select_default_state(dev);
-> +
-> +	while (!vf50_ts->stop_touchscreen) {
-> +		/* X-Direction */
-> +		val_x = adc_ts_measure(&vf50_ts->channels[0],
-> +				vf50_ts->gpio_xp, vf50_ts->gpio_xm);
-> +		if (val_x < 0)
-> +			break;
-> +
-> +		/* Y-Direction */
-> +		val_y = adc_ts_measure(&vf50_ts->channels[1],
-> +				vf50_ts->gpio_yp, vf50_ts->gpio_ym);
-> +		if (val_y < 0)
-> +			break;
-> +
-> +		/*
-> +		 * Touch pressure
-> +		 * Measure on XP/YM
-> +		 */
-> +		val_z1 = adc_ts_measure(&vf50_ts->channels[2],
-> +				vf50_ts->gpio_yp, vf50_ts->gpio_xm);
-> +		if (val_z1 < 0)
-> +			break;
-> +		val_z2 = adc_ts_measure(&vf50_ts->channels[3],
-> +				vf50_ts->gpio_yp, vf50_ts->gpio_xm);
-> +		if (val_z2 < 0)
-> +			break;
-> +
-> +		/* Validate signal (avoid calculation using noise) */
-> +		if (val_z1 > 64 && val_x > 64) {
-> +			/*
-> +			 * Calculate resistance between the plates
-> +			 * lower resistance means higher pressure
-> +			 */
-> +			int r_x = (1000 * val_x) / VF_ADC_MAX;
-> +
-> +			val_p = (r_x * val_z2) / val_z1 - r_x;
-> +
-> +		} else {
-> +			val_p = 2000;
-> +		}
-> +
-> +		val_p = 2000 - val_p;
-> +		dev_dbg(dev, "Measured values: x: %d, y: %d, z1: %d, z2: %d, "
-> +			"p: %d\n", val_x, val_y, val_z1, val_z2, val_p);
-> +
-> +		/*
-> +		 * If touch pressure is too low, stop measuring and reenable
-> +		 * touch detection
-> +		 */
-> +		if (val_p < vf50_ts->min_pressure || val_p > 2000)
-> +			break;
-> +
-> +		/*
-> +		 * The pressure may not be enough for the first x and the
-> +		 * second y measurement, but, the pressure is ok when the
-> +		 * driver is doing the third and fourth measurement. To
-> +		 * take care of this, we drop the first measurement always.
-> +		 */
-> +		if (discard_val_on_start) {
-> +			discard_val_on_start = false;
-> +		} else {
-> +			/*
-> +			 * Report touch position and sleep for
-> +			 * next measurement
-> +			 */
-> +			input_report_abs(vf50_ts->ts_input,
-> +					ABS_X, VF_ADC_MAX - val_x);
-> +			input_report_abs(vf50_ts->ts_input,
-> +					ABS_Y, VF_ADC_MAX - val_y);
-> +			input_report_abs(vf50_ts->ts_input,
-> +					ABS_PRESSURE, val_p);
-> +			input_report_key(vf50_ts->ts_input, BTN_TOUCH, 1);
-> +			input_sync(vf50_ts->ts_input);
-> +		}
-> +
-> +		msleep(10);
-> +	}
-> +
-> +	/* Report no more touch, reenable touch detection */
-> +	input_report_abs(vf50_ts->ts_input, ABS_PRESSURE, 0);
-> +	input_report_key(vf50_ts->ts_input, BTN_TOUCH, 0);
-> +	input_sync(vf50_ts->ts_input);
-> +
-> +	vf50_ts_enable_touch_detection(vf50_ts);
-> +
-> +	/* Wait for the pull-up to be stable on high */
-> +	msleep(10);
-> +
-> +	return IRQ_HANDLED;
-> +}
-> +
-> +static int vf50_ts_open(struct input_dev *dev_input)
-> +{
-> +	struct vf50_touch_device *touchdev = input_get_drvdata(dev_input);
-> +	struct device *dev = &touchdev->pdev->dev;
-> +
-> +	dev_dbg(dev, "Input device %s opened, starting touch detection\n",
-> +			dev_input->name);
-> +
-> +	touchdev->stop_touchscreen = false;
-> +
-> +	/* Mux detection before request IRQ, wait for pull-up to settle */
-> +	vf50_ts_enable_touch_detection(touchdev);
-> +	msleep(10);
-> +
-> +	return 0;
-> +}
-> +
-> +static void vf50_ts_close(struct input_dev *dev_input)
-> +{
-> +	struct vf50_touch_device *touchdev = input_get_drvdata(dev_input);
-> +	struct device *dev = &touchdev->pdev->dev;
-> +
-> +	touchdev->stop_touchscreen = true;
-> +
-> +	/* Make sure IRQ is not running past close */
-> +	mb();
-> +	synchronize_irq(touchdev->pen_irq);
-> +
-
-Should we drive the gpio_ym inactive here? What about pin control?
-
-> +	dev_dbg(dev, "Input device %s closed, disable touch detection\n",
-> +		dev_input->name);
-> +}
-> +
-> +static int vf50_ts_get_gpiod(struct device *dev,
-> +	struct gpio_desc **gpio_d, const char *con_id, enum gpiod_flags flags)
-> +{
-> +	int error;
-> +
-> +	*gpio_d = devm_gpiod_get(dev, con_id, flags);
-> +	if (IS_ERR(*gpio_d)) {
-> +		error = PTR_ERR(*gpio_d);
-> +		dev_err(dev, "Could not get gpio_%s %d\n", con_id, error);
-> +		return error;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static void vf50_ts_channel_release(void *data)
-> +{
-> +	struct vf50_touch_device *touchdev = data;
-> +
-> +	iio_channel_release_all(touchdev->channels);
-> +}
-> +
-> +static int vf50_ts_probe(struct platform_device *pdev)
-> +{
-> +	struct input_dev *input;
-> +	struct iio_channel *channels;
-> +	struct device *dev = &pdev->dev;
-> +	struct vf50_touch_device *touchdev;
-> +	int error;
-> +
-> +	channels = iio_channel_get_all(dev);
-> +	if (IS_ERR(channels))
-> +		return PTR_ERR(channels);
-> +
-> +	touchdev = devm_kzalloc(dev, sizeof(*touchdev), GFP_KERNEL);
-> +	if (!touchdev) {
-> +		error = -ENOMEM;
-> +		return error;
-
-Why not simply
-
-		return -ENOMEM;
-
-here?
-
-Also you are leaking your iio channels here. You need to install the
-custom action earlier.
-
-> +	}
-> +
-> +	error = of_property_read_u32(dev->of_node, "vf50-ts-min-pressure",
-> +				 &touchdev->min_pressure);
-> +	if (error)
-> +		return error;
-> +
-> +	error = devm_add_action(dev, vf50_ts_channel_release, channels);
-> +	if (error) {
-> +		dev_err(dev, "Failed to register iio channel release action");
-
-You also need
-
-		vf50_ts_channel_release(touchdev);
-
-> +		return error;
-> +	}
-> +
-> +	input = devm_input_allocate_device(dev);
-> +	if (!input) {
-> +		dev_err(dev, "Failed to allocate TS input device\n");
-> +		error = -ENOMEM;
-> +		return error;
-
-Again simply return error code, no need to assign to the error variable.
-
-> +	}
-> +
-> +	platform_set_drvdata(pdev, touchdev);
-> +
-> +	touchdev->pdev = pdev;
-> +	touchdev->channels = channels;
-> +
-> +	input->name = DRIVER_NAME;
-> +	input->id.bustype = BUS_HOST;
-> +	input->dev.parent = dev;
-> +	input->open = vf50_ts_open;
-> +	input->close = vf50_ts_close;
-> +
-> +	input_set_capability(input, EV_KEY, BTN_TOUCH);
-> +	input_set_abs_params(input, ABS_X, 0, VF_ADC_MAX, 0, 0);
-> +	input_set_abs_params(input, ABS_Y, 0, VF_ADC_MAX, 0, 0);
-> +	input_set_abs_params(input, ABS_PRESSURE, 0, VF_ADC_MAX, 0, 0);
-> +
-> +	touchdev->ts_input = input;
-> +	input_set_drvdata(input, touchdev);
-> +	error = input_register_device(input);
-> +	if (error) {
-> +		dev_err(dev, "Failed to register input device\n");
-> +		return error;
-> +	}
-> +
-> +	error = vf50_ts_get_gpiod(dev, &touchdev->gpio_xp,
-> +				"xp", GPIOD_OUT_LOW);
-> +	if (error)
-> +		return error;
-> +
-> +	error = vf50_ts_get_gpiod(dev, &touchdev->gpio_xm,
-> +				"xm", GPIOD_OUT_LOW);
-> +	if (error)
-> +		return error;
-> +
-> +	error = vf50_ts_get_gpiod(dev, &touchdev->gpio_yp,
-> +				"yp", GPIOD_OUT_LOW);
-> +	if (error)
-> +		return error;
-> +
-> +	error = vf50_ts_get_gpiod(dev, &touchdev->gpio_ym,
-> +				"ym", GPIOD_OUT_LOW);
-> +	if (error)
-> +		return error;
-> +
-> +	touchdev->pen_irq = platform_get_irq(pdev, 0);
-> +	if (touchdev->pen_irq < 0)
-> +		return touchdev->pen_irq;
-> +
-> +	error = devm_request_threaded_irq(dev, touchdev->pen_irq, NULL,
-> +			vf50_ts_irq_bh, IRQF_ONESHOT,
-> +			"vf50 touch", touchdev);
-> +	if (error < 0)
-> +		return error;
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct of_device_id vf50_touch_of_match[] = {
-> +	{ .compatible = "toradex,vf50-touchscreen", },
-> +	{ }
-> +};
-> +MODULE_DEVICE_TABLE(of, vf50_touch_of_match);
-> +
-> +static struct platform_driver vf50_touch_driver = {
-> +	.driver = {
-> +		.name = "toradex,vf50_touchctrl",
-> +		.of_match_table = vf50_touch_of_match,
-> +	},
-> +	.probe = vf50_ts_probe,
-> +};
-> +
-> +module_platform_driver(vf50_touch_driver);
-> +
-> +MODULE_AUTHOR("Sanchayan Maity");
-> +MODULE_DESCRIPTION("Colibri VF50 Touchscreen driver");
-> +MODULE_LICENSE("GPL v2");
-
-Please change it to "GPL" which means GPL v2+ to match license notice at
-the top.
-
-> +MODULE_VERSION(DRV_VERSION);
-> -- 
-> 2.5.0
-> 
-
-Thank you.
-
+diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
+index 6a0f9c7..539b1a6 100644
+--- a/drivers/mmc/host/Kconfig
++++ b/drivers/mmc/host/Kconfig
+@@ -607,15 +607,7 @@ config MMC_DW
+ 	help
+ 	  This selects support for the Synopsys DesignWare Mobile Storage IP
+ 	  block, this provides host support for SD and MMC interfaces, in both
+-	  PIO and external DMA modes.
+-
+-config MMC_DW_IDMAC
+-	bool "Internal DMAC interface"
+-	depends on MMC_DW
+-	help
+-	  This selects support for the internal DMAC block within the Synopsys
+-	  Designware Mobile Storage IP block. This disables the external DMA
+-	  interface.
++	  PIO, internal DMA mode and external DMA mode.
+ 
+ config MMC_DW_PLTFM
+ 	tristate "Synopsys Designware MCI Support as platform device"
+@@ -644,7 +636,6 @@ config MMC_DW_K3
+ 	tristate "K3 specific extensions for Synopsys DW Memory Card Interface"
+ 	depends on MMC_DW
+ 	select MMC_DW_PLTFM
+-	select MMC_DW_IDMAC
+ 	help
+ 	  This selects support for Hisilicon K3 SoC specific extensions to the
+ 	  Synopsys DesignWare Memory Card Interface driver. Select this option
+diff --git a/drivers/mmc/host/dw_mmc-pltfm.c b/drivers/mmc/host/dw_mmc-pltfm.c
+index ec6dbcd..7e1d13b 100644
+--- a/drivers/mmc/host/dw_mmc-pltfm.c
++++ b/drivers/mmc/host/dw_mmc-pltfm.c
+@@ -59,6 +59,8 @@ int dw_mci_pltfm_register(struct platform_device *pdev,
+ 	host->pdata = pdev->dev.platform_data;
+ 
+ 	regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	/* Get registers' physical base address */
++	host->phy_regs = (void *)(regs->start);
+ 	host->regs = devm_ioremap_resource(&pdev->dev, regs);
+ 	if (IS_ERR(host->regs))
+ 		return PTR_ERR(host->regs);
+diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+index fcbf552..9c91983 100644
+--- a/drivers/mmc/host/dw_mmc.c
++++ b/drivers/mmc/host/dw_mmc.c
+@@ -56,7 +56,6 @@
+ #define DW_MCI_FREQ_MAX	200000000	/* unit: HZ */
+ #define DW_MCI_FREQ_MIN	400000		/* unit: HZ */
+ 
+-#ifdef CONFIG_MMC_DW_IDMAC
+ #define IDMAC_INT_CLR		(SDMMC_IDMAC_INT_AI | SDMMC_IDMAC_INT_NI | \
+ 				 SDMMC_IDMAC_INT_CES | SDMMC_IDMAC_INT_DU | \
+ 				 SDMMC_IDMAC_INT_FBE | SDMMC_IDMAC_INT_RI | \
+@@ -102,7 +101,6 @@ struct idmac_desc {
+ 
+ /* Each descriptor can transfer up to 4KB of data in chained mode */
+ #define DW_MCI_DESC_DATA_LENGTH	0x1000
+-#endif /* CONFIG_MMC_DW_IDMAC */
+ 
+ static bool dw_mci_reset(struct dw_mci *host);
+ static bool dw_mci_ctrl_reset(struct dw_mci *host, u32 reset);
+@@ -407,7 +405,6 @@ static int dw_mci_get_dma_dir(struct mmc_data *data)
+ 		return DMA_FROM_DEVICE;
+ }
+ 
+-#ifdef CONFIG_MMC_DW_IDMAC
+ static void dw_mci_dma_cleanup(struct dw_mci *host)
+ {
+ 	struct mmc_data *data = host->data;
+@@ -445,12 +442,21 @@ static void dw_mci_idmac_stop_dma(struct dw_mci *host)
+ 	mci_writel(host, BMOD, temp);
+ }
+ 
+-static void dw_mci_idmac_complete_dma(struct dw_mci *host)
++static void dw_mci_dmac_complete_dma(void *arg)
+ {
++	struct dw_mci *host = arg;
+ 	struct mmc_data *data = host->data;
+ 
+ 	dev_vdbg(host->dev, "DMA complete\n");
+ 
++	if ((host->use_dma == TRANS_MODE_EDMAC) &&
++	    data && (data->flags & MMC_DATA_READ))
++		/* Invalidate cache after read */
++		dma_sync_sg_for_cpu(mmc_dev(host->cur_slot->mmc),
++				    data->sg,
++				    data->sg_len,
++				    DMA_FROM_DEVICE);
++
+ 	host->dma_ops->cleanup(host);
+ 
+ 	/*
+@@ -564,7 +570,7 @@ static void dw_mci_translate_sglist(struct dw_mci *host, struct mmc_data *data,
+ 	wmb(); /* drain writebuffer */
+ }
+ 
+-static void dw_mci_idmac_start_dma(struct dw_mci *host, unsigned int sg_len)
++static int dw_mci_idmac_start_dma(struct dw_mci *host, unsigned int sg_len)
+ {
+ 	u32 temp;
+ 
+@@ -589,6 +595,8 @@ static void dw_mci_idmac_start_dma(struct dw_mci *host, unsigned int sg_len)
+ 
+ 	/* Start it running */
+ 	mci_writel(host, PLDMND, 1);
++
++	return 0;
+ }
+ 
+ static int dw_mci_idmac_init(struct dw_mci *host)
+@@ -669,10 +677,112 @@ static const struct dw_mci_dma_ops dw_mci_idmac_ops = {
+ 	.init = dw_mci_idmac_init,
+ 	.start = dw_mci_idmac_start_dma,
+ 	.stop = dw_mci_idmac_stop_dma,
+-	.complete = dw_mci_idmac_complete_dma,
++	.complete = dw_mci_dmac_complete_dma,
++	.cleanup = dw_mci_dma_cleanup,
++};
++
++static void dw_mci_edmac_stop_dma(struct dw_mci *host)
++{
++	dmaengine_terminate_all(host->dms->ch);
++}
++
++static int dw_mci_edmac_start_dma(struct dw_mci *host,
++					    unsigned int sg_len)
++{
++	struct dma_slave_config cfg;
++	struct dma_async_tx_descriptor *desc = NULL;
++	struct scatterlist *sgl = host->data->sg;
++	const u32 mszs[] = {1, 4, 8, 16, 32, 64, 128, 256};
++	u32 sg_elems = host->data->sg_len;
++	u32 fifoth_val;
++	u32 fifo_offset = host->fifo_reg - host->regs;
++	int ret = 0;
++
++	/* Set external dma config: burst size, burst width */
++	cfg.dst_addr = (dma_addr_t)(host->phy_regs + fifo_offset);
++	cfg.src_addr = cfg.dst_addr;
++	cfg.dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
++	cfg.src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
++
++	/* Match burst msize with external dma config */
++	fifoth_val = mci_readl(host, FIFOTH);
++	cfg.dst_maxburst = mszs[(fifoth_val >> 28) & 0x7];
++	cfg.src_maxburst = cfg.dst_maxburst;
++
++	if (host->data->flags & MMC_DATA_WRITE)
++		cfg.direction = DMA_MEM_TO_DEV;
++	else /* MMC_DATA_READ */
++		cfg.direction = DMA_DEV_TO_MEM;
++
++	ret = dmaengine_slave_config(host->dms->ch, &cfg);
++	if (ret) {
++		dev_err(host->dev, "Failed to config edmac.\n");
++		return -EBUSY;
++	}
++
++	desc = dmaengine_prep_slave_sg(host->dms->ch, sgl,
++				       sg_len, cfg.direction,
++				       DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
++	if (!desc) {
++		dev_err(host->dev, "Can't prepare slave sg.\n");
++		return -EBUSY;
++	}
++
++	/* Set dw_mci_dmac_complete_dma as callback */
++	desc->callback = dw_mci_dmac_complete_dma;
++	desc->callback_param = (void *)host;
++	dmaengine_submit(desc);
++
++	/* Flush cache before write */
++	if (host->data->flags & MMC_DATA_WRITE)
++		dma_sync_sg_for_device(mmc_dev(host->cur_slot->mmc), sgl,
++				       sg_elems, DMA_TO_DEVICE);
++
++	dma_async_issue_pending(host->dms->ch);
++
++	return 0;
++}
++
++static int dw_mci_edmac_init(struct dw_mci *host)
++{
++	/* Request external dma channel */
++	host->dms = kzalloc(sizeof(struct dw_mci_dma_slave), GFP_KERNEL);
++	if (!host->dms)
++		return -ENOMEM;
++
++	host->dms->ch = dma_request_slave_channel(host->dev, "rx-tx");
++	if (!host->dms->ch) {
++		dev_err(host->dev,
++			"Failed to get external DMA channel %d\n",
++			host->dms->ch->chan_id);
++		kfree(host->dms);
++		host->dms = NULL;
++		return -ENXIO;
++	}
++
++	return 0;
++}
++
++static void dw_mci_edmac_exit(struct dw_mci *host)
++{
++	if (host->dms) {
++		if (host->dms->ch) {
++			dma_release_channel(host->dms->ch);
++			host->dms->ch = NULL;
++		}
++		kfree(host->dms);
++		host->dms = NULL;
++	}
++}
++
++static const struct dw_mci_dma_ops dw_mci_edmac_ops = {
++	.init = dw_mci_edmac_init,
++	.exit = dw_mci_edmac_exit,
++	.start = dw_mci_edmac_start_dma,
++	.stop = dw_mci_edmac_stop_dma,
++	.complete = dw_mci_dmac_complete_dma,
+ 	.cleanup = dw_mci_dma_cleanup,
+ };
+-#endif /* CONFIG_MMC_DW_IDMAC */
+ 
+ static int dw_mci_pre_dma_transfer(struct dw_mci *host,
+ 				   struct mmc_data *data,
+@@ -752,7 +862,6 @@ static void dw_mci_post_req(struct mmc_host *mmc,
+ 
+ static void dw_mci_adjust_fifoth(struct dw_mci *host, struct mmc_data *data)
+ {
+-#ifdef CONFIG_MMC_DW_IDMAC
+ 	unsigned int blksz = data->blksz;
+ 	const u32 mszs[] = {1, 4, 8, 16, 32, 64, 128, 256};
+ 	u32 fifo_width = 1 << host->data_shift;
+@@ -760,6 +869,10 @@ static void dw_mci_adjust_fifoth(struct dw_mci *host, struct mmc_data *data)
+ 	u32 msize = 0, rx_wmark = 1, tx_wmark, tx_wmark_invers;
+ 	int idx = ARRAY_SIZE(mszs) - 1;
+ 
++	/* pio should ship this scenario */
++	if (!host->use_dma)
++		return;
++
+ 	tx_wmark = (host->fifo_depth) / 2;
+ 	tx_wmark_invers = host->fifo_depth - tx_wmark;
+ 
+@@ -788,7 +901,6 @@ static void dw_mci_adjust_fifoth(struct dw_mci *host, struct mmc_data *data)
+ done:
+ 	fifoth_val = SDMMC_SET_FIFOTH(msize, rx_wmark, tx_wmark);
+ 	mci_writel(host, FIFOTH, fifoth_val);
+-#endif
+ }
+ 
+ static void dw_mci_ctrl_rd_thld(struct dw_mci *host, struct mmc_data *data)
+@@ -850,10 +962,12 @@ static int dw_mci_submit_data_dma(struct dw_mci *host, struct mmc_data *data)
+ 
+ 	host->using_dma = 1;
+ 
+-	dev_vdbg(host->dev,
+-		 "sd sg_cpu: %#lx sg_dma: %#lx sg_len: %d\n",
+-		 (unsigned long)host->sg_cpu, (unsigned long)host->sg_dma,
+-		 sg_len);
++	if (host->use_dma == TRANS_MODE_IDMAC)
++		dev_vdbg(host->dev,
++			 "sd sg_cpu: %#lx sg_dma: %#lx sg_len: %d\n",
++			 (unsigned long)host->sg_cpu,
++			 (unsigned long)host->sg_dma,
++			 sg_len);
+ 
+ 	/*
+ 	 * Decide the MSIZE and RX/TX Watermark.
+@@ -875,7 +989,11 @@ static int dw_mci_submit_data_dma(struct dw_mci *host, struct mmc_data *data)
+ 	mci_writel(host, INTMASK, temp);
+ 	spin_unlock_irqrestore(&host->irq_lock, irqflags);
+ 
+-	host->dma_ops->start(host, sg_len);
++	if (host->dma_ops->start(host, sg_len)) {
++		/* We can't do DMA */
++		dev_err(host->dev, "%s: failed to start DMA.\n", __func__);
++		return -ENODEV;
++	}
+ 
+ 	return 0;
+ }
+@@ -2343,15 +2461,17 @@ static irqreturn_t dw_mci_interrupt(int irq, void *dev_id)
+ 
+ 	}
+ 
+-#ifdef CONFIG_MMC_DW_IDMAC
+-	/* Handle DMA interrupts */
++	if (host->use_dma != TRANS_MODE_IDMAC)
++		return IRQ_HANDLED;
++
++	/* Handle IDMA interrupts */
+ 	if (host->dma_64bit_address == 1) {
+ 		pending = mci_readl(host, IDSTS64);
+ 		if (pending & (SDMMC_IDMAC_INT_TI | SDMMC_IDMAC_INT_RI)) {
+ 			mci_writel(host, IDSTS64, SDMMC_IDMAC_INT_TI |
+ 							SDMMC_IDMAC_INT_RI);
+ 			mci_writel(host, IDSTS64, SDMMC_IDMAC_INT_NI);
+-			host->dma_ops->complete(host);
++			host->dma_ops->complete((void *)host);
+ 		}
+ 	} else {
+ 		pending = mci_readl(host, IDSTS);
+@@ -2359,10 +2479,9 @@ static irqreturn_t dw_mci_interrupt(int irq, void *dev_id)
+ 			mci_writel(host, IDSTS, SDMMC_IDMAC_INT_TI |
+ 							SDMMC_IDMAC_INT_RI);
+ 			mci_writel(host, IDSTS, SDMMC_IDMAC_INT_NI);
+-			host->dma_ops->complete(host);
++			host->dma_ops->complete((void *)host);
+ 		}
+ 	}
+-#endif
+ 
+ 	return IRQ_HANDLED;
+ }
+@@ -2471,13 +2590,21 @@ static int dw_mci_init_slot(struct dw_mci *host, unsigned int id)
+ 		goto err_host_allocated;
+ 
+ 	/* Useful defaults if platform data is unset. */
+-	if (host->use_dma) {
++	if (host->use_dma == TRANS_MODE_IDMAC) {
+ 		mmc->max_segs = host->ring_size;
+ 		mmc->max_blk_size = 65536;
+ 		mmc->max_seg_size = 0x1000;
+ 		mmc->max_req_size = mmc->max_seg_size * host->ring_size;
+ 		mmc->max_blk_count = mmc->max_req_size / 512;
++	} else if (host->use_dma == TRANS_MODE_EDMAC) {
++			mmc->max_segs = 64;
++			mmc->max_blk_size = 65536;
++			mmc->max_blk_count = 65535;
++			mmc->max_req_size =
++					mmc->max_blk_size * mmc->max_blk_count;
++			mmc->max_seg_size = mmc->max_req_size;
+ 	} else {
++		/* TRANS_MODE_PIO */
+ 		mmc->max_segs = 64;
+ 		mmc->max_blk_size = 65536; /* BLKSIZ is 16 bits */
+ 		mmc->max_blk_count = 512;
+@@ -2517,35 +2644,79 @@ static void dw_mci_cleanup_slot(struct dw_mci_slot *slot, unsigned int id)
+ static void dw_mci_init_dma(struct dw_mci *host)
+ {
+ 	int addr_config;
+-	/* Check ADDR_CONFIG bit in HCON to find IDMAC address bus width */
+-	addr_config = (mci_readl(host, HCON) >> 27) & 0x01;
+-
+-	if (addr_config == 1) {
+-		/* host supports IDMAC in 64-bit address mode */
+-		host->dma_64bit_address = 1;
+-		dev_info(host->dev, "IDMAC supports 64-bit address mode.\n");
+-		if (!dma_set_mask(host->dev, DMA_BIT_MASK(64)))
+-			dma_set_coherent_mask(host->dev, DMA_BIT_MASK(64));
+-	} else {
+-		/* host supports IDMAC in 32-bit address mode */
+-		host->dma_64bit_address = 0;
+-		dev_info(host->dev, "IDMAC supports 32-bit address mode.\n");
+-	}
++	int trans_mode;
++	struct device *dev = host->dev;
++	struct device_node *np = dev->of_node;
+ 
+-	/* Alloc memory for sg translation */
+-	host->sg_cpu = dmam_alloc_coherent(host->dev, PAGE_SIZE,
+-					  &host->sg_dma, GFP_KERNEL);
+-	if (!host->sg_cpu) {
+-		dev_err(host->dev, "%s: could not alloc DMA memory\n",
+-			__func__);
++	/*
++	* Check tansfer mode from HCON[17:16]
++	* Clear the ambiguous description of dw_mmc databook:
++	* 2b'00: No DMA Interface -> Actually means using Internal DMA block
++	* 2b'01: DesignWare DMA Interface -> Synopsys DW-DMA block
++	* 2b'10: Generic DMA Interface -> non-Synopsys generic DMA block
++	* 2b'11: Non DW DMA Interface -> pio only
++	* Compared to DesignWare DMA Interface, Generic DMA Interface has a
++	* simpler request/acknowledge handshake mechanism and both of them
++	* are regarded as external dma master for dw_mmc.
++	* Note: host->use_dma can't take HCON[17:16] value directly for the
++	* the reason mentioned above.
++	*/
++	trans_mode = SDMMC_GET_TRANS_MODE(mci_readl(host, HCON));
++	if (trans_mode == DMA_INTERFACE_IDMA) {
++		trans_mode = TRANS_MODE_IDMAC;
++	} else if (trans_mode == DMA_INTERFACE_DWDMA ||
++		   trans_mode == DMA_INTERFACE_GDMA) {
++		trans_mode = TRANS_MODE_EDMAC;
++	} else {
++		trans_mode = TRANS_MODE_PIO;
+ 		goto no_dma;
+ 	}
+ 
+ 	/* Determine which DMA interface to use */
+-#ifdef CONFIG_MMC_DW_IDMAC
+-	host->dma_ops = &dw_mci_idmac_ops;
+-	dev_info(host->dev, "Using internal DMA controller.\n");
+-#endif
++	if (trans_mode == TRANS_MODE_IDMAC) {
++		/*
++		* Check ADDR_CONFIG bit in HCON to find
++		* IDMAC address bus width
++		*/
++		addr_config = (mci_readl(host, HCON) >> 27) & 0x01;
++
++		if (addr_config == 1) {
++			/* host supports IDMAC in 64-bit address mode */
++			host->dma_64bit_address = 1;
++			dev_info(host->dev,
++				 "IDMAC supports 64-bit address mode.\n");
++			if (!dma_set_mask(host->dev, DMA_BIT_MASK(64)))
++				dma_set_coherent_mask(host->dev,
++						      DMA_BIT_MASK(64));
++		} else {
++			/* host supports IDMAC in 32-bit address mode */
++			host->dma_64bit_address = 0;
++			dev_info(host->dev,
++				 "IDMAC supports 32-bit address mode.\n");
++		}
++
++		/* Alloc memory for sg translation */
++		host->sg_cpu = dmam_alloc_coherent(host->dev, PAGE_SIZE,
++						   &host->sg_dma, GFP_KERNEL);
++		if (!host->sg_cpu) {
++			dev_err(host->dev,
++				"%s: could not alloc DMA memory\n",
++				__func__);
++			goto no_dma;
++		}
++
++		host->dma_ops = &dw_mci_idmac_ops;
++		dev_info(host->dev, "Using internal DMA controller.\n");
++	} else {
++		/* TRANS_MODE_EDMAC: check dma bindings again */
++		if ((of_property_count_strings(np, "dma-names") < 0) ||
++		    (!of_find_property(np, "dmas", NULL))) {
++			trans_mode = TRANS_MODE_PIO;
++			goto no_dma;
++		}
++		host->dma_ops = &dw_mci_edmac_ops;
++		dev_info(host->dev, "Using external DMA controller.\n");
++	}
+ 
+ 	if (!host->dma_ops)
+ 		goto no_dma;
+@@ -2562,12 +2733,12 @@ static void dw_mci_init_dma(struct dw_mci *host)
+ 		goto no_dma;
+ 	}
+ 
+-	host->use_dma = 1;
++	host->use_dma = trans_mode;
+ 	return;
+ 
+ no_dma:
+ 	dev_info(host->dev, "Using PIO mode.\n");
+-	host->use_dma = 0;
++	host->use_dma = trans_mode;
+ }
+ 
+ static bool dw_mci_ctrl_reset(struct dw_mci *host, u32 reset)
+@@ -2650,10 +2821,9 @@ static bool dw_mci_reset(struct dw_mci *host)
+ 		}
+ 	}
+ 
+-#if IS_ENABLED(CONFIG_MMC_DW_IDMAC)
+-	/* It is also recommended that we reset and reprogram idmac */
+-	dw_mci_idmac_reset(host);
+-#endif
++	if (host->use_dma == TRANS_MODE_IDMAC)
++		/* It is also recommended that we reset and reprogram idmac */
++		dw_mci_idmac_reset(host);
+ 
+ 	ret = true;
+ 
+@@ -3067,6 +3237,9 @@ EXPORT_SYMBOL(dw_mci_remove);
+  */
+ int dw_mci_suspend(struct dw_mci *host)
+ {
++	if (host->use_dma && host->dma_ops->exit)
++		host->dma_ops->exit(host);
++
+ 	return 0;
+ }
+ EXPORT_SYMBOL(dw_mci_suspend);
+diff --git a/drivers/mmc/host/dw_mmc.h b/drivers/mmc/host/dw_mmc.h
+index 8ce4674..811d467 100644
+--- a/drivers/mmc/host/dw_mmc.h
++++ b/drivers/mmc/host/dw_mmc.h
+@@ -148,6 +148,12 @@
+ #define SDMMC_SET_FIFOTH(m, r, t)	(((m) & 0x7) << 28 | \
+ 					 ((r) & 0xFFF) << 16 | \
+ 					 ((t) & 0xFFF))
++/* HCON register defines */
++#define DMA_INTERFACE_IDMA		(0x0)
++#define DMA_INTERFACE_DWDMA		(0x1)
++#define DMA_INTERFACE_GDMA		(0x2)
++#define DMA_INTERFACE_NODMA		(0x3)
++#define SDMMC_GET_TRANS_MODE(x)		(((x)>>16) & 0x3)
+ /* Internal DMAC interrupt defines */
+ #define SDMMC_IDMAC_INT_AI		BIT(9)
+ #define SDMMC_IDMAC_INT_NI		BIT(8)
+diff --git a/include/linux/mmc/dw_mmc.h b/include/linux/mmc/dw_mmc.h
+index 134c574..f67b2ec 100644
+--- a/include/linux/mmc/dw_mmc.h
++++ b/include/linux/mmc/dw_mmc.h
+@@ -16,6 +16,7 @@
+ 
+ #include <linux/scatterlist.h>
+ #include <linux/mmc/core.h>
++#include <linux/dmaengine.h>
+ 
+ #define MAX_MCI_SLOTS	2
+ 
+@@ -40,6 +41,17 @@ enum {
+ 
+ struct mmc_data;
+ 
++enum {
++	TRANS_MODE_PIO = 0,
++	TRANS_MODE_IDMAC,
++	TRANS_MODE_EDMAC
++};
++
++struct dw_mci_dma_slave {
++	struct dma_chan *ch;
++	enum dma_transfer_direction direction;
++};
++
+ /**
+  * struct dw_mci - MMC controller state shared between all slots
+  * @lock: Spinlock protecting the queue and associated data.
+@@ -154,7 +166,14 @@ struct dw_mci {
+ 	dma_addr_t		sg_dma;
+ 	void			*sg_cpu;
+ 	const struct dw_mci_dma_ops	*dma_ops;
++	/* For idmac */
+ 	unsigned int		ring_size;
++
++	/* For edmac */
++	struct dw_mci_dma_slave *dms;
++	/* Registers's physical base address */
++	void                    *phy_regs;
++
+ 	u32			cmd_status;
+ 	u32			data_status;
+ 	u32			stop_cmdr;
+@@ -208,8 +227,8 @@ struct dw_mci {
+ struct dw_mci_dma_ops {
+ 	/* DMA Ops */
+ 	int (*init)(struct dw_mci *host);
+-	void (*start)(struct dw_mci *host, unsigned int sg_len);
+-	void (*complete)(struct dw_mci *host);
++	int (*start)(struct dw_mci *host, unsigned int sg_len);
++	void (*complete)(void *host);
+ 	void (*stop)(struct dw_mci *host);
+ 	void (*cleanup)(struct dw_mci *host);
+ 	void (*exit)(struct dw_mci *host);
 -- 
-Dmitry
+2.3.7
