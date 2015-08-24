@@ -1,52 +1,126 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 24 Aug 2015 12:59:56 +0200
-Subject: [PATCH] soc: mediatek: add scpsys support active_wakeup
-In-Reply-To: <1437631249-706-1-git-send-email-eddie.huang@mediatek.com>
-References: <1437631249-706-1-git-send-email-eddie.huang@mediatek.com>
-Message-ID: <20150824105956.GT5161@pengutronix.de>
+From: marex@denx.de (Marek Vasut)
+Date: Mon, 24 Aug 2015 13:03:51 +0200
+Subject: [PATCH linux-next v4 5/5] mtd: atmel-quadspi: add driver for
+ Atmel QSPI controller
+In-Reply-To: <bf368fc101f38db231131b69eff0863210f2b01c.1440410236.git.cyrille.pitchen@atmel.com>
+References: <cover.1440410236.git.cyrille.pitchen@atmel.com>
+ <bf368fc101f38db231131b69eff0863210f2b01c.1440410236.git.cyrille.pitchen@atmel.com>
+Message-ID: <201508241303.52066.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 23, 2015 at 02:00:49PM +0800, Eddie Huang wrote:
-> Register gpd_dev_ops.active_wakeup function to support keep power
-> during suspend state. And add flag to each power domain to
-> decide whether keep power during suspend or not.
+On Monday, August 24, 2015 at 12:14:00 PM, Cyrille Pitchen wrote:
+> This driver add support to the new Atmel QSPI controller embedded into
+> sama5d2x SoCs. It expects a NOR memory to be connected to the QSPI
+> controller.
 > 
-> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
-> Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
-> ---
->  drivers/soc/mediatek/mtk-scpsys.c | 28 ++++++++++++++++++++++++++++
->  1 file changed, 28 insertions(+)
-> 
-> diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
-> index 43a79ed..fc78b70 100644
-> --- a/drivers/soc/mediatek/mtk-scpsys.c
-> +++ b/drivers/soc/mediatek/mtk-scpsys.c
-> @@ -67,6 +67,7 @@ struct scp_domain_data {
->  	u32 sram_pdn_ack_bits;
->  	u32 bus_prot_mask;
->  	enum clk_id clk_id;
-> +	bool active_wakeup;
->  };
->  
->  static const struct scp_domain_data scp_domain_data[] __initconst = {
-> @@ -77,6 +78,7 @@ static const struct scp_domain_data scp_domain_data[] __initconst = {
->  		.sram_pdn_bits = GENMASK(11, 8),
->  		.sram_pdn_ack_bits = GENMASK(12, 12),
->  		.clk_id = MT8173_CLK_MM,
-> +		.active_wakeup = false,
+> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-You can drop the .active_wakeup = false lines.
+Hi,
 
-Otherwise:
+[...]
 
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+> +/* Register access macros */
 
-Sascha
+These are functions, not macros :)
 
+btw is there any reason for these ? I'd say, just put the read*() and
+write*() functions directly into the code and be done with it, it is
+much less confusing.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Also, why do you use the _relaxed() versions of the functions ?
+
+> +static inline u32 qspi_readl(struct atmel_qspi *aq, u32 reg)
+> +{
+> +	return readl_relaxed(aq->regs + reg);
+> +}
+> +
+> +static inline void qspi_writel(struct atmel_qspi *aq, u32 reg, u32 value)
+> +{
+> +	writel_relaxed(value, aq->regs + reg);
+> +}
+> +
+> +static inline u16 qspi_readw(struct atmel_qspi *aq, u32 reg)
+> +{
+> +	return readw_relaxed(aq->regs + reg);
+> +}
+> +
+> +static inline void qspi_writew(struct atmel_qspi *aq, u32 reg, u16 value)
+> +{
+> +	writew_relaxed(value, aq->regs + reg);
+> +}
+> +
+> +static inline u8 qspi_readb(struct atmel_qspi *aq, u32 reg)
+> +{
+> +	return readb_relaxed(aq->regs + reg);
+> +}
+> +
+> +static inline void qspi_writeb(struct atmel_qspi *aq, u32 reg, u8 value)
+> +{
+> +	writeb_relaxed(value, aq->regs + reg);
+> +}
+
+[...]
+
+> +static int atmel_qspi_run_command(struct atmel_qspi *aq,
+> +				  const struct atmel_qspi_command *cmd)
+> +{
+> +	u32 iar, icr, ifr, sr;
+> +	int err = 0;
+> +
+> +	iar = 0;
+> +	icr = 0;
+> +	ifr = aq->ifr_width | cmd->ifr_tfrtyp;
+> +
+> +	/* Compute instruction parameters */
+> +	if (cmd->enable.bits.instruction) {
+> +		icr |= QSPI_ICR_INST(cmd->instruction);
+> +		ifr |= QSPI_IFR_INSTEN;
+> +	}
+> +
+> +	/* Compute address parameters */
+> +	switch (cmd->enable.bits.address) {
+> +	case 4:
+> +		ifr |= QSPI_IFR_ADDRL;
+> +		/*break;*/ /* fallback to the 24bit address case */
+
+What's this commented out bit of code for ? :-)
+
+> +	case 3:
+> +		iar = (cmd->enable.bits.data) ? 0 : cmd->address;
+> +		ifr |= QSPI_IFR_ADDREN;
+> +		break;
+> +	case 0:
+> +		break;
+> +	default:
+> +		return -EINVAL;
+> +	}
+
+[...]
+
+> +no_data:
+> +	/* Poll INSTRuction End status */
+> +	sr = qspi_readl(aq, QSPI_SR);
+> +	if (sr & QSPI_SR_INSTRE)
+> +		return err;
+> +
+> +	/* Wait for INSTRuction End interrupt */
+> +	init_completion(&aq->completion);
+
+You should use reinit_completion() in the code. init_completion()
+should be used only in the probe() function and nowhere else.
+
+> +	aq->pending = 0;
+> +	qspi_writel(aq, QSPI_IER, QSPI_SR_INSTRE);
+> +	if (!wait_for_completion_timeout(&aq->completion,
+> +					 msecs_to_jiffies(1000)))
+> +		err = -ETIMEDOUT;
+> +	qspi_writel(aq, QSPI_IDR, QSPI_SR_INSTRE);
+> +
+> +	return err;
+> +}
+
+[...]
+
+Hope this helps :)
