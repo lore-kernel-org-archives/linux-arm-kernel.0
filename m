@@ -1,150 +1,137 @@
-From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Mon, 24 Aug 2015 22:17:13 +0530
-Subject: [PATCH-v6 5/6] mfd: 88pm800: Set default interrupt clear method
-In-Reply-To: <20150824155129.GA19409@x1>
-References: <1436358392-15449-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1436358392-15449-6-git-send-email-vaibhav.hiremath@linaro.org>
- <20150824135422.GF3237@x1> <55DB3627.2030503@linaro.org>
- <20150824155129.GA19409@x1>
-Message-ID: <55DB4A91.9000702@linaro.org>
+From: marex@denx.de (Marek Vasut)
+Date: Mon, 24 Aug 2015 18:48:50 +0200
+Subject: [PATCH linux-next v4 3/5] mtd: spi-nor: allow to tune the number
+ of dummy cycles
+In-Reply-To: <55DB4986.1000207@atmel.com>
+References: <cover.1440410236.git.cyrille.pitchen@atmel.com>
+ <201508241248.17466.marex@denx.de> <55DB4986.1000207@atmel.com>
+Message-ID: <201508241848.50974.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Monday, August 24, 2015 at 06:42:46 PM, Cyrille Pitchen wrote:
+> Hi Marek,
 
+Hi!
 
-On Monday 24 August 2015 09:21 PM, Lee Jones wrote:
-> On Mon, 24 Aug 2015, Vaibhav Hiremath wrote:
->
->>
->>
->> On Monday 24 August 2015 07:24 PM, Lee Jones wrote:
->>> On Wed, 08 Jul 2015, Vaibhav Hiremath wrote:
->>>
->>>> As per the spec, bit 1 (INT_CLEAR_MODE) of reg addr 0xe
->>>> (page 0) controls the method of clearing interrupt
->>>> status of 88pm800 family of devices;
->>>>
->>>>    0: clear on read
->>>>    1: clear on write
->>>>
->>>> If pdata is not coming from board file, then set the
->>>> default irq clear method to "irq clear on write"
->>>>
->>>> Also, as suggested by "Lee Jones" renaming variable field
->>>> to appropriate name and removed unnecessary field
->>>> pm80x_chip.irq_mode, using platform_data.irq_clr_method.
->>>>
->>>> Signed-off-by: Zhao Ye <zhaoy@marvell.com>
->>>> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
->>>> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->>>> ---
->>>>   drivers/mfd/88pm800.c       | 15 ++++++++++-----
->>>>   include/linux/mfd/88pm80x.h |  9 +++++++--
->>>>   2 files changed, 17 insertions(+), 7 deletions(-)
->>>
->>> [...]
->>>
->>>> +#define PM800_WAKEUP2_INT_READ_CLEAR	(0 << 1)
->>>> +#define PM800_WAKEUP2_INT_WRITE_CLEAR	(1 << 1)
->>>
->>> Use BIT().
->>>
->>>> +/* Used by irq_clr_method */
->>>> +#define PM800_IRQ_CLR_ON_READ	0
->>>> +#define PM800_IRQ_CLR_ON_WRITE	1
->>>
->>>> -	int irq_mode;		/* Clear interrupt by read/write(0/1) */
->>>> +	bool irq_clr_method;		/* Clear interrupt by read/write(0/1) */
->>>
->>>> +	irq_clr_mode = pdata->irq_clr_method == PM800_IRQ_CLR_ON_WRITE ?
->>>> +		PM800_WAKEUP2_INT_WRITE_CLEAR : PM800_WAKEUP2_INT_READ_CLEAR;
->>>> +	ret = regmap_update_bits(map, PM800_WAKEUP2, mask, irq_clr_mode);
->>>
->>> This is pretty convoluted.
->>>
->>> For starters you're abusing the 'bool' type here.  Bool is either
->>> 'true' or 'false', so at the very least you should rename
->>> 'irq_clr_method' to 'irq_clr_on_write'.
->>>
->>> Then you can do:
->>>
->>> 	irq_clr_mode = pdata->irq_clr_on_write ?
->>> 		PM800_WAKEUP2_INT_WRITE_CLEAR : PM800_WAKEUP2_INT_READ_CLEAR;
->>>
->>
->> We have discussed on this, and went back-n-forth.
->> I think if I remember correctly, one of the version was using
->> true/false then we decided to rename it to relevant macro.
->>
->> If I am not wrong V4 version of this series is exactly same as what you
->> are referring to.
->
-> Right.  I made a few suggestions which vary in usefulness depending on
-> how you plan to implement all of this.  Unfortunately this is a bit of
-> a bastardised version where some of it make sense and other parts
-> could do with some improvement.
->
+[...]
 
-This so called "basterdised version could have been avoided :)
+> >> - * Dummy Cycle calculation for different type of read.
+> >> - * It can be used to support more commands with
+> >> - * different dummy cycle requirements.
+> >> - */
+> >> -static inline int spi_nor_read_dummy_cycles(struct spi_nor *nor)
+> >> -{
+> >> -	switch (nor->flash_read) {
+> >> -	case SPI_NOR_FAST:
+> >> -	case SPI_NOR_DUAL:
+> >> -	case SPI_NOR_QUAD:
+> >> -		return 8;
+> >> -	case SPI_NOR_NORMAL:
+> >> -		return 0;
+> >> -	}
+> >> -	return 0;
+> >> -}
+> > 
+> > You can probably just soup up this function so that it sets the
+> > nor->read_dummy, no ?
+> 
+> Actually, this is what the patch does: spi_nor_read_dummy_cycles() was
+> reused and enhanced few lines below where you've pointed out the
+> "switch (nor->flash_read)" block should be move after the else block.
 
-V2 version itself was clean and ready. It just got dragged into
-multiple iterations.
+You know what? I'll go get some sleep, coffee doesn't cut it anymore :)
 
->>> However, what I suggest you really do is share
->>> PM800_WAKEUP2_INT_{READ,WRITE}_CLEAR with platform data and just pass
->>> the value through directly.
->>>
->>
->> I think we discussed about this also, and the reason I recall here is,
->>
->> we may need to control this from DT in the future so we decided to keep
->> it boolean in platform_data and have simple check before writing to
->> register.
->>
->> And I think that was also another reason we introduced
->>
->> /* Used by irq_clr_method */
->> #define PM800_IRQ_CLR_ON_READ   0
->> #define PM800_IRQ_CLR_ON_WRITE  1
->
-> I think these are still required.  So it would look like this:
->
+> I think when I wrote the code I've chosen to move the definition of this
+> function instead of adding forward declarations of functions such as
+> read_cr() or write_sr_cr(), which are now called by
+> micron_set_dummy_cycles().
 
-NO. I think you are confused here,
-We have two different macros playing around here,
+Yep, that's all right, sorry for the confusion.
 
+> >> -/*
+> >> 
+> >>   * Write status register 1 byte
+> >>   * Returns negative if error occurred.
+> >>   */
+> >> 
+> >> @@ -1012,6 +994,81 @@ static int set_quad_mode(struct spi_nor *nor,
+> >> struct flash_info *info) }
+> >> 
+> >>  }
 
-+/* Used by irq_clr_method */
-+#define PM800_IRQ_CLR_ON_READ	0
-+#define PM800_IRQ_CLR_ON_WRITE	1
+[...]
 
-/* Used to write to register */
-+#define PM800_WAKEUP2_INT_READ_CLEAR		(0 << 1)
-+#define PM800_WAKEUP2_INT_WRITE_CLEAR		(1 << 1)
+> >> +/*
+> >> + * Dummy Cycle calculation for different type of read.
+> >> + * It can be used to support more commands with
+> >> + * different dummy cycle requirements.
+> >> + */
+> >> +static int spi_nor_read_dummy_cycles(struct spi_nor *nor,
+> >> +				     const struct flash_info *info)
+> >> +{
+> >> +	struct device_node *np = nor->dev->of_node;
+> >> +	u32 num_dummy_cycles;
+> >> +
+> >> +	if (np && !of_property_read_u32(np, "m25p,num-dummy-cycles",
+> >> +					&num_dummy_cycles)) {
+> >> +		nor->read_dummy = num_dummy_cycles;
+> >> +
+> >> +		/*
+> >> +		 * This switch block might be moved after the if...then...else
+> >> +		 * statement but it was not tested with all Spansion or Micron
+> >> +		 * memories.
+> >> +		 * Now the "m25p,num-dummy-cycles" property needs to be
+> >> +		 * explicitly set in the device tree so the switch statement is
+> >> +		 * executed. This should avoid unwanted side effects and keep
+> >> +		 * backward compatibility.
+> >> +		 */
+> >> +		switch (JEDEC_MFR(info)) {
+> >> +		case CFI_MFR_ST:
+> >> +			return micron_set_dummy_cycles(nor);
+> > 
+> >> +		default:
+> > If you do have m25p,num-dummy-cycles set for non-micron flash, you have a
+> > problem here I believe.
+> > 
+> >> +			break;
+> >> +		}
+> >> +	} else {
+> > 
+> > The solution would be to drop this else {} bit here, so that if you fail
+> > in the DT-based configuration, you fall back to this old behavior. What
+> > do you think please ? :)
+> 
+> Good idea!
+> I also add a trace for the default case of "switch (JEDEC_MFR(info))":
+> 
+> dev_warn(dev, "can't set the number of dummy cycles\n");
 
+Maybe change this to "setting the number of dummy cycles not supported by chip, 
+ignoring" or something, to be explicit about the fallback and that this is not
+supported by the chip. But this is just an idea, feel free to ignore it.
 
+> So the user is notified that the driver could not use the value of
+> "m25p,num-dummy-cycles" from the DT before falling back to the legacy
+> code.
 
-> == Platform data ==
->
-> struct pdata {
->    bool clear_irq_on_write;
-> };
->
-> pdata->clear_irq_on_write = PM800_IRQ_CLR_ON_{READ,WRITE};
->
-> == Driver ==
->
-> irq_clr_mode = pdata->clear_irq_on_write ?
->                   PM800_WAKEUP2_INT_WRITE_CLEAR : PM800_WAKEUP2_INT_READ_CLEAR;
-> regmap_update_bits(map, PM800_WAKEUP2, mask, irq_clr_mode);
->
+Yup.
 
-Please check V2, which is exactly same as above.
+> >> +		switch (nor->flash_read) {
+> >> +		case SPI_NOR_FAST:
+> >> +		case SPI_NOR_DUAL:
+> >> +		case SPI_NOR_QUAD:
+> >> +			nor->read_dummy = 8;
+> >> +		case SPI_NOR_NORMAL:
+> >> +			nor->read_dummy = 0;
+> >> +		}
+> >> +	}
+> >> +
+> >> +	return 0;
+> >> +}
+> > 
+> > [...]
+> 
+> thanks for the review!
 
-https://patchwork.kernel.org/patch/6627781/
-
-
-If you are OK with it, I will spin another version and submit it.
-
-Thanks,
-Vaibhav
+Im glad it helped ;-)
