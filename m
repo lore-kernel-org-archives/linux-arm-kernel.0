@@ -1,58 +1,53 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 24 Aug 2015 14:47:10 +0100
-Subject: [PATCH] irqchip, gicv3-its, numa: Workaround for Cavium ThunderX
- erratum 23144
-In-Reply-To: <CAFpQJXUTNss=u2x7Ynd9wOObZn_ZHkcMz2+F4MKooy5jrvZ02w@mail.gmail.com>
-References: <20150822131050.GK1820@rric.localdomain>	<55DAEF3C.5090303@arm.com>	<CAFpQJXVVcdag7OQnCxqyEw601Y32eO2rHCmH1_bVzyvg+OPzRA@mail.gmail.com>	<55DB11F3.1070604@arm.com>
- <CAFpQJXUTNss=u2x7Ynd9wOObZn_ZHkcMz2+F4MKooy5jrvZ02w@mail.gmail.com>
-Message-ID: <55DB205E.9070205@arm.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 24 Aug 2015 08:47:00 -0500
+Subject: [PATCH 1/7] drm/vc4: Add devicetree bindings for VC4.
+In-Reply-To: <874mjxwyx5.fsf@eliezer.anholt.net>
+References: <1439427380-2436-1-git-send-email-eric@anholt.net>
+ <1439427380-2436-2-git-send-email-eric@anholt.net>
+ <55CEC25E.7070303@wwwdotorg.org>
+ <874mjxwyx5.fsf@eliezer.anholt.net>
+Message-ID: <CAL_JsqJxiGUR5BxBPyR3-0NxqWsOxMGrWQA6cMXe2pjTom__nw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/08/15 14:27, Ganapatrao Kulkarni wrote:
-> On Mon, Aug 24, 2015 at 6:15 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-
->>>>>  static void its_enable_cavium_thunderx(void *data)
->>>>>  {
->>>>> -     struct its_node *its = data;
->>>>> +     struct its_node __maybe_unused *its = data;
->>>>>
->>>>> -     its->flags |= ITS_FLAGS_CAVIUM_THUNDERX;
->>>>> +#ifdef CONFIG_CAVIUM_ERRATUM_22375
->>>>> +     its->flags |= ITS_WORKAROUND_CAVIUM_22375;
->>>>> +     pr_info("ITS: Enabling workaround for 22375, 24313\n");
->>>>> +#endif
->>>>> +
->>>>> +#ifdef CONFIG_CAVIUM_ERRATUM_23144
->>>>> +     if (num_possible_nodes() > 1) {
->>>>> +             its->numa_node = its_get_node_thunderx(its);
->>>>
->>>> I'd rather see numa_node being always initialized to something useful.
->>>> If you're adding numa support, why can't this be initialized via
->>>> standard topology bindings?
->>> IIUC, topology defines only cpu topology.
+On Mon, Aug 17, 2015 at 1:30 PM, Eric Anholt <eric@anholt.net> wrote:
+> Stephen Warren <swarren@wwwdotorg.org> writes:
+>
+>> On 08/12/2015 06:56 PM, Eric Anholt wrote:
+>>> Signed-off-by: Eric Anholt <eric@anholt.net>
 >>
->> Well, welcome to a much more complex system where both your CPUs and
->> your IOs have some degree of affinity. This needs to be described
->> properly, and not hacked on the side.
-> ok, will add description for the function.
+>> This one definitely needs a patch description, since someone might not
+>> know what a VC4 is, and "git log" won't show the text from the binding
+>> doc itself. I'd suggest adding the initial paragraph of the binding doc
+>> as the patch description, or more.
+>>
+>>> diff --git a/Documentation/devicetree/bindings/gpu/brcm,bcm-vc4.txt b/Documentation/devicetree/bindings/gpu/brcm,bcm-vc4.txt
+>
+>>> +- hvss:             List of references to HVS video scalers
+>>> +- encoders: List of references to output encoders (HDMI, SDTV)
+>>
+>> Would it make sense to make all those nodes child node of the vc4
+>> object. That way, there's no need to have these lists of objects; they
+>> can be automatically built up as the DT is enumerated. I know that e.g.
+>> the NVIDIA Tegra host1x binding works this way, and I think it may have
+>> been inspired by other similar cases.
+>
+> I've looked at tegra, and the component system used by msm appears to be
+> nicer than it.  To follow tegra's model, it looks like I need to build
+> this extra bus thing corresponding to host1x that is effectively the
+> drivers/base/component.c code, so that I can get at vc4's structure from
+> the component drivers.
+>
+>> Of course, this is only appropriate if the HW modules really are
+>> logically children of the VC4 HW module. Perhaps they aren't. If they
+>> aren't though, I wonder what this "vc4" module actually represents in HW?
+>
+> It's the subsystem, same as we use a subsystem node for msm, sti,
+> rockchip, imx, and exynos.  This appears to be the common model of how
+> the collection of graphics-related components is represented in the DT.
 
-I sense that you misunderstood what I meant. What I'd like to see is
-some topology information coming from DT, showing the relationship
-between a device (your ITS) and a given node (your socket). This can
-then be used from two purposes:
+I think most of these bindings are wrong. They are grouped together
+because that is what DRM wants not because that reflects the h/w. So
+convince me this is one block, not that it is what other people do.
 
-- find the optimal affinity for a MSI so that it doesn't default to a
-foreign node (a reasonable performance expectation),
-- work around implementation bugs where an LPI cannot be routed to a
-redistributor that is on a foreign node.
-
-I really don't feel like adding a hack just for the second point, and
-I'd rather get the big picture right so that your workaround is just a
-special case of the generic one.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Rob
