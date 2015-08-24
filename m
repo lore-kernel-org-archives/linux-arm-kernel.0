@@ -1,68 +1,166 @@
-From: rjui@broadcom.com (Ray Jui)
-Date: Mon, 24 Aug 2015 13:24:26 -0700
-Subject: [PATCH 05/18] ARM: BCM: use const and __initconst for
- smp_operations
-In-Reply-To: <55DB6379.7040009@gmail.com>
-References: <1440390978-22796-1-git-send-email-yamada.masahiro@socionext.com>
- <1440390978-22796-6-git-send-email-yamada.masahiro@socionext.com>
- <55DB6379.7040009@gmail.com>
-Message-ID: <55DB7D7A.5070704@broadcom.com>
+From: Shenwei.Wang@freescale.com (Shenwei Wang)
+Date: Mon, 24 Aug 2015 20:26:12 +0000
+Subject: [PATCH v3 1/1] misc: sram: add dev_pm_ops to support module power
+ gate
+In-Reply-To: <1438272681-29338-1-git-send-email-shenwei.wang@freescale.com>
+References: <1438272681-29338-1-git-send-email-shenwei.wang@freescale.com>
+Message-ID: <BY1PR0301MB0839FD550FAFB2F0C04B601183620@BY1PR0301MB0839.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi GregKH,
 
-
-On 8/24/2015 11:33 AM, Florian Fainelli wrote:
-> On 23/08/15 21:36, Masahiro Yamada wrote:
->> The smp_operations structure is not over-written, so add const
->> qualifier and replace __initdata with __initconst.
->>
->> Also, add static to bcm63138_smp_ops.
->>
->> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> 
-> For bcm63xx and brcmstb:
-> 
-> Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
-> 
->> ---
->>
->>  arch/arm/mach-bcm/bcm63xx_smp.c     | 2 +-
->>  arch/arm/mach-bcm/kona_smp.c        | 2 +-
->>  arch/arm/mach-bcm/platsmp-brcmstb.c | 2 +-
->>  3 files changed, 3 insertions(+), 3 deletions(-)
->>
->> diff --git a/arch/arm/mach-bcm/bcm63xx_smp.c b/arch/arm/mach-bcm/bcm63xx_smp.c
->> index 19be904..9b6727e 100644
->> --- a/arch/arm/mach-bcm/bcm63xx_smp.c
->> +++ b/arch/arm/mach-bcm/bcm63xx_smp.c
->> @@ -161,7 +161,7 @@ static void __init bcm63138_smp_prepare_cpus(unsigned int max_cpus)
->>  	}
->>  }
->>  
->> -struct smp_operations bcm63138_smp_ops __initdata = {
->> +static const struct smp_operations bcm63138_smp_ops __initconst = {
->>  	.smp_prepare_cpus	= bcm63138_smp_prepare_cpus,
->>  	.smp_boot_secondary	= bcm63138_smp_boot_secondary,
->>  };
->> diff --git a/arch/arm/mach-bcm/kona_smp.c b/arch/arm/mach-bcm/kona_smp.c
->> index 66a0465..da8328b 100644
->> --- a/arch/arm/mach-bcm/kona_smp.c
->> +++ b/arch/arm/mach-bcm/kona_smp.c
->> @@ -194,7 +194,7 @@ static int bcm_boot_secondary(unsigned int cpu, struct task_struct *idle)
->>  	return -ENOSYS;
->>  }
->>  
->> -static struct smp_operations bcm_smp_ops __initdata = {
->> +static const struct smp_operations bcm_smp_ops __initconst = {
->>  	.smp_prepare_cpus	= bcm_smp_prepare_cpus,
->>  	.smp_boot_secondary	= bcm_boot_secondary,
->>  };
-
-The change to kona_smp.c looks fine to me.
-
-Signed-off-by: Ray Jui <rjui@broadcom.com>
+Can you please take a look at this patch? 
 
 Thanks,
+Shenwei
 
-Ray
+> -----Original Message-----
+> From: linux-arm-kernel [mailto:linux-arm-kernel-bounces at lists.infradead.org] On
+> Behalf Of Shenwei Wang
+> Sent: 2015?7?30? 11:11
+> To: gregkh at linuxfoundation.org; arnd at arndb.de
+> Cc: Huang Yongcai-B20788; linux-arm-kernel at lists.infradead.org
+> Subject: [PATCH v3 1/1] misc: sram: add dev_pm_ops to support module power
+> gate
+> 
+> When system goes into low power states like SUSPEND_MEM and HIBERNATION,
+> the hardware IP block may be powered off to reduce the power consumption.
+> This power down will lost all the data inside the ram. This patch added the
+> dev_pm_ops and implemented two callbacks: suspend_noirq and resume_noirq,
+> which will save the data in the on-chip-ram right before power down and restore
+> it after system resumes.
+> 
+> A new property string named "can-power-gate" is added to the devicetree
+> bindings too.
+> 
+> Signed-off-by: Shenwei Wang <shenwei.wang@freescale.com>
+> Signed-off-by: Anson Huang <b20788@freescale.com>
+> ---
+> Change log:
+> 
+> PATCH v3
+> 	Removed the unnecessary clk_enable/clk_disable.
+> 
+> PATCH v2
+> 	Use vmalloc to allocate the SRAM backup memory.
+> 	Code clean up.
+> 
+>  Documentation/devicetree/bindings/misc/sram.txt |  2 ++
+>  drivers/misc/sram.c                             | 42
+> +++++++++++++++++++++++++
+>  2 files changed, 44 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/misc/sram.txt
+> b/Documentation/devicetree/bindings/misc/sram.txt
+> index 36cbe5a..1170086 100644
+> --- a/Documentation/devicetree/bindings/misc/sram.txt
+> +++ b/Documentation/devicetree/bindings/misc/sram.txt
+> @@ -33,6 +33,8 @@ Optional properties in the area nodes:
+> 
+>  - compatible : standard definition, should contain a vendor specific string
+>                 in the form <vendor>,[<device>-]<usage>
+> +- can-power-gate: a property to tell the driver that the sram can support
+> +		power gate
+> 
+>  Example:
+> 
+> diff --git a/drivers/misc/sram.c b/drivers/misc/sram.c index 15c33cc..db9f1fa
+> 100644
+> --- a/drivers/misc/sram.c
+> +++ b/drivers/misc/sram.c
+> @@ -30,7 +30,9 @@
+> 
+>  struct sram_dev {
+>  	struct device *dev;
+> +	void *power_off_save;
+>  	void __iomem *virt_base;
+> +	u32 size;
+> 
+>  	struct gen_pool *pool;
+>  	struct clk *clk;
+> @@ -156,6 +158,33 @@ static int sram_reserve_regions(struct sram_dev
+> *sram, struct resource *res)
+>  	return ret;
+>  }
+> 
+> +static int sram_suspend_noirq(struct device *dev) {
+> +	struct platform_device *pdev = to_platform_device(dev);
+> +	struct sram_dev *sram = platform_get_drvdata(pdev);
+> +
+> +	if (!sram->power_off_save)
+> +		return 0;
+> +
+> +	/* Save necessary regs */
+> +	memcpy(sram->power_off_save, sram->virt_base, sram->size);
+> +
+> +	return 0;
+> +}
+> +
+> +static int sram_resume_noirq(struct device *dev) {
+> +	struct platform_device *pdev = to_platform_device(dev);
+> +	struct sram_dev *sram = platform_get_drvdata(pdev);
+> +
+> +	if (!sram->power_off_save)
+> +		return 0;
+> +
+> +	memcpy(sram->virt_base, sram->power_off_save, sram->size);
+> +
+> +	return 0;
+> +}
+> +
+>  static int sram_probe(struct platform_device *pdev)  {
+>  	struct sram_dev *sram;
+> @@ -176,6 +205,7 @@ static int sram_probe(struct platform_device *pdev)
+>  	}
+> 
+>  	size = resource_size(res);
+> +	sram->size = size;
+> 
+>  	if (!devm_request_mem_region(sram->dev, res->start, size, pdev->name)) {
+>  		dev_err(sram->dev, "could not request region for resource\n"); @@
+> -203,6 +233,9 @@ static int sram_probe(struct platform_device *pdev)
+> 
+>  	platform_set_drvdata(pdev, sram);
+> 
+> +	if (of_property_read_bool(pdev->dev.of_node, "can-power-gate"))
+> +		sram->power_off_save = vmalloc(size);
+> +
+>  	dev_dbg(sram->dev, "SRAM pool: %zu KiB @ 0x%p\n",
+>  		gen_pool_size(sram->pool) / 1024, sram->virt_base);
+> 
+> @@ -219,6 +252,9 @@ static int sram_remove(struct platform_device *pdev)
+>  	if (sram->clk)
+>  		clk_disable_unprepare(sram->clk);
+> 
+> +	if (sram->power_off_save)
+> +		vfree(sram->power_off_save);
+> +
+>  	return 0;
+>  }
+> 
+> @@ -229,10 +265,16 @@ static const struct of_device_id sram_dt_ids[] = {  };
+> #endif
+> 
+> +static const struct dev_pm_ops sram_pm_ops = {
+> +	.suspend_noirq = sram_suspend_noirq,
+> +	.resume_noirq = sram_resume_noirq,
+> +};
+> +
+>  static struct platform_driver sram_driver = {
+>  	.driver = {
+>  		.name = "sram",
+>  		.of_match_table = of_match_ptr(sram_dt_ids),
+> +		.pm	= &sram_pm_ops,
+>  	},
+>  	.probe = sram_probe,
+>  	.remove = sram_remove,
+> --
+> 2.5.0.rc2
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
