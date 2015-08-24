@@ -1,10 +1,9 @@
 From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Mon, 24 Aug 2015 09:27:43 +0800
-Subject: [RFC PATCH v7 09/10] arm: multi_v7_defconfig: remove
- CONFIG_MMC_DW_IDMAC
+Date: Mon, 24 Aug 2015 09:28:04 +0800
+Subject: [RFC PATCH v7 10/10] arm: zx_defconfig: remove CONFIG_MMC_DW_IDMAC
 In-Reply-To: <1440379479-24308-1-git-send-email-shawn.lin@rock-chips.com>
 References: <1440379479-24308-1-git-send-email-shawn.lin@rock-chips.com>
-Message-ID: <1440379663-24767-1-git-send-email-shawn.lin@rock-chips.com>
+Message-ID: <1440379684-24811-1-git-send-email-shawn.lin@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -22,20 +21,20 @@ Changes in v4: None
 Changes in v3: None
 Changes in v2: None
 
- arch/arm/configs/multi_v7_defconfig | 1 -
+ arch/arm/configs/zx_defconfig | 1 -
  1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 5fd8df6..a3734b5 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -520,7 +520,6 @@ CONFIG_MMC_ATMELMCI=y
- CONFIG_MMC_MVSDIO=y
- CONFIG_MMC_SDHI=y
+diff --git a/arch/arm/configs/zx_defconfig b/arch/arm/configs/zx_defconfig
+index b200bb0..ab683fb 100644
+--- a/arch/arm/configs/zx_defconfig
++++ b/arch/arm/configs/zx_defconfig
+@@ -83,7 +83,6 @@ CONFIG_MMC=y
+ CONFIG_MMC_UNSAFE_RESUME=y
+ CONFIG_MMC_BLOCK_MINORS=16
  CONFIG_MMC_DW=y
 -CONFIG_MMC_DW_IDMAC=y
- CONFIG_MMC_DW_PLTFM=y
- CONFIG_MMC_DW_EXYNOS=y
- CONFIG_MMC_DW_ROCKCHIP=y
+ CONFIG_EXT2_FS=y
+ CONFIG_EXT4_FS=y
+ CONFIG_EXT4_FS_POSIX_ACL=y
 -- 
 2.3.7
