@@ -1,68 +1,33 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Mon, 24 Aug 2015 15:24:53 -0400
-Subject: ahci_imx: can read corrupted data successfully
-In-Reply-To: <20150824105501.GX7557@n2100.arm.linux.org.uk>
-References: <20150824105501.GX7557@n2100.arm.linux.org.uk>
-Message-ID: <20150824192453.GD28944@mtj.duckdns.org>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Mon, 24 Aug 2015 21:30:20 +0200 (CEST)
+Subject: [PATCH v9 1/1] irqchip: imx-gpcv2: IMX GPCv2 driver for wakeup
+ sources
+In-Reply-To: <BY1PR0301MB0839B96E88B2CCFF8A9D794783620@BY1PR0301MB0839.namprd03.prod.outlook.com>
+References: <1440443055-7291-1-git-send-email-shenwei.wang@freescale.com>
+ <alpine.DEB.2.11.1508242112450.15006@nanos>
+ <BY1PR0301MB0839B96E88B2CCFF8A9D794783620@BY1PR0301MB0839.namprd03.prod.outlook.com>
+Message-ID: <alpine.DEB.2.11.1508242127230.15006@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello, Russell.
-
-On Mon, Aug 24, 2015 at 11:55:01AM +0100, Russell King - ARM Linux wrote:
-> I've no idea how this is happening, but it appears that it's possible
-> to read corrupted data over an eSATA link.
+On Mon, 24 Aug 2015, Shenwei Wang wrote:
+> > Ok, last question. How is Anson related to this? He did not convey your patch and
+> > in the first posted versions his SOB was never there.
 > 
-> The setup is a Solid-run Cubox-i4pro connected to an external eSATA 2.5"
-> enclosure with a Corsair Neutron 128GB SSD.
-> 
-> While the issue seems to be the generally poor quality of eSATA cables
-> (I have two eSATA enclosures, the other enclosure's eSATA cable
-> interferes with a Logitech wireless receiver - I've had to wrap the
-> cable in aluminium foil.)  However, it shouldn't be possible to
-> successfully read faulty data in that condition - and this is what I
-> find most worrying.
-> 
-> What I've noticed is that at boot, the the SSD is sometimes properly
-> detected, other times it isn't:
-...
-> ata1.00: ATA-8: Corsair Neutron SSD, M311, max UDMA/133
-> ata1.00: 250069680 sectors, multi 1: LBA48 NCQ (depth 31/32)
-...
-> ata1: SATA link up 3.0 Gbps (SStatus 123 SControl 300)
-> ata1.00: ATA-8: , , max UDMA/133
-> ata1.00: 250069680 sectors, multi 1: LBA48
-...
+> This patch was based on his internal version of GPCv2 driver. I reused some of his
+> implementation and ported it to latest linux kernel. Adding his name here to give 
+> the credits to him.
 
-It'd be interesting to see the ID data being returned.
-"libata.force=dump_id" should do it but bit flips during transfer or
-outright incorrect DMA won't lead to the above result.  Looks more
-like the firmware on the drive side getting terminally confused.
+So the proper way to express this is:
 
-...
-> How does SATA ensure command and data integrity over the link?  I'd
-> assume that there's a CRC present on the data, like UDMA on PATA.  How
-> are CRC errors supposed to be reported?  Is it possible that ahci_imx
-> and other layers are not properly checking for CRC errors?
+Based-on-a-patch-by: Anson
+Signed-off-by: You
 
-IIRC, the 8/10b encoding does running parity and there's per-frame
-(packet) CRC too.  Link and frame integrity is always checked by
-hardware.  Reporting and handling can be different depending on which
-party detects the error tho.
+The way you did it suggests that you wrote it and Anson conveyed it,
+which is not the case.
 
-> Any ideas what to look at?
-> 
-> Anyone got any suggestions on where to get a good quality, but not
-> stupidly expensive eSATA cable from?
-> 
-> I'm waiting for it to happen again, and I'll dump out more of the drive's
-> "contents" when the cable is bad.  If it is the drive's firmware, it
-> should contain the manufacturer name/model somewhere in the image.
+I'll change it that way then.
 
-I highly doubt this is something happening on the controller / link
-side.  Looks like a messed up drive firmware to me.
+Thanks,
 
-Thanks.
-
--- 
-tejun
+	tglx
