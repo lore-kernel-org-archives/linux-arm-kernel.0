@@ -1,37 +1,64 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 24 Aug 2015 14:47:45 -0700
-Subject: [PATCH 0/3] ARM: uniphier: add outer cache support and rework SMP
- operations
-In-Reply-To: <1440382692-3855-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1440382692-3855-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <CAOesGMgL3bNH_wG3igSJhNOkV0uUfNWEi0t-Gny2A1oNnGKu=w@mail.gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 24 Aug 2015 23:57:30 +0200
+Subject: [PATCH V2] clockevents/drivers/mtk: Fix spurious interrupt leading to
+ crash
+In-Reply-To: <1440426924.17418.11.camel@mtksdaap41>
+References: <1440426924.17418.11.camel@mtksdaap41>
+Message-ID: <1440453450-21203-1-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+After analysis done by Yingjoe Chen, the timer appears to have a pending
+interrupt when it is enabled.
 
-On Sun, Aug 23, 2015 at 7:18 PM, Masahiro Yamada
-<yamada.masahiro@socionext.com> wrote:
-> 1/3: add outer cache support
-> 2/3: rework SMP operations
-> 3/3: add device tree nodes
+Fix this by acknowledging the pending interrupt when enabling the timer
+interrupt.
 
-Timing of this is unfortunate, please resend after 4.3-rc1 is out and
-we can queue it up.
+Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+---
+ drivers/clocksource/mtk_timer.c | 16 ++++++----------
+ 1 file changed, 6 insertions(+), 10 deletions(-)
 
-> Because 2/3 highly depends on 1/3, I hope whole of this series
-> is applied to ARM-SOC tree.
-
-Review or acked-by from Russell would be appreciated in that case.
-
-> Olof,
-> From this series, I am using "ARM: uniphier:" rather than "ARM: UniPhier:"
-> for the subject prefixes because I noticed you often rephased so when you
-> applied my patches.
-> Are sub-arch names in lower cases preferable in subject prefixes?
-
-If you look at "git log --no-merges --oneline arch/arm/mach-*" you'll
-see that most platforms use either all-caps or all-lowercase.
-
-
--Olof
+diff --git a/drivers/clocksource/mtk_timer.c b/drivers/clocksource/mtk_timer.c
+index 4cd16fb..505f53d 100644
+--- a/drivers/clocksource/mtk_timer.c
++++ b/drivers/clocksource/mtk_timer.c
+@@ -156,14 +156,6 @@ static irqreturn_t mtk_timer_interrupt(int irq, void *dev_id)
+ 	return IRQ_HANDLED;
+ }
+ 
+-static void mtk_timer_global_reset(struct mtk_clock_event_device *evt)
+-{
+-	/* Disable all interrupts */
+-	writel(0x0, evt->gpt_base + GPT_IRQ_EN_REG);
+-	/* Acknowledge all interrupts */
+-	writel(0x3f, evt->gpt_base + GPT_IRQ_ACK_REG);
+-}
+-
+ static void
+ mtk_timer_setup(struct mtk_clock_event_device *evt, u8 timer, u8 option)
+ {
+@@ -183,6 +175,12 @@ static void mtk_timer_enable_irq(struct mtk_clock_event_device *evt, u8 timer)
+ {
+ 	u32 val;
+ 
++	/* Disable all interrupts */
++	writel(0x0, evt->gpt_base + GPT_IRQ_EN_REG);
++
++	/* Acknowledge all spurious pending interrupts */
++	writel(0x3f, evt->gpt_base + GPT_IRQ_ACK_REG);
++
+ 	val = readl(evt->gpt_base + GPT_IRQ_EN_REG);
+ 	writel(val | GPT_IRQ_ENABLE(timer),
+ 			evt->gpt_base + GPT_IRQ_EN_REG);
+@@ -232,8 +230,6 @@ static void __init mtk_timer_init(struct device_node *node)
+ 	}
+ 	rate = clk_get_rate(clk);
+ 
+-	mtk_timer_global_reset(evt);
+-
+ 	if (request_irq(evt->dev.irq, mtk_timer_interrupt,
+ 			IRQF_TIMER | IRQF_IRQPOLL, "mtk_timer", evt)) {
+ 		pr_warn("failed to setup irq %d\n", evt->dev.irq);
+-- 
+1.9.1
