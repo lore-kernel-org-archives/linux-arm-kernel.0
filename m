@@ -1,69 +1,63 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Mon, 24 Aug 2015 13:50:32 -0600
-Subject: [PATCH 2/9] PM / Domains: Remove dev->driver check for runtime PM
-In-Reply-To: <7hio88gxpn.fsf@deeprootsystems.com>
-References: <1438731339-58317-1-git-send-email-lina.iyer@linaro.org>
- <1438731339-58317-3-git-send-email-lina.iyer@linaro.org>
- <7hfv3onv5c.fsf@deeprootsystems.com>
- <CAMuHMdVeffa-jgXuSjDQBKTrhgW-d87OKzs1iXX+4y-9U_AJbg@mail.gmail.com>
- <7hwpwylepx.fsf@deeprootsystems.com>
- <CAMuHMdW-T9rUWXsQeffwtXspHbjfGqo_0G4QMB1o0TwTLJAQAg@mail.gmail.com>
- <CAMAWPa-0R42thqBo0omn0KK7y0wyxoyaP+wsfoRvXBmWhBytKg@mail.gmail.com>
- <CAMuHMdV2gDBaPRb3yE=tVPO_pr7PFA6bwhyQE5raumCh_qPXww@mail.gmail.com>
- <7hio88gxpn.fsf@deeprootsystems.com>
-Message-ID: <20150824195032.GA1384@linaro.org>
+From: moritz.fischer@ettus.com (Moritz Fischer)
+Date: Mon, 24 Aug 2015 15:58:40 -0400
+Subject: [PATCH 17/18] ARM: zynq: use const and __initconst for
+ smp_operations
+In-Reply-To: <1440390978-22796-18-git-send-email-yamada.masahiro@socionext.com>
+References: <1440390978-22796-1-git-send-email-yamada.masahiro@socionext.com>
+ <1440390978-22796-18-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <CAAtXAHcAVxcCdkh-ne9W=2vORwi6o3WH6-yADn7mtgM4aaGpxw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 21 2015 at 15:04 -0600, Kevin Hilman wrote:
->Geert Uytterhoeven <geert@linux-m68k.org> writes:
->
->> Hi Kevin,
->>
->> On Fri, Aug 14, 2015 at 7:19 PM, Kevin Hilman <khilman@kernel.org> wrote:
->>> On Fri, Aug 14, 2015 at 12:24 AM, Geert Uytterhoeven
->>> <geert@linux-m68k.org> wrote:
->>>> On Fri, Aug 14, 2015 at 5:40 AM, Kevin Hilman <khilman@kernel.org> wrote:
->>>>> Geert Uytterhoeven <geert@linux-m68k.org> writes:
->>>>>> On Wed, Aug 12, 2015 at 9:50 PM, Kevin Hilman <khilman@kernel.org> wrote:
->>>>>>> This check might have made sense before PM domains, but with PM domains,
->>>>>>> it's entirely possible to have a simple device without a driver and the
->>>>>>> PM domain handles all the necesary PM, so I think this check
->>>>>>> could/should be removed.
->>>>>>>
->>>>>>> Thoughts?
->>>>>>
->>>>>> Simple devices without a driver aren't handled automatically.
->>>>>> At minimum, the driver should call pm_runtime_enable(), cfr.
->>>>>> drivers/bus/simple-pm-bus.c.
->>>>>
->>>>> That's correct, and in the proof-of-concept stuff I hacked up and in
->>>>> Lina's series, the CPU "devices" do indeed to this.  Without that, they
->>>>> wouldn't end up ever taking this codepath through genpd's
->>>>> runtime_suspend and power_off hooks.
->>>>>
->>>>> Also, I'm not sure if your comment was meant to be an objection to the
->>>>> patch?  or if you're OK with it.
->>>>
->>>> My comment was purely meant as a response to "it's entirely possible to have a
->>>> simple device without a driver and the PM domain handles all the necesary PM".
->>>
->>> Right, so if the PM domain does the pm_runtime_enable() for these
->>> "simple" devices without drivers, they can still exist without a
->>> driver, and the PM domain doing all the magic.
->>
->> Is it possible to let the PM Domain do the pm_runtime_enable() itself in
->> the absence of a driver?
->
->Well, I suppose it's possible, not sure it's recommended. :)
->
->> If yes, I wouldn't have needed simple-pm-bus.c.
->> What if a driver is bound later?
->
->Yeah, you're approach is better.
->
-I am not sure I understand the approach? Initialize the CPU devices as
-"simple-pm-bus" compatible?
+Acked-by: Moritz Fischer <moritz.fischer@ettus.com>
 
 Thanks,
-Lina
+
+Moritz
+
+On Mon, Aug 24, 2015 at 12:36 AM, Masahiro Yamada
+<yamada.masahiro@socionext.com> wrote:
+> The smp_operations structure is not over-written, so add const
+> qualifier and replace __initdata with __initconst.
+>
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> ---
+>
+>  arch/arm/mach-zynq/common.h  | 2 +-
+>  arch/arm/mach-zynq/platsmp.c | 2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/mach-zynq/common.h b/arch/arm/mach-zynq/common.h
+> index 79cda2e..e771933 100644
+> --- a/arch/arm/mach-zynq/common.h
+> +++ b/arch/arm/mach-zynq/common.h
+> @@ -30,7 +30,7 @@ extern char zynq_secondary_trampoline;
+>  extern char zynq_secondary_trampoline_jump;
+>  extern char zynq_secondary_trampoline_end;
+>  extern int zynq_cpun_start(u32 address, int cpu);
+> -extern struct smp_operations zynq_smp_ops __initdata;
+> +extern const struct smp_operations zynq_smp_ops;
+>  #endif
+>
+>  extern void __iomem *zynq_scu_base;
+> diff --git a/arch/arm/mach-zynq/platsmp.c b/arch/arm/mach-zynq/platsmp.c
+> index f66816c..7cd9865 100644
+> --- a/arch/arm/mach-zynq/platsmp.c
+> +++ b/arch/arm/mach-zynq/platsmp.c
+> @@ -157,7 +157,7 @@ static void zynq_cpu_die(unsigned int cpu)
+>  }
+>  #endif
+>
+> -struct smp_operations zynq_smp_ops __initdata = {
+> +const struct smp_operations zynq_smp_ops __initconst = {
+>         .smp_init_cpus          = zynq_smp_init_cpus,
+>         .smp_prepare_cpus       = zynq_smp_prepare_cpus,
+>         .smp_boot_secondary     = zynq_boot_secondary,
+> --
+> 1.9.1
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
