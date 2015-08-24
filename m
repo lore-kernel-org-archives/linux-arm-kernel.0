@@ -1,328 +1,640 @@
-From: varada@codeaurora.org (Varadarajan Narayanan)
-Date: Mon, 24 Aug 2015 13:53:39 +0530
-Subject: [PATCH v2] qcom: ipq40xx: Add basic board/dts support for
- IPQ40XX SoC
-In-Reply-To: <20150821162133.GF13472@usrtlx11787.corpusers.net>
-References: <20150821103253.GA27466@codeaurora.org>
- <20150821162133.GF13472@usrtlx11787.corpusers.net>
-Message-ID: <20150824082339.GA329@codeaurora.org>
+From: Haibo.Chen@freescale.com (Chen Bough)
+Date: Mon, 24 Aug 2015 08:24:14 +0000
+Subject: [PATCH v2 1/5] input: touchscreen: add imx6ul_tsc driver support
+In-Reply-To: <20150821092607.GA706@pengutronix.de>
+References: <1438077521-12857-1-git-send-email-haibo.chen@freescale.com>
+ <1438077521-12857-2-git-send-email-haibo.chen@freescale.com>
+ <20150821092607.GA706@pengutronix.de>
+Message-ID: <BY1PR03MB138872B8FDE6BB8E7553F2839A620@BY1PR03MB1388.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 21, 2015 at 09:21:33AM -0700, Bjorn Andersson wrote:
+Hi Markus,
 
-> On Fri 21 Aug 03:32 PDT 2015, Varadarajan Narayanan wrote:
->
-> > Add initial dts files and SoC support for IPQ40XX
+
+
+> -----Original Message-----
+> From: Markus Pargmann [mailto:mpa at pengutronix.de]
+> Sent: Friday, August 21, 2015 5:26 PM
+> To: Chen Haibo-B51421
+> Cc: robh+dt at kernel.org; pawel.moll at arm.com; mark.rutland at arm.com;
+> ijc+devicetree at hellion.org.uk; galak at codeaurora.org; shawnguo at kernel.org;
+> kernel at pengutronix.de; linux at arm.linux.org.uk; dmitry.torokhov at gmail.com;
+> hans.verkuil at cisco.com; hadess at hadess.net; mchehab at osg.samsung.com;
+> mamlinav at gmail.com; arnd at arndb.de; jonathar at broadcom.com;
+> hdegoede at redhat.com; christian.gmeiner at gmail.com; scott.liu at emc.com.tw;
+> geert at linux-m68k.org; benjamin.tissoires at redhat.com;
+> sebastien.szymanski at armadeus.com; sbranden at broadcom.com;
+> devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; linux-input at vger.kernel.org
+> Subject: Re: [PATCH v2 1/5] input: touchscreen: add imx6ul_tsc driver
+> support
+> 
+> On Tue, Jul 28, 2015 at 05:58:37PM +0800, Haibo Chen wrote:
+> > Freescale i.MX6UL contains a internal touchscreen controller, this
+> > patch add a driver to support this controller.
 > >
-> > Signed-off-by: Varadarajan Narayanan <varada@codeaurora.org>
+> > Signed-off-by: Haibo Chen <haibo.chen@freescale.com>
 > > ---
-> > Changes in v2:
-> >   - Added devicetree bindings documentation
+> >  drivers/input/touchscreen/Kconfig      |  12 +
+> >  drivers/input/touchscreen/Makefile     |   1 +
+> >  drivers/input/touchscreen/imx6ul_tsc.c | 504
+> > +++++++++++++++++++++++++++++++++
+> >  3 files changed, 517 insertions(+)
+> >  create mode 100644 drivers/input/touchscreen/imx6ul_tsc.c
 > >
-> >  .../devicetree/bindings/clock/qca,gcnt.txt         | 14 ++++
-> >  Documentation/devicetree/bindings/ipq.txt          | 16 ++++
-> >  arch/arm/boot/dts/Makefile                         |  3 +-
-> >  arch/arm/boot/dts/qcom-ipq40xx-r3pc.dts            | 33 +++++++++
-> >  arch/arm/boot/dts/qcom-ipq40xx.dtsi                | 86 ++++++++++++++++++++++
-> >  arch/arm/configs/ipq_defconfig                     |  1 +
-> >  arch/arm/mach-qcom/Kconfig                         |  4 +
-> >  arch/arm/mach-qcom/board.c                         |  1 +
-> >  8 files changed, 157 insertions(+), 1 deletion(-)
-> >  create mode 100644 Documentation/devicetree/bindings/clock/qca,gcnt.txt
-> >  create mode 100644 Documentation/devicetree/bindings/ipq.txt
-> >  create mode 100644 arch/arm/boot/dts/qcom-ipq40xx-r3pc.dts
-> >  create mode 100644 arch/arm/boot/dts/qcom-ipq40xx.dtsi
+> > diff --git a/drivers/input/touchscreen/Kconfig
+> > b/drivers/input/touchscreen/Kconfig
+> > index 5b272ba..32c300d 100644
+> > --- a/drivers/input/touchscreen/Kconfig
+> > +++ b/drivers/input/touchscreen/Kconfig
+> > @@ -479,6 +479,18 @@ config TOUCHSCREEN_MTOUCH
+> >  	  To compile this driver as a module, choose M here: the
+> >  	  module will be called mtouch.
 > >
-> > diff --git a/Documentation/devicetree/bindings/clock/qca,gcnt.txt b/Documentation/devicetree/bindings/clock/qca,gcnt.txt
+> > +config TOUCHSCREEN_IMX6UL_TSC
+> > +	tristate "Freescale i.MX6UL touchscreen controller"
+> > +	depends on OF
+> > +	help
+> > +	  Say Y here if you have a Freescale i.MX6UL, and want to
+> > +	  use the internal touchscreen controller.
+> > +
+> > +	  If unsure, say N.
+> > +
+> > +	  To compile this driver as a module, choose M here: the
+> > +	  moduel will be called imx6ul_tsc.
+> > +
+> >  config TOUCHSCREEN_INEXIO
+> >  	tristate "iNexio serial touchscreens"
+> >  	select SERIO
+> > diff --git a/drivers/input/touchscreen/Makefile
+> > b/drivers/input/touchscreen/Makefile
+> > index c85aae2..9379b32 100644
+> > --- a/drivers/input/touchscreen/Makefile
+> > +++ b/drivers/input/touchscreen/Makefile
+> > @@ -38,6 +38,7 @@ obj-$(CONFIG_TOUCHSCREEN_EGALAX)	+= egalax_ts.o
+> >  obj-$(CONFIG_TOUCHSCREEN_FUJITSU)	+= fujitsu_ts.o
+> >  obj-$(CONFIG_TOUCHSCREEN_GOODIX)	+= goodix.o
+> >  obj-$(CONFIG_TOUCHSCREEN_ILI210X)	+= ili210x.o
+> > +obj-$(CONFIG_TOUCHSCREEN_IMX6UL_TSC)	+= imx6ul_tsc.o
+> >  obj-$(CONFIG_TOUCHSCREEN_INEXIO)	+= inexio.o
+> >  obj-$(CONFIG_TOUCHSCREEN_INTEL_MID)	+= intel-mid-touch.o
+> >  obj-$(CONFIG_TOUCHSCREEN_IPROC)		+= bcm_iproc_tsc.o
+> > diff --git a/drivers/input/touchscreen/imx6ul_tsc.c
+> > b/drivers/input/touchscreen/imx6ul_tsc.c
 > > new file mode 100644
-> > index 0000000..dd0d71e
+> > index 0000000..807f1db
 > > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/clock/qca,gcnt.txt
-> > @@ -0,0 +1,14 @@
-> > +QCA Global Counter
->
-> I don't think I've seen the "global counter" blocks before, what is it?
-> What does it do? Do you have a upcoming driver for it? (Have I just
-> missed it?)
-
-It is a 56-bit counter that supplies the count to the ARM arch timers.
-An upcoming patch will use it.
-
-> You add it to the dts below, but don't seem to reference it. What is
-> its purpose?
->
-> Also, you should split this definition into its own patch.
-
-Sure. Will post a revised patch.
-
-> > +------------------------------------------------
-> > +
-> > +Required properties :
-> > +- compatible : "qcom,qca-gcnt"
-> > +
-> > +- reg : shall contain base register location and length
-> > +
-> > +Example:
-> > +
-> > +	counter {
-> > +		compatible = "qcom,qca-gcnt";
-> > +		reg = <0x004a1000 0x4>;
->
-> Most of the time when there's a device consuming one register it turns
-> out to be part of some larger hw block and down the road things get
-> complicated from the fact that we mapped 4 bytes in the middle.
->
-> Is this part of a larger block? Can we better implement that as a
-> simple-mfd or syscon?
-
-Sure. Will see if I can re-implement it.
-
-> > +	};
-> > diff --git a/Documentation/devicetree/bindings/ipq.txt b/Documentation/devicetree/bindings/ipq.txt
-> > new file mode 100644
-> > index 0000000..7d56bd0
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/ipq.txt
->
-> This doesn't really follow the general pattern of this directory. There
-> are some files like this, but then you should probably name it
-> qualcomm.txt.
-
-Will rename.
-
-> > @@ -0,0 +1,16 @@
-> > +Qualcomm IPQ device tree bindings
-> > +---------------------------------
-> > +
-> > +System on Chip
-> > +
-> > +Device tree must specify which SoC it uses, with one of the
-> > +following compatible strings
-> > +
-> > +       "qcom,ipq40xx"
-> > +
-> > +Platform
-> > +
-> > +Device tree must specify which Platform it uses, with one of the
-> > +following compatible strings
-> > +
-> > +       "qcom,ipq40xx-r3pc"
->
-> I would expect an "ipq.txt" to contain "qcom,ipq8064-ap148" and
-> "qcom,ipq8064" as well.
->
-> > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> > index 246473a..6b4caee 100644
-> > --- a/arch/arm/boot/dts/Makefile
-> > +++ b/arch/arm/boot/dts/Makefile
-> > @@ -477,7 +477,8 @@ dtb-$(CONFIG_ARCH_QCOM) += \
-> >  	qcom-ipq8064-ap148.dtb \
-> >  	qcom-msm8660-surf.dtb \
-> >  	qcom-msm8960-cdp.dtb \
-> > -	qcom-msm8974-sony-xperia-honami.dtb
-> > +	qcom-msm8974-sony-xperia-honami.dtb \
-> > +	qcom-ipq40xx-r3pc.dtb
->
-> Please insert your entry alphabetically.
-
-Sure.
-
-> >  dtb-$(CONFIG_ARCH_REALVIEW) += \
-> >  	arm-realview-pb1176.dtb
-> >  dtb-$(CONFIG_ARCH_ROCKCHIP) += \
-> > diff --git a/arch/arm/boot/dts/qcom-ipq40xx-r3pc.dts b/arch/arm/boot/dts/qcom-ipq40xx-r3pc.dts
-> > new file mode 100644
-> > index 0000000..7e4e629
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/qcom-ipq40xx-r3pc.dts
-> > @@ -0,0 +1,33 @@
-> > +/* Copyright (c) 2014, The Linux Foundation. All rights reserved.
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 and
-> > + * only version 2 as published by the Free Software Foundation.
-> > + *
-> > + * This program is distributed in the hope that it will be useful,
-> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + * GNU General Public License for more details.
-> > + */
-> > +
-> > +#include "qcom-ipq40xx.dtsi"
-> > +
-> > +/ {
-> > +	model = "Qualcomm Technologies, Inc. IPQ40XX R3PC";
-> > +	compatible = "qcom,ipq40xx-r3pc", "qcom,ipq40xx";
-> > +
-> > +	memory {
-> > +		device_type = "memory";
-> > +		reg = <0x80000000 0x20000000>; /* 512MB */
-> > +	};
-> > +
-> > +	chosen {
-> > +		bootargs = "root=/dev/ram rw init=/init console=ttyMSM0,115200n8 initrd=0x82000000,0x000E2246";
-> > +	};
-> > +
-> > +	soc {
-> > +		serial at 78b0000 {
-> > +			status = "ok";
-> > +		};
-> > +	};
-> > +};
->
-> This part looks good.
->
-> > diff --git a/arch/arm/boot/dts/qcom-ipq40xx.dtsi b/arch/arm/boot/dts/qcom-ipq40xx.dtsi
-> > new file mode 100644
-> > index 0000000..76c55a3
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/qcom-ipq40xx.dtsi
-> > @@ -0,0 +1,86 @@
+> > +++ b/drivers/input/touchscreen/imx6ul_tsc.c
+> > @@ -0,0 +1,504 @@
 > > +/*
-> > + * Copyright (c) 2014, The Linux Foundation. All rights reserved.
+> > + * Freescale i.MX6UL touchscreen controller driver
 > > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 and
-> > + * only version 2 as published by the Free Software Foundation.
+> > + * Copyright (C) 2015 Freescale Semiconductor, Inc.
 > > + *
-> > + * This program is distributed in the hope that it will be useful,
-> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + * GNU General Public License for more details.
+> > + * This program is free software; you can redistribute it and/or
+> > +modify
+> > + * it under the terms of the GNU General Public License version 2 as
+> > + * published by the Free Software Foundation.
 > > + */
 > > +
-> > +/dts-v1/;
+> > +#include <linux/errno.h>
+> > +#include <linux/kernel.h>
+> > +#include <linux/module.h>
+> > +#include <linux/gpio.h>
+> > +#include <linux/input.h>
+> > +#include <linux/slab.h>
+> > +#include <linux/completion.h>
+> > +#include <linux/delay.h>
+> > +#include <linux/of.h>
+> > +#include <linux/of_device.h>
+> > +#include <linux/of_gpio.h>
+> > +#include <linux/of_irq.h>
+> > +#include <linux/interrupt.h>
+> > +#include <linux/platform_device.h>
+> > +#include <linux/clk.h>
+> > +#include <linux/io.h>
 > > +
-> > +#include "skeleton.dtsi"
+> > +/* ADC configuration registers field define */
+> > +#define ADC_AIEN		(0x1 << 7)
+> > +#define ADC_CONV_DISABLE	0x1F
+> > +#define ADC_CAL			(0x1 << 7)
+> > +#define ADC_CALF		0x2
+> > +#define ADC_12BIT_MODE		(0x2 << 2)
+> > +#define ADC_IPG_CLK		0x00
+> > +#define ADC_CLK_DIV_8		(0x03 << 5)
+> > +#define ADC_SHORT_SAMPLE_MODE	(0x0 << 4)
+> > +#define ADC_HARDWARE_TRIGGER	(0x1 << 13)
+> > +#define SELECT_CHANNEL_4	0x04
+> > +#define SELECT_CHANNEL_1	0x01
+> > +#define DISABLE_CONVERSION_INT	(0x0 << 7)
 > > +
-> > +/ {
-> > +	model = "Qualcomm Technologies, Inc. IPQ40XX";
-> > +	compatible = "qcom,ipq40xx";
-> > +	interrupt-parent = <&intc>;
+> > +/* ADC registers */
+> > +#define REG_ADC_HC0		0x00
+> > +#define REG_ADC_HC1		0x04
+> > +#define REG_ADC_HC2		0x08
+> > +#define REG_ADC_HC3		0x0C
+> > +#define REG_ADC_HC4		0x10
+> > +#define REG_ADC_HS		0x14
+> > +#define REG_ADC_R0		0x18
+> > +#define REG_ADC_CFG		0x2C
+> > +#define REG_ADC_GC		0x30
+> > +#define REG_ADC_GS		0x34
 > > +
-> > +	cpus {
-> > +		#address-cells = <1>;
-> > +		#size-cells = <0>;
-> > +		cpu at 0 {
-> > +			device_type = "cpu";
-> > +			compatible = "arm,cortex-a7";
-> > +			reg = <0x0>;
-> > +		};
+> > +#define ADC_TIMEOUT		msecs_to_jiffies(100)
+> 
+> These defines are in two drivers. Here and in drivers/iio/adc/vf610_adc.c
+
+Actually, they are different. In the TSC driver, add REG_ADC_HC2/3/4, and the offset of the 
+REG_ADC_HS~ REG_ADC_GS also changed.
+
+For i.MX6UL, to support TSC, our IC team add some changes in ADC2, like add add REG_ADC_HC2/3/4,
+so that we can config the channel of ADC2 to connect with X-/X+/Y+/Y- of touch screen.
+And IC team suggest the ADC2 only used for TSC, should not work as a normal ADC. 
+ 
+
+> 
 > > +
-> > +		cpu at 1 {
-> > +			device_type = "cpu";
-> > +			compatible = "arm,cortex-a7";
-> > +			reg = <0x1>;
-> > +		};
+> > +/* TSC registers */
+> > +#define REG_TSC_BASIC_SETING	0x00
+> > +#define REG_TSC_PRE_CHARGE_TIME	0x10
+> > +#define REG_TSC_FLOW_CONTROL	0x20
+> > +#define REG_TSC_MEASURE_VALUE	0x30
+> > +#define REG_TSC_INT_EN		0x40
+> > +#define REG_TSC_INT_SIG_EN	0x50
+> > +#define REG_TSC_INT_STATUS	0x60
+> > +#define REG_TSC_DEBUG_MODE	0x70
+> > +#define REG_TSC_DEBUG_MODE2	0x80
 > > +
-> > +		cpu at 2 {
-> > +			device_type = "cpu";
-> > +			compatible = "arm,cortex-a7";
-> > +			reg = <0x2>;
-> > +		};
+> > +/* TSC configuration registers field define */
+> > +#define DETECT_4_WIRE_MODE	(0x0 << 4)
+> > +#define AUTO_MEASURE		0x1
+> > +#define MEASURE_SIGNAL		0x1
+> > +#define DETECT_SIGNAL		(0x1 << 4)
+> > +#define VALID_SIGNAL		(0x1 << 8)
+> > +#define MEASURE_INT_EN		0x1
+> > +#define MEASURE_SIG_EN		0x1
+> > +#define VALID_SIG_EN		(0x1 << 8)
+> > +#define DE_GLITCH_2		(0x2 << 29)
+> > +#define START_SENSE		(0x1 << 12)
+> > +#define TSC_DISABLE		(0x1 << 16)
+> > +#define DETECT_MODE		0x2
 > > +
-> > +		cpu at 3 {
-> > +			device_type = "cpu";
-> > +			compatible = "arm,cortex-a7";
-> > +			reg = <0x3>;
-> > +		};
-> > +	};
+> > +struct imx6ul_tsc {
+> > +	struct device *dev;
+> > +	struct input_dev *input;
+> > +	void __iomem *tsc_regs;
+> > +	void __iomem *adc_regs;
+> > +	struct clk *tsc_clk;
+> > +	struct clk *adc_clk;
 > > +
-> > +	soc {
-> > +		#address-cells = <1>;
-> > +		#size-cells = <1>;
-> > +		ranges;
-> > +		compatible = "simple-bus";
+> > +	int xnur_gpio;
+> > +	int measure_delay_time;
+> > +	int pre_charge_time;
 > > +
-> > +		intc: interrupt-controller at b000000 {
-> > +			compatible = "qcom,msm-qgic2";
-> > +			interrupt-controller;
-> > +			#interrupt-cells = <3>;
-> > +			reg = <0x0b000000 0x1000>,
-> > +			<0x0b002000 0x1000>;
-> > +		};
-> > +
-> > +		counter {
-> > +			compatible = "qcom,qca-gcnt";
-> > +			reg = <0x004a1000 0x4>;
-> > +		};
-> > +
-> > +		timer {
-> > +			compatible = "arm,armv7-timer";
-> > +			interrupts = <1 2 0xf08>,
-> > +				     <1 3 0xf08>,
-> > +				     <1 4 0xf08>,
-> > +				     <1 1 0xf08>;
-> > +			clock-frequency = <20833333>;
-> > +		};
-> > +
-> > +		serial at 78b0000 {
-> > +			compatible = "qcom,msm-uartdm-v1.4", "qcom,msm-uartdm";
-> > +			reg = <0x78b0000 0x200>;
-> > +			interrupts = <0 108 0>;
-> > +			status = "disabled";
-> > +		};
-> > +	};
+> > +	struct completion completion;
 > > +};
->
-> Unless the counter has a critical function I suggest you add that
-> separately, otherwise this looks good.
-
-Ok
-
-> > diff --git a/arch/arm/configs/ipq_defconfig b/arch/arm/configs/ipq_defconfig
-> > index 1cabd8b..054a159 100644
-> > --- a/arch/arm/configs/ipq_defconfig
-> > +++ b/arch/arm/configs/ipq_defconfig
-> > @@ -22,6 +22,7 @@ CONFIG_ARCH_MSM8X60=y
-> >  CONFIG_ARCH_MSM8960=y
-> >  CONFIG_ARCH_MSM8974=y
-> >  CONFIG_ARCH_IPQ8064=y
-> > +CONFIG_ARCH_IPQ40XX=y
-> >  CONFIG_SMP=y
-> >  CONFIG_PREEMPT=y
-> >  CONFIG_AEABI=y
-> > diff --git a/arch/arm/mach-qcom/Kconfig b/arch/arm/mach-qcom/Kconfig
-> > index fab49a2..3add9f9 100644
-> > --- a/arch/arm/mach-qcom/Kconfig
-> > +++ b/arch/arm/mach-qcom/Kconfig
-> > @@ -26,4 +26,8 @@ config ARCH_IPQ8064
-> >  	bool "Enable support for IPQ806x"
-> >  	select CLKSRC_QCOM
-> >
-> > +config ARCH_IPQ40XX
-> > +	bool "Enable support for IPQ40XX"
-> > +	select HAVE_ARM_ARCH_TIMER
 > > +
->
-> Please insert your entry alphabetically.
+> > +/*
+> > + * TSC module need ADC to get the measure value. So
+> > + * before config TSC, we should initialize ADC module.
+> > + */
+> > +static void imx6ul_adc_init(struct imx6ul_tsc *tsc) {
+> > +	int adc_hc = 0;
+> > +	int adc_gc;
+> > +	int adc_gs;
+> > +	int adc_cfg;
+> > +	int timeout;
+> > +
+> > +	adc_cfg = readl(tsc->adc_regs + REG_ADC_CFG);
+> > +	adc_cfg |= ADC_12BIT_MODE | ADC_IPG_CLK;
+> > +	adc_cfg |= ADC_CLK_DIV_8 | ADC_SHORT_SAMPLE_MODE;
+> > +	adc_cfg &= ~ADC_HARDWARE_TRIGGER;
+> > +	writel(adc_cfg, tsc->adc_regs + REG_ADC_CFG);
+> > +
+> > +	/* enable calibration interrupt */
+> > +	adc_hc |= ADC_AIEN;
+> > +	adc_hc |= ADC_CONV_DISABLE;
+> > +	writel(adc_hc, tsc->adc_regs + REG_ADC_HC0);
+> > +
+> > +	/* start ADC calibration */
+> > +	adc_gc = readl(tsc->adc_regs + REG_ADC_GC);
+> > +	adc_gc |= ADC_CAL;
+> > +	writel(adc_gc, tsc->adc_regs + REG_ADC_GC);
+> > +
+> > +	timeout = wait_for_completion_timeout
+> > +			(&tsc->completion, ADC_TIMEOUT);
+> > +	if (timeout == 0)
+> > +		dev_err(tsc->dev, "Timeout for adc calibration\n");
+> > +
+> > +	adc_gs = readl(tsc->adc_regs + REG_ADC_GS);
+> > +	if (adc_gs & ADC_CALF)
+> > +		dev_err(tsc->dev, "ADC calibration failed\n");
+> > +
+> > +	/* TSC need the ADC work in hardware trigger */
+> > +	adc_cfg = readl(tsc->adc_regs + REG_ADC_CFG);
+> > +	adc_cfg |= ADC_HARDWARE_TRIGGER;
+> > +	writel(adc_cfg, tsc->adc_regs + REG_ADC_CFG); }
+> > +
+> > +/*
+> > + * This is a TSC workaround. Currently TSC misconnect two
+> > + * ADC channels, this function remap channel configure for
+> > + * hardware trigger.
+> > + */
+> > +static void imx6ul_tsc_channel_config(struct imx6ul_tsc *tsc) {
+> > +	int adc_hc0, adc_hc1, adc_hc2, adc_hc3, adc_hc4;
+> > +
+> > +	adc_hc0 = DISABLE_CONVERSION_INT;
+> > +	writel(adc_hc0, tsc->adc_regs + REG_ADC_HC0);
+> > +
+> > +	adc_hc1 = DISABLE_CONVERSION_INT | SELECT_CHANNEL_4;
+> > +	writel(adc_hc1, tsc->adc_regs + REG_ADC_HC1);
+> > +
+> > +	adc_hc2 = DISABLE_CONVERSION_INT;
+> > +	writel(adc_hc2, tsc->adc_regs + REG_ADC_HC2);
+> > +
+> > +	adc_hc3 = DISABLE_CONVERSION_INT | SELECT_CHANNEL_1;
+> > +	writel(adc_hc3, tsc->adc_regs + REG_ADC_HC3);
+> > +
+> > +	adc_hc4 = DISABLE_CONVERSION_INT;
+> > +	writel(adc_hc4, tsc->adc_regs + REG_ADC_HC4); }
+> 
+> Is this code similar to initialization of the adc driver? Does it make
+> sense to move this code to the ADC driver?
+ 
+Our IC team misconnect the ADC's channel1 and channel3,  in the TSC logic,
+ADC channel1  --->   Y-
+ADC channel2  --->   Y+
+ADC channel3  --->   X-
+ADC channel4  --->   X+
+The upper connection can make tsc work normal, but our IC team make a mistake,
+in default,  ADC channel1  connect to X-, ADC channel3 connect to Y-.
 
-Ok.
+So these code is just a software workaround, switch the ADC channel1 and channel3,
+to make the TSC work normal.
 
-> >  endif
-> > diff --git a/arch/arm/mach-qcom/board.c b/arch/arm/mach-qcom/board.c
-> > index 6d8bbf7..566487d 100644
-> > --- a/arch/arm/mach-qcom/board.c
-> > +++ b/arch/arm/mach-qcom/board.c
-> > @@ -22,6 +22,7 @@ static const char * const qcom_dt_match[] __initconst = {
-> >  	"qcom,ipq8064",
-> >  	"qcom,msm8660-surf",
-> >  	"qcom,msm8960-cdp",
-> > +	"qcom,ipq40xx-r3pc",
->
-> Please add qcom,ipq40xx instead, so that we don't need to list every
-> single device.
->
-> Also, please keep the list alphabetically sorted.
+So I think we should distinguish these code and the adc initialization.
 
-Ok.
+Best regards,
 
-> >  	NULL
-> >  };
->
-> Regards,
-> Bjorn
+haibo
 
-Thanks for your feedback Bjorn. Will re-work and post the patches.
-Varada
+> 
+> Best regards,
+> 
+> Markus
+> 
+> > +
+> > +/*
+> > + * TSC setting, confige the pre-charge time and measure delay time.
+> > + * different touch screen may need different pre-charge time and
+> > + * measure delay time.
+> > + */
+> > +static void imx6ul_tsc_set(struct imx6ul_tsc *tsc) {
+> > +	int basic_setting = 0;
+> > +	int start;
+> > +
+> > +	basic_setting |= tsc->measure_delay_time << 8;
+> > +	basic_setting |= DETECT_4_WIRE_MODE | AUTO_MEASURE;
+> > +	writel(basic_setting, tsc->tsc_regs + REG_TSC_BASIC_SETING);
+> > +
+> > +	writel(DE_GLITCH_2, tsc->tsc_regs + REG_TSC_DEBUG_MODE2);
+> > +
+> > +	writel(tsc->pre_charge_time, tsc->tsc_regs +
+> REG_TSC_PRE_CHARGE_TIME);
+> > +	writel(MEASURE_INT_EN, tsc->tsc_regs + REG_TSC_INT_EN);
+> > +	writel(MEASURE_SIG_EN | VALID_SIG_EN,
+> > +		tsc->tsc_regs + REG_TSC_INT_SIG_EN);
+> > +
+> > +	/* start sense detection */
+> > +	start = readl(tsc->tsc_regs + REG_TSC_FLOW_CONTROL);
+> > +	start |= START_SENSE;
+> > +	start &= ~TSC_DISABLE;
+> > +	writel(start, tsc->tsc_regs + REG_TSC_FLOW_CONTROL); }
+> > +
+> > +static void imx6ul_tsc_init(struct imx6ul_tsc *tsc) {
+> > +	imx6ul_adc_init(tsc);
+> > +	imx6ul_tsc_channel_config(tsc);
+> > +	imx6ul_tsc_set(tsc);
+> > +}
+> > +
+> > +static irqreturn_t tsc_irq_fn(int irq, void *dev_id) {
+> > +	struct imx6ul_tsc *tsc = (struct imx6ul_tsc *)dev_id;
+> > +	int status;
+> > +	int value;
+> > +	int x, y;
+> > +	int xnur;
+> > +	int debug_mode2;
+> > +	int state_machine;
+> > +	int start;
+> > +	unsigned long timeout;
+> > +
+> > +	status = readl(tsc->tsc_regs + REG_TSC_INT_STATUS);
+> > +
+> > +	/* write 1 to clear the bit measure-signal */
+> > +	writel(MEASURE_SIGNAL | DETECT_SIGNAL,
+> > +		tsc->tsc_regs + REG_TSC_INT_STATUS);
+> > +
+> > +	/* It's a HW self-clean bit. Set this bit and start sense detection
+> */
+> > +	start = readl(tsc->tsc_regs + REG_TSC_FLOW_CONTROL);
+> > +	start |= START_SENSE;
+> > +	writel(start, tsc->tsc_regs + REG_TSC_FLOW_CONTROL);
+> > +
+> > +	if (status & MEASURE_SIGNAL) {
+> > +		value = readl(tsc->tsc_regs + REG_TSC_MEASURE_VALUE);
+> > +		x = (value >> 16) & 0x0fff;
+> > +		y = value & 0x0fff;
+> > +
+> > +		/*
+> > +		 * Delay some time(max 2ms), wait the pre-charge done.
+> > +		 * After the pre-change mode, TSC go into detect mode.
+> > +		 * And in detect mode, we can get the xnur gpio value.
+> > +		 * If xnur is low, this means the touch screen still
+> > +		 * be touched. If xnur is high, this means finger leave
+> > +		 * the touch screen.
+> > +		 */
+> > +		timeout = jiffies + HZ/500;
+> > +		do {
+> > +			if (time_after(jiffies, timeout)) {
+> > +				xnur = 0;
+> > +				goto touch_event;
+> > +			}
+> > +			usleep_range(200, 400);
+> > +			debug_mode2 = readl(tsc->tsc_regs +
+> REG_TSC_DEBUG_MODE2);
+> > +			state_machine = (debug_mode2 >> 20) & 0x7;
+> > +		} while (state_machine != DETECT_MODE);
+> > +		usleep_range(200, 400);
+> > +
+> > +		xnur = gpio_get_value(tsc->xnur_gpio);
+> > +touch_event:
+> > +		if (xnur == 0) {
+> > +			input_report_key(tsc->input, BTN_TOUCH, 1);
+> > +			input_report_abs(tsc->input, ABS_X, x);
+> > +			input_report_abs(tsc->input, ABS_Y, y);
+> > +		} else
+> > +			input_report_key(tsc->input, BTN_TOUCH, 0);
+> > +
+> > +		input_sync(tsc->input);
+> > +	}
+> > +
+> > +	return IRQ_HANDLED;
+> > +}
+> > +
+> > +static irqreturn_t adc_irq_fn(int irq, void *dev_id) {
+> > +	struct imx6ul_tsc *tsc = (struct imx6ul_tsc *)dev_id;
+> > +	int coco;
+> > +	int value;
+> > +
+> > +	coco = readl(tsc->adc_regs + REG_ADC_HS);
+> > +	if (coco & 0x01) {
+> > +		value = readl(tsc->adc_regs + REG_ADC_R0);
+> > +		complete(&tsc->completion);
+> > +	}
+> > +
+> > +	return IRQ_HANDLED;
+> > +}
+> > +
+> > +static const struct of_device_id imx6ul_tsc_match[] = {
+> > +	{ .compatible = "fsl,imx6ul-tsc", },
+> > +	{ /* sentinel */ }
+> > +};
+> > +MODULE_DEVICE_TABLE(of, imx6ul_tsc_match);
+> > +
+> > +static int imx6ul_tsc_probe(struct platform_device *pdev) {
+> > +	struct imx6ul_tsc *tsc;
+> > +	struct resource *tsc_mem;
+> > +	struct resource *adc_mem;
+> > +	struct input_dev *input_dev;
+> > +	struct device_node *np = pdev->dev.of_node;
+> > +	int err;
+> > +	int tsc_irq;
+> > +	int adc_irq;
+> > +
+> > +	tsc = devm_kzalloc(&pdev->dev, sizeof(struct imx6ul_tsc),
+> GFP_KERNEL);
+> > +	input_dev = devm_input_allocate_device(&pdev->dev);
+> > +
+> > +	tsc->dev = &pdev->dev;
+> > +
+> > +	tsc->input = input_dev;
+> > +	tsc->input->evbit[0] = BIT_MASK(EV_KEY) | BIT_MASK(EV_ABS);
+> > +	tsc->input->keybit[BIT_WORD(BTN_TOUCH)] = BIT_MASK(BTN_TOUCH);
+> > +	input_set_abs_params(tsc->input, ABS_X, 0, 0xFFF, 0, 0);
+> > +	input_set_abs_params(tsc->input, ABS_Y, 0, 0xFFF, 0, 0);
+> > +
+> > +	tsc->input->name = "iMX6UL TouchScreen Controller";
+> > +
+> > +	tsc->xnur_gpio = of_get_named_gpio(np, "xnur-gpio", 0);
+> > +	err = gpio_request_one(tsc->xnur_gpio, GPIOF_IN, "tsc_X-");
+> > +	if (err) {
+> > +		dev_err(&pdev->dev, "failed to request GPIO tsc_X-\n");
+> > +		return err;
+> > +	}
+> > +
+> > +	tsc_mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> > +	tsc->tsc_regs = devm_ioremap_resource(&pdev->dev, tsc_mem);
+> > +	if (IS_ERR(tsc->tsc_regs)) {
+> > +		dev_err(&pdev->dev, "failed to remap tsc memory\n");
+> > +		err = PTR_ERR(tsc->tsc_regs);
+> > +		return err;
+> > +	}
+> > +
+> > +	adc_mem = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+> > +	tsc->adc_regs = devm_ioremap_resource(&pdev->dev, adc_mem);
+> > +	if (IS_ERR(tsc->adc_regs)) {
+> > +		dev_err(&pdev->dev, "failed to remap adc memory\n");
+> > +		err = PTR_ERR(tsc->adc_regs);
+> > +		return err;
+> > +	}
+> > +
+> > +	tsc->tsc_clk = devm_clk_get(&pdev->dev, "tsc");
+> > +	if (IS_ERR(tsc->tsc_clk)) {
+> > +		dev_err(&pdev->dev, "failed getting tsc clock\n");
+> > +		err = PTR_ERR(tsc->tsc_clk);
+> > +		return err;
+> > +	}
+> > +
+> > +	tsc->adc_clk = devm_clk_get(&pdev->dev, "adc");
+> > +	if (IS_ERR(tsc->adc_clk)) {
+> > +		dev_err(&pdev->dev, "failed getting adc clock\n");
+> > +		err = PTR_ERR(tsc->adc_clk);
+> > +		return err;
+> > +	}
+> > +
+> > +	tsc_irq = platform_get_irq(pdev, 0);
+> > +	if (tsc_irq < 0) {
+> > +		dev_err(&pdev->dev, "no tsc irq resource?\n");
+> > +		return tsc_irq;
+> > +	}
+> > +
+> > +	adc_irq = platform_get_irq(pdev, 1);
+> > +	if (adc_irq <= 0) {
+> > +		dev_err(&pdev->dev, "no adc irq resource?\n");
+> > +		return adc_irq;
+> > +	}
+> > +
+> > +	err = devm_request_threaded_irq(tsc->dev, tsc_irq,
+> > +					NULL, tsc_irq_fn,
+> > +					IRQF_TRIGGER_HIGH | IRQF_ONESHOT,
+> > +					dev_name(&pdev->dev), tsc);
+> > +	if (err < 0) {
+> > +		dev_err(&pdev->dev,
+> > +			"failed requesting tsc irq %d\n",
+> > +					    tsc_irq);
+> > +		return err;
+> > +	}
+> > +
+> > +	err = devm_request_irq(tsc->dev, adc_irq,
+> > +				adc_irq_fn, 0,
+> > +				dev_name(&pdev->dev), tsc);
+> > +	if (err < 0) {
+> > +		dev_err(&pdev->dev,
+> > +			"failed requesting adc irq %d\n",
+> > +					    adc_irq);
+> > +		return err;
+> > +	}
+> > +
+> > +	err = of_property_read_u32(np, "measure-delay-time",
+> > +				&tsc->measure_delay_time);
+> > +	if (err)
+> > +		tsc->measure_delay_time = 0xffff;
+> > +
+> > +	err = of_property_read_u32(np, "pre-charge-time",
+> > +				&tsc->pre_charge_time);
+> > +	if (err)
+> > +		tsc->pre_charge_time = 0xfff;
+> > +
+> > +	init_completion(&tsc->completion);
+> > +
+> > +	err = clk_prepare_enable(tsc->adc_clk);
+> > +	if (err) {
+> > +		dev_err(&pdev->dev,
+> > +			"Could not prepare or enable the adc clock.\n");
+> > +		return err;
+> > +	}
+> > +
+> > +	err = clk_prepare_enable(tsc->tsc_clk);
+> > +	if (err) {
+> > +		dev_err(&pdev->dev,
+> > +			"Could not prepare or enable the tsc clock.\n");
+> > +		goto error_tsc_clk_enable;
+> > +	}
+> > +
+> > +	err = input_register_device(tsc->input);
+> > +	if (err < 0) {
+> > +		dev_err(&pdev->dev, "failed to register input device\n");
+> > +		err = -EIO;
+> > +		goto err_input_register;
+> > +	}
+> > +
+> > +	imx6ul_tsc_init(tsc);
+> > +
+> > +	platform_set_drvdata(pdev, tsc);
+> > +	return 0;
+> > +
+> > +err_input_register:
+> > +	clk_disable_unprepare(tsc->tsc_clk);
+> > +error_tsc_clk_enable:
+> > +	clk_disable_unprepare(tsc->adc_clk);
+> > +
+> > +	return err;
+> > +}
+> > +
+> > +static void imx6ul_tsc_disable(struct imx6ul_tsc *tsc) {
+> > +	int tsc_flow;
+> > +	int adc_cfg;
+> > +
+> > +	/* TSC controller enters to idle status */
+> > +	tsc_flow = readl(tsc->tsc_regs + REG_TSC_FLOW_CONTROL);
+> > +	tsc_flow |= TSC_DISABLE;
+> > +	writel(tsc_flow, tsc->tsc_regs + REG_TSC_FLOW_CONTROL);
+> > +
+> > +	/* ADC controller enters to stop mode */
+> > +	adc_cfg = readl(tsc->adc_regs + REG_ADC_HC0);
+> > +	adc_cfg |= ADC_CONV_DISABLE;
+> > +	writel(adc_cfg, tsc->adc_regs + REG_ADC_HC0); }
+> > +
+> > +static int imx6ul_tsc_remove(struct platform_device *pdev) {
+> > +	struct imx6ul_tsc *tsc = platform_get_drvdata(pdev);
+> > +
+> > +	imx6ul_tsc_disable(tsc);
+> > +
+> > +	clk_disable_unprepare(tsc->tsc_clk);
+> > +	clk_disable_unprepare(tsc->adc_clk);
+> > +	input_unregister_device(tsc->input);
+> > +	kfree(tsc);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static int __maybe_unused imx6ul_tsc_suspend(struct device *dev) {
+> > +	struct platform_device *pdev = to_platform_device(dev);
+> > +	struct imx6ul_tsc *tsc = platform_get_drvdata(pdev);
+> > +
+> > +	imx6ul_tsc_disable(tsc);
+> > +
+> > +	clk_disable_unprepare(tsc->tsc_clk);
+> > +	clk_disable_unprepare(tsc->adc_clk);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static int __maybe_unused imx6ul_tsc_resume(struct device *dev) {
+> > +	struct platform_device *pdev = to_platform_device(dev);
+> > +	struct imx6ul_tsc *tsc = platform_get_drvdata(pdev);
+> > +	int err;
+> > +
+> > +	err = clk_prepare_enable(tsc->adc_clk);
+> > +	if (err)
+> > +		return err;
+> > +
+> > +	err = clk_prepare_enable(tsc->tsc_clk);
+> > +	if (err) {
+> > +		clk_disable_unprepare(tsc->adc_clk);
+> > +		return err;
+> > +	}
+> > +
+> > +	imx6ul_tsc_init(tsc);
+> > +	return 0;
+> > +}
+> > +
+> > +static SIMPLE_DEV_PM_OPS(imx6ul_tsc_pm_ops,
+> > +			 imx6ul_tsc_suspend,
+> > +			 imx6ul_tsc_resume);
+> > +
+> > +static struct platform_driver imx6ul_tsc_driver = {
+> > +	.driver		= {
+> > +		.name	= "imx6ul-tsc",
+> > +		.owner	= THIS_MODULE,
+> > +		.of_match_table	= imx6ul_tsc_match,
+> > +		.pm	= &imx6ul_tsc_pm_ops,
+> > +	},
+> > +	.probe		= imx6ul_tsc_probe,
+> > +	.remove		= imx6ul_tsc_remove,
+> > +};
+> > +module_platform_driver(imx6ul_tsc_driver);
+> > +
+> > +MODULE_AUTHOR("Haibo Chen <haibo.chen@freescale.com>");
+> > +MODULE_DESCRIPTION("Freescale i.MX6UL Touchscreen controller
+> > +driver"); MODULE_LICENSE("GPL v2");
+> > --
+> > 1.9.1
+> >
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe
+> > linux-kernel" in the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> > Please read the FAQ at  http://www.tux.org/lkml/
+> >
+> 
+> --
+> Pengutronix e.K.                           |
+> |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/
+> |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0
+> |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555
+> |
