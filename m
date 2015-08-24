@@ -1,61 +1,32 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 24 Aug 2015 15:30:44 +0200
-Subject: [PATCH] clockevents/drivers/mtk: Fix spurious interrupt leading to
- crash
-In-Reply-To: <1440167950.20169.29.camel@mtksdaap41>
-References: <1440167950.20169.29.camel@mtksdaap41>
-Message-ID: <1440423045-7883-1-git-send-email-daniel.lezcano@linaro.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 24 Aug 2015 15:35:18 +0200
+Subject: [PATCH 1/5] ARM: dts: sun4i: inet97fv2: Disable unused usb
+ controllers
+In-Reply-To: <1440369446-22195-1-git-send-email-hdegoede@redhat.com>
+References: <1440369446-22195-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <20150824133518.GL2413@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After analysis done by Yingjoe Chen, the timer appears to have a pending
-interrupt when it is enabled.
+On Mon, Aug 24, 2015 at 12:37:22AM +0200, Hans de Goede wrote:
+> The inet97fv2 tablet only has a usb-2 wifi device connected to the second
+> ehci controller, disable the first ehci controller and both ohci
+> controllers.
+> 
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
-Fix this by acknowledging the pending interrupt when enabling the timer
-interrupt.
+Queued, thanks.
 
-Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
----
- drivers/clocksource/mtk_timer.c | 13 +++----------
- 1 file changed, 3 insertions(+), 10 deletions(-)
+Maxime
 
-diff --git a/drivers/clocksource/mtk_timer.c b/drivers/clocksource/mtk_timer.c
-index 4cd16fb..13543a8 100644
---- a/drivers/clocksource/mtk_timer.c
-+++ b/drivers/clocksource/mtk_timer.c
-@@ -156,14 +156,6 @@ static irqreturn_t mtk_timer_interrupt(int irq, void *dev_id)
- 	return IRQ_HANDLED;
- }
- 
--static void mtk_timer_global_reset(struct mtk_clock_event_device *evt)
--{
--	/* Disable all interrupts */
--	writel(0x0, evt->gpt_base + GPT_IRQ_EN_REG);
--	/* Acknowledge all interrupts */
--	writel(0x3f, evt->gpt_base + GPT_IRQ_ACK_REG);
--}
--
- static void
- mtk_timer_setup(struct mtk_clock_event_device *evt, u8 timer, u8 option)
- {
-@@ -183,6 +175,9 @@ static void mtk_timer_enable_irq(struct mtk_clock_event_device *evt, u8 timer)
- {
- 	u32 val;
- 
-+        /* Acknowledge all spurious pending interrupts */
-+        writel(0x3f, evt->gpt_base + GPT_IRQ_ACK_REG);
-+
- 	val = readl(evt->gpt_base + GPT_IRQ_EN_REG);
- 	writel(val | GPT_IRQ_ENABLE(timer),
- 			evt->gpt_base + GPT_IRQ_EN_REG);
-@@ -232,8 +227,6 @@ static void __init mtk_timer_init(struct device_node *node)
- 	}
- 	rate = clk_get_rate(clk);
- 
--	mtk_timer_global_reset(evt);
--
- 	if (request_irq(evt->dev.irq, mtk_timer_interrupt,
- 			IRQF_TIMER | IRQF_IRQPOLL, "mtk_timer", evt)) {
- 		pr_warn("failed to setup irq %d\n", evt->dev.irq);
 -- 
-1.9.1
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150824/c7703755/attachment-0001.sig>
