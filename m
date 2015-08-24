@@ -1,132 +1,152 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 24 Aug 2015 13:48:01 +0100
-Subject: [PATCH v1 3/3] arm64: dts: add Hi6220 mailbox node
-In-Reply-To: <1440411596.3517.12.camel@linaro.org>
-References: <1439977055-1747-1-git-send-email-leo.yan@linaro.org>
- <1439977055-1747-4-git-send-email-leo.yan@linaro.org>
- <20150821184059.GB2000@svinekod>
- <20150824091845.GA28290@leoy-linaro>
- <20150824095144.GA7139@leverpostej>
- <1440411596.3517.12.camel@linaro.org>
-Message-ID: <20150824124800.GD7139@leverpostej>
+From: ykk@rock-chips.com (Yakir Yang)
+Date: Mon, 24 Aug 2015 20:48:01 +0800
+Subject: [PATCH v3 06/14] Documentation: drm/bridge: add document for
+ analogix_dp
+In-Reply-To: <55DA9B72.1030804@samsung.com>
+References: <1439995728-18046-1-git-send-email-ykk@rock-chips.com>
+ <1439995834-18363-1-git-send-email-ykk@rock-chips.com>
+ <CAL_JsqLz+8RtBucctUj4euXZ3Ac0DvB52N9ONpAerh5T9BiTJg@mail.gmail.com>
+ <CAJKOXPeEm8exg_UG0tDnaEGO40ejBKZ-ok=bKbVrwYvXnDaMdg@mail.gmail.com>
+ <55DA8486.1000803@rock-chips.com> <55DA9B72.1030804@samsung.com>
+Message-ID: <55DB1281.9070502@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > > > I don't see why you need reserved-memory here, given you're not referring to
-> > > > these regions by phandle anyway.
-> > > 
-> > > - Now we have enabled EFI_STUB, so the memory node will be removed in
-> > >   kernel:
-> > >     efi_entry()
-> > >       \-> allocate_new_fdt_and_exit_boot()
-> > >             \-> update_fdt();
-> > > 
-> > >   Finally in kernel it cannot use memory node to carve out reseved
-> > >   memory regions.
-> > > 
-> > > - On the other hand, DTS's the memory node is to "describes the
-> > >   physical memory layout for the system"; so it's better to use it only
-> > >   to describe the hardware info for memory. We can use reserved-memory
-> > >   to help manage the memory regions which are reserved from software
-> > >   perspective.
-> > 
-> > The fact that you have no-map means that the memory should not be
-> > described to the kernel as mappable in the first place. It's wrong to
-> > place such memory in the memory node, even if listed in reserved-memory.
-> > 
-> > If your EFI memory map describes the memory as mappable, it is wrong.
-> 
-> When kernel is working, kernel will create its own page table based on
-> UEFI memory map. Since it's reserved in DTS file as Leo's patch, it'll
-> be moved to reserved memblock. Why is it wrong?
+Hi Krzysztof,
 
-That is a _Linux_ detail, not a _UEFI_ detail.
+? 08/24/2015 12:20 PM, Krzysztof Kozlowski ??:
+> On 24.08.2015 11:42, Yakir Yang wrote:
+>> Hi Krzysztof,
+>>
+>> ? 08/23/2015 07:43 PM, Krzysztof Kozlowski ??:
+>>> 2015-08-24 8:23 GMT+09:00 Rob Herring <robherring2@gmail.com>:
+>>>> On Wed, Aug 19, 2015 at 9:50 AM, Yakir Yang <ykk@rock-chips.com> wrote:
+>>>>> Analogix dp driver is split from exynos dp driver, so we just
+>>>>> make an copy of exynos_dp.txt, and then simplify exynos_dp.txt
+>>>>>
+>>>>> Beside update some exynos dtsi file with the latest change
+>>>>> according to the devicetree binding documents.
+>>>> You can't just change the exynos bindings and break compatibility. Is
+>>>> there some agreement with exynos folks to do this?
+>>> No, there is no agreement. This wasn't even sent to Exynos maintainers.
+>> Sorry about this one, actually I have add Exynos maintainers in version
+>> 1 & version 2,
+>> but lose some maintainers in version 3, I would fix it in bellow versions.
+>>
+>>> Additionally the patchset did not look interesting to me because of
+>>> misleading subject - Documentation instead of "ARM: dts:".
+>>>
+>>> Yakir, please:
+>>> 1. Provide backward compatibility. Mark old properties as deprecated
+>>> but still support them.
+>> Do you mean that I should keep the old properties declare in exynos-dp.txt,
+>> but just mark them as deprecated flag.
+> That is one of ways how to do this. However more important is that
+> driver should still support old bindings so such code:
+> -       if (of_property_read_u32(dp_node, "samsung,color-space",
+> +       if (of_property_read_u32(dp_node, "analogix,color-space",
+>
+> is probably wrong. Will the driver support old DTB in the same way as it
+> was supporting before the change?
 
-Anything which only handles UEFI and knows nothing of reserved-memory
-(e.g. GRUB) will be broken and/or break the Linux use of the region, as
-it will happily try to allocate memory in the region (and could even
-decide to reserve it permanently for its own usage).
+Okay, I got your means. So document is not the focus, the most important 
+is that
+driver should support the old dts prop. If so the new analogix dp driver 
+should keep
+the "samsung,color-space", rather then just mark it with [DEPRECATED] flag.
 
-If the memory is truly specific to the mailbox, then UEFI needs to know
-that it is reserved as such. If it is not, then it need not be described
-in the DT and can be allocated dynamically by the kernel.
+But from your follow suggest, I think you agree to update driver code, 
+and just mark
+old prop with deprecated flag. If so I think such code would not be wrong
 
-> In the second, UEFI is firmware. When it's stable, nobody should change
-> it without any reason. These reserved memory are used in mailbox driver.
-> Look. It's driver, so it could be changed at any time. Why do you want
-> to UEFI knowing this memory range? Do you hope UEFI to change when
-> mailbox driver is changed?
+-       if (of_property_read_u32(dp_node, "samsung,color-space",
++      if (of_property_read_u32(dp_node, "analogix,color-space",
 
-It shouldn't need to change if that memory is truly reserved for the
-sole use of the mailbox. If that's not the case then we have a different
-issue.
+And actually @Rob have suggest me to remove the prefix, just use 
+"color-space" here.
 
-If the memory range to use can be allocated by the driver, then I don't
-see why it should be described in reserved-memory. It certainly should
-not require a no-map attribute.
+>
+>> Let me show same examples, make
+>> me understand your suggest rightly.
+> exynos-dp already contains deprecated properties. Other ways of doing
+> this would be:
+> Documentation/devicetree/bindings/input/touchscreen/touchscreen.txt
+> Documentation/devicetree/bindings/rtc/s3c-rtc.txt
+>
+> It depends up to you. The "touchscreen" looks good because it organizes
+> old properties in a common section. In case of exynos-dp.txt you can add
+> at beginning of file information about new bindings and mark everything
+> deprecated.
 
-Additionally, the driver needs to ensure that the requisite cache
-maintenance takes place prior to the use of the memory region given
-prior agents may have ampped it as cacheable, leaving stale (perhaps
-dirty) lines in the caches.
+Whoops, thanks for your remind, I prefer the "touchscreen" style.
 
-> > > According to upper info, we still need to use reserved-memory node to
-> > > depict the reserved memory regions. i have no knowledge about EFI_STUB,
-> > > so please confirm or correct as needed.
-> > 
-> > If the memory shouldn't be mapped, it should neither be in the memory
-> > node nor EFI memory map (with attributes allowing it to be mapped) to
-> > begin with.
-> 
-> As I said above, kernel will create its own page table. When kernel's
-> page table is working, UEFI's page table is destroying. So the memory
-> won't be mapped twice at the same time. What's wrong?
-> > 
-> > As far as I can see you do not need to use reserved-memory.
-> 
-> 1. Are we talking on the same thing? Leo already mentioned that all
-> memory node in DTB will be destroyed by kernel when EFI_STUB is enabled
-> on arm. Did you read the source code after his reply?
-> And you suggested that Leo to use discrete memory region in DTB. It is
-> really wrong. Kernel only gets memory map information from UEFI, not
-> DTB.
+>> 1. "samsung,ycbcr-coeff" is abandoned in latest analogix-dp driver,
+>> absolutely
+>>      I should not carry this to analogix-dp.txt document. But I should
+>> keep this in
+>>      exynos-dp.txt document, and mark them with an little "deprecated" flag.
+>>
+>> [Documentation/devicetree/bindings/video/exynos_dp.txt]
+>> Required properties for dp-controller:
+>>     [...]
+>>      -samsung,ycbcr-coeff (DEPRECATED):
+>>          YCbCr co-efficients for input video.
+>>              COLOR_YCBCR601 = 0, COLOR_YCBCR709 = 1
+>>
+>> Is it right ?
+> Yes, this is right.
+>
+>>> 2. Separate all DTS changes to a separate patch, unless bisectability
+>>> would be hurt. Anyway you should prepare it in a such way that
+>>> separation would be possible without breaking bisectability.
+>> So I should separate this patch into two parts, one is name "Document:",
+>> the other is "ARM: dts: ".
+> Yes.
+>
+>> Honestly, I don't understand what the "bisectability" means in this case.
+> I was referring to bisectability in general. The patchset should be
+> fully bisectable which means that it does not introduce any issues
+> during "git bisect". This effectively means that at each intermediate
+> step (after applying each patch, one by one) every existing stuff works
+> the same as previously without any regression. Including booting with
+> old DTB.
 
-I did _not_ suggest that Leo use discrete memory. I suggested that
-reserved regions should not be described in the memory node (the same
-premise applying to the UEFI memory map).
+Oh, thanks for your careful explain, so I guess your first comment is 
+talking about
+the "bisectability" that if I only apply the 01 - 05 patches, kernel 
+could not bootup
+normally, cause driver need "analogix,color-space" but DTB only have 
+"samsung,color-space".
 
-w.r.t. UEFI, please see my comments above. If you're using the UEFI
-memory map, you have to use the UEFI memory map, not the UEFI memory map
-with additional (non-UEFI) caveats applied atop.
+>
+>>> 3. Use proper subject for the patch changing DTS. This is not
+>>> documentation change!
+>> Hmm... when I separate this patch into two parts, I though I can keep
+>> "Documentation" proper subject in this patch, and the other is the "ARM:
+>> dts"
+>> proper subject. Am I right ?
+> Yes, you're right.
+>
+>>> 4. Please use script get_maintainers to obtain list of valid
+>>> maintainers and CC-them with at least cover letter and patches
+>>> requiring their attention.
+>> Yeah, thanks.
+> Sure. Now I found older versions of the patchset but previously there
+> were no changes to the bindings. Again the prefix in subject is
+> important to easily filter out and find necessary emails.
+>
+> BTW, I like the patchset because I like in general works which merge
+> code and reduce duplicate stuff.
 
-> 2. The working flow is in below.
->    a. Kernel gets memory map information from UEFI.
->    b. Kernel loads the memory reserved information from DTB.
+Aha, thanks  :-D
 
-This relies on Linux, and ignores other UEFI clients.
+Best regards,
+- Yakir
 
-> 3. Do you mean the reserved-memory is totally wrong? If it's wrong,
-> please submit patches to remove all reserved-memory in linux kernel
-> first.
-
-I did not say that.
-
-I said that describing some memory in a memory node, then also
-describing that in reserved-memory with a no-map property was wrong. If
-it's never meant to be mapped then there's no reason for it to be in the
-memory node.
-
-> 4. Again and again. Memory node should be only used to describe the
-> RAM information.
-
-The memory node describes the memory available to the OS. There are some
-caveats w.r.t. /memreserve/, regions which may be mapped but remain
-unused and so on, but the memory node does generally encode a policy
-that the memory may be used.
-
-Describing unusable memory in a memory node is pointless, and has an
-adverse effect on clients which don't support reserved-memory. It's
-doubly harmful when that memory should never be mapped.
-
-Thanks,
-Mark.
+> Best regards,
+> Krzysztof
+>
+>
+>
+>
+>
