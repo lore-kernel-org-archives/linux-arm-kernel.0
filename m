@@ -1,31 +1,29 @@
 From: gabriel.fernandez@linaro.org (Gabriel Fernandez)
-Date: Mon, 24 Aug 2015 11:40:04 +0200
-Subject: [PATCH 1/1] ARM: DT: STi: STiH418: Fix mmc0 clock configuration
-Message-ID: <1440409204-11108-1-git-send-email-gabriel.fernandez@linaro.org>
+Date: Mon, 24 Aug 2015 11:40:47 +0200
+Subject: [PATCH v2 0/4] ST PLL improvement
+Message-ID: <1440409251-11166-1-git-send-email-gabriel.fernandez@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch configure correctly the MMC-0 clock for STiH418 platform.
+Changes in v2:
+ - Add const for st_pll4600c28_418_a9 structure
+ - Use readl_relaxed_poll_timeout macro instead Jiffies
+ - Add patch to enable stih418 A9 pll via DT.
 
-Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
----
- arch/arm/boot/dts/stih418-b2199.dts | 4 ++++
- 1 file changed, 4 insertions(+)
+This patchset is based on '[PATCH 0/2] ST PLL fixes for 4.3'
 
-diff --git a/arch/arm/boot/dts/stih418-b2199.dts b/arch/arm/boot/dts/stih418-b2199.dts
-index 82eee39..7a03ca6 100644
---- a/arch/arm/boot/dts/stih418-b2199.dts
-+++ b/arch/arm/boot/dts/stih418-b2199.dts
-@@ -85,6 +85,10 @@
- 			sd-uhs-sdr50;
- 			sd-uhs-sdr104;
- 			sd-uhs-ddr50;
-+
-+			assigned-clocks = <&clk_s_c0_flexgen CLK_MMC_0>;
-+			assigned-clock-parents = <&clk_s_c0_pll1 0>;
-+			assigned-clock-rates = <200000000>;
- 		};
- 
- 		miphy28lp_phy: miphy28lp at 9b22000 {
+Gabriel Fernandez (4):
+  drivers: clk: st: Support for enable/disable in Clockgen PLLs
+  drivers: clk: st: PLL rate change implementation for DVFS
+  drivers: clk: st: Correct the pll-type for A9 for stih418
+  ARM: STi: DT: Add support for stih418 A9 pll
+
+ .../devicetree/bindings/clock/st/st,clkgen-pll.txt |   1 +
+ arch/arm/boot/dts/stih418-clock.dtsi               |   2 +-
+ drivers/clk/st/clkgen-mux.c                        |   3 +
+ drivers/clk/st/clkgen-pll.c                        | 469 ++++++++++++++++++++-
+ drivers/clk/st/clkgen.h                            |   2 +
+ 5 files changed, 468 insertions(+), 9 deletions(-)
+
 -- 
 1.9.1
