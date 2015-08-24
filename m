@@ -1,54 +1,68 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Mon, 24 Aug 2015 12:22:33 -0700
-Subject: Prevent list poison values from being mapped by userspace
- processes
-In-Reply-To: <20150824191427.GF7557@n2100.arm.linux.org.uk>
-References: <CABXk95C=CpeL4mNmS6-jJ-0bMJf6fawwfs6DM1-p8FctTEFbpw@mail.gmail.com>
- <20150821133043.GV7557@n2100.arm.linux.org.uk>
- <CAGXu5jJ8KOoVkx99rrajEEx77Z6zO4TzCXaXkB74zv9QQFuJFw@mail.gmail.com>
- <20150824184709.GE7557@n2100.arm.linux.org.uk>
- <CAGXu5jJFf+9OgnGt_Cx5Q-Pht7LAT7M-sSXftTDORybrr+SECg@mail.gmail.com>
- <20150824191427.GF7557@n2100.arm.linux.org.uk>
-Message-ID: <CAGXu5jLW-nfUr40cit25_GsBrPJ6e0topdBQ1RY6vSm2dBFyDA@mail.gmail.com>
+From: tj@kernel.org (Tejun Heo)
+Date: Mon, 24 Aug 2015 15:24:53 -0400
+Subject: ahci_imx: can read corrupted data successfully
+In-Reply-To: <20150824105501.GX7557@n2100.arm.linux.org.uk>
+References: <20150824105501.GX7557@n2100.arm.linux.org.uk>
+Message-ID: <20150824192453.GD28944@mtj.duckdns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 24, 2015 at 12:14 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Aug 24, 2015 at 11:51:04AM -0700, Kees Cook wrote:
->> On Mon, Aug 24, 2015 at 11:47 AM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->> > That's something which Catalin indicated that he'll work on.  However,
->> > he said in a public email last week that he won't be around for a while.
->> >
->> > So, I have no immediate solution for LPAE - it looks like LPAE will
->> > require switching the page tables on kernel entry or exit, and again
->> > each and every time we want to perform a userspace access.  How this
->> > is done is not something that has been discussed, and neither do we
->> > yet know how expensive this will be.  There are a number of places in
->> > the kernel where a large number of get_user()s or put_user()s follow
->> > one after each other, which necessitates switching back and forth
->> > multiple times.  We may need to address some of those areas by
->> > converting them to copy_(to|from)_user().
->>
->> By the way, have you looked at grsecurity's implementation of these
->> protections? They've been using domains for a while now, and I think
->> have an LPAE solution as well.
->
-> *Sigh*.
->
-> No, and I really don't care - if people want to do development work out
-> of the mainline kernel and not bother to talk about getting it upstream,
-> it's their loss.  As far as I'm concerned, such external work doesn't
-> exist.
+Hello, Russell.
 
-Sure, I understand, but it's worth at least looking at to compare
-feature sets. For example, when doing the W^X kernel memory work, I
-looked at both qcom and spender's work, trying to get the best of both
-into upstreamable shape.
+On Mon, Aug 24, 2015 at 11:55:01AM +0100, Russell King - ARM Linux wrote:
+> I've no idea how this is happening, but it appears that it's possible
+> to read corrupted data over an eSATA link.
+> 
+> The setup is a Solid-run Cubox-i4pro connected to an external eSATA 2.5"
+> enclosure with a Corsair Neutron 128GB SSD.
+> 
+> While the issue seems to be the generally poor quality of eSATA cables
+> (I have two eSATA enclosures, the other enclosure's eSATA cable
+> interferes with a Logitech wireless receiver - I've had to wrap the
+> cable in aluminium foil.)  However, it shouldn't be possible to
+> successfully read faulty data in that condition - and this is what I
+> find most worrying.
+> 
+> What I've noticed is that at boot, the the SSD is sometimes properly
+> detected, other times it isn't:
+...
+> ata1.00: ATA-8: Corsair Neutron SSD, M311, max UDMA/133
+> ata1.00: 250069680 sectors, multi 1: LBA48 NCQ (depth 31/32)
+...
+> ata1: SATA link up 3.0 Gbps (SStatus 123 SControl 300)
+> ata1.00: ATA-8: , , max UDMA/133
+> ata1.00: 250069680 sectors, multi 1: LBA48
+...
 
--Kees
+It'd be interesting to see the ID data being returned.
+"libata.force=dump_id" should do it but bit flips during transfer or
+outright incorrect DMA won't lead to the above result.  Looks more
+like the firmware on the drive side getting terminally confused.
+
+...
+> How does SATA ensure command and data integrity over the link?  I'd
+> assume that there's a CRC present on the data, like UDMA on PATA.  How
+> are CRC errors supposed to be reported?  Is it possible that ahci_imx
+> and other layers are not properly checking for CRC errors?
+
+IIRC, the 8/10b encoding does running parity and there's per-frame
+(packet) CRC too.  Link and frame integrity is always checked by
+hardware.  Reporting and handling can be different depending on which
+party detects the error tho.
+
+> Any ideas what to look at?
+> 
+> Anyone got any suggestions on where to get a good quality, but not
+> stupidly expensive eSATA cable from?
+> 
+> I'm waiting for it to happen again, and I'll dump out more of the drive's
+> "contents" when the cable is bad.  If it is the drive's firmware, it
+> should contain the manufacturer name/model somewhere in the image.
+
+I highly doubt this is something happening on the controller / link
+side.  Looks like a messed up drive firmware to me.
+
+Thanks.
 
 -- 
-Kees Cook
-Chrome OS Security
+tejun
