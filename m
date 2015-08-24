@@ -1,74 +1,135 @@
 From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Mon, 24 Aug 2015 09:25:54 +0800
-Subject: [RFC PATCH v7 02/10] mmc: dw_mmc: use macro for HCON register
- operations
-In-Reply-To: <1440379479-24308-1-git-send-email-shawn.lin@rock-chips.com>
-References: <1440379479-24308-1-git-send-email-shawn.lin@rock-chips.com>
-Message-ID: <1440379554-24444-1-git-send-email-shawn.lin@rock-chips.com>
+Date: Mon, 24 Aug 2015 09:24:39 +0800
+Subject: [RFC PATCH v7 0/10] Add external dma support for Synopsys MSHC
+Message-ID: <1440379479-24308-1-git-send-email-shawn.lin@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add some macros for HCON register operations
-to make code more readable.
 
-Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
----
+Synopsys DesignWare mobile storage host controller supports three
+types of transfer mode: pio, internal dma and external dma. However,
+dw_mmc can only supports pio and internal dma now. Thus some platforms
+using dw-mshc integrated with generic dma can't work in dma mode. So we
+submit this patch to achieve it.
 
-Changes in v7: None
-Changes in v6: None
-Changes in v5: None
-Changes in v4: None
-Changes in v3: None
-Changes in v2: None
+And the config option, CONFIG_MMC_DW_IDMAC, was added by Will Newton
+(commit:f95f3850) for the first version of dw_mmc and never be touched since
+then. At that time dt-bindings hadn't been introduced into dw_mmc yet means
+we should select CONFIG_MMC_DW_IDMAC to enable internal dma mode at compile
+time. Nowadays, device-tree helps us to support a variety of boards with one
+kernel. That's why we need to remove it and decide the transfer mode by reading
+dw_mmc's HCON reg at runtime.
 
- drivers/mmc/host/dw_mmc.c | 6 +++---
- drivers/mmc/host/dw_mmc.h | 3 +++
- 2 files changed, 6 insertions(+), 3 deletions(-)
+This RFC patch needs lots of ACKs. I know it's hard, but it does need someone
+to make the running.
 
-diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-index 9c91983..0a3c63c 100644
---- a/drivers/mmc/host/dw_mmc.c
-+++ b/drivers/mmc/host/dw_mmc.c
-@@ -2678,7 +2678,7 @@ static void dw_mci_init_dma(struct dw_mci *host)
- 		* Check ADDR_CONFIG bit in HCON to find
- 		* IDMAC address bus width
- 		*/
--		addr_config = (mci_readl(host, HCON) >> 27) & 0x01;
-+		addr_config = SDMMC_GET_ADDR_CONFIG(mci_readl(host, HCON));
- 
- 		if (addr_config == 1) {
- 			/* host supports IDMAC in 64-bit address mode */
-@@ -3060,7 +3060,7 @@ int dw_mci_probe(struct dw_mci *host)
- 	 * Get the host data width - this assumes that HCON has been set with
- 	 * the correct values.
- 	 */
--	i = (mci_readl(host, HCON) >> 7) & 0x7;
-+	i = SDMMC_GET_HDATA_WIDTH(mci_readl(host, HCON));
- 	if (!i) {
- 		host->push_data = dw_mci_push_data16;
- 		host->pull_data = dw_mci_pull_data16;
-@@ -3142,7 +3142,7 @@ int dw_mci_probe(struct dw_mci *host)
- 	if (host->pdata->num_slots)
- 		host->num_slots = host->pdata->num_slots;
- 	else
--		host->num_slots = ((mci_readl(host, HCON) >> 1) & 0x1F) + 1;
-+		host->num_slots = SDMMC_GET_SLOT_NUM(mci_readl(host, HCON));
- 
- 	/*
- 	 * Enable interrupts for command done, data over, data empty,
-diff --git a/drivers/mmc/host/dw_mmc.h b/drivers/mmc/host/dw_mmc.h
-index 811d467..f2a88d4 100644
---- a/drivers/mmc/host/dw_mmc.h
-+++ b/drivers/mmc/host/dw_mmc.h
-@@ -154,6 +154,9 @@
- #define DMA_INTERFACE_GDMA		(0x2)
- #define DMA_INTERFACE_NODMA		(0x3)
- #define SDMMC_GET_TRANS_MODE(x)		(((x)>>16) & 0x3)
-+#define SDMMC_GET_SLOT_NUM(x)		((((x)>>1) & 0x1F) + 1)
-+#define SDMMC_GET_HDATA_WIDTH(x)	(((x)>>7) & 0x7)
-+#define SDMMC_GET_ADDR_CONFIG(x)	(((x)>>27) & 0x1)
- /* Internal DMAC interrupt defines */
- #define SDMMC_IDMAC_INT_AI		BIT(9)
- #define SDMMC_IDMAC_INT_NI		BIT(8)
+Patch does the following things:
+- remove CONFIG_MMC_DW_IDMAC config option
+- add bindings for edmac used by synopsys-dw-mshc
+  at runtime
+- add edmac support for synopsys-dw-mshc
+
+Patch is based on next of git://git.linaro.org/people/ulf.hansson/mmc
+
+Test emmc throughput on my platform with edmac support and without edmac support(pio only)
+iozone -L64 -S32 -azecwI -+n -r4k -r64k -r128k -s1g -i0 -i1 -i2 -f datafile -Rb out.xls > /mnt/result.txt
+(light cpu loading, Direct IO, fixed line size, all pattern recycle, 1GB data in total)
+ ___________________________________________________________
+|                   external dma mode                       |
+|-----------------------------------------------------------|
+|blksz | Random Read | Random Write | Seq Read   | Seq Write|
+|-----------------------------------------------------------|
+|4kB   |  13953kB/s  |    8602kB/s  | 13672kB/s  |  9785kB/s|
+|-----------------------------------------------------------|
+|64kB  |  46058kB/s  |   24794kB/s  | 48058kB/s  | 25418kB/s|
+|-----------------------------------------------------------|
+|128kB |  57026kB/s  |   35117kB/s  | 57375kB/s  | 35183kB/s|
+|-----------------------------------------------------------|
+                           VS
+ ___________________________________________________________
+|                          pio mode                         |
+|-----------------------------------------------------------|
+|blksz | Random Read  | Random Write | Seq Read  | Seq Write|
+|-----------------------------------------------------------|
+|4kB   |  11720kB/s   |    8644kB/s  | 11549kB/s |  9624kB/s|
+|-----------------------------------------------------------|
+|64kB  |  21869kB/s   |   24414kB/s  | 22031kB/s | 27986kB/s|
+|-----------------------------------------------------------|
+|128kB |  23718kB/s   |   34495kB/s  | 24698kB/s | 34637kB/s|
+|-----------------------------------------------------------|
+
+
+Changes in v7:
+- rebased on Ulf's next
+- combine condition state
+- elaborate more about DMA_INTERFACE
+- define some macro for DMA_INERFACE value
+- spilt HCON ops' changes into another patch
+
+Changes in v6:
+- add trans_mode condition for IDMAC initialization
+  suggested by Heiko
+- re-test my patch on rk3188 platform and update commit msg
+- update performance of pio vs edmac in cover letter
+
+Changes in v5:
+- add the title of cover letter
+- fix typo of comment
+- add macro for reading HCON register
+- add "Acked-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>" for exynos_defconfig patch
+- add "Acked-by: Vineet Gupta <vgupta@synopsys.com>" for axs10x_defconfig patch
+- add "Acked-by: Govindraj Raja <govindraj.raja@imgtec.com>" and
+  "Acked-by: Ralf Baechle <ralf@linux-mips.org>" for pistachio_defconfig patch
+- add "Acked-by: Joachim Eastwood <manabian@gmail.com>" for lpc18xx_defconfig patch
+- add "Acked-by: Wei Xu <xuwei5@hisilicon.com>" for hisi_defconfig patch
+- rebase on "https://github.com/jh80chung/dw-mmc.git tags/dw-mmc-for-ulf-v4.2" for merging easily
+
+Changes in v4:
+- remove "host->trans_mode" and use "host->use_dma" to indicate
+  transfer mode.
+- remove all bt-bindings' changes since we don't need new properities.
+- check transfer mode at runtime by reading HCON reg
+- spilt defconfig changes for each sub-architecture
+- fix the title of cover letter
+- reuse some code for reducing code size
+
+Changes in v3:
+- choose transfer mode at runtime
+- remove all CONFIG_MMC_DW_IDMAC config option
+- add supports-idmac property for some platforms
+
+Changes in v2:
+- Fix typo of dev_info msg
+- remove unused dmach from declaration of dw_mci_dma_slave
+
+Shawn Lin (10):
+  mmc: dw_mmc: Add external dma interface support
+  mmc: dw_mmc: use macro for HCON register operations
+  Documentation: synopsys-dw-mshc: add bindings for idmac and edmac
+  mips: pistachio_defconfig: remove CONFIG_MMC_DW_IDMAC
+  arc: axs10x_defconfig: remove CONFIG_MMC_DW_IDMAC
+  arm: exynos_defconfig: remove CONFIG_MMC_DW_IDMAC
+  arm: hisi_defconfig: remove CONFIG_MMC_DW_IDMAC
+  arm: lpc18xx_defconfig: remove CONFIG_MMC_DW_IDMAC
+  arm: multi_v7_defconfig: remove CONFIG_MMC_DW_IDMAC
+  arm: zx_defconfig: remove CONFIG_MMC_DW_IDMAC
+
+ .../devicetree/bindings/mmc/synopsys-dw-mshc.txt   |  25 ++
+ arch/arc/configs/axs101_defconfig                  |   1 -
+ arch/arc/configs/axs103_defconfig                  |   1 -
+ arch/arc/configs/axs103_smp_defconfig              |   1 -
+ arch/arm/configs/exynos_defconfig                  |   1 -
+ arch/arm/configs/hisi_defconfig                    |   1 -
+ arch/arm/configs/lpc18xx_defconfig                 |   1 -
+ arch/arm/configs/multi_v7_defconfig                |   1 -
+ arch/arm/configs/zx_defconfig                      |   1 -
+ arch/mips/configs/pistachio_defconfig              |   1 -
+ drivers/mmc/host/Kconfig                           |  11 +-
+ drivers/mmc/host/dw_mmc-pltfm.c                    |   2 +
+ drivers/mmc/host/dw_mmc.c                          | 277 +++++++++++++++++----
+ drivers/mmc/host/dw_mmc.h                          |   9 +
+ include/linux/mmc/dw_mmc.h                         |  23 +-
+ 15 files changed, 283 insertions(+), 73 deletions(-)
+
 -- 
 2.3.7
