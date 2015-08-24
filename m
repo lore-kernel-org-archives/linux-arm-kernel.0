@@ -1,85 +1,38 @@
-From: petr.cvek@tul.cz (Petr Cvek)
-Date: Mon, 24 Aug 2015 05:39:57 +0200
-Subject: [PATCH v2 01/21] ARM: pxa: magician: Fix Kconfig for magician to
- always include htc-egpio
-In-Reply-To: <1439969382.11928.6.camel@gmail.com>
-References: <cover.1439843482.git.petr.cvek@tul.cz> <55D25880.3030507@tul.cz>
- <87zj1o8n3w.fsf@belgarion.home> <55D38F60.7010405@tul.cz>
- <1439969382.11928.6.camel@gmail.com>
-Message-ID: <55DA920D.4030605@tul.cz>
+From: leilk.liu@mediatek.com (Leilk Liu)
+Date: Mon, 24 Aug 2015 11:45:14 +0800
+Subject: [PATCHi v3 0/4] Fixup mediatek spi driver 
+Message-ID: <1440387918-22191-1-git-send-email-leilk.liu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne 19.8.2015 v 09:29 Philipp Zabel napsal(a):
-> Am Dienstag, den 18.08.2015, 22:02 +0200 schrieb Petr Cvek:
->> Dne 18.8.2015 v 20:31 Robert Jarzmik napsal(a):
->>> Petr Cvek <petr.cvek@tul.cz> writes:
->>>
->>>> The htc-egpio driver should be always included in the kernel as 
->>>> it
->>>> controls MMC/charging/IrDA power, which is the only way to get
->>>> an useful rootfs.
->>>>
->>>> Signed-off-by: Petr Cvek <petr.cvek@tul.cz>
->>> It's already defined in magician_defconfig, why enforce it in 
->>> Kconfig ?
->>
->> Good remark, I did not use defconfig at all (as I had to fix from 
->> zero configuration + I did not know if defconfig works and will be 
->> supported in the future).
->>
->> I will check if magician_defconfig needs to be updated (probably for 
->> leds).
->>
->>>
->>> And if it's enforced and I want to build a kernel for magician 
->>> without
->>> MMC/charging/IrDA, why should I be forced to build in HTC_EGPIO ?
->>>
->>> Or said differently, does a kernel without HTC_EGPIO is proven to 
->>> fail 100%
->>> without this option ?
->>
->> Kernel will probably run OK, but the phone will be unusable (for any 
->> practical purposes). The EGPIO chip (CPLD) will stay in the state 
->> programmed from the previous environment (bootloader or WinCE/Mobile) 
->> and drivers fail to init because of the missing EGPIO (and if they 
->> init, they will be without any idea about state of the peripherals 
->> (no charger detection/charging current stuck on the previous 
->> settings, no LCD backlight control, no IrDA, no rootfs, no GSM, no 
->> sound, no LEDs).
->>
->> Different PCB revisions probably use EGPIO pin for LCD power (and at 
->> least on my phone, LCD power must have very specific order).
->>
->> For future (when ROM XIP will work) I would like to be able boot 
->> kernel from flash, which itself uses EGPIO for Vpp control (another 
->> initial EGPIO configuration). Last possible boot is from JTAG and 
->> there will be no previous EGPIO initialization.
->>
->> Petr
-> 
-> I agree with Robert, let's drop this patch.
-As finishing patchset v3 I've finally got enough deterministic configuration.
+From: Leilk Liu <leilk.liu@mediatek.com>
 
-Situation A:
-	Most code same as v2 patchset (GPIO init, devices, ...)
-	RTC patch (not in patchset, but vanilla causes errors during boot)
-	Boot from bootloader (htc-tools), kernel from RAM 
-	Rootfs on SDHC
-	EGPIO driver in kernel
-	-> boot
-Situation B:
-	EGPIO disabled
-	-> every EGPIO requests fail (bad LCD readability, but most probably by -EDEFER)
-	mci driver fails to start (SD card power EGPIO and others are not found)
-	kernel prints cannot open root device ...
-	there is kernel panic from rootfs mount (stackdump with some *mount* function name)
+This series are based on 4.2-rc1 and provide four patches to fix mediatek spi driver.
 
--> So it seems EGPIO driver is required for standard boot.
+Change in v3:
+1. The follow patches are applied, so remove them from series:
+  - spi: mediatek: fix spi incorrect endian usage
+  - spi: medaitek: revise quirks compatibility style
+  - spi: mediatek: use BIT() to instead of SPI_CMD_*_OFFSET
+2. The patch "spi: mediatek: revise coding style" title is not clear, so split it to four patches.
 
-When trying to boot with initrd, the htc-boot will freeze during image upload (around 5 MB of initrd, not enough for rootfs), but maybe I'm doing something wrong. 
+Change in v2:
+1. The patch "spi: mediatek: remove redundant clock in prepare_hardware/unprepare_hardware" 
+   is applied, so remove it from series.
+2. fix incorrect endian usage to support little-endian and big-endian system.
+3. revise quirks style to bool.
+4. use BIT() to instead of SPI_CMD_*_OFFSET.
+5. revise coding style, such as time name, and variable type. 
 
--> Without initrd, there is no way to get useful rootfs.
+Leilk Liu (4):
+  spi: mediatek: add linux/io.h include file
+  spi: mediatek: replace int with u32, delete TAB and define
+    MTK_SPI_PAUSE_INT_STATUS marco
+  spi: mediatek: add PM clk_prepare_enable fail flow
+  spi: mediatek: replace *_time name
 
-Petr
+ drivers/spi/spi-mt65xx.c | 52 ++++++++++++++++++++++++++++--------------------
+ 1 file changed, 30 insertions(+), 22 deletions(-)
+
+--
+1.8.1.1.dirty
