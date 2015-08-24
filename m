@@ -1,66 +1,115 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Mon, 24 Aug 2015 11:51:04 -0700
-Subject: Prevent list poison values from being mapped by userspace
- processes
-In-Reply-To: <20150824184709.GE7557@n2100.arm.linux.org.uk>
-References: <CABXk95C=CpeL4mNmS6-jJ-0bMJf6fawwfs6DM1-p8FctTEFbpw@mail.gmail.com>
- <20150821133043.GV7557@n2100.arm.linux.org.uk>
- <CAGXu5jJ8KOoVkx99rrajEEx77Z6zO4TzCXaXkB74zv9QQFuJFw@mail.gmail.com>
- <20150824184709.GE7557@n2100.arm.linux.org.uk>
-Message-ID: <CAGXu5jJFf+9OgnGt_Cx5Q-Pht7LAT7M-sSXftTDORybrr+SECg@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 24 Aug 2015 13:53:38 -0500
+Subject: [PATCH v4 1/2] Documentation: dt: Add Xilinx zynqmp dma device
+ tree binding documentation
+In-Reply-To: <1438831173-8761-1-git-send-email-punnaia@xilinx.com>
+References: <1438831173-8761-1-git-send-email-punnaia@xilinx.com>
+Message-ID: <CAL_Jsq+261JzSorbgEyQ4BFCHbsFsBaJQnpWJX-G=SX3yhqZJw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 24, 2015 at 11:47 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Aug 24, 2015 at 11:06:52AM -0700, Kees Cook wrote:
->> On Fri, Aug 21, 2015 at 6:30 AM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->> > On Tue, Aug 18, 2015 at 02:42:44PM -0700, Jeffrey Vander Stoep wrote:
->> >> List poison pointer values point to memory that is mappable by
->> >> userspace. i.e. LIST_POISON1 = 0x00100100 and LIST_POISON2 =
->> >> 0x00200200. This means poison values can be valid pointers controlled
->> >> by userspace and can be used to exploit the kernel as demonstrated in
->> >> a recent blackhat talk:
->> >> https://www.blackhat.com/docs/us-15/materials/us-15-Xu-Ah-Universal-Android-Rooting-Is-Back-wp.pdf
->> >>
->> >> Can these poison values be moved to an area not mappable by userspace
->> >> on 32 bit ARM?
->> >
->> > As was discussed privately before your message, both Catalin and myself
->> > agreed that this is not possible, and I proposed alternatives which were
->> > feasible.
->> >
->> > I have now implemented the domain access alternative which I mentioned
->> > during that discussion, which is suitable for all non-LPAE setups, which
->> > has the effect of blocking almost all implicit kernel accesses to
->> > userspace, thereby substantially reducing the possibility for an attack
->> > similar to that given in the above paper.
->>
->> What's the right solution for LPAE setups?
+On Wed, Aug 5, 2015 at 10:19 PM, Punnaiah Choudary Kalluri
+<punnaiah.choudary.kalluri@xilinx.com> wrote:
+> Device-tree binding documentation for Xilinx zynqmp dma engine used in
+> Zynq UltraScale+ MPSoC.
 >
-> That's something which Catalin indicated that he'll work on.  However,
-> he said in a public email last week that he won't be around for a while.
+> Signed-off-by: Punnaiah Choudary Kalluri <punnaia@xilinx.com>
+> ---
+> Changes in v4:
+> - None
+> Changes in v3:
+> - None
+> Changes in v2:
+> - None
+> ---
+>  .../devicetree/bindings/dma/xilinx/zynqmp_dma.txt  |   61 ++++++++++++++++++++
+>  1 files changed, 61 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/dma/xilinx/zynqmp_dma.txt
 >
-> So, I have no immediate solution for LPAE - it looks like LPAE will
-> require switching the page tables on kernel entry or exit, and again
-> each and every time we want to perform a userspace access.  How this
-> is done is not something that has been discussed, and neither do we
-> yet know how expensive this will be.  There are a number of places in
-> the kernel where a large number of get_user()s or put_user()s follow
-> one after each other, which necessitates switching back and forth
-> multiple times.  We may need to address some of those areas by
-> converting them to copy_(to|from)_user().
+> diff --git a/Documentation/devicetree/bindings/dma/xilinx/zynqmp_dma.txt b/Documentation/devicetree/bindings/dma/xilinx/zynqmp_dma.txt
+> new file mode 100644
+> index 0000000..e4f92b9
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/dma/xilinx/zynqmp_dma.txt
+> @@ -0,0 +1,61 @@
+> +Xilinx ZynqMP DMA engine, it does support memory to memory transfers,
+> +memory to device and device to memory transfers. It also has flow
+> +control and rate control support for slave/peripheral dma access.
+> +
+> +Required properties:
+> +- compatible: Should be "xlnx,zynqmp-dma-1.0"
+> +- #dma-cells: Should be <1>, a single cell holding a line request number
+> +- reg: Memory map for module access
+> +- interrupt-parent: Interrupt controller the interrupt is routed through
+> +- interrupts: Should contain DMA channel interrupt
+> +- xlnx,bus-width: AXI buswidth in bits. Should contain 128 or 64
+> +
+> +Optional properties:
+> +- xlnx,include-sg: Indicates the controller to operate in simple or scatter
+> +                  gather dma mode
+> +- xlnx,ratectrl: Scheduling interval in terms of clock cycles for
+> +                source AXI transaction
+> +- xlnx,overfetch: Tells whether the channel is allowed to over fetch the data
+> +- xlnx,src-issue: Number of AXI outstanding transactions on source side
+> +- xlnx,desc-axi-cohrnt: Tells whether the AXI transactions generated for the
+> +                       descriptor read are marked Non-coherent
+> +- xlnx,src-axi-cohrnt: Tells whether the AXI transactions generated for the
+> +                       source descriptor payload are marked Non-coherent
+> +- xlnx,dst-axi-cohrnt: Tells whether the AXI transactions generated for the
+> +                       dst descriptor payload are marked Non-coherent
 
-By the way, have you looked at grsecurity's implementation of these
-protections? They've been using domains for a while now, and I think
-have an LPAE solution as well.
+Do you really need 3? dma-coherent property doesn't work for you?
 
-The original description of the work was here:
-https://forums.grsecurity.net/viewtopic.php?f=7&t=3292
+Not that it should dictate the binding, but the kernel doesn't support
+a device needing both coherent and non-coherent DMA ops.
 
--Kees
+> +- xlnx,desc-axi-qos: AXI QOS bits to be used for descriptor fetch
+> +- xlnx,src-axi-qos: AXI QOS bits to be used for data read
+> +- xlnx,dst-axi-qos: AXI QOS bits to be used for data write
+> +- xlnx,desc-axi-cache: AXI cache bits to be used for descriptor fetch.
+> +- xlnx,desc-axi-cache: AXI cache bits to be used for data read
+> +- xlnx,desc-axi-cache: AXI cache bits to be used for data write
 
--- 
-Kees Cook
-Chrome OS Security
+These signals are generally part of the coherent or not setting. This
+allows for potentially invalid combinations.
+
+Plus you have a copy/paste error.
+
+> +- xlnx,src-burst-len: AXI length for data read. Support only power of 2 values
+> +                     i.e 1,2,4,8 and 16
+> +- xlnx,dst-burst-len: AXI length for data write. Support only power of 2 values
+> +                     i.e 1,2,4,8 and 16
+> +
+> +Example:
+> +++++++++
+> +fpd_dma_chan1: dma at FD500000 {
+> +       compatible = "xlnx,zynqmp-dma-1.0";
+> +       reg = <0x0 0xFD500000 0x1000>;
+> +       #dma_cells = <1>;
+> +       interrupt-parent = <&gic>;
+> +       interrupts = <0 117 4>;
+> +       xlnx,bus-width = <128>;
+> +       xlnx,include-sg;
+> +       xlnx,overfetch;
+> +       xlnx,ratectrl = <0>;
+> +       xlnx,src-issue = <16>;
+> +       xlnx,desc-axi-cohrnt;
+> +       xlnx,src-axi-cohrnt;
+> +       xlnx,dst-axi-cohrnt;
+> +       xlnx,desc-axi-qos = <0>;
+> +       xlnx,desc-axi-cache = <0>;
+> +       xlnx,src-axi-qos = <0>;
+> +       xlnx,src-axi-cache = <2>;
+> +       xlnx,dst-axi-qos = <0>;
+> +       xlnx,dst-axi-cache = <2>;
+> +       xlnx,src-burst-len = <4>;
+> +       xlnx,dst-burst-len = <4>;
+> +};
+> --
+> 1.7.4
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
