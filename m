@@ -1,53 +1,60 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 24 Aug 2015 10:00:43 +0200
-Subject: [PATCH 0/2] arm64: ignore memory outside of the linear range
-In-Reply-To: <CY1PR0301MB0748FC71E6866C8AFACAAFF687780@CY1PR0301MB0748.namprd03.prod.outlook.com>
-References: <1439890482-20798-1-git-send-email-ard.biesheuvel@linaro.org>
- <CY1PR0301MB0748FC71E6866C8AFACAAFF687780@CY1PR0301MB0748.namprd03.prod.outlook.com>
-Message-ID: <CAKv+Gu-OQ4VyCqe=mEDOrrfAtAWTfRtAiqXMGSVjJxOH6xi4Ow@mail.gmail.com>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Mon, 24 Aug 2015 13:32:21 +0530
+Subject: [PATCH v2 0/7] Add support for Exynos SROM Controller driver
+Message-ID: <1440403348-8974-1-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 August 2015 at 16:18, Stuart Yoder <stuart.yoder@freescale.com> wrote:
->
->
->> -----Original Message-----
->> From: Ard Biesheuvel [mailto:ard.biesheuvel at linaro.org]
->> Sent: Tuesday, August 18, 2015 4:35 AM
->> To: linux-arm-kernel at lists.infradead.org; mark.rutland at arm.com; catalin.marinas at arm.com; robh at kernel.org
->> Cc: grant.likely at linaro.org; Yoder Stuart-B08248; will.deacon at arm.com; Ard Biesheuvel
->> Subject: [PATCH 0/2] arm64: ignore memory outside of the linear range
->>
->> This is a followup to the single patch I posted on Aug 15th to ignore
->> RAM that cannot be covered by the linear mapping. Instead of clipping
->> the memory after the fact, this clips the memory before installing the
->> regions into the memblock memory table.
->>
->> This is basically the approach that Mark Rutland suggested here
->>
->> http://article.gmane.org/gmane.linux.ports.arm.kernel/430239
->>
->> but modified to correctly consider the base of the kernel image as the
->> start of the linear mapping.
->>
->> Ard Biesheuvel (2):
->>   of/fdt: make memblock maximum physical address arch configurable
->>   arm64: set MAX_MEMBLOCK_ADDR according to linear region size
->>
->>  arch/arm64/include/asm/memory.h |  8 ++++++++
->>  drivers/of/fdt.c                | 12 +++++++-----
->>  2 files changed, 15 insertions(+), 5 deletions(-)
->
-> Tested on Freescale LS2085ARDB which has a split memory region
-> that triggers the bug.
->
-> Tested-by: Stuart Yoder <stuart.yoder@freescale.com>
->
+This patch set adds support for Exynos SROM controller DT based driver.
+Currently SROM register sets are used only during S2R, so driver
+basically added for taking care of S2R. It will help us in removing
+static mapping from exynos.c and other extra code handline during S2R.
 
-Hi Will,
+This patch set also updated exynos4 and exynos5 dtsi files for with device
+node for srom, and added binding documentation for the same.
 
-Will you be picking up this series for v4.3? If so, do you need me to
-resend it with the tags added?
+First two patches are some minor cleanup in mach-exynos.
 
-Thanks,
-Ard.
+Patchset v1 was posted here[1]
+[1]: https://lkml.org/lkml/2015/4/29/98
+
+Changes since v1:
+ - Rebased to latest kgene tree.
+ - Addressed review comments from Krzysztof Kozlowski.
+ - Add two new patches for minor cleanup in exynos.c and map.h
+
+Pankaj Dubey (7):
+  ARM: EXYNOS: remove unused static mapping of CMU for exynos5
+  ARM: EXYNOS: code cleanup in map.h
+  drivers: soc: add support for exynos SROM driver
+  ARM: EXYNOS: Remove SROM related register settings from mach-exynos
+  ARM: dts: add SROM device node for exynos4
+  ARM: dts: add SROM device node for exynos5
+  Documentation: dt-bindings: add exynos-srom binding information
+
+ .../bindings/arm/samsung/exynos-srom.txt           |  12 ++
+ arch/arm/boot/dts/exynos4.dtsi                     |   5 +
+ arch/arm/boot/dts/exynos5.dtsi                     |   5 +
+ arch/arm/mach-exynos/Kconfig                       |   2 +
+ arch/arm/mach-exynos/common.h                      |   2 -
+ arch/arm/mach-exynos/exynos.c                      |  22 ----
+ arch/arm/mach-exynos/include/mach/map.h            |   8 --
+ arch/arm/mach-exynos/regs-srom.h                   |  53 --------
+ arch/arm/mach-exynos/suspend.c                     |  20 +--
+ arch/arm/plat-samsung/include/plat/map-s5p.h       |   1 -
+ drivers/soc/Kconfig                                |   1 +
+ drivers/soc/Makefile                               |   1 +
+ drivers/soc/samsung/Kconfig                        |  13 ++
+ drivers/soc/samsung/Makefile                       |   1 +
+ drivers/soc/samsung/exynos-srom.c                  | 143 +++++++++++++++++++++
+ drivers/soc/samsung/exynos-srom.h                  |  51 ++++++++
+ 16 files changed, 236 insertions(+), 104 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/samsung/exynos-srom.txt
+ delete mode 100644 arch/arm/mach-exynos/regs-srom.h
+ create mode 100644 drivers/soc/samsung/Kconfig
+ create mode 100644 drivers/soc/samsung/Makefile
+ create mode 100644 drivers/soc/samsung/exynos-srom.c
+ create mode 100644 drivers/soc/samsung/exynos-srom.h
+
+-- 
+2.4.5
