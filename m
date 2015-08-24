@@ -1,43 +1,107 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 24 Aug 2015 11:45:02 +0200
-Subject: [PATCH v3 2/2] drivers: rtc: add xilinx zynqmp rtc driver
-In-Reply-To: <55DAE15B.6090602@xilinx.com>
-References: <1439978002-12157-1-git-send-email-suneel.garapati@xilinx.com>
- <1439978002-12157-2-git-send-email-suneel.garapati@xilinx.com>
- <20150824074310.GF13155@piout.net> <55DACC5A.80707@xilinx.com>
- <20150824080800.GG13155@piout.net> <55DAE15B.6090602@xilinx.com>
-Message-ID: <20150824094502.GI13155@piout.net>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 24 Aug 2015 10:51:45 +0100
+Subject: [PATCH v1 3/3] arm64: dts: add Hi6220 mailbox node
+In-Reply-To: <20150824091845.GA28290@leoy-linaro>
+References: <1439977055-1747-1-git-send-email-leo.yan@linaro.org>
+ <1439977055-1747-4-git-send-email-leo.yan@linaro.org>
+ <20150821184059.GB2000@svinekod>
+ <20150824091845.GA28290@leoy-linaro>
+Message-ID: <20150824095144.GA7139@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/08/2015 at 11:18:19 +0200, Michal Simek wrote :
-> > I'm not fond of carrying patches with uncontactable authors. Is that a
-> > permanent error?
+On Mon, Aug 24, 2015 at 10:18:45AM +0100, Leo Yan wrote:
+> Hi Mark,
 > 
-> Unfortunately. That guy left Xilinx last week but don't be scared that
-> none will be responsible about this driver. I have well proven history
-> on Linux and others project and I am here if you need to do some testing
-> or ACK for changes. Just let me know when you need something.
+> On Fri, Aug 21, 2015 at 07:40:59PM +0100, Mark Rutland wrote:
+> > On Wed, Aug 19, 2015 at 10:37:35AM +0100, Leo Yan wrote:
+> > > On Hi6220, below memory regions in DDR have specific purpose:
+> > > 
+> > >   0x05e0,0000 - 0x05ef,ffff: For MCU firmware using at runtime;
+> > >   0x0740,f000 - 0x0740,ffff: For MCU firmware's section;
+> > >   0x06df,f000 - 0x06df,ffff: For mailbox message data.
+> > > 
+> > > This patch reserves these memory regions and add device node for
+> > > mailbox in dts.
+> > > 
+> > > Signed-off-by: Leo Yan <leo.yan@linaro.org>
+> > > ---
+> > >  arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 20 +++++++++++++++++---
+> > >  arch/arm64/boot/dts/hisilicon/hi6220.dtsi      |  8 ++++++++
+> > >  2 files changed, 25 insertions(+), 3 deletions(-)
+> > > 
+> > > diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+> > > index e36a539..d5470d3 100644
+> > > --- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+> > > +++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+> > > @@ -7,9 +7,6 @@
+> > >  
+> > >  /dts-v1/;
+> > >  
+> > > -/*Reserved 1MB memory for MCU*/
+> > > -/memreserve/ 0x05e00000 0x00100000;
+> > > -
+> > >  #include "hi6220.dtsi"
+> > >  
+> > >  / {
+> > > @@ -28,4 +25,21 @@
+> > >  		device_type = "memory";
+> > >  		reg = <0x0 0x0 0x0 0x40000000>;
+> > >  	};
+> > > +
+> > > +	reserved-memory {
+> > > +		#address-cells = <2>;
+> > > +		#size-cells = <2>;
+> > > +		ranges;
+> > > +
+> > > +		mcu-buf at 05e00000 {
+> > > +			no-map;
+> > > +			reg = <0x0 0x05e00000 0x0 0x00100000>,	/* MCU firmware buffer */
+> > > +			      <0x0 0x0740f000 0x0 0x00001000>;	/* MCU firmware section */
+> > > +		};
+> > > +
+> > > +		mbox-buf at 06dff000 {
+> > > +			no-map;
+> > > +			reg = <0x0 0x06dff000 0x0 0x00001000>;	/* Mailbox message buf */
+> > > +		};
+> > > +	};
+> > 
+> > As far as I can see, it would be simpler to simply carve these out of the
+> > memory node.
+> > 
+> > I don't see why you need reserved-memory here, given you're not referring to
+> > these regions by phandle anyway.
 > 
-> get_maintainer returns me and Soren that's why you shouldn't have any
-> problem with it.
+> - Now we have enabled EFI_STUB, so the memory node will be removed in
+>   kernel:
+>     efi_entry()
+>       \-> allocate_new_fdt_and_exit_boot()
+>             \-> update_fdt();
 > 
-> [linux]$ ./scripts/get_maintainer.pl -f drivers/rtc/rtc-zynqmp.c
-> Alessandro Zummo <a.zummo@towertech.it> (maintainer:REAL TIME CLOCK
-> (RTC) SUBSYSTEM)
-> Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> (maintainer:REAL TIME CLOCK (RTC) SUBSYSTEM)
-> Michal Simek <michal.simek@xilinx.com> (supporter:ARM/ZYNQ ARCHITECTURE)
-> "S?ren Brinkmann" <soren.brinkmann@xilinx.com> (reviewer)
-> rtc-linux at googlegroups.com (open list:REAL TIME CLOCK (RTC) SUBSYSTEM)
-> linux-arm-kernel at lists.infradead.org (moderated list:ARM/ZYNQ ARCHITECTURE)
-> linux-kernel at vger.kernel.org (open list)
+>   Finally in kernel it cannot use memory node to carve out reseved
+>   memory regions.
 > 
+> - On the other hand, DTS's the memory node is to "describes the
+>   physical memory layout for the system"; so it's better to use it only
+>   to describe the hardware info for memory. We can use reserved-memory
+>   to help manage the memory regions which are reserved from software
+>   perspective.
 
-Perfect, thanks!
+The fact that you have no-map means that the memory should not be
+described to the kernel as mappable in the first place. It's wrong to
+place such memory in the memory node, even if listed in reserved-memory.
 
+If your EFI memory map describes the memory as mappable, it is wrong.
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+> According to upper info, we still need to use reserved-memory node to
+> depict the reserved memory regions. i have no knowledge about EFI_STUB,
+> so please confirm or correct as needed.
+
+If the memory shouldn't be mapped, it should neither be in the memory
+node nor EFI memory map (with attributes allowing it to be mapped) to
+begin with.
+
+As far as I can see you do not need to use reserved-memory.
+
+Thanks,
+Mark.
