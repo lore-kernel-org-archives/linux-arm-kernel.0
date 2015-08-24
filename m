@@ -1,68 +1,69 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 24 Aug 2015 15:39:02 +0200
-Subject: [linux-sunxi] Re: [PATCH] net: sun4i-emac: Claim emac sram
-In-Reply-To: <55DAE137.4040306@redhat.com>
-References: <1440354698-11144-1-git-send-email-hdegoede@redhat.com>
- <20150824074605.GF2413@lukather> <55DAE137.4040306@redhat.com>
-Message-ID: <20150824133902.GQ2413@lukather>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 24 Aug 2015 14:42:05 +0100
+Subject: [PATCH] arm64/kvm: set {v,}TCR_EL2 RES1 bits
+Message-ID: <1440423725-31700-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 24, 2015 at 11:17:43AM +0200, Hans de Goede wrote:
-> Hi,
-> 
-> On 24-08-15 09:46, Maxime Ripard wrote:
-> >Hi Hans,
-> >
-> >On Sun, Aug 23, 2015 at 08:31:38PM +0200, Hans de Goede wrote:
-> >>Claim the emac sram ourselves, rather then relying on the bootloader
-> >>having mapped the sram to the emac controller during boot.
-> >>
-> >>Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> >>---
-> >>  drivers/net/ethernet/allwinner/sun4i-emac.c | 13 +++++++++++--
-> >>  1 file changed, 11 insertions(+), 2 deletions(-)
-> >>
-> >>diff --git a/drivers/net/ethernet/allwinner/sun4i-emac.c b/drivers/net/ethernet/allwinner/sun4i-emac.c
-> >>index bab01c84..48ce83e 100644
-> >>--- a/drivers/net/ethernet/allwinner/sun4i-emac.c
-> >>+++ b/drivers/net/ethernet/allwinner/sun4i-emac.c
-> >>@@ -28,6 +28,7 @@
-> >>  #include <linux/of_platform.h>
-> >>  #include <linux/platform_device.h>
-> >>  #include <linux/phy.h>
-> >>+#include <linux/soc/sunxi/sunxi_sram.h>
-> >>
-> >>  #include "sun4i-emac.h"
-> >>
-> >>@@ -857,11 +858,17 @@ static int emac_probe(struct platform_device *pdev)
-> >>
-> >>  	clk_prepare_enable(db->clk);
-> >>
-> >>+	ret = sunxi_sram_claim(&pdev->dev);
-> >>+	if (ret) {
-> >>+		dev_err(&pdev->dev, "Error couldn't map SRAM to device\n");
-> >>+		goto out;
-> >
-> >Shouldn't you disable you clock too?
-> 
-> You're right, but that is a pre-existing problem, iow an unrelated
-> issue.
-> 
-> I've put doing a follow-up patch for this on my todo list.
+Currently we don't set the RES1 bits of TCR_EL2 and VTCR_EL2 when
+configuring them, which could lead to unexpected behaviour when an
+architectural meaning is defined for those bits.
 
-Thanks.
+Set the RES1 bits to avoid issues.
 
-Maxime
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Christoffer Dall <christoffer.dall@linaro.org>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Suzuki Poulose <suzuki.poulose@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/include/asm/kvm_arm.h | 10 +++++++---
+ 1 file changed, 7 insertions(+), 3 deletions(-)
 
+diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+index ac6fafb..d0dac88 100644
+--- a/arch/arm64/include/asm/kvm_arm.h
++++ b/arch/arm64/include/asm/kvm_arm.h
+@@ -95,6 +95,7 @@
+ 			 SCTLR_EL2_SA | SCTLR_EL2_I)
+ 
+ /* TCR_EL2 Registers bits */
++#define TCR_EL2_RES1	((1 << 31) | (1 << 23))
+ #define TCR_EL2_TBI	(1 << 20)
+ #define TCR_EL2_PS	(7 << 16)
+ #define TCR_EL2_PS_40B	(2 << 16)
+@@ -106,9 +107,10 @@
+ #define TCR_EL2_MASK	(TCR_EL2_TG0 | TCR_EL2_SH0 | \
+ 			 TCR_EL2_ORGN0 | TCR_EL2_IRGN0 | TCR_EL2_T0SZ)
+ 
+-#define TCR_EL2_FLAGS	(TCR_EL2_PS_40B)
++#define TCR_EL2_FLAGS	(TCR_EL2_RES1 | TCR_EL2_PS_40B)
+ 
+ /* VTCR_EL2 Registers bits */
++#define VTCR_EL2_RES1		(1 << 31)
+ #define VTCR_EL2_PS_MASK	(7 << 16)
+ #define VTCR_EL2_TG0_MASK	(1 << 14)
+ #define VTCR_EL2_TG0_4K		(0 << 14)
+@@ -147,7 +149,8 @@
+  */
+ #define VTCR_EL2_FLAGS		(VTCR_EL2_TG0_64K | VTCR_EL2_SH0_INNER | \
+ 				 VTCR_EL2_ORGN0_WBWA | VTCR_EL2_IRGN0_WBWA | \
+-				 VTCR_EL2_SL0_LVL1 | VTCR_EL2_T0SZ_40B)
++				 VTCR_EL2_SL0_LVL1 | VTCR_EL2_T0SZ_40B | \
++				 VTCR_EL2_RES1)
+ #define VTTBR_X		(38 - VTCR_EL2_T0SZ_40B)
+ #else
+ /*
+@@ -158,7 +161,8 @@
+  */
+ #define VTCR_EL2_FLAGS		(VTCR_EL2_TG0_4K | VTCR_EL2_SH0_INNER | \
+ 				 VTCR_EL2_ORGN0_WBWA | VTCR_EL2_IRGN0_WBWA | \
+-				 VTCR_EL2_SL0_LVL1 | VTCR_EL2_T0SZ_40B)
++				 VTCR_EL2_SL0_LVL1 | VTCR_EL2_T0SZ_40B | \
++				 VTCR_EL2_RES1)
+ #define VTTBR_X		(37 - VTCR_EL2_T0SZ_40B)
+ #endif
+ 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150824/54747424/attachment.sig>
+1.9.1
