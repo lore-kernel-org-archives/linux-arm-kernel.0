@@ -1,194 +1,66 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 24 Aug 2015 19:08:19 +0100
-Subject: [PATCH v2 07/15] KVM: arm64: handle ITS related GICv3
- redistributor registers
-In-Reply-To: <55CC8AE2.2070807@linaro.org>
-References: <1436538111-4294-1-git-send-email-andre.przywara@arm.com>
- <1436538111-4294-8-git-send-email-andre.przywara@arm.com>
- <55CC8AE2.2070807@linaro.org>
-Message-ID: <55DB5D93.3090007@arm.com>
+From: Shenwei.Wang@freescale.com (Shenwei Wang)
+Date: Mon, 24 Aug 2015 18:25:07 +0000
+Subject: [PATCH v8 1/2] irqchip: imx-gpcv2: IMX GPCv2 driver for wakeup
+ sources
+In-Reply-To: <alpine.DEB.2.11.1508241933150.3873@nanos>
+References: <1438378439-11569-1-git-send-email-shenwei.wang@freescale.com>
+ <1438378439-11569-2-git-send-email-shenwei.wang@freescale.com>
+ <alpine.DEB.2.11.1508231251040.3873@nanos>
+ <CY1PR0301MB084328829F8128A8FBFA6A9283620@CY1PR0301MB0843.namprd03.prod.outlook.com>
+ <alpine.DEB.2.11.1508241933150.3873@nanos>
+Message-ID: <BY1PR0301MB0839B8F390ABA092FB80362083620@BY1PR0301MB0839.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
 
-On 13/08/15 13:17, Eric Auger wrote:
-> On 07/10/2015 04:21 PM, Andre Przywara wrote:
->> In the GICv3 redistributor there are the PENDBASER and PROPBASER
->> registers which we did not emulate so far, as they only make sense
->> when having an ITS. In preparation for that emulate those MMIO
->> accesses by storing the 64-bit data written into it into a variable
->> which we later read in the ITS emulation.
->>
->> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->> ---
->>  include/kvm/arm_vgic.h      |  8 ++++++++
->>  virt/kvm/arm/vgic-v3-emul.c | 44 ++++++++++++++++++++++++++++++++++++++++++++
->>  virt/kvm/arm/vgic.c         | 35 +++++++++++++++++++++++++++++++++++
->>  virt/kvm/arm/vgic.h         |  4 ++++
->>  4 files changed, 91 insertions(+)
->>
->> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
->> index 3ee063b..8c6cb0e 100644
->> --- a/include/kvm/arm_vgic.h
->> +++ b/include/kvm/arm_vgic.h
->> @@ -256,6 +256,14 @@ struct vgic_dist {
->>  	struct vgic_vm_ops	vm_ops;
->>  	struct vgic_io_device	dist_iodev;
->>  	struct vgic_io_device	*redist_iodevs;
->> +
->> +	/* Address of LPI configuration table shared by all redistributors */
->> +	u64			propbaser;
->> +
->> +	/* Addresses of LPI pending tables per redistributor */
->> +	u64			*pendbaser;
->> +
->> +	bool			lpis_enabled;
->>  };
->>  
->>  struct vgic_v2_cpu_if {
->> diff --git a/virt/kvm/arm/vgic-v3-emul.c b/virt/kvm/arm/vgic-v3-emul.c
->> index a8cf669..5269ad1 100644
->> --- a/virt/kvm/arm/vgic-v3-emul.c
->> +++ b/virt/kvm/arm/vgic-v3-emul.c
->> @@ -651,6 +651,38 @@ static bool handle_mmio_cfg_reg_redist(struct kvm_vcpu *vcpu,
->>  	return vgic_handle_cfg_reg(reg, mmio, offset);
->>  }
->>  
->> +/* We don't trigger any actions here, just store the register value */
->> +static bool handle_mmio_propbaser_redist(struct kvm_vcpu *vcpu,
->> +					 struct kvm_exit_mmio *mmio,
->> +					 phys_addr_t offset)
->> +{
->> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
->> +	int mode = ACCESS_READ_VALUE;
->> +
->> +	/* Storing a value with LPIs already enabled is undefined */
->> +	mode |= dist->lpis_enabled ? ACCESS_WRITE_IGNORED : ACCESS_WRITE_VALUE;
->> +	vgic_handle_base_register(vcpu, mmio, offset, &dist->propbaser, mode);
->> +
->> +	return false;
->> +}
->> +
->> +/* We don't trigger any actions here, just store the register value */
->> +static bool handle_mmio_pendbaser_redist(struct kvm_vcpu *vcpu,
->> +					 struct kvm_exit_mmio *mmio,
->> +					 phys_addr_t offset)
->> +{
->> +	struct kvm_vcpu *rdvcpu = mmio->private;
->> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
->> +	int mode = ACCESS_READ_VALUE;
->> +
->> +	/* Storing a value with LPIs already enabled is undefined */
->> +	mode |= dist->lpis_enabled ? ACCESS_WRITE_IGNORED : ACCESS_WRITE_VALUE;
->> +	vgic_handle_base_register(vcpu, mmio, offset,
->> +				  &dist->pendbaser[rdvcpu->vcpu_id], mode);
->> +
->> +	return false;
->> +}
->> +
->>  #define SGI_base(x) ((x) + SZ_64K)
->>  
->>  static const struct vgic_io_range vgic_redist_ranges[] = {
->> @@ -679,6 +711,18 @@ static const struct vgic_io_range vgic_redist_ranges[] = {
->>  		.handle_mmio    = handle_mmio_raz_wi,
->>  	},
->>  	{
->> +		.base		= GICR_PENDBASER,
->> +		.len		= 0x08,
->> +		.bits_per_irq	= 0,
->> +		.handle_mmio	= handle_mmio_pendbaser_redist,
->> +	},
->> +	{
->> +		.base		= GICR_PROPBASER,
->> +		.len		= 0x08,
->> +		.bits_per_irq	= 0,
->> +		.handle_mmio	= handle_mmio_propbaser_redist,
->> +	},
->> +	{
->>  		.base           = GICR_IDREGS,
->>  		.len            = 0x30,
->>  		.bits_per_irq   = 0,
->> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
->> index 15e447f..49ee92b 100644
->> --- a/virt/kvm/arm/vgic.c
->> +++ b/virt/kvm/arm/vgic.c
->> @@ -446,6 +446,41 @@ void vgic_reg_access(struct kvm_exit_mmio *mmio, u32 *reg,
->>  	}
->>  }
->>  
->> +/* handle a 64-bit register access */
->> +void vgic_handle_base_register(struct kvm_vcpu *vcpu,
->> +			       struct kvm_exit_mmio *mmio,
->> +			       phys_addr_t offset, u64 *basereg,
->> +			       int mode)
->> +{
-> why do we have vcpu in the proto? I don't see it used. Also if it were
-> can't we fetch it from mmio->private?
-> 
-> why not renaming this into something like vgic_reg64_access as par
-> vgic_reg_access 32b flavor above. vgic_handle* usually is the name of
-> the region handler returning bool?
 
-Makes sense, I both renamed the function and removed the vcpu parameter.
-I need to check whether we need the vcpu to do some endianness checks in
-the future, though. Using mmio->private would be a hack, then.
+> -----Original Message-----
+> From: Thomas Gleixner [mailto:tglx at linutronix.de]
+> > > > +static int gpcv2_wakeup_source_save(void) {
+> > > > +	struct gpcv2_irqchip_data *cd;
+> > > > +	void __iomem *reg;
+> > > > +	int i;
+> > > > +
+> > > > +	cd = imx_gpcv2_instance;
+> > > > +	if (!cd)
+> > > > +		return 0;
+> > > > +
+> > > > +	for (i = 0; i < IMR_NUM; i++) {
+> > > > +		reg = cd->gpc_base + cd->cpu2wakeup + i * 4;
+> > > > +		cd->enabled_irqs[i] = readl_relaxed(reg);
+> > >
+> > > You read the full state of the register and restore the full state.
+> > > So why enabled_irqs?
+> >
+> > There are two user scenarios:
+> > In CPU Idle state, the system need to be woke up by any enabled irqs,
+> > not just the ones that marked as wakeup sources.
+> > In Suspend State, they system will only be woke up by the one that
+> > marked as a wakeup source.  Enabled_irqs are used to save the values
+> > before suspend, and restore them after resume.
+> 
+> That's what you want achieve. Still you save the full content of the registers and
+> restore the full content. That saves/restores the enabled and disabled interrupts.
+> So enabled_irqs is a misnomer as you save the full state.
 
-Cheers,
-Andre.
+How about change its name to "saved_irq_mask"?
 
+> > > set_wake() or leave it when they want to have resume functionality?
+> > >
+> > Each time system goes into the suspend state, it will call set_wake
+> > (ON) again to configure the wakeup sources. Clearing wakeup_sources
+> > here can make sure the system work as expected no matter that a driver
+> > calls set_wake (OFF) during resume stage.
 > 
->> +	u32 reg;
->> +	u64 breg;
->> +
->> +	switch (offset & ~3) {
->> +	case 0x00:
->> +		breg = *basereg;
->> +		reg = lower_32_bits(breg);
->> +		vgic_reg_access(mmio, &reg, offset & 3, mode);
->> +		if (mmio->is_write && (mode & ACCESS_WRITE_VALUE)) {
->> +			breg &= GENMASK_ULL(63, 32);
->> +			breg |= reg;
->> +			*basereg = breg;
->> +		}
->> +		break;
->> +	case 0x04:
->> +		breg = *basereg;
->> +		reg = upper_32_bits(breg);
->> +		vgic_reg_access(mmio, &reg, offset & 3, mode);
->> +		if (mmio->is_write && (mode & ACCESS_WRITE_VALUE)) {
->> +			breg  = lower_32_bits(breg);
->> +			breg |= (u64)reg << 32;
->> +			*basereg = breg;
->> +		}
->> +		break;
->> +	}
->> +}
->> +
->> +
->> +
-> some spare white lines
+> We rather make sure that the drivers call set_wake(OFF) as they are supposed to,
+> because if they do not then the set_wake(ON) logic in the core code will see the
+> counter != 0 and not invoke the irq callback.
+
+Sounds reasonable. Then I will remove this line in new patch.
+
+Thanks,
+Shenwei
+
+> Thanks,
 > 
-> Best Regards
-> 
-> Eric
->>  bool handle_mmio_raz_wi(struct kvm_vcpu *vcpu, struct kvm_exit_mmio *mmio,
->>  			phys_addr_t offset)
->>  {
->> diff --git a/virt/kvm/arm/vgic.h b/virt/kvm/arm/vgic.h
->> index a093f5c..b2d791c 100644
->> --- a/virt/kvm/arm/vgic.h
->> +++ b/virt/kvm/arm/vgic.h
->> @@ -71,6 +71,10 @@ void vgic_reg_access(struct kvm_exit_mmio *mmio, u32 *reg,
->>  		     phys_addr_t offset, int mode);
->>  bool handle_mmio_raz_wi(struct kvm_vcpu *vcpu, struct kvm_exit_mmio *mmio,
->>  			phys_addr_t offset);
->> +void vgic_handle_base_register(struct kvm_vcpu *vcpu,
->> +			       struct kvm_exit_mmio *mmio,
->> +			       phys_addr_t offset, u64 *basereg,
->> +			       int mode);
->>  
->>  static inline
->>  u32 mmio_data_read(struct kvm_exit_mmio *mmio, u32 mask)
->>
-> 
+> 	tglx
