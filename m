@@ -1,37 +1,52 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Mon, 24 Aug 2015 13:32:27 +0530
-Subject: [PATCH v2 6/7] ARM: dts: add SROM device node for exynos5
-In-Reply-To: <1440403348-8974-1-git-send-email-pankaj.dubey@samsung.com>
-References: <1440403348-8974-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <1440403348-8974-7-git-send-email-pankaj.dubey@samsung.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 24 Aug 2015 10:08:00 +0200
+Subject: [PATCH v3 2/2] drivers: rtc: add xilinx zynqmp rtc driver
+In-Reply-To: <55DACC5A.80707@xilinx.com>
+References: <1439978002-12157-1-git-send-email-suneel.garapati@xilinx.com>
+ <1439978002-12157-2-git-send-email-suneel.garapati@xilinx.com>
+ <20150824074310.GF13155@piout.net> <55DACC5A.80707@xilinx.com>
+Message-ID: <20150824080800.GG13155@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add SROM controller device node for exynos5.
+On 24/08/2015 at 09:48:42 +0200, Michal Simek wrote :
+> On 08/24/2015 09:43 AM, Alexandre Belloni wrote:
+> > On 19/08/2015 at 15:23:22 +0530, Suneel Garapati wrote :
+> >> adds support for RTC controller found on
+> >> Xilinx Zynq Ultrascale+ MPSoC platform.
+> >>
+> >> Signed-off-by: Suneel Garapati <suneel.garapati@xilinx.com>
+> >> ---
+> >> Changes v3 
+> >> - fix checkpatch errors 
+> >> - check time in secs arg against max sec val 
+> >> - order header files 
+> >> - use ptr_err_or_zero macro 
+> >> - use time64 variants 
+> >> Changes v2 
+> >> - change alm to alarm 
+> >> ---
+> >>  drivers/rtc/Kconfig      |   7 ++
+> >>  drivers/rtc/Makefile     |   1 +
+> >>  drivers/rtc/rtc-zynqmp.c | 279 +++++++++++++++++++++++++++++++++++++++++++++++
+> >>  3 files changed, 287 insertions(+)
+> >>  create mode 100644 drivers/rtc/rtc-zynqmp.c
+> >>
+> > Applied, thanks.
+> > 
+> 
 
-CC: Rob Herring <robh+dt@kernel.org>
-CC: Mark Rutland <mark.rutland@arm.com>
-CC: Ian Campbell <ijc+devicetree@hellion.org.uk>
-Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
----
- arch/arm/boot/dts/exynos5.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+Actually, I got the following message:
+A message that you sent could not be delivered to one or more of its
+recipients. This is a permanent error. The following address(es) failed:
 
-diff --git a/arch/arm/boot/dts/exynos5.dtsi b/arch/arm/boot/dts/exynos5.dtsi
-index 110dbd4..b5d3437 100644
---- a/arch/arm/boot/dts/exynos5.dtsi
-+++ b/arch/arm/boot/dts/exynos5.dtsi
-@@ -30,6 +30,11 @@
- 		reg = <0x10000000 0x100>;
- 	};
- 
-+	sromc at 12250000 {
-+		compatible = "samsung,exynos-srom";
-+		reg = <0x12250000 0x10>;
-+	};
-+
- 	combiner: interrupt-controller at 10440000 {
- 		compatible = "samsung,exynos4210-combiner";
- 		#interrupt-cells = <2>;
+  suneel.garapati at xilinx.com
+    Unknown User
+
+I'm not fond of carrying patches with uncontactable authors. Is that a
+permanent error?
+
 -- 
-2.4.5
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
