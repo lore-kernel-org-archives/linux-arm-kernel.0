@@ -1,66 +1,85 @@
-From: b38611@freescale.com (Fugang Duan)
-Date: Mon, 24 Aug 2015 11:29:51 +0800
-Subject: [PATCH v2 4/5] ARM: dts: imx7d: add fec1 and fec2 support for i.MX7d
- soc
-In-Reply-To: <1440386992-6775-1-git-send-email-b38611@freescale.com>
-References: <1440386992-6775-1-git-send-email-b38611@freescale.com>
-Message-ID: <1440386992-6775-5-git-send-email-b38611@freescale.com>
+From: petr.cvek@tul.cz (Petr Cvek)
+Date: Mon, 24 Aug 2015 05:39:57 +0200
+Subject: [PATCH v2 01/21] ARM: pxa: magician: Fix Kconfig for magician to
+ always include htc-egpio
+In-Reply-To: <1439969382.11928.6.camel@gmail.com>
+References: <cover.1439843482.git.petr.cvek@tul.cz> <55D25880.3030507@tul.cz>
+ <87zj1o8n3w.fsf@belgarion.home> <55D38F60.7010405@tul.cz>
+ <1439969382.11928.6.camel@gmail.com>
+Message-ID: <55DA920D.4030605@tul.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add fec1 and fec2 nodes for i.MX7d soc.
+Dne 19.8.2015 v 09:29 Philipp Zabel napsal(a):
+> Am Dienstag, den 18.08.2015, 22:02 +0200 schrieb Petr Cvek:
+>> Dne 18.8.2015 v 20:31 Robert Jarzmik napsal(a):
+>>> Petr Cvek <petr.cvek@tul.cz> writes:
+>>>
+>>>> The htc-egpio driver should be always included in the kernel as 
+>>>> it
+>>>> controls MMC/charging/IrDA power, which is the only way to get
+>>>> an useful rootfs.
+>>>>
+>>>> Signed-off-by: Petr Cvek <petr.cvek@tul.cz>
+>>> It's already defined in magician_defconfig, why enforce it in 
+>>> Kconfig ?
+>>
+>> Good remark, I did not use defconfig at all (as I had to fix from 
+>> zero configuration + I did not know if defconfig works and will be 
+>> supported in the future).
+>>
+>> I will check if magician_defconfig needs to be updated (probably for 
+>> leds).
+>>
+>>>
+>>> And if it's enforced and I want to build a kernel for magician 
+>>> without
+>>> MMC/charging/IrDA, why should I be forced to build in HTC_EGPIO ?
+>>>
+>>> Or said differently, does a kernel without HTC_EGPIO is proven to 
+>>> fail 100%
+>>> without this option ?
+>>
+>> Kernel will probably run OK, but the phone will be unusable (for any 
+>> practical purposes). The EGPIO chip (CPLD) will stay in the state 
+>> programmed from the previous environment (bootloader or WinCE/Mobile) 
+>> and drivers fail to init because of the missing EGPIO (and if they 
+>> init, they will be without any idea about state of the peripherals 
+>> (no charger detection/charging current stuck on the previous 
+>> settings, no LCD backlight control, no IrDA, no rootfs, no GSM, no 
+>> sound, no LEDs).
+>>
+>> Different PCB revisions probably use EGPIO pin for LCD power (and at 
+>> least on my phone, LCD power must have very specific order).
+>>
+>> For future (when ROM XIP will work) I would like to be able boot 
+>> kernel from flash, which itself uses EGPIO for Vpp control (another 
+>> initial EGPIO configuration). Last possible boot is from JTAG and 
+>> there will be no previous EGPIO initialization.
+>>
+>> Petr
+> 
+> I agree with Robert, let's drop this patch.
+As finishing patchset v3 I've finally got enough deterministic configuration.
 
-Signed-off-by: Fugang Duan <B38611@freescale.com>
----
- arch/arm/boot/dts/imx7d.dtsi | 36 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 36 insertions(+)
+Situation A:
+	Most code same as v2 patchset (GPIO init, devices, ...)
+	RTC patch (not in patchset, but vanilla causes errors during boot)
+	Boot from bootloader (htc-tools), kernel from RAM 
+	Rootfs on SDHC
+	EGPIO driver in kernel
+	-> boot
+Situation B:
+	EGPIO disabled
+	-> every EGPIO requests fail (bad LCD readability, but most probably by -EDEFER)
+	mci driver fails to start (SD card power EGPIO and others are not found)
+	kernel prints cannot open root device ...
+	there is kernel panic from rootfs mount (stackdump with some *mount* function name)
 
-diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
-index b738ce0..7631492 100644
---- a/arch/arm/boot/dts/imx7d.dtsi
-+++ b/arch/arm/boot/dts/imx7d.dtsi
-@@ -729,6 +729,42 @@
- 				bus-width = <4>;
- 				status = "disabled";
- 			};
-+
-+			fec1: ethernet at 30be0000 {
-+				compatible = "fsl,imx7d-fec", "fsl,imx6sx-fec";
-+				reg = <0x30be0000 0x10000>;
-+				interrupts = <GIC_SPI 118 IRQ_TYPE_LEVEL_HIGH>,
-+					<GIC_SPI 119 IRQ_TYPE_LEVEL_HIGH>,
-+					<GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX7D_ENET_AXI_ROOT_CLK>,
-+					<&clks IMX7D_ENET_AXI_ROOT_CLK>,
-+					<&clks IMX7D_ENET1_TIME_ROOT_CLK>,
-+					<&clks IMX7D_PLL_ENET_MAIN_125M_CLK>,
-+					<&clks IMX7D_ENET_PHY_REF_ROOT_CLK>;
-+				clock-names = "ipg", "ahb", "ptp",
-+					"enet_clk_ref", "enet_out";
-+				fsl,num-tx-queues=<3>;
-+				fsl,num-rx-queues=<3>;
-+				status = "disabled";
-+			};
-+
-+			fec2: ethernet at 30bf0000 {
-+				compatible = "fsl,imx7d-fec", "fsl,imx6sx-fec";
-+				reg = <0x30bf0000 0x10000>;
-+				interrupts = <GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>,
-+					<GIC_SPI 101 IRQ_TYPE_LEVEL_HIGH>,
-+					<GIC_SPI 102 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX7D_ENET_AXI_ROOT_CLK>,
-+					<&clks IMX7D_ENET_AXI_ROOT_CLK>,
-+					<&clks IMX7D_ENET2_TIME_ROOT_CLK>,
-+					<&clks IMX7D_PLL_ENET_MAIN_125M_CLK>,
-+					<&clks IMX7D_ENET_PHY_REF_ROOT_CLK>;
-+				clock-names = "ipg", "ahb", "ptp",
-+					"enet_clk_ref", "enet_out";
-+				fsl,num-tx-queues=<3>;
-+				fsl,num-rx-queues=<3>;
-+				status = "disabled";
-+			};
- 		};
- 	};
- };
--- 
-1.9.1
+-> So it seems EGPIO driver is required for standard boot.
+
+When trying to boot with initrd, the htc-boot will freeze during image upload (around 5 MB of initrd, not enough for rootfs), but maybe I'm doing something wrong. 
+
+-> Without initrd, there is no way to get useful rootfs.
+
+Petr
