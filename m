@@ -1,75 +1,35 @@
-From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Mon, 24 Aug 2015 22:35:24 +0800
-Subject: [PATCH] clockevents/drivers/mtk: Fix spurious interrupt leading
- to crash
-In-Reply-To: <1440423045-7883-1-git-send-email-daniel.lezcano@linaro.org>
-References: <1440167950.20169.29.camel@mtksdaap41>
- <1440423045-7883-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1440426924.17418.11.camel@mtksdaap41>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 24 Aug 2015 15:36:20 +0100
+Subject: [PATCH 0/4] Efficiency cleanups
+In-Reply-To: <20150821134630.GW7557@n2100.arm.linux.org.uk>
+References: <CABXk95C=CpeL4mNmS6-jJ-0bMJf6fawwfs6DM1-p8FctTEFbpw@mail.gmail.com>
+ <20150821133043.GV7557@n2100.arm.linux.org.uk>
+ <20150821134630.GW7557@n2100.arm.linux.org.uk>
+Message-ID: <20150824143619.GD20147@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-08-24 at 15:30 +0200, Daniel Lezcano wrote:
-> After analysis done by Yingjoe Chen, the timer appears to have a pending
-> interrupt when it is enabled.
->
-> Fix this by acknowledging the pending interrupt when enabling the timer
-> interrupt.
->
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-
-Hi Daniel,
-
-
-Thanks for your patch, this can fix the boot issue.
-Tested-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
-
-> ---
->  drivers/clocksource/mtk_timer.c | 13 +++----------
->  1 file changed, 3 insertions(+), 10 deletions(-)
+On Fri, Aug 21, 2015 at 02:46:30PM +0100, Russell King - ARM Linux wrote:
+> While developing the previous patch set, I noticed that the kernel's
+> "fast" exit path efficiency was not what it's supposed to be due to the
+> addition of trace and context tracking.
 > 
-> diff --git a/drivers/clocksource/mtk_timer.c b/drivers/clocksource/mtk_timer.c
-> index 4cd16fb..13543a8 100644
-> --- a/drivers/clocksource/mtk_timer.c
-> +++ b/drivers/clocksource/mtk_timer.c
-> @@ -156,14 +156,6 @@ static irqreturn_t mtk_timer_interrupt(int irq, void *dev_id)
->  	return IRQ_HANDLED;
->  }
->  
-> -static void mtk_timer_global_reset(struct mtk_clock_event_device *evt)
-> -{
-> -	/* Disable all interrupts */
-> -	writel(0x0, evt->gpt_base + GPT_IRQ_EN_REG);
-> -	/* Acknowledge all interrupts */
-> -	writel(0x3f, evt->gpt_base + GPT_IRQ_ACK_REG);
-> -}
-> -
->  static void
->  mtk_timer_setup(struct mtk_clock_event_device *evt, u8 timer, u8 option)
->  {
-> @@ -183,6 +175,9 @@ static void mtk_timer_enable_irq(struct mtk_clock_event_device *evt, u8 timer)
->  {
->  	u32 val;
->  
-> +        /* Acknowledge all spurious pending interrupts */
-> +        writel(0x3f, evt->gpt_base + GPT_IRQ_ACK_REG);
+> These add several instances of register stacking and unstacking around
+> various function calls, several of which we can avoid.  Many of these
+> instances don't need to stack any register other than r0.
+> 
+> Moreover, we can avoid stacking and unstacking r0 if these features are
+> enabled by storing r0 in the pt_regs as we would do in our slow return
+> path.
+> 
+> Various other cleanups are included in this set as well.  Acks welcome.
 
-This should use tab to indent.
+All four patches look fine to me:
 
-> +
->  	val = readl(evt->gpt_base + GPT_IRQ_EN_REG);
->  	writel(val | GPT_IRQ_ENABLE(timer),
->  			evt->gpt_base + GPT_IRQ_EN_REG);
-> @@ -232,8 +227,6 @@ static void __init mtk_timer_init(struct device_node *node)
->  	}
->  	rate = clk_get_rate(clk);
->  
-> -	mtk_timer_global_reset(evt);
-> -
+  Acked-by: Will Deacon <will.deacon@arm.com>
 
-I think we should keep this one, or at least disable irq first in
-mtk_timer_enable_irq. MT8173 firmware didn't use this GPT, but I think
-it is a good ideat to do it just in case firmware in some other platform
-use it.
+For some reason, I thought the numbering of the TIF_ flags was important
+for some immediate construction in asm code, but either I'm mistaken or
+it's no longer the case.
 
-Joe.C
+Will
