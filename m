@@ -1,40 +1,52 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Mon, 24 Aug 2015 09:28:04 +0800
-Subject: [RFC PATCH v7 10/10] arm: zx_defconfig: remove CONFIG_MMC_DW_IDMAC
-In-Reply-To: <1440379479-24308-1-git-send-email-shawn.lin@rock-chips.com>
-References: <1440379479-24308-1-git-send-email-shawn.lin@rock-chips.com>
-Message-ID: <1440379684-24811-1-git-send-email-shawn.lin@rock-chips.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Mon, 24 Aug 2015 11:18:09 +0900
+Subject: [PATCH 0/3] ARM: uniphier: add outer cache support and rework SMP
+ operations
+Message-ID: <1440382692-3855-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DesignWare MMC Controller's transfer mode should be decided
-at runtime instead of compile-time. So we remove this config
-option and read dw_mmc's register to select DMA master.
+1/3: add outer cache support
+2/3: rework SMP operations
+3/3: add device tree nodes
 
-Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
----
+Because 2/3 highly depends on 1/3, I hope whole of this series
+is applied to ARM-SOC tree.
 
-Changes in v7: None
-Changes in v6: None
-Changes in v5: None
-Changes in v4: None
-Changes in v3: None
-Changes in v2: None
+Olof,
+>From this series, I am using "ARM: uniphier:" rather than "ARM: UniPhier:"
+for the subject prefixes because I noticed you often rephased so when you
+applied my patches.
+Are sub-arch names in lower cases preferable in subject prefixes?
 
- arch/arm/configs/zx_defconfig | 1 -
- 1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm/configs/zx_defconfig b/arch/arm/configs/zx_defconfig
-index b200bb0..ab683fb 100644
---- a/arch/arm/configs/zx_defconfig
-+++ b/arch/arm/configs/zx_defconfig
-@@ -83,7 +83,6 @@ CONFIG_MMC=y
- CONFIG_MMC_UNSAFE_RESUME=y
- CONFIG_MMC_BLOCK_MINORS=16
- CONFIG_MMC_DW=y
--CONFIG_MMC_DW_IDMAC=y
- CONFIG_EXT2_FS=y
- CONFIG_EXT4_FS=y
- CONFIG_EXT4_FS_POSIX_ACL=y
+
+Masahiro Yamada (3):
+  ARM: uniphier: add outer cache support
+  ARM: uniphier: rework SMP operations to use trampoline code
+  ARM: dts: uniphier: add outer cache controller nodes
+
+ .../bindings/arm/uniphier/cache-uniphier.txt       |  30 ++
+ MAINTAINERS                                        |   2 +
+ arch/arm/boot/dts/uniphier-ph1-ld4.dtsi            |   7 +
+ arch/arm/boot/dts/uniphier-ph1-pro4.dtsi           |   7 +
+ arch/arm/boot/dts/uniphier-ph1-pro5.dtsi           |  14 +
+ arch/arm/boot/dts/uniphier-ph1-sld3.dtsi           |   7 +
+ arch/arm/boot/dts/uniphier-ph1-sld8.dtsi           |   7 +
+ arch/arm/boot/dts/uniphier-proxstream2.dtsi        |   7 +
+ arch/arm/include/asm/hardware/cache-uniphier.h     |  40 ++
+ arch/arm/mach-uniphier/Makefile                    |   2 +-
+ arch/arm/mach-uniphier/headsmp.S                   |  43 ++
+ arch/arm/mach-uniphier/platsmp.c                   | 183 ++++++--
+ arch/arm/mach-uniphier/uniphier.c                  |  11 +
+ arch/arm/mm/Kconfig                                |  10 +
+ arch/arm/mm/Makefile                               |   1 +
+ arch/arm/mm/cache-uniphier.c                       | 518 +++++++++++++++++++++
+ 16 files changed, 857 insertions(+), 32 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/uniphier/cache-uniphier.txt
+ create mode 100644 arch/arm/include/asm/hardware/cache-uniphier.h
+ create mode 100644 arch/arm/mach-uniphier/headsmp.S
+ create mode 100644 arch/arm/mm/cache-uniphier.c
+
 -- 
-2.3.7
+1.9.1
