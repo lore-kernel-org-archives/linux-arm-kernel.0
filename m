@@ -1,69 +1,58 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 24 Aug 2015 15:45:18 +0200
-Subject: [PATCH v2 5/5] arm64: add KASan support
-In-Reply-To: <20150824131557.GB7557@n2100.arm.linux.org.uk>
-References: <1431698344-28054-1-git-send-email-a.ryabinin@samsung.com>
- <1431698344-28054-6-git-send-email-a.ryabinin@samsung.com>
- <CACRpkdaRJJjCXR=vK1M2YhR26JZfGoBB+jcqz8r2MhERfxRzqA@mail.gmail.com>
- <CAPAsAGy-r8Z2N09wKV+e0kLfbwxd-eWK6N5Xajsnqq9jfyWqcQ@mail.gmail.com>
- <CACRpkdZmHLMxosLXjyOPdkavo=UNzmTcHOLF5vV4cS1ULfbq6A@mail.gmail.com>
- <CAPAsAGw-iawTpjJh66rQN5fqBFT6UBZCcv2eKx7JTqCXzhzpsw@mail.gmail.com>
- <CACRpkdY2i2M27gP_fXawkFrC_GFgWaKr5rEn6d47refNPiEk=g@mail.gmail.com>
- <55AE56DB.4040607@samsung.com>
- <CACRpkdYaqK8upK-3b01JbO_y+sHnk4-Hm1MfvjSy0tKUkFREtQ@mail.gmail.com>
- <20150824131557.GB7557@n2100.arm.linux.org.uk>
-Message-ID: <CACRpkdYwpucRiXM05y00RQY=gKv8W6YjCNspYFRMGaM605cU0w@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 24 Aug 2015 14:47:10 +0100
+Subject: [PATCH] irqchip, gicv3-its, numa: Workaround for Cavium ThunderX
+ erratum 23144
+In-Reply-To: <CAFpQJXUTNss=u2x7Ynd9wOObZn_ZHkcMz2+F4MKooy5jrvZ02w@mail.gmail.com>
+References: <20150822131050.GK1820@rric.localdomain>	<55DAEF3C.5090303@arm.com>	<CAFpQJXVVcdag7OQnCxqyEw601Y32eO2rHCmH1_bVzyvg+OPzRA@mail.gmail.com>	<55DB11F3.1070604@arm.com>
+ <CAFpQJXUTNss=u2x7Ynd9wOObZn_ZHkcMz2+F4MKooy5jrvZ02w@mail.gmail.com>
+Message-ID: <55DB205E.9070205@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 24, 2015 at 3:15 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Jul 21, 2015 at 11:27:56PM +0200, Linus Walleij wrote:
->> On Tue, Jul 21, 2015 at 4:27 PM, Andrey Ryabinin <a.ryabinin@samsung.com> wrote:
+On 24/08/15 14:27, Ganapatrao Kulkarni wrote:
+> On Mon, Aug 24, 2015 at 6:15 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+
+>>>>>  static void its_enable_cavium_thunderx(void *data)
+>>>>>  {
+>>>>> -     struct its_node *its = data;
+>>>>> +     struct its_node __maybe_unused *its = data;
+>>>>>
+>>>>> -     its->flags |= ITS_FLAGS_CAVIUM_THUNDERX;
+>>>>> +#ifdef CONFIG_CAVIUM_ERRATUM_22375
+>>>>> +     its->flags |= ITS_WORKAROUND_CAVIUM_22375;
+>>>>> +     pr_info("ITS: Enabling workaround for 22375, 24313\n");
+>>>>> +#endif
+>>>>> +
+>>>>> +#ifdef CONFIG_CAVIUM_ERRATUM_23144
+>>>>> +     if (num_possible_nodes() > 1) {
+>>>>> +             its->numa_node = its_get_node_thunderx(its);
+>>>>
+>>>> I'd rather see numa_node being always initialized to something useful.
+>>>> If you're adding numa support, why can't this be initialized via
+>>>> standard topology bindings?
+>>> IIUC, topology defines only cpu topology.
 >>
->> > I used vexpress. Anyway, it doesn't matter now, since I have an update
->> > with a lot of stuff fixed, and it works on hardware.
->> > I still need to do some work on it and tomorrow, probably, I will share.
->>
->> Ah awesome. I have a stash of ARM boards so I can test it on a
->> range of hardware once you feel it's ready.
->>
->> Sorry for pulling stuff out of your hands, people are excited about
->> KASan ARM32 as it turns out.
->
-> People may be excited about it because it's a new feature, but we really
-> need to consider whether gobbling up 512MB of userspace for it is a good
-> idea or not.  There are programs around which like to map large amounts
-> of memory into their process space, and the more we steal from them, the
-> more likely these programs are to fail.
+>> Well, welcome to a much more complex system where both your CPUs and
+>> your IOs have some degree of affinity. This needs to be described
+>> properly, and not hacked on the side.
+> ok, will add description for the function.
 
-I looked at some different approaches over the last weeks for this
-when playing around with KASan.
+I sense that you misunderstood what I meant. What I'd like to see is
+some topology information coming from DT, showing the relationship
+between a device (your ITS) and a given node (your socket). This can
+then be used from two purposes:
 
-It seems since KASan was developed on 64bit systems, this was
-not much of an issue for them as they could take their shadow
-memory from the vmalloc space.
+- find the optimal affinity for a MSI so that it doesn't default to a
+foreign node (a reasonable performance expectation),
+- work around implementation bugs where an LPI cannot be routed to a
+redistributor that is on a foreign node.
 
-I think it is possible to actually just steal as much memory as is
-needed to cover the kernel, and not 1/8 of the entire addressable
-32bit space. So instead of covering all from 0x0-0xffffffff
-at least just MODULES_VADDR thru 0xffffffff should be enough.
-So if that is 0xbf000000-0xffffffff in most cases, 0x41000000
-bytes, then 1/8 of that, 0x8200000, 130MB should be enough.
-(Andrey need to say if this is possible.)
+I really don't feel like adding a hack just for the second point, and
+I'd rather get the big picture right so that your workaround is just a
+special case of the generic one.
 
-That will probably miss some usecases I'm not familiar with, where
-the kernel is actually executing something below 0xbf000000...
+Thanks,
 
-I looked at taking memory from vmalloc instead, but ran into
-problems since this is subject to the highmem split and KASan
-need to have it's address offset at compile time. On
-Ux500 I managed to remove all the static maps and steal memory
-from the top of the vmalloc area instead of the beginning, but
-that is probably not generally feasible.
-
-I suspect you have better ideas than what I can come up
-with though.
-
-Yours,
-Linus Walleij
+	M.
+-- 
+Jazz is not dead. It just smells funny...
