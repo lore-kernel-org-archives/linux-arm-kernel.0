@@ -1,40 +1,72 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Mon, 24 Aug 2015 15:47:09 +0200
-Subject: [PATCH v4 1/2] Documentation: dt: Add Xilinx zynqmp dma device
- tree binding documentation
-In-Reply-To: <1438831173-8761-1-git-send-email-punnaia@xilinx.com>
-References: <1438831173-8761-1-git-send-email-punnaia@xilinx.com>
-Message-ID: <55DB205D.7090802@metafoo.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 24 Aug 2015 14:54:22 +0100
+Subject: [PATCH-v6 5/6] mfd: 88pm800: Set default interrupt clear method
+In-Reply-To: <1436358392-15449-6-git-send-email-vaibhav.hiremath@linaro.org>
+References: <1436358392-15449-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1436358392-15449-6-git-send-email-vaibhav.hiremath@linaro.org>
+Message-ID: <20150824135422.GF3237@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/06/2015 05:19 AM, Punnaiah Choudary Kalluri wrote:
+On Wed, 08 Jul 2015, Vaibhav Hiremath wrote:
+
+> As per the spec, bit 1 (INT_CLEAR_MODE) of reg addr 0xe
+> (page 0) controls the method of clearing interrupt
+> status of 88pm800 family of devices;
+> 
+>   0: clear on read
+>   1: clear on write
+> 
+> If pdata is not coming from board file, then set the
+> default irq clear method to "irq clear on write"
+> 
+> Also, as suggested by "Lee Jones" renaming variable field
+> to appropriate name and removed unnecessary field
+> pm80x_chip.irq_mode, using platform_data.irq_clr_method.
+> 
+> Signed-off-by: Zhao Ye <zhaoy@marvell.com>
+> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
+> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> ---
+>  drivers/mfd/88pm800.c       | 15 ++++++++++-----
+>  include/linux/mfd/88pm80x.h |  9 +++++++--
+>  2 files changed, 17 insertions(+), 7 deletions(-)
+
 [...]
-> +Optional properties:
-> +- xlnx,include-sg: Indicates the controller to operate in simple or scatter
-> +		   gather dma mode
-> +- xlnx,ratectrl: Scheduling interval in terms of clock cycles for
-> +		 source AXI transaction
-> +- xlnx,overfetch: Tells whether the channel is allowed to over fetch the data
-> +- xlnx,src-issue: Number of AXI outstanding transactions on source side
-> +- xlnx,desc-axi-cohrnt: Tells whether the AXI transactions generated for the
-> +			descriptor read are marked Non-coherent
-> +- xlnx,src-axi-cohrnt: Tells whether the AXI transactions generated for the
-> +			source descriptor payload are marked Non-coherent
-> +- xlnx,dst-axi-cohrnt: Tells whether the AXI transactions generated for the
-> +			dst descriptor payload are marked Non-coherent
-> +- xlnx,desc-axi-qos: AXI QOS bits to be used for descriptor fetch
-> +- xlnx,src-axi-qos: AXI QOS bits to be used for data read
-> +- xlnx,dst-axi-qos: AXI QOS bits to be used for data write
-> +- xlnx,desc-axi-cache: AXI cache bits to be used for descriptor fetch.
-> +- xlnx,desc-axi-cache: AXI cache bits to be used for data read
-> +- xlnx,desc-axi-cache: AXI cache bits to be used for data write
-> +- xlnx,src-burst-len: AXI length for data read. Support only power of 2 values
-> +		      i.e 1,2,4,8 and 16
-> +- xlnx,dst-burst-len: AXI length for data write. Support only power of 2 values
-> +		      i.e 1,2,4,8 and 16
 
-None of these really belong into the devicetree. This is all runtime
-configuration data.
+> +#define PM800_WAKEUP2_INT_READ_CLEAR	(0 << 1)
+> +#define PM800_WAKEUP2_INT_WRITE_CLEAR	(1 << 1)
 
-- Lars
+Use BIT().
+
+> +/* Used by irq_clr_method */
+> +#define PM800_IRQ_CLR_ON_READ	0
+> +#define PM800_IRQ_CLR_ON_WRITE	1
+
+> -	int irq_mode;		/* Clear interrupt by read/write(0/1) */
+> +	bool irq_clr_method;		/* Clear interrupt by read/write(0/1) */
+
+> +	irq_clr_mode = pdata->irq_clr_method == PM800_IRQ_CLR_ON_WRITE ?
+> +		PM800_WAKEUP2_INT_WRITE_CLEAR : PM800_WAKEUP2_INT_READ_CLEAR;
+> +	ret = regmap_update_bits(map, PM800_WAKEUP2, mask, irq_clr_mode);
+
+This is pretty convoluted.
+
+For starters you're abusing the 'bool' type here.  Bool is either
+'true' or 'false', so at the very least you should rename
+'irq_clr_method' to 'irq_clr_on_write'.
+
+Then you can do: 
+
+	irq_clr_mode = pdata->irq_clr_on_write ?
+		PM800_WAKEUP2_INT_WRITE_CLEAR : PM800_WAKEUP2_INT_READ_CLEAR;
+
+However, what I suggest you really do is share
+PM800_WAKEUP2_INT_{READ,WRITE}_CLEAR with platform data and just pass
+the value through directly.
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
