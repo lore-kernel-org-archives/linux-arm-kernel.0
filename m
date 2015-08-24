@@ -1,69 +1,104 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 24 Aug 2015 11:00:54 +0100
-Subject: [PATCH v2 3/3] arm64: dts: add Hi6220 mailbox node
-In-Reply-To: <1440039239-8772-4-git-send-email-leo.yan@linaro.org>
-References: <1440039239-8772-1-git-send-email-leo.yan@linaro.org>
- <1440039239-8772-4-git-send-email-leo.yan@linaro.org>
-Message-ID: <20150824100054.GB7139@leverpostej>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Mon, 24 Aug 2015 12:01:19 +0200
+Subject: [RESEND PATCH] clk: rockchip: disable init state before mmc card
+ initialization
+In-Reply-To: <1440404863-14350-1-git-send-email-shawn.lin@rock-chips.com>
+References: <1440404863-14350-1-git-send-email-shawn.lin@rock-chips.com>
+Message-ID: <120036049.vlT25D4un8@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 20, 2015 at 03:53:59AM +0100, Leo Yan wrote:
-> On Hi6220, below memory regions in DDR have specific purpose:
+Hi Shawn,
+
+Am Montag, 24. August 2015, 16:27:43 schrieb Shawn Lin:
+> mmc host controller's IO input/output timing is unpredictable if
+> bootloader execute tuning for HS200 mode. It might make kernel failed
+> to initialize mmc card in identification mode. The root cause is
+> tuning phase and degree setting for HS200 mode in bootloader aren't
+> applicable to that of identification mode in kernel stage. Anyway, we
+> can't force all bootloaders to disable tuning phase and degree setting
+> before into kernel. Simply disable it in rockchip_clk_register_mmc.
 > 
->   0x05e0,0000 - 0x05ef,ffff: For MCU firmware using at runtime;
->   0x0740,f000 - 0x0740,ffff: For MCU firmware's section;
->   0x06df,f000 - 0x06df,ffff: For mailbox message data.
+> Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
 > 
-> This patch reserves these memory regions and add device node for
-> mailbox in dts.
-> 
-> Signed-off-by: Leo Yan <leo.yan@linaro.org>
 > ---
->  arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 20 +++++++++++++++++---
->  arch/arm64/boot/dts/hisilicon/hi6220.dtsi      |  8 ++++++++
->  2 files changed, 25 insertions(+), 3 deletions(-)
 > 
-> diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-> index e36a539..d5470d3 100644
-> --- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-> +++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-> @@ -7,9 +7,6 @@
->  
->  /dts-v1/;
->  
-> -/*Reserved 1MB memory for MCU*/
-> -/memreserve/ 0x05e00000 0x00100000;
-> -
->  #include "hi6220.dtsi"
->  
->  / {
-> @@ -28,4 +25,21 @@
->  		device_type = "memory";
->  		reg = <0x0 0x0 0x0 0x40000000>;
->  	};
-> +
-> +	reserved-memory {
-> +		#address-cells = <2>;
-> +		#size-cells = <2>;
-> +		ranges;
-> +
-> +		mcu-buf at 05e00000 {
-> +			no-map;
-> +			reg = <0x0 0x05e00000 0x0 0x00100000>,	/* MCU firmware buffer */
-> +			      <0x0 0x0740f000 0x0 0x00001000>;	/* MCU firmware section */
-> +		};
-> +
-> +		mbox-buf at 06dff000 {
-> +			no-map;
-> +			reg = <0x0 0x06dff000 0x0 0x00001000>;	/* Mailbox message buf */
-> +		};
-> +	};
+>  drivers/clk/rockchip/clk-mmc-phase.c | 20 ++++++++++++++++++++
+>  1 file changed, 20 insertions(+)
+> 
+> diff --git a/drivers/clk/rockchip/clk-mmc-phase.c
+> b/drivers/clk/rockchip/clk-mmc-phase.c index e9f8df32..ae21592 100644
+> --- a/drivers/clk/rockchip/clk-mmc-phase.c
+> +++ b/drivers/clk/rockchip/clk-mmc-phase.c
+> @@ -38,6 +38,9 @@ static unsigned long rockchip_mmc_recalc(struct clk_hw
+> *hw, #define ROCKCHIP_MMC_DEGREE_MASK 0x3
+>  #define ROCKCHIP_MMC_DELAYNUM_OFFSET 2
+>  #define ROCKCHIP_MMC_DELAYNUM_MASK (0xff << ROCKCHIP_MMC_DELAYNUM_OFFSET)
+> +#define ROCKCHIP_MMC_INIT_STATE_DISABLE (0x1)
+> +#define ROCKCHIP_MMC_INIT_STATE_SHIFT (1)
+> +#define ROCKCHIP_MMC_INIT_STATE_MASK  (0x1)
+
+you don't need the "()" around primitive values. Also I don't think you need 
+the second MASK attribute, doing
+	writel(HIWORD_UPDATE(ROCKCHIP_MMC_INIT_STATE_DISABLE,
+				     ROCKCHIP_MMC_INIT_STATE_DISABLE,
+				     mmc_clock->shift),
+
+should be enough. And thirdly I'm undecided about the naming of the constant. 
+The manual describes the init_state as "Assert init_state to soft reset the 
+CLKGEN.", so I guess I'd prefer
+
+	ROCKCHIP_MMC_INIT_STATE_RESET
+
+or so
+
+> 
+>  #define PSECS_PER_SEC 1000000000000LL
+> 
+> @@ -119,6 +122,21 @@ static const struct clk_ops rockchip_mmc_clk_ops = {
+>  	.set_phase	= rockchip_mmc_set_phase,
 >  };
+> 
+> +static void rockchip_clk_mmc_disable_init(struct rockchip_mmc_clock
 
-As mentioned in my other reply [1], you should fix your EFI memory map
-instead. There is no reason for this at all.
+I guess similar to the thoughts above, simply name this
+	rockchip_clk_mmc_reset()
 
-Mark.
+or alternatively just do the reset in rockchip_clk_register_mmc directly:
 
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-August/365921.html
+if (mmc_clock->shift == ROCKCHIP_MMC_INIT_STATE_SHIFT))
+	writel(HIWORD_UPDATE(ROCKCHIP_MMC_INIT_STATE_DISABLE,
+				     ROCKCHIP_MMC_INIT_STATE_MASK,
+			     mmc_clock->shift),
+	       mmc_clock->reg);
+
+as the pr_debug does not really serve a purpose.
+
+
+Heiko
+
+> *mmc_clock) +{
+> +	if (mmc_clock->shift != ROCKCHIP_MMC_INIT_STATE_SHIFT)
+> +		return;
+> +
+> +	writel(HIWORD_UPDATE(ROCKCHIP_MMC_INIT_STATE_DISABLE,
+> +			     ROCKCHIP_MMC_INIT_STATE_MASK,
+> +			     mmc_clock->shift),
+> +	       mmc_clock->reg);
+> +
+> +	pr_debug("%s: clear mmc init state to %d", __func__,
+> +		 (readl(mmc_clock->reg) >> (mmc_clock->shift)) &
+> +		 ROCKCHIP_MMC_INIT_STATE_MASK);
+> +}
+> +
+>  struct clk *rockchip_clk_register_mmc(const char *name,
+>  				const char *const *parent_names, u8 num_parents,
+>  				void __iomem *reg, int shift)
+> @@ -139,6 +157,8 @@ struct clk *rockchip_clk_register_mmc(const char *name,
+>  	mmc_clock->reg = reg;
+>  	mmc_clock->shift = shift;
+> 
+> +	rockchip_clk_mmc_disable_init(mmc_clock);
+> +
+>  	if (name)
+>  		init.name = name;
