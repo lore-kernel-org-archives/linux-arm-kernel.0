@@ -1,43 +1,59 @@
-From: alim.akhtar@samsung.com (Alim Akhtar)
-Date: Mon, 24 Aug 2015 18:01:15 +0530
-Subject: [PATCH] arm64: defconfig: Enable samsung serial and mmc
-Message-ID: <1440419475-14411-1-git-send-email-alim.akhtar@samsung.com>
+From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
+Date: Mon, 24 Aug 2015 18:10:04 +0530
+Subject: [PATCH-v3 0/2] regulator: 88pm800: Add dual phase mode support on
+ BUCK1
+Message-ID: <1440420006-31556-1-git-send-email-vaibhav.hiremath@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch update defconfig, adds samsung serial and
-Synopsys Designware MMC configs related to exynos SoC
+88PM860 device supports dual phase mode on BUCK1 output.
+In normal usecase, BUCK1A and BUCK1B operates independently with 3A
+capacity. And they both can work as a dual phase providing 6A capacity.
 
-Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
----
- arch/arm64/configs/defconfig |    8 ++++++++
- 1 file changed, 8 insertions(+)
+This patch series is subset of earlier patch-series
+Link to earlier series - https://lkml.org/lkml/2015/7/16/722
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 34d71dd..c8ccda1 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -109,6 +109,10 @@ CONFIG_SERIAL_8250_DW=y
- CONFIG_SERIAL_8250_MT6577=y
- CONFIG_SERIAL_AMBA_PL011=y
- CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
-+CONFIG_SERIAL_SAMSUNG=y
-+CONFIG_SERIAL_SAMSUNG_UARTS_4=y
-+CONFIG_SERIAL_SAMSUNG_UARTS=4
-+CONFIG_SERIAL_SAMSUNG_CONSOLE=y
- CONFIG_SERIAL_MSM=y
- CONFIG_SERIAL_MSM_CONSOLE=y
- CONFIG_SERIAL_OF_PLATFORM=y
-@@ -145,6 +149,10 @@ CONFIG_MMC_ARMMMCI=y
- CONFIG_MMC_SDHCI=y
- CONFIG_MMC_SDHCI_PLTFM=y
- CONFIG_MMC_SPI=y
-+CONFIG_MMC_DW=y
-+CONFIG_MMC_DW_IDMAC=y
-+CONFIG_MMC_DW_PLTFM=y
-+CONFIG_MMC_DW_EXYNOS=y
- CONFIG_NEW_LEDS=y
- CONFIG_LEDS_CLASS=y
- CONFIG_LEDS_SYSCON=y
+Except PATCH[5/5], all other patches in the series are accepted and
+queued up for next merge window.
+And based on discussion on the list, creating DT property to enable
+dual-phase mode on BUCK1.
+
+Testing:
+ - Tested on 88PM860 based platform
+ - Boot tested 
+ - Tested with & without DT property being set
+ - Read register value before and after probe to make sure that
+   value has been set.
+
+V2 => V3:
+========
+ - Based on discussion on earlier patch-series,
+   (comments from Krzysztof Kozlowski)
+   Dynamically controlled current capacity and registration of BUCK1B,
+   in case of BUCK1 dual phase mode enabled.
+   Now, if BUCK1 dual phase is enabled, current capacity is set to 6A,
+   and, BUCK1B will not be registered to regulator framework.
+
+V1 => V2:
+========
+ - This is new patch-series, where, all accepted patches dropped.
+   Upgraded Patch version, to ease review.
+ - Based on Mark Brown's comment, we should use DT property of its own.
+   using set_current_limit() is not right way here.
+   So, created DT property for Dual phase mode enable.
+ - Updated binding for new DT property
+
+
+Vaibhav Hiremath (2):
+  mfd: devicetree: bindings: 88pm800: Add DT property for dual phase
+    enable
+  regulator: 88pm800: Add support for configuration of dual phase on
+    BUCK1
+
+ Documentation/devicetree/bindings/mfd/88pm800.txt |  6 ++++
+ drivers/regulator/88pm800.c                       | 40 +++++++++++++++++++++++
+ include/linux/mfd/88pm80x.h                       |  3 ++
+ 3 files changed, 49 insertions(+)
+
 -- 
-1.7.10.4
+1.9.1
