@@ -1,80 +1,55 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 24 Aug 2015 12:48:33 +0100
-Subject: [PATCH v4 1/4] mfd: max77686: Don't suggest in binding to use a
- deprecated property
-In-Reply-To: <1440406041-25071-2-git-send-email-javier@osg.samsung.com>
+Date: Mon, 24 Aug 2015 12:48:48 +0100
+Subject: [PATCH v4 2/4] mfd: max77686: Use a generic name for the PMIC
+ node in the example
+In-Reply-To: <1440406041-25071-3-git-send-email-javier@osg.samsung.com>
 References: <1440406041-25071-1-git-send-email-javier@osg.samsung.com>
- <1440406041-25071-2-git-send-email-javier@osg.samsung.com>
-Message-ID: <20150824114833.GA3237@x1>
+ <1440406041-25071-3-git-send-email-javier@osg.samsung.com>
+Message-ID: <20150824114848.GB3237@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Mon, 24 Aug 2015, Javier Martinez Canillas wrote:
 
-> The regulator-compatible property from the regulator DT binding was
-> deprecated. But the max77686 DT binding doc still suggest to use it
-> instead of the regulator node name's which is the correct approach.
+> The ePAPR standard says that: "the name of a node should be somewhat
+> generic, reflecting the function of the device and not its precise
+> programming model."
 > 
+> So, change the max77686 binding document example to use a generic
+> node name instead of using the chip's name.
+> 
+> Suggested-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 > Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 > Acked-by: Lee Jones <lee.jones@linaro.org>
 > 
 > ---
 > 
 > Changes in v4:
-> - Add Lee Jones Acked-by tag to patch #1.
+> - Add Lee Jones Acked-by tag to patch #2.
 > 
-> Changes in v3: None
-> Changes in v2:
-> - Add Krzysztof Kozlowski Reviewed-by tag to patch #1.
+> Changes in v3:
+> - Fix typo in ePAPR document name. Suggested by Sergei Shtylyov
 > 
->  Documentation/devicetree/bindings/mfd/max77686.txt | 11 ++++-------
->  1 file changed, 4 insertions(+), 7 deletions(-)
+> Changes in v2: None
+> 
+>  Documentation/devicetree/bindings/mfd/max77686.txt | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
 Applied, thanks.
 
 > diff --git a/Documentation/devicetree/bindings/mfd/max77686.txt b/Documentation/devicetree/bindings/mfd/max77686.txt
-> index 163bd81a4607..8221102d3fc2 100644
+> index 8221102d3fc2..d2ed3c20a5c3 100644
 > --- a/Documentation/devicetree/bindings/mfd/max77686.txt
 > +++ b/Documentation/devicetree/bindings/mfd/max77686.txt
-> @@ -26,7 +26,7 @@ Optional node:
->  	};
->  	refer Documentation/devicetree/bindings/regulator/regulator.txt
+> @@ -48,7 +48,7 @@ to get matched with their hardware counterparts as follow:
 >  
-> -  The regulator-compatible property of regulator should initialized with string
-> +  The regulator node's name should be initialized with a string
->  to get matched with their hardware counterparts as follow:
+>  Example:
 >  
->  	-LDOn 	:	for LDOs, where n can lie in range 1 to 26.
-> @@ -55,16 +55,14 @@ Example:
->  		reg = <0x09>;
->  
->  		voltage-regulators {
-> -			ldo11_reg {
-> -				regulator-compatible = "LDO11";
-> +			ldo11_reg: LDO11 {
->  				regulator-name = "vdd_ldo11";
->  				regulator-min-microvolt = <1900000>;
->  				regulator-max-microvolt = <1900000>;
->  				regulator-always-on;
->  			};
->  
-> -			buck1_reg {
-> -				regulator-compatible = "BUCK1";
-> +			buck1_reg: BUCK1 {
->  				regulator-name = "vdd_mif";
->  				regulator-min-microvolt = <950000>;
->  				regulator-max-microvolt = <1300000>;
-> @@ -72,8 +70,7 @@ Example:
->  				regulator-boot-on;
->  			};
->  
-> -			buck9_reg {
-> -				regulator-compatible = "BUCK9";
-> +			buck9_reg: BUCK9 {
->  				regulator-name = "CAM_ISP_CORE_1.2V";
->  				regulator-min-microvolt = <1000000>;
->  				regulator-max-microvolt = <1200000>;
+> -	max77686 at 09 {
+> +	max77686: pmic at 09 {
+>  		compatible = "maxim,max77686";
+>  		interrupt-parent = <&wakeup_eint>;
+>  		interrupts = <26 0>;
 
 -- 
 Lee Jones
