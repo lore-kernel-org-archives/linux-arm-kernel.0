@@ -1,47 +1,34 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Mon, 24 Aug 2015 17:16:50 +0100
-Subject: [PATCH v2 5/5] arm64: add KASan support
-In-Reply-To: <CAPAsAGyg_oUvUrfSSQccVMcGtY_bwR8n6tf3tFsnh43YT6-b4w@mail.gmail.com>
-References: <1431698344-28054-1-git-send-email-a.ryabinin@samsung.com>	<1431698344-28054-6-git-send-email-a.ryabinin@samsung.com>	<CACRpkdaRJJjCXR=vK1M2YhR26JZfGoBB+jcqz8r2MhERfxRzqA@mail.gmail.com>	<CAPAsAGy-r8Z2N09wKV+e0kLfbwxd-eWK6N5Xajsnqq9jfyWqcQ@mail.gmail.com>	<CACRpkdZmHLMxosLXjyOPdkavo=UNzmTcHOLF5vV4cS1ULfbq6A@mail.gmail.com>	<CAPAsAGw-iawTpjJh66rQN5fqBFT6UBZCcv2eKx7JTqCXzhzpsw@mail.gmail.com>	<CACRpkdY2i2M27gP_fXawkFrC_GFgWaKr5rEn6d47refNPiEk=g@mail.gmail.com>	<55AE56DB.4040607@samsung.com>	<CACRpkdYaqK8upK-3b01JbO_y+sHnk4-Hm1MfvjSy0tKUkFREtQ@mail.gmail.com>	<20150824131557.GB7557@n2100.arm.linux.org.uk>	<CACRpkdYwpucRiXM05y00RQY=gKv8W6YjCNspYFRMGaM605cU0w@mail.gmail.com>	<CAPAsAGwji7FpUJK9O=FWYN15-rJkYMQyOt9W9ncdY9uLybxkiA@mail.gmail.com>	<55DB3BD3.7030202@arm.com>
- <CAPAsAGyg_oUvUrfSSQccVMcGtY_bwR8n6tf3tFsnh43YT6-b4w@mail.gmail.com>
-Message-ID: <55DB4372.5010406@arm.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Mon, 24 Aug 2015 18:16:39 +0200
+Subject: [PATCH v3 06/14] Documentation: drm/bridge: add document for
+ analogix_dp
+In-Reply-To: <CAL_JsqKZYMMzV9Sc2r3K_rnM0FNuyb1TyJEhjGq1Hf7dTiWFKQ@mail.gmail.com>
+References: <1439995728-18046-1-git-send-email-ykk@rock-chips.com>
+ <20150824125758.GA7557@n2100.arm.linux.org.uk>
+ <CAL_JsqKZYMMzV9Sc2r3K_rnM0FNuyb1TyJEhjGq1Hf7dTiWFKQ@mail.gmail.com>
+Message-ID: <1749941.uaVRIcm7Pc@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/08/15 17:00, Andrey Ryabinin wrote:
-> 2015-08-24 18:44 GMT+03:00 Vladimir Murzin <vladimir.murzin@arm.com>:
->>
->> Another option would be having "sparse" shadow memory based on page
->> extension. I did play with that some time ago based on ideas from
->> original v1 KASan support for x86/arm - it is how 614be38 "irqchip:
->> gic-v3: Fix out of bounds access to cpu_logical_map" was caught.
->> It doesn't require any VA reservations, only some contiguous memory for
->> the page_ext itself, which serves as indirection level for the 0-order
->> shadow pages.
+Am Montag, 24. August 2015, 09:48:27 schrieb Rob Herring:
+> On Mon, Aug 24, 2015 at 7:57 AM, Russell King - ARM Linux
+> > When we adopted the graph bindings for iMX DRM, I thought exactly at that
+> > time "it would be nice if this could become the standard for binding DRM
+> > components together" but I don't have the authority from either the DT
+> > perspective or the DRM perspective to mandate that.  Neither does anyone
+> > else.  That's the _real_ problem here.
+> > 
+> > I've seen several DRM bindings go by which don't use the of-graph stuff,
+> > which means that they'll never be compatible with generic components
+> > which do use the of-graph stuff.
 > 
-> We won't be able to use inline instrumentation (I could live with that),
-> and most importantly, we won't be able to use stack instrumentation.
-> GCC needs to know shadow address for inline and/or stack instrumentation
-> to generate correct code.
+> It goes beyond bindings IMO. The use of the component framework or not
+> has been at the whim of driver writers as well. It is either used or
+> private APIs are created. I'm using components and my need for it
+> boils down to passing the struct drm_device pointer to the encoder.
+> Other components like panels and bridges have different ways to attach
+> to the DRM driver.
 
-It's definitely a trade-off ;)
-
-Just for my understanding does that stack instrumentation is controlled
-via -asan-stack?
-
-Thanks
-Vladimir
-
-> 
->> In theory such design can be reused by others 32-bit arches and, I
->> think, nommu too. Additionally, the shadow pages might be movable with
->> help of driver-page migration patch series [1].
->> The cost is obvious - performance drop, although I didn't bother
->> measuring it.
->>
->> [1] https://lwn.net/Articles/650917/
->>
->> Cheers
->> Vladimir
->>
-> 
+but that is then simply implementation specific. Panels and bridges can very 
+well be part of and created from an of_graph description without needing to be 
+a (linux-)component - see patch 7.
