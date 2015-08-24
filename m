@@ -1,249 +1,243 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 24 Aug 2015 15:49:28 -0700
-Subject: [PATCH v3] qcom: ipq40xx: Add basic board/dts support for
- IPQ40XX SoC
-In-Reply-To: <20150824092813.GA15581@codeaurora.org>
-References: <20150824092813.GA15581@codeaurora.org>
-Message-ID: <20150824224928.GE14330@codeaurora.org>
+From: briannorris@chromium.org (Brian Norris)
+Date: Mon, 24 Aug 2015 15:58:03 -0700
+Subject: [PATCH v3] ARM: dts: rockchip: add veyron-jaq board
+Message-ID: <1440457083-77519-1-git-send-email-briannorris@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/24, Varadarajan Narayanan wrote:
-> Add initial dts files and SoC support for IPQ40XX
-> 
+a.k.a. Haier Chromebook 11, and others
 
-So far we haven't added any Xs in the model names for our SoC
-support. Even for IPQ806X, we have it as IPQ8064 as the config
-name with IPQ806x in the help text because there's IPQ8062 out
-there. So I guess it should be IPQ4019 or something?
+Signed-off-by: Brian Norris <briannorris@chromium.org>
+Cc: Alexandru M Stan <amstan@chromium.org>
+Cc: Douglas Anderson <dianders@chromium.org>
+Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+---
+v2 -> v3:
+ - add "and others" language
+ - drop other patches from series (picked up already by Heiko)
 
-> Signed-off-by: Varadarajan Narayanan <varada@codeaurora.org>
-> ---
-> diff --git a/Documentation/devicetree/bindings/qcom.txt b/Documentation/devicetree/bindings/qcom.txt
-> new file mode 100644
-> index 0000000..7d56bd0
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/qcom.txt
-> @@ -0,0 +1,16 @@
-> +Qualcomm IPQ device tree bindings
-> +---------------------------------
-> +
-> +System on Chip
-> +
-> +Device tree must specify which SoC it uses, with one of the
-> +following compatible strings
-> +
-> +       "qcom,ipq40xx"
-> +
-> +Platform
-> +
-> +Device tree must specify which Platform it uses, with one of the
-> +following compatible strings
-> +
-> +       "qcom,ipq40xx-r3pc"
+v1 -> v2:
+ - add overlooked DT binding doc
+ - fixup regulator suspend state for LDO_REG2
 
-This file is not complete and I don't see any other silicon
-vendors doing this, so please drop the entire file.
 
-> diff --git a/arch/arm/boot/dts/qcom-ipq40xx-r3pc.dts b/arch/arm/boot/dts/qcom-ipq40xx-r3pc.dts
-> new file mode 100644
-> index 0000000..7e4e629
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/qcom-ipq40xx-r3pc.dts
-> @@ -0,0 +1,33 @@
-> +/* Copyright (c) 2014, The Linux Foundation. All rights reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 and
-> + * only version 2 as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include "qcom-ipq40xx.dtsi"
-> +
-> +/ {
-> +	model = "Qualcomm Technologies, Inc. IPQ40XX R3PC";
+ Documentation/devicetree/bindings/arm/rockchip.txt |   7 +
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/rk3288-veyron-jaq.dts            | 176 +++++++++++++++++++++
+ 3 files changed, 184 insertions(+)
+ create mode 100644 arch/arm/boot/dts/rk3288-veyron-jaq.dts
 
-Same here, we should know what model number is on the board.
-
-> +	compatible = "qcom,ipq40xx-r3pc", "qcom,ipq40xx";
-> +
-> +	memory {
-> +		device_type = "memory";
-> +		reg = <0x80000000 0x20000000>; /* 512MB */
-> +	};
-
-Doesn't the bootloader fill the memory node for us? Why do we
-need this?
-
-> +
-> +	chosen {
-> +		bootargs = "root=/dev/ram rw init=/init console=ttyMSM0,115200n8 initrd=0x82000000,0x000E2246";
-> +	};
-
-Please don't add bootargs. Use stdout-path for the console part
-and everything else should be done by the bootloader or is the
-defaults.
-
-> +
-> +	soc {
-> +		serial at 78b0000 {
-> +			status = "ok";
-> +		};
-> +	};
-> +};
-> diff --git a/arch/arm/boot/dts/qcom-ipq40xx.dtsi b/arch/arm/boot/dts/qcom-ipq40xx.dtsi
-> new file mode 100644
-> index 0000000..f572f38
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/qcom-ipq40xx.dtsi
-> @@ -0,0 +1,81 @@
-> +/*
-> + * Copyright (c) 2014, The Linux Foundation. All rights reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 and
-> + * only version 2 as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +/dts-v1/;
-> +
-> +#include "skeleton.dtsi"
-> +
-> +/ {
-> +	model = "Qualcomm Technologies, Inc. IPQ40XX";
-> +	compatible = "qcom,ipq40xx";
-
-These two should also be specific and drop the Xs. Same goes for
-the file name.
-
-> +	interrupt-parent = <&intc>;
-> +
-> +	cpus {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		cpu at 0 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a7";
-> +			reg = <0x0>;
-> +		};
-> +
-> +		cpu at 1 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a7";
-> +			reg = <0x1>;
-> +		};
-> +
-> +		cpu at 2 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a7";
-> +			reg = <0x2>;
-> +		};
-> +
-> +		cpu at 3 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a7";
-> +			reg = <0x3>;
-> +		};
-> +	};
-> +
-> +	soc {
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges;
-> +		compatible = "simple-bus";
-> +
-> +		intc: interrupt-controller at b000000 {
-> +			compatible = "qcom,msm-qgic2";
-> +			interrupt-controller;
-> +			#interrupt-cells = <3>;
-> +			reg = <0x0b000000 0x1000>,
-> +			<0x0b002000 0x1000>;
-> +		};
-> +
-> +		timer {
-
-This node is not a child of the SoC node. It should be at the
-root level.
-
-> +			compatible = "arm,armv7-timer";
-> +			interrupts = <1 2 0xf08>,
-> +				     <1 3 0xf08>,
-> +				     <1 4 0xf08>,
-> +				     <1 1 0xf08>;
-> +			clock-frequency = <20833333>;
-
-Drop this clock-frequency part if you can. The hardware should
-properly report the frequency.
-
-> +		};
-> +
-> +		serial at 78b0000 {
-> +			compatible = "qcom,msm-uartdm-v1.4", "qcom,msm-uartdm";
-> +			reg = <0x78b0000 0x200>;
-> +			interrupts = <0 108 0>;
-> +			status = "disabled";
-
-Don't you need some clocks here?
-
-> +		};
-> +	};
-> +};
-> diff --git a/arch/arm/configs/ipq_defconfig b/arch/arm/configs/ipq_defconfig
-> index 1cabd8b..89bf8ad 100644
-> --- a/arch/arm/configs/ipq_defconfig
-> +++ b/arch/arm/configs/ipq_defconfig
-> @@ -21,6 +21,7 @@ CONFIG_ARCH_QCOM=y
->  CONFIG_ARCH_MSM8X60=y
->  CONFIG_ARCH_MSM8960=y
->  CONFIG_ARCH_MSM8974=y
-> +CONFIG_ARCH_IPQ40XX=y
->  CONFIG_ARCH_IPQ8064=y
->  CONFIG_SMP=y
->  CONFIG_PREEMPT=y
-
-This hunk should be in a separate patch.
-
-> diff --git a/arch/arm/mach-qcom/Kconfig b/arch/arm/mach-qcom/Kconfig
-> index fab49a2..70812aa 100644
-> --- a/arch/arm/mach-qcom/Kconfig
-> +++ b/arch/arm/mach-qcom/Kconfig
-> @@ -22,6 +22,10 @@ config ARCH_MSM8974
->  	bool "Enable support for MSM8974"
->  	select HAVE_ARM_ARCH_TIMER
->  
-> +config ARCH_IPQ40XX
-> +	bool "Enable support for IPQ40XX"
-> +	select HAVE_ARM_ARCH_TIMER
-> +
->  config ARCH_IPQ8064
->  	bool "Enable support for IPQ806x"
->  	select CLKSRC_QCOM
-> diff --git a/arch/arm/mach-qcom/board.c b/arch/arm/mach-qcom/board.c
-> index 6d8bbf7..af9e247 100644
-> --- a/arch/arm/mach-qcom/board.c
-> +++ b/arch/arm/mach-qcom/board.c
-> @@ -18,6 +18,7 @@ static const char * const qcom_dt_match[] __initconst = {
->  	"qcom,apq8064",
->  	"qcom,apq8074-dragonboard",
->  	"qcom,apq8084",
-> +	"qcom,ipq40xx",
->  	"qcom,ipq8062",
->  	"qcom,ipq8064",
->  	"qcom,msm8660-surf",
-> 
-
-And these two should also go as a separate patch.
-
+diff --git a/Documentation/devicetree/bindings/arm/rockchip.txt b/Documentation/devicetree/bindings/arm/rockchip.txt
+index af58cd74aeff..cc421ed530e7 100644
+--- a/Documentation/devicetree/bindings/arm/rockchip.txt
++++ b/Documentation/devicetree/bindings/arm/rockchip.txt
+@@ -31,6 +31,13 @@ Rockchip platforms device tree bindings
+     Required root node properties:
+       - compatible = "netxeon,r89", "rockchip,rk3288";
+ 
++- Google Jaq (Haier Chromebook 11 and more):
++    Required root node properties:
++      - compatible = "google,veyron-jaq-rev5", "google,veyron-jaq-rev4",
++		     "google,veyron-jaq-rev3", "google,veyron-jaq-rev2",
++		     "google,veyron-jaq-rev1", "google,veyron-jaq",
++		     "google,veyron", "rockchip,rk3288";
++
+ - Google Jerry (Hisense Chromebook C11 and more):
+     Required root node properties:
+       - compatible = "google,veyron-jerry-rev7", "google,veyron-jerry-rev6",
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 7805a6541a38..a08ca6c3d76e 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -490,6 +490,7 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += \
+ 	rk3288-firefly-beta.dtb \
+ 	rk3288-firefly.dtb \
+ 	rk3288-r89.dtb \
++	rk3288-veyron-jaq.dtb \
+ 	rk3288-veyron-jerry.dtb \
+ 	rk3288-veyron-minnie.dtb \
+ 	rk3288-veyron-pinky.dtb \
+diff --git a/arch/arm/boot/dts/rk3288-veyron-jaq.dts b/arch/arm/boot/dts/rk3288-veyron-jaq.dts
+new file mode 100644
+index 000000000000..c2f52cfb4d06
+--- /dev/null
++++ b/arch/arm/boot/dts/rk3288-veyron-jaq.dts
+@@ -0,0 +1,176 @@
++/*
++ * Google Veyron Jaq Rev 1+ board device tree source
++ *
++ * Copyright 2015 Google, Inc
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ *  Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++
++#include "rk3288-veyron-chromebook.dtsi"
++#include "cros-ec-sbs.dtsi"
++
++/ {
++	model = "Google Jaq";
++	compatible = "google,veyron-jaq-rev5", "google,veyron-jaq-rev4",
++		     "google,veyron-jaq-rev3", "google,veyron-jaq-rev2",
++		     "google,veyron-jaq-rev1", "google,veyron-jaq",
++		     "google,veyron", "rockchip,rk3288";
++
++	panel_regulator: panel-regulator {
++		compatible = "regulator-fixed";
++		enable-active-high;
++		gpio = <&gpio7 14 GPIO_ACTIVE_HIGH>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&lcd_enable_h>;
++		regulator-name = "panel_regulator";
++		vin-supply = <&vcc33_sys>;
++	};
++
++	vcc18_lcd: vcc18-lcd {
++		compatible = "regulator-fixed";
++		enable-active-high;
++		gpio = <&gpio2 13 GPIO_ACTIVE_HIGH>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&avdd_1v8_disp_en>;
++		regulator-name = "vcc18_lcd";
++		regulator-always-on;
++		regulator-boot-on;
++		vin-supply = <&vcc18_wl>;
++	};
++
++	backlight_regulator: backlight-regulator {
++		compatible = "regulator-fixed";
++		enable-active-high;
++		gpio = <&gpio2 12 GPIO_ACTIVE_HIGH>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&bl_pwr_en>;
++		regulator-name = "backlight_regulator";
++		vin-supply = <&vcc33_sys>;
++		startup-delay-us = <15000>;
++	};
++};
++
++&rk808 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pmic_int_l &dvs_1 &dvs_2>;
++	dvs-gpios = <&gpio7 12 GPIO_ACTIVE_HIGH>,
++		    <&gpio7 15 GPIO_ACTIVE_HIGH>;
++
++	regulators {
++		mic_vcc: LDO_REG2 {
++			regulator-name = "mic_vcc";
++			regulator-always-on;
++			regulator-boot-on;
++			regulator-min-microvolt = <1800000>;
++			regulator-max-microvolt = <1800000>;
++			regulator-state-mem {
++				regulator-off-in-suspend;
++			};
++		};
++	};
++};
++
++&sdmmc {
++	disable-wp;
++	pinctrl-names = "default";
++	pinctrl-0 = <&sdmmc_clk &sdmmc_cmd &sdmmc_cd_disabled &sdmmc_cd_gpio
++			&sdmmc_bus4>;
++};
++
++&vcc_5v {
++	enable-active-high;
++	gpio = <&gpio7 21 GPIO_ACTIVE_HIGH>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&drv_5v>;
++};
++
++&vcc50_hdmi {
++	enable-active-high;
++	gpio = <&gpio5 19 GPIO_ACTIVE_HIGH>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&vcc50_hdmi_en>;
++};
++
++&pinctrl {
++	backlight {
++		bl_pwr_en: bl_pwr_en {
++			rockchip,pins = <2 12 RK_FUNC_GPIO &pcfg_pull_none>;
++		};
++	};
++
++	buck-5v {
++		drv_5v: drv-5v {
++			rockchip,pins = <7 21 RK_FUNC_GPIO &pcfg_pull_none>;
++		};
++	};
++
++	edp {
++		edp_hpd: edp_hpd {
++			rockchip,pins = <7 11 RK_FUNC_2 &pcfg_pull_down>;
++		};
++	};
++
++	hdmi {
++		vcc50_hdmi_en: vcc50-hdmi-en {
++			rockchip,pins = <5 19 RK_FUNC_GPIO &pcfg_pull_none>;
++		};
++	};
++
++	lcd {
++		lcd_enable_h: lcd-en {
++			rockchip,pins = <7 14 RK_FUNC_GPIO &pcfg_pull_none>;
++		};
++
++		avdd_1v8_disp_en: avdd-1v8-disp-en {
++			rockchip,pins = <2 13 RK_FUNC_GPIO &pcfg_pull_none>;
++		};
++	};
++
++	pmic {
++		dvs_1: dvs-1 {
++			rockchip,pins = <7 12 RK_FUNC_GPIO &pcfg_pull_down>;
++		};
++
++		dvs_2: dvs-2 {
++			rockchip,pins = <7 15 RK_FUNC_GPIO &pcfg_pull_down>;
++		};
++	};
++};
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+2.5.0.457.gab17608
