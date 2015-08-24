@@ -1,164 +1,150 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 24 Aug 2015 12:48:17 +0200
-Subject: [PATCH linux-next v4 3/5] mtd: spi-nor: allow to tune the number
- of dummy cycles
-In-Reply-To: <b0d8470fdd46e89ef692e27dc2600b880c1d5dde.1440410236.git.cyrille.pitchen@atmel.com>
-References: <cover.1440410236.git.cyrille.pitchen@atmel.com>
- <b0d8470fdd46e89ef692e27dc2600b880c1d5dde.1440410236.git.cyrille.pitchen@atmel.com>
-Message-ID: <201508241248.17466.marex@denx.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 24 Aug 2015 11:55:01 +0100
+Subject: ahci_imx: can read corrupted data successfully
+Message-ID: <20150824105501.GX7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, August 24, 2015 at 12:13:58 PM, Cyrille Pitchen wrote:
-> The number of dummy cycles used during Fast Read commands can be reduced
-> to improve transfer performances. Each manufacturer has a dedicated set of
-> registers to provide the memory with the exact number of dummy cycles it
-> should expect. Both the memory and the (Q)SPI controller must agree on
-> this number of dummy cycles.
-> 
-> The number of dummy cycles can be found into the memory datasheet and
-> mostly depends on the SPI clock frequency, the Fast Read op code and the
-> Single/Dual Data Rate mode.
-> 
-> Probing JEDEC Serial Flash Discoverable Parameters (SFDP) tables would
-> only provide the driver with a high enough number of dummy cycles for each
-> Fast Read command to be used for all clock frequencies: this solution
-> would not be optimized.
-> 
-> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+I've no idea how this is happening, but it appears that it's possible
+to read corrupted data over an eSATA link.
 
-Hi!
+The setup is a Solid-run Cubox-i4pro connected to an external eSATA 2.5"
+enclosure with a Corsair Neutron 128GB SSD.
 
->  drivers/mtd/spi-nor/spi-nor.c | 97
-> ++++++++++++++++++++++++++++++++++--------- include/linux/mtd/spi-nor.h  
-> |  2 +
->  2 files changed, 80 insertions(+), 19 deletions(-)
-> 
-> diff --git a/drivers/mtd/spi-nor/spi-nor.c b/drivers/mtd/spi-nor/spi-nor.c
-> index e2a6029dc056..869e098a6841 100644
-> --- a/drivers/mtd/spi-nor/spi-nor.c
-> +++ b/drivers/mtd/spi-nor/spi-nor.c
-> @@ -119,24 +119,6 @@ static int read_cr(struct spi_nor *nor)
->  }
-> 
->  /*
-> - * Dummy Cycle calculation for different type of read.
-> - * It can be used to support more commands with
-> - * different dummy cycle requirements.
-> - */
-> -static inline int spi_nor_read_dummy_cycles(struct spi_nor *nor)
-> -{
-> -	switch (nor->flash_read) {
-> -	case SPI_NOR_FAST:
-> -	case SPI_NOR_DUAL:
-> -	case SPI_NOR_QUAD:
-> -		return 8;
-> -	case SPI_NOR_NORMAL:
-> -		return 0;
-> -	}
-> -	return 0;
-> -}
+While the issue seems to be the generally poor quality of eSATA cables
+(I have two eSATA enclosures, the other enclosure's eSATA cable
+interferes with a Logitech wireless receiver - I've had to wrap the
+cable in aluminium foil.)  However, it shouldn't be possible to
+successfully read faulty data in that condition - and this is what I
+find most worrying.
 
-You can probably just soup up this function so that it sets the
-nor->read_dummy, no ?
+What I've noticed is that at boot, the the SSD is sometimes properly
+detected, other times it isn't:
 
-> -/*
->   * Write status register 1 byte
->   * Returns negative if error occurred.
->   */
-> @@ -1012,6 +994,81 @@ static int set_quad_mode(struct spi_nor *nor, struct
-> flash_info *info) }
->  }
-> 
-> +static int micron_set_dummy_cycles(struct spi_nor *nor)
-> +{
-> +	int ret;
-> +	u8 val, mask;
-> +
-> +	/* read the Volatile Configuration Register (VCR) */
+[reboot at 10am]
 
-NIT: If this is a sentence, start it with capital letter and end it with 
-fullstop :)
+ata1: softreset failed (device not ready)
+ata1: SATA link up 3.0 Gbps (SStatus 123 SControl 300)
+ata1.00: ATA-8: Corsair Neutron SSD, M311, max UDMA/133
+ata1.00: 250069680 sectors, multi 1: LBA48 NCQ (depth 31/32)
+ata1.00: configured for UDMA/133
+scsi 0:0:0:0: Direct-Access     ATA      Corsair Neutron  M311 PQ: 0 ANSI: 5
+sd 0:0:0:0: [sda] 250069680 512-byte logical blocks: (128 GB/119 GiB)
+sd 0:0:0:0: [sda] Write Protect is off
+sd 0:0:0:0: [sda] Mode Sense: 00 3a 00 00
+sd 0:0:0:0: [sda] Write cache: enabled, read cache: enabled, doesn't support DPO
+ sda: sda1 sda2 sda3
+sd 0:0:0:0: [sda] Attached SCSI disk
 
-> +	ret = nor->read_reg(nor, SPINOR_OP_RD_VCR, &val, 1);
-> +	if (ret < 0) {
-> +		dev_err(nor->dev, "error %d reading VCR\n", ret);
-> +		return ret;
-> +	}
-> +
-> +	write_enable(nor);
-> +
-> +	/* update the number of dummy into the VCR */
+[half an hour passes and a reboot later]
 
-DTTO
+ata1: SATA link up 3.0 Gbps (SStatus 123 SControl 300)
+ata1.00: ATA-8: , , max UDMA/133
+ata1.00: 250069680 sectors, multi 1: LBA48
+ata1.00: configured for UDMA/133
+scsi 0:0:0:0: Direct-Access     ATA                       n/a  PQ: 0 ANSI: 5
+sd 0:0:0:0: [sda] 250069680 512-byte logical blocks: (128 GB/119 GiB)
+sd 0:0:0:0: [sda] Write Protect is off
+sd 0:0:0:0: [sda] Mode Sense: 00 3a 00 00
+sd 0:0:0:0: [sda] Write cache: enabled, read cache: enabled, doesn't support DPO
+sd 0:0:0:0: [sda] Attached SCSI disk
 
-> +	mask = GENMASK(7, 4);
-> +	val &= ~mask;
-> +	val |= (nor->read_dummy << 4) & mask;
-> +	ret = nor->write_reg(nor, SPINOR_OP_WR_VCR, &val, 1, 0);
-> +	if (ret < 0) {
-> +		dev_err(nor->dev, "error while writing VCR register\n");
-> +		return ret;
-> +	}
-> +
-> +	ret = spi_nor_wait_till_ready(nor);
-> +	if (ret)
-> +		return ret;
-> +
-> +	return 0;
-> +}
-> +
-> +/*
-> + * Dummy Cycle calculation for different type of read.
-> + * It can be used to support more commands with
-> + * different dummy cycle requirements.
-> + */
-> +static int spi_nor_read_dummy_cycles(struct spi_nor *nor,
-> +				     const struct flash_info *info)
-> +{
-> +	struct device_node *np = nor->dev->of_node;
-> +	u32 num_dummy_cycles;
-> +
-> +	if (np && !of_property_read_u32(np, "m25p,num-dummy-cycles",
-> +					&num_dummy_cycles)) {
-> +		nor->read_dummy = num_dummy_cycles;
-> +
-> +		/*
-> +		 * This switch block might be moved after the if...then...else
-> +		 * statement but it was not tested with all Spansion or Micron
-> +		 * memories.
-> +		 * Now the "m25p,num-dummy-cycles" property needs to be
-> +		 * explicitly set in the device tree so the switch statement is
-> +		 * executed. This should avoid unwanted side effects and keep
-> +		 * backward compatibility.
-> +		 */
-> +		switch (JEDEC_MFR(info)) {
-> +		case CFI_MFR_ST:
-> +			return micron_set_dummy_cycles(nor);
-> +		default:
+[replugging the eSATA connector]
 
-If you do have m25p,num-dummy-cycles set for non-micron flash, you have a 
-problem here I believe.
+ata1: exception Emask 0x10 SAct 0x0 SErr 0x4050002 action 0xe frozen
+ata1: irq_stat 0x00000040, connection status changed
+ata1: SError: { RecovComm PHYRdyChg CommWake DevExch }
+ata1: hard resetting link
+ata1: SATA link up 3.0 Gbps (SStatus 123 SControl 300)
+ata1.00: ATA-8: Corsair Neutron SSD, M311, max UDMA/133
+ata1.00: 250069680 sectors, multi 1: LBA48 NCQ (depth 31/32)
+ata1.00: configured for UDMA/133
+ata1: EH complete
+scsi 0:0:0:0: Direct-Access     ATA      Corsair Neutron  M311 PQ: 0 ANSI: 5
+sd 0:0:0:0: [sda] 250069680 512-byte logical blocks: (128 GB/119 GiB)
+sd 0:0:0:0: [sda] Write Protect is off
+sd 0:0:0:0: [sda] Mode Sense: 00 3a 00 00
+sd 0:0:0:0: [sda] Write cache: enabled, read cache: enabled, doesn't support DPO
+ sda: sda1 sda2 sda3
+sd 0:0:0:0: [sda] Attached SCSI disk
 
-> +			break;
-> +		}
-> +	} else {
+[another reboot]
 
-The solution would be to drop this else {} bit here, so that if you fail in
-the DT-based configuration, you fall back to this old behavior. What do you 
-think please ? :)
+ata1: SATA link up 3.0 Gbps (SStatus 123 SControl 300)
+ata1.00: ATA-8: Corsair Neutron SSD, M311, max UDMA/133
+ata1.00: 250069680 sectors, multi 1: LBA48 NCQ (depth 31/32)
+ata1.00: configured for UDMA/133
+scsi 0:0:0:0: Direct-Access     ATA      Corsair Neutron  M311 PQ: 0 ANSI: 5
+sd 0:0:0:0: [sda] 250069680 512-byte logical blocks: (128 GB/119 GiB)
+sd 0:0:0:0: [sda] Write Protect is off
+sd 0:0:0:0: [sda] Mode Sense: 00 3a 00 00
+sd 0:0:0:0: [sda] Write cache: enabled, read cache: enabled, doesn't support DPO
+ sda: sda1 sda2 sda3
+sd 0:0:0:0: [sda] Attached SCSI disk
 
-> +		switch (nor->flash_read) {
-> +		case SPI_NOR_FAST:
-> +		case SPI_NOR_DUAL:
-> +		case SPI_NOR_QUAD:
-> +			nor->read_dummy = 8;
-> +		case SPI_NOR_NORMAL:
-> +			nor->read_dummy = 0;
-> +		}
-> +	}
-> +
-> +	return 0;
-> +}
+When the SSD is mis-detected, as can be seen above, the partition table
+isn't recognised.  Reading sector 0 shows:
 
-[...]
+00000000  18 f0 9f e5 18 f0 9f e5  18 f0 9f e5 18 f0 9f e5  |................|
+00000010  18 f0 9f e5 00 00 a0 e1  14 f0 9f e5 14 f0 9f e5  |................|
+00000020  f8 09 00 00 3c 00 00 00  40 00 00 00 1c f2 00 00  |....<... at .......|
+00000030  04 f2 00 00 5c 12 00 00  90 12 00 00 fe ff ff ea  |....\...........|
+00000040  fe ff ff ea 00 00 00 ea  da 0d 00 ea 28 00 8f e2  |............(...|
+00000050  00 0c 90 e8 00 a0 8a e0  01 70 4a e2 00 b0 8b e0  |.........pJ.....|
+
+which is some ARM code - it looks like early boot code, code which would
+normally be found in the vector page.
+
+What should be there is the partition table:
+
+00000000  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+*
+000001b0  00 00 00 00 00 00 00 00  bf 64 9b 0b 00 00 00 20  |.........d..... |
+000001c0  21 00 83 53 09 0a 00 08  00 00 00 80 02 00 00 53  |!..S...........S|
+000001d0  0a 0a 83 a8 0a 1e 00 88  02 00 00 00 00 01 00 a8  |................|
+000001e0  0b 1e 83 1d 3f ce 00 88  02 01 b0 3a e5 0d 00 00  |....?......:....|
+000001f0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 55 aa  |..............U.|
+
+The SSD has had no ARM executables copied on to it since it was
+purchased.  It contains a DOS partition and swap space, so it's possible
+that the swap space could have had ARM code swapped to it.  Grepping the
+swap partition for the initial sequence of 8 bytes (18 f0 9f e5 18 f0 9f
+e5) gives nothing.
+
+Another possibility is we didn't actually read any data from the SSD at
+all but ended up copying it from somewhere else.  As I say above, it
+looks like what one would expect to find in the ARM vector page.  It
+doesn't tie up with the iMX6 ROM nor the uboot image in the SD card.
+It's not the kernel's vectors either.  It could be the SSD firmware (I
+haven't checked, but I wouldn't be surprised if the SSD has an ARM CPU
+on it) but that would point towards a very weird failure of the SSD -
+though not if it's receiving corrupted commands and there was no
+verification of those commands.  Without a firmware image of the SSD
+(which isn't going to be possible to get hold of) it's impossible to
+know.
+
+What concerns me is that this incorrect data was successfully read
+allegedly from the device.  What happens if a write were to occur -
+what would we be writing to?
+
+Also, clearly the identify information is definitely screwed, although
+some of it does seem to be correct, such as the capacity, but the
+device identifiers are broken.
+
+How does SATA ensure command and data integrity over the link?  I'd
+assume that there's a CRC present on the data, like UDMA on PATA.  How
+are CRC errors supposed to be reported?  Is it possible that ahci_imx
+and other layers are not properly checking for CRC errors?
+
+Any ideas what to look at?
+
+Anyone got any suggestions on where to get a good quality, but not
+stupidly expensive eSATA cable from?
+
+I'm waiting for it to happen again, and I'll dump out more of the drive's
+"contents" when the cable is bad.  If it is the drive's firmware, it
+should contain the manufacturer name/model somewhere in the image.
+
+-- 
+FTTC broadband for 0.8mile line: currently@10.5Mbps down 400kbps up
+according to speedtest.net.
