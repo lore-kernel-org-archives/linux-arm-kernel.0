@@ -1,97 +1,101 @@
-From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Mon, 24 Aug 2015 20:50:07 +0530
-Subject: [PATCH-v6 5/6] mfd: 88pm800: Set default interrupt clear method
-In-Reply-To: <20150824135422.GF3237@x1>
-References: <1436358392-15449-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1436358392-15449-6-git-send-email-vaibhav.hiremath@linaro.org>
- <20150824135422.GF3237@x1>
-Message-ID: <55DB3627.2030503@linaro.org>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Mon, 24 Aug 2015 16:44:19 +0100
+Subject: [PATCH v2 5/5] arm64: add KASan support
+In-Reply-To: <CAPAsAGwji7FpUJK9O=FWYN15-rJkYMQyOt9W9ncdY9uLybxkiA@mail.gmail.com>
+References: <1431698344-28054-1-git-send-email-a.ryabinin@samsung.com>	<1431698344-28054-6-git-send-email-a.ryabinin@samsung.com>	<CACRpkdaRJJjCXR=vK1M2YhR26JZfGoBB+jcqz8r2MhERfxRzqA@mail.gmail.com>	<CAPAsAGy-r8Z2N09wKV+e0kLfbwxd-eWK6N5Xajsnqq9jfyWqcQ@mail.gmail.com>	<CACRpkdZmHLMxosLXjyOPdkavo=UNzmTcHOLF5vV4cS1ULfbq6A@mail.gmail.com>	<CAPAsAGw-iawTpjJh66rQN5fqBFT6UBZCcv2eKx7JTqCXzhzpsw@mail.gmail.com>	<CACRpkdY2i2M27gP_fXawkFrC_GFgWaKr5rEn6d47refNPiEk=g@mail.gmail.com>	<55AE56DB.4040607@samsung.com>	<CACRpkdYaqK8upK-3b01JbO_y+sHnk4-Hm1MfvjSy0tKUkFREtQ@mail.gmail.com>	<20150824131557.GB7557@n2100.arm.linux.org.uk>	<CACRpkdYwpucRiXM05y00RQY=gKv8W6YjCNspYFRMGaM605cU0w@mail.gmail.com>
+ <CAPAsAGwji7FpUJK9O=FWYN15-rJkYMQyOt9W9ncdY9uLybxkiA@mail.gmail.com>
+Message-ID: <55DB3BD3.7030202@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On Monday 24 August 2015 07:24 PM, Lee Jones wrote:
-> On Wed, 08 Jul 2015, Vaibhav Hiremath wrote:
->
->> As per the spec, bit 1 (INT_CLEAR_MODE) of reg addr 0xe
->> (page 0) controls the method of clearing interrupt
->> status of 88pm800 family of devices;
+On 24/08/15 15:15, Andrey Ryabinin wrote:
+> 2015-08-24 16:45 GMT+03:00 Linus Walleij <linus.walleij@linaro.org>:
+>> On Mon, Aug 24, 2015 at 3:15 PM, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>>> On Tue, Jul 21, 2015 at 11:27:56PM +0200, Linus Walleij wrote:
+>>>> On Tue, Jul 21, 2015 at 4:27 PM, Andrey Ryabinin <a.ryabinin@samsung.com> wrote:
+>>>>
+>>>>> I used vexpress. Anyway, it doesn't matter now, since I have an update
+>>>>> with a lot of stuff fixed, and it works on hardware.
+>>>>> I still need to do some work on it and tomorrow, probably, I will share.
+>>>>
+>>>> Ah awesome. I have a stash of ARM boards so I can test it on a
+>>>> range of hardware once you feel it's ready.
+>>>>
+>>>> Sorry for pulling stuff out of your hands, people are excited about
+>>>> KASan ARM32 as it turns out.
+>>>
+>>> People may be excited about it because it's a new feature, but we really
+>>> need to consider whether gobbling up 512MB of userspace for it is a good
+>>> idea or not.  There are programs around which like to map large amounts
+>>> of memory into their process space, and the more we steal from them, the
+>>> more likely these programs are to fail.
 >>
->>    0: clear on read
->>    1: clear on write
+>> I looked at some different approaches over the last weeks for this
+>> when playing around with KASan.
 >>
->> If pdata is not coming from board file, then set the
->> default irq clear method to "irq clear on write"
+>> It seems since KASan was developed on 64bit systems, this was
+>> not much of an issue for them as they could take their shadow
+>> memory from the vmalloc space.
 >>
->> Also, as suggested by "Lee Jones" renaming variable field
->> to appropriate name and removed unnecessary field
->> pm80x_chip.irq_mode, using platform_data.irq_clr_method.
+>> I think it is possible to actually just steal as much memory as is
+>> needed to cover the kernel, and not 1/8 of the entire addressable
+>> 32bit space. So instead of covering all from 0x0-0xffffffff
+>> at least just MODULES_VADDR thru 0xffffffff should be enough.
+>> So if that is 0xbf000000-0xffffffff in most cases, 0x41000000
+>> bytes, then 1/8 of that, 0x8200000, 130MB should be enough.
+>> (Andrey need to say if this is possible.)
 >>
->> Signed-off-by: Zhao Ye <zhaoy@marvell.com>
->> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
->> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->> ---
->>   drivers/mfd/88pm800.c       | 15 ++++++++++-----
->>   include/linux/mfd/88pm80x.h |  9 +++++++--
->>   2 files changed, 17 insertions(+), 7 deletions(-)
->
-> [...]
->
->> +#define PM800_WAKEUP2_INT_READ_CLEAR	(0 << 1)
->> +#define PM800_WAKEUP2_INT_WRITE_CLEAR	(1 << 1)
->
-> Use BIT().
->
->> +/* Used by irq_clr_method */
->> +#define PM800_IRQ_CLR_ON_READ	0
->> +#define PM800_IRQ_CLR_ON_WRITE	1
->
->> -	int irq_mode;		/* Clear interrupt by read/write(0/1) */
->> +	bool irq_clr_method;		/* Clear interrupt by read/write(0/1) */
->
->> +	irq_clr_mode = pdata->irq_clr_method == PM800_IRQ_CLR_ON_WRITE ?
->> +		PM800_WAKEUP2_INT_WRITE_CLEAR : PM800_WAKEUP2_INT_READ_CLEAR;
->> +	ret = regmap_update_bits(map, PM800_WAKEUP2, mask, irq_clr_mode);
->
-> This is pretty convoluted.
->
-> For starters you're abusing the 'bool' type here.  Bool is either
-> 'true' or 'false', so at the very least you should rename
-> 'irq_clr_method' to 'irq_clr_on_write'.
->
-> Then you can do:
->
-> 	irq_clr_mode = pdata->irq_clr_on_write ?
-> 		PM800_WAKEUP2_INT_WRITE_CLEAR : PM800_WAKEUP2_INT_READ_CLEAR;
->
+> 
+> Yes, ~130Mb (3G/1G split) should work. 512Mb shadow is optional.
+> The only advantage of 512Mb shadow is better handling of user memory
+> accesses bugs
+> (access to user memory without copy_from_user/copy_to_user/strlen_user etc API).
+> In case of 512Mb shadow we could to not map anything in shadow for
+> user addresses, so such bug will
+> guarantee  to crash the kernel.
+> In case of 130Mb, the behavior will depend on memory layout of the
+> current process.
+> So, I think it's fine to keep shadow only for kernel addresses.
 
-We have discussed on this, and went back-n-forth.
-I think if I remember correctly, one of the version was using
-true/false then we decided to rename it to relevant macro.
+Another option would be having "sparse" shadow memory based on page
+extension. I did play with that some time ago based on ideas from
+original v1 KASan support for x86/arm - it is how 614be38 "irqchip:
+gic-v3: Fix out of bounds access to cpu_logical_map" was caught.
+It doesn't require any VA reservations, only some contiguous memory for
+the page_ext itself, which serves as indirection level for the 0-order
+shadow pages.
+In theory such design can be reused by others 32-bit arches and, I
+think, nommu too. Additionally, the shadow pages might be movable with
+help of driver-page migration patch series [1].
+The cost is obvious - performance drop, although I didn't bother
+measuring it.
 
-If I am not wrong V4 version of this series is exactly same as what you
-are referring to.
+[1] https://lwn.net/Articles/650917/
 
+Cheers
+Vladimir
 
-> However, what I suggest you really do is share
-> PM800_WAKEUP2_INT_{READ,WRITE}_CLEAR with platform data and just pass
-> the value through directly.
->
-
-I think we discussed about this also, and the reason I recall here is,
-
-we may need to control this from DT in the future so we decided to keep
-it boolean in platform_data and have simple check before writing to
-register.
-
-And I think that was also another reason we introduced
-
-/* Used by irq_clr_method */
-#define PM800_IRQ_CLR_ON_READ   0
-#define PM800_IRQ_CLR_ON_WRITE  1
-
-(Earlier it was true/false in V4)
-
-Thanks,
-Vaibhav
+> 
+>> That will probably miss some usecases I'm not familiar with, where
+>> the kernel is actually executing something below 0xbf000000...
+>>
+>> I looked at taking memory from vmalloc instead, but ran into
+>> problems since this is subject to the highmem split and KASan
+>> need to have it's address offset at compile time. On
+>> Ux500 I managed to remove all the static maps and steal memory
+>> from the top of the vmalloc area instead of the beginning, but
+>> that is probably not generally feasible.
+>>
+>> I suspect you have better ideas than what I can come up
+>> with though.
+>>
+>> Yours,
+>> Linus Walleij
+> 
+> --
+> To unsubscribe, send a message with 'unsubscribe linux-mm' in
+> the body to majordomo at kvack.org.  For more info on Linux MM,
+> see: http://www.linux-mm.org/ .
+> Don't email: <a href=mailto:"dont@kvack.org"> email at kvack.org </a>
+> 
