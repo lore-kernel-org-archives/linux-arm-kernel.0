@@ -1,41 +1,44 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Mon, 24 Aug 2015 10:19:56 +0300
-Subject: [PATCH 00/11] ARM: OMAP/DTS: dra7/72-evm/beagle-x15: Audio support
-Message-ID: <1440400807-32274-1-git-send-email-peter.ujfalusi@ti.com>
+Date: Mon, 24 Aug 2015 10:19:59 +0300
+Subject: [PATCH 03/11] ARM: DTS: dra7-evm: Rename mmc2_3v3 supply to evm_3v3_sw
+In-Reply-To: <1440400807-32274-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1440400807-32274-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1440400807-32274-4-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Use the name for the supply as it is in the schematics since the same
+supply is used for other peripherals than MMC2, like audio.
 
-this series will enable analog audio (via onboard aic310x codec) for dra7-evm,
-dra72-evm and am57xx-beagle-x15 boards.
-In these board McASP3 is connected to the codec and for the McASP3 we needed to
-have the DMA crossbar in place since the request lines are not mapped by
-default.
-
-Regars,
-Peter
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
-Peter Ujfalusi (11):
-  ARM: OMAP: DRA7: hwmod: Add data for McASP3
-  ARM: DTS: dra7: Add McASP3 node
-  ARM: DTS: dra7-evm: Rename mmc2_3v3 supply to evm_3v3_sw
-  ARM: DTS: dra7-evm: Add fixed regulator to be used by aic3106's DVDD
-  ARM: DTS: dra7-evm: Enable pcf8575 (0x26 address) on i2c2 bus
-  ARM: DTS: dra7-evm: Audio support
-  ARM: DTS: dra72-evm: Add fixed regulator representing DVDD supply for
-    aic3106
-  ARM: DTS: dra72-evm: Add gpio hog for vin6_sel_s0 to select audio
-  ARM: DTS: dra72-evm: Audio support
-  ARM: DTS: am57xx-beagle-x15: Add fixed regulator for aic3104's DVDD
-  ARM: DTS: am57xx-beagle-x15: Enable analog audio support
+ arch/arm/boot/dts/dra7-evm.dts | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
- arch/arm/boot/dts/am57xx-beagle-x15.dts   |  95 ++++++++++++++++++++
- arch/arm/boot/dts/dra7-evm.dts            | 142 +++++++++++++++++++++++++++++-
- arch/arm/boot/dts/dra7.dtsi               |  15 ++++
- arch/arm/boot/dts/dra72-evm.dts           | 138 +++++++++++++++++++++++++++++
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c |  41 +++++++++
- 5 files changed, 428 insertions(+), 3 deletions(-)
-
+diff --git a/arch/arm/boot/dts/dra7-evm.dts b/arch/arm/boot/dts/dra7-evm.dts
+index a6c82e5b64fe..de02cf5853a9 100644
+--- a/arch/arm/boot/dts/dra7-evm.dts
++++ b/arch/arm/boot/dts/dra7-evm.dts
+@@ -28,9 +28,9 @@
+ 		gpio = <&pcf_gpio_21 5 GPIO_ACTIVE_HIGH>;
+ 	};
+ 
+-	mmc2_3v3: fixedregulator-mmc2 {
++	evm_3v3_sw: fixedregulator-evm_3v3_sw {
+ 		compatible = "regulator-fixed";
+-		regulator-name = "mmc2_3v3";
++		regulator-name = "evm_3v3_sw";
+ 		regulator-min-microvolt = <3300000>;
+ 		regulator-max-microvolt = <3300000>;
+ 	};
+@@ -484,7 +484,7 @@
+ 
+ &mmc2 {
+ 	status = "okay";
+-	vmmc-supply = <&mmc2_3v3>;
++	vmmc-supply = <&evm_3v3_sw>;
+ 	bus-width = <8>;
+ };
+ 
 -- 
 2.5.0
