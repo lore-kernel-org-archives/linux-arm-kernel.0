@@ -1,211 +1,138 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 24 Aug 2015 11:17:55 +0100
-Subject: [PATCH 1/3] Docs: dt: add generic MSI bindings
-In-Reply-To: <20150805165120.GB28849@leverpostej>
-References: <1437670365-20704-1-git-send-email-mark.rutland@arm.com>
- <1437670365-20704-2-git-send-email-mark.rutland@arm.com>
- <20150805165120.GB28849@leverpostej>
-Message-ID: <20150824101755.GC7139@leverpostej>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Mon, 24 Aug 2015 18:19:56 +0800
+Subject: [PATCH v1 3/3] arm64: dts: add Hi6220 mailbox node
+In-Reply-To: <20150824095144.GA7139@leverpostej>
+References: <1439977055-1747-1-git-send-email-leo.yan@linaro.org>
+ <1439977055-1747-4-git-send-email-leo.yan@linaro.org>
+ <20150821184059.GB2000@svinekod> <20150824091845.GA28290@leoy-linaro>
+ <20150824095144.GA7139@leverpostej>
+Message-ID: <1440411596.3517.12.camel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 05, 2015 at 05:51:20PM +0100, Mark Rutland wrote:
-> Rob,
+On Mon, 2015-08-24 at 10:51 +0100, Mark Rutland wrote:
+> On Mon, Aug 24, 2015 at 10:18:45AM +0100, Leo Yan wrote:
+> > Hi Mark,
+> > 
+> > On Fri, Aug 21, 2015 at 07:40:59PM +0100, Mark Rutland wrote:
+> > > On Wed, Aug 19, 2015 at 10:37:35AM +0100, Leo Yan wrote:
+> > > > On Hi6220, below memory regions in DDR have specific purpose:
+> > > > 
+> > > >   0x05e0,0000 - 0x05ef,ffff: For MCU firmware using at runtime;
+> > > >   0x0740,f000 - 0x0740,ffff: For MCU firmware's section;
+> > > >   0x06df,f000 - 0x06df,ffff: For mailbox message data.
+> > > > 
+> > > > This patch reserves these memory regions and add device node for
+> > > > mailbox in dts.
+> > > > 
+> > > > Signed-off-by: Leo Yan <leo.yan@linaro.org>
+> > > > ---
+> > > >  arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 20 +++++++++++++++++---
+> > > >  arch/arm64/boot/dts/hisilicon/hi6220.dtsi      |  8 ++++++++
+> > > >  2 files changed, 25 insertions(+), 3 deletions(-)
+> > > > 
+> > > > diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+> > > > index e36a539..d5470d3 100644
+> > > > --- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+> > > > +++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+> > > > @@ -7,9 +7,6 @@
+> > > >  
+> > > >  /dts-v1/;
+> > > >  
+> > > > -/*Reserved 1MB memory for MCU*/
+> > > > -/memreserve/ 0x05e00000 0x00100000;
+> > > > -
+> > > >  #include "hi6220.dtsi"
+> > > >  
+> > > >  / {
+> > > > @@ -28,4 +25,21 @@
+> > > >  		device_type = "memory";
+> > > >  		reg = <0x0 0x0 0x0 0x40000000>;
+> > > >  	};
+> > > > +
+> > > > +	reserved-memory {
+> > > > +		#address-cells = <2>;
+> > > > +		#size-cells = <2>;
+> > > > +		ranges;
+> > > > +
+> > > > +		mcu-buf at 05e00000 {
+> > > > +			no-map;
+> > > > +			reg = <0x0 0x05e00000 0x0 0x00100000>,	/* MCU firmware buffer */
+> > > > +			      <0x0 0x0740f000 0x0 0x00001000>;	/* MCU firmware section */
+> > > > +		};
+> > > > +
+> > > > +		mbox-buf at 06dff000 {
+> > > > +			no-map;
+> > > > +			reg = <0x0 0x06dff000 0x0 0x00001000>;	/* Mailbox message buf */
+> > > > +		};
+> > > > +	};
+> > > 
+> > > As far as I can see, it would be simpler to simply carve these out of the
+> > > memory node.
+> > > 
+> > > I don't see why you need reserved-memory here, given you're not referring to
+> > > these regions by phandle anyway.
+> > 
+> > - Now we have enabled EFI_STUB, so the memory node will be removed in
+> >   kernel:
+> >     efi_entry()
+> >       \-> allocate_new_fdt_and_exit_boot()
+> >             \-> update_fdt();
+> > 
+> >   Finally in kernel it cannot use memory node to carve out reseved
+> >   memory regions.
+> > 
+> > - On the other hand, DTS's the memory node is to "describes the
+> >   physical memory layout for the system"; so it's better to use it only
+> >   to describe the hardware info for memory. We can use reserved-memory
+> >   to help manage the memory regions which are reserved from software
+> >   perspective.
 > 
-> Do you have any objections to this, or are you happy to take this patch?
+> The fact that you have no-map means that the memory should not be
+> described to the kernel as mappable in the first place. It's wrong to
+> place such memory in the memory node, even if listed in reserved-memory.
 > 
-> There's a user of this binding (the GICv3 ITS) queued for v4.3 already in
-> the tip tree, so either we either need to be ok with this binding or we
-> need to rework that before v4.3.
+> If your EFI memory map describes the memory as mappable, it is wrong.
 
-Sorry to ping, but are you happy to take this? Marc's replied and
-provided his ack.
+When kernel is working, kernel will create its own page table based on
+UEFI memory map. Since it's reserved in DTS file as Leo's patch, it'll
+be moved to reserved memblock. Why is it wrong?
 
-I'm happy to resend if you prefer?
+In the second, UEFI is firmware. When it's stable, nobody should change
+it without any reason. These reserved memory are used in mailbox driver.
+Look. It's driver, so it could be changed at any time. Why do you want
+to UEFI knowing this memory range? Do you hope UEFI to change when
+mailbox driver is changed?
 
-Thanks,
-Mark.
+> 
+> > According to upper info, we still need to use reserved-memory node to
+> > depict the reserved memory regions. i have no knowledge about EFI_STUB,
+> > so please confirm or correct as needed.
+> 
+> If the memory shouldn't be mapped, it should neither be in the memory
+> node nor EFI memory map (with attributes allowing it to be mapped) to
+> begin with.
 
-> Marc, can I take it from your use of the binding that you are happy to
-> provide your ack?
+As I said above, kernel will create its own page table. When kernel's
+page table is working, UEFI's page table is destroying. So the memory
+won't be mapped twice at the same time. What's wrong?
 > 
-> Thanks,
-> Mark.
-> 
-> On Thu, Jul 23, 2015 at 05:52:43PM +0100, Mark Rutland wrote:
-> > Currently msi-parent is used in a couple of drivers despite being fairly
-> > underspecified. This patch adds a generic binding for MSIs (including
-> > the existing msi-parent property) enabling the description of platform
-> > devices capable of using MSIs.
-> > 
-> > While MSIs are primarily distinguished by doorbell and payload, some MSI
-> > controllers (e.g. the GICv3 ITS) also use side-band information
-> > accompanying the write to identify the master which originated the MSI,
-> > to allow for sandboxing. This sideband information is non-probeable and
-> > needs to be described in the DT. Other MSI controllers may have
-> > additional configuration details which need to be described per-master.
-> > 
-> > This patch adds a generic msi-parent binding document, extending the
-> > de-facto standard with a new (optional) #msi-cells which can be used to
-> > express any per-master configuration and/or sideband data. This is
-> > sufficient to describe non-hotpluggable devices.
-> > 
-> > For busses where sideband data may be derived from some bus-specific
-> > master ID scheme, other properties will be required to describe the
-> > mapping.
-> > 
-> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> > ---
-> >  .../bindings/interrupt-controller/msi.txt          | 135 +++++++++++++++++++++
-> >  1 file changed, 135 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/msi.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/interrupt-controller/msi.txt b/Documentation/devicetree/bindings/interrupt-controller/msi.txt
-> > new file mode 100644
-> > index 0000000..c60c034
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/interrupt-controller/msi.txt
-> > @@ -0,0 +1,135 @@
-> > +This document describes the generic device tree binding for MSI controllers and
-> > +their master(s).
-> > +
-> > +Message Signaled Interrupts (MSIs) are a class of interrupts generated by a
-> > +write to an MMIO address.
-> > +
-> > +MSIs were originally specified by PCI (and are used with PCIe), but may also be
-> > +used with other busses, and hence a mechanism is required to relate devices on
-> > +those busses to the MSI controllers which they are capable of using,
-> > +potentially including additional information.
-> > +
-> > +MSIs are distinguished by some combination of:
-> > +
-> > +- The doorbell (the MMIO address written to).
-> > +  
-> > +  Devices may be configured by software to write to arbitrary doorbells which
-> > +  they can address. An MSI controller may feature a number of doorbells.
-> > +
-> > +- The payload (the value written to the doorbell).
-> > +  
-> > +  Devices may be configured to write an arbitrary payload chosen by software.
-> > +  MSI controllers may have restrictions on permitted payloads.
-> > +
-> > +- Sideband information accompanying the write.
-> > +  
-> > +  Typically this is neither configurable nor probeable, and depends on the path
-> > +  taken through the memory system (i.e. it is a property of the combination of
-> > +  MSI controller and device rather than a property of either in isolation).
-> > +
-> > +
-> > +MSI controllers:
-> > +================
-> > +
-> > +An MSI controller signals interrupts to a CPU when a write is made to an MMIO
-> > +address by some master. An MSI controller may feature a number of doorbells.
-> > +
-> > +Required properties:
-> > +--------------------
-> > +
-> > +- msi-controller: Identifies the node as an MSI controller.
-> > +
-> > +Optional properties:
-> > +--------------------
-> > +
-> > +- #msi-cells: The number of cells in an msi-specifier, required if not zero.
-> > +
-> > +  Typically this will encode information related to sideband data, and will
-> > +  not encode doorbells or payloads as these can be configured dynamically.
-> > +
-> > +  The meaning of the msi-specifier is defined by the device tree binding of
-> > +  the specific MSI controller. 
-> > +
-> > +
-> > +MSI clients
-> > +===========
-> > +
-> > +MSI clients are devices which generate MSIs. For each MSI they wish to
-> > +generate, the doorbell and payload may be configured, though sideband
-> > +information may not be configurable.
-> > +
-> > +Required properties:
-> > +--------------------
-> > +
-> > +- msi-parent: A list of phandle + msi-specifier pairs, one for each MSI
-> > +  controller which the device is capable of using.
-> > +
-> > +  This property is unordered, and MSIs may be allocated from any combination of
-> > +  MSI controllers listed in the msi-parent property.
-> > +
-> > +  If a device has restrictions on the allocation of MSIs, these restrictions
-> > +  must be described with additional properties.
-> > +
-> > +  When #msi-cells is non-zero, busses with an msi-parent will require
-> > +  additional properties to describe the relationship between devices on the bus
-> > +  and the set of MSIs they can potentially generate.
-> > +
-> > +
-> > +Example
-> > +=======
-> > +
-> > +/ {
-> > +	#address-cells = <1>;
-> > +	#size-cells = <1>;
-> > +
-> > +	msi_a: msi-controller at a {
-> > +		reg = <0xa 0xf00>;
-> > +		compatible = "vendor-a,some-controller";
-> > +		msi-controller;
-> > +		/* No sideband data, so #msi-cells omitted */
-> > +	};
-> > +
-> > +	msi_b: msi-controller at b {
-> > +		reg = <0xb 0xf00>;
-> > +		compatible = "vendor-b,another-controller";
-> > +		msi-controller;
-> > +		/* Each device has some unique ID */
-> > +		#msi-cells = <1>;
-> > +	};
-> > +
-> > +	msi_c: msi-controller at c {
-> > +		reg = <0xb 0xf00>;
-> > +		compatible = "vendor-b,another-controller";
-> > +		msi-controller;
-> > +		/* Each device has some unique ID */
-> > +		#msi-cells = <1>;
-> > +	};
-> > +
-> > +	dev at 0 {
-> > +		reg = <0x0 0xf00>;
-> > +		compatible = "vendor-c,some-device";
-> > +
-> > +		/* Can only generate MSIs to msi_a */
-> > +		msi-parent = <&msi_a>;
-> > +	};
-> > +
-> > +	dev at 1 {
-> > +		reg = <0x1 0xf00>;
-> > +		compatible = "vendor-c,some-device";
-> > +
-> > +		/* 
-> > +		 * Can generate MSIs to either A or B.
-> > +		 */
-> > +		msi-parent = <&msi_a>, <&msi_b 0x17>;
-> > +	};
-> > +
-> > +	dev at 2 {
-> > +		reg = <0x2 0xf00>;
-> > +		compatible = "vendor-c,some-device";
-> > +		/*
-> > +		 * Has different IDs at each MSI controller.
-> > +		 * Can generate MSIs to all of the MSI controllers.
-> > +		 */
-> > +		msi-parent = <&msi_a>, <&msi_b 0x17>, <&msi_c 0x53>;
-> > +	};
-> > +};
-> > -- 
-> > 1.9.1
-> > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+> As far as I can see you do not need to use reserved-memory.
+
+1. Are we talking on the same thing? Leo already mentioned that all
+memory node in DTB will be destroyed by kernel when EFI_STUB is enabled
+on arm. Did you read the source code after his reply?
+And you suggested that Leo to use discrete memory region in DTB. It is
+really wrong. Kernel only gets memory map information from UEFI, not
+DTB.
+
+2. The working flow is in below.
+   a. Kernel gets memory map information from UEFI.
+   b. Kernel loads the memory reserved information from DTB.
+
+3. Do you mean the reserved-memory is totally wrong? If it's wrong,
+please submit patches to remove all reserved-memory in linux kernel
+first.
+
+4. Again and again. Memory node should be only used to describe the
+RAM information.
