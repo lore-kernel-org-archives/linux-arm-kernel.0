@@ -1,303 +1,128 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Mon, 24 Aug 2015 09:55:26 -0400
-Subject: [PATCH] arm: Handle starting up in secure mode
-Message-ID: <1440424572-27116-1-git-send-email-cov@codeaurora.org>
+From: shawn.lin@rock-chips.com (Shawn Lin)
+Date: Mon, 24 Aug 2015 22:02:32 +0800
+Subject: [RESEND PATCH] clk: rockchip: disable init state before mmc card
+ initialization
+In-Reply-To: <120036049.vlT25D4un8@phil>
+References: <1440404863-14350-1-git-send-email-shawn.lin@rock-chips.com>
+ <120036049.vlT25D4un8@phil>
+Message-ID: <55DB23F8.1000704@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM Linux appears to have never been made aware of the ARMv7 security
-extensions. When CONFIG_ARM_SEC_EXT=y, have it probe for its security
-state by checking whether CNTFRQ is writeable and potentially make
-mode changes based on the information. The most features are available
-from hypervisor (HYP) mode, so switch to it possible. Failing that,
-prefer non-secure supervisor (SVC) mode to secure supervisor mode.
+On 2015/8/24 18:01, Heiko Stuebner wrote:
+> Hi Shawn,
+>
+> Am Montag, 24. August 2015, 16:27:43 schrieb Shawn Lin:
+>> mmc host controller's IO input/output timing is unpredictable if
+>> bootloader execute tuning for HS200 mode. It might make kernel failed
+>> to initialize mmc card in identification mode. The root cause is
+>> tuning phase and degree setting for HS200 mode in bootloader aren't
+>> applicable to that of identification mode in kernel stage. Anyway, we
+>> can't force all bootloaders to disable tuning phase and degree setting
+>> before into kernel. Simply disable it in rockchip_clk_register_mmc.
+>>
+>> Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
+>>
+>> ---
+>>
+>>   drivers/clk/rockchip/clk-mmc-phase.c | 20 ++++++++++++++++++++
+>>   1 file changed, 20 insertions(+)
+>>
+>> diff --git a/drivers/clk/rockchip/clk-mmc-phase.c
+>> b/drivers/clk/rockchip/clk-mmc-phase.c index e9f8df32..ae21592 100644
+>> --- a/drivers/clk/rockchip/clk-mmc-phase.c
+>> +++ b/drivers/clk/rockchip/clk-mmc-phase.c
+>> @@ -38,6 +38,9 @@ static unsigned long rockchip_mmc_recalc(struct clk_hw
+>> *hw, #define ROCKCHIP_MMC_DEGREE_MASK 0x3
+>>   #define ROCKCHIP_MMC_DELAYNUM_OFFSET 2
+>>   #define ROCKCHIP_MMC_DELAYNUM_MASK (0xff << ROCKCHIP_MMC_DELAYNUM_OFFSET)
+>> +#define ROCKCHIP_MMC_INIT_STATE_DISABLE (0x1)
+>> +#define ROCKCHIP_MMC_INIT_STATE_SHIFT (1)
+>> +#define ROCKCHIP_MMC_INIT_STATE_MASK  (0x1)
+>
+> you don't need the "()" around primitive values. Also I don't think you need
+> the second MASK attribute, doing
+> 	writel(HIWORD_UPDATE(ROCKCHIP_MMC_INIT_STATE_DISABLE,
+> 				     ROCKCHIP_MMC_INIT_STATE_DISABLE,
+> 				     mmc_clock->shift),
+>
+> should be enough. And thirdly I'm undecided about the naming of the constant.
+> The manual describes the init_state as "Assert init_state to soft reset the
+> CLKGEN.", so I guess I'd prefer
+>
+> 	ROCKCHIP_MMC_INIT_STATE_RESET
 
-Signed-off-by: Christopher Covington <cov@codeaurora.org>
----
- arch/arm/include/asm/sec.h         |  27 +++++++
- arch/arm/include/uapi/asm/ptrace.h |   1 +
- arch/arm/kernel/Makefile           |   1 +
- arch/arm/kernel/head.S             |   3 +
- arch/arm/kernel/mon-stub.S         | 158 +++++++++++++++++++++++++++++++++++++
- arch/arm/mm/Kconfig                |  20 ++++-
- 6 files changed, 206 insertions(+), 4 deletions(-)
- create mode 100644 arch/arm/include/asm/sec.h
- create mode 100644 arch/arm/kernel/mon-stub.S
+Thanks, Heiko.
 
-diff --git a/arch/arm/include/asm/sec.h b/arch/arm/include/asm/sec.h
-new file mode 100644
-index 0000000..4a9a573
---- /dev/null
-+++ b/arch/arm/include/asm/sec.h
-@@ -0,0 +1,27 @@
-+/*
-+ * Copyright (c) 2014, The Linux Foundation. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#ifndef SEC_H
-+#define SEC_H
-+
-+#ifndef __ASSEMBLY__
-+
-+#ifdef CONFIG_ARM_SEC_EXT
-+extern int __boot_cpu_secure;
-+#else
-+#define __boot_cpu_secure 0
-+#endif
-+
-+#endif /* ! __ASSEMBLY__ */
-+
-+#endif /* SEC_H */
-diff --git a/arch/arm/include/uapi/asm/ptrace.h b/arch/arm/include/uapi/asm/ptrace.h
-index 5af0ed1..70ff6bf 100644
---- a/arch/arm/include/uapi/asm/ptrace.h
-+++ b/arch/arm/include/uapi/asm/ptrace.h
-@@ -53,6 +53,7 @@
- #endif
- #define FIQ_MODE	0x00000011
- #define IRQ_MODE	0x00000012
-+#define MON_MODE	0x00000016
- #define ABT_MODE	0x00000017
- #define HYP_MODE	0x0000001a
- #define UND_MODE	0x0000001b
-diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-index e69f7a1..a60a0f7 100644
---- a/arch/arm/kernel/Makefile
-+++ b/arch/arm/kernel/Makefile
-@@ -87,6 +87,7 @@ head-y			:= head$(MMUEXT).o
- obj-$(CONFIG_DEBUG_LL)	+= debug.o
- obj-$(CONFIG_EARLY_PRINTK)	+= early_printk.o
- 
-+obj-$(CONFIG_ARM_SEC_EXT)	+= mon-stub.o
- obj-$(CONFIG_ARM_VIRT_EXT)	+= hyp-stub.o
- ifeq ($(CONFIG_ARM_PSCI),y)
- obj-y				+= psci.o psci-call.o
-diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-index 29e2991..d137ba4 100644
---- a/arch/arm/kernel/head.S
-+++ b/arch/arm/kernel/head.S
-@@ -85,6 +85,9 @@ ENTRY(stext)
-  THUMB(	.thumb			)	@ switch to Thumb now.
-  THUMB(1:			)
- 
-+#ifdef CONFIG_ARM_SEC_EXT
-+	bl	__mon_stub_install
-+#endif
- #ifdef CONFIG_ARM_VIRT_EXT
- 	bl	__hyp_stub_install
- #endif
-diff --git a/arch/arm/kernel/mon-stub.S b/arch/arm/kernel/mon-stub.S
-new file mode 100644
-index 0000000..ab1a361
---- /dev/null
-+++ b/arch/arm/kernel/mon-stub.S
-@@ -0,0 +1,158 @@
-+/*
-+ * Copyright (c) 2014, The Linux Foundation. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/linkage.h>
-+#include <asm/assembler.h>
-+#include <asm/sec.h>
-+
-+.data
-+ENTRY(__boot_cpu_secure)
-+	.long	0
-+.text
-+
-+/*
-+ * ARM Linux has the most features available in hypervisor mode and
-+ * running in non-secure mode is recommended. Thus, try to get into
-+ * hypervisor mode if we're not already there, or failing that, try
-+ * to get into non-secure supervisor mode.
-+ */
-+ENTRY(__mon_stub_install)
-+	/*
-+	 * Store the mode field of the CPSR in r4 and return early if we're
-+	 * already in hypervisor mode.
-+	 */
-+	mrs	r4, cpsr
-+	and	r4, r4, #MODE_MASK
-+	cmp	r4, #HYP_MODE
-+	reteq	lr
-+
-+	/*
-+	 * Save the link register in a non-banked register, r5, so that we
-+	 * still have access to it after mode switches.
-+	 */
-+	mov	r5, lr
-+
-+	/*
-+	 * Read ID_PFR1 and store the value in r6. This register indicates
-+	 * the presence of the security and virtualization extensions. The
-+	 * former is interesting because we must traverse secure monitor mode
-+	 * to get to hypervisor mode and it allows easy manipulation of
-+	 * exception vectors via the Vector Base Address Register (VBAR).
-+	 *
-+	 * ID_PFR1 also indicates whether the generic timer is present, which
-+	 * has a handy register for our purposes, CNTFRQ. Accesses won't trap
-+	 * even with higher exception levels in AArch64 and writes will only
-+	 * succeed from the highest exception level on a system (the undefined
-+	 * exception from a failed write is used as a branch).
-+	 */
-+
-+	mrc   p15, 0, r6, c0, c1, 1	@ ID_PFR1
-+
-+	/*
-+	 * If we're in monitor mode then we know the security setting and can
-+	 * begin the transition to hypervisor or non-secure supervisor mode
-+	 * immediately.
-+	 */
-+
-+	cmp	r4, #MON_MODE
-+	beq	monitor
-+
-+	/*
-+	 * Check that the security extensions and generic timer are present.
-+	 */
-+	and	r7, r6, #0xf0
-+	cmp	r7, #0x10
-+	cmpne	r7, #0x20
-+	retne	lr
-+	and	r8, r6, #0xf0000
-+	cmp	r8, #0x10000
-+	retne	lr
-+
-+	/*
-+	 * Set things up so that if a CNTFRQ access causes an undefined
-+	 * instruction exception, we return to the address indicated in r5
-+	 * in the mode indicated in r4.
-+	 */
-+	adr	r7, __mon_stub_vectors
-+	mcr	p15, 0, r7, c12, c0, 0	@ set vector base address (VBAR)
-+
-+	mrc	p15, 0, r7, c14, c0, 0	@ CNTFRQ
-+	mcr	p15, 0, r7, c14, c0, 0	@ CNTFRQ
-+
-+	/*
-+	 * If we got this far, switch to monitor mode and prepare for further
-+	 * switching.
-+	 */
-+	cps	#MON_MODE
-+
-+monitor:
-+	/*
-+	 * TODO: Handle SIF and separate secure physical memory in general
-+	 */
-+	mrc	p15, 0, r8, c1, c1, 0	@ get secure configuration (SCR)
-+	orr	r8, r8, #1		@ non-secure (NS)
-+
-+	mov	r8, #1
-+	ldr	r7, =__boot_cpu_secure
-+	str	r8, [r7]
-+
-+	/*
-+	 * See whether the switch will be to hypervisor or supervisor.
-+	 */
-+	and	r7, r6, #0xf000
-+	cmp	r7, #0x1000
-+	mcrne	p15, 0, r8, c1, c1, 0	@ set secure configuration (SCR)
-+	bne	supervise
-+
-+	orr	r8, r8, #0x100		@ hypercall enable (HCE)
-+	mcr	p15, 0, r8, c1, c1, 0	@ set secure configuration (SCR)
-+
-+	mov	lr, r5
-+	msr	spsr, #HYP_MODE
-+	__ERET
-+
-+supervise:
-+	/*
-+	 * Switch to supervisor mode and return using a non-banked register,
-+	 * in case we're not in the mode we started out in.
-+	 */
-+	cps	#SVC_MODE
-+	ret	r5
-+ENDPROC(__mon_stub_install)
-+
-+ENTRY(__mon_stub_do_undef)
-+	/*
-+	 * Return to the address at r5 with the mode in r4. If there is an
-+	 * illegal or unimplemented mode in r4 the cpsr write will cause an
-+	 * undefined exception, recursing. To avoid that, put the current
-+	 * mode in r4 before performing the write.
-+	 */
-+	mrs	r6, cpsr
-+	bic	r7, r6, #MODE_MASK
-+	orr	r7, r7, r4
-+	and	r4, r6, #MODE_MASK
-+	msr	cpsr, r7
-+	ret	r5
-+ENDPROC(__mon_stub_do_undef)
-+
-+.align 5
-+__mon_stub_vectors:
-+__mon_stub_reset:	W(b)	.
-+__mon_stub_und:		W(b)	__mon_stub_do_undef
-+__mon_stub_call:	W(b)	.
-+__mon_stub_pabort:	W(b)	.
-+__mon_stub_dabort:	W(b)	.
-+__mon_stub_trap:	W(b)	.
-+__mon_stub_irq:		W(b)	.
-+__mon_stub_fiq:		W(b)	.
-+ENDPROC(__mon_stub_vectors)
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index 7c6b976..32fa451 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -676,7 +676,7 @@ config ARM_THUMBEE
- 	  make use of it. Say N for code that can run on CPUs without ThumbEE.
- 
- config ARM_VIRT_EXT
--	bool
-+	bool "Support for Virtualization Extensions"
- 	depends on MMU
- 	default y if CPU_V7
- 	help
-@@ -684,9 +684,21 @@ config ARM_VIRT_EXT
- 	  Extensions to install hypervisors without run-time firmware
- 	  assistance.
- 
--	  A compliant bootloader is required in order to make maximum
--	  use of this feature.  Refer to Documentation/arm/Booting for
--	  details.
-+	  A compliant bootloader or enabling ARM_SEC_EXT is required in
-+	  order to make maximum use of this feature. Refer to
-+	  Documentation/arm/Booting for details.
-+
-+config ARM_SEC_EXT
-+	bool "Support for Security Extensions"
-+	depends on MMU
-+	default n
-+	help
-+	  Say Y to have the kernel check for the presence of the ARM Security
-+	  Extensions and where possible, use them to switch to preferred
-+	  security and mode settings. This decreases the kernel's dependency
-+	  on bootloaders.
-+
-+	  If unsure, say N.
- 
- config SWP_EMULATE
- 	bool "Emulate SWP/SWPB instructions" if !SMP
+Actually, I'm either not so sure how to naming this bit since if we are 
+used to calling a bit, reset bit, which I thought it should at least do 
+some reset either to state machine or to register value. But obvious it 
+doesn't. Moreover, Assert/Dis-assert seems like disable/enable from my 
+point. Anyway, ROCKCHIP_MMC_INIT_STATE_RESET is okay for me, but I think 
+I should add some comments for these code.
+
+>
+> or so
+>
+>>
+>>   #define PSECS_PER_SEC 1000000000000LL
+>>
+>> @@ -119,6 +122,21 @@ static const struct clk_ops rockchip_mmc_clk_ops = {
+>>   	.set_phase	= rockchip_mmc_set_phase,
+>>   };
+>>
+>> +static void rockchip_clk_mmc_disable_init(struct rockchip_mmc_clock
+>
+> I guess similar to the thoughts above, simply name this
+> 	rockchip_clk_mmc_reset()
+>
+> or alternatively just do the reset in rockchip_clk_register_mmc directly:
+>
+> if (mmc_clock->shift == ROCKCHIP_MMC_INIT_STATE_SHIFT))
+> 	writel(HIWORD_UPDATE(ROCKCHIP_MMC_INIT_STATE_DISABLE,
+> 				     ROCKCHIP_MMC_INIT_STATE_MASK,
+> 			     mmc_clock->shift),
+> 	       mmc_clock->reg);
+>
+> as the pr_debug does not really serve a purpose.
+>
+
+Okay, rockchip_clk_mmc_reset is coming in v2 :)
+
+>
+> Heiko
+>
+>> *mmc_clock) +{
+>> +	if (mmc_clock->shift != ROCKCHIP_MMC_INIT_STATE_SHIFT)
+>> +		return;
+>> +
+>> +	writel(HIWORD_UPDATE(ROCKCHIP_MMC_INIT_STATE_DISABLE,
+>> +			     ROCKCHIP_MMC_INIT_STATE_MASK,
+>> +			     mmc_clock->shift),
+>> +	       mmc_clock->reg);
+>> +
+>> +	pr_debug("%s: clear mmc init state to %d", __func__,
+>> +		 (readl(mmc_clock->reg) >> (mmc_clock->shift)) &
+>> +		 ROCKCHIP_MMC_INIT_STATE_MASK);
+>> +}
+>> +
+>>   struct clk *rockchip_clk_register_mmc(const char *name,
+>>   				const char *const *parent_names, u8 num_parents,
+>>   				void __iomem *reg, int shift)
+>> @@ -139,6 +157,8 @@ struct clk *rockchip_clk_register_mmc(const char *name,
+>>   	mmc_clock->reg = reg;
+>>   	mmc_clock->shift = shift;
+>>
+>> +	rockchip_clk_mmc_disable_init(mmc_clock);
+>> +
+>>   	if (name)
+>>   		init.name = name;
+>
+>
+>
+>
+
+
 -- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Best Regards
+Shawn Lin
