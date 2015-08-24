@@ -1,31 +1,39 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 24 Aug 2015 13:49:24 +0100
-Subject: [PATCH linux-next v4 5/5] mtd: atmel-quadspi: add driver for
- Atmel QSPI controller
-In-Reply-To: <201508241303.52066.marex@denx.de>
-References: <cover.1440410236.git.cyrille.pitchen@atmel.com>
- <bf368fc101f38db231131b69eff0863210f2b01c.1440410236.git.cyrille.pitchen@atmel.com>
- <201508241303.52066.marex@denx.de>
-Message-ID: <20150824124924.GZ7557@n2100.arm.linux.org.uk>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon, 24 Aug 2015 05:49:55 -0700
+Subject: [PATCH v2] watchdog: sunxi: fix activation of system reset
+In-Reply-To: <CAGb2v66oZH_OifuUkzjJS3B5L-uBOaNMWZ7xhgF01EjrkuEq6g@mail.gmail.com>
+References: <55B32BCE.5050506@gmail.com> <20150726193238.GM2564@lukather>
+ <CAGb2v66oZH_OifuUkzjJS3B5L-uBOaNMWZ7xhgF01EjrkuEq6g@mail.gmail.com>
+Message-ID: <55DB12F3.3020100@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 24, 2015 at 01:03:51PM +0200, Marek Vasut wrote:
-> These are functions, not macros :)
-> 
-> btw is there any reason for these ? I'd say, just put the read*() and
-> write*() functions directly into the code and be done with it, it is
-> much less confusing.
-> 
-> Also, why do you use the _relaxed() versions of the functions ?
+On 08/24/2015 02:25 AM, Chen-Yu Tsai wrote:
+> Hi,
+>
+> On Mon, Jul 27, 2015 at 3:32 AM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+>> On Sat, Jul 25, 2015 at 08:25:18AM +0200, Francesco Lavra wrote:
+>>> Commit f2147de33470 ("watchdog: sunxi: support parameterized compatible
+>>> strings") introduced a regression in sunxi_wdt_start(), by which
+>>> the system reset function of the watchdog is not enabled upon
+>>> starting the watchdog. As a result, the system is not reset when the
+>>> watchdog expires. Fix it.
+>>>
+>>> Signed-off-by: Francesco Lavra <francescolavra.fl@gmail.com>
+>>> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+>>> Fixes: f2147de33470 ("watchdog: sunxi: support parameterized compatible strings")
+>>> Cc: stable at vger.kernel.org
+>>
+>> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>
+> What tree should this go in through?
+> Guenter, are you still taking watchdog patches?
+>
 
-Now that the _relaxed() accessors are available throughout the kernel,
-everyone should be using the _relaxed() versions unless they need the
-properties of the non-relaxed versions.  Remember that the non-relaxed
-versions are rather expensive on ARM due to the need to go all the way
-out to the L2 cache - it at least doubles the number of accesses for
-every read*/write*().
+The patch is included in the pull request I sent to Wim last week [1].
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Guenter
+
+---
+[1] http://www.spinics.net/lists/linux-watchdog/msg07219.html
