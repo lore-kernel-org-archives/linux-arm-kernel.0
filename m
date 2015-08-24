@@ -1,29 +1,30 @@
-From: fcooper@ti.com (Franklin S Cooper Jr.)
-Date: Mon, 24 Aug 2015 08:36:05 -0500
-Subject: [RESEND][PATCH 4/4] ARM: dts: keystone: Add ti,keystone-spi for
- SPI
-In-Reply-To: <55AFC207.3050100@oracle.com>
-References: <1437568344-18889-1-git-send-email-fcooper@ti.com>
- <1437568344-18889-5-git-send-email-fcooper@ti.com>
- <55AFC207.3050100@oracle.com>
-Message-ID: <55DB1DC5.7060607@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 24 Aug 2015 15:37:29 +0200
+Subject: [PATCH 4/5] ARM: dts: sun4i: inet97fv2: Enable support for
+ tablet keys
+In-Reply-To: <1440369446-22195-4-git-send-email-hdegoede@redhat.com>
+References: <1440369446-22195-1-git-send-email-hdegoede@redhat.com>
+ <1440369446-22195-4-git-send-email-hdegoede@redhat.com>
+Message-ID: <20150824133729.GO2413@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Santosh,
+On Mon, Aug 24, 2015 at 12:37:25AM +0200, Hans de Goede wrote:
+> Enable support for the tablet keys which are connected via the lradc.
+> 
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
-All the patches except this one are in linux-next.
+Queued, thanks!
+Maxime
 
-On 07/22/2015 11:17 AM, santosh shilimkar wrote:
-> On 7/22/2015 5:32 AM, Franklin S Cooper Jr wrote:
->> Add ti,keystone-spi to the compatible field for the SPI node. This new
->> entry insures that the proper prescaler limit is used for keystone devices
->>
->> Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
->> ---
-> Once the binding and driver makes it, I can pick this up.
-> Keep me posted. Thanks !!
->
-> Regards,
-> Santosh
->
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150824/9c2fdc87/attachment.sig>
