@@ -1,46 +1,51 @@
-From: treding@nvidia.com (Thierry Reding)
-Date: Tue, 25 Aug 2015 16:21:51 +0200
-Subject: [PATCH v3 06/14] Documentation: drm/bridge: add document for
- analogix_dp
-In-Reply-To: <55DC75C8.209@rock-chips.com>
-References: <1439995728-18046-1-git-send-email-ykk@rock-chips.com>
- <1439995834-18363-1-git-send-email-ykk@rock-chips.com>
- <20150825095817.GC14034@ulmo.nvidia.com>
- <55DC75C8.209@rock-chips.com>
-Message-ID: <20150825142150.GB3820@ulmo.nvidia.com>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Tue, 25 Aug 2015 15:24:16 +0100
+Subject: [PATCH v1 3/3] arm64: dts: add Hi6220 mailbox node
+In-Reply-To: <1440510194.10987.52.camel@linaro.org>
+References: <20150821184059.GB2000@svinekod>
+ <20150824091845.GA28290@leoy-linaro>
+ <20150824095144.GA7139@leverpostej>
+ <1440411596.3517.12.camel@linaro.org>
+ <20150824114903.GT10728@bivouac.eciton.net>
+ <1440490427.10987.29.camel@linaro.org>
+ <20150825094630.GU10728@bivouac.eciton.net>
+ <1440497710.10987.42.camel@linaro.org>
+ <20150825104256.GB13471@leverpostej>
+ <1440510194.10987.52.camel@linaro.org>
+Message-ID: <20150825142416.GW10728@bivouac.eciton.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 25, 2015 at 10:03:52PM +0800, Yakir Yang wrote:
-> Hi Thierry,
+On Tue, Aug 25, 2015 at 09:43:14PM +0800, Haojian Zhuang wrote:
+> Since we discussed a lot on this, let's make a conclusion on it.
 > 
-> ? 2015/8/25 17:58, Thierry Reding ??:
-> >On Wed, Aug 19, 2015 at 09:50:34AM -0500, Yakir Yang wrote:
-> >[...]
-> >>+	-analogix,color-space:
-> >>+		input video data format.
-> >>+			COLOR_RGB = 0, COLOR_YCBCR422 = 1, COLOR_YCBCR444 = 2
-> >I don't think DT is an appropriate place to set this. To my knowledge
-> >this depends on the display and/or mode, so I don't think hard-coding
-> >it here is the right thing to do.
-> 
-> Yeah, same question with my previous reply ;)
+> 1. UEFI could append the reserved buffer in it's memory mapping.
 
-I don't have an answer for you, unfortunately. But like I said,
-hard-coding isn't going to work. What if, for example, you set this to a
-fixed value and then you connect a monitor that doesn't support the
-specific one you set?
+Yes. It needs to.
 
-You cited code from dw_hdmi.c earlier, it looks like it might be correct
-even though it doesn't cite a reference for why this was done. Perhaps
-someone on this thread, or someone involved with dw_hdmi can answer
-where that code came from.
+(I will let Mark comment on points 2-4.)
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150825/79ae0ecb/attachment.sig>
+> 5. A patch is necessary in kernel. If efi stub feature is enabled,
+>    arm kernel should not parse memory node or reserved memory buffer in
+>    DT any more.
+
+This is already the case. The stub deletes any present memory nodes and
+reserved entries in drivers/firmware/efi/libstub/fdt.c:update_fdt().
+
+Then, during setup_arch(), arch/arm64/kernel/efi.c:efi_init() calls
+reserve_regions(), which adds only those memory regions available for
+use by Linux as RAM to memblock.
+
+>    Arm kernel should either fetch memory information from 
+>    efi or DT.
+
+Absolutely.
+
+>    Currently arm kernel fetch both efi memory information and
+>    reserved buffer from DTB at the same time.
+
+No, it does not.
+
+Regards,
+
+Leif
