@@ -1,66 +1,172 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 25 Aug 2015 14:07:00 +0200
-Subject: [PATCH 1/4] mmc: mediatek: Add online-tuning support of EMMC/SD
-In-Reply-To: <1439812888.5627.9.camel@mhfsdcap03>
-References: <1439367845-5891-1-git-send-email-chaotian.jing@mediatek.com>
- <1439367845-5891-2-git-send-email-chaotian.jing@mediatek.com>
- <CAPDyKFpX4Pp1+U9eNBuGd83sBeBgLU17qysAJ-2V-ABZZHYAGQ@mail.gmail.com>
- <1439812888.5627.9.camel@mhfsdcap03>
-Message-ID: <CAPDyKFpGk9gcLLjBnN=+BD5WP-7dZ0+XHC1bcEEGGLvLbTyKHw@mail.gmail.com>
+From: varada@codeaurora.org (Varadarajan Narayanan)
+Date: Tue, 25 Aug 2015 17:38:04 +0530
+Subject: [PATCH v4] qcom: ipq4019: Add basic board/dts support for IPQ4019 SoC
+Message-ID: <20150825120804.GA30996@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 August 2015 at 14:01, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
-> Hi Ulf,
-> Thanks, please see my comment:
-> On Mon, 2015-08-17 at 13:31 +0200, Ulf Hansson wrote:
->> On 12 August 2015 at 10:24, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
->> > Schedule a workqueue to do tuning when CRC error
->> > Call mmc_hw_reset to re-init card when data timeout
->>
->> Thanks to Adrian Hunter, the mmc core already supports re-tuning for
->> the above scenarios through the mmc_retune_*() APIs.
->>
->> SDHCI driver has already adopted to use that feature, you should do
->> that for the mtk-sd driver as well.
->>
->> Kind regards
->> Uffe
->>
-> I also noticed that the mmc core already supports re-tuning, but it is
-> not suitable for our host.
-> For EMMC, the CMD21 only support HS200/HS400 mode, for SD card, CMD19
-> only support SDR50/SDR104 mode, but in our host, even 50Mhz clock
-> frequency may also occur CRC error, Cannot find a parameter that can
-> cover all SD cards which running at 50Mhz, even 25Mhz, will occur CRC
-> error for stress test, DDR50 mode is worse.
+Add initial dts files and SoC support for IPQ4019
 
-I don't follow. You may run for example HS200 in lower speed, nothing
-will prevent tuning and re-tuning from happen for these scenarios.
+Signed-off-by: Varadarajan Narayanan <varada@codeaurora.org>
+---
+Changes in v2:
+  - Added devicetree bindings documentation
 
-Or you are talking about other speed modes than HS200/400 and
-SDR50/104? If so, which speed modes are these?
+Changes in v3:
+  - Split 'gcnt' into a separate patch
+  - Added the new entries to Makefiles, Kconfig & board.c in sorted order
+  - Used "qcom,ipq40xx" instead of "qcom,ipq40xx-r3pc" in board.c
 
-BTW, there are currently a patch being discussed which is about adding
-tuning for DDR mode. Please have look.
-http://www.spinics.net/lists/arm-kernel/msg438434.html
+Changes in v4:
+  - Renamed IPQ40xx as IPQ4019
+  - Moved kconfig and defconfig enablement to separate patch
+  - Dropped Documentation/devicetree/bindings/qcom.txt
 
-Regarding re-tuning on CRC errors, that's already supported by the mmc
-core. More precisely when a host driver returns -EILSEQ for a request.
+ arch/arm/boot/dts/Makefile              |  1 +
+ arch/arm/boot/dts/qcom-ipq4019-r3pc.dts | 34 ++++++++++++++
+ arch/arm/boot/dts/qcom-ipq4019.dtsi     | 81 +++++++++++++++++++++++++++++++++
+ 3 files changed, 116 insertions(+)
+ create mode 100644 arch/arm/boot/dts/qcom-ipq4019-r3pc.dts
+ create mode 100644 arch/arm/boot/dts/qcom-ipq4019.dtsi
 
-> By the way,there are too many tune parameters need try for response,
-> read data, write crc status CRC error, these parameters are
-> multidimensional, it is hard to find a best parameter, and, try
-> thousands of parameters will take long time.
-
-As I see, it's your responsibility from the host driver to propagate
-the proper error code towards the mmc core. If you encounter an error
-that you want to trigger a retune, just return -EILSEQ.
-
-Moreover, if you see a need to extend the tuning/re-tuning support in
-the mmc core to suit your need - I am definitely open to look into
-that. More importantly, I don't want to see host specific hacks trying
-to deal with this.
-
-Kind regards
-Uffe
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 246473a..ca603f3 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -474,6 +474,7 @@ dtb-$(CONFIG_ARCH_QCOM) += \
+ 	qcom-apq8074-dragonboard.dtb \
+ 	qcom-apq8084-ifc6540.dtb \
+ 	qcom-apq8084-mtp.dtb \
++	qcom-ipq4019-r3pc.dtb \
+ 	qcom-ipq8064-ap148.dtb \
+ 	qcom-msm8660-surf.dtb \
+ 	qcom-msm8960-cdp.dtb \
+diff --git a/arch/arm/boot/dts/qcom-ipq4019-r3pc.dts b/arch/arm/boot/dts/qcom-ipq4019-r3pc.dts
+new file mode 100644
+index 0000000..e3855d7
+--- /dev/null
++++ b/arch/arm/boot/dts/qcom-ipq4019-r3pc.dts
+@@ -0,0 +1,34 @@
++/* Copyright (c) 2014, The Linux Foundation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include "qcom-ipq4019.dtsi"
++
++/ {
++	model = "Qualcomm Technologies, Inc. IPQ4019 R3PC";
++	compatible = "qcom,ipq4019-r3pc", "qcom,ipq4019";
++
++	memory {
++		device_type = "memory";
++		reg = <0x80000000 0x20000000>; /* 512MB */
++	};
++
++	chosen {
++		bootargs = "root=/dev/ram rw init=/init initrd=0x82000000,0x000E2246";
++		stdout-path = "/serial at 78b0000:115200";
++	};
++
++	soc {
++		serial at 78b0000 {
++			status = "ok";
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/qcom-ipq4019.dtsi b/arch/arm/boot/dts/qcom-ipq4019.dtsi
+new file mode 100644
+index 0000000..1be0322
+--- /dev/null
++++ b/arch/arm/boot/dts/qcom-ipq4019.dtsi
+@@ -0,0 +1,81 @@
++/*
++ * Copyright (c) 2014, The Linux Foundation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++/dts-v1/;
++
++#include "skeleton.dtsi"
++
++/ {
++	model = "Qualcomm Technologies, Inc. IPQ4019";
++	compatible = "qcom,ipq4019";
++	interrupt-parent = <&intc>;
++
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0x0>;
++		};
++
++		cpu at 1 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0x1>;
++		};
++
++		cpu at 2 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0x2>;
++		};
++
++		cpu at 3 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0x3>;
++		};
++	};
++
++	soc {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++		compatible = "simple-bus";
++
++		intc: interrupt-controller at b000000 {
++			compatible = "qcom,msm-qgic2";
++			interrupt-controller;
++			#interrupt-cells = <3>;
++			reg = <0x0b000000 0x1000>,
++			<0x0b002000 0x1000>;
++		};
++
++		serial at 78b0000 {
++			compatible = "qcom,msm-uartdm-v1.4", "qcom,msm-uartdm";
++			reg = <0x78b0000 0x200>;
++			interrupts = <0 108 0>;
++			status = "disabled";
++		};
++	};
++
++	timer {
++		compatible = "arm,armv7-timer";
++		interrupts = <1 2 0xf08>,
++			     <1 3 0xf08>,
++			     <1 4 0xf08>,
++			     <1 1 0xf08>;
++		clock-frequency = <20833333>;
++	};
++};
+-- 
+1.8.2.1
