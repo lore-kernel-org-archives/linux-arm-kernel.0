@@ -1,104 +1,41 @@
 From: mturquette@baylibre.com (Michael Turquette)
-Date: Tue, 25 Aug 2015 11:40:13 -0700
-Subject: [PATCH v4 2/6] clk: samsung: exynos4x12: add cpu clock
- configuration data and instantiate cpu clock
-In-Reply-To: <1438868514-8814-3-git-send-email-b.zolnierkie@samsung.com>
-References: <1438868514-8814-1-git-send-email-b.zolnierkie@samsung.com>
- <1438868514-8814-3-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <20150825184013.31346.67214@quantum>
+Date: Tue, 25 Aug 2015 11:45:27 -0700
+Subject: [PATCH V1 0/3] fix clock issue for fsl,spdif
+In-Reply-To: <cover.1439284957.git.shengjiu.wang@freescale.com>
+References: <cover.1439284957.git.shengjiu.wang@freescale.com>
+Message-ID: <20150825184527.31346.52324@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Bartlomiej Zolnierkiewicz (2015-08-06 06:41:50)
-> With the addition of the new Samsung specific cpu-clock type, the
-> arm clock can be represented as a cpu-clock type. Add the CPU clock
-> configuration data and instantiate the CPU clock type for Exynos4x12.
+Quoting Shengjiu Wang (2015-08-11 02:26:51)
+> fix clock issue for fsl,spdif
 > 
-> Based on the earlier work by Thomas Abraham.
-> 
-> Cc: Tomasz Figa <tomasz.figa@gmail.com>
-> Cc: Michael Turquette <mturquette@baylibre.com>
-> Cc: Thomas Abraham <thomas.ab@samsung.com>
-> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> Tested-by: Tobias Jakobi <tjakobi@math.uni-bielefeld.de>
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> Shengjiu Wang (3):
+>   ARM: imx6q: Add SPDIF_GCLK clock in clock tree
+>   ARM: imx6sl: Add SPDIF_GCLK clock in clock tree
+>   ARM: imx6sx: Add SPDIF_GCLK clock in clock tree
 
-Acked-by: Michael Turquette <mturquette@baylibre.com>
+Hello Shengjiu Wang,
 
-> ---
->  drivers/clk/samsung/clk-exynos4.c | 50 +++++++++++++++++++++++++++++++++++++++
->  1 file changed, 50 insertions(+)
+Please move the dts changes into separate patches. I can take the
+changes to the clock driver and the header through the clk tree, but the
+dt patches need to go through arm-soc.
+
+Regards,
+Mike
+
 > 
-> diff --git a/drivers/clk/samsung/clk-exynos4.c b/drivers/clk/samsung/clk-exynos4.c
-> index 251f48d..7f370d3 100644
-> --- a/drivers/clk/samsung/clk-exynos4.c
-> +++ b/drivers/clk/samsung/clk-exynos4.c
-> @@ -1398,6 +1398,45 @@ static const struct exynos_cpuclk_cfg_data e4210_armclk_d[] __initconst = {
->         {  0 },
->  };
->  
-> +static const struct exynos_cpuclk_cfg_data e4212_armclk_d[] __initconst = {
-> +       { 1500000, E4210_CPU_DIV0(2, 1, 6, 0, 7, 3), E4210_CPU_DIV1(2, 6), },
-> +       { 1400000, E4210_CPU_DIV0(2, 1, 6, 0, 7, 3), E4210_CPU_DIV1(2, 6), },
-> +       { 1300000, E4210_CPU_DIV0(2, 1, 5, 0, 7, 3), E4210_CPU_DIV1(2, 5), },
-> +       { 1200000, E4210_CPU_DIV0(2, 1, 5, 0, 7, 3), E4210_CPU_DIV1(2, 5), },
-> +       { 1100000, E4210_CPU_DIV0(2, 1, 4, 0, 6, 3), E4210_CPU_DIV1(2, 4), },
-> +       { 1000000, E4210_CPU_DIV0(1, 1, 4, 0, 5, 2), E4210_CPU_DIV1(2, 4), },
-> +       {  900000, E4210_CPU_DIV0(1, 1, 3, 0, 5, 2), E4210_CPU_DIV1(2, 3), },
-> +       {  800000, E4210_CPU_DIV0(1, 1, 3, 0, 5, 2), E4210_CPU_DIV1(2, 3), },
-> +       {  700000, E4210_CPU_DIV0(1, 1, 3, 0, 4, 2), E4210_CPU_DIV1(2, 3), },
-> +       {  600000, E4210_CPU_DIV0(1, 1, 3, 0, 4, 2), E4210_CPU_DIV1(2, 3), },
-> +       {  500000, E4210_CPU_DIV0(1, 1, 3, 0, 4, 2), E4210_CPU_DIV1(2, 3), },
-> +       {  400000, E4210_CPU_DIV0(1, 1, 3, 0, 4, 2), E4210_CPU_DIV1(2, 3), },
-> +       {  300000, E4210_CPU_DIV0(1, 1, 2, 0, 4, 2), E4210_CPU_DIV1(2, 3), },
-> +       {  200000, E4210_CPU_DIV0(1, 1, 1, 0, 3, 1), E4210_CPU_DIV1(2, 3), },
-> +       {  0 },
-> +};
-> +
-> +#define E4412_CPU_DIV1(cores, hpm, copy)                               \
-> +               (((cores) << 8) | ((hpm) << 4) | ((copy) << 0))
-> +
-> +static const struct exynos_cpuclk_cfg_data e4412_armclk_d[] __initconst = {
-> +       { 1500000, E4210_CPU_DIV0(2, 1, 6, 0, 7, 3), E4412_CPU_DIV1(7, 0, 6), },
-> +       { 1400000, E4210_CPU_DIV0(2, 1, 6, 0, 7, 3), E4412_CPU_DIV1(6, 0, 6), },
-> +       { 1300000, E4210_CPU_DIV0(2, 1, 5, 0, 7, 3), E4412_CPU_DIV1(6, 0, 5), },
-> +       { 1200000, E4210_CPU_DIV0(2, 1, 5, 0, 7, 3), E4412_CPU_DIV1(5, 0, 5), },
-> +       { 1100000, E4210_CPU_DIV0(2, 1, 4, 0, 6, 3), E4412_CPU_DIV1(5, 0, 4), },
-> +       { 1000000, E4210_CPU_DIV0(1, 1, 4, 0, 5, 2), E4412_CPU_DIV1(4, 0, 4), },
-> +       {  900000, E4210_CPU_DIV0(1, 1, 3, 0, 5, 2), E4412_CPU_DIV1(4, 0, 3), },
-> +       {  800000, E4210_CPU_DIV0(1, 1, 3, 0, 5, 2), E4412_CPU_DIV1(3, 0, 3), },
-> +       {  700000, E4210_CPU_DIV0(1, 1, 3, 0, 4, 2), E4412_CPU_DIV1(3, 0, 3), },
-> +       {  600000, E4210_CPU_DIV0(1, 1, 3, 0, 4, 2), E4412_CPU_DIV1(2, 0, 3), },
-> +       {  500000, E4210_CPU_DIV0(1, 1, 3, 0, 4, 2), E4412_CPU_DIV1(2, 0, 3), },
-> +       {  400000, E4210_CPU_DIV0(1, 1, 3, 0, 4, 2), E4412_CPU_DIV1(1, 0, 3), },
-> +       {  300000, E4210_CPU_DIV0(1, 1, 2, 0, 4, 2), E4412_CPU_DIV1(1, 0, 3), },
-> +       {  200000, E4210_CPU_DIV0(1, 1, 1, 0, 3, 1), E4412_CPU_DIV1(0, 0, 3), },
-> +       {  0 },
-> +};
-> +
->  /* register exynos4 clocks */
->  static void __init exynos4_clk_init(struct device_node *np,
->                                     enum exynos4_soc soc)
-> @@ -1491,6 +1530,17 @@ static void __init exynos4_clk_init(struct device_node *np,
->                 samsung_clk_register_fixed_factor(ctx,
->                         exynos4x12_fixed_factor_clks,
->                         ARRAY_SIZE(exynos4x12_fixed_factor_clks));
-> +               if (of_machine_is_compatible("samsung,exynos4412")) {
-> +                       exynos_register_cpu_clock(ctx, CLK_ARM_CLK, "armclk",
-> +                               mout_core_p4x12[0], mout_core_p4x12[1], 0x14200,
-> +                               e4412_armclk_d, ARRAY_SIZE(e4412_armclk_d),
-> +                               CLK_CPU_NEEDS_DEBUG_ALT_DIV | CLK_CPU_HAS_DIV1);
-> +               } else {
-> +                       exynos_register_cpu_clock(ctx, CLK_ARM_CLK, "armclk",
-> +                               mout_core_p4x12[0], mout_core_p4x12[1], 0x14200,
-> +                               e4212_armclk_d, ARRAY_SIZE(e4212_armclk_d),
-> +                               CLK_CPU_NEEDS_DEBUG_ALT_DIV | CLK_CPU_HAS_DIV1);
-> +               }
->         }
->  
->         samsung_clk_register_alias(ctx, exynos4_aliases,
+>  arch/arm/boot/dts/imx6qdl.dtsi            |  2 +-
+>  arch/arm/boot/dts/imx6sl.dtsi             | 16 ++++++++++++++++
+>  arch/arm/boot/dts/imx6sx.dtsi             |  2 +-
+>  drivers/clk/imx/clk-imx6q.c               |  4 +++-
+>  drivers/clk/imx/clk-imx6sl.c              |  4 +++-
+>  drivers/clk/imx/clk-imx6sx.c              |  1 +
+>  include/dt-bindings/clock/imx6qdl-clock.h |  3 ++-
+>  include/dt-bindings/clock/imx6sl-clock.h  |  3 ++-
+>  include/dt-bindings/clock/imx6sx-clock.h  |  3 ++-
+>  9 files changed, 31 insertions(+), 7 deletions(-)
+> 
 > -- 
 > 1.9.1
 > 
