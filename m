@@ -1,26 +1,35 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Tue, 25 Aug 2015 16:24:09 -0500
-Subject: [PATCH v2 4/6] ARM: dts: qs600: remove unnecessary i2c pinctrl
- nodes in board file.
-In-Reply-To: <1439903419-20275-1-git-send-email-srinivas.kandagatla@linaro.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 25 Aug 2015 14:33:13 -0700
+Subject: [PATCH v2 1/6] ARM: dts: ifc6410: Add pwrseq support for WLAN
+In-Reply-To: <1439903212-19931-1-git-send-email-srinivas.kandagatla@linaro.org>
 References: <1439903069-19752-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1439903419-20275-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <20150825212409.GB12349@qualcomm.com>
+ <1439903212-19931-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <55DCDF19.4070901@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 18, 2015 at 02:10:19PM +0100, Srinivas Kandagatla wrote:
-> This patch removes unnecessary i2c pinctrl nodes in board file, these
-> are already defined in the soc specific file qcom-apq8064.dtsi.
-> 
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> ---
->  arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts | 9 ---------
->  1 file changed, 9 deletions(-)
+On 08/18/2015 06:06 AM, Srinivas Kandagatla wrote:
+> @@ -10,6 +11,20 @@
+>   		serial1 = &gsbi6_serial;
+>   	};
+>   
+> +	pwrseq {
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges;
 
-Applied, thanks!
+Why do we need any of these three properties?
+
+> +		compatible = "simple-bus";
+> +
+> +		sdcc4_pwrseq: sdcc4_pwrseq {
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&wlan_default_gpios>;
+> +			compatible = "mmc-pwrseq-simple";
+> +			reset-gpios = <&pm8921_gpio 43 GPIO_ACTIVE_LOW>;
+
+Especially because this node doesn't have a reg property.
 
 -- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
 a Linux Foundation Collaborative Project
