@@ -1,43 +1,54 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 25 Aug 2015 12:06:55 +0530
-Subject: [PATCH 12/17] ARM: dts: am57xx-beagle-x15: Fix regulator populated
- in MMC1 dt node
-In-Reply-To: <55B92B88.1080409@ti.com>
-References: <1438168187-1614-1-git-send-email-kishon@ti.com>
- <1438168187-1614-13-git-send-email-kishon@ti.com> <55B92B88.1080409@ti.com>
-Message-ID: <55DC0D07.7030504@ti.com>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Tue, 25 Aug 2015 08:36:56 +0200
+Subject: [PATCH v7 11/44] [media] media: use entity.graph_obj.mdev instead
+ of .parent
+In-Reply-To: <dc1be98277c46ddd87e431148fc7e332176828ab.1440359643.git.mchehab@osg.samsung.com>
+References: <cover.1440359643.git.mchehab@osg.samsung.com>
+ <dc1be98277c46ddd87e431148fc7e332176828ab.1440359643.git.mchehab@osg.samsung.com>
+Message-ID: <55DC0D08.10504@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+On 08/23/2015 10:17 PM, Mauro Carvalho Chehab wrote:
+> From: Javier Martinez Canillas <javier@osg.samsung.com>
+> 
+> The struct media_entity has a .parent field that stores a pointer
+> to the parent struct media_device. But recently a media_gobj was
+> embedded into the entities and since struct media_gojb already has
+> a pointer to a struct media_device in the .mdev field, the .parent
+> field becomes redundant and can be removed.
+> 
+> This patch replaces all the usage of .parent by .graph_obj.mdev so
+> that field will become unused and can be removed on a later patch.
+> 
+> No functional changes.
+> 
+> The transformation was made using the following coccinelle spatch:
+> 
+> @@
+> struct media_entity *me;
+> @@
+> 
+> - me->parent
+> + me->graph_obj.mdev
+> 
+> @@
+> struct media_entity *link;
+> @@
+> 
+> - link->source->entity->parent
+> + link->source->entity->graph_obj.mdev
+> 
+> @@
+> struct exynos_video_entity *ve;
+> @@
+> 
+> - ve->vdev.entity.parent
+> + ve->vdev.entity.graph_obj.mdev
+> 
+> Suggested-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
+> 
+> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> Signed-off-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
 
-On Thursday 30 July 2015 01:07 AM, Nishanth Menon wrote:
-> On 07/29/2015 06:09 AM, Kishon Vijay Abraham I wrote:
->> For beagle x15, both the vdd and io lines are connected to the
->> same regulator (ldo1_reg). However vmmc_aux is populated to vdd_3v3.
->> Remove it.
->>
->> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
->> ---
->>  arch/arm/boot/dts/am57xx-beagle-x15.dts |    1 -
->>  1 file changed, 1 deletion(-)
->>
->> diff --git a/arch/arm/boot/dts/am57xx-beagle-x15.dts b/arch/arm/boot/dts/am57xx-beagle-x15.dts
->> index a63bf78..d0db5c5 100644
->> --- a/arch/arm/boot/dts/am57xx-beagle-x15.dts
->> +++ b/arch/arm/boot/dts/am57xx-beagle-x15.dts
->> @@ -579,7 +579,6 @@
->>  	pinctrl-0 = <&mmc1_pins_default>;
->>  
->>  	vmmc-supply = <&ldo1_reg>;
->> -	vmmc_aux-supply = <&vdd_3v3>;
->>  	pbias-supply = <&pbias_mmc_reg>;
->>  	bus-width = <4>;
->>  	cd-gpios = <&gpio6 27 0>; /* gpio 219 */
->>
-> Acked-by: Nishanth Menon <nm@ti.com>
-
-Can you pick this one or you want me to resend it?
-
-Thanks
-Kishon
+Acked-by: Hans Verkuil <hans.verkuil@cisco.com>
