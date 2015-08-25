@@ -1,70 +1,70 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 25 Aug 2015 16:51:22 +0200
-Subject: [PATCH v1 3/3] arm64: dts: add Hi6220 mailbox node
-In-Reply-To: <20150825142416.GW10728@bivouac.eciton.net>
-References: <20150821184059.GB2000@svinekod>
- <20150824091845.GA28290@leoy-linaro>
- <20150824095144.GA7139@leverpostej>
- <1440411596.3517.12.camel@linaro.org>
- <20150824114903.GT10728@bivouac.eciton.net>
- <1440490427.10987.29.camel@linaro.org>
- <20150825094630.GU10728@bivouac.eciton.net>
- <1440497710.10987.42.camel@linaro.org>
- <20150825104256.GB13471@leverpostej>
- <1440510194.10987.52.camel@linaro.org>
- <20150825142416.GW10728@bivouac.eciton.net>
-Message-ID: <CAKv+Gu-b=QvMF++V9UjULRxrGvoz-0ytFLeuLm8Y5sQH4p53Sw@mail.gmail.com>
+From: Shenwei.Wang@freescale.com (Shenwei Wang)
+Date: Tue, 25 Aug 2015 14:54:41 +0000
+Subject: [PATCH v9 1/1] irqchip: imx-gpcv2: IMX GPCv2 driver for wakeup
+ sources
+In-Reply-To: <55DC7FA4.7040902@arm.com>
+References: <1440443055-7291-1-git-send-email-shenwei.wang@freescale.com>
+ <55DC3452.3070205@arm.com>
+ <CY1PR0301MB08439B6C5F841AFFD152DFD883610@CY1PR0301MB0843.namprd03.prod.outlook.com>
+ <55DC738D.8000302@arm.com>
+ <CY1PR0301MB0843AE566996617D855CC00683610@CY1PR0301MB0843.namprd03.prod.outlook.com>
+ <55DC7FA4.7040902@arm.com>
+Message-ID: <CY1PR0301MB08433A2659C75028821F0AE783610@CY1PR0301MB0843.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 August 2015 at 16:24, Leif Lindholm <leif.lindholm@linaro.org> wrote:
-> On Tue, Aug 25, 2015 at 09:43:14PM +0800, Haojian Zhuang wrote:
->> Since we discussed a lot on this, let's make a conclusion on it.
->>
->> 1. UEFI could append the reserved buffer in it's memory mapping.
->
-> Yes. It needs to.
->
-> (I will let Mark comment on points 2-4.)
->
->> 5. A patch is necessary in kernel. If efi stub feature is enabled,
->>    arm kernel should not parse memory node or reserved memory buffer in
->>    DT any more.
->
-> This is already the case. The stub deletes any present memory nodes and
-> reserved entries in drivers/firmware/efi/libstub/fdt.c:update_fdt().
->
-> Then, during setup_arch(), arch/arm64/kernel/efi.c:efi_init() calls
-> reserve_regions(), which adds only those memory regions available for
-> use by Linux as RAM to memblock.
->
->>    Arm kernel should either fetch memory information from
->>    efi or DT.
->
-> Absolutely.
->
->>    Currently arm kernel fetch both efi memory information and
->>    reserved buffer from DTB at the same time.
->
-> No, it does not.
->
 
-It should not, but it does. Due to an oversight, the stub removes
-/memreserve/ entries but ignores the reserved-memory node completely.
 
-This was reported here in fact
+> -----Original Message-----
+> From: Sudeep Holla [mailto:sudeep.holla at arm.com]
+> Sent: 2015?8?25? 9:46
+> To: Wang Shenwei-B38339
+> Cc: Sudeep Holla; shawn.guo at linaro.org; tglx at linutronix.de;
+> jason at lakedaemon.net; Huang Yongcai-B20788; linux-kernel at vger.kernel.org;
+> linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH v9 1/1] irqchip: imx-gpcv2: IMX GPCv2 driver for wakeup
+> sources
+> 
+> 
+> 
+> On 25/08/15 15:14, Shenwei Wang wrote:
+> >
+> >
+> >> -----Original Message-----
+> >> From: Sudeep Holla [mailto:sudeep.holla at arm.com]
+> 
+> [...]
+> 
+> >> I don't see this driver doing anything extra apart from keeping the
+> >> wakeup irqs enabled. i.e. You use the same cpu*wake register to
+> >> mask/unmask the interrupt as well as set the wakeup source. Since the
+> >> wakeup interrupt will be enabled by the driver, you just need to mark
+> >> it as wake-up source and nothing extra in the controller right ?
+> >> If so, you need to set IRQCHIP_SKIP_SET_WAKE as you are just leaving
+> >> that irq enabled and not doing any extra configuration to enable it as wakeup
+> source.
+> >> Please correct if that wrong, but from the code that's what I could infer.
+> >
+> > There is no special for this driver. We just use the IRQCHIP driver
+> > framework to manage the wakeup sources. Why did you propose to set
+> > IRQCHIP_SKIP_SET_WAKE flag here? If you don't need the wakeup feature,
+> > you should just not enable this driver in the configuration.
+> >
+> 
+> No, if the driver doesn't nothing extra to configure the wake up source other than
+> keeping it enabled, then it fits the case of SKIP_SET_WAKE.
+> The driver using this wake would have requested and enabled the irq.
+> When it calls enable_irq_wake, you have nothing extra to set(atleast from the
+> looks of the driver), so setting SKIP_SET_WAKE will skip the call and updated the
+> wake flags in irq core.
+> 
+> I don't see the real need of 2 separate sets of irq mask being saved in either case.
 
-http://thread.gmane.org/gmane.linux.kernel.efi/5736/focus=5742
+You don't really understand what happens after a driver calls enable_irq_wake. In suspend state, even the interrupt
+controller itself is powered off. How can you get the system up again by just using a SKIP_SET_WAKE.
 
-but there has not been a followup to this series.
+Regards,
+Shenwei
 
-I think it is fine to keep those memory reservations in the DT, but
-you should simply understand that UEFI does not parse the DT, so you
-need to tell it which memory it cannot touch. Otherwise, the firmware
-itself or anything that executes under it (UEFI drivers, the UEFI
-Shell, GRUB, the UEFI stub in the kernel) will think it is available
-and may allocate it for its own use. This may include runtime services
-regions that will remain reserved even after exiting boot services.
-
--- 
-Ard.
+> Regards,
+> Sudeep
