@@ -1,108 +1,85 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Tue, 25 Aug 2015 15:36:35 -0500
-Subject: [PATCH] soc: qcom: smd: Use correct remote processor ID
-Message-ID: <1440534995-12899-1-git-send-email-agross@codeaurora.org>
+From: robdclark@gmail.com (Rob Clark)
+Date: Tue, 25 Aug 2015 16:42:18 -0400
+Subject: [PATCH 1/7] drm/vc4: Add devicetree bindings for VC4.
+In-Reply-To: <CAL_JsqJxiGUR5BxBPyR3-0NxqWsOxMGrWQA6cMXe2pjTom__nw@mail.gmail.com>
+References: <1439427380-2436-1-git-send-email-eric@anholt.net>
+ <1439427380-2436-2-git-send-email-eric@anholt.net>
+ <55CEC25E.7070303@wwwdotorg.org>
+ <874mjxwyx5.fsf@eliezer.anholt.net>
+ <CAL_JsqJxiGUR5BxBPyR3-0NxqWsOxMGrWQA6cMXe2pjTom__nw@mail.gmail.com>
+Message-ID: <CAF6AEGu2fi0M7DsicHz+5SDHi1DyDRmvWjkmYPPgY6pZ423WcA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes SMEM addressing issues when remote processors need to use
-secure SMEM partitions.
+On Mon, Aug 24, 2015 at 9:47 AM, Rob Herring <robherring2@gmail.com> wrote:
+> On Mon, Aug 17, 2015 at 1:30 PM, Eric Anholt <eric@anholt.net> wrote:
+>> Stephen Warren <swarren@wwwdotorg.org> writes:
+>>
+>>> On 08/12/2015 06:56 PM, Eric Anholt wrote:
+>>>> Signed-off-by: Eric Anholt <eric@anholt.net>
+>>>
+>>> This one definitely needs a patch description, since someone might not
+>>> know what a VC4 is, and "git log" won't show the text from the binding
+>>> doc itself. I'd suggest adding the initial paragraph of the binding doc
+>>> as the patch description, or more.
+>>>
+>>>> diff --git a/Documentation/devicetree/bindings/gpu/brcm,bcm-vc4.txt b/Documentation/devicetree/bindings/gpu/brcm,bcm-vc4.txt
+>>
+>>>> +- hvss:             List of references to HVS video scalers
+>>>> +- encoders: List of references to output encoders (HDMI, SDTV)
+>>>
+>>> Would it make sense to make all those nodes child node of the vc4
+>>> object. That way, there's no need to have these lists of objects; they
+>>> can be automatically built up as the DT is enumerated. I know that e.g.
+>>> the NVIDIA Tegra host1x binding works this way, and I think it may have
+>>> been inspired by other similar cases.
+>>
+>> I've looked at tegra, and the component system used by msm appears to be
+>> nicer than it.  To follow tegra's model, it looks like I need to build
+>> this extra bus thing corresponding to host1x that is effectively the
+>> drivers/base/component.c code, so that I can get at vc4's structure from
+>> the component drivers.
+>>
+>>> Of course, this is only appropriate if the HW modules really are
+>>> logically children of the VC4 HW module. Perhaps they aren't. If they
+>>> aren't though, I wonder what this "vc4" module actually represents in HW?
+>>
+>> It's the subsystem, same as we use a subsystem node for msm, sti,
+>> rockchip, imx, and exynos.  This appears to be the common model of how
+>> the collection of graphics-related components is represented in the DT.
+>
+> I think most of these bindings are wrong. They are grouped together
+> because that is what DRM wants not because that reflects the h/w. So
+> convince me this is one block, not that it is what other people do.
 
-Signed-off-by: Andy Gross <agross@codeaurora.org>
----
- .../devicetree/bindings/soc/qcom/qcom,smd.txt      |    7 +++++++
- drivers/soc/qcom/smd.c                             |   18 ++++++++++++++----
- 2 files changed, 21 insertions(+), 4 deletions(-)
+I think, when it comes to more complex driver subsystems (like drm in
+particular) we have a bit of mismatch between how things look from the
+"pure hw ignoring sw" perspective, and the "how sw and in particular
+userspace expects things" perspective.  Maybe it is less a problem in
+other subsystems, where bindings map to things that are only visible
+in the kernel, or well defined devices like uart or sata controller.
+But when given the choice, I'm going to err on the side of not
+confusing userspace and the large software stack that sits above
+drm/kms, over dt purity.
 
-diff --git a/Documentation/devicetree/bindings/soc/qcom/qcom,smd.txt b/Documentation/devicetree/bindings/soc/qcom/qcom,smd.txt
-index f65c76d..3b60702 100644
---- a/Documentation/devicetree/bindings/soc/qcom/qcom,smd.txt
-+++ b/Documentation/devicetree/bindings/soc/qcom/qcom,smd.txt
-@@ -37,6 +37,12 @@ The edge is described by the following properties:
- 	Definition: the identifier of the remote processor in the smd channel
- 		    allocation table
- 
-+- qcom,remote-pid:
-+	Usage: required
-+	Value type: <u32>
-+	Definition: the identifier for the remote processor as known by the rest
-+		    of the system.
-+
- = SMD DEVICES
- 
- In turn, subnodes of the "edges" represent devices tied to SMD channels on that
-@@ -68,6 +74,7 @@ The following example represents a smd node, with one edge representing the
- 			interrupts = <0 168 1>;
- 			qcom,ipc = <&apcs 8 0>;
- 			qcom,smd-edge = <15>;
-+			qcom,remote-pid = <0xffffffff>;
- 
- 			rpm_requests {
- 				compatible = "qcom,rpm-msm8974";
-diff --git a/drivers/soc/qcom/smd.c b/drivers/soc/qcom/smd.c
-index 327adcf..bca8aba 100644
---- a/drivers/soc/qcom/smd.c
-+++ b/drivers/soc/qcom/smd.c
-@@ -111,6 +111,7 @@ struct qcom_smd_edge {
- 	struct qcom_smd *smd;
- 	struct device_node *of_node;
- 	unsigned edge_id;
-+	unsigned remote_pid;
- 
- 	int irq;
- 
-@@ -572,7 +573,7 @@ static irqreturn_t qcom_smd_edge_intr(int irq, void *data)
- 	 * have to scan if the amount of available space in smem have changed
- 	 * since last scan.
- 	 */
--	available = qcom_smem_get_free_space(edge->edge_id);
-+	available = qcom_smem_get_free_space(edge->remote_pid);
- 	if (available != edge->smem_available) {
- 		edge->smem_available = available;
- 		edge->need_rescan = true;
-@@ -976,7 +977,8 @@ static struct qcom_smd_channel *qcom_smd_create_channel(struct qcom_smd_edge *ed
- 	spin_lock_init(&channel->recv_lock);
- 	init_waitqueue_head(&channel->fblockread_event);
- 
--	ret = qcom_smem_get(edge->edge_id, smem_info_item, (void **)&info, &info_size);
-+	ret = qcom_smem_get(edge->remote_pid, smem_info_item, (void **)&info,
-+			    &info_size);
- 	if (ret)
- 		goto free_name_and_channel;
- 
-@@ -997,7 +999,8 @@ static struct qcom_smd_channel *qcom_smd_create_channel(struct qcom_smd_edge *ed
- 		goto free_name_and_channel;
- 	}
- 
--	ret = qcom_smem_get(edge->edge_id, smem_fifo_item, &fifo_base, &fifo_size);
-+	ret = qcom_smem_get(edge->remote_pid, smem_fifo_item, &fifo_base,
-+			    &fifo_size);
- 	if (ret)
- 		goto free_name_and_channel;
- 
-@@ -1041,7 +1044,7 @@ static void qcom_discover_channels(struct qcom_smd_edge *edge)
- 	int i;
- 
- 	for (tbl = 0; tbl < SMD_ALLOC_TBL_COUNT; tbl++) {
--		ret = qcom_smem_get(edge->edge_id,
-+		ret = qcom_smem_get(edge->remote_pid,
- 				    smem_items[tbl].alloc_tbl_id,
- 				    (void **)&alloc_tbl,
- 				    NULL);
-@@ -1184,6 +1187,13 @@ static int qcom_smd_parse_edge(struct device *dev,
- 		return -EINVAL;
- 	}
- 
-+	key = "qcom,remote-pid";
-+	ret = of_property_read_u32(node, key, &edge->remote_pid);
-+	if (ret) {
-+		dev_err(dev, "edge missing %s property\n", key);
-+		return -EINVAL;
-+	}
-+
- 	syscon_np = of_parse_phandle(node, "qcom,ipc", 0);
- 	if (!syscon_np) {
- 		dev_err(dev, "no qcom,ipc node\n");
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+Maybe it would be nice to have a sort of dt overlay that adds the bits
+needed to tie together hw blocks that should be assembled into a
+single logical device for linux and userspace (but maybe not some
+other hypothetical operating system).  But so far that doesn't exist.
+All we have is a hammer (devicetree), everything looks like a nail.
+End result is we end up adding some things in the bindings which
+aren't purely about the hw.  Until someone invents a screwdriver, I'm
+not sure what else to do.  In the end, other hypothetical OS is free
+to ignore those extra fields in the bindings if it doesn't need them.
+So meh?
+
+BR,
+-R
+
+
+> Rob
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
