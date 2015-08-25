@@ -1,144 +1,68 @@
-From: shenwei.wang@freescale.com (Shenwei Wang)
-Date: Tue, 25 Aug 2015 17:03:07 -0500
-Subject: [PATCH v3 1/1][Resend] misc: sram: add dev_pm_ops to support module
- power gate
-Message-ID: <1440540187-6208-1-git-send-email-shenwei.wang@freescale.com>
+From: isubramanian@apm.com (Iyappan Subramanian)
+Date: Tue, 25 Aug 2015 15:03:03 -0700
+Subject: [PATCH] drivers: net: xgene: fix: Oops in linkwatch_fire_event
+Message-ID: <1440540183-11006-1-git-send-email-isubramanian@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When system goes into low power states like SUSPEND_MEM and
-HIBERNATION, the hardware IP block may be powered off to reduce
-the power consumption. This power down will lost all the
-data inside the ram. This patch added the dev_pm_ops and
-implemented two callbacks: suspend_noirq and resume_noirq, which
-will save the data in the on-chip-ram right before power down
-and restore it after system resumes.
+[ 1065.801569] Internal error: Oops: 96000006 [#1] SMP
+...
+[ 1065.866655] Hardware name: AppliedMicro Mustang/Mustang, BIOS 1.1.0 Apr 22 2015
+[ 1065.873937] Workqueue: events_power_efficient phy_state_machine
+[ 1065.879837] task: fffffe01de105e80 ti: fffffe00bcf18000 task.ti: fffffe00bcf18000
+[ 1065.887288] PC is at linkwatch_fire_event+0xac/0xc0
+[ 1065.892141] LR is at linkwatch_fire_event+0xa0/0xc0
+[ 1065.896995] pc : [<fffffe000060284c>] lr : [<fffffe0000602840>] pstate: 200001c5
+[ 1065.904356] sp : fffffe00bcf1bd00
+...
+[ 1066.196813] Call Trace:
+[ 1066.199248] [<fffffe000060284c>] linkwatch_fire_event+0xac/0xc0
+[ 1066.205140] [<fffffe000061167c>] netif_carrier_off+0x54/0x64
+[ 1066.210773] [<fffffe00004f1654>] phy_state_machine+0x120/0x3bc
+[ 1066.216578] [<fffffe00000d8d10>] process_one_work+0x15c/0x3a8
+[ 1066.222296] [<fffffe00000d9090>] worker_thread+0x134/0x470
+[ 1066.227757] [<fffffe00000df014>] kthread+0xe0/0xf8
+[ 1066.232525] Code: 97f65ee9 f9420660 d538d082 8b000042 (885f7c40)
 
-A new property string named "can-power-gate" is added to
-the devicetree bindings too.
+The fix is to call phy_disconnect() from xgene_enet_mdio_remove,
+which in turn call cancel_delayed_work_sync().
 
-Based-on-a-patch-by: Anson Huang <b20788@freescale.com>
-Signed-off-by: Shenwei Wang <shenwei.wang@freescale.com>
-
+Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
 ---
-Change log:
+ drivers/net/ethernet/apm/xgene/xgene_enet_hw.c   | 3 +++
+ drivers/net/ethernet/apm/xgene/xgene_enet_main.c | 5 +++--
+ 2 files changed, 6 insertions(+), 2 deletions(-)
 
-PATCH v3
-	Removed the unnecessary clk_enable/clk_disable.
-
-PATCH v2
-	Use vmalloc to allocate the SRAM backup memory.
-	Code clean up.
-
- Documentation/devicetree/bindings/misc/sram.txt |  2 ++
- drivers/misc/sram.c                             | 42 +++++++++++++++++++++++++
- 2 files changed, 44 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/misc/sram.txt b/Documentation/devicetree/bindings/misc/sram.txt
-index 36cbe5a..1170086 100644
---- a/Documentation/devicetree/bindings/misc/sram.txt
-+++ b/Documentation/devicetree/bindings/misc/sram.txt
-@@ -33,6 +33,8 @@ Optional properties in the area nodes:
-
- - compatible : standard definition, should contain a vendor specific string
-                in the form <vendor>,[<device>-]<usage>
-+- can-power-gate: a property to tell the driver that the sram can support
-+		power gate
-
- Example:
-
-diff --git a/drivers/misc/sram.c b/drivers/misc/sram.c
-index 15c33cc..db9f1fa 100644
---- a/drivers/misc/sram.c
-+++ b/drivers/misc/sram.c
-@@ -30,7 +30,9 @@
-
- struct sram_dev {
- 	struct device *dev;
-+	void *power_off_save;
- 	void __iomem *virt_base;
-+	u32 size;
-
- 	struct gen_pool *pool;
- 	struct clk *clk;
-@@ -156,6 +158,33 @@ static int sram_reserve_regions(struct sram_dev *sram, struct resource *res)
- 	return ret;
- }
-
-+static int sram_suspend_noirq(struct device *dev)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct sram_dev *sram = platform_get_drvdata(pdev);
-+
-+	if (!sram->power_off_save)
-+		return 0;
-+
-+	/* Save necessary regs */
-+	memcpy(sram->power_off_save, sram->virt_base, sram->size);
-+
-+	return 0;
-+}
-+
-+static int sram_resume_noirq(struct device *dev)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct sram_dev *sram = platform_get_drvdata(pdev);
-+
-+	if (!sram->power_off_save)
-+		return 0;
-+
-+	memcpy(sram->virt_base, sram->power_off_save, sram->size);
-+
-+	return 0;
-+}
-+
- static int sram_probe(struct platform_device *pdev)
+diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
+index a626c43..cfa3704 100644
+--- a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
++++ b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
+@@ -801,6 +801,9 @@ int xgene_enet_mdio_config(struct xgene_enet_pdata *pdata)
+ 
+ void xgene_enet_mdio_remove(struct xgene_enet_pdata *pdata)
  {
- 	struct sram_dev *sram;
-@@ -176,6 +205,7 @@ static int sram_probe(struct platform_device *pdev)
- 	}
-
- 	size = resource_size(res);
-+	sram->size = size;
-
- 	if (!devm_request_mem_region(sram->dev, res->start, size, pdev->name)) {
- 		dev_err(sram->dev, "could not request region for resource\n");
-@@ -203,6 +233,9 @@ static int sram_probe(struct platform_device *pdev)
-
- 	platform_set_drvdata(pdev, sram);
-
-+	if (of_property_read_bool(pdev->dev.of_node, "can-power-gate"))
-+		sram->power_off_save = vmalloc(size);
++	if (pdata->phy_dev)
++		phy_disconnect(pdata->phy_dev);
 +
- 	dev_dbg(sram->dev, "SRAM pool: %zu KiB @ 0x%p\n",
- 		gen_pool_size(sram->pool) / 1024, sram->virt_base);
-
-@@ -219,6 +252,9 @@ static int sram_remove(struct platform_device *pdev)
- 	if (sram->clk)
- 		clk_disable_unprepare(sram->clk);
-
-+	if (sram->power_off_save)
-+		vfree(sram->power_off_save);
-+
- 	return 0;
- }
-
-@@ -229,10 +265,16 @@ static const struct of_device_id sram_dt_ids[] = {
- };
- #endif
-
-+static const struct dev_pm_ops sram_pm_ops = {
-+	.suspend_noirq = sram_suspend_noirq,
-+	.resume_noirq = sram_resume_noirq,
-+};
-+
- static struct platform_driver sram_driver = {
- 	.driver = {
- 		.name = "sram",
- 		.of_match_table = of_match_ptr(sram_dt_ids),
-+		.pm	= &sram_pm_ops,
- 	},
- 	.probe = sram_probe,
- 	.remove = sram_remove,
---
-2.5.0.rc2
+ 	mdiobus_unregister(pdata->mdio_bus);
+ 	mdiobus_free(pdata->mdio_bus);
+ 	pdata->mdio_bus = NULL;
+diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
+index 299eb43..a02ea7f8 100644
+--- a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
++++ b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
+@@ -1277,9 +1277,10 @@ static int xgene_enet_remove(struct platform_device *pdev)
+ 	mac_ops->tx_disable(pdata);
+ 
+ 	xgene_enet_napi_del(pdata);
+-	xgene_enet_mdio_remove(pdata);
+-	xgene_enet_delete_desc_rings(pdata);
++	if (pdata->phy_mode == PHY_INTERFACE_MODE_RGMII)
++		xgene_enet_mdio_remove(pdata);
+ 	unregister_netdev(ndev);
++	xgene_enet_delete_desc_rings(pdata);
+ 	pdata->port_ops->shutdown(pdata);
+ 	free_netdev(ndev);
+ 
+-- 
+1.9.1
