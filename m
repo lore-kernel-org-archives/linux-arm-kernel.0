@@ -1,51 +1,70 @@
-From: haibo.chen@freescale.com (Haibo Chen)
-Date: Tue, 25 Aug 2015 11:34:19 +0800
-Subject: [PATCH v6 0/6] mmc: imx: a few fixes and new feature
-In-Reply-To: <20150813085854.GA19166@shlinux1.ap.freescale.net>
-References: <1439293111-21077-1-git-send-email-haibo.chen@freescale.com>
- <20150813085854.GA19166@shlinux1.ap.freescale.net>
-Message-ID: <20150825033418.GA15468@b51421-server.ap.freescale.net>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Tue, 25 Aug 2015 07:33:48 +0300
+Subject: [PATCH 2/2] pinctrl: digicolor: convert null test to IS_ERR test
+In-Reply-To: <1440450747-10080-3-git-send-email-Julia.Lawall@lip6.fr>
+References: <1440450747-10080-1-git-send-email-Julia.Lawall@lip6.fr>
+ <1440450747-10080-3-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <20150825043348.GX2619@sapphire.tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 13, 2015 at 04:58:56PM +0800, Dong Aisheng wrote:
-> On Tue, Aug 11, 2015 at 07:38:25PM +0800, Haibo Chen wrote:
-> > Changes for v6:
-> > -remove duplicate code in esdhc_set_uhs_signaling().
-> > -fix a typo for patch-2.
-> > -make commit log of patch-3 more specific.
-> > 
-> > Haibo Chen (6):
-> >   mmc: sdhci-esdhc-imx: add imx7d support and support HS400
-> >   mmc: sdhci-esdhc-imx: add tuning-step setting support
-> >   mmc: sdhci-esdhc-imx: add imx7d support in bingding doc
-> >   ARM: dts: imx7d-sdb: add eMMC5.0 support
-> >   mmc: sdhci-esdhc-imx: set back the burst_length_enable bit to 1
-> >   mmc: sdhci-esdhc-imx: change default watermark level and burst length
-> > 
-> >  .../devicetree/bindings/mmc/fsl-imx-esdhc.txt      |   6 ++
-> >  arch/arm/boot/dts/imx7d-sdb.dts                    |  13 +++
-> >  drivers/mmc/host/sdhci-esdhc-imx.c                 | 114 ++++++++++++++++++++-
-> >  include/linux/platform_data/mmc-esdhc-imx.h        |   1 +
-> >  4 files changed, 130 insertions(+), 4 deletions(-)
-> > 
-> > -- 
-> > 1.9.1
-> > 
+Hi Julia,
+
+On Mon, Aug 24, 2015 at 11:12:27PM +0200, Julia Lawall wrote:
+> Since commit 323de9efdf3e ("pinctrl: make pinctrl_register() return proper
+> error code"), pinctrl_register returns an error code rather than NULL on
+> failure.  Update a driver that was introduced more recently.
 > 
-> The patch set looks good to me.
+> The semantic patch that makes this change is as follows:
+> (http://coccinelle.lip6.fr/)
 > 
-> Acked-by: Dong Aisheng <aisheng.dong@freescale.com>
+> // <smpl>
+> @@
+> expression e,e1,e2;
+> @@
 > 
-> Regards
-> Dong Aisheng
+> e = pinctrl_register(...)
+> ... when != e = e1
+> if (
+> -   e == NULL
+> +   IS_ERR(e)
+>    ) {
+>      ...
+>      return
+> -      e2
+> +      PTR_ERR(e)
+>      ;
+>      }
+> // </smpl>
+> 
+> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 
-Hi Ulf,
+Acked-by: Baruch Siach <baruch@tkos.co.il>
 
-Can you help pull these patches into your branch?
+Thanks,
+baruch
 
+>  drivers/pinctrl/pinctrl-digicolor.c |    4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/pinctrl/pinctrl-digicolor.c b/drivers/pinctrl/pinctrl-digicolor.c
+> index 461fffc..11f8b83 100644
+> --- a/drivers/pinctrl/pinctrl-digicolor.c
+> +++ b/drivers/pinctrl/pinctrl-digicolor.c
+> @@ -337,9 +337,9 @@ static int dc_pinctrl_probe(struct platform_device *pdev)
+>  	pmap->dev = &pdev->dev;
+>  
+>  	pmap->pctl = pinctrl_register(pctl_desc, &pdev->dev, pmap);
+> -	if (!pmap->pctl) {
+> +	if (IS_ERR(pmap->pctl)) {
+>  		dev_err(&pdev->dev, "pinctrl driver registration failed\n");
+> -		return -EINVAL;
+> +		return PTR_ERR(pmap->pctl);
+>  	}
+>  
+>  	ret = dc_gpiochip_add(pmap, pdev->dev.of_node);
 
-Best regards
-
-Haibo
 -- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
