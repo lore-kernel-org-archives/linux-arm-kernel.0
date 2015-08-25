@@ -1,62 +1,88 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Tue, 25 Aug 2015 12:10:33 -0700
-Subject: [PULL] clk: at91: sama5d2 materials
-In-Reply-To: <20150818102401.17de779b@bbrezillon>
-References: <20150818102401.17de779b@bbrezillon>
-Message-ID: <20150825191033.31346.67237@quantum>
+From: Shenwei.Wang@freescale.com (Shenwei Wang)
+Date: Tue, 25 Aug 2015 19:24:28 +0000
+Subject: [PATCH v9 1/1] irqchip: imx-gpcv2: IMX GPCv2 driver for wakeup
+ sources
+In-Reply-To: <55DC96BA.2020905@arm.com>
+References: <1440443055-7291-1-git-send-email-shenwei.wang@freescale.com>
+ <55DC3452.3070205@arm.com>
+ <CY1PR0301MB08439B6C5F841AFFD152DFD883610@CY1PR0301MB0843.namprd03.prod.outlook.com>
+ <55DC738D.8000302@arm.com>
+ <CY1PR0301MB0843AE566996617D855CC00683610@CY1PR0301MB0843.namprd03.prod.outlook.com>
+ <55DC7FA4.7040902@arm.com>
+ <CY1PR0301MB08433A2659C75028821F0AE783610@CY1PR0301MB0843.namprd03.prod.outlook.com>
+ <55DC96BA.2020905@arm.com>
+Message-ID: <CY1PR0301MB0843388CA3BB07493BC2907183610@CY1PR0301MB0843.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Boris Brezillon (2015-08-18 01:24:01)
-> Stephen, Mike,
-> 
-> Here is a PR for the sama5d2 materials.
-> I know we're already late in the release cycle and I'm not sure you can
-> take this PR into account for 4.3, so if you can't could you please
-> queue it for 4.4?
 
-Queued for 4.4.
 
-Thanks,
-Mike
-
-> 
-> Thanks,
-> 
-> Boris
-> 
-> The following changes since commit c42743f11f58646a50bc4b96da363429dca0c5e6:
-> 
->   clk: add bindings for the Ux500 clocks (2015-08-13 11:29:45 -0700)
-> 
-> are available in the git repository at:
-> 
->   https://github.com/bbrezillon/linux-at91.git clk/atmel-clk-next
-> 
-> for you to fetch changes up to 3be0527c0f8bbbb744a6a34603d6a83e511c6741:
-> 
->   clk: at91: add generated clock driver (2015-08-18 10:11:57 +0200)
-> 
-> ----------------------------------------------------------------
-> Nicolas Ferre (4):
->       clk: at91: cleanup PMC header file for PCR register fields
->       clk: at91: modify PMC peripheral clock to deal with newer register layout
->       clk: at91: add PMC sama5d2 support
->       clk: at91: add generated clock driver
-> 
->  Documentation/devicetree/bindings/clock/at91-clock.txt |  35 +++++++++++++++++++++
->  arch/arm/mach-at91/Kconfig                             |   3 ++
->  drivers/clk/at91/Makefile                              |   1 +
->  drivers/clk/at91/clk-generated.c                       | 306 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
->  drivers/clk/at91/clk-peripheral.c                      |  24 +++++++++-----
->  drivers/clk/at91/pmc.c                                 |  21 +++++++++++++
->  drivers/clk/at91/pmc.h                                 |   3 ++
->  include/dt-bindings/clock/at91.h                       |   1 +
->  include/linux/clk/at91_pmc.h                           |  22 ++++++++-----
->  9 files changed, 400 insertions(+), 16 deletions(-)
->  create mode 100644 drivers/clk/at91/clk-generated.c
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
+> -----Original Message-----
+> From: Sudeep Holla [mailto:sudeep.holla at arm.com]
+> Sent: 2015?8?25? 11:24
+> To: Wang Shenwei-B38339
+> Cc: Sudeep Holla; shawn.guo at linaro.org; tglx at linutronix.de;
+> jason at lakedaemon.net; Huang Yongcai-B20788; linux-kernel at vger.kernel.org;
 > linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Subject: Re: [PATCH v9 1/1] irqchip: imx-gpcv2: IMX GPCv2 driver for wakeup
+> >
+> > You don't really understand what happens after a driver calls
+> > enable_irq_wake. In suspend state, even the interrupt controller
+> > itself is powered off. How can you get the system up again  by just
+> > using a SKIP_SET_WAKE.
+> >
+> 
+> Sorry for that, let me try to understand aloud. So you have irq_{un,}mask function
+> that are called when interrupts are enabled and disabled. So suppose you have 3
+> irqs that are enabled and only one of then is set as wakeup source.
+> 
+> Now you call enable_irq_wake, you save that in wakeup_sources, fine.
+> Later when you enter suspend, you save all the 3 active irqs in saved_irq_mask
+> and over-write cpu2wakeup with wakeup_sources, right?
+> 
+> All fine, what I am saying is let irq-core know that you want to mask the 2
+> non-wakeup irqs you have using MASK_ON_SUSPEND. So when
+> suspend_device_irqs is called in suspend path, that's done for you automatically
+> and the cpu2wakeup will have just 1 wakeup enabled which is what you are doing
+> in suspend callback, right ?
+
+	/*
+	 * Hardware which has no wakeup source configuration facility
+	 * requires that the non wakeup interrupts are masked at the
+	 * chip level. The chip implementation indicates that with
+	 * IRQCHIP_MASK_ON_SUSPEND.
+	 */
+	if (irq_desc_get_chip(desc)->flags & IRQCHIP_MASK_ON_SUSPEND)
+		mask_irq(desc);
+
+IRQCHIP_MASK_ON_SUSPEND flag is for the hardware that has no wakeup source capability.
+This GPCv2 block is designed to manage the wakeup source, so the flag does not make any sense.
+
+> Now that it's already done for you, you need not do anything extra and hence just
+> set SKIP_SET_WAKE to do nothing.
+
+static int set_irq_wake_real(unsigned int irq, unsigned int on)
+{
+	struct irq_desc *desc = irq_to_desc(irq);
+	int ret = -ENXIO;
+
+	if (irq_desc_get_chip(desc)->flags &  IRQCHIP_SKIP_SET_WAKE)
+		return 0;
+
+	if (desc->irq_data.chip->irq_set_wake)
+		ret = desc->irq_data.chip->irq_set_wake(&desc->irq_data, on);
+
+	return ret;
+}
+>From the codes above, if a irqchip can not handle the wakeup sources, it can set SKIP flag.
+This driver is intended to manage the wakeup sources, what's the reason to skip here?
+
+Regards,
+Shenwei
+
+
+> Hope this clarifies, sorry if I am still missing to understand something here, but I
+> don't see anything. Let me know.
+> 
+> Regards,
+> Sudeep
