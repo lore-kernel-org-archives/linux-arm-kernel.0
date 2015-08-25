@@ -1,90 +1,78 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Tue, 25 Aug 2015 13:25:46 -0700
-Subject: [PATCH v10 3/5] mtd: nand: vf610_nfc: add device tree bindings
-In-Reply-To: <1438594050-4595-4-git-send-email-stefan@agner.ch>
-References: <1438594050-4595-1-git-send-email-stefan@agner.ch>
- <1438594050-4595-4-git-send-email-stefan@agner.ch>
-Message-ID: <20150825202546.GL81844@google.com>
+From: mturquette@baylibre.com (Michael Turquette)
+Date: Tue, 25 Aug 2015 13:25:51 -0700
+Subject: [PATCH v2 1/6] clk: berlin: move MAX_CLKS out of
+ drivers/clk/berlin
+In-Reply-To: <1439898368-11543-2-git-send-email-antoine.tenart@free-electrons.com>
+References: <1439898368-11543-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1439898368-11543-2-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <20150825202551.31346.93685@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry, I realized a potential issue here.
-
-On Mon, Aug 03, 2015 at 11:27:28AM +0200, Stefan Agner wrote:
-> Signed-off-by: Bill Pringlemeir <bpringlemeir@nbsps.com>
-> Acked-by: Shawn Guo <shawnguo@kernel.org>
-> Reviewed-by: Brian Norris <computersforpeace@gmail.com>
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> ---
->  .../devicetree/bindings/mtd/vf610-nfc.txt          | 45 ++++++++++++++++++++++
->  1 file changed, 45 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mtd/vf610-nfc.txt
+Quoting Antoine Tenart (2015-08-18 04:46:03)
+> Move the MAX_CLKS definition used in the Berlin clock driver outside the
+> driver.
 > 
-> diff --git a/Documentation/devicetree/bindings/mtd/vf610-nfc.txt b/Documentation/devicetree/bindings/mtd/vf610-nfc.txt
-> new file mode 100644
-> index 0000000..cae5f25
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mtd/vf610-nfc.txt
-> @@ -0,0 +1,45 @@
-> +Freescale's NAND flash controller (NFC)
+> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+
+Acked-by: Michael Turquette <mturquette@baylibre.com>
+
+> ---
+>  drivers/clk/berlin/bg2.c             | 1 -
+>  drivers/clk/berlin/bg2q.c            | 1 -
+>  include/dt-bindings/clock/berlin2.h  | 2 ++
+>  include/dt-bindings/clock/berlin2q.h | 2 ++
+>  4 files changed, 4 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/clk/berlin/bg2.c b/drivers/clk/berlin/bg2.c
+> index 73153fc45ee9..469a2c57e1b4 100644
+> --- a/drivers/clk/berlin/bg2.c
+> +++ b/drivers/clk/berlin/bg2.c
+> @@ -91,7 +91,6 @@
+>   *
+>   */
+>  
+> -#define        MAX_CLKS 41
+>  static struct clk *clks[MAX_CLKS];
+>  static struct clk_onecell_data clk_data;
+>  static DEFINE_SPINLOCK(lock);
+> diff --git a/drivers/clk/berlin/bg2q.c b/drivers/clk/berlin/bg2q.c
+> index 221f40c2b850..a27958efab92 100644
+> --- a/drivers/clk/berlin/bg2q.c
+> +++ b/drivers/clk/berlin/bg2q.c
+> @@ -45,7 +45,6 @@
+>  #define REG_SDIO0XIN_CLKCTL    0x0158
+>  #define REG_SDIO1XIN_CLKCTL    0x015c
+>  
+> -#define        MAX_CLKS 27
+>  static struct clk *clks[MAX_CLKS];
+>  static struct clk_onecell_data clk_data;
+>  static DEFINE_SPINLOCK(lock);
+> diff --git a/include/dt-bindings/clock/berlin2.h b/include/dt-bindings/clock/berlin2.h
+> index 0c30800175df..97832b840beb 100644
+> --- a/include/dt-bindings/clock/berlin2.h
+> +++ b/include/dt-bindings/clock/berlin2.h
+> @@ -43,3 +43,5 @@
+>  #define CLKID_VIDEO1           38
+>  #define CLKID_VIDEO2           39
+>  #define CLKID_TWD              40
 > +
-> +This variant of the Freescale NAND flash controller (NFC) can be found on
-> +Vybrid (vf610), MPC5125, MCF54418 and Kinetis K70.
+> +#define MAX_CLKS               41
+> diff --git a/include/dt-bindings/clock/berlin2q.h b/include/dt-bindings/clock/berlin2q.h
+> index 287fc3b4afb2..c79af928ae92 100644
+> --- a/include/dt-bindings/clock/berlin2q.h
+> +++ b/include/dt-bindings/clock/berlin2q.h
+> @@ -29,3 +29,5 @@
+>  #define CLKID_SMEMC            24
+>  #define CLKID_PCIE             25
+>  #define CLKID_TWD              26
 > +
-> +Required properties:
-> +- compatible: Should be set to "fsl,vf610-nfc"
-> +- reg: address range of the NFC
-> +- interrupts: interrupt of the NFC
-> +- nand-bus-width: see nand.txt
-> +- nand-ecc-mode: see nand.txt
-> +- nand-on-flash-bbt: see nand.txt
-
-Stumbling across the "multi-CS" questions on the driver reminds me: it
-typically makes sense to define new NAND bindings using separate NAND
-*controller* and *flash* device nodes. The above 3 properties, at least,
-would apply on a per-flash basis, not per-controller typically. See
-sunxi-nand, for instance:
-
-http://lxr.free-electrons.com/source/Documentation/devicetree/bindings/mtd/sunxi-nand.txt
-
-brcmnand had a similar pattern:
-
-https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/devicetree/bindings/mtd/brcm,brcmnand.txt
-
-(Perhaps it's time we standardized this a little more formally...)
-
-> +- assigned-clocks: main clock from the SoC, for Vybrid <&clks VF610_CLK_NFC>;
-> +- assigned-clock-rates: The NAND bus timing is derived from this clock
-> +    rate and should not exceed maximum timing for any NAND memory chip
-> +    in a board stuffing. Typical NAND memory timings derived from this
-> +    clock are found in the SoC hardware reference manual. Furthermore,
-> +    there might be restrictions on maximum rates when using hardware ECC.
-> +
-> +- #address-cells, #size-cells : Must be present if the device has sub-nodes
-> +  representing partitions.
-> +
-> +Required properties for hardware ECC:
-> +- nand-ecc-strength: supported strengths are 24 and 32 bit (see nand.txt)
-> +- nand-ecc-step-size: step size equals page size, currently only 2k pages are
-> +    supported
-> +
-> +Example:
-> +
-> +	nfc: nand at 400e0000 {
-> +		compatible = "fsl,vf610-nfc";
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		reg = <0x400e0000 0x4000>;
-> +		interrupts = <GIC_SPI 83 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&clks VF610_CLK_NFC>;
-> +		clock-names = "nfc";
-> +		assigned-clocks = <&clks VF610_CLK_NFC>;
-> +		assigned-clock-rates = <33000000>;
-> +		nand-bus-width = <8>;
-> +		nand-ecc-mode = "hw";
-> +		nand-ecc-strength = <32>;
-> +		nand-ecc-step-size = <2048>;
-> +		nand-on-flash-bbt;
-> +	};
-
-Brian
+> +#define MAX_CLKS               27
+> -- 
+> 2.5.0
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
