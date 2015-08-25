@@ -1,190 +1,282 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Tue, 25 Aug 2015 16:04:45 +0800
-Subject: [PATCH v1 3/3] arm64: dts: add Hi6220 mailbox node
-In-Reply-To: <20150824124800.GD7139@leverpostej>
-References: <1439977055-1747-1-git-send-email-leo.yan@linaro.org>
- <1439977055-1747-4-git-send-email-leo.yan@linaro.org>
- <20150821184059.GB2000@svinekod> <20150824091845.GA28290@leoy-linaro>
- <20150824095144.GA7139@leverpostej> <1440411596.3517.12.camel@linaro.org>
- <20150824124800.GD7139@leverpostej>
-Message-ID: <1440489885.10987.26.camel@linaro.org>
+From: varada@codeaurora.org (Varadarajan Narayanan)
+Date: Tue, 25 Aug 2015 13:40:42 +0530
+Subject: [PATCH v3] qcom: ipq40xx: Add basic board/dts support for
+ IPQ40XX SoC
+In-Reply-To: <20150824224928.GE14330@codeaurora.org>
+References: <20150824092813.GA15581@codeaurora.org>
+ <20150824224928.GE14330@codeaurora.org>
+Message-ID: <20150825081042.GA14028@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-08-24 at 13:48 +0100, Mark Rutland wrote:
-> > > > > I don't see why you need reserved-memory here, given you're not referring to
-> > > > > these regions by phandle anyway.
-> > > > 
-> > > > - Now we have enabled EFI_STUB, so the memory node will be removed in
-> > > >   kernel:
-> > > >     efi_entry()
-> > > >       \-> allocate_new_fdt_and_exit_boot()
-> > > >             \-> update_fdt();
-> > > > 
-> > > >   Finally in kernel it cannot use memory node to carve out reseved
-> > > >   memory regions.
-> > > > 
-> > > > - On the other hand, DTS's the memory node is to "describes the
-> > > >   physical memory layout for the system"; so it's better to use it only
-> > > >   to describe the hardware info for memory. We can use reserved-memory
-> > > >   to help manage the memory regions which are reserved from software
-> > > >   perspective.
-> > > 
-> > > The fact that you have no-map means that the memory should not be
-> > > described to the kernel as mappable in the first place. It's wrong to
-> > > place such memory in the memory node, even if listed in reserved-memory.
-> > > 
-> > > If your EFI memory map describes the memory as mappable, it is wrong.
-> > 
-> > When kernel is working, kernel will create its own page table based on
-> > UEFI memory map. Since it's reserved in DTS file as Leo's patch, it'll
-> > be moved to reserved memblock. Why is it wrong?
-> 
-> That is a _Linux_ detail, not a _UEFI_ detail.
-> 
-> Anything which only handles UEFI and knows nothing of reserved-memory
-> (e.g. GRUB) will be broken and/or break the Linux use of the region, as
-> it will happily try to allocate memory in the region (and could even
-> decide to reserve it permanently for its own usage).
-> 
-> If the memory is truly specific to the mailbox, then UEFI needs to know
-> that it is reserved as such. If it is not, then it need not be described
-> in the DT and can be allocated dynamically by the kernel.
+On Mon, Aug 24, 2015 at 03:49:28PM -0700, Stephen Boyd wrote:
+> On 08/24, Varadarajan Narayanan wrote:
+> > Add initial dts files and SoC support for IPQ40XX
+> >
+>
+> So far we haven't added any Xs in the model names for our SoC
+> support. Even for IPQ806X, we have it as IPQ8064 as the config
+> name with IPQ806x in the help text because there's IPQ8062 out
+> there. So I guess it should be IPQ4019 or something?
 
-No. We support both UEFI and uboot on hikey. We must reserve these
-mailbox buffer in DT. Otherwise, it's a problem to support uboot.
-We should only deliver one kernel and one DTB to support both UEFI and
-uboot.
+Will rename it as IPQ4019
 
-And mailbox driver is already upgraded from beginning. Nobody can say
-that it won't be upgraded again in the future.
+> > Signed-off-by: Varadarajan Narayanan <varada@codeaurora.org>
+> > ---
+> > diff --git a/Documentation/devicetree/bindings/qcom.txt b/Documentation/devicetree/bindings/qcom.txt
+> > new file mode 100644
+> > index 0000000..7d56bd0
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/qcom.txt
+> > @@ -0,0 +1,16 @@
+> > +Qualcomm IPQ device tree bindings
+> > +---------------------------------
+> > +
+> > +System on Chip
+> > +
+> > +Device tree must specify which SoC it uses, with one of the
+> > +following compatible strings
+> > +
+> > +       "qcom,ipq40xx"
+> > +
+> > +Platform
+> > +
+> > +Device tree must specify which Platform it uses, with one of the
+> > +following compatible strings
+> > +
+> > +       "qcom,ipq40xx-r3pc"
+>
+> This file is not complete and I don't see any other silicon
+> vendors doing this, so please drop the entire file.
 
-By the way, UEFI is loaded in the upper memory region of hikey. It won't
-break anything in linux kernel.
-> 
-> > In the second, UEFI is firmware. When it's stable, nobody should change
-> > it without any reason. These reserved memory are used in mailbox driver.
-> > Look. It's driver, so it could be changed at any time. Why do you want
-> > to UEFI knowing this memory range? Do you hope UEFI to change when
-> > mailbox driver is changed?
-> 
-> It shouldn't need to change if that memory is truly reserved for the
-> sole use of the mailbox. If that's not the case then we have a different
-> issue.
-> 
-> If the memory range to use can be allocated by the driver, then I don't
-> see why it should be described in reserved-memory. It certainly should
-> not require a no-map attribute.
-> 
-> Additionally, the driver needs to ensure that the requisite cache
-> maintenance takes place prior to the use of the memory region given
-> prior agents may have ampped it as cacheable, leaving stale (perhaps
-> dirty) lines in the caches.
-> 
+Ok.
 
-Since those mailbox buffer is declared as reserved with "no-map"
-property, it means that linux kernel won't create the page table of
-them.
+> > diff --git a/arch/arm/boot/dts/qcom-ipq40xx-r3pc.dts b/arch/arm/boot/dts/qcom-ipq40xx-r3pc.dts
+> > new file mode 100644
+> > index 0000000..7e4e629
+> > --- /dev/null
+> > +++ b/arch/arm/boot/dts/qcom-ipq40xx-r3pc.dts
+> > @@ -0,0 +1,33 @@
+> > +/* Copyright (c) 2014, The Linux Foundation. All rights reserved.
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License version 2 and
+> > + * only version 2 as published by the Free Software Foundation.
+> > + *
+> > + * This program is distributed in the hope that it will be useful,
+> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > + * GNU General Public License for more details.
+> > + */
+> > +
+> > +#include "qcom-ipq40xx.dtsi"
+> > +
+> > +/ {
+> > +	model = "Qualcomm Technologies, Inc. IPQ40XX R3PC";
+>
+> Same here, we should know what model number is on the board.
 
-The meaning of "no-map" is removing it from memory memblock.
-setup_arch()
-  |
-  ---> efi_init() -- Get memory map information from UEFI
-  |
-  ---> arm64_memblock_init()
-  |      |
-  |      ---> early_init_fdt_scan_reserved_mem()
-  |           Get reserved memory buffer from DT. Split memory
-  |           memblock according to reserved buffer.
-  ---> paging_init()
-         |--> map_mem()
-              _Only_ map the discrete memory memblock into kernel
-              page table.
+Ok.
 
->From this working flow, we could know that those mailbox buffers
-won't be mapped into kernel page table. So there's no concern on
-cache maintenance.
-              
-> > > > According to upper info, we still need to use reserved-memory node to
-> > > > depict the reserved memory regions. i have no knowledge about EFI_STUB,
-> > > > so please confirm or correct as needed.
-> > > 
-> > > If the memory shouldn't be mapped, it should neither be in the memory
-> > > node nor EFI memory map (with attributes allowing it to be mapped) to
-> > > begin with.
-> > 
-> > As I said above, kernel will create its own page table. When kernel's
-> > page table is working, UEFI's page table is destroying. So the memory
-> > won't be mapped twice at the same time. What's wrong?
-> > > 
-> > > As far as I can see you do not need to use reserved-memory.
-> > 
-> > 1. Are we talking on the same thing? Leo already mentioned that all
-> > memory node in DTB will be destroyed by kernel when EFI_STUB is enabled
-> > on arm. Did you read the source code after his reply?
-> > And you suggested that Leo to use discrete memory region in DTB. It is
-> > really wrong. Kernel only gets memory map information from UEFI, not
-> > DTB.
-> 
-> I did _not_ suggest that Leo use discrete memory. I suggested that
-> reserved regions should not be described in the memory node (the same
-> premise applying to the UEFI memory map).
+> > +	compatible = "qcom,ipq40xx-r3pc", "qcom,ipq40xx";
+> > +
+> > +	memory {
+> > +		device_type = "memory";
+> > +		reg = <0x80000000 0x20000000>; /* 512MB */
+> > +	};
+>
+> Doesn't the bootloader fill the memory node for us? Why do we
+> need this?
+>
+> > +
+> > +	chosen {
+> > +		bootargs = "root=/dev/ram rw init=/init console=ttyMSM0,115200n8 initrd=0x82000000,0x000E2246";
+> > +	};
+>
+> Please don't add bootargs. Use stdout-path for the console part
+> and everything else should be done by the bootloader or is the
+> defaults.
 
-I agree that reserved region shouldn't be described in the memory node.
-And Leo didn't describe reserved region in memory node too.
+Since this is for the emulation platform, we don't have the bootloader.
 
-> 
-> w.r.t. UEFI, please see my comments above. If you're using the UEFI
-> memory map, you have to use the UEFI memory map, not the UEFI memory map
-> with additional (non-UEFI) caveats applied atop.
+> > +
+> > +	soc {
+> > +		serial at 78b0000 {
+> > +			status = "ok";
+> > +		};
+> > +	};
+> > +};
+> > diff --git a/arch/arm/boot/dts/qcom-ipq40xx.dtsi b/arch/arm/boot/dts/qcom-ipq40xx.dtsi
+> > new file mode 100644
+> > index 0000000..f572f38
+> > --- /dev/null
+> > +++ b/arch/arm/boot/dts/qcom-ipq40xx.dtsi
+> > @@ -0,0 +1,81 @@
+> > +/*
+> > + * Copyright (c) 2014, The Linux Foundation. All rights reserved.
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License version 2 and
+> > + * only version 2 as published by the Free Software Foundation.
+> > + *
+> > + * This program is distributed in the hope that it will be useful,
+> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > + * GNU General Public License for more details.
+> > + */
+> > +
+> > +/dts-v1/;
+> > +
+> > +#include "skeleton.dtsi"
+> > +
+> > +/ {
+> > +	model = "Qualcomm Technologies, Inc. IPQ40XX";
+> > +	compatible = "qcom,ipq40xx";
+>
+> These two should also be specific and drop the Xs. Same goes for
+> the file name.
 
-The main concern is that we're supporting both UEFI and uboot.
-Declaring these reserved buffer in DTB will be a better choice.
+Ok.
 
-> 
-> > 2. The working flow is in below.
-> >    a. Kernel gets memory map information from UEFI.
-> >    b. Kernel loads the memory reserved information from DTB.
-> 
-> This relies on Linux, and ignores other UEFI clients.
+> > +	interrupt-parent = <&intc>;
+> > +
+> > +	cpus {
+> > +		#address-cells = <1>;
+> > +		#size-cells = <0>;
+> > +		cpu at 0 {
+> > +			device_type = "cpu";
+> > +			compatible = "arm,cortex-a7";
+> > +			reg = <0x0>;
+> > +		};
+> > +
+> > +		cpu at 1 {
+> > +			device_type = "cpu";
+> > +			compatible = "arm,cortex-a7";
+> > +			reg = <0x1>;
+> > +		};
+> > +
+> > +		cpu at 2 {
+> > +			device_type = "cpu";
+> > +			compatible = "arm,cortex-a7";
+> > +			reg = <0x2>;
+> > +		};
+> > +
+> > +		cpu at 3 {
+> > +			device_type = "cpu";
+> > +			compatible = "arm,cortex-a7";
+> > +			reg = <0x3>;
+> > +		};
+> > +	};
+> > +
+> > +	soc {
+> > +		#address-cells = <1>;
+> > +		#size-cells = <1>;
+> > +		ranges;
+> > +		compatible = "simple-bus";
+> > +
+> > +		intc: interrupt-controller at b000000 {
+> > +			compatible = "qcom,msm-qgic2";
+> > +			interrupt-controller;
+> > +			#interrupt-cells = <3>;
+> > +			reg = <0x0b000000 0x1000>,
+> > +			<0x0b002000 0x1000>;
+> > +		};
+> > +
+> > +		timer {
+>
+> This node is not a child of the SoC node. It should be at the
+> root level.
 
-Yes, it's depend on CONFIG_EFI_STUB.
+Ok.
 
-> 
-> > 3. Do you mean the reserved-memory is totally wrong? If it's wrong,
-> > please submit patches to remove all reserved-memory in linux kernel
-> > first.
-> 
-> I did not say that.
-> 
-> I said that describing some memory in a memory node, then also
-> describing that in reserved-memory with a no-map property was wrong. If
-> it's never meant to be mapped then there's no reason for it to be in the
-> memory node.
+> > +			compatible = "arm,armv7-timer";
+> > +			interrupts = <1 2 0xf08>,
+> > +				     <1 3 0xf08>,
+> > +				     <1 4 0xf08>,
+> > +				     <1 1 0xf08>;
+> > +			clock-frequency = <20833333>;
+>
+> Drop this clock-frequency part if you can. The hardware should
+> properly report the frequency.
 
-No, it's not never mapped. Leo just wants it to be mapped as
-uncacheable in mailbox driver.
+Cannot drop this. This is the ref-clock frequency. For the
+chip it is 48MHz, for emulation is ~20MHz. Similar to
+https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/arch/arm/boot/dts/qcom-msm8974.dtsi#n89
 
-If we look at his mailbox node in DT, Leo used these memory regions
-in reg property. He wants to use ioremap() in mailbox driver.
+> > +		};
+> > +
+> > +		serial at 78b0000 {
+> > +			compatible = "qcom,msm-uartdm-v1.4", "qcom,msm-uartdm";
+> > +			reg = <0x78b0000 0x200>;
+> > +			interrupts = <0 108 0>;
+> > +			status = "disabled";
+>
+> Don't you need some clocks here?
 
-> 
-> > 4. Again and again. Memory node should be only used to describe the
-> > RAM information.
-> 
-> The memory node describes the memory available to the OS. There are some
-> caveats w.r.t. /memreserve/, regions which may be mapped but remain
-> unused and so on, but the memory node does generally encode a policy
-> that the memory may be used.
-> 
-> Describing unusable memory in a memory node is pointless, and has an
-> adverse effect on clients which don't support reserved-memory. It's
-> doubly harmful when that memory should never be mapped.
-> 
+Yes, will get updated in subsequent patches.
 
-He didn't declare those buffer in memory node. He only declared it
-in reserved-memory node. And it's not never be mapped. He use ioremap()
-in the driver.
+> > +		};
+> > +	};
+> > +};
+> > diff --git a/arch/arm/configs/ipq_defconfig b/arch/arm/configs/ipq_defconfig
+> > index 1cabd8b..89bf8ad 100644
+> > --- a/arch/arm/configs/ipq_defconfig
+> > +++ b/arch/arm/configs/ipq_defconfig
+> > @@ -21,6 +21,7 @@ CONFIG_ARCH_QCOM=y
+> >  CONFIG_ARCH_MSM8X60=y
+> >  CONFIG_ARCH_MSM8960=y
+> >  CONFIG_ARCH_MSM8974=y
+> > +CONFIG_ARCH_IPQ40XX=y
+> >  CONFIG_ARCH_IPQ8064=y
+> >  CONFIG_SMP=y
+> >  CONFIG_PREEMPT=y
+>
+> This hunk should be in a separate patch.
 
-And I think that Leo could use phandle to reference the reserved buffer
-in mailbox node. Then it could be more clear.
+Ok.
+
+> > diff --git a/arch/arm/mach-qcom/Kconfig b/arch/arm/mach-qcom/Kconfig
+> > index fab49a2..70812aa 100644
+> > --- a/arch/arm/mach-qcom/Kconfig
+> > +++ b/arch/arm/mach-qcom/Kconfig
+> > @@ -22,6 +22,10 @@ config ARCH_MSM8974
+> >  	bool "Enable support for MSM8974"
+> >  	select HAVE_ARM_ARCH_TIMER
+> >
+> > +config ARCH_IPQ40XX
+> > +	bool "Enable support for IPQ40XX"
+> > +	select HAVE_ARM_ARCH_TIMER
+> > +
+> >  config ARCH_IPQ8064
+> >  	bool "Enable support for IPQ806x"
+> >  	select CLKSRC_QCOM
+> > diff --git a/arch/arm/mach-qcom/board.c b/arch/arm/mach-qcom/board.c
+> > index 6d8bbf7..af9e247 100644
+> > --- a/arch/arm/mach-qcom/board.c
+> > +++ b/arch/arm/mach-qcom/board.c
+> > @@ -18,6 +18,7 @@ static const char * const qcom_dt_match[] __initconst = {
+> >  	"qcom,apq8064",
+> >  	"qcom,apq8074-dragonboard",
+> >  	"qcom,apq8084",
+> > +	"qcom,ipq40xx",
+> >  	"qcom,ipq8062",
+> >  	"qcom,ipq8064",
+> >  	"qcom,msm8660-surf",
+> >
+>
+> And these two should also go as a separate patch.
+
+Ok.
+
+Thanks
+Varada
+
+>
+> --
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+> a Linux Foundation Collaborative Project
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
