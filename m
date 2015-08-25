@@ -1,92 +1,106 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Tue, 25 Aug 2015 15:54:09 +0200
-Subject: [PATCH v7 25/44] [media] replace all occurrences of
- MEDIA_ENT_T_DEVNODE_V4L
-In-Reply-To: <20150825083236.37659d22@recife.lan>
-References: <cover.1440359643.git.mchehab@osg.samsung.com>	<23e2f9440a259e1162e15dba7e6261dbc4c521c6.1440359643.git.mchehab@osg.samsung.com>	<55DC340C.8030503@xs4all.nl>
- <20150825083236.37659d22@recife.lan>
-Message-ID: <55DC7381.9090600@xs4all.nl>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 25 Aug 2015 15:58:45 +0200
+Subject: [PATCH v2] mmc: sunxi: Don't start commands while the card is busy
+In-Reply-To: <55DC5B09.2020705@redhat.com>
+References: <1436541284-11800-1-git-send-email-hdegoede@redhat.com>
+ <CAPDyKFoNe0bghfSXs48stHzZToTc7Hjd5gVPy-VbDF8bzdVVMQ@mail.gmail.com>
+ <55BC8ADE.3070802@redhat.com>
+ <CAPDyKFrYvL33DsaATg4fyAJg=G3SEuOP+xU=o_UwasmNZ+a07Q@mail.gmail.com>
+ <55DC5B09.2020705@redhat.com>
+Message-ID: <CAPDyKFpJGBA7GN=PJmWdpT+_OiPF_ET0i9wC7XYBCJA9EwLrgw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/25/15 13:32, Mauro Carvalho Chehab wrote:
-> Em Tue, 25 Aug 2015 11:23:24 +0200
-> Hans Verkuil <hverkuil@xs4all.nl> escreveu:
-> 
->> On 08/23/15 22:17, Mauro Carvalho Chehab wrote:
->>> Now that interfaces and entities are distinct, it makes no sense
->>> of keeping something named as MEDIA_ENT_T_DEVNODE.
+On 25 August 2015 at 14:09, Hans de Goede <hdegoede@redhat.com> wrote:
+> Hi,
+>
+>
+> On 25-08-15 14:05, Ulf Hansson wrote:
+>>
+>> On 1 August 2015 at 11:01, Hans de Goede <hdegoede@redhat.com> wrote:
 >>>
->>> This change was done with this script:
+>>> Hi,
 >>>
->>> 	for i in $(git grep -l MEDIA_ENT_T|grep -v uapi/linux/media.h); do sed s,MEDIA_ENT_T_DEVNODE_V4L,MEDIA_ENT_T_V4L2_VIDEO, <$i >a && mv a $i; done
+>>> On 21-07-15 14:15, Ulf Hansson wrote:
+>>>>
+>>>>
+>>>> On 10 July 2015 at 17:14, Hans de Goede <hdegoede@redhat.com> wrote:
+>>>>>
+>>>>>
+>>>>> Some sdio wifi modules have not been working reliable with the
+>>>>> sunxi-mmc
+>>>>> host code. This turns out to be caused by it starting new commands
+>>>>> while
+>>>>> the card signals that it is still busy processing a previous command.
+>>>>
+>>>>
+>>>>
+>>>> Which are those commands?
 >>>
->>> Signed-off-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
 >>>
->>> diff --git a/Documentation/DocBook/media/v4l/media-ioc-enum-entities.xml b/Documentation/DocBook/media/v4l/media-ioc-enum-entities.xml
->>> index 5872f8bbf774..910243d4edb8 100644
->>> --- a/Documentation/DocBook/media/v4l/media-ioc-enum-entities.xml
->>> +++ b/Documentation/DocBook/media/v4l/media-ioc-enum-entities.xml
->>> @@ -183,7 +183,7 @@
->>>  	    <entry>Unknown device node</entry>
->>>  	  </row>
->>>  	  <row>
->>> -	    <entry><constant>MEDIA_ENT_T_DEVNODE_V4L</constant></entry>
->>> +	    <entry><constant>MEDIA_ENT_T_V4L2_VIDEO</constant></entry>
->>>  	    <entry>V4L video, radio or vbi device node</entry>
->>>  	  </row>
+>>>
+>>> The code were things get stuck when not waiting for the busy signal uses
+>>> the following sdio helper functions:
+>>>
+>>> sdio_readb/sdio_writeb
+>>> sdio_f0_readb/sdio_f0_writeb
+>>> sdio_readw/sdio_writew
+>>> sdio_readl/sdio_writel
+>>> sdio_readsb
+>>> sdio_memcpy_fromio/sdio_memcpy_toio
+>>>
+>>> And directly issues the following command:
+>>>
+>>>          mmc_dat.flags = write ? MMC_DATA_WRITE : MMC_DATA_READ;
+>>>          mmc_cmd.opcode = SD_IO_RW_EXTENDED;
+>>>          mmc_cmd.arg = write ? 1<<31 : 0;        /* write flag  */
+>>>          mmc_cmd.arg |= (fn & 0x7) << 28;        /* SDIO func num */
+>>>          mmc_cmd.arg |= 1<<27;                   /* block mode */
+>>>          /* for function 1 the addr will be incremented */
+>>>          mmc_cmd.arg |= (fn == 1) ? 1<<26 : 0;
+>>>          mmc_cmd.flags = MMC_RSP_SPI_R5 | MMC_RSP_R5 | MMC_CMD_ADTC;
+>>>
+>>> I do not know if the busy wait is necessary for all
+>>> of these, but the hack in the android kernel code,
+>>> which inserts calls to a wait_card_busy function directly
+>>> into: drivers/net/wireless/brcm80211/brcmfmac/bcmsdh.c
+>>>
+>>> Does so for all of these.
+>>>
+>>>> Or more interesting, which response types do
+>>>>
+>>>> these commands expect?
+>>>> I don't think this is a sunxi specific issue, I have seen similar
+>>>> issues for other host controllers.
+>>>
+>>>
+>>>
+>>> Agreed, recent dw-mmc patches address the same issue, also involving
+>>> broadcom sdio wifi chips.
+>>>
+>>>> I am thinking that perhaps this should be managed by the mmc core
+>>>> instead of local hacks to sunxi. Potentially we could make the core to
+>>>> invoke the already existing host_ops->card_busy() callback when
+>>>> needed...
+>>>
+>>>
+>>>
+>>> I'm fine with solving this either way, implementing host_ops->card_busy()
+>>> for sunxi is easy, and if the core os modified to call that function
+>>> before issue sdio io ops (which seems to be the common thing here),
+>>> then that indeed is better then having the sunxi code always do
+>>> the busy check.
 >>
->> OK, this makes no sense and that ties in with my confusion of the previous patch.
 >>
->> These are not device nodes, in the new scheme these are DMA entities (I know,
->> naming TDB) that have an associated interface.
-> 
-> Yes. Well, DMA is a bad name. It won't cover USB devices, where the DMA
-> engine is outside the V4L2 drivers, nor it would work for RDS radio data,
-> with may not need any DMA at all on no-USB devices, as the data flows via
-> the I2C bus.
-> 
->> I think a much better approach would be to add entity type(s) for such DMA
->> engines in patch 24, then use that new name in existing drivers and split
->> up the existing DEVNODE_V4L media_entity into a media_entity and a
->> media_intf_devnode:
-> 
-> Sorry, but I didn't get. That's precisely what I did ;)
-> 
->> The current media_entity defined in struct video_device has to be replaced
->> by media_intf_devnode, and the DMA entity has to be added as a new entity
->> to these drivers.
-> 
-> If I do this way, it would break bisectability. I need first to replace
-> the names, but keep them as entities, and then add the interfaces.
-> 
->>
->> This reflects these two action items from our meeting:
->>
->> Migration: add v4l-subdev media_interface: Laurent
->> Migration: add explicit DMA Engine entity: Laurent
->>
->> Unless Laurent says differently I think this is something you'll have to
->> do given Laurent's workload.
-> 
-> Yes. The above action items are covered on this series.
-> 
-> What patch 24 does is to define the new namespace, moving the legacy
-> symbols kept due to backward compatibility on a separate part of the
-> header.
-> 
-> Then, patches 25-38 replace the occurrences of the deprecated names
-> by the new ones.
-> 
-> Nothing is touched at the interfaces yet, to avoid breaking bisectability.
+>> Okay, so let's make the core to call the ->card_busy() callback and
+>> then it's up to each host driver to implement that callback.
+>
+>
+> Ok, do you plan to do a patch for this, or do you expect to get
+> one submitted to you ?
 
-I don't follow why that would break bisect.
+I prefer to get a patch submitted to me. My bandwidth has been limited
+and still have a lot to catch up with...
 
-> Then, the next patches add interfaces support at the V4L side.
-
-So this is not yet included in this patch series? That would explain
-my confusion. If it is, then I need to take another look on Friday.
-
-Regards,
-
-	Hans
+Kind regards
+Uffe
