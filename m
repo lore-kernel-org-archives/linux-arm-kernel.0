@@ -1,317 +1,117 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 25 Aug 2015 08:52:46 +0100
-Subject: [PATCH-v2 1/5] mfd: 88pm800: Fix tabbing issue
-In-Reply-To: <1440442594-3102-3-git-send-email-vaibhav.hiremath@linaro.org>
-References: <1440442594-3102-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1440442594-3102-3-git-send-email-vaibhav.hiremath@linaro.org>
-Message-ID: <20150825075246.GF19409@x1>
+From: anders.roxell@linaro.org (Anders Roxell)
+Date: Tue, 25 Aug 2015 09:52:05 +0200
+Subject: [PATCH] drivers: i2c: exynos5: irq spinlock rt-safe
+Message-ID: <1440489125-20082-1-git-send-email-anders.roxell@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 25 Aug 2015, Vaibhav Hiremath wrote:
+The exynos5_i2c_message_start enables interrupts while holding the i2c
+lock which is sought by the irq handler. If an IRQ is received before
+this lock is released then a deadlock occurs.
 
-> Driver had coding style issues where spaces were used instead
-> of tabs. This patch fixes them all.
-> 
-> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
-> ---
->  drivers/mfd/88pm800.c | 125 ++++++++++++++++++++++++--------------------------
->  1 file changed, 61 insertions(+), 64 deletions(-)
+This is only seen on an RT patched kernel, due to the transformation of
+spinlocks into sleeping locks. By using raw_spinlocks here the same code
+can run in mainline or an RT patched kernel. No change for !RT kenrels
 
-Same comment as before.
+[   10.992238] kernel BUG at ../kernel/locking/rtmutex.c:998!
+[   10.992243] Internal error: Oops - BUG: 0 [#1] PREEMPT SMP ARM
+[   10.992250] Modules linked in:
+[   10.992258] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.1.5-rt5
+[   10.992263] Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
+[   10.992268] task: ed880000 ti: ed888000 task.ti: ed888000
+[   10.992281] PC is at rt_spin_lock_slowlock+0xa4/0x2ec
+[   10.992288] LR is at rt_spin_lock_slowlock+0x54/0x2ec
+[   10.992296] pc : [<c099e1bc>]    lr : [<c099e16c>]    psr: 60000193
+[   10.992296] sp : ed889a28  ip : ed880001  fp : 00000089
+[   10.992300] r10: ed889a28  r9 : c0f55654  r8 : 00000060
+[   10.992305] r7 : ed880000  r6 : 00000000  r5 : 00000001  r4 : ed9f7288
+[   10.992310] r3 : ed880000  r2 : 00000000  r1 : ed880000  r0 : 00000000
+[   10.992316] Flags: nZCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM
+Segment kernel
+...
+...
+[   10.992662] [<c099e1bc>] (rt_spin_lock_slowlock) from [<c07bc794>]
+(exynos5_i2c_irq+0x20/0x2b0)
+[   10.992678] [<c07bc794>] (exynos5_i2c_irq) from [<c028c8b4>]
+(handle_irq_event_percpu+0x68/0x158)
+[   10.992690] [<c028c8b4>] (handle_irq_event_percpu) from [<c028ca0c>]
+(handle_irq_event+0x68/0xa8)
+[   10.992702] [<c028ca0c>] (handle_irq_event) from [<c028f9c4>]
+(handle_fasteoi_irq+0x11c/0x1d4)
+[   10.992713] [<c028f9c4>] (handle_fasteoi_irq) from [<c028c17c>]
+(generic_handle_irq+0x20/0x30)
+[   10.992724] [<c028c17c>] (generic_handle_irq) from [<c028c290>]
+(__handle_domain_irq+0x6c/0xe4)
+[   10.992734] [<c028c290>] (__handle_domain_irq) from [<c020a71c>]
+(gic_handle_irq+0x2c/0x68)
+[   10.992744] [<c020a71c>] (gic_handle_irq) from [<c0214140>]
+(__irq_svc+0x40/0x88)
+[   10.992749] Exception stack(0xed889b28 to 0xed889b70)
+...
+...
 
-How similar is this file to the other one?
+Signed-off-by: Anders Roxell <anders.roxell@linaro.org>
+---
+ drivers/i2c/busses/i2c-exynos5.c | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-Can you reduce the size by having shared register defines?
-
-> diff --git a/drivers/mfd/88pm800.c b/drivers/mfd/88pm800.c
-> index f104a32..c4e097d 100644
-> --- a/drivers/mfd/88pm800.c
-> +++ b/drivers/mfd/88pm800.c
-> @@ -30,55 +30,55 @@
->  #include <linux/of_device.h>
->  
->  /* Interrupt Registers */
-> -#define PM800_INT_STATUS1		(0x05)
-> +#define PM800_INT_STATUS1		0x05
->  #define PM800_ONKEY_INT_STS1		(1 << 0)
->  #define PM800_EXTON_INT_STS1		(1 << 1)
-> -#define PM800_CHG_INT_STS1			(1 << 2)
-> -#define PM800_BAT_INT_STS1			(1 << 3)
-> -#define PM800_RTC_INT_STS1			(1 << 4)
-> +#define PM800_CHG_INT_STS1		(1 << 2)
-> +#define PM800_BAT_INT_STS1		(1 << 3)
-> +#define PM800_RTC_INT_STS1		(1 << 4)
->  #define PM800_CLASSD_OC_INT_STS1	(1 << 5)
->  
-> -#define PM800_INT_STATUS2		(0x06)
-> +#define PM800_INT_STATUS2		0x06
->  #define PM800_VBAT_INT_STS2		(1 << 0)
->  #define PM800_VSYS_INT_STS2		(1 << 1)
->  #define PM800_VCHG_INT_STS2		(1 << 2)
->  #define PM800_TINT_INT_STS2		(1 << 3)
-> -#define PM800_GPADC0_INT_STS2	(1 << 4)
-> +#define PM800_GPADC0_INT_STS2		(1 << 4)
->  #define PM800_TBAT_INT_STS2		(1 << 5)
-> -#define PM800_GPADC2_INT_STS2	(1 << 6)
-> -#define PM800_GPADC3_INT_STS2	(1 << 7)
-> +#define PM800_GPADC2_INT_STS2		(1 << 6)
-> +#define PM800_GPADC3_INT_STS2		(1 << 7)
->  
-> -#define PM800_INT_STATUS3		(0x07)
-> +#define PM800_INT_STATUS3		0x07
->  
-> -#define PM800_INT_STATUS4		(0x08)
-> +#define PM800_INT_STATUS4		0x08
->  #define PM800_GPIO0_INT_STS4		(1 << 0)
->  #define PM800_GPIO1_INT_STS4		(1 << 1)
->  #define PM800_GPIO2_INT_STS4		(1 << 2)
->  #define PM800_GPIO3_INT_STS4		(1 << 3)
->  #define PM800_GPIO4_INT_STS4		(1 << 4)
->  
-> -#define PM800_INT_ENA_1		(0x09)
-> +#define PM800_INT_ENA_1			0x09
->  #define PM800_ONKEY_INT_ENA1		(1 << 0)
->  #define PM800_EXTON_INT_ENA1		(1 << 1)
-> -#define PM800_CHG_INT_ENA1			(1 << 2)
-> -#define PM800_BAT_INT_ENA1			(1 << 3)
-> -#define PM800_RTC_INT_ENA1			(1 << 4)
-> +#define PM800_CHG_INT_ENA1		(1 << 2)
-> +#define PM800_BAT_INT_ENA1		(1 << 3)
-> +#define PM800_RTC_INT_ENA1		(1 << 4)
->  #define PM800_CLASSD_OC_INT_ENA1	(1 << 5)
->  
-> -#define PM800_INT_ENA_2		(0x0A)
-> +#define PM800_INT_ENA_2			0x0A
->  #define PM800_VBAT_INT_ENA2		(1 << 0)
->  #define PM800_VSYS_INT_ENA2		(1 << 1)
->  #define PM800_VCHG_INT_ENA2		(1 << 2)
->  #define PM800_TINT_INT_ENA2		(1 << 3)
->  
-> -#define PM800_INT_ENA_3		(0x0B)
-> +#define PM800_INT_ENA_3			0x0B
->  #define PM800_GPADC0_INT_ENA3		(1 << 0)
->  #define PM800_GPADC1_INT_ENA3		(1 << 1)
->  #define PM800_GPADC2_INT_ENA3		(1 << 2)
->  #define PM800_GPADC3_INT_ENA3		(1 << 3)
->  #define PM800_GPADC4_INT_ENA3		(1 << 4)
->  
-> -#define PM800_INT_ENA_4		(0x0C)
-> +#define PM800_INT_ENA_4			0x0C
->  #define PM800_GPIO0_INT_ENA4		(1 << 0)
->  #define PM800_GPIO1_INT_ENA4		(1 << 1)
->  #define PM800_GPIO2_INT_ENA4		(1 << 2)
-> @@ -86,7 +86,7 @@
->  #define PM800_GPIO4_INT_ENA4		(1 << 4)
->  
->  /* number of INT_ENA & INT_STATUS regs */
-> -#define PM800_INT_REG_NUM			(4)
-> +#define PM800_INT_REG_NUM		4
->  
->  /* Interrupt Number in 88PM800 */
->  enum {
-> @@ -114,7 +114,7 @@ enum {
->  };
->  
->  /* PM800: generation identification number */
-> -#define PM800_CHIP_GEN_ID_NUM	0x3
-> +#define PM800_CHIP_GEN_ID_NUM		0x3
->  
->  static const struct i2c_device_id pm80x_id_table[] = {
->  	{"88PM800", 0},
-> @@ -129,47 +129,47 @@ static const struct of_device_id pm80x_of_match_table[] = {
->  
->  static struct resource rtc_resources[] = {
->  	{
-> -	 .name = "88pm80x-rtc",
-> -	 .start = PM800_IRQ_RTC,
-> -	 .end = PM800_IRQ_RTC,
-> -	 .flags = IORESOURCE_IRQ,
-> -	 },
-> +		.name = "88pm80x-rtc",
-> +		.start = PM800_IRQ_RTC,
-> +		.end = PM800_IRQ_RTC,
-> +		.flags = IORESOURCE_IRQ,
-> +	},
->  };
->  
->  static struct mfd_cell rtc_devs[] = {
->  	{
-> -	 .name = "88pm80x-rtc",
-> -	 .of_compatible = "marvell,88pm80x-rtc",
-> -	 .num_resources = ARRAY_SIZE(rtc_resources),
-> -	 .resources = &rtc_resources[0],
-> -	 .id = -1,
-> -	 },
-> +		.name = "88pm80x-rtc",
-> +		.of_compatible = "marvell,88pm80x-rtc",
-> +		.num_resources = ARRAY_SIZE(rtc_resources),
-> +		.resources = &rtc_resources[0],
-> +		.id = -1,
-> +	},
->  };
->  
->  static struct resource onkey_resources[] = {
->  	{
-> -	 .name = "88pm80x-onkey",
-> -	 .start = PM800_IRQ_ONKEY,
-> -	 .end = PM800_IRQ_ONKEY,
-> -	 .flags = IORESOURCE_IRQ,
-> -	 },
-> +		.name = "88pm80x-onkey",
-> +		.start = PM800_IRQ_ONKEY,
-> +		.end = PM800_IRQ_ONKEY,
-> +		.flags = IORESOURCE_IRQ,
-> +	},
->  };
->  
->  static const struct mfd_cell onkey_devs[] = {
->  	{
-> -	 .name = "88pm80x-onkey",
-> -	 .of_compatible = "marvell,88pm80x-onkey",
-> -	 .num_resources = 1,
-> -	 .resources = &onkey_resources[0],
-> -	 .id = -1,
-> -	 },
-> +		.name = "88pm80x-onkey",
-> +		.of_compatible = "marvell,88pm80x-onkey",
-> +		.num_resources = 1,
-> +		.resources = &onkey_resources[0],
-> +		.id = -1,
-> +	},
->  };
->  
->  static const struct mfd_cell regulator_devs[] = {
->  	{
-> -	 .name = "88pm80x-regulator",
-> -	 .of_compatible = "marvell,88pm80x-regulator",
-> -	 .id = -1,
-> +		.name = "88pm80x-regulator",
-> +		.of_compatible = "marvell,88pm80x-regulator",
-> +		.id = -1,
->  	},
->  };
->  
-> @@ -323,8 +323,8 @@ out:
->  static int device_onkey_init(struct pm80x_chip *chip)
->  {
->  	return mfd_add_devices(chip->dev, 0, &onkey_devs[0],
-> -			      ARRAY_SIZE(onkey_devs), &onkey_resources[0], 0,
-> -			      NULL);
-> +			ARRAY_SIZE(onkey_devs), &onkey_resources[0], 0,
-> +			NULL);
->  }
->  
->  static int device_rtc_init(struct pm80x_chip *chip)
-> @@ -335,13 +335,13 @@ static int device_rtc_init(struct pm80x_chip *chip)
->  	rtc_devs[0].pdata_size = pdata->rtc ? sizeof(struct pm80x_rtc_pdata) : 0;
->  
->  	return mfd_add_devices(chip->dev, 0, &rtc_devs[0],
-> -			      ARRAY_SIZE(rtc_devs), NULL, 0, NULL);
-> +			ARRAY_SIZE(rtc_devs), NULL, 0, NULL);
->  }
->  
->  static int device_regulator_init(struct pm80x_chip *chip)
->  {
->  	return mfd_add_devices(chip->dev, 0, &regulator_devs[0],
-> -			      ARRAY_SIZE(regulator_devs), NULL, 0, NULL);
-> +			ARRAY_SIZE(regulator_devs), NULL, 0, NULL);
->  }
->  
->  static int device_irq_init_800(struct pm80x_chip *chip)
-> @@ -358,11 +358,10 @@ static int device_irq_init_800(struct pm80x_chip *chip)
->  
->  	/*
->  	 * irq_clr_on_wr defines the way of clearing interrupt by
-> -	 * read/write(0/1).  It's read-clear by default.
-> +	 * read/write(0/1). It's read-clear by default.
->  	 */
-> -	mask =
-> -	    PM800_WAKEUP2_INV_INT | PM800_WAKEUP2_INT_CLEAR |
-> -	    PM800_WAKEUP2_INT_MASK;
-> +	mask = PM800_WAKEUP2_INV_INT | PM800_WAKEUP2_INT_CLEAR |
-> +		PM800_WAKEUP2_INT_MASK;
->  
->  	irq_clr_mode = pdata->irq_clr_method == PM800_IRQ_CLR_ON_WRITE ?
->  		PM800_WAKEUP2_INT_WRITE_CLEAR : PM800_WAKEUP2_INT_READ_CLEAR;
-> @@ -371,9 +370,8 @@ static int device_irq_init_800(struct pm80x_chip *chip)
->  	if (ret < 0)
->  		goto out;
->  
-> -	ret =
-> -	    regmap_add_irq_chip(chip->regmap, chip->irq, flags, -1,
-> -				chip->regmap_irq_chip, &chip->irq_data);
-> +	ret = regmap_add_irq_chip(chip->regmap, chip->irq, flags, -1,
-> +			chip->regmap_irq_chip, &chip->irq_data);
->  
->  out:
->  	return ret;
-> @@ -409,18 +407,18 @@ static int pm800_pages_init(struct pm80x_chip *chip)
->  
->  	/* PM800 block power page */
->  	subchip->power_page = i2c_new_dummy(client->adapter,
-> -					    subchip->power_page_addr);
-> +					subchip->power_page_addr);
->  	if (subchip->power_page == NULL) {
->  		ret = -ENODEV;
->  		goto out;
->  	}
->  
->  	subchip->regmap_power = devm_regmap_init_i2c(subchip->power_page,
-> -						     &pm80x_regmap_config);
-> +				&pm80x_regmap_config);
->  	if (IS_ERR(subchip->regmap_power)) {
->  		ret = PTR_ERR(subchip->regmap_power);
->  		dev_err(chip->dev,
-> -			"Failed to allocate regmap_power: %d\n", ret);
-> +				"Failed to allocate regmap_power: %d\n", ret);
->  		goto out;
->  	}
->  
-> @@ -428,18 +426,18 @@ static int pm800_pages_init(struct pm80x_chip *chip)
->  
->  	/* PM800 block GPADC */
->  	subchip->gpadc_page = i2c_new_dummy(client->adapter,
-> -					    subchip->gpadc_page_addr);
-> +				subchip->gpadc_page_addr);
->  	if (subchip->gpadc_page == NULL) {
->  		ret = -ENODEV;
->  		goto out;
->  	}
->  
->  	subchip->regmap_gpadc = devm_regmap_init_i2c(subchip->gpadc_page,
-> -						     &pm80x_regmap_config);
-> +				&pm80x_regmap_config);
->  	if (IS_ERR(subchip->regmap_gpadc)) {
->  		ret = PTR_ERR(subchip->regmap_gpadc);
->  		dev_err(chip->dev,
-> -			"Failed to allocate regmap_gpadc: %d\n", ret);
-> +				"Failed to allocate regmap_gpadc: %d\n", ret);
->  		goto out;
->  	}
->  	i2c_set_clientdata(subchip->gpadc_page, chip);
-> @@ -620,8 +618,7 @@ static int pm800_probe(struct i2c_client *client,
->  	chip = i2c_get_clientdata(client);
->  
->  	/* init subchip for PM800 */
-> -	subchip =
-> -	    devm_kzalloc(&client->dev, sizeof(struct pm80x_subchip),
-> +	subchip = devm_kzalloc(&client->dev, sizeof(struct pm80x_subchip),
->  			 GFP_KERNEL);
->  	if (!subchip) {
->  		ret = -ENOMEM;
-> @@ -684,7 +681,7 @@ static struct i2c_driver pm800_driver = {
->  		.owner = THIS_MODULE,
->  		.pm = &pm80x_pm_ops,
->  		.of_match_table	= pm80x_of_match_table,
-> -		},
-> +	},
->  	.probe = pm800_probe,
->  	.remove = pm800_remove,
->  	.id_table = pm80x_id_table,
-
+diff --git a/drivers/i2c/busses/i2c-exynos5.c b/drivers/i2c/busses/i2c-exynos5.c
+index b29c750..b12e77e 100644
+--- a/drivers/i2c/busses/i2c-exynos5.c
++++ b/drivers/i2c/busses/i2c-exynos5.c
+@@ -170,7 +170,7 @@ struct exynos5_i2c {
+ 	struct device		*dev;
+ 	int			state;
+ 
+-	spinlock_t		lock;		/* IRQ synchronization */
++	raw_spinlock_t		lock;		/* IRQ synchronization */
+ 
+ 	/*
+ 	 * Since the TRANS_DONE bit is cleared on read, and we may read it
+@@ -433,7 +433,7 @@ static irqreturn_t exynos5_i2c_irq(int irqno, void *dev_id)
+ 
+ 	i2c->state = -EINVAL;
+ 
+-	spin_lock(&i2c->lock);
++	raw_spin_lock(&i2c->lock);
+ 
+ 	int_status = readl(i2c->regs + HSI2C_INT_STATUS);
+ 	writel(int_status, i2c->regs + HSI2C_INT_STATUS);
+@@ -521,7 +521,7 @@ static irqreturn_t exynos5_i2c_irq(int irqno, void *dev_id)
+ 		complete(&i2c->msg_complete);
+ 	}
+ 
+-	spin_unlock(&i2c->lock);
++	raw_spin_unlock(&i2c->lock);
+ 
+ 	return IRQ_HANDLED;
+ }
+@@ -610,7 +610,7 @@ static void exynos5_i2c_message_start(struct exynos5_i2c *i2c, int stop)
+ 	 * Enable interrupts before starting the transfer so that we don't
+ 	 * miss any INT_I2C interrupts.
+ 	 */
+-	spin_lock_irqsave(&i2c->lock, flags);
++	raw_spin_lock_irqsave(&i2c->lock, flags);
+ 	writel(int_en, i2c->regs + HSI2C_INT_ENABLE);
+ 
+ 	if (stop == 1)
+@@ -618,7 +618,7 @@ static void exynos5_i2c_message_start(struct exynos5_i2c *i2c, int stop)
+ 	i2c_auto_conf |= i2c->msg->len;
+ 	i2c_auto_conf |= HSI2C_MASTER_RUN;
+ 	writel(i2c_auto_conf, i2c->regs + HSI2C_AUTO_CONF);
+-	spin_unlock_irqrestore(&i2c->lock, flags);
++	raw_spin_unlock_irqrestore(&i2c->lock, flags);
+ }
+ 
+ static int exynos5_i2c_xfer_msg(struct exynos5_i2c *i2c,
+@@ -763,7 +763,7 @@ static int exynos5_i2c_probe(struct platform_device *pdev)
+ 	/* Clear pending interrupts from u-boot or misc causes */
+ 	exynos5_i2c_clr_pend_irq(i2c);
+ 
+-	spin_lock_init(&i2c->lock);
++	raw_spin_lock_init(&i2c->lock);
+ 	init_completion(&i2c->msg_complete);
+ 
+ 	i2c->irq = ret = platform_get_irq(pdev, 0);
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+2.1.4
