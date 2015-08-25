@@ -1,56 +1,45 @@
-From: Shenwei.Wang@freescale.com (Shenwei Wang)
-Date: Tue, 25 Aug 2015 19:35:04 +0000
-Subject: [PATCH v3 1/1] misc: sram: add dev_pm_ops to support module power
- gate
-In-Reply-To: <55DC91BE.7090107@arm.com>
-References: <1438272681-29338-1-git-send-email-shenwei.wang@freescale.com>
- <55DC677E.1030004@arm.com>
- <CY1PR0301MB0843D5CB5FFC56991B90EB4283610@CY1PR0301MB0843.namprd03.prod.outlook.com>
- <55DC74CF.7070300@arm.com>
- <CY1PR0301MB084302FA2AA9582A3BA9B50B83610@CY1PR0301MB0843.namprd03.prod.outlook.com>
- <55DC7E5E.5020701@arm.com>
- <CY1PR0301MB0843A508122C7FCF3969AF3D83610@CY1PR0301MB0843.namprd03.prod.outlook.com>
- <55DC91BE.7090107@arm.com>
-Message-ID: <CY1PR0301MB0843AB9C6330D29EBD5F47DA83610@CY1PR0301MB0843.namprd03.prod.outlook.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 25 Aug 2015 12:40:00 -0700
+Subject: [PATCH] ARM: probes: Don't stop the machine if we're in the
+ debugger
+In-Reply-To: <CAGXu5j+oExmQPR9UuJy8oVaL_DzZ70kSP6ftS+ZhyFSs7hyxsA@mail.gmail.com>
+References: <1440460739-19522-1-git-send-email-dianders@chromium.org>
+ <55DBB48E.7040508@codeaurora.org>
+ <CAGXu5j+oExmQPR9UuJy8oVaL_DzZ70kSP6ftS+ZhyFSs7hyxsA@mail.gmail.com>
+Message-ID: <CAD=FV=Xe7hg7ifJ3JAO8StfugMYnojc3SNfsa=gLfWpm0n262A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Kees,
 
+On Tue, Aug 25, 2015 at 9:50 AM, Kees Cook <keescook@chromium.org> wrote:
+> On Mon, Aug 24, 2015 at 5:19 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+>> On 08/24/2015 04:58 PM, Douglas Anderson wrote:
+>>>
+>>> If we're in kgdb then the machine is already stopped.  Trying to stop
+>>> it again will cause us to try to sleep, which is not allowed while in
+>>> kgdb.  To avoid this problem, only stop the machine when we're not in
+>>> kgdb.
+>>>
+>>> Reported-by: Aapo Vienamo <avienamo@nvidia.com>
+>>> Suggested-by: Kees Cook <keescook@chromium.org>
+>
+> I actually suggested using in_atomic_preempt_off() which is I think a
+> better catch-all. Could you use that instead, please?
 
-> -----Original Message-----
-> From: Sudeep Holla [mailto:sudeep.holla at arm.com]
-> Sent: 2015?8?25? 11:03
-> To: Wang Shenwei-B38339
-> Cc: Sudeep Holla; gregkh at linuxfoundation.org; arnd at arndb.de; Huang
-> Yongcai-B20788; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH v3 1/1] misc: sram: add dev_pm_ops to support module
-> power gate
-> >> I don't like that solution as it's not scalable with SRAM size and
-> >> saving all the content of SRAM just because of few active regions
-> >> makes no sense to me at-least. I prefer leaving it to the users to
-> >> handle that rather than SRAM driver.
-> >
-> > I don't think it is not scalable. The choice should be made by the
-> > application. From the driver side, it should be able to provide the
-> > way to retain its contents during power gate.
-> >
-> 
-> OK that was just my opinion. I just wanted to avoid unnecessary save/restore, e.g.
-> if say just few kilobytes are active in say 32MB SRAM, you will save/restore entire
-> SRAM ?
+I chose not to use that because (I think) in_atomic_preempt_off()
+doesn't guarantee that stop_machine() is not needed.  Said another
+way: if in_atomic_preempt_off() returns true then we can't sleep on
+the current CPU.  ...but other CPUs may be running.  In this case
+technically we need to call stop_machine(), but we'd need to do it in
+a way that didn't require sleeping.
 
-Although in theory a SoC can integrate such a big SRAM like 32MB inside, but I don't
-think anyone will practice it because the cost is too high. So far, the most popular size
-of a SRAM in a SoC is hundreds of KB. 
- 
-> Anyways, the driver is saving/restoring the memory unconditionally whenever DT
-> sets that boolean right ? at-least as the patch stands.
+In the case of kgdb we know that the machine is stopped and we're
+atomic too.  ...so we could certainly fix kgdb by checking for
+"atomic", but that would mean there would be other places where we'd
+get no warning and (I think) invalid behavior.
 
-The saving/restoring feature is not enabled by default in this patch. To enable it you
-need to add the can-power-gate string in the relating DT node.
+Stephen Boyd suggested that I just change this so that we expose a new
+function and that makes everything a bit cleaner.  I'll try that.
 
-Regards,
-Shenwei
-
-> Regards,
-> Sudeep
+-Doug
