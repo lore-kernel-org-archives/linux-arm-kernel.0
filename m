@@ -1,89 +1,111 @@
-From: eddie.huang@mediatek.com (Eddie Huang)
-Date: Tue, 25 Aug 2015 14:00:40 +0800
-Subject: [PATCH v2] soc: mediatek: add scpsys support active_wakeup
-Message-ID: <1440482440-28700-1-git-send-email-eddie.huang@mediatek.com>
+From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
+Date: Tue, 25 Aug 2015 11:53:44 +0530
+Subject: [PATCH-v3 2/2] regulator: 88pm800: Add support for configuration
+ of dual phase on BUCK1
+In-Reply-To: <55DBF3B9.4060602@samsung.com>
+References: <1440420006-31556-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1440420006-31556-3-git-send-email-vaibhav.hiremath@linaro.org>
+ <55DBF3B9.4060602@samsung.com>
+Message-ID: <55DC09F0.6010109@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Register gpd_dev_ops.active_wakeup function to support keep power
-during suspend state. And add flag to each power domain to
-decide whether keep power during suspend or not.
 
-Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
-Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
 
----
-Change in v2:
-Drop .active_wakeup = false lines in scp_domain_data[] array
+On Tuesday 25 August 2015 10:18 AM, Krzysztof Kozlowski wrote:
+> On 24.08.2015 21:40, Vaibhav Hiremath wrote:
+>> 88PM860 device supports dual phase mode on BUCK1 output.
+>> In normal usecase, BUCK1A and BUCK1B operates independently with 3A
+>> capacity. And they both can work as a dual phase providing 6A capacity.
+>>
+>> This patch updates the regulator driver to read the respective
+>> DT property and enable dual-phase mode on BUCK1.
+>> Note that if dual phase mode is enabled, then BUCK1B will not be
+>> registered to the regulator framework and the current capacity of
+>> BUCK1(A) would be set to 6A [3A of BUCK1A + 3A of BUCK1B].
+>>
+>> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
+>> ---
+>>   drivers/regulator/88pm800.c | 40 ++++++++++++++++++++++++++++++++++++++++
+>>   include/linux/mfd/88pm80x.h |  3 +++
+>>   2 files changed, 43 insertions(+)
+>>
+>> diff --git a/drivers/regulator/88pm800.c b/drivers/regulator/88pm800.c
+>> index 365a154..7aca6d17 100644
+>> --- a/drivers/regulator/88pm800.c
+>> +++ b/drivers/regulator/88pm800.c
+>> @@ -267,6 +267,37 @@ static struct pm800_regulator_info pm860_regulator_info[] = {
+>>   	PM800_LDO(ldo20, LDO20, LDO_ENA1_3, 3, 10000, ldo_volt_table2),
+>>   };
+>>
+>> +static int pm800_regulator_init(struct platform_device *pdev,
+>> +		struct pm800_regulator_info *info)
+>> +{
+>> +	struct pm800_regulators *pm800_data = platform_get_drvdata(pdev);
+>> +	struct pm80x_chip *chip = pm800_data->chip;
+>> +	int ret = 0;
+>> +
+>> +	/* Currently only supported on 88pm860 device */
+>> +	if (chip->type != CHIP_PM860)
+>> +		return 0;
+>> +
+>> +	if (of_property_read_bool(pdev->dev.of_node,
+>> +				"marvell,88pm860-buck1-dualphase-en")) {
+>> +		/* Update the constraint  to [3A (BUCK1A) + 3A (BUCK1B)] */
+>> +		info[PM800_ID_BUCK1].max_ua = 6000000;
+>> +		/* Remove BUCK1B from the list, as we are in dual phase mode */
+>> +		memset(&info[PM800_ID_BUCK1B], 0, sizeof(*info));
+>> +		/* Enable dual phase mode */
+>> +		ret = regmap_update_bits(chip->subchip->regmap_power,
+>> +					PM860_BUCK1_MISC,
+>> +					BUCK1_DUAL_PHASE_SEL,
+>> +					BUCK1_DUAL_PHASE_SEL);
+>> +		if (ret) {
+>> +			dev_err(chip->dev, "failed to set dual-pase mode %d\n", ret);
+>> +			return ret;
+>> +		}
+>> +	}
+>> +
+>> +	return ret;
+>> +}
+>> +
+>>   static int pm800_regulator_probe(struct platform_device *pdev)
+>>   {
+>>   	struct pm80x_chip *chip = dev_get_drvdata(pdev->dev.parent);
+>> @@ -311,11 +342,20 @@ static int pm800_regulator_probe(struct platform_device *pdev)
+>>   		return -ENODEV;
+>>   	}
+>>
+>> +	ret = pm800_regulator_init(pdev, info);
+>> +	if (ret) {
+>> +		dev_err(&pdev->dev, "failed to init 88pm800 regulator device\n");
+>> +		return ret;
+>> +	}
+>> +
+>>   	config.dev = chip->dev;
+>>   	config.regmap = pm800_data->map;
+>>   	for (i = 0; i < PM800_ID_RG_MAX; i++) {
+>>   		struct regulator_dev *regulator;
+>>
+>> +		if (!info[i].desc.name)
+>> +			continue;
+>
+> How the driver was working without this on 88PM800? There is a gap in
+> pm800_regulator_info - three regulators are not set.
+>
 
----
- drivers/soc/mediatek/mtk-scpsys.c | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+I have 88PM860 based board, where the whole array will be filled up.
+So it was missed I guess :)
 
-diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
-index 43a79ed..df2f288 100644
---- a/drivers/soc/mediatek/mtk-scpsys.c
-+++ b/drivers/soc/mediatek/mtk-scpsys.c
-@@ -67,6 +67,7 @@ struct scp_domain_data {
- 	u32 sram_pdn_ack_bits;
- 	u32 bus_prot_mask;
- 	enum clk_id clk_id;
-+	bool active_wakeup;
- };
- 
- static const struct scp_domain_data scp_domain_data[] __initconst = {
-@@ -127,6 +128,7 @@ static const struct scp_domain_data scp_domain_data[] __initconst = {
- 		.sram_pdn_bits = GENMASK(11, 8),
- 		.sram_pdn_ack_bits = GENMASK(15, 12),
- 		.clk_id = MT8173_CLK_NONE,
-+		.active_wakeup = true,
- 	},
- 	[MT8173_POWER_DOMAIN_MFG_ASYNC] = {
- 		.name = "mfg_async",
-@@ -171,6 +173,7 @@ struct scp_domain {
- 	u32 sram_pdn_bits;
- 	u32 sram_pdn_ack_bits;
- 	u32 bus_prot_mask;
-+	bool active_wakeup;
- };
- 
- struct scp {
-@@ -370,6 +373,20 @@ out:
- 	return ret;
- }
- 
-+static bool scpsys_active_wakeup(struct device *dev)
-+{
-+	struct generic_pm_domain *genpd;
-+	struct scp_domain *scpd;
-+
-+	if (IS_ERR_OR_NULL(dev->pm_domain))
-+		return false;
-+
-+	genpd = pd_to_genpd(dev->pm_domain);
-+	scpd = container_of(genpd, struct scp_domain, genpd);
-+
-+	return scpd->active_wakeup;
-+}
-+
- static int __init scpsys_probe(struct platform_device *pdev)
- {
- 	struct genpd_onecell_data *pd_data;
-@@ -427,12 +444,14 @@ static int __init scpsys_probe(struct platform_device *pdev)
- 		scpd->sram_pdn_bits = data->sram_pdn_bits;
- 		scpd->sram_pdn_ack_bits = data->sram_pdn_ack_bits;
- 		scpd->bus_prot_mask = data->bus_prot_mask;
-+		scpd->active_wakeup = data->active_wakeup;
- 		if (data->clk_id != MT8173_CLK_NONE)
- 			scpd->clk = clk[data->clk_id];
- 
- 		genpd->name = data->name;
- 		genpd->power_off = scpsys_power_off;
- 		genpd->power_on = scpsys_power_on;
-+		genpd->dev_ops.active_wakeup = scpsys_active_wakeup;
- 
- 		/*
- 		 * Initially turn on all domains to make the domains usable
--- 
-1.9.1
+But when I introduced logic for skipping BUCK1B, I hit this.
+And here is the fix.
+
+
+> The patch itself looks good
+> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>
+
+Thanks for your review.
+
+Thanks,
+Vaibhav
