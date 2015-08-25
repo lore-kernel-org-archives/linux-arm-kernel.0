@@ -1,51 +1,51 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 25 Aug 2015 15:40:30 +0100
-Subject: [PATCH v3 1/1] misc: sram: add dev_pm_ops to support module power
- gate
-In-Reply-To: <CY1PR0301MB084302FA2AA9582A3BA9B50B83610@CY1PR0301MB0843.namprd03.prod.outlook.com>
-References: <1438272681-29338-1-git-send-email-shenwei.wang@freescale.com>
- <55DC677E.1030004@arm.com>
- <CY1PR0301MB0843D5CB5FFC56991B90EB4283610@CY1PR0301MB0843.namprd03.prod.outlook.com>
- <55DC74CF.7070300@arm.com>
- <CY1PR0301MB084302FA2AA9582A3BA9B50B83610@CY1PR0301MB0843.namprd03.prod.outlook.com>
-Message-ID: <55DC7E5E.5020701@arm.com>
+Date: Tue, 25 Aug 2015 15:45:56 +0100
+Subject: [PATCH v9 1/1] irqchip: imx-gpcv2: IMX GPCv2 driver for wakeup
+ sources
+In-Reply-To: <CY1PR0301MB0843AE566996617D855CC00683610@CY1PR0301MB0843.namprd03.prod.outlook.com>
+References: <1440443055-7291-1-git-send-email-shenwei.wang@freescale.com>
+ <55DC3452.3070205@arm.com>
+ <CY1PR0301MB08439B6C5F841AFFD152DFD883610@CY1PR0301MB0843.namprd03.prod.outlook.com>
+ <55DC738D.8000302@arm.com>
+ <CY1PR0301MB0843AE566996617D855CC00683610@CY1PR0301MB0843.namprd03.prod.outlook.com>
+Message-ID: <55DC7FA4.7040902@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 25/08/15 15:20, Shenwei Wang wrote:
+On 25/08/15 15:14, Shenwei Wang wrote:
 >
 >
 >> -----Original Message-----
 >> From: Sudeep Holla [mailto:sudeep.holla at arm.com]
->> Sent: 2015?8?25? 9:00
->> To: Wang Shenwei-B38339
->> Cc: Sudeep Holla; gregkh at linuxfoundation.org; arnd at arndb.de; Huang
->> Yongcai-B20788; linux-arm-kernel at lists.infradead.org
->> Subject: Re: [PATCH v3 1/1] misc: sram: add dev_pm_ops to support module
->> power gate
->>> On latest Freescale i.MX7D, it has two SRAMs in side. One is for low
->>> power mode which will be powered on in suspend state. The other one is
->>> for other peripherals which can be powered off on demand.
->>>
->>
->> What I meant is who will be using the SRAM when entering S2R that you need to
->> save the content. Either the user needs to take care of the content or just release
->> the pool when not in use. When the sram pool has no user, clock can be gated.
->>
->> Again can you give details of this use-case.
+
+[...]
+
+>> I don't see this driver doing anything extra apart from keeping the wakeup irqs
+>> enabled. i.e. You use the same cpu*wake register to mask/unmask the interrupt
+>> as well as set the wakeup source. Since the wakeup interrupt will be enabled by
+>> the driver, you just need to mark it as wake-up source and nothing extra in the
+>> controller right ?
+>> If so, you need to set IRQCHIP_SKIP_SET_WAKE as you are just leaving that irq
+>> enabled and not doing any extra configuration to enable it as wakeup source.
+>> Please correct if that wrong, but from the code that's what I could infer.
 >
-> We are not talking about clock gate state. Here we are handling the power gate for
-> this SRAM IP block. Of course, you can ask each driver to save its contents during
-> low power state, but I think the easier way is to save the contents in this sram driver
-> and just leave the drivers who use this sram behave as is today.
+> There is no special for this driver. We just use the IRQCHIP driver framework to
+> manage the wakeup sources. Why did you propose to set IRQCHIP_SKIP_SET_WAKE
+> flag here? If you don't need the wakeup feature, you should just not enable this
+> driver in the configuration.
 >
 
-I don't like that solution as it's not scalable with SRAM size and
-saving all the content of SRAM just because of few active regions makes
-no sense to me at-least. I prefer leaving it to the users to handle that
-rather than SRAM driver.
+No, if the driver doesn't nothing extra to configure the wake up source
+other than keeping it enabled, then it fits the case of SKIP_SET_WAKE.
+The driver using this wake would have requested and enabled the irq.
+When it calls enable_irq_wake, you have nothing extra to set(atleast
+from the looks of the driver), so setting SKIP_SET_WAKE will skip the
+call and updated the wake flags in irq core.
+
+I don't see the real need of 2 separate sets of irq mask being saved in
+either case.
 
 Regards,
 Sudeep
