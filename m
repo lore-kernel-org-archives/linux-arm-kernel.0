@@ -1,58 +1,25 @@
-From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
-Date: Wed, 26 Aug 2015 00:33:29 +0700
-Subject: [PATCH V2 4/4] PCI: ACPI: Add support for PCI device DMA coherency
-In-Reply-To: <1440524009-5359-1-git-send-email-Suravee.Suthikulpanit@amd.com>
-References: <1440524009-5359-1-git-send-email-Suravee.Suthikulpanit@amd.com>
-Message-ID: <1440524009-5359-5-git-send-email-Suravee.Suthikulpanit@amd.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 25 Aug 2015 18:47:21 +0100
+Subject: [PATCH v3 2/4] spi: mediatek: replace int with u32, delete TAB
+ and define MTK_SPI_PAUSE_INT_STATUS marco
+In-Reply-To: <1440387918-22191-3-git-send-email-leilk.liu@mediatek.com>
+References: <1440387918-22191-1-git-send-email-leilk.liu@mediatek.com>
+ <1440387918-22191-3-git-send-email-leilk.liu@mediatek.com>
+Message-ID: <20150825174721.GH12878@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for setting up PCI device DMA coherency from
-ACPI _CCA object that should normally be specified in the DSDT node
-of its PCI host bridge.
+On Mon, Aug 24, 2015 at 11:45:16AM +0800, Leilk Liu wrote:
 
-Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-CC: Bjorn Helgaas <bhelgaas@google.com>
-CC: Catalin Marinas <catalin.marinas@arm.com>
-CC: Rob Herring <robh+dt@kernel.org>
-CC: Will Deacon <will.deacon@arm.com>
-CC: Rafael J. Wysocki <rjw@rjwysocki.net>
-CC: Murali Karicheri <m-karicheri2@ti.com>
----
- drivers/pci/probe.c | 15 ++++++++++-----
- 1 file changed, 10 insertions(+), 5 deletions(-)
+> this patch replaces int with u32, deletes TAB, and defines
+> MTK_SPI_PAUSE_INT_STATUS marco.
 
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index 4de6594..2fd2a60 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -1551,17 +1551,22 @@ static void pci_init_capabilities(struct pci_dev *dev)
-  * @dev: ptr to pci_dev struct of the PCI device
-  *
-  * Function to update PCI devices's DMA configuration using the same
-- * info from the OF node of host bridge's parent (if any).
-+ * info from the OF node or ACPI node of host bridge's parent (if any).
-  */
- static void pci_dma_configure(struct pci_dev *dev)
- {
- 	struct device *bridge = pci_get_host_bridge_device(dev);
- 
- 	if (IS_ENABLED(CONFIG_OF) && dev->dev.of_node) {
--		if (!bridge->parent)
--			return;
--
--		of_dma_configure(&dev->dev, bridge->parent->of_node);
-+		if (bridge->parent)
-+			of_dma_configure(&dev->dev,
-+					 bridge->parent->of_node);
-+	} else if (has_acpi_companion(bridge)) {
-+		struct acpi_device *adev = to_acpi_node(bridge->fwnode);
-+		int coherent = acpi_check_dma_coherency(adev);
-+
-+		if (-1 != coherent)
-+			arch_setup_dma_ops(&dev->dev, 0, 0, NULL, coherent);
- 	}
- 
- 	pci_put_host_bridge_device(bridge);
--- 
-2.1.0
+You've listed three changes in one patch and they're not obviously
+interrelated.  As has been said before one change per patch please :(
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150825/7b786396/attachment.sig>
