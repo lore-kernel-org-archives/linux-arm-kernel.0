@@ -1,88 +1,84 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Tue, 25 Aug 2015 13:24:05 +0200
-Subject: [PATCH] ARM: enable imprecise aborts during early kernel startup
-Message-ID: <1440501845-25723-1-git-send-email-l.stach@pengutronix.de>
+From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
+Date: Tue, 25 Aug 2015 13:24:20 +0200
+Subject: [PATCH linux-next v4 5/5] mtd: atmel-quadspi: add driver for
+ Atmel QSPI controller
+In-Reply-To: <A765B125120D1346A63912DDE6D8B6310BF47A26@NTXXIAMBX02.xacn.micron.com>
+References: <cover.1440410236.git.cyrille.pitchen@atmel.com>
+ <bf368fc101f38db231131b69eff0863210f2b01c.1440410236.git.cyrille.pitchen@atmel.com>
+ <A765B125120D1346A63912DDE6D8B6310BF47A26@NTXXIAMBX02.xacn.micron.com>
+Message-ID: <55DC5064.6050500@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabrice Gasnier <fabrice.gasnier@st.com>
+Hi!
 
-This patch adds imprecise abort enable/disable macros and uses them to
-enable imprecise aborts early when starting the kernel.
+Le 25/08/2015 03:44, Bean Huo ??? (beanhuo) a ?crit :
+> 
+>> +	nor->read_reg = atmel_qspi_read_reg;
+>> +	nor->write_reg = atmel_qspi_write_reg;
+>> +	nor->read = atmel_qspi_read;
+>> +	nor->write = atmel_qspi_write;
+>> +	nor->erase = atmel_qspi_erase;
+>> +	nor->set_protocol = atmel_qspi_set_protocol;
+> 
+> This is very good, the structure of spi_nor should add a hook function to notify spi controller 
+> That spi nor transfer protocol already changed.
+> 
+>> +
+>> +	if (of_modalias_node(child, modalias, sizeof(modalias)) < 0) {
+>> +		err = -ENODEV;
+>> +		goto release_channel;
+>> +	}
+>> +
+>> +	err = of_property_read_u32(child, "spi-max-frequency", &aq->clk_rate);
+>> +	if (err < 0)
+>> +		goto release_channel;
+>> +
+>> +	err = atmel_qspi_init(aq);
+>> +	if (err)
+>> +		goto release_channel;
+>> +
+>> +	nor->dev->of_node = child;
+>> +	err = spi_nor_scan(nor, modalias, SPI_NOR_QUAD);
+>> 		goto release_channel;
+>> +
+> 
+> 
+> .......
+> 
+>> static inline struct spi_nor *mtd_to_spi_nor(struct mtd_info *mtd)  {
+>  	return mtd->priv;
+>> @@ -944,6 +960,11 @@ static int micron_quad_enable(struct spi_nor *nor)
+>> 		return ret;
+>> 	}
+>>
+>> +	/* switch protocol to Quad CMD 4-4-4 */
+>> +	ret = spi_nor_set_protocol(nor, SPI_PROTO_4_4_4);
+>> +	if (ret)
+>> +		return ret;
+>> +
+> 
+> This make sense,from spi nor side,once its protocol being changed,
+> Mtd layer must notify this status to spi nor controller immediately,
+> And spi nor controller also should re-adjust its protocol.
+> Otherwise, following reading SR operation will fail. 
+> 
+>>
+>> 	ret = spi_nor_wait_till_ready(nor);
+>> 	if (ret)
+>> 		return ret;
+> 
+> If my ack has any value in here, feel free to add it.
+> 
+> Acked-by: Bean Huo <beanhuo@micron.com>
+> 
 
-This helps in tracking down the real cause for such imprecise abort, as
-they are handled as soon as they occur. Until now those aborts would
-only be enabled when entering the userspace and as a consequence crash
-the first userspace process if any abort had been raised during kernel
-startup.
+Since your comments deal with the protocol change, I'll add your ack to the
+first patch of the series:
+"mtd: spi-nor: notify (Q)SPI controller about protocol change"
 
-Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
----
-lst:
-- rebased to current kernel
-- reworked commit message
-- moved abort enable to point where handlers could run
-  (tested by hacking bootloader to leave a dangling abort behind)
----
- arch/arm/include/asm/irqflags.h | 10 ++++++++++
- arch/arm/kernel/smp.c           |  1 +
- arch/arm/mm/mmu.c               |  3 +++
- 3 files changed, 14 insertions(+)
+Thanks for your review!
 
-diff --git a/arch/arm/include/asm/irqflags.h b/arch/arm/include/asm/irqflags.h
-index 43908146a5cf..e6b70d9d084e 100644
---- a/arch/arm/include/asm/irqflags.h
-+++ b/arch/arm/include/asm/irqflags.h
-@@ -54,6 +54,14 @@ static inline void arch_local_irq_disable(void)
- 
- #define local_fiq_enable()  __asm__("cpsie f	@ __stf" : : : "memory", "cc")
- #define local_fiq_disable() __asm__("cpsid f	@ __clf" : : : "memory", "cc")
-+
-+#ifndef CONFIG_CPU_V7M
-+#define local_abt_enable()  __asm__("cpsie a	@ __sta" : : : "memory", "cc")
-+#define local_abt_disable() __asm__("cpsid a	@ __cla" : : : "memory", "cc")
-+#else
-+#define local_abt_enable()	do { } while (0)
-+#define local_abt_disable()	do { } while (0)
-+#endif
- #else
- 
- /*
-@@ -136,6 +144,8 @@ static inline void arch_local_irq_disable(void)
- 	: "memory", "cc");					\
- 	})
- 
-+#define local_abt_enable()	do { } while (0)
-+#define local_abt_disable()	do { } while (0)
- #endif
- 
- /*
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 3d6b7821cff8..f6f0a76ee573 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -385,6 +385,7 @@ asmlinkage void secondary_start_kernel(void)
- 
- 	local_irq_enable();
- 	local_fiq_enable();
-+	local_abt_enable();
- 
- 	/*
- 	 * OK, it's off to the idle thread for us
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index 870838a46d52..862caeadcaf0 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -1319,6 +1319,9 @@ static void __init devicemaps_init(const struct machine_desc *mdesc)
- 	 */
- 	local_flush_tlb_all();
- 	flush_cache_all();
-+
-+	/* Enable asynchronous aborts */
-+	local_abt_enable();
- }
- 
- static void __init kmap_init(void)
--- 
-2.4.6
+Best regards,
+
+Cyrille
