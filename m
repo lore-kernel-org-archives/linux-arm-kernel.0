@@ -1,98 +1,37 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 25 Aug 2015 14:05:06 +0200
-Subject: [PATCH v2] mmc: sunxi: Don't start commands while the card is busy
-In-Reply-To: <55BC8ADE.3070802@redhat.com>
-References: <1436541284-11800-1-git-send-email-hdegoede@redhat.com>
- <CAPDyKFoNe0bghfSXs48stHzZToTc7Hjd5gVPy-VbDF8bzdVVMQ@mail.gmail.com>
- <55BC8ADE.3070802@redhat.com>
-Message-ID: <CAPDyKFrYvL33DsaATg4fyAJg=G3SEuOP+xU=o_UwasmNZ+a07Q@mail.gmail.com>
+Date: Tue, 25 Aug 2015 14:05:56 +0200
+Subject: [PATCH 1/2] mmc: core: enable CMD19 tuning for DDR50 mode
+In-Reply-To: <CAGsJ_4wvvQdyjFi=JmWfASm-LbJMybrhC=Wxxn7jHZEP5dUfEw@mail.gmail.com>
+References: <1439282492-6274-1-git-send-email-21cnbao@gmail.com>
+ <CAPDyKFpXZD28NwNAhKQyxmWasVhk_7AeyOW6oXaBPHKuSTmGUA@mail.gmail.com>
+ <CAGsJ_4wvvQdyjFi=JmWfASm-LbJMybrhC=Wxxn7jHZEP5dUfEw@mail.gmail.com>
+Message-ID: <CAPDyKFpEwWvu3tnbMT9ZvM0TUvEHp0Qa8PADohyJoTaNZ9HS9g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 August 2015 at 11:01, Hans de Goede <hdegoede@redhat.com> wrote:
-> Hi,
->
-> On 21-07-15 14:15, Ulf Hansson wrote:
->>
->> On 10 July 2015 at 17:14, Hans de Goede <hdegoede@redhat.com> wrote:
+On 20 August 2015 at 02:16, Barry Song <21cnbao@gmail.com> wrote:
+> 2015-08-18 1:11 GMT+08:00 Ulf Hansson <ulf.hansson@linaro.org>:
+>> On 11 August 2015 at 10:41, Barry Song <21cnbao@gmail.com> wrote:
+>>> From: Weijun Yang <york.yang@csr.com>
 >>>
->>> Some sdio wifi modules have not been working reliable with the sunxi-mmc
->>> host code. This turns out to be caused by it starting new commands while
->>> the card signals that it is still busy processing a previous command.
+>>> As SD Specifications Part1 Physical Layer Specification Version
+>>> 3.01 says, CMD19 tuning is available for unlocked cards in transfer
+>>> state of 1.8V signaling mode. The small difference between v3.00
+>>> and 3.01 spec means that CMD19 tuning is also available for DDR50
+>>> mode.
 >>
->>
->> Which are those commands?
+>> So what happens with cards following the 3.0 spec version, those
+>> doesn't need to support the tuning CMD right? Perhaps that needs to be
+>> addressed in this patch well!?
 >
->
-> The code were things get stuck when not waiting for the busy signal uses
-> the following sdio helper functions:
->
-> sdio_readb/sdio_writeb
-> sdio_f0_readb/sdio_f0_writeb
-> sdio_readw/sdio_writew
-> sdio_readl/sdio_writel
-> sdio_readsb
-> sdio_memcpy_fromio/sdio_memcpy_toio
->
-> And directly issues the following command:
->
->         mmc_dat.flags = write ? MMC_DATA_WRITE : MMC_DATA_READ;
->         mmc_cmd.opcode = SD_IO_RW_EXTENDED;
->         mmc_cmd.arg = write ? 1<<31 : 0;        /* write flag  */
->         mmc_cmd.arg |= (fn & 0x7) << 28;        /* SDIO func num */
->         mmc_cmd.arg |= 1<<27;                   /* block mode */
->         /* for function 1 the addr will be incremented */
->         mmc_cmd.arg |= (fn == 1) ? 1<<26 : 0;
->         mmc_cmd.flags = MMC_RSP_SPI_R5 | MMC_RSP_R5 | MMC_CMD_ADTC;
->
-> I do not know if the busy wait is necessary for all
-> of these, but the hack in the android kernel code,
-> which inserts calls to a wait_card_busy function directly
-> into: drivers/net/wireless/brcm80211/brcmfmac/bcmsdh.c
->
-> Does so for all of these.
->
->> Or more interesting, which response types do
->>
->> these commands expect?
->> I don't think this is a sunxi specific issue, I have seen similar
->> issues for other host controllers.
->
->
-> Agreed, recent dw-mmc patches address the same issue, also involving
-> broadcom sdio wifi chips.
->
->> I am thinking that perhaps this should be managed by the mmc core
->> instead of local hacks to sunxi. Potentially we could make the core to
->> invoke the already existing host_ops->card_busy() callback when
->> needed...
->
->
-> I'm fine with solving this either way, implementing host_ops->card_busy()
-> for sunxi is easy, and if the core os modified to call that function
-> before issue sdio io ops (which seems to be the common thing here),
-> then that indeed is better then having the sunxi code always do
-> the busy check.
+> from HW registers of the card, we cann't know whether the HW needs
+> tuning. it is said 3.0.x need tuning, but 3.0 doesn't need.  @weijun,
+> pls fix me if i am wrong.
+> if so, it seems we need a static flag somewhere to indicate whether
+> the tuning is needed. we can't detect to find the tuning requirement.
 
-Okay, so let's make the core to call the ->card_busy() callback and
-then it's up to each host driver to implement that callback.
-
-As an optimization, we might consider (in a separate step) to add
-MMC_RSP_BUSY to the response type. I realize that would somewhat be a
-violation of the spec, but apparently the SDIO spec isn't really clear
-on this area.
-
->
->> Within this context, could I ask whether you controller supports IRQ
->> based HW-busy detection? Or you need polling of the status register?
->
->
-> I'm afraid that we need to poll the status register. I've been unable
-> to find an irq flag corresponding to this.
-
-Okay, thanks for the info.
-
-[...]
+Another way is to always try doing the tuning for DDR50, but in case
+of errors just ignore them and print a debug/info message!?
 
 Kind regards
 Uffe
