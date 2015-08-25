@@ -1,58 +1,94 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 25 Aug 2015 10:37:15 +0900
-Subject: [PATCH 00/18] ARM: use const and __initconst for smp_operations
-In-Reply-To: <CAOesGMgayep0EgCAdDWSujmiycDqtFUb0iKg-aioJqyzHRectA@mail.gmail.com>
-References: <1440390978-22796-1-git-send-email-yamada.masahiro@socionext.com>
- <CAOesGMjku09wsUmwooq2ZXLyV7CPfioi0oAV5EgvW_wE98VYeg@mail.gmail.com>
- <20150824212127.GH7557@n2100.arm.linux.org.uk>
- <CAOesGMgayep0EgCAdDWSujmiycDqtFUb0iKg-aioJqyzHRectA@mail.gmail.com>
-Message-ID: <CAK7LNATD0559Yh5E2pkGpcEOFUboK=5hR37QfLwNBRt+7aJHGg@mail.gmail.com>
+From: ykk@rock-chips.com (Yakir Yang)
+Date: Tue, 25 Aug 2015 09:37:13 +0800
+Subject: [PATCH v3 06/14] Documentation: drm/bridge: add document for
+ analogix_dp
+In-Reply-To: <18468783.Lfl8UEMQ1s@phil>
+References: <1439995728-18046-1-git-send-email-ykk@rock-chips.com>
+ <55DA9B72.1030804@samsung.com> <55DB1281.9070502@rock-chips.com>
+ <18468783.Lfl8UEMQ1s@phil>
+Message-ID: <55DBC6C9.8030705@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell, Olof,
+Hi Heiko,
 
-2015-08-25 6:44 GMT+09:00 Olof Johansson <olof@lixom.net>:
-> On Mon, Aug 24, 2015 at 2:21 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
->> On Mon, Aug 24, 2015 at 02:12:06PM -0700, Olof Johansson wrote:
->>> Easiest of all would probably be to get the sub-arch patches into one
->>> release, then switch the prototypes and function definitions in the
->>> next. If you switch prototypes first you'll get a bunch of warnings,
->>> right?
+? 2015/8/24 21:03, Heiko Stuebner ??:
+> Hi Yakir,
+>
+> Am Montag, 24. August 2015, 20:48:01 schrieb Yakir Yang:
+>> ? 08/24/2015 12:20 PM, Krzysztof Kozlowski ??:
+>>> On 24.08.2015 11:42, Yakir Yang wrote:
+>>>> Hi Krzysztof,
+>>>>
+>>>> ? 08/23/2015 07:43 PM, Krzysztof Kozlowski ??:
+>>>>> 2015-08-24 8:23 GMT+09:00 Rob Herring <robherring2@gmail.com>:
+>>>>>> On Wed, Aug 19, 2015 at 9:50 AM, Yakir Yang <ykk@rock-chips.com> wrote:
+>>>>>>> Analogix dp driver is split from exynos dp driver, so we just
+>>>>>>> make an copy of exynos_dp.txt, and then simplify exynos_dp.txt
+>>>>>>>
+>>>>>>> Beside update some exynos dtsi file with the latest change
+>>>>>>> according to the devicetree binding documents.
+>>>>>> You can't just change the exynos bindings and break compatibility. Is
+>>>>>> there some agreement with exynos folks to do this?
+>>>>> No, there is no agreement. This wasn't even sent to Exynos maintainers.
+>>>> Sorry about this one, actually I have add Exynos maintainers in version
+>>>> 1 & version 2,
+>>>> but lose some maintainers in version 3, I would fix it in bellow
+>>>> versions.
+>>>>
+>>>>> Additionally the patchset did not look interesting to me because of
+>>>>> misleading subject - Documentation instead of "ARM: dts:".
+>>>>>
+>>>>> Yakir, please:
+>>>>> 1. Provide backward compatibility. Mark old properties as deprecated
+>>>>> but still support them.
+>>>> Do you mean that I should keep the old properties declare in
+>>>> exynos-dp.txt,
+>>>> but just mark them as deprecated flag.
+>>> That is one of ways how to do this. However more important is that
+>>> driver should still support old bindings so such code:
+>>> -       if (of_property_read_u32(dp_node, "samsung,color-space",
+>>> +       if (of_property_read_u32(dp_node, "analogix,color-space",
+>>>
+>>> is probably wrong. Will the driver support old DTB in the same way as it
+>>> was supporting before the change?
+>> Okay, I got your means. So document is not the focus, the most important
+>> is that
+>> driver should support the old dts prop. If so the new analogix dp driver
+>> should keep
+>> the "samsung,color-space", rather then just mark it with [DEPRECATED] flag.
 >>
->> Wrong way around. :)
+>> But from your follow suggest, I think you agree to update driver code,
+>> and just mark
+>> old prop with deprecated flag. If so I think such code would not be wrong
 >>
->> If you change the sub-arches to declare the smp operations as const,
->> and try and pass them into a function which doesn't take a const-pointer,
->> you'll get a warning.  The core bits need to go in first before the
->> sub-arch patches.
+>> -       if (of_property_read_u32(dp_node, "samsung,color-space",
+>> +      if (of_property_read_u32(dp_node, "analogix,color-space",
+> In a generic driver, the property should have either none, or the analogix
+> prefix. But DT-properties need to be backwards compatible, meaning an older
+> Exynos devicetree should run unmodified with a newer kernel.
 >
-> Ah yes, my bad.
+> So the common course of action is to mark the old one as deprecated but still
+> test for both, so something like:
 >
->> I think the series has limited value - it allows us to (a) check that a
->> small quantity of code doesn't write to these things, and (b) allows us
->> to move the SMP operations structure from __initdata to __initconstdata.
->> It's still going to end up in the init region which is read/write in any
->> case, and still gets thrown away.
->>
->> Given where we are, I don't think we need to rush this in during the
->> last week before the merge window opens, even though it's trivial.
+>         if (of_property_read_u32(dp_node, "analogix,color-space",
+>                                   &dp_video_config->color_space))
+> 	       if (of_property_read_u32(dp_node, "samsung,color-space",
+>                  	                 &dp_video_config->color_space)) {
 >
-> Agreed. So if you pick it up for 4.4, we'll get the rest for 4.5.
+>                  	dev_err(dev, "failed to get color-space\n");
+>                  	return ERR_PTR(-EINVAL);
+>          	}
 >
 
-OK.
+Wow, thanks a lot for your explain and code, it do help me to understand
+this suggest rightly  :-)
 
-I will put 01 and 02 to Russell's patch tracker
-(after waiting for a bit more comments just in case).
+Thanks,
+- Yakir
 
-I will do the rest later.
-
-
-
-
-
--- 
-Best Regards
-Masahiro Yamada
+>
+>
+>
+>
+>
