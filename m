@@ -1,49 +1,44 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 25 Aug 2015 17:46:44 +0200 (CEST)
-Subject: [PATCH v3 3/4] irqchip: GIC: Convert to EOImode == 1
-In-Reply-To: <1440503605-10185-4-git-send-email-marc.zyngier@arm.com>
-References: <1440503605-10185-1-git-send-email-marc.zyngier@arm.com>
- <1440503605-10185-4-git-send-email-marc.zyngier@arm.com>
-Message-ID: <alpine.DEB.2.11.1508251745070.15006@nanos>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Tue, 25 Aug 2015 08:57:49 -0700
+Subject: [PATCH linux-next v4 5/5] mtd: atmel-quadspi: add driver for
+ Atmel QSPI controller
+In-Reply-To: <201508251222.10813.marex@denx.de>
+References: <cover.1440410236.git.cyrille.pitchen@atmel.com>
+ <201508241303.52066.marex@denx.de> <55DC40C1.3050405@atmel.com>
+ <201508251222.10813.marex@denx.de>
+Message-ID: <20150825155749.GA7622@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 25 Aug 2015, Marc Zyngier wrote:
-> +static struct static_key supports_deactivate = STATIC_KEY_INIT_TRUE;
-> +
->  #ifndef MAX_GIC_NR
->  #define MAX_GIC_NR	1
->  #endif
-> @@ -137,6 +140,14 @@ static inline unsigned int gic_irq(struct irq_data *d)
->  	return d->hwirq;
->  }
->  
-> +static inline bool primary_gic_irq(struct irq_data *d)
-> +{
-> +	if (MAX_GIC_NR > 1)
-> +		return irq_data_get_irq_chip_data(d) == &gic_data[0];
-> +
-> +	return true;
-> +}
-> +
->  /*
->   * Routines to acknowledge, disable and enable interrupts
->   */
-> @@ -164,7 +175,14 @@ static void gic_unmask_irq(struct irq_data *d)
->  
->  static void gic_eoi_irq(struct irq_data *d)
->  {
-> -	writel_relaxed(gic_irq(d), gic_cpu_base(d) + GIC_CPU_EOI);
-> +	u32 deact_offset = GIC_CPU_EOI;
-> +
-> +	if (static_key_true(&supports_deactivate)) {
-> +		if (primary_gic_irq(d))
-> +			deact_offset = GIC_CPU_DEACTIVATE;
+On Tue, Aug 25, 2015 at 12:22:10PM +0200, Marek Vasut wrote:
+> On Tuesday, August 25, 2015 at 12:17:37 PM, Cyrille Pitchen wrote:
+> > If you don't mind, I'd rather keep some of these inline functions. I have
+> > no strong justification, it's more a personal taste: it makes lines
+> > shorter as it avoids the need to add "->regs + ".
+> > Also it makes the code consistent with other Atmel drivers which already
+> > use such wrappers.
+> > 
+> > However I'll fix the comment and remove the byte and word versions, which
+> > are not used. So only qspi_readl() and qspi_writel() are left.
+> > 
+> > Does it sound good to you?
+> 
+> In my mind, seeing explicit readl_relaxed() somewhere is much easier to
+> digest than seeing some wrapper, which I have to look up. But please do
+> wait for others to voice their concern too, I might not be the best person
+> to tell you what to do when it comes to wrapping IO accessors ;-)
 
-I really wonder for the whole series whether you really want all that
-static key dance and extra conditionals in the callbacks instead of
-just using seperate irq chips for the different interrupts.
+I could go either way, but there are times where local wrapper I/O
+accessors are useful. Case in point: it makes it really easy to make the
+choice between readl() and readl_relaxed() in one place (i.e., the
+discussion you had in another branch of this thread). That's been useful
+for me on brcmnand, where certain platforms (big-endian MIPS) have
+different assumptions about endianness than your average platform. Also,
+it helps with things like what Robert Jarzmik is trying to do on
+pxa3xx_nand -- add debug info to print every register read/write.
 
-Thanks,
+Also as Cyrille mentioned, personal taste is a factor.
 
-	tglx
+Anyway, I'll go with whatever makes sense between y'all. I don't mind.
+
+Brian
