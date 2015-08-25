@@ -1,74 +1,48 @@
-From: Shenwei.Wang@freescale.com (Shenwei Wang)
-Date: Tue, 25 Aug 2015 13:38:28 +0000
-Subject: [PATCH v9 1/1] irqchip: imx-gpcv2: IMX GPCv2 driver for wakeup
- sources
-In-Reply-To: <55DC3452.3070205@arm.com>
-References: <1440443055-7291-1-git-send-email-shenwei.wang@freescale.com>
- <55DC3452.3070205@arm.com>
-Message-ID: <CY1PR0301MB08439B6C5F841AFFD152DFD883610@CY1PR0301MB0843.namprd03.prod.outlook.com>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Tue, 25 Aug 2015 21:43:14 +0800
+Subject: [PATCH v1 3/3] arm64: dts: add Hi6220 mailbox node
+In-Reply-To: <20150825104256.GB13471@leverpostej>
+References: <1439977055-1747-1-git-send-email-leo.yan@linaro.org>
+ <1439977055-1747-4-git-send-email-leo.yan@linaro.org>
+ <20150821184059.GB2000@svinekod> <20150824091845.GA28290@leoy-linaro>
+ <20150824095144.GA7139@leverpostej> <1440411596.3517.12.camel@linaro.org>
+ <20150824114903.GT10728@bivouac.eciton.net>
+ <1440490427.10987.29.camel@linaro.org>
+ <20150825094630.GU10728@bivouac.eciton.net>
+ <1440497710.10987.42.camel@linaro.org> <20150825104256.GB13471@leverpostej>
+Message-ID: <1440510194.10987.52.camel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-> -----Original Message-----
-> From: Sudeep Holla [mailto:sudeep.holla at arm.com]
-> Sent: 2015?8?25? 4:25
-> To: Wang Shenwei-B38339
-> Cc: shawn.guo at linaro.org; tglx at linutronix.de; jason at lakedaemon.net; Sudeep
-> Holla; Huang Yongcai-B20788; linux-kernel at vger.kernel.org;
-> linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH v9 1/1] irqchip: imx-gpcv2: IMX GPCv2 driver for wakeup
-> sources
+On Tue, 2015-08-25 at 11:42 +0100, Mark Rutland wrote:
+> > > Are you then going to hack GRUB, release a special HiKey version of
+> > > GRUB, not support any other versions, and still can your firmware
+> > > UEFI?
+> > 
+> > I don't need to hack GRUB at all.
 > 
+> Then it is working for you by pure chance alone.
 > 
-> 
-> On 24/08/15 20:04, Shenwei Wang wrote:
-> > IMX7D contains a new version of GPC IP block (GPCv2). It has two major
-> > functions: power management and wakeup source management.
-> > This patch adds a new irqchip driver to manage the interrupt wakeup
-> > sources on IMX7D.
-> 
-> Interesting, you mention that this IP block has mainly power management and it
-> itself requires save/restore. Is it not in always on domain ?
+> Please listen to the advice you are being given here; we're trying to
+> ensure that your platform functions (and continues to function) as best
+> it can.
 
-Yes, it is in always on domain.
+Since we discussed a lot on this, let's make a conclusion on it.
 
-> > When the system is in WFI (wait for interrupt) mode, this GPC block
-> > will be the first block on the platform to be activated and signaled.
-> > Under normal wait mode during cpu idle, the system can be woke up by
-> > +static void gpcv2_wakeup_source_restore(void) {
-> > +	struct gpcv2_irqchip_data *cd;
-> > +	void __iomem *reg;
-> > +	int i;
-> > +
-> > +	cd = imx_gpcv2_instance;
-> > +	if (!cd)
-> > +		return;
-> > +
-> > +	for (i = 0; i < IMR_NUM; i++) {
-> > +		reg = cd->gpc_base + cd->cpu2wakeup + i * 4;
-> > +		writel_relaxed(cd->saved_irq_mask[i], reg);
-> 
-> Instead of saving all the non-wakeup sources, can't you use raw save/restore of
-> these registers and mask all the non-wakeup sources by setting
-> MASK_ON_SUSPEND ?
+1. UEFI could append the reserved buffer in it's memory mapping.
+2. These reserved buffer must be declared in DT, since we also need to
+   support non-UEFI (uboot) at the same time.
+3. Mailbox node should reference reserved buffer by phandle in DT. Then
+   map the buffer as non-cacheable in driver.
+4. These reserved buffer must use "no-map" property since it should be
+   non-cacheable in driver.
+5. A patch is necessary in kernel. If efi stub feature is enabled,
+   arm kernel should not parse memory node or reserved memory buffer in
+   DT any more. Arm kernel should either fetch memory information from 
+   efi or DT. Currently arm kernel fetch both efi memory information and
+   reserved buffer from DTB at the same time.
 
-I can't catch what you mean. Can you show me an example?
+Do you agree on these points?
 
-> Also your interrupt controller seems like has no special way to configure wakeups,
-> you are just leaving them enabled. i.e. I see cpu2wakeup used for both
-> {un,}masking and wakeup enable. So you can just use IRQCHIP_SKIP_SET_WAKE.
-> Correct me if my understanding is wrong.
-
-In this driver, the Core0 is configured to be the default core to be woke up, not both. You can
-configure it to Core1 by changing the cpu2wakeup value. I don't see any reason to
-use IRQCHIP_SKIP_SET_WAKE flag.
-
-Thanks,
-Shenwei
- 
-
-
-> Regards,
-> Sudeep
+Regards
+Haojian
