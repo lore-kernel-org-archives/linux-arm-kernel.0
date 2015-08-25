@@ -1,95 +1,77 @@
-From: Shenwei.Wang@freescale.com (Shenwei Wang)
-Date: Tue, 25 Aug 2015 14:14:58 +0000
-Subject: [PATCH v9 1/1] irqchip: imx-gpcv2: IMX GPCv2 driver for wakeup
- sources
-In-Reply-To: <55DC738D.8000302@arm.com>
-References: <1440443055-7291-1-git-send-email-shenwei.wang@freescale.com>
- <55DC3452.3070205@arm.com>
- <CY1PR0301MB08439B6C5F841AFFD152DFD883610@CY1PR0301MB0843.namprd03.prod.outlook.com>
- <55DC738D.8000302@arm.com>
-Message-ID: <CY1PR0301MB0843AE566996617D855CC00683610@CY1PR0301MB0843.namprd03.prod.outlook.com>
+From: treding@nvidia.com (Thierry Reding)
+Date: Tue, 25 Aug 2015 16:16:43 +0200
+Subject: [PATCH v3 06/14] Documentation: drm/bridge: add document for
+ analogix_dp
+In-Reply-To: <55DC7211.9080601@rock-chips.com>
+References: <1439995728-18046-1-git-send-email-ykk@rock-chips.com>
+ <1439995834-18363-1-git-send-email-ykk@rock-chips.com>
+ <CAL_JsqLz+8RtBucctUj4euXZ3Ac0DvB52N9ONpAerh5T9BiTJg@mail.gmail.com>
+ <20150825091534.GB14034@ulmo.nvidia.com>
+ <CAL_Jsq++RLZo4gvEUTKO8MfEPwSqT2R+bqG22Jsgb2qLgDQFpw@mail.gmail.com>
+ <55DC7211.9080601@rock-chips.com>
+Message-ID: <20150825141642.GA3820@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-> -----Original Message-----
-> From: Sudeep Holla [mailto:sudeep.holla at arm.com]
-> >>> IMX7D contains a new version of GPC IP block (GPCv2). It has two
-> >>> major
-> >>> functions: power management and wakeup source management.
-> >>> This patch adds a new irqchip driver to manage the interrupt wakeup
-> >>> sources on IMX7D.
-> >>
-> >> Interesting, you mention that this IP block has mainly power
-> >> management and it itself requires save/restore. Is it not in always on
-> domain ?
-> >
-> > Yes, it is in always on domain.
-> >
+On Tue, Aug 25, 2015 at 09:48:01PM +0800, Yakir Yang wrote:
+> Hi Thierry & Rob,
 > 
-> Hmm, then why do you need to save and restore the mask ?
-
-The save/restore is used to handle the two different low power states: one is
-WFI in cpu idle, and the other case is suspend. This has nothing to do with this
-IP block itself.
-
-> >>> When the system is in WFI (wait for interrupt) mode, this GPC block
-> >>> will be the first block on the platform to be activated and signaled.
-> >>> Under normal wait mode during cpu idle, the system can be woke up by
-> >>> +static void gpcv2_wakeup_source_restore(void) {
-> >>> +	struct gpcv2_irqchip_data *cd;
-> >>> +	void __iomem *reg;
-> >>> +	int i;
-> >>> +
-> >>> +	cd = imx_gpcv2_instance;
-> >>> +	if (!cd)
-> >>> +		return;
-> >>> +
-> >>> +	for (i = 0; i < IMR_NUM; i++) {
-> >>> +		reg = cd->gpc_base + cd->cpu2wakeup + i * 4;
-> >>> +		writel_relaxed(cd->saved_irq_mask[i], reg);
-> >>
-> >> Instead of saving all the non-wakeup sources, can't you use raw
-> >> save/restore of these registers and mask all the non-wakeup sources
-> >> by setting MASK_ON_SUSPEND ?
-> >
-> > I can't catch what you mean. Can you show me an example?
-> >
+> ? 2015/8/25 21:27, Rob Herring ??:
+> >On Tue, Aug 25, 2015 at 4:15 AM, Thierry Reding <treding@nvidia.com> wrote:
+> >>On Sun, Aug 23, 2015 at 06:23:14PM -0500, Rob Herring wrote:
+> >>>On Wed, Aug 19, 2015 at 9:50 AM, Yakir Yang <ykk@rock-chips.com> wrote:
+> >>[...]
+> >>>>+       -analogix,link-rate:
+> >>>>+               max link rate supported by the eDP controller.
+> >>>>+                       LINK_RATE_1_62GBPS = 0x6, LINK_RATE_2_70GBPS = 0x0A,
+> >>>>+                       LINK_RATE_5_40GBPS = 0x14
+> >>>Same here. I'd rather see something like "link-rate-mbps" and use the
+> >>>actual rate.
+> >>There is no need whatsoever to hard-code this in DT. (e)DP provides the
+> >>means to detect what rate the link supports and the specification
+> >>provides guidance on how to select an appropriate one.
+> >Good, even better.
 > 
-> What I meant is instead of you tracking all the enabled irqs(both wakeup and
-> non-wakeup) in saved_irq_mask, just set MASK_ON_SUSPEND flag where all the
-> non-wakeup interrupts are masked on suspend and unmasked on resume by the
-> irq core. You can then just save and restore the wakeup irq mask, but as I asked
-> above do you have to do that as you are saying it's in always on domain ?
+> I do think we still need keep this DT prop yet.
 > 
-> >> Also your interrupt controller seems like has no special way to
-> >> configure wakeups, you are just leaving them enabled. i.e. I see
-> >> cpu2wakeup used for both {un,}masking and wakeup enable. So you can just
-> use IRQCHIP_SKIP_SET_WAKE.
-> >> Correct me if my understanding is wrong.
-> >
-> > In this driver, the Core0 is configured to be the default core to be
-> > woke up, not both. You can configure it to Core1 by changing the
-> > cpu2wakeup value. I don't see any reason to use IRQCHIP_SKIP_SET_WAKE flag.
-> >
+> I think drm_dp_help.c could get the "panel" max link-rate and lane-count,
+> but it's not enough, we still need knew the "eDP controller" max link-rate
+> and lane-count.
 > 
-> I don't see this driver doing anything extra apart from keeping the wakeup irqs
-> enabled. i.e. You use the same cpu*wake register to mask/unmask the interrupt
-> as well as set the wakeup source. Since the wakeup interrupt will be enabled by
-> the driver, you just need to mark it as wake-up source and nothing extra in the
-> controller right ?
-> If so, you need to set IRQCHIP_SKIP_SET_WAKE as you are just leaving that irq
-> enabled and not doing any extra configuration to enable it as wakeup source.
-> Please correct if that wrong, but from the code that's what I could infer.
+> Let me show the exact example that happened in my side. When I connect
+> my board to my 2K DP-1.2 TV. Analogix dp driver would get the max link-rate
+> from dpcd, and the max link-rate is 5.4Gbps. So if I just set eDP controller
+> link-rate
+> to 5.4Gbps, the DP TV just broken, do not light up normally.
+> 
+> This reason why TV broken is the max link-rate which support by RK3288 eDP
+> controller is 2.7Gbps. Here are the exact words that RK3288 eDP TRM said:
+> 
+> *??Compliant with DisplayPortTM Specification, Version 1.2.
+> ??Compliant with eDPTM Specification, Version 1.3.
+> ??HDCP v1.3 amendment for DisplayPortTM Revision 1.0.
+> ??Main link containing 4 physical lanes of 2.7/1.62 Gbps/lane
+> *
+> **
+> 
+> 
+> Beside I haven't found there are some registers would indicate the eDP
+> controller
+> max link-rate and lane-count, so this is why I still instance that we need
+> this DT
+> prop to indicata "Max rate controller support".
+> 
+> So, I wish you could agree with me on this point.
 
-There is no special for this driver. We just use the IRQCHIP driver framework to
-manage the wakeup sources. Why did you propose to set IRQCHIP_SKIP_SET_WAKE
-flag here? If you don't need the wakeup feature, you should just not enable this
-driver in the configuration.
+Your driver should know what link rates it supports and restrict itself
+to use those. This is implied by the compatible string and doesn't need
+to be duplicated into device tree.
 
-Thanks,
-Shenwei
-
-> Regards,
-> Sudeep
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150825/5f331b4b/attachment-0001.sig>
