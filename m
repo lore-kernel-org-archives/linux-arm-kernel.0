@@ -1,51 +1,132 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 25 Aug 2015 17:45:17 +0200
-Subject: [PATCH v1 3/3] arm64: dts: add Hi6220 mailbox node
-In-Reply-To: <20150825153754.GY10728@bivouac.eciton.net>
-References: <20150824095144.GA7139@leverpostej>
- <1440411596.3517.12.camel@linaro.org>
- <20150824114903.GT10728@bivouac.eciton.net>
- <1440490427.10987.29.camel@linaro.org>
- <20150825094630.GU10728@bivouac.eciton.net>
- <1440497710.10987.42.camel@linaro.org>
- <20150825104256.GB13471@leverpostej>
- <1440510194.10987.52.camel@linaro.org>
- <20150825142416.GW10728@bivouac.eciton.net>
- <CAKv+Gu-b=QvMF++V9UjULRxrGvoz-0ytFLeuLm8Y5sQH4p53Sw@mail.gmail.com>
- <20150825153754.GY10728@bivouac.eciton.net>
-Message-ID: <CAKv+Gu-JrEmf+wLOsDDjT0vPhGvQkrWqmOBx7KA_31DPmpP7UA@mail.gmail.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Tue, 25 Aug 2015 16:47:01 +0100
+Subject: [PATCH v2 12/15] KVM: arm64: sync LPI configuration and pending
+ tables
+In-Reply-To: <55CDE0A6.5010906@linaro.org>
+References: <1436538111-4294-1-git-send-email-andre.przywara@arm.com>
+ <1436538111-4294-13-git-send-email-andre.przywara@arm.com>
+ <55CDD7CB.9020103@linaro.org> <55CDE0A6.5010906@linaro.org>
+Message-ID: <55DC8DF5.3010303@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 August 2015 at 17:37, Leif Lindholm <leif.lindholm@linaro.org> wrote:
-> On Tue, Aug 25, 2015 at 04:51:22PM +0200, Ard Biesheuvel wrote:
->> >>    Arm kernel should either fetch memory information from
->> >>    efi or DT.
->> >
->> > Absolutely.
->> >
->> >>    Currently arm kernel fetch both efi memory information and
->> >>    reserved buffer from DTB at the same time.
->> >
->> > No, it does not.
->>
->> It should not, but it does. Due to an oversight, the stub removes
->> /memreserve/ entries but ignores the reserved-memory node completely.
->
-> Urgh.
->
->> This was reported here in fact
->>
->> http://thread.gmane.org/gmane.linux.kernel.efi/5736/focus=5742
->>
->> but there has not been a followup to this series.
->
-> Are all of those patches still relevant, or did some of them go in
-> already?
->
+Hi Eric,
 
-The first two patches are in v4.2-rc1 and up, the others should still
-apply on top of that.
+On 14/08/15 13:35, Eric Auger wrote:
+> On 08/14/2015 01:58 PM, Eric Auger wrote:
+>> On 07/10/2015 04:21 PM, Andre Przywara wrote:
+>>> The LPI configuration and pending tables of the GICv3 LPIs are held
+>>> in tables in (guest) memory. To achieve reasonable performance, we
+>>> cache this data in our own data structures, so we need to sync those
+>>> two views from time to time. This behaviour is well described in the
+>>> GICv3 spec and is also exercised by hardware, so the sync points are
+>>> well known.
+>>>
+>>> Provide functions that read the guest memory and store the
+>>> information from the configuration and pending tables in the kernel.
+>>>
+>>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>>> ---
+>> would help to have change log between v1 -> v2 (valid for the whole series)
+>>>  include/kvm/arm_vgic.h  |   2 +
+>>>  virt/kvm/arm/its-emul.c | 124 ++++++++++++++++++++++++++++++++++++++++++++++++
+>>>  virt/kvm/arm/its-emul.h |   3 ++
+>>>  3 files changed, 129 insertions(+)
+>>>
+>>> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+>>> index 2a67a10..323c33a 100644
+>>> --- a/include/kvm/arm_vgic.h
+>>> +++ b/include/kvm/arm_vgic.h
+>>> @@ -167,6 +167,8 @@ struct vgic_its {
+>>>  	int			cwriter;
+>>>  	struct list_head	device_list;
+>>>  	struct list_head	collection_list;
+>>> +	/* memory used for buffering guest's memory */
+>>> +	void			*buffer_page;
+>>>  };
+>>>  
+>>>  struct vgic_dist {
+>>> diff --git a/virt/kvm/arm/its-emul.c b/virt/kvm/arm/its-emul.c
+>>> index b9c40d7..05245cb 100644
+>>> --- a/virt/kvm/arm/its-emul.c
+>>> +++ b/virt/kvm/arm/its-emul.c
+>>> @@ -50,6 +50,7 @@ struct its_itte {
+>>>  	struct its_collection *collection;
+>>>  	u32 lpi;
+>>>  	u32 event_id;
+>>> +	u8 priority;
+>>>  	bool enabled;
+>>>  	unsigned long *pending;
+>>>  };
+>>> @@ -70,8 +71,124 @@ static struct its_itte *find_itte_by_lpi(struct kvm *kvm, int lpi)
+>>>  	return NULL;
+>>>  }
+>>>  
+>>> +#define LPI_PROP_ENABLE_BIT(p)	((p) & LPI_PROP_ENABLED)
+>>> +#define LPI_PROP_PRIORITY(p)	((p) & 0xfc)
+>>> +
+>>> +/* stores the priority and enable bit for a given LPI */
+>>> +static void update_lpi_config(struct kvm *kvm, struct its_itte *itte, u8 prop)
+>>> +{
+>>> +	itte->priority = LPI_PROP_PRIORITY(prop);
+>>> +	itte->enabled  = LPI_PROP_ENABLE_BIT(prop);
+>>> +}
+>>> +
+>>> +#define GIC_LPI_OFFSET 8192
+>>> +
+>>> +/* We scan the table in chunks the size of the smallest page size */
+>> 4kB chunks?
+>>> +#define CHUNK_SIZE 4096U
+>>> +
+>>>  #define BASER_BASE_ADDRESS(x) ((x) & 0xfffffffff000ULL)
+>>>  
+>>> +static int nr_idbits_propbase(u64 propbaser)
+>>> +{
+>>> +	int nr_idbits = (1U << (propbaser & 0x1f)) + 1;
+>>> +
+>>> +	return max(nr_idbits, INTERRUPT_ID_BITS_ITS);
+>>> +}
+>>> +
+>>> +/*
+>>> + * Scan the whole LPI configuration table and put the LPI configuration
+>>> + * data in our own data structures. This relies on the LPI being
+>>> + * mapped before.
+>>> + */
+>>> +static bool its_update_lpis_configuration(struct kvm *kvm)
+>>> +{
+>>> +	struct vgic_dist *dist = &kvm->arch.vgic;
+>>> +	u8 *prop = dist->its.buffer_page;
+>>> +	u32 tsize;
+>>> +	gpa_t propbase;
+>>> +	int lpi = GIC_LPI_OFFSET;
+>>> +	struct its_itte *itte;
+>>> +	struct its_device *device;
+>>> +	int ret;
+>>> +
+>>> +	propbase = BASER_BASE_ADDRESS(dist->propbaser);
+>>> +	tsize = nr_idbits_propbase(dist->propbaser);
+>>> +
+>>> +	while (tsize > 0) {
+>>> +		int chunksize = min(tsize, CHUNK_SIZE);
+>>> +
+>>> +		ret = kvm_read_guest(kvm, propbase, prop, chunksize);
+>> I think you still have the spin_lock issue  since if my understanding is
+>> correct this is called from
+>> vgic_handle_mmio_access/vcall_range_handler/gic_enable_lpis
+>> where vgic_handle_mmio_access. Or does it take another path?
+>>
+>> Shouldn't we create a new kvm_io_device to avoid holding the dist lock?
+> 
+> Sorry I forgot it was the case already. But currently we always register
+> the same io ops (registration entry point being
+> vgic_register_kvm_io_dev) and maybe we should have separate dispatcher
+> function for dist, redit and its?
 
--- 
-Ard.
+What would be the idea behind it? To have separate locks for each? I
+don't think that will work, as some ITS functions are called from GICv3
+register handler functions which manipulate members of the distributor
+structure. So I am more in favour of dropping the dist lock in these
+cases before handing off execution to ITS specific functions.
+
+Cheers,
+Andre.
