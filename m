@@ -1,43 +1,51 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Tue, 25 Aug 2015 16:41:27 +0100
-Subject: [PATCH v2 02/10] ARM: domains: provide domain_mask()
+Date: Tue, 25 Aug 2015 16:41:32 +0100
+Subject: [PATCH v2 03/10] ARM: domains: move initial domain setting value to
+ asm/domains.h
 In-Reply-To: <20150825154026.GT7557@n2100.arm.linux.org.uk>
 References: <20150825154026.GT7557@n2100.arm.linux.org.uk>
-Message-ID: <E1ZUGLn-0007sZ-1D@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1ZUGLs-0007xg-7o@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide a macro to generate the mask for a domain, rather than using
-domain_val(, DOMAIN_MANAGER) which won't work when CPU_USE_DOMAINS
-is turned off.
-
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/include/asm/domain.h | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ arch/arm/include/asm/domain.h | 6 ++++++
+ arch/arm/kernel/head.S        | 5 +----
+ 2 files changed, 7 insertions(+), 4 deletions(-)
 
 diff --git a/arch/arm/include/asm/domain.h b/arch/arm/include/asm/domain.h
-index 7f2941905714..045b9b453bcd 100644
+index 045b9b453bcd..4218f88e8f7e 100644
 --- a/arch/arm/include/asm/domain.h
 +++ b/arch/arm/include/asm/domain.h
-@@ -55,7 +55,8 @@
- #define DOMAIN_MANAGER	1
- #endif
+@@ -58,6 +58,12 @@
+ #define domain_mask(dom)	((3) << (2 * (dom)))
+ #define domain_val(dom,type)	((type) << (2 * (dom)))
  
--#define domain_val(dom,type)	((type) << (2*(dom)))
-+#define domain_mask(dom)	((3) << (2 * (dom)))
-+#define domain_val(dom,type)	((type) << (2 * (dom)))
- 
++#define DACR_INIT \
++	(domain_val(DOMAIN_USER, DOMAIN_MANAGER) | \
++	 domain_val(DOMAIN_KERNEL, DOMAIN_MANAGER) | \
++	 domain_val(DOMAIN_TABLE, DOMAIN_MANAGER) | \
++	 domain_val(DOMAIN_IO, DOMAIN_CLIENT))
++
  #ifndef __ASSEMBLY__
  
-@@ -82,7 +83,7 @@ static inline void set_domain(unsigned val)
- #define modify_domain(dom,type)					\
- 	do {							\
- 		unsigned int domain = get_domain();		\
--		domain &= ~domain_val(dom, DOMAIN_MANAGER);	\
-+		domain &= ~domain_mask(dom);			\
- 		domain = domain | domain_val(dom, type);	\
- 		set_domain(domain);				\
- 	} while (0)
+ static inline unsigned int get_domain(void)
+diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+index bd755d97e459..d56e5e9a9e1e 100644
+--- a/arch/arm/kernel/head.S
++++ b/arch/arm/kernel/head.S
+@@ -461,10 +461,7 @@ __enable_mmu:
+ #ifdef CONFIG_ARM_LPAE
+ 	mcrr	p15, 0, r4, r5, c2		@ load TTBR0
+ #else
+-	mov	r5, #(domain_val(DOMAIN_USER, DOMAIN_MANAGER) | \
+-		      domain_val(DOMAIN_KERNEL, DOMAIN_MANAGER) | \
+-		      domain_val(DOMAIN_TABLE, DOMAIN_MANAGER) | \
+-		      domain_val(DOMAIN_IO, DOMAIN_CLIENT))
++	mov	r5, #DACR_INIT
+ 	mcr	p15, 0, r5, c3, c0, 0		@ load domain access register
+ 	mcr	p15, 0, r4, c2, c0, 0		@ load page table pointer
+ #endif
 -- 
 2.1.0
