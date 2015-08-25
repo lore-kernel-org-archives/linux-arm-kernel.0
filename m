@@ -1,83 +1,68 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Wed, 26 Aug 2015 05:11:47 +0800
-Subject: [PATCH v2] soc: mediatek: add scpsys support active_wakeup
-In-Reply-To: <1440482440-28700-1-git-send-email-eddie.huang@mediatek.com>
-References: <1440482440-28700-1-git-send-email-eddie.huang@mediatek.com>
-Message-ID: <CAGS+omBqTbcJk-6QvupV4tkB5WQm97zpb5NzZ-S2ivR-UEWF4g@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 25 Aug 2015 14:14:05 -0700
+Subject: [PATCH v3] qcom: ipq40xx: Add basic board/dts support for
+ IPQ40XX SoC
+In-Reply-To: <20150825081042.GA14028@codeaurora.org>
+References: <20150824092813.GA15581@codeaurora.org>
+ <20150824224928.GE14330@codeaurora.org>
+ <20150825081042.GA14028@codeaurora.org>
+Message-ID: <20150825211405.GJ19120@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eddie,
+On 08/25, Varadarajan Narayanan wrote:
+> On Mon, Aug 24, 2015 at 03:49:28PM -0700, Stephen Boyd wrote:
+> > On 08/24, Varadarajan Narayanan wrote:
+> 
+> > > +	compatible = "qcom,ipq40xx-r3pc", "qcom,ipq40xx";
+> > > +
+> > > +	memory {
+> > > +		device_type = "memory";
+> > > +		reg = <0x80000000 0x20000000>; /* 512MB */
+> > > +	};
+> >
+> > Doesn't the bootloader fill the memory node for us? Why do we
+> > need this?
+> >
+> > > +
+> > > +	chosen {
+> > > +		bootargs = "root=/dev/ram rw init=/init console=ttyMSM0,115200n8 initrd=0x82000000,0x000E2246";
+> > > +	};
+> >
+> > Please don't add bootargs. Use stdout-path for the console part
+> > and everything else should be done by the bootloader or is the
+> > defaults.
+> 
+> Since this is for the emulation platform, we don't have the bootloader.
 
-On Tue, Aug 25, 2015 at 2:00 PM, Eddie Huang <eddie.huang@mediatek.com> wrote:
-> Register gpd_dev_ops.active_wakeup function to support keep power
-> during suspend state. And add flag to each power domain to
-> decide whether keep power during suspend or not.
->
-> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
-> Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
-> Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
->
-> ---
-> Change in v2:
-> Drop .active_wakeup = false lines in scp_domain_data[] array
->
-> ---
->  drivers/soc/mediatek/mtk-scpsys.c | 19 +++++++++++++++++++
->  1 file changed, 19 insertions(+)
->
-> diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
-> index 43a79ed..df2f288 100644
-> --- a/drivers/soc/mediatek/mtk-scpsys.c
-> +++ b/drivers/soc/mediatek/mtk-scpsys.c
-> @@ -67,6 +67,7 @@ struct scp_domain_data {
->         u32 sram_pdn_ack_bits;
->         u32 bus_prot_mask;
->         enum clk_id clk_id;
-> +       bool active_wakeup;
->  };
->
->  static const struct scp_domain_data scp_domain_data[] __initconst = {
-> @@ -127,6 +128,7 @@ static const struct scp_domain_data scp_domain_data[] __initconst = {
->                 .sram_pdn_bits = GENMASK(11, 8),
->                 .sram_pdn_ack_bits = GENMASK(15, 12),
->                 .clk_id = MT8173_CLK_NONE,
-> +               .active_wakeup = true,
->         },
->         [MT8173_POWER_DOMAIN_MFG_ASYNC] = {
->                 .name = "mfg_async",
-> @@ -171,6 +173,7 @@ struct scp_domain {
->         u32 sram_pdn_bits;
->         u32 sram_pdn_ack_bits;
->         u32 bus_prot_mask;
-> +       bool active_wakeup;
->  };
->
->  struct scp {
-> @@ -370,6 +373,20 @@ out:
->         return ret;
->  }
->
-> +static bool scpsys_active_wakeup(struct device *dev)
-> +{
-> +       struct generic_pm_domain *genpd;
-> +       struct scp_domain *scpd;
-> +
-> +       if (IS_ERR_OR_NULL(dev->pm_domain))
-> +               return false;
+Why are we upstreaming an emulation platform?
 
-Is it really possible to get here w/ pm_domain as an ERR or NULL?
-If the power core can ensure this cannot happen, then this function
-could be a bit simpler.
+I assume you have some sort of scripts or something to load the
+kernel image into the emulator, so those scripts could go and
+modify the dtb in place to populate the initrd and commandline.
+If you need pointers on that feel free to contact me directly.
 
-Other than that, this patch is:
-Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
+> 
+> > > +			compatible = "arm,armv7-timer";
+> > > +			interrupts = <1 2 0xf08>,
+> > > +				     <1 3 0xf08>,
+> > > +				     <1 4 0xf08>,
+> > > +				     <1 1 0xf08>;
+> > > +			clock-frequency = <20833333>;
+> >
+> > Drop this clock-frequency part if you can. The hardware should
+> > properly report the frequency.
+> 
+> Cannot drop this. This is the ref-clock frequency. For the
+> chip it is 48MHz, for emulation is ~20MHz. Similar to
+> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/arch/arm/boot/dts/qcom-msm8974.dtsi#n89
 
--Dan
+And the hardware is not emulated properly to report the actual
+frequency that the timer is running at? That's sad.
 
-> +
-> +       genpd = pd_to_genpd(dev->pm_domain);
-> +       scpd = container_of(genpd, struct scp_domain, genpd);
-> +
-> +       return scpd->active_wakeup;
-> +}
+At the least, this should be in the board specific dtsi file
+instead of the SoC specific file, because it's a board quirk.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
