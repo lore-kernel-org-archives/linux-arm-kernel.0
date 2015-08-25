@@ -1,133 +1,98 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Tue, 25 Aug 2015 10:01:19 -0400
-Subject: [PATCH] ARM64: kernel: implement ACPI parking protocol
-In-Reply-To: <20150824171345.GA4981@red-moon>
-References: <1436959990-32054-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1437063431.3583.2.camel@redhat.com> <20150716171221.GB18582@red-moon>
- <55A7F24D.2000100@redhat.com> <1437071026.21160.1.camel@redhat.com>
- <20150824171345.GA4981@red-moon>
-Message-ID: <1440511279.5882.14.camel@redhat.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Tue, 25 Aug 2015 22:04:50 +0800
+Subject: [PATCH v1 3/3] arm64: dts: add Hi6220 mailbox node
+In-Reply-To: <55DC532C.3020005@arm.com>
+References: <1439977055-1747-1-git-send-email-leo.yan@linaro.org>
+ <1439977055-1747-4-git-send-email-leo.yan@linaro.org>
+ <55DC532C.3020005@arm.com>
+Message-ID: <20150825140450.GB28262@leoy-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-08-24 at 18:13 +0100, Lorenzo Pieralisi wrote:
-> Hi Mark,
-> 
-> On Thu, Jul 16, 2015 at 07:23:46PM +0100, Mark Salter wrote:
-> > On Thu, 2015-07-16 at 12:05 -0600, Al Stone wrote:
-> > 
-> > > On 07/16/2015 11:12 AM, Lorenzo Pieralisi wrote:
-> > 
-> > > > On Thu, Jul 16, 2015 at 05:17:11PM +0100, Mark Salter wrote:
-> > 
-> > > > > On Wed, 2015-07-15 at 12:33 +0100, Lorenzo Pieralisi wrote:
-> > > > > 
-> > 
-> > > > > > The SBBR and ACPI specifications allow ACPI based systems that 
-> > > > > > do not
-> > > > > > implement PSCI (eg systems with no EL3) to boot through the 
-> > > > > > ACPI parking
-> > > > > > protocol specification[1].
-> > > > > > 
-> > > > > > This patch implements the ACPI parking protocol CPU operations, 
-> > > > > > and adds
-> > > > > > code that eases parsing the parking protocol data structures to 
-> > > > > > the
-> > > > > > ARM64 SMP initializion carried out at the same time as cpus 
-> > > > > > enumeration.
-> > > > > > 
-> > > > > > To wake-up the CPUs from the parked state, this patch 
-> > > > > > implements a
-> > > > > > wakeup IPI for ARM64 (ie arch_send_wakeup_ipi_mask()) that 
-> > > > > > mirrors the
-> > > > > > ARM one, so that a specific IPI is sent for wake-up purpose in 
-> > > > > > order
-> > > > > > to distinguish it from other IPI sources.
-> > > > > > 
-> > > > > > Given the current ACPI MADT parsing API, the patch implements a 
-> > > > > > glue
-> > > > > > layer that helps passing MADT GICC data structure from SMP 
-> > > > > > initialization
-> > > > > 
-> > > > > Somewhat off topic, but this reminds once again, that it might be
-> > > > > better to generalize the ACPI_MADT_TYPE_GENERIC_INTERRUPT so that 
-> > > > > it
-> > > > > could be done in one pass. Currently, the SMP code and the GIC 
-> > > > > code
-> > > > > need boot-time info from ACPI_MADT_TYPE_GENERIC_INTERRUPT tables. 
-> > > > > This
-> > > > > patch adds parking protocol, and this patch:
-> > > > > 
-> > > > >  https://lkml.org/lkml/2015/5/1/203
-> > > > > 
-> > > > > need to get the PMU irq from the same table. I've been thinking 
-> > > > > of
-> > > > > something like a single loop through the table in setup.c with
-> > > > > callouts to registered users of the various bits of data.
-> > > > 
-> > > > It is not off topic at all, it is bang on topic. I hate the code
-> > > > as it stands forcing parsing the MADT in multiple places at 
-> > > > different
-> > > > times, that's why I added hooks to set the parking protocol entries
-> > > > from smp.c and I know that's ugly, I posted it like this on purpose
-> > > > to get feedback.
-> > > > 
-> > 
-> > > > > Those users could register a handler function with something like 
-> > > > > an
-> > > > > ACPI_MADT_GIC_DECLARE() macro which would add a handler to a
-> > > > > special linker section.
-> > > > > 
-> > > > > I could work up a separate patch if others think it a worthwhile
-> > > > > thing to do.
-> > > > 
-> > > > Something simpler ? Like stashing the GICC entries (I know we need
-> > > > permanent table mappings for that to work unless we create data
-> > > > structures out of the MADT entries with the fields we are 
-> > > > interested in)
-> > > > for possible CPUS ?
-> > > 
-> > > Right -- it seems like it would be pretty straightforward to traverse
-> > > the MADT once, and capture all the GICC subtables in a list of 
-> > > pointers,
-> > > or even make a copy of the contents of all of them.  Each user of the
-> > > content would still have to traverse the list, though, unless data is
-> > > reduced to only those things that are needed and the rest tossed. 
-> > >  Even
-> > > if only keep the info needed, I've still got a list of entries, one 
-> > > for
-> > > each CPU, I think, that I would still have to traverse.
-> > > 
-> > > If I have to register a handler to gather a specific bit of data 
-> > > needed,
-> > > I'm not understanding how that's any less complicated than what I 
-> > > need
-> > > to do today -- call acpi_parse_table_madt() with my GICC handler. 
-> > >  Wouldn't
-> > > both GICC subtable handlers be just about the same code?
-> > > 
-> > > I'm probably missing something obvious, but I'm not understanding 
-> > > what problem
-> > > is being solved....
-> > > 
-> > 
-> > The difference is that GIC code and SMP code each loop
-> > through the tables getting the info they need. If they
-> > registered a handler, there is only one loop through
-> > the tables regardless of how many handlers get registered.
-> > Having each loop through as currently done isn't really
-> > a performance issue (its boot-time only right now), but
-> > there is duplicated code wrt validating the table entry
-> > and calling the acpi API to do it. All of that could be
-> > done in one place instead of duplicating it in different
-> > places.
-> 
-> Did you have time to put the patch together ? I would like
-> to post a v2 for this set soon.
-> 
-> Thank you !
-> Lorenzo
+Hi Sudeep,
 
-No. The original idea I had wasn't going to work out because the
-parsing had to happen at different times during the boot. I'm not
-sure if there's a better way than what we're doing now.
+On Tue, Aug 25, 2015 at 12:36:12PM +0100, Sudeep Holla wrote:
+> 
+> 
+> On 19/08/15 10:37, Leo Yan wrote:
+> >On Hi6220, below memory regions in DDR have specific purpose:
+> >
+> >   0x05e0,0000 - 0x05ef,ffff: For MCU firmware using at runtime;
+> >   0x0740,f000 - 0x0740,ffff: For MCU firmware's section;
+> >   0x06df,f000 - 0x06df,ffff: For mailbox message data.
+> >
+> 
+> Unless I am reading the DTS file completely wrong, I don't think the
+> above memory regions are in DDR as per the memory node.
+
+i'm not sure if understand correctly for your question; Hikey board
+has DDR 1GB at 0x0, but there have some memory regions are used for MCU.
+
+So this patch is to reserve these memory regions so that make sure
+kernel will not map and allocate them.
+
+Will remove these memory regions from memory node in next version.
+
+> >This patch reserves these memory regions and add device node for
+> >mailbox in dts.
+> >
+> >Signed-off-by: Leo Yan <leo.yan@linaro.org>
+> >---
+> >  arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 20 +++++++++++++++++---
+> >  arch/arm64/boot/dts/hisilicon/hi6220.dtsi      |  8 ++++++++
+> >  2 files changed, 25 insertions(+), 3 deletions(-)
+> >
+> >diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+> >index e36a539..d5470d3 100644
+> >--- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+> >+++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+> >@@ -7,9 +7,6 @@
+> >
+> >  /dts-v1/;
+> >
+> >-/*Reserved 1MB memory for MCU*/
+> >-/memreserve/ 0x05e00000 0x00100000;
+> >-
+> >  #include "hi6220.dtsi"
+> >
+> >  / {
+> >@@ -28,4 +25,21 @@
+> >  		device_type = "memory";
+> >  		reg = <0x0 0x0 0x0 0x40000000>;
+> >  	};
+> 
+> I have no access to the spec, but I read this as 1GB RAM @0x0
+> Unless this entry is completely wrong, what your commit log claims is
+> incorrect. If this entry is wrong I wonder how is it booting with this
+> DT then.
+
+Do you mean should remove all reserved memory regions from memory
+node? Will submit next version's patch for this.
+
+Kernel can boot successfully on Hikey with this patch [1].
+
+[1] https://github.com/96boards/linux
+
+> >+
+> >+	reserved-memory {
+> >+		#address-cells = <2>;
+> >+		#size-cells = <2>;
+> >+		ranges;
+> >+
+> >+		mcu-buf at 05e00000 {
+> >+			no-map;
+> >+			reg = <0x0 0x05e00000 0x0 0x00100000>,	/* MCU firmware buffer */
+> >+			      <0x0 0x0740f000 0x0 0x00001000>;	/* MCU firmware section */
+> 
+> So I don't see how can this be part of DDR ? Or at-least part of DDR
+> that's mapped by kernel ?
+
+Here use reserved-memory node to remove these regions from memblock
+during kernel's boot up; kernel also will not map for them with
+property "no-map".
+
+I think this is the same question which have been brought up by Mark
+in his early mail and suggested to use UEFI to do this.
+
+Thanks,
+Leo Yan
