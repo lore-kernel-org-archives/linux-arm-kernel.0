@@ -1,45 +1,32 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Tue, 25 Aug 2015 17:22:08 +0100
-Subject: [PATCH 1/3] ARM: DT: STi: stihxxx-b2120: Add pulse-width properties
- to ssc2 & ssc3
+Date: Tue, 25 Aug 2015 17:22:10 +0100
+Subject: [PATCH 3/3] [media] c8sectpfe: Remove select on undefined LIBELF_32
 In-Reply-To: <1440519730-486-1-git-send-email-peter.griffin@linaro.org>
 References: <1440519730-486-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1440519730-486-2-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1440519730-486-4-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding these properties makes the I2C bus to the demodulators much
-more reliable, and we no longer suffer from I2C errors when tuning.
+LIBELF_32 is not defined in Kconfig, and is left over legacy
+which is not required in the upstream driver, so remove it.
 
 Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+Suggested-by: Valentin Rothberg <valentinrothberg@gmail.com>
 ---
- arch/arm/boot/dts/stihxxx-b2120.dtsi | 10 ++++++++--
- 1 file changed, 8 insertions(+), 2 deletions(-)
+ drivers/media/platform/sti/c8sectpfe/Kconfig | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/stihxxx-b2120.dtsi b/arch/arm/boot/dts/stihxxx-b2120.dtsi
-index f589fe4..62994ae 100644
---- a/arch/arm/boot/dts/stihxxx-b2120.dtsi
-+++ b/arch/arm/boot/dts/stihxxx-b2120.dtsi
-@@ -27,12 +27,18 @@
- 			};
- 		};
- 
--		i2c at 9842000 {
-+		ssc2: i2c at 9842000 {
- 			status = "okay";
-+			clock-frequency = <100000>;
-+			st,i2c-min-scl-pulse-width-us = <0>;
-+			st,i2c-min-sda-pulse-width-us = <5>;
- 		};
- 
--		i2c at 9843000 {
-+		ssc3: i2c at 9843000 {
- 			status = "okay";
-+			clock-frequency = <100000>;
-+			st,i2c-min-scl-pulse-width-us = <0>;
-+			st,i2c-min-sda-pulse-width-us = <5>;
- 		};
- 
- 		i2c at 9844000 {
+diff --git a/drivers/media/platform/sti/c8sectpfe/Kconfig b/drivers/media/platform/sti/c8sectpfe/Kconfig
+index d1bfd4c..b9ec667 100644
+--- a/drivers/media/platform/sti/c8sectpfe/Kconfig
++++ b/drivers/media/platform/sti/c8sectpfe/Kconfig
+@@ -1,7 +1,6 @@
+ config DVB_C8SECTPFE
+ 	tristate "STMicroelectronics C8SECTPFE DVB support"
+ 	depends on DVB_CORE && I2C && (ARCH_STI || ARCH_MULTIPLATFORM)
+-	select LIBELF_32
+ 	select FW_LOADER
+ 	select FW_LOADER_USER_HELPER_FALLBACK
+ 	select DEBUG_FS
 -- 
 1.9.1
