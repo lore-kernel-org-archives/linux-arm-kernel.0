@@ -1,33 +1,47 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 21 Aug 2015 10:16:40 -0700
-Subject: [GIT PULL 8/9] ARM: tegra: Devicetree changes for v4.3-rc1
- (updated)
-In-Reply-To: <1440175939-13663-1-git-send-email-thierry.reding@gmail.com>
-References: <1439563720-13189-9-git-send-email-thierry.reding@gmail.com>
- <1440175939-13663-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <20150821171640.GA31493@localhost>
+From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
+Date: Wed, 26 Aug 2015 00:33:25 +0700
+Subject: [PATCH V2 0/4] PCI: ACPI: Setting up DMA coherency for PCI device
+ from _CCA attribute
+Message-ID: <1440524009-5359-1-git-send-email-Suravee.Suthikulpanit@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 21, 2015 at 06:52:19PM +0200, Thierry Reding wrote:
-> Hi ARM SoC maintainers,
-> 
-> The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
-> 
->   Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.3-dt
-> 
-> for you to fetch changes up to 17cdddf0fb684f5456c1af3aa2c10aca3b68b8de:
-> 
->   ARM: tegra: Add gpio-ranges property (2015-08-21 18:44:28 +0200)
-> 
-> This updated version of the pull request includes the for-4.3/clk branch
-> which is a build-time dependency for for-4.3/dt.
+This patch adds support to setup DMA coherency for PCI device using
+the ACPI _CCA attribute. According to the ACPI spec, the _CCA attribute
+is required for ARM64. Therefore, this patch is a pre-req for ACPI PCI
+support for ARM64 which is currently in development.
 
-Merged, thanks.
+Also, this should not affect other architectures that does not define 
+CONFIG_ACPI_CCA_REQUIRED, since the default value is coherent.
 
+In the V2 of this patch series, I have pulled in the following patch from Jeremy
+before cleaning up the acpi_check_dma() function (in patch 2).
 
--Olof
+    http://www.spinics.net/lists/linux-usb/msg128582.html)
+
+Changes from V1: (https://lkml.org/lkml/2015/8/13/182)
+    * Include patch 1 from Jeremy to enable support for _CCA=0
+    * Clean up acpi_check_dma() per Bjorn suggestions
+    * Split the original V1 patch into two patches (patch 3 and 4)
+
+Jeremy Linton (1):
+  Honor ACPI _CCA attribute setting
+
+Suravee Suthikulpanit (3):
+  ACPI/scan: Clean up acpi_check_dma
+  PCI: OF: Move of_pci_dma_configure() to pci_dma_configure()
+  PCI: ACPI: Add support for PCI device DMA coherency
+
+ drivers/acpi/acpi_platform.c |  7 ++++++-
+ drivers/acpi/glue.c          |  5 +++--
+ drivers/acpi/scan.c          | 39 +++++++++++++++++++++++++++++++++++++++
+ drivers/base/property.c      |  8 ++++++--
+ drivers/of/of_pci.c          | 20 --------------------
+ drivers/pci/probe.c          | 32 ++++++++++++++++++++++++++++++--
+ include/acpi/acpi_bus.h      | 35 ++---------------------------------
+ include/linux/acpi.h         |  4 ++--
+ include/linux/of_pci.h       |  3 ---
+ 9 files changed, 88 insertions(+), 65 deletions(-)
+
+-- 
+2.1.0
