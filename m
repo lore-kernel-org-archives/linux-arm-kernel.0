@@ -1,89 +1,95 @@
-From: Shenwei.Wang@freescale.com (Shenwei Wang)
-Date: Tue, 25 Aug 2015 13:47:00 +0000
-Subject: [PATCH v3 1/1] misc: sram: add dev_pm_ops to support module power
- gate
-In-Reply-To: <55DC677E.1030004@arm.com>
-References: <1438272681-29338-1-git-send-email-shenwei.wang@freescale.com>
- <55DC677E.1030004@arm.com>
-Message-ID: <CY1PR0301MB0843D5CB5FFC56991B90EB4283610@CY1PR0301MB0843.namprd03.prod.outlook.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 25 Aug 2015 14:54:21 +0100
+Subject: [PATCH v9 1/1] irqchip: imx-gpcv2: IMX GPCv2 driver for wakeup
+ sources
+In-Reply-To: <CY1PR0301MB08439B6C5F841AFFD152DFD883610@CY1PR0301MB0843.namprd03.prod.outlook.com>
+References: <1440443055-7291-1-git-send-email-shenwei.wang@freescale.com>
+ <55DC3452.3070205@arm.com>
+ <CY1PR0301MB08439B6C5F841AFFD152DFD883610@CY1PR0301MB0843.namprd03.prod.outlook.com>
+Message-ID: <55DC738D.8000302@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-> -----Original Message-----
-> From: Sudeep Holla [mailto:sudeep.holla at arm.com]
-> Sent: 2015?8?25? 8:03
-> To: Wang Shenwei-B38339
-> Cc: gregkh at linuxfoundation.org; arnd at arndb.de; Sudeep Holla; Huang
-> Yongcai-B20788; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH v3 1/1] misc: sram: add dev_pm_ops to support module
-> power gate
-> 
-> 
-> 
-> On 30/07/15 17:11, Shenwei Wang wrote:
-> > When system goes into low power states like SUSPEND_MEM and
-> > HIBERNATION, the hardware IP block may be powered off to reduce the
-> > power consumption. This power down will lost all the data inside the
-> > ram. This patch added the dev_pm_ops and implemented two callbacks:
-> > suspend_noirq and resume_noirq, which will save the data in the
-> > on-chip-ram right before power down and restore it after system
-> > resumes.
-> >
-> 
-> Who uses this SRAM ? Can't they be released before suspending ?
-> This might not be feasible and time consuming as the size of SRAM increases.
+On 25/08/15 14:38, Shenwei Wang wrote:
+>
+>
+>> -----Original Message-----
+>> From: Sudeep Holla [mailto:sudeep.holla at arm.com]
+>> Sent: 2015?8?25? 4:25
+>> To: Wang Shenwei-B38339
+>> Cc: shawn.guo at linaro.org; tglx at linutronix.de; jason at lakedaemon.net; Sudeep
+>> Holla; Huang Yongcai-B20788; linux-kernel at vger.kernel.org;
+>> linux-arm-kernel at lists.infradead.org
+>> Subject: Re: [PATCH v9 1/1] irqchip: imx-gpcv2: IMX GPCv2 driver for wakeup
+>> sources
+>>
+>>
+>>
+>> On 24/08/15 20:04, Shenwei Wang wrote:
+>>> IMX7D contains a new version of GPC IP block (GPCv2). It has two major
+>>> functions: power management and wakeup source management.
+>>> This patch adds a new irqchip driver to manage the interrupt wakeup
+>>> sources on IMX7D.
+>>
+>> Interesting, you mention that this IP block has mainly power management and it
+>> itself requires save/restore. Is it not in always on domain ?
+>
+> Yes, it is in always on domain.
+>
 
-On Freescale i.MX7D, we are using this kind of SRAM. As I implemented this as an 
-optional feature, a user can balance between the suspend/resume time and the power
-consumption.
+Hmm, then why do you need to save and restore the mask ?
 
-> Also I just check the entire tree for the users of gen_pool, I found it's used for
-> video/audio and crypto which needs to on-demand basis.
-> Apart from that it's mainly used for low power modes in which case, SRAM needs
-> to be powered on. So can you provide more details on your use-case.
+>>> When the system is in WFI (wait for interrupt) mode, this GPC block
+>>> will be the first block on the platform to be activated and signaled.
+>>> Under normal wait mode during cpu idle, the system can be woke up by
+>>> +static void gpcv2_wakeup_source_restore(void) {
+>>> +	struct gpcv2_irqchip_data *cd;
+>>> +	void __iomem *reg;
+>>> +	int i;
+>>> +
+>>> +	cd = imx_gpcv2_instance;
+>>> +	if (!cd)
+>>> +		return;
+>>> +
+>>> +	for (i = 0; i < IMR_NUM; i++) {
+>>> +		reg = cd->gpc_base + cd->cpu2wakeup + i * 4;
+>>> +		writel_relaxed(cd->saved_irq_mask[i], reg);
+>>
+>> Instead of saving all the non-wakeup sources, can't you use raw save/restore of
+>> these registers and mask all the non-wakeup sources by setting
+>> MASK_ON_SUSPEND ?
+>
+> I can't catch what you mean. Can you show me an example?
+>
 
-On latest Freescale i.MX7D, it has two SRAMs in side. One is for low power mode which will be powered
-on in suspend state. The other one is for other peripherals which can be powered off on demand.
+What I meant is instead of you tracking all the enabled irqs(both wakeup
+and non-wakeup) in saved_irq_mask, just set MASK_ON_SUSPEND flag
+where all the non-wakeup interrupts are masked on suspend and unmasked
+on resume by the irq core. You can then just save and restore the wakeup
+irq mask, but as I asked above do you have to do that as you are saying
+it's in always on domain ?
 
-Thanks,
-Shenwei 
+>> Also your interrupt controller seems like has no special way to configure wakeups,
+>> you are just leaving them enabled. i.e. I see cpu2wakeup used for both
+>> {un,}masking and wakeup enable. So you can just use IRQCHIP_SKIP_SET_WAKE.
+>> Correct me if my understanding is wrong.
+>
+> In this driver, the Core0 is configured to be the default core to be woke up, not both. You can
+> configure it to Core1 by changing the cpu2wakeup value. I don't see any reason to
+> use IRQCHIP_SKIP_SET_WAKE flag.
+>
 
-> > A new property string named "can-power-gate" is added to the
-> > devicetree bindings too.
-> >
-> > Signed-off-by: Shenwei Wang <shenwei.wang@freescale.com>
-> > Signed-off-by: Anson Huang <b20788@freescale.com>
-> > ---
-> > Change log:
-> >
-> > PATCH v3
-> > 	Removed the unnecessary clk_enable/clk_disable.
-> >
-> > PATCH v2
-> > 	Use vmalloc to allocate the SRAM backup memory.
-> > 	Code clean up.
-> >
-> >   Documentation/devicetree/bindings/misc/sram.txt |  2 ++
-> >   drivers/misc/sram.c                             | 42
-> +++++++++++++++++++++++++
-> >   2 files changed, 44 insertions(+)
-> >
-> > diff --git a/Documentation/devicetree/bindings/misc/sram.txt
-> > b/Documentation/devicetree/bindings/misc/sram.txt
-> > index 36cbe5a..1170086 100644
-> > --- a/Documentation/devicetree/bindings/misc/sram.txt
-> > +++ b/Documentation/devicetree/bindings/misc/sram.txt
-> > @@ -33,6 +33,8 @@ Optional properties in the area nodes:
-> >
-> >   - compatible : standard definition, should contain a vendor specific string
-> >                  in the form <vendor>,[<device>-]<usage>
-> > +- can-power-gate: a property to tell the driver that the sram can support
-> > +		power gate
-> >
-> 
-> Please cc device-tree list for such generic bindings.
-> 
-> Regards,
-> Sudeep
+I don't see this driver doing anything extra apart from keeping the
+wakeup irqs enabled. i.e. You use the same cpu*wake register to
+mask/unmask the interrupt as well as set the wakeup source. Since
+the wakeup interrupt will be enabled by the driver, you just need to
+mark it as wake-up source and nothing extra in the controller right ?
+If so, you need to set IRQCHIP_SKIP_SET_WAKE as you are just leaving
+that irq enabled and not doing any extra configuration to enable it as
+wakeup source. Please correct if that wrong, but from the code that's
+what I could infer.
+
+Regards,
+Sudeep
