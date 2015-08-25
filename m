@@ -1,103 +1,95 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Tue, 25 Aug 2015 11:40:53 +0100
-Subject: [PATCH v1 3/3] arm64: dts: add Hi6220 mailbox node
-In-Reply-To: <1440497710.10987.42.camel@linaro.org>
-References: <1439977055-1747-1-git-send-email-leo.yan@linaro.org>
- <1439977055-1747-4-git-send-email-leo.yan@linaro.org>
- <20150821184059.GB2000@svinekod>
- <20150824091845.GA28290@leoy-linaro>
- <20150824095144.GA7139@leverpostej>
- <1440411596.3517.12.camel@linaro.org>
- <20150824114903.GT10728@bivouac.eciton.net>
- <1440490427.10987.29.camel@linaro.org>
- <20150825094630.GU10728@bivouac.eciton.net>
- <1440497710.10987.42.camel@linaro.org>
-Message-ID: <20150825104053.GV10728@bivouac.eciton.net>
+From: treding@nvidia.com (Thierry Reding)
+Date: Tue, 25 Aug 2015 12:40:01 +0200
+Subject: [PATCH v3 06/14] Documentation: drm/bridge: add document for
+ analogix_dp
+In-Reply-To: <20150825092939.GM7557@n2100.arm.linux.org.uk>
+References: <1439995728-18046-1-git-send-email-ykk@rock-chips.com>
+ <1439995834-18363-1-git-send-email-ykk@rock-chips.com>
+ <CAL_JsqLz+8RtBucctUj4euXZ3Ac0DvB52N9ONpAerh5T9BiTJg@mail.gmail.com>
+ <20150824125758.GA7557@n2100.arm.linux.org.uk>
+ <CAL_JsqKZYMMzV9Sc2r3K_rnM0FNuyb1TyJEhjGq1Hf7dTiWFKQ@mail.gmail.com>
+ <20150825091246.GA14034@ulmo.nvidia.com>
+ <20150825092939.GM7557@n2100.arm.linux.org.uk>
+Message-ID: <20150825104000.GE14034@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 25, 2015 at 06:15:10PM +0800, Haojian Zhuang wrote:
-> > > 1. We need support both UEFI and uboot. So the reserved buffer have to
-> > > be declared in DTB since they are used by kernel driver, not UEFI.
+On Tue, Aug 25, 2015 at 10:29:39AM +0100, Russell King - ARM Linux wrote:
+> On Tue, Aug 25, 2015 at 11:12:48AM +0200, Thierry Reding wrote:
+> > On Mon, Aug 24, 2015 at 09:48:27AM -0500, Rob Herring wrote:
+> > > It goes beyond bindings IMO. The use of the component framework or not
+> > > has been at the whim of driver writers as well. It is either used or
+> > > private APIs are created. I'm using components and my need for it
+> > > boils down to passing the struct drm_device pointer to the encoder.
+> > > Other components like panels and bridges have different ways to attach
+> > > to the DRM driver.
 > > 
-> > The buffer may need to be declared in DTB also, but it most certanily
-> > needs to be declared in UEFI.
-> > 
-> > And for the U-Boot case, since it is not memory available to Linux, it
-> > should not be declared as "memory".
+> > I certainly support unification, but it needs to be reasonable. There
+> > are cases where a different structure for the binding work better than
+> > another and I think this always needs to be evaluated on a case by case
+> > basis.
 > 
-> Something are messed at here. We have these buffer are used in mailbox.
-> They should be allocated as non-cacheable.
-
-That is a completely different issue, and if that is not currently
-possible, then we need to fix that. But it needs to be fixed in the
-right place.
-
-> If these buffers are contained in memory memblock in kernel, it means
-> that they exist in kernel page table with cachable property. When it's
-> used in mailbox driver with non-cachable property, it'll only cause
-> cache maintenance issue. So Leo declared these buffers as reserved
-> in DT with "no-map" property. It's the key. It could avoid the cache
-> maintenance issue.
-
-Yes, when not booting with UEFI.
-
-> > > 2. UEFI just loads grub. It's no time to run any other custom EFI
-> > > application.
-> > 
-> > Apart from being completely irrelevant, how are you intending to
-> > validate that GRUB never touches these memory regions?
+> It can't be a case-by-case basis.
 > 
-> GRUB is just a part of bootloader. When linux kernel is running,
-> who cares GRUB? GRUB's lifetime is already finished.
-
-We don't care once Linux is running - we care between UEFI boot
-services starting and Linux memblock being initialised.
-
-> By the way, UEFI code region is at [0x3Dxx_xxxx, 0x3DFF_FFFF]. Those
-> mailbox buffer is in [0x05e0_xxxx, 0x06f0_xxxx]. Then I can make sure
-> UEFI won't touch the reserved buffer.
-
-And if a UEFI application explicitly requests to map an area
-elsewhere, will your UEFI reject that request? How will it do that
-without having information in its memory map about areas it must not
-access?
-
-> Even if UEFI touched the reserved
-> buffer, is it an issue? Definitely it's not. UEFI's lifetime is end
-> when linux kernel is running at hikey. Even if UEFI runtime service
-> is enabled, the runtime data area is at [0x38xx_xxxx, 0x38xx_xxxx].
-
-The runtime data area is currently, in your current image, at
-[0x38xx_xxxx, 0x38xx_xxxx].
-
-What happens if a UEFI application registers a configuration table?
-Or registers a protocol for use at runtime?
-
-Areas of memory that are not available for UEFI _must_ be marked as
-such in the UEFI memory map. Once they are, we can deal with them in
-the kernel. If this is not currently being done, that is a bug that
-needs fixing.
-
-> > Build a version once, test it, and hope the results remain valid
-> > forever? And then when you move the regions and the previously working
-> > GRUB now tramples all over them? Or when something changes in upstream
-> > GRUB and its memory allocations drifts into the secretly untouchable
-> > regions?
+> The TDA998x encoder/connector is going to be component only.  This is
+> a generic chip, which can be attached to the output of any parallel
+> RGB+sync+clock bus.  In other words, it could appear anywhere.
 > 
-> As I said above, UEFI won't touch it. And even UEFI touch it, kernel
-> doesn't care since UEFI's lifetime is end.
+> Are you really saying that we need to support multiple schemes of
+> attaching the driver to DRM?  That's totally insane IMHO.
 
-UEFI's lifetime doesn't end until reset.
+No, what I'm saying is that we should have a single scheme, but one
+that doesn't put any restrictions on what kind of DT binding you use or
+how your driver is architected.
 
-> > Are you then going to hack GRUB, release a special HiKey version of
-> > GRUB, not support any other versions, and still can your firmware
-> > UEFI?
+> The problem with the drm_encoder_slave stuff is that you can't sanely
+> attach of-nodes to the drm-created i2c device.  Yes, you can parse
+> them from the DT file as a sub-node of the upper device, but that
+> then goes against the principle of the I2C bindings, which is to
+> list the I2C devices as a child below the I2C adapter node.  If you
+> try and put the DT node there, then the OF code will create the I2C
+> device for you, and the drm_encoder_slave stuff won't have the
+> control it needs to communicate through the wrapped i2c_driver
+> stuff.
 > 
-> I don't need to hack GRUB at all.
+> So, tda998x is going component-only, as that's the _only_ sane solution
+> for it.
 
-You will if you're running it under a "UEFI" which has areas you can't
-touch and aren't telling it about that.
+Has anyone ever considered turning it into a DRM bridge driver? I had
+always envisioned component/master to be primarily useful to glue
+together various SoC components to form one componentized device. Now
+if tda998x is an I2C slave it is external to the SoC (auxiliary), so
+in my opinion much better off as a bridge driver.
 
-/
-    Leif
+Bridge drivers don't come with any of the disadvantages that the
+drm_encoder_slave stuff has. They are regular drivers that are probed
+via their parent busses (I2C, platform, SPI, ...) and hook into DRM via
+an abstract interface. The DT aspect is taken care of automatically
+because they get instantiated by their parent bus like any other device.
+
+> Now, what happens when some other DRM driver wants to use the tda998x
+> driver, and its bindings are not compatible with the component helpers?
+> They're pretty much stuck up the creek without a paddle.
+
+I'm sure that will be very helpful response for whoever's going to end
+up having to deal with that situation.
+
+> Case by case doesn't work unless you're talking about truely isolated
+> hardware where no one shares anything.
+
+There are two different things here. The inter-driver interface, which,
+in my opinion, it makes a lot of sense to standardize. Like I mentioned
+above I think it unwise to make this interface depend upon a framework
+or the firmware description such as DT in order to avoid unnecessary
+restrictions. The second, orthogonal, issue, is the DT bindings. Those
+I think should absolutely be designed case by case and select whatever
+most accurately describes the hardware.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150825/de0cd192/attachment.sig>
