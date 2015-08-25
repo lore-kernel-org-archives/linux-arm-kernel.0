@@ -1,350 +1,271 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Tue, 25 Aug 2015 16:42:03 +0100
-Subject: [PATCH v2 09/10] ARM: entry: provide uaccess assembly macro hooks
+Date: Tue, 25 Aug 2015 16:42:08 +0100
+Subject: [PATCH v2 10/10] ARM: software-based priviledged-no-access support
 In-Reply-To: <20150825154026.GT7557@n2100.arm.linux.org.uk>
 References: <20150825154026.GT7557@n2100.arm.linux.org.uk>
-Message-ID: <E1ZUGMN-00007p-4V@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1ZUGMS-0000BG-8B@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide hooks into the kernel entry and exit paths to permit control
-of userspace visibility to the kernel.  The intended use is:
+Provide a software-based implementation of the priviledged no access
+support found in ARMv8.1.
 
-- on entry to kernel from user, uaccess_disable will be called to
-  disable userspace visibility
-- on exit from kernel to user, uaccess_enable will be called to
-  enable userspace visibility
-- on entry from a kernel exception, uaccess_save_and_disable will be
-  called to save the current userspace visibility setting, and disable
-  access
-- on exit from a kernel exception, uaccess_restore will be called to
-  restore the userspace visibility as it was before the exception
-  occurred.
+Userspace pages are mapped using a different domain number from the
+kernel and IO mappings.  If we switch the user domain to "no access"
+when we enter the kernel, we can prevent the kernel from touching
+userspace.
 
-These hooks allows us to keep userspace visibility disabled for the
-vast majority of the kernel, except for localised regions where we
-want to explicitly access userspace.
+However, the kernel needs to be able to access userspace via the
+various user accessor functions.  With the wrapping in the previous
+patch, we can temporarily enable access when the kernel needs user
+access, and re-disable it afterwards.
+
+This allows us to trap non-intended accesses to userspace, eg, caused
+by an inadvertent dereference of the LIST_POISON* values, which, with
+appropriate user mappings setup, can be made to succeed.  This in turn
+can allow use-after-free bugs to be further exploited than would
+otherwise be possible.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/include/asm/assembler.h | 17 +++++++++++++++++
- arch/arm/kernel/entry-armv.S     | 30 ++++++++++++++++++++++--------
- arch/arm/kernel/entry-common.S   |  2 ++
- arch/arm/kernel/entry-header.S   |  5 +++++
- arch/arm/mm/abort-ev4.S          |  1 +
- arch/arm/mm/abort-ev5t.S         |  1 +
- arch/arm/mm/abort-ev5tj.S        |  1 +
- arch/arm/mm/abort-ev6.S          |  7 ++++---
- arch/arm/mm/abort-ev7.S          |  1 +
- arch/arm/mm/abort-lv4t.S         |  2 ++
- arch/arm/mm/abort-macro.S        |  1 +
- 11 files changed, 57 insertions(+), 11 deletions(-)
+ arch/arm/Kconfig                   | 15 +++++++++++++++
+ arch/arm/include/asm/assembler.h   | 30 ++++++++++++++++++++++++++++++
+ arch/arm/include/asm/domain.h      | 21 +++++++++++++++++++--
+ arch/arm/include/asm/uaccess.h     | 14 ++++++++++++++
+ arch/arm/kernel/process.c          | 24 ++++++++++++++++++------
+ arch/arm/lib/csumpartialcopyuser.S | 14 ++++++++++++++
+ 6 files changed, 110 insertions(+), 8 deletions(-)
 
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index a750c1425c3a..a898eb72da51 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1694,6 +1694,21 @@ config HIGHPTE
+ 	bool "Allocate 2nd-level pagetables from highmem"
+ 	depends on HIGHMEM
+ 
++config CPU_SW_DOMAIN_PAN
++	bool "Enable use of CPU domains to implement priviledged no-access"
++	depends on MMU && !ARM_LPAE
++	default y
++	help
++	  Increase kernel security by ensuring that normal kernel accesses
++	  are unable to access userspace addresses.  This can help prevent
++	  use-after-free bugs becoming an exploitable privilege escalation
++	  by ensuring that magic values (such as LIST_POISON) will always
++	  fault when dereferenced.
++
++	  CPUs with low-vector mappings use a best-efforts implementation.
++	  Their lower 1MB needs to remain accessible for the vectors, but
++	  the remainder of userspace will become appropriately inaccessible.
++
+ config HW_PERF_EVENTS
+ 	bool "Enable hardware performance counter support for perf events"
+ 	depends on PERF_EVENTS
 diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
-index 4abe57279c66..a91177043467 100644
+index a91177043467..ff74f0b54b0e 100644
 --- a/arch/arm/include/asm/assembler.h
 +++ b/arch/arm/include/asm/assembler.h
-@@ -445,6 +445,23 @@ THUMB(	orr	\reg , \reg , #PSR_T_BIT	)
- #endif
+@@ -446,15 +446,45 @@ THUMB(	orr	\reg , \reg , #PSR_T_BIT	)
  	.endm
  
-+	.macro	uaccess_disable, tmp, isb=1
-+	.endm
-+
-+	.macro	uaccess_enable, tmp, isb=1
-+	.endm
-+
-+	.macro	uaccess_save, tmp
-+	.endm
-+
-+	.macro	uaccess_restore
-+	.endm
-+
-+	.macro	uaccess_save_and_disable, tmp
-+	uaccess_save \tmp
-+	uaccess_disable \tmp
-+	.endm
-+
- 	.irp	c,,eq,ne,cs,cc,mi,pl,vs,vc,hi,ls,ge,lt,gt,le,hs,lo
- 	.macro	ret\c, reg
- #if __LINUX_ARM_ARCH__ < 6
-diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-index d19adcf6c580..61f00a3f3047 100644
---- a/arch/arm/kernel/entry-armv.S
-+++ b/arch/arm/kernel/entry-armv.S
-@@ -149,10 +149,10 @@ ENDPROC(__und_invalid)
- #define SPFIX(code...)
- #endif
- 
--	.macro	svc_entry, stack_hole=0, trace=1
-+	.macro	svc_entry, stack_hole=0, trace=1, uaccess=1
-  UNWIND(.fnstart		)
-  UNWIND(.save {r0 - pc}		)
--	sub	sp, sp, #(S_FRAME_SIZE + \stack_hole - 4)
-+	sub	sp, sp, #(S_FRAME_SIZE + 8 + \stack_hole - 4)
- #ifdef CONFIG_THUMB2_KERNEL
-  SPFIX(	str	r0, [sp]	)	@ temporarily saved
-  SPFIX(	mov	r0, sp		)
-@@ -167,7 +167,7 @@ ENDPROC(__und_invalid)
- 	ldmia	r0, {r3 - r5}
- 	add	r7, sp, #S_SP - 4	@ here for interlock avoidance
- 	mov	r6, #-1			@  ""  ""      ""       ""
--	add	r2, sp, #(S_FRAME_SIZE + \stack_hole - 4)
-+	add	r2, sp, #(S_FRAME_SIZE + 8 + \stack_hole - 4)
-  SPFIX(	addeq	r2, r2, #4	)
- 	str	r3, [sp, #-4]!		@ save the "real" r0 copied
- 					@ from the exception stack
-@@ -185,6 +185,11 @@ ENDPROC(__und_invalid)
- 	@
- 	stmia	r7, {r2 - r6}
- 
-+	uaccess_save r0
-+	.if \uaccess
-+	uaccess_disable r0
+ 	.macro	uaccess_disable, tmp, isb=1
++#ifdef CONFIG_CPU_SW_DOMAIN_PAN
++	/*
++	 * Whenever we re-enter userspace, the domains should always be
++	 * set appropriately.
++	 */
++	mov	\tmp, #DACR_UACCESS_DISABLE
++	mcr	p15, 0, \tmp, c3, c0, 0		@ Set domain register
++	.if	\isb
++	isb
 +	.endif
-+
- 	.if \trace
- #ifdef CONFIG_TRACE_IRQFLAGS
- 	bl	trace_hardirqs_off
-@@ -194,7 +199,7 @@ ENDPROC(__und_invalid)
++#endif
+ 	.endm
  
- 	.align	5
- __dabt_svc:
--	svc_entry
-+	svc_entry uaccess=0
- 	mov	r2, sp
- 	dabt_helper
-  THUMB(	ldr	r5, [sp, #S_PSR]	)	@ potentially updated CPSR
-@@ -368,7 +373,7 @@ ENDPROC(__fiq_abt)
- #error "sizeof(struct pt_regs) must be a multiple of 8"
- #endif
- 
--	.macro	usr_entry, trace=1
-+	.macro	usr_entry, trace=1, uaccess=1
-  UNWIND(.fnstart	)
-  UNWIND(.cantunwind	)	@ don't unwind the user space
- 	sub	sp, sp, #S_FRAME_SIZE
-@@ -400,6 +405,10 @@ ENDPROC(__fiq_abt)
-  ARM(	stmdb	r0, {sp, lr}^			)
-  THUMB(	store_user_sp_lr r0, r1, S_SP - S_PC	)
- 
-+	.if \uaccess
-+	uaccess_disable ip
+ 	.macro	uaccess_enable, tmp, isb=1
++#ifdef CONFIG_CPU_SW_DOMAIN_PAN
++	/*
++	 * Whenever we re-enter userspace, the domains should always be
++	 * set appropriately.
++	 */
++	mov	\tmp, #DACR_UACCESS_ENABLE
++	mcr	p15, 0, \tmp, c3, c0, 0
++	.if	\isb
++	isb
 +	.endif
-+
- 	@ Enable the alignment trap while in kernel mode
-  ATRAP(	teq	r8, r7)
-  ATRAP( mcrne	p15, 0, r8, c1, c0, 0)
-@@ -435,7 +444,7 @@ ENDPROC(__fiq_abt)
- 
- 	.align	5
- __dabt_usr:
--	usr_entry
-+	usr_entry uaccess=0
- 	kuser_cmpxchg_check
- 	mov	r2, sp
- 	dabt_helper
-@@ -458,7 +467,7 @@ ENDPROC(__irq_usr)
- 
- 	.align	5
- __und_usr:
--	usr_entry
-+	usr_entry uaccess=0
- 
- 	mov	r2, r4
- 	mov	r3, r5
-@@ -484,6 +493,8 @@ __und_usr:
- 1:	ldrt	r0, [r4]
-  ARM_BE8(rev	r0, r0)				@ little endian instruction
- 
-+	uaccess_disable ip
-+
- 	@ r0 = 32-bit ARM instruction which caused the exception
- 	@ r2 = PC value for the following instruction (:= regs->ARM_pc)
- 	@ r4 = PC value for the faulting instruction
-@@ -518,9 +529,10 @@ __und_usr_thumb:
- 2:	ldrht	r5, [r4]
- ARM_BE8(rev16	r5, r5)				@ little endian instruction
- 	cmp	r5, #0xe800			@ 32bit instruction if xx != 0
--	blo	__und_usr_fault_16		@ 16bit undefined instruction
-+	blo	__und_usr_fault_16_pan		@ 16bit undefined instruction
- 3:	ldrht	r0, [r2]
- ARM_BE8(rev16	r0, r0)				@ little endian instruction
-+	uaccess_disable ip
- 	add	r2, r2, #2			@ r2 is PC + 2, make it PC + 4
- 	str	r2, [sp, #S_PC]			@ it's a 2x16bit instr, update
- 	orr	r0, r0, r5, lsl #16
-@@ -715,6 +727,8 @@ ENDPROC(no_fp)
- __und_usr_fault_32:
- 	mov	r1, #4
- 	b	1f
-+__und_usr_fault_16_pan:
-+	uaccess_disable ip
- __und_usr_fault_16:
- 	mov	r1, #2
- 1:	mov	r0, sp
-diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
-index 92828a1dec80..189154980703 100644
---- a/arch/arm/kernel/entry-common.S
-+++ b/arch/arm/kernel/entry-common.S
-@@ -173,6 +173,8 @@ ENTRY(vector_swi)
-  USER(	ldr	scno, [lr, #-4]		)	@ get SWI instruction
- #endif
- 
-+	uaccess_disable tbl
-+
- 	adr	tbl, sys_call_table		@ load syscall table pointer
- 
- #if defined(CONFIG_OABI_COMPAT)
-diff --git a/arch/arm/kernel/entry-header.S b/arch/arm/kernel/entry-header.S
-index 1a0045abead7..220ac24900cc 100644
---- a/arch/arm/kernel/entry-header.S
-+++ b/arch/arm/kernel/entry-header.S
-@@ -215,6 +215,7 @@
- 	blne	trace_hardirqs_off
- #endif
- 	.endif
-+	uaccess_restore
- 	msr	spsr_cxsf, \rpsr
- #if defined(CONFIG_CPU_V6) || defined(CONFIG_CPU_32v6K)
- 	@ We must avoid clrex due to Cortex-A15 erratum #830321
-@@ -241,6 +242,7 @@
- 	@ on the stack remains correct).
- 	@
- 	.macro  svc_exit_via_fiq
-+	uaccess_restore
- 	mov	r0, sp
- 	ldmib	r0, {r1 - r14}	@ abort is deadly from here onward (it will
- 				@ clobber state restored below)
-@@ -253,6 +255,7 @@
++#endif
  	.endm
  
- 	.macro	restore_user_regs, fast = 0, offset = 0
-+	uaccess_enable r1, isb=0
- 	mov	r2, sp
- 	ldr	r1, [r2, #\offset + S_PSR]	@ get calling cpsr
- 	ldr	lr, [r2, #\offset + S_PC]!	@ get pc
-@@ -329,6 +332,7 @@
- 	 * part of each exception entry and exit sequence.
- 	 */
- 	.macro	restore_user_regs, fast = 0, offset = 0
-+	uaccess_enable r1, isb=0
- 	.if	\offset
- 	add	sp, #\offset
- 	.endif
-@@ -336,6 +340,7 @@
+ 	.macro	uaccess_save, tmp
++#ifdef CONFIG_CPU_SW_DOMAIN_PAN
++	mrc	p15, 0, \tmp, c3, c0, 0
++	str	\tmp, [sp, #S_FRAME_SIZE]
++#endif
  	.endm
- #else	/* ifdef CONFIG_CPU_V7M */
- 	.macro	restore_user_regs, fast = 0, offset = 0
-+	uaccess_enable r1, isb=0
- 	mov	r2, sp
- 	load_user_sp_lr r2, r3, \offset + S_SP	@ calling sp, lr
- 	ldr	r1, [sp, #\offset + S_PSR]	@ get calling cpsr
-diff --git a/arch/arm/mm/abort-ev4.S b/arch/arm/mm/abort-ev4.S
-index 54473cd4aba9..b3b31e30cadd 100644
---- a/arch/arm/mm/abort-ev4.S
-+++ b/arch/arm/mm/abort-ev4.S
-@@ -19,6 +19,7 @@ ENTRY(v4_early_abort)
- 	mrc	p15, 0, r1, c5, c0, 0		@ get FSR
- 	mrc	p15, 0, r0, c6, c0, 0		@ get FAR
- 	ldr	r3, [r4]			@ read aborted ARM instruction
-+	uaccess_disable ip			@ disable userspace access
- 	bic	r1, r1, #1 << 11 | 1 << 10	@ clear bits 11 and 10 of FSR
- 	tst	r3, #1 << 20			@ L = 1 -> write?
- 	orreq	r1, r1, #1 << 11		@ yes.
-diff --git a/arch/arm/mm/abort-ev5t.S b/arch/arm/mm/abort-ev5t.S
-index c913031b79cc..a6a381a6caa5 100644
---- a/arch/arm/mm/abort-ev5t.S
-+++ b/arch/arm/mm/abort-ev5t.S
-@@ -21,6 +21,7 @@ ENTRY(v5t_early_abort)
- 	mrc	p15, 0, r0, c6, c0, 0		@ get FAR
- 	do_thumb_abort fsr=r1, pc=r4, psr=r5, tmp=r3
- 	ldreq	r3, [r4]			@ read aborted ARM instruction
-+	uaccess_disable ip			@ disable user access
- 	bic	r1, r1, #1 << 11		@ clear bits 11 of FSR
- 	teq_ldrd tmp=ip, insn=r3		@ insn was LDRD?
- 	beq	do_DataAbort			@ yes
-diff --git a/arch/arm/mm/abort-ev5tj.S b/arch/arm/mm/abort-ev5tj.S
-index 1b80d71adb0f..00ab011bef58 100644
---- a/arch/arm/mm/abort-ev5tj.S
-+++ b/arch/arm/mm/abort-ev5tj.S
-@@ -24,6 +24,7 @@ ENTRY(v5tj_early_abort)
- 	bne	do_DataAbort
- 	do_thumb_abort fsr=r1, pc=r4, psr=r5, tmp=r3
- 	ldreq	r3, [r4]			@ read aborted ARM instruction
-+	uaccess_disable ip			@ disable userspace access
- 	teq_ldrd tmp=ip, insn=r3		@ insn was LDRD?
- 	beq	do_DataAbort			@ yes
- 	tst	r3, #1 << 20			@ L = 0 -> write
-diff --git a/arch/arm/mm/abort-ev6.S b/arch/arm/mm/abort-ev6.S
-index 113704f30e9f..8801a15aa105 100644
---- a/arch/arm/mm/abort-ev6.S
-+++ b/arch/arm/mm/abort-ev6.S
-@@ -26,17 +26,18 @@ ENTRY(v6_early_abort)
- 	ldr	ip, =0x4107b36
- 	mrc	p15, 0, r3, c0, c0, 0		@ get processor id
- 	teq	ip, r3, lsr #4			@ r0 ARM1136?
--	bne	do_DataAbort
-+	bne	1f
- 	tst	r5, #PSR_J_BIT			@ Java?
- 	tsteq	r5, #PSR_T_BIT			@ Thumb?
--	bne	do_DataAbort
-+	bne	1f
- 	bic	r1, r1, #1 << 11		@ clear bit 11 of FSR
- 	ldr	r3, [r4]			@ read aborted ARM instruction
-  ARM_BE8(rev	r3, r3)
  
- 	teq_ldrd tmp=ip, insn=r3		@ insn was LDRD?
--	beq	do_DataAbort			@ yes
-+	beq	1f				@ yes
- 	tst	r3, #1 << 20			@ L = 0 -> write
- 	orreq	r1, r1, #1 << 11		@ yes.
+ 	.macro	uaccess_restore
++#ifdef CONFIG_CPU_SW_DOMAIN_PAN
++	ldr	r0, [sp, #S_FRAME_SIZE]
++	mcr	p15, 0, r0, c3, c0, 0
++#endif
+ 	.endm
+ 
+ 	.macro	uaccess_save_and_disable, tmp
+diff --git a/arch/arm/include/asm/domain.h b/arch/arm/include/asm/domain.h
+index 2be929549938..e878129f2fee 100644
+--- a/arch/arm/include/asm/domain.h
++++ b/arch/arm/include/asm/domain.h
+@@ -57,11 +57,29 @@
+ #define domain_mask(dom)	((3) << (2 * (dom)))
+ #define domain_val(dom,type)	((type) << (2 * (dom)))
+ 
++#ifdef CONFIG_CPU_SW_DOMAIN_PAN
++#define DACR_INIT \
++	(domain_val(DOMAIN_USER, DOMAIN_NOACCESS) | \
++	 domain_val(DOMAIN_KERNEL, DOMAIN_MANAGER) | \
++	 domain_val(DOMAIN_IO, DOMAIN_CLIENT) | \
++	 domain_val(DOMAIN_VECTORS, DOMAIN_CLIENT))
++#else
+ #define DACR_INIT \
+ 	(domain_val(DOMAIN_USER, DOMAIN_CLIENT) | \
+ 	 domain_val(DOMAIN_KERNEL, DOMAIN_MANAGER) | \
+ 	 domain_val(DOMAIN_IO, DOMAIN_CLIENT) | \
+ 	 domain_val(DOMAIN_VECTORS, DOMAIN_CLIENT))
++#endif
++
++#define __DACR_DEFAULT \
++	domain_val(DOMAIN_KERNEL, DOMAIN_CLIENT) | \
++	domain_val(DOMAIN_IO, DOMAIN_CLIENT) | \
++	domain_val(DOMAIN_VECTORS, DOMAIN_CLIENT)
++
++#define DACR_UACCESS_DISABLE	\
++	(__DACR_DEFAULT | domain_val(DOMAIN_USER, DOMAIN_NOACCESS))
++#define DACR_UACCESS_ENABLE	\
++	(__DACR_DEFAULT | domain_val(DOMAIN_USER, DOMAIN_CLIENT))
+ 
+ #ifndef __ASSEMBLY__
+ 
+@@ -76,7 +94,6 @@ static inline unsigned int get_domain(void)
+ 	return domain;
+ }
+ 
+-#ifdef CONFIG_CPU_USE_DOMAINS
+ static inline void set_domain(unsigned val)
+ {
+ 	asm volatile(
+@@ -85,6 +102,7 @@ static inline void set_domain(unsigned val)
+ 	isb();
+ }
+ 
++#ifdef CONFIG_CPU_USE_DOMAINS
+ #define modify_domain(dom,type)					\
+ 	do {							\
+ 		unsigned int domain = get_domain();		\
+@@ -94,7 +112,6 @@ static inline void set_domain(unsigned val)
+ 	} while (0)
+ 
+ #else
+-static inline void set_domain(unsigned val) { }
+ static inline void modify_domain(unsigned dom, unsigned type)	{ }
  #endif
-+1:	uaccess_disable ip			@ disable userspace access
- 	b	do_DataAbort
-diff --git a/arch/arm/mm/abort-ev7.S b/arch/arm/mm/abort-ev7.S
-index 4812ad054214..e8d0e08c227f 100644
---- a/arch/arm/mm/abort-ev7.S
-+++ b/arch/arm/mm/abort-ev7.S
-@@ -15,6 +15,7 @@
- ENTRY(v7_early_abort)
- 	mrc	p15, 0, r1, c5, c0, 0		@ get FSR
- 	mrc	p15, 0, r0, c6, c0, 0		@ get FAR
-+	uaccess_disable ip			@ disable userspace access
  
- 	/*
- 	 * V6 code adjusts the returned DFSR.
-diff --git a/arch/arm/mm/abort-lv4t.S b/arch/arm/mm/abort-lv4t.S
-index f3982580c273..6d8e8e3365d1 100644
---- a/arch/arm/mm/abort-lv4t.S
-+++ b/arch/arm/mm/abort-lv4t.S
-@@ -26,6 +26,7 @@ ENTRY(v4t_late_abort)
+diff --git a/arch/arm/include/asm/uaccess.h b/arch/arm/include/asm/uaccess.h
+index 82880132f941..01bae13b2cea 100644
+--- a/arch/arm/include/asm/uaccess.h
++++ b/arch/arm/include/asm/uaccess.h
+@@ -57,11 +57,25 @@ extern int fixup_exception(struct pt_regs *regs);
+  */
+ static inline unsigned int uaccess_save_and_enable(void)
+ {
++#ifdef CONFIG_CPU_SW_DOMAIN_PAN
++	unsigned int old_domain = get_domain();
++
++	/* Set the current domain access to permit user accesses */
++	set_domain((old_domain & ~domain_mask(DOMAIN_USER)) |
++		   domain_val(DOMAIN_USER, DOMAIN_CLIENT));
++
++	return old_domain;
++#else
+ 	return 0;
++#endif
+ }
+ 
+ static inline void uaccess_restore(unsigned int flags)
+ {
++#ifdef CONFIG_CPU_SW_DOMAIN_PAN
++	/* Restore the user access mask */
++	set_domain(flags);
++#endif
+ }
+ 
+ /*
+diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+index e722f9b3c9b1..b407cc7a7b55 100644
+--- a/arch/arm/kernel/process.c
++++ b/arch/arm/kernel/process.c
+@@ -129,12 +129,24 @@ void __show_regs(struct pt_regs *regs)
+ 	buf[4] = '\0';
+ 
+ #ifndef CONFIG_CPU_V7M
+-	printk("Flags: %s  IRQs o%s  FIQs o%s  Mode %s  ISA %s  Segment %s\n",
+-		buf, interrupts_enabled(regs) ? "n" : "ff",
+-		fast_interrupts_enabled(regs) ? "n" : "ff",
+-		processor_modes[processor_mode(regs)],
+-		isa_modes[isa_mode(regs)],
+-		get_fs() == get_ds() ? "kernel" : "user");
++	{
++		unsigned int domain = get_domain();
++		const char *segment;
++
++		if ((domain & domain_mask(DOMAIN_USER)) ==
++		    domain_val(DOMAIN_USER, DOMAIN_NOACCESS))
++			segment = "none";
++		else if (get_fs() == get_ds())
++			segment = "kernel";
++		else
++			segment = "user";
++
++		printk("Flags: %s  IRQs o%s  FIQs o%s  Mode %s  ISA %s  Segment %s\n",
++			buf, interrupts_enabled(regs) ? "n" : "ff",
++			fast_interrupts_enabled(regs) ? "n" : "ff",
++			processor_modes[processor_mode(regs)],
++			isa_modes[isa_mode(regs)], segment);
++	}
+ #else
+ 	printk("xPSR: %08lx\n", regs->ARM_cpsr);
  #endif
- 	bne	.data_thumb_abort
- 	ldr	r8, [r4]			@ read arm instruction
-+	uaccess_disable ip			@ disable userspace access
- 	tst	r8, #1 << 20			@ L = 1 -> write?
- 	orreq	r1, r1, #1 << 11		@ yes.
- 	and	r7, r8, #15 << 24
-@@ -155,6 +156,7 @@ ENTRY(v4t_late_abort)
+diff --git a/arch/arm/lib/csumpartialcopyuser.S b/arch/arm/lib/csumpartialcopyuser.S
+index 1d0957e61f89..52784f6f1086 100644
+--- a/arch/arm/lib/csumpartialcopyuser.S
++++ b/arch/arm/lib/csumpartialcopyuser.S
+@@ -17,6 +17,19 @@
  
- .data_thumb_abort:
- 	ldrh	r8, [r4]			@ read instruction
-+	uaccess_disable ip			@ disable userspace access
- 	tst	r8, #1 << 11			@ L = 1 -> write?
- 	orreq	r1, r1, #1 << 8			@ yes
- 	and	r7, r8, #15 << 12
-diff --git a/arch/arm/mm/abort-macro.S b/arch/arm/mm/abort-macro.S
-index 50d6c0a900b1..4509bee4e081 100644
---- a/arch/arm/mm/abort-macro.S
-+++ b/arch/arm/mm/abort-macro.S
-@@ -13,6 +13,7 @@
- 	tst	\psr, #PSR_T_BIT
- 	beq	not_thumb
- 	ldrh	\tmp, [\pc]			@ Read aborted Thumb instruction
-+	uaccess_disable ip			@ disable userspace access
- 	and	\tmp, \tmp, # 0xfe00		@ Mask opcode field
- 	cmp	\tmp, # 0x5600			@ Is it ldrsb?
- 	orreq	\tmp, \tmp, #1 << 11		@ Set L-bit if yes
+ 		.text
+ 
++#ifdef CONFIG_CPU_SW_DOMAIN_PAN
++		.macro	save_regs
++		mrc	p15, 0, r3, c3, c0, 0
++		stmfd	sp!, {r1 - r8, lr}
++		uaccess_enable r3
++		.endm
++
++		.macro	load_regs
++		ldmfd	sp!, {r1 - r8, lr}
++		mcr	p15, 0, r3, c3, c0, 0
++		ret	lr
++		.endm
++#else
+ 		.macro	save_regs
+ 		stmfd	sp!, {r1, r2, r4 - r8, lr}
+ 		.endm
+@@ -24,6 +37,7 @@
+ 		.macro	load_regs
+ 		ldmfd	sp!, {r1, r2, r4 - r8, pc}
+ 		.endm
++#endif
+ 
+ 		.macro	load1b,	reg1
+ 		ldrusr	\reg1, r0, 1
 -- 
 2.1.0
