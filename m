@@ -1,37 +1,45 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 25 Aug 2015 14:05:56 +0200
-Subject: [PATCH 1/2] mmc: core: enable CMD19 tuning for DDR50 mode
-In-Reply-To: <CAGsJ_4wvvQdyjFi=JmWfASm-LbJMybrhC=Wxxn7jHZEP5dUfEw@mail.gmail.com>
-References: <1439282492-6274-1-git-send-email-21cnbao@gmail.com>
- <CAPDyKFpXZD28NwNAhKQyxmWasVhk_7AeyOW6oXaBPHKuSTmGUA@mail.gmail.com>
- <CAGsJ_4wvvQdyjFi=JmWfASm-LbJMybrhC=Wxxn7jHZEP5dUfEw@mail.gmail.com>
-Message-ID: <CAPDyKFpEwWvu3tnbMT9ZvM0TUvEHp0Qa8PADohyJoTaNZ9HS9g@mail.gmail.com>
+Date: Tue, 25 Aug 2015 14:06:05 +0200
+Subject: [PATCH v6 0/6] mmc: imx: a few fixes and new feature
+In-Reply-To: <1439293111-21077-1-git-send-email-haibo.chen@freescale.com>
+References: <1439293111-21077-1-git-send-email-haibo.chen@freescale.com>
+Message-ID: <CAPDyKFriWeJTsymd+Ha0ZY+UWjpbEdKMwZgw1hA2zZhw5khPaw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 August 2015 at 02:16, Barry Song <21cnbao@gmail.com> wrote:
-> 2015-08-18 1:11 GMT+08:00 Ulf Hansson <ulf.hansson@linaro.org>:
->> On 11 August 2015 at 10:41, Barry Song <21cnbao@gmail.com> wrote:
->>> From: Weijun Yang <york.yang@csr.com>
->>>
->>> As SD Specifications Part1 Physical Layer Specification Version
->>> 3.01 says, CMD19 tuning is available for unlocked cards in transfer
->>> state of 1.8V signaling mode. The small difference between v3.00
->>> and 3.01 spec means that CMD19 tuning is also available for DDR50
->>> mode.
->>
->> So what happens with cards following the 3.0 spec version, those
->> doesn't need to support the tuning CMD right? Perhaps that needs to be
->> addressed in this patch well!?
+On 11 August 2015 at 13:38, Haibo Chen <haibo.chen@freescale.com> wrote:
+> Changes for v6:
+> -remove duplicate code in esdhc_set_uhs_signaling().
+> -fix a typo for patch-2.
+> -make commit log of patch-3 more specific.
 >
-> from HW registers of the card, we cann't know whether the HW needs
-> tuning. it is said 3.0.x need tuning, but 3.0 doesn't need.  @weijun,
-> pls fix me if i am wrong.
-> if so, it seems we need a static flag somewhere to indicate whether
-> the tuning is needed. we can't detect to find the tuning requirement.
+> Haibo Chen (6):
+>   mmc: sdhci-esdhc-imx: add imx7d support and support HS400
+>   mmc: sdhci-esdhc-imx: add tuning-step setting support
+>   mmc: sdhci-esdhc-imx: add imx7d support in bingding doc
+>   ARM: dts: imx7d-sdb: add eMMC5.0 support
+>   mmc: sdhci-esdhc-imx: set back the burst_length_enable bit to 1
+>   mmc: sdhci-esdhc-imx: change default watermark level and burst length
+>
+>  .../devicetree/bindings/mmc/fsl-imx-esdhc.txt      |   6 ++
+>  arch/arm/boot/dts/imx7d-sdb.dts                    |  13 +++
+>  drivers/mmc/host/sdhci-esdhc-imx.c                 | 114 ++++++++++++++++++++-
+>  include/linux/platform_data/mmc-esdhc-imx.h        |   1 +
+>  4 files changed, 130 insertions(+), 4 deletions(-)
+>
+> --
+> 1.9.1
+>
 
-Another way is to always try doing the tuning for DDR50, but in case
-of errors just ignore them and print a debug/info message!?
+I have applied this for next - except patch4 as it needs and ack from
+the IMX SOC maintainer, or it may be better to take that patch through
+ARM soc...
+
+Regarding patch3, which document the new bindings and the compatible
+string, I moved this to be the first patch and fixed the spelling of
+the commit message header.
+
+Thanks!
 
 Kind regards
 Uffe
