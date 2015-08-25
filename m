@@ -1,55 +1,62 @@
 From: mturquette@baylibre.com (Michael Turquette)
-Date: Tue, 25 Aug 2015 11:59:31 -0700
-Subject: [PATCH v2] clk: rockchip: add pclk_cpu to the list of rk3188
- critical clocks
-In-Reply-To: <F5234F5E-2A91-4B63-B260-3F20A4D16A9D@mniewoehner.de>
-References: <5400BEF8-5245-4F7B-845B-D326A7BC56B5@mniewoehner.de>
- <5275855.eah07vmf4I@phil>
- <9DBF9CCE-196E-43FB-BA76-BFB4B5F47A22@mniewoehner.de>
- <10213368.VjAQGt7Kjq@phil>
- <F5234F5E-2A91-4B63-B260-3F20A4D16A9D@mniewoehner.de>
-Message-ID: <20150825185931.31346.26497@quantum>
+Date: Tue, 25 Aug 2015 12:10:33 -0700
+Subject: [PULL] clk: at91: sama5d2 materials
+In-Reply-To: <20150818102401.17de779b@bbrezillon>
+References: <20150818102401.17de779b@bbrezillon>
+Message-ID: <20150825191033.31346.67237@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Michael Niewoehner (2015-08-17 12:50:53)
-> pclk_cpu needs to keep running because it is needed for devices like
-> the act8865 regulator but with the recent gpio clock handling this is
-> not always the case anymore. So add it to the list of critical clocks.
+Quoting Boris Brezillon (2015-08-18 01:24:01)
+> Stephen, Mike,
 > 
-> Signed-off-by: Michael Niewoehner <linux@mniewoehner.de>
+> Here is a PR for the sama5d2 materials.
+> I know we're already late in the release cycle and I'm not sure you can
+> take this PR into account for 4.3, so if you can't could you please
+> queue it for 4.4?
 
-Patch fails to apply due to a problem with line 15. git format-patch
-problem?
+Queued for 4.4.
 
-Regards,
+Thanks,
 Mike
 
-> ---
-> Changes in v2:
-> - adapt commit message
-> - add Linus Walleij to recipients, as the patch is related to the gpio clock
->   change in the rockchip pinctrl driver it should go through his tree as well
 > 
-> drivers/clk/rockchip/clk-rk3188.c | 1 +
-> 1 file changed, 1 insertion(+)
+> Thanks,
 > 
-> diff --git a/drivers/clk/rockchip/clk-rk3188.c b/drivers/clk/rockchip/clk-rk3188.c
-> index e4f9d47..1c93229 100644
-> --- a/drivers/clk/rockchip/clk-rk3188.c
-> +++ b/drivers/clk/rockchip/clk-rk3188.c
-> @@ -708,6 +708,7 @@ static const char *const rk3188_critical_clocks[] __initconst = {
->         "aclk_cpu",
->         "aclk_peri",
->         "hclk_peri",
-> +       "pclk_cpu",
-> };
+> Boris
 > 
-> static void __init rk3188_common_clk_init(struct device_node *np)
-> -- 
-> 2.5.0
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+> The following changes since commit c42743f11f58646a50bc4b96da363429dca0c5e6:
+> 
+>   clk: add bindings for the Ux500 clocks (2015-08-13 11:29:45 -0700)
+> 
+> are available in the git repository at:
+> 
+>   https://github.com/bbrezillon/linux-at91.git clk/atmel-clk-next
+> 
+> for you to fetch changes up to 3be0527c0f8bbbb744a6a34603d6a83e511c6741:
+> 
+>   clk: at91: add generated clock driver (2015-08-18 10:11:57 +0200)
+> 
+> ----------------------------------------------------------------
+> Nicolas Ferre (4):
+>       clk: at91: cleanup PMC header file for PCR register fields
+>       clk: at91: modify PMC peripheral clock to deal with newer register layout
+>       clk: at91: add PMC sama5d2 support
+>       clk: at91: add generated clock driver
+> 
+>  Documentation/devicetree/bindings/clock/at91-clock.txt |  35 +++++++++++++++++++++
+>  arch/arm/mach-at91/Kconfig                             |   3 ++
+>  drivers/clk/at91/Makefile                              |   1 +
+>  drivers/clk/at91/clk-generated.c                       | 306 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+>  drivers/clk/at91/clk-peripheral.c                      |  24 +++++++++-----
+>  drivers/clk/at91/pmc.c                                 |  21 +++++++++++++
+>  drivers/clk/at91/pmc.h                                 |   3 ++
+>  include/dt-bindings/clock/at91.h                       |   1 +
+>  include/linux/clk/at91_pmc.h                           |  22 ++++++++-----
+>  9 files changed, 400 insertions(+), 16 deletions(-)
+>  create mode 100644 drivers/clk/at91/clk-generated.c
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
