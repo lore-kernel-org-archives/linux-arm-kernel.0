@@ -1,32 +1,60 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 25 Aug 2015 11:52:46 +0100
-Subject: [PATCH v3 06/14] Documentation: drm/bridge: add document for
- analogix_dp
-In-Reply-To: <20150825104000.GE14034@ulmo.nvidia.com>
-References: <1439995728-18046-1-git-send-email-ykk@rock-chips.com>
- <1439995834-18363-1-git-send-email-ykk@rock-chips.com>
- <CAL_JsqLz+8RtBucctUj4euXZ3Ac0DvB52N9ONpAerh5T9BiTJg@mail.gmail.com>
- <20150824125758.GA7557@n2100.arm.linux.org.uk>
- <CAL_JsqKZYMMzV9Sc2r3K_rnM0FNuyb1TyJEhjGq1Hf7dTiWFKQ@mail.gmail.com>
- <20150825091246.GA14034@ulmo.nvidia.com>
- <20150825092939.GM7557@n2100.arm.linux.org.uk>
- <20150825104000.GE14034@ulmo.nvidia.com>
-Message-ID: <20150825105246.GP7557@n2100.arm.linux.org.uk>
+From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
+Date: Tue, 25 Aug 2015 16:26:16 +0530
+Subject: [PATCH-v2 1/5] mfd: 88pm800: Fix tabbing issue
+In-Reply-To: <20150825103546.GQ19409@x1>
+References: <1440442594-3102-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1440442594-3102-3-git-send-email-vaibhav.hiremath@linaro.org>
+ <20150825075246.GF19409@x1> <55DC2C4D.1040304@linaro.org>
+ <20150825103546.GQ19409@x1>
+Message-ID: <55DC49D0.1030608@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 25, 2015 at 12:40:01PM +0200, Thierry Reding wrote:
-> On Tue, Aug 25, 2015 at 10:29:39AM +0100, Russell King - ARM Linux wrote:
-> > Now, what happens when some other DRM driver wants to use the tda998x
-> > driver, and its bindings are not compatible with the component helpers?
-> > They're pretty much stuck up the creek without a paddle.
-> 
-> I'm sure that will be very helpful response for whoever's going to end
-> up having to deal with that situation.
 
-Thank you for that comment, it's very constructive and much appreciated.
-I can see it's well worth me continuing to spend time on this thread.
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+On Tuesday 25 August 2015 04:05 PM, Lee Jones wrote:
+> On Tue, 25 Aug 2015, Vaibhav Hiremath wrote:
+>
+>>
+>>
+>> On Tuesday 25 August 2015 01:22 PM, Lee Jones wrote:
+>>> On Tue, 25 Aug 2015, Vaibhav Hiremath wrote:
+>>>
+>>>> Driver had coding style issues where spaces were used instead
+>>>> of tabs. This patch fixes them all.
+>>>>
+>>>> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
+>>>> ---
+>>>>   drivers/mfd/88pm800.c | 125 ++++++++++++++++++++++++--------------------------
+>>>>   1 file changed, 61 insertions(+), 64 deletions(-)
+>>>
+>>> Same comment as before.
+>>>
+>>> How similar is this file to the other one?
+>>
+>> I believe you are referring to include/linux/mfd/88pm80x.h
+>>
+>>>
+>>> Can you reduce the size by having shared register defines?
+>>>
+>>
+>> Not sure whether I understand your comment here,
+>> They are common defines.
+>
+> I guess the question was a little convoluted.
+>
+> How about; why are the extra defines in the driver?  Why aren't all of
+> them in the header file?  What is the difference between the defines
+> in the C file compared with the ones defined in the header?
+>
+
+
+I do not see any difference and need of having defines separately in C
+file.
+That's the cleanup I was referring to in another email.
+
+I will walk through the whole driver code and try to cleanup all such
+coding related issues. Probably expect separate series here.
+
+Thanks,
+Vaibhav
