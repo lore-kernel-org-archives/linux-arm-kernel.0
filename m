@@ -1,69 +1,55 @@
-From: beanhuo@micron.com (=?iso-2022-jp?B?QmVhbiBIdW8gGyRCcDlJTElMGyhCIChiZWFuaHVvKQ==?=)
-Date: Tue, 25 Aug 2015 01:44:57 +0000
-Subject: [PATCH linux-next v4 5/5] mtd: atmel-quadspi: add driver for
- Atmel QSPI controller
-In-Reply-To: <bf368fc101f38db231131b69eff0863210f2b01c.1440410236.git.cyrille.pitchen@atmel.com>
-References: <cover.1440410236.git.cyrille.pitchen@atmel.com>
- <bf368fc101f38db231131b69eff0863210f2b01c.1440410236.git.cyrille.pitchen@atmel.com>
-Message-ID: <A765B125120D1346A63912DDE6D8B6310BF47A26@NTXXIAMBX02.xacn.micron.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Tue, 25 Aug 2015 10:50:00 +0900
+Subject: [PATCH 0/3] ARM: uniphier: add outer cache support and rework SMP
+ operations
+In-Reply-To: <CAOesGMgL3bNH_wG3igSJhNOkV0uUfNWEi0t-Gny2A1oNnGKu=w@mail.gmail.com>
+References: <1440382692-3855-1-git-send-email-yamada.masahiro@socionext.com>
+ <CAOesGMgL3bNH_wG3igSJhNOkV0uUfNWEi0t-Gny2A1oNnGKu=w@mail.gmail.com>
+Message-ID: <CAK7LNAQk4aEgZV3y90zBVMeq=jA45v683sCR1e5BBYtg5AcDOA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
->+	nor->read_reg = atmel_qspi_read_reg;
->+	nor->write_reg = atmel_qspi_write_reg;
->+	nor->read = atmel_qspi_read;
->+	nor->write = atmel_qspi_write;
->+	nor->erase = atmel_qspi_erase;
->+	nor->set_protocol = atmel_qspi_set_protocol;
-
-This is very good, the structure of spi_nor should add a hook function to notify spi controller 
-That spi nor transfer protocol already changed.
-
->+
->+	if (of_modalias_node(child, modalias, sizeof(modalias)) < 0) {
->+		err = -ENODEV;
->+		goto release_channel;
->+	}
->+
->+	err = of_property_read_u32(child, "spi-max-frequency", &aq->clk_rate);
->+	if (err < 0)
->+		goto release_channel;
->+
->+	err = atmel_qspi_init(aq);
->+	if (err)
->+		goto release_channel;
->+
->+	nor->dev->of_node = child;
->+	err = spi_nor_scan(nor, modalias, SPI_NOR_QUAD);
->		goto release_channel;
->+
+Hi Olof,
 
 
-.......
-
->static inline struct spi_nor *mtd_to_spi_nor(struct mtd_info *mtd)  {
- 	return mtd->priv;
->@@ -944,6 +960,11 @@ static int micron_quad_enable(struct spi_nor *nor)
->		return ret;
-> 	}
-> 
->+	/* switch protocol to Quad CMD 4-4-4 */
->+	ret = spi_nor_set_protocol(nor, SPI_PROTO_4_4_4);
->+	if (ret)
->+		return ret;
->+
-
-This make sense,from spi nor side,once its protocol being changed,
-Mtd layer must notify this status to spi nor controller immediately,
-And spi nor controller also should re-adjust its protocol.
-Otherwise, following reading SR operation will fail. 
-
+2015-08-25 6:47 GMT+09:00 Olof Johansson <olof@lixom.net>:
+> Hi,
 >
-> 	ret = spi_nor_wait_till_ready(nor);
-> 	if (ret)
-> 		return ret;
+> On Sun, Aug 23, 2015 at 7:18 PM, Masahiro Yamada
+> <yamada.masahiro@socionext.com> wrote:
+>> 1/3: add outer cache support
+>> 2/3: rework SMP operations
+>> 3/3: add device tree nodes
+>
+> Timing of this is unfortunate, please resend after 4.3-rc1 is out and
+> we can queue it up.
 
-If my ack has any value in here, feel free to add it.
+Given that rc8 is out and the merge window has been delayed,
+is it still too late for 4.3-rc1?
 
-Acked-by: Bean Huo <beanhuo@micron.com>
+
+
+>> Because 2/3 highly depends on 1/3, I hope whole of this series
+>> is applied to ARM-SOC tree.
+>
+> Review or acked-by from Russell would be appreciated in that case.
+>
+>> Olof,
+>> From this series, I am using "ARM: uniphier:" rather than "ARM: UniPhier:"
+>> for the subject prefixes because I noticed you often rephased so when you
+>> applied my patches.
+>> Are sub-arch names in lower cases preferable in subject prefixes?
+>
+> If you look at "git log --no-merges --oneline arch/arm/mach-*" you'll
+> see that most platforms use either all-caps or all-lowercase.
+
+I see.
+
+But, we use "UniPhier" (with only U and P capitalized) in our official
+documents.
+
+
+
+-- 
+Best Regards
+Masahiro Yamada
