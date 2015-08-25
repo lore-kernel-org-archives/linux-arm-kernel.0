@@ -1,38 +1,59 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 25 Aug 2015 10:17:38 -0700
-Subject: [GIT PULL 2/2] Rockchip soc fix for 4.3
-In-Reply-To: <9416843.VhjrryKIms@phil>
-References: <1879932.6Bpqy7C2KO@phil>
-	<9416843.VhjrryKIms@phil>
-Message-ID: <CAOesGMiVy5F-EJFCyj5LLKCGUWNZGenrK6AhbjubfBADXMxE_A@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 25 Aug 2015 18:18:51 +0100
+Subject: [PATCH v3 3/4] irqchip: GIC: Convert to EOImode == 1
+In-Reply-To: <alpine.DEB.2.11.1508251745070.15006@nanos>
+References: <1440503605-10185-1-git-send-email-marc.zyngier@arm.com>
+ <1440503605-10185-4-git-send-email-marc.zyngier@arm.com>
+ <alpine.DEB.2.11.1508251745070.15006@nanos>
+Message-ID: <55DCA37B.8030208@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 25, 2015 at 2:30 AM, Heiko Stuebner <heiko@sntech.de> wrote:
-> Hi Arnd, Kevin, Olof,
->
-> Fabio did find an error in what is returned as error codes in the init of
-> the suspend code. Nobody complained about this actually breaking stuff
-> but it would be nice to have this fixed nevertheless, so please pull.
->
->
-> Thanks
-> Heiko
->
->
-> The following changes since commit 9bb91ae970dd004393a3d7d09bdcc30dfe2f8693:
->
->   ARM: rockchip: enable PMU_GPIOINT_WAKEUP_EN when entering shallow suspend (2015-08-06 13:05:14 +0200)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.3-rockchip32-soc3
->
-> for you to fetch changes up to 2a03c025fdea25a491c359b31d8a8c8d452b06d0:
->
->   ARM: rockchip: pm: Fix PTR_ERR() argument (2015-08-24 12:39:14 +0200)
+Hi Thomas,
 
-Merged, thanks.
+On 25/08/15 16:46, Thomas Gleixner wrote:
+> On Tue, 25 Aug 2015, Marc Zyngier wrote:
+>> +static struct static_key supports_deactivate = STATIC_KEY_INIT_TRUE;
+>> +
+>>  #ifndef MAX_GIC_NR
+>>  #define MAX_GIC_NR	1
+>>  #endif
+>> @@ -137,6 +140,14 @@ static inline unsigned int gic_irq(struct irq_data *d)
+>>  	return d->hwirq;
+>>  }
+>>  
+>> +static inline bool primary_gic_irq(struct irq_data *d)
+>> +{
+>> +	if (MAX_GIC_NR > 1)
+>> +		return irq_data_get_irq_chip_data(d) == &gic_data[0];
+>> +
+>> +	return true;
+>> +}
+>> +
+>>  /*
+>>   * Routines to acknowledge, disable and enable interrupts
+>>   */
+>> @@ -164,7 +175,14 @@ static void gic_unmask_irq(struct irq_data *d)
+>>  
+>>  static void gic_eoi_irq(struct irq_data *d)
+>>  {
+>> -	writel_relaxed(gic_irq(d), gic_cpu_base(d) + GIC_CPU_EOI);
+>> +	u32 deact_offset = GIC_CPU_EOI;
+>> +
+>> +	if (static_key_true(&supports_deactivate)) {
+>> +		if (primary_gic_irq(d))
+>> +			deact_offset = GIC_CPU_DEACTIVATE;
+> 
+> I really wonder for the whole series whether you really want all that
+> static key dance and extra conditionals in the callbacks instead of
+> just using seperate irq chips for the different interrupts.
 
+Hmmm. We definitely could have different irqchips between primary and
+secondary controllers indeed. We'd still need a static key for the
+gic_handle_irq path though, but that's not too bad.
 
--Olof
+Let me hack something, and I'll come back to you ;-).
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
