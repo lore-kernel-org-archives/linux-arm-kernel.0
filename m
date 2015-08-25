@@ -1,23 +1,83 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Tue, 25 Aug 2015 16:08:57 -0500
-Subject: [PATCH] arm64: dts: qcom: Add RNG device tree node
-In-Reply-To: <1440517062-30313-1-git-send-email-stanimir.varbanov@linaro.org>
-References: <1440517062-30313-1-git-send-email-stanimir.varbanov@linaro.org>
-Message-ID: <20150825210857.GA12349@qualcomm.com>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Wed, 26 Aug 2015 05:11:47 +0800
+Subject: [PATCH v2] soc: mediatek: add scpsys support active_wakeup
+In-Reply-To: <1440482440-28700-1-git-send-email-eddie.huang@mediatek.com>
+References: <1440482440-28700-1-git-send-email-eddie.huang@mediatek.com>
+Message-ID: <CAGS+omBqTbcJk-6QvupV4tkB5WQm97zpb5NzZ-S2ivR-UEWF4g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 25, 2015 at 06:37:42PM +0300, Stanimir Varbanov wrote:
-> Adds rng device tree node for msm8916 SoCs.
-> 
-> Signed-off-by: Stanimir Varbanov <stanimir.varbanov@linaro.org>
+Hi Eddie,
+
+On Tue, Aug 25, 2015 at 2:00 PM, Eddie Huang <eddie.huang@mediatek.com> wrote:
+> Register gpd_dev_ops.active_wakeup function to support keep power
+> during suspend state. And add flag to each power domain to
+> decide whether keep power during suspend or not.
+>
+> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+> Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
+> Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+>
 > ---
->  arch/arm64/boot/dts/qcom/msm8916.dtsi |    7 +++++++
->  1 file changed, 7 insertions(+)
+> Change in v2:
+> Drop .active_wakeup = false lines in scp_domain_data[] array
+>
+> ---
+>  drivers/soc/mediatek/mtk-scpsys.c | 19 +++++++++++++++++++
+>  1 file changed, 19 insertions(+)
+>
+> diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
+> index 43a79ed..df2f288 100644
+> --- a/drivers/soc/mediatek/mtk-scpsys.c
+> +++ b/drivers/soc/mediatek/mtk-scpsys.c
+> @@ -67,6 +67,7 @@ struct scp_domain_data {
+>         u32 sram_pdn_ack_bits;
+>         u32 bus_prot_mask;
+>         enum clk_id clk_id;
+> +       bool active_wakeup;
+>  };
+>
+>  static const struct scp_domain_data scp_domain_data[] __initconst = {
+> @@ -127,6 +128,7 @@ static const struct scp_domain_data scp_domain_data[] __initconst = {
+>                 .sram_pdn_bits = GENMASK(11, 8),
+>                 .sram_pdn_ack_bits = GENMASK(15, 12),
+>                 .clk_id = MT8173_CLK_NONE,
+> +               .active_wakeup = true,
+>         },
+>         [MT8173_POWER_DOMAIN_MFG_ASYNC] = {
+>                 .name = "mfg_async",
+> @@ -171,6 +173,7 @@ struct scp_domain {
+>         u32 sram_pdn_bits;
+>         u32 sram_pdn_ack_bits;
+>         u32 bus_prot_mask;
+> +       bool active_wakeup;
+>  };
+>
+>  struct scp {
+> @@ -370,6 +373,20 @@ out:
+>         return ret;
+>  }
+>
+> +static bool scpsys_active_wakeup(struct device *dev)
+> +{
+> +       struct generic_pm_domain *genpd;
+> +       struct scp_domain *scpd;
+> +
+> +       if (IS_ERR_OR_NULL(dev->pm_domain))
+> +               return false;
 
-Looks good to me.  Applied.
+Is it really possible to get here w/ pm_domain as an ERR or NULL?
+If the power core can ensure this cannot happen, then this function
+could be a bit simpler.
 
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Other than that, this patch is:
+Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
+
+-Dan
+
+> +
+> +       genpd = pd_to_genpd(dev->pm_domain);
+> +       scpd = container_of(genpd, struct scp_domain, genpd);
+> +
+> +       return scpd->active_wakeup;
+> +}
