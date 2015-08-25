@@ -1,63 +1,57 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Tue, 25 Aug 2015 16:13:47 +0800
-Subject: [PATCH v1 3/3] arm64: dts: add Hi6220 mailbox node
-In-Reply-To: <20150824114903.GT10728@bivouac.eciton.net>
-References: <1439977055-1747-1-git-send-email-leo.yan@linaro.org>
- <1439977055-1747-4-git-send-email-leo.yan@linaro.org>
- <20150821184059.GB2000@svinekod> <20150824091845.GA28290@leoy-linaro>
- <20150824095144.GA7139@leverpostej> <1440411596.3517.12.camel@linaro.org>
- <20150824114903.GT10728@bivouac.eciton.net>
-Message-ID: <1440490427.10987.29.camel@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 25 Aug 2015 09:15:56 +0100
+Subject: Prevent list poison values from being mapped by userspace
+ processes
+In-Reply-To: <55DB16AF.7090607@freebox.fr>
+References: <CABXk95C=CpeL4mNmS6-jJ-0bMJf6fawwfs6DM1-p8FctTEFbpw@mail.gmail.com>
+ <20150821133043.GV7557@n2100.arm.linux.org.uk>
+ <55DB16AF.7090607@freebox.fr>
+Message-ID: <20150825081556.GL7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-08-24 at 12:49 +0100, Leif Lindholm wrote:
-> On Mon, Aug 24, 2015 at 06:19:56PM +0800, Haojian Zhuang wrote:
-> > > If your EFI memory map describes the memory as mappable, it is wrong.
-> > 
-> > When kernel is working, kernel will create its own page table based on
-> > UEFI memory map. Since it's reserved in DTS file as Leo's patch, it'll
-> > be moved to reserved memblock. Why is it wrong?
-> > 
-> > In the second, UEFI is firmware. When it's stable, nobody should change
-> > it without any reason.
-> 
-> Much like the memory map.
-> 
-> > These reserved memory are used in mailbox driver.
-> > Look. It's driver, so it could be changed at any time.
-> 
-> No, it is a set of regions of memory set aside for use by a different
-> master in the system as well as communications with that master.
-> 
-> The fact that there is a driver somewhere that is aware of this is
-> entirely beside the point. All agents in the system must adher to this
-> protocol.
-> 
-> > Why do you want
-> > to UEFI knowing this memory range? Do you hope UEFI to change when
-> > mailbox driver is changed?
-> 
-> Yes.
-> 
-> UEFI is a runtime environment. Having random magic areas not to be
-> touched will cause random pieces of software running under it to break
-> horribly or break other things horribly.
-> Unless you mark them as reserved in the UEFI memory map.
-> At which point the Linux kernel will automatically ignore them, and
-> the proposed patch is redundant.
-> 
-> So, yes, if you want a system that can boot reliably, run testsuites
-> (like SCT or FWTS), run applications (like fastboot ... or the EFI
-> stub kernel itself), then any memory regions that is reserved for
-> mailbox communication (or other masters in the system) _must_ be
-> marked in the EFI memory map.
+On Mon, Aug 24, 2015 at 03:05:51PM +0200, Nicolas Schichan wrote:
+> I gave your patch serie a try on ARMv5/kirkwood (backported on a v4.1 kernel)
+> and at first I got the following panic just after the kernel transitioned
+> to userland (with CONFIG_CPU_SW_DOMAIN_PAN=y):
 
-1. We need support both UEFI and uboot. So the reserved buffer have to
-be declared in DTB since they are used by kernel driver, not UEFI.
+Ah, damn.  Thanks for testing.  I really need to add some non-ARMv7
+platforms to my nightly test rig, but I'm out of physical space to
+do that. :p
 
-2. UEFI just loads grub. It's no time to run any other custom EFI
-application.
+> I have tracked this to the attempt made by the code in
+> arch/arm/mm/abort-ev5t.S to read the fault instruction which in this
+> case is in unserspace:
+> 
+> 	ldreq	r3, [r4]			@ read aborted ARM instruction
 
-Regards
-Haojian
+There's going to be many more of these... it may be better if I left
+the domain enabled when calling into these handlers, and had every
+handler do the turn-off itself when it's ready to do so - there's
+no point turning off userspace access only to then immediately
+re-enable it.
+
+> With the changes above, userland boots fine and attempts to
+> dereference LIST_POISON1 from the kernel results the expected "page
+> domain fault".
+> 
+> To test that I mapped LIST_POISON1 from user space via mmap() and
+> triggered the fault by reading from /proc/cpu/alignment. I modified the
+> code showing /proc/cpu/alignment to access LIST_POISON1. Without your
+> patch serie the access to LIST_POISON1 goes through without a hitch.
+
+Great, thanks for the independent testing of its effectiveness.
+
+> Also, when CONFIG_CPU_SW_DOMAIN_PAN is not set, the DACR_INIT constant is
+> setup with (domain_val(DOMAIN_USER, DOMAIN_NOACCESS) which will cause the
+> kernel to die with a "page domain fault" when running init.
+
+If you don't mind, I'll merge that into the patch adding this so it
+doesn't introduce a regression there.
+
+Once I've fixed the abort handler issue, would you mind re-testing
+and giving a tested-by attributation please?
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
