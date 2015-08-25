@@ -1,75 +1,51 @@
 From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Tue, 25 Aug 2015 14:15:04 +0530
-Subject: [PATCH-v2 2/5] mfd: 88pm800: Update the header file with 32K
- clk related macros
-In-Reply-To: <20150825075556.GG19409@x1>
+Date: Tue, 25 Aug 2015 14:20:21 +0530
+Subject: [PATCH-v2 1/5] mfd: 88pm800: Fix tabbing issue
+In-Reply-To: <20150825075246.GF19409@x1>
 References: <1440442594-3102-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1440442594-3102-4-git-send-email-vaibhav.hiremath@linaro.org>
- <20150825075556.GG19409@x1>
-Message-ID: <55DC2B10.3080200@linaro.org>
+ <1440442594-3102-3-git-send-email-vaibhav.hiremath@linaro.org>
+ <20150825075246.GF19409@x1>
+Message-ID: <55DC2C4D.1040304@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On Tuesday 25 August 2015 01:25 PM, Lee Jones wrote:
+On Tuesday 25 August 2015 01:22 PM, Lee Jones wrote:
 > On Tue, 25 Aug 2015, Vaibhav Hiremath wrote:
 >
->> Update header file with required macros for 32KHz buffered clock
->> output of 88PM800 family of device.
->> These macros will be used in clk provider driver.
+>> Driver had coding style issues where spaces were used instead
+>> of tabs. This patch fixes them all.
 >>
 >> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
 >> ---
->>   include/linux/mfd/88pm80x.h | 12 ++++++++++++
->>   1 file changed, 12 insertions(+)
->>
->> diff --git a/include/linux/mfd/88pm80x.h b/include/linux/mfd/88pm80x.h
->> index 122cfd2..0215d5f 100644
->> --- a/include/linux/mfd/88pm80x.h
->> +++ b/include/linux/mfd/88pm80x.h
->> @@ -91,6 +91,7 @@ enum {
->>   /* Referance and low power registers */
->>   #define PM800_LOW_POWER1		(0x20)
->>   #define PM800_LOW_POWER2		(0x21)
->> +#define PM800_LOW_POWER2_XO_LJ_EN	BIT(5)
+>>   drivers/mfd/88pm800.c | 125 ++++++++++++++++++++++++--------------------------
+>>   1 file changed, 61 insertions(+), 64 deletions(-)
 >
-> Some people add an extra space for register bits, which I quite like.
+> Same comment as before.
 >
-> So:
->
-> #define SOME_REGISTER_ADDRESS	0x123
-> #define  SOME_BIT_VALUE		BIT(4)
->
-> Feel free to use it, or not.
->
->>   #define PM800_LOW_POWER_CONFIG3		(0x22)
->>   #define PM800_LDOBK_FREEZE		BIT(7)
->> @@ -138,6 +139,13 @@ enum {
->>   #define PM800_ALARM			BIT(5)
->>   #define PM800_RTC1_USE_XO		BIT(7)
->>
->> +#define PM800_32K_OUTX_SEL_MASK		0x3
->> +/* 32KHz clk output sel mode */
->> +#define PM800_32K_OUTX_SEL_ZERO		0x0
->> +#define PM800_32K_OUTX_SEL_INT_32KHZ	0x1
->> +#define PM800_32K_OUTX_SEL_XO_32KHZ	0x2
->> +#define PM800_32K_OUTX_SEL_HIZ		0x3
->> +
->>   /* Regulator Control Registers: BUCK1,BUCK5,LDO1 have DVC */
->>
->>   /* buck registers */
->> @@ -208,6 +216,10 @@ enum {
->>   #define PM800_PMOD_MEAS1		0x52
->>   #define PM800_PMOD_MEAS2		0x53
->>
->> +/* Oscillator control */
->> +#define PM800_OSC_CNTRL1		0x50
->> +#define PM800_OSC_CNTRL1_OSC_FREERUN_EN	BIT(1)
->
-> 0x50 goes before 0x52 (and 0x51 if it's there).
+> How similar is this file to the other one?
 
-Will reorder in next version.
+I believe you are referring to include/linux/mfd/88pm80x.h
+
+>
+> Can you reduce the size by having shared register defines?
+>
+
+Not sure whether I understand your comment here,
+They are common defines.
+
+PM860 only defines are named as
+
+PM860_XXXX
+
+Similarly,
+PM805 only defines are named as
+
+PM805_XXXX
+
+
+and PM800_xxx should be common.
 
 Thanks,
 Vaibhav
