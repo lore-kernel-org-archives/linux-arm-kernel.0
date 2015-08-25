@@ -1,45 +1,72 @@
-From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Tue, 25 Aug 2015 14:34:28 +0530
-Subject: [PATCH-v3 RESEND] mfd: 88pm80x: Add 88pm860 chip type support
-Message-ID: <1440493468-5471-1-git-send-email-vaibhav.hiremath@linaro.org>
+From: treding@nvidia.com (Thierry Reding)
+Date: Tue, 25 Aug 2015 11:12:48 +0200
+Subject: [PATCH v3 06/14] Documentation: drm/bridge: add document for
+ analogix_dp
+In-Reply-To: <CAL_JsqKZYMMzV9Sc2r3K_rnM0FNuyb1TyJEhjGq1Hf7dTiWFKQ@mail.gmail.com>
+References: <1439995728-18046-1-git-send-email-ykk@rock-chips.com>
+ <1439995834-18363-1-git-send-email-ykk@rock-chips.com>
+ <CAL_JsqLz+8RtBucctUj4euXZ3Ac0DvB52N9ONpAerh5T9BiTJg@mail.gmail.com>
+ <20150824125758.GA7557@n2100.arm.linux.org.uk>
+ <CAL_JsqKZYMMzV9Sc2r3K_rnM0FNuyb1TyJEhjGq1Hf7dTiWFKQ@mail.gmail.com>
+Message-ID: <20150825091246.GA14034@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add chip identification support for 88PM860 device
-to the pm80x_chip_mapping table.
+On Mon, Aug 24, 2015 at 09:48:27AM -0500, Rob Herring wrote:
+> On Mon, Aug 24, 2015 at 7:57 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Sun, Aug 23, 2015 at 06:23:14PM -0500, Rob Herring wrote:
+> >> On Wed, Aug 19, 2015 at 9:50 AM, Yakir Yang <ykk@rock-chips.com> wrote:
+> >> > +       -analogix,color-depth:
+> >> > +               number of bits per colour component.
+> >> > +                       COLOR_6 = 0, COLOR_8 = 1, COLOR_10 = 2, COLOR_12 = 3
+> >>
+> >> This seems pretty generic. Just use 6, 8, 10, or 12 for values. And
+> >> drop the vendor prefix.
+> >
+> > Please think about this some more.  What does "color-depth" mean?  Does it
+> > mean the number of bits per colour _component_, or does it mean the total
+> > number of bits to represent a particular colour.  It's confusing as it
+> > stands.
+> 
+> Then "component-color-bpp" perhaps?
 
-Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Acked-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/mfd/88pm80x.c       | 2 ++
- include/linux/mfd/88pm80x.h | 1 +
- 2 files changed, 3 insertions(+)
+There should be no need to have this in DT at all. The BPC is a property
+of the attached panel and it should come from the panel (either the
+panel driver or parsed from EDID if available).
 
-diff --git a/drivers/mfd/88pm80x.c b/drivers/mfd/88pm80x.c
-index 5e72f65..63445ea 100644
---- a/drivers/mfd/88pm80x.c
-+++ b/drivers/mfd/88pm80x.c
-@@ -33,6 +33,8 @@ static struct pm80x_chip_mapping chip_mapping[] = {
- 	{0x3,	CHIP_PM800},
- 	/* 88PM805 chip id number */
- 	{0x0,	CHIP_PM805},
-+	/* 88PM860 chip id number */
-+	{0x4,	CHIP_PM860},
- };
- 
- /*
-diff --git a/include/linux/mfd/88pm80x.h b/include/linux/mfd/88pm80x.h
-index 8fcad63..d409ceb 100644
---- a/include/linux/mfd/88pm80x.h
-+++ b/include/linux/mfd/88pm80x.h
-@@ -21,6 +21,7 @@ enum {
- 	CHIP_INVALID = 0,
- 	CHIP_PM800,
- 	CHIP_PM805,
-+	CHIP_PM860,
- 	CHIP_MAX,
- };
- 
--- 
-1.9.1
+> > When we adopted the graph bindings for iMX DRM, I thought exactly at that
+> > time "it would be nice if this could become the standard for binding DRM
+> > components together" but I don't have the authority from either the DT
+> > perspective or the DRM perspective to mandate that.  Neither does anyone
+> > else.  That's the _real_ problem here.
+> >
+> > I've seen several DRM bindings go by which don't use the of-graph stuff,
+> > which means that they'll never be compatible with generic components
+> > which do use the of-graph stuff.
+> 
+> It goes beyond bindings IMO. The use of the component framework or not
+> has been at the whim of driver writers as well. It is either used or
+> private APIs are created. I'm using components and my need for it
+> boils down to passing the struct drm_device pointer to the encoder.
+> Other components like panels and bridges have different ways to attach
+> to the DRM driver.
+
+I certainly support unification, but it needs to be reasonable. There
+are cases where a different structure for the binding work better than
+another and I think this always needs to be evaluated on a case by case
+basis.
+
+Because of that I think it makes sense to make all these framework bits
+opt-in, otherwise we could easily end up in a situation where drivers
+have to be rearchitected (or even DT bindings altered!) in order to be
+able to reuse code.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150825/6154bc96/attachment.sig>
