@@ -1,36 +1,44 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 25 Aug 2015 10:15:47 +0100
-Subject: [PATCH v2 5/5] arm64: add KASan support
-In-Reply-To: <20150824174736.GD7557@n2100.arm.linux.org.uk>
-References: <CAPAsAGy-r8Z2N09wKV+e0kLfbwxd-eWK6N5Xajsnqq9jfyWqcQ@mail.gmail.com>
- <CACRpkdZmHLMxosLXjyOPdkavo=UNzmTcHOLF5vV4cS1ULfbq6A@mail.gmail.com>
- <CAPAsAGw-iawTpjJh66rQN5fqBFT6UBZCcv2eKx7JTqCXzhzpsw@mail.gmail.com>
- <CACRpkdY2i2M27gP_fXawkFrC_GFgWaKr5rEn6d47refNPiEk=g@mail.gmail.com>
- <55AE56DB.4040607@samsung.com>
- <CACRpkdYaqK8upK-3b01JbO_y+sHnk4-Hm1MfvjSy0tKUkFREtQ@mail.gmail.com>
- <20150824131557.GB7557@n2100.arm.linux.org.uk>
- <CACRpkdYwpucRiXM05y00RQY=gKv8W6YjCNspYFRMGaM605cU0w@mail.gmail.com>
- <CAPAsAGwji7FpUJK9O=FWYN15-rJkYMQyOt9W9ncdY9uLybxkiA@mail.gmail.com>
- <20150824174736.GD7557@n2100.arm.linux.org.uk>
-Message-ID: <20150825091547.GA21300@arm.com>
+From: treding@nvidia.com (Thierry Reding)
+Date: Tue, 25 Aug 2015 11:15:36 +0200
+Subject: [PATCH v3 06/14] Documentation: drm/bridge: add document for
+ analogix_dp
+In-Reply-To: <CAL_JsqLz+8RtBucctUj4euXZ3Ac0DvB52N9ONpAerh5T9BiTJg@mail.gmail.com>
+References: <1439995728-18046-1-git-send-email-ykk@rock-chips.com>
+ <1439995834-18363-1-git-send-email-ykk@rock-chips.com>
+ <CAL_JsqLz+8RtBucctUj4euXZ3Ac0DvB52N9ONpAerh5T9BiTJg@mail.gmail.com>
+Message-ID: <20150825091534.GB14034@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 24, 2015 at 06:47:36PM +0100, Russell King - ARM Linux wrote:
-> On Mon, Aug 24, 2015 at 05:15:22PM +0300, Andrey Ryabinin wrote:
-> > Yes, ~130Mb (3G/1G split) should work. 512Mb shadow is optional.
-> > The only advantage of 512Mb shadow is better handling of user memory
-> > accesses bugs
-> > (access to user memory without copy_from_user/copy_to_user/strlen_user etc API).
+On Sun, Aug 23, 2015 at 06:23:14PM -0500, Rob Herring wrote:
+> On Wed, Aug 19, 2015 at 9:50 AM, Yakir Yang <ykk@rock-chips.com> wrote:
+[...]
+> > +       -analogix,link-rate:
+> > +               max link rate supported by the eDP controller.
+> > +                       LINK_RATE_1_62GBPS = 0x6, LINK_RATE_2_70GBPS = 0x0A,
+> > +                       LINK_RATE_5_40GBPS = 0x14
 > 
-> No need for that to be handed by KASan.  I have patches in linux-next,
-> now acked by Will, which prevent the kernel accessing userspace with
-> zero memory footprint.  No need for remapping, we have a way to quickly
-> turn off access to userspace mapped pages on non-LPAE 32-bit CPUs.
-> (LPAE is not supported yet - Catalin will be working on that using the
-> hooks I'm providing once he returns.)
+> Same here. I'd rather see something like "link-rate-mbps" and use the
+> actual rate.
 
-Hey, I only acked the "Efficiency cleanups" series so far! The PAN emulation
-is still on my list.
+There is no need whatsoever to hard-code this in DT. (e)DP provides the
+means to detect what rate the link supports and the specification
+provides guidance on how to select an appropriate one.
 
-Will
+> 
+> > +       -analogix,lane-count:
+> > +               max number of lanes supported by the eDP contoller.
+> > +                       LANE_COUNT1 = 1, LANE_COUNT2 = 2, LANE_COUNT4 = 4
+> 
+> And drop the vendor prefix here.
+
+Same as for the link rate.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150825/6f34dcce/attachment.sig>
