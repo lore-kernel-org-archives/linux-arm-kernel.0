@@ -1,35 +1,67 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 25 Aug 2015 07:52:22 +0100
-Subject: [PATCH v5 4/6] drm: bridge/dw_hdmi-i2s-audio: add audio driver
-In-Reply-To: <20150808153540.GL7557@n2100.arm.linux.org.uk>
-References: <1434730417-10629-1-git-send-email-ykk@rock-chips.com>
- <1434731295-11060-1-git-send-email-ykk@rock-chips.com>
- <20150808153540.GL7557@n2100.arm.linux.org.uk>
-Message-ID: <20150825065222.GG27431@sirena.org.uk>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Tue, 25 Aug 2015 08:53:15 +0200
+Subject: [PATCH] clk: rockchip: register pll mux before pll itself
+In-Reply-To: <20150824234319.GG14330@codeaurora.org>
+References: <7060610.CC2Q1RMG2L@phil>
+ <CAD=FV=UG_QkU0W5tpb3Y7zxuq6X7dtQmC4m5_j9vMtJgjdiquQ@mail.gmail.com>
+ <20150824234319.GG14330@codeaurora.org>
+Message-ID: <2414716.nTJ39zAhgn@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 08, 2015 at 04:35:41PM +0100, Russell King - ARM Linux wrote:
-> On Sat, Jun 20, 2015 at 12:28:15AM +0800, Yakir Yang wrote:
-> > Add ALSA based HDMI I2S audio driver for dw_hdmi. Sound card
-> > driver could connect to this codec through the codec dai name
-> > "dw-hdmi-i2s-audio".
+Am Montag, 24. August 2015, 16:43:19 schrieb Stephen Boyd:
+> On 08/24, Doug Anderson wrote:
+> > Heiko
+> > 
+> > On Wed, Aug 19, 2015 at 6:06 AM, Heiko Stuebner <heiko@sntech.de> wrote:
+> > > The structure is xin24m -> pll -> pll-mux (xin24m,pll,xin32k). The pll
+> > > does have an init callback to make sure the boot-selected frequency is
+> > > using the expected pll settings and resets the same frequency using
+> > > the values provided in the driver if necessary.
+> > > 
+> > > The setting itself also involves remuxing the pll-mux temporarily to
+> > > the xin24m source to let the new pll rate settle. Until now this worked
+> > > flawlessly, even when it had the flaw of accessing the mux settings
+> > > before the mux actually got registered.
+> > > 
+> > > With the recent clock-core conversions this flaw became apparent in
+> > > null pointer dereference in
+> > > [<c03fc400>] (clk_hw_get_num_parents) from [<c0400df0>]
+> > > (clk_mux_get_parent+0x14/0xc8) [<c0400ddc>] (clk_mux_get_parent) from
+> > > [<c040246c>] (rockchip_rk3066_pll_set_rate+0xd8/0x320)
+> > > 
+> > > So to fix that, simply register the pll-mux before the pll, so that
+> > > it will be fully initialized when the pll clock executes its init-
+> > > callback and possibly touches the pll-mux clock.
+> > > 
+> > > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> > > ---
+> > > This only surfaced with the clk_core changes for 4.3, so should
+> > > probably just go on top.
+> > > 
+> > >  drivers/clk/rockchip/clk-pll.c | 63
+> > >  +++++++++++++++++++++--------------------- 1 file changed, 32
+> > >  insertions(+), 31 deletions(-)
+> > 
+> > Fixes boot crash on rk3288-veyron-jerry on next-20150824.  It'd be
+> > super great to get this landed somewhere so that we can boot linuxnext
+> > again.  :)
+> > 
+> > Tested-by: Douglas Anderson <dianders@chromium.org>
+> 
+> So I understand the fix, but how could it have ever possibly
+> worked flawlessly? clk_mux_get_parent() should have returned
+> -EINVAL through that u8 which would have meant that the check in
+> rockchip_rk3066_pll_set_rate() for cur_parent == PLL_MODE_NORM
+> would never have been true, and we would never have switched the
+> PLL mux over. I guess we've been getting away with this because
+> we don't need to actually switch the mux at this time?
 
-> I'm applying this patch to my tree with some changes.  I haven't seen
-> anyone ack it, nor review it any further.  I'm hoping someone can ack
-> this patch with the following changes below - I'll be posting it as
-> part of my dw-hdmi devel updates later today.
+The manual mandates the switch away from the pll source before touching the 
+pll settings, aka to the slow mode from the 24MHz source. I guess we were 
+lucky it simply still worked nevertheless.
 
-I'm pretty sure I deleted this patch unread because what shows up in my
-inbox is:
-
-->  197   C 08/08 Russell King -  (1.1K) ? ??>Re: [PATCH v5 4/6] drm: bridge/dw_
-
-so there's no indication that it's anything to do with audio :(
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150825/9c435d3b/attachment.sig>
+In normal rate changes both clocks will have been registered already, so only 
+the init callback is affected and also only runs on plls that generate the rate 
+from a different settings-touple that what we have in the rate-table, so not 
+even all plls normally.
