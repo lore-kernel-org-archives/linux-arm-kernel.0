@@ -1,106 +1,64 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 25 Aug 2015 15:58:45 +0200
-Subject: [PATCH v2] mmc: sunxi: Don't start commands while the card is busy
-In-Reply-To: <55DC5B09.2020705@redhat.com>
-References: <1436541284-11800-1-git-send-email-hdegoede@redhat.com>
- <CAPDyKFoNe0bghfSXs48stHzZToTc7Hjd5gVPy-VbDF8bzdVVMQ@mail.gmail.com>
- <55BC8ADE.3070802@redhat.com>
- <CAPDyKFrYvL33DsaATg4fyAJg=G3SEuOP+xU=o_UwasmNZ+a07Q@mail.gmail.com>
- <55DC5B09.2020705@redhat.com>
-Message-ID: <CAPDyKFpJGBA7GN=PJmWdpT+_OiPF_ET0i9wC7XYBCJA9EwLrgw@mail.gmail.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 25 Aug 2015 14:59:43 +0100
+Subject: [PATCH v3 1/1] misc: sram: add dev_pm_ops to support module power
+ gate
+In-Reply-To: <CY1PR0301MB0843D5CB5FFC56991B90EB4283610@CY1PR0301MB0843.namprd03.prod.outlook.com>
+References: <1438272681-29338-1-git-send-email-shenwei.wang@freescale.com>
+ <55DC677E.1030004@arm.com>
+ <CY1PR0301MB0843D5CB5FFC56991B90EB4283610@CY1PR0301MB0843.namprd03.prod.outlook.com>
+Message-ID: <55DC74CF.7070300@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 August 2015 at 14:09, Hans de Goede <hdegoede@redhat.com> wrote:
-> Hi,
->
->
-> On 25-08-15 14:05, Ulf Hansson wrote:
->>
->> On 1 August 2015 at 11:01, Hans de Goede <hdegoede@redhat.com> wrote:
->>>
->>> Hi,
->>>
->>> On 21-07-15 14:15, Ulf Hansson wrote:
->>>>
->>>>
->>>> On 10 July 2015 at 17:14, Hans de Goede <hdegoede@redhat.com> wrote:
->>>>>
->>>>>
->>>>> Some sdio wifi modules have not been working reliable with the
->>>>> sunxi-mmc
->>>>> host code. This turns out to be caused by it starting new commands
->>>>> while
->>>>> the card signals that it is still busy processing a previous command.
->>>>
->>>>
->>>>
->>>> Which are those commands?
->>>
->>>
->>>
->>> The code were things get stuck when not waiting for the busy signal uses
->>> the following sdio helper functions:
->>>
->>> sdio_readb/sdio_writeb
->>> sdio_f0_readb/sdio_f0_writeb
->>> sdio_readw/sdio_writew
->>> sdio_readl/sdio_writel
->>> sdio_readsb
->>> sdio_memcpy_fromio/sdio_memcpy_toio
->>>
->>> And directly issues the following command:
->>>
->>>          mmc_dat.flags = write ? MMC_DATA_WRITE : MMC_DATA_READ;
->>>          mmc_cmd.opcode = SD_IO_RW_EXTENDED;
->>>          mmc_cmd.arg = write ? 1<<31 : 0;        /* write flag  */
->>>          mmc_cmd.arg |= (fn & 0x7) << 28;        /* SDIO func num */
->>>          mmc_cmd.arg |= 1<<27;                   /* block mode */
->>>          /* for function 1 the addr will be incremented */
->>>          mmc_cmd.arg |= (fn == 1) ? 1<<26 : 0;
->>>          mmc_cmd.flags = MMC_RSP_SPI_R5 | MMC_RSP_R5 | MMC_CMD_ADTC;
->>>
->>> I do not know if the busy wait is necessary for all
->>> of these, but the hack in the android kernel code,
->>> which inserts calls to a wait_card_busy function directly
->>> into: drivers/net/wireless/brcm80211/brcmfmac/bcmsdh.c
->>>
->>> Does so for all of these.
->>>
->>>> Or more interesting, which response types do
->>>>
->>>> these commands expect?
->>>> I don't think this is a sunxi specific issue, I have seen similar
->>>> issues for other host controllers.
->>>
->>>
->>>
->>> Agreed, recent dw-mmc patches address the same issue, also involving
->>> broadcom sdio wifi chips.
->>>
->>>> I am thinking that perhaps this should be managed by the mmc core
->>>> instead of local hacks to sunxi. Potentially we could make the core to
->>>> invoke the already existing host_ops->card_busy() callback when
->>>> needed...
->>>
->>>
->>>
->>> I'm fine with solving this either way, implementing host_ops->card_busy()
->>> for sunxi is easy, and if the core os modified to call that function
->>> before issue sdio io ops (which seems to be the common thing here),
->>> then that indeed is better then having the sunxi code always do
->>> the busy check.
->>
->>
->> Okay, so let's make the core to call the ->card_busy() callback and
->> then it's up to each host driver to implement that callback.
->
->
-> Ok, do you plan to do a patch for this, or do you expect to get
-> one submitted to you ?
 
-I prefer to get a patch submitted to me. My bandwidth has been limited
-and still have a lot to catch up with...
 
-Kind regards
-Uffe
+On 25/08/15 14:47, Shenwei Wang wrote:
+>
+>
+>> -----Original Message-----
+>> From: Sudeep Holla [mailto:sudeep.holla at arm.com]
+>> Sent: 2015?8?25? 8:03
+>> To: Wang Shenwei-B38339
+>> Cc: gregkh at linuxfoundation.org; arnd at arndb.de; Sudeep Holla; Huang
+>> Yongcai-B20788; linux-arm-kernel at lists.infradead.org
+>> Subject: Re: [PATCH v3 1/1] misc: sram: add dev_pm_ops to support module
+>> power gate
+>>
+>>
+>>
+>> On 30/07/15 17:11, Shenwei Wang wrote:
+>>> When system goes into low power states like SUSPEND_MEM and
+>>> HIBERNATION, the hardware IP block may be powered off to reduce the
+>>> power consumption. This power down will lost all the data inside the
+>>> ram. This patch added the dev_pm_ops and implemented two callbacks:
+>>> suspend_noirq and resume_noirq, which will save the data in the
+>>> on-chip-ram right before power down and restore it after system
+>>> resumes.
+>>>
+>>
+>> Who uses this SRAM ? Can't they be released before suspending ?
+>> This might not be feasible and time consuming as the size of SRAM increases.
+>
+> On Freescale i.MX7D, we are using this kind of SRAM. As I implemented this as an
+> optional feature, a user can balance between the suspend/resume time and the power
+> consumption.
+>
+>> Also I just check the entire tree for the users of gen_pool, I found it's used for
+>> video/audio and crypto which needs to on-demand basis.
+>> Apart from that it's mainly used for low power modes in which case, SRAM needs
+>> to be powered on. So can you provide more details on your use-case.
+>
+> On latest Freescale i.MX7D, it has two SRAMs in side. One is for low
+> power mode which will be powered on in suspend state. The other one
+> is for other peripherals which can be powered off on demand.
+>
+
+What I meant is who will be using the SRAM when entering S2R that you
+need to save the content. Either the user needs to take care of the
+content or just release the pool when not in use. When the sram pool has
+no user, clock can be gated.
+
+Again can you give details of this use-case.
+
+Regards,
+Sudeep
