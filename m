@@ -1,48 +1,98 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 25 Aug 2015 14:58:30 -0500
-Subject: CONFIG_DEBUG_SHIRQ and PM
-Message-ID: <20150825195830.GH27534@saruman.tx.rr.com>
+From: Shenwei.Wang@freescale.com (Shenwei Wang)
+Date: Tue, 25 Aug 2015 19:58:50 +0000
+Subject: [PATCH v9 1/1] irqchip: imx-gpcv2: IMX GPCv2 driver for wakeup
+ sources
+In-Reply-To: <alpine.DEB.2.11.1508252126360.15006@nanos>
+References: <1440443055-7291-1-git-send-email-shenwei.wang@freescale.com>
+ <55DC3452.3070205@arm.com>
+ <CY1PR0301MB08439B6C5F841AFFD152DFD883610@CY1PR0301MB0843.namprd03.prod.outlook.com>
+ <55DC738D.8000302@arm.com>
+ <CY1PR0301MB0843AE566996617D855CC00683610@CY1PR0301MB0843.namprd03.prod.outlook.com>
+ <55DC7FA4.7040902@arm.com>
+ <CY1PR0301MB08433A2659C75028821F0AE783610@CY1PR0301MB0843.namprd03.prod.outlook.com>
+ <55DC96BA.2020905@arm.com>
+ <CY1PR0301MB0843388CA3BB07493BC2907183610@CY1PR0301MB0843.namprd03.prod.outlook.com>
+ <alpine.DEB.2.11.1508252126360.15006@nanos>
+Message-ID: <CY1PR0301MB08430902E0E46A43D00317C283610@CY1PR0301MB0843.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ingo,
 
-I'm facing an issue with CONFIG_DEBUG_SHIRQ and pm_runtime when using
-devm_request_*irq().
 
-If we using devm_request_*irq(), that irq will be freed after device
-drivers' ->remove() gets called. If on ->remove(), we're calling
-pm_runtime_put_sync(); pm_runtime_disable(), device's clocks might get
-gated and, because we do an extra call to the device's IRQ handler when
-CONFIG_DEBUG_SHIRQ=y, we might trigger an abort exception if, inside the
-IRQ handler, we try to read a register which is clocked by the device's
-clock.
+> -----Original Message-----
+> From: Thomas Gleixner [mailto:tglx at linutronix.de]
+> Sent: 2015?8?25? 14:30
+> To: Wang Shenwei-B38339
+> Cc: Sudeep Holla; shawn.guo at linaro.org; jason at lakedaemon.net; Huang
+> Yongcai-B20788; linux-kernel at vger.kernel.org;
+> linux-arm-kernel at lists.infradead.org
+> Subject: RE: [PATCH v9 1/1] irqchip: imx-gpcv2: IMX GPCv2 driver for wakeup
+> sources
+> 
+> On Tue, 25 Aug 2015, Shenwei Wang wrote:
+> > > From: Sudeep Holla [mailto:sudeep.holla at arm.com] All fine, what I am
+> > > saying is let irq-core know that you want to mask the 2 non-wakeup
+> > > irqs you have using MASK_ON_SUSPEND. So when suspend_device_irqs is
+> > > called in suspend path, that's done for you automatically and the
+> > > cpu2wakeup will have just 1 wakeup enabled which is what you are
+> > > doing in suspend callback, right ?
+> >
+> > 	/*
+> > 	 * Hardware which has no wakeup source configuration facility
+> > 	 * requires that the non wakeup interrupts are masked at the
+> > 	 * chip level. The chip implementation indicates that with
+> > 	 * IRQCHIP_MASK_ON_SUSPEND.
+> > 	 */
+> > 	if (irq_desc_get_chip(desc)->flags & IRQCHIP_MASK_ON_SUSPEND)
+> > 		mask_irq(desc);
+> >
+> > IRQCHIP_MASK_ON_SUSPEND flag is for the hardware that has no wakeup
+> > source capability.  This GPCv2 block is designed to manage the wakeup
+> > source, so the flag does not make any sense.
+> 
+> You have no seperate wakeup source mechanism. All you do is to mask all non
+> wakeup sources and keep the wakeup sources unmask.
+> 
+> That's what happens in gpcv2_wakeup_source_save()
+> 
+>        writel_relaxed(cd->wakeup_sources[i], reg);
+> 
+> So it's the same as letting the core mask all non wakeup sources and leave the
+> wakeup sources unmask.
 
-This is, of course, really old code which has been in tree for many,
-many years. I guess nobody has been running their tests in the setup
-mentioned above (CONFIG_DEBUG_SHIRQ=y, pm_runtime_put_sync() on
-->remove(), a register read on IRQ handler, and a shared IRQ handler),
-so that's why we never caught this before.
+Does it mean an unexpected interrupt may activate the system, and the core will let
+the system go into suspend again if the core determines it not a wakeup source? The current design
+is to ignore all the unexpected interrupts in the hardware level. Only the presetting 
+wakeup sources can activate the platform. Here power consumption is more 
+important.
 
-Disabling CONFIG_DEBUG_SHIRQ, of course, makes the problem go away, but
-if driver *must* be ready to receive, and handle, an IRQ even during
-module removal, I wonder what the IRQ handler should do. We can't, in
-most cases, call pm_runtime_put_sync() from IRQ handler.
+> > > Now that it's already done for you, you need not do anything extra
+> > > and hence just set SKIP_SET_WAKE to do nothing.
+> >
+> > static int set_irq_wake_real(unsigned int irq, unsigned int on) {
+> > 	struct irq_desc *desc = irq_to_desc(irq);
+> > 	int ret = -ENXIO;
+> >
+> > 	if (irq_desc_get_chip(desc)->flags &  IRQCHIP_SKIP_SET_WAKE)
+> > 		return 0;
+> >
+> > 	if (desc->irq_data.chip->irq_set_wake)
+> > 		ret = desc->irq_data.chip->irq_set_wake(&desc->irq_data, on);
+> >
+> > 	return ret;
+> > }
+> > From the codes above, if a irqchip can not handle the wakeup sources,
+> > it can set SKIP flag.  This driver is intended to manage the wakeup
+> > sources, what's the reason to skip here?
+> 
+> To reduce code. Everything the core can do for you is something you don't have to
+> implement.
 
-I'm guessing the only way would be to move pm_runtime calls into the bus
-driver (in this case, the platform_bus) and make sure it only gets
-called after device managed resources are freed ?
+Same as above.
 
-Any hints would be greatly appreciated.
+Thanks,
+Shenwei
 
-cheers
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150825/091ce5a7/attachment.sig>
+> Thanks,
+> 
+> 	tglx
