@@ -1,102 +1,92 @@
-From: nschichan@freebox.fr (Nicolas Schichan)
-Date: Tue, 25 Aug 2015 15:55:04 +0200
-Subject: [PATCH 9/9] ARM: software-based priviledged-no-access support
-In-Reply-To: <20150825123800.GQ7557@n2100.arm.linux.org.uk>
-References: <20150821133043.GV7557@n2100.arm.linux.org.uk>
- <E1ZSmQG-0002za-E3@rmk-PC.arm.linux.org.uk>
- <CAMuHMdVMka2mt5pFpnXfLRY2M3Sj_71MgEpthOia2C99RaP_DA@mail.gmail.com>
- <20150825104422.GO7557@n2100.arm.linux.org.uk>
- <CAMuHMdWCLcDS=64m0J09KJJ4bDtgZ1Yvq8rw7u9FE0vZkKT2cw@mail.gmail.com>
- <20150825123800.GQ7557@n2100.arm.linux.org.uk>
-Message-ID: <55DC73B8.3010002@freebox.fr>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Tue, 25 Aug 2015 15:54:09 +0200
+Subject: [PATCH v7 25/44] [media] replace all occurrences of
+ MEDIA_ENT_T_DEVNODE_V4L
+In-Reply-To: <20150825083236.37659d22@recife.lan>
+References: <cover.1440359643.git.mchehab@osg.samsung.com>	<23e2f9440a259e1162e15dba7e6261dbc4c521c6.1440359643.git.mchehab@osg.samsung.com>	<55DC340C.8030503@xs4all.nl>
+ <20150825083236.37659d22@recife.lan>
+Message-ID: <55DC7381.9090600@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/25/2015 02:38 PM, Russell King - ARM Linux wrote:
-> On Tue, Aug 25, 2015 at 01:21:04PM +0200, Geert Uytterhoeven wrote:
->> Hi Russell,
->>
->> On Tue, Aug 25, 2015 at 12:44 PM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->>> On Tue, Aug 25, 2015 at 12:32:51PM +0200, Geert Uytterhoeven wrote:
->>>> This patch, which is now in arm-soc/for-next, breaks shmobile_defconfig
->>>> on r8a7791/koelsch, which has a dual core CA15:
->>>>
->>>>     [ ok ] Configuring network interfaces...done.
->>>>     Unhandled fault: page domain fault (0x01b) at 0xbe8e6120
->>>>     pgd = edbb0000
->>>>     [be8e6120] *pgd=6da77831, *pte=bf4d075f, *ppte=bf4d0c7f
->>>>     Internal error: : 1b [#1] SMP ARM
->>>>     CPU: 1 PID: 1629 Comm: ntpdate Not tainted
->>>> 4.2.0-rc8-06444-g3c24fd89c9421db1 #31
->>>>     9
->>>>     Hardware name: Generic R8A7791 (Flattened Device Tree)
->>>>     task: ed883a80 ti: ed41c000 task.ti: ed41c000
->>>>     PC is at csum_partial_copy_from_user+0x28/0x3d8
->>>>     LR is at csum_and_copy_from_iter+0x334/0x4c0
->>>>     pc : [<c04ba510>]    lr : [<c01c82e8>]    psr: 000f0013
->>>>     sp : ed41db00  ip : 00000020  fp : ed41db6c
->>>>     r10: ed41ddc0  r9 : 00000027  r8 : ed41dc20
->>>>     r7 : 00000027  r6 : eda52653  r5 : ed41dec8  r4 : 00000000
->>>>     r3 : 00000000  r2 : 00000027  r1 : eda5262c  r0 : be8e6120
->>>>     Flags: nzcv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment none
->>>>     Control: 10c5307d  Table: 6dbb006a  DAC: 00000051
->>>>     Process ntpdate (pid: 1629, stack limit = 0xed41c210)
+On 08/25/15 13:32, Mauro Carvalho Chehab wrote:
+> Em Tue, 25 Aug 2015 11:23:24 +0200
+> Hans Verkuil <hverkuil@xs4all.nl> escreveu:
+> 
+>> On 08/23/15 22:17, Mauro Carvalho Chehab wrote:
+>>> Now that interfaces and entities are distinct, it makes no sense
+>>> of keeping something named as MEDIA_ENT_T_DEVNODE.
 >>>
->>> Thanks.  I wonder what's different about your ntpdate that triggers
->>> this, and why all my iMX6 behave fine, which have desktop-like ubuntu
->>> installs on (of two different versions.)
+>>> This change was done with this script:
+>>>
+>>> 	for i in $(git grep -l MEDIA_ENT_T|grep -v uapi/linux/media.h); do sed s,MEDIA_ENT_T_DEVNODE_V4L,MEDIA_ENT_T_V4L2_VIDEO, <$i >a && mv a $i; done
+>>>
+>>> Signed-off-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
+>>>
+>>> diff --git a/Documentation/DocBook/media/v4l/media-ioc-enum-entities.xml b/Documentation/DocBook/media/v4l/media-ioc-enum-entities.xml
+>>> index 5872f8bbf774..910243d4edb8 100644
+>>> --- a/Documentation/DocBook/media/v4l/media-ioc-enum-entities.xml
+>>> +++ b/Documentation/DocBook/media/v4l/media-ioc-enum-entities.xml
+>>> @@ -183,7 +183,7 @@
+>>>  	    <entry>Unknown device node</entry>
+>>>  	  </row>
+>>>  	  <row>
+>>> -	    <entry><constant>MEDIA_ENT_T_DEVNODE_V4L</constant></entry>
+>>> +	    <entry><constant>MEDIA_ENT_T_V4L2_VIDEO</constant></entry>
+>>>  	    <entry>V4L video, radio or vbi device node</entry>
+>>>  	  </row>
 >>
->> It's ntpdate 1:4.2.6.p5+dfsg-7 from desktop-like Debian jessie.
+>> OK, this makes no sense and that ties in with my confusion of the previous patch.
+>>
+>> These are not device nodes, in the new scheme these are DMA entities (I know,
+>> naming TDB) that have an associated interface.
 > 
-> Hmm, I think I tried at one time to install Debian on an iMX6 platform
-> and gave up with it after spending 50 minutes with the installer getting
-> so far, and then killing the network - it was very repeatable, and always
-> happened at the same point in the installation.  I gave up with Debian
-> at that point, as I didn't have lots of 50 minutes to babysit the silly
-> installer (which can't ask the questions up-front) nor did I want to
-> waste my monthly internet allowance on multiple failed install attempts.
+> Yes. Well, DMA is a bad name. It won't cover USB devices, where the DMA
+> engine is outside the V4L2 drivers, nor it would work for RDS radio data,
+> with may not need any DMA at all on no-USB devices, as the data flows via
+> the I2C bus.
 > 
-> The reports I was getting from other iMX6 users was that Debian Jessie
-> had lots of problems at that time.
+>> I think a much better approach would be to add entity type(s) for such DMA
+>> engines in patch 24, then use that new name in existing drivers and split
+>> up the existing DEVNODE_V4L media_entity into a media_entity and a
+>> media_intf_devnode:
 > 
->> But I get similar dumps during boot up from rpc.idmapd (SyS_send),
->> rsyslogd (SyS_send), and from sshd (SyS_write) when trying to log in.
+> Sorry, but I didn't get. That's precisely what I did ;)
 > 
-> Hmm.
+>> The current media_entity defined in struct video_device has to be replaced
+>> by media_intf_devnode, and the DMA entity has to be added as a new entity
+>> to these drivers.
 > 
-> root       693  0.0  0.1   4944  3196 ?        Ss   01:22   0:00 /usr/sbin/sshd -D
-> syslog     720  0.2  0.0  30404  2032 ?        Sl   01:23   1:19 rsyslogd -c5
-> root       722  0.0  0.0   2392  1340 ?        Ss   01:23   0:00 rpc.idmapd
+> If I do this way, it would break bisectability. I need first to replace
+> the names, but keep them as entities, and then add the interfaces.
 > 
-> So, the question I need to find an answer to is... why hasn't this path
-> been exercised on my platforms during my testing.  It's certainly
-> compiled into the kernel...
+>>
+>> This reflects these two action items from our meeting:
+>>
+>> Migration: add v4l-subdev media_interface: Laurent
+>> Migration: add explicit DMA Engine entity: Laurent
+>>
+>> Unless Laurent says differently I think this is something you'll have to
+>> do given Laurent's workload.
 > 
-> Anyway, I've now (hopefully) fixed the bug, but I've nobbled
-> csum_partial_copy_from_user to ensure that it will always oops the kernel
-> if called:
+> Yes. The above action items are covered on this series.
 > 
-> 000000b4 <csum_partial_copy_from_user>:
->   b4:   ee133f10        mrc     15, 0, r3, cr3, cr0, {0}
->   b8:   e92d41fe        push    {r1, r2, r3, r4, r5, r6, r7, r8, lr}
->   bc:   e3a03055        mov     r3, #85 ; 0x55
->   c0:   ee033f10        mcr     15, 0, r3, cr3, cr0, {0}
->   c4:   e7033003        str     r3, [r3, -r3]
+> What patch 24 does is to define the new namespace, moving the legacy
+> symbols kept due to backward compatibility on a separate part of the
+> header.
 > 
-> and... it doesn't trigger.  I can only assume that this is because the
-> iMX6 ethernet interface uses TSO (which implies checksum offload), there's
-> no need to use these csum functions - and that would explain why it never
-> came up in my local testing.
+> Then, patches 25-38 replace the occurrences of the deprecated names
+> by the new ones.
+> 
+> Nothing is touched at the interfaces yet, to avoid breaking bisectability.
 
-[resent with the list and other original recipients this time]
+I don't follow why that would break bisect.
 
-I have the csum_partial_copy_from_user issue too, but with radvd (which sends
-ipv6 packets). ipv4 networking is fine on the other hand. The kirkwood
-platform I use does have checksum offload for ipv4 only and not ipv6 so the
-csum functions will get called in the ipv6 case.
+> Then, the next patches add interfaces support at the V4L side.
 
+So this is not yet included in this patch series? That would explain
+my confusion. If it is, then I need to take another look on Friday.
 
--- 
-Nicolas Schichan
-Freebox SAS
+Regards,
+
+	Hans
