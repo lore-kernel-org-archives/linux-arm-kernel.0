@@ -1,34 +1,40 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 25 Aug 2015 14:06:31 +0200
-Subject: [PATCH] ARM: shmobile: remove Makefile.boot
-In-Reply-To: <1440113264-30359-1-git-send-email-horms+renesas@verge.net.au>
-References: <1440113264-30359-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdWYM6vVWzUQgR4u8cvoH6Jtq4XerYd2PbpvfUruDPi7-Q@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 25 Aug 2015 14:06:36 +0200
+Subject: [PATCH] mmc: atmel-mci: remove useless include
+In-Reply-To: <1439216808-11826-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1439216808-11826-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <CAPDyKFrOnmd2prcsYsSpFD66V5vpcFWQvPyBQgyyiTde_ew7eg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 21, 2015 at 1:27 AM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> Now that the only multiplatform boot is supported for all
-> shmobile platforms Makefile.boot may be removed.
+On 10 August 2015 at 16:26, Alexandre Belloni
+<alexandre.belloni@free-electrons.com> wrote:
+> Definitions from linux/platform_data/atmel.h are not used, remove the
+> include.
 >
-> This seems correct to me given:
-> * Setting MACHINE to no value in arch/arm/Makefile
->   if CONFIG_ARCH_MULTIPLATFORM is set
-> * Not including Makefile.boot in arch/arm/boot/Makefile
->   if MACHINE has no value
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+
+Thanks, applied for next!
+
+Kind regards
+Uffe
+
+> ---
+>  drivers/mmc/host/atmel-mci.c | 1 -
+>  1 file changed, 1 deletion(-)
 >
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
+> index 9a39e0b7e583..bf62e429f7fc 100644
+> --- a/drivers/mmc/host/atmel-mci.c
+> +++ b/drivers/mmc/host/atmel-mci.c
+> @@ -29,7 +29,6 @@
+>  #include <linux/slab.h>
+>  #include <linux/stat.h>
+>  #include <linux/types.h>
+> -#include <linux/platform_data/atmel.h>
+>  #include <linux/platform_data/mmc-atmel-mci.h>
+>
+>  #include <linux/mmc/host.h>
+> --
+> 2.1.4
+>
