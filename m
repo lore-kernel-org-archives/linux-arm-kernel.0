@@ -1,109 +1,237 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 25 Aug 2015 18:22:29 -0500
-Subject: [PATCH 1/7] drm/vc4: Add devicetree bindings for VC4.
-In-Reply-To: <CAF6AEGu2fi0M7DsicHz+5SDHi1DyDRmvWjkmYPPgY6pZ423WcA@mail.gmail.com>
-References: <1439427380-2436-1-git-send-email-eric@anholt.net>
- <1439427380-2436-2-git-send-email-eric@anholt.net>
- <55CEC25E.7070303@wwwdotorg.org>
- <874mjxwyx5.fsf@eliezer.anholt.net>
- <CAL_JsqJxiGUR5BxBPyR3-0NxqWsOxMGrWQA6cMXe2pjTom__nw@mail.gmail.com>
- <CAF6AEGu2fi0M7DsicHz+5SDHi1DyDRmvWjkmYPPgY6pZ423WcA@mail.gmail.com>
-Message-ID: <CAL_JsqJpWmEpOZK5-HG5Xz8J-h7SX8ViytagjxGLdeMwXeONow@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 25 Aug 2015 16:36:45 -0700
+Subject: [PATCH 2/5] ARM: NSP: add minimal Northstar Plus device tree
+In-Reply-To: <1440092804-25726-1-git-send-email-jonmason@broadcom.com>
+References: <1440092804-25726-1-git-send-email-jonmason@broadcom.com>
+Message-ID: <CAOesGMhE40_mfZCD2PqcTObE_Gz_6rKFwhf3-6kZY4n9Yxn2rQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 25, 2015 at 3:42 PM, Rob Clark <robdclark@gmail.com> wrote:
-> On Mon, Aug 24, 2015 at 9:47 AM, Rob Herring <robherring2@gmail.com> wrote:
->> On Mon, Aug 17, 2015 at 1:30 PM, Eric Anholt <eric@anholt.net> wrote:
->>> Stephen Warren <swarren@wwwdotorg.org> writes:
->>>
->>>> On 08/12/2015 06:56 PM, Eric Anholt wrote:
->>>>> Signed-off-by: Eric Anholt <eric@anholt.net>
->>>>
->>>> This one definitely needs a patch description, since someone might not
->>>> know what a VC4 is, and "git log" won't show the text from the binding
->>>> doc itself. I'd suggest adding the initial paragraph of the binding doc
->>>> as the patch description, or more.
->>>>
->>>>> diff --git a/Documentation/devicetree/bindings/gpu/brcm,bcm-vc4.txt b/Documentation/devicetree/bindings/gpu/brcm,bcm-vc4.txt
->>>
->>>>> +- hvss:             List of references to HVS video scalers
->>>>> +- encoders: List of references to output encoders (HDMI, SDTV)
->>>>
->>>> Would it make sense to make all those nodes child node of the vc4
->>>> object. That way, there's no need to have these lists of objects; they
->>>> can be automatically built up as the DT is enumerated. I know that e.g.
->>>> the NVIDIA Tegra host1x binding works this way, and I think it may have
->>>> been inspired by other similar cases.
->>>
->>> I've looked at tegra, and the component system used by msm appears to be
->>> nicer than it.  To follow tegra's model, it looks like I need to build
->>> this extra bus thing corresponding to host1x that is effectively the
->>> drivers/base/component.c code, so that I can get at vc4's structure from
->>> the component drivers.
->>>
->>>> Of course, this is only appropriate if the HW modules really are
->>>> logically children of the VC4 HW module. Perhaps they aren't. If they
->>>> aren't though, I wonder what this "vc4" module actually represents in HW?
->>>
->>> It's the subsystem, same as we use a subsystem node for msm, sti,
->>> rockchip, imx, and exynos.  This appears to be the common model of how
->>> the collection of graphics-related components is represented in the DT.
->>
->> I think most of these bindings are wrong. They are grouped together
->> because that is what DRM wants not because that reflects the h/w. So
->> convince me this is one block, not that it is what other people do.
+Hi,
+
+I'm not sure what the strategy behind your cc:ing on this patch set
+is. I only got a couple of them in my inbox, and this one wasn't one
+of them. :)
+
+On Thu, Aug 20, 2015 at 10:46 AM, Jon Mason <jonmason@broadcom.com> wrote:
+> Add a very minimalistic set of Northstar Plus Device Tree files which
+> describes the SoC and the BCM958625 implementation.  The perpherials
+> described are:
 >
-> I think, when it comes to more complex driver subsystems (like drm in
-> particular) we have a bit of mismatch between how things look from the
-> "pure hw ignoring sw" perspective, and the "how sw and in particular
-> userspace expects things" perspective.  Maybe it is less a problem in
-> other subsystems, where bindings map to things that are only visible
-> in the kernel, or well defined devices like uart or sata controller.
-> But when given the choice, I'm going to err on the side of not
-> confusing userspace and the large software stack that sits above
-> drm/kms, over dt purity.
+> ARM Cortex A9 CPU
+> 2 8250 UARTs
+> ARM GIC
+> PL310 L2 Cache
+> ARM A9 Global timer
+>
+> Signed-off-by: Jon Mason <jonmason@broadcom.com>
+> Signed-off-by: Kapil Hali <kapilh@broadcom.com>
+> Reviewed-by: Ray Jui <rjui@broadcom.com>
+> Reviewed-by: Scott Branden <sbranden@broadcom.com>
 
-I wasn't implying that this should get exposed to userspace as
-components. V4L2 has gone that route with media controller and
-sub-devs. Perhaps that is needed for DRM, perhaps not. For the moment,
-I definitely agree the kernel should hide most/all of those details,
-but I don't think that means DT has to hide the details or know what
-components are handled by a single driver. My point was that on the DT
-side we have a mixture of OF graph usage, parent-child nodes or custom
-phandles (this case) to describe the relationships between h/w
-components. That's not necessarily wrong, but we should have some
-rules around how certain relationships are described. Then in the
-drivers we have a mixture of deferred probe, component API, and custom
-inter-module APIs to control init order. We then have a mixture of all
-those which leads to very few if any drivers having the same overall
-structure that could be shared. Should we mandate using the component
-API for h/w that is discrete blocks? Should we throw out the component
-API for something else? Can we tie the graph parsing and component API
-together with common code?
+Seeing reviewed-by already attached to a v1 of a patchset has limited
+value for someone on the outside.
+
+Reviewed-by is one of those tags that has a value that's mostly
+dependent on who it comes from. By not actually seeing the review and
+the feedback provided (and revisions made), less data is provided to
+tell if it's a valuable review or not.
+
+Also, if you're posting the code you should probably have your name
+below Kapil's, since you're the one signing off the origin of the
+code. See Documentation/SubmittingPatches.txt for details on what
+S-o-b actually means.
 
 
-> Maybe it would be nice to have a sort of dt overlay that adds the bits
-> needed to tie together hw blocks that should be assembled into a
-> single logical device for linux and userspace (but maybe not some
-> other hypothetical operating system).  But so far that doesn't exist.
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/bcm-nsp.dtsi
+> @@ -0,0 +1,105 @@
+> +/*
+> + *  BSD LICENSE
+> + *
+> + *  Copyright(c) 2015 Broadcom Corporation.  All rights reserved.
+> + *
+> + *  Redistribution and use in source and binary forms, with or without
+> + *  modification, are permitted provided that the following conditions
+> + *  are met:
+> + *
+> + *    * Redistributions of source code must retain the above copyright
+> + *      notice, this list of conditions and the following disclaimer.
+> + *    * Redistributions in binary form must reproduce the above copyright
+> + *      notice, this list of conditions and the following disclaimer in
+> + *      the documentation and/or other materials provided with the
+> + *      distribution.
+> + *    * Neither the name of Broadcom Corporation nor the names of its
+> + *      contributors may be used to endorse or promote products derived
+> + *      from this software without specific prior written permission.
+> + *
+> + *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+> + *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+> + *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+> + *  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+> + *  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+> + *  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+> + *  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+> + *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+> + *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+> + *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+> + *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+> + */
 
-OF graph is supposed to do this. OF graph is a double edged sword. It
-is very flexible, but then each platform can do something different.
-We need to have some level of requirements around how the OF graph is
-used. As an example, any system with an HDMI connector should have an
-"hdmi-connector" compatible node or encoder/bridge chips/blocks must
-have certain ports defined.
+I'm not sure we've seen BSD-only submissions before. I'll let DT
+maintainers (or Ian) speak up in case this would cause problems.
 
 
-> All we have is a hammer (devicetree), everything looks like a nail.
-> End result is we end up adding some things in the bindings which
-> aren't purely about the hw.  Until someone invents a screwdriver, I'm
-> not sure what else to do.  In the end, other hypothetical OS is free
-> to ignore those extra fields in the bindings if it doesn't need them.
-> So meh?
+> +
+> +#include <dt-bindings/interrupt-controller/arm-gic.h>
+> +#include <dt-bindings/interrupt-controller/irq.h>
+> +
+> +#include "skeleton.dtsi"
+> +
+> +/ {
+> +       compatible = "brcm,nsp";
+> +       model = "Broadcom Northstar Plus SoC";
+> +       interrupt-parent = <&gic>;
+> +
+> +       cpus {
+> +               #address-cells = <1>;
+> +               #size-cells = <0>;
+> +
+> +               cpu at 0 {
+> +                       device_type = "cpu";
+> +                       compatible = "arm,cortex-a9";
+> +                       next-level-cache = <&L2>;
+> +                       reg = <0x0>;
+> +               };
+> +       };
+> +
+> +       clocks {
+> +               #address-cells = <1>;
+> +               #size-cells = <1>;
+> +               ranges;
+> +
+> +               periph_clk: periph_clk {
+> +                       compatible = "fixed-clock";
+> +                       #clock-cells = <0>;
+> +                       clock-frequency = <500000000>;
+> +               };
+> +       };
+> +
+> +       uart0: serial at 18000300 {
+> +               compatible = "ns16550a";
+> +               reg = <0x18000300 0x100>;
+> +               interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
+> +               clock-frequency = <62499840>;
+> +               status = "disabled";
+> +       };
+> +
+> +       uart1: serial at 18000400 {
+> +               compatible = "ns16550a";
+> +               reg = <0x18000400 0x100>;
+> +               interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
+> +               clock-frequency = <62499840>;
+> +               status = "disabled";
+> +       };
+> +
+> +       gic: interrupt-controller at 19021000 {
+> +               compatible = "arm,cortex-a9-gic";
+> +               #interrupt-cells = <3>;
+> +               #address-cells = <0>;
+> +               interrupt-controller;
+> +               reg = <0x19021000 0x1000>,
+> +                     <0x19020100 0x100>;
+> +       };
+> +
+> +       L2: l2-cache {
+> +               compatible = "arm,pl310-cache";
+> +               reg = <0x19022000 0x1000>;
+> +               cache-unified;
+> +               cache-level = <2>;
+> +       };
+> +
+> +       timer at 19020200 {
+> +               compatible = "arm,cortex-a9-global-timer";
+> +               reg = <0x19020200 0x100>;
+> +               interrupts = <GIC_PPI 11 IRQ_TYPE_LEVEL_HIGH>;
+> +               clocks = <&periph_clk>;
+> +       };
+> +};
+> diff --git a/arch/arm/boot/dts/bcm958625k.dts b/arch/arm/boot/dts/bcm958625k.dts
+> new file mode 100644
+> index 0000000..a1bc151
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/bcm958625k.dts
+> @@ -0,0 +1,57 @@
+> +/*
+> + *  BSD LICENSE
+> + *
+> + *  Copyright(c) 2015 Broadcom Corporation.  All rights reserved.
+> + *
+> + *  Redistribution and use in source and binary forms, with or without
+> + *  modification, are permitted provided that the following conditions
+> + *  are met:
+> + *
+> + *    * Redistributions of source code must retain the above copyright
+> + *      notice, this list of conditions and the following disclaimer.
+> + *    * Redistributions in binary form must reproduce the above copyright
+> + *      notice, this list of conditions and the following disclaimer in
+> + *      the documentation and/or other materials provided with the
+> + *      distribution.
+> + *    * Neither the name of Broadcom Corporation nor the names of its
+> + *      contributors may be used to endorse or promote products derived
+> + *      from this software without specific prior written permission.
+> + *
+> + *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+> + *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+> + *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+> + *  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+> + *  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+> + *  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+> + *  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+> + *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+> + *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+> + *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+> + *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+> + */
+> +
+> +/dts-v1/;
+> +
+> +#include "bcm-nsp.dtsi"
+> +
+> +/ {
+> +       model = "NorthStar Plus SVK (BCM958625K)";
+> +       compatible = "brcm,bcm58625", "brcm,nsp";
+> +
+> +       aliases {
+> +               serial0 = &uart0;
+> +               serial1 = &uart1;
+> +       };
+> +
+> +       chosen {
+> +               stdout-path = "serial0:115200n8";
+> +       };
 
-We really want to err on the side of fewer bindings, not more as once
-used they are an ABI.
+No way to mount a root filesystem yet? How much work remains for that
+to be possible, and what's the plan for that?
 
-Rob
+> +
+> +       uart0: serial at 18000300 {
+> +               status = "okay";
+> +       };
+> +
+> +       uart1: serial at 18000400 {
+> +               status = "okay";
+> +       };
+
+I recommend using labels here instead so you don't have to mirror the
+DT layout to get the updated property right.
+
+I.e.
+
+&uart1 {
+        status = "okay";
+};
+
+
+
+-Olof
