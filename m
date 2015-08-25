@@ -1,156 +1,54 @@
-From: gkulkarni@caviumnetworks.com (Ganapatrao Kulkarni)
-Date: Tue, 25 Aug 2015 15:48:05 +0530
-Subject: [PATCH v2] irqchip, gicv3-its,
- numa: Workaround for Cavium ThunderX erratum 23144
-Message-ID: <1440497885-24584-1-git-send-email-gkulkarni@caviumnetworks.com>
+From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
+Date: Tue, 25 Aug 2015 12:21:06 +0200
+Subject: [PATCH linux-next v4 5/5] mtd: atmel-quadspi: add driver for
+ Atmel QSPI controller
+In-Reply-To: <CAOiHx=kExyKAoGW4ciWHHxGNosNR0VdvHHrSqeo7RH1rNOXgig@mail.gmail.com>
+References: <cover.1440410236.git.cyrille.pitchen@atmel.com>
+ <201508241303.52066.marex@denx.de> <55DB4EA6.9090807@atmel.com>
+ <201508241945.33577.marex@denx.de>
+ <CAOiHx=kExyKAoGW4ciWHHxGNosNR0VdvHHrSqeo7RH1rNOXgig@mail.gmail.com>
+Message-ID: <55DC4192.6060906@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch below adds a workaround for gicv3 in a numa environment. It
-is on top of Robert's recent gicv3 errata patch submission v4 and my
-arm64 numa patches v5.
+Le 25/08/2015 11:46, Jonas Gorski a ?crit :
+> On Mon, Aug 24, 2015 at 7:45 PM, Marek Vasut <marex@denx.de> wrote:
+>> On Monday, August 24, 2015 at 07:04:38 PM, Cyrille Pitchen wrote:
+>>> Hi Marek,
+>>
+>> Hi!
+>>
+>>> Le 24/08/2015 13:03, Marek Vasut a ?crit :
+>>>> On Monday, August 24, 2015 at 12:14:00 PM, Cyrille Pitchen wrote:
+>>>>> This driver add support to the new Atmel QSPI controller embedded into
+>>>>> sama5d2x SoCs. It expects a NOR memory to be connected to the QSPI
+>>>>> controller.
+>>
+>> [...]
+>>
+>>>>> +  /* Compute address parameters */
+>>>>> +  switch (cmd->enable.bits.address) {
+>>>>> +  case 4:
+>>>>> +          ifr |= QSPI_IFR_ADDRL;
+>>>>> +          /*break;*/ /* fallback to the 24bit address case */
+>>>>
+>>>> What's this commented out bit of code for ? :-)
+>>>
+>>> I just wanted to stress out there was no missing "break;".
+>>> I've reworded the comment to:
+>>> /* No "break" on purpose: fallback to the 24bit address case. */
+>>
+>> Oh, the address is in bytes . I see, yes, it makes sense to be more
+>> explicit here about the purpose of the fallback. I think this change
+>> in the comment will make it easier for everyone who comes back in a
+>> few years and reads this code.
+> 
+> I think you are looking for the term "(switch case) fallthrough", not
+> "fallback". "Fallback" makes it sound like there is something missing,
+> or an invalid state.
+> 
+> 
+> Jonas
+> 
 
-This implements a workaround for gicv3-its erratum 23144 on Cavium's
-ThunderX dual-socket platforms, where LPI cannot be routed to a
-redistributors present on a foreign node.
-
-v2:
-updatated as per Marc Zyngier's review comments.
-
-Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
-Signed-off-by: Robert Richter <rrichter@cavium.com>
----
- drivers/irqchip/irq-gic-v3-its.c | 53 +++++++++++++++++++++++++++++++++-------
- 1 file changed, 44 insertions(+), 9 deletions(-)
-
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 614a367..d3fe0a4 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -40,7 +40,8 @@
- #include "irqchip.h"
- 
- #define ITS_FLAGS_CMDQ_NEEDS_FLUSHING          (1ULL << 0)
--#define ITS_FLAGS_CAVIUM_THUNDERX              (1ULL << 1)
-+#define ITS_WORKAROUND_CAVIUM_22375            (1ULL << 1)
-+#define ITS_WORKAROUND_CAVIUM_23144            (1ULL << 2)
- 
- #define RDIST_FLAGS_PROPBASE_NEEDS_FLUSHING	(1 << 0)
- 
-@@ -73,6 +74,7 @@ struct its_node {
- 	struct list_head	its_device_list;
- 	u64			flags;
- 	u32			ite_size;
-+	int			numa_node;
- };
- 
- #define ITS_ITT_ALIGN		SZ_256
-@@ -607,11 +609,20 @@ static void its_eoi_irq(struct irq_data *d)
- static int its_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
- 			    bool force)
- {
--	unsigned int cpu = cpumask_any_and(mask_val, cpu_online_mask);
-+	unsigned int cpu;
-+	const struct cpumask *cpu_mask = cpu_online_mask;
- 	struct its_device *its_dev = irq_data_get_irq_chip_data(d);
- 	struct its_collection *target_col;
- 	u32 id = its_get_event_id(d);
- 
-+	/* lpi cannot be routed to a redistributor that is on a foreign node */
-+	if (its_dev->its->flags & ITS_WORKAROUND_CAVIUM_23144) {
-+		cpu_mask = cpumask_of_node(its_dev->its->numa_node);
-+		if (!cpumask_intersects(mask_val, cpu_mask))
-+			return -EINVAL;
-+	}
-+
-+	cpu = cpumask_any_and(mask_val, cpu_mask);
- 	if (cpu >= nr_cpu_ids)
- 		return -EINVAL;
- 
-@@ -1338,9 +1349,14 @@ static void its_irq_domain_activate(struct irq_domain *domain,
- {
- 	struct its_device *its_dev = irq_data_get_irq_chip_data(d);
- 	u32 event = its_get_event_id(d);
-+	const struct cpumask *cpu_mask = cpu_online_mask;
-+
-+	/* get the cpu_mask of local node */
-+	if (IS_ENABLED(CONFIG_NUMA))
-+		cpu_mask = cpumask_of_node(its_dev->its->numa_node);
- 
- 	/* Bind the LPI to the first possible CPU */
--	its_dev->event_map.col_map[event] = cpumask_first(cpu_online_mask);
-+	its_dev->event_map.col_map[event] = cpumask_first(cpu_mask);
- 
- 	/* Map the GIC IRQ and event to the device */
- 	its_send_mapvi(its_dev, d->hwirq, event);
-@@ -1423,11 +1439,19 @@ static int its_force_quiescent(void __iomem *base)
- 	}
- }
- 
--static void its_enable_cavium_thunderx(void *data)
-+static void its_enable_cavium_thunderx_22375(void *data)
- {
-        struct its_node *its = data;
- 
--       its->flags |= ITS_FLAGS_CAVIUM_THUNDERX;
-+	its->flags |= ITS_WORKAROUND_CAVIUM_22375;
-+}
-+
-+static void its_enable_cavium_thunderx_23144(void *data)
-+{
-+	struct its_node *its = data;
-+
-+	if (num_possible_nodes() > 1)
-+		its->flags |= ITS_WORKAROUND_CAVIUM_23144;
- }
- 
- static const struct gic_capabilities its_errata[] = {
-@@ -1435,10 +1459,16 @@ static const struct gic_capabilities its_errata[] = {
-                .desc   = "ITS: Cavium errata 22375, 24313",
-                .iidr   = 0xa100034c,   /* ThunderX pass 1.x */
-                .mask   = 0xffff0fff,
--               .init   = its_enable_cavium_thunderx,
--       },
--       {
--       }
-+		.init	= its_enable_cavium_thunderx_22375,
-+	},
-+	{
-+		.desc	= "ITS: Cavium errata 23144",
-+		.iidr	= 0xa100034c,	/* ThunderX pass 1.x */
-+		.mask	= 0xffff0fff,
-+		.init	= its_enable_cavium_thunderx_23144,
-+	},
-+	{
-+	}
- };
- 
- static void its_enable_quirks(struct its_node *its)
-@@ -1456,6 +1486,7 @@ static int its_probe(struct device_node *node, struct irq_domain *parent)
- 	u32 val;
- 	u64 baser, tmp;
- 	int err;
-+	int numa_node;
- 
- 	err = of_address_to_resource(node, 0, &res);
- 	if (err) {
-@@ -1463,6 +1494,9 @@ static int its_probe(struct device_node *node, struct irq_domain *parent)
- 		return -ENXIO;
- 	}
- 
-+	/* get numa affinity of its node*/
-+	numa_node = of_node_to_nid(node);
-+
- 	its_base = ioremap(res.start, resource_size(&res));
- 	if (!its_base) {
- 		pr_warn("%s: unable to map registers\n", node->full_name);
-@@ -1498,6 +1532,7 @@ static int its_probe(struct device_node *node, struct irq_domain *parent)
- 	its->phys_base = res.start;
- 	its->msi_chip.of_node = node;
- 	its->ite_size = ((readl_relaxed(its_base + GITS_TYPER) >> 4) & 0xf) + 1;
-+	its->numa_node = numa_node;
- 
- 	its->cmd_base = kzalloc(ITS_CMD_QUEUE_SZ, GFP_KERNEL);
- 	if (!its->cmd_base) {
--- 
-1.8.1.4
+will be modified in the next series, thanks for the review!
