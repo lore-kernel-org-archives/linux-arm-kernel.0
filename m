@@ -1,37 +1,127 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 25 Aug 2015 07:38:25 +0100
-Subject: [PATCH-v3] mfd: 88pm80x: Add 88pm860 chip type support
-In-Reply-To: <55DAC179.2060802@linaro.org>
-References: <1437393151-5362-1-git-send-email-vaibhav.hiremath@linaro.org>
- <55DAC179.2060802@linaro.org>
-Message-ID: <20150825063825.GE27431@sirena.org.uk>
+From: punnaia@xilinx.com (punnaiah choudary kalluri)
+Date: Tue, 25 Aug 2015 12:16:38 +0530
+Subject: [PATCH v4 1/2] Documentation: dt: Add Xilinx zynqmp dma device
+ tree binding documentation
+In-Reply-To: <CAL_Jsq+261JzSorbgEyQ4BFCHbsFsBaJQnpWJX-G=SX3yhqZJw@mail.gmail.com>
+References: <1438831173-8761-1-git-send-email-punnaia@xilinx.com>
+ <CAL_Jsq+261JzSorbgEyQ4BFCHbsFsBaJQnpWJX-G=SX3yhqZJw@mail.gmail.com>
+Message-ID: <CAGnW=BbS0V-avm+oV-V5J0995YUXwP9v0uZFwc4i9587u1SDTg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 24, 2015 at 12:32:17PM +0530, Vaibhav Hiremath wrote:
-> On Monday 20 July 2015 05:22 PM, Vaibhav Hiremath wrote:
-> >Add chip identification support for 88PM860 device
-> >to the pm80x_chip_mapping table.
+Hi Rob,
 
-> Last update/understanding which I have on this patch is,
-> 
-> Lee is OK with taking this patch from regulator tree.
-> Lee please let me know if you think otherwise.
-> 
-> With this patch in, the build dependency will go away.
-> 
-> Request to pick this patch into your topic/88pm800 branch and run build
-> test.
+On Tue, Aug 25, 2015 at 12:23 AM, Rob Herring <robherring2@gmail.com> wrote:
+> On Wed, Aug 5, 2015 at 10:19 PM, Punnaiah Choudary Kalluri
+> <punnaiah.choudary.kalluri@xilinx.com> wrote:
+>> Device-tree binding documentation for Xilinx zynqmp dma engine used in
+>> Zynq UltraScale+ MPSoC.
+>>
+>> Signed-off-by: Punnaiah Choudary Kalluri <punnaia@xilinx.com>
+>> ---
+>> Changes in v4:
+>> - None
+>> Changes in v3:
+>> - None
+>> Changes in v2:
+>> - None
+>> ---
+>>  .../devicetree/bindings/dma/xilinx/zynqmp_dma.txt  |   61 ++++++++++++++++++++
+>>  1 files changed, 61 insertions(+), 0 deletions(-)
+>>  create mode 100644 Documentation/devicetree/bindings/dma/xilinx/zynqmp_dma.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/dma/xilinx/zynqmp_dma.txt b/Documentation/devicetree/bindings/dma/xilinx/zynqmp_dma.txt
+>> new file mode 100644
+>> index 0000000..e4f92b9
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/dma/xilinx/zynqmp_dma.txt
+>> @@ -0,0 +1,61 @@
+>> +Xilinx ZynqMP DMA engine, it does support memory to memory transfers,
+>> +memory to device and device to memory transfers. It also has flow
+>> +control and rate control support for slave/peripheral dma access.
+>> +
+>> +Required properties:
+>> +- compatible: Should be "xlnx,zynqmp-dma-1.0"
+>> +- #dma-cells: Should be <1>, a single cell holding a line request number
+>> +- reg: Memory map for module access
+>> +- interrupt-parent: Interrupt controller the interrupt is routed through
+>> +- interrupts: Should contain DMA channel interrupt
+>> +- xlnx,bus-width: AXI buswidth in bits. Should contain 128 or 64
+>> +
+>> +Optional properties:
+>> +- xlnx,include-sg: Indicates the controller to operate in simple or scatter
+>> +                  gather dma mode
+>> +- xlnx,ratectrl: Scheduling interval in terms of clock cycles for
+>> +                source AXI transaction
+>> +- xlnx,overfetch: Tells whether the channel is allowed to over fetch the data
+>> +- xlnx,src-issue: Number of AXI outstanding transactions on source side
+>> +- xlnx,desc-axi-cohrnt: Tells whether the AXI transactions generated for the
+>> +                       descriptor read are marked Non-coherent
+>> +- xlnx,src-axi-cohrnt: Tells whether the AXI transactions generated for the
+>> +                       source descriptor payload are marked Non-coherent
+>> +- xlnx,dst-axi-cohrnt: Tells whether the AXI transactions generated for the
+>> +                       dst descriptor payload are marked Non-coherent
+>
+> Do you really need 3? dma-coherent property doesn't work for you?
+>
+> Not that it should dictate the binding, but the kernel doesn't support
+> a device needing both coherent and non-coherent DMA ops.
 
-Please don't send content free pings, they just waste time.  I can't
-review or apply content free pings.  Please submit patches following the
-process in SubmittingPatches.
+I will get back to you shortly on this
 
-The chances are I deleted this mail unread since it is a MFD patch...
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150825/abcce420/attachment-0001.sig>
+>
+>> +- xlnx,desc-axi-qos: AXI QOS bits to be used for descriptor fetch
+>> +- xlnx,src-axi-qos: AXI QOS bits to be used for data read
+>> +- xlnx,dst-axi-qos: AXI QOS bits to be used for data write
+>> +- xlnx,desc-axi-cache: AXI cache bits to be used for descriptor fetch.
+>> +- xlnx,desc-axi-cache: AXI cache bits to be used for data read
+>> +- xlnx,desc-axi-cache: AXI cache bits to be used for data write
+>
+> These signals are generally part of the coherent or not setting. This
+> allows for potentially invalid combinations.
+>
+> Plus you have a copy/paste error.
+
+I will fix this.
+
+Thanks,
+Punnaiah
+>
+>> +- xlnx,src-burst-len: AXI length for data read. Support only power of 2 values
+>> +                     i.e 1,2,4,8 and 16
+>> +- xlnx,dst-burst-len: AXI length for data write. Support only power of 2 values
+>> +                     i.e 1,2,4,8 and 16
+>> +
+>> +Example:
+>> +++++++++
+>> +fpd_dma_chan1: dma at FD500000 {
+>> +       compatible = "xlnx,zynqmp-dma-1.0";
+>> +       reg = <0x0 0xFD500000 0x1000>;
+>> +       #dma_cells = <1>;
+>> +       interrupt-parent = <&gic>;
+>> +       interrupts = <0 117 4>;
+>> +       xlnx,bus-width = <128>;
+>> +       xlnx,include-sg;
+>> +       xlnx,overfetch;
+>> +       xlnx,ratectrl = <0>;
+>> +       xlnx,src-issue = <16>;
+>> +       xlnx,desc-axi-cohrnt;
+>> +       xlnx,src-axi-cohrnt;
+>> +       xlnx,dst-axi-cohrnt;
+>> +       xlnx,desc-axi-qos = <0>;
+>> +       xlnx,desc-axi-cache = <0>;
+>> +       xlnx,src-axi-qos = <0>;
+>> +       xlnx,src-axi-cache = <2>;
+>> +       xlnx,dst-axi-qos = <0>;
+>> +       xlnx,dst-axi-cache = <2>;
+>> +       xlnx,src-burst-len = <4>;
+>> +       xlnx,dst-burst-len = <4>;
+>> +};
+>> --
+>> 1.7.4
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
