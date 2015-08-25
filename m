@@ -1,111 +1,92 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 25 Aug 2015 14:09:45 +0200
-Subject: [PATCH v2] mmc: sunxi: Don't start commands while the card is busy
-In-Reply-To: <CAPDyKFrYvL33DsaATg4fyAJg=G3SEuOP+xU=o_UwasmNZ+a07Q@mail.gmail.com>
-References: <1436541284-11800-1-git-send-email-hdegoede@redhat.com>
- <CAPDyKFoNe0bghfSXs48stHzZToTc7Hjd5gVPy-VbDF8bzdVVMQ@mail.gmail.com>
- <55BC8ADE.3070802@redhat.com>
- <CAPDyKFrYvL33DsaATg4fyAJg=G3SEuOP+xU=o_UwasmNZ+a07Q@mail.gmail.com>
-Message-ID: <55DC5B09.2020705@redhat.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 25 Aug 2015 13:38:00 +0100
+Subject: [PATCH 9/9] ARM: software-based priviledged-no-access support
+In-Reply-To: <CAMuHMdWCLcDS=64m0J09KJJ4bDtgZ1Yvq8rw7u9FE0vZkKT2cw@mail.gmail.com>
+References: <20150821133043.GV7557@n2100.arm.linux.org.uk>
+ <E1ZSmQG-0002za-E3@rmk-PC.arm.linux.org.uk>
+ <CAMuHMdVMka2mt5pFpnXfLRY2M3Sj_71MgEpthOia2C99RaP_DA@mail.gmail.com>
+ <20150825104422.GO7557@n2100.arm.linux.org.uk>
+ <CAMuHMdWCLcDS=64m0J09KJJ4bDtgZ1Yvq8rw7u9FE0vZkKT2cw@mail.gmail.com>
+Message-ID: <20150825123800.GQ7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Aug 25, 2015 at 01:21:04PM +0200, Geert Uytterhoeven wrote:
+> Hi Russell,
+> 
+> On Tue, Aug 25, 2015 at 12:44 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Tue, Aug 25, 2015 at 12:32:51PM +0200, Geert Uytterhoeven wrote:
+> >> This patch, which is now in arm-soc/for-next, breaks shmobile_defconfig
+> >> on r8a7791/koelsch, which has a dual core CA15:
+> >>
+> >>     [ ok ] Configuring network interfaces...done.
+> >>     Unhandled fault: page domain fault (0x01b) at 0xbe8e6120
+> >>     pgd = edbb0000
+> >>     [be8e6120] *pgd=6da77831, *pte=bf4d075f, *ppte=bf4d0c7f
+> >>     Internal error: : 1b [#1] SMP ARM
+> >>     CPU: 1 PID: 1629 Comm: ntpdate Not tainted
+> >> 4.2.0-rc8-06444-g3c24fd89c9421db1 #31
+> >>     9
+> >>     Hardware name: Generic R8A7791 (Flattened Device Tree)
+> >>     task: ed883a80 ti: ed41c000 task.ti: ed41c000
+> >>     PC is at csum_partial_copy_from_user+0x28/0x3d8
+> >>     LR is at csum_and_copy_from_iter+0x334/0x4c0
+> >>     pc : [<c04ba510>]    lr : [<c01c82e8>]    psr: 000f0013
+> >>     sp : ed41db00  ip : 00000020  fp : ed41db6c
+> >>     r10: ed41ddc0  r9 : 00000027  r8 : ed41dc20
+> >>     r7 : 00000027  r6 : eda52653  r5 : ed41dec8  r4 : 00000000
+> >>     r3 : 00000000  r2 : 00000027  r1 : eda5262c  r0 : be8e6120
+> >>     Flags: nzcv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment none
+> >>     Control: 10c5307d  Table: 6dbb006a  DAC: 00000051
+> >>     Process ntpdate (pid: 1629, stack limit = 0xed41c210)
+> >
+> > Thanks.  I wonder what's different about your ntpdate that triggers
+> > this, and why all my iMX6 behave fine, which have desktop-like ubuntu
+> > installs on (of two different versions.)
+> 
+> It's ntpdate 1:4.2.6.p5+dfsg-7 from desktop-like Debian jessie.
 
-On 25-08-15 14:05, Ulf Hansson wrote:
-> On 1 August 2015 at 11:01, Hans de Goede <hdegoede@redhat.com> wrote:
->> Hi,
->>
->> On 21-07-15 14:15, Ulf Hansson wrote:
->>>
->>> On 10 July 2015 at 17:14, Hans de Goede <hdegoede@redhat.com> wrote:
->>>>
->>>> Some sdio wifi modules have not been working reliable with the sunxi-mmc
->>>> host code. This turns out to be caused by it starting new commands while
->>>> the card signals that it is still busy processing a previous command.
->>>
->>>
->>> Which are those commands?
->>
->>
->> The code were things get stuck when not waiting for the busy signal uses
->> the following sdio helper functions:
->>
->> sdio_readb/sdio_writeb
->> sdio_f0_readb/sdio_f0_writeb
->> sdio_readw/sdio_writew
->> sdio_readl/sdio_writel
->> sdio_readsb
->> sdio_memcpy_fromio/sdio_memcpy_toio
->>
->> And directly issues the following command:
->>
->>          mmc_dat.flags = write ? MMC_DATA_WRITE : MMC_DATA_READ;
->>          mmc_cmd.opcode = SD_IO_RW_EXTENDED;
->>          mmc_cmd.arg = write ? 1<<31 : 0;        /* write flag  */
->>          mmc_cmd.arg |= (fn & 0x7) << 28;        /* SDIO func num */
->>          mmc_cmd.arg |= 1<<27;                   /* block mode */
->>          /* for function 1 the addr will be incremented */
->>          mmc_cmd.arg |= (fn == 1) ? 1<<26 : 0;
->>          mmc_cmd.flags = MMC_RSP_SPI_R5 | MMC_RSP_R5 | MMC_CMD_ADTC;
->>
->> I do not know if the busy wait is necessary for all
->> of these, but the hack in the android kernel code,
->> which inserts calls to a wait_card_busy function directly
->> into: drivers/net/wireless/brcm80211/brcmfmac/bcmsdh.c
->>
->> Does so for all of these.
->>
->>> Or more interesting, which response types do
->>>
->>> these commands expect?
->>> I don't think this is a sunxi specific issue, I have seen similar
->>> issues for other host controllers.
->>
->>
->> Agreed, recent dw-mmc patches address the same issue, also involving
->> broadcom sdio wifi chips.
->>
->>> I am thinking that perhaps this should be managed by the mmc core
->>> instead of local hacks to sunxi. Potentially we could make the core to
->>> invoke the already existing host_ops->card_busy() callback when
->>> needed...
->>
->>
->> I'm fine with solving this either way, implementing host_ops->card_busy()
->> for sunxi is easy, and if the core os modified to call that function
->> before issue sdio io ops (which seems to be the common thing here),
->> then that indeed is better then having the sunxi code always do
->> the busy check.
->
-> Okay, so let's make the core to call the ->card_busy() callback and
-> then it's up to each host driver to implement that callback.
+Hmm, I think I tried at one time to install Debian on an iMX6 platform
+and gave up with it after spending 50 minutes with the installer getting
+so far, and then killing the network - it was very repeatable, and always
+happened at the same point in the installation.  I gave up with Debian
+at that point, as I didn't have lots of 50 minutes to babysit the silly
+installer (which can't ask the questions up-front) nor did I want to
+waste my monthly internet allowance on multiple failed install attempts.
 
-Ok, do you plan to do a patch for this, or do you expect to get
-one submitted to you ?
+The reports I was getting from other iMX6 users was that Debian Jessie
+had lots of problems at that time.
 
-Regards,
+> But I get similar dumps during boot up from rpc.idmapd (SyS_send),
+> rsyslogd (SyS_send), and from sshd (SyS_write) when trying to log in.
 
-Hans
+Hmm.
 
+root       693  0.0  0.1   4944  3196 ?        Ss   01:22   0:00 /usr/sbin/sshd -D
+syslog     720  0.2  0.0  30404  2032 ?        Sl   01:23   1:19 rsyslogd -c5
+root       722  0.0  0.0   2392  1340 ?        Ss   01:23   0:00 rpc.idmapd
 
-> As an optimization, we might consider (in a separate step) to add
-> MMC_RSP_BUSY to the response type. I realize that would somewhat be a
-> violation of the spec, but apparently the SDIO spec isn't really clear
-> on this area.
->
->>
->>> Within this context, could I ask whether you controller supports IRQ
->>> based HW-busy detection? Or you need polling of the status register?
->>
->>
->> I'm afraid that we need to poll the status register. I've been unable
->> to find an irq flag corresponding to this.
->
-> Okay, thanks for the info.
->
-> [...]
->
-> Kind regards
-> Uffe
->
+So, the question I need to find an answer to is... why hasn't this path
+been exercised on my platforms during my testing.  It's certainly
+compiled into the kernel...
+
+Anyway, I've now (hopefully) fixed the bug, but I've nobbled
+csum_partial_copy_from_user to ensure that it will always oops the kernel
+if called:
+
+000000b4 <csum_partial_copy_from_user>:
+  b4:   ee133f10        mrc     15, 0, r3, cr3, cr0, {0}
+  b8:   e92d41fe        push    {r1, r2, r3, r4, r5, r6, r7, r8, lr}
+  bc:   e3a03055        mov     r3, #85 ; 0x55
+  c0:   ee033f10        mcr     15, 0, r3, cr3, cr0, {0}
+  c4:   e7033003        str     r3, [r3, -r3]
+
+and... it doesn't trigger.  I can only assume that this is because the
+iMX6 ethernet interface uses TSO (which implies checksum offload), there's
+no need to use these csum functions - and that would explain why it never
+came up in my local testing.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
