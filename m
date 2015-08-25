@@ -1,76 +1,89 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 25 Aug 2015 14:25:20 +0900
-Subject: [PATCH-v2 5/5] mfd: 88pm800: Add support for clk subdevice
-In-Reply-To: <1440442594-3102-7-git-send-email-vaibhav.hiremath@linaro.org>
-References: <1440442594-3102-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1440442594-3102-7-git-send-email-vaibhav.hiremath@linaro.org>
-Message-ID: <55DBFC40.3010603@samsung.com>
+From: eddie.huang@mediatek.com (Eddie Huang)
+Date: Tue, 25 Aug 2015 14:00:40 +0800
+Subject: [PATCH v2] soc: mediatek: add scpsys support active_wakeup
+Message-ID: <1440482440-28700-1-git-send-email-eddie.huang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25.08.2015 03:56, Vaibhav Hiremath wrote:
-> This patch adds mfd_cell/clk-subdevice for 88PM800 MFD
-> (and family of devices).
-> 
-> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
-> ---
->  drivers/mfd/88pm800.c | 25 +++++++++++++++++++++++++
->  1 file changed, 25 insertions(+)
-> 
-> diff --git a/drivers/mfd/88pm800.c b/drivers/mfd/88pm800.c
-> index c4e097d..a928eed 100644
-> --- a/drivers/mfd/88pm800.c
-> +++ b/drivers/mfd/88pm800.c
-> @@ -173,6 +173,14 @@ static const struct mfd_cell regulator_devs[] = {
->  	},
->  };
->  
-> +static struct mfd_cell clk_devs[] = {
-> +	{
-> +		.name = "88pm80x-clk",
-> +		.of_compatible = "marvell,88pm800-clk",
-> +		.id = -1,
+Register gpd_dev_ops.active_wakeup function to support keep power
+during suspend state. And add flag to each power domain to
+decide whether keep power during suspend or not.
 
-The "-1" here stands for PLATFORM_DEVID_NONE?
+Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
+Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
 
-Best regards,
-Krzysztof
+---
+Change in v2:
+Drop .active_wakeup = false lines in scp_domain_data[] array
 
-> +	},
-> +};
-> +
->  static const struct regmap_irq pm800_irqs[] = {
->  	/* INT0 */
->  	[PM800_IRQ_ONKEY] = {
-> @@ -344,6 +352,17 @@ static int device_regulator_init(struct pm80x_chip *chip)
->  			ARRAY_SIZE(regulator_devs), NULL, 0, NULL);
->  }
->  
-> +static int device_clk_init(struct pm80x_chip *chip)
-> +{
-> +	if (chip->type == CHIP_PM800)
-> +		clk_devs[0].name = "88pm800-clk";
-> +	else if (chip->type == CHIP_PM860)
-> +		clk_devs[0].name = "88pm860-clk";
-> +
-> +	return mfd_add_devices(chip->dev, 0, &clk_devs[0],
-> +			ARRAY_SIZE(clk_devs), NULL, 0, NULL);
-> +}
-> +
->  static int device_irq_init_800(struct pm80x_chip *chip)
->  {
->  	struct regmap *map = chip->regmap;
-> @@ -511,6 +530,12 @@ static int device_800_init(struct pm80x_chip *chip)
->  		goto out;
->  	}
->  
-> +	ret = device_clk_init(chip);
-> +	if (ret) {
-> +		dev_err(chip->dev, "Failed to add clk subdev\n");
-> +		goto out;
-> +	}
-> +
->  	return 0;
->  out_dev:
->  	mfd_remove_devices(chip->dev);
-> 
+---
+ drivers/soc/mediatek/mtk-scpsys.c | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
+
+diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
+index 43a79ed..df2f288 100644
+--- a/drivers/soc/mediatek/mtk-scpsys.c
++++ b/drivers/soc/mediatek/mtk-scpsys.c
+@@ -67,6 +67,7 @@ struct scp_domain_data {
+ 	u32 sram_pdn_ack_bits;
+ 	u32 bus_prot_mask;
+ 	enum clk_id clk_id;
++	bool active_wakeup;
+ };
+ 
+ static const struct scp_domain_data scp_domain_data[] __initconst = {
+@@ -127,6 +128,7 @@ static const struct scp_domain_data scp_domain_data[] __initconst = {
+ 		.sram_pdn_bits = GENMASK(11, 8),
+ 		.sram_pdn_ack_bits = GENMASK(15, 12),
+ 		.clk_id = MT8173_CLK_NONE,
++		.active_wakeup = true,
+ 	},
+ 	[MT8173_POWER_DOMAIN_MFG_ASYNC] = {
+ 		.name = "mfg_async",
+@@ -171,6 +173,7 @@ struct scp_domain {
+ 	u32 sram_pdn_bits;
+ 	u32 sram_pdn_ack_bits;
+ 	u32 bus_prot_mask;
++	bool active_wakeup;
+ };
+ 
+ struct scp {
+@@ -370,6 +373,20 @@ out:
+ 	return ret;
+ }
+ 
++static bool scpsys_active_wakeup(struct device *dev)
++{
++	struct generic_pm_domain *genpd;
++	struct scp_domain *scpd;
++
++	if (IS_ERR_OR_NULL(dev->pm_domain))
++		return false;
++
++	genpd = pd_to_genpd(dev->pm_domain);
++	scpd = container_of(genpd, struct scp_domain, genpd);
++
++	return scpd->active_wakeup;
++}
++
+ static int __init scpsys_probe(struct platform_device *pdev)
+ {
+ 	struct genpd_onecell_data *pd_data;
+@@ -427,12 +444,14 @@ static int __init scpsys_probe(struct platform_device *pdev)
+ 		scpd->sram_pdn_bits = data->sram_pdn_bits;
+ 		scpd->sram_pdn_ack_bits = data->sram_pdn_ack_bits;
+ 		scpd->bus_prot_mask = data->bus_prot_mask;
++		scpd->active_wakeup = data->active_wakeup;
+ 		if (data->clk_id != MT8173_CLK_NONE)
+ 			scpd->clk = clk[data->clk_id];
+ 
+ 		genpd->name = data->name;
+ 		genpd->power_off = scpsys_power_off;
+ 		genpd->power_on = scpsys_power_on;
++		genpd->dev_ops.active_wakeup = scpsys_active_wakeup;
+ 
+ 		/*
+ 		 * Initially turn on all domains to make the domains usable
+-- 
+1.9.1
