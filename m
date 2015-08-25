@@ -1,106 +1,55 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Tue, 25 Aug 2015 11:23:24 +0200
-Subject: [PATCH v7 25/44] [media] replace all occurrences of
- MEDIA_ENT_T_DEVNODE_V4L
-In-Reply-To: <23e2f9440a259e1162e15dba7e6261dbc4c521c6.1440359643.git.mchehab@osg.samsung.com>
-References: <cover.1440359643.git.mchehab@osg.samsung.com>
- <23e2f9440a259e1162e15dba7e6261dbc4c521c6.1440359643.git.mchehab@osg.samsung.com>
-Message-ID: <55DC340C.8030503@xs4all.nl>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 25 Aug 2015 10:27:05 +0100
+Subject: [PATCH-v3 RESEND] mfd: 88pm80x: Add 88pm860 chip type support
+In-Reply-To: <1440493468-5471-1-git-send-email-vaibhav.hiremath@linaro.org>
+References: <1440493468-5471-1-git-send-email-vaibhav.hiremath@linaro.org>
+Message-ID: <20150825092705.GN19409@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/23/15 22:17, Mauro Carvalho Chehab wrote:
-> Now that interfaces and entities are distinct, it makes no sense
-> of keeping something named as MEDIA_ENT_T_DEVNODE.
+On Tue, 25 Aug 2015, Vaibhav Hiremath wrote:
+
+> Add chip identification support for 88PM860 device
+> to the pm80x_chip_mapping table.
 > 
-> This change was done with this script:
-> 
-> 	for i in $(git grep -l MEDIA_ENT_T|grep -v uapi/linux/media.h); do sed s,MEDIA_ENT_T_DEVNODE_V4L,MEDIA_ENT_T_V4L2_VIDEO, <$i >a && mv a $i; done
-> 
-> Signed-off-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
-> 
-> diff --git a/Documentation/DocBook/media/v4l/media-ioc-enum-entities.xml b/Documentation/DocBook/media/v4l/media-ioc-enum-entities.xml
-> index 5872f8bbf774..910243d4edb8 100644
-> --- a/Documentation/DocBook/media/v4l/media-ioc-enum-entities.xml
-> +++ b/Documentation/DocBook/media/v4l/media-ioc-enum-entities.xml
-> @@ -183,7 +183,7 @@
->  	    <entry>Unknown device node</entry>
->  	  </row>
->  	  <row>
-> -	    <entry><constant>MEDIA_ENT_T_DEVNODE_V4L</constant></entry>
-> +	    <entry><constant>MEDIA_ENT_T_V4L2_VIDEO</constant></entry>
->  	    <entry>V4L video, radio or vbi device node</entry>
->  	  </row>
+> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
+> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Acked-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  drivers/mfd/88pm80x.c       | 2 ++
+>  include/linux/mfd/88pm80x.h | 1 +
+>  2 files changed, 3 insertions(+)
 
-OK, this makes no sense and that ties in with my confusion of the previous patch.
+Applied, thanks.
 
-These are not device nodes, in the new scheme these are DMA entities (I know,
-naming TDB) that have an associated interface.
-
-I think a much better approach would be to add entity type(s) for such DMA
-engines in patch 24, then use that new name in existing drivers and split
-up the existing DEVNODE_V4L media_entity into a media_entity and a
-media_intf_devnode:
-
-The current media_entity defined in struct video_device has to be replaced
-by media_intf_devnode, and the DMA entity has to be added as a new entity
-to these drivers.
-
-This reflects these two action items from our meeting:
-
-Migration: add v4l-subdev media_interface: Laurent
-Migration: add explicit DMA Engine entity: Laurent
-
-Unless Laurent says differently I think this is something you'll have to
-do given Laurent's workload.
-
-I think doing this at this stage of the patch series is crucial, otherwise
-the remaining patches really make no sense.
-
-I'll skip reviewing patches 26-38 for now.
-
-Regards,
-
-	Hans
-
->  	  <row>
-> diff --git a/drivers/media/platform/xilinx/xilinx-dma.c b/drivers/media/platform/xilinx/xilinx-dma.c
-> index 92e8116dc28f..88cd789cdaf7 100644
-> --- a/drivers/media/platform/xilinx/xilinx-dma.c
-> +++ b/drivers/media/platform/xilinx/xilinx-dma.c
-> @@ -193,7 +193,7 @@ static int xvip_pipeline_validate(struct xvip_pipeline *pipe,
->  	while ((entity = media_entity_graph_walk_next(&graph))) {
->  		struct xvip_dma *dma;
+> diff --git a/drivers/mfd/88pm80x.c b/drivers/mfd/88pm80x.c
+> index 5e72f65..63445ea 100644
+> --- a/drivers/mfd/88pm80x.c
+> +++ b/drivers/mfd/88pm80x.c
+> @@ -33,6 +33,8 @@ static struct pm80x_chip_mapping chip_mapping[] = {
+>  	{0x3,	CHIP_PM800},
+>  	/* 88PM805 chip id number */
+>  	{0x0,	CHIP_PM805},
+> +	/* 88PM860 chip id number */
+> +	{0x4,	CHIP_PM860},
+>  };
 >  
-> -		if (entity->type != MEDIA_ENT_T_DEVNODE_V4L)
-> +		if (entity->type != MEDIA_ENT_T_V4L2_VIDEO)
->  			continue;
+>  /*
+> diff --git a/include/linux/mfd/88pm80x.h b/include/linux/mfd/88pm80x.h
+> index 8fcad63..d409ceb 100644
+> --- a/include/linux/mfd/88pm80x.h
+> +++ b/include/linux/mfd/88pm80x.h
+> @@ -21,6 +21,7 @@ enum {
+>  	CHIP_INVALID = 0,
+>  	CHIP_PM800,
+>  	CHIP_PM805,
+> +	CHIP_PM860,
+>  	CHIP_MAX,
+>  };
 >  
->  		dma = to_xvip_dma(media_entity_to_video_device(entity));
-> diff --git a/drivers/media/v4l2-core/v4l2-dev.c b/drivers/media/v4l2-core/v4l2-dev.c
-> index 71a1b93b0790..44b330589787 100644
-> --- a/drivers/media/v4l2-core/v4l2-dev.c
-> +++ b/drivers/media/v4l2-core/v4l2-dev.c
-> @@ -912,7 +912,7 @@ int __video_register_device(struct video_device *vdev, int type, int nr,
->  	/* Part 5: Register the entity. */
->  	if (vdev->v4l2_dev->mdev &&
->  	    vdev->vfl_type != VFL_TYPE_SUBDEV) {
-> -		vdev->entity.type = MEDIA_ENT_T_DEVNODE_V4L;
-> +		vdev->entity.type = MEDIA_ENT_T_V4L2_VIDEO;
->  		vdev->entity.name = vdev->name;
->  		vdev->entity.info.dev.major = VIDEO_MAJOR;
->  		vdev->entity.info.dev.minor = vdev->minor;
-> diff --git a/drivers/media/v4l2-core/v4l2-subdev.c b/drivers/media/v4l2-core/v4l2-subdev.c
-> index 83615b8fb46a..e6e1115d8215 100644
-> --- a/drivers/media/v4l2-core/v4l2-subdev.c
-> +++ b/drivers/media/v4l2-core/v4l2-subdev.c
-> @@ -535,7 +535,7 @@ v4l2_subdev_link_validate_get_format(struct media_pad *pad,
->  		return v4l2_subdev_call(sd, pad, get_fmt, NULL, fmt);
->  	}
->  
-> -	WARN(pad->entity->type != MEDIA_ENT_T_DEVNODE_V4L,
-> +	WARN(pad->entity->type != MEDIA_ENT_T_V4L2_VIDEO,
->  	     "Driver bug! Wrong media entity type 0x%08x, entity %s\n",
->  	     pad->entity->type, pad->entity->name);
->  
-> 
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
