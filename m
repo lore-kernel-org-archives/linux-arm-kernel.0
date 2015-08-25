@@ -1,33 +1,48 @@
-From: stanimir.varbanov@linaro.org (Stanimir Varbanov)
-Date: Tue, 25 Aug 2015 18:37:42 +0300
-Subject: [PATCH] arm64: dts: qcom: Add RNG device tree node
-Message-ID: <1440517062-30313-1-git-send-email-stanimir.varbanov@linaro.org>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Tue, 25 Aug 2015 16:37:54 +0100
+Subject: [PATCH v1 3/3] arm64: dts: add Hi6220 mailbox node
+In-Reply-To: <CAKv+Gu-b=QvMF++V9UjULRxrGvoz-0ytFLeuLm8Y5sQH4p53Sw@mail.gmail.com>
+References: <20150824095144.GA7139@leverpostej>
+ <1440411596.3517.12.camel@linaro.org>
+ <20150824114903.GT10728@bivouac.eciton.net>
+ <1440490427.10987.29.camel@linaro.org>
+ <20150825094630.GU10728@bivouac.eciton.net>
+ <1440497710.10987.42.camel@linaro.org>
+ <20150825104256.GB13471@leverpostej>
+ <1440510194.10987.52.camel@linaro.org>
+ <20150825142416.GW10728@bivouac.eciton.net>
+ <CAKv+Gu-b=QvMF++V9UjULRxrGvoz-0ytFLeuLm8Y5sQH4p53Sw@mail.gmail.com>
+Message-ID: <20150825153754.GY10728@bivouac.eciton.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds rng device tree node for msm8916 SoCs.
+On Tue, Aug 25, 2015 at 04:51:22PM +0200, Ard Biesheuvel wrote:
+> >>    Arm kernel should either fetch memory information from
+> >>    efi or DT.
+> >
+> > Absolutely.
+> >
+> >>    Currently arm kernel fetch both efi memory information and
+> >>    reserved buffer from DTB at the same time.
+> >
+> > No, it does not.
+> 
+> It should not, but it does. Due to an oversight, the stub removes
+> /memreserve/ entries but ignores the reserved-memory node completely.
 
-Signed-off-by: Stanimir Varbanov <stanimir.varbanov@linaro.org>
----
- arch/arm64/boot/dts/qcom/msm8916.dtsi |    7 +++++++
- 1 file changed, 7 insertions(+)
+Urgh.
 
-diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-index 0f49ebd0aa8b..060c6c53ff33 100644
---- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
-+++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-@@ -215,5 +215,12 @@
- 			interrupt-controller;
- 			#interrupt-cells = <4>;
- 		};
-+
-+		rng at 22000 {
-+			compatible = "qcom,prng";
-+			reg = <0x00022000 0x200>;
-+			clocks = <&gcc GCC_PRNG_AHB_CLK>;
-+			clock-names = "core";
-+		};
- 	};
- };
--- 
-1.7.9.5
+> This was reported here in fact
+> 
+> http://thread.gmane.org/gmane.linux.kernel.efi/5736/focus=5742
+> 
+> but there has not been a followup to this series.
+
+Are all of those patches still relevant, or did some of them go in
+already?
+
+Haojian: can you give that patch a spin and see if it does what you
+need, combined with adding the reserved areas to the UEFI memory map?
+
+/
+    Leif
