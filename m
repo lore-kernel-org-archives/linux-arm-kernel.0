@@ -1,45 +1,53 @@
-From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Tue, 25 Aug 2015 23:03:29 +0200
-Subject: [PATCH] ARM: stm32: Reduce FORCE_MAX_ZONEORDER to 9
-In-Reply-To: <3551937.qa4lRhD8e3@wuerfel>
-References: <1440533237-5831-1-git-send-email-mcoquelin.stm32@gmail.com>
- <3551937.qa4lRhD8e3@wuerfel>
-Message-ID: <55DCD821.5040600@gmail.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Tue, 25 Aug 2015 14:07:04 -0700
+Subject: [RESEND PATCH v16 4/4] ARM: dts: add the support power-domain
+ node on RK3288 SoCs
+In-Reply-To: <1440487486-6154-5-git-send-email-wxt@rock-chips.com> (Caesar
+ Wang's message of "Tue, 25 Aug 2015 15:24:46 +0800")
+References: <1440487486-6154-1-git-send-email-wxt@rock-chips.com>
+ <1440487486-6154-5-git-send-email-wxt@rock-chips.com>
+Message-ID: <7hfv37axhj.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Caesar Wang <wxt@rock-chips.com> writes:
 
-
-On 08/25/2015 10:36 PM, Arnd Bergmann wrote:
-> On Tuesday 25 August 2015 22:07:17 Maxime Coquelin wrote:
->> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
->> index a750c14..57d53af 100644
->> --- a/arch/arm/Kconfig
->> +++ b/arch/arm/Kconfig
->> @@ -1734,7 +1734,7 @@ config FORCE_MAX_ZONEORDER
->>          int "Maximum zone order" if ARCH_SHMOBILE_LEGACY
->>          range 11 64 if ARCH_SHMOBILE_LEGACY
->>          default "12" if SOC_AM33XX
->> -       default "9" if SA1111 || ARCH_EFM32
->> +       default "9" if SA1111 || ARCH_EFM32 || ARCH_STM32
->>          default "11"
->>
-> This looks wrong now that we can enable multiple ARMV7M platforms
-> together. In practice it doesn't matter much, because you wouldn't
-> do that for a real-life system, but out of principle this seems
-> like something you'd better put into the defconfig file for
-> both ARCH_EFM32 and ARCH_STM32. We could also think about changing
-> the default to "9" for any ARM_SINGLE_ARMV7M config and increasing
-> it again in defconfig for any platform that actually has a lot of
-> RAM (if any).
+> We can add more domains node in the future.
+> This patch add the needed clocks into power-controller.
+> As the discuess about all the device clocks being listed in
+> the power-domains itself.
 >
+> There are several reasons as follows:
+>
+> Firstly, the clocks need be turned off to save power when
+> the system enter the suspend state. So we need to enumerate
+> the clocks in the dts. In order to power domain can turn on and off.
 
-Both proposals seem reasonable.
-I propose to make this entry configurable in defconfig if ARM_SINGLE_ARMV7M,
-keeping the default to 11. Then, in efm32 and stm32 defconfig files, 
-select value 9.
+Yes, but this is the job of device drivers which are runtime PM adapted
+to gate their own clocks.  I agree these clocks need to be enumerated in
+the DTS, but they should be in the device nodes.
 
-Uwe, is it ok for you?
+> Secondly, the reset-circuit should reset be synchronous on RK3288,
+> then sync revoked. So we need to enable clocks of all devices.
+> In other words, we have to enable the clocks before you operate them
+> if all the device clocks are included in someone domians.
 
-Regards,
-Maxime
+Yes, this is pretty common for reset.  
+
+> Someone wish was to get the clocks by reading the clocks from the
+> device nodes, We can do that but we can solve the above issues.
+
+I don't follow this sentence.  Are you saying doing that will not solve
+the above issues?  Why not?  Please explain.
+
+If there are non-device clocks that also need to be enabled before
+asserting reset, then those are candidates for the power-domain node,
+but not device clocks.
+
+> Anyway, the best ideas we can fix it in the future SoCs.
+
+I don't think this is an SoC design issue as this is needed when you
+have synchronous reset.  My concern is primarily around how to describe
+this in the DT.
+
+Kevin
