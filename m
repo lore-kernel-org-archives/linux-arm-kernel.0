@@ -1,43 +1,56 @@
-From: dianders@chromium.org (Douglas Anderson)
-Date: Mon, 24 Aug 2015 16:58:59 -0700
-Subject: [PATCH] ARM: probes: Don't stop the machine if we're in the debugger
-Message-ID: <1440460739-19522-1-git-send-email-dianders@chromium.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 24 Aug 2015 17:19:26 -0700
+Subject: [PATCH] ARM: probes: Don't stop the machine if we're in the
+ debugger
+In-Reply-To: <1440460739-19522-1-git-send-email-dianders@chromium.org>
+References: <1440460739-19522-1-git-send-email-dianders@chromium.org>
+Message-ID: <55DBB48E.7040508@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If we're in kgdb then the machine is already stopped.  Trying to stop
-it again will cause us to try to sleep, which is not allowed while in
-kgdb.  To avoid this problem, only stop the machine when we're not in
-kgdb.
+On 08/24/2015 04:58 PM, Douglas Anderson wrote:
+> If we're in kgdb then the machine is already stopped.  Trying to stop
+> it again will cause us to try to sleep, which is not allowed while in
+> kgdb.  To avoid this problem, only stop the machine when we're not in
+> kgdb.
+>
+> Reported-by: Aapo Vienamo <avienamo@nvidia.com>
+> Suggested-by: Kees Cook <keescook@chromium.org>
+> Signed-off-by: Douglas Anderson <dianders@chromium.org>
+> ---
 
-Reported-by: Aapo Vienamo <avienamo@nvidia.com>
-Suggested-by: Kees Cook <keescook@chromium.org>
-Signed-off-by: Douglas Anderson <dianders@chromium.org>
----
- arch/arm/kernel/patch.c | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+Can you add the backtrace?
 
-diff --git a/arch/arm/kernel/patch.c b/arch/arm/kernel/patch.c
-index 69bda1a..abf30ec 100644
---- a/arch/arm/kernel/patch.c
-+++ b/arch/arm/kernel/patch.c
-@@ -1,5 +1,6 @@
- #include <linux/kernel.h>
- #include <linux/spinlock.h>
-+#include <linux/kgdb.h>
- #include <linux/kprobes.h>
- #include <linux/mm.h>
- #include <linux/stop_machine.h>
-@@ -124,6 +125,9 @@ void __kprobes patch_text(void *addr, unsigned int insn)
- 		.insn = insn,
- 	};
- 
--	stop_machine(patch_text_stop_machine, &patch, NULL);
-+	/* Stop machine before patching; but not if in the debugger */
-+	if (unlikely(in_dbg_master()))
-+		patch_text_stop_machine(&patch);
-+	else
-+		stop_machine(patch_text_stop_machine, &patch, NULL);
- }
+>   arch/arm/kernel/patch.c | 7 ++++++-
+>   1 file changed, 6 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/kernel/patch.c b/arch/arm/kernel/patch.c
+> index 69bda1a..abf30ec 100644
+> --- a/arch/arm/kernel/patch.c
+> +++ b/arch/arm/kernel/patch.c
+> @@ -1,5 +1,6 @@
+>   #include <linux/kernel.h>
+>   #include <linux/spinlock.h>
+> +#include <linux/kgdb.h>
+>   #include <linux/kprobes.h>
+>   #include <linux/mm.h>
+>   #include <linux/stop_machine.h>
+> @@ -124,6 +125,9 @@ void __kprobes patch_text(void *addr, unsigned int insn)
+>   		.insn = insn,
+>   	};
+>   
+> -	stop_machine(patch_text_stop_machine, &patch, NULL);
+> +	/* Stop machine before patching; but not if in the debugger */
+> +	if (unlikely(in_dbg_master()))
+> +		patch_text_stop_machine(&patch);
+> +	else
+> +		stop_machine(patch_text_stop_machine, &patch, NULL);
+>   }
+
+Perhaps it would be better to add a different function for the kgdb call 
+site? Then it's explicit what's going on without us having to figure out 
+when in_dbg_master() is true.
+
 -- 
-2.5.0.457.gab17608
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
