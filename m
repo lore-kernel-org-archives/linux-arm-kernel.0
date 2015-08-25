@@ -1,71 +1,67 @@
-From: nschichan@freebox.fr (Nicolas Schichan)
-Date: Tue, 25 Aug 2015 19:07:39 +0200
-Subject: [PATCH v2 10/10] ARM: software-based priviledged-no-access support
-In-Reply-To: <E1ZUGMS-0000BG-8B@rmk-PC.arm.linux.org.uk>
-References: <20150825154026.GT7557@n2100.arm.linux.org.uk>
- <E1ZUGMS-0000BG-8B@rmk-PC.arm.linux.org.uk>
-Message-ID: <55DCA0DB.7000103@freebox.fr>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Tue, 25 Aug 2015 18:08:40 +0100
+Subject: [PATCH 1/7] dmaengine: st_fdma: Add STMicroelectronics FDMA DT
+ binding documentation
+In-Reply-To: <20150819150605.GA13546@localhost>
+References: <1436371888-27863-1-git-send-email-peter.griffin@linaro.org>
+ <1436371888-27863-2-git-send-email-peter.griffin@linaro.org>
+ <20150819150605.GA13546@localhost>
+Message-ID: <20150825170840.GA1498@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/25/2015 05:42 PM, Russell King wrote:
-> Provide a software-based implementation of the priviledged no access
-> support found in ARMv8.1.
-[...]
-> diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
-> index a91177043467..ff74f0b54b0e 100644
-> --- a/arch/arm/include/asm/assembler.h
-> +++ b/arch/arm/include/asm/assembler.h
-> @@ -446,15 +446,45 @@ THUMB(	orr	\reg , \reg , #PSR_T_BIT	)
->  	.endm
->  
->  	.macro	uaccess_disable, tmp, isb=1
-> +#ifdef CONFIG_CPU_SW_DOMAIN_PAN
-> +	/*
-> +	 * Whenever we re-enter userspace, the domains should always be
-> +	 * set appropriately.
-> +	 */
-> +	mov	\tmp, #DACR_UACCESS_DISABLE
-> +	mcr	p15, 0, \tmp, c3, c0, 0		@ Set domain register
-> +	.if	\isb
-> +	isb
-> +	.endif
-> +#endif
->  	.endm
->  
->  	.macro	uaccess_enable, tmp, isb=1
-> +#ifdef CONFIG_CPU_SW_DOMAIN_PAN
-> +	/*
-> +	 * Whenever we re-enter userspace, the domains should always be
-> +	 * set appropriately.
-> +	 */
-> +	mov	\tmp, #DACR_UACCESS_ENABLE
-> +	mcr	p15, 0, \tmp, c3, c0, 0
-> +	.if	\isb
-> +	isb
-> +	.endif
-> +#endif
->  	.endm
+Hi Vinod,
 
-Thanks for the updated serie,
+Thanks for reviewing.
 
-on ARMv5, I get the following compile error:
+On Wed, 19 Aug 2015, Vinod Koul wrote:
 
-arch/arm/kernel/entry-common.S: Assembler messages:
-arch/arm/kernel/entry-common.S:200: Error: selected processor does not support
-ARM mode `isb'
+> On Wed, Jul 08, 2015 at 05:11:22PM +0100, Peter Griffin wrote:
+> > This patch adds the DT binding documentation for the FDMA constroller
+> > found on STi based chipsets from STMicroelectronics.
+> > 
+> > Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+> > Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> > ---
+> >  Documentation/devicetree/bindings/dma/st_fdma.txt | 76 +++++++++++++++++++++++
+> >  1 file changed, 76 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/dma/st_fdma.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/dma/st_fdma.txt b/Documentation/devicetree/bindings/dma/st_fdma.txt
+> > new file mode 100644
+> > index 0000000..1ec7470
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/dma/st_fdma.txt
+> > @@ -0,0 +1,76 @@
+> > +* STMicroelectronics Flexible Direct Memory Access Device Tree bindings
+> > +
+> > +The FDMA is a general-purpose direct memory access controller capable of
+> > +supporting 16 independent DMA channels. It accepts up to 32 DMA requests.
+> > +The FDMA is based on a Slim processor which require a firmware.
+> > +
+> > +* FDMA Controller
+> > +
+> > +Required properties:
+> > +- compatible	: Should be "st,fdma_mpe31"
+> > +- reg		: Should contain DMA registers location and length
+> > +- interrupts	: Should contain one interrupt shared by all channel
+> 
+> s/channel/channels
 
-replacing those two "isb" occurences with "instr_sync" fixed it.
+Will fix in v2.
 
-With that added access to LIST_POISON are still correctly catched, when
-CONFIG_CPU_SW_DOMAIN_PAN is set. Also the transmit of an ipv6 packet does not
-result in a fault anymore. Also with CONFIG_CPU_SW_DOMAIN_PAN disabled, the
-system now boots fine.
+> 
+> > +- dma-channels	: Number of channels supported by the controller
+> > +- #dma-cells	: Must be <3>.
+> 
+> any reason three?
 
-This has been tested on Linux 4.1 / kirkwood and Linux 4.2-rc8 / qemu,armv5.
+Yes, it is documented further down in the file under DMA Client.
 
-Thanks,
+To make it clearer in V2 I could change to
 
--- 
-Nicolas Schichan
-Freebox SAS
+"- #dma-cells	: Must be <3>. See DMA client section below"?
+
+regards,
+
+Peter.
