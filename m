@@ -1,198 +1,70 @@
-From: jogo@openwrt.org (Jonas Gorski)
-Date: Tue, 25 Aug 2015 16:50:05 +0200
-Subject: [PATCH v4] qcom: ipq4019: Add basic board/dts support for IPQ4019
- SoC
-In-Reply-To: <20150825120804.GA30996@codeaurora.org>
-References: <20150825120804.GA30996@codeaurora.org>
-Message-ID: <CAOiHx=kz1voQXre2tkNC2bZo6fqq0L81+V9VeZadKhjR0nDNww@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 25 Aug 2015 16:51:22 +0200
+Subject: [PATCH v1 3/3] arm64: dts: add Hi6220 mailbox node
+In-Reply-To: <20150825142416.GW10728@bivouac.eciton.net>
+References: <20150821184059.GB2000@svinekod>
+ <20150824091845.GA28290@leoy-linaro>
+ <20150824095144.GA7139@leverpostej>
+ <1440411596.3517.12.camel@linaro.org>
+ <20150824114903.GT10728@bivouac.eciton.net>
+ <1440490427.10987.29.camel@linaro.org>
+ <20150825094630.GU10728@bivouac.eciton.net>
+ <1440497710.10987.42.camel@linaro.org>
+ <20150825104256.GB13471@leverpostej>
+ <1440510194.10987.52.camel@linaro.org>
+ <20150825142416.GW10728@bivouac.eciton.net>
+Message-ID: <CAKv+Gu-b=QvMF++V9UjULRxrGvoz-0ytFLeuLm8Y5sQH4p53Sw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tue, Aug 25, 2015 at 2:08 PM, Varadarajan Narayanan
-<varada@codeaurora.org> wrote:
-> Add initial dts files and SoC support for IPQ4019
+On 25 August 2015 at 16:24, Leif Lindholm <leif.lindholm@linaro.org> wrote:
+> On Tue, Aug 25, 2015 at 09:43:14PM +0800, Haojian Zhuang wrote:
+>> Since we discussed a lot on this, let's make a conclusion on it.
+>>
+>> 1. UEFI could append the reserved buffer in it's memory mapping.
 >
-> Signed-off-by: Varadarajan Narayanan <varada@codeaurora.org>
-> ---
-> Changes in v2:
->   - Added devicetree bindings documentation
+> Yes. It needs to.
 >
-> Changes in v3:
->   - Split 'gcnt' into a separate patch
->   - Added the new entries to Makefiles, Kconfig & board.c in sorted order
->   - Used "qcom,ipq40xx" instead of "qcom,ipq40xx-r3pc" in board.c
+> (I will let Mark comment on points 2-4.)
 >
-> Changes in v4:
->   - Renamed IPQ40xx as IPQ4019
->   - Moved kconfig and defconfig enablement to separate patch
->   - Dropped Documentation/devicetree/bindings/qcom.txt
+>> 5. A patch is necessary in kernel. If efi stub feature is enabled,
+>>    arm kernel should not parse memory node or reserved memory buffer in
+>>    DT any more.
 >
->  arch/arm/boot/dts/Makefile              |  1 +
->  arch/arm/boot/dts/qcom-ipq4019-r3pc.dts | 34 ++++++++++++++
->  arch/arm/boot/dts/qcom-ipq4019.dtsi     | 81 +++++++++++++++++++++++++++++++++
->  3 files changed, 116 insertions(+)
->  create mode 100644 arch/arm/boot/dts/qcom-ipq4019-r3pc.dts
->  create mode 100644 arch/arm/boot/dts/qcom-ipq4019.dtsi
+> This is already the case. The stub deletes any present memory nodes and
+> reserved entries in drivers/firmware/efi/libstub/fdt.c:update_fdt().
 >
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 246473a..ca603f3 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -474,6 +474,7 @@ dtb-$(CONFIG_ARCH_QCOM) += \
->         qcom-apq8074-dragonboard.dtb \
->         qcom-apq8084-ifc6540.dtb \
->         qcom-apq8084-mtp.dtb \
-> +       qcom-ipq4019-r3pc.dtb \
->         qcom-ipq8064-ap148.dtb \
->         qcom-msm8660-surf.dtb \
->         qcom-msm8960-cdp.dtb \
-> diff --git a/arch/arm/boot/dts/qcom-ipq4019-r3pc.dts b/arch/arm/boot/dts/qcom-ipq4019-r3pc.dts
-> new file mode 100644
-> index 0000000..e3855d7
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/qcom-ipq4019-r3pc.dts
-> @@ -0,0 +1,34 @@
-> +/* Copyright (c) 2014, The Linux Foundation. All rights reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 and
-> + * only version 2 as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include "qcom-ipq4019.dtsi"
-> +
-> +/ {
-> +       model = "Qualcomm Technologies, Inc. IPQ4019 R3PC";
-> +       compatible = "qcom,ipq4019-r3pc", "qcom,ipq4019";
-> +
-> +       memory {
-> +               device_type = "memory";
-> +               reg = <0x80000000 0x20000000>; /* 512MB */
-> +       };
-> +
-> +       chosen {
-> +               bootargs = "root=/dev/ram rw init=/init initrd=0x82000000,0x000E2246";
-> +               stdout-path = "/serial at 78b0000:115200";
+> Then, during setup_arch(), arch/arm64/kernel/efi.c:efi_init() calls
+> reserve_regions(), which adds only those memory regions available for
+> use by Linux as RAM to memblock.
+>
+>>    Arm kernel should either fetch memory information from
+>>    efi or DT.
+>
+> Absolutely.
+>
+>>    Currently arm kernel fetch both efi memory information and
+>>    reserved buffer from DTB at the same time.
+>
+> No, it does not.
+>
 
-I suggest adding an alias to the serial node, so you can just use the
-alias name instead of the path (also I never tried using an actual
-path, but wouldn't it be "/soc/serial at 78b0000"?).
+It should not, but it does. Due to an oversight, the stub removes
+/memreserve/ entries but ignores the reserved-memory node completely.
 
-> +       };
-> +
-> +       soc {
-> +               serial at 78b0000 {
-> +                       status = "ok";
-> +               };
-> +       };
-> +};
-> diff --git a/arch/arm/boot/dts/qcom-ipq4019.dtsi b/arch/arm/boot/dts/qcom-ipq4019.dtsi
-> new file mode 100644
-> index 0000000..1be0322
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/qcom-ipq4019.dtsi
-> @@ -0,0 +1,81 @@
-> +/*
-> + * Copyright (c) 2014, The Linux Foundation. All rights reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 and
-> + * only version 2 as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +/dts-v1/;
-> +
-> +#include "skeleton.dtsi"
-> +
-> +/ {
-> +       model = "Qualcomm Technologies, Inc. IPQ4019";
-> +       compatible = "qcom,ipq4019";
-> +       interrupt-parent = <&intc>;
-> +
-> +       cpus {
-> +               #address-cells = <1>;
-> +               #size-cells = <0>;
-> +               cpu at 0 {
-> +                       device_type = "cpu";
-> +                       compatible = "arm,cortex-a7";
-> +                       reg = <0x0>;
-> +               };
-> +
-> +               cpu at 1 {
-> +                       device_type = "cpu";
-> +                       compatible = "arm,cortex-a7";
-> +                       reg = <0x1>;
-> +               };
-> +
-> +               cpu at 2 {
-> +                       device_type = "cpu";
-> +                       compatible = "arm,cortex-a7";
-> +                       reg = <0x2>;
-> +               };
-> +
-> +               cpu at 3 {
-> +                       device_type = "cpu";
-> +                       compatible = "arm,cortex-a7";
-> +                       reg = <0x3>;
-> +               };
-> +       };
-> +
-> +       soc {
-> +               #address-cells = <1>;
-> +               #size-cells = <1>;
-> +               ranges;
-> +               compatible = "simple-bus";
-> +
-> +               intc: interrupt-controller at b000000 {
-> +                       compatible = "qcom,msm-qgic2";
-> +                       interrupt-controller;
-> +                       #interrupt-cells = <3>;
-> +                       reg = <0x0b000000 0x1000>,
-> +                       <0x0b002000 0x1000>;
-> +               };
-> +
-> +               serial at 78b0000 {
-> +                       compatible = "qcom,msm-uartdm-v1.4", "qcom,msm-uartdm";
-> +                       reg = <0x78b0000 0x200>;
-> +                       interrupts = <0 108 0>;
-> +                       status = "disabled";
-> +               };
+This was reported here in fact
 
-I think it's nice to have the nodes ordered by their (first) registers
-address, so maybe consider doing that. This makes it also clear where
-new blocks should be added, and if several people try to add blocks
-the chance of conflicts is reduced.
+http://thread.gmane.org/gmane.linux.kernel.efi/5736/focus=5742
 
-> +       };
-> +
-> +       timer {
-> +               compatible = "arm,armv7-timer";
-> +               interrupts = <1 2 0xf08>,
-> +                            <1 3 0xf08>,
-> +                            <1 4 0xf08>,
-> +                            <1 1 0xf08>;
-> +               clock-frequency = <20833333>;
+but there has not been a followup to this series.
 
-Assuming ipq4019 is the name of the emulated chip and not a special id
-for the emulator, and "IPQ4019 R3PC" is the dts file for the emulator,
-you could set the clock-frequency in the board dts instead of forcing
-every "real chip" board dts to overwrite/clear it.
+I think it is fine to keep those memory reservations in the DT, but
+you should simply understand that UEFI does not parse the DT, so you
+need to tell it which memory it cannot touch. Otherwise, the firmware
+itself or anything that executes under it (UEFI drivers, the UEFI
+Shell, GRUB, the UEFI stub in the kernel) will think it is available
+and may allocate it for its own use. This may include runtime services
+regions that will remain reserved even after exiting boot services.
 
-> +       };
-> +};
-> --
-
-regards
-Jonas
+-- 
+Ard.
