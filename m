@@ -1,44 +1,93 @@
-From: treding@nvidia.com (Thierry Reding)
-Date: Tue, 25 Aug 2015 11:15:36 +0200
-Subject: [PATCH v3 06/14] Documentation: drm/bridge: add document for
- analogix_dp
-In-Reply-To: <CAL_JsqLz+8RtBucctUj4euXZ3Ac0DvB52N9ONpAerh5T9BiTJg@mail.gmail.com>
-References: <1439995728-18046-1-git-send-email-ykk@rock-chips.com>
- <1439995834-18363-1-git-send-email-ykk@rock-chips.com>
- <CAL_JsqLz+8RtBucctUj4euXZ3Ac0DvB52N9ONpAerh5T9BiTJg@mail.gmail.com>
-Message-ID: <20150825091534.GB14034@ulmo.nvidia.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 25 Aug 2015 11:24:13 +0200
+Subject: [PATCH 2/9] PM / Domains: Remove dev->driver check for runtime PM
+In-Reply-To: <20150824195032.GA1384@linaro.org>
+References: <1438731339-58317-1-git-send-email-lina.iyer@linaro.org>
+ <1438731339-58317-3-git-send-email-lina.iyer@linaro.org>
+ <7hfv3onv5c.fsf@deeprootsystems.com>
+ <CAMuHMdVeffa-jgXuSjDQBKTrhgW-d87OKzs1iXX+4y-9U_AJbg@mail.gmail.com>
+ <7hwpwylepx.fsf@deeprootsystems.com>
+ <CAMuHMdW-T9rUWXsQeffwtXspHbjfGqo_0G4QMB1o0TwTLJAQAg@mail.gmail.com>
+ <CAMAWPa-0R42thqBo0omn0KK7y0wyxoyaP+wsfoRvXBmWhBytKg@mail.gmail.com>
+ <CAMuHMdV2gDBaPRb3yE=tVPO_pr7PFA6bwhyQE5raumCh_qPXww@mail.gmail.com>
+ <7hio88gxpn.fsf@deeprootsystems.com>
+ <20150824195032.GA1384@linaro.org>
+Message-ID: <CAMuHMdV9bRhGR6TarfWpv40TpZW1ntC4rpfn8snm8dTt_wg71g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 23, 2015 at 06:23:14PM -0500, Rob Herring wrote:
-> On Wed, Aug 19, 2015 at 9:50 AM, Yakir Yang <ykk@rock-chips.com> wrote:
-[...]
-> > +       -analogix,link-rate:
-> > +               max link rate supported by the eDP controller.
-> > +                       LINK_RATE_1_62GBPS = 0x6, LINK_RATE_2_70GBPS = 0x0A,
-> > +                       LINK_RATE_5_40GBPS = 0x14
-> 
-> Same here. I'd rather see something like "link-rate-mbps" and use the
-> actual rate.
+Hi Lina,
 
-There is no need whatsoever to hard-code this in DT. (e)DP provides the
-means to detect what rate the link supports and the specification
-provides guidance on how to select an appropriate one.
+On Mon, Aug 24, 2015 at 9:50 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
+> On Fri, Aug 21 2015 at 15:04 -0600, Kevin Hilman wrote:
+>> Geert Uytterhoeven <geert@linux-m68k.org> writes:
+>>> On Fri, Aug 14, 2015 at 7:19 PM, Kevin Hilman <khilman@kernel.org> wrote:
+>>>> On Fri, Aug 14, 2015 at 12:24 AM, Geert Uytterhoeven
+>>>> <geert@linux-m68k.org> wrote:
+>>>>> On Fri, Aug 14, 2015 at 5:40 AM, Kevin Hilman <khilman@kernel.org>
+>>>>> wrote:
+>>>>>> Geert Uytterhoeven <geert@linux-m68k.org> writes:
+>>>>>>> On Wed, Aug 12, 2015 at 9:50 PM, Kevin Hilman <khilman@kernel.org>
+>>>>>>> wrote:
+>>>>>>>> This check might have made sense before PM domains, but with PM
+>>>>>>>> domains,
+>>>>>>>> it's entirely possible to have a simple device without a driver and
+>>>>>>>> the
+>>>>>>>> PM domain handles all the necesary PM, so I think this check
+>>>>>>>> could/should be removed.
+>>>>>>>>
+>>>>>>>> Thoughts?
+>>>>>>>
+>>>>>>> Simple devices without a driver aren't handled automatically.
+>>>>>>> At minimum, the driver should call pm_runtime_enable(), cfr.
+>>>>>>> drivers/bus/simple-pm-bus.c.
+>>>>>>
+>>>>>> That's correct, and in the proof-of-concept stuff I hacked up and in
+>>>>>> Lina's series, the CPU "devices" do indeed to this.  Without that,
+>>>>>> they
+>>>>>> wouldn't end up ever taking this codepath through genpd's
+>>>>>> runtime_suspend and power_off hooks.
+>>>>>>
+>>>>>> Also, I'm not sure if your comment was meant to be an objection to the
+>>>>>> patch?  or if you're OK with it.
+>>>>>
+>>>>> My comment was purely meant as a response to "it's entirely possible to
+>>>>> have a
+>>>>> simple device without a driver and the PM domain handles all the
+>>>>> necesary PM".
+>>>>
+>>>> Right, so if the PM domain does the pm_runtime_enable() for these
+>>>> "simple" devices without drivers, they can still exist without a
+>>>> driver, and the PM domain doing all the magic.
+>>>
+>>> Is it possible to let the PM Domain do the pm_runtime_enable() itself in
+>>> the absence of a driver?
+>>
+>> Well, I suppose it's possible, not sure it's recommended. :)
+>>
+>>> If yes, I wouldn't have needed simple-pm-bus.c.
+>>> What if a driver is bound later?
+>>
+>> Yeah, you're approach is better.
+>>
+> I am not sure I understand the approach? Initialize the CPU devices as
+> "simple-pm-bus" compatible?
 
-> 
-> > +       -analogix,lane-count:
-> > +               max number of lanes supported by the eDP contoller.
-> > +                       LANE_COUNT1 = 1, LANE_COUNT2 = 2, LANE_COUNT4 = 4
-> 
-> And drop the vendor prefix here.
+No, Kevin and I are discussing about transparent buses that need power
+management, not about CPU devices.
 
-Same as for the link rate.
+Cfr. commit 89d463ea106dba53 ("drivers: bus: Add Simple Power-Managed Bus
+Driver").
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150825/6f34dcce/attachment.sig>
+Sorry for the confusion...
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
