@@ -1,25 +1,17 @@
 From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
-Date: Wed, 26 Aug 2015 00:33:27 +0700
-Subject: [PATCH V2 2/4] ACPI/scan: Clean up acpi_check_dma
+Date: Wed, 26 Aug 2015 00:33:28 +0700
+Subject: [PATCH V2 3/4] PCI: OF: Move of_pci_dma_configure() to
+ pci_dma_configure()
 In-Reply-To: <1440524009-5359-1-git-send-email-Suravee.Suthikulpanit@amd.com>
 References: <1440524009-5359-1-git-send-email-Suravee.Suthikulpanit@amd.com>
-Message-ID: <1440524009-5359-3-git-send-email-Suravee.Suthikulpanit@amd.com>
+Message-ID: <1440524009-5359-4-git-send-email-Suravee.Suthikulpanit@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The original name of acpi_check_dma() function does not clearly tell what
-exactly it is checking. Also, returning two boolean values (one to indicate
-device is DMA capability, and the other to inidicate device coherency
-attribute) can be confusing.
+This patch move of_pci_dma_configure() to a more generic
+pci_dma_configure(), which can be extended by non-OF code (e.g. ACPI).
 
-So, in order to simplify the function, this patch renames acpi_check_dma()
-to acpi_check_dma_coherency() to clearly indicate the purpose of this
-function, and only returns an integer where -1 means DMA not supported,
-1 means coherent DMA, and 0 means non-coherent DMA.
-
-Also, this patch moves the function into drivers/acpi/scan.c since
-it is easier to follow the logic in the acpi_init_coherency() in the
-same file here.
+This has no functional change.
 
 Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 CC: Bjorn Helgaas <bhelgaas@google.com>
@@ -27,194 +19,121 @@ CC: Catalin Marinas <catalin.marinas@arm.com>
 CC: Rob Herring <robh+dt@kernel.org>
 CC: Will Deacon <will.deacon@arm.com>
 CC: Rafael J. Wysocki <rjw@rjwysocki.net>
+CC: Murali Karicheri <m-karicheri2@ti.com>
 ---
- drivers/acpi/acpi_platform.c |  7 ++++++-
- drivers/acpi/glue.c          |  5 +++--
- drivers/acpi/scan.c          | 39 +++++++++++++++++++++++++++++++++++++++
- drivers/base/property.c      |  8 ++++++--
- include/acpi/acpi_bus.h      | 36 ++----------------------------------
- include/linux/acpi.h         |  4 ++--
- 6 files changed, 58 insertions(+), 41 deletions(-)
+ drivers/of/of_pci.c    | 20 --------------------
+ drivers/pci/probe.c    | 27 +++++++++++++++++++++++++--
+ include/linux/of_pci.h |  3 ---
+ 3 files changed, 25 insertions(+), 25 deletions(-)
 
-diff --git a/drivers/acpi/acpi_platform.c b/drivers/acpi/acpi_platform.c
-index 06a67d5..2261e85 100644
---- a/drivers/acpi/acpi_platform.c
-+++ b/drivers/acpi/acpi_platform.c
-@@ -103,7 +103,12 @@ struct platform_device *acpi_create_platform_device(struct acpi_device *adev)
- 	pdevinfo.res = resources;
- 	pdevinfo.num_res = count;
- 	pdevinfo.fwnode = acpi_fwnode_handle(adev);
--	pdevinfo.dma_mask = acpi_check_dma(adev, NULL) ? DMA_BIT_MASK(32) : 0;
-+
-+	if (-1 != acpi_check_dma_coherency(adev))
-+		pdevinfo.dma_mask = DMA_BIT_MASK(32);
-+	else
-+		pdevinfo.dma_mask = 0;
-+
- 	pdev = platform_device_register_full(&pdevinfo);
- 	if (IS_ERR(pdev))
- 		dev_err(&adev->dev, "platform device creation failed: %ld\n",
-diff --git a/drivers/acpi/glue.c b/drivers/acpi/glue.c
-index b9657af..55cf916 100644
---- a/drivers/acpi/glue.c
-+++ b/drivers/acpi/glue.c
-@@ -168,7 +168,7 @@ int acpi_bind_one(struct device *dev, struct acpi_device *acpi_dev)
- 	struct list_head *physnode_list;
- 	unsigned int node_id;
- 	int retval = -EINVAL;
--	bool coherent;
-+	int coherent;
+diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
+index 5751dc5..b66ee4e 100644
+--- a/drivers/of/of_pci.c
++++ b/drivers/of/of_pci.c
+@@ -117,26 +117,6 @@ int of_get_pci_domain_nr(struct device_node *node)
+ }
+ EXPORT_SYMBOL_GPL(of_get_pci_domain_nr);
  
- 	if (has_acpi_companion(dev)) {
- 		if (acpi_dev) {
-@@ -225,7 +225,8 @@ int acpi_bind_one(struct device *dev, struct acpi_device *acpi_dev)
- 	if (!has_acpi_companion(dev))
- 		ACPI_COMPANION_SET(dev, acpi_dev);
+-/**
+- * of_pci_dma_configure - Setup DMA configuration
+- * @dev: ptr to pci_dev struct of the PCI device
+- *
+- * Function to update PCI devices's DMA configuration using the same
+- * info from the OF node of host bridge's parent (if any).
+- */
+-void of_pci_dma_configure(struct pci_dev *pci_dev)
+-{
+-	struct device *dev = &pci_dev->dev;
+-	struct device *bridge = pci_get_host_bridge_device(pci_dev);
+-
+-	if (!bridge->parent)
+-		return;
+-
+-	of_dma_configure(dev, bridge->parent->of_node);
+-	pci_put_host_bridge_device(bridge);
+-}
+-EXPORT_SYMBOL_GPL(of_pci_dma_configure);
+-
+ #if defined(CONFIG_OF_ADDRESS)
+ /**
+  * of_pci_get_host_bridge_resources - Parse PCI host bridge resources from DT
+diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+index cefd636..4de6594 100644
+--- a/drivers/pci/probe.c
++++ b/drivers/pci/probe.c
+@@ -6,12 +6,14 @@
+ #include <linux/delay.h>
+ #include <linux/init.h>
+ #include <linux/pci.h>
+-#include <linux/of_pci.h>
++#include <linux/of_device.h>
+ #include <linux/pci_hotplug.h>
+ #include <linux/slab.h>
+ #include <linux/module.h>
+ #include <linux/cpumask.h>
+ #include <linux/pci-aspm.h>
++#include <linux/acpi.h>
++#include <linux/property.h>
+ #include <asm-generic/pci-bridge.h>
+ #include "pci.h"
  
--	if (acpi_check_dma(acpi_dev, &coherent))
-+	coherent = acpi_check_dma_coherency(acpi_dev);
-+	if (coherent != -1)
- 		arch_setup_dma_ops(dev, 0, 0, NULL, coherent);
- 
- 	acpi_physnode_link_name(physical_node_name, node_id);
-diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
-index ec25635..299a825 100644
---- a/drivers/acpi/scan.c
-+++ b/drivers/acpi/scan.c
-@@ -2182,6 +2182,45 @@ void acpi_free_pnp_ids(struct acpi_device_pnp *pnp)
- 	kfree(pnp->unique_id);
+@@ -1544,6 +1546,27 @@ static void pci_init_capabilities(struct pci_dev *dev)
+ 	pci_enable_acs(dev);
  }
  
 +/**
-+ * acpi_check_dma_coherency - Check DMA coherency for the specified device.
-+ * @adev: The pointer to acpi device to check coherency attribute
++ * pci_dma_configure - Setup DMA configuration
++ * @dev: ptr to pci_dev struct of the PCI device
 + *
-+ * Return -1 if DMA is not supported. Otherwise, return 1 if the
-+ * device support coherent DMA, or 0 for non-coherent DMA.
++ * Function to update PCI devices's DMA configuration using the same
++ * info from the OF node of host bridge's parent (if any).
 + */
-+int acpi_check_dma_coherency(struct acpi_device *adev)
++static void pci_dma_configure(struct pci_dev *dev)
 +{
-+	int ret = -1;
++	struct device *bridge = pci_get_host_bridge_device(dev);
 +
-+	if (!adev)
-+		return ret;
++	if (IS_ENABLED(CONFIG_OF) && dev->dev.of_node) {
++		if (!bridge->parent)
++			return;
 +
-+	/**
-+	 * Currently, we only support _CCA=1 (i.e. coherent_dma=1)
-+	 * This should be equivalent to specifying dma-coherent for
-+	 * a device in OF.
-+	 *
-+	 * For the case when _CCA=0 (i.e. coherent_dma=0 && cca_seen=1),
-+	 * we have two choices:
-+	 *   1. Do not support and disable DMA.
-+	 *   2. Support but rely on arch-specific cache maintenance for
-+	 *      non-coherenje DMA operations.
-+	 * Currently, we implement case 2 above.
-+	 *
-+	 * For the case when _CCA is missing (i.e. cca_seen=0) and
-+	 * platform specifies ACPI_CCA_REQUIRED, we do not support DMA,
-+	 * and fallback to arch-specific default handling.
-+	 *
-+	 * See acpi_init_coherency() for more info.
-+	 */
-+	if (!adev->flags.cca_seen && IS_ENABLED(CONFIG_ACPI_CCA_REQUIRED))
-+		return ret;
-+
-+	return adev->flags.coherent_dma;
-+}
-+EXPORT_SYMBOL_GPL(acpi_check_dma_coherency);
-+
- static void acpi_init_coherency(struct acpi_device *adev)
- {
- 	unsigned long long cca = 0;
-diff --git a/drivers/base/property.c b/drivers/base/property.c
-index f3f6d16..643b0fb 100644
---- a/drivers/base/property.c
-+++ b/drivers/base/property.c
-@@ -527,8 +527,12 @@ bool device_dma_is_coherent(struct device *dev)
- 
- 	if (IS_ENABLED(CONFIG_OF) && dev->of_node)
- 		coherent = of_dma_is_coherent(dev->of_node);
--	else
--		acpi_check_dma(ACPI_COMPANION(dev), &coherent);
-+	else {
-+		int ac = acpi_check_dma_coherency(ACPI_COMPANION(dev));
-+
-+		if (ac != -1)
-+			coherent = ac;
++		of_dma_configure(&dev->dev, bridge->parent->of_node);
 +	}
- 
- 	return coherent;
- }
-diff --git a/include/acpi/acpi_bus.h b/include/acpi/acpi_bus.h
-index 7ecb8e4..baf43ea 100644
---- a/include/acpi/acpi_bus.h
-+++ b/include/acpi/acpi_bus.h
-@@ -382,40 +382,6 @@ struct acpi_device {
- 	void (*remove)(struct acpi_device *);
- };
- 
--static inline bool acpi_check_dma(struct acpi_device *adev, bool *coherent)
--{
--	bool ret = false;
--
--	if (!adev)
--		return ret;
--
--	/**
--	 * Currently, we only support _CCA=1 (i.e. coherent_dma=1)
--	 * This should be equivalent to specifyig dma-coherent for
--	 * a device in OF.
--	 *
--	 * For the case when _CCA=0 (i.e. coherent_dma=0 && cca_seen=1),
--	 * There are two cases:
--	 * case 1. Do not support and disable DMA.
--	 * case 2. Support but rely on arch-specific cache maintenance for
--	 *         non-coherence DMA operations.
--	 * Currently, we implement case 2 above.
--	 *
--	 * For the case when _CCA is missing (i.e. cca_seen=0) and
--	 * platform specifies ACPI_CCA_REQUIRED, we do not support DMA,
--	 * and fallback to arch-specific default handling.
--	 *
--	 * See acpi_init_coherency() for more info.
--	 */
--	if (adev->flags.coherent_dma ||
--	    (adev->flags.cca_seen && IS_ENABLED(CONFIG_ARM64))) {
--		ret = true;
--		if (coherent)
--			*coherent = adev->flags.coherent_dma;
--	}
--	return ret;
--}
--
- static inline bool is_acpi_node(struct fwnode_handle *fwnode)
- {
- 	return fwnode && fwnode->type == FWNODE_ACPI;
-@@ -640,6 +606,8 @@ static inline bool acpi_device_can_poweroff(struct acpi_device *adev)
- 	return adev->power.states[ACPI_STATE_D3_COLD].flags.valid;
- }
- 
-+int acpi_check_dma_coherency(struct acpi_device *adev);
 +
- #else	/* CONFIG_ACPI */
- 
- static inline int register_acpi_bus_type(void *bus) { return 0; }
-diff --git a/include/linux/acpi.h b/include/linux/acpi.h
-index d2445fa..530d2fa 100644
---- a/include/linux/acpi.h
-+++ b/include/linux/acpi.h
-@@ -562,9 +562,9 @@ static inline int acpi_device_modalias(struct device *dev,
- 	return -ENODEV;
- }
- 
--static inline bool acpi_check_dma(struct acpi_device *adev, bool *coherent)
-+static inline int acpi_check_dma_coherency(struct acpi_device *adev)
++	pci_put_host_bridge_device(bridge);
++}
++
+ void pci_device_add(struct pci_dev *dev, struct pci_bus *bus)
  {
--	return false;
-+	return -1;
- }
+ 	int ret;
+@@ -1557,7 +1580,7 @@ void pci_device_add(struct pci_dev *dev, struct pci_bus *bus)
+ 	dev->dev.dma_mask = &dev->dma_mask;
+ 	dev->dev.dma_parms = &dev->dma_parms;
+ 	dev->dev.coherent_dma_mask = 0xffffffffull;
+-	of_pci_dma_configure(dev);
++	pci_dma_configure(dev);
  
- #define ACPI_PTR(_ptr)	(NULL)
+ 	pci_set_dma_max_seg_size(dev, 65536);
+ 	pci_set_dma_seg_boundary(dev, 0xffffffff);
+diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
+index 29fd3fe..ce0e5ab 100644
+--- a/include/linux/of_pci.h
++++ b/include/linux/of_pci.h
+@@ -16,7 +16,6 @@ int of_pci_get_devfn(struct device_node *np);
+ int of_irq_parse_and_map_pci(const struct pci_dev *dev, u8 slot, u8 pin);
+ int of_pci_parse_bus_range(struct device_node *node, struct resource *res);
+ int of_get_pci_domain_nr(struct device_node *node);
+-void of_pci_dma_configure(struct pci_dev *pci_dev);
+ #else
+ static inline int of_irq_parse_pci(const struct pci_dev *pdev, struct of_phandle_args *out_irq)
+ {
+@@ -51,8 +50,6 @@ of_get_pci_domain_nr(struct device_node *node)
+ {
+ 	return -1;
+ }
+-
+-static inline void of_pci_dma_configure(struct pci_dev *pci_dev) { }
+ #endif
+ 
+ #if defined(CONFIG_OF_ADDRESS)
 -- 
 2.1.0
