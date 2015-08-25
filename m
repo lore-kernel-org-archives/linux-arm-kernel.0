@@ -1,32 +1,74 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 25 Aug 2015 08:27:10 -0500
-Subject: [PATCH v3 06/14] Documentation: drm/bridge: add document for
- analogix_dp
-In-Reply-To: <20150825091534.GB14034@ulmo.nvidia.com>
-References: <1439995728-18046-1-git-send-email-ykk@rock-chips.com>
- <1439995834-18363-1-git-send-email-ykk@rock-chips.com>
- <CAL_JsqLz+8RtBucctUj4euXZ3Ac0DvB52N9ONpAerh5T9BiTJg@mail.gmail.com>
- <20150825091534.GB14034@ulmo.nvidia.com>
-Message-ID: <CAL_Jsq++RLZo4gvEUTKO8MfEPwSqT2R+bqG22Jsgb2qLgDQFpw@mail.gmail.com>
+From: Shenwei.Wang@freescale.com (Shenwei Wang)
+Date: Tue, 25 Aug 2015 13:38:28 +0000
+Subject: [PATCH v9 1/1] irqchip: imx-gpcv2: IMX GPCv2 driver for wakeup
+ sources
+In-Reply-To: <55DC3452.3070205@arm.com>
+References: <1440443055-7291-1-git-send-email-shenwei.wang@freescale.com>
+ <55DC3452.3070205@arm.com>
+Message-ID: <CY1PR0301MB08439B6C5F841AFFD152DFD883610@CY1PR0301MB0843.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 25, 2015 at 4:15 AM, Thierry Reding <treding@nvidia.com> wrote:
-> On Sun, Aug 23, 2015 at 06:23:14PM -0500, Rob Herring wrote:
->> On Wed, Aug 19, 2015 at 9:50 AM, Yakir Yang <ykk@rock-chips.com> wrote:
-> [...]
->> > +       -analogix,link-rate:
->> > +               max link rate supported by the eDP controller.
->> > +                       LINK_RATE_1_62GBPS = 0x6, LINK_RATE_2_70GBPS = 0x0A,
->> > +                       LINK_RATE_5_40GBPS = 0x14
->>
->> Same here. I'd rather see something like "link-rate-mbps" and use the
->> actual rate.
->
-> There is no need whatsoever to hard-code this in DT. (e)DP provides the
-> means to detect what rate the link supports and the specification
-> provides guidance on how to select an appropriate one.
 
-Good, even better.
 
-Rob
+> -----Original Message-----
+> From: Sudeep Holla [mailto:sudeep.holla at arm.com]
+> Sent: 2015?8?25? 4:25
+> To: Wang Shenwei-B38339
+> Cc: shawn.guo at linaro.org; tglx at linutronix.de; jason at lakedaemon.net; Sudeep
+> Holla; Huang Yongcai-B20788; linux-kernel at vger.kernel.org;
+> linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH v9 1/1] irqchip: imx-gpcv2: IMX GPCv2 driver for wakeup
+> sources
+> 
+> 
+> 
+> On 24/08/15 20:04, Shenwei Wang wrote:
+> > IMX7D contains a new version of GPC IP block (GPCv2). It has two major
+> > functions: power management and wakeup source management.
+> > This patch adds a new irqchip driver to manage the interrupt wakeup
+> > sources on IMX7D.
+> 
+> Interesting, you mention that this IP block has mainly power management and it
+> itself requires save/restore. Is it not in always on domain ?
+
+Yes, it is in always on domain.
+
+> > When the system is in WFI (wait for interrupt) mode, this GPC block
+> > will be the first block on the platform to be activated and signaled.
+> > Under normal wait mode during cpu idle, the system can be woke up by
+> > +static void gpcv2_wakeup_source_restore(void) {
+> > +	struct gpcv2_irqchip_data *cd;
+> > +	void __iomem *reg;
+> > +	int i;
+> > +
+> > +	cd = imx_gpcv2_instance;
+> > +	if (!cd)
+> > +		return;
+> > +
+> > +	for (i = 0; i < IMR_NUM; i++) {
+> > +		reg = cd->gpc_base + cd->cpu2wakeup + i * 4;
+> > +		writel_relaxed(cd->saved_irq_mask[i], reg);
+> 
+> Instead of saving all the non-wakeup sources, can't you use raw save/restore of
+> these registers and mask all the non-wakeup sources by setting
+> MASK_ON_SUSPEND ?
+
+I can't catch what you mean. Can you show me an example?
+
+> Also your interrupt controller seems like has no special way to configure wakeups,
+> you are just leaving them enabled. i.e. I see cpu2wakeup used for both
+> {un,}masking and wakeup enable. So you can just use IRQCHIP_SKIP_SET_WAKE.
+> Correct me if my understanding is wrong.
+
+In this driver, the Core0 is configured to be the default core to be woke up, not both. You can
+configure it to Core1 by changing the cpu2wakeup value. I don't see any reason to
+use IRQCHIP_SKIP_SET_WAKE flag.
+
+Thanks,
+Shenwei
+ 
+
+
+> Regards,
+> Sudeep
