@@ -1,55 +1,59 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 24 Aug 2015 17:19:26 -0700
-Subject: [PATCH] ARM: probes: Don't stop the machine if we're in the
- debugger
-In-Reply-To: <1440460739-19522-1-git-send-email-dianders@chromium.org>
-References: <1440460739-19522-1-git-send-email-dianders@chromium.org>
-Message-ID: <55DBB48E.7040508@codeaurora.org>
+Date: Mon, 24 Aug 2015 17:22:57 -0700
+Subject: [PATCH 1/2] ARM: qcom: add mdio bus on IPQ806x/AP148
+In-Reply-To: <1440006802-2415-1-git-send-email-mathieu@codeaurora.org>
+References: <1440006802-2415-1-git-send-email-mathieu@codeaurora.org>
+Message-ID: <20150825002257.GA19120@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/24/2015 04:58 PM, Douglas Anderson wrote:
-> If we're in kgdb then the machine is already stopped.  Trying to stop
-> it again will cause us to try to sleep, which is not allowed while in
-> kgdb.  To avoid this problem, only stop the machine when we're not in
-> kgdb.
->
-> Reported-by: Aapo Vienamo <avienamo@nvidia.com>
-> Suggested-by: Kees Cook <keescook@chromium.org>
-> Signed-off-by: Douglas Anderson <dianders@chromium.org>
-> ---
+On 08/19, Mathieu Olivari wrote:
+> diff --git a/arch/arm/boot/dts/qcom-ipq8064-ap148.dts b/arch/arm/boot/dts/qcom-ipq8064-ap148.dts
+> index 6886d09..d73df24 100644
+> --- a/arch/arm/boot/dts/qcom-ipq8064-ap148.dts
+> +++ b/arch/arm/boot/dts/qcom-ipq8064-ap148.dts
+> @@ -19,8 +19,9 @@
+>  		};
+>  	};
+>  
+> -	alias {
+> +	aliases {
 
-Can you add the backtrace?
+Good catch!
 
->   arch/arm/kernel/patch.c | 7 ++++++-
->   1 file changed, 6 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm/kernel/patch.c b/arch/arm/kernel/patch.c
-> index 69bda1a..abf30ec 100644
-> --- a/arch/arm/kernel/patch.c
-> +++ b/arch/arm/kernel/patch.c
-> @@ -1,5 +1,6 @@
->   #include <linux/kernel.h>
->   #include <linux/spinlock.h>
-> +#include <linux/kgdb.h>
->   #include <linux/kprobes.h>
->   #include <linux/mm.h>
->   #include <linux/stop_machine.h>
-> @@ -124,6 +125,9 @@ void __kprobes patch_text(void *addr, unsigned int insn)
->   		.insn = insn,
->   	};
->   
-> -	stop_machine(patch_text_stop_machine, &patch, NULL);
-> +	/* Stop machine before patching; but not if in the debugger */
-> +	if (unlikely(in_dbg_master()))
-> +		patch_text_stop_machine(&patch);
-> +	else
-> +		stop_machine(patch_text_stop_machine, &patch, NULL);
->   }
+>  		serial0 = &uart4;
+> +		mdio-gpio0 = &mdio0;
+>  	};
+>  
+>  	chosen {
+> @@ -93,5 +103,24 @@
+>  		sata at 29000000 {
+>  			status = "ok";
+>  		};
+> +
+> +		mdio0: mdio {
 
-Perhaps it would be better to add a different function for the kgdb call 
-site? Then it's explicit what's going on without us having to figure out 
-when in_dbg_master() is true.
+This node should be at the root level, not inside the soc node.
+
+> +			compatible = "virtual,mdio-gpio";
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			gpios = <&qcom_pinmux 1 0 &qcom_pinmux 0 0>;
+> +			pinctrl-0 = <&mdio0_pins>;
+> +			pinctrl-names = "default";
+> +
+> +			phy0: ethernet-phy at 0 {
+> +				device_type = "ethernet-phy";
+> +				reg = <0>;
+> +			};
+> +
+> +			phy4: ethernet-phy at 4 {
+> +				device_type = "ethernet-phy";
+> +				reg = <4>;
+> +			};
+> +		};
+>  	};
+>  };
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
