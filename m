@@ -1,51 +1,198 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 25 Aug 2015 15:45:56 +0100
-Subject: [PATCH v9 1/1] irqchip: imx-gpcv2: IMX GPCv2 driver for wakeup
- sources
-In-Reply-To: <CY1PR0301MB0843AE566996617D855CC00683610@CY1PR0301MB0843.namprd03.prod.outlook.com>
-References: <1440443055-7291-1-git-send-email-shenwei.wang@freescale.com>
- <55DC3452.3070205@arm.com>
- <CY1PR0301MB08439B6C5F841AFFD152DFD883610@CY1PR0301MB0843.namprd03.prod.outlook.com>
- <55DC738D.8000302@arm.com>
- <CY1PR0301MB0843AE566996617D855CC00683610@CY1PR0301MB0843.namprd03.prod.outlook.com>
-Message-ID: <55DC7FA4.7040902@arm.com>
+From: jogo@openwrt.org (Jonas Gorski)
+Date: Tue, 25 Aug 2015 16:50:05 +0200
+Subject: [PATCH v4] qcom: ipq4019: Add basic board/dts support for IPQ4019
+ SoC
+In-Reply-To: <20150825120804.GA30996@codeaurora.org>
+References: <20150825120804.GA30996@codeaurora.org>
+Message-ID: <CAOiHx=kz1voQXre2tkNC2bZo6fqq0L81+V9VeZadKhjR0nDNww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-
-On 25/08/15 15:14, Shenwei Wang wrote:
+On Tue, Aug 25, 2015 at 2:08 PM, Varadarajan Narayanan
+<varada@codeaurora.org> wrote:
+> Add initial dts files and SoC support for IPQ4019
 >
+> Signed-off-by: Varadarajan Narayanan <varada@codeaurora.org>
+> ---
+> Changes in v2:
+>   - Added devicetree bindings documentation
 >
->> -----Original Message-----
->> From: Sudeep Holla [mailto:sudeep.holla at arm.com]
-
-[...]
-
->> I don't see this driver doing anything extra apart from keeping the wakeup irqs
->> enabled. i.e. You use the same cpu*wake register to mask/unmask the interrupt
->> as well as set the wakeup source. Since the wakeup interrupt will be enabled by
->> the driver, you just need to mark it as wake-up source and nothing extra in the
->> controller right ?
->> If so, you need to set IRQCHIP_SKIP_SET_WAKE as you are just leaving that irq
->> enabled and not doing any extra configuration to enable it as wakeup source.
->> Please correct if that wrong, but from the code that's what I could infer.
+> Changes in v3:
+>   - Split 'gcnt' into a separate patch
+>   - Added the new entries to Makefiles, Kconfig & board.c in sorted order
+>   - Used "qcom,ipq40xx" instead of "qcom,ipq40xx-r3pc" in board.c
 >
-> There is no special for this driver. We just use the IRQCHIP driver framework to
-> manage the wakeup sources. Why did you propose to set IRQCHIP_SKIP_SET_WAKE
-> flag here? If you don't need the wakeup feature, you should just not enable this
-> driver in the configuration.
+> Changes in v4:
+>   - Renamed IPQ40xx as IPQ4019
+>   - Moved kconfig and defconfig enablement to separate patch
+>   - Dropped Documentation/devicetree/bindings/qcom.txt
 >
+>  arch/arm/boot/dts/Makefile              |  1 +
+>  arch/arm/boot/dts/qcom-ipq4019-r3pc.dts | 34 ++++++++++++++
+>  arch/arm/boot/dts/qcom-ipq4019.dtsi     | 81 +++++++++++++++++++++++++++++++++
+>  3 files changed, 116 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/qcom-ipq4019-r3pc.dts
+>  create mode 100644 arch/arm/boot/dts/qcom-ipq4019.dtsi
+>
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 246473a..ca603f3 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -474,6 +474,7 @@ dtb-$(CONFIG_ARCH_QCOM) += \
+>         qcom-apq8074-dragonboard.dtb \
+>         qcom-apq8084-ifc6540.dtb \
+>         qcom-apq8084-mtp.dtb \
+> +       qcom-ipq4019-r3pc.dtb \
+>         qcom-ipq8064-ap148.dtb \
+>         qcom-msm8660-surf.dtb \
+>         qcom-msm8960-cdp.dtb \
+> diff --git a/arch/arm/boot/dts/qcom-ipq4019-r3pc.dts b/arch/arm/boot/dts/qcom-ipq4019-r3pc.dts
+> new file mode 100644
+> index 0000000..e3855d7
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/qcom-ipq4019-r3pc.dts
+> @@ -0,0 +1,34 @@
+> +/* Copyright (c) 2014, The Linux Foundation. All rights reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 and
+> + * only version 2 as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include "qcom-ipq4019.dtsi"
+> +
+> +/ {
+> +       model = "Qualcomm Technologies, Inc. IPQ4019 R3PC";
+> +       compatible = "qcom,ipq4019-r3pc", "qcom,ipq4019";
+> +
+> +       memory {
+> +               device_type = "memory";
+> +               reg = <0x80000000 0x20000000>; /* 512MB */
+> +       };
+> +
+> +       chosen {
+> +               bootargs = "root=/dev/ram rw init=/init initrd=0x82000000,0x000E2246";
+> +               stdout-path = "/serial at 78b0000:115200";
 
-No, if the driver doesn't nothing extra to configure the wake up source
-other than keeping it enabled, then it fits the case of SKIP_SET_WAKE.
-The driver using this wake would have requested and enabled the irq.
-When it calls enable_irq_wake, you have nothing extra to set(atleast
-from the looks of the driver), so setting SKIP_SET_WAKE will skip the
-call and updated the wake flags in irq core.
+I suggest adding an alias to the serial node, so you can just use the
+alias name instead of the path (also I never tried using an actual
+path, but wouldn't it be "/soc/serial at 78b0000"?).
 
-I don't see the real need of 2 separate sets of irq mask being saved in
-either case.
+> +       };
+> +
+> +       soc {
+> +               serial at 78b0000 {
+> +                       status = "ok";
+> +               };
+> +       };
+> +};
+> diff --git a/arch/arm/boot/dts/qcom-ipq4019.dtsi b/arch/arm/boot/dts/qcom-ipq4019.dtsi
+> new file mode 100644
+> index 0000000..1be0322
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/qcom-ipq4019.dtsi
+> @@ -0,0 +1,81 @@
+> +/*
+> + * Copyright (c) 2014, The Linux Foundation. All rights reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 and
+> + * only version 2 as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +/dts-v1/;
+> +
+> +#include "skeleton.dtsi"
+> +
+> +/ {
+> +       model = "Qualcomm Technologies, Inc. IPQ4019";
+> +       compatible = "qcom,ipq4019";
+> +       interrupt-parent = <&intc>;
+> +
+> +       cpus {
+> +               #address-cells = <1>;
+> +               #size-cells = <0>;
+> +               cpu at 0 {
+> +                       device_type = "cpu";
+> +                       compatible = "arm,cortex-a7";
+> +                       reg = <0x0>;
+> +               };
+> +
+> +               cpu at 1 {
+> +                       device_type = "cpu";
+> +                       compatible = "arm,cortex-a7";
+> +                       reg = <0x1>;
+> +               };
+> +
+> +               cpu at 2 {
+> +                       device_type = "cpu";
+> +                       compatible = "arm,cortex-a7";
+> +                       reg = <0x2>;
+> +               };
+> +
+> +               cpu at 3 {
+> +                       device_type = "cpu";
+> +                       compatible = "arm,cortex-a7";
+> +                       reg = <0x3>;
+> +               };
+> +       };
+> +
+> +       soc {
+> +               #address-cells = <1>;
+> +               #size-cells = <1>;
+> +               ranges;
+> +               compatible = "simple-bus";
+> +
+> +               intc: interrupt-controller at b000000 {
+> +                       compatible = "qcom,msm-qgic2";
+> +                       interrupt-controller;
+> +                       #interrupt-cells = <3>;
+> +                       reg = <0x0b000000 0x1000>,
+> +                       <0x0b002000 0x1000>;
+> +               };
+> +
+> +               serial at 78b0000 {
+> +                       compatible = "qcom,msm-uartdm-v1.4", "qcom,msm-uartdm";
+> +                       reg = <0x78b0000 0x200>;
+> +                       interrupts = <0 108 0>;
+> +                       status = "disabled";
+> +               };
 
-Regards,
-Sudeep
+I think it's nice to have the nodes ordered by their (first) registers
+address, so maybe consider doing that. This makes it also clear where
+new blocks should be added, and if several people try to add blocks
+the chance of conflicts is reduced.
+
+> +       };
+> +
+> +       timer {
+> +               compatible = "arm,armv7-timer";
+> +               interrupts = <1 2 0xf08>,
+> +                            <1 3 0xf08>,
+> +                            <1 4 0xf08>,
+> +                            <1 1 0xf08>;
+> +               clock-frequency = <20833333>;
+
+Assuming ipq4019 is the name of the emulated chip and not a special id
+for the emulator, and "IPQ4019 R3PC" is the dts file for the emulator,
+you could set the clock-frequency in the board dts instead of forcing
+every "real chip" board dts to overwrite/clear it.
+
+> +       };
+> +};
+> --
+
+regards
+Jonas
