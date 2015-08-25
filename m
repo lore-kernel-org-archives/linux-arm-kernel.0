@@ -1,47 +1,90 @@
-From: linux@mniewoehner.de (Michael Niewoehner)
-Date: Tue, 25 Aug 2015 22:22:07 +0200
-Subject: [PATCH v3] clk: rockchip: add pclk_cpu to the list of rk3188 critical
- clocks
-In-Reply-To: <20150825185931.31346.26497@quantum>
-References: <5400BEF8-5245-4F7B-845B-D326A7BC56B5@mniewoehner.de>
- <5275855.eah07vmf4I@phil>
- <9DBF9CCE-196E-43FB-BA76-BFB4B5F47A22@mniewoehner.de>
- <10213368.VjAQGt7Kjq@phil>
- <F5234F5E-2A91-4B63-B260-3F20A4D16A9D@mniewoehner.de>
- <20150825185931.31346.26497@quantum>
-Message-ID: <8804658D-175F-4668-BC12-4AC439438B61@mniewoehner.de>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Tue, 25 Aug 2015 13:25:46 -0700
+Subject: [PATCH v10 3/5] mtd: nand: vf610_nfc: add device tree bindings
+In-Reply-To: <1438594050-4595-4-git-send-email-stefan@agner.ch>
+References: <1438594050-4595-1-git-send-email-stefan@agner.ch>
+ <1438594050-4595-4-git-send-email-stefan@agner.ch>
+Message-ID: <20150825202546.GL81844@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pclk_cpu needs to keep running because it is needed for devices like
-the act8865 regulator but with the recent gpio clock handling this is
-not always the case anymore. So add it to the list of critical clocks.
+Sorry, I realized a potential issue here.
 
-Signed-off-by: Michael Niewoehner <linux@mniewoehner.de>
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
----
-Changes in v3:
-- fix git format-patch problem
+On Mon, Aug 03, 2015 at 11:27:28AM +0200, Stefan Agner wrote:
+> Signed-off-by: Bill Pringlemeir <bpringlemeir@nbsps.com>
+> Acked-by: Shawn Guo <shawnguo@kernel.org>
+> Reviewed-by: Brian Norris <computersforpeace@gmail.com>
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> ---
+>  .../devicetree/bindings/mtd/vf610-nfc.txt          | 45 ++++++++++++++++++++++
+>  1 file changed, 45 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mtd/vf610-nfc.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/mtd/vf610-nfc.txt b/Documentation/devicetree/bindings/mtd/vf610-nfc.txt
+> new file mode 100644
+> index 0000000..cae5f25
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mtd/vf610-nfc.txt
+> @@ -0,0 +1,45 @@
+> +Freescale's NAND flash controller (NFC)
+> +
+> +This variant of the Freescale NAND flash controller (NFC) can be found on
+> +Vybrid (vf610), MPC5125, MCF54418 and Kinetis K70.
+> +
+> +Required properties:
+> +- compatible: Should be set to "fsl,vf610-nfc"
+> +- reg: address range of the NFC
+> +- interrupts: interrupt of the NFC
+> +- nand-bus-width: see nand.txt
+> +- nand-ecc-mode: see nand.txt
+> +- nand-on-flash-bbt: see nand.txt
 
-Changes in v2:
-- adapt commit message
-- add Linus Walleij to recipients, as the patch is related to the gpio clock
- change in the rockchip pinctrl driver it should go through his tree as well
+Stumbling across the "multi-CS" questions on the driver reminds me: it
+typically makes sense to define new NAND bindings using separate NAND
+*controller* and *flash* device nodes. The above 3 properties, at least,
+would apply on a per-flash basis, not per-controller typically. See
+sunxi-nand, for instance:
 
- drivers/clk/rockchip/clk-rk3188.c | 1 +
- 1 file changed, 1 insertion(+)
+http://lxr.free-electrons.com/source/Documentation/devicetree/bindings/mtd/sunxi-nand.txt
 
-diff --git a/drivers/clk/rockchip/clk-rk3188.c b/drivers/clk/rockchip/clk-rk3188.c
-index ed02bbc..f63a642 100644
---- a/drivers/clk/rockchip/clk-rk3188.c
-+++ b/drivers/clk/rockchip/clk-rk3188.c
-@@ -716,6 +716,7 @@ static const char *const rk3188_critical_clocks[] __initconst = {
- 	"aclk_cpu",
- 	"aclk_peri",
- 	"hclk_peri",
-+	"pclk_cpu",
- };
- 
- static void __init rk3188_common_clk_init(struct device_node *np)
--- 
-2.5.0
+brcmnand had a similar pattern:
+
+https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/devicetree/bindings/mtd/brcm,brcmnand.txt
+
+(Perhaps it's time we standardized this a little more formally...)
+
+> +- assigned-clocks: main clock from the SoC, for Vybrid <&clks VF610_CLK_NFC>;
+> +- assigned-clock-rates: The NAND bus timing is derived from this clock
+> +    rate and should not exceed maximum timing for any NAND memory chip
+> +    in a board stuffing. Typical NAND memory timings derived from this
+> +    clock are found in the SoC hardware reference manual. Furthermore,
+> +    there might be restrictions on maximum rates when using hardware ECC.
+> +
+> +- #address-cells, #size-cells : Must be present if the device has sub-nodes
+> +  representing partitions.
+> +
+> +Required properties for hardware ECC:
+> +- nand-ecc-strength: supported strengths are 24 and 32 bit (see nand.txt)
+> +- nand-ecc-step-size: step size equals page size, currently only 2k pages are
+> +    supported
+> +
+> +Example:
+> +
+> +	nfc: nand at 400e0000 {
+> +		compatible = "fsl,vf610-nfc";
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		reg = <0x400e0000 0x4000>;
+> +		interrupts = <GIC_SPI 83 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&clks VF610_CLK_NFC>;
+> +		clock-names = "nfc";
+> +		assigned-clocks = <&clks VF610_CLK_NFC>;
+> +		assigned-clock-rates = <33000000>;
+> +		nand-bus-width = <8>;
+> +		nand-ecc-mode = "hw";
+> +		nand-ecc-strength = <32>;
+> +		nand-ecc-step-size = <2048>;
+> +		nand-on-flash-bbt;
+> +	};
+
+Brian
