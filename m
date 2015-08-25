@@ -1,36 +1,109 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 25 Aug 2015 18:48:41 +0100
-Subject: [PATCH v2 10/10] ARM: software-based priviledged-no-access support
-In-Reply-To: <55DCA0DB.7000103@freebox.fr>
-References: <20150825154026.GT7557@n2100.arm.linux.org.uk>
- <E1ZUGMS-0000BG-8B@rmk-PC.arm.linux.org.uk>
- <55DCA0DB.7000103@freebox.fr>
-Message-ID: <20150825174841.GV7557@n2100.arm.linux.org.uk>
+From: mturquette@baylibre.com (Michael Turquette)
+Date: Tue, 25 Aug 2015 11:40:13 -0700
+Subject: [PATCH v4 2/6] clk: samsung: exynos4x12: add cpu clock
+ configuration data and instantiate cpu clock
+In-Reply-To: <1438868514-8814-3-git-send-email-b.zolnierkie@samsung.com>
+References: <1438868514-8814-1-git-send-email-b.zolnierkie@samsung.com>
+ <1438868514-8814-3-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <20150825184013.31346.67214@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 25, 2015 at 07:07:39PM +0200, Nicolas Schichan wrote:
-> arch/arm/kernel/entry-common.S: Assembler messages:
-> arch/arm/kernel/entry-common.S:200: Error: selected processor does not support
-> ARM mode `isb'
+Quoting Bartlomiej Zolnierkiewicz (2015-08-06 06:41:50)
+> With the addition of the new Samsung specific cpu-clock type, the
+> arm clock can be represented as a cpu-clock type. Add the CPU clock
+> configuration data and instantiate the CPU clock type for Exynos4x12.
 > 
-> replacing those two "isb" occurences with "instr_sync" fixed it.
+> Based on the earlier work by Thomas Abraham.
+> 
+> Cc: Tomasz Figa <tomasz.figa@gmail.com>
+> Cc: Michael Turquette <mturquette@baylibre.com>
+> Cc: Thomas Abraham <thomas.ab@samsung.com>
+> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> Tested-by: Tobias Jakobi <tjakobi@math.uni-bielefeld.de>
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 
-Thanks, that's exactly what I've done.  I've pushed that and the other
-fixes out for linux-next to pick up, hopefully with fewer failures.
+Acked-by: Michael Turquette <mturquette@baylibre.com>
 
-This series passed my own build tests (which included building and
-booting SDP4430, LDP4430, Versatile Express and iMX6 platforms.)
-Unfortunately, they're all Cortex-A8 or A9 platforms.
-
-Olof's builder is showing some build failures in the boot log, but I'll
-assume that they're down to the above - I don't yet have the build log,
-and that's going to arrive at some point after I've left for a committee
-meeting which will extend for most of the evening.  So, I'm hoping that
-tonight's linux-next will see improvement rather than deterioration -
-that's all I can do at this point... hope.  I'm out of time to do any
-more build checking prior to linux-next pulling my tree.
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+> ---
+>  drivers/clk/samsung/clk-exynos4.c | 50 +++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 50 insertions(+)
+> 
+> diff --git a/drivers/clk/samsung/clk-exynos4.c b/drivers/clk/samsung/clk-exynos4.c
+> index 251f48d..7f370d3 100644
+> --- a/drivers/clk/samsung/clk-exynos4.c
+> +++ b/drivers/clk/samsung/clk-exynos4.c
+> @@ -1398,6 +1398,45 @@ static const struct exynos_cpuclk_cfg_data e4210_armclk_d[] __initconst = {
+>         {  0 },
+>  };
+>  
+> +static const struct exynos_cpuclk_cfg_data e4212_armclk_d[] __initconst = {
+> +       { 1500000, E4210_CPU_DIV0(2, 1, 6, 0, 7, 3), E4210_CPU_DIV1(2, 6), },
+> +       { 1400000, E4210_CPU_DIV0(2, 1, 6, 0, 7, 3), E4210_CPU_DIV1(2, 6), },
+> +       { 1300000, E4210_CPU_DIV0(2, 1, 5, 0, 7, 3), E4210_CPU_DIV1(2, 5), },
+> +       { 1200000, E4210_CPU_DIV0(2, 1, 5, 0, 7, 3), E4210_CPU_DIV1(2, 5), },
+> +       { 1100000, E4210_CPU_DIV0(2, 1, 4, 0, 6, 3), E4210_CPU_DIV1(2, 4), },
+> +       { 1000000, E4210_CPU_DIV0(1, 1, 4, 0, 5, 2), E4210_CPU_DIV1(2, 4), },
+> +       {  900000, E4210_CPU_DIV0(1, 1, 3, 0, 5, 2), E4210_CPU_DIV1(2, 3), },
+> +       {  800000, E4210_CPU_DIV0(1, 1, 3, 0, 5, 2), E4210_CPU_DIV1(2, 3), },
+> +       {  700000, E4210_CPU_DIV0(1, 1, 3, 0, 4, 2), E4210_CPU_DIV1(2, 3), },
+> +       {  600000, E4210_CPU_DIV0(1, 1, 3, 0, 4, 2), E4210_CPU_DIV1(2, 3), },
+> +       {  500000, E4210_CPU_DIV0(1, 1, 3, 0, 4, 2), E4210_CPU_DIV1(2, 3), },
+> +       {  400000, E4210_CPU_DIV0(1, 1, 3, 0, 4, 2), E4210_CPU_DIV1(2, 3), },
+> +       {  300000, E4210_CPU_DIV0(1, 1, 2, 0, 4, 2), E4210_CPU_DIV1(2, 3), },
+> +       {  200000, E4210_CPU_DIV0(1, 1, 1, 0, 3, 1), E4210_CPU_DIV1(2, 3), },
+> +       {  0 },
+> +};
+> +
+> +#define E4412_CPU_DIV1(cores, hpm, copy)                               \
+> +               (((cores) << 8) | ((hpm) << 4) | ((copy) << 0))
+> +
+> +static const struct exynos_cpuclk_cfg_data e4412_armclk_d[] __initconst = {
+> +       { 1500000, E4210_CPU_DIV0(2, 1, 6, 0, 7, 3), E4412_CPU_DIV1(7, 0, 6), },
+> +       { 1400000, E4210_CPU_DIV0(2, 1, 6, 0, 7, 3), E4412_CPU_DIV1(6, 0, 6), },
+> +       { 1300000, E4210_CPU_DIV0(2, 1, 5, 0, 7, 3), E4412_CPU_DIV1(6, 0, 5), },
+> +       { 1200000, E4210_CPU_DIV0(2, 1, 5, 0, 7, 3), E4412_CPU_DIV1(5, 0, 5), },
+> +       { 1100000, E4210_CPU_DIV0(2, 1, 4, 0, 6, 3), E4412_CPU_DIV1(5, 0, 4), },
+> +       { 1000000, E4210_CPU_DIV0(1, 1, 4, 0, 5, 2), E4412_CPU_DIV1(4, 0, 4), },
+> +       {  900000, E4210_CPU_DIV0(1, 1, 3, 0, 5, 2), E4412_CPU_DIV1(4, 0, 3), },
+> +       {  800000, E4210_CPU_DIV0(1, 1, 3, 0, 5, 2), E4412_CPU_DIV1(3, 0, 3), },
+> +       {  700000, E4210_CPU_DIV0(1, 1, 3, 0, 4, 2), E4412_CPU_DIV1(3, 0, 3), },
+> +       {  600000, E4210_CPU_DIV0(1, 1, 3, 0, 4, 2), E4412_CPU_DIV1(2, 0, 3), },
+> +       {  500000, E4210_CPU_DIV0(1, 1, 3, 0, 4, 2), E4412_CPU_DIV1(2, 0, 3), },
+> +       {  400000, E4210_CPU_DIV0(1, 1, 3, 0, 4, 2), E4412_CPU_DIV1(1, 0, 3), },
+> +       {  300000, E4210_CPU_DIV0(1, 1, 2, 0, 4, 2), E4412_CPU_DIV1(1, 0, 3), },
+> +       {  200000, E4210_CPU_DIV0(1, 1, 1, 0, 3, 1), E4412_CPU_DIV1(0, 0, 3), },
+> +       {  0 },
+> +};
+> +
+>  /* register exynos4 clocks */
+>  static void __init exynos4_clk_init(struct device_node *np,
+>                                     enum exynos4_soc soc)
+> @@ -1491,6 +1530,17 @@ static void __init exynos4_clk_init(struct device_node *np,
+>                 samsung_clk_register_fixed_factor(ctx,
+>                         exynos4x12_fixed_factor_clks,
+>                         ARRAY_SIZE(exynos4x12_fixed_factor_clks));
+> +               if (of_machine_is_compatible("samsung,exynos4412")) {
+> +                       exynos_register_cpu_clock(ctx, CLK_ARM_CLK, "armclk",
+> +                               mout_core_p4x12[0], mout_core_p4x12[1], 0x14200,
+> +                               e4412_armclk_d, ARRAY_SIZE(e4412_armclk_d),
+> +                               CLK_CPU_NEEDS_DEBUG_ALT_DIV | CLK_CPU_HAS_DIV1);
+> +               } else {
+> +                       exynos_register_cpu_clock(ctx, CLK_ARM_CLK, "armclk",
+> +                               mout_core_p4x12[0], mout_core_p4x12[1], 0x14200,
+> +                               e4212_armclk_d, ARRAY_SIZE(e4212_armclk_d),
+> +                               CLK_CPU_NEEDS_DEBUG_ALT_DIV | CLK_CPU_HAS_DIV1);
+> +               }
+>         }
+>  
+>         samsung_clk_register_alias(ctx, exynos4_aliases,
+> -- 
+> 1.9.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
