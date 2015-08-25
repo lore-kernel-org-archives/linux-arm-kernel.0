@@ -1,74 +1,111 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 25 Aug 2015 12:10:58 +0200
-Subject: [PATCH 0/2] arm64: ignore memory outside of the linear range
-In-Reply-To: <20150825100254.GB21300@arm.com>
-References: <1439890482-20798-1-git-send-email-ard.biesheuvel@linaro.org>
- <CY1PR0301MB0748FC71E6866C8AFACAAFF687780@CY1PR0301MB0748.namprd03.prod.outlook.com>
- <CAKv+Gu-OQ4VyCqe=mEDOrrfAtAWTfRtAiqXMGSVjJxOH6xi4Ow@mail.gmail.com>
- <20150824092256.GA11262@arm.com>
- <CY1PR0301MB0748EAE8103DDF771A37785787620@CY1PR0301MB0748.namprd03.prod.outlook.com>
- <20150824140828.GB20147@arm.com>
- <CY1PR0301MB07481C5861695902A75CD23D87620@CY1PR0301MB0748.namprd03.prod.outlook.com>
- <CAKv+Gu-d77ab78WfT8r9YovrNXwFtpq4K9uKmSq5E1jOmRitYw@mail.gmail.com>
- <20150825100254.GB21300@arm.com>
-Message-ID: <CAKv+Gu8pAm99fm8vE40+ugboCr93ioMP17RpfKf35W8+m7TrCA@mail.gmail.com>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Tue, 25 Aug 2015 18:15:10 +0800
+Subject: [PATCH v1 3/3] arm64: dts: add Hi6220 mailbox node
+In-Reply-To: <20150825094630.GU10728@bivouac.eciton.net>
+References: <1439977055-1747-1-git-send-email-leo.yan@linaro.org>
+ <1439977055-1747-4-git-send-email-leo.yan@linaro.org>
+ <20150821184059.GB2000@svinekod> <20150824091845.GA28290@leoy-linaro>
+ <20150824095144.GA7139@leverpostej> <1440411596.3517.12.camel@linaro.org>
+ <20150824114903.GT10728@bivouac.eciton.net>
+ <1440490427.10987.29.camel@linaro.org>
+ <20150825094630.GU10728@bivouac.eciton.net>
+Message-ID: <1440497710.10987.42.camel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 August 2015 at 12:02, Will Deacon <will.deacon@arm.com> wrote:
-> On Tue, Aug 25, 2015 at 10:45:01AM +0100, Ard Biesheuvel wrote:
->> On 25 August 2015 at 00:34, Stuart Yoder <stuart.yoder@freescale.com> wrote:
->> >> On Mon, Aug 24, 2015 at 02:58:26PM +0100, Stuart Yoder wrote:
->> >> > Are we sending to stable as well?
->> >>
->> >> I've already pushed the patch out without a Cc stable (it's not a
->> >> regression afaict), so if you want it backported then you'll need to send
->> >> it to stable separately.
->> >
->> > Ok, was asking because of Catalin's previous comment:
->> >
->> >  > Even though it is not a regression, I think it is a bug fix and it's
->> >  > worth cc'ing stable (though we could push it after 4.3-rc1).
->> >
->>
->> Indeed. Catalin also mentioned that you and he discussed a minimal fix
->> with a cc to stable, only the fix itself was flawed. So let's not make
->> this Stuart's problem, considering that this issue breaks all arm64
->> systems with 32+ GB of RAM if they follow ARM's own recommendation
->> regarding the physical layout of memory.
->>
->> > Ard, are you going to send to stable?
->> >
->>
->> We'll have to wait until the merge window closes, of course, but yes,
->> we should propose it.
->>
->> @Will: what do you think? It would be nice to have you on record with
->> an opinion rather than leaving it up to Stuart.
->
-> This isn't something that has *ever* worked with the arm64 kernel,
-> right? In which case, it's not a regression, it's more like adding
-> support for some systems that we've not supported before.
+On Tue, 2015-08-25 at 10:46 +0100, Leif Lindholm wrote:
+> On Tue, Aug 25, 2015 at 04:13:47PM +0800, Haojian Zhuang wrote:
+> > On Mon, 2015-08-24 at 12:49 +0100, Leif Lindholm wrote:
+> > > On Mon, Aug 24, 2015 at 06:19:56PM +0800, Haojian Zhuang wrote:
+> > > > > If your EFI memory map describes the memory as mappable, it is wrong.
+> > > > 
+> > > > When kernel is working, kernel will create its own page table based on
+> > > > UEFI memory map. Since it's reserved in DTS file as Leo's patch, it'll
+> > > > be moved to reserved memblock. Why is it wrong?
+> > > > 
+> > > > In the second, UEFI is firmware. When it's stable, nobody should change
+> > > > it without any reason.
+> > > 
+> > > Much like the memory map.
+> > > 
+> > > > These reserved memory are used in mailbox driver.
+> > > > Look. It's driver, so it could be changed at any time.
+> > > 
+> > > No, it is a set of regions of memory set aside for use by a different
+> > > master in the system as well as communications with that master.
+> > > 
+> > > The fact that there is a driver somewhere that is aware of this is
+> > > entirely beside the point. All agents in the system must adher to this
+> > > protocol.
+> > > 
+> > > > Why do you want
+> > > > to UEFI knowing this memory range? Do you hope UEFI to change when
+> > > > mailbox driver is changed?
+> > > 
+> > > Yes.
+> > > 
+> > > UEFI is a runtime environment. Having random magic areas not to be
+> > > touched will cause random pieces of software running under it to break
+> > > horribly or break other things horribly.
+> > > Unless you mark them as reserved in the UEFI memory map.
+> > > At which point the Linux kernel will automatically ignore them, and
+> > > the proposed patch is redundant.
+> > > 
+> > > So, yes, if you want a system that can boot reliably, run testsuites
+> > > (like SCT or FWTS), run applications (like fastboot ... or the EFI
+> > > stub kernel itself), then any memory regions that is reserved for
+> > > mailbox communication (or other masters in the system) _must_ be
+> > > marked in the EFI memory map.
+> > 
+> > 1. We need support both UEFI and uboot. So the reserved buffer have to
+> > be declared in DTB since they are used by kernel driver, not UEFI.
+> 
+> The buffer may need to be declared in DTB also, but it most certanily
+> needs to be declared in UEFI.
+> 
+> And for the U-Boot case, since it is not memory available to Linux, it
+> should not be declared as "memory".
 
-I am somewhat on the fence on this one, to be honest. The bug has
-always existed but since DRAM is upgradeable, it may affect systems
-that we do support and are working fine currently.
+Something are messed at here. We have these buffer are used in mailbox.
+They should be allocated as non-cacheable.
 
-> Now, given the
-> nature of the patch, I'm not against stable, but by the time Stuart
-> pointed that out, I'd already pushed the patch and I don't want to
-> rebase our 4.3 queue at this stage.
->
+If these buffers are contained in memory memblock in kernel, it means
+that they exist in kernel page table with cachable property. When it's
+used in mailbox driver with non-cachable property, it'll only cause
+cache maintenance issue. So Leo declared these buffers as reserved
+in DT with "no-map" property. It's the key. It could avoid the cache
+maintenance issue.
 
-Noted. I just wanted to understand whether you had left it out on purpose.
+> 
+> > 2. UEFI just loads grub. It's no time to run any other custom EFI
+> > application.
+> 
+> Apart from being completely irrelevant, how are you intending to
+> validate that GRUB never touches these memory regions?
+> 
 
-> The best bet is to send this to stable once it's in mainline (i.e. -rc1)
-> and I think it makes sense for Stuart to do that, since he is the one
-> most interested in having that happen.
->
+GRUB is just a part of bootloader. When linux kernel is running,
+who cares GRUB? GRUB's lifetime is already finished.
 
-Indeed. I take Russell's point about fixes being important, but in
-this case, I think it can wait until after the merge window.
+By the way, UEFI code region is at [0x3Dxx_xxxx, 0x3DFF_FFFF]. Those
+mailbox buffer is in [0x05e0_xxxx, 0x06f0_xxxx]. Then I can make sure
+UEFI won't touch the reserved buffer. Even if UEFI touched the reserved
+buffer, is it an issue? Definitely it's not. UEFI's lifetime is end
+when linux kernel is running at hikey. Even if UEFI runtime service
+is enabled, the runtime data area is at [0x38xx_xxxx, 0x38xx_xxxx].
 
--- 
-Ard.
+> Build a version once, test it, and hope the results remain valid
+> forever? And then when you move the regions and the previously working
+> GRUB now tramples all over them? Or when something changes in upstream
+> GRUB and its memory allocations drifts into the secretly untouchable
+> regions?
+
+As I said above, UEFI won't touch it. And even UEFI touch it, kernel
+doesn't care since UEFI's lifetime is end.
+
+> 
+> Are you then going to hack GRUB, release a special HiKey version of
+> GRUB, not support any other versions, and still can your firmware
+> UEFI?
+
+I don't need to hack GRUB at all.
