@@ -1,41 +1,49 @@
 From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Tue, 25 Aug 2015 14:02:07 +0530
-Subject: [PATCH-v3] mfd: 88pm80x: Add 88pm860 chip type support
-In-Reply-To: <20150825063825.GE27431@sirena.org.uk>
-References: <1437393151-5362-1-git-send-email-vaibhav.hiremath@linaro.org>
- <55DAC179.2060802@linaro.org> <20150825063825.GE27431@sirena.org.uk>
-Message-ID: <55DC2807.5020202@linaro.org>
+Date: Tue, 25 Aug 2015 14:08:26 +0530
+Subject: [PATCH-v2 5/5] mfd: 88pm800: Add support for clk subdevice
+In-Reply-To: <20150825074924.GD19409@x1>
+References: <1440442594-3102-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1440442594-3102-7-git-send-email-vaibhav.hiremath@linaro.org>
+ <55DBFC40.3010603@samsung.com> <20150825074924.GD19409@x1>
+Message-ID: <55DC2982.5010906@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On Tuesday 25 August 2015 12:08 PM, Mark Brown wrote:
-> On Mon, Aug 24, 2015 at 12:32:17PM +0530, Vaibhav Hiremath wrote:
->> On Monday 20 July 2015 05:22 PM, Vaibhav Hiremath wrote:
->>> Add chip identification support for 88PM860 device
->>> to the pm80x_chip_mapping table.
+On Tuesday 25 August 2015 01:19 PM, Lee Jones wrote:
+> On Tue, 25 Aug 2015, Krzysztof Kozlowski wrote:
 >
->> Last update/understanding which I have on this patch is,
+>> On 25.08.2015 03:56, Vaibhav Hiremath wrote:
+>>> This patch adds mfd_cell/clk-subdevice for 88PM800 MFD
+>>> (and family of devices).
+>>>
+>>> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
+>>> ---
+>>>   drivers/mfd/88pm800.c | 25 +++++++++++++++++++++++++
+>>>   1 file changed, 25 insertions(+)
+>>>
+>>> diff --git a/drivers/mfd/88pm800.c b/drivers/mfd/88pm800.c
+>>> index c4e097d..a928eed 100644
+>>> --- a/drivers/mfd/88pm800.c
+>>> +++ b/drivers/mfd/88pm800.c
+>>> @@ -173,6 +173,14 @@ static const struct mfd_cell regulator_devs[] = {
+>>>   	},
+>>>   };
+>>>
+>>> +static struct mfd_cell clk_devs[] = {
+>>> +	{
+>>> +		.name = "88pm80x-clk",
+>>> +		.of_compatible = "marvell,88pm800-clk",
+>>> +		.id = -1,
 >>
->> Lee is OK with taking this patch from regulator tree.
->> Lee please let me know if you think otherwise.
->>
->> With this patch in, the build dependency will go away.
->>
->> Request to pick this patch into your topic/88pm800 branch and run build
->> test.
+>> The "-1" here stands for PLATFORM_DEVID_NONE?
 >
-> Please don't send content free pings, they just waste time.  I can't
-> review or apply content free pings.  Please submit patches following the
-> process in SubmittingPatches.
->
-> The chances are I deleted this mail unread since it is a MFD patch...
+> Right.  Please use the define, but use it in the mfd_add_devices()
+> call, rather than individual cells.
 >
 
-Hmmm Ok,
-
-Resending now...
+Ok,
 
 Thanks,
 Vaibhav
