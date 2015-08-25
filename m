@@ -1,172 +1,111 @@
-From: varada@codeaurora.org (Varadarajan Narayanan)
-Date: Tue, 25 Aug 2015 17:38:04 +0530
-Subject: [PATCH v4] qcom: ipq4019: Add basic board/dts support for IPQ4019 SoC
-Message-ID: <20150825120804.GA30996@codeaurora.org>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 25 Aug 2015 14:09:45 +0200
+Subject: [PATCH v2] mmc: sunxi: Don't start commands while the card is busy
+In-Reply-To: <CAPDyKFrYvL33DsaATg4fyAJg=G3SEuOP+xU=o_UwasmNZ+a07Q@mail.gmail.com>
+References: <1436541284-11800-1-git-send-email-hdegoede@redhat.com>
+ <CAPDyKFoNe0bghfSXs48stHzZToTc7Hjd5gVPy-VbDF8bzdVVMQ@mail.gmail.com>
+ <55BC8ADE.3070802@redhat.com>
+ <CAPDyKFrYvL33DsaATg4fyAJg=G3SEuOP+xU=o_UwasmNZ+a07Q@mail.gmail.com>
+Message-ID: <55DC5B09.2020705@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add initial dts files and SoC support for IPQ4019
+Hi,
 
-Signed-off-by: Varadarajan Narayanan <varada@codeaurora.org>
----
-Changes in v2:
-  - Added devicetree bindings documentation
+On 25-08-15 14:05, Ulf Hansson wrote:
+> On 1 August 2015 at 11:01, Hans de Goede <hdegoede@redhat.com> wrote:
+>> Hi,
+>>
+>> On 21-07-15 14:15, Ulf Hansson wrote:
+>>>
+>>> On 10 July 2015 at 17:14, Hans de Goede <hdegoede@redhat.com> wrote:
+>>>>
+>>>> Some sdio wifi modules have not been working reliable with the sunxi-mmc
+>>>> host code. This turns out to be caused by it starting new commands while
+>>>> the card signals that it is still busy processing a previous command.
+>>>
+>>>
+>>> Which are those commands?
+>>
+>>
+>> The code were things get stuck when not waiting for the busy signal uses
+>> the following sdio helper functions:
+>>
+>> sdio_readb/sdio_writeb
+>> sdio_f0_readb/sdio_f0_writeb
+>> sdio_readw/sdio_writew
+>> sdio_readl/sdio_writel
+>> sdio_readsb
+>> sdio_memcpy_fromio/sdio_memcpy_toio
+>>
+>> And directly issues the following command:
+>>
+>>          mmc_dat.flags = write ? MMC_DATA_WRITE : MMC_DATA_READ;
+>>          mmc_cmd.opcode = SD_IO_RW_EXTENDED;
+>>          mmc_cmd.arg = write ? 1<<31 : 0;        /* write flag  */
+>>          mmc_cmd.arg |= (fn & 0x7) << 28;        /* SDIO func num */
+>>          mmc_cmd.arg |= 1<<27;                   /* block mode */
+>>          /* for function 1 the addr will be incremented */
+>>          mmc_cmd.arg |= (fn == 1) ? 1<<26 : 0;
+>>          mmc_cmd.flags = MMC_RSP_SPI_R5 | MMC_RSP_R5 | MMC_CMD_ADTC;
+>>
+>> I do not know if the busy wait is necessary for all
+>> of these, but the hack in the android kernel code,
+>> which inserts calls to a wait_card_busy function directly
+>> into: drivers/net/wireless/brcm80211/brcmfmac/bcmsdh.c
+>>
+>> Does so for all of these.
+>>
+>>> Or more interesting, which response types do
+>>>
+>>> these commands expect?
+>>> I don't think this is a sunxi specific issue, I have seen similar
+>>> issues for other host controllers.
+>>
+>>
+>> Agreed, recent dw-mmc patches address the same issue, also involving
+>> broadcom sdio wifi chips.
+>>
+>>> I am thinking that perhaps this should be managed by the mmc core
+>>> instead of local hacks to sunxi. Potentially we could make the core to
+>>> invoke the already existing host_ops->card_busy() callback when
+>>> needed...
+>>
+>>
+>> I'm fine with solving this either way, implementing host_ops->card_busy()
+>> for sunxi is easy, and if the core os modified to call that function
+>> before issue sdio io ops (which seems to be the common thing here),
+>> then that indeed is better then having the sunxi code always do
+>> the busy check.
+>
+> Okay, so let's make the core to call the ->card_busy() callback and
+> then it's up to each host driver to implement that callback.
 
-Changes in v3:
-  - Split 'gcnt' into a separate patch
-  - Added the new entries to Makefiles, Kconfig & board.c in sorted order
-  - Used "qcom,ipq40xx" instead of "qcom,ipq40xx-r3pc" in board.c
+Ok, do you plan to do a patch for this, or do you expect to get
+one submitted to you ?
 
-Changes in v4:
-  - Renamed IPQ40xx as IPQ4019
-  - Moved kconfig and defconfig enablement to separate patch
-  - Dropped Documentation/devicetree/bindings/qcom.txt
+Regards,
 
- arch/arm/boot/dts/Makefile              |  1 +
- arch/arm/boot/dts/qcom-ipq4019-r3pc.dts | 34 ++++++++++++++
- arch/arm/boot/dts/qcom-ipq4019.dtsi     | 81 +++++++++++++++++++++++++++++++++
- 3 files changed, 116 insertions(+)
- create mode 100644 arch/arm/boot/dts/qcom-ipq4019-r3pc.dts
- create mode 100644 arch/arm/boot/dts/qcom-ipq4019.dtsi
+Hans
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 246473a..ca603f3 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -474,6 +474,7 @@ dtb-$(CONFIG_ARCH_QCOM) += \
- 	qcom-apq8074-dragonboard.dtb \
- 	qcom-apq8084-ifc6540.dtb \
- 	qcom-apq8084-mtp.dtb \
-+	qcom-ipq4019-r3pc.dtb \
- 	qcom-ipq8064-ap148.dtb \
- 	qcom-msm8660-surf.dtb \
- 	qcom-msm8960-cdp.dtb \
-diff --git a/arch/arm/boot/dts/qcom-ipq4019-r3pc.dts b/arch/arm/boot/dts/qcom-ipq4019-r3pc.dts
-new file mode 100644
-index 0000000..e3855d7
---- /dev/null
-+++ b/arch/arm/boot/dts/qcom-ipq4019-r3pc.dts
-@@ -0,0 +1,34 @@
-+/* Copyright (c) 2014, The Linux Foundation. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include "qcom-ipq4019.dtsi"
-+
-+/ {
-+	model = "Qualcomm Technologies, Inc. IPQ4019 R3PC";
-+	compatible = "qcom,ipq4019-r3pc", "qcom,ipq4019";
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x80000000 0x20000000>; /* 512MB */
-+	};
-+
-+	chosen {
-+		bootargs = "root=/dev/ram rw init=/init initrd=0x82000000,0x000E2246";
-+		stdout-path = "/serial at 78b0000:115200";
-+	};
-+
-+	soc {
-+		serial at 78b0000 {
-+			status = "ok";
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/qcom-ipq4019.dtsi b/arch/arm/boot/dts/qcom-ipq4019.dtsi
-new file mode 100644
-index 0000000..1be0322
---- /dev/null
-+++ b/arch/arm/boot/dts/qcom-ipq4019.dtsi
-@@ -0,0 +1,81 @@
-+/*
-+ * Copyright (c) 2014, The Linux Foundation. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+/dts-v1/;
-+
-+#include "skeleton.dtsi"
-+
-+/ {
-+	model = "Qualcomm Technologies, Inc. IPQ4019";
-+	compatible = "qcom,ipq4019";
-+	interrupt-parent = <&intc>;
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a7";
-+			reg = <0x0>;
-+		};
-+
-+		cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a7";
-+			reg = <0x1>;
-+		};
-+
-+		cpu at 2 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a7";
-+			reg = <0x2>;
-+		};
-+
-+		cpu at 3 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a7";
-+			reg = <0x3>;
-+		};
-+	};
-+
-+	soc {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+		compatible = "simple-bus";
-+
-+		intc: interrupt-controller at b000000 {
-+			compatible = "qcom,msm-qgic2";
-+			interrupt-controller;
-+			#interrupt-cells = <3>;
-+			reg = <0x0b000000 0x1000>,
-+			<0x0b002000 0x1000>;
-+		};
-+
-+		serial at 78b0000 {
-+			compatible = "qcom,msm-uartdm-v1.4", "qcom,msm-uartdm";
-+			reg = <0x78b0000 0x200>;
-+			interrupts = <0 108 0>;
-+			status = "disabled";
-+		};
-+	};
-+
-+	timer {
-+		compatible = "arm,armv7-timer";
-+		interrupts = <1 2 0xf08>,
-+			     <1 3 0xf08>,
-+			     <1 4 0xf08>,
-+			     <1 1 0xf08>;
-+		clock-frequency = <20833333>;
-+	};
-+};
--- 
-1.8.2.1
+
+> As an optimization, we might consider (in a separate step) to add
+> MMC_RSP_BUSY to the response type. I realize that would somewhat be a
+> violation of the spec, but apparently the SDIO spec isn't really clear
+> on this area.
+>
+>>
+>>> Within this context, could I ask whether you controller supports IRQ
+>>> based HW-busy detection? Or you need polling of the status register?
+>>
+>>
+>> I'm afraid that we need to poll the status register. I've been unable
+>> to find an irq flag corresponding to this.
+>
+> Okay, thanks for the info.
+>
+> [...]
+>
+> Kind regards
+> Uffe
+>
