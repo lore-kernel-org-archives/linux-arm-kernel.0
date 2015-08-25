@@ -1,47 +1,116 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 25 Aug 2015 16:57:52 +0100
-Subject: [PATCH v3 06/14] Documentation: drm/bridge: add document for
- analogix_dp
-In-Reply-To: <20150825142150.GB3820@ulmo.nvidia.com>
-References: <1439995728-18046-1-git-send-email-ykk@rock-chips.com>
- <1439995834-18363-1-git-send-email-ykk@rock-chips.com>
- <20150825095817.GC14034@ulmo.nvidia.com>
- <55DC75C8.209@rock-chips.com>
- <20150825142150.GB3820@ulmo.nvidia.com>
-Message-ID: <20150825155752.GU7557@n2100.arm.linux.org.uk>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Wed, 26 Aug 2015 00:00:30 +0800
+Subject: [PATCH v1 3/3] arm64: dts: add Hi6220 mailbox node
+In-Reply-To: <1440510194.10987.52.camel@linaro.org>
+References: <20150821184059.GB2000@svinekod>
+ <20150824091845.GA28290@leoy-linaro>
+ <20150824095144.GA7139@leverpostej>
+ <1440411596.3517.12.camel@linaro.org>
+ <20150824114903.GT10728@bivouac.eciton.net>
+ <1440490427.10987.29.camel@linaro.org>
+ <20150825094630.GU10728@bivouac.eciton.net>
+ <1440497710.10987.42.camel@linaro.org>
+ <20150825104256.GB13471@leverpostej>
+ <1440510194.10987.52.camel@linaro.org>
+Message-ID: <20150825160030.GA3774@leoy-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 25, 2015 at 04:21:51PM +0200, Thierry Reding wrote:
-> You cited code from dw_hdmi.c earlier, it looks like it might be correct
-> even though it doesn't cite a reference for why this was done. Perhaps
-> someone on this thread, or someone involved with dw_hdmi can answer
-> where that code came from.
+On Tue, Aug 25, 2015 at 09:43:14PM +0800, Haojian Zhuang wrote:
+> On Tue, 2015-08-25 at 11:42 +0100, Mark Rutland wrote:
+> > > > Are you then going to hack GRUB, release a special HiKey version of
+> > > > GRUB, not support any other versions, and still can your firmware
+> > > > UEFI?
+> > > 
+> > > I don't need to hack GRUB at all.
+> > 
+> > Then it is working for you by pure chance alone.
+> > 
+> > Please listen to the advice you are being given here; we're trying to
+> > ensure that your platform functions (and continues to function) as best
+> > it can.
+> 
+> Since we discussed a lot on this, let's make a conclusion on it.
+> 
+> 1. UEFI could append the reserved buffer in it's memory mapping.
+> 2. These reserved buffer must be declared in DT, since we also need to
+>    support non-UEFI (uboot) at the same time.
+> 3. Mailbox node should reference reserved buffer by phandle in DT. Then
+>    map the buffer as non-cacheable in driver.
+> 4. These reserved buffer must use "no-map" property since it should be
+>    non-cacheable in driver.
 
-dw_hdmi doesn't do any format conversion - it's hard coded to RGB, 8
-bits per colour component.  That's a requirement for all HDMI sinks.
+For more specific discussion for DTS, i list two options at here;
 
-The reason it's hard-coded in dw_hdmi is that (a) no one has yet decided
-its worth the effort to get the dw_hdmi hardware to do the colourspace
-conversion to the YUV spaces and verify that it works, and (b) I really
-don't see the point when we're talking about computer like devices which
-work primerily with RGB and RGB is always supported by the sink.
+- Option 1: just simply reserve memory regions through memory node,
+  and mailbox node will directly use the buffer through reg ranges;
 
-As far as greater colour depths go, the driver came from the Freescale
-iMX6 code base, and the hardware which feeds dw_hdmi can't do more than
-8 bits per component - so going to 10, 12 or 16 bits per component is
-beyond what iMX6 can cope with.  Hence, no one on the iMX6 side has a
-need for the deep colour stuff.
+- Option 2: use reserved-memory and mailbox node will refer phandle
+  of reserved-memory;
 
-In any case, I view this as a very low priority issue - it would be nice
-to have audio support on HDMI for iMX6 at some point in the next 20 years,
-preferably before the hardware becomes obsolete.  I've been maintaining
-patches for this for 1.5 years now... how much longer is it going to take?
-My pull request to David from 15th July was ignored.  My re-send of that
-after he returned was ignored.  My reminder of it has been ignored.  What's
-going on in DRM land?  It would be nice to get _some_ kind of feedback so
-I know why they're not being taken, so I can fix whatever the issue is.
+These two options both can work well with UEFI and Uboot, but option 1
+is more simple and straightforward; so i personally prefer it. But
+look forwarding your guys' suggestion.
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Option 1:
+
+	memory at 0 {
+		device_type = "memory";
+		reg = <0x00000000 0x00000000 0x00000000 0x05e00000>,
+		      <0x00000000 0x05f00000 0x00000000 0x00eff000>,
+		      <0x00000000 0x06e00000 0x00000000 0x0060f000>,
+		      <0x00000000 0x07410000 0x00000000 0x38bf0000>;
+	};
+
+        [...]
+
+	mailbox: mailbox at f7510000 {
+		#mbox-cells = <1>;
+		compatible = "hisilicon,hi6220-mbox";
+		reg = <0x0 0xf7510000 0x0 0x1000>, /* IPC_S */
+		      <0x0 0x06dff800 0x0 0x0800>; /* Mailbox buffer */
+		interrupts = <GIC_SPI 94 IRQ_TYPE_LEVEL_HIGH>;
+	};
+
+Option 2:
+
+	memory at 0 {
+		device_type = "memory";
+		reg = <0x0 0x0 0x0 0x40000000>;
+	};
+
+	reserved-memory {
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+
+		mcu_reserved: mcu_reserved at 06dff000 {
+			no-map;
+			reg = <0x0 0x06dff000 0x0 0x00001000>,	/* MCU mailbox buffer */
+			      <0x0 0x05e00000 0x0 0x00100000>,	/* MCU firmware buffer */
+			      <0x0 0x0740f000 0x0 0x00001000>;	/* MCU firmware section */
+		};
+	};
+
+        [...]
+
+	mailbox: mailbox at f7510000 {
+		#mbox-cells = <1>;
+		compatible = "hisilicon,hi6220-mbox";
+		reg = <0x0 0xf7510000 0x0 0x1000>; /* IPC_S */
+		memory-region = <&mcu_reserved>;   /* Mailbox buffer */
+		interrupts = <GIC_SPI 94 IRQ_TYPE_LEVEL_HIGH>;
+	};
+
+
+> 5. A patch is necessary in kernel. If efi stub feature is enabled,
+>    arm kernel should not parse memory node or reserved memory buffer in
+>    DT any more. Arm kernel should either fetch memory information from 
+>    efi or DT. Currently arm kernel fetch both efi memory information and
+>    reserved buffer from DTB at the same time.
+> 
+> Do you agree on these points?
+> 
+> Regards
+> Haojian
+> 
