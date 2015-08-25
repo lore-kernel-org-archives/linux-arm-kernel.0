@@ -1,149 +1,63 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 25 Aug 2015 11:42:56 +0100
-Subject: [PATCH v1 3/3] arm64: dts: add Hi6220 mailbox node
-In-Reply-To: <1440497710.10987.42.camel@linaro.org>
-References: <1439977055-1747-1-git-send-email-leo.yan@linaro.org>
- <1439977055-1747-4-git-send-email-leo.yan@linaro.org>
- <20150821184059.GB2000@svinekod>
- <20150824091845.GA28290@leoy-linaro>
- <20150824095144.GA7139@leverpostej>
- <1440411596.3517.12.camel@linaro.org>
- <20150824114903.GT10728@bivouac.eciton.net>
- <1440490427.10987.29.camel@linaro.org>
- <20150825094630.GU10728@bivouac.eciton.net>
- <1440497710.10987.42.camel@linaro.org>
-Message-ID: <20150825104256.GB13471@leverpostej>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 25 Aug 2015 11:44:22 +0100
+Subject: [PATCH 9/9] ARM: software-based priviledged-no-access support
+In-Reply-To: <CAMuHMdVMka2mt5pFpnXfLRY2M3Sj_71MgEpthOia2C99RaP_DA@mail.gmail.com>
+References: <20150821133043.GV7557@n2100.arm.linux.org.uk>
+ <E1ZSmQG-0002za-E3@rmk-PC.arm.linux.org.uk>
+ <CAMuHMdVMka2mt5pFpnXfLRY2M3Sj_71MgEpthOia2C99RaP_DA@mail.gmail.com>
+Message-ID: <20150825104422.GO7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 25, 2015 at 11:15:10AM +0100, Haojian Zhuang wrote:
-> On Tue, 2015-08-25 at 10:46 +0100, Leif Lindholm wrote:
-> > On Tue, Aug 25, 2015 at 04:13:47PM +0800, Haojian Zhuang wrote:
-> > > On Mon, 2015-08-24 at 12:49 +0100, Leif Lindholm wrote:
-> > > > On Mon, Aug 24, 2015 at 06:19:56PM +0800, Haojian Zhuang wrote:
-> > > > > > If your EFI memory map describes the memory as mappable, it is wrong.
-> > > > > 
-> > > > > When kernel is working, kernel will create its own page table based on
-> > > > > UEFI memory map. Since it's reserved in DTS file as Leo's patch, it'll
-> > > > > be moved to reserved memblock. Why is it wrong?
-> > > > > 
-> > > > > In the second, UEFI is firmware. When it's stable, nobody should change
-> > > > > it without any reason.
-> > > > 
-> > > > Much like the memory map.
-> > > > 
-> > > > > These reserved memory are used in mailbox driver.
-> > > > > Look. It's driver, so it could be changed at any time.
-> > > > 
-> > > > No, it is a set of regions of memory set aside for use by a different
-> > > > master in the system as well as communications with that master.
-> > > > 
-> > > > The fact that there is a driver somewhere that is aware of this is
-> > > > entirely beside the point. All agents in the system must adher to this
-> > > > protocol.
-> > > > 
-> > > > > Why do you want
-> > > > > to UEFI knowing this memory range? Do you hope UEFI to change when
-> > > > > mailbox driver is changed?
-> > > > 
-> > > > Yes.
-> > > > 
-> > > > UEFI is a runtime environment. Having random magic areas not to be
-> > > > touched will cause random pieces of software running under it to break
-> > > > horribly or break other things horribly.
-> > > > Unless you mark them as reserved in the UEFI memory map.
-> > > > At which point the Linux kernel will automatically ignore them, and
-> > > > the proposed patch is redundant.
-> > > > 
-> > > > So, yes, if you want a system that can boot reliably, run testsuites
-> > > > (like SCT or FWTS), run applications (like fastboot ... or the EFI
-> > > > stub kernel itself), then any memory regions that is reserved for
-> > > > mailbox communication (or other masters in the system) _must_ be
-> > > > marked in the EFI memory map.
-> > > 
-> > > 1. We need support both UEFI and uboot. So the reserved buffer have to
-> > > be declared in DTB since they are used by kernel driver, not UEFI.
-> > 
-> > The buffer may need to be declared in DTB also, but it most certanily
-> > needs to be declared in UEFI.
-> > 
-> > And for the U-Boot case, since it is not memory available to Linux, it
-> > should not be declared as "memory".
+On Tue, Aug 25, 2015 at 12:32:51PM +0200, Geert Uytterhoeven wrote:
+> This patch, which is now in arm-soc/for-next, breaks shmobile_defconfig
+> on r8a7791/koelsch, which has a dual core CA15:
 > 
-> Something are messed at here. We have these buffer are used in mailbox.
-> They should be allocated as non-cacheable.
+>     [ ok ] Configuring network interfaces...done.
+>     Unhandled fault: page domain fault (0x01b) at 0xbe8e6120
+>     pgd = edbb0000
+>     [be8e6120] *pgd=6da77831, *pte=bf4d075f, *ppte=bf4d0c7f
+>     Internal error: : 1b [#1] SMP ARM
+>     CPU: 1 PID: 1629 Comm: ntpdate Not tainted
+> 4.2.0-rc8-06444-g3c24fd89c9421db1 #31
+>     9
+>     Hardware name: Generic R8A7791 (Flattened Device Tree)
+>     task: ed883a80 ti: ed41c000 task.ti: ed41c000
+>     PC is at csum_partial_copy_from_user+0x28/0x3d8
+>     LR is at csum_and_copy_from_iter+0x334/0x4c0
+>     pc : [<c04ba510>]    lr : [<c01c82e8>]    psr: 000f0013
+>     sp : ed41db00  ip : 00000020  fp : ed41db6c
+>     r10: ed41ddc0  r9 : 00000027  r8 : ed41dc20
+>     r7 : 00000027  r6 : eda52653  r5 : ed41dec8  r4 : 00000000
+>     r3 : 00000000  r2 : 00000027  r1 : eda5262c  r0 : be8e6120
+>     Flags: nzcv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment none
+>     Control: 10c5307d  Table: 6dbb006a  DAC: 00000051
+>     Process ntpdate (pid: 1629, stack limit = 0xed41c210)
+
+Thanks.  I wonder what's different about your ntpdate that triggers
+this, and why all my iMX6 behave fine, which have desktop-like ubuntu
+installs on (of two different versions.)
+
+What it's basically showing is that (unsurprisingly)
+csum_partial_copy_from_user is trying to access userspace.  I'll see
+about fixing that today, or pulling the patch from -next if I can't.
+
+I've also noticed that on rpc_defconfig, the 0-day builder shows that
+this triggers an ICE as the compiler appears to think it's run out of
+registers.
+
+> After disabling CONFIG_CPU_SW_DOMAIN_PAN it  fails differently:
 > 
-> If these buffers are contained in memory memblock in kernel, it means
-> that they exist in kernel page table with cachable property. When it's
-> used in mailbox driver with non-cachable property, it'll only cause
-> cache maintenance issue. So Leo declared these buffers as reserved
-> in DT with "no-map" property. It's the key. It could avoid the cache
-> maintenance issue.
+>     VFS: Mounted root (nfs filesystem) readonly on device 0:13.
+>     devtmpfs: mounted
+>     Freeing unused kernel memory: 300K (c0629000 - c0674000)
+>     Unhandled fault: page domain fault (0x81b) at 0x000263e0
+>     pgd = ed908000
+>     [000263e0] *pgd=6e299831, *pte=bf81d75f, *ppte=bf81dc7f
 
-The better solution is to never describe the memory to the kernel as
-memory, by never placing it in a memory node, and ensuring that if it is
-in the UEFI memory map, its attributes do not allow it to be mapped.
+Yes, this one is because I forgot to provide the non-protected default
+for bootup, which I've already merged a fix for.
 
-That way a driver can map it as non-cacheable if it wishes, but nothing
-else can possibly touch that memory.
-
-That is all you need to do.
-
-> > > 2. UEFI just loads grub. It's no time to run any other custom EFI
-> > > application.
-> > 
-> > Apart from being completely irrelevant, how are you intending to
-> > validate that GRUB never touches these memory regions?
-> > 
-> 
-> GRUB is just a part of bootloader. When linux kernel is running,
-> who cares GRUB? GRUB's lifetime is already finished.
-
-If GRUB temporarily maps memory as cacheable, or hands it to a device,
-then your statements above about cache maintenance are broken.
-
-An EFI application like GRUB might leave something resident in memory
-after it's done (consider the UEFI shim), or it could even load the
-kernel into the region that you care about having reserved, because as
-far as it's concerned it's just memory. That could leave you with a
-conflict for that region of memory.
-
-You _must_ care about GRUB (and other EFI applications) doing the right
-thing. To get them to avoid a region of memory, it must not be described
-as being usable by them in the UEFI memory map.
-
-> By the way, UEFI code region is at [0x3Dxx_xxxx, 0x3DFF_FFFF]. Those
-> mailbox buffer is in [0x05e0_xxxx, 0x06f0_xxxx]. Then I can make sure
-> UEFI won't touch the reserved buffer. Even if UEFI touched the reserved
-> buffer, is it an issue? Definitely it's not.
-
-It definitely is, due to the possibility of stale cache lines being left
-in the region from when UEFI may have mapped it with cacheable
-attributes.
-
-> > Build a version once, test it, and hope the results remain valid
-> > forever? And then when you move the regions and the previously working
-> > GRUB now tramples all over them? Or when something changes in upstream
-> > GRUB and its memory allocations drifts into the secretly untouchable
-> > regions?
-> 
-> As I said above, UEFI won't touch it. And even UEFI touch it, kernel
-> doesn't care since UEFI's lifetime is end.
-
-If EFI touches it there may be stale cache lines left around, which you
-don't seem to expect.
-
-> > Are you then going to hack GRUB, release a special HiKey version of
-> > GRUB, not support any other versions, and still can your firmware
-> > UEFI?
-> 
-> I don't need to hack GRUB at all.
-
-Then it is working for you by pure chance alone.
-
-Please listen to the advice you are being given here; we're trying to
-ensure that your platform functions (and continues to function) as best
-it can.
-
-Thanks,
-Mark.
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
