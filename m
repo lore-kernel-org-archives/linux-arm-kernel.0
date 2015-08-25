@@ -1,68 +1,59 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 25 Aug 2015 11:18:11 +0900
-Subject: [PATCH v2 0/7] Add support for Exynos SROM Controller driver
-In-Reply-To: <1440403348-8974-1-git-send-email-pankaj.dubey@samsung.com>
-References: <1440403348-8974-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <55DBD063.5040703@samsung.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 24 Aug 2015 20:05:45 -0700
+Subject: [PATCH 0/3] ARM: uniphier: add outer cache support and rework SMP
+ operations
+In-Reply-To: <CAK7LNAQk4aEgZV3y90zBVMeq=jA45v683sCR1e5BBYtg5AcDOA@mail.gmail.com>
+References: <1440382692-3855-1-git-send-email-yamada.masahiro@socionext.com>
+ <CAOesGMgL3bNH_wG3igSJhNOkV0uUfNWEi0t-Gny2A1oNnGKu=w@mail.gmail.com>
+ <CAK7LNAQk4aEgZV3y90zBVMeq=jA45v683sCR1e5BBYtg5AcDOA@mail.gmail.com>
+Message-ID: <CAOesGMj2M2GBE+KgkUw1PeWQEbzv0spkx58WfVDoGyPYDQGC4g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24.08.2015 17:02, Pankaj Dubey wrote:
-> This patch set adds support for Exynos SROM controller DT based driver.
-> Currently SROM register sets are used only during S2R, so driver
-> basically added for taking care of S2R. It will help us in removing
-> static mapping from exynos.c and other extra code handline during S2R.
-> 
-> This patch set also updated exynos4 and exynos5 dtsi files for with device
-> node for srom, and added binding documentation for the same.
-> 
-> First two patches are some minor cleanup in mach-exynos.
-> 
-> Patchset v1 was posted here[1]
-> [1]: https://lkml.org/lkml/2015/4/29/98
-> 
-> Changes since v1:
->  - Rebased to latest kgene tree.
->  - Addressed review comments from Krzysztof Kozlowski.
->  - Add two new patches for minor cleanup in exynos.c and map.h
-> 
-> Pankaj Dubey (7):
->   ARM: EXYNOS: remove unused static mapping of CMU for exynos5
->   ARM: EXYNOS: code cleanup in map.h
->   drivers: soc: add support for exynos SROM driver
->   ARM: EXYNOS: Remove SROM related register settings from mach-exynos
->   ARM: dts: add SROM device node for exynos4
->   ARM: dts: add SROM device node for exynos5
->   Documentation: dt-bindings: add exynos-srom binding information
+On Mon, Aug 24, 2015 at 6:50 PM, Masahiro Yamada
+<yamada.masahiro@socionext.com> wrote:
+> Hi Olof,
+>
+>
+> 2015-08-25 6:47 GMT+09:00 Olof Johansson <olof@lixom.net>:
+>> Hi,
+>>
+>> On Sun, Aug 23, 2015 at 7:18 PM, Masahiro Yamada
+>> <yamada.masahiro@socionext.com> wrote:
+>>> 1/3: add outer cache support
+>>> 2/3: rework SMP operations
+>>> 3/3: add device tree nodes
+>>
+>> Timing of this is unfortunate, please resend after 4.3-rc1 is out and
+>> we can queue it up.
+>
+> Given that rc8 is out and the merge window has been delayed,
+> is it still too late for 4.3-rc1?
 
-One more thing: please update the existing Exynos entry in maintainers
-so it would cover drivers/soc/samsung.
+Yes.
 
-Best regards,
-Krzysztof
+>>> Because 2/3 highly depends on 1/3, I hope whole of this series
+>>> is applied to ARM-SOC tree.
+>>
+>> Review or acked-by from Russell would be appreciated in that case.
+>>
+>>> Olof,
+>>> From this series, I am using "ARM: uniphier:" rather than "ARM: UniPhier:"
+>>> for the subject prefixes because I noticed you often rephased so when you
+>>> applied my patches.
+>>> Are sub-arch names in lower cases preferable in subject prefixes?
+>>
+>> If you look at "git log --no-merges --oneline arch/arm/mach-*" you'll
+>> see that most platforms use either all-caps or all-lowercase.
+>
+> I see.
+>
+> But, we use "UniPhier" (with only U and P capitalized) in our official
+> documents.
 
-> 
->  .../bindings/arm/samsung/exynos-srom.txt           |  12 ++
->  arch/arm/boot/dts/exynos4.dtsi                     |   5 +
->  arch/arm/boot/dts/exynos5.dtsi                     |   5 +
->  arch/arm/mach-exynos/Kconfig                       |   2 +
->  arch/arm/mach-exynos/common.h                      |   2 -
->  arch/arm/mach-exynos/exynos.c                      |  22 ----
->  arch/arm/mach-exynos/include/mach/map.h            |   8 --
->  arch/arm/mach-exynos/regs-srom.h                   |  53 --------
->  arch/arm/mach-exynos/suspend.c                     |  20 +--
->  arch/arm/plat-samsung/include/plat/map-s5p.h       |   1 -
->  drivers/soc/Kconfig                                |   1 +
->  drivers/soc/Makefile                               |   1 +
->  drivers/soc/samsung/Kconfig                        |  13 ++
->  drivers/soc/samsung/Makefile                       |   1 +
->  drivers/soc/samsung/exynos-srom.c                  | 143 +++++++++++++++++++++
->  drivers/soc/samsung/exynos-srom.h                  |  51 ++++++++
->  16 files changed, 236 insertions(+), 104 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/arm/samsung/exynos-srom.txt
->  delete mode 100644 arch/arm/mach-exynos/regs-srom.h
->  create mode 100644 drivers/soc/samsung/Kconfig
->  create mode 100644 drivers/soc/samsung/Makefile
->  create mode 100644 drivers/soc/samsung/exynos-srom.c
->  create mode 100644 drivers/soc/samsung/exynos-srom.h
-> 
+That's OK, others surely capitalize their platform names too in
+documentation. Some of them even have funkier capitalization than
+that, such as "SPEAr".
+
+
+-Olof
