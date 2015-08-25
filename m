@@ -1,68 +1,26 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 25 Aug 2015 14:14:05 -0700
-Subject: [PATCH v3] qcom: ipq40xx: Add basic board/dts support for
- IPQ40XX SoC
-In-Reply-To: <20150825081042.GA14028@codeaurora.org>
-References: <20150824092813.GA15581@codeaurora.org>
- <20150824224928.GE14330@codeaurora.org>
- <20150825081042.GA14028@codeaurora.org>
-Message-ID: <20150825211405.GJ19120@codeaurora.org>
+From: agross@codeaurora.org (Andy Gross)
+Date: Tue, 25 Aug 2015 16:24:09 -0500
+Subject: [PATCH v2 4/6] ARM: dts: qs600: remove unnecessary i2c pinctrl
+ nodes in board file.
+In-Reply-To: <1439903419-20275-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1439903069-19752-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1439903419-20275-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <20150825212409.GB12349@qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/25, Varadarajan Narayanan wrote:
-> On Mon, Aug 24, 2015 at 03:49:28PM -0700, Stephen Boyd wrote:
-> > On 08/24, Varadarajan Narayanan wrote:
+On Tue, Aug 18, 2015 at 02:10:19PM +0100, Srinivas Kandagatla wrote:
+> This patch removes unnecessary i2c pinctrl nodes in board file, these
+> are already defined in the soc specific file qcom-apq8064.dtsi.
 > 
-> > > +	compatible = "qcom,ipq40xx-r3pc", "qcom,ipq40xx";
-> > > +
-> > > +	memory {
-> > > +		device_type = "memory";
-> > > +		reg = <0x80000000 0x20000000>; /* 512MB */
-> > > +	};
-> >
-> > Doesn't the bootloader fill the memory node for us? Why do we
-> > need this?
-> >
-> > > +
-> > > +	chosen {
-> > > +		bootargs = "root=/dev/ram rw init=/init console=ttyMSM0,115200n8 initrd=0x82000000,0x000E2246";
-> > > +	};
-> >
-> > Please don't add bootargs. Use stdout-path for the console part
-> > and everything else should be done by the bootloader or is the
-> > defaults.
-> 
-> Since this is for the emulation platform, we don't have the bootloader.
+> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> ---
+>  arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts | 9 ---------
+>  1 file changed, 9 deletions(-)
 
-Why are we upstreaming an emulation platform?
-
-I assume you have some sort of scripts or something to load the
-kernel image into the emulator, so those scripts could go and
-modify the dtb in place to populate the initrd and commandline.
-If you need pointers on that feel free to contact me directly.
-
-> 
-> > > +			compatible = "arm,armv7-timer";
-> > > +			interrupts = <1 2 0xf08>,
-> > > +				     <1 3 0xf08>,
-> > > +				     <1 4 0xf08>,
-> > > +				     <1 1 0xf08>;
-> > > +			clock-frequency = <20833333>;
-> >
-> > Drop this clock-frequency part if you can. The hardware should
-> > properly report the frequency.
-> 
-> Cannot drop this. This is the ref-clock frequency. For the
-> chip it is 48MHz, for emulation is ~20MHz. Similar to
-> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/arch/arm/boot/dts/qcom-msm8974.dtsi#n89
-
-And the hardware is not emulated properly to report the actual
-frequency that the timer is running at? That's sad.
-
-At the least, this should be in the board specific dtsi file
-instead of the SoC specific file, because it's a board quirk.
+Applied, thanks!
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 a Linux Foundation Collaborative Project
