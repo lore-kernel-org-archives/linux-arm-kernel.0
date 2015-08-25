@@ -1,72 +1,36 @@
-From: treding@nvidia.com (Thierry Reding)
-Date: Tue, 25 Aug 2015 11:12:48 +0200
-Subject: [PATCH v3 06/14] Documentation: drm/bridge: add document for
- analogix_dp
-In-Reply-To: <CAL_JsqKZYMMzV9Sc2r3K_rnM0FNuyb1TyJEhjGq1Hf7dTiWFKQ@mail.gmail.com>
-References: <1439995728-18046-1-git-send-email-ykk@rock-chips.com>
- <1439995834-18363-1-git-send-email-ykk@rock-chips.com>
- <CAL_JsqLz+8RtBucctUj4euXZ3Ac0DvB52N9ONpAerh5T9BiTJg@mail.gmail.com>
- <20150824125758.GA7557@n2100.arm.linux.org.uk>
- <CAL_JsqKZYMMzV9Sc2r3K_rnM0FNuyb1TyJEhjGq1Hf7dTiWFKQ@mail.gmail.com>
-Message-ID: <20150825091246.GA14034@ulmo.nvidia.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 25 Aug 2015 10:15:47 +0100
+Subject: [PATCH v2 5/5] arm64: add KASan support
+In-Reply-To: <20150824174736.GD7557@n2100.arm.linux.org.uk>
+References: <CAPAsAGy-r8Z2N09wKV+e0kLfbwxd-eWK6N5Xajsnqq9jfyWqcQ@mail.gmail.com>
+ <CACRpkdZmHLMxosLXjyOPdkavo=UNzmTcHOLF5vV4cS1ULfbq6A@mail.gmail.com>
+ <CAPAsAGw-iawTpjJh66rQN5fqBFT6UBZCcv2eKx7JTqCXzhzpsw@mail.gmail.com>
+ <CACRpkdY2i2M27gP_fXawkFrC_GFgWaKr5rEn6d47refNPiEk=g@mail.gmail.com>
+ <55AE56DB.4040607@samsung.com>
+ <CACRpkdYaqK8upK-3b01JbO_y+sHnk4-Hm1MfvjSy0tKUkFREtQ@mail.gmail.com>
+ <20150824131557.GB7557@n2100.arm.linux.org.uk>
+ <CACRpkdYwpucRiXM05y00RQY=gKv8W6YjCNspYFRMGaM605cU0w@mail.gmail.com>
+ <CAPAsAGwji7FpUJK9O=FWYN15-rJkYMQyOt9W9ncdY9uLybxkiA@mail.gmail.com>
+ <20150824174736.GD7557@n2100.arm.linux.org.uk>
+Message-ID: <20150825091547.GA21300@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 24, 2015 at 09:48:27AM -0500, Rob Herring wrote:
-> On Mon, Aug 24, 2015 at 7:57 AM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Sun, Aug 23, 2015 at 06:23:14PM -0500, Rob Herring wrote:
-> >> On Wed, Aug 19, 2015 at 9:50 AM, Yakir Yang <ykk@rock-chips.com> wrote:
-> >> > +       -analogix,color-depth:
-> >> > +               number of bits per colour component.
-> >> > +                       COLOR_6 = 0, COLOR_8 = 1, COLOR_10 = 2, COLOR_12 = 3
-> >>
-> >> This seems pretty generic. Just use 6, 8, 10, or 12 for values. And
-> >> drop the vendor prefix.
-> >
-> > Please think about this some more.  What does "color-depth" mean?  Does it
-> > mean the number of bits per colour _component_, or does it mean the total
-> > number of bits to represent a particular colour.  It's confusing as it
-> > stands.
+On Mon, Aug 24, 2015 at 06:47:36PM +0100, Russell King - ARM Linux wrote:
+> On Mon, Aug 24, 2015 at 05:15:22PM +0300, Andrey Ryabinin wrote:
+> > Yes, ~130Mb (3G/1G split) should work. 512Mb shadow is optional.
+> > The only advantage of 512Mb shadow is better handling of user memory
+> > accesses bugs
+> > (access to user memory without copy_from_user/copy_to_user/strlen_user etc API).
 > 
-> Then "component-color-bpp" perhaps?
+> No need for that to be handed by KASan.  I have patches in linux-next,
+> now acked by Will, which prevent the kernel accessing userspace with
+> zero memory footprint.  No need for remapping, we have a way to quickly
+> turn off access to userspace mapped pages on non-LPAE 32-bit CPUs.
+> (LPAE is not supported yet - Catalin will be working on that using the
+> hooks I'm providing once he returns.)
 
-There should be no need to have this in DT at all. The BPC is a property
-of the attached panel and it should come from the panel (either the
-panel driver or parsed from EDID if available).
+Hey, I only acked the "Efficiency cleanups" series so far! The PAN emulation
+is still on my list.
 
-> > When we adopted the graph bindings for iMX DRM, I thought exactly at that
-> > time "it would be nice if this could become the standard for binding DRM
-> > components together" but I don't have the authority from either the DT
-> > perspective or the DRM perspective to mandate that.  Neither does anyone
-> > else.  That's the _real_ problem here.
-> >
-> > I've seen several DRM bindings go by which don't use the of-graph stuff,
-> > which means that they'll never be compatible with generic components
-> > which do use the of-graph stuff.
-> 
-> It goes beyond bindings IMO. The use of the component framework or not
-> has been at the whim of driver writers as well. It is either used or
-> private APIs are created. I'm using components and my need for it
-> boils down to passing the struct drm_device pointer to the encoder.
-> Other components like panels and bridges have different ways to attach
-> to the DRM driver.
-
-I certainly support unification, but it needs to be reasonable. There
-are cases where a different structure for the binding work better than
-another and I think this always needs to be evaluated on a case by case
-basis.
-
-Because of that I think it makes sense to make all these framework bits
-opt-in, otherwise we could easily end up in a situation where drivers
-have to be rearchitected (or even DT bindings altered!) in order to be
-able to reuse code.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150825/6154bc96/attachment.sig>
+Will
