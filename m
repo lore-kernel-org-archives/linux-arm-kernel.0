@@ -1,51 +1,46 @@
-From: Shenwei.Wang@freescale.com (Shenwei Wang)
-Date: Tue, 25 Aug 2015 20:53:52 +0000
-Subject: [PATCH v9 1/1] irqchip: imx-gpcv2: IMX GPCv2 driver for wakeup
- sources
-In-Reply-To: <alpine.DEB.2.11.1508252248040.15006@nanos>
-References: <1440443055-7291-1-git-send-email-shenwei.wang@freescale.com>
- <55DC3452.3070205@arm.com>
- <CY1PR0301MB08439B6C5F841AFFD152DFD883610@CY1PR0301MB0843.namprd03.prod.outlook.com>
- <55DC738D.8000302@arm.com>
- <CY1PR0301MB0843AE566996617D855CC00683610@CY1PR0301MB0843.namprd03.prod.outlook.com>
- <55DC7FA4.7040902@arm.com>
- <CY1PR0301MB08433A2659C75028821F0AE783610@CY1PR0301MB0843.namprd03.prod.outlook.com>
- <55DC96BA.2020905@arm.com>
- <CY1PR0301MB0843388CA3BB07493BC2907183610@CY1PR0301MB0843.namprd03.prod.outlook.com>
- <alpine.DEB.2.11.1508252126360.15006@nanos>
- <CY1PR0301MB08430902E0E46A43D00317C283610@CY1PR0301MB0843.namprd03.prod.outlook.com>
- <alpine.DEB.2.11.1508252213220.15006@nanos>
- <CY1PR0301MB08439BB31108FD3DDC234EDA83610@CY1PR0301MB0843.namprd03.prod.outlook.com>
- <alpine.DEB.2.11.1508252248040.15006@nanos>
-Message-ID: <CY1PR0301MB08434BC3FDA533BF580598CC83610@CY1PR0301MB0843.namprd03.prod.outlook.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Tue, 25 Aug 2015 13:57:16 -0700
+Subject: [RESEND PATCH v16 3/4] soc: rockchip: power-domain: Add power
+ domain driver
+In-Reply-To: <1440487486-6154-4-git-send-email-wxt@rock-chips.com> (Caesar
+ Wang's message of "Tue, 25 Aug 2015 15:24:45 +0800")
+References: <1440487486-6154-1-git-send-email-wxt@rock-chips.com>
+ <1440487486-6154-4-git-send-email-wxt@rock-chips.com>
+Message-ID: <7hwpwjaxxv.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Caesar Wang <wxt@rock-chips.com> writes:
 
+> This driver is found on RK3288 SoCs.
+>
+> In order to meet high performance and low power requirements, a power
+> management unit is designed or saving power when RK3288 in low power
+> mode.
+> The RK3288 PMU is dedicated for managing the power of the whole chip.
+>
+> PMU can work in the Low Power Mode by setting bit[0] of PMU_PWRMODE_CON
+> register. After setting the register, PMU would enter the Low Power mode.
+> In the low power mode, pmu will auto power on/off the specified power
+> domain, send idle req to specified power domain, shut down/up pll and
+> so on. All of above are configurable by setting corresponding registers.
+>
+> Signed-off-by: jinkun.hong <jinkun.hong@rock-chips.com>
+> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
 
-> -----Original Message-----
-> From: Thomas Gleixner [mailto:tglx at linutronix.de]
-> Sent: 2015?8?25? 15:50
-> To: Wang Shenwei-B38339
-> Cc: Sudeep Holla; shawn.guo at linaro.org; jason at lakedaemon.net; Huang
-> Yongcai-B20788; linux-kernel at vger.kernel.org;
-> linux-arm-kernel at lists.infradead.org
-> Subject: RE: [PATCH v9 1/1] irqchip: imx-gpcv2: IMX GPCv2 driver for wakeup
-> sources
-> 
-> On Tue, 25 Aug 2015, Shenwei Wang wrote:
-> >
-> > IRQCHIP_SKIP_SET_WAKE flag can't be used here because the wakeup
-> > sources are required for power management.
-> 
-> You could use it. Instead of copying the saved values, you can read the values
-> back from the register.
+[...]
 
-It is an option too. 
+> diff --git a/drivers/soc/rockchip/Kconfig b/drivers/soc/rockchip/Kconfig
+> new file mode 100644
+> index 0000000..87a09c3
+> --- /dev/null
+> +++ b/drivers/soc/rockchip/Kconfig
+> @@ -0,0 +1,13 @@
+> +#
+> +# Rockchip Soc drivers
+> +#
+> +config PM_GENERIC_DOMAINS
 
-Thanks,
-Shenwei
+Why are you (re)defining this config option?  This name is already used in kernel/pm/Kconfig.
 
-> Thanks,
-> 
-> 	tglx
+Kevin
