@@ -1,70 +1,88 @@
-From: Shenwei.Wang@freescale.com (Shenwei Wang)
-Date: Tue, 25 Aug 2015 14:54:41 +0000
-Subject: [PATCH v9 1/1] irqchip: imx-gpcv2: IMX GPCv2 driver for wakeup
- sources
-In-Reply-To: <55DC7FA4.7040902@arm.com>
-References: <1440443055-7291-1-git-send-email-shenwei.wang@freescale.com>
- <55DC3452.3070205@arm.com>
- <CY1PR0301MB08439B6C5F841AFFD152DFD883610@CY1PR0301MB0843.namprd03.prod.outlook.com>
- <55DC738D.8000302@arm.com>
- <CY1PR0301MB0843AE566996617D855CC00683610@CY1PR0301MB0843.namprd03.prod.outlook.com>
- <55DC7FA4.7040902@arm.com>
-Message-ID: <CY1PR0301MB08433A2659C75028821F0AE783610@CY1PR0301MB0843.namprd03.prod.outlook.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 25 Aug 2015 08:01:32 -0700 (PDT)
+Subject: [RFC] arm: change some function and data to init section
+In-Reply-To: <1440488173-28825-1-git-send-email-yalin.wang2010@gmail.com>
+References: <1440488173-28825-1-git-send-email-yalin.wang2010@gmail.com>
+Message-ID: <alpine.LFD.2.20.1508250800090.21591@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, 25 Aug 2015, yalin wang wrote:
+
+> This patch change some function and the related data to init section,
+> they are only called by free_initmem(), can be freed safely after
+> boot up.
+
+The magic keyword here is __init_refok.
+
+> Signed-off-by: yalin wang <yalin.wang2010@gmail.com>
+
+Acked-by: Nicolas Pitre <nico@linaro.org>
 
 
-> -----Original Message-----
-> From: Sudeep Holla [mailto:sudeep.holla at arm.com]
-> Sent: 2015?8?25? 9:46
-> To: Wang Shenwei-B38339
-> Cc: Sudeep Holla; shawn.guo at linaro.org; tglx at linutronix.de;
-> jason at lakedaemon.net; Huang Yongcai-B20788; linux-kernel at vger.kernel.org;
-> linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH v9 1/1] irqchip: imx-gpcv2: IMX GPCv2 driver for wakeup
-> sources
+> ---
+>  arch/arm/mm/init.c | 12 ++++++------
+>  1 file changed, 6 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+> index 8a63b4c..7b505de 100644
+> --- a/arch/arm/mm/init.c
+> +++ b/arch/arm/mm/init.c
+> @@ -577,7 +577,7 @@ struct section_perm {
+>  	pmdval_t clear;
+>  };
+>  
+> -static struct section_perm nx_perms[] = {
+> +static struct section_perm nx_perms[] __initdata = {
+>  	/* Make pages tables, etc before _stext RW (set NX). */
+>  	{
+>  		.start	= PAGE_OFFSET,
+> @@ -680,7 +680,7 @@ static inline bool arch_has_strict_perms(void)
+>  	}								\
+>  }
+>  
+> -static inline void fix_kernmem_perms(void)
+> +static void __init fix_kernmem_perms(void)
+>  {
+>  	set_section_perms(nx_perms, prot);
+>  }
+> @@ -706,7 +706,7 @@ void set_kernel_text_ro(void)
+>  static inline void fix_kernmem_perms(void) { }
+>  #endif /* CONFIG_ARM_KERNMEM_PERMS */
+>  
+> -void free_tcmmem(void)
+> +static void __init free_tcmmem(void)
+>  {
+>  #ifdef CONFIG_HAVE_TCM
+>  	extern char __tcm_start, __tcm_end;
+> @@ -716,7 +716,7 @@ void free_tcmmem(void)
+>  #endif
+>  }
+>  
+> -void free_initmem(void)
+> +void __init_refok free_initmem(void)
+>  {
+>  	fix_kernmem_perms();
+>  	free_tcmmem();
+> @@ -728,9 +728,9 @@ void free_initmem(void)
+>  
+>  #ifdef CONFIG_BLK_DEV_INITRD
+>  
+> -static int keep_initrd;
+> +static int keep_initrd __initdata;
+>  
+> -void free_initrd_mem(unsigned long start, unsigned long end)
+> +void __init free_initrd_mem(unsigned long start, unsigned long end)
+>  {
+>  	if (!keep_initrd) {
+>  		if (start == initrd_start)
+> -- 
+> 1.9.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
 > 
 > 
-> 
-> On 25/08/15 15:14, Shenwei Wang wrote:
-> >
-> >
-> >> -----Original Message-----
-> >> From: Sudeep Holla [mailto:sudeep.holla at arm.com]
-> 
-> [...]
-> 
-> >> I don't see this driver doing anything extra apart from keeping the
-> >> wakeup irqs enabled. i.e. You use the same cpu*wake register to
-> >> mask/unmask the interrupt as well as set the wakeup source. Since the
-> >> wakeup interrupt will be enabled by the driver, you just need to mark
-> >> it as wake-up source and nothing extra in the controller right ?
-> >> If so, you need to set IRQCHIP_SKIP_SET_WAKE as you are just leaving
-> >> that irq enabled and not doing any extra configuration to enable it as wakeup
-> source.
-> >> Please correct if that wrong, but from the code that's what I could infer.
-> >
-> > There is no special for this driver. We just use the IRQCHIP driver
-> > framework to manage the wakeup sources. Why did you propose to set
-> > IRQCHIP_SKIP_SET_WAKE flag here? If you don't need the wakeup feature,
-> > you should just not enable this driver in the configuration.
-> >
-> 
-> No, if the driver doesn't nothing extra to configure the wake up source other than
-> keeping it enabled, then it fits the case of SKIP_SET_WAKE.
-> The driver using this wake would have requested and enabled the irq.
-> When it calls enable_irq_wake, you have nothing extra to set(atleast from the
-> looks of the driver), so setting SKIP_SET_WAKE will skip the call and updated the
-> wake flags in irq core.
-> 
-> I don't see the real need of 2 separate sets of irq mask being saved in either case.
-
-You don't really understand what happens after a driver calls enable_irq_wake. In suspend state, even the interrupt
-controller itself is powered off. How can you get the system up again by just using a SKIP_SET_WAKE.
-
-Regards,
-Shenwei
-
-> Regards,
-> Sudeep
