@@ -1,88 +1,52 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 25 Aug 2015 08:01:32 -0700 (PDT)
-Subject: [RFC] arm: change some function and data to init section
-In-Reply-To: <1440488173-28825-1-git-send-email-yalin.wang2010@gmail.com>
-References: <1440488173-28825-1-git-send-email-yalin.wang2010@gmail.com>
-Message-ID: <alpine.LFD.2.20.1508250800090.21591@knanqh.ubzr>
+From: Shenwei.Wang@freescale.com (Shenwei Wang)
+Date: Tue, 25 Aug 2015 15:05:36 +0000
+Subject: [PATCH v3 1/1] misc: sram: add dev_pm_ops to support module power
+ gate
+In-Reply-To: <55DC7E5E.5020701@arm.com>
+References: <1438272681-29338-1-git-send-email-shenwei.wang@freescale.com>
+ <55DC677E.1030004@arm.com>
+ <CY1PR0301MB0843D5CB5FFC56991B90EB4283610@CY1PR0301MB0843.namprd03.prod.outlook.com>
+ <55DC74CF.7070300@arm.com>
+ <CY1PR0301MB084302FA2AA9582A3BA9B50B83610@CY1PR0301MB0843.namprd03.prod.outlook.com>
+ <55DC7E5E.5020701@arm.com>
+Message-ID: <CY1PR0301MB0843A508122C7FCF3969AF3D83610@CY1PR0301MB0843.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 25 Aug 2015, yalin wang wrote:
-
-> This patch change some function and the related data to init section,
-> they are only called by free_initmem(), can be freed safely after
-> boot up.
-
-The magic keyword here is __init_refok.
-
-> Signed-off-by: yalin wang <yalin.wang2010@gmail.com>
-
-Acked-by: Nicolas Pitre <nico@linaro.org>
 
 
-> ---
->  arch/arm/mm/init.c | 12 ++++++------
->  1 file changed, 6 insertions(+), 6 deletions(-)
+> -----Original Message-----
+> From: Sudeep Holla [mailto:sudeep.holla at arm.com]
+> Sent: 2015?8?25? 9:41
+> To: Wang Shenwei-B38339
+> Cc: Sudeep Holla; gregkh at linuxfoundation.org; arnd at arndb.de; Huang
+> Yongcai-B20788; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH v3 1/1] misc: sram: add dev_pm_ops to support module
+> power gate
+> >> What I meant is who will be using the SRAM when entering S2R that you
+> >> need to save the content. Either the user needs to take care of the
+> >> content or just release the pool when not in use. When the sram pool has no
+> user, clock can be gated.
+> >>
+> >> Again can you give details of this use-case.
+> >
+> > We are not talking about clock gate state. Here we are handling the
+> > power gate for this SRAM IP block. Of course, you can ask each driver
+> > to save its contents during low power state, but I think the easier
+> > way is to save the contents in this sram driver and just leave the drivers who
+> use this sram behave as is today.
+> >
 > 
-> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-> index 8a63b4c..7b505de 100644
-> --- a/arch/arm/mm/init.c
-> +++ b/arch/arm/mm/init.c
-> @@ -577,7 +577,7 @@ struct section_perm {
->  	pmdval_t clear;
->  };
->  
-> -static struct section_perm nx_perms[] = {
-> +static struct section_perm nx_perms[] __initdata = {
->  	/* Make pages tables, etc before _stext RW (set NX). */
->  	{
->  		.start	= PAGE_OFFSET,
-> @@ -680,7 +680,7 @@ static inline bool arch_has_strict_perms(void)
->  	}								\
->  }
->  
-> -static inline void fix_kernmem_perms(void)
-> +static void __init fix_kernmem_perms(void)
->  {
->  	set_section_perms(nx_perms, prot);
->  }
-> @@ -706,7 +706,7 @@ void set_kernel_text_ro(void)
->  static inline void fix_kernmem_perms(void) { }
->  #endif /* CONFIG_ARM_KERNMEM_PERMS */
->  
-> -void free_tcmmem(void)
-> +static void __init free_tcmmem(void)
->  {
->  #ifdef CONFIG_HAVE_TCM
->  	extern char __tcm_start, __tcm_end;
-> @@ -716,7 +716,7 @@ void free_tcmmem(void)
->  #endif
->  }
->  
-> -void free_initmem(void)
-> +void __init_refok free_initmem(void)
->  {
->  	fix_kernmem_perms();
->  	free_tcmmem();
-> @@ -728,9 +728,9 @@ void free_initmem(void)
->  
->  #ifdef CONFIG_BLK_DEV_INITRD
->  
-> -static int keep_initrd;
-> +static int keep_initrd __initdata;
->  
-> -void free_initrd_mem(unsigned long start, unsigned long end)
-> +void __init free_initrd_mem(unsigned long start, unsigned long end)
->  {
->  	if (!keep_initrd) {
->  		if (start == initrd_start)
-> -- 
-> 1.9.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
-> 
-> 
+> I don't like that solution as it's not scalable with SRAM size and saving all the
+> content of SRAM just because of few active regions makes no sense to me
+> at-least. I prefer leaving it to the users to handle that rather than SRAM driver.
+
+I don't think it is not scalable. The choice should be made by the application.
+>From the driver side, it should be able to provide the way to retain its contents
+during power gate. 
+
+Regards,
+Shenwei
+
+> Regards,
+> Sudeep
