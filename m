@@ -1,71 +1,71 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 25 Aug 2015 17:53:26 +0100
+From: nschichan@freebox.fr (Nicolas Schichan)
+Date: Tue, 25 Aug 2015 19:07:39 +0200
 Subject: [PATCH v2 10/10] ARM: software-based priviledged-no-access support
 In-Reply-To: <E1ZUGMS-0000BG-8B@rmk-PC.arm.linux.org.uk>
 References: <20150825154026.GT7557@n2100.arm.linux.org.uk>
  <E1ZUGMS-0000BG-8B@rmk-PC.arm.linux.org.uk>
-Message-ID: <20150825165326.GL21300@arm.com>
+Message-ID: <55DCA0DB.7000103@freebox.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
-
-On Tue, Aug 25, 2015 at 04:42:08PM +0100, Russell King wrote:
+On 08/25/2015 05:42 PM, Russell King wrote:
 > Provide a software-based implementation of the priviledged no access
 > support found in ARMv8.1.
-> 
-> Userspace pages are mapped using a different domain number from the
-> kernel and IO mappings.  If we switch the user domain to "no access"
-> when we enter the kernel, we can prevent the kernel from touching
-> userspace.
-> 
-> However, the kernel needs to be able to access userspace via the
-> various user accessor functions.  With the wrapping in the previous
-> patch, we can temporarily enable access when the kernel needs user
-> access, and re-disable it afterwards.
-> 
-> This allows us to trap non-intended accesses to userspace, eg, caused
-> by an inadvertent dereference of the LIST_POISON* values, which, with
-> appropriate user mappings setup, can be made to succeed.  This in turn
-> can allow use-after-free bugs to be further exploited than would
-> otherwise be possible.
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
->  arch/arm/Kconfig                   | 15 +++++++++++++++
->  arch/arm/include/asm/assembler.h   | 30 ++++++++++++++++++++++++++++++
->  arch/arm/include/asm/domain.h      | 21 +++++++++++++++++++--
->  arch/arm/include/asm/uaccess.h     | 14 ++++++++++++++
->  arch/arm/kernel/process.c          | 24 ++++++++++++++++++------
->  arch/arm/lib/csumpartialcopyuser.S | 14 ++++++++++++++
->  6 files changed, 110 insertions(+), 8 deletions(-)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index a750c1425c3a..a898eb72da51 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1694,6 +1694,21 @@ config HIGHPTE
->  	bool "Allocate 2nd-level pagetables from highmem"
->  	depends on HIGHMEM
+[...]
+> diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
+> index a91177043467..ff74f0b54b0e 100644
+> --- a/arch/arm/include/asm/assembler.h
+> +++ b/arch/arm/include/asm/assembler.h
+> @@ -446,15 +446,45 @@ THUMB(	orr	\reg , \reg , #PSR_T_BIT	)
+>  	.endm
 >  
-> +config CPU_SW_DOMAIN_PAN
-> +	bool "Enable use of CPU domains to implement priviledged no-access"
+>  	.macro	uaccess_disable, tmp, isb=1
+> +#ifdef CONFIG_CPU_SW_DOMAIN_PAN
+> +	/*
+> +	 * Whenever we re-enter userspace, the domains should always be
+> +	 * set appropriately.
+> +	 */
+> +	mov	\tmp, #DACR_UACCESS_DISABLE
+> +	mcr	p15, 0, \tmp, c3, c0, 0		@ Set domain register
+> +	.if	\isb
+> +	isb
+> +	.endif
+> +#endif
+>  	.endm
+>  
+>  	.macro	uaccess_enable, tmp, isb=1
+> +#ifdef CONFIG_CPU_SW_DOMAIN_PAN
+> +	/*
+> +	 * Whenever we re-enter userspace, the domains should always be
+> +	 * set appropriately.
+> +	 */
+> +	mov	\tmp, #DACR_UACCESS_ENABLE
+> +	mcr	p15, 0, \tmp, c3, c0, 0
+> +	.if	\isb
+> +	isb
+> +	.endif
+> +#endif
+>  	.endm
 
-Minor comment, but you've consistently misspelt "privileged".
+Thanks for the updated serie,
 
-Anyway, I tried this on my TC2 board running Debian Jessie armhf and,
-whilst it boots to a shell on the console, ssh connections appear to
-hang on the client before even trying to auth. I don't see anything
-like a domain fault and the machine is still responsive on the console.
-Disabling this option gets things working again for me.
+on ARMv5, I get the following compile error:
 
-Note that I *do* see undefined instruction exceptions from sshd
-regardless of this patch, however I think they're triggered from
-something like libcrypto which is prepared to handle the SIGILL.
+arch/arm/kernel/entry-common.S: Assembler messages:
+arch/arm/kernel/entry-common.S:200: Error: selected processor does not support
+ARM mode `isb'
 
-FWIW, I'm using your ten patches from this series on top of 4.2-rc8 and
-I've put the .config here:
+replacing those two "isb" occurences with "instr_sync" fixed it.
 
-  http://www.willdeacon.ukfsn.org/bitbucket/oopsen/pan/pan-tc2.config
+With that added access to LIST_POISON are still correctly catched, when
+CONFIG_CPU_SW_DOMAIN_PAN is set. Also the transmit of an ipv6 packet does not
+result in a fault anymore. Also with CONFIG_CPU_SW_DOMAIN_PAN disabled, the
+system now boots fine.
 
-Will
+This has been tested on Linux 4.1 / kirkwood and Linux 4.2-rc8 / qemu,armv5.
+
+Thanks,
+
+-- 
+Nicolas Schichan
+Freebox SAS
