@@ -1,64 +1,133 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 25 Aug 2015 14:59:43 +0100
-Subject: [PATCH v3 1/1] misc: sram: add dev_pm_ops to support module power
- gate
-In-Reply-To: <CY1PR0301MB0843D5CB5FFC56991B90EB4283610@CY1PR0301MB0843.namprd03.prod.outlook.com>
-References: <1438272681-29338-1-git-send-email-shenwei.wang@freescale.com>
- <55DC677E.1030004@arm.com>
- <CY1PR0301MB0843D5CB5FFC56991B90EB4283610@CY1PR0301MB0843.namprd03.prod.outlook.com>
-Message-ID: <55DC74CF.7070300@arm.com>
+From: msalter@redhat.com (Mark Salter)
+Date: Tue, 25 Aug 2015 10:01:19 -0400
+Subject: [PATCH] ARM64: kernel: implement ACPI parking protocol
+In-Reply-To: <20150824171345.GA4981@red-moon>
+References: <1436959990-32054-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1437063431.3583.2.camel@redhat.com> <20150716171221.GB18582@red-moon>
+ <55A7F24D.2000100@redhat.com> <1437071026.21160.1.camel@redhat.com>
+ <20150824171345.GA4981@red-moon>
+Message-ID: <1440511279.5882.14.camel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, 2015-08-24 at 18:13 +0100, Lorenzo Pieralisi wrote:
+> Hi Mark,
+> 
+> On Thu, Jul 16, 2015 at 07:23:46PM +0100, Mark Salter wrote:
+> > On Thu, 2015-07-16 at 12:05 -0600, Al Stone wrote:
+> > 
+> > > On 07/16/2015 11:12 AM, Lorenzo Pieralisi wrote:
+> > 
+> > > > On Thu, Jul 16, 2015 at 05:17:11PM +0100, Mark Salter wrote:
+> > 
+> > > > > On Wed, 2015-07-15 at 12:33 +0100, Lorenzo Pieralisi wrote:
+> > > > > 
+> > 
+> > > > > > The SBBR and ACPI specifications allow ACPI based systems that 
+> > > > > > do not
+> > > > > > implement PSCI (eg systems with no EL3) to boot through the 
+> > > > > > ACPI parking
+> > > > > > protocol specification[1].
+> > > > > > 
+> > > > > > This patch implements the ACPI parking protocol CPU operations, 
+> > > > > > and adds
+> > > > > > code that eases parsing the parking protocol data structures to 
+> > > > > > the
+> > > > > > ARM64 SMP initializion carried out at the same time as cpus 
+> > > > > > enumeration.
+> > > > > > 
+> > > > > > To wake-up the CPUs from the parked state, this patch 
+> > > > > > implements a
+> > > > > > wakeup IPI for ARM64 (ie arch_send_wakeup_ipi_mask()) that 
+> > > > > > mirrors the
+> > > > > > ARM one, so that a specific IPI is sent for wake-up purpose in 
+> > > > > > order
+> > > > > > to distinguish it from other IPI sources.
+> > > > > > 
+> > > > > > Given the current ACPI MADT parsing API, the patch implements a 
+> > > > > > glue
+> > > > > > layer that helps passing MADT GICC data structure from SMP 
+> > > > > > initialization
+> > > > > 
+> > > > > Somewhat off topic, but this reminds once again, that it might be
+> > > > > better to generalize the ACPI_MADT_TYPE_GENERIC_INTERRUPT so that 
+> > > > > it
+> > > > > could be done in one pass. Currently, the SMP code and the GIC 
+> > > > > code
+> > > > > need boot-time info from ACPI_MADT_TYPE_GENERIC_INTERRUPT tables. 
+> > > > > This
+> > > > > patch adds parking protocol, and this patch:
+> > > > > 
+> > > > >  https://lkml.org/lkml/2015/5/1/203
+> > > > > 
+> > > > > need to get the PMU irq from the same table. I've been thinking 
+> > > > > of
+> > > > > something like a single loop through the table in setup.c with
+> > > > > callouts to registered users of the various bits of data.
+> > > > 
+> > > > It is not off topic at all, it is bang on topic. I hate the code
+> > > > as it stands forcing parsing the MADT in multiple places at 
+> > > > different
+> > > > times, that's why I added hooks to set the parking protocol entries
+> > > > from smp.c and I know that's ugly, I posted it like this on purpose
+> > > > to get feedback.
+> > > > 
+> > 
+> > > > > Those users could register a handler function with something like 
+> > > > > an
+> > > > > ACPI_MADT_GIC_DECLARE() macro which would add a handler to a
+> > > > > special linker section.
+> > > > > 
+> > > > > I could work up a separate patch if others think it a worthwhile
+> > > > > thing to do.
+> > > > 
+> > > > Something simpler ? Like stashing the GICC entries (I know we need
+> > > > permanent table mappings for that to work unless we create data
+> > > > structures out of the MADT entries with the fields we are 
+> > > > interested in)
+> > > > for possible CPUS ?
+> > > 
+> > > Right -- it seems like it would be pretty straightforward to traverse
+> > > the MADT once, and capture all the GICC subtables in a list of 
+> > > pointers,
+> > > or even make a copy of the contents of all of them.  Each user of the
+> > > content would still have to traverse the list, though, unless data is
+> > > reduced to only those things that are needed and the rest tossed. 
+> > >  Even
+> > > if only keep the info needed, I've still got a list of entries, one 
+> > > for
+> > > each CPU, I think, that I would still have to traverse.
+> > > 
+> > > If I have to register a handler to gather a specific bit of data 
+> > > needed,
+> > > I'm not understanding how that's any less complicated than what I 
+> > > need
+> > > to do today -- call acpi_parse_table_madt() with my GICC handler. 
+> > >  Wouldn't
+> > > both GICC subtable handlers be just about the same code?
+> > > 
+> > > I'm probably missing something obvious, but I'm not understanding 
+> > > what problem
+> > > is being solved....
+> > > 
+> > 
+> > The difference is that GIC code and SMP code each loop
+> > through the tables getting the info they need. If they
+> > registered a handler, there is only one loop through
+> > the tables regardless of how many handlers get registered.
+> > Having each loop through as currently done isn't really
+> > a performance issue (its boot-time only right now), but
+> > there is duplicated code wrt validating the table entry
+> > and calling the acpi API to do it. All of that could be
+> > done in one place instead of duplicating it in different
+> > places.
+> 
+> Did you have time to put the patch together ? I would like
+> to post a v2 for this set soon.
+> 
+> Thank you !
+> Lorenzo
 
-
-On 25/08/15 14:47, Shenwei Wang wrote:
->
->
->> -----Original Message-----
->> From: Sudeep Holla [mailto:sudeep.holla at arm.com]
->> Sent: 2015?8?25? 8:03
->> To: Wang Shenwei-B38339
->> Cc: gregkh at linuxfoundation.org; arnd at arndb.de; Sudeep Holla; Huang
->> Yongcai-B20788; linux-arm-kernel at lists.infradead.org
->> Subject: Re: [PATCH v3 1/1] misc: sram: add dev_pm_ops to support module
->> power gate
->>
->>
->>
->> On 30/07/15 17:11, Shenwei Wang wrote:
->>> When system goes into low power states like SUSPEND_MEM and
->>> HIBERNATION, the hardware IP block may be powered off to reduce the
->>> power consumption. This power down will lost all the data inside the
->>> ram. This patch added the dev_pm_ops and implemented two callbacks:
->>> suspend_noirq and resume_noirq, which will save the data in the
->>> on-chip-ram right before power down and restore it after system
->>> resumes.
->>>
->>
->> Who uses this SRAM ? Can't they be released before suspending ?
->> This might not be feasible and time consuming as the size of SRAM increases.
->
-> On Freescale i.MX7D, we are using this kind of SRAM. As I implemented this as an
-> optional feature, a user can balance between the suspend/resume time and the power
-> consumption.
->
->> Also I just check the entire tree for the users of gen_pool, I found it's used for
->> video/audio and crypto which needs to on-demand basis.
->> Apart from that it's mainly used for low power modes in which case, SRAM needs
->> to be powered on. So can you provide more details on your use-case.
->
-> On latest Freescale i.MX7D, it has two SRAMs in side. One is for low
-> power mode which will be powered on in suspend state. The other one
-> is for other peripherals which can be powered off on demand.
->
-
-What I meant is who will be using the SRAM when entering S2R that you
-need to save the content. Either the user needs to take care of the
-content or just release the pool when not in use. When the sram pool has
-no user, clock can be gated.
-
-Again can you give details of this use-case.
-
-Regards,
-Sudeep
+No. The original idea I had wasn't going to work out because the
+parsing had to happen at different times during the boot. I'm not
+sure if there's a better way than what we're doing now.
