@@ -1,51 +1,67 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Tue, 25 Aug 2015 15:24:16 +0100
-Subject: [PATCH v1 3/3] arm64: dts: add Hi6220 mailbox node
-In-Reply-To: <1440510194.10987.52.camel@linaro.org>
-References: <20150821184059.GB2000@svinekod>
- <20150824091845.GA28290@leoy-linaro>
- <20150824095144.GA7139@leverpostej>
- <1440411596.3517.12.camel@linaro.org>
- <20150824114903.GT10728@bivouac.eciton.net>
- <1440490427.10987.29.camel@linaro.org>
- <20150825094630.GU10728@bivouac.eciton.net>
- <1440497710.10987.42.camel@linaro.org>
- <20150825104256.GB13471@leverpostej>
- <1440510194.10987.52.camel@linaro.org>
-Message-ID: <20150825142416.GW10728@bivouac.eciton.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 25 Aug 2015 16:25:09 +0200
+Subject: [PATCH 2/6] gpio: Introduce gpio descriptor 'name'
+In-Reply-To: <20150813132813.GX19600@pengutronix.de>
+References: <1438680203-13432-1-git-send-email-mpa@pengutronix.de>
+ <1438680203-13432-3-git-send-email-mpa@pengutronix.de>
+ <CACRpkdYv=-fCj+ts9tTmFsovPN0RPYkOdYh9Dj6oFDJiRV=RUA@mail.gmail.com>
+ <20150813132813.GX19600@pengutronix.de>
+Message-ID: <CACRpkdYhAe7fpqvixLhZ2t=3hC1w=VHNtWNSJverVb7ng3Qe_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 25, 2015 at 09:43:14PM +0800, Haojian Zhuang wrote:
-> Since we discussed a lot on this, let's make a conclusion on it.
-> 
-> 1. UEFI could append the reserved buffer in it's memory mapping.
+On Thu, Aug 13, 2015 at 3:28 PM, Markus Pargmann <mpa@pengutronix.de> wrote:
+> On Mon, Aug 10, 2015 at 11:37:06AM +0200, Linus Walleij wrote:
+>> On Tue, Aug 4, 2015 at 11:23 AM, Markus Pargmann <mpa@pengutronix.de> wrote:
+>>
+>> > The latest gpio hogging mechanism assigns each gpio a 'line-name' in the
+>> > devicetree. The 'name' field is different from the 'label' field.
+>> > 'label' is only used for requested GPIOs to describe its current use by
+>> > driver or userspace.
+>> >
+>> > The 'name' field describes the GPIO itself, not the use. This is most
+>> > likely identical to the label in the schematic on the GPIO line and
+>> > should help to find this particular GPIO.
+>> >
+>> > This patch adds a helper function to find gpio descriptors by name
+>> > instead of gpio number.
+>> >
+>> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+>>
+>> Oh I realized there is a big problem with this.
+>>
+>> struct gpio_chip already contains this:
+>>
+>>         const char              *const *names;
+>>
+>> Now it seems like names can be stored in two places:
+>> in an array in the gpio_chip and in a name tag in struct
+>> gpio_desc.
+>>
+>> So how do we handle this?
+>>
+>> I guess we need to keep just *one* of them, so maybe remove
+>> the names array from the struct gpio_chip and add a helper function
+>> that sets the names on the descs for the lines like:
+>>
+>> int gpiochip_set_names(struct gpio_chip *gc, const char * const names);
+>>
+>> And then refactor all code and chips that use the old names
+>> array to use this instead. I don't think they are too many, really.
+>
+> That sounds good. There are just a few users of this names array, so it
+> should all be fine.
 
-Yes. It needs to.
+OK thanks.
 
-(I will let Mark comment on points 2-4.)
+> Just to clarify: The line names will then be the same as this name
+> array? So all GPIOs with name/line-names are then exported by their name
+> and not the number?
 
-> 5. A patch is necessary in kernel. If efi stub feature is enabled,
->    arm kernel should not parse memory node or reserved memory buffer in
->    DT any more.
+Yeah I consider it a legacy mechanism to achieve the same thing.
 
-This is already the case. The stub deletes any present memory nodes and
-reserved entries in drivers/firmware/efi/libstub/fdt.c:update_fdt().
+The problem with it is that it has a flat namespace and we
+need to conform to that.
 
-Then, during setup_arch(), arch/arm64/kernel/efi.c:efi_init() calls
-reserve_regions(), which adds only those memory regions available for
-use by Linux as RAM to memblock.
-
->    Arm kernel should either fetch memory information from 
->    efi or DT.
-
-Absolutely.
-
->    Currently arm kernel fetch both efi memory information and
->    reserved buffer from DTB at the same time.
-
-No, it does not.
-
-Regards,
-
-Leif
+Yours,
+Linus Walleij
