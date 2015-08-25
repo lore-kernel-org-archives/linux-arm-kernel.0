@@ -1,78 +1,68 @@
-From: pi-cheng.chen@linaro.org (Pi-Cheng Chen)
-Date: Tue, 25 Aug 2015 10:10:44 +0800
-Subject: [RESEND PATCH 0/3 v6] Add Mediatek MT8173 cpufreq driver
-In-Reply-To: <1439803465-19683-1-git-send-email-pi-cheng.chen@linaro.org>
-References: <1439803465-19683-1-git-send-email-pi-cheng.chen@linaro.org>
-Message-ID: <CALx668VWg2xVxzy8P7f5QFWRzm+TDJXUghL-_rbvRLsLYjtnng@mail.gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 25 Aug 2015 11:18:11 +0900
+Subject: [PATCH v2 0/7] Add support for Exynos SROM Controller driver
+In-Reply-To: <1440403348-8974-1-git-send-email-pankaj.dubey@samsung.com>
+References: <1440403348-8974-1-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <55DBD063.5040703@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 17, 2015 at 5:24 PM, Pi-Cheng Chen <pi-cheng.chen@linaro.org> wrote:
-> MT8173 is a ARMv8 based SoC with 2 clusters. All CPUs in a single cluster
-> share the same power and clock domain. This series tries to add cpufreq support
-> for MT8173 SoC. The v6 of this series is resent with Acks added.
+On 24.08.2015 17:02, Pankaj Dubey wrote:
+> This patch set adds support for Exynos SROM controller DT based driver.
+> Currently SROM register sets are used only during S2R, so driver
+> basically added for taking care of S2R. It will help us in removing
+> static mapping from exynos.c and other extra code handline during S2R.
+> 
+> This patch set also updated exynos4 and exynos5 dtsi files for with device
+> node for srom, and added binding documentation for the same.
+> 
+> First two patches are some minor cleanup in mach-exynos.
+> 
+> Patchset v1 was posted here[1]
+> [1]: https://lkml.org/lkml/2015/4/29/98
+> 
+> Changes since v1:
+>  - Rebased to latest kgene tree.
+>  - Addressed review comments from Krzysztof Kozlowski.
+>  - Add two new patches for minor cleanup in exynos.c and map.h
+> 
+> Pankaj Dubey (7):
+>   ARM: EXYNOS: remove unused static mapping of CMU for exynos5
+>   ARM: EXYNOS: code cleanup in map.h
+>   drivers: soc: add support for exynos SROM driver
+>   ARM: EXYNOS: Remove SROM related register settings from mach-exynos
+>   ARM: dts: add SROM device node for exynos4
+>   ARM: dts: add SROM device node for exynos5
+>   Documentation: dt-bindings: add exynos-srom binding information
 
-Hi Rafael,
+One more thing: please update the existing Exynos entry in maintainers
+so it would cover drivers/soc/samsung.
 
-Not sure if I has missed the merge window.
-Do I have chance to have this series merged for 4.3?
-Would you please take [1,2] of this series?
-Thanks.
+Best regards,
+Krzysztof
 
-Best Regards,
-Pi-Cheng
-
->
-> changes in v6:
-> - Move clock and regulator consumer properties document to the device tree
->   bindings documents of MT8173 CPU DVFS clock driver
-> - Add change log to describe what is implemented in the MT8173 cpufreq driver
-> - Add missed rcu_read_unlock() in the error path
-> - Move of_init_opp_table() call to make sure all required hardware resources
->   are already there before it is called
-> - Add comments to describe why both platform driver and deivce registration
->   codes are put in the initcall function
-> - Use the term "voltage tracking" instead of "voltage trace" according to an
->   internal SoC document
->
-> changes in v5:
-> - Move resource allocation code from init() into probe() and remove some unused
->   functions due to this change
-> - Fix descriptions for device tree binding document
-> - Address review comments for last version
-> - Register CPU cooling device
->
-> Changes in v4:
-> - Add bindings for MT8173 cpufreq driver
-> - Move OPP table back into device tree
-> - Address comments for last version
->
-> Changes in v3:
-> - Implement MT8173 specific standalone cpufreq driver instead of using
->   cpufreq-dt driver
-> - Define OPP table in the driver source code until new OPP binding is ready
->
-> Changes in v2:
-> - Add intermediate frequency support in cpufreq-dt driver
-> - Use voltage scaling code of cpufreq-dt for little cluster instead of
->   implementaion in notifier of mtk-cpufreq driver
-> - Code refinement for mtk-cpufreq driver
->
-> Pi-Cheng Chen (3):
->   dt-bindings: mediatek: Add MT8173 CPU DVFS clock bindings
->   cpufreq: mediatek: Add MT8173 cpufreq driver
->   arm64: dts: mt8173: Add mt8173 cpufreq driver support
->
->  .../devicetree/bindings/clock/mt8173-cpu-dvfs.txt  |  83 ++++
->  arch/arm64/boot/dts/mediatek/mt8173-evb.dts        |  18 +
->  arch/arm64/boot/dts/mediatek/mt8173.dtsi           |  64 +++
->  drivers/cpufreq/Kconfig.arm                        |   7 +
->  drivers/cpufreq/Makefile                           |   1 +
->  drivers/cpufreq/mt8173-cpufreq.c                   | 524 +++++++++++++++++++++
->  6 files changed, 697 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/clock/mt8173-cpu-dvfs.txt
->  create mode 100644 drivers/cpufreq/mt8173-cpufreq.c
->
-> --
-> 1.9.1
->
+> 
+>  .../bindings/arm/samsung/exynos-srom.txt           |  12 ++
+>  arch/arm/boot/dts/exynos4.dtsi                     |   5 +
+>  arch/arm/boot/dts/exynos5.dtsi                     |   5 +
+>  arch/arm/mach-exynos/Kconfig                       |   2 +
+>  arch/arm/mach-exynos/common.h                      |   2 -
+>  arch/arm/mach-exynos/exynos.c                      |  22 ----
+>  arch/arm/mach-exynos/include/mach/map.h            |   8 --
+>  arch/arm/mach-exynos/regs-srom.h                   |  53 --------
+>  arch/arm/mach-exynos/suspend.c                     |  20 +--
+>  arch/arm/plat-samsung/include/plat/map-s5p.h       |   1 -
+>  drivers/soc/Kconfig                                |   1 +
+>  drivers/soc/Makefile                               |   1 +
+>  drivers/soc/samsung/Kconfig                        |  13 ++
+>  drivers/soc/samsung/Makefile                       |   1 +
+>  drivers/soc/samsung/exynos-srom.c                  | 143 +++++++++++++++++++++
+>  drivers/soc/samsung/exynos-srom.h                  |  51 ++++++++
+>  16 files changed, 236 insertions(+), 104 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/arm/samsung/exynos-srom.txt
+>  delete mode 100644 arch/arm/mach-exynos/regs-srom.h
+>  create mode 100644 drivers/soc/samsung/Kconfig
+>  create mode 100644 drivers/soc/samsung/Makefile
+>  create mode 100644 drivers/soc/samsung/exynos-srom.c
+>  create mode 100644 drivers/soc/samsung/exynos-srom.h
+> 
