@@ -1,113 +1,77 @@
-From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
-Date: Tue, 25 Aug 2015 13:42:21 +0200
-Subject: [PATCH v8 1/2] mfd: devicetree: add bindings for Atmel Flexcom
-In-Reply-To: <20150724150854.GI3436@x1>
-References: <cover.1437731428.git.cyrille.pitchen@atmel.com>
- <738a001f14a5fa4fa8e5f90ad859a318cba0de42.1437731428.git.cyrille.pitchen@atmel.com>
- <20150724150854.GI3436@x1>
-Message-ID: <55DC549D.7060307@atmel.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 25 Aug 2015 12:53:21 +0100
+Subject: [PATCH v3 0/4] irqchip: GICv2/v3: Add support for irq_vcpu_affinity
+Message-ID: <1440503605-10185-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+The GICv2 and GICv3 architectures allow an active physical interrupt
+to be forwarded to a guest, and the guest to indirectly perform the
+deactivation of the interrupt by performing an EOI on the virtual
+interrupt (see for example the GICv2 spec, 3.2.1).
 
-any feedback on this kind of DT bindings?
-Is it a proper way of using the "ranges" property?
+This allows some substantial performance improvement for level
+triggered interrupts that otherwise have to be masked/unmasked in
+VFIO, not to mention the required trap back to KVM when the guest
+performs an EOI.
 
-Best regards,
+To enable this, the GICs need to be switched to a different EOImode,
+where a taken interrupt can be left "active" (which prevents the same
+interrupt from being taken again), while other interrupts are still
+being processed normally.
 
-Cyrille
+We also use the new irq_set_vcpu_affinity hook that was introduced for
+Intel's "Posted Interrupts" to determine whether or not to perform the
+deactivation at EOI-time.
 
-Le 24/07/2015 17:08, Lee Jones a ?crit :
-> DT chaps,
-> 
-> Please can you take a look at this binding.
-> 
-> In particular the use of the 'ranges' property to store device 'mode'.
-> 
->> This patch documents the DT bindings for the Atmel Flexcom which will be
->> introduced by sama5d2x SoCs. These bindings will be used by the actual
->> Flexcom driver to be sent in another patch.
->>
->> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
->> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->> ---
->>  .../devicetree/bindings/mfd/atmel-flexcom.txt      | 68 ++++++++++++++++++++++
->>  1 file changed, 68 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/mfd/atmel-flexcom.txt
->>
->> diff --git a/Documentation/devicetree/bindings/mfd/atmel-flexcom.txt b/Documentation/devicetree/bindings/mfd/atmel-flexcom.txt
->> new file mode 100644
->> index 000000000000..588d527dbfa7
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/mfd/atmel-flexcom.txt
->> @@ -0,0 +1,68 @@
->> +* Device tree bindings for Atmel Flexcom (Flexible Serial Communication Unit)
->> +
->> +The Atmel Flexcom is just a wrapper which embeds a SPI controller, an I2C
->> +controller and an USART. Only one function can be used at a time and is chosen
->> +at boot time according to the device tree.
->> +
->> +Required properties:
->> +- compatible:		Should be "atmel,sama5d2-flexcom"
->> +- reg:			Should be the pair (offset, size) for the Flexcom
->> +			dedicated I/O registers (without USART, TWI or SPI
->> +			registers).
->> +- clocks:		Should be the Flexcom peripheral clock from PMC.
->> +- #address-cells:	Should be <2>
->> +- #size-cells:		Should be <1>
->> +- ranges:		Should be a list of ranges.
->> +			One range per peripheral wrapped by the Flexcom. So each
->> +			range is a triplet (child_addr, parent_addr, size). The
->> +			first u32 of "child_addr" is the value to be set in the
->> +			Operating Mode bitfield of the Flexcom Mode Register.
->> +			Then "parent_addr" stores the base address of the
->> +			corresponding peripheral in the system memory. Finally,
->> +			"size" if the size of the memory region of this
->> +			peripheral.
->> +
->> +Required child:
->> +A single available child for the serial controller to enable.
->> +
->> +Required properties of this child:
->> +- reg:			Should be a pair (child_addr, size) with child_addr
->> +			matching one of the parent ranges.
->> +- clocks:		Should be the very same phandle as for the parent's one.
->> +
->> +Other properties remain unchanged. See documentation of the respective device:
->> +- ../serial/atmel-usart.txt
->> +- ../spi/spi_atmel.txt
->> +- ../i2c/i2c-at91.txt
->> +
->> +Example:
->> +
->> +flexcom at f8034000 {
->> +	compatible = "atmel,sama5d2-flexcom";
->> +	reg = <0xf8034000 0x200>;
->> +	clocks = <&flx0_clk>;
->> +	#address-cells = <2>;
->> +	#size-cells = <1>;
->> +	ranges = <1 0 0xf8034200 0x200		/* opmode 1: USART */
->> +		  2 0 0xf8034400 0x200		/* opmode 2: SPI */
->> +		  3 0 0xf8034600 0x200>;	/* opmode 3: I2C */
->> +
->> +	spi at 2,0 {
->> +		compatible = "atmel,at91rm9200-spi";
->> +		reg = <2 0 0x200>;
->> +		interrupts = <19 IRQ_TYPE_LEVEL_HIGH 7>;
->> +		pinctrl-names = "default";
->> +		pinctrl-0 = <&pinctrl_flx0_default>;
->> +		#address-cells = <1>;
->> +		#size-cells = <0>;
->> +		clocks = <&flx0_clk>;
->> +		clock-names = "spi_clk";
->> +		atmel,fifo-size = <32>;
->> +
->> +		mtd_dataflash at 0 {
->> +			compatible = "atmel,at25f512b";
->> +			reg = <0>;
->> +			spi-max-frequency = <20000000>;
->> +		};
->> +	};
->> +};
-> 
+As all of this only makes sense when the kernel can behave as a
+hypervisor, we only enable this mode on detecting that the kernel was
+actually booted in HYP mode, and that the GIC supports this feature.
+
+This series is a complete rework of a RFC I sent over a year ago:
+
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/266328.html
+
+Since then, a lot has been either merged (the irqchip_state) or reworked
+(my active-timer series: http://www.spinics.net/lists/kvm/msg118768.html),
+and this implements the last few bits for Eric Auger's series to
+finally make it into the kernel:
+
+https://lkml.org/lkml/2015/7/2/268
+https://lkml.org/lkml/2015/7/6/291
+
+With all these patches combined, physical interrupt routing from the
+kernel into a VM becomes possible.
+
+This has been tested on Juno (GICv2) and FastModel (GICv3), and Eric
+tested it on a Calxeda Midway. A branch is available at:
+
+git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git irq/gic-irq-vcpu-affinity-v2
+
+* From v2:
+  - Another small fix from Eric
+  - Some commit message cleanups
+
+* From v1:
+  - Fixes after review from Eric
+  - Got rid of the cascaded GICv2 hack (it was broken anyway)
+  - Folded the LPI deactivation patch (it makes more sense as part of
+    the main one.
+  - Some clarifying comments about the "deactivate on mask"
+  - I haven't retained Eric's Reviewed/Tested-by, as the code as
+    significantly changed on GICv2
+
+Marc Zyngier (4):
+  irqchip: GICv3: Convert to EOImode == 1
+  irqchip: GICv3: Don't deactivate interrupts forwarded to a guest
+  irqchip: GIC: Convert to EOImode == 1
+  irqchip: GIC: Don't deactivate interrupts forwarded to a guest
+
+ drivers/irqchip/irq-gic-v3.c       |  70 +++++++++++++++++++++--
+ drivers/irqchip/irq-gic.c          | 111 ++++++++++++++++++++++++++++++++++++-
+ include/linux/irqchip/arm-gic-v3.h |   9 +++
+ include/linux/irqchip/arm-gic.h    |   4 ++
+ 4 files changed, 188 insertions(+), 6 deletions(-)
+
+-- 
+2.1.4
