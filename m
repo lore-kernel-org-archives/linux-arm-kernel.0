@@ -1,282 +1,63 @@
-From: varada@codeaurora.org (Varadarajan Narayanan)
-Date: Tue, 25 Aug 2015 13:40:42 +0530
-Subject: [PATCH v3] qcom: ipq40xx: Add basic board/dts support for
- IPQ40XX SoC
-In-Reply-To: <20150824224928.GE14330@codeaurora.org>
-References: <20150824092813.GA15581@codeaurora.org>
- <20150824224928.GE14330@codeaurora.org>
-Message-ID: <20150825081042.GA14028@codeaurora.org>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Tue, 25 Aug 2015 16:13:47 +0800
+Subject: [PATCH v1 3/3] arm64: dts: add Hi6220 mailbox node
+In-Reply-To: <20150824114903.GT10728@bivouac.eciton.net>
+References: <1439977055-1747-1-git-send-email-leo.yan@linaro.org>
+ <1439977055-1747-4-git-send-email-leo.yan@linaro.org>
+ <20150821184059.GB2000@svinekod> <20150824091845.GA28290@leoy-linaro>
+ <20150824095144.GA7139@leverpostej> <1440411596.3517.12.camel@linaro.org>
+ <20150824114903.GT10728@bivouac.eciton.net>
+Message-ID: <1440490427.10987.29.camel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 24, 2015 at 03:49:28PM -0700, Stephen Boyd wrote:
-> On 08/24, Varadarajan Narayanan wrote:
-> > Add initial dts files and SoC support for IPQ40XX
-> >
->
-> So far we haven't added any Xs in the model names for our SoC
-> support. Even for IPQ806X, we have it as IPQ8064 as the config
-> name with IPQ806x in the help text because there's IPQ8062 out
-> there. So I guess it should be IPQ4019 or something?
+On Mon, 2015-08-24 at 12:49 +0100, Leif Lindholm wrote:
+> On Mon, Aug 24, 2015 at 06:19:56PM +0800, Haojian Zhuang wrote:
+> > > If your EFI memory map describes the memory as mappable, it is wrong.
+> > 
+> > When kernel is working, kernel will create its own page table based on
+> > UEFI memory map. Since it's reserved in DTS file as Leo's patch, it'll
+> > be moved to reserved memblock. Why is it wrong?
+> > 
+> > In the second, UEFI is firmware. When it's stable, nobody should change
+> > it without any reason.
+> 
+> Much like the memory map.
+> 
+> > These reserved memory are used in mailbox driver.
+> > Look. It's driver, so it could be changed at any time.
+> 
+> No, it is a set of regions of memory set aside for use by a different
+> master in the system as well as communications with that master.
+> 
+> The fact that there is a driver somewhere that is aware of this is
+> entirely beside the point. All agents in the system must adher to this
+> protocol.
+> 
+> > Why do you want
+> > to UEFI knowing this memory range? Do you hope UEFI to change when
+> > mailbox driver is changed?
+> 
+> Yes.
+> 
+> UEFI is a runtime environment. Having random magic areas not to be
+> touched will cause random pieces of software running under it to break
+> horribly or break other things horribly.
+> Unless you mark them as reserved in the UEFI memory map.
+> At which point the Linux kernel will automatically ignore them, and
+> the proposed patch is redundant.
+> 
+> So, yes, if you want a system that can boot reliably, run testsuites
+> (like SCT or FWTS), run applications (like fastboot ... or the EFI
+> stub kernel itself), then any memory regions that is reserved for
+> mailbox communication (or other masters in the system) _must_ be
+> marked in the EFI memory map.
 
-Will rename it as IPQ4019
+1. We need support both UEFI and uboot. So the reserved buffer have to
+be declared in DTB since they are used by kernel driver, not UEFI.
 
-> > Signed-off-by: Varadarajan Narayanan <varada@codeaurora.org>
-> > ---
-> > diff --git a/Documentation/devicetree/bindings/qcom.txt b/Documentation/devicetree/bindings/qcom.txt
-> > new file mode 100644
-> > index 0000000..7d56bd0
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/qcom.txt
-> > @@ -0,0 +1,16 @@
-> > +Qualcomm IPQ device tree bindings
-> > +---------------------------------
-> > +
-> > +System on Chip
-> > +
-> > +Device tree must specify which SoC it uses, with one of the
-> > +following compatible strings
-> > +
-> > +       "qcom,ipq40xx"
-> > +
-> > +Platform
-> > +
-> > +Device tree must specify which Platform it uses, with one of the
-> > +following compatible strings
-> > +
-> > +       "qcom,ipq40xx-r3pc"
->
-> This file is not complete and I don't see any other silicon
-> vendors doing this, so please drop the entire file.
+2. UEFI just loads grub. It's no time to run any other custom EFI
+application.
 
-Ok.
-
-> > diff --git a/arch/arm/boot/dts/qcom-ipq40xx-r3pc.dts b/arch/arm/boot/dts/qcom-ipq40xx-r3pc.dts
-> > new file mode 100644
-> > index 0000000..7e4e629
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/qcom-ipq40xx-r3pc.dts
-> > @@ -0,0 +1,33 @@
-> > +/* Copyright (c) 2014, The Linux Foundation. All rights reserved.
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 and
-> > + * only version 2 as published by the Free Software Foundation.
-> > + *
-> > + * This program is distributed in the hope that it will be useful,
-> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + * GNU General Public License for more details.
-> > + */
-> > +
-> > +#include "qcom-ipq40xx.dtsi"
-> > +
-> > +/ {
-> > +	model = "Qualcomm Technologies, Inc. IPQ40XX R3PC";
->
-> Same here, we should know what model number is on the board.
-
-Ok.
-
-> > +	compatible = "qcom,ipq40xx-r3pc", "qcom,ipq40xx";
-> > +
-> > +	memory {
-> > +		device_type = "memory";
-> > +		reg = <0x80000000 0x20000000>; /* 512MB */
-> > +	};
->
-> Doesn't the bootloader fill the memory node for us? Why do we
-> need this?
->
-> > +
-> > +	chosen {
-> > +		bootargs = "root=/dev/ram rw init=/init console=ttyMSM0,115200n8 initrd=0x82000000,0x000E2246";
-> > +	};
->
-> Please don't add bootargs. Use stdout-path for the console part
-> and everything else should be done by the bootloader or is the
-> defaults.
-
-Since this is for the emulation platform, we don't have the bootloader.
-
-> > +
-> > +	soc {
-> > +		serial at 78b0000 {
-> > +			status = "ok";
-> > +		};
-> > +	};
-> > +};
-> > diff --git a/arch/arm/boot/dts/qcom-ipq40xx.dtsi b/arch/arm/boot/dts/qcom-ipq40xx.dtsi
-> > new file mode 100644
-> > index 0000000..f572f38
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/qcom-ipq40xx.dtsi
-> > @@ -0,0 +1,81 @@
-> > +/*
-> > + * Copyright (c) 2014, The Linux Foundation. All rights reserved.
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 and
-> > + * only version 2 as published by the Free Software Foundation.
-> > + *
-> > + * This program is distributed in the hope that it will be useful,
-> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + * GNU General Public License for more details.
-> > + */
-> > +
-> > +/dts-v1/;
-> > +
-> > +#include "skeleton.dtsi"
-> > +
-> > +/ {
-> > +	model = "Qualcomm Technologies, Inc. IPQ40XX";
-> > +	compatible = "qcom,ipq40xx";
->
-> These two should also be specific and drop the Xs. Same goes for
-> the file name.
-
-Ok.
-
-> > +	interrupt-parent = <&intc>;
-> > +
-> > +	cpus {
-> > +		#address-cells = <1>;
-> > +		#size-cells = <0>;
-> > +		cpu at 0 {
-> > +			device_type = "cpu";
-> > +			compatible = "arm,cortex-a7";
-> > +			reg = <0x0>;
-> > +		};
-> > +
-> > +		cpu at 1 {
-> > +			device_type = "cpu";
-> > +			compatible = "arm,cortex-a7";
-> > +			reg = <0x1>;
-> > +		};
-> > +
-> > +		cpu at 2 {
-> > +			device_type = "cpu";
-> > +			compatible = "arm,cortex-a7";
-> > +			reg = <0x2>;
-> > +		};
-> > +
-> > +		cpu at 3 {
-> > +			device_type = "cpu";
-> > +			compatible = "arm,cortex-a7";
-> > +			reg = <0x3>;
-> > +		};
-> > +	};
-> > +
-> > +	soc {
-> > +		#address-cells = <1>;
-> > +		#size-cells = <1>;
-> > +		ranges;
-> > +		compatible = "simple-bus";
-> > +
-> > +		intc: interrupt-controller at b000000 {
-> > +			compatible = "qcom,msm-qgic2";
-> > +			interrupt-controller;
-> > +			#interrupt-cells = <3>;
-> > +			reg = <0x0b000000 0x1000>,
-> > +			<0x0b002000 0x1000>;
-> > +		};
-> > +
-> > +		timer {
->
-> This node is not a child of the SoC node. It should be at the
-> root level.
-
-Ok.
-
-> > +			compatible = "arm,armv7-timer";
-> > +			interrupts = <1 2 0xf08>,
-> > +				     <1 3 0xf08>,
-> > +				     <1 4 0xf08>,
-> > +				     <1 1 0xf08>;
-> > +			clock-frequency = <20833333>;
->
-> Drop this clock-frequency part if you can. The hardware should
-> properly report the frequency.
-
-Cannot drop this. This is the ref-clock frequency. For the
-chip it is 48MHz, for emulation is ~20MHz. Similar to
-https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/arch/arm/boot/dts/qcom-msm8974.dtsi#n89
-
-> > +		};
-> > +
-> > +		serial at 78b0000 {
-> > +			compatible = "qcom,msm-uartdm-v1.4", "qcom,msm-uartdm";
-> > +			reg = <0x78b0000 0x200>;
-> > +			interrupts = <0 108 0>;
-> > +			status = "disabled";
->
-> Don't you need some clocks here?
-
-Yes, will get updated in subsequent patches.
-
-> > +		};
-> > +	};
-> > +};
-> > diff --git a/arch/arm/configs/ipq_defconfig b/arch/arm/configs/ipq_defconfig
-> > index 1cabd8b..89bf8ad 100644
-> > --- a/arch/arm/configs/ipq_defconfig
-> > +++ b/arch/arm/configs/ipq_defconfig
-> > @@ -21,6 +21,7 @@ CONFIG_ARCH_QCOM=y
-> >  CONFIG_ARCH_MSM8X60=y
-> >  CONFIG_ARCH_MSM8960=y
-> >  CONFIG_ARCH_MSM8974=y
-> > +CONFIG_ARCH_IPQ40XX=y
-> >  CONFIG_ARCH_IPQ8064=y
-> >  CONFIG_SMP=y
-> >  CONFIG_PREEMPT=y
->
-> This hunk should be in a separate patch.
-
-Ok.
-
-> > diff --git a/arch/arm/mach-qcom/Kconfig b/arch/arm/mach-qcom/Kconfig
-> > index fab49a2..70812aa 100644
-> > --- a/arch/arm/mach-qcom/Kconfig
-> > +++ b/arch/arm/mach-qcom/Kconfig
-> > @@ -22,6 +22,10 @@ config ARCH_MSM8974
-> >  	bool "Enable support for MSM8974"
-> >  	select HAVE_ARM_ARCH_TIMER
-> >
-> > +config ARCH_IPQ40XX
-> > +	bool "Enable support for IPQ40XX"
-> > +	select HAVE_ARM_ARCH_TIMER
-> > +
-> >  config ARCH_IPQ8064
-> >  	bool "Enable support for IPQ806x"
-> >  	select CLKSRC_QCOM
-> > diff --git a/arch/arm/mach-qcom/board.c b/arch/arm/mach-qcom/board.c
-> > index 6d8bbf7..af9e247 100644
-> > --- a/arch/arm/mach-qcom/board.c
-> > +++ b/arch/arm/mach-qcom/board.c
-> > @@ -18,6 +18,7 @@ static const char * const qcom_dt_match[] __initconst = {
-> >  	"qcom,apq8064",
-> >  	"qcom,apq8074-dragonboard",
-> >  	"qcom,apq8084",
-> > +	"qcom,ipq40xx",
-> >  	"qcom,ipq8062",
-> >  	"qcom,ipq8064",
-> >  	"qcom,msm8660-surf",
-> >
->
-> And these two should also go as a separate patch.
-
-Ok.
-
-Thanks
-Varada
-
->
-> --
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> a Linux Foundation Collaborative Project
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Regards
+Haojian
