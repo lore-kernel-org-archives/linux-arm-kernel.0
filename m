@@ -1,85 +1,84 @@
-From: robdclark@gmail.com (Rob Clark)
-Date: Tue, 25 Aug 2015 16:42:18 -0400
-Subject: [PATCH 1/7] drm/vc4: Add devicetree bindings for VC4.
-In-Reply-To: <CAL_JsqJxiGUR5BxBPyR3-0NxqWsOxMGrWQA6cMXe2pjTom__nw@mail.gmail.com>
-References: <1439427380-2436-1-git-send-email-eric@anholt.net>
- <1439427380-2436-2-git-send-email-eric@anholt.net>
- <55CEC25E.7070303@wwwdotorg.org>
- <874mjxwyx5.fsf@eliezer.anholt.net>
- <CAL_JsqJxiGUR5BxBPyR3-0NxqWsOxMGrWQA6cMXe2pjTom__nw@mail.gmail.com>
-Message-ID: <CAF6AEGu2fi0M7DsicHz+5SDHi1DyDRmvWjkmYPPgY6pZ423WcA@mail.gmail.com>
+From: Shenwei.Wang@freescale.com (Shenwei Wang)
+Date: Tue, 25 Aug 2015 20:43:36 +0000
+Subject: [PATCH v9 1/1] irqchip: imx-gpcv2: IMX GPCv2 driver for wakeup
+ sources
+In-Reply-To: <alpine.DEB.2.11.1508252213220.15006@nanos>
+References: <1440443055-7291-1-git-send-email-shenwei.wang@freescale.com>
+ <55DC3452.3070205@arm.com>
+ <CY1PR0301MB08439B6C5F841AFFD152DFD883610@CY1PR0301MB0843.namprd03.prod.outlook.com>
+ <55DC738D.8000302@arm.com>
+ <CY1PR0301MB0843AE566996617D855CC00683610@CY1PR0301MB0843.namprd03.prod.outlook.com>
+ <55DC7FA4.7040902@arm.com>
+ <CY1PR0301MB08433A2659C75028821F0AE783610@CY1PR0301MB0843.namprd03.prod.outlook.com>
+ <55DC96BA.2020905@arm.com>
+ <CY1PR0301MB0843388CA3BB07493BC2907183610@CY1PR0301MB0843.namprd03.prod.outlook.com>
+ <alpine.DEB.2.11.1508252126360.15006@nanos>
+ <CY1PR0301MB08430902E0E46A43D00317C283610@CY1PR0301MB0843.namprd03.prod.outlook.com>
+ <alpine.DEB.2.11.1508252213220.15006@nanos>
+Message-ID: <CY1PR0301MB08439BB31108FD3DDC234EDA83610@CY1PR0301MB0843.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 24, 2015 at 9:47 AM, Rob Herring <robherring2@gmail.com> wrote:
-> On Mon, Aug 17, 2015 at 1:30 PM, Eric Anholt <eric@anholt.net> wrote:
->> Stephen Warren <swarren@wwwdotorg.org> writes:
->>
->>> On 08/12/2015 06:56 PM, Eric Anholt wrote:
->>>> Signed-off-by: Eric Anholt <eric@anholt.net>
->>>
->>> This one definitely needs a patch description, since someone might not
->>> know what a VC4 is, and "git log" won't show the text from the binding
->>> doc itself. I'd suggest adding the initial paragraph of the binding doc
->>> as the patch description, or more.
->>>
->>>> diff --git a/Documentation/devicetree/bindings/gpu/brcm,bcm-vc4.txt b/Documentation/devicetree/bindings/gpu/brcm,bcm-vc4.txt
->>
->>>> +- hvss:             List of references to HVS video scalers
->>>> +- encoders: List of references to output encoders (HDMI, SDTV)
->>>
->>> Would it make sense to make all those nodes child node of the vc4
->>> object. That way, there's no need to have these lists of objects; they
->>> can be automatically built up as the DT is enumerated. I know that e.g.
->>> the NVIDIA Tegra host1x binding works this way, and I think it may have
->>> been inspired by other similar cases.
->>
->> I've looked at tegra, and the component system used by msm appears to be
->> nicer than it.  To follow tegra's model, it looks like I need to build
->> this extra bus thing corresponding to host1x that is effectively the
->> drivers/base/component.c code, so that I can get at vc4's structure from
->> the component drivers.
->>
->>> Of course, this is only appropriate if the HW modules really are
->>> logically children of the VC4 HW module. Perhaps they aren't. If they
->>> aren't though, I wonder what this "vc4" module actually represents in HW?
->>
->> It's the subsystem, same as we use a subsystem node for msm, sti,
->> rockchip, imx, and exynos.  This appears to be the common model of how
->> the collection of graphics-related components is represented in the DT.
->
-> I think most of these bindings are wrong. They are grouped together
-> because that is what DRM wants not because that reflects the h/w. So
-> convince me this is one block, not that it is what other people do.
-
-I think, when it comes to more complex driver subsystems (like drm in
-particular) we have a bit of mismatch between how things look from the
-"pure hw ignoring sw" perspective, and the "how sw and in particular
-userspace expects things" perspective.  Maybe it is less a problem in
-other subsystems, where bindings map to things that are only visible
-in the kernel, or well defined devices like uart or sata controller.
-But when given the choice, I'm going to err on the side of not
-confusing userspace and the large software stack that sits above
-drm/kms, over dt purity.
-
-Maybe it would be nice to have a sort of dt overlay that adds the bits
-needed to tie together hw blocks that should be assembled into a
-single logical device for linux and userspace (but maybe not some
-other hypothetical operating system).  But so far that doesn't exist.
-All we have is a hammer (devicetree), everything looks like a nail.
-End result is we end up adding some things in the bindings which
-aren't purely about the hw.  Until someone invents a screwdriver, I'm
-not sure what else to do.  In the end, other hypothetical OS is free
-to ignore those extra fields in the bindings if it doesn't need them.
-So meh?
-
-BR,
--R
 
 
-> Rob
->
-> _______________________________________________
-> linux-arm-kernel mailing list
+> -----Original Message-----
+> From: Thomas Gleixner [mailto:tglx at linutronix.de]
+> Sent: 2015?8?25? 15:16
+> To: Wang Shenwei-B38339
+> Cc: Sudeep Holla; shawn.guo at linaro.org; jason at lakedaemon.net; Huang
+> Yongcai-B20788; linux-kernel at vger.kernel.org;
 > linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Subject: RE: [PATCH v9 1/1] irqchip: imx-gpcv2: IMX GPCv2 driver for wakeup
+> sources
+> 
+> On Tue, 25 Aug 2015, Shenwei Wang wrote:
+> > > From: Thomas Gleixner [mailto:tglx at linutronix.de]
+> > > > IRQCHIP_MASK_ON_SUSPEND flag is for the hardware that has no
+> > > > wakeup source capability.  This GPCv2 block is designed to manage
+> > > > the wakeup source, so the flag does not make any sense.
+> > >
+> > > You have no seperate wakeup source mechanism. All you do is to mask
+> > > all non wakeup sources and keep the wakeup sources unmask.
+> > >
+> > > That's what happens in gpcv2_wakeup_source_save()
+> > >
+> > >        writel_relaxed(cd->wakeup_sources[i], reg);
+> > >
+> > > So it's the same as letting the core mask all non wakeup sources and
+> > > leave the wakeup sources unmask.
+> >
+> > Does it mean an unexpected interrupt may activate the system, and the
+> > core will let the system go into suspend again if the core determines
+> > it not a wakeup source? The current design is to ignore all the
+> > unexpected interrupts in the hardware level. Only the presetting
+> > wakeup sources can activate the platform. Here power consumption is
+> > more important.
+> 
+> Did you actually read, what I wrote?
+> 
+> The core does in case of MASK_ON_SUSPEND
+> 
+>     for_each_irq() {
+> 	if (!irq->wakeupsource)
+> 	   mask(irq)
+>     }
+> 
+> That's identical to what you are doing. You just do it differently by saving the
+> active wakeup sources in your own data structure and then write that info to the
+> mask register, which leaves only the wakeup sources unmasked.
+
+Sorry. I just took a study on the two flags: MASK_ON_SUSPEND and IRQCHIP_SKIP_SET_WAKE.
+MASK_ON_SUSPEND flag does simply the implementation. 
+IRQCHIP_SKIP_SET_WAKE flag can't be used here because the wakeup sources are required for power management.
+I will send out a subsequent patch to simply the implementation by using this idea.
+
+Thank you Sudeep for the insightful review!
+
+Thanks,
+Shenwei
+
+
+
+> Thanks,
+> 
+> 	tglx
