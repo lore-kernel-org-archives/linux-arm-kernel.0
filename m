@@ -1,57 +1,55 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 25 Aug 2015 09:15:56 +0100
-Subject: Prevent list poison values from being mapped by userspace
- processes
-In-Reply-To: <55DB16AF.7090607@freebox.fr>
-References: <CABXk95C=CpeL4mNmS6-jJ-0bMJf6fawwfs6DM1-p8FctTEFbpw@mail.gmail.com>
- <20150821133043.GV7557@n2100.arm.linux.org.uk>
- <55DB16AF.7090607@freebox.fr>
-Message-ID: <20150825081556.GL7557@n2100.arm.linux.org.uk>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Tue, 25 Aug 2015 09:17:32 +0100
+Subject: Tegra baseline test results for v4.2-rc8
+Message-ID: <55DC249C.5070808@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 24, 2015 at 03:05:51PM +0200, Nicolas Schichan wrote:
-> I gave your patch serie a try on ARMv5/kirkwood (backported on a v4.1 kernel)
-> and at first I got the following panic just after the kernel transitioned
-> to userland (with CONFIG_CPU_SW_DOMAIN_PAN=y):
+Here are some basic Tegra test results for Linux v4.2-rc8.
+Logs and other details at:
 
-Ah, damn.  Thanks for testing.  I really need to add some non-ARMv7
-platforms to my nightly test rig, but I'm out of physical space to
-do that. :p
+    https://nvtb.github.io//linux/test_v4.2-rc8/20150823213103/
 
-> I have tracked this to the attempt made by the code in
-> arch/arm/mm/abort-ev5t.S to read the fault instruction which in this
-> case is in unserspace:
-> 
-> 	ldreq	r3, [r4]			@ read aborted ARM instruction
 
-There's going to be many more of these... it may be better if I left
-the domain enabled when calling into these handlers, and had every
-handler do the turn-off itself when it's ready to do so - there's
-no point turning off userspace access only to then immediately
-re-enable it.
+Test summary
+------------
 
-> With the changes above, userland boots fine and attempts to
-> dereference LIST_POISON1 from the kernel results the expected "page
-> domain fault".
-> 
-> To test that I mapped LIST_POISON1 from user space via mmap() and
-> triggered the fault by reading from /proc/cpu/alignment. I modified the
-> code showing /proc/cpu/alignment to access LIST_POISON1. Without your
-> patch serie the access to LIST_POISON1 goes through without a hitch.
+Build: zImage:
+    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
 
-Great, thanks for the independent testing of its effectiveness.
+Build: Image:
+    Pass: ( 1/ 1): defconfig
 
-> Also, when CONFIG_CPU_SW_DOMAIN_PAN is not set, the DACR_INIT constant is
-> setup with (domain_val(DOMAIN_USER, DOMAIN_NOACCESS) which will cause the
-> kernel to die with a "page domain fault" when running init.
+Boot to userspace: defconfig:
+    Pass: ( 1/ 1): qemu-vexpress64
 
-If you don't mind, I'll merge that into the patch adding this so it
-doesn't introduce a regression there.
+Boot to userspace: multi_v7_defconfig:
+    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice, tegra30-beaver
 
-Once I've fixed the abort handler issue, would you mind re-testing
-and giving a tested-by attributation please?
+Boot to userspace: tegra_defconfig:
+    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice, tegra30-beaver
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+
+vmlinux object size
+(delta in bytes from test_v4.2-rc7 (2c6625cd545bdd66acff14f3394865d43920a5c7)):
+   text     data      bss    total  kernel
+     -3        0        0       -3  defconfig
+   text     data      bss    total  kernel
+  -1151        0        0    -1151  multi_v7_defconfig
+ -14778      -64        0   -14842  tegra_defconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v4.2-rc7 (2c6625cd545bdd66acff14f3394865d43920a5c7))
+    avail    rsrvd     high    freed                board              kconfig                  dtb
+        .        .        .        .      qemu-vexpress64            defconfig           __internal
+        .        .        .       4k tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
+      16k     -16k        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
+        .        .        .       4k  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
+      16k     -16k        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
+        .        .        .       4k    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
+      16k     -16k        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
+        .        .        .       4k       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+      16k     -16k        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
