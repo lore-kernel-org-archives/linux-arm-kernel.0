@@ -1,60 +1,29 @@
-From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Tue, 25 Aug 2015 16:26:16 +0530
-Subject: [PATCH-v2 1/5] mfd: 88pm800: Fix tabbing issue
-In-Reply-To: <20150825103546.GQ19409@x1>
-References: <1440442594-3102-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1440442594-3102-3-git-send-email-vaibhav.hiremath@linaro.org>
- <20150825075246.GF19409@x1> <55DC2C4D.1040304@linaro.org>
- <20150825103546.GQ19409@x1>
-Message-ID: <55DC49D0.1030608@linaro.org>
+From: p.fedin@samsung.com (Pavel Fedin)
+Date: Tue, 25 Aug 2015 14:01:22 +0300
+Subject: [PATCH 2/5] gic-its: Allow pci_requester_id to be overridden.
+In-Reply-To: <55D5F0E1.30702@caviumnetworks.com>
+References: <1436979285-8177-1-git-send-email-ddaney.cavm@gmail.com>
+ <1436979285-8177-3-git-send-email-ddaney.cavm@gmail.com>
+ <01a101d0db52$2d23b360$876b1a20$@samsung.com>
+ <55D5F0E1.30702@caviumnetworks.com>
+Message-ID: <012a01d0df25$61515ad0$23f41070$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+ Hello!
 
+> >   What if instead of this function we simply add a field to a struct pci_bus ? Then bus driver
+would
+> > fill in HW-specific ID bits for every bus.
+> >   I can send a patch if interested.
+> 
+> There is a lot of work being done in the upstream to extract the proper
+> information from the device tree.  We are going to piggyback on that for
+> the next versions of the patch.
 
-On Tuesday 25 August 2015 04:05 PM, Lee Jones wrote:
-> On Tue, 25 Aug 2015, Vaibhav Hiremath wrote:
->
->>
->>
->> On Tuesday 25 August 2015 01:22 PM, Lee Jones wrote:
->>> On Tue, 25 Aug 2015, Vaibhav Hiremath wrote:
->>>
->>>> Driver had coding style issues where spaces were used instead
->>>> of tabs. This patch fixes them all.
->>>>
->>>> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
->>>> ---
->>>>   drivers/mfd/88pm800.c | 125 ++++++++++++++++++++++++--------------------------
->>>>   1 file changed, 61 insertions(+), 64 deletions(-)
->>>
->>> Same comment as before.
->>>
->>> How similar is this file to the other one?
->>
->> I believe you are referring to include/linux/mfd/88pm80x.h
->>
->>>
->>> Can you reduce the size by having shared register defines?
->>>
->>
->> Not sure whether I understand your comment here,
->> They are common defines.
->
-> I guess the question was a little convoluted.
->
-> How about; why are the extra defines in the driver?  Why aren't all of
-> them in the header file?  What is the difference between the defines
-> in the C file compared with the ones defined in the header?
->
+ Where can i take a look at the code?
 
-
-I do not see any difference and need of having defines separately in C
-file.
-That's the cleanup I was referring to in another email.
-
-I will walk through the whole driver code and try to cleanup all such
-coding related issues. Probably expect separate series here.
-
-Thanks,
-Vaibhav
+Kind regards,
+Pavel Fedin
+Expert Engineer
+Samsung Electronics Research center Russia
