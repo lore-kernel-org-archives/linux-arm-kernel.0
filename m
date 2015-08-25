@@ -1,172 +1,99 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 25 Aug 2015 11:22:36 -0500
-Subject: [PATCH] arm: rpi: Device tree modifications for U-Boot
-In-Reply-To: <CAPnjgZ3ubK_5j4AV4wO6xgoRf8iN+G8YSQm0pSW5fVzwpxYu5Q@mail.gmail.com>
-References: <1439303153-12171-1-git-send-email-sjg@chromium.org>
- <1439312701.2451.3.camel@lynxeye.de>
- <CAPnjgZ3ztXnkxZJvitiXiKMzq5+x46hbv0PW4HcF7yGgsXUV+Q@mail.gmail.com>
- <CAPnjgZ0hzyjy=8o8ocaGCoOC7Js4CirhystidbvtabzbhRi4RQ@mail.gmail.com>
- <CAL_Jsq++ihz6svJAKWwT7-=KyJvyWXjdf=tZb4aDGgV_Dc=-Nw@mail.gmail.com>
- <CAPnjgZ3ubK_5j4AV4wO6xgoRf8iN+G8YSQm0pSW5fVzwpxYu5Q@mail.gmail.com>
-Message-ID: <CAL_JsqJ-N+nFEMEEmg4O45DVF0g382fUvjGTH=fP_HbgK38aKw@mail.gmail.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 25 Aug 2015 17:24:26 +0100
+Subject: [PATCH v9 1/1] irqchip: imx-gpcv2: IMX GPCv2 driver for wakeup
+ sources
+In-Reply-To: <CY1PR0301MB08433A2659C75028821F0AE783610@CY1PR0301MB0843.namprd03.prod.outlook.com>
+References: <1440443055-7291-1-git-send-email-shenwei.wang@freescale.com>
+ <55DC3452.3070205@arm.com>
+ <CY1PR0301MB08439B6C5F841AFFD152DFD883610@CY1PR0301MB0843.namprd03.prod.outlook.com>
+ <55DC738D.8000302@arm.com>
+ <CY1PR0301MB0843AE566996617D855CC00683610@CY1PR0301MB0843.namprd03.prod.outlook.com>
+ <55DC7FA4.7040902@arm.com>
+ <CY1PR0301MB08433A2659C75028821F0AE783610@CY1PR0301MB0843.namprd03.prod.outlook.com>
+Message-ID: <55DC96BA.2020905@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 15, 2015 at 8:46 AM, Simon Glass <sjg@chromium.org> wrote:
-> Hi Rob,
+
+
+On 25/08/15 15:54, Shenwei Wang wrote:
 >
-> On 14 August 2015 at 14:29, Rob Herring <robherring2@gmail.com> wrote:
->> On Fri, Aug 14, 2015 at 1:34 PM, Simon Glass <sjg@chromium.org> wrote:
->>> -linux-tegra
+>
+>> -----Original Message-----
+>> From: Sudeep Holla [mailto:sudeep.holla at arm.com]
+>> Sent: 2015?8?25? 9:46
+>> To: Wang Shenwei-B38339
+>> Cc: Sudeep Holla; shawn.guo at linaro.org; tglx at linutronix.de;
+>> jason at lakedaemon.net; Huang Yongcai-B20788; linux-kernel at vger.kernel.org;
+>> linux-arm-kernel at lists.infradead.org
+>> Subject: Re: [PATCH v9 1/1] irqchip: imx-gpcv2: IMX GPCv2 driver for wakeup
+>> sources
+>>
+>>
+>>
+>> On 25/08/15 15:14, Shenwei Wang wrote:
 >>>
->>> Hi,
 >>>
->>> On 12 August 2015 at 07:21, Simon Glass <sjg@chromium.org> wrote:
->>>> Hi Lucas,
->>>>
->>>> On 11 August 2015 at 11:05, Lucas Stach <dev@lynxeye.de> wrote:
->>>>> Hi Simon,
->>>>>
->>>>> why did you send this to the Tegra ML?
->>>>>
->>>>> Am Dienstag, den 11.08.2015, 08:25 -0600 schrieb Simon Glass:
->>>>>> This updates the device tree from the kernel version to something suitable
->>>>>> for U-Boot:
->>>>>>
->>>>>> - Add stdout-path alias for console
->>>>>> - Mark the /soc node to be available pre-relocation so that the early
->>>>>> serial console works (we need the 'ranges' property to be available)
+>>>> -----Original Message-----
+>>>> From: Sudeep Holla [mailto:sudeep.holla at arm.com]
 >>
->> I find it quite strange that you must explicitly enable the parent
->> node, but not the uart node.
->
-> U-Boot tries hard to find and bind the UART using the stdout-path
-> link. I would like to add it in the UART node also but we were able to
-> work around it so far.
->
+>> [...]
 >>
->>>>>>
->>>>>> Signed-off-by: Simon Glass <sjg@chromium.org>
->>>>>> ---
->>>>>>
->>>>>>  arch/arm/boot/dts/bcm2835.dtsi | 4 +++-
->>>>>>  1 file changed, 3 insertions(+), 1 deletion(-)
->>>>>>
->>>>>> diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
->>>>>> index 301c73f..bd6bff6 100644
->>>>>> --- a/arch/arm/boot/dts/bcm2835.dtsi
->>>>>> +++ b/arch/arm/boot/dts/bcm2835.dtsi
->>>>>> @@ -8,6 +8,7 @@
->>>>>>
->>>>>>       chosen {
->>>>>>               bootargs = "earlyprintk console=ttyAMA0";
->>>>>> +             stdout-path = &uart;
->>>>>>       };
->>>>>>
->>>>>>       soc {
->>>>>> @@ -16,6 +17,7 @@
->>>>>>               #size-cells = <1>;
->>>>>>               ranges = <0x7e000000 0x20000000 0x02000000>;
->>>>>>               dma-ranges = <0x40000000 0x00000000 0x20000000>;
->>>>>> +             u-boot,dm-pre-reloc;
->>>>>
->>>>> Why do you need this and why should upstream carry your favourite
->>>>> bootloaders configuration? This is in no way hardware description.
->>>>
->>>> I'm not sure how much you know about U-Boot, so let me know if you
->>>> need more info.
->>>>
->>>> U-Boot normally starts up by setting up its serial UART and displaying
->>>> a banner message. At this stage typically only a few devices are
->>>> initialised (e.g. maybe just the UART). It then relocates itself to
->>>> the top of memory and starts up all the devices. It throws away any
->>>> previous devices that it set up before relocation and starts again.
->>>>
->>>> U-Boot uses a thing called driver model (dm) which handles driver
->>>> binding and probing. Driver model has the device tree and would
->>>> normally scan through it and create devices for everything it finds.
+>>>> I don't see this driver doing anything extra apart from keeping
+>>>> the wakeup irqs enabled. i.e. You use the same cpu*wake
+>>>> register to mask/unmask the interrupt as well as set the wakeup
+>>>> source. Since the wakeup interrupt will be enabled by the
+>>>> driver, you just need to mark it as wake-up source and nothing
+>>>> extra in the controller right ? If so, you need to set
+>>>> IRQCHIP_SKIP_SET_WAKE as you are just leaving that irq enabled
+>>>> and not doing any extra configuration to enable it  as wakeup source.
+>>>> Please correct if that wrong, but from the code that's what I
+>>>> couldinfer.
+>>>
+>>> There is no special for this driver. We just use the IRQCHIP
+>>> driver framework to manage the wakeup sources. Why did you
+>>> propose to set IRQCHIP_SKIP_SET_WAKE flag here? If you don't need
+>>> the wakeup feature, you should just not enable this driver in the
+>>> configuration.
+>>>
 >>
->> How do you debug the DM itself? It seems like you still would need
->> something earlier for debug like earlycon in the kernel. u-boot DM is
->> probably simple enough you can get away with using it early, but you
->> often can't as the complexity increases. Ultimately you need something
->> simple that just hits all the registers needed to get characters out.
->> What happens when you add pinmux, clocks, PMIC, power domains, etc. to
->> the DM and they all become dependencies for the UART?
->
-> This doesn't seem like a device tree binding question but let me try
-> to answer it.
->
-> This is a problem - one of the challenges of driver model is that the
-> UART gets further away from the reset vector.
-
-This is a common problem for any complex embedded system. Nothing
-special about u-boot here. So either we don't need anything because
-everyone else has dealt with the problem in some way or we need a
-common solution because we all have this problem.
-
-> In U-Boot there is a single debug UART which can be supported by the
-> various serial drivers (only one can be selected on each platform).
-> There is a special debug_uart_init() function which is supposed to set
-> up the UART for that platform. After that, and until driver model UART
-> is up, console output can go through the debug UART.
-
-So you don't need this for the common case of an early console, but
-only for platforms needing some other platform specific setup?
-
->>>> Before relocation we don't need every device. Also the CPU is often
->>>> running slowly, perhaps without the cache enabled. SDRAM may not be
->>>> available yet so space is short. We want to avoid starting up things
->>>> that will not be used.
->>>>
->>>> So this property indicates that the device is needed before relocation
->>>> and should be set up by driver model. We need it to avoid a very slow
->>>> and memory-hungry startup.
+>> No, if the driver doesn't nothing extra to configure the wake up
+>> source other than  keeping it enabled, then it fits the case of
+>> SKIP_SET_WAKE. The driver using this wake would have requested
+>> and enabled the irq. When it calls enable_irq_wake, you have
+>> nothing extra to set(atleast  from the looks of the driver), so
+>> setting SKIP_SET_WAKE will skip the call and  updated the wake
+>> flags in irq core.
 >>
->> Can't the need for that property change over time? Either as more
->> drivers are converted to DM you need to add this or you add some
->> feature that depends on a driver (e.g. get a board rev or boot mode
->> from GPIO). You would have backwards compatibility issues with this.
->> I'm somewhat less worried about that for u-boot as we should be
->> bundling the dtb and bootloader rather than kernel and dtb. For the
->> UART, you can just get which UART to initialize early from
->> stdout-path. But for other cases, couldn't you just have the platform
->> provide the list of needed drivers. Then when u-boot needs change, you
->> just change u-boot.
+>> I don't see the real need of 2 separate sets of irq mask being
+>> saved  in either case.
 >
-> Yes U-Boot and its device tree are normally built from the same tree
-> at the same time. We don't expect to have to support an older or newer
-> device tree with the same U-Boot binary. So I don't see a problem
-> here.
-
-My point is that if I had to pick how bootloader+dtb+kernel are
-bundled or not, I would rather see the dtb in sync with the bootloader
-rather than the kernel. But I can't decide that for everyone and
-neither can you. You still have a compatibility problem and that has
-to be addressed.
-
-> The UART should have as few dependencies as possible. But if the
-> particular platform needs to check a GPIO to find out the UART number
-> (i.e. stdout-path cannot be used) then we would need to support that
-> case. It hasn't come up yet but it might. I certainly see platforms
-> where we need some other nodes before relocation and would like to
-> mark them as such. But I hope that for UART we can generally use
-> stdout-path.
+> You don't really understand what happens after a driver calls
+> enable_irq_wake. In suspend state, even the interrupt
+> controller itself is powered off. How can you get the system up
+> again  by just using a SKIP_SET_WAKE.
 >
-> The list of drivers doesn't help that much. What would I do with such
-> a list, and where would I keep such platform-specific information
-> other than in the device tree? It seems much simpler to hold the
-> information about what the platform needs to get through early boot in
-> one place. Then we have just a few lines of generic code to deal with
-> it.
 
-If you need certain drivers such as gpio, then you obviously have some
-board specific code using those drivers already. If you can tell the
-DM which devices to enumerate via DT, you can also tell the DM with C
-code.
+Sorry for that, let me try to understand aloud. So you have
+irq_{un,}mask function that are called when interrupts are enabled and
+disabled. So suppose you have 3 irqs that are enabled and only one of
+then is set as wakeup source.
 
-While doing everything generically without board code is nice, we
-should only do that for the common cases and handle the screwy cases
-with board code.
+Now you call enable_irq_wake, you save that in wakeup_sources, fine.
+Later when you enter suspend, you save all the 3 active irqs in
+saved_irq_mask and over-write cpu2wakeup with wakeup_sources, right?
 
-Rob
+All fine, what I am saying is let irq-core know that you want to mask
+the 2 non-wakeup irqs you have using MASK_ON_SUSPEND. So when
+suspend_device_irqs is called in suspend path, that's done for you
+automatically and the cpu2wakeup will have just 1 wakeup enabled which
+is what you are doing in suspend callback, right ?
+
+Now that it's already done for you, you need not do anything extra and
+hence just set SKIP_SET_WAKE to do nothing.
+
+Hope this clarifies, sorry if I am still missing to understand something
+here, but I don't see anything. Let me know.
+
+Regards,
+Sudeep
