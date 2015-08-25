@@ -1,30 +1,23 @@
-From: vishalm@ti.com (Vishal Mahaveer)
-Date: Tue, 25 Aug 2015 16:50:50 -0500
-Subject: [PATCH] ARM: dts: DRA7: fix a typo in ethernet
-Message-ID: <1440539450-8393-1-git-send-email-vishalm@ti.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 25 Aug 2015 23:51:50 +0200 (CEST)
+Subject: [PATCH] drivers: i2c: exynos5: irq spinlock rt-safe
+In-Reply-To: <1440489125-20082-1-git-send-email-anders.roxell@linaro.org>
+References: <1440489125-20082-1-git-send-email-anders.roxell@linaro.org>
+Message-ID: <alpine.DEB.2.11.1508252349070.15006@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Register address in name of the node is wrong
+On Tue, 25 Aug 2015, Anders Roxell wrote:
 
-Signed-off-by: Vishal Mahaveer <vishalm@ti.com>
-Acked-by: Mugunthan V N <mugunthanvnm@ti.com>
----
- arch/arm/boot/dts/dra7.dtsi |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+> The exynos5_i2c_message_start enables interrupts while holding the i2c
+> lock which is sought by the irq handler. If an IRQ is received before
+> this lock is released then a deadlock occurs.
 
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index 1e29ccf..9a20d46 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -1398,7 +1398,7 @@
- 			ti,irqs-safe-map = <0>;
- 		};
+That's crap. The interrupt handler runs in an irq thread as RT forces
+all normal interrupts to that.
+
+Thanks,
+
+	tglx
+
  
--		mac: ethernet at 4a100000 {
-+		mac: ethernet at 48484000 {
- 			compatible = "ti,cpsw";
- 			ti,hwmods = "gmac";
- 			clocks = <&dpll_gmac_ck>, <&gmac_gmii_ref_clk_div>;
--- 
-1.7.4.1
