@@ -1,55 +1,65 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 25 Aug 2015 10:50:00 +0900
-Subject: [PATCH 0/3] ARM: uniphier: add outer cache support and rework SMP
- operations
-In-Reply-To: <CAOesGMgL3bNH_wG3igSJhNOkV0uUfNWEi0t-Gny2A1oNnGKu=w@mail.gmail.com>
-References: <1440382692-3855-1-git-send-email-yamada.masahiro@socionext.com>
- <CAOesGMgL3bNH_wG3igSJhNOkV0uUfNWEi0t-Gny2A1oNnGKu=w@mail.gmail.com>
-Message-ID: <CAK7LNAQk4aEgZV3y90zBVMeq=jA45v683sCR1e5BBYtg5AcDOA@mail.gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 25 Aug 2015 10:53:08 +0900
+Subject: [PATCH v2 4/7] ARM: EXYNOS: Remove SROM related register settings
+ from mach-exynos
+In-Reply-To: <1440403348-8974-5-git-send-email-pankaj.dubey@samsung.com>
+References: <1440403348-8974-1-git-send-email-pankaj.dubey@samsung.com>
+ <1440403348-8974-5-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <55DBCA84.2070506@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+On 24.08.2015 17:02, Pankaj Dubey wrote:
+> As now we have dedicated driver for SROM controller, it will take care
+> of saving register banks during S2R so we can safely remove these
+> settings from mach-exynos.
+> 
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> ---
+>  arch/arm/mach-exynos/Kconfig                 |  2 ++
+>  arch/arm/mach-exynos/common.h                |  2 --
+>  arch/arm/mach-exynos/exynos.c                | 17 ---------
+>  arch/arm/mach-exynos/include/mach/map.h      |  3 --
+>  arch/arm/mach-exynos/regs-srom.h             | 53 ----------------------------
+>  arch/arm/mach-exynos/suspend.c               | 20 ++---------
+>  arch/arm/plat-samsung/include/plat/map-s5p.h |  1 -
+>  7 files changed, 4 insertions(+), 94 deletions(-)
+>  delete mode 100644 arch/arm/mach-exynos/regs-srom.h
 
+The order of patches looks wrong. Is this fully bisectable? You are
+removing here support for SROM but DTS bindings are not added yet.
 
-2015-08-25 6:47 GMT+09:00 Olof Johansson <olof@lixom.net>:
-> Hi,
->
-> On Sun, Aug 23, 2015 at 7:18 PM, Masahiro Yamada
-> <yamada.masahiro@socionext.com> wrote:
->> 1/3: add outer cache support
->> 2/3: rework SMP operations
->> 3/3: add device tree nodes
->
-> Timing of this is unfortunate, please resend after 4.3-rc1 is out and
-> we can queue it up.
+> 
+> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+> index 3a10f1a..7c917ef 100644
+> --- a/arch/arm/mach-exynos/Kconfig
+> +++ b/arch/arm/mach-exynos/Kconfig
+> @@ -27,6 +27,8 @@ menuconfig ARCH_EXYNOS
+>  	select SRAM
+>  	select THERMAL
+>  	select MFD_SYSCON
+> +	select SOC_SAMSUNG
+> +	select EXYNOS_SROM
+>  	help
+>  	  Support for SAMSUNG EXYNOS SoCs (EXYNOS4/5)
+>  
+> diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
+> index 1534925..1c04741 100644
+> --- a/arch/arm/mach-exynos/common.h
+> +++ b/arch/arm/mach-exynos/common.h
+> @@ -108,8 +108,6 @@ IS_SAMSUNG_CPU(exynos5800, EXYNOS5800_SOC_ID, EXYNOS5_SOC_MASK)
+>  
+>  #define soc_is_exynos4() (soc_is_exynos4210() || soc_is_exynos4212() || \
+>  			  soc_is_exynos4412())
+> -#define soc_is_exynos5() (soc_is_exynos5250() || soc_is_exynos5410() || \
+> -			  soc_is_exynos5420() || soc_is_exynos5800())
 
-Given that rc8 is out and the merge window has been delayed,
-is it still too late for 4.3-rc1?
+That wasn't here in v1. I see that it is not used any more and
+of_machine_is_compatible is preferred but I would prefer to leave it. In
+certain cases you cannot use of_machine_is_compatible (e.g. in
+platform_do_lowpower).
 
+Rest looks good.
 
-
->> Because 2/3 highly depends on 1/3, I hope whole of this series
->> is applied to ARM-SOC tree.
->
-> Review or acked-by from Russell would be appreciated in that case.
->
->> Olof,
->> From this series, I am using "ARM: uniphier:" rather than "ARM: UniPhier:"
->> for the subject prefixes because I noticed you often rephased so when you
->> applied my patches.
->> Are sub-arch names in lower cases preferable in subject prefixes?
->
-> If you look at "git log --no-merges --oneline arch/arm/mach-*" you'll
-> see that most platforms use either all-caps or all-lowercase.
-
-I see.
-
-But, we use "UniPhier" (with only U and P capitalized) in our official
-documents.
-
-
-
--- 
-Best Regards
-Masahiro Yamada
+Best regards,
+Krzysztof
