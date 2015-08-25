@@ -1,53 +1,60 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 25 Aug 2015 12:17:20 +0100
-Subject: [PATCH v1 1/3] dt-bindings: mailbox: Document Hi6220 mailbox
- driver
-In-Reply-To: <1439977055-1747-2-git-send-email-leo.yan@linaro.org>
-References: <1439977055-1747-1-git-send-email-leo.yan@linaro.org>
- <1439977055-1747-2-git-send-email-leo.yan@linaro.org>
-Message-ID: <55DC4EC0.4060301@arm.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 25 Aug 2015 13:21:04 +0200
+Subject: [PATCH 9/9] ARM: software-based priviledged-no-access support
+In-Reply-To: <20150825104422.GO7557@n2100.arm.linux.org.uk>
+References: <20150821133043.GV7557@n2100.arm.linux.org.uk>
+ <E1ZSmQG-0002za-E3@rmk-PC.arm.linux.org.uk>
+ <CAMuHMdVMka2mt5pFpnXfLRY2M3Sj_71MgEpthOia2C99RaP_DA@mail.gmail.com>
+ <20150825104422.GO7557@n2100.arm.linux.org.uk>
+Message-ID: <CAMuHMdWCLcDS=64m0J09KJJ4bDtgZ1Yvq8rw7u9FE0vZkKT2cw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Russell,
 
-
-On 19/08/15 10:37, Leo Yan wrote:
-> Document the new compatible for Hisilicon Hi6220 mailbox driver.
+On Tue, Aug 25, 2015 at 12:44 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Aug 25, 2015 at 12:32:51PM +0200, Geert Uytterhoeven wrote:
+>> This patch, which is now in arm-soc/for-next, breaks shmobile_defconfig
+>> on r8a7791/koelsch, which has a dual core CA15:
+>>
+>>     [ ok ] Configuring network interfaces...done.
+>>     Unhandled fault: page domain fault (0x01b) at 0xbe8e6120
+>>     pgd = edbb0000
+>>     [be8e6120] *pgd=6da77831, *pte=bf4d075f, *ppte=bf4d0c7f
+>>     Internal error: : 1b [#1] SMP ARM
+>>     CPU: 1 PID: 1629 Comm: ntpdate Not tainted
+>> 4.2.0-rc8-06444-g3c24fd89c9421db1 #31
+>>     9
+>>     Hardware name: Generic R8A7791 (Flattened Device Tree)
+>>     task: ed883a80 ti: ed41c000 task.ti: ed41c000
+>>     PC is at csum_partial_copy_from_user+0x28/0x3d8
+>>     LR is at csum_and_copy_from_iter+0x334/0x4c0
+>>     pc : [<c04ba510>]    lr : [<c01c82e8>]    psr: 000f0013
+>>     sp : ed41db00  ip : 00000020  fp : ed41db6c
+>>     r10: ed41ddc0  r9 : 00000027  r8 : ed41dc20
+>>     r7 : 00000027  r6 : eda52653  r5 : ed41dec8  r4 : 00000000
+>>     r3 : 00000000  r2 : 00000027  r1 : eda5262c  r0 : be8e6120
+>>     Flags: nzcv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment none
+>>     Control: 10c5307d  Table: 6dbb006a  DAC: 00000051
+>>     Process ntpdate (pid: 1629, stack limit = 0xed41c210)
 >
-> Signed-off-by: Leo Yan <leo.yan@linaro.org>
-> ---
->   .../bindings/mailbox/hisilicon,hi6220-mailbox.txt  | 57 ++++++++++++++++++++++
->   1 file changed, 57 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/mailbox/hisilicon,hi6220-mailbox.txt
->
-> diff --git a/Documentation/devicetree/bindings/mailbox/hisilicon,hi6220-mailbox.txt b/Documentation/devicetree/bindings/mailbox/hisilicon,hi6220-mailbox.txt
-> new file mode 100644
-> index 0000000..3dfb0b0
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mailbox/hisilicon,hi6220-mailbox.txt
-> @@ -0,0 +1,57 @@
-> +Hisilicon Hi6220 Mailbox Driver
-> +===============================
-> +
-> +Hisilicon Hi6220 mailbox supports up to 32 channels. Each channel
-> +is unidirectional with a maximum message size of 8 words. I/O is
-> +performed using register access (there is no DMA) and the cell
-> +raises an interrupt when messages are received.
-> +
-> +Mailbox Device Node:
-> +====================
-> +
-> +Required properties:
-> +--------------------
-> +- compatible:		Shall be "hisilicon,hi6220-mbox"
-> +- reg:			Contains the mailbox register address range (base
-> +			address and length); the first item is for IPC
-> +			registers, the second item is shared buffer for
-> +			slots.
+> Thanks.  I wonder what's different about your ntpdate that triggers
+> this, and why all my iMX6 behave fine, which have desktop-like ubuntu
+> installs on (of two different versions.)
 
-Not sure if the shared buffer needs to be part of the controller binding
-as it's not related to it. It's just agreement between the endpoints of
-this mailbox on particular SoC and IMO has to part of the client binding.
+It's ntpdate 1:4.2.6.p5+dfsg-7 from desktop-like Debian jessie.
 
-Regards,
-Sudeep
+But I get similar dumps during boot up from rpc.idmapd (SyS_send),
+rsyslogd (SyS_send), and from sshd (SyS_write) when trying to log in.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
