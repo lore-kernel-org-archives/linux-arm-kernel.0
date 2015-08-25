@@ -1,73 +1,32 @@
-From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Tue, 25 Aug 2015 21:21:11 +0800
-Subject: [PATCH V2] clockevents/drivers/mtk: Fix spurious interrupt
- leading to crash
-In-Reply-To: <1440453450-21203-1-git-send-email-daniel.lezcano@linaro.org>
-References: <1440426924.17418.11.camel@mtksdaap41>
- <1440453450-21203-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1440508871.29634.1.camel@mtksdaap41>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 25 Aug 2015 08:27:10 -0500
+Subject: [PATCH v3 06/14] Documentation: drm/bridge: add document for
+ analogix_dp
+In-Reply-To: <20150825091534.GB14034@ulmo.nvidia.com>
+References: <1439995728-18046-1-git-send-email-ykk@rock-chips.com>
+ <1439995834-18363-1-git-send-email-ykk@rock-chips.com>
+ <CAL_JsqLz+8RtBucctUj4euXZ3Ac0DvB52N9ONpAerh5T9BiTJg@mail.gmail.com>
+ <20150825091534.GB14034@ulmo.nvidia.com>
+Message-ID: <CAL_Jsq++RLZo4gvEUTKO8MfEPwSqT2R+bqG22Jsgb2qLgDQFpw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-08-24 at 23:57 +0200, Daniel Lezcano wrote:
-> After analysis done by Yingjoe Chen, the timer appears to have a pending
-> interrupt when it is enabled.
-> 
-> Fix this by acknowledging the pending interrupt when enabling the timer
-> interrupt.
-> 
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> ---
->  drivers/clocksource/mtk_timer.c | 16 ++++++----------
->  1 file changed, 6 insertions(+), 10 deletions(-)
-> 
-> diff --git a/drivers/clocksource/mtk_timer.c b/drivers/clocksource/mtk_timer.c
-> index 4cd16fb..505f53d 100644
-> --- a/drivers/clocksource/mtk_timer.c
-> +++ b/drivers/clocksource/mtk_timer.c
-> @@ -156,14 +156,6 @@ static irqreturn_t mtk_timer_interrupt(int irq, void *dev_id)
->  	return IRQ_HANDLED;
->  }
->  
-> -static void mtk_timer_global_reset(struct mtk_clock_event_device *evt)
-> -{
-> -	/* Disable all interrupts */
-> -	writel(0x0, evt->gpt_base + GPT_IRQ_EN_REG);
-> -	/* Acknowledge all interrupts */
-> -	writel(0x3f, evt->gpt_base + GPT_IRQ_ACK_REG);
-> -}
-> -
->  static void
->  mtk_timer_setup(struct mtk_clock_event_device *evt, u8 timer, u8 option)
->  {
-> @@ -183,6 +175,12 @@ static void mtk_timer_enable_irq(struct mtk_clock_event_device *evt, u8 timer)
->  {
->  	u32 val;
->  
-> +	/* Disable all interrupts */
-> +	writel(0x0, evt->gpt_base + GPT_IRQ_EN_REG);
-> +
-> +	/* Acknowledge all spurious pending interrupts */
-> +	writel(0x3f, evt->gpt_base + GPT_IRQ_ACK_REG);
-> +
->  	val = readl(evt->gpt_base + GPT_IRQ_EN_REG);
->  	writel(val | GPT_IRQ_ENABLE(timer),
->  			evt->gpt_base + GPT_IRQ_EN_REG);
-> @@ -232,8 +230,6 @@ static void __init mtk_timer_init(struct device_node *node)
->  	}
->  	rate = clk_get_rate(clk);
->  
-> -	mtk_timer_global_reset(evt);
-> -
->  	if (request_irq(evt->dev.irq, mtk_timer_interrupt,
->  			IRQF_TIMER | IRQF_IRQPOLL, "mtk_timer", evt)) {
->  		pr_warn("failed to setup irq %d\n", evt->dev.irq);
+On Tue, Aug 25, 2015 at 4:15 AM, Thierry Reding <treding@nvidia.com> wrote:
+> On Sun, Aug 23, 2015 at 06:23:14PM -0500, Rob Herring wrote:
+>> On Wed, Aug 19, 2015 at 9:50 AM, Yakir Yang <ykk@rock-chips.com> wrote:
+> [...]
+>> > +       -analogix,link-rate:
+>> > +               max link rate supported by the eDP controller.
+>> > +                       LINK_RATE_1_62GBPS = 0x6, LINK_RATE_2_70GBPS = 0x0A,
+>> > +                       LINK_RATE_5_40GBPS = 0x14
+>>
+>> Same here. I'd rather see something like "link-rate-mbps" and use the
+>> actual rate.
+>
+> There is no need whatsoever to hard-code this in DT. (e)DP provides the
+> means to detect what rate the link supports and the specification
+> provides guidance on how to select an appropriate one.
 
+Good, even better.
 
-Hi Daniel,
-
-
-Thanks for your patch, tested on mt8173
-Tested-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
-
-Joe.C
+Rob
