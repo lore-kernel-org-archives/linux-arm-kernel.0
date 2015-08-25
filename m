@@ -1,70 +1,26 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Tue, 25 Aug 2015 08:34:36 +0800
-Subject: [PATCH v2] clk: rockchip: reset init state before mmc card
- initialization
-Message-ID: <1440462876-5457-1-git-send-email-shawn.lin@rock-chips.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 25 Aug 2015 09:55:38 +0900
+Subject: [PATCH v2 1/7] ARM: EXYNOS: remove unused static mapping of CMU
+ for exynos5
+In-Reply-To: <1440403348-8974-2-git-send-email-pankaj.dubey@samsung.com>
+References: <1440403348-8974-1-git-send-email-pankaj.dubey@samsung.com>
+ <1440403348-8974-2-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <55DBBD0A.1020805@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mmc host controller's IO input/output timing is unpredictable if
-bootloader execute tuning for HS200 mode. It might make kernel failed
-to initialize mmc card in identification mode. The root cause is
-tuning phase and degree setting for HS200 mode in bootloader aren't
-applicable to that of identification mode in kernel stage. Anyway, we
-can't force all bootloaders to reset tuning phase and degree setting
-before into kernel. Simply reset it in rockchip_clk_register_mmc.
+On 24.08.2015 17:02, Pankaj Dubey wrote:
+> Remove unused static mapping of exynos5 CMU and related code.
+> 
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> ---
+>  arch/arm/mach-exynos/exynos.c           | 5 -----
+>  arch/arm/mach-exynos/include/mach/map.h | 1 -
+>  2 files changed, 6 deletions(-)
 
-Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
+Looks good:
 
----
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-Changes in v2:
-- rename to rockchip_clk_mmc_reset
-- simplifying the code
-
- drivers/clk/rockchip/clk-mmc-phase.c | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
-
-diff --git a/drivers/clk/rockchip/clk-mmc-phase.c b/drivers/clk/rockchip/clk-mmc-phase.c
-index e9f8df32..1d3e8fe6 100644
---- a/drivers/clk/rockchip/clk-mmc-phase.c
-+++ b/drivers/clk/rockchip/clk-mmc-phase.c
-@@ -38,6 +38,8 @@ static unsigned long rockchip_mmc_recalc(struct clk_hw *hw,
- #define ROCKCHIP_MMC_DEGREE_MASK 0x3
- #define ROCKCHIP_MMC_DELAYNUM_OFFSET 2
- #define ROCKCHIP_MMC_DELAYNUM_MASK (0xff << ROCKCHIP_MMC_DELAYNUM_OFFSET)
-+#define ROCKCHIP_MMC_INIT_STATE_RESET 0x1
-+#define ROCKCHIP_MMC_INIT_STATE_SHIFT 1
- 
- #define PSECS_PER_SEC 1000000000000LL
- 
-@@ -119,6 +121,14 @@ static const struct clk_ops rockchip_mmc_clk_ops = {
- 	.set_phase	= rockchip_mmc_set_phase,
- };
- 
-+static void rockchip_clk_mmc_reset(struct rockchip_mmc_clock *mmc_clock)
-+{
-+	if (mmc_clock->shift == ROCKCHIP_MMC_INIT_STATE_SHIFT)
-+		writel(HIWORD_UPDATE(ROCKCHIP_MMC_INIT_STATE_RESET,
-+				     ROCKCHIP_MMC_INIT_STATE_RESET,
-+				     mmc_clock->shift), mmc_clock->reg);
-+}
-+
- struct clk *rockchip_clk_register_mmc(const char *name,
- 				const char *const *parent_names, u8 num_parents,
- 				void __iomem *reg, int shift)
-@@ -139,6 +149,12 @@ struct clk *rockchip_clk_register_mmc(const char *name,
- 	mmc_clock->reg = reg;
- 	mmc_clock->shift = shift;
- 
-+	/*
-+	* Assert init_state to soft reset the CLKGEN
-+	* for mmc tuning phase and degree
-+	*/
-+	rockchip_clk_mmc_reset(mmc_clock);
-+
- 	if (name)
- 		init.name = name;
- 
--- 
-2.3.7
+Best regards,
+Krzysztof
