@@ -1,96 +1,51 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 26 Aug 2015 16:04:57 +0200
-Subject: [PATCH 3/3] efi/arm64: clean up efi_get_fdt_params() interface
-In-Reply-To: <1440595498-30630-4-git-send-email-leif.lindholm@linaro.org>
-References: <1440595498-30630-1-git-send-email-leif.lindholm@linaro.org>
- <1440595498-30630-4-git-send-email-leif.lindholm@linaro.org>
-Message-ID: <CAKv+Gu9KwJfr6x8A607CsbAvpLUG2pqLPzcXsqhvmQnrcGy_ug@mail.gmail.com>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Wed, 26 Aug 2015 22:10:08 +0800
+Subject: [PATCH 0/5] add GPT timer support for mt8173
+In-Reply-To: <55DD6CC4.6010708@linaro.org>
+References: <1436779969-18610-1-git-send-email-yingjoe.chen@mediatek.com>
+ <55DD6CC4.6010708@linaro.org>
+Message-ID: <1440598208.30139.3.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 August 2015 at 15:24, Leif Lindholm <leif.lindholm@linaro.org> wrote:
-> As we now have a common debug infrastructure between core and arm64 efi,
-> drop the bit of the interface passing verbose output flags around.
->
-> Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
-> ---
->  arch/arm64/kernel/efi.c    | 2 +-
->  drivers/firmware/efi/efi.c | 6 ++----
->  include/linux/efi.h        | 2 +-
->  3 files changed, 4 insertions(+), 6 deletions(-)
->
-> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-> index 612ad5e..ab5eeb6 100644
-> --- a/arch/arm64/kernel/efi.c
-> +++ b/arch/arm64/kernel/efi.c
-> @@ -201,7 +201,7 @@ void __init efi_init(void)
->         struct efi_fdt_params params;
->
+On Wed, 2015-08-26 at 09:37 +0200, Daniel Lezcano wrote:
+> On 07/13/2015 11:32 AM, Yingjoe Chen wrote:
+> > This series add GPT timer support for mt8173. This is based on v4.2-rc1
+> > and Matthias' next branch (for dts parts).
+> >
+> > The first 2 patches comes from 'Add SMP bringup support for mt65xx socs'
+> > series [1]. I decide to move these 2 patches to this series, since it
+> > is more relevent here. They are changed based on Matthias' and Daniel's
+> > comments.
+> >
+> > [1] http://lists.infradead.org/pipermail/linux-mediatek/2015-May/000714.html
+> >
+> > Daniel Kurtz (1):
+> >    arm64: dts: mt8173: add timer node
+> >
+> > Yingjoe Chen (4):
+> >    clocksource: mediatek: do not enable GPT_CLK_EVT when setup
+> >    clocksource: mediatek: Use GPT as sched clock source
+> >    arm64: mediatek: enable MTK_TIMER
+> >    clk: mediatek: add 13mhz clock for MT8173
+> >
+> >   arch/arm64/Kconfig                       |  1 +
+> >   arch/arm64/boot/dts/mediatek/mt8173.dtsi |  9 +++++++++
+> >   drivers/clk/mediatek/clk-mt8173.c        |  5 +++++
+> >   drivers/clocksource/mtk_timer.c          | 26 ++++++++++++++++++++------
+> >   include/dt-bindings/clock/mt8173-clk.h   |  3 ++-
+> >   5 files changed, 37 insertions(+), 7 deletions(-)
+> 
+> Who will take this patchset ? I can take the patch 2 if needed.
+> 
+> 
 
-Actually, one nit: struct efi_fdt_params has a verbose field that was
-never used in the first place, but was added [supposedly] to convey
-the same as EFI_DBG that we have now. So I think you should remove
-that as well.
+Hi Daniel,
 
--- 
-Ard.
+Please take patch 2 with your fix. Thanks.
 
+I think patch 3(enable MTK_TIMER in Kconfig) and 5 (add timer node)
+should go through Matthias' tree to arm-soc and patch 4(add 13mhz clock)
+should go through James' mtk-clk tree to clk maintainer.
 
->         /* Grab UEFI information placed in FDT by stub */
-> -       if (!efi_get_fdt_params(&params, efi_enabled(EFI_DBG)))
-> +       if (!efi_get_fdt_params(&params))
->                 return;
->
->         efi_system_table = params.system_table;
-> diff --git a/drivers/firmware/efi/efi.c b/drivers/firmware/efi/efi.c
-> index 78de0bd..aca6aaf 100644
-> --- a/drivers/firmware/efi/efi.c
-> +++ b/drivers/firmware/efi/efi.c
-> @@ -492,7 +492,6 @@ static __initdata struct {
->  };
->
->  struct param_info {
-> -       int verbose;
->         int found;
->         void *params;
->  };
-> @@ -523,21 +522,20 @@ static int __init fdt_find_uefi_params(unsigned long node, const char *uname,
->                 else
->                         *(u64 *)dest = val;
->
-> -               if (info->verbose)
-> +               if (efi_enabled(EFI_DBG))
->                         pr_info("  %s: 0x%0*llx\n", dt_params[i].name,
->                                 dt_params[i].size * 2, val);
->         }
->         return 1;
->  }
->
-> -int __init efi_get_fdt_params(struct efi_fdt_params *params, int verbose)
-> +int __init efi_get_fdt_params(struct efi_fdt_params *params)
->  {
->         struct param_info info;
->         int ret;
->
->         pr_info("Getting EFI parameters from FDT:\n");
->
-> -       info.verbose = verbose;
->         info.found = 0;
->         info.params = params;
->
-> diff --git a/include/linux/efi.h b/include/linux/efi.h
-> index 85ef051..b1a5b74 100644
-> --- a/include/linux/efi.h
-> +++ b/include/linux/efi.h
-> @@ -901,7 +901,7 @@ extern void efi_initialize_iomem_resources(struct resource *code_resource,
->                 struct resource *data_resource, struct resource *bss_resource);
->  extern void efi_get_time(struct timespec *now);
->  extern void efi_reserve_boot_services(void);
-> -extern int efi_get_fdt_params(struct efi_fdt_params *params, int verbose);
-> +extern int efi_get_fdt_params(struct efi_fdt_params *params);
->  extern struct efi_memory_map memmap;
->  extern struct kobject *efi_kobj;
->
-> --
-> 2.1.4
->
+Joe.C
