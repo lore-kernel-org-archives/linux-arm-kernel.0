@@ -1,202 +1,98 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 26 Aug 2015 18:19:45 +0200
-Subject: [PATCH v3 2/2] ARM: dma-mapping: Fix the coherent case when iommu is
- used
-In-Reply-To: <1440605985-13446-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1440605985-13446-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1440605985-13446-3-git-send-email-gregory.clement@free-electrons.com>
+From: dianders@chromium.org (Douglas Anderson)
+Date: Wed, 26 Aug 2015 09:20:38 -0700
+Subject: [PATCH v2] arm: kgdb: Fix registers on sleeping tasks
+Message-ID: <1440606038-14816-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When doing dma allocation with IOMMU the __iommu_alloc_atomic() was
-used even when the system was coherent. However, this function
-allocates from a non-cacheable pool, which is fine when the device is
-not cache coherent but won't work as expected in the device is cache
-coherent. Indeed, the CPU and device must access the memory using the
-same cacheability attributes.
+From: Doug Anderson <dianders@chromium.org>
 
-Moreover when the devices are coherent, the mmap call must not change
-the pg_prot flags in the vma struct. The arm_coherent_iommu_mmap_attrs
-has been updated in the same way that it was done for the arm_dma_mmap
-in commit 55af8a91640d ("ARM: 8387/1: arm/mm/dma-mapping.c: Add
-arm_coherent_dma_mmap").
+Dumping registers from other sleeping tasks in KGDB was totally
+failing for me.  All registers were reported as 0 in many cases.
 
-Suggested-by: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+The code was using task_pt_regs(task) to try to get other thread
+registers.  This doesn't appear to be the right place to look.  From
+my tests, I saw non-zero values in this structure when we were looking
+at a kernel thread that had a userspace task associated with it, but
+it contained the register values from the userspace task.  So even in
+the cases where registers weren't reported as 0 we were still not
+showing the right thing.
+
+Instead of using task_pt_regs(task) let's use task_thread_info(task).
+This is the same place that is referred to when doing a dump of all
+sleeping task stacks (kdb_show_stack() -> show_stack() ->
+dump_backtrace() -> unwind_backtrace() -> thread_saved_sp()).
+
+As further evidence that this is the right thing to do, you can find
+the following comment in "gdbstub.c" right before it calls
+sleeping_thread_to_gdb_regs():
+  Pull stuff saved during switch_to; nothing else is accessible (or
+  even particularly relevant).  This should be enough for a stack
+  trace.
+...and if you look at switch_to() it only saves r4-r11, sp and lr.
+Those are the same registers that I'm getting out of the
+task_thread_info().
+
+With this change you can use "info thread" to see all tasks in the
+kernel and you can switch to other tasks and examine them in gdb.
+
+Signed-off-by: Doug Anderson <dianders@chromium.org>
+Signed-off-by: Douglas Anderson <dianders@chromium.org>
 ---
- arch/arm/mm/dma-mapping.c | 88 +++++++++++++++++++++++++++++++++++------------
- 1 file changed, 66 insertions(+), 22 deletions(-)
+Changes in v2:
+- Don't use task_pt_regs(task) at all.
 
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index a2513c0031c2..d678286e8ff1 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -1349,13 +1349,16 @@ static struct page **__iommu_get_pages(void *cpu_addr, struct dma_attrs *attrs)
- 	return NULL;
- }
- 
--static void *__iommu_alloc_atomic(struct device *dev, size_t size,
--				  dma_addr_t *handle)
-+static void *__iommu_alloc_simple(struct device *dev, size_t size, gfp_t gfp,
-+				  dma_addr_t *handle, bool is_coherent)
+ arch/arm/kernel/kgdb.c | 31 ++++++++++++-------------------
+ 1 file changed, 12 insertions(+), 19 deletions(-)
+
+diff --git a/arch/arm/kernel/kgdb.c b/arch/arm/kernel/kgdb.c
+index a6ad93c..abb17b0 100644
+--- a/arch/arm/kernel/kgdb.c
++++ b/arch/arm/kernel/kgdb.c
+@@ -74,7 +74,7 @@ int dbg_set_reg(int regno, void *mem, struct pt_regs *regs)
+ void
+ sleeping_thread_to_gdb_regs(unsigned long *gdb_regs, struct task_struct *task)
  {
- 	struct page *page;
- 	void *addr;
+-	struct pt_regs *thread_regs;
++	struct thread_info *ti;
+ 	int regno;
  
--	addr = __alloc_from_pool(size, &page);
-+	if (is_coherent)
-+		addr = __alloc_simple_buffer(dev, size, gfp, &page);
-+	else
-+		addr = __alloc_from_pool(size, &page);
- 	if (!addr)
- 		return NULL;
+ 	/* Just making sure... */
+@@ -86,24 +86,17 @@ sleeping_thread_to_gdb_regs(unsigned long *gdb_regs, struct task_struct *task)
+ 		gdb_regs[regno] = 0;
  
-@@ -1370,15 +1373,19 @@ err_mapping:
- 	return NULL;
+ 	/* Otherwise, we have only some registers from switch_to() */
+-	thread_regs		= task_pt_regs(task);
+-	gdb_regs[_R0]		= thread_regs->ARM_r0;
+-	gdb_regs[_R1]		= thread_regs->ARM_r1;
+-	gdb_regs[_R2]		= thread_regs->ARM_r2;
+-	gdb_regs[_R3]		= thread_regs->ARM_r3;
+-	gdb_regs[_R4]		= thread_regs->ARM_r4;
+-	gdb_regs[_R5]		= thread_regs->ARM_r5;
+-	gdb_regs[_R6]		= thread_regs->ARM_r6;
+-	gdb_regs[_R7]		= thread_regs->ARM_r7;
+-	gdb_regs[_R8]		= thread_regs->ARM_r8;
+-	gdb_regs[_R9]		= thread_regs->ARM_r9;
+-	gdb_regs[_R10]		= thread_regs->ARM_r10;
+-	gdb_regs[_FP]		= thread_regs->ARM_fp;
+-	gdb_regs[_IP]		= thread_regs->ARM_ip;
+-	gdb_regs[_SPT]		= thread_regs->ARM_sp;
+-	gdb_regs[_LR]		= thread_regs->ARM_lr;
+-	gdb_regs[_PC]		= thread_regs->ARM_pc;
+-	gdb_regs[_CPSR]		= thread_regs->ARM_cpsr;
++	ti			= task_thread_info(task);
++	gdb_regs[_R4]		= ti->cpu_context.r4;
++	gdb_regs[_R5]		= ti->cpu_context.r5;
++	gdb_regs[_R6]		= ti->cpu_context.r6;
++	gdb_regs[_R7]		= ti->cpu_context.r7;
++	gdb_regs[_R8]		= ti->cpu_context.r8;
++	gdb_regs[_R9]		= ti->cpu_context.r9;
++	gdb_regs[_R10]		= ti->cpu_context.sl;
++	gdb_regs[_FP]		= ti->cpu_context.fp;
++	gdb_regs[_SPT]		= ti->cpu_context.sp;
++	gdb_regs[_PC]		= ti->cpu_context.pc;
  }
  
--static void __iommu_free_atomic(struct device *dev, void *cpu_addr,
--				dma_addr_t handle, size_t size)
-+static void __iommu_free_simple(struct device *dev, void *cpu_addr,
-+	    dma_addr_t handle, size_t size, bool is_coherent)
- {
- 	__iommu_remove_mapping(dev, handle, size);
--	__free_from_pool(cpu_addr, size);
-+	if (is_coherent)
-+		__dma_free_buffer(virt_to_page(cpu_addr), size);
-+	else
-+		__free_from_pool(cpu_addr, size);
- }
- 
--static void *arm_iommu_alloc_attrs(struct device *dev, size_t size,
--	    dma_addr_t *handle, gfp_t gfp, struct dma_attrs *attrs)
-+static void *__arm_iommu_alloc_attrs(struct device *dev, size_t size,
-+	    dma_addr_t *handle, gfp_t gfp, struct dma_attrs *attrs,
-+	    bool is_coherent)
- {
- 	pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL);
- 	struct page **pages;
-@@ -1387,8 +1394,8 @@ static void *arm_iommu_alloc_attrs(struct device *dev, size_t size,
- 	*handle = DMA_ERROR_CODE;
- 	size = PAGE_ALIGN(size);
- 
--	if (!(gfp & __GFP_WAIT))
--		return __iommu_alloc_atomic(dev, size, handle);
-+	if (is_coherent || !(gfp & __GFP_WAIT))
-+		return __iommu_alloc_simple(dev, size, gfp, handle, is_coherent);
- 
- 	/*
- 	 * Following is a work-around (a.k.a. hack) to prevent pages
-@@ -1399,8 +1406,7 @@ static void *arm_iommu_alloc_attrs(struct device *dev, size_t size,
- 	 */
- 	gfp &= ~(__GFP_COMP);
- 
--	/* For now always consider we are in a non-coherent case */
--	pages = __iommu_alloc_buffer(dev, size, gfp, attrs, false);
-+	pages = __iommu_alloc_buffer(dev, size, gfp, attrs, is_coherent);
- 	if (!pages)
- 		return NULL;
- 
-@@ -1425,7 +1431,19 @@ err_buffer:
- 	return NULL;
- }
- 
--static int arm_iommu_mmap_attrs(struct device *dev, struct vm_area_struct *vma,
-+static void *arm_iommu_alloc_attrs(struct device *dev, size_t size,
-+	    dma_addr_t *handle, gfp_t gfp, struct dma_attrs *attrs)
-+{
-+	return __arm_iommu_alloc_attrs(dev, size, handle, gfp, attrs, false);
-+}
-+
-+static void *arm_coherent_iommu_alloc_attrs(struct device *dev, size_t size,
-+	    dma_addr_t *handle, gfp_t gfp, struct dma_attrs *attrs)
-+{
-+	return __arm_iommu_alloc_attrs(dev, size, handle, gfp, attrs, true);
-+}
-+
-+static int __arm_iommu_mmap_attrs(struct device *dev, struct vm_area_struct *vma,
- 		    void *cpu_addr, dma_addr_t dma_addr, size_t size,
- 		    struct dma_attrs *attrs)
- {
-@@ -1433,8 +1451,6 @@ static int arm_iommu_mmap_attrs(struct device *dev, struct vm_area_struct *vma,
- 	unsigned long usize = vma->vm_end - vma->vm_start;
- 	struct page **pages = __iommu_get_pages(cpu_addr, attrs);
- 
--	vma->vm_page_prot = __get_dma_pgprot(attrs, vma->vm_page_prot);
--
- 	if (!pages)
- 		return -ENXIO;
- 
-@@ -1451,18 +1467,34 @@ static int arm_iommu_mmap_attrs(struct device *dev, struct vm_area_struct *vma,
- 	return 0;
- }
- 
-+static int arm_iommu_mmap_attrs(struct device *dev,
-+		    struct vm_area_struct *vma, void *cpu_addr,
-+		    dma_addr_t dma_addr, size_t size, struct dma_attrs *attrs)
-+{
-+	vma->vm_page_prot = __get_dma_pgprot(attrs, vma->vm_page_prot);
-+
-+	return __arm_iommu_mmap_attrs(dev, vma, cpu_addr, dma_addr, size, attrs);
-+}
-+
-+static int arm_coherent_iommu_mmap_attrs(struct device *dev,
-+		    struct vm_area_struct *vma, void *cpu_addr,
-+		    dma_addr_t dma_addr, size_t size, struct dma_attrs *attrs)
-+{
-+	return __arm_iommu_mmap_attrs(dev, vma, cpu_addr, dma_addr, size, attrs);
-+}
-+
- /*
-  * free a page as defined by the above mapping.
-  * Must not be called with IRQs disabled.
-  */
--void arm_iommu_free_attrs(struct device *dev, size_t size, void *cpu_addr,
--			  dma_addr_t handle, struct dma_attrs *attrs)
-+void __arm_iommu_free_attrs(struct device *dev, size_t size, void *cpu_addr,
-+	dma_addr_t handle, struct dma_attrs *attrs, bool is_coherent)
- {
- 	struct page **pages;
- 	size = PAGE_ALIGN(size);
- 
--	if (__in_atomic_pool(cpu_addr, size)) {
--		__iommu_free_atomic(dev, cpu_addr, handle, size);
-+	if (is_coherent || __in_atomic_pool(cpu_addr, size)) {
-+		__iommu_free_simple(dev, cpu_addr, handle, size, is_coherent);
- 		return;
- 	}
- 
-@@ -1481,6 +1513,18 @@ void arm_iommu_free_attrs(struct device *dev, size_t size, void *cpu_addr,
- 	__iommu_free_buffer(dev, pages, size, attrs);
- }
- 
-+void arm_iommu_free_attrs(struct device *dev, size_t size,
-+	    void *cpu_addr, dma_addr_t handle, struct dma_attrs *attrs)
-+{
-+	__arm_iommu_free_attrs(dev, size, cpu_addr, handle, attrs, false);
-+}
-+
-+void arm_coherent_iommu_free_attrs(struct device *dev, size_t size,
-+	    void *cpu_addr, dma_addr_t handle, struct dma_attrs *attrs)
-+{
-+	__arm_iommu_free_attrs(dev, size, cpu_addr, handle, attrs, true);
-+}
-+
- static int arm_iommu_get_sgtable(struct device *dev, struct sg_table *sgt,
- 				 void *cpu_addr, dma_addr_t dma_addr,
- 				 size_t size, struct dma_attrs *attrs)
-@@ -1887,9 +1931,9 @@ struct dma_map_ops iommu_ops = {
- };
- 
- struct dma_map_ops iommu_coherent_ops = {
--	.alloc		= arm_iommu_alloc_attrs,
--	.free		= arm_iommu_free_attrs,
--	.mmap		= arm_iommu_mmap_attrs,
-+	.alloc		= arm_coherent_iommu_alloc_attrs,
-+	.free		= arm_coherent_iommu_free_attrs,
-+	.mmap		= arm_coherent_iommu_mmap_attrs,
- 	.get_sgtable	= arm_iommu_get_sgtable,
- 
- 	.map_page	= arm_coherent_iommu_map_page,
+ void kgdb_arch_set_pc(struct pt_regs *regs, unsigned long pc)
 -- 
-2.1.0
+2.5.0.457.gab17608
