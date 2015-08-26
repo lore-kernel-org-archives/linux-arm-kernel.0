@@ -1,143 +1,100 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 26 Aug 2015 17:00:28 +0200
-Subject: [PATCH v2 1/5] arm64: clone early_init_dt_add_memory_arch() to
- override default
-In-Reply-To: <20150826144325.GA10728@bivouac.eciton.net>
-References: <1440576391-25725-1-git-send-email-ard.biesheuvel@linaro.org>
- <1440576391-25725-2-git-send-email-ard.biesheuvel@linaro.org>
- <20150826144325.GA10728@bivouac.eciton.net>
-Message-ID: <CAKv+Gu9roNfr8KPUJj_hhP6jw-Rz_CdcoT08vyxYDgW2AXpt4A@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 26 Aug 2015 17:06:45 +0200
+Subject: [PATCH 1/4] mmc: mediatek: Add online-tuning support of EMMC/SD
+In-Reply-To: <1440578416.26912.12.camel@mhfsdcap03>
+References: <1439367845-5891-1-git-send-email-chaotian.jing@mediatek.com>
+ <1439367845-5891-2-git-send-email-chaotian.jing@mediatek.com>
+ <CAPDyKFpX4Pp1+U9eNBuGd83sBeBgLU17qysAJ-2V-ABZZHYAGQ@mail.gmail.com>
+ <1439812888.5627.9.camel@mhfsdcap03>
+ <CAPDyKFpGk9gcLLjBnN=+BD5WP-7dZ0+XHC1bcEEGGLvLbTyKHw@mail.gmail.com>
+ <1440578416.26912.12.camel@mhfsdcap03>
+Message-ID: <CAPDyKFp0Eypyr8Asx_-_+VOfnDVW19Lrc-MmG2XA8kW+WM6Cnw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 August 2015 at 16:43, Leif Lindholm <leif.lindholm@linaro.org> wrote:
-> On Wed, Aug 26, 2015 at 10:06:27AM +0200, Ard Biesheuvel wrote:
->> Override the __weak early_init_dt_add_memory_arch() with our own
->> version. We need this in a subsequent patch to make the handling of
->> the memory nodes conditional on whether we are booting via UEFI or
->> not.
->
-> Worth clarifying that this is a direct copy?
-> ("Our own version" can be read as there being modifications here.)
->
-
-Yes. In fact, it wasn't before, so hence the choice of words here.
-
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>  arch/arm64/mm/init.c | 41 ++++++++++++++++++++
->>  1 file changed, 41 insertions(+)
+On 26 August 2015 at 10:40, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
+> On Tue, 2015-08-25 at 14:07 +0200, Ulf Hansson wrote:
+>> On 17 August 2015 at 14:01, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
+>> > Hi Ulf,
+>> > Thanks, please see my comment:
+>> > On Mon, 2015-08-17 at 13:31 +0200, Ulf Hansson wrote:
+>> >> On 12 August 2015 at 10:24, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
+>> >> > Schedule a workqueue to do tuning when CRC error
+>> >> > Call mmc_hw_reset to re-init card when data timeout
+>> >>
+>> >> Thanks to Adrian Hunter, the mmc core already supports re-tuning for
+>> >> the above scenarios through the mmc_retune_*() APIs.
+>> >>
+>> >> SDHCI driver has already adopted to use that feature, you should do
+>> >> that for the mtk-sd driver as well.
+>> >>
+>> >> Kind regards
+>> >> Uffe
+>> >>
+>> > I also noticed that the mmc core already supports re-tuning, but it is
+>> > not suitable for our host.
+>> > For EMMC, the CMD21 only support HS200/HS400 mode, for SD card, CMD19
+>> > only support SDR50/SDR104 mode, but in our host, even 50Mhz clock
+>> > frequency may also occur CRC error, Cannot find a parameter that can
+>> > cover all SD cards which running at 50Mhz, even 25Mhz, will occur CRC
+>> > error for stress test, DDR50 mode is worse.
 >>
->> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
->> index f5c0680d17d9..ab25fde7397c 100644
->> --- a/arch/arm64/mm/init.c
->> +++ b/arch/arm64/mm/init.c
->> @@ -374,3 +374,44 @@ static int __init keepinitrd_setup(char *__unused)
+>> I don't follow. You may run for example HS200 in lower speed, nothing
+>> will prevent tuning and re-tuning from happen for these scenarios.
 >>
->>  __setup("keepinitrd", keepinitrd_setup);
->>  #endif
->> +
->> +void __init early_init_dt_add_memory_arch(u64 base, u64 size)
->> +{
->> +     const u64 phys_offset = __pa(PAGE_OFFSET);
->> +
->> +     if (!PAGE_ALIGNED(base)) {
->> +             if (size < PAGE_SIZE - (base & ~PAGE_MASK)) {
->> +                     pr_warn("Ignoring memory block 0x%llx - 0x%llx\n",
->> +                             base, base + size);
->> +                     return;
->> +             }
->> +             size -= PAGE_SIZE - (base & ~PAGE_MASK);
->> +             base = PAGE_ALIGN(base);
->> +     }
->> +     size &= PAGE_MASK;
->> +
->> +     if (base > MAX_MEMBLOCK_ADDR) {
->> +             pr_warning("Ignoring memory block 0x%llx - 0x%llx\n",
->> +                             base, base + size);
->> +             return;
->> +     }
->> +
->> +     if (base + size - 1 > MAX_MEMBLOCK_ADDR) {
->> +             pr_warning("Ignoring memory range 0x%llx - 0x%llx\n",
->> +                             ((u64)MAX_MEMBLOCK_ADDR) + 1, base + size);
->> +             size = MAX_MEMBLOCK_ADDR - base + 1;
->> +     }
->> +
->> +     if (base + size < phys_offset) {
->> +             pr_warning("Ignoring memory block 0x%llx - 0x%llx\n",
->> +                        base, base + size);
->> +             return;
->> +     }
->> +     if (base < phys_offset) {
->> +             pr_warning("Ignoring memory range 0x%llx - 0x%llx\n",
->> +                        base, phys_offset);
->> +             size -= phys_offset - base;
->> +             base = phys_offset;
->> +     }
->> +     memblock_add(base, size);
->> +}
->> --
->> 1.9.1
->
-> Would it be too crazy to do this via an added call to a weak
-> memblock_use_dt() function in the original instead, to avoid
-> duplicating this entire function?
->
+>> Or you are talking about other speed modes than HS200/400 and
+>> SDR50/104? If so, which speed modes are these?
+>>
+> Yes, I am talking about other speed modes.
+> For SD card, the speed mode is High Speed, for EMMC, the speed may be
+> High Speed or DDR mode.
+> If CRC error occurs at these speed modes, the MMC core layer will never
+> handler it. even propagate the -EILSEQ towards to the mmc core, it will
+> not start mmc_retune.
 
-This keeps coming up: I have a series in the freezer that decouples
-the kernel mapping from the linear mapping, which makes another round
-of changes to this function. So that is why I cloned the function in
-the first place, only to reuse this patch for this series as well.
+That's true and that's because the MMC/SD/SDIO specs states it.
+Moreover, there a no tuning ever executed even while initializing such
+cards. I think you need to elaborate more on what kind of "tuning"
+your controller needs for these legacy speed modes, can you please do
+that?
 
-The following does the trick as well, but I am not sure if the alias
-attribute is allowed in the kernel
+Currently the mmc block layer has request retry mechanism when
+encountering IO errors. That may even reset or power cycle the card,
+via mmc_hw_reset(). Isn't that sufficient?
 
-"""
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index ad87ce826cce..af2f30cbf357 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -374,3 +374,8
+>> BTW, there are currently a patch being discussed which is about adding
+>> tuning for DDR mode. Please have look.
+>> http://www.spinics.net/lists/arm-kernel/msg438434.html
+>>
+>> Regarding re-tuning on CRC errors, that's already supported by the mmc
+>> core. More precisely when a host driver returns -EILSEQ for a request.
+>>
+>> > By the way,there are too many tune parameters need try for response,
+>> > read data, write crc status CRC error, these parameters are
+>> > multidimensional, it is hard to find a best parameter, and, try
+>> > thousands of parameters will take long time.
+>>
+>> As I see, it's your responsibility from the host driver to propagate
+>> the proper error code towards the mmc core. If you encounter an error
+>> that you want to trigger a retune, just return -EILSEQ.
+>>
+>> Moreover, if you see a need to extend the tuning/re-tuning support in
+>> the mmc core to suit your need - I am definitely open to look into
+>> that. More importantly, I don't want to see host specific hacks trying
+>> to deal with this.
+>>
+> In addition, the CMD21 is only valid for HS200 mode, do not support
+> HS400, So that there is no chance to tune the HS400 read/write data with
+> current mmc core layer codes.
+> As you see, in our platform, tune of HS200 and HS400 is different, but
+> if use the CMD21, it will never work at HS400 mode, even with
+> "prepare_hs400_tuning", but it prepare what ? what we need is that
+> running at HS400 mode and tune the read/write parameters, but not HS200,
+> because for data Rx path, the tune result of HS200 is meaningless for
+> HS400.
 
- __setup("keepinitrd", keepinitrd_setup);
- #endif
-+
-+void __init early_init_dt_add_memory_arch(u64 base, u64 size)
-+{
-+       __early_init_dt_add_memory_arch(base, size);
-+}
-diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
-index 07496560e5b9..2da75619ed78 100644
---- a/drivers/of/fdt.c
-+++ b/drivers/of/fdt.c
-@@ -1047,6 +1047,9
- }
- #endif
+So, should we perhaps add another host_ops callback to satisfy your
+need for HS400?
 
-+void __early_init_dt_add_memory_arch(u64 base, u64 size)
-+                       __attribute__((alias("early_init_dt_add_memory_arch")));
-+
- bool __init early_init_dt_verify(void *params)
- {
-        if (!params)
-diff --git a/include/linux/of_fdt.h b/include/linux/of_fdt.h
-index df9ef3801812..64fcb143f5f4 100644
---- a/include/linux/of_fdt.h
-+++ b/include/linux/of_fdt.h
-@@ -66,6 +66,7
- extern void early_init_fdt_scan_reserved_mem(void);
- extern void early_init_fdt_reserve_self(void);
- extern void early_init_dt_add_memory_arch(u64 base, u64 size);
-+extern void __early_init_dt_add_memory_arch(u64 base, u64 size);
- extern int early_init_dt_reserve_memory_arch(phys_addr_t base,
-phys_addr_t size,
-                                             bool no_map);
- extern void * early_init_dt_alloc_memory_arch(u64 size, u64 align);
-"""
-
-> We need the functionality for 4/5 (nice cleanup) and 5/5 (bugfix), so
-> happy with whatever works.
->
-
-Indeed.
+Kind regards
+Uffe
