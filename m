@@ -1,58 +1,66 @@
-From: wxt@rock-chips.com (Caesar Wang)
-Date: Wed, 26 Aug 2015 17:27:59 +0800
-Subject: [RESEND PATCH v16 3/4] soc: rockchip: power-domain: Add power
- domain driver
-In-Reply-To: <7hwpwjaxxv.fsf@deeprootsystems.com>
-References: <1440487486-6154-1-git-send-email-wxt@rock-chips.com>
- <1440487486-6154-4-git-send-email-wxt@rock-chips.com>
- <7hwpwjaxxv.fsf@deeprootsystems.com>
-Message-ID: <55DD869F.9010309@rock-chips.com>
+From: antonios.motakis@huawei.com (Antonios Motakis)
+Date: Wed, 26 Aug 2015 11:28:47 +0200
+Subject: [PATCH 00/13] arm64: Virtualization Host Extension support
+In-Reply-To: <55DD851B.4040106@siemens.com>
+References: <1436372356-30410-1-git-send-email-marc.zyngier@arm.com>
+ <55DD82FB.60903@huawei.com> <55DD851B.4040106@siemens.com>
+Message-ID: <55DD86CF.70309@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-? 2015?08?26? 04:57, Kevin Hilman ??:
-> Caesar Wang <wxt@rock-chips.com> writes:
->
->> This driver is found on RK3288 SoCs.
+On 26-Aug-15 11:21, Jan Kiszka wrote:
+> On 2015-08-26 11:12, Antonios Motakis wrote:
+>> Hello Marc,
 >>
->> In order to meet high performance and low power requirements, a power
->> management unit is designed or saving power when RK3288 in low power
->> mode.
->> The RK3288 PMU is dedicated for managing the power of the whole chip.
+>> On 08-Jul-15 18:19, Marc Zyngier wrote:
+>>> ARMv8.1 comes with the "Virtualization Host Extension" (VHE for
+>>> short), which enables simpler support of Type-2 hypervisors.
+>>>
+>>> This extension allows the kernel to directly run at EL2, and
+>>> significantly reduces the number of system registers shared between
+>>> host and guest, reducing the overhead of virtualization.
+>>>
+>>> In order to have the same kernel binary running on all versions of the
+>>> architecture, this series makes heavy use of runtime code patching.
+>>>
+>>> The first ten patches massage the KVM code to deal with VHE and enable
+>>> Linux to run at EL2.
 >>
->> PMU can work in the Low Power Mode by setting bit[0] of PMU_PWRMODE_CON
->> register. After setting the register, PMU would enter the Low Power mode.
->> In the low power mode, pmu will auto power on/off the specified power
->> domain, send idle req to specified power domain, shut down/up pll and
->> so on. All of above are configurable by setting corresponding registers.
+>> I am currently working on getting the Jailhouse hypervisor to work on AArch64.
 >>
->> Signed-off-by: jinkun.hong <jinkun.hong@rock-chips.com>
->> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
-> [...]
->
->> diff --git a/drivers/soc/rockchip/Kconfig b/drivers/soc/rockchip/Kconfig
->> new file mode 100644
->> index 0000000..87a09c3
->> --- /dev/null
->> +++ b/drivers/soc/rockchip/Kconfig
->> @@ -0,0 +1,13 @@
->> +#
->> +# Rockchip Soc drivers
->> +#
->> +config PM_GENERIC_DOMAINS
-> Why are you (re)defining this config option?  This name is already used in kernel/pm/Kconfig.
+>> I've been looking at your patches, trying to figure out the implications for Jailhouse. It seems there are a few :)
+>>
+>> Jailhouse likes to be loaded by Linux into memory, and then to inject itself at a higher level than Linux (demoting Linux into being the "root cell"). This works on x86 and ARM (AArch32 and eventually AArch64 without VHE). What this means in ARM, is that Jailhouse hooks into the HVC stub exposed by Linux, and happily installs itself in EL2.
+>>
+>> With Linux running in EL2 though, that won't be as straightforward. It looks like we can't just demote Linux to EL1 without breaking something. Obviously it's OK for us that KVM won't work, but it looks like at least the timer code will break horribly if we try to do something like that.
+>>
+>> Any comments on this? One work around would be to just remap the incoming interrupt from the timer, so Linux never really realizes it's not running in EL2 anymore. Then we would also have to deal with the intricacies of removing and re-adding vCPUs to the Linux root cell, so we would have to maintain the illusion of running in EL2 for each one of them.
+> 
+> Without knowing any of the details, I would say there are two strategies
+> regarding this:
+> 
+> - Disable KVM support in the Linux kernel - then we shouldn't boot into
+>   EL2 in the first place, should we?
 
-Fixed.
+We would have to ask the user to patch the kernel, to ignore VHE and keep all the hyp stub magic that we rely on currently. It is an option of course.
 
-----
-Thanks,
-Caesar
+> 
+> - Emulate what Linux is missing after take-over by Jailhouse (we do
+>   this on x86 with VT-d interrupt remapping which cannot be disabled
+>   anymore for Linux once it started with it, and we cannot boot without
+>   it when we want to use the x2APIC).
 
-> Kevin
->
-> _______________________________________________
-> Linux-rockchip mailing list
-> Linux-rockchip at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-rockchip
+Essentially what I described above; let's call it nested virtualization without the virtualization parts? :)
+
+> 
+> Jan
+> 
+
+-- 
+Antonios Motakis
+Virtualization Engineer
+Huawei Technologies Duesseldorf GmbH
+European Research Center
+Riesstrasse 25, 80992 M?nchen
