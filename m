@@ -1,63 +1,40 @@
-From: ranjit.waghmode@xilinx.com (Ranjit Waghmode)
-Date: Wed, 26 Aug 2015 11:56:03 +0530
-Subject: [LINUX RFC v2 0/4] spi: add dual parallel mode support in Zynq MPSoC
- GQSPI controller
-Message-ID: <1440570367-22569-1-git-send-email-ranjit.waghmode@xilinx.com>
+From: pi-cheng.chen@linaro.org (Pi-Cheng Chen)
+Date: Wed, 26 Aug 2015 14:53:39 +0800
+Subject: [RESEND PATCH 0/3 v6] Add Mediatek MT8173 cpufreq driver
+In-Reply-To: <20150826021659.GD8784@linux>
+References: <1439803465-19683-1-git-send-email-pi-cheng.chen@linaro.org>
+ <CALx668VWg2xVxzy8P7f5QFWRzm+TDJXUghL-_rbvRLsLYjtnng@mail.gmail.com>
+ <1617873.VRHfat3V76@vostro.rjw.lan>
+ <CALx668UvkYhLoU8rxLG70RqTzsnaiV5-ybDYTKqb4MEJS8pmRw@mail.gmail.com>
+ <20150826021659.GD8784@linux>
+Message-ID: <CALx668V2herrp6XOtCDR7nNvFhd7DLLMjXmr86cjfCOQ_cgmrw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds dual parallel mode support for Zynq Ultrascale+
-MPSoC GQSPI controller driver.
+On Wed, Aug 26, 2015 at 10:16 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> On 26-08-15, 09:25, Pi-Cheng Chen wrote:
+>> The [3/3] is based on Mediatek SoC maintainer tree[1] and the patch which
+>> introduce a new clock type[2] consumed by MT8173 cpufreq driver. So it will
+>> cause some conflicts if it goes through your tree. I am not sure how this
+>> should be handled, but should it be merged through Mediatek SoC maintainer
+>> tree?
+>
+> Just get that applied to MTK tree, it doesn't have any dependency on
+> rest of the patches for build/boot. The only thing is that cpufreq
+> wouldn't work and it will work as soon as Rafael's and MTK's trees are
+> merged by Linus.
 
-What is dual parallel mode?
----------------------------
-ZynqMP GQSPI controller supports Dual Parallel mode with following functionalities:
-1) Supporting two SPI flash memories operating in parallel. 8 I/O lines.
-2) Chip selects and clock are shared to both the flash devices
-3) This mode is targeted for faster read/write speed and also doubles the size
-4) Commands/data can be transmitted/received from both the devices(mirror),
-   or only upper or only lower flash memory devices.
-5) Data arrangement:
-   With stripe enabled,
-   Even bytes i.e. 0, 2, 4,... are transmitted on Lower Data Bus
-   Odd bytes i.e. 1, 3, 5,.. are transmitted on Upper Data Bus.
+Thanks for your explanation.
 
-This series also updated MTD layer files for adding parallel mode support.
+@Rafael, Would you please apply [1,2] to your tree?
 
-1) Added Support for two flashes
-2) Support to enable/disable data stripe as and when required.
-3) Added required parameters to spi_nor structure. Initialized all
-   added parameters in spi_nor_scan()
-4) Added support for dual parallel in spi_nor_read/write/erase functions by:
-   a) Increasing page_size, sector_size, erase_size and toatal flash size
-      as and when required.
-   b) Dividing address by 2
-   c) Updating spi->master->flags for qspi driver to change CS
-5) Updated read_sr() to get status of both flashes
-6) Also updated read_fsr() to get status of both flashes
+@Matthias, Would you please apply [3/3] of this series?
 
-These all are very high level changes and expected to make an idea clear.
-Comments and suggestions are always welcomed
+Thanks.
 
----
-V2 Changes:
-a) Splitted patches based on logical changes
-b) Added error handling for newly added APIs in SPI core
----
+Best Regards,
+Pi-Cheng
 
-Ranjit Waghmode (4):
-  spi: add support of two chip selects & data stripe
-  mtd: add spi_device instance to spi_nor struct
-  spi-nor: add dual parallel mode support
-  spi: zynqmp: gqspi: add support for dual parallel mode configuration
-
- drivers/mtd/devices/m25p80.c   |  1 +
- drivers/mtd/spi-nor/spi-nor.c  | 91 +++++++++++++++++++++++++++++++++---------
- drivers/spi/spi-zynqmp-gqspi.c | 24 ++++++++++-
- drivers/spi/spi.c              |  8 ++++
- include/linux/mtd/spi-nor.h    |  3 ++
- include/linux/spi/spi.h        | 11 +++++
- 6 files changed, 118 insertions(+), 20 deletions(-)
-
---
-2.1.2
+>
+> --
+> viresh
