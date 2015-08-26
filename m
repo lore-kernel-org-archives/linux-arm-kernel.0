@@ -1,83 +1,27 @@
-From: hongzhou.yang@mediatek.com (Hongzhou Yang)
-Date: Tue, 25 Aug 2015 17:16:10 -0700
-Subject: [PATCH v4] pinctrl: mediatek: Fix multiple registration issue.
-Message-ID: <1440548170-10174-1-git-send-email-hongzhou.yang@mediatek.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 26 Aug 2015 09:27:25 +0900
+Subject: [PATCH] ARM: shmobile: remove Makefile.boot
+In-Reply-To: <CAMuHMdWYM6vVWzUQgR4u8cvoH6Jtq4XerYd2PbpvfUruDPi7-Q@mail.gmail.com>
+References: <1440113264-30359-1-git-send-email-horms+renesas@verge.net.au>
+ <CAMuHMdWYM6vVWzUQgR4u8cvoH6Jtq4XerYd2PbpvfUruDPi7-Q@mail.gmail.com>
+Message-ID: <20150826002724.GA11168@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since our common driver need support main chip and PMU
-at the same time, that means it will register two
-pinctrl device, and the pinctrl_desc structure should
-be used two times.
+On Tue, Aug 25, 2015 at 02:06:31PM +0200, Geert Uytterhoeven wrote:
+> On Fri, Aug 21, 2015 at 1:27 AM, Simon Horman
+> <horms+renesas@verge.net.au> wrote:
+> > Now that the only multiplatform boot is supported for all
+> > shmobile platforms Makefile.boot may be removed.
+> >
+> > This seems correct to me given:
+> > * Setting MACHINE to no value in arch/arm/Makefile
+> >   if CONFIG_ARCH_MULTIPLATFORM is set
+> > * Not including Makefile.boot in arch/arm/boot/Makefile
+> >   if MACHINE has no value
+> >
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> 
+> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-But pinctrl_desc use global static definition, then
-the latest registered pinctrl device will overwrite
-the old one's, all members in pinctrl_desc will set to
-the new one's, such as name, pins and pins numbers, etc.
-This is a bug. Changing to use devm_kzalloc to fix it.
-
-Cc: stable at vger.kernel.org # v4.1+
-Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
-Reviewed-by: Axel Lin <axel.lin@ingics.com>
----
- Adding pinctrl_desc into mtk_pinctrl, assign new value for each 
- pinctrl device.
-
- drivers/pinctrl/mediatek/pinctrl-mtk-common.c |   21 ++++++++++-----------
- drivers/pinctrl/mediatek/pinctrl-mtk-common.h |    1 +
- 2 files changed, 11 insertions(+), 11 deletions(-)
-
-diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-index ad1ea16..4a52072 100644
---- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-+++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-@@ -1202,12 +1202,6 @@ static int mtk_pctrl_build_state(struct platform_device *pdev)
- 	return 0;
- }
- 
--static struct pinctrl_desc mtk_pctrl_desc = {
--	.confops	= &mtk_pconf_ops,
--	.pctlops	= &mtk_pctrl_ops,
--	.pmxops		= &mtk_pmx_ops,
--};
--
- int mtk_pctrl_init(struct platform_device *pdev,
- 		const struct mtk_pinctrl_devdata *data,
- 		struct regmap *regmap)
-@@ -1265,12 +1259,17 @@ int mtk_pctrl_init(struct platform_device *pdev,
- 
- 	for (i = 0; i < pctl->devdata->npins; i++)
- 		pins[i] = pctl->devdata->pins[i].pin;
--	mtk_pctrl_desc.name = dev_name(&pdev->dev);
--	mtk_pctrl_desc.owner = THIS_MODULE;
--	mtk_pctrl_desc.pins = pins;
--	mtk_pctrl_desc.npins = pctl->devdata->npins;
-+
-+	pctl->pctl_desc.name = dev_name(&pdev->dev);
-+	pctl->pctl_desc.owner = THIS_MODULE;
-+	pctl->pctl_desc.pins = pins;
-+	pctl->pctl_desc.npins = pctl->devdata->npins;
-+	pctl->pctl_desc.confops = &mtk_pconf_ops;
-+	pctl->pctl_desc.pctlops = &mtk_pctrl_ops;
-+	pctl->pctl_desc.pmxops = &mtk_pmx_ops;
- 	pctl->dev = &pdev->dev;
--	pctl->pctl_dev = pinctrl_register(&mtk_pctrl_desc, &pdev->dev, pctl);
-+
-+	pctl->pctl_dev = pinctrl_register(&pctl->pctl_desc, &pdev->dev, pctl);
- 	if (IS_ERR(pctl->pctl_dev)) {
- 		dev_err(&pdev->dev, "couldn't register pinctrl driver\n");
- 		return PTR_ERR(pctl->pctl_dev);
-diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.h b/drivers/pinctrl/mediatek/pinctrl-mtk-common.h
-index 30213e5..c532c23 100644
---- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.h
-+++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.h
-@@ -256,6 +256,7 @@ struct mtk_pinctrl_devdata {
- struct mtk_pinctrl {
- 	struct regmap	*regmap1;
- 	struct regmap	*regmap2;
-+	struct pinctrl_desc pctl_desc;
- 	struct device           *dev;
- 	struct gpio_chip	*chip;
- 	struct mtk_pinctrl_group	*groups;
--- 
-1.7.9.5
+Thanks, I have queued this up for v4.4.
