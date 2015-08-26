@@ -1,103 +1,78 @@
-From: holler@ahsoftware.de (Alexander Holler)
-Date: Wed, 26 Aug 2015 14:28:16 +0200
-Subject: [PATCH 04/16] deps: dtc: introduce new (virtual) property
- no-dependencies
-In-Reply-To: <1440592108-3740-1-git-send-email-holler@ahsoftware.de>
-References: <1440592108-3740-1-git-send-email-holler@ahsoftware.de>
-Message-ID: <1440592108-3740-5-git-send-email-holler@ahsoftware.de>
+From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
+Date: Wed, 26 Aug 2015 14:30:22 +0200
+Subject: [PATCH linux-next v5 0/5] add driver for Atmel QSPI controller
+Message-ID: <cover.1440580764.git.cyrille.pitchen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In some cases it makes sense to handle some phandles not as dependencies.
+ChangeLog
 
-This is escpecially true for 'remote-endpoint' properties, because these
-otherwise introducing dependency cycles into the graph. To avoid these,
-one end of each remote-endpoint pairs has not to be handled as a
-dependency.
+v5:
+- remove unused inline functions qspi_read[bw]() and qspi_write[bw](),
+  keep only qspi_readl() and qspi_writel().
+- use reinit_completion() instead of init_completion() during run time,
+  call init_completion() once for all in the probe().
+- add a dev_warn() when trying to tune the number of dummy cycles for
+  spi-nor of a not supported manufacturer then fall back to the default
+  framework value.
+- reword some comments.
+- add "Acked-by: Marek Vasut <marex@denx.de>" for patches 1 and 4.
+- add "Acked-by: Bean Huo <beanhuo@micron.com>" for patch 1.
 
-The syntax is like
+v4:
+- add "OF && HAS_DMA" dependency in Kconfig for Atmel Quad SPI driver.
+- return -ENOMEM instead of the return code of dma_mapping_error() as this
+  function returns a boolean on ARM achitecture.
+- add "Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>" for Atmel Quad
+  SPI driver and its DT binding documentation.
 
-	foo {
-		remote-endpoint = <&bar>;
-	};
-	bar {
-		remote-endpoint = <&foo>;
-		no-dependencies = <&foo>;
-	};
+v3:
+- reword the comment which explains that spi_nor_set_protocol() is used by
+  the spi-nor framework to notify lower layers, especially the (Q)SPI
+  controller about a protocol change.
+- change the definitions of register/bitfield macros in the Atmel QSPI
+  controller driver: get rid of concatenation operator and use BIT and
+  GENMASK macros when possible.
+- use #define[SPACE] instead of #define[TAB]
 
-Without that 'no-dependencies' property dtc would automatically add a
-dependency to foo to the property 'dependencies' of the node bar.
-But with that 'no-dependencies' it will not automatically add the
-listed dependencies.
+v2:
+- remove the patches to set the "latency code" of Spansion QSPI memories
+  (support of Spansion memories may be submitted in later series).
+- rename "qspi" node into "spi" in the DT example to fit ePAPR standard.
+- remove the useless "qspi0" label from the DT node example.
+- remove the leading 0 from the size of the second memory region to make
+  it consistent with the size of the first memory region.
+- indent the DT bindings documentation to make it more readable.
+- remove the useless ".bus	= &platform_bus_type," line from the
+  platform driver definition.
 
-The property 'no-dependencies' is virtual property and will not be added
-to any output file.
+v1:
 
-Signed-off-by: Alexander Holler <holler@ahsoftware.de>
----
- scripts/dtc/dependencies.c | 33 +++++++++++++++++++++++++++++++++
- 1 file changed, 33 insertions(+)
+This series of patches add support for the new Atmel QSPI controller
+embedded inside sama5d2x SoCs.
 
-diff --git a/scripts/dtc/dependencies.c b/scripts/dtc/dependencies.c
-index 2c1e0d4..76e4d91 100644
---- a/scripts/dtc/dependencies.c
-+++ b/scripts/dtc/dependencies.c
-@@ -44,6 +44,23 @@ static bool is_parent_of(struct node *node1, struct node *node2)
- 
- }
- 
-+static bool is_no_dependency(struct node *dt, struct property *prop, cell_t ph)
-+{
-+	struct node *node;
-+	unsigned i;
-+	cell_t *cell = (cell_t *)(prop->val.val);
-+
-+	for (i = 0; i < prop->val.len/4; ++i) {
-+		node = get_node_by_phandle(dt, cpu_to_fdt32(*cell++));
-+		if (node) {
-+			node = find_compatible_not_disabled(node);
-+			if (node && get_node_phandle(dt, node) == ph)
-+				return true;
-+		}
-+	}
-+	return false;
-+}
-+
- static void add_deps(struct node *dt, struct node *node, struct property *prop)
- {
- 	struct marker *m = prop->val.markers;
-@@ -73,6 +90,10 @@ static void add_deps(struct node *dt, struct node *node, struct property *prop)
- 				is_parent_of(target, source))
- 			continue;
- 		phandle = get_node_phandle(dt, target);
-+		prop_deps = get_property(node, "no-dependencies");
-+		if (prop_deps && is_no_dependency(dt, prop_deps, phandle))
-+			/* avoid adding non-dependencies */
-+			continue;
- 		prop_deps = get_property(source, "dependencies");
- 		if (!prop_deps) {
- 			add_property(source,
-@@ -102,9 +123,21 @@ static void process_nodes_props(struct node *dt, struct node *node)
- 		process_nodes_props(dt, child);
- }
- 
-+static void del_prop_no_dependencies(struct node *node)
-+{
-+	struct node *child;
-+
-+	if (!node)
-+		return;
-+	delete_property_by_name(node, "no-dependencies");
-+	for_each_child(node, child)
-+		del_prop_no_dependencies(child);
-+}
-+
- void add_dependencies(struct boot_info *bi)
- {
- 	process_nodes_props(bi->dt, bi->dt);
-+	del_prop_no_dependencies(bi->dt);
- }
- 
- /*
+These patches were first developped for linux-3.18-at91 and tested on a
+sama5d27 Xplained ultra board, which embeds a Micron n25q128a13 QSPI NOR
+flash memory. Then the series was adapted for mainline.
+
+Cyrille Pitchen (5):
+  mtd: spi-nor: notify (Q)SPI controller about protocol change
+  Documentation: mtd: add a DT property to set the number of dummy
+    cycles
+  mtd: spi-nor: allow to tune the number of dummy cycles
+  Documentation: atmel-quadspi: add binding file for Atmel QSPI driver
+  mtd: atmel-quadspi: add driver for Atmel QSPI controller
+
+ .../devicetree/bindings/mtd/atmel-quadspi.txt      |  29 +
+ .../devicetree/bindings/mtd/jedec,spi-nor.txt      |   6 +
+ drivers/mtd/spi-nor/Kconfig                        |   7 +
+ drivers/mtd/spi-nor/Makefile                       |   1 +
+ drivers/mtd/spi-nor/atmel-quadspi.c                | 859 +++++++++++++++++++++
+ drivers/mtd/spi-nor/spi-nor.c                      | 123 ++-
+ include/linux/mtd/spi-nor.h                        |  15 +
+ 7 files changed, 1021 insertions(+), 19 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mtd/atmel-quadspi.txt
+ create mode 100644 drivers/mtd/spi-nor/atmel-quadspi.c
+
 -- 
-2.1.0
+1.8.2.2
