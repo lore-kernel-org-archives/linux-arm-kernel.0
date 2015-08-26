@@ -1,53 +1,193 @@
-From: jan.kiszka@siemens.com (Jan Kiszka)
-Date: Wed, 26 Aug 2015 11:21:31 +0200
-Subject: [PATCH 00/13] arm64: Virtualization Host Extension support
-In-Reply-To: <55DD82FB.60903@huawei.com>
-References: <1436372356-30410-1-git-send-email-marc.zyngier@arm.com>
- <55DD82FB.60903@huawei.com>
-Message-ID: <55DD851B.4040106@siemens.com>
+From: wxt@rock-chips.com (Caesar Wang)
+Date: Wed, 26 Aug 2015 17:24:39 +0800
+Subject: [RESEND PATCH v16 4/4] ARM: dts: add the support power-domain
+ node on RK3288 SoCs
+In-Reply-To: <7htwrn6l7g.fsf@deeprootsystems.com>
+References: <1440487486-6154-1-git-send-email-wxt@rock-chips.com>
+ <1440487486-6154-5-git-send-email-wxt@rock-chips.com>
+ <7hfv37axhj.fsf@deeprootsystems.com>
+ <CAD=FV=V6oG+9U=W_JZmqCuNo-9-5wW8ffZzG7ZE_3cnSTNAjFQ@mail.gmail.com>
+ <7htwrn6l7g.fsf@deeprootsystems.com>
+Message-ID: <55DD85D7.5010208@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-08-26 11:12, Antonios Motakis wrote:
-> Hello Marc,
-> 
-> On 08-Jul-15 18:19, Marc Zyngier wrote:
->> ARMv8.1 comes with the "Virtualization Host Extension" (VHE for
->> short), which enables simpler support of Type-2 hypervisors.
+
+
+? 2015?08?26? 06:45, Kevin Hilman ??:
+> Doug Anderson <dianders@chromium.org> writes:
+>
+>> Kevin,
 >>
->> This extension allows the kernel to directly run at EL2, and
->> significantly reduces the number of system registers shared between
->> host and guest, reducing the overhead of virtualization.
+>> On Tue, Aug 25, 2015 at 2:07 PM, Kevin Hilman <khilman@kernel.org> wrote:
+>>> Caesar Wang <wxt@rock-chips.com> writes:
+>>>
+>>>> We can add more domains node in the future.
+>>>> This patch add the needed clocks into power-controller.
+>>>> As the discuess about all the device clocks being listed in
+>>>> the power-domains itself.
+>>>>
+>>>> There are several reasons as follows:
+>>>>
+>>>> Firstly, the clocks need be turned off to save power when
+>>>> the system enter the suspend state. So we need to enumerate
+>>>> the clocks in the dts. In order to power domain can turn on and off.
+>>> Yes, but this is the job of device drivers which are runtime PM adapted
+>>> to gate their own clocks.  I agree these clocks need to be enumerated in
+>>> the DTS, but they should be in the device nodes.
+>> I _think_ what Caesar means is that the alternative to this patch is
+>> to leave the clocks on all the time as they were during the early days
+>> of Rockchip (AKA last year).  If the clocks are on all the time then
+>> the power domain patches can work fine.  However, once you start
+>> letting clocks turn off then you need to make sure that the power
+>> domain code turns the back on temporarily.
+> Yup, I understand that part, and many SoCs have this same "feature".
+>
+>>>> Secondly, the reset-circuit should reset be synchronous on RK3288,
+>>>> then sync revoked. So we need to enable clocks of all devices.
+>>>> In other words, we have to enable the clocks before you operate them
+>>>> if all the device clocks are included in someone domians.
+>>> Yes, this is pretty common for reset.
+>>>
+>>>> Someone wish was to get the clocks by reading the clocks from the
+>>>> device nodes, We can do that but we can solve the above issues.
+>>> I don't follow this sentence.  Are you saying doing that will not solve
+>>> the above issues?  Why not?  Please explain.
+>>>
+>>> If there are non-device clocks that also need to be enabled before
+>>> asserting reset, then those are candidates for the power-domain node,
+>>> but not device clocks.
+>> It's been a long time and I don't know that I've reviewed every
+>> revision of this series, but I think there was a proposal that we
+>> shouldn't list clocks here.  Instead we should search through and find
+>> all devices that refer to this power domain, reach in and find their
+>> clocks, and turn them on.  Did I get that right?
+> Yes...
+
+Sounds resonable, the domain(e.g. "pd_vio"...) idle will be abnormal but 
+you have registered all devices.
+Why?
+AFAIK, you need turn on the noc/ip clocks if we are operating the 
+"pd_vio" domain to enter the idle status.
+if the noc is same clock with ip side.  We need turn on the IP side 
+clocks. Otherwise we need turn on the noc clocks.
+
+>> To put things in a
+>> concrete way, for pd_vio we'd go through the entire device tree
+>> ourselves and find all properties that look like "power-domains =
+>> <&power RK3288_PD_VIO>;".  We'd then find the parent of those
+>> properties and look for a property named "clocks".  We'd then iterate
+>> over all those clocks and turn those on.  Did I get that right?
+> ... but you make it sound like more work than it is.  The genpd already
+> keeps a list of devices that refer to the power domain.  In fact, the
+> genpd 'attach' method can be platform-specific, so could be used to keep
+> track of a list (or a subset) of clocks which are needed for reset.
+>
+>> The above doesn't seem like a terribly great idea to me for a number
+>> of reasons, including:
 >>
->> In order to have the same kernel binary running on all versions of the
->> architecture, this series makes heavy use of runtime code patching.
->>
->> The first ten patches massage the KVM code to deal with VHE and enable
->> Linux to run at EL2.
-> 
-> I am currently working on getting the Jailhouse hypervisor to work on AArch64.
-> 
-> I've been looking at your patches, trying to figure out the implications for Jailhouse. It seems there are a few :)
-> 
-> Jailhouse likes to be loaded by Linux into memory, and then to inject itself at a higher level than Linux (demoting Linux into being the "root cell"). This works on x86 and ARM (AArch32 and eventually AArch64 without VHE). What this means in ARM, is that Jailhouse hooks into the HVC stub exposed by Linux, and happily installs itself in EL2.
-> 
-> With Linux running in EL2 though, that won't be as straightforward. It looks like we can't just demote Linux to EL1 without breaking something. Obviously it's OK for us that KVM won't work, but it looks like at least the timer code will break horribly if we try to do something like that.
-> 
-> Any comments on this? One work around would be to just remap the incoming interrupt from the timer, so Linux never really realizes it's not running in EL2 anymore. Then we would also have to deal with the intricacies of removing and re-adding vCPUs to the Linux root cell, so we would have to maintain the illusion of running in EL2 for each one of them.
+>> 1. If I remember correctly, it's important to turn on clocks for
+>> devices even if they're not something you're using / have a driver
+>> for.  If you don't then the device won't get reset properly and this
+>> can affect things like suspend/resume because the hardware in the SoC
+>> will query all devices at suspend time to make sure they're ready.
+> Correct.  This condition also exists in the clock framework when unused
+> clocks are disabled, or if you have drivers but PM_RUNTIME is disabled
+> (which can happen from userspace on a per-device basis) so it needs to
+> be understood and managed already.
+>
+>> If
+>> a device is wedged because its clock wasn't on at the right them then
+>> it will cause problems.
+> Right.  I'm not arguing that the power domain doesn't have to deal with
+> device clocks. It has to for sync reset.  The objection I have have is
+> where these clocks are described.
+>
+>> 2. If we absolutely need to turn all clocks and we get clocks from
+>> device tree nodes on then it means we need device tree nodes for every
+>> device in the domain.
+> Isn't that the end goal?
+>
+>> These would be needed even if there are no
+>> accepted bindings for this device yet.  So we'd need to do one of: A)
+>> Block power domain patches on feature complete bindings for all
+>> drivers; B) Make up non-approved compatible strings for all devices
+>> and throw them into the DTS; C) Add nodes in the DTS without a
+>> compatible string just to satisfy the power domain requirements.  None
+>> of these seem terribly appealing.
+> well, I think we can be slightly more accomodating than that and go for
+> somewhere in between:
+>
+> D) In the power-domain DTS, clearly describe why each clock is needed by
+> the power-domain.  In particular list out clocks that are not device
+> clocks (and why they need to be asserted for reset) and separate those
+> from device clocks which are only listed in the power-domain because
+> there is not *yet* a driver/binding for that device node.
+>
+> Doing it that way also makes it clear that when a new driver/binding is
+> added, the clocks should be removed from the power-domain node and put
+> into the device node.
+>
+> Also, this addresses my primary concern that the DTS acurately describes
+> the hardware.  IOW, in hardware, most of these clocks are are properties
+> of devices, not power-domains, and the DT should reflect that.
+>
+> IMO, if it's not describing the hardware, and is a placeholder until a
+> driver/binding is in place, it should be properly documented.
+>
+>> 3. It is entirely possible that there are clocks that will be listed
+>> in the individual devices that aren't needed for powering on the power
+>> domain.  I'd tend to believe that PCLK_EDP_CTRL (the pixel clock)
+>> doesn't really need to be turned on when adjusting the "VIO" power
+>> domain.  Right now Caesar has it listed, but it probably isn't needed
+>> (Caesar: can you confirm?).
+> Yes, I suspect there are several of those, which is also why I'd like to
+> see the clocks in the power-domain node described in detail, and exacly
+> why they're needed to be enabled.
+>
+> Also, in the current proposed DTS, clocks that are listed in both device
+> nodes and the power domain are also suspicous, especially when the
+> device node doesn't have a power-domain property.  (c.f. vop[bl] nodes
+> and ACLK_VOP[01] clocks.)  For that matter, this series doesn't add any
+> devices to the power domains, which makes it even more confusing about
+> how this is meant to work.  IOW, with no devices belonging to
+> power-domains, how are the power-domain power_on/power_off callbacks
+> being called?
 
-Without knowing any of the details, I would say there are two strategies
-regarding this:
+Okay, As the cover-letter lists.
+We can add the EDP/VOP domain node to test in next-kernel.
 
-- Disable KVM support in the Linux kernel - then we shouldn't boot into
-  EL2 in the first place, should we?
+Also, the chromium-3.14 has some devices to complete it.
 
-- Emulate what Linux is missing after take-over by Jailhouse (we do
-  this on x86 with VT-d interrupt remapping which cannot be disabled
-  anymore for Linux once it started with it, and we cannot boot without
-  it when we want to use the x2APIC).
+https://chromium.googlesource.com/chromiumos/third_party/kernel/+/v3.14
 
-Jan
+----
+Thanks,
+Caesar
 
--- 
-Siemens AG, Corporate Technology, CT RTC ITP SES-DE
-Corporate Competence Center Embedded Linux
+
+>> 4. It seems just slightly brittle to be reaching into other device
+>> nodes and making assumptions about their properties.  Yeah, it's
+>> probably safe to assume that "clocks" has a list of clocks and
+>> "power-domains" will point to something whose first entry is a
+>> phandle, but it still seems just a tad bit like violating an
+>> abstraction barrier.
+> shmobile is already doing this with platform-specific genpd attach
+> callbacks, and using the pm_clk API.  I don't see any issues with that.
+>
+>> Anyway, perhaps I'm misunderstanding, or perhaps my concerns are
+>> simply not for important things.  If so feel free to yell at me.  ;)
+> No need for me to yell. Your concerns are perfectly valid, and it's not
+> my style anyways. ;)
+>
+> Thanks for the feedback,
+>
+> Kevin
+>
+>
+>
+>
+> _______________________________________________
+> Linux-rockchip mailing list
+> Linux-rockchip at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-rockchip
