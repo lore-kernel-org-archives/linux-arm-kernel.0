@@ -1,54 +1,74 @@
-From: pi-cheng.chen@linaro.org (Pi-Cheng Chen)
-Date: Wed, 26 Aug 2015 09:25:29 +0800
-Subject: [RESEND PATCH 0/3 v6] Add Mediatek MT8173 cpufreq driver
-In-Reply-To: <1617873.VRHfat3V76@vostro.rjw.lan>
-References: <1439803465-19683-1-git-send-email-pi-cheng.chen@linaro.org>
- <CALx668VWg2xVxzy8P7f5QFWRzm+TDJXUghL-_rbvRLsLYjtnng@mail.gmail.com>
- <1617873.VRHfat3V76@vostro.rjw.lan>
-Message-ID: <CALx668UvkYhLoU8rxLG70RqTzsnaiV5-ybDYTKqb4MEJS8pmRw@mail.gmail.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Wed, 26 Aug 2015 10:38:59 +0900
+Subject: [PATCH 1/3] ARM: uniphier: add outer cache support
+In-Reply-To: <2021253.vgeYqalDfp@wuerfel>
+References: <1440382692-3855-1-git-send-email-yamada.masahiro@socionext.com>
+ <1440382692-3855-2-git-send-email-yamada.masahiro@socionext.com>
+ <2021253.vgeYqalDfp@wuerfel>
+Message-ID: <CAK7LNAQ_oymnQNEcP+FDqyxNKtMyiCwgxSRMmg5HAKQW9C6eRg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rafael,
+Hi Arnd,
 
-On Wed, Aug 26, 2015 at 7:01 AM, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> On Tuesday, August 25, 2015 10:10:44 AM Pi-Cheng Chen wrote:
->> On Mon, Aug 17, 2015 at 5:24 PM, Pi-Cheng Chen <pi-cheng.chen@linaro.org> wrote:
->> > MT8173 is a ARMv8 based SoC with 2 clusters. All CPUs in a single cluster
->> > share the same power and clock domain. This series tries to add cpufreq support
->> > for MT8173 SoC. The v6 of this series is resent with Acks added.
+
+2015-08-25 4:59 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
+> On Monday 24 August 2015 11:18:10 Masahiro Yamada wrote:
+>> diff --git a/Documentation/devicetree/bindings/arm/uniphier/cache-uniphier.txt b/Documentation/devicetree/bindings/arm/uniphier/cache-uniphier.txt
+>> new file mode 100644
+>> index 0000000..6428289
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/arm/uniphier/cache-uniphier.txt
+>> @@ -0,0 +1,30 @@
+>> +UniPhier outer cache controller
+>> +
+>> +UniPhier SoCs are integrated with a level 2 cache controller that resides
+>> +outside of the ARM cores, some of them also have a level 3 cache controller.
+>> +
+>> +Required properties:
+>> +- compatible: should be one of the followings:
+>> +       "socionext,uniphier-l2-cache"   (L2 cache)
+>> +       "socionext,uniphier-l3-cache"   (L3 cache)
+>> +- reg: offsets and lengths of the register sets for the device.  It should
+>> +  contain 3 regions: control registers, revision registers, operation
+>> +  registers, in this order.
+>> +
+>> +The L2 cache must exist to use the L3 cache; adding only an L3 cache device
+>> +node to the device tree causes the initialization failure of the whole outer
+>> +cache system.
 >>
->> Hi Rafael,
->>
->> Not sure if I has missed the merge window.
->> Do I have chance to have this series merged for 4.3?
 >
-> Yes, it should make it.
->
->> Would you please take [1,2] of this series?
+> How much does this outer cache have in common with the l2x0/pl310 cache
+> controller model?
 
-Thanks.
+Nothing.
 
->
-> I'm not sure what you mean.  Are you withdrawing the [3/3]?
+This outer cache is not a variant of l2x0/pl310.
+It was designed only for our SoCs from scratch.
 
-The [3/3] is based on Mediatek SoC maintainer tree[1] and the patch which
-introduce a new clock type[2] consumed by MT8173 cpufreq driver. So it will
-cause some conflicts if it goes through your tree. I am not sure how this
-should be handled, but should it be merged through Mediatek SoC maintainer
-tree?
 
-@Matthias?
+> Would it make sense to at least share the
+> common entry point at l2x0_of_init() so you don't need to call it from
+> the platform file?
 
-Thanks
+I do not think so.
 
-Best Regards,
-Pi-Cheng
 
-[1] https://github.com/mbgg/linux-mediatek.git v4.2-next/arm64
-[2] http://article.gmane.org/gmane.linux.kernel/2021379
+l2x0_of_init() checks L2X0_AUX_CTRL register,
+but the cache-uniphier does not have such register,
+so the boot code crashes.
 
->
-> Thanks,
-> Rafael
->
+
+
+BTW, what makes l2x0_of_init() so special?
+
+Only L2x0/L310 and variants can be initialized
+directly from init_IRQ().
+
+Moreover, outer-cache init seems to be unrelated to
+IRQ init.
+
+
+-- 
+Best Regards
+Masahiro Yamada
