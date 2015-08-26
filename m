@@ -1,74 +1,33 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 26 Aug 2015 14:08:02 +0100
-Subject: [PATCH 3/4] ARM: STiH407: Add nodes for RemoteProc
-In-Reply-To: <1440594483-29601-1-git-send-email-lee.jones@linaro.org>
-References: <1440594483-29601-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1440594483-29601-4-git-send-email-lee.jones@linaro.org>
+Date: Wed, 26 Aug 2015 14:07:59 +0100
+Subject: [PATCH 0/4] remoteproc: Add driver for STMicroelectronics platforms
+Message-ID: <1440594483-29601-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- arch/arm/boot/dts/stih407-family.dtsi | 48 +++++++++++++++++++++++++++++++++++
- 1 file changed, 48 insertions(+)
+ST's platforms often have multiple co-processors (usually ST40s or ST231s)
+on-board.  This provides the Linux-side infrastructure to flash and boot
+them successfully.
 
-diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
-index 33daa49..89a363c 100644
---- a/arch/arm/boot/dts/stih407-family.dtsi
-+++ b/arch/arm/boot/dts/stih407-family.dtsi
-@@ -608,5 +608,53 @@
- 			status		= "okay";
- 			tx-only;
- 		};
-+
-+		st231_gp0: st231-gp0 at 0 {
-+			compatible = "st,st231-rproc";
-+			reg = <0x40000000 0x01000000>;
-+			reg-names = "carveout";
-+			resets = <&softreset STIH407_ST231_GP0_SOFTRESET>;
-+			reset-names = "sw_reset";
-+			clocks = <&clk_s_c0_flexgen CLK_ST231_GP_0>;
-+			clock-names = "rproc_clk";
-+			clock-frequency = <600000000>;
-+			st,syscfg-boot = <&syscfg_core 0x22C>;
-+		};
-+
-+		st231_gp1: st231-gp1 at 0 {
-+			compatible = "st,st231-rproc";
-+			reg = <0x41000000 0x01000000>;
-+			reg-names = "carveout";
-+			resets = <&softreset STIH407_ST231_GP1_SOFTRESET>;
-+			reset-names = "sw_reset";
-+			clocks = <&clk_s_c0_flexgen CLK_ST231_GP_1>;
-+			clock-names = "rproc_clk";
-+			clock-frequency = <600000000>;
-+			st,syscfg-boot = <&syscfg_core 0x220>;
-+		};
-+
-+		st231_audio: st231-audio at 0 {
-+			compatible = "st,st231-rproc";
-+			reg = <0x42000000 0x01000000>;
-+			reg-names = "carveout";
-+			resets = <&softreset STIH407_ST231_AUD_SOFTRESET>;
-+			reset-names = "sw_reset";
-+			clocks = <&clk_s_c0_flexgen CLK_ST231_AUD_0>;
-+			clock-names = "rproc_clk";
-+			clock-frequency = <600000000>;
-+			st,syscfg-boot = <&syscfg_core 0x228>;
-+		};
-+
-+		st231_dmu: st231-dmu at 0 {
-+			compatible = "st,st231-rproc";
-+			reg = <0x43000000 0x01000000>;
-+			reg-names = "carveout";
-+			resets = <&softreset STIH407_ST231_DMU_SOFTRESET>;
-+			reset-names = "sw_reset";
-+			clocks = <&clk_s_c0_flexgen CLK_ST231_DMU>;
-+			clock-names = "rproc_clk";
-+			clock-frequency = <600000000>;
-+			st,syscfg-boot = <&syscfg_core 0x224>;
-+		};
- 	};
- };
+This set has been tested on an STiH410-B2120.
+
+Lee Jones (4):
+  remoteproc: dt: Provide bindings for ST's Remote Processor Controller
+    driver
+  remoteproc: Supply controller driver for ST's Remote Processors
+  ARM: STiH407: Add nodes for RemoteProc
+  remoteproc: debugfs: Add ability to boot remote processor using
+    debugfs
+
+ .../devicetree/bindings/remoteproc/st-rproc.txt    |  38 +++
+ arch/arm/boot/dts/stih407-family.dtsi              |  48 ++++
+ drivers/remoteproc/Kconfig                         |   9 +
+ drivers/remoteproc/Makefile                        |   1 +
+ drivers/remoteproc/remoteproc_debugfs.c            |  25 ++
+ drivers/remoteproc/st_remoteproc.c                 | 300 +++++++++++++++++++++
+ 6 files changed, 421 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/remoteproc/st-rproc.txt
+ create mode 100644 drivers/remoteproc/st_remoteproc.c
+
 -- 
 1.9.1
