@@ -1,112 +1,81 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 26 Aug 2015 12:25:32 +0100
-Subject: [PATCH v3 1/1][Resend] misc: sram: add dev_pm_ops to support
- module power gate
-In-Reply-To: <1440540187-6208-1-git-send-email-shenwei.wang@freescale.com>
-References: <1440540187-6208-1-git-send-email-shenwei.wang@freescale.com>
-Message-ID: <55DDA22C.4090408@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 26 Aug 2015 13:32:03 +0200
+Subject: [PATCH] arm64: fix bug for reloading FPSIMD state after execve on
+ cpu 0.
+In-Reply-To: <20150826111205.GD30466@arm.com>
+References: <1440556841-17219-1-git-send-email-chunyan.zhang@spreadtrum.com>
+ <20150826111205.GD30466@arm.com>
+Message-ID: <CAKv+Gu_VtFGsKPmFfLHm=kNM=vK=p1TR+fd52P68MiA6J0zUFQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 26 August 2015 at 13:12, Will Deacon <will.deacon@arm.com> wrote:
+> Hello,
+>
+> [adding Ard]
+>
+> On Wed, Aug 26, 2015 at 03:40:41AM +0100, Chunyan Zhang wrote:
+>> From: Janet Liu <janet.liu@spreadtrum.com>
+>>
+>> If process A is running on CPU 0 and do execve syscall and after sched_exec,
+>> dest_cpu is 0, fpsimd_state.cpu is 0. If at the time Process A get scheduled
+>> out and after some kernel threads running on CPU 0, process A is back in CPU 0,
+>> A's fpsimd_state.cpu is current cpu id "0", and per_cpu(fpsimd_last_state)
+>> points A's fpsimd_state, TIF_FOREIGN_FPSTATE will be clear, kernel will not
+>> reload the context during it return to userspace. so set the cpu's
+>> fpsimd_last_state to NULL to avoid this.
+>
+> AFAICT, this is only a problem if one of the kernel threads uses the fpsimd
+> registers, right? However, kernel_neon_begin_partial clobbers
+> fpsimd_last_state, so I'm struggling to see the problem.
+>
 
+I think the problem is real, but it would be better to set the
+fpsimd_state::cpu field to an invalid value like we do in
+fpsimd_flush_task_state()
 
-On 25/08/15 23:03, Shenwei Wang wrote:
-> When system goes into low power states like SUSPEND_MEM and
-> HIBERNATION, the hardware IP block may be powered off to reduce
-> the power consumption. This power down will lost all the
-> data inside the ram. This patch added the dev_pm_ops and
-> implemented two callbacks: suspend_noirq and resume_noirq, which
-> will save the data in the on-chip-ram right before power down
-> and restore it after system resumes.
->
-> A new property string named "can-power-gate" is added to
-> the devicetree bindings too.
->
-> Based-on-a-patch-by: Anson Huang <b20788@freescale.com>
-> Signed-off-by: Shenwei Wang <shenwei.wang@freescale.com>
->
-> ---
-> Change log:
->
-> PATCH v3
-> 	Removed the unnecessary clk_enable/clk_disable.
->
-> PATCH v2
-> 	Use vmalloc to allocate the SRAM backup memory.
-> 	Code clean up.
->
->   Documentation/devicetree/bindings/misc/sram.txt |  2 ++
->   drivers/misc/sram.c                             | 42 +++++++++++++++++++++++++
->   2 files changed, 44 insertions(+)
->
-> diff --git a/Documentation/devicetree/bindings/misc/sram.txt b/Documentation/devicetree/bindings/misc/sram.txt
-> index 36cbe5a..1170086 100644
-> --- a/Documentation/devicetree/bindings/misc/sram.txt
-> +++ b/Documentation/devicetree/bindings/misc/sram.txt
-> @@ -33,6 +33,8 @@ Optional properties in the area nodes:
->
->   - compatible : standard definition, should contain a vendor specific string
->                  in the form <vendor>,[<device>-]<usage>
-> +- can-power-gate: a property to tell the driver that the sram can support
-> +		power gate
->
->   Example:
->
-> diff --git a/drivers/misc/sram.c b/drivers/misc/sram.c
-> index 15c33cc..db9f1fa 100644
-> --- a/drivers/misc/sram.c
-> +++ b/drivers/misc/sram.c
-> @@ -30,7 +30,9 @@
->
->   struct sram_dev {
->   	struct device *dev;
-> +	void *power_off_save;
->   	void __iomem *virt_base;
-> +	u32 size;
->
->   	struct gen_pool *pool;
->   	struct clk *clk;
-> @@ -156,6 +158,33 @@ static int sram_reserve_regions(struct sram_dev *sram, struct resource *res)
->   	return ret;
->   }
->
-> +static int sram_suspend_noirq(struct device *dev)
-> +{
-> +	struct platform_device *pdev = to_platform_device(dev);
-> +	struct sram_dev *sram = platform_get_drvdata(pdev);
-> +
-> +	if (!sram->power_off_save)
-> +		return 0;
-> +
-> +	/* Save necessary regs */
-> +	memcpy(sram->power_off_save, sram->virt_base, sram->size);
-> +
-> +	return 0;
-> +}
-> +
-> +static int sram_resume_noirq(struct device *dev)
-> +{
-> +	struct platform_device *pdev = to_platform_device(dev);
-> +	struct sram_dev *sram = platform_get_drvdata(pdev);
-> +
-> +	if (!sram->power_off_save)
-> +		return 0;
-> +
-> +	memcpy(sram->virt_base, sram->power_off_save, sram->size);
+diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+index 44d6f7545505..c56956a16d3f 100644
+--- a/arch/arm64/kernel/fpsimd.c
++++ b/arch/arm64/kernel/fpsimd.c
+@@ -158,6 +158,7 @@ void fpsimd_thread_switch(struct task_struct *next)
+ void fpsimd_flush_thread(void)
+ {
+        memset(&current->thread.fpsimd_state, 0, sizeof(struct fpsimd_state));
++       fpsimd_flush_task_state(current);
+        set_thread_flag(TIF_FOREIGN_FPSTATE);
+ }
 
-As I objected in the original thread[1], I am just iterating myself here
-again. IMO this is unnecessary and can be avoided. It's also not
-scalable for large SRAM. I *still can't understand* what's the use-case
-where you need to save/restore the entire SRAM content.
+(note the memset erroneously initializes that field to CPU 0)
 
-I see it's mostly used for audio/video and some crypto use-case(in the
-mainline). In most of those cases, when you enter S2R, all the devices
-*needs to be in quiescent state* which implies they no longer use SRAM.
-So can you please care to provide your reasons for this save/restore ?
+This more accurately reflects the state of the process after forking,
+i.e., that its FPSIMD state has never been loaded into any CPU.
 
-On some platforms, it's used for PM in which case it needs to be always on.
+-- 
+Ard.
 
-Regards,
-Sudeep
-
-[1] http://www.spinics.net/lists/arm-kernel/msg441449.html
+> Are you seeing an issue in practice?
+>
+> Will
+>
+>> Signed-off-by: Janet Liu <janet.liu@spreadtrum.com>
+>> Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
+>> ---
+>>  arch/arm64/kernel/fpsimd.c |    1 +
+>>  1 file changed, 1 insertion(+)
+>>
+>> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+>> index 44d6f75..ec58d94 100644
+>> --- a/arch/arm64/kernel/fpsimd.c
+>> +++ b/arch/arm64/kernel/fpsimd.c
+>> @@ -159,6 +159,7 @@ void fpsimd_flush_thread(void)
+>>  {
+>>       memset(&current->thread.fpsimd_state, 0, sizeof(struct fpsimd_state));
+>>       set_thread_flag(TIF_FOREIGN_FPSTATE);
+>> +     this_cpu_write(fpsimd_last_state, NULL);
+>>  }
+>>
+>>  /*
+>> --
+>> 1.7.9.5
+>>
