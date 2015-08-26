@@ -1,55 +1,52 @@
 From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
-Date: Wed, 26 Aug 2015 20:54:35 +0700
-Subject: [PATCH V3 0/4] PCI: ACPI: Setting up DMA coherency for PCI device
- from _CCA attribute
-Message-ID: <1440597279-11802-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+Date: Wed, 26 Aug 2015 20:54:36 +0700
+Subject: [PATCH V3 1/4] Honor ACPI _CCA attribute setting
+In-Reply-To: <1440597279-11802-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+References: <1440597279-11802-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+Message-ID: <1440597279-11802-2-git-send-email-Suravee.Suthikulpanit@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support to setup DMA coherency for PCI device using
-the ACPI _CCA attribute. According to the ACPI spec, the _CCA attribute
-is required for ARM64. Therefore, this patch is a pre-req for ACPI PCI
-support for ARM64 which is currently in development.
+From: Jeremy Linton <jeremy.linton@arm.com>
 
-Also, this should not affect other architectures that does not define 
-CONFIG_ACPI_CCA_REQUIRED, since the default value is coherent.
+ACPI configurations can now mark devices as noncoherent,
+support that choice.
 
-I have included the following patch from Jeremy before cleaning up
-the acpi_check_dma() function (in patch 2).
+NOTE: This is required to support USB on ARM Juno Development Board.
 
-    http://www.spinics.net/lists/linux-usb/msg128582.html)
+Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+CC: Bjorn Helgaas <bhelgaas@google.com>
+CC: Catalin Marinas <catalin.marinas@arm.com>
+CC: Rob Herring <robh+dt@kernel.org>
+CC: Will Deacon <will.deacon@arm.com>
+CC: Rafael J. Wysocki <rjw@rjwysocki.net>
+---
+ include/acpi/acpi_bus.h | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-Changes from V2: (https://lkml.org/lkml/2015/8/25/549)
-    * Return -ENOSUPP instead of -1 (per Rafael's suggestion)
-    * Add WARN() when fail to setup DMA for PCI device when booting
-      ACPI (per Arnd's suggestion)
-    * Added Acked-by from Rob.
-    * Minor clean up
-
-Changes from V1: (https://lkml.org/lkml/2015/8/13/182)
-    * Include patch 1 from Jeremy to enable support for _CCA=0
-    * Clean up acpi_check_dma() per Bjorn suggestions
-    * Split the original V1 patch into two patches (patch 3 and 4)
-
-
-Jeremy Linton (1):
-  Honor ACPI _CCA attribute setting
-
-Suravee Suthikulpanit (3):
-  ACPI/scan: Clean up acpi_check_dma
-  PCI: OF: Move of_pci_dma_configure() to pci_dma_configure()
-  PCI: ACPI: Add support for PCI device DMA coherency
-
- drivers/acpi/acpi_platform.c |  7 ++++++-
- drivers/acpi/glue.c          |  6 +++---
- drivers/acpi/scan.c          | 39 +++++++++++++++++++++++++++++++++++++++
- drivers/base/property.c      | 10 +++++++---
- drivers/of/of_pci.c          | 20 --------------------
- drivers/pci/probe.c          | 35 +++++++++++++++++++++++++++++++++--
- include/acpi/acpi_bus.h      | 35 ++---------------------------------
- include/linux/acpi.h         |  4 ++--
- include/linux/of_pci.h       |  3 ---
- 9 files changed, 92 insertions(+), 67 deletions(-)
-
+diff --git a/include/acpi/acpi_bus.h b/include/acpi/acpi_bus.h
+index 83061ca..7ecb8e4 100644
+--- a/include/acpi/acpi_bus.h
++++ b/include/acpi/acpi_bus.h
+@@ -399,7 +399,7 @@ static inline bool acpi_check_dma(struct acpi_device *adev, bool *coherent)
+ 	 * case 1. Do not support and disable DMA.
+ 	 * case 2. Support but rely on arch-specific cache maintenance for
+ 	 *         non-coherence DMA operations.
+-	 * Currently, we implement case 1 above.
++	 * Currently, we implement case 2 above.
+ 	 *
+ 	 * For the case when _CCA is missing (i.e. cca_seen=0) and
+ 	 * platform specifies ACPI_CCA_REQUIRED, we do not support DMA,
+@@ -407,7 +407,8 @@ static inline bool acpi_check_dma(struct acpi_device *adev, bool *coherent)
+ 	 *
+ 	 * See acpi_init_coherency() for more info.
+ 	 */
+-	if (adev->flags.coherent_dma) {
++	if (adev->flags.coherent_dma ||
++	    (adev->flags.cca_seen && IS_ENABLED(CONFIG_ARM64))) {
+ 		ret = true;
+ 		if (coherent)
+ 			*coherent = adev->flags.coherent_dma;
 -- 
 2.1.0
