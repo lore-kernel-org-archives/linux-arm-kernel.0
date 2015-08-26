@@ -1,28 +1,58 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 26 Aug 2015 14:47:37 +0200
-Subject: [PATCH] gpio: vf610: handle level IRQ's properly
-In-Reply-To: <1440197802-29720-1-git-send-email-stefan@agner.ch>
-References: <1440197802-29720-1-git-send-email-stefan@agner.ch>
-Message-ID: <CACRpkdYqU_yvZE4WS2jBDOhemPy7dcHeOoj_dG61hCL8ugTMYg@mail.gmail.com>
+From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
+Date: Wed, 26 Aug 2015 14:30:26 +0200
+Subject: [PATCH linux-next v5 4/5] Documentation: atmel-quadspi: add binding
+ file for Atmel QSPI driver
+In-Reply-To: <cover.1440580764.git.cyrille.pitchen@atmel.com>
+References: <cover.1440580764.git.cyrille.pitchen@atmel.com>
+Message-ID: <793cb906c79eed821cf9b47e79dc1b54a7a5dbd0.1440580764.git.cyrille.pitchen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 22, 2015 at 12:56 AM, Stefan Agner <stefan@agner.ch> wrote:
+This patch documents the DT bindings for the driver of the Atmel QSPI
+controller embedded inside sama5d2x SoCs.
 
-> The GPIO IRQ controller is able to generate level triggered
-> interrupts, however, these were handled by handle_simple_irq so far
-> which did not take care of IRQ masking. This lead to "nobody cared
-> (try booting with the "irqpoll" option)" stack traces.
->
-> Use the generic interrupt handlers depending on the IRQ type.
->
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
+Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Acked-by: Marek Vasut <marex@denx.de>
+---
+ .../devicetree/bindings/mtd/atmel-quadspi.txt      | 29 ++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mtd/atmel-quadspi.txt
 
-Patch applied.
-
-Hm, this looks like a problem that could exist in a few more
-GPIO drivers. Can you look around and see if there is something
-immediately suspicious in drivers/gpio?
-
-Yours,
-Linus Walleij
+diff --git a/Documentation/devicetree/bindings/mtd/atmel-quadspi.txt b/Documentation/devicetree/bindings/mtd/atmel-quadspi.txt
+new file mode 100644
+index 000000000000..0b8d545bb198
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mtd/atmel-quadspi.txt
+@@ -0,0 +1,29 @@
++* Atmel Quad Serial Peripheral Interface (QSPI)
++
++Required properties:
++- compatible:     should be "atmel,sama5d2-qspi"
++- reg:            the first contains the register location and length,
++                  the second contains the memory mapping address and length
++- interrupts:     should contain the interrupt for the device
++- clocks:         the phandle of the clock needed by the QSPI controller
++- #address-cells: should be <1>
++- #size-cells:    should be <0>
++
++Example:
++
++spi at f0020000 {
++	compatible = "atmel,sama5d2-qspi";
++	reg = <0xf0020000 0x100>,
++	      <0xd0000000 0x8000000>;
++	interrupts = <52 IRQ_TYPE_LEVEL_HIGH 7>;
++	clocks = <&spi0_clk>;
++	#address-cells = <1>;
++	#size-cells = <0>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_spi0_default>;
++	status = "okay";
++
++	m25p80 at 0 {
++		...
++	};
++};
+-- 
+1.8.2.2
