@@ -1,50 +1,44 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 26 Aug 2015 20:54:21 +0200 (CEST)
-Subject: [PATCH 1/1] irqchip: imx-gpcv2: Simplify the implemenation
-In-Reply-To: <CY1PR0301MB084315B04E53CF64EF299D0B83600@CY1PR0301MB0843.namprd03.prod.outlook.com>
-References: <1440604166-2624-1-git-send-email-shenwei.wang@freescale.com>
- <alpine.DEB.2.11.1508261756540.15006@nanos>
- <CY1PR0301MB084315B04E53CF64EF299D0B83600@CY1PR0301MB0843.namprd03.prod.outlook.com>
-Message-ID: <alpine.DEB.2.11.1508262052260.15006@nanos>
+From: jonmason@broadcom.com (Jon Mason)
+Date: Wed, 26 Aug 2015 15:00:46 -0400
+Subject: [PATCH 5/5] MAINTAINERS: add entry for the Broadcom Northstar
+ Plus SoCs
+In-Reply-To: <CAOesGMioBQY9qy-S8kMJmo_=B6-KZiUkd=Ns1Uo2dGu0BiqppQ@mail.gmail.com>
+References: <1440092861-25825-1-git-send-email-jonmason@broadcom.com>
+ <CAOesGMioBQY9qy-S8kMJmo_=B6-KZiUkd=Ns1Uo2dGu0BiqppQ@mail.gmail.com>
+Message-ID: <20150826190046.GB4171@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 26 Aug 2015, Shenwei Wang wrote:
-> > From: Thomas Gleixner [mailto:tglx at linutronix.de]
-> > > +	cd = imx_gpcv2_instance;
-> > > +	if (!cd)
-> > >  		return 0;
-> > >
-> > > +	for (i = 0; i < IMR_NUM; i++) {
-> > > +		reg = cd->gpc_base + cd->cpu2wakeup + i * 4;
-> > > +		cd->wakeup_sources[i] = readl_relaxed(reg);
-> > > +	}
-> > > +
-> > >  	if (sources)
-> > > -		*sources = imx_gpcv2_instance->wakeup_sources;
-> > > +		*sources = cd->wakeup_sources;
-> > >
-> > >  	return IMR_NUM;
-> > 
-> > You do not need the intermediate storage at all.
-> > 
-> > u32 imx_gpcv2_get_wakeup_source(u32 *sources) {
-> > 	if (sources) {
-> > 		for (i = 0; i < IMR_NUM; i++) {
-> > 			reg = cd->gpc_base + cd->cpu2wakeup + i * 4;
-> > 			sources[i] = readl_relaxed(reg);
-> > 		}
-> > 	}
-> > 	....
+On Tue, Aug 25, 2015 at 04:42:42PM -0700, Olof Johansson wrote:
+> On Thu, Aug 20, 2015 at 10:47 AM, Jon Mason <jonmason@broadcom.com> wrote:
+> > Modify the iProc MAINTAINER to cover the Nortstar Plus SoCs, and add me
+> > to the list of people responsible for it.
 > 
-> Using the intermediate storage here can make the caller a little easier,
-> because the caller does not need to malloc the memory before the call.
-> Especially the caller does not even know how many memory to allocate
-> In the beginning.
+> That's not what this patch does. It removes CYGNUS from the
+> description as well. Hmm?
 
-Fair enough, but why do you need that case where sources can be NULL
-just to return IMR_NUM?
+iProc is a family of SoCs that includes Cygnus, Northstar (BCM5301X),
+Northstar Plus, Northstar 2, and a number of other platforms.  I
+removed the "Cygnus" for that reason.
+
+> 
+> I'm also not a fan of the complex patterns, but that's more of a
+> bikeshedding comment. Does Broadcom really not have a bit more
+> systematic naming than this? :)
+
+Per Florian's comment, it's a bit of a mess internally.
+
+> 
+> > Signed-off-by: Jon Mason <jonmason@broadcom.com>
+> > Reviewed-by: Scott Branden <sbranden@broadcom.com>
+> 
+> For maintainer updates, we usuallu like to see a public ack of this
+> and not just a pre-acked patch. You _could_ have added it yourself
+> without Scott's actual approval, after all.
 
 Thanks,
+Jon
 
-	tglx
+> 
+> 
+> -Olof
