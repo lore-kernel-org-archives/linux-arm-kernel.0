@@ -1,81 +1,327 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 26 Aug 2015 11:09:58 +0100
-Subject: [PATCH v3 1/4] irqchip: GICv3: Convert to EOImode == 1
-In-Reply-To: <55DD7EDB.7010208@linaro.org>
-References: <1440503605-10185-1-git-send-email-marc.zyngier@arm.com>
- <1440503605-10185-2-git-send-email-marc.zyngier@arm.com>
- <55DD7EDB.7010208@linaro.org>
-Message-ID: <55DD9076.7080000@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 26 Aug 2015 12:37:17 +0200
+Subject: [PATCH] arm: Handle starting up in secure mode
+In-Reply-To: <1440424572-27116-1-git-send-email-cov@codeaurora.org>
+References: <1440424572-27116-1-git-send-email-cov@codeaurora.org>
+Message-ID: <CAKv+Gu90tTKEBpdrarvnVMFqH27WhxRwvbeXNuhR12FFBOtuYg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/08/15 09:54, Eric Auger wrote:
-> Hi Marc,
-> On 08/25/2015 01:53 PM, Marc Zyngier wrote:
->> So far, GICv3 has been used in with EOImode == 0. The effect of this
->> mode is to perform the priority drop and the deactivation of the
->> interrupt at the same time.
->>
->> While this works perfectly for Linux (we only have a single priority),
->> it causes issues when an interrupt is forwarded to a guest, and when
->> we want the guest to perform the EOI itself.
->>
->> For this case, the GIC architecture provides EOImode == 1, where:
->> - A write to ICC_EOIR1_EL1 drops the priority of the interrupt and
->>   leaves it active. Other interrupts at the same priority level can
->>   now be taken, but the active interrupt cannot be taken again
->> - A write to ICC_DIR_EL1 marks the interrupt as inactive, meaning
->>   it can now be taken again.
->>
->> This patch converts the driver to be able to use this new mode,
->> depending on whether or not the kernel can behave as a hypervisor.
->> No feature change.
->>
->> Reviewed-by: Eric Auger <eric.auger@linaro.org>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  drivers/irqchip/irq-gic-v3.c       | 39 ++++++++++++++++++++++++++++++++++----
->>  include/linux/irqchip/arm-gic-v3.h |  9 +++++++++
->>  2 files changed, 44 insertions(+), 4 deletions(-)
->>
->> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
->> index c52f7ba..addd2ee 100644
->> --- a/drivers/irqchip/irq-gic-v3.c
->> +++ b/drivers/irqchip/irq-gic-v3.c
->> @@ -30,6 +30,7 @@
->>  #include <asm/cputype.h>
->>  #include <asm/exception.h>
->>  #include <asm/smp_plat.h>
->> +#include <asm/virt.h>
->>  
->>  #include "irq-gic-common.h"
->>  #include "irqchip.h"
->> @@ -50,6 +51,7 @@ struct gic_chip_data {
->>  };
->>  
->>  static struct gic_chip_data gic_data __read_mostly;
->> +static struct static_key supports_deactivate = STATIC_KEY_INIT_TRUE;
-> 
-> in http://www.spinics.net/lists/arm-kernel/msg439813.html, Catalin
-> reported the direct usage of static_key was deprecated. Sorry I learned
-> that after my last review.
-> 
-> see https://lkml.org/lkml/2015/8/3/539
+On 24 August 2015 at 15:55, Christopher Covington <cov@codeaurora.org> wrote:
+> ARM Linux appears to have never been made aware of the ARMv7 security
+> extensions. When CONFIG_ARM_SEC_EXT=y, have it probe for its security
+> state by checking whether CNTFRQ is writeable and potentially make
+> mode changes based on the information. The most features are available
+> from hypervisor (HYP) mode, so switch to it possible. Failing that,
+> prefer non-secure supervisor (SVC) mode to secure supervisor mode.
+>
+> Signed-off-by: Christopher Covington <cov@codeaurora.org>
 
-Hi Eric,
+Nice hack! One comment below ...
 
-I'm aware of Peter's work to rework static keys, but that code is not
-merged yet (though I believe it is on its way to 4.3). I have an
-additional patch that repaints the code to use static_key_likely() all
-over the place, but I keep it separate for the time being.
+> ---
+>  arch/arm/include/asm/sec.h         |  27 +++++++
+>  arch/arm/include/uapi/asm/ptrace.h |   1 +
+>  arch/arm/kernel/Makefile           |   1 +
+>  arch/arm/kernel/head.S             |   3 +
+>  arch/arm/kernel/mon-stub.S         | 158 +++++++++++++++++++++++++++++++++++++
+>  arch/arm/mm/Kconfig                |  20 ++++-
+>  6 files changed, 206 insertions(+), 4 deletions(-)
+>  create mode 100644 arch/arm/include/asm/sec.h
+>  create mode 100644 arch/arm/kernel/mon-stub.S
+>
+> diff --git a/arch/arm/include/asm/sec.h b/arch/arm/include/asm/sec.h
+> new file mode 100644
+> index 0000000..4a9a573
+> --- /dev/null
+> +++ b/arch/arm/include/asm/sec.h
+> @@ -0,0 +1,27 @@
+> +/*
+> + * Copyright (c) 2014, The Linux Foundation. All rights reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 and
+> + * only version 2 as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#ifndef SEC_H
+> +#define SEC_H
+> +
+> +#ifndef __ASSEMBLY__
+> +
+> +#ifdef CONFIG_ARM_SEC_EXT
+> +extern int __boot_cpu_secure;
+> +#else
+> +#define __boot_cpu_secure 0
+> +#endif
+> +
+> +#endif /* ! __ASSEMBLY__ */
+> +
+> +#endif /* SEC_H */
+> diff --git a/arch/arm/include/uapi/asm/ptrace.h b/arch/arm/include/uapi/asm/ptrace.h
+> index 5af0ed1..70ff6bf 100644
+> --- a/arch/arm/include/uapi/asm/ptrace.h
+> +++ b/arch/arm/include/uapi/asm/ptrace.h
+> @@ -53,6 +53,7 @@
+>  #endif
+>  #define FIQ_MODE       0x00000011
+>  #define IRQ_MODE       0x00000012
+> +#define MON_MODE       0x00000016
+>  #define ABT_MODE       0x00000017
+>  #define HYP_MODE       0x0000001a
+>  #define UND_MODE       0x0000001b
+> diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+> index e69f7a1..a60a0f7 100644
+> --- a/arch/arm/kernel/Makefile
+> +++ b/arch/arm/kernel/Makefile
+> @@ -87,6 +87,7 @@ head-y                        := head$(MMUEXT).o
+>  obj-$(CONFIG_DEBUG_LL) += debug.o
+>  obj-$(CONFIG_EARLY_PRINTK)     += early_printk.o
+>
+> +obj-$(CONFIG_ARM_SEC_EXT)      += mon-stub.o
+>  obj-$(CONFIG_ARM_VIRT_EXT)     += hyp-stub.o
+>  ifeq ($(CONFIG_ARM_PSCI),y)
+>  obj-y                          += psci.o psci-call.o
+> diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+> index 29e2991..d137ba4 100644
+> --- a/arch/arm/kernel/head.S
+> +++ b/arch/arm/kernel/head.S
+> @@ -85,6 +85,9 @@ ENTRY(stext)
+>   THUMB(        .thumb                  )       @ switch to Thumb now.
+>   THUMB(1:                      )
+>
+> +#ifdef CONFIG_ARM_SEC_EXT
+> +       bl      __mon_stub_install
+> +#endif
+>  #ifdef CONFIG_ARM_VIRT_EXT
+>         bl      __hyp_stub_install
+>  #endif
+> diff --git a/arch/arm/kernel/mon-stub.S b/arch/arm/kernel/mon-stub.S
+> new file mode 100644
+> index 0000000..ab1a361
+> --- /dev/null
+> +++ b/arch/arm/kernel/mon-stub.S
+> @@ -0,0 +1,158 @@
+> +/*
+> + * Copyright (c) 2014, The Linux Foundation. All rights reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 and
+> + * only version 2 as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/linkage.h>
+> +#include <asm/assembler.h>
+> +#include <asm/sec.h>
+> +
+> +.data
+> +ENTRY(__boot_cpu_secure)
+> +       .long   0
+> +.text
+> +
+> +/*
+> + * ARM Linux has the most features available in hypervisor mode and
+> + * running in non-secure mode is recommended. Thus, try to get into
+> + * hypervisor mode if we're not already there, or failing that, try
+> + * to get into non-secure supervisor mode.
+> + */
+> +ENTRY(__mon_stub_install)
+> +       /*
+> +        * Store the mode field of the CPSR in r4 and return early if we're
+> +        * already in hypervisor mode.
+> +        */
+> +       mrs     r4, cpsr
+> +       and     r4, r4, #MODE_MASK
+> +       cmp     r4, #HYP_MODE
+> +       reteq   lr
+> +
+> +       /*
+> +        * Save the link register in a non-banked register, r5, so that we
+> +        * still have access to it after mode switches.
+> +        */
+> +       mov     r5, lr
+> +
+> +       /*
+> +        * Read ID_PFR1 and store the value in r6. This register indicates
+> +        * the presence of the security and virtualization extensions. The
+> +        * former is interesting because we must traverse secure monitor mode
+> +        * to get to hypervisor mode and it allows easy manipulation of
+> +        * exception vectors via the Vector Base Address Register (VBAR).
+> +        *
+> +        * ID_PFR1 also indicates whether the generic timer is present, which
+> +        * has a handy register for our purposes, CNTFRQ. Accesses won't trap
+> +        * even with higher exception levels in AArch64 and writes will only
+> +        * succeed from the highest exception level on a system (the undefined
+> +        * exception from a failed write is used as a branch).
+> +        */
+> +
+> +       mrc   p15, 0, r6, c0, c1, 1     @ ID_PFR1
+> +
+> +       /*
+> +        * If we're in monitor mode then we know the security setting and can
+> +        * begin the transition to hypervisor or non-secure supervisor mode
+> +        * immediately.
+> +        */
+> +
+> +       cmp     r4, #MON_MODE
+> +       beq     monitor
+> +
+> +       /*
+> +        * Check that the security extensions and generic timer are present.
+> +        */
+> +       and     r7, r6, #0xf0
+> +       cmp     r7, #0x10
+> +       cmpne   r7, #0x20
+> +       retne   lr
+> +       and     r8, r6, #0xf0000
+> +       cmp     r8, #0x10000
+> +       retne   lr
+> +
+> +       /*
+> +        * Set things up so that if a CNTFRQ access causes an undefined
+> +        * instruction exception, we return to the address indicated in r5
+> +        * in the mode indicated in r4.
+> +        */
+> +       adr     r7, __mon_stub_vectors
+> +       mcr     p15, 0, r7, c12, c0, 0  @ set vector base address (VBAR)
+> +
+> +       mrc     p15, 0, r7, c14, c0, 0  @ CNTFRQ
+> +       mcr     p15, 0, r7, c14, c0, 0  @ CNTFRQ
+> +
+> +       /*
+> +        * If we got this far, switch to monitor mode and prepare for further
+> +        * switching.
+> +        */
+> +       cps     #MON_MODE
+> +
+> +monitor:
+> +       /*
+> +        * TODO: Handle SIF and separate secure physical memory in general
+> +        */
+> +       mrc     p15, 0, r8, c1, c1, 0   @ get secure configuration (SCR)
+> +       orr     r8, r8, #1              @ non-secure (NS)
+> +
+> +       mov     r8, #1
+> +       ldr     r7, =__boot_cpu_secure
+> +       str     r8, [r7]
 
-If this series makes it in for 4.3, I'll post the repainting patch after
--rc1. Otherwise, I'll just update it in my tree.
+'=__boot_cpu_secure' gives you a link time virtual address, which is
+unusable at this point, since you are still running with the MMU off.
 
-I'm about to post v4 anyway, and I'll mention this in the cover letter.
+c022f99c:       e59f707c        ldr     r7, [pc, #124]  ; c022fa20
+c022f9a0:       e5878000        str     r8, [r7]
 
-Thanks,
+and
 
-	M.
+c022fa20:       c0f31508        .word   0xc0f31508
+
+You need to use a PC relative reference instead.
+
 -- 
-Jazz is not dead. It just smells funny...
+Ard.
+
+
+> +
+> +       /*
+> +        * See whether the switch will be to hypervisor or supervisor.
+> +        */
+> +       and     r7, r6, #0xf000
+> +       cmp     r7, #0x1000
+> +       mcrne   p15, 0, r8, c1, c1, 0   @ set secure configuration (SCR)
+> +       bne     supervise
+> +
+> +       orr     r8, r8, #0x100          @ hypercall enable (HCE)
+> +       mcr     p15, 0, r8, c1, c1, 0   @ set secure configuration (SCR)
+> +
+> +       mov     lr, r5
+> +       msr     spsr, #HYP_MODE
+> +       __ERET
+> +
+> +supervise:
+> +       /*
+> +        * Switch to supervisor mode and return using a non-banked register,
+> +        * in case we're not in the mode we started out in.
+> +        */
+> +       cps     #SVC_MODE
+> +       ret     r5
+> +ENDPROC(__mon_stub_install)
+> +
+> +ENTRY(__mon_stub_do_undef)
+> +       /*
+> +        * Return to the address at r5 with the mode in r4. If there is an
+> +        * illegal or unimplemented mode in r4 the cpsr write will cause an
+> +        * undefined exception, recursing. To avoid that, put the current
+> +        * mode in r4 before performing the write.
+> +        */
+> +       mrs     r6, cpsr
+> +       bic     r7, r6, #MODE_MASK
+> +       orr     r7, r7, r4
+> +       and     r4, r6, #MODE_MASK
+> +       msr     cpsr, r7
+> +       ret     r5
+> +ENDPROC(__mon_stub_do_undef)
+> +
+> +.align 5
+> +__mon_stub_vectors:
+> +__mon_stub_reset:      W(b)    .
+> +__mon_stub_und:                W(b)    __mon_stub_do_undef
+> +__mon_stub_call:       W(b)    .
+> +__mon_stub_pabort:     W(b)    .
+> +__mon_stub_dabort:     W(b)    .
+> +__mon_stub_trap:       W(b)    .
+> +__mon_stub_irq:                W(b)    .
+> +__mon_stub_fiq:                W(b)    .
+> +ENDPROC(__mon_stub_vectors)
+> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+> index 7c6b976..32fa451 100644
+> --- a/arch/arm/mm/Kconfig
+> +++ b/arch/arm/mm/Kconfig
+> @@ -676,7 +676,7 @@ config ARM_THUMBEE
+>           make use of it. Say N for code that can run on CPUs without ThumbEE.
+>
+>  config ARM_VIRT_EXT
+> -       bool
+> +       bool "Support for Virtualization Extensions"
+>         depends on MMU
+>         default y if CPU_V7
+>         help
+> @@ -684,9 +684,21 @@ config ARM_VIRT_EXT
+>           Extensions to install hypervisors without run-time firmware
+>           assistance.
+>
+> -         A compliant bootloader is required in order to make maximum
+> -         use of this feature.  Refer to Documentation/arm/Booting for
+> -         details.
+> +         A compliant bootloader or enabling ARM_SEC_EXT is required in
+> +         order to make maximum use of this feature. Refer to
+> +         Documentation/arm/Booting for details.
+> +
+> +config ARM_SEC_EXT
+> +       bool "Support for Security Extensions"
+> +       depends on MMU
+> +       default n
+> +       help
+> +         Say Y to have the kernel check for the presence of the ARM Security
+> +         Extensions and where possible, use them to switch to preferred
+> +         security and mode settings. This decreases the kernel's dependency
+> +         on bootloaders.
+> +
+> +         If unsure, say N.
+>
+>  config SWP_EMULATE
+>         bool "Emulate SWP/SWPB instructions" if !SMP
+> --
+> Qualcomm Innovation Center, Inc.
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> a Linux Foundation Collaborative Project
+>
