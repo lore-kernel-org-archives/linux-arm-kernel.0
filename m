@@ -1,68 +1,65 @@
 From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
-Date: Wed, 26 Aug 2015 09:00:23 +0700
-Subject: [PATCH V2 2/4] ACPI/scan: Clean up acpi_check_dma
-In-Reply-To: <1659571.paO1iYcMuM@vostro.rjw.lan>
+Date: Wed, 26 Aug 2015 09:01:58 +0700
+Subject: [PATCH V2 4/4] PCI: ACPI: Add support for PCI device DMA coherency
+In-Reply-To: <5541922.5doADRYBJG@vostro.rjw.lan>
 References: <1440524009-5359-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <1440524009-5359-3-git-send-email-Suravee.Suthikulpanit@amd.com>
- <1659571.paO1iYcMuM@vostro.rjw.lan>
-Message-ID: <55DD1DB7.1020203@amd.com>
+ <1440524009-5359-5-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <5541922.5doADRYBJG@vostro.rjw.lan>
+Message-ID: <55DD1E16.40607@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Rafael,
 
 On 8/26/15 06:48, Rafael J. Wysocki wrote:
-
->[...]
-> On Wednesday, August 26, 2015 12:33:27 AM Suravee Suthikulpanit wrote:
->> diff --git a/drivers/acpi/glue.c b/drivers/acpi/glue.c
->> index b9657af..55cf916 100644
->> --- a/drivers/acpi/glue.c
->> +++ b/drivers/acpi/glue.c
->> @@ -168,7 +168,7 @@ int acpi_bind_one(struct device *dev, struct acpi_device *acpi_dev)
->>   	struct list_head *physnode_list;
->>   	unsigned int node_id;
->>   	int retval = -EINVAL;
->> -	bool coherent;
->> +	int coherent;
->
-> enum, anyone?  With clearly defined values?
-
-Originally I had defined
-
-enum acpi_dma_coherency {
-	ACPI_DMA_NON_COHERENT,
-	ACPI_DMA_COHERENT,
-	APCI_DMA_NOT_SUPPORTED = -1,
-};
-
-Although, this would need to be defined in the include/linux/acpi.h, and 
-will be used also for #ifndef CONFIG_ACPI code to return errors. I was 
-not sure if this would be too much. If this is preferred, I'll add this 
-back in.
-
+> On Wednesday, August 26, 2015 12:33:29 AM Suravee Suthikulpanit wrote:
+>> This patch adds support for setting up PCI device DMA coherency from
+>> ACPI _CCA object that should normally be specified in the DSDT node
+>> of its PCI host bridge.
 >>
->>   	if (has_acpi_companion(dev)) {
->>   		if (acpi_dev) {
->> @@ -225,7 +225,8 @@ int acpi_bind_one(struct device *dev, struct acpi_device *acpi_dev)
->>   	if (!has_acpi_companion(dev))
->>   		ACPI_COMPANION_SET(dev, acpi_dev);
+>> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+>> CC: Bjorn Helgaas <bhelgaas@google.com>
+>> CC: Catalin Marinas <catalin.marinas@arm.com>
+>> CC: Rob Herring <robh+dt@kernel.org>
+>> CC: Will Deacon <will.deacon@arm.com>
+>> CC: Rafael J. Wysocki <rjw@rjwysocki.net>
+>> CC: Murali Karicheri <m-karicheri2@ti.com>
+>> ---
+>>   drivers/pci/probe.c | 15 ++++++++++-----
+>>   1 file changed, 10 insertions(+), 5 deletions(-)
 >>
->> -	if (acpi_check_dma(acpi_dev, &coherent))
->> +	coherent = acpi_check_dma_coherency(acpi_dev);
->> +	if (coherent != -1)
+>> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+>> index 4de6594..2fd2a60 100644
+>> --- a/drivers/pci/probe.c
+>> +++ b/drivers/pci/probe.c
+>> @@ -1551,17 +1551,22 @@ static void pci_init_capabilities(struct pci_dev *dev)
+>>    * @dev: ptr to pci_dev struct of the PCI device
+>>    *
+>>    * Function to update PCI devices's DMA configuration using the same
+>> - * info from the OF node of host bridge's parent (if any).
+>> + * info from the OF node or ACPI node of host bridge's parent (if any).
+>>    */
+>>   static void pci_dma_configure(struct pci_dev *dev)
+>>   {
+>>   	struct device *bridge = pci_get_host_bridge_device(dev);
+>>
+>>   	if (IS_ENABLED(CONFIG_OF) && dev->dev.of_node) {
+>> -		if (!bridge->parent)
+>> -			return;
+>> -
+>> -		of_dma_configure(&dev->dev, bridge->parent->of_node);
+>> +		if (bridge->parent)
+>> +			of_dma_configure(&dev->dev,
+>> +					 bridge->parent->of_node);
+>> +	} else if (has_acpi_companion(bridge)) {
+>> +		struct acpi_device *adev = to_acpi_node(bridge->fwnode);
+>> +		int coherent = acpi_check_dma_coherency(adev);
+>> +
+>> +		if (-1 != coherent)
 >
-> Like here I'm not sure why -1 is special?
+> The ordering of this check is somewhat unusual.
 
-It's just another value to communicate that DMA is not supported. :)
+I'll fix this.
 
 Thanks,
 Suravee
->
->>   		arch_setup_dma_ops(dev, 0, 0, NULL, coherent);
->>
->>   	acpi_physnode_link_name(physical_node_name, node_id);
->
-> Thanks,
-> Rafael
->
