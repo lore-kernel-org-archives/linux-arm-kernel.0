@@ -1,45 +1,120 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 26 Aug 2015 18:00:24 +0200 (CEST)
-Subject: [PATCH 1/1] irqchip: imx-gpcv2: Simplify the implemenation
-In-Reply-To: <1440604166-2624-1-git-send-email-shenwei.wang@freescale.com>
-References: <1440604166-2624-1-git-send-email-shenwei.wang@freescale.com>
-Message-ID: <alpine.DEB.2.11.1508261756540.15006@nanos>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 26 Aug 2015 17:00:45 +0100
+Subject: [PATCH v4 4/4] irqchip: GIC: Don't deactivate interrupts forwarded to
+ a guest
+In-Reply-To: <1440604845-28229-1-git-send-email-marc.zyngier@arm.com>
+References: <1440604845-28229-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1440604845-28229-5-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 26 Aug 2015, Shenwei Wang wrote:
->  u32 imx_gpcv2_get_wakeup_source(u32 **sources)
->  {
-> -	if (!imx_gpcv2_instance)
-> +	struct gpcv2_irqchip_data *cd;
-> +	void __iomem *reg;
-> +	int i;
-> +
-> +	cd = imx_gpcv2_instance;
-> +	if (!cd)
->  		return 0;
->  
-> +	for (i = 0; i < IMR_NUM; i++) {
-> +		reg = cd->gpc_base + cd->cpu2wakeup + i * 4;
-> +		cd->wakeup_sources[i] = readl_relaxed(reg);
-> +	}
-> +
->  	if (sources)
-> -		*sources = imx_gpcv2_instance->wakeup_sources;
-> +		*sources = cd->wakeup_sources;
->  
->  	return IMR_NUM;
+Commit 0a4377de3056 ("genirq: Introduce irq_set_vcpu_affinity() to
+target an interrupt to a VCPU") added just what we needed at the
+lowest level to allow an interrupt to be deactivated by a guest.
 
-You do not need the intermediate storage at all.
+When such a request reaches the GIC, it knows it doesn't need to
+perform the deactivation anymore, and can safely leave the guest
+do its magic. This of course requires additional support in both
+VFIO and KVM.
 
-u32 imx_gpcv2_get_wakeup_source(u32 *sources)
-{
-	if (sources) {
-		for (i = 0; i < IMR_NUM; i++) {
-			reg = cd->gpc_base + cd->cpu2wakeup + i * 4;
-			sources[i] = readl_relaxed(reg);
-		}
-	}
-	....
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ drivers/irqchip/irq-gic.c | 55 +++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 55 insertions(+)
 
-Hmm?
+diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+index 9215897..0f1f00c 100644
+--- a/drivers/irqchip/irq-gic.c
++++ b/drivers/irqchip/irq-gic.c
+@@ -140,6 +140,36 @@ static inline unsigned int gic_irq(struct irq_data *d)
+ 	return d->hwirq;
+ }
+ 
++static inline bool cascading_gic_irq(struct irq_data *d)
++{
++	void *data = irq_data_get_irq_handler_data(d);
++
++	/*
++	 * If handler_data pointing to one of the secondary GICs, then
++	 * this is a cascading interrupt, and it cannot possibly be
++	 * forwarded.
++	 */
++	if (data >= (void *)(gic_data + 1) &&
++	    data <  (void *)(gic_data + MAX_GIC_NR))
++		return true;
++
++	return false;
++}
++
++static inline bool forwarded_irq(struct irq_data *d)
++{
++	/*
++	 * A forwarded interrupt:
++	 * - is on the primary GIC
++	 * - has its handler_data set to a value
++	 * - that isn't a secondary GIC
++	 */
++	if (d->handler_data && !cascading_gic_irq(d))
++		return true;
++
++	return false;
++}
++
+ /*
+  * Routines to acknowledge, disable and enable interrupts
+  */
+@@ -163,6 +193,16 @@ static void gic_mask_irq(struct irq_data *d)
+ static void gic_eoimode1_mask_irq(struct irq_data *d)
+ {
+ 	gic_mask_irq(d);
++	/*
++	 * When masking a forwarded interrupt, make sure it is
++	 * deactivated as well.
++	 *
++	 * This ensures that an interrupt that is getting
++	 * disabled/masked will not get "stuck", because there is
++	 * noone to deactivate it (guest is being terminated).
++	 */
++	if (forwarded_irq(d))
++		gic_poke_irq(d, GIC_DIST_ACTIVE_CLEAR);
+ }
+ 
+ static void gic_unmask_irq(struct irq_data *d)
+@@ -177,6 +217,10 @@ static void gic_eoi_irq(struct irq_data *d)
+ 
+ static void gic_eoimode1_eoi_irq(struct irq_data *d)
+ {
++	/* Do not deactivate an IRQ forwarded to a vcpu. */
++	if (forwarded_irq(d))
++		return;
++
+ 	writel_relaxed(gic_irq(d), gic_cpu_base(d) + GIC_CPU_DEACTIVATE);
+ }
+ 
+@@ -246,6 +290,16 @@ static int gic_set_type(struct irq_data *d, unsigned int type)
+ 	return gic_configure_irq(gicirq, type, base, NULL);
+ }
+ 
++static int gic_irq_set_vcpu_affinity(struct irq_data *d, void *vcpu)
++{
++	/* Only interrupts on the primary GIC can be forwarded to a vcpu. */
++	if (cascading_gic_irq(d))
++		return -EINVAL;
++
++	d->handler_data = vcpu;
++	return 0;
++}
++
+ #ifdef CONFIG_SMP
+ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
+ 			    bool force)
+@@ -355,6 +409,7 @@ static struct irq_chip gic_eoimode1_chip = {
+ #endif
+ 	.irq_get_irqchip_state	= gic_irq_get_irqchip_state,
+ 	.irq_set_irqchip_state	= gic_irq_set_irqchip_state,
++	.irq_set_vcpu_affinity	= gic_irq_set_vcpu_affinity,
+ 	.flags			= IRQCHIP_SET_TYPE_MASKED,
+ };
+ 
+-- 
+2.1.4
