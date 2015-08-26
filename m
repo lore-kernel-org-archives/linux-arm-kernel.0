@@ -1,44 +1,45 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 26 Aug 2015 08:33:51 +0100
-Subject: [PATCH 6/7] MAINTAINERS: Add FDMA driver files to STi section.
-In-Reply-To: <1436371888-27863-7-git-send-email-peter.griffin@linaro.org>
-References: <1436371888-27863-1-git-send-email-peter.griffin@linaro.org>
- <1436371888-27863-7-git-send-email-peter.griffin@linaro.org>
-Message-ID: <20150826073351.GU19409@x1>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 26 Aug 2015 09:37:40 +0200
+Subject: [PATCH 0/5] add GPT timer support for mt8173
+In-Reply-To: <1436779969-18610-1-git-send-email-yingjoe.chen@mediatek.com>
+References: <1436779969-18610-1-git-send-email-yingjoe.chen@mediatek.com>
+Message-ID: <55DD6CC4.6010708@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 08 Jul 2015, Peter Griffin wrote:
+On 07/13/2015 11:32 AM, Yingjoe Chen wrote:
+> This series add GPT timer support for mt8173. This is based on v4.2-rc1
+> and Matthias' next branch (for dts parts).
+>
+> The first 2 patches comes from 'Add SMP bringup support for mt65xx socs'
+> series [1]. I decide to move these 2 patches to this series, since it
+> is more relevent here. They are changed based on Matthias' and Daniel's
+> comments.
+>
+> [1] http://lists.infradead.org/pipermail/linux-mediatek/2015-May/000714.html
+>
+> Daniel Kurtz (1):
+>    arm64: dts: mt8173: add timer node
+>
+> Yingjoe Chen (4):
+>    clocksource: mediatek: do not enable GPT_CLK_EVT when setup
+>    clocksource: mediatek: Use GPT as sched clock source
+>    arm64: mediatek: enable MTK_TIMER
+>    clk: mediatek: add 13mhz clock for MT8173
+>
+>   arch/arm64/Kconfig                       |  1 +
+>   arch/arm64/boot/dts/mediatek/mt8173.dtsi |  9 +++++++++
+>   drivers/clk/mediatek/clk-mt8173.c        |  5 +++++
+>   drivers/clocksource/mtk_timer.c          | 26 ++++++++++++++++++++------
+>   include/dt-bindings/clock/mt8173-clk.h   |  3 ++-
+>   5 files changed, 37 insertions(+), 7 deletions(-)
 
-> This patch adds the FDMA driver files to the STi
-> section of the maintainers file.
-> 
-> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> ---
->  MAINTAINERS | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 8133cef..8cb1ad9 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -1503,6 +1503,8 @@ S:	Maintained
->  F:	arch/arm/mach-sti/
->  F:	arch/arm/boot/dts/sti*
->  F:	drivers/clocksource/arm_global_timer.c
-> +F:	drivers/dma/st_fdma.*
-> +F:	drivers/dma/st_fdma_xbar.c
+Who will take this patchset ? I can take the patch 2 if needed.
 
-How about you replace both lines with:
-
-F:	drivers/dma/st_fdma*
-
->  F:	drivers/i2c/busses/i2c-st.c
->  F:	drivers/media/rc/st_rc.c
->  F:	drivers/mmc/host/sdhci-st.c
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
