@@ -1,120 +1,102 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 26 Aug 2015 17:00:45 +0100
-Subject: [PATCH v4 4/4] irqchip: GIC: Don't deactivate interrupts forwarded to
- a guest
-In-Reply-To: <1440604845-28229-1-git-send-email-marc.zyngier@arm.com>
-References: <1440604845-28229-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1440604845-28229-5-git-send-email-marc.zyngier@arm.com>
+Date: Wed, 26 Aug 2015 17:00:41 +0100
+Subject: [PATCH v4 0/4] irqchip: GICv2/v3: Add support for irq_vcpu_affinity
+Message-ID: <1440604845-28229-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 0a4377de3056 ("genirq: Introduce irq_set_vcpu_affinity() to
-target an interrupt to a VCPU") added just what we needed at the
-lowest level to allow an interrupt to be deactivated by a guest.
+The GICv2 and GICv3 architectures allow an active physical interrupt
+to be forwarded to a guest, and the guest to indirectly perform the
+deactivation of the interrupt by performing an EOI on the virtual
+interrupt (see for example the GICv2 spec, 3.2.1).
 
-When such a request reaches the GIC, it knows it doesn't need to
-perform the deactivation anymore, and can safely leave the guest
-do its magic. This of course requires additional support in both
-VFIO and KVM.
+This allows some substantial performance improvement for level
+triggered interrupts that otherwise have to be masked/unmasked in
+VFIO, not to mention the required trap back to KVM when the guest
+performs an EOI.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- drivers/irqchip/irq-gic.c | 55 +++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 55 insertions(+)
+To enable this, the GICs need to be switched to a different EOImode,
+where a taken interrupt can be left "active" (which prevents the same
+interrupt from being taken again), while other interrupts are still
+being processed normally.
 
-diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index 9215897..0f1f00c 100644
---- a/drivers/irqchip/irq-gic.c
-+++ b/drivers/irqchip/irq-gic.c
-@@ -140,6 +140,36 @@ static inline unsigned int gic_irq(struct irq_data *d)
- 	return d->hwirq;
- }
- 
-+static inline bool cascading_gic_irq(struct irq_data *d)
-+{
-+	void *data = irq_data_get_irq_handler_data(d);
-+
-+	/*
-+	 * If handler_data pointing to one of the secondary GICs, then
-+	 * this is a cascading interrupt, and it cannot possibly be
-+	 * forwarded.
-+	 */
-+	if (data >= (void *)(gic_data + 1) &&
-+	    data <  (void *)(gic_data + MAX_GIC_NR))
-+		return true;
-+
-+	return false;
-+}
-+
-+static inline bool forwarded_irq(struct irq_data *d)
-+{
-+	/*
-+	 * A forwarded interrupt:
-+	 * - is on the primary GIC
-+	 * - has its handler_data set to a value
-+	 * - that isn't a secondary GIC
-+	 */
-+	if (d->handler_data && !cascading_gic_irq(d))
-+		return true;
-+
-+	return false;
-+}
-+
- /*
-  * Routines to acknowledge, disable and enable interrupts
-  */
-@@ -163,6 +193,16 @@ static void gic_mask_irq(struct irq_data *d)
- static void gic_eoimode1_mask_irq(struct irq_data *d)
- {
- 	gic_mask_irq(d);
-+	/*
-+	 * When masking a forwarded interrupt, make sure it is
-+	 * deactivated as well.
-+	 *
-+	 * This ensures that an interrupt that is getting
-+	 * disabled/masked will not get "stuck", because there is
-+	 * noone to deactivate it (guest is being terminated).
-+	 */
-+	if (forwarded_irq(d))
-+		gic_poke_irq(d, GIC_DIST_ACTIVE_CLEAR);
- }
- 
- static void gic_unmask_irq(struct irq_data *d)
-@@ -177,6 +217,10 @@ static void gic_eoi_irq(struct irq_data *d)
- 
- static void gic_eoimode1_eoi_irq(struct irq_data *d)
- {
-+	/* Do not deactivate an IRQ forwarded to a vcpu. */
-+	if (forwarded_irq(d))
-+		return;
-+
- 	writel_relaxed(gic_irq(d), gic_cpu_base(d) + GIC_CPU_DEACTIVATE);
- }
- 
-@@ -246,6 +290,16 @@ static int gic_set_type(struct irq_data *d, unsigned int type)
- 	return gic_configure_irq(gicirq, type, base, NULL);
- }
- 
-+static int gic_irq_set_vcpu_affinity(struct irq_data *d, void *vcpu)
-+{
-+	/* Only interrupts on the primary GIC can be forwarded to a vcpu. */
-+	if (cascading_gic_irq(d))
-+		return -EINVAL;
-+
-+	d->handler_data = vcpu;
-+	return 0;
-+}
-+
- #ifdef CONFIG_SMP
- static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
- 			    bool force)
-@@ -355,6 +409,7 @@ static struct irq_chip gic_eoimode1_chip = {
- #endif
- 	.irq_get_irqchip_state	= gic_irq_get_irqchip_state,
- 	.irq_set_irqchip_state	= gic_irq_set_irqchip_state,
-+	.irq_set_vcpu_affinity	= gic_irq_set_vcpu_affinity,
- 	.flags			= IRQCHIP_SET_TYPE_MASKED,
- };
- 
+We also use the new irq_set_vcpu_affinity hook that was introduced for
+Intel's "Posted Interrupts" to determine whether or not to perform the
+deactivation at EOI-time.
+
+As all of this only makes sense when the kernel can behave as a
+hypervisor, we only enable this mode on detecting that the kernel was
+actually booted in HYP mode, and that the GIC supports this feature.
+
+This series is a complete rework of a RFC I sent over a year ago:
+
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/266328.html
+
+Since then, a lot has been either merged (the irqchip_state) or reworked
+(my active-timer series: http://www.spinics.net/lists/kvm/msg118768.html),
+and this implements the last few bits for Eric Auger's series to
+finally make it into the kernel:
+
+https://lkml.org/lkml/2015/7/2/268
+https://lkml.org/lkml/2015/7/6/291
+
+With all these patches combined, physical interrupt routing from the
+kernel into a VM becomes possible.
+
+Note that the implementation makes use of the static_key mechanism,
+which is undergoing an extensive rework in 4.3. I intend to convert
+this code once both are in mainline.
+
+This has been tested on Juno (GICv2) and FastModel (GICv3). A branch
+is available at:
+
+git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git irq/gic-irq-vcpu-affinity-v4
+
+* From v3:
+  - Use separate irq_chip structures, leading to much nicer code (tglx)
+  - Dropped Eric's Tested/Reviewed-by as there is significant changes
+
+* From v2:
+  - Another small fix from Eric
+  - Some commit message cleanups
+
+* From v1:
+  - Fixes after review from Eric
+  - Got rid of the cascaded GICv2 hack (it was broken anyway)
+  - Folded the LPI deactivation patch (it makes more sense as part of
+    the main one.
+  - Some clarifying comments about the "deactivate on mask"
+  - I haven't retained Eric's Reviewed/Tested-by, as the code as
+    significantly changed on GICv2
+
+Marc Zyngier (4):
+  irqchip: GICv3: Convert to EOImode == 1
+  irqchip: GICv3: Don't deactivate interrupts forwarded to a guest
+  irqchip: GIC: Convert to EOImode == 1
+  irqchip: GIC: Don't deactivate interrupts forwarded to a guest
+
+ drivers/irqchip/irq-gic-v3.c       |  70 +++++++++++++++++++++--
+ drivers/irqchip/irq-gic.c          | 111 ++++++++++++++++++++++++++++++++++++-
+ include/linux/irqchip/arm-gic-v3.h |   9 +++
+ include/linux/irqchip/arm-gic.h    |   4 ++
+ 4 files changed, 188 insertions(+), 6 deletions(-)
+
+-- 
+2.1.4
+
+*** BLURB HERE ***
+
+Marc Zyngier (4):
+  irqchip: GICv3: Convert to EOImode == 1
+  irqchip: GICv3: Don't deactivate interrupts forwarded to a guest
+  irqchip: GIC: Convert to EOImode == 1
+  irqchip: GIC: Don't deactivate interrupts forwarded to a guest
+
+ drivers/irqchip/irq-gic-v3.c       |  91 +++++++++++++++++++++++++--
+ drivers/irqchip/irq-gic.c          | 124 ++++++++++++++++++++++++++++++++++++-
+ include/linux/irqchip/arm-gic-v3.h |   9 +++
+ include/linux/irqchip/arm-gic.h    |   4 ++
+ 4 files changed, 219 insertions(+), 9 deletions(-)
+
 -- 
 2.1.4
