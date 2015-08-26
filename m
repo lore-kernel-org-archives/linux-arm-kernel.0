@@ -1,45 +1,47 @@
-From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
-Date: Wed, 26 Aug 2015 14:30:24 +0200
-Subject: [PATCH linux-next v5 2/5] Documentation: mtd: add a DT property to
- set the number of dummy cycles
-In-Reply-To: <cover.1440580764.git.cyrille.pitchen@atmel.com>
-References: <cover.1440580764.git.cyrille.pitchen@atmel.com>
-Message-ID: <648dbf9f9d1d4cd414fe2df8d298880b2245c7b5.1440580764.git.cyrille.pitchen@atmel.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 26 Aug 2015 15:46:38 +0200
+Subject: [PATCH 0/3] unify efi debug output across architectures
+In-Reply-To: <1440595498-30630-1-git-send-email-leif.lindholm@linaro.org>
+References: <1440595498-30630-1-git-send-email-leif.lindholm@linaro.org>
+Message-ID: <CAKv+Gu9rePiKwk63+tppYWKW-3VV7OmKekteUra57zowejfQqw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Depending on the SPI clock frequency, the Fast Read op code and the
-Single/Dual Data Rate mode, the number of dummy cycles can be tuned to
-improve transfer speed.
-The actual number of dummy cycles is specific for each memory model and is
-provided by the manufacturer thanks to the memory datasheet.
+On 26 August 2015 at 15:24, Leif Lindholm <leif.lindholm@linaro.org> wrote:
+> efi didn't use to have much in the way of kernel command line options,
+> until some point last year. Then once the efi= option was added, it has
+> been expanded on.
+>
+> x86 had an efi=debug option added, but that would be a useful thing
+> across all efi architectures.
+>
+> arm64 efi support (predating efi=debug) came with its own 'uefi_debug'
+> option, and passed along a special verbosity flag when calling into
+> some not-strictly-arch-specific functions in core efi code.
+>
+> So:
+> - Move efi=debug into core code, to be usable by all architectures
+> - Change arm64 efi code to use 'efi=debug' instead of 'uefi_debug'
+> - Rework arm64 interface to core code to drop special verbosity flag
+>
 
-Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
----
- Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt | 6 ++++++
- 1 file changed, 6 insertions(+)
+For the series:
 
-diff --git a/Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt b/Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt
-index 2bee68103b01..4387567d8024 100644
---- a/Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt
-+++ b/Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt
-@@ -19,6 +19,11 @@ Optional properties:
-                    all chips and support for it can not be detected at runtime.
-                    Refer to your chips' datasheet to check if this is supported
-                    by your chip.
-+- m25p,num-dummy-cycles : Set the number of dummy cycles for Fast Read commands.
-+                          Depending on the manufacturer additional dedicated
-+                          commands are sent to the flash memory so the
-+                          controller and the memory can agree on the number of
-+                          dummy cycles to use.
- 
- Example:
- 
-@@ -29,4 +34,5 @@ Example:
- 		reg = <0>;
- 		spi-max-frequency = <40000000>;
- 		m25p,fast-read;
-+		m25p,num-dummy-cycles = <8>;
- 	};
--- 
-1.8.2.2
+Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+
+> Leif Lindholm (3):
+>   efi/x86: move efi=debug option parsing to core
+>   arm64: use core efi=debug instead of uefi_debug command line parameter
+>   efi/arm64: clean up efi_get_fdt_params() interface
+>
+>  Documentation/arm/uefi.txt  |  2 --
+>  arch/arm64/kernel/efi.c     | 19 +++++--------------
+>  arch/x86/platform/efi/efi.c |  2 --
+>  drivers/firmware/efi/efi.c  |  9 +++++----
+>  include/linux/efi.h         |  2 +-
+>  5 files changed, 11 insertions(+), 23 deletions(-)
+>
+> --
+> 2.1.4
+>
