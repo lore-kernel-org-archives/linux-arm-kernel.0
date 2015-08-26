@@ -1,41 +1,40 @@
 From: ryabinin.a.a@gmail.com (Andrey Ryabinin)
-Date: Wed, 26 Aug 2015 19:15:03 +0300
-Subject: [PATCH 0/4] KASAN/ARM64 EFI fixes
-Message-ID: <1440605707-8325-1-git-send-email-ryabinin.a.a@gmail.com>
+Date: Wed, 26 Aug 2015 19:15:05 +0300
+Subject: [PATCH 2/4] efi/runtime-wrappers,
+ kasan: don't sanitize runtime wrappers.
+In-Reply-To: <1440605707-8325-1-git-send-email-ryabinin.a.a@gmail.com>
+References: <1440605707-8325-1-git-send-email-ryabinin.a.a@gmail.com>
+Message-ID: <1440605707-8325-3-git-send-email-ryabinin.a.a@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/13/2015 08:23 PM, Will Deacon wrote:
-> I tried this out under EFI and it dies horribly in the stub code because
-> we're missing at least one KASAN_SANITIZE_ Makefile entry.
-> 
-> So I think this needs longer to stew before hitting mainline. By all means
-> get the x86 dependencies in for 4.3, but the arm64 port can probably use
-> another cycle to iron out the bugs.
-> 
-> Cheers,
-> 
-> Will
-> 
+ARM64 maps efi runtime services in userspace addresses
+which don't have KASAN shadow. So dereferencing these addresses
+in efi_call_virt() will cause crash if this code instrumented.
 
-These series fixes boot crash with KASAN under EFI.
-I'm sending it separetly for easier review.
-We have one more small x86 dependcy in the first patch.
-Patches 2-4 I'm going to squash into v6 'arm64: add KASAN support' patch.
+Signed-off-by: Andrey Ryabinin <ryabinin.a.a@gmail.com>
+---
+ drivers/firmware/efi/Makefile | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-
-Andrey Ryabinin (4):
-  x86, efi, kasan: #undef memset/memcpy/memmove per arch.
-  efi/runtime-wrappers, kasan: don't sanitize runtime wrappers.
-  arm64/efi-stub, kasan: don't instrument efi-stub.
-  libfdt, kasan: don't instrument libfdt.
-
- arch/arm64/kernel/Makefile             | 2 ++
- arch/x86/include/asm/efi.h             | 8 ++++++++
- drivers/firmware/efi/Makefile          | 8 ++++++++
- drivers/firmware/efi/libstub/efistub.h | 4 ----
- lib/Makefile                           | 3 ++-
- 5 files changed, 20 insertions(+), 5 deletions(-)
-
---
+diff --git a/drivers/firmware/efi/Makefile b/drivers/firmware/efi/Makefile
+index 6fd3da9..413fcf2 100644
+--- a/drivers/firmware/efi/Makefile
++++ b/drivers/firmware/efi/Makefile
+@@ -1,6 +1,14 @@
+ #
+ # Makefile for linux kernel
+ #
++
++#
++# ARM64 maps efi runtime services in userspace addresses
++# which don't have KASAN shadow. So dereference of these addresses
++# in efi_call_virt() will cause crash if this code instrumented.
++#
++KASAN_SANITIZE_runtime-wrappers.o	:= n
++
+ obj-$(CONFIG_EFI)			+= efi.o vars.o reboot.o
+ obj-$(CONFIG_EFI_VARS)			+= efivars.o
+ obj-$(CONFIG_EFI_ESRT)			+= esrt.o
+-- 
 2.4.6
