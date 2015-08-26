@@ -1,32 +1,61 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 26 Aug 2015 17:51:49 +0100
-Subject: [PATCH] arm: perf: Add event descriptions
-In-Reply-To: <20150817205809.GA16506@dreric01-gentoo.localdomain>
-References: <20150804001522.GA13214@dreric01-gentoo.localdomain>
- <20150817205809.GA16506@dreric01-gentoo.localdomain>
-Message-ID: <20150826165148.GF30466@arm.com>
+From: Nathan_Lynch@mentor.com (Nathan Lynch)
+Date: Wed, 26 Aug 2015 12:07:30 -0500
+Subject: [PATCH 2/4] remoteproc: Supply controller driver for ST's Remote
+ Processors
+In-Reply-To: <1440594483-29601-3-git-send-email-lee.jones@linaro.org>
+References: <1440594483-29601-1-git-send-email-lee.jones@linaro.org>
+ <1440594483-29601-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <55DDF252.2010901@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 17, 2015 at 09:58:09PM +0100, Drew Richardson wrote:
-> On Tue, Aug 04, 2015 at 01:15:23AM +0100, Drew Richardson wrote:
-> > Add additional information about hardware events to make counters self
-> > describing. This makes the hardware PMUs easier to use as perf list
-> > contains the possible events instead of users having to refer to
-> > documentation like the ARM TRMs. This could also allow tools like
-> > oprofile to support PMUs without requiring an update.
-> > 
-> > Signed-off-by: Drew Richardson <drew.richardson@arm.com>
-> > ---
-> >  arch/arm/kernel/perf_event.c    |   1 +
-> >  arch/arm/kernel/perf_event_v7.c | 617 ++++++++++++++++++++++++++++++++++++++++
-> >  2 files changed, 618 insertions(+)
-> 
-> Any concerns with merging this?
+On 08/26/2015 08:08 AM, Lee Jones wrote:
+> --- /dev/null
+> +++ b/drivers/remoteproc/st_remoteproc.c
+> @@ -0,0 +1,300 @@
+> +/*
+> + * ST's Remote Processor Control Driver
+> + *
+> + * Copyright (C) 2015 STMicroelectronics - All Rights Reserved
+> + *
+> + * Author: Ludovic Barre <ludovic.barre@st.com>
 
-We should revisit this after the merge window (since the ARM perf code is
-moving out to drivers/), but I do have reservations about putting all these
-strings into the kernel. Why can't we put this into something like libpfm
-instead?
+When submitting code you didn't write, I'd say it's better practice to
+clearly indicate its provenance in the commit message.  E.g. something
+like "Driver based on code authored by Ludovic Barre for ST".  And
+obtain signoffs etc if possible.
 
-Will
+
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License.
+
+Please review the wording here.  It's unclear whether this is intended
+to be v2-only or v2 or later.
+
+
+> +static int st_rproc_stop(struct rproc *rproc)
+> +{
+> +	struct st_rproc *st_rproc = rproc->priv;
+> +	int err = 0;
+> +
+> +	if (st_rproc->config->sw_reset) {
+> +		err = reset_control_assert(st_rproc->sw_reset);
+> +		if (err)
+> +			dev_warn(&rproc->dev, "Failed to assert S/W Reset\n");
+> +	}
+> +
+> +	if (st_rproc->config->pwr_reset) {
+> +		err = reset_control_assert(st_rproc->pwr_reset);
+> +		if (err)
+> +			dev_warn(&rproc->dev, "Failed to assert Power Reset\n");
+> +	}
+> +
+> +	clk_disable(st_rproc->clk);
+> +
+> +	return 0;
+> +}
+
+Seems like st_rproc_stop should propagate errors back to its caller
+instead of always returning 0.
