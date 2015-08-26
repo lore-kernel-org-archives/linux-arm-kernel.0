@@ -1,74 +1,59 @@
-From: varada@codeaurora.org (Varadarajan Narayanan)
-Date: Wed, 26 Aug 2015 11:09:50 +0530
-Subject: [PATCH v3] qcom: ipq40xx: Add basic board/dts support for
- IPQ40XX SoC
-In-Reply-To: <20150825211405.GJ19120@codeaurora.org>
-References: <20150824092813.GA15581@codeaurora.org>
- <20150824224928.GE14330@codeaurora.org>
- <20150825081042.GA14028@codeaurora.org>
- <20150825211405.GJ19120@codeaurora.org>
-Message-ID: <20150826053950.GB25312@codeaurora.org>
+From: yong.wu@mediatek.com (Yong Wu)
+Date: Wed, 26 Aug 2015 14:19:26 +0800
+Subject: [PATCH v5 0/3] arm64: IOMMU-backed DMA mapping
+In-Reply-To: <cover.1438362603.git.robin.murphy@arm.com>
+References: <cover.1438362603.git.robin.murphy@arm.com>
+Message-ID: <1440569966.25782.3.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 25, 2015 at 02:14:05PM -0700, Stephen Boyd wrote:
-> On 08/25, Varadarajan Narayanan wrote:
-> > On Mon, Aug 24, 2015 at 03:49:28PM -0700, Stephen Boyd wrote:
-> > > On 08/24, Varadarajan Narayanan wrote:
-> >
-> > > > +	compatible = "qcom,ipq40xx-r3pc", "qcom,ipq40xx";
-> > > > +
-> > > > +	memory {
-> > > > +		device_type = "memory";
-> > > > +		reg = <0x80000000 0x20000000>; /* 512MB */
-> > > > +	};
-> > >
-> > > Doesn't the bootloader fill the memory node for us? Why do we
-> > > need this?
-> > >
-> > > > +
-> > > > +	chosen {
-> > > > +		bootargs = "root=/dev/ram rw init=/init console=ttyMSM0,115200n8 initrd=0x82000000,0x000E2246";
-> > > > +	};
-> > >
-> > > Please don't add bootargs. Use stdout-path for the console part
-> > > and everything else should be done by the bootloader or is the
-> > > defaults.
-> >
-> > Since this is for the emulation platform, we don't have the bootloader.
->
-> Why are we upstreaming an emulation platform?
+On Fri, 2015-07-31 at 18:18 +0100, Robin Murphy wrote:
+> Hi all,
+> 
+> Here's an update following Catalin's feedback on v4[1].
+> 
+> Changes this round:
+> - Rebased onto linux-next
+>   - IOVA alignment fix applied already
+>   - iommu_iova_cache_init() is now iova_cache_get()
+> - Tidied up iommu_dma_alloc()
+>   - Simplified pgprot handling
+>   - Removed redundant memset
+>   - Skip coherent page-flushing in a simpler way
+> - Spotted a bug in iommu_dma_init_domain() where the checks for
+>   reinitialising an existing domain were backwards.
+> 
+> If it is going to be down to me to tackle all the driver fixes and
+> conversion of arch/arm dma_ops, I'd still much rather have this
+> code merged first as a stable base to work with (and un-block arm64
+> in the meantime). Have we decided yet whether this should go via the
+> IOMMU tree or the arm64 tree?
 
-Ok, will skip this.
+Hi Robin,
+   Sorry to disturb you. Is there any plan for the next version of arm64
+DMA. If it's yes, when could we get it?
+   Thanks very much.
 
--Varada
-
-> I assume you have some sort of scripts or something to load the
-> kernel image into the emulator, so those scripts could go and
-> modify the dtb in place to populate the initrd and commandline.
-> If you need pointers on that feel free to contact me directly.
->
-> >
-> > > > +			compatible = "arm,armv7-timer";
-> > > > +			interrupts = <1 2 0xf08>,
-> > > > +				     <1 3 0xf08>,
-> > > > +				     <1 4 0xf08>,
-> > > > +				     <1 1 0xf08>;
-> > > > +			clock-frequency = <20833333>;
-> > >
-> > > Drop this clock-frequency part if you can. The hardware should
-> > > properly report the frequency.
-> >
-> > Cannot drop this. This is the ref-clock frequency. For the
-> > chip it is 48MHz, for emulation is ~20MHz. Similar to
-> > https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/arch/arm/boot/dts/qcom-msm8974.dtsi#n89
->
-> And the hardware is not emulated properly to report the actual
-> frequency that the timer is running at? That's sad.
->
-> At the least, this should be in the board specific dtsi file
-> instead of the SoC specific file, because it's a board quirk.
->
-> --
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> a Linux Foundation Collaborative Project
+> 
+> Thanks,
+> Robin.
+> 
+> [1]:http://thread.gmane.org/gmane.linux.kernel.iommu/10181
+> 
+> Robin Murphy (3):
+>   iommu: Implement common IOMMU ops for DMA mapping
+>   arm64: Add IOMMU dma_ops
+>   arm64: Hook up IOMMU dma_ops
+> 
+>  arch/arm64/Kconfig                   |   1 +
+>  arch/arm64/include/asm/dma-mapping.h |  15 +-
+>  arch/arm64/mm/dma-mapping.c          | 449 +++++++++++++++++++++++++++++
+>  drivers/iommu/Kconfig                |   7 +
+>  drivers/iommu/Makefile               |   1 +
+>  drivers/iommu/dma-iommu.c            | 534 +++++++++++++++++++++++++++++++++++
+>  include/linux/dma-iommu.h            |  84 ++++++
+>  include/linux/iommu.h                |   1 +
+>  8 files changed, 1084 insertions(+), 8 deletions(-)
+>  create mode 100644 drivers/iommu/dma-iommu.c
+>  create mode 100644 include/linux/dma-iommu.h
+> 
