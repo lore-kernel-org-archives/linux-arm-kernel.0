@@ -1,66 +1,41 @@
 From: ryabinin.a.a@gmail.com (Andrey Ryabinin)
-Date: Wed, 26 Aug 2015 19:15:04 +0300
-Subject: [PATCH 1/4] x86, efi, kasan: #undef memset/memcpy/memmove per arch.
-In-Reply-To: <1440605707-8325-1-git-send-email-ryabinin.a.a@gmail.com>
-References: <1440605707-8325-1-git-send-email-ryabinin.a.a@gmail.com>
-Message-ID: <1440605707-8325-2-git-send-email-ryabinin.a.a@gmail.com>
+Date: Wed, 26 Aug 2015 19:15:03 +0300
+Subject: [PATCH 0/4] KASAN/ARM64 EFI fixes
+Message-ID: <1440605707-8325-1-git-send-email-ryabinin.a.a@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In not-instrumented code KASAN replaces instrumented
-memset/memcpy/memmove with not-instrumented analogues
-__memset/__memcpy/__memove.
-However, on x86 EFI stub is not linked with kernel.
-It uses not-instrumented mem*() functions from
-arch/x86/boot/compressed/string.c
-So we don't replace them with __mem*() variants in EFI stub.
+On 08/13/2015 08:23 PM, Will Deacon wrote:
+> I tried this out under EFI and it dies horribly in the stub code because
+> we're missing at least one KASAN_SANITIZE_ Makefile entry.
+> 
+> So I think this needs longer to stew before hitting mainline. By all means
+> get the x86 dependencies in for 4.3, but the arm64 port can probably use
+> another cycle to iron out the bugs.
+> 
+> Cheers,
+> 
+> Will
+> 
 
-In ARM64 EFI stub is linked with the kernel, so we should
-replace mem*() functions with __mem*(), because EFI stub
-runs before KASAN setup early shadow.
+These series fixes boot crash with KASAN under EFI.
+I'm sending it separetly for easier review.
+We have one more small x86 dependcy in the first patch.
+Patches 2-4 I'm going to squash into v6 'arm64: add KASAN support' patch.
 
-So let's move these #undef mem* into arch's asm/efi.h which is
-also included by EFI stub.
 
-Signed-off-by: Andrey Ryabinin <ryabinin.a.a@gmail.com>
----
+Andrey Ryabinin (4):
+  x86, efi, kasan: #undef memset/memcpy/memmove per arch.
+  efi/runtime-wrappers, kasan: don't sanitize runtime wrappers.
+  arm64/efi-stub, kasan: don't instrument efi-stub.
+  libfdt, kasan: don't instrument libfdt.
+
+ arch/arm64/kernel/Makefile             | 2 ++
  arch/x86/include/asm/efi.h             | 8 ++++++++
+ drivers/firmware/efi/Makefile          | 8 ++++++++
  drivers/firmware/efi/libstub/efistub.h | 4 ----
- 2 files changed, 8 insertions(+), 4 deletions(-)
+ lib/Makefile                           | 3 ++-
+ 5 files changed, 20 insertions(+), 5 deletions(-)
 
-diff --git a/arch/x86/include/asm/efi.h b/arch/x86/include/asm/efi.h
-index 155162e..d821ce2 100644
---- a/arch/x86/include/asm/efi.h
-+++ b/arch/x86/include/asm/efi.h
-@@ -25,6 +25,14 @@
- #define EFI32_LOADER_SIGNATURE	"EL32"
- #define EFI64_LOADER_SIGNATURE	"EL64"
- 
-+/*
-+ * Use memcpy/memset from arch/x86/boot/compressed/string.c
-+ * for EFI stub.
-+ */
-+#undef memcpy
-+#undef memset
-+#undef memmove
-+
- #ifdef CONFIG_X86_32
- 
- 
-diff --git a/drivers/firmware/efi/libstub/efistub.h b/drivers/firmware/efi/libstub/efistub.h
-index e334a01..6b6548f 100644
---- a/drivers/firmware/efi/libstub/efistub.h
-+++ b/drivers/firmware/efi/libstub/efistub.h
-@@ -5,10 +5,6 @@
- /* error code which can't be mistaken for valid address */
- #define EFI_ERROR	(~0UL)
- 
--#undef memcpy
--#undef memset
--#undef memmove
--
- void efi_char16_printk(efi_system_table_t *, efi_char16_t *);
- 
- efi_status_t efi_open_volume(efi_system_table_t *sys_table_arg, void *__image,
--- 
+--
 2.4.6
