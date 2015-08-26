@@ -1,48 +1,91 @@
 From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Wed, 26 Aug 2015 14:24:56 +0100
-Subject: [PATCH 1/3] efi/x86: move efi=debug option parsing to core
+Date: Wed, 26 Aug 2015 14:24:57 +0100
+Subject: [PATCH 2/3] arm64: use core efi=debug instead of uefi_debug command
+ line parameter
 In-Reply-To: <1440595498-30630-1-git-send-email-leif.lindholm@linaro.org>
 References: <1440595498-30630-1-git-send-email-leif.lindholm@linaro.org>
-Message-ID: <1440595498-30630-2-git-send-email-leif.lindholm@linaro.org>
+Message-ID: <1440595498-30630-3-git-send-email-leif.lindholm@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-fed6cefe3b6e ("x86/efi: Add a "debug" option to the efi= cmdline")
-adds the DBG flag, but does so for x86 only. Move this early param
-parsing to core code.
+Now that we have an efi=debug command line option in the core code, use
+this instead of the arm64-specific uefi_debug option.
 
 Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
 ---
- arch/x86/platform/efi/efi.c | 2 --
- drivers/firmware/efi/efi.c  | 3 +++
- 2 files changed, 3 insertions(+), 2 deletions(-)
+ Documentation/arm/uefi.txt |  2 --
+ arch/arm64/kernel/efi.c    | 19 +++++--------------
+ 2 files changed, 5 insertions(+), 16 deletions(-)
 
-diff --git a/arch/x86/platform/efi/efi.c b/arch/x86/platform/efi/efi.c
-index e4308fe..9757b79 100644
---- a/arch/x86/platform/efi/efi.c
-+++ b/arch/x86/platform/efi/efi.c
-@@ -979,8 +979,6 @@ static int __init arch_parse_efi_cmdline(char *str)
+diff --git a/Documentation/arm/uefi.txt b/Documentation/arm/uefi.txt
+index d60030a..7b3fdfe 100644
+--- a/Documentation/arm/uefi.txt
++++ b/Documentation/arm/uefi.txt
+@@ -60,5 +60,3 @@ linux,uefi-mmap-desc-ver  | 32-bit | Version of the mmap descriptor format.
+ --------------------------------------------------------------------------------
+ linux,uefi-stub-kern-ver  | string | Copy of linux_banner from build.
+ --------------------------------------------------------------------------------
+-
+-For verbose debug messages, specify 'uefi_debug' on the kernel command line.
+diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+index e8ca6ea..612ad5e 100644
+--- a/arch/arm64/kernel/efi.c
++++ b/arch/arm64/kernel/efi.c
+@@ -51,15 +51,6 @@ static struct mm_struct efi_mm = {
+ 	INIT_MM_CONTEXT(efi_mm)
+ };
  
- 	if (parse_option_str(str, "old_map"))
- 		set_bit(EFI_OLD_MEMMAP, &efi.flags);
--	if (parse_option_str(str, "debug"))
--		set_bit(EFI_DBG, &efi.flags);
+-static int uefi_debug __initdata;
+-static int __init uefi_debug_setup(char *str)
+-{
+-	uefi_debug = 1;
+-
+-	return 0;
+-}
+-early_param("uefi_debug", uefi_debug_setup);
+-
+ static int __init is_normal_ram(efi_memory_desc_t *md)
+ {
+ 	if (md->attribute & EFI_MEMORY_WB)
+@@ -171,14 +162,14 @@ static __init void reserve_regions(void)
+ 	efi_memory_desc_t *md;
+ 	u64 paddr, npages, size;
  
- 	return 0;
- }
-diff --git a/drivers/firmware/efi/efi.c b/drivers/firmware/efi/efi.c
-index d6144e3..78de0bd 100644
---- a/drivers/firmware/efi/efi.c
-+++ b/drivers/firmware/efi/efi.c
-@@ -63,6 +63,9 @@ static int __init parse_efi_cmdline(char *str)
- 		return -EINVAL;
+-	if (uefi_debug)
++	if (efi_enabled(EFI_DBG))
+ 		pr_info("Processing EFI memory map:\n");
+ 
+ 	for_each_efi_memory_desc(&memmap, md) {
+ 		paddr = md->phys_addr;
+ 		npages = md->num_pages;
+ 
+-		if (uefi_debug) {
++		if (efi_enabled(EFI_DBG)) {
+ 			char buf[64];
+ 
+ 			pr_info("  0x%012llx-0x%012llx %s",
+@@ -194,11 +185,11 @@ static __init void reserve_regions(void)
+ 
+ 		if (is_reserve_region(md)) {
+ 			memblock_reserve(paddr, size);
+-			if (uefi_debug)
++			if (efi_enabled(EFI_DBG))
+ 				pr_cont("*");
+ 		}
+ 
+-		if (uefi_debug)
++		if (efi_enabled(EFI_DBG))
+ 			pr_cont("\n");
  	}
  
-+	if (parse_option_str(str, "debug"))
-+		set_bit(EFI_DBG, &efi.flags);
-+
- 	if (parse_option_str(str, "noruntime"))
- 		disable_runtime = true;
+@@ -210,7 +201,7 @@ void __init efi_init(void)
+ 	struct efi_fdt_params params;
  
+ 	/* Grab UEFI information placed in FDT by stub */
+-	if (!efi_get_fdt_params(&params, uefi_debug))
++	if (!efi_get_fdt_params(&params, efi_enabled(EFI_DBG)))
+ 		return;
+ 
+ 	efi_system_table = params.system_table;
 -- 
 2.1.4
