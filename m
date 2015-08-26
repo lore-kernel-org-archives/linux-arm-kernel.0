@@ -1,61 +1,55 @@
 From: Nathan_Lynch@mentor.com (Nathan Lynch)
-Date: Wed, 26 Aug 2015 12:07:30 -0500
-Subject: [PATCH 2/4] remoteproc: Supply controller driver for ST's Remote
- Processors
-In-Reply-To: <1440594483-29601-3-git-send-email-lee.jones@linaro.org>
+Date: Wed, 26 Aug 2015 12:08:48 -0500
+Subject: [PATCH 4/4] remoteproc: debugfs: Add ability to boot remote
+ processor using debugfs
+In-Reply-To: <1440594483-29601-5-git-send-email-lee.jones@linaro.org>
 References: <1440594483-29601-1-git-send-email-lee.jones@linaro.org>
- <1440594483-29601-3-git-send-email-lee.jones@linaro.org>
-Message-ID: <55DDF252.2010901@mentor.com>
+ <1440594483-29601-5-git-send-email-lee.jones@linaro.org>
+Message-ID: <55DDF2A0.5010404@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 08/26/2015 08:08 AM, Lee Jones wrote:
-> --- /dev/null
-> +++ b/drivers/remoteproc/st_remoteproc.c
-> @@ -0,0 +1,300 @@
-> +/*
-> + * ST's Remote Processor Control Driver
-> + *
-> + * Copyright (C) 2015 STMicroelectronics - All Rights Reserved
-> + *
-> + * Author: Ludovic Barre <ludovic.barre@st.com>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  drivers/remoteproc/remoteproc_debugfs.c | 25 +++++++++++++++++++++++++
+>  1 file changed, 25 insertions(+)
 
-When submitting code you didn't write, I'd say it's better practice to
-clearly indicate its provenance in the commit message.  E.g. something
-like "Driver based on code authored by Ludovic Barre for ST".  And
-obtain signoffs etc if possible.
+The commit message should describe why this is needed...
 
 
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License.
-
-Please review the wording here.  It's unclear whether this is intended
-to be v2-only or v2 or later.
-
-
-> +static int st_rproc_stop(struct rproc *rproc)
+> diff --git a/drivers/remoteproc/remoteproc_debugfs.c b/drivers/remoteproc/remoteproc_debugfs.c
+> index 9d30809..9620962 100644
+> --- a/drivers/remoteproc/remoteproc_debugfs.c
+> +++ b/drivers/remoteproc/remoteproc_debugfs.c
+> @@ -88,8 +88,33 @@ static ssize_t rproc_state_read(struct file *filp, char __user *userbuf,
+>  	return simple_read_from_buffer(userbuf, count, ppos, buf, i);
+>  }
+>  
+> +static ssize_t rproc_state_write(struct file *filp, const char __user *userbuf,
+> +				 size_t count, loff_t *ppos)
 > +{
-> +	struct st_rproc *st_rproc = rproc->priv;
-> +	int err = 0;
+> +	struct rproc *rproc = filp->private_data;
+> +	char buf[2];
+> +	int ret;
 > +
-> +	if (st_rproc->config->sw_reset) {
-> +		err = reset_control_assert(st_rproc->sw_reset);
-> +		if (err)
-> +			dev_warn(&rproc->dev, "Failed to assert S/W Reset\n");
+> +	ret = copy_from_user(buf, userbuf, 1);
+> +	if (ret)
+> +		return -EFAULT;
+> +
+> +	switch (buf[0]) {
+> +	case '1':
+> +		ret = rproc_boot(rproc);
+> +		if (ret)
+> +			dev_warn(&rproc->dev, "Boot failed: %d\n", ret);
+> +		break;
+> +	default:
+> +		rproc_shutdown(rproc);
 > +	}
 > +
-> +	if (st_rproc->config->pwr_reset) {
-> +		err = reset_control_assert(st_rproc->pwr_reset);
-> +		if (err)
-> +			dev_warn(&rproc->dev, "Failed to assert Power Reset\n");
-> +	}
-> +
-> +	clk_disable(st_rproc->clk);
-> +
-> +	return 0;
+> +	return count;
 > +}
 
-Seems like st_rproc_stop should propagate errors back to its caller
-instead of always returning 0.
+... and I suggest that the user interface be reconsidered.  If '1' means
+"boot" and literally anything else means "shut down" then you can't add
+operations in the future without potentially breaking things.
