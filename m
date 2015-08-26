@@ -1,13 +1,13 @@
 From: fengguang.wu@intel.com (kbuild test robot)
-Date: Wed, 26 Aug 2015 19:44:10 +0800
+Date: Wed, 26 Aug 2015 19:48:13 +0800
 Subject: [PATCH] ASoC: rockchip: fix platform_no_drv_owner.cocci warnings
-In-Reply-To: <201508261907.XaXhY7JN%fengguang.wu@intel.com>
-References: <201508261907.XaXhY7JN%fengguang.wu@intel.com>
-Message-ID: <20150826114410.GA186569@ivytown2>
+In-Reply-To: <201508261911.CXlWEwle%fengguang.wu@intel.com>
+References: <201508261911.CXlWEwle%fengguang.wu@intel.com>
+Message-ID: <20150826114813.GA88839@ivytown2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-sound/soc/rockchip/rockchip_max98090.c:225:3-8: No need to set .owner here. The core will do it.
+sound/soc/rockchip/rockchip_rt5645.c:214:3-8: No need to set .owner here. The core will do it.
 
  Remove .owner field if calls are used which set it automatically
 
@@ -17,16 +17,16 @@ CC: zhengxing <zhengxing@rock-chips.com>
 Signed-off-by: Fengguang Wu <fengguang.wu@intel.com>
 ---
 
- rockchip_max98090.c |    1 -
+ rockchip_rt5645.c |    1 -
  1 file changed, 1 deletion(-)
 
---- a/sound/soc/rockchip/rockchip_max98090.c
-+++ b/sound/soc/rockchip/rockchip_max98090.c
-@@ -222,7 +222,6 @@ static struct platform_driver snd_rk_mc_
+--- a/sound/soc/rockchip/rockchip_rt5645.c
++++ b/sound/soc/rockchip/rockchip_rt5645.c
+@@ -211,7 +211,6 @@ static struct platform_driver snd_rk_mc_
  	.probe = snd_rk_mc_probe,
  	.driver = {
  		.name = DRV_NAME,
 -		.owner = THIS_MODULE,
  		.pm = &snd_soc_pm_ops,
- 		.of_match_table = rockchip_max98090_of_match,
+ 		.of_match_table = rockchip_rt5645_of_match,
  	},
