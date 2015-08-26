@@ -1,49 +1,47 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Wed, 26 Aug 2015 10:11:25 -0700
-Subject: [PATCH] gpio: vf610: handle level IRQ's properly
-In-Reply-To: <CACRpkdYqU_yvZE4WS2jBDOhemPy7dcHeOoj_dG61hCL8ugTMYg@mail.gmail.com>
-References: <1440197802-29720-1-git-send-email-stefan@agner.ch>
- <CACRpkdYqU_yvZE4WS2jBDOhemPy7dcHeOoj_dG61hCL8ugTMYg@mail.gmail.com>
-Message-ID: <99db8c092e8b54d485e88887630d51c0@agner.ch>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 26 Aug 2015 10:17:05 -0700
+Subject: [PATCH 5/5] MAINTAINERS: add entry for the Broadcom Northstar
+ Plus SoCs
+In-Reply-To: <CAOesGMioBQY9qy-S8kMJmo_=B6-KZiUkd=Ns1Uo2dGu0BiqppQ@mail.gmail.com>
+References: <1440092861-25825-1-git-send-email-jonmason@broadcom.com>
+ <CAOesGMioBQY9qy-S8kMJmo_=B6-KZiUkd=Ns1Uo2dGu0BiqppQ@mail.gmail.com>
+Message-ID: <55DDF491.3090700@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-08-26 05:47, Linus Walleij wrote:
-> On Sat, Aug 22, 2015 at 12:56 AM, Stefan Agner <stefan@agner.ch> wrote:
+On 25/08/15 16:42, Olof Johansson wrote:
+> On Thu, Aug 20, 2015 at 10:47 AM, Jon Mason <jonmason@broadcom.com> wrote:
+>> Modify the iProc MAINTAINER to cover the Nortstar Plus SoCs, and add me
+>> to the list of people responsible for it.
 > 
->> The GPIO IRQ controller is able to generate level triggered
->> interrupts, however, these were handled by handle_simple_irq so far
->> which did not take care of IRQ masking. This lead to "nobody cared
->> (try booting with the "irqpoll" option)" stack traces.
->>
->> Use the generic interrupt handlers depending on the IRQ type.
->>
->> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> That's not what this patch does. It removes CYGNUS from the
+> description as well. Hmm?
 > 
-> Patch applied.
+> I'm also not a fan of the complex patterns, but that's more of a
+> bikeshedding comment. Does Broadcom really not have a bit more
+> systematic naming than this? :)
 
-Thx
+The naming conventions are fairly simple actually:
 
- 
-> Hm, this looks like a problem that could exist in a few more
-> GPIO drivers. Can you look around and see if there is something
-> immediately suspicious in drivers/gpio?
+* BCM is just a common prefix for internal names/projects/whatever
+* 9 indicates that this is a development/reference board
+* 4 to 5 digits designate the chip identifier
 
-Just looked a bit around. There are some which use handle_simple_irq but
-also run their handler in threaded/one-shot handler. I guess in that
-case it is fine to use the simple_irq handler.
+Now, if you are trying to get some sense about how the chip ids are
+actually chosen, I am afraid none of us have that knowledge ;)
 
-However, those GPIO drivers look suspicious:
+> 
+>> Signed-off-by: Jon Mason <jonmason@broadcom.com>
+>> Reviewed-by: Scott Branden <sbranden@broadcom.com>
+> 
+> For maintainer updates, we usuallu like to see a public ack of this
+> and not just a pre-acked patch. You _could_ have added it yourself
+> without Scott's actual approval, after all.
+> 
+> 
+> -Olof
+> 
 
-gpio-altera.c: Uses handle_simple_irq, supports edge and level
-gpio-bcm-kona.c: Uses handle_simple_irq, supports only edge
-gpio-grgpio.c: Uses handle_simple_irq, supports edge and level
-gpio-intel-mid.c: Uses handle_simple_irq, supports only edge
-gpio-lynxpoint.c: Uses handle_simple_irq, supports edge and level
-gpio-ml-ioh.c: Uses handle_simple_irq, supports edge and level
-gpio-pl061.c: Uses handle_simple_irq, supports edge and level
-gpio-rcar.c: Uses handle_level_irq, supports edge and level
-gpio-timberdale.c: Uses handle_simple_irq, supports edge and level
 
---
-Stefan
+-- 
+Florian
