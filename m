@@ -1,96 +1,73 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 26 Aug 2015 14:11:28 +0200
-Subject: [PATCH v2] pinctrl: mediatek: Fix multiple registration issue.
-In-Reply-To: <CAFRkauDE4QRnZP4q61JyX+t8rn3zOtokiESJTV4uak71zM0kTg@mail.gmail.com>
-References: <1440041931-38278-1-git-send-email-hongzhou.yang@mediatek.com>
- <CAFRkauDE4QRnZP4q61JyX+t8rn3zOtokiESJTV4uak71zM0kTg@mail.gmail.com>
-Message-ID: <CACRpkdY-W+=Eq2nsabqULcFZCi1bLd3eyBDY8yQmyCLwEz1RSA@mail.gmail.com>
+From: jteki@openedev.com (Jagan Teki)
+Date: Wed, 26 Aug 2015 17:49:59 +0530
+Subject: [LINUX RFC v2 0/4] spi: add dual parallel mode support in Zynq
+ MPSoC GQSPI controller
+In-Reply-To: <1440570367-22569-1-git-send-email-ranjit.waghmode@xilinx.com>
+References: <1440570367-22569-1-git-send-email-ranjit.waghmode@xilinx.com>
+Message-ID: <CAD6G_RQhWBsUTZNBB44W98Fjzw82H_D_E9nY0aDWezj729mkoA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 20, 2015 at 5:49 AM, Axel Lin <axel.lin@ingics.com> wrote:
-> 2015-08-20 11:38 GMT+08:00 Hongzhou Yang <hongzhou.yang@mediatek.com>:
->> Since our common driver need support main chip and PMU
->> at the same time, that means it will register two
->> pinctrl device, and the pinctrl_desc structure should
->> be used two times.
->>
->> But pinctrl_desc use global static definition, then
->> the latest registered pinctrl device will overwrite
->> the old one's, all members in pinctrl_desc will set to
->> the new one's, such as name, pins and pins numbers, etc.
->> This is a bug. Changing to use devm_kzalloc to fix it.
->>
->> Cc: stable at vger.kernel.org # v4.1+
->> Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
->> ---
->>  Use dynamic allocation to fix multiple registration issue.
->>
->>  drivers/pinctrl/mediatek/pinctrl-mtk-common.c |   26 ++++++++++++++-----------
->>  drivers/pinctrl/mediatek/pinctrl-mtk-common.h |    1 +
->>  2 files changed, 16 insertions(+), 11 deletions(-)
->>
->> diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
->> index ad1ea16..911c736 100644
->> --- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
->> +++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
->> @@ -1202,12 +1202,6 @@ static int mtk_pctrl_build_state(struct platform_device *pdev)
->>         return 0;
->>  }
->>
->> -static struct pinctrl_desc mtk_pctrl_desc = {
->> -       .confops        = &mtk_pconf_ops,
->> -       .pctlops        = &mtk_pctrl_ops,
->> -       .pmxops         = &mtk_pmx_ops,
->> -};
->> -
->>  int mtk_pctrl_init(struct platform_device *pdev,
->>                 const struct mtk_pinctrl_devdata *data,
->>                 struct regmap *regmap)
->> @@ -1265,12 +1259,22 @@ int mtk_pctrl_init(struct platform_device *pdev,
->>
->>         for (i = 0; i < pctl->devdata->npins; i++)
->>                 pins[i] = pctl->devdata->pins[i].pin;
->> -       mtk_pctrl_desc.name = dev_name(&pdev->dev);
->> -       mtk_pctrl_desc.owner = THIS_MODULE;
->> -       mtk_pctrl_desc.pins = pins;
->> -       mtk_pctrl_desc.npins = pctl->devdata->npins;
->> +
->> +       pctl->pctl_desc = devm_kzalloc(&pdev->dev, sizeof(*pctl->pctl_desc),
->> +                               GFP_KERNEL);
->> +       if (!pctl->pctl_desc)
->> +               return -ENOMEM;
->> +
->> +       pctl->pctl_desc->name = dev_name(&pdev->dev);
->> +       pctl->pctl_desc->owner = THIS_MODULE;
->> +       pctl->pctl_desc->pins = pins;
->> +       pctl->pctl_desc->npins = pctl->devdata->npins;
->> +       pctl->pctl_desc->confops = &mtk_pconf_ops;
->> +       pctl->pctl_desc->pctlops = &mtk_pctrl_ops;
->> +       pctl->pctl_desc->pmxops = &mtk_pmx_ops;
->>         pctl->dev = &pdev->dev;
->> -       pctl->pctl_dev = pinctrl_register(&mtk_pctrl_desc, &pdev->dev, pctl);
->> +
->> +       pctl->pctl_dev = pinctrl_register(pctl->pctl_desc, &pdev->dev, pctl);
->>         if (IS_ERR(pctl->pctl_dev)) {
->>                 dev_err(&pdev->dev, "couldn't register pinctrl driver\n");
->>                 return PTR_ERR(pctl->pctl_dev);
->> diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.h b/drivers/pinctrl/mediatek/pinctrl-mtk-common.h
->> index 30213e5..93d6f5b 100644
->> --- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.h
->> +++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.h
->> @@ -256,6 +256,7 @@ struct mtk_pinctrl_devdata {
->>  struct mtk_pinctrl {
->>         struct regmap   *regmap1;
->>         struct regmap   *regmap2;
->> +       struct pinctrl_desc *pctl_desc;
-> Use
-> struct pinctrl_desc pctl_desc;
+On 26 August 2015 at 11:56, Ranjit Waghmode <ranjit.waghmode@xilinx.com> wrote:
+> This series adds dual parallel mode support for Zynq Ultrascale+
+> MPSoC GQSPI controller driver.
 >
-> Then you can remove the devm_kzalloc.
+> What is dual parallel mode?
+> ---------------------------
+> ZynqMP GQSPI controller supports Dual Parallel mode with following functionalities:
+> 1) Supporting two SPI flash memories operating in parallel. 8 I/O lines.
+> 2) Chip selects and clock are shared to both the flash devices
+> 3) This mode is targeted for faster read/write speed and also doubles the size
+> 4) Commands/data can be transmitted/received from both the devices(mirror),
+>    or only upper or only lower flash memory devices.
+> 5) Data arrangement:
+>    With stripe enabled,
+>    Even bytes i.e. 0, 2, 4,... are transmitted on Lower Data Bus
+>    Odd bytes i.e. 1, 3, 5,.. are transmitted on Upper Data Bus.
+>
+> This series also updated MTD layer files for adding parallel mode support.
+>
+> 1) Added Support for two flashes
+> 2) Support to enable/disable data stripe as and when required.
+> 3) Added required parameters to spi_nor structure. Initialized all
+>    added parameters in spi_nor_scan()
+> 4) Added support for dual parallel in spi_nor_read/write/erase functions by:
+>    a) Increasing page_size, sector_size, erase_size and toatal flash size
+>       as and when required.
+>    b) Dividing address by 2
+>    c) Updating spi->master->flags for qspi driver to change CS
+> 5) Updated read_sr() to get status of both flashes
+> 6) Also updated read_fsr() to get status of both flashes
+>
+> These all are very high level changes and expected to make an idea clear.
+> Comments and suggestions are always welcomed
+>
+> ---
+> V2 Changes:
+> a) Splitted patches based on logical changes
+> b) Added error handling for newly added APIs in SPI core
+> ---
+>
+> Ranjit Waghmode (4):
+>   spi: add support of two chip selects & data stripe
+>   mtd: add spi_device instance to spi_nor struct
+>   spi-nor: add dual parallel mode support
+>   spi: zynqmp: gqspi: add support for dual parallel mode configuration
 
-I agree with Axel, use a true member instead of a pointer
-and you get something simpler.
+I don't find any previous discussion about way to inform flash
+dual-ness into spi-nor
+from spi drivers.
 
-Yours,
-Linus Walleij
+Here is my idea, probably others may think same.
+Informing dual_flash from drivers/spi through flags or any other mode
+bits is not a better approach as dual flash feature is specific to
+spi-nor flash controller (controller specially designed for spi-nor
+flash not the generic spi controller).  So if the driver sits on
+drivers/mtd/spi-nor/ (ex: fsl-quadspi.c), may be we can inform flash
+specific things to spi-nor as it's not touching generic spi stack in
+Linux. But there is a defined-drawback if the driver is moved to
+drivers/mtd/spi-nor ie it can't use spi core API's at-all.
+
+thanks!
+-- 
+Jagan | openedev.
