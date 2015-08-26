@@ -1,71 +1,94 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 26 Aug 2015 11:10:06 -0700
-Subject: [PATCH] ARM: OMAP2+: omap-device: remove omap_device_late_init
- call completely
-In-Reply-To: <1440611890-4935-1-git-send-email-grygorii.strashko@ti.com>
-References: <1440611890-4935-1-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <20150826181006.GT4215@atomide.com>
+From: agross@codeaurora.org (Andy Gross)
+Date: Wed, 26 Aug 2015 13:14:10 -0500
+Subject: [PATCH] soc: qcom: smd: Use correct remote processor ID
+In-Reply-To: <20150826034622.GH13472@usrtlx11787.corpusers.net>
+References: <1440534995-12899-1-git-send-email-agross@codeaurora.org>
+ <20150826034622.GH13472@usrtlx11787.corpusers.net>
+Message-ID: <20150826181410.GC13139@qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Grygorii Strashko <grygorii.strashko@ti.com> [150826 11:01]:
-> Now Kernel fails to boot 50% of times (form build to build) with
-> RT-patchset applied due to the following race - on late boot
-> stages deferred_probe_work_func races with omap_device_late_ini
+On Tue, Aug 25, 2015 at 08:46:22PM -0700, Bjorn Andersson wrote:
+> On Tue 25 Aug 13:36 PDT 2015, Andy Gross wrote:
 > 
-> late_initcall
->  - deferred_probe_initcal() tries to re-probe all pending driver's probe.
->    [In general, It's NOT expected to probe any other built-in drivers after
->    deferred_probe_initcal() is finished, because most of
->    late_initcall_sync/late_initcall functions expected that all driver
->    or probed or deferred already.]
+> > This patch fixes SMEM addressing issues when remote processors need to use
+> > secure SMEM partitions.
+> > 
 > 
-> - later on, some driver is probing in this case It's could cpsw.c
->   (but could be any other drivers)
->   cpsw_init
->   - platform_driver_register
->     - really_probe
->        - driver_bound
->          - driver_deferred_probe_trigger
->   and boot proceed.
->   So, at this moment we have  deferred_probe_work_func scheduled.
+> Right, sorry for missing that remote_pid and edge_pid isn't in sync...
 > 
-> late_initcall_sync
->   - omap_device_late_init
->     - omap_device_idle
+> > Signed-off-by: Andy Gross <agross@codeaurora.org>
+> > ---
+> >  .../devicetree/bindings/soc/qcom/qcom,smd.txt      |    7 +++++++
+> >  drivers/soc/qcom/smd.c                             |   18 ++++++++++++++----
+> >  2 files changed, 21 insertions(+), 4 deletions(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/soc/qcom/qcom,smd.txt b/Documentation/devicetree/bindings/soc/qcom/qcom,smd.txt
+> > index f65c76d..3b60702 100644
+> > --- a/Documentation/devicetree/bindings/soc/qcom/qcom,smd.txt
+> > +++ b/Documentation/devicetree/bindings/soc/qcom/qcom,smd.txt
+> > @@ -37,6 +37,12 @@ The edge is described by the following properties:
+> >  	Definition: the identifier of the remote processor in the smd channel
+> >  		    allocation table
+> >  
+> > +- qcom,remote-pid:
+> > +	Usage: required
 > 
-> CPU1					CPU2
->   - deferred_probe_work_func
->     - really_probe
->       - omap_hsmmc_probe
-> 	- pm_runtime_get_sync
-> 					late_initcall_sync
-> 					- omap_device_late_init
-> 						if (od->_driver_status != BUS_NOTIFY_BOUND_DRIVER) {
-> 							if (od->_state == OMAP_DEVICE_STATE_ENABLED) {
-> 								- omap_device_idle [ops - IP is disabled, ]
-> 	- [fail]
-> 	- pm_runtime_put_sync
->           - omap_hsmmc_runtime_suspend [ooops!]
+> I would like to see this being optional, as this is not a property that
+> matters on any of the 32-bit systems (perhaps 8084?).
 
-OK idling of unclaimed devices should not happen for deferred probe,
-it should only happen when there's no driver and no probing happening. 
- 
-> Lets remove just remove omap_device_late_init completely as suggested
-> by Tero Kristo:
+I thought about that myself, and yeah I have to agree.
+
 > 
-> "How about remove omap_device_late_init call completely. I don't think
-> it does anything useful at the moment; none of the omap devices get
-> enabled outside runtime_pm, so there should be no need to explicitly
-> disable the devices."
+> > +	Value type: <u32>
+> > +	Definition: the identifier for the remote processor as known by the rest
+> > +		    of the system.
+> > +
+> >  = SMD DEVICES
+> >  
+> >  In turn, subnodes of the "edges" represent devices tied to SMD channels on that
+> > @@ -68,6 +74,7 @@ The following example represents a smd node, with one edge representing the
+> >  			interrupts = <0 168 1>;
+> >  			qcom,ipc = <&apcs 8 0>;
+> >  			qcom,smd-edge = <15>;
+> > +			qcom,remote-pid = <0xffffffff>;
+> 
+> This looks messy, so let's make the property optional and make its
+> absence indicate the "global partition".
+> 
+> >  
+> >  			rpm_requests {
+> >  				compatible = "qcom,rpm-msm8974";
+> > diff --git a/drivers/soc/qcom/smd.c b/drivers/soc/qcom/smd.c
+> [..]
+> > @@ -1184,6 +1187,13 @@ static int qcom_smd_parse_edge(struct device *dev,
+> >  		return -EINVAL;
+> >  	}
+> >  
+> > +	key = "qcom,remote-pid";
+> > +	ret = of_property_read_u32(node, key, &edge->remote_pid);
+> > +	if (ret) {
+> > +		dev_err(dev, "edge missing %s property\n", key);
+> > +		return -EINVAL;
+> > +	}
+> > +
+> 
+> So I suggest you changing this to:
+> 
+> edge->remote_pid = QCOM_SMEM_HOST_ANY;
+> of_property_read_u32(node, "qcom,remote-pid", &edge->remote_pid);
 
-I think this is still needed from PM point of view as otherwise we
-don't idle any devices that don't have a driver available. Or am I
-missing something?
+Agreed.
 
-To me it seems the bug is relying on the BUS_NOTIFY_BOUND_DRIVER is
-not set in the deferred probe case.
+> 
+> >  	syscon_np = of_parse_phandle(node, "qcom,ipc", 0);
+> >  	if (!syscon_np) {
+> >  		dev_err(dev, "no qcom,ipc node\n");
+> 
+> Regards,
+> Bjorn
 
-Regards,
-
-Tony
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
