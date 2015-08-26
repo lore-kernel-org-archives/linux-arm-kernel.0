@@ -1,46 +1,54 @@
-From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
-Date: Wed, 26 Aug 2015 09:36:28 +0700
-Subject: [PATCH V2 0/4] PCI: ACPI: Setting up DMA coherency for PCI device
- from _CCA attribute
-In-Reply-To: <240091906.Gl2z931jjW@wuerfel>
-References: <1440524009-5359-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <240091906.Gl2z931jjW@wuerfel>
-Message-ID: <55DD262C.3010008@amd.com>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Wed, 26 Aug 2015 10:41:52 +0800
+Subject: [PATCH v1 3/3] arm64: dts: add Hi6220 mailbox node
+In-Reply-To: <20150825153754.GY10728@bivouac.eciton.net>
+References: <20150824095144.GA7139@leverpostej>
+ <1440411596.3517.12.camel@linaro.org>
+ <20150824114903.GT10728@bivouac.eciton.net>
+ <1440490427.10987.29.camel@linaro.org>
+ <20150825094630.GU10728@bivouac.eciton.net>
+ <1440497710.10987.42.camel@linaro.org> <20150825104256.GB13471@leverpostej>
+ <1440510194.10987.52.camel@linaro.org>
+ <20150825142416.GW10728@bivouac.eciton.net>
+ <CAKv+Gu-b=QvMF++V9UjULRxrGvoz-0ytFLeuLm8Y5sQH4p53Sw@mail.gmail.com>
+ <20150825153754.GY10728@bivouac.eciton.net>
+Message-ID: <1440556912.10987.54.camel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Tue, 2015-08-25 at 16:37 +0100, Leif Lindholm wrote:
+> On Tue, Aug 25, 2015 at 04:51:22PM +0200, Ard Biesheuvel wrote:
+> > >>    Arm kernel should either fetch memory information from
+> > >>    efi or DT.
+> > >
+> > > Absolutely.
+> > >
+> > >>    Currently arm kernel fetch both efi memory information and
+> > >>    reserved buffer from DTB at the same time.
+> > >
+> > > No, it does not.
+> > 
+> > It should not, but it does. Due to an oversight, the stub removes
+> > /memreserve/ entries but ignores the reserved-memory node completely.
+> 
+> Urgh.
+> 
+> > This was reported here in fact
+> > 
+> > http://thread.gmane.org/gmane.linux.kernel.efi/5736/focus=5742
+> > 
+> > but there has not been a followup to this series.
+> 
+> Are all of those patches still relevant, or did some of them go in
+> already?
+> 
+> Haojian: can you give that patch a spin and see if it does what you
+> need, combined with adding the reserved areas to the UEFI memory map?
+> 
+> /
+>     Leif
 
-On 8/26/15 01:48, Arnd Bergmann wrote:
-> On Wednesday 26 August 2015 00:33:25 Suravee Suthikulpanit wrote:
->> This patch adds support to setup DMA coherency for PCI device using
->> the ACPI _CCA attribute. According to the ACPI spec, the _CCA attribute
->> is required for ARM64. Therefore, this patch is a pre-req for ACPI PCI
->> support for ARM64 which is currently in development.
->>
->> Also, this should not affect other architectures that does not define
->> CONFIG_ACPI_CCA_REQUIRED, since the default value is coherent.
->>
->
-> We only support ACPI on SBSA compliant platforms, and SBSA mandates
-> cache-coherent PCI, so I don't think this is actually needed,
-> just use coherent all the time and do WARN_ON(!CCA) to catch people
-> that try to incorrectly use ACPI on a non-SBSA platform.
->
-> 	Arnd
+It's so nice. This patch is what I need.
 
-Thanks for pointing out. The CONFIG_ACPI_CCA_REQUIRED is already existed 
-and selected in arch/arm64/Kconfig, and used for both PCI and non-PCI 
-devices. I am not adding anything specific for the PCI case.
-
-Although, I think WARN_ON(!CCA) when it is required is a good idea. I'll 
-find a proper place for it.
-
-Thanks,
-Suravee.
-
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
+Thanks
+Haojian
