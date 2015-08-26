@@ -1,62 +1,42 @@
 From: holler@ahsoftware.de (Alexander Holler)
-Date: Wed, 26 Aug 2015 14:28:26 +0200
-Subject: [PATCH 14/16] deps: WIP: kirkwood: annotate some initcalls
+Date: Wed, 26 Aug 2015 14:28:28 +0200
+Subject: [PATCH 16/16] phy: phy-core: fix initcall level
 In-Reply-To: <1440592108-3740-1-git-send-email-holler@ahsoftware.de>
 References: <1440592108-3740-1-git-send-email-holler@ahsoftware.de>
-Message-ID: <1440592108-3740-15-git-send-email-holler@ahsoftware.de>
+Message-ID: <1440592108-3740-17-git-send-email-holler@ahsoftware.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-WIP means Work In Progress.
+The phy-core has to be initialized before other dependent usb-drivers,
+otherwise a crash might occur.
 
-Change some kirkwood drivers to offer annotated initcalls.
+Currently phy_core_init() is called in the initcall-level device, which is
+the same level where most usb-drivers will end up. By luck this seemed to
+have been called most of the time before other usb-drivers without having
+been explicitly enforced. But if phy_core_init() is not called before a
+dependent driver, a null-pointer exception might occur (e.g. because the
+phy device class isn't registered).
+
+To fix this, phy_core_init() is moved to the initcall-level fs (right
+before the standard initcall level device).
 
 Signed-off-by: Alexander Holler <holler@ahsoftware.de>
 ---
- drivers/dma/mv_xor.c                       | 2 +-
- drivers/net/ethernet/marvell/mv643xx_eth.c | 3 ++-
- drivers/usb/host/ehci-orion.c              | 2 +-
- 3 files changed, 4 insertions(+), 3 deletions(-)
+ drivers/phy/phy-core.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/dma/mv_xor.c b/drivers/dma/mv_xor.c
-index f1325f6..e766ab2 100644
---- a/drivers/dma/mv_xor.c
-+++ b/drivers/dma/mv_xor.c
-@@ -1295,7 +1295,7 @@ static int __init mv_xor_init(void)
- {
- 	return platform_driver_register(&mv_xor_driver);
+diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
+index fc48fac..4945029 100644
+--- a/drivers/phy/phy-core.c
++++ b/drivers/phy/phy-core.c
+@@ -930,7 +930,7 @@ static int __init phy_core_init(void)
+ 
+ 	return 0;
  }
--module_init(mv_xor_init);
-+annotated_module_init(mv_xor_init, mv_xor_driver.driver);
+-module_init(phy_core_init);
++fs_initcall_sync(phy_core_init);
  
- /* it's currently unsafe to unload this module */
- #if 0
-diff --git a/drivers/net/ethernet/marvell/mv643xx_eth.c b/drivers/net/ethernet/marvell/mv643xx_eth.c
-index d52639b..5eec4d8 100644
---- a/drivers/net/ethernet/marvell/mv643xx_eth.c
-+++ b/drivers/net/ethernet/marvell/mv643xx_eth.c
-@@ -3239,7 +3239,8 @@ static int __init mv643xx_eth_init_module(void)
- 
- 	return rc;
- }
--module_init(mv643xx_eth_init_module);
-+annotated_module_init(mv643xx_eth_init_module,
-+		      mv643xx_eth_shared_driver.driver);
- 
- static void __exit mv643xx_eth_cleanup_module(void)
- {
-diff --git a/drivers/usb/host/ehci-orion.c b/drivers/usb/host/ehci-orion.c
-index bfcbb9a..28f8793 100644
---- a/drivers/usb/host/ehci-orion.c
-+++ b/drivers/usb/host/ehci-orion.c
-@@ -333,7 +333,7 @@ static int __init ehci_orion_init(void)
- 	ehci_init_driver(&ehci_orion_hc_driver, &orion_overrides);
- 	return platform_driver_register(&ehci_orion_driver);
- }
--module_init(ehci_orion_init);
-+annotated_module_init(ehci_orion_init, ehci_orion_driver.driver);
- 
- static void __exit ehci_orion_cleanup(void)
+ static void __exit phy_core_exit(void)
  {
 -- 
 2.1.0
