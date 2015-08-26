@@ -1,52 +1,24 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 26 Aug 2015 13:06:28 +0100
-Subject: [PATCH v4 2/2] dt: power: st: Provide bindings for ST's OPPs
-In-Reply-To: <20150812110841.GC20238@linux>
-References: <20150810132247.GH3249@x1> <20150811080023.GB5509@linux>
- <20150811093039.GA18282@x1> <20150811100941.GG5509@linux>
- <20150811115425.GE18282@x1> <20150811120124.GH5509@linux>
- <20150811132756.GG18282@x1> <20150811142812.GJ5509@linux>
- <20150811151736.GO18282@x1> <20150812110841.GC20238@linux>
-Message-ID: <20150826120628.GZ19409@x1>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 26 Aug 2015 14:08:31 +0200
+Subject: [PATCH 3/3] gpiolib: Add GPIO initialization
+In-Reply-To: <1439979512-3894-4-git-send-email-mpa@pengutronix.de>
+References: <1439979512-3894-1-git-send-email-mpa@pengutronix.de>
+ <1439979512-3894-4-git-send-email-mpa@pengutronix.de>
+Message-ID: <CACRpkdZV0_QgT9eAPC7cQ4JFYb5npNobn40M13mhYruU0O0vdw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 12 Aug 2015, Viresh Kumar wrote:
+On Wed, Aug 19, 2015 at 12:18 PM, Markus Pargmann <mpa@pengutronix.de> wrote:
 
-> On 11-08-15, 16:17, Lee Jones wrote:
-> > This would work if we only had a single variable to contend with, but
-> > what I showed you in my previous example is that we have 3 variables
-> > to consider; cut (version), pcode and substrate.
-> > 
-> > Using the two (simple) examples I provided, how would your suggestion
-> > look in our case?
-> 
-> So the solution I gave is for picking the microvolt based on pcode.
-> The other two (cut, substrate) aren't about picking microvolt, but if
-> the OPP is available or not. Right?
+> From: Markus Pargmann <mpa@devmp.org>
+>
+> This functions adds a way to initialize a GPIO without hogging it.
+>
+> Signed-off-by: Markus Pargmann <mpa@devmp.org>
+> ---
+>  Documentation/devicetree/bindings/gpio/gpio.txt | 29 +++++++------
 
-'pcode', 'cut' and 'substrate' all determine whether a given set of
-OPPs an be used on the running platform.  I do not believe that you
-can differentiate between them. 
+This needs to go to devicetree at vger.kernel.org for review.
 
-> If these terms are generic enough, then we can add something similar
-> to what you have added..
-
-If it makes it easier, you can treat them as version numbers 2.2.1
-<pcode.cut.substrate>, but I don't see how this can help.  Obviously
-this becomes more difficult when you add wild cards to the OPPs, where
-a particular OPP would be suitable for all cuts for example.
-
-If you still think you can come up with a generic method to lay out
-CPUFreq OPP nodes that will satisfy all vendors and not be a mass of
-10's of separate nodes, then great.  Again, I'm struggling to see how
-that might be possible.
-
-What I believe we shouldn't do, is have this blocked forever for the
-sake of adding a couple of vendor properties however.
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Yours,
+Linus Walleij
