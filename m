@@ -1,51 +1,46 @@
-From: shengjiu.wang@freescale.com (Shengjiu Wang)
-Date: Wed, 26 Aug 2015 09:19:24 +0800
-Subject: [PATCH V1 0/3] fix clock issue for fsl,spdif
-In-Reply-To: <20150825184527.31346.52324@quantum>
-References: <cover.1439284957.git.shengjiu.wang@freescale.com>
- <20150825184527.31346.52324@quantum>
-Message-ID: <20150826011922.GA9708@shlinux2>
+From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
+Date: Wed, 26 Aug 2015 09:36:28 +0700
+Subject: [PATCH V2 0/4] PCI: ACPI: Setting up DMA coherency for PCI device
+ from _CCA attribute
+In-Reply-To: <240091906.Gl2z931jjW@wuerfel>
+References: <1440524009-5359-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <240091906.Gl2z931jjW@wuerfel>
+Message-ID: <55DD262C.3010008@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 25, 2015 at 11:45:27AM -0700, Michael Turquette wrote:
-> Quoting Shengjiu Wang (2015-08-11 02:26:51)
-> > fix clock issue for fsl,spdif
-> > 
-> > Shengjiu Wang (3):
-> >   ARM: imx6q: Add SPDIF_GCLK clock in clock tree
-> >   ARM: imx6sl: Add SPDIF_GCLK clock in clock tree
-> >   ARM: imx6sx: Add SPDIF_GCLK clock in clock tree
-> 
-> Hello Shengjiu Wang,
-> 
-> Please move the dts changes into separate patches. I can take the
-> changes to the clock driver and the header through the clk tree, but the
-> dt patches need to go through arm-soc.
-> 
-> Regards,
-> Mike
+Hi Arnd,
 
-Thanks Mike. I will send another patches for dts changes.
+On 8/26/15 01:48, Arnd Bergmann wrote:
+> On Wednesday 26 August 2015 00:33:25 Suravee Suthikulpanit wrote:
+>> This patch adds support to setup DMA coherency for PCI device using
+>> the ACPI _CCA attribute. According to the ACPI spec, the _CCA attribute
+>> is required for ARM64. Therefore, this patch is a pre-req for ACPI PCI
+>> support for ARM64 which is currently in development.
+>>
+>> Also, this should not affect other architectures that does not define
+>> CONFIG_ACPI_CCA_REQUIRED, since the default value is coherent.
+>>
+>
+> We only support ACPI on SBSA compliant platforms, and SBSA mandates
+> cache-coherent PCI, so I don't think this is actually needed,
+> just use coherent all the time and do WARN_ON(!CCA) to catch people
+> that try to incorrectly use ACPI on a non-SBSA platform.
+>
+> 	Arnd
 
-> 
-> > 
-> >  arch/arm/boot/dts/imx6qdl.dtsi            |  2 +-
-> >  arch/arm/boot/dts/imx6sl.dtsi             | 16 ++++++++++++++++
-> >  arch/arm/boot/dts/imx6sx.dtsi             |  2 +-
-> >  drivers/clk/imx/clk-imx6q.c               |  4 +++-
-> >  drivers/clk/imx/clk-imx6sl.c              |  4 +++-
-> >  drivers/clk/imx/clk-imx6sx.c              |  1 +
-> >  include/dt-bindings/clock/imx6qdl-clock.h |  3 ++-
-> >  include/dt-bindings/clock/imx6sl-clock.h  |  3 ++-
-> >  include/dt-bindings/clock/imx6sx-clock.h  |  3 ++-
-> >  9 files changed, 31 insertions(+), 7 deletions(-)
-> > 
-> > -- 
-> > 1.9.1
-> > 
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> > Please read the FAQ at  http://www.tux.org/lkml/
+Thanks for pointing out. The CONFIG_ACPI_CCA_REQUIRED is already existed 
+and selected in arch/arm64/Kconfig, and used for both PCI and non-PCI 
+devices. I am not adding anything specific for the PCI case.
+
+Although, I think WARN_ON(!CCA) when it is required is a good idea. I'll 
+find a proper place for it.
+
+Thanks,
+Suravee.
+
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
