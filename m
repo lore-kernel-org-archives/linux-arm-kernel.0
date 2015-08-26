@@ -1,108 +1,54 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Wed, 26 Aug 2015 09:25:41 +0800
-Subject: [PATCH v1 3/3] arm64: dts: add Hi6220 mailbox node
-In-Reply-To: <20150825160030.GA3774@leoy-linaro>
-References: <20150821184059.GB2000@svinekod>
- <20150824091845.GA28290@leoy-linaro> <20150824095144.GA7139@leverpostej>
- <1440411596.3517.12.camel@linaro.org>
- <20150824114903.GT10728@bivouac.eciton.net>
- <1440490427.10987.29.camel@linaro.org>
- <20150825094630.GU10728@bivouac.eciton.net>
- <1440497710.10987.42.camel@linaro.org> <20150825104256.GB13471@leverpostej>
- <1440510194.10987.52.camel@linaro.org> <20150825160030.GA3774@leoy-linaro>
-Message-ID: <1440552341.10987.53.camel@linaro.org>
+From: pi-cheng.chen@linaro.org (Pi-Cheng Chen)
+Date: Wed, 26 Aug 2015 09:25:29 +0800
+Subject: [RESEND PATCH 0/3 v6] Add Mediatek MT8173 cpufreq driver
+In-Reply-To: <1617873.VRHfat3V76@vostro.rjw.lan>
+References: <1439803465-19683-1-git-send-email-pi-cheng.chen@linaro.org>
+ <CALx668VWg2xVxzy8P7f5QFWRzm+TDJXUghL-_rbvRLsLYjtnng@mail.gmail.com>
+ <1617873.VRHfat3V76@vostro.rjw.lan>
+Message-ID: <CALx668UvkYhLoU8rxLG70RqTzsnaiV5-ybDYTKqb4MEJS8pmRw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-08-26 at 00:00 +0800, Leo Yan wrote:
-> On Tue, Aug 25, 2015 at 09:43:14PM +0800, Haojian Zhuang wrote:
-> > On Tue, 2015-08-25 at 11:42 +0100, Mark Rutland wrote:
-> > > > > Are you then going to hack GRUB, release a special HiKey version of
-> > > > > GRUB, not support any other versions, and still can your firmware
-> > > > > UEFI?
-> > > > 
-> > > > I don't need to hack GRUB at all.
-> > > 
-> > > Then it is working for you by pure chance alone.
-> > > 
-> > > Please listen to the advice you are being given here; we're trying to
-> > > ensure that your platform functions (and continues to function) as best
-> > > it can.
-> > 
-> > Since we discussed a lot on this, let's make a conclusion on it.
-> > 
-> > 1. UEFI could append the reserved buffer in it's memory mapping.
-> > 2. These reserved buffer must be declared in DT, since we also need to
-> >    support non-UEFI (uboot) at the same time.
-> > 3. Mailbox node should reference reserved buffer by phandle in DT. Then
-> >    map the buffer as non-cacheable in driver.
-> > 4. These reserved buffer must use "no-map" property since it should be
-> >    non-cacheable in driver.
-> 
-> For more specific discussion for DTS, i list two options at here;
-> 
-> - Option 1: just simply reserve memory regions through memory node,
->   and mailbox node will directly use the buffer through reg ranges;
-> 
-> - Option 2: use reserved-memory and mailbox node will refer phandle
->   of reserved-memory;
-> 
-> These two options both can work well with UEFI and Uboot, but option 1
-> is more simple and straightforward; so i personally prefer it. But
-> look forwarding your guys' suggestion.
-> 
-> Option 1:
-> 
-> 	memory at 0 {
-> 		device_type = "memory";
-> 		reg = <0x00000000 0x00000000 0x00000000 0x05e00000>,
-> 		      <0x00000000 0x05f00000 0x00000000 0x00eff000>,
-> 		      <0x00000000 0x06e00000 0x00000000 0x0060f000>,
-> 		      <0x00000000 0x07410000 0x00000000 0x38bf0000>;
-> 	};
-> 
->         [...]
-> 
-> 	mailbox: mailbox at f7510000 {
-> 		#mbox-cells = <1>;
-> 		compatible = "hisilicon,hi6220-mbox";
-> 		reg = <0x0 0xf7510000 0x0 0x1000>, /* IPC_S */
-> 		      <0x0 0x06dff800 0x0 0x0800>; /* Mailbox buffer */
-> 		interrupts = <GIC_SPI 94 IRQ_TYPE_LEVEL_HIGH>;
-> 	};
-> 
-> Option 2:
-> 
-> 	memory at 0 {
-> 		device_type = "memory";
-> 		reg = <0x0 0x0 0x0 0x40000000>;
-> 	};
-> 
-> 	reserved-memory {
-> 		#address-cells = <2>;
-> 		#size-cells = <2>;
-> 		ranges;
-> 
-> 		mcu_reserved: mcu_reserved at 06dff000 {
-> 			no-map;
-> 			reg = <0x0 0x06dff000 0x0 0x00001000>,	/* MCU mailbox buffer */
-> 			      <0x0 0x05e00000 0x0 0x00100000>,	/* MCU firmware buffer */
-> 			      <0x0 0x0740f000 0x0 0x00001000>;	/* MCU firmware section */
-> 		};
-> 	};
-> 
->         [...]
-> 
-> 	mailbox: mailbox at f7510000 {
-> 		#mbox-cells = <1>;
-> 		compatible = "hisilicon,hi6220-mbox";
-> 		reg = <0x0 0xf7510000 0x0 0x1000>; /* IPC_S */
-> 		memory-region = <&mcu_reserved>;   /* Mailbox buffer */
-> 		interrupts = <GIC_SPI 94 IRQ_TYPE_LEVEL_HIGH>;
-> 	};
+Hi Rafael,
 
-I prefer the second one. From my view, memory node should only describe
-the hardware information of memory.
+On Wed, Aug 26, 2015 at 7:01 AM, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> On Tuesday, August 25, 2015 10:10:44 AM Pi-Cheng Chen wrote:
+>> On Mon, Aug 17, 2015 at 5:24 PM, Pi-Cheng Chen <pi-cheng.chen@linaro.org> wrote:
+>> > MT8173 is a ARMv8 based SoC with 2 clusters. All CPUs in a single cluster
+>> > share the same power and clock domain. This series tries to add cpufreq support
+>> > for MT8173 SoC. The v6 of this series is resent with Acks added.
+>>
+>> Hi Rafael,
+>>
+>> Not sure if I has missed the merge window.
+>> Do I have chance to have this series merged for 4.3?
+>
+> Yes, it should make it.
+>
+>> Would you please take [1,2] of this series?
 
-Regards
-Haojian
+Thanks.
+
+>
+> I'm not sure what you mean.  Are you withdrawing the [3/3]?
+
+The [3/3] is based on Mediatek SoC maintainer tree[1] and the patch which
+introduce a new clock type[2] consumed by MT8173 cpufreq driver. So it will
+cause some conflicts if it goes through your tree. I am not sure how this
+should be handled, but should it be merged through Mediatek SoC maintainer
+tree?
+
+@Matthias?
+
+Thanks
+
+Best Regards,
+Pi-Cheng
+
+[1] https://github.com/mbgg/linux-mediatek.git v4.2-next/arm64
+[2] http://article.gmane.org/gmane.linux.kernel/2021379
+
+>
+> Thanks,
+> Rafael
+>
