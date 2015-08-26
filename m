@@ -1,93 +1,228 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 26 Aug 2015 17:00:43 +0100
-Subject: [PATCH v4 2/4] irqchip: GICv3: Don't deactivate interrupts forwarded
- to a guest
+Date: Wed, 26 Aug 2015 17:00:44 +0100
+Subject: [PATCH v4 3/4] irqchip: GIC: Convert to EOImode == 1
 In-Reply-To: <1440604845-28229-1-git-send-email-marc.zyngier@arm.com>
 References: <1440604845-28229-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1440604845-28229-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1440604845-28229-4-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 0a4377de3056 ("genirq: Introduce irq_set_vcpu_affinity() to
-target an interrupt to a VCPU") added just what we needed at the
-lowest level to allow an interrupt to be deactivated by a guest.
+So far, GICv2 has been used with EOImode == 0. The effect of this
+mode is to perform the priority drop and the deactivation of the
+interrupt at the same time.
 
-When such a request reaches the GIC, it knows it doesn't need to
-perform the deactivation anymore, and can safely leave the guest
-do its magic. This of course requires additional support in both
-VFIO and KVM.
+While this works perfectly for Linux (we only have a single priority),
+it causes issues when an interrupt is forwarded to a guest, and when
+we want the guest to perform the EOI itself.
+
+For this case, the GIC architecture provides EOImode == 1, where:
+- A write to the EOI register drops the priority of the interrupt
+  and leaves it active. Other interrupts at the same priority level
+  can now be taken, but the active interrupt cannot be taken again
+- A write to the DIR marks the interrupt as inactive, meaning it can
+  now be taken again.
+
+We only enable this feature when booted in HYP mode and that
+the device-tree reported a suitable CPU interface. Observable behaviour
+should remain unchanged.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/irqchip/irq-gic-v3.c | 27 +++++++++++++++++++++++++--
- 1 file changed, 25 insertions(+), 2 deletions(-)
+ drivers/irqchip/irq-gic.c       | 69 +++++++++++++++++++++++++++++++++++++++--
+ include/linux/irqchip/arm-gic.h |  4 +++
+ 2 files changed, 70 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-index e4eba7e..51635af 100644
---- a/drivers/irqchip/irq-gic-v3.c
-+++ b/drivers/irqchip/irq-gic-v3.c
-@@ -70,6 +70,11 @@ static inline int gic_irq_in_rdist(struct irq_data *d)
- 	return gic_irq(d) < 32;
+diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+index 4dd8826..9215897 100644
+--- a/drivers/irqchip/irq-gic.c
++++ b/drivers/irqchip/irq-gic.c
+@@ -46,6 +46,7 @@
+ #include <asm/irq.h>
+ #include <asm/exception.h>
+ #include <asm/smp_plat.h>
++#include <asm/virt.h>
+ 
+ #include "irq-gic-common.h"
+ #include "irqchip.h"
+@@ -82,6 +83,8 @@ static DEFINE_RAW_SPINLOCK(irq_controller_lock);
+ #define NR_GIC_CPU_IF 8
+ static u8 gic_cpu_map[NR_GIC_CPU_IF] __read_mostly;
+ 
++static struct static_key supports_deactivate = STATIC_KEY_INIT_TRUE;
++
+ #ifndef MAX_GIC_NR
+ #define MAX_GIC_NR	1
+ #endif
+@@ -157,6 +160,11 @@ static void gic_mask_irq(struct irq_data *d)
+ 	gic_poke_irq(d, GIC_DIST_ENABLE_CLEAR);
  }
  
-+static inline bool forwarded_irq(struct irq_data *d)
++static void gic_eoimode1_mask_irq(struct irq_data *d)
 +{
-+	return d->handler_data != NULL;
++	gic_mask_irq(d);
 +}
 +
- static inline void __iomem *gic_dist_base(struct irq_data *d)
- {
- 	if (gic_irq_in_rdist(d))	/* SGI+PPI -> SGI_base for this CPU */
-@@ -236,6 +241,16 @@ static void gic_mask_irq(struct irq_data *d)
- static void gic_eoimode1_mask_irq(struct irq_data *d)
- {
- 	gic_mask_irq(d);
-+	/*
-+	 * When masking a forwarded interrupt, make sure it is
-+	 * deactivated as well.
-+	 *
-+	 * This ensures that an interrupt that is getting
-+	 * disabled/masked will not get "stuck", because there is
-+	 * noone to deactivate it (guest is being terminated).
-+	 */
-+	if (forwarded_irq(d))
-+		gic_poke_irq(d, GICD_ICACTIVER);
- }
- 
  static void gic_unmask_irq(struct irq_data *d)
-@@ -306,9 +321,10 @@ static void gic_eoi_irq(struct irq_data *d)
- static void gic_eoimode1_eoi_irq(struct irq_data *d)
  {
- 	/*
--	 * No need to deactivate an LPI.
-+	 * No need to deactivate an LPI, or an interrupt that
-+	 * is is getting forwarded to a vcpu.
- 	 */
--	if (gic_irq(d) >= 8192)
-+	if (gic_irq(d) >= 8192 || forwarded_irq(d))
- 		return;
- 	gic_write_dir(gic_irq(d));
- }
-@@ -339,6 +355,12 @@ static int gic_set_type(struct irq_data *d, unsigned int type)
- 	return gic_configure_irq(irq, type, base, rwp_wait);
+ 	gic_poke_irq(d, GIC_DIST_ENABLE_SET);
+@@ -167,6 +175,11 @@ static void gic_eoi_irq(struct irq_data *d)
+ 	writel_relaxed(gic_irq(d), gic_cpu_base(d) + GIC_CPU_EOI);
  }
  
-+static int gic_irq_set_vcpu_affinity(struct irq_data *d, void *vcpu)
++static void gic_eoimode1_eoi_irq(struct irq_data *d)
 +{
-+	d->handler_data = vcpu;
-+	return 0;
++	writel_relaxed(gic_irq(d), gic_cpu_base(d) + GIC_CPU_DEACTIVATE);
 +}
 +
- static u64 gic_mpidr_to_affinity(u64 mpidr)
+ static int gic_irq_set_irqchip_state(struct irq_data *d,
+ 				     enum irqchip_irq_state which, bool val)
  {
- 	u64 aff;
-@@ -703,6 +725,7 @@ static struct irq_chip gic_eoimode1_chip = {
- 	.irq_set_affinity	= gic_set_affinity,
- 	.irq_get_irqchip_state	= gic_irq_get_irqchip_state,
- 	.irq_set_irqchip_state	= gic_irq_set_irqchip_state,
-+	.irq_set_vcpu_affinity	= gic_irq_set_vcpu_affinity,
+@@ -272,11 +285,15 @@ static void __exception_irq_entry gic_handle_irq(struct pt_regs *regs)
+ 		irqnr = irqstat & GICC_IAR_INT_ID_MASK;
+ 
+ 		if (likely(irqnr > 15 && irqnr < 1021)) {
++			if (static_key_true(&supports_deactivate))
++				writel_relaxed(irqstat, cpu_base + GIC_CPU_EOI);
+ 			handle_domain_irq(gic->domain, irqnr, regs);
+ 			continue;
+ 		}
+ 		if (irqnr < 16) {
+ 			writel_relaxed(irqstat, cpu_base + GIC_CPU_EOI);
++			if (static_key_true(&supports_deactivate))
++				writel_relaxed(irqstat, cpu_base + GIC_CPU_DEACTIVATE);
+ #ifdef CONFIG_SMP
+ 			handle_IPI(irqnr, regs);
+ #endif
+@@ -327,6 +344,20 @@ static struct irq_chip gic_chip = {
  	.flags			= IRQCHIP_SET_TYPE_MASKED,
  };
  
++static struct irq_chip gic_eoimode1_chip = {
++	.name			= "GICv2",
++	.irq_mask		= gic_eoimode1_mask_irq,
++	.irq_unmask		= gic_unmask_irq,
++	.irq_eoi		= gic_eoimode1_eoi_irq,
++	.irq_set_type		= gic_set_type,
++#ifdef CONFIG_SMP
++	.irq_set_affinity	= gic_set_affinity,
++#endif
++	.irq_get_irqchip_state	= gic_irq_get_irqchip_state,
++	.irq_set_irqchip_state	= gic_irq_set_irqchip_state,
++	.flags			= IRQCHIP_SET_TYPE_MASKED,
++};
++
+ void __init gic_cascade_irq(unsigned int gic_nr, unsigned int irq)
+ {
+ 	if (gic_nr >= MAX_GIC_NR)
+@@ -359,6 +390,10 @@ static void gic_cpu_if_up(void)
+ {
+ 	void __iomem *cpu_base = gic_data_cpu_base(&gic_data[0]);
+ 	u32 bypass = 0;
++	u32 mode = 0;
++
++	if (static_key_true(&supports_deactivate))
++		mode = GIC_CPU_CTRL_EOImodeNS;
+ 
+ 	/*
+ 	* Preserve bypass disable bits to be written back later
+@@ -366,7 +401,7 @@ static void gic_cpu_if_up(void)
+ 	bypass = readl(cpu_base + GIC_CPU_CTRL);
+ 	bypass &= GICC_DIS_BYPASS_MASK;
+ 
+-	writel_relaxed(bypass | GICC_ENABLE, cpu_base + GIC_CPU_CTRL);
++	writel_relaxed(bypass | mode | GICC_ENABLE, cpu_base + GIC_CPU_CTRL);
+ }
+ 
+ 
+@@ -789,13 +824,20 @@ void __init gic_init_physaddr(struct device_node *node)
+ static int gic_irq_domain_map(struct irq_domain *d, unsigned int irq,
+ 				irq_hw_number_t hw)
+ {
++	struct irq_chip *chip = &gic_chip;
++
++	if (static_key_true(&supports_deactivate)) {
++		if (d->host_data == (void *)&gic_data[0])
++			chip = &gic_eoimode1_chip;
++	}
++
+ 	if (hw < 32) {
+ 		irq_set_percpu_devid(irq);
+-		irq_domain_set_info(d, irq, hw, &gic_chip, d->host_data,
++		irq_domain_set_info(d, irq, hw, chip, d->host_data,
+ 				    handle_percpu_devid_irq, NULL, NULL);
+ 		set_irq_flags(irq, IRQF_VALID | IRQF_NOAUTOEN);
+ 	} else {
+-		irq_domain_set_info(d, irq, hw, &gic_chip, d->host_data,
++		irq_domain_set_info(d, irq, hw, chip, d->host_data,
+ 				    handle_fasteoi_irq, NULL, NULL);
+ 		set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
+ 	}
+@@ -986,6 +1028,8 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+ 		register_cpu_notifier(&gic_cpu_notifier);
+ #endif
+ 		set_handle_irq(gic_handle_irq);
++		if (static_key_true(&supports_deactivate))
++			pr_info("GIC: Using split EOI/Deactivate mode\n");
+ 	}
+ 
+ 	gic_dist_init(gic);
+@@ -1001,6 +1045,7 @@ gic_of_init(struct device_node *node, struct device_node *parent)
+ {
+ 	void __iomem *cpu_base;
+ 	void __iomem *dist_base;
++	struct resource cpu_res;
+ 	u32 percpu_offset;
+ 	int irq;
+ 
+@@ -1013,6 +1058,16 @@ gic_of_init(struct device_node *node, struct device_node *parent)
+ 	cpu_base = of_iomap(node, 1);
+ 	WARN(!cpu_base, "unable to map gic cpu registers\n");
+ 
++	of_address_to_resource(node, 1, &cpu_res);
++
++	/*
++	 * Disable split EOI/Deactivate if either HYP is not available
++	 * or the CPU interface is too small.
++	 */
++	if (gic_cnt == 0 && (!is_hyp_mode_available() ||
++			     resource_size(&cpu_res) < SZ_8K))
++		static_key_slow_dec(&supports_deactivate);
++
+ 	if (of_property_read_u32(node, "cpu-offset", &percpu_offset))
+ 		percpu_offset = 0;
+ 
+@@ -1132,6 +1187,14 @@ gic_v2_acpi_init(struct acpi_table_header *table)
+ 	}
+ 
+ 	/*
++	 * Disable split EOI/Deactivate if HYP is not available. ACPI
++	 * guarantees that we'll always have a GICv2, so the CPU
++	 * interface will always be the right size.
++	 */
++	if (!is_hyp_mode_available())
++		static_key_slow_dec(&supports_deactivate);
++
++	/*
+ 	 * Initialize zero GIC instance (no multi-GIC support). Also, set GIC
+ 	 * as default IRQ domain to allow for GSI registration and GSI to IRQ
+ 	 * number translation (see acpi_register_gsi() and acpi_gsi_to_irq()).
+diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
+index 9de976b..b1533c0 100644
+--- a/include/linux/irqchip/arm-gic.h
++++ b/include/linux/irqchip/arm-gic.h
+@@ -20,9 +20,13 @@
+ #define GIC_CPU_ALIAS_BINPOINT		0x1c
+ #define GIC_CPU_ACTIVEPRIO		0xd0
+ #define GIC_CPU_IDENT			0xfc
++#define GIC_CPU_DEACTIVATE		0x1000
+ 
+ #define GICC_ENABLE			0x1
+ #define GICC_INT_PRI_THRESHOLD		0xf0
++
++#define GIC_CPU_CTRL_EOImodeNS		(1 << 9)
++
+ #define GICC_IAR_INT_ID_MASK		0x3ff
+ #define GICC_INT_SPURIOUS		1023
+ #define GICC_DIS_BYPASS_MASK		0x1e0
 -- 
 2.1.4
