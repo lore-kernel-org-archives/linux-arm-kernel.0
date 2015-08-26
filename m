@@ -1,59 +1,42 @@
-From: yong.wu@mediatek.com (Yong Wu)
-Date: Wed, 26 Aug 2015 14:19:26 +0800
-Subject: [PATCH v5 0/3] arm64: IOMMU-backed DMA mapping
-In-Reply-To: <cover.1438362603.git.robin.murphy@arm.com>
-References: <cover.1438362603.git.robin.murphy@arm.com>
-Message-ID: <1440569966.25782.3.camel@mhfsdcap03>
+From: mark.yao@rock-chips.com (Mark yao)
+Date: Wed, 26 Aug 2015 14:34:21 +0800
+Subject: [GIT PULL] drm/rockchip: fixes and new features
+In-Reply-To: <1437962762-19157-1-git-send-email-mark.yao@rock-chips.com>
+References: <1437962762-19157-1-git-send-email-mark.yao@rock-chips.com>
+Message-ID: <55DD5DED.7030109@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-07-31 at 18:18 +0100, Robin Murphy wrote:
-> Hi all,
-> 
-> Here's an update following Catalin's feedback on v4[1].
-> 
-> Changes this round:
-> - Rebased onto linux-next
->   - IOVA alignment fix applied already
->   - iommu_iova_cache_init() is now iova_cache_get()
-> - Tidied up iommu_dma_alloc()
->   - Simplified pgprot handling
->   - Removed redundant memset
->   - Skip coherent page-flushing in a simpler way
-> - Spotted a bug in iommu_dma_init_domain() where the checks for
->   reinitialising an existing domain were backwards.
-> 
-> If it is going to be down to me to tackle all the driver fixes and
-> conversion of arch/arm dma_ops, I'd still much rather have this
-> code merged first as a stable base to work with (and un-block arm64
-> in the meantime). Have we decided yet whether this should go via the
-> IOMMU tree or the arm64 tree?
+Hi Dave
+     Here are some fixes and some new features for rockchip drm,
+     tested on popmetal rk3288 board, can you land them?
 
-Hi Robin,
-   Sorry to disturb you. Is there any plan for the next version of arm64
-DMA. If it's yes, when could we get it?
-   Thanks very much.
+The following changes since commit db56176025cee5e242dfeed5f4e304d095d29fa3:
 
-> 
-> Thanks,
-> Robin.
-> 
-> [1]:http://thread.gmane.org/gmane.linux.kernel.iommu/10181
-> 
-> Robin Murphy (3):
->   iommu: Implement common IOMMU ops for DMA mapping
->   arm64: Add IOMMU dma_ops
->   arm64: Hook up IOMMU dma_ops
-> 
->  arch/arm64/Kconfig                   |   1 +
->  arch/arm64/include/asm/dma-mapping.h |  15 +-
->  arch/arm64/mm/dma-mapping.c          | 449 +++++++++++++++++++++++++++++
->  drivers/iommu/Kconfig                |   7 +
->  drivers/iommu/Makefile               |   1 +
->  drivers/iommu/dma-iommu.c            | 534 +++++++++++++++++++++++++++++++++++
->  include/linux/dma-iommu.h            |  84 ++++++
->  include/linux/iommu.h                |   1 +
->  8 files changed, 1084 insertions(+), 8 deletions(-)
->  create mode 100644 drivers/iommu/dma-iommu.c
->  create mode 100644 include/linux/dma-iommu.h
-> 
+   Revert "drm/atomic: Call ww_acquire_done after check phase is 
+complete" (2015-08-25 17:23:36 +1000)
+
+are available in the git repository at:
+
+   https://github.com/markyzq/kernel-drm-rockchip.git 
+drm-rockchip-2015-08-26
+
+for you to fetch changes up to 4c156c21c7948a0be854cbe5914af3181303e529:
+
+   drm/rockchip: vop: support plane scale (2015-08-26 14:16:26 +0800)
+
+----------------------------------------------------------------
+Mark Yao (6):
+       drm/rockchip: vop: Fix virtual stride calculation
+       drm/rockchip: vop: Fix window dest start point
+       drm/rockchip: vop: Add yuv plane support
+       drm/rockchip: vop: Default enable win2/3 area0 bit
+       drm/rockchip: vop: restore vop registers when resume
+       drm/rockchip: vop: support plane scale
+
+  drivers/gpu/drm/rockchip/rockchip_drm_vop.c |  269 
+++++++++++++++++++++++++++-
+  drivers/gpu/drm/rockchip/rockchip_drm_vop.h |   88 +++++++++
+  2 files changed, 348 insertions(+), 9 deletions(-)
+
+-Mark
