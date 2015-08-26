@@ -1,40 +1,33 @@
 From: ryabinin.a.a@gmail.com (Andrey Ryabinin)
-Date: Wed, 26 Aug 2015 19:15:05 +0300
-Subject: [PATCH 2/4] efi/runtime-wrappers,
- kasan: don't sanitize runtime wrappers.
+Date: Wed, 26 Aug 2015 19:15:07 +0300
+Subject: [PATCH 4/4] libfdt, kasan: don't instrument libfdt.
 In-Reply-To: <1440605707-8325-1-git-send-email-ryabinin.a.a@gmail.com>
 References: <1440605707-8325-1-git-send-email-ryabinin.a.a@gmail.com>
-Message-ID: <1440605707-8325-3-git-send-email-ryabinin.a.a@gmail.com>
+Message-ID: <1440605707-8325-5-git-send-email-ryabinin.a.a@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM64 maps efi runtime services in userspace addresses
-which don't have KASAN shadow. So dereferencing these addresses
-in efi_call_virt() will cause crash if this code instrumented.
+libfdt is used by EFI code and it runs before we setup early
+shadow, so it has to be not instrumented to prevent boot crash.
 
 Signed-off-by: Andrey Ryabinin <ryabinin.a.a@gmail.com>
 ---
- drivers/firmware/efi/Makefile | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ lib/Makefile | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/firmware/efi/Makefile b/drivers/firmware/efi/Makefile
-index 6fd3da9..413fcf2 100644
---- a/drivers/firmware/efi/Makefile
-+++ b/drivers/firmware/efi/Makefile
-@@ -1,6 +1,14 @@
- #
- # Makefile for linux kernel
- #
-+
-+#
-+# ARM64 maps efi runtime services in userspace addresses
-+# which don't have KASAN shadow. So dereference of these addresses
-+# in efi_call_virt() will cause crash if this code instrumented.
-+#
-+KASAN_SANITIZE_runtime-wrappers.o	:= n
-+
- obj-$(CONFIG_EFI)			+= efi.o vars.o reboot.o
- obj-$(CONFIG_EFI_VARS)			+= efivars.o
- obj-$(CONFIG_EFI_ESRT)			+= esrt.o
+diff --git a/lib/Makefile b/lib/Makefile
+index 6897b52..44e1d81 100644
+--- a/lib/Makefile
++++ b/lib/Makefile
+@@ -165,7 +165,8 @@ obj-$(CONFIG_STMP_DEVICE) += stmp_device.o
+ libfdt_files = fdt.o fdt_ro.o fdt_wip.o fdt_rw.o fdt_sw.o fdt_strerror.o \
+ 	       fdt_empty_tree.o
+ $(foreach file, $(libfdt_files), \
+-	$(eval CFLAGS_$(file) = -I$(src)/../scripts/dtc/libfdt))
++	$(eval CFLAGS_$(file) = -I$(src)/../scripts/dtc/libfdt) \
++	$(eval KASAN_SANITIZE_$(file) := n))
+ lib-$(CONFIG_LIBFDT) += $(libfdt_files)
+ 
+ obj-$(CONFIG_RBTREE_TEST) += rbtree_test.o
 -- 
 2.4.6
