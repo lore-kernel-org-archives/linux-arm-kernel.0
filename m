@@ -1,58 +1,78 @@
-From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
-Date: Wed, 26 Aug 2015 14:30:26 +0200
-Subject: [PATCH linux-next v5 4/5] Documentation: atmel-quadspi: add binding
- file for Atmel QSPI driver
-In-Reply-To: <cover.1440580764.git.cyrille.pitchen@atmel.com>
-References: <cover.1440580764.git.cyrille.pitchen@atmel.com>
-Message-ID: <793cb906c79eed821cf9b47e79dc1b54a7a5dbd0.1440580764.git.cyrille.pitchen@atmel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 26 Aug 2015 14:52:45 +0200
+Subject: [PATCH 1/3] ARM: uniphier: add outer cache support
+In-Reply-To: <CAK7LNAQ_oymnQNEcP+FDqyxNKtMyiCwgxSRMmg5HAKQW9C6eRg@mail.gmail.com>
+References: <1440382692-3855-1-git-send-email-yamada.masahiro@socionext.com>
+ <2021253.vgeYqalDfp@wuerfel>
+ <CAK7LNAQ_oymnQNEcP+FDqyxNKtMyiCwgxSRMmg5HAKQW9C6eRg@mail.gmail.com>
+Message-ID: <4027826.UsiXogeDbt@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch documents the DT bindings for the driver of the Atmel QSPI
-controller embedded inside sama5d2x SoCs.
+On Wednesday 26 August 2015 10:38:59 Masahiro Yamada wrote:
+> 
+> 2015-08-25 4:59 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
+> > On Monday 24 August 2015 11:18:10 Masahiro Yamada wrote:
 
-Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Acked-by: Marek Vasut <marex@denx.de>
----
- .../devicetree/bindings/mtd/atmel-quadspi.txt      | 29 ++++++++++++++++++++++
- 1 file changed, 29 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mtd/atmel-quadspi.txt
+> Nothing.
+> 
+> This outer cache is not a variant of l2x0/pl310.
+> It was designed only for our SoCs from scratch.
 
-diff --git a/Documentation/devicetree/bindings/mtd/atmel-quadspi.txt b/Documentation/devicetree/bindings/mtd/atmel-quadspi.txt
-new file mode 100644
-index 000000000000..0b8d545bb198
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mtd/atmel-quadspi.txt
-@@ -0,0 +1,29 @@
-+* Atmel Quad Serial Peripheral Interface (QSPI)
-+
-+Required properties:
-+- compatible:     should be "atmel,sama5d2-qspi"
-+- reg:            the first contains the register location and length,
-+                  the second contains the memory mapping address and length
-+- interrupts:     should contain the interrupt for the device
-+- clocks:         the phandle of the clock needed by the QSPI controller
-+- #address-cells: should be <1>
-+- #size-cells:    should be <0>
-+
-+Example:
-+
-+spi at f0020000 {
-+	compatible = "atmel,sama5d2-qspi";
-+	reg = <0xf0020000 0x100>,
-+	      <0xd0000000 0x8000000>;
-+	interrupts = <52 IRQ_TYPE_LEVEL_HIGH 7>;
-+	clocks = <&spi0_clk>;
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_spi0_default>;
-+	status = "okay";
-+
-+	m25p80 at 0 {
-+		...
-+	};
-+};
--- 
-1.8.2.2
+Ok, I see.
+
+> > Would it make sense to at least share the
+> > common entry point at l2x0_of_init() so you don't need to call it from
+> > the platform file?
+> 
+> I do not think so.
+> 
+> 
+> l2x0_of_init() checks L2X0_AUX_CTRL register,
+> but the cache-uniphier does not have such register,
+> so the boot code crashes.
+> 
+> 
+> 
+> BTW, what makes l2x0_of_init() so special?
+> 
+> Only L2x0/L310 and variants can be initialized
+> directly from init_IRQ().
+
+The only thing that is special about it is that almost everyone
+uses it because it is often licensed together with the Cortex-A
+cores from ARM. There are a few variants that are closely related
+(tauros3 and aurora, both from Marvell. All other outer_cache
+implementations (feroceon, xscale, tauros2) are for older
+Marvell (or Intel) cores that have since been replaced with
+Cortex-A cores in newer products.
+
+> Moreover, outer-cache init seems to be unrelated to
+> IRQ init.
+
+Agreed, this is also just a historic artifact, as we don't really
+have a place to put cache controller initialization, and the
+irq init callback was already there at the time when people
+added code to init their outer caches. It often does not matter
+much where you call it, but doing it early speeds up the boot
+time.
+
+It would be nice to unify the cache initialization a bit further,
+apparently only a few older platforms still call the l2x0 init
+manually and we can probably all convert them to the implicit
+configuration in one way or another.
+
+As we now have three kinds of cache controllers (l2x0, tauros2
+and uniphier) that we need to support using DT, it would be nice
+for generalize that init sequence a bit more.
+
+A first step would be to add the tauros2 and uniphier outer cache
+init to the init_IRQ() function, and then have another patch
+that moves all the outercache initialization into a new place
+like arch/arm/mm/outercache.c so we don't clutter up irq.c
+with unrelated stuff.
+
+Russell probably also has some ideas on this topic, in doubt
+just do what he suggests.
+
+	Arnd
