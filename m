@@ -1,42 +1,68 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 25 Aug 2015 19:56:31 -0600
-Subject: [PATCH v4 4/5] spi: bcm2835: new driver implementing auxiliar
- spi1/spi2 on the bcm2835 soc
-In-Reply-To: <1440405608-3995-5-git-send-email-kernel@martin.sperl.org>
-References: <1440405608-3995-1-git-send-email-kernel@martin.sperl.org>
- <1440405608-3995-5-git-send-email-kernel@martin.sperl.org>
-Message-ID: <55DD1CCF.4080808@wwwdotorg.org>
+From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
+Date: Wed, 26 Aug 2015 09:00:23 +0700
+Subject: [PATCH V2 2/4] ACPI/scan: Clean up acpi_check_dma
+In-Reply-To: <1659571.paO1iYcMuM@vostro.rjw.lan>
+References: <1440524009-5359-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <1440524009-5359-3-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <1659571.paO1iYcMuM@vostro.rjw.lan>
+Message-ID: <55DD1DB7.1020203@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/24/2015 02:40 AM, kernel at martin.sperl.org wrote:
-> From: Martin Sperl <kernel@martin.sperl.org>
+Hi Rafael,
 
-Patch description?
+On 8/26/15 06:48, Rafael J. Wysocki wrote:
 
->  arch/arm/configs/bcm2835_defconfig |    1 +
->  drivers/spi/Kconfig                |   12 +
->  drivers/spi/Makefile               |    1 +
->  drivers/spi/spi-bcm2835aux.c       |  506 ++++++++++++++++++++++++++++++++++++
+>[...]
+> On Wednesday, August 26, 2015 12:33:27 AM Suravee Suthikulpanit wrote:
+>> diff --git a/drivers/acpi/glue.c b/drivers/acpi/glue.c
+>> index b9657af..55cf916 100644
+>> --- a/drivers/acpi/glue.c
+>> +++ b/drivers/acpi/glue.c
+>> @@ -168,7 +168,7 @@ int acpi_bind_one(struct device *dev, struct acpi_device *acpi_dev)
+>>   	struct list_head *physnode_list;
+>>   	unsigned int node_id;
+>>   	int retval = -EINVAL;
+>> -	bool coherent;
+>> +	int coherent;
+>
+> enum, anyone?  With clearly defined values?
 
-A change to the defconfig would be applied by the RPi maintainers, and a
-change to drivers/spi by the SPI maintainers. Those need to be in
-different patches.
+Originally I had defined
 
-> diff --git a/drivers/spi/spi-bcm2835aux.c b/drivers/spi/spi-bcm2835aux.c
+enum acpi_dma_coherency {
+	ACPI_DMA_NON_COHERENT,
+	ACPI_DMA_COHERENT,
+	APCI_DMA_NOT_SUPPORTED = -1,
+};
 
-> +static int bcm2835aux_spi_probe(struct platform_device *pdev)
+Although, this would need to be defined in the include/linux/acpi.h, and 
+will be used also for #ifndef CONFIG_ACPI code to return errors. I was 
+not sure if this would be too much. If this is preferred, I'll add this 
+back in.
 
-> +	clk_prepare_enable(bs->clk);
+>>
+>>   	if (has_acpi_companion(dev)) {
+>>   		if (acpi_dev) {
+>> @@ -225,7 +225,8 @@ int acpi_bind_one(struct device *dev, struct acpi_device *acpi_dev)
+>>   	if (!has_acpi_companion(dev))
+>>   		ACPI_COMPANION_SET(dev, acpi_dev);
+>>
+>> -	if (acpi_check_dma(acpi_dev, &coherent))
+>> +	coherent = acpi_check_dma_coherency(acpi_dev);
+>> +	if (coherent != -1)
+>
+> Like here I'm not sure why -1 is special?
 
-Error checking?
+It's just another value to communicate that DMA is not supported. :)
 
-> +	/* enable HW block */
-> +	bcm2835aux_enable(&pdev->dev, ENABLE_PROPERTY);
-
-The return value needs to be error-checked, so that deferred probe can
-work, and so other kinds of errors can be detected. Wasn't this correct
-in a previous patch version?
-
-Note that I didn't review any code besides probe(), remove() and the
-driver boiler-plate that refers to those functions.
+Thanks,
+Suravee
+>
+>>   		arch_setup_dma_ops(dev, 0, 0, NULL, coherent);
+>>
+>>   	acpi_physnode_link_name(physical_node_name, node_id);
+>
+> Thanks,
+> Rafael
+>
