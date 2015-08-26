@@ -1,69 +1,58 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 26 Aug 2015 10:26:54 +0100
-Subject: [PATCH v3 1/1] misc: sram: add dev_pm_ops to support module power
- gate
-In-Reply-To: <CY1PR0301MB0843AB9C6330D29EBD5F47DA83610@CY1PR0301MB0843.namprd03.prod.outlook.com>
-References: <1438272681-29338-1-git-send-email-shenwei.wang@freescale.com>
- <55DC677E.1030004@arm.com>
- <CY1PR0301MB0843D5CB5FFC56991B90EB4283610@CY1PR0301MB0843.namprd03.prod.outlook.com>
- <55DC74CF.7070300@arm.com>
- <CY1PR0301MB084302FA2AA9582A3BA9B50B83610@CY1PR0301MB0843.namprd03.prod.outlook.com>
- <55DC7E5E.5020701@arm.com>
- <CY1PR0301MB0843A508122C7FCF3969AF3D83610@CY1PR0301MB0843.namprd03.prod.outlook.com>
- <55DC91BE.7090107@arm.com>
- <CY1PR0301MB0843AB9C6330D29EBD5F47DA83610@CY1PR0301MB0843.namprd03.prod.outlook.com>
-Message-ID: <55DD865E.4050603@arm.com>
+From: wxt@rock-chips.com (Caesar Wang)
+Date: Wed, 26 Aug 2015 17:27:59 +0800
+Subject: [RESEND PATCH v16 3/4] soc: rockchip: power-domain: Add power
+ domain driver
+In-Reply-To: <7hwpwjaxxv.fsf@deeprootsystems.com>
+References: <1440487486-6154-1-git-send-email-wxt@rock-chips.com>
+ <1440487486-6154-4-git-send-email-wxt@rock-chips.com>
+ <7hwpwjaxxv.fsf@deeprootsystems.com>
+Message-ID: <55DD869F.9010309@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 25/08/15 20:35, Shenwei Wang wrote:
+? 2015?08?26? 04:57, Kevin Hilman ??:
+> Caesar Wang <wxt@rock-chips.com> writes:
 >
->
->> -----Original Message-----
->> From: Sudeep Holla [mailto:sudeep.holla at arm.com]
->> Sent: 2015?8?25? 11:03
->> To: Wang Shenwei-B38339
->> Cc: Sudeep Holla; gregkh at linuxfoundation.org; arnd at arndb.de; Huang
->> Yongcai-B20788; linux-arm-kernel at lists.infradead.org
->> Subject: Re: [PATCH v3 1/1] misc: sram: add dev_pm_ops to support module
->> power gate
->>>> I don't like that solution as it's not scalable with SRAM size and
->>>> saving all the content of SRAM just because of few active regions
->>>> makes no sense to me at-least. I prefer leaving it to the users to
->>>> handle that rather than SRAM driver.
->>>
->>> I don't think it is not scalable. The choice should be made by the
->>> application. From the driver side, it should be able to provide the
->>> way to retain its contents during power gate.
->>>
+>> This driver is found on RK3288 SoCs.
 >>
->> OK that was just my opinion. I just wanted to avoid unnecessary save/restore, e.g.
->> if say just few kilobytes are active in say 32MB SRAM, you will save/restore entire
->> SRAM ?
+>> In order to meet high performance and low power requirements, a power
+>> management unit is designed or saving power when RK3288 in low power
+>> mode.
+>> The RK3288 PMU is dedicated for managing the power of the whole chip.
+>>
+>> PMU can work in the Low Power Mode by setting bit[0] of PMU_PWRMODE_CON
+>> register. After setting the register, PMU would enter the Low Power mode.
+>> In the low power mode, pmu will auto power on/off the specified power
+>> domain, send idle req to specified power domain, shut down/up pll and
+>> so on. All of above are configurable by setting corresponding registers.
+>>
+>> Signed-off-by: jinkun.hong <jinkun.hong@rock-chips.com>
+>> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+> [...]
 >
-> Although in theory a SoC can integrate such a big SRAM like 32MB inside, but I don't
-> think anyone will practice it because the cost is too high. So far, the most popular size
-> of a SRAM in a SoC is hundreds of KB.
+>> diff --git a/drivers/soc/rockchip/Kconfig b/drivers/soc/rockchip/Kconfig
+>> new file mode 100644
+>> index 0000000..87a09c3
+>> --- /dev/null
+>> +++ b/drivers/soc/rockchip/Kconfig
+>> @@ -0,0 +1,13 @@
+>> +#
+>> +# Rockchip Soc drivers
+>> +#
+>> +config PM_GENERIC_DOMAINS
+> Why are you (re)defining this config option?  This name is already used in kernel/pm/Kconfig.
+
+Fixed.
+
+----
+Thanks,
+Caesar
+
+> Kevin
 >
-
-I have seen 32MB SRAM and people are thinking of doubling it. So I
-disagree, especially if that's your main argument.
-
-On Android targets, I have seen suspend-to-ram used quite aggressively
-and this save/restore might add significant delay and might be
-unnecessary most of the time.
-
->> Anyways, the driver is saving/restoring the memory unconditionally whenever DT
->> sets that boolean right ? at-least as the patch stands.
->
-> The saving/restoring feature is not enabled by default in this patch. To enable it you
-> need to add the can-power-gate string in the relating DT node.
-
-Yes I understood and that's what I mentioned above, but once it's
-present in DT, it's unconditional for the entire SRAM which might not be
-used actively. So I still don't like this approach.
-
-Regards,
-Sudeep
+> _______________________________________________
+> Linux-rockchip mailing list
+> Linux-rockchip at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-rockchip
