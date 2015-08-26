@@ -1,35 +1,44 @@
-From: sbranden@broadcom.com (Scott Branden)
-Date: Wed, 26 Aug 2015 11:20:59 -0700
-Subject: [PATCH 5/5] MAINTAINERS: add entry for the Broadcom Northstar
- Plus SoCs
-In-Reply-To: <CAOesGMioBQY9qy-S8kMJmo_=B6-KZiUkd=Ns1Uo2dGu0BiqppQ@mail.gmail.com>
-References: <1440092861-25825-1-git-send-email-jonmason@broadcom.com>
- <CAOesGMioBQY9qy-S8kMJmo_=B6-KZiUkd=Ns1Uo2dGu0BiqppQ@mail.gmail.com>
-Message-ID: <55DE038B.1060908@broadcom.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 26 Aug 2015 20:29:27 +0200
+Subject: [PATCH 2/3] arm64: use core efi=debug instead of uefi_debug
+ command line parameter
+In-Reply-To: <20150826173000.GG10728@bivouac.eciton.net>
+References: <1440595498-30630-1-git-send-email-leif.lindholm@linaro.org>
+ <1440595498-30630-3-git-send-email-leif.lindholm@linaro.org>
+ <20150826172455.GB2837@codeblueprint.co.uk>
+ <20150826173000.GG10728@bivouac.eciton.net>
+Message-ID: <CAKv+Gu8vkHaqkOrJpiQweczj1zzNh4sGfM4ySFJ7qiwDM5u_4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15-08-25 04:42 PM, Olof Johansson wrote:
-> On Thu, Aug 20, 2015 at 10:47 AM, Jon Mason <jonmason@broadcom.com> wrote:
->> Modify the iProc MAINTAINER to cover the Nortstar Plus SoCs, and add me
->> to the list of people responsible for it.
+On 26 August 2015 at 19:30, Leif Lindholm <leif.lindholm@linaro.org> wrote:
+> On Wed, Aug 26, 2015 at 06:24:55PM +0100, Matt Fleming wrote:
+>> On Wed, 26 Aug, at 02:24:57PM, Leif Lindholm wrote:
+>> > Now that we have an efi=debug command line option in the core code, use
+>> > this instead of the arm64-specific uefi_debug option.
+>> >
+>> > Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
+>> > ---
+>> >  Documentation/arm/uefi.txt |  2 --
+>> >  arch/arm64/kernel/efi.c    | 19 +++++--------------
+>> >  2 files changed, 5 insertions(+), 16 deletions(-)
+>>
+>> Are there no concerns with backwards-compatibility here? I expected
+>> this patch to internally convert uefi_debug to efi=debug if old boot
+>> loaders, kernel config, etc specify it.
+>>
+>> Is that something that can be safely ignored?
 >
-> That's not what this patch does. It removes CYGNUS from the
-> description as well. Hmm?
+> Since it is purely a debug feature, I opted to just drop it.
+> I don't have strong feelings, and it could certainly be kept as an
+> arm64-only alias (but setting the EFI_DBG flag) if others disagree.
 >
-> I'm also not a fan of the complex patterns, but that's more of a
-> bikeshedding comment. Does Broadcom really not have a bit more
-> systematic naming than this? :)
->
->> Signed-off-by: Jon Mason <jonmason@broadcom.com>
->> Reviewed-by: Scott Branden <sbranden@broadcom.com>
-Acked-by: Scott Branden <sbranden@broadcom.com>
 
->
-> For maintainer updates, we usuallu like to see a public ack of this
-> and not just a pre-acked patch. You _could_ have added it yourself
-> without Scott's actual approval, after all.
->
->
-> -Olof
->
+Let's not bother. This is strictly a debug option that only affects
+what gets printed to the kernel log, which itself is not (or should
+not be) an ABI. Also, if anyone cares deeply about always having the
+feature enabled both on before and after kernels, they can always pass
+both options.
+
+-- 
+Ard.
