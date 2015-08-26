@@ -1,57 +1,94 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 26 Aug 2015 12:39:22 +0100
-Subject: [PATCH] arm64: fix bug for reloading FPSIMD state after execve
- on cpu 0.
-In-Reply-To: <CAKv+Gu_VtFGsKPmFfLHm=kNM=vK=p1TR+fd52P68MiA6J0zUFQ@mail.gmail.com>
-References: <1440556841-17219-1-git-send-email-chunyan.zhang@spreadtrum.com>
- <20150826111205.GD30466@arm.com>
- <CAKv+Gu_VtFGsKPmFfLHm=kNM=vK=p1TR+fd52P68MiA6J0zUFQ@mail.gmail.com>
-Message-ID: <20150826113922.GE30466@arm.com>
+From: henryc.chen@mediatek.com (Henry Chen)
+Date: Wed, 26 Aug 2015 19:43:16 +0800
+Subject: [PATCH] regmap: Fix the null function of format_val on
+ regmap_bulk_read.
+Message-ID: <1440589396-696-1-git-send-email-henryc.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 26, 2015 at 12:32:03PM +0100, Ard Biesheuvel wrote:
-> On 26 August 2015 at 13:12, Will Deacon <will.deacon@arm.com> wrote:
-> > On Wed, Aug 26, 2015 at 03:40:41AM +0100, Chunyan Zhang wrote:
-> >> From: Janet Liu <janet.liu@spreadtrum.com>
-> >>
-> >> If process A is running on CPU 0 and do execve syscall and after sched_exec,
-> >> dest_cpu is 0, fpsimd_state.cpu is 0. If at the time Process A get scheduled
-> >> out and after some kernel threads running on CPU 0, process A is back in CPU 0,
-> >> A's fpsimd_state.cpu is current cpu id "0", and per_cpu(fpsimd_last_state)
-> >> points A's fpsimd_state, TIF_FOREIGN_FPSTATE will be clear, kernel will not
-> >> reload the context during it return to userspace. so set the cpu's
-> >> fpsimd_last_state to NULL to avoid this.
-> >
-> > AFAICT, this is only a problem if one of the kernel threads uses the fpsimd
-> > registers, right? However, kernel_neon_begin_partial clobbers
-> > fpsimd_last_state, so I'm struggling to see the problem.
-> >
-> 
-> I think the problem is real, but it would be better to set the
-> fpsimd_state::cpu field to an invalid value like we do in
-> fpsimd_flush_task_state()
-> 
-> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-> index 44d6f7545505..c56956a16d3f 100644
-> --- a/arch/arm64/kernel/fpsimd.c
-> +++ b/arch/arm64/kernel/fpsimd.c
-> @@ -158,6 +158,7 @@ void fpsimd_thread_switch(struct task_struct *next)
->  void fpsimd_flush_thread(void)
->  {
->         memset(&current->thread.fpsimd_state, 0, sizeof(struct fpsimd_state));
-> +       fpsimd_flush_task_state(current);
->         set_thread_flag(TIF_FOREIGN_FPSTATE);
->  }
-> 
-> (note the memset erroneously initializes that field to CPU 0)
+The regmap_format will not be initialize if device driver not declare the regmap_bus
+when registering the regmap. To avoid the null function of format_val when
+called regmap_bulk_read(). It need to give a format function when regmap init.
 
-Aha, I see. So the problem is actually that we get a view on our fpsimd
-state before the exec, rather than a view on some kernel state.
+Signed-off-by: Henry Chen <henryc.chen@mediatek.com>
+---
+I ran into this bug when testing Matthias' v4.2-next/for-next branch on mt8173.
+It now crashes on boot. The commit [0], which added the call to
+map->format.format_val from regmap_bulk_read() when map->bus == NULL.
 
-> This more accurately reflects the state of the process after forking,
-> i.e., that its FPSIMD state has never been loaded into any CPU.
+[0] commit 15b8d2c41fe5839582029f65c5f7004db451cc2b
+  Author: Arun Chandran <achandran <at> mvista.com>
+  regmap: Fix regmap_bulk_read in BE mode
 
-Yup, that's much clearer.
+Please see the error below, thanks.
 
-Will
+Call trace:
+[<          (null)>]           (null)
+[<ffffffc0004cbdd0>] mtk_rtc_read_time+0x9c/0x134
+[<ffffffc0004c9618>] __rtc_read_time.isra.3+0x40/0x7c
+[<ffffffc0004c9688>] rtc_read_time+0x34/0x58
+[<ffffffc0004c9e64>] __rtc_read_alarm+0x20/0x37c
+[<ffffffc0004c8d2c>] rtc_device_register+0x194/0x2e0
+[<ffffffc0004cbf60>] mtk_rtc_probe+0xf8/0x18c
+[<ffffffc0003fb5e0>] platform_drv_probe+0x48/0xc4
+[<ffffffc0003f99e0>] driver_probe_device+0x188/0x29c
+[<ffffffc0003f9b8c>] __driver_attach+0x98/0xa0
+[<ffffffc0003f7ce0>] bus_for_each_dev+0x54/0x98
+[<ffffffc0003f94c8>] driver_attach+0x1c/0x28
+[<ffffffc0003f9164>] bus_add_driver+0x1c0/0x228
+[<ffffffc0003fa45c>] driver_register+0x64/0x130
+[<ffffffc0003fb514>] __platform_driver_register+0x5c/0x68
+[<ffffffc0008639a4>] mtk_rtc_driver_init+0x14/0x20
+[<ffffffc000082864>] do_one_initcall+0x88/0x1ac
+[<ffffffc000842b10>] kernel_init_freeable+0x158/0x1fc
+[<ffffffc0005f45fc>] kernel_init+0xc/0xd8
+---
+ drivers/base/regmap/regmap.c | 20 +++++++++++++++++---
+ 1 file changed, 17 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/base/regmap/regmap.c b/drivers/base/regmap/regmap.c
+index 7111d04..9357186 100644
+--- a/drivers/base/regmap/regmap.c
++++ b/drivers/base/regmap/regmap.c
+@@ -607,13 +607,13 @@ struct regmap *regmap_init(struct device *dev,
+ 		map->reg_write = config->reg_write;
+ 
+ 		map->defer_caching = false;
+-		goto skip_format_initialization;
++		goto simple_format_initialization;
+ 	} else if (!bus->read || !bus->write) {
+ 		map->reg_read = _regmap_bus_reg_read;
+ 		map->reg_write = _regmap_bus_reg_write;
+ 
+ 		map->defer_caching = false;
+-		goto skip_format_initialization;
++		goto simple_format_initialization;
+ 	} else {
+ 		map->reg_read  = _regmap_bus_read;
+ 	}
+@@ -783,8 +783,22 @@ struct regmap *regmap_init(struct device *dev,
+ 		map->defer_caching = true;
+ 		map->reg_write = _regmap_bus_raw_write;
+ 	}
++/*
++ * For bulk read, need to hook the format function.
++ */
++simple_format_initialization:
+ 
+-skip_format_initialization:
++	switch (config->val_bits) {
++		case 8:
++			map->format.format_val = regmap_format_8;
++			break;
++		case 16:
++			map->format.format_val = regmap_format_16_native;
++			break;
++		case 32:
++			map->format.format_val = regmap_format_32_native;
++			break;
++	}
+ 
+ 	map->range_tree = RB_ROOT;
+ 	for (i = 0; i < config->num_ranges; i++) {
+-- 
+1.8.1.1.dirty
