@@ -1,67 +1,176 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 26 Aug 2015 09:52:16 +0100
-Subject: [PATCH v9 1/1] irqchip: imx-gpcv2: IMX GPCv2 driver for wakeup
- sources
-In-Reply-To: <alpine.DEB.2.11.1508252123310.15006@nanos>
-References: <1440443055-7291-1-git-send-email-shenwei.wang@freescale.com>
- <55DC3452.3070205@arm.com>
- <CY1PR0301MB08439B6C5F841AFFD152DFD883610@CY1PR0301MB0843.namprd03.prod.outlook.com>
- <55DC738D.8000302@arm.com>
- <CY1PR0301MB0843AE566996617D855CC00683610@CY1PR0301MB0843.namprd03.prod.outlook.com>
- <55DC7FA4.7040902@arm.com>
- <CY1PR0301MB08433A2659C75028821F0AE783610@CY1PR0301MB0843.namprd03.prod.outlook.com>
- <55DC96BA.2020905@arm.com> <alpine.DEB.2.11.1508252123310.15006@nanos>
-Message-ID: <55DD7E40.1040009@arm.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Wed, 26 Aug 2015 10:54:51 +0200
+Subject: [PATCH v3 1/4] irqchip: GICv3: Convert to EOImode == 1
+In-Reply-To: <1440503605-10185-2-git-send-email-marc.zyngier@arm.com>
+References: <1440503605-10185-1-git-send-email-marc.zyngier@arm.com>
+ <1440503605-10185-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <55DD7EDB.7010208@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+Hi Marc,
+On 08/25/2015 01:53 PM, Marc Zyngier wrote:
+> So far, GICv3 has been used in with EOImode == 0. The effect of this
+> mode is to perform the priority drop and the deactivation of the
+> interrupt at the same time.
+> 
+> While this works perfectly for Linux (we only have a single priority),
+> it causes issues when an interrupt is forwarded to a guest, and when
+> we want the guest to perform the EOI itself.
+> 
+> For this case, the GIC architecture provides EOImode == 1, where:
+> - A write to ICC_EOIR1_EL1 drops the priority of the interrupt and
+>   leaves it active. Other interrupts at the same priority level can
+>   now be taken, but the active interrupt cannot be taken again
+> - A write to ICC_DIR_EL1 marks the interrupt as inactive, meaning
+>   it can now be taken again.
+> 
+> This patch converts the driver to be able to use this new mode,
+> depending on whether or not the kernel can behave as a hypervisor.
+> No feature change.
+> 
+> Reviewed-by: Eric Auger <eric.auger@linaro.org>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  drivers/irqchip/irq-gic-v3.c       | 39 ++++++++++++++++++++++++++++++++++----
+>  include/linux/irqchip/arm-gic-v3.h |  9 +++++++++
+>  2 files changed, 44 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+> index c52f7ba..addd2ee 100644
+> --- a/drivers/irqchip/irq-gic-v3.c
+> +++ b/drivers/irqchip/irq-gic-v3.c
+> @@ -30,6 +30,7 @@
+>  #include <asm/cputype.h>
+>  #include <asm/exception.h>
+>  #include <asm/smp_plat.h>
+> +#include <asm/virt.h>
+>  
+>  #include "irq-gic-common.h"
+>  #include "irqchip.h"
+> @@ -50,6 +51,7 @@ struct gic_chip_data {
+>  };
+>  
+>  static struct gic_chip_data gic_data __read_mostly;
+> +static struct static_key supports_deactivate = STATIC_KEY_INIT_TRUE;
 
-On 25/08/15 20:26, Thomas Gleixner wrote:
-> On Tue, 25 Aug 2015, Sudeep Holla wrote:
->> On 25/08/15 15:54, Shenwei Wang wrote:
->>> You don't really understand what happens after a driver calls
->>> enable_irq_wake. In suspend state, even the interrupt
->>> controller itself is powered off. How can you get the system up
->>> again  by just using a SKIP_SET_WAKE.
->>
->> Sorry for that, let me try to understand aloud. So you have
->> irq_{un,}mask function that are called when interrupts are enabled and
->> disabled. So suppose you have 3 irqs that are enabled and only one of
->> then is set as wakeup source.
->>
->> Now you call enable_irq_wake, you save that in wakeup_sources, fine.
->> Later when you enter suspend, you save all the 3 active irqs in
->> saved_irq_mask and over-write cpu2wakeup with wakeup_sources, right?
->>
->> All fine, what I am saying is let irq-core know that you want to mask
->> the 2 non-wakeup irqs you have using MASK_ON_SUSPEND. So when
->> suspend_device_irqs is called in suspend path, that's done for you
->> automatically and the cpu2wakeup will have just 1 wakeup enabled which
->> is what you are doing in suspend callback, right ?
->
-> I missed that when I reviewed the patch. You are right, it can be
-> simplified.
->
->> Now that it's already done for you, you need not do anything extra and
->> hence just set SKIP_SET_WAKE to do nothing.
+in http://www.spinics.net/lists/arm-kernel/msg439813.html, Catalin
+reported the direct usage of static_key was deprecated. Sorry I learned
+that after my last review.
 
-Thanks for confirming this.
+see https://lkml.org/lkml/2015/8/3/539
 
->
-> He still needs the set_wake function to capture the wake enabled
-> interrupts as they are handed over to the low level asm code via
-> imx_gpcv2_get_wakeup_source(). Though they could be read back from the
-> hw registers as well.
->
+Best Regards
 
-Correct, I have no objection on how it's saved/restored but was against
-having 2 different masks and with the approach taken in this patch the
-non-wakeup interrupts are enabled until syscore_suspend which is wrong.
-
-There's whole lot of drivers blindly copy pasting this as theme which I
-am going through and trying to clean up. I wanted to ensure no more such
-additions happen meanwhile, so I am watching such patches closely.
-
-Regards,
-Sudeep
+Eric
+>  
+>  #define gic_data_rdist()		(this_cpu_ptr(gic_data.rdists.rdist))
+>  #define gic_data_rdist_rd_base()	(gic_data_rdist()->rd_base)
+> @@ -293,7 +295,14 @@ static int gic_irq_get_irqchip_state(struct irq_data *d,
+>  
+>  static void gic_eoi_irq(struct irq_data *d)
+>  {
+> -	gic_write_eoir(gic_irq(d));
+> +	if (static_key_true(&supports_deactivate)) {
+> +		/* No need to deactivate an LPI */
+> +		if (gic_irq(d) >= 8192)
+> +			return;
+> +		gic_write_dir(gic_irq(d));
+> +	} else {
+> +		gic_write_eoir(gic_irq(d));
+> +	}
+>  }
+>  
+>  static int gic_set_type(struct irq_data *d, unsigned int type)
+> @@ -343,15 +352,26 @@ static asmlinkage void __exception_irq_entry gic_handle_irq(struct pt_regs *regs
+>  
+>  		if (likely(irqnr > 15 && irqnr < 1020) || irqnr >= 8192) {
+>  			int err;
+> +
+> +			if (static_key_true(&supports_deactivate))
+> +				gic_write_eoir(irqnr);
+> +
+>  			err = handle_domain_irq(gic_data.domain, irqnr, regs);
+>  			if (err) {
+>  				WARN_ONCE(true, "Unexpected interrupt received!\n");
+> -				gic_write_eoir(irqnr);
+> +				if (static_key_true(&supports_deactivate)) {
+> +					if (irqnr < 8192)
+> +						gic_write_dir(irqnr);
+> +				} else {
+> +					gic_write_eoir(irqnr);
+> +				}
+>  			}
+>  			continue;
+>  		}
+>  		if (irqnr < 16) {
+>  			gic_write_eoir(irqnr);
+> +			if (static_key_true(&supports_deactivate))
+> +				gic_write_dir(irqnr);
+>  #ifdef CONFIG_SMP
+>  			handle_IPI(irqnr, regs);
+>  #else
+> @@ -451,8 +471,13 @@ static void gic_cpu_sys_reg_init(void)
+>  	/* Set priority mask register */
+>  	gic_write_pmr(DEFAULT_PMR_VALUE);
+>  
+> -	/* EOI deactivates interrupt too (mode 0) */
+> -	gic_write_ctlr(ICC_CTLR_EL1_EOImode_drop_dir);
+> +	if (static_key_true(&supports_deactivate)) {
+> +		/* EOI drops priority only (mode 1) */
+> +		gic_write_ctlr(ICC_CTLR_EL1_EOImode_drop);
+> +	} else {
+> +		/* EOI deactivates interrupt too (mode 0) */
+> +		gic_write_ctlr(ICC_CTLR_EL1_EOImode_drop_dir);
+> +	}
+>  
+>  	/* ... and let's hit the road... */
+>  	gic_write_grpen1(1);
+> @@ -820,6 +845,12 @@ static int __init gic_of_init(struct device_node *node, struct device_node *pare
+>  	if (of_property_read_u64(node, "redistributor-stride", &redist_stride))
+>  		redist_stride = 0;
+>  
+> +	if (!is_hyp_mode_available())
+> +		static_key_slow_dec(&supports_deactivate);
+> +
+> +	if (static_key_true(&supports_deactivate))
+> +		pr_info("GIC: Using split EOI/Deactivate mode\n");
+> +
+>  	gic_data.dist_base = dist_base;
+>  	gic_data.redist_regions = rdist_regs;
+>  	gic_data.nr_redist_regions = nr_redist_regions;
+> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+> index ffbc034..bc98832 100644
+> --- a/include/linux/irqchip/arm-gic-v3.h
+> +++ b/include/linux/irqchip/arm-gic-v3.h
+> @@ -104,6 +104,8 @@
+>  #define GICR_SYNCR			0x00C0
+>  #define GICR_MOVLPIR			0x0100
+>  #define GICR_MOVALLR			0x0110
+> +#define GICR_ISACTIVER			GICD_ISACTIVER
+> +#define GICR_ICACTIVER			GICD_ICACTIVER
+>  #define GICR_IDREGS			GICD_IDREGS
+>  #define GICR_PIDR2			GICD_PIDR2
+>  
+> @@ -288,6 +290,7 @@
+>  #define ICH_VMCR_PMR_MASK		(0xffUL << ICH_VMCR_PMR_SHIFT)
+>  
+>  #define ICC_EOIR1_EL1			sys_reg(3, 0, 12, 12, 1)
+> +#define ICC_DIR_EL1			sys_reg(3, 0, 12, 11, 1)
+>  #define ICC_IAR1_EL1			sys_reg(3, 0, 12, 12, 0)
+>  #define ICC_SGI1R_EL1			sys_reg(3, 0, 12, 11, 5)
+>  #define ICC_PMR_EL1			sys_reg(3, 0, 4, 6, 0)
+> @@ -384,6 +387,12 @@ static inline void gic_write_eoir(u64 irq)
+>  	isb();
+>  }
+>  
+> +static inline void gic_write_dir(u64 irq)
+> +{
+> +	asm volatile("msr_s " __stringify(ICC_DIR_EL1) ", %0" : : "r" (irq));
+> +	isb();
+> +}
+> +
+>  struct irq_domain;
+>  int its_cpu_init(void);
+>  int its_init(struct device_node *node, struct rdists *rdists,
+> 
