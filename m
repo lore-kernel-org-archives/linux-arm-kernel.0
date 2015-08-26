@@ -1,34 +1,81 @@
-From: zhengxing@rock-chips.com (Xing Zheng)
-Date: Wed, 26 Aug 2015 11:20:44 +0800
-Subject: [PATCH v2] ASoC: rockchip: fix a misjudgement by return
-Message-ID: <1440559244-17634-1-git-send-email-zhengxing@rock-chips.com>
+From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
+Date: Tue, 25 Aug 2015 20:46:22 -0700
+Subject: [PATCH] soc: qcom: smd: Use correct remote processor ID
+In-Reply-To: <1440534995-12899-1-git-send-email-agross@codeaurora.org>
+References: <1440534995-12899-1-git-send-email-agross@codeaurora.org>
+Message-ID: <20150826034622.GH13472@usrtlx11787.corpusers.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Being careless, judge the return value of snd_soc_card_jack_new
-is opposite, so it should be fixed.
+On Tue 25 Aug 13:36 PDT 2015, Andy Gross wrote:
 
----
+> This patch fixes SMEM addressing issues when remote processors need to use
+> secure SMEM partitions.
+> 
 
-Changes in v2:
-Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
-Reviewed-by: Dylan Reid <dgreid@chromium.org>
+Right, sorry for missing that remote_pid and edge_pid isn't in sync...
 
- sound/soc/rockchip/rockchip_rt5645.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> Signed-off-by: Andy Gross <agross@codeaurora.org>
+> ---
+>  .../devicetree/bindings/soc/qcom/qcom,smd.txt      |    7 +++++++
+>  drivers/soc/qcom/smd.c                             |   18 ++++++++++++++----
+>  2 files changed, 21 insertions(+), 4 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/soc/qcom/qcom,smd.txt b/Documentation/devicetree/bindings/soc/qcom/qcom,smd.txt
+> index f65c76d..3b60702 100644
+> --- a/Documentation/devicetree/bindings/soc/qcom/qcom,smd.txt
+> +++ b/Documentation/devicetree/bindings/soc/qcom/qcom,smd.txt
+> @@ -37,6 +37,12 @@ The edge is described by the following properties:
+>  	Definition: the identifier of the remote processor in the smd channel
+>  		    allocation table
+>  
+> +- qcom,remote-pid:
+> +	Usage: required
 
-diff --git a/sound/soc/rockchip/rockchip_rt5645.c b/sound/soc/rockchip/rockchip_rt5645.c
-index 3c6bb1e..adfe98c 100644
---- a/sound/soc/rockchip/rockchip_rt5645.c
-+++ b/sound/soc/rockchip/rockchip_rt5645.c
-@@ -118,7 +118,7 @@ static int rk_init(struct snd_soc_pcm_runtime *runtime)
- 				    SND_JACK_BTN_0 | SND_JACK_BTN_1 |
- 				    SND_JACK_BTN_2 | SND_JACK_BTN_3,
- 				    &headset_jack, NULL, 0);
--	if (!ret) {
-+	if (ret) {
- 		dev_err(card->dev, "New Headset Jack failed! (%d)\n", ret);
- 		return ret;
- 	}
--- 
-1.7.9.5
+I would like to see this being optional, as this is not a property that
+matters on any of the 32-bit systems (perhaps 8084?).
+
+> +	Value type: <u32>
+> +	Definition: the identifier for the remote processor as known by the rest
+> +		    of the system.
+> +
+>  = SMD DEVICES
+>  
+>  In turn, subnodes of the "edges" represent devices tied to SMD channels on that
+> @@ -68,6 +74,7 @@ The following example represents a smd node, with one edge representing the
+>  			interrupts = <0 168 1>;
+>  			qcom,ipc = <&apcs 8 0>;
+>  			qcom,smd-edge = <15>;
+> +			qcom,remote-pid = <0xffffffff>;
+
+This looks messy, so let's make the property optional and make its
+absence indicate the "global partition".
+
+>  
+>  			rpm_requests {
+>  				compatible = "qcom,rpm-msm8974";
+> diff --git a/drivers/soc/qcom/smd.c b/drivers/soc/qcom/smd.c
+[..]
+> @@ -1184,6 +1187,13 @@ static int qcom_smd_parse_edge(struct device *dev,
+>  		return -EINVAL;
+>  	}
+>  
+> +	key = "qcom,remote-pid";
+> +	ret = of_property_read_u32(node, key, &edge->remote_pid);
+> +	if (ret) {
+> +		dev_err(dev, "edge missing %s property\n", key);
+> +		return -EINVAL;
+> +	}
+> +
+
+So I suggest you changing this to:
+
+edge->remote_pid = QCOM_SMEM_HOST_ANY;
+of_property_read_u32(node, "qcom,remote-pid", &edge->remote_pid);
+
+>  	syscon_np = of_parse_phandle(node, "qcom,ipc", 0);
+>  	if (!syscon_np) {
+>  		dev_err(dev, "no qcom,ipc node\n");
+
+Regards,
+Bjorn
