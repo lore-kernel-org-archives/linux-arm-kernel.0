@@ -1,23 +1,71 @@
-From: libv@skynet.be (Luc Verhaegen)
-Date: Wed, 26 Aug 2015 11:44:39 +0200
-Subject: [PATCH v2 1/7] drm/vc4: Add devicetree bindings for VC4.
-In-Reply-To: <1439934848-7196-2-git-send-email-eric@anholt.net>
-References: <1439934848-7196-1-git-send-email-eric@anholt.net>
- <1439934848-7196-2-git-send-email-eric@anholt.net>
-Message-ID: <20150826094438.GB2032@skynet.be>
+From: jan.kiszka@siemens.com (Jan Kiszka)
+Date: Wed, 26 Aug 2015 11:54:38 +0200
+Subject: [PATCH 00/13] arm64: Virtualization Host Extension support
+In-Reply-To: <55DD86CF.70309@huawei.com>
+References: <1436372356-30410-1-git-send-email-marc.zyngier@arm.com>
+ <55DD82FB.60903@huawei.com> <55DD851B.4040106@siemens.com>
+ <55DD86CF.70309@huawei.com>
+Message-ID: <55DD8CDE.8000407@siemens.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 18, 2015 at 02:54:02PM -0700, Eric Anholt wrote:
-> VC4 is the GPU (display and 3D) subsystem present on the 2835 and some
-> other Broadcom SoCs.
-> ...
-> +Broadcom VC4 GPU
-> +
-> +The VC4 device present on the Raspberry Pi includes a display system
-> +with HDMI output and the HVS scaler for compositing display planes.
+On 2015-08-26 11:28, Antonios Motakis wrote:
+> 
+> 
+> On 26-Aug-15 11:21, Jan Kiszka wrote:
+>> On 2015-08-26 11:12, Antonios Motakis wrote:
+>>> Hello Marc,
+>>>
+>>> On 08-Jul-15 18:19, Marc Zyngier wrote:
+>>>> ARMv8.1 comes with the "Virtualization Host Extension" (VHE for
+>>>> short), which enables simpler support of Type-2 hypervisors.
+>>>>
+>>>> This extension allows the kernel to directly run at EL2, and
+>>>> significantly reduces the number of system registers shared between
+>>>> host and guest, reducing the overhead of virtualization.
+>>>>
+>>>> In order to have the same kernel binary running on all versions of the
+>>>> architecture, this series makes heavy use of runtime code patching.
+>>>>
+>>>> The first ten patches massage the KVM code to deal with VHE and enable
+>>>> Linux to run at EL2.
+>>>
+>>> I am currently working on getting the Jailhouse hypervisor to work on AArch64.
+>>>
+>>> I've been looking at your patches, trying to figure out the implications for Jailhouse. It seems there are a few :)
+>>>
+>>> Jailhouse likes to be loaded by Linux into memory, and then to inject itself at a higher level than Linux (demoting Linux into being the "root cell"). This works on x86 and ARM (AArch32 and eventually AArch64 without VHE). What this means in ARM, is that Jailhouse hooks into the HVC stub exposed by Linux, and happily installs itself in EL2.
+>>>
+>>> With Linux running in EL2 though, that won't be as straightforward. It looks like we can't just demote Linux to EL1 without breaking something. Obviously it's OK for us that KVM won't work, but it looks like at least the timer code will break horribly if we try to do something like that.
+>>>
+>>> Any comments on this? One work around would be to just remap the incoming interrupt from the timer, so Linux never really realizes it's not running in EL2 anymore. Then we would also have to deal with the intricacies of removing and re-adding vCPUs to the Linux root cell, so we would have to maintain the illusion of running in EL2 for each one of them.
+>>
+>> Without knowing any of the details, I would say there are two strategies
+>> regarding this:
+>>
+>> - Disable KVM support in the Linux kernel - then we shouldn't boot into
+>>   EL2 in the first place, should we?
+> 
+> We would have to ask the user to patch the kernel, to ignore VHE and keep all the hyp stub magic that we rely on currently. It is an option of course.
 
-Is this a direct hw driver implementation, banging registers, or is this 
-talking to the os/firmware/binary blob running on the videocore dsp?
+Patch or reconfigure? CONFIG_KVM isn't mandatory for arm64, is it?
 
-Luc Verhaegen.
+Jan
+
+> 
+>>
+>> - Emulate what Linux is missing after take-over by Jailhouse (we do
+>>   this on x86 with VT-d interrupt remapping which cannot be disabled
+>>   anymore for Linux once it started with it, and we cannot boot without
+>>   it when we want to use the x2APIC).
+> 
+> Essentially what I described above; let's call it nested virtualization without the virtualization parts? :)
+> 
+>>
+>> Jan
+>>
+> 
+
+-- 
+Siemens AG, Corporate Technology, CT RTC ITP SES-DE
+Corporate Competence Center Embedded Linux
