@@ -1,42 +1,103 @@
-From: mark.yao@rock-chips.com (Mark yao)
-Date: Wed, 26 Aug 2015 14:34:21 +0800
-Subject: [GIT PULL] drm/rockchip: fixes and new features
-In-Reply-To: <1437962762-19157-1-git-send-email-mark.yao@rock-chips.com>
-References: <1437962762-19157-1-git-send-email-mark.yao@rock-chips.com>
-Message-ID: <55DD5DED.7030109@rock-chips.com>
+From: ranjit.waghmode@xilinx.com (Ranjit Waghmode)
+Date: Wed, 26 Aug 2015 11:56:07 +0530
+Subject: [LINUX RFC v2 4/4] spi: zynqmp: gqspi: add support for dual parallel
+ mode configuration
+In-Reply-To: <1440570367-22569-1-git-send-email-ranjit.waghmode@xilinx.com>
+References: <1440570367-22569-1-git-send-email-ranjit.waghmode@xilinx.com>
+Message-ID: <1440570367-22569-5-git-send-email-ranjit.waghmode@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dave
-     Here are some fixes and some new features for rockchip drm,
-     tested on popmetal rk3288 board, can you land them?
+This patch adds support of dual parallel mode configuration
+for Zynq Ultrascale+ MPSoC GQSPI controller driver.
 
-The following changes since commit db56176025cee5e242dfeed5f4e304d095d29fa3:
+Signed-off-by: Ranjit Waghmode <ranjit.waghmode@xilinx.com>
+---
+V2 Changes:
+- No change in this patch
+---
+ drivers/spi/spi-zynqmp-gqspi.c | 24 +++++++++++++++++++++++-
+ 1 file changed, 23 insertions(+), 1 deletion(-)
 
-   Revert "drm/atomic: Call ww_acquire_done after check phase is 
-complete" (2015-08-25 17:23:36 +1000)
+diff --git a/drivers/spi/spi-zynqmp-gqspi.c b/drivers/spi/spi-zynqmp-gqspi.c
+index f23f36e..7a72781 100644
+--- a/drivers/spi/spi-zynqmp-gqspi.c
++++ b/drivers/spi/spi-zynqmp-gqspi.c
+@@ -153,6 +153,7 @@ enum mode_type {GQSPI_MODE_IO, GQSPI_MODE_DMA};
+  * @dma_rx_bytes:	Remaining bytes to receive by DMA mode
+  * @dma_addr:		DMA address after mapping the kernel buffer
+  * @genfifoentry:	Used for storing the genfifoentry instruction.
++ * @isinstr:		To determine whether the transfer is instruction
+  * @mode:		Defines the mode in which QSPI is operating
+  */
+ struct zynqmp_qspi {
+@@ -170,6 +171,7 @@ struct zynqmp_qspi {
+ 	u32 dma_rx_bytes;
+ 	dma_addr_t dma_addr;
+ 	u32 genfifoentry;
++	bool isinstr;
+ 	enum mode_type mode;
+ };
 
-are available in the git repository at:
+@@ -405,9 +407,20 @@ static void zynqmp_qspi_chipselect(struct spi_device *qspi, bool is_high)
+ 	genfifoentry |= GQSPI_GENFIFO_MODE_SPI;
+ 	genfifoentry |= xqspi->genfifobus;
 
-   https://github.com/markyzq/kernel-drm-rockchip.git 
-drm-rockchip-2015-08-26
++	if (qspi->master->flags & SPI_MASTER_BOTH_CS) {
++		zynqmp_gqspi_selectslave(xqspi,
++				GQSPI_SELECT_FLASH_CS_BOTH,
++				GQSPI_SELECT_FLASH_BUS_BOTH);
++	} else {
++		zynqmp_gqspi_selectslave(xqspi,
++				GQSPI_SELECT_FLASH_CS_LOWER,
++				GQSPI_SELECT_FLASH_BUS_LOWER);
++	}
++
+ 	if (!is_high) {
+ 		genfifoentry |= xqspi->genfifocs;
+ 		genfifoentry |= GQSPI_GENFIFO_CS_SETUP;
++		xqspi->isinstr = true;
+ 	} else {
+ 		genfifoentry |= GQSPI_GENFIFO_CS_HOLD;
+ 	}
+@@ -664,6 +677,7 @@ static irqreturn_t zynqmp_qspi_irq(int irq, void *dev_id)
+ 	if ((xqspi->bytes_to_receive == 0) && (xqspi->bytes_to_transfer == 0)
+ 			&& ((status & GQSPI_IRQ_MASK) == GQSPI_IRQ_MASK)) {
+ 		zynqmp_gqspi_write(xqspi, GQSPI_IDR_OFST, GQSPI_ISR_IDR_MASK);
++		xqspi->isinstr = false;
+ 		spi_finalize_current_transfer(master);
+ 		ret = IRQ_HANDLED;
+ 	}
+@@ -827,6 +841,9 @@ static int zynqmp_qspi_start_transfer(struct spi_master *master,
+ 	genfifoentry |= xqspi->genfifocs;
+ 	genfifoentry |= xqspi->genfifobus;
 
-for you to fetch changes up to 4c156c21c7948a0be854cbe5914af3181303e529:
++	if ((!xqspi->isinstr) && (master->flags & SPI_MASTER_DATA_STRIPE))
++		genfifoentry |= GQSPI_GENFIFO_STRIPE;
++
+ 	zynqmp_qspi_txrxsetup(xqspi, transfer, &genfifoentry);
 
-   drm/rockchip: vop: support plane scale (2015-08-26 14:16:26 +0800)
+ 	if (xqspi->mode == GQSPI_MODE_DMA)
+@@ -983,6 +1000,7 @@ static int zynqmp_qspi_probe(struct platform_device *pdev)
+ 	struct zynqmp_qspi *xqspi;
+ 	struct resource *res;
+ 	struct device *dev = &pdev->dev;
++	u32 num_cs;
 
-----------------------------------------------------------------
-Mark Yao (6):
-       drm/rockchip: vop: Fix virtual stride calculation
-       drm/rockchip: vop: Fix window dest start point
-       drm/rockchip: vop: Add yuv plane support
-       drm/rockchip: vop: Default enable win2/3 area0 bit
-       drm/rockchip: vop: restore vop registers when resume
-       drm/rockchip: vop: support plane scale
+ 	master = spi_alloc_master(&pdev->dev, sizeof(*xqspi));
+ 	if (!master)
+@@ -1043,7 +1061,11 @@ static int zynqmp_qspi_probe(struct platform_device *pdev)
+ 		goto clk_dis_all;
+ 	}
 
-  drivers/gpu/drm/rockchip/rockchip_drm_vop.c |  269 
-++++++++++++++++++++++++++-
-  drivers/gpu/drm/rockchip/rockchip_drm_vop.h |   88 +++++++++
-  2 files changed, 348 insertions(+), 9 deletions(-)
+-	master->num_chipselect = GQSPI_DEFAULT_NUM_CS;
++	ret = of_property_read_u32(pdev->dev.of_node, "num-cs", &num_cs);
++	if (ret < 0)
++		master->num_chipselect = GQSPI_DEFAULT_NUM_CS;
++	else
++		master->num_chipselect = num_cs;
 
--Mark
+ 	master->setup = zynqmp_qspi_setup;
+ 	master->set_cs = zynqmp_qspi_chipselect;
+--
+2.1.2
