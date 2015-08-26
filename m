@@ -1,47 +1,60 @@
 From: jonmason@broadcom.com (Jon Mason)
-Date: Wed, 26 Aug 2015 18:35:25 -0400
-Subject: [PATCH v2 0/5] Add Broadcom Northstar Plus Support
-Message-ID: <1440628530-6137-1-git-send-email-jonmason@broadcom.com>
+Date: Wed, 26 Aug 2015 18:35:26 -0400
+Subject: [PATCH v2 1/5] dt-bindings: Create Documentation for NSP DT bindings
+In-Reply-To: <1440628530-6137-1-git-send-email-jonmason@broadcom.com>
+References: <1440628530-6137-1-git-send-email-jonmason@broadcom.com>
+Message-ID: <1440628530-6137-2-git-send-email-jonmason@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add the documentation for the Broadcom Northstar Plus device tree
+bindings.
 
-Changes in version 2 incorporate Olof's comments regarding:
-* the removal of all "Reviewed-by" lines not occurring on external
-  mailing lists
-* reordering of s-o-b lines
-* modification of the device tree file to use labels when enabling
-* increated description of the modification to the MAINTAINERS entry
-
-Also, modifying the "to" and "cc" recepients so that everyone is
-receving all of the patches. 
-
---
-
-This patch series adds support for the Broadcom Northstar Plus family of
-SoCs.  NSP is a Cortex A9 based SoC under the Broadcom iProc family.
-
-Jon Mason (5):
-  dt-bindings: Create Documentation for NSP DT bindings
-  ARM: NSP: add minimal Northstar Plus device tree
-  ARM: NSP: Add basic support for Broadcom Northstar Plus SoC
-  ARM: multi_v7_defconfig: Add NSP to defconfig
-  MAINTAINERS: add entry for the Broadcom Northstar Plus SoCs
-
- .../devicetree/bindings/arm/bcm/brcm,nsp.txt       |  34 +++++++
- MAINTAINERS                                        |  12 ++-
- arch/arm/boot/dts/Makefile                         |   2 +
- arch/arm/boot/dts/bcm-nsp.dtsi                     | 105 +++++++++++++++++++++
- arch/arm/boot/dts/bcm958625k.dts                   |  57 +++++++++++
- arch/arm/configs/multi_v7_defconfig                |   1 +
- arch/arm/mach-bcm/Kconfig                          |  14 +++
- arch/arm/mach-bcm/Makefile                         |   5 +-
- arch/arm/mach-bcm/bcm_nsp.c                        |  25 +++++
- 9 files changed, 252 insertions(+), 3 deletions(-)
+Signed-off-by: Jon Mason <jonmason@broadcom.com>
+---
+ .../devicetree/bindings/arm/bcm/brcm,nsp.txt       | 34 ++++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/arm/bcm/brcm,nsp.txt
- create mode 100644 arch/arm/boot/dts/bcm-nsp.dtsi
- create mode 100644 arch/arm/boot/dts/bcm958625k.dts
- create mode 100644 arch/arm/mach-bcm/bcm_nsp.c
 
+diff --git a/Documentation/devicetree/bindings/arm/bcm/brcm,nsp.txt b/Documentation/devicetree/bindings/arm/bcm/brcm,nsp.txt
+new file mode 100644
+index 0000000..eae53e4
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/bcm/brcm,nsp.txt
+@@ -0,0 +1,34 @@
++Broadcom Northstar Plus device tree bindings
++--------------------------------------------
++
++Broadcom Northstar Plus family of SoCs are used for switching control
++and management applications as well as residential router/gateway
++applications. The SoC features dual core Cortex A9 ARM CPUs, integrating
++several peripheral interfaces including multiple Gigabit Ethernet PHYs,
++DDR3 memory, PCIE Gen-2, USB 2.0 and USB 3.0, serial and NAND flash,
++SATA and several other IO controllers.
++
++Boards with Northstar Plus SoCs shall have the following properties:
++
++Required root node property:
++
++BCM58522
++compatible = "brcm,bcm58522", "brcm,nsp";
++
++BCM58525
++compatible = "brcm,bcm58525", "brcm,nsp";
++
++BCM58535
++compatible = "brcm,bcm58535", "brcm,nsp";
++
++BCM58622
++compatible = "brcm,bcm58622", "brcm,nsp";
++
++BCM58623
++compatible = "brcm,bcm58623", "brcm,nsp";
++
++BCM58625
++compatible = "brcm,bcm58625", "brcm,nsp";
++
++BCM88312
++compatible = "brcm,bcm88312", "brcm,nsp";
 -- 
 1.9.1
