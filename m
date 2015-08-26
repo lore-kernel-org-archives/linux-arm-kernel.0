@@ -1,56 +1,63 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Wed, 26 Aug 2015 15:13:22 -0400
-Subject: [PATCH] ARM64: kernel: implement ACPI parking protocol
-In-Reply-To: <20150826160716.GB11863@red-moon>
-References: <1436959990-32054-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1437063431.3583.2.camel@redhat.com> <20150716171221.GB18582@red-moon>
- <1437068449.3583.4.camel@redhat.com> <20150826160716.GB11863@red-moon>
-Message-ID: <1440616402.13044.16.camel@redhat.com>
+From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
+Date: Wed, 26 Aug 2015 16:29:52 -0300
+Subject: CONFIG_DEBUG_SHIRQ and PM
+In-Reply-To: <20150825195830.GH27534@saruman.tx.rr.com>
+References: <20150825195830.GH27534@saruman.tx.rr.com>
+Message-ID: <CAAEAJfCY1BRuoQCWfD2pCq36E54vDB5Coy2S7rz3RfL2BVLGaw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-08-26 at 17:07 +0100, Lorenzo Pieralisi wrote:
-> Mark,
-> 
-> On Thu, Jul 16, 2015 at 06:40:49PM +0100, Mark Salter wrote:
-> 
-> [...]
-> 
-> > > > The kernel will only add cached memory regions to linear mapping 
-> > > > and
-> > > > presumably, the FW will mark the mailboxes as uncached. Otherwise, 
-> > > > it
-> > > > is a FW bug. But I suppose we could run into problems with kernels
-> > > > using 64K pagesize since firmware assumes 4k.
-> > > 
-> > > Nope, ioremap takes care of that, everything should be fine.
-> > 
-> > The mailbox is 4K. If it is next to a cached UEFI region, the kernel 
-> > may
-> > have to overlap the mailbox with a cached 64K mapping in order to 
-> > include
-> > the adjoining UEFI region in the linear map. Then the ioremap would 
-> > fail
-> > because the mailbox is included in the linear mapping.
-> 
-> You have to acknowledge that what you describe is a bit of a corner
-> case (and a silly FW set-up), are you aware of any existing FW set-up
-> where we actually hit the corner case above ?
+Felipe,
 
-Oh sure. It could definitely be a corner case. I'm not aware of any
-existing firmware supporting the protocol implemented by your patch.
-So time will tell how well firmware vendors which do implement it
-avoid the corner case problem. I am aware of some existing firmwares
-which put the mailbox area in RAM which is also in the kernel linear
-mapping as cached memory. But those wouldn't work with your patch for
-more reasons than that.
+On 25 August 2015 at 16:58, Felipe Balbi <balbi@ti.com> wrote:
+> Hi Ingo,
+>
+> I'm facing an issue with CONFIG_DEBUG_SHIRQ and pm_runtime when using
+> devm_request_*irq().
+>
 
-> 
-> I think it is fine to leave code as-is, at least the mailbox
-> mappings, I will check to see I can improve the MADT parsing,
-> somehow.
+I may be jumping on the gun here, but I believe here's your problem.
+Using devm_request_irq with shared IRQs is not a good idea.
 
-I'm not strenuously opposed to leaving it as-is. But we need to
-acknowledge that if the 64K pagesize issue isn't covered by the
-protocol spec, we're relying on firmware vendors to be diligent
-not to break 64K pagesize kernels.
+Or at least, it forces you to handle interrupts after your device
+is _completely_ removed (e.g. your IRQ cookie could be bogus).
+
+AFAICS, the CONFIG_DEBUG_SHIRQ option is just triggering a couple
+spurious interrupts, that are expected to happen anyway.
+
+Your IRQ is shared, and so you may get any IRQ at any time,
+coming from another device (not yours).
+
+So, if I'm right, my suggestion is simple: use request_irq/free_irq
+and free your IRQ before you disable your clocks, remove your device, etc.
+
+> If we using devm_request_*irq(), that irq will be freed after device
+> drivers' ->remove() gets called. If on ->remove(), we're calling
+> pm_runtime_put_sync(); pm_runtime_disable(), device's clocks might get
+> gated and, because we do an extra call to the device's IRQ handler when
+> CONFIG_DEBUG_SHIRQ=y, we might trigger an abort exception if, inside the
+> IRQ handler, we try to read a register which is clocked by the device's
+> clock.
+>
+> This is, of course, really old code which has been in tree for many,
+> many years. I guess nobody has been running their tests in the setup
+> mentioned above (CONFIG_DEBUG_SHIRQ=y, pm_runtime_put_sync() on
+> ->remove(), a register read on IRQ handler, and a shared IRQ handler),
+> so that's why we never caught this before.
+>
+> Disabling CONFIG_DEBUG_SHIRQ, of course, makes the problem go away, but
+> if driver *must* be ready to receive, and handle, an IRQ even during
+> module removal, I wonder what the IRQ handler should do. We can't, in
+> most cases, call pm_runtime_put_sync() from IRQ handler.
+>
+> I'm guessing the only way would be to move pm_runtime calls into the bus
+> driver (in this case, the platform_bus) and make sure it only gets
+> called after device managed resources are freed ?
+>
+> Any hints would be greatly appreciated.
+>
+
+Hope it helps!
+-- 
+Ezequiel Garc?a, VanguardiaSur
+www.vanguardiasur.com.ar
