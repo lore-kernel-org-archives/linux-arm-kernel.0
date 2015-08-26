@@ -1,25 +1,114 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 26 Aug 2015 16:25:15 +0200
-Subject: [PATCH V2] clockevents/drivers/mtk: Fix spurious interrupt leading
- to crash
-In-Reply-To: <1440508871.29634.1.camel@mtksdaap41>
-References: <1440426924.17418.11.camel@mtksdaap41>	
- <1440453450-21203-1-git-send-email-daniel.lezcano@linaro.org>
- <1440508871.29634.1.camel@mtksdaap41>
-Message-ID: <55DDCC4B.7010203@linaro.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 26 Aug 2015 09:30:17 -0500
+Subject: [PATCH 1/7] drm/vc4: Add devicetree bindings for VC4.
+In-Reply-To: <20150826120934.GC320@ulmo.nvidia.com>
+References: <1439427380-2436-1-git-send-email-eric@anholt.net>
+ <1439427380-2436-2-git-send-email-eric@anholt.net>
+ <55CEC25E.7070303@wwwdotorg.org>
+ <874mjxwyx5.fsf@eliezer.anholt.net>
+ <CAL_JsqJxiGUR5BxBPyR3-0NxqWsOxMGrWQA6cMXe2pjTom__nw@mail.gmail.com>
+ <CAF6AEGu2fi0M7DsicHz+5SDHi1DyDRmvWjkmYPPgY6pZ423WcA@mail.gmail.com>
+ <20150826115229.GI1367@phenom.ffwll.local>
+ <20150826120934.GC320@ulmo.nvidia.com>
+Message-ID: <CAL_JsqJ2v=wBaUe_gN_UcpQKis+kRH6oa0NTN24Lp9w9LVWtbQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/25/2015 03:21 PM, Yingjoe Chen wrote:
-> Tested-by: Yingjoe Chen<yingjoe.chen@mediatek.com>
+On Wed, Aug 26, 2015 at 7:09 AM, Thierry Reding
+<thierry.reding@gmail.com> wrote:
+> On Wed, Aug 26, 2015 at 01:52:29PM +0200, Daniel Vetter wrote:
+>> On Tue, Aug 25, 2015 at 04:42:18PM -0400, Rob Clark wrote:
+>> > On Mon, Aug 24, 2015 at 9:47 AM, Rob Herring <robherring2@gmail.com> wrote:
+>> > > On Mon, Aug 17, 2015 at 1:30 PM, Eric Anholt <eric@anholt.net> wrote:
+>> > >> Stephen Warren <swarren@wwwdotorg.org> writes:
+>> > >>
+>> > >>> On 08/12/2015 06:56 PM, Eric Anholt wrote:
+>> > >>>> Signed-off-by: Eric Anholt <eric@anholt.net>
+>> > >>>
+>> > >>> This one definitely needs a patch description, since someone might not
+>> > >>> know what a VC4 is, and "git log" won't show the text from the binding
+>> > >>> doc itself. I'd suggest adding the initial paragraph of the binding doc
+>> > >>> as the patch description, or more.
+>> > >>>
+>> > >>>> diff --git a/Documentation/devicetree/bindings/gpu/brcm,bcm-vc4.txt b/Documentation/devicetree/bindings/gpu/brcm,bcm-vc4.txt
+>> > >>
+>> > >>>> +- hvss:             List of references to HVS video scalers
+>> > >>>> +- encoders: List of references to output encoders (HDMI, SDTV)
+>> > >>>
+>> > >>> Would it make sense to make all those nodes child node of the vc4
+>> > >>> object. That way, there's no need to have these lists of objects; they
+>> > >>> can be automatically built up as the DT is enumerated. I know that e.g.
+>> > >>> the NVIDIA Tegra host1x binding works this way, and I think it may have
+>> > >>> been inspired by other similar cases.
+>> > >>
+>> > >> I've looked at tegra, and the component system used by msm appears to be
+>> > >> nicer than it.  To follow tegra's model, it looks like I need to build
+>> > >> this extra bus thing corresponding to host1x that is effectively the
+>> > >> drivers/base/component.c code, so that I can get at vc4's structure from
+>> > >> the component drivers.
+>> > >>
+>> > >>> Of course, this is only appropriate if the HW modules really are
+>> > >>> logically children of the VC4 HW module. Perhaps they aren't. If they
+>> > >>> aren't though, I wonder what this "vc4" module actually represents in HW?
+>> > >>
+>> > >> It's the subsystem, same as we use a subsystem node for msm, sti,
+>> > >> rockchip, imx, and exynos.  This appears to be the common model of how
+>> > >> the collection of graphics-related components is represented in the DT.
+>> > >
+>> > > I think most of these bindings are wrong. They are grouped together
+>> > > because that is what DRM wants not because that reflects the h/w. So
+>> > > convince me this is one block, not that it is what other people do.
+>> >
+>> > I think, when it comes to more complex driver subsystems (like drm in
+>> > particular) we have a bit of mismatch between how things look from the
+>> > "pure hw ignoring sw" perspective, and the "how sw and in particular
+>> > userspace expects things" perspective.  Maybe it is less a problem in
+>> > other subsystems, where bindings map to things that are only visible
+>> > in the kernel, or well defined devices like uart or sata controller.
+>> > But when given the choice, I'm going to err on the side of not
+>> > confusing userspace and the large software stack that sits above
+>> > drm/kms, over dt purity.
+>> >
+>> > Maybe it would be nice to have a sort of dt overlay that adds the bits
+>> > needed to tie together hw blocks that should be assembled into a
+>> > single logical device for linux and userspace (but maybe not some
+>> > other hypothetical operating system).  But so far that doesn't exist.
+>> > All we have is a hammer (devicetree), everything looks like a nail.
+>> > End result is we end up adding some things in the bindings which
+>> > aren't purely about the hw.  Until someone invents a screwdriver, I'm
+>> > not sure what else to do.  In the end, other hypothetical OS is free
+>> > to ignore those extra fields in the bindings if it doesn't need them.
+>> > So meh?
+>>
+>> I thought we agreed a while back that these kind of "pull everything for
+>> the logical device together" dt nodes which just have piles of phandles
+>> are totally accepted? At least that's the point behind the component
+>> helpers, and Eric even suggested to create dt-specific component helpers
+>> to cut down a bit on the usual boilerplate. dt maintainers are also fine
+>> with this approach afaik. From my understanding tegra with the host1x bus
+>> really is the odd one out and not the norm.
+>
+> I agree that in many aspects Tegra is somewhat special. But the same
+> principles that the host1x infrastructure uses could be implemented in a
+> similar way for other DRM drivers. You can easily collect information
+> about subdevices by walking the device tree and matching on known
+> compatible strings. And you can also instantiate the top-level device
+> from driver code rather than have it in DT. It should still be possible
+> to make this work without an artificial device node in DT. The component
+> and master infrastructure is largely orthogonal to that, and as far as I
+> remember the only blocker is the need for a top-level device. I wonder
+> if perhaps this could be made to work by binding the master to the top-
+> level SoC device.
+>
+> Obviously adding the node in DT is easier, but to my knowledge easy has
+> never been a good excuse for mangling DT. Perhaps that's different these
+> days...
 
-Applied to my tree for 4.4.
+I agree we should avoid the virtual node if possible. It is certainly
+possible as I started out with one and removed it. At least in my
+case, it essentially required the drm_device and crtc to be a single
+driver rather than 2 components. However, I'm more concerned that we
+are consistent from platform to platform where it makes sense than
+whether we have a somewhat questionable node or not.
 
-   -- Daniel
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Rob
