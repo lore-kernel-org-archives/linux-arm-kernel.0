@@ -1,100 +1,74 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Wed, 26 Aug 2015 16:25:26 +0100
-Subject: [PATCH v2 4/5] arm64/efi: ignore DT memory nodes instead of
- removing them
-In-Reply-To: <1440576391-25725-5-git-send-email-ard.biesheuvel@linaro.org>
-References: <1440576391-25725-1-git-send-email-ard.biesheuvel@linaro.org>
- <1440576391-25725-5-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20150826152526.GD10728@bivouac.eciton.net>
+From: bpringle@sympatico.ca (Bill Pringlemeir)
+Date: Wed, 26 Aug 2015 11:26:36 -0400
+Subject: [PATCH v10 3/5] mtd: nand: vf610_nfc: add device tree bindings
+References: <1438594050-4595-1-git-send-email-stefan@agner.ch>
+ <1438594050-4595-4-git-send-email-stefan@agner.ch>
+ <20150825202546.GL81844@google.com>
+Message-ID: <BLU436-SMTP1971442F63D96D55AC8E905B8600@phx.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 26, 2015 at 10:06:30AM +0200, Ard Biesheuvel wrote:
-> There are two problems with the UEFI stub DT memory node removal
-> routine:
-> - it deletes nodes as it traverses the tree, which happens to work
->   but is not supported, as deletion invalidates the node iterator;
-> - deleting memory nodes entirely may discard annotations in the form
->   of additional properties on the nodes.
-> 
-> Now that the UEFI initialization has moved to an earlier stage, we can
-> actually just ignore any memblocks that are installed after we have
-> processed the UEFI memory map. This way, it is no longer necessary to
-> remove the nodes, so we can remove that logic from the stub as well.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/mm/init.c               | 10 ++++++++
->  drivers/firmware/efi/libstub/fdt.c | 24 +-------------------
->  2 files changed, 11 insertions(+), 23 deletions(-)
+On 25 Aug 2015, computersforpeace at gmail.com wrote:
 
-Nice cleanup.
+> Sorry, I realized a potential issue here.
 
-Acked-by: Leif Lindholm <leif.lindholm@linaro.org>
- 
-> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-> index ab25fde7397c..ecbc051bc66b 100644
-> --- a/arch/arm64/mm/init.c
-> +++ b/arch/arm64/mm/init.c
-> @@ -379,6 +379,16 @@ void __init early_init_dt_add_memory_arch(u64 base, u64 size)
->  {
->  	const u64 phys_offset = __pa(PAGE_OFFSET);
->  
-> +	/*
-> +	 * This callback will be invoked both when booting via UEFI and when
-> +	 * booting via DT only. In the former case, we need to ignore memory
-> +	 * nodes in the DT since UEFI is authoritative when it comes to the
-> +	 * memory map. So ignore any invocations of this callback after
-> +	 * EFI_MEMMAP has been set.
-> +	 */
-> +	if (efi_enabled(EFI_MEMMAP))
-> +		return;
-> +
->  	if (!PAGE_ALIGNED(base)) {
->  		if (size < PAGE_SIZE - (base & ~PAGE_MASK)) {
->  			pr_warn("Ignoring memory block 0x%llx - 0x%llx\n",
-> diff --git a/drivers/firmware/efi/libstub/fdt.c b/drivers/firmware/efi/libstub/fdt.c
-> index ef5d764e2a27..343e7992bd8f 100644
-> --- a/drivers/firmware/efi/libstub/fdt.c
-> +++ b/drivers/firmware/efi/libstub/fdt.c
-> @@ -24,7 +24,7 @@ efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
->  			unsigned long map_size, unsigned long desc_size,
->  			u32 desc_ver)
->  {
-> -	int node, prev, num_rsv;
-> +	int node, num_rsv;
->  	int status;
->  	u32 fdt_val32;
->  	u64 fdt_val64;
-> @@ -54,28 +54,6 @@ efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
->  		goto fdt_set_fail;
->  
->  	/*
-> -	 * Delete any memory nodes present. We must delete nodes which
-> -	 * early_init_dt_scan_memory may try to use.
-> -	 */
-> -	prev = 0;
-> -	for (;;) {
-> -		const char *type;
-> -		int len;
-> -
-> -		node = fdt_next_node(fdt, prev, NULL);
-> -		if (node < 0)
-> -			break;
-> -
-> -		type = fdt_getprop(fdt, node, "device_type", &len);
-> -		if (type && strncmp(type, "memory", len) == 0) {
-> -			fdt_del_node(fdt, node);
-> -			continue;
-> -		}
-> -
-> -		prev = node;
-> -	}
-> -
-> -	/*
->  	 * Delete all memory reserve map entries. When booting via UEFI,
->  	 * kernel will use the UEFI memory map to find reserved regions.
->  	 */
-> -- 
-> 1.9.1
-> 
+> On Mon, Aug 03, 2015 at 11:27:28AM +0200, Stefan Agner wrote:
+>> Signed-off-by: Bill Pringlemeir <bpringlemeir@nbsps.com>
+>> Acked-by: Shawn Guo <shawnguo@kernel.org>
+>> Reviewed-by: Brian Norris <computersforpeace@gmail.com>
+>> Signed-off-by: Stefan Agner <stefan@agner.ch>
+>> ---
+>> .../devicetree/bindings/mtd/vf610-nfc.txt | 45 ++++++++++++++++++++++
+>> 1 file changed, 45 insertions(+) create mode 100644
+>> Documentation/devicetree/bindings/mtd/vf610-nfc.txt
+
+>> diff --git a/Documentation/devicetree/bindings/mtd/vf610-nfc.txt
+>> b/Documentation/devicetree/bindings/mtd/vf610-nfc.txt
+>> new file mode 100644
+>> index 0000000..cae5f25
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/mtd/vf610-nfc.txt
+>>>> -0,0 +1,45 @@
+>> +- nand-bus-width: see nand.txt
+>> +- nand-ecc-mode: see nand.txt
+>> +- nand-on-flash-bbt: see nand.txt
+
+> Stumbling across the "multi-CS" questions on the driver reminds me: it
+> typically makes sense to define new NAND bindings using separate NAND
+> *controller* and *flash* device nodes. The above 3 properties, at
+> least, would apply on a per-flash basis, not per-controller
+> typically. See sunxi-nand, for instance:
+
+> http://lxr.free-electrons.com/source/Documentation/devicetree/bindings/mtd/sunxi-nand.txt
+
+> brcmnand had a similar pattern:
+
+> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/devicetree/bindings/mtd/brcm,brcmnand.txt
+
+> (Perhaps it's time we standardized this a little more formally...)
+
+These would apply per chip, but the controller has to be configured to
+support each and every one.  Every time an operation was performed, we
+would have to check the chip type and reconfigure the controller.
+Currently, the driver does not support this and it would add a lot of
+overhead in some cases unless a register cache was used.
+
+Is the flexibility of using a system with combined 8/16bit devices
+really worth all the overhead?  Isn't it sort of brain dead hardware not
+to make all of the chips similar?  Why would everyone have to pay for
+such a crazy setup?
+
+To separate it would at least be a lie versus the code in the current
+form.  As well, there are only a few SOC which support multiple chip
+selects.  The 'multi-CS' register bits of this controller varies between
+PowerPC, 68K/Coldfire and ARM platforms.
+
+I looked briefly at the brcmnand.c  and it seems that it is not
+supporting different ECC per chip even though the nodes are broken out
+this way.  In fact, if some raw functions are called, I think it will
+put it in ECC mode even if it wasn't before?  Well, I agree that this
+would be good generically, I think it puts a lot of effort in the
+drivers for not so much payoff?
+
+Fwiw,
+Bill Pringlemeir.
