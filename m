@@ -1,140 +1,41 @@
-From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
-Date: Wed, 26 Aug 2015 16:13:22 +0200
-Subject: [PATCH] ARM: BCM5301X: Add DT for Netgear R7000
-Message-ID: <1440598402-19106-1-git-send-email-zajec5@gmail.com>
+From: msalter@redhat.com (Mark Salter)
+Date: Wed, 26 Aug 2015 10:15:03 -0400
+Subject: [PATCH 3/3] efi/arm64: clean up efi_get_fdt_params() interface
+In-Reply-To: <CAKv+Gu9KwJfr6x8A607CsbAvpLUG2pqLPzcXsqhvmQnrcGy_ug@mail.gmail.com>
+References: <1440595498-30630-1-git-send-email-leif.lindholm@linaro.org>
+ <1440595498-30630-4-git-send-email-leif.lindholm@linaro.org>
+ <CAKv+Gu9KwJfr6x8A607CsbAvpLUG2pqLPzcXsqhvmQnrcGy_ug@mail.gmail.com>
+Message-ID: <1440598503.13044.1.camel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
----
- arch/arm/boot/dts/Makefile                  |   1 +
- arch/arm/boot/dts/bcm4709-netgear-r7000.dts | 106 ++++++++++++++++++++++++++++
- 2 files changed, 107 insertions(+)
- create mode 100644 arch/arm/boot/dts/bcm4709-netgear-r7000.dts
+On Wed, 2015-08-26 at 16:04 +0200, Ard Biesheuvel wrote:
+> On 26 August 2015 at 15:24, Leif Lindholm <leif.lindholm@linaro.org> 
+> wrote:
+> > As we now have a common debug infrastructure between core and arm64 
+> > efi,
+> > drop the bit of the interface passing verbose output flags around.
+> > 
+> > Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
+> > ---
+> >  arch/arm64/kernel/efi.c    | 2 +-
+> >  drivers/firmware/efi/efi.c | 6 ++----
+> >  include/linux/efi.h        | 2 +-
+> >  3 files changed, 4 insertions(+), 6 deletions(-)
+> > 
+> > diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+> > index 612ad5e..ab5eeb6 100644
+> > --- a/arch/arm64/kernel/efi.c
+> > +++ b/arch/arm64/kernel/efi.c
+> > @@ -201,7 +201,7 @@ void __init efi_init(void)
+> >         struct efi_fdt_params params;
+> > 
+> 
+> Actually, one nit: struct efi_fdt_params has a verbose field that was
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 685b488..dd551bf 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -72,6 +72,7 @@ dtb-$(CONFIG_ARCH_BCM_5301X) += \
- 	bcm47081-buffalo-wzr-900dhp.dtb \
- 	bcm4709-asus-rt-ac87u.dtb \
- 	bcm4709-buffalo-wxr-1900dhp.dtb \
-+	bcm4709-netgear-r7000.dtb \
- 	bcm4709-netgear-r8000.dtb
- dtb-$(CONFIG_ARCH_BCM_63XX) += \
- 	bcm963138dvt.dtb
-diff --git a/arch/arm/boot/dts/bcm4709-netgear-r7000.dts b/arch/arm/boot/dts/bcm4709-netgear-r7000.dts
-new file mode 100644
-index 0000000..a22ed14
---- /dev/null
-+++ b/arch/arm/boot/dts/bcm4709-netgear-r7000.dts
-@@ -0,0 +1,106 @@
-+/*
-+ * Broadcom BCM470X / BCM5301X ARM platform code.
-+ * DTS for Netgear R7000
-+ *
-+ * Copyright (C) 2015 Rafa? Mi?ecki <zajec5@gmail.com>
-+ *
-+ * Licensed under the GNU/GPL. See COPYING for details.
-+ */
-+
-+/dts-v1/;
-+
-+#include "bcm4708.dtsi"
-+#include "bcm5301x-nand-cs0-bch8.dtsi"
-+
-+/ {
-+	compatible = "netgear,r7000", "brcm,bcm4709", "brcm,bcm4708";
-+	model = "Netgear R7000";
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200";
-+	};
-+
-+	memory {
-+		reg = <0x00000000 0x08000000>;
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+
-+		power-white {
-+			label = "bcm53xx:white:power";
-+			gpios = <&chipcommon 2 GPIO_ACTIVE_LOW>;
-+			linux,default-trigger = "default-on";
-+		};
-+
-+		power-amber {
-+			label = "bcm53xx:amber:power";
-+			gpios = <&chipcommon 3 GPIO_ACTIVE_LOW>;
-+			linux,default-trigger = "default-off";
-+		};
-+
-+		5ghz {
-+			label = "bcm53xx:white:5ghz";
-+			gpios = <&chipcommon 12 GPIO_ACTIVE_LOW>;
-+			linux,default-trigger = "default-off";
-+		};
-+
-+		2ghz {
-+			label = "bcm53xx:white:2ghz";
-+			gpios = <&chipcommon 13 GPIO_ACTIVE_LOW>;
-+			linux,default-trigger = "default-off";
-+		};
-+
-+		wps {
-+			label = "bcm53xx:white:wps";
-+			gpios = <&chipcommon 14 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "default-off";
-+		};
-+
-+		wireless {
-+			label = "bcm53xx:white:wireless";
-+			gpios = <&chipcommon 15 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "default-off";
-+		};
-+
-+		usb3 {
-+			label = "bcm53xx:white:usb3";
-+			gpios = <&chipcommon 17 GPIO_ACTIVE_LOW>;
-+			linux,default-trigger = "default-off";
-+		};
-+
-+		usb2 {
-+			label = "bcm53xx:white:usb2";
-+			gpios = <&chipcommon 18 GPIO_ACTIVE_LOW>;
-+			linux,default-trigger = "default-off";
-+		};
-+	};
-+
-+	gpio-keys {
-+		compatible = "gpio-keys";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		wps {
-+			label = "WPS";
-+			linux,code = <KEY_WPS_BUTTON>;
-+			gpios = <&chipcommon 4 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		rfkill {
-+			label = "WiFi";
-+			linux,code = <KEY_RFKILL>;
-+			gpios = <&chipcommon 5 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		restart {
-+			label = "Reset";
-+			linux,code = <KEY_RESTART>;
-+			gpios = <&chipcommon 6 GPIO_ACTIVE_LOW>;
-+		};
-+	};
-+};
-+
-+&uart0 {
-+	status = "okay";
-+};
--- 
-1.8.4.5
+No it doesn't. :)
+
+> never used in the first place, but was added [supposedly] to convey
+> the same as EFI_DBG that we have now. So I think you should remove
+> that as well.
+> 
