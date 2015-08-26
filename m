@@ -1,85 +1,37 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Wed, 26 Aug 2015 15:22:46 +0200
-Subject: [PATCH] regmap: Fix the null function of format_val on
- regmap_bulk_read.
-In-Reply-To: <20150826123556.GB2977@sirena.org.uk>
-References: <1440589396-696-1-git-send-email-henryc.chen@mediatek.com>
- <20150826123556.GB2977@sirena.org.uk>
-Message-ID: <20150826132246.GR706@pengutronix.de>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Wed, 26 Aug 2015 14:24:55 +0100
+Subject: [PATCH 0/3] unify efi debug output across architectures
+Message-ID: <1440595498-30630-1-git-send-email-leif.lindholm@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 26, 2015 at 01:35:56PM +0100, Mark Brown wrote:
-> On Wed, Aug 26, 2015 at 07:43:16PM +0800, Henry Chen wrote:
-> > The regmap_format will not be initialize if device driver not declare the regmap_bus
-> > when registering the regmap. To avoid the null function of format_val when
-> > called regmap_bulk_read(). It need to give a format function when regmap init.
-> 
-> > Call trace:
-> > [<          (null)>]           (null)
-> > [<ffffffc0004cbdd0>] mtk_rtc_read_time+0x9c/0x134
-> > [<ffffffc0004c9618>] __rtc_read_time.isra.3+0x40/0x7c
-> > [<ffffffc0004c9688>] rtc_read_time+0x34/0x58
-> 
-> Please don't paste entire backtraces in, they're enormous and tend to
-> obscure the actual content while adding little value.  If needed then
-> edited highlights work better.  I'm fairly sure I've mentioned this
-> before...
-> 
-> > @@ -783,8 +783,22 @@ struct regmap *regmap_init(struct device *dev,
-> >  		map->defer_caching = true;
-> >  		map->reg_write = _regmap_bus_raw_write;
-> >  	}
-> > +/*
-> > + * For bulk read, need to hook the format function.
-> > + */
-> > +simple_format_initialization:
-> 
-> The indentation is all messed up here, we're misssing a blank line and
-> the comment is not indented.
-> 
-> > -skip_format_initialization:
-> > +	switch (config->val_bits) {
-> > +		case 8:
-> > +			map->format.format_val = regmap_format_8;
-> > +			break;
-> > +		case 16:
-> > +			map->format.format_val = regmap_format_16_native;
-> > +			break;
-> > +		case 32:
-> > +			map->format.format_val = regmap_format_32_native;
-> > +			break;
-> > +	}
-> 
-> Why are these format functions sensible?  Converting a null pointer
-> dereference into data corruption wouldn't be ideal.  The commit message
-> should really cover this.
+efi didn't use to have much in the way of kernel command line options,
+until some point last year. Then once the efi= option was added, it has
+been expanded on.
 
-The regmap_bulk_read() function worked before the following patch:
-	15b8d2c41fe5 (regmap: Fix regmap_bulk_read in BE mode)
+x86 had an efi=debug option added, but that would be a useful thing
+across all efi architectures.
 
-As far as I can see this patch fixes this issue by using simple format
-functions. Before the above mentioned patch, the code used memcpy. Now
-regmap_format_*_native is used which should result in the same behaviour
-but fixes the null pointer.
+arm64 efi support (predating efi=debug) came with its own 'uefi_debug'
+option, and passed along a special verbosity flag when calling into
+some not-strictly-arch-specific functions in core efi code.
 
-I am not sure if there are other locations in the code where format_val
-is used in this setup so I don't know if this would change behavior in a
-different codepath.
+So:
+- Move efi=debug into core code, to be usable by all architectures
+- Change arm64 efi code to use 'efi=debug' instead of 'uefi_debug'
+- Rework arm64 interface to core code to drop special verbosity flag
 
-Best regards,
+Leif Lindholm (3):
+  efi/x86: move efi=debug option parsing to core
+  arm64: use core efi=debug instead of uefi_debug command line parameter
+  efi/arm64: clean up efi_get_fdt_params() interface
 
-Markus
+ Documentation/arm/uefi.txt  |  2 --
+ arch/arm64/kernel/efi.c     | 19 +++++--------------
+ arch/x86/platform/efi/efi.c |  2 --
+ drivers/firmware/efi/efi.c  |  9 +++++----
+ include/linux/efi.h         |  2 +-
+ 5 files changed, 11 insertions(+), 23 deletions(-)
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150826/d7064fcd/attachment.sig>
+2.1.4
