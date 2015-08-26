@@ -1,107 +1,136 @@
-From: varada@codeaurora.org (Varadarajan Narayanan)
-Date: Wed, 26 Aug 2015 17:57:47 +0530
-Subject: [PATCH v5] qcom: ipq4019: Add basic board/dts support for IPQ4019 SoC
-Message-ID: <20150826122747.GA4957@codeaurora.org>
+From: holler@ahsoftware.de (Alexander Holler)
+Date: Wed, 26 Aug 2015 14:28:12 +0200
+Subject: [PATCH 00/16] deps: deterministic driver initialization order
+Message-ID: <1440592108-3740-1-git-send-email-holler@ahsoftware.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add initial dts files and SoC support for IPQ4019
+Hello,
 
-Signed-off-by: Varadarajan Narayanan <varada@codeaurora.org>
----
-Changes in v2:
-  - Added devicetree bindings documentation
+I've already written a lot on that topic, therefor this introductory
+mail doesn't explain everything.
 
-Changes in v3:
-  - Split 'gcnt' into a separate patch
-  - Added the new entries to Makefiles, Kconfig & board.c in sorted order
-  - Used "qcom,ipq40xx" instead of "qcom,ipq40xx-r3pc" in board.c
+Please have a look at the threads
 
-Changes in v4:
-  - Removed r3pc dts
-  - Removed timer frequency
+"dt: dependencies (for deterministic driver initialization order based on
+the DT)"
 
- arch/arm/boot/dts/qcom-ipq4019.dtsi | 72 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 72 insertions(+)
- create mode 100644 arch/arm/boot/dts/qcom-ipq4019.dtsi
+and
 
-diff --git a/arch/arm/boot/dts/qcom-ipq4019.dtsi b/arch/arm/boot/dts/qcom-ipq4019.dtsi
-new file mode 100644
-index 0000000..668cc84
---- /dev/null
-+++ b/arch/arm/boot/dts/qcom-ipq4019.dtsi
-@@ -0,0 +1,72 @@
-+/*
-+ * Copyright (c) 2014, The Linux Foundation. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+/dts-v1/;
-+
-+#include "skeleton.dtsi"
-+
-+/ {
-+	model = "Qualcomm Technologies, Inc. IPQ4019";
-+	compatible = "qcom,ipq4019";
-+	interrupt-parent = <&intc>;
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a7";
-+			reg = <0x0>;
-+		};
-+
-+		cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a7";
-+			reg = <0x1>;
-+		};
-+
-+		cpu at 2 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a7";
-+			reg = <0x2>;
-+		};
-+
-+		cpu at 3 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a7";
-+			reg = <0x3>;
-+		};
-+	};
-+
-+	soc {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+		compatible = "simple-bus";
-+
-+		intc: interrupt-controller at b000000 {
-+			compatible = "qcom,msm-qgic2";
-+			interrupt-controller;
-+			#interrupt-cells = <3>;
-+			reg = <0x0b000000 0x1000>,
-+			<0x0b002000 0x1000>;
-+		};
-+
-+		serial at 78b0000 {
-+			compatible = "qcom,msm-uartdm-v1.4", "qcom,msm-uartdm";
-+			reg = <0x78b0000 0x200>;
-+			interrupts = <0 108 0>;
-+			status = "disabled";
-+		};
-+	};
-+};
--- 
-1.8.2.1
+"On-demand device registration"
+
+on LKML for previous discussions.
+
+In short, the current init system is quiet old and doesn't really match
+todays HW which needs much more drivers than 20 years ago.
+
+As I've mentioned in those threads, initcalls should be identifiable
+in order to sort them. My previous attempt intercepted the driver
+registrations in order to do that, which unfortunately ended up with
+having to deal how drivers are creating devices.
+
+I've now spend some more time and this partly new approach now annotates
+the initcalls directly, by storing a pointer to a struct device_driver in
+addition to the pointer to the initcall.
+
+This makes my previous patches smaller, cleaner and better to understand,
+the result which you can see in this little patch series.
+
+The whole patch series is made up of several parts.
+
+The first 4 patches are modifying dtc to include dependencies (type
+information for phandles).
+
+The next 3 patches are the ones which are implementing those annotated
+initcalls and the driver sort algorithm.
+
+Then there are 3 patches with small changes on some dts.
+
+The following 4 patches with the WIP (Work In Progress) are changing
+some initcalls to annotated initcalls. I would split them up in
+a bunch of patches (one for each driver), if I get the promise that
+the other patches will be merged into mainline (but not without that
+promise).
+
+The final 2 patches are fixes which should end up in mainline, regardless
+if this feature is merged or not.
+
+Some numbers (5 boots on each board, without and with ordering drivers),
+all times are seconds.
+
+Kirkwood (dockstar, armv5):
+
+Boot to "Freeing unused kernel memory" (includes mounting the rootfs),
+unordered:
+4.456016 3.937801 4.114788 4.114526 3.949480 (average 4.1145222)
+ordered:
+3.173054 3.164045 3.141418 3.480679 3.459298 (3.2836988)
+Time needed to sort (of_init_build_order()):
+0.003024
+Time needed to match drivers to the order (without calling them):
+0.002884
+
+Beagleboard (rev C4, armv7):
+
+unordered:
+6.706024 6.821746 6.696014 6.673675 6.769866 (6.733465)
+ordered:
+5.544860 5.514160 5.505859 5.527374 5.496795 (5.5178096)
+sorting: 0.021209
+matching: 0.006165
+
+Beaglebone Black (rev A5, armv7):
+
+unordered:
+3.826531 3.825662 3.826648 3.825434 3.825263 (3.8259076)
+ordered:
+2.838554 2.838322 2.839459 2.838467 2.838421 (2.8386446)
+sorting: 0.004769
+matching: 0.004860
+
+imx6q (armv7):
+
+unordered:
+3.451998 3.418864 3.446952 3.429974 3.440996 (3.4377568)
+ordered:
+3.538312 3.549019 3.538105 3.515916 3.555715 (3.5394134)
+sorting: 0.004622
+matching: 0.003868
+
+
+Because I'm using different configuration options on these boards,
+the absolute times aren't comparable.
+
+But in conclusion, most boards are booting faster when the initcalls
+have been ordered.
+
+In addition, ordering the initcalls makes the initialization sequence
+more deterministic (it can even be seen without booting a machine).
+
+But I still think the most benefit of these little series is by not having
+to use in-driver hacks or that ugly brute force trial-and-error deferred
+probing in order to fix a wrong default call order of initcalls.
+
+Further improvements could be to initialize drivers in parallel (using
+multiple cores) and/or to use this stuff on x86 (ACPI) too (e.g. by using a
+minimal DT which just includes dependencies).
+
+
+To test this series with any other DT enabled board, look at which
+drivers are referenced in the DT (see patch 2 or 3), annotate these
+drivers (trivial, see patch 5 or the examples with WIP in the subject),
+turn on CONFIG_OF_DEPENDENCIES, compile and boot.
+
+
+Just to mention it, unless CONFIG_OF_DEPENDENCIES is turned on (which is
+marked as experimental), nothing will change, even if you've annotated
+some drivers (the new macros will just map to the old ones).
+
+
+Regards,
+
+Alexander Holler
+
+PS: Please keep in mind that these patches are an offer. I'm already
+100+ patches above mainline and don't really care to maintain some more
+for myself.
