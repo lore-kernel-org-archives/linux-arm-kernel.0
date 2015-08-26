@@ -1,100 +1,257 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 26 Aug 2015 17:06:45 +0200
-Subject: [PATCH 1/4] mmc: mediatek: Add online-tuning support of EMMC/SD
-In-Reply-To: <1440578416.26912.12.camel@mhfsdcap03>
-References: <1439367845-5891-1-git-send-email-chaotian.jing@mediatek.com>
- <1439367845-5891-2-git-send-email-chaotian.jing@mediatek.com>
- <CAPDyKFpX4Pp1+U9eNBuGd83sBeBgLU17qysAJ-2V-ABZZHYAGQ@mail.gmail.com>
- <1439812888.5627.9.camel@mhfsdcap03>
- <CAPDyKFpGk9gcLLjBnN=+BD5WP-7dZ0+XHC1bcEEGGLvLbTyKHw@mail.gmail.com>
- <1440578416.26912.12.camel@mhfsdcap03>
-Message-ID: <CAPDyKFp0Eypyr8Asx_-_+VOfnDVW19Lrc-MmG2XA8kW+WM6Cnw@mail.gmail.com>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Wed, 26 Aug 2015 16:16:27 +0100
+Subject: [PATCH v2 3/5] arm64/efi: move EFI init before early FDT
+ processing
+In-Reply-To: <1440576391-25725-4-git-send-email-ard.biesheuvel@linaro.org>
+References: <1440576391-25725-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1440576391-25725-4-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20150826151627.GC10728@bivouac.eciton.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 August 2015 at 10:40, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
-> On Tue, 2015-08-25 at 14:07 +0200, Ulf Hansson wrote:
->> On 17 August 2015 at 14:01, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
->> > Hi Ulf,
->> > Thanks, please see my comment:
->> > On Mon, 2015-08-17 at 13:31 +0200, Ulf Hansson wrote:
->> >> On 12 August 2015 at 10:24, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
->> >> > Schedule a workqueue to do tuning when CRC error
->> >> > Call mmc_hw_reset to re-init card when data timeout
->> >>
->> >> Thanks to Adrian Hunter, the mmc core already supports re-tuning for
->> >> the above scenarios through the mmc_retune_*() APIs.
->> >>
->> >> SDHCI driver has already adopted to use that feature, you should do
->> >> that for the mtk-sd driver as well.
->> >>
->> >> Kind regards
->> >> Uffe
->> >>
->> > I also noticed that the mmc core already supports re-tuning, but it is
->> > not suitable for our host.
->> > For EMMC, the CMD21 only support HS200/HS400 mode, for SD card, CMD19
->> > only support SDR50/SDR104 mode, but in our host, even 50Mhz clock
->> > frequency may also occur CRC error, Cannot find a parameter that can
->> > cover all SD cards which running at 50Mhz, even 25Mhz, will occur CRC
->> > error for stress test, DDR50 mode is worse.
->>
->> I don't follow. You may run for example HS200 in lower speed, nothing
->> will prevent tuning and re-tuning from happen for these scenarios.
->>
->> Or you are talking about other speed modes than HS200/400 and
->> SDR50/104? If so, which speed modes are these?
->>
-> Yes, I am talking about other speed modes.
-> For SD card, the speed mode is High Speed, for EMMC, the speed may be
-> High Speed or DDR mode.
-> If CRC error occurs at these speed modes, the MMC core layer will never
-> handler it. even propagate the -EILSEQ towards to the mmc core, it will
-> not start mmc_retune.
+On Wed, Aug 26, 2015 at 10:06:29AM +0200, Ard Biesheuvel wrote:
+> The early FDT processing is responsible for enumerating the
+> DT memory nodes and installing them as memblocks. This should
+> only be done if we are not booting via EFI, but at this point,
+> we don't know yet if that is the case or not.
+> 
+> So move the EFI init to before the early FDT processing. This involves
+> making some changes to the way EFI discovers the locations of the
+> EFI system table and the memory map, since those values are retrieved
+> from the FDT as well. Instead the of_scan infrastructure, it now uses
+> libfdt directly to access the /chosen node.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/include/asm/efi.h   |  4 +-
+>  arch/arm64/kernel/efi.c        | 14 ++--
+>  arch/arm64/kernel/setup.c      |  4 +-
+>  drivers/firmware/efi/efi-fdt.c | 74 ++++++++------------
+>  include/linux/efi.h            |  3 +-
+>  5 files changed, 40 insertions(+), 59 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/efi.h b/arch/arm64/include/asm/efi.h
+> index ef572206f1c3..635101f36720 100644
+> --- a/arch/arm64/include/asm/efi.h
+> +++ b/arch/arm64/include/asm/efi.h
+> @@ -5,9 +5,9 @@
+>  #include <asm/neon.h>
+>  
+>  #ifdef CONFIG_EFI
+> -extern void efi_init(void);
+> +extern void efi_init_fdt(void *fdt);
+>  #else
+> -#define efi_init()
+> +#define efi_init_fdt(x)
+>  #endif
+>  
+>  #define efi_call_virt(f, ...)						\
+> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+> index 9d4aa18f2a82..0e3dbe2cb752 100644
+> --- a/arch/arm64/kernel/efi.c
+> +++ b/arch/arm64/kernel/efi.c
+> @@ -51,14 +51,7 @@ static struct mm_struct efi_mm = {
+>  	INIT_MM_CONTEXT(efi_mm)
+>  };
+>  
+> -static int uefi_debug __initdata;
+> -static int __init uefi_debug_setup(char *str)
+> -{
+> -	uefi_debug = 1;
+> -
+> -	return 0;
+> -}
+> -early_param("uefi_debug", uefi_debug_setup);
+> +static bool uefi_debug __initdata;
 
-That's true and that's because the MMC/SD/SDIO specs states it.
-Moreover, there a no tuning ever executed even while initializing such
-cards. I think you need to elaborate more on what kind of "tuning"
-your controller needs for these legacy speed modes, can you please do
-that?
+So, this obviously clashes with the patches I sent out recently, but
+then they were triggered by the awkwardness of the interface passing
+the verbosity flag around...
+  
+>  static int __init is_normal_ram(efi_memory_desc_t *md)
+>  {
+> @@ -205,14 +198,15 @@ static __init void reserve_regions(void)
+>  	set_bit(EFI_MEMMAP, &efi.flags);
+>  }
+>  
+> -void __init efi_init(void)
+> +void __init efi_init_fdt(void *fdt)
 
-Currently the mmc block layer has request retry mechanism when
-encountering IO errors. That may even reset or power cycle the card,
-via mmc_hw_reset(). Isn't that sufficient?
+(Nitpick: efi_init_fdt here, efi_virtmap_init below - naming consistency)
 
->> BTW, there are currently a patch being discussed which is about adding
->> tuning for DDR mode. Please have look.
->> http://www.spinics.net/lists/arm-kernel/msg438434.html
->>
->> Regarding re-tuning on CRC errors, that's already supported by the mmc
->> core. More precisely when a host driver returns -EILSEQ for a request.
->>
->> > By the way,there are too many tune parameters need try for response,
->> > read data, write crc status CRC error, these parameters are
->> > multidimensional, it is hard to find a best parameter, and, try
->> > thousands of parameters will take long time.
->>
->> As I see, it's your responsibility from the host driver to propagate
->> the proper error code towards the mmc core. If you encounter an error
->> that you want to trigger a retune, just return -EILSEQ.
->>
->> Moreover, if you see a need to extend the tuning/re-tuning support in
->> the mmc core to suit your need - I am definitely open to look into
->> that. More importantly, I don't want to see host specific hacks trying
->> to deal with this.
->>
-> In addition, the CMD21 is only valid for HS200 mode, do not support
-> HS400, So that there is no chance to tune the HS400 read/write data with
-> current mmc core layer codes.
-> As you see, in our platform, tune of HS200 and HS400 is different, but
-> if use the CMD21, it will never work at HS400 mode, even with
-> "prepare_hs400_tuning", but it prepare what ? what we need is that
-> running at HS400 mode and tune the read/write parameters, but not HS200,
-> because for data Rx path, the tune result of HS200 is meaningless for
-> HS400.
+>  {
+>  	struct efi_fdt_params params;
+>  
+>  	/* Grab UEFI information placed in FDT by stub */
+> -	if (!efi_get_fdt_params(&params, uefi_debug))
+> +	if (!efi_get_fdt_params(fdt, &params))
+>  		return;
+>  
+> +	uefi_debug = params.verbose;
+>  	efi_system_table = params.system_table;
 
-So, should we perhaps add another host_ops callback to satisfy your
-need for HS400?
+Here is where it gets problematic.
+Because this is now called before parse_early_params(), we lose the
+ability to do debug output. Now, the details in the DT parsing is
+maybe not that critical, but what follow is:
+  
+>  	memblock_reserve(params.mmap & PAGE_MASK,
 
-Kind regards
-Uffe
+... and we _really_ need to be able to dump the memory regions, with
+attributes, for debugging purposes.
+
+> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+> index fddae2c15ad2..8fdde97c975c 100644
+> --- a/arch/arm64/kernel/setup.c
+> +++ b/arch/arm64/kernel/setup.c
+> @@ -298,6 +298,9 @@ static void __init setup_machine_fdt(phys_addr_t dt_phys)
+>  {
+>  	void *dt_virt = fixmap_remap_fdt(dt_phys);
+>  
+> +	if (dt_virt)
+> +		efi_init_fdt(dt_virt);
+> +
+>  	if (!dt_virt || !early_init_dt_scan(dt_virt)) {
+>  		pr_crit("\n"
+>  			"Error: invalid device tree blob at physical address %pa (virtual address 0x%p)\n"
+> @@ -366,7 +369,6 @@ void __init setup_arch(char **cmdline_p)
+>  	 */
+>  	local_async_enable();
+>  
+> -	efi_init();
+
+So can we just keep this call and terminate efi_init_fdt before
+memblock_reserve?
+
+>  	arm64_memblock_init();
+>  
+>  	/* Parse the ACPI tables for possible boot-time configuration */
+> diff --git a/drivers/firmware/efi/efi-fdt.c b/drivers/firmware/efi/efi-fdt.c
+> index f0e7ef2ae0e9..2e0e1a5a3fbb 100644
+> --- a/drivers/firmware/efi/efi-fdt.c
+> +++ b/drivers/firmware/efi/efi-fdt.c
+> @@ -8,8 +8,7 @@
+>  
+>  #include <linux/init.h>
+>  #include <linux/efi.h>
+> -#include <linux/of.h>
+> -#include <linux/of_fdt.h>
+> +#include <linux/libfdt.h>
+>  
+>  #define UEFI_PARAM(name, prop, field)			   \
+>  	{						   \
+> @@ -32,62 +31,47 @@ static __initdata struct {
+>  	UEFI_PARAM("MemMap Desc. Version", "linux,uefi-mmap-desc-ver", desc_ver)
+>  };
+>  
+> -struct param_info {
+> -	int verbose;
+> -	int found;
+> -	void *params;
+> -};
+> -
+> -static int __init fdt_find_uefi_params(unsigned long node, const char *uname,
+> -				       int depth, void *data)
+> +bool __init efi_get_fdt_params(void *fdt, struct efi_fdt_params *params)
+>  {
+> -	struct param_info *info = data;
+>  	const void *prop;
+> -	void *dest;
+> -	u64 val;
+> -	int i, len;
+> +	int node, i;
+> +
+> +	pr_info("Getting EFI parameters from FDT:\n");
+>  
+> -	if (depth != 1 || strcmp(uname, "chosen") != 0)
+> -		return 0;
+> +	node = fdt_path_offset(fdt, "/chosen");
+> +	if (node < 0) {
+> +		pr_err("/chosen node not found!\n");
+> +		return false;
+> +	}
+> +
+> +	prop = fdt_getprop(fdt, node, "bootargs", NULL);
+> +	params->verbose = prop && strstr(prop, "uefi_debug");
+>  
+>  	for (i = 0; i < ARRAY_SIZE(dt_params); i++) {
+> -		prop = of_get_flat_dt_prop(node, dt_params[i].propname, &len);
+> -		if (!prop)
+> -			return 0;
+> -		dest = info->params + dt_params[i].offset;
+> -		info->found++;
+> +		void *dest;
+> +		int len;
+> +		u64 val;
+>  
+> -		val = of_read_number(prop, len / sizeof(u32));
+> +		prop = fdt_getprop(fdt, node, dt_params[i].propname, &len);
+> +		if (!prop)
+> +			goto not_found;
+> +		dest = (void *)params + dt_params[i].offset;
+>  
+>  		if (dt_params[i].size == sizeof(u32))
+> -			*(u32 *)dest = val;
+> +			val = *(u32 *)dest = be32_to_cpup(prop);
+>  		else
+> -			*(u64 *)dest = val;
+> +			val = *(u64 *)dest = be64_to_cpup(prop);
+>  
+> -		if (info->verbose)
+> +		if (params->verbose)
+>  			pr_info("  %s: 0x%0*llx\n", dt_params[i].name,
+>  				dt_params[i].size * 2, val);
+>  	}
+> -	return 1;
+> -}
+> -
+> -int __init efi_get_fdt_params(struct efi_fdt_params *params, int verbose)
+> -{
+> -	struct param_info info;
+> -	int ret;
+> +	return true;
+>  
+> -	pr_info("Getting EFI parameters from FDT:\n");
+> -
+> -	info.verbose = verbose;
+> -	info.found = 0;
+> -	info.params = params;
+> -
+> -	ret = of_scan_flat_dt(fdt_find_uefi_params, &info);
+> -	if (!info.found)
+> +not_found:
+> +	if (i == 0)
+>  		pr_info("UEFI not found.\n");
+> -	else if (!ret)
+> -		pr_err("Can't find '%s' in device tree!\n",
+> -		       dt_params[info.found].name);
+> -
+> -	return ret;
+> +	else
+> +		pr_err("Can't find '%s' in device tree!\n", dt_params[i].name);
+> +	return false;
+>  }
+> diff --git a/include/linux/efi.h b/include/linux/efi.h
+> index 85ef051ac6fb..faafa1ad6ea7 100644
+> --- a/include/linux/efi.h
+> +++ b/include/linux/efi.h
+> @@ -690,6 +690,7 @@ struct efi_fdt_params {
+>  	u32 mmap_size;
+>  	u32 desc_size;
+>  	u32 desc_ver;
+> +	bool verbose;
+>  };
+>  
+>  typedef struct {
+> @@ -901,7 +902,7 @@ extern void efi_initialize_iomem_resources(struct resource *code_resource,
+>  		struct resource *data_resource, struct resource *bss_resource);
+>  extern void efi_get_time(struct timespec *now);
+>  extern void efi_reserve_boot_services(void);
+> -extern int efi_get_fdt_params(struct efi_fdt_params *params, int verbose);
+> +extern bool efi_get_fdt_params(void *fdt, struct efi_fdt_params *params);
+>  extern struct efi_memory_map memmap;
+>  extern struct kobject *efi_kobj;
+>  
+> -- 
+> 1.9.1
+> 
