@@ -1,41 +1,42 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Wed, 26 Aug 2015 10:15:03 -0400
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 26 Aug 2015 16:16:24 +0200
 Subject: [PATCH 3/3] efi/arm64: clean up efi_get_fdt_params() interface
-In-Reply-To: <CAKv+Gu9KwJfr6x8A607CsbAvpLUG2pqLPzcXsqhvmQnrcGy_ug@mail.gmail.com>
+In-Reply-To: <1440598503.13044.1.camel@redhat.com>
 References: <1440595498-30630-1-git-send-email-leif.lindholm@linaro.org>
  <1440595498-30630-4-git-send-email-leif.lindholm@linaro.org>
  <CAKv+Gu9KwJfr6x8A607CsbAvpLUG2pqLPzcXsqhvmQnrcGy_ug@mail.gmail.com>
-Message-ID: <1440598503.13044.1.camel@redhat.com>
+ <1440598503.13044.1.camel@redhat.com>
+Message-ID: <CAKv+Gu_jVAq0CGh1J+H3Yufwd2Gx3kU=8ZsVfawoi2VKjYxE9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-08-26 at 16:04 +0200, Ard Biesheuvel wrote:
-> On 26 August 2015 at 15:24, Leif Lindholm <leif.lindholm@linaro.org> 
-> wrote:
-> > As we now have a common debug infrastructure between core and arm64 
-> > efi,
-> > drop the bit of the interface passing verbose output flags around.
-> > 
-> > Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
-> > ---
-> >  arch/arm64/kernel/efi.c    | 2 +-
-> >  drivers/firmware/efi/efi.c | 6 ++----
-> >  include/linux/efi.h        | 2 +-
-> >  3 files changed, 4 insertions(+), 6 deletions(-)
-> > 
-> > diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-> > index 612ad5e..ab5eeb6 100644
-> > --- a/arch/arm64/kernel/efi.c
-> > +++ b/arch/arm64/kernel/efi.c
-> > @@ -201,7 +201,7 @@ void __init efi_init(void)
-> >         struct efi_fdt_params params;
-> > 
-> 
-> Actually, one nit: struct efi_fdt_params has a verbose field that was
+On 26 August 2015 at 16:15, Mark Salter <msalter@redhat.com> wrote:
+> On Wed, 2015-08-26 at 16:04 +0200, Ard Biesheuvel wrote:
+>> On 26 August 2015 at 15:24, Leif Lindholm <leif.lindholm@linaro.org>
+>> wrote:
+>> > As we now have a common debug infrastructure between core and arm64
+>> > efi,
+>> > drop the bit of the interface passing verbose output flags around.
+>> >
+>> > Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
+>> > ---
+>> >  arch/arm64/kernel/efi.c    | 2 +-
+>> >  drivers/firmware/efi/efi.c | 6 ++----
+>> >  include/linux/efi.h        | 2 +-
+>> >  3 files changed, 4 insertions(+), 6 deletions(-)
+>> >
+>> > diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+>> > index 612ad5e..ab5eeb6 100644
+>> > --- a/arch/arm64/kernel/efi.c
+>> > +++ b/arch/arm64/kernel/efi.c
+>> > @@ -201,7 +201,7 @@ void __init efi_init(void)
+>> >         struct efi_fdt_params params;
+>> >
+>>
+>> Actually, one nit: struct efi_fdt_params has a verbose field that was
+>
+> No it doesn't. :)
+>
 
-No it doesn't. :)
-
-> never used in the first place, but was added [supposedly] to convey
-> the same as EFI_DBG that we have now. So I think you should remove
-> that as well.
-> 
+OK, must have been something I added myself locally then.
+Never mind.
