@@ -1,263 +1,269 @@
-From: jonmason@broadcom.com (Jon Mason)
-Date: Wed, 26 Aug 2015 14:40:10 -0400
-Subject: [PATCH 2/5] ARM: NSP: add minimal Northstar Plus device tree
-In-Reply-To: <CAOesGMhE40_mfZCD2PqcTObE_Gz_6rKFwhf3-6kZY4n9Yxn2rQ@mail.gmail.com>
-References: <1440092804-25726-1-git-send-email-jonmason@broadcom.com>
- <CAOesGMhE40_mfZCD2PqcTObE_Gz_6rKFwhf3-6kZY4n9Yxn2rQ@mail.gmail.com>
-Message-ID: <20150826184009.GA4171@broadcom.com>
+From: codekipper@gmail.com (codekipper at gmail.com)
+Date: Wed, 26 Aug 2015 20:46:58 +0200
+Subject: [linux-next][PATCH v2] ARM: sun7i: dt: Add new Olimex A20 EVB device
+Message-ID: <1440614818-25765-1-git-send-email-codekipper@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 25, 2015 at 04:36:45PM -0700, Olof Johansson wrote:
-> Hi,
-> 
-> I'm not sure what the strategy behind your cc:ing on this patch set
-> is. I only got a couple of them in my inbox, and this one wasn't one
-> of them. :)
+From: Marcus Cooper <codekipper@gmail.com>
 
-I sent them to the people listed as maintainers in get_maintainer.pl.
-It didn't seem to include you in all of them, but I thought the
-mailing list would be enough of a catch all.  My apologies.  I'll CC
-everyone listed as a maintainer on all of the patches in the future.
+The A20-SOM-EVB is a reference design of a 2-layer board for the
+A20-SOM.
+It expands the features of A20-SOM by adding VGA connector, HDMI
+connector, audio In/Out, LCD connector, 2 Mpix camera, gigabit
+Ethernet, SATA, USB-OTG and 2 USB hosts.
 
-> 
-> On Thu, Aug 20, 2015 at 10:46 AM, Jon Mason <jonmason@broadcom.com> wrote:
-> > Add a very minimalistic set of Northstar Plus Device Tree files which
-> > describes the SoC and the BCM958625 implementation.  The perpherials
-> > described are:
-> >
-> > ARM Cortex A9 CPU
-> > 2 8250 UARTs
-> > ARM GIC
-> > PL310 L2 Cache
-> > ARM A9 Global timer
-> >
-> > Signed-off-by: Jon Mason <jonmason@broadcom.com>
-> > Signed-off-by: Kapil Hali <kapilh@broadcom.com>
-> > Reviewed-by: Ray Jui <rjui@broadcom.com>
-> > Reviewed-by: Scott Branden <sbranden@broadcom.com>
-> 
-> Seeing reviewed-by already attached to a v1 of a patchset has limited
-> value for someone on the outside.
-> 
-> Reviewed-by is one of those tags that has a value that's mostly
-> dependent on who it comes from. By not actually seeing the review and
-> the feedback provided (and revisions made), less data is provided to
-> tell if it's a valuable review or not.
-> 
-> Also, if you're posting the code you should probably have your name
-> below Kapil's, since you're the one signing off the origin of the
-> code. See Documentation/SubmittingPatches.txt for details on what
-> S-o-b actually means.
+This patch adds basic support for the device
+https://www.olimex.com/Products/SOM/A20/A20-SOM-EVB/
 
-We worked on it together, but I'll be happy to reorder as you suggest.
+More information on the SOM can be found here
+http://linux-sunxi.org/Olimex_A20-SOM.
 
-> 
-> 
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/bcm-nsp.dtsi
-> > @@ -0,0 +1,105 @@
-> > +/*
-> > + *  BSD LICENSE
-> > + *
-> > + *  Copyright(c) 2015 Broadcom Corporation.  All rights reserved.
-> > + *
-> > + *  Redistribution and use in source and binary forms, with or without
-> > + *  modification, are permitted provided that the following conditions
-> > + *  are met:
-> > + *
-> > + *    * Redistributions of source code must retain the above copyright
-> > + *      notice, this list of conditions and the following disclaimer.
-> > + *    * Redistributions in binary form must reproduce the above copyright
-> > + *      notice, this list of conditions and the following disclaimer in
-> > + *      the documentation and/or other materials provided with the
-> > + *      distribution.
-> > + *    * Neither the name of Broadcom Corporation nor the names of its
-> > + *      contributors may be used to endorse or promote products derived
-> > + *      from this software without specific prior written permission.
-> > + *
-> > + *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-> > + *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-> > + *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-> > + *  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-> > + *  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-> > + *  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-> > + *  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-> > + *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-> > + *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-> > + *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-> > + *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-> > + */
-> 
-> I'm not sure we've seen BSD-only submissions before. I'll let DT
-> maintainers (or Ian) speak up in case this would cause problems.
+Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+---
+Changes since v1:
+- renamed dts from sun7i-a20-olinuxino-evb to sun7i-a20-olimex-som-evb
+- added "axp209 dtsi"
+- change regulator settings
+---
+ arch/arm/boot/dts/Makefile                     |   1 +
+ arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts | 216 +++++++++++++++++++++++++
+ 2 files changed, 217 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
 
-I was following the precedent in arch/arm/boot/dts/bcm-cygnus.dtsi.
-If this is preferred to be GPL v2, then I will happily comply.
-
-> 
-> 
-> > +
-> > +#include <dt-bindings/interrupt-controller/arm-gic.h>
-> > +#include <dt-bindings/interrupt-controller/irq.h>
-> > +
-> > +#include "skeleton.dtsi"
-> > +
-> > +/ {
-> > +       compatible = "brcm,nsp";
-> > +       model = "Broadcom Northstar Plus SoC";
-> > +       interrupt-parent = <&gic>;
-> > +
-> > +       cpus {
-> > +               #address-cells = <1>;
-> > +               #size-cells = <0>;
-> > +
-> > +               cpu at 0 {
-> > +                       device_type = "cpu";
-> > +                       compatible = "arm,cortex-a9";
-> > +                       next-level-cache = <&L2>;
-> > +                       reg = <0x0>;
-> > +               };
-> > +       };
-> > +
-> > +       clocks {
-> > +               #address-cells = <1>;
-> > +               #size-cells = <1>;
-> > +               ranges;
-> > +
-> > +               periph_clk: periph_clk {
-> > +                       compatible = "fixed-clock";
-> > +                       #clock-cells = <0>;
-> > +                       clock-frequency = <500000000>;
-> > +               };
-> > +       };
-> > +
-> > +       uart0: serial at 18000300 {
-> > +               compatible = "ns16550a";
-> > +               reg = <0x18000300 0x100>;
-> > +               interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
-> > +               clock-frequency = <62499840>;
-> > +               status = "disabled";
-> > +       };
-> > +
-> > +       uart1: serial at 18000400 {
-> > +               compatible = "ns16550a";
-> > +               reg = <0x18000400 0x100>;
-> > +               interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
-> > +               clock-frequency = <62499840>;
-> > +               status = "disabled";
-> > +       };
-> > +
-> > +       gic: interrupt-controller at 19021000 {
-> > +               compatible = "arm,cortex-a9-gic";
-> > +               #interrupt-cells = <3>;
-> > +               #address-cells = <0>;
-> > +               interrupt-controller;
-> > +               reg = <0x19021000 0x1000>,
-> > +                     <0x19020100 0x100>;
-> > +       };
-> > +
-> > +       L2: l2-cache {
-> > +               compatible = "arm,pl310-cache";
-> > +               reg = <0x19022000 0x1000>;
-> > +               cache-unified;
-> > +               cache-level = <2>;
-> > +       };
-> > +
-> > +       timer at 19020200 {
-> > +               compatible = "arm,cortex-a9-global-timer";
-> > +               reg = <0x19020200 0x100>;
-> > +               interrupts = <GIC_PPI 11 IRQ_TYPE_LEVEL_HIGH>;
-> > +               clocks = <&periph_clk>;
-> > +       };
-> > +};
-> > diff --git a/arch/arm/boot/dts/bcm958625k.dts b/arch/arm/boot/dts/bcm958625k.dts
-> > new file mode 100644
-> > index 0000000..a1bc151
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/bcm958625k.dts
-> > @@ -0,0 +1,57 @@
-> > +/*
-> > + *  BSD LICENSE
-> > + *
-> > + *  Copyright(c) 2015 Broadcom Corporation.  All rights reserved.
-> > + *
-> > + *  Redistribution and use in source and binary forms, with or without
-> > + *  modification, are permitted provided that the following conditions
-> > + *  are met:
-> > + *
-> > + *    * Redistributions of source code must retain the above copyright
-> > + *      notice, this list of conditions and the following disclaimer.
-> > + *    * Redistributions in binary form must reproduce the above copyright
-> > + *      notice, this list of conditions and the following disclaimer in
-> > + *      the documentation and/or other materials provided with the
-> > + *      distribution.
-> > + *    * Neither the name of Broadcom Corporation nor the names of its
-> > + *      contributors may be used to endorse or promote products derived
-> > + *      from this software without specific prior written permission.
-> > + *
-> > + *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-> > + *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-> > + *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-> > + *  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-> > + *  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-> > + *  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-> > + *  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-> > + *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-> > + *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-> > + *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-> > + *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-> > + */
-> > +
-> > +/dts-v1/;
-> > +
-> > +#include "bcm-nsp.dtsi"
-> > +
-> > +/ {
-> > +       model = "NorthStar Plus SVK (BCM958625K)";
-> > +       compatible = "brcm,bcm58625", "brcm,nsp";
-> > +
-> > +       aliases {
-> > +               serial0 = &uart0;
-> > +               serial1 = &uart1;
-> > +       };
-> > +
-> > +       chosen {
-> > +               stdout-path = "serial0:115200n8";
-> > +       };
-> 
-> No way to mount a root filesystem yet? How much work remains for that
-> to be possible, and what's the plan for that?
-
-It mounts rootfs.  I am adding the rootfs to the kernel and device
-tree blob via the u-boot mkimage command.  It boots all the way to
-shell without issue.
-
-> 
-> > +
-> > +       uart0: serial at 18000300 {
-> > +               status = "okay";
-> > +       };
-> > +
-> > +       uart1: serial at 18000400 {
-> > +               status = "okay";
-> > +       };
-> 
-> I recommend using labels here instead so you don't have to mirror the
-> DT layout to get the updated property right.
-
-Agreed.
-
-Thanks,
-Jon
-
-> 
-> I.e.
-> 
-> &uart1 {
->         status = "okay";
-> };
-> 
-> 
-> 
-> -Olof
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index f830e1f..e4e1d29 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -588,6 +588,7 @@ dtb-$(CONFIG_MACH_SUN7I) += \
+ 	sun7i-a20-i12-tvbox.dtb \
+ 	sun7i-a20-m3.dtb \
+ 	sun7i-a20-mk808c.dtb \
++	sun7i-a20-olimex-som-evb.dtb \
+ 	sun7i-a20-olinuxino-lime.dtb \
+ 	sun7i-a20-olinuxino-lime2.dtb \
+ 	sun7i-a20-olinuxino-micro.dtb \
+diff --git a/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts b/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
+new file mode 100644
+index 0000000..36d1e77
+--- /dev/null
++++ b/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
+@@ -0,0 +1,216 @@
++/*
++ * Copyright 2015 - Marcus Cooper <codekipper@gmail.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++#include "sun7i-a20.dtsi"
++#include "sunxi-common-regulators.dtsi"
++
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/interrupt-controller/irq.h>
++#include <dt-bindings/pinctrl/sun4i-a10.h>
++
++/ {
++	model = "Olimex A20-Olimex-SOM-EVB";
++	compatible = "olimex,a20-olimex-som-evb", "allwinner,sun7i-a20";
++
++	aliases {
++		serial0 = &uart0;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
++	leds {
++		compatible = "gpio-leds";
++		pinctrl-names = "default";
++		pinctrl-0 = <&led_pins_olimex_som_evb>;
++
++		green {
++			label = "a20-olimex-som-evb:green:usr";
++			gpios = <&pio 7 2 GPIO_ACTIVE_HIGH>;
++			default-state = "on";
++		};
++	};
++
++	reg_axp_ipsout: axp_ipsout {
++		compatible = "regulator-fixed";
++		regulator-name = "axp-ipsout";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		regulator-always-on;
++	};
++};
++
++&ahci {
++	target-supply = <&reg_ahci_5v>;
++	status = "okay";
++};
++
++&ehci0 {
++	status = "okay";
++};
++
++&ehci1 {
++	status = "okay";
++};
++
++&gmac {
++	pinctrl-names = "default";
++	pinctrl-0 = <&gmac_pins_rgmii_a>;
++	phy = <&phy1>;
++	phy-mode = "rgmii";
++	status = "okay";
++
++	phy1: ethernet-phy at 1 {
++		reg = <1>;
++	};
++};
++
++&i2c0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c0_pins_a>;
++	status = "okay";
++
++	axp209: pmic at 34 {
++		reg = <0x34>;
++		interrupt-parent = <&nmi_intc>;
++		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
++	};
++};
++
++&i2c1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c1_pins_a>;
++	status = "okay";
++};
++
++&mmc0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_reference_design>;
++	vmmc-supply = <&reg_vcc3v3>;
++	bus-width = <4>;
++	cd-gpios = <&pio 7 1 GPIO_ACTIVE_HIGH>; /* PH1 */
++	cd-inverted;
++	status = "okay";
++};
++
++&ohci0 {
++	status = "okay";
++};
++
++&ohci1 {
++	status = "okay";
++};
++
++&pio {
++	ahci_pwr_pin_olimex_som_evb: ahci_pwr_pin at 1 {
++		allwinner,pins = "PC3";
++		allwinner,function = "gpio_out";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
++
++	led_pins_olimex_som_evb: led_pins at 0 {
++		allwinner,pins = "PH2";
++		allwinner,function = "gpio_out";
++		allwinner,drive = <SUN4I_PINCTRL_20_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
++};
++
++&reg_ahci_5v {
++	pinctrl-0 = <&ahci_pwr_pin_olimex_som_evb>;
++	gpio = <&pio 2 3 GPIO_ACTIVE_HIGH>;
++	status = "okay";
++};
++
++#include "axp209.dtsi"
++
++&reg_dcdc2 {
++	regulator-always-on;
++	regulator-min-microvolt = <1000000>;
++	regulator-max-microvolt = <1425000>;
++	regulator-name = "vdd-cpu";
++};
++
++&reg_dcdc3 {
++	regulator-always-on;
++	regulator-min-microvolt = <1000000>;
++	regulator-max-microvolt = <1400000>;
++	regulator-name = "vdd-int-dll";
++};
++
++&reg_ldo1 {
++	regulator-name = "vdd-rtc";
++};
++
++&reg_ldo2 {
++	regulator-always-on;
++	regulator-min-microvolt = <3000000>;
++	regulator-max-microvolt = <3000000>;
++	regulator-name = "avcc";
++};
++
++&reg_usb0_vbus {
++	status = "okay";
++};
++
++&reg_usb1_vbus {
++	status = "okay";
++};
++
++&reg_usb2_vbus {
++	status = "okay";
++};
++
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_pins_a>;
++	status = "okay";
++};
++
++&usbphy {
++	usb1_vbus-supply = <&reg_usb1_vbus>;
++	usb2_vbus-supply = <&reg_usb2_vbus>;
++	status = "okay";
++};
+-- 
+2.5.0
