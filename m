@@ -1,33 +1,86 @@
-From: marex@denx.de (Marek Vasut)
-Date: Wed, 26 Aug 2015 16:39:02 +0200
-Subject: [PATCH linux-next v5 3/5] mtd: spi-nor: allow to tune the number
- of dummy cycles
-In-Reply-To: <4324f398c0e69e3057e7da6a1a3e0328b44f224f.1440580764.git.cyrille.pitchen@atmel.com>
-References: <cover.1440580764.git.cyrille.pitchen@atmel.com>
- <4324f398c0e69e3057e7da6a1a3e0328b44f224f.1440580764.git.cyrille.pitchen@atmel.com>
-Message-ID: <201508261639.02377.marex@denx.de>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Wed, 26 Aug 2015 15:43:25 +0100
+Subject: [PATCH v2 1/5] arm64: clone early_init_dt_add_memory_arch() to
+ override default
+In-Reply-To: <1440576391-25725-2-git-send-email-ard.biesheuvel@linaro.org>
+References: <1440576391-25725-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1440576391-25725-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20150826144325.GA10728@bivouac.eciton.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, August 26, 2015 at 02:30:25 PM, Cyrille Pitchen wrote:
-> The number of dummy cycles used during Fast Read commands can be reduced
-> to improve transfer performances. Each manufacturer has a dedicated set of
-> registers to provide the memory with the exact number of dummy cycles it
-> should expect. Both the memory and the (Q)SPI controller must agree on
-> this number of dummy cycles.
-> 
-> The number of dummy cycles can be found into the memory datasheet and
-> mostly depends on the SPI clock frequency, the Fast Read op code and the
-> Single/Dual Data Rate mode.
-> 
-> Probing JEDEC Serial Flash Discoverable Parameters (SFDP) tables would
-> only provide the driver with a high enough number of dummy cycles for each
-> Fast Read command to be used for all clock frequencies: this solution
-> would not be optimized.
-> 
-> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+On Wed, Aug 26, 2015 at 10:06:27AM +0200, Ard Biesheuvel wrote:
+> Override the __weak early_init_dt_add_memory_arch() with our own
+> version. We need this in a subsequent patch to make the handling of
+> the memory nodes conditional on whether we are booting via UEFI or
+> not.
 
-Acked-by: Marek Vasut <marex@denx.de>
+Worth clarifying that this is a direct copy?
+("Our own version" can be read as there being modifications here.)
 
-Best regards,
-Marek Vasut
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/mm/init.c | 41 ++++++++++++++++++++
+>  1 file changed, 41 insertions(+)
+> 
+> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+> index f5c0680d17d9..ab25fde7397c 100644
+> --- a/arch/arm64/mm/init.c
+> +++ b/arch/arm64/mm/init.c
+> @@ -374,3 +374,44 @@ static int __init keepinitrd_setup(char *__unused)
+>  
+>  __setup("keepinitrd", keepinitrd_setup);
+>  #endif
+> +
+> +void __init early_init_dt_add_memory_arch(u64 base, u64 size)
+> +{
+> +	const u64 phys_offset = __pa(PAGE_OFFSET);
+> +
+> +	if (!PAGE_ALIGNED(base)) {
+> +		if (size < PAGE_SIZE - (base & ~PAGE_MASK)) {
+> +			pr_warn("Ignoring memory block 0x%llx - 0x%llx\n",
+> +				base, base + size);
+> +			return;
+> +		}
+> +		size -= PAGE_SIZE - (base & ~PAGE_MASK);
+> +		base = PAGE_ALIGN(base);
+> +	}
+> +	size &= PAGE_MASK;
+> +
+> +	if (base > MAX_MEMBLOCK_ADDR) {
+> +		pr_warning("Ignoring memory block 0x%llx - 0x%llx\n",
+> +				base, base + size);
+> +		return;
+> +	}
+> +
+> +	if (base + size - 1 > MAX_MEMBLOCK_ADDR) {
+> +		pr_warning("Ignoring memory range 0x%llx - 0x%llx\n",
+> +				((u64)MAX_MEMBLOCK_ADDR) + 1, base + size);
+> +		size = MAX_MEMBLOCK_ADDR - base + 1;
+> +	}
+> +
+> +	if (base + size < phys_offset) {
+> +		pr_warning("Ignoring memory block 0x%llx - 0x%llx\n",
+> +			   base, base + size);
+> +		return;
+> +	}
+> +	if (base < phys_offset) {
+> +		pr_warning("Ignoring memory range 0x%llx - 0x%llx\n",
+> +			   base, phys_offset);
+> +		size -= phys_offset - base;
+> +		base = phys_offset;
+> +	}
+> +	memblock_add(base, size);
+> +}
+> -- 
+> 1.9.1
+
+Would it be too crazy to do this via an added call to a weak
+memblock_use_dt() function in the original instead, to avoid
+duplicating this entire function?
+
+We need the functionality for 4/5 (nice cleanup) and 5/5 (bugfix), so
+happy with whatever works.
+
+/
+    Leif
