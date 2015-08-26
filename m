@@ -1,94 +1,156 @@
-From: henryc.chen@mediatek.com (Henry Chen)
-Date: Wed, 26 Aug 2015 19:43:16 +0800
-Subject: [PATCH] regmap: Fix the null function of format_val on
- regmap_bulk_read.
-Message-ID: <1440589396-696-1-git-send-email-henryc.chen@mediatek.com>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Wed, 26 Aug 2015 12:44:33 +0100
+Subject: [PATCH 2/3] ARM: DT: STi: STiH407: Add c8sectpfe LinuxDVB DT node.
+In-Reply-To: <20150826073041.GT19409@x1>
+References: <1440519730-486-1-git-send-email-peter.griffin@linaro.org>
+ <1440519730-486-3-git-send-email-peter.griffin@linaro.org>
+ <20150826073041.GT19409@x1>
+Message-ID: <20150826114433.GB1498@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The regmap_format will not be initialize if device driver not declare the regmap_bus
-when registering the regmap. To avoid the null function of format_val when
-called regmap_bulk_read(). It need to give a format function when regmap init.
+Hi Lee,
 
-Signed-off-by: Henry Chen <henryc.chen@mediatek.com>
----
-I ran into this bug when testing Matthias' v4.2-next/for-next branch on mt8173.
-It now crashes on boot. The commit [0], which added the call to
-map->format.format_val from regmap_bulk_read() when map->bus == NULL.
+On Wed, 26 Aug 2015, Lee Jones wrote:
 
-[0] commit 15b8d2c41fe5839582029f65c5f7004db451cc2b
-  Author: Arun Chandran <achandran <at> mvista.com>
-  regmap: Fix regmap_bulk_read in BE mode
+> On Tue, 25 Aug 2015, Peter Griffin wrote:
+> 
+> > This patch adds in the required DT node for the c8sectpfe
+> > Linux DVB demux driver which allows the tsin channels
+> > to be used on an upstream kernel.
+> > 
+> > Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> > ---
+> >  arch/arm/boot/dts/stihxxx-b2120.dtsi | 38 ++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 38 insertions(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/stihxxx-b2120.dtsi b/arch/arm/boot/dts/stihxxx-b2120.dtsi
+> > index 62994ae..1bc018e 100644
+> > --- a/arch/arm/boot/dts/stihxxx-b2120.dtsi
+> > +++ b/arch/arm/boot/dts/stihxxx-b2120.dtsi
+> > @@ -6,6 +6,10 @@
+> >   * it under the terms of the GNU General Public License version 2 as
+> >   * published by the Free Software Foundation.
+> >   */
+> > +
+> > +#include <dt-bindings/clock/stih407-clks.h>
+> > +#include <dt-bindings/media/c8sectpfe.h>
+> > +
+> 
+> Looks like some of the STi files are a little wavering on convention,
+> but I suggest the extra '\n's are superfluous.
 
-Please see the error below, thanks.
+Ok I will remove them in v2.
 
-Call trace:
-[<          (null)>]           (null)
-[<ffffffc0004cbdd0>] mtk_rtc_read_time+0x9c/0x134
-[<ffffffc0004c9618>] __rtc_read_time.isra.3+0x40/0x7c
-[<ffffffc0004c9688>] rtc_read_time+0x34/0x58
-[<ffffffc0004c9e64>] __rtc_read_alarm+0x20/0x37c
-[<ffffffc0004c8d2c>] rtc_device_register+0x194/0x2e0
-[<ffffffc0004cbf60>] mtk_rtc_probe+0xf8/0x18c
-[<ffffffc0003fb5e0>] platform_drv_probe+0x48/0xc4
-[<ffffffc0003f99e0>] driver_probe_device+0x188/0x29c
-[<ffffffc0003f9b8c>] __driver_attach+0x98/0xa0
-[<ffffffc0003f7ce0>] bus_for_each_dev+0x54/0x98
-[<ffffffc0003f94c8>] driver_attach+0x1c/0x28
-[<ffffffc0003f9164>] bus_add_driver+0x1c0/0x228
-[<ffffffc0003fa45c>] driver_register+0x64/0x130
-[<ffffffc0003fb514>] __platform_driver_register+0x5c/0x68
-[<ffffffc0008639a4>] mtk_rtc_driver_init+0x14/0x20
-[<ffffffc000082864>] do_one_initcall+0x88/0x1ac
-[<ffffffc000842b10>] kernel_init_freeable+0x158/0x1fc
-[<ffffffc0005f45fc>] kernel_init+0xc/0xd8
----
- drivers/base/regmap/regmap.c | 20 +++++++++++++++++---
- 1 file changed, 17 insertions(+), 3 deletions(-)
+> 
+> >  / {
+> >  	soc {
+> >  		sbc_serial0: serial at 9530000 {
+> > @@ -85,5 +89,39 @@
+> >  			status = "okay";
+> >  		};
+> >  
+> > +		c8sectpfe at 08a20000 {
+> 
+> This should be a device type, not a model number.
+> 
+> demodulator at abcdabcd {
 
-diff --git a/drivers/base/regmap/regmap.c b/drivers/base/regmap/regmap.c
-index 7111d04..9357186 100644
---- a/drivers/base/regmap/regmap.c
-+++ b/drivers/base/regmap/regmap.c
-@@ -607,13 +607,13 @@ struct regmap *regmap_init(struct device *dev,
- 		map->reg_write = config->reg_write;
- 
- 		map->defer_caching = false;
--		goto skip_format_initialization;
-+		goto simple_format_initialization;
- 	} else if (!bus->read || !bus->write) {
- 		map->reg_read = _regmap_bus_reg_read;
- 		map->reg_write = _regmap_bus_reg_write;
- 
- 		map->defer_caching = false;
--		goto skip_format_initialization;
-+		goto simple_format_initialization;
- 	} else {
- 		map->reg_read  = _regmap_bus_read;
- 	}
-@@ -783,8 +783,22 @@ struct regmap *regmap_init(struct device *dev,
- 		map->defer_caching = true;
- 		map->reg_write = _regmap_bus_raw_write;
- 	}
-+/*
-+ * For bulk read, need to hook the format function.
-+ */
-+simple_format_initialization:
- 
--skip_format_initialization:
-+	switch (config->val_bits) {
-+		case 8:
-+			map->format.format_val = regmap_format_8;
-+			break;
-+		case 16:
-+			map->format.format_val = regmap_format_16_native;
-+			break;
-+		case 32:
-+			map->format.format_val = regmap_format_32_native;
-+			break;
-+	}
- 
- 	map->range_tree = RB_ROOT;
- 	for (i = 0; i < config->num_ranges; i++) {
--- 
-1.8.1.1.dirty
+Ok will change to demux at 08a20000 in v2
+
+> 
+> > +			compatible = "st,stih407-c8sectpfe";
+> 
+> To the uninitiated c8sectpfe is pretty indecipherable.
+
+It is the name of the IP block in the datasheet. It stands
+for SECurity TRansport Processor FrontEnd
+
+> 
+> How about *-c8sectpfe-demod?
+
+That doesn't really make sense, the demod is a seperate device
+typically controlled over I2C bus and connected to this IP block
+via the TS pins. Also although a tsin channel is "normally" connected
+to a demodulator device there is no reason it couldn't be connected
+for example to another STi chipset which is doing tsout.
+
+Also this IP block can do more than accept tsin, it can
+also do tsout, and merge TS channels together (some coming from
+DDR, external TS pins). Which are features we hope to add
+to the driver in the future so the name needs to be very generic.
+
+So with that in mind I would prefer to leave the compatible as
+the name of the IP block from the SoC datasheet.
+
+> 
+> > +			status = "okay";
+> > +			reg = <0x08a20000 0x10000>, <0x08a00000 0x4000>;
+> > +			reg-names = "c8sectpfe", "c8sectpfe-ram";
+> > +
+> > +			interrupts = <0 34 0>, <0 35 0>;
+> 
+> Please use the predetermined DEFINES for the flags cell.
+
+Will fix in V2
+
+> 
+> > +			interrupt-names = "c8sectpfe-error-irq",
+> > +					  "c8sectpfe-idle-irq";
+> > +
+> > +			pinctrl-names	= "tsin0-serial", "tsin0-parallel",
+> > +					  "tsin3-serial", "tsin4-serial",
+> > +					  "tsin5-serial";
+> 
+> I would put *-names *under* the properties they pertain to and in the
+> same format i.e. one per line in this case, for easy eye-match.
+
+Ok will change in V2.
+> 
+> > +			pinctrl-0	= <&pinctrl_tsin0_serial>;
+> > +			pinctrl-1	= <&pinctrl_tsin0_parallel>;
+> > +			pinctrl-2	= <&pinctrl_tsin3_serial>;
+> > +			pinctrl-3	= <&pinctrl_tsin4_serial_alt3>;
+> > +			pinctrl-4	= <&pinctrl_tsin5_serial_alt1>;
+> > +
+> > +			clocks = <&clk_s_c0_flexgen CLK_PROC_STFE>;
+> > +			clock-names = "c8sectpfe";
+> > +
+> > +			/* tsin0 is TSA on NIMA */
+> > +			tsin0: port at 0 {
+> > +
+> 
+> Why the '\n'?
+
+Removed in v2
+> 
+> > +				tsin-num = <0>;
+> > +				serial-not-parallel;
+> > +				i2c-bus = <&ssc2>;
+> 
+> If you are adding this property, I would get Wolfram or one of the DT
+> guys to Ack it.
+
+This driver is actually already accepted, I just missed off one patch from
+the v2 series which meant this patch broke the build when Mauro applied it,
+which is the reason for re-sending it.
+
+This binding is the same way the drm display drivers use DT via ddc-i2c-bus
+property to get the i2c bus for EDID control, so I think uncontroversial.
+> 
+> > +				rst-gpio = <&pio15 4 0>;
+> 
+> Why not use the whole name "reset"?
+> 
+> "-gpio" should be "-gpios".
+> 
+> So, in full: "reset-gpios"?
+> 
+> Flags: GPIO_ACTIVE_HIGH ?
+
+Doing a grep, that does seem to be "more standard". Will fix in V2 as a single
+atomic commit.
+
+regards,
+
+Peter.
