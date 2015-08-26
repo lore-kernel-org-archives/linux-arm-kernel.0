@@ -1,121 +1,136 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 26 Aug 2015 13:04:35 -0700
-Subject: [PATCH 2/5] ARM: NSP: add minimal Northstar Plus device tree
-In-Reply-To: <20150826184009.GA4171@broadcom.com>
-References: <1440092804-25726-1-git-send-email-jonmason@broadcom.com>
- <CAOesGMhE40_mfZCD2PqcTObE_Gz_6rKFwhf3-6kZY4n9Yxn2rQ@mail.gmail.com>
- <20150826184009.GA4171@broadcom.com>
-Message-ID: <CAOesGMif9Bxx=K5GQqkiJKg2SD7QvgU8=2PQa65mEbJHnhNQ8Q@mail.gmail.com>
+From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
+Date: Wed, 26 Aug 2015 17:15:51 -0300
+Subject: CONFIG_DEBUG_SHIRQ and PM
+In-Reply-To: <20150826200300.GU14625@saruman.tx.rr.com>
+References: <20150825195830.GH27534@saruman.tx.rr.com>
+ <CAAEAJfCY1BRuoQCWfD2pCq36E54vDB5Coy2S7rz3RfL2BVLGaw@mail.gmail.com>
+ <20150826193820.GT14625@saruman.tx.rr.com>
+ <CAAEAJfAPVgxhRnfYJYzebFJDRJ4Ooam6n+0B5HJ-+uLJ0exTLA@mail.gmail.com>
+ <20150826200300.GU14625@saruman.tx.rr.com>
+Message-ID: <CAAEAJfB3iiRENEKm6xx-kLae5AR6BV0XVo0KNkb8-okvLjhFhg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 26, 2015 at 11:40 AM, Jon Mason <jonmason@broadcom.com> wrote:
-> On Tue, Aug 25, 2015 at 04:36:45PM -0700, Olof Johansson wrote:
->> Hi,
->>
->> I'm not sure what the strategy behind your cc:ing on this patch set
->> is. I only got a couple of them in my inbox, and this one wasn't one
->> of them. :)
->
-> I sent them to the people listed as maintainers in get_maintainer.pl.
-> It didn't seem to include you in all of them, but I thought the
-> mailing list would be enough of a catch all.  My apologies.  I'll CC
-> everyone listed as a maintainer on all of the patches in the future.
-
-No worries. Just pointing it out since you asked me to look at the
-patches and, well, I hadn't received them all. :)
-
->> On Thu, Aug 20, 2015 at 10:46 AM, Jon Mason <jonmason@broadcom.com> wrote:
->> > Add a very minimalistic set of Northstar Plus Device Tree files which
->> > describes the SoC and the BCM958625 implementation.  The perpherials
->> > described are:
+On 26 August 2015 at 17:03, Felipe Balbi <balbi@ti.com> wrote:
+> On Wed, Aug 26, 2015 at 04:53:27PM -0300, Ezequiel Garcia wrote:
+>> On 26 August 2015 at 16:38, Felipe Balbi <balbi@ti.com> wrote:
+>> > Hi,
 >> >
->> > ARM Cortex A9 CPU
->> > 2 8250 UARTs
->> > ARM GIC
->> > PL310 L2 Cache
->> > ARM A9 Global timer
+>> > On Wed, Aug 26, 2015 at 04:29:52PM -0300, Ezequiel Garcia wrote:
+>> >> Felipe,
+>> >>
+>> >> On 25 August 2015 at 16:58, Felipe Balbi <balbi@ti.com> wrote:
+>> >> > Hi Ingo,
+>> >> >
+>> >> > I'm facing an issue with CONFIG_DEBUG_SHIRQ and pm_runtime when using
+>> >> > devm_request_*irq().
+>> >> >
+>> >>
+>> >> I may be jumping on the gun here, but I believe here's your problem.
+>> >> Using devm_request_irq with shared IRQs is not a good idea.
+>> >>
+>> >> Or at least, it forces you to handle interrupts after your device
+>> >> is _completely_ removed (e.g. your IRQ cookie could be bogus).
+>> >>
+>> >> AFAICS, the CONFIG_DEBUG_SHIRQ option is just triggering a couple
+>> >> spurious interrupts, that are expected to happen anyway.
+>> >>
+>> >> Your IRQ is shared, and so you may get any IRQ at any time,
+>> >> coming from another device (not yours).
+>> >>
+>> >> So, if I'm right, my suggestion is simple: use request_irq/free_irq
+>> >> and free your IRQ before you disable your clocks, remove your device,
+>> >> etc.
 >> >
->> > Signed-off-by: Jon Mason <jonmason@broadcom.com>
->> > Signed-off-by: Kapil Hali <kapilh@broadcom.com>
->> > Reviewed-by: Ray Jui <rjui@broadcom.com>
->> > Reviewed-by: Scott Branden <sbranden@broadcom.com>
+>> > yeah, that's just a workaround though. Specially with IRQ flags coming
+>> > from DT, driver might have no knowledge that its IRQ is shared to start
+>> > with.
+>> >
 >>
->> Seeing reviewed-by already attached to a v1 of a patchset has limited
->> value for someone on the outside.
+>> Really? Is there any way the DT can set the IRQF_SHARED flag?
+>> The caller of devm_request_irq / request_irq needs to pass the irqflags,
+>> so I'd say the driver is perfectly aware of the IRQ being shared or not.
 >>
->> Reviewed-by is one of those tags that has a value that's mostly
->> dependent on who it comes from. By not actually seeing the review and
->> the feedback provided (and revisions made), less data is provided to
->> tell if it's a valuable review or not.
->>
->> Also, if you're posting the code you should probably have your name
->> below Kapil's, since you're the one signing off the origin of the
->> code. See Documentation/SubmittingPatches.txt for details on what
->> S-o-b actually means.
+>> Maybe you can clarify what I'm missing here.
 >
-> We worked on it together, but I'll be happy to reorder as you suggest.
+> hmm, that's true. Now that I look at it, DT can pass triggering flags.
 >
+>> > Besides, removing devm_* is just a workaround to the real problem. It
+>> > seems, to me at least, that drivers shouldn't be calling
+>> > pm_runtime_put_sync(); pm_runtime_disable() from their ->remove(),
+>> > rather the bus driver should be responsible for doing so; much
+>> > usb_bus_type and pci_bus_type do. Of course, this has the side effect of
+>> > requiring buses to make sure that by the time ->probe() is called, that
+>> > device's clocks are stable and running and the device is active.
+>> >
+>> > However, that's not done today for the platform_bus_type and, frankly,
+>> > that would be somewhat of a complex problem to solve, considering that
+>> > different SoCs integrate IPs the way they want.
+>> >
+>> > Personally, I think removing devm_* is but a workaround to the real
+>> > thing we're dealing with.
+>> >
 >>
->>
->> > --- /dev/null
->> > +++ b/arch/arm/boot/dts/bcm-nsp.dtsi
->> > @@ -0,0 +1,105 @@
->> > +/*
->> > + *  BSD LICENSE
->> > + *
->> > + *  Copyright(c) 2015 Broadcom Corporation.  All rights reserved.
->> > + *
->> > + *  Redistribution and use in source and binary forms, with or without
->> > + *  modification, are permitted provided that the following conditions
->> > + *  are met:
->> > + *
->> > + *    * Redistributions of source code must retain the above copyright
->> > + *      notice, this list of conditions and the following disclaimer.
->> > + *    * Redistributions in binary form must reproduce the above copyright
->> > + *      notice, this list of conditions and the following disclaimer in
->> > + *      the documentation and/or other materials provided with the
->> > + *      distribution.
->> > + *    * Neither the name of Broadcom Corporation nor the names of its
->> > + *      contributors may be used to endorse or promote products derived
->> > + *      from this software without specific prior written permission.
->> > + *
->> > + *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
->> > + *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
->> > + *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
->> > + *  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
->> > + *  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
->> > + *  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
->> > + *  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
->> > + *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
->> > + *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
->> > + *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
->> > + *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
->> > + */
->>
->> I'm not sure we've seen BSD-only submissions before. I'll let DT
->> maintainers (or Ian) speak up in case this would cause problems.
+>> I don't see any problems here: if your interrupt is shared, then you must
+>> be prepared to handle it any time, coming from any sources (not only
+>> your device). And CONFIG_DEBUG_SHIRQ does exactly that, in order to
+>> make sure all the drivers passing IRQF_SHARED comply with that rule.
 >
-> I was following the precedent in arch/arm/boot/dts/bcm-cygnus.dtsi.
-> If this is preferred to be GPL v2, then I will happily comply.
+> you need to be sure of that with non-shared IRQs anyway.
 
-No, we'd rather have BSD-only than GPL-only, so keeping it as it is
-should be OK.
+Not entirely. If your IRQ is not shared, then you usually have a register
+to enable or unmask your peripheral interrupts. So the driver is in control
+of when it will get interrupts.
 
->> > +       chosen {
->> > +               stdout-path = "serial0:115200n8";
->> > +       };
->>
->> No way to mount a root filesystem yet? How much work remains for that
->> to be possible, and what's the plan for that?
+If the IRQ is shared, this won't do. This is what I mean by "shared IRQs
+must be prepared to receive an interrupt any time", in the sense that
+the driver has no way of preventing IRQs (because they may be
+coming from any source).
+
+In the same sense, shared IRQs handlers need to double-check
+the IRQ is coming to the current device by checking some IRQ
+status register to see if there's pending work.
+
+> Also, an IRQ
+> which isn't shared in SoC A, might become shared in SoC B which uses the
+> same IP.
 >
-> It mounts rootfs.  I am adding the rootfs to the kernel and device
-> tree blob via the u-boot mkimage command.  It boots all the way to
-> shell without issue.
+>> So you either avoid using devm_request_irq, or you prepare your handler
+>> accordingly to be ready to handle an interrupt _any time_.
+>
+> the handler is ready to handle at any time, what isn't correct is the
+> fact that clocks get gated before IRQ is freed.
+>
+> There should be no such special case as "if your handler is shared,
+> don't use devm_request_*irq()" because if we just disable PM_RUNTIME, it
+> works as expected anyway.
+>
 
-Sure, any system with memory can use ramdisk for root, that's not what I meant.
+Yeah, I meant to say: if you use devm_request_irq with IRQF_SHARED
+then you _must_ be prepared to get an IRQ *after* your remove() has
+been called.
 
-Still, based on post from Scott it sounds like NAND support isn't far away.
+Let's consider this snippet from tw68:
 
+static irqreturn_t tw68_irq(int irq, void *dev_id)
+{
+        struct tw68_dev *dev = dev_id;
+        u32 status, orig;
+        int loop;
 
--Olof
+        status = orig = tw_readl(TW68_INTSTAT) & dev->pci_irqmask;
+        [etc]
+}
+
+The IRQ handler accesses the device struct and then
+reads through PCI. So if you use devm_request_irq
+you need to make sure the device struct is still allocated
+after remove(), and the PCI read won't stall or crash.
+
+Interestingly, tw68 uses devm_request_irq with IRQF_SHARED :-)
+
+Still, I don't think that's a good idea, since it relies on
+the IRQ being freed *before* the device struct.
+-- 
+Ezequiel Garc?a, VanguardiaSur
+www.vanguardiasur.com.ar
