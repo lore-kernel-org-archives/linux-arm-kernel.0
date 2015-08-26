@@ -1,90 +1,117 @@
-From: eddie.huang@mediatek.com (Eddie Huang)
-Date: Wed, 26 Aug 2015 15:14:41 +0800
-Subject: [PATCH v3] soc: mediatek: add scpsys support active_wakeup
-Message-ID: <1440573281-28952-1-git-send-email-eddie.huang@mediatek.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 26 Aug 2015 08:30:41 +0100
+Subject: [PATCH 2/3] ARM: DT: STi: STiH407: Add c8sectpfe LinuxDVB DT node.
+In-Reply-To: <1440519730-486-3-git-send-email-peter.griffin@linaro.org>
+References: <1440519730-486-1-git-send-email-peter.griffin@linaro.org>
+ <1440519730-486-3-git-send-email-peter.griffin@linaro.org>
+Message-ID: <20150826073041.GT19409@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Register gpd_dev_ops.active_wakeup function to support keep power
-during suspend state. And add flag to each power domain to
-decide whether keep power during suspend or not.
+On Tue, 25 Aug 2015, Peter Griffin wrote:
 
-Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
-Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
-Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
+> This patch adds in the required DT node for the c8sectpfe
+> Linux DVB demux driver which allows the tsin channels
+> to be used on an upstream kernel.
+> 
+> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> ---
+>  arch/arm/boot/dts/stihxxx-b2120.dtsi | 38 ++++++++++++++++++++++++++++++++++++
+>  1 file changed, 38 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/stihxxx-b2120.dtsi b/arch/arm/boot/dts/stihxxx-b2120.dtsi
+> index 62994ae..1bc018e 100644
+> --- a/arch/arm/boot/dts/stihxxx-b2120.dtsi
+> +++ b/arch/arm/boot/dts/stihxxx-b2120.dtsi
+> @@ -6,6 +6,10 @@
+>   * it under the terms of the GNU General Public License version 2 as
+>   * published by the Free Software Foundation.
+>   */
+> +
+> +#include <dt-bindings/clock/stih407-clks.h>
+> +#include <dt-bindings/media/c8sectpfe.h>
+> +
 
----
-Change in v3:
-Remove check dev->power_domain NULL or ERR. This will not happen
-when call scpsys_active_wakeup function
+Looks like some of the STi files are a little wavering on convention,
+but I suggest the extra '\n's are superfluous.
 
-Change in v2:
-Drop .active_wakeup = false lines in scp_domain_data[] array
----
- drivers/soc/mediatek/mtk-scpsys.c | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+>  / {
+>  	soc {
+>  		sbc_serial0: serial at 9530000 {
+> @@ -85,5 +89,39 @@
+>  			status = "okay";
+>  		};
+>  
+> +		c8sectpfe at 08a20000 {
 
-diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
-index 43a79ed..3a00975 100644
---- a/drivers/soc/mediatek/mtk-scpsys.c
-+++ b/drivers/soc/mediatek/mtk-scpsys.c
-@@ -67,6 +67,7 @@ struct scp_domain_data {
- 	u32 sram_pdn_ack_bits;
- 	u32 bus_prot_mask;
- 	enum clk_id clk_id;
-+	bool active_wakeup;
- };
- 
- static const struct scp_domain_data scp_domain_data[] __initconst = {
-@@ -127,6 +128,7 @@ static const struct scp_domain_data scp_domain_data[] __initconst = {
- 		.sram_pdn_bits = GENMASK(11, 8),
- 		.sram_pdn_ack_bits = GENMASK(15, 12),
- 		.clk_id = MT8173_CLK_NONE,
-+		.active_wakeup = true,
- 	},
- 	[MT8173_POWER_DOMAIN_MFG_ASYNC] = {
- 		.name = "mfg_async",
-@@ -171,6 +173,7 @@ struct scp_domain {
- 	u32 sram_pdn_bits;
- 	u32 sram_pdn_ack_bits;
- 	u32 bus_prot_mask;
-+	bool active_wakeup;
- };
- 
- struct scp {
-@@ -370,6 +373,17 @@ out:
- 	return ret;
- }
- 
-+static bool scpsys_active_wakeup(struct device *dev)
-+{
-+	struct generic_pm_domain *genpd;
-+	struct scp_domain *scpd;
-+
-+	genpd = pd_to_genpd(dev->pm_domain);
-+	scpd = container_of(genpd, struct scp_domain, genpd);
-+
-+	return scpd->active_wakeup;
-+}
-+
- static int __init scpsys_probe(struct platform_device *pdev)
- {
- 	struct genpd_onecell_data *pd_data;
-@@ -427,12 +441,14 @@ static int __init scpsys_probe(struct platform_device *pdev)
- 		scpd->sram_pdn_bits = data->sram_pdn_bits;
- 		scpd->sram_pdn_ack_bits = data->sram_pdn_ack_bits;
- 		scpd->bus_prot_mask = data->bus_prot_mask;
-+		scpd->active_wakeup = data->active_wakeup;
- 		if (data->clk_id != MT8173_CLK_NONE)
- 			scpd->clk = clk[data->clk_id];
- 
- 		genpd->name = data->name;
- 		genpd->power_off = scpsys_power_off;
- 		genpd->power_on = scpsys_power_on;
-+		genpd->dev_ops.active_wakeup = scpsys_active_wakeup;
- 
- 		/*
- 		 * Initially turn on all domains to make the domains usable
+This should be a device type, not a model number.
+
+demodulator at abcdabcd {
+
+> +			compatible = "st,stih407-c8sectpfe";
+
+To the uninitiated c8sectpfe is pretty indecipherable.
+
+How about *-c8sectpfe-demod?
+
+> +			status = "okay";
+> +			reg = <0x08a20000 0x10000>, <0x08a00000 0x4000>;
+> +			reg-names = "c8sectpfe", "c8sectpfe-ram";
+> +
+> +			interrupts = <0 34 0>, <0 35 0>;
+
+Please use the predetermined DEFINES for the flags cell.
+
+> +			interrupt-names = "c8sectpfe-error-irq",
+> +					  "c8sectpfe-idle-irq";
+> +
+> +			pinctrl-names	= "tsin0-serial", "tsin0-parallel",
+> +					  "tsin3-serial", "tsin4-serial",
+> +					  "tsin5-serial";
+
+I would put *-names *under* the properties they pertain to and in the
+same format i.e. one per line in this case, for easy eye-match.
+
+> +			pinctrl-0	= <&pinctrl_tsin0_serial>;
+> +			pinctrl-1	= <&pinctrl_tsin0_parallel>;
+> +			pinctrl-2	= <&pinctrl_tsin3_serial>;
+> +			pinctrl-3	= <&pinctrl_tsin4_serial_alt3>;
+> +			pinctrl-4	= <&pinctrl_tsin5_serial_alt1>;
+> +
+> +			clocks = <&clk_s_c0_flexgen CLK_PROC_STFE>;
+> +			clock-names = "c8sectpfe";
+> +
+> +			/* tsin0 is TSA on NIMA */
+> +			tsin0: port at 0 {
+> +
+
+Why the '\n'?
+
+> +				tsin-num = <0>;
+> +				serial-not-parallel;
+> +				i2c-bus = <&ssc2>;
+
+If you are adding this property, I would get Wolfram or one of the DT
+guys to Ack it.
+
+> +				rst-gpio = <&pio15 4 0>;
+
+Why not use the whole name "reset"?
+
+"-gpio" should be "-gpios".
+
+So, in full: "reset-gpios"?
+
+Flags: GPIO_ACTIVE_HIGH ?
+
+> +				dvb-card = <STV0367_TDA18212_NIMA_1>;
+> +			};
+> +		};
+>  	};
+>  };
+
 -- 
-1.9.1
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
