@@ -1,97 +1,152 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 26 Aug 2015 17:39:03 +0200
-Subject: [PATCH v10 3/5] mtd: nand: vf610_nfc: add device tree bindings
-In-Reply-To: <BLU436-SMTP1971442F63D96D55AC8E905B8600@phx.gbl>
-References: <1438594050-4595-1-git-send-email-stefan@agner.ch>
- <1438594050-4595-4-git-send-email-stefan@agner.ch>
- <20150825202546.GL81844@google.com>
- <BLU436-SMTP1971442F63D96D55AC8E905B8600@phx.gbl>
-Message-ID: <20150826173903.25479201@bbrezillon>
+From: shenwei.wang@freescale.com (Shenwei Wang)
+Date: Wed, 26 Aug 2015 10:49:26 -0500
+Subject: [PATCH 1/1] irqchip: imx-gpcv2:  Simplify the implemenation
+Message-ID: <1440604166-2624-1-git-send-email-shenwei.wang@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bill,
+Based on Sudeep Holla's review comments, the implementation can
+be simplified by using the two flags: IRQCHIP_SKIP_SET_WAKE and
+IRQCHIP_MASK_ON_SUSPEND. This patch enables the flags in the
+struct irq_chip and removes the unnecessory syscore_ops callbacks.
 
-On Wed, 26 Aug 2015 11:26:36 -0400
-Bill Pringlemeir <bpringle@sympatico.ca> wrote:
+Signed-off-by: Shenwei Wang <shenwei.wang@freescale.com>
+---
+ drivers/irqchip/irq-imx-gpcv2.c | 83 +++++++----------------------------------
+ 1 file changed, 13 insertions(+), 70 deletions(-)
 
-> On 25 Aug 2015, computersforpeace at gmail.com wrote:
-> 
-> > Sorry, I realized a potential issue here.
-> 
-> > On Mon, Aug 03, 2015 at 11:27:28AM +0200, Stefan Agner wrote:
-> >> Signed-off-by: Bill Pringlemeir <bpringlemeir@nbsps.com>
-> >> Acked-by: Shawn Guo <shawnguo@kernel.org>
-> >> Reviewed-by: Brian Norris <computersforpeace@gmail.com>
-> >> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> >> ---
-> >> .../devicetree/bindings/mtd/vf610-nfc.txt | 45 ++++++++++++++++++++++
-> >> 1 file changed, 45 insertions(+) create mode 100644
-> >> Documentation/devicetree/bindings/mtd/vf610-nfc.txt
-> 
-> >> diff --git a/Documentation/devicetree/bindings/mtd/vf610-nfc.txt
-> >> b/Documentation/devicetree/bindings/mtd/vf610-nfc.txt
-> >> new file mode 100644
-> >> index 0000000..cae5f25
-> >> --- /dev/null
-> >> +++ b/Documentation/devicetree/bindings/mtd/vf610-nfc.txt
-> >>>> -0,0 +1,45 @@
-> >> +- nand-bus-width: see nand.txt
-> >> +- nand-ecc-mode: see nand.txt
-> >> +- nand-on-flash-bbt: see nand.txt
-> 
-> > Stumbling across the "multi-CS" questions on the driver reminds me: it
-> > typically makes sense to define new NAND bindings using separate NAND
-> > *controller* and *flash* device nodes. The above 3 properties, at
-> > least, would apply on a per-flash basis, not per-controller
-> > typically. See sunxi-nand, for instance:
-> 
-> > http://lxr.free-electrons.com/source/Documentation/devicetree/bindings/mtd/sunxi-nand.txt
-> 
-> > brcmnand had a similar pattern:
-> 
-> > https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/devicetree/bindings/mtd/brcm,brcmnand.txt
-> 
-> > (Perhaps it's time we standardized this a little more formally...)
-> 
-> These would apply per chip, but the controller has to be configured to
-> support each and every one.  Every time an operation was performed, we
-> would have to check the chip type and reconfigure the controller.
-> Currently, the driver does not support this and it would add a lot of
-> overhead in some cases unless a register cache was used.
-> 
-> Is the flexibility of using a system with combined 8/16bit devices
-> really worth all the overhead?  Isn't it sort of brain dead hardware not
-> to make all of the chips similar?  Why would everyone have to pay for
-> such a crazy setup?
-> 
-> To separate it would at least be a lie versus the code in the current
-> form.  As well, there are only a few SOC which support multiple chip
-> selects.  The 'multi-CS' register bits of this controller varies between
-> PowerPC, 68K/Coldfire and ARM platforms.
-> 
-> I looked briefly at the brcmnand.c  and it seems that it is not
-> supporting different ECC per chip even though the nodes are broken out
-> this way.  In fact, if some raw functions are called, I think it will
-> put it in ECC mode even if it wasn't before?  Well, I agree that this
-> would be good generically, I think it puts a lot of effort in the
-> drivers for not so much payoff?
-
-Hm, the sunxi driver supports it, and it does not add such a big
-overhead...
-The only thing you have to do is cache a bunch of register values
-per-chip and restore/apply them when the chip is selected
-(in your ->select_chip() implementation).
-
-Anyway, even if the suggested DT representation is a lie in regards to
-your implementation, it's actually pretty accurate from an hardware
-POV, and this is exactly what DT is supposed to represent.
-
-Best Regards,
-
-Boris
-
+diff --git a/drivers/irqchip/irq-imx-gpcv2.c b/drivers/irqchip/irq-imx-gpcv2.c
+index 4a97afa..e25df78 100644
+--- a/drivers/irqchip/irq-imx-gpcv2.c
++++ b/drivers/irqchip/irq-imx-gpcv2.c
+@@ -22,7 +22,6 @@ struct gpcv2_irqchip_data {
+ 	struct raw_spinlock    rlock;
+ 	void __iomem       *gpc_base;
+ 	u32 wakeup_sources[IMR_NUM];
+-	u32 saved_irq_mask[IMR_NUM];
+ 	u32 cpu2wakeup;
+ };
+ 
+@@ -30,79 +29,25 @@ static struct gpcv2_irqchip_data *imx_gpcv2_instance;
+ 
+ u32 imx_gpcv2_get_wakeup_source(u32 **sources)
+ {
+-	if (!imx_gpcv2_instance)
++	struct gpcv2_irqchip_data *cd;
++	void __iomem *reg;
++	int i;
++
++	cd = imx_gpcv2_instance;
++	if (!cd)
+ 		return 0;
+ 
++	for (i = 0; i < IMR_NUM; i++) {
++		reg = cd->gpc_base + cd->cpu2wakeup + i * 4;
++		cd->wakeup_sources[i] = readl_relaxed(reg);
++	}
++
+ 	if (sources)
+-		*sources = imx_gpcv2_instance->wakeup_sources;
++		*sources = cd->wakeup_sources;
+ 
+ 	return IMR_NUM;
+ }
+ 
+-static int gpcv2_wakeup_source_save(void)
+-{
+-	struct gpcv2_irqchip_data *cd;
+-	void __iomem *reg;
+-	int i;
+-
+-	cd = imx_gpcv2_instance;
+-	if (!cd)
+-		return 0;
+-
+-	for (i = 0; i < IMR_NUM; i++) {
+-		reg = cd->gpc_base + cd->cpu2wakeup + i * 4;
+-		cd->saved_irq_mask[i] = readl_relaxed(reg);
+-		writel_relaxed(cd->wakeup_sources[i], reg);
+-	}
+-
+-	return 0;
+-}
+-
+-static void gpcv2_wakeup_source_restore(void)
+-{
+-	struct gpcv2_irqchip_data *cd;
+-	void __iomem *reg;
+-	int i;
+-
+-	cd = imx_gpcv2_instance;
+-	if (!cd)
+-		return;
+-
+-	for (i = 0; i < IMR_NUM; i++) {
+-		reg = cd->gpc_base + cd->cpu2wakeup + i * 4;
+-		writel_relaxed(cd->saved_irq_mask[i], reg);
+-	}
+-}
+-
+-static struct syscore_ops imx_gpcv2_syscore_ops = {
+-	.suspend	= gpcv2_wakeup_source_save,
+-	.resume		= gpcv2_wakeup_source_restore,
+-};
+-
+-static int imx_gpcv2_irq_set_wake(struct irq_data *d, unsigned int on)
+-{
+-	struct gpcv2_irqchip_data *cd = d->chip_data;
+-	unsigned int idx = d->hwirq / 32;
+-	unsigned long flags;
+-	void __iomem *reg;
+-	u32 mask, val;
+-
+-	raw_spin_lock_irqsave(&cd->rlock, flags);
+-	reg = cd->gpc_base + cd->cpu2wakeup + idx * 4;
+-	mask = 1 << d->hwirq % 32;
+-	val = cd->wakeup_sources[idx];
+-
+-	cd->wakeup_sources[idx] = on ? (val & ~mask) : (val | mask);
+-	raw_spin_unlock_irqrestore(&cd->rlock, flags);
+-
+-	/*
+-	 * Do *not* call into the parent, as the GIC doesn't have any
+-	 * wake-up facility...
+-	 */
+-
+-	return 0;
+-}
+-
+ static void imx_gpcv2_irq_unmask(struct irq_data *d)
+ {
+ 	struct gpcv2_irqchip_data *cd = d->chip_data;
+@@ -140,11 +85,11 @@ static struct irq_chip gpcv2_irqchip_data_chip = {
+ 	.irq_eoi		= irq_chip_eoi_parent,
+ 	.irq_mask		= imx_gpcv2_irq_mask,
+ 	.irq_unmask		= imx_gpcv2_irq_unmask,
+-	.irq_set_wake		= imx_gpcv2_irq_set_wake,
+ 	.irq_retrigger		= irq_chip_retrigger_hierarchy,
+ #ifdef CONFIG_SMP
+ 	.irq_set_affinity	= irq_chip_set_affinity_parent,
+ #endif
++	.flags			= IRQCHIP_SKIP_SET_WAKE | IRQCHIP_MASK_ON_SUSPEND,
+ };
+ 
+ static int imx_gpcv2_domain_xlate(struct irq_domain *domain,
+@@ -253,7 +198,6 @@ static int __init imx_gpcv2_irqchip_init(struct device_node *node,
+ 	for (i = 0; i < IMR_NUM; i++) {
+ 		writel_relaxed(~0, cd->gpc_base + GPC_IMR1_CORE0 + i * 4);
+ 		writel_relaxed(~0, cd->gpc_base + GPC_IMR1_CORE1 + i * 4);
+-		cd->wakeup_sources[i] = ~0;
+ 	}
+ 
+ 	/* Let CORE0 as the default CPU to wake up by GPC */
+@@ -267,7 +211,6 @@ static int __init imx_gpcv2_irqchip_init(struct device_node *node,
+ 	writel_relaxed(~0x1, cd->gpc_base + cd->cpu2wakeup);
+ 
+ 	imx_gpcv2_instance = cd;
+-	register_syscore_ops(&imx_gpcv2_syscore_ops);
+ 
+ 	return 0;
+ }
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+2.5.0.rc2
