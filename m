@@ -1,81 +1,143 @@
-From: mchehab@osg.samsung.com (Mauro Carvalho Chehab)
-Date: Wed, 26 Aug 2015 11:59:05 -0300
-Subject: [PATCH v7 11/44] [media] media: use entity.graph_obj.mdev
- instead of .parent
-In-Reply-To: <CAKocOOM7_mgp1ORz1mLzso9AZxSTuEcHAef64_LQ-NZVp5FASw@mail.gmail.com>
-References: <cover.1440359643.git.mchehab@osg.samsung.com>
- <dc1be98277c46ddd87e431148fc7e332176828ab.1440359643.git.mchehab@osg.samsung.com>
- <55DC0D08.10504@xs4all.nl>
- <CAKocOOM7_mgp1ORz1mLzso9AZxSTuEcHAef64_LQ-NZVp5FASw@mail.gmail.com>
-Message-ID: <20150826115905.3a953918@recife.lan>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 26 Aug 2015 17:00:28 +0200
+Subject: [PATCH v2 1/5] arm64: clone early_init_dt_add_memory_arch() to
+ override default
+In-Reply-To: <20150826144325.GA10728@bivouac.eciton.net>
+References: <1440576391-25725-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1440576391-25725-2-git-send-email-ard.biesheuvel@linaro.org>
+ <20150826144325.GA10728@bivouac.eciton.net>
+Message-ID: <CAKv+Gu9roNfr8KPUJj_hhP6jw-Rz_CdcoT08vyxYDgW2AXpt4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Tue, 25 Aug 2015 13:25:15 -0600
-Shuah Khan <shuahkhan@gmail.com> escreveu:
+On 26 August 2015 at 16:43, Leif Lindholm <leif.lindholm@linaro.org> wrote:
+> On Wed, Aug 26, 2015 at 10:06:27AM +0200, Ard Biesheuvel wrote:
+>> Override the __weak early_init_dt_add_memory_arch() with our own
+>> version. We need this in a subsequent patch to make the handling of
+>> the memory nodes conditional on whether we are booting via UEFI or
+>> not.
+>
+> Worth clarifying that this is a direct copy?
+> ("Our own version" can be read as there being modifications here.)
+>
 
-> On Tue, Aug 25, 2015 at 12:36 AM, Hans Verkuil <hverkuil@xs4all.nl> wrote:
-> > On 08/23/2015 10:17 PM, Mauro Carvalho Chehab wrote:
-> >> From: Javier Martinez Canillas <javier@osg.samsung.com>
-> >>
-> >> The struct media_entity has a .parent field that stores a pointer
-> >> to the parent struct media_device. But recently a media_gobj was
-> >> embedded into the entities and since struct media_gojb already has
-> >> a pointer to a struct media_device in the .mdev field, the .parent
-> >> field becomes redundant and can be removed.
-> >>
-> >> This patch replaces all the usage of .parent by .graph_obj.mdev so
-> >> that field will become unused and can be removed on a later patch.
-> >>
-> >> No functional changes.
-> >>
-> >> The transformation was made using the following coccinelle spatch:
-> >>
-> >> @@
-> >> struct media_entity *me;
-> >> @@
-> >>
-> >> - me->parent
-> >> + me->graph_obj.mdev
-> >>
-> >> @@
-> >> struct media_entity *link;
-> >> @@
-> >>
-> >> - link->source->entity->parent
-> >> + link->source->entity->graph_obj.mdev
-> >>
-> >> @@
-> >> struct exynos_video_entity *ve;
-> >> @@
-> >>
-> >> - ve->vdev.entity.parent
-> >> + ve->vdev.entity.graph_obj.mdev
-> >>
-> >> Suggested-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
-> >>
-> >> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> >> Signed-off-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
-> >
-> > Acked-by: Hans Verkuil <hans.verkuil@cisco.com>
-> 
-> The change looks good to me. I would really like to see a before and after
-> media graph with these changes, this patch and series in general.
+Yes. In fact, it wasn't before, so hence the choice of words here.
 
-Well, it shouldn't change. If something changes, things would be wrong
-:)
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> ---
+>>  arch/arm64/mm/init.c | 41 ++++++++++++++++++++
+>>  1 file changed, 41 insertions(+)
+>>
+>> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+>> index f5c0680d17d9..ab25fde7397c 100644
+>> --- a/arch/arm64/mm/init.c
+>> +++ b/arch/arm64/mm/init.c
+>> @@ -374,3 +374,44 @@ static int __init keepinitrd_setup(char *__unused)
+>>
+>>  __setup("keepinitrd", keepinitrd_setup);
+>>  #endif
+>> +
+>> +void __init early_init_dt_add_memory_arch(u64 base, u64 size)
+>> +{
+>> +     const u64 phys_offset = __pa(PAGE_OFFSET);
+>> +
+>> +     if (!PAGE_ALIGNED(base)) {
+>> +             if (size < PAGE_SIZE - (base & ~PAGE_MASK)) {
+>> +                     pr_warn("Ignoring memory block 0x%llx - 0x%llx\n",
+>> +                             base, base + size);
+>> +                     return;
+>> +             }
+>> +             size -= PAGE_SIZE - (base & ~PAGE_MASK);
+>> +             base = PAGE_ALIGN(base);
+>> +     }
+>> +     size &= PAGE_MASK;
+>> +
+>> +     if (base > MAX_MEMBLOCK_ADDR) {
+>> +             pr_warning("Ignoring memory block 0x%llx - 0x%llx\n",
+>> +                             base, base + size);
+>> +             return;
+>> +     }
+>> +
+>> +     if (base + size - 1 > MAX_MEMBLOCK_ADDR) {
+>> +             pr_warning("Ignoring memory range 0x%llx - 0x%llx\n",
+>> +                             ((u64)MAX_MEMBLOCK_ADDR) + 1, base + size);
+>> +             size = MAX_MEMBLOCK_ADDR - base + 1;
+>> +     }
+>> +
+>> +     if (base + size < phys_offset) {
+>> +             pr_warning("Ignoring memory block 0x%llx - 0x%llx\n",
+>> +                        base, base + size);
+>> +             return;
+>> +     }
+>> +     if (base < phys_offset) {
+>> +             pr_warning("Ignoring memory range 0x%llx - 0x%llx\n",
+>> +                        base, phys_offset);
+>> +             size -= phys_offset - base;
+>> +             base = phys_offset;
+>> +     }
+>> +     memblock_add(base, size);
+>> +}
+>> --
+>> 1.9.1
+>
+> Would it be too crazy to do this via an added call to a weak
+> memblock_use_dt() function in the original instead, to avoid
+> duplicating this entire function?
+>
 
-Btw, Javier is doing a before/after tests on OMAP3. There are a few
-fixup things to be added/adjusted (unfortunately, OMAP3 doesn't compile
-on x86 COMPILE_TEST), but on his tests, the differences between before
-and after, with media-ctl are zero.
+This keeps coming up: I have a series in the freezer that decouples
+the kernel mapping from the linear mapping, which makes another round
+of changes to this function. So that is why I cloned the function in
+the first place, only to reuse this patch for this series as well.
 
-As media-ctl is using the legacy API, it shouldn't have any changes
-there, otherwise something is broken and should be fixed ;)
+The following does the trick as well, but I am not sure if the alias
+attribute is allowed in the kernel
 
-I'll spin this patch series with Javier fixes for OMAP at the next 
-version of this patch series.
+"""
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index ad87ce826cce..af2f30cbf357 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -374,3 +374,8
 
-> 
-> thanks,
-> -- Shuah
+ __setup("keepinitrd", keepinitrd_setup);
+ #endif
++
++void __init early_init_dt_add_memory_arch(u64 base, u64 size)
++{
++       __early_init_dt_add_memory_arch(base, size);
++}
+diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
+index 07496560e5b9..2da75619ed78 100644
+--- a/drivers/of/fdt.c
++++ b/drivers/of/fdt.c
+@@ -1047,6 +1047,9
+ }
+ #endif
+
++void __early_init_dt_add_memory_arch(u64 base, u64 size)
++                       __attribute__((alias("early_init_dt_add_memory_arch")));
++
+ bool __init early_init_dt_verify(void *params)
+ {
+        if (!params)
+diff --git a/include/linux/of_fdt.h b/include/linux/of_fdt.h
+index df9ef3801812..64fcb143f5f4 100644
+--- a/include/linux/of_fdt.h
++++ b/include/linux/of_fdt.h
+@@ -66,6 +66,7
+ extern void early_init_fdt_scan_reserved_mem(void);
+ extern void early_init_fdt_reserve_self(void);
+ extern void early_init_dt_add_memory_arch(u64 base, u64 size);
++extern void __early_init_dt_add_memory_arch(u64 base, u64 size);
+ extern int early_init_dt_reserve_memory_arch(phys_addr_t base,
+phys_addr_t size,
+                                             bool no_map);
+ extern void * early_init_dt_alloc_memory_arch(u64 size, u64 align);
+"""
+
+> We need the functionality for 4/5 (nice cleanup) and 5/5 (bugfix), so
+> happy with whatever works.
+>
+
+Indeed.
