@@ -1,77 +1,60 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Wed, 26 Aug 2015 16:35:18 +0100
-Subject: [PATCH v2 5/5] arm64/efi: ignore DT memreserve entries instead
- of removing them
-In-Reply-To: <1440576391-25725-6-git-send-email-ard.biesheuvel@linaro.org>
-References: <1440576391-25725-1-git-send-email-ard.biesheuvel@linaro.org>
- <1440576391-25725-6-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20150826153518.GE10728@bivouac.eciton.net>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Wed, 26 Aug 2015 08:36:29 -0700
+Subject: Build error in -next with gcc 4.9.1+ due to 'ARM: software-based
+ priviledged-no-access support'
+Message-ID: <55DDDCFD.7040208@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 26, 2015 at 10:06:31AM +0200, Ard Biesheuvel wrote:
-> Now that the reservation of the FDT image itself is split off, we
-> can make the DT scanning of memreserves conditional on whether we
-> booted via UEFI and have its memory map available. This allows us
-> to drop deletion of these memreserves in the stub. It also fixes
-> the issue where the /reserved-memory/ node (which offers another
-> way of reserving memory ranges) was not being ignored under UEFI.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/mm/init.c               |  3 ++-
->  drivers/firmware/efi/libstub/fdt.c | 11 +----------
->  2 files changed, 3 insertions(+), 11 deletions(-)
+Hi Russell,
 
-Acked-by: Leif Lindholm <leif.lindholm@linaro.org>
+your patch 'ARM: software-based priviledged-no-access support' results in an internal
+gcc error when trying to build arm:rpc_defconfig with gcc version 4.9.1 and 4.9.2.
 
-And possibly a reference to 0ceac9e094b0?
+fs/fat/dir.c: In function 'fat_ioctl_filldir':
+fs/fat/dir.c:752:43: internal compiler error: Max. number of generated reload insns per insn is achieved (90)
 
-As it is a bugfix, it would be nice to see this one go into 4.3, but...
+  FAT_IOCTL_FILLDIR_FUNC(fat_ioctl_filldir, __fat_dirent)
+                                            ^
+fs/fat/dir.c:707:9: note: in definition of macro 'FAT_IOCTL_FILLDIR_FUNC'
+   struct dirent_type __user *d2 = d1 + 1;       \
+          ^
 
-> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-> index ecbc051bc66b..0c33670ed1b6 100644
-> --- a/arch/arm64/mm/init.c
-> +++ b/arch/arm64/mm/init.c
-> @@ -170,7 +170,8 @@ void __init arm64_memblock_init(void)
->  		memblock_reserve(__virt_to_phys(initrd_start), initrd_end - initrd_start);
->  #endif
->  
-> -	early_init_fdt_scan_reserved_mem();
-> +	if (!efi_enabled(EFI_MEMMAP))
-> +		early_init_fdt_scan_reserved_mem();
->  
->  	/* 4GB maximum for 32-bit only capable devices */
->  	if (IS_ENABLED(CONFIG_ZONE_DMA))
-> diff --git a/drivers/firmware/efi/libstub/fdt.c b/drivers/firmware/efi/libstub/fdt.c
-> index 343e7992bd8f..a7e87cd582f2 100644
-> --- a/drivers/firmware/efi/libstub/fdt.c
-> +++ b/drivers/firmware/efi/libstub/fdt.c
-> @@ -24,8 +24,7 @@ efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
->  			unsigned long map_size, unsigned long desc_size,
->  			u32 desc_ver)
->  {
-> -	int node, num_rsv;
-> -	int status;
-> +	int node, status;
->  	u32 fdt_val32;
->  	u64 fdt_val64;
->  
-> @@ -53,14 +52,6 @@ efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
->  	if (status != 0)
->  		goto fdt_set_fail;
->  
-> -	/*
-> -	 * Delete all memory reserve map entries. When booting via UEFI,
-> -	 * kernel will use the UEFI memory map to find reserved regions.
-> -	 */
-> -	num_rsv = fdt_num_mem_rsv(fdt);
-> -	while (num_rsv-- > 0)
-> -		fdt_del_mem_rsv(fdt, num_rsv);
-> -
->  	node = fdt_subnode_offset(fdt, 0, "chosen");
->  	if (node < 0) {
->  		node = fdt_add_subnode(fdt, 0, "chosen");
-> -- 
-> 1.9.1
-> 
+This is with yocto/poky toolchains (version 1.7 for gcc 4.9.1 and 1.8 for gcc 4.9.2).
+The error is not seen with gcc 4.7.2 (from yocto/poky 1.4.2).
+
+Guenter
+
+---
+bisect log:
+
+# bad: [4aae1afc9fcd8fce05c9c429bf46991166aa14b6] Add linux-next specific files for 20150826
+# good: [c13dcf9f2d6f5f06ef1bf79ec456df614c5e058b] Linux 4.2-rc8
+git bisect start 'HEAD' 'v4.2-rc8'
+# bad: [72fc9ce3821064893ae82c94da877437f2ccf2ea] Merge remote-tracking branch 'crypto/master'
+git bisect bad 72fc9ce3821064893ae82c94da877437f2ccf2ea
+# bad: [364353176f56b287fe8a8a12cc33d6e6ae62cb84] Merge remote-tracking branch 'hid/for-next'
+git bisect bad 364353176f56b287fe8a8a12cc33d6e6ae62cb84
+# bad: [bf7be12bfc48f8429596f2c2df8e9ad1c88b0923] Merge remote-tracking branch 'tegra/for-next'
+git bisect bad bf7be12bfc48f8429596f2c2df8e9ad1c88b0923
+# good: [5908b2fba50b28d1435f15a2c5edb346677172ed] Merge branch 'next/dt' into for-next
+git bisect good 5908b2fba50b28d1435f15a2c5edb346677172ed
+# good: [9a1d1799d5acbc961fbabdeaaac1bee31a84484e] Merge branch 'next/soc' into for-next
+git bisect good 9a1d1799d5acbc961fbabdeaaac1bee31a84484e
+# bad: [803f911c33ce5ba474335757ac6ddac5fafc4118] Merge remote-tracking branch 'arm-soc/for-next'
+git bisect bad 803f911c33ce5ba474335757ac6ddac5fafc4118
+# bad: [2a3639fea519310619e803414e565a3d3c875258] Merge branch 'drm-dwhdmi-devel' into for-next
+git bisect bad 2a3639fea519310619e803414e565a3d3c875258
+# bad: [42050b2a875fbe66f2cbef9a0b8fdb24f70b6b9a] Merge branches 'cleanup', 'fixes', 'fiq' (early part), 'misc', 'omap-barrier', 'pcmcia' and 'uaccess' into for-next
+git bisect bad 42050b2a875fbe66f2cbef9a0b8fdb24f70b6b9a
+# good: [9205b797dbe519a629267ec8c5766cd973d35063] ARM: 8421/1: smp: Collapse arch_cpu_idle_dead() into cpu_die()
+git bisect good 9205b797dbe519a629267ec8c5766cd973d35063
+# bad: [a2421d7da31d098570059007f6f7e290420034ee] ARM: software-based priviledged-no-access support
+git bisect bad a2421d7da31d098570059007f6f7e290420034ee
+# good: [a02d8dfd54cdf3b1b0464ccc2c1c4afe2c003a35] ARM: domains: keep vectors in separate domain
+git bisect good a02d8dfd54cdf3b1b0464ccc2c1c4afe2c003a35
+# good: [08446b129bbde34665c423d882f857a45b8c3aed] ARM: mm: improve do_ldrd_abort macro
+git bisect good 08446b129bbde34665c423d882f857a45b8c3aed
+# good: [c043dd6568a98f105e62b03481dff047ebcb3585] ARM: entry: provide uaccess assembly macro hooks
+git bisect good c043dd6568a98f105e62b03481dff047ebcb3585
+# first bad commit: [a2421d7da31d098570059007f6f7e290420034ee] ARM: software-based priviledged-no-access support
