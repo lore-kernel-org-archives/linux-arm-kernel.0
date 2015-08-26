@@ -1,111 +1,96 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 26 Aug 2015 14:09:36 +0200
-Subject: [PATCH 1/7] drm/vc4: Add devicetree bindings for VC4.
-In-Reply-To: <20150826115229.GI1367@phenom.ffwll.local>
-References: <1439427380-2436-1-git-send-email-eric@anholt.net>
- <1439427380-2436-2-git-send-email-eric@anholt.net>
- <55CEC25E.7070303@wwwdotorg.org>
- <874mjxwyx5.fsf@eliezer.anholt.net>
- <CAL_JsqJxiGUR5BxBPyR3-0NxqWsOxMGrWQA6cMXe2pjTom__nw@mail.gmail.com>
- <CAF6AEGu2fi0M7DsicHz+5SDHi1DyDRmvWjkmYPPgY6pZ423WcA@mail.gmail.com>
- <20150826115229.GI1367@phenom.ffwll.local>
-Message-ID: <20150826120934.GC320@ulmo.nvidia.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 26 Aug 2015 14:11:28 +0200
+Subject: [PATCH v2] pinctrl: mediatek: Fix multiple registration issue.
+In-Reply-To: <CAFRkauDE4QRnZP4q61JyX+t8rn3zOtokiESJTV4uak71zM0kTg@mail.gmail.com>
+References: <1440041931-38278-1-git-send-email-hongzhou.yang@mediatek.com>
+ <CAFRkauDE4QRnZP4q61JyX+t8rn3zOtokiESJTV4uak71zM0kTg@mail.gmail.com>
+Message-ID: <CACRpkdY-W+=Eq2nsabqULcFZCi1bLd3eyBDY8yQmyCLwEz1RSA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 26, 2015 at 01:52:29PM +0200, Daniel Vetter wrote:
-> On Tue, Aug 25, 2015 at 04:42:18PM -0400, Rob Clark wrote:
-> > On Mon, Aug 24, 2015 at 9:47 AM, Rob Herring <robherring2@gmail.com> wrote:
-> > > On Mon, Aug 17, 2015 at 1:30 PM, Eric Anholt <eric@anholt.net> wrote:
-> > >> Stephen Warren <swarren@wwwdotorg.org> writes:
-> > >>
-> > >>> On 08/12/2015 06:56 PM, Eric Anholt wrote:
-> > >>>> Signed-off-by: Eric Anholt <eric@anholt.net>
-> > >>>
-> > >>> This one definitely needs a patch description, since someone might not
-> > >>> know what a VC4 is, and "git log" won't show the text from the binding
-> > >>> doc itself. I'd suggest adding the initial paragraph of the binding doc
-> > >>> as the patch description, or more.
-> > >>>
-> > >>>> diff --git a/Documentation/devicetree/bindings/gpu/brcm,bcm-vc4.txt b/Documentation/devicetree/bindings/gpu/brcm,bcm-vc4.txt
-> > >>
-> > >>>> +- hvss:             List of references to HVS video scalers
-> > >>>> +- encoders: List of references to output encoders (HDMI, SDTV)
-> > >>>
-> > >>> Would it make sense to make all those nodes child node of the vc4
-> > >>> object. That way, there's no need to have these lists of objects; they
-> > >>> can be automatically built up as the DT is enumerated. I know that e.g.
-> > >>> the NVIDIA Tegra host1x binding works this way, and I think it may have
-> > >>> been inspired by other similar cases.
-> > >>
-> > >> I've looked at tegra, and the component system used by msm appears to be
-> > >> nicer than it.  To follow tegra's model, it looks like I need to build
-> > >> this extra bus thing corresponding to host1x that is effectively the
-> > >> drivers/base/component.c code, so that I can get at vc4's structure from
-> > >> the component drivers.
-> > >>
-> > >>> Of course, this is only appropriate if the HW modules really are
-> > >>> logically children of the VC4 HW module. Perhaps they aren't. If they
-> > >>> aren't though, I wonder what this "vc4" module actually represents in HW?
-> > >>
-> > >> It's the subsystem, same as we use a subsystem node for msm, sti,
-> > >> rockchip, imx, and exynos.  This appears to be the common model of how
-> > >> the collection of graphics-related components is represented in the DT.
-> > >
-> > > I think most of these bindings are wrong. They are grouped together
-> > > because that is what DRM wants not because that reflects the h/w. So
-> > > convince me this is one block, not that it is what other people do.
-> > 
-> > I think, when it comes to more complex driver subsystems (like drm in
-> > particular) we have a bit of mismatch between how things look from the
-> > "pure hw ignoring sw" perspective, and the "how sw and in particular
-> > userspace expects things" perspective.  Maybe it is less a problem in
-> > other subsystems, where bindings map to things that are only visible
-> > in the kernel, or well defined devices like uart or sata controller.
-> > But when given the choice, I'm going to err on the side of not
-> > confusing userspace and the large software stack that sits above
-> > drm/kms, over dt purity.
-> > 
-> > Maybe it would be nice to have a sort of dt overlay that adds the bits
-> > needed to tie together hw blocks that should be assembled into a
-> > single logical device for linux and userspace (but maybe not some
-> > other hypothetical operating system).  But so far that doesn't exist.
-> > All we have is a hammer (devicetree), everything looks like a nail.
-> > End result is we end up adding some things in the bindings which
-> > aren't purely about the hw.  Until someone invents a screwdriver, I'm
-> > not sure what else to do.  In the end, other hypothetical OS is free
-> > to ignore those extra fields in the bindings if it doesn't need them.
-> > So meh?
-> 
-> I thought we agreed a while back that these kind of "pull everything for
-> the logical device together" dt nodes which just have piles of phandles
-> are totally accepted? At least that's the point behind the component
-> helpers, and Eric even suggested to create dt-specific component helpers
-> to cut down a bit on the usual boilerplate. dt maintainers are also fine
-> with this approach afaik. From my understanding tegra with the host1x bus
-> really is the odd one out and not the norm.
+On Thu, Aug 20, 2015 at 5:49 AM, Axel Lin <axel.lin@ingics.com> wrote:
+> 2015-08-20 11:38 GMT+08:00 Hongzhou Yang <hongzhou.yang@mediatek.com>:
+>> Since our common driver need support main chip and PMU
+>> at the same time, that means it will register two
+>> pinctrl device, and the pinctrl_desc structure should
+>> be used two times.
+>>
+>> But pinctrl_desc use global static definition, then
+>> the latest registered pinctrl device will overwrite
+>> the old one's, all members in pinctrl_desc will set to
+>> the new one's, such as name, pins and pins numbers, etc.
+>> This is a bug. Changing to use devm_kzalloc to fix it.
+>>
+>> Cc: stable at vger.kernel.org # v4.1+
+>> Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
+>> ---
+>>  Use dynamic allocation to fix multiple registration issue.
+>>
+>>  drivers/pinctrl/mediatek/pinctrl-mtk-common.c |   26 ++++++++++++++-----------
+>>  drivers/pinctrl/mediatek/pinctrl-mtk-common.h |    1 +
+>>  2 files changed, 16 insertions(+), 11 deletions(-)
+>>
+>> diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+>> index ad1ea16..911c736 100644
+>> --- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+>> +++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+>> @@ -1202,12 +1202,6 @@ static int mtk_pctrl_build_state(struct platform_device *pdev)
+>>         return 0;
+>>  }
+>>
+>> -static struct pinctrl_desc mtk_pctrl_desc = {
+>> -       .confops        = &mtk_pconf_ops,
+>> -       .pctlops        = &mtk_pctrl_ops,
+>> -       .pmxops         = &mtk_pmx_ops,
+>> -};
+>> -
+>>  int mtk_pctrl_init(struct platform_device *pdev,
+>>                 const struct mtk_pinctrl_devdata *data,
+>>                 struct regmap *regmap)
+>> @@ -1265,12 +1259,22 @@ int mtk_pctrl_init(struct platform_device *pdev,
+>>
+>>         for (i = 0; i < pctl->devdata->npins; i++)
+>>                 pins[i] = pctl->devdata->pins[i].pin;
+>> -       mtk_pctrl_desc.name = dev_name(&pdev->dev);
+>> -       mtk_pctrl_desc.owner = THIS_MODULE;
+>> -       mtk_pctrl_desc.pins = pins;
+>> -       mtk_pctrl_desc.npins = pctl->devdata->npins;
+>> +
+>> +       pctl->pctl_desc = devm_kzalloc(&pdev->dev, sizeof(*pctl->pctl_desc),
+>> +                               GFP_KERNEL);
+>> +       if (!pctl->pctl_desc)
+>> +               return -ENOMEM;
+>> +
+>> +       pctl->pctl_desc->name = dev_name(&pdev->dev);
+>> +       pctl->pctl_desc->owner = THIS_MODULE;
+>> +       pctl->pctl_desc->pins = pins;
+>> +       pctl->pctl_desc->npins = pctl->devdata->npins;
+>> +       pctl->pctl_desc->confops = &mtk_pconf_ops;
+>> +       pctl->pctl_desc->pctlops = &mtk_pctrl_ops;
+>> +       pctl->pctl_desc->pmxops = &mtk_pmx_ops;
+>>         pctl->dev = &pdev->dev;
+>> -       pctl->pctl_dev = pinctrl_register(&mtk_pctrl_desc, &pdev->dev, pctl);
+>> +
+>> +       pctl->pctl_dev = pinctrl_register(pctl->pctl_desc, &pdev->dev, pctl);
+>>         if (IS_ERR(pctl->pctl_dev)) {
+>>                 dev_err(&pdev->dev, "couldn't register pinctrl driver\n");
+>>                 return PTR_ERR(pctl->pctl_dev);
+>> diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.h b/drivers/pinctrl/mediatek/pinctrl-mtk-common.h
+>> index 30213e5..93d6f5b 100644
+>> --- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.h
+>> +++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.h
+>> @@ -256,6 +256,7 @@ struct mtk_pinctrl_devdata {
+>>  struct mtk_pinctrl {
+>>         struct regmap   *regmap1;
+>>         struct regmap   *regmap2;
+>> +       struct pinctrl_desc *pctl_desc;
+> Use
+> struct pinctrl_desc pctl_desc;
+>
+> Then you can remove the devm_kzalloc.
 
-I agree that in many aspects Tegra is somewhat special. But the same
-principles that the host1x infrastructure uses could be implemented in a
-similar way for other DRM drivers. You can easily collect information
-about subdevices by walking the device tree and matching on known
-compatible strings. And you can also instantiate the top-level device
-from driver code rather than have it in DT. It should still be possible
-to make this work without an artificial device node in DT. The component
-and master infrastructure is largely orthogonal to that, and as far as I
-remember the only blocker is the need for a top-level device. I wonder
-if perhaps this could be made to work by binding the master to the top-
-level SoC device.
+I agree with Axel, use a true member instead of a pointer
+and you get something simpler.
 
-Obviously adding the node in DT is easier, but to my knowledge easy has
-never been a good excuse for mangling DT. Perhaps that's different these
-days...
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150826/23936e24/attachment.sig>
+Yours,
+Linus Walleij
