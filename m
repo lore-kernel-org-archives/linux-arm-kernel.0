@@ -1,40 +1,85 @@
-From: pi-cheng.chen@linaro.org (Pi-Cheng Chen)
-Date: Wed, 26 Aug 2015 14:53:39 +0800
-Subject: [RESEND PATCH 0/3 v6] Add Mediatek MT8173 cpufreq driver
-In-Reply-To: <20150826021659.GD8784@linux>
-References: <1439803465-19683-1-git-send-email-pi-cheng.chen@linaro.org>
- <CALx668VWg2xVxzy8P7f5QFWRzm+TDJXUghL-_rbvRLsLYjtnng@mail.gmail.com>
- <1617873.VRHfat3V76@vostro.rjw.lan>
- <CALx668UvkYhLoU8rxLG70RqTzsnaiV5-ybDYTKqb4MEJS8pmRw@mail.gmail.com>
- <20150826021659.GD8784@linux>
-Message-ID: <CALx668V2herrp6XOtCDR7nNvFhd7DLLMjXmr86cjfCOQ_cgmrw@mail.gmail.com>
+From: eddie.huang@mediatek.com (Eddie Huang)
+Date: Wed, 26 Aug 2015 14:55:08 +0800
+Subject: [PATCH v2] soc: mediatek: add scpsys support active_wakeup
+In-Reply-To: <CAGS+omBqTbcJk-6QvupV4tkB5WQm97zpb5NzZ-S2ivR-UEWF4g@mail.gmail.com>
+References: <1440482440-28700-1-git-send-email-eddie.huang@mediatek.com>
+ <CAGS+omBqTbcJk-6QvupV4tkB5WQm97zpb5NzZ-S2ivR-UEWF4g@mail.gmail.com>
+Message-ID: <1440572108.28149.4.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 26, 2015 at 10:16 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> On 26-08-15, 09:25, Pi-Cheng Chen wrote:
->> The [3/3] is based on Mediatek SoC maintainer tree[1] and the patch which
->> introduce a new clock type[2] consumed by MT8173 cpufreq driver. So it will
->> cause some conflicts if it goes through your tree. I am not sure how this
->> should be handled, but should it be merged through Mediatek SoC maintainer
->> tree?
->
-> Just get that applied to MTK tree, it doesn't have any dependency on
-> rest of the patches for build/boot. The only thing is that cpufreq
-> wouldn't work and it will work as soon as Rafael's and MTK's trees are
-> merged by Linus.
+On Wed, 2015-08-26 at 05:11 +0800, Daniel Kurtz wrote:
+> Hi Eddie,
+> 
+> On Tue, Aug 25, 2015 at 2:00 PM, Eddie Huang <eddie.huang@mediatek.com> wrote:
+> > Register gpd_dev_ops.active_wakeup function to support keep power
+> > during suspend state. And add flag to each power domain to
+> > decide whether keep power during suspend or not.
+> >
+> > Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+> > Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
+> > Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+> >
+> > ---
+> > Change in v2:
+> > Drop .active_wakeup = false lines in scp_domain_data[] array
+> >
+> > ---
+> >  drivers/soc/mediatek/mtk-scpsys.c | 19 +++++++++++++++++++
+> >  1 file changed, 19 insertions(+)
+> >
+> > diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
+> > index 43a79ed..df2f288 100644
+> > --- a/drivers/soc/mediatek/mtk-scpsys.c
+> > +++ b/drivers/soc/mediatek/mtk-scpsys.c
+> > @@ -67,6 +67,7 @@ struct scp_domain_data {
+> >         u32 sram_pdn_ack_bits;
+> >         u32 bus_prot_mask;
+> >         enum clk_id clk_id;
+> > +       bool active_wakeup;
+> >  };
+> >
+> >  static const struct scp_domain_data scp_domain_data[] __initconst = {
+> > @@ -127,6 +128,7 @@ static const struct scp_domain_data scp_domain_data[] __initconst = {
+> >                 .sram_pdn_bits = GENMASK(11, 8),
+> >                 .sram_pdn_ack_bits = GENMASK(15, 12),
+> >                 .clk_id = MT8173_CLK_NONE,
+> > +               .active_wakeup = true,
+> >         },
+> >         [MT8173_POWER_DOMAIN_MFG_ASYNC] = {
+> >                 .name = "mfg_async",
+> > @@ -171,6 +173,7 @@ struct scp_domain {
+> >         u32 sram_pdn_bits;
+> >         u32 sram_pdn_ack_bits;
+> >         u32 bus_prot_mask;
+> > +       bool active_wakeup;
+> >  };
+> >
+> >  struct scp {
+> > @@ -370,6 +373,20 @@ out:
+> >         return ret;
+> >  }
+> >
+> > +static bool scpsys_active_wakeup(struct device *dev)
+> > +{
+> > +       struct generic_pm_domain *genpd;
+> > +       struct scp_domain *scpd;
+> > +
+> > +       if (IS_ERR_OR_NULL(dev->pm_domain))
+> > +               return false;
+> 
+> Is it really possible to get here w/ pm_domain as an ERR or NULL?
+> If the power core can ensure this cannot happen, then this function
+> could be a bit simpler.
+> 
+> Other than that, this patch is:
+> Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
+> 
+> -Dan
+> 
 
-Thanks for your explanation.
+After checking drivers/base/power/domain.c, I believe check
+dev->pm_domain here is redundant, I will remove it.
 
-@Rafael, Would you please apply [1,2] to your tree?
-
-@Matthias, Would you please apply [3/3] of this series?
-
-Thanks.
-
-Best Regards,
-Pi-Cheng
-
->
-> --
-> viresh
+Eddie
+Thanks
