@@ -1,136 +1,264 @@
 From: holler@ahsoftware.de (Alexander Holler)
-Date: Wed, 26 Aug 2015 14:28:12 +0200
-Subject: [PATCH 00/16] deps: deterministic driver initialization order
-Message-ID: <1440592108-3740-1-git-send-email-holler@ahsoftware.de>
+Date: Wed, 26 Aug 2015 14:28:13 +0200
+Subject: [PATCH 01/16] deps: dtc: Automatically add new property
+ 'dependencies' which contains a list of referenced phandles
+In-Reply-To: <1440592108-3740-1-git-send-email-holler@ahsoftware.de>
+References: <1440592108-3740-1-git-send-email-holler@ahsoftware.de>
+Message-ID: <1440592108-3740-2-git-send-email-holler@ahsoftware.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+During the step from .dts to .dtb the information about dependcies
+contained in the .dts through phandle references is lost. This makes it
+impossible to use the binary blob to create a dependency graph without
+knowing the semantic of all cell arrays.
 
-I've already written a lot on that topic, therefor this introductory
-mail doesn't explain everything.
+Therefor automatically add a new property called 'dependencies' to all
+nodes which have phandle references in one of their properties.
 
-Please have a look at the threads
+This new property will contain an array of phandles with one value for
+every phandle referenced by other properties in the node.
 
-"dt: dependencies (for deterministic driver initialization order based on
-the DT)"
+If such a property already exists (e.g. to manually add dependencies
+through the .dts), the existing list will be expanded.
 
-and
+Added phandles will be the phandle of either the referenced node itself
+(if it has a property named 'compatible', or of the next parent of the
+referenced node which as property named 'compatible'. This ensures only
+dependencies to drivers will be added.
 
-"On-demand device registration"
+References to phandles of parent or child nodes will not be added to this
+property, because this information is already contained in the blob (in
+the form of the tree itself).
 
-on LKML for previous discussions.
+No dependencies to disabled nodes will be added.
 
-In short, the current init system is quiet old and doesn't really match
-todays HW which needs much more drivers than 20 years ago.
+Signed-off-by: Alexander Holler <holler@ahsoftware.de>
+---
+ scripts/dtc/Makefile       |   3 +-
+ scripts/dtc/Makefile.dtc   |   1 +
+ scripts/dtc/dependencies.c | 108 +++++++++++++++++++++++++++++++++++++++++++++
+ scripts/dtc/dtc.c          |  12 ++++-
+ scripts/dtc/dtc.h          |   3 ++
+ 5 files changed, 125 insertions(+), 2 deletions(-)
+ create mode 100644 scripts/dtc/dependencies.c
 
-As I've mentioned in those threads, initcalls should be identifiable
-in order to sort them. My previous attempt intercepted the driver
-registrations in order to do that, which unfortunately ended up with
-having to deal how drivers are creating devices.
-
-I've now spend some more time and this partly new approach now annotates
-the initcalls directly, by storing a pointer to a struct device_driver in
-addition to the pointer to the initcall.
-
-This makes my previous patches smaller, cleaner and better to understand,
-the result which you can see in this little patch series.
-
-The whole patch series is made up of several parts.
-
-The first 4 patches are modifying dtc to include dependencies (type
-information for phandles).
-
-The next 3 patches are the ones which are implementing those annotated
-initcalls and the driver sort algorithm.
-
-Then there are 3 patches with small changes on some dts.
-
-The following 4 patches with the WIP (Work In Progress) are changing
-some initcalls to annotated initcalls. I would split them up in
-a bunch of patches (one for each driver), if I get the promise that
-the other patches will be merged into mainline (but not without that
-promise).
-
-The final 2 patches are fixes which should end up in mainline, regardless
-if this feature is merged or not.
-
-Some numbers (5 boots on each board, without and with ordering drivers),
-all times are seconds.
-
-Kirkwood (dockstar, armv5):
-
-Boot to "Freeing unused kernel memory" (includes mounting the rootfs),
-unordered:
-4.456016 3.937801 4.114788 4.114526 3.949480 (average 4.1145222)
-ordered:
-3.173054 3.164045 3.141418 3.480679 3.459298 (3.2836988)
-Time needed to sort (of_init_build_order()):
-0.003024
-Time needed to match drivers to the order (without calling them):
-0.002884
-
-Beagleboard (rev C4, armv7):
-
-unordered:
-6.706024 6.821746 6.696014 6.673675 6.769866 (6.733465)
-ordered:
-5.544860 5.514160 5.505859 5.527374 5.496795 (5.5178096)
-sorting: 0.021209
-matching: 0.006165
-
-Beaglebone Black (rev A5, armv7):
-
-unordered:
-3.826531 3.825662 3.826648 3.825434 3.825263 (3.8259076)
-ordered:
-2.838554 2.838322 2.839459 2.838467 2.838421 (2.8386446)
-sorting: 0.004769
-matching: 0.004860
-
-imx6q (armv7):
-
-unordered:
-3.451998 3.418864 3.446952 3.429974 3.440996 (3.4377568)
-ordered:
-3.538312 3.549019 3.538105 3.515916 3.555715 (3.5394134)
-sorting: 0.004622
-matching: 0.003868
-
-
-Because I'm using different configuration options on these boards,
-the absolute times aren't comparable.
-
-But in conclusion, most boards are booting faster when the initcalls
-have been ordered.
-
-In addition, ordering the initcalls makes the initialization sequence
-more deterministic (it can even be seen without booting a machine).
-
-But I still think the most benefit of these little series is by not having
-to use in-driver hacks or that ugly brute force trial-and-error deferred
-probing in order to fix a wrong default call order of initcalls.
-
-Further improvements could be to initialize drivers in parallel (using
-multiple cores) and/or to use this stuff on x86 (ACPI) too (e.g. by using a
-minimal DT which just includes dependencies).
-
-
-To test this series with any other DT enabled board, look at which
-drivers are referenced in the DT (see patch 2 or 3), annotate these
-drivers (trivial, see patch 5 or the examples with WIP in the subject),
-turn on CONFIG_OF_DEPENDENCIES, compile and boot.
-
-
-Just to mention it, unless CONFIG_OF_DEPENDENCIES is turned on (which is
-marked as experimental), nothing will change, even if you've annotated
-some drivers (the new macros will just map to the old ones).
-
-
-Regards,
-
-Alexander Holler
-
-PS: Please keep in mind that these patches are an offer. I'm already
-100+ patches above mainline and don't really care to maintain some more
-for myself.
+diff --git a/scripts/dtc/Makefile b/scripts/dtc/Makefile
+index 2a48022..1174cf9 100644
+--- a/scripts/dtc/Makefile
++++ b/scripts/dtc/Makefile
+@@ -4,7 +4,7 @@ hostprogs-y	:= dtc
+ always		:= $(hostprogs-y)
+ 
+ dtc-objs	:= dtc.o flattree.o fstree.o data.o livetree.o treesource.o \
+-		   srcpos.o checks.o util.o
++		   srcpos.o checks.o util.o dependencies.o
+ dtc-objs	+= dtc-lexer.lex.o dtc-parser.tab.o
+ 
+ # Source files need to get at the userspace version of libfdt_env.h to compile
+@@ -13,6 +13,7 @@ HOSTCFLAGS_DTC := -I$(src) -I$(src)/libfdt
+ 
+ HOSTCFLAGS_checks.o := $(HOSTCFLAGS_DTC)
+ HOSTCFLAGS_data.o := $(HOSTCFLAGS_DTC)
++HOSTCFLAGS_dependencies.o := $(HOSTCFLAGS_DTC)
+ HOSTCFLAGS_dtc.o := $(HOSTCFLAGS_DTC)
+ HOSTCFLAGS_flattree.o := $(HOSTCFLAGS_DTC)
+ HOSTCFLAGS_fstree.o := $(HOSTCFLAGS_DTC)
+diff --git a/scripts/dtc/Makefile.dtc b/scripts/dtc/Makefile.dtc
+index bece49b..5fb5343 100644
+--- a/scripts/dtc/Makefile.dtc
++++ b/scripts/dtc/Makefile.dtc
+@@ -6,6 +6,7 @@
+ DTC_SRCS = \
+ 	checks.c \
+ 	data.c \
++	dependencies.c \
+ 	dtc.c \
+ 	flattree.c \
+ 	fstree.c \
+diff --git a/scripts/dtc/dependencies.c b/scripts/dtc/dependencies.c
+new file mode 100644
+index 0000000..dd4658c
+--- /dev/null
++++ b/scripts/dtc/dependencies.c
+@@ -0,0 +1,108 @@
++/*
++ * Code to add a property which contains dependencies (used phandle references)
++ * to all (driver) nodes which are having phandle references.
++ *
++ * Copyright (C) 2014 Alexander Holler <holler@ahsoftware.de>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version
++ * 2 of the License, or (at your option) any later version.
++ */
++
++#include <dtc.h>
++
++/* Searches upwards for a node with a property 'compatible' */
++static struct node *find_compatible_not_disabled(struct node *node)
++{
++	struct property *prop;
++
++	while (node) {
++		prop = get_property(node, "compatible");
++		if (prop) {
++			prop = get_property(node, "status");
++			if (prop)
++				if (!prop->val.len ||
++					(strcmp(prop->val.val, "okay") &&
++						strcmp(prop->val.val, "ok")))
++					return NULL; /* disabled */
++			return node;
++		}
++		node = node->parent;
++	}
++	return NULL;
++}
++
++static bool is_parent_of(struct node *node1, struct node *node2)
++{
++	while (node2) {
++		if (node2->parent == node1)
++			return true;
++		node2 = node2->parent;
++	}
++	return false;
++
++}
++
++static void add_deps(struct node *dt, struct node *node, struct property *prop)
++{
++	struct marker *m = prop->val.markers;
++	struct node *refnode;
++	cell_t phandle;
++	struct property *prop_deps;
++	unsigned i;
++	cell_t *cell;
++	struct node *source;
++	struct node *target;
++
++	for_each_marker_of_type(m, REF_PHANDLE) {
++		assert(m->offset + sizeof(cell_t) <= prop->val.len);
++
++		refnode = get_node_by_ref(dt, m->ref);
++		if (!refnode) {
++			fprintf(stderr,
++				"ERROR: Reference to non-existent node or label \"%s\"\n",
++				m->ref);
++			continue;
++		}
++
++		source = find_compatible_not_disabled(node);
++		target = find_compatible_not_disabled(refnode);
++		if (!source || !target || source == target ||
++				is_parent_of(source, target) ||
++				is_parent_of(target, source))
++			continue;
++		phandle = get_node_phandle(dt, target);
++		prop_deps = get_property(source, "dependencies");
++		if (!prop_deps) {
++			add_property(source,
++			     build_property("dependencies",
++				data_append_cell(empty_data, phandle)));
++			continue;
++		}
++		cell = (cell_t *)prop_deps->val.val;
++		for (i = 0; i < prop_deps->val.len/4; ++i)
++			if (*cell++ == cpu_to_fdt32(phandle))
++				break;
++		if (i < prop_deps->val.len/4)
++			continue; /* avoid duplicates */
++		prop_deps->val = data_append_cell(prop_deps->val, phandle);
++	}
++}
++
++static void process_nodes_props(struct node *dt, struct node *node)
++{
++	struct node *child;
++	struct property *prop;
++
++	for_each_property(node, prop)
++		add_deps(dt, node, prop);
++
++	for_each_child(node, child)
++		process_nodes_props(dt, child);
++}
++
++void add_dependencies(struct boot_info *bi)
++{
++	process_nodes_props(bi->dt, bi->dt);
++}
+diff --git a/scripts/dtc/dtc.c b/scripts/dtc/dtc.c
+index 8c4add6..28def27 100644
+--- a/scripts/dtc/dtc.c
++++ b/scripts/dtc/dtc.c
+@@ -51,7 +51,7 @@ static void fill_fullpaths(struct node *tree, const char *prefix)
+ #define FDT_VERSION(version)	_FDT_VERSION(version)
+ #define _FDT_VERSION(version)	#version
+ static const char usage_synopsis[] = "dtc [options] <input file>";
+-static const char usage_short_opts[] = "qI:O:o:V:d:R:S:p:fb:i:H:sW:E:hv";
++static const char usage_short_opts[] = "qI:O:o:V:d:R:S:p:fb:i:H:sDW:E:hv";
+ static struct option const usage_long_opts[] = {
+ 	{"quiet",            no_argument, NULL, 'q'},
+ 	{"in-format",         a_argument, NULL, 'I'},
+@@ -66,6 +66,7 @@ static struct option const usage_long_opts[] = {
+ 	{"force",            no_argument, NULL, 'f'},
+ 	{"include",           a_argument, NULL, 'i'},
+ 	{"sort",             no_argument, NULL, 's'},
++	{"no-deps",          no_argument, NULL, 'D'},
+ 	{"phandle",           a_argument, NULL, 'H'},
+ 	{"warning",           a_argument, NULL, 'W'},
+ 	{"error",             a_argument, NULL, 'E'},
+@@ -93,6 +94,7 @@ static const char * const usage_opts_help[] = {
+ 	"\n\tTry to produce output even if the input tree has errors",
+ 	"\n\tAdd a path to search for include files",
+ 	"\n\tSort nodes and properties before outputting (useful for comparing trees)",
++	"\n\tDo not automatically add dependencies for phandle references",
+ 	"\n\tValid phandle formats are:\n"
+ 	 "\t\tlegacy - \"linux,phandle\" properties only\n"
+ 	 "\t\tepapr  - \"phandle\" properties only\n"
+@@ -112,6 +114,7 @@ int main(int argc, char *argv[])
+ 	const char *outname = "-";
+ 	const char *depname = NULL;
+ 	bool force = false, sort = false;
++	bool dependencies = true;
+ 	const char *arg;
+ 	int opt;
+ 	FILE *outf = NULL;
+@@ -179,6 +182,10 @@ int main(int argc, char *argv[])
+ 			sort = true;
+ 			break;
+ 
++		case 'D':
++			dependencies = false;
++			break;
++
+ 		case 'W':
+ 			parse_checks_option(true, false, optarg);
+ 			break;
+@@ -236,6 +243,9 @@ int main(int argc, char *argv[])
+ 	if (sort)
+ 		sort_tree(bi);
+ 
++	if (dependencies)
++		add_dependencies(bi);
++
+ 	if (streq(outname, "-")) {
+ 		outf = stdout;
+ 	} else {
+diff --git a/scripts/dtc/dtc.h b/scripts/dtc/dtc.h
+index 56212c8..6facad1 100644
+--- a/scripts/dtc/dtc.h
++++ b/scripts/dtc/dtc.h
+@@ -266,4 +266,7 @@ struct boot_info *dt_from_source(const char *f);
+ 
+ struct boot_info *dt_from_fs(const char *dirname);
+ 
++/* Dependencies */
++void add_dependencies(struct boot_info *bi);
++
+ #endif /* _DTC_H */
+-- 
+2.1.0
