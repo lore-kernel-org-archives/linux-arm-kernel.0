@@ -1,98 +1,87 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Tue, 25 Aug 2015 17:32:06 -0700
-Subject: [PATCH] arm: kgdb: Don't try to stop the machine when setting
- breakpoints
-In-Reply-To: <1440540165-28875-1-git-send-email-dianders@chromium.org>
-References: <1440540165-28875-1-git-send-email-dianders@chromium.org>
-Message-ID: <CAGXu5jL+JUysOA8-B30__6vf-u6jhqJMTB++zuqQBxY17A-TRw@mail.gmail.com>
+From: hongzhou.yang@mediatek.com (Hongzhou Yang)
+Date: Tue, 25 Aug 2015 17:32:45 -0700
+Subject: [PATCH v4] pinctrl: mediatek: Fix multiple registration issue.
+Message-ID: <1440549165-35637-1-git-send-email-hongzhou.yang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 25, 2015 at 3:02 PM, Douglas Anderson <dianders@chromium.org> wrote:
-> In (23a4e40 arm: kgdb: Handle read-only text / modules) we moved to
-> using patch_text() to set breakpoints so that we could handle the case
-> when we had CONFIG_DEBUG_RODATA.  That patch used patch_text().
-> Unfortunately, patch_text() assumes that we're not in atomic context
-> when it runs since it needs to grab a mutex and also wait for other
-> CPUs to stop (which it does with a completion).
->
-> This would result in a stack crawl if you had
-> CONFIG_DEBUG_ATOMIC_SLEEP and tried to set a breakpoint in kgdb.  The
-> crawl looked something like:
->
->  BUG: scheduling while atomic: swapper/0/0/0x00010007
->  CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.2.0-rc7-00133-geb63b34 #1073
->  Hardware name: Rockchip (Device Tree)
->   (unwind_backtrace) from [<c00133d4>] (show_stack+0x20/0x24)
->   (show_stack) from [<c05400e8>] (dump_stack+0x84/0xb8)
->   (dump_stack) from [<c004913c>] (__schedule_bug+0x54/0x6c)
->   (__schedule_bug) from [<c054065c>] (__schedule+0x80/0x668)
->   (__schedule) from [<c0540cfc>] (schedule+0xb8/0xd4)
->   (schedule) from [<c0543a3c>] (schedule_timeout+0x2c/0x234)
->   (schedule_timeout) from [<c05417c0>] (wait_for_common+0xf4/0x188)
->   (wait_for_common) from [<c0541874>] (wait_for_completion+0x20/0x24)
->   (wait_for_completion) from [<c00a0104>] (__stop_cpus+0x58/0x70)
->   (__stop_cpus) from [<c00a0580>] (stop_cpus+0x3c/0x54)
->   (stop_cpus) from [<c00a06c4>] (__stop_machine+0xcc/0xe8)
->   (__stop_machine) from [<c00a0714>] (stop_machine+0x34/0x44)
->   (stop_machine) from [<c00173e8>] (patch_text+0x28/0x34)
->   (patch_text) from [<c001733c>] (kgdb_arch_set_breakpoint+0x40/0x4c)
->   (kgdb_arch_set_breakpoint) from [<c00a0d68>] (kgdb_validate_break_address+0x2c/0x60)
->   (kgdb_validate_break_address) from [<c00a0e90>] (dbg_set_sw_break+0x1c/0xdc)
->   (dbg_set_sw_break) from [<c00a2e88>] (gdb_serial_stub+0x9c4/0xba4)
->   (gdb_serial_stub) from [<c00a11cc>] (kgdb_cpu_enter+0x1f8/0x60c)
->   (kgdb_cpu_enter) from [<c00a18cc>] (kgdb_handle_exception+0x19c/0x1d0)
->   (kgdb_handle_exception) from [<c0016f7c>] (kgdb_compiled_brk_fn+0x30/0x3c)
->   (kgdb_compiled_brk_fn) from [<c00091a4>] (do_undefinstr+0x1a4/0x20c)
->   (do_undefinstr) from [<c001400c>] (__und_svc_finish+0x0/0x34)
->
-> It turns out that when we're in kgdb all the CPUs are stopped anyway
-> so there's no reason we should be calling patch_text().  We can
-> instead directly call __patch_text() which assumes that CPUs have
-> already been stopped.
->
-> Fixes: 23a4e4050ba9 ("arm: kgdb: Handle read-only text / modules")
-> Reported-by: Aapo Vienamo <avienamo@nvidia.com>
-> Signed-off-by: Douglas Anderson <dianders@chromium.org>
-> ---
->  arch/arm/kernel/kgdb.c | 8 +++++---
->  1 file changed, 5 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/arm/kernel/kgdb.c b/arch/arm/kernel/kgdb.c
-> index a6ad93c..fd9eefc 100644
-> --- a/arch/arm/kernel/kgdb.c
-> +++ b/arch/arm/kernel/kgdb.c
-> @@ -259,15 +259,17 @@ int kgdb_arch_set_breakpoint(struct kgdb_bkpt *bpt)
->         if (err)
->                 return err;
->
-> -       patch_text((void *)bpt->bpt_addr,
-> -                  *(unsigned int *)arch_kgdb_ops.gdb_bpt_instr);
-> +       /* Machine is already stopped, so we can use __patch_text() directly */
-> +       __patch_text((void *)bpt->bpt_addr,
-> +                    *(unsigned int *)arch_kgdb_ops.gdb_bpt_instr);
->
->         return err;
->  }
->
->  int kgdb_arch_remove_breakpoint(struct kgdb_bkpt *bpt)
->  {
-> -       patch_text((void *)bpt->bpt_addr, *(unsigned int *)bpt->saved_instr);
-> +       /* Machine is already stopped, so we can use __patch_text() directly */
-> +       __patch_text((void *)bpt->bpt_addr, *(unsigned int *)bpt->saved_instr);
->
->         return 0;
->  }
-> --
-> 2.5.0.457.gab17608
->
+Since our common driver need support main chip and PMU
+at the same time, that means it will register two
+pinctrl device, and the pinctrl_desc structure should
+be used two times.
 
-Ah, yes, much nicer. :) Thanks for chasing this!
+But pinctrl_desc use global static definition, then
+the latest registered pinctrl device will overwrite
+the old one's, all members in pinctrl_desc will set to
+the new one's, such as name, pins and pins numbers, etc.
+This is a bug.
 
-Acked-by: Kees Cook <keescook@chromium.org>
+Move pinctrl_desc into mtk_pinctrl, assign new value for
+each pinctrl device to fix it.
 
--Kees
+Cc: stable at vger.kernel.org # v4.1+
+Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
+Reviewed-by: Axel Lin <axel.lin@ingics.com>
+---
+ In order to fix multiple registration issue, move 
+ pinctrl_desc into mtk_pinctrl, assign new value for
+ each pinctrl device.
 
+ drivers/pinctrl/mediatek/pinctrl-mtk-common.c |   21 ++++++++++-----------
+ drivers/pinctrl/mediatek/pinctrl-mtk-common.h |    1 +
+ 2 files changed, 11 insertions(+), 11 deletions(-)
+
+diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+index ad1ea16..4a52072 100644
+--- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
++++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+@@ -1202,12 +1202,6 @@ static int mtk_pctrl_build_state(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-static struct pinctrl_desc mtk_pctrl_desc = {
+-	.confops	= &mtk_pconf_ops,
+-	.pctlops	= &mtk_pctrl_ops,
+-	.pmxops		= &mtk_pmx_ops,
+-};
+-
+ int mtk_pctrl_init(struct platform_device *pdev,
+ 		const struct mtk_pinctrl_devdata *data,
+ 		struct regmap *regmap)
+@@ -1265,12 +1259,17 @@ int mtk_pctrl_init(struct platform_device *pdev,
+ 
+ 	for (i = 0; i < pctl->devdata->npins; i++)
+ 		pins[i] = pctl->devdata->pins[i].pin;
+-	mtk_pctrl_desc.name = dev_name(&pdev->dev);
+-	mtk_pctrl_desc.owner = THIS_MODULE;
+-	mtk_pctrl_desc.pins = pins;
+-	mtk_pctrl_desc.npins = pctl->devdata->npins;
++
++	pctl->pctl_desc.name = dev_name(&pdev->dev);
++	pctl->pctl_desc.owner = THIS_MODULE;
++	pctl->pctl_desc.pins = pins;
++	pctl->pctl_desc.npins = pctl->devdata->npins;
++	pctl->pctl_desc.confops = &mtk_pconf_ops;
++	pctl->pctl_desc.pctlops = &mtk_pctrl_ops;
++	pctl->pctl_desc.pmxops = &mtk_pmx_ops;
+ 	pctl->dev = &pdev->dev;
+-	pctl->pctl_dev = pinctrl_register(&mtk_pctrl_desc, &pdev->dev, pctl);
++
++	pctl->pctl_dev = pinctrl_register(&pctl->pctl_desc, &pdev->dev, pctl);
+ 	if (IS_ERR(pctl->pctl_dev)) {
+ 		dev_err(&pdev->dev, "couldn't register pinctrl driver\n");
+ 		return PTR_ERR(pctl->pctl_dev);
+diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.h b/drivers/pinctrl/mediatek/pinctrl-mtk-common.h
+index 30213e5..c532c23 100644
+--- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.h
++++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.h
+@@ -256,6 +256,7 @@ struct mtk_pinctrl_devdata {
+ struct mtk_pinctrl {
+ 	struct regmap	*regmap1;
+ 	struct regmap	*regmap2;
++	struct pinctrl_desc pctl_desc;
+ 	struct device           *dev;
+ 	struct gpio_chip	*chip;
+ 	struct mtk_pinctrl_group	*groups;
 -- 
-Kees Cook
-Chrome OS Security
+1.7.9.5
