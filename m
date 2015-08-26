@@ -1,45 +1,122 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 26 Aug 2015 09:37:40 +0200
-Subject: [PATCH 0/5] add GPT timer support for mt8173
-In-Reply-To: <1436779969-18610-1-git-send-email-yingjoe.chen@mediatek.com>
-References: <1436779969-18610-1-git-send-email-yingjoe.chen@mediatek.com>
-Message-ID: <55DD6CC4.6010708@linaro.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 26 Aug 2015 08:46:20 +0100
+Subject: [PATCH 5/7] ARM: STi: DT: STiH407: Add FDMA driver and xbar
+ driver dt nodes.
+In-Reply-To: <1436371888-27863-6-git-send-email-peter.griffin@linaro.org>
+References: <1436371888-27863-1-git-send-email-peter.griffin@linaro.org>
+ <1436371888-27863-6-git-send-email-peter.griffin@linaro.org>
+Message-ID: <20150826074620.GV19409@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/13/2015 11:32 AM, Yingjoe Chen wrote:
-> This series add GPT timer support for mt8173. This is based on v4.2-rc1
-> and Matthias' next branch (for dts parts).
->
-> The first 2 patches comes from 'Add SMP bringup support for mt65xx socs'
-> series [1]. I decide to move these 2 patches to this series, since it
-> is more relevent here. They are changed based on Matthias' and Daniel's
-> comments.
->
-> [1] http://lists.infradead.org/pipermail/linux-mediatek/2015-May/000714.html
->
-> Daniel Kurtz (1):
->    arm64: dts: mt8173: add timer node
->
-> Yingjoe Chen (4):
->    clocksource: mediatek: do not enable GPT_CLK_EVT when setup
->    clocksource: mediatek: Use GPT as sched clock source
->    arm64: mediatek: enable MTK_TIMER
->    clk: mediatek: add 13mhz clock for MT8173
->
->   arch/arm64/Kconfig                       |  1 +
->   arch/arm64/boot/dts/mediatek/mt8173.dtsi |  9 +++++++++
->   drivers/clk/mediatek/clk-mt8173.c        |  5 +++++
->   drivers/clocksource/mtk_timer.c          | 26 ++++++++++++++++++++------
->   include/dt-bindings/clock/mt8173-clk.h   |  3 ++-
->   5 files changed, 37 insertions(+), 7 deletions(-)
+On Wed, 08 Jul 2015, Peter Griffin wrote:
 
-Who will take this patchset ? I can take the patch 2 if needed.
+> These nodes are required to get the fdma and xbar driver working
+> on STiH407 based silicon.
+> 
+> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> ---
+>  arch/arm/boot/dts/stih407-family.dtsi | 59 +++++++++++++++++++++++++++++++++++
+>  1 file changed, 59 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
+> index 838b812..b6d9e20 100644
+> --- a/arch/arm/boot/dts/stih407-family.dtsi
+> +++ b/arch/arm/boot/dts/stih407-family.dtsi
+> @@ -565,5 +565,64 @@
+>  						  <&phy_port2 PHY_TYPE_USB3>;
+>  			};
+>  		};
+> +
+> +		xbar0: fdma-xbar-mpe at 0 {
 
+The unit address should match the one in the reg property.
+
+> +			compatible = "st,fdma-xbar-1.0";
+
+Is that a version number in the compatible string?
+
+> +			reg = <0x8e80000 0x1000>;
+> +			dma-requests = <79>;
+> +			#st,fdma-xbar-cells = <1>;
+
+Why can't FDMA use the generic DMA properties?
+
+> +		};
+> +
+> +		fdma0: fdma-audio at 0 {
+
+Same comment as above.
+
+> +			compatible = "st,fdma_mpe31";
+
+DT doesn't usually like underscores.
+
+> +			reg = <0x8e20000 0x20000>;
+> +			interrupts = <GIC_SPI 5 IRQ_TYPE_NONE>;
+> +			dma-channels = <16>;
+> +			#dma-cells = <3>;
+> +			st,fw-name = "fdma_STiH407_0.elf";
+
+I've bought this up before somewhere (although there doesn't appear to
+be a Firmware Maintainer), surely we should define a generic binding
+for passing firmware names?  Many vendors are going to require it.
+
+> +			clocks = <&clk_s_c0_flexgen CLK_FDMA>,
+> +				 <&clk_s_c0_flexgen CLK_EXT2F_A9>,
+> +				 <&clk_s_c0_flexgen CLK_EXT2F_A9>,
+> +				 <&clk_s_c0_flexgen CLK_EXT2F_A9>;
+> +			clock-names = "fdma_slim",
+> +				      "fdma_hi",
+> +				      "fdma_low",
+> +				      "fdma_ic";
+> +		};
+> +
+> +		fdma1: fdma-app at 1 {
+
+As above.
+
+> +			compatible = "st,fdma_mpe31";
+
+As above.
+
+> +			reg = <0x8e40000 0x20000>;
+> +			interrupts = <GIC_SPI 7 IRQ_TYPE_NONE>;
+> +			dma-channels = <16>;
+> +			#dma-cells = <3>;
+> +			st,fdma-xbar = <&xbar0 0>;
+> +			st,fw-name = "fdma_STiH407_1.elf";
+> +			clocks = <&clk_s_c0_flexgen CLK_FDMA>,
+> +				 <&clk_s_c0_flexgen CLK_TX_ICN_DMU>,
+> +				 <&clk_s_c0_flexgen CLK_TX_ICN_DMU>,
+> +				 <&clk_s_c0_flexgen CLK_EXT2F_A9>;
+> +			clock-names = "fdma_slim",
+> +				      "fdma_hi",
+> +				      "fdma_low",
+> +				      "fdma_ic";
+> +		};
+> +
+> +		fdma2: fdma-free_running at 2 {
+> +			compatible = "st,fdma_mpe31";
+> +			reg = <0x8e60000 0x20000>;
+> +			interrupts = <GIC_SPI 9 IRQ_TYPE_NONE>;
+> +			dma-channels = <16>;
+> +			#dma-cells = <3>;
+> +			st,fw-name = "fdma_STiH407_2.elf";
+> +			clocks = <&clk_s_c0_flexgen CLK_FDMA>,
+> +				 <&clk_s_c0_flexgen CLK_EXT2F_A9>,
+> +				 <&clk_s_c0_flexgen CLK_TX_ICN_DISP_0>,
+> +				 <&clk_s_c0_flexgen CLK_EXT2F_A9>;
+> +			clock-names = "fdma_slim",
+> +				      "fdma_hi",
+> +				      "fdma_low",
+> +				      "fdma_ic";
+> +		};
+>  	};
+>  };
 
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
