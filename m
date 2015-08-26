@@ -1,33 +1,32 @@
 From: ryabinin.a.a@gmail.com (Andrey Ryabinin)
-Date: Wed, 26 Aug 2015 19:15:07 +0300
-Subject: [PATCH 4/4] libfdt, kasan: don't instrument libfdt.
+Date: Wed, 26 Aug 2015 19:15:06 +0300
+Subject: [PATCH 3/4] arm64/efi-stub, kasan: don't instrument efi-stub.
 In-Reply-To: <1440605707-8325-1-git-send-email-ryabinin.a.a@gmail.com>
 References: <1440605707-8325-1-git-send-email-ryabinin.a.a@gmail.com>
-Message-ID: <1440605707-8325-5-git-send-email-ryabinin.a.a@gmail.com>
+Message-ID: <1440605707-8325-4-git-send-email-ryabinin.a.a@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-libfdt is used by EFI code and it runs before we setup early
-shadow, so it has to be not instrumented to prevent boot crash.
+efi-stub.c code runs before we setup early shadow.
+Intrumentation of it will cause boot crash.
 
 Signed-off-by: Andrey Ryabinin <ryabinin.a.a@gmail.com>
 ---
- lib/Makefile | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm64/kernel/Makefile | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/lib/Makefile b/lib/Makefile
-index 6897b52..44e1d81 100644
---- a/lib/Makefile
-+++ b/lib/Makefile
-@@ -165,7 +165,8 @@ obj-$(CONFIG_STMP_DEVICE) += stmp_device.o
- libfdt_files = fdt.o fdt_ro.o fdt_wip.o fdt_rw.o fdt_sw.o fdt_strerror.o \
- 	       fdt_empty_tree.o
- $(foreach file, $(libfdt_files), \
--	$(eval CFLAGS_$(file) = -I$(src)/../scripts/dtc/libfdt))
-+	$(eval CFLAGS_$(file) = -I$(src)/../scripts/dtc/libfdt) \
-+	$(eval KASAN_SANITIZE_$(file) := n))
- lib-$(CONFIG_LIBFDT) += $(libfdt_files)
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index 426d076..086b122 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -7,6 +7,8 @@ AFLAGS_head.o		:= -DTEXT_OFFSET=$(TEXT_OFFSET)
+ CFLAGS_efi-stub.o 	:= -DTEXT_OFFSET=$(TEXT_OFFSET)
+ CFLAGS_armv8_deprecated.o := -I$(src)
  
- obj-$(CONFIG_RBTREE_TEST) += rbtree_test.o
++KASAN_SANITIZE_efi-stub.o	:= n
++
+ CFLAGS_REMOVE_ftrace.o = -pg
+ CFLAGS_REMOVE_insn.o = -pg
+ CFLAGS_REMOVE_return_address.o = -pg
 -- 
 2.4.6
