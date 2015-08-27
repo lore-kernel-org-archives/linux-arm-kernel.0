@@ -1,79 +1,60 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 27 Aug 2015 09:05:33 -0600
-Subject: [PATCH] Coresight: ETMv4: Prevent TRCRSCTLR0&1 from being accessed
-In-Reply-To: <1440648369-4614-1-git-send-email-zhang.chunyan@linaro.org>
-References: <1440648369-4614-1-git-send-email-zhang.chunyan@linaro.org>
-Message-ID: <CANLsYkz8JwxoaCUg2EYrfcgFoL05OfhTmM5wT5CaHZFUHN87Lw@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 27 Aug 2015 16:10:01 +0100
+Subject: [PATCH v2] arm64: KVM: Do not inject a 64bit fault for a 32bit guest
+Message-ID: <1440688201-6324-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 August 2015 at 22:06, Chunyan Zhang <zhang.chunyan@linaro.org> wrote:
-> 1. TRCRSCTLRn - Resource Selection Control Registers n=0~1 are reserved,
->    we shouldn't access them.
-> 2. The max number of 'n' here is defined in TRCIDR4.NUMRSPAIR whoes value
->    indicates the number of resource selection *pairs*, and 0 indicates
->    one resource selection pair, 1 indicates two pairs, and so on ...
->
-> So, the total number of resource selection control registers which we can
-> access is (TRCIDR4.NUMRSPAIR * 2)
->
-> Signed-off-by: Chunyan Zhang <zhang.chunyan@linaro.org>
-> ---
->  drivers/hwtracing/coresight/coresight-etm4x.c | 15 ++++++++++-----
->  1 file changed, 10 insertions(+), 5 deletions(-)
->
-> diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
-> index 1312e99..9425249 100644
-> --- a/drivers/hwtracing/coresight/coresight-etm4x.c
-> +++ b/drivers/hwtracing/coresight/coresight-etm4x.c
-> @@ -136,7 +136,9 @@ static void etm4_enable_hw(void *info)
->                 writel_relaxed(drvdata->cntr_val[i],
->                                drvdata->base + TRCCNTVRn(i));
->         }
-> -       for (i = 0; i < drvdata->nr_resource; i++)
-> +
-> +       /* Resource selector pair 0 is always implemented and reserved */
-> +       for (i = 2; i < (drvdata->nr_resource + 1) * 2; i++)
+When injecting a fault into a misbehaving 32bit guest, it seems
+rather idiotic to also inject a 64bit fault that is only going
+to corrupt the guest state. This leads to a situation where we
+perform an illegal exception return at EL2 causing the host
+to crash instead of killing the guest.
 
-Instead of repeating "->nr_resource + 1) * 2" every time, please add
-"->nr_resource += 1" in etm4_init_arch_data() along with a comment
-that explains why.
+Just fix the stupid bug that has been there from day 1.
 
->                 writel_relaxed(drvdata->res_ctrl[i],
->                                drvdata->base + TRCRSCTLRn(i));
->
-> @@ -489,8 +491,9 @@ static ssize_t reset_store(struct device *dev,
->                 drvdata->cntr_val[i] = 0x0;
->         }
->
-> -       drvdata->res_idx = 0x0;
-> -       for (i = 0; i < drvdata->nr_resource; i++)
-> +       /* Resource selector pair 0 is always implemented and reserved */
-> +       drvdata->res_idx = 0x2;
-> +       for (i = 2; i < (drvdata->nr_resource + 1) * 2; i++)
->                 drvdata->res_ctrl[i] = 0x0;
->
->         for (i = 0; i < drvdata->nr_ss_cmp; i++) {
-> @@ -1729,7 +1732,7 @@ static ssize_t res_idx_store(struct device *dev,
->         if (kstrtoul(buf, 16, &val))
->                 return -EINVAL;
->         /* Resource selector pair 0 is always implemented and reserved */
-> -       if ((val == 0) || (val >= drvdata->nr_resource))
-> +       if (val < 2 || val > (drvdata->nr_resource + 1) * 2)
->                 return -EINVAL;
->
->         /*
-> @@ -2498,7 +2501,9 @@ static void etm4_init_default_data(struct etmv4_drvdata *drvdata)
->                 drvdata->cntr_val[i] = 0x0;
->         }
->
-> -       for (i = 2; i < drvdata->nr_resource * 2; i++)
-> +       /* Resource selector pair 0 is always implemented and reserved */
-> +       drvdata->res_idx = 0x2;
-> +       for (i = 2; i < (drvdata->nr_resource + 1) * 2; i++)
->                 drvdata->res_ctrl[i] = 0x0;
->
->         for (i = 0; i < drvdata->nr_ss_cmp; i++) {
-> --
-> 1.9.1
->
+Cc: stable at vger.kernel.org
+Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Tested-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/kvm/inject_fault.c | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm64/kvm/inject_fault.c b/arch/arm64/kvm/inject_fault.c
+index f02530e..85c5715 100644
+--- a/arch/arm64/kvm/inject_fault.c
++++ b/arch/arm64/kvm/inject_fault.c
+@@ -168,8 +168,8 @@ void kvm_inject_dabt(struct kvm_vcpu *vcpu, unsigned long addr)
+ {
+ 	if (!(vcpu->arch.hcr_el2 & HCR_RW))
+ 		inject_abt32(vcpu, false, addr);
+-
+-	inject_abt64(vcpu, false, addr);
++	else
++		inject_abt64(vcpu, false, addr);
+ }
+ 
+ /**
+@@ -184,8 +184,8 @@ void kvm_inject_pabt(struct kvm_vcpu *vcpu, unsigned long addr)
+ {
+ 	if (!(vcpu->arch.hcr_el2 & HCR_RW))
+ 		inject_abt32(vcpu, true, addr);
+-
+-	inject_abt64(vcpu, true, addr);
++	else
++		inject_abt64(vcpu, true, addr);
+ }
+ 
+ /**
+@@ -198,6 +198,6 @@ void kvm_inject_undefined(struct kvm_vcpu *vcpu)
+ {
+ 	if (!(vcpu->arch.hcr_el2 & HCR_RW))
+ 		inject_undef32(vcpu);
+-
+-	inject_undef64(vcpu);
++	else
++		inject_undef64(vcpu);
+ }
+-- 
+2.1.4
