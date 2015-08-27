@@ -1,34 +1,58 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 27 Aug 2015 14:40:05 -0700
-Subject: [PATCH 8/9] ARM: entry: provide uaccess assembly macro hooks
-In-Reply-To: <E1ZSmQB-0002zT-A6@rmk-PC.arm.linux.org.uk>
-References: <20150821133043.GV7557@n2100.arm.linux.org.uk>
- <E1ZSmQB-0002zT-A6@rmk-PC.arm.linux.org.uk>
-Message-ID: <20150827214005.GX19120@codeaurora.org>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Thu, 27 Aug 2015 17:43:47 -0400
+Subject: [PATCH] soc: ti: reset irq affinity before freeing irq
+In-Reply-To: <55DF58A0.8090105@oracle.com>
+References: <1440690671-1029-1-git-send-email-m-karicheri2@ti.com>
+ <55DF3E3F.6030506@mentor.com> <55DF5589.6050802@ti.com>
+ <55DF581A.2090300@mentor.com> <55DF58A0.8090105@oracle.com>
+Message-ID: <55DF8493.7090307@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/21, Russell King wrote:
-> @@ -400,6 +402,10 @@ ENDPROC(__fiq_abt)
->   ARM(	stmdb	r0, {sp, lr}^			)
->   THUMB(	store_user_sp_lr r0, r1, S_SP - S_PC	)
->  
-> +	.if \uaccess
-
-This \u seems to trip up my clang build. It seems that the
-assembler thinks \u is escaping for unicode or something?
-
- arch/arm/kernel/entry-armv.S:202:
- Error: non-constant expression in ".if" statement
-
-Looking at the intermediate assembly file I see:
-
- .if ??ss
- uaccess_disable ip
- .endif
-
-Changing 'uaccess' to 'access' seems to make the problem go away.
+On 08/27/2015 02:36 PM, santosh.shilimkar at oracle.com wrote:
+> On 8/27/15 11:34 AM, Nathan Lynch wrote:
+>> On 08/27/2015 01:23 PM, Murali Karicheri wrote:
+>>> On 08/27/2015 12:43 PM, Nathan Lynch wrote:
+>>>> On 08/27/2015 10:51 AM, Murali Karicheri wrote:
+>>>>> When using accumulator queue for rx side for network driver, following
+>>>>> warning is seen when doing a reboot command from Linux console. This
+>>>>> is because, affinity value is not reset before calling free_irq().
+>>>>> This
+>>>>> patch fixes this.
+>>>>>
+>>>>> Deconfiguring network interfaces...
+>>>>> [   55.176589] ------------[ cut here ]-----------
+>>>>> [   55.181232] WARNING: CPU: 0 PID: 2081 at kernel/irq/manage.c:1370
+>>>>> __free_irq+0x208/0x214
+>>>>
+>>>> The full content of the warning should be included in the commit
+>>>> message; __free_irq has several potential sources of warning messages,
+>>>> and line 1370 doesn't correspond to any of them in 4.2-rc8.
+>>>
+>>> The log corresponds to 4.1.x kernel. Corresponding WARN_ONCE is
+>>>
+>>> #ifdef CONFIG_SMP
+>>>          /* make sure affinity_hint is cleaned up */
+>>>          if (WARN_ON_ONCE(desc->affinity_hint))
+>>>                  desc->affinity_hint = NULL;
+>>> #endif
+>>>
+>>> Which is line 1922. I can edit to make it 1922. Does that work?
+>>
+>> Eh, I guess I wasn't thinking clearly about this clearly when I wrote
+>> that.  (I somehow had the notion that WARN_ON... maybe printed more than
+>> just the file and line number, but that is clearly mistaken.)  I think
+>> your message is fine as is, sorry for the noise.
+>>
+>> I don't think changing the line number will make it any easier on future
+>> readers.
+>>
+> Right. Just leave the full call in the commit so that the context
+> is captured.
+>
+>
+Will do that and resend it
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Murali Karicheri
+Linux Kernel, Keystone
