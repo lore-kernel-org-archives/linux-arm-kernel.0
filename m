@@ -1,82 +1,58 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 27 Aug 2015 17:51:51 +0200
-Subject: [PATCH 03/10] ARM: marvell/dt: add crypto related nodes to
- armada 370 dtsi
-In-Reply-To: <877fog69a7.fsf@free-electrons.com>
-References: <1439885341-14644-1-git-send-email-boris.brezillon@free-electrons.com>
- <1439885341-14644-4-git-send-email-boris.brezillon@free-electrons.com>
- <877fog69a7.fsf@free-electrons.com>
-Message-ID: <20150827175151.23994256@bbrezillon>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Thu, 27 Aug 2015 09:54:07 -0600
+Subject: [PATCH 2/5] coresight-etm4x: Change the name of the ctxid_val to
+ ctxid_pid
+In-Reply-To: <55DF2DB5.7000909@codeaurora.org>
+References: <1436258518-9339-1-git-send-email-zhang.chunyan@linaro.org>
+ <1436258518-9339-3-git-send-email-zhang.chunyan@linaro.org>
+ <55DDFE01.50201@codeaurora.org>
+ <CANLsYkyA_C=PUDEUSbcA_Sa6Abqnxk1TP9ye6F9i0bWW_OxqiA@mail.gmail.com>
+ <55DF2DB5.7000909@codeaurora.org>
+Message-ID: <CANLsYkyfJX1CywxZ-e8TgK45XXs9jxkBDrp41OWAzTjC63Ggww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gregory,
+On 27 August 2015 at 09:33, Christopher Covington <cov@codeaurora.org> wrote:
+> On 08/27/2015 11:12 AM, Mathieu Poirier wrote:
+>> On 26 August 2015 at 11:57, Christopher Covington <cov@codeaurora.org> wrote:
+>>> On 07/07/2015 04:41 AM, Chunyan Zhang wrote:
+>>>> 'ctxid_val' array was used to store the value of ETM context ID comparator
+>>>> which actually stores the process ID to be traced, so using 'ctxid_pid' as
+>>>> its name instead make it easier to understand.
+>>>
+>>> Previous discussion with some ARM folks has led me to believe there isn't a
+>>> guarantee that the Context ID Register will always have a PID. Why not allow
+>>> filtering on thread group ID, session ID, cgroup related identifiers, etc.?
+>>
+>> Coresight tracers only support contextID tracing.  The HW
+>> automatically does the match between the contextID comparator register
+>> in the tracer with the contextID register of the core.  Tracing is
+>> enabled if both values match (and the tracer is configured to do so).
+>
+> Is there a reason to only ever allow Process IDs to be written into the
+> Coresight and CPU Context ID registers? Is there anything in the hardware that
+> would prevent writing, for example, Thread Group IDs into the Coresight and
+> CPU Context ID registers? If there's no hardware limitation, why should there
+> be kernel or device tree architecture that states or implies that patches to
+> support such a use case are unacceptable?
 
-On Thu, 27 Aug 2015 17:28:00 +0200
-Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
+I'm not saying your idea is unacceptable - I actually think there is
+value in it.  At this time the scheduler will automatically write the
+PID to the contextID register when a task is running, a reality this
+feature is exploiting.
 
-> Hi Boris and Arnaud,
-> 
-> Boris Brezillon <boris.brezillon@free-electrons.com> writes:
-> 
-> > From: Arnaud Ebalard <arno@natisbad.org>
-> >
-> > Add crypto related nodes in armada-370.dtsi.
-> [...]
-> > +
-> > +			crypto at 90000 {
-> > +				compatible = "marvell,armada-370-crypto";
-> > +				reg = <0x90000 0x10000>;
-> > +				reg-names = "regs";
-> > +				interrupts = <48>;
-> > +				clocks = <&gateclk 23>;
-> > +				clock-names = "cesa0";
-> > +				marvell,crypto-srams = <&crypto_sram>;
-> > +				marvell,crypto-sram-size = <0x7e0>;
-> > +			};
-> > +		};
-> > +
-> > +		crypto_sram: sa-sram {
-> > +			compatible = "mmio-sram";
-> > +			reg = <MBUS_ID(0x09, 0x01) 0 0x800>;
-> > +			reg-names = "sram";
-> > +			clocks = <&gateclk 23>;
-> > +			#address-cells = <1>;
-> > +			#size-cells = <1>;
-> > +			ranges = <0 MBUS_ID(0x09, 0x01) 0 0x800>;
-> > +
-> > +			idle-sram at 0 {
-> > +				reg = <0x0 0x20>;
-> > +			};
-> 
-> So you think at the cpuilde hack using the sram. And you reserved 32
-> bytes for it. So indeed it is enough to store the code we need. Could
-> you add a little comment about it ?
+There is no limitation as to what can be written to the coresight
+contextID register - tracing will start for as long as the values and
+mask are configured properly.  I do not know the limitation imposed on
+the core's contextID register (if any). We'd also have to make sure
+that all the code, everywhere, relying on that information has been
+modified to take into account the new semantic.
 
-Sure, I'll add a comment explaining why we reserve a memory region for
-idle support.
-
-> 
-> In mvebu_setup_boot_addr_wa we use mvebu_mbus_add_window_by_id but this
-> windows was also added by the code you add. I wonder if it could be a
-> problem.
-
-I tested it and it works: apparently you can create different MBUS
-windows pointing to the same peripheral (in our case the SRAM).
-
-> 
-> Maybe we should look for if the idle-sram is present and in this case
-> not calling mvebu_mbus_add_window_by_id, but it is not necessary for
-> this series.
-
-Hm, I considered reworking the code dealing with this erratum, but
-since everything works as is I don't think this is necessary.
-
-Best Regards,
-
-Boris
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+>
+> Thanks,
+> Christopher Covington
+>
+> --
+> Qualcomm Innovation Center, Inc.
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> a Linux Foundation Collaborative Project
