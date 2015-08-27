@@ -1,80 +1,51 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Thu, 27 Aug 2015 16:02:31 -0700
-Subject: [PATCH 1/2] clk: atlas7: move variable-definition together
-In-Reply-To: <1439514663-23979-1-git-send-email-21cnbao@gmail.com>
-References: <1439514663-23979-1-git-send-email-21cnbao@gmail.com>
-Message-ID: <20150827230231.30921.20071@quantum>
+From: sbranden@broadcom.com (Scott Branden)
+Date: Thu, 27 Aug 2015 16:35:30 -0700
+Subject: [PATCH v2 0/5] Add Broadcom Northstar Plus Support
+In-Reply-To: <1440628530-6137-1-git-send-email-jonmason@broadcom.com>
+References: <1440628530-6137-1-git-send-email-jonmason@broadcom.com>
+Message-ID: <55DF9EC2.4060902@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Barry Song (2015-08-13 18:11:02)
-> From: Guo Zeng <Guo.Zeng@csr.com>
-> 
-> re-order the codes more reasonable by moving variable-definition
-> together.
-> 
-> Signed-off-by: Guo Zeng <Guo.Zeng@csr.com>
-> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+Patchset all look good.
+Acked-by: Scott Branden <sbranden@broadcom.com>
 
-Hi Barry,
-
-I'll apply these after -rc1 drops, towards 4.4. Please be sure to Cc
-linux-clk at vger.kernel.org for future clk patches.
-
-Thanks!
-Mike
-
-> ---
->  drivers/clk/sirf/clk-atlas7.c | 24 ++++++++++++------------
->  1 file changed, 12 insertions(+), 12 deletions(-)
-> 
-> diff --git a/drivers/clk/sirf/clk-atlas7.c b/drivers/clk/sirf/clk-atlas7.c
-> index a98e21f..d34d1b3 100644
-> --- a/drivers/clk/sirf/clk-atlas7.c
-> +++ b/drivers/clk/sirf/clk-atlas7.c
-> @@ -206,18 +206,6 @@
->  #define SIRFSOC_CLKC_LEAF_CLK_EN8_SET        0x0548
->  
->  
-> -static void __iomem *sirfsoc_clk_vbase;
-> -static struct clk_onecell_data clk_data;
-> -
-> -static const struct clk_div_table pll_div_table[] = {
-> -       { .val = 0, .div = 1 },
-> -       { .val = 1, .div = 2 },
-> -       { .val = 2, .div = 4 },
-> -       { .val = 3, .div = 8 },
-> -       { .val = 4, .div = 16 },
-> -       { .val = 5, .div = 32 },
-> -};
-> -
->  struct clk_pll {
->         struct clk_hw hw;
->         u16 regofs;  /* register offset */
-> @@ -284,6 +272,18 @@ struct atlas7_reset_desc {
->         spinlock_t *lock;
->  };
->  
-> +static void __iomem *sirfsoc_clk_vbase;
-> +static struct clk_onecell_data clk_data;
-> +
-> +static const struct clk_div_table pll_div_table[] = {
-> +       { .val = 0, .div = 1 },
-> +       { .val = 1, .div = 2 },
-> +       { .val = 2, .div = 4 },
-> +       { .val = 3, .div = 8 },
-> +       { .val = 4, .div = 16 },
-> +       { .val = 5, .div = 32 },
-> +};
-> +
->  static DEFINE_SPINLOCK(cpupll_ctrl1_lock);
->  static DEFINE_SPINLOCK(mempll_ctrl1_lock);
->  static DEFINE_SPINLOCK(sys0pll_ctrl1_lock);
-> -- 
-> 1.9.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+On 15-08-26 03:35 PM, Jon Mason wrote:
+>
+> Changes in version 2 incorporate Olof's comments regarding:
+> * the removal of all "Reviewed-by" lines not occurring on external
+>    mailing lists
+> * reordering of s-o-b lines
+> * modification of the device tree file to use labels when enabling
+> * increated description of the modification to the MAINTAINERS entry
+>
+> Also, modifying the "to" and "cc" recepients so that everyone is
+> receving all of the patches.
+>
+> --
+>
+> This patch series adds support for the Broadcom Northstar Plus family of
+> SoCs.  NSP is a Cortex A9 based SoC under the Broadcom iProc family.
+>
+> Jon Mason (5):
+>    dt-bindings: Create Documentation for NSP DT bindings
+>    ARM: NSP: add minimal Northstar Plus device tree
+>    ARM: NSP: Add basic support for Broadcom Northstar Plus SoC
+>    ARM: multi_v7_defconfig: Add NSP to defconfig
+>    MAINTAINERS: add entry for the Broadcom Northstar Plus SoCs
+>
+>   .../devicetree/bindings/arm/bcm/brcm,nsp.txt       |  34 +++++++
+>   MAINTAINERS                                        |  12 ++-
+>   arch/arm/boot/dts/Makefile                         |   2 +
+>   arch/arm/boot/dts/bcm-nsp.dtsi                     | 105 +++++++++++++++++++++
+>   arch/arm/boot/dts/bcm958625k.dts                   |  57 +++++++++++
+>   arch/arm/configs/multi_v7_defconfig                |   1 +
+>   arch/arm/mach-bcm/Kconfig                          |  14 +++
+>   arch/arm/mach-bcm/Makefile                         |   5 +-
+>   arch/arm/mach-bcm/bcm_nsp.c                        |  25 +++++
+>   9 files changed, 252 insertions(+), 3 deletions(-)
+>   create mode 100644 Documentation/devicetree/bindings/arm/bcm/brcm,nsp.txt
+>   create mode 100644 arch/arm/boot/dts/bcm-nsp.dtsi
+>   create mode 100644 arch/arm/boot/dts/bcm958625k.dts
+>   create mode 100644 arch/arm/mach-bcm/bcm_nsp.c
+>
