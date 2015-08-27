@@ -1,90 +1,105 @@
-From: jianhua.ljh@gmail.com (Jianhua Liu)
-Date: Thu, 27 Aug 2015 10:43:47 +0800
-Subject: [PATCH] arm64: fix bug for reloading FPSIMD state after execve on
- cpu 0.
-In-Reply-To: <CAKv+Gu_VtFGsKPmFfLHm=kNM=vK=p1TR+fd52P68MiA6J0zUFQ@mail.gmail.com>
-References: <1440556841-17219-1-git-send-email-chunyan.zhang@spreadtrum.com>
- <20150826111205.GD30466@arm.com>
- <CAKv+Gu_VtFGsKPmFfLHm=kNM=vK=p1TR+fd52P68MiA6J0zUFQ@mail.gmail.com>
-Message-ID: <CAAgTQPUxuDZtuhAHswfW=mt+6qTNfrwY6qonWttyj+PNsp8_FA@mail.gmail.com>
+From: agross@codeaurora.org (Andy Gross)
+Date: Wed, 26 Aug 2015 22:36:20 -0500
+Subject: [PATCH] arm64: dts: qcom: Add 8x16 Serial UART1 node
+Message-ID: <1440646580-28241-1-git-send-email-agross@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 26, 2015 at 7:32 PM, Ard Biesheuvel
-<ard.biesheuvel@linaro.org> wrote:
-> On 26 August 2015 at 13:12, Will Deacon <will.deacon@arm.com> wrote:
->> Hello,
->>
->> [adding Ard]
->>
->> On Wed, Aug 26, 2015 at 03:40:41AM +0100, Chunyan Zhang wrote:
->>> From: Janet Liu <janet.liu@spreadtrum.com>
->>>
->>> If process A is running on CPU 0 and do execve syscall and after sched_exec,
->>> dest_cpu is 0, fpsimd_state.cpu is 0. If at the time Process A get scheduled
->>> out and after some kernel threads running on CPU 0, process A is back in CPU 0,
->>> A's fpsimd_state.cpu is current cpu id "0", and per_cpu(fpsimd_last_state)
->>> points A's fpsimd_state, TIF_FOREIGN_FPSTATE will be clear, kernel will not
->>> reload the context during it return to userspace. so set the cpu's
->>> fpsimd_last_state to NULL to avoid this.
->>
->> AFAICT, this is only a problem if one of the kernel threads uses the fpsimd
->> registers, right? However, kernel_neon_begin_partial clobbers
->> fpsimd_last_state, so I'm struggling to see the problem.
->>
->
-> I think the problem is real, but it would be better to set the
-> fpsimd_state::cpu field to an invalid value like we do in
-> fpsimd_flush_task_state()
->
-> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-> index 44d6f7545505..c56956a16d3f 100644
-> --- a/arch/arm64/kernel/fpsimd.c
-> +++ b/arch/arm64/kernel/fpsimd.c
-> @@ -158,6 +158,7 @@ void fpsimd_thread_switch(struct task_struct *next)
->  void fpsimd_flush_thread(void)
->  {
->         memset(&current->thread.fpsimd_state, 0, sizeof(struct fpsimd_state));
-> +       fpsimd_flush_task_state(current);
->         set_thread_flag(TIF_FOREIGN_FPSTATE);
->  }
->
-> (note the memset erroneously initializes that field to CPU 0)
->
-> This more accurately reflects the state of the process after forking,
-> i.e., that its FPSIMD state has never been loaded into any CPU.
+This patch adds the nodes required to support the UART1 node on the
+MSM8916.
 
-I agree with you.
-Can you send a patch to maintainer as soon as possible to solve this issue?
+Signed-off-by: Andy Gross <agross@codeaurora.org>
+---
+ arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi |    8 +++++++
+ arch/arm64/boot/dts/qcom/msm8916.dtsi     |   35 ++++++++++++++++++++++++++++-
+ 2 files changed, 42 insertions(+), 1 deletion(-)
 
-
-Janet
->
-> --
-> Ard.
->
->> Are you seeing an issue in practice?
->>
->> Will
->>
->>> Signed-off-by: Janet Liu <janet.liu@spreadtrum.com>
->>> Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
->>> ---
->>>  arch/arm64/kernel/fpsimd.c |    1 +
->>>  1 file changed, 1 insertion(+)
->>>
->>> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
->>> index 44d6f75..ec58d94 100644
->>> --- a/arch/arm64/kernel/fpsimd.c
->>> +++ b/arch/arm64/kernel/fpsimd.c
->>> @@ -159,6 +159,7 @@ void fpsimd_flush_thread(void)
->>>  {
->>>       memset(&current->thread.fpsimd_state, 0, sizeof(struct fpsimd_state));
->>>       set_thread_flag(TIF_FOREIGN_FPSTATE);
->>> +     this_cpu_write(fpsimd_last_state, NULL);
->>>  }
->>>
->>>  /*
->>> --
->>> 1.7.9.5
->>>
+diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
+index 98abece..3cc53a7 100644
+--- a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
++++ b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
+@@ -19,6 +19,7 @@
+ / {
+ 	aliases {
+ 		serial0 = &blsp1_uart2;
++		serial1 = &blsp1_uart1;
+ 	};
+ 
+ 	chosen {
+@@ -26,6 +27,13 @@
+ 	};
+ 
+ 	soc {
++		serial at 78af000 {
++			status = "okay";
++			pinctrl-names = "default", "sleep";
++			pinctrl-0 = <&blsp1_uart1_default>;
++			pinctrl-1 = <&blsp1_uart1_sleep>;
++		};
++
+ 		serial at 78b0000 {
+ 			status = "okay";
+ 			pinctrl-names = "default", "sleep";
+diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+index 0f49ebd..ba64447 100644
+--- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+@@ -91,6 +91,30 @@
+ 			interrupt-controller;
+ 			#interrupt-cells = <2>;
+ 
++			blsp1_uart1_default: blsp1_uart1_default {
++				pinmux {
++					function = "blsp_uart1";
++					pins = "gpio0", "gpio1";
++				};
++				pinconf {
++					pins = "gpio0", "gpio1";
++					drive-strength = <16>;
++					bias-disable;
++				};
++			};
++
++			blsp1_uart1_sleep: blsp1_uart1_sleep {
++				pinmux {
++					function = "gpio";
++					pins = "gpio0", "gpio1";
++				};
++				pinconf {
++					pins = "gpio0", "gpio1";
++					drive-strength = <2>;
++					bias-pull-down;
++				};
++			};
++
+ 			blsp1_uart2_default: blsp1_uart2_default {
+ 				pinmux {
+ 					function = "blsp_uart2";
+@@ -105,7 +129,7 @@
+ 
+ 			blsp1_uart2_sleep: blsp1_uart2_sleep {
+ 				pinmux {
+-					function = "blsp_uart2";
++					function = "gpio";
+ 					pins = "gpio4", "gpio5";
+ 				};
+ 				pinconf {
+@@ -123,6 +147,15 @@
+ 			reg = <0x1800000 0x80000>;
+ 		};
+ 
++		blsp1_uart1: serial at 78af000 {
++			compatible = "qcom,msm-uartdm-v1.4", "qcom,msm-uartdm";
++			reg = <0x78af000 0x200>;
++			interrupts = <GIC_SPI 107 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&gcc GCC_BLSP1_UART1_APPS_CLK>, <&gcc GCC_BLSP1_AHB_CLK>;
++			clock-names = "core", "iface";
++			status = "disabled";
++		};
++
+ 		blsp1_uart2: serial at 78b0000 {
+ 			compatible = "qcom,msm-uartdm-v1.4", "qcom,msm-uartdm";
+ 			reg = <0x78b0000 0x200>;
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
