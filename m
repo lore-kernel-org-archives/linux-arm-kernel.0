@@ -1,87 +1,32 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 27 Aug 2015 14:07:03 -0500
-Subject: [RFC PATCH] arm/arm64: build all dtbs for CONPILE_TEST
-In-Reply-To: <CAOesGMjzBaobpLsS77UziWeYO9wo21SkdpWT=Pib6AM7DDKTnA@mail.gmail.com>
-References: <1440690994-5978-1-git-send-email-robh@kernel.org>
- <CAOesGMjzBaobpLsS77UziWeYO9wo21SkdpWT=Pib6AM7DDKTnA@mail.gmail.com>
-Message-ID: <CAL_JsqK+QHgCu4x-X+ShyWhj6g=+X-AC5AeCLm1DNYfFdCpH5A@mail.gmail.com>
+From: holler@ahsoftware.de (Alexander Holler)
+Date: Thu, 27 Aug 2015 21:15:26 +0200
+Subject: [PATCH 00/16] deps: deterministic driver initialization order
+In-Reply-To: <55DF5E7C.8030806@ahsoftware.de>
+References: <1440592108-3740-1-git-send-email-holler@ahsoftware.de>
+ <55DF5E7C.8030806@ahsoftware.de>
+Message-ID: <55DF61CE.9030303@ahsoftware.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 27, 2015 at 11:08 AM, Olof Johansson <olof@lixom.net> wrote:
-> On Thu, Aug 27, 2015 at 8:56 AM, Rob Herring <robh@kernel.org> wrote:
->> Enable building all dtb files when COMPILE_TEST is enabled. The dtbs are
->> not really dependent on a platform being enabled or any other kernel
->> config, so for testing coverage it is convenient to build all of the
->> dtbs.
->>
->> This builds all dts files in the tree, not just targets listed. This
->> is simpler for arm64 which has a bunch of sub-dirs.
->>
->> Signed-off-by: Rob Herring <robh@kernel.org>
->> Cc: Russell King <linux@arm.linux.org.uk>
->> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> ---
->> I've had this on my todo list for a while. RFC for now as I want to do
->> the rest of the arches as well. I was originally thinking a new target
->> for this, but thanks to Olof for the COMPILE_TEST suggestion.
->>
->> Rob
->>
->>  arch/arm/boot/dts/Makefile   | 4 ++++
->>  arch/arm64/boot/dts/Makefile | 6 ++++++
->>  2 files changed, 10 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->> index 246473a..4968442a 100644
->> --- a/arch/arm/boot/dts/Makefile
->> +++ b/arch/arm/boot/dts/Makefile
->> @@ -712,5 +712,9 @@ dtb-$(CONFIG_ARCH_MEDIATEK) += \
->>  dtb-$(CONFIG_ARCH_ZX) += zx296702-ad1.dtb
->>  endif
->>
->> +dtstree                := $(srctree)/$(src)
->> +
->> +dtb-$(CONFIG_COMPILE_TEST) := $(patsubst $(dtstree)/%.dts,%.dtb, $(wildcard $(dtstree)/*.dts))
->> +
->>  always         := $(dtb-y)
->>  clean-files    := *.dtb
->> diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
->> index 38913be..9f19390 100644
->> --- a/arch/arm64/boot/dts/Makefile
->> +++ b/arch/arm64/boot/dts/Makefile
->> @@ -11,3 +11,9 @@ dts-dirs += sprd
->>  dts-dirs += xilinx
->>
->>  subdir-y       := $(dts-dirs)
->> +
->> +dtstree                := $(srctree)/$(src)
->> +
->> +dtb-$(CONFIG_COMPILE_TEST) := $(patsubst $(dtstree)/%.dts,%.dtb, $(foreach d,$(dts-dirs), $(wildcard $(dtstree)/$(d)/*.dts)))
+Am 27.08.2015 um 21:01 schrieb Alexander Holler:
+> Am 26.08.2015 um 14:28 schrieb Alexander Holler:
 >
-> I think it would be more appropriate to build dtb-n  here instead of
-> _any_ file ending in dts.
+>> The final 2 patches are fixes which should end up in mainline, regardless
+>> if this feature is merged or not.
+>
+> Just in case your serial or MTD-NAND partitions don't work, the drivers
+> drivers/tty/serial/8250/8250_core.c and drivers/mtd/ofpart.c need the
+> same trivial fix for their initcall level as found in the last two
+> patches of my series. I'm not going to post these patches now until I've
+> got some feedback for the other stuff.
 
-The problem is here dtb-n is NULL. We have to add this into every
-sub-dir. Not a big deal to do, but my concern was remembering to it
-for new ones. Then again, most people are good at mindlessly
-copy-pasting so maybe that won't be a problem. :)
+And just in case, I also have an idea how to fix such dependencies for 
+drivers without DT (by adding hard-wired dependencies directly to 
+drivers). That would also be usable for ACPI and x86.
 
-> It would be useful to build all files, but it's not the behavior that
-> COMPILE_TEST usually has.
+But one step after another. Based on my past experiences, I don't even 
+think the stuff I've just posted will ever end up in the kernel.
 
-Just changing to dtb-n would be equivalent because there is no other
-dependency to enable building. Code has other dependencies typically.
-What dtb do we not want to built in an allyesconfig build? If dtb's
-have any dependencies, that would be a bug. To really make this
-equivalent to a driver using COMPILE_TEST, we would need kconfig
-symbols specifically for each platform's dtbs. Then we would have the
-2 stage unhide (setting COMPILE_TEST) then enable the option.
-
-I was also thinking that perhaps we don't want to require a kconfig
-symbol for every platform family. Adding a kconfig entry is the only
-way to enable building a dtb ATM. I know there are 2 camps to this
-policy though.
-
-Rob
+> Regards,
+>
+> Alexander Holler
