@@ -1,51 +1,95 @@
-From: sbranden@broadcom.com (Scott Branden)
-Date: Thu, 27 Aug 2015 16:35:30 -0700
-Subject: [PATCH v2 0/5] Add Broadcom Northstar Plus Support
-In-Reply-To: <1440628530-6137-1-git-send-email-jonmason@broadcom.com>
-References: <1440628530-6137-1-git-send-email-jonmason@broadcom.com>
-Message-ID: <55DF9EC2.4060902@broadcom.com>
+From: shawn.lin@rock-chips.com (Shawn Lin)
+Date: Fri, 28 Aug 2015 07:52:19 +0800
+Subject: [PATCH v1 3/5] ARM: dts: Add arm, pl330-broken-no-flushp quirk
+ for rk3288 platform
+In-Reply-To: <CAD=FV=Uy8zhPnCQGcks9T-wezcRAohO8Ec3KSLn=Ftr7J1TeSA@mail.gmail.com>
+References: <1440685419-22037-1-git-send-email-shawn.lin@rock-chips.com>
+ <1440685481-22163-1-git-send-email-shawn.lin@rock-chips.com>
+ <CAD=FV=Uy8zhPnCQGcks9T-wezcRAohO8Ec3KSLn=Ftr7J1TeSA@mail.gmail.com>
+Message-ID: <55DFA2B3.1010401@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Patchset all look good.
-Acked-by: Scott Branden <sbranden@broadcom.com>
+On 2015/8/28 0:52, Doug Anderson wrote:
+> Hi,
+>
+> On Thu, Aug 27, 2015 at 7:24 AM, Shawn Lin <shawn.lin@rock-chips.com> wrote:
+>> From: Addy Ke <addy.ke@rock-chips.com>
+>
+> Looks like you just added the "From" here.  I think that's fine, but
+> better to set the author so you get the right cover letter...
+>
+>
+>> Pl330 integrated in rk3288 platform doesn't support
+>> DMAFLUSHP function. So we add broken-no-flushp quirk
+>> for it.
+>>
+>> Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
+>> Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
+>> cc: Heiko Stuebner <heiko@sntech.de>
+>> cc: Doug Anderson <dianders@chromium.org>
+>> cc: Olof Johansson <olofj@google.com>
+>>
+>> ---
+>>
+>> Changes in v1:
+>> - rename broken-no-flushp to "arm,pl330-broken-no-flushp" suggested
+>>    by Krzysztof.
+>> - remove Sunny's tag
+>
+> Note that typically for patches I see people go from "no v" to "v2".  AKA:
+> * PATCH
+> * PATCH v2
+> * PATCH v3
+>
+>
+>>   arch/arm/boot/dts/rk3288.dtsi | 3 +++
+>>   1 file changed, 3 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+>> index 22316d0..106adf7 100644
+>> --- a/arch/arm/boot/dts/rk3288.dtsi
+>> +++ b/arch/arm/boot/dts/rk3288.dtsi
+>> @@ -144,6 +144,7 @@
+>>                          #dma-cells = <1>;
+>>                          clocks = <&cru ACLK_DMAC2>;
+>>                          clock-names = "apb_pclk";
+>> +                       arm,pl330-broken-no-flushp;
+>
+> Note that you should add bindings _before_ the usage of them.  So
+> patch #5 (Documentation) needs to come before this one.
+>
 
-On 15-08-26 03:35 PM, Jon Mason wrote:
+Cool! That makes sense.
+Thanks, Doug.
+
+>>                  };
+>>
+>>                  dmac_bus_ns: dma-controller at ff600000 {
+>> @@ -155,6 +156,7 @@
+>>                          clocks = <&cru ACLK_DMAC1>;
+>>                          clock-names = "apb_pclk";
+>>                          status = "disabled";
+>> +                       arm,pl330-broken-no-flushp;
+>>                  };
+>>
+>>                  dmac_bus_s: dma-controller at ffb20000 {
+>> @@ -165,6 +167,7 @@
+>>                          #dma-cells = <1>;
+>>                          clocks = <&cru ACLK_DMAC1>;
+>>                          clock-names = "apb_pclk";
+>> +                       arm,pl330-broken-no-flushp;
+>>                  };
+>>          };
 >
-> Changes in version 2 incorporate Olof's comments regarding:
-> * the removal of all "Reviewed-by" lines not occurring on external
->    mailing lists
-> * reordering of s-o-b lines
-> * modification of the device tree file to use labels when enabling
-> * increated description of the modification to the MAINTAINERS entry
+> Other than the small nits above, this looks fine to me.
 >
-> Also, modifying the "to" and "cc" recepients so that everyone is
-> receving all of the patches.
+> Reviewed-by: Douglas Anderson <dianders@chromium.org>
 >
-> --
 >
-> This patch series adds support for the Broadcom Northstar Plus family of
-> SoCs.  NSP is a Cortex A9 based SoC under the Broadcom iProc family.
 >
-> Jon Mason (5):
->    dt-bindings: Create Documentation for NSP DT bindings
->    ARM: NSP: add minimal Northstar Plus device tree
->    ARM: NSP: Add basic support for Broadcom Northstar Plus SoC
->    ARM: multi_v7_defconfig: Add NSP to defconfig
->    MAINTAINERS: add entry for the Broadcom Northstar Plus SoCs
->
->   .../devicetree/bindings/arm/bcm/brcm,nsp.txt       |  34 +++++++
->   MAINTAINERS                                        |  12 ++-
->   arch/arm/boot/dts/Makefile                         |   2 +
->   arch/arm/boot/dts/bcm-nsp.dtsi                     | 105 +++++++++++++++++++++
->   arch/arm/boot/dts/bcm958625k.dts                   |  57 +++++++++++
->   arch/arm/configs/multi_v7_defconfig                |   1 +
->   arch/arm/mach-bcm/Kconfig                          |  14 +++
->   arch/arm/mach-bcm/Makefile                         |   5 +-
->   arch/arm/mach-bcm/bcm_nsp.c                        |  25 +++++
->   9 files changed, 252 insertions(+), 3 deletions(-)
->   create mode 100644 Documentation/devicetree/bindings/arm/bcm/brcm,nsp.txt
->   create mode 100644 arch/arm/boot/dts/bcm-nsp.dtsi
->   create mode 100644 arch/arm/boot/dts/bcm958625k.dts
->   create mode 100644 arch/arm/mach-bcm/bcm_nsp.c
->
+
+
+-- 
+Best Regards
+Shawn Lin
