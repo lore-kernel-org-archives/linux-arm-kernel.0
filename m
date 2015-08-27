@@ -1,100 +1,113 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Thu, 27 Aug 2015 15:03:12 +0200
-Subject: [PATCH v4 0/4] irqchip: GICv2/v3: Add support for
- irq_vcpu_affinity
-In-Reply-To: <1440604845-28229-1-git-send-email-marc.zyngier@arm.com>
-References: <1440604845-28229-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <55DF0A90.9010407@linaro.org>
+Date: Thu, 27 Aug 2015 15:05:01 +0200
+Subject: [PATCH v4 0/4] VFIO platform reset
+In-Reply-To: <55DEFAFE.3000909@linaro.org>
+References: <1434359385-19916-1-git-send-email-eric.auger@linaro.org>
+ <55DEFAFE.3000909@linaro.org>
+Message-ID: <55DF0AFD.7020806@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+Dear all,
 
-I tested the series on Calxeda Midway with VFIO use case. Also reviewed
-it again without finding anything new.
+Please ignore this email. It is a reply to a wrong thread (was targeting
+[PATCH v4 0/4] irqchip: GICv2/v3: Add support for irq_vcpu_affinity).
 
-Tested-by: Eric Auger <eric.auger@linaro.org>
-Reviewed-by: Eric Auger <eric.auger@linaro.org>
+My apologies
 
 Best Regards
 
 Eric
 
-
-On 08/26/2015 06:00 PM, Marc Zyngier wrote:
-> The GICv2 and GICv3 architectures allow an active physical interrupt
-> to be forwarded to a guest, and the guest to indirectly perform the
-> deactivation of the interrupt by performing an EOI on the virtual
-> interrupt (see for example the GICv2 spec, 3.2.1).
+On 08/27/2015 01:56 PM, Eric Auger wrote:
+> Hi Marc,
 > 
-> This allows some substantial performance improvement for level
-> triggered interrupts that otherwise have to be masked/unmasked in
-> VFIO, not to mention the required trap back to KVM when the guest
-> performs an EOI.
+> I tested the series on Calxeda Midway with VFIO use case. Also reviewed
+> it again without finding anything new.
 > 
-> To enable this, the GICs need to be switched to a different EOImode,
-> where a taken interrupt can be left "active" (which prevents the same
-> interrupt from being taken again), while other interrupts are still
-> being processed normally.
+> Tested-by: Eric Auger <eric.auger@linaro.org>
+> Reviewed-by: Eric Auger <eric.auger@linaro.org>
 > 
-> We also use the new irq_set_vcpu_affinity hook that was introduced for
-> Intel's "Posted Interrupts" to determine whether or not to perform the
-> deactivation at EOI-time.
+> Best Regards
 > 
-> As all of this only makes sense when the kernel can behave as a
-> hypervisor, we only enable this mode on detecting that the kernel was
-> actually booted in HYP mode, and that the GIC supports this feature.
+> Eric
 > 
-> This series is a complete rework of a RFC I sent over a year ago:
-> 
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/266328.html
-> 
-> Since then, a lot has been either merged (the irqchip_state) or reworked
-> (my active-timer series: http://www.spinics.net/lists/kvm/msg118768.html),
-> and this implements the last few bits for Eric Auger's series to
-> finally make it into the kernel:
-> 
-> https://lkml.org/lkml/2015/7/2/268
-> https://lkml.org/lkml/2015/7/6/291
-> 
-> With all these patches combined, physical interrupt routing from the
-> kernel into a VM becomes possible.
-> 
-> Note that the implementation makes use of the static_key mechanism,
-> which is undergoing an extensive rework in 4.3. I intend to convert
-> this code once both are in mainline.
-> 
-> This has been tested on Juno (GICv2) and FastModel (GICv3). A branch
-> is available at:
-> 
-> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git irq/gic-irq-vcpu-affinity-v4
-> 
-> * From v3:
->   - Use separate irq_chip structures, leading to much nicer code (tglx)
->   - Dropped Eric's Tested/Reviewed-by as there is significant changes
-> 
-> * From v2:
->   - Another small fix from Eric
->   - Some commit message cleanups
-> 
-> * From v1:
->   - Fixes after review from Eric
->   - Got rid of the cascaded GICv2 hack (it was broken anyway)
->   - Folded the LPI deactivation patch (it makes more sense as part of
->     the main one.
->   - Some clarifying comments about the "deactivate on mask"
->   - I haven't retained Eric's Reviewed/Tested-by, as the code as
->     significantly changed on GICv2
-> 
-> Marc Zyngier (4):
->   irqchip: GICv3: Convert to EOImode == 1
->   irqchip: GICv3: Don't deactivate interrupts forwarded to a guest
->   irqchip: GIC: Convert to EOImode == 1
->   irqchip: GIC: Don't deactivate interrupts forwarded to a guest
-> 
->  drivers/irqchip/irq-gic-v3.c       |  70 +++++++++++++++++++++--
->  drivers/irqchip/irq-gic.c          | 111 ++++++++++++++++++++++++++++++++++++-
->  include/linux/irqchip/arm-gic-v3.h |   9 +++
->  include/linux/irqchip/arm-gic.h    |   4 ++
->  4 files changed, 188 insertions(+), 6 deletions(-)
+> On 06/15/2015 11:09 AM, Eric Auger wrote:
+>> In situations where the userspace driver is stopped abnormally and the
+>> VFIO platform device is released, the assigned HW device currently is
+>> left running. As a consequence the HW device might continue issuing IRQs
+>> and performing DMA accesses.
+>>
+>> On release, no physical IRQ handler is setup anymore. Also the DMA buffers
+>> are unmapped leading to IOMMU aborts. So there is no serious consequence.
+>>
+>> However when assigning that HW device again to another userspace driver,
+>> this latter might face some unexpected IRQs and DMA accesses, which are
+>> the result of the previous assignment.
+>>
+>> In virtualization use-case, a VM newly granted with that HW device may be
+>> impacted by the assignment of that device to a previous VM:
+>> - IRQs may be injected very early when booting the new guest, even before
+>>   the guest driver has initialized leading to possible driver state
+>>   inconsistency.
+>> - DMA accesses may hit the newly mapped VM address space at addresses that
+>>   may jeopardize the integrity of the newly installed VM.
+>>
+>> Obviously the criticity depends on the assigned HW device.
+>>
+>> As opposed to PCI, there is no standard mechanism to reset the platform
+>> device.
+>>
+>> This series proposes to implement device specific reset functions in
+>> separate in-kernel vfio reset modules. The vfio-platform driver holds
+>> a whitelist of implemented triplets (compat string, module name,
+>> reset function name). When the vfio-platform driver is probed it identifies
+>> the fellow reset module/function matching the compat string of the
+>> device, if any, and forces the load of this reset module.
+>>
+>> A first reset module is provided: the vfio-platform-calxedaxgmac
+>> module which implements a basic reset for the Calxeda xgmac.
+>>
+>> The series can be found at
+>> https://git.linaro.org/people/eric.auger/linux.git/shortlog/refs/heads/v4.1-rc8-reset-v4
+>>
+>> History:
+>> v3 -> v4:
+>> - fix the commit message of "VFIO: platform: add reset struct and lookup table"
+>>
+>> v2 -> v3:
+>> - remove void module_init/exit functions in calxeda reset module
+>> - remove enum vfio_platform_reset_type
+>> - for reset lookup, use ARRAY_SIZE
+>> - in reset put use symbol_put_addr
+>>
+>> v1 -> v2:
+>> - much simplified compared to v1 although principle of external modules is
+>>   kept: removed mechanism of dynamic registration of reset functions
+>> - list is replaced by whitelist lookup table
+>> - name of the reset function also stored in the lookup table
+>> - autoload of reset modules
+>>
+>> RFC -> PATCH v1:
+>> - solution now based on a lookup list instead of specialized driver
+>>
+>>
+>> Eric Auger (4):
+>>   VFIO: platform: add reset struct and lookup table
+>>   VFIO: platform: add reset callback
+>>   VFIO: platform: populate the reset function on probe
+>>   VFIO: platform: Calxeda xgmac reset module
+>>
+>>  drivers/vfio/platform/Kconfig                      |  2 +
+>>  drivers/vfio/platform/Makefile                     |  2 +
+>>  drivers/vfio/platform/reset/Kconfig                |  7 ++
+>>  drivers/vfio/platform/reset/Makefile               |  5 ++
+>>  .../platform/reset/vfio_platform_calxedaxgmac.c    | 86 ++++++++++++++++++++++
+>>  drivers/vfio/platform/vfio_platform_common.c       | 60 ++++++++++++++-
+>>  drivers/vfio/platform/vfio_platform_private.h      |  7 ++
+>>  7 files changed, 166 insertions(+), 3 deletions(-)
+>>  create mode 100644 drivers/vfio/platform/reset/Kconfig
+>>  create mode 100644 drivers/vfio/platform/reset/Makefile
+>>  create mode 100644 drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c
+>>
 > 
