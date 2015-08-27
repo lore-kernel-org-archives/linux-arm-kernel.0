@@ -1,43 +1,90 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Wed, 26 Aug 2015 18:10:05 -0700
-Subject: [PATCH v10 1/5] mtd: nand: vf610_nfc: Freescale NFC for VF610,
- MPC5125 and others
-In-Reply-To: <20150825203412.GM81844@google.com>
-References: <1438594050-4595-1-git-send-email-stefan@agner.ch>
- <1438594050-4595-2-git-send-email-stefan@agner.ch>
- <20150825203412.GM81844@google.com>
-Message-ID: <a2060e9f1ad9f26e508af64549da52e7@agner.ch>
+From: jianhua.ljh@gmail.com (Jianhua Liu)
+Date: Thu, 27 Aug 2015 10:43:47 +0800
+Subject: [PATCH] arm64: fix bug for reloading FPSIMD state after execve on
+ cpu 0.
+In-Reply-To: <CAKv+Gu_VtFGsKPmFfLHm=kNM=vK=p1TR+fd52P68MiA6J0zUFQ@mail.gmail.com>
+References: <1440556841-17219-1-git-send-email-chunyan.zhang@spreadtrum.com>
+ <20150826111205.GD30466@arm.com>
+ <CAKv+Gu_VtFGsKPmFfLHm=kNM=vK=p1TR+fd52P68MiA6J0zUFQ@mail.gmail.com>
+Message-ID: <CAAgTQPUxuDZtuhAHswfW=mt+6qTNfrwY6qonWttyj+PNsp8_FA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-08-25 13:34, Brian Norris wrote:
-> One more thing...
-> 
-> On Mon, Aug 03, 2015 at 11:27:26AM +0200, Stefan Agner wrote:
->> --- /dev/null
->> +++ b/drivers/mtd/nand/vf610_nfc.c
->> @@ -0,0 +1,645 @@
-> ...
->> +struct vf610_nfc {
->> +	struct mtd_info mtd;
->> +	struct nand_chip chip;
->> +	struct device *dev;
->> +	void __iomem *regs;
->> +	struct completion cmd_done;
->> +	uint buf_offset;
->> +	int page_sz;
-> 
-> AFAICT (even with the 2nd patch), you never really use this field. You
-> just set it/increment it, but don't use it for anything. Kill it?
+On Wed, Aug 26, 2015 at 7:32 PM, Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+> On 26 August 2015 at 13:12, Will Deacon <will.deacon@arm.com> wrote:
+>> Hello,
+>>
+>> [adding Ard]
+>>
+>> On Wed, Aug 26, 2015 at 03:40:41AM +0100, Chunyan Zhang wrote:
+>>> From: Janet Liu <janet.liu@spreadtrum.com>
+>>>
+>>> If process A is running on CPU 0 and do execve syscall and after sched_exec,
+>>> dest_cpu is 0, fpsimd_state.cpu is 0. If at the time Process A get scheduled
+>>> out and after some kernel threads running on CPU 0, process A is back in CPU 0,
+>>> A's fpsimd_state.cpu is current cpu id "0", and per_cpu(fpsimd_last_state)
+>>> points A's fpsimd_state, TIF_FOREIGN_FPSTATE will be clear, kernel will not
+>>> reload the context during it return to userspace. so set the cpu's
+>>> fpsimd_last_state to NULL to avoid this.
+>>
+>> AFAICT, this is only a problem if one of the kernel threads uses the fpsimd
+>> registers, right? However, kernel_neon_begin_partial clobbers
+>> fpsimd_last_state, so I'm struggling to see the problem.
+>>
+>
+> I think the problem is real, but it would be better to set the
+> fpsimd_state::cpu field to an invalid value like we do in
+> fpsimd_flush_task_state()
+>
+> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+> index 44d6f7545505..c56956a16d3f 100644
+> --- a/arch/arm64/kernel/fpsimd.c
+> +++ b/arch/arm64/kernel/fpsimd.c
+> @@ -158,6 +158,7 @@ void fpsimd_thread_switch(struct task_struct *next)
+>  void fpsimd_flush_thread(void)
+>  {
+>         memset(&current->thread.fpsimd_state, 0, sizeof(struct fpsimd_state));
+> +       fpsimd_flush_task_state(current);
+>         set_thread_flag(TIF_FOREIGN_FPSTATE);
+>  }
+>
+> (note the memset erroneously initializes that field to CPU 0)
+>
+> This more accurately reflects the state of the process after forking,
+> i.e., that its FPSIMD state has never been loaded into any CPU.
 
-It is used in the write path, I think I meant to use it for subpage
-writes, when I thought it would just mean to transfer only parts of the
-page to the controller.
+I agree with you.
+Can you send a patch to maintainer as soon as possible to solve this issue?
 
-However, as the subpage discussion basically concluded in not using it
-for now on this controller, we can as well transfer the complete page
-(page_sz). Or is there another case in which vf610_nfc_write_buf could
-be called with less than page_sz?
 
---
-Stefan
+Janet
+>
+> --
+> Ard.
+>
+>> Are you seeing an issue in practice?
+>>
+>> Will
+>>
+>>> Signed-off-by: Janet Liu <janet.liu@spreadtrum.com>
+>>> Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
+>>> ---
+>>>  arch/arm64/kernel/fpsimd.c |    1 +
+>>>  1 file changed, 1 insertion(+)
+>>>
+>>> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+>>> index 44d6f75..ec58d94 100644
+>>> --- a/arch/arm64/kernel/fpsimd.c
+>>> +++ b/arch/arm64/kernel/fpsimd.c
+>>> @@ -159,6 +159,7 @@ void fpsimd_flush_thread(void)
+>>>  {
+>>>       memset(&current->thread.fpsimd_state, 0, sizeof(struct fpsimd_state));
+>>>       set_thread_flag(TIF_FOREIGN_FPSTATE);
+>>> +     this_cpu_write(fpsimd_last_state, NULL);
+>>>  }
+>>>
+>>>  /*
+>>> --
+>>> 1.7.9.5
+>>>
