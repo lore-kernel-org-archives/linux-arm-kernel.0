@@ -1,27 +1,30 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 27 Aug 2015 19:45:26 +0100
-Subject: [PATCH-v3 1/2] mfd: devicetree: bindings: 88pm800: Add DT
- property for dual phase enable
-In-Reply-To: <55DB3012.6010904@linaro.org>
-References: <1440420006-31556-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1440420006-31556-2-git-send-email-vaibhav.hiremath@linaro.org>
- <20150824130205.GE3237@x1> <55DB3012.6010904@linaro.org>
-Message-ID: <20150827184526.GJ5313@sirena.org.uk>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 27 Aug 2015 11:53:10 -0700
+Subject: [PATCH] clk: at91: add audio pll clock driver
+In-Reply-To: <20150827113035.072cccb5@bbrezillon>
+References: <1438337864-27949-1-git-send-email-nicolas.ferre@atmel.com>
+ <20150827113035.072cccb5@bbrezillon>
+Message-ID: <20150827185310.GV19120@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 24, 2015 at 08:24:10PM +0530, Vaibhav Hiremath wrote:
+On 08/27, Boris Brezillon wrote:
+> Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+> > +
+> > +static long clk_audio_pll_pad_round_rate(struct clk_hw *hw, unsigned long rate,
+> > +					 unsigned long *parent_rate)
+> 
+> I thought we were trying to get rid of the ->round_rate() function in
+> favor of the ->determine_rate() one (which is more flexible), but maybe
+> I'm wrong. Stephen, Mike, what's your opinion?
 
-> Mark,
+I'm not opposed to people using ->round_rate() if they want to
+use it and it serves their purpose. Moving everyone to
+->determine_rate() will be a long journey that has little to no
+benefit for most drivers, so it's not like we need to force
+everyone to use the determine rate op for new submissions so that
+we can delete the round rate op one day.
 
-> Any comments here before I spin V4.
-
-Please just resubmit things, seeing that a change was requested is
-usually a good indication that a new version is incoming.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150827/5eb1b350/attachment.sig>
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
