@@ -1,30 +1,23 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 27 Aug 2015 11:53:10 -0700
-Subject: [PATCH] clk: at91: add audio pll clock driver
-In-Reply-To: <20150827113035.072cccb5@bbrezillon>
-References: <1438337864-27949-1-git-send-email-nicolas.ferre@atmel.com>
- <20150827113035.072cccb5@bbrezillon>
-Message-ID: <20150827185310.GV19120@codeaurora.org>
+From: holler@ahsoftware.de (Alexander Holler)
+Date: Thu, 27 Aug 2015 21:01:16 +0200
+Subject: [PATCH 00/16] deps: deterministic driver initialization order
+In-Reply-To: <1440592108-3740-1-git-send-email-holler@ahsoftware.de>
+References: <1440592108-3740-1-git-send-email-holler@ahsoftware.de>
+Message-ID: <55DF5E7C.8030806@ahsoftware.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/27, Boris Brezillon wrote:
-> Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
-> > +
-> > +static long clk_audio_pll_pad_round_rate(struct clk_hw *hw, unsigned long rate,
-> > +					 unsigned long *parent_rate)
-> 
-> I thought we were trying to get rid of the ->round_rate() function in
-> favor of the ->determine_rate() one (which is more flexible), but maybe
-> I'm wrong. Stephen, Mike, what's your opinion?
+Am 26.08.2015 um 14:28 schrieb Alexander Holler:
 
-I'm not opposed to people using ->round_rate() if they want to
-use it and it serves their purpose. Moving everyone to
-->determine_rate() will be a long journey that has little to no
-benefit for most drivers, so it's not like we need to force
-everyone to use the determine rate op for new submissions so that
-we can delete the round rate op one day.
+> The final 2 patches are fixes which should end up in mainline, regardless
+> if this feature is merged or not.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Just in case your serial or MTD-NAND partitions don't work, the drivers
+drivers/tty/serial/8250/8250_core.c and drivers/mtd/ofpart.c need the 
+same trivial fix for their initcall level as found in the last two 
+patches of my series. I'm not going to post these patches now until I've 
+got some feedback for the other stuff.
+
+Regards,
+
+Alexander Holler
