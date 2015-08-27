@@ -1,61 +1,74 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Thu, 27 Aug 2015 09:47:36 -0700
-Subject: [PATCH v10 1/5] mtd: nand: vf610_nfc: Freescale NFC for VF610,
- MPC5125 and others
-In-Reply-To: <a2060e9f1ad9f26e508af64549da52e7@agner.ch>
-References: <1438594050-4595-1-git-send-email-stefan@agner.ch>
- <1438594050-4595-2-git-send-email-stefan@agner.ch>
- <20150825203412.GM81844@google.com>
- <a2060e9f1ad9f26e508af64549da52e7@agner.ch>
-Message-ID: <20150827164736.GY81844@google.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 27 Aug 2015 11:49:06 -0500
+Subject: [PATCH 1/2] drm/layerscape: Add HDMI support for DCU DRM driver
+In-Reply-To: <1440649198-27244-1-git-send-email-jianwei.wang.chn@gmail.com>
+References: <1440649198-27244-1-git-send-email-jianwei.wang.chn@gmail.com>
+Message-ID: <CAL_JsqJGPuZOya+UARaKkhWus2cHjr=8ByhL7WnQhMrCj7-beQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 26, 2015 at 06:10:05PM -0700, Stefan Agner wrote:
-> On 2015-08-25 13:34, Brian Norris wrote:
-> > One more thing...
-> > 
-> > On Mon, Aug 03, 2015 at 11:27:26AM +0200, Stefan Agner wrote:
-> >> --- /dev/null
-> >> +++ b/drivers/mtd/nand/vf610_nfc.c
-> >> @@ -0,0 +1,645 @@
-> > ...
-> >> +struct vf610_nfc {
-> >> +	struct mtd_info mtd;
-> >> +	struct nand_chip chip;
-> >> +	struct device *dev;
-> >> +	void __iomem *regs;
-> >> +	struct completion cmd_done;
-> >> +	uint buf_offset;
-> >> +	int page_sz;
-> > 
-> > AFAICT (even with the 2nd patch), you never really use this field. You
-> > just set it/increment it, but don't use it for anything. Kill it?
-> 
-> It is used in the write path, I think I meant to use it for subpage
-> writes, when I thought it would just mean to transfer only parts of the
-> page to the controller.
+On Wed, Aug 26, 2015 at 11:19 PM, Jianwei Wang
+<jianwei.wang.chn@gmail.com> wrote:
+> Some Freescale SoCs, there has an DVI/HDMI controller and a PHY,
+> attached to one of their display controller unit's LCDC interfaces.
+> This patch adds a driver for SiI902x. The SiI902x is a HDMI
+> transmitter It supports resolutions from standard definition
+> 480i/p and 576i/p all the way to high-definition 720p, 1080i,
+> and 1080p, the highest resolution supported by HDTVs today.
+>
+> Signed-off-by: Alison Wang <b18965@freescale.com>
+> Signed-off-by: Xiubo Li <lixiubo@cmss.chinamobile.com>
+> Signed-off-by: Jianwei Wang <jianwei.wang.chn@gmail.com>
+> ---
+>  .../devicetree/bindings/video/SiI902x.txt          |  17 +
+>  drivers/gpu/drm/fsl-dcu/Makefile                   |   1 +
+>  drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_hdmi.c         | 639 +++++++++++++++++++++
 
-Ah, you're right. Sorry, I missed that. I got mixed up seeing most of
-your uses of 'page_sz' were for a local variable of the same name, not
-this field.
+This is a separate chip. It should not be part of the FSL DCU driver.
 
-> However, as the subpage discussion basically concluded in not using it
-> for now on this controller, we can as well transfer the complete page
-> (page_sz). Or is there another case in which vf610_nfc_write_buf could
-> be called with less than page_sz?
+>  drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_kms.c          |  10 +
+>  drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_output.h       |  10 +
+>  5 files changed, 677 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/video/SiI902x.txt
+>  create mode 100644 drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_hdmi.c
+>
+> diff --git a/Documentation/devicetree/bindings/video/SiI902x.txt b/Documentation/devicetree/bindings/video/SiI902x.txt
+> new file mode 100644
+> index 0000000..d304499
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/video/SiI902x.txt
+> @@ -0,0 +1,17 @@
+> +Device-Tree bindings for the SiI902x hdmi transmitter.
+> +
+> +Required properties:
+> +- compatible:  Should be "sii902x".
 
-I'll leave that up to you. I'm perfectly fine leaving it in, now that I
-see its proper use. Just in case things change in the future, I think it
-does help to clarify the flow of information a little. Although, I might
-recommend a change in naming, since it could get confused with the
-actual page size -- which is normally constant -- whereas this field
-changes dynamically depending on the command-in-flight.
+This should have the vendor prefix sil. It should also be specific to
+which chip number. There is already a binding for the 9022 in
+vexpress-v2m.dtsi, so we should use the same binding although it is
+not documented. I'm not too sure about the -tpi and -cpi parts of the
+binding though. It appears the device has multiple i2c addresses which
+is fairly common. I would not do multiple nodes like was done. If the
+secondary addresses are known or programmable thru the primary
+address, we can just hardcode them in the driver (ADV7511 is an
+example). If we don't know the addresses, then we can just put
+multiple addresses in the reg property.
 
-Perhaps the struct could have 'write_len' (to help represent an action)
-and the local variable in vf610_nfc_command() could be 'tfr_len' (to
-distinguish how it isn't necessarily identical to 'write_len')? Just
-throwing (likely bad) ideas out there.
+Rob
 
-Regards,
-Brian
+> +- reg:                 The I2C address of the device.
+> +- interrupts:  Interrupt number to the cpu.
+> +
+> +Example:
+> +
+> +&i2c1 {
+> +       status = "okay";
+> +       hdmi: sii9022a at 39 {
+> +             compatible = "sii902x";
+> +             reg = <0x39>;
+> +             interrupts = <GIC_SPI 167 IRQ_TYPE_EDGE_RISING>;
+> +       };
+
+You should be using the OF graph to describe the connection to the DCU output.
+
+Rob
