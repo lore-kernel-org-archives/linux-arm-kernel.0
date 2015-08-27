@@ -1,65 +1,84 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 27 Aug 2015 07:44:52 +0100
-Subject: [PATCH 4/4] remoteproc: debugfs: Add ability to boot remote
- processor using debugfs
-In-Reply-To: <55DDF2A0.5010404@mentor.com>
-References: <1440594483-29601-1-git-send-email-lee.jones@linaro.org>
- <1440594483-29601-5-git-send-email-lee.jones@linaro.org>
- <55DDF2A0.5010404@mentor.com>
-Message-ID: <20150827064452.GC19409@x1>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Thu, 27 Aug 2015 08:44:32 +0200
+Subject: [PATCH v3 4/4] regmap-i2c: Add smbus i2c block support
+In-Reply-To: <1440657872-24554-1-git-send-email-mpa@pengutronix.de>
+References: <1440657872-24554-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <1440657872-24554-5-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 26 Aug 2015, Nathan Lynch wrote:
+This allows to read/write up to 32 bytes of data and is to be prefered
+if supported before the register read/write smbus support.
 
-> On 08/26/2015 08:08 AM, Lee Jones wrote:
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > ---
-> >  drivers/remoteproc/remoteproc_debugfs.c | 25 +++++++++++++++++++++++++
-> >  1 file changed, 25 insertions(+)
-> 
-> The commit message should describe why this is needed...
-> 
-> > diff --git a/drivers/remoteproc/remoteproc_debugfs.c b/drivers/remoteproc/remoteproc_debugfs.c
-> > index 9d30809..9620962 100644
-> > --- a/drivers/remoteproc/remoteproc_debugfs.c
-> > +++ b/drivers/remoteproc/remoteproc_debugfs.c
-> > @@ -88,8 +88,33 @@ static ssize_t rproc_state_read(struct file *filp, char __user *userbuf,
-> >  	return simple_read_from_buffer(userbuf, count, ppos, buf, i);
-> >  }
-> >  
-> > +static ssize_t rproc_state_write(struct file *filp, const char __user *userbuf,
-> > +				 size_t count, loff_t *ppos)
-> > +{
-> > +	struct rproc *rproc = filp->private_data;
-> > +	char buf[2];
-> > +	int ret;
-> > +
-> > +	ret = copy_from_user(buf, userbuf, 1);
-> > +	if (ret)
-> > +		return -EFAULT;
-> > +
-> > +	switch (buf[0]) {
-> > +	case '1':
-> > +		ret = rproc_boot(rproc);
-> > +		if (ret)
-> > +			dev_warn(&rproc->dev, "Boot failed: %d\n", ret);
-> > +		break;
-> > +	default:
-> > +		rproc_shutdown(rproc);
-> > +	}
-> > +
-> > +	return count;
-> > +}
-> 
-> ... and I suggest that the user interface be reconsidered.  If '1' means
-> "boot" and literally anything else means "shut down" then you can't add
-> operations in the future without potentially breaking things.
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+---
+ drivers/base/regmap/regmap-i2c.c | 49 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 49 insertions(+)
 
-Good points, will fix.
-
+diff --git a/drivers/base/regmap/regmap-i2c.c b/drivers/base/regmap/regmap-i2c.c
+index 4b76e33110a2..ddb9b0efb724 100644
+--- a/drivers/base/regmap/regmap-i2c.c
++++ b/drivers/base/regmap/regmap-i2c.c
+@@ -209,11 +209,60 @@ static struct regmap_bus regmap_i2c = {
+ 	.val_format_endian_default = REGMAP_ENDIAN_BIG,
+ };
+ 
++static int regmap_i2c_smbus_i2c_write(void *context, const void *data,
++				      size_t count)
++{
++	struct device *dev = context;
++	struct i2c_client *i2c = to_i2c_client(dev);
++
++	if (count < 1)
++		return -EINVAL;
++	if (count >= I2C_SMBUS_BLOCK_MAX)
++		return -E2BIG;
++
++	--count;
++	return i2c_smbus_write_i2c_block_data(i2c, ((u8 *)data)[0], count,
++					      ((u8 *)data + 1));
++}
++
++static int regmap_i2c_smbus_i2c_read(void *context, const void *reg,
++				     size_t reg_size, void *val,
++				     size_t val_size)
++{
++	struct device *dev = context;
++	struct i2c_client *i2c = to_i2c_client(dev);
++	int ret;
++
++	if (reg_size != 1 || val_size < 1)
++		return -EINVAL;
++	if (val_size >= I2C_SMBUS_BLOCK_MAX)
++		return -E2BIG;
++
++	ret = i2c_smbus_read_i2c_block_data(i2c, ((u8 *)reg)[0], val_size, val);
++	if (ret == val_size)
++		return 0;
++	else if (ret < 0)
++		return ret;
++	else
++		return -EIO;
++}
++
++static struct regmap_bus regmap_i2c_smbus_i2c_block = {
++	.write = regmap_i2c_smbus_i2c_write,
++	.read = regmap_i2c_smbus_i2c_read,
++	.max_raw_read = I2C_SMBUS_BLOCK_MAX,
++	.max_raw_write = I2C_SMBUS_BLOCK_MAX,
++};
++
+ static const struct regmap_bus *regmap_get_i2c_bus(struct i2c_client *i2c,
+ 					const struct regmap_config *config)
+ {
+ 	if (i2c_check_functionality(i2c->adapter, I2C_FUNC_I2C))
+ 		return &regmap_i2c;
++	else if (config->reg_bits == 8 &&
++		 i2c_check_functionality(i2c->adapter,
++					 I2C_FUNC_SMBUS_I2C_BLOCK))
++		return &regmap_i2c_smbus_i2c_block;
+ 	else if (config->val_bits == 16 && config->reg_bits == 8 &&
+ 		 i2c_check_functionality(i2c->adapter,
+ 					 I2C_FUNC_SMBUS_WORD_DATA))
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+2.5.0
