@@ -1,177 +1,287 @@
-From: jteki@openedev.com (Jagan Teki)
-Date: Thu, 27 Aug 2015 11:53:16 +0530
-Subject: [LINUX RFC v2 0/4] spi: add dual parallel mode support in Zynq
- MPSoC GQSPI controller
-In-Reply-To: <CAGnW=BZtsVtT+Z7gTq5jybXsHWp+RNpjc6ckk6-MXWxAS7u8Mw@mail.gmail.com>
-References: <1440570367-22569-1-git-send-email-ranjit.waghmode@xilinx.com>
- <CAD6G_RQhWBsUTZNBB44W98Fjzw82H_D_E9nY0aDWezj729mkoA@mail.gmail.com>
- <CAGnW=BZtsVtT+Z7gTq5jybXsHWp+RNpjc6ckk6-MXWxAS7u8Mw@mail.gmail.com>
-Message-ID: <CAD6G_RTCQ5Fzjgxz+-3oMDAyUTg6UFAqvpEPQzJ9maSTZ3Nc_g@mail.gmail.com>
+From: Hannes.Schmelzer@br-automation.com (Hannes Schmelzer)
+Date: Thu, 27 Aug 2015 08:25:57 +0200
+Subject: [PATCH 2/2] memory: omap-gpmc: Add Kconfig option for debug
+In-Reply-To: <1432156863-19695-3-git-send-email-tony@atomide.com>
+References: <1432156863-19695-1-git-send-email-tony@atomide.com>
+ <1432156863-19695-3-git-send-email-tony@atomide.com>
+Message-ID: <OFD8721230.94222018-ONC1257EAE.00234FC6-C1257EAE.0023561C@br-automation.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 August 2015 at 21:02, punnaiah choudary kalluri
-<punnaia@xilinx.com> wrote:
-> On Wed, Aug 26, 2015 at 5:49 PM, Jagan Teki <jteki@openedev.com> wrote:
->> On 26 August 2015 at 11:56, Ranjit Waghmode <ranjit.waghmode@xilinx.com> wrote:
->>> This series adds dual parallel mode support for Zynq Ultrascale+
->>> MPSoC GQSPI controller driver.
->>>
->>> What is dual parallel mode?
->>> ---------------------------
->>> ZynqMP GQSPI controller supports Dual Parallel mode with following functionalities:
->>> 1) Supporting two SPI flash memories operating in parallel. 8 I/O lines.
->>> 2) Chip selects and clock are shared to both the flash devices
->>> 3) This mode is targeted for faster read/write speed and also doubles the size
->>> 4) Commands/data can be transmitted/received from both the devices(mirror),
->>>    or only upper or only lower flash memory devices.
->>> 5) Data arrangement:
->>>    With stripe enabled,
->>>    Even bytes i.e. 0, 2, 4,... are transmitted on Lower Data Bus
->>>    Odd bytes i.e. 1, 3, 5,.. are transmitted on Upper Data Bus.
->>>
->>> This series also updated MTD layer files for adding parallel mode support.
->>>
->>> 1) Added Support for two flashes
->>> 2) Support to enable/disable data stripe as and when required.
->>> 3) Added required parameters to spi_nor structure. Initialized all
->>>    added parameters in spi_nor_scan()
->>> 4) Added support for dual parallel in spi_nor_read/write/erase functions by:
->>>    a) Increasing page_size, sector_size, erase_size and toatal flash size
->>>       as and when required.
->>>    b) Dividing address by 2
->>>    c) Updating spi->master->flags for qspi driver to change CS
->>> 5) Updated read_sr() to get status of both flashes
->>> 6) Also updated read_fsr() to get status of both flashes
->>>
->>> These all are very high level changes and expected to make an idea clear.
->>> Comments and suggestions are always welcomed
->>>
->>> ---
->>> V2 Changes:
->>> a) Splitted patches based on logical changes
->>> b) Added error handling for newly added APIs in SPI core
->>> ---
->>>
->>> Ranjit Waghmode (4):
->>>   spi: add support of two chip selects & data stripe
->>>   mtd: add spi_device instance to spi_nor struct
->>>   spi-nor: add dual parallel mode support
->>>   spi: zynqmp: gqspi: add support for dual parallel mode configuration
->>
->> I don't find any previous discussion about way to inform flash
->> dual-ness into spi-nor
->> from spi drivers.
->>
->> Here is my idea, probably others may think same.
->> Informing dual_flash from drivers/spi through flags or any other mode
->> bits is not a better approach as dual flash feature is specific to
->> spi-nor flash controller (controller specially designed for spi-nor
->> flash not the generic spi controller).  So if the driver sits on
->> drivers/mtd/spi-nor/ (ex: fsl-quadspi.c), may be we can inform flash
->> specific things to spi-nor as it's not touching generic spi stack in
->> Linux. But there is a defined-drawback if the driver is moved to
->> drivers/mtd/spi-nor ie it can't use spi core API's at-all.
->
-> Xilinx GQSPI is a generic quad spi controller. The primary goal is to support
-> Generic/Future command sequences and Future NOR/NAND flash devices.
-> This core can also be used for legacy SPI devices. Due to the generic nature
-> of the core, software can generate any command sequence. It also has additional
-> features like parallel and stacked configurations to double the data
-> rate and size.
-> Accessing spi-nor flash device is one particular use case and like
-> that there will be
-> many. So, we decided to keep this driver in generic spi framework and
-> that is the ideal
-> thing to do for the GQSPI controller.
+Hi Tony,
 
-Yes, I understand the generic nature of the GQSPI and it's good to
-have all-in-one like generic spi, spi-nor and spi-nand and more
-together, but Linux stacks were implemented in such a way to support
-the each type of controller with connected slaves separably for better
-handling.
+Did anyone test this changeset on some AM335x board?
 
-Currently GQSPI driver is added in drivers/spi as it supports generic
-spi nature and now it enhanced more through flags for supporting
-spi-nor, what if we add spi-nand support for the same controller? do
-we add one more driver in spi-nand framework (drivers/mtd/spi-nand -
-an on going implementation)? My only observation here is even if the
-controller is more generic to support more number of device classes,
-and adding same driver and populate the slave stuff through flags or
-different kind of mechanism to different driver stack, this is not a
-better approach I thought.
+Today I ran into trouble with that because:
 
-Based on the above comments, there is an approach to handle this
-support and I'm not 100% sure whether this fits or not but we
-implemented the same -  this is "probing child devices from parent"
-(there was a discussion with Arnd earlier wrt this, but I'm unable to
-get the mailing thread)
+The GPMC controller gets reseted on kernel boot due to the missing/removed 
+HWMOD_INIT_NO_RESET flag.
 
-Added Arnd (probably will give more inputs or corrections)
+Primary this should not be a big problem, but on my board (maybe on all 
+AM335x) the GPMC doesn't behave as described in TRM.
+Especially the GPMC_CONFIG register is not reset to 0h after reset, 
+instead it holds the value 0xa00 which is very strange because bit 10-31 
+are reserved.
 
-Let me explain how we implemented on our design.
-We have PCIe controller that support basic root complex handling, dma
-and controller hotplug (not in-build pcie hp) and ideally we need to
-write driver for handling root complex on drivers/pci/host and one
-hotplug driver in drivers/pci and one more driver in drivers/dma for
-handling pcie dma stuff. And some pcie calls need to navigate from
-root complex driver to dma and hotplug driver that means there is call
-transition from driver/pci to driver/dma which is absolutely not a
-good approach (spi to spi-nor and spi-nand transition - in GQSPI case)
+Further this 0xa00 means that Bit9 (WAIT1PINPOLARITY) is set, exactly this 
+causes my system to stall on first access the connected NAND flash because 
+it never becomes ready due to the wrong wait pin polarity. Maybe others 
+dont't run into trouble because they may use WAIT0PIN, which one has it's 
+old polarity.
 
-So the implementation we follow is like there is a pcie root complex
-driver(probably generic spi driver in drivers/spi/*) and inside probe
-we have register platform_device for hotplug (spi-nor) and dma
-(spi-nand) and the dma driver in drivers/dma and hotplug driver in
-driver/pci/ are platform drivers which is of legacy binding (not with
-dts) so there should be a common dts for root complex driver
-(drivers/spi/*) and individual child driver need to take those while
-registering platform_device.
+First approach was simply to write 0x0 to the GPMC_CONFIG register during 
+gpmc_probe function.
+It solves the problem.
 
-example pseudo:
+I also tried to issue some SYSRESET through GPMC registers without 
+success, same strange behavior.
 
-drivers/dma/dma-child2.c
+What?s your thinking around that?
 
-Legacy platform_driver binding and handling dma future as normal dma
-driver, spi-nand in your case
+Best regards,
+Hannes
 
-drivers/pci/hotplug/hp-child1.c
+linux-omap-owner at vger.kernel.org schrieb am 20.05.2015 23:21:03:
 
-Legacy platform_driver binding and handling hotplug future as normal
-hotplug driver, spi-nor in your case.
-
-drivers/pci/host/rc-parent-pci.c
-
-static int rc_parent_pcie_probe_bridge(struct platform_device *pdev)
-{
-   // Generic rc handling (genric spi stuff)
-
-   // Hotplug handling (spi-nor)
-   - platform_device_alloc
-   - assign need resources
-   - register pdev using platform_device_add
-
-    // DMA handling (spi-nand)
-   - same as above
-}
-
-static const struct of_device_id rc_parent_pcie_match_table[] = {
-        {.compatible = "abc,rc-parent",},
-        {},
-};
-
-static struct platform_driver rc_parent_pcie_driver = {
-        .driver = {
-                   .name = "rc-parent",
-                   .of_match_table = of_match_ptr(rc_parent_pcie_match_table),
-        },
-        .probe = rc_parent_pcie_probe_bridge,
-};
-module_platform_driver(rc_parent_pcie_driver);
-
-I couldn't find any driver mainlined wrt this design, think more on
-GQSPI front, whether this design fits well or not.
-
-thanks!
--- 
-Jagan | openedev.
+> Von: Tony Lindgren <tony@atomide.com>
+> An: linux-omap at vger.kernel.org
+> Kopie: linux-arm-kernel at lists.infradead.org, Brian Hutchinson 
+> <b.hutchman@gmail.com>, Paul Walmsley <paul@pwsan.com>, Roger Quadros 
+<rogerq@ti.com>
+> Datum: 20.05.2015 23:37
+> Betreff: [PATCH 2/2] memory: omap-gpmc: Add Kconfig option for debug
+> Gesendet von: linux-omap-owner at vger.kernel.org
+> 
+> We support decoding the bootloader values if DEBUG is defined.
+> But we also need to change the struct omap_hwmod flags to have
+> HWMOD_INIT_NO_RESET to avoid the GPMC being reset during the
+> boot. Otherwise just the default timings will be displayed
+> instead of the bootloader configured timings.
+> 
+> This also allows us to clean up the various GPMC related
+> hwmod flags. For debugging, we only need HWMOD_INIT_NO_RESET,
+> and HWMOD_INIT_NO_IDLE is not needed.
+> 
+> Cc: Brian Hutchinson <b.hutchman@gmail.com>
+> Cc: Paul Walmsley <paul@pwsan.com>
+> Cc: Roger Quadros <rogerq@ti.com>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> ---
+>  arch/arm/mach-omap2/omap_hwmod.h                        |  6 ++++++
+>  arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c      | 12 
+++----------
+>  arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c |  3 ++-
+>  arch/arm/mach-omap2/omap_hwmod_3xxx_data.c              | 12 
+++----------
+>  arch/arm/mach-omap2/omap_hwmod_44xx_data.c              | 11 
+++---------
+>  arch/arm/mach-omap2/omap_hwmod_7xx_data.c               |  4 ++--
+>  arch/arm/mach-omap2/omap_hwmod_81xx_data.c              |  2 ++
+>  drivers/memory/Kconfig                                  |  8 ++++++++
+>  drivers/memory/omap-gpmc.c                              |  6 +++---
+>  9 files changed, 29 insertions(+), 35 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/omap_hwmod.h 
+b/arch/arm/mach-omap2/omap_hwmod.h
+> index 9611c91..b5d27ec 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod.h
+> +++ b/arch/arm/mach-omap2/omap_hwmod.h
+> @@ -109,6 +109,12 @@ extern struct omap_hwmod_sysc_fields 
+omap_hwmod_sysc_type3;
+> 
+>  #define DEBUG_OMAPUART_FLAGS   (HWMOD_INIT_NO_IDLE | 
+HWMOD_INIT_NO_RESET)
+> 
+> +#ifdef CONFIG_OMAP_GPMC_DEBUG
+> +#define DEBUG_OMAP_GPMC_HWMOD_FLAGS   HWMOD_INIT_NO_RESET
+> +#else
+> +#define DEBUG_OMAP_GPMC_HWMOD_FLAGS   0
+> +#endif
+> +
+>  #if defined(CONFIG_DEBUG_OMAP2UART1)
+>  #undef DEBUG_OMAP2UART1_FLAGS
+>  #define DEBUG_OMAP2UART1_FLAGS DEBUG_OMAPUART_FLAGS
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c 
+b/arch/arm/
+> mach-omap2/omap_hwmod_2xxx_ipblock_data.c
+> index 8821b9d..6dcfd03 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c
+> @@ -762,16 +762,8 @@ struct omap_hwmod omap2xxx_gpmc_hwmod = {
+>     .name      = "gpmc",
+>     .class      = &omap2xxx_gpmc_hwmod_class,
+>     .main_clk   = "gpmc_fck",
+> -   /*
+> -    * XXX HWMOD_INIT_NO_RESET should not be needed for this IP
+> -    * block.  It is not being added due to any known bugs with
+> -    * resetting the GPMC IP block, but rather because any timings
+> -    * set by the bootloader are not being correctly programmed by
+> -    * the kernel from the board file or DT data.
+> -    * HWMOD_INIT_NO_RESET should be removed ASAP.
+> -    */
+> -   .flags      = (HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET |
+> -            HWMOD_NO_IDLEST),
+> +   /* Skip reset for CONFIG_OMAP_GPMC_DEBUG for bootloader timings */
+> +   .flags      = HWMOD_NO_IDLEST | DEBUG_OMAP_GPMC_HWMOD_FLAGS,
+>     .prcm      = {
+>        .omap2   = {
+>           .prcm_reg_id = 3,
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c 
+b/arch/
+> arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c
+> index cabc569..ae0cb67 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c
+> @@ -668,7 +668,8 @@ struct omap_hwmod am33xx_gpmc_hwmod = {
+>     .name      = "gpmc",
+>     .class      = &am33xx_gpmc_hwmod_class,
+>     .clkdm_name   = "l3s_clkdm",
+> -   .flags      = (HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET),
+> +   /* Skip reset for CONFIG_OMAP_GPMC_DEBUG for bootloader timings */
+> +   .flags      = DEBUG_OMAP_GPMC_HWMOD_FLAGS,
+>     .main_clk   = "l3s_gclk",
+>     .prcm      = {
+>        .omap4   = {
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c 
+b/arch/arm/mach-omap2/
+> omap_hwmod_3xxx_data.c
+> index 4e8e93c..0ca4d3f 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+> @@ -2169,16 +2169,8 @@ static struct omap_hwmod omap3xxx_gpmc_hwmod = {
+>     .clkdm_name   = "core_l3_clkdm",
+>     .mpu_irqs   = omap3xxx_gpmc_irqs,
+>     .main_clk   = "gpmc_fck",
+> -   /*
+> -    * XXX HWMOD_INIT_NO_RESET should not be needed for this IP
+> -    * block.  It is not being added due to any known bugs with
+> -    * resetting the GPMC IP block, but rather because any timings
+> -    * set by the bootloader are not being correctly programmed by
+> -    * the kernel from the board file or DT data.
+> -    * HWMOD_INIT_NO_RESET should be removed ASAP.
+> -    */
+> -   .flags      = (HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET |
+> -            HWMOD_NO_IDLEST),
+> +   /* Skip reset for CONFIG_OMAP_GPMC_DEBUG for bootloader timings */
+> +   .flags      = HWMOD_NO_IDLEST | DEBUG_OMAP_GPMC_HWMOD_FLAGS,
+>  };
+> 
+>  /*
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c 
+b/arch/arm/mach-omap2/
+> omap_hwmod_44xx_data.c
+> index f5e68a7..43eebf2 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+> @@ -1188,15 +1188,8 @@ static struct omap_hwmod omap44xx_gpmc_hwmod = {
+>     .name      = "gpmc",
+>     .class      = &omap44xx_gpmc_hwmod_class,
+>     .clkdm_name   = "l3_2_clkdm",
+> -   /*
+> -    * XXX HWMOD_INIT_NO_RESET should not be needed for this IP
+> -    * block.  It is not being added due to any known bugs with
+> -    * resetting the GPMC IP block, but rather because any timings
+> -    * set by the bootloader are not being correctly programmed by
+> -    * the kernel from the board file or DT data.
+> -    * HWMOD_INIT_NO_RESET should be removed ASAP.
+> -    */
+> -   .flags      = HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET,
+> +   /* Skip reset for CONFIG_OMAP_GPMC_DEBUG for bootloader timings */
+> +   .flags      = DEBUG_OMAP_GPMC_HWMOD_FLAGS,
+>     .prcm = {
+>        .omap4 = {
+>           .clkctrl_offs = OMAP4_CM_L3_2_GPMC_CLKCTRL_OFFSET,
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c 
+b/arch/arm/mach-omap2/
+> omap_hwmod_7xx_data.c
+> index 0e64c2f..a0411f3 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+> @@ -819,8 +819,8 @@ static struct omap_hwmod dra7xx_gpmc_hwmod = {
+>     .name      = "gpmc",
+>     .class      = &dra7xx_gpmc_hwmod_class,
+>     .clkdm_name   = "l3main1_clkdm",
+> -   .flags      = (HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET |
+> -            HWMOD_SWSUP_SIDLE),
+> +   /* Skip reset for CONFIG_OMAP_GPMC_DEBUG for bootloader timings */
+> +   .flags      = HWMOD_SWSUP_SIDLE | DEBUG_OMAP_GPMC_HWMOD_FLAGS,
+>     .main_clk   = "l3_iclk_div",
+>     .prcm = {
+>        .omap4 = {
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_81xx_data.c 
+b/arch/arm/mach-omap2/
+> omap_hwmod_81xx_data.c
+> index cab1eb6..c924137 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod_81xx_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_81xx_data.c
+> @@ -478,6 +478,8 @@ static struct omap_hwmod dm81xx_gpmc_hwmod = {
+>     .clkdm_name   = "alwon_l3s_clkdm",
+>     .class      = &dm81xx_gpmc_hwmod_class,
+>     .main_clk   = "sysclk6_ck",
+> +   /* Skip reset for CONFIG_OMAP_GPMC_DEBUG for bootloader timings */
+> +   .flags      = DEBUG_OMAP_GPMC_HWMOD_FLAGS,
+>     .prcm = {
+>        .omap4 = {
+>           .clkctrl_offs = DM816X_CM_ALWON_GPMC_CLKCTRL,
+> diff --git a/drivers/memory/Kconfig b/drivers/memory/Kconfig
+> index 868036f..8406c668 100644
+> --- a/drivers/memory/Kconfig
+> +++ b/drivers/memory/Kconfig
+> @@ -49,6 +49,14 @@ config OMAP_GPMC
+>       interfacing to a variety of asynchronous as well as synchronous
+>       memory drives like NOR, NAND, OneNAND, SRAM.
+> 
+> +config OMAP_GPMC_DEBUG
+> +   bool
+> +   depends on OMAP_GPMC
+> +   help
+> +     Enables verbose debugging mostly to decode the bootloader provided
+> +     timings. Enable this during development to configure devices
+> +     connected to the GPMC bus.
+> +
+>  config MVEBU_DEVBUS
+>     bool "Marvell EBU Device Bus Controller"
+>     default y
+> diff --git a/drivers/memory/omap-gpmc.c b/drivers/memory/omap-gpmc.c
+> index 0e524a1..3a27a84 100644
+> --- a/drivers/memory/omap-gpmc.c
+> +++ b/drivers/memory/omap-gpmc.c
+> @@ -403,7 +403,7 @@ static void gpmc_cs_bool_timings(int cs, const 
+struct 
+> gpmc_bool_timings *p)
+>              p->cycle2cyclediffcsen);
+>  }
+> 
+> -#ifdef DEBUG
+> +#ifdef CONFIG_OMAP_GPMC_DEBUG
+>  /**
+>   * get_gpmc_timing_reg - read a timing parameter and print DTS settings 
+for it.
+>   * @cs:      Chip Select Region
+> @@ -612,7 +612,7 @@ static int set_gpmc_timing_reg(int cs, int reg, int 
+> st_bit, int end_bit, int max
+>     }
+> 
+>     l = gpmc_cs_read_reg(cs, reg);
+> -#ifdef DEBUG
+> +#ifdef CONFIG_OMAP_GPMC_DEBUG
+>     pr_info(
+>        "GPMC CS%d: %-17s: %3d ticks, %3lu ns (was %3i ticks) %3d ns\n",
+>            cs, name, ticks, gpmc_get_clk_period(cs, cd) * ticks / 1000,
+> @@ -767,7 +767,7 @@ int gpmc_cs_set_timings(int cs, const struct 
+gpmc_timings *t,
+>               GPMC_CONFIG1_CLKACTIVATIONTIME_MAX,
+>               clk_activation, GPMC_CD_FCLK);
+> 
+> -#ifdef DEBUG
+> +#ifdef CONFIG_OMAP_GPMC_DEBUG
+>     pr_info("GPMC CS%d CLK period is %lu ns (div %d)\n",
+>           cs, (div * gpmc_get_fclk_period()) / 1000, div);
+>  #endif
+> -- 
+> 2.1.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
