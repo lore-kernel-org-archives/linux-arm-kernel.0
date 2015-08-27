@@ -1,32 +1,27 @@
-From: holler@ahsoftware.de (Alexander Holler)
-Date: Thu, 27 Aug 2015 21:15:26 +0200
-Subject: [PATCH 00/16] deps: deterministic driver initialization order
-In-Reply-To: <55DF5E7C.8030806@ahsoftware.de>
-References: <1440592108-3740-1-git-send-email-holler@ahsoftware.de>
- <55DF5E7C.8030806@ahsoftware.de>
-Message-ID: <55DF61CE.9030303@ahsoftware.de>
+From: dianders@chromium.org (Doug Anderson)
+Date: Thu, 27 Aug 2015 12:30:51 -0700
+Subject: [PATCH 2/2] ARM: dts: rockchip: correct regulator PM properties
+In-Reply-To: <10828643.SSUS2EOuvv@phil>
+References: <1439923455-109818-1-git-send-email-briannorris@chromium.org>
+ <20150818224831.GA140911@google.com>
+ <20150818232806.GC140911@google.com> <10828643.SSUS2EOuvv@phil>
+Message-ID: <CAD=FV=UiCcqCm+W4=ExOps8Npi=mkdVgJ2zgdomOw3YqPhCqug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 27.08.2015 um 21:01 schrieb Alexander Holler:
-> Am 26.08.2015 um 14:28 schrieb Alexander Holler:
->
->> The final 2 patches are fixes which should end up in mainline, regardless
->> if this feature is merged or not.
->
-> Just in case your serial or MTD-NAND partitions don't work, the drivers
-> drivers/tty/serial/8250/8250_core.c and drivers/mtd/ofpart.c need the
-> same trivial fix for their initcall level as found in the last two
-> patches of my series. I'm not going to post these patches now until I've
-> got some feedback for the other stuff.
+Hi,
 
-And just in case, I also have an idea how to fix such dependencies for 
-drivers without DT (by adding hard-wired dependencies directly to 
-drivers). That would also be usable for ACPI and x86.
+On Tue, Aug 18, 2015 at 11:19 PM, Heiko Stuebner <heiko@sntech.de> wrote:
+> great, just take into account the deep vs. shallow suspend modes :-)
 
-But one step after another. Based on my past experiences, I don't even 
-think the stuff I've just posted will ever end up in the kernel.
+One note: do you think it would make sense to re-implement shallow
+suspend as "standby"?  I had a proof of concept doing that in
+<https://chromium-review.googlesource.com/#/c/275123/>.  One nice
+advantage is that you "magically" get a second set of regulator states
+for standby vs "mem".
 
-> Regards,
->
-> Alexander Holler
+If I understand correctly, the distinction between "standby" and "mem"
+is not too clearly defined, so if we wanted to use it for this it
+wouldn't be terrible?
+
+-Doug
