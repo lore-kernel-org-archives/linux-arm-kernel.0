@@ -1,105 +1,70 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Wed, 26 Aug 2015 22:36:20 -0500
-Subject: [PATCH] arm64: dts: qcom: Add 8x16 Serial UART1 node
-Message-ID: <1440646580-28241-1-git-send-email-agross@codeaurora.org>
+From: zhang.chunyan@linaro.org (Chunyan Zhang)
+Date: Thu, 27 Aug 2015 12:06:09 +0800
+Subject: [PATCH] Coresight: ETMv4: Prevent TRCRSCTLR0&1 from being accessed
+Message-ID: <1440648369-4614-1-git-send-email-zhang.chunyan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the nodes required to support the UART1 node on the
-MSM8916.
+1. TRCRSCTLRn - Resource Selection Control Registers n=0~1 are reserved,
+   we shouldn't access them.
+2. The max number of 'n' here is defined in TRCIDR4.NUMRSPAIR whoes value
+   indicates the number of resource selection *pairs*, and 0 indicates
+   one resource selection pair, 1 indicates two pairs, and so on ...
 
-Signed-off-by: Andy Gross <agross@codeaurora.org>
+So, the total number of resource selection control registers which we can
+access is (TRCIDR4.NUMRSPAIR * 2)
+
+Signed-off-by: Chunyan Zhang <zhang.chunyan@linaro.org>
 ---
- arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi |    8 +++++++
- arch/arm64/boot/dts/qcom/msm8916.dtsi     |   35 ++++++++++++++++++++++++++++-
- 2 files changed, 42 insertions(+), 1 deletion(-)
+ drivers/hwtracing/coresight/coresight-etm4x.c | 15 ++++++++++-----
+ 1 file changed, 10 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
-index 98abece..3cc53a7 100644
---- a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
-+++ b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
-@@ -19,6 +19,7 @@
- / {
- 	aliases {
- 		serial0 = &blsp1_uart2;
-+		serial1 = &blsp1_uart1;
- 	};
- 
- 	chosen {
-@@ -26,6 +27,13 @@
- 	};
- 
- 	soc {
-+		serial at 78af000 {
-+			status = "okay";
-+			pinctrl-names = "default", "sleep";
-+			pinctrl-0 = <&blsp1_uart1_default>;
-+			pinctrl-1 = <&blsp1_uart1_sleep>;
-+		};
+diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
+index 1312e99..9425249 100644
+--- a/drivers/hwtracing/coresight/coresight-etm4x.c
++++ b/drivers/hwtracing/coresight/coresight-etm4x.c
+@@ -136,7 +136,9 @@ static void etm4_enable_hw(void *info)
+ 		writel_relaxed(drvdata->cntr_val[i],
+ 			       drvdata->base + TRCCNTVRn(i));
+ 	}
+-	for (i = 0; i < drvdata->nr_resource; i++)
 +
- 		serial at 78b0000 {
- 			status = "okay";
- 			pinctrl-names = "default", "sleep";
-diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-index 0f49ebd..ba64447 100644
---- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
-+++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-@@ -91,6 +91,30 @@
- 			interrupt-controller;
- 			#interrupt-cells = <2>;
++	/* Resource selector pair 0 is always implemented and reserved */
++	for (i = 2; i < (drvdata->nr_resource + 1) * 2; i++)
+ 		writel_relaxed(drvdata->res_ctrl[i],
+ 			       drvdata->base + TRCRSCTLRn(i));
  
-+			blsp1_uart1_default: blsp1_uart1_default {
-+				pinmux {
-+					function = "blsp_uart1";
-+					pins = "gpio0", "gpio1";
-+				};
-+				pinconf {
-+					pins = "gpio0", "gpio1";
-+					drive-strength = <16>;
-+					bias-disable;
-+				};
-+			};
-+
-+			blsp1_uart1_sleep: blsp1_uart1_sleep {
-+				pinmux {
-+					function = "gpio";
-+					pins = "gpio0", "gpio1";
-+				};
-+				pinconf {
-+					pins = "gpio0", "gpio1";
-+					drive-strength = <2>;
-+					bias-pull-down;
-+				};
-+			};
-+
- 			blsp1_uart2_default: blsp1_uart2_default {
- 				pinmux {
- 					function = "blsp_uart2";
-@@ -105,7 +129,7 @@
+@@ -489,8 +491,9 @@ static ssize_t reset_store(struct device *dev,
+ 		drvdata->cntr_val[i] = 0x0;
+ 	}
  
- 			blsp1_uart2_sleep: blsp1_uart2_sleep {
- 				pinmux {
--					function = "blsp_uart2";
-+					function = "gpio";
- 					pins = "gpio4", "gpio5";
- 				};
- 				pinconf {
-@@ -123,6 +147,15 @@
- 			reg = <0x1800000 0x80000>;
- 		};
+-	drvdata->res_idx = 0x0;
+-	for (i = 0; i < drvdata->nr_resource; i++)
++	/* Resource selector pair 0 is always implemented and reserved */
++	drvdata->res_idx = 0x2;
++	for (i = 2; i < (drvdata->nr_resource + 1) * 2; i++)
+ 		drvdata->res_ctrl[i] = 0x0;
  
-+		blsp1_uart1: serial at 78af000 {
-+			compatible = "qcom,msm-uartdm-v1.4", "qcom,msm-uartdm";
-+			reg = <0x78af000 0x200>;
-+			interrupts = <GIC_SPI 107 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&gcc GCC_BLSP1_UART1_APPS_CLK>, <&gcc GCC_BLSP1_AHB_CLK>;
-+			clock-names = "core", "iface";
-+			status = "disabled";
-+		};
-+
- 		blsp1_uart2: serial at 78b0000 {
- 			compatible = "qcom,msm-uartdm-v1.4", "qcom,msm-uartdm";
- 			reg = <0x78b0000 0x200>;
+ 	for (i = 0; i < drvdata->nr_ss_cmp; i++) {
+@@ -1729,7 +1732,7 @@ static ssize_t res_idx_store(struct device *dev,
+ 	if (kstrtoul(buf, 16, &val))
+ 		return -EINVAL;
+ 	/* Resource selector pair 0 is always implemented and reserved */
+-	if ((val == 0) || (val >= drvdata->nr_resource))
++	if (val < 2 || val > (drvdata->nr_resource + 1) * 2)
+ 		return -EINVAL;
+ 
+ 	/*
+@@ -2498,7 +2501,9 @@ static void etm4_init_default_data(struct etmv4_drvdata *drvdata)
+ 		drvdata->cntr_val[i] = 0x0;
+ 	}
+ 
+-	for (i = 2; i < drvdata->nr_resource * 2; i++)
++	/* Resource selector pair 0 is always implemented and reserved */
++	drvdata->res_idx = 0x2;
++	for (i = 2; i < (drvdata->nr_resource + 1) * 2; i++)
+ 		drvdata->res_ctrl[i] = 0x0;
+ 
+ 	for (i = 0; i < drvdata->nr_ss_cmp; i++) {
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+1.9.1
