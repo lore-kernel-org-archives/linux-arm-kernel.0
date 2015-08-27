@@ -1,109 +1,77 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 27 Aug 2015 21:57:52 +0900
-Subject: [PATCH 1/5] DMA: pl330: support burst mode for dev-to-mem and
- mem-to-dev transmit
-In-Reply-To: <1440665313-31603-1-git-send-email-shawn.lin@rock-chips.com>
-References: <1440665280-31557-1-git-send-email-shawn.lin@rock-chips.com>
- <1440665313-31603-1-git-send-email-shawn.lin@rock-chips.com>
-Message-ID: <CAJKOXPdw+ZZURRPUNvKHdx7wRG7M-Frqmvq46KFM_ckGq8h0Yg@mail.gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 27 Aug 2015 08:02:18 -0500
+Subject: CONFIG_DEBUG_SHIRQ and PM
+In-Reply-To: <CAAEAJfAPB1N-xcz+HbHCcF8JaXAVL05CSwpQGi7ea+114mMpmw@mail.gmail.com>
+References: <20150825195830.GH27534@saruman.tx.rr.com>
+ <CAAEAJfCY1BRuoQCWfD2pCq36E54vDB5Coy2S7rz3RfL2BVLGaw@mail.gmail.com>
+ <20150826193820.GT14625@saruman.tx.rr.com>
+ <CAAEAJfAPVgxhRnfYJYzebFJDRJ4Ooam6n+0B5HJ-+uLJ0exTLA@mail.gmail.com>
+ <20150826200300.GU14625@saruman.tx.rr.com>
+ <CAAEAJfB3iiRENEKm6xx-kLae5AR6BV0XVo0KNkb8-okvLjhFhg@mail.gmail.com>
+ <20150826202429.GV14625@saruman.tx.rr.com>
+ <CAAEAJfAPB1N-xcz+HbHCcF8JaXAVL05CSwpQGi7ea+114mMpmw@mail.gmail.com>
+Message-ID: <20150827130218.GA4701@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-08-27 17:48 GMT+09:00 Shawn Lin <shawn.lin@rock-chips.com>:
->
-> This patch adds to support burst mode for dev-to-mem and
-> mem-to-dev transmit.
->
-> Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
-> Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
-> Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
-> cc: Heiko Stuebner <heiko@sntech.de>
-> cc: Doug Anderson <dianders@chromium.org>
-> cc: Olof Johansson <olofj@google.com>
-> Reviewed-and-tested-by: Sonny Rao <sonnyrao@chromium.org>
+On Wed, Aug 26, 2015 at 05:36:24PM -0300, Ezequiel Garcia wrote:
+> On 26 August 2015 at 17:24, Felipe Balbi <balbi@ti.com> wrote:
+> [..]
+> >>
+> >> static irqreturn_t tw68_irq(int irq, void *dev_id)
+> >> {
+> >>         struct tw68_dev *dev = dev_id;
+> >>         u32 status, orig;
+> >>         int loop;
+> >>
+> >>         status = orig = tw_readl(TW68_INTSTAT) & dev->pci_irqmask;
+> >
+> > Now try to read that register when your clock is gated. That's the
+> > problem I'm talking about. Everything about the handler is functioning
+> > correctly; however clocks are gated in ->remove() and free_irq() is
+> > only called *AFTER* ->remove() has returned.
+> >
+> 
+> Yeah, it's pretty clear you are talking about clocks here. That's
+> why I said "read won't stall" in the next paragraph.
+> 
+> >>         [etc]
+> >> }
+> >>
+> >> The IRQ handler accesses the device struct and then
+> >> reads through PCI. So if you use devm_request_irq
+> >> you need to make sure the device struct is still allocated
+> >> after remove(), and the PCI read won't stall or crash.
+> >
+> > dude, that's not the problem I'm talking about. I still have my
+> > private_data around, what I don't have is:
+> >
+> >               _            _
+> >   __ _    ___| | ___   ___| | __
+> >  / _` |  / __| |/ _ \ / __| |/ /
+> > | (_| | | (__| | (_) | (__|   <
+> >  \__,_|  \___|_|\___/ \___|_|\_\
+> >
+> >
+> 
+> Yes, *you* may have your private data around and have a clock gated,
+> others (the tw68 for instance) may have its region released and unmapped.
+> 
+> And yet others may have $whatever resource released in the
+> remove() and assume it's available in the IRQ handler.
+> 
+> I honestly can't think why using request_irq / free_irq to solve this
+> is a workaround.
 
-For the entire patchset: I would prefer to see someone's
-reviewed/tested tag in his response. Sending a version 1 of patchset
-(regardless of Boojin Kim's work two years ago) with such tag could
-mean anything. I cannot verify it easily (unless digging somewhere...
-or asking people). You could add for example: Reviewed-by Santa Claus.
-Should I sent a letter to him asking for confirmation? :)
+because it'll, eventually, boil down to not using devm_* at all and
+that's pretty stupid.
 
-More seriously - reviewed-by is a statement (please look at
-Documentation/SubmittingPatches) and you cannot force someone to make
-that statement. He must make such statement on his own.
-
-That's all from my side since I don't feel skilled enough to review the code.
-
-Best regards,
-Krzysztof
-
->
-> ---
->
->  drivers/dma/pl330.c | 18 ++++++++++++------
->  1 file changed, 12 insertions(+), 6 deletions(-)
->
-> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-> index ecab4ea0..0d544d2 100644
-> --- a/drivers/dma/pl330.c
-> +++ b/drivers/dma/pl330.c
-> @@ -1141,10 +1141,13 @@ static inline int _ldst_devtomem(unsigned dry_run, u8 buf[],
->                 const struct _xfer_spec *pxs, int cyc)
->  {
->         int off = 0;
-> +       enum pl330_cond cond;
-> +
-> +       cond = (pxs->desc->rqcfg.brst_len == 1) ? SINGLE : BURST;
->
->         while (cyc--) {
-> -               off += _emit_WFP(dry_run, &buf[off], SINGLE, pxs->desc->peri);
-> -               off += _emit_LDP(dry_run, &buf[off], SINGLE, pxs->desc->peri);
-> +               off += _emit_WFP(dry_run, &buf[off], cond, pxs->desc->peri);
-> +               off += _emit_LDP(dry_run, &buf[off], cond, pxs->desc->peri);
->                 off += _emit_ST(dry_run, &buf[off], ALWAYS);
->                 off += _emit_FLUSHP(dry_run, &buf[off], pxs->desc->peri);
->         }
-> @@ -1156,11 +1159,14 @@ static inline int _ldst_memtodev(unsigned dry_run, u8 buf[],
->                 const struct _xfer_spec *pxs, int cyc)
->  {
->         int off = 0;
-> +       enum pl330_cond cond;
-> +
-> +       cond = (pxs->desc->rqcfg.brst_len == 1) ? SINGLE : BURST;
->
->         while (cyc--) {
-> -               off += _emit_WFP(dry_run, &buf[off], SINGLE, pxs->desc->peri);
-> +               off += _emit_WFP(dry_run, &buf[off], cond, pxs->desc->peri);
->                 off += _emit_LD(dry_run, &buf[off], ALWAYS);
-> -               off += _emit_STP(dry_run, &buf[off], SINGLE, pxs->desc->peri);
-> +               off += _emit_STP(dry_run, &buf[off], cond, pxs->desc->peri);
->                 off += _emit_FLUSHP(dry_run, &buf[off], pxs->desc->peri);
->         }
->
-> @@ -2557,7 +2563,7 @@ static struct dma_async_tx_descriptor *pl330_prep_dma_cyclic(
->
->                 desc->rqtype = direction;
->                 desc->rqcfg.brst_size = pch->burst_sz;
-> -               desc->rqcfg.brst_len = 1;
-> +               desc->rqcfg.brst_len = pch->burst_len;
->                 desc->bytes_requested = period_len;
->                 fill_px(&desc->px, dst, src, period_len);
->
-> @@ -2702,7 +2708,7 @@ pl330_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
->                 }
->
->                 desc->rqcfg.brst_size = pch->burst_sz;
-> -               desc->rqcfg.brst_len = 1;
-> +               desc->rqcfg.brst_len = pch->burst_len;
->                 desc->rqtype = direction;
->                 desc->bytes_requested = sg_dma_len(sg);
->         }
-> --
-> 2.3.7
->
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe dmaengine" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150827/d7668b03/attachment.sig>
