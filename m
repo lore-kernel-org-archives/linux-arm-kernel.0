@@ -1,60 +1,106 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 27 Aug 2015 09:59:41 -0700
-Subject: [PATCH 2/2] memory: omap-gpmc: Add Kconfig option for debug
-In-Reply-To: <OFCA2F1DCE.C787A961-ONC1257EAE.001D79BC-C1257EAE.00203AFF@br-automation.com>
-References: <1432156863-19695-1-git-send-email-tony@atomide.com>
- <1432156863-19695-3-git-send-email-tony@atomide.com>
- <OFCA2F1DCE.C787A961-ONC1257EAE.001D79BC-C1257EAE.00203AFF@br-automation.com>
-Message-ID: <20150827165940.GY4215@atomide.com>
+From: agross@codeaurora.org (Andy Gross)
+Date: Thu, 27 Aug 2015 12:01:23 -0500
+Subject: [PATCH v3] soc: qcom: smd: Use correct remote processor ID
+Message-ID: <1440694883-22685-1-git-send-email-agross@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patch fixes SMEM addressing issues when remote processors need to use
+secure SMEM partitions.
 
-* Hannes Schmelzer <Hannes.Schmelzer@br-automation.com> [150826 22:55]:
-> Hi Tony,
-> 
-> Did anyone test this changeset on some AM335x board?
+Signed-off-by: Andy Gross <agross@codeaurora.org>
+Reviewed-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+---
+ .../devicetree/bindings/soc/qcom/qcom,smd.txt      |    6 ++++++
+ drivers/soc/qcom/smd.c                             |   16 ++++++++++++----
+ 2 files changed, 18 insertions(+), 4 deletions(-)
 
-Apparently not if it does not work or else you somehow have a different
-configuration for GPMC.
+diff --git a/Documentation/devicetree/bindings/soc/qcom/qcom,smd.txt b/Documentation/devicetree/bindings/soc/qcom/qcom,smd.txt
+index f65c76d..97d9b3e 100644
+--- a/Documentation/devicetree/bindings/soc/qcom/qcom,smd.txt
++++ b/Documentation/devicetree/bindings/soc/qcom/qcom,smd.txt
+@@ -37,6 +37,12 @@ The edge is described by the following properties:
+ 	Definition: the identifier of the remote processor in the smd channel
+ 		    allocation table
  
-> Today I ran into trouble with that because:
-> 
-> The GPMC controller gets reseted on kernel boot due to the missing/removed 
-> HWMOD_INIT_NO_RESET flag.
-
-Oh so you mean it only works on am335x if CONFIG_OMAP_GPMC_DEBUG is set?
++- qcom,remote-pid:
++	Usage: optional
++	Value type: <u32>
++	Definition: the identifier for the remote processor as known by the rest
++		    of the system.
++
+ = SMD DEVICES
  
-> Primary this should not be a big problem, but on my board (maybe on all 
-> AM335x) the GPMC doesn't behave as described in TRM.
-> Especially the GPMC_CONFIG register is not reset to 0h after reset, 
-> instead it holds the value 0xa00 which is very strange because bit 10-31 
-> are reserved.
-> 
-> Further this 0xa00 means that Bit9 (WAIT1PINPOLARITY) is set, exactly this 
-> causes my system to stall on first access the connected NAND flash because 
-> it never becomes ready due to the wrong wait pin polarity. Maybe others 
-> dont't run into trouble because they may use WAIT0PIN, which one has it's 
-> old polarity.
-> 
-> First approach was simply to write 0x0 to the GPMC_CONFIG register during 
-> gpmc_probe function.
-> It solves the problem.
-
-OK
+ In turn, subnodes of the "edges" represent devices tied to SMD channels on that
+diff --git a/drivers/soc/qcom/smd.c b/drivers/soc/qcom/smd.c
+index 327adcf..edd9d9a 100644
+--- a/drivers/soc/qcom/smd.c
++++ b/drivers/soc/qcom/smd.c
+@@ -96,6 +96,7 @@ static const struct {
+  * @smd:		handle to qcom_smd
+  * @of_node:		of_node handle for information related to this edge
+  * @edge_id:		identifier of this edge
++ * @remote_pid:		identifier of remote processor
+  * @irq:		interrupt for signals on this edge
+  * @ipc_regmap:		regmap handle holding the outgoing ipc register
+  * @ipc_offset:		offset within @ipc_regmap of the register for ipc
+@@ -111,6 +112,7 @@ struct qcom_smd_edge {
+ 	struct qcom_smd *smd;
+ 	struct device_node *of_node;
+ 	unsigned edge_id;
++	unsigned remote_pid;
  
-> I also tried to issue some SYSRESET through GPMC registers without 
-> success, same strange behavior.
-
-Interesting, never heard of that one before.
+ 	int irq;
  
-> What?s your thinking around that?
-
-We could add a custom hwmod reset function that sets GPMC_CONFIG to 0.
-Similar to omap_i2c_reset() is set up. Or we could set up a property for
-the wait pin polarity. Roger, got any better ideas?
-
-Regards,
-
-Tony
+@@ -572,7 +574,7 @@ static irqreturn_t qcom_smd_edge_intr(int irq, void *data)
+ 	 * have to scan if the amount of available space in smem have changed
+ 	 * since last scan.
+ 	 */
+-	available = qcom_smem_get_free_space(edge->edge_id);
++	available = qcom_smem_get_free_space(edge->remote_pid);
+ 	if (available != edge->smem_available) {
+ 		edge->smem_available = available;
+ 		edge->need_rescan = true;
+@@ -976,7 +978,8 @@ static struct qcom_smd_channel *qcom_smd_create_channel(struct qcom_smd_edge *ed
+ 	spin_lock_init(&channel->recv_lock);
+ 	init_waitqueue_head(&channel->fblockread_event);
+ 
+-	ret = qcom_smem_get(edge->edge_id, smem_info_item, (void **)&info, &info_size);
++	ret = qcom_smem_get(edge->remote_pid, smem_info_item, (void **)&info,
++			    &info_size);
+ 	if (ret)
+ 		goto free_name_and_channel;
+ 
+@@ -997,7 +1000,8 @@ static struct qcom_smd_channel *qcom_smd_create_channel(struct qcom_smd_edge *ed
+ 		goto free_name_and_channel;
+ 	}
+ 
+-	ret = qcom_smem_get(edge->edge_id, smem_fifo_item, &fifo_base, &fifo_size);
++	ret = qcom_smem_get(edge->remote_pid, smem_fifo_item, &fifo_base,
++			    &fifo_size);
+ 	if (ret)
+ 		goto free_name_and_channel;
+ 
+@@ -1041,7 +1045,7 @@ static void qcom_discover_channels(struct qcom_smd_edge *edge)
+ 	int i;
+ 
+ 	for (tbl = 0; tbl < SMD_ALLOC_TBL_COUNT; tbl++) {
+-		ret = qcom_smem_get(edge->edge_id,
++		ret = qcom_smem_get(edge->remote_pid,
+ 				    smem_items[tbl].alloc_tbl_id,
+ 				    (void **)&alloc_tbl,
+ 				    NULL);
+@@ -1184,6 +1188,10 @@ static int qcom_smd_parse_edge(struct device *dev,
+ 		return -EINVAL;
+ 	}
+ 
++	edge->remote_pid = QCOM_SMEM_HOST_ANY;
++	key = "qcom,remote-pid";
++	of_property_read_u32(node, key, &edge->remote_pid);
++
+ 	syscon_np = of_parse_phandle(node, "qcom,ipc", 0);
+ 	if (!syscon_np) {
+ 		dev_err(dev, "no qcom,ipc node\n");
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
