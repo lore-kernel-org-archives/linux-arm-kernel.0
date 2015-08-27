@@ -1,77 +1,100 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 27 Aug 2015 08:02:18 -0500
-Subject: CONFIG_DEBUG_SHIRQ and PM
-In-Reply-To: <CAAEAJfAPB1N-xcz+HbHCcF8JaXAVL05CSwpQGi7ea+114mMpmw@mail.gmail.com>
-References: <20150825195830.GH27534@saruman.tx.rr.com>
- <CAAEAJfCY1BRuoQCWfD2pCq36E54vDB5Coy2S7rz3RfL2BVLGaw@mail.gmail.com>
- <20150826193820.GT14625@saruman.tx.rr.com>
- <CAAEAJfAPVgxhRnfYJYzebFJDRJ4Ooam6n+0B5HJ-+uLJ0exTLA@mail.gmail.com>
- <20150826200300.GU14625@saruman.tx.rr.com>
- <CAAEAJfB3iiRENEKm6xx-kLae5AR6BV0XVo0KNkb8-okvLjhFhg@mail.gmail.com>
- <20150826202429.GV14625@saruman.tx.rr.com>
- <CAAEAJfAPB1N-xcz+HbHCcF8JaXAVL05CSwpQGi7ea+114mMpmw@mail.gmail.com>
-Message-ID: <20150827130218.GA4701@saruman.tx.rr.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Thu, 27 Aug 2015 15:03:12 +0200
+Subject: [PATCH v4 0/4] irqchip: GICv2/v3: Add support for
+ irq_vcpu_affinity
+In-Reply-To: <1440604845-28229-1-git-send-email-marc.zyngier@arm.com>
+References: <1440604845-28229-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <55DF0A90.9010407@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 26, 2015 at 05:36:24PM -0300, Ezequiel Garcia wrote:
-> On 26 August 2015 at 17:24, Felipe Balbi <balbi@ti.com> wrote:
-> [..]
-> >>
-> >> static irqreturn_t tw68_irq(int irq, void *dev_id)
-> >> {
-> >>         struct tw68_dev *dev = dev_id;
-> >>         u32 status, orig;
-> >>         int loop;
-> >>
-> >>         status = orig = tw_readl(TW68_INTSTAT) & dev->pci_irqmask;
-> >
-> > Now try to read that register when your clock is gated. That's the
-> > problem I'm talking about. Everything about the handler is functioning
-> > correctly; however clocks are gated in ->remove() and free_irq() is
-> > only called *AFTER* ->remove() has returned.
-> >
-> 
-> Yeah, it's pretty clear you are talking about clocks here. That's
-> why I said "read won't stall" in the next paragraph.
-> 
-> >>         [etc]
-> >> }
-> >>
-> >> The IRQ handler accesses the device struct and then
-> >> reads through PCI. So if you use devm_request_irq
-> >> you need to make sure the device struct is still allocated
-> >> after remove(), and the PCI read won't stall or crash.
-> >
-> > dude, that's not the problem I'm talking about. I still have my
-> > private_data around, what I don't have is:
-> >
-> >               _            _
-> >   __ _    ___| | ___   ___| | __
-> >  / _` |  / __| |/ _ \ / __| |/ /
-> > | (_| | | (__| | (_) | (__|   <
-> >  \__,_|  \___|_|\___/ \___|_|\_\
-> >
-> >
-> 
-> Yes, *you* may have your private data around and have a clock gated,
-> others (the tw68 for instance) may have its region released and unmapped.
-> 
-> And yet others may have $whatever resource released in the
-> remove() and assume it's available in the IRQ handler.
-> 
-> I honestly can't think why using request_irq / free_irq to solve this
-> is a workaround.
+Hi Marc,
 
-because it'll, eventually, boil down to not using devm_* at all and
-that's pretty stupid.
+I tested the series on Calxeda Midway with VFIO use case. Also reviewed
+it again without finding anything new.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150827/d7668b03/attachment.sig>
+Tested-by: Eric Auger <eric.auger@linaro.org>
+Reviewed-by: Eric Auger <eric.auger@linaro.org>
+
+Best Regards
+
+Eric
+
+
+On 08/26/2015 06:00 PM, Marc Zyngier wrote:
+> The GICv2 and GICv3 architectures allow an active physical interrupt
+> to be forwarded to a guest, and the guest to indirectly perform the
+> deactivation of the interrupt by performing an EOI on the virtual
+> interrupt (see for example the GICv2 spec, 3.2.1).
+> 
+> This allows some substantial performance improvement for level
+> triggered interrupts that otherwise have to be masked/unmasked in
+> VFIO, not to mention the required trap back to KVM when the guest
+> performs an EOI.
+> 
+> To enable this, the GICs need to be switched to a different EOImode,
+> where a taken interrupt can be left "active" (which prevents the same
+> interrupt from being taken again), while other interrupts are still
+> being processed normally.
+> 
+> We also use the new irq_set_vcpu_affinity hook that was introduced for
+> Intel's "Posted Interrupts" to determine whether or not to perform the
+> deactivation at EOI-time.
+> 
+> As all of this only makes sense when the kernel can behave as a
+> hypervisor, we only enable this mode on detecting that the kernel was
+> actually booted in HYP mode, and that the GIC supports this feature.
+> 
+> This series is a complete rework of a RFC I sent over a year ago:
+> 
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/266328.html
+> 
+> Since then, a lot has been either merged (the irqchip_state) or reworked
+> (my active-timer series: http://www.spinics.net/lists/kvm/msg118768.html),
+> and this implements the last few bits for Eric Auger's series to
+> finally make it into the kernel:
+> 
+> https://lkml.org/lkml/2015/7/2/268
+> https://lkml.org/lkml/2015/7/6/291
+> 
+> With all these patches combined, physical interrupt routing from the
+> kernel into a VM becomes possible.
+> 
+> Note that the implementation makes use of the static_key mechanism,
+> which is undergoing an extensive rework in 4.3. I intend to convert
+> this code once both are in mainline.
+> 
+> This has been tested on Juno (GICv2) and FastModel (GICv3). A branch
+> is available at:
+> 
+> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git irq/gic-irq-vcpu-affinity-v4
+> 
+> * From v3:
+>   - Use separate irq_chip structures, leading to much nicer code (tglx)
+>   - Dropped Eric's Tested/Reviewed-by as there is significant changes
+> 
+> * From v2:
+>   - Another small fix from Eric
+>   - Some commit message cleanups
+> 
+> * From v1:
+>   - Fixes after review from Eric
+>   - Got rid of the cascaded GICv2 hack (it was broken anyway)
+>   - Folded the LPI deactivation patch (it makes more sense as part of
+>     the main one.
+>   - Some clarifying comments about the "deactivate on mask"
+>   - I haven't retained Eric's Reviewed/Tested-by, as the code as
+>     significantly changed on GICv2
+> 
+> Marc Zyngier (4):
+>   irqchip: GICv3: Convert to EOImode == 1
+>   irqchip: GICv3: Don't deactivate interrupts forwarded to a guest
+>   irqchip: GIC: Convert to EOImode == 1
+>   irqchip: GIC: Don't deactivate interrupts forwarded to a guest
+> 
+>  drivers/irqchip/irq-gic-v3.c       |  70 +++++++++++++++++++++--
+>  drivers/irqchip/irq-gic.c          | 111 ++++++++++++++++++++++++++++++++++++-
+>  include/linux/irqchip/arm-gic-v3.h |   9 +++
+>  include/linux/irqchip/arm-gic.h    |   4 ++
+>  4 files changed, 188 insertions(+), 6 deletions(-)
+> 
