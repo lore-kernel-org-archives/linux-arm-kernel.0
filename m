@@ -1,118 +1,79 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Thu, 27 Aug 2015 19:05:04 +0800
-Subject: [PATCH 1/5] DMA: pl330: support burst mode for dev-to-mem and
- mem-to-dev transmit
-In-Reply-To: <7170592.bdD8VT9GQ2@phil>
-References: <1440665280-31557-1-git-send-email-shawn.lin@rock-chips.com>
- <1440665313-31603-1-git-send-email-shawn.lin@rock-chips.com>
- <7170592.bdD8VT9GQ2@phil>
-Message-ID: <55DEEEE0.4060208@rock-chips.com>
+From: lee@kernel.org (Lee Jones)
+Date: Thu, 27 Aug 2015 12:10:46 +0100
+Subject: [GIT PULL] RPi DT changes due for v4.3
+In-Reply-To: <878u9dhggh.fsf@eliezer.anholt.net>
+References: <20150811160642.GQ18282@x1> <20150813103056.GY30160@localhost>
+ <878u9dhggh.fsf@eliezer.anholt.net>
+Message-ID: <20150827111046.GB4796@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/8/27 16:57, Heiko Stuebner wrote:
-> Hi Shawn,
->
->
-> you're loosing the original author. Your can override the patch-author (away
-> from the mail sender) via a "From:" line at the top of the commit message,
-> like:
->
+On Fri, 14 Aug 2015, Eric Anholt wrote:
+> Olof Johansson <olof@lixom.net> writes:
+> > On Tue, Aug 11, 2015 at 05:06:42PM +0100, Lee Jones wrote:
+> >> ARM SoC Chaps,
+> >> 
+> >> Please find a couple of simple RPi changes pertaining to Firmware.
+> >> 
+> >> The following changes since commit bc0195aad0daa2ad5b0d76cce22b167bc3435590:
+> >> 
+> >>   Linux 4.2-rc2 (2015-07-12 15:10:30 -0700)
+> >> 
+> >> are available in the git repository at:
+> >> 
+> >>   git://git.kernel.org/pub/scm/linux/kernel/git/rpi/linux-rpi.git tags/rpi-dt-for-armsoc-4.3
+> >> 
+> >> for you to fetch changes up to fd26f8830979de48eb3f1c253eb9d2ee2e468eb6:
+> >> 
+> >>   dt/bindings: Add binding for the Raspberry Pi firmware driver (2015-08-11 16:56:41 +0100)
+> >
+> > I've merged this but I'm a little confused about bcm2835 maintainership:
+> > I got a MAINTAINERS update from Florian earlier grouped in a set of
+> > other bcm changes (adding Eric), and now this directly from you.
+> >
+> > In general the bcm platforms are quite diverse and we've asked Florian
+> > to be the funnel for all of the new ones, but I don't think we talked
+> > much about 2835 at that time. Should we expect to see merges directly
+> > from you and the other maintainers there or will it go through Florian?
+> 
+> I'd been talking with Arnd and Florian about the delays in RPi patch
+> acceptance (Stephen and Lee have limited time to dedicate to 2835), and
+> Florian suggested me becoming a maintainer and routing patches through
+> him.  He's been great to work with and has had useful feedback on my
+> patches.
+> 
+> I was kind of surprised to see Lee send this pull request -- these
+> patches had been sitting un-merged for 2 months and pings on irc didn't
+> get replies, so I thought I was stepping in where the others definitely
+> didn't have time.  It was also odd to see just these two patches, but
+> not the actual driver.
+> 
+> I'm willing to do the merging process for 2835, and if I'm doing so, I
+> like the idea of feeding it through a more experienced maintainer who's
+> ready to look at my pull requests whenever, without bothering the main
+> arm-soc folks.  My goal here, besides my actual job of getting open
+> source graphics working for Broadcom, is to hopefully push the rpi
+> foundation toward getting their code merged, so that this hardware fully
+> works on stock upstream.
 
-Woops.... sorry for missing this bit. Thanks for pointing out that. :)
+Apologies for the confusion caused by this pull-request.  After
+speaking with Florian last cycle the plan was to send the request to
+him prior to him sending to ARM-SoC; however, I didn't realise how
+early in the cycle he was going to send that request and I missed the
+boat.  So rather than miss the cycle, I decided just to send directly
+to ARM-SoC instead.
 
-Patch 1 is from Boojin, and patch 2,3 attribute to Addy(Actually I 
-rebase it for linux-next from v3.14). patch 4 and 5 comes from myself.
+I do resent the IRQ comment though, as I'm always on IRC during
+working hours and (unless something has gone wrong) I have a proxy
+which collects missed messages and replays them back to me, so in
+theory I shouldn't miss a message.  All messages you've sent to me
+I've replied to.
 
-It will be fixed from the next ones if any.
+The Firmware patches wouldn't have ever been part of this set without
+explicit request/permission from the Maintainer.  So that's why the
+driver patches weren't part of this set.
 
-> ------
-> From: Boojin Kim <boojin.kim@samsung.com>
->
-> This patch adds to support burst mode for dev-to-mem and
-> mem-to-dev transmit.
-> ...
-> ------
->
->
->> This patch adds to support burst mode for dev-to-mem and
->> mem-to-dev transmit.
->>
->> Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
->> Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
->> Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
->> cc: Heiko Stuebner <heiko@sntech.de>
->> cc: Doug Anderson <dianders@chromium.org>
->> cc: Olof Johansson <olofj@google.com>
->> Reviewed-and-tested-by: Sonny Rao <sonnyrao@chromium.org>
->>
->> ---
->>
->>   drivers/dma/pl330.c | 18 ++++++++++++------
->>   1 file changed, 12 insertions(+), 6 deletions(-)
->>
->> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
->> index ecab4ea0..0d544d2 100644
->> --- a/drivers/dma/pl330.c
->> +++ b/drivers/dma/pl330.c
->> @@ -1141,10 +1141,13 @@ static inline int _ldst_devtomem(unsigned dry_run,
->> u8 buf[], const struct _xfer_spec *pxs, int cyc)
->>   {
->>   	int off = 0;
->> +	enum pl330_cond cond;
->> +
->> +	cond = (pxs->desc->rqcfg.brst_len == 1) ? SINGLE : BURST;
->>
->>   	while (cyc--) {
->> -		off += _emit_WFP(dry_run, &buf[off], SINGLE, pxs->desc->peri);
->> -		off += _emit_LDP(dry_run, &buf[off], SINGLE, pxs->desc->peri);
->> +		off += _emit_WFP(dry_run, &buf[off], cond, pxs->desc->peri);
->> +		off += _emit_LDP(dry_run, &buf[off], cond, pxs->desc->peri);
->>   		off += _emit_ST(dry_run, &buf[off], ALWAYS);
->>   		off += _emit_FLUSHP(dry_run, &buf[off], pxs->desc->peri);
->>   	}
->> @@ -1156,11 +1159,14 @@ static inline int _ldst_memtodev(unsigned dry_run,
->> u8 buf[], const struct _xfer_spec *pxs, int cyc)
->>   {
->>   	int off = 0;
->> +	enum pl330_cond cond;
->> +
->> +	cond = (pxs->desc->rqcfg.brst_len == 1) ? SINGLE : BURST;
->>
->>   	while (cyc--) {
->> -		off += _emit_WFP(dry_run, &buf[off], SINGLE, pxs->desc->peri);
->> +		off += _emit_WFP(dry_run, &buf[off], cond, pxs->desc->peri);
->>   		off += _emit_LD(dry_run, &buf[off], ALWAYS);
->> -		off += _emit_STP(dry_run, &buf[off], SINGLE, pxs->desc->peri);
->> +		off += _emit_STP(dry_run, &buf[off], cond, pxs->desc->peri);
->>   		off += _emit_FLUSHP(dry_run, &buf[off], pxs->desc->peri);
->>   	}
->>
->> @@ -2557,7 +2563,7 @@ static struct dma_async_tx_descriptor
->> *pl330_prep_dma_cyclic(
->>
->>   		desc->rqtype = direction;
->>   		desc->rqcfg.brst_size = pch->burst_sz;
->> -		desc->rqcfg.brst_len = 1;
->> +		desc->rqcfg.brst_len = pch->burst_len;
->>   		desc->bytes_requested = period_len;
->>   		fill_px(&desc->px, dst, src, period_len);
->>
->> @@ -2702,7 +2708,7 @@ pl330_prep_slave_sg(struct dma_chan *chan, struct
->> scatterlist *sgl, }
->>
->>   		desc->rqcfg.brst_size = pch->burst_sz;
->> -		desc->rqcfg.brst_len = 1;
->> +		desc->rqcfg.brst_len = pch->burst_len;
->>   		desc->rqtype = direction;
->>   		desc->bytes_requested = sg_dma_len(sg);
->>   	}
->
->
->
->
-
-
--- 
-Best Regards
-Shawn Lin
+How would you like to move forward?  Do you still want me to apply
+patches to the RPi repo and send Florian a pull-request early in the
+cycle (say -rc4 for example), or would you rather Florian picked the
+patches form the list directly?
