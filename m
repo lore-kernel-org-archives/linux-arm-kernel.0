@@ -1,52 +1,41 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 27 Aug 2015 22:46:38 +0200
-Subject: [RFC PATCH] arm/arm64: build all dtbs for CONPILE_TEST
-In-Reply-To: <CAL_JsqK+QHgCu4x-X+ShyWhj6g=+X-AC5AeCLm1DNYfFdCpH5A@mail.gmail.com>
-References: <1440690994-5978-1-git-send-email-robh@kernel.org>
- <CAOesGMjzBaobpLsS77UziWeYO9wo21SkdpWT=Pib6AM7DDKTnA@mail.gmail.com>
- <CAL_JsqK+QHgCu4x-X+ShyWhj6g=+X-AC5AeCLm1DNYfFdCpH5A@mail.gmail.com>
-Message-ID: <CAMuHMdXYBBxi6Y+ZW6nLP7+NEBcjvOtNWQGCgwArqUV95JyZTw@mail.gmail.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Thu, 27 Aug 2015 22:51:22 +0200
+Subject: [PATCH 2/2] ARM: dts: rockchip: correct regulator PM properties
+In-Reply-To: <CAD=FV=UiCcqCm+W4=ExOps8Npi=mkdVgJ2zgdomOw3YqPhCqug@mail.gmail.com>
+References: <1439923455-109818-1-git-send-email-briannorris@chromium.org>
+ <10828643.SSUS2EOuvv@phil>
+ <CAD=FV=UiCcqCm+W4=ExOps8Npi=mkdVgJ2zgdomOw3YqPhCqug@mail.gmail.com>
+Message-ID: <2079050.z559I6SEaj@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Am Donnerstag, 27. August 2015, 12:30:51 schrieb Doug Anderson:
+> Hi,
+> 
+> On Tue, Aug 18, 2015 at 11:19 PM, Heiko Stuebner <heiko@sntech.de> wrote:
+> > great, just take into account the deep vs. shallow suspend modes :-)
+> 
+> One note: do you think it would make sense to re-implement shallow
+> suspend as "standby"?  I had a proof of concept doing that in
+> <https://chromium-review.googlesource.com/#/c/275123/>.  One nice
+> advantage is that you "magically" get a second set of regulator states
+> for standby vs "mem".
 
-On Thu, Aug 27, 2015 at 9:07 PM, Rob Herring <robh@kernel.org> wrote:
->> It would be useful to build all files, but it's not the behavior that
->> COMPILE_TEST usually has.
->
-> Just changing to dtb-n would be equivalent because there is no other
-> dependency to enable building. Code has other dependencies typically.
-> What dtb do we not want to built in an allyesconfig build? If dtb's
-> have any dependencies, that would be a bug. To really make this
-> equivalent to a driver using COMPILE_TEST, we would need kconfig
-> symbols specifically for each platform's dtbs. Then we would have the
-> 2 stage unhide (setting COMPILE_TEST) then enable the option.
->
-> I was also thinking that perhaps we don't want to require a kconfig
-> symbol for every platform family. Adding a kconfig entry is the only
-> way to enable building a dtb ATM. I know there are 2 camps to this
-> policy though.
+Somewhere I've read something about keeping wifi associated to an ap during 
+suspend which might be a candidate for such a distinction?
 
-I think it would be good to have a single Kconfig option (depending on
-COMPILE_TEST) to build all dtbs.
 
-For drivers, COMPILE_TEST doesn't enable anything by itself, it just
-relaxes dependencies. Hence if any driver is broken, I can still
-disable that driver in the .config.
+> If I understand correctly, the distinction between "standby" and "mem"
+> is not too clearly defined, so if we wanted to use it for this it
+> wouldn't be terrible?
 
-If any dtb is broken, I cannot disable it, except by disabling COMPILE_TEST,
-which I may not want to do for other reasons (e.g. I'm compile testing my
-driver). If there would be an extra Kconfig symbol for building all dtbs,
-I can still disable it.
+>From reading Documentation/power/states.txt it looks like the boot-cpu is 
+supposed to retain power in the suspend state. Although we also do not lose 
+"operating state" in our suspend I guess?
 
-Gr{oetje,eeting}s,
+So using the shallow suspend as standby sounds interesting, for the time when 
+the deep suspend works too. If there is only one suspend state it 
+automatically becomes the "mem"-state it seems.
 
-                        Geert
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Heiko
