@@ -1,37 +1,25 @@
-From: jianwei.wang.chn@gmail.com (Jianwei Wang)
-Date: Thu, 27 Aug 2015 12:19:58 +0800
-Subject: [PATCH 2/2] arm:dts:ls1021a: Add SiI902x dts node
-In-Reply-To: <1440649198-27244-1-git-send-email-jianwei.wang.chn@gmail.com>
-References: <1440649198-27244-1-git-send-email-jianwei.wang.chn@gmail.com>
-Message-ID: <1440649198-27244-2-git-send-email-jianwei.wang.chn@gmail.com>
+From: agross@codeaurora.org (Andy Gross)
+Date: Wed, 26 Aug 2015 23:27:47 -0500
+Subject: [PATCH 05/10] ARM: dts: qcom: apq8084-ifc6540: Use stdout-path
+In-Reply-To: <1434490313-13905-6-git-send-email-sboyd@codeaurora.org>
+References: <1434490313-13905-1-git-send-email-sboyd@codeaurora.org>
+ <1434490313-13905-6-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20150827042747.GC28274@qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SiI902x is a HDMI transmitter.
+On Tue, Jun 16, 2015 at 02:31:48PM -0700, Stephen Boyd wrote:
+> Use stdout-path so that we don't have to put the console on the
+> kernel command line.
+> 
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>  arch/arm/boot/dts/qcom-apq8084-ifc6540.dts | 8 ++++++++
+>  1 file changed, 8 insertions(+)
 
-Signed-off-by: Alison Wang <b18965@freescale.com>
-Signed-off-by: Xiubo Li <lixiubo@cmss.chinamobile.com>
-Signed-off-by: Jianwei Wang <jianwei.wang.chn@gmail.com>
----
- arch/arm/boot/dts/ls1021a-twr.dts | 6 ++++++
- 1 file changed, 6 insertions(+)
+Applied.  Thanks
 
-diff --git a/arch/arm/boot/dts/ls1021a-twr.dts b/arch/arm/boot/dts/ls1021a-twr.dts
-index a2c591e..c3140f0 100644
---- a/arch/arm/boot/dts/ls1021a-twr.dts
-+++ b/arch/arm/boot/dts/ls1021a-twr.dts
-@@ -79,6 +79,12 @@
- 
- &i2c1 {
- 	status = "okay";
-+
-+	hdmi: sii9022a at 39 {
-+		compatible = "sii902x";
-+		reg = <0x39>;
-+		interrupts = <GIC_SPI 167 IRQ_TYPE_EDGE_RISING>;
-+		};
- };
- 
- &ifc {
 -- 
-2.1.0.27.g96db324
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
