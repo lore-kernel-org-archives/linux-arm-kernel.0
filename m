@@ -1,72 +1,76 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 27 Aug 2015 07:45:39 +0100
-Subject: [PATCH 2/4] remoteproc: Supply controller driver for ST's Remote
- Processors
-In-Reply-To: <55DDF252.2010901@mentor.com>
-References: <1440594483-29601-1-git-send-email-lee.jones@linaro.org>
- <1440594483-29601-3-git-send-email-lee.jones@linaro.org>
- <55DDF252.2010901@mentor.com>
-Message-ID: <20150827064539.GD19409@x1>
+From: yalin.wang2010@gmail.com (yalin wang)
+Date: Thu, 27 Aug 2015 16:21:00 +0800
+Subject: [PATCH] arm64: ioremap: change ioremap prototype and add
+ ioremap_cache macro
+Message-ID: <1440663660-24244-1-git-send-email-yalin.wang2010@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 26 Aug 2015, Nathan Lynch wrote:
+This patch change ioremap_*() first parameter type to resource_size_t to
+be the same as other platforms, and add ioremap_cache macro,
+because some code will test if this macro is defined or not, and
+will generate a generric version if not defined, for example,
+memremap.c do like this.
 
-> On 08/26/2015 08:08 AM, Lee Jones wrote:
-> > --- /dev/null
-> > +++ b/drivers/remoteproc/st_remoteproc.c
-> > @@ -0,0 +1,300 @@
-> > +/*
-> > + * ST's Remote Processor Control Driver
-> > + *
-> > + * Copyright (C) 2015 STMicroelectronics - All Rights Reserved
-> > + *
-> > + * Author: Ludovic Barre <ludovic.barre@st.com>
-> 
-> When submitting code you didn't write, I'd say it's better practice to
-> clearly indicate its provenance in the commit message.  E.g. something
-> like "Driver based on code authored by Ludovic Barre for ST".  And
-> obtain signoffs etc if possible.
-> 
-> 
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License as published by
-> > + * the Free Software Foundation; either version 2 of the License.
-> 
-> Please review the wording here.  It's unclear whether this is intended
-> to be v2-only or v2 or later.
-> 
-> 
-> > +static int st_rproc_stop(struct rproc *rproc)
-> > +{
-> > +	struct st_rproc *st_rproc = rproc->priv;
-> > +	int err = 0;
-> > +
-> > +	if (st_rproc->config->sw_reset) {
-> > +		err = reset_control_assert(st_rproc->sw_reset);
-> > +		if (err)
-> > +			dev_warn(&rproc->dev, "Failed to assert S/W Reset\n");
-> > +	}
-> > +
-> > +	if (st_rproc->config->pwr_reset) {
-> > +		err = reset_control_assert(st_rproc->pwr_reset);
-> > +		if (err)
-> > +			dev_warn(&rproc->dev, "Failed to assert Power Reset\n");
-> > +	}
-> > +
-> > +	clk_disable(st_rproc->clk);
-> > +
-> > +	return 0;
-> > +}
-> 
-> Seems like st_rproc_stop should propagate errors back to its caller
-> instead of always returning 0.
+Signed-off-by: yalin wang <yalin.wang2010@gmail.com>
+---
+ arch/arm64/include/asm/io.h | 5 +++--
+ arch/arm64/mm/ioremap.c     | 6 +++---
+ 2 files changed, 6 insertions(+), 5 deletions(-)
 
-Good points, will fix.
-
+diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
+index 44be1e0..500e09f 100644
+--- a/arch/arm64/include/asm/io.h
++++ b/arch/arm64/include/asm/io.h
+@@ -163,15 +163,16 @@ extern void __memset_io(volatile void __iomem *, int, size_t);
+ /*
+  * I/O memory mapping functions.
+  */
+-extern void __iomem *__ioremap(phys_addr_t phys_addr, size_t size, pgprot_t prot);
++extern void __iomem *__ioremap(resource_size_t phys_addr, size_t size, pgprot_t prot);
+ extern void __iounmap(volatile void __iomem *addr);
+-extern void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size);
++extern void __iomem *ioremap_cache(resource_size_t phys_addr, size_t size);
+ 
+ #define ioremap(addr, size)		__ioremap((addr), (size), __pgprot(PROT_DEVICE_nGnRE))
+ #define ioremap_nocache(addr, size)	__ioremap((addr), (size), __pgprot(PROT_DEVICE_nGnRE))
+ #define ioremap_wc(addr, size)		__ioremap((addr), (size), __pgprot(PROT_NORMAL_NC))
+ #define ioremap_wt(addr, size)		__ioremap((addr), (size), __pgprot(PROT_DEVICE_nGnRE))
+ #define iounmap				__iounmap
++#define ioremap_cache			ioremap_cache
+ 
+ /*
+  * io{read,write}{16,32}be() macros
+diff --git a/arch/arm64/mm/ioremap.c b/arch/arm64/mm/ioremap.c
+index 01e88c8..082e963 100644
+--- a/arch/arm64/mm/ioremap.c
++++ b/arch/arm64/mm/ioremap.c
+@@ -29,7 +29,7 @@
+ #include <asm/tlbflush.h>
+ #include <asm/pgalloc.h>
+ 
+-static void __iomem *__ioremap_caller(phys_addr_t phys_addr, size_t size,
++static void __iomem *__ioremap_caller(resource_size_t phys_addr, size_t size,
+ 				      pgprot_t prot, void *caller)
+ {
+ 	unsigned long last_addr;
+@@ -73,7 +73,7 @@ static void __iomem *__ioremap_caller(phys_addr_t phys_addr, size_t size,
+ 	return (void __iomem *)(offset + addr);
+ }
+ 
+-void __iomem *__ioremap(phys_addr_t phys_addr, size_t size, pgprot_t prot)
++void __iomem *__ioremap(resource_size_t phys_addr, size_t size, pgprot_t prot)
+ {
+ 	return __ioremap_caller(phys_addr, size, prot,
+ 				__builtin_return_address(0));
+@@ -93,7 +93,7 @@ void __iounmap(volatile void __iomem *io_addr)
+ }
+ EXPORT_SYMBOL(__iounmap);
+ 
+-void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size)
++void __iomem *ioremap_cache(resource_size_t phys_addr, size_t size)
+ {
+ 	/* For normal memory we already have a cacheable mapping. */
+ 	if (pfn_valid(__phys_to_pfn(phys_addr)))
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.9.1
