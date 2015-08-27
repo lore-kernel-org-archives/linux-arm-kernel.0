@@ -1,123 +1,96 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Thu, 27 Aug 2015 21:28:18 +0800
-Subject: [PATCH 1/5] DMA: pl330: support burst mode for dev-to-mem and
- mem-to-dev transmit
-In-Reply-To: <CAJKOXPdw+ZZURRPUNvKHdx7wRG7M-Frqmvq46KFM_ckGq8h0Yg@mail.gmail.com>
-References: <1440665280-31557-1-git-send-email-shawn.lin@rock-chips.com>
- <1440665313-31603-1-git-send-email-shawn.lin@rock-chips.com>
- <CAJKOXPdw+ZZURRPUNvKHdx7wRG7M-Frqmvq46KFM_ckGq8h0Yg@mail.gmail.com>
-Message-ID: <55DF1072.1070905@rock-chips.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Thu, 27 Aug 2015 16:38:47 +0300
+Subject: [PATCH] ARM: OMAP2+: omap-device: remove omap_device_late_init
+ call completely
+In-Reply-To: <20150826181006.GT4215@atomide.com>
+References: <1440611890-4935-1-git-send-email-grygorii.strashko@ti.com>
+ <20150826181006.GT4215@atomide.com>
+Message-ID: <55DF12E7.10802@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2015/8/27 20:57, Krzysztof Kozlowski ??:
-> 2015-08-27 17:48 GMT+09:00 Shawn Lin <shawn.lin@rock-chips.com>:
->>
->> This patch adds to support burst mode for dev-to-mem and
->> mem-to-dev transmit.
->>
->> Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
->> Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
->> Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
->> cc: Heiko Stuebner <heiko@sntech.de>
->> cc: Doug Anderson <dianders@chromium.org>
->> cc: Olof Johansson <olofj@google.com>
->> Reviewed-and-tested-by: Sonny Rao <sonnyrao@chromium.org>
->
-> For the entire patchset: I would prefer to see someone's
-> reviewed/tested tag in his response. Sending a version 1 of patchset
-> (regardless of Boojin Kim's work two years ago) with such tag could
-> mean anything. I cannot verify it easily (unless digging somewhere...
-> or asking people). You could add for example: Reviewed-by Santa Claus.
-> Should I sent a letter to him asking for confirmation? :)
->
+Hi Tony,
 
-:) yes, you are right. I should comply with the rule, even if the 
-patchest had been reviewed or tested by someone on another tree.
+On 08/26/2015 09:10 PM, Tony Lindgren wrote:
+> * Grygorii Strashko <grygorii.strashko@ti.com> [150826 11:01]:
+>> Now Kernel fails to boot 50% of times (form build to build) with
+>> RT-patchset applied due to the following race - on late boot
+>> stages deferred_probe_work_func races with omap_device_late_ini
+>>
+>> late_initcall
+>>   - deferred_probe_initcal() tries to re-probe all pending driver's probe.
+>>     [In general, It's NOT expected to probe any other built-in drivers after
+>>     deferred_probe_initcal() is finished, because most of
+>>     late_initcall_sync/late_initcall functions expected that all driver
+>>     or probed or deferred already.]
+>>
+>> - later on, some driver is probing in this case It's could cpsw.c
+>>    (but could be any other drivers)
+>>    cpsw_init
+>>    - platform_driver_register
+>>      - really_probe
+>>         - driver_bound
+>>           - driver_deferred_probe_trigger
+>>    and boot proceed.
+>>    So, at this moment we have  deferred_probe_work_func scheduled.
+>>
+>> late_initcall_sync
+>>    - omap_device_late_init
+>>      - omap_device_idle
+>>
+>> CPU1					CPU2
+>>    - deferred_probe_work_func
+>>      - really_probe
+>>        - omap_hsmmc_probe
+>> 	- pm_runtime_get_sync
+>> 					late_initcall_sync
+>> 					- omap_device_late_init
+>> 						if (od->_driver_status != BUS_NOTIFY_BOUND_DRIVER) {
+>> 							if (od->_state == OMAP_DEVICE_STATE_ENABLED) {
+>> 								- omap_device_idle [ops - IP is disabled, ]
+>> 	- [fail]
+>> 	- pm_runtime_put_sync
+>>            - omap_hsmmc_runtime_suspend [ooops!]
+> 
+> OK idling of unclaimed devices should not happen for deferred probe,
+> it should only happen when there's no driver and no probing happening.
+>   
+>> Lets remove just remove omap_device_late_init completely as suggested
+>> by Tero Kristo:
+>>
+>> "How about remove omap_device_late_init call completely. I don't think
+>> it does anything useful at the moment; none of the omap devices get
+>> enabled outside runtime_pm, so there should be no need to explicitly
+>> disable the devices."
+> 
+> I think this is still needed from PM point of view as otherwise we
+> don't idle any devices that don't have a driver available. Or am I
+> missing something?
+> 
+> To me it seems the bug is relying on the BUS_NOTIFY_BOUND_DRIVER is
+> not set in the deferred probe case.
+> 
 
-> More seriously - reviewed-by is a statement (please look at
-> Documentation/SubmittingPatches) and you cannot force someone to make
-> that statement. He must make such statement on his own.
->
-> That's all from my side since I don't feel skilled enough to review the code.
->
-> Best regards,
-> Krzysztof
->
->>
->> ---
->>
->>   drivers/dma/pl330.c | 18 ++++++++++++------
->>   1 file changed, 12 insertions(+), 6 deletions(-)
->>
->> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
->> index ecab4ea0..0d544d2 100644
->> --- a/drivers/dma/pl330.c
->> +++ b/drivers/dma/pl330.c
->> @@ -1141,10 +1141,13 @@ static inline int _ldst_devtomem(unsigned dry_run, u8 buf[],
->>                  const struct _xfer_spec *pxs, int cyc)
->>   {
->>          int off = 0;
->> +       enum pl330_cond cond;
->> +
->> +       cond = (pxs->desc->rqcfg.brst_len == 1) ? SINGLE : BURST;
->>
->>          while (cyc--) {
->> -               off += _emit_WFP(dry_run, &buf[off], SINGLE, pxs->desc->peri);
->> -               off += _emit_LDP(dry_run, &buf[off], SINGLE, pxs->desc->peri);
->> +               off += _emit_WFP(dry_run, &buf[off], cond, pxs->desc->peri);
->> +               off += _emit_LDP(dry_run, &buf[off], cond, pxs->desc->peri);
->>                  off += _emit_ST(dry_run, &buf[off], ALWAYS);
->>                  off += _emit_FLUSHP(dry_run, &buf[off], pxs->desc->peri);
->>          }
->> @@ -1156,11 +1159,14 @@ static inline int _ldst_memtodev(unsigned dry_run, u8 buf[],
->>                  const struct _xfer_spec *pxs, int cyc)
->>   {
->>          int off = 0;
->> +       enum pl330_cond cond;
->> +
->> +       cond = (pxs->desc->rqcfg.brst_len == 1) ? SINGLE : BURST;
->>
->>          while (cyc--) {
->> -               off += _emit_WFP(dry_run, &buf[off], SINGLE, pxs->desc->peri);
->> +               off += _emit_WFP(dry_run, &buf[off], cond, pxs->desc->peri);
->>                  off += _emit_LD(dry_run, &buf[off], ALWAYS);
->> -               off += _emit_STP(dry_run, &buf[off], SINGLE, pxs->desc->peri);
->> +               off += _emit_STP(dry_run, &buf[off], cond, pxs->desc->peri);
->>                  off += _emit_FLUSHP(dry_run, &buf[off], pxs->desc->peri);
->>          }
->>
->> @@ -2557,7 +2563,7 @@ static struct dma_async_tx_descriptor *pl330_prep_dma_cyclic(
->>
->>                  desc->rqtype = direction;
->>                  desc->rqcfg.brst_size = pch->burst_sz;
->> -               desc->rqcfg.brst_len = 1;
->> +               desc->rqcfg.brst_len = pch->burst_len;
->>                  desc->bytes_requested = period_len;
->>                  fill_px(&desc->px, dst, src, period_len);
->>
->> @@ -2702,7 +2708,7 @@ pl330_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
->>                  }
->>
->>                  desc->rqcfg.brst_size = pch->burst_sz;
->> -               desc->rqcfg.brst_len = 1;
->> +               desc->rqcfg.brst_len = pch->burst_len;
->>                  desc->rqtype = direction;
->>                  desc->bytes_requested = sg_dma_len(sg);
->>          }
->> --
->> 2.3.7
->>
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe dmaengine" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
->
->
+
+What do you think about below alternative?
+
+diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
+index 4cb8fd9..72ebc4c 100644
+--- a/arch/arm/mach-omap2/omap_device.c
++++ b/arch/arm/mach-omap2/omap_device.c
+@@ -901,7 +901,8 @@ static int __init omap_device_late_idle(struct device *dev, void *data)
+                if (od->hwmods[i]->flags & HWMOD_INIT_NO_IDLE)
+                        return 0;
+ 
+-       if (od->_driver_status != BUS_NOTIFY_BOUND_DRIVER) {
++       if (od->_driver_status != BUS_NOTIFY_BOUND_DRIVER &&
++           od->_driver_status != BUS_NOTIFY_BIND_DRIVER) {
+                if (od->_state == OMAP_DEVICE_STATE_ENABLED) {
+                        dev_warn(dev, "%s: enabled but no driver.  Idling\n",
+                                 __func__);
+
 
 
 -- 
-Best Regards
-Shawn Lin
+regards,
+-grygorii
