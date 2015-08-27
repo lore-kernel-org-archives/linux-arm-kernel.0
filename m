@@ -1,60 +1,170 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 27 Aug 2015 16:10:01 +0100
-Subject: [PATCH v2] arm64: KVM: Do not inject a 64bit fault for a 32bit guest
-Message-ID: <1440688201-6324-1-git-send-email-marc.zyngier@arm.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Thu, 27 Aug 2015 09:12:17 -0600
+Subject: [PATCH 2/5] coresight-etm4x: Change the name of the ctxid_val to
+ ctxid_pid
+In-Reply-To: <55DDFE01.50201@codeaurora.org>
+References: <1436258518-9339-1-git-send-email-zhang.chunyan@linaro.org>
+ <1436258518-9339-3-git-send-email-zhang.chunyan@linaro.org>
+ <55DDFE01.50201@codeaurora.org>
+Message-ID: <CANLsYkyA_C=PUDEUSbcA_Sa6Abqnxk1TP9ye6F9i0bWW_OxqiA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When injecting a fault into a misbehaving 32bit guest, it seems
-rather idiotic to also inject a 64bit fault that is only going
-to corrupt the guest state. This leads to a situation where we
-perform an illegal exception return at EL2 causing the host
-to crash instead of killing the guest.
+On 26 August 2015 at 11:57, Christopher Covington <cov@codeaurora.org> wrote:
+> On 07/07/2015 04:41 AM, Chunyan Zhang wrote:
+>> 'ctxid_val' array was used to store the value of ETM context ID comparator
+>> which actually stores the process ID to be traced, so using 'ctxid_pid' as
+>> its name instead make it easier to understand.
+>
+> Previous discussion with some ARM folks has led me to believe there isn't a
+> guarantee that the Context ID Register will always have a PID. Why not allow
+> filtering on thread group ID, session ID, cgroup related identifiers, etc.?
 
-Just fix the stupid bug that has been there from day 1.
+Coresight tracers only support contextID tracing.  The HW
+automatically does the match between the contextID comparator register
+in the tracer with the contextID register of the core.  Tracing is
+enabled if both values match (and the tracer is configured to do so).
 
-Cc: stable at vger.kernel.org
-Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
-Tested-by: Russell King <rmk+kernel@arm.linux.org.uk>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm64/kvm/inject_fault.c | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm64/kvm/inject_fault.c b/arch/arm64/kvm/inject_fault.c
-index f02530e..85c5715 100644
---- a/arch/arm64/kvm/inject_fault.c
-+++ b/arch/arm64/kvm/inject_fault.c
-@@ -168,8 +168,8 @@ void kvm_inject_dabt(struct kvm_vcpu *vcpu, unsigned long addr)
- {
- 	if (!(vcpu->arch.hcr_el2 & HCR_RW))
- 		inject_abt32(vcpu, false, addr);
--
--	inject_abt64(vcpu, false, addr);
-+	else
-+		inject_abt64(vcpu, false, addr);
- }
- 
- /**
-@@ -184,8 +184,8 @@ void kvm_inject_pabt(struct kvm_vcpu *vcpu, unsigned long addr)
- {
- 	if (!(vcpu->arch.hcr_el2 & HCR_RW))
- 		inject_abt32(vcpu, true, addr);
--
--	inject_abt64(vcpu, true, addr);
-+	else
-+		inject_abt64(vcpu, true, addr);
- }
- 
- /**
-@@ -198,6 +198,6 @@ void kvm_inject_undefined(struct kvm_vcpu *vcpu)
- {
- 	if (!(vcpu->arch.hcr_el2 & HCR_RW))
- 		inject_undef32(vcpu);
--
--	inject_undef64(vcpu);
-+	else
-+		inject_undef64(vcpu);
- }
--- 
-2.1.4
+>
+>> This patch also changes the ABI, it is normally not allowed, but
+>> fortunately it is a testing ABI and very new for now. Nevertheless,
+>> if you don't think it should be changed, we could always add an alias
+>> for userspace.
+>>
+>> Signed-off-by: Chunyan Zhang <zhang.chunyan@linaro.org>
+>> Reviewed-by: Mark Brown <broonie@kernel.org>
+>> ---
+>>  .../ABI/testing/sysfs-bus-coresight-devices-etm4x    |  2 +-
+>>  drivers/hwtracing/coresight/coresight-etm4x.c        | 20 ++++++++++----------
+>>  drivers/hwtracing/coresight/coresight-etm4x.h        |  4 ++--
+>>  3 files changed, 13 insertions(+), 13 deletions(-)
+>>
+>> diff --git a/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x b/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x
+>> index 2fe2e3d..2355ed8 100644
+>> --- a/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x
+>> +++ b/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x
+>> @@ -249,7 +249,7 @@ KernelVersion:    4.01
+>>  Contact:     Mathieu Poirier <mathieu.poirier@linaro.org>
+>>  Description: (RW) Select which context ID comparator to work with.
+>>
+>> -What:                /sys/bus/coresight/devices/<memory_map>.etm/ctxid_val
+>> +What:                /sys/bus/coresight/devices/<memory_map>.etm/ctxid_pid
+>>  Date:                April 2015
+>>  KernelVersion:       4.01
+>>  Contact:     Mathieu Poirier <mathieu.poirier@linaro.org>
+>> diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
+>> index 1312e99..9afbda5 100644
+>> --- a/drivers/hwtracing/coresight/coresight-etm4x.c
+>> +++ b/drivers/hwtracing/coresight/coresight-etm4x.c
+>> @@ -155,7 +155,7 @@ static void etm4_enable_hw(void *info)
+>>                              drvdata->base + TRCACATRn(i));
+>>       }
+>>       for (i = 0; i < drvdata->numcidc; i++)
+>> -             writeq_relaxed(drvdata->ctxid_val[i],
+>> +             writeq_relaxed(drvdata->ctxid_pid[i],
+>>                              drvdata->base + TRCCIDCVRn(i));
+>>       writel_relaxed(drvdata->ctxid_mask0, drvdata->base + TRCCIDCCTLR0);
+>>       writel_relaxed(drvdata->ctxid_mask1, drvdata->base + TRCCIDCCTLR1);
+>> @@ -507,7 +507,7 @@ static ssize_t reset_store(struct device *dev,
+>>
+>>       drvdata->ctxid_idx = 0x0;
+>>       for (i = 0; i < drvdata->numcidc; i++)
+>> -             drvdata->ctxid_val[i] = 0x0;
+>> +             drvdata->ctxid_pid[i] = 0x0;
+>>       drvdata->ctxid_mask0 = 0x0;
+>>       drvdata->ctxid_mask1 = 0x0;
+>>
+>> @@ -1815,7 +1815,7 @@ static ssize_t ctxid_idx_store(struct device *dev,
+>>  }
+>>  static DEVICE_ATTR_RW(ctxid_idx);
+>>
+>> -static ssize_t ctxid_val_show(struct device *dev,
+>> +static ssize_t ctxid_pid_show(struct device *dev,
+>>                             struct device_attribute *attr,
+>>                             char *buf)
+>>  {
+>> @@ -1825,12 +1825,12 @@ static ssize_t ctxid_val_show(struct device *dev,
+>>
+>>       spin_lock(&drvdata->spinlock);
+>>       idx = drvdata->ctxid_idx;
+>> -     val = (unsigned long)drvdata->ctxid_val[idx];
+>> +     val = (unsigned long)drvdata->ctxid_pid[idx];
+>>       spin_unlock(&drvdata->spinlock);
+>>       return scnprintf(buf, PAGE_SIZE, "%#lx\n", val);
+>>  }
+>>
+>> -static ssize_t ctxid_val_store(struct device *dev,
+>> +static ssize_t ctxid_pid_store(struct device *dev,
+>>                              struct device_attribute *attr,
+>>                              const char *buf, size_t size)
+>>  {
+>> @@ -1850,11 +1850,11 @@ static ssize_t ctxid_val_store(struct device *dev,
+>>
+>>       spin_lock(&drvdata->spinlock);
+>>       idx = drvdata->ctxid_idx;
+>> -     drvdata->ctxid_val[idx] = (u64)val;
+>> +     drvdata->ctxid_pid[idx] = (u64)val;
+>>       spin_unlock(&drvdata->spinlock);
+>>       return size;
+>>  }
+>> -static DEVICE_ATTR_RW(ctxid_val);
+>> +static DEVICE_ATTR_RW(ctxid_pid);
+>>
+>>  static ssize_t ctxid_masks_show(struct device *dev,
+>>                               struct device_attribute *attr,
+>> @@ -1949,7 +1949,7 @@ static ssize_t ctxid_masks_store(struct device *dev,
+>>                */
+>>               for (j = 0; j < 8; j++) {
+>>                       if (maskbyte & 1)
+>> -                             drvdata->ctxid_val[i] &= ~(0xFF << (j * 8));
+>> +                             drvdata->ctxid_pid[i] &= ~(0xFF << (j * 8));
+>>                       maskbyte >>= 1;
+>>               }
+>>               /* Select the next ctxid comparator mask value */
+>> @@ -2193,7 +2193,7 @@ static struct attribute *coresight_etmv4_attrs[] = {
+>>       &dev_attr_res_idx.attr,
+>>       &dev_attr_res_ctrl.attr,
+>>       &dev_attr_ctxid_idx.attr,
+>> -     &dev_attr_ctxid_val.attr,
+>> +     &dev_attr_ctxid_pid.attr,
+>>       &dev_attr_ctxid_masks.attr,
+>>       &dev_attr_vmid_idx.attr,
+>>       &dev_attr_vmid_val.attr,
+>> @@ -2514,7 +2514,7 @@ static void etm4_init_default_data(struct etmv4_drvdata *drvdata)
+>>       }
+>>
+>>       for (i = 0; i < drvdata->numcidc; i++)
+>> -             drvdata->ctxid_val[i] = 0x0;
+>> +             drvdata->ctxid_pid[i] = 0x0;
+>>       drvdata->ctxid_mask0 = 0x0;
+>>       drvdata->ctxid_mask1 = 0x0;
+>>
+>> diff --git a/drivers/hwtracing/coresight/coresight-etm4x.h b/drivers/hwtracing/coresight/coresight-etm4x.h
+>> index e08e983..1e8fb36 100644
+>> --- a/drivers/hwtracing/coresight/coresight-etm4x.h
+>> +++ b/drivers/hwtracing/coresight/coresight-etm4x.h
+>> @@ -265,7 +265,7 @@
+>>   * @addr_type:       Current status of the comparator register.
+>>   * @ctxid_idx:       Context ID index selector.
+>>   * @ctxid_size:      Size of the context ID field to consider.
+>> - * @ctxid_val:       Value of the context ID comparator.
+>> + * @ctxid_pid:       Value of the context ID comparator.
+>>   * @ctxid_mask0:Context ID comparator mask for comparator 0-3.
+>>   * @ctxid_mask1:Context ID comparator mask for comparator 4-7.
+>>   * @vmid_idx:        VM ID index selector.
+>> @@ -352,7 +352,7 @@ struct etmv4_drvdata {
+>>       u8                              addr_type[ETM_MAX_SINGLE_ADDR_CMP];
+>>       u8                              ctxid_idx;
+>>       u8                              ctxid_size;
+>> -     u64                             ctxid_val[ETMv4_MAX_CTXID_CMP];
+>> +     u64                             ctxid_pid[ETMv4_MAX_CTXID_CMP];
+>>       u32                             ctxid_mask0;
+>>       u32                             ctxid_mask1;
+>>       u8                              vmid_idx;
+>>
+>
+>
+> --
+> Qualcomm Innovation Center, Inc.
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> a Linux Foundation Collaborative Project
