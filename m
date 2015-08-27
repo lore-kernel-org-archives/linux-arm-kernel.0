@@ -1,95 +1,241 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Fri, 28 Aug 2015 07:52:19 +0800
-Subject: [PATCH v1 3/5] ARM: dts: Add arm, pl330-broken-no-flushp quirk
- for rk3288 platform
-In-Reply-To: <CAD=FV=Uy8zhPnCQGcks9T-wezcRAohO8Ec3KSLn=Ftr7J1TeSA@mail.gmail.com>
-References: <1440685419-22037-1-git-send-email-shawn.lin@rock-chips.com>
- <1440685481-22163-1-git-send-email-shawn.lin@rock-chips.com>
- <CAD=FV=Uy8zhPnCQGcks9T-wezcRAohO8Ec3KSLn=Ftr7J1TeSA@mail.gmail.com>
-Message-ID: <55DFA2B3.1010401@rock-chips.com>
+From: mturquette@baylibre.com (Michael Turquette)
+Date: Thu, 27 Aug 2015 16:58:49 -0700
+Subject: [PATCH] clk: at91: add audio pll clock driver
+In-Reply-To: <20150827113035.072cccb5@bbrezillon>
+References: <1438337864-27949-1-git-send-email-nicolas.ferre@atmel.com>
+ <20150827113035.072cccb5@bbrezillon>
+Message-ID: <20150827235849.30921.22045@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/8/28 0:52, Doug Anderson wrote:
-> Hi,
->
-> On Thu, Aug 27, 2015 at 7:24 AM, Shawn Lin <shawn.lin@rock-chips.com> wrote:
->> From: Addy Ke <addy.ke@rock-chips.com>
->
-> Looks like you just added the "From" here.  I think that's fine, but
-> better to set the author so you get the right cover letter...
->
->
->> Pl330 integrated in rk3288 platform doesn't support
->> DMAFLUSHP function. So we add broken-no-flushp quirk
->> for it.
->>
->> Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
->> Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
->> cc: Heiko Stuebner <heiko@sntech.de>
->> cc: Doug Anderson <dianders@chromium.org>
->> cc: Olof Johansson <olofj@google.com>
->>
->> ---
->>
->> Changes in v1:
->> - rename broken-no-flushp to "arm,pl330-broken-no-flushp" suggested
->>    by Krzysztof.
->> - remove Sunny's tag
->
-> Note that typically for patches I see people go from "no v" to "v2".  AKA:
-> * PATCH
-> * PATCH v2
-> * PATCH v3
->
->
->>   arch/arm/boot/dts/rk3288.dtsi | 3 +++
->>   1 file changed, 3 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
->> index 22316d0..106adf7 100644
->> --- a/arch/arm/boot/dts/rk3288.dtsi
->> +++ b/arch/arm/boot/dts/rk3288.dtsi
->> @@ -144,6 +144,7 @@
->>                          #dma-cells = <1>;
->>                          clocks = <&cru ACLK_DMAC2>;
->>                          clock-names = "apb_pclk";
->> +                       arm,pl330-broken-no-flushp;
->
-> Note that you should add bindings _before_ the usage of them.  So
-> patch #5 (Documentation) needs to come before this one.
->
+Quoting Boris Brezillon (2015-08-27 02:30:35)
+> Hi Nicolas,
+> 
+> On Fri, 31 Jul 2015 12:17:44 +0200
+> Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+> 
+> > This new clock driver set allows to have a fractional divided clock
+> > that would generate a precise clock particularly suitable for
+> > audio applications.
+> > 
+> > The main audio pll clock has two children clocks: one that is connected
+> > to the PMC, the other that can directly drive a pad. As these two routes
+> > have different enable bits and different dividers and divider formula,
+> > they are handled by two different drivers.
+> > Each of them would modify the rate of the main audio pll parent.
+> 
+> Hm, not sure allowing both children to modify the parent clk rate is
+> a good idea, but let's see how it works.
 
-Cool! That makes sense.
-Thanks, Doug.
+Might be a good idea to use clk_set_rate_range? Of course most audio use
+cases need exact rates...
 
->>                  };
->>
->>                  dmac_bus_ns: dma-controller at ff600000 {
->> @@ -155,6 +156,7 @@
->>                          clocks = <&cru ACLK_DMAC1>;
->>                          clock-names = "apb_pclk";
->>                          status = "disabled";
->> +                       arm,pl330-broken-no-flushp;
->>                  };
->>
->>                  dmac_bus_s: dma-controller at ffb20000 {
->> @@ -165,6 +167,7 @@
->>                          #dma-cells = <1>;
->>                          clocks = <&cru ACLK_DMAC1>;
->>                          clock-names = "apb_pclk";
->> +                       arm,pl330-broken-no-flushp;
->>                  };
->>          };
->
-> Other than the small nits above, this looks fine to me.
->
-> Reviewed-by: Douglas Anderson <dianders@chromium.org>
->
->
->
+Regards,
+Mike
 
-
--- 
-Best Regards
-Shawn Lin
+> 
+> > 
+> > Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> > ---
+> >  .../devicetree/bindings/clock/at91-clock.txt       |  38 +++
+> >  drivers/clk/at91/Makefile                          |   2 +
+> >  drivers/clk/at91/clk-audio-pll-pad.c               | 220 +++++++++++++++++
+> >  drivers/clk/at91/clk-audio-pll-pmc.c               | 171 ++++++++++++++
+> >  drivers/clk/at91/clk-audio-pll.c                   | 261 +++++++++++++++++++++
+> >  drivers/clk/at91/pmc.c                             |  14 ++
+> >  drivers/clk/at91/pmc.h                             |   7 +
+> >  include/linux/clk/at91_pmc.h                       |  25 ++
+> >  8 files changed, 738 insertions(+)
+> >  create mode 100644 drivers/clk/at91/clk-audio-pll-pad.c
+> >  create mode 100644 drivers/clk/at91/clk-audio-pll-pmc.c
+> >  create mode 100644 drivers/clk/at91/clk-audio-pll.c
+> > 
+> 
+> [...]
+> 
+> > +
+> > +static int clk_audio_pll_compute_qdpad(unsigned long q_rate, unsigned long rate,
+> > +                                    unsigned long *qd, u8 *div, u8 *ext_div)
+> > +{
+> > +     unsigned long tmp_qd;
+> > +     unsigned long rem2, rem3;
+> > +     unsigned long ldiv, lext_div;
+> > +
+> > +     if (!rate)
+> > +             return -EINVAL;
+> > +
+> > +     tmp_qd = q_rate / rate;
+> > +     if (!tmp_qd || tmp_qd > AUDIO_PLL_QDPAD_MAX)
+> > +             return -EINVAL;
+> 
+> Do you really want to return an error in this case?
+> I mean, you're calling this function from ->round_rate(), and
+> ->round_rate() is supposed to find the closest rate, not to return an
+> error if the rate is too low or to high.
+> ITOH, you're calling the same function from ->set_rate(), which is
+> supposed to complain if the requested rate is not exactly met.
+> 
+> Maybe you can deal with that by passing an additional argument to this
+> function. Something like:
+> 
+>         tmp_qd = q_rate / rate;
+> 
+>         if (!strict) {
+>                 if (!tmp_qd)
+>                         tmp_qd = 1;
+>                 else if (tmp_qd > AUDIO_PLL_QDPAD_MAX)
+>                         tmp_qd = AUDIO_PLL_QDPAD_MAX;
+>         }
+> 
+>         if (!tmp_qd || tmp_qd > AUDIO_PLL_QDPAD_MAX)
+>                 return -EINVAL;
+> 
+> > +
+> > +     if (tmp_qd <= AT91_PMC_AUDIO_PLL_QDPAD_EXTDIV_MAX) {
+> > +             ldiv = 1;
+> > +             lext_div = tmp_qd;
+> > +     } else {
+> > +             rem2 = tmp_qd % 2;
+> > +             rem3 = tmp_qd % 3;
+> > +
+> > +             if (rem3 == 0 ||
+> > +                 tmp_qd > AT91_PMC_AUDIO_PLL_QDPAD_EXTDIV_MAX * 2 ||
+> > +                 rem3 < rem2) {
+> > +                     ldiv = 3;
+> > +                     lext_div = tmp_qd / 3;
+> > +             } else {
+> > +                     ldiv = 2;
+> > +                     lext_div = tmp_qd >> 1;
+> > +             }
+> > +     }
+> > +
+> > +     pr_debug("A PLL/PAD: %s, qd = %lu (div = %lu, ext_div = %lu)\n",
+> > +              __func__, ldiv * lext_div, ldiv, lext_div);
+> > +
+> > +     /* if we were given variable to store, we can provide them */
+> > +     if (qd)
+> > +             *qd = ldiv * lext_div;
+> > +     if (div && ext_div) {
+> > +             /* we can cast here as we verified the bounds just above */
+> > +             *div = (u8)ldiv;
+> > +             *ext_div = (u8)lext_div;
+> > +     }
+> > +
+> > +     return 0;
+> > +}
+> > +
+> > +static long clk_audio_pll_pad_round_rate(struct clk_hw *hw, unsigned long rate,
+> > +                                      unsigned long *parent_rate)
+> 
+> I thought we were trying to get rid of the ->round_rate() function in
+> favor of the ->determine_rate() one (which is more flexible), but maybe
+> I'm wrong. Stephen, Mike, what's your opinion?
+> 
+> > +{
+> > +     struct clk *pclk = __clk_get_parent(hw->clk);
+> > +     long best_rate = -EINVAL;
+> > +     unsigned long best_parent_rate = 0;
+> > +     unsigned long tmp_qd;
+> > +
+> > +     pr_debug("A PLL/PAD: %s, rate = %lu (parent_rate = %lu)\n",
+> > +              __func__, rate, *parent_rate);
+> > +
+> > +     if (clk_audio_pll_compute_qdpad(AUDIO_PLL_REFERENCE_FOUT, rate,
+> > +                                     &tmp_qd, NULL, NULL))
+> > +             return -EINVAL;
+> 
+> You're calculating your divisor based on the AUDIO_PLL_REFERENCE_FOUT
+> value...
+> 
+> > +
+> > +     best_parent_rate = __clk_round_rate(pclk, rate * tmp_qd);
+> 
+> ... and then asking your parent to adapt its rate based on the returned
+> divisor. Wouldn't it be preferable to search for the best parent rate
+> when choosing the divisor?
+> 
+> > +     best_rate = best_parent_rate / tmp_qd;
+> > +
+> > +     pr_debug("A PLL/PAD: %s, best_rate = %ld, best_parent_rate = %lu\n",
+> > +              __func__, best_rate, best_parent_rate);
+> > +
+> > +     *parent_rate = best_parent_rate;
+> > +     return best_rate;
+> > +}
+> 
+> [...]
+> 
+> > +
+> > +static long clk_audio_pll_pmc_round_rate(struct clk_hw *hw, unsigned long rate,
+> > +                                      unsigned long *parent_rate)
+> > +{
+> > +     struct clk *pclk = __clk_get_parent(hw->clk);
+> > +     long best_rate = -EINVAL;
+> > +     unsigned long best_parent_rate = 0;
+> > +     unsigned long tmp_qd;
+> > +
+> > +     pr_debug("A PLL/PMC: %s, rate = %lu (parent_rate = %lu)\n",
+> > +              __func__, rate, *parent_rate);
+> > +
+> > +     if (clk_audio_pll_compute_qdpmc(AUDIO_PLL_REFERENCE_FOUT, rate, &tmp_qd))
+> > +             return -EINVAL;
+> > +
+> > +     best_parent_rate = __clk_round_rate(pclk, rate * tmp_qd);
+> 
+> Ditto.
+> 
+> BTW, I'm not sure this is safe to allow both pll-audio children to
+> change their parent rate. What will happen if one of them change the
+> pll-audio rate while the other is still using it?
+> 
+> > +     best_rate = best_parent_rate / tmp_qd;
+> > +
+> > +     pr_debug("A PLL/PMC: %s, best_rate = %ld, best_parent_rate = %lu (qd = %lu)\n",
+> > +              __func__, best_rate, best_parent_rate, tmp_qd - 1);
+> > +
+> > +     *parent_rate = best_parent_rate;
+> > +     return best_rate;
+> > +}
+> 
+> [...]
+> 
+> > +
+> > +#define to_clk_audio_frac(hw) container_of(hw, struct clk_audio_frac, hw)
+> > +
+> > +/* make sure that pll is in reset state beforehand */
+> > +static int clk_audio_pll_prepare(struct clk_hw *hw)
+> > +{
+> > +     struct clk_audio_frac *fck = to_clk_audio_frac(hw);
+> > +     struct at91_pmc *pmc = fck->pmc;
+> > +     u32 tmp;
+> > +
+> > +     pmc_lock(pmc);
+> > +     tmp = pmc_read(pmc, AT91_PMC_AUDIO_PLL0) & ~AT91_PMC_AUDIO_PLL_RESETN;
+> > +     pmc_write(pmc, AT91_PMC_AUDIO_PLL0, tmp);
+> > +     pmc_unlock(pmc);
+> 
+> Nothing sleeps in this code, so you could move everything in your
+> ->enable() function.
+> 
+> > +     return 0;
+> > +}
+> > +
+> > +static void clk_audio_pll_unprepare(struct clk_hw *hw)
+> > +{
+> > +     clk_audio_pll_prepare(hw);
+> 
+> Ditto.
+> 
+> Best Regards,
+> 
+> Boris
+> 
+> -- 
+> Boris Brezillon, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
