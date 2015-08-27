@@ -1,106 +1,106 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Thu, 27 Aug 2015 12:01:23 -0500
-Subject: [PATCH v3] soc: qcom: smd: Use correct remote processor ID
-Message-ID: <1440694883-22685-1-git-send-email-agross@codeaurora.org>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Thu, 27 Aug 2015 20:06:32 +0300
+Subject: [PATCH] ARM: OMAP2+: omap-device: remove omap_device_late_init
+ call completely
+In-Reply-To: <20150827163856.GX4215@atomide.com>
+References: <1440611890-4935-1-git-send-email-grygorii.strashko@ti.com>
+ <20150826181006.GT4215@atomide.com> <55DF12E7.10802@ti.com>
+ <20150827163856.GX4215@atomide.com>
+Message-ID: <55DF4398.7020201@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes SMEM addressing issues when remote processors need to use
-secure SMEM partitions.
+On 08/27/2015 07:38 PM, Tony Lindgren wrote:
+> * Grygorii Strashko <grygorii.strashko@ti.com> [150827 06:42]:
+>> Hi Tony,
+>>
+>> On 08/26/2015 09:10 PM, Tony Lindgren wrote:
+>>> * Grygorii Strashko <grygorii.strashko@ti.com> [150826 11:01]:
+>>>> Now Kernel fails to boot 50% of times (form build to build) with
+>>>> RT-patchset applied due to the following race - on late boot
+>>>> stages deferred_probe_work_func races with omap_device_late_ini
+>>>>
+>>>> late_initcall
+>>>>    - deferred_probe_initcal() tries to re-probe all pending driver's probe.
+>>>>      [In general, It's NOT expected to probe any other built-in drivers after
+>>>>      deferred_probe_initcal() is finished, because most of
+>>>>      late_initcall_sync/late_initcall functions expected that all driver
+>>>>      or probed or deferred already.]
+>>>>
+>>>> - later on, some driver is probing in this case It's could cpsw.c
+>>>>     (but could be any other drivers)
+>>>>     cpsw_init
+>>>>     - platform_driver_register
+>>>>       - really_probe
+>>>>          - driver_bound
+>>>>            - driver_deferred_probe_trigger
+>>>>     and boot proceed.
+>>>>     So, at this moment we have  deferred_probe_work_func scheduled.
+>>>>
+>>>> late_initcall_sync
+>>>>     - omap_device_late_init
+>>>>       - omap_device_idle
+>>>>
+>>>> CPU1					CPU2
+>>>>     - deferred_probe_work_func
+>>>>       - really_probe
+>>>>         - omap_hsmmc_probe
+>>>> 	- pm_runtime_get_sync
+>>>> 					late_initcall_sync
+>>>> 					- omap_device_late_init
+>>>> 						if (od->_driver_status != BUS_NOTIFY_BOUND_DRIVER) {
+>>>> 							if (od->_state == OMAP_DEVICE_STATE_ENABLED) {
+>>>> 								- omap_device_idle [ops - IP is disabled, ]
+>>>> 	- [fail]
+>>>> 	- pm_runtime_put_sync
+>>>>             - omap_hsmmc_runtime_suspend [ooops!]
+>>>
+>>> OK idling of unclaimed devices should not happen for deferred probe,
+>>> it should only happen when there's no driver and no probing happening.
+>>>    
+>>>> Lets remove just remove omap_device_late_init completely as suggested
+>>>> by Tero Kristo:
+>>>>
+>>>> "How about remove omap_device_late_init call completely. I don't think
+>>>> it does anything useful at the moment; none of the omap devices get
+>>>> enabled outside runtime_pm, so there should be no need to explicitly
+>>>> disable the devices."
+>>>
+>>> I think this is still needed from PM point of view as otherwise we
+>>> don't idle any devices that don't have a driver available. Or am I
+>>> missing something?
+>>>
+>>> To me it seems the bug is relying on the BUS_NOTIFY_BOUND_DRIVER is
+>>> not set in the deferred probe case.
+>>>
+>>
+>>
+>> What do you think about below alternative?
+>>
+>> diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
+>> index 4cb8fd9..72ebc4c 100644
+>> --- a/arch/arm/mach-omap2/omap_device.c
+>> +++ b/arch/arm/mach-omap2/omap_device.c
+>> @@ -901,7 +901,8 @@ static int __init omap_device_late_idle(struct device *dev, void *data)
+>>                  if (od->hwmods[i]->flags & HWMOD_INIT_NO_IDLE)
+>>                          return 0;
+>>   
+>> -       if (od->_driver_status != BUS_NOTIFY_BOUND_DRIVER) {
+>> +       if (od->_driver_status != BUS_NOTIFY_BOUND_DRIVER &&
+>> +           od->_driver_status != BUS_NOTIFY_BIND_DRIVER) {
+>>                  if (od->_state == OMAP_DEVICE_STATE_ENABLED) {
+>>                          dev_warn(dev, "%s: enabled but no driver.  Idling\n",
+>>                                   __func__);
+> 
+> Seems better to me if it really fixes the issue.
+> 
 
-Signed-off-by: Andy Gross <agross@codeaurora.org>
-Reviewed-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
----
- .../devicetree/bindings/soc/qcom/qcom,smd.txt      |    6 ++++++
- drivers/soc/qcom/smd.c                             |   16 ++++++++++++----
- 2 files changed, 18 insertions(+), 4 deletions(-)
+My dra7-evm failed to boot on "2b186e5 Add linux-next specific files for 20150827"
+and this change restores boot.
 
-diff --git a/Documentation/devicetree/bindings/soc/qcom/qcom,smd.txt b/Documentation/devicetree/bindings/soc/qcom/qcom,smd.txt
-index f65c76d..97d9b3e 100644
---- a/Documentation/devicetree/bindings/soc/qcom/qcom,smd.txt
-+++ b/Documentation/devicetree/bindings/soc/qcom/qcom,smd.txt
-@@ -37,6 +37,12 @@ The edge is described by the following properties:
- 	Definition: the identifier of the remote processor in the smd channel
- 		    allocation table
- 
-+- qcom,remote-pid:
-+	Usage: optional
-+	Value type: <u32>
-+	Definition: the identifier for the remote processor as known by the rest
-+		    of the system.
-+
- = SMD DEVICES
- 
- In turn, subnodes of the "edges" represent devices tied to SMD channels on that
-diff --git a/drivers/soc/qcom/smd.c b/drivers/soc/qcom/smd.c
-index 327adcf..edd9d9a 100644
---- a/drivers/soc/qcom/smd.c
-+++ b/drivers/soc/qcom/smd.c
-@@ -96,6 +96,7 @@ static const struct {
-  * @smd:		handle to qcom_smd
-  * @of_node:		of_node handle for information related to this edge
-  * @edge_id:		identifier of this edge
-+ * @remote_pid:		identifier of remote processor
-  * @irq:		interrupt for signals on this edge
-  * @ipc_regmap:		regmap handle holding the outgoing ipc register
-  * @ipc_offset:		offset within @ipc_regmap of the register for ipc
-@@ -111,6 +112,7 @@ struct qcom_smd_edge {
- 	struct qcom_smd *smd;
- 	struct device_node *of_node;
- 	unsigned edge_id;
-+	unsigned remote_pid;
- 
- 	int irq;
- 
-@@ -572,7 +574,7 @@ static irqreturn_t qcom_smd_edge_intr(int irq, void *data)
- 	 * have to scan if the amount of available space in smem have changed
- 	 * since last scan.
- 	 */
--	available = qcom_smem_get_free_space(edge->edge_id);
-+	available = qcom_smem_get_free_space(edge->remote_pid);
- 	if (available != edge->smem_available) {
- 		edge->smem_available = available;
- 		edge->need_rescan = true;
-@@ -976,7 +978,8 @@ static struct qcom_smd_channel *qcom_smd_create_channel(struct qcom_smd_edge *ed
- 	spin_lock_init(&channel->recv_lock);
- 	init_waitqueue_head(&channel->fblockread_event);
- 
--	ret = qcom_smem_get(edge->edge_id, smem_info_item, (void **)&info, &info_size);
-+	ret = qcom_smem_get(edge->remote_pid, smem_info_item, (void **)&info,
-+			    &info_size);
- 	if (ret)
- 		goto free_name_and_channel;
- 
-@@ -997,7 +1000,8 @@ static struct qcom_smd_channel *qcom_smd_create_channel(struct qcom_smd_edge *ed
- 		goto free_name_and_channel;
- 	}
- 
--	ret = qcom_smem_get(edge->edge_id, smem_fifo_item, &fifo_base, &fifo_size);
-+	ret = qcom_smem_get(edge->remote_pid, smem_fifo_item, &fifo_base,
-+			    &fifo_size);
- 	if (ret)
- 		goto free_name_and_channel;
- 
-@@ -1041,7 +1045,7 @@ static void qcom_discover_channels(struct qcom_smd_edge *edge)
- 	int i;
- 
- 	for (tbl = 0; tbl < SMD_ALLOC_TBL_COUNT; tbl++) {
--		ret = qcom_smem_get(edge->edge_id,
-+		ret = qcom_smem_get(edge->remote_pid,
- 				    smem_items[tbl].alloc_tbl_id,
- 				    (void **)&alloc_tbl,
- 				    NULL);
-@@ -1184,6 +1188,10 @@ static int qcom_smd_parse_edge(struct device *dev,
- 		return -EINVAL;
- 	}
- 
-+	edge->remote_pid = QCOM_SMEM_HOST_ANY;
-+	key = "qcom,remote-pid";
-+	of_property_read_u32(node, key, &edge->remote_pid);
-+
- 	syscon_np = of_parse_phandle(node, "qcom,ipc", 0);
- 	if (!syscon_np) {
- 		dev_err(dev, "no qcom,ipc node\n");
+Will wait for confirmation from Keerthy.
+
+
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+regards,
+-grygorii
