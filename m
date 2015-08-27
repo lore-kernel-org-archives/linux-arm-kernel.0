@@ -1,32 +1,79 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Thu, 27 Aug 2015 16:56:18 +0200 (CEST)
-Subject: [PATCH v3] irqchip: kill off set_irq_flags usage
-In-Reply-To: <CAL_JsqL9EsFpE3j_ud6bvoJ38di+2428mBD2VgQPX8fba=BpdQ@mail.gmail.com>
-References: <1438030523-15853-1-git-send-email-robh@kernel.org>
- <1438030523-15853-6-git-send-email-robh@kernel.org>
- <CAL_JsqL9EsFpE3j_ud6bvoJ38di+2428mBD2VgQPX8fba=BpdQ@mail.gmail.com>
-Message-ID: <alpine.DEB.2.11.1508271655220.15006@nanos>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Thu, 27 Aug 2015 09:05:33 -0600
+Subject: [PATCH] Coresight: ETMv4: Prevent TRCRSCTLR0&1 from being accessed
+In-Reply-To: <1440648369-4614-1-git-send-email-zhang.chunyan@linaro.org>
+References: <1440648369-4614-1-git-send-email-zhang.chunyan@linaro.org>
+Message-ID: <CANLsYkz8JwxoaCUg2EYrfcgFoL05OfhTmM5wT5CaHZFUHN87Lw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 26 Aug 2015, Rob Herring wrote:
-> Everything except this patch, sh, gpu, and final removal of
-> set_irq_flags in arm/arm64 are in -next. There don't appear to be any
-> new users either.
-> 
-> Can you apply this patch and these 2 now so they have some time in -next:
-> 
-> http://lkml.kernel.org/r/1438030523-15853-11-git-send-email-robh at kernel.org
-> http://lkml.kernel.org/r/1438030523-15853-5-git-send-email-robh at kernel.org
-> 
-> And these 2 toward the end of the merge window once there is no more
-> set_irq_flags:
-> 
-> http://lkml.kernel.org/r/1436711211-18223-13-git-send-email-robh at kernel.org
-> http://lkml.kernel.org/r/1436711211-18223-14-git-send-email-robh at kernel.org
+On 26 August 2015 at 22:06, Chunyan Zhang <zhang.chunyan@linaro.org> wrote:
+> 1. TRCRSCTLRn - Resource Selection Control Registers n=0~1 are reserved,
+>    we shouldn't access them.
+> 2. The max number of 'n' here is defined in TRCIDR4.NUMRSPAIR whoes value
+>    indicates the number of resource selection *pairs*, and 0 indicates
+>    one resource selection pair, 1 indicates two pairs, and so on ...
+>
+> So, the total number of resource selection control registers which we can
+> access is (TRCIDR4.NUMRSPAIR * 2)
+>
+> Signed-off-by: Chunyan Zhang <zhang.chunyan@linaro.org>
+> ---
+>  drivers/hwtracing/coresight/coresight-etm4x.c | 15 ++++++++++-----
+>  1 file changed, 10 insertions(+), 5 deletions(-)
+>
+> diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
+> index 1312e99..9425249 100644
+> --- a/drivers/hwtracing/coresight/coresight-etm4x.c
+> +++ b/drivers/hwtracing/coresight/coresight-etm4x.c
+> @@ -136,7 +136,9 @@ static void etm4_enable_hw(void *info)
+>                 writel_relaxed(drvdata->cntr_val[i],
+>                                drvdata->base + TRCCNTVRn(i));
+>         }
+> -       for (i = 0; i < drvdata->nr_resource; i++)
+> +
+> +       /* Resource selector pair 0 is always implemented and reserved */
+> +       for (i = 2; i < (drvdata->nr_resource + 1) * 2; i++)
 
-Could you please resend these 5 patches to me. Seems I lost some of them.
+Instead of repeating "->nr_resource + 1) * 2" every time, please add
+"->nr_resource += 1" in etm4_init_arch_data() along with a comment
+that explains why.
 
-Thanks,
-
-	tglx
+>                 writel_relaxed(drvdata->res_ctrl[i],
+>                                drvdata->base + TRCRSCTLRn(i));
+>
+> @@ -489,8 +491,9 @@ static ssize_t reset_store(struct device *dev,
+>                 drvdata->cntr_val[i] = 0x0;
+>         }
+>
+> -       drvdata->res_idx = 0x0;
+> -       for (i = 0; i < drvdata->nr_resource; i++)
+> +       /* Resource selector pair 0 is always implemented and reserved */
+> +       drvdata->res_idx = 0x2;
+> +       for (i = 2; i < (drvdata->nr_resource + 1) * 2; i++)
+>                 drvdata->res_ctrl[i] = 0x0;
+>
+>         for (i = 0; i < drvdata->nr_ss_cmp; i++) {
+> @@ -1729,7 +1732,7 @@ static ssize_t res_idx_store(struct device *dev,
+>         if (kstrtoul(buf, 16, &val))
+>                 return -EINVAL;
+>         /* Resource selector pair 0 is always implemented and reserved */
+> -       if ((val == 0) || (val >= drvdata->nr_resource))
+> +       if (val < 2 || val > (drvdata->nr_resource + 1) * 2)
+>                 return -EINVAL;
+>
+>         /*
+> @@ -2498,7 +2501,9 @@ static void etm4_init_default_data(struct etmv4_drvdata *drvdata)
+>                 drvdata->cntr_val[i] = 0x0;
+>         }
+>
+> -       for (i = 2; i < drvdata->nr_resource * 2; i++)
+> +       /* Resource selector pair 0 is always implemented and reserved */
+> +       drvdata->res_idx = 0x2;
+> +       for (i = 2; i < (drvdata->nr_resource + 1) * 2; i++)
+>                 drvdata->res_ctrl[i] = 0x0;
+>
+>         for (i = 0; i < drvdata->nr_ss_cmp; i++) {
+> --
+> 1.9.1
+>
