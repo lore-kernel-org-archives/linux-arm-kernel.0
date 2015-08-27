@@ -1,58 +1,54 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 27 Aug 2015 09:54:07 -0600
-Subject: [PATCH 2/5] coresight-etm4x: Change the name of the ctxid_val to
- ctxid_pid
-In-Reply-To: <55DF2DB5.7000909@codeaurora.org>
-References: <1436258518-9339-1-git-send-email-zhang.chunyan@linaro.org>
- <1436258518-9339-3-git-send-email-zhang.chunyan@linaro.org>
- <55DDFE01.50201@codeaurora.org>
- <CANLsYkyA_C=PUDEUSbcA_Sa6Abqnxk1TP9ye6F9i0bWW_OxqiA@mail.gmail.com>
- <55DF2DB5.7000909@codeaurora.org>
-Message-ID: <CANLsYkyfJX1CywxZ-e8TgK45XXs9jxkBDrp41OWAzTjC63Ggww@mail.gmail.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Thu, 27 Aug 2015 16:54:49 +0100
+Subject: [PATCH v1 3/3] arm64: dts: add Hi6220 mailbox node
+In-Reply-To: <1440552341.10987.53.camel@linaro.org>
+References: <20150821184059.GB2000@svinekod>
+ <20150824091845.GA28290@leoy-linaro> <20150824095144.GA7139@leverpostej>
+ <1440411596.3517.12.camel@linaro.org>
+ <20150824114903.GT10728@bivouac.eciton.net>
+ <1440490427.10987.29.camel@linaro.org>
+ <20150825094630.GU10728@bivouac.eciton.net>
+ <1440497710.10987.42.camel@linaro.org> <20150825104256.GB13471@leverpostej>
+ <1440510194.10987.52.camel@linaro.org> <20150825160030.GA3774@leoy-linaro>
+ <1440552341.10987.53.camel@linaro.org>
+Message-ID: <55DF32C9.8040302@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 August 2015 at 09:33, Christopher Covington <cov@codeaurora.org> wrote:
-> On 08/27/2015 11:12 AM, Mathieu Poirier wrote:
->> On 26 August 2015 at 11:57, Christopher Covington <cov@codeaurora.org> wrote:
->>> On 07/07/2015 04:41 AM, Chunyan Zhang wrote:
->>>> 'ctxid_val' array was used to store the value of ETM context ID comparator
->>>> which actually stores the process ID to be traced, so using 'ctxid_pid' as
->>>> its name instead make it easier to understand.
->>>
->>> Previous discussion with some ARM folks has led me to believe there isn't a
->>> guarantee that the Context ID Register will always have a PID. Why not allow
->>> filtering on thread group ID, session ID, cgroup related identifiers, etc.?
+On 26/08/15 02:25, Haojian Zhuang wrote:
+>> Option 1:
 >>
->> Coresight tracers only support contextID tracing.  The HW
->> automatically does the match between the contextID comparator register
->> in the tracer with the contextID register of the core.  Tracing is
->> enabled if both values match (and the tracer is configured to do so).
+>> 	memory at 0 {
+>> 		device_type = "memory";
+>> 		reg = <0x00000000 0x00000000 0x00000000 0x05e00000>,
+>> 		      <0x00000000 0x05f00000 0x00000000 0x00eff000>,
+>> 		      <0x00000000 0x06e00000 0x00000000 0x0060f000>,
+>> 		      <0x00000000 0x07410000 0x00000000 0x38bf0000>;
+>> 	};
+>>
+>> [snip]
+ >>
+>> Option 2:
+>>
+>> 	memory at 0 {
+>> 		device_type = "memory";
+>> 		reg = <0x0 0x0 0x0 0x40000000>;
+>> 	};
+>>
+ >> [snip]
+ >>
 >
-> Is there a reason to only ever allow Process IDs to be written into the
-> Coresight and CPU Context ID registers? Is there anything in the hardware that
-> would prevent writing, for example, Thread Group IDs into the Coresight and
-> CPU Context ID registers? If there's no hardware limitation, why should there
-> be kernel or device tree architecture that states or implies that patches to
-> support such a use case are unacceptable?
+> I prefer the second one. From my view, memory node should only describe
+> the hardware information of memory.
 
-I'm not saying your idea is unacceptable - I actually think there is
-value in it.  At this time the scheduler will automatically write the
-PID to the contextID register when a task is running, a reality this
-feature is exploiting.
+Haven't we already established that, to avoid the risk of UEFI 
+applications accessing inappropriate memory locations, a (correct) UEFI 
+implementation must use, and pass to the kernel, a memory map that looks 
+like option 1?
 
-There is no limitation as to what can be written to the coresight
-contextID register - tracing will start for as long as the values and
-mask are configured properly.  I do not know the limitation imposed on
-the core's contextID register (if any). We'd also have to make sure
-that all the code, everywhere, relying on that information has been
-modified to take into account the new semantic.
+That being the case why would we want u-boot (or any other similar 
+bootloader) to pass a memory map that is gratuitously different to the 
+one supplied by UEFI?
 
->
-> Thanks,
-> Christopher Covington
->
-> --
-> Qualcomm Innovation Center, Inc.
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> a Linux Foundation Collaborative Project
+
+Daniel.
