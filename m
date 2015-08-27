@@ -1,71 +1,72 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Thu, 27 Aug 2015 08:44:30 +0200
-Subject: [PATCH v3 2/4] regmap: regmap max_raw_read/write getter functions
-In-Reply-To: <1440657872-24554-1-git-send-email-mpa@pengutronix.de>
-References: <1440657872-24554-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1440657872-24554-3-git-send-email-mpa@pengutronix.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 27 Aug 2015 07:45:39 +0100
+Subject: [PATCH 2/4] remoteproc: Supply controller driver for ST's Remote
+ Processors
+In-Reply-To: <55DDF252.2010901@mentor.com>
+References: <1440594483-29601-1-git-send-email-lee.jones@linaro.org>
+ <1440594483-29601-3-git-send-email-lee.jones@linaro.org>
+ <55DDF252.2010901@mentor.com>
+Message-ID: <20150827064539.GD19409@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add functions to access the maximum size we can read/write using
-regmap_raw_read/write().
+On Wed, 26 Aug 2015, Nathan Lynch wrote:
 
-This helps drivers that need to know how much they can write with the
-raw functions without problems. There are some devices (e.g. bmc150)
-that have fifos as registers which need to be read in specific chunks
-otherwise samples are dropped.
+> On 08/26/2015 08:08 AM, Lee Jones wrote:
+> > --- /dev/null
+> > +++ b/drivers/remoteproc/st_remoteproc.c
+> > @@ -0,0 +1,300 @@
+> > +/*
+> > + * ST's Remote Processor Control Driver
+> > + *
+> > + * Copyright (C) 2015 STMicroelectronics - All Rights Reserved
+> > + *
+> > + * Author: Ludovic Barre <ludovic.barre@st.com>
+> 
+> When submitting code you didn't write, I'd say it's better practice to
+> clearly indicate its provenance in the commit message.  E.g. something
+> like "Driver based on code authored by Ludovic Barre for ST".  And
+> obtain signoffs etc if possible.
+> 
+> 
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License as published by
+> > + * the Free Software Foundation; either version 2 of the License.
+> 
+> Please review the wording here.  It's unclear whether this is intended
+> to be v2-only or v2 or later.
+> 
+> 
+> > +static int st_rproc_stop(struct rproc *rproc)
+> > +{
+> > +	struct st_rproc *st_rproc = rproc->priv;
+> > +	int err = 0;
+> > +
+> > +	if (st_rproc->config->sw_reset) {
+> > +		err = reset_control_assert(st_rproc->sw_reset);
+> > +		if (err)
+> > +			dev_warn(&rproc->dev, "Failed to assert S/W Reset\n");
+> > +	}
+> > +
+> > +	if (st_rproc->config->pwr_reset) {
+> > +		err = reset_control_assert(st_rproc->pwr_reset);
+> > +		if (err)
+> > +			dev_warn(&rproc->dev, "Failed to assert Power Reset\n");
+> > +	}
+> > +
+> > +	clk_disable(st_rproc->clk);
+> > +
+> > +	return 0;
+> > +}
+> 
+> Seems like st_rproc_stop should propagate errors back to its caller
+> instead of always returning 0.
 
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
----
- drivers/base/regmap/regmap.c | 22 ++++++++++++++++++++++
- include/linux/regmap.h       |  2 ++
- 2 files changed, 24 insertions(+)
+Good points, will fix.
 
-diff --git a/drivers/base/regmap/regmap.c b/drivers/base/regmap/regmap.c
-index c4ebc6bce46c..b4d12fe15f21 100644
---- a/drivers/base/regmap/regmap.c
-+++ b/drivers/base/regmap/regmap.c
-@@ -1390,6 +1390,28 @@ bool regmap_can_raw_write(struct regmap *map)
- }
- EXPORT_SYMBOL_GPL(regmap_can_raw_write);
- 
-+/**
-+ * regmap_get_raw_read_max - Get the maximum size we can read
-+ *
-+ * @map: Map to check.
-+ */
-+size_t regmap_get_raw_read_max(struct regmap *map)
-+{
-+	return map->max_raw_read;
-+}
-+EXPORT_SYMBOL_GPL(regmap_get_raw_read_max);
-+
-+/**
-+ * regmap_get_raw_write_max - Get the maximum size we can read
-+ *
-+ * @map: Map to check.
-+ */
-+size_t regmap_get_raw_write_max(struct regmap *map)
-+{
-+	return map->max_raw_write;
-+}
-+EXPORT_SYMBOL_GPL(regmap_get_raw_write_max);
-+
- static int _regmap_bus_formatted_write(void *context, unsigned int reg,
- 				       unsigned int val)
- {
-diff --git a/include/linux/regmap.h b/include/linux/regmap.h
-index 327b8f291d3f..6724d0e3819e 100644
---- a/include/linux/regmap.h
-+++ b/include/linux/regmap.h
-@@ -444,6 +444,8 @@ int regmap_get_max_register(struct regmap *map);
- int regmap_get_reg_stride(struct regmap *map);
- int regmap_async_complete(struct regmap *map);
- bool regmap_can_raw_write(struct regmap *map);
-+size_t regmap_get_raw_read_max(struct regmap *map);
-+size_t regmap_get_raw_write_max(struct regmap *map);
- 
- int regcache_sync(struct regmap *map);
- int regcache_sync_region(struct regmap *map, unsigned int min,
 -- 
-2.5.0
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
