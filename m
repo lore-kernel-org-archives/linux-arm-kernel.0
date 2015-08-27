@@ -1,22 +1,23 @@
 From: agross@codeaurora.org (Andy Gross)
-Date: Wed, 26 Aug 2015 23:35:29 -0500
-Subject: [PATCH 01/10] ARM: dts: qcom: Label serial nodes for aliasing
- and stdout-path
-In-Reply-To: <1434490313-13905-2-git-send-email-sboyd@codeaurora.org>
+Date: Wed, 26 Aug 2015 23:36:05 -0500
+Subject: [PATCH 08/10] ARM: dts: qcom: msm8660-surf: Use stdout-path
+In-Reply-To: <1434490313-13905-9-git-send-email-sboyd@codeaurora.org>
 References: <1434490313-13905-1-git-send-email-sboyd@codeaurora.org>
- <1434490313-13905-2-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20150827043529.GG28274@qualcomm.com>
+ <1434490313-13905-9-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20150827043605.GH28274@qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 16, 2015 at 02:31:44PM -0700, Stephen Boyd wrote:
-> Add a label to the serial nodes that are being used for the
-> console.
+On Tue, Jun 16, 2015 at 02:31:51PM -0700, Stephen Boyd wrote:
+> Use stdout-path so that we don't have to put the console on the
+> kernel command line.
 > 
 > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 > ---
+>  arch/arm/boot/dts/qcom-msm8660-surf.dts | 8 ++++++++
+>  1 file changed, 8 insertions(+)
 
-Applied.  Thanks
+Applied.  thanks
 
 -- 
 Qualcomm Innovation Center, Inc.
