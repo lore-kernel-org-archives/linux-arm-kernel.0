@@ -1,24 +1,26 @@
 From: agross@codeaurora.org (Andy Gross)
-Date: Wed, 26 Aug 2015 23:36:54 -0500
-Subject: [PATCH 06/10] ARM: dts: qcom: apq8084-mtp: Use stdout-path
-In-Reply-To: <1434490313-13905-7-git-send-email-sboyd@codeaurora.org>
-References: <1434490313-13905-1-git-send-email-sboyd@codeaurora.org>
- <1434490313-13905-7-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20150827043654.GJ28274@qualcomm.com>
+Date: Wed, 26 Aug 2015 23:53:48 -0500
+Subject: [PATCH v2 5/6] ARM: dts: qs600: add alias to serial0
+In-Reply-To: <20150825214622.GC12349@qualcomm.com>
+References: <1439903069-19752-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1439903427-20317-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <20150825214622.GC12349@qualcomm.com>
+Message-ID: <20150827045348.GK28274@qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 16, 2015 at 02:31:49PM -0700, Stephen Boyd wrote:
-> Use stdout-path so that we don't have to put the console on the
-> kernel command line.
+On Tue, Aug 25, 2015 at 04:46:22PM -0500, Andy Gross wrote:
+> On Tue, Aug 18, 2015 at 02:10:27PM +0100, Srinivas Kandagatla wrote:
+> > This patch add alias node with serial0.
+> > 
+> > Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> > ---
+> >  arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts | 4 ++++
+> >  1 file changed, 4 insertions(+)
 > 
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
->  arch/arm/boot/dts/qcom-apq8084-mtp.dts | 8 ++++++++
->  1 file changed, 8 insertions(+)
+> Looks fine.  Applied.
 
-
-Applied.  Thanks
+Scratch that.  I dropped it from the patch list due to stephen's set.
 
 -- 
 Qualcomm Innovation Center, Inc.
