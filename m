@@ -1,81 +1,68 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 27 Aug 2015 09:52:08 -0700
-Subject: [PATCH v1 3/5] ARM: dts: Add arm, pl330-broken-no-flushp quirk
- for rk3288 platform
-In-Reply-To: <1440685481-22163-1-git-send-email-shawn.lin@rock-chips.com>
-References: <1440685419-22037-1-git-send-email-shawn.lin@rock-chips.com>
- <1440685481-22163-1-git-send-email-shawn.lin@rock-chips.com>
-Message-ID: <CAD=FV=Uy8zhPnCQGcks9T-wezcRAohO8Ec3KSLn=Ftr7J1TeSA@mail.gmail.com>
+From: mturquette@baylibre.com (Michael Turquette)
+Date: Thu, 27 Aug 2015 09:52:44 -0700
+Subject: [PATCH v3] clk: rockchip: add pclk_cpu to the list of rk3188
+ critical clocks
+In-Reply-To: <8804658D-175F-4668-BC12-4AC439438B61@mniewoehner.de>
+References: <5400BEF8-5245-4F7B-845B-D326A7BC56B5@mniewoehner.de>
+ <5275855.eah07vmf4I@phil>
+ <9DBF9CCE-196E-43FB-BA76-BFB4B5F47A22@mniewoehner.de>
+ <10213368.VjAQGt7Kjq@phil>
+ <F5234F5E-2A91-4B63-B260-3F20A4D16A9D@mniewoehner.de>
+ <20150825185931.31346.26497@quantum>
+ <8804658D-175F-4668-BC12-4AC439438B61@mniewoehner.de>
+Message-ID: <20150827165244.30921.8929@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Quoting Michael Niewoehner (2015-08-25 13:22:07)
+> pclk_cpu needs to keep running because it is needed for devices like
+> the act8865 regulator but with the recent gpio clock handling this is
+> not always the case anymore. So add it to the list of critical clocks.
+> 
+> Signed-off-by: Michael Niewoehner <linux@mniewoehner.de>
+> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
 
-On Thu, Aug 27, 2015 at 7:24 AM, Shawn Lin <shawn.lin@rock-chips.com> wrote:
-> From: Addy Ke <addy.ke@rock-chips.com>
+Acked-by: Michael Turquette <mturquette@baylibre.com>
 
-Looks like you just added the "From" here.  I think that's fine, but
-better to set the author so you get the right cover letter...
+This patch applies cleanly to clk-next, so I guess the patch formatting
+issues have been resolved ;-)
 
+Note that I did NOT apply this to the clk tree, just locally for
+testing.
 
-> Pl330 integrated in rk3288 platform doesn't support
-> DMAFLUSHP function. So we add broken-no-flushp quirk
-> for it.
->
-> Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
-> Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
-> cc: Heiko Stuebner <heiko@sntech.de>
-> cc: Doug Anderson <dianders@chromium.org>
-> cc: Olof Johansson <olofj@google.com>
->
+Regards,
+Mike
+
 > ---
->
-> Changes in v1:
-> - rename broken-no-flushp to "arm,pl330-broken-no-flushp" suggested
->   by Krzysztof.
-> - remove Sunny's tag
-
-Note that typically for patches I see people go from "no v" to "v2".  AKA:
-* PATCH
-* PATCH v2
-* PATCH v3
-
-
->  arch/arm/boot/dts/rk3288.dtsi | 3 +++
->  1 file changed, 3 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-> index 22316d0..106adf7 100644
-> --- a/arch/arm/boot/dts/rk3288.dtsi
-> +++ b/arch/arm/boot/dts/rk3288.dtsi
-> @@ -144,6 +144,7 @@
->                         #dma-cells = <1>;
->                         clocks = <&cru ACLK_DMAC2>;
->                         clock-names = "apb_pclk";
-> +                       arm,pl330-broken-no-flushp;
-
-Note that you should add bindings _before_ the usage of them.  So
-patch #5 (Documentation) needs to come before this one.
-
->                 };
->
->                 dmac_bus_ns: dma-controller at ff600000 {
-> @@ -155,6 +156,7 @@
->                         clocks = <&cru ACLK_DMAC1>;
->                         clock-names = "apb_pclk";
->                         status = "disabled";
-> +                       arm,pl330-broken-no-flushp;
->                 };
->
->                 dmac_bus_s: dma-controller at ffb20000 {
-> @@ -165,6 +167,7 @@
->                         #dma-cells = <1>;
->                         clocks = <&cru ACLK_DMAC1>;
->                         clock-names = "apb_pclk";
-> +                       arm,pl330-broken-no-flushp;
->                 };
->         };
-
-Other than the small nits above, this looks fine to me.
-
-Reviewed-by: Douglas Anderson <dianders@chromium.org>
+> Changes in v3:
+> - fix git format-patch problem
+> 
+> Changes in v2:
+> - adapt commit message
+> - add Linus Walleij to recipients, as the patch is related to the gpio clock
+>  change in the rockchip pinctrl driver it should go through his tree as well
+> 
+>  drivers/clk/rockchip/clk-rk3188.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/clk/rockchip/clk-rk3188.c b/drivers/clk/rockchip/clk-rk3188.c
+> index ed02bbc..f63a642 100644
+> --- a/drivers/clk/rockchip/clk-rk3188.c
+> +++ b/drivers/clk/rockchip/clk-rk3188.c
+> @@ -716,6 +716,7 @@ static const char *const rk3188_critical_clocks[] __initconst = {
+>         "aclk_cpu",
+>         "aclk_peri",
+>         "hclk_peri",
+> +       "pclk_cpu",
+>  };
+>  
+>  static void __init rk3188_common_clk_init(struct device_node *np)
+> -- 
+> 2.5.0
+> 
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
