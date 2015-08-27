@@ -1,70 +1,27 @@
-From: zhang.chunyan@linaro.org (Chunyan Zhang)
-Date: Thu, 27 Aug 2015 12:06:09 +0800
-Subject: [PATCH] Coresight: ETMv4: Prevent TRCRSCTLR0&1 from being accessed
-Message-ID: <1440648369-4614-1-git-send-email-zhang.chunyan@linaro.org>
+From: agross@codeaurora.org (Andy Gross)
+Date: Wed, 26 Aug 2015 23:16:51 -0500
+Subject: [PATCH 03/10] ARM: dts: qcom: apq8064-ifc6410: Use stdout-path
+In-Reply-To: <1434490313-13905-4-git-send-email-sboyd@codeaurora.org>
+References: <1434490313-13905-1-git-send-email-sboyd@codeaurora.org>
+ <1434490313-13905-4-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20150827041651.GA28274@qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-1. TRCRSCTLRn - Resource Selection Control Registers n=0~1 are reserved,
-   we shouldn't access them.
-2. The max number of 'n' here is defined in TRCIDR4.NUMRSPAIR whoes value
-   indicates the number of resource selection *pairs*, and 0 indicates
-   one resource selection pair, 1 indicates two pairs, and so on ...
+On Tue, Jun 16, 2015 at 02:31:46PM -0700, Stephen Boyd wrote:
+> Use stdout-path so that we don't have to put the console on the
+> kernel command line.
+> 
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>  arch/arm/boot/dts/qcom-apq8064-ifc6410.dts | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
 
-So, the total number of resource selection control registers which we can
-access is (TRCIDR4.NUMRSPAIR * 2)
+Thanks.  Applied.
 
-Signed-off-by: Chunyan Zhang <zhang.chunyan@linaro.org>
----
- drivers/hwtracing/coresight/coresight-etm4x.c | 15 ++++++++++-----
- 1 file changed, 10 insertions(+), 5 deletions(-)
-
-diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
-index 1312e99..9425249 100644
---- a/drivers/hwtracing/coresight/coresight-etm4x.c
-+++ b/drivers/hwtracing/coresight/coresight-etm4x.c
-@@ -136,7 +136,9 @@ static void etm4_enable_hw(void *info)
- 		writel_relaxed(drvdata->cntr_val[i],
- 			       drvdata->base + TRCCNTVRn(i));
- 	}
--	for (i = 0; i < drvdata->nr_resource; i++)
-+
-+	/* Resource selector pair 0 is always implemented and reserved */
-+	for (i = 2; i < (drvdata->nr_resource + 1) * 2; i++)
- 		writel_relaxed(drvdata->res_ctrl[i],
- 			       drvdata->base + TRCRSCTLRn(i));
- 
-@@ -489,8 +491,9 @@ static ssize_t reset_store(struct device *dev,
- 		drvdata->cntr_val[i] = 0x0;
- 	}
- 
--	drvdata->res_idx = 0x0;
--	for (i = 0; i < drvdata->nr_resource; i++)
-+	/* Resource selector pair 0 is always implemented and reserved */
-+	drvdata->res_idx = 0x2;
-+	for (i = 2; i < (drvdata->nr_resource + 1) * 2; i++)
- 		drvdata->res_ctrl[i] = 0x0;
- 
- 	for (i = 0; i < drvdata->nr_ss_cmp; i++) {
-@@ -1729,7 +1732,7 @@ static ssize_t res_idx_store(struct device *dev,
- 	if (kstrtoul(buf, 16, &val))
- 		return -EINVAL;
- 	/* Resource selector pair 0 is always implemented and reserved */
--	if ((val == 0) || (val >= drvdata->nr_resource))
-+	if (val < 2 || val > (drvdata->nr_resource + 1) * 2)
- 		return -EINVAL;
- 
- 	/*
-@@ -2498,7 +2501,9 @@ static void etm4_init_default_data(struct etmv4_drvdata *drvdata)
- 		drvdata->cntr_val[i] = 0x0;
- 	}
- 
--	for (i = 2; i < drvdata->nr_resource * 2; i++)
-+	/* Resource selector pair 0 is always implemented and reserved */
-+	drvdata->res_idx = 0x2;
-+	for (i = 2; i < (drvdata->nr_resource + 1) * 2; i++)
- 		drvdata->res_ctrl[i] = 0x0;
- 
- 	for (i = 0; i < drvdata->nr_ss_cmp; i++) {
 -- 
-1.9.1
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
