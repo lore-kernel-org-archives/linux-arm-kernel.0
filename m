@@ -1,39 +1,118 @@
-From: lee@kernel.org (Lee Jones)
-Date: Thu, 27 Aug 2015 11:48:54 +0100
-Subject: [PATCH v5 3/3] ARM: bcm2835: Add DT for the firmware clocks
- driver.
-In-Reply-To: <55CEBC6B.9070001@wwwdotorg.org>
-References: <1439507142-2965-1-git-send-email-eric@anholt.net>
- <1439507142-2965-4-git-send-email-eric@anholt.net>
- <55CEBC6B.9070001@wwwdotorg.org>
-Message-ID: <20150827104854.GA4796@x1>
+From: shawn.lin@rock-chips.com (Shawn Lin)
+Date: Thu, 27 Aug 2015 19:05:04 +0800
+Subject: [PATCH 1/5] DMA: pl330: support burst mode for dev-to-mem and
+ mem-to-dev transmit
+In-Reply-To: <7170592.bdD8VT9GQ2@phil>
+References: <1440665280-31557-1-git-send-email-shawn.lin@rock-chips.com>
+ <1440665313-31603-1-git-send-email-shawn.lin@rock-chips.com>
+ <7170592.bdD8VT9GQ2@phil>
+Message-ID: <55DEEEE0.4060208@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 14 Aug 2015, Stephen Warren wrote:
+On 2015/8/27 16:57, Heiko Stuebner wrote:
+> Hi Shawn,
+>
+>
+> you're loosing the original author. Your can override the patch-author (away
+> from the mail sender) via a "From:" line at the top of the commit message,
+> like:
+>
 
-> On 08/13/2015 05:05 PM, Eric Anholt wrote:
-> > Signed-off-by: Eric Anholt <eric@anholt.net>
-> > Acked-by: Lee Jones <lee@kernel.org>
-> 
-> A patch description might be nice, although admittedly the subject seems
-> clear enough.
+Woops.... sorry for missing this bit. Thanks for pointing out that. :)
 
-Agreed that the subject is clear enough on this occasion.
+Patch 1 is from Boojin, and patch 2,3 attribute to Addy(Actually I 
+rebase it for linux-next from v3.14). patch 4 and 5 comes from myself.
 
-> > diff --git a/arch/arm/boot/dts/bcm2835-rpi.dtsi b/arch/arm/boot/dts/bcm2835-rpi.dtsi
-> 
-> > +		firmware_clocks: firmware-clocks {
-> > +			compatible = "raspberrypi,bcm2835-firmware-clocks";
-> > +			#clock-cells = <1>;
-> > +			raspberrypi,firmware = <&firmware>;
-> > +		};
-> 
-> No need to resend for this, but just a background note: DT node names
-> usually contain a device type not a device identity, so "clocks" not
-> "firmware-clocks" would be typical.
+It will be fixed from the next ones if any.
 
-Please fix this up when you re-send the set.
+> ------
+> From: Boojin Kim <boojin.kim@samsung.com>
+>
+> This patch adds to support burst mode for dev-to-mem and
+> mem-to-dev transmit.
+> ...
+> ------
+>
+>
+>> This patch adds to support burst mode for dev-to-mem and
+>> mem-to-dev transmit.
+>>
+>> Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
+>> Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
+>> Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
+>> cc: Heiko Stuebner <heiko@sntech.de>
+>> cc: Doug Anderson <dianders@chromium.org>
+>> cc: Olof Johansson <olofj@google.com>
+>> Reviewed-and-tested-by: Sonny Rao <sonnyrao@chromium.org>
+>>
+>> ---
+>>
+>>   drivers/dma/pl330.c | 18 ++++++++++++------
+>>   1 file changed, 12 insertions(+), 6 deletions(-)
+>>
+>> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+>> index ecab4ea0..0d544d2 100644
+>> --- a/drivers/dma/pl330.c
+>> +++ b/drivers/dma/pl330.c
+>> @@ -1141,10 +1141,13 @@ static inline int _ldst_devtomem(unsigned dry_run,
+>> u8 buf[], const struct _xfer_spec *pxs, int cyc)
+>>   {
+>>   	int off = 0;
+>> +	enum pl330_cond cond;
+>> +
+>> +	cond = (pxs->desc->rqcfg.brst_len == 1) ? SINGLE : BURST;
+>>
+>>   	while (cyc--) {
+>> -		off += _emit_WFP(dry_run, &buf[off], SINGLE, pxs->desc->peri);
+>> -		off += _emit_LDP(dry_run, &buf[off], SINGLE, pxs->desc->peri);
+>> +		off += _emit_WFP(dry_run, &buf[off], cond, pxs->desc->peri);
+>> +		off += _emit_LDP(dry_run, &buf[off], cond, pxs->desc->peri);
+>>   		off += _emit_ST(dry_run, &buf[off], ALWAYS);
+>>   		off += _emit_FLUSHP(dry_run, &buf[off], pxs->desc->peri);
+>>   	}
+>> @@ -1156,11 +1159,14 @@ static inline int _ldst_memtodev(unsigned dry_run,
+>> u8 buf[], const struct _xfer_spec *pxs, int cyc)
+>>   {
+>>   	int off = 0;
+>> +	enum pl330_cond cond;
+>> +
+>> +	cond = (pxs->desc->rqcfg.brst_len == 1) ? SINGLE : BURST;
+>>
+>>   	while (cyc--) {
+>> -		off += _emit_WFP(dry_run, &buf[off], SINGLE, pxs->desc->peri);
+>> +		off += _emit_WFP(dry_run, &buf[off], cond, pxs->desc->peri);
+>>   		off += _emit_LD(dry_run, &buf[off], ALWAYS);
+>> -		off += _emit_STP(dry_run, &buf[off], SINGLE, pxs->desc->peri);
+>> +		off += _emit_STP(dry_run, &buf[off], cond, pxs->desc->peri);
+>>   		off += _emit_FLUSHP(dry_run, &buf[off], pxs->desc->peri);
+>>   	}
+>>
+>> @@ -2557,7 +2563,7 @@ static struct dma_async_tx_descriptor
+>> *pl330_prep_dma_cyclic(
+>>
+>>   		desc->rqtype = direction;
+>>   		desc->rqcfg.brst_size = pch->burst_sz;
+>> -		desc->rqcfg.brst_len = 1;
+>> +		desc->rqcfg.brst_len = pch->burst_len;
+>>   		desc->bytes_requested = period_len;
+>>   		fill_px(&desc->px, dst, src, period_len);
+>>
+>> @@ -2702,7 +2708,7 @@ pl330_prep_slave_sg(struct dma_chan *chan, struct
+>> scatterlist *sgl, }
+>>
+>>   		desc->rqcfg.brst_size = pch->burst_sz;
+>> -		desc->rqcfg.brst_len = 1;
+>> +		desc->rqcfg.brst_len = pch->burst_len;
+>>   		desc->rqtype = direction;
+>>   		desc->bytes_requested = sg_dma_len(sg);
+>>   	}
+>
+>
+>
+>
 
-> This patch,
-> Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+
+-- 
+Best Regards
+Shawn Lin
