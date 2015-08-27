@@ -1,227 +1,82 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 27 Aug 2015 11:30:35 +0200
-Subject: [PATCH] clk: at91: add audio pll clock driver
-In-Reply-To: <1438337864-27949-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1438337864-27949-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <20150827113035.072cccb5@bbrezillon>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 27 Aug 2015 10:32:28 +0100
+Subject: [PATCH v2] arm64/efi: base UEFI mapping permissions on region
+ attributes
+In-Reply-To: <1440595802-20359-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1440595802-20359-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20150827093228.GA23520@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
+Hi Ard,
 
-On Fri, 31 Jul 2015 12:17:44 +0200
-Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
-
-> This new clock driver set allows to have a fractional divided clock
-> that would generate a precise clock particularly suitable for
-> audio applications.
+On Wed, Aug 26, 2015 at 02:30:02PM +0100, Ard Biesheuvel wrote:
+> Currently, we infer the UEFI memory region mapping permissions
+> from the memory region type (i.e., runtime services code are
+> mapped RWX and runtime services data mapped RW-). This appears to
+> work fine but is not entirely UEFI spec compliant. So instead, use
+> the designated permission attributes to decide how these regions
+> should be mapped.
 > 
-> The main audio pll clock has two children clocks: one that is connected
-> to the PMC, the other that can directly drive a pad. As these two routes
-> have different enable bits and different dividers and divider formula,
-> they are handled by two different drivers.
-> Each of them would modify the rate of the main audio pll parent.
-
-Hm, not sure allowing both children to modify the parent clk rate is
-a good idea, but let's see how it works.
-
+> Since UEFIv2.5 introduces a new EFI_MEMORY_RO permission attribute,
+> and redefines EFI_MEMORY_WP as a cacheability attribute, use only
+> the former as a read-only attribute. For setting the PXN bit, the
+> corresponding EFI_MEMORY_XP attribute is used.
 > 
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 > ---
->  .../devicetree/bindings/clock/at91-clock.txt       |  38 +++
->  drivers/clk/at91/Makefile                          |   2 +
->  drivers/clk/at91/clk-audio-pll-pad.c               | 220 +++++++++++++++++
->  drivers/clk/at91/clk-audio-pll-pmc.c               | 171 ++++++++++++++
->  drivers/clk/at91/clk-audio-pll.c                   | 261 +++++++++++++++++++++
->  drivers/clk/at91/pmc.c                             |  14 ++
->  drivers/clk/at91/pmc.h                             |   7 +
->  include/linux/clk/at91_pmc.h                       |  25 ++
->  8 files changed, 738 insertions(+)
->  create mode 100644 drivers/clk/at91/clk-audio-pll-pad.c
->  create mode 100644 drivers/clk/at91/clk-audio-pll-pmc.c
->  create mode 100644 drivers/clk/at91/clk-audio-pll.c
+> Changes since v1:
+> - rewrote page size and alignment check to be more legible
+> - use code that is STRICT_MM_TYPECHECKS compliant
 > 
+> Example output of a recent Tianocore build on FVP Foundation model
+> is attached below.
+> 
+>  arch/arm64/kernel/efi.c | 37 +++++++++++++-------
+>  1 file changed, 24 insertions(+), 13 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+> index ab21e0d58278..c8d587f46f3e 100644
+> --- a/arch/arm64/kernel/efi.c
+> +++ b/arch/arm64/kernel/efi.c
+> @@ -235,7 +235,7 @@ static bool __init efi_virtmap_init(void)
+>  
+>  	for_each_efi_memory_desc(&memmap, md) {
+>  		u64 paddr, npages, size;
+> -		pgprot_t prot;
+> +		pteval_t prot_val;
+>  
+>  		if (!(md->attribute & EFI_MEMORY_RUNTIME))
+>  			continue;
+> @@ -247,22 +247,33 @@ static bool __init efi_virtmap_init(void)
+>  		memrange_efi_to_native(&paddr, &npages);
+>  		size = npages << PAGE_SHIFT;
+>  
+> -		pr_info("  EFI remap 0x%016llx => %p\n",
+> -			md->phys_addr, (void *)md->virt_addr);
+> +		if (!is_normal_ram(md))
+> +			prot_val = PROT_DEVICE_nGnRE;
+> +		else
+> +			prot_val = pgprot_val(PAGE_KERNEL_EXEC);
+>  
+>  		/*
+> -		 * Only regions of type EFI_RUNTIME_SERVICES_CODE need to be
+> -		 * executable, everything else can be mapped with the XN bits
+> -		 * set.
+> +		 * On 64 KB granule kernels, only use strict permissions when
+> +		 * the region does not share a 64 KB page frame with another
+> +		 * region at either end.
+>  		 */
+> -		if (!is_normal_ram(md))
+> -			prot = __pgprot(PROT_DEVICE_nGnRE);
+> -		else if (md->type == EFI_RUNTIME_SERVICES_CODE)
+> -			prot = PAGE_KERNEL_EXEC;
+> -		else
+> -			prot = PAGE_KERNEL;
+> +		if (PAGE_SIZE == EFI_PAGE_SIZE ||
+> +		    (PAGE_ALIGNED(md->virt_addr) &&
+> +		     PAGE_ALIGNED(md->phys_addr + md->num_pages * EFI_PAGE_SIZE))) {
 
-[...]
+Why do you use virt_addr instead of phys_addr for the base check?
 
-> +
-> +static int clk_audio_pll_compute_qdpad(unsigned long q_rate, unsigned long rate,
-> +				       unsigned long *qd, u8 *div, u8 *ext_div)
-> +{
-> +	unsigned long tmp_qd;
-> +	unsigned long rem2, rem3;
-> +	unsigned long ldiv, lext_div;
-> +
-> +	if (!rate)
-> +		return -EINVAL;
-> +
-> +	tmp_qd = q_rate / rate;
-> +	if (!tmp_qd || tmp_qd > AUDIO_PLL_QDPAD_MAX)
-> +		return -EINVAL;
-
-Do you really want to return an error in this case?
-I mean, you're calling this function from ->round_rate(), and
-->round_rate() is supposed to find the closest rate, not to return an
-error if the rate is too low or to high.
-ITOH, you're calling the same function from ->set_rate(), which is
-supposed to complain if the requested rate is not exactly met.
-
-Maybe you can deal with that by passing an additional argument to this
-function. Something like:
-
-	tmp_qd = q_rate / rate;
-
-	if (!strict) {
-		if (!tmp_qd)
-			tmp_qd = 1;
-		else if (tmp_qd > AUDIO_PLL_QDPAD_MAX)
-			tmp_qd = AUDIO_PLL_QDPAD_MAX;
-	}
-
-	if (!tmp_qd || tmp_qd > AUDIO_PLL_QDPAD_MAX)
-		return -EINVAL;
-
-> +
-> +	if (tmp_qd <= AT91_PMC_AUDIO_PLL_QDPAD_EXTDIV_MAX) {
-> +		ldiv = 1;
-> +		lext_div = tmp_qd;
-> +	} else {
-> +		rem2 = tmp_qd % 2;
-> +		rem3 = tmp_qd % 3;
-> +
-> +		if (rem3 == 0 ||
-> +		    tmp_qd > AT91_PMC_AUDIO_PLL_QDPAD_EXTDIV_MAX * 2 ||
-> +		    rem3 < rem2) {
-> +			ldiv = 3;
-> +			lext_div = tmp_qd / 3;
-> +		} else {
-> +			ldiv = 2;
-> +			lext_div = tmp_qd >> 1;
-> +		}
-> +	}
-> +
-> +	pr_debug("A PLL/PAD: %s, qd = %lu (div = %lu, ext_div = %lu)\n",
-> +		 __func__, ldiv * lext_div, ldiv, lext_div);
-> +
-> +	/* if we were given variable to store, we can provide them */
-> +	if (qd)
-> +		*qd = ldiv * lext_div;
-> +	if (div && ext_div) {
-> +		/* we can cast here as we verified the bounds just above */
-> +		*div = (u8)ldiv;
-> +		*ext_div = (u8)lext_div;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static long clk_audio_pll_pad_round_rate(struct clk_hw *hw, unsigned long rate,
-> +					 unsigned long *parent_rate)
-
-I thought we were trying to get rid of the ->round_rate() function in
-favor of the ->determine_rate() one (which is more flexible), but maybe
-I'm wrong. Stephen, Mike, what's your opinion?
-
-> +{
-> +	struct clk *pclk = __clk_get_parent(hw->clk);
-> +	long best_rate = -EINVAL;
-> +	unsigned long best_parent_rate = 0;
-> +	unsigned long tmp_qd;
-> +
-> +	pr_debug("A PLL/PAD: %s, rate = %lu (parent_rate = %lu)\n",
-> +		 __func__, rate, *parent_rate);
-> +
-> +	if (clk_audio_pll_compute_qdpad(AUDIO_PLL_REFERENCE_FOUT, rate,
-> +					&tmp_qd, NULL, NULL))
-> +		return -EINVAL;
-
-You're calculating your divisor based on the AUDIO_PLL_REFERENCE_FOUT
-value...
-
-> +
-> +	best_parent_rate = __clk_round_rate(pclk, rate * tmp_qd);
-
-... and then asking your parent to adapt its rate based on the returned
-divisor. Wouldn't it be preferable to search for the best parent rate
-when choosing the divisor?
-
-> +	best_rate = best_parent_rate / tmp_qd;
-> +
-> +	pr_debug("A PLL/PAD: %s, best_rate = %ld, best_parent_rate = %lu\n",
-> +		 __func__, best_rate, best_parent_rate);
-> +
-> +	*parent_rate = best_parent_rate;
-> +	return best_rate;
-> +}
-
-[...]
-
-> +
-> +static long clk_audio_pll_pmc_round_rate(struct clk_hw *hw, unsigned long rate,
-> +					 unsigned long *parent_rate)
-> +{
-> +	struct clk *pclk = __clk_get_parent(hw->clk);
-> +	long best_rate = -EINVAL;
-> +	unsigned long best_parent_rate = 0;
-> +	unsigned long tmp_qd;
-> +
-> +	pr_debug("A PLL/PMC: %s, rate = %lu (parent_rate = %lu)\n",
-> +		 __func__, rate, *parent_rate);
-> +
-> +	if (clk_audio_pll_compute_qdpmc(AUDIO_PLL_REFERENCE_FOUT, rate, &tmp_qd))
-> +		return -EINVAL;
-> +
-> +	best_parent_rate = __clk_round_rate(pclk, rate * tmp_qd);
-
-Ditto.
-
-BTW, I'm not sure this is safe to allow both pll-audio children to
-change their parent rate. What will happen if one of them change the
-pll-audio rate while the other is still using it?
-
-> +	best_rate = best_parent_rate / tmp_qd;
-> +
-> +	pr_debug("A PLL/PMC: %s, best_rate = %ld, best_parent_rate = %lu (qd = %lu)\n",
-> +		 __func__, best_rate, best_parent_rate, tmp_qd - 1);
-> +
-> +	*parent_rate = best_parent_rate;
-> +	return best_rate;
-> +}
-
-[...]
-
-> +
-> +#define to_clk_audio_frac(hw) container_of(hw, struct clk_audio_frac, hw)
-> +
-> +/* make sure that pll is in reset state beforehand */
-> +static int clk_audio_pll_prepare(struct clk_hw *hw)
-> +{
-> +	struct clk_audio_frac *fck = to_clk_audio_frac(hw);
-> +	struct at91_pmc *pmc = fck->pmc;
-> +	u32 tmp;
-> +
-> +	pmc_lock(pmc);
-> +	tmp = pmc_read(pmc, AT91_PMC_AUDIO_PLL0) & ~AT91_PMC_AUDIO_PLL_RESETN;
-> +	pmc_write(pmc, AT91_PMC_AUDIO_PLL0, tmp);
-> +	pmc_unlock(pmc);
-
-Nothing sleeps in this code, so you could move everything in your
-->enable() function.
-
-> +	return 0;
-> +}
-> +
-> +static void clk_audio_pll_unprepare(struct clk_hw *hw)
-> +{
-> +	clk_audio_pll_prepare(hw);
-
-Ditto.
-
-Best Regards,
-
-Boris
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Will
