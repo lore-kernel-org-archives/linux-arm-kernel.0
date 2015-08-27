@@ -1,49 +1,60 @@
-From: santosh.shilimkar@oracle.com (santosh.shilimkar at oracle.com)
-Date: Thu, 27 Aug 2015 11:36:16 -0700
-Subject: [PATCH] soc: ti: reset irq affinity before freeing irq
-In-Reply-To: <55DF581A.2090300@mentor.com>
-References: <1440690671-1029-1-git-send-email-m-karicheri2@ti.com>
- <55DF3E3F.6030506@mentor.com> <55DF5589.6050802@ti.com>
- <55DF581A.2090300@mentor.com>
-Message-ID: <55DF58A0.8090105@oracle.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu, 27 Aug 2015 20:37:31 +0200
+Subject: [PATCH] ARM: dts: sun5i: inet98v_rev2 fix regulator for the usb wifi
+ module
+In-Reply-To: <1440700651-30575-1-git-send-email-hdegoede@redhat.com>
+References: <1440700651-30575-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <1440700651-30575-2-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/27/15 11:34 AM, Nathan Lynch wrote:
-> On 08/27/2015 01:23 PM, Murali Karicheri wrote:
->> On 08/27/2015 12:43 PM, Nathan Lynch wrote:
->>> On 08/27/2015 10:51 AM, Murali Karicheri wrote:
->>>> When using accumulator queue for rx side for network driver, following
->>>> warning is seen when doing a reboot command from Linux console. This
->>>> is because, affinity value is not reset before calling free_irq(). This
->>>> patch fixes this.
->>>>
->>>> Deconfiguring network interfaces...
->>>> [   55.176589] ------------[ cut here ]-----------
->>>> [   55.181232] WARNING: CPU: 0 PID: 2081 at kernel/irq/manage.c:1370
->>>> __free_irq+0x208/0x214
->>>
->>> The full content of the warning should be included in the commit
->>> message; __free_irq has several potential sources of warning messages,
->>> and line 1370 doesn't correspond to any of them in 4.2-rc8.
->>
->> The log corresponds to 4.1.x kernel. Corresponding WARN_ONCE is
->>
->> #ifdef CONFIG_SMP
->>          /* make sure affinity_hint is cleaned up */
->>          if (WARN_ON_ONCE(desc->affinity_hint))
->>                  desc->affinity_hint = NULL;
->> #endif
->>
->> Which is line 1922. I can edit to make it 1922. Does that work?
->
-> Eh, I guess I wasn't thinking clearly about this clearly when I wrote
-> that.  (I somehow had the notion that WARN_ON... maybe printed more than
-> just the file and line number, but that is clearly mistaken.)  I think
-> your message is fine as is, sorry for the noise.
->
-> I don't think changing the line number will make it any easier on future
-> readers.
->
-Right. Just leave the full call in the commit so that the context
-is captured.
+The usb-wifi module is not connected to a gpio controller regulator
+(as is typical on sunxi boards), instead is it connected to ldo3.
+
+This commit fixes the us_phy usb1_vbus-supply setting thereby making
+sure that we power the usb-wifi and that it can be used.
+
+This commit also removes the wrong and now unused bits which refer to
+the gpio controlled reg_usb1_vbus.
+
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ arch/arm/boot/dts/sun5i-a13-inet-98v-rev2.dts | 11 +----------
+ 1 file changed, 1 insertion(+), 10 deletions(-)
+
+diff --git a/arch/arm/boot/dts/sun5i-a13-inet-98v-rev2.dts b/arch/arm/boot/dts/sun5i-a13-inet-98v-rev2.dts
+index 6d466a2..6fa54b6 100644
+--- a/arch/arm/boot/dts/sun5i-a13-inet-98v-rev2.dts
++++ b/arch/arm/boot/dts/sun5i-a13-inet-98v-rev2.dts
+@@ -201,11 +201,6 @@
+ 	status = "okay";
+ };
+ 
+-&reg_usb1_vbus {
+-	gpio = <&pio 6 11 GPIO_ACTIVE_HIGH>; /* PG11 */
+-	status = "okay";
+-};
+-
+ &uart1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart1_pins_b>;
+@@ -221,16 +216,12 @@
+ 	allwinner,pins = "PG12";
+ };
+ 
+-&usb1_vbus_pin_a {
+-	allwinner,pins = "PG11";
+-};
+-
+ &usbphy {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&usb0_id_detect_pin>, <&usb0_vbus_detect_pin>;
+ 	usb0_id_det-gpio = <&pio 6 2 GPIO_ACTIVE_HIGH>; /* PG2 */
+ 	usb0_vbus_det-gpio = <&pio 6 1 GPIO_ACTIVE_HIGH>; /* PG1 */
+ 	usb0_vbus-supply = <&reg_usb0_vbus>;
+-	usb1_vbus-supply = <&reg_usb1_vbus>;
++	usb1_vbus-supply = <&reg_ldo3>;
+ 	status = "okay";
+ };
+-- 
+2.4.3
