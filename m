@@ -1,66 +1,42 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Thu, 27 Aug 2015 07:49:25 +0200
-Subject: [PATCH] regmap: Fix the null function of format_val on
- regmap_bulk_read.
-In-Reply-To: <20150826173812.GA28760@sirena.org.uk>
-References: <1440589396-696-1-git-send-email-henryc.chen@mediatek.com>
- <20150826123556.GB2977@sirena.org.uk>
- <20150826132246.GR706@pengutronix.de>
- <20150826173812.GA28760@sirena.org.uk>
-Message-ID: <20150827054925.GK706@pengutronix.de>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 27 Aug 2015 08:12:33 +0200
+Subject: [PATCH] arm64: flush FP/SIMD state correctly after execve()
+Message-ID: <1440655953-31431-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 26, 2015 at 06:38:12PM +0100, Mark Brown wrote:
-> On Wed, Aug 26, 2015 at 03:22:46PM +0200, Markus Pargmann wrote:
-> > On Wed, Aug 26, 2015 at 01:35:56PM +0100, Mark Brown wrote:
-> > > On Wed, Aug 26, 2015 at 07:43:16PM +0800, Henry Chen wrote:
-> 
-> > > Why are these format functions sensible?  Converting a null pointer
-> > > dereference into data corruption wouldn't be ideal.  The commit message
-> > > should really cover this.
-> 
-> > The regmap_bulk_read() function worked before the following patch:
-> > 	15b8d2c41fe5 (regmap: Fix regmap_bulk_read in BE mode)
-> 
-> Define "worked" here.
+When a task calls execve(), its FP/SIMD state is flushed so that
+none of the original program state is observeable by the incoming
+program.
 
-"worked" means here that it did not run into a null pointer and returned
-something that the user expected. I am not sure if someone actually
-complained about the previous use of memcpy? I also don't know how the
-behavior of regmap_bulk_read with reg_read() is defined.
+However, since this flushing consists of setting the in-memory copy
+of the FP/SIMD state to all zeroes, the CPU field is set to CPU 0 as
+well, which indicates to the lazy FP/SIMD preserve/restore code that
+the FP/SIMD state does not need to be reread from memory if the task
+is scheduled again on CPU 0 without any other tasks having entered
+userland (or used the FP/SIMD in kernel mode) on the same CPU in the
+mean time. If this happens, the FP/SIMD state of the old program will
+still be present in the registers when the new program starts.
 
-Best Regards,
+So set the CPU field to the invalid value of NR_CPUS when performing
+the flush, by calling fpsimd_flush_task_state().
 
-Markus
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm64/kernel/fpsimd.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-> 
-> > As far as I can see this patch fixes this issue by using simple format
-> > functions. Before the above mentioned patch, the code used memcpy. Now
-> > regmap_format_*_native is used which should result in the same behaviour
-> > but fixes the null pointer.
-> 
-> Again, this sort of analysis needs to be in the commit message (and
-> really ought to explain why the resulting API makes sense).
-> 
-> > I am not sure if there are other locations in the code where format_val
-> > is used in this setup so I don't know if this would change behavior in a
-> > different codepath.
-> 
-> Which is another part of the concern, being able to format values is a
-> more general concept.
-
-
-
+diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+index 44d6f7545505..c56956a16d3f 100644
+--- a/arch/arm64/kernel/fpsimd.c
++++ b/arch/arm64/kernel/fpsimd.c
+@@ -158,6 +158,7 @@ void fpsimd_thread_switch(struct task_struct *next)
+ void fpsimd_flush_thread(void)
+ {
+ 	memset(&current->thread.fpsimd_state, 0, sizeof(struct fpsimd_state));
++	fpsimd_flush_task_state(current);
+ 	set_thread_flag(TIF_FOREIGN_FPSTATE);
+ }
+ 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150827/7e3ac6bd/attachment.sig>
+1.9.1
