@@ -1,51 +1,67 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 27 Aug 2015 19:02:44 +0100
-Subject: [GIT PULL] Late arm64 KVM fix for 4.2
-Message-ID: <20150827180244.GE23520@arm.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Thu, 27 Aug 2015 14:23:05 -0400
+Subject: [PATCH] soc: ti: reset irq affinity before freeing irq
+In-Reply-To: <55DF3E3F.6030506@mentor.com>
+References: <1440690671-1029-1-git-send-email-m-karicheri2@ti.com>
+ <55DF3E3F.6030506@mentor.com>
+Message-ID: <55DF5589.6050802@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On 08/27/2015 12:43 PM, Nathan Lynch wrote:
+> On 08/27/2015 10:51 AM, Murali Karicheri wrote:
+>> When using accumulator queue for rx side for network driver, following
+>> warning is seen when doing a reboot command from Linux console. This
+>> is because, affinity value is not reset before calling free_irq(). This
+>> patch fixes this.
+>>
+>> Deconfiguring network interfaces...
+>> [   55.176589] ------------[ cut here ]-----------
+>> [   55.181232] WARNING: CPU: 0 PID: 2081 at kernel/irq/manage.c:1370
+>> __free_irq+0x208/0x214
+>
+> The full content of the warning should be included in the commit
+> message; __free_irq has several potential sources of warning messages,
+> and line 1370 doesn't correspond to any of them in 4.2-rc8.
 
-I appreciate that it's extremely late in the cycle, but we've uncovered
-a nasty bug in the arm64 KVM code which allows a badly behaved 32-bit
-guest to bring down the host. The fix is simple (it's what I believe we
-call a "brown paper bag" bug) and I don't think it makes sense to sit on
-this, particularly as Russell ended up triggering this rather than just
-somebody noticing a potential problem by inspection.
+The log corresponds to 4.1.x kernel. Corresponding WARN_ONCE is
 
-Usually arm64 KVM changes would go via Paolo's tree, but he's on holiday
-at the moment and the deal is that anything urgent gets shuffled via
-the arch trees, so here it is. Please pull.
+#ifdef CONFIG_SMP
+         /* make sure affinity_hint is cleaned up */
+         if (WARN_ON_ONCE(desc->affinity_hint))
+                 desc->affinity_hint = NULL;
+#endif
 
-Cheers,
+Which is line 1922. I can edit to make it 1922. Does that work?
 
-Will
+Murali
+>
+>
+>> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+>> ---
+>>   - Applies to v4.2.0-rc8
+>>
+>>   drivers/soc/ti/knav_qmss_acc.c | 4 ++++
+>>   1 file changed, 4 insertions(+)
+>>
+>> diff --git a/drivers/soc/ti/knav_qmss_acc.c b/drivers/soc/ti/knav_qmss_acc.c
+>> index ef6f69d..b98fe56 100644
+>> --- a/drivers/soc/ti/knav_qmss_acc.c
+>> +++ b/drivers/soc/ti/knav_qmss_acc.c
+>> @@ -261,6 +261,10 @@ static int knav_range_setup_acc_irq(struct knav_range_info *range,
+>>   	if (old && !new) {
+>>   		dev_dbg(kdev->dev, "setup-acc-irq: freeing %s for channel %s\n",
+>>   			acc->name, acc->name);
+>> +		ret = irq_set_affinity_hint(irq, NULL);
+>> +		if (ret)
+>> +			dev_warn(range->kdev->dev,
+>> +				 "Failed to set IRQ affinity\n");
+>
+> Seems unnecessary to add a warning here.
+>
+>
 
---->8
 
-The following changes since commit c13dcf9f2d6f5f06ef1bf79ec456df614c5e058b:
-
-  Linux 4.2-rc8 (2015-08-23 20:52:59 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git tags/arm64-fixes
-
-for you to fetch changes up to 126c69a0bd0e441bf6766a5d9bf20de011be9f68:
-
-  arm64: KVM: Fix host crash when injecting a fault into a 32bit guest (2015-08-27 16:16:55 +0100)
-
-----------------------------------------------------------------
-Urgent arm64 KVM fix for 4.2:
-
-Fix arm64 KVM issue when injecting an abort into a 32-bit guest, which
-would lead to an illegal exception return at EL2 and a subsequent host
-crash.
-
-----------------------------------------------------------------
-Marc Zyngier (1):
-      arm64: KVM: Fix host crash when injecting a fault into a 32bit guest
-
- arch/arm64/kvm/inject_fault.c | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+-- 
+Murali Karicheri
+Linux Kernel, Keystone
