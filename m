@@ -1,122 +1,99 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Thu, 27 Aug 2015 13:52:02 +0200
-Subject: [PATCH] rtc: Fix module autoload for OF platform drivers
-Message-ID: <1440676322-19870-1-git-send-email-javier@osg.samsung.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Thu, 27 Aug 2015 13:56:46 +0200
+Subject: [PATCH v4 0/4] VFIO platform reset
+In-Reply-To: <1434359385-19916-1-git-send-email-eric.auger@linaro.org>
+References: <1434359385-19916-1-git-send-email-eric.auger@linaro.org>
+Message-ID: <55DEFAFE.3000909@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These platform drivers have a OF device ID table but the OF module
-alias information is not created so module autoloading won't work.
+Hi Marc,
 
-Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+I tested the series on Calxeda Midway with VFIO use case. Also reviewed
+it again without finding anything new.
 
----
+Tested-by: Eric Auger <eric.auger@linaro.org>
+Reviewed-by: Eric Auger <eric.auger@linaro.org>
 
- drivers/rtc/rtc-armada38x.c | 1 +
- drivers/rtc/rtc-coh901331.c | 1 +
- drivers/rtc/rtc-da9063.c    | 1 +
- drivers/rtc/rtc-moxart.c    | 1 +
- drivers/rtc/rtc-mpc5121.c   | 1 +
- drivers/rtc/rtc-mt6397.c    | 1 +
- drivers/rtc/rtc-mv.c        | 1 +
- drivers/rtc/rtc-vt8500.c    | 1 +
- 8 files changed, 8 insertions(+)
+Best Regards
 
-diff --git a/drivers/rtc/rtc-armada38x.c b/drivers/rtc/rtc-armada38x.c
-index 06c6bd5eab41..9a3f2a6f512e 100644
---- a/drivers/rtc/rtc-armada38x.c
-+++ b/drivers/rtc/rtc-armada38x.c
-@@ -295,6 +295,7 @@ static const struct of_device_id armada38x_rtc_of_match_table[] = {
- 	{ .compatible = "marvell,armada-380-rtc", },
- 	{}
- };
-+MODULE_DEVICE_TABLE(of, armada38x_rtc_of_match_table);
- #endif
- 
- static struct platform_driver armada38x_rtc_driver = {
-diff --git a/drivers/rtc/rtc-coh901331.c b/drivers/rtc/rtc-coh901331.c
-index 56343b2fbc68..101b7a240e0f 100644
---- a/drivers/rtc/rtc-coh901331.c
-+++ b/drivers/rtc/rtc-coh901331.c
-@@ -263,6 +263,7 @@ static const struct of_device_id coh901331_dt_match[] = {
- 	{ .compatible = "stericsson,coh901331" },
- 	{},
- };
-+MODULE_DEVICE_TABLE(of, coh901331_dt_match);
- 
- static struct platform_driver coh901331_driver = {
- 	.driver = {
-diff --git a/drivers/rtc/rtc-da9063.c b/drivers/rtc/rtc-da9063.c
-index 5f38a5c84b56..00a8f7f4f87c 100644
---- a/drivers/rtc/rtc-da9063.c
-+++ b/drivers/rtc/rtc-da9063.c
-@@ -169,6 +169,7 @@ static const struct of_device_id da9063_compatible_reg_id_table[] = {
- 	{ .compatible = "dlg,da9062-rtc", .data = &da9062_aa_regs },
- 	{ },
- };
-+MODULE_DEVICE_TABLE(of, da9063_compatible_reg_id_table);
- 
- static void da9063_data_to_tm(u8 *data, struct rtc_time *tm,
- 			      struct da9063_compatible_rtc *rtc)
-diff --git a/drivers/rtc/rtc-moxart.c b/drivers/rtc/rtc-moxart.c
-index 73759c9a4527..07b30a373a92 100644
---- a/drivers/rtc/rtc-moxart.c
-+++ b/drivers/rtc/rtc-moxart.c
-@@ -312,6 +312,7 @@ static const struct of_device_id moxart_rtc_match[] = {
- 	{ .compatible = "moxa,moxart-rtc" },
- 	{ },
- };
-+MODULE_DEVICE_TABLE(of, moxart_rtc_match);
- 
- static struct platform_driver moxart_rtc_driver = {
- 	.probe	= moxart_rtc_probe,
-diff --git a/drivers/rtc/rtc-mpc5121.c b/drivers/rtc/rtc-mpc5121.c
-index 1767e18d5bd4..4ca4daa0b8f3 100644
---- a/drivers/rtc/rtc-mpc5121.c
-+++ b/drivers/rtc/rtc-mpc5121.c
-@@ -406,6 +406,7 @@ static const struct of_device_id mpc5121_rtc_match[] = {
- 	{ .compatible = "fsl,mpc5200-rtc", },
- 	{},
- };
-+MODULE_DEVICE_TABLE(of, mpc5121_rtc_match);
- #endif
- 
- static struct platform_driver mpc5121_rtc_driver = {
-diff --git a/drivers/rtc/rtc-mt6397.c b/drivers/rtc/rtc-mt6397.c
-index 30c926b36361..06a5c52b292f 100644
---- a/drivers/rtc/rtc-mt6397.c
-+++ b/drivers/rtc/rtc-mt6397.c
-@@ -402,6 +402,7 @@ static const struct of_device_id mt6397_rtc_of_match[] = {
- 	{ .compatible = "mediatek,mt6397-rtc", },
- 	{ }
- };
-+MODULE_DEVICE_TABLE(of, mt6397_rtc_of_match);
- 
- static struct platform_driver mtk_rtc_driver = {
- 	.driver = {
-diff --git a/drivers/rtc/rtc-mv.c b/drivers/rtc/rtc-mv.c
-index 7f50d2ef7f6e..79bb28617d45 100644
---- a/drivers/rtc/rtc-mv.c
-+++ b/drivers/rtc/rtc-mv.c
-@@ -324,6 +324,7 @@ static const struct of_device_id rtc_mv_of_match_table[] = {
- 	{ .compatible = "marvell,orion-rtc", },
- 	{}
- };
-+MODULE_DEVICE_TABLE(of, rtc_mv_of_match_table);
- #endif
- 
- static struct platform_driver mv_rtc_driver = {
-diff --git a/drivers/rtc/rtc-vt8500.c b/drivers/rtc/rtc-vt8500.c
-index a58b6d17e6f0..27e896995e9b 100644
---- a/drivers/rtc/rtc-vt8500.c
-+++ b/drivers/rtc/rtc-vt8500.c
-@@ -271,6 +271,7 @@ static const struct of_device_id wmt_dt_ids[] = {
- 	{ .compatible = "via,vt8500-rtc", },
- 	{}
- };
-+MODULE_DEVICE_TABLE(of, wmt_dt_ids);
- 
- static struct platform_driver vt8500_rtc_driver = {
- 	.probe		= vt8500_rtc_probe,
--- 
-2.4.3
+Eric
+
+On 06/15/2015 11:09 AM, Eric Auger wrote:
+> In situations where the userspace driver is stopped abnormally and the
+> VFIO platform device is released, the assigned HW device currently is
+> left running. As a consequence the HW device might continue issuing IRQs
+> and performing DMA accesses.
+> 
+> On release, no physical IRQ handler is setup anymore. Also the DMA buffers
+> are unmapped leading to IOMMU aborts. So there is no serious consequence.
+> 
+> However when assigning that HW device again to another userspace driver,
+> this latter might face some unexpected IRQs and DMA accesses, which are
+> the result of the previous assignment.
+> 
+> In virtualization use-case, a VM newly granted with that HW device may be
+> impacted by the assignment of that device to a previous VM:
+> - IRQs may be injected very early when booting the new guest, even before
+>   the guest driver has initialized leading to possible driver state
+>   inconsistency.
+> - DMA accesses may hit the newly mapped VM address space at addresses that
+>   may jeopardize the integrity of the newly installed VM.
+> 
+> Obviously the criticity depends on the assigned HW device.
+> 
+> As opposed to PCI, there is no standard mechanism to reset the platform
+> device.
+> 
+> This series proposes to implement device specific reset functions in
+> separate in-kernel vfio reset modules. The vfio-platform driver holds
+> a whitelist of implemented triplets (compat string, module name,
+> reset function name). When the vfio-platform driver is probed it identifies
+> the fellow reset module/function matching the compat string of the
+> device, if any, and forces the load of this reset module.
+> 
+> A first reset module is provided: the vfio-platform-calxedaxgmac
+> module which implements a basic reset for the Calxeda xgmac.
+> 
+> The series can be found at
+> https://git.linaro.org/people/eric.auger/linux.git/shortlog/refs/heads/v4.1-rc8-reset-v4
+> 
+> History:
+> v3 -> v4:
+> - fix the commit message of "VFIO: platform: add reset struct and lookup table"
+> 
+> v2 -> v3:
+> - remove void module_init/exit functions in calxeda reset module
+> - remove enum vfio_platform_reset_type
+> - for reset lookup, use ARRAY_SIZE
+> - in reset put use symbol_put_addr
+> 
+> v1 -> v2:
+> - much simplified compared to v1 although principle of external modules is
+>   kept: removed mechanism of dynamic registration of reset functions
+> - list is replaced by whitelist lookup table
+> - name of the reset function also stored in the lookup table
+> - autoload of reset modules
+> 
+> RFC -> PATCH v1:
+> - solution now based on a lookup list instead of specialized driver
+> 
+> 
+> Eric Auger (4):
+>   VFIO: platform: add reset struct and lookup table
+>   VFIO: platform: add reset callback
+>   VFIO: platform: populate the reset function on probe
+>   VFIO: platform: Calxeda xgmac reset module
+> 
+>  drivers/vfio/platform/Kconfig                      |  2 +
+>  drivers/vfio/platform/Makefile                     |  2 +
+>  drivers/vfio/platform/reset/Kconfig                |  7 ++
+>  drivers/vfio/platform/reset/Makefile               |  5 ++
+>  .../platform/reset/vfio_platform_calxedaxgmac.c    | 86 ++++++++++++++++++++++
+>  drivers/vfio/platform/vfio_platform_common.c       | 60 ++++++++++++++-
+>  drivers/vfio/platform/vfio_platform_private.h      |  7 ++
+>  7 files changed, 166 insertions(+), 3 deletions(-)
+>  create mode 100644 drivers/vfio/platform/reset/Kconfig
+>  create mode 100644 drivers/vfio/platform/reset/Makefile
+>  create mode 100644 drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c
+> 
