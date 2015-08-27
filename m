@@ -1,86 +1,96 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 27 Aug 2015 22:33:37 +0200
-Subject: [PATCH v2] arm64/efi: base UEFI mapping permissions on region
- attributes
-In-Reply-To: <20150827093228.GA23520@arm.com>
-References: <1440595802-20359-1-git-send-email-ard.biesheuvel@linaro.org>
- <20150827093228.GA23520@arm.com>
-Message-ID: <A4801D35-3216-43D2-AEAE-C01ED59A0F24@linaro.org>
+From: agross@codeaurora.org (Andy Gross)
+Date: Thu, 27 Aug 2015 15:39:14 -0500
+Subject: [PATCH v2] arm64: dts: qcom: Add 8x16 Serial UART1 node
+Message-ID: <1440707954-18490-1-git-send-email-agross@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch adds the nodes required to support the UART1 node on the
+MSM8916 and also fixes the sleep pins function for UART2.
 
-> On 27 aug. 2015, at 11:32, Will Deacon <will.deacon@arm.com> wrote:
-> 
-> Hi Ard,
-> 
->> On Wed, Aug 26, 2015 at 02:30:02PM +0100, Ard Biesheuvel wrote:
->> Currently, we infer the UEFI memory region mapping permissions
->> from the memory region type (i.e., runtime services code are
->> mapped RWX and runtime services data mapped RW-). This appears to
->> work fine but is not entirely UEFI spec compliant. So instead, use
->> the designated permission attributes to decide how these regions
->> should be mapped.
->> 
->> Since UEFIv2.5 introduces a new EFI_MEMORY_RO permission attribute,
->> and redefines EFI_MEMORY_WP as a cacheability attribute, use only
->> the former as a read-only attribute. For setting the PXN bit, the
->> corresponding EFI_MEMORY_XP attribute is used.
->> 
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->> Changes since v1:
->> - rewrote page size and alignment check to be more legible
->> - use code that is STRICT_MM_TYPECHECKS compliant
->> 
->> Example output of a recent Tianocore build on FVP Foundation model
->> is attached below.
->> 
->> arch/arm64/kernel/efi.c | 37 +++++++++++++-------
->> 1 file changed, 24 insertions(+), 13 deletions(-)
->> 
->> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
->> index ab21e0d58278..c8d587f46f3e 100644
->> --- a/arch/arm64/kernel/efi.c
->> +++ b/arch/arm64/kernel/efi.c
->> @@ -235,7 +235,7 @@ static bool __init efi_virtmap_init(void)
->> 
->>    for_each_efi_memory_desc(&memmap, md) {
->>        u64 paddr, npages, size;
->> -        pgprot_t prot;
->> +        pteval_t prot_val;
->> 
->>        if (!(md->attribute & EFI_MEMORY_RUNTIME))
->>            continue;
->> @@ -247,22 +247,33 @@ static bool __init efi_virtmap_init(void)
->>        memrange_efi_to_native(&paddr, &npages);
->>        size = npages << PAGE_SHIFT;
->> 
->> -        pr_info("  EFI remap 0x%016llx => %p\n",
->> -            md->phys_addr, (void *)md->virt_addr);
->> +        if (!is_normal_ram(md))
->> +            prot_val = PROT_DEVICE_nGnRE;
->> +        else
->> +            prot_val = pgprot_val(PAGE_KERNEL_EXEC);
->> 
->>        /*
->> -         * Only regions of type EFI_RUNTIME_SERVICES_CODE need to be
->> -         * executable, everything else can be mapped with the XN bits
->> -         * set.
->> +         * On 64 KB granule kernels, only use strict permissions when
->> +         * the region does not share a 64 KB page frame with another
->> +         * region at either end.
->>         */
->> -        if (!is_normal_ram(md))
->> -            prot = __pgprot(PROT_DEVICE_nGnRE);
->> -        else if (md->type == EFI_RUNTIME_SERVICES_CODE)
->> -            prot = PAGE_KERNEL_EXEC;
->> -        else
->> -            prot = PAGE_KERNEL;
->> +        if (PAGE_SIZE == EFI_PAGE_SIZE ||
->> +            (PAGE_ALIGNED(md->virt_addr) &&
->> +             PAGE_ALIGNED(md->phys_addr + md->num_pages * EFI_PAGE_SIZE))) {
-> 
-> Why do you use virt_addr instead of phys_addr for the base check?
+Signed-off-by: Andy Gross <agross@codeaurora.org>
+---
+ arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi  |    1 +
+ arch/arm64/boot/dts/qcom/msm8916-pins.dtsi |   26 +++++++++++++++++++++++++-
+ arch/arm64/boot/dts/qcom/msm8916.dtsi      |    9 +++++++++
+ 3 files changed, 35 insertions(+), 1 deletion(-)
 
-No reason in particular, as far as I remember, so i should probably change that
+diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
+index 66804ff..3fc3be4 100644
+--- a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
++++ b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
+@@ -19,6 +19,7 @@
+ / {
+ 	aliases {
+ 		serial0 = &blsp1_uart2;
++		serial1 = &blsp1_uart1;
+ 	};
+ 
+ 	chosen {
+diff --git a/arch/arm64/boot/dts/qcom/msm8916-pins.dtsi b/arch/arm64/boot/dts/qcom/msm8916-pins.dtsi
+index 5689568..42941b9 100644
+--- a/arch/arm64/boot/dts/qcom/msm8916-pins.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8916-pins.dtsi
+@@ -13,6 +13,30 @@
+ 
+ &msmgpio {
+ 
++	blsp1_uart1_default: blsp1_uart1_default {
++		pinmux {
++			function = "blsp_uart1";
++			pins = "gpio0", "gpio1";
++		};
++		pinconf {
++			pins = "gpio0", "gpio1";
++			drive-strength = <16>;
++			bias-disable;
++		};
++	};
++
++	blsp1_uart1_sleep: blsp1_uart1_sleep {
++		pinmux {
++			function = "gpio";
++			pins = "gpio0", "gpio1";
++		};
++		pinconf {
++			pins = "gpio0", "gpio1";
++			drive-strength = <2>;
++			bias-pull-down;
++		};
++	};
++
+ 	blsp1_uart2_default: blsp1_uart2_default {
+ 		pinmux {
+ 			function = "blsp_uart2";
+@@ -27,7 +51,7 @@
+ 
+ 	blsp1_uart2_sleep: blsp1_uart2_sleep {
+ 		pinmux {
+-			function = "blsp_uart2";
++			function = "gpio";
+ 			pins = "gpio4", "gpio5";
+ 		};
+ 		pinconf {
+diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+index 5911de0..9a49dff 100644
+--- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+@@ -102,6 +102,15 @@
+ 			reg = <0x1800000 0x80000>;
+ 		};
+ 
++		blsp1_uart1: serial at 78af000 {
++			compatible = "qcom,msm-uartdm-v1.4", "qcom,msm-uartdm";
++			reg = <0x78af000 0x200>;
++			interrupts = <GIC_SPI 107 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&gcc GCC_BLSP1_UART1_APPS_CLK>, <&gcc GCC_BLSP1_AHB_CLK>;
++			clock-names = "core", "iface";
++			status = "disabled";
++		};
++
+ 		blsp1_uart2: serial at 78b0000 {
+ 			compatible = "qcom,msm-uartdm-v1.4", "qcom,msm-uartdm";
+ 			reg = <0x78b0000 0x200>;
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
