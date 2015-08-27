@@ -1,25 +1,35 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Wed, 26 Aug 2015 23:17:28 -0500
-Subject: [PATCH 04/10] ARM: dts: qcom: apq8074-dragonboard: Use stdout-path
-In-Reply-To: <1434490313-13905-5-git-send-email-sboyd@codeaurora.org>
-References: <1434490313-13905-1-git-send-email-sboyd@codeaurora.org>
- <1434490313-13905-5-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20150827041728.GB28274@qualcomm.com>
+From: a0131933@ti.com (Lokesh Vutla)
+Date: Thu, 27 Aug 2015 09:51:41 +0530
+Subject: [PATCH v3 0/3] ARM: OMAP2+: hwmod: RTC: Add lock and unlock hooks
+In-Reply-To: <1437657946-10733-1-git-send-email-lokeshvutla@ti.com>
+References: <1437657946-10733-1-git-send-email-lokeshvutla@ti.com>
+Message-ID: <55DE9055.4090701@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 16, 2015 at 02:31:47PM -0700, Stephen Boyd wrote:
-> Use stdout-path so that we don't have to put the console on the
-> kernel command line.
+Hi Paul,
+
+On Thursday 23 July 2015 06:55 PM, Lokesh Vutla wrote:
+> This series implements lock and unlock functions for RTC and hooks
+> the same to DRA7 and AMx3xx hwmod.
+> This is dependent on the patch https://patchwork.kernel.org/patch/6578281/,
+> which is queued recently by Paul.
+Gentle ping on this series.
+
+Thanks and regards,
+Lokesh
 > 
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
->  arch/arm/boot/dts/qcom-apq8074-dragonboard.dts | 8 ++++++++
->  1 file changed, 8 insertions(+)
-
-Thanks.  Applied.
-
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+> Changes since v2:
+> - Add kerneldoc for omap_hwmod_rtc_lock() function.
+> 
+> Lokesh Vutla (3):
+>   ARM: hwmod: RTC: Add lock and unlock functions
+>   ARM: DRA7: RTC: Add lock and unlock functions
+>   ARM: AMx3xx: RTC: Add lock and unlock functions
+> 
+>  arch/arm/mach-omap2/omap_hwmod.h                   |  2 +
+>  .../mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c |  2 +
+>  arch/arm/mach-omap2/omap_hwmod_7xx_data.c          |  2 +
+>  arch/arm/mach-omap2/omap_hwmod_reset.c             | 65 ++++++++++++++++++++++
+>  4 files changed, 71 insertions(+)
+> 
