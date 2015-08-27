@@ -1,9 +1,9 @@
 From: l.stach@pengutronix.de (Lucas Stach)
-Date: Thu, 27 Aug 2015 18:39:20 +0200
-Subject: [PATCH 7/8] clk: imx6: retain early UART clocks during kernel init
+Date: Thu, 27 Aug 2015 18:39:17 +0200
+Subject: [PATCH 4/8] clk: imx31: retain early UART clocks during kernel init
 In-Reply-To: <1440693561-28095-1-git-send-email-l.stach@pengutronix.de>
 References: <1440693561-28095-1-git-send-email-l.stach@pengutronix.de>
-Message-ID: <1440693561-28095-8-git-send-email-l.stach@pengutronix.de>
+Message-ID: <1440693561-28095-5-git-send-email-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,97 +12,46 @@ earlyprintk or earlycon are active.
 
 Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
 ---
- drivers/clk/imx/clk-imx6q.c  | 12 ++++++++++++
- drivers/clk/imx/clk-imx6sl.c | 12 ++++++++++++
- drivers/clk/imx/clk-imx6sx.c | 12 ++++++++++++
- 3 files changed, 36 insertions(+)
+ drivers/clk/imx/clk-imx31.c | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-diff --git a/drivers/clk/imx/clk-imx6q.c b/drivers/clk/imx/clk-imx6q.c
-index d046f8e43de8..af6a6517b26c 100644
---- a/drivers/clk/imx/clk-imx6q.c
-+++ b/drivers/clk/imx/clk-imx6q.c
-@@ -130,6 +130,12 @@ static inline int clk_on_imx6dl(void)
- 	return of_machine_is_compatible("fsl,imx6dl");
- }
+diff --git a/drivers/clk/imx/clk-imx31.c b/drivers/clk/imx/clk-imx31.c
+index fe66c40b7be2..c8da3b31f24d 100644
+--- a/drivers/clk/imx/clk-imx31.c
++++ b/drivers/clk/imx/clk-imx31.c
+@@ -62,6 +62,16 @@ enum mx31_clks {
+ static struct clk *clk[clk_max];
+ static struct clk_onecell_data clk_data;
  
-+static void __init imx6q_uart_disable_cb(void)
++static void __init imx31_uart_disable_cb(void)
 +{
-+	clk_disable_unprepare(clk[IMX6QDL_CLK_UART_IPG]);
-+	clk_disable_unprepare(clk[IMX6QDL_CLK_UART_SERIAL]);
++	clk_disable_unprepare(clk[ipg]);
++	clk_disable_unprepare(clk[uart1_gate]);
++	clk_disable_unprepare(clk[uart2_gate]);
++	clk_disable_unprepare(clk[uart3_gate]);
++	clk_disable_unprepare(clk[uart4_gate]);
++	clk_disable_unprepare(clk[uart5_gate]);
 +}
 +
- static void __init imx6q_clocks_init(struct device_node *ccm_node)
+ int __init mx31_clocks_init(unsigned long fref)
  {
- 	struct device_node *np;
-@@ -534,5 +540,11 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
- 	/* All existing boards with PCIe use LVDS1 */
- 	if (IS_ENABLED(CONFIG_PCI_IMX6))
- 		clk_set_parent(clk[IMX6QDL_CLK_LVDS1_SEL], clk[IMX6QDL_CLK_SATA_REF_100M]);
-+
+ 	void __iomem *base;
+@@ -199,6 +209,16 @@ int __init mx31_clocks_init(unsigned long fref)
+ 	mx31_revision();
+ 	clk_disable_unprepare(clk[iim_gate]);
+ 
 +	if (imx_clk_keep_uart()) {
-+		clk_prepare_enable(clk[IMX6QDL_CLK_UART_IPG]);
-+		clk_prepare_enable(clk[IMX6QDL_CLK_UART_SERIAL]);
-+		imx_clk_set_uart_disable_callback(imx6q_uart_disable_cb);
++		clk_prepare_enable(clk[ipg]);
++		clk_prepare_enable(clk[uart1_gate]);
++		clk_prepare_enable(clk[uart2_gate]);
++		clk_prepare_enable(clk[uart3_gate]);
++		clk_prepare_enable(clk[uart4_gate]);
++		clk_prepare_enable(clk[uart5_gate]);
++		imx_clk_set_uart_disable_callback(imx31_uart_disable_cb);
 +	}
- }
- CLK_OF_DECLARE(imx6q, "fsl,imx6q-ccm", imx6q_clocks_init);
-diff --git a/drivers/clk/imx/clk-imx6sl.c b/drivers/clk/imx/clk-imx6sl.c
-index a0d4cf26cfa9..737a9a84f201 100644
---- a/drivers/clk/imx/clk-imx6sl.c
-+++ b/drivers/clk/imx/clk-imx6sl.c
-@@ -184,6 +184,12 @@ void imx6sl_set_wait_clk(bool enter)
- 		imx6sl_enable_pll_arm(false);
- }
- 
-+static void __init imx6sl_uart_disable_cb(void)
-+{
-+	clk_disable_unprepare(clks[IMX6SL_CLK_UART]);
-+	clk_disable_unprepare(clks[IMX6SL_CLK_UART_SERIAL]);
-+}
 +
- static void __init imx6sl_clocks_init(struct device_node *ccm_node)
- {
- 	struct device_node *np;
-@@ -439,5 +445,11 @@ static void __init imx6sl_clocks_init(struct device_node *ccm_node)
+ 	mxc_timer_init(MX31_GPT1_BASE_ADDR, MX31_INT_GPT, GPT_TYPE_IMX31);
  
- 	clk_set_parent(clks[IMX6SL_CLK_LCDIF_AXI_SEL],
- 		       clks[IMX6SL_CLK_PLL2_PFD2]);
-+
-+	if (imx_clk_keep_uart()) {
-+		clk_prepare_enable(clks[IMX6SL_CLK_UART]);
-+		clk_prepare_enable(clks[IMX6SL_CLK_UART_SERIAL]);
-+		imx_clk_set_uart_disable_callback(imx6sl_uart_disable_cb);
-+	}
- }
- CLK_OF_DECLARE(imx6sl, "fsl,imx6sl-ccm", imx6sl_clocks_init);
-diff --git a/drivers/clk/imx/clk-imx6sx.c b/drivers/clk/imx/clk-imx6sx.c
-index 5b95c2c2bf52..ec14235659cc 100644
---- a/drivers/clk/imx/clk-imx6sx.c
-+++ b/drivers/clk/imx/clk-imx6sx.c
-@@ -135,6 +135,12 @@ static u32 share_count_ssi1;
- static u32 share_count_ssi2;
- static u32 share_count_ssi3;
- 
-+static void __init imx6sx_uart_disable_cb(void)
-+{
-+	clk_disable_unprepare(clks[IMX6SX_CLK_UART_IPG]);
-+	clk_disable_unprepare(clks[IMX6SX_CLK_UART_SERIAL]);
-+}
-+
- static void __init imx6sx_clocks_init(struct device_node *ccm_node)
- {
- 	struct device_node *np;
-@@ -557,5 +563,11 @@ static void __init imx6sx_clocks_init(struct device_node *ccm_node)
- 
- 	clk_set_parent(clks[IMX6SX_CLK_QSPI1_SEL], clks[IMX6SX_CLK_PLL2_BUS]);
- 	clk_set_parent(clks[IMX6SX_CLK_QSPI2_SEL], clks[IMX6SX_CLK_PLL2_BUS]);
-+
-+	if (imx_clk_keep_uart()) {
-+		clk_prepare_enable(clks[IMX6SX_CLK_UART_IPG]);
-+		clk_prepare_enable(clks[IMX6SX_CLK_UART_SERIAL]);
-+		imx_clk_set_uart_disable_callback(imx6sx_uart_disable_cb);
-+	}
- }
- CLK_OF_DECLARE(imx6sx, "fsl,imx6sx-ccm", imx6sx_clocks_init);
+ 	return 0;
 -- 
 2.5.0
