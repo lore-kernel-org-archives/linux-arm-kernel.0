@@ -1,42 +1,23 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 27 Aug 2015 15:45:49 +0100
-Subject: [PATCH] arm64: KVM: Do not inject a 64bit fault for a 32bit guest
-In-Reply-To: <1440684348-5292-1-git-send-email-marc.zyngier@arm.com>
-References: <1440684348-5292-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20150827144549.GF21084@n2100.arm.linux.org.uk>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 27 Aug 2015 15:54:51 +0100
+Subject: [PATCH] arm: tegra: update default configuration
+In-Reply-To: <1440670255-19437-1-git-send-email-marcel.ziswiler@toradex.com>
+References: <1440670255-19437-1-git-send-email-marcel.ziswiler@toradex.com>
+Message-ID: <20150827145451.GB5313@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 27, 2015 at 03:05:47PM +0100, Marc Zyngier wrote:
-> When injecting a fault into a 32bit guest, it seems rather idiotic
-> to also inject a 64bit fault that is only going to corrupt the
-> guest state, and lead to a situation where we restore an illegal
-> context.
-> 
-> Just fix the stupid bug that has been there from day 1.
-> 
-> Cc: stable at vger.kernel.org
-> Reported-by: Russell King <linux@arm.linux.org.uk>
+On Thu, Aug 27, 2015 at 12:10:55PM +0200, Marcel Ziswiler wrote:
 
-s/linux/rmk+kernel/ please
+>   * WM9712 audio/touch controller as found on Colibri T20
 
-Tested-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> +CONFIG_BATTERY_WM97XX=y
 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
-> Will: Paolo being on holiday, do you mind merging this one
-> via your tree?
-
-I don't think the commit message does this bug justice.  The implication
-is it's just a guest issue.  It isn't, the bug appears to take out the
-host kernel in a truely spectacular way.
-
-http://www.arm.linux.org.uk/developer/build/result.php?type=boot&idx=4871
-
-Tested here, the fix stops the host kernel exploding.  The crashed kvm
-instance can be stopped and a proper kernel can then be booted in a new
-guest instance.
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Does the system really have the wm9712 wired up as a battery monitor?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150827/8445fd4d/attachment.sig>
