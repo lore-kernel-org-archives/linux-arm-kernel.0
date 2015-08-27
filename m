@@ -1,112 +1,66 @@
-From: varada@codeaurora.org (Varadarajan Narayanan)
-Date: Thu, 27 Aug 2015 11:01:38 +0530
-Subject: [PATCH v4] qcom: ipq4019: Add basic board/dts support for IPQ4019 SoC
-Message-ID: <20150827053138.GA24234@codeaurora.org>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Thu, 27 Aug 2015 07:49:25 +0200
+Subject: [PATCH] regmap: Fix the null function of format_val on
+ regmap_bulk_read.
+In-Reply-To: <20150826173812.GA28760@sirena.org.uk>
+References: <1440589396-696-1-git-send-email-henryc.chen@mediatek.com>
+ <20150826123556.GB2977@sirena.org.uk>
+ <20150826132246.GR706@pengutronix.de>
+ <20150826173812.GA28760@sirena.org.uk>
+Message-ID: <20150827054925.GK706@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add initial dts files and SoC support for IPQ4019
+On Wed, Aug 26, 2015 at 06:38:12PM +0100, Mark Brown wrote:
+> On Wed, Aug 26, 2015 at 03:22:46PM +0200, Markus Pargmann wrote:
+> > On Wed, Aug 26, 2015 at 01:35:56PM +0100, Mark Brown wrote:
+> > > On Wed, Aug 26, 2015 at 07:43:16PM +0800, Henry Chen wrote:
+> 
+> > > Why are these format functions sensible?  Converting a null pointer
+> > > dereference into data corruption wouldn't be ideal.  The commit message
+> > > should really cover this.
+> 
+> > The regmap_bulk_read() function worked before the following patch:
+> > 	15b8d2c41fe5 (regmap: Fix regmap_bulk_read in BE mode)
+> 
+> Define "worked" here.
 
-Signed-off-by: Varadarajan Narayanan <varada@codeaurora.org>
----
-All,
-	Missed linux-arm-msm mailing list last time and
-	incorrectly versioned the patch as v5.
-	Kindly excuse.
+"worked" means here that it did not run into a null pointer and returned
+something that the user expected. I am not sure if someone actually
+complained about the previous use of memcpy? I also don't know how the
+behavior of regmap_bulk_read with reg_read() is defined.
 
-Changes in v2:
-  - Added devicetree bindings documentation
+Best Regards,
 
-Changes in v3:
-  - Split 'gcnt' into a separate patch
-  - Added the new entries to Makefiles, Kconfig & board.c in sorted order
-  - Used "qcom,ipq40xx" instead of "qcom,ipq40xx-r3pc" in board.c
+Markus
 
-Changes in v4:
-  - Removed r3pc dts
-  - Removed timer frequency
+> 
+> > As far as I can see this patch fixes this issue by using simple format
+> > functions. Before the above mentioned patch, the code used memcpy. Now
+> > regmap_format_*_native is used which should result in the same behaviour
+> > but fixes the null pointer.
+> 
+> Again, this sort of analysis needs to be in the commit message (and
+> really ought to explain why the resulting API makes sense).
+> 
+> > I am not sure if there are other locations in the code where format_val
+> > is used in this setup so I don't know if this would change behavior in a
+> > different codepath.
+> 
+> Which is another part of the concern, being able to format values is a
+> more general concept.
 
- arch/arm/boot/dts/qcom-ipq4019.dtsi | 72 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 72 insertions(+)
- create mode 100644 arch/arm/boot/dts/qcom-ipq4019.dtsi
 
-diff --git a/arch/arm/boot/dts/qcom-ipq4019.dtsi b/arch/arm/boot/dts/qcom-ipq4019.dtsi
-new file mode 100644
-index 0000000..668cc84
---- /dev/null
-+++ b/arch/arm/boot/dts/qcom-ipq4019.dtsi
-@@ -0,0 +1,72 @@
-+/*
-+ * Copyright (c) 2014, The Linux Foundation. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+/dts-v1/;
-+
-+#include "skeleton.dtsi"
-+
-+/ {
-+	model = "Qualcomm Technologies, Inc. IPQ4019";
-+	compatible = "qcom,ipq4019";
-+	interrupt-parent = <&intc>;
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a7";
-+			reg = <0x0>;
-+		};
-+
-+		cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a7";
-+			reg = <0x1>;
-+		};
-+
-+		cpu at 2 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a7";
-+			reg = <0x2>;
-+		};
-+
-+		cpu at 3 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a7";
-+			reg = <0x3>;
-+		};
-+	};
-+
-+	soc {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+		compatible = "simple-bus";
-+
-+		intc: interrupt-controller at b000000 {
-+			compatible = "qcom,msm-qgic2";
-+			interrupt-controller;
-+			#interrupt-cells = <3>;
-+			reg = <0x0b000000 0x1000>,
-+			<0x0b002000 0x1000>;
-+		};
-+
-+		serial at 78b0000 {
-+			compatible = "qcom,msm-uartdm-v1.4", "qcom,msm-uartdm";
-+			reg = <0x78b0000 0x200>;
-+			interrupts = <0 108 0>;
-+			status = "disabled";
-+		};
-+	};
-+};
+
 -- 
-1.8.2.1
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150827/7e3ac6bd/attachment.sig>
