@@ -1,34 +1,86 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 27 Aug 2015 21:59:57 +0900
-Subject: [PATCH 5/5] Documentation: arm-pl330: add description of
- broken-no-flushp
-In-Reply-To: <1440665362-31771-1-git-send-email-shawn.lin@rock-chips.com>
-References: <1440665280-31557-1-git-send-email-shawn.lin@rock-chips.com>
- <1440665362-31771-1-git-send-email-shawn.lin@rock-chips.com>
-Message-ID: <CAJKOXPfPLu09ZGChTRr+9-m_HLruYN6KvT=bvMrYrndCBtN2Rg@mail.gmail.com>
+From: msalter@redhat.com (Mark Salter)
+Date: Thu, 27 Aug 2015 09:27:37 -0400
+Subject: [PATCH] ARM64: kernel: implement ACPI parking protocol
+In-Reply-To: <20150827095026.GB21134@red-moon>
+References: <1436959990-32054-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1437063431.3583.2.camel@redhat.com> <20150716171221.GB18582@red-moon>
+ <1437068449.3583.4.camel@redhat.com> <20150826160716.GB11863@red-moon>
+ <1440616402.13044.16.camel@redhat.com> <20150827095026.GB21134@red-moon>
+Message-ID: <1440682057.13044.24.camel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-08-27 17:49 GMT+09:00 Shawn Lin <shawn.lin@rock-chips.com>:
-> Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
-> ---
->
->  Documentation/devicetree/bindings/dma/arm-pl330.txt | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/Documentation/devicetree/bindings/dma/arm-pl330.txt b/Documentation/devicetree/bindings/dma/arm-pl330.txt
-> index 2675658..0f19268 100644
-> --- a/Documentation/devicetree/bindings/dma/arm-pl330.txt
-> +++ b/Documentation/devicetree/bindings/dma/arm-pl330.txt
-> @@ -15,6 +15,7 @@ Optional properties:
->      cells in the dmas property of client device.
->    - dma-channels: contains the total number of DMA channels supported by the DMAC
->    - dma-requests: contains the total number of DMA requests supported by the DMAC
-> +  - broken-no-flushp: quirk for avoiding to execute DMAFLUSHP
+On Thu, 2015-08-27 at 10:50 +0100, Lorenzo Pieralisi wrote:
+> On Wed, Aug 26, 2015 at 08:13:22PM +0100, Mark Salter wrote:
+> > On Wed, 2015-08-26 at 17:07 +0100, Lorenzo Pieralisi wrote:
+> > > Mark,
+> > > 
+> > > On Thu, Jul 16, 2015 at 06:40:49PM +0100, Mark Salter wrote:
+> > > 
+> > > [...]
+> > > 
+> > > > > > The kernel will only add cached memory regions to linear 
+> > > > > > mapping 
+> > > > > > and
+> > > > > > presumably, the FW will mark the mailboxes as uncached. 
+> > > > > > Otherwise, 
+> > > > > > it
+> > > > > > is a FW bug. But I suppose we could run into problems with 
+> > > > > > kernels
+> > > > > > using 64K pagesize since firmware assumes 4k.
+> > > > > 
+> > > > > Nope, ioremap takes care of that, everything should be fine.
+> > > > 
+> > > > The mailbox is 4K. If it is next to a cached UEFI region, the 
+> > > > kernel 
+> > > > may
+> > > > have to overlap the mailbox with a cached 64K mapping in order to 
+> > > > include
+> > > > the adjoining UEFI region in the linear map. Then the ioremap would 
+> > > > fail
+> > > > because the mailbox is included in the linear mapping.
+> > > 
+> > > You have to acknowledge that what you describe is a bit of a corner
+> > > case (and a silly FW set-up), are you aware of any existing FW set-up
+> > > where we actually hit the corner case above ?
+> > 
+> > Oh sure. It could definitely be a corner case. I'm not aware of any
+> > existing firmware supporting the protocol implemented by your patch.
+> 
+> So basically there is no existing firmware implementing the ARM64 ACPI
+> parking protocol.
 
-It looks like a device or vendor specific quirk so the property should
-have a prefix. For example:
-arm,pl330-broken-no-flushp
+None that I am aware of.
 
-Best regards,
-Krzysztof
+> 
+> > So time will tell how well firmware vendors which do implement it
+> > avoid the corner case problem. I am aware of some existing firmwares
+> > which put the mailbox area in RAM which is also in the kernel linear
+> > mapping as cached memory. But those wouldn't work with your patch for
+> > more reasons than that.
+> 
+> They will have to fix them, that's the reason why I am pushing this
+> patch upstream, and not a version that is massaged to make their
+> non-compliant firmware compliant.
+
+Absolutely agree.
+
+> 
+> > > I think it is fine to leave code as-is, at least the mailbox
+> > > mappings, I will check to see I can improve the MADT parsing,
+> > > somehow.
+> > 
+> > I'm not strenuously opposed to leaving it as-is. But we need to
+> > acknowledge that if the 64K pagesize issue isn't covered by the
+> > protocol spec, we're relying on firmware vendors to be diligent
+> > not to break 64K pagesize kernels.
+> 
+> Should we try to amend the protocol spec ? I will raise the point,
+> I do not see how we can prevent this issue otherwise, other than
+> relying on vendors to be aware of the issue and prevent it.
+
+Yes, please do.
+
+> 
+> Thanks,
+> Lorenzo
