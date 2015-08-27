@@ -1,42 +1,65 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Thu, 27 Aug 2015 08:44:28 +0200
-Subject: [PATCH v3 0/4] regmap: i2c block support
-Message-ID: <1440657872-24554-1-git-send-email-mpa@pengutronix.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 27 Aug 2015 07:44:52 +0100
+Subject: [PATCH 4/4] remoteproc: debugfs: Add ability to boot remote
+ processor using debugfs
+In-Reply-To: <55DDF2A0.5010404@mentor.com>
+References: <1440594483-29601-1-git-send-email-lee.jones@linaro.org>
+ <1440594483-29601-5-git-send-email-lee.jones@linaro.org>
+ <55DDF2A0.5010404@mentor.com>
+Message-ID: <20150827064452.GC19409@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, 26 Aug 2015, Nathan Lynch wrote:
 
-This series adds support for i2c block read/writes. To support the maximum 32
-byte read/write operations, the regmap core is extended by max_raw_read and
-max_raw_write. bulk operations are splitted depending of the size of
-max_raw_read/write.
+> On 08/26/2015 08:08 AM, Lee Jones wrote:
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > ---
+> >  drivers/remoteproc/remoteproc_debugfs.c | 25 +++++++++++++++++++++++++
+> >  1 file changed, 25 insertions(+)
+> 
+> The commit message should describe why this is needed...
+> 
+> > diff --git a/drivers/remoteproc/remoteproc_debugfs.c b/drivers/remoteproc/remoteproc_debugfs.c
+> > index 9d30809..9620962 100644
+> > --- a/drivers/remoteproc/remoteproc_debugfs.c
+> > +++ b/drivers/remoteproc/remoteproc_debugfs.c
+> > @@ -88,8 +88,33 @@ static ssize_t rproc_state_read(struct file *filp, char __user *userbuf,
+> >  	return simple_read_from_buffer(userbuf, count, ppos, buf, i);
+> >  }
+> >  
+> > +static ssize_t rproc_state_write(struct file *filp, const char __user *userbuf,
+> > +				 size_t count, loff_t *ppos)
+> > +{
+> > +	struct rproc *rproc = filp->private_data;
+> > +	char buf[2];
+> > +	int ret;
+> > +
+> > +	ret = copy_from_user(buf, userbuf, 1);
+> > +	if (ret)
+> > +		return -EFAULT;
+> > +
+> > +	switch (buf[0]) {
+> > +	case '1':
+> > +		ret = rproc_boot(rproc);
+> > +		if (ret)
+> > +			dev_warn(&rproc->dev, "Boot failed: %d\n", ret);
+> > +		break;
+> > +	default:
+> > +		rproc_shutdown(rproc);
+> > +	}
+> > +
+> > +	return count;
+> > +}
+> 
+> ... and I suggest that the user interface be reconsidered.  If '1' means
+> "boot" and literally anything else means "shut down" then you can't add
+> operations in the future without potentially breaking things.
 
-The last patch needs testing before it can be applied.
-
-Best Regards,
-
-Markus
-
-
-Changes in v3:
-- Rebased onto latest version of "regmap: fixes" series
-
-Changes in v2:
-- max_raw_io splitted into max_raw_read/write
-- Use E2BIG as error value in the block read/write functions
-
-Markus Pargmann (4):
-  regmap: Introduce max_raw_read/write for regmap_bulk_read/write
-  regmap: regmap max_raw_read/write getter functions
-  regmap: Add raw_write/read checks for max_raw_write/read sizes
-  regmap-i2c: Add smbus i2c block support
-
- drivers/base/regmap/internal.h   |   4 ++
- drivers/base/regmap/regmap-i2c.c |  49 +++++++++++++++++
- drivers/base/regmap/regmap.c     | 113 +++++++++++++++++++++++++++++++++------
- include/linux/regmap.h           |   6 +++
- 4 files changed, 157 insertions(+), 15 deletions(-)
+Good points, will fix.
 
 -- 
-2.5.0
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
