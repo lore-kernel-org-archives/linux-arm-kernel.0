@@ -1,97 +1,59 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 27 Aug 2015 09:38:56 -0700
-Subject: [PATCH] ARM: OMAP2+: omap-device: remove omap_device_late_init
- call completely
-In-Reply-To: <55DF12E7.10802@ti.com>
-References: <1440611890-4935-1-git-send-email-grygorii.strashko@ti.com>
- <20150826181006.GT4215@atomide.com> <55DF12E7.10802@ti.com>
-Message-ID: <20150827163856.GX4215@atomide.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Thu, 27 Aug 2015 18:39:13 +0200
+Subject: [PATCH 0/8] i.MX early debug UART clock fixes
+Message-ID: <1440693561-28095-1-git-send-email-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Grygorii Strashko <grygorii.strashko@ti.com> [150827 06:42]:
-> Hi Tony,
-> 
-> On 08/26/2015 09:10 PM, Tony Lindgren wrote:
-> > * Grygorii Strashko <grygorii.strashko@ti.com> [150826 11:01]:
-> >> Now Kernel fails to boot 50% of times (form build to build) with
-> >> RT-patchset applied due to the following race - on late boot
-> >> stages deferred_probe_work_func races with omap_device_late_ini
-> >>
-> >> late_initcall
-> >>   - deferred_probe_initcal() tries to re-probe all pending driver's probe.
-> >>     [In general, It's NOT expected to probe any other built-in drivers after
-> >>     deferred_probe_initcal() is finished, because most of
-> >>     late_initcall_sync/late_initcall functions expected that all driver
-> >>     or probed or deferred already.]
-> >>
-> >> - later on, some driver is probing in this case It's could cpsw.c
-> >>    (but could be any other drivers)
-> >>    cpsw_init
-> >>    - platform_driver_register
-> >>      - really_probe
-> >>         - driver_bound
-> >>           - driver_deferred_probe_trigger
-> >>    and boot proceed.
-> >>    So, at this moment we have  deferred_probe_work_func scheduled.
-> >>
-> >> late_initcall_sync
-> >>    - omap_device_late_init
-> >>      - omap_device_idle
-> >>
-> >> CPU1					CPU2
-> >>    - deferred_probe_work_func
-> >>      - really_probe
-> >>        - omap_hsmmc_probe
-> >> 	- pm_runtime_get_sync
-> >> 					late_initcall_sync
-> >> 					- omap_device_late_init
-> >> 						if (od->_driver_status != BUS_NOTIFY_BOUND_DRIVER) {
-> >> 							if (od->_state == OMAP_DEVICE_STATE_ENABLED) {
-> >> 								- omap_device_idle [ops - IP is disabled, ]
-> >> 	- [fail]
-> >> 	- pm_runtime_put_sync
-> >>            - omap_hsmmc_runtime_suspend [ooops!]
-> > 
-> > OK idling of unclaimed devices should not happen for deferred probe,
-> > it should only happen when there's no driver and no probing happening.
-> >   
-> >> Lets remove just remove omap_device_late_init completely as suggested
-> >> by Tero Kristo:
-> >>
-> >> "How about remove omap_device_late_init call completely. I don't think
-> >> it does anything useful at the moment; none of the omap devices get
-> >> enabled outside runtime_pm, so there should be no need to explicitly
-> >> disable the devices."
-> > 
-> > I think this is still needed from PM point of view as otherwise we
-> > don't idle any devices that don't have a driver available. Or am I
-> > missing something?
-> > 
-> > To me it seems the bug is relying on the BUS_NOTIFY_BOUND_DRIVER is
-> > not set in the deferred probe case.
-> > 
-> 
-> 
-> What do you think about below alternative?
-> 
-> diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
-> index 4cb8fd9..72ebc4c 100644
-> --- a/arch/arm/mach-omap2/omap_device.c
-> +++ b/arch/arm/mach-omap2/omap_device.c
-> @@ -901,7 +901,8 @@ static int __init omap_device_late_idle(struct device *dev, void *data)
->                 if (od->hwmods[i]->flags & HWMOD_INIT_NO_IDLE)
->                         return 0;
->  
-> -       if (od->_driver_status != BUS_NOTIFY_BOUND_DRIVER) {
-> +       if (od->_driver_status != BUS_NOTIFY_BOUND_DRIVER &&
-> +           od->_driver_status != BUS_NOTIFY_BIND_DRIVER) {
->                 if (od->_state == OMAP_DEVICE_STATE_ENABLED) {
->                         dev_warn(dev, "%s: enabled but no driver.  Idling\n",
->                                  __func__);
+This series fixes a long standing interaction issue between the
+kernels early debug facilities and the i.MX clock drivers.
 
-Seems better to me if it really fixes the issue.
+Both earlyprintk and earlycon rely on the bootloader setup clocks
+for the UARTs to be retained during kernel init. As those clocks are
+only enabled in hardware, but not referenced in software they (or even
+their parent clocks) may get disabled as a result of other clocks being
+en-/disabled during boot.
+
+This results in missing messages from the early debug console until the
+regular system console takes over, or even worse system hangs in response
+to unclocked register accesses. This renders those debugging facilities a
+lot less useful.
+
+The fix implemented here is to check if any of this early debugging is
+enabled and keep the UART clocks referenced and enabled in that case.
+The clocks will then only be disabled at the end of kernel init, at which
+point the real console should have taken over and the early outputs being
+disabled.
+
+I've runtime tested this on i.MX6Q and i.MX53, other platforms are only
+compile tested. This is mostly a mechanical change, but still I would
+appreciate some testing.
 
 Regards,
+Lucas
 
-Tony
+Lucas Stach (8):
+  clk: imx: add common logic to detect early UART usage
+  clk: imx25: retain early UART clocks during kernel init
+  clk: imx27: retain early UART clocks during kernel init
+  clk: imx31: retain early UART clocks during kernel init
+  clk: imx35: retain early UART clocks during kernel init
+  clk: imx5: retain early UART clocks during kernel init
+  clk: imx6: retain early UART clocks during kernel init
+  clk: imx7d: retain early UART clocks during kernel init
+
+ drivers/clk/imx/clk-imx25.c       | 20 ++++++++++++++++++++
+ drivers/clk/imx/clk-imx27.c       | 22 ++++++++++++++++++++++
+ drivers/clk/imx/clk-imx31.c       | 20 ++++++++++++++++++++
+ drivers/clk/imx/clk-imx35.c       | 16 ++++++++++++++++
+ drivers/clk/imx/clk-imx51-imx53.c | 28 ++++++++++++++++++++++++++++
+ drivers/clk/imx/clk-imx6q.c       | 12 ++++++++++++
+ drivers/clk/imx/clk-imx6sl.c      | 12 ++++++++++++
+ drivers/clk/imx/clk-imx6sx.c      | 12 ++++++++++++
+ drivers/clk/imx/clk-imx7d.c       | 22 ++++++++++++++++++++++
+ drivers/clk/imx/clk.c             | 33 +++++++++++++++++++++++++++++++++
+ drivers/clk/imx/clk.h             |  2 ++
+ 11 files changed, 199 insertions(+)
+
+-- 
+2.5.0
