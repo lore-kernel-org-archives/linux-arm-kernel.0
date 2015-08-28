@@ -1,161 +1,34 @@
-From: alim.akhtar@samsung.com (Alim Akhtar)
-Date: Fri, 28 Aug 2015 16:55:34 +0530
-Subject: [PATCH] arm64: dts: Add BUS1 instance pinctrl support
-Message-ID: <1440761134-27639-1-git-send-email-alim.akhtar@samsung.com>
+From: horia.geanta@freescale.com (=?UTF-8?q?Horia=20Geant=C4=83?=)
+Date: Fri, 28 Aug 2015 14:45:06 +0300
+Subject: [RFC][PATCH 0/2] crypto: caam - Revamp I/O accessors
+Message-ID: <1440762306-7764-1-git-send-email-horia.geanta@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds BUS1 instance pinctrl for exynos7 soc.
+(Part of the) I/O accessors in caam driver are PPC-specific.
+Use io{read,write}XX[be] instead.
 
-Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
----
- arch/arm64/boot/dts/exynos/exynos7-pinctrl.dtsi |  111 +++++++++++++++++++++++
- arch/arm64/boot/dts/exynos/exynos7.dtsi         |    7 ++
- 2 files changed, 118 insertions(+)
+While here, prepare for "mixed" endianness platforms (like ARMv8-based
+LS1043A), where caam endianness (big) does not match the endianness
+of the core (little).
 
-diff --git a/arch/arm64/boot/dts/exynos/exynos7-pinctrl.dtsi b/arch/arm64/boot/dts/exynos/exynos7-pinctrl.dtsi
-index 2eef4a2..96be6e3 100644
---- a/arch/arm64/boot/dts/exynos/exynos7-pinctrl.dtsi
-+++ b/arch/arm64/boot/dts/exynos/exynos7-pinctrl.dtsi
-@@ -586,3 +586,114 @@
- 		samsung,pin-drv = <2>;
- 	};
- };
-+
-+&pinctrl_bus1 {
-+	etc1: etc1 {
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+	};
-+
-+	gpf0: gpf0 {
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+	};
-+
-+	gpf1: gpf1 {
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+	};
-+
-+	gpf2: gpf2 {
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+	};
-+
-+	gpf3: gpf3 {
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+	};
-+
-+	gpf4: gpf4 {
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+	};
-+
-+	gpf5: gpf5 {
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+	};
-+
-+	gpg1: gpg1 {
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+	};
-+
-+	gpg2: gpg2 {
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+	};
-+
-+	gph1: gph1 {
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+	};
-+
-+	gpv6: gpv6 {
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+	};
-+
-+	spi5_bus: spi5-bus {
-+		samsung,pins = "gpf2-0", "gpf2-1", "gpf2-2", "gpf2-3";
-+		samsung,pin-function = <2>;
-+		samsung,pin-pud = <3>;
-+		samsung,pin-drv = <0>;
-+	};
-+
-+	ufs_refclk_out: ufs-refclk-out {
-+		samsung,pins = "gpg2-4";
-+		samsung,pin-function = <2>;
-+		samsung,pin-pud = <0>;
-+		samsung,pin-drv = <2>;
-+	};
-+
-+	ufs_rst_n: ufs-rst-n {
-+		samsung,pins = "gph1-5";
-+		samsung,pin-function = <2>;
-+		samsung,pin-pud = <3>;
-+		samsung,pin-drv = <0>;
-+	};
-+};
-diff --git a/arch/arm64/boot/dts/exynos/exynos7.dtsi b/arch/arm64/boot/dts/exynos/exynos7.dtsi
-index d7a37c3..f9c5a54 100644
---- a/arch/arm64/boot/dts/exynos/exynos7.dtsi
-+++ b/arch/arm64/boot/dts/exynos/exynos7.dtsi
-@@ -26,6 +26,7 @@
- 		pinctrl5 = &pinctrl_ese;
- 		pinctrl6 = &pinctrl_fsys0;
- 		pinctrl7 = &pinctrl_fsys1;
-+		pinctrl8 = &pinctrl_bus1;
- 	};
- 
- 	cpus {
-@@ -278,6 +279,12 @@
- 			interrupts = <0 203 0>;
- 		};
- 
-+		pinctrl_bus1: pinctrl at 14870000 {
-+			compatible = "samsung,exynos7-pinctrl";
-+			reg = <0x14870000 0x1000>;
-+			interrupts = <0 384 0>;
-+		};
-+
- 		hsi2c_0: hsi2c at 13640000 {
- 			compatible = "samsung,exynos7-hsi2c";
- 			reg = <0x13640000 0x1000>;
+1st patch adds 64-bit accessors for arm64.
+
+2nd patch updates the I/O accessors in the caam driver.
+
+Horia Geant? (2):
+  arm64: add ioread64be and iowrite64be macros
+  crypto: caam - handle core endianness != caam endianness
+
+ arch/arm64/include/asm/io.h       |  4 ++-
+ drivers/crypto/caam/caamhash.c    |  5 +--
+ drivers/crypto/caam/ctrl.c        |  2 +-
+ drivers/crypto/caam/desc.h        |  9 ++++-
+ drivers/crypto/caam/desc_constr.h | 42 +++++++++++++++--------
+ drivers/crypto/caam/jr.c          |  8 ++---
+ drivers/crypto/caam/regs.h        | 72 ++++++++++++++++++++++++++++-----------
+ drivers/crypto/caam/sg_sw_sec4.h  | 10 +++---
+ 8 files changed, 105 insertions(+), 47 deletions(-)
+
 -- 
-1.7.10.4
+2.4.4
