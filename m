@@ -1,39 +1,32 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 28 Aug 2015 21:11:26 +0200 (CEST)
-Subject: [PATCH v2 1/1] irqchip: imx-gpcv2: Simplify the implementation
-In-Reply-To: <1440617755-2942-1-git-send-email-shenwei.wang@freescale.com>
-References: <1440617755-2942-1-git-send-email-shenwei.wang@freescale.com>
-Message-ID: <alpine.DEB.2.11.1508282110260.15006@nanos>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 28 Aug 2015 12:19:42 -0700
+Subject: [PATCH] ARM: omap2plus_defconfig: Enable MUSB DMA support
+Message-ID: <1440789582-25392-1-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 26 Aug 2015, Shenwei Wang wrote:
->  u32 imx_gpcv2_get_wakeup_source(u32 **sources)
->  {
-> -	if (!imx_gpcv2_instance)
-> +	struct gpcv2_irqchip_data *cd;
-> +	void __iomem *reg;
-> +	int i;
-> +
-> +	cd = imx_gpcv2_instance;
-> +	if (!cd)
->  		return 0;
-> 
-> +	for (i = 0; i < IMR_NUM; i++) {
-> +		reg = cd->gpc_base + cd->cpu2wakeup + i * 4;
-> +		cd->wakeup_sources[i] = readl_relaxed(reg);
-> +	}
-> +
->  	if (sources)
-> -		*sources = imx_gpcv2_instance->wakeup_sources;
-> +		*sources = cd->wakeup_sources;
-> 
->  	return IMR_NUM;
->  }
+With recent MUSB changes we can now build in support for multiple
+DMA implementations. So let's enable DMA by default to make life
+easier for distro use.
 
-So once again. As you said before nothing is going to use the case
-where source == NULL, can we please get rid of it?
+Cc: Felipe Balbi <balbi@ti.com>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/configs/omap2plus_defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Thanks,
-
-	tglx
+diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
+index 789fa5a8..1d5f80f 100644
+--- a/arch/arm/configs/omap2plus_defconfig
++++ b/arch/arm/configs/omap2plus_defconfig
+@@ -350,6 +350,8 @@ CONFIG_USB_MUSB_HDRC=m
+ CONFIG_USB_MUSB_OMAP2PLUS=m
+ CONFIG_USB_MUSB_AM35X=m
+ CONFIG_USB_MUSB_DSPS=m
++CONFIG_USB_INVENTRA_DMA=y
++CONFIG_USB_TI_CPPI41_DMA=y
+ CONFIG_USB_DWC3=m
+ CONFIG_USB_TEST=m
+ CONFIG_AM335X_PHY_USB=y
+-- 
+2.1.4
