@@ -1,27 +1,39 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Fri, 28 Aug 2015 11:53:49 +0200
-Subject: [PATCH 1/4] x86, efi, kasan: #undef memset/memcpy/memmove per
- arch.
-In-Reply-To: <20150828083941.GN10728@bivouac.eciton.net>
-References: <1440605707-8325-1-git-send-email-ryabinin.a.a@gmail.com>
- <1440605707-8325-2-git-send-email-ryabinin.a.a@gmail.com>
- <20150828062745.GB1928@gmail.com>
- <20150828083941.GN10728@bivouac.eciton.net>
-Message-ID: <20150828095349.GA23114@gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 28 Aug 2015 17:54:37 +0800
+Subject: [PATCH 4/6] ARM: dts: sun6i: Add mmc2 pins for 8 bit emmc
+In-Reply-To: <1440755679-8266-1-git-send-email-wens@csie.org>
+References: <1440755679-8266-1-git-send-email-wens@csie.org>
+Message-ID: <1440755679-8266-5-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This also includes the reset pin for emmc.
 
-* Leif Lindholm <leif.lindholm@linaro.org> wrote:
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ arch/arm/boot/dts/sun6i-a31.dtsi | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-> > > So let's move these #undef mem* into arch's asm/efi.h which is
-> > 
-> > s/lets
-> 
-> No, that one is actually correct. Abbreviation of let us.
-
-Indeed.
-
-Thanks,
-
-	Ingo
+diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+index 431c7c884e1c..98359f37bf11 100644
+--- a/arch/arm/boot/dts/sun6i-a31.dtsi
++++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+@@ -691,6 +691,16 @@
+ 				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+ 			};
+ 
++			mmc2_8bit_emmc_pins: mmc2 at 0 {
++				allwinner,pins = "PC6", "PC7", "PC8", "PC9",
++						 "PC10", "PC11", "PC12",
++						 "PC13", "PC14", "PC15",
++						 "PC24";
++				allwinner,function = "mmc2";
++				allwinner,drive = <SUN4I_PINCTRL_30_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
++
+ 			gmac_pins_mii_a: gmac_mii at 0 {
+ 				allwinner,pins = "PA0", "PA1", "PA2", "PA3",
+ 						"PA8", "PA9", "PA11",
+-- 
+2.5.0
