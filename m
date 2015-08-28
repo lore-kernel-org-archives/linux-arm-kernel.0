@@ -1,50 +1,83 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Fri, 28 Aug 2015 12:19:04 -0500
-Subject: [GIT PULL] qcom SoC changes for 4.3-rc2
-In-Reply-To: <20150828001603.GO13472@usrtlx11787.corpusers.net>
-References: <1440710899-29214-1-git-send-email-agross@codeaurora.org>
- <20150828001603.GO13472@usrtlx11787.corpusers.net>
-Message-ID: <20150828171903.GA7886@qualcomm.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Fri, 28 Aug 2015 10:17:28 -0700
+Subject: [PATCH v2 4/4] remoteproc: debugfs: Add ability to boot remote
+ processor using debugfs
+In-Reply-To: <1440757911-9120-5-git-send-email-lee.jones@linaro.org>
+References: <1440757911-9120-1-git-send-email-lee.jones@linaro.org>
+ <1440757911-9120-5-git-send-email-lee.jones@linaro.org>
+Message-ID: <55E097A8.4080305@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 27, 2015 at 05:16:03PM -0700, Bjorn Andersson wrote:
-> On Thu 27 Aug 14:28 PDT 2015, Andy Gross wrote:
-> 
-> > The following changes since commit 72af1ff60d08a57e223b9753f9c52396fb4c3897:
-> > 
-> >   Merge tag 'qcom-soc-for-4.3' into for-soc-new (2015-08-27 12:14:29 -0500)
-> > 
-> > are available in the git repository at:
-> > 
-> > 
-> >   git://codeaurora.org/quic/kernel/agross-msm.git tags/qcom-soc-for-4.3-rc2
-> > 
-> > for you to fetch changes up to 3427446d72e21f6992534a3b68055f1b4c722546:
-> > 
-> >   soc: qcom: smd: Use correct remote processor ID (2015-08-27 12:15:58 -0500)
-> > 
-> > ----------------------------------------------------------------
-> > Qualcomm ARM Based SoC Updates for 4.3-rc2
-> > 
-> > * Fix errant private access in SMEM
-> > * Fix use of correct remote processor ID in SMD transactions
-> > 
-> 
-> I was hoping to see my fBLOCKREADINTR fix [1] here as well, as the issue
-> it's fixing it a never ending stall if we're trying to send data with a
-> full tx fifo - i.e. a rather bad result...
-> 
-> But I'm fine with you queuing it for -rc3 too...
-> 
-> [1] https://lkml.org/lkml/2015/8/24/756
-> 
-> Regards,
-> Bjorn
+On 28/08/15 03:31, Lee Jones wrote:
+> This functionality is especially useful during the testing phase.  When
+> used in conjunction with Mailbox's Test Framework we can trivially conduct
+> end-to-end testing i.e. boot co-processor, send and receive messages to
+> the co-processor, then shut it down again (repeat as required).
 
-Ack, sorry.  I'll resend it after bumping the subject
+This does not strike me as a particularly well defined nor suitable
+interface for controlling a remote processor's state. I know you are
+just extending the existing debugfs interface here, but someone ought to
+remove that piece of code and make it a proper character device or
+netlink or whatever that allows someone to get proper signaling of
+what's going on with the remote processor state by polling or listening
+to a socket.
+
+What's the intended use case behind debugfs for this after all? Is your
+application expected to keep reading the state file in a loop until it
+is happy and reads "running", how is that not racy by nature?
+
+> 
+> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  drivers/remoteproc/remoteproc_debugfs.c | 29 +++++++++++++++++++++++++++++
+>  1 file changed, 29 insertions(+)
+> 
+> diff --git a/drivers/remoteproc/remoteproc_debugfs.c b/drivers/remoteproc/remoteproc_debugfs.c
+> index 9d30809..464470d 100644
+> --- a/drivers/remoteproc/remoteproc_debugfs.c
+> +++ b/drivers/remoteproc/remoteproc_debugfs.c
+> @@ -88,8 +88,37 @@ static ssize_t rproc_state_read(struct file *filp, char __user *userbuf,
+>  	return simple_read_from_buffer(userbuf, count, ppos, buf, i);
+>  }
+>  
+> +static ssize_t rproc_state_write(struct file *filp, const char __user *userbuf,
+> +				 size_t count, loff_t *ppos)
+> +{
+> +	struct rproc *rproc = filp->private_data;
+> +	char buf[2];
+> +	int ret;
+> +
+> +	ret = copy_from_user(buf, userbuf, 1);
+> +	if (ret)
+> +		return -EFAULT;
+> +
+> +	switch (buf[0]) {
+> +	case '0':
+> +		rproc_shutdown(rproc);
+> +		break;
+> +	case '1':
+> +		ret = rproc_boot(rproc);
+> +		if (ret)
+> +			dev_warn(&rproc->dev, "Boot failed: %d\n", ret);
+> +		break;
+> +	default:
+> +		dev_err(&rproc->dev, "Unrecognised option: %x\n", buf[1]);
+> +		return -EINVAL;
+> +	}
+> +
+> +	return count;
+> +}
+> +
+>  static const struct file_operations rproc_state_ops = {
+>  	.read = rproc_state_read,
+> +	.write = rproc_state_write,
+>  	.open = simple_open,
+>  	.llseek	= generic_file_llseek,
+>  };
+> 
+
 
 -- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Florian
