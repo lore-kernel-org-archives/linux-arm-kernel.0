@@ -1,224 +1,80 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 28 Aug 2015 10:41:19 -0500
-Subject: [PATCH v2 2/5] ARM: NSP: add minimal Northstar Plus device tree
-In-Reply-To: <1440628530-6137-3-git-send-email-jonmason@broadcom.com>
-References: <1440628530-6137-1-git-send-email-jonmason@broadcom.com>
- <1440628530-6137-3-git-send-email-jonmason@broadcom.com>
-Message-ID: <CAL_JsqJb+Pj7c=3Q9ViPhU_=tJxqOzEhOPALctf-zaFHQv+bWg@mail.gmail.com>
+From: msalter@redhat.com (Mark Salter)
+Date: Fri, 28 Aug 2015 11:56:36 -0400
+Subject: [PATCH] ARM64: kernel: implement ACPI parking protocol
+In-Reply-To: <20150828153212.GG15924@red-moon>
+References: <1436959990-32054-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1437063431.3583.2.camel@redhat.com> <20150716171221.GB18582@red-moon>
+ <1437068449.3583.4.camel@redhat.com> <20150828102314.GC15924@red-moon>
+ <1440772186.31961.8.camel@redhat.com> <20150828153212.GG15924@red-moon>
+Message-ID: <1440777396.31961.13.camel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 26, 2015 at 5:35 PM, Jon Mason <jonmason@broadcom.com> wrote:
-> Add a very minimalistic set of Northstar Plus Device Tree files which
-> describes the SoC and the BCM958625 implementation.  The perpherials
-> described are:
->
-> ARM Cortex A9 CPU
-> 2 8250 UARTs
-> ARM GIC
-> PL310 L2 Cache
-> ARM A9 Global timer
->
-> Signed-off-by: Kapil Hali <kapilh@broadcom.com>
-> Signed-off-by: Jon Mason <jonmason@broadcom.com>
-> ---
->  arch/arm/boot/dts/Makefile       |   2 +
->  arch/arm/boot/dts/bcm-nsp.dtsi   | 105 +++++++++++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/bcm958625k.dts |  57 +++++++++++++++++++++
->  3 files changed, 164 insertions(+)
->  create mode 100644 arch/arm/boot/dts/bcm-nsp.dtsi
->  create mode 100644 arch/arm/boot/dts/bcm958625k.dts
->
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 246473a..adb5732 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -82,6 +82,8 @@ dtb-$(CONFIG_ARCH_BCM_CYGNUS) += \
->  dtb-$(CONFIG_ARCH_BCM_MOBILE) += \
->         bcm28155-ap.dtb \
->         bcm21664-garnet.dtb
-> +dtb-$(CONFIG_ARCH_BCM_NSP) += \
-> +       bcm958625k.dtb
->  dtb-$(CONFIG_ARCH_BERLIN) += \
->         berlin2-sony-nsz-gs7.dtb \
->         berlin2cd-google-chromecast.dtb \
-> diff --git a/arch/arm/boot/dts/bcm-nsp.dtsi b/arch/arm/boot/dts/bcm-nsp.dtsi
-> new file mode 100644
-> index 0000000..77f9bfc
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/bcm-nsp.dtsi
-> @@ -0,0 +1,105 @@
-> +/*
-> + *  BSD LICENSE
-> + *
-> + *  Copyright(c) 2015 Broadcom Corporation.  All rights reserved.
-> + *
-> + *  Redistribution and use in source and binary forms, with or without
-> + *  modification, are permitted provided that the following conditions
-> + *  are met:
-> + *
-> + *    * Redistributions of source code must retain the above copyright
-> + *      notice, this list of conditions and the following disclaimer.
-> + *    * Redistributions in binary form must reproduce the above copyright
-> + *      notice, this list of conditions and the following disclaimer in
-> + *      the documentation and/or other materials provided with the
-> + *      distribution.
-> + *    * Neither the name of Broadcom Corporation nor the names of its
-> + *      contributors may be used to endorse or promote products derived
-> + *      from this software without specific prior written permission.
-> + *
-> + *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-> + *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-> + *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-> + *  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-> + *  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-> + *  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-> + *  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-> + *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-> + *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-> + *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-> + *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-> + */
-> +
-> +#include <dt-bindings/interrupt-controller/arm-gic.h>
-> +#include <dt-bindings/interrupt-controller/irq.h>
-> +
-> +#include "skeleton.dtsi"
-> +
-> +/ {
-> +       compatible = "brcm,nsp";
-> +       model = "Broadcom Northstar Plus SoC";
-> +       interrupt-parent = <&gic>;
-> +
-> +       cpus {
-> +               #address-cells = <1>;
-> +               #size-cells = <0>;
-> +
-> +               cpu at 0 {
-> +                       device_type = "cpu";
-> +                       compatible = "arm,cortex-a9";
-> +                       next-level-cache = <&L2>;
-> +                       reg = <0x0>;
-> +               };
-> +       };
-> +
-> +       clocks {
-> +               #address-cells = <1>;
-> +               #size-cells = <1>;
-> +               ranges;
-> +
-> +               periph_clk: periph_clk {
-> +                       compatible = "fixed-clock";
-> +                       #clock-cells = <0>;
-> +                       clock-frequency = <500000000>;
-> +               };
-> +       };
-> +
-> +       uart0: serial at 18000300 {
+On Fri, 2015-08-28 at 16:32 +0100, Lorenzo Pieralisi wrote:
+> [Cc'ing Leif and Ard]
+> 
+> On Fri, Aug 28, 2015 at 03:29:46PM +0100, Mark Salter wrote:
+> > On Fri, 2015-08-28 at 11:23 +0100, Lorenzo Pieralisi wrote:
+> > > Mark,
+> > > 
+> > > On Thu, Jul 16, 2015 at 06:40:49PM +0100, Mark Salter wrote:
+> > > 
+> > > [...]
+> > > 
+> > > > On Thu, 2015-07-16 at 18:12 +0100, Lorenzo Pieralisi wrote:
+> > > > > > The kernel will only add cached memory regions to linear 
+> > > > > > mapping 
+> > > > > > and
+> > > > > > presumably, the FW will mark the mailboxes as uncached. 
+> > > > > > Otherwise, 
+> > > > > > it
+> > > > > > is a FW bug. But I suppose we could run into problems with 
+> > > > > > kernels
+> > > > > > using 64K pagesize since firmware assumes 4k.
+> > > > > 
+> > > > > Nope, ioremap takes care of that, everything should be fine.
+> > > > 
+> > > > The mailbox is 4K. If it is next to a cached UEFI region, the 
+> > > > kernel 
+> > > > may
+> > > > have to overlap the mailbox with a cached 64K mapping in order to 
+> > > > include
+> > > > the adjoining UEFI region in the linear map. Then the ioremap would 
+> > > > fail
+> > > > because the mailbox is included in the linear mapping.
+> > > 
+> > > So that I understand: are you referring to memrange_efi_to_native()
+> > > in arch/arm64/kernel/efi.c ? Is it safe to round up (and add it to
+> > > the memblock layer) the memory region size to PAGE_SIZE without 
+> > > checking
+> > > attributes of overlapping (within PAGE_SIZE) UEFI regions ?
+> > 
+> > The problem is that nothing in the UEFI spec or parking protocol spec
+> > prevents firmware from placing a 4K parking protocol mailbox area in
+> > the same 64K page as normal cached memory which winds up mapped in
+> > the kernel linear mapping. The kernel might be able to work around
+> > that by not putting the 64K page in the linear map. There's nothing
+> > the kernel could do if the mailbox is in same 64K page with UEFI 
+> > runtime
+> > memory which would use a cached mapping.
+> 
+> Ok, I failed to explain myself. Let's imagine that we have a, say, 64k
+> aligned memory region (EFI_MEMORY_WB - size 16k) that lives in the same
+> 64K memory frame as a device's registers memory space.
+> The code I pointed at above creates a 64K memory frame out of the 16K
+> region and adds it to the memblock so that it ends up in the kernel 
+> linear
+> mapping which ends up mapping the device registers too with cacheable
+> attributes and that's not correct.
+> 
+> I am not sure what's the best way to solve that, probably we should
+> amend the UEFI specs to enforce uniform 64K memory region attributes,
+> comments welcome.
 
-All these devices should go under a bus node.
+OIC. Well it is a potential problem. Hardware designers do some whacky
+things, but I'd like to think I/O regions and cached mem regions bordering
+on such a small power of two boundary is not one of them.
 
-> +               compatible = "ns16550a";
-> +               reg = <0x18000300 0x100>;
-> +               interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
-> +               clock-frequency = <62499840>;
-> +               status = "disabled";
-> +       };
-> +
-> +       uart1: serial at 18000400 {
-> +               compatible = "ns16550a";
-> +               reg = <0x18000400 0x100>;
-> +               interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
-> +               clock-frequency = <62499840>;
-> +               status = "disabled";
-> +       };
-> +
-> +       gic: interrupt-controller at 19021000 {
-> +               compatible = "arm,cortex-a9-gic";
-> +               #interrupt-cells = <3>;
-> +               #address-cells = <0>;
-> +               interrupt-controller;
-> +               reg = <0x19021000 0x1000>,
-> +                     <0x19020100 0x100>;
-> +       };
-> +
-> +       L2: l2-cache {
-> +               compatible = "arm,pl310-cache";
-> +               reg = <0x19022000 0x1000>;
-> +               cache-unified;
-> +               cache-level = <2>;
-> +       };
-> +
-> +       timer at 19020200 {
-> +               compatible = "arm,cortex-a9-global-timer";
-> +               reg = <0x19020200 0x100>;
-> +               interrupts = <GIC_PPI 11 IRQ_TYPE_LEVEL_HIGH>;
-> +               clocks = <&periph_clk>;
-> +       };
-> +};
-> diff --git a/arch/arm/boot/dts/bcm958625k.dts b/arch/arm/boot/dts/bcm958625k.dts
-> new file mode 100644
-> index 0000000..16303db
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/bcm958625k.dts
-> @@ -0,0 +1,57 @@
-> +/*
-> + *  BSD LICENSE
-> + *
-> + *  Copyright(c) 2015 Broadcom Corporation.  All rights reserved.
-> + *
-> + *  Redistribution and use in source and binary forms, with or without
-> + *  modification, are permitted provided that the following conditions
-> + *  are met:
-> + *
-> + *    * Redistributions of source code must retain the above copyright
-> + *      notice, this list of conditions and the following disclaimer.
-> + *    * Redistributions in binary form must reproduce the above copyright
-> + *      notice, this list of conditions and the following disclaimer in
-> + *      the documentation and/or other materials provided with the
-> + *      distribution.
-> + *    * Neither the name of Broadcom Corporation nor the names of its
-> + *      contributors may be used to endorse or promote products derived
-> + *      from this software without specific prior written permission.
-> + *
-> + *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-> + *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-> + *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-> + *  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-> + *  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-> + *  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-> + *  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-> + *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-> + *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-> + *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-> + *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-> + */
-> +
-> +/dts-v1/;
-> +
-> +#include "bcm-nsp.dtsi"
-> +
-> +/ {
-> +       model = "NorthStar Plus SVK (BCM958625K)";
-> +       compatible = "brcm,bcm58625", "brcm,nsp";
-> +
-> +       aliases {
-> +               serial0 = &uart0;
-> +               serial1 = &uart1;
-> +       };
-> +
-> +       chosen {
-> +               stdout-path = "serial0:115200n8";
-> +       };
-> +};
-> +
-> +&uart0 {
-> +       status = "okay";
-> +};
-> +
-> +&uart1 {
-> +       status = "okay";
-> +};
-> --
-> 1.9.1
->
+> 
+> Thanks,
+> Lorenzo
