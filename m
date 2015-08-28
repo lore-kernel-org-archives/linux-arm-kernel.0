@@ -1,33 +1,37 @@
-From: zhengxing@rock-chips.com (Xing Zheng)
-Date: Fri, 28 Aug 2015 18:07:24 +0800
-Subject: [PATCH v1 0/3] Port and support rk3036 SoC platform
-In-Reply-To: <6551991.RUDkGfdSCp@phil>
-References: <1440740808-15004-1-git-send-email-zhengxing@rock-chips.com>
- <6551991.RUDkGfdSCp@phil>
-Message-ID: <55E032DC.1090703@rock-chips.com>
+From: frans.klaver@xsens.com (Frans Klaver)
+Date: Fri, 28 Aug 2015 12:10:32 +0200
+Subject: [PATCH] arm: omap2: vc: fix 'or' always true warning
+In-Reply-To: <DUB128-W519E183FDD98EF80BD4CB79C6E0@phx.gbl>
+References: <DUB128-W519E183FDD98EF80BD4CB79C6E0@phx.gbl>
+Message-ID: <1440756632-14043-1-git-send-email-frans.klaver@xsens.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HI Heiko,
-Thank you for your reply. I will improve them as quickly as possible.
+From: Frans Klaver <fransklaver@gmail.com>
 
-Thanks. :)
+Fix the warning:
+arch/arm/mach-omap2/vc.c:302:47: warning: logical ?or? of collectively exhaustive tests is always true [-Wlogical-op]
 
-On 2015?08?28? 17:59, Heiko Stuebner wrote:
-> Hi,
->
-> Am Freitag, 28. August 2015, 13:46:45 schrieb Xing Zheng:
->> We need to support rk3036 soc platform via upstream, there are
->> 3 parts for the initial release of minimum system: dts, pinctrl,
->> and clock tree for rk3036, startup and run to init processs.
-> this is really cool that you're working on supporting the rk3036.
-> I had some comments to the individual patches, but overall it looks quite nice
-> already.
->
->
-> So, thanks for working on this
-> Heiko
->
->
->
->
+As we're toggling both CLKREQ and OFFMODE, we should also be checking
+OFFMODE.
+
+Signed-off-by: Frans Klaver <fransklaver@gmail.com>
+---
+ arch/arm/mach-omap2/vc.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-omap2/vc.c b/arch/arm/mach-omap2/vc.c
+index 076fd20d7e5a..807bc79e3e3d 100644
+--- a/arch/arm/mach-omap2/vc.c
++++ b/arch/arm/mach-omap2/vc.c
+@@ -300,7 +300,7 @@ static void __init omap3_vc_init_pmic_signaling(struct voltagedomain *voltdm)
+ 
+ 	val = voltdm->read(OMAP3_PRM_POLCTRL_OFFSET);
+ 	if (!(val & OMAP3430_PRM_POLCTRL_CLKREQ_POL) ||
+-	    (val & OMAP3430_PRM_POLCTRL_CLKREQ_POL)) {
++	    (val & OMAP3430_PRM_POLCTRL_OFFMODE_POL)) {
+ 		val |= OMAP3430_PRM_POLCTRL_CLKREQ_POL;
+ 		val &= ~OMAP3430_PRM_POLCTRL_OFFMODE_POL;
+ 		pr_debug("PM: fixing sys_clkreq and sys_off_mode polarity to 0x%x\n",
+-- 
+2.3.4
