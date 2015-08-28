@@ -1,54 +1,33 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 28 Aug 2015 22:43:51 +0200
-Subject: [PATCH 2/6] ARM: dts: sunxi: Add dtsi for AXP221 PMIC
-In-Reply-To: <CAGb2v66nBh+_P=EDxrNYeFoUUXqPWuZyfq1OEQww_aSMhT8wVQ@mail.gmail.com>
+Date: Fri, 28 Aug 2015 22:44:35 +0200
+Subject: [PATCH 3/6] ARM: dts: sun6i: hummingbird: Use axp221.dtsi for
+ axp221 regulators
+In-Reply-To: <CAGb2v67wEXNTDYrPm9Hf2P59+B4nGHAR8kTPCuLVuS+TLHxMRQ@mail.gmail.com>
 References: <1440755679-8266-1-git-send-email-wens@csie.org>
- <1440755679-8266-3-git-send-email-wens@csie.org>
- <20150828123159.GJ29389@lukather>
- <CAGb2v66nBh+_P=EDxrNYeFoUUXqPWuZyfq1OEQww_aSMhT8wVQ@mail.gmail.com>
-Message-ID: <20150828204351.GS29389@lukather>
+ <1440755679-8266-4-git-send-email-wens@csie.org>
+ <20150828123244.GK29389@lukather>
+ <CAGb2v67wEXNTDYrPm9Hf2P59+B4nGHAR8kTPCuLVuS+TLHxMRQ@mail.gmail.com>
+Message-ID: <20150828204435.GT29389@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 29, 2015 at 12:09:55AM +0800, Chen-Yu Tsai wrote:
-> >> +/*
-> >> + * AXP221/221s/223 Integrated Power Management Chip
-> >> + * http://www.x-powers.com/product/AXP22X.php
-> >> + * http://dl.linux-sunxi.org/AXP/AXP221%20Datasheet%20V1.2%2020130326%20.pdf
-> >> + */
+On Sat, Aug 29, 2015 at 12:47:00AM +0800, Chen-Yu Tsai wrote:
+> >> +&reg_dcdc3 {
+> >> +     regulator-always-on;
+> >> +     regulator-min-microvolt = <700000>;
+> >> +     regulator-max-microvolt = <1320000>;
+> >> +     regulator-name = "vdd-gpu";
+> >> +};
 > >
-> > I'm usually not really fond of URLs in the source code and/or the
-> > commit logs. They tend to be broken very easily.
+> > I'm know it's just a mechanical change from your part, but is the GPU
+> > regulator really need to be always on?
 > 
-> OK. Would you rather I put them in Documentation/arm/sunxi/README?
-> It's not immediately clear that sunxi and axp* are connected though.
+> I don't think so. It shouldn't affect anything else, though I can't
+> think of a way to thoroughly test it. Maybe I just disable it for.
+> If anyone complains later on when adding new peripherals they can
+> turn it back on.
 
-It's one of the first things that pop up when googling, and it's not
-really related to sunxi, so I'd say simply leave them out.
-
-> >> +
-> >> +&axp221 {
-> >> +     compatible = "x-powers,axp221";
-> >> +     interrupt-controller;
-> >> +     #interrupt-cells = <1>;
-> >> +
-> >> +     regulators {
-> >> +             /* Default work frequency for buck regulators */
-> >> +             x-powers,dcdc-freq = <3000>;
-> >> +
-> >> +             /* supplies for dc1sw & dc5ldo are connected internally */
-> >> +             dcdc1-supply = <&reg_dcdc1>;
-> >> +             dcdc5-supply = <&reg_dcdc5>;
-> >
-> > so the parent regulator of DCDC1 is DCDC1 ?
-> 
-> These probably aren't the best names. These are the supplies for DC1SW and
-> DC5LDO, respectively. They are connected internally, so there aren't named
-> pins for them. The comment above explains it, though probably not clearly
-> enough. Furthermore, the input pins for DCDC1/5 are VIN1/5.
-
-I'm not quite sure I understand. They're connected internally but they
-have pins ?
+Sounds good. That also applies to your other patches though.
 
 Maxime
 
@@ -62,4 +41,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150828/165096b7/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150828/91bb260f/attachment.sig>
