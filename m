@@ -1,53 +1,68 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 28 Aug 2015 17:54:38 +0800
-Subject: [PATCH 5/6] ARM: dts: sun6i: Add support for Sinlinx A31s SDK board
+Date: Fri, 28 Aug 2015 17:54:39 +0800
+Subject: [PATCH 6/6] ARM: dts: sun6i: Add dts file for MSI Primo81 tablet
 In-Reply-To: <1440755679-8266-1-git-send-email-wens@csie.org>
 References: <1440755679-8266-1-git-send-email-wens@csie.org>
-Message-ID: <1440755679-8266-6-git-send-email-wens@csie.org>
+Message-ID: <1440755679-8266-7-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Sinlinx A31s SDK is a A31s based module/baseboard development kit.
+From: Karsten Merker <merker@debian.org>
 
-The core module has the SoC, PMIC, DRAM, eMMC and supporting components.
-There are also pads for UART0, JTAG and I2S.
+The MSI Primo81 is an A31s based tablet, with 1G RAM, 16G NAND,
+768x1024 IPS LCD display, mono speaker, 0.3 MP front camera, 2.0 MP
+rear camera, 3500 mAh battery, gt911 touchscreen, mma8452 accelerometer
+and rtl8188etv usb wifi. Has "power", "volume+" and "volume-" buttons
+(both volume buttons are also connected to the UBOOT_SEL pin). The
+external connectors are represented by MicroSD slot, MiniHDMI, MicroUSB
+OTG and 3.5mm headphone jack. More details are available at
 
-The baseboard has 100 Mbps Ethernet, 5x USB 2.0 host ports via a USB 2.0
-hub chip, MMC, HDMI, SPDIF, CIR, audio jacks, 2 tablet-like volume
-buttons, RS232 style UART and USB OTG (though VBUS is not connected).
-Various headers are available for other addon modules, such as SDIO
-WiFi, LCD display, camera sensor, UARTs, I2C, SPI and GPIOs.
+    http://linux-sunxi.org/MSI_Primo81
 
+USB OTG is enabled in host only mode. AXP221 USB power supply and
+GPIO support are required for full USB OTG support.
+
+Signed-off-by: Siarhei Siamashka <siarhei.siamashka@gmail.com>
+Signed-off-by: Karsten Merker <merker@debian.org>
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/Makefile                     |   3 +-
- arch/arm/boot/dts/sun6i-a31s-sina31s-core.dtsi | 131 ++++++++++++++++++++++
- arch/arm/boot/dts/sun6i-a31s-sina31s.dts       | 149 +++++++++++++++++++++++++
- 3 files changed, 282 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/sun6i-a31s-sina31s-core.dtsi
- create mode 100644 arch/arm/boot/dts/sun6i-a31s-sina31s.dts
+
+Changes since v4:
+
+  - Use axp221.dtsi and add all active regulators.
+  - Enable i2c controllers for capacitive touch panel and accelerometer.
+  - Mark i2c controller for camera sensors as failed for now.
+  - Enable USB OTG in host only mode.
+  - Drop uart0 as this is not tested.
+  - s/library/file/ in GPL header.
+
+---
+ arch/arm/boot/dts/Makefile               |   1 +
+ arch/arm/boot/dts/sun6i-a31s-primo81.dts | 255 +++++++++++++++++++++++++++++++
+ 2 files changed, 256 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun6i-a31s-primo81.dts
 
 diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index f830e1f12716..ada5156fdd49 100644
+index ada5156fdd49..c87513ed4eb4 100644
 --- a/arch/arm/boot/dts/Makefile
 +++ b/arch/arm/boot/dts/Makefile
-@@ -578,7 +578,8 @@ dtb-$(CONFIG_MACH_SUN6I) += \
- 	sun6i-a31-i7.dtb \
+@@ -579,6 +579,7 @@ dtb-$(CONFIG_MACH_SUN6I) += \
  	sun6i-a31-m9.dtb \
  	sun6i-a31-mele-a1000g-quad.dtb \
--	sun6i-a31s-cs908.dtb
-+	sun6i-a31s-cs908.dtb \
-+	sun6i-a31s-sina31s.dtb
+ 	sun6i-a31s-cs908.dtb \
++	sun6i-a31s-primo81.dtb \
+ 	sun6i-a31s-sina31s.dtb
  dtb-$(CONFIG_MACH_SUN7I) += \
  	sun7i-a20-bananapi.dtb \
- 	sun7i-a20-bananapro.dtb \
-diff --git a/arch/arm/boot/dts/sun6i-a31s-sina31s-core.dtsi b/arch/arm/boot/dts/sun6i-a31s-sina31s-core.dtsi
+diff --git a/arch/arm/boot/dts/sun6i-a31s-primo81.dts b/arch/arm/boot/dts/sun6i-a31s-primo81.dts
 new file mode 100644
-index 000000000000..409b31ec647c
+index 000000000000..d22befaf363b
 --- /dev/null
-+++ b/arch/arm/boot/dts/sun6i-a31s-sina31s-core.dtsi
-@@ -0,0 +1,131 @@
++++ b/arch/arm/boot/dts/sun6i-a31s-primo81.dts
+@@ -0,0 +1,255 @@
 +/*
++ * Copyright 2014 Siarhei Siamashka <siarhei.siamashka@gmail.com>
++ * Copyright 2015 Karsten Merker <merker@debian.org>
 + * Copyright 2015 Chen-Yu Tsai <wens@csie.org>
 + *
 + * This file is dual-licensed: you can use it either under the terms
@@ -94,32 +109,123 @@ index 000000000000..409b31ec647c
 +#include "sunxi-common-regulators.dtsi"
 +
 +#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/input/input.h>
 +#include <dt-bindings/pinctrl/sun4i-a10.h>
 +
 +/ {
-+	model = "Sinlinx SinA31s Core Board";
-+	compatible = "sinlinx,sina31s", "allwinner,sun6i-a31s";
-+
-+	aliases {
-+		serial0 = &uart0;
-+	};
++	model = "MSI Primo81 tablet";
++	compatible = "msi,primo81", "allwinner,sun6i-a31s";
 +};
 +
-+/* eMMC on core board */
-+&mmc2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc2_8bit_emmc_pins>;
-+	vmmc-supply = <&reg_vcc3v0>;
-+	bus-width = <8>;
-+	non-removable;
++&cpu0 {
++	cpu-supply = <&reg_dcdc2>;
++};
++
++&ehci0 {
++	/* rtl8188etv wifi is connected here */
 +	status = "okay";
 +};
 +
-+/* AXP221s PMIC on core board */
++&i2c0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c0_pins_a>;
++	/* pull-ups and device VDDIO require AXP221 DLDO3 */
++	status = "failed";
++};
++
++&i2c1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c1_pins_a>;
++	status = "okay";
++
++	ctp at 5d {
++		pinctrl-names = "default";
++		pinctrl-0 = <&gt911_int_primo81>;
++		compatible = "goodix,gt911";
++		reg = <0x5d>;
++		interrupt-parent = <&pio>;
++		interrupts = <0 3 IRQ_TYPE_LEVEL_HIGH>; /* PA3 */
++		/*
++		 * The default 0,0 coordinate is at the corner closest to
++		 * the headphone jack. X goes along the long side, while
++		 * Y goes along the short side.
++		 */
++	};
++};
++
++&i2c2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c2_pins_a>;
++	status = "okay";
++
++	accelerometer at 1c {
++		pinctrl-names = "default";
++		pinctrl-0 = <&mma8452_int_primo81>;
++		compatible = "fsl,mma8452";
++		reg = <0x1c>;
++		interrupt-parent = <&pio>;
++		interrupts = <0 9 IRQ_TYPE_LEVEL_HIGH>; /* PA9 */
++		#io-channel-cells = <1>;
++	};
++};
++
++&lradc {
++	vref-supply = <&reg_aldo3>;
++	status = "okay";
++
++	button at 158 {
++		label = "Volume Up";
++		linux,code = <KEY_VOLUMEUP>;
++		channel = <0>;
++		voltage = <158730>;
++	};
++
++	button at 349 {
++		label = "Volume Down";
++		linux,code = <KEY_VOLUMEDOWN>;
++		channel = <0>;
++		voltage = <349206>;
++	};
++};
++
++&mmc0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_primo81>;
++	vmmc-supply = <&reg_dcdc1>;
++	bus-width = <4>;
++	cd-gpios = <&pio 0 8 GPIO_ACTIVE_HIGH>; /* PA8 */
++	cd-inverted;
++	status = "okay";
++};
++
++&pio {
++	gt911_int_primo81: gt911_int_pin at 0 {
++		allwinner,pins = "PA3";
++		allwinner,function = "gpio_in";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
++
++	mma8452_int_primo81: mma8452_int_pin at 0 {
++		allwinner,pins = "PA9";
++		allwinner,function = "gpio_in";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
++	};
++
++	mmc0_cd_pin_primo81: mmc0_cd_pin at 0 {
++		allwinner,pins = "PA8";
++		allwinner,function = "gpio_in";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
++	};
++};
++
 +&p2wi {
 +	status = "okay";
 +
 +	axp221: pmic at 68 {
++		compatible = "x-powers,axp221";
 +		reg = <0x68>;
 +		interrupt-parent = <&nmi_intc>;
 +		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
@@ -151,10 +257,9 @@ index 000000000000..409b31ec647c
 +
 +&reg_dcdc4 {
 +	regulator-always-on;
-+	/* This board is not stable at recommended 1.1 V */
-+	regulator-min-microvolt = <1200000>;
-+	regulator-max-microvolt = <1200000>;
-+	regulator-name = "vdd-sys";
++	regulator-min-microvolt = <1240000>;
++	regulator-max-microvolt = <1240000>;
++	regulator-name = "vdd-sys-dll";
 +};
 +
 +&reg_dcdc5 {
@@ -171,167 +276,44 @@ index 000000000000..409b31ec647c
 +	regulator-name = "avcc";
 +};
 +
-+/* UART0 pads available on core board */
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_pins_a>;
-+	status = "okay";
-+};
-+
-diff --git a/arch/arm/boot/dts/sun6i-a31s-sina31s.dts b/arch/arm/boot/dts/sun6i-a31s-sina31s.dts
-new file mode 100644
-index 000000000000..47b517d7b8a1
---- /dev/null
-+++ b/arch/arm/boot/dts/sun6i-a31s-sina31s.dts
-@@ -0,0 +1,149 @@
-+/*
-+ * Copyright 2015 Chen-Yu Tsai <wens@csie.org>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/* The SinA31s development board has the SinA31s core board soldered on */
-+#include "sun6i-a31s-sina31s-core.dtsi"
-+
-+#include <dt-bindings/input/input.h>
-+
-+/ {
-+	model = "Sinlinx SinA31s Development Board";
-+	compatible = "sinlinx,sina31s-sdk", "allwinner,sun6i-a31s";
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+};
-+
-+&ehci0 {
-+	/* USB 2.0 4 port hub IC */
-+	status = "okay";
-+};
-+
-+&ehci1 {
-+	status = "okay";
-+};
-+
-+&gmac {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&gmac_pins_mii_a>;
-+	phy = <&phy1>;
-+	phy-mode = "mii";
-+	phy-supply = <&reg_dldo1>;
-+	status = "okay";
-+
-+	phy1: ethernet-phy at 1 {
-+		reg = <1>;
-+	};
-+};
-+
-+&i2c0 {
-+	/* Available on camera header */
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c0_pins_a>;
-+	status = "okay";
-+};
-+
-+&i2c1 {
-+	/* Available on LCD header */
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c1_pins_a>;
-+	status = "okay";
-+};
-+
-+&ir {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&ir_pins_a>;
-+	status = "okay";
-+};
-+
-+&lradc {
-+	vref-supply = <&reg_vcc3v0>;
-+	status = "okay";
-+
-+	button at 158 {
-+		label = "Volume Up";
-+		linux,code = <KEY_VOLUMEUP>;
-+		channel = <0>;
-+		voltage = <158730>;
-+	};
-+
-+	button at 349 {
-+		label = "Volume Down";
-+		linux,code = <KEY_VOLUMEDOWN>;
-+		channel = <0>;
-+		voltage = <349206>;
-+	};
-+};
-+
-+&mmc0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_sina31s>;
-+	vmmc-supply = <&reg_vcc3v0>;
-+	bus-width = <4>;
-+	cd-gpios = <&pio 0 4 GPIO_ACTIVE_HIGH>; /* PA4 */
-+	cd-inverted;
-+	status = "okay";
-+};
-+
-+&ohci1 {
-+	status = "okay";
-+};
-+
-+&pio {
-+	mmc0_cd_pin_sina31s: mmc0_cd_pin at 0 {
-+		allwinner,pins = "PA4";
-+		allwinner,function = "gpio_in";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
-+	};
-+};
-+
 +&reg_dldo1 {
 +	regulator-min-microvolt = <3300000>;
 +	regulator-max-microvolt = <3300000>;
-+	regulator-name = "vcc_gmac_phy";
++	regulator-name = "vcc-wifi";
++};
++
++&reg_eldo3 {
++	regulator-always-on;
++	regulator-min-microvolt = <1200000>;
++	regulator-max-microvolt = <1200000>;
++	regulator-name = "vcc-mipi-bridge";
++	/* This is used by simplefb LCD display. Add regulator support? */
++};
++
++&reg_dc1sw {
++	regulator-always-on;
++	regulator-min-microvolt = <3000000>;
++	regulator-max-microvolt = <3000000>;
++	regulator-name = "vcc-lcd";
++	/* This is used by simplefb LCD display. Add regulator support? */
++};
++
++&reg_dc5ldo {
++	regulator-always-on;
++	regulator-min-microvolt = <1100000>;
++	regulator-max-microvolt = <1100000>;
++	regulator-name = "vcc-cpus"; /* This is an educated guess */
++};
++
++&usb_otg {
++	/* otg support requires support for AXP221 usb-power-supply and GPIO */
++	dr_mode = "host";
++	status = "okay";
 +};
 +
 +&usbphy {
 +	status = "okay";
++	usb1_vbus-supply = <&reg_dldo1>;
 +};
 -- 
 2.5.0
