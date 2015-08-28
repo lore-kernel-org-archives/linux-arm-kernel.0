@@ -1,41 +1,82 @@
-From: horia.geanta@freescale.com (=?UTF-8?q?Horia=20Geant=C4=83?=)
-Date: Fri, 28 Aug 2015 14:49:47 +0300
-Subject: [RFC][PATCH 1/2] arm64: add ioread64be and iowrite64be macros
-In-Reply-To: <1440762306-7764-1-git-send-email-horia.geanta@freescale.com>
-References: <1440762306-7764-1-git-send-email-horia.geanta@freescale.com>
-Message-ID: <1440762587-7815-1-git-send-email-horia.geanta@freescale.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Fri, 28 Aug 2015 13:49:35 +0200
+Subject: [PATCH v2] clk: samsung: fix cpu clock's flags checking
+Message-ID: <1440762575-21520-1-git-send-email-b.zolnierkie@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This will allow device drivers to consistently use io{read,write}XXbe
-macros also for 64-bit accesses.
+CLK_CPU_HAS_DIV1 and CLK_CPU_NEEDS_DEBUG_ALT_DIV masks were
+incorrectly used as a bit numbers.  Fix it.
 
-Signed-off-by: Alex Porosanu <alexandru.porosanu@freescale.com>
-Signed-off-by: Horia Geant? <horia.geanta@freescale.com>
+Tested on Exynos4210 based Origen board and on Exynos5250 based
+Arndale board.
+
+Cc: Tomasz Figa <tomasz.figa@gmail.com>
+Cc: Michael Turquette <mturquette@baylibre.com>
+Cc: Thomas Abraham <thomas.ab@samsung.com>
+Fixes: ddeac8d96 ("clk: samsung: add infrastructure to register cpu clocks")
+Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Reviewed-by: Javier Martinez Canillas <javier@dowhile0.org>
+Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 ---
- arch/arm64/include/asm/io.h | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+v2:
+- added Reviewed-by, Acked-by and Fixes tags (no code changes)
 
-diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
-index 44be1e03ed65..9b6e408cfa51 100644
---- a/arch/arm64/include/asm/io.h
-+++ b/arch/arm64/include/asm/io.h
-@@ -174,13 +174,15 @@ extern void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size);
- #define iounmap				__iounmap
+Michael, please apply.  Thank you.
+
+ drivers/clk/samsung/clk-cpu.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/clk/samsung/clk-cpu.c b/drivers/clk/samsung/clk-cpu.c
+index 7c1e1f5..2fe37f7 100644
+--- a/drivers/clk/samsung/clk-cpu.c
++++ b/drivers/clk/samsung/clk-cpu.c
+@@ -164,7 +164,7 @@ static int exynos_cpuclk_pre_rate_change(struct clk_notifier_data *ndata,
+ 	 * the values for DIV_COPY and DIV_HPM dividers need not be set.
+ 	 */
+ 	div0 = cfg_data->div0;
+-	if (test_bit(CLK_CPU_HAS_DIV1, &cpuclk->flags)) {
++	if (cpuclk->flags & CLK_CPU_HAS_DIV1) {
+ 		div1 = cfg_data->div1;
+ 		if (readl(base + E4210_SRC_CPU) & E4210_MUX_HPM_MASK)
+ 			div1 = readl(base + E4210_DIV_CPU1) &
+@@ -185,7 +185,7 @@ static int exynos_cpuclk_pre_rate_change(struct clk_notifier_data *ndata,
+ 		alt_div = DIV_ROUND_UP(alt_prate, tmp_rate) - 1;
+ 		WARN_ON(alt_div >= MAX_DIV);
  
- /*
-- * io{read,write}{16,32}be() macros
-+ * io{read,write}{16,32,64}be() macros
-  */
- #define ioread16be(p)		({ __u16 __v = be16_to_cpu((__force __be16)__raw_readw(p)); __iormb(); __v; })
- #define ioread32be(p)		({ __u32 __v = be32_to_cpu((__force __be32)__raw_readl(p)); __iormb(); __v; })
-+#define ioread64be(p)		({ __u64 __v = be64_to_cpu((__force __be64)__raw_readq(p)); __iormb(); __v; })
+-		if (test_bit(CLK_CPU_NEEDS_DEBUG_ALT_DIV, &cpuclk->flags)) {
++		if (cpuclk->flags & CLK_CPU_NEEDS_DEBUG_ALT_DIV) {
+ 			/*
+ 			 * In Exynos4210, ATB clock parent is also mout_core. So
+ 			 * ATB clock also needs to be mantained at safe speed.
+@@ -206,7 +206,7 @@ static int exynos_cpuclk_pre_rate_change(struct clk_notifier_data *ndata,
+ 	writel(div0, base + E4210_DIV_CPU0);
+ 	wait_until_divider_stable(base + E4210_DIV_STAT_CPU0, DIV_MASK_ALL);
  
- #define iowrite16be(v,p)	({ __iowmb(); __raw_writew((__force __u16)cpu_to_be16(v), p); })
- #define iowrite32be(v,p)	({ __iowmb(); __raw_writel((__force __u32)cpu_to_be32(v), p); })
-+#define iowrite64be(v,p)	({ __iowmb(); __raw_writeq((__force __u64)cpu_to_be64(v), p); })
+-	if (test_bit(CLK_CPU_HAS_DIV1, &cpuclk->flags)) {
++	if (cpuclk->flags & CLK_CPU_HAS_DIV1) {
+ 		writel(div1, base + E4210_DIV_CPU1);
+ 		wait_until_divider_stable(base + E4210_DIV_STAT_CPU1,
+ 				DIV_MASK_ALL);
+@@ -225,7 +225,7 @@ static int exynos_cpuclk_post_rate_change(struct clk_notifier_data *ndata,
+ 	unsigned long mux_reg;
  
- /*
-  * Convert a physical pointer to a virtual kernel pointer for /dev/mem
+ 	/* find out the divider values to use for clock data */
+-	if (test_bit(CLK_CPU_NEEDS_DEBUG_ALT_DIV, &cpuclk->flags)) {
++	if (cpuclk->flags & CLK_CPU_NEEDS_DEBUG_ALT_DIV) {
+ 		while ((cfg_data->prate * 1000) != ndata->new_rate) {
+ 			if (cfg_data->prate == 0)
+ 				return -EINVAL;
+@@ -240,7 +240,7 @@ static int exynos_cpuclk_post_rate_change(struct clk_notifier_data *ndata,
+ 	writel(mux_reg & ~(1 << 16), base + E4210_SRC_CPU);
+ 	wait_until_mux_stable(base + E4210_STAT_CPU, 16, 1);
+ 
+-	if (test_bit(CLK_CPU_NEEDS_DEBUG_ALT_DIV, &cpuclk->flags)) {
++	if (cpuclk->flags & CLK_CPU_NEEDS_DEBUG_ALT_DIV) {
+ 		div |= (cfg_data->div0 & E4210_DIV0_ATB_MASK);
+ 		div_mask |= E4210_DIV0_ATB_MASK;
+ 	}
 -- 
-2.4.4
+1.9.1
