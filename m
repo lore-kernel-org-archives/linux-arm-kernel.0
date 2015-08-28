@@ -1,56 +1,44 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 28 Aug 2015 10:08:09 +0200
-Subject: linux-next: manual merge of the rtc tree with the arm-soc tree
-In-Reply-To: <20150827162229.10fe7255@canb.auug.org.au>
-References: <20150827162229.10fe7255@canb.auug.org.au>
-Message-ID: <20150828080809.GU13155@piout.net>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Fri, 28 Aug 2015 10:16:09 +0200
+Subject: [PATCH] ARM: exynos_defconfig: Enable big.LITTLE CPUidle support
+Message-ID: <1440749769-10135-1-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+Some Exynos big.LITTLE boards (i.e: Exynos5420 and Exynos5800 based
+Chromebooks) have proper firmware that allow the big.LITTLE CPUidle
+driver to work correctly, so enable support for this.
 
-On 27/08/2015 at 16:22:29 +1000, Stephen Rothwell wrote :
->   		clock-frequency = <12000000>;
->   	};
->   
->  +	sound0: sound at 0 {
->  +		compatible = "simple-audio-card";
->  +		simple-audio-card,name = "AM437x-GP-EVM";
->  +		simple-audio-card,widgets =
->  +			"Headphone", "Headphone Jack",
->  +			"Line", "Line In";
->  +		simple-audio-card,routing =
->  +			"Headphone Jack",	"HPLOUT",
->  +			"Headphone Jack",	"HPROUT",
->  +			"LINE1L",		"Line In",
->  +			"LINE1R",		"Line In";
->  +		simple-audio-card,format = "dsp_b";
->  +		simple-audio-card,bitclock-master = <&sound0_master>;
->  +		simple-audio-card,frame-master = <&sound0_master>;
->  +		simple-audio-card,bitclock-inversion;
->  +
->  +		simple-audio-card,cpu {
->  +			sound-dai = <&mcasp1>;
->  +			system-clock-frequency = <12000000>;
->  +		};
->  +
->  +		sound0_master: simple-audio-card,codec {
->  +			sound-dai = <&tlv320aic3106>;
->  +			system-clock-frequency = <12000000>;
->  +		};
->  +	};
-> ++
-> + 	/* fixed 32k external oscillator clock */
-> + 	clk_32k_rtc: clk_32k_rtc {
-> + 		#clock-cells = <0>;
-> + 		compatible = "fixed-clock";
-> + 		clock-frequency = <32768>;
-> + 	};
+Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
-It is just a matter of taste but maybe both oscillators/clocks can be
-grouped.
+---
+Kukjin and Krzysztof,
 
+As you know there are other boards like the Exynos5422 based Odroid XU{3,4}
+whose firmware is broken due leaving CCI in secure mode which means that the
+kernel MCPM support can't properly manage CCI.
+
+So if you pick this patch, it should be tested in kernelci before appearing
+in linux-next to prevent any boot issues.
+
+But if that happens, I believe that is better to do a fix / workaround in
+those broken platforms since nothing prevents users to enable this option
+anyways. For example the CCI device node could be disabled in the DTS.
+
+ arch/arm/configs/exynos_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+index 729e2fae3e58..228ee945b8ed 100644
+--- a/arch/arm/configs/exynos_defconfig
++++ b/arch/arm/configs/exynos_defconfig
+@@ -30,6 +30,7 @@ CONFIG_CPU_FREQ=y
+ CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
+ CONFIG_CPUFREQ_DT=y
+ CONFIG_CPU_IDLE=y
++CONFIG_ARM_BIG_LITTLE_CPUIDLE=y
+ CONFIG_ARM_EXYNOS_CPUIDLE=y
+ CONFIG_VFP=y
+ CONFIG_NEON=y
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+2.4.3
