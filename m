@@ -1,92 +1,88 @@
-From: ryabinin.a.a@gmail.com (Andrey Ryabinin)
-Date: Fri, 28 Aug 2015 17:57:14 +0300
-Subject: [PATCH v2] x86, efi, kasan: #undef memset/memcpy/memmove per arch.
-In-Reply-To: <20150828144358.GI2759@codeblueprint.co.uk>
-References: <20150828062745.GB1928@gmail.com>
- <1440760199-18111-1-git-send-email-ryabinin.a.a@gmail.com>
- <20150828144358.GI2759@codeblueprint.co.uk>
-Message-ID: <CAPAsAGwDQC36yRRPGVqSp6Fy5o2xgO6g7j8Bz_BysMJJAriv3g@mail.gmail.com>
+From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
+Date: Fri, 28 Aug 2015 20:29:05 +0530
+Subject: [PATCH v5 0/8] arm64, numa: Add numa support for arm64 platforms.
+In-Reply-To: <55E070D6.8060604@gmail.com>
+References: <1439570374-4079-1-git-send-email-gkulkarni@caviumnetworks.com>
+ <55E070D6.8060604@gmail.com>
+Message-ID: <CAFpQJXUYycrvxp_p=A_pmeNUpHVs=8kYUfZP9dYDhYLqeCTZ3Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-08-28 17:43 GMT+03:00 Matt Fleming <matt@codeblueprint.co.uk>:
-> On Fri, 28 Aug, at 02:09:59PM, Andrey Ryabinin wrote:
->> In not-instrumented code KASAN replaces instrumented
->> memset/memcpy/memmove with not-instrumented analogues
->> __memset/__memcpy/__memove.
->> However, on x86 the EFI stub is not linked with the kernel.
->> It uses not-instrumented mem*() functions from
->> arch/x86/boot/compressed/string.c
->> So we don't replace them with __mem*() variants in EFI stub.
->>
->> On ARM64 the EFI stub is linked with the kernel, so we should
->> replace mem*() functions with __mem*(), because the EFI stub
->> runs before KASAN sets up early shadow.
->>
->> So let's move these #undef mem* into arch's asm/efi.h which is
->> also included by the EFI stub.
->>
->> Signed-off-by: Andrey Ryabinin <ryabinin.a.a@gmail.com>
->> ---
->>  arch/x86/include/asm/efi.h             | 11 +++++++++++
->>  drivers/firmware/efi/libstub/efistub.h |  4 ----
->>  2 files changed, 11 insertions(+), 4 deletions(-)
->>
->> diff --git a/arch/x86/include/asm/efi.h b/arch/x86/include/asm/efi.h
->> index 155162e..6862f11 100644
->> --- a/arch/x86/include/asm/efi.h
->> +++ b/arch/x86/include/asm/efi.h
->> @@ -25,6 +25,17 @@
->>  #define EFI32_LOADER_SIGNATURE       "EL32"
->>  #define EFI64_LOADER_SIGNATURE       "EL64"
->>
->> +/*
->> + * Sometimes we may redefine memset to __memset.
->> + * The EFI stub doesn't have __memset() because it's not
->> + * linked with the kernel. So we should use standard
->> + * memset from arch/x86/boot/compressed/string.c
->> + * The same applies to memcpy and memmove.
->> + */
->> +#undef memcpy
->> +#undef memset
->> +#undef memmove
->> +
+On Fri, Aug 28, 2015 at 8:01 PM, Matthias Brugger
+<matthias.bgg@gmail.com> wrote:
 >
-> I think the key piece of information missing in this comment is that
-> it's redefined for KASAN, right?
 >
-
-Right.
-
->>  #ifdef CONFIG_X86_32
+> On 14/08/15 18:39, Ganapatrao Kulkarni wrote:
+>>
+>> v5:
+>>         - created base verion of numa.c which creates dummy numa without
+>> using dt
+>>           on single socket platforms. Then added patches for dt support.
+>>         - Incorporated review comments from Hanjun Guo.
+>>
+>> v4:
+>> done changes as per Arnd review comments.
+>>
+>> v3:
+>> Added changes to support numa on arm64 based platforms.
+>> Tested these patches on cavium's multinode(2 node topology) platform.
+>> In this patchset, defined and implemented dt bindings for numa mapping
+>> for core and memory using device node property arm,associativity.
+>>
+>> v2:
+>> Defined and implemented numa map for memory, cores to node and
+>> proximity distance matrix of nodes.
+>>
+>> v1:
+>> Initial patchset to support numa on arm64 platforms.
+>>
+>> Note:
+>>         1. This patchset is tested for numa with dt on
+>>            thunderx single socket and dual socket boards.
+>>         2. Numa DT booting needs the dt memory nodes, which are deleted in
+>> current efi-stub,
+>>         hence to try numa with dt, you need to rebase with ard's patchset.
+>>
+>> http://git.linaro.org/people/ard.biesheuvel/linux-arm.git/shortlog/refs/heads/arm64-uefi-early-fdt-handling
 >>
 >>
->> diff --git a/drivers/firmware/efi/libstub/efistub.h b/drivers/firmware/efi/libstub/efistub.h
->> index e334a01..6b6548f 100644
->> --- a/drivers/firmware/efi/libstub/efistub.h
->> +++ b/drivers/firmware/efi/libstub/efistub.h
->> @@ -5,10 +5,6 @@
->>  /* error code which can't be mistaken for valid address */
->>  #define EFI_ERROR    (~0UL)
+>> Ganapatrao Kulkarni (4):
+>>    arm64, numa: adding numa support for arm64 platforms.
+>>    Documentation: arm64/arm: dt bindings for numa.
+>>    arm64, numa: adding numa support for arm64 platforms.
+>>    arm64, dt, thunderx: Add initial dts for Cavium Thunder SoC in 2 Node
+>>      topology.
 >>
->> -#undef memcpy
->> -#undef memset
->> -#undef memmove
->> -
->>  void efi_char16_printk(efi_system_table_t *, efi_char16_t *);
+>>   Documentation/devicetree/bindings/arm/numa.txt  | 212 +++++++
+>>   arch/arm64/Kconfig                              |  32 +
+>>   arch/arm64/boot/dts/cavium/Makefile             |   2 +-
+>>   arch/arm64/boot/dts/cavium/thunder-88xx-2n.dts  |  78 +++
+>>   arch/arm64/boot/dts/cavium/thunder-88xx-2n.dtsi | 790
+>> ++++++++++++++++++++++++
+>>   arch/arm64/include/asm/mmzone.h                 |  32 +
+>>   arch/arm64/include/asm/numa.h                   |  49 ++
+>>   arch/arm64/kernel/Makefile                      |   1 +
+>>   arch/arm64/kernel/dt_numa.c                     | 316 ++++++++++
+>>   arch/arm64/kernel/setup.c                       |   9 +
+>>   arch/arm64/kernel/smp.c                         |   3 +
+>>   arch/arm64/mm/Makefile                          |   1 +
+>>   arch/arm64/mm/init.c                            |  34 +-
+>>   arch/arm64/mm/numa.c                            | 563 +++++++++++++++++
+>>   14 files changed, 2115 insertions(+), 7 deletions(-)
+>>   create mode 100644 Documentation/devicetree/bindings/arm/numa.txt
+>>   create mode 100644 arch/arm64/boot/dts/cavium/thunder-88xx-2n.dts
+>>   create mode 100644 arch/arm64/boot/dts/cavium/thunder-88xx-2n.dtsi
+>>   create mode 100644 arch/arm64/include/asm/mmzone.h
+>>   create mode 100644 arch/arm64/include/asm/numa.h
+>>   create mode 100644 arch/arm64/kernel/dt_numa.c
+>>   create mode 100644 arch/arm64/mm/numa.c
 >>
->>  efi_status_t efi_open_volume(efi_system_table_t *sys_table_arg, void *__image,
 >
-> Does this patch have any negative consequences for arm64? Can we
-> safely remove these #undefs without breaking the arm64 EFI stub?
+> On which version is this patch-set based?
+4.2 -rc5
 >
+> Regards,
+> Matthias
 
-The whole point of this patch is to remove these #undefs on ARM64.
-Otherwise we end up calling instrumented memset, which will access to
-kasan shadow,
-before we set it up
-So on ARM64 we should use not-instumented __memset on ARM64, iow we
-need to keep #define memset __memset.
-
-> --
-> Matt Fleming, Intel Open Source Technology Center
+thanks
+Ganapat
