@@ -1,39 +1,30 @@
-From: marcel.ziswiler@toradex.com (Marcel Ziswiler)
-Date: Fri, 28 Aug 2015 14:42:36 +0200
-Subject: [PATCH 9/9] arm: tegra: apalis_t30: fix power/wakeup key for eval
- board
-In-Reply-To: <1440765756-1382-1-git-send-email-marcel.ziswiler@toradex.com>
-References: <1440765756-1382-1-git-send-email-marcel.ziswiler@toradex.com>
-Message-ID: <1440765756-1382-10-git-send-email-marcel.ziswiler@toradex.com>
+From: luis@debethencourt.com (Luis de Bethencourt)
+Date: Fri, 28 Aug 2015 14:43:54 +0200
+Subject: [PATCH 3/5] clk: sunxi: sun6i-ar100: Fix module autoload for OF
+ platform driver
+Message-ID: <20150828124354.GA26610@goodgumbo.baconseed.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rather than a power key WAKE1_MICO is actually a standard Apalis MXM3
-pin used for wake-up purpose which this patch fixes.
+This platform driver has a OF device ID table but the OF module
+alias information is not created so module autoloading won't work.
 
-Signed-off-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
+Signed-off-by: Luis de Bethencourt <luis@debethencourt.com>
 ---
+ drivers/clk/sunxi/clk-sun6i-ar100.c | 1 +
+ 1 file changed, 1 insertion(+)
 
- arch/arm/boot/dts/tegra30-apalis-eval.dts | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/boot/dts/tegra30-apalis-eval.dts b/arch/arm/boot/dts/tegra30-apalis-eval.dts
-index c832c15..f2879cf 100644
---- a/arch/arm/boot/dts/tegra30-apalis-eval.dts
-+++ b/arch/arm/boot/dts/tegra30-apalis-eval.dts
-@@ -191,10 +191,10 @@
- 	gpio-keys {
- 		compatible = "gpio-keys";
+diff --git a/drivers/clk/sunxi/clk-sun6i-ar100.c b/drivers/clk/sunxi/clk-sun6i-ar100.c
+index 63cf149..40828fb 100644
+--- a/drivers/clk/sunxi/clk-sun6i-ar100.c
++++ b/drivers/clk/sunxi/clk-sun6i-ar100.c
+@@ -219,6 +219,7 @@ static const struct of_device_id sun6i_a31_ar100_clk_dt_ids[] = {
+ 	{ .compatible = "allwinner,sun6i-a31-ar100-clk" },
+ 	{ /* sentinel */ }
+ };
++MODULE_DEVICE_TABLE(of, sun6i_a31_ar100_clk_dt_ids);
  
--		power {
--			label = "Power";
-+		wakeup {
-+			label = "WAKE1_MICO";
- 			gpios = <&gpio TEGRA_GPIO(V, 1) GPIO_ACTIVE_LOW>;
--			linux,code = <KEY_POWER>;
-+			linux,code = <KEY_WAKEUP>;
- 			debounce-interval = <10>;
- 			gpio-key,wakeup;
- 		};
+ static struct platform_driver sun6i_a31_ar100_clk_driver = {
+ 	.driver = {
 -- 
-2.4.3
+2.4.6
