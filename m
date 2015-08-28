@@ -1,34 +1,34 @@
 From: marcel.ziswiler@toradex.com (Marcel Ziswiler)
-Date: Fri, 28 Aug 2015 17:59:35 +0200
-Subject: [PATCH 00/11] arm: tegra: colibri_t30: fix hdmi, power i2c,
- wakeup and activate touch
-Message-ID: <1440777586-19545-1-git-send-email-marcel.ziswiler@toradex.com>
+Date: Fri, 28 Aug 2015 17:59:44 +0200
+Subject: [PATCH 09/11] arm: tegra: colibri_t30: fix vendor string of m41t0m6
+ rtc on eval board
+In-Reply-To: <1440777586-19545-1-git-send-email-marcel.ziswiler@toradex.com>
+References: <1440777586-19545-1-git-send-email-marcel.ziswiler@toradex.com>
+Message-ID: <1440777586-19545-10-git-send-email-marcel.ziswiler@toradex.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series finally continues on my previous Easter efforts (BTW:
-thanks all for the feedback and all the patches thereof already having
-been applied) and additionally to activating the STMPE811 touch
-controller also fixes HDMI, power I2C and the wake-up key.
+Fix compatible vendor string of M41T0M6 real time clock as found on the
+Colibri Evaluation board.
 
+Signed-off-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
+---
 
-Marcel Ziswiler (11):
-  arm: tegra: colibri_t30: update hardware revisions compatible comment
-  arm: tegra: colibri_t30: fix hdmi supply
-  arm: tegra: colibri_t30: improve comment about thermal alert pin
-  arm: tegra: colibri_t30: add pin muxing for on-module power i2c
-  arm: tegra: colibri_t30: fix comment about 3v3 fixed supply
-  arm: tegra: colibri_t30: add touch pen interrupt pin muxing
-  arm: tegra: colibri_t30: activate stmpe811 touch controller
-  arm: tegra: colibri_t30: replace emmc label by comment
-  arm: tegra: colibri_t30: fix vendor string of m41t0m6 rtc on eval
-    board
-  arm: tegra: colibri_t30: add comment concerning sd/mmc for eval board
-  arm: tegra: colibri_t30: fix power/wakeup key for eval board
+ arch/arm/boot/dts/tegra30-colibri-eval-v3.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
- arch/arm/boot/dts/tegra30-colibri-eval-v3.dts |   9 +-
- arch/arm/boot/dts/tegra30-colibri.dtsi        | 124 ++++++++++++++++++++++----
- 2 files changed, 111 insertions(+), 22 deletions(-)
-
+diff --git a/arch/arm/boot/dts/tegra30-colibri-eval-v3.dts b/arch/arm/boot/dts/tegra30-colibri-eval-v3.dts
+index 4d3ddc5..46a7c2d 100644
+--- a/arch/arm/boot/dts/tegra30-colibri-eval-v3.dts
++++ b/arch/arm/boot/dts/tegra30-colibri-eval-v3.dts
+@@ -55,7 +55,7 @@
+ 
+ 		/* M41T0M6 real time clock on carrier board */
+ 		rtc at 68 {
+-			compatible = "stm,m41t00";
++			compatible = "st,m41t00";
+ 			reg = <0x68>;
+ 		};
+ 	};
 -- 
 2.4.3
