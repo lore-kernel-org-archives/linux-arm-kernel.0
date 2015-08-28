@@ -1,65 +1,75 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 28 Aug 2015 11:31:51 +0100
-Subject: [PATCH v2 4/4] remoteproc: debugfs: Add ability to boot remote
- processor using debugfs
+Date: Fri, 28 Aug 2015 11:31:48 +0100
+Subject: [PATCH v2 1/4] ARM: STiH407: Add nodes for RemoteProc
 In-Reply-To: <1440757911-9120-1-git-send-email-lee.jones@linaro.org>
 References: <1440757911-9120-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1440757911-9120-5-git-send-email-lee.jones@linaro.org>
+Message-ID: <1440757911-9120-2-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-This functionality is especially useful during the testing phase.  When
-used in conjunction with Mailbox's Test Framework we can trivially conduct
-end-to-end testing i.e. boot co-processor, send and receive messages to
-the co-processor, then shut it down again (repeat as required).
 
 Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/remoteproc/remoteproc_debugfs.c | 29 +++++++++++++++++++++++++++++
- 1 file changed, 29 insertions(+)
+ arch/arm/boot/dts/stih407-family.dtsi | 48 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 48 insertions(+)
 
-diff --git a/drivers/remoteproc/remoteproc_debugfs.c b/drivers/remoteproc/remoteproc_debugfs.c
-index 9d30809..464470d 100644
---- a/drivers/remoteproc/remoteproc_debugfs.c
-+++ b/drivers/remoteproc/remoteproc_debugfs.c
-@@ -88,8 +88,37 @@ static ssize_t rproc_state_read(struct file *filp, char __user *userbuf,
- 	return simple_read_from_buffer(userbuf, count, ppos, buf, i);
- }
- 
-+static ssize_t rproc_state_write(struct file *filp, const char __user *userbuf,
-+				 size_t count, loff_t *ppos)
-+{
-+	struct rproc *rproc = filp->private_data;
-+	char buf[2];
-+	int ret;
+diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
+index 33daa49..89a363c 100644
+--- a/arch/arm/boot/dts/stih407-family.dtsi
++++ b/arch/arm/boot/dts/stih407-family.dtsi
+@@ -608,5 +608,53 @@
+ 			status		= "okay";
+ 			tx-only;
+ 		};
 +
-+	ret = copy_from_user(buf, userbuf, 1);
-+	if (ret)
-+		return -EFAULT;
++		st231_gp0: st231-gp0 at 0 {
++			compatible = "st,st231-rproc";
++			reg = <0x40000000 0x01000000>;
++			reg-names = "carveout";
++			resets = <&softreset STIH407_ST231_GP0_SOFTRESET>;
++			reset-names = "sw_reset";
++			clocks = <&clk_s_c0_flexgen CLK_ST231_GP_0>;
++			clock-names = "rproc_clk";
++			clock-frequency = <600000000>;
++			st,syscfg-boot = <&syscfg_core 0x22C>;
++		};
 +
-+	switch (buf[0]) {
-+	case '0':
-+		rproc_shutdown(rproc);
-+		break;
-+	case '1':
-+		ret = rproc_boot(rproc);
-+		if (ret)
-+			dev_warn(&rproc->dev, "Boot failed: %d\n", ret);
-+		break;
-+	default:
-+		dev_err(&rproc->dev, "Unrecognised option: %x\n", buf[1]);
-+		return -EINVAL;
-+	}
++		st231_gp1: st231-gp1 at 0 {
++			compatible = "st,st231-rproc";
++			reg = <0x41000000 0x01000000>;
++			reg-names = "carveout";
++			resets = <&softreset STIH407_ST231_GP1_SOFTRESET>;
++			reset-names = "sw_reset";
++			clocks = <&clk_s_c0_flexgen CLK_ST231_GP_1>;
++			clock-names = "rproc_clk";
++			clock-frequency = <600000000>;
++			st,syscfg-boot = <&syscfg_core 0x220>;
++		};
 +
-+	return count;
-+}
++		st231_audio: st231-audio at 0 {
++			compatible = "st,st231-rproc";
++			reg = <0x42000000 0x01000000>;
++			reg-names = "carveout";
++			resets = <&softreset STIH407_ST231_AUD_SOFTRESET>;
++			reset-names = "sw_reset";
++			clocks = <&clk_s_c0_flexgen CLK_ST231_AUD_0>;
++			clock-names = "rproc_clk";
++			clock-frequency = <600000000>;
++			st,syscfg-boot = <&syscfg_core 0x228>;
++		};
 +
- static const struct file_operations rproc_state_ops = {
- 	.read = rproc_state_read,
-+	.write = rproc_state_write,
- 	.open = simple_open,
- 	.llseek	= generic_file_llseek,
++		st231_dmu: st231-dmu at 0 {
++			compatible = "st,st231-rproc";
++			reg = <0x43000000 0x01000000>;
++			reg-names = "carveout";
++			resets = <&softreset STIH407_ST231_DMU_SOFTRESET>;
++			reset-names = "sw_reset";
++			clocks = <&clk_s_c0_flexgen CLK_ST231_DMU>;
++			clock-names = "rproc_clk";
++			clock-frequency = <600000000>;
++			st,syscfg-boot = <&syscfg_core 0x224>;
++		};
+ 	};
  };
 -- 
 1.9.1
