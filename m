@@ -1,87 +1,51 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Fri, 28 Aug 2015 09:39:41 +0100
-Subject: [PATCH 1/4] x86, efi, kasan: #undef memset/memcpy/memmove per
- arch.
-In-Reply-To: <20150828062745.GB1928@gmail.com>
-References: <1440605707-8325-1-git-send-email-ryabinin.a.a@gmail.com>
- <1440605707-8325-2-git-send-email-ryabinin.a.a@gmail.com>
- <20150828062745.GB1928@gmail.com>
-Message-ID: <20150828083941.GN10728@bivouac.eciton.net>
+From: horia.geanta@freescale.com (=?UTF-8?Q?Horia_Geant=c4=83?=)
+Date: Fri, 28 Aug 2015 11:50:29 +0300
+Subject: [PATCH v3] ARM: configs: Add Freescale LS1021A defconfig
+In-Reply-To: <BN3PR0301MB0867591B07957C47F30C9711FE6E0@BN3PR0301MB0867.namprd03.prod.outlook.com>
+References: <1438941784-38403-1-git-send-email-b18965@freescale.com>
+ <55CB4829.40204@freescale.com> <55CE1FFE.2080200@freescale.com>
+ <CAOMZO5By_15OCsb7z2pbywPi3n9vKGj=393hWYHVEQ32=jDNaA@mail.gmail.com>
+ <BN3PR0301MB08672520CA978383BBF2CF6CFE790@BN3PR0301MB0867.namprd03.prod.outlook.com>
+ <55D6073C.1020000@freescale.com>
+ <BN3PR0301MB0867591B07957C47F30C9711FE6E0@BN3PR0301MB0867.namprd03.prod.outlook.com>
+Message-ID: <55E020D5.4090201@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 28, 2015 at 08:27:45AM +0200, Ingo Molnar wrote:
+On 8/28/2015 11:04 AM, Wang Huan-B18965 wrote:
+> Hi, Horia,
 > 
-> * Andrey Ryabinin <ryabinin.a.a@gmail.com> wrote:
-> 
-> > In not-instrumented code KASAN replaces instrumented
-> > memset/memcpy/memmove with not-instrumented analogues
-> > __memset/__memcpy/__memove.
-> > However, on x86 EFI stub is not linked with kernel.
-> 
-> s/with the kernel
-> 
-> > It uses not-instrumented mem*() functions from
-> > arch/x86/boot/compressed/string.c
-> > So we don't replace them with __mem*() variants in EFI stub.
-> > 
-> > In ARM64 EFI stub is linked with the kernel, so we should
-> 
-> s/In ARM64 EFI stub/On ARM64 the EFI stub/.
-> 
-> > replace mem*() functions with __mem*(), because EFI stub
-> 
-> s/the EFI stub
-> 
-> > runs before KASAN setup early shadow.
-> 
-> s/before KASAN sets up the early shadow
-> 
-> ?
-> 
-> > So let's move these #undef mem* into arch's asm/efi.h which is
-> 
-> s/lets
+>> On 8/17/2015 6:42 AM, Wang Huan-B18965 wrote:
+>>> Hi, Fabio,
+>>
+>> Please don't top post.
+>>
+>>>
+>>> 	Based on the analysis and discussion, we prefer to use
+>> ls1021a_defconfig and remove LS1021A from imx_v6_v7_defconfig.
+>>
+>> Alison, when you submit v4 for this patch (adding
+>> CONFIG_ARCH_DMA_ADDR_T_64BIT=y as suggested), could you also send a
+>> patch removing CONFIG_SOC_LS1021A from imx_v6_v7_config?
+> [Alison Wang] I don?t know CONFIG_ARCH_DMA_ADDR_T_64BIT=y is suggested.
+> Could you help to explain the suggestion?
 
-No, that one is actually correct. Abbreviation of let us.
- 
-> > also included by EFI stub.
-> 
-> s/by the EFI stub
-> 
-> > 
-> > Signed-off-by: Andrey Ryabinin <ryabinin.a.a@gmail.com>
-> > ---
-> >  arch/x86/include/asm/efi.h             | 8 ++++++++
-> >  drivers/firmware/efi/libstub/efistub.h | 4 ----
-> >  2 files changed, 8 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/arch/x86/include/asm/efi.h b/arch/x86/include/asm/efi.h
-> > index 155162e..d821ce2 100644
-> > --- a/arch/x86/include/asm/efi.h
-> > +++ b/arch/x86/include/asm/efi.h
-> > @@ -25,6 +25,14 @@
-> >  #define EFI32_LOADER_SIGNATURE	"EL32"
-> >  #define EFI64_LOADER_SIGNATURE	"EL64"
-> >  
-> > +/*
-> > + * Use memcpy/memset from arch/x86/boot/compressed/string.c
-> > + * for EFI stub.
-> > + */
-> > +#undef memcpy
-> > +#undef memset
-> > +#undef memmove
-> 
-> This comment should also mention why it's done, not what is done.
-> 
-> Also:
-> 
->     s/for EFI stub/for the EFI stub
-> 
-> Thanks,
-> 
-> 	Ingo
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-efi" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Please see
+http://lists.infradead.org/pipermail/linux-arm-kernel/2011-November/072446.html
+
+Instead of having CONFIG_ARCH_DMA_ADDR_T_64BIT=y in the defconfig, I
+guess selecting it from Kconfig makes more sense:
+
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index 573536f1bb73..bb417e73af0f 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -563,6 +563,7 @@ config SOC_LS1021A
+        select HAVE_ARM_ARCH_TIMER
+        select PCI_DOMAINS if PCI
+        select ZONE_DMA if ARM_LPAE
++       select ARCH_DMA_ADDR_T_64BIT
+        help
+          This enables support for Freescale LS1021A processor.
+
+Horia
