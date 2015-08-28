@@ -1,44 +1,49 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 28 Aug 2015 22:44:35 +0200
-Subject: [PATCH 3/6] ARM: dts: sun6i: hummingbird: Use axp221.dtsi for
- axp221 regulators
-In-Reply-To: <CAGb2v67wEXNTDYrPm9Hf2P59+B4nGHAR8kTPCuLVuS+TLHxMRQ@mail.gmail.com>
-References: <1440755679-8266-1-git-send-email-wens@csie.org>
- <1440755679-8266-4-git-send-email-wens@csie.org>
- <20150828123244.GK29389@lukather>
- <CAGb2v67wEXNTDYrPm9Hf2P59+B4nGHAR8kTPCuLVuS+TLHxMRQ@mail.gmail.com>
-Message-ID: <20150828204435.GT29389@lukather>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 28 Aug 2015 15:12:28 -0500
+Subject: [PATCH] ARM: omap2plus_defconfig: Enable MUSB DMA support
+In-Reply-To: <1440789582-25392-1-git-send-email-tony@atomide.com>
+References: <1440789582-25392-1-git-send-email-tony@atomide.com>
+Message-ID: <20150828201228.GE7334@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 29, 2015 at 12:47:00AM +0800, Chen-Yu Tsai wrote:
-> >> +&reg_dcdc3 {
-> >> +     regulator-always-on;
-> >> +     regulator-min-microvolt = <700000>;
-> >> +     regulator-max-microvolt = <1320000>;
-> >> +     regulator-name = "vdd-gpu";
-> >> +};
-> >
-> > I'm know it's just a mechanical change from your part, but is the GPU
-> > regulator really need to be always on?
+On Fri, Aug 28, 2015 at 12:19:42PM -0700, Tony Lindgren wrote:
+> With recent MUSB changes we can now build in support for multiple
+> DMA implementations. So let's enable DMA by default to make life
+> easier for distro use.
 > 
-> I don't think so. It shouldn't affect anything else, though I can't
-> think of a way to thoroughly test it. Maybe I just disable it for.
-> If anyone complains later on when adding new peripherals they can
-> turn it back on.
+> Cc: Felipe Balbi <balbi@ti.com>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
 
-Sounds good. That also applies to your other patches though.
+Acked-by: Felipe Balbi <balbi@ti.com>
 
-Maxime
+> ---
+>  arch/arm/configs/omap2plus_defconfig | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
+> index 789fa5a8..1d5f80f 100644
+> --- a/arch/arm/configs/omap2plus_defconfig
+> +++ b/arch/arm/configs/omap2plus_defconfig
+> @@ -350,6 +350,8 @@ CONFIG_USB_MUSB_HDRC=m
+>  CONFIG_USB_MUSB_OMAP2PLUS=m
+>  CONFIG_USB_MUSB_AM35X=m
+>  CONFIG_USB_MUSB_DSPS=m
+> +CONFIG_USB_INVENTRA_DMA=y
+> +CONFIG_USB_TI_CPPI41_DMA=y
+>  CONFIG_USB_DWC3=m
+>  CONFIG_USB_TEST=m
+>  CONFIG_AM335X_PHY_USB=y
+> -- 
+> 2.1.4
+> 
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+balbi
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150828/91bb260f/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150828/793f5691/attachment.sig>
