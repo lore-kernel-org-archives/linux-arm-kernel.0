@@ -1,41 +1,60 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 28 Aug 2015 11:31:47 +0100
-Subject: [PATCH v2 0/4] remoteproc: Add driver for STMicroelectronics platforms
-Message-ID: <1440757911-9120-1-git-send-email-lee.jones@linaro.org>
+Date: Fri, 28 Aug 2015 11:31:49 +0100
+Subject: [PATCH v2 2/4] remoteproc: dt: Provide bindings for ST's Remote
+ Processor Controller driver
+In-Reply-To: <1440757911-9120-1-git-send-email-lee.jones@linaro.org>
+References: <1440757911-9120-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1440757911-9120-3-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ST's platforms often have multiple co-processors (usually ST40s or ST231s)
-on-board.  This provides the Linux-side infrastructure to flash and boot
-them successfully.
- 
-This set has been tested on an STiH410-B2120.
-
-v1 = v2:
- - Remove Linux implementation specific comment from binding document
- - Force debugfs '0' to shutdown co-processor - rather than !1
- - Supply more detailed commit message
- - Propagate errors back from .stop()
- - Review GPL wording
- - Supply original author's SoBs
-
-Lee Jones (4):
-  ARM: STiH407: Add nodes for RemoteProc
-  remoteproc: dt: Provide bindings for ST's Remote Processor Controller
-    driver
-  remoteproc: Supply controller driver for ST's Remote Processors
-  remoteproc: debugfs: Add ability to boot remote processor using
-    debugfs
-
- .../devicetree/bindings/remoteproc/st-rproc.txt    |  35 +++
- arch/arm/boot/dts/stih407-family.dtsi              |  48 ++++
- drivers/remoteproc/Kconfig                         |   9 +
- drivers/remoteproc/Makefile                        |   1 +
- drivers/remoteproc/remoteproc_debugfs.c            |  29 ++
- drivers/remoteproc/st_remoteproc.c                 | 301 +++++++++++++++++++++
- 6 files changed, 423 insertions(+)
+Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ .../devicetree/bindings/remoteproc/st-rproc.txt    | 35 ++++++++++++++++++++++
+ 1 file changed, 35 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/remoteproc/st-rproc.txt
- create mode 100644 drivers/remoteproc/st_remoteproc.c
 
+diff --git a/Documentation/devicetree/bindings/remoteproc/st-rproc.txt b/Documentation/devicetree/bindings/remoteproc/st-rproc.txt
+new file mode 100644
+index 0000000..fbd7d78
+--- /dev/null
++++ b/Documentation/devicetree/bindings/remoteproc/st-rproc.txt
+@@ -0,0 +1,35 @@
++STMicroelectronics Remote Processor
++-----------------------------------
++
++This binding provides support for adjunct processors found on ST SoCs.
++
++The remote processors can be controlled from the bootloader or the primary OS.
++If the bootloader starts a remote processor processor the primary OS must detect
++its state and act accordingly.
++
++Required properties:
++- compatible		Should be one of:
++				"st,st231-rproc"
++				"st,st40-rproc"
++- reg			Size and length of reserved co-processor memory
++- resets		Reset lines (See: ../reset/reset.txt)
++- reset-names		Must be "sw_reset" and "pwr_reset"
++- clocks		Clock for co-processor (See: ../clock/clock-bindings.txt)
++- clock-names		Must be "rproc_clk"
++- clock-frequency	Clock frequency to set co-processor at if the bootloader
++			hasn't already done so
++- st,syscfg-boot	The register that holds the boot vector for the co-processor
++
++Example:
++
++	st231-audio at bae00000 {
++		compatible	= "st,st231-rproc";
++		reg		= <0xbae00000 0x01000000>;
++		reg-names	= "rproc_mem";
++		resets		= <&softreset STIH407_ST231_AUD_SOFTRESET>;
++		reset-names	= "sw_reset";
++		clocks		= <&clk_s_c0_flexgen CLK_ST231_AUD_0>;
++		clock-names	= "rproc_clk";
++		clock-frequency	= <600000000>;
++		st,syscfg-boot	= <&syscfg_core 0x228>;
++	};
 -- 
 1.9.1
