@@ -1,62 +1,120 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Fri, 28 Aug 2015 17:11:29 +0100
-Subject: [PATCH] ARM64: kernel: implement ACPI parking protocol
-In-Reply-To: <1440777396.31961.13.camel@redhat.com>
-References: <1436959990-32054-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1437063431.3583.2.camel@redhat.com>
- <20150716171221.GB18582@red-moon>
- <1437068449.3583.4.camel@redhat.com>
- <20150828102314.GC15924@red-moon>
- <1440772186.31961.8.camel@redhat.com>
- <20150828153212.GG15924@red-moon>
- <1440777396.31961.13.camel@redhat.com>
-Message-ID: <20150828161128.GQ10728@bivouac.eciton.net>
+From: Nathan_Lynch@mentor.com (Nathan Lynch)
+Date: Fri, 28 Aug 2015 11:24:20 -0500
+Subject: [PATCH v2 3/4] remoteproc: Supply controller driver for ST's
+ Remote Processors
+In-Reply-To: <1440757911-9120-4-git-send-email-lee.jones@linaro.org>
+References: <1440757911-9120-1-git-send-email-lee.jones@linaro.org>
+ <1440757911-9120-4-git-send-email-lee.jones@linaro.org>
+Message-ID: <55E08B34.9080102@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 28, 2015 at 11:56:36AM -0400, Mark Salter wrote:
-> > > > So that I understand: are you referring to memrange_efi_to_native()
-> > > > in arch/arm64/kernel/efi.c ? Is it safe to round up (and add it to
-> > > > the memblock layer) the memory region size to PAGE_SIZE without 
-> > > > checking
-> > > > attributes of overlapping (within PAGE_SIZE) UEFI regions ?
-> > > 
-> > > The problem is that nothing in the UEFI spec or parking protocol spec
-> > > prevents firmware from placing a 4K parking protocol mailbox area in
-> > > the same 64K page as normal cached memory which winds up mapped in
-> > > the kernel linear mapping. The kernel might be able to work around
-> > > that by not putting the 64K page in the linear map. There's nothing
-> > > the kernel could do if the mailbox is in same 64K page with UEFI 
-> > > runtime memory which would use a cached mapping.
+On 08/28/2015 05:31 AM, Lee Jones wrote:
+> diff --git a/drivers/remoteproc/Kconfig b/drivers/remoteproc/Kconfig
+> index 28c711f..72e97d7 100644
+> --- a/drivers/remoteproc/Kconfig
+> +++ b/drivers/remoteproc/Kconfig
+> @@ -77,4 +77,13 @@ config DA8XX_REMOTEPROC
+>  	  It's safe to say n here if you're not interested in multimedia
+>  	  offloading.
+>  
+> +config ST_REMOTEPROC
+> +	tristate "ST remoteproc support"
+> +	depends on ARCH_STI
+> +	select REMOTEPROC
+> +	help
+> +	  Say y here to support ST's adjunct processors via the remote
+> +	  processor framework.
+> +	  This can be either built-in or a loadable module.
+> +
 
-Indeed.
+The code uses reset_control_* APIs, so this should depend on
+RESET_CONTROLLER, no?
 
-> > Ok, I failed to explain myself. Let's imagine that we have a, say, 64k
-> > aligned memory region (EFI_MEMORY_WB - size 16k) that lives in the same
-> > 64K memory frame as a device's registers memory space.
-> > The code I pointed at above creates a 64K memory frame out of the 16K
-> > region and adds it to the memblock so that it ends up in the kernel 
-> > linear
-> > mapping which ends up mapping the device registers too with cacheable
-> > attributes and that's not correct.
-> > 
-> > I am not sure what's the best way to solve that, probably we should
-> > amend the UEFI specs to enforce uniform 64K memory region attributes,
-> > comments welcome.
+> +/*
+> + * ST's Remote Processor Control Driver
+> + *
+> + * Copyright (C) 2015 STMicroelectronics - All Rights Reserved
+> + *
+> + * Author: Ludovic Barre <ludovic.barre@st.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2, or (at your option)
+> + * any later version.
+> + */
 
-Agreed.
+OK, but:
 
-> OIC. Well it is a potential problem. Hardware designers do some whacky
-> things, but I'd like to think I/O regions and cached mem regions bordering
-> on such a small power of two boundary is not one of them.
+> +MODULE_LICENSE("GPL v2");
 
-Sure. But the same applies to memory regions _mapped_ as Device.
-Which is (apparently) necessary for the spin-tables used by the
-parking protocol.
+These are not in agreement.  You want "GPL" for MODULE_LICENSE if you
+intend v2 or later.
 
-So the spec should ban use of incompatible memory attributes between
-any regions kept around at runtime, as opposed to specifically the
-regions used for runtime services (the current wording in the spec).
 
-/
-    Leif
+> +static int st_rproc_stop(struct rproc *rproc)
+> +{
+> +	struct st_rproc *st_rproc = rproc->priv;
+> +	int ret, err = 0;
+> +
+> +	if (st_rproc->config->sw_reset) {
+> +		ret = reset_control_assert(st_rproc->sw_reset);
+> +		if (ret)
+> +			dev_err(&rproc->dev, "Failed to assert S/W Reset\n");
+> +	}
+> +
+> +	if (st_rproc->config->pwr_reset) {
+> +		err = reset_control_assert(st_rproc->pwr_reset);
+> +		if (err)
+> +			dev_err(&rproc->dev, "Failed to assert Power Reset\n");
+> +	}
+> +
+> +	clk_disable(st_rproc->clk);
+> +
+> +	return ret ?: err;
+> +}
+
+Sorry, but I think this is a stylistically inadequate response to my
+earlier comments.  At least name the status variables sw_ret and pwr_ret
+or something.  And it looks like ret could be used uninitialized.
+
+Also, do you want to unconditionally call clk_disable even if you've
+encountered errors?
+
+
+> +static int st_rproc_start(struct rproc *rproc)
+> +{
+> +	struct st_rproc *st_rproc = rproc->priv;
+> +	int err;
+> +
+> +	regmap_update_bits(st_rproc->boot_base, st_rproc->boot_offset,
+> +			   st_rproc->config->bootaddr_mask, rproc->bootaddr);
+> +
+> +	err = clk_enable(st_rproc->clk);
+> +	if (err) {
+> +		dev_err(&rproc->dev, "Failed to enable clock\n");
+> +		return err;
+> +	}
+> +
+> +	if (st_rproc->config->sw_reset) {
+> +		err = reset_control_deassert(st_rproc->sw_reset);
+> +		if (err) {
+> +			dev_err(&rproc->dev, "Failed to deassert S/W Reset\n");
+> +			return err;
+> +		}
+> +	}
+> +
+> +	if (st_rproc->config->pwr_reset) {
+> +		err = reset_control_deassert(st_rproc->pwr_reset);
+> +		if (err) {
+> +			dev_err(&rproc->dev, "Failed to deassert Power Reset\n");
+> +			return err;
+> +		}
+> +	}
+> +
+> +	dev_info(&rproc->dev, "Started from 0x%x\n", rproc->bootaddr);
+> +
+> +	return 0;
+> +}
+
+Does this want to unwind any of its operations if it encounters a failure?
