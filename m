@@ -1,33 +1,156 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 28 Aug 2015 11:18:49 -0700
-Subject: [PATCH] soc: qcom: smem: Avoid NULL pointer exception on remove
-Message-ID: <1440785929-22441-1-git-send-email-sboyd@codeaurora.org>
+From: sonnyrao@chromium.org (Sonny Rao)
+Date: Fri, 28 Aug 2015 11:19:52 -0700
+Subject: [PATCH 1/5] DMA: pl330: support burst mode for dev-to-mem and
+ mem-to-dev transmit
+In-Reply-To: <55DF1072.1070905@rock-chips.com>
+References: <1440665280-31557-1-git-send-email-shawn.lin@rock-chips.com>
+ <1440665313-31603-1-git-send-email-shawn.lin@rock-chips.com>
+ <CAJKOXPdw+ZZURRPUNvKHdx7wRG7M-Frqmvq46KFM_ckGq8h0Yg@mail.gmail.com>
+ <55DF1072.1070905@rock-chips.com>
+Message-ID: <CAPz6YkX-d8B1wPgjnULDAY8+nyuFePVrEU2NQe0rV2CsjYEj3Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Don't set a pointer to NULL and then dereference it in the next
-line.
+On Thu, Aug 27, 2015 at 6:28 AM, Shawn Lin <shawn.lin@rock-chips.com> wrote:
+> ? 2015/8/27 20:57, Krzysztof Kozlowski ??:
+>>
+>> 2015-08-27 17:48 GMT+09:00 Shawn Lin <shawn.lin@rock-chips.com>:
+>>>
+>>>
+>>> This patch adds to support burst mode for dev-to-mem and
+>>> mem-to-dev transmit.
+>>>
+>>> Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
+>>> Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
+>>> Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
+>>> cc: Heiko Stuebner <heiko@sntech.de>
+>>> cc: Doug Anderson <dianders@chromium.org>
+>>> cc: Olof Johansson <olofj@google.com>
+>>> Reviewed-and-tested-by: Sonny Rao <sonnyrao@chromium.org>
+>>
+>>
+>> For the entire patchset: I would prefer to see someone's
+>> reviewed/tested tag in his response. Sending a version 1 of patchset
+>> (regardless of Boojin Kim's work two years ago) with such tag could
+>> mean anything. I cannot verify it easily (unless digging somewhere...
+>> or asking people). You could add for example: Reviewed-by Santa Claus.
+>> Should I sent a letter to him asking for confirmation? :)
+>>
+>
+> :) yes, you are right. I should comply with the rule, even if the patchest
+> had been reviewed or tested by someone on another tree.
 
-Cc: Bjorn Andersson <bjorn.andersson@sonymobile.com>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- drivers/soc/qcom/smem.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Hi, yeah I reviewed on a different tree, so you shouldn't put that tag
+here, thanks for removing it.
+I can re-review if you'd like.
 
-diff --git a/drivers/soc/qcom/smem.c b/drivers/soc/qcom/smem.c
-index 6603201d7fc7..4c347e7c5880 100644
---- a/drivers/soc/qcom/smem.c
-+++ b/drivers/soc/qcom/smem.c
-@@ -737,8 +737,8 @@ static int qcom_smem_probe(struct platform_device *pdev)
- 
- static int qcom_smem_remove(struct platform_device *pdev)
- {
--	__smem = NULL;
- 	hwspin_lock_free(__smem->hwlock);
-+	__smem = NULL;
- 
- 	return 0;
- }
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+>
+>
+>> More seriously - reviewed-by is a statement (please look at
+>> Documentation/SubmittingPatches) and you cannot force someone to make
+>> that statement. He must make such statement on his own.
+>>
+>> That's all from my side since I don't feel skilled enough to review the
+>> code.
+>>
+>> Best regards,
+>> Krzysztof
+>>
+>>>
+>>> ---
+>>>
+>>>   drivers/dma/pl330.c | 18 ++++++++++++------
+>>>   1 file changed, 12 insertions(+), 6 deletions(-)
+>>>
+>>> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+>>> index ecab4ea0..0d544d2 100644
+>>> --- a/drivers/dma/pl330.c
+>>> +++ b/drivers/dma/pl330.c
+>>> @@ -1141,10 +1141,13 @@ static inline int _ldst_devtomem(unsigned
+>>> dry_run, u8 buf[],
+>>>                  const struct _xfer_spec *pxs, int cyc)
+>>>   {
+>>>          int off = 0;
+>>> +       enum pl330_cond cond;
+>>> +
+>>> +       cond = (pxs->desc->rqcfg.brst_len == 1) ? SINGLE : BURST;
+>>>
+>>>          while (cyc--) {
+>>> -               off += _emit_WFP(dry_run, &buf[off], SINGLE,
+>>> pxs->desc->peri);
+>>> -               off += _emit_LDP(dry_run, &buf[off], SINGLE,
+>>> pxs->desc->peri);
+>>> +               off += _emit_WFP(dry_run, &buf[off], cond,
+>>> pxs->desc->peri);
+>>> +               off += _emit_LDP(dry_run, &buf[off], cond,
+>>> pxs->desc->peri);
+>>>                  off += _emit_ST(dry_run, &buf[off], ALWAYS);
+>>>                  off += _emit_FLUSHP(dry_run, &buf[off],
+>>> pxs->desc->peri);
+>>>          }
+>>> @@ -1156,11 +1159,14 @@ static inline int _ldst_memtodev(unsigned
+>>> dry_run, u8 buf[],
+>>>                  const struct _xfer_spec *pxs, int cyc)
+>>>   {
+>>>          int off = 0;
+>>> +       enum pl330_cond cond;
+>>> +
+>>> +       cond = (pxs->desc->rqcfg.brst_len == 1) ? SINGLE : BURST;
+>>>
+>>>          while (cyc--) {
+>>> -               off += _emit_WFP(dry_run, &buf[off], SINGLE,
+>>> pxs->desc->peri);
+>>> +               off += _emit_WFP(dry_run, &buf[off], cond,
+>>> pxs->desc->peri);
+>>>                  off += _emit_LD(dry_run, &buf[off], ALWAYS);
+>>> -               off += _emit_STP(dry_run, &buf[off], SINGLE,
+>>> pxs->desc->peri);
+>>> +               off += _emit_STP(dry_run, &buf[off], cond,
+>>> pxs->desc->peri);
+>>>                  off += _emit_FLUSHP(dry_run, &buf[off],
+>>> pxs->desc->peri);
+>>>          }
+>>>
+>>> @@ -2557,7 +2563,7 @@ static struct dma_async_tx_descriptor
+>>> *pl330_prep_dma_cyclic(
+>>>
+>>>                  desc->rqtype = direction;
+>>>                  desc->rqcfg.brst_size = pch->burst_sz;
+>>> -               desc->rqcfg.brst_len = 1;
+>>> +               desc->rqcfg.brst_len = pch->burst_len;
+>>>                  desc->bytes_requested = period_len;
+>>>                  fill_px(&desc->px, dst, src, period_len);
+>>>
+>>> @@ -2702,7 +2708,7 @@ pl330_prep_slave_sg(struct dma_chan *chan, struct
+>>> scatterlist *sgl,
+>>>                  }
+>>>
+>>>                  desc->rqcfg.brst_size = pch->burst_sz;
+>>> -               desc->rqcfg.brst_len = 1;
+>>> +               desc->rqcfg.brst_len = pch->burst_len;
+>>>                  desc->rqtype = direction;
+>>>                  desc->bytes_requested = sg_dma_len(sg);
+>>>          }
+>>> --
+>>> 2.3.7
+>>>
+>>>
+>>> --
+>>> To unsubscribe from this list: send the line "unsubscribe dmaengine" in
+>>> the body of a message to majordomo at vger.kernel.org
+>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>
+>>
+>>
+>>
+>
+>
+> --
+> Best Regards
+> Shawn Lin
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
