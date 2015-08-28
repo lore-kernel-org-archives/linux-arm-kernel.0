@@ -1,113 +1,98 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat, 29 Aug 2015 00:09:55 +0800
-Subject: [PATCH 2/6] ARM: dts: sunxi: Add dtsi for AXP221 PMIC
-In-Reply-To: <20150828123159.GJ29389@lukather>
-References: <1440755679-8266-1-git-send-email-wens@csie.org>
- <1440755679-8266-3-git-send-email-wens@csie.org>
- <20150828123159.GJ29389@lukather>
-Message-ID: <CAGb2v66nBh+_P=EDxrNYeFoUUXqPWuZyfq1OEQww_aSMhT8wVQ@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 28 Aug 2015 17:10:35 +0100
+Subject: [PATCH] ARM64: kernel: implement ACPI parking protocol
+In-Reply-To: <1440777396.31961.13.camel@redhat.com>
+References: <1436959990-32054-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1437063431.3583.2.camel@redhat.com>
+ <20150716171221.GB18582@red-moon>
+ <1437068449.3583.4.camel@redhat.com>
+ <20150828102314.GC15924@red-moon>
+ <1440772186.31961.8.camel@redhat.com>
+ <20150828153212.GG15924@red-moon>
+ <1440777396.31961.13.camel@redhat.com>
+Message-ID: <20150828161035.GH15924@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 28, 2015 at 8:31 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Fri, Aug 28, 2015 at 05:54:35PM +0800, Chen-Yu Tsai wrote:
->> The AXP221 PMIC is used with some Allwinner SoCs. This patch adds
->> a dtsi file listing all the regulator nodes. The regulators are
->> initialized based on their device node names.
->>
->> This can later be used with the AXP223 PMIC as well, which has
->> the same functionality as AXP221, except for its host interface.
->>
->> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->> ---
->>  arch/arm/boot/dts/axp221.dtsi | 148 ++++++++++++++++++++++++++++++++++++++++++
->>  1 file changed, 148 insertions(+)
->>  create mode 100644 arch/arm/boot/dts/axp221.dtsi
->>
->> diff --git a/arch/arm/boot/dts/axp221.dtsi b/arch/arm/boot/dts/axp221.dtsi
->> new file mode 100644
->> index 000000000000..74836f329863
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/axp221.dtsi
->> @@ -0,0 +1,148 @@
->> +/*
->> + * Copyright 2015 Chen-Yu Tsai
->> + *
->> + * Chen-Yu Tsai <wens@csie.org>
->> + *
->> + * This file is dual-licensed: you can use it either under the terms
->> + * of the GPL or the X11 license, at your option. Note that this dual
->> + * licensing only applies to this file, and not this project as a
->> + * whole.
->> + *
->> + *  a) This file is free software; you can redistribute it and/or
->> + *     modify it under the terms of the GNU General Public License as
->> + *     published by the Free Software Foundation; either version 2 of the
->> + *     License, or (at your option) any later version.
->> + *
->> + *     This file is distributed in the hope that it will be useful,
->> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + *     GNU General Public License for more details.
->> + *
->> + * Or, alternatively,
->> + *
->> + *  b) Permission is hereby granted, free of charge, to any person
->> + *     obtaining a copy of this software and associated documentation
->> + *     files (the "Software"), to deal in the Software without
->> + *     restriction, including without limitation the rights to use,
->> + *     copy, modify, merge, publish, distribute, sublicense, and/or
->> + *     sell copies of the Software, and to permit persons to whom the
->> + *     Software is furnished to do so, subject to the following
->> + *     conditions:
->> + *
->> + *     The above copyright notice and this permission notice shall be
->> + *     included in all copies or substantial portions of the Software.
->> + *
->> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
->> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
->> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
->> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
->> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
->> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
->> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
->> + *     OTHER DEALINGS IN THE SOFTWARE.
->> + */
->> +
->> +/*
->> + * AXP221/221s/223 Integrated Power Management Chip
->> + * http://www.x-powers.com/product/AXP22X.php
->> + * http://dl.linux-sunxi.org/AXP/AXP221%20Datasheet%20V1.2%2020130326%20.pdf
->> + */
->
-> I'm usually not really fond of URLs in the source code and/or the
-> commit logs. They tend to be broken very easily.
+On Fri, Aug 28, 2015 at 04:56:36PM +0100, Mark Salter wrote:
+> On Fri, 2015-08-28 at 16:32 +0100, Lorenzo Pieralisi wrote:
+> > [Cc'ing Leif and Ard]
+> > 
+> > On Fri, Aug 28, 2015 at 03:29:46PM +0100, Mark Salter wrote:
+> > > On Fri, 2015-08-28 at 11:23 +0100, Lorenzo Pieralisi wrote:
+> > > > Mark,
+> > > > 
+> > > > On Thu, Jul 16, 2015 at 06:40:49PM +0100, Mark Salter wrote:
+> > > > 
+> > > > [...]
+> > > > 
+> > > > > On Thu, 2015-07-16 at 18:12 +0100, Lorenzo Pieralisi wrote:
+> > > > > > > The kernel will only add cached memory regions to linear 
+> > > > > > > mapping 
+> > > > > > > and
+> > > > > > > presumably, the FW will mark the mailboxes as uncached. 
+> > > > > > > Otherwise, 
+> > > > > > > it
+> > > > > > > is a FW bug. But I suppose we could run into problems with 
+> > > > > > > kernels
+> > > > > > > using 64K pagesize since firmware assumes 4k.
+> > > > > > 
+> > > > > > Nope, ioremap takes care of that, everything should be fine.
+> > > > > 
+> > > > > The mailbox is 4K. If it is next to a cached UEFI region, the 
+> > > > > kernel 
+> > > > > may
+> > > > > have to overlap the mailbox with a cached 64K mapping in order to 
+> > > > > include
+> > > > > the adjoining UEFI region in the linear map. Then the ioremap would 
+> > > > > fail
+> > > > > because the mailbox is included in the linear mapping.
+> > > > 
+> > > > So that I understand: are you referring to memrange_efi_to_native()
+> > > > in arch/arm64/kernel/efi.c ? Is it safe to round up (and add it to
+> > > > the memblock layer) the memory region size to PAGE_SIZE without 
+> > > > checking
+> > > > attributes of overlapping (within PAGE_SIZE) UEFI regions ?
+> > > 
+> > > The problem is that nothing in the UEFI spec or parking protocol spec
+> > > prevents firmware from placing a 4K parking protocol mailbox area in
+> > > the same 64K page as normal cached memory which winds up mapped in
+> > > the kernel linear mapping. The kernel might be able to work around
+> > > that by not putting the 64K page in the linear map. There's nothing
+> > > the kernel could do if the mailbox is in same 64K page with UEFI 
+> > > runtime
+> > > memory which would use a cached mapping.
+> > 
+> > Ok, I failed to explain myself. Let's imagine that we have a, say, 64k
+> > aligned memory region (EFI_MEMORY_WB - size 16k) that lives in the same
+> > 64K memory frame as a device's registers memory space.
+> > The code I pointed at above creates a 64K memory frame out of the 16K
+> > region and adds it to the memblock so that it ends up in the kernel 
+> > linear
+> > mapping which ends up mapping the device registers too with cacheable
+> > attributes and that's not correct.
+> > 
+> > I am not sure what's the best way to solve that, probably we should
+> > amend the UEFI specs to enforce uniform 64K memory region attributes,
+> > comments welcome.
+> 
+> OIC. Well it is a potential problem. Hardware designers do some whacky
+> things, but I'd like to think I/O regions and cached mem regions bordering
+> on such a small power of two boundary is not one of them.
 
-OK. Would you rather I put them in Documentation/arm/sunxi/README?
-It's not immediately clear that sunxi and axp* are connected though.
+Yes, I agree with you as far as I/O is concerned, I just wanted
+to understand if the issue you mentioned is a consequence of how
+the code above performs the rounding (it could discard memory regions
+having mixed attributes within PAGE_SIZE instead, if we enforce it in
+the specs).
 
->> +
->> +&axp221 {
->> +     compatible = "x-powers,axp221";
->> +     interrupt-controller;
->> +     #interrupt-cells = <1>;
->> +
->> +     regulators {
->> +             /* Default work frequency for buck regulators */
->> +             x-powers,dcdc-freq = <3000>;
->> +
->> +             /* supplies for dc1sw & dc5ldo are connected internally */
->> +             dcdc1-supply = <&reg_dcdc1>;
->> +             dcdc5-supply = <&reg_dcdc5>;
->
-> so the parent regulator of DCDC1 is DCDC1 ?
+Unfortunately for the mailboxes, since it is RAM, it might well happen.
+If we change the UEFI specs to enforce uniform attributes on 64K regions
+the problem you raised is solved at UEFI spec level instead of changing
+the ACPI parking protocol specs.
 
-These probably aren't the best names. These are the supplies for DC1SW and
-DC5LDO, respectively. They are connected internally, so there aren't named
-pins for them. The comment above explains it, though probably not clearly
-enough. Furthermore, the input pins for DCDC1/5 are VIN1/5.
+I will raise the point, apart from that I will send a v2 soon with
+the issue you raised addressed in the specs.
 
-
-Regards
-ChenYu
+Thanks,
+Lorenzo
