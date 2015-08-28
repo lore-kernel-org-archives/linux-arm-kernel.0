@@ -1,79 +1,36 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Fri, 28 Aug 2015 08:27:45 +0200
-Subject: [PATCH 1/4] x86, efi, kasan: #undef memset/memcpy/memmove per
- arch.
-In-Reply-To: <1440605707-8325-2-git-send-email-ryabinin.a.a@gmail.com>
-References: <1440605707-8325-1-git-send-email-ryabinin.a.a@gmail.com>
- <1440605707-8325-2-git-send-email-ryabinin.a.a@gmail.com>
-Message-ID: <20150828062745.GB1928@gmail.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Fri, 28 Aug 2015 08:31:44 +0200
+Subject: [PATCH v9] dmaengine: Add Xilinx AXI Direct Memory Access Engine
+ driver support
+In-Reply-To: <CAAtXAHccn5UjCg9Qr1Li1c9LfsBXrgF=gpMqJ6stGOaWL0u_-g@mail.gmail.com>
+References: <1440432666-10310-1-git-send-email-appanad@xilinx.com>
+ <CAAtXAHccn5UjCg9Qr1Li1c9LfsBXrgF=gpMqJ6stGOaWL0u_-g@mail.gmail.com>
+Message-ID: <55E00050.2020709@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Moritz,
 
-* Andrey Ryabinin <ryabinin.a.a@gmail.com> wrote:
-
-> In not-instrumented code KASAN replaces instrumented
-> memset/memcpy/memmove with not-instrumented analogues
-> __memset/__memcpy/__memove.
-> However, on x86 EFI stub is not linked with kernel.
-
-s/with the kernel
-
-> It uses not-instrumented mem*() functions from
-> arch/x86/boot/compressed/string.c
-> So we don't replace them with __mem*() variants in EFI stub.
+On 08/27/2015 04:30 PM, Moritz Fischer wrote:
+> Hi Kedar,
 > 
-> In ARM64 EFI stub is linked with the kernel, so we should
+> one thing that I realized is that you're not grabbing any clocks, does
+> this assume that you boot your system with fclk_enable to make this
+> work on Zynq e.g?
+> I realize the Xilinx VDMA driver in mainline doesn't have clock
+> handling built in neither, but wouldn't having that in new drivers at
+> least be desirable?
 
-s/In ARM64 EFI stub/On ARM64 the EFI stub/.
+Handling clock for soft IPs is not trivial problem from generation point
+of view. Adding clock handling to driver is simple and if you look all
+our soft IP drivers are lacking it.
+Users can change clocks freq in IP which needs to be covered too.
+And yes currently fclks are enabled by default that's why adding clock
+handling to the driver is not needed.
 
-> replace mem*() functions with __mem*(), because EFI stub
-
-s/the EFI stub
-
-> runs before KASAN setup early shadow.
-
-s/before KASAN sets up the early shadow
-
-?
-
-> So let's move these #undef mem* into arch's asm/efi.h which is
-
-s/lets
-
-> also included by EFI stub.
-
-s/by the EFI stub
-
-> 
-> Signed-off-by: Andrey Ryabinin <ryabinin.a.a@gmail.com>
-> ---
->  arch/x86/include/asm/efi.h             | 8 ++++++++
->  drivers/firmware/efi/libstub/efistub.h | 4 ----
->  2 files changed, 8 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/x86/include/asm/efi.h b/arch/x86/include/asm/efi.h
-> index 155162e..d821ce2 100644
-> --- a/arch/x86/include/asm/efi.h
-> +++ b/arch/x86/include/asm/efi.h
-> @@ -25,6 +25,14 @@
->  #define EFI32_LOADER_SIGNATURE	"EL32"
->  #define EFI64_LOADER_SIGNATURE	"EL64"
->  
-> +/*
-> + * Use memcpy/memset from arch/x86/boot/compressed/string.c
-> + * for EFI stub.
-> + */
-> +#undef memcpy
-> +#undef memset
-> +#undef memmove
-
-This comment should also mention why it's done, not what is done.
-
-Also:
-
-    s/for EFI stub/for the EFI stub
+Definitely PL clk handling is a topic which we are aware of but we don't
+have any 100% workable solution now. Current expectation is that clock
+is just working.
 
 Thanks,
-
-	Ingo
+Michal
