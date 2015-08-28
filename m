@@ -1,44 +1,65 @@
 From: marcel.ziswiler@toradex.com (Marcel Ziswiler)
-Date: Fri, 28 Aug 2015 17:59:39 +0200
-Subject: [PATCH 04/11] arm: tegra: colibri_t30: add pin muxing for on-module
- power i2c
+Date: Fri, 28 Aug 2015 17:59:38 +0200
+Subject: [PATCH 03/11] arm: tegra: colibri_t30: improve comment about thermal
+ alert pin
 In-Reply-To: <1440777586-19545-1-git-send-email-marcel.ziswiler@toradex.com>
 References: <1440777586-19545-1-git-send-email-marcel.ziswiler@toradex.com>
-Message-ID: <1440777586-19545-5-git-send-email-marcel.ziswiler@toradex.com>
+Message-ID: <1440777586-19545-4-git-send-email-marcel.ziswiler@toradex.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add pin muxing for the on-module power I2C bus which connects to the
-PMICs, temperature sensor and touch screen controller.
+Improve the comment about the THERMD_ALERT# pin which is the unlatched
+I2C address pin of the LM95245 temperature sensor and therefore
+requires disabling for now otherwise it won't get detected properly.
+
+While at it also move that pin further down to have it alphabetically
+sorted again.
 
 Signed-off-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
 ---
 
- arch/arm/boot/dts/tegra30-colibri.dtsi | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ arch/arm/boot/dts/tegra30-colibri.dtsi | 22 +++++++++++++---------
+ 1 file changed, 13 insertions(+), 9 deletions(-)
 
 diff --git a/arch/arm/boot/dts/tegra30-colibri.dtsi b/arch/arm/boot/dts/tegra30-colibri.dtsi
-index 074123f..4ddccfa 100644
+index 5e6a47e..074123f 100644
 --- a/arch/arm/boot/dts/tegra30-colibri.dtsi
 +++ b/arch/arm/boot/dts/tegra30-colibri.dtsi
-@@ -159,6 +159,18 @@
- 				nvidia,tristate = <TEGRA_PIN_DISABLE>;
+@@ -66,15 +66,6 @@
+ 				nvidia,enable-input = <TEGRA_PIN_ENABLE>;
  			};
  
-+			/* Power I2C (On-module) */
-+			pwr_i2c_scl_pz6 {
-+				nvidia,pins = "pwr_i2c_scl_pz6",
-+					      "pwr_i2c_sda_pz7";
-+				nvidia,function = "i2cpwr";
+-			/* Thermal alert, need to be disabled */
+-			lcd_dc1_pd2 {
+-				nvidia,pins = "lcd_dc1_pd2";
+-				nvidia,function = "rsvd3";
+-				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
+-				nvidia,tristate = <TEGRA_PIN_DISABLE>;
+-				nvidia,enable-input = <TEGRA_PIN_ENABLE>;
+-			};
+-
+ 			/* Colibri MMC */
+ 			kb_row10_ps2 {
+ 				nvidia,pins = "kb_row10_ps2";
+@@ -167,6 +158,19 @@
+ 				nvidia,pull = <TEGRA_PIN_PULL_UP>;
+ 				nvidia,tristate = <TEGRA_PIN_DISABLE>;
+ 			};
++
++			/*
++			 * THERMD_ALERT#, unlatched I2C address pin of LM95245
++			 * temperature sensor therefore requires disabling for
++			 * now
++			 */
++			lcd_dc1_pd2 {
++				nvidia,pins = "lcd_dc1_pd2";
++				nvidia,function = "rsvd3";
 +				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
 +				nvidia,tristate = <TEGRA_PIN_DISABLE>;
 +				nvidia,enable-input = <TEGRA_PIN_ENABLE>;
-+				nvidia,lock = <TEGRA_PIN_DISABLE>;
-+				nvidia,open-drain = <TEGRA_PIN_ENABLE>;
 +			};
-+
- 			/*
- 			 * THERMD_ALERT#, unlatched I2C address pin of LM95245
- 			 * temperature sensor therefore requires disabling for
+ 		};
+ 	};
+ 
 -- 
 2.4.3
