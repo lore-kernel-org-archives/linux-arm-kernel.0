@@ -1,33 +1,170 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Sat, 29 Aug 2015 01:25:01 +0200
-Subject: [PATCH] pinctrl: mediatek: Consistently use the BIT() macro
-Message-ID: <1440804302-6903-1-git-send-email-javier@osg.samsung.com>
+From: shawn.lin@rock-chips.com (Shawn Lin)
+Date: Sat, 29 Aug 2015 07:40:41 +0800
+Subject: [PATCH 1/5] DMA: pl330: support burst mode for dev-to-mem and
+ mem-to-dev transmit
+In-Reply-To: <CAPz6YkX-d8B1wPgjnULDAY8+nyuFePVrEU2NQe0rV2CsjYEj3Q@mail.gmail.com>
+References: <1440665280-31557-1-git-send-email-shawn.lin@rock-chips.com>
+ <1440665313-31603-1-git-send-email-shawn.lin@rock-chips.com>
+ <CAJKOXPdw+ZZURRPUNvKHdx7wRG7M-Frqmvq46KFM_ckGq8h0Yg@mail.gmail.com>
+ <55DF1072.1070905@rock-chips.com>
+ <CAPz6YkX-d8B1wPgjnULDAY8+nyuFePVrEU2NQe0rV2CsjYEj3Q@mail.gmail.com>
+Message-ID: <55E0F179.2020601@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mediatek pinctrl driver uses the BIT() macro instead of open
-coding 1 << n in all but one place. Replace this occurrence with
-the BIT() macro for consistency.
+? 2015/8/29 2:19, Sonny Rao ??:
+> On Thu, Aug 27, 2015 at 6:28 AM, Shawn Lin <shawn.lin@rock-chips.com> wrote:
+>> ? 2015/8/27 20:57, Krzysztof Kozlowski ??:
+>>>
+>>> 2015-08-27 17:48 GMT+09:00 Shawn Lin <shawn.lin@rock-chips.com>:
+>>>>
+>>>>
+>>>> This patch adds to support burst mode for dev-to-mem and
+>>>> mem-to-dev transmit.
+>>>>
+>>>> Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
+>>>> Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
+>>>> Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
+>>>> cc: Heiko Stuebner <heiko@sntech.de>
+>>>> cc: Doug Anderson <dianders@chromium.org>
+>>>> cc: Olof Johansson <olofj@google.com>
+>>>> Reviewed-and-tested-by: Sonny Rao <sonnyrao@chromium.org>
+>>>
+>>>
+>>> For the entire patchset: I would prefer to see someone's
+>>> reviewed/tested tag in his response. Sending a version 1 of patchset
+>>> (regardless of Boojin Kim's work two years ago) with such tag could
+>>> mean anything. I cannot verify it easily (unless digging somewhere...
+>>> or asking people). You could add for example: Reviewed-by Santa Claus.
+>>> Should I sent a letter to him asking for confirmation? :)
+>>>
+>>
+>> :) yes, you are right. I should comply with the rule, even if the patchest
+>> had been reviewed or tested by someone on another tree.
+>
+> Hi, yeah I reviewed on a different tree, so you shouldn't put that tag
+> here, thanks for removing it.
+> I can re-review if you'd like.
+>
 
-Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+Hi, sunny, Thanks for reply.
+It's very great if you can help me re-review the patchset here. :)
 
----
+>>
+>>
+>>> More seriously - reviewed-by is a statement (please look at
+>>> Documentation/SubmittingPatches) and you cannot force someone to make
+>>> that statement. He must make such statement on his own.
+>>>
+>>> That's all from my side since I don't feel skilled enough to review the
+>>> code.
+>>>
+>>> Best regards,
+>>> Krzysztof
+>>>
+>>>>
+>>>> ---
+>>>>
+>>>>    drivers/dma/pl330.c | 18 ++++++++++++------
+>>>>    1 file changed, 12 insertions(+), 6 deletions(-)
+>>>>
+>>>> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+>>>> index ecab4ea0..0d544d2 100644
+>>>> --- a/drivers/dma/pl330.c
+>>>> +++ b/drivers/dma/pl330.c
+>>>> @@ -1141,10 +1141,13 @@ static inline int _ldst_devtomem(unsigned
+>>>> dry_run, u8 buf[],
+>>>>                   const struct _xfer_spec *pxs, int cyc)
+>>>>    {
+>>>>           int off = 0;
+>>>> +       enum pl330_cond cond;
+>>>> +
+>>>> +       cond = (pxs->desc->rqcfg.brst_len == 1) ? SINGLE : BURST;
+>>>>
+>>>>           while (cyc--) {
+>>>> -               off += _emit_WFP(dry_run, &buf[off], SINGLE,
+>>>> pxs->desc->peri);
+>>>> -               off += _emit_LDP(dry_run, &buf[off], SINGLE,
+>>>> pxs->desc->peri);
+>>>> +               off += _emit_WFP(dry_run, &buf[off], cond,
+>>>> pxs->desc->peri);
+>>>> +               off += _emit_LDP(dry_run, &buf[off], cond,
+>>>> pxs->desc->peri);
+>>>>                   off += _emit_ST(dry_run, &buf[off], ALWAYS);
+>>>>                   off += _emit_FLUSHP(dry_run, &buf[off],
+>>>> pxs->desc->peri);
+>>>>           }
+>>>> @@ -1156,11 +1159,14 @@ static inline int _ldst_memtodev(unsigned
+>>>> dry_run, u8 buf[],
+>>>>                   const struct _xfer_spec *pxs, int cyc)
+>>>>    {
+>>>>           int off = 0;
+>>>> +       enum pl330_cond cond;
+>>>> +
+>>>> +       cond = (pxs->desc->rqcfg.brst_len == 1) ? SINGLE : BURST;
+>>>>
+>>>>           while (cyc--) {
+>>>> -               off += _emit_WFP(dry_run, &buf[off], SINGLE,
+>>>> pxs->desc->peri);
+>>>> +               off += _emit_WFP(dry_run, &buf[off], cond,
+>>>> pxs->desc->peri);
+>>>>                   off += _emit_LD(dry_run, &buf[off], ALWAYS);
+>>>> -               off += _emit_STP(dry_run, &buf[off], SINGLE,
+>>>> pxs->desc->peri);
+>>>> +               off += _emit_STP(dry_run, &buf[off], cond,
+>>>> pxs->desc->peri);
+>>>>                   off += _emit_FLUSHP(dry_run, &buf[off],
+>>>> pxs->desc->peri);
+>>>>           }
+>>>>
+>>>> @@ -2557,7 +2563,7 @@ static struct dma_async_tx_descriptor
+>>>> *pl330_prep_dma_cyclic(
+>>>>
+>>>>                   desc->rqtype = direction;
+>>>>                   desc->rqcfg.brst_size = pch->burst_sz;
+>>>> -               desc->rqcfg.brst_len = 1;
+>>>> +               desc->rqcfg.brst_len = pch->burst_len;
+>>>>                   desc->bytes_requested = period_len;
+>>>>                   fill_px(&desc->px, dst, src, period_len);
+>>>>
+>>>> @@ -2702,7 +2708,7 @@ pl330_prep_slave_sg(struct dma_chan *chan, struct
+>>>> scatterlist *sgl,
+>>>>                   }
+>>>>
+>>>>                   desc->rqcfg.brst_size = pch->burst_sz;
+>>>> -               desc->rqcfg.brst_len = 1;
+>>>> +               desc->rqcfg.brst_len = pch->burst_len;
+>>>>                   desc->rqtype = direction;
+>>>>                   desc->bytes_requested = sg_dma_len(sg);
+>>>>           }
+>>>> --
+>>>> 2.3.7
+>>>>
+>>>>
+>>>> --
+>>>> To unsubscribe from this list: send the line "unsubscribe dmaengine" in
+>>>> the body of a message to majordomo at vger.kernel.org
+>>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>>
+>>>
+>>>
+>>>
+>>
+>>
+>> --
+>> Best Regards
+>> Shawn Lin
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>> Please read the FAQ at  http://www.tux.org/lkml/
+>
+>
+>
 
- drivers/pinctrl/mediatek/pinctrl-mtk-common.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-index 23f2de07f598..497b9125342a 100644
---- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-+++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-@@ -898,7 +898,7 @@ static int mtk_eint_flip_edge(struct mtk_pinctrl *pctl, int hwirq)
- 	int start_level, curr_level;
- 	unsigned int reg_offset;
- 	const struct mtk_eint_offsets *eint_offsets = &(pctl->devdata->eint_offsets);
--	u32 mask = 1 << (hwirq & 0x1f);
-+	u32 mask = BIT(hwirq & 0x1f);
- 	u32 port = (hwirq >> 5) & eint_offsets->port_mask;
- 	void __iomem *reg = pctl->eint_reg_base + (port << 2);
- 	const struct mtk_desc_pin *pin;
 -- 
-2.4.3
+Best Regards
+Shawn Lin
