@@ -1,133 +1,39 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Fri, 28 Aug 2015 15:04:52 +0300
-Subject: [PATCH] ARM: OMAP2+: omap-device: remove omap_device_late_init
- call completely
-In-Reply-To: <55E028C7.3060509@ti.com>
-References: <1440611890-4935-1-git-send-email-grygorii.strashko@ti.com>
- <20150826181006.GT4215@atomide.com> <55DF12E7.10802@ti.com>
- <20150827163856.GX4215@atomide.com> <55DF4398.7020201@ti.com>
- <55E028C7.3060509@ti.com>
-Message-ID: <55E04E64.2070204@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 28 Aug 2015 14:28:47 +0200
+Subject: [PATCH 0/1] ARM: dts: sun5i: inet98v_rev2 fix regulator for the
+ usb wifi
+In-Reply-To: <1440700651-30575-1-git-send-email-hdegoede@redhat.com>
+References: <1440700651-30575-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <20150828122847.GH29389@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/28/2015 12:24 PM, Keerthy wrote:
->
->
-> On Thursday 27 August 2015 10:36 PM, Grygorii Strashko wrote:
->> On 08/27/2015 07:38 PM, Tony Lindgren wrote:
->>> * Grygorii Strashko <grygorii.strashko@ti.com> [150827 06:42]:
->>>> Hi Tony,
->>>>
->>>> On 08/26/2015 09:10 PM, Tony Lindgren wrote:
->>>>> * Grygorii Strashko <grygorii.strashko@ti.com> [150826 11:01]:
->>>>>> Now Kernel fails to boot 50% of times (form build to build) with
->>>>>> RT-patchset applied due to the following race - on late boot
->>>>>> stages deferred_probe_work_func races with omap_device_late_ini
->>>>>>
->>>>>> late_initcall
->>>>>>     - deferred_probe_initcal() tries to re-probe all pending
->>>>>> driver's probe.
->>>>>>       [In general, It's NOT expected to probe any other built-in
->>>>>> drivers after
->>>>>>       deferred_probe_initcal() is finished, because most of
->>>>>>       late_initcall_sync/late_initcall functions expected that all
->>>>>> driver
->>>>>>       or probed or deferred already.]
->>>>>>
->>>>>> - later on, some driver is probing in this case It's could cpsw.c
->>>>>>      (but could be any other drivers)
->>>>>>      cpsw_init
->>>>>>      - platform_driver_register
->>>>>>        - really_probe
->>>>>>           - driver_bound
->>>>>>             - driver_deferred_probe_trigger
->>>>>>      and boot proceed.
->>>>>>      So, at this moment we have  deferred_probe_work_func scheduled.
->>>>>>
->>>>>> late_initcall_sync
->>>>>>      - omap_device_late_init
->>>>>>        - omap_device_idle
->>>>>>
->>>>>> CPU1                    CPU2
->>>>>>      - deferred_probe_work_func
->>>>>>        - really_probe
->>>>>>          - omap_hsmmc_probe
->>>>>>     - pm_runtime_get_sync
->>>>>>                     late_initcall_sync
->>>>>>                     - omap_device_late_init
->>>>>>                         if (od->_driver_status !=
->>>>>> BUS_NOTIFY_BOUND_DRIVER) {
->>>>>>                             if (od->_state ==
->>>>>> OMAP_DEVICE_STATE_ENABLED) {
->>>>>>                                 - omap_device_idle [ops - IP is
->>>>>> disabled, ]
->>>>>>     - [fail]
->>>>>>     - pm_runtime_put_sync
->>>>>>              - omap_hsmmc_runtime_suspend [ooops!]
->>>>>
->>>>> OK idling of unclaimed devices should not happen for deferred probe,
->>>>> it should only happen when there's no driver and no probing happening.
->>>>>
->>>>>> Lets remove just remove omap_device_late_init completely as suggested
->>>>>> by Tero Kristo:
->>>>>>
->>>>>> "How about remove omap_device_late_init call completely. I don't
->>>>>> think
->>>>>> it does anything useful at the moment; none of the omap devices get
->>>>>> enabled outside runtime_pm, so there should be no need to explicitly
->>>>>> disable the devices."
->>>>>
->>>>> I think this is still needed from PM point of view as otherwise we
->>>>> don't idle any devices that don't have a driver available. Or am I
->>>>> missing something?
->>>>>
->>>>> To me it seems the bug is relying on the BUS_NOTIFY_BOUND_DRIVER is
->>>>> not set in the deferred probe case.
->>>>>
->>>>
->>>>
->>>> What do you think about below alternative?
->>>>
->>>> diff --git a/arch/arm/mach-omap2/omap_device.c
->>>> b/arch/arm/mach-omap2/omap_device.c
->>>> index 4cb8fd9..72ebc4c 100644
->>>> --- a/arch/arm/mach-omap2/omap_device.c
->>>> +++ b/arch/arm/mach-omap2/omap_device.c
->>>> @@ -901,7 +901,8 @@ static int __init omap_device_late_idle(struct
->>>> device *dev, void *data)
->>>>                   if (od->hwmods[i]->flags & HWMOD_INIT_NO_IDLE)
->>>>                           return 0;
->>>>
->>>> -       if (od->_driver_status != BUS_NOTIFY_BOUND_DRIVER) {
->>>> +       if (od->_driver_status != BUS_NOTIFY_BOUND_DRIVER &&
->>>> +           od->_driver_status != BUS_NOTIFY_BIND_DRIVER) {
->>>>                   if (od->_state == OMAP_DEVICE_STATE_ENABLED) {
->>>>                           dev_warn(dev, "%s: enabled but no driver.
->>>> Idling\n",
->>>>                                    __func__);
->>>
->>> Seems better to me if it really fixes the issue.
->>>
->>
->> My dra7-evm failed to boot on "2b186e5 Add linux-next specific files
->> for 20150827"
->> and this change restores boot.
->>
->> Will wait for confirmation from Keerthy.
->
-> I confirm that with this patch the boot crash is fixed.
->
-> Tested-by: Keerthy <j-keerthy@ti.com>
->
->
-> Without this patch i see this crash during boot:
->
+Hi Hans,
 
-Thanks, Keerthy.
+On Thu, Aug 27, 2015 at 08:37:30PM +0200, Hans de Goede wrote:
+> Hi Maxime,
+> 
+> Here is a fixup patch for the patch adding a dts for the inet98v_rev2.
+> 
+> I'm not sure if you've merged the original patch yet, hence I'm sending
+> this as a follow-up patch. If you've not yet merged the original patch
+> feel free to squash this fix in.
 
-I'll update and resend this new patch version.
+Have you ever submitted that first patch in the first place?
+
+I'm don't have the DTS file you're patching in my tree, and I don't
+see any email and/or patch relating to that board.
+
+Maxime
 
 -- 
-regards,
--grygorii
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150828/5f0413b6/attachment.sig>
