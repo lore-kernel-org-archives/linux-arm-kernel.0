@@ -1,22 +1,22 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Fri, 28 Aug 2015 15:23:20 -0700
-Subject: arm64: how to check endianness of Image file?
-Message-ID: <CAMAWPa8EW92OAAVn7FOkBzPbtsQLQDpU1F0TM3uuTFa9P6bYOA@mail.gmail.com>
+From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
+Date: Fri, 28 Aug 2015 12:52:40 -0700
+Subject: [PATCH] soc: qcom: Reorder SMEM/SMD configs
+In-Reply-To: <1440786213-23375-1-git-send-email-sboyd@codeaurora.org>
+References: <1440786213-23375-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20150828195239.GR13472@usrtlx11787.corpusers.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Will, Catalin,
+On Fri 28 Aug 11:23 PDT 2015, Stephen Boyd wrote:
 
-Any suggestions on a quick way to check if an arm64 kernel Image file
-is big-endian?
+> When I make nconfig, having the SMEM option after the SMD option
+> causes the configurator to get confused when I'm enabling and
+> disabling these options. Let's move SMEM before SMD so there's a
+> clear indented dependency chain.
+> 
+> Cc: Bjorn Andersson <bjorn.andersson@sonymobile.com>
 
-We're adding more boot support for arm64 defconfig +
-CONFIG_CPU_BIG_ENDIAN=y to kernelci.org, and are looking for a
-reliable way to check the endianness of the kernel Image file, we
-don't have the vmlinux around to check the ELF headers.
+Reviewed-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
 
-On arm32, the zImage has some magic fields set from
-arch/arm/boot/compressed/head.S, but arm64 doesn't have the
-equivalent.
-
-Kevin
+Regards,
+Bjorn
