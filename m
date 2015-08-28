@@ -1,34 +1,31 @@
-From: luis@debethencourt.com (Luis de Bethencourt)
-Date: Fri, 28 Aug 2015 14:42:22 +0200
-Subject: [PATCH 0/5] clk: sunxi: Fix module autoload for OF platform driver
-Message-ID: <20150828124222.GA24923@goodgumbo.baconseed.org>
+From: marcel.ziswiler@toradex.com (Marcel Ziswiler)
+Date: Fri, 28 Aug 2015 14:42:31 +0200
+Subject: [PATCH 4/9] arm: tegra: apalis_t30: add comment concerning emmc
+In-Reply-To: <1440765756-1382-1-git-send-email-marcel.ziswiler@toradex.com>
+References: <1440765756-1382-1-git-send-email-marcel.ziswiler@toradex.com>
+Message-ID: <1440765756-1382-5-git-send-email-marcel.ziswiler@toradex.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Instead of adding an otherwise unused emmc label just add a comment.
 
-This series add the missing MODULE_DEVICE_TABLE() for OF to eport
-that information so modules have the correct aliases built-in
-and autoloading works correctly.
+Signed-off-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
+---
 
-A longer explanation by Javier Canillas can be found here:
-https://lkml.org/lkml/2015/7/30/519
+ arch/arm/boot/dts/tegra30-apalis.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
-Thanks,
-Luis
-
-Luis de Bethencourt (5)
-  clk: sunxi: sun9i-mmc: Fix module autoload for OF platform driver
-  clk: sunxi: sun8i-apb0: Fix module autoload for OF platform driver
-  clk: sunxi: sun6i-ar100: Fix module autoload for OF platform driver
-  clk: sunxi: sun6i-apb0-gates: Fix module autoload for OF platform driver
-  clk: sunxi: sun6i-apb0: Fix module autoload for OF platform driver
- drivers/clk/sunxi/clk-sun6i-apb0-gates.c | 1 +
- drivers/clk/sunxi/clk-sun6i-apb0.c       | 1 +
- drivers/clk/sunxi/clk-sun6i-ar100.c      | 1 +
- drivers/clk/sunxi/clk-sun8i-apb0.c       | 1 +
- drivers/clk/sunxi/clk-sun9i-mmc.c        | 1 +
- 5 files changed, 5 insertions(+)
-
---
-2.4.6
+diff --git a/arch/arm/boot/dts/tegra30-apalis.dtsi b/arch/arm/boot/dts/tegra30-apalis.dtsi
+index 84744dc..d1b24b1 100644
+--- a/arch/arm/boot/dts/tegra30-apalis.dtsi
++++ b/arch/arm/boot/dts/tegra30-apalis.dtsi
+@@ -636,6 +636,7 @@
+ 		nvidia,sys-clock-req-active-high;
+ 	};
+ 
++	/* eMMC */
+ 	sdhci at 78000600 {
+ 		status = "okay";
+ 		bus-width = <8>;
+-- 
+2.4.3
