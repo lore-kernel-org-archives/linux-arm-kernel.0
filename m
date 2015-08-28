@@ -1,50 +1,62 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 28 Aug 2015 18:08:36 +0200
-Subject: no booting due to handle_domain_irq on orion5x/kurobox
-In-Reply-To: <20150828155826.GD2776@dinsnail.net> (Michael Weiser's message of
- "Fri, 28 Aug 2015 17:58:26 +0200")
-References: <20150828155826.GD2776@dinsnail.net>
-Message-ID: <87vbbz75vf.fsf@free-electrons.com>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Fri, 28 Aug 2015 17:11:29 +0100
+Subject: [PATCH] ARM64: kernel: implement ACPI parking protocol
+In-Reply-To: <1440777396.31961.13.camel@redhat.com>
+References: <1436959990-32054-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1437063431.3583.2.camel@redhat.com>
+ <20150716171221.GB18582@red-moon>
+ <1437068449.3583.4.camel@redhat.com>
+ <20150828102314.GC15924@red-moon>
+ <1440772186.31961.8.camel@redhat.com>
+ <20150828153212.GG15924@red-moon>
+ <1440777396.31961.13.camel@redhat.com>
+Message-ID: <20150828161128.GQ10728@bivouac.eciton.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Michael,
+On Fri, Aug 28, 2015 at 11:56:36AM -0400, Mark Salter wrote:
+> > > > So that I understand: are you referring to memrange_efi_to_native()
+> > > > in arch/arm64/kernel/efi.c ? Is it safe to round up (and add it to
+> > > > the memblock layer) the memory region size to PAGE_SIZE without 
+> > > > checking
+> > > > attributes of overlapping (within PAGE_SIZE) UEFI regions ?
+> > > 
+> > > The problem is that nothing in the UEFI spec or parking protocol spec
+> > > prevents firmware from placing a 4K parking protocol mailbox area in
+> > > the same 64K page as normal cached memory which winds up mapped in
+> > > the kernel linear mapping. The kernel might be able to work around
+> > > that by not putting the 64K page in the linear map. There's nothing
+> > > the kernel could do if the mailbox is in same 64K page with UEFI 
+> > > runtime memory which would use a cached mapping.
 
-Michael Weiser <michael@dinsnail.net> writes:
-> Hi,
->
-> I've got vanilla kernels running on a Buffalo Linkstation Pro
-> (orion5x/Kurobox Pro). The last release kernel to work is 3.17.8.
-> Anything after that just says "Uncompressing Linux... Ok. booting the
-> kernel" and stops. 
->
-> By building and booting various intermediate stages from git, I've
-> narrowed it down to the following three commits:
->
-> 76ba59f8366f2d9282cb5bda9de75b4b68cbe55f genirq: Add irq_domain-aware core IRQ handler
-> a71b092a9c68685a270ebdde7b5986ba8787e575 ARM: Convert handle_IRQ to use __handle_domain_irq
-> f4bc9288b4a29ead48425dd7d1bf4b825a8aff58 irqchip: orion: Convert to handle_domain_irq
->
-> If I revert those from an otherwise unmodified current
-> torvalds/linux.git HEAD it boots up just fine.
->
-> I'm afraid that's as far as my kernel debugging know-how will take me.
-> Any help in how to proceed further in order to get current kernels
-> running on my box would be highly appreciated.
+Indeed.
 
-The good new is that a fix have already been submitted, the bad news is
-that it won't be in 4.2, but it will be in 4.3-rc1 and as it was tagged
-as stable it would be part of the older stable kernel in the next weeks.
-You can cherry-pick it from linux-next:
+> > Ok, I failed to explain myself. Let's imagine that we have a, say, 64k
+> > aligned memory region (EFI_MEMORY_WB - size 16k) that lives in the same
+> > 64K memory frame as a device's registers memory space.
+> > The code I pointed at above creates a 64K memory frame out of the 16K
+> > region and adds it to the memblock so that it ends up in the kernel 
+> > linear
+> > mapping which ends up mapping the device registers too with cacheable
+> > attributes and that's not correct.
+> > 
+> > I am not sure what's the best way to solve that, probably we should
+> > amend the UEFI specs to enforce uniform 64K memory region attributes,
+> > comments welcome.
 
-http://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/?id=5be9fc23cdb42e1d383ecc8eae8a8ff70a752708
+Agreed.
 
-Thanks,
+> OIC. Well it is a potential problem. Hardware designers do some whacky
+> things, but I'd like to think I/O regions and cached mem regions bordering
+> on such a small power of two boundary is not one of them.
 
-Gregory
+Sure. But the same applies to memory regions _mapped_ as Device.
+Which is (apparently) necessary for the spin-tables used by the
+parking protocol.
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+So the spec should ban use of incompatible memory attributes between
+any regions kept around at runtime, as opposed to specifically the
+regions used for runtime services (the current wording in the spec).
+
+/
+    Leif
