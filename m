@@ -1,166 +1,359 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Thu, 27 Aug 2015 17:34:55 -0700
-Subject: [PATCH v11 0/5] mtd: nand: vf610_nfc: Freescale NFC for VF610
-Message-ID: <1440722100-25388-1-git-send-email-stefan@agner.ch>
+Date: Thu, 27 Aug 2015 17:34:57 -0700
+Subject: [PATCH v11 2/5] mtd: nand: vf610_nfc: add hardware BCH-ECC support
+In-Reply-To: <1440722100-25388-1-git-send-email-stefan@agner.ch>
+References: <1440722100-25388-1-git-send-email-stefan@agner.ch>
+Message-ID: <1440722100-25388-3-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In this 11th revision the driver now rereads the OOB area in case
-hardware ECC fails. This allows to count the flipped bits accross
-the whole page reliably. Also the device tree bindings have been
-updated: NAND chips can be specified using sub-nodes, the ECC
-properties are part of those chip nodes. Note however that the
-driver currently only supports one NAND chip. The driver has been
-verified again using the MTD tests.
+This adds hardware ECC support using the BCH encoder in the NFC IP.
+The ECC encoder supports up to 32-bit correction by using 60 error
+correction bytes. There is no sub-page ECC step, ECC is calculated
+always accross the whole page (up to 2k pages).
 
-More information and the full test log of earlier patchset version
-can be found in the cover letter of the last revision v6:
-http://thread.gmane.org/gmane.linux.kernel/1979868
+Limitations:
+- HW ECC: Only 2K page with 64+ OOB.
+- HW ECC: Only 24 and 32-bit error correction implemented.
 
-Changes since v10:
-- Rebased onto l2-mtd/master
-- Use children nodes for NAND chips in device tree bindings
-- Support exactly one NAND chip using the new device tree bindings
-- Reread page OOB on ECC error in order to reliable determine the amount
-  of bit flips on a erased page
-- Use ECC strength/2 as the only bit flip threshold
-- Rely on endianness aware word read to read the ECC status
-- Introduce vf610_nfc_variant which reflects the variant according to
-  the device tree compatible string
-- Use variant to determine chip select implementation
-- Use enum for alternate buffer indication
-- Renamed page_sz variable in struct vf610_nfc as well as in the function
-  vf610_nfc_command to more specific names
-- Some smaller code cleanup (altered ECC_SRAM_ADDR, introduce OOB_MAX)
+Raw writes have been tested using the generic nand_write_page_raw
+implementation. However, raw reads are currently not possible
+because the controller need to know whether we are going to use
+the ECC mode already at NAND_CMD_READ0 command time. At this point
+we do not have the information whether it is a raw read or a
+regular read at driver level...
 
-Changes since v9:
-- Remove inline of vf610_nfc_done
-- Add __iomem to src argument of vf610_nfc_memcpy
-- Handle return value of mtd_device_parse_register correctly
-- Count bits in OOB too (only non-ECC bits)
-- Return bitflips in ecc.read_page callback vf610_nfc_read_page
-- Fall-through ALT_BUF_ONFI
-- Use BIT macros
+Signed-off-by: Bill Pringlemeir <bpringlemeir@nbsps.com>
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+---
+ drivers/mtd/nand/Kconfig     |   6 +-
+ drivers/mtd/nand/vf610_nfc.c | 204 ++++++++++++++++++++++++++++++++++++++++++-
+ 2 files changed, 206 insertions(+), 4 deletions(-)
 
-Changes since v8:
-- Fix 16-Bit NAND flash support by splitting up initialization
-  (introduce vf610_nfc_preinit_controller)
-- Updated comments in initialziation functions
-
-Changes since v7:
-- vf610-twr.dts: Moved NFC pinmux into the existing iomuxc node
-  and sort new nfc node behind the existing iomuxc node as well.
-- vf610-twr.dts/vf-colibri.dtsi: Dropped _1 suffixes
-
-Changes since v6:
-- Rebased ontop of l2-mtd/master (v4.2-rc1 based)
-- Removed HAVE_NAND_VF610_NFC and use depends on. This made
-  "[PATCH v6 4/6] ARM: vf610: enable NAND Flash Controller" unnecessary
-
-Changes since v5:
-- Removed fsl,mpc5125-nfc compatible string
-- Removed readl/writel_relaxed
-- Change interface of vf610_nfc_transfer_size to match other accessors
-
-Changes since v4:
-- Rebased ontop of l2-mtd/master (v4.1-rc4 based)
-- Eliminate unnecessary page read (NAND_CMD_SEQIN) since the driver does
-  not support sub-page writes anyway (improves write performance)
-- Support ONFI by enabling READID command with offset and parameter page
-  reads (CMD_PARAM)
-- Change to dedicated read_page/write_page function, enables raw writes
-- Use __LITTLE_ENDIAN to distingush between LE/BE relevant statements
-- Eliminated vf610_nfc_probe_dt in favor of common DT init code
-- Use wait_for_completion_timeout
-- Some style fixes (spaces, etc.)
-
-Changes since v3:
-- Make the driver selectable when COMPILE_TEST is set
-- Fix compile error due to superfluous ECC_STATUS configuration in initial
-  patch (without ECC correction ECC_STATUS does not need to be configured)
-- Remove custom BBT pattern and switch to in-band BBT in the initial patch
-- Include two bug fixes, for details see the corresponding U-Boot patches:
-  http://thread.gmane.org/gmane.comp.boot-loaders.u-boot/215802
-
-Changes since v2:
-- Updated binding documentation
-
-Changes since v1:
-- Nest nfc_config struct within the main nfc struct
-- Use assigned clock binding to specify NFC clock
-- Rebased ontop of MSCM IR patchset (driver parts have been merged)
-- Split out arch Kconfig in a separate config
-- Fix module license
-- Updated MAINTAINERS
-
-Changes since RFC (Bill Pringlemeir):
-- Renamed driver from fsl_nfc to vf610_nfc
-- Use readl/writel for all register in accessor functions
-- Optimized field accessor functions
-- Implemented PM (suspend/resume) functions
-- Implemented basic support for ECC strength/ECC step size from dt
-- Improved performance of count_written_bits by using hweight32
-- Support ECC with 60-bytes to correct up to 32 bit errors
-- Changed to in-band BBT (NAND_BBT_NO_OOB) which also allows ECC modes
-  which uses up to 60 bytes on 64 byte OOB
-- Removed custom (downstream) BBT pattern since BBT table won't be
-  compatible anyway (due to the change above)
-
-mtd_speedtest of this 11th revision on a Colibri VF61:
-
-[ 2321.921612] =================================================
-[ 2321.927459] mtd_speedtest: MTD device: 3
-[ 2321.936619] mtd_speedtest: MTD device size 104857600, eraseblock size 131072, page size 2048, count of eraseblocks 800, pages per eraseblock 64, OOB size 64
-[ 2321.954428] mtd_test: scanning for bad eraseblocks
-[ 2321.959626] mtd_test: block 142 is bad
-[ 2321.966038] mtd_test: scanned 800 eraseblocks, 1 are bad
-[ 2322.370120] mtd_speedtest: testing eraseblock write speed
-[ 2344.047677] mtd_speedtest: eraseblock write speed is 4718 KiB/s
-[ 2344.053687] mtd_speedtest: testing eraseblock read speed
-[ 2351.890573] mtd_speedtest: eraseblock read speed is 13059 KiB/s
-[ 2352.315120] mtd_speedtest: testing page write speed
-[ 2374.882015] mtd_speedtest: page write speed is 4533 KiB/s
-[ 2374.887526] mtd_speedtest: testing page read speed
-[ 2382.886572] mtd_speedtest: page read speed is 12791 KiB/s
-[ 2383.290314] mtd_speedtest: testing 2 page write speed
-[ 2405.362236] mtd_speedtest: 2 page write speed is 4634 KiB/s
-[ 2405.367925] mtd_speedtest: testing 2 page read speed
-[ 2413.299551] mtd_speedtest: 2 page read speed is 12901 KiB/s
-[ 2413.305228] mtd_speedtest: Testing erase speed
-[ 2413.707595] mtd_speedtest: erase speed is 257612 KiB/s
-[ 2413.712796] mtd_speedtest: Testing 2x multi-block erase speed
-[ 2414.110127] mtd_speedtest: 2x multi-block erase speed is 260897 KiB/s
-[ 2414.116656] mtd_speedtest: Testing 4x multi-block erase speed
-[ 2414.510316] mtd_speedtest: 4x multi-block erase speed is 264268 KiB/s
-[ 2414.516838] mtd_speedtest: Testing 8x multi-block erase speed
-[ 2414.908075] mtd_speedtest: 8x multi-block erase speed is 265641 KiB/s
-[ 2414.914607] mtd_speedtest: Testing 16x multi-block erase speed
-[ 2415.306958] mtd_speedtest: 16x multi-block erase speed is 264268 KiB/s
-[ 2415.313586] mtd_speedtest: Testing 32x multi-block erase speed
-[ 2415.702660] mtd_speedtest: 32x multi-block erase speed is 267028 KiB/s
-[ 2415.709270] mtd_speedtest: Testing 64x multi-block erase speed
-[ 2416.098225] mtd_speedtest: 64x multi-block erase speed is 266333 KiB/s
-[ 2416.104833] mtd_speedtest: finished
-[ 2416.108379] =================================================
-
-Stefan Agner (5):
-  mtd: nand: vf610_nfc: Freescale NFC for VF610, MPC5125 and others
-  mtd: nand: vf610_nfc: add hardware BCH-ECC support
-  mtd: nand: vf610_nfc: add device tree bindings
-  ARM: dts: vf610twr: add NAND flash controller peripherial
-  ARM: dts: vf-colibri: enable NAND flash controller
-
- .../devicetree/bindings/mtd/vf610-nfc.txt          |  59 ++
- MAINTAINERS                                        |   6 +
- arch/arm/boot/dts/vf-colibri.dtsi                  |  39 +
- arch/arm/boot/dts/vf610-twr.dts                    |  47 ++
- arch/arm/boot/dts/vfxxx.dtsi                       |  10 +
- drivers/mtd/nand/Kconfig                           |  11 +
- drivers/mtd/nand/Makefile                          |   1 +
- drivers/mtd/nand/vf610_nfc.c                       | 890 +++++++++++++++++++++
- 8 files changed, 1063 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mtd/vf610-nfc.txt
- create mode 100644 drivers/mtd/nand/vf610_nfc.c
-
+diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
+index 9f9736c..ccd1158 100644
+--- a/drivers/mtd/nand/Kconfig
++++ b/drivers/mtd/nand/Kconfig
+@@ -466,8 +466,10 @@ config MTD_NAND_VF610_NFC
+ 	help
+ 	  Enables support for NAND Flash Controller on some Freescale
+ 	  processors like the VF610, MPC5125, MCF54418 or Kinetis K70.
+-	  The driver supports a maximum 2k page size. The driver
+-	  currently does not support hardware ECC.
++	  The driver supports a maximum 2k page size. With 2k pages and
++	  64 bytes or more of OOB, hardware ECC with up to 32-bit error
++	  correction is supported. Hardware ECC is only enabled through
++	  device tree.
+ 
+ config MTD_NAND_MXC
+ 	tristate "MXC NAND support"
+diff --git a/drivers/mtd/nand/vf610_nfc.c b/drivers/mtd/nand/vf610_nfc.c
+index eba67dc..14f51c8 100644
+--- a/drivers/mtd/nand/vf610_nfc.c
++++ b/drivers/mtd/nand/vf610_nfc.c
+@@ -19,8 +19,8 @@
+  * - Untested on MPC5125 and M54418.
+  * - DMA and pipelining not used.
+  * - 2K pages or less.
+- * - No chip select, one NAND chip per controller.
+- * - No hardware ECC.
++ * - HW ECC: Only 2K page with 64+ OOB.
++ * - HW ECC: Only 24 and 32-bit error correction implemented.
+  */
+ 
+ #include <linux/module.h>
+@@ -77,6 +77,8 @@
+ 
+ /* NFC ECC mode define */
+ #define ECC_BYPASS			0
++#define ECC_45_BYTE			6
++#define ECC_60_BYTE			7
+ 
+ /*** Register Mask and bit definitions */
+ 
+@@ -129,6 +131,18 @@
+ #define CMD_DONE_CLEAR_BIT			BIT(18)
+ #define IDLE_CLEAR_BIT				BIT(17)
+ 
++/*
++ * ECC status - seems to consume 8 bytes (double word). The documented
++ * status byte is located in the lowest byte of the second word (which is
++ * the 4th or 7th byte depending on endianness).
++ * Calculate an offset to store the ECC status at the end of the buffer.
++ */
++#define ECC_SRAM_ADDR		(PAGE_2K + OOB_MAX - 8)
++
++#define ECC_STATUS		0x4
++#define ECC_STATUS_MASK		0x80
++#define ECC_STATUS_ERR_COUNT	0x3F
++
+ enum vf610_nfc_alt_buf {
+ 	ALT_BUF_DATA = 0,
+ 	ALT_BUF_ID = 1,
+@@ -152,10 +166,40 @@ struct vf610_nfc {
+ 	enum vf610_nfc_alt_buf alt_buf;
+ 	enum vf610_nfc_variant variant;
+ 	struct clk *clk;
++	bool use_hw_ecc;
++	u32 ecc_mode;
+ };
+ 
+ #define mtd_to_nfc(_mtd) container_of(_mtd, struct vf610_nfc, mtd)
+ 
++static struct nand_ecclayout vf610_nfc_ecc45 = {
++	.eccbytes = 45,
++	.eccpos = {19, 20, 21, 22, 23,
++		   24, 25, 26, 27, 28, 29, 30, 31,
++		   32, 33, 34, 35, 36, 37, 38, 39,
++		   40, 41, 42, 43, 44, 45, 46, 47,
++		   48, 49, 50, 51, 52, 53, 54, 55,
++		   56, 57, 58, 59, 60, 61, 62, 63},
++	.oobfree = {
++		{.offset = 2,
++		 .length = 17} }
++};
++
++static struct nand_ecclayout vf610_nfc_ecc60 = {
++	.eccbytes = 60,
++	.eccpos = { 4,  5,  6,  7,  8,  9, 10, 11,
++		   12, 13, 14, 15, 16, 17, 18, 19,
++		   20, 21, 22, 23, 24, 25, 26, 27,
++		   28, 29, 30, 31, 32, 33, 34, 35,
++		   36, 37, 38, 39, 40, 41, 42, 43,
++		   44, 45, 46, 47, 48, 49, 50, 51,
++		   52, 53, 54, 55, 56, 57, 58, 59,
++		   60, 61, 62, 63 },
++	.oobfree = {
++		{.offset = 2,
++		 .length = 2} }
++};
++
+ static inline u32 vf610_nfc_read(struct vf610_nfc *nfc, uint reg)
+ {
+ 	return readl(nfc->regs + reg);
+@@ -298,6 +342,13 @@ static void vf610_nfc_addr_cycle(struct vf610_nfc *nfc, int column, int page)
+ 				    ROW_ADDR_SHIFT, page);
+ }
+ 
++static inline void vf610_nfc_ecc_mode(struct vf610_nfc *nfc, int ecc_mode)
++{
++	vf610_nfc_set_field(nfc, NFC_FLASH_CONFIG,
++			    CONFIG_ECC_MODE_MASK,
++			    CONFIG_ECC_MODE_SHIFT, ecc_mode);
++}
++
+ static inline void vf610_nfc_transfer_size(struct vf610_nfc *nfc, int size)
+ {
+ 	vf610_nfc_write(nfc, NFC_SECTOR_SIZE, size);
+@@ -316,6 +367,8 @@ static void vf610_nfc_command(struct mtd_info *mtd, unsigned command,
+ 	case NAND_CMD_SEQIN:
+ 		/* Use valid column/page from preread... */
+ 		vf610_nfc_addr_cycle(nfc, column, page);
++		nfc->buf_offset = 0;
++
+ 		/*
+ 		 * SEQIN => data => PAGEPROG sequence is done by the controller
+ 		 * hence we do not need to issue the command here...
+@@ -324,6 +377,11 @@ static void vf610_nfc_command(struct mtd_info *mtd, unsigned command,
+ 	case NAND_CMD_PAGEPROG:
+ 		trfr_sz += nfc->write_sz;
+ 
++		if (nfc->use_hw_ecc)
++			vf610_nfc_ecc_mode(nfc, nfc->ecc_mode);
++		else
++			vf610_nfc_ecc_mode(nfc, ECC_BYPASS);
++
+ 		vf610_nfc_transfer_size(nfc, trfr_sz);
+ 		vf610_nfc_send_commands(nfc, NAND_CMD_SEQIN,
+ 					command, PROGRAM_PAGE_CMD_CODE);
+@@ -341,11 +399,13 @@ static void vf610_nfc_command(struct mtd_info *mtd, unsigned command,
+ 		vf610_nfc_send_commands(nfc, NAND_CMD_READ0,
+ 					NAND_CMD_READSTART, READ_PAGE_CMD_CODE);
+ 		vf610_nfc_addr_cycle(nfc, column, page);
++		vf610_nfc_ecc_mode(nfc, ECC_BYPASS);
+ 		break;
+ 
+ 	case NAND_CMD_READ0:
+ 		trfr_sz += mtd->writesize + mtd->oobsize;
+ 		vf610_nfc_transfer_size(nfc, trfr_sz);
++		vf610_nfc_ecc_mode(nfc, nfc->ecc_mode);
+ 		vf610_nfc_send_commands(nfc, NAND_CMD_READ0,
+ 					NAND_CMD_READSTART, READ_PAGE_CMD_CODE);
+ 		vf610_nfc_addr_cycle(nfc, column, page);
+@@ -358,6 +418,7 @@ static void vf610_nfc_command(struct mtd_info *mtd, unsigned command,
+ 		vf610_nfc_send_command(nfc, command, READ_ONFI_PARAM_CMD_CODE);
+ 		vf610_nfc_set_field(nfc, NFC_ROW_ADDR, ROW_ADDR_MASK,
+ 				    ROW_ADDR_SHIFT, column);
++		vf610_nfc_ecc_mode(nfc, ECC_BYPASS);
+ 		break;
+ 
+ 	case NAND_CMD_ERASE1:
+@@ -387,6 +448,7 @@ static void vf610_nfc_command(struct mtd_info *mtd, unsigned command,
+ 
+ 	vf610_nfc_done(nfc);
+ 
++	nfc->use_hw_ecc = false;
+ 	nfc->write_sz = 0;
+ }
+ 
+@@ -481,6 +543,94 @@ static void vf610_nfc_select_chip(struct mtd_info *mtd, int chip)
+ 	vf610_nfc_write(nfc, NFC_ROW_ADDR, tmp);
+ }
+ 
++/* Count the number of 0's in buff up to max_bits */
++static inline int count_written_bits(uint8_t *buff, int size, int max_bits)
++{
++	uint32_t *buff32 = (uint32_t *)buff;
++	int k, written_bits = 0;
++
++	for (k = 0; k < (size / 4); k++) {
++		written_bits += hweight32(~buff32[k]);
++		if (unlikely(written_bits > max_bits))
++			break;
++	}
++
++	return written_bits;
++}
++
++static inline int vf610_nfc_correct_data(struct mtd_info *mtd, uint8_t *dat,
++					 uint8_t *oob, int page)
++{
++	struct vf610_nfc *nfc = mtd_to_nfc(mtd);
++	u32 ecc_status_off = NFC_MAIN_AREA(0) + ECC_SRAM_ADDR + ECC_STATUS;
++	u8 ecc_status;
++	u8 ecc_count;
++	int flips;
++	int flips_threshold = nfc->chip.ecc.strength / 2;
++
++	ecc_status = vf610_nfc_read(nfc, ecc_status_off) & 0xff;
++	ecc_count = ecc_status & ECC_STATUS_ERR_COUNT;
++
++	if (!(ecc_status & ECC_STATUS_MASK))
++		return ecc_count;
++
++	/* Read OOB without ECC unit enabled */
++	vf610_nfc_command(mtd, NAND_CMD_READOOB, 0, page);
++	vf610_nfc_read_buf(mtd, oob, mtd->oobsize);
++
++	/*
++	 * On an erased page, bit count (including OOB) should be zero or
++	 * at least less then half of the ECC strength.
++	 */
++	flips = count_written_bits(dat, nfc->chip.ecc.size, flips_threshold);
++	flips += count_written_bits(oob, mtd->oobsize, flips_threshold);
++
++	if (unlikely(flips > flips_threshold))
++		return -EINVAL;
++
++	/* Erased page. */
++	memset(dat, 0xff, nfc->chip.ecc.size);
++	memset(oob, 0xff, mtd->oobsize);
++	return 0;
++}
++
++static int vf610_nfc_read_page(struct mtd_info *mtd, struct nand_chip *chip,
++				uint8_t *buf, int oob_required, int page)
++{
++	int eccsize = chip->ecc.size;
++	int stat;
++
++	vf610_nfc_read_buf(mtd, buf, eccsize);
++	if (oob_required)
++		vf610_nfc_read_buf(mtd, chip->oob_poi, mtd->oobsize);
++
++	stat = vf610_nfc_correct_data(mtd, buf, chip->oob_poi, page);
++
++	if (stat < 0) {
++		mtd->ecc_stats.failed++;
++		return 0;
++	} else {
++		mtd->ecc_stats.corrected += stat;
++		return stat;
++	}
++}
++
++static int vf610_nfc_write_page(struct mtd_info *mtd, struct nand_chip *chip,
++			       const uint8_t *buf, int oob_required)
++{
++	struct vf610_nfc *nfc = mtd_to_nfc(mtd);
++
++	vf610_nfc_write_buf(mtd, buf, mtd->writesize);
++	if (oob_required)
++		vf610_nfc_write_buf(mtd, chip->oob_poi, mtd->oobsize);
++
++	/* Always write whole page including OOB due to HW ECC */
++	nfc->use_hw_ecc = true;
++	nfc->write_sz = mtd->writesize + mtd->oobsize;
++
++	return 0;
++}
++
+ static const struct of_device_id vf610_nfc_dt_ids[] = {
+ 	{ .compatible = "fsl,vf610-nfc", .data = (void *)NFC_VFC610 },
+ 	{ /* sentinel */ }
+@@ -507,6 +657,17 @@ static void vf610_nfc_init_controller(struct vf610_nfc *nfc)
+ 		vf610_nfc_set(nfc, NFC_FLASH_CONFIG, CONFIG_16BIT);
+ 	else
+ 		vf610_nfc_clear(nfc, NFC_FLASH_CONFIG, CONFIG_16BIT);
++
++	if (nfc->chip.ecc.mode == NAND_ECC_HW) {
++		/* Set ECC status offset in SRAM */
++		vf610_nfc_set_field(nfc, NFC_FLASH_CONFIG,
++				    CONFIG_ECC_SRAM_ADDR_MASK,
++				    CONFIG_ECC_SRAM_ADDR_SHIFT,
++				    ECC_SRAM_ADDR >> 3);
++
++		/* Enable ECC status in SRAM */
++		vf610_nfc_set(nfc, NFC_FLASH_CONFIG, CONFIG_ECC_SRAM_REQ_BIT);
++	}
+ }
+ 
+ static int vf610_nfc_probe(struct platform_device *pdev)
+@@ -614,6 +775,45 @@ static int vf610_nfc_probe(struct platform_device *pdev)
+ 		goto error;
+ 	}
+ 
++	if (chip->ecc.mode == NAND_ECC_HW) {
++		if (mtd->writesize != PAGE_2K && mtd->oobsize < 64) {
++			dev_err(nfc->dev, "Unsupported flash with hwecc\n");
++			err = -ENXIO;
++			goto error;
++		}
++
++		if (chip->ecc.size != mtd->writesize) {
++			dev_err(nfc->dev, "Step size needs to be page size\n");
++			err = -ENXIO;
++			goto error;
++		}
++
++		/* Only 64 byte ECC layouts known */
++		if (mtd->oobsize > 64)
++			mtd->oobsize = 64;
++
++		if (chip->ecc.strength == 32) {
++			nfc->ecc_mode = ECC_60_BYTE;
++			chip->ecc.bytes = 60;
++			chip->ecc.layout = &vf610_nfc_ecc60;
++		} else if (chip->ecc.strength == 24) {
++			nfc->ecc_mode = ECC_45_BYTE;
++			chip->ecc.bytes = 45;
++			chip->ecc.layout = &vf610_nfc_ecc45;
++		} else {
++			dev_err(nfc->dev, "Unsupported ECC strength\n");
++			err = -ENXIO;
++			goto error;
++		}
++
++		/* propagate ecc.layout to mtd_info */
++		mtd->ecclayout = chip->ecc.layout;
++		chip->ecc.read_page = vf610_nfc_read_page;
++		chip->ecc.write_page = vf610_nfc_write_page;
++
++		chip->ecc.size = PAGE_2K;
++	}
++
+ 	/* second phase scan */
+ 	if (nand_scan_tail(mtd)) {
+ 		err = -ENXIO;
 -- 
 2.5.0
