@@ -1,30 +1,39 @@
-From: luis@debethencourt.com (Luis de Bethencourt)
-Date: Fri, 28 Aug 2015 14:43:33 +0200
-Subject: [PATCH 2/5] clk: sunxi: sun6i-apb0-gates: Fix module autoload for OF
- platform driver
-Message-ID: <20150828124333.GA26601@goodgumbo.baconseed.org>
+From: marcel.ziswiler@toradex.com (Marcel Ziswiler)
+Date: Fri, 28 Aug 2015 14:42:36 +0200
+Subject: [PATCH 9/9] arm: tegra: apalis_t30: fix power/wakeup key for eval
+ board
+In-Reply-To: <1440765756-1382-1-git-send-email-marcel.ziswiler@toradex.com>
+References: <1440765756-1382-1-git-send-email-marcel.ziswiler@toradex.com>
+Message-ID: <1440765756-1382-10-git-send-email-marcel.ziswiler@toradex.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This platform driver has a OF device ID table but the OF module
-alias information is not created so module autoloading won't work.
+Rather than a power key WAKE1_MICO is actually a standard Apalis MXM3
+pin used for wake-up purpose which this patch fixes.
 
-Signed-off-by: Luis de Bethencourt <luis@debethencourt.com>
+Signed-off-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
 ---
- drivers/clk/sunxi/clk-sun6i-apb0-gates.c | 1 +
- 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/clk/sunxi/clk-sun6i-apb0-gates.c b/drivers/clk/sunxi/clk-sun6i-apb0-gates.c
-index 64f3e46..23d042a 100644
---- a/drivers/clk/sunxi/clk-sun6i-apb0-gates.c
-+++ b/drivers/clk/sunxi/clk-sun6i-apb0-gates.c
-@@ -34,6 +34,7 @@ static const struct of_device_id sun6i_a31_apb0_gates_clk_dt_ids[] = {
- 	{ .compatible = "allwinner,sun8i-a23-apb0-gates-clk", .data = &sun8i_a23_apb0_gates },
- 	{ /* sentinel */ }
- };
-+MODULE_DEVICE_TABLE(of, sun6i_a31_apb0_gates_clk_dt_ids);
+ arch/arm/boot/dts/tegra30-apalis-eval.dts | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/boot/dts/tegra30-apalis-eval.dts b/arch/arm/boot/dts/tegra30-apalis-eval.dts
+index c832c15..f2879cf 100644
+--- a/arch/arm/boot/dts/tegra30-apalis-eval.dts
++++ b/arch/arm/boot/dts/tegra30-apalis-eval.dts
+@@ -191,10 +191,10 @@
+ 	gpio-keys {
+ 		compatible = "gpio-keys";
  
- static int sun6i_a31_apb0_gates_clk_probe(struct platform_device *pdev)
- {
+-		power {
+-			label = "Power";
++		wakeup {
++			label = "WAKE1_MICO";
+ 			gpios = <&gpio TEGRA_GPIO(V, 1) GPIO_ACTIVE_LOW>;
+-			linux,code = <KEY_POWER>;
++			linux,code = <KEY_WAKEUP>;
+ 			debounce-interval = <10>;
+ 			gpio-key,wakeup;
+ 		};
 -- 
-2.4.6
+2.4.3
