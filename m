@@ -1,37 +1,30 @@
-From: marcel.ziswiler@toradex.com (Marcel Ziswiler)
-Date: Fri, 28 Aug 2015 14:42:28 +0200
-Subject: [PATCH 1/9] arm: tegra: apalis_t30: update hardware revisions
- compatibility comment
-In-Reply-To: <1440765756-1382-1-git-send-email-marcel.ziswiler@toradex.com>
-References: <1440765756-1382-1-git-send-email-marcel.ziswiler@toradex.com>
-Message-ID: <1440765756-1382-2-git-send-email-marcel.ziswiler@toradex.com>
+From: luis@debethencourt.com (Luis de Bethencourt)
+Date: Fri, 28 Aug 2015 14:43:14 +0200
+Subject: [PATCH 1/5] clk: sunxi: sun6i-apb0: Fix module autoload for OF
+ platform driver
+Message-ID: <20150828124314.GA26550@goodgumbo.baconseed.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update introductory comment about what exact hardware revisions this
-device tree is compatible with as a hint for our customers.
+This platform driver has a OF device ID table but the OF module
+alias information is not created so module autoloading won't work.
 
-Signed-off-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
+Signed-off-by: Luis de Bethencourt <luis@debethencourt.com>
 ---
+ drivers/clk/sunxi/clk-sun6i-apb0.c | 1 +
+ 1 file changed, 1 insertion(+)
 
- arch/arm/boot/dts/tegra30-apalis.dtsi | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/boot/dts/tegra30-apalis.dtsi b/arch/arm/boot/dts/tegra30-apalis.dtsi
-index a5446cb..3bff4d7 100644
---- a/arch/arm/boot/dts/tegra30-apalis.dtsi
-+++ b/arch/arm/boot/dts/tegra30-apalis.dtsi
-@@ -1,8 +1,9 @@
- #include "tegra30.dtsi"
+diff --git a/drivers/clk/sunxi/clk-sun6i-apb0.c b/drivers/clk/sunxi/clk-sun6i-apb0.c
+index 7076360..e703e18 100644
+--- a/drivers/clk/sunxi/clk-sun6i-apb0.c
++++ b/drivers/clk/sunxi/clk-sun6i-apb0.c
+@@ -61,6 +61,7 @@ static const struct of_device_id sun6i_a31_apb0_clk_dt_ids[] = {
+ 	{ .compatible = "allwinner,sun6i-a31-apb0-clk" },
+ 	{ /* sentinel */ }
+ };
++MODULE_DEVICE_TABLE(of, sun6i_a31_apb0_clk_dt_ids);
  
- /*
-- * Toradex Apalis T30 Device Tree
-- * Compatible for Revisions 1GB: V1.0A; 2GB: V1.0B, V1.0C
-+ * Toradex Apalis T30 Module Device Tree
-+ * Compatible for Revisions 1GB: V1.0A, V1.1A; 1GB IT: V1.1A;
-+ * 2GB: V1.0B, V1.0C, V1.0E, V1.1A
-  */
- / {
- 	model = "Toradex Apalis T30";
+ static struct platform_driver sun6i_a31_apb0_clk_driver = {
+ 	.driver = {
 -- 
-2.4.3
+2.4.6
