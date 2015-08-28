@@ -1,30 +1,38 @@
-From: luis@debethencourt.com (Luis de Bethencourt)
-Date: Fri, 28 Aug 2015 14:44:32 +0200
-Subject: [PATCH 5/5] clk: sunxi: sun9i-mmc: Fix module autoload for OF
- platform driver
-Message-ID: <20150828124432.GA26670@goodgumbo.baconseed.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 28 Aug 2015 14:58:51 +0200
+Subject: [PATCH 0/5] clk: sunxi: Fix module autoload for OF platform driver
+In-Reply-To: <20150828124222.GA24923@goodgumbo.baconseed.org>
+References: <20150828124222.GA24923@goodgumbo.baconseed.org>
+Message-ID: <20150828125851.GO29389@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This platform driver has a OF device ID table but the OF module
-alias information is not created so module autoloading won't work.
+On Fri, Aug 28, 2015 at 02:42:22PM +0200, Luis de Bethencourt wrote:
+> Hello,
+> 
+> This series add the missing MODULE_DEVICE_TABLE() for OF to eport
+> that information so modules have the correct aliases built-in
+> and autoloading works correctly.
+> 
+> A longer explanation by Javier Canillas can be found here:
+> https://lkml.org/lkml/2015/7/30/519
 
-Signed-off-by: Luis de Bethencourt <luis@debethencourt.com>
----
- drivers/clk/sunxi/clk-sun9i-mmc.c | 1 +
- 1 file changed, 1 insertion(+)
+On the whole serie,
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-diff --git a/drivers/clk/sunxi/clk-sun9i-mmc.c b/drivers/clk/sunxi/clk-sun9i-mmc.c
-index 710c273..7618b13 100644
---- a/drivers/clk/sunxi/clk-sun9i-mmc.c
-+++ b/drivers/clk/sunxi/clk-sun9i-mmc.c
-@@ -203,6 +203,7 @@ static const struct of_device_id sun9i_a80_mmc_config_clk_dt_ids[] = {
- 	{ .compatible = "allwinner,sun9i-a80-mmc-config-clk" },
- 	{ /* sentinel */ }
- };
-+MODULE_DEVICE_TABLE(of, sun9i_a80_mmc_config_clk_dt_ids);
- 
- static struct platform_driver sun9i_a80_mmc_config_clk_driver = {
- 	.driver = {
+Mike, Stephen, can you apply them directly as fixes for 4.3 ?
+
+Thanks,
+Maxime
+
 -- 
-2.4.6
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150828/9b893158/attachment-0001.sig>
