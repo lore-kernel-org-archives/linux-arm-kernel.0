@@ -1,29 +1,317 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 28 Aug 2015 14:34:43 +0200
-Subject: [PATCH 5/6] ARM: dts: sun6i: Add support for Sinlinx A31s SDK
- board
-In-Reply-To: <1440755679-8266-6-git-send-email-wens@csie.org>
+Date: Fri, 28 Aug 2015 14:38:05 +0200
+Subject: [PATCH 6/6] ARM: dts: sun6i: Add dts file for MSI Primo81 tablet
+In-Reply-To: <1440755679-8266-7-git-send-email-wens@csie.org>
 References: <1440755679-8266-1-git-send-email-wens@csie.org>
- <1440755679-8266-6-git-send-email-wens@csie.org>
-Message-ID: <20150828123443.GM29389@lukather>
+ <1440755679-8266-7-git-send-email-wens@csie.org>
+Message-ID: <20150828123805.GN29389@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 28, 2015 at 05:54:38PM +0800, Chen-Yu Tsai wrote:
-> The Sinlinx A31s SDK is a A31s based module/baseboard development kit.
+On Fri, Aug 28, 2015 at 05:54:39PM +0800, Chen-Yu Tsai wrote:
+> From: Karsten Merker <merker@debian.org>
 > 
-> The core module has the SoC, PMIC, DRAM, eMMC and supporting components.
-> There are also pads for UART0, JTAG and I2S.
+> The MSI Primo81 is an A31s based tablet, with 1G RAM, 16G NAND,
+> 768x1024 IPS LCD display, mono speaker, 0.3 MP front camera, 2.0 MP
+> rear camera, 3500 mAh battery, gt911 touchscreen, mma8452 accelerometer
+> and rtl8188etv usb wifi. Has "power", "volume+" and "volume-" buttons
+> (both volume buttons are also connected to the UBOOT_SEL pin). The
+> external connectors are represented by MicroSD slot, MiniHDMI, MicroUSB
+> OTG and 3.5mm headphone jack. More details are available at
+> 
+>     http://linux-sunxi.org/MSI_Primo81
 
-Can you use that core module without that baseboard?
+Again, not a huge fan of the commit logs URL... This commit log is
+already fine without it.
 
-> The baseboard has 100 Mbps Ethernet, 5x USB 2.0 host ports via a USB 2.0
-> hub chip, MMC, HDMI, SPDIF, CIR, audio jacks, 2 tablet-like volume
-> buttons, RS232 style UART and USB OTG (though VBUS is not connected).
-> Various headers are available for other addon modules, such as SDIO
-> WiFi, LCD display, camera sensor, UARTs, I2C, SPI and GPIOs.
+> 
+> USB OTG is enabled in host only mode. AXP221 USB power supply and
+> GPIO support are required for full USB OTG support.
+> 
+> Signed-off-by: Siarhei Siamashka <siarhei.siamashka@gmail.com>
+> Signed-off-by: Karsten Merker <merker@debian.org>
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+> 
+> Changes since v4:
+> 
+>   - Use axp221.dtsi and add all active regulators.
+>   - Enable i2c controllers for capacitive touch panel and accelerometer.
+>   - Mark i2c controller for camera sensors as failed for now.
+>   - Enable USB OTG in host only mode.
+>   - Drop uart0 as this is not tested.
+>   - s/library/file/ in GPL header.
+> 
+> ---
+>  arch/arm/boot/dts/Makefile               |   1 +
+>  arch/arm/boot/dts/sun6i-a31s-primo81.dts | 255 +++++++++++++++++++++++++++++++
+>  2 files changed, 256 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/sun6i-a31s-primo81.dts
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index ada5156fdd49..c87513ed4eb4 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -579,6 +579,7 @@ dtb-$(CONFIG_MACH_SUN6I) += \
+>  	sun6i-a31-m9.dtb \
+>  	sun6i-a31-mele-a1000g-quad.dtb \
+>  	sun6i-a31s-cs908.dtb \
+> +	sun6i-a31s-primo81.dtb \
+>  	sun6i-a31s-sina31s.dtb
+>  dtb-$(CONFIG_MACH_SUN7I) += \
+>  	sun7i-a20-bananapi.dtb \
+> diff --git a/arch/arm/boot/dts/sun6i-a31s-primo81.dts b/arch/arm/boot/dts/sun6i-a31s-primo81.dts
+> new file mode 100644
+> index 000000000000..d22befaf363b
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/sun6i-a31s-primo81.dts
+> @@ -0,0 +1,255 @@
+> +/*
+> + * Copyright 2014 Siarhei Siamashka <siarhei.siamashka@gmail.com>
+> + * Copyright 2015 Karsten Merker <merker@debian.org>
+> + * Copyright 2015 Chen-Yu Tsai <wens@csie.org>
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This file is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +
+> +/dts-v1/;
+> +#include "sun6i-a31s.dtsi"
+> +#include "sunxi-common-regulators.dtsi"
+> +
+> +#include <dt-bindings/gpio/gpio.h>
+> +#include <dt-bindings/input/input.h>
+> +#include <dt-bindings/pinctrl/sun4i-a10.h>
+> +
+> +/ {
+> +	model = "MSI Primo81 tablet";
+> +	compatible = "msi,primo81", "allwinner,sun6i-a31s";
+> +};
+> +
+> +&cpu0 {
+> +	cpu-supply = <&reg_dcdc2>;
+> +};
+> +
+> +&ehci0 {
+> +	/* rtl8188etv wifi is connected here */
+> +	status = "okay";
+> +};
+> +
+> +&i2c0 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&i2c0_pins_a>;
+> +	/* pull-ups and device VDDIO require AXP221 DLDO3 */
 
-Can the baseboard be used with our core modules?
+Now that we have AXP221, that can probably be solved, right?
+
+> +	status = "failed";
+> +};
+> +
+> +&i2c1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&i2c1_pins_a>;
+> +	status = "okay";
+> +
+> +	ctp at 5d {
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&gt911_int_primo81>;
+> +		compatible = "goodix,gt911";
+> +		reg = <0x5d>;
+> +		interrupt-parent = <&pio>;
+> +		interrupts = <0 3 IRQ_TYPE_LEVEL_HIGH>; /* PA3 */
+> +		/*
+> +		 * The default 0,0 coordinate is at the corner closest to
+> +		 * the headphone jack. X goes along the long side, while
+> +		 * Y goes along the short side.
+> +		 */
+
+I'm not exactly sure what that comment is supposed to be for...
+
+> +	};
+> +};
+> +
+> +&i2c2 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&i2c2_pins_a>;
+> +	status = "okay";
+> +
+> +	accelerometer at 1c {
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&mma8452_int_primo81>;
+> +		compatible = "fsl,mma8452";
+> +		reg = <0x1c>;
+> +		interrupt-parent = <&pio>;
+> +		interrupts = <0 9 IRQ_TYPE_LEVEL_HIGH>; /* PA9 */
+> +		#io-channel-cells = <1>;
+> +	};
+> +};
+> +
+> +&lradc {
+> +	vref-supply = <&reg_aldo3>;
+> +	status = "okay";
+> +
+> +	button at 158 {
+> +		label = "Volume Up";
+> +		linux,code = <KEY_VOLUMEUP>;
+> +		channel = <0>;
+> +		voltage = <158730>;
+> +	};
+> +
+> +	button at 349 {
+> +		label = "Volume Down";
+> +		linux,code = <KEY_VOLUMEDOWN>;
+> +		channel = <0>;
+> +		voltage = <349206>;
+> +	};
+> +};
+> +
+> +&mmc0 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_primo81>;
+> +	vmmc-supply = <&reg_dcdc1>;
+> +	bus-width = <4>;
+> +	cd-gpios = <&pio 0 8 GPIO_ACTIVE_HIGH>; /* PA8 */
+> +	cd-inverted;
+> +	status = "okay";
+> +};
+> +
+> +&pio {
+> +	gt911_int_primo81: gt911_int_pin at 0 {
+> +		allwinner,pins = "PA3";
+> +		allwinner,function = "gpio_in";
+> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> +		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+> +	};
+> +
+> +	mma8452_int_primo81: mma8452_int_pin at 0 {
+> +		allwinner,pins = "PA9";
+> +		allwinner,function = "gpio_in";
+> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> +		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+> +	};
+> +
+> +	mmc0_cd_pin_primo81: mmc0_cd_pin at 0 {
+> +		allwinner,pins = "PA8";
+> +		allwinner,function = "gpio_in";
+> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> +		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+> +	};
+> +};
+> +
+> +&p2wi {
+> +	status = "okay";
+> +
+> +	axp221: pmic at 68 {
+> +		compatible = "x-powers,axp221";
+> +		reg = <0x68>;
+> +		interrupt-parent = <&nmi_intc>;
+> +		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
+> +	};
+> +};
+> +
+> +#include "axp221.dtsi"
+> +
+> +&reg_dcdc1 {
+> +	regulator-always-on;
+> +	regulator-min-microvolt = <3000000>;
+> +	regulator-max-microvolt = <3000000>;
+> +	regulator-name = "vcc-3v0";
+> +};
+> +
+> +&reg_dcdc2 {
+> +	regulator-always-on;
+> +	regulator-min-microvolt = <700000>;
+> +	regulator-max-microvolt = <1320000>;
+> +	regulator-name = "vdd-cpu";
+> +};
+> +
+> +&reg_dcdc3 {
+> +	regulator-always-on;
+> +	regulator-min-microvolt = <700000>;
+> +	regulator-max-microvolt = <1320000>;
+> +	regulator-name = "vdd-gpu";
+> +};
+
+The GPU regulator can probably be disabled...
+
+> +&reg_dcdc4 {
+> +	regulator-always-on;
+> +	regulator-min-microvolt = <1240000>;
+> +	regulator-max-microvolt = <1240000>;
+> +	regulator-name = "vdd-sys-dll";
+> +};
+> +
+> +&reg_dcdc5 {
+> +	regulator-always-on;
+> +	regulator-min-microvolt = <1500000>;
+> +	regulator-max-microvolt = <1500000>;
+> +	regulator-name = "vcc-dram";
+> +};
+> +
+> +&reg_aldo3 {
+> +	regulator-always-on;
+> +	regulator-min-microvolt = <3000000>;
+> +	regulator-max-microvolt = <3000000>;
+> +	regulator-name = "avcc";
+> +};
+> +
+> +&reg_dldo1 {
+> +	regulator-min-microvolt = <3300000>;
+> +	regulator-max-microvolt = <3300000>;
+> +	regulator-name = "vcc-wifi";
+> +};
+> +
+> +&reg_eldo3 {
+> +	regulator-always-on;
+> +	regulator-min-microvolt = <1200000>;
+> +	regulator-max-microvolt = <1200000>;
+> +	regulator-name = "vcc-mipi-bridge";
+> +	/* This is used by simplefb LCD display. Add regulator support? */
+> +};
+> +
+> +&reg_dc1sw {
+> +	regulator-always-on;
+> +	regulator-min-microvolt = <3000000>;
+> +	regulator-max-microvolt = <3000000>;
+> +	regulator-name = "vcc-lcd";
+> +	/* This is used by simplefb LCD display. Add regulator support? */
+
+Yes.
 
 Thanks,
 Maxime
@@ -38,4 +326,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150828/d55d427f/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150828/40b50101/attachment-0001.sig>
