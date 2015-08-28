@@ -1,97 +1,79 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Fri, 28 Aug 2015 11:02:29 +0800
-Subject: [PATCH v6] arm64: dts: Add spi bus dts
-In-Reply-To: <CAGS+omCFQRoH3ft2O5qPLBgngCuLPaminTys5OU6QcKmRXTyNw@mail.gmail.com>
-References: <1439782198-32396-1-git-send-email-leilk.liu@mediatek.com>
- <CAGS+omCFQRoH3ft2O5qPLBgngCuLPaminTys5OU6QcKmRXTyNw@mail.gmail.com>
-Message-ID: <CAGS+omBBGmMzo6WeOdasMT9c-4BhKGJz1iPJjxF5vzJJ0J=Pug@mail.gmail.com>
+From: zhang.chunyan@linaro.org (Chunyan Zhang)
+Date: Fri, 28 Aug 2015 12:10:01 +0800
+Subject: [PATCH v2] Coresight: ETMv4: Prevent TRCRSCTLR0&1 from being accessed
+Message-ID: <1440735001-29760-1-git-send-email-zhang.chunyan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Matthias,
+1. TRCRSCTLRn - Resource Selection Control Registers n=0~1 are reserved,
+   we shouldn't access them.
+2. The max number of 'n' here is defined in TRCIDR4.NUMRSPAIR whoes value
+   indicates the number of resource selection *pairs*, and 0 indicates
+   one resource selection pair, 1 indicates two pairs, and so on ...
 
-On Mon, Aug 17, 2015 at 12:32 PM, Daniel Kurtz <djkurtz@chromium.org> wrote:
-> On Mon, Aug 17, 2015 at 11:29 AM, Leilk Liu <leilk.liu@mediatek.com> wrote:
->>
->> This patch adds MT8173 spi bus controllers into device tree.
->>
->> Signed-off-by: Leilk Liu <leilk.liu@mediatek.com>
->
-> Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
+So, the total number of resource selection control registers which we can
+access is (TRCIDR4.NUMRSPAIR * 2)
 
-The other SPI patches have already been picked up in broonie's spi tree.
-Can you pick this one into your mediatek tree?
+Signed-off-by: Chunyan Zhang <zhang.chunyan@linaro.org>
+---
+ drivers/hwtracing/coresight/coresight-etm4x.c | 17 +++++++++++------
+ 1 file changed, 11 insertions(+), 6 deletions(-)
 
-Thanks.
--Dan
-
->
->> ---
->> Change in this patch:
->> pinctl and pad-select fields are board specific, so move to
->> mt8173-evb.dtsi, and status = "okay".
->> ---
->>  arch/arm64/boot/dts/mediatek/mt8173-evb.dts | 18 ++++++++++++++++++
->>  arch/arm64/boot/dts/mediatek/mt8173.dtsi    | 12 ++++++++++++
->>  2 files changed, 30 insertions(+)
->>
->> diff --git a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
->> index 4be66ca..811cb76 100644
->> --- a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
->> +++ b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
->> @@ -387,6 +387,24 @@
->>         };
->>  };
->>
->> +&pio {
->> +       spi_pins_a: spi0 {
->> +               pins_spi {
->> +                       pinmux = <MT8173_PIN_69_SPI_CK__FUNC_SPI_CK_0_>,
->> +                               <MT8173_PIN_70_SPI_MI__FUNC_SPI_MI_0_>,
->> +                               <MT8173_PIN_71_SPI_MO__FUNC_SPI_MO_0_>,
->> +                               <MT8173_PIN_72_SPI_CS__FUNC_SPI_CS_0_>;
->> +               };
->> +       };
->> +};
->> +
->> +&spi {
->> +       pinctrl-names = "default";
->> +       pinctrl-0 = <&spi_pins_a>;
->> +       mediatek,pad-select = <0>;
->> +       status = "okay";
->> +};
->> +
->>  &uart0 {
->>         status = "okay";
->>  };
->> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
->> index d18ee42..3dfb6ed 100644
->> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
->> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
->> @@ -365,6 +365,18 @@
->>                         status = "disabled";
->>                 };
->>
->> +               spi: spi at 1100a000 {
->> +                       compatible = "mediatek,mt8173-spi";
->> +                       #address-cells = <1>;
->> +                       #size-cells = <0>;
->> +                       reg = <0 0x1100a000 0 0x1000>;
->> +                       interrupts = <GIC_SPI 110 IRQ_TYPE_LEVEL_LOW>;
->> +                       clocks = <&topckgen CLK_TOP_SPI_SEL>,
->> +                                <&topckgen CLK_TOP_SYSPLL3_D2>;
->> +                       clock-names = "spi-clk", "parent-clk";
->> +                       status = "disabled";
->> +               };
->> +
->>                 i2c3: i2c3 at 11010000 {
->>                         compatible = "mediatek,mt8173-i2c";
->>                         reg = <0 0x11010000 0 0x70>,
->> --
->> 1.8.1.1.dirty
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->> Please read the FAQ at  http://www.tux.org/lkml/
+diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
+index 1312e99..fe93b47 100644
+--- a/drivers/hwtracing/coresight/coresight-etm4x.c
++++ b/drivers/hwtracing/coresight/coresight-etm4x.c
+@@ -136,7 +136,9 @@ static void etm4_enable_hw(void *info)
+ 		writel_relaxed(drvdata->cntr_val[i],
+ 			       drvdata->base + TRCCNTVRn(i));
+ 	}
+-	for (i = 0; i < drvdata->nr_resource; i++)
++
++	/* Resource selector pair 0 is always implemented and reserved */
++	for (i = 2; i < drvdata->nr_resource * 2; i++)
+ 		writel_relaxed(drvdata->res_ctrl[i],
+ 			       drvdata->base + TRCRSCTLRn(i));
+ 
+@@ -489,8 +491,9 @@ static ssize_t reset_store(struct device *dev,
+ 		drvdata->cntr_val[i] = 0x0;
+ 	}
+ 
+-	drvdata->res_idx = 0x0;
+-	for (i = 0; i < drvdata->nr_resource; i++)
++	/* Resource selector pair 0 is always implemented and reserved */
++	drvdata->res_idx = 0x2;
++	for (i = 2; i < drvdata->nr_resource * 2; i++)
+ 		drvdata->res_ctrl[i] = 0x0;
+ 
+ 	for (i = 0; i < drvdata->nr_ss_cmp; i++) {
+@@ -1729,7 +1732,7 @@ static ssize_t res_idx_store(struct device *dev,
+ 	if (kstrtoul(buf, 16, &val))
+ 		return -EINVAL;
+ 	/* Resource selector pair 0 is always implemented and reserved */
+-	if ((val == 0) || (val >= drvdata->nr_resource))
++	if (val < 2 || val >= drvdata->nr_resource * 2)
+ 		return -EINVAL;
+ 
+ 	/*
+@@ -2410,8 +2413,8 @@ static void etm4_init_arch_data(void *info)
+ 	drvdata->nr_addr_cmp = BMVAL(etmidr4, 0, 3);
+ 	/* NUMPC, bits[15:12] number of PE comparator inputs for tracing */
+ 	drvdata->nr_pe_cmp = BMVAL(etmidr4, 12, 15);
+-	/* NUMRSPAIR, bits[19:16] the number of resource pairs for tracing */
+-	drvdata->nr_resource = BMVAL(etmidr4, 16, 19);
++	/* NUMRSPAIR, bits[19:16] the number of resource pairs minus one */
++	drvdata->nr_resource = BMVAL(etmidr4, 16, 19) + 1;
+ 	/*
+ 	 * NUMSSCC, bits[23:20] the number of single-shot
+ 	 * comparator control for tracing
+@@ -2498,6 +2501,8 @@ static void etm4_init_default_data(struct etmv4_drvdata *drvdata)
+ 		drvdata->cntr_val[i] = 0x0;
+ 	}
+ 
++	/* Resource selector pair 0 is always implemented and reserved */
++	drvdata->res_idx = 0x2;
+ 	for (i = 2; i < drvdata->nr_resource * 2; i++)
+ 		drvdata->res_ctrl[i] = 0x0;
+ 
+-- 
+1.9.1
