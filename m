@@ -1,48 +1,48 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Fri, 28 Aug 2015 10:29:46 -0400
-Subject: [PATCH] ARM64: kernel: implement ACPI parking protocol
-In-Reply-To: <20150828102314.GC15924@red-moon>
-References: <1436959990-32054-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1437063431.3583.2.camel@redhat.com> <20150716171221.GB18582@red-moon>
- <1437068449.3583.4.camel@redhat.com> <20150828102314.GC15924@red-moon>
-Message-ID: <1440772186.31961.8.camel@redhat.com>
+From: julien.grall@citrix.com (Julien Grall)
+Date: Fri, 28 Aug 2015 15:29:19 +0100
+Subject: [Xen-devel] [PATCH v3 04/20] xen/grant: Introduce helpers to
+ split a page into grant
+In-Reply-To: <55D5A337.7090704@citrix.com>
+References: <1438966019-19322-1-git-send-email-julien.grall@citrix.com>
+ <1438966019-19322-5-git-send-email-julien.grall@citrix.com>
+ <55D5A337.7090704@citrix.com>
+Message-ID: <55E0703F.5060003@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-08-28 at 11:23 +0100, Lorenzo Pieralisi wrote:
-> Mark,
-> 
-> On Thu, Jul 16, 2015 at 06:40:49PM +0100, Mark Salter wrote:
-> 
-> [...]
-> 
-> > On Thu, 2015-07-16 at 18:12 +0100, Lorenzo Pieralisi wrote:
-> > > > The kernel will only add cached memory regions to linear mapping 
-> > > > and
-> > > > presumably, the FW will mark the mailboxes as uncached. Otherwise, 
-> > > > it
-> > > > is a FW bug. But I suppose we could run into problems with kernels
-> > > > using 64K pagesize since firmware assumes 4k.
-> > > 
-> > > Nope, ioremap takes care of that, everything should be fine.
-> > 
-> > The mailbox is 4K. If it is next to a cached UEFI region, the kernel 
-> > may
-> > have to overlap the mailbox with a cached 64K mapping in order to 
-> > include
-> > the adjoining UEFI region in the linear map. Then the ioremap would 
-> > fail
-> > because the mailbox is included in the linear mapping.
-> 
-> So that I understand: are you referring to memrange_efi_to_native()
-> in arch/arm64/kernel/efi.c ? Is it safe to round up (and add it to
-> the memblock layer) the memory region size to PAGE_SIZE without checking
-> attributes of overlapping (within PAGE_SIZE) UEFI regions ?
+Hi David,
 
-The problem is that nothing in the UEFI spec or parking protocol spec
-prevents firmware from placing a 4K parking protocol mailbox area in
-the same 64K page as normal cached memory which winds up mapped in
-the kernel linear mapping. The kernel might be able to work around
-that by not putting the 64K page in the linear map. There's nothing
-the kernel could do if the mailbox is in same 64K page with UEFI runtime
-memory which would use a cached mapping.
+On 20/08/15 10:51, David Vrabel wrote:
+> On 07/08/15 17:46, Julien Grall wrote:
+>> Currently, a grant is always based on the Xen page granularity (i.e
+>> 4KB). When Linux is using a different page granularity, a single page
+>> will be split between multiple grants.
+>>
+>> The new helpers will be in charge to split the Linux page into grants and
+>> call a function given by the caller on each grant.
+>>
+>> Also provide an helper to count the number of grants within a given
+>> contiguous region.
+>>
+>> Note that the x86/include/asm/xen/page.h is now including
+>> xen/interface/grant_table.h rather than xen/grant_table.h. It's
+>> necessary because xen/grant_table.h depends on asm/xen/page.h and will
+>> break the compilation. Furthermore, only definition in
+>> interface/grant_table.h was required.
+> 
+> Reviewed-by: David Vrabel <david.vrabel@citrix.com>
+> But...
+> 
+>> +/* Helper to get to call fn only on the first "grant chunk" */
+>> +static inline void gnttab_one_grant(struct page *page, unsigned int offset,
+>> +				    unsigned len, xen_grant_fn_t fn,
+>> +				    void *data)
+> 
+> ...call this gnttab_for_one_grant().
+
+Will rename it on the next version.
+
+Regards,
+
+-- 
+Julien Grall
