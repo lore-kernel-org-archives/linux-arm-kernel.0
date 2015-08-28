@@ -1,180 +1,170 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 28 Aug 2015 13:32:29 +0100
-Subject: [PATCH v5 2/4] Documentation: arm64/arm: dt bindings for numa.
-In-Reply-To: <1439570374-4079-3-git-send-email-gkulkarni@caviumnetworks.com>
-References: <1439570374-4079-1-git-send-email-gkulkarni@caviumnetworks.com>
- <1439570374-4079-3-git-send-email-gkulkarni@caviumnetworks.com>
-Message-ID: <20150828123228.GE31748@leverpostej>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 28 Aug 2015 14:32:45 +0200
+Subject: [PATCH 3/6] ARM: dts: sun6i: hummingbird: Use axp221.dtsi for
+ axp221 regulators
+In-Reply-To: <1440755679-8266-4-git-send-email-wens@csie.org>
+References: <1440755679-8266-1-git-send-email-wens@csie.org>
+ <1440755679-8266-4-git-send-email-wens@csie.org>
+Message-ID: <20150828123244.GK29389@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Fri, Aug 14, 2015 at 05:39:32PM +0100, Ganapatrao Kulkarni wrote:
-> DT bindings for numa map for memory, cores and IOs using
-> arm,associativity device node property.
-
-Given this is just a copy of ibm,associativity, I'm not sure I see much
-point in renaming the properties.
-
-However, (somewhat counter to that) I'm also concerned that this isn't
-sufficient for systems we're beginning to see today (more on that
-below), so I don't think a simple copy of ibm,associativity is good
-enough.
-
+On Fri, Aug 28, 2015 at 05:54:36PM +0800, Chen-Yu Tsai wrote:
+> Now that we have axp221.dtsi describing common axp22x hardware, use
+> it and reference the nodes instead of declaring the whole tree.
 > 
-> Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
+> Also add regulator reference for cpu0 supply.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 > ---
->  Documentation/devicetree/bindings/arm/numa.txt | 212 +++++++++++++++++++++++++
->  1 file changed, 212 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/numa.txt
+>  arch/arm/boot/dts/sun6i-a31-hummingbird.dts | 114 ++++++++++++++--------------
+>  1 file changed, 56 insertions(+), 58 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/numa.txt b/Documentation/devicetree/bindings/arm/numa.txt
-> new file mode 100644
-> index 0000000..dc3ef86
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/numa.txt
-> @@ -0,0 +1,212 @@
-> +==============================================================================
-> +NUMA binding description.
-> +==============================================================================
+> diff --git a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
+> index d0cfadac0691..d019cb70acec 100644
+> --- a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
+> +++ b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
+> @@ -67,6 +67,10 @@
+>  	};
+>  };
+>  
+> +&cpu0 {
+> +	cpu-supply = <&reg_dcdc2>;
+> +};
 > +
-> +==============================================================================
-> +1 - Introduction
-> +==============================================================================
+>  &ehci0 {
+>  	status = "okay";
+>  };
+> @@ -119,7 +123,7 @@
+>  &mmc0 {
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_hummingbird>;
+> -	vmmc-supply = <&vcc_3v0>;
+> +	vmmc-supply = <&reg_dcdc1>;
+>  	bus-width = <4>;
+>  	cd-gpios = <&pio 0 8 GPIO_ACTIVE_HIGH>; /* PA8 */
+>  	cd-inverted;
+> @@ -134,7 +138,7 @@
+>  &mmc1 {
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&mmc1_pins_a>, <&wifi_reset_pin_hummingbird>;
+> -	vmmc-supply = <&vcc_wifi>;
+> +	vmmc-supply = <&reg_aldo1>;
+>  	mmc-pwrseq = <&wifi_pwrseq>;
+>  	bus-width = <4>;
+>  	non-removable;
+> @@ -169,65 +173,59 @@
+>  		reg = <0x68>;
+>  		interrupt-parent = <&nmi_intc>;
+>  		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
+> -		interrupt-controller;
+> -		#interrupt-cells = <1>;
+> -		dcdc1-supply = <&vcc_3v0>;
+> -		dcdc5-supply = <&vcc_dram>;
+> -
+> -		regulators {
+> -			x-powers,dcdc-freq = <3000>;
+> -
+> -			vcc_3v0: dcdc1 {
+> -				regulator-always-on;
+> -				regulator-min-microvolt = <3000000>;
+> -				regulator-max-microvolt = <3000000>;
+> -				regulator-name = "vcc-3v0";
+> -			};
+> -
+> -			vdd_cpu: dcdc2 {
+> -				regulator-always-on;
+> -				regulator-min-microvolt = <700000>;
+> -				regulator-max-microvolt = <1320000>;
+> -				regulator-name = "vdd-cpu";
+> -			};
+> -
+> -			vdd_gpu: dcdc3 {
+> -				regulator-always-on;
+> -				regulator-min-microvolt = <700000>;
+> -				regulator-max-microvolt = <1320000>;
+> -				regulator-name = "vdd-gpu";
+> -			};
+> -
+> -			vdd_sys_dll: dcdc4 {
+> -				regulator-always-on;
+> -				regulator-min-microvolt = <1100000>;
+> -				regulator-max-microvolt = <1100000>;
+> -				regulator-name = "vdd-sys-dll";
+> -			};
+> -
+> -			vcc_dram: dcdc5 {
+> -				regulator-always-on;
+> -				regulator-min-microvolt = <1500000>;
+> -				regulator-max-microvolt = <1500000>;
+> -				regulator-name = "vcc-dram";
+> -			};
+> -
+> -			vcc_wifi: aldo1 {
+> -				regulator-min-microvolt = <3300000>;
+> -				regulator-max-microvolt = <3300000>;
+> -				regulator-name = "vcc_wifi";
+> -			};
+> -
+> -			avcc: aldo3 {
+> -				regulator-always-on;
+> -				regulator-min-microvolt = <3000000>;
+> -				regulator-max-microvolt = <3000000>;
+> -				regulator-name = "avcc";
+> -			};
+> -		};
+>  	};
+>  };
+>  
+> +#include "axp221.dtsi"
 > +
-> +Systems employing a Non Uniform Memory Access (NUMA) architecture contain
-> +collections of hardware resources including processors, memory, and I/O buses,
-> +that comprise what is commonly known as a NUMA node.
-> +Processor accesses to memory within the local NUMA node is generally faster
-> +than processor accesses to memory outside of the local NUMA node.
-> +DT defines interfaces that allow the platform to convey NUMA node
-> +topology information to OS.
+> +&reg_aldo1 {
+> +	regulator-min-microvolt = <3300000>;
+> +	regulator-max-microvolt = <3300000>;
+> +	regulator-name = "vcc-wifi";
+> +};
 > +
-> +==============================================================================
-> +2 - arm,associativity
-> +==============================================================================
-> +The mapping is done using arm,associativity device property.
-> +this property needs to be present in every device node which needs to to be
-> +mapped to numa nodes.
-
-Can't there be some inheritance? e.g. all devices on a bus with an
-arm,associativity property being assumed to share that value?
-
+> +&reg_aldo3 {
+> +	regulator-always-on;
+> +	regulator-min-microvolt = <3000000>;
+> +	regulator-max-microvolt = <3000000>;
+> +	regulator-name = "avcc";
+> +};
 > +
-> +arm,associativity property is set of 32-bit integers which defines level of
-
-s/set/list/ -- the order is important.
-
-> +topology and boundary in the system at which a significant difference in
-> +performance can be measured between cross-device accesses within
-> +a single location and those spanning multiple locations.
-> +The first cell always contains the broadest subdivision within the system,
-> +while the last cell enumerates the individual devices, such as an SMT thread
-> +of a CPU, or a bus bridge within an SoC".
-
-While this gives us some hierarchy, this doesn't seem to encode relative
-distances at all. That seems like an oversight.
-
-Additionally, I'm somewhat unclear on how what you'd be expected to
-provide for this property in cases like ring or mesh interconnects,
-where there isn't a strict hierarchy (see systems with ARM's own CCN, or
-Tilera's TILE-Mx), but there is some measure of closeness.
-
-Must all of these have the same length? If so, why not have a
-#(whatever)-cells property in the root to describe the expected length?
-If not, how are they to be interpreted relative to each other?
-
+> +&reg_dcdc1 {
+> +	regulator-always-on;
+> +	regulator-min-microvolt = <3000000>;
+> +	regulator-max-microvolt = <3000000>;
+> +	regulator-name = "vcc-3v0";
+> +};
 > +
-> +ex:
-
-s/ex/Example:/, please. There's no need to contract that.
-
-> +       /* board 0, socket 0, cluster 0, core 0  thread 0 */
-> +       arm,associativity = <0 0 0 0 0>;
+> +&reg_dcdc2 {
+> +	regulator-always-on;
+> +	regulator-min-microvolt = <700000>;
+> +	regulator-max-microvolt = <1320000>;
+> +	regulator-name = "vdd-cpu";
+> +};
 > +
-> +==============================================================================
-> +3 - arm,associativity-reference-points
-> +==============================================================================
-> +This property is a set of 32-bit integers, each representing an index into
+> +&reg_dcdc3 {
+> +	regulator-always-on;
+> +	regulator-min-microvolt = <700000>;
+> +	regulator-max-microvolt = <1320000>;
+> +	regulator-name = "vdd-gpu";
+> +};
 
-Likeise, s/set/list/
+I'm know it's just a mechanical change from your part, but is the GPU
+regulator really need to be always on?
 
-> +the arm,associativity nodes. The first integer is the most significant
-> +NUMA boundary and the following are progressively less significant boundaries.
-> +There can be more than one level of NUMA.
+Maxime
 
-I'm not clear on why this is necessary; the arm,associativity property
-is already ordered from most significant to least significant per its
-description.
-
-What does this property achieve?
-
-The description also doesn't describe where this property is expected to
-live. The example isn't sufficient to disambiguate that, especially as
-it seems like a trivial case.
-
-Is this only expected at the root of the tree? Can it be re-defined in
-sub-nodes?
-
-> +
-> +Ex:
-
-s/Ex/Example:/, please
-
-> +       arm,associativity-reference-points = <0 1>;
-> +       The board Id(index 0) used first to calculate the associativity (node
-> +       distance), then follows the  socket id(index 1).
-> +
-> +       arm,associativity-reference-points = <1 0>;
-> +       The socket Id(index 1) used first to calculate the associativity,
-> +       then follows the board id(index 0).
-> +
-> +       arm,associativity-reference-points = <0>;
-> +       Only the board Id(index 0) used to calculate the associativity.
-> +
-> +       arm,associativity-reference-points = <1>;
-> +       Only socket Id(index 1) used to calculate the associativity.
-> +
-> +==============================================================================
-> +4 - Example dts
-> +==============================================================================
-> +
-> +Example: 2 Node system consists of 2 boards and each board having one socket
-> +and 8 core in each socket.
-> +
-> +       arm,associativity-reference-points = <0>;
-> +
-> +       memory at 00c00000 {
-> +               device_type = "memory";
-> +               reg = <0x0 0x00c00000 0x0 0x80000000>;
-> +               /* board 0, socket 0, no specific core */
-> +               arm,associativity = <0 0 0xffff>;
-> +       };
-> +
-> +       memory at 10000000000 {
-> +               device_type = "memory";
-> +               reg = <0x100 0x00000000 0x0 0x80000000>;
-> +               /* board 1, socket 0, no specific core */
-> +               arm,associativity = <1 0 0xffff>;
-> +       };
-> +
-> +       cpus {
-> +               #address-cells = <2>;
-> +               #size-cells = <0>;
-> +
-> +               cpu at 000 {
-> +                       device_type = "cpu";
-> +                       compatible =  "arm,armv8";
-> +                       reg = <0x0 0x000>;
-> +                       enable-method = "psci";
-> +                       /* board 0, socket 0, core 0*/
-> +                       arm,associativity = <0 0 0>;
-
-We should specify w.r.t. memory and CPUs how the property is expected to
-be used (e.g. in the CPU nodes rather than the cpu-map, with separate
-memory nodes, etc). The generic description of arm,associativity isn't
-sufficient to limit confusion there.
-
-Thanks,
-Mark.
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150828/bda2fc3c/attachment.sig>
