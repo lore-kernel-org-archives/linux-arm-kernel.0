@@ -1,38 +1,34 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 28 Aug 2015 14:58:51 +0200
-Subject: [PATCH 0/5] clk: sunxi: Fix module autoload for OF platform driver
-In-Reply-To: <20150828124222.GA24923@goodgumbo.baconseed.org>
-References: <20150828124222.GA24923@goodgumbo.baconseed.org>
-Message-ID: <20150828125851.GO29389@lukather>
+From: marcel.ziswiler@toradex.com (Marcel Ziswiler)
+Date: Fri, 28 Aug 2015 14:42:34 +0200
+Subject: [PATCH 7/9] arm: tegra: apalis_t30: set otg dr_mode for eval board
+In-Reply-To: <1440765756-1382-1-git-send-email-marcel.ziswiler@toradex.com>
+References: <1440765756-1382-1-git-send-email-marcel.ziswiler@toradex.com>
+Message-ID: <1440765756-1382-8-git-send-email-marcel.ziswiler@toradex.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 28, 2015 at 02:42:22PM +0200, Luis de Bethencourt wrote:
-> Hello,
-> 
-> This series add the missing MODULE_DEVICE_TABLE() for OF to eport
-> that information so modules have the correct aliases built-in
-> and autoloading works correctly.
-> 
-> A longer explanation by Javier Canillas can be found here:
-> https://lkml.org/lkml/2015/7/30/519
+This has currently no functional effect as neither USB device nor OTG
+is currently supported on any Tegras in mainline as of yet. However
+once we use the same device tree on U-Boot this will actually make it
+work properly there.
 
-On the whole serie,
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Signed-off-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
+---
 
-Mike, Stephen, can you apply them directly as fixes for 4.3 ?
+ arch/arm/boot/dts/tegra30-apalis-eval.dts | 1 +
+ 1 file changed, 1 insertion(+)
 
-Thanks,
-Maxime
-
+diff --git a/arch/arm/boot/dts/tegra30-apalis-eval.dts b/arch/arm/boot/dts/tegra30-apalis-eval.dts
+index 5a49f03..37437c6 100644
+--- a/arch/arm/boot/dts/tegra30-apalis-eval.dts
++++ b/arch/arm/boot/dts/tegra30-apalis-eval.dts
+@@ -153,6 +153,7 @@
+ 
+ 	usb-phy at 7d000000 {
+ 		status = "okay";
++		dr_mode = "otg";
+ 		vbus-supply = <&usbo1_vbus_reg>;
+ 	};
+ 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150828/9b893158/attachment-0001.sig>
+2.4.3
