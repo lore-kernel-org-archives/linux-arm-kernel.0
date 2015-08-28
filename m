@@ -1,83 +1,94 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 28 Aug 2015 10:17:28 -0700
-Subject: [PATCH v2 4/4] remoteproc: debugfs: Add ability to boot remote
- processor using debugfs
-In-Reply-To: <1440757911-9120-5-git-send-email-lee.jones@linaro.org>
-References: <1440757911-9120-1-git-send-email-lee.jones@linaro.org>
- <1440757911-9120-5-git-send-email-lee.jones@linaro.org>
-Message-ID: <55E097A8.4080305@gmail.com>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Fri, 28 Aug 2015 18:25:59 +0100
+Subject: [PATCH v2 5/5] [media] c8sectpfe: Update DT binding doc with
+ some minor fixes
+In-Reply-To: <20150828065702.GC4796@x1>
+References: <1440678575-21646-1-git-send-email-peter.griffin@linaro.org>
+ <1440678575-21646-6-git-send-email-peter.griffin@linaro.org>
+ <20150828065702.GC4796@x1>
+Message-ID: <20150828172559.GC18136@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/08/15 03:31, Lee Jones wrote:
-> This functionality is especially useful during the testing phase.  When
-> used in conjunction with Mailbox's Test Framework we can trivially conduct
-> end-to-end testing i.e. boot co-processor, send and receive messages to
-> the co-processor, then shut it down again (repeat as required).
+Hi Lee,
 
-This does not strike me as a particularly well defined nor suitable
-interface for controlling a remote processor's state. I know you are
-just extending the existing debugfs interface here, but someone ought to
-remove that piece of code and make it a proper character device or
-netlink or whatever that allows someone to get proper signaling of
-what's going on with the remote processor state by polling or listening
-to a socket.
+On Fri, 28 Aug 2015, Lee Jones wrote:
 
-What's the intended use case behind debugfs for this after all? Is your
-application expected to keep reading the state file in a loop until it
-is happy and reads "running", how is that not racy by nature?
+> On Thu, 27 Aug 2015, Peter Griffin wrote:
+> 
+> > Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> > ---
+> >  .../devicetree/bindings/media/stih407-c8sectpfe.txt      | 16 +++++++---------
+> >  1 file changed, 7 insertions(+), 9 deletions(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/media/stih407-c8sectpfe.txt b/Documentation/devicetree/bindings/media/stih407-c8sectpfe.txt
+> > index e70d840..5d6438c 100644
+> > --- a/Documentation/devicetree/bindings/media/stih407-c8sectpfe.txt
+> > +++ b/Documentation/devicetree/bindings/media/stih407-c8sectpfe.txt
+> > @@ -55,21 +55,20 @@ Example:
+> >  		status = "okay";
+> >  		reg = <0x08a20000 0x10000>, <0x08a00000 0x4000>;
+> >  		reg-names = "stfe", "stfe-ram";
+> > -		interrupts = <0 34 0>, <0 35 0>;
+> > +		interrupts = <GIC_SPI 34 IRQ_TYPE_NONE>, <GIC_SPI 35 IRQ_TYPE_NONE>;
+> >  		interrupt-names = "stfe-error-irq", "stfe-idle-irq";
+> > -
+> > -		pinctrl-names	= "tsin0-serial", "tsin0-parallel", "tsin3-serial",
+> > -				"tsin4-serial", "tsin5-serial";
+> > -
+> > +		pinctrl-names	= "tsin0-serial",
+> > +				  "tsin0-parallel",
+> > +				  "tsin3-serial",
+> > +				  "tsin4-serial",
+> > +				  "tsin5-serial";
+> >  		pinctrl-0	= <&pinctrl_tsin0_serial>;
+> >  		pinctrl-1	= <&pinctrl_tsin0_parallel>;
+> >  		pinctrl-2	= <&pinctrl_tsin3_serial>;
+> >  		pinctrl-3	= <&pinctrl_tsin4_serial_alt3>;
+> >  		pinctrl-4	= <&pinctrl_tsin5_serial_alt1>;
+> > -
+> >  		clocks = <&clk_s_c0_flexgen CLK_PROC_STFE>;
+> > -		clock-names = "stfe";
+> > -
+> > +		clock-names = "c8sectpfe";
+> 
+> Are you sure you even need this property?  I'm thinking that *-names
+> properties are *usually* only required if there are more than one in a
+> single property.
+
+Yes that is true, but for tsout and merged input stream
+functionality the driver will require additional clocks. As I
+mentioned in a previous email I hope to add support for this in the
+near future.
 
 > 
-> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  drivers/remoteproc/remoteproc_debugfs.c | 29 +++++++++++++++++++++++++++++
->  1 file changed, 29 insertions(+)
+> >  		/* tsin0 is TSA on NIMA */
+> >  		tsin0: port at 0 {
+> >  			tsin-num		= <0>;
+> > @@ -78,7 +77,6 @@ Example:
+> >  			reset-gpios		= <&pio15 4 GPIO_ACTIVE_HIGH>;
+> >  			dvb-card		= <STV0367_TDA18212_NIMA_1>;
+> >  		};
+> > -
 > 
-> diff --git a/drivers/remoteproc/remoteproc_debugfs.c b/drivers/remoteproc/remoteproc_debugfs.c
-> index 9d30809..464470d 100644
-> --- a/drivers/remoteproc/remoteproc_debugfs.c
-> +++ b/drivers/remoteproc/remoteproc_debugfs.c
-> @@ -88,8 +88,37 @@ static ssize_t rproc_state_read(struct file *filp, char __user *userbuf,
->  	return simple_read_from_buffer(userbuf, count, ppos, buf, i);
->  }
->  
-> +static ssize_t rproc_state_write(struct file *filp, const char __user *userbuf,
-> +				 size_t count, loff_t *ppos)
-> +{
-> +	struct rproc *rproc = filp->private_data;
-> +	char buf[2];
-> +	int ret;
-> +
-> +	ret = copy_from_user(buf, userbuf, 1);
-> +	if (ret)
-> +		return -EFAULT;
-> +
-> +	switch (buf[0]) {
-> +	case '0':
-> +		rproc_shutdown(rproc);
-> +		break;
-> +	case '1':
-> +		ret = rproc_boot(rproc);
-> +		if (ret)
-> +			dev_warn(&rproc->dev, "Boot failed: %d\n", ret);
-> +		break;
-> +	default:
-> +		dev_err(&rproc->dev, "Unrecognised option: %x\n", buf[1]);
-> +		return -EINVAL;
-> +	}
-> +
-> +	return count;
-> +}
-> +
->  static const struct file_operations rproc_state_ops = {
->  	.read = rproc_state_read,
-> +	.write = rproc_state_write,
->  	.open = simple_open,
->  	.llseek	= generic_file_llseek,
->  };
+> My personal preference is to have a '\n' between nodes.
+
+Yes mine as well, I removed it due to your earlier comment about "superflous \n".
+I will add it back in again in v3.
+
 > 
+> >  		tsin3: port at 3 {
+> >  			tsin-num		= <3>;
+> >  			serial-not-parallel;
+> 
+> But these comments are pretty trivial, so agree or not, or fix-up or
+> not, it's that big of a deal.
 
+I agree all trivial, but will fixup in v3.
+> 
+> Either way,
+>   Acked-by: Lee Jones <lee.jones@linaro.org>
 
--- 
-Florian
+Thanks & regards,
+
+Peter.
