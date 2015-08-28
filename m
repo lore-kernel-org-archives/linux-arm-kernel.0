@@ -1,41 +1,39 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 28 Aug 2015 12:06:16 -0700
-Subject: [PATCH] ARM: OMAP2+: Fix booting if no timer parent clock is available
-Message-ID: <1440788776-19978-1-git-send-email-tony@atomide.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 28 Aug 2015 21:11:26 +0200 (CEST)
+Subject: [PATCH v2 1/1] irqchip: imx-gpcv2: Simplify the implementation
+In-Reply-To: <1440617755-2942-1-git-send-email-shenwei.wang@freescale.com>
+References: <1440617755-2942-1-git-send-email-shenwei.wang@freescale.com>
+Message-ID: <alpine.DEB.2.11.1508282110260.15006@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When bringing up a new SoC we needlessly prevent booting at timer
-init if timer clock_set_parent fails. This can fail if the system
-is booting on bootloader configured PLL values until the clock
-framework driver for the PLL is implemented.
+On Wed, 26 Aug 2015, Shenwei Wang wrote:
+>  u32 imx_gpcv2_get_wakeup_source(u32 **sources)
+>  {
+> -	if (!imx_gpcv2_instance)
+> +	struct gpcv2_irqchip_data *cd;
+> +	void __iomem *reg;
+> +	int i;
+> +
+> +	cd = imx_gpcv2_instance;
+> +	if (!cd)
+>  		return 0;
+> 
+> +	for (i = 0; i < IMR_NUM; i++) {
+> +		reg = cd->gpc_base + cd->cpu2wakeup + i * 4;
+> +		cd->wakeup_sources[i] = readl_relaxed(reg);
+> +	}
+> +
+>  	if (sources)
+> -		*sources = imx_gpcv2_instance->wakeup_sources;
+> +		*sources = cd->wakeup_sources;
+> 
+>  	return IMR_NUM;
+>  }
 
-Let's just WARN instead, this will provide helpful information
-for anybody bringing up a new SoC what needs to be fixed.
+So once again. As you said before nothing is going to use the case
+where source == NULL, can we please get rid of it?
 
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/mach-omap2/timer.c | 8 ++------
- 1 file changed, 2 insertions(+), 6 deletions(-)
+Thanks,
 
-diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-index e4d8701..a556551 100644
---- a/arch/arm/mach-omap2/timer.c
-+++ b/arch/arm/mach-omap2/timer.c
-@@ -297,12 +297,8 @@ static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
- 	if (IS_ERR(src))
- 		return PTR_ERR(src);
- 
--	r = clk_set_parent(timer->fclk, src);
--	if (r < 0) {
--		pr_warn("%s: %s cannot set source\n", __func__, oh->name);
--		clk_put(src);
--		return r;
--	}
-+	WARN(clk_set_parent(timer->fclk, src) < 0,
-+	     "Cannot set timer parent clock, no PLL clock driver?");
- 
- 	clk_put(src);
- 
--- 
-2.1.4
+	tglx
