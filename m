@@ -1,41 +1,50 @@
-From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Thu, 27 Aug 2015 17:16:03 -0700
-Subject: [GIT PULL] qcom SoC changes for 4.3-rc2
-In-Reply-To: <1440710899-29214-1-git-send-email-agross@codeaurora.org>
-References: <1440710899-29214-1-git-send-email-agross@codeaurora.org>
-Message-ID: <20150828001603.GO13472@usrtlx11787.corpusers.net>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Thu, 27 Aug 2015 17:24:13 -0700
+Subject: [RESEND PATCH v16 4/4] ARM: dts: add the support power-domain
+ node on RK3288 SoCs
+In-Reply-To: <CAKdAkRS=9Dq+YpMNSjpij0Am4ZD6uUURv74OLLYf+akD=W885A@mail.gmail.com>
+ (Dmitry Torokhov's message of "Tue, 25 Aug 2015 16:47:58 -0700")
+References: <1440487486-6154-1-git-send-email-wxt@rock-chips.com>
+ <1440487486-6154-5-git-send-email-wxt@rock-chips.com>
+ <7hfv37axhj.fsf@deeprootsystems.com>
+ <CAD=FV=V6oG+9U=W_JZmqCuNo-9-5wW8ffZzG7ZE_3cnSTNAjFQ@mail.gmail.com>
+ <7htwrn6l7g.fsf@deeprootsystems.com>
+ <CAKdAkRS=9Dq+YpMNSjpij0Am4ZD6uUURv74OLLYf+akD=W885A@mail.gmail.com>
+Message-ID: <7hmvxc45w2.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 27 Aug 14:28 PDT 2015, Andy Gross wrote:
+Dmitry Torokhov <dmitry.torokhov@gmail.com> writes:
 
-> The following changes since commit 72af1ff60d08a57e223b9753f9c52396fb4c3897:
-> 
->   Merge tag 'qcom-soc-for-4.3' into for-soc-new (2015-08-27 12:14:29 -0500)
-> 
-> are available in the git repository at:
-> 
-> 
->   git://codeaurora.org/quic/kernel/agross-msm.git tags/qcom-soc-for-4.3-rc2
-> 
-> for you to fetch changes up to 3427446d72e21f6992534a3b68055f1b4c722546:
-> 
->   soc: qcom: smd: Use correct remote processor ID (2015-08-27 12:15:58 -0500)
-> 
-> ----------------------------------------------------------------
-> Qualcomm ARM Based SoC Updates for 4.3-rc2
-> 
-> * Fix errant private access in SMEM
-> * Fix use of correct remote processor ID in SMD transactions
-> 
+> On Tue, Aug 25, 2015 at 3:45 PM, Kevin Hilman <khilman@kernel.org> wrote:
+>> Doug Anderson <dianders@chromium.org> writes:
+>>
+>>> To put things in a
+>>> concrete way, for pd_vio we'd go through the entire device tree
+>>> ourselves and find all properties that look like "power-domains =
+>>> <&power RK3288_PD_VIO>;".  We'd then find the parent of those
+>>> properties and look for a property named "clocks".  We'd then iterate
+>>> over all those clocks and turn those on.  Did I get that right?
+>>
+>> ... but you make it sound like more work than it is.  The genpd already
+>> keeps a list of devices that refer to the power domain.  In fact, the
+>> genpd 'attach' method can be platform-specific, so could be used to keep
+>> track of a list (or a subset) of clocks which are needed for reset.
+>
+> That is not really workable: the attach and detach happen in
+> probe/remove path; if you do not have driver for the device you will
+> miss the clocks for it. 
 
-I was hoping to see my fBLOCKREADINTR fix [1] here as well, as the issue
-it's fixing it a never ending stall if we're trying to send data with a
-full tx fifo - i.e. a rather bad result...
+And in my proposal, I suggested that clocks without drivers are
+good candidates to list in the domain, with the caveat that the be
+called out (documented) as being device clocks that are missing a
+driver, so when a driver shows up they can be moved accordingly, and in
+a way that actually describes the hardware.
 
-But I'm fine with you queuing it for -rc3 too...
+> And the quirk of this SoC is that we need to
+> turn all clocks during domain transition, regardless of whether there
+> is a driver for all devices.
 
-[1] https://lkml.org/lkml/2015/8/24/756
+I understand.  And that "quirk" is not unique to rockchip socs.
 
-Regards,
-Bjorn
+Kevin
