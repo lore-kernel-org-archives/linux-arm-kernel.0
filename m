@@ -1,90 +1,95 @@
-From: julien.grall@citrix.com (Julien Grall)
-Date: Fri, 28 Aug 2015 16:33:25 +0100
-Subject: [PATCH v3 15/20] block/xen-blkfront: Make it running on 64KB
- page granularity
-In-Reply-To: <55D58B6F.8010904@citrix.com>
-References: <1438966019-19322-1-git-send-email-julien.grall@citrix.com>
- <1438966019-19322-16-git-send-email-julien.grall@citrix.com>
- <55D58B6F.8010904@citrix.com>
-Message-ID: <55E07F45.5020501@citrix.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 28 Aug 2015 17:36:29 +0200
+Subject: [PATCH v5 0/8] arm64, numa: Add numa support for arm64 platforms.
+In-Reply-To: <CAFpQJXUYycrvxp_p=A_pmeNUpHVs=8kYUfZP9dYDhYLqeCTZ3Q@mail.gmail.com>
+References: <1439570374-4079-1-git-send-email-gkulkarni@caviumnetworks.com>
+ <55E070D6.8060604@gmail.com>
+ <CAFpQJXUYycrvxp_p=A_pmeNUpHVs=8kYUfZP9dYDhYLqeCTZ3Q@mail.gmail.com>
+Message-ID: <55E07FFD.6030204@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/08/15 09:10, Roger Pau Monn? wrote:
-> Hello,
 
-Hi,
 
-> I have some comments regarding the commit message, IMHO it would be good
-> that a native English speaker reviews it too.
-> 
-> El 07/08/15 a les 18.46, Julien Grall ha escrit:
->> The PV block protocol is using 4KB page granularity. The goal of this
->> patch is to allow a Linux using 64KB page granularity using block
->> device on a non-modified Xen.
+On 28/08/15 16:59, Ganapatrao Kulkarni wrote:
+> On Fri, Aug 28, 2015 at 8:01 PM, Matthias Brugger
+> <matthias.bgg@gmail.com> wrote:
 >>
->> The block API is using segment which should at least be the size of a
->> Linux page. Therefore, the driver will have to break the page in chunk
->> of 4K before giving the page to the backend.
 >>
->> Breaking a 64KB segment in 4KB chunk will result to have some chunk with
->> no data.
-> 
-> I would rewrite the above line as:
-> 
-> When breaking a 64KB segment into 4KB chunks it is possible that some
-Correct,
-> chunks are empty.
-
-Sounds good, I will replace with it.
-
->> As the PV protocol always require to have data in the chunk, we
->> have to count the number of Xen page which will be in use and avoid to
->                                   ^pages
->> sent empty chunk.
->   ^and avoid sending empty chunks.
+>> On 14/08/15 18:39, Ganapatrao Kulkarni wrote:
+>>>
+>>> v5:
+>>>          - created base verion of numa.c which creates dummy numa without
+>>> using dt
+>>>            on single socket platforms. Then added patches for dt support.
+>>>          - Incorporated review comments from Hanjun Guo.
+>>>
+>>> v4:
+>>> done changes as per Arnd review comments.
+>>>
+>>> v3:
+>>> Added changes to support numa on arm64 based platforms.
+>>> Tested these patches on cavium's multinode(2 node topology) platform.
+>>> In this patchset, defined and implemented dt bindings for numa mapping
+>>> for core and memory using device node property arm,associativity.
+>>>
+>>> v2:
+>>> Defined and implemented numa map for memory, cores to node and
+>>> proximity distance matrix of nodes.
+>>>
+>>> v1:
+>>> Initial patchset to support numa on arm64 platforms.
+>>>
+>>> Note:
+>>>          1. This patchset is tested for numa with dt on
+>>>             thunderx single socket and dual socket boards.
+>>>          2. Numa DT booting needs the dt memory nodes, which are deleted in
+>>> current efi-stub,
+>>>          hence to try numa with dt, you need to rebase with ard's patchset.
+>>>
+>>> http://git.linaro.org/people/ard.biesheuvel/linux-arm.git/shortlog/refs/heads/arm64-uefi-early-fdt-handling
+>>>
+>>>
+>>> Ganapatrao Kulkarni (4):
+>>>     arm64, numa: adding numa support for arm64 platforms.
+>>>     Documentation: arm64/arm: dt bindings for numa.
+>>>     arm64, numa: adding numa support for arm64 platforms.
+>>>     arm64, dt, thunderx: Add initial dts for Cavium Thunder SoC in 2 Node
+>>>       topology.
+>>>
+>>>    Documentation/devicetree/bindings/arm/numa.txt  | 212 +++++++
+>>>    arch/arm64/Kconfig                              |  32 +
+>>>    arch/arm64/boot/dts/cavium/Makefile             |   2 +-
+>>>    arch/arm64/boot/dts/cavium/thunder-88xx-2n.dts  |  78 +++
+>>>    arch/arm64/boot/dts/cavium/thunder-88xx-2n.dtsi | 790
+>>> ++++++++++++++++++++++++
+>>>    arch/arm64/include/asm/mmzone.h                 |  32 +
+>>>    arch/arm64/include/asm/numa.h                   |  49 ++
+>>>    arch/arm64/kernel/Makefile                      |   1 +
+>>>    arch/arm64/kernel/dt_numa.c                     | 316 ++++++++++
+>>>    arch/arm64/kernel/setup.c                       |   9 +
+>>>    arch/arm64/kernel/smp.c                         |   3 +
+>>>    arch/arm64/mm/Makefile                          |   1 +
+>>>    arch/arm64/mm/init.c                            |  34 +-
+>>>    arch/arm64/mm/numa.c                            | 563 +++++++++++++++++
+>>>    14 files changed, 2115 insertions(+), 7 deletions(-)
+>>>    create mode 100644 Documentation/devicetree/bindings/arm/numa.txt
+>>>    create mode 100644 arch/arm64/boot/dts/cavium/thunder-88xx-2n.dts
+>>>    create mode 100644 arch/arm64/boot/dts/cavium/thunder-88xx-2n.dtsi
+>>>    create mode 100644 arch/arm64/include/asm/mmzone.h
+>>>    create mode 100644 arch/arm64/include/asm/numa.h
+>>>    create mode 100644 arch/arm64/kernel/dt_numa.c
+>>>    create mode 100644 arch/arm64/mm/numa.c
+>>>
 >>
->> Note that, a pre-defined number of grant is reserved before preparing
->                                      ^grants are
->> the request. This pre-defined number is based on the number and the
->> maximum size of the segments. If each segment contain a very small
->                                                 ^contains
->> amount of data, the driver may reserve too much grant (16 grant is
->                                              ^many grants   ^grants are
->> reserved per segment with 64KB page granularity).
->>
->> Futhermore, in the case of persistent grant we allocate one Linux page
->                                         ^grants
->> per grant although only the 4KB of the page will be effectively use.
->                              ^first                              ^in
->> This could be improved by share the page with multiple grants.
->                             ^sharing
->>
->> Signed-off-by: Julien Grall <julien.grall@citrix.com>
-> 
-> LGTM:
-> 
-> Acked-by: Roger Pau Monn? <roger.pau@citrix.com>
+>> On which version is this patch-set based?
+> 4.2 -rc5
 
-Thank you, I will fix all the typos in the next version.
-
-> Just one question.
-
-[..]
-
->> +		gnttab_foreach_grant_in_range(sg_page(sg),
->> +					      sg->offset,
->> +					      sg->length,
->> +					      blkif_setup_rw_req_grant,
->> +					      &setup);
-> 
-> If I'm understanding this right, on x86 gnttab_foreach_grant_in_range is
-> only going to perform one iteration, since XEN_PAGE_SIZE == PAGE_SIZE.
-
-Correct, it will only perform when iteration for x86 but also for arm32
-and arm64 (when 4KB page is in use).
+Seems as if
+"arm64: add support for memtest" (36dd9086cb)
+is not taken into account. I wasn't able to apply the set without 
+conflicts, neither on v4.2-rc5, v4.2-rc8, nor on
+arm64-uefi-early-fdt-handling.
 
 Regards,
-
--- 
-Julien Grall
+Matthias
