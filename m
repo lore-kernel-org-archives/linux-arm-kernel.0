@@ -1,69 +1,90 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 28 Aug 2015 16:32:12 +0100
-Subject: [PATCH] ARM64: kernel: implement ACPI parking protocol
-In-Reply-To: <1440772186.31961.8.camel@redhat.com>
-References: <1436959990-32054-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1437063431.3583.2.camel@redhat.com>
- <20150716171221.GB18582@red-moon>
- <1437068449.3583.4.camel@redhat.com>
- <20150828102314.GC15924@red-moon>
- <1440772186.31961.8.camel@redhat.com>
-Message-ID: <20150828153212.GG15924@red-moon>
+From: julien.grall@citrix.com (Julien Grall)
+Date: Fri, 28 Aug 2015 16:33:25 +0100
+Subject: [PATCH v3 15/20] block/xen-blkfront: Make it running on 64KB
+ page granularity
+In-Reply-To: <55D58B6F.8010904@citrix.com>
+References: <1438966019-19322-1-git-send-email-julien.grall@citrix.com>
+ <1438966019-19322-16-git-send-email-julien.grall@citrix.com>
+ <55D58B6F.8010904@citrix.com>
+Message-ID: <55E07F45.5020501@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Cc'ing Leif and Ard]
+On 20/08/15 09:10, Roger Pau Monn? wrote:
+> Hello,
 
-On Fri, Aug 28, 2015 at 03:29:46PM +0100, Mark Salter wrote:
-> On Fri, 2015-08-28 at 11:23 +0100, Lorenzo Pieralisi wrote:
-> > Mark,
-> > 
-> > On Thu, Jul 16, 2015 at 06:40:49PM +0100, Mark Salter wrote:
-> > 
-> > [...]
-> > 
-> > > On Thu, 2015-07-16 at 18:12 +0100, Lorenzo Pieralisi wrote:
-> > > > > The kernel will only add cached memory regions to linear mapping 
-> > > > > and
-> > > > > presumably, the FW will mark the mailboxes as uncached. Otherwise, 
-> > > > > it
-> > > > > is a FW bug. But I suppose we could run into problems with kernels
-> > > > > using 64K pagesize since firmware assumes 4k.
-> > > > 
-> > > > Nope, ioremap takes care of that, everything should be fine.
-> > > 
-> > > The mailbox is 4K. If it is next to a cached UEFI region, the kernel 
-> > > may
-> > > have to overlap the mailbox with a cached 64K mapping in order to 
-> > > include
-> > > the adjoining UEFI region in the linear map. Then the ioremap would 
-> > > fail
-> > > because the mailbox is included in the linear mapping.
-> > 
-> > So that I understand: are you referring to memrange_efi_to_native()
-> > in arch/arm64/kernel/efi.c ? Is it safe to round up (and add it to
-> > the memblock layer) the memory region size to PAGE_SIZE without checking
-> > attributes of overlapping (within PAGE_SIZE) UEFI regions ?
+Hi,
+
+> I have some comments regarding the commit message, IMHO it would be good
+> that a native English speaker reviews it too.
 > 
-> The problem is that nothing in the UEFI spec or parking protocol spec
-> prevents firmware from placing a 4K parking protocol mailbox area in
-> the same 64K page as normal cached memory which winds up mapped in
-> the kernel linear mapping. The kernel might be able to work around
-> that by not putting the 64K page in the linear map. There's nothing
-> the kernel could do if the mailbox is in same 64K page with UEFI runtime
-> memory which would use a cached mapping.
+> El 07/08/15 a les 18.46, Julien Grall ha escrit:
+>> The PV block protocol is using 4KB page granularity. The goal of this
+>> patch is to allow a Linux using 64KB page granularity using block
+>> device on a non-modified Xen.
+>>
+>> The block API is using segment which should at least be the size of a
+>> Linux page. Therefore, the driver will have to break the page in chunk
+>> of 4K before giving the page to the backend.
+>>
+>> Breaking a 64KB segment in 4KB chunk will result to have some chunk with
+>> no data.
+> 
+> I would rewrite the above line as:
+> 
+> When breaking a 64KB segment into 4KB chunks it is possible that some
+Correct,
+> chunks are empty.
 
-Ok, I failed to explain myself. Let's imagine that we have a, say, 64k
-aligned memory region (EFI_MEMORY_WB - size 16k) that lives in the same
-64K memory frame as a device's registers memory space.
-The code I pointed at above creates a 64K memory frame out of the 16K
-region and adds it to the memblock so that it ends up in the kernel linear
-mapping which ends up mapping the device registers too with cacheable
-attributes and that's not correct.
+Sounds good, I will replace with it.
 
-I am not sure what's the best way to solve that, probably we should
-amend the UEFI specs to enforce uniform 64K memory region attributes,
-comments welcome.
+>> As the PV protocol always require to have data in the chunk, we
+>> have to count the number of Xen page which will be in use and avoid to
+>                                   ^pages
+>> sent empty chunk.
+>   ^and avoid sending empty chunks.
+>>
+>> Note that, a pre-defined number of grant is reserved before preparing
+>                                      ^grants are
+>> the request. This pre-defined number is based on the number and the
+>> maximum size of the segments. If each segment contain a very small
+>                                                 ^contains
+>> amount of data, the driver may reserve too much grant (16 grant is
+>                                              ^many grants   ^grants are
+>> reserved per segment with 64KB page granularity).
+>>
+>> Futhermore, in the case of persistent grant we allocate one Linux page
+>                                         ^grants
+>> per grant although only the 4KB of the page will be effectively use.
+>                              ^first                              ^in
+>> This could be improved by share the page with multiple grants.
+>                             ^sharing
+>>
+>> Signed-off-by: Julien Grall <julien.grall@citrix.com>
+> 
+> LGTM:
+> 
+> Acked-by: Roger Pau Monn? <roger.pau@citrix.com>
 
-Thanks,
-Lorenzo
+Thank you, I will fix all the typos in the next version.
+
+> Just one question.
+
+[..]
+
+>> +		gnttab_foreach_grant_in_range(sg_page(sg),
+>> +					      sg->offset,
+>> +					      sg->length,
+>> +					      blkif_setup_rw_req_grant,
+>> +					      &setup);
+> 
+> If I'm understanding this right, on x86 gnttab_foreach_grant_in_range is
+> only going to perform one iteration, since XEN_PAGE_SIZE == PAGE_SIZE.
+
+Correct, it will only perform when iteration for x86 but also for arm32
+and arm64 (when 4KB page is in use).
+
+Regards,
+
+-- 
+Julien Grall
