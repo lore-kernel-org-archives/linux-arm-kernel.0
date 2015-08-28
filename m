@@ -1,36 +1,87 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 28 Aug 2015 10:36:59 +0200
-Subject: [PATCH 2/2] ARM: dma-mapping: add support for offset parameter in
- dma_mmap()
-In-Reply-To: <1440751036-6585-1-git-send-email-m.szyprowski@samsung.com>
-References: <1440751036-6585-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1440751036-6585-2-git-send-email-m.szyprowski@samsung.com>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Fri, 28 Aug 2015 09:39:41 +0100
+Subject: [PATCH 1/4] x86, efi, kasan: #undef memset/memcpy/memmove per
+ arch.
+In-Reply-To: <20150828062745.GB1928@gmail.com>
+References: <1440605707-8325-1-git-send-email-ryabinin.a.a@gmail.com>
+ <1440605707-8325-2-git-send-email-ryabinin.a.a@gmail.com>
+ <20150828062745.GB1928@gmail.com>
+Message-ID: <20150828083941.GN10728@bivouac.eciton.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-IOMMU-based dma_mmap() implementation lacked proper support for offset
-parameter used in mmap call (it always assumed that mapping starts from
-offset zero). This patch adds support for offset parameter to IOMMU-based
-implementation.
+On Fri, Aug 28, 2015 at 08:27:45AM +0200, Ingo Molnar wrote:
+> 
+> * Andrey Ryabinin <ryabinin.a.a@gmail.com> wrote:
+> 
+> > In not-instrumented code KASAN replaces instrumented
+> > memset/memcpy/memmove with not-instrumented analogues
+> > __memset/__memcpy/__memove.
+> > However, on x86 EFI stub is not linked with kernel.
+> 
+> s/with the kernel
+> 
+> > It uses not-instrumented mem*() functions from
+> > arch/x86/boot/compressed/string.c
+> > So we don't replace them with __mem*() variants in EFI stub.
+> > 
+> > In ARM64 EFI stub is linked with the kernel, so we should
+> 
+> s/In ARM64 EFI stub/On ARM64 the EFI stub/.
+> 
+> > replace mem*() functions with __mem*(), because EFI stub
+> 
+> s/the EFI stub
+> 
+> > runs before KASAN setup early shadow.
+> 
+> s/before KASAN sets up the early shadow
+> 
+> ?
+> 
+> > So let's move these #undef mem* into arch's asm/efi.h which is
+> 
+> s/lets
 
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-CC: stable at vger.kernel.org  # v3.6+
----
- arch/arm/mm/dma-mapping.c | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index 67ae0f2ed983..25ecc6afec4c 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -1424,6 +1424,8 @@ static int arm_iommu_mmap_attrs(struct device *dev, struct vm_area_struct *vma,
- 	if (off >= nr_pages || (usize >> PAGE_SHIFT) > nr_pages - off)
- 		return -ENXIO;
+No, that one is actually correct. Abbreviation of let us.
  
-+	pages += off;
-+
- 	do {
- 		int ret = vm_insert_page(vma, uaddr, *pages++);
- 		if (ret) {
--- 
-1.9.2
+> > also included by EFI stub.
+> 
+> s/by the EFI stub
+> 
+> > 
+> > Signed-off-by: Andrey Ryabinin <ryabinin.a.a@gmail.com>
+> > ---
+> >  arch/x86/include/asm/efi.h             | 8 ++++++++
+> >  drivers/firmware/efi/libstub/efistub.h | 4 ----
+> >  2 files changed, 8 insertions(+), 4 deletions(-)
+> > 
+> > diff --git a/arch/x86/include/asm/efi.h b/arch/x86/include/asm/efi.h
+> > index 155162e..d821ce2 100644
+> > --- a/arch/x86/include/asm/efi.h
+> > +++ b/arch/x86/include/asm/efi.h
+> > @@ -25,6 +25,14 @@
+> >  #define EFI32_LOADER_SIGNATURE	"EL32"
+> >  #define EFI64_LOADER_SIGNATURE	"EL64"
+> >  
+> > +/*
+> > + * Use memcpy/memset from arch/x86/boot/compressed/string.c
+> > + * for EFI stub.
+> > + */
+> > +#undef memcpy
+> > +#undef memset
+> > +#undef memmove
+> 
+> This comment should also mention why it's done, not what is done.
+> 
+> Also:
+> 
+>     s/for EFI stub/for the EFI stub
+> 
+> Thanks,
+> 
+> 	Ingo
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-efi" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
