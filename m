@@ -1,37 +1,38 @@
-From: frans.klaver@xsens.com (Frans Klaver)
-Date: Fri, 28 Aug 2015 12:10:32 +0200
-Subject: [PATCH] arm: omap2: vc: fix 'or' always true warning
-In-Reply-To: <DUB128-W519E183FDD98EF80BD4CB79C6E0@phx.gbl>
-References: <DUB128-W519E183FDD98EF80BD4CB79C6E0@phx.gbl>
-Message-ID: <1440756632-14043-1-git-send-email-frans.klaver@xsens.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 28 Aug 2015 11:23:14 +0100
+Subject: [PATCH] ARM64: kernel: implement ACPI parking protocol
+In-Reply-To: <1437068449.3583.4.camel@redhat.com>
+References: <1436959990-32054-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1437063431.3583.2.camel@redhat.com>
+ <20150716171221.GB18582@red-moon>
+ <1437068449.3583.4.camel@redhat.com>
+Message-ID: <20150828102314.GC15924@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Frans Klaver <fransklaver@gmail.com>
+Mark,
 
-Fix the warning:
-arch/arm/mach-omap2/vc.c:302:47: warning: logical ?or? of collectively exhaustive tests is always true [-Wlogical-op]
+On Thu, Jul 16, 2015 at 06:40:49PM +0100, Mark Salter wrote:
 
-As we're toggling both CLKREQ and OFFMODE, we should also be checking
-OFFMODE.
+[...]
 
-Signed-off-by: Frans Klaver <fransklaver@gmail.com>
----
- arch/arm/mach-omap2/vc.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> On Thu, 2015-07-16 at 18:12 +0100, Lorenzo Pieralisi wrote:
+> > > The kernel will only add cached memory regions to linear mapping and
+> > > presumably, the FW will mark the mailboxes as uncached. Otherwise, it
+> > > is a FW bug. But I suppose we could run into problems with kernels
+> > > using 64K pagesize since firmware assumes 4k.
+> >
+> > Nope, ioremap takes care of that, everything should be fine.
+> 
+> The mailbox is 4K. If it is next to a cached UEFI region, the kernel may
+> have to overlap the mailbox with a cached 64K mapping in order to include
+> the adjoining UEFI region in the linear map. Then the ioremap would fail
+> because the mailbox is included in the linear mapping.
 
-diff --git a/arch/arm/mach-omap2/vc.c b/arch/arm/mach-omap2/vc.c
-index 076fd20d7e5a..807bc79e3e3d 100644
---- a/arch/arm/mach-omap2/vc.c
-+++ b/arch/arm/mach-omap2/vc.c
-@@ -300,7 +300,7 @@ static void __init omap3_vc_init_pmic_signaling(struct voltagedomain *voltdm)
- 
- 	val = voltdm->read(OMAP3_PRM_POLCTRL_OFFSET);
- 	if (!(val & OMAP3430_PRM_POLCTRL_CLKREQ_POL) ||
--	    (val & OMAP3430_PRM_POLCTRL_CLKREQ_POL)) {
-+	    (val & OMAP3430_PRM_POLCTRL_OFFMODE_POL)) {
- 		val |= OMAP3430_PRM_POLCTRL_CLKREQ_POL;
- 		val &= ~OMAP3430_PRM_POLCTRL_OFFMODE_POL;
- 		pr_debug("PM: fixing sys_clkreq and sys_off_mode polarity to 0x%x\n",
--- 
-2.3.4
+So that I understand: are you referring to memrange_efi_to_native()
+in arch/arm64/kernel/efi.c ? Is it safe to round up (and add it to
+the memblock layer) the memory region size to PAGE_SIZE without checking
+attributes of overlapping (within PAGE_SIZE) UEFI regions ?
+
+Thanks,
+Lorenzo
