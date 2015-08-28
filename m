@@ -1,69 +1,47 @@
-From: ryabinin.a.a@gmail.com (Andrey Ryabinin)
-Date: Fri, 28 Aug 2015 14:09:59 +0300
-Subject: [PATCH v2] x86, efi, kasan: #undef memset/memcpy/memmove per arch.
-In-Reply-To: <20150828062745.GB1928@gmail.com>
-References: <20150828062745.GB1928@gmail.com>
-Message-ID: <1440760199-18111-1-git-send-email-ryabinin.a.a@gmail.com>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Fri, 28 Aug 2015 13:19:22 +0200
+Subject: [PATCH v3 1/5] input: touchscreen: add imx6ul_tsc driver support
+In-Reply-To: <1440752976-9094-2-git-send-email-haibo.chen@freescale.com>
+References: <1440752976-9094-1-git-send-email-haibo.chen@freescale.com>
+ <1440752976-9094-2-git-send-email-haibo.chen@freescale.com>
+Message-ID: <20150828131922.79693714@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In not-instrumented code KASAN replaces instrumented
-memset/memcpy/memmove with not-instrumented analogues
-__memset/__memcpy/__memove.
-However, on x86 the EFI stub is not linked with the kernel.
-It uses not-instrumented mem*() functions from
-arch/x86/boot/compressed/string.c
-So we don't replace them with __mem*() variants in EFI stub.
+Hi,
 
-On ARM64 the EFI stub is linked with the kernel, so we should
-replace mem*() functions with __mem*(), because the EFI stub
-runs before KASAN sets up early shadow.
+> Freescale i.MX6UL contains a internal touchscreen controller,
+> this patch add a driver to support this controller.
+> 
+> Signed-off-by: Haibo Chen <haibo.chen@freescale.com>
+> ---
+>  drivers/input/touchscreen/Kconfig      |  12 +
+>  drivers/input/touchscreen/Makefile     |   1 +
+>  drivers/input/touchscreen/imx6ul_tsc.c | 524 +++++++++++++++++++++++++++++++++
+>  3 files changed, 537 insertions(+)
+>  create mode 100644 drivers/input/touchscreen/imx6ul_tsc.c
+> 
+> diff --git a/drivers/input/touchscreen/Kconfig b/drivers/input/touchscreen/Kconfig
+> index 059edeb..50a42b8 100644
+> --- a/drivers/input/touchscreen/Kconfig
+> +++ b/drivers/input/touchscreen/Kconfig
+> @@ -479,6 +479,18 @@ config TOUCHSCREEN_MTOUCH
+>  	  To compile this driver as a module, choose M here: the
+>  	  module will be called mtouch.
+>  
+> +config TOUCHSCREEN_IMX6UL_TSC
+> +	tristate "Freescale i.MX6UL touchscreen controller"
+> +	depends on (OF && GPIOLIB) || COMPILE_TEST
+> +	help
+> +	  Say Y here if you have a Freescale i.MX6UL, and want to
+> +	  use the internal touchscreen controller.
+> +
+> +	  If unsure, say N.
+> +
+> +	  To compile this driver as a module, choose M here: the
+> +	  moduel will be called imx6ul_tsc.
+>
+s/moduel/module/
 
-So let's move these #undef mem* into arch's asm/efi.h which is
-also included by the EFI stub.
 
-Signed-off-by: Andrey Ryabinin <ryabinin.a.a@gmail.com>
----
- arch/x86/include/asm/efi.h             | 11 +++++++++++
- drivers/firmware/efi/libstub/efistub.h |  4 ----
- 2 files changed, 11 insertions(+), 4 deletions(-)
-
-diff --git a/arch/x86/include/asm/efi.h b/arch/x86/include/asm/efi.h
-index 155162e..6862f11 100644
---- a/arch/x86/include/asm/efi.h
-+++ b/arch/x86/include/asm/efi.h
-@@ -25,6 +25,17 @@
- #define EFI32_LOADER_SIGNATURE	"EL32"
- #define EFI64_LOADER_SIGNATURE	"EL64"
- 
-+/*
-+ * Sometimes we may redefine memset to __memset.
-+ * The EFI stub doesn't have __memset() because it's not
-+ * linked with the kernel. So we should use standard
-+ * memset from arch/x86/boot/compressed/string.c
-+ * The same applies to memcpy and memmove.
-+ */
-+#undef memcpy
-+#undef memset
-+#undef memmove
-+
- #ifdef CONFIG_X86_32
- 
- 
-diff --git a/drivers/firmware/efi/libstub/efistub.h b/drivers/firmware/efi/libstub/efistub.h
-index e334a01..6b6548f 100644
---- a/drivers/firmware/efi/libstub/efistub.h
-+++ b/drivers/firmware/efi/libstub/efistub.h
-@@ -5,10 +5,6 @@
- /* error code which can't be mistaken for valid address */
- #define EFI_ERROR	(~0UL)
- 
--#undef memcpy
--#undef memset
--#undef memmove
--
- void efi_char16_printk(efi_system_table_t *, efi_char16_t *);
- 
- efi_status_t efi_open_volume(efi_system_table_t *sys_table_arg, void *__image,
--- 
-2.4.6
+Lothar Wa?mann
