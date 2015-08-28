@@ -1,45 +1,97 @@
-From: fan.chen@mediatek.com (fan.chen at mediatek.com)
-Date: Fri, 28 Aug 2015 10:11:59 +0800
-Subject: [PATCH] arm64: dts: mediatek: mt8173 PSCI-1.0 support
-Message-ID: <1440727919-34719-1-git-send-email-fan.chen@mediatek.com>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Fri, 28 Aug 2015 11:02:29 +0800
+Subject: [PATCH v6] arm64: dts: Add spi bus dts
+In-Reply-To: <CAGS+omCFQRoH3ft2O5qPLBgngCuLPaminTys5OU6QcKmRXTyNw@mail.gmail.com>
+References: <1439782198-32396-1-git-send-email-leilk.liu@mediatek.com>
+ <CAGS+omCFQRoH3ft2O5qPLBgngCuLPaminTys5OU6QcKmRXTyNw@mail.gmail.com>
+Message-ID: <CAGS+omBBGmMzo6WeOdasMT9c-4BhKGJz1iPJjxF5vzJJ0J=Pug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fan Chen <fan.chen@mediatek.com>
+Matthias,
 
-This patch adds psci comatible properties to support all mandatory
-functions of PSCI-1.0, PSCI-0.2 and PSCI-0.1, and system suspend
-can be supported in PSCI-1.0.
+On Mon, Aug 17, 2015 at 12:32 PM, Daniel Kurtz <djkurtz@chromium.org> wrote:
+> On Mon, Aug 17, 2015 at 11:29 AM, Leilk Liu <leilk.liu@mediatek.com> wrote:
+>>
+>> This patch adds MT8173 spi bus controllers into device tree.
+>>
+>> Signed-off-by: Leilk Liu <leilk.liu@mediatek.com>
+>
+> Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
 
-Signed-off-by: Fan Chen <fan.chen@mediatek.com>
----
-Because PSCI-1.0 patches hadn't landed on mainline, this patch is
-based on three patch sets below:
-[0] http://www.spinics.net/lists/arm-kernel/msg425793.html
-    PSCI: system suspend support
-[1] git://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git
-    psci/unification
-[2] http://www.spinics.net/lists/devicetree/msg82017.html
-    [PATCH 0/6] drivers: firmware: psci: add basic v1.0 support
+The other SPI patches have already been picked up in broonie's spi tree.
+Can you pick this one into your mediatek tree?
 
-Before they are merged in, this patch still works fine with psci-0.2
-support in current mainline.
----
- arch/arm64/boot/dts/mediatek/mt8173.dtsi |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Thanks.
+-Dan
 
-diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-index d18ee42..b9b4205 100644
---- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-+++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-@@ -95,7 +95,7 @@
- 	};
- 
- 	psci {
--		compatible = "arm,psci";
-+		compatible = "arm,psci-1.0", "arm,psci-0.2", "arm,psci";
- 		method = "smc";
- 		cpu_suspend   = <0x84000001>;
- 		cpu_off	      = <0x84000002>;
--- 
-1.7.9.5
+>
+>> ---
+>> Change in this patch:
+>> pinctl and pad-select fields are board specific, so move to
+>> mt8173-evb.dtsi, and status = "okay".
+>> ---
+>>  arch/arm64/boot/dts/mediatek/mt8173-evb.dts | 18 ++++++++++++++++++
+>>  arch/arm64/boot/dts/mediatek/mt8173.dtsi    | 12 ++++++++++++
+>>  2 files changed, 30 insertions(+)
+>>
+>> diff --git a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+>> index 4be66ca..811cb76 100644
+>> --- a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+>> +++ b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+>> @@ -387,6 +387,24 @@
+>>         };
+>>  };
+>>
+>> +&pio {
+>> +       spi_pins_a: spi0 {
+>> +               pins_spi {
+>> +                       pinmux = <MT8173_PIN_69_SPI_CK__FUNC_SPI_CK_0_>,
+>> +                               <MT8173_PIN_70_SPI_MI__FUNC_SPI_MI_0_>,
+>> +                               <MT8173_PIN_71_SPI_MO__FUNC_SPI_MO_0_>,
+>> +                               <MT8173_PIN_72_SPI_CS__FUNC_SPI_CS_0_>;
+>> +               };
+>> +       };
+>> +};
+>> +
+>> +&spi {
+>> +       pinctrl-names = "default";
+>> +       pinctrl-0 = <&spi_pins_a>;
+>> +       mediatek,pad-select = <0>;
+>> +       status = "okay";
+>> +};
+>> +
+>>  &uart0 {
+>>         status = "okay";
+>>  };
+>> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+>> index d18ee42..3dfb6ed 100644
+>> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+>> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+>> @@ -365,6 +365,18 @@
+>>                         status = "disabled";
+>>                 };
+>>
+>> +               spi: spi at 1100a000 {
+>> +                       compatible = "mediatek,mt8173-spi";
+>> +                       #address-cells = <1>;
+>> +                       #size-cells = <0>;
+>> +                       reg = <0 0x1100a000 0 0x1000>;
+>> +                       interrupts = <GIC_SPI 110 IRQ_TYPE_LEVEL_LOW>;
+>> +                       clocks = <&topckgen CLK_TOP_SPI_SEL>,
+>> +                                <&topckgen CLK_TOP_SYSPLL3_D2>;
+>> +                       clock-names = "spi-clk", "parent-clk";
+>> +                       status = "disabled";
+>> +               };
+>> +
+>>                 i2c3: i2c3 at 11010000 {
+>>                         compatible = "mediatek,mt8173-i2c";
+>>                         reg = <0 0x11010000 0 0x70>,
+>> --
+>> 1.8.1.1.dirty
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>> Please read the FAQ at  http://www.tux.org/lkml/
