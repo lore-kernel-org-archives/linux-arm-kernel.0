@@ -1,36 +1,101 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 28 Aug 2015 12:31:10 -0700
-Subject: [PATCH] spmi: pmic-arb: u8 <= 0xff is always true
-Message-ID: <1440790270-14859-1-git-send-email-sboyd@codeaurora.org>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 28 Aug 2015 21:42:26 +0200 (CEST)
+Subject: CONFIG_DEBUG_SHIRQ and PM
+In-Reply-To: <20150825195830.GH27534@saruman.tx.rr.com>
+References: <20150825195830.GH27534@saruman.tx.rr.com>
+Message-ID: <alpine.DEB.2.11.1508282122480.15006@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Silences this static checker warning:
+On Tue, 25 Aug 2015, Felipe Balbi wrote:
+> Hi Ingo,
 
- drivers/spmi/spmi-pmic-arb.c:363
- pmic_arb_write_cmd() warn: always true condition
- '(opc <= 255) => (0-255 <= 255)'
+Thanks for not cc'ing the irq maintainer ....
+ 
+> I'm facing an issue with CONFIG_DEBUG_SHIRQ and pm_runtime when using
+> devm_request_*irq().
+> 
+> If we using devm_request_*irq(), that irq will be freed after device
+> drivers' ->remove() gets called. If on ->remove(), we're calling
+> pm_runtime_put_sync(); pm_runtime_disable(), device's clocks might get
+> gated and, because we do an extra call to the device's IRQ handler when
+> CONFIG_DEBUG_SHIRQ=y, we might trigger an abort exception if, inside the
+> IRQ handler, we try to read a register which is clocked by the device's
+> clock.
+> 
+> This is, of course, really old code which has been in tree for many,
+> many years. I guess nobody has been running their tests in the setup
+> mentioned above (CONFIG_DEBUG_SHIRQ=y, pm_runtime_put_sync() on
+> ->remove(), a register read on IRQ handler, and a shared IRQ handler),
+> so that's why we never caught this before.
+> 
+> Disabling CONFIG_DEBUG_SHIRQ, of course, makes the problem go away, but
+> if driver *must* be ready to receive, and handle, an IRQ even during
+> module removal, I wonder what the IRQ handler should do. We can't, in
+> most cases, call pm_runtime_put_sync() from IRQ handler.
 
-Cc: Andy Gross <agross@codeaurora.org>
-Cc: Bjorn Andersson <bjorn.andersson@sonymobile.com>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- drivers/spmi/spmi-pmic-arb.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Well, a shared interrupt handler must handle this situation, no matter
+what. Assume the following:
 
-diff --git a/drivers/spmi/spmi-pmic-arb.c b/drivers/spmi/spmi-pmic-arb.c
-index 5e834bd23c09..c7aa6f1a898e 100644
---- a/drivers/spmi/spmi-pmic-arb.c
-+++ b/drivers/spmi/spmi-pmic-arb.c
-@@ -360,7 +360,7 @@ static int pmic_arb_write_cmd(struct spmi_controller *ctrl, u8 opc, u8 sid,
- 		opc = PMIC_ARB_OP_EXT_WRITE;
- 	else if (opc >= 0x30 && opc <= 0x37)
- 		opc = PMIC_ARB_OP_EXT_WRITEL;
--	else if (opc >= 0x80 && opc <= 0xFF)
-+	else if (opc >= 0x80)
- 		opc = PMIC_ARB_OP_ZERO_WRITE;
- 	else
- 		return -EINVAL;
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+irqreturn_t dev_irq(int irq, void *data)
+{
+	struct devdata *dd = data;
+	u32 state;
+
+	state = readl(dd->base);
+	...
+}
+
+void module_exit(void)
+{	
+	/* Write to the device interrupt register */
+	disable_device_irq(dd->base);
+	/*
+	 * After this point the device does not longer
+	 * raise an interrupt
+	 */
+	iounmap(dd->base);
+	free_irq();
+
+If the other device which shares the interrupt line raises an
+interrupt after the unmap and before free_irq() removed the device
+handler from the irq, the machine is toast, because the dev_irq
+handler is still called.
+
+If the handler is shut down after critical parts of the driver/device
+are shut down, then you can 
+
+ - either can change the setup/teardown ordering
+
+	disable_device_irq(dd->base);
+	free_irq();
+	iounmap(dd->base);
+
+ - or have a proper flag in the private data which tells the interrupt
+   handler to sod off.
+
+irqreturn_t dev_irq(int irq, void *data)
+{
+	struct devdata *dd = data;
+
+	if (dd->shutdown)
+		return IRQ_NONE;
+	...
+
+void module_exit(void)
+{	
+	disable_device_irq(dd->base);
+	dd->shutdown = 1;
+
+	/* On an SMP machine you also need: */	
+	synchronize_irq(dd->irq);
+
+So for the problem at hand, the devm magic needs to make sure that the
+crucial parts are still alive when the devm allocated irq is released.
+
+I have no idea how that runtime PM stuff is integrated into devm (I
+fear not at all), so it's hard to give you a proper advise on that.
+
+Thanks,
+
+	tglx
