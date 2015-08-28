@@ -1,24 +1,69 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Fri, 28 Aug 2015 12:50:19 +0200
-Subject: [PATCH] clk: samsung: fix cpu clock's flags checking
-In-Reply-To: <1435598978-21800-1-git-send-email-b.zolnierkie@samsung.com>
-References: <1435598978-21800-1-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <55E03CEB.4070102@samsung.com>
+From: ryabinin.a.a@gmail.com (Andrey Ryabinin)
+Date: Fri, 28 Aug 2015 14:09:59 +0300
+Subject: [PATCH v2] x86, efi, kasan: #undef memset/memcpy/memmove per arch.
+In-Reply-To: <20150828062745.GB1928@gmail.com>
+References: <20150828062745.GB1928@gmail.com>
+Message-ID: <1440760199-18111-1-git-send-email-ryabinin.a.a@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/06/15 19:29, Bartlomiej Zolnierkiewicz wrote:
-> CLK_CPU_HAS_DIV1 and CLK_CPU_NEEDS_DEBUG_ALT_DIV masks were
-> incorrectly used as a bit numbers.  Fix it.
-> 
-> Tested on Exynos4210 based Origen board and on Exynos5250 based
-> Arndale board.
-> 
-> Cc: Tomasz Figa <tomasz.figa@gmail.com>
-> Cc: Michael Turquette <mturquette@baylibre.com>
-> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> Cc: Thomas Abraham <thomas.ab@samsung.com>
-> Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+In not-instrumented code KASAN replaces instrumented
+memset/memcpy/memmove with not-instrumented analogues
+__memset/__memcpy/__memove.
+However, on x86 the EFI stub is not linked with the kernel.
+It uses not-instrumented mem*() functions from
+arch/x86/boot/compressed/string.c
+So we don't replace them with __mem*() variants in EFI stub.
 
-Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+On ARM64 the EFI stub is linked with the kernel, so we should
+replace mem*() functions with __mem*(), because the EFI stub
+runs before KASAN sets up early shadow.
+
+So let's move these #undef mem* into arch's asm/efi.h which is
+also included by the EFI stub.
+
+Signed-off-by: Andrey Ryabinin <ryabinin.a.a@gmail.com>
+---
+ arch/x86/include/asm/efi.h             | 11 +++++++++++
+ drivers/firmware/efi/libstub/efistub.h |  4 ----
+ 2 files changed, 11 insertions(+), 4 deletions(-)
+
+diff --git a/arch/x86/include/asm/efi.h b/arch/x86/include/asm/efi.h
+index 155162e..6862f11 100644
+--- a/arch/x86/include/asm/efi.h
++++ b/arch/x86/include/asm/efi.h
+@@ -25,6 +25,17 @@
+ #define EFI32_LOADER_SIGNATURE	"EL32"
+ #define EFI64_LOADER_SIGNATURE	"EL64"
+ 
++/*
++ * Sometimes we may redefine memset to __memset.
++ * The EFI stub doesn't have __memset() because it's not
++ * linked with the kernel. So we should use standard
++ * memset from arch/x86/boot/compressed/string.c
++ * The same applies to memcpy and memmove.
++ */
++#undef memcpy
++#undef memset
++#undef memmove
++
+ #ifdef CONFIG_X86_32
+ 
+ 
+diff --git a/drivers/firmware/efi/libstub/efistub.h b/drivers/firmware/efi/libstub/efistub.h
+index e334a01..6b6548f 100644
+--- a/drivers/firmware/efi/libstub/efistub.h
++++ b/drivers/firmware/efi/libstub/efistub.h
+@@ -5,10 +5,6 @@
+ /* error code which can't be mistaken for valid address */
+ #define EFI_ERROR	(~0UL)
+ 
+-#undef memcpy
+-#undef memset
+-#undef memmove
+-
+ void efi_char16_printk(efi_system_table_t *, efi_char16_t *);
+ 
+ efi_status_t efi_open_volume(efi_system_table_t *sys_table_arg, void *__image,
+-- 
+2.4.6
