@@ -1,156 +1,52 @@
-From: sonnyrao@chromium.org (Sonny Rao)
-Date: Fri, 28 Aug 2015 11:19:52 -0700
-Subject: [PATCH 1/5] DMA: pl330: support burst mode for dev-to-mem and
- mem-to-dev transmit
-In-Reply-To: <55DF1072.1070905@rock-chips.com>
-References: <1440665280-31557-1-git-send-email-shawn.lin@rock-chips.com>
- <1440665313-31603-1-git-send-email-shawn.lin@rock-chips.com>
- <CAJKOXPdw+ZZURRPUNvKHdx7wRG7M-Frqmvq46KFM_ckGq8h0Yg@mail.gmail.com>
- <55DF1072.1070905@rock-chips.com>
-Message-ID: <CAPz6YkX-d8B1wPgjnULDAY8+nyuFePVrEU2NQe0rV2CsjYEj3Q@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 28 Aug 2015 11:23:33 -0700
+Subject: [PATCH] soc: qcom: Reorder SMEM/SMD configs
+Message-ID: <1440786213-23375-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 27, 2015 at 6:28 AM, Shawn Lin <shawn.lin@rock-chips.com> wrote:
-> ? 2015/8/27 20:57, Krzysztof Kozlowski ??:
->>
->> 2015-08-27 17:48 GMT+09:00 Shawn Lin <shawn.lin@rock-chips.com>:
->>>
->>>
->>> This patch adds to support burst mode for dev-to-mem and
->>> mem-to-dev transmit.
->>>
->>> Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
->>> Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
->>> Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
->>> cc: Heiko Stuebner <heiko@sntech.de>
->>> cc: Doug Anderson <dianders@chromium.org>
->>> cc: Olof Johansson <olofj@google.com>
->>> Reviewed-and-tested-by: Sonny Rao <sonnyrao@chromium.org>
->>
->>
->> For the entire patchset: I would prefer to see someone's
->> reviewed/tested tag in his response. Sending a version 1 of patchset
->> (regardless of Boojin Kim's work two years ago) with such tag could
->> mean anything. I cannot verify it easily (unless digging somewhere...
->> or asking people). You could add for example: Reviewed-by Santa Claus.
->> Should I sent a letter to him asking for confirmation? :)
->>
->
-> :) yes, you are right. I should comply with the rule, even if the patchest
-> had been reviewed or tested by someone on another tree.
+When I make nconfig, having the SMEM option after the SMD option
+causes the configurator to get confused when I'm enabling and
+disabling these options. Let's move SMEM before SMD so there's a
+clear indented dependency chain.
 
-Hi, yeah I reviewed on a different tree, so you shouldn't put that tag
-here, thanks for removing it.
-I can re-review if you'd like.
+Cc: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ drivers/soc/qcom/Kconfig | 16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
 
->
->
->> More seriously - reviewed-by is a statement (please look at
->> Documentation/SubmittingPatches) and you cannot force someone to make
->> that statement. He must make such statement on his own.
->>
->> That's all from my side since I don't feel skilled enough to review the
->> code.
->>
->> Best regards,
->> Krzysztof
->>
->>>
->>> ---
->>>
->>>   drivers/dma/pl330.c | 18 ++++++++++++------
->>>   1 file changed, 12 insertions(+), 6 deletions(-)
->>>
->>> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
->>> index ecab4ea0..0d544d2 100644
->>> --- a/drivers/dma/pl330.c
->>> +++ b/drivers/dma/pl330.c
->>> @@ -1141,10 +1141,13 @@ static inline int _ldst_devtomem(unsigned
->>> dry_run, u8 buf[],
->>>                  const struct _xfer_spec *pxs, int cyc)
->>>   {
->>>          int off = 0;
->>> +       enum pl330_cond cond;
->>> +
->>> +       cond = (pxs->desc->rqcfg.brst_len == 1) ? SINGLE : BURST;
->>>
->>>          while (cyc--) {
->>> -               off += _emit_WFP(dry_run, &buf[off], SINGLE,
->>> pxs->desc->peri);
->>> -               off += _emit_LDP(dry_run, &buf[off], SINGLE,
->>> pxs->desc->peri);
->>> +               off += _emit_WFP(dry_run, &buf[off], cond,
->>> pxs->desc->peri);
->>> +               off += _emit_LDP(dry_run, &buf[off], cond,
->>> pxs->desc->peri);
->>>                  off += _emit_ST(dry_run, &buf[off], ALWAYS);
->>>                  off += _emit_FLUSHP(dry_run, &buf[off],
->>> pxs->desc->peri);
->>>          }
->>> @@ -1156,11 +1159,14 @@ static inline int _ldst_memtodev(unsigned
->>> dry_run, u8 buf[],
->>>                  const struct _xfer_spec *pxs, int cyc)
->>>   {
->>>          int off = 0;
->>> +       enum pl330_cond cond;
->>> +
->>> +       cond = (pxs->desc->rqcfg.brst_len == 1) ? SINGLE : BURST;
->>>
->>>          while (cyc--) {
->>> -               off += _emit_WFP(dry_run, &buf[off], SINGLE,
->>> pxs->desc->peri);
->>> +               off += _emit_WFP(dry_run, &buf[off], cond,
->>> pxs->desc->peri);
->>>                  off += _emit_LD(dry_run, &buf[off], ALWAYS);
->>> -               off += _emit_STP(dry_run, &buf[off], SINGLE,
->>> pxs->desc->peri);
->>> +               off += _emit_STP(dry_run, &buf[off], cond,
->>> pxs->desc->peri);
->>>                  off += _emit_FLUSHP(dry_run, &buf[off],
->>> pxs->desc->peri);
->>>          }
->>>
->>> @@ -2557,7 +2563,7 @@ static struct dma_async_tx_descriptor
->>> *pl330_prep_dma_cyclic(
->>>
->>>                  desc->rqtype = direction;
->>>                  desc->rqcfg.brst_size = pch->burst_sz;
->>> -               desc->rqcfg.brst_len = 1;
->>> +               desc->rqcfg.brst_len = pch->burst_len;
->>>                  desc->bytes_requested = period_len;
->>>                  fill_px(&desc->px, dst, src, period_len);
->>>
->>> @@ -2702,7 +2708,7 @@ pl330_prep_slave_sg(struct dma_chan *chan, struct
->>> scatterlist *sgl,
->>>                  }
->>>
->>>                  desc->rqcfg.brst_size = pch->burst_sz;
->>> -               desc->rqcfg.brst_len = 1;
->>> +               desc->rqcfg.brst_len = pch->burst_len;
->>>                  desc->rqtype = direction;
->>>                  desc->bytes_requested = sg_dma_len(sg);
->>>          }
->>> --
->>> 2.3.7
->>>
->>>
->>> --
->>> To unsubscribe from this list: send the line "unsubscribe dmaengine" in
->>> the body of a message to majordomo at vger.kernel.org
->>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>
->>
->>
->>
->
->
-> --
-> Best Regards
-> Shawn Lin
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+diff --git a/drivers/soc/qcom/Kconfig b/drivers/soc/qcom/Kconfig
+index ba47b70f4d85..3e4d2133c3d2 100644
+--- a/drivers/soc/qcom/Kconfig
++++ b/drivers/soc/qcom/Kconfig
+@@ -19,6 +19,14 @@ config QCOM_PM
+ 	  modes. It interface with various system drivers to put the cores in
+ 	  low power modes.
+ 
++config QCOM_SMEM
++	tristate "Qualcomm Shared Memory Manager (SMEM)"
++	depends on ARCH_QCOM
++	help
++	  Say y here to enable support for the Qualcomm Shared Memory Manager.
++	  The driver provides an interface to items in a heap shared among all
++	  processors in a Qualcomm platform.
++
+ config QCOM_SMD
+ 	tristate "Qualcomm Shared Memory Driver (SMD)"
+ 	depends on QCOM_SMEM
+@@ -40,11 +48,3 @@ config QCOM_SMD_RPM
+ 
+ 	  Say M here if you want to include support for the Qualcomm RPM as a
+ 	  module. This will build a module called "qcom-smd-rpm".
+-
+-config QCOM_SMEM
+-	tristate "Qualcomm Shared Memory Manager (SMEM)"
+-	depends on ARCH_QCOM
+-	help
+-	  Say y here to enable support for the Qualcomm Shared Memory Manager.
+-	  The driver provides an interface to items in a heap shared among all
+-	  processors in a Qualcomm platform.
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
