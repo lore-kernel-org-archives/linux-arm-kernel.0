@@ -1,88 +1,39 @@
-From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
-Date: Fri, 28 Aug 2015 20:29:05 +0530
-Subject: [PATCH v5 0/8] arm64, numa: Add numa support for arm64 platforms.
-In-Reply-To: <55E070D6.8060604@gmail.com>
-References: <1439570374-4079-1-git-send-email-gkulkarni@caviumnetworks.com>
- <55E070D6.8060604@gmail.com>
-Message-ID: <CAFpQJXUYycrvxp_p=A_pmeNUpHVs=8kYUfZP9dYDhYLqeCTZ3Q@mail.gmail.com>
+From: aleksey.makarov@auriga.com (Aleksey Makarov)
+Date: Fri, 28 Aug 2015 17:59:53 +0300
+Subject: [PATCH net-next 1/8] net: thunderx: fix MAINTAINERS
+Message-ID: <1440774004-27923-1-git-send-email-aleksey.makarov@auriga.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 28, 2015 at 8:01 PM, Matthias Brugger
-<matthias.bgg@gmail.com> wrote:
->
->
-> On 14/08/15 18:39, Ganapatrao Kulkarni wrote:
->>
->> v5:
->>         - created base verion of numa.c which creates dummy numa without
->> using dt
->>           on single socket platforms. Then added patches for dt support.
->>         - Incorporated review comments from Hanjun Guo.
->>
->> v4:
->> done changes as per Arnd review comments.
->>
->> v3:
->> Added changes to support numa on arm64 based platforms.
->> Tested these patches on cavium's multinode(2 node topology) platform.
->> In this patchset, defined and implemented dt bindings for numa mapping
->> for core and memory using device node property arm,associativity.
->>
->> v2:
->> Defined and implemented numa map for memory, cores to node and
->> proximity distance matrix of nodes.
->>
->> v1:
->> Initial patchset to support numa on arm64 platforms.
->>
->> Note:
->>         1. This patchset is tested for numa with dt on
->>            thunderx single socket and dual socket boards.
->>         2. Numa DT booting needs the dt memory nodes, which are deleted in
->> current efi-stub,
->>         hence to try numa with dt, you need to rebase with ard's patchset.
->>
->> http://git.linaro.org/people/ard.biesheuvel/linux-arm.git/shortlog/refs/heads/arm64-uefi-early-fdt-handling
->>
->>
->> Ganapatrao Kulkarni (4):
->>    arm64, numa: adding numa support for arm64 platforms.
->>    Documentation: arm64/arm: dt bindings for numa.
->>    arm64, numa: adding numa support for arm64 platforms.
->>    arm64, dt, thunderx: Add initial dts for Cavium Thunder SoC in 2 Node
->>      topology.
->>
->>   Documentation/devicetree/bindings/arm/numa.txt  | 212 +++++++
->>   arch/arm64/Kconfig                              |  32 +
->>   arch/arm64/boot/dts/cavium/Makefile             |   2 +-
->>   arch/arm64/boot/dts/cavium/thunder-88xx-2n.dts  |  78 +++
->>   arch/arm64/boot/dts/cavium/thunder-88xx-2n.dtsi | 790
->> ++++++++++++++++++++++++
->>   arch/arm64/include/asm/mmzone.h                 |  32 +
->>   arch/arm64/include/asm/numa.h                   |  49 ++
->>   arch/arm64/kernel/Makefile                      |   1 +
->>   arch/arm64/kernel/dt_numa.c                     | 316 ++++++++++
->>   arch/arm64/kernel/setup.c                       |   9 +
->>   arch/arm64/kernel/smp.c                         |   3 +
->>   arch/arm64/mm/Makefile                          |   1 +
->>   arch/arm64/mm/init.c                            |  34 +-
->>   arch/arm64/mm/numa.c                            | 563 +++++++++++++++++
->>   14 files changed, 2115 insertions(+), 7 deletions(-)
->>   create mode 100644 Documentation/devicetree/bindings/arm/numa.txt
->>   create mode 100644 arch/arm64/boot/dts/cavium/thunder-88xx-2n.dts
->>   create mode 100644 arch/arm64/boot/dts/cavium/thunder-88xx-2n.dtsi
->>   create mode 100644 arch/arm64/include/asm/mmzone.h
->>   create mode 100644 arch/arm64/include/asm/numa.h
->>   create mode 100644 arch/arm64/kernel/dt_numa.c
->>   create mode 100644 arch/arm64/mm/numa.c
->>
->
-> On which version is this patch-set based?
-4.2 -rc5
->
-> Regards,
-> Matthias
+From: Aleksey Makarov <aleksey.makarov@caviumnetworks.com>
 
-thanks
-Ganapat
+The liquidio and thunder drivers have different maintainers.
+
+Signed-off-by: Aleksey Makarov <aleksey.makarov@caviumnetworks.com>
+---
+ MAINTAINERS | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 4e6dcb6..43cf79e 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -928,7 +928,7 @@ M:	Sunil Goutham <sgoutham@cavium.com>
+ M:	Robert Richter <rric@kernel.org>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ S:	Supported
+-F:	drivers/net/ethernet/cavium/
++F:	drivers/net/ethernet/cavium/thunder/
+ 
+ ARM/CIRRUS LOGIC CLPS711X ARM ARCHITECTURE
+ M:	Alexander Shiyan <shc_work@mail.ru>
+@@ -2543,7 +2543,6 @@ M:     Raghu Vatsavayi <raghu.vatsavayi@caviumnetworks.com>
+ L:     netdev at vger.kernel.org
+ W:     http://www.cavium.com
+ S:     Supported
+-F:     drivers/net/ethernet/cavium/
+ F:     drivers/net/ethernet/cavium/liquidio/
+ 
+ CC2520 IEEE-802.15.4 RADIO DRIVER
+-- 
+2.5.0
