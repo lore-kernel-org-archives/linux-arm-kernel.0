@@ -1,30 +1,47 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Fri, 28 Aug 2015 15:18:28 -0500
-Subject: [GIT PULL] qcom SoC changes for 4.3-rc2 Part 2
-Message-ID: <1440793108-10849-1-git-send-email-agross@codeaurora.org>
+From: marcel.ziswiler@toradex.com (Marcel Ziswiler)
+Date: Fri, 28 Aug 2015 20:30:35 +0000
+Subject: [PATCH] arm: tegra: update default configuration
+In-Reply-To: <20150828165132.GQ12027@sirena.org.uk>
+References: <986a8cee-f090-4888-91f2-7b564c4b3d1d@email.android.com>
+ <20150828165132.GQ12027@sirena.org.uk>
+Message-ID: <1440793833.2795.57.camel@toradex.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 3427446d72e21f6992534a3b68055f1b4c722546:
+On Fri, 2015-08-28 at 16:51 +0000, Mark Brown wrote:
 
-  soc: qcom: smd: Use correct remote processor ID (2015-08-27 12:15:58 -0500)
+> Please fix your mailer to word wrap within paragraphs so that your
+> mails
+> are legible.
 
-are available in the git repository at:
+Sure, sorry. At times I forget that Android isn't sane in that respect
+and can't be used to send mailing list compliant emails.
 
-  git://codeaurora.org/quic/kernel/agross-msm.git tags/qcom-soc-for-4.3-rc2-1
+> > On 27 Aug 2015 16:55, Mark Brown <broonie@kernel.org> wrote:
+> 
+> > > Does the system really have the wm9712 wired up as a battery
+> > > monitor?
+> 
+> > Well, remember we are talking about a system on module. Those
+> > WM9712
+> > pins all go to the 200 pin SODIMM edge connector and I know that
+> > certain customers indeed have carrier boards that use it that way.
+> > If
+> > there is any opposition and considering this being rather optional
+> > I
+> > may also drop this one but audio/touch is definitely a standard
+> > feature available on all or carrier boards.
+> 
+> Does that actually work with mainline?  The driver requires platform
+> data to do anything useful (there's no DT bindings for it) and I
+> can't
+> see anything providing that on Tegra systems.
 
-for you to fetch changes up to 8208b90daca1a685eb19e90bbef23af00449f46c:
-
-  soc: qcom: smd: Correct fBLOCKREADINTR handling (2015-08-28 14:54:08 -0500)
-
-----------------------------------------------------------------
-Qualcomm ARM Based SoC Updates for 4.3-rc2-1
-
-* Correct SMD fBLOCKREADINTR handling
-
-----------------------------------------------------------------
-Bjorn Andersson (1):
-      soc: qcom: smd: Correct fBLOCKREADINTR handling
-
- drivers/soc/qcom/smd.c |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+To be honest I have not really tried it resp. I did actually notice it
+bailing out but haven't had time to look closer into it yet. We are
+using it with NVIDIA's still platform data based downstream L4T R16.5
+and I do know that it works there so I just kind of assumed there will
+be a way to make it work in mainline as well. However rather than
+adding such platform data I guess migrating it to DT would make more
+sense. But until such a migration has been completed I guess we rather
+just drop enabling it for now and I will send out a v2 in that respect.
