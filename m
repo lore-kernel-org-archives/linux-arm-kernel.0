@@ -1,22 +1,25 @@
 From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Fri, 28 Aug 2015 12:55:45 -0700
-Subject: [PATCH] spmi: pmic-arb: u8 <= 0xff is always true
-In-Reply-To: <1440790270-14859-1-git-send-email-sboyd@codeaurora.org>
-References: <1440790270-14859-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20150828195545.GT13472@usrtlx11787.corpusers.net>
+Date: Fri, 28 Aug 2015 13:01:06 -0700
+Subject: [PATCH] spmi: pmic-arb: Don't byte swap when reading/writing FIFO
+In-Reply-To: <1440789702-1648-1-git-send-email-sboyd@codeaurora.org>
+References: <1440789702-1648-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20150828200106.GU13472@usrtlx11787.corpusers.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 28 Aug 12:31 PDT 2015, Stephen Boyd wrote:
+On Fri 28 Aug 12:21 PDT 2015, Stephen Boyd wrote:
 
-> Silences this static checker warning:
-> 
->  drivers/spmi/spmi-pmic-arb.c:363
->  pmic_arb_write_cmd() warn: always true condition
->  '(opc <= 255) => (0-255 <= 255)'
+> We don't want to swap bytes that we're reading and writing to the
+> FIFOs when we're running on a big-endian CPU. Doing so causes
+> problems like where the qcom-spmi-iadc driver can't detect the
+> type of device because the bytes are all mixed up. Use the raw IO
+> accessors for these API instead, and collapse pmic_arb_base_read()
+> into the byte reading API so that we aren't tempted to read non-FIFO
+> data like commands with that function.
 > 
 > Cc: Andy Gross <agross@codeaurora.org>
-Reviewed-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+
+Acked-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
 
 Regards,
 Bjorn
