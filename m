@@ -1,59 +1,28 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Fri, 28 Aug 2015 08:38:33 +0800
-Subject: [PATCH v2 5/5] ARM: dts: Add arm,
- pl330-broken-no-flushp quirk for rk3xxx platform
-In-Reply-To: <1440722176-31588-1-git-send-email-shawn.lin@rock-chips.com>
-References: <1440722176-31588-1-git-send-email-shawn.lin@rock-chips.com>
-Message-ID: <1440722313-31803-1-git-send-email-shawn.lin@rock-chips.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 27 Aug 2015 17:43:03 -0700
+Subject: [PATCH v2 3/5] ARM: NSP: Add basic support for Broadcom Northstar
+ Plus SoC
+In-Reply-To: <1440628530-6137-4-git-send-email-jonmason@broadcom.com>
+References: <1440628530-6137-1-git-send-email-jonmason@broadcom.com>
+ <1440628530-6137-4-git-send-email-jonmason@broadcom.com>
+Message-ID: <55DFAE97.3030003@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pl330 integrated in rk3xxx platform doesn't support
-DMAFLUSHP function. So we add arm,pl330-broken-no-flushp quirk
-for it.
+On 26/08/15 15:35, Jon Mason wrote:
+> Broadcom Northstar Plus family of SoCs are used for switching
+> control and management applications as well as residential
+> router/gateway applications. The SoC features dual core Cortex
+> A9 ARM CPUs, integrating several peripheral interfaces including
+> multiple Gigabit Ethernet PHYs, DDR3 memory, PCIE Gen-2, USB 2.0
+> and USB 3.0, serial and NAND flash, SATA and several other IO
+> controllers.
+> 
+> Signed-off-by: Kapil Hali <kapilh@broadcom.com>
+> Signed-off-by: Jon Mason <jonmason@broadcom.com>
 
-Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
-cc: Heiko Stuebner <heiko@sntech.de>
-cc: Doug Anderson <dianders@chromium.org>
-cc: Olof Johansson <olof@lixom.net>
+Applied to soc/next at github.com/stblinux, thanks!
 
----
-
-Changes in v2: None
-Changes in v1:
-- rename broken-no-flushp to "arm,pl330-broken-no-flushp" suggested
-  by Krzysztof.
-
- arch/arm/boot/dts/rk3xxx.dtsi | 3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/arch/arm/boot/dts/rk3xxx.dtsi b/arch/arm/boot/dts/rk3xxx.dtsi
-index a2ae9f3..a8ca4b3 100644
---- a/arch/arm/boot/dts/rk3xxx.dtsi
-+++ b/arch/arm/boot/dts/rk3xxx.dtsi
-@@ -79,6 +79,7 @@
- 			#dma-cells = <1>;
- 			clocks = <&cru ACLK_DMA1>;
- 			clock-names = "apb_pclk";
-+			arm,pl330-broken-no-flushp;
- 		};
- 
- 		dmac1_ns: dma-controller at 2001c000 {
-@@ -89,6 +90,7 @@
- 			#dma-cells = <1>;
- 			clocks = <&cru ACLK_DMA1>;
- 			clock-names = "apb_pclk";
-+			arm,pl330-broken-no-flushp;
- 			status = "disabled";
- 		};
- 
-@@ -100,6 +102,7 @@
- 			#dma-cells = <1>;
- 			clocks = <&cru ACLK_DMA2>;
- 			clock-names = "apb_pclk";
-+			arm,pl330-broken-no-flushp;
- 		};
- 	};
- 
+This is a little late for 4.3, so this will be queued for 4.4, thanks!
 -- 
-2.3.7
+Florian
