@@ -1,30 +1,56 @@
-From: luis@debethencourt.com (Luis de Bethencourt)
-Date: Fri, 28 Aug 2015 14:43:14 +0200
-Subject: [PATCH 1/5] clk: sunxi: sun6i-apb0: Fix module autoload for OF
- platform driver
-Message-ID: <20150828124314.GA26550@goodgumbo.baconseed.org>
+From: marcel.ziswiler@toradex.com (Marcel Ziswiler)
+Date: Fri, 28 Aug 2015 14:42:32 +0200
+Subject: [PATCH 5/9] arm: tegra: apalis_t30: add digital audio pin muxing
+In-Reply-To: <1440765756-1382-1-git-send-email-marcel.ziswiler@toradex.com>
+References: <1440765756-1382-1-git-send-email-marcel.ziswiler@toradex.com>
+Message-ID: <1440765756-1382-6-git-send-email-marcel.ziswiler@toradex.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This platform driver has a OF device ID table but the OF module
-alias information is not created so module autoloading won't work.
+Add Apalis digital audio pin muxing which is e.g. used for HDA
+operation together with the Realtek HDA codec as found on the Apalis
+Evaluation board.
 
-Signed-off-by: Luis de Bethencourt <luis@debethencourt.com>
+Signed-off-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
 ---
- drivers/clk/sunxi/clk-sun6i-apb0.c | 1 +
- 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/clk/sunxi/clk-sun6i-apb0.c b/drivers/clk/sunxi/clk-sun6i-apb0.c
-index 7076360..e703e18 100644
---- a/drivers/clk/sunxi/clk-sun6i-apb0.c
-+++ b/drivers/clk/sunxi/clk-sun6i-apb0.c
-@@ -61,6 +61,7 @@ static const struct of_device_id sun6i_a31_apb0_clk_dt_ids[] = {
- 	{ .compatible = "allwinner,sun6i-a31-apb0-clk" },
- 	{ /* sentinel */ }
- };
-+MODULE_DEVICE_TABLE(of, sun6i_a31_apb0_clk_dt_ids);
+ arch/arm/boot/dts/tegra30-apalis.dtsi | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
+
+diff --git a/arch/arm/boot/dts/tegra30-apalis.dtsi b/arch/arm/boot/dts/tegra30-apalis.dtsi
+index d1b24b1..4a6ca38 100644
+--- a/arch/arm/boot/dts/tegra30-apalis.dtsi
++++ b/arch/arm/boot/dts/tegra30-apalis.dtsi
+@@ -109,6 +109,30 @@
+ 				nvidia,enable-input = <TEGRA_PIN_ENABLE>;
+ 			};
  
- static struct platform_driver sun6i_a31_apb0_clk_driver = {
- 	.driver = {
++			/* Apalis Digital Audio */
++			clk1_req_pee2 {
++				nvidia,pins =	"clk1_req_pee2";
++				nvidia,function = "hda";
++				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
++				nvidia,tristate = <TEGRA_PIN_DISABLE>;
++			};
++			clk2_out_pw5 {
++				nvidia,pins = "clk2_out_pw5";
++				nvidia,function = "extperiph2";
++				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
++				nvidia,tristate = <TEGRA_PIN_DISABLE>;
++				nvidia,enable-input = <TEGRA_PIN_DISABLE>;
++			};
++			dap1_fs_pn0 {
++				nvidia,pins =	"dap1_fs_pn0",
++						"dap1_din_pn1",
++						"dap1_dout_pn2",
++						"dap1_sclk_pn3";
++				nvidia,function = "hda";
++				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
++				nvidia,tristate = <TEGRA_PIN_DISABLE>;
++			};
++
+ 			/* Apalis I2C3 */
+ 			cam_i2c_scl_pbb1 {
+ 				nvidia,pins = "cam_i2c_scl_pbb1",
 -- 
-2.4.6
+2.4.3
