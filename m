@@ -1,39 +1,61 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 28 Aug 2015 17:54:37 +0800
-Subject: [PATCH 4/6] ARM: dts: sun6i: Add mmc2 pins for 8 bit emmc
-In-Reply-To: <1440755679-8266-1-git-send-email-wens@csie.org>
-References: <1440755679-8266-1-git-send-email-wens@csie.org>
-Message-ID: <1440755679-8266-5-git-send-email-wens@csie.org>
+Date: Fri, 28 Aug 2015 17:54:33 +0800
+Subject: [PATCH 0/6] ARM: sunxi: Support MSI Primo81 tablet and Sinlinx SinA31s
+Message-ID: <1440755679-8266-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This also includes the reset pin for emmc.
+Hi Maxime,
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- arch/arm/boot/dts/sun6i-a31.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+This series adds support for MSI's Primo81 tablet, and Sinlinx's SinA31s
+development kit. This also adds a common axp221.dtsi, like we have for
+axp209 and axp152. The Hummingbird A31 dts is also migrated to this.
 
-diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
-index 431c7c884e1c..98359f37bf11 100644
---- a/arch/arm/boot/dts/sun6i-a31.dtsi
-+++ b/arch/arm/boot/dts/sun6i-a31.dtsi
-@@ -691,6 +691,16 @@
- 				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
-+			mmc2_8bit_emmc_pins: mmc2 at 0 {
-+				allwinner,pins = "PC6", "PC7", "PC8", "PC9",
-+						 "PC10", "PC11", "PC12",
-+						 "PC13", "PC14", "PC15",
-+						 "PC24";
-+				allwinner,function = "mmc2";
-+				allwinner,drive = <SUN4I_PINCTRL_30_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
-+
- 			gmac_pins_mii_a: gmac_mii at 0 {
- 				allwinner,pins = "PA0", "PA1", "PA2", "PA3",
- 						"PA8", "PA9", "PA11",
+The Primo81 patch is actually a v5. Changes since the last version can
+be found in that patch.
+
+Patch 1 adds an lradc node to sun6i-a31.dtsi. This is the same lradc
+for tablet buttons found on the other sunxi SoCs.
+
+Patch 2 adds a common dtsi for the AXP221 PMIC. This includes listing
+all the regulators, and the basic common properties, like
+"interrupt-controller".
+
+Patch 3 migrates the Hummingbird A31 dts to use the new axp221.dtsi
+
+Patch 4 adds the pinmux settings for A31/A31s mmc2 with 8-bit bus for
+emmc.
+
+Patch 5 adds dtsi/dts files for the Sinlinx SinA31s development kit.
+
+Patch 6 adds a dts file for the A31s based MSI Primo81 tablet.
+
+
+Regards
+ChenYu
+
+Chen-Yu Tsai (5):
+  ARM: dts: sun6i: Add lradc node
+  ARM: dts: sunxi: Add dtsi for AXP221 PMIC
+  ARM: dts: sun6i: hummingbird: Use axp221.dtsi for axp221 regulators
+  ARM: dts: sun6i: Add mmc2 pins for 8 bit emmc
+  ARM: dts: sun6i: Add support for Sinlinx A31s SDK board
+
+Karsten Merker (1):
+  ARM: dts: sun6i: Add dts file for MSI Primo81 tablet
+
+ arch/arm/boot/dts/Makefile                     |   4 +-
+ arch/arm/boot/dts/axp221.dtsi                  | 148 ++++++++++++++
+ arch/arm/boot/dts/sun6i-a31-hummingbird.dts    | 114 ++++++-----
+ arch/arm/boot/dts/sun6i-a31.dtsi               |  17 ++
+ arch/arm/boot/dts/sun6i-a31s-primo81.dts       | 255 +++++++++++++++++++++++++
+ arch/arm/boot/dts/sun6i-a31s-sina31s-core.dtsi | 131 +++++++++++++
+ arch/arm/boot/dts/sun6i-a31s-sina31s.dts       | 149 +++++++++++++++
+ 7 files changed, 759 insertions(+), 59 deletions(-)
+ create mode 100644 arch/arm/boot/dts/axp221.dtsi
+ create mode 100644 arch/arm/boot/dts/sun6i-a31s-primo81.dts
+ create mode 100644 arch/arm/boot/dts/sun6i-a31s-sina31s-core.dtsi
+ create mode 100644 arch/arm/boot/dts/sun6i-a31s-sina31s.dts
+
 -- 
 2.5.0
