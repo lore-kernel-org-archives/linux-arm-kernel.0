@@ -1,66 +1,56 @@
-From: Hannes.Schmelzer@br-automation.com (Hannes Schmelzer)
-Date: Fri, 28 Aug 2015 06:44:02 +0200
-Subject: [PATCH 2/2] memory: omap-gpmc: Add Kconfig option for debug
-In-Reply-To: <20150827165940.GY4215@atomide.com>
-References: <1432156863-19695-1-git-send-email-tony@atomide.com>
- <1432156863-19695-3-git-send-email-tony@atomide.com>
- <OFCA2F1DCE.C787A961-ONC1257EAE.001D79BC-C1257EAE.00203AFF@br-automation.com>
- <20150827165940.GY4215@atomide.com>
-Message-ID: <OF3C55E837.F60C3642-ONC1257EAF.0019FAE8-C1257EAF.001A0165@br-automation.com>
+From: zhengxing@rock-chips.com (Xing Zheng)
+Date: Fri, 28 Aug 2015 13:46:47 +0800
+Subject: [PATCH v1 2/3] pinctrl: rockchip: add support for the rk3036
+In-Reply-To: <1440740808-15004-1-git-send-email-zhengxing@rock-chips.com>
+References: <1440740808-15004-1-git-send-email-zhengxing@rock-chips.com>
+Message-ID: <1440740808-15004-3-git-send-email-zhengxing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> 
-> Hi,
-Hi,
+Many parts of pinctrl rk3036 are similar to rk2928's.
 
-> 
-> * Hannes Schmelzer <Hannes.Schmelzer@br-automation.com> [150826 22:55]:
-> > Hi Tony,
-> > 
-> > Did anyone test this changeset on some AM335x board?
-> 
-> Apparently not if it does not work or else you somehow have a different
-> configuration for GPMC.
-> 
-> > Today I ran into trouble with that because:
-> > 
-> > The GPMC controller gets reseted on kernel boot due to the 
-missing/removed 
-> > HWMOD_INIT_NO_RESET flag.
-> 
-> Oh so you mean it only works on am335x if CONFIG_OMAP_GPMC_DEBUG is set?
-Exactly.
+Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
+---
 
-> 
-> > I also tried to issue some SYSRESET through GPMC registers without 
-> > success, same strange behavior.
-> 
-> Interesting, never heard of that one before.
+Changes in v1: None
 
-Unfortunately i only have my B&R hardware to test,
-maybe somebody else has an am335x board with NAND flash on it and can 
-test.
+ drivers/pinctrl/pinctrl-rockchip.c |   17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
-
-> > What?s your thinking around that?
-> 
-> We could add a custom hwmod reset function that sets GPMC_CONFIG to 0.
-> Similar to omap_i2c_reset() is set up. 
-This would be possible, but we've to take care that such functions isn't 
-called during the new introduced debug-case.
-
-
-> Or we could set up a property for
-> the wait pin polarity. Roger, got any better ideas?
-
-In general, it would be a good idea to introduce a dt-property to control 
-the polarity of the wait pins, since there is allready a property to 
-select the wait pin - this would make the thing complete.
-
-> 
-> Regards,
-> Tony
-
-best regards,
-Hannes
+diff --git a/drivers/pinctrl/pinctrl-rockchip.c b/drivers/pinctrl/pinctrl-rockchip.c
+index cc2843a..d06631d 100644
+--- a/drivers/pinctrl/pinctrl-rockchip.c
++++ b/drivers/pinctrl/pinctrl-rockchip.c
+@@ -2042,6 +2042,21 @@ static struct rockchip_pin_ctrl rk2928_pin_ctrl = {
+ 		.pull_calc_reg		= rk2928_calc_pull_reg_and_bit,
+ };
+ 
++static struct rockchip_pin_bank rk3036_pin_banks[] = {
++	PIN_BANK(0, 32, "gpio0"),
++	PIN_BANK(1, 32, "gpio1"),
++	PIN_BANK(2, 32, "gpio2"),
++};
++
++static struct rockchip_pin_ctrl rk3036_pin_ctrl = {
++		.pin_banks		= rk3036_pin_banks,
++		.nr_banks		= ARRAY_SIZE(rk3036_pin_banks),
++		.label			= "RK3036-GPIO",
++		.type			= RK2928,
++		.grf_mux_offset		= 0xa8,
++		.pull_calc_reg		= rk2928_calc_pull_reg_and_bit,
++};
++
+ static struct rockchip_pin_bank rk3066a_pin_banks[] = {
+ 	PIN_BANK(0, 32, "gpio0"),
+ 	PIN_BANK(1, 32, "gpio1"),
+@@ -2160,6 +2175,8 @@ static struct rockchip_pin_ctrl rk3368_pin_ctrl = {
+ static const struct of_device_id rockchip_pinctrl_dt_match[] = {
+ 	{ .compatible = "rockchip,rk2928-pinctrl",
+ 		.data = (void *)&rk2928_pin_ctrl },
++	{ .compatible = "rockchip,rk3036-pinctrl",
++		.data = (void *)&rk3036_pin_ctrl },
+ 	{ .compatible = "rockchip,rk3066a-pinctrl",
+ 		.data = (void *)&rk3066a_pin_ctrl },
+ 	{ .compatible = "rockchip,rk3066b-pinctrl",
+-- 
+1.7.9.5
