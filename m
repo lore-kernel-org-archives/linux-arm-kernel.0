@@ -1,34 +1,41 @@
 From: horia.geanta@freescale.com (=?UTF-8?q?Horia=20Geant=C4=83?=)
-Date: Fri, 28 Aug 2015 14:45:06 +0300
-Subject: [RFC][PATCH 0/2] crypto: caam - Revamp I/O accessors
-Message-ID: <1440762306-7764-1-git-send-email-horia.geanta@freescale.com>
+Date: Fri, 28 Aug 2015 14:49:47 +0300
+Subject: [RFC][PATCH 1/2] arm64: add ioread64be and iowrite64be macros
+In-Reply-To: <1440762306-7764-1-git-send-email-horia.geanta@freescale.com>
+References: <1440762306-7764-1-git-send-email-horia.geanta@freescale.com>
+Message-ID: <1440762587-7815-1-git-send-email-horia.geanta@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(Part of the) I/O accessors in caam driver are PPC-specific.
-Use io{read,write}XX[be] instead.
+This will allow device drivers to consistently use io{read,write}XXbe
+macros also for 64-bit accesses.
 
-While here, prepare for "mixed" endianness platforms (like ARMv8-based
-LS1043A), where caam endianness (big) does not match the endianness
-of the core (little).
+Signed-off-by: Alex Porosanu <alexandru.porosanu@freescale.com>
+Signed-off-by: Horia Geant? <horia.geanta@freescale.com>
+---
+ arch/arm64/include/asm/io.h | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-1st patch adds 64-bit accessors for arm64.
-
-2nd patch updates the I/O accessors in the caam driver.
-
-Horia Geant? (2):
-  arm64: add ioread64be and iowrite64be macros
-  crypto: caam - handle core endianness != caam endianness
-
- arch/arm64/include/asm/io.h       |  4 ++-
- drivers/crypto/caam/caamhash.c    |  5 +--
- drivers/crypto/caam/ctrl.c        |  2 +-
- drivers/crypto/caam/desc.h        |  9 ++++-
- drivers/crypto/caam/desc_constr.h | 42 +++++++++++++++--------
- drivers/crypto/caam/jr.c          |  8 ++---
- drivers/crypto/caam/regs.h        | 72 ++++++++++++++++++++++++++++-----------
- drivers/crypto/caam/sg_sw_sec4.h  | 10 +++---
- 8 files changed, 105 insertions(+), 47 deletions(-)
-
+diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
+index 44be1e03ed65..9b6e408cfa51 100644
+--- a/arch/arm64/include/asm/io.h
++++ b/arch/arm64/include/asm/io.h
+@@ -174,13 +174,15 @@ extern void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size);
+ #define iounmap				__iounmap
+ 
+ /*
+- * io{read,write}{16,32}be() macros
++ * io{read,write}{16,32,64}be() macros
+  */
+ #define ioread16be(p)		({ __u16 __v = be16_to_cpu((__force __be16)__raw_readw(p)); __iormb(); __v; })
+ #define ioread32be(p)		({ __u32 __v = be32_to_cpu((__force __be32)__raw_readl(p)); __iormb(); __v; })
++#define ioread64be(p)		({ __u64 __v = be64_to_cpu((__force __be64)__raw_readq(p)); __iormb(); __v; })
+ 
+ #define iowrite16be(v,p)	({ __iowmb(); __raw_writew((__force __u16)cpu_to_be16(v), p); })
+ #define iowrite32be(v,p)	({ __iowmb(); __raw_writel((__force __u32)cpu_to_be32(v), p); })
++#define iowrite64be(v,p)	({ __iowmb(); __raw_writeq((__force __u64)cpu_to_be64(v), p); })
+ 
+ /*
+  * Convert a physical pointer to a virtual kernel pointer for /dev/mem
 -- 
 2.4.4
