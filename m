@@ -1,118 +1,49 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Sat, 29 Aug 2015 13:44:57 +0100
-Subject: [PATCH] ARM64: PCI: do not enable resources on PROBE_ONLY systems
-In-Reply-To: <20150828211444.GA27890@google.com>
-References: <1438262039-32085-1-git-send-email-lorenzo.pieralisi@arm.com>
- <20150828211444.GA27890@google.com>
-Message-ID: <20150829124457.GA18125@red-moon>
+From: yangyingliang@huawei.com (Yang Yingliang)
+Date: Sat, 29 Aug 2015 21:00:57 +0800
+Subject: [PATCH] arm64: fix a migrating irq bug when hotplug cpu
+Message-ID: <55E1AD09.7020701@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+From: Yang Yingliang <yangyingliang@huawei.com>
 
-On Fri, Aug 28, 2015 at 10:14:44PM +0100, Bjorn Helgaas wrote:
-> Hi Lorenzo,
-> 
-> On Thu, Jul 30, 2015 at 02:13:59PM +0100, Lorenzo Pieralisi wrote:
-> > On ARM64 PROBE_ONLY PCI systems resources are not currently claimed,
-> > therefore they can't be enabled since they do not have a valid
-> > parent pointer; this in turn prevents enabling PCI devices on
-> > ARM64 PROBE_ONLY systems, causing PCI devices initialization to
-> > fail.
-> 
-> Where does arm64 claim PCI BAR resources for the non-PROBE_ONLY case?
+When cpu is disabled, all irqs will be migratged to another cpu.
+In some cases, a new affinity is different, it needed to be coppied
+to irq's affinity. But if the type of irq is LPI, it's affinity will
+not be coppied because of irq_set_affinity's return value.
+So copy the affinity, when the return value is IRQ_SET_MASK_OK_DONE.
 
-arm64 (and arm) does not claim resources in arch code, they are always
-assigned in the respective host controllers (or the pcibios on arm),
-except for the PCI generic host when in PROBE_ONLY mode, where resources
-are neither claimed nor assigned (the reason for this patch to exist).
+Cc: Jiang Liu <jiang.liu@linux.intel.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+  arch/arm64/kernel/irq.c | 9 ++++++---
+  1 file changed, 6 insertions(+), 3 deletions(-)
 
-Certainly something to consolidate as part of the rework we talked
-about at LPC (PCI ACPI probing is yet another reason to consolidate it).
+diff --git a/arch/arm64/kernel/irq.c b/arch/arm64/kernel/irq.c
+index 463fa2e..2acc8ec 100644
+--- a/arch/arm64/kernel/irq.c
++++ b/arch/arm64/kernel/irq.c
+@@ -78,10 +78,13 @@ static bool migrate_one_irq(struct irq_desc *desc)
+  	}
 
-I am working on this, in particular I want to test how claiming the
-resources by default will impact ARM systems.
+  	c = irq_data_get_irq_chip(d);
+-	if (!c->irq_set_affinity)
++	if (!c->irq_set_affinity) {
+  		pr_debug("IRQ%u: unable to set affinity\n", d->irq);
+-	else if (c->irq_set_affinity(d, affinity, false) == IRQ_SET_MASK_OK && 
+ret)
+-		cpumask_copy(irq_data_get_affinity_mask(d), affinity);
++	} else if (c->irq_set_affinity(d, affinity, false) == IRQ_SET_MASK_OK 
+&& ret) {
++		int r = c->irq_set_affinity(d, affinity, false);
++		if ((r == IRQ_SET_MASK_OK || r == IRQ_SET_MASK_OK_DONE) && ret)
++			cpumask_copy(irq_data_get_affinity_mask(d), affinity);
++	}
 
-For the records, Will kindly provided me with an Alpha box so that I can
-test on it too.
-
-> I know it must be there somewhere, but I don't see it.
-
-It is not there, it is done in the host controllers by assigning the
-resources (which also "claim" them by assigning the parent pointer).
-
-Thanks,
-Lorenzo
-
-> 
-> > To solve this issue, resources must be claimed when devices are
-> > added on PROBE_ONLY systems, which ensures that the resource hierarchy
-> > is validated and the resource tree is sane, but this requires changes
-> > in the ARM64 resource management that can affect adversely existing
-> > PCI set-ups (claiming resources on !PROBE_ONLY systems might break
-> > existing ARM64 PCI platform implementations).
-> > 
-> > As a temporary solution in preparation for a proper resources claiming
-> > implementation in ARM64 core, to enable PCI PROBE_ONLY systems on ARM64,
-> > this patch adds a pcibios_enable_device() arch implementation that
-> > simply prevents enabling resources on PROBE_ONLY systems (mirroring ARM
-> > behaviour).
-> > 
-> > This is always a safe thing to do because on PROBE_ONLY systems the
-> > configuration space set-up can be considered immutable, and it is in
-> > preparation of proper resource claiming that would finally validate
-> > the PCI resources tree in the ARM64 arch implementation on PROBE_ONLY
-> > systems.
-> > 
-> > For !PROBE_ONLY systems resources enablement in pcibios_enable_device()
-> > on ARM64 is implemented as in current PCI core, leaving the behaviour
-> > unchanged.
-> > 
-> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > Cc: Bjorn Helgaas <bhelgaas@google.com>
-> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > ---
-> > Bjorn, all,
-> > 
-> > as I mention in the commit log, this patch is a temporary solution
-> > in preparation for proper resources claiming in ARM64, so that
-> > we can safely enable the PCI generic host controller on ARM64 systems.
-> > 
-> > It mirrors ARM implementation and I will work on changing both
-> > ARM and ARM64 to convert them to proper resources claiming in
-> > the respective implementations.
-> > 
-> > Lorenzo
-> > 
-> >  arch/arm64/kernel/pci.c | 13 +++++++++++++
-> >  1 file changed, 13 insertions(+)
-> > 
-> > diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
-> > index 4095379..b3d098b 100644
-> > --- a/arch/arm64/kernel/pci.c
-> > +++ b/arch/arm64/kernel/pci.c
-> > @@ -38,6 +38,19 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
-> >  	return res->start;
-> >  }
-> >  
-> > +/**
-> > + * pcibios_enable_device - Enable I/O and memory.
-> > + * @dev: PCI device to be enabled
-> > + * @mask: bitmask of BARs to enable
-> > + */
-> > +int pcibios_enable_device(struct pci_dev *dev, int mask)
-> > +{
-> > +	if (pci_has_flag(PCI_PROBE_ONLY))
-> > +		return 0;
-> > +
-> > +	return pci_enable_resources(dev, mask);
-> > +}
-> > +
-> >  /*
-> >   * Try to assign the IRQ number from DT when adding a new device
-> >   */
-> > -- 
-> > 2.2.1
-> > 
-> 
+  	return ret;
+  }
+-- 
+2.5.0
