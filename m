@@ -1,163 +1,35 @@
-From: siarhei.siamashka@gmail.com (Siarhei Siamashka)
-Date: Sat, 29 Aug 2015 07:43:03 +0300
-Subject: [PATCH 6/6] ARM: dts: sun6i: Add dts file for MSI Primo81 tablet
-In-Reply-To: <20150828210208.GU29389@lukather>
-References: <1440755679-8266-1-git-send-email-wens@csie.org>
- <1440755679-8266-7-git-send-email-wens@csie.org>
- <20150828123805.GN29389@lukather> <20150828163144.239e9bd5@i7>
- <20150828210208.GU29389@lukather>
-Message-ID: <20150829074303.0b2a4c0d@i7>
+From: davem@davemloft.net (David Miller)
+Date: Fri, 28 Aug 2015 22:10:49 -0700 (PDT)
+Subject: [PATCH net-next 7/8] net: thunderx: Support for upto 96 queues
+ for a VF
+In-Reply-To: <CALW4P+KVjSFA3F+9wHTMiyMHkFjrbedP2LpUu033-o0k32F0nw@mail.gmail.com>
+References: <1440774004-27923-1-git-send-email-aleksey.makarov@auriga.com>
+ <1440774004-27923-7-git-send-email-aleksey.makarov@auriga.com>
+ <CALW4P+KVjSFA3F+9wHTMiyMHkFjrbedP2LpUu033-o0k32F0nw@mail.gmail.com>
+Message-ID: <20150828.221049.256686243264204039.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 28 Aug 2015 23:02:08 +0200
-Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+From: Alexey Klimov <klimov.linux@gmail.com>
+Date: Sat, 29 Aug 2015 04:45:03 +0300
 
-> Hi,
+>> @@ -717,9 +833,24 @@ static void nic_unregister_interrupts(struct nicpf *nic)
+>>         nic_disable_msix(nic);
+>>  }
+>>
+>> +static int nic_num_sqs_en(struct nicpf *nic, int vf_en)
+>> +{
+>> +       int pos = 0, sqs_per_vf = MAX_SQS_PER_VF_SINGLE_NODE;
 > 
-> On Fri, Aug 28, 2015 at 04:31:44PM +0300, Siarhei Siamashka wrote:
-> > > > external connectors are represented by MicroSD slot, MiniHDMI, MicroUSB
-> > > > OTG and 3.5mm headphone jack. More details are available at
-> > > > 
-> > > >     http://linux-sunxi.org/MSI_Primo81
-> > > 
-> > > Again, not a huge fan of the commit logs URL...
-> > 
-> > But you are not strongly objecting to it either, right?
-> > 
-> > AFAIK many people are in favour of having links to the device pages in
-> > the linux-sunxi wiki listed somewhere in the commit logs or along with
-> > the board maintainer contact information (in U-Boot).
-> 
-> [citation needed]
+> Please check if you really need to initialize 'pos' by zero here.
 
-Sure. I'm not going to search for every possible post in the mailing
-lists on this particular subject, but you can check this one for
-example:
-    http://lists.denx.de/pipermail/u-boot/2015-June/215675.html
-And also look here:
-    https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=0ff1ffd3fe86840c80458ea45c2379014c86b660
+Please do _NOT_ quote hundreds of lines of code only to give feedback
+on one particular hunk.
 
-> And it's a good thing that we're in Linux then.
+Quote _ONLY_ the exact context required, nothing more.
 
-What do you mean by this?
+Everyone has to scroll through all of this unrelated crap you quoted,
+and that makes more work for everyone.
 
-> > Because these pages contain the most relevant and up to date
-> > information about the device, various pictures, tips and tricks,
-> > etc.
-> > 
-> > If you are worried about linux-sunxi.org suddenly going down and not
-> > coming back, there is also webarchive:
-> > 
-> >     http://web.archive.org/web/*/http://linux-sunxi.org/MSI_Primo81
-> 
-> If you have to look in web archive to find that page, you can just as
-> well use google in the first place?
-
-You *don't* have to look in web archive to find that page. That's only
-an emergency option, just in case if shit hits the fan. Hopefully we
-are never going to have to resort to this.
-
-Do you mean that the users probably will not think about the webarchive
-alternative in the case of emergency? If you are really so paranoid, it
-is possible to provide both the real wiki page url and the webarchive
-url. Does this solve the problem?
-
-> > > This commit log is already fine without it.
-> > 
-> > This commit log is a nice example of why having a link to the wiki page
-> > is a good idea. The errors and omissions in the wiki page can be
-> > corrected. The old commit logs can't.
-> 
-> Which is exactly why we shouldn't have URLs. Because we can't fix them
-> when they become irrelevant.
-
-By the very same reasoning, we shouldn't ever have e-mail addresses in
-the commit messages, documentation or source files. Because you know,
-they sometimes may change too. I mentioned e-mail addresses here because
-wiki pages and e-mail addresses both serve a very similar purpose:
-that's a contact information.
-
-> 
-> Plus, quoting SubmittingPatches
-> 
-> "
-> When you submit or resubmit a patch or patch series, include the
-> complete patch description and justification for it.  Don't just
-> say that this is version N of the patch (series).  Don't expect the
-> subsystem maintainer to refer back to earlier patch versions or referenced
-> URLs to find the patch description and put that into the patch.
-> I.e., the patch (series) and its description should be self-contained.
-> "
-
-There is a significant difference between "patch description" mentioned
-in this quotation (in other words, a commit message) and an external
-URL with additional useful information.
-
-If you search "http:" substring in the "git log" output, then you can
-find a lot of various links to external web pages. Most of them are
-links to the archived discussions in the mailing lists or references
-to bugtracker issues. AFAIK there is no strict policy about prohibiting
-URLs in general.
-
-> If the patch description is self-contained, there's no need for a
-> URL. And I really don't care about the board description being
-> comprehensive either, so there's nothing to edit.
-
-Finally looks like we have the real reasoning for stripping out URLs
-and other extra information: *you* don't care. Basically, that's your
-whim. And don't get me wrong, that's a perfectly valid explanation.
- 
-> > > > +&i2c1 {
-> > > > +	pinctrl-names = "default";
-> > > > +	pinctrl-0 = <&i2c1_pins_a>;
-> > > > +	status = "okay";
-> > > > +
-> > > > +	ctp at 5d {
-> > > > +		pinctrl-names = "default";
-> > > > +		pinctrl-0 = <&gt911_int_primo81>;
-> > > > +		compatible = "goodix,gt911";
-> > > > +		reg = <0x5d>;
-> > > > +		interrupt-parent = <&pio>;
-> > > > +		interrupts = <0 3 IRQ_TYPE_LEVEL_HIGH>; /* PA3 */
-> > > > +		/*
-> > > > +		 * The default 0,0 coordinate is at the corner closest to
-> > > > +		 * the headphone jack. X goes along the long side, while
-> > > > +		 * Y goes along the short side.
-> > > > +		 */
-> > > 
-> > > I'm not exactly sure what that comment is supposed to be for...
-> > 
-> > It's probably a human readable comment intended to be read by humans.
-> > 
-> > Yeah, this information might actually better belong to the wiki page.
-> > But then again, this brings us to the question whether we should have
-> > a link to the linux-sunxi wiki page somewhere in the dts.
-> 
-> I guess I'm not a human then, but a DT is definitely not the place I
-> would look at for such information, and I'm not sure a user that
-> didn't even build his kernel will either.
-
-Why not? If the users are troubleshooting problems with the peripherals
-in their devices (such as the touchscreen in this particular example),
-why would they not look into a DTS file? It is one of the possible
-culprits and also a source of valuable information, which may aid
-debugging.
-
-And if a user doesn't have any device yet, but is only considering to
-buy something that is well supported by the Linux kernel, then why
-would (s)he not look though the list of the available DTS files as
-the first step in this search?
-
-> However, I'm pretty sure that if it was in a wiki page, any search
-> engine would return exactly the info I need, far more reliably than if
-> it was in the kernel source.
-
-That's just a speculation. I'm not sharing your enthusiasm about "any"
-search engine and about "exactly". And we are talking not about you,
-but about a wider population of users with varying levels of skills
-and experience.
-
--- 
-Best regards,
-Siarhei Siamashka
+Think particularly of _ME_ who has to be aware of what's going on in
+every discussion thread for every patch that gets posted to this list.
