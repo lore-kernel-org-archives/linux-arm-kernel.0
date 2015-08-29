@@ -1,29 +1,42 @@
-From: santosh.shilimkar@oracle.com (santosh shilimkar)
-Date: Sat, 29 Aug 2015 10:11:23 -0700
-Subject: [PATCH] gpio: omap: Fix gpiochip_add() handling for deferred probe
-In-Reply-To: <1440787489-15992-1-git-send-email-tony@atomide.com>
-References: <1440787489-15992-1-git-send-email-tony@atomide.com>
-Message-ID: <55E1E7BB.7020200@oracle.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Sat, 29 Aug 2015 19:12:40 +0100
+Subject: [PATCH] arm64: fix a migrating irq bug when hotplug cpu
+In-Reply-To: <55E1CBE9.6080705@linux.intel.com>
+References: <55E1AD09.7020701@huawei.com> <55E1CBE9.6080705@linux.intel.com>
+Message-ID: <66e158e6da958d355d54543ef69e5e94@www.loen.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-8/28/2015 11:44 AM, Tony Lindgren wrote:
-> Currently we gpio-omap breaks if gpiochip_add() returns -EPROBE_DEFER:
->
-> [    0.570000] gpiochip_add: GPIOs 0..31 (gpio) failed to register
-> [    0.570000] omap_gpio 48310000.gpio: Could not register gpio chip -517
-> ...
-> [    3.670000] omap_gpio 48310000.gpio: Unbalanced pm_runtime_enable!
->
-> Let's fix the issue by adding the missing pm_runtime_put() on error.
->
-> Cc: Grygorii Strashko <grygorii.strashko@ti.com>
-> Cc: Javier Martinez Canillas <javier@dowhile0.org>
-> Cc: Kevin Hilman <khilman@deeprootsystems.com>
-> Cc: Santosh Shilimkar <ssantosh@kernel.org>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> ---
->   drivers/gpio/gpio-omap.c | 5 ++++-
->   1 file changed, 4 insertions(+), 1 deletion(-)
->
-Acked-by: Santosh Shilimkar <ssantosh@kernel.org>
+On 2015-08-29 16:12, Jiang Liu wrote:
+> On 2015/8/29 21:00, Yang Yingliang wrote:
+>> From: Yang Yingliang <yangyingliang@huawei.com>
+>>
+>> When cpu is disabled, all irqs will be migratged to another cpu.
+>> In some cases, a new affinity is different, it needed to be coppied
+>> to irq's affinity. But if the type of irq is LPI, it's affinity will
+>> not be coppied because of irq_set_affinity's return value.
+>> So copy the affinity, when the return value is IRQ_SET_MASK_OK_DONE.
+> Hi Yingliang,
+> 	If irq_set_affinity callback returns IRQ_SET_MASK_OK_DONE,
+> it means that irq_set_affinity has copied the new CPU mask to irq
+> affinity mask. It would be better to change irq_set_affinity for LPI
+> to follow this rule.
+
+The main issue here seems to be that we do not call irq_set_affinity, 
+but
+that we directly call into the top-level irqchip method, which relies 
+on
+the core code to do the copy (see irq_do_set_affinity). Too bad.
+
+It feels like the arm/arm64 code would probably be better consolidated 
+into
+kernel/irq/migration.c, which already deals with some of this for x86
+and ia64. It would save us the duplication and will make sure we don't
+miss things next time we add a new return code, as irq_do_set_affinity
+would handle this properly.
+
+Thoughts?
+
+          M.
+-- 
+Fast, cheap, reliable. Pick two.
