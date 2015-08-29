@@ -1,89 +1,57 @@
-From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
-Date: Sat, 29 Aug 2015 20:26:42 +0530
-Subject: [PATCH v5 2/4] Documentation: arm64/arm: dt bindings for numa.
-In-Reply-To: <55E17F58.5020101@huawei.com>
-References: <1439570374-4079-1-git-send-email-gkulkarni@caviumnetworks.com>
- <1439570374-4079-3-git-send-email-gkulkarni@caviumnetworks.com>
- <20150828123228.GE31748@leverpostej>
- <CAL_JsqLOpUTVeKbkJ6uPi0EYistd=BowAHdtSmaUYYDhU6c9Sg@mail.gmail.com>
- <55E17F58.5020101@huawei.com>
-Message-ID: <CAFpQJXWO0xT0kxWf09L_XcAOXm1Lov8i2U2BQzk-x0TStj7vBg@mail.gmail.com>
+From: jiang.liu@linux.intel.com (Jiang Liu)
+Date: Sat, 29 Aug 2015 23:12:41 +0800
+Subject: [PATCH] arm64: fix a migrating irq bug when hotplug cpu
+In-Reply-To: <55E1AD09.7020701@huawei.com>
+References: <55E1AD09.7020701@huawei.com>
+Message-ID: <55E1CBE9.6080705@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thunder,
-
-On Sat, Aug 29, 2015 at 3:16 PM, Leizhen (ThunderTown)
-<thunder.leizhen@huawei.com> wrote:
->
->
-> On 2015/8/28 22:02, Rob Herring wrote:
->> +benh
->>
->> On Fri, Aug 28, 2015 at 7:32 AM, Mark Rutland <mark.rutland@arm.com> wrote:
->>> Hi,
->>>
->>> On Fri, Aug 14, 2015 at 05:39:32PM +0100, Ganapatrao Kulkarni wrote:
->>>> DT bindings for numa map for memory, cores and IOs using
->>>> arm,associativity device node property.
->>>
->>> Given this is just a copy of ibm,associativity, I'm not sure I see much
->>> point in renaming the properties.
->>
->> So just keep the ibm? I'm okay with that. That would help move to
->> common code. Alternatively, we could drop the vendor prefix and have
->> common code just check for both.
->>
->
-> Hi all,
->
-> Why not copy the method of ACPI numa? There only three elements should be configured:
-> 1) a cpu belong to which node
-> 2) a memory block belong to which node
-> 3) the distance of each two nodes
->
-> The devicetree nodes of numa can be like below:
-> / {
->         ...
->
->         numa-nodes-info {
->                 node-name: node-description {
->                         mem-ranges = <...>;
->                         cpus-list = <...>;
->                 };
->
->                 nodes-distance {
->                         distance-list = <...>;
->                 };
->         };
->
->         ...
-> };
->
-some what similar to what your are proposing is already implemented in
-my v2 patchset.
-https://lwn.net/Articles/623920/
-http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/305164.html
-we have went to associativity property based implementation to keep it
-more generic.
-i do have both acpi(using linaro/hanjun's patches) and associativity
-based implementations on our internal tree
-and tested on thunderx platform.
-i do see issue in creating numa mapping using ACPI for IOs(for
-example, i am not able to create numa mapping for ITS which is on each
-node, using ACPI tables),  since ACPI spec (tables SRAT and SLIT)
-talks only about processor and memory.
-however associativity is generic and you can apply on any dt node.
-> Sorry, I don't think xxx,associativity is a good method, it's hard to config, and it
-> seems hardware-dependent. Especially, when we want to support memory hot-add, it's too hard.
-> Because xxx,associativity have no obvious information about it. Like powerpc, it use another
-> property: "/ibm,dynamic-reconfiguration-memory".
->
-> I spend almost a whole month to implement of_numa(configured by dt-nodes), base upon my opinion
-> mentioned above. If somebody are interested in it, I can send my patchset to show it.
->
-> Regards,
-> Thunder.
->
-thanks
-ganapat
+On 2015/8/29 21:00, Yang Yingliang wrote:
+> From: Yang Yingliang <yangyingliang@huawei.com>
+> 
+> When cpu is disabled, all irqs will be migratged to another cpu.
+> In some cases, a new affinity is different, it needed to be coppied
+> to irq's affinity. But if the type of irq is LPI, it's affinity will
+> not be coppied because of irq_set_affinity's return value.
+> So copy the affinity, when the return value is IRQ_SET_MASK_OK_DONE.
+Hi Yingliang,
+	If irq_set_affinity callback returns IRQ_SET_MASK_OK_DONE,
+it means that irq_set_affinity has copied the new CPU mask to irq
+affinity mask. It would be better to change irq_set_affinity for LPI
+to follow this rule.
+Thanks!
+Gerry
+> 
+> Cc: Jiang Liu <jiang.liu@linux.intel.com>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/kernel/irq.c | 9 ++++++---
+>  1 file changed, 6 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/irq.c b/arch/arm64/kernel/irq.c
+> index 463fa2e..2acc8ec 100644
+> --- a/arch/arm64/kernel/irq.c
+> +++ b/arch/arm64/kernel/irq.c
+> @@ -78,10 +78,13 @@ static bool migrate_one_irq(struct irq_desc *desc)
+>      }
+> 
+>      c = irq_data_get_irq_chip(d);
+> -    if (!c->irq_set_affinity)
+> +    if (!c->irq_set_affinity) {
+>          pr_debug("IRQ%u: unable to set affinity\n", d->irq);
+> -    else if (c->irq_set_affinity(d, affinity, false) == IRQ_SET_MASK_OK
+> && ret)
+> -        cpumask_copy(irq_data_get_affinity_mask(d), affinity);
+> +    } else if (c->irq_set_affinity(d, affinity, false) ==
+> IRQ_SET_MASK_OK && ret) {
+> +        int r = c->irq_set_affinity(d, affinity, false);
+> +        if ((r == IRQ_SET_MASK_OK || r == IRQ_SET_MASK_OK_DONE) && ret)
+> +            cpumask_copy(irq_data_get_affinity_mask(d), affinity);
+> +    }
+> 
+>      return ret;
+>  }
