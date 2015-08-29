@@ -1,7 +1,7 @@
 From: apinski@cavium.com (Andrew Pinski)
-Date: Sun, 30 Aug 2015 02:38:40 +0800
-Subject: [PATCH] ARM64: Add AT_ARM64_MIDR to the aux vector
-Message-ID: <1440873520-43899-1-git-send-email-apinski@cavium.com>
+Date: Sun, 30 Aug 2015 02:46:22 +0800
+Subject: [PATCHv2] ARM64: Add AT_ARM64_MIDR to the aux vector
+Message-ID: <1440873982-44062-1-git-send-email-apinski@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,12 +14,16 @@ http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/358995.html.
 It allows for faster access to midr_el1 than going through a trap and
 does not exist if the set of cores are not the same.
 
+Changes from v1:
+Forgot to include the auxvec.h part.
+
 Signed-off-by: Andrew Pinski <apinski@cavium.com>
 ---
- arch/arm64/include/asm/cpu.h |    1 +
- arch/arm64/include/asm/elf.h |    6 ++++++
- arch/arm64/kernel/cpuinfo.c  |   22 ++++++++++++++++++++++
- 3 files changed, 29 insertions(+)
+ arch/arm64/include/asm/cpu.h         |    1 +
+ arch/arm64/include/asm/elf.h         |    6 ++++++
+ arch/arm64/include/uapi/asm/auxvec.h |    3 +++
+ arch/arm64/kernel/cpuinfo.c          |   22 ++++++++++++++++++++++
+ 4 files changed, 32 insertions(+)
 
 diff --git a/arch/arm64/include/asm/cpu.h b/arch/arm64/include/asm/cpu.h
 index 8e797b2..fab0aa1 100644
@@ -58,6 +62,18 @@ index faad6df..d3549de 100644
  } while (0)
  
  #define ARCH_HAS_SETUP_ADDITIONAL_PAGES
+diff --git a/arch/arm64/include/uapi/asm/auxvec.h b/arch/arm64/include/uapi/asm/auxvec.h
+index 22d6d88..dc55c56 100644
+--- a/arch/arm64/include/uapi/asm/auxvec.h
++++ b/arch/arm64/include/uapi/asm/auxvec.h
+@@ -19,4 +19,7 @@
+ /* vDSO location */
+ #define AT_SYSINFO_EHDR	33
+ 
++/* Machine IDenfier Register (MDIR). */
++#define AT_ARM64_MIDR 38
++
+ #endif
 diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
 index 75d5a86..b14c87d 100644
 --- a/arch/arm64/kernel/cpuinfo.c
