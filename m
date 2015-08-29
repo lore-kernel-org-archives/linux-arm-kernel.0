@@ -1,245 +1,496 @@
-From: rjui@broadcom.com (Ray Jui)
-Date: Fri, 28 Aug 2015 17:20:20 -0700
-Subject: [PATCH v3 2/5] ARM: NSP: add minimal Northstar Plus device tree
-In-Reply-To: <1440805644-18241-1-git-send-email-jonmason@broadcom.com>
-References: <1440805644-18241-1-git-send-email-jonmason@broadcom.com>
-Message-ID: <55E0FAC4.2040108@broadcom.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 28 Aug 2015 17:44:10 -0700
+Subject: [PATCH] soc: qcom: smem: Handle big endian CPUs
+Message-ID: <1440809050-8718-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The contents of smem are always in little endian, but the smem
+driver is not capable of being used on big endian CPUs. Annotate
+the little endian data members and update the code to do the
+proper byte swapping.
 
+Cc: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ drivers/soc/qcom/smem.c | 230 +++++++++++++++++++++++++++++-------------------
+ 1 file changed, 139 insertions(+), 91 deletions(-)
 
-On 8/28/2015 4:47 PM, Jon Mason wrote:
-> Add a very minimalistic set of Northstar Plus Device Tree files which
-> describes the SoC and the BCM958625 implementation.  The perpherials
-> described are:
-> 
-> ARM Cortex A9 CPU
-> 2 8250 UARTs
-> ARM GIC
-> PL310 L2 Cache
-> ARM A9 Global timer
-> 
-> Signed-off-by: Kapil Hali <kapilh@broadcom.com>
-> Signed-off-by: Jon Mason <jonmason@broadcom.com>
-> ---
->  arch/arm/boot/dts/Makefile       |   2 +
->  arch/arm/boot/dts/bcm-nsp.dtsi   | 120 +++++++++++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/bcm958625k.dts |  57 +++++++++++++++++++
->  3 files changed, 179 insertions(+)
->  create mode 100644 arch/arm/boot/dts/bcm-nsp.dtsi
->  create mode 100644 arch/arm/boot/dts/bcm958625k.dts
-> 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 246473a..adb5732 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -82,6 +82,8 @@ dtb-$(CONFIG_ARCH_BCM_CYGNUS) += \
->  dtb-$(CONFIG_ARCH_BCM_MOBILE) += \
->  	bcm28155-ap.dtb \
->  	bcm21664-garnet.dtb
-> +dtb-$(CONFIG_ARCH_BCM_NSP) += \
-> +	bcm958625k.dtb
->  dtb-$(CONFIG_ARCH_BERLIN) += \
->  	berlin2-sony-nsz-gs7.dtb \
->  	berlin2cd-google-chromecast.dtb \
-> diff --git a/arch/arm/boot/dts/bcm-nsp.dtsi b/arch/arm/boot/dts/bcm-nsp.dtsi
-> new file mode 100644
-> index 0000000..f5f494f
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/bcm-nsp.dtsi
-> @@ -0,0 +1,120 @@
-> +/*
-> + *  BSD LICENSE
-> + *
-> + *  Copyright(c) 2015 Broadcom Corporation.  All rights reserved.
-> + *
-> + *  Redistribution and use in source and binary forms, with or without
-> + *  modification, are permitted provided that the following conditions
-> + *  are met:
-> + *
-> + *    * Redistributions of source code must retain the above copyright
-> + *      notice, this list of conditions and the following disclaimer.
-> + *    * Redistributions in binary form must reproduce the above copyright
-> + *      notice, this list of conditions and the following disclaimer in
-> + *      the documentation and/or other materials provided with the
-> + *      distribution.
-> + *    * Neither the name of Broadcom Corporation nor the names of its
-> + *      contributors may be used to endorse or promote products derived
-> + *      from this software without specific prior written permission.
-> + *
-> + *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-> + *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-> + *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-> + *  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-> + *  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-> + *  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-> + *  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-> + *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-> + *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-> + *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-> + *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-> + */
-> +
-> +#include <dt-bindings/interrupt-controller/arm-gic.h>
-> +#include <dt-bindings/interrupt-controller/irq.h>
-> +
-> +#include "skeleton.dtsi"
-> +
-> +/ {
-> +	compatible = "brcm,nsp";
-> +	model = "Broadcom Northstar Plus SoC";
-> +	interrupt-parent = <&gic>;
-> +
-> +	mpcore {
-> +		compatible = "simple-bus";
-> +		ranges = <0x00000000 0x19020000 0x00003000>;
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +
-> +		cpus {
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +
-> +			cpu at 0 {
-> +				device_type = "cpu";
-> +				compatible = "arm,cortex-a9";
-> +				next-level-cache = <&L2>;
-> +				reg = <0x0>;
-> +			};
-> +		};
-> +
-> +		L2: l2-cache {
-> +			compatible = "arm,pl310-cache";
-> +			reg = <0x2000 0x1000>;
-> +			cache-unified;
-> +			cache-level = <2>;
-> +		};
-> +
-> +		gic: interrupt-controller at 19021000 {
-> +			compatible = "arm,cortex-a9-gic";
-> +			#interrupt-cells = <3>;
-> +			#address-cells = <0>;
-> +			interrupt-controller;
-> +			reg = <0x1000 0x1000>,
-> +			      <0x0100 0x100>;
-> +		};
-> +
-> +		timer at 19020200 {
-> +			compatible = "arm,cortex-a9-global-timer";
-> +			reg = <0x0200 0x100>;
-> +			interrupts = <GIC_PPI 11 IRQ_TYPE_LEVEL_HIGH>;
-> +			clocks = <&periph_clk>;
-> +		};
-> +	};
-> +
-> +	clocks {
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges;
-> +
-> +		periph_clk: periph_clk {
-> +			compatible = "fixed-clock";
-> +			#clock-cells = <0>;
-> +			clock-frequency = <500000000>;
-> +		};
-> +	};
-> +
-> +	apb {
-> +		compatible = "arm,amba-bus", "simple-bus";
-
-Should "arm,amba-bus" has a separate bus node with AMBA compatible
-devices declared in there (e.g, pl330, spi-pl022, and etc.) in the
-future after they are brought up? To my best knowledge, "ns16550a" UART
-is NOT an AMBA compatible device.
-
-> +		interrupt-parent = <&gic>;
-> +		ranges = <0x00000000 0x18000000 0x00001000>;
-
-Does the 'apb' bus mean to cover all peripherals connected through APB?
-If so, the size is only 0x1000 and that seems to be too small...
-
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +
-> +		uart0: serial at 18000300 {
-> +			compatible = "ns16550a";
-> +			reg = <0x0300 0x100>;
-> +			interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
-> +			clock-frequency = <62499840>;
-> +			status = "disabled";
-> +		};
-> +
-> +		uart1: serial at 18000400 {
-> +			compatible = "ns16550a";
-> +			reg = <0x0400 0x100>;
-> +			interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
-> +			clock-frequency = <62499840>;
-> +			status = "disabled";
-> +		};
-> +	};
-> +};
-> diff --git a/arch/arm/boot/dts/bcm958625k.dts b/arch/arm/boot/dts/bcm958625k.dts
-> new file mode 100644
-> index 0000000..16303db
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/bcm958625k.dts
-> @@ -0,0 +1,57 @@
-> +/*
-> + *  BSD LICENSE
-> + *
-> + *  Copyright(c) 2015 Broadcom Corporation.  All rights reserved.
-> + *
-> + *  Redistribution and use in source and binary forms, with or without
-> + *  modification, are permitted provided that the following conditions
-> + *  are met:
-> + *
-> + *    * Redistributions of source code must retain the above copyright
-> + *      notice, this list of conditions and the following disclaimer.
-> + *    * Redistributions in binary form must reproduce the above copyright
-> + *      notice, this list of conditions and the following disclaimer in
-> + *      the documentation and/or other materials provided with the
-> + *      distribution.
-> + *    * Neither the name of Broadcom Corporation nor the names of its
-> + *      contributors may be used to endorse or promote products derived
-> + *      from this software without specific prior written permission.
-> + *
-> + *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-> + *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-> + *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-> + *  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-> + *  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-> + *  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-> + *  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-> + *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-> + *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-> + *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-> + *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-> + */
-> +
-> +/dts-v1/;
-> +
-> +#include "bcm-nsp.dtsi"
-> +
-> +/ {
-> +	model = "NorthStar Plus SVK (BCM958625K)";
-> +	compatible = "brcm,bcm58625", "brcm,nsp";
-> +
-> +	aliases {
-> +		serial0 = &uart0;
-> +		serial1 = &uart1;
-> +	};
-> +
-> +	chosen {
-> +		stdout-path = "serial0:115200n8";
-> +	};
-> +};
-> +
-> +&uart0 {
-> +	status = "okay";
-> +};
-> +
-> +&uart1 {
-> +	status = "okay";
-> +};
-> 
+diff --git a/drivers/soc/qcom/smem.c b/drivers/soc/qcom/smem.c
+index 4c347e7c5880..eba4cbaaacbe 100644
+--- a/drivers/soc/qcom/smem.c
++++ b/drivers/soc/qcom/smem.c
+@@ -92,9 +92,9 @@
+   * @params:	parameters to the command
+   */
+ struct smem_proc_comm {
+-	u32 command;
+-	u32 status;
+-	u32 params[2];
++	__le32 command;
++	__le32 status;
++	__le32 params[2];
+ };
+ 
+ /**
+@@ -106,10 +106,10 @@ struct smem_proc_comm {
+  *		the default region. bits 0,1 are reserved
+  */
+ struct smem_global_entry {
+-	u32 allocated;
+-	u32 offset;
+-	u32 size;
+-	u32 aux_base; /* bits 1:0 reserved */
++	__le32 allocated;
++	__le32 offset;
++	__le32 size;
++	__le32 aux_base; /* bits 1:0 reserved */
+ };
+ #define AUX_BASE_MASK		0xfffffffc
+ 
+@@ -125,11 +125,11 @@ struct smem_global_entry {
+  */
+ struct smem_header {
+ 	struct smem_proc_comm proc_comm[4];
+-	u32 version[32];
+-	u32 initialized;
+-	u32 free_offset;
+-	u32 available;
+-	u32 reserved;
++	__le32 version[32];
++	__le32 initialized;
++	__le32 free_offset;
++	__le32 available;
++	__le32 reserved;
+ 	struct smem_global_entry toc[SMEM_ITEM_COUNT];
+ };
+ 
+@@ -143,12 +143,12 @@ struct smem_header {
+  * @reserved:	reserved entries for later use
+  */
+ struct smem_ptable_entry {
+-	u32 offset;
+-	u32 size;
+-	u32 flags;
+-	u16 host0;
+-	u16 host1;
+-	u32 reserved[8];
++	__le32 offset;
++	__le32 size;
++	__le32 flags;
++	__le16 host0;
++	__le16 host1;
++	__le32 reserved[8];
+ };
+ 
+ /**
+@@ -160,13 +160,14 @@ struct smem_ptable_entry {
+  * @entry:	list of @smem_ptable_entry for the @num_entries partitions
+  */
+ struct smem_ptable {
+-	u32 magic;
+-	u32 version;
+-	u32 num_entries;
+-	u32 reserved[5];
++	u8 magic[4];
++	__le32 version;
++	__le32 num_entries;
++	__le32 reserved[5];
+ 	struct smem_ptable_entry entry[];
+ };
+-#define SMEM_PTABLE_MAGIC	0x434f5424 /* "$TOC" */
++
++static const u8 SMEM_PTABLE_MAGIC[] = { 0x24, 0x54, 0x4f, 0x43 }; /* "$TOC" */
+ 
+ /**
+  * struct smem_partition_header - header of the partitions
+@@ -181,15 +182,16 @@ struct smem_ptable {
+  * @reserved:	for now reserved entries
+  */
+ struct smem_partition_header {
+-	u32 magic;
+-	u16 host0;
+-	u16 host1;
+-	u32 size;
+-	u32 offset_free_uncached;
+-	u32 offset_free_cached;
+-	u32 reserved[3];
++	u8 magic[4];
++	__le16 host0;
++	__le16 host1;
++	__le32 size;
++	__le32 offset_free_uncached;
++	__le32 offset_free_cached;
++	__le32 reserved[3];
+ };
+-#define SMEM_PART_MAGIC		0x54525024 /* "$PRT" */
++
++static const u8 SMEM_PART_MAGIC[] = { 0x24, 0x50, 0x52, 0x54 };
+ 
+ /**
+  * struct smem_private_entry - header of each item in the private partition
+@@ -201,12 +203,12 @@ struct smem_partition_header {
+  * @reserved:	for now reserved entry
+  */
+ struct smem_private_entry {
+-	u16 canary;
+-	u16 item;
+-	u32 size; /* includes padding bytes */
+-	u16 padding_data;
+-	u16 padding_hdr;
+-	u32 reserved;
++	u16 canary; /* bytes are the same so no swapping needed */
++	__le16 item;
++	__le32 size; /* includes padding bytes */
++	__le16 padding_data;
++	__le16 padding_hdr;
++	__le32 reserved;
+ };
+ #define SMEM_PRIVATE_CANARY	0xa5a5
+ 
+@@ -242,6 +244,45 @@ struct qcom_smem {
+ 	struct smem_region regions[0];
+ };
+ 
++static struct smem_private_entry *
++phdr_to_last_private_entry(struct smem_partition_header *phdr)
++{
++	void *p = phdr;
++
++	return p + le32_to_cpu(phdr->offset_free_uncached);
++}
++
++static void *phdr_to_first_cached_entry(struct smem_partition_header *phdr)
++{
++	void *p = phdr;
++
++	return p + le32_to_cpu(phdr->offset_free_cached);
++}
++
++static struct smem_private_entry *
++phdr_to_first_private_entry(struct smem_partition_header *phdr)
++{
++	void *p = phdr;
++
++	return p + sizeof(*phdr);
++}
++
++static struct smem_private_entry *
++private_entry_next(struct smem_private_entry *e)
++{
++	void *p = e;
++
++	return p + sizeof(*e) + le16_to_cpu(e->padding_hdr) +
++	       le32_to_cpu(e->size);
++}
++
++static void *entry_to_item(struct smem_private_entry *e)
++{
++	void *p = e;
++
++	return p + sizeof(*e) + le16_to_cpu(e->padding_hdr);
++}
++
+ /* Pointer to the one and only smem handle */
+ static struct qcom_smem *__smem;
+ 
+@@ -254,20 +295,20 @@ static int qcom_smem_alloc_private(struct qcom_smem *smem,
+ 				   size_t size)
+ {
+ 	struct smem_partition_header *phdr;
+-	struct smem_private_entry *hdr;
++	struct smem_private_entry *hdr, *end;
+ 	size_t alloc_size;
+-	void *p;
++	void *cached;
+ 
+ 	/* We're not going to find it if there's no matching partition */
+ 	if (host >= SMEM_HOST_COUNT || !smem->partitions[host])
+ 		return -ENOENT;
+ 
+ 	phdr = smem->partitions[host];
++	hdr = phdr_to_first_private_entry(phdr);
++	end = phdr_to_last_private_entry(phdr);
++	cached = phdr_to_first_cached_entry(phdr);
+ 
+-	p = (void *)phdr + sizeof(*phdr);
+-	while (p < (void *)phdr + phdr->offset_free_uncached) {
+-		hdr = p;
+-
++	while (hdr < end) {
+ 		if (hdr->canary != SMEM_PRIVATE_CANARY) {
+ 			dev_err(smem->dev,
+ 				"Found invalid canary in host %d partition\n",
+@@ -275,24 +316,23 @@ static int qcom_smem_alloc_private(struct qcom_smem *smem,
+ 			return -EINVAL;
+ 		}
+ 
+-		if (hdr->item == item)
++		if (le16_to_cpu(hdr->item) == item)
+ 			return -EEXIST;
+ 
+-		p += sizeof(*hdr) + hdr->padding_hdr + hdr->size;
++		hdr = private_entry_next(hdr);
+ 	}
+ 
+ 	/* Check that we don't grow into the cached region */
+ 	alloc_size = sizeof(*hdr) + ALIGN(size, 8);
+-	if (p + alloc_size >= (void *)phdr + phdr->offset_free_cached) {
++	if ((void *)hdr + alloc_size >= cached) {
+ 		dev_err(smem->dev, "Out of memory\n");
+ 		return -ENOSPC;
+ 	}
+ 
+-	hdr = p;
+ 	hdr->canary = SMEM_PRIVATE_CANARY;
+-	hdr->item = item;
+-	hdr->size = ALIGN(size, 8);
+-	hdr->padding_data = hdr->size - size;
++	hdr->item = cpu_to_le16(item);
++	hdr->size = cpu_to_le32(ALIGN(size, 8));
++	hdr->padding_data = cpu_to_le16(le32_to_cpu(hdr->size) - size);
+ 	hdr->padding_hdr = 0;
+ 
+ 	/*
+@@ -301,7 +341,7 @@ static int qcom_smem_alloc_private(struct qcom_smem *smem,
+ 	 * gets a consistent view of the linked list.
+ 	 */
+ 	wmb();
+-	phdr->offset_free_uncached += alloc_size;
++	le32_add_cpu(&phdr->offset_free_uncached, alloc_size);
+ 
+ 	return 0;
+ }
+@@ -322,11 +362,11 @@ static int qcom_smem_alloc_global(struct qcom_smem *smem,
+ 		return -EEXIST;
+ 
+ 	size = ALIGN(size, 8);
+-	if (WARN_ON(size > header->available))
++	if (WARN_ON(size > le32_to_cpu(header->available)))
+ 		return -ENOMEM;
+ 
+ 	entry->offset = header->free_offset;
+-	entry->size = size;
++	entry->size = cpu_to_le32(size);
+ 
+ 	/*
+ 	 * Ensure the header is consistent before we mark the item allocated,
+@@ -334,10 +374,10 @@ static int qcom_smem_alloc_global(struct qcom_smem *smem,
+ 	 * even though they do not take the spinlock on read.
+ 	 */
+ 	wmb();
+-	entry->allocated = 1;
++	entry->allocated = cpu_to_le32(1);
+ 
+-	header->free_offset += size;
+-	header->available -= size;
++	le32_add_cpu(&header->free_offset, size);
++	le32_add_cpu(&header->available, -size);
+ 
+ 	return 0;
+ }
+@@ -401,19 +441,20 @@ static int qcom_smem_get_global(struct qcom_smem *smem,
+ 		return -ENXIO;
+ 
+ 	if (ptr != NULL) {
+-		aux_base = entry->aux_base & AUX_BASE_MASK;
++		aux_base = le32_to_cpu(entry->aux_base) & AUX_BASE_MASK;
+ 
+ 		for (i = 0; i < smem->num_regions; i++) {
+ 			area = &smem->regions[i];
+ 
+ 			if (area->aux_base == aux_base || !aux_base) {
+-				*ptr = area->virt_base + entry->offset;
++				*ptr = area->virt_base +
++				       le32_to_cpu(entry->offset);
+ 				break;
+ 			}
+ 		}
+ 	}
+ 	if (size != NULL)
+-		*size = entry->size;
++		*size = le32_to_cpu(entry->size);
+ 
+ 	return 0;
+ }
+@@ -425,37 +466,36 @@ static int qcom_smem_get_private(struct qcom_smem *smem,
+ 				 size_t *size)
+ {
+ 	struct smem_partition_header *phdr;
+-	struct smem_private_entry *hdr;
+-	void *p;
++	struct smem_private_entry *e, *end;
+ 
+ 	/* We're not going to find it if there's no matching partition */
+ 	if (host >= SMEM_HOST_COUNT || !smem->partitions[host])
+ 		return -ENOENT;
+ 
+ 	phdr = smem->partitions[host];
++	e = phdr_to_first_private_entry(phdr);
++	end = phdr_to_last_private_entry(phdr);
+ 
+-	p = (void *)phdr + sizeof(*phdr);
+-	while (p < (void *)phdr + phdr->offset_free_uncached) {
+-		hdr = p;
+-
+-		if (hdr->canary != SMEM_PRIVATE_CANARY) {
++	while (e < end) {
++		if (e->canary != SMEM_PRIVATE_CANARY) {
+ 			dev_err(smem->dev,
+ 				"Found invalid canary in host %d partition\n",
+ 				host);
+ 			return -EINVAL;
+ 		}
+ 
+-		if (hdr->item == item) {
++		if (le16_to_cpu(e->item) == item) {
+ 			if (ptr != NULL)
+-				*ptr = p + sizeof(*hdr) + hdr->padding_hdr;
++				*ptr = entry_to_item(e);
+ 
+ 			if (size != NULL)
+-				*size = hdr->size - hdr->padding_data;
++				*size = le32_to_cpu(e->size) -
++					le16_to_cpu(e->padding_data);
+ 
+ 			return 0;
+ 		}
+ 
+-		p += sizeof(*hdr) + hdr->padding_hdr + hdr->size;
++		e = private_entry_next(e);
+ 	}
+ 
+ 	return -ENOENT;
+@@ -513,10 +553,11 @@ int qcom_smem_get_free_space(unsigned host)
+ 
+ 	if (host < SMEM_HOST_COUNT && __smem->partitions[host]) {
+ 		phdr = __smem->partitions[host];
+-		ret = phdr->offset_free_cached - phdr->offset_free_uncached;
++		ret = le32_to_cpu(phdr->offset_free_cached) -
++		      le32_to_cpu(phdr->offset_free_uncached);
+ 	} else {
+ 		header = __smem->regions[0].virt_base;
+-		ret = header->available;
++		ret = le32_to_cpu(header->available);
+ 	}
+ 
+ 	return ret;
+@@ -525,7 +566,7 @@ EXPORT_SYMBOL(qcom_smem_get_free_space);
+ 
+ static int qcom_smem_get_sbl_version(struct qcom_smem *smem)
+ {
+-	unsigned *versions;
++	__le32 *versions;
+ 	size_t size;
+ 	int ret;
+ 
+@@ -541,7 +582,7 @@ static int qcom_smem_get_sbl_version(struct qcom_smem *smem)
+ 		return -EINVAL;
+ 	}
+ 
+-	return versions[SMEM_MASTER_SBL_VERSION_INDEX];
++	return le32_to_cpu(versions[SMEM_MASTER_SBL_VERSION_INDEX]);
+ }
+ 
+ static int qcom_smem_enumerate_partitions(struct qcom_smem *smem,
+@@ -551,35 +592,38 @@ static int qcom_smem_enumerate_partitions(struct qcom_smem *smem,
+ 	struct smem_ptable_entry *entry;
+ 	struct smem_ptable *ptable;
+ 	unsigned remote_host;
++	u32 version, host0, host1;
+ 	int i;
+ 
+ 	ptable = smem->regions[0].virt_base + smem->regions[0].size - SZ_4K;
+-	if (ptable->magic != SMEM_PTABLE_MAGIC)
++	if (memcmp(ptable->magic, SMEM_PTABLE_MAGIC, sizeof(ptable->magic)))
+ 		return 0;
+ 
+-	if (ptable->version != 1) {
++	version = le32_to_cpu(ptable->version);
++	if (version != 1) {
+ 		dev_err(smem->dev,
+-			"Unsupported partition header version %d\n",
+-			ptable->version);
++			"Unsupported partition header version %d\n", version);
+ 		return -EINVAL;
+ 	}
+ 
+-	for (i = 0; i < ptable->num_entries; i++) {
++	for (i = 0; i < le32_to_cpu(ptable->num_entries); i++) {
+ 		entry = &ptable->entry[i];
++		host0 = le16_to_cpu(entry->host0);
++		host1 = le16_to_cpu(entry->host1);
+ 
+-		if (entry->host0 != local_host && entry->host1 != local_host)
++		if (host0 != local_host && host1 != local_host)
+ 			continue;
+ 
+-		if (!entry->offset)
++		if (!le32_to_cpu(entry->offset))
+ 			continue;
+ 
+-		if (!entry->size)
++		if (!le32_to_cpu(entry->size))
+ 			continue;
+ 
+-		if (entry->host0 == local_host)
+-			remote_host = entry->host1;
++		if (host0 == local_host)
++			remote_host = host1;
+ 		else
+-			remote_host = entry->host0;
++			remote_host = host0;
+ 
+ 		if (remote_host >= SMEM_HOST_COUNT) {
+ 			dev_err(smem->dev,
+@@ -595,21 +639,24 @@ static int qcom_smem_enumerate_partitions(struct qcom_smem *smem,
+ 			return -EINVAL;
+ 		}
+ 
+-		header = smem->regions[0].virt_base + entry->offset;
++		header = smem->regions[0].virt_base + le32_to_cpu(entry->offset);
++		host0 = le16_to_cpu(header->host0);
++		host1 = le16_to_cpu(header->host1);
+ 
+-		if (header->magic != SMEM_PART_MAGIC) {
++		if (memcmp(header->magic, SMEM_PART_MAGIC,
++			    sizeof(header->magic))) {
+ 			dev_err(smem->dev,
+ 				"Partition %d has invalid magic\n", i);
+ 			return -EINVAL;
+ 		}
+ 
+-		if (header->host0 != local_host && header->host1 != local_host) {
++		if (host0 != local_host && host1 != local_host) {
+ 			dev_err(smem->dev,
+ 				"Partition %d hosts are invalid\n", i);
+ 			return -EINVAL;
+ 		}
+ 
+-		if (header->host0 != remote_host && header->host1 != remote_host) {
++		if (host0 != remote_host && host1 != remote_host) {
+ 			dev_err(smem->dev,
+ 				"Partition %d hosts are invalid\n", i);
+ 			return -EINVAL;
+@@ -621,7 +668,7 @@ static int qcom_smem_enumerate_partitions(struct qcom_smem *smem,
+ 			return -EINVAL;
+ 		}
+ 
+-		if (header->offset_free_uncached > header->size) {
++		if (le32_to_cpu(header->offset_free_uncached) > le32_to_cpu(header->size)) {
+ 			dev_err(smem->dev,
+ 				"Partition %d has invalid free pointer\n", i);
+ 			return -EINVAL;
+@@ -705,7 +752,8 @@ static int qcom_smem_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	header = smem->regions[0].virt_base;
+-	if (header->initialized != 1 || header->reserved) {
++	if (le32_to_cpu(header->initialized) != 1 ||
++	    le32_to_cpu(header->reserved)) {
+ 		dev_err(&pdev->dev, "SMEM is not initialized by SBL\n");
+ 		return -EINVAL;
+ 	}
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
