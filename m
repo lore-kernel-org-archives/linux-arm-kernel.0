@@ -1,29 +1,67 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Sat, 29 Aug 2015 10:35:48 +0100
-Subject: [PATCH v3 0/4] regmap: i2c block support
-In-Reply-To: <1440657872-24554-1-git-send-email-mpa@pengutronix.de>
-References: <1440657872-24554-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <20150829093548.GY12027@sirena.org.uk>
+From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
+Date: Sat, 29 Aug 2015 17:46:00 +0800
+Subject: [PATCH v5 2/4] Documentation: arm64/arm: dt bindings for numa.
+In-Reply-To: <CAL_JsqLOpUTVeKbkJ6uPi0EYistd=BowAHdtSmaUYYDhU6c9Sg@mail.gmail.com>
+References: <1439570374-4079-1-git-send-email-gkulkarni@caviumnetworks.com>
+ <1439570374-4079-3-git-send-email-gkulkarni@caviumnetworks.com>
+ <20150828123228.GE31748@leverpostej>
+ <CAL_JsqLOpUTVeKbkJ6uPi0EYistd=BowAHdtSmaUYYDhU6c9Sg@mail.gmail.com>
+Message-ID: <55E17F58.5020101@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 27, 2015 at 08:44:28AM +0200, Markus Pargmann wrote:
-> Hi,
+
+
+On 2015/8/28 22:02, Rob Herring wrote:
+> +benh
 > 
-> This series adds support for i2c block read/writes. To support the maximum 32
-> byte read/write operations, the regmap core is extended by max_raw_read and
-> max_raw_write. bulk operations are splitted depending of the size of
-> max_raw_read/write.
+> On Fri, Aug 28, 2015 at 7:32 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+>> Hi,
+>>
+>> On Fri, Aug 14, 2015 at 05:39:32PM +0100, Ganapatrao Kulkarni wrote:
+>>> DT bindings for numa map for memory, cores and IOs using
+>>> arm,associativity device node property.
+>>
+>> Given this is just a copy of ibm,associativity, I'm not sure I see much
+>> point in renaming the properties.
+> 
+> So just keep the ibm? I'm okay with that. That would help move to
+> common code. Alternatively, we could drop the vendor prefix and have
+> common code just check for both.
+> 
 
-...and reverted because it broke the build, probably because it was not
-a patch against current development trees:
+Hi all,
 
-  http://kernelci.org/build/broonie-regmap/kernel/v4.2-rc8-34-gd535ae53edec/
+Why not copy the method of ACPI numa? There only three elements should be configured:
+1) a cpu belong to which node
+2) a memory block belong to which node
+3) the distance of each two nodes
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150829/ab2985c7/attachment.sig>
+The devicetree nodes of numa can be like below:
+/ {
+	...
+
+	numa-nodes-info {
+		node-name: node-description {
+			mem-ranges = <...>;
+			cpus-list = <...>;
+		};
+
+		nodes-distance {
+			distance-list = <...>;
+		};
+	};
+
+	...
+};
+
+Sorry, I don't think xxx,associativity is a good method, it's hard to config, and it
+seems hardware-dependent. Especially, when we want to support memory hot-add, it's too hard.
+Because xxx,associativity have no obvious information about it. Like powerpc, it use another
+property: "/ibm,dynamic-reconfiguration-memory".
+
+I spend almost a whole month to implement of_numa(configured by dt-nodes), base upon my opinion
+mentioned above. If somebody are interested in it, I can send my patchset to show it.
+
+Regards,
+Thunder.
