@@ -1,38 +1,61 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sun, 30 Aug 2015 15:55:20 +0200
-Subject: [PATCH 0/2] Improve and add tracepoints for KVM on arm/arm64
-Message-ID: <1440942922-23955-1-git-send-email-christoffer.dall@linaro.org>
+From: mchehab@osg.samsung.com (Mauro Carvalho Chehab)
+Date: Sun, 30 Aug 2015 11:27:53 -0300
+Subject: [PATCH v8 00/55] MC next generation patches
+In-Reply-To: <cover.1440902901.git.mchehab@osg.samsung.com>
+References: <cover.1440902901.git.mchehab@osg.samsung.com>
+Message-ID: <20150830112753.65858fdd@recife.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The timer and vgic code didn't have tracepoints for quite a while and
-we've been adding those ad-hoc when doing development a lot of times.
-Add some simple tracepoints for those parts of KVM to get the
-infrastructure in place.
+Em Sun, 30 Aug 2015 00:06:11 -0300
+Mauro Carvalho Chehab <mchehab@osg.samsung.com> escreveu:
 
-Also improve the kvm_exit tracepoint on arm/arm64 to print something
-meaningful and be much less misleading compared to what we have now.
+> That's the 8th version of the MC next generation patches.
+> 
+> Differences from version 7:
+> 
+> - Patches reworked to make the reviewers happy;
+> - Bug fixes;
+> - ALSA changes got their own separate patches;
+> - Javier patches got integrated into this series;
+> - media-entity.h structs are now properly documented;
+> - Tested on both au0828 and omap3isp.
+> 
+> Due to the complexity of this change, other platform drivers may
+> require some fixes. 
+> 
+> As the patch series sent before, this is not meant to be sent
+> upstream yet. Its goal is to merge it for Kernel 4.4, in order to
+> give people enough time to review and fix pending issues.
 
-This series depends on the "Rework architected timer and fix UEFI reset"
-series sent earlier.  It is also available here:
+As on the previous series, the patches are available on my experimental
+tree:
+	http://git.linuxtv.org/cgit.cgi/mchehab/experimental.git/log/?h=mc_next_gen
 
-https://git.linaro.org/people/christoffer.dall/linux-kvm-arm.git tracing-fixup
+There's one additional patch there that removes the backlinks from G_TOPOLOGY
+ioctl. I'll be posting it in separate at the ML.
 
-I borrowed some of this code from Alex Benn?e, thanks!
+I also added a new branch:
+	http://git.linuxtv.org/cgit.cgi/mchehab/experimental.git/log/?h=mc_next_gen_test
 
-Christoffer Dall (2):
-  arm/arm64: KVM: Add tracepoints for vgic and timer
-  arm/arm64: KVM: Improve kvm_exit tracepoint
+Based on the first one. It contains a hack for au0828 that exposes the tuner
+also via subdev devnode, and reduces the number of output pads of the DVB
+demux to just 5, as the default is too high to produce a .dot file that
+would be useful. Of course, this patch should never leave my experimental
+tree ;) 
 
- arch/arm/include/asm/kvm_arm.h   | 20 +++++++++
- arch/arm/kvm/arm.c               |  2 +-
- arch/arm/kvm/trace.h             | 10 +++--
- arch/arm64/include/asm/kvm_arm.h | 16 +++++++
- virt/kvm/arm/arch_timer.c        |  4 ++
- virt/kvm/arm/trace.h             | 97 ++++++++++++++++++++++++++++++++++++++++
- virt/kvm/arm/vgic.c              |  9 ++++
- 7 files changed, 154 insertions(+), 4 deletions(-)
- create mode 100644 virt/kvm/arm/trace.h
+There are a few other from Javier there meant to allow testing the omap3isp
+on my Beaglebone (that doesn't have any sensor on it) and on his omap3
+devices.
 
--- 
-2.1.2.330.g565301e.dirty
+I added support at the mc_nextgen_test tool to produce Graphviz .dot
+files. It is still experimental, but it is good enough to already produce
+some useful graphs. The newest version is at:
+
+	http://git.linuxtv.org/cgit.cgi/mchehab/experimental-v4l-utils.git/log/?h=mc-next-gen
+
+I added some graphs produced by it at:
+	https://mchehab.fedorapeople.org/mc-next-gen/
+
+Regards,
+Mauro
