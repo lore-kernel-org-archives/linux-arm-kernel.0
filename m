@@ -1,21 +1,19 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sun, 30 Aug 2015 15:54:21 +0200
-Subject: [PATCH 4/9] arm/arm64: Implement GICD_ICFGR as RO for PPIs
+Date: Sun, 30 Aug 2015 15:54:22 +0200
+Subject: [PATCH 5/9] arm/arm64: KVM: Use appropriate define in VGIC reset code
 In-Reply-To: <1440942866-23802-1-git-send-email-christoffer.dall@linaro.org>
 References: <1440942866-23802-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1440942866-23802-5-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1440942866-23802-6-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The GICD_ICFGR allows the bits for the SGIs and PPIs to be read only.
-We currently simulate this behavior by writing a hardcoded value to the
-register for the SGIs and PPIs on every write of these bits to the
-register (ignoring what the guest actually wrote), and by writing the
-same value as the reset value to the register.
+We currently initialize the SGIs to be enabled in the VGIC code, but we
+use the VGIC_NR_PPIS define for this purpose, instead of the the more
+natural VGIC_NR_SGIS.  Change this slightly confusing use of the
+defines.
 
-This is a bit counter-intuitive, as the register is RO for these bits,
-and we can just implement it that way, allowing us to control the value
-of the bits purely in the reset code.
+Note: This should have no functional change, as both names are defined
+to the number 16.
 
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
@@ -23,17 +21,17 @@ Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index c5750be..0ba92d3 100644
+index 0ba92d3..8299c24 100644
 --- a/virt/kvm/arm/vgic.c
 +++ b/virt/kvm/arm/vgic.c
-@@ -655,7 +655,7 @@ bool vgic_handle_cfg_reg(u32 *reg, struct kvm_exit_mmio *mmio,
- 			ACCESS_READ_VALUE | ACCESS_WRITE_VALUE);
- 	if (mmio->is_write) {
- 		if (offset < 8) {
--			*reg = ~0U; /* Force PPIs/SGIs to 1 */
-+			/* Ignore writes to read-only SGI and PPI bits */
- 			return false;
+@@ -2099,7 +2099,7 @@ int vgic_init(struct kvm *kvm)
  		}
  
+ 		for (i = 0; i < dist->nr_irqs; i++) {
+-			if (i < VGIC_NR_PPIS)
++			if (i < VGIC_NR_SGIS)
+ 				vgic_bitmap_set_irq_val(&dist->irq_enabled,
+ 							vcpu->vcpu_id, i, 1);
+ 			if (i < VGIC_NR_PRIVATE_IRQS)
 -- 
 2.1.2.330.g565301e.dirty
