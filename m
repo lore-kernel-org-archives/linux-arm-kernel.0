@@ -1,271 +1,91 @@
-From: aleksey.makarov@auriga.com (Aleksey Makarov)
-Date: Sun, 30 Aug 2015 12:29:16 +0300
-Subject: [PATCH net-next v2 8/8] net: thunderx: Support for internal loopback
- mode
-In-Reply-To: <1440926958-1874-1-git-send-email-aleksey.makarov@auriga.com>
-References: <1440926958-1874-1-git-send-email-aleksey.makarov@auriga.com>
-Message-ID: <1440926958-1874-9-git-send-email-aleksey.makarov@auriga.com>
+From: romain.perier@gmail.com (Romain Perier)
+Date: Sun, 30 Aug 2015 14:16:15 +0200
+Subject: [PATCH v3 0/14] Add Analogix Core Display Port Driver
+In-Reply-To: <20150821131631.GC22118@ulmo.nvidia.com>
+References: <1439995728-18046-1-git-send-email-ykk@rock-chips.com>
+ <105A0032-83A0-4B75-AE94-258F12451670@gmail.com>
+ <55D6F6F8.70504@rock-chips.com>
+ <8384E112-E1F4-4CD3-85BF-A2A25989783F@gmail.com>
+ <20150821131631.GC22118@ulmo.nvidia.com>
+Message-ID: <CABgxDoKcsRye43pqzZC=4A=D1+iDj5Bmy9XZjx+K8ekca0=FwQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sunil Goutham <sgoutham@cavium.com>
+Hi,
 
-Support for setting VF's corresponding BGX LMAC in internal
-loopback mode. This mode can be used for verifying basic HW
-functionality such as packet I/O, RX checksum validation,
-CQ/RBDR interrupts, stats e.t.c. Useful when DUT has no external
-network connectivity.
+Could you rebase your serie onto linux-next or 4.2-rc8 ? it does not
+apply here...
 
-'loopback' mode can be enabled or disabled via ethtool.
+Regards,
+Romain
 
-Note: This feature is not supported when no of VFs enabled are
-morethan no of physical interfaces i.e active BGX LMACs
-
-Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
-Signed-off-by: Aleksey Makarov <aleksey.makarov@caviumnetworks.com>
----
- drivers/net/ethernet/cavium/thunder/nic.h         | 11 ++++++++
- drivers/net/ethernet/cavium/thunder/nic_main.c    | 21 +++++++++++++++
- drivers/net/ethernet/cavium/thunder/nicvf_main.c  | 30 ++++++++++++++++++++++
- drivers/net/ethernet/cavium/thunder/thunder_bgx.c | 31 +++++++++++++++++++++++
- drivers/net/ethernet/cavium/thunder/thunder_bgx.h |  4 +++
- 5 files changed, 97 insertions(+)
-
-diff --git a/drivers/net/ethernet/cavium/thunder/nic.h b/drivers/net/ethernet/cavium/thunder/nic.h
-index 35b2ee1..d3950b2 100644
---- a/drivers/net/ethernet/cavium/thunder/nic.h
-+++ b/drivers/net/ethernet/cavium/thunder/nic.h
-@@ -265,6 +265,7 @@ struct nicvf {
- 	u8			node;
- 	u8			tns_mode:1;
- 	u8			sqs_mode:1;
-+	u8			loopback_supported:1;
- 	u16			mtu;
- 	struct queue_set	*qs;
- #define	MAX_SQS_PER_VF_SINGLE_NODE		5
-@@ -344,6 +345,7 @@ struct nicvf {
- #define	NIC_MBOX_MSG_NICVF_PTR		0x13	/* Send nicvf ptr to PF */
- #define	NIC_MBOX_MSG_PNICVF_PTR		0x14	/* Get primary qset nicvf ptr */
- #define	NIC_MBOX_MSG_SNICVF_PTR		0x15	/* Send sqet nicvf ptr to PVF */
-+#define	NIC_MBOX_MSG_LOOPBACK		0x16	/* Set interface in loopback */
- #define	NIC_MBOX_MSG_CFG_DONE		0xF0	/* VF configuration done */
- #define	NIC_MBOX_MSG_SHUTDOWN		0xF1	/* VF is being shutdown */
- 
-@@ -353,6 +355,7 @@ struct nic_cfg_msg {
- 	u8    node_id;
- 	u8    tns_mode:1;
- 	u8    sqs_mode:1;
-+	u8    loopback_supported:1;
- 	u8    mac_addr[ETH_ALEN];
- };
- 
-@@ -452,6 +455,13 @@ struct nicvf_ptr {
- 	u64   nicvf;
- };
- 
-+/* Set interface in loopback mode */
-+struct set_loopback {
-+	u8    msg;
-+	u8    vf_id;
-+	bool  enable;
-+};
-+
- /* 128 bit shared memory between PF and each VF */
- union nic_mbx {
- 	struct { u8 msg; }	msg;
-@@ -468,6 +478,7 @@ union nic_mbx {
- 	struct bgx_link_status  link_status;
- 	struct sqs_alloc        sqs_alloc;
- 	struct nicvf_ptr	nicvf;
-+	struct set_loopback	lbk;
- };
- 
- #define NIC_NODE_ID_MASK	0x03
-diff --git a/drivers/net/ethernet/cavium/thunder/nic_main.c b/drivers/net/ethernet/cavium/thunder/nic_main.c
-index dac8094..b3a5947 100644
---- a/drivers/net/ethernet/cavium/thunder/nic_main.c
-+++ b/drivers/net/ethernet/cavium/thunder/nic_main.c
-@@ -154,6 +154,9 @@ static void nic_mbx_send_ready(struct nicpf *nic, int vf)
- 	}
- 	mbx.nic_cfg.sqs_mode = (vf >= nic->num_vf_en) ? true : false;
- 	mbx.nic_cfg.node_id = nic->node;
-+
-+	mbx.nic_cfg.loopback_supported = vf < MAX_LMAC;
-+
- 	nic_send_msg_to_vf(nic, vf, &mbx);
- }
- 
-@@ -579,6 +582,21 @@ send_mbox:
- 	nic_send_msg_to_vf(nic, sqs->vf_id, &mbx);
- }
- 
-+static int nic_config_loopback(struct nicpf *nic, struct set_loopback *lbk)
-+{
-+	int bgx_idx, lmac_idx;
-+
-+	if (lbk->vf_id > MAX_LMAC)
-+		return -1;
-+
-+	bgx_idx = NIC_GET_BGX_FROM_VF_LMAC_MAP(nic->vf_lmac_map[lbk->vf_id]);
-+	lmac_idx = NIC_GET_LMAC_FROM_VF_LMAC_MAP(nic->vf_lmac_map[lbk->vf_id]);
-+
-+	bgx_lmac_internal_loopback(nic->node, bgx_idx, lmac_idx, lbk->enable);
-+
-+	return 0;
-+}
-+
- /* Interrupt handler to handle mailbox messages from VFs */
- static void nic_handle_mbx_intr(struct nicpf *nic, int vf)
- {
-@@ -702,6 +720,9 @@ static void nic_handle_mbx_intr(struct nicpf *nic, int vf)
- 	case NIC_MBOX_MSG_BGX_STATS:
- 		nic_get_bgx_stats(nic, &mbx.bgx_stats);
- 		goto unlock;
-+	case NIC_MBOX_MSG_LOOPBACK:
-+		ret = nic_config_loopback(nic, &mbx.lbk);
-+		break;
- 	default:
- 		dev_err(&nic->pdev->dev,
- 			"Invalid msg from VF%d, msg 0x%x\n", vf, mbx.msg.msg);
-diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_main.c b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-index 68b2dce..b63e579 100644
---- a/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-+++ b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-@@ -202,6 +202,7 @@ static void  nicvf_handle_mbx_intr(struct nicvf *nic)
- 			ether_addr_copy(nic->netdev->dev_addr,
- 					mbx.nic_cfg.mac_addr);
- 		nic->sqs_mode = mbx.nic_cfg.sqs_mode;
-+		nic->loopback_supported = mbx.nic_cfg.loopback_supported;
- 		nic->link_up = false;
- 		nic->duplex = 0;
- 		nic->speed = 0;
-@@ -1404,6 +1405,30 @@ static void nicvf_reset_task(struct work_struct *work)
- 	nic->netdev->trans_start = jiffies;
- }
- 
-+static int nicvf_config_loopback(struct nicvf *nic,
-+				 netdev_features_t features)
-+{
-+	union nic_mbx mbx = {};
-+
-+	mbx.lbk.msg = NIC_MBOX_MSG_LOOPBACK;
-+	mbx.lbk.vf_id = nic->vf_id;
-+	mbx.lbk.enable = (features & NETIF_F_LOOPBACK) != 0;
-+
-+	return nicvf_send_msg_to_pf(nic, &mbx);
-+}
-+
-+static netdev_features_t nicvf_fix_features(struct net_device *netdev,
-+					    netdev_features_t features)
-+{
-+	struct nicvf *nic = netdev_priv(netdev);
-+
-+	if ((features & NETIF_F_LOOPBACK) &&
-+	    netif_running(netdev) && !nic->loopback_supported)
-+		features &= ~NETIF_F_LOOPBACK;
-+
-+	return features;
-+}
-+
- static int nicvf_set_features(struct net_device *netdev,
- 			      netdev_features_t features)
- {
-@@ -1413,6 +1438,9 @@ static int nicvf_set_features(struct net_device *netdev,
- 	if (changed & NETIF_F_HW_VLAN_CTAG_RX)
- 		nicvf_config_vlan_stripping(nic, features);
- 
-+	if ((changed & NETIF_F_LOOPBACK) && netif_running(netdev))
-+		return nicvf_config_loopback(nic, features);
-+
- 	return 0;
- }
- 
-@@ -1424,6 +1452,7 @@ static const struct net_device_ops nicvf_netdev_ops = {
- 	.ndo_set_mac_address	= nicvf_set_mac_address,
- 	.ndo_get_stats64	= nicvf_get_stats64,
- 	.ndo_tx_timeout         = nicvf_tx_timeout,
-+	.ndo_fix_features       = nicvf_fix_features,
- 	.ndo_set_features       = nicvf_set_features,
- };
- 
-@@ -1518,6 +1547,7 @@ static int nicvf_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
- 	netdev->hw_features |= NETIF_F_RXHASH;
- 
- 	netdev->features |= netdev->hw_features;
-+	netdev->hw_features |= NETIF_F_LOOPBACK;
- 
- 	netdev->vlan_features = NETIF_F_SG | NETIF_F_IP_CSUM | NETIF_F_TSO;
- 
-diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-index 5e54186..574c492 100644
---- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-+++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-@@ -329,6 +329,37 @@ static void bgx_flush_dmac_addrs(struct bgx *bgx, int lmac)
- 	}
- }
- 
-+/* Configure BGX LMAC in internal loopback mode */
-+void bgx_lmac_internal_loopback(int node, int bgx_idx,
-+				int lmac_idx, bool enable)
-+{
-+	struct bgx *bgx;
-+	struct lmac *lmac;
-+	u64    cfg;
-+
-+	bgx = bgx_vnic[(node * MAX_BGX_PER_CN88XX) + bgx_idx];
-+	if (!bgx)
-+		return;
-+
-+	lmac = &bgx->lmac[lmac_idx];
-+	if (lmac->is_sgmii) {
-+		cfg = bgx_reg_read(bgx, lmac_idx, BGX_GMP_PCS_MRX_CTL);
-+		if (enable)
-+			cfg |= PCS_MRX_CTL_LOOPBACK1;
-+		else
-+			cfg &= ~PCS_MRX_CTL_LOOPBACK1;
-+		bgx_reg_write(bgx, lmac_idx, BGX_GMP_PCS_MRX_CTL, cfg);
-+	} else {
-+		cfg = bgx_reg_read(bgx, lmac_idx, BGX_SPUX_CONTROL1);
-+		if (enable)
-+			cfg |= SPU_CTL_LOOPBACK;
-+		else
-+			cfg &= ~SPU_CTL_LOOPBACK;
-+		bgx_reg_write(bgx, lmac_idx, BGX_SPUX_CONTROL1, cfg);
-+	}
-+}
-+EXPORT_SYMBOL(bgx_lmac_internal_loopback);
-+
- static int bgx_lmac_sgmii_init(struct bgx *bgx, int lmacid)
- {
- 	u64 cfg;
-diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.h b/drivers/net/ethernet/cavium/thunder/thunder_bgx.h
-index ba4f53b..07b7ec6 100644
---- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.h
-+++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.h
-@@ -72,6 +72,7 @@
- 
- #define BGX_SPUX_CONTROL1		0x10000
- #define  SPU_CTL_LOW_POWER			BIT_ULL(11)
-+#define  SPU_CTL_LOOPBACK			BIT_ULL(14)
- #define  SPU_CTL_RESET				BIT_ULL(15)
- #define BGX_SPUX_STATUS1		0x10008
- #define  SPU_STATUS1_RCV_LNK			BIT_ULL(2)
-@@ -126,6 +127,7 @@
- #define	 PCS_MRX_CTL_RST_AN			BIT_ULL(9)
- #define	 PCS_MRX_CTL_PWR_DN			BIT_ULL(11)
- #define	 PCS_MRX_CTL_AN_EN			BIT_ULL(12)
-+#define	 PCS_MRX_CTL_LOOPBACK1			BIT_ULL(14)
- #define	 PCS_MRX_CTL_RESET			BIT_ULL(15)
- #define BGX_GMP_PCS_MRX_STATUS		0x30008
- #define	 PCS_MRX_STATUS_AN_CPT			BIT_ULL(5)
-@@ -186,6 +188,8 @@ int bgx_get_lmac_count(int node, int bgx);
- const u8 *bgx_get_lmac_mac(int node, int bgx_idx, int lmacid);
- void bgx_set_lmac_mac(int node, int bgx_idx, int lmacid, const u8 *mac);
- void bgx_get_lmac_link_state(int node, int bgx_idx, int lmacid, void *status);
-+void bgx_lmac_internal_loopback(int node, int bgx_idx,
-+				int lmac_idx, bool enable);
- u64 bgx_get_rx_stats(int node, int bgx_idx, int lmac, int idx);
- u64 bgx_get_tx_stats(int node, int bgx_idx, int lmac, int idx);
- #define BGX_RX_STATS_COUNT 11
--- 
-2.5.0
+2015-08-21 15:16 GMT+02:00 Thierry Reding <treding@nvidia.com>:
+> On Fri, Aug 21, 2015 at 08:24:16PM +0900, Jingoo Han wrote:
+>> On 2015. 8. 21., at PM 7:01, Yakir Yang <ykk@rock-chips.com> wrote:
+>> >
+>> > Hi Jingoo,
+>> >
+>> >> ? 2015/8/21 16:20, Jingoo Han ??:
+>> >>> On 2015. 8. 19., at PM 11:48, Yakir Yang <ykk@rock-chips.com> wrote:
+>> >>
+>> >> .....
+>> >>
+>> >>> .../bindings/video/analogix_dp-rockchip.txt        |   83 ++
+>> >>> .../devicetree/bindings/video/exynos_dp.txt        |   51 +-
+>> >>> arch/arm/boot/dts/exynos5250-arndale.dts           |   10 +-
+>> >>> arch/arm/boot/dts/exynos5250-smdk5250.dts          |   10 +-
+>> >>> arch/arm/boot/dts/exynos5250-snow.dts              |   12 +-
+>> >>> arch/arm/boot/dts/exynos5250-spring.dts            |   12 +-
+>> >>> arch/arm/boot/dts/exynos5420-peach-pit.dts         |   12 +-
+>> >>> arch/arm/boot/dts/exynos5420-smdk5420.dts          |   10 +-
+>> >>> arch/arm/boot/dts/exynos5800-peach-pi.dts          |   12 +-
+>> >>> drivers/gpu/drm/bridge/Kconfig                     |    5 +
+>> >>> drivers/gpu/drm/bridge/Makefile                    |    1 +
+>> >>> drivers/gpu/drm/bridge/analogix_dp_core.c          | 1382 +++++++++++++++++++
+>> >>> drivers/gpu/drm/bridge/analogix_dp_core.h          |  286 ++++
+>> >>> drivers/gpu/drm/bridge/analogix_dp_reg.c           | 1294 ++++++++++++++++++
+>> >>> .../exynos_dp_reg.h => bridge/analogix_dp_reg.h}   |  270 ++--
+>> >>> drivers/gpu/drm/exynos/Kconfig                     |    5 +-
+>> >>> drivers/gpu/drm/exynos/Makefile                    |    2 +-
+>> >>> drivers/gpu/drm/exynos/analogix_dp-exynos.c        |  347 +++++
+>> >> Would you change this file name to "exynos_dp.c"?
+>> >
+>> > Sorry, I don't think so  ;(
+>> >
+>> > I think IP_name+Soc_name would be better in this re-use case.
+>>
+>> So? Is there the naming rule such as "IP_name+SoC_name"?
+>>
+>> > Beside I see
+>> > there are lots of driver named with this format in kernel, such as dw_hdmi & dw_mmc
+>>
+>> Please look at other dw cases.
+>> For example, look at dw_pcie.
+>>
+>> drivers/pci/host/
+>> pcie-designware.c
+>> pci-spear13xx.c
+>> pci-exynos.c
+>>
+>> In this case, pci-spear13xx.c and pci-exynos.c do not use "IP_name+SoC_name", even though these are dw IPs.
+>>
+>> Also, naming consistency is more important.
+>> Now, Exynos DRM files are using "exynos_drm_" prefix.
+>>
+>> drivers/gpu/drm/exynos/
+>> exynos_drm_buf.c
+>> exynos_drm_core.c
+>> ....
+>>
+>> However, "analogix_dp-exynos.c" looks very inconsistent.
+>>
+>> If there is no strict naming rule, please use "exynos_dp.c"
+>> or "exynos_drm_dp.c".
+>
+> Exynos DRM maintainers get to pick their filenames, so Yakir, please
+> rename as Jingoo suggested.
+>
+> Even if you didn't the first thing that would go into the Exynos DRM
+> driver tree after this is merged is a rename patch anyway.
+>
+> Thierry
