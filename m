@@ -1,32 +1,27 @@
-From: yalin.wang2010@gmail.com (yalin wang)
-Date: Sun, 30 Aug 2015 14:19:59 +0800
-Subject: [PATCH] arm64: add kc_offset_to_vaddr and kc_vaddr_to_offset macro
-Message-ID: <1440915599-18485-1-git-send-email-yalin.wang2010@gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sun, 30 Aug 2015 09:11:21 +0200
+Subject: Trying to get a Pogoplug v4 board description added
+In-Reply-To: <CAAKvOSg7h=YOVWQ1gKLv-WGw6BGF_rBfp+Zb=za7FkKE2Zwbhg@mail.gmail.com>
+References: <CAAKvOShfrRn-E9o2Gjek5xb8xfGucUmO_FRu7c3T7S2V=co-2g@mail.gmail.com>
+ <20150829153646.GB31545@lunn.ch>
+ <CAAKvOSg7h=YOVWQ1gKLv-WGw6BGF_rBfp+Zb=za7FkKE2Zwbhg@mail.gmail.com>
+Message-ID: <20150830071121.GI31545@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add kc_offset_to_vaddr() and kc_vaddr_to_offset(),
-the default version doesn't work on arm64, because arm64 kernel address
-is below the PAGE_OFFSET, like module address and vmemmap address are
-all below PAGE_OFFSET address.
+On Sun, Aug 30, 2015 at 09:11:08AM +0800, Andrew Innes wrote:
+> I have found the author and I have sent ebbix a pivate message
+> informing him of what I'm doing and asking for his email address.
+> http://archlinuxarm.org/forum/
+> There is a severe lack of licence information.
 
-Signed-off-by: yalin wang <yalin.wang2010@gmail.com>
----
- arch/arm64/include/asm/pgtable.h | 2 ++
- 1 file changed, 2 insertions(+)
+The author is the one who gets to decide the license. So ask ebbix.
 
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index d374191..ef1ed5c 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -660,6 +660,8 @@ static inline void update_mmu_cache(struct vm_area_struct *vma,
- 
- #define update_mmu_cache_pmd(vma, address, pmd) do { } while (0)
- 
-+#define	kc_vaddr_to_offset(v) ((v) & ((1UL << VA_BITS) - 1))
-+#define	kc_offset_to_vaddr(o) ((o) | ~((1UL << VA_BITS) - 1))
- #endif /* !__ASSEMBLY__ */
- 
- #endif /* __ASM_PGTABLE_H */
--- 
-1.9.1
+Generally it is GPL, but for some DT files, but less so for Kirkwood,
+we are trying for dual license GPL and X11. That would allow for
+example FreeBSD to use it, or a boot loader which is not GPL. But
+Kirkwood files are at the moment all GPL, and we have not made any
+attempts yet to get the core .dtsi files re-licensed. So if its GPL,
+thats O.K.
+
+     Andrew
