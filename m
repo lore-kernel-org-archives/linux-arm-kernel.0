@@ -1,37 +1,99 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sun, 30 Aug 2015 15:54:22 +0200
-Subject: [PATCH 5/9] arm/arm64: KVM: Use appropriate define in VGIC reset code
+Date: Sun, 30 Aug 2015 15:54:24 +0200
+Subject: [PATCH 7/9] arm/arm64: KVM: vgic: Move active state handling to
+ flush_hwstate
 In-Reply-To: <1440942866-23802-1-git-send-email-christoffer.dall@linaro.org>
 References: <1440942866-23802-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1440942866-23802-6-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1440942866-23802-8-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We currently initialize the SGIs to be enabled in the VGIC code, but we
-use the VGIC_NR_PPIS define for this purpose, instead of the the more
-natural VGIC_NR_SGIS.  Change this slightly confusing use of the
-defines.
+We currently set the physical active state only when we *inject* a new
+pending virtual interrupt, but this is actually not correct, because we
+could have been preempted and run something else on the system that
+resets the active state to clear.  This causes us to run the VM with the
+timer set to fire, but without setting the physical active state.
 
-Note: This should have no functional change, as both names are defined
-to the number 16.
+The solution is to always check the LR configurations, and we if have a
+mapped interrupt in th LR in either the pending or active state
+(virtual), then set the physical active state.
 
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- virt/kvm/arm/vgic.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ virt/kvm/arm/vgic.c | 42 ++++++++++++++++++++++++++----------------
+ 1 file changed, 26 insertions(+), 16 deletions(-)
 
 diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 0ba92d3..8299c24 100644
+index 8299c24..9ed8d53 100644
 --- a/virt/kvm/arm/vgic.c
 +++ b/virt/kvm/arm/vgic.c
-@@ -2099,7 +2099,7 @@ int vgic_init(struct kvm *kvm)
- 		}
+@@ -1144,26 +1144,11 @@ static void vgic_queue_irq_to_lr(struct kvm_vcpu *vcpu, int irq,
+ 		struct irq_phys_map *map;
+ 		map = vgic_irq_map_search(vcpu, irq);
  
- 		for (i = 0; i < dist->nr_irqs; i++) {
--			if (i < VGIC_NR_PPIS)
-+			if (i < VGIC_NR_SGIS)
- 				vgic_bitmap_set_irq_val(&dist->irq_enabled,
- 							vcpu->vcpu_id, i, 1);
- 			if (i < VGIC_NR_PRIVATE_IRQS)
+-		/*
+-		 * If we have a mapping, and the virtual interrupt is
+-		 * being injected, then we must set the state to
+-		 * active in the physical world. Otherwise the
+-		 * physical interrupt will fire and the guest will
+-		 * exit before processing the virtual interrupt.
+-		 */
+ 		if (map) {
+-			int ret;
+-
+-			BUG_ON(!map->active);
+ 			vlr.hwirq = map->phys_irq;
+ 			vlr.state |= LR_HW;
+ 			vlr.state &= ~LR_EOI_INT;
+ 
+-			ret = irq_set_irqchip_state(map->irq,
+-						    IRQCHIP_STATE_ACTIVE,
+-						    true);
+-			WARN_ON(ret);
+-
+ 			/*
+ 			 * Make sure we're not going to sample this
+ 			 * again, as a HW-backed interrupt cannot be
+@@ -1255,7 +1240,7 @@ static void __kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu)
+ 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+ 	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+ 	unsigned long *pa_percpu, *pa_shared;
+-	int i, vcpu_id;
++	int i, vcpu_id, lr, ret;
+ 	int overflow = 0;
+ 	int nr_shared = vgic_nr_shared_irqs(dist);
+ 
+@@ -1310,6 +1295,31 @@ epilog:
+ 		 */
+ 		clear_bit(vcpu_id, dist->irq_pending_on_cpu);
+ 	}
++
++	for (lr = 0; lr < vgic->nr_lr; lr++) {
++		struct vgic_lr vlr;
++
++		if (!test_bit(lr, vgic_cpu->lr_used))
++			continue;
++
++		vlr = vgic_get_lr(vcpu, lr);
++
++		/*
++		 * If we have a mapping, and the virtual interrupt is
++		 * presented to the guest (as pending or active), then we must
++		 * set the state to active in the physical world. See
++		 * Documentation/virtual/kvm/arm/vgic-mapped-irqs.txt.
++		 */
++		if (vlr.state & LR_HW) {
++			struct irq_phys_map *map;
++			map = vgic_irq_map_search(vcpu, vlr.irq);
++
++			ret = irq_set_irqchip_state(map->irq,
++						    IRQCHIP_STATE_ACTIVE,
++						    true);
++			WARN_ON(ret);
++		}
++	}
+ }
+ 
+ static int process_level_irq(struct kvm_vcpu *vcpu, int lr, struct vgic_lr vlr)
 -- 
 2.1.2.330.g565301e.dirty
