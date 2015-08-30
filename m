@@ -1,50 +1,39 @@
-From: feumilieu@gmail.com (Aleksey Makarov)
-Date: Sun, 30 Aug 2015 12:20:38 +0300
-Subject: [PATCH net-next 6/8] net: thunderx: Rework interrupt handler
-In-Reply-To: <CALW4P++2cG5epoit8BXBjp7Z2PK=P5wqbxkDqrt6kCa7SaZK+g@mail.gmail.com>
-References: <CALW4P++2cG5epoit8BXBjp7Z2PK=P5wqbxkDqrt6kCa7SaZK+g@mail.gmail.com>
-Message-ID: <55E2CAE6.1040305@auriga.com>
+From: aleksey.makarov@auriga.com (Aleksey Makarov)
+Date: Sun, 30 Aug 2015 12:29:08 +0300
+Subject: [PATCH net-next v2 0/8] net: thunderx: New features and fixes
+Message-ID: <1440926958-1874-1-git-send-email-aleksey.makarov@auriga.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29.08.2015 04:44, Alexey Klimov wrote:
+v2:
+  - The unused affinity_mask field of the structure cmp_queue 
+  has been deleted. (thanks to David Miller)
+  - The unneeded initializers have been dropped. (thanks to Alexey Klimov)
+  - The commit message "net: thunderx: Rework interrupt handling"
+  has been fixed. (thanks to Alexey Klimov)
 
->> -static irqreturn_t nicvf_intr_handler(int irq, void *nicvf_irq)
->> +static irqreturn_t nicvf_intr_handler(int irq, void *cq_irq)
->> +{
->> +       struct nicvf_cq_poll *cq_poll = (struct nicvf_cq_poll *)cq_irq;
->> +       struct nicvf *nic = cq_poll->nicvf;
->> +       int qidx = cq_poll->cq_idx;
->> +
->> +       nicvf_dump_intr_status(nic);
->> +
->> +       /* Disable interrupts */
->> +       nicvf_disable_intr(nic, NICVF_INTR_CQ, qidx);
->> +
->> +       /* Schedule NAPI */
->> +       napi_schedule(&cq_poll->napi);
->> +
->> +       /* Clear interrupt */
->> +       nicvf_clear_intr(nic, NICVF_INTR_CQ, qidx);
->> +
->> +       return IRQ_HANDLED;
->> +}
->
-> You're not considering spurious irqs in all new irq handlers here and
-> below and schedule napi/tasklets unconditionally. Is it correct?
-> For me it looks like previous implementation relied on reading of
-> NIC_VF_INT to understand irq type and what actions should be
-> performed. It generally had idea that no interrupt might occur.
+Aleksey Makarov (1):
+  net: thunderx: fix MAINTAINERS
 
-1. The previous version of the handler did not handle spurious 
-interrupts either.  Probably that means that the author of the patch 
-knows for sure that they do not happen.
+Sunil Goutham (7):
+  net: thunderx: Add receive error stats reporting via ethtool
+  net: thunderx: mailboxes: remove code duplication
+  net: thunderx: Receive hashing HW offload support
+  net: thunderx: Support for HW VLAN stripping
+  net: thunderx: Rework interrupt handling
+  net: thunderx: Support for upto 96 queues for a VF
+  net: thunderx: Support for internal loopback mode
 
-2. Instead of reading the status register new version registers 
-different handlers for different irqs.  I don't see why it can be wrong.
+ MAINTAINERS                                        |   3 +-
+ drivers/net/ethernet/cavium/thunder/nic.h          |  93 +++-
+ drivers/net/ethernet/cavium/thunder/nic_main.c     | 198 +++++++-
+ .../net/ethernet/cavium/thunder/nicvf_ethtool.c    | 182 +++++--
+ drivers/net/ethernet/cavium/thunder/nicvf_main.c   | 541 +++++++++++++++------
+ drivers/net/ethernet/cavium/thunder/nicvf_queues.c | 144 +++---
+ drivers/net/ethernet/cavium/thunder/nicvf_queues.h |  44 +-
+ drivers/net/ethernet/cavium/thunder/thunder_bgx.c  |  31 ++
+ drivers/net/ethernet/cavium/thunder/thunder_bgx.h  |   4 +
+ 9 files changed, 911 insertions(+), 329 deletions(-)
 
-I am going to address your other suggestions in the next version of the 
-patchset.
-
-Thank you
-Aleksey Makarov
+-- 
+2.5.0
