@@ -1,61 +1,41 @@
-From: mchehab@osg.samsung.com (Mauro Carvalho Chehab)
-Date: Sun, 30 Aug 2015 11:27:53 -0300
-Subject: [PATCH v8 00/55] MC next generation patches
-In-Reply-To: <cover.1440902901.git.mchehab@osg.samsung.com>
-References: <cover.1440902901.git.mchehab@osg.samsung.com>
-Message-ID: <20150830112753.65858fdd@recife.lan>
+From: j@jannau.net (Janne Grunau)
+Date: Sun, 30 Aug 2015 17:24:28 +0200
+Subject: [arm64/apm] add support for the gigabyte mp30-ar0 board
+Message-ID: <1440948270-1991-1-git-send-email-j@jannau.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Sun, 30 Aug 2015 00:06:11 -0300
-Mauro Carvalho Chehab <mchehab@osg.samsung.com> escreveu:
+Hi,
 
-> That's the 8th version of the MC next generation patches.
-> 
-> Differences from version 7:
-> 
-> - Patches reworked to make the reviewers happy;
-> - Bug fixes;
-> - ALSA changes got their own separate patches;
-> - Javier patches got integrated into this series;
-> - media-entity.h structs are now properly documented;
-> - Tested on both au0828 and omap3isp.
-> 
-> Due to the complexity of this change, other platform drivers may
-> require some fixes. 
-> 
-> As the patch series sent before, this is not meant to be sent
-> upstream yet. Its goal is to merge it for Kernel 4.4, in order to
-> give people enough time to review and fix pending issues.
+following two patches add support for the gigabyte mp30-ar0 mainboard
+based on the APM X-Gene Storm (APM883408). The only difference to the
+APM88320T used in the mustang board seems to be that it has 4 instead
+of 2 DDR memory controllers.
 
-As on the previous series, the patches are available on my experimental
-tree:
-	http://git.linuxtv.org/cgit.cgi/mchehab/experimental.git/log/?h=mc_next_gen
+Every device defined in 4.2-rc8's apm-storm.dtsi appears to work.
+I haven't tested the 10G ethernet device and the PCIexpress slots.
+The second 10G device is missing. It boots only with clk_ignored_unused.
+I haven't had a chance to investigate why. The bootloader doesn't clear
+x2 and x3.
 
-There's one additional patch there that removes the backlinks from G_TOPOLOGY
-ioctl. I'll be posting it in separate at the ML.
+The board ships with u-boot (U-Boot 2013.04 (Jun 02 2015 - 10:54:10)
+REV: 1.15.01-F05), Linux 3.12 and a buildroot based initrd. There seems
+no sources available for the shipped binaries. There is no mention of
+the GPL in the handbook or shipped materials. The handbook is available
+from http://b2b.gigabyte.com/products/product-page.aspx?pid=5422#manual .
+The binaries are also available as download from http://b2b.gigabyte.com/products/product-page.aspx?pid=5422#bios .
 
-I also added a new branch:
-	http://git.linuxtv.org/cgit.cgi/mchehab/experimental.git/log/?h=mc_next_gen_test
+I asked Thursday for sources of the GPL licensed parts but have of
+course no answer yet.
 
-Based on the first one. It contains a hack for au0828 that exposes the tuner
-also via subdev devnode, and reduces the number of output pads of the DVB
-demux to just 5, as the default is too high to produce a .dot file that
-would be useful. Of course, this patch should never leave my experimental
-tree ;) 
+cheers,
 
-There are a few other from Javier there meant to allow testing the omap3isp
-on my Beaglebone (that doesn't have any sensor on it) and on his omap3
-devices.
+Janne
 
-I added support at the mc_nextgen_test tool to produce Graphviz .dot
-files. It is still experimental, but it is good enough to already produce
-some useful graphs. The newest version is at:
 
-	http://git.linuxtv.org/cgit.cgi/mchehab/experimental-v4l-utils.git/log/?h=mc-next-gen
-
-I added some graphs produced by it at:
-	https://mchehab.fedorapeople.org/mc-next-gen/
-
-Regards,
-Mauro
+ arch/arm64/boot/dts/apm/Makefile              |  1 +
+ arch/arm64/boot/dts/apm/apm-mustang.dts       |  1 +
+ arch/arm64/boot/dts/apm/apm-storm-883208.dtsi | 99 +++++++++++++++++++++++++++++++++++++++++++++++++++
+ arch/arm64/boot/dts/apm/apm-storm-883408.dtsi | 98 ++++++++++++++++++++++++++++++++++++++++++++++++++
+ arch/arm64/boot/dts/apm/apm-storm.dtsi        | 87 --------------------------------------------
+ arch/arm64/boot/dts/apm/mp30ar0.dts           | 85 +++++++++++++++++++++++++++++++++++++++++++
