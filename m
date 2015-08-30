@@ -1,66 +1,24 @@
-From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
-Date: Sun, 30 Aug 2015 22:01:04 +0530
-Subject: [PATCH net-next 6/8] net: thunderx: Rework interrupt handler
-In-Reply-To: <55E2CAE6.1040305@auriga.com>
-References: <CALW4P++2cG5epoit8BXBjp7Z2PK=P5wqbxkDqrt6kCa7SaZK+g@mail.gmail.com>
- <55E2CAE6.1040305@auriga.com>
-Message-ID: <CA+sq2CdEn4vq3FD5RyQwuagmE9TNu91XmamjEFLaF4SOyrp64A@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Sun, 30 Aug 2015 18:53:00 +0200
+Subject: [PATCH] arm64/kvm: set {v,}TCR_EL2 RES1 bits
+In-Reply-To: <1440423725-31700-1-git-send-email-mark.rutland@arm.com>
+References: <1440423725-31700-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <20150830165300.GF24113@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 30, 2015 at 2:50 PM, Aleksey Makarov <feumilieu@gmail.com> wrote:
-> On 29.08.2015 04:44, Alexey Klimov wrote:
->
->>> -static irqreturn_t nicvf_intr_handler(int irq, void *nicvf_irq)
->>> +static irqreturn_t nicvf_intr_handler(int irq, void *cq_irq)
->>> +{
->>> +       struct nicvf_cq_poll *cq_poll = (struct nicvf_cq_poll *)cq_irq;
->>> +       struct nicvf *nic = cq_poll->nicvf;
->>> +       int qidx = cq_poll->cq_idx;
->>> +
->>> +       nicvf_dump_intr_status(nic);
->>> +
->>> +       /* Disable interrupts */
->>> +       nicvf_disable_intr(nic, NICVF_INTR_CQ, qidx);
->>> +
->>> +       /* Schedule NAPI */
->>> +       napi_schedule(&cq_poll->napi);
->>> +
->>> +       /* Clear interrupt */
->>> +       nicvf_clear_intr(nic, NICVF_INTR_CQ, qidx);
->>> +
->>> +       return IRQ_HANDLED;
->>> +}
->>
->>
->> You're not considering spurious irqs in all new irq handlers here and
->> below and schedule napi/tasklets unconditionally. Is it correct?
->> For me it looks like previous implementation relied on reading of
->> NIC_VF_INT to understand irq type and what actions should be
->> performed. It generally had idea that no interrupt might occur.
->
->
-> 1. The previous version of the handler did not handle spurious interrupts
-> either.  Probably that means that the author of the patch knows for sure
-> that they do not happen.
+On Mon, Aug 24, 2015 at 02:42:05PM +0100, Mark Rutland wrote:
+> Currently we don't set the RES1 bits of TCR_EL2 and VTCR_EL2 when
+> configuring them, which could lead to unexpected behaviour when an
+> architectural meaning is defined for those bits.
+> 
+> Set the RES1 bits to avoid issues.
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Suzuki Poulose <suzuki.poulose@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
 
-Yes, no spurious interrupts are expected from hardware.
-Even if it does the NAPI poll routine will handle it as valid
-descriptor count would be zero.
-Don't think it makes sense to check for spurious interrupt upon every interrupt.
-
->
-> 2. Instead of reading the status register new version registers different
-> handlers for different irqs.  I don't see why it can be wrong.
-
-Previous implementation results on scheduling multiple NAPI poll handlers
-on the same CPU even if IRQ's affinities are set to different CPUs.
-Hence they are seperated now.
-
->
-> I am going to address your other suggestions in the next version of the
-> patchset.
->
-> Thank you
-> Aleksey Makarov
->
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
