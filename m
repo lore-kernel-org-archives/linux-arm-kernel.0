@@ -1,90 +1,163 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sun, 30 Aug 2015 15:54:23 +0200
-Subject: [PATCH 6/9] arm/arm64: KVM: Add mapped interrupts documentation
+Date: Sun, 30 Aug 2015 15:54:20 +0200
+Subject: [PATCH 3/9] arm/arm64: KVM: vgic: Factor out level irq processing on
+ guest exit
 In-Reply-To: <1440942866-23802-1-git-send-email-christoffer.dall@linaro.org>
 References: <1440942866-23802-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1440942866-23802-7-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1440942866-23802-4-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mapped interrupts on arm/arm64 is a tricky concept and the way we deal
-with them is not apparently easy to understand by reading various specs.
+Currently vgic_process_maintenance() processes dealing with a completed
+level-triggered interrupt directly, but we are soon going to reuse this
+logic for level-triggered mapped interrupts with the HW bit set, so
+move this logic into a separate static function.
 
-Therefore, add a proper documentation file explaining the flow and
-rationale of the behavior of the vgic.
+Probably the most scary part of this commit is convincing yourself that
+the current flow is safe compared to the old one.  In the following I
+try to list the changes and why they are harmless:
 
-Some of this text was contributed by Marc Zyngier.
+  Move vgic_irq_clear_queued after kvm_notify_acked_irq:
+    Harmless because the effect of clearing the queued flag wrt.
+    kvm_set_irq is only that vgic_update_irq_pending does not set the
+    pending bit on the emulated CPU interface or in the pending_on_cpu
+    bitmask, but we set this in __kvm_vgic_sync_hwstate later on if the
+    level is stil high.
+
+  Move vgic_set_lr before kvm_notify_acked_irq:
+    Also, harmless because the LR are cpu-local operations and
+    kvm_notify_acked only affects the dist
+
+  Move vgic_dist_irq_clear_soft_pend after kvm_notify_acked_irq:
+    Also harmless because it's just a bit which is cleared and altering
+    the line state does not affect this bit.
 
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- Documentation/virtual/kvm/arm/vgic-mapped-irqs.txt | 59 ++++++++++++++++++++++
- 1 file changed, 59 insertions(+)
- create mode 100644 Documentation/virtual/kvm/arm/vgic-mapped-irqs.txt
+ virt/kvm/arm/vgic.c | 88 ++++++++++++++++++++++++++++++-----------------------
+ 1 file changed, 50 insertions(+), 38 deletions(-)
 
-diff --git a/Documentation/virtual/kvm/arm/vgic-mapped-irqs.txt b/Documentation/virtual/kvm/arm/vgic-mapped-irqs.txt
-new file mode 100644
-index 0000000..49e1357
---- /dev/null
-+++ b/Documentation/virtual/kvm/arm/vgic-mapped-irqs.txt
-@@ -0,0 +1,59 @@
-+KVM/ARM VGIC Mapped Interrupts
-+==============================
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index 9eb489a..c5750be 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -1312,12 +1312,56 @@ epilog:
+ 	}
+ }
+ 
++static int process_level_irq(struct kvm_vcpu *vcpu, int lr, struct vgic_lr vlr)
++{
++	int level_pending = 0;
 +
-+Setting the Physical Active State for Edge vs. Level Triggered IRQs
-+-------------------------------------------------------------------
++	vlr.state = 0;
++	vlr.hwirq = 0;
++	vgic_set_lr(vcpu, lr, vlr);
 +
-+Mapped non-shared interrupts injected to a guest should always mark the
-+interrupt as active on the physical distributor.
++	/*
++	 * If the IRQ was EOIed (called from vgic_process_maintenance) or it
++	 * went from active to non-active (called from vgic_sync_hwirq) it was
++	 * also ACKed and we we therefore assume we can clear the soft pending
++	 * state (should it had been set) for this interrupt.
++	 *
++	 * Note: if the IRQ soft pending state was set after the IRQ was
++	 * acked, it actually shouldn't be cleared, but we have no way of
++	 * knowing that unless we start trapping ACKs when the soft-pending
++	 * state is set.
++	 */
++	vgic_dist_irq_clear_soft_pend(vcpu, vlr.irq);
 +
-+The reasoning for level-triggered interrupts:
-+For level-triggered interrupts, we have to mark the interrupt as active
-+on the physical distributor, because otherwise, as the line remains
-+asserted, the guest will never execute because the host will keep taking
-+interrupts.  As soon as the guest deactivates the interrupt, the
-+physical line is sampled by the hardware again and the host takes a new
-+interrupt if the physical line is still asserted.
++	/*
++	 * Tell the gic to start sampling the line of this interrupt again.
++	 */
++	vgic_irq_clear_queued(vcpu, vlr.irq);
 +
-+The reasoning for edge-triggered interrupts:
-+For edge-triggered interrupts, if we set the HW bit in the LR we also
-+have to mark the interrupt as active on the physical distributor.  If we
-+don't set the physical active bit and the interrupt hits again before
-+the guest has deactivated the interrupt, the interrupt goes to the host,
-+which cannot set the state to ACTIVE+PENDING in the LR, because that is
-+not supported when setting the HW bit in the LR.
++	/* Any additional pending interrupt? */
++	if (vgic_dist_irq_get_level(vcpu, vlr.irq)) {
++		vgic_cpu_irq_set(vcpu, vlr.irq);
++		level_pending = 1;
++	} else {
++		vgic_dist_irq_clear_pending(vcpu, vlr.irq);
++		vgic_cpu_irq_clear(vcpu, vlr.irq);
++	}
 +
-+An alternative could be to not use HW bit at all, and inject
-+edge-triggered interrupts from a physical assigned device as pure
-+virtual interrupts, but that would potentially slow down handling of the
-+interrupt in the guest, because a physical interrupt occurring in the
-+middle of the guest ISR would preempt the guest for the host to handle
-+the interrupt.
++	/*
++	 * Despite being EOIed, the LR may not have
++	 * been marked as empty.
++	 */
++	vgic_sync_lr_elrsr(vcpu, lr, vlr);
 +
++	return level_pending;
++}
 +
-+Life Cycle for Forwarded Physical Interrupts
-+--------------------------------------------
-+
-+By forwarded physical interrupts we mean interrupts presented to a guest
-+representing a real HW event originally signaled to the host as a
-+physical interrupt and injecting this as a virtual interrupt with the HW
-+bit set in the LR.
-+
-+The state of such an interrupt is managed in the following way:
-+
-+  - LR.Pending must be set when the interrupt is first injected, because this
-+    is the only way the GICV interface is going to present it to the guest.
-+  - LR.Pending will stay set as long as the guest has not acked the interrupt.
-+  - LR.Pending transitions to LR.Active on read of IAR, as expected.
-+  - On EOI, the *physical distributor* active bit gets cleared, but the
-+    LR.Active is left untouched - it looks like the GIC can only clear a
-+    single bit (either the virtual active, or the physical one).
-+  - This means we cannot trust LR.Active to find out about the state of the
-+    interrupt, and we definitely need to look at the distributor version.
-+
-+Consequently, when we context switch the state of a VCPU with forwarded
-+physical interrupts, we must context switch set pending *or* active bits in the
-+LR for that VCPU until the guest has deactivated the physical interrupt, and
-+then clear the corresponding bits in the LR.  If we ever set an LR to pending or
-+mapped when switching in a VCPU for a forwarded physical interrupt, we must also
-+set the active state on the *physical distributor*.
+ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
+ {
+ 	u32 status = vgic_get_interrupt_status(vcpu);
+ 	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+-	bool level_pending = false;
+ 	struct kvm *kvm = vcpu->kvm;
++	int level_pending = 0;
+ 
+ 	kvm_debug("STATUS = %08x\n", status);
+ 
+@@ -1332,54 +1376,22 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
+ 
+ 		for_each_set_bit(lr, eisr_ptr, vgic->nr_lr) {
+ 			struct vgic_lr vlr = vgic_get_lr(vcpu, lr);
+-			WARN_ON(vgic_irq_is_edge(vcpu, vlr.irq));
+ 
+-			spin_lock(&dist->lock);
+-			vgic_irq_clear_queued(vcpu, vlr.irq);
++			WARN_ON(vgic_irq_is_edge(vcpu, vlr.irq));
+ 			WARN_ON(vlr.state & LR_STATE_MASK);
+-			vlr.state = 0;
+-			vgic_set_lr(vcpu, lr, vlr);
+ 
+-			/*
+-			 * If the IRQ was EOIed it was also ACKed and we we
+-			 * therefore assume we can clear the soft pending
+-			 * state (should it had been set) for this interrupt.
+-			 *
+-			 * Note: if the IRQ soft pending state was set after
+-			 * the IRQ was acked, it actually shouldn't be
+-			 * cleared, but we have no way of knowing that unless
+-			 * we start trapping ACKs when the soft-pending state
+-			 * is set.
+-			 */
+-			vgic_dist_irq_clear_soft_pend(vcpu, vlr.irq);
+ 
+ 			/*
+ 			 * kvm_notify_acked_irq calls kvm_set_irq()
+-			 * to reset the IRQ level. Need to release the
+-			 * lock for kvm_set_irq to grab it.
++			 * to reset the IRQ level, which grabs the dist->lock
++			 * so we call this before taking the dist->lock.
+ 			 */
+-			spin_unlock(&dist->lock);
+-
+ 			kvm_notify_acked_irq(kvm, 0,
+ 					     vlr.irq - VGIC_NR_PRIVATE_IRQS);
+-			spin_lock(&dist->lock);
+-
+-			/* Any additional pending interrupt? */
+-			if (vgic_dist_irq_get_level(vcpu, vlr.irq)) {
+-				vgic_cpu_irq_set(vcpu, vlr.irq);
+-				level_pending = true;
+-			} else {
+-				vgic_dist_irq_clear_pending(vcpu, vlr.irq);
+-				vgic_cpu_irq_clear(vcpu, vlr.irq);
+-			}
+ 
++			spin_lock(&dist->lock);
++			level_pending |= process_level_irq(vcpu, lr, vlr);
+ 			spin_unlock(&dist->lock);
+-
+-			/*
+-			 * Despite being EOIed, the LR may not have
+-			 * been marked as empty.
+-			 */
+-			vgic_sync_lr_elrsr(vcpu, lr, vlr);
+ 		}
+ 	}
+ 
 -- 
 2.1.2.330.g565301e.dirty
