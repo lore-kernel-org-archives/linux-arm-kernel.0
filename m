@@ -1,91 +1,44 @@
-From: romain.perier@gmail.com (Romain Perier)
-Date: Sun, 30 Aug 2015 14:16:15 +0200
-Subject: [PATCH v3 0/14] Add Analogix Core Display Port Driver
-In-Reply-To: <20150821131631.GC22118@ulmo.nvidia.com>
-References: <1439995728-18046-1-git-send-email-ykk@rock-chips.com>
- <105A0032-83A0-4B75-AE94-258F12451670@gmail.com>
- <55D6F6F8.70504@rock-chips.com>
- <8384E112-E1F4-4CD3-85BF-A2A25989783F@gmail.com>
- <20150821131631.GC22118@ulmo.nvidia.com>
-Message-ID: <CABgxDoKcsRye43pqzZC=4A=D1+iDj5Bmy9XZjx+K8ekca0=FwQ@mail.gmail.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Sun, 30 Aug 2015 21:15:56 +0800
+Subject: [PATCH] arm64: fix a migrating irq bug when hotplug cpu
+In-Reply-To: <66e158e6da958d355d54543ef69e5e94@www.loen.fr>
+References: <55E1AD09.7020701@huawei.com> <55E1CBE9.6080705@linux.intel.com>
+ <66e158e6da958d355d54543ef69e5e94@www.loen.fr>
+Message-ID: <55E3020C.8020303@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Could you rebase your serie onto linux-next or 4.2-rc8 ? it does not
-apply here...
-
-Regards,
-Romain
-
-2015-08-21 15:16 GMT+02:00 Thierry Reding <treding@nvidia.com>:
-> On Fri, Aug 21, 2015 at 08:24:16PM +0900, Jingoo Han wrote:
->> On 2015. 8. 21., at PM 7:01, Yakir Yang <ykk@rock-chips.com> wrote:
->> >
->> > Hi Jingoo,
->> >
->> >> ? 2015/8/21 16:20, Jingoo Han ??:
->> >>> On 2015. 8. 19., at PM 11:48, Yakir Yang <ykk@rock-chips.com> wrote:
->> >>
->> >> .....
->> >>
->> >>> .../bindings/video/analogix_dp-rockchip.txt        |   83 ++
->> >>> .../devicetree/bindings/video/exynos_dp.txt        |   51 +-
->> >>> arch/arm/boot/dts/exynos5250-arndale.dts           |   10 +-
->> >>> arch/arm/boot/dts/exynos5250-smdk5250.dts          |   10 +-
->> >>> arch/arm/boot/dts/exynos5250-snow.dts              |   12 +-
->> >>> arch/arm/boot/dts/exynos5250-spring.dts            |   12 +-
->> >>> arch/arm/boot/dts/exynos5420-peach-pit.dts         |   12 +-
->> >>> arch/arm/boot/dts/exynos5420-smdk5420.dts          |   10 +-
->> >>> arch/arm/boot/dts/exynos5800-peach-pi.dts          |   12 +-
->> >>> drivers/gpu/drm/bridge/Kconfig                     |    5 +
->> >>> drivers/gpu/drm/bridge/Makefile                    |    1 +
->> >>> drivers/gpu/drm/bridge/analogix_dp_core.c          | 1382 +++++++++++++++++++
->> >>> drivers/gpu/drm/bridge/analogix_dp_core.h          |  286 ++++
->> >>> drivers/gpu/drm/bridge/analogix_dp_reg.c           | 1294 ++++++++++++++++++
->> >>> .../exynos_dp_reg.h => bridge/analogix_dp_reg.h}   |  270 ++--
->> >>> drivers/gpu/drm/exynos/Kconfig                     |    5 +-
->> >>> drivers/gpu/drm/exynos/Makefile                    |    2 +-
->> >>> drivers/gpu/drm/exynos/analogix_dp-exynos.c        |  347 +++++
->> >> Would you change this file name to "exynos_dp.c"?
->> >
->> > Sorry, I don't think so  ;(
->> >
->> > I think IP_name+Soc_name would be better in this re-use case.
->>
->> So? Is there the naming rule such as "IP_name+SoC_name"?
->>
->> > Beside I see
->> > there are lots of driver named with this format in kernel, such as dw_hdmi & dw_mmc
->>
->> Please look at other dw cases.
->> For example, look at dw_pcie.
->>
->> drivers/pci/host/
->> pcie-designware.c
->> pci-spear13xx.c
->> pci-exynos.c
->>
->> In this case, pci-spear13xx.c and pci-exynos.c do not use "IP_name+SoC_name", even though these are dw IPs.
->>
->> Also, naming consistency is more important.
->> Now, Exynos DRM files are using "exynos_drm_" prefix.
->>
->> drivers/gpu/drm/exynos/
->> exynos_drm_buf.c
->> exynos_drm_core.c
->> ....
->>
->> However, "analogix_dp-exynos.c" looks very inconsistent.
->>
->> If there is no strict naming rule, please use "exynos_dp.c"
->> or "exynos_drm_dp.c".
+On 08/30/2015 02:12 AM, Marc Zyngier wrote:
+> On 2015-08-29 16:12, Jiang Liu wrote:
+>> On 2015/8/29 21:00, Yang Yingliang wrote:
+>>> From: Yang Yingliang <yangyingliang@huawei.com>
+>>>
+>>> When cpu is disabled, all irqs will be migratged to another cpu.
+>>> In some cases, a new affinity is different, it needed to be coppied
+>>> to irq's affinity. But if the type of irq is LPI, it's affinity will
+>>> not be coppied because of irq_set_affinity's return value.
+>>> So copy the affinity, when the return value is IRQ_SET_MASK_OK_DONE.
+>> Hi Yingliang,
+>>     If irq_set_affinity callback returns IRQ_SET_MASK_OK_DONE,
+>> it means that irq_set_affinity has copied the new CPU mask to irq
+>> affinity mask. It would be better to change irq_set_affinity for LPI
+>> to follow this rule.
 >
-> Exynos DRM maintainers get to pick their filenames, so Yakir, please
-> rename as Jingoo suggested.
+> The main issue here seems to be that we do not call irq_set_affinity, but
+> that we directly call into the top-level irqchip method, which relies on
+> the core code to do the copy (see irq_do_set_affinity). Too bad.
 >
-> Even if you didn't the first thing that would go into the Exynos DRM
-> driver tree after this is merged is a rename patch anyway.
+> It feels like the arm/arm64 code would probably be better consolidated into
+> kernel/irq/migration.c, which already deals with some of this for x86
+> and ia64. It would save us the duplication and will make sure we don't
+> miss things next time we add a new return code, as irq_do_set_affinity
+> would handle this properly.
 >
-> Thierry
+> Thoughts?
+
+I agree. In arch/arm64/kernel/irq.c the irq migrate code is the same
+as ARM32, and it's duplicate. But this is a bugfix, can we fix it in
+a simple way, and refactor the code later?
+
+Thanks
+Hanjun
