@@ -1,71 +1,44 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Sun, 30 Aug 2015 09:33:54 +0200
-Subject: [PATCH v4 2/4] regmap: regmap max_raw_read/write getter functions
-In-Reply-To: <1440920036-17517-1-git-send-email-mpa@pengutronix.de>
-References: <1440920036-17517-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1440920036-17517-3-git-send-email-mpa@pengutronix.de>
+Date: Sun, 30 Aug 2015 09:44:43 +0200
+Subject: [PATCH v2 0/3] gpiolib: Initializing GPIOs using DT property
+ gpio-initval
+Message-ID: <1440920686-6892-1-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add functions to access the maximum size we can read/write using
-regmap_raw_read/write().
+Hi,
 
-This helps drivers that need to know how much they can write with the
-raw functions without problems. There are some devices (e.g. bmc150)
-that have fifos as registers which need to be read in specific chunks
-otherwise samples are dropped.
+This is basically a resend with the devicetree mailinglist added to CC.
 
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
----
- drivers/base/regmap/regmap.c | 22 ++++++++++++++++++++++
- include/linux/regmap.h       |  2 ++
- 2 files changed, 24 insertions(+)
+This series adds a gpio-initval property to the devicetree. It provides a way
+to initialize GPIOs to a defined value.
 
-diff --git a/drivers/base/regmap/regmap.c b/drivers/base/regmap/regmap.c
-index 7674ceb61251..fc8084033982 100644
---- a/drivers/base/regmap/regmap.c
-+++ b/drivers/base/regmap/regmap.c
-@@ -1378,6 +1378,28 @@ bool regmap_can_raw_write(struct regmap *map)
- }
- EXPORT_SYMBOL_GPL(regmap_can_raw_write);
- 
-+/**
-+ * regmap_get_raw_read_max - Get the maximum size we can read
-+ *
-+ * @map: Map to check.
-+ */
-+size_t regmap_get_raw_read_max(struct regmap *map)
-+{
-+	return map->max_raw_read;
-+}
-+EXPORT_SYMBOL_GPL(regmap_get_raw_read_max);
-+
-+/**
-+ * regmap_get_raw_write_max - Get the maximum size we can read
-+ *
-+ * @map: Map to check.
-+ */
-+size_t regmap_get_raw_write_max(struct regmap *map)
-+{
-+	return map->max_raw_write;
-+}
-+EXPORT_SYMBOL_GPL(regmap_get_raw_write_max);
-+
- static int _regmap_bus_formatted_write(void *context, unsigned int reg,
- 				       unsigned int val)
- {
-diff --git a/include/linux/regmap.h b/include/linux/regmap.h
-index c77601c2445e..8fc0bfd8edc4 100644
---- a/include/linux/regmap.h
-+++ b/include/linux/regmap.h
-@@ -705,6 +705,8 @@ int regmap_get_max_register(struct regmap *map);
- int regmap_get_reg_stride(struct regmap *map);
- int regmap_async_complete(struct regmap *map);
- bool regmap_can_raw_write(struct regmap *map);
-+size_t regmap_get_raw_read_max(struct regmap *map);
-+size_t regmap_get_raw_write_max(struct regmap *map);
- 
- int regcache_sync(struct regmap *map);
- int regcache_sync_region(struct regmap *map, unsigned int min,
+There are 3 patches. The first two simplify the function gpiod_hog. The third
+reuses the gpiod_hog()_code for a new gpiod_initialize() and adds the parsing
+of the DT.
+
+This series is based on the series
+"[PATCH v3 0/9] gpiolib: Add GPIO name support".
+
+Best regards,
+
+Markus
+
+
+Changes in v2:
+ - Fixed Signed-off-by/author
+
+
+Markus Pargmann (3):
+  gpio: Use __gpiod_request directly
+  gpiolib: gpiod_hog remove separate name argument
+  gpiolib: Add GPIO initialization
+
+ Documentation/devicetree/bindings/gpio/gpio.txt | 29 ++++++----
+ drivers/gpio/gpiolib-of.c                       | 11 +++-
+ drivers/gpio/gpiolib.c                          | 74 +++++++++++++++++--------
+ drivers/gpio/gpiolib.h                          |  6 +-
+ 4 files changed, 83 insertions(+), 37 deletions(-)
+
 -- 
 2.5.0
