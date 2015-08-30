@@ -1,137 +1,90 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sun, 30 Aug 2015 15:54:18 +0200
-Subject: [PATCH 1/9] KVM: Add kvm_arch_vcpu_{un}blocking callbacks
+Date: Sun, 30 Aug 2015 15:54:23 +0200
+Subject: [PATCH 6/9] arm/arm64: KVM: Add mapped interrupts documentation
 In-Reply-To: <1440942866-23802-1-git-send-email-christoffer.dall@linaro.org>
 References: <1440942866-23802-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1440942866-23802-2-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1440942866-23802-7-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some times it is useful for architecture implementations of KVM to know
-when the VCPU thread is about to block or when it comes back from
-blocking (arm/arm64 needs to know this to properly implement timers, for
-example).
+Mapped interrupts on arm/arm64 is a tricky concept and the way we deal
+with them is not apparently easy to understand by reading various specs.
 
-Therefore provide a generic architecture callback function in line with
-what we do elsewhere for KVM generic-arch interactions.
+Therefore, add a proper documentation file explaining the flow and
+rationale of the behavior of the vgic.
+
+Some of this text was contributed by Marc Zyngier.
 
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/include/asm/kvm_host.h     | 3 +++
- arch/arm64/include/asm/kvm_host.h   | 3 +++
- arch/mips/include/asm/kvm_host.h    | 2 ++
- arch/powerpc/include/asm/kvm_host.h | 2 ++
- arch/s390/include/asm/kvm_host.h    | 2 ++
- arch/x86/include/asm/kvm_host.h     | 3 +++
- include/linux/kvm_host.h            | 2 ++
- virt/kvm/kvm_main.c                 | 3 +++
- 8 files changed, 20 insertions(+)
+ Documentation/virtual/kvm/arm/vgic-mapped-irqs.txt | 59 ++++++++++++++++++++++
+ 1 file changed, 59 insertions(+)
+ create mode 100644 Documentation/virtual/kvm/arm/vgic-mapped-irqs.txt
 
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index dcba0fa..86fcf6e 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -236,4 +236,7 @@ static inline void kvm_arm_setup_debug(struct kvm_vcpu *vcpu) {}
- static inline void kvm_arm_clear_debug(struct kvm_vcpu *vcpu) {}
- static inline void kvm_arm_reset_debug_ptr(struct kvm_vcpu *vcpu) {}
- 
-+static inline void kvm_arch_vcpu_blocking(struct kvm_vcpu *vcpu) {}
-+static inline void kvm_arch_vcpu_unblocking(struct kvm_vcpu *vcpu) {}
+diff --git a/Documentation/virtual/kvm/arm/vgic-mapped-irqs.txt b/Documentation/virtual/kvm/arm/vgic-mapped-irqs.txt
+new file mode 100644
+index 0000000..49e1357
+--- /dev/null
++++ b/Documentation/virtual/kvm/arm/vgic-mapped-irqs.txt
+@@ -0,0 +1,59 @@
++KVM/ARM VGIC Mapped Interrupts
++==============================
 +
- #endif /* __ARM_KVM_HOST_H__ */
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 415938d..dd143f5 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -257,4 +257,7 @@ void kvm_arm_setup_debug(struct kvm_vcpu *vcpu);
- void kvm_arm_clear_debug(struct kvm_vcpu *vcpu);
- void kvm_arm_reset_debug_ptr(struct kvm_vcpu *vcpu);
- 
-+static inline void kvm_arch_vcpu_blocking(struct kvm_vcpu *vcpu) {}
-+static inline void kvm_arch_vcpu_unblocking(struct kvm_vcpu *vcpu) {}
++Setting the Physical Active State for Edge vs. Level Triggered IRQs
++-------------------------------------------------------------------
 +
- #endif /* __ARM64_KVM_HOST_H__ */
-diff --git a/arch/mips/include/asm/kvm_host.h b/arch/mips/include/asm/kvm_host.h
-index e8c8d9d..58f0f4d 100644
---- a/arch/mips/include/asm/kvm_host.h
-+++ b/arch/mips/include/asm/kvm_host.h
-@@ -845,5 +845,7 @@ static inline void kvm_arch_flush_shadow_memslot(struct kvm *kvm,
- 		struct kvm_memory_slot *slot) {}
- static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
- static inline void kvm_arch_sched_in(struct kvm_vcpu *vcpu, int cpu) {}
-+static inline void kvm_arch_vcpu_blocking(struct kvm_vcpu *vcpu) {}
-+static inline void kvm_arch_vcpu_unblocking(struct kvm_vcpu *vcpu) {}
- 
- #endif /* __MIPS_KVM_HOST_H__ */
-diff --git a/arch/powerpc/include/asm/kvm_host.h b/arch/powerpc/include/asm/kvm_host.h
-index d91f65b..179f9a7 100644
---- a/arch/powerpc/include/asm/kvm_host.h
-+++ b/arch/powerpc/include/asm/kvm_host.h
-@@ -702,5 +702,7 @@ static inline void kvm_arch_memslots_updated(struct kvm *kvm, struct kvm_memslot
- static inline void kvm_arch_flush_shadow_all(struct kvm *kvm) {}
- static inline void kvm_arch_sched_in(struct kvm_vcpu *vcpu, int cpu) {}
- static inline void kvm_arch_exit(void) {}
-+static inline void kvm_arch_vcpu_blocking(struct kvm_vcpu *vcpu) {}
-+static inline void kvm_arch_vcpu_unblocking(struct kvm_vcpu *vcpu) {}
- 
- #endif /* __POWERPC_KVM_HOST_H__ */
-diff --git a/arch/s390/include/asm/kvm_host.h b/arch/s390/include/asm/kvm_host.h
-index 3024acb..04a97df 100644
---- a/arch/s390/include/asm/kvm_host.h
-+++ b/arch/s390/include/asm/kvm_host.h
-@@ -640,5 +640,7 @@ static inline void kvm_arch_memslots_updated(struct kvm *kvm, struct kvm_memslot
- static inline void kvm_arch_flush_shadow_all(struct kvm *kvm) {}
- static inline void kvm_arch_flush_shadow_memslot(struct kvm *kvm,
- 		struct kvm_memory_slot *slot) {}
-+static inline void kvm_arch_vcpu_blocking(struct kvm_vcpu *vcpu) {}
-+static inline void kvm_arch_vcpu_unblocking(struct kvm_vcpu *vcpu) {}
- 
- #endif
-diff --git a/arch/x86/include/asm/kvm_host.h b/arch/x86/include/asm/kvm_host.h
-index 2a7f5d7..26c4086 100644
---- a/arch/x86/include/asm/kvm_host.h
-+++ b/arch/x86/include/asm/kvm_host.h
-@@ -1202,4 +1202,7 @@ int __x86_set_memory_region(struct kvm *kvm,
- int x86_set_memory_region(struct kvm *kvm,
- 			  const struct kvm_userspace_memory_region *mem);
- 
-+static inline void kvm_arch_vcpu_blocking(struct kvm_vcpu *vcpu) {}
-+static inline void kvm_arch_vcpu_unblocking(struct kvm_vcpu *vcpu) {}
++Mapped non-shared interrupts injected to a guest should always mark the
++interrupt as active on the physical distributor.
 +
- #endif /* _ASM_X86_KVM_HOST_H */
-diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
-index 9564fd7..87d7be6 100644
---- a/include/linux/kvm_host.h
-+++ b/include/linux/kvm_host.h
-@@ -619,6 +619,8 @@ int kvm_vcpu_write_guest(struct kvm_vcpu *vcpu, gpa_t gpa, const void *data,
- void kvm_vcpu_mark_page_dirty(struct kvm_vcpu *vcpu, gfn_t gfn);
- 
- void kvm_vcpu_block(struct kvm_vcpu *vcpu);
-+void kvm_arch_vcpu_blocking(struct kvm_vcpu *vcpu);
-+void kvm_arch_vcpu_unblocking(struct kvm_vcpu *vcpu);
- void kvm_vcpu_kick(struct kvm_vcpu *vcpu);
- int kvm_vcpu_yield_to(struct kvm_vcpu *target);
- void kvm_vcpu_on_spin(struct kvm_vcpu *vcpu);
-diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
-index 8b8a444..04b59dd 100644
---- a/virt/kvm/kvm_main.c
-+++ b/virt/kvm/kvm_main.c
-@@ -1946,6 +1946,8 @@ void kvm_vcpu_block(struct kvm_vcpu *vcpu)
- 		} while (single_task_running() && ktime_before(cur, stop));
- 	}
- 
-+	kvm_arch_vcpu_blocking(vcpu);
++The reasoning for level-triggered interrupts:
++For level-triggered interrupts, we have to mark the interrupt as active
++on the physical distributor, because otherwise, as the line remains
++asserted, the guest will never execute because the host will keep taking
++interrupts.  As soon as the guest deactivates the interrupt, the
++physical line is sampled by the hardware again and the host takes a new
++interrupt if the physical line is still asserted.
 +
- 	for (;;) {
- 		prepare_to_wait(&vcpu->wq, &wait, TASK_INTERRUPTIBLE);
- 
-@@ -1959,6 +1961,7 @@ void kvm_vcpu_block(struct kvm_vcpu *vcpu)
- 	finish_wait(&vcpu->wq, &wait);
- 	cur = ktime_get();
- 
-+	kvm_arch_vcpu_unblocking(vcpu);
- out:
- 	trace_kvm_vcpu_wakeup(ktime_to_ns(cur) - ktime_to_ns(start), waited);
- }
++The reasoning for edge-triggered interrupts:
++For edge-triggered interrupts, if we set the HW bit in the LR we also
++have to mark the interrupt as active on the physical distributor.  If we
++don't set the physical active bit and the interrupt hits again before
++the guest has deactivated the interrupt, the interrupt goes to the host,
++which cannot set the state to ACTIVE+PENDING in the LR, because that is
++not supported when setting the HW bit in the LR.
++
++An alternative could be to not use HW bit at all, and inject
++edge-triggered interrupts from a physical assigned device as pure
++virtual interrupts, but that would potentially slow down handling of the
++interrupt in the guest, because a physical interrupt occurring in the
++middle of the guest ISR would preempt the guest for the host to handle
++the interrupt.
++
++
++Life Cycle for Forwarded Physical Interrupts
++--------------------------------------------
++
++By forwarded physical interrupts we mean interrupts presented to a guest
++representing a real HW event originally signaled to the host as a
++physical interrupt and injecting this as a virtual interrupt with the HW
++bit set in the LR.
++
++The state of such an interrupt is managed in the following way:
++
++  - LR.Pending must be set when the interrupt is first injected, because this
++    is the only way the GICV interface is going to present it to the guest.
++  - LR.Pending will stay set as long as the guest has not acked the interrupt.
++  - LR.Pending transitions to LR.Active on read of IAR, as expected.
++  - On EOI, the *physical distributor* active bit gets cleared, but the
++    LR.Active is left untouched - it looks like the GIC can only clear a
++    single bit (either the virtual active, or the physical one).
++  - This means we cannot trust LR.Active to find out about the state of the
++    interrupt, and we definitely need to look at the distributor version.
++
++Consequently, when we context switch the state of a VCPU with forwarded
++physical interrupts, we must context switch set pending *or* active bits in the
++LR for that VCPU until the guest has deactivated the physical interrupt, and
++then clear the corresponding bits in the LR.  If we ever set an LR to pending or
++mapped when switching in a VCPU for a forwarded physical interrupt, we must also
++set the active state on the *physical distributor*.
 -- 
 2.1.2.330.g565301e.dirty
