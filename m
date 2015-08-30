@@ -1,238 +1,66 @@
-From: j@jannau.net (Janne Grunau)
-Date: Sun, 30 Aug 2015 17:24:29 +0200
-Subject: [PATCH 1/2] arm64/apm: create X-Gene storm chip variant dtsi
-In-Reply-To: <1440948270-1991-1-git-send-email-j@jannau.net>
-References: <1440948270-1991-1-git-send-email-j@jannau.net>
-Message-ID: <1440948270-1991-2-git-send-email-j@jannau.net>
+From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
+Date: Sun, 30 Aug 2015 22:01:04 +0530
+Subject: [PATCH net-next 6/8] net: thunderx: Rework interrupt handler
+In-Reply-To: <55E2CAE6.1040305@auriga.com>
+References: <CALW4P++2cG5epoit8BXBjp7Z2PK=P5wqbxkDqrt6kCa7SaZK+g@mail.gmail.com>
+ <55E2CAE6.1040305@auriga.com>
+Message-ID: <CA+sq2CdEn4vq3FD5RyQwuagmE9TNu91XmamjEFLaF4SOyrp64A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The CPU and timer table and GIC registers differ between APM883208 and
-APM883408 chip variants.  Move them to their own file so the soc node in
-apm-storm.dtsi can be shared.
+On Sun, Aug 30, 2015 at 2:50 PM, Aleksey Makarov <feumilieu@gmail.com> wrote:
+> On 29.08.2015 04:44, Alexey Klimov wrote:
+>
+>>> -static irqreturn_t nicvf_intr_handler(int irq, void *nicvf_irq)
+>>> +static irqreturn_t nicvf_intr_handler(int irq, void *cq_irq)
+>>> +{
+>>> +       struct nicvf_cq_poll *cq_poll = (struct nicvf_cq_poll *)cq_irq;
+>>> +       struct nicvf *nic = cq_poll->nicvf;
+>>> +       int qidx = cq_poll->cq_idx;
+>>> +
+>>> +       nicvf_dump_intr_status(nic);
+>>> +
+>>> +       /* Disable interrupts */
+>>> +       nicvf_disable_intr(nic, NICVF_INTR_CQ, qidx);
+>>> +
+>>> +       /* Schedule NAPI */
+>>> +       napi_schedule(&cq_poll->napi);
+>>> +
+>>> +       /* Clear interrupt */
+>>> +       nicvf_clear_intr(nic, NICVF_INTR_CQ, qidx);
+>>> +
+>>> +       return IRQ_HANDLED;
+>>> +}
+>>
+>>
+>> You're not considering spurious irqs in all new irq handlers here and
+>> below and schedule napi/tasklets unconditionally. Is it correct?
+>> For me it looks like previous implementation relied on reading of
+>> NIC_VF_INT to understand irq type and what actions should be
+>> performed. It generally had idea that no interrupt might occur.
+>
+>
+> 1. The previous version of the handler did not handle spurious interrupts
+> either.  Probably that means that the author of the patch knows for sure
+> that they do not happen.
 
-Signed-off-by: Janne Grunau <j@jannau.net>
----
- arch/arm64/boot/dts/apm/apm-mustang.dts       |  1 +
- arch/arm64/boot/dts/apm/apm-storm-883208.dtsi | 99 +++++++++++++++++++++++++++
- arch/arm64/boot/dts/apm/apm-storm.dtsi        | 87 -----------------------
- 3 files changed, 100 insertions(+), 87 deletions(-)
- create mode 100644 arch/arm64/boot/dts/apm/apm-storm-883208.dtsi
+Yes, no spurious interrupts are expected from hardware.
+Even if it does the NAPI poll routine will handle it as valid
+descriptor count would be zero.
+Don't think it makes sense to check for spurious interrupt upon every interrupt.
 
-diff --git a/arch/arm64/boot/dts/apm/apm-mustang.dts b/arch/arm64/boot/dts/apm/apm-mustang.dts
-index 4c55833..096e5ec 100644
---- a/arch/arm64/boot/dts/apm/apm-mustang.dts
-+++ b/arch/arm64/boot/dts/apm/apm-mustang.dts
-@@ -11,6 +11,7 @@
- 
- /dts-v1/;
- 
-+/include/ "apm-storm-883208.dtsi"
- /include/ "apm-storm.dtsi"
- 
- / {
-diff --git a/arch/arm64/boot/dts/apm/apm-storm-883208.dtsi b/arch/arm64/boot/dts/apm/apm-storm-883208.dtsi
-new file mode 100644
-index 0000000..e4daaf9
---- /dev/null
-+++ b/arch/arm64/boot/dts/apm/apm-storm-883208.dtsi
-@@ -0,0 +1,99 @@
-+/*
-+ * dts file for AppliedMicro (APM) X-Gene Storm SOC
-+ *
-+ * Copyright (C) 2013, Applied Micro Circuits Corporation
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation; either version 2 of
-+ * the License, or (at your option) any later version.
-+ */
-+
-+/ {
-+	compatible = "apm,xgene-storm";
-+	interrupt-parent = <&gic>;
-+	#address-cells = <2>;
-+	#size-cells = <2>;
-+
-+	cpus {
-+		#address-cells = <2>;
-+		#size-cells = <0>;
-+
-+		cpu at 000 {
-+			device_type = "cpu";
-+			compatible = "apm,potenza", "arm,armv8";
-+			reg = <0x0 0x000>;
-+			enable-method = "spin-table";
-+			cpu-release-addr = <0x1 0x0000fff8>;
-+		};
-+		cpu at 001 {
-+			device_type = "cpu";
-+			compatible = "apm,potenza", "arm,armv8";
-+			reg = <0x0 0x001>;
-+			enable-method = "spin-table";
-+			cpu-release-addr = <0x1 0x0000fff8>;
-+		};
-+		cpu at 100 {
-+			device_type = "cpu";
-+			compatible = "apm,potenza", "arm,armv8";
-+			reg = <0x0 0x100>;
-+			enable-method = "spin-table";
-+			cpu-release-addr = <0x1 0x0000fff8>;
-+		};
-+		cpu at 101 {
-+			device_type = "cpu";
-+			compatible = "apm,potenza", "arm,armv8";
-+			reg = <0x0 0x101>;
-+			enable-method = "spin-table";
-+			cpu-release-addr = <0x1 0x0000fff8>;
-+		};
-+		cpu at 200 {
-+			device_type = "cpu";
-+			compatible = "apm,potenza", "arm,armv8";
-+			reg = <0x0 0x200>;
-+			enable-method = "spin-table";
-+			cpu-release-addr = <0x1 0x0000fff8>;
-+		};
-+		cpu at 201 {
-+			device_type = "cpu";
-+			compatible = "apm,potenza", "arm,armv8";
-+			reg = <0x0 0x201>;
-+			enable-method = "spin-table";
-+			cpu-release-addr = <0x1 0x0000fff8>;
-+		};
-+		cpu at 300 {
-+			device_type = "cpu";
-+			compatible = "apm,potenza", "arm,armv8";
-+			reg = <0x0 0x300>;
-+			enable-method = "spin-table";
-+			cpu-release-addr = <0x1 0x0000fff8>;
-+		};
-+		cpu at 301 {
-+			device_type = "cpu";
-+			compatible = "apm,potenza", "arm,armv8";
-+			reg = <0x0 0x301>;
-+			enable-method = "spin-table";
-+			cpu-release-addr = <0x1 0x0000fff8>;
-+		};
-+	};
-+
-+	gic: interrupt-controller at 78010000 {
-+		compatible = "arm,cortex-a15-gic";
-+		#interrupt-cells = <3>;
-+		interrupt-controller;
-+		reg = <0x0 0x78010000 0x0 0x1000>,	/* GIC Dist */
-+		      <0x0 0x78020000 0x0 0x1000>,	/* GIC CPU */
-+		      <0x0 0x78040000 0x0 0x2000>,	/* GIC VCPU Control */
-+		      <0x0 0x78060000 0x0 0x2000>;	/* GIC VCPU */
-+		interrupts = <1 9 0xf04>;	/* GIC Maintenence IRQ */
-+	};
-+
-+	timer {
-+		compatible = "arm,armv8-timer";
-+		interrupts = <1 0 0xff01>,	/* Secure Phys IRQ */
-+			     <1 13 0xff01>,	/* Non-secure Phys IRQ */
-+			     <1 14 0xff01>,	/* Virt IRQ */
-+			     <1 15 0xff01>;	/* Hyp IRQ */
-+		clock-frequency = <50000000>;
-+	};
-+};
-diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-index 58093ed..4177b3d 100644
---- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
-+++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-@@ -10,93 +10,6 @@
-  */
- 
- / {
--	compatible = "apm,xgene-storm";
--	interrupt-parent = <&gic>;
--	#address-cells = <2>;
--	#size-cells = <2>;
--
--	cpus {
--		#address-cells = <2>;
--		#size-cells = <0>;
--
--		cpu at 000 {
--			device_type = "cpu";
--			compatible = "apm,potenza", "arm,armv8";
--			reg = <0x0 0x000>;
--			enable-method = "spin-table";
--			cpu-release-addr = <0x1 0x0000fff8>;
--		};
--		cpu at 001 {
--			device_type = "cpu";
--			compatible = "apm,potenza", "arm,armv8";
--			reg = <0x0 0x001>;
--			enable-method = "spin-table";
--			cpu-release-addr = <0x1 0x0000fff8>;
--		};
--		cpu at 100 {
--			device_type = "cpu";
--			compatible = "apm,potenza", "arm,armv8";
--			reg = <0x0 0x100>;
--			enable-method = "spin-table";
--			cpu-release-addr = <0x1 0x0000fff8>;
--		};
--		cpu at 101 {
--			device_type = "cpu";
--			compatible = "apm,potenza", "arm,armv8";
--			reg = <0x0 0x101>;
--			enable-method = "spin-table";
--			cpu-release-addr = <0x1 0x0000fff8>;
--		};
--		cpu at 200 {
--			device_type = "cpu";
--			compatible = "apm,potenza", "arm,armv8";
--			reg = <0x0 0x200>;
--			enable-method = "spin-table";
--			cpu-release-addr = <0x1 0x0000fff8>;
--		};
--		cpu at 201 {
--			device_type = "cpu";
--			compatible = "apm,potenza", "arm,armv8";
--			reg = <0x0 0x201>;
--			enable-method = "spin-table";
--			cpu-release-addr = <0x1 0x0000fff8>;
--		};
--		cpu at 300 {
--			device_type = "cpu";
--			compatible = "apm,potenza", "arm,armv8";
--			reg = <0x0 0x300>;
--			enable-method = "spin-table";
--			cpu-release-addr = <0x1 0x0000fff8>;
--		};
--		cpu at 301 {
--			device_type = "cpu";
--			compatible = "apm,potenza", "arm,armv8";
--			reg = <0x0 0x301>;
--			enable-method = "spin-table";
--			cpu-release-addr = <0x1 0x0000fff8>;
--		};
--	};
--
--	gic: interrupt-controller at 78010000 {
--		compatible = "arm,cortex-a15-gic";
--		#interrupt-cells = <3>;
--		interrupt-controller;
--		reg = <0x0 0x78010000 0x0 0x1000>,	/* GIC Dist */
--		      <0x0 0x78020000 0x0 0x1000>,	/* GIC CPU */
--		      <0x0 0x78040000 0x0 0x2000>,	/* GIC VCPU Control */
--		      <0x0 0x78060000 0x0 0x2000>;	/* GIC VCPU */
--		interrupts = <1 9 0xf04>;	/* GIC Maintenence IRQ */
--	};
--
--	timer {
--		compatible = "arm,armv8-timer";
--		interrupts = <1 0 0xff01>,	/* Secure Phys IRQ */
--			     <1 13 0xff01>,	/* Non-secure Phys IRQ */
--			     <1 14 0xff01>,	/* Virt IRQ */
--			     <1 15 0xff01>;	/* Hyp IRQ */
--		clock-frequency = <50000000>;
--	};
--
- 	soc {
- 		compatible = "simple-bus";
- 		#address-cells = <2>;
--- 
-2.5.0
+>
+> 2. Instead of reading the status register new version registers different
+> handlers for different irqs.  I don't see why it can be wrong.
+
+Previous implementation results on scheduling multiple NAPI poll handlers
+on the same CPU even if IRQ's affinities are set to different CPUs.
+Hence they are seperated now.
+
+>
+> I am going to address your other suggestions in the next version of the
+> patchset.
+>
+> Thank you
+> Aleksey Makarov
+>
