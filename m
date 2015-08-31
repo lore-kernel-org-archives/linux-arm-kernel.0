@@ -1,147 +1,76 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon, 31 Aug 2015 20:24:01 +0200
-Subject: [PATCH 3/8] mmc: core: Add mmc_regulator_set_vqmmc()
+Date: Mon, 31 Aug 2015 20:24:05 +0200
+Subject: [PATCH 7/8] ARM: dts: rockchip: Add drive/sample clocks for rk3288
+ dw_mmc devices
 In-Reply-To: <1441045446-30858-1-git-send-email-heiko@sntech.de>
 References: <1441045446-30858-1-git-send-email-heiko@sntech.de>
-Message-ID: <1441045446-30858-4-git-send-email-heiko@sntech.de>
+Message-ID: <1441045446-30858-8-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Douglas Anderson <dianders@chromium.org>
+From: Alexandru M Stan <amstan@chromium.org>
 
-This adds logic to the MMC core to set VQMMC.  This is expected to be
-called by MMC drivers like dw_mmc as part of (or instead of) their
-start_signal_voltage_switch() callback.
+The drive/sample clocks can be phase shifted.  The drive clock
+could be used in a future patch to adjust hold times.  The sample
+clock is used for tuning.
 
-A few notes:
-
-* When setting the signal voltage to 3.3V we do our best to make VQMMC
-  and VMMC match.  It's been reported that this makes some old cards
-  happy since they were tested back in the day before UHS when VQMMC
-  and VMMC were provided by the same regulator.  A nice side effect of
-  this is that we don't end up on the hairy edge of VQMMC (2.7V),
-  which some EEs claim is a little too close to the minimum for
-  comfort.
-  If this is not supported by the supplying regulator we try to find
-  a suitable voltage within the whole 2.7V-3.6V area of the spec.
-
-* When setting the signal voltage to 1.8V or 1.2V we aim for that
-  specific voltage instead of picking the lowest one in the range.
-
-* We very purposely don't print errors in mmc_regulator_set_vqmmc().
-  There are cases where the MMC core will try several different
-  voltages and we don't want to pollute the logs.
-
-Signed-off-by: Douglas Anderson <dianders@chromium.org>
+Signed-off-by: Alexandru M Stan <amstan@chromium.org>
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- drivers/mmc/core/core.c  | 68 ++++++++++++++++++++++++++++++++++++++++++++++++
- include/linux/mmc/host.h |  7 +++++
- 2 files changed, 75 insertions(+)
+ arch/arm/boot/dts/rk3288.dtsi | 20 ++++++++++++--------
+ 1 file changed, 12 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
-index 0520064..9dc0b65 100644
---- a/drivers/mmc/core/core.c
-+++ b/drivers/mmc/core/core.c
-@@ -1437,6 +1437,74 @@ int mmc_regulator_set_ocr(struct mmc_host *mmc,
- }
- EXPORT_SYMBOL_GPL(mmc_regulator_set_ocr);
- 
-+static int mmc_regulator_set_voltage_if_supported(struct regulator *regulator,
-+						  int min_uV, int target_uV,
-+						  int max_uV)
-+{
-+	/*
-+	 * Check if supported first to avoid errors since we may try several
-+	 * signal levels during power up and don't want to show errors.
-+	 */
-+	if (!regulator_is_supported_voltage(regulator, min_uV, max_uV))
-+		return -EINVAL;
-+
-+	return regulator_set_voltage_triplet(regulator, min_uV, target_uV,
-+					     max_uV);
-+}
-+
-+/**
-+ * mmc_regulator_set_vqmmc - Set VQMMC as per the ios
-+ *
-+ * For 3.3V signaling, we try to match VQMMC to VMMC as closely as possible.
-+ * That will match the behavior of old boards where VQMMC and VMMC were supplied
-+ * by the same supply.  The Bus Operating conditions for 3.3V signaling in the
-+ * SD card spec also define VQMMC in terms of VMMC.
-+ * If this is not possible we'll try the full 2.7-3.6V of the spec.
-+ *
-+ * For 1.2V and 1.8V signaling we'll try to get as close as possible to the
-+ * requested voltage.  This is definitely a good idea for UHS where there's a
-+ * separate regulator on the card that's trying to make 1.8V and it's best if
-+ * we match.
-+ *
-+ * This function is expected to be used by a controller's
-+ * start_signal_voltage_switch() function.
-+ */
-+int mmc_regulator_set_vqmmc(struct mmc_host *mmc, struct mmc_ios *ios)
-+{
-+	int volt, min_uV, max_uV;
-+
-+	/* If no vqmmc supply then we can't change the voltage */
-+	if (IS_ERR(mmc->supply.vqmmc))
-+		return -EINVAL;
-+
-+	switch (ios->signal_voltage) {
-+	case MMC_SIGNAL_VOLTAGE_120:
-+		return mmc_regulator_set_voltage_if_supported(mmc->supply.vqmmc,
-+						1100000, 1200000, 1300000);
-+	case MMC_SIGNAL_VOLTAGE_180:
-+		return mmc_regulator_set_voltage_if_supported(mmc->supply.vqmmc,
-+						1700000, 1800000, 1950000);
-+	case MMC_SIGNAL_VOLTAGE_330:
-+		volt = regulator_get_voltage(mmc->supply.vmmc);
-+		if (volt < 0)
-+			return volt;
-+
-+		min_uV = max(volt - 300000, 2700000);
-+		max_uV = min(volt + 300000, 3600000);
-+
-+		/* try to stay close to vmmc@first */
-+		if (!mmc_regulator_set_voltage_if_supported(mmc->supply.vqmmc,
-+						min_uV, volt, max_uV))
-+			return 0;
-+
-+		return mmc_regulator_set_voltage_if_supported(mmc->supply.vqmmc,
-+						2700000, volt, 3600000);
-+	default:
-+		return -EINVAL;
-+	}
-+}
-+EXPORT_SYMBOL_GPL(mmc_regulator_set_vqmmc);
-+
- #endif /* CONFIG_REGULATOR */
- 
- int mmc_regulator_get_supply(struct mmc_host *mmc)
-diff --git a/include/linux/mmc/host.h b/include/linux/mmc/host.h
-index 83b81fd..a2a78eb 100644
---- a/include/linux/mmc/host.h
-+++ b/include/linux/mmc/host.h
-@@ -423,6 +423,7 @@ int mmc_regulator_get_ocrmask(struct regulator *supply);
- int mmc_regulator_set_ocr(struct mmc_host *mmc,
- 			struct regulator *supply,
- 			unsigned short vdd_bit);
-+int mmc_regulator_set_vqmmc(struct mmc_host *mmc, struct mmc_ios *ios);
- #else
- static inline int mmc_regulator_get_ocrmask(struct regulator *supply)
- {
-@@ -435,6 +436,12 @@ static inline int mmc_regulator_set_ocr(struct mmc_host *mmc,
- {
- 	return 0;
- }
-+
-+static inline int mmc_regulator_set_vqmmc(struct mmc_host *mmc,
-+					  struct mmc_ios *ios)
-+{
-+	return -EINVAL;
-+}
- #endif
- 
- int mmc_regulator_get_supply(struct mmc_host *mmc);
+diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+index 118fe74..b084bc6 100644
+--- a/arch/arm/boot/dts/rk3288.dtsi
++++ b/arch/arm/boot/dts/rk3288.dtsi
+@@ -222,8 +222,9 @@
+ 	sdmmc: dwmmc at ff0c0000 {
+ 		compatible = "rockchip,rk3288-dw-mshc";
+ 		clock-freq-min-max = <400000 150000000>;
+-		clocks = <&cru HCLK_SDMMC>, <&cru SCLK_SDMMC>;
+-		clock-names = "biu", "ciu";
++		clocks = <&cru HCLK_SDMMC>, <&cru SCLK_SDMMC>,
++			 <&cru SCLK_SDMMC_DRV>, <&cru SCLK_SDMMC_SAMPLE>;
++		clock-names = "biu", "ciu", "ciu_drv", "ciu_sample";
+ 		fifo-depth = <0x100>;
+ 		interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
+ 		reg = <0xff0c0000 0x4000>;
+@@ -233,8 +234,9 @@
+ 	sdio0: dwmmc at ff0d0000 {
+ 		compatible = "rockchip,rk3288-dw-mshc";
+ 		clock-freq-min-max = <400000 150000000>;
+-		clocks = <&cru HCLK_SDIO0>, <&cru SCLK_SDIO0>;
+-		clock-names = "biu", "ciu";
++		clocks = <&cru HCLK_SDIO0>, <&cru SCLK_SDIO0>,
++			 <&cru SCLK_SDIO0_DRV>, <&cru SCLK_SDIO0_SAMPLE>;
++		clock-names = "biu", "ciu", "ciu_drv", "ciu_sample";
+ 		fifo-depth = <0x100>;
+ 		interrupts = <GIC_SPI 33 IRQ_TYPE_LEVEL_HIGH>;
+ 		reg = <0xff0d0000 0x4000>;
+@@ -244,8 +246,9 @@
+ 	sdio1: dwmmc at ff0e0000 {
+ 		compatible = "rockchip,rk3288-dw-mshc";
+ 		clock-freq-min-max = <400000 150000000>;
+-		clocks = <&cru HCLK_SDIO1>, <&cru SCLK_SDIO1>;
+-		clock-names = "biu", "ciu";
++		clocks = <&cru HCLK_SDIO1>, <&cru SCLK_SDIO1>,
++			 <&cru SCLK_SDIO1_DRV>, <&cru SCLK_SDIO1_SAMPLE>;
++		clock-names = "biu", "ciu", "ciu_drv", "ciu_sample";
+ 		fifo-depth = <0x100>;
+ 		interrupts = <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>;
+ 		reg = <0xff0e0000 0x4000>;
+@@ -255,8 +258,9 @@
+ 	emmc: dwmmc at ff0f0000 {
+ 		compatible = "rockchip,rk3288-dw-mshc";
+ 		clock-freq-min-max = <400000 150000000>;
+-		clocks = <&cru HCLK_EMMC>, <&cru SCLK_EMMC>;
+-		clock-names = "biu", "ciu";
++		clocks = <&cru HCLK_EMMC>, <&cru SCLK_EMMC>,
++			 <&cru SCLK_EMMC_DRV>, <&cru SCLK_EMMC_SAMPLE>;
++		clock-names = "biu", "ciu", "ciu_drv", "ciu_sample";
+ 		fifo-depth = <0x100>;
+ 		interrupts = <GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>;
+ 		reg = <0xff0f0000 0x4000>;
 -- 
 2.1.4
